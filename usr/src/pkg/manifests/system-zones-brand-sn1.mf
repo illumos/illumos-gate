@@ -1,0 +1,80 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/zones/brand/sn1@$(PKGVERS)
+set name=pkg.description value="Support for the Fake Solaris N-1 Brand"
+set name=pkg.summary value="Fake Solaris N-1 Brand"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Virtualization
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=etc/zones group=sys
+$(sparc_ONLY)dir path=platform group=sys
+$(sparc_ONLY)dir path=platform/sun4u group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/brand group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/brand/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/sun4v group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/brand group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/brand/$(ARCH64) group=sys
+dir path=usr group=sys
+$(i386_ONLY)dir path=usr/kernel group=sys
+$(i386_ONLY)dir path=usr/kernel/brand group=sys
+$(i386_ONLY)dir path=usr/kernel/brand/$(ARCH64) group=sys
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/brand
+dir path=usr/lib/brand/sn1 group=sys
+dir path=usr/lib/brand/sn1/$(ARCH64)
+file path=etc/zones/SUNWsn1.xml mode=0444
+$(sparc_ONLY)file path=platform/sun4u/kernel/brand/$(ARCH64)/sn1_brand group=sys \
+    mode=0755 reboot-needed=true
+$(sparc_ONLY)file path=platform/sun4v/kernel/brand/$(ARCH64)/sn1_brand group=sys \
+    mode=0755 reboot-needed=true
+$(i386_ONLY)file path=usr/kernel/brand/$(ARCH64)/sn1_brand group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/brand/sn1_brand group=sys mode=0755
+file path=usr/lib/$(ARCH64)/sn1_brand.so.1
+file path=usr/lib/brand/sn1/$(ARCH64)/sn1_librtld_db.so.1
+file path=usr/lib/brand/sn1/config.xml mode=0444
+file path=usr/lib/brand/sn1/platform.xml mode=0444
+file path=usr/lib/brand/sn1/sn1_boot mode=0755
+file path=usr/lib/brand/sn1/sn1_librtld_db.so.1
+file path=usr/lib/sn1_brand.so.1
+legacy pkg=SUNWsn1rint arch=$(ARCH) category=system \
+    desc="Support for the Fake Solaris N-1 Brand" \
+    hotline="Please contact your local service provider" \
+    name="Fake Solaris N-1 Brand (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWsn1uint arch=$(ARCH) category=system \
+    desc="Support for the Fake Solaris N-1 Brand" \
+    hotline="Please contact your local service provider" \
+    name="Fake Solaris N-1 Brand (Usr)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/brand/sn1/64 target=$(ARCH64)

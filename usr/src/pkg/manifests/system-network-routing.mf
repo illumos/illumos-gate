@@ -1,0 +1,74 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/network/routing@$(PKGVERS)
+set name=pkg.description value="Network Routing daemons/commands"
+set name=pkg.summary value="Network Routing daemons/commands"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/method
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/inet
+dir path=usr/sbin
+dir path=var group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/network group=sys
+dir path=var/svc/manifest/network/routing group=sys
+file path=lib/svc/method/svc-ndp mode=0555
+file path=lib/svc/method/svc-rdisc mode=0555
+file path=lib/svc/method/svc-ripng mode=0555
+file path=lib/svc/method/svc-route mode=0555
+file path=usr/lib/inet/in.ndpd mode=0555
+file path=usr/lib/inet/in.ripngd mode=0555
+file path=usr/sbin/in.rdisc mode=0555
+file path=usr/sbin/in.routed mode=0555
+file path=usr/sbin/rtquery mode=0555
+file path=var/svc/manifest/network/routing/ndp.xml group=sys mode=0444
+file path=var/svc/manifest/network/routing/rdisc.xml group=sys mode=0444
+file path=var/svc/manifest/network/routing/ripng.xml group=sys mode=0444
+file path=var/svc/manifest/network/routing/route.xml group=sys mode=0444
+legacy pkg=SUNWroute arch=$(ARCH) category=system \
+    desc="Network Routing daemons/commands (Usr)" \
+    hotline="Please contact your local service provider" \
+    name="Network Routing daemons/commands (Usr)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWroutr arch=$(ARCH) category=system \
+    desc="Network Routing daemons/commands (Root)" \
+    hotline="Please contact your local service provider" \
+    name="Network Routing daemons/commands (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cmd/cmd-inet/usr.sbin/in.rdisc/THIRDPARTYLICENSE \
+    license=cmd/cmd-inet/usr.sbin/in.rdisc/THIRDPARTYLICENSE
+license cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE \
+    license=cmd/cmd-inet/usr.sbin/in.routed/THIRDPARTYLICENSE
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license lic_SUNWroute license=lic_SUNWroute

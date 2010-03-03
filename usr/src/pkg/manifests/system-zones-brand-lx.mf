@@ -1,0 +1,124 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/system/zones/brand/lx@$(PKGVERS)
+set name=pkg.description value="Support for the 'lx' Brand"
+set name=pkg.summary value="lx Brand"
+set name=info.classification \
+    value="org.opensolaris.category.2008:Applications/System Utilities"
+set name=variant.arch value=i386
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=etc/zones group=sys
+dir path=usr group=sys
+dir path=usr/kernel group=sys
+dir path=usr/kernel/brand group=sys
+dir path=usr/kernel/brand/$(ARCH64) group=sys
+dir path=usr/kernel/drv group=sys
+dir path=usr/kernel/drv/$(ARCH64) group=sys
+dir path=usr/kernel/dtrace group=sys
+dir path=usr/kernel/dtrace/$(ARCH64) group=sys
+dir path=usr/kernel/fs group=sys
+dir path=usr/kernel/fs/$(ARCH64) group=sys
+dir path=usr/kernel/strmod group=sys
+dir path=usr/kernel/strmod/$(ARCH64) group=sys
+dir path=usr/lib
+dir path=usr/lib/brand
+dir path=usr/lib/brand/lx
+dir path=usr/lib/brand/lx/$(ARCH64)
+dir path=usr/lib/brand/lx/distros
+dir path=usr/lib/devfsadm group=sys
+dir path=usr/lib/devfsadm/linkmod group=sys
+driver name=lx_audio
+driver name=lx_ptm perms="lx_ptmajor 0666 root sys"
+driver name=lx_systrace perms="* 0644 root sys"
+file path=etc/zones/SUNWlx.xml mode=0444
+file path=usr/kernel/brand/$(ARCH64)/lx_brand group=sys mode=0755
+file path=usr/kernel/brand/lx_brand group=sys mode=0755
+file path=usr/kernel/drv/$(ARCH64)/lx_audio group=sys
+file path=usr/kernel/drv/$(ARCH64)/lx_ptm group=sys
+file path=usr/kernel/drv/$(ARCH64)/lx_systrace group=sys
+file path=usr/kernel/drv/lx_audio group=sys
+file path=usr/kernel/drv/lx_audio.conf group=sys
+file path=usr/kernel/drv/lx_ptm group=sys
+file path=usr/kernel/drv/lx_ptm.conf group=sys
+file path=usr/kernel/drv/lx_systrace group=sys
+file path=usr/kernel/drv/lx_systrace.conf group=sys
+file path=usr/kernel/fs/$(ARCH64)/lx_afs group=sys mode=0755
+file path=usr/kernel/fs/$(ARCH64)/lx_proc group=sys mode=0755
+file path=usr/kernel/fs/lx_afs group=sys mode=0755
+file path=usr/kernel/fs/lx_proc group=sys mode=0755
+file path=usr/kernel/strmod/$(ARCH64)/ldlinux group=sys mode=0755
+file path=usr/kernel/strmod/ldlinux group=sys mode=0755
+file path=usr/lib/brand/lx/$(ARCH64)/lx_librtld_db.so.1
+file path=usr/lib/brand/lx/$(ARCH64)/lx_nametoaddr.so.1
+file path=usr/lib/brand/lx/$(ARCH64)/lx_thunk.so.1
+file path=usr/lib/brand/lx/config.xml mode=0444
+file path=usr/lib/brand/lx/distros/centos35.distro mode=0444
+file path=usr/lib/brand/lx/distros/centos36.distro mode=0444
+file path=usr/lib/brand/lx/distros/centos37.distro mode=0444
+file path=usr/lib/brand/lx/distros/centos38.distro mode=0444
+file path=usr/lib/brand/lx/distros/rhel35.distro mode=0444
+file path=usr/lib/brand/lx/distros/rhel36.distro mode=0444
+file path=usr/lib/brand/lx/distros/rhel37.distro mode=0444
+file path=usr/lib/brand/lx/distros/rhel38.distro mode=0444
+file path=usr/lib/brand/lx/distros/rhel_centos_common mode=0444
+file path=usr/lib/brand/lx/etc_default_nfs group=sys mode=0444
+file path=usr/lib/brand/lx/etc_netconfig group=sys mode=0444
+file path=usr/lib/brand/lx/lx_distro_install mode=0755
+file path=usr/lib/brand/lx/lx_init_zone mode=0755
+file path=usr/lib/brand/lx/lx_install mode=0755
+file path=usr/lib/brand/lx/lx_librtld_db.so.1
+file path=usr/lib/brand/lx/lx_lockd mode=0755
+file path=usr/lib/brand/lx/lx_nametoaddr.so.1
+file path=usr/lib/brand/lx/lx_native mode=0755
+file path=usr/lib/brand/lx/lx_statd mode=0755
+file path=usr/lib/brand/lx/lx_support mode=0755
+file path=usr/lib/brand/lx/lx_thunk mode=0755
+file path=usr/lib/brand/lx/lx_thunk.so.1
+file path=usr/lib/brand/lx/platform.xml mode=0444
+file path=usr/lib/devfsadm/linkmod/SUNW_lx_link_$(ARCH).so group=sys
+file path=usr/lib/lx_brand.so.1
+hardlink path=usr/kernel/dtrace/$(ARCH64)/lx_systrace \
+    target=../../../kernel/drv/$(ARCH64)/lx_systrace
+hardlink path=usr/kernel/dtrace/lx_systrace target=../../kernel/drv/lx_systrace
+legacy pkg=SUNWlxr arch=$(ARCH) category=system \
+    desc="Support for the 'lx' Brand" \
+    hotline="Please contact your local service provider" name="lx Brand (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWlxu arch=$(ARCH) category=system \
+    desc="Support for the 'lx' Brand" \
+    hotline="Please contact your local service provider" name="lx Brand (Usr)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/brand/lx/64 target=$(ARCH64)

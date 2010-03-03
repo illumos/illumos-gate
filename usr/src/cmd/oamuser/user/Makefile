@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/oamuser/user/Makefile
@@ -32,19 +32,16 @@ GREP=		grep
 USERADD= 	useradd
 USERDEL= 	userdel
 USERMOD= 	usermod
-PROFILE=	.profile
-STDPROFILE=	stdprofile
 ROLEADD=	roleadd
 ROLEDEL=	roledel
 ROLEMOD=	rolemod
 
 SBINPROG=	$(USERADD)   $(USERDEL)   $(USERMOD)
-SKELFILE=	$(PROFILE)
 #
 #	Removing sysadm: deleted $(SYSADMPROG) from this target.
 #
 PROG=		$(SBINPROG)
-PRODUCT=	$(PROG) $(PROFILE)
+PRODUCT=	$(PROG)
 
 ADD_OBJ=	useradd.o     uid.o        homedir.o \
 		groups.o      call_pass.o      userdefs.o   messages.o \
@@ -62,7 +59,6 @@ OBJECTS=	$(ADD_OBJ)     $(DEL_OBJ)    $(MOD_OBJ)
 
 SRCS=		$(OBJECTS:.o=.c)
 
-CLOBBERFILES=	$(PROFILE)
 LIBDIR=		../lib
 LIBUSRGRP=	$(LIBDIR)/lib.a
 LIBADM=		-ladm
@@ -95,9 +91,6 @@ LDLIBS +=	-lsecdb -lproject -ltsol
 
 all: 		$(PRODUCT)
 
-$(PROFILE):    $(STDPROFILE)
-	$(GREP) -v "^#ident" $(STDPROFILE) > $(PROFILE)
-
 $(PROG):	$$(OBJS) $$(LIBS)
 	$(LINK.c) $(OBJS) -o $@ $(LIBS) $(LDLIBS)
 	$(POST_PROCESS)
@@ -113,12 +106,6 @@ install:	all .WAIT $(ROOTSKEL) $(INSSBINPROG) $(INSSKELFILE)
 		$(LN) $(ROOTUSRSBIN)/$(USERDEL) $(ROOTUSRSBIN)/$(ROLEDEL)
 		$(RM) $(ROOTUSRSBIN)/$(ROLEMOD)
 		$(LN) $(ROOTUSRSBIN)/$(USERMOD) $(ROOTUSRSBIN)/$(ROLEMOD)
-
-$(ROOTSKEL):
-	$(INS.dir)
-
-$(ROOTSKEL)/%:	%
-	$(INS.file)
 
 clean:
 	$(RM) $(OBJECTS)

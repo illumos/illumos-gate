@@ -1,0 +1,109 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/fault-management/mtst@$(PKGVERS)
+set name=pkg.description value="CPU/memory error injector for internal testing"
+set name=pkg.summary value="CPU/memory error injector"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=org.opensolaris.redist value=internal
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+$(i386_ONLY)dir path=kernel group=sys
+$(i386_ONLY)dir path=kernel/drv group=sys
+$(i386_ONLY)dir path=kernel/drv/$(ARCH64) group=sys
+dir path=platform group=sys
+$(sparc_ONLY)dir path=platform/sun4u group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/drv group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/sun4v group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/drv group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/drv/$(ARCH64) group=sys
+dir path=usr group=sys
+dir path=usr/bin
+$(i386_ONLY)dir path=usr/include
+$(i386_ONLY)dir path=usr/include/sys
+dir path=usr/platform group=sys
+$(i386_ONLY)dir path=usr/platform/i86pc group=sys
+$(i386_ONLY)dir path=usr/platform/i86pc/lib
+$(i386_ONLY)dir path=usr/platform/i86pc/lib/mtst
+$(sparc_ONLY)dir path=usr/platform/sun4u group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4u/include
+$(sparc_ONLY)dir path=usr/platform/sun4u/include/sys
+$(sparc_ONLY)dir path=usr/platform/sun4v group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4v/include
+$(sparc_ONLY)dir path=usr/platform/sun4v/include/sys
+driver name=memtest perms="* 0660 root sys"
+$(i386_ONLY)file path=kernel/drv/$(ARCH64)/memtest group=sys
+$(i386_ONLY)file path=kernel/drv/memtest group=sys
+$(i386_ONLY)file path=kernel/drv/memtest.conf group=sys reboot-needed=false
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/memtest group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/memtest.conf group=sys \
+    reboot-needed=false
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/memtest group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/memtest.conf group=sys \
+    reboot-needed=false
+file path=usr/bin/mtst mode=0555
+$(i386_ONLY)file path=usr/include/sys/memtest.h group=sys
+$(i386_ONLY)file path=usr/platform/i86pc/lib/mtst/mtst_AuthenticAMD.so
+$(i386_ONLY)file path=usr/platform/i86pc/lib/mtst/mtst_AuthenticAMD_15.so
+$(i386_ONLY)file path=usr/platform/i86pc/lib/mtst/mtst_GenuineIntel.so
+$(i386_ONLY)file path=usr/platform/i86pc/lib/mtst/mtst_generic.so
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memtestio.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memtestio_ch.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memtestio_chp.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memtestio_ja.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memtestio_jg.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memtestio_oc.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memtestio_pn.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memtestio_sf.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memtestio_sr.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/memtestio_u.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/memtestio.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/memtestio_kt.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/memtestio_n2.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/memtestio_ni.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/memtestio_v.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/memtestio_vf.h
+$(i386_ONLY)legacy pkg=SUNWonmtst.i arch=$(ARCH).i86pc category=internal \
+    desc="CPU/memory error injector for internal testing" \
+    hotline="Please contact fma-interest@sun.com" \
+    name="CPU/memory error injector" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+$(sparc_ONLY)legacy pkg=SUNWonmtst.u arch=$(ARCH).sun4u category=internal \
+    desc="CPU/memory error injector for internal testing" \
+    hotline="Please contact fma-interest@sun.com" \
+    name="CPU/memory error injector" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+$(sparc_ONLY)legacy pkg=SUNWonmtst.v arch=$(ARCH).sun4v category=internal \
+    desc="CPU/memory error injector for internal testing" \
+    hotline="Please contact ei-support@sun.com" \
+    name="CPU/memory error injector" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

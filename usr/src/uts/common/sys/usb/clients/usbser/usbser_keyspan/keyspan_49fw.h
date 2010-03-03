@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,12 +43,6 @@
  *
  * To build the usbs49_fw module (using x86 platform as an example):
  * $ cd usr/src/uts/intel/usbs49_fw
- * $ make install
- *
- * To build the SUNWukspfw package:
- * $ cd usr/src/pkgdefs/
- * $ make
- * $ cd usr/src/pkgdefs/SUNWukspfw
  * $ make install
  *
  * See usbsksp(7D) for details on using the Solaris USB keyspan

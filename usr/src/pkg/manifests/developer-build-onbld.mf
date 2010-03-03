@@ -1,0 +1,253 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/developer/build/onbld@$(PKGVERS)
+set name=pkg.description value="tools used to build the OS-Net consolidation"
+set name=pkg.summary value="OS-Net Build Tools"
+set name=info.classification \
+    value="org.opensolaris.category.2008:Development/Distribution Tools"
+
+#
+# This package should be neither incorporated, nor should it
+# have automated dependencies generated.  This allows the tools
+# to be upgraded without upgrading the entire system.
+#
+set name=org.opensolaris.nodepend value=true
+set name=org.opensolaris.noincorp value=true
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=opt group=sys
+dir path=opt/onbld
+dir path=opt/onbld/bin
+dir path=opt/onbld/bin/$(ARCH)
+dir path=opt/onbld/env
+dir path=opt/onbld/etc
+dir path=opt/onbld/etc/exception_lists
+dir path=opt/onbld/gk
+dir path=opt/onbld/lib
+dir path=opt/onbld/lib/$(ARCH)
+dir path=opt/onbld/lib/perl
+dir path=opt/onbld/lib/python
+dir path=opt/onbld/lib/python/onbld
+dir path=opt/onbld/lib/python/onbld/Checks
+dir path=opt/onbld/lib/python/onbld/Scm
+dir path=opt/onbld/lib/python/onbld/hgext
+dir path=opt/onbld/man
+dir path=opt/onbld/man/man1
+dir path=opt/onbld/man/sman1
+$(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/aw mode=0555
+file path=opt/onbld/bin/$(ARCH)/bfuld mode=0555
+$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/chk4ubin mode=0555
+file path=opt/onbld/bin/$(ARCH)/codereview mode=0555
+file path=opt/onbld/bin/$(ARCH)/cpiotranslate mode=0555
+file path=opt/onbld/bin/$(ARCH)/cscope-fast mode=0555
+file path=opt/onbld/bin/$(ARCH)/ctfconvert mode=0555
+file path=opt/onbld/bin/$(ARCH)/ctfdump mode=0555
+file path=opt/onbld/bin/$(ARCH)/ctfmerge mode=0555
+file path=opt/onbld/bin/$(ARCH)/ctfstabs mode=0555
+file path=opt/onbld/bin/$(ARCH)/cw mode=0555
+$(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/elfextract mode=0555
+file path=opt/onbld/bin/$(ARCH)/fastfs mode=0555
+file path=opt/onbld/bin/$(ARCH)/findunref mode=0555
+$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth mode=0555
+$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth_preload.so.1 mode=0555
+file path=opt/onbld/bin/$(ARCH)/install mode=0555
+file path=opt/onbld/bin/$(ARCH)/lintdump mode=0555
+$(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/mbh_patch mode=0555
+file path=opt/onbld/bin/$(ARCH)/ndrgen mode=0555
+file path=opt/onbld/bin/$(ARCH)/ndrgen1 mode=0555
+file path=opt/onbld/bin/$(ARCH)/pmodes mode=0555
+file path=opt/onbld/bin/$(ARCH)/protocmp mode=0555
+file path=opt/onbld/bin/$(ARCH)/protolist mode=0555
+$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/stabs mode=0555
+$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize mode=0555
+$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize.exe mode=0555
+file path=opt/onbld/bin/Install mode=0555
+file path=opt/onbld/bin/bfu mode=0555
+file path=opt/onbld/bin/bfudrop mode=0555
+file path=opt/onbld/bin/bindrop mode=0555
+file path=opt/onbld/bin/bldenv mode=0555
+file path=opt/onbld/bin/bringovercheck mode=0555
+file path=opt/onbld/bin/build_cscope mode=0555
+file path=opt/onbld/bin/cddlchk mode=0555
+file path=opt/onbld/bin/check_rtime mode=0555
+file path=opt/onbld/bin/checkpaths mode=0555
+file path=opt/onbld/bin/checkproto mode=0555
+file path=opt/onbld/bin/copyrightchk mode=0555
+file path=opt/onbld/bin/cryptodrop mode=0555
+file path=opt/onbld/bin/cstyle mode=0555
+file path=opt/onbld/bin/ctfcvtptbl mode=0555
+file path=opt/onbld/bin/ctffindmod mode=0555
+file path=opt/onbld/bin/elfcmp mode=0555
+file path=opt/onbld/bin/elfsigncmp mode=0555
+file path=opt/onbld/bin/find_elf mode=0555
+file path=opt/onbld/bin/findcrypto mode=0555
+file path=opt/onbld/bin/flg.flp mode=0555
+file path=opt/onbld/bin/genoffsets mode=0555
+file path=opt/onbld/bin/get_depend_info mode=0555
+file path=opt/onbld/bin/hdrchk mode=0555
+file path=opt/onbld/bin/hg-active mode=0555
+file path=opt/onbld/bin/hgsetup mode=0555
+file path=opt/onbld/bin/interface_check mode=0555
+file path=opt/onbld/bin/interface_cmp mode=0555
+file path=opt/onbld/bin/jstyle mode=0555
+file path=opt/onbld/bin/keywords mode=0555
+file path=opt/onbld/bin/make_pkg_db mode=0555
+file path=opt/onbld/bin/makebfu mode=0555
+file path=opt/onbld/bin/mapfilechk mode=0555
+file path=opt/onbld/bin/mkbfu mode=0555
+file path=opt/onbld/bin/mkclosed mode=0555
+file path=opt/onbld/bin/mkreadme_osol mode=0555
+file path=opt/onbld/bin/mktpl mode=0555
+file path=opt/onbld/bin/nightly mode=0555
+file path=opt/onbld/bin/onblddrop mode=0555
+file path=opt/onbld/bin/onu mode=0555
+file path=opt/onbld/bin/protocmp.terse mode=0555
+file path=opt/onbld/bin/rtichk mode=0555
+file path=opt/onbld/bin/sccscheck mode=0555
+file path=opt/onbld/bin/sccscp mode=0555
+file path=opt/onbld/bin/sccshist mode=0555
+file path=opt/onbld/bin/sccsmv mode=0555
+file path=opt/onbld/bin/sccsrm mode=0555
+file path=opt/onbld/bin/sdrop mode=0555
+file path=opt/onbld/bin/signit mode=0555
+file path=opt/onbld/bin/signproto mode=0555
+file path=opt/onbld/bin/validate_flg mode=0555
+file path=opt/onbld/bin/validate_paths mode=0555
+file path=opt/onbld/bin/validate_pkg mode=0555
+file path=opt/onbld/bin/wdiff mode=0555
+file path=opt/onbld/bin/webrev mode=0555
+file path=opt/onbld/bin/which_scm mode=0555
+file path=opt/onbld/bin/ws mode=0555
+file path=opt/onbld/bin/wsdiff mode=0555
+file path=opt/onbld/bin/wx mode=0555
+file path=opt/onbld/bin/wx2hg mode=0555
+file path=opt/onbld/bin/xref mode=0555
+file path=opt/onbld/bin/xref.mk
+file path=opt/onbld/env/developer
+file path=opt/onbld/env/gatekeeper
+file path=opt/onbld/env/opensolaris
+file path=opt/onbld/etc/SampleLinks
+file path=opt/onbld/etc/SamplePkgLinks
+file path=opt/onbld/etc/exception_lists/check_rtime
+file path=opt/onbld/etc/exception_lists/interface_check
+file path=opt/onbld/etc/exception_lists/interface_cmp
+file path=opt/onbld/etc/hgstyle
+file path=opt/onbld/etc/its.conf
+file path=opt/onbld/etc/its.reg
+file path=opt/onbld/gk/.cshrc
+file path=opt/onbld/gk/.login
+file path=opt/onbld/gk/gen_make.machines mode=0755
+file path=opt/onbld/lib/$(ARCH)/libdwarf.so.1
+file path=opt/onbld/lib/perl/onbld_elfmod.pm
+file path=opt/onbld/lib/python/onbld/Checks/CStyle.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/CStyle.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Cddl.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Cddl.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/CmtBlk.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/CmtBlk.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Comments.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Comments.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Copyright.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Copyright.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/DbLookups.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/DbLookups.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/HdrChk.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/HdrChk.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/JStyle.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/JStyle.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Keywords.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Keywords.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Mapfile.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Mapfile.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/ProcessCheck.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/ProcessCheck.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Rti.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/Rti.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/__init__.py mode=0444
+file path=opt/onbld/lib/python/onbld/Checks/__init__.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Scm/Backup.py mode=0444
+file path=opt/onbld/lib/python/onbld/Scm/Backup.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Scm/Version.py mode=0444
+file path=opt/onbld/lib/python/onbld/Scm/Version.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Scm/WorkSpace.py mode=0444
+file path=opt/onbld/lib/python/onbld/Scm/WorkSpace.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/Scm/__init__.py mode=0444
+file path=opt/onbld/lib/python/onbld/Scm/__init__.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/__init__.py mode=0444
+file path=opt/onbld/lib/python/onbld/__init__.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/hgext/__init__.py mode=0444
+file path=opt/onbld/lib/python/onbld/hgext/__init__.pyc mode=0444
+file path=opt/onbld/lib/python/onbld/hgext/cdm.py mode=0444
+file path=opt/onbld/lib/python/onbld/hgext/cdm.pyc mode=0444
+file path=opt/onbld/man/man1/Install.1
+file path=opt/onbld/man/man1/bldenv.1
+file path=opt/onbld/man/man1/bringovercheck.1
+file path=opt/onbld/man/man1/cddlchk.1
+file path=opt/onbld/man/man1/check_rtime.1
+file path=opt/onbld/man/man1/checkpaths.1
+file path=opt/onbld/man/man1/codereview.1
+file path=opt/onbld/man/man1/cstyle.1
+file path=opt/onbld/man/man1/cw.1
+file path=opt/onbld/man/man1/find_elf.1
+file path=opt/onbld/man/man1/findunref.1
+file path=opt/onbld/man/man1/flg.flp.1
+file path=opt/onbld/man/man1/hdrchk.1
+file path=opt/onbld/man/man1/hgsetup.1
+file path=opt/onbld/man/man1/interface_check.1
+file path=opt/onbld/man/man1/interface_cmp.1
+file path=opt/onbld/man/man1/jstyle.1
+file path=opt/onbld/man/man1/lintdump.1
+file path=opt/onbld/man/man1/mapfilechk.1
+file path=opt/onbld/man/man1/ndrgen.1
+file path=opt/onbld/man/man1/nightly.1
+file path=opt/onbld/man/man1/onu.1
+file path=opt/onbld/man/man1/sccscheck.1
+file path=opt/onbld/man/man1/sccscp.1
+file path=opt/onbld/man/man1/sccsmv.1
+file path=opt/onbld/man/man1/sccsrm.1
+file path=opt/onbld/man/man1/signit.1
+file path=opt/onbld/man/man1/signproto.1
+file path=opt/onbld/man/man1/webrev.1
+file path=opt/onbld/man/man1/which_scm.1
+file path=opt/onbld/man/man1/ws.1
+file path=opt/onbld/man/man1/wsdiff.1
+file path=opt/onbld/man/man1/wx.1
+file path=opt/onbld/man/man1/wx2hg.1
+file path=opt/onbld/man/man1/xref.1
+file path=opt/onbld/man/sman1/get_depend_info.1
+file path=opt/onbld/man/sman1/make_pkg_db.1
+hardlink path=opt/onbld/bin/$(ARCH)/install.bin target=./install
+legacy pkg=SUNWonbld arch=$(ARCH) category=system \
+    desc="tools used to build the OS-Net consolidation" \
+    hotline="Please contact your local service provider" \
+    name="OS-Net Build Tools" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.10.22
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license tools/ctf/dwarf/THIRDPARTYLICENSE \
+    license=tools/ctf/dwarf/THIRDPARTYLICENSE
+license tools/onbld/THIRDPARTYLICENSE license=tools/onbld/THIRDPARTYLICENSE

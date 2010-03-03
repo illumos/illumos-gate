@@ -19,13 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 CRON_ENT= adm root sys
 CRON_LIB= .proto at.deny cron.deny queuedefs
-ETC_SCRIPT= group project ttysrch
+ETC_SCRIPT= group project ttysrch mailcap mime.types
 ZI_SPECIAL= zones-index
 SUBDIRS= sun
 

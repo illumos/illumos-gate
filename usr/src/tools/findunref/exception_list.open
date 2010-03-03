@@ -144,7 +144,6 @@
 # Ignore internal packages, scripts, and tools that are intentionally not
 # built or used during a nightly.
 #
-./usr/src/cmd/mdb/packages
 ./usr/src/cmd/sgs/packages
 ./usr/src/cmd/sgs/rtld.4.x
 ./usr/src/prototypes
@@ -251,5 +250,3 @@
 # and sparc prototype files
 #
 ./usr/src/cmd/fps/fptest/singdoub*
-./usr/src/pkgdefs/SUNWfsu/prototype_gcc_sparc
-./usr/src/pkgdefs/SUNWfsu/prototype_cc_sparc

@@ -1,0 +1,148 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/driver/usb@$(PKGVERS)
+set name=pkg.description value="USBA (USB framework) and USB Device Drivers"
+set name=pkg.summary value="USB Device Drivers"
+set name=info.classification value=org.opensolaris.category.2008:Drivers/Ports
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=etc/usb group=sys
+dir path=kernel group=sys
+dir path=kernel/dacf group=sys
+dir path=kernel/dacf/$(ARCH64) group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=kernel/misc group=sys
+dir path=kernel/misc/$(ARCH64) group=sys
+dir path=kernel/strmod group=sys
+dir path=kernel/strmod/$(ARCH64) group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/method
+dir path=sbin group=sys
+dir path=var group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/system group=sys
+driver name=ehci alias=pciclass,0c0320 perms="* 0644 root sys"
+driver name=hid alias=usbif,class3 perms="* 0600 root sys"
+driver name=hubd alias=usbif,class9 perms="* 0644 root sys"
+driver name=hwahc alias=usbif,classe0.2.1 perms="* 0644 root sys"
+driver name=hwarc alias=usbif,classe0.1.2 perms="* 0644 root sys"
+driver name=ohci alias=pciclass,0c0310 perms="* 0644 root sys"
+driver name=scsa2usb \
+    alias=usb584,222 \
+    alias=usbif,class8
+driver name=uhci alias=pciclass,0c0300 perms="* 0644 root sys"
+driver name=usb_ac alias=usbif,class1.1 perms="* 0600 root sys"
+driver name=usb_as alias=usbif,class1.2 perms="* 0600 root sys"
+driver name=usb_ia alias=usb,ia
+driver name=usb_mid alias=usb,device
+driver name=usbprn alias=usbif,class7.1 perms="* 0666 root sys"
+driver name=wusb_ca alias=usbif,classef.3.1 perms="* 0666 root sys"
+driver name=wusb_df perms="* 0666 root sys" \
+    alias=usb15a9,5 \
+    alias=usb3495,3007
+file path=etc/usb/config_map.conf group=sys \
+    original_name=SUNWusb:etc/usb/config_map.conf preserve=true
+file path=kernel/drv/$(ARCH64)/ehci group=sys
+file path=kernel/drv/$(ARCH64)/hid group=sys
+file path=kernel/drv/$(ARCH64)/hubd group=sys
+file path=kernel/drv/$(ARCH64)/hwahc group=sys
+file path=kernel/drv/$(ARCH64)/hwarc group=sys
+file path=kernel/drv/$(ARCH64)/ohci group=sys
+file path=kernel/drv/$(ARCH64)/scsa2usb group=sys
+file path=kernel/drv/$(ARCH64)/uhci group=sys
+file path=kernel/drv/$(ARCH64)/usb_ac group=sys
+file path=kernel/drv/$(ARCH64)/usb_as group=sys
+file path=kernel/drv/$(ARCH64)/usb_ia group=sys
+file path=kernel/drv/$(ARCH64)/usb_mid group=sys
+file path=kernel/drv/$(ARCH64)/usbprn group=sys
+file path=kernel/drv/$(ARCH64)/wusb_ca group=sys
+file path=kernel/drv/$(ARCH64)/wusb_df group=sys
+$(i386_ONLY)file path=kernel/drv/ehci group=sys
+file path=kernel/drv/ehci.conf group=sys reboot-needed=false
+$(i386_ONLY)file path=kernel/drv/hid group=sys
+$(i386_ONLY)file path=kernel/drv/hubd group=sys
+$(i386_ONLY)file path=kernel/drv/hwahc group=sys
+$(i386_ONLY)file path=kernel/drv/hwarc group=sys
+$(i386_ONLY)file path=kernel/drv/ohci group=sys
+file path=kernel/drv/ohci.conf group=sys reboot-needed=false
+$(i386_ONLY)file path=kernel/drv/scsa2usb group=sys
+file path=kernel/drv/scsa2usb.conf group=sys \
+    original_name=SUNWusb:kernel/drv/scsa2usb.conf preserve=true \
+    reboot-needed=false
+$(i386_ONLY)file path=kernel/drv/uhci group=sys
+file path=kernel/drv/uhci.conf group=sys reboot-needed=false
+$(i386_ONLY)file path=kernel/drv/usb_ac group=sys
+file path=kernel/drv/usb_ac.conf group=sys reboot-needed=false
+$(i386_ONLY)file path=kernel/drv/usb_as group=sys
+$(i386_ONLY)file path=kernel/drv/usb_ia group=sys
+$(i386_ONLY)file path=kernel/drv/usb_mid group=sys
+$(i386_ONLY)file path=kernel/drv/usbprn group=sys
+$(i386_ONLY)file path=kernel/drv/wusb_ca group=sys
+$(i386_ONLY)file path=kernel/drv/wusb_df group=sys
+file path=kernel/misc/$(ARCH64)/hidparser group=sys mode=0755 reboot-needed=true
+file path=kernel/misc/$(ARCH64)/hwa1480_fw group=sys mode=0755 \
+    reboot-needed=true
+file path=kernel/misc/$(ARCH64)/usba group=sys mode=0755 reboot-needed=true
+file path=kernel/misc/$(ARCH64)/usba10 group=sys mode=0755 reboot-needed=true
+$(i386_ONLY)file path=kernel/misc/hidparser group=sys mode=0755 \
+    reboot-needed=true
+$(i386_ONLY)file path=kernel/misc/hwa1480_fw group=sys mode=0755 \
+    reboot-needed=true
+$(i386_ONLY)file path=kernel/misc/usba group=sys mode=0755 reboot-needed=true
+$(i386_ONLY)file path=kernel/misc/usba10 group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/$(ARCH64)/usb_ah group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/$(ARCH64)/usbkbm group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/$(ARCH64)/usbms group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/$(ARCH64)/usbwcm group=sys mode=0755 reboot-needed=true
+$(i386_ONLY)file path=kernel/strmod/usb_ah group=sys mode=0755 \
+    reboot-needed=true
+$(i386_ONLY)file path=kernel/strmod/usbkbm group=sys mode=0755 \
+    reboot-needed=true
+$(i386_ONLY)file path=kernel/strmod/usbms group=sys mode=0755 reboot-needed=true
+$(i386_ONLY)file path=kernel/strmod/usbwcm group=sys mode=0755 \
+    reboot-needed=true
+file path=lib/svc/method/svc-wusb mode=0555
+file path=sbin/wusbadm mode=0555
+file path=var/svc/manifest/system/wusb.xml group=sys mode=0444
+legacy pkg=SUNWusb arch=$(ARCH) category=system \
+    desc="USBA (USB framework) and USB Device Drivers" \
+    hotline="Please contact your local service provider" \
+    name="USB Device Drivers" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license license_in_headers license=license_in_headers

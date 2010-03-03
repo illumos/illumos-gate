@@ -1,0 +1,2694 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/SUNWcs@$(PKGVERS)
+set name=pkg.description \
+    value="core software for a specific instruction-set architecture"
+set name=pkg.summary value="Core Solaris"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=dev group=sys
+dir path=etc group=sys
+dir path=etc/certs group=sys
+dir path=etc/cron.d group=sys
+dir path=etc/crypto group=sys
+dir path=etc/crypto/certs group=sys
+dir path=etc/crypto/crls group=sys
+dir path=etc/default group=sys
+dir path=etc/dev group=sys
+dir path=etc/devices group=sys
+dir path=etc/dfs group=sys
+dir path=etc/dhcp group=sys
+dir path=etc/fs group=sys
+dir path=etc/fs/dev group=sys
+dir path=etc/fs/hsfs group=sys
+dir path=etc/fs/ufs group=sys
+dir path=etc/ftpd group=sys
+dir path=etc/inet group=sys
+dir path=etc/init.d group=sys
+dir path=etc/lib group=sys
+dir path=etc/mail group=mail
+dir path=etc/net group=sys
+dir path=etc/net/ticlts group=sys
+dir path=etc/net/ticots group=sys
+dir path=etc/net/ticotsord group=sys
+dir path=etc/opt group=sys
+dir path=etc/rc0.d group=sys
+dir path=etc/rc1.d group=sys
+dir path=etc/rc2.d group=sys
+dir path=etc/rc3.d group=sys
+dir path=etc/rcS.d group=sys
+dir path=etc/rpcsec group=sys
+dir path=etc/saf
+dir path=etc/saf/zsmon group=sys
+dir path=etc/sasl group=sys
+dir path=etc/security group=sys
+dir path=etc/security/audit group=sys
+dir path=etc/security/audit/localhost group=sys
+dir path=etc/security/auth_attr.d group=sys
+dir path=etc/security/dev group=sys
+dir path=etc/security/exec_attr.d group=sys
+dir path=etc/security/lib group=sys
+dir path=etc/security/prof_attr.d group=sys
+dir path=etc/security/spool group=sys
+dir path=etc/skel group=sys
+dir path=etc/svc group=sys
+dir path=etc/svc/volatile group=sys
+dir path=etc/sysevent group=sys
+dir path=etc/sysevent/config group=sys
+dir path=etc/tm group=sys
+dir path=etc/user_attr.d group=sys
+dir path=lib
+dir path=lib/crypto
+dir path=lib/inet
+dir path=lib/svc
+dir path=lib/svc/bin
+dir path=lib/svc/capture
+dir path=lib/svc/method
+dir path=lib/svc/monitor
+dir path=lib/svc/seed
+dir path=lib/svc/share
+dir path=mnt group=sys
+dir path=opt group=sys
+dir path=proc group=root mode=0555
+dir path=root group=root mode=0700
+dir path=sbin group=sys
+dir path=system group=root
+dir path=system/contract group=root mode=0555
+dir path=system/object group=root mode=0555
+dir path=tmp group=sys mode=1777
+dir path=usr group=sys
+dir path=usr/bin
+dir path=usr/bin/$(ARCH32)
+dir path=usr/bin/$(ARCH64)
+dir path=usr/ccs
+dir path=usr/ccs/bin
+dir path=usr/demo
+dir path=usr/games
+dir path=usr/has
+dir path=usr/has/bin
+dir path=usr/has/lib
+dir path=usr/kernel group=sys
+dir path=usr/kernel/drv group=sys
+dir path=usr/kernel/drv/$(ARCH64) group=sys
+dir path=usr/kernel/exec group=sys
+dir path=usr/kernel/exec/$(ARCH64) group=sys
+dir path=usr/kernel/fs group=sys
+dir path=usr/kernel/fs/$(ARCH64) group=sys
+dir path=usr/kernel/pcbe group=sys
+dir path=usr/kernel/pcbe/$(ARCH64) group=sys
+dir path=usr/kernel/sched group=sys
+dir path=usr/kernel/sched/$(ARCH64) group=sys
+dir path=usr/kernel/strmod group=sys
+dir path=usr/kernel/strmod/$(ARCH64) group=sys
+dir path=usr/kernel/sys group=sys
+dir path=usr/kernel/sys/$(ARCH64) group=sys
+dir path=usr/kvm
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/audit
+dir path=usr/lib/class
+dir path=usr/lib/class/FX
+dir path=usr/lib/class/IA
+dir path=usr/lib/class/RT
+dir path=usr/lib/class/SDC
+dir path=usr/lib/class/TS
+dir path=usr/lib/crypto
+dir path=usr/lib/devfsadm group=sys
+dir path=usr/lib/devfsadm/linkmod group=sys
+dir path=usr/lib/fs group=sys
+dir path=usr/lib/fs/cachefs group=sys
+dir path=usr/lib/fs/ctfs group=sys
+dir path=usr/lib/fs/dev group=sys
+dir path=usr/lib/fs/fd group=sys
+dir path=usr/lib/fs/hsfs group=sys
+dir path=usr/lib/fs/lofs group=sys
+dir path=usr/lib/fs/mntfs group=sys
+dir path=usr/lib/fs/nfs group=sys
+dir path=usr/lib/fs/nfs/$(ARCH64) group=sys
+dir path=usr/lib/fs/objfs group=sys
+dir path=usr/lib/fs/proc group=sys
+dir path=usr/lib/fs/sharefs group=sys
+dir path=usr/lib/fs/tmpfs group=sys
+dir path=usr/lib/fs/ufs group=sys
+dir path=usr/lib/help
+dir path=usr/lib/help/auths
+dir path=usr/lib/help/auths/locale
+dir path=usr/lib/help/auths/locale/C
+dir path=usr/lib/help/profiles
+dir path=usr/lib/help/profiles/locale
+dir path=usr/lib/help/profiles/locale/C
+dir path=usr/lib/iconv
+dir path=usr/lib/inet
+dir path=usr/lib/inet/$(ARCH32)
+dir path=usr/lib/inet/$(ARCH64)
+dir path=usr/lib/inet/dhcp
+dir path=usr/lib/inet/dhcp/nsu
+dir path=usr/lib/inet/dhcp/svc
+dir path=usr/lib/locale
+dir path=usr/lib/locale/C
+dir path=usr/lib/locale/C/LC_COLLATE
+dir path=usr/lib/locale/C/LC_CTYPE
+dir path=usr/lib/locale/C/LC_MESSAGES
+dir path=usr/lib/locale/C/LC_MONETARY
+dir path=usr/lib/locale/C/LC_NUMERIC
+dir path=usr/lib/locale/C/LC_TIME
+dir path=usr/lib/localedef
+dir path=usr/lib/localedef/extensions
+dir path=usr/lib/localedef/src
+dir path=usr/lib/netsvc group=sys
+dir path=usr/lib/pci
+dir path=usr/lib/rcm
+dir path=usr/lib/rcm/modules
+dir path=usr/lib/rcm/scripts
+dir path=usr/lib/reparse
+dir path=usr/lib/saf
+dir path=usr/lib/secure
+dir path=usr/lib/secure/$(ARCH64)
+dir path=usr/lib/security
+dir path=usr/lib/sysevent
+dir path=usr/lib/sysevent/modules
+dir path=usr/net group=sys
+dir path=usr/net/nls group=sys
+dir path=usr/net/servers group=sys
+dir path=usr/old
+dir path=usr/platform group=sys
+dir path=usr/sadm
+dir path=usr/sadm/bin
+dir path=usr/sadm/install
+dir path=usr/sadm/install/scripts
+dir path=usr/sadm/sysadm
+dir path=usr/sadm/sysadm/add-ons
+dir path=usr/sadm/sysadm/bin
+dir path=usr/sbin
+$(i386_ONLY)dir path=usr/sbin/$(ARCH32)
+dir path=usr/sbin/$(ARCH64)
+dir path=usr/share group=sys
+dir path=usr/share/doc group=other
+dir path=usr/share/doc/ksh
+dir path=usr/share/doc/ksh/images
+dir path=usr/share/doc/ksh/images/callouts
+dir path=usr/share/lib group=sys
+dir path=usr/share/lib/mailx
+dir path=usr/share/lib/pub
+dir path=usr/share/lib/tabset
+dir path=usr/share/lib/terminfo
+dir path=usr/share/lib/terminfo/3
+dir path=usr/share/lib/terminfo/A
+dir path=usr/share/lib/terminfo/a
+dir path=usr/share/lib/terminfo/s
+dir path=usr/share/lib/terminfo/u
+dir path=usr/share/lib/terminfo/v
+dir path=usr/share/lib/terminfo/x
+dir path=usr/share/lib/xml group=sys
+dir path=usr/share/lib/xml/dtd group=sys
+dir path=usr/share/lib/xml/style group=sys
+dir path=usr/share/lib/zoneinfo
+dir path=usr/share/lib/zoneinfo/Africa
+dir path=usr/share/lib/zoneinfo/America
+dir path=usr/share/lib/zoneinfo/America/Argentina
+dir path=usr/share/lib/zoneinfo/America/Indiana
+dir path=usr/share/lib/zoneinfo/America/Kentucky
+dir path=usr/share/lib/zoneinfo/America/North_Dakota
+dir path=usr/share/lib/zoneinfo/Antarctica
+dir path=usr/share/lib/zoneinfo/Arctic
+dir path=usr/share/lib/zoneinfo/Asia
+dir path=usr/share/lib/zoneinfo/Atlantic
+dir path=usr/share/lib/zoneinfo/Australia
+dir path=usr/share/lib/zoneinfo/Brazil
+dir path=usr/share/lib/zoneinfo/Canada
+dir path=usr/share/lib/zoneinfo/Chile
+dir path=usr/share/lib/zoneinfo/Etc
+dir path=usr/share/lib/zoneinfo/Europe
+dir path=usr/share/lib/zoneinfo/Indian
+dir path=usr/share/lib/zoneinfo/Mexico
+dir path=usr/share/lib/zoneinfo/Mideast
+dir path=usr/share/lib/zoneinfo/Pacific
+dir path=usr/share/lib/zoneinfo/US
+dir path=usr/share/lib/zoneinfo/src
+dir path=usr/share/lib/zoneinfo/tab
+dir path=usr/share/src group=sys
+dir path=usr/xpg4
+dir path=usr/xpg4/bin
+dir path=var group=sys
+dir path=var/adm group=sys mode=0775
+dir path=var/adm/exacct group=adm owner=adm
+dir path=var/adm/log group=adm owner=adm
+dir path=var/adm/streams group=sys
+dir path=var/audit group=sys
+dir path=var/cores group=sys
+dir path=var/cron group=sys
+dir path=var/games
+dir path=var/idmap group=daemon owner=daemon
+dir path=var/inet group=sys
+dir path=var/ld
+dir path=var/ld/$(ARCH64)
+dir path=var/log group=sys
+dir path=var/mail group=mail mode=1777
+dir path=var/mail/:saved group=mail mode=0775
+dir path=var/news
+dir path=var/opt group=sys
+dir path=var/preserve mode=1777
+dir path=var/run group=sys
+dir path=var/sadm group=sys
+dir path=var/sadm/system group=sys
+dir path=var/sadm/system/admin group=sys
+dir path=var/saf
+dir path=var/saf/zsmon group=sys
+dir path=var/spool
+dir path=var/spool/cron group=sys
+dir path=var/spool/cron/atjobs group=sys
+dir path=var/spool/cron/crontabs group=sys
+dir path=var/spool/locks group=uucp owner=uucp
+dir path=var/svc group=sys
+dir path=var/svc/log group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/application group=sys
+dir path=var/svc/manifest/application/management group=sys
+dir path=var/svc/manifest/application/security group=sys
+dir path=var/svc/manifest/device group=sys
+dir path=var/svc/manifest/milestone group=sys
+dir path=var/svc/manifest/network group=sys
+dir path=var/svc/manifest/network/dns group=sys
+dir path=var/svc/manifest/network/ipsec group=sys
+dir path=var/svc/manifest/network/ldap group=sys
+dir path=var/svc/manifest/network/routing group=sys
+dir path=var/svc/manifest/network/rpc group=sys
+dir path=var/svc/manifest/network/shares group=sys
+dir path=var/svc/manifest/network/ssl group=sys
+dir path=var/svc/manifest/platform group=sys
+$(sparc_ONLY)dir path=var/svc/manifest/platform/sun4u group=sys
+dir path=var/svc/manifest/site group=sys
+dir path=var/svc/manifest/system group=sys
+dir path=var/svc/manifest/system/device group=sys
+dir path=var/svc/manifest/system/filesystem group=sys
+dir path=var/svc/manifest/system/security group=sys
+dir path=var/svc/manifest/system/svc group=sys
+dir path=var/svc/profile group=sys
+dir path=var/tmp group=sys mode=1777
+driver name=dump perms="dump 0660 root sys"
+driver name=fssnap \
+    policy="ctl read_priv_set=sys_config write_priv_set=sys_config" \
+    perms="* 0640 root sys" perms="ctl 0666 root sys"
+driver name=kstat perms="* 0666 root sys"
+driver name=ksyms perms="* 0666 root sys"
+driver name=logindmux
+driver name=ptm clone_perms="ptmx 0666 root sys"
+driver name=pts perms="* 0644 root sys" perms="0 0620 root tty" \
+    perms="1 0620 root tty" perms="2 0620 root tty" perms="3 0620 root tty"
+file path=etc/.login group=sys preserve=renamenew
+file path=etc/certs/SUNWObjectCA group=sys
+file path=etc/certs/SUNWSolarisCA group=sys
+file path=etc/certs/SUNW_SunOS_5.10 group=sys
+file path=etc/cron.d/.proto group=sys mode=0744
+file path=etc/cron.d/at.deny group=sys preserve=true
+file path=etc/cron.d/cron.deny group=sys preserve=true
+file path=etc/cron.d/queuedefs group=sys
+file path=etc/crypto/certs/CA group=sys
+file path=etc/crypto/certs/SUNW_SunOS_5.10 group=sys
+file path=etc/crypto/kmf.conf group=sys preserve=true
+file path=etc/crypto/pkcs11.conf group=sys preserve=true
+file path=etc/datemsk group=sys mode=0444
+file path=etc/default/cron group=sys preserve=true
+file path=etc/default/devfsadm group=sys preserve=true
+file path=etc/default/fs group=sys preserve=true
+file path=etc/default/init group=sys preserve=true
+file path=etc/default/kbd group=sys preserve=true
+file path=etc/default/keyserv group=sys preserve=true
+file path=etc/default/login group=sys preserve=true
+file path=etc/default/nss group=sys preserve=true
+file path=etc/default/passwd group=sys preserve=true
+file path=etc/default/su group=sys preserve=true
+file path=etc/default/syslogd group=sys preserve=true
+file path=etc/default/tar group=sys preserve=true
+file path=etc/default/utmpd group=sys preserve=true
+file path=etc/dev/reserved_devnames group=sys preserve=true
+file path=etc/device.tab group=root mode=0444 preserve=true
+file path=etc/dfs/dfstab group=sys preserve=true
+file path=etc/dfs/fstypes group=root preserve=true
+file path=etc/dfs/sharetab group=root mode=0444 preserve=true
+file path=etc/dgroup.tab group=sys mode=0444 preserve=true
+file path=etc/dhcp/inittab group=sys preserve=true
+file path=etc/dhcp/inittab6 group=sys preserve=true
+file path=etc/dumpdates group=sys mode=0664 preserve=true
+file path=etc/format.dat group=sys preserve=true
+file path=etc/fs/dev/mount mode=0555
+file path=etc/fs/hsfs/mount mode=0555
+file path=etc/fs/ufs/mount mode=0555
+file path=etc/ftpd/ftpusers group=sys preserve=true
+file path=etc/group group=sys preserve=true
+file path=etc/inet/hosts group=sys preserve=true
+file path=etc/inet/inetd.conf group=sys preserve=true
+file path=etc/inet/ipaddrsel.conf group=sys preserve=true
+file path=etc/inet/netmasks group=sys preserve=true
+file path=etc/inet/networks group=sys preserve=true
+file path=etc/inet/protocols group=sys preserve=true
+file path=etc/inet/services group=sys preserve=true
+file path=etc/inet/wanboot.conf.sample group=sys mode=0444
+file path=etc/init.d/PRESERVE group=sys mode=0744 preserve=true
+file path=etc/init.d/README group=sys preserve=true
+file path=etc/init.d/cachefs.daemon group=sys mode=0744 preserve=true
+file path=etc/init.d/deallocate group=sys mode=0744 preserve=true
+file path=etc/init.d/ldap.client group=sys mode=0744
+file path=etc/init.d/mkdtab group=sys mode=0744 preserve=true
+file path=etc/init.d/nscd group=sys mode=0744
+file path=etc/init.d/sysetup group=sys mode=0744 preserve=true
+file path=etc/init.d/ufs_quota group=sys mode=0744 preserve=true
+file path=etc/inittab group=sys preserve=true
+file path=etc/ioctl.syscon group=sys preserve=true
+file path=etc/ksh.kshrc group=sys preserve=renameold
+file path=etc/logadm.conf group=sys preserve=true
+file path=etc/logindevperm group=sys preserve=true
+file path=etc/magic mode=0444
+file path=etc/mail/mailx.rc preserve=true
+file path=etc/mailcap preserve=true
+file path=etc/mime.types preserve=true
+file path=etc/mnttab group=root mode=0444 preserve=true
+file path=etc/motd group=sys preserve=true
+file path=etc/net/ticlts/hosts group=sys
+file path=etc/net/ticlts/services group=sys preserve=true
+file path=etc/net/ticots/hosts group=sys
+file path=etc/net/ticots/services group=sys preserve=true
+file path=etc/net/ticotsord/hosts group=sys
+file path=etc/net/ticotsord/services group=sys preserve=true
+file path=etc/netconfig group=sys preserve=true
+file path=etc/nscd.conf group=sys preserve=true
+file path=etc/nsswitch.ad group=sys
+file path=etc/nsswitch.conf group=sys preserve=true
+file path=etc/nsswitch.dns group=sys
+file path=etc/nsswitch.files group=sys
+file path=etc/nsswitch.ldap group=sys
+file path=etc/pam.conf group=sys preserve=true
+file path=etc/passwd group=sys preserve=true
+file path=etc/profile group=sys preserve=true
+file path=etc/project group=sys preserve=true
+file path=etc/rc2.d/README group=sys
+file path=etc/rc3.d/README group=sys
+file path=etc/rcS.d/README group=sys
+file path=etc/remote preserve=true
+file path=etc/rpc group=sys preserve=true
+file path=etc/saf/_sactab group=sys preserve=true
+file path=etc/saf/_sysconfig group=sys preserve=true
+file path=etc/saf/zsmon/_pmtab group=sys preserve=true
+file path=etc/security/audit_class group=sys preserve=renamenew
+file path=etc/security/audit_control group=sys preserve=renamenew
+file path=etc/security/audit_event group=sys preserve=renamenew
+file path=etc/security/audit_user group=sys preserve=renamenew
+file path=etc/security/audit_warn group=sys mode=0740 preserve=renamenew
+file path=etc/security/auth_attr group=sys preserve=true \
+    timestamp=19700101T000000Z
+file path=etc/security/auth_attr.d/SUNWcs group=sys
+file path=etc/security/bsmconv group=sys mode=0740
+file path=etc/security/bsmunconv group=sys mode=0740
+file path=etc/security/crypt.conf group=sys preserve=renamenew
+file path=etc/security/dev/audio mode=0400
+file path=etc/security/dev/fd0 mode=0400
+file path=etc/security/dev/sr0 mode=0400
+file path=etc/security/dev/st0 mode=0400
+file path=etc/security/dev/st1 mode=0400
+file path=etc/security/exec_attr group=sys preserve=true \
+    timestamp=19700101T000000Z
+file path=etc/security/exec_attr.d/SUNWcs group=sys
+file path=etc/security/kmfpolicy.xml
+file path=etc/security/lib/audio_clean group=sys mode=0555
+file path=etc/security/lib/fd_clean group=sys mode=0555
+file path=etc/security/lib/sr_clean group=sys mode=0555
+file path=etc/security/lib/st_clean group=sys mode=0555
+file path=etc/security/policy.conf group=sys preserve=true
+file path=etc/security/priv_names group=sys preserve=renameold
+file path=etc/security/prof_attr group=sys preserve=true \
+    timestamp=19700101T000000Z
+file path=etc/security/prof_attr.d/SUNWcs group=sys
+file path=etc/shadow group=sys mode=0400 preserve=true
+file path=etc/skel/.profile group=other preserve=true
+file path=etc/skel/local.cshrc group=sys preserve=true
+file path=etc/skel/local.login group=sys preserve=true
+file path=etc/skel/local.profile group=sys preserve=true
+file path=etc/sysevent/config/README group=sys mode=0444
+file path=etc/sysevent/config/SUNW,EC_dr,ESC_dr_req,sysevent.conf group=sys
+file path=etc/syslog.conf group=sys preserve=true
+file path=etc/ttydefs group=sys preserve=true
+file path=etc/ttysrch group=sys preserve=true
+file path=etc/user_attr group=sys preserve=true timestamp=19700101T000000Z
+file path=etc/user_attr.d/SUNWcs group=sys
+file path=etc/vfstab group=sys preserve=true
+file path=lib/crypto/kcfd mode=0555
+file path=lib/inet/in.mpathd mode=0555
+file path=lib/inet/netcfgd mode=0555
+file path=lib/inet/nwamd mode=0555
+file path=lib/svc/bin/lsvcrun group=sys mode=0555
+file path=lib/svc/bin/mfstscan group=sys mode=0555
+file path=lib/svc/bin/prophist group=sys mode=0555
+file path=lib/svc/bin/restore_repository group=sys mode=0555
+file path=lib/svc/bin/sqlite group=sys mode=0555
+file path=lib/svc/bin/svc.configd group=sys mode=0555
+file path=lib/svc/bin/svc.ipfd group=sys mode=0555
+file path=lib/svc/bin/svc.startd group=sys mode=0555
+file path=lib/svc/method/boot-archive mode=0555
+file path=lib/svc/method/boot-archive-update mode=0555
+file path=lib/svc/method/console-login mode=0555
+file path=lib/svc/method/devices-audio mode=0555
+file path=lib/svc/method/devices-local mode=0555
+file path=lib/svc/method/fs-local mode=0555
+file path=lib/svc/method/fs-minimal mode=0555
+file path=lib/svc/method/fs-root mode=0555
+file path=lib/svc/method/fs-usr mode=0555
+file path=lib/svc/method/identity-domain mode=0555
+file path=lib/svc/method/identity-node mode=0555
+file path=lib/svc/method/inetd-upgrade mode=0555
+file path=lib/svc/method/keymap mode=0555
+file path=lib/svc/method/ldap-client mode=0555
+file path=lib/svc/method/manifest-import mode=0555
+file path=lib/svc/method/mpxio-upgrade mode=0555
+file path=lib/svc/method/net-init mode=0555
+file path=lib/svc/method/net-ipqos mode=0555
+file path=lib/svc/method/net-iptun mode=0555
+file path=lib/svc/method/net-loc mode=0555
+file path=lib/svc/method/net-loopback mode=0555
+file path=lib/svc/method/net-netmask mode=0555
+file path=lib/svc/method/net-nwam mode=0555
+file path=lib/svc/method/net-physical mode=0555
+file path=lib/svc/method/net-routing-setup mode=0555
+file path=lib/svc/method/net-svc mode=0555
+file path=lib/svc/method/rmtmpfiles mode=0555
+file path=lib/svc/method/rpc-bind mode=0555
+file path=lib/svc/method/svc-auditd mode=0555
+file path=lib/svc/method/svc-boot-config mode=0555
+file path=lib/svc/method/svc-consadm mode=0555
+file path=lib/svc/method/svc-cron mode=0555
+file path=lib/svc/method/svc-dlmgmtd mode=0555
+file path=lib/svc/method/svc-forwarding mode=0555
+$(i386_ONLY)file path=lib/svc/method/svc-hostid mode=0555
+file path=lib/svc/method/svc-hotplug mode=0555
+file path=lib/svc/method/svc-legacy-routing mode=0555
+file path=lib/svc/method/svc-nscd mode=0555
+file path=lib/svc/method/svc-rbac mode=0555
+file path=lib/svc/method/svc-utmpd mode=0555
+file path=lib/svc/method/system-log mode=0555
+file path=lib/svc/method/vtdaemon mode=0555
+file path=lib/svc/method/yp mode=0555
+file path=lib/svc/seed/global.db group=sys mode=0444
+file path=lib/svc/seed/nonglobal.db group=sys mode=0444
+file path=lib/svc/share/README mode=0444
+file path=lib/svc/share/fs_include.sh mode=0444
+file path=lib/svc/share/ipf_include.sh mode=0444
+file path=lib/svc/share/manifest_cleanup.ksh mode=0444
+file path=lib/svc/share/mfsthistory mode=0444
+file path=lib/svc/share/net_include.sh mode=0444
+file path=lib/svc/share/routing_include.sh mode=0444
+file path=lib/svc/share/smf_include.sh mode=0444
+file path=root/.bashrc group=root preserve=true
+file path=root/.profile group=root preserve=true
+file path=sbin/autopush mode=0555
+$(i386_ONLY)file path=sbin/biosdev mode=0555
+file path=sbin/bootadm mode=0555
+file path=sbin/cryptoadm mode=0555
+file path=sbin/devprop mode=0555
+file path=sbin/dhcpagent mode=0555
+file path=sbin/dhcpinfo mode=0555
+file path=sbin/dlmgmtd mode=0555
+file path=sbin/fdisk mode=0555
+file path=sbin/fiocompress mode=0555
+file path=sbin/hostconfig mode=0555
+file path=sbin/ifconfig mode=0555
+file path=sbin/ifparse mode=0555
+file path=sbin/init group=sys mode=0555
+$(i386_ONLY)file path=sbin/installgrub group=sys mode=0555
+file path=sbin/ipmpstat mode=0555
+file path=sbin/mount mode=0555
+file path=sbin/mountall group=sys mode=0555
+file path=sbin/netstrategy mode=0555
+file path=sbin/rc0 group=sys mode=0744
+file path=sbin/rc1 group=sys mode=0744
+file path=sbin/rc2 group=sys mode=0744
+file path=sbin/rc3 group=sys mode=0744
+file path=sbin/rcS group=sys mode=0744
+file path=sbin/route mode=0555
+file path=sbin/routeadm mode=0555
+file path=sbin/soconfig mode=0555
+file path=sbin/su.static group=sys mode=0555
+file path=sbin/sulogin mode=0555
+file path=sbin/swapadd group=sys mode=0744
+file path=sbin/sync mode=0555
+file path=sbin/tzreload mode=0555
+file path=sbin/uadmin group=sys mode=0555
+file path=sbin/umount mode=0555
+file path=sbin/umountall group=sys mode=0555
+file path=sbin/uname mode=0555
+file path=sbin/zonename mode=0555
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/amt mode=0555
+file path=usr/bin/$(ARCH32)/decrypt mode=0555
+file path=usr/bin/$(ARCH32)/digest mode=0555
+file path=usr/bin/$(ARCH32)/ksh93 mode=0555
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/newtask group=sys mode=4555
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/nohup mode=0555
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/prctl mode=0555
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/prstat mode=0555
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/ps mode=0555
+file path=usr/bin/$(ARCH32)/savecore mode=0555
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/setuname mode=0555
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/uptime mode=4555
+file path=usr/bin/$(ARCH64)/amt mode=0555
+file path=usr/bin/$(ARCH64)/crle mode=0555
+file path=usr/bin/$(ARCH64)/decrypt mode=0555
+file path=usr/bin/$(ARCH64)/digest mode=0555
+file path=usr/bin/$(ARCH64)/ksh93 mode=0555
+file path=usr/bin/$(ARCH64)/ls mode=0555
+file path=usr/bin/$(ARCH64)/moe mode=0555
+file path=usr/bin/$(ARCH64)/newtask group=sys mode=4555
+file path=usr/bin/$(ARCH64)/nohup mode=0555
+file path=usr/bin/$(ARCH64)/prctl mode=0555
+file path=usr/bin/$(ARCH64)/prstat mode=0555
+file path=usr/bin/$(ARCH64)/ps mode=0555
+file path=usr/bin/$(ARCH64)/savecore mode=0555
+file path=usr/bin/$(ARCH64)/setuname mode=0555
+file path=usr/bin/$(ARCH64)/uptime mode=4555
+$(i386_ONLY)file path=usr/bin/addbadsec mode=0555
+file path=usr/bin/alias mode=0555
+file path=usr/bin/amt mode=0555
+file path=usr/bin/arch mode=0555
+file path=usr/bin/at group=sys mode=4755
+file path=usr/bin/atq group=sys mode=4755
+file path=usr/bin/atrm group=sys mode=4755
+file path=usr/bin/auths mode=0555
+file path=usr/bin/basename mode=0555
+file path=usr/bin/busstat mode=0555
+file path=usr/bin/captoinfo mode=0555
+file path=usr/bin/cat mode=0555
+file path=usr/bin/chgrp mode=0555
+file path=usr/bin/chmod mode=0555
+file path=usr/bin/chown mode=0555
+file path=usr/bin/ckdate mode=0555
+file path=usr/bin/ckgid mode=0555
+file path=usr/bin/ckint mode=0555
+file path=usr/bin/ckitem mode=0555
+file path=usr/bin/ckkeywd mode=0555
+file path=usr/bin/ckpath mode=0555
+file path=usr/bin/ckrange mode=0555
+file path=usr/bin/ckstr mode=0555
+file path=usr/bin/cktime mode=0555
+file path=usr/bin/ckuid mode=0555
+file path=usr/bin/ckyorn mode=0555
+file path=usr/bin/clear mode=0555
+file path=usr/bin/coreadm mode=0555
+file path=usr/bin/cp mode=0555
+file path=usr/bin/cpio mode=0555
+file path=usr/bin/crle mode=0555
+file path=usr/bin/crontab mode=4555
+file path=usr/bin/crypt mode=0555
+file path=usr/bin/csh mode=0555
+file path=usr/bin/ctrun mode=0555
+file path=usr/bin/ctstat mode=0555
+file path=usr/bin/ctwatch mode=0555
+file path=usr/bin/date mode=0555
+file path=usr/bin/dd mode=0555
+file path=usr/bin/devattr mode=0555
+file path=usr/bin/devfree mode=0555
+file path=usr/bin/devreserv mode=0555
+file path=usr/bin/dirname mode=0555
+$(i386_ONLY)file path=usr/bin/diskscan mode=0555
+file path=usr/bin/domainname mode=0555
+file path=usr/bin/du mode=0555
+file path=usr/bin/dumpcs mode=0555
+file path=usr/bin/dumpkeys mode=0555
+file path=usr/bin/echo mode=0555
+file path=usr/bin/ed mode=0555
+file path=usr/bin/egrep mode=0555
+file path=usr/bin/eject mode=0555
+file path=usr/bin/env mode=0555
+file path=usr/bin/expr mode=0555
+file path=usr/bin/false mode=0555
+file path=usr/bin/fdetach mode=0555
+file path=usr/bin/fdformat mode=4555
+file path=usr/bin/fgrep mode=0555
+file path=usr/bin/file mode=0555
+file path=usr/bin/find mode=0555
+file path=usr/bin/fmli mode=0755
+file path=usr/bin/fmt mode=0555
+file path=usr/bin/fmtmsg mode=0555
+file path=usr/bin/fold mode=0555
+file path=usr/bin/fsstat mode=0555
+file path=usr/bin/geniconvtbl mode=0555
+file path=usr/bin/getconf mode=0555
+file path=usr/bin/getdev mode=0555
+file path=usr/bin/getdgrp mode=0555
+file path=usr/bin/getent mode=0555
+file path=usr/bin/getfacl mode=0555
+file path=usr/bin/getopt mode=0555
+file path=usr/bin/gettext mode=0555
+file path=usr/bin/getvol mode=0555
+file path=usr/bin/grep mode=0555
+file path=usr/bin/groups mode=0555
+file path=usr/bin/head mode=0555
+file path=usr/bin/hostid mode=0555
+file path=usr/bin/hostname mode=0555
+file path=usr/bin/i286 mode=0555
+file path=usr/bin/iconv mode=0555
+file path=usr/bin/id mode=0555
+file path=usr/bin/infocmp mode=0555
+file path=usr/bin/iostat mode=0555
+file path=usr/bin/isainfo mode=0555
+file path=usr/bin/isalist mode=0555
+file path=usr/bin/itu mode=0555
+file path=usr/bin/kbd mode=0555
+file path=usr/bin/keylogin mode=0555
+file path=usr/bin/keylogout mode=0555
+file path=usr/bin/kmfcfg mode=0555
+file path=usr/bin/line mode=0555
+file path=usr/bin/listdgrp mode=0555
+file path=usr/bin/listusers mode=0555
+file path=usr/bin/loadkeys mode=0555
+file path=usr/bin/localedef mode=0555
+file path=usr/bin/logger mode=0555
+file path=usr/bin/login mode=4555
+file path=usr/bin/logins mode=0750
+file path=usr/bin/ls mode=0555
+file path=usr/bin/m4 mode=0555
+file path=usr/bin/mach mode=0555
+file path=usr/bin/mail group=mail mode=2511
+file path=usr/bin/mailx group=mail mode=2511
+file path=usr/bin/makedev mode=0555
+file path=usr/bin/mesg mode=0555
+file path=usr/bin/mkbootmedia mode=0555
+file path=usr/bin/mkdir mode=0555
+file path=usr/bin/mkpwdict mode=0555
+file path=usr/bin/mktemp mode=0555
+file path=usr/bin/moe mode=0555
+file path=usr/bin/more mode=0555
+file path=usr/bin/mpstat mode=0555
+file path=usr/bin/mt mode=0555
+file path=usr/bin/netstat mode=0555
+file path=usr/bin/newgrp group=sys mode=4755
+file path=usr/bin/nice mode=0555
+file path=usr/bin/optisa mode=0555
+file path=usr/bin/pagesize mode=0555
+file path=usr/bin/passwd group=sys mode=6555
+file path=usr/bin/pathchk mode=0555
+file path=usr/bin/pax mode=0555
+file path=usr/bin/pfexec mode=4555
+file path=usr/bin/pg mode=0555
+file path=usr/bin/pgrep mode=0555
+file path=usr/bin/pkg2du mode=0555
+file path=usr/bin/pktool mode=0555
+file path=usr/bin/pr mode=0555
+file path=usr/bin/priocntl mode=0555
+file path=usr/bin/profiles mode=0555
+file path=usr/bin/projects mode=0555
+file path=usr/bin/putdev mode=0555
+file path=usr/bin/putdgrp mode=0555
+file path=usr/bin/pwd mode=0555
+file path=usr/bin/renice mode=0555
+file path=usr/bin/rm mode=0555
+file path=usr/bin/rmdir mode=0555
+file path=usr/bin/roles mode=0555
+file path=usr/bin/rpcinfo mode=0555
+file path=usr/bin/runat mode=0555
+file path=usr/bin/script mode=0555
+file path=usr/bin/sed mode=0555
+file path=usr/bin/setfacl mode=0555
+file path=usr/bin/setpgrp group=sys mode=0555
+file path=usr/bin/settime mode=0555
+file path=usr/bin/shcomp mode=0555
+file path=usr/bin/strchg group=root mode=0555
+file path=usr/bin/strconf group=root mode=0555
+file path=usr/bin/stty mode=0555
+file path=usr/bin/su group=sys mode=4555
+file path=usr/bin/svcprop mode=0555
+file path=usr/bin/svcs mode=0555
+file path=usr/bin/tabs mode=0555
+file path=usr/bin/tail mode=0555
+file path=usr/bin/tic mode=0555
+file path=usr/bin/time mode=0555
+file path=usr/bin/tip mode=4511 owner=uucp
+file path=usr/bin/tplot mode=0555
+file path=usr/bin/tpmadm mode=0555
+file path=usr/bin/tput mode=0555
+file path=usr/bin/tr mode=0555
+file path=usr/bin/true mode=0555
+file path=usr/bin/tty mode=0555
+file path=usr/bin/tzselect mode=0555
+file path=usr/bin/updatemedia mode=0555
+file path=usr/bin/vmstat mode=0555
+file path=usr/bin/which mode=0555
+file path=usr/bin/who mode=0555
+file path=usr/bin/wracct mode=0555
+file path=usr/bin/write group=tty mode=2555
+file path=usr/bin/xargs mode=0555
+file path=usr/bin/xstr mode=0555
+file path=usr/has/bin/edit mode=0555
+file path=usr/has/bin/patch mode=0555
+file path=usr/has/bin/sh mode=0555
+file path=usr/kernel/drv/$(ARCH64)/dump group=sys
+file path=usr/kernel/drv/$(ARCH64)/fssnap group=sys
+file path=usr/kernel/drv/$(ARCH64)/kstat group=sys
+file path=usr/kernel/drv/$(ARCH64)/ksyms group=sys
+file path=usr/kernel/drv/$(ARCH64)/logindmux group=sys
+file path=usr/kernel/drv/$(ARCH64)/ptm group=sys
+file path=usr/kernel/drv/$(ARCH64)/pts group=sys
+$(i386_ONLY)file path=usr/kernel/drv/dump group=sys
+file path=usr/kernel/drv/dump.conf group=sys
+$(i386_ONLY)file path=usr/kernel/drv/fssnap group=sys
+file path=usr/kernel/drv/fssnap.conf group=sys
+$(i386_ONLY)file path=usr/kernel/drv/kstat group=sys
+file path=usr/kernel/drv/kstat.conf group=sys
+$(i386_ONLY)file path=usr/kernel/drv/ksyms group=sys
+file path=usr/kernel/drv/ksyms.conf group=sys
+$(i386_ONLY)file path=usr/kernel/drv/logindmux group=sys
+file path=usr/kernel/drv/logindmux.conf group=sys
+$(i386_ONLY)file path=usr/kernel/drv/ptm group=sys
+file path=usr/kernel/drv/ptm.conf group=sys
+$(i386_ONLY)file path=usr/kernel/drv/pts group=sys
+file path=usr/kernel/drv/pts.conf group=sys
+file path=usr/kernel/exec/$(ARCH64)/javaexec group=sys mode=0755
+file path=usr/kernel/exec/$(ARCH64)/shbinexec group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/exec/javaexec group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/exec/shbinexec group=sys mode=0755
+file path=usr/kernel/fs/$(ARCH64)/fdfs group=sys mode=0755
+file path=usr/kernel/fs/$(ARCH64)/pcfs group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/fs/fdfs group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/fs/pcfs group=sys mode=0755
+file path=usr/kernel/sched/$(ARCH64)/FX group=sys mode=0755
+file path=usr/kernel/sched/$(ARCH64)/FX_DPTBL group=sys mode=0755
+file path=usr/kernel/sched/$(ARCH64)/IA group=sys mode=0755
+file path=usr/kernel/sched/$(ARCH64)/RT group=sys mode=0755
+file path=usr/kernel/sched/$(ARCH64)/RT_DPTBL group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/sched/FX group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/sched/FX_DPTBL group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/sched/IA group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/sched/RT group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/sched/RT_DPTBL group=sys mode=0755
+file path=usr/kernel/strmod/$(ARCH64)/cryptmod group=sys mode=0755
+file path=usr/kernel/strmod/$(ARCH64)/rlmod group=sys mode=0755
+file path=usr/kernel/strmod/$(ARCH64)/telmod group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/strmod/cryptmod group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/strmod/rlmod group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/strmod/telmod group=sys mode=0755
+file path=usr/kernel/sys/$(ARCH64)/acctctl group=sys mode=0755
+file path=usr/kernel/sys/$(ARCH64)/exacctsys group=sys mode=0755
+file path=usr/kernel/sys/$(ARCH64)/sysacct group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/sys/acctctl group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/sys/exacctsys group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/sys/sysacct group=sys mode=0755
+file path=usr/kvm/README group=sys
+file path=usr/lib/$(ARCH64)/libshare.so.1
+file path=usr/lib/audit/audit_record_attr mode=0444
+file path=usr/lib/calprog mode=0555
+file path=usr/lib/class/FX/FXdispadmin mode=0555
+file path=usr/lib/class/FX/FXpriocntl mode=0555
+file path=usr/lib/class/IA/IAdispadmin mode=0555
+file path=usr/lib/class/IA/IApriocntl mode=0555
+file path=usr/lib/class/RT/RTdispadmin mode=0555
+file path=usr/lib/class/RT/RTpriocntl mode=0555
+file path=usr/lib/class/SDC/SDCdispadmin mode=0555
+file path=usr/lib/class/SDC/SDCpriocntl mode=0555
+file path=usr/lib/class/TS/TSdispadmin mode=0555
+file path=usr/lib/class/TS/TSpriocntl mode=0555
+file path=usr/lib/devfsadm/linkmod/SUNW_audio_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_cfg_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_disk_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_fssnap_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_ieee1394_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_lofi_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_md_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_misc_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_misc_link_$(ARCH).so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_port_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_ramdisk_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_sgen_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_smp_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_tape_link.so group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_usb_link.so group=sys
+$(i386_ONLY)file path=usr/lib/devfsadm/linkmod/SUNW_xen_link.so group=sys
+file path=usr/lib/diffh mode=0555
+file path=usr/lib/expreserve mode=0555
+file path=usr/lib/exrecover mode=0555
+file path=usr/lib/fs/cachefs/cachefsd mode=0555
+file path=usr/lib/fs/cachefs/cachefslog mode=0555
+file path=usr/lib/fs/cachefs/cachefspack mode=0555
+file path=usr/lib/fs/cachefs/cachefsstat mode=0555
+file path=usr/lib/fs/cachefs/cachefswssize mode=0555
+file path=usr/lib/fs/cachefs/cfsadmin mode=0555
+file path=usr/lib/fs/cachefs/cfsfstype mode=0555
+file path=usr/lib/fs/cachefs/cfstagchk mode=0555
+file path=usr/lib/fs/cachefs/dfshares mode=0555
+file path=usr/lib/fs/cachefs/fsck mode=0555
+file path=usr/lib/fs/cachefs/mount mode=0555
+file path=usr/lib/fs/cachefs/share mode=0555
+file path=usr/lib/fs/cachefs/umount mode=0555
+file path=usr/lib/fs/cachefs/unshare mode=0555
+file path=usr/lib/fs/ctfs/mount mode=0555
+file path=usr/lib/fs/fd/mount mode=0555
+file path=usr/lib/fs/hsfs/fstyp.so.1 mode=0555
+file path=usr/lib/fs/hsfs/labelit mode=0555
+file path=usr/lib/fs/lofs/mount mode=0555
+file path=usr/lib/fs/mntfs/mount mode=0555
+file path=usr/lib/fs/objfs/mount mode=0555
+file path=usr/lib/fs/proc/mount mode=0555
+file path=usr/lib/fs/sharefs/mount mode=0555
+file path=usr/lib/fs/tmpfs/mount mode=0555
+file path=usr/lib/fs/ufs/clri mode=0555
+file path=usr/lib/fs/ufs/df mode=0555
+file path=usr/lib/fs/ufs/edquota mode=0555
+file path=usr/lib/fs/ufs/ff mode=0555
+file path=usr/lib/fs/ufs/fsck mode=0555
+file path=usr/lib/fs/ufs/fsckall mode=0555
+file path=usr/lib/fs/ufs/fsdb mode=0555
+file path=usr/lib/fs/ufs/fsirand mode=0555
+file path=usr/lib/fs/ufs/fssnap mode=0555
+file path=usr/lib/fs/ufs/fstyp.so.1 mode=0555
+file path=usr/lib/fs/ufs/labelit mode=0555
+file path=usr/lib/fs/ufs/lockfs mode=0555
+file path=usr/lib/fs/ufs/mkfs mode=0555
+file path=usr/lib/fs/ufs/ncheck mode=0555
+file path=usr/lib/fs/ufs/newfs mode=0555
+file path=usr/lib/fs/ufs/quot mode=0555
+file path=usr/lib/fs/ufs/quota mode=4555
+file path=usr/lib/fs/ufs/quotacheck mode=0555
+file path=usr/lib/fs/ufs/quotaoff mode=0555
+file path=usr/lib/fs/ufs/repquota mode=0555
+file path=usr/lib/fs/ufs/tunefs mode=0555
+file path=usr/lib/fs/ufs/ufsdump mode=4555
+file path=usr/lib/fs/ufs/ufsrestore mode=4555
+file path=usr/lib/fs/ufs/volcopy mode=0555
+file path=usr/lib/getoptcvt mode=0555
+file path=usr/lib/help/auths/locale/C/AllSolAuthsHeader.html
+file path=usr/lib/help/auths/locale/C/AuditConfig.html
+file path=usr/lib/help/auths/locale/C/AuditHeader.html
+file path=usr/lib/help/auths/locale/C/AuditRead.html
+file path=usr/lib/help/auths/locale/C/AuthJobsAdmin.html
+file path=usr/lib/help/auths/locale/C/AuthJobsUser.html
+file path=usr/lib/help/auths/locale/C/AuthMMSDeviceLog.html
+file path=usr/lib/help/auths/locale/C/AuthMMSDeviceState.html
+file path=usr/lib/help/auths/locale/C/AuthMMSIORead.html
+file path=usr/lib/help/auths/locale/C/AuthMMSIOWrite.html
+file path=usr/lib/help/auths/locale/C/AuthMMSMedia.html
+file path=usr/lib/help/auths/locale/C/AuthMMSRequest.html
+file path=usr/lib/help/auths/locale/C/AuthProfmgrAssign.html
+file path=usr/lib/help/auths/locale/C/AuthProfmgrDelegate.html
+file path=usr/lib/help/auths/locale/C/AuthProfmgrExecattrWrite.html
+file path=usr/lib/help/auths/locale/C/AuthProfmgrRead.html
+file path=usr/lib/help/auths/locale/C/AuthProfmgrWrite.html
+file path=usr/lib/help/auths/locale/C/AuthReadNDMP.html
+file path=usr/lib/help/auths/locale/C/AuthReadSMB.html
+file path=usr/lib/help/auths/locale/C/AuthRoleAssign.html
+file path=usr/lib/help/auths/locale/C/AuthRoleDelegate.html
+file path=usr/lib/help/auths/locale/C/AuthRoleWrite.html
+file path=usr/lib/help/auths/locale/C/BindStates.html
+file path=usr/lib/help/auths/locale/C/DevAllocHeader.html
+file path=usr/lib/help/auths/locale/C/DevAllocate.html
+file path=usr/lib/help/auths/locale/C/DevConfig.html
+file path=usr/lib/help/auths/locale/C/DevGrant.html
+file path=usr/lib/help/auths/locale/C/DevRevoke.html
+file path=usr/lib/help/auths/locale/C/DhcpmgrHeader.html
+file path=usr/lib/help/auths/locale/C/DhcpmgrWrite.html
+file path=usr/lib/help/auths/locale/C/HotplugHeader.html
+file path=usr/lib/help/auths/locale/C/HotplugModify.html
+file path=usr/lib/help/auths/locale/C/IdmapRules.html
+file path=usr/lib/help/auths/locale/C/JobHeader.html
+file path=usr/lib/help/auths/locale/C/JobsGrant.html
+file path=usr/lib/help/auths/locale/C/LinkSecurity.html
+file path=usr/lib/help/auths/locale/C/LoginEnable.html
+file path=usr/lib/help/auths/locale/C/LoginHeader.html
+file path=usr/lib/help/auths/locale/C/LoginRemote.html
+file path=usr/lib/help/auths/locale/C/MMSHeader.html
+file path=usr/lib/help/auths/locale/C/NetworkAutoconfRead.html
+file path=usr/lib/help/auths/locale/C/NetworkAutoconfSelect.html
+file path=usr/lib/help/auths/locale/C/NetworkAutoconfWlan.html
+file path=usr/lib/help/auths/locale/C/NetworkAutoconfWrite.html
+file path=usr/lib/help/auths/locale/C/NetworkHeader.html
+file path=usr/lib/help/auths/locale/C/NetworkILBconf.html
+file path=usr/lib/help/auths/locale/C/NetworkILBenable.html
+file path=usr/lib/help/auths/locale/C/NetworkVRRP.html
+file path=usr/lib/help/auths/locale/C/PriAdmin.html
+file path=usr/lib/help/auths/locale/C/ProfmgrHeader.html
+file path=usr/lib/help/auths/locale/C/RoleHeader.html
+file path=usr/lib/help/auths/locale/C/SmfAutofsStates.html
+file path=usr/lib/help/auths/locale/C/SmfCoreadmStates.html
+file path=usr/lib/help/auths/locale/C/SmfCronStates.html
+file path=usr/lib/help/auths/locale/C/SmfExAcctFlowStates.html
+file path=usr/lib/help/auths/locale/C/SmfExAcctNetStates.html
+file path=usr/lib/help/auths/locale/C/SmfExAcctProcessStates.html
+file path=usr/lib/help/auths/locale/C/SmfExAcctTaskStates.html
+file path=usr/lib/help/auths/locale/C/SmfHeader.html
+file path=usr/lib/help/auths/locale/C/SmfILBStates.html
+file path=usr/lib/help/auths/locale/C/SmfIPsecStates.html
+file path=usr/lib/help/auths/locale/C/SmfIdmapStates.html
+file path=usr/lib/help/auths/locale/C/SmfInetdStates.html
+file path=usr/lib/help/auths/locale/C/SmfLocationStates.html
+file path=usr/lib/help/auths/locale/C/SmfMDNSStates.html
+file path=usr/lib/help/auths/locale/C/SmfManageHeader.html
+file path=usr/lib/help/auths/locale/C/SmfManageHotplug.html
+file path=usr/lib/help/auths/locale/C/SmfManageMMS.html
+file path=usr/lib/help/auths/locale/C/SmfManageZFSSnap.html
+file path=usr/lib/help/auths/locale/C/SmfModifyAppl.html
+file path=usr/lib/help/auths/locale/C/SmfModifyDepend.html
+file path=usr/lib/help/auths/locale/C/SmfModifyFramework.html
+file path=usr/lib/help/auths/locale/C/SmfModifyHeader.html
+file path=usr/lib/help/auths/locale/C/SmfModifyMethod.html
+file path=usr/lib/help/auths/locale/C/SmfNADDStates.html
+file path=usr/lib/help/auths/locale/C/SmfNDMPStates.html
+file path=usr/lib/help/auths/locale/C/SmfNWAMStates.html
+file path=usr/lib/help/auths/locale/C/SmfNscdStates.html
+file path=usr/lib/help/auths/locale/C/SmfPowerStates.html
+file path=usr/lib/help/auths/locale/C/SmfReparseStates.html
+file path=usr/lib/help/auths/locale/C/SmfRoutingStates.html
+file path=usr/lib/help/auths/locale/C/SmfSMBFSStates.html
+file path=usr/lib/help/auths/locale/C/SmfSMBStates.html
+file path=usr/lib/help/auths/locale/C/SmfSendmailStates.html
+file path=usr/lib/help/auths/locale/C/SmfSshStates.html
+file path=usr/lib/help/auths/locale/C/SmfSyslogStates.html
+file path=usr/lib/help/auths/locale/C/SmfVRRPStates.html
+file path=usr/lib/help/auths/locale/C/SmfValueCoreadm.html
+file path=usr/lib/help/auths/locale/C/SmfValueExAcctFlow.html
+file path=usr/lib/help/auths/locale/C/SmfValueExAcctNet.html
+file path=usr/lib/help/auths/locale/C/SmfValueExAcctProcess.html
+file path=usr/lib/help/auths/locale/C/SmfValueExAcctTask.html
+file path=usr/lib/help/auths/locale/C/SmfValueFirewall.html
+file path=usr/lib/help/auths/locale/C/SmfValueHeader.html
+file path=usr/lib/help/auths/locale/C/SmfValueIPsec.html
+file path=usr/lib/help/auths/locale/C/SmfValueIdmap.html
+file path=usr/lib/help/auths/locale/C/SmfValueInetd.html
+file path=usr/lib/help/auths/locale/C/SmfValueIscsitgt.html
+file path=usr/lib/help/auths/locale/C/SmfValueMDNS.html
+file path=usr/lib/help/auths/locale/C/SmfValueMMS.html
+file path=usr/lib/help/auths/locale/C/SmfValueNADD.html
+file path=usr/lib/help/auths/locale/C/SmfValueNDMP.html
+file path=usr/lib/help/auths/locale/C/SmfValueNWAM.html
+file path=usr/lib/help/auths/locale/C/SmfValueRouting.html
+file path=usr/lib/help/auths/locale/C/SmfValueSMB.html
+file path=usr/lib/help/auths/locale/C/SmfValueVscan.html
+file path=usr/lib/help/auths/locale/C/SmfValueVt.html
+file path=usr/lib/help/auths/locale/C/SmfVscanStates.html
+file path=usr/lib/help/auths/locale/C/SmfVtStates.html
+file path=usr/lib/help/auths/locale/C/SmfWpaStates.html
+file path=usr/lib/help/auths/locale/C/SysCpuPowerMgmt.html
+file path=usr/lib/help/auths/locale/C/SysDate.html
+file path=usr/lib/help/auths/locale/C/SysHeader.html
+file path=usr/lib/help/auths/locale/C/SysMaintenance.html
+file path=usr/lib/help/auths/locale/C/SysPowerMgmtBrightness.html
+file path=usr/lib/help/auths/locale/C/SysPowerMgmtHeader.html
+file path=usr/lib/help/auths/locale/C/SysPowerMgmtSuspend.html
+file path=usr/lib/help/auths/locale/C/SysPowerMgmtSuspendtoDisk.html
+file path=usr/lib/help/auths/locale/C/SysPowerMgmtSuspendtoRAM.html
+file path=usr/lib/help/auths/locale/C/SysShutdown.html
+file path=usr/lib/help/auths/locale/C/SysSyseventRead.html
+file path=usr/lib/help/auths/locale/C/SysSyseventWrite.html
+file path=usr/lib/help/auths/locale/C/WifiConfig.html
+file path=usr/lib/help/auths/locale/C/WifiWep.html
+file path=usr/lib/help/profiles/locale/C/RtAcctadm.html
+file path=usr/lib/help/profiles/locale/C/RtAll.html
+file path=usr/lib/help/profiles/locale/C/RtAuditCtrl.html
+file path=usr/lib/help/profiles/locale/C/RtAuditReview.html
+file path=usr/lib/help/profiles/locale/C/RtCPUPowerManagement.html
+file path=usr/lib/help/profiles/locale/C/RtConsUser.html
+file path=usr/lib/help/profiles/locale/C/RtContractObserver.html
+file path=usr/lib/help/profiles/locale/C/RtCronMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtCryptoMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtDHCPMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtDatAdmin.html
+file path=usr/lib/help/profiles/locale/C/RtDefault.html
+file path=usr/lib/help/profiles/locale/C/RtDeviceMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtDeviceSecurity.html
+file path=usr/lib/help/profiles/locale/C/RtExAcctFlow.html
+file path=usr/lib/help/profiles/locale/C/RtExAcctNet.html
+file path=usr/lib/help/profiles/locale/C/RtExAcctProcess.html
+file path=usr/lib/help/profiles/locale/C/RtExAcctTask.html
+file path=usr/lib/help/profiles/locale/C/RtFTPMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtFileSysMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtFileSysSecurity.html
+file path=usr/lib/help/profiles/locale/C/RtHotplugMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtIPFilterMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtIdmapMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtIdmapNameRulesMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtInetdMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtKerberosClntMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtKerberosSrvrMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtLogMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtMMSAdmin.html
+file path=usr/lib/help/profiles/locale/C/RtMMSOper.html
+file path=usr/lib/help/profiles/locale/C/RtMMSUser.html
+file path=usr/lib/help/profiles/locale/C/RtMailMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtMaintAndRepair.html
+file path=usr/lib/help/profiles/locale/C/RtMediaBkup.html
+file path=usr/lib/help/profiles/locale/C/RtMediaCtlg.html
+file path=usr/lib/help/profiles/locale/C/RtMediaRestore.html
+file path=usr/lib/help/profiles/locale/C/RtNDMPMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtNameServiceAdmin.html
+file path=usr/lib/help/profiles/locale/C/RtNameServiceSecure.html
+file path=usr/lib/help/profiles/locale/C/RtNetAutoconfAdmin.html
+file path=usr/lib/help/profiles/locale/C/RtNetAutoconfUser.html
+file path=usr/lib/help/profiles/locale/C/RtNetILB.html
+file path=usr/lib/help/profiles/locale/C/RtNetIPsec.html
+file path=usr/lib/help/profiles/locale/C/RtNetLinkSecure.html
+file path=usr/lib/help/profiles/locale/C/RtNetMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtNetObservability.html
+file path=usr/lib/help/profiles/locale/C/RtNetSecure.html
+file path=usr/lib/help/profiles/locale/C/RtNetVRRP.html
+file path=usr/lib/help/profiles/locale/C/RtNetWifiMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtNetWifiSecure.html
+file path=usr/lib/help/profiles/locale/C/RtObAccessMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtOperator.html
+file path=usr/lib/help/profiles/locale/C/RtPriAdmin.html
+file path=usr/lib/help/profiles/locale/C/RtPrntAdmin.html
+file path=usr/lib/help/profiles/locale/C/RtProcManagement.html
+file path=usr/lib/help/profiles/locale/C/RtReparseMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtRightsDelegate.html
+file path=usr/lib/help/profiles/locale/C/RtSMBFSMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtSMBMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtSoftwareInstall.html
+file path=usr/lib/help/profiles/locale/C/RtSysAdmin.html
+file path=usr/lib/help/profiles/locale/C/RtSysEvMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtSysPowerMgmt.html
+file path=usr/lib/help/profiles/locale/C/RtSysPowerMgmtBrightness.html
+file path=usr/lib/help/profiles/locale/C/RtSysPowerMgmtSuspend.html
+file path=usr/lib/help/profiles/locale/C/RtSysPowerMgmtSuspendtoDisk.html
+file path=usr/lib/help/profiles/locale/C/RtSysPowerMgmtSuspendtoRAM.html
+file path=usr/lib/help/profiles/locale/C/RtUserMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtUserSecurity.html
+file path=usr/lib/help/profiles/locale/C/RtVscanMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtZFSFileSysMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtZFSStorageMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtZoneMngmnt.html
+file path=usr/lib/hotplugd mode=0555
+file path=usr/lib/iconv/646da.8859.t mode=0444
+file path=usr/lib/iconv/646de.8859.t mode=0444
+file path=usr/lib/iconv/646en.8859.t mode=0444
+file path=usr/lib/iconv/646es.8859.t mode=0444
+file path=usr/lib/iconv/646fr.8859.t mode=0444
+file path=usr/lib/iconv/646it.8859.t mode=0444
+file path=usr/lib/iconv/646sv.8859.t mode=0444
+file path=usr/lib/iconv/8859.646.t mode=0444
+file path=usr/lib/iconv/8859.646da.t mode=0444
+file path=usr/lib/iconv/8859.646de.t mode=0444
+file path=usr/lib/iconv/8859.646en.t mode=0444
+file path=usr/lib/iconv/8859.646es.t mode=0444
+file path=usr/lib/iconv/8859.646fr.t mode=0444
+file path=usr/lib/iconv/8859.646it.t mode=0444
+file path=usr/lib/iconv/8859.646sv.t mode=0444
+file path=usr/lib/iconv/iconv_data mode=0444
+file path=usr/lib/idmapd mode=0555
+file path=usr/lib/inet/$(ARCH32)/in.iked mode=0555
+file path=usr/lib/inet/$(ARCH64)/in.iked mode=0555
+file path=usr/lib/inet/certdb mode=0555
+file path=usr/lib/inet/certlocal mode=0555
+file path=usr/lib/inet/certrldb mode=0555
+file path=usr/lib/inet/inetd mode=0555
+file path=usr/lib/intrd mode=0555
+file path=usr/lib/isaexec mode=0555
+file path=usr/lib/kssladm mode=0555
+$(sparc_ONLY)file path=usr/lib/ld.so
+file path=usr/lib/libshare.so.1
+file path=usr/lib/locale/C/locale_description mode=0444
+file path=usr/lib/localedef/extensions/generic_eucbc.x mode=0444
+file path=usr/lib/localedef/extensions/single_byte.x mode=0444
+file path=usr/lib/makekey mode=0555
+file path=usr/lib/more.help
+file path=usr/lib/newsyslog group=sys mode=0555
+file path=usr/lib/pci/pcidr mode=0555
+file path=usr/lib/pci/pcidr_plugin.so
+file path=usr/lib/platexec mode=0555
+file path=usr/lib/rcm/modules/SUNW_aggr_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_cluster_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_dump_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_filesys_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_ip_anon_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_ip_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_mpxio_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_network_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_swap_rcm.so mode=0555
+$(sparc_ONLY)file path=usr/lib/rcm/modules/SUNW_ttymux_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_vlan_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_vnic_rcm.so mode=0555
+file path=usr/lib/rcm/rcm_daemon mode=0555
+file path=usr/lib/reparse/reparsed group=sys mode=0555
+file path=usr/lib/saf/listen group=sys mode=0755
+file path=usr/lib/saf/nlps_server group=sys mode=0755
+file path=usr/lib/saf/sac group=sys mode=0555
+file path=usr/lib/saf/ttymon group=sys mode=0555
+file path=usr/lib/sysevent/modules/datalink_mod.so
+file path=usr/lib/sysevent/modules/devfsadmd_mod.so
+file path=usr/lib/sysevent/modules/sysevent_conf_mod.so
+file path=usr/lib/sysevent/modules/sysevent_reg_mod.so
+file path=usr/lib/sysevent/syseventconfd mode=0555
+file path=usr/lib/sysevent/syseventd mode=0555
+file path=usr/lib/t300 mode=0555
+file path=usr/lib/t300s mode=0555
+file path=usr/lib/t4014 mode=0555
+file path=usr/lib/t450 mode=0555
+file path=usr/lib/utmp_update mode=4555
+file path=usr/lib/utmpd mode=0555
+file path=usr/lib/vplot mode=0555
+file path=usr/lib/vtdaemon mode=0555
+file path=usr/lib/vtinfo mode=0555
+file path=usr/lib/vtxlock mode=0555
+file path=usr/sadm/bin/puttext mode=0555
+file path=usr/sadm/install/miniroot.db group=sys mode=0444
+file path=usr/sadm/install/scripts/i.ipsecalgs group=sys mode=0555
+file path=usr/sadm/install/scripts/i.kcfconf group=sys mode=0555
+file path=usr/sadm/install/scripts/i.kmfconf group=sys mode=0555
+file path=usr/sadm/install/scripts/i.manifest group=sys mode=0555
+file path=usr/sadm/install/scripts/i.pkcs11conf group=sys mode=0555
+file path=usr/sadm/install/scripts/i.rbac group=sys mode=0555
+file path=usr/sadm/install/scripts/r.ipsecalgs group=sys mode=0555
+file path=usr/sadm/install/scripts/r.kcfconf group=sys mode=0555
+file path=usr/sadm/install/scripts/r.kmfconf group=sys mode=0555
+file path=usr/sadm/install/scripts/r.manifest group=sys mode=0555
+file path=usr/sadm/install/scripts/r.pkcs11conf group=sys mode=0555
+file path=usr/sadm/install/scripts/r.rbac group=sys mode=0555
+file path=usr/sadm/sysadm/bin/mkdtab mode=0755
+file path=usr/sadm/ugdates mode=0444
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/add_drv group=sys mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/modinfo group=sys mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/modload group=sys mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/modunload group=sys mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/pbind group=sys mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/prtconf group=sys mode=2555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/psrset group=sys mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/rem_drv group=sys mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/swap group=sys mode=2555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/sysdef group=sys mode=2555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/update_drv group=sys mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/whodo mode=4555
+file path=usr/sbin/$(ARCH64)/add_drv group=sys mode=0555
+file path=usr/sbin/$(ARCH64)/modinfo group=sys mode=0555
+file path=usr/sbin/$(ARCH64)/modload group=sys mode=0555
+file path=usr/sbin/$(ARCH64)/modunload group=sys mode=0555
+file path=usr/sbin/$(ARCH64)/pbind group=sys mode=0555
+file path=usr/sbin/$(ARCH64)/prtconf group=sys mode=2555
+file path=usr/sbin/$(ARCH64)/psrset group=sys mode=0555
+file path=usr/sbin/$(ARCH64)/rem_drv group=sys mode=0555
+file path=usr/sbin/$(ARCH64)/swap group=sys mode=2555
+file path=usr/sbin/$(ARCH64)/sysdef group=sys mode=2555
+file path=usr/sbin/$(ARCH64)/update_drv group=sys mode=0555
+file path=usr/sbin/$(ARCH64)/whodo mode=4555
+file path=usr/sbin/6to4relay mode=0555
+file path=usr/sbin/acctadm mode=0555
+file path=usr/sbin/allocate mode=4555
+file path=usr/sbin/arp mode=0555
+file path=usr/sbin/audit mode=0555
+file path=usr/sbin/auditconfig mode=0555
+file path=usr/sbin/auditd mode=0555
+file path=usr/sbin/auditrecord mode=0555
+file path=usr/sbin/auditreduce mode=0555
+file path=usr/sbin/auditstat mode=0555
+file path=usr/sbin/cfgadm mode=0555
+file path=usr/sbin/chroot mode=0555
+file path=usr/sbin/clear_locks mode=0555
+file path=usr/sbin/clinfo mode=0555
+file path=usr/sbin/clri mode=0555
+file path=usr/sbin/consadm group=sys mode=0555
+file path=usr/sbin/cron group=sys mode=0555
+file path=usr/sbin/devfsadm group=sys mode=0755
+file path=usr/sbin/devinfo mode=0555
+file path=usr/sbin/df mode=0555
+file path=usr/sbin/dfmounts mode=0555
+file path=usr/sbin/dispadmin mode=0555
+file path=usr/sbin/dminfo mode=0555
+file path=usr/sbin/dumpadm mode=0555
+file path=usr/sbin/eeprom group=sys mode=2555
+file path=usr/sbin/ff mode=0555
+file path=usr/sbin/fmthard group=sys mode=0555
+file path=usr/sbin/format mode=0555
+file path=usr/sbin/fsck mode=0555
+file path=usr/sbin/fstyp group=sys mode=0555
+file path=usr/sbin/fuser mode=0555
+file path=usr/sbin/getdevpolicy group=sys mode=0555
+file path=usr/sbin/getmajor group=sys mode=0755
+file path=usr/sbin/groupadd group=sys mode=0555
+file path=usr/sbin/groupdel group=sys mode=0555
+file path=usr/sbin/groupmod group=sys mode=0555
+file path=usr/sbin/grpck mode=0555
+file path=usr/sbin/halt mode=0755
+file path=usr/sbin/hotplug mode=0555
+file path=usr/sbin/idmap mode=0555
+file path=usr/sbin/if_mpadm mode=0555
+file path=usr/sbin/ikeadm mode=0555
+file path=usr/sbin/ikecert mode=0555
+file path=usr/sbin/inetadm mode=0555
+file path=usr/sbin/inetconv mode=0555
+file path=usr/sbin/install mode=0555
+file path=usr/sbin/installboot group=sys mode=0555
+file path=usr/sbin/ipaddrsel mode=0555
+file path=usr/sbin/ipsecalgs mode=0555
+file path=usr/sbin/ipsecconf mode=0555
+file path=usr/sbin/ipseckey mode=0555
+file path=usr/sbin/keyserv group=sys mode=0555
+file path=usr/sbin/killall mode=0555
+file path=usr/sbin/ksslcfg mode=0555
+file path=usr/sbin/link mode=0555
+file path=usr/sbin/locator mode=0555
+file path=usr/sbin/lofiadm mode=0555
+file path=usr/sbin/logadm mode=0555
+file path=usr/sbin/makedbm mode=0555
+file path=usr/sbin/mkdevalloc mode=0555
+file path=usr/sbin/mkfile mode=0555
+file path=usr/sbin/mknod mode=0555
+file path=usr/sbin/mountall group=sys mode=0555
+file path=usr/sbin/msgid mode=0555
+file path=usr/sbin/mvdir mode=0555
+file path=usr/sbin/ndd mode=0555
+file path=usr/sbin/netservices group=sys mode=0555
+file path=usr/sbin/nlsadmin group=adm mode=0755
+file path=usr/sbin/nscd mode=0555
+file path=usr/sbin/nwamadm mode=0555
+file path=usr/sbin/nwamcfg mode=0555
+file path=usr/sbin/passmgmt group=sys mode=0555
+file path=usr/sbin/pmadm group=sys mode=0555
+file path=usr/sbin/praudit mode=0555
+$(i386_ONLY)file path=usr/sbin/prtdiag group=sys mode=2755
+file path=usr/sbin/prtvtoc group=sys mode=0555
+file path=usr/sbin/psradm group=sys mode=0555
+file path=usr/sbin/psrinfo group=sys mode=0555
+file path=usr/sbin/pwck mode=0555
+file path=usr/sbin/pwconv group=sys mode=0555
+file path=usr/sbin/raidctl mode=0555
+file path=usr/sbin/ramdiskadm mode=0555
+file path=usr/sbin/rctladm mode=0555
+file path=usr/sbin/root_archive group=sys mode=0555
+file path=usr/sbin/rpcbind mode=0555
+$(i386_ONLY)file path=usr/sbin/rtc mode=0555
+file path=usr/sbin/sacadm group=sys mode=4755
+file path=usr/sbin/setmnt mode=0555
+file path=usr/sbin/shareall mode=0555
+file path=usr/sbin/sharectl mode=0555
+file path=usr/sbin/sharemgr mode=0555
+file path=usr/sbin/shutdown group=sys mode=0755
+file path=usr/sbin/smbios mode=0555
+file path=usr/sbin/stmsboot mode=0555
+file path=usr/sbin/strace group=sys mode=0555
+file path=usr/sbin/strclean group=sys mode=0555
+file path=usr/sbin/strerr group=sys mode=0555
+file path=usr/sbin/sttydefs group=sys mode=0755
+file path=usr/sbin/svcadm mode=0555
+file path=usr/sbin/svccfg mode=0555
+file path=usr/sbin/syncinit mode=0555
+file path=usr/sbin/syncloop mode=0555
+file path=usr/sbin/syncstat mode=0555
+file path=usr/sbin/syseventadm group=sys mode=0555
+file path=usr/sbin/syslogd group=sys mode=0555
+file path=usr/sbin/tar mode=0555
+file path=usr/sbin/traceroute mode=4555
+file path=usr/sbin/ttyadm group=sys mode=0755
+$(i386_ONLY)file path=usr/sbin/ucodeadm mode=0555
+file path=usr/sbin/umountall group=sys mode=0555
+file path=usr/sbin/unlink mode=0555
+file path=usr/sbin/unshareall mode=0555
+file path=usr/sbin/useradd group=sys mode=0555
+file path=usr/sbin/userdel group=sys mode=0555
+file path=usr/sbin/usermod group=sys mode=0555
+$(sparc_ONLY)file path=usr/sbin/virtinfo mode=0555
+file path=usr/sbin/volcopy mode=0555
+file path=usr/sbin/wall group=tty mode=2555
+file path=usr/sbin/zdump mode=0555
+file path=usr/sbin/zic mode=0555
+file path=usr/share/doc/ksh/COMPATIBILITY
+file path=usr/share/doc/ksh/DESIGN
+file path=usr/share/doc/ksh/OBSOLETE
+file path=usr/share/doc/ksh/README
+file path=usr/share/doc/ksh/RELEASE
+file path=usr/share/doc/ksh/TYPES
+file path=usr/share/doc/ksh/images/callouts/1.png
+file path=usr/share/doc/ksh/images/callouts/10.png
+file path=usr/share/doc/ksh/images/callouts/2.png
+file path=usr/share/doc/ksh/images/callouts/3.png
+file path=usr/share/doc/ksh/images/callouts/4.png
+file path=usr/share/doc/ksh/images/callouts/5.png
+file path=usr/share/doc/ksh/images/callouts/6.png
+file path=usr/share/doc/ksh/images/callouts/7.png
+file path=usr/share/doc/ksh/images/callouts/8.png
+file path=usr/share/doc/ksh/images/callouts/9.png
+file path=usr/share/doc/ksh/images/tag_bourne.png
+file path=usr/share/doc/ksh/images/tag_i18n.png
+file path=usr/share/doc/ksh/images/tag_ksh.png
+file path=usr/share/doc/ksh/images/tag_ksh88.png
+file path=usr/share/doc/ksh/images/tag_ksh93.png
+file path=usr/share/doc/ksh/images/tag_l10n.png
+file path=usr/share/doc/ksh/images/tag_perf.png
+file path=usr/share/doc/ksh/shell_styleguide.docbook
+file path=usr/share/doc/ksh/shell_styleguide.html
+file path=usr/share/lib/mailx/mailx.help
+file path=usr/share/lib/mailx/mailx.help.~
+file path=usr/share/lib/tabset/3101
+file path=usr/share/lib/tabset/beehive
+file path=usr/share/lib/tabset/hds
+file path=usr/share/lib/tabset/hds3
+file path=usr/share/lib/tabset/std
+file path=usr/share/lib/tabset/stdcrt
+file path=usr/share/lib/tabset/teleray
+file path=usr/share/lib/tabset/vt100
+file path=usr/share/lib/tabset/wyse-adds
+file path=usr/share/lib/tabset/xerox1720
+file path=usr/share/lib/termcap
+file path=usr/share/lib/terminfo/A/AT386-DOS
+file path=usr/share/lib/terminfo/A/AT386-DOS-M
+file path=usr/share/lib/terminfo/a/ansi
+file path=usr/share/lib/terminfo/a/ansi+arrows
+file path=usr/share/lib/terminfo/a/ansi+cup
+file path=usr/share/lib/terminfo/a/ansi+erase
+file path=usr/share/lib/terminfo/a/ansi+idc
+file path=usr/share/lib/terminfo/a/ansi+idl
+file path=usr/share/lib/terminfo/a/ansi+idl1
+file path=usr/share/lib/terminfo/a/ansi+inittabs
+file path=usr/share/lib/terminfo/a/ansi+local
+file path=usr/share/lib/terminfo/a/ansi+local1
+file path=usr/share/lib/terminfo/a/ansi+pp
+file path=usr/share/lib/terminfo/a/ansi+rca
+file path=usr/share/lib/terminfo/a/ansi+rep
+file path=usr/share/lib/terminfo/a/ansi+sgr
+file path=usr/share/lib/terminfo/a/ansi+sgrbold
+file path=usr/share/lib/terminfo/a/ansi+sgrdim
+file path=usr/share/lib/terminfo/a/ansi+sgrso
+file path=usr/share/lib/terminfo/a/ansi+sgrul
+file path=usr/share/lib/terminfo/a/ansi+tabs
+file path=usr/share/lib/terminfo/a/at386
+file path=usr/share/lib/terminfo/a/at386-m
+file path=usr/share/lib/terminfo/s/screen
+file path=usr/share/lib/terminfo/s/screen-w
+file path=usr/share/lib/terminfo/s/sun
+file path=usr/share/lib/terminfo/s/sun-1
+file path=usr/share/lib/terminfo/s/sun-12
+file path=usr/share/lib/terminfo/s/sun-17
+file path=usr/share/lib/terminfo/s/sun-24
+file path=usr/share/lib/terminfo/s/sun-34
+file path=usr/share/lib/terminfo/s/sun-48
+file path=usr/share/lib/terminfo/s/sun-cmd
+file path=usr/share/lib/terminfo/s/sun-color
+file path=usr/share/lib/terminfo/s/sun-e
+file path=usr/share/lib/terminfo/s/sun-e-s
+file path=usr/share/lib/terminfo/s/sun-na
+file path=usr/share/lib/terminfo/s/sun-s
+file path=usr/share/lib/terminfo/u/unknown
+file path=usr/share/lib/terminfo/v/vs100
+file path=usr/share/lib/terminfo/v/vs100s
+file path=usr/share/lib/terminfo/v/vt100
+file path=usr/share/lib/terminfo/v/vt100-bot-s
+file path=usr/share/lib/terminfo/v/vt100-nam
+file path=usr/share/lib/terminfo/v/vt100-nam-w
+file path=usr/share/lib/terminfo/v/vt100-nav
+file path=usr/share/lib/terminfo/v/vt100-nav-w
+file path=usr/share/lib/terminfo/v/vt100-np
+file path=usr/share/lib/terminfo/v/vt100-s
+file path=usr/share/lib/terminfo/v/vt100-w
+file path=usr/share/lib/terminfo/v/vt100am
+file path=usr/share/lib/terminfo/v/vt100nam
+file path=usr/share/lib/terminfo/v/vt100s
+file path=usr/share/lib/terminfo/v/vt100w
+file path=usr/share/lib/terminfo/v/vt132
+file path=usr/share/lib/terminfo/v/vt220
+file path=usr/share/lib/terminfo/x/xtermc
+file path=usr/share/lib/terminfo/x/xtermm
+file path=usr/share/lib/unittab
+file path=usr/share/lib/xml/dtd/adt_record.dtd.1
+file path=usr/share/lib/xml/dtd/kmfpolicy.dtd
+file path=usr/share/lib/xml/dtd/service_bundle.dtd.1 group=sys
+file path=usr/share/lib/xml/style/adt_record.xsl.1
+file path=usr/share/lib/zoneinfo/Africa/Abidjan
+file path=usr/share/lib/zoneinfo/Africa/Accra
+file path=usr/share/lib/zoneinfo/Africa/Addis_Ababa
+file path=usr/share/lib/zoneinfo/Africa/Algiers
+file path=usr/share/lib/zoneinfo/Africa/Asmara
+file path=usr/share/lib/zoneinfo/Africa/Bamako
+file path=usr/share/lib/zoneinfo/Africa/Bangui
+file path=usr/share/lib/zoneinfo/Africa/Banjul
+file path=usr/share/lib/zoneinfo/Africa/Bissau
+file path=usr/share/lib/zoneinfo/Africa/Blantyre
+file path=usr/share/lib/zoneinfo/Africa/Brazzaville
+file path=usr/share/lib/zoneinfo/Africa/Bujumbura
+file path=usr/share/lib/zoneinfo/Africa/Cairo
+file path=usr/share/lib/zoneinfo/Africa/Casablanca
+file path=usr/share/lib/zoneinfo/Africa/Ceuta
+file path=usr/share/lib/zoneinfo/Africa/Conakry
+file path=usr/share/lib/zoneinfo/Africa/Dakar
+file path=usr/share/lib/zoneinfo/Africa/Dar_es_Salaam
+file path=usr/share/lib/zoneinfo/Africa/Djibouti
+file path=usr/share/lib/zoneinfo/Africa/Douala
+file path=usr/share/lib/zoneinfo/Africa/El_Aaiun
+file path=usr/share/lib/zoneinfo/Africa/Freetown
+file path=usr/share/lib/zoneinfo/Africa/Gaborone
+file path=usr/share/lib/zoneinfo/Africa/Harare
+file path=usr/share/lib/zoneinfo/Africa/Johannesburg
+file path=usr/share/lib/zoneinfo/Africa/Kampala
+file path=usr/share/lib/zoneinfo/Africa/Khartoum
+file path=usr/share/lib/zoneinfo/Africa/Kigali
+file path=usr/share/lib/zoneinfo/Africa/Kinshasa
+file path=usr/share/lib/zoneinfo/Africa/Lagos
+file path=usr/share/lib/zoneinfo/Africa/Libreville
+file path=usr/share/lib/zoneinfo/Africa/Lome
+file path=usr/share/lib/zoneinfo/Africa/Luanda
+file path=usr/share/lib/zoneinfo/Africa/Lubumbashi
+file path=usr/share/lib/zoneinfo/Africa/Lusaka
+file path=usr/share/lib/zoneinfo/Africa/Malabo
+file path=usr/share/lib/zoneinfo/Africa/Maputo
+file path=usr/share/lib/zoneinfo/Africa/Maseru
+file path=usr/share/lib/zoneinfo/Africa/Mbabane
+file path=usr/share/lib/zoneinfo/Africa/Mogadishu
+file path=usr/share/lib/zoneinfo/Africa/Monrovia
+file path=usr/share/lib/zoneinfo/Africa/Nairobi
+file path=usr/share/lib/zoneinfo/Africa/Ndjamena
+file path=usr/share/lib/zoneinfo/Africa/Niamey
+file path=usr/share/lib/zoneinfo/Africa/Nouakchott
+file path=usr/share/lib/zoneinfo/Africa/Ouagadougou
+file path=usr/share/lib/zoneinfo/Africa/Porto-Novo
+file path=usr/share/lib/zoneinfo/Africa/Sao_Tome
+file path=usr/share/lib/zoneinfo/Africa/Tripoli
+file path=usr/share/lib/zoneinfo/Africa/Tunis
+file path=usr/share/lib/zoneinfo/Africa/Windhoek
+file path=usr/share/lib/zoneinfo/America/Adak
+file path=usr/share/lib/zoneinfo/America/Anchorage
+file path=usr/share/lib/zoneinfo/America/Anguilla
+file path=usr/share/lib/zoneinfo/America/Antigua
+file path=usr/share/lib/zoneinfo/America/Araguaina
+file path=usr/share/lib/zoneinfo/America/Argentina/Buenos_Aires
+file path=usr/share/lib/zoneinfo/America/Argentina/Catamarca
+file path=usr/share/lib/zoneinfo/America/Argentina/Cordoba
+file path=usr/share/lib/zoneinfo/America/Argentina/Jujuy
+file path=usr/share/lib/zoneinfo/America/Argentina/La_Rioja
+file path=usr/share/lib/zoneinfo/America/Argentina/Mendoza
+file path=usr/share/lib/zoneinfo/America/Argentina/Rio_Gallegos
+file path=usr/share/lib/zoneinfo/America/Argentina/Salta
+file path=usr/share/lib/zoneinfo/America/Argentina/San_Juan
+file path=usr/share/lib/zoneinfo/America/Argentina/San_Luis
+file path=usr/share/lib/zoneinfo/America/Argentina/Tucuman
+file path=usr/share/lib/zoneinfo/America/Argentina/Ushuaia
+file path=usr/share/lib/zoneinfo/America/Aruba
+file path=usr/share/lib/zoneinfo/America/Asuncion
+file path=usr/share/lib/zoneinfo/America/Atikokan
+file path=usr/share/lib/zoneinfo/America/Bahia
+file path=usr/share/lib/zoneinfo/America/Barbados
+file path=usr/share/lib/zoneinfo/America/Belem
+file path=usr/share/lib/zoneinfo/America/Belize
+file path=usr/share/lib/zoneinfo/America/Blanc-Sablon
+file path=usr/share/lib/zoneinfo/America/Boa_Vista
+file path=usr/share/lib/zoneinfo/America/Bogota
+file path=usr/share/lib/zoneinfo/America/Boise
+file path=usr/share/lib/zoneinfo/America/Cambridge_Bay
+file path=usr/share/lib/zoneinfo/America/Campo_Grande
+file path=usr/share/lib/zoneinfo/America/Cancun
+file path=usr/share/lib/zoneinfo/America/Caracas
+file path=usr/share/lib/zoneinfo/America/Cayenne
+file path=usr/share/lib/zoneinfo/America/Cayman
+file path=usr/share/lib/zoneinfo/America/Chicago
+file path=usr/share/lib/zoneinfo/America/Chihuahua
+file path=usr/share/lib/zoneinfo/America/Costa_Rica
+file path=usr/share/lib/zoneinfo/America/Cuiaba
+file path=usr/share/lib/zoneinfo/America/Curacao
+file path=usr/share/lib/zoneinfo/America/Danmarkshavn
+file path=usr/share/lib/zoneinfo/America/Dawson
+file path=usr/share/lib/zoneinfo/America/Dawson_Creek
+file path=usr/share/lib/zoneinfo/America/Denver
+file path=usr/share/lib/zoneinfo/America/Detroit
+file path=usr/share/lib/zoneinfo/America/Dominica
+file path=usr/share/lib/zoneinfo/America/Edmonton
+file path=usr/share/lib/zoneinfo/America/Eirunepe
+file path=usr/share/lib/zoneinfo/America/El_Salvador
+file path=usr/share/lib/zoneinfo/America/Fortaleza
+file path=usr/share/lib/zoneinfo/America/Glace_Bay
+file path=usr/share/lib/zoneinfo/America/Godthab
+file path=usr/share/lib/zoneinfo/America/Goose_Bay
+file path=usr/share/lib/zoneinfo/America/Grand_Turk
+file path=usr/share/lib/zoneinfo/America/Grenada
+file path=usr/share/lib/zoneinfo/America/Guadeloupe
+file path=usr/share/lib/zoneinfo/America/Guatemala
+file path=usr/share/lib/zoneinfo/America/Guayaquil
+file path=usr/share/lib/zoneinfo/America/Guyana
+file path=usr/share/lib/zoneinfo/America/Halifax
+file path=usr/share/lib/zoneinfo/America/Havana
+file path=usr/share/lib/zoneinfo/America/Hermosillo
+file path=usr/share/lib/zoneinfo/America/Indiana/Indianapolis
+file path=usr/share/lib/zoneinfo/America/Indiana/Knox
+file path=usr/share/lib/zoneinfo/America/Indiana/Marengo
+file path=usr/share/lib/zoneinfo/America/Indiana/Petersburg
+file path=usr/share/lib/zoneinfo/America/Indiana/Tell_City
+file path=usr/share/lib/zoneinfo/America/Indiana/Vevay
+file path=usr/share/lib/zoneinfo/America/Indiana/Vincennes
+file path=usr/share/lib/zoneinfo/America/Indiana/Winamac
+file path=usr/share/lib/zoneinfo/America/Inuvik
+file path=usr/share/lib/zoneinfo/America/Iqaluit
+file path=usr/share/lib/zoneinfo/America/Jamaica
+file path=usr/share/lib/zoneinfo/America/Juneau
+file path=usr/share/lib/zoneinfo/America/Kentucky/Louisville
+file path=usr/share/lib/zoneinfo/America/Kentucky/Monticello
+file path=usr/share/lib/zoneinfo/America/La_Paz
+file path=usr/share/lib/zoneinfo/America/Lima
+file path=usr/share/lib/zoneinfo/America/Los_Angeles
+file path=usr/share/lib/zoneinfo/America/Maceio
+file path=usr/share/lib/zoneinfo/America/Managua
+file path=usr/share/lib/zoneinfo/America/Manaus
+file path=usr/share/lib/zoneinfo/America/Martinique
+file path=usr/share/lib/zoneinfo/America/Matamoros
+file path=usr/share/lib/zoneinfo/America/Mazatlan
+file path=usr/share/lib/zoneinfo/America/Menominee
+file path=usr/share/lib/zoneinfo/America/Merida
+file path=usr/share/lib/zoneinfo/America/Mexico_City
+file path=usr/share/lib/zoneinfo/America/Miquelon
+file path=usr/share/lib/zoneinfo/America/Moncton
+file path=usr/share/lib/zoneinfo/America/Monterrey
+file path=usr/share/lib/zoneinfo/America/Montevideo
+file path=usr/share/lib/zoneinfo/America/Montreal
+file path=usr/share/lib/zoneinfo/America/Montserrat
+file path=usr/share/lib/zoneinfo/America/Nassau
+file path=usr/share/lib/zoneinfo/America/New_York
+file path=usr/share/lib/zoneinfo/America/Nipigon
+file path=usr/share/lib/zoneinfo/America/Nome
+file path=usr/share/lib/zoneinfo/America/Noronha
+file path=usr/share/lib/zoneinfo/America/North_Dakota/Center
+file path=usr/share/lib/zoneinfo/America/North_Dakota/New_Salem
+file path=usr/share/lib/zoneinfo/America/Ojinaga
+file path=usr/share/lib/zoneinfo/America/Panama
+file path=usr/share/lib/zoneinfo/America/Pangnirtung
+file path=usr/share/lib/zoneinfo/America/Paramaribo
+file path=usr/share/lib/zoneinfo/America/Phoenix
+file path=usr/share/lib/zoneinfo/America/Port-au-Prince
+file path=usr/share/lib/zoneinfo/America/Port_of_Spain
+file path=usr/share/lib/zoneinfo/America/Porto_Velho
+file path=usr/share/lib/zoneinfo/America/Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Rainy_River
+file path=usr/share/lib/zoneinfo/America/Rankin_Inlet
+file path=usr/share/lib/zoneinfo/America/Recife
+file path=usr/share/lib/zoneinfo/America/Regina
+file path=usr/share/lib/zoneinfo/America/Resolute
+file path=usr/share/lib/zoneinfo/America/Rio_Branco
+file path=usr/share/lib/zoneinfo/America/Santa_Isabel
+file path=usr/share/lib/zoneinfo/America/Santarem
+file path=usr/share/lib/zoneinfo/America/Santiago
+file path=usr/share/lib/zoneinfo/America/Santo_Domingo
+file path=usr/share/lib/zoneinfo/America/Sao_Paulo
+file path=usr/share/lib/zoneinfo/America/Scoresbysund
+file path=usr/share/lib/zoneinfo/America/St_Johns
+file path=usr/share/lib/zoneinfo/America/St_Kitts
+file path=usr/share/lib/zoneinfo/America/St_Lucia
+file path=usr/share/lib/zoneinfo/America/St_Thomas
+file path=usr/share/lib/zoneinfo/America/St_Vincent
+file path=usr/share/lib/zoneinfo/America/Swift_Current
+file path=usr/share/lib/zoneinfo/America/Tegucigalpa
+file path=usr/share/lib/zoneinfo/America/Thule
+file path=usr/share/lib/zoneinfo/America/Thunder_Bay
+file path=usr/share/lib/zoneinfo/America/Tijuana
+file path=usr/share/lib/zoneinfo/America/Toronto
+file path=usr/share/lib/zoneinfo/America/Tortola
+file path=usr/share/lib/zoneinfo/America/Vancouver
+file path=usr/share/lib/zoneinfo/America/Whitehorse
+file path=usr/share/lib/zoneinfo/America/Winnipeg
+file path=usr/share/lib/zoneinfo/America/Yakutat
+file path=usr/share/lib/zoneinfo/America/Yellowknife
+file path=usr/share/lib/zoneinfo/Antarctica/Casey
+file path=usr/share/lib/zoneinfo/Antarctica/Davis
+file path=usr/share/lib/zoneinfo/Antarctica/DumontDUrville
+file path=usr/share/lib/zoneinfo/Antarctica/Mawson
+file path=usr/share/lib/zoneinfo/Antarctica/McMurdo
+file path=usr/share/lib/zoneinfo/Antarctica/Palmer
+file path=usr/share/lib/zoneinfo/Antarctica/Rothera
+file path=usr/share/lib/zoneinfo/Antarctica/Syowa
+file path=usr/share/lib/zoneinfo/Antarctica/Vostok
+file path=usr/share/lib/zoneinfo/Asia/Aden
+file path=usr/share/lib/zoneinfo/Asia/Almaty
+file path=usr/share/lib/zoneinfo/Asia/Amman
+file path=usr/share/lib/zoneinfo/Asia/Anadyr
+file path=usr/share/lib/zoneinfo/Asia/Aqtau
+file path=usr/share/lib/zoneinfo/Asia/Aqtobe
+file path=usr/share/lib/zoneinfo/Asia/Ashgabat
+file path=usr/share/lib/zoneinfo/Asia/Baghdad
+file path=usr/share/lib/zoneinfo/Asia/Bahrain
+file path=usr/share/lib/zoneinfo/Asia/Baku
+file path=usr/share/lib/zoneinfo/Asia/Bangkok
+file path=usr/share/lib/zoneinfo/Asia/Beirut
+file path=usr/share/lib/zoneinfo/Asia/Bishkek
+file path=usr/share/lib/zoneinfo/Asia/Brunei
+file path=usr/share/lib/zoneinfo/Asia/Choibalsan
+file path=usr/share/lib/zoneinfo/Asia/Chongqing
+file path=usr/share/lib/zoneinfo/Asia/Colombo
+file path=usr/share/lib/zoneinfo/Asia/Damascus
+file path=usr/share/lib/zoneinfo/Asia/Dhaka
+file path=usr/share/lib/zoneinfo/Asia/Dili
+file path=usr/share/lib/zoneinfo/Asia/Dubai
+file path=usr/share/lib/zoneinfo/Asia/Dushanbe
+file path=usr/share/lib/zoneinfo/Asia/Gaza
+file path=usr/share/lib/zoneinfo/Asia/Harbin
+file path=usr/share/lib/zoneinfo/Asia/Ho_Chi_Minh
+file path=usr/share/lib/zoneinfo/Asia/Hong_Kong
+file path=usr/share/lib/zoneinfo/Asia/Hovd
+file path=usr/share/lib/zoneinfo/Asia/Irkutsk
+file path=usr/share/lib/zoneinfo/Asia/Jakarta
+file path=usr/share/lib/zoneinfo/Asia/Jayapura
+file path=usr/share/lib/zoneinfo/Asia/Jerusalem
+file path=usr/share/lib/zoneinfo/Asia/Kabul
+file path=usr/share/lib/zoneinfo/Asia/Kamchatka
+file path=usr/share/lib/zoneinfo/Asia/Karachi
+file path=usr/share/lib/zoneinfo/Asia/Kashgar
+file path=usr/share/lib/zoneinfo/Asia/Kathmandu
+file path=usr/share/lib/zoneinfo/Asia/Kolkata
+file path=usr/share/lib/zoneinfo/Asia/Krasnoyarsk
+file path=usr/share/lib/zoneinfo/Asia/Kuala_Lumpur
+file path=usr/share/lib/zoneinfo/Asia/Kuching
+file path=usr/share/lib/zoneinfo/Asia/Kuwait
+file path=usr/share/lib/zoneinfo/Asia/Macau
+file path=usr/share/lib/zoneinfo/Asia/Magadan
+file path=usr/share/lib/zoneinfo/Asia/Makassar
+file path=usr/share/lib/zoneinfo/Asia/Manila
+file path=usr/share/lib/zoneinfo/Asia/Muscat
+file path=usr/share/lib/zoneinfo/Asia/Nicosia
+file path=usr/share/lib/zoneinfo/Asia/Novokuznetsk
+file path=usr/share/lib/zoneinfo/Asia/Novosibirsk
+file path=usr/share/lib/zoneinfo/Asia/Omsk
+file path=usr/share/lib/zoneinfo/Asia/Oral
+file path=usr/share/lib/zoneinfo/Asia/Phnom_Penh
+file path=usr/share/lib/zoneinfo/Asia/Pontianak
+file path=usr/share/lib/zoneinfo/Asia/Pyongyang
+file path=usr/share/lib/zoneinfo/Asia/Qatar
+file path=usr/share/lib/zoneinfo/Asia/Qyzylorda
+file path=usr/share/lib/zoneinfo/Asia/Rangoon
+file path=usr/share/lib/zoneinfo/Asia/Riyadh
+file path=usr/share/lib/zoneinfo/Asia/Riyadh87
+file path=usr/share/lib/zoneinfo/Asia/Riyadh88
+file path=usr/share/lib/zoneinfo/Asia/Riyadh89
+file path=usr/share/lib/zoneinfo/Asia/Sakhalin
+file path=usr/share/lib/zoneinfo/Asia/Samarkand
+file path=usr/share/lib/zoneinfo/Asia/Seoul
+file path=usr/share/lib/zoneinfo/Asia/Shanghai
+file path=usr/share/lib/zoneinfo/Asia/Singapore
+file path=usr/share/lib/zoneinfo/Asia/Taipei
+file path=usr/share/lib/zoneinfo/Asia/Tashkent
+file path=usr/share/lib/zoneinfo/Asia/Tbilisi
+file path=usr/share/lib/zoneinfo/Asia/Tehran
+file path=usr/share/lib/zoneinfo/Asia/Thimphu
+file path=usr/share/lib/zoneinfo/Asia/Tokyo
+file path=usr/share/lib/zoneinfo/Asia/Ulaanbaatar
+file path=usr/share/lib/zoneinfo/Asia/Urumqi
+file path=usr/share/lib/zoneinfo/Asia/Vientiane
+file path=usr/share/lib/zoneinfo/Asia/Vladivostok
+file path=usr/share/lib/zoneinfo/Asia/Yakutsk
+file path=usr/share/lib/zoneinfo/Asia/Yekaterinburg
+file path=usr/share/lib/zoneinfo/Asia/Yerevan
+file path=usr/share/lib/zoneinfo/Atlantic/Azores
+file path=usr/share/lib/zoneinfo/Atlantic/Bermuda
+file path=usr/share/lib/zoneinfo/Atlantic/Canary
+file path=usr/share/lib/zoneinfo/Atlantic/Cape_Verde
+file path=usr/share/lib/zoneinfo/Atlantic/Faroe
+file path=usr/share/lib/zoneinfo/Atlantic/Madeira
+file path=usr/share/lib/zoneinfo/Atlantic/Reykjavik
+file path=usr/share/lib/zoneinfo/Atlantic/South_Georgia
+file path=usr/share/lib/zoneinfo/Atlantic/St_Helena
+file path=usr/share/lib/zoneinfo/Atlantic/Stanley
+file path=usr/share/lib/zoneinfo/Australia/Adelaide
+file path=usr/share/lib/zoneinfo/Australia/Brisbane
+file path=usr/share/lib/zoneinfo/Australia/Broken_Hill
+file path=usr/share/lib/zoneinfo/Australia/Currie
+file path=usr/share/lib/zoneinfo/Australia/Darwin
+file path=usr/share/lib/zoneinfo/Australia/Eucla
+file path=usr/share/lib/zoneinfo/Australia/Hobart
+file path=usr/share/lib/zoneinfo/Australia/Lindeman
+file path=usr/share/lib/zoneinfo/Australia/Lord_Howe
+file path=usr/share/lib/zoneinfo/Australia/Melbourne
+file path=usr/share/lib/zoneinfo/Australia/Perth
+file path=usr/share/lib/zoneinfo/Australia/Sydney
+file path=usr/share/lib/zoneinfo/CET
+file path=usr/share/lib/zoneinfo/CST6CDT
+file path=usr/share/lib/zoneinfo/EET
+file path=usr/share/lib/zoneinfo/EST
+file path=usr/share/lib/zoneinfo/EST5EDT
+file path=usr/share/lib/zoneinfo/Etc/GMT
+file path=usr/share/lib/zoneinfo/Etc/GMT+1
+file path=usr/share/lib/zoneinfo/Etc/GMT+10
+file path=usr/share/lib/zoneinfo/Etc/GMT+11
+file path=usr/share/lib/zoneinfo/Etc/GMT+12
+file path=usr/share/lib/zoneinfo/Etc/GMT+2
+file path=usr/share/lib/zoneinfo/Etc/GMT+3
+file path=usr/share/lib/zoneinfo/Etc/GMT+4
+file path=usr/share/lib/zoneinfo/Etc/GMT+5
+file path=usr/share/lib/zoneinfo/Etc/GMT+6
+file path=usr/share/lib/zoneinfo/Etc/GMT+7
+file path=usr/share/lib/zoneinfo/Etc/GMT+8
+file path=usr/share/lib/zoneinfo/Etc/GMT+9
+file path=usr/share/lib/zoneinfo/Etc/GMT-1
+file path=usr/share/lib/zoneinfo/Etc/GMT-10
+file path=usr/share/lib/zoneinfo/Etc/GMT-11
+file path=usr/share/lib/zoneinfo/Etc/GMT-12
+file path=usr/share/lib/zoneinfo/Etc/GMT-13
+file path=usr/share/lib/zoneinfo/Etc/GMT-14
+file path=usr/share/lib/zoneinfo/Etc/GMT-2
+file path=usr/share/lib/zoneinfo/Etc/GMT-3
+file path=usr/share/lib/zoneinfo/Etc/GMT-4
+file path=usr/share/lib/zoneinfo/Etc/GMT-5
+file path=usr/share/lib/zoneinfo/Etc/GMT-6
+file path=usr/share/lib/zoneinfo/Etc/GMT-7
+file path=usr/share/lib/zoneinfo/Etc/GMT-8
+file path=usr/share/lib/zoneinfo/Etc/GMT-9
+file path=usr/share/lib/zoneinfo/Etc/UCT
+file path=usr/share/lib/zoneinfo/Etc/UTC
+file path=usr/share/lib/zoneinfo/Europe/Amsterdam
+file path=usr/share/lib/zoneinfo/Europe/Andorra
+file path=usr/share/lib/zoneinfo/Europe/Athens
+file path=usr/share/lib/zoneinfo/Europe/Belgrade
+file path=usr/share/lib/zoneinfo/Europe/Berlin
+file path=usr/share/lib/zoneinfo/Europe/Brussels
+file path=usr/share/lib/zoneinfo/Europe/Bucharest
+file path=usr/share/lib/zoneinfo/Europe/Budapest
+file path=usr/share/lib/zoneinfo/Europe/Chisinau
+file path=usr/share/lib/zoneinfo/Europe/Copenhagen
+file path=usr/share/lib/zoneinfo/Europe/Dublin
+file path=usr/share/lib/zoneinfo/Europe/Gibraltar
+file path=usr/share/lib/zoneinfo/Europe/Helsinki
+file path=usr/share/lib/zoneinfo/Europe/Istanbul
+file path=usr/share/lib/zoneinfo/Europe/Kaliningrad
+file path=usr/share/lib/zoneinfo/Europe/Kiev
+file path=usr/share/lib/zoneinfo/Europe/Lisbon
+file path=usr/share/lib/zoneinfo/Europe/London
+file path=usr/share/lib/zoneinfo/Europe/Luxembourg
+file path=usr/share/lib/zoneinfo/Europe/Madrid
+file path=usr/share/lib/zoneinfo/Europe/Malta
+file path=usr/share/lib/zoneinfo/Europe/Minsk
+file path=usr/share/lib/zoneinfo/Europe/Monaco
+file path=usr/share/lib/zoneinfo/Europe/Moscow
+file path=usr/share/lib/zoneinfo/Europe/Oslo
+file path=usr/share/lib/zoneinfo/Europe/Paris
+file path=usr/share/lib/zoneinfo/Europe/Prague
+file path=usr/share/lib/zoneinfo/Europe/Riga
+file path=usr/share/lib/zoneinfo/Europe/Rome
+file path=usr/share/lib/zoneinfo/Europe/Samara
+file path=usr/share/lib/zoneinfo/Europe/Simferopol
+file path=usr/share/lib/zoneinfo/Europe/Sofia
+file path=usr/share/lib/zoneinfo/Europe/Stockholm
+file path=usr/share/lib/zoneinfo/Europe/Tallinn
+file path=usr/share/lib/zoneinfo/Europe/Tirane
+file path=usr/share/lib/zoneinfo/Europe/Uzhgorod
+file path=usr/share/lib/zoneinfo/Europe/Vaduz
+file path=usr/share/lib/zoneinfo/Europe/Vienna
+file path=usr/share/lib/zoneinfo/Europe/Vilnius
+file path=usr/share/lib/zoneinfo/Europe/Volgograd
+file path=usr/share/lib/zoneinfo/Europe/Warsaw
+file path=usr/share/lib/zoneinfo/Europe/Zaporozhye
+file path=usr/share/lib/zoneinfo/Europe/Zurich
+file path=usr/share/lib/zoneinfo/Factory
+file path=usr/share/lib/zoneinfo/HST
+file path=usr/share/lib/zoneinfo/Indian/Antananarivo
+file path=usr/share/lib/zoneinfo/Indian/Chagos
+file path=usr/share/lib/zoneinfo/Indian/Christmas
+file path=usr/share/lib/zoneinfo/Indian/Cocos
+file path=usr/share/lib/zoneinfo/Indian/Comoro
+file path=usr/share/lib/zoneinfo/Indian/Kerguelen
+file path=usr/share/lib/zoneinfo/Indian/Mahe
+file path=usr/share/lib/zoneinfo/Indian/Maldives
+file path=usr/share/lib/zoneinfo/Indian/Mauritius
+file path=usr/share/lib/zoneinfo/Indian/Mayotte
+file path=usr/share/lib/zoneinfo/Indian/Reunion
+file path=usr/share/lib/zoneinfo/MET
+file path=usr/share/lib/zoneinfo/MST
+file path=usr/share/lib/zoneinfo/MST7MDT
+file path=usr/share/lib/zoneinfo/PST8PDT
+file path=usr/share/lib/zoneinfo/Pacific/Apia
+file path=usr/share/lib/zoneinfo/Pacific/Auckland
+file path=usr/share/lib/zoneinfo/Pacific/Chatham
+file path=usr/share/lib/zoneinfo/Pacific/Easter
+file path=usr/share/lib/zoneinfo/Pacific/Efate
+file path=usr/share/lib/zoneinfo/Pacific/Enderbury
+file path=usr/share/lib/zoneinfo/Pacific/Fakaofo
+file path=usr/share/lib/zoneinfo/Pacific/Fiji
+file path=usr/share/lib/zoneinfo/Pacific/Funafuti
+file path=usr/share/lib/zoneinfo/Pacific/Galapagos
+file path=usr/share/lib/zoneinfo/Pacific/Gambier
+file path=usr/share/lib/zoneinfo/Pacific/Guadalcanal
+file path=usr/share/lib/zoneinfo/Pacific/Guam
+file path=usr/share/lib/zoneinfo/Pacific/Honolulu
+file path=usr/share/lib/zoneinfo/Pacific/Johnston
+file path=usr/share/lib/zoneinfo/Pacific/Kiritimati
+file path=usr/share/lib/zoneinfo/Pacific/Kosrae
+file path=usr/share/lib/zoneinfo/Pacific/Kwajalein
+file path=usr/share/lib/zoneinfo/Pacific/Majuro
+file path=usr/share/lib/zoneinfo/Pacific/Marquesas
+file path=usr/share/lib/zoneinfo/Pacific/Midway
+file path=usr/share/lib/zoneinfo/Pacific/Nauru
+file path=usr/share/lib/zoneinfo/Pacific/Niue
+file path=usr/share/lib/zoneinfo/Pacific/Norfolk
+file path=usr/share/lib/zoneinfo/Pacific/Noumea
+file path=usr/share/lib/zoneinfo/Pacific/Pago_Pago
+file path=usr/share/lib/zoneinfo/Pacific/Palau
+file path=usr/share/lib/zoneinfo/Pacific/Pitcairn
+file path=usr/share/lib/zoneinfo/Pacific/Ponape
+file path=usr/share/lib/zoneinfo/Pacific/Port_Moresby
+file path=usr/share/lib/zoneinfo/Pacific/Rarotonga
+file path=usr/share/lib/zoneinfo/Pacific/Saipan
+file path=usr/share/lib/zoneinfo/Pacific/Tahiti
+file path=usr/share/lib/zoneinfo/Pacific/Tarawa
+file path=usr/share/lib/zoneinfo/Pacific/Tongatapu
+file path=usr/share/lib/zoneinfo/Pacific/Truk
+file path=usr/share/lib/zoneinfo/Pacific/Wake
+file path=usr/share/lib/zoneinfo/Pacific/Wallis
+file path=usr/share/lib/zoneinfo/WET
+file path=usr/share/lib/zoneinfo/src/README
+file path=usr/share/lib/zoneinfo/src/africa
+file path=usr/share/lib/zoneinfo/src/antarctica
+file path=usr/share/lib/zoneinfo/src/asia
+file path=usr/share/lib/zoneinfo/src/australasia
+file path=usr/share/lib/zoneinfo/src/backward
+file path=usr/share/lib/zoneinfo/src/etcetera
+file path=usr/share/lib/zoneinfo/src/europe
+file path=usr/share/lib/zoneinfo/src/factory
+file path=usr/share/lib/zoneinfo/src/northamerica
+file path=usr/share/lib/zoneinfo/src/pacificnew
+file path=usr/share/lib/zoneinfo/src/solar87
+file path=usr/share/lib/zoneinfo/src/solar88
+file path=usr/share/lib/zoneinfo/src/solar89
+file path=usr/share/lib/zoneinfo/src/southamerica
+file path=usr/share/lib/zoneinfo/src/systemv
+file path=usr/share/lib/zoneinfo/tab/continent.tab
+file path=usr/share/lib/zoneinfo/tab/country.tab
+file path=usr/share/lib/zoneinfo/tab/zone_sun.tab
+file path=usr/xpg4/bin/sh mode=0555
+file path=var/adm/aculog mode=0600 owner=uucp preserve=true
+file path=var/adm/spellhist mode=0666 preserve=true
+file path=var/adm/utmpx preserve=true
+file path=var/adm/wtmpx group=adm owner=adm preserve=true
+file path=var/log/authlog group=sys mode=0600 preserve=true
+file path=var/log/syslog group=sys preserve=true
+file path=var/sadm/system/admin/default_java group=sys mode=0444
+file path=var/saf/zsmon/log group=sys preserve=true
+file path=var/spool/cron/crontabs/adm group=sys mode=0600 preserve=true
+file path=var/spool/cron/crontabs/root group=sys mode=0600 preserve=true
+file path=var/svc/manifest/milestone/multi-user-server.xml group=sys mode=0444
+file path=var/svc/manifest/milestone/multi-user.xml group=sys mode=0444
+file path=var/svc/manifest/milestone/name-services.xml group=sys mode=0444
+file path=var/svc/manifest/milestone/network.xml group=sys mode=0444
+file path=var/svc/manifest/milestone/single-user.xml group=sys mode=0444
+file path=var/svc/manifest/milestone/sysconfig.xml group=sys mode=0444
+file path=var/svc/manifest/network/dlmgmt.xml group=sys mode=0444
+file path=var/svc/manifest/network/dns/client.xml group=sys mode=0444
+file path=var/svc/manifest/network/forwarding.xml group=sys mode=0444
+file path=var/svc/manifest/network/inetd-upgrade.xml group=sys mode=0444
+file path=var/svc/manifest/network/inetd.xml group=sys mode=0444
+file path=var/svc/manifest/network/ipsec/ike.xml group=sys mode=0444
+file path=var/svc/manifest/network/ipsec/ipsecalgs.xml group=sys mode=0444
+file path=var/svc/manifest/network/ipsec/manual-key.xml group=sys mode=0444
+file path=var/svc/manifest/network/ipsec/policy.xml group=sys mode=0444
+file path=var/svc/manifest/network/ldap/client.xml group=sys mode=0444
+file path=var/svc/manifest/network/network-initial.xml group=sys mode=0444
+file path=var/svc/manifest/network/network-ipqos.xml group=sys mode=0444
+file path=var/svc/manifest/network/network-iptun.xml group=sys mode=0444
+file path=var/svc/manifest/network/network-location.xml group=sys mode=0444
+file path=var/svc/manifest/network/network-loopback.xml group=sys mode=0444
+file path=var/svc/manifest/network/network-netcfg.xml group=sys mode=0444
+file path=var/svc/manifest/network/network-netmask.xml group=sys mode=0444
+file path=var/svc/manifest/network/network-physical.xml group=sys mode=0444
+file path=var/svc/manifest/network/network-routing-setup.xml group=sys mode=0444
+file path=var/svc/manifest/network/network-service.xml group=sys mode=0444
+file path=var/svc/manifest/network/routing/legacy-routing.xml group=sys \
+    mode=0444
+file path=var/svc/manifest/network/rpc/bind.xml group=sys mode=0444
+file path=var/svc/manifest/network/rpc/keyserv.xml group=sys mode=0444
+file path=var/svc/manifest/network/shares/group.xml group=sys mode=0444
+file path=var/svc/manifest/network/shares/reparsed.xml group=sys mode=0444
+file path=var/svc/manifest/network/ssl/kssl-proxy.xml group=sys mode=0444
+file path=var/svc/manifest/system/auditd.xml group=sys mode=0444
+file path=var/svc/manifest/system/boot-archive-update.xml group=sys mode=0444
+file path=var/svc/manifest/system/boot-archive.xml group=sys mode=0444
+file path=var/svc/manifest/system/boot-config.xml group=sys mode=0444
+file path=var/svc/manifest/system/consadm.xml group=sys mode=0444
+file path=var/svc/manifest/system/console-login.xml group=sys mode=0444
+file path=var/svc/manifest/system/coreadm.xml group=sys mode=0444
+file path=var/svc/manifest/system/cron.xml group=sys mode=0444
+file path=var/svc/manifest/system/cryptosvc.xml group=sys mode=0444
+file path=var/svc/manifest/system/device/devices-audio.xml group=sys mode=0444
+file path=var/svc/manifest/system/device/devices-local.xml group=sys mode=0444
+file path=var/svc/manifest/system/device/mpxio-upgrade.xml group=sys mode=0444
+file path=var/svc/manifest/system/extended-accounting.xml group=sys mode=0444
+file path=var/svc/manifest/system/filesystem/local-fs.xml group=sys mode=0444
+file path=var/svc/manifest/system/filesystem/minimal-fs.xml group=sys mode=0444
+file path=var/svc/manifest/system/filesystem/root-fs.xml group=sys mode=0444
+file path=var/svc/manifest/system/filesystem/usr-fs.xml group=sys mode=0444
+$(i386_ONLY)file path=var/svc/manifest/system/hostid.xml group=sys mode=0444
+file path=var/svc/manifest/system/hotplug.xml group=sys mode=0444
+file path=var/svc/manifest/system/identity.xml group=sys mode=0444
+file path=var/svc/manifest/system/idmap.xml group=sys mode=0444
+file path=var/svc/manifest/system/keymap.xml group=sys mode=0444
+file path=var/svc/manifest/system/manifest-import.xml group=sys mode=0444
+file path=var/svc/manifest/system/name-service-cache.xml group=sys mode=0444
+file path=var/svc/manifest/system/rbac.xml group=sys mode=0444
+file path=var/svc/manifest/system/rmtmpfiles.xml group=sys mode=0444
+file path=var/svc/manifest/system/sac.xml group=sys mode=0444
+file path=var/svc/manifest/system/svc/global.xml group=sys mode=0444
+file path=var/svc/manifest/system/svc/restarter.xml group=sys mode=0444
+file path=var/svc/manifest/system/system-log.xml group=sys mode=0444
+file path=var/svc/manifest/system/utmp.xml group=sys mode=0444
+file path=var/svc/manifest/system/vtdaemon.xml group=sys mode=0444
+file path=var/svc/profile/generic_limited_net.xml group=sys mode=0444
+file path=var/svc/profile/generic_open.xml group=sys mode=0444
+file path=var/svc/profile/inetd_generic.xml group=sys mode=0444
+file path=var/svc/profile/inetd_upgrade.xml group=sys mode=0444
+file path=var/svc/profile/ns_dns.xml group=sys mode=0444
+file path=var/svc/profile/ns_files.xml group=sys mode=0444
+file path=var/svc/profile/ns_ldap.xml group=sys mode=0444
+file path=var/svc/profile/ns_nis.xml group=sys mode=0444
+file path=var/svc/profile/ns_none.xml group=sys mode=0444
+$(sparc_ONLY)file path=var/svc/profile/platform_SUNW,SPARC-Enterprise.xml \
+    group=sys mode=0444
+$(sparc_ONLY)file path=var/svc/profile/platform_SUNW,Sun-Fire-15000.xml \
+    group=sys mode=0444
+$(sparc_ONLY)file path=var/svc/profile/platform_SUNW,Sun-Fire-880.xml group=sys \
+    mode=0444
+$(sparc_ONLY)file path=var/svc/profile/platform_SUNW,Sun-Fire.xml group=sys \
+    mode=0444
+$(sparc_ONLY)file path=var/svc/profile/platform_SUNW,Ultra-Enterprise-10000.xml \
+    group=sys mode=0444
+$(sparc_ONLY)file path=var/svc/profile/platform_SUNW,UltraSPARC-IIi-Netract.xml \
+    group=sys mode=0444
+file path=var/svc/profile/platform_none.xml group=sys mode=0444
+$(sparc_ONLY)file path=var/svc/profile/platform_sun4v.xml group=sys mode=0444
+file path=var/svc/profile/prophist.SUNWcsr group=sys mode=0444
+hardlink path=etc/crypto/certs/SUNWObjectCA \
+    target=../../../etc/certs/SUNWObjectCA
+hardlink path=etc/rc2.d/S20sysetup target=../../etc/init.d/sysetup
+hardlink path=etc/rc2.d/S73cachefs.daemon target=../../etc/init.d/cachefs.daemon
+hardlink path=etc/rc2.d/S82mkdtab target=../../etc/init.d/mkdtab
+hardlink path=etc/rc2.d/S89PRESERVE target=../../etc/init.d/PRESERVE
+hardlink path=etc/rc2.d/S98deallocate target=../../etc/init.d/deallocate
+hardlink path=sbin/rc5 target=../sbin/rc0
+hardlink path=sbin/rc6 target=../sbin/rc0
+hardlink path=usr/bin/$(ARCH32)/encrypt target=decrypt
+hardlink path=usr/bin/$(ARCH32)/ksh target=ksh93
+hardlink path=usr/bin/$(ARCH32)/mac target=digest
+hardlink path=usr/bin/$(ARCH32)/pfksh target=ksh93
+hardlink path=usr/bin/$(ARCH32)/pfksh93 target=ksh93
+hardlink path=usr/bin/$(ARCH32)/pfrksh target=ksh93
+hardlink path=usr/bin/$(ARCH32)/pfrksh93 target=ksh93
+hardlink path=usr/bin/$(ARCH32)/rksh target=ksh93
+hardlink path=usr/bin/$(ARCH32)/rksh93 target=ksh93
+$(i386_ONLY)hardlink path=usr/bin/$(ARCH32)/w target=uptime
+hardlink path=usr/bin/$(ARCH64)/encrypt target=decrypt
+hardlink path=usr/bin/$(ARCH64)/ksh target=ksh93
+hardlink path=usr/bin/$(ARCH64)/mac target=digest
+hardlink path=usr/bin/$(ARCH64)/pfksh target=ksh93
+hardlink path=usr/bin/$(ARCH64)/pfksh93 target=ksh93
+hardlink path=usr/bin/$(ARCH64)/pfrksh target=ksh93
+hardlink path=usr/bin/$(ARCH64)/pfrksh93 target=ksh93
+hardlink path=usr/bin/$(ARCH64)/rksh target=ksh93
+hardlink path=usr/bin/$(ARCH64)/rksh93 target=ksh93
+hardlink path=usr/bin/$(ARCH64)/w target=uptime
+hardlink path=usr/bin/bg target=../../usr/bin/alias
+hardlink path=usr/bin/cd target=../../usr/bin/alias
+hardlink path=usr/bin/cksum target=../../usr/bin/alias
+hardlink path=usr/bin/cmp target=../../usr/bin/alias
+hardlink path=usr/bin/comm target=../../usr/bin/alias
+hardlink path=usr/bin/command target=../../usr/bin/alias
+hardlink path=usr/bin/cut target=../../usr/bin/alias
+hardlink path=usr/bin/decrypt target=../../usr/lib/isaexec
+hardlink path=usr/bin/digest target=../../usr/lib/isaexec
+hardlink path=usr/bin/dispgid target=../../usr/bin/ckgid
+hardlink path=usr/bin/dispuid target=../../usr/bin/ckuid
+hardlink path=usr/bin/edit target=../has/bin/edit
+hardlink path=usr/bin/encrypt target=../../usr/lib/isaexec
+hardlink path=usr/bin/fc target=../../usr/bin/alias
+hardlink path=usr/bin/fg target=../../usr/bin/alias
+hardlink path=usr/bin/getopts target=../../usr/bin/alias
+hardlink path=usr/bin/hash target=../../usr/bin/alias
+hardlink path=usr/bin/i386 target=../../usr/bin/i286
+hardlink path=usr/bin/i486 target=../../usr/bin/i286
+hardlink path=usr/bin/i860 target=../../usr/bin/i286
+hardlink path=usr/bin/i86pc target=../../usr/bin/i286
+hardlink path=usr/bin/iAPX286 target=../../usr/bin/i286
+hardlink path=usr/bin/jobs target=../../usr/bin/alias
+hardlink path=usr/bin/join target=../../usr/bin/alias
+hardlink path=usr/bin/kill target=../../usr/bin/alias
+hardlink path=usr/bin/ksh target=../../usr/lib/isaexec
+hardlink path=usr/bin/ksh93 target=../../usr/lib/isaexec
+hardlink path=usr/bin/ln target=../../usr/bin/cp
+hardlink path=usr/bin/logname target=../../usr/bin/alias
+hardlink path=usr/bin/m68k target=../../usr/bin/i286
+hardlink path=usr/bin/mac target=../../usr/lib/isaexec
+hardlink path=usr/bin/mc68000 target=../../usr/bin/i286
+hardlink path=usr/bin/mc68010 target=../../usr/bin/i286
+hardlink path=usr/bin/mc68020 target=../../usr/bin/i286
+hardlink path=usr/bin/mc68030 target=../../usr/bin/i286
+hardlink path=usr/bin/mc68040 target=../../usr/bin/i286
+hardlink path=usr/bin/mv target=../../usr/bin/cp
+hardlink path=usr/bin/newtask target=../../usr/lib/isaexec
+hardlink path=usr/bin/nohup target=../../usr/lib/isaexec
+hardlink path=usr/bin/page target=../../usr/bin/more
+hardlink path=usr/bin/paste target=../../usr/bin/alias
+hardlink path=usr/bin/pdp11 target=../../usr/bin/i286
+hardlink path=usr/bin/pfcsh target=../../usr/bin/csh
+hardlink path=usr/bin/pfksh target=../../usr/lib/isaexec
+hardlink path=usr/bin/pfksh93 target=../../usr/lib/isaexec
+hardlink path=usr/bin/pfrksh target=../../usr/lib/isaexec
+hardlink path=usr/bin/pfrksh93 target=../../usr/lib/isaexec
+hardlink path=usr/bin/pkill target=../../usr/bin/pgrep
+hardlink path=usr/bin/prctl target=../../usr/lib/isaexec
+hardlink path=usr/bin/print target=../../usr/bin/alias
+hardlink path=usr/bin/prstat target=../../usr/lib/isaexec
+hardlink path=usr/bin/ps target=../../usr/lib/isaexec
+hardlink path=usr/bin/read target=../../usr/bin/alias
+hardlink path=usr/bin/red target=../../usr/bin/ed
+hardlink path=usr/bin/rev target=../../usr/bin/alias
+hardlink path=usr/bin/rksh target=../../usr/lib/isaexec
+hardlink path=usr/bin/rksh93 target=../../usr/lib/isaexec
+hardlink path=usr/bin/savecore target=../../usr/lib/isaexec
+hardlink path=usr/bin/setuname target=../../usr/lib/isaexec
+hardlink path=usr/bin/sleep target=../../usr/bin/alias
+hardlink path=usr/bin/sparc target=../../usr/bin/i286
+hardlink path=usr/bin/sum target=../../usr/bin/alias
+hardlink path=usr/bin/sun target=../../usr/bin/i286
+hardlink path=usr/bin/sun2 target=../../usr/bin/i286
+hardlink path=usr/bin/sun3 target=../../usr/bin/i286
+hardlink path=usr/bin/sun3x target=../../usr/bin/i286
+hardlink path=usr/bin/sun4 target=../../usr/bin/i286
+hardlink path=usr/bin/sun4c target=../../usr/bin/i286
+hardlink path=usr/bin/sun4d target=../../usr/bin/i286
+hardlink path=usr/bin/sun4e target=../../usr/bin/i286
+hardlink path=usr/bin/sun4m target=../../usr/bin/i286
+hardlink path=usr/bin/tee target=../../usr/bin/alias
+hardlink path=usr/bin/test target=../../usr/bin/alias
+hardlink path=usr/bin/touch target=../../usr/bin/settime
+hardlink path=usr/bin/type target=../../usr/bin/alias
+hardlink path=usr/bin/u370 target=../../usr/bin/i286
+hardlink path=usr/bin/u3b target=../../usr/bin/i286
+hardlink path=usr/bin/u3b15 target=../../usr/bin/i286
+hardlink path=usr/bin/u3b2 target=../../usr/bin/i286
+hardlink path=usr/bin/u3b5 target=../../usr/bin/i286
+hardlink path=usr/bin/ulimit target=../../usr/bin/alias
+hardlink path=usr/bin/umask target=../../usr/bin/alias
+hardlink path=usr/bin/unalias target=../../usr/bin/alias
+hardlink path=usr/bin/uniq target=../../usr/bin/alias
+hardlink path=usr/bin/uptime target=../../usr/lib/isaexec
+hardlink path=usr/bin/vax target=../../usr/bin/i286
+hardlink path=usr/bin/vedit target=../has/bin/edit
+hardlink path=usr/bin/w target=../../usr/lib/isaexec
+hardlink path=usr/bin/wait target=../../usr/bin/alias
+hardlink path=usr/bin/wc target=../../usr/bin/alias
+hardlink path=usr/has/bin/ex target=edit
+hardlink path=usr/has/bin/vedit target=edit
+hardlink path=usr/has/bin/vi target=edit
+hardlink path=usr/has/bin/view target=edit
+hardlink path=usr/lib/fs/hsfs/fstyp target=../../../sbin/fstyp
+hardlink path=usr/lib/fs/ufs/dcopy target=../../../../usr/lib/fs/ufs/clri
+hardlink path=usr/lib/fs/ufs/fstyp target=../../../sbin/fstyp
+hardlink path=usr/lib/fs/ufs/quotaon target=../../../../usr/lib/fs/ufs/quotaoff
+hardlink path=usr/lib/inet/in.iked target=../../../usr/lib/isaexec
+hardlink path=usr/sadm/bin/dispgid target=../../../usr/bin/ckgid
+hardlink path=usr/sadm/bin/dispuid target=../../../usr/bin/ckuid
+hardlink path=usr/sadm/bin/errange target=../../../usr/bin/ckrange
+hardlink path=usr/sadm/bin/errdate target=../../../usr/bin/ckdate
+hardlink path=usr/sadm/bin/errgid target=../../../usr/bin/ckgid
+hardlink path=usr/sadm/bin/errint target=../../../usr/bin/ckint
+hardlink path=usr/sadm/bin/erritem target=../../../usr/bin/ckitem
+hardlink path=usr/sadm/bin/errpath target=../../../usr/bin/ckpath
+hardlink path=usr/sadm/bin/errstr target=../../../usr/bin/ckstr
+hardlink path=usr/sadm/bin/errtime target=../../../usr/bin/cktime
+hardlink path=usr/sadm/bin/erruid target=../../../usr/bin/ckuid
+hardlink path=usr/sadm/bin/erryorn target=../../../usr/bin/ckyorn
+hardlink path=usr/sadm/bin/helpdate target=../../../usr/bin/ckdate
+hardlink path=usr/sadm/bin/helpgid target=../../../usr/bin/ckgid
+hardlink path=usr/sadm/bin/helpint target=../../../usr/bin/ckint
+hardlink path=usr/sadm/bin/helpitem target=../../../usr/bin/ckitem
+hardlink path=usr/sadm/bin/helppath target=../../../usr/bin/ckpath
+hardlink path=usr/sadm/bin/helprange target=../../../usr/bin/ckrange
+hardlink path=usr/sadm/bin/helpstr target=../../../usr/bin/ckstr
+hardlink path=usr/sadm/bin/helptime target=../../../usr/bin/cktime
+hardlink path=usr/sadm/bin/helpuid target=../../../usr/bin/ckuid
+hardlink path=usr/sadm/bin/helpyorn target=../../../usr/bin/ckyorn
+hardlink path=usr/sadm/bin/valdate target=../../../usr/bin/ckdate
+hardlink path=usr/sadm/bin/valgid target=../../../usr/bin/ckgid
+hardlink path=usr/sadm/bin/valint target=../../../usr/bin/ckint
+hardlink path=usr/sadm/bin/valpath target=../../../usr/bin/ckpath
+hardlink path=usr/sadm/bin/valrange target=../../../usr/bin/ckrange
+hardlink path=usr/sadm/bin/valstr target=../../../usr/bin/ckstr
+hardlink path=usr/sadm/bin/valtime target=../../../usr/bin/cktime
+hardlink path=usr/sadm/bin/valuid target=../../../usr/bin/ckuid
+hardlink path=usr/sadm/bin/valyorn target=../../../usr/bin/ckyorn
+hardlink path=usr/sbin/add_drv target=../../usr/lib/isaexec
+hardlink path=usr/sbin/audlinks target=./devfsadm
+hardlink path=usr/sbin/consadmd target=../../usr/sbin/consadm
+hardlink path=usr/sbin/deallocate target=../../usr/sbin/allocate
+hardlink path=usr/sbin/devlinks target=./devfsadm
+hardlink path=usr/sbin/dfshares target=../../usr/sbin/dfmounts
+hardlink path=usr/sbin/disks target=./devfsadm
+hardlink path=usr/sbin/drvconfig target=./devfsadm
+hardlink path=usr/sbin/list_devices target=../../usr/sbin/allocate
+hardlink path=usr/sbin/mkdevmaps target=../../usr/sbin/mkdevalloc
+hardlink path=usr/sbin/modinfo target=../../usr/lib/isaexec
+hardlink path=usr/sbin/modload target=../../usr/lib/isaexec
+hardlink path=usr/sbin/modunload target=../../usr/lib/isaexec
+hardlink path=usr/sbin/pbind target=../../usr/lib/isaexec
+hardlink path=usr/sbin/ports target=./devfsadm
+hardlink path=usr/sbin/poweroff target=./halt
+hardlink path=usr/sbin/prtconf target=../../usr/lib/isaexec
+$(sparc_ONLY)hardlink path=usr/sbin/prtdiag target=../../usr/lib/platexec
+hardlink path=usr/sbin/psrset target=../../usr/lib/isaexec
+hardlink path=usr/sbin/reboot target=./halt
+hardlink path=usr/sbin/rem_drv target=../../usr/lib/isaexec
+hardlink path=usr/sbin/roleadd target=../../usr/sbin/useradd
+hardlink path=usr/sbin/roledel target=../../usr/sbin/userdel
+hardlink path=usr/sbin/rolemod target=../../usr/sbin/usermod
+hardlink path=usr/sbin/share target=../../usr/sbin/sharemgr
+hardlink path=usr/sbin/swap target=../../usr/lib/isaexec
+hardlink path=usr/sbin/sysdef target=../../usr/lib/isaexec
+hardlink path=usr/sbin/tapes target=./devfsadm
+hardlink path=usr/sbin/trapstat target=../../usr/lib/platexec
+hardlink path=usr/sbin/unshare target=../../usr/sbin/sharemgr
+hardlink path=usr/sbin/update_drv target=../../usr/lib/isaexec
+hardlink path=usr/sbin/whodo target=../../usr/lib/isaexec
+hardlink path=usr/share/lib/terminfo/3/386AT \
+    target=../../../../../usr/share/lib/terminfo/a/at386
+hardlink path=usr/share/lib/terminfo/3/386AT-M \
+    target=../../../../../usr/share/lib/terminfo/a/at386-m
+hardlink path=usr/share/lib/terminfo/3/386at \
+    target=../../../../../usr/share/lib/terminfo/a/at386
+hardlink path=usr/share/lib/terminfo/3/386at-m \
+    target=../../../../../usr/share/lib/terminfo/a/at386-m
+hardlink path=usr/share/lib/terminfo/A/AT386 \
+    target=../../../../../usr/share/lib/terminfo/a/at386
+hardlink path=usr/share/lib/terminfo/A/AT386-M \
+    target=../../../../../usr/share/lib/terminfo/a/at386-m
+hardlink path=usr/share/lib/terminfo/s/sun-nic \
+    target=../../../../../usr/share/lib/terminfo/s/sun-e
+hardlink path=usr/share/lib/terminfo/s/sun-s-e \
+    target=../../../../../usr/share/lib/terminfo/s/sun-e-s
+hardlink path=usr/share/lib/terminfo/s/sun1 \
+    target=../../../../../usr/share/lib/terminfo/s/sun
+hardlink path=usr/share/lib/terminfo/s/sun2 \
+    target=../../../../../usr/share/lib/terminfo/s/sun
+hardlink path=usr/share/lib/terminfo/s/sune \
+    target=../../../../../usr/share/lib/terminfo/s/sun-e
+hardlink path=usr/share/lib/terminfo/v/vt100-am \
+    target=../../../../../usr/share/lib/terminfo/v/vt100
+hardlink path=usr/share/lib/terminfo/v/vt100-s-bot \
+    target=../../../../../usr/share/lib/terminfo/v/vt100-bot-s
+hardlink path=usr/share/lib/terminfo/v/vt100-s-top \
+    target=../../../../../usr/share/lib/terminfo/v/vt100-s
+hardlink path=usr/share/lib/terminfo/v/vt100-top-s \
+    target=../../../../../usr/share/lib/terminfo/v/vt100-s
+hardlink path=usr/share/lib/terminfo/v/vt100-w-am \
+    target=../../../../../usr/share/lib/terminfo/v/vt100-w
+hardlink path=usr/share/lib/terminfo/v/vt100-w-nam \
+    target=../../../../../usr/share/lib/terminfo/v/vt100-nam-w
+hardlink path=usr/share/lib/terminfo/v/vt100-w-nav \
+    target=../../../../../usr/share/lib/terminfo/v/vt100-nav-w
+hardlink path=usr/share/lib/terminfo/x/xterm \
+    target=../../../../../usr/share/lib/terminfo/v/vs100
+hardlink path=usr/share/lib/terminfo/x/xterm-color \
+    target=../../../../../usr/share/lib/terminfo/x/xtermc
+hardlink path=usr/share/lib/terminfo/x/xterms \
+    target=../../../../../usr/share/lib/terminfo/v/vs100s
+hardlink path=usr/share/lib/zoneinfo/Africa/Asmera \
+    target=../../../../../usr/share/lib/zoneinfo/Africa/Asmara
+hardlink path=usr/share/lib/zoneinfo/Africa/Timbuktu \
+    target=../../../../../usr/share/lib/zoneinfo/Africa/Bamako
+hardlink path=usr/share/lib/zoneinfo/America/Argentina/ComodRivadavia \
+    target=../../../../../../usr/share/lib/zoneinfo/America/Argentina/Catamarca
+hardlink path=usr/share/lib/zoneinfo/America/Atka \
+    target=../../../../../usr/share/lib/zoneinfo/America/Adak
+hardlink path=usr/share/lib/zoneinfo/America/Buenos_Aires \
+    target=../../../../../usr/share/lib/zoneinfo/America/Argentina/Buenos_Aires
+hardlink path=usr/share/lib/zoneinfo/America/Catamarca \
+    target=../../../../../usr/share/lib/zoneinfo/America/Argentina/Catamarca
+hardlink path=usr/share/lib/zoneinfo/America/Coral_Harbour \
+    target=../../../../../usr/share/lib/zoneinfo/America/Atikokan
+hardlink path=usr/share/lib/zoneinfo/America/Cordoba \
+    target=../../../../../usr/share/lib/zoneinfo/America/Argentina/Cordoba
+hardlink path=usr/share/lib/zoneinfo/America/Ensenada \
+    target=../../../../../usr/share/lib/zoneinfo/America/Tijuana
+hardlink path=usr/share/lib/zoneinfo/America/Fort_Wayne \
+    target=../../../../../usr/share/lib/zoneinfo/America/Indiana/Indianapolis
+hardlink path=usr/share/lib/zoneinfo/America/Indianapolis \
+    target=../../../../../usr/share/lib/zoneinfo/America/Indiana/Indianapolis
+hardlink path=usr/share/lib/zoneinfo/America/Jujuy \
+    target=../../../../../usr/share/lib/zoneinfo/America/Argentina/Jujuy
+hardlink path=usr/share/lib/zoneinfo/America/Knox_IN \
+    target=../../../../../usr/share/lib/zoneinfo/America/Indiana/Knox
+hardlink path=usr/share/lib/zoneinfo/America/Louisville \
+    target=../../../../../usr/share/lib/zoneinfo/America/Kentucky/Louisville
+hardlink path=usr/share/lib/zoneinfo/America/Marigot \
+    target=../../../../../usr/share/lib/zoneinfo/America/Guadeloupe
+hardlink path=usr/share/lib/zoneinfo/America/Mendoza \
+    target=../../../../../usr/share/lib/zoneinfo/America/Argentina/Mendoza
+hardlink path=usr/share/lib/zoneinfo/America/Porto_Acre \
+    target=../../../../../usr/share/lib/zoneinfo/America/Rio_Branco
+hardlink path=usr/share/lib/zoneinfo/America/Rosario \
+    target=../../../../../usr/share/lib/zoneinfo/America/Argentina/Cordoba
+hardlink path=usr/share/lib/zoneinfo/America/Shiprock \
+    target=../../../../../usr/share/lib/zoneinfo/America/Denver
+hardlink path=usr/share/lib/zoneinfo/America/St_Barthelemy \
+    target=../../../../../usr/share/lib/zoneinfo/America/Guadeloupe
+hardlink path=usr/share/lib/zoneinfo/America/Virgin \
+    target=../../../../../usr/share/lib/zoneinfo/America/St_Thomas
+hardlink path=usr/share/lib/zoneinfo/Antarctica/South_Pole \
+    target=../../../../../usr/share/lib/zoneinfo/Antarctica/McMurdo
+hardlink path=usr/share/lib/zoneinfo/Arctic/Longyearbyen \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Oslo
+hardlink path=usr/share/lib/zoneinfo/Asia/Ashkhabad \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Ashgabat
+hardlink path=usr/share/lib/zoneinfo/Asia/Calcutta \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Kolkata
+hardlink path=usr/share/lib/zoneinfo/Asia/Chungking \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Chongqing
+hardlink path=usr/share/lib/zoneinfo/Asia/Dacca \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Dhaka
+hardlink path=usr/share/lib/zoneinfo/Asia/Istanbul \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Istanbul
+hardlink path=usr/share/lib/zoneinfo/Asia/Katmandu \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Kathmandu
+hardlink path=usr/share/lib/zoneinfo/Asia/Macao \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Macau
+hardlink path=usr/share/lib/zoneinfo/Asia/Saigon \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Ho_Chi_Minh
+hardlink path=usr/share/lib/zoneinfo/Asia/Tel_Aviv \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Jerusalem
+hardlink path=usr/share/lib/zoneinfo/Asia/Thimbu \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Thimphu
+hardlink path=usr/share/lib/zoneinfo/Asia/Ujung_Pandang \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Makassar
+hardlink path=usr/share/lib/zoneinfo/Asia/Ulan_Bator \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Ulaanbaatar
+hardlink path=usr/share/lib/zoneinfo/Atlantic/Faeroe \
+    target=../../../../../usr/share/lib/zoneinfo/Atlantic/Faroe
+hardlink path=usr/share/lib/zoneinfo/Atlantic/Jan_Mayen \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Oslo
+hardlink path=usr/share/lib/zoneinfo/Australia/ACT \
+    target=../../../../../usr/share/lib/zoneinfo/Australia/Sydney
+hardlink path=usr/share/lib/zoneinfo/Australia/Canberra \
+    target=../../../../../usr/share/lib/zoneinfo/Australia/Sydney
+hardlink path=usr/share/lib/zoneinfo/Australia/LHI \
+    target=../../../../../usr/share/lib/zoneinfo/Australia/Lord_Howe
+hardlink path=usr/share/lib/zoneinfo/Australia/NSW \
+    target=../../../../../usr/share/lib/zoneinfo/Australia/Sydney
+hardlink path=usr/share/lib/zoneinfo/Australia/North \
+    target=../../../../../usr/share/lib/zoneinfo/Australia/Darwin
+hardlink path=usr/share/lib/zoneinfo/Australia/Queensland \
+    target=../../../../../usr/share/lib/zoneinfo/Australia/Brisbane
+hardlink path=usr/share/lib/zoneinfo/Australia/South \
+    target=../../../../../usr/share/lib/zoneinfo/Australia/Adelaide
+hardlink path=usr/share/lib/zoneinfo/Australia/Tasmania \
+    target=../../../../../usr/share/lib/zoneinfo/Australia/Hobart
+hardlink path=usr/share/lib/zoneinfo/Australia/Victoria \
+    target=../../../../../usr/share/lib/zoneinfo/Australia/Melbourne
+hardlink path=usr/share/lib/zoneinfo/Australia/West \
+    target=../../../../../usr/share/lib/zoneinfo/Australia/Perth
+hardlink path=usr/share/lib/zoneinfo/Australia/Yancowinna \
+    target=../../../../../usr/share/lib/zoneinfo/Australia/Broken_Hill
+hardlink path=usr/share/lib/zoneinfo/Brazil/Acre \
+    target=../../../../../usr/share/lib/zoneinfo/America/Rio_Branco
+hardlink path=usr/share/lib/zoneinfo/Brazil/DeNoronha \
+    target=../../../../../usr/share/lib/zoneinfo/America/Noronha
+hardlink path=usr/share/lib/zoneinfo/Brazil/East \
+    target=../../../../../usr/share/lib/zoneinfo/America/Sao_Paulo
+hardlink path=usr/share/lib/zoneinfo/Brazil/West \
+    target=../../../../../usr/share/lib/zoneinfo/America/Manaus
+hardlink path=usr/share/lib/zoneinfo/Canada/Atlantic \
+    target=../../../../../usr/share/lib/zoneinfo/America/Halifax
+hardlink path=usr/share/lib/zoneinfo/Canada/Central \
+    target=../../../../../usr/share/lib/zoneinfo/America/Winnipeg
+hardlink path=usr/share/lib/zoneinfo/Canada/East-Saskatchewan \
+    target=../../../../../usr/share/lib/zoneinfo/America/Regina
+hardlink path=usr/share/lib/zoneinfo/Canada/Eastern \
+    target=../../../../../usr/share/lib/zoneinfo/America/Toronto
+hardlink path=usr/share/lib/zoneinfo/Canada/Mountain \
+    target=../../../../../usr/share/lib/zoneinfo/America/Edmonton
+hardlink path=usr/share/lib/zoneinfo/Canada/Newfoundland \
+    target=../../../../../usr/share/lib/zoneinfo/America/St_Johns
+hardlink path=usr/share/lib/zoneinfo/Canada/Pacific \
+    target=../../../../../usr/share/lib/zoneinfo/America/Vancouver
+hardlink path=usr/share/lib/zoneinfo/Canada/Saskatchewan \
+    target=../../../../../usr/share/lib/zoneinfo/America/Regina
+hardlink path=usr/share/lib/zoneinfo/Canada/Yukon \
+    target=../../../../../usr/share/lib/zoneinfo/America/Whitehorse
+hardlink path=usr/share/lib/zoneinfo/Chile/Continental \
+    target=../../../../../usr/share/lib/zoneinfo/America/Santiago
+hardlink path=usr/share/lib/zoneinfo/Chile/EasterIsland \
+    target=../../../../../usr/share/lib/zoneinfo/Pacific/Easter
+hardlink path=usr/share/lib/zoneinfo/Cuba \
+    target=../../../../usr/share/lib/zoneinfo/America/Havana
+hardlink path=usr/share/lib/zoneinfo/Egypt \
+    target=../../../../usr/share/lib/zoneinfo/Africa/Cairo
+hardlink path=usr/share/lib/zoneinfo/Eire \
+    target=../../../../usr/share/lib/zoneinfo/Europe/Dublin
+hardlink path=usr/share/lib/zoneinfo/Etc/GMT+0 \
+    target=../../../../../usr/share/lib/zoneinfo/Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/Etc/GMT-0 \
+    target=../../../../../usr/share/lib/zoneinfo/Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/Etc/GMT0 \
+    target=../../../../../usr/share/lib/zoneinfo/Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/Etc/Greenwich \
+    target=../../../../../usr/share/lib/zoneinfo/Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/Etc/Universal \
+    target=../../../../../usr/share/lib/zoneinfo/Etc/UTC
+hardlink path=usr/share/lib/zoneinfo/Etc/Zulu \
+    target=../../../../../usr/share/lib/zoneinfo/Etc/UTC
+hardlink path=usr/share/lib/zoneinfo/Europe/Belfast \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/London
+hardlink path=usr/share/lib/zoneinfo/Europe/Bratislava \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Prague
+hardlink path=usr/share/lib/zoneinfo/Europe/Guernsey \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/London
+hardlink path=usr/share/lib/zoneinfo/Europe/Isle_of_Man \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/London
+hardlink path=usr/share/lib/zoneinfo/Europe/Jersey \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/London
+hardlink path=usr/share/lib/zoneinfo/Europe/Ljubljana \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Belgrade
+hardlink path=usr/share/lib/zoneinfo/Europe/Mariehamn \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Helsinki
+hardlink path=usr/share/lib/zoneinfo/Europe/Nicosia \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Nicosia
+hardlink path=usr/share/lib/zoneinfo/Europe/Podgorica \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Belgrade
+hardlink path=usr/share/lib/zoneinfo/Europe/San_Marino \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Rome
+hardlink path=usr/share/lib/zoneinfo/Europe/Sarajevo \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Belgrade
+hardlink path=usr/share/lib/zoneinfo/Europe/Skopje \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Belgrade
+hardlink path=usr/share/lib/zoneinfo/Europe/Tiraspol \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Chisinau
+hardlink path=usr/share/lib/zoneinfo/Europe/Vatican \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Rome
+hardlink path=usr/share/lib/zoneinfo/Europe/Zagreb \
+    target=../../../../../usr/share/lib/zoneinfo/Europe/Belgrade
+hardlink path=usr/share/lib/zoneinfo/GB \
+    target=../../../../usr/share/lib/zoneinfo/Europe/London
+hardlink path=usr/share/lib/zoneinfo/GB-Eire \
+    target=../../../../usr/share/lib/zoneinfo/Europe/London
+hardlink path=usr/share/lib/zoneinfo/GMT \
+    target=../../../../usr/share/lib/zoneinfo/Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/GMT+0 \
+    target=../../../../usr/share/lib/zoneinfo/Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/GMT-0 \
+    target=../../../../usr/share/lib/zoneinfo/Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/GMT0 \
+    target=../../../../usr/share/lib/zoneinfo/Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/Greenwich \
+    target=../../../../usr/share/lib/zoneinfo/Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/Hongkong \
+    target=../../../../usr/share/lib/zoneinfo/Asia/Hong_Kong
+hardlink path=usr/share/lib/zoneinfo/Iceland \
+    target=../../../../usr/share/lib/zoneinfo/Atlantic/Reykjavik
+hardlink path=usr/share/lib/zoneinfo/Iran \
+    target=../../../../usr/share/lib/zoneinfo/Asia/Tehran
+hardlink path=usr/share/lib/zoneinfo/Israel \
+    target=../../../../usr/share/lib/zoneinfo/Asia/Jerusalem
+hardlink path=usr/share/lib/zoneinfo/Jamaica \
+    target=../../../../usr/share/lib/zoneinfo/America/Jamaica
+hardlink path=usr/share/lib/zoneinfo/Japan \
+    target=../../../../usr/share/lib/zoneinfo/Asia/Tokyo
+hardlink path=usr/share/lib/zoneinfo/Kwajalein \
+    target=../../../../usr/share/lib/zoneinfo/Pacific/Kwajalein
+hardlink path=usr/share/lib/zoneinfo/Libya \
+    target=../../../../usr/share/lib/zoneinfo/Africa/Tripoli
+hardlink path=usr/share/lib/zoneinfo/Mexico/BajaNorte \
+    target=../../../../../usr/share/lib/zoneinfo/America/Tijuana
+hardlink path=usr/share/lib/zoneinfo/Mexico/BajaSur \
+    target=../../../../../usr/share/lib/zoneinfo/America/Mazatlan
+hardlink path=usr/share/lib/zoneinfo/Mexico/General \
+    target=../../../../../usr/share/lib/zoneinfo/America/Mexico_City
+hardlink path=usr/share/lib/zoneinfo/Mideast/Riyadh87 \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Riyadh87
+hardlink path=usr/share/lib/zoneinfo/Mideast/Riyadh88 \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Riyadh88
+hardlink path=usr/share/lib/zoneinfo/Mideast/Riyadh89 \
+    target=../../../../../usr/share/lib/zoneinfo/Asia/Riyadh89
+hardlink path=usr/share/lib/zoneinfo/NZ \
+    target=../../../../usr/share/lib/zoneinfo/Pacific/Auckland
+hardlink path=usr/share/lib/zoneinfo/NZ-CHAT \
+    target=../../../../usr/share/lib/zoneinfo/Pacific/Chatham
+hardlink path=usr/share/lib/zoneinfo/Navajo \
+    target=../../../../usr/share/lib/zoneinfo/America/Denver
+hardlink path=usr/share/lib/zoneinfo/PRC \
+    target=../../../../usr/share/lib/zoneinfo/Asia/Shanghai
+hardlink path=usr/share/lib/zoneinfo/Pacific/Samoa \
+    target=../../../../../usr/share/lib/zoneinfo/Pacific/Pago_Pago
+hardlink path=usr/share/lib/zoneinfo/Pacific/Yap \
+    target=../../../../../usr/share/lib/zoneinfo/Pacific/Truk
+hardlink path=usr/share/lib/zoneinfo/Poland \
+    target=../../../../usr/share/lib/zoneinfo/Europe/Warsaw
+hardlink path=usr/share/lib/zoneinfo/Portugal \
+    target=../../../../usr/share/lib/zoneinfo/Europe/Lisbon
+hardlink path=usr/share/lib/zoneinfo/ROK \
+    target=../../../../usr/share/lib/zoneinfo/Asia/Seoul
+hardlink path=usr/share/lib/zoneinfo/Singapore \
+    target=../../../../usr/share/lib/zoneinfo/Asia/Singapore
+hardlink path=usr/share/lib/zoneinfo/Turkey \
+    target=../../../../usr/share/lib/zoneinfo/Europe/Istanbul
+hardlink path=usr/share/lib/zoneinfo/UCT \
+    target=../../../../usr/share/lib/zoneinfo/Etc/UCT
+hardlink path=usr/share/lib/zoneinfo/US/Alaska \
+    target=../../../../../usr/share/lib/zoneinfo/America/Anchorage
+hardlink path=usr/share/lib/zoneinfo/US/Aleutian \
+    target=../../../../../usr/share/lib/zoneinfo/America/Adak
+hardlink path=usr/share/lib/zoneinfo/US/Arizona \
+    target=../../../../../usr/share/lib/zoneinfo/America/Phoenix
+hardlink path=usr/share/lib/zoneinfo/US/Central \
+    target=../../../../../usr/share/lib/zoneinfo/America/Chicago
+hardlink path=usr/share/lib/zoneinfo/US/East-Indiana \
+    target=../../../../../usr/share/lib/zoneinfo/America/Indiana/Indianapolis
+hardlink path=usr/share/lib/zoneinfo/US/Eastern \
+    target=../../../../../usr/share/lib/zoneinfo/America/New_York
+hardlink path=usr/share/lib/zoneinfo/US/Hawaii \
+    target=../../../../../usr/share/lib/zoneinfo/Pacific/Honolulu
+hardlink path=usr/share/lib/zoneinfo/US/Indiana-Starke \
+    target=../../../../../usr/share/lib/zoneinfo/America/Indiana/Knox
+hardlink path=usr/share/lib/zoneinfo/US/Michigan \
+    target=../../../../../usr/share/lib/zoneinfo/America/Detroit
+hardlink path=usr/share/lib/zoneinfo/US/Mountain \
+    target=../../../../../usr/share/lib/zoneinfo/America/Denver
+hardlink path=usr/share/lib/zoneinfo/US/Pacific \
+    target=../../../../../usr/share/lib/zoneinfo/America/Los_Angeles
+hardlink path=usr/share/lib/zoneinfo/US/Pacific-New \
+    target=../../../../../usr/share/lib/zoneinfo/America/Los_Angeles
+hardlink path=usr/share/lib/zoneinfo/US/Samoa \
+    target=../../../../../usr/share/lib/zoneinfo/Pacific/Pago_Pago
+hardlink path=usr/share/lib/zoneinfo/UTC \
+    target=../../../../usr/share/lib/zoneinfo/Etc/UTC
+hardlink path=usr/share/lib/zoneinfo/Universal \
+    target=../../../../usr/share/lib/zoneinfo/Etc/UTC
+hardlink path=usr/share/lib/zoneinfo/W-SU \
+    target=../../../../usr/share/lib/zoneinfo/Europe/Moscow
+hardlink path=usr/share/lib/zoneinfo/Zulu \
+    target=../../../../usr/share/lib/zoneinfo/Etc/UTC
+$(sparc_ONLY)hardlink path=var/svc/profile/platform_SUNW,Sun-Fire-V890.xml \
+    target=./platform_SUNW,Sun-Fire-880.xml
+$(sparc_ONLY)hardlink \
+    path=var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml \
+    target=./platform_SUNW,UltraSPARC-IIi-Netract.xml
+$(sparc_ONLY)hardlink \
+    path=var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml \
+    target=./platform_SUNW,UltraSPARC-IIi-Netract.xml
+legacy pkg=SUNWcsr arch=$(ARCH) category=system \
+    desc="core software for a specific instruction-set architecture" \
+    hotline="Please contact your local service provider" \
+    name="Core Solaris, (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWcsu arch=$(ARCH) category=system \
+    desc="core software for a specific instruction-set architecture" \
+    hotline="Please contact your local service provider" \
+    name="Core Solaris, (Usr)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWftpr arch=$(ARCH) category=system \
+    desc="FTP Server Configuration Files" \
+    hotline="Please contact your local service provider" \
+    name="FTP Server, (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license ../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
+    license=../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
+license cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE \
+    license=cmd/cmd-inet/sbin/ifparse/THIRDPARTYLICENSE
+license cmd/cmd-inet/usr.lib/in.mpathd/THIRDPARTYLICENSE \
+    license=cmd/cmd-inet/usr.lib/in.mpathd/THIRDPARTYLICENSE
+license cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.arp \
+    license=cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.arp
+license cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route \
+    license=cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.route
+license cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE \
+    license=cmd/cmd-inet/usr.sbin/ifconfig/THIRDPARTYLICENSE
+license cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE \
+    license=cmd/cmd-inet/usr.sbin/traceroute/THIRDPARTYLICENSE
+license cmd/csh/THIRDPARTYLICENSE license=cmd/csh/THIRDPARTYLICENSE
+license cmd/eeprom/THIRDPARTYLICENSE license=cmd/eeprom/THIRDPARTYLICENSE
+license cmd/fs.d/ufs/THIRDPARTYLICENSE license=cmd/fs.d/ufs/THIRDPARTYLICENSE
+license cmd/mt/THIRDPARTYLICENSE license=cmd/mt/THIRDPARTYLICENSE
+license cmd/script/THIRDPARTYLICENSE license=cmd/script/THIRDPARTYLICENSE
+license cmd/stat/vmstat/THIRDPARTYLICENSE \
+    license=cmd/stat/vmstat/THIRDPARTYLICENSE
+license cmd/tip/THIRDPARTYLICENSE license=cmd/tip/THIRDPARTYLICENSE
+license cmd/vi/THIRDPARTYLICENSE license=cmd/vi/THIRDPARTYLICENSE
+license cmd/which/THIRDPARTYLICENSE license=cmd/which/THIRDPARTYLICENSE
+license cmd/xstr/THIRDPARTYLICENSE license=cmd/xstr/THIRDPARTYLICENSE
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=bin target=./usr/bin
+link path=etc/TIMEZONE target=./default/init
+link path=etc/autopush target=../sbin/autopush
+link path=etc/cfgadm target=../usr/sbin/cfgadm
+link path=etc/clri target=../usr/sbin/clri
+link path=etc/cron target=../usr/sbin/cron
+link path=etc/dcopy target=../usr/sbin/dcopy
+link path=etc/ff target=../usr/sbin/ff
+link path=etc/fmthard target=../usr/sbin/fmthard
+link path=etc/format target=../usr/sbin/format
+link path=etc/fsck target=../usr/sbin/fsck
+link path=etc/fsdb target=../usr/sbin/fsdb
+link path=etc/fstyp target=../usr/sbin/fstyp
+link path=etc/getty target=../usr/lib/saf/ttymon
+link path=etc/grpck target=../usr/sbin/grpck
+link path=etc/halt target=../usr/sbin/halt
+link path=etc/hosts target=./inet/hosts
+link path=etc/inet/ipnodes target=./hosts
+link path=etc/inetd.conf target=./inet/inetd.conf
+link path=etc/init target=../sbin/init
+link path=etc/install target=../usr/sbin/install
+link path=etc/killall target=../usr/sbin/killall
+link path=etc/labelit target=../usr/sbin/labelit
+link path=etc/lib/ld.so.1 target=../../lib/ld.so.1
+link path=etc/lib/libdl.so.1 target=../../lib/libdl.so.1
+link path=etc/lib/nss_files.so.1 target=../../lib/nss_files.so.1
+link path=etc/log target=../var/adm/log
+link path=etc/mkfs target=../usr/sbin/mkfs
+link path=etc/mknod target=../usr/sbin/mknod
+link path=etc/mount target=../sbin/mount
+link path=etc/mountall target=../sbin/mountall
+link path=etc/ncheck target=../usr/sbin/ncheck
+link path=etc/netmasks target=./inet/netmasks
+link path=etc/networks target=./inet/networks
+link path=etc/protocols target=./inet/protocols
+link path=etc/prtconf target=../usr/sbin/prtconf
+link path=etc/prtvtoc target=../usr/sbin/prtvtoc
+link path=etc/rc0 target=../sbin/rc0
+link path=etc/rc1 target=../sbin/rc1
+link path=etc/rc2 target=../sbin/rc2
+link path=etc/rc3 target=../sbin/rc3
+link path=etc/rc5 target=../sbin/rc5
+link path=etc/rc6 target=../sbin/rc6
+link path=etc/rcS target=../sbin/rcS
+link path=etc/reboot target=../usr/sbin/halt
+link path=etc/security/audit/localhost/files target=../../../../var/audit
+link path=etc/services target=./inet/services
+link path=etc/setmnt target=../usr/sbin/setmnt
+link path=etc/shutdown target=../usr/sbin/shutdown
+link path=etc/sulogin target=../sbin/sulogin
+link path=etc/swap target=../usr/sbin/swap
+link path=etc/swapadd target=../sbin/swapadd
+link path=etc/sysdef target=../usr/sbin/sysdef
+link path=etc/tar target=../usr/sbin/tar
+link path=etc/telinit target=../sbin/init
+link path=etc/uadmin target=../sbin/uadmin
+link path=etc/umount target=../sbin/umount
+link path=etc/umountall target=../sbin/umountall
+link path=etc/utmpx target=../var/adm/utmpx
+link path=etc/volcopy target=../usr/sbin/volcopy
+link path=etc/wall target=../usr/sbin/wall
+link path=etc/whodo target=../usr/sbin/whodo
+link path=etc/wtmpx target=../var/adm/wtmpx
+link path=sbin/in.mpathd target=../lib/inet/in.mpathd
+link path=sbin/jsh target=../usr/bin/ksh93
+link path=sbin/pfsh target=../usr/bin/ksh93
+link path=sbin/sh target=../usr/bin/$(ARCH32)/ksh93
+link path=sbin/su target=../usr/bin/su
+link path=usr/adm target=../var/adm
+link path=usr/bin/cachefspack target=../lib/fs/cachefs/cachefspack
+link path=usr/bin/cachefsstat target=../lib/fs/cachefs/cachefsstat
+link path=usr/bin/df target=../sbin/df
+link path=usr/bin/jsh target=ksh93
+link path=usr/bin/passmgmt target=../sbin/passmgmt
+link path=usr/bin/pfsh target=ksh93
+link path=usr/bin/pwconv target=../sbin/pwconv
+link path=usr/bin/rmail target=./mail
+link path=usr/bin/sh target=$(ARCH32)/ksh93
+link path=usr/bin/strclean target=../sbin/strclean
+link path=usr/bin/strerr target=../sbin/strerr
+link path=usr/bin/sync target=../../sbin/sync
+link path=usr/bin/tar target=../sbin/tar
+link path=usr/bin/uname target=../../sbin/uname
+link path=usr/ccs/bin/m4 target=../../bin/m4
+link path=usr/has/bin/jsh target=sh
+link path=usr/has/bin/pfsh target=sh
+link path=usr/has/lib/rsh target=../bin/sh
+link path=usr/lib/$(ARCH64)/ld.so.1 target=../../../lib/$(ARCH64)/ld.so.1
+link path=usr/lib/cron target=../../etc/cron.d
+link path=usr/lib/devfsadm/devfsadmd target=../../sbin/devfsadm
+link path=usr/lib/embedded_su target=../bin/su
+link path=usr/lib/fs/dev/mount target=../../../../etc/fs/dev/mount
+link path=usr/lib/fs/hsfs/mount target=../../../../etc/fs/hsfs/mount
+link path=usr/lib/fs/ufs/mount target=../../../../etc/fs/ufs/mount
+link path=usr/lib/inet/in.mpathd target=../../../lib/inet/in.mpathd
+link path=usr/lib/ld.so.1 target=../../lib/ld.so.1
+link path=usr/lib/locale/POSIX target=./C
+link path=usr/lib/rsh target=../bin/ksh93
+link path=usr/lib/secure/32 target=.
+link path=usr/lib/secure/64 target=$(ARCH64)
+link path=usr/lib/wusbd target=../../sbin/wusbadm
+link path=usr/mail target=../var/mail
+link path=usr/net/nls/listen target=../../lib/saf/listen
+link path=usr/net/nls/nlps_server target=../../lib/saf/nlps_server
+link path=usr/news target=../var/news
+link path=usr/preserve target=../var/preserve
+link path=usr/pub target=./share/lib/pub
+link path=usr/sbin/autopush target=../../sbin/autopush
+link path=usr/sbin/bootadm target=../../sbin/bootadm
+link path=usr/sbin/cachefslog target=../lib/fs/cachefs/cachefslog
+link path=usr/sbin/cachefswssize target=../lib/fs/cachefs/cachefswssize
+link path=usr/sbin/cfsadmin target=../lib/fs/cachefs/cfsadmin
+link path=usr/sbin/cryptoadm target=../../sbin/cryptoadm
+link path=usr/sbin/dcopy target=./clri
+link path=usr/sbin/devnm target=./df
+link path=usr/sbin/dladm target=../../sbin/dladm
+link path=usr/sbin/edquota target=../lib/fs/ufs/edquota
+link path=usr/sbin/fdisk target=../../sbin/fdisk
+link path=usr/sbin/fiocompress target=../../sbin/fiocompress
+link path=usr/sbin/flowadm target=../../sbin/flowadm
+link path=usr/sbin/fsdb target=./clri
+link path=usr/sbin/fsirand target=../lib/fs/ufs/fsirand
+link path=usr/sbin/fssnap target=./clri
+link path=usr/sbin/hostconfig target=../../sbin/hostconfig
+link path=usr/sbin/ifconfig target=../../sbin/ifconfig
+link path=usr/sbin/inetd target=../lib/inet/inetd
+link path=usr/sbin/init target=../../sbin/init
+$(i386_ONLY)link path=usr/sbin/installgrub target=../../sbin/installgrub
+link path=usr/sbin/ipmpstat target=../../sbin/ipmpstat
+link path=usr/sbin/labelit target=./clri
+link path=usr/sbin/lockfs target=../lib/fs/ufs/lockfs
+link path=usr/sbin/mkfs target=./clri
+link path=usr/sbin/mount target=../../sbin/mount
+link path=usr/sbin/ncheck target=./ff
+link path=usr/sbin/newfs target=../lib/fs/ufs/newfs
+link path=usr/sbin/quot target=../lib/fs/ufs/quot
+link path=usr/sbin/quota target=../lib/fs/ufs/quota
+link path=usr/sbin/quotacheck target=../lib/fs/ufs/quotacheck
+link path=usr/sbin/quotaoff target=../lib/fs/ufs/quotaoff
+link path=usr/sbin/quotaon target=../lib/fs/ufs/quotaon
+link path=usr/sbin/repquota target=../lib/fs/ufs/repquota
+link path=usr/sbin/route target=../../sbin/route
+link path=usr/sbin/routeadm target=../../sbin/routeadm
+link path=usr/sbin/sync target=../../sbin/sync
+link path=usr/sbin/tunefs target=../lib/fs/ufs/tunefs
+link path=usr/sbin/tzreload target=../../sbin/tzreload
+link path=usr/sbin/uadmin target=../../sbin/uadmin
+link path=usr/sbin/ufsdump target=../lib/fs/ufs/ufsdump
+link path=usr/sbin/ufsrestore target=../lib/fs/ufs/ufsrestore
+link path=usr/sbin/umount target=../../sbin/umount
+link path=usr/sbin/wusbadm target=../../sbin/wusbadm
+link path=usr/share/lib/zoneinfo/posixrules target=./US/Eastern
+link path=usr/spool target=../var/spool
+link path=usr/src target=./share/src
+link path=usr/tmp target=../var/tmp
+link path=var/ld/32 target=.
+link path=var/ld/64 target=$(ARCH64)
+depend fmri=runtime/perl-584 type=require

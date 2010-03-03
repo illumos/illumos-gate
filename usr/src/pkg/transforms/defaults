@@ -1,0 +1,81 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This isn't really a transform, but it's a valid default.
+#
+set name=org.opensolaris.consolidation value=osnet
+
+#
+# For kernel/drv, set .conf files to mode 0644.  Assume all other
+# files there are drivers, and give them mode 0755 and reboot-needed.
+#
+# The (?<!r) construct in the reboot-needed transform is a negative
+# lookbehind assertion: it says "only match this regex if the
+# previously matched text does NOT match regex r."  So it will match
+# all files in the various kernel trees, except for .conf files.
+#
+<transform file path=.*kernel/drv/.+\.conf -> default mode 0644>
+<transform file path=.*kernel/drv/.+ -> default mode 0755>
+<transform file path=.*kernel/.+(?<!\.conf)$ -> default reboot-needed true>
+
+#
+# shared objects should generally have mode 0755
+#
+<transform file path=.*lib/.*\.so.* -> default mode 0755>
+
+#
+# Catch some of the collections of largely read-only files
+#
+<transform file path=usr/lib/help/.+ -> default mode 0444>
+<transform file path=usr/share/doc/ksh/.+ -> default mode 0644>
+<transform file path=usr/share/ipfilter/.+ -> default mode 0644>
+<transform file path=usr/share/lib/ccs/.+ -> default mode 0644>
+<transform file path=usr/share/lib/java/.+ -> default mode 0644>
+<transform file path=usr/share/lib/locale/com/sun/dhcpmgr/.+\.properties -> default mode 0644>
+<transform file path=usr/share/lib/locale/com/sun/dhcpmgr/.+ -> default mode 0444>
+<transform file path=usr/share/lib/locale/com/sun/.+ -> default mode 0644>
+<transform file path=usr/share/lib/mailx/.+ -> default mode 0644>
+<transform file path=usr/share/lib/nterm/.+ -> default mode 0644>
+<transform file path=usr/share/lib/pub/.+ -> default mode 0644>
+<transform file path=usr/share/lib/sgml/.+ -> default mode 0644>
+<transform file path=usr/share/lib/slp/.+ -> default mode 0644>
+<transform file path=usr/share/lib/tabset/.+ -> default mode 0644>
+<transform file path=usr/share/lib/t.+ -> default mode 0644>
+<transform file path=usr/share/lib/unittab/.+ -> default mode 0644>
+<transform file path=usr/share/lib/zoneinfo/.+ -> default mode 0644>
+<transform file path=usr/share/src/grub/.+ -> default mode 0644>
+<transform file path=usr/share/.+ -> default mode 0444>
+
+
+#
+# For what's left, go with root:bin 0644, +x for directories
+#
+#
+<transform file dir -> default owner root>
+<transform file dir -> default group bin>
+<transform file -> default mode 0644>
+<transform dir -> default mode 0755>

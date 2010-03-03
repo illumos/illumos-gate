@@ -1,0 +1,113 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/system/kernel/platform/netra@$(PKGVERS)
+set name=pkg.description \
+    value="I2C and System Controller and Status Drivers for Netra ct cPCI platform"
+set name=pkg.summary value="Netra ct I2C and System Drivers"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=sparc
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=platform group=sys
+dir path=platform/SUNW,Netra-CP2300 group=sys
+dir path=platform/SUNW,Netra-CP2300/kernel group=sys
+dir path=platform/SUNW,Netra-CP2300/kernel/dacf group=sys
+dir path=platform/SUNW,Netra-CP2300/kernel/dacf/$(ARCH64) group=sys
+dir path=platform/SUNW,Netra-CP2300/kernel/drv group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40 group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/dacf group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/dacf/$(ARCH64) group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv/$(ARCH64) group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-60 group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/dacf group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/dacf/$(ARCH64) group=sys
+dir path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/drv group=sys
+dir path=platform/SUNW,UltraSPARC-IIi-Netract group=sys
+dir path=platform/SUNW,UltraSPARC-IIi-Netract/kernel group=sys
+dir path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/dacf group=sys
+dir path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/dacf/$(ARCH64) group=sys
+dir path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv group=sys
+dir path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64) group=sys
+driver name=acebus
+driver name=scsb alias=nct-ATML,at27c64
+file path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv/acebus.conf \
+    group=sys reboot-needed=false
+file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/dacf/$(ARCH64)/ttymux_dacf \
+    group=sys reboot-needed=true
+file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64)/acebus \
+    group=sys
+file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64)/pcf8574 \
+    group=sys
+file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64)/pcf8591 \
+    group=sys
+file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64)/scsb \
+    group=sys
+file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/scsb.conf group=sys \
+    reboot-needed=false
+file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/se.conf group=sys \
+    reboot-needed=false
+file path=platform/SUNW,UltraSPARC-IIi-Netract/kernel/drv/ttymux.conf group=sys \
+    reboot-needed=false
+legacy pkg=SUNWcti2.u arch=$(ARCH).sun4u category=system \
+    desc="I2C and System Controller and Status Drivers for Netra ct cPCI platform" \
+    hotline="Please contact your local service provider" \
+    name="Netra ct I2C and System Drivers" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=platform/SUNW,Netra-CP2300/kernel/dacf/$(ARCH64)/ttymux_dacf \
+    target=../../../../SUNW,UltraSPARC-IIi-Netract/kernel/dacf/$(ARCH64)/ttymux_dacf
+link path=platform/SUNW,Netra-CP2300/kernel/drv/ttymux.conf \
+    target=../../../SUNW,UltraSPARC-IIi-Netract/kernel/drv/ttymux.conf
+link \
+    path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/dacf/$(ARCH64)/ttymux_dacf \
+    target=../../../../SUNW,UltraSPARC-IIi-Netract/kernel/dacf/$(ARCH64)/ttymux_dacf
+link path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv/$(ARCH64)/acebus \
+    target=../../../../SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64)/acebus
+link path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv/$(ARCH64)/pcf8574 \
+    target=../../../../SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64)/pcf8574
+link path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv/$(ARCH64)/scsb \
+    target=../../../../SUNW,UltraSPARC-IIi-Netract/kernel/drv/$(ARCH64)/scsb
+link path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv/scsb.conf \
+    target=../../../SUNW,UltraSPARC-IIi-Netract/kernel/drv/scsb.conf
+link path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv/se.conf \
+    target=../../../SUNW,UltraSPARC-IIi-Netract/kernel/drv/se.conf
+link path=platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/drv/ttymux.conf \
+    target=../../../SUNW,UltraSPARC-IIi-Netract/kernel/drv/ttymux.conf
+link \
+    path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/dacf/$(ARCH64)/ttymux_dacf \
+    target=../../../../SUNW,UltraSPARC-IIi-Netract/kernel/dacf/$(ARCH64)/ttymux_dacf
+link path=platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/drv/ttymux.conf \
+    target=../../../SUNW,UltraSPARC-IIi-Netract/kernel/drv/ttymux.conf

@@ -25,13 +25,27 @@
 
 MANIFEST  = group.xml
 
+PROG= sharemgr
+
 include ../../Makefile.cmd
+
+#
+# To build sharemgr as both 32- and 64-bit objects, using isaexec, set
+# SHAREMGR64= in your build environment.
+#
+SHAREMGR64= $(POUND_SIGN)
 
 #
 # One for each ISA.
 #
 SUBDIRS =	$(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+$(SHAREMGR64)$(BUILD64)SUBDIRS += $(MACH64)
+
+LINKS= share unshare
+ROOTLINKS= $(LINKS:%=$(ROOTUSRSBIN)/%)
+ROOTLINKS32= $(LINKS:%=$(ROOTUSRSBIN32)/%)
+ROOTLINKS64= $(LINKS:%=$(ROOTUSRSBIN64)/%)
+$(SHAREMGR64)ROOTLINKS += $(ROOTLINKS32) $(ROOTLINKS64)
 
 ROOTMANIFESTDIR	= $(ROOTSVCNETWORKSHARES)
 $(ROOTMANIFEST)		:= FILEMODE= 444
@@ -47,11 +61,15 @@ lint	:=	TARGET= lint
 
 all clean clobber lint _msg:	$(SUBDIRS)
 
-install: $(SUBDIRS) $(ROOTMANIFEST)
+install: $(SUBDIRS) $(ROOTMANIFEST) .WAIT $(ROOTLINKS)
+
+$(ROOTLINKS): FRC
+	-$(RM) $@
+	-$(LN) $(@D)/$(PROG) $@
 
 check:	$(CHKMANIFEST)
 
-$(SUBDIRS) $(TESTSUBS):	FRC
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

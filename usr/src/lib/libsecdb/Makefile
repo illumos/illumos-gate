@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -45,10 +45,14 @@ ROOTETCSECURITY =	$(ROOTETC)/security
 EFILES =	user_attr
 EFILESRC =	$(EFILES:%=%)
 ETCFILES =	$(EFILES:%=$(ROOTETC)/%)
+ETCDFILES =	$(EFILES:%=$(ROOTETC)/%.d/SUNWcs)
 
-ESFILES =		auth_attr exec_attr prof_attr policy.conf
+ESDFILES =	auth_attr exec_attr prof_attr
+ESFILES =		$(ESDFILES) policy.conf
 ESSRC =			$(ESFILES:%=%)
 ETCSECURITYFILES =	$(ESFILES:%=$(ROOTETCSECURITY)/%)
+ETCSECURITYDFILES =	$(ESDFILES:%=$(ROOTETCSECURITY)/%.d/SUNWcs)
+
 
 MFSTFILES =	rbac.xml
 MANIFESTDIR =	$(ROOT)/var/svc/manifest/system
@@ -61,7 +65,7 @@ METHOD =	$(METHODFILES:%=$(METHODDIR)/%)
 $(METHOD) :=	FILEMODE = 0555
 
 SCRIPTS =		i.rbac r.rbac
-CLASS_SCR_SRC_DIR =	$(SRC)/pkgdefs/common_files
+CLASS_SCR_SRC_DIR =	common
 INSTALL_DIR =		$(ROOT)/usr/sadm/install
 
 CLASS_SCR_DIR =		$(INSTALL_DIR)/scripts
@@ -74,13 +78,16 @@ _msg: $(MSGSUBDIRS)
 
 install:	install_data
 
-install_data:	$(ETCSECURITYFILES) $(ETCFILES) $(CLASS_SCR_FILES) \
-	$(MANIFESTDIR) $(MANIFEST) $(METHODDIR) $(METHOD)
+install_data:	$(ETCSECURITYFILES) $(ETCSECURITYDFILES) $(ETCFILES) \
+		$(ETCDFILES) $(CLASS_SCR_FILES) $(MANIFESTDIR) $(MANIFEST) \
+		$(METHODDIR) $(METHOD)
 
 ATTR_FILES =	auth_attr exec_attr prof_attr user_attr
 ${ATTR_FILES}:	$$@.txt
 	> $@
 	$(ECHO) $@.txt $@ | $(SHELL) ${CLASS_SCR_SRC_DIR}/i.rbac
+
+$(ETCSECURITYDFILES) $(ETCDFILES): $$(@D)
 
 $(ETCSECURITYFILES) $(ETCFILES): $(ETCSECURITY) $(ROOTETCSECURITY)
 
@@ -93,8 +100,14 @@ $(ROOTETCSECURITY):
 $(ROOTETCSECURITY)/%: %
 	$(INS.file)
 
+$(ROOTETCSECURITY)/%.d/SUNWcs: %
+	$(INS.rename)
+
 $(ROOTETC)/% : %
 	$(INS.file)
+
+$(ROOTETC)/%.d/SUNWcs: %
+	$(INS.rename)
 
 $(MANIFESTDIR):
 	$(INS.dir)

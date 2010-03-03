@@ -1,0 +1,135 @@
+.\" " CDDL HEADER START
+.\" "
+.\" " The contents of this file are subject to the terms of the
+.\" " Common Development and Distribution License (the "License").
+.\" " You may not use this file except in compliance with the License.
+.\" "
+.\" " You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" " or http://www.opensolaris.org/os/licensing.
+.\" " See the License for the specific language governing permissions
+.\" " and limitations under the License.
+.\" "
+.\" " When distributing Covered Code, include this CDDL HEADER in each
+.\" " file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" " If applicable, add the following below this CDDL HEADER, with the
+.\" " fields enclosed by brackets "[]" replaced with your own identifying
+.\" " information: Portions Copyright [yyyy] [name of copyright owner]
+.\" "
+.\" " CDDL HEADER END
+.\" "
+.\" "Copyright 2010 Sun Microsystems, Inc.  All rights reserved."
+.\" "Use is subject to license terms."
+.\"
+.TH onu 1 "11 February 2010"
+.SH NAME
+.I onu
+\- Os/Net Update
+.SH SYNOPSIS
+\fBonu [-e <URI> [-E <publisher>]] [ -O ] [-s <beName>] -t <beName> [-u <URI> [-U <publisher>]] [-v]\fP
+.br
+\fBonu [-d <dir>] [ -O ] [-s <beName>] -t <beName> [-v]\fP
+.LP
+.SH DESCRIPTION
+.IX "OS-Net build tools" "onu" "" "\fBonu\fP"
+.LP
+.I onu 
+is a replacement for
+.I bfu
+used to update a system with the latest set of IPS packages for the ON
+(OS/Net) consolidation of Solaris, using beadm(1M) to create a new Boot
+Environment (BE) and pkg(1) to update the image.
+.LP
+Former users of bfu should note the following ways in which onu behaves
+differently from bfu.  First, as noted above, onu creates a new BE, rather
+than updating an existing BE in-place.  Second, onu will not install packages
+that are older than what is already installed in the source BE.  Third,
+conflicts in system configuration files are automatically resolved according
+to the files' "preserve" attribute, as described in pkg(5).
+.SH OPTIONS
+.LP
+The following options are supported:
+.TP 4
+.B \-d <dir>
+Specifies that <dir> contains repo.redist and repo.extra sub-directories;
+.I onu
+will stand up a depot for each and use them for the publisher and extra
+packaging repositories.  Note that -d overrides -u, -U, -e, and -E, as well
+as the environment variables used by those options.
+.TP 4
+.B \-e <URI>
+Specifies that <URI> should be used as the origin URI for the extra repository.
+See \fBONEXTRAURI\fP below for default values.
+.TP 4
+.B \-E <publisher>
+Specifies that <publisher> should be used as the publisher name for
+the extra repository.  See \fBONEXTRAPUB\fP below for default values.
+.TP 4
+.B \-O
+Open mode, where the extra repository will not be used.
+.TP 4
+.B \-s <beName>
+Specifies that <beName> should be used as the source Boot Environment to
+clone.  The default is the active BE.
+.TP 4
+.B \-t <beName>
+Specifies the target BE name.  Note that this argument is required; there
+is no default value.
+.TP 4
+.B \-u <URI>
+Specifies that <beName> should be used as the origin URI for the publisher
+packaging repository.  See \fBONURI\fP below for default values.
+.TP 4
+.B \-U <publisher>
+Specifies that <publisher> should be used as the publisher name for
+the packaging repository.  See \fBONPUB\fP below for default values.
+.TP 4
+.B \-v
+Verbose mode.
+.SH EXIT STATUS
+.LP
+The following exit values are returned:
+.TP 4
+.B 0
+The command completed successfully.
+No errors or warnings were reported.
+.LP
+.TP 4
+.B 1
+Incorrect usage.
+.LP
+.TP 4
+.B 2
+One of the commands used by the script failed.
+.SH ENVIRONMENT
+.LP
+ONURI
+.IP
+If the -u option is not provided, and this variable is set, it will be used
+as the origin URI for the publisher packaging repository.  If -u is not
+provided and this variable is not set, http://ipkg.sfbay/on-nightly will
+be used.
+.LP
+ONPUB
+.IP
+If the -U option is not provided, and this variable is set, it will be
+used as the publisher name for the packaging repository.  If -U is not
+provided and this variable is not set, on-nightly will be used.
+.LP
+ONEXTRAURI
+.IP
+If the -e option is not provided, and this variable is set, it will be used
+as the origin URI for the extra repository.  If -e is not provided and this
+variable is not set, http://ipkg.sfbay/on-extra will be used.  Note: for
+external users where an extra repository does not apply, use the -O option.
+.LP
+ONEXTRAPUB
+.IP
+If the -E option is not provided, and this variable is set, it will be
+used as the publisher name for the extra repository.  If -E is not
+provided and this variable is not set, on-extra will be used.
+.LP
+.SH SEE ALSO
+.BR beadm "(1M), "
+.BR bfu "(1), "
+.BR pkg "(1), "
+.BR pkg "(5) "

@@ -1,0 +1,125 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/file-system/smb@$(PKGVERS)
+set name=pkg.description value="SMB Server libraries and commands"
+set name=pkg.summary value="SMB Server"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/File System"
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=kernel group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/drv group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/kmdb group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/kmdb/$(ARCH64) group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/method
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/fs group=sys
+dir path=usr/lib/fs/smb group=sys
+dir path=usr/lib/fs/smb/$(ARCH64) group=sys
+dir path=usr/lib/mdb group=sys
+dir path=usr/lib/mdb/kvm group=sys
+dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
+dir path=usr/lib/security
+dir path=usr/lib/smbsrv
+dir path=usr/sbin
+dir path=var group=sys
+dir path=var/smb group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/network group=sys
+dir path=var/svc/manifest/network/smb group=sys
+driver name=smbsrv perms="* 0640 root sys"
+file path=kernel/drv/$(ARCH64)/smbsrv group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+$(i386_ONLY)file path=kernel/drv/smbsrv group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=kernel/drv/smbsrv.conf group=sys opensolaris.zone=global \
+    reboot-needed=false variant.opensolaris.zone=global
+file path=kernel/kmdb/$(ARCH64)/smbsrv group=sys mode=0555 \
+    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
+$(i386_ONLY)file path=kernel/kmdb/smbsrv group=sys mode=0555 \
+    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
+file path=lib/svc/method/svc-smbd mode=0555
+file path=usr/lib/fs/smb/$(ARCH64)/libshare_smb.so.1
+file path=usr/lib/fs/smb/libshare_smb.so.1
+file path=usr/lib/mdb/kvm/$(ARCH64)/smbsrv.so group=sys mode=0555
+$(i386_ONLY)file path=usr/lib/mdb/kvm/smbsrv.so group=sys mode=0555
+file path=usr/lib/security/pam_smb_passwd.so.1
+file path=usr/lib/smbsrv/libmlrpc.so.1
+file path=usr/lib/smbsrv/libmlsvc.so.1
+file path=usr/lib/smbsrv/libsmb.so.1
+file path=usr/lib/smbsrv/libsmbns.so.1
+file path=usr/lib/smbsrv/libsmbrdr.so.1
+file path=usr/lib/smbsrv/libsqlite.so.1
+file path=usr/lib/smbsrv/llib-lmlrpc
+file path=usr/lib/smbsrv/llib-lmlrpc.ln
+file path=usr/lib/smbsrv/llib-lmlsvc
+file path=usr/lib/smbsrv/llib-lmlsvc.ln
+file path=usr/lib/smbsrv/llib-lsmb
+file path=usr/lib/smbsrv/llib-lsmb.ln
+file path=usr/lib/smbsrv/llib-lsmbns
+file path=usr/lib/smbsrv/llib-lsmbns.ln
+file path=usr/lib/smbsrv/llib-lsmbrdr
+file path=usr/lib/smbsrv/llib-lsmbrdr.ln
+file path=usr/lib/smbsrv/smbd mode=0555
+file path=usr/sbin/smbadm mode=0555
+file path=usr/sbin/smbstat mode=0555
+file path=var/smb/smbpasswd group=sys mode=0400 \
+    original_name=SUNWsmbs:var/smb/smbpasswd preserve=true
+file path=var/svc/manifest/network/smb/server.xml group=sys mode=0444
+legacy pkg=SUNWsmbskr arch=$(ARCH) category=system \
+    desc="SMB Server kernel root components" \
+    hotline="Please contact your local service provider" \
+    name="SMB Server (Kernel)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWsmbsr arch=$(ARCH) category=system \
+    desc="SMB Server root components" \
+    hotline="Please contact your local service provider" \
+    name="SMB Server (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWsmbsu arch=$(ARCH) category=system \
+    desc="SMB Server libraries and commands" \
+    hotline="Please contact your local service provider" \
+    name="SMB Server (Usr)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/security/pam_smb_passwd.so target=pam_smb_passwd.so.1
+link path=usr/lib/smbsrv/libmlrpc.so target=libmlrpc.so.1
+link path=usr/lib/smbsrv/libmlsvc.so target=libmlsvc.so.1
+link path=usr/lib/smbsrv/libsmb.so target=libsmb.so.1
+link path=usr/lib/smbsrv/libsmbns.so target=libsmbns.so.1
+link path=usr/lib/smbsrv/libsmbrdr.so target=libsmbrdr.so.1

@@ -329,7 +329,6 @@ COMMON_SUBDIRS = \
 	cmd/ztest \
 	lib/abi \
 	lib/auditd_plugins \
-	lib/brand/native \
 	lib/brand/sn1 \
 	lib/brand/solaris10 \
 	lib/cfgadm_plugins/sdcard \

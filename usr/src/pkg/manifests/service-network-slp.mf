@@ -1,0 +1,76 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/network/slp@$(PKGVERS)
+set name=pkg.description \
+    value="Usr filesystem portion of the Service Location Protocol (SLP) framework. Included are C and Java developer libraries and a daemon which can act as a directory agent (DA)."
+set name=pkg.summary value=SLP
+set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=etc/inet group=sys
+dir path=etc/init.d group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/method
+dir path=usr group=sys
+dir path=usr/include
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/inet
+dir path=usr/share group=sys
+dir path=usr/share/lib group=sys
+dir path=usr/share/lib/slp
+dir path=var group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/network group=sys
+file path=etc/inet/slp.conf.example group=sys
+file path=etc/init.d/slpd group=sys mode=0744
+file path=lib/svc/method/slp mode=0555
+file path=usr/include/slp.h
+file path=usr/lib/$(ARCH64)/libslp.so.1
+file path=usr/lib/$(ARCH64)/llib-lslp.ln
+file path=usr/lib/inet/slpd mode=0555
+file path=usr/lib/libslp.so.1
+file path=usr/lib/llib-lslp
+file path=usr/lib/llib-lslp.ln
+file path=usr/share/lib/slp/slp.jar group=sys
+file path=usr/share/lib/slp/slpd.jar group=sys mode=0600
+file path=var/svc/manifest/network/slp.xml group=sys mode=0444
+legacy pkg=SUNWslpr arch=$(ARCH) category=system \
+    desc="Root filesystem portion of the Service Location Protocol (SLP) framework. Includes the SLP configuration file and start scripts for the SLP daemon." \
+    hotline="Please contact your local service provider" name="SLP, (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWslpu arch=$(ARCH) category=system \
+    desc="Usr filesystem portion of the Service Location Protocol (SLP) framework. Included are C and Java developer libraries and a daemon which can act as a directory agent (DA)." \
+    hotline="Please contact your local service provider" name="SLP, (Usr)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/$(ARCH64)/libslp.so target=libslp.so.1
+link path=usr/lib/libslp.so target=libslp.so.1

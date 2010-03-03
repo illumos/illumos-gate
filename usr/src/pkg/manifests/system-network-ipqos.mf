@@ -1,0 +1,59 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/network/ipqos@$(PKGVERS)
+set name=pkg.description value="Solaris IP Quality of Service"
+set name=pkg.summary value="IP QoS"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/include
+dir path=usr/include/ipp
+dir path=usr/include/ipp/dlcosmk
+dir path=usr/include/ipp/dscpmk
+dir path=usr/include/ipp/flowacct
+dir path=usr/include/ipp/meters
+dir path=usr/lib
+dir path=usr/lib/ipqosconf
+dir path=usr/sbin
+file path=usr/include/ipp/dlcosmk/dlcosmk.h
+file path=usr/include/ipp/dscpmk/dscpmk.h
+file path=usr/include/ipp/flowacct/flowacct.h
+file path=usr/include/ipp/meters/meter.h
+file path=usr/lib/ipqosconf/dlcosmk.types mode=0444
+file path=usr/lib/ipqosconf/dscpmk.types mode=0444
+file path=usr/lib/ipqosconf/flowacct.types mode=0444
+file path=usr/lib/ipqosconf/ipgpc.types mode=0444
+file path=usr/lib/ipqosconf/tokenmt.types mode=0444
+file path=usr/lib/ipqosconf/tswtclmt.types mode=0444
+file path=usr/sbin/ipqosconf mode=0755
+legacy pkg=SUNWqosu arch=$(ARCH) category=system \
+    desc="Solaris IP Quality of Service (Usr)" \
+    hotline="Please contact your local service provider" name="IP QoS, (Usr)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

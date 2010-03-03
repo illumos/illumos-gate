@@ -19,16 +19,16 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 OK, so you've got approval to integrate code, and you want to know how to
 properly communicate the license terms.  What do you do next?
 
-0. If everything is covered by a Sun copyright and the CDDL, you're done.
+0. Determine whether your code should be covered by Sun copyright,
+   CDDL, and/or a third party license.  If only Sun copyright and/or
+   CDDL, then skip to step 4.
 
 1. Scan the source code and extract all of the third party licenses
    into one or more separate files.
@@ -67,92 +67,30 @@ properly communicate the license terms.  What do you do next?
    of your new license file(s).
 
 4. Figure out which packages deliver objects that are built using the
-   new third party source, and add a reference to LICENSEFILES in the
-   pkg Makefile.
+   new source, and add license actions to the package manifest(s).
 
    A. It's extremely rare for a package NOT to include a Sun copyright
-      statement.  If your package is one of the 99 percent that should
-      have a Sun copyright, then you should append to LICENSEFILES like
-      this:
+      and CDDL.  If your package is one of the 99 percent that should
+      have a Sun copyright and CDDL, then your package should have license
+      actions like this:
 
-          LICENSEFILES += relative/path/to/my/new/license/file
+	  license lic_CDDL license=lic_CDDL
+	  license cr_Sun license=cr_Sun
 
-      or
-
-          LICENSEFILES += \
-                  path/to/first/file \
-                  path/to/other/file
-
-      These paths should be relative to the pkg build directory, for
-      example relative to usr/src/pkgdefs/SUNWbcp for pkg SUNWbcp.
-
-      EXAMPLE: usr/src/pkgdefs/SUNWpsm-ipp/Makefile
-      EXAMPLE: usr/src/pkgdefs/SUNWrcmdc/Makefile
-
-   B. If, on the other hand, you do NOT want a Sun copyright, then you
-      should follow the example above, but use "=" instead of "+=" when
-      you assign the LICENSEFILES macro.
-
-      EXAMPLE: usr/src/pkgdefs/SUNWrtls/Makefile
-
-   C. It's also unusual for a package NOT to reference the CDDL.  If you
-      used "+=" above, and you want the CDDL, then you don't need to do
-      anything else.  It will automatically be appended.
-
-   D. If you used "+=" above, because you want the Sun copyright, but you
-      do NOT want the CDDL, then you should also include the following line:
-
-          CDDL=
-
-      in your pkg Makefile.
-
-      EXAMPLE: usr/src/pkgdefs/SUNWwpi/Makefile
-
-   E. If you used "=" above, then you will not get the CDDL unless you
-      explicitly append it to LICENSEFILES:
-
-          LICENSEFILES = \
-                  path/to/first/file \
-                  path/to/other/file \
-                  $(CDDL)
-
-
-      EXAMPLE: usr/src/pkgdefs/SUNWhea/Makefile
-
-   F. If your package delivers ONLY header files, and has multiple different
+   B. If your package delivers ONLY header files, and has multiple different
       copyrights or licenses, you can use
 
-          LICENSEFILES = $(LIC_IN_HDRS) \
-                  path/to/most/common/copyright/file \
-                  path/to/most/common/license/file
+          license license_in_headers license=license_in_headers
+	  license path/to/most/common/copyright/file license=path/to/most/common/copyright/file
+	  license path/to/most/common/license/file license=path/to/most/common/license/file
 
-      EXAMPLE: usr/src/pkgdefs/SUNWhea/Makefile
+   C. For your new license files, the path you use in your license
+      actions should be relative to ${SRC}.
 
-   G. Empty packages: if your package delivers nothing (or, more strictly
-      speaking, nothing besides directories) you should keep the Sun
-      copyright but nix the CDDL.  As a reminder, that's done simply by
-      adding the single line
+   D. Empty packages: if your package delivers nothing (or, more strictly
+      speaking, nothing besides directories) you should include the Sun
+      copyright but not the CDDL.
 
-          CDDL=
-
-      to your pkg Makefile.
-
-      EXAMPLE: usr/src/pkgdefs/SUNWdfb.i/Makefile
-
-   H. COPYRIGHT: Don't mess with this.  If you reset this, then you must
-      use the "copyright=" convention in your prototype_com.  As described
-      above, LICENSEFILES is the preferred mechanism.
-
-   I. Architecture dependent license files look like this:
-
-          LICENSEFILES_i386 = path/to/i386/only/license(s)
-
-          LICENSEFILES_sparc = path/to/sparc/only/license(s)
-
-          LICENSEFILES += \
-                  path/to/common/license/files(s) \
-                  $(LICENSEFILES_$(MACH))
-
-      EXAMPLE: usr/src/pkgdefs/SUNWcsl/Makefile
-      EXAMPLE: usr/src/pkgdefs/SUNWbcp/Makefile
-
+   E. As with any other action that is architecture dependent, license
+      actions may be preceded by $(blah_ONLY), where "blah" corresponds
+      to $(uname -p).

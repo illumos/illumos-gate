@@ -1,0 +1,54 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/resource-pools/poold@$(PKGVERS)
+set name=pkg.description value="core software for dynamic resource pools"
+set name=pkg.summary value="Dynamic Resource Pools"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/pool
+file path=usr/lib/pool/JPool.jar mode=0444
+file path=usr/lib/pool/libjkstat.so.1
+file path=usr/lib/pool/libjlgrp.so.1
+file path=usr/lib/pool/libjpool.so.1
+file path=usr/lib/pool/libjsyslog.so.1
+file path=usr/lib/pool/poold mode=0555
+file path=usr/lib/pool/poold.properties mode=0444
+legacy pkg=SUNWpoold arch=$(ARCH) category=system \
+    desc="core software for dynamic resource pools" \
+    hotline="Please contact your local service provider" \
+    name="Dynamic Resource Pools" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/pool/libjkstat.so target=./libjkstat.so.1
+link path=usr/lib/pool/libjlgrp.so target=./libjlgrp.so.1
+link path=usr/lib/pool/libjpool.so target=./libjpool.so.1
+link path=usr/lib/pool/libjsyslog.so target=./libjsyslog.so.1
+depend fmri=runtime/java type=require

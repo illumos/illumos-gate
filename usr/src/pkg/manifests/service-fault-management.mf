@@ -1,0 +1,642 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/fault-management@$(PKGVERS)
+set name=pkg.description value="Fault Management Daemon and Utilities"
+set name=pkg.summary value="Fault Management Daemon and Utilities"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Administration and Configuration"
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=etc/fm group=sys
+dir path=etc/fm/fmd group=sys
+dir path=etc/net-snmp
+dir path=etc/net-snmp/snmp
+dir path=etc/net-snmp/snmp/mibs
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr group=sys
+dir path=usr/include
+dir path=usr/include/fm
+dir path=usr/lib
+dir path=usr/lib/fm
+dir path=usr/lib/fm/$(ARCH64)
+dir path=usr/lib/fm/dict
+dir path=usr/lib/fm/eft
+dir path=usr/lib/fm/fmd
+dir path=usr/lib/fm/fmd/plugins
+dir path=usr/lib/fm/fmd/schemes
+dir path=usr/lib/fm/fmd/schemes/$(ARCH64)
+dir path=usr/lib/fm/topo
+dir path=usr/lib/fm/topo/maps
+dir path=usr/lib/fm/topo/plugins
+dir path=usr/lib/locale
+dir path=usr/lib/locale/C
+dir path=usr/lib/locale/C/LC_MESSAGES
+dir path=usr/lib/mdb group=sys
+dir path=usr/lib/mdb/proc group=sys
+dir path=usr/platform group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3060 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3060/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3060/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3060/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3060/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3060/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3060/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3260 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3260/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3260/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3260/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3260/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3260/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3260/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5220 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5220/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5220/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5220/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5220/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5220/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5220/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5440 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5440/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5440/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5440/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5440/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5440/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T5440/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise-T5120 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/fmd
+$(sparc_ONLY)dir \
+    path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/lib/fm/topo/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6300 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6300/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6300/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6300/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6300/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6300/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6300/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/eft
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-T200 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-T200/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-T200/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire/lib/fm/topo/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,T5140 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,T5140/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,T5140/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,T5140/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/SUNW,T5140/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,T5140/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,T5140/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/SUNW,USBRDT-5240 group=sys
+$(sparc_ONLY)dir path=usr/platform/SUNW,USBRDT-5240/lib
+$(sparc_ONLY)dir path=usr/platform/SUNW,USBRDT-5240/lib/fm
+$(sparc_ONLY)dir path=usr/platform/SUNW,USBRDT-5240/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/SUNW,USBRDT-5240/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/SUNW,USBRDT-5240/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/SUNW,USBRDT-5240/lib/fm/topo/maps
+$(i386_ONLY)dir path=usr/platform/i86pc group=sys
+$(i386_ONLY)dir path=usr/platform/i86pc/lib
+$(i386_ONLY)dir path=usr/platform/i86pc/lib/fm
+$(i386_ONLY)dir path=usr/platform/i86pc/lib/fm/eft
+$(i386_ONLY)dir path=usr/platform/i86pc/lib/fm/topo
+$(i386_ONLY)dir path=usr/platform/i86pc/lib/fm/topo/maps
+$(i386_ONLY)dir path=usr/platform/i86pc/lib/fm/topo/plugins
+$(sparc_ONLY)dir path=usr/platform/sun4u group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/fm
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/fm/eft
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/sun4u/lib/fm/topo/plugins
+$(sparc_ONLY)dir path=usr/platform/sun4v group=sys
+$(sparc_ONLY)dir path=usr/platform/sun4v/include
+$(sparc_ONLY)dir path=usr/platform/sun4v/include/sys
+$(sparc_ONLY)dir path=usr/platform/sun4v/include/sys/fm
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm/eft
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm/fmd
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm/fmd/plugins
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm/topo
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm/topo/maps
+$(sparc_ONLY)dir path=usr/platform/sun4v/lib/fm/topo/plugins
+dir path=usr/sbin
+dir path=usr/share group=sys
+dir path=usr/share/lib group=sys
+dir path=usr/share/lib/xml group=sys
+dir path=usr/share/lib/xml/dtd group=sys
+dir path=var/fm group=sys
+dir path=var/fm/fmd group=sys
+dir path=var/fm/fmd/ckpt group=sys
+dir path=var/fm/fmd/rsrc group=sys
+dir path=var/fm/fmd/xprt group=sys
+driver name=fm perms="* 0644 root sys"
+file path=etc/net-snmp/snmp/fmd-trapgen.conf mode=0600
+file path=etc/net-snmp/snmp/mibs/SUN-FM-MIB.mib
+file path=kernel/drv/$(ARCH64)/fm group=sys
+$(i386_ONLY)file path=kernel/drv/fm group=sys
+file path=kernel/drv/fm.conf group=sys reboot-needed=false
+file path=usr/include/fm/diagcode.h
+file path=usr/include/fm/fmd_adm.h
+file path=usr/include/fm/fmd_agent.h
+file path=usr/include/fm/fmd_api.h
+file path=usr/include/fm/fmd_fmri.h
+file path=usr/include/fm/fmd_log.h
+file path=usr/include/fm/fmd_msg.h
+file path=usr/include/fm/fmd_snmp.h
+file path=usr/include/fm/libdiskstatus.h
+file path=usr/include/fm/libfmevent.h
+file path=usr/include/fm/libtopo.h
+file path=usr/include/fm/topo_hc.h
+file path=usr/include/fm/topo_list.h
+file path=usr/include/fm/topo_method.h
+file path=usr/include/fm/topo_mod.h
+file path=usr/lib/fm/$(ARCH64)/libdiagcode.so.1
+file path=usr/lib/fm/$(ARCH64)/libdiskstatus.so.1
+file path=usr/lib/fm/$(ARCH64)/libfmd_adm.so.1
+file path=usr/lib/fm/$(ARCH64)/libfmd_agent.so.1
+file path=usr/lib/fm/$(ARCH64)/libfmd_log.so.1
+file path=usr/lib/fm/$(ARCH64)/libfmd_msg.so.1
+file path=usr/lib/fm/$(ARCH64)/libfmd_snmp.so.1
+file path=usr/lib/fm/$(ARCH64)/libfmevent.so.1
+$(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/libldom.so.1
+$(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/libmdesc.so.1
+file path=usr/lib/fm/$(ARCH64)/libtopo.so.1
+file path=usr/lib/fm/$(ARCH64)/llib-ldiagcode.ln
+file path=usr/lib/fm/$(ARCH64)/llib-ldiskstatus.ln
+file path=usr/lib/fm/$(ARCH64)/llib-lfmd_adm.ln
+file path=usr/lib/fm/$(ARCH64)/llib-lfmd_agent.ln
+file path=usr/lib/fm/$(ARCH64)/llib-lfmd_log.ln
+file path=usr/lib/fm/$(ARCH64)/llib-lfmd_msg.ln
+file path=usr/lib/fm/$(ARCH64)/llib-lfmd_snmp.ln
+file path=usr/lib/fm/$(ARCH64)/llib-lfmevent.ln
+$(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/llib-lldom.ln
+$(sparc_ONLY)file path=usr/lib/fm/$(ARCH64)/llib-lmdesc.ln
+file path=usr/lib/fm/$(ARCH64)/llib-ltopo.ln
+$(i386_ONLY)file path=usr/lib/fm/dict/AMD.dict mode=0444
+file path=usr/lib/fm/dict/DISK.dict mode=0444
+file path=usr/lib/fm/dict/FMD.dict mode=0444
+$(i386_ONLY)file path=usr/lib/fm/dict/GMCA.dict mode=0444
+$(i386_ONLY)file path=usr/lib/fm/dict/INTEL.dict mode=0444
+file path=usr/lib/fm/dict/NXGE.dict mode=0444
+file path=usr/lib/fm/dict/PCI.dict mode=0444
+file path=usr/lib/fm/dict/PCIEX.dict mode=0444
+$(sparc_ONLY)file path=usr/lib/fm/dict/SCF.dict mode=0444
+file path=usr/lib/fm/dict/SENSOR.dict mode=0444
+$(sparc_ONLY)file path=usr/lib/fm/dict/SUN4.dict mode=0444
+$(sparc_ONLY)file path=usr/lib/fm/dict/SUN4U.dict mode=0444
+$(sparc_ONLY)file path=usr/lib/fm/dict/SUN4V.dict mode=0444
+file path=usr/lib/fm/dict/SUNOS.dict mode=0444
+file path=usr/lib/fm/dict/ZFS.dict mode=0444
+file path=usr/lib/fm/eft/disk.eft mode=0444
+file path=usr/lib/fm/eft/neptune_xaui.eft mode=0444
+file path=usr/lib/fm/eft/neptune_xfp.eft mode=0444
+file path=usr/lib/fm/eft/pci.eft mode=0444
+file path=usr/lib/fm/eft/pciex.eft mode=0444
+file path=usr/lib/fm/eft/pciexrc.eft mode=0444
+file path=usr/lib/fm/eft/sensor.eft mode=0444
+file path=usr/lib/fm/fmd/fmd mode=0555
+file path=usr/lib/fm/fmd/fminject mode=0555
+file path=usr/lib/fm/fmd/fmsim mode=0555
+file path=usr/lib/fm/fmd/fmtopo mode=0555
+file path=usr/lib/fm/fmd/ipmitopo mode=0555
+file path=usr/lib/fm/fmd/plugins/cpumem-retire.conf
+file path=usr/lib/fm/fmd/plugins/cpumem-retire.so mode=0555
+file path=usr/lib/fm/fmd/plugins/disk-monitor.conf
+file path=usr/lib/fm/fmd/plugins/disk-monitor.so mode=0555
+file path=usr/lib/fm/fmd/plugins/disk-transport.conf
+file path=usr/lib/fm/fmd/plugins/disk-transport.so mode=0555
+file path=usr/lib/fm/fmd/plugins/eft.conf
+file path=usr/lib/fm/fmd/plugins/eft.so mode=0555
+file path=usr/lib/fm/fmd/plugins/ext-event-transport.conf
+file path=usr/lib/fm/fmd/plugins/ext-event-transport.so mode=0555
+file path=usr/lib/fm/fmd/plugins/fabric-xlate.conf
+file path=usr/lib/fm/fmd/plugins/fabric-xlate.so mode=0555
+file path=usr/lib/fm/fmd/plugins/fdd-msg.conf
+file path=usr/lib/fm/fmd/plugins/fdd-msg.so mode=0555
+file path=usr/lib/fm/fmd/plugins/io-retire.conf
+file path=usr/lib/fm/fmd/plugins/io-retire.so mode=0555
+file path=usr/lib/fm/fmd/plugins/ip-transport.conf
+file path=usr/lib/fm/fmd/plugins/ip-transport.so mode=0555
+file path=usr/lib/fm/fmd/plugins/sensor-transport.conf
+file path=usr/lib/fm/fmd/plugins/sensor-transport.so mode=0555
+file path=usr/lib/fm/fmd/plugins/snmp-trapgen.conf
+file path=usr/lib/fm/fmd/plugins/snmp-trapgen.so mode=0555
+file path=usr/lib/fm/fmd/plugins/sp-monitor.conf
+file path=usr/lib/fm/fmd/plugins/sp-monitor.so mode=0555
+file path=usr/lib/fm/fmd/plugins/syslog-msgs.conf
+file path=usr/lib/fm/fmd/plugins/syslog-msgs.so mode=0555
+file path=usr/lib/fm/fmd/plugins/zfs-diagnosis.conf
+file path=usr/lib/fm/fmd/plugins/zfs-diagnosis.so mode=0555
+file path=usr/lib/fm/fmd/plugins/zfs-retire.conf
+file path=usr/lib/fm/fmd/plugins/zfs-retire.so mode=0555
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/cpu.so mode=0555
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/dev.so mode=0555
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/fmd.so mode=0555
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/hc.so mode=0555
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/legacy-hc.so mode=0555
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/mem.so mode=0555
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/mod.so mode=0555
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/pkg.so mode=0555
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/svc.so mode=0555
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/zfs.so mode=0555
+file path=usr/lib/fm/fmd/schemes/cpu.so mode=0555
+file path=usr/lib/fm/fmd/schemes/dev.so mode=0555
+file path=usr/lib/fm/fmd/schemes/fmd.so mode=0555
+file path=usr/lib/fm/fmd/schemes/hc.so mode=0555
+file path=usr/lib/fm/fmd/schemes/legacy-hc.so mode=0555
+file path=usr/lib/fm/fmd/schemes/mem.so mode=0555
+file path=usr/lib/fm/fmd/schemes/mod.so mode=0555
+file path=usr/lib/fm/fmd/schemes/pkg.so mode=0555
+file path=usr/lib/fm/fmd/schemes/svc.so mode=0555
+file path=usr/lib/fm/fmd/schemes/zfs.so mode=0555
+file path=usr/lib/fm/libdiagcode.so.1
+file path=usr/lib/fm/libdiskstatus.so.1
+file path=usr/lib/fm/libfmd_adm.so.1
+file path=usr/lib/fm/libfmd_agent.so.1
+file path=usr/lib/fm/libfmd_log.so.1
+file path=usr/lib/fm/libfmd_msg.so.1
+file path=usr/lib/fm/libfmd_snmp.so.1
+file path=usr/lib/fm/libfmevent.so.1
+$(sparc_ONLY)file path=usr/lib/fm/libldom.so.1
+$(sparc_ONLY)file path=usr/lib/fm/libmdesc.so.1
+file path=usr/lib/fm/libtopo.so.1
+file path=usr/lib/fm/llib-ldiagcode
+file path=usr/lib/fm/llib-ldiagcode.ln
+file path=usr/lib/fm/llib-ldiskstatus
+file path=usr/lib/fm/llib-ldiskstatus.ln
+file path=usr/lib/fm/llib-lfmd_adm
+file path=usr/lib/fm/llib-lfmd_adm.ln
+file path=usr/lib/fm/llib-lfmd_agent
+file path=usr/lib/fm/llib-lfmd_agent.ln
+file path=usr/lib/fm/llib-lfmd_log
+file path=usr/lib/fm/llib-lfmd_log.ln
+file path=usr/lib/fm/llib-lfmd_msg
+file path=usr/lib/fm/llib-lfmd_msg.ln
+file path=usr/lib/fm/llib-lfmd_snmp
+file path=usr/lib/fm/llib-lfmd_snmp.ln
+file path=usr/lib/fm/llib-lfmevent
+file path=usr/lib/fm/llib-lfmevent.ln
+$(sparc_ONLY)file path=usr/lib/fm/llib-lldom
+$(sparc_ONLY)file path=usr/lib/fm/llib-lldom.ln
+$(sparc_ONLY)file path=usr/lib/fm/llib-lmdesc
+$(sparc_ONLY)file path=usr/lib/fm/llib-lmdesc.ln
+file path=usr/lib/fm/llib-ltopo
+file path=usr/lib/fm/llib-ltopo.ln
+file path=usr/lib/fm/topo/maps/xfp-hc-topology.xml mode=0444
+file path=usr/lib/fm/topo/plugins/disk.so mode=0555
+file path=usr/lib/fm/topo/plugins/fac_prov_ipmi.so mode=0555
+file path=usr/lib/fm/topo/plugins/ipmi.so mode=0555
+file path=usr/lib/fm/topo/plugins/ses.so mode=0555
+file path=usr/lib/fm/topo/plugins/xfp.so mode=0555
+$(i386_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/AMD.mo mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/DISK.mo mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/FMD.mo mode=0444
+$(i386_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/GMCA.mo mode=0444
+$(i386_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/INTEL.mo mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/NXGE.mo mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/PCI.mo mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/PCIEX.mo mode=0444
+$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SCF.mo mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/SENSOR.mo mode=0444
+$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4.mo mode=0444
+$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4U.mo mode=0444
+$(sparc_ONLY)file path=usr/lib/locale/C/LC_MESSAGES/SUN4V.mo mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/SUNOS.mo mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/ZFS.mo mode=0444
+file path=usr/lib/mdb/proc/eft.so group=sys mode=0555
+file path=usr/lib/mdb/proc/fmd.so group=sys mode=0555
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-CP3060/lib/fm/fmd/plugins/etm.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-CP3060/lib/fm/topo/maps/Netra-CP3060-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-CP3260/lib/fm/fmd/plugins/etm.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-CP3260/lib/fm/topo/maps/Netra-CP3260-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file path=usr/platform/SUNW,Netra-T5220/lib/fm/fmd/plugins/etm.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-T5220/lib/fm/topo/maps/Netra-T5220-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file path=usr/platform/SUNW,Netra-T5440/lib/fm/fmd/plugins/etm.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Netra-T5440/lib/fm/topo/maps/Netra-T5440-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/fmd/plugins/etm.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps/SPARC-Enterprise-T5120-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps/SPARC-Enterprise-T5220-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,SPARC-Enterprise/lib/fm/fmd/plugins/cpumem-retire.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,SPARC-Enterprise/lib/fm/fmd/plugins/cpumem-retire.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,SPARC-Enterprise/lib/fm/fmd/plugins/event-transport.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,SPARC-Enterprise/lib/fm/fmd/plugins/event-transport.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,SPARC-Enterprise/lib/fm/topo/maps/SPARC-Enterprise-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,SPARC-Enterprise/lib/fm/topo/plugins/ioboard.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-T6300/lib/fm/fmd/plugins/etm.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-T6300/lib/fm/topo/maps/Sun-Blade-T6300-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm/fmd/plugins/etm.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm/topo/maps/Sun-Blade-T6320-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/eft/SUNW,Sun-Fire-15000.eft \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/maps/Sun-Fire-15000-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/plugins/ioboard.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/fmd/plugins/etm.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Netra-T2000-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/SPARC-Enterprise-T1000-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/SPARC-Enterprise-T2000-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Fire-T1000-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/maps/Sun-Fire-T200-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,Sun-Fire/lib/fm/topo/maps/Sun-Fire-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire/lib/fm/topo/plugins/ioboard.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/SUNW,T5140/lib/fm/fmd/plugins/etm.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,T5140/lib/fm/topo/maps/Sun-Blade-T6340-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,T5140/lib/fm/topo/maps/T5140-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,T5140/lib/fm/topo/maps/T5240-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,T5140/lib/fm/topo/maps/T5440-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file path=usr/platform/SUNW,USBRDT-5240/lib/fm/fmd/plugins/etm.conf
+$(sparc_ONLY)file \
+    path=usr/platform/SUNW,USBRDT-5240/lib/fm/topo/maps/USBRDT-5240-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/eft/$(ARCH64).eft mode=0444
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/eft/gcpu.eft mode=0444
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/eft/gcpu_amd.eft mode=0444
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/eft/intel.eft mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Netra-X4200-M2-disk-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4200-M2-disk-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4200-Server-disk-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4500-disk-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4540-disk-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4600-M2-disk-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/chassis-hc-topology.xml mode=0444
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/maps/chip-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/maps/fan-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/maps/i86pc-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/i86pc-legacy-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/maps/psu-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/chip.so mode=0555
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/hostbridge.so \
+    mode=0555
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/pcibus.so mode=0555
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/x86pi.so mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/eft/fire.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/eft/oberon.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/eft/psycho.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/eft/schizo.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/eft/tomatillo.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/eft/xmits.eft mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/sun4u/lib/fm/fmd/plugins/USII-io-diagnosis.conf
+$(sparc_ONLY)file \
+    path=usr/platform/sun4u/lib/fm/fmd/plugins/USII-io-diagnosis.so mode=0555
+$(sparc_ONLY)file \
+    path=usr/platform/sun4u/lib/fm/fmd/plugins/cpumem-diagnosis.conf
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/fmd/plugins/cpumem-diagnosis.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/platform/sun4u/lib/fm/fmd/plugins/datapath-retire.conf
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/fmd/plugins/datapath-retire.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/fmd/plugins/fps-transport.conf
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/fmd/plugins/fps-transport.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/topo/maps/sun4u-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/topo/plugins/chip.so mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/topo/plugins/hostbridge.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/fm/topo/plugins/pcibus.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/fm/ldom.h
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/eft/fire.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/eft/gcpu.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/eft/gmem.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/eft/n2niu_xaui.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/eft/n2niu_xfp.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/eft/n2piu.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/eft/sp.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/eft/vfncx.eft mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/eft/zambezi.eft mode=0444
+$(sparc_ONLY)file \
+    path=usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.conf
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-retire.conf
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-retire.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/fmd/plugins/etm.conf
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/fmd/plugins/etm.so mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/fmd/plugins/generic-mem.conf
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/fmd/plugins/generic-mem.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/maps/sun4v-hc-topology.xml \
+    mode=0444
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/chip.so mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/cpuboard.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/dimm.so mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/hostbridge.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/motherboard.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/niu.so mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/pcibus.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/platform-cpu.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/platform-mem.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/sun4vpi.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/xaui.so mode=0555
+$(sparc_ONLY)file path=usr/platform/sun4v/lib/fm/topo/plugins/zambezi.so \
+    mode=0555
+file path=usr/sbin/fmadm mode=0555
+file path=usr/sbin/fmdump mode=0555
+file path=usr/sbin/fmstat mode=0555
+file path=usr/share/lib/xml/dtd/topology.dtd.1
+legacy pkg=SUNWfmd arch=$(ARCH) category=system \
+    desc="Fault Management Daemon and Utilities" \
+    hotline="Please contact your local service provider" \
+    name="Fault Management Daemon and Utilities" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWfmdr arch=$(ARCH) category=system \
+    desc="Fault Management Daemon and Utilities (Root)" \
+    hotline="Please contact your local service provider" \
+    name="Fault Management Daemon and Utilities (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/fm/$(ARCH64)/libdiagcode.so target=./libdiagcode.so.1
+link path=usr/lib/fm/$(ARCH64)/libdiskstatus.so target=./libdiskstatus.so.1
+link path=usr/lib/fm/$(ARCH64)/libfmd_adm.so target=./libfmd_adm.so.1
+link path=usr/lib/fm/$(ARCH64)/libfmd_agent.so target=./libfmd_agent.so.1
+link path=usr/lib/fm/$(ARCH64)/libfmd_log.so target=./libfmd_log.so.1
+link path=usr/lib/fm/$(ARCH64)/libfmd_msg.so target=./libfmd_msg.so.1
+link path=usr/lib/fm/$(ARCH64)/libfmd_snmp.so target=./libfmd_snmp.so.1
+link path=usr/lib/fm/$(ARCH64)/libfmevent.so target=./libfmevent.so.1
+$(sparc_ONLY)link path=usr/lib/fm/$(ARCH64)/libldom.so target=libldom.so.1
+$(sparc_ONLY)link path=usr/lib/fm/$(ARCH64)/libmdesc.so target=libmdesc.so.1
+link path=usr/lib/fm/$(ARCH64)/libtopo.so target=libtopo.so.1
+link path=usr/lib/fm/libdiagcode.so target=libdiagcode.so.1
+link path=usr/lib/fm/libdiskstatus.so target=libdiskstatus.so.1
+link path=usr/lib/fm/libfmd_adm.so target=libfmd_adm.so.1
+link path=usr/lib/fm/libfmd_agent.so target=libfmd_agent.so.1
+link path=usr/lib/fm/libfmd_log.so target=libfmd_log.so.1
+link path=usr/lib/fm/libfmd_msg.so target=libfmd_msg.so.1
+link path=usr/lib/fm/libfmd_snmp.so target=libfmd_snmp.so.1
+link path=usr/lib/fm/libfmevent.so target=libfmevent.so.1
+$(sparc_ONLY)link path=usr/lib/fm/libldom.so target=libldom.so.1
+$(sparc_ONLY)link path=usr/lib/fm/libmdesc.so target=libmdesc.so.1
+link path=usr/lib/fm/libtopo.so target=libtopo.so.1
+$(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3060/lib/fm/fmd/plugins/etm.so \
+    target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
+$(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3260/lib/fm/fmd/plugins/etm.so \
+    target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
+$(sparc_ONLY)link path=usr/platform/SUNW,Netra-T5220/lib/fm/fmd/plugins/etm.so \
+    target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
+$(sparc_ONLY)link path=usr/platform/SUNW,Netra-T5440/lib/fm/fmd/plugins/etm.so \
+    target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/fmd/plugins/etm.so \
+    target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Blade-T6300/lib/fm/fmd/plugins/etm.so \
+    target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
+$(sparc_ONLY)link \
+    path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm/fmd/plugins/etm.so \
+    target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
+$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/fmd/plugins/etm.so \
+    target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
+$(sparc_ONLY)link path=usr/platform/SUNW,T5140/lib/fm/fmd/plugins/etm.so \
+    target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
+$(sparc_ONLY)link path=usr/platform/SUNW,USBRDT-5240/lib/fm/fmd/plugins/etm.so \
+    target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so

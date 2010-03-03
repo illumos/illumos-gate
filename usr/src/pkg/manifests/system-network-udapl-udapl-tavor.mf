@@ -1,0 +1,76 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/network/udapl/udapl-tavor@$(PKGVERS)
+set name=pkg.description value="Sun uDAPL provider for Tavor"
+set name=pkg.summary value="Sun uDAPL for Tavor (User)"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
+dir path=etc/init.d group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=etc/rc2.d group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/drv group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/share group=sys
+dir path=usr/share/dat group=sys
+driver name=daplt perms="* 0644 root sys"
+file path=etc/init.d/dodatadm.udaplt group=sys mode=0744 opensolaris.zone=global \
+    original_name=SUNWudaplt:etc/init.d/dodatadm.udaplt preserve=true \
+    variant.opensolaris.zone=global
+file path=kernel/drv/$(ARCH64)/daplt group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+$(i386_ONLY)file path=kernel/drv/daplt group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=kernel/drv/daplt.conf group=sys opensolaris.zone=global \
+    reboot-needed=false variant.opensolaris.zone=global
+file path=usr/lib/$(ARCH64)/udapl_tavor.so.1
+file path=usr/lib/udapl_tavor.so.1
+file path=usr/share/dat/SUNWudaplt.conf group=sys mode=0644
+hardlink path=etc/rc2.d/S81dodatadm.udaplt opensolaris.zone=global \
+    target=../../etc/init.d/dodatadm.udaplt variant.opensolaris.zone=global
+legacy pkg=SUNWudapltr arch=$(ARCH) category=system \
+    desc="Sun uDAPL provider for Tavor driver and registration script" \
+    hotline="Please contact your local service provider" \
+    name="Sun uDAPL for Tavor (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWudapltu arch=$(ARCH) category=system \
+    desc="Sun uDAPL provider for Tavor" \
+    hotline="Please contact your local service provider" \
+    name="Sun uDAPL for Tavor (User)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_OSBL license=lic_OSBL
+license lic_OSBL_preamble license=lic_OSBL_preamble

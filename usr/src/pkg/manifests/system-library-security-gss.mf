@@ -1,0 +1,60 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/library/security/gss@$(PKGVERS)
+set name=pkg.description \
+    value="Generic Security Service Application Program Interface, Version 2 - user"
+set name=pkg.summary value="GSSAPI V2"
+set name=info.classification value=org.opensolaris.category.2008:System/Security
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH64)/gss
+dir path=usr/lib/gss
+dir path=usr/lib/sasl
+dir path=usr/lib/sasl/$(ARCH64)
+dir path=usr/sbin
+file path=usr/lib/$(ARCH64)/libgss.so.1
+file path=usr/lib/gss/gsscred_clean group=sys mode=0744
+file path=usr/lib/gss/gssd mode=0555
+file path=usr/lib/libgss.so.1
+file path=usr/lib/sasl/$(ARCH64)/gssapi.so.1
+file path=usr/lib/sasl/gssapi.so.1
+file path=usr/sbin/gsscred group=sys mode=0555
+legacy pkg=SUNWgss arch=$(ARCH) category=system \
+    desc="Generic Security Service Application Program Interface, Version 2 - user" \
+    hotline="Please contact your local service provider" name="GSSAPI V2" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lib/libgss/THIRDPARTYLICENSE license=lib/libgss/THIRDPARTYLICENSE
+license lic_CDDL license=lic_CDDL
+license lic_gss license=lic_gss
+license uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE \
+    license=uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE
+link path=usr/lib/$(ARCH64)/libgss.so target=libgss.so.1
+link path=usr/lib/libgss.so target=libgss.so.1

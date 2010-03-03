@@ -70,7 +70,7 @@ $(SUBDIRS): FRC
 $(XMLDIR)/%: %
 	$(INS.file)
 
-$(ROOT)/usr/sadm/install/scripts/%: $(SRC)/pkgdefs/common_files/%
+$(ROOT)/usr/sadm/install/scripts/%: common/%
 	$(INS.file)
 
 FRC:

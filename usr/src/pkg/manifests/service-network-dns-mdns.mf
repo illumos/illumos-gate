@@ -1,0 +1,148 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/network/dns/mdns@$(PKGVERS)
+set name=pkg.description \
+    value="Root components for Multicast DNS daemon and service discovery support"
+set name=pkg.summary value="Multicast DNS and Service Discovery"
+set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/bin
+dir path=usr/include
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/inet
+dir path=usr/share group=sys
+dir path=usr/share/lib group=sys
+dir path=usr/share/lib/java group=sys
+dir path=usr/share/lib/java/javadoc group=other
+dir path=usr/share/lib/java/javadoc/dnssd group=other
+dir path=usr/share/lib/java/javadoc/dnssd/api group=other
+dir path=usr/share/lib/java/javadoc/dnssd/api/com group=other
+dir path=usr/share/lib/java/javadoc/dnssd/api/com/apple group=other
+dir path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd group=other
+dir path=usr/share/lib/java/javadoc/dnssd/api/resources group=other
+dir path=usr/share/lib/java/javadoc/dnssd/examples group=other
+dir path=var group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/network group=sys
+dir path=var/svc/manifest/network/dns group=sys
+file path=usr/bin/dns-sd mode=0555
+file path=usr/include/dns_sd.h
+file path=usr/lib/$(ARCH64)/libdns_sd.so.1
+file path=usr/lib/$(ARCH64)/libjdns_sd.so.1
+file path=usr/lib/$(ARCH64)/llib-ldns_sd.ln
+file path=usr/lib/$(ARCH64)/nss_mdns.so.1
+file path=usr/lib/inet/mdnsd mode=0555
+file path=usr/lib/libdns_sd.so.1
+file path=usr/lib/libjdns_sd.so.1
+file path=usr/lib/llib-ldns_sd
+file path=usr/lib/llib-ldns_sd.ln
+file path=usr/lib/nss_mdns.so.1
+file path=usr/share/lib/java/dnssd.jar group=sys
+file path=usr/share/lib/java/javadoc/dnssd/api/allclasses-frame.html group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/allclasses-noframe.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/BaseListener.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/BrowseListener.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSRecord.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSD.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSDException.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSDRecordRegistrar.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSDRegistration.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSDService.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DomainListener.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/QueryListener.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/RegisterListener.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/RegisterRecordListener.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/ResolveListener.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/TXTRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/package-frame.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/package-summary.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/package-tree.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/constant-values.html group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/deprecated-list.html group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/help-doc.html group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/index-all.html group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/index.html group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/overview-tree.html group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/package-list group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/resources/inherit.gif group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/serialized-form.html group=other
+file path=usr/share/lib/java/javadoc/dnssd/api/stylesheet.css group=other
+file path=usr/share/lib/java/javadoc/dnssd/examples/BrowserApp.jar group=sys
+file path=usr/share/lib/java/javadoc/dnssd/examples/SimpleChat.jar group=sys
+file path=var/svc/manifest/network/dns/multicast.xml group=sys mode=0444
+legacy pkg=SUNWdsdr arch=$(ARCH) category=system \
+    desc="Root components for Multicast DNS daemon and service discovery support" \
+    hotline="Please contact your local service provider" \
+    name="Multicast DNS and Service Discovery (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWdsdu arch=$(ARCH) category=system \
+    desc="Multicast DNS daemon and service discovery modules" \
+    hotline="Please contact your local service provider" \
+    name="Multicast DNS and Service Discovery (Usr)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE \
+    license=cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE
+license cr_Sun license=cr_Sun
+license lib/libdns_sd/THIRDPARTYLICENSE license=lib/libdns_sd/THIRDPARTYLICENSE
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/$(ARCH64)/libdns_sd.so target=libdns_sd.so.1
+link path=usr/lib/$(ARCH64)/libjdns_sd.so target=libjdns_sd.so.1
+link path=usr/lib/libdns_sd.so target=libdns_sd.so.1
+link path=usr/lib/libjdns_sd.so target=libjdns_sd.so.1

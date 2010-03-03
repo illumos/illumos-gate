@@ -150,12 +150,6 @@ current source code
 Do an "old style" (pre-S10) build using root privileges to set OWNER
 and GROUP from the Makefiles.
 .TP
-.B \-0
-Create a globalization package.  Requires that G11N_PKGDIR be set
-in the build environment.  See 
-.B ENVIRONMENT VARIABLES
-below.
-.TP
 .B \-a
 Create BFU archives
 .TP
@@ -197,8 +191,7 @@ Check for cstyle/hdrchk errors
 .B \-f
 Check for unreferenced files.  Since the full workspace must be built
 in order to accurately identify unreferenced files, -f is ignored for
-incremental (-i) builds, or builds that do not include -l, and -p.  In
-addition, -f implies -0.
+incremental (-i) builds, or builds that do not include -l, and -p.
 .TP
 .B \-r
 Check the ELF runtime attributes of all dynamic objects
@@ -223,7 +216,7 @@ proto area will be used for comparison (which might not be what you want).
 .B Groups of options
 .TP 10
 .B \-G
-Gate keeper default group of options (-0au)
+Gate keeper default group of options (-au)
 .TP
 .B \-I
 Integration engineer default group of options (-ampu)
@@ -341,19 +334,10 @@ the starting point of build activity.  It should be expressed
 in terms of $CODEMGR_WS.
 .RE
 .LP
-.B G11N_PKGDIR
-.RS 5
-The location of the globalization package directory.  It should be
-expressed in terms of $CODEMGR_WS.  If this is not set, then the -0
-option will be ignored, whether it was set explicitly in
-NIGHTLY_OPTIONS or implicitly via the -f option.  If this is set, but
-the diretory does not exist, the -0 option will have no effect.  
-.RE
-.LP
 .B ROOT
 .RS 5
 Root of the proto area for the build.  The makefiles direct
-the installation of header files and libraries to this area and
+installation of build products to this area and
 direct references to these files by builds of commands and other
 targets.  It should be expressed in terms of $CODEMGR_WS.
 .LP
@@ -364,6 +348,18 @@ $ROOT-nd contains the non-DEBUG build.
 For OpenSolaris deliveries (\fB\-O\fR), $ROOT-open contains the DEBUG
 build of just the open source tree, and $ROOT-open-nd contains the
 non-DEBUG build.
+.RE
+.LP
+.B TOOLS_ROOT
+.RS 5
+Root of the tools proto area for the build.  The makefiles direct
+installation of tools build products to this area.  Unless \fB+t\fR
+is part of $NIGHTLY_OPTIONS, these tools will be used during the
+build.
+.LP
+As built by nightly, this will always contain non-DEBUG objects.
+Therefore, this will always have a -nd suffix, regardless of
+$MULTI_PROTO.
 .RE
 .LP
 .B MACH
@@ -421,8 +417,14 @@ but want one hierarchy of BFU archives.
 .LP
 .B PARENT_ROOT
 .RS 5
-The parent root, which is the destination for updated headers and
-libraries when using the \-U option.
+The parent root, which is the destination for copying the proto
+area(s) when using the \-U option.
+.RE
+.LP
+.B PARENT_TOOLS_ROOT
+.RS 5
+The parent tools root, which is the destination for copying the tools
+proto area when using the \-U option.
 .RE
 .LP
 .B RELEASE
@@ -457,11 +459,6 @@ Define this to build a release with a non-DEBUG kernel.
 Generally, let
 .I nightly
 set this for you based on its options.
-.RE
-.LP
-.B PKGDEFS
-.RS 5
-Points to "$SRC/pkgdefs."  Not used these days.
 .RE
 .LP
 .B PKGARCHIVE

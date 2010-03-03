@@ -19,37 +19,57 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG= profile .login ksh.kshrc system
-PROGSKEL= local.login local.profile local.cshrc
+PROGSKEL= local.login local.profile local.cshrc .profile
+PROGROOT= .profile .bashrc
 
 include ../Makefile.cmd
 
+ROOTROOT= $(ROOT)/root
 ROOTETCSKEL= $(ROOTETC)/skel
 ROOTETCSKELPROG= $(PROGSKEL:%=$(ROOTETCSKEL)/%)
+ROOTROOTPROG= $(PROGROOT:%=$(ROOTROOT)/%)
 FILEMODE= 0644
 
+CLOBBERFILES = profile .bashrc .profile .login
+
 .login: login.csh
-	$(RM) .login; $(CP) login.csh .login
+	$(RM) .login; 
+	$(CP) login.csh .login
+
+profile: etc-profile.sh
+	$(RM) profile
+	$(CP) etc-profile.sh $@
+
+.profile: dot-profile.sh
+	$(RM) .profile
+	$(CP) dot-profile.sh $@
+
+.bashrc: bashrc.sh
+	$(RM) .bashrc
+	$(CP) bashrc.sh $@
 
 .KEEP_STATE:
 
-all: $(PROG) $(PROGSKEL) 
+all: $(PROG) $(PROGSKEL)
 
+$(ROOTROOT)/% \
 $(ROOTETCSKEL)/%: %
 	$(INS.file)
 
+$(ROOTROOT) \
 $(ROOTETCSKEL):
 	$(INS.dir)
 
-install: all $(ROOTETCSKEL) $(ROOTETCPROG) $(ROOTETCSKELPROG)
+install: all $(ROOTETCSKEL) $(ROOTETCPROG) $(ROOTETCSKELPROG) $(ROOTROOTPROG)
 
 clean:
 
 clobber:
-	$(RM) .login
+	$(RM) $(CLOBBERFILES)
 
 lint:

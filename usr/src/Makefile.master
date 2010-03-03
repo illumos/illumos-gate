@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -868,9 +868,6 @@ $(EXPORT_RELEASE_BUILD)ELFSIGN_OBJECT=	$(ELFSIGN_O) sign \
 #		delete the comment section (mcs -d)
 #		add the standard comment (mcs -a $(RELEASE_CM))
 #
-#	The ONVERS macro sets the default value for the VERSION string
-#	within pkginfo.
-#
 # The following list of macros are used in the definition of RELEASE_CM
 # which is used to label all binaries in the build:
 #
@@ -885,7 +882,6 @@ $(EXPORT_RELEASE_BUILD)ELFSIGN_OBJECT=	$(ELFSIGN_O) sign \
 #	PATCH_DATE	Date the patch was created, if this is blank it
 #			will default to the RELEASE_DATE
 #
-ONVERS=		"11.11"
 RELEASE_MAJOR=	5
 RELEASE_MINOR=	11
 RELEASE=	$(RELEASE_MAJOR).$(RELEASE_MINOR)
@@ -920,16 +916,19 @@ CHK4UBINFLAGS=
 CHK4UBINARY=	$(CHK4UBIN) $(CHK4UBINFLAGS) $@
 
 #
-# The PKGDEFS macro points to the source directory containing the majority
-# of ON's package definitions plus Makefiles with general package creation
-# rules.
-#
 # PKGARCHIVE specifies the default location where packages should be
 # placed if built.
 #
-PKGDEFS=$(SRC)/pkgdefs
 $(RELEASE_BUILD)PKGARCHIVESUFFIX=	-nd
 PKGARCHIVE=$(SRC)/../../packages/$(MACH)/nightly$(PKGARCHIVESUFFIX)
+
+#
+# The repositories will be created with these publisher settings.  To
+# update an image to the resulting repositories, this must match the
+# publisher name provided to "pkg set-publisher."
+#
+PKGPUBLISHER_REDIST=	on-nightly
+PKGPUBLISHER_NONREDIST=	on-extra
 
 #	Default build rules which perform comment section post-processing.
 #

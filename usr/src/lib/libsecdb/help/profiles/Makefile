@@ -71,6 +71,8 @@ HTMLENTS = \
 	RtNetLinkSecure.html \
 	RtNetVRRP.html \
 	RtObAccessMngmnt.html \
+	RtOperator.html \
+	RtPriAdmin.html \
 	RtPrntAdmin.html \
 	RtProcManagement.html \
 	RtReparseMngmnt.html \
@@ -78,6 +80,7 @@ HTMLENTS = \
 	RtSMBMngmnt.html \
 	RtSMBFSMngmnt.html \
 	RtSoftwareInstall.html \
+	RtSysAdmin.html \
 	RtSysEvMngmnt.html \
 	RtUserMngmnt.html \
 	RtUserSecurity.html \

@@ -47,9 +47,6 @@ GATE=onnv-bugfixes;			export GATE
 # CODEMGR_WS - where is your workspace at (or what should nightly name it)
 CODEMGR_WS="/builds/$GATE";			export CODEMGR_WS
 
-# G11N_PKGDIR - where does the globalization package live
-G11N_PKGDIR="$CODEMGR_WS/usr/src/pkgdefs/SUNW0on";	export G11N_PKGDIR
-
 # PARENT_WS is used to determine the parent of this workspace. This is
 # for the options that deal with the parent workspace (such as where the
 # proto area will go).
@@ -128,11 +125,19 @@ VERSION="$GATE";			export VERSION
 # not applicable given the NIGHTLY_OPTIONS
 #
 PARENT_ROOT=$PARENT_WS/proto/root_$MACH; export PARENT_ROOT
+PARENT_TOOLS_ROOT=$PARENT_WS/usr/src/tools/proto/root_$MACH-nd; export PARENT_TOOLS_ROOT
 
 #
-#       package creation variable. you probably shouldn't change this either.
+# Package creation variables.  You probably shouldn't change these,
+# either.
+#
+# PKGARCHIVE determines where repositories will be created.
+#
+# PKGPUBLISHER* control the publisher settings for those repositories.
 #
 PKGARCHIVE="${CODEMGR_WS}/packages/${MACH}/nightly";	export PKGARCHIVE
+# PKGPUBLISHER_REDIST="on-redist";			export PKGPUBLISHER_REDIST
+# PKGPUBLISHER_NONREDIST="on-extra";			export PKGPUBLISHER_NONREDIST
 
 # we want make to do as much as it can, just in case there's more than
 # one problem.
@@ -171,12 +176,6 @@ UT_NO_USAGE_TRACKING="1"; export UT_NO_USAGE_TRACKING
 #
 #IA32_IHV_BINARY_PKGS=/ws/${GATE}-ihv-bin
 #export IA32_IHV_BINARY_PKGS
-
-#
-# Destination for sparc realmode package SUNWrmodu
-#
-#SPARC_RM_PKGARCHIVE="${CODEMGR_WS}/packages/sparc_realmode/nightly"
-#export SPARC_RM_PKGARCHIVE
 
 # Set this flag to 'n' to disable the automatic validation of the dmake
 # version in use.  The default is to check it.

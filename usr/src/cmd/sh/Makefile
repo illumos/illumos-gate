@@ -24,7 +24,7 @@
 #
 
 PROG =		sh
-ROOTFS_PROG =	$(PROG)
+USR_PROG =	$(PROG)
 
 OBJS=	args.o blok.o cmd.o defs.o error.o fault.o hash.o hashserv.o \
 	io.o msg.o print.o stak.o string.o word.o xec.o \
@@ -53,7 +53,7 @@ LDLIBS += -lgen -lsecdb
 
 .PARALLEL:	$(OBJS)
 
-all: $(ROOTFS_PROG)
+all: $(ROOTHASBINPROG)
 
 $(PROG): $(OBJS) $(MAPFILES)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -63,19 +63,13 @@ $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT)     $(POFILES) > $@
 
-install: all $(ROOTSBINPROG)
-	$(RM) $(ROOTSBIN)/jsh
-	$(SYMLINK) sh $(ROOTSBIN)/jsh
-	$(RM) $(ROOTSBIN)/pfsh
-	$(SYMLINK) sh $(ROOTSBIN)/pfsh
-	$(RM) $(ROOTBIN)/sh
-	$(SYMLINK) ../../sbin/sh $(ROOTBIN)/sh
-	$(RM) $(ROOTBIN)/jsh
-	$(SYMLINK) ../../sbin/sh $(ROOTBIN)/jsh
-	$(RM) $(ROOTBIN)/pfsh
-	$(SYMLINK) ../../sbin/sh $(ROOTBIN)/pfsh
-	$(RM) $(ROOTLIB)/rsh
-	$(SYMLINK) ../../sbin/sh $(ROOTLIB)/rsh
+install: all $(ROOTHASBINPROG)
+	$(RM) $(ROOTHASBIN)/jsh
+	$(SYMLINK) sh $(ROOTHASBIN)/jsh
+	$(RM) $(ROOTHASBIN)/pfsh
+	$(SYMLINK) sh $(ROOTHASBIN)/pfsh
+	$(RM) $(ROOTHASLIB)/rsh
+	$(SYMLINK) ../bin/sh $(ROOTHASLIB)/rsh
 
 clean:	
 	$(RM) $(OBJS)

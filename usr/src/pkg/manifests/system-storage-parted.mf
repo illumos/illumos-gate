@@ -1,0 +1,65 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri \
+    value=pkg:/system/storage/parted@1.8.8,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.description \
+    value="GNU Parted is for the display and manipulation of disk partitions"
+set name=pkg.summary value="GNU Parted - Partition Editor"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Administration and Configuration"
+set name=variant.arch value=i386
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/include
+dir path=usr/include/parted
+dir path=usr/lib
+dir path=usr/sbin
+file path=usr/include/parted/constraint.h
+file path=usr/include/parted/crc32.h
+file path=usr/include/parted/debug.h
+file path=usr/include/parted/device.h
+file path=usr/include/parted/disk.h
+file path=usr/include/parted/endian.h
+file path=usr/include/parted/exception.h
+file path=usr/include/parted/filesys.h
+file path=usr/include/parted/geom.h
+file path=usr/include/parted/natmath.h
+file path=usr/include/parted/parted.h
+file path=usr/include/parted/solaris.h
+file path=usr/include/parted/timer.h
+file path=usr/include/parted/unit.h
+file path=usr/lib/libparted.so.8
+file path=usr/sbin/parted mode=0555
+legacy pkg=SUNWparted arch=$(ARCH) category=system \
+    desc="GNU Parted is for the display and manipulation of disk partitions" \
+    hotline="Please contact your local service provider" \
+    name="GNU Parted - Partition Editor" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/libparted.so target=./libparted.so.8
+depend fmri=system/file-system/ntfsprogs type=require

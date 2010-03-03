@@ -1,0 +1,71 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/print/lp/filter/postscript-lp-filter@$(PKGVERS)
+set name=pkg.description \
+    value="client configuration files and utilities for the print service"
+set name=pkg.summary value="PostScript filters -"
+set name=info.classification value=org.opensolaris.category.2008:System/Printing
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/lp group=lp
+dir path=usr/lib/lp/postscript group=lp
+file path=usr/lib/lp/postscript/aps.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/banner.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/baseline.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/color.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/download group=lp mode=0555
+file path=usr/lib/lp/postscript/dpost group=lp mode=0555
+file path=usr/lib/lp/postscript/dpost.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/draw.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/fatcourier.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/forms.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/picpack group=lp mode=0555
+file path=usr/lib/lp/postscript/postcomm group=lp mode=0555
+file path=usr/lib/lp/postscript/postdaisy group=lp mode=0555
+file path=usr/lib/lp/postscript/postdaisy.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/postdmd group=lp mode=0555
+file path=usr/lib/lp/postscript/postdmd.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/postio group=lp mode=0555
+file path=usr/lib/lp/postscript/postmd group=lp mode=0555
+file path=usr/lib/lp/postscript/postmd.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/postplot group=lp mode=0555
+file path=usr/lib/lp/postscript/postplot.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/postprint group=lp mode=0555
+file path=usr/lib/lp/postscript/postprint.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/postreverse group=lp mode=0555
+file path=usr/lib/lp/postscript/posttek group=lp mode=0555
+file path=usr/lib/lp/postscript/posttek.ps group=lp mode=0555
+file path=usr/lib/lp/postscript/ps.requests group=lp mode=0555
+legacy pkg=SUNWpsf arch=$(ARCH) category=system \
+    desc="client configuration files and utilities for the print service" \
+    hotline="Please contact your local service provider" \
+    name="PostScript filters - (Usr)" vendor="Sun Microsystems, Inc." \
+    version=13.1,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

@@ -1,0 +1,129 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/diagnostic/cpu-counters@$(PKGVERS)
+set name=pkg.description value="CPU Performance Counter libraries and utilities"
+set name=pkg.summary value="CPU Performance Counter libraries and utilities"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/bin
+$(i386_ONLY)dir path=usr/bin/$(ARCH32)
+dir path=usr/bin/$(ARCH64)
+dir path=usr/include
+dir path=usr/include/sys
+dir path=usr/kernel group=sys
+dir path=usr/kernel/pcbe group=sys
+dir path=usr/kernel/pcbe/$(ARCH64) group=sys
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/sbin
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/cputrack mode=0555
+file path=usr/bin/$(ARCH64)/cputrack mode=0555
+file path=usr/include/libcpc.h
+file path=usr/include/libpctx.h
+$(sparc_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.4.6 group=sys mode=0755
+$(sparc_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.62 group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.AuthenticAMD group=sys \
+    mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.15 group=sys \
+    mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6 group=sys \
+    mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.15 group=sys \
+    mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/pcbe.AuthenticAMD group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/pcbe.GenuineIntel.15 group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/pcbe.GenuineIntel.6 group=sys mode=0755
+$(i386_ONLY)file path=usr/kernel/pcbe/pcbe.GenuineIntel.6.15 group=sys mode=0755
+file path=usr/lib/$(ARCH64)/libcpc.so.1
+file path=usr/lib/$(ARCH64)/libpctx.so.1
+file path=usr/lib/$(ARCH64)/llib-lcpc.ln
+file path=usr/lib/$(ARCH64)/llib-lpctx.ln
+file path=usr/lib/libcpc.so.1
+file path=usr/lib/libpctx.so.1
+file path=usr/lib/llib-lcpc
+file path=usr/lib/llib-lcpc.ln
+file path=usr/lib/llib-lpctx
+file path=usr/lib/llib-lpctx.ln
+file path=usr/sbin/cpustat mode=0555
+hardlink path=usr/bin/cputrack target=../lib/isaexec
+$(sparc_ONLY)hardlink path=usr/kernel/pcbe/$(ARCH64)/pcbe.23 target=pcbe.62
+$(sparc_ONLY)hardlink path=usr/kernel/pcbe/$(ARCH64)/pcbe.4.7 target=pcbe.4.6
+$(i386_ONLY)hardlink path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.5 \
+    target=pcbe.GenuineIntel.6
+$(i386_ONLY)hardlink path=usr/kernel/pcbe/pcbe.GenuineIntel.5 \
+    target=pcbe.GenuineIntel.6
+legacy pkg=SUNWcpcu arch=$(ARCH) category=system \
+    desc="CPU Performance Counter libraries and utilities" \
+    hotline="Please contact your local service provider" \
+    name="CPU Performance Counter libraries and utilities" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license uts/intel/pcbe/THIRDPARTYLICENSE \
+    license=uts/intel/pcbe/THIRDPARTYLICENSE
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.23 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.26 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.28 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.29 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.30 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.31 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.37 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.44 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.46 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.23 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.26 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.28 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.29 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.30 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.31 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.37 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.44 \
+    target=pcbe.GenuineIntel.6.15
+$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.46 \
+    target=pcbe.GenuineIntel.6.15
+link path=usr/lib/$(ARCH64)/libcpc.so target=./libcpc.so.1
+link path=usr/lib/$(ARCH64)/libpctx.so target=./libpctx.so.1
+link path=usr/lib/libcpc.so target=./libcpc.so.1
+link path=usr/lib/libpctx.so target=./libpctx.so.1

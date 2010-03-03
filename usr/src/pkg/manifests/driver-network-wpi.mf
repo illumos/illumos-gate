@@ -1,0 +1,69 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/driver/network/wpi@$(PKGVERS)
+set name=pkg.description value="Intel(R) PRO/Wireless 3945ABG driver"
+set name=pkg.summary value="Intel(R) PRO/Wireless 3945ABG driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=i386
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+driver name=wpi clone_perms="wpi 0666 root sys" perms="* 0666 root sys" \
+    alias=pciex8086,4222 \
+    alias=pciex8086,4222.8086.1000 \
+    alias=pciex8086,4222.8086.1001 \
+    alias=pciex8086,4222.8086.1005 \
+    alias=pciex8086,4222.8086.1034 \
+    alias=pciex8086,4222.8086.1040 \
+    alias=pciex8086,4222.8086.1041 \
+    alias=pciex8086,4222.8086.1044 \
+    alias=pciex8086,4222.8086.1050 \
+    alias=pciex8086,4222.8086.1053 \
+    alias=pciex8086,4227 \
+    alias=pciex8086,4227.8086.1011 \
+    alias=pciex8086,4227.8086.1012 \
+    alias=pciex8086,4227.8086.1014
+file path=kernel/drv/$(ARCH64)/wpi group=sys
+file path=kernel/drv/wpi group=sys
+legacy pkg=SUNWwpi arch=$(ARCH) category=system \
+    desc="Intel(R) PRO/Wireless 3945ABG driver" \
+    hotline="Please contact your local service provider" \
+    name="Intel(R) PRO/Wireless 3945ABG driver" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license uts/common/io/wpi/THIRDPARTYLICENSE \
+    license=uts/common/io/wpi/THIRDPARTYLICENSE
+license uts/common/io/wpi/fw-wpi/LICENSE \
+    license=uts/common/io/wpi/fw-wpi/LICENSE

@@ -87,7 +87,6 @@ DIRS= \
 	/devices/pseudo \
 	/etc \
 	/etc/brand  \
-	/etc/brand/native  \
 	/etc/brand/solaris10  \
 	/etc/certs	\
 	/etc/cron.d \
@@ -122,6 +121,9 @@ DIRS= \
 	/etc/iscsi \
 	/etc/rpcsec	\
 	/etc/security	\
+	/etc/security/auth_attr.d \
+	/etc/security/exec_attr.d \
+	/etc/security/prof_attr.d \
 	/etc/security/tsol	\
 	/etc/gss	\
 	/etc/init.d  \
@@ -151,6 +153,7 @@ DIRS= \
 	/etc/svc/volatile \
 	/etc/tm  \
 	/etc/usb   \
+	/etc/user_attr.d \
 	/etc/zfs  \
 	/etc/zones  \
 	/export  \
@@ -189,6 +192,9 @@ DIRS= \
 	/usr/demo \
 	/usr/demo/SOUND \
 	/usr/games \
+	/usr/has \
+	/usr/has/bin \
+	/usr/has/lib \
 	/usr/include \
 	/usr/include/ast \
 	/usr/include/fm \
@@ -207,7 +213,8 @@ DIRS= \
 	/usr/lib \
 	/usr/lib/abi \
 	/usr/lib/brand \
-	/usr/lib/brand/native \
+	/usr/lib/brand/ipkg \
+	/usr/lib/brand/labeled \
 	/usr/lib/brand/shared \
 	/usr/lib/brand/sn1 \
 	/usr/lib/brand/solaris10 \
@@ -248,7 +255,6 @@ DIRS= \
 	/usr/lib/mdb \
 	/usr/lib/mdb/kvm \
 	/usr/lib/mdb/proc \
-	/usr/lib/mdb/disasm \
 	/usr/lib/nfs \
 	/usr/net \
 	/usr/net/servers \
@@ -270,7 +276,6 @@ DIRS= \
 	/usr/lib/zfs \
 	/usr/lib/zones \
 	/usr/old \
-	/usr/openwin \
 	/usr/platform  \
 	/usr/proc \
 	/usr/proc/bin \
@@ -533,7 +538,7 @@ $(ROOT)/var/krb5/rcache/root:=	DIRMODE= 700
 
 #
 # These permissions must match those set
-# in pkgdefs.
+# in the package manifests.
 #
 $(ROOT)/var/sadm/pkg \
 $(ROOT)/var/sadm/security \

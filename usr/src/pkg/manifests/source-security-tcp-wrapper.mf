@@ -1,0 +1,117 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri \
+    value=pkg:/source/security/tcp-wrapper@7.6,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.description \
+    value="tcpd - access control facility for internet services (Source)"
+set name=pkg.summary \
+    value="tcpd - access control facility for internet services (Source)"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/share group=sys
+dir path=usr/share/src group=sys
+dir path=usr/share/src/tcp_wrappers
+file path=usr/share/src/tcp_wrappers/BLURB
+file path=usr/share/src/tcp_wrappers/Banners.Makefile
+file path=usr/share/src/tcp_wrappers/CHANGES
+file path=usr/share/src/tcp_wrappers/DISCLAIMER
+file path=usr/share/src/tcp_wrappers/Makefile
+file path=usr/share/src/tcp_wrappers/Makefile.dist
+file path=usr/share/src/tcp_wrappers/Makefile.org
+file path=usr/share/src/tcp_wrappers/README
+file path=usr/share/src/tcp_wrappers/README.IRIX
+file path=usr/share/src/tcp_wrappers/README.NIS
+file path=usr/share/src/tcp_wrappers/README.ipv6
+file path=usr/share/src/tcp_wrappers/README.sfw
+file path=usr/share/src/tcp_wrappers/clean_exit.c
+file path=usr/share/src/tcp_wrappers/diag.c
+file path=usr/share/src/tcp_wrappers/environ.c
+file path=usr/share/src/tcp_wrappers/eval.c
+file path=usr/share/src/tcp_wrappers/fakelog.c
+file path=usr/share/src/tcp_wrappers/fix_options.c
+file path=usr/share/src/tcp_wrappers/fromhost.c
+file path=usr/share/src/tcp_wrappers/hosts_access.3
+file path=usr/share/src/tcp_wrappers/hosts_access.4
+file path=usr/share/src/tcp_wrappers/hosts_access.c
+file path=usr/share/src/tcp_wrappers/hosts_access.c.org
+file path=usr/share/src/tcp_wrappers/hosts_ctl.c
+file path=usr/share/src/tcp_wrappers/hosts_options.4
+file path=usr/share/src/tcp_wrappers/inetcf.c
+file path=usr/share/src/tcp_wrappers/inetcf.h
+file path=usr/share/src/tcp_wrappers/misc.c
+file path=usr/share/src/tcp_wrappers/misc.c.org
+file path=usr/share/src/tcp_wrappers/miscd.c
+file path=usr/share/src/tcp_wrappers/mystdarg.h
+file path=usr/share/src/tcp_wrappers/myvsyslog.c
+file path=usr/share/src/tcp_wrappers/ncr.c
+file path=usr/share/src/tcp_wrappers/options.c
+file path=usr/share/src/tcp_wrappers/patchlevel.h
+file path=usr/share/src/tcp_wrappers/percent_m.c
+file path=usr/share/src/tcp_wrappers/percent_x.c
+file path=usr/share/src/tcp_wrappers/printf.ck
+file path=usr/share/src/tcp_wrappers/ptx.c
+file path=usr/share/src/tcp_wrappers/refuse.c
+file path=usr/share/src/tcp_wrappers/rfc931.c
+file path=usr/share/src/tcp_wrappers/rfc931.c.org
+file path=usr/share/src/tcp_wrappers/safe_finger.c
+file path=usr/share/src/tcp_wrappers/scaffold.c
+file path=usr/share/src/tcp_wrappers/scaffold.c.org
+file path=usr/share/src/tcp_wrappers/scaffold.h
+file path=usr/share/src/tcp_wrappers/setenv.c
+file path=usr/share/src/tcp_wrappers/shell_cmd.c
+file path=usr/share/src/tcp_wrappers/socket.c
+file path=usr/share/src/tcp_wrappers/socket.c.diff
+file path=usr/share/src/tcp_wrappers/socket.c.org
+file path=usr/share/src/tcp_wrappers/strcasecmp.c
+file path=usr/share/src/tcp_wrappers/tags
+file path=usr/share/src/tcp_wrappers/tcpd.1m
+file path=usr/share/src/tcp_wrappers/tcpd.c
+file path=usr/share/src/tcp_wrappers/tcpd.h
+file path=usr/share/src/tcp_wrappers/tcpd.h.org
+file path=usr/share/src/tcp_wrappers/tcpdchk.1m
+file path=usr/share/src/tcp_wrappers/tcpdchk.c
+file path=usr/share/src/tcp_wrappers/tcpdchk.c.org
+file path=usr/share/src/tcp_wrappers/tcpdmatch.1m
+file path=usr/share/src/tcp_wrappers/tcpdmatch.c
+file path=usr/share/src/tcp_wrappers/tcpdmatch.c.org
+file path=usr/share/src/tcp_wrappers/tli-sequent.c
+file path=usr/share/src/tcp_wrappers/tli-sequent.h
+file path=usr/share/src/tcp_wrappers/tli.c
+file path=usr/share/src/tcp_wrappers/tli.c.org
+file path=usr/share/src/tcp_wrappers/try-from.c
+file path=usr/share/src/tcp_wrappers/update.c
+file path=usr/share/src/tcp_wrappers/update.c.org
+file path=usr/share/src/tcp_wrappers/vfprintf.c
+file path=usr/share/src/tcp_wrappers/workarounds.c
+legacy pkg=SUNWtcpdS arch=$(ARCH) category=system \
+    desc="tcpd - access control facility for internet services (Source)" \
+    hotline="Please contact your local service provider" \
+    name="tcpd - access control facility for internet services (Source)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cmd/tcpd/THIRDPARTYLICENSE license=cmd/tcpd/THIRDPARTYLICENSE

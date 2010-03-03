@@ -363,7 +363,7 @@ if [[ -z "$CLOSED_IS_PRESENT" ]]; then
 fi
 
 TOOLS="${SRC}/tools"
-TOOLS_PROTO="${TOOLS}/proto"
+TOOLS_PROTO="${TOOLS}/proto/root_${MACH}-nd" ; export TOOLS_PROTO
 
 if "${flags.t}" ; then
 	export ONBLD_TOOLS="${ONBLD_TOOLS:=${TOOLS_PROTO}/opt/onbld}"
@@ -416,6 +416,7 @@ ENVCPPFLAGS2=
 ENVCPPFLAGS3=
 ENVCPPFLAGS4=
 PARENT_ROOT=
+PARENT_TOOLS_ROOT=
 
 "${flags.O}" && export ROOT="$ROOT-open"
 
@@ -442,6 +443,7 @@ export \
 	ENVCPPFLAGS4 \
         MAKEFLAGS \
         PARENT_ROOT \
+        PARENT_TOOLS_ROOT \
 	SCM_TYPE
 
 printf 'RELEASE      is %s\n'   "$RELEASE"

@@ -18,11 +18,13 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+
 # ucbcmd/Makefile
-#
 
 # include global definitions; SRC should be defined in the shell.
 # SRC is needed until RFE 1026993 is implemented.
@@ -142,10 +144,13 @@ OTHERLINKS = $(ROOTETC)/termcap \
 
 $(S5LINK) :=		LINKDEST= bin
 $(DICTLINK) :=		LINKDEST= share/lib/dict
-$(ROOTBIN)/e :=		LINKDEST= ../bin/ex
+$(ROOTBIN)/e :=		LINKDEST= ../bin/edit
+$(ROOTBIN)/ex :=	LINKDEST= ../bin/edit
 $(ROOTBIN)/page :=	LINKDEST= ../bin/more
 $(ROOTBIN)/quota :=	LINKDEST= ../lib/fs/ufs/quota
 $(ROOTETC)/termcap :=	LINKDEST= ../usr/share/lib/termcap
+$(ROOTBIN)/vi :=	LINKDEST= ../bin/edit
+$(ROOTBIN)/view :=	LINKDEST= ../bin/edit
 $(ROOTSHLIB)/zoneinfo/posixrules := LINKDEST= US/Eastern
 
 .KEEP_STATE:

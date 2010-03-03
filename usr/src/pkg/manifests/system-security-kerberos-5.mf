@@ -1,0 +1,115 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/security/kerberos-5@$(PKGVERS)
+set name=pkg.description value="Kerberos V5 Master KDC (user)"
+set name=pkg.summary value="Kerberos V5 Master KDC (user)"
+set name=info.classification value=org.opensolaris.category.2008:System/Security
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=etc/inet group=sys
+dir path=etc/krb5 group=sys
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/krb5
+dir path=usr/lib/krb5/ListResourceBundle
+dir path=usr/lib/security
+dir path=usr/sbin
+dir path=usr/share group=sys
+dir path=usr/share/lib group=sys
+dir path=usr/share/lib/ldif group=sys
+dir path=var group=sys
+dir path=var/krb5 group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/network group=sys
+dir path=var/svc/manifest/network/security group=sys
+file path=etc/krb5/kadm5.acl group=sys original_name=SUNWkdc:etc/krb5/kadm5.acl \
+    preserve=true
+file path=etc/krb5/kdc.conf group=sys original_name=SUNWkdc:etc/krb5/kdc.conf \
+    preserve=true
+file path=etc/krb5/kpropd.acl group=sys \
+    original_name=SUNWkdc:etc/krb5/kpropd.acl preserve=true
+file path=usr/lib/krb5/HelpIndex.html mode=0444
+file path=usr/lib/krb5/ListResourceBundle/GuiResource.java mode=0444
+file path=usr/lib/krb5/ListResourceBundle/HelpData.java mode=0444
+file path=usr/lib/krb5/README.db2 mode=0444
+file path=usr/lib/krb5/db2.so.1
+file path=usr/lib/krb5/gkadmin.jar mode=0444
+file path=usr/lib/krb5/kadmind mode=0500
+file path=usr/lib/krb5/kdyndns mode=0555
+file path=usr/lib/krb5/kldap.so.1
+file path=usr/lib/krb5/klookup mode=0555
+file path=usr/lib/krb5/kprop mode=0555
+file path=usr/lib/krb5/kprop_script mode=0555
+file path=usr/lib/krb5/kpropd mode=0555
+file path=usr/lib/krb5/krb5kdc mode=0500
+file path=usr/lib/krb5/ksetpw mode=0555
+file path=usr/lib/krb5/ksmb mode=0555
+file path=usr/lib/krb5/libdb2.so.1
+file path=usr/lib/krb5/libdyn.so.1
+file path=usr/lib/krb5/libkadm5srv.so.1
+file path=usr/lib/krb5/libkadmin.so.1
+file path=usr/lib/krb5/libkdb.so.1
+file path=usr/lib/krb5/libkdb_ldap.so.1
+file path=usr/lib/krb5/visualrt.jar mode=0444
+file path=usr/lib/security/pam_krb5_first mode=0444
+file path=usr/lib/security/pam_krb5_only mode=0444
+file path=usr/lib/security/pam_krb5_optional mode=0444
+file path=usr/sbin/gkadmin mode=0555
+file path=usr/sbin/k5srvutil mode=0555
+file path=usr/sbin/kadmin mode=0555
+file path=usr/sbin/kadmin.local mode=0555
+file path=usr/sbin/kclient mode=0555
+file path=usr/sbin/kdb5_ldap_util mode=0555
+file path=usr/sbin/kdb5_util mode=0555
+file path=usr/sbin/kdcmgr mode=0555
+file path=usr/sbin/kproplog mode=0555
+file path=usr/share/lib/ldif/kerberos.ldif
+file path=var/svc/manifest/network/security/krb5_prop.xml group=sys mode=0444
+legacy pkg=SUNWkdcr arch=$(ARCH) category=system desc="Kerberos V5 KDC (root)" \
+    hotline="Please contact your local service provider" \
+    name="Kerberos V5 KDC (root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWkdcu arch=$(ARCH) category=system \
+    desc=" Kerberos V5 Master KDC (user)" \
+    hotline="Please contact your local service provider" \
+    name="Kerberos V5 Master KDC (user)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lib/krb5/THIRDPARTYLICENSE license=lib/krb5/THIRDPARTYLICENSE
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/krb5/db2.so target=db2.so.1
+link path=usr/lib/krb5/kldap.so target=kldap.so.1
+link path=usr/lib/krb5/libdb2.so target=libdb2.so.1
+link path=usr/lib/krb5/libdyn.so target=libdyn.so.1
+link path=usr/lib/krb5/libkadm5srv.so target=libkadm5srv.so.1
+link path=usr/lib/krb5/libkadmin.so target=libkadmin.so.1
+link path=usr/lib/krb5/libkdb.so target=libkdb.so.1
+link path=usr/lib/krb5/libkdb_ldap.so target=libkdb_ldap.so.1
+depend fmri=naming/ldap type=require
+depend fmri=system/library/security/rpcsec type=require

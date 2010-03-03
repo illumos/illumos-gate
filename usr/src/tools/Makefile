@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -83,11 +83,6 @@ SUBDIRS= \
 	$(COMMON_SUBDIRS) \
 	$(UNSHIPPED_SUBDIRS)
 
-#
-# Packages built here
-#
-PKG_SUBDIRS= SUNWonbld
-
 include Makefile.tools
 
 ROOTDIRS= \
@@ -120,6 +115,14 @@ _msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
+#
+# Only create directories in the tools proto area when doing an actual
+# build, not a clean or clobber.
+#
+DOROOTDIRS= $(ROOTDIRS)
+clobber:= DOROOTDIRS=
+clean:= DOROOTDIRS=
+
 all install: $(SUBDIRS)
 
 clean: $(SUBDIRS)
@@ -127,23 +130,18 @@ clean: $(SUBDIRS)
 clobber: $(SUBDIRS)
 	$(RM) -rf $(TOOLS_PROTO)
 
-pkg: install .WAIT $(PKG_SUBDIRS)
-
 lint: $(LINTSUBDIRS)
 
 _msg: $(MSGSUBDIRS)
 
-.PARALLEL: $(SUBDIRS) $(PKG_SUBDIRS) $(CLOSED_SUBDIRS)
+.PARALLEL: $(SUBDIRS) $(CLOSED_SUBDIRS)
 
 $(SUBDIRS) $(CLOSED_SUBDIRS): $(BOOT_SUBDIRS)
 
-$(BOOT_SUBDIRS) $(SUBDIRS): $(ROOTDIRS) FRC
+$(BOOT_SUBDIRS) $(SUBDIRS): $$(DOROOTDIRS) FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
-$(PKG_SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) install
-
-FRC:
 
 $(ROOTDIRS):
 	$(INS.dir)
+
+FRC:

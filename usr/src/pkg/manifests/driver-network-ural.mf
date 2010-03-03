@@ -1,0 +1,57 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/driver/network/ural@$(PKGVERS)
+set name=pkg.description value="Ralink RT2500USB 802.11b/g Wireless Driver"
+set name=pkg.summary value="Ralink RT2500USB 802.11b/g Wireless Driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=i386
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+driver name=ural clone_perms="ural 0666 root sys" perms="* 0666 root sys" \
+    alias=usb1044,8007 \
+    alias=usb13b1,d \
+    alias=usb2001,3c00 \
+    alias=usb411,67
+file path=kernel/drv/$(ARCH64)/ural group=sys
+file path=kernel/drv/ural group=sys
+legacy pkg=SUNWural arch=$(ARCH) category=system \
+    desc="Ralink RT2500USB 802.11b/g Wireless Driver" \
+    hotline="Please contact your local service provider" \
+    name="Ralink RT2500USB 802.11b/g Wireless Driver" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license uts/common/io/ural/THIRDPARTYLICENSE \
+    license=uts/common/io/ural/THIRDPARTYLICENSE

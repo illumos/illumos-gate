@@ -1,0 +1,624 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/developer/dtrace@$(PKGVERS)
+set name=pkg.description value="Dynamic Tracing (DTrace) Clients"
+set name=pkg.summary value="DTrace Clients"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/demo
+dir path=usr/demo/dtrace
+dir path=usr/include
+dir path=usr/include/sys
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/devfsadm group=sys
+dir path=usr/lib/devfsadm/linkmod group=sys
+dir path=usr/lib/dtrace
+dir path=usr/lib/dtrace/64
+dir path=usr/lib/mdb group=sys
+dir path=usr/lib/mdb/kvm group=sys
+dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
+dir path=usr/lib/mdb/raw group=sys
+dir path=usr/lib/mdb/raw/$(ARCH64) group=sys
+dir path=usr/sbin
+dir path=usr/sbin/$(ARCH32)
+dir path=usr/sbin/$(ARCH64)
+dir path=usr/share group=sys
+dir path=usr/share/lib group=sys
+dir path=usr/share/lib/java group=sys
+dir path=usr/share/lib/java/javadoc group=other
+dir path=usr/share/lib/java/javadoc/dtrace group=other
+dir path=usr/share/lib/java/javadoc/dtrace/api group=other
+dir path=usr/share/lib/java/javadoc/dtrace/api/org group=other
+dir path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris group=other
+dir path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os group=other
+dir path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace \
+    group=other
+dir \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use \
+    group=other
+dir path=usr/share/lib/java/javadoc/dtrace/api/resources group=other
+dir path=usr/share/lib/java/javadoc/dtrace/examples group=other
+dir path=usr/share/lib/java/javadoc/dtrace/html group=other
+dir path=usr/share/lib/java/javadoc/dtrace/images group=other
+file path=usr/demo/dtrace/applicat.d
+file path=usr/demo/dtrace/badopen.d
+file path=usr/demo/dtrace/begin.d
+file path=usr/demo/dtrace/callout.d
+file path=usr/demo/dtrace/clause.d
+file path=usr/demo/dtrace/clear.d
+file path=usr/demo/dtrace/countdown.d
+file path=usr/demo/dtrace/counter.d
+file path=usr/demo/dtrace/dateprof.d
+file path=usr/demo/dtrace/delay.d
+file path=usr/demo/dtrace/denorm.d
+file path=usr/demo/dtrace/end.d
+file path=usr/demo/dtrace/error.d
+file path=usr/demo/dtrace/errorpath.d
+file path=usr/demo/dtrace/find.d
+file path=usr/demo/dtrace/firebird.d
+file path=usr/demo/dtrace/hello.d
+file path=usr/demo/dtrace/howlong.d
+file path=usr/demo/dtrace/index.html
+file path=usr/demo/dtrace/interp.d
+file path=usr/demo/dtrace/interval.d
+file path=usr/demo/dtrace/intr.d
+file path=usr/demo/dtrace/iocpu.d
+file path=usr/demo/dtrace/iosnoop.d
+file path=usr/demo/dtrace/iothrough.d
+file path=usr/demo/dtrace/iotime.d
+file path=usr/demo/dtrace/ipio.d
+file path=usr/demo/dtrace/ipproto.d
+file path=usr/demo/dtrace/iprb.d
+file path=usr/demo/dtrace/kstat.d
+file path=usr/demo/dtrace/ksyms.d
+file path=usr/demo/dtrace/libc.d
+file path=usr/demo/dtrace/lquantize.d
+file path=usr/demo/dtrace/lwptime.d
+file path=usr/demo/dtrace/normalize.d
+file path=usr/demo/dtrace/nscd.d
+file path=usr/demo/dtrace/pri.d
+file path=usr/demo/dtrace/printa.d
+file path=usr/demo/dtrace/pritime.d
+file path=usr/demo/dtrace/prof.d
+file path=usr/demo/dtrace/profpri.d
+file path=usr/demo/dtrace/progtime.d
+file path=usr/demo/dtrace/putnext.d
+file path=usr/demo/dtrace/qlen.d
+file path=usr/demo/dtrace/qtime.d
+file path=usr/demo/dtrace/renormalize.d
+file path=usr/demo/dtrace/restest.d
+file path=usr/demo/dtrace/ring.d
+file path=usr/demo/dtrace/rtime.d
+file path=usr/demo/dtrace/rwinfo.d
+file path=usr/demo/dtrace/rwtime.d
+file path=usr/demo/dtrace/sig.d
+file path=usr/demo/dtrace/soffice.d
+file path=usr/demo/dtrace/spec.d
+file path=usr/demo/dtrace/specopen.d
+file path=usr/demo/dtrace/ssd.d
+file path=usr/demo/dtrace/syscall.d
+file path=usr/demo/dtrace/tcprst.d
+file path=usr/demo/dtrace/tick.d
+file path=usr/demo/dtrace/ticktime.d
+file path=usr/demo/dtrace/time.d
+file path=usr/demo/dtrace/tracewrite.d
+file path=usr/demo/dtrace/trunc.d
+file path=usr/demo/dtrace/trussrw.d
+file path=usr/demo/dtrace/userfunc.d
+file path=usr/demo/dtrace/whatfor.d
+file path=usr/demo/dtrace/whatlock.d
+file path=usr/demo/dtrace/where.d
+file path=usr/demo/dtrace/whererun.d
+file path=usr/demo/dtrace/whoexec.d
+file path=usr/demo/dtrace/whofor.d
+file path=usr/demo/dtrace/whoio.d
+file path=usr/demo/dtrace/whopreempt.d
+file path=usr/demo/dtrace/whoqueue.d
+file path=usr/demo/dtrace/whosteal.d
+file path=usr/demo/dtrace/whowrite.d
+file path=usr/demo/dtrace/writes.d
+file path=usr/demo/dtrace/writesbycmd.d
+file path=usr/demo/dtrace/writesbycmdfd.d
+file path=usr/demo/dtrace/writetime.d
+file path=usr/demo/dtrace/writetimeq.d
+file path=usr/demo/dtrace/xioctl.d
+file path=usr/demo/dtrace/xterm.d
+file path=usr/demo/dtrace/xwork.d
+file path=usr/include/dtrace.h
+file path=usr/include/sys/dtrace.h
+file path=usr/include/sys/dtrace_impl.h
+file path=usr/include/sys/fasttrap.h
+file path=usr/include/sys/fasttrap_impl.h
+file path=usr/include/sys/fasttrap_isa.h
+file path=usr/include/sys/lockstat.h
+file path=usr/include/sys/sdt.h
+file path=usr/lib/$(ARCH64)/libdtrace.so.1
+file path=usr/lib/$(ARCH64)/libdtrace_jni.so.1
+file path=usr/lib/$(ARCH64)/llib-ldtrace.ln
+file path=usr/lib/devfsadm/linkmod/SUNW_dtrace_link.so group=sys
+file path=usr/lib/dtrace/64/drti.o
+file path=usr/lib/dtrace/drti.o
+file path=usr/lib/dtrace/errno.d
+file path=usr/lib/dtrace/fc.d
+file path=usr/lib/dtrace/io.d
+file path=usr/lib/dtrace/ip.d
+file path=usr/lib/dtrace/iscsit.d
+file path=usr/lib/dtrace/net.d
+file path=usr/lib/dtrace/nfs.d
+file path=usr/lib/dtrace/procfs.d
+file path=usr/lib/dtrace/regs.d
+file path=usr/lib/dtrace/sched.d
+file path=usr/lib/dtrace/scsi.d
+file path=usr/lib/dtrace/signal.d
+file path=usr/lib/dtrace/srp.d
+file path=usr/lib/dtrace/sysevent.d
+file path=usr/lib/dtrace/unistd.d
+file path=usr/lib/libdtrace.so.1
+file path=usr/lib/libdtrace_jni.so.1
+file path=usr/lib/llib-ldtrace
+file path=usr/lib/llib-ldtrace.ln
+file path=usr/lib/mdb/kvm/$(ARCH64)/dtrace.so group=sys mode=0555
+$(i386_ONLY)file path=usr/lib/mdb/kvm/dtrace.so group=sys mode=0555
+file path=usr/lib/mdb/raw/$(ARCH64)/dof.so group=sys mode=0555
+file path=usr/lib/mdb/raw/dof.so group=sys mode=0555
+file path=usr/sbin/$(ARCH32)/dtrace mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/intrstat mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/lockstat mode=0555
+$(i386_ONLY)file path=usr/sbin/$(ARCH32)/plockstat mode=0555
+file path=usr/sbin/$(ARCH64)/dtrace mode=0555
+file path=usr/sbin/$(ARCH64)/intrstat mode=0555
+file path=usr/sbin/$(ARCH64)/lockstat mode=0555
+file path=usr/sbin/$(ARCH64)/plockstat mode=0555
+file path=usr/share/lib/java/dtrace.jar group=sys
+file path=usr/share/lib/java/javadoc/dtrace/api/allclasses-frame.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/allclasses-noframe.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/constant-values.html group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/deprecated-list.html group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/help-doc.html group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/index-all.html group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/index.html group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Aggregate.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Aggregation.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/AggregationRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/AggregationValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/AvgValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Consumer.OpenFlag.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Consumer.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ConsumerAdapter.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ConsumerEvent.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ConsumerException.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ConsumerListener.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/CountValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/DTraceException.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/DataEvent.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Distribution.Bucket.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Distribution.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Drop.Kind.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Drop.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/DropEvent.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Error.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ErrorEvent.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ExceptionHandler.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ExitRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Flow.Kind.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Flow.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/InterfaceAttributes.DependencyClass.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/InterfaceAttributes.Stability.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/InterfaceAttributes.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/KernelStackRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/KernelSymbolRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/LinearDistribution.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/LocalConsumer.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/LogDistribution.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/MaxValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/MinValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Option.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/PrintaRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/PrintfRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Probe.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ProbeData.KeyField.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ProbeData.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ProbeDescription.Spec.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ProbeDescription.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ProbeInfo.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ProcessEvent.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ProcessState.State.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ProcessState.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Program.File.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Program.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ProgramInfo.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Record.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ScalarRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/StackFrame.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/StackValueRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/StddevValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/SumValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/SymbolValueRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Tuple.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/UserStackRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/UserSymbolRecord.Value.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/UserSymbolRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ValueRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Aggregate.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Aggregation.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/AggregationRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/AggregationValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/AvgValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Consumer.OpenFlag.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Consumer.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ConsumerAdapter.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ConsumerEvent.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ConsumerException.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ConsumerListener.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/CountValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/DTraceException.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/DataEvent.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Distribution.Bucket.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Distribution.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Drop.Kind.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Drop.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/DropEvent.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Error.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ErrorEvent.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ExceptionHandler.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ExitRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Flow.Kind.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Flow.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/InterfaceAttributes.DependencyClass.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/InterfaceAttributes.Stability.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/InterfaceAttributes.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/KernelStackRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/KernelSymbolRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/LinearDistribution.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/LocalConsumer.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/LogDistribution.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/MaxValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/MinValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Option.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/PrintaRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/PrintfRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Probe.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ProbeData.KeyField.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ProbeData.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ProbeDescription.Spec.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ProbeDescription.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ProbeInfo.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ProcessEvent.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ProcessState.State.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ProcessState.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Program.File.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Program.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ProgramInfo.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Record.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ScalarRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/StackFrame.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/StackValueRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/StddevValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/SumValue.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/SymbolValueRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Tuple.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/UserStackRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/UserSymbolRecord.Value.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/UserSymbolRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ValueRecord.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/package-frame.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/package-summary.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/package-tree.html \
+    group=other
+file \
+    path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/package-use.html \
+    group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/overview-tree.html group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/package-list group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/resources/inherit.gif \
+    group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/serialized-form.html group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/stylesheet.css group=other
+file path=usr/share/lib/java/javadoc/dtrace/examples/TestAPI.java group=other
+file path=usr/share/lib/java/javadoc/dtrace/examples/TestAPI2.java group=other
+file path=usr/share/lib/java/javadoc/dtrace/examples/TestTarget.java group=other
+file path=usr/share/lib/java/javadoc/dtrace/examples/hello.d group=other
+file path=usr/share/lib/java/javadoc/dtrace/examples/intrstat.d group=other
+file path=usr/share/lib/java/javadoc/dtrace/examples/syscall.d group=other
+file path=usr/share/lib/java/javadoc/dtrace/examples/target.d group=other
+file path=usr/share/lib/java/javadoc/dtrace/html/JavaDTraceAPI.html group=other
+file path=usr/share/lib/java/javadoc/dtrace/html/fast.html group=other
+file path=usr/share/lib/java/javadoc/dtrace/images/JavaDTraceAPI.gif group=other
+hardlink path=usr/sbin/dtrace target=../../usr/lib/isaexec
+hardlink path=usr/sbin/intrstat target=../../usr/lib/isaexec
+hardlink path=usr/sbin/lockstat target=../../usr/lib/isaexec
+hardlink path=usr/sbin/plockstat target=../../usr/lib/isaexec
+legacy pkg=SUNWdtrc arch=$(ARCH) category=system \
+    desc="Dynamic Tracing (DTrace) Clients" \
+    hotline="Please contact your local service provider" name="DTrace Clients" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license lic_iprb license=lic_iprb
+link path=usr/lib/$(ARCH64)/libdtrace.so target=libdtrace.so.1
+link path=usr/lib/$(ARCH64)/libdtrace_jni.so target=libdtrace_jni.so.1
+link path=usr/lib/libdtrace.so target=libdtrace.so.1
+link path=usr/lib/libdtrace_jni.so target=libdtrace_jni.so.1

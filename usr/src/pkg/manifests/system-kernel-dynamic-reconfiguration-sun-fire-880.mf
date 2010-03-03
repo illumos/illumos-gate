@@ -1,0 +1,71 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri \
+    value=pkg:/system/kernel/dynamic-reconfiguration/sun-fire-880@$(PKGVERS)
+set name=pkg.description value="Sun Fire 880 DR Daemon"
+set name=pkg.summary value="Sun Fire 880 DR Daemon"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Enterprise Management"
+set name=variant.arch value=sparc
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib/svc/method opensolaris.zone=global variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/platform group=sys
+dir path=usr/platform/SUNW,Sun-Fire-880 group=sys
+dir path=usr/platform/SUNW,Sun-Fire-880/lib
+dir path=usr/platform/SUNW,Sun-Fire-V890 group=sys
+dir path=usr/platform/SUNW,Sun-Fire-V890/lib
+dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
+dir path=var/svc group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=var/svc/manifest group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=var/svc/manifest/platform group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=var/svc/manifest/platform/sun4u group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=lib/svc/method/sf880dr mode=0555 opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=usr/platform/SUNW,Sun-Fire-880/lib/sf880drd group=sys mode=0755
+file path=var/svc/manifest/platform/sun4u/sf880drd.xml group=sys mode=0444 \
+    opensolaris.zone=global variant.opensolaris.zone=global
+legacy pkg=SUNWsfdr.u arch=$(ARCH).sun4u category=system \
+    desc="Sun Fire 880 DR Daemon" \
+    hotline="Please contact your local service provider" \
+    name="Sun Fire 880 DR Daemon" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWsfdrr.u arch=$(ARCH).sun4u category=system \
+    desc="DR Daemon support for Sun Fire 880, (Root)" \
+    hotline="Please contact your local service provider" \
+    name="Sun Fire 880 DR Daemon service method" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/platform/SUNW,Sun-Fire-V890/lib/sf880drd \
+    target=../../SUNW,Sun-Fire-880/lib/sf880drd

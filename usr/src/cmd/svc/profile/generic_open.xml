@@ -139,6 +139,9 @@
   <service name='system/power' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>
+  <service name='network/dns/multicast' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
 
   <service name='application/management/net-snmp' version='1' type='service'>
     <instance name='default' enabled='true' />
@@ -160,11 +163,8 @@
   </service>
 
   <!--
-      Enable CDE/GDM/X11 services.
+      Enable GDM services.
   -->
-  <service name='application/cde-printinfo' version='1' type='service'>
-    <instance name='default' enabled='true' />
-  </service>
   <service name='application/graphical-login/gdm' version='1'
     type='service'>
     <instance name='default' enabled='true' />
@@ -175,7 +175,19 @@
   </service>
 
   <!--
+      Enable VNC config service for xVM
+  -->
+  <service name='system/xvm/vnc-config' version='1' type='service'>
+     <instance name='default' enabled='true'/>
+  </service>
+
+  <service name='system/xvm/ipagent' version='1' type='service'>
+     <instance name='default' enabled='true'/>
+  </service>
+
+  <!--
       Include inetd(1M) services profile.
   -->
   <xi:include href='file:/var/svc/profile/inetd_services.xml' />
+
 </service_bundle>

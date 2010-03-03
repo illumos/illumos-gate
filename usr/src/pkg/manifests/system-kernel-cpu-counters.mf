@@ -1,0 +1,92 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/system/kernel/cpu-counters@$(PKGVERS)
+set name=pkg.description value="Kernel support for CPU Performance Counters"
+set name=pkg.summary value="CPU Performance Counter driver"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=platform group=sys
+$(i386_ONLY)dir path=platform/i86pc group=sys
+$(i386_ONLY)dir path=platform/i86pc/kernel group=sys
+$(i386_ONLY)dir path=platform/i86pc/kernel/drv group=sys
+$(i386_ONLY)dir path=platform/i86pc/kernel/drv/$(ARCH64) group=sys
+$(i386_ONLY)dir path=platform/i86pc/kernel/sys group=sys
+$(i386_ONLY)dir path=platform/i86pc/kernel/sys/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/sun4u group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/drv group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/sys group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/sys/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/sun4v group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/drv group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/sys group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/sys/$(ARCH64) group=sys
+driver name=cpc perms="shared 0666 root sys"
+$(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/cpc group=sys
+$(i386_ONLY)file path=platform/i86pc/kernel/drv/cpc group=sys
+$(i386_ONLY)file path=platform/i86pc/kernel/drv/cpc.conf group=sys \
+    reboot-needed=false
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/cpc group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/cpc.conf group=sys \
+    reboot-needed=false
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/cpc group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/cpc.conf group=sys \
+    reboot-needed=false
+$(i386_ONLY)hardlink path=platform/i86pc/kernel/sys/$(ARCH64)/cpc \
+    target=../../drv/$(ARCH64)/cpc
+$(i386_ONLY)hardlink path=platform/i86pc/kernel/sys/cpc target=../drv/cpc
+$(sparc_ONLY)hardlink path=platform/sun4u/kernel/sys/$(ARCH64)/cpc \
+    target=../../drv/$(ARCH64)/cpc
+$(sparc_ONLY)hardlink path=platform/sun4v/kernel/sys/$(ARCH64)/cpc \
+    target=../../drv/$(ARCH64)/cpc
+$(i386_ONLY)legacy pkg=SUNWcpc.i arch=$(ARCH).i86pc category=system \
+    desc="Kernel support for CPU Performance Counters" \
+    hotline="Please contact your local service provider" \
+    name="CPU Performance Counter driver" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+$(sparc_ONLY)legacy pkg=SUNWcpc.u arch=$(ARCH).sun4u category=system \
+    desc="Kernel support for CPU Performance Counters" \
+    hotline="Please contact your local service provider" \
+    name="CPU Performance Counter driver" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+$(sparc_ONLY)legacy pkg=SUNWcpc.v arch=$(ARCH).sun4v category=system \
+    desc="Kernel support for CPU Performance Counters" \
+    hotline="Please contact your local service provider" \
+    name="CPU Performance Counter driver" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

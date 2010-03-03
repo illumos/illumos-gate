@@ -1,0 +1,79 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/storage/virus-scan@$(PKGVERS)
+set name=pkg.description value="Virus Scan Service Kernel Root Components"
+set name=pkg.summary value="Virus Scan Service Kernel"
+set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=kernel group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/drv group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/devfsadm group=sys
+dir path=usr/lib/devfsadm/linkmod group=sys
+dir path=usr/lib/vscan
+dir path=usr/sbin
+dir path=var group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/system group=sys
+dir path=var/svc/manifest/system/filesystem group=sys
+driver name=vscan perms="* 0640 root sys"
+file path=kernel/drv/$(ARCH64)/vscan group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+$(i386_ONLY)file path=kernel/drv/vscan group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=kernel/drv/vscan.conf group=sys opensolaris.zone=global \
+    reboot-needed=false variant.opensolaris.zone=global
+file path=usr/lib/devfsadm/linkmod/SUNW_vscan_link.so group=sys
+file path=usr/lib/vscan/libvscan.so.1
+file path=usr/lib/vscan/vscand mode=0555
+file path=usr/sbin/vscanadm mode=0555
+file path=var/svc/manifest/system/filesystem/vscan.xml group=sys mode=0444
+legacy pkg=SUNWvscankr arch=$(ARCH) category=system \
+    desc="Virus Scan Service Kernel Root Components" \
+    hotline="Please contact your local service provider" \
+    name="Virus Scan Service Kernel (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWvscanr arch=$(ARCH) category=system \
+    desc="Virus Scan Service Root Components" \
+    hotline="Please contact your local service provider" \
+    name="Virus Scan Service (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWvscanu arch=$(ARCH) category=system \
+    desc="Virus Scan Service Usr Components" \
+    hotline="Please contact your local service provider" \
+    name="Virus Scan Service (Usr)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/vscan/libvscan.so target=libvscan.so.1

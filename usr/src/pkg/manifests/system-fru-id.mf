@@ -1,0 +1,71 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/fru-id@$(PKGVERS)
+set name=pkg.description value="FRU ID prtfru command and libfru library"
+set name=pkg.summary value="FRU ID Utility and Library"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Administration and Configuration"
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+$(sparc_ONLY)dir path=usr/sbin
+file path=usr/lib/$(ARCH64)/libfru.so.1
+$(sparc_ONLY)file path=usr/lib/$(ARCH64)/libfrupicl.so.1
+file path=usr/lib/$(ARCH64)/libfruraw.so.1
+file path=usr/lib/$(ARCH64)/libfrureg.so.1
+file path=usr/lib/$(ARCH64)/libfruutils.so.1
+file path=usr/lib/$(ARCH64)/libnvfru.so.1
+file path=usr/lib/libfru.so.1
+$(sparc_ONLY)file path=usr/lib/libfrupicl.so.1
+$(sparc_ONLY)file path=usr/lib/libfrupicltree.so.1
+file path=usr/lib/libfruraw.so.1
+file path=usr/lib/libfrureg.so.1
+file path=usr/lib/libfruutils.so.1
+file path=usr/lib/libnvfru.so.1
+$(sparc_ONLY)file path=usr/sbin/prtfru mode=0755
+legacy pkg=SUNWfruid arch=$(ARCH) category=system \
+    desc="FRU ID prtfru command and libfru library" \
+    hotline="Please contact your local service provider" \
+    name="FRU ID Utility and Library (Usr)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/$(ARCH64)/libfru.so target=./libfru.so.1
+$(sparc_ONLY)link path=usr/lib/$(ARCH64)/libfrupicl.so target=./libfrupicl.so.1
+link path=usr/lib/$(ARCH64)/libfruraw.so target=./libfruraw.so.1
+link path=usr/lib/$(ARCH64)/libfrureg.so target=./libfrureg.so.1
+link path=usr/lib/$(ARCH64)/libfruutils.so target=./libfruutils.so.1
+link path=usr/lib/$(ARCH64)/libnvfru.so target=./libnvfru.so.1
+link path=usr/lib/libfru.so target=./libfru.so.1
+$(sparc_ONLY)link path=usr/lib/libfrupicl.so target=./libfrupicl.so.1
+$(sparc_ONLY)link path=usr/lib/libfrupicltree.so target=./libfrupicltree.so.1
+link path=usr/lib/libfruraw.so target=./libfruraw.so.1
+link path=usr/lib/libfrureg.so target=./libfrureg.so.1
+link path=usr/lib/libfruutils.so target=./libfruutils.so.1
+link path=usr/lib/libnvfru.so target=./libnvfru.so.1

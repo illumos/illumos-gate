@@ -1,0 +1,111 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/xopen/xcu4@$(PKGVERS)
+set name=pkg.description \
+    value="utilities providing conformance with XCU4 specifications"
+set name=pkg.summary value="XCU4 Utilities"
+set name=info.classification \
+    value="org.opensolaris.category.2008:Applications/System Utilities"
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/xpg4
+dir path=usr/xpg4/bin
+file path=usr/xpg4/bin/alias mode=0555
+file path=usr/xpg4/bin/ar mode=0555
+file path=usr/xpg4/bin/at group=sys mode=4755
+file path=usr/xpg4/bin/awk mode=0555
+file path=usr/xpg4/bin/basename mode=0555
+file path=usr/xpg4/bin/batch mode=0555
+file path=usr/xpg4/bin/chgrp mode=0555
+file path=usr/xpg4/bin/chown mode=0555
+file path=usr/xpg4/bin/cp mode=0555
+file path=usr/xpg4/bin/crontab mode=4555
+file path=usr/xpg4/bin/ctags mode=0555
+file path=usr/xpg4/bin/date mode=0555
+file path=usr/xpg4/bin/df mode=0555
+file path=usr/xpg4/bin/du mode=0555
+file path=usr/xpg4/bin/ed mode=0555
+file path=usr/xpg4/bin/edit mode=0555
+file path=usr/xpg4/bin/env mode=0555
+file path=usr/xpg4/bin/expr mode=0555
+file path=usr/xpg4/bin/file mode=0555
+file path=usr/xpg4/bin/find mode=0555
+file path=usr/xpg4/bin/getconf mode=0555
+file path=usr/xpg4/bin/grep mode=0555
+file path=usr/xpg4/bin/id mode=0555
+file path=usr/xpg4/bin/link mode=0555
+file path=usr/xpg4/bin/ls mode=0555
+file path=usr/xpg4/bin/m4 mode=0555
+file path=usr/xpg4/bin/more mode=0555
+file path=usr/xpg4/bin/nice mode=0555
+file path=usr/xpg4/bin/nl mode=0555
+file path=usr/xpg4/bin/nm mode=0555
+file path=usr/xpg4/bin/nohup mode=0555
+file path=usr/xpg4/bin/od mode=0555
+file path=usr/xpg4/bin/pr mode=0555
+file path=usr/xpg4/bin/rm mode=0555
+file path=usr/xpg4/bin/sed mode=0555
+file path=usr/xpg4/bin/sort mode=0555
+file path=usr/xpg4/bin/stty mode=0555
+file path=usr/xpg4/bin/tail mode=0555
+file path=usr/xpg4/bin/tr mode=0555
+file path=usr/xpg4/bin/who mode=0555
+hardlink path=usr/xpg4/bin/bg target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/cd target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/command target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/egrep target=../../../usr/xpg4/bin/grep
+hardlink path=usr/xpg4/bin/ex target=../../../usr/xpg4/bin/edit
+hardlink path=usr/xpg4/bin/fc target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/fg target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/fgrep target=../../../usr/xpg4/bin/grep
+hardlink path=usr/xpg4/bin/getopts target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/hash target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/jobs target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/kill target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/ln target=../../../usr/xpg4/bin/cp
+hardlink path=usr/xpg4/bin/mv target=../../../usr/xpg4/bin/cp
+hardlink path=usr/xpg4/bin/read target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/test target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/type target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/ulimit target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/umask target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/unalias target=../../../usr/xpg4/bin/alias
+hardlink path=usr/xpg4/bin/vedit target=../../../usr/xpg4/bin/edit
+hardlink path=usr/xpg4/bin/vi target=../../../usr/xpg4/bin/edit
+hardlink path=usr/xpg4/bin/view target=../../../usr/xpg4/bin/edit
+hardlink path=usr/xpg4/bin/wait target=../../../usr/xpg4/bin/alias
+legacy pkg=SUNWxcu4 arch=$(ARCH) category=system \
+    desc="utilities providing conformance with XCU4 specifications" \
+    hotline="Please contact your local service provider" name="XCU4 Utilities" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_ATT license=cr_ATT
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license lic_OSBL license=lic_OSBL
+license lic_OSBL_preamble license=lic_OSBL_preamble
+link path=usr/xpg4/bin/ipcs target=../../bin/ipcs

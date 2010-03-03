@@ -1,0 +1,71 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/storage/media-volume-manager@$(PKGVERS)
+set name=pkg.description value="Non-graphical removable volume manager"
+set name=pkg.summary value="Removable volume manager"
+set name=info.classification value=org.opensolaris.category.2008:System/Media
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib/svc/method opensolaris.zone=global variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/bin
+dir path=usr/lib
+dir path=usr/sbin
+dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
+dir path=var/svc group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=var/svc/manifest group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=var/svc/manifest/system/filesystem group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=lib/svc/method/svc-rmvolmgr mode=0555 opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=usr/bin/rmformat mode=4555
+file path=usr/bin/rmmount mode=0555
+file path=usr/bin/volcheck mode=0555
+file path=usr/bin/volrmmount mode=0555
+file path=usr/lib/rmvolmgr mode=0555
+file path=var/svc/manifest/system/filesystem/rmvolmgr.xml group=sys mode=0444 \
+    opensolaris.zone=global variant.opensolaris.zone=global
+legacy pkg=SUNWrmvolmgr arch=$(ARCH) category=system \
+    desc="Non-graphical removable volume manager" \
+    hotline="Please contact your local service provider" \
+    name="Removable volume manager" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWrmvolmgrr arch=$(ARCH) category=system \
+    desc="Non-graphical removable volume manager (Root)" \
+    hotline="Please contact your local service provider" \
+    name="Removable volume manager (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/bin/rmumount target=./rmmount
+link path=usr/sbin/rmmount target=../bin/rmmount

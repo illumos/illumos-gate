@@ -21,13 +21,13 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 #
-# Make SUNWonbld package tarball for OpenSolaris.  Besides the
-# package, we include licensing files.
+# Make onbld tarball for OpenSolaris.  Besides the files delivered
+# in the package, we include licensing files.
 #
 
 fail() {
@@ -44,7 +44,7 @@ subdir=onbld
 
 [ -n "$SRC" ] || fail "Please set SRC."
 [ -n "$CODEMGR_WS" ] || fail "Please set CODEMGR_WS."
-[ -n "$PKGARCHIVE" ] || fail "Please set PKGARCHIVE."
+[ -n "$TOOLS_PROTO" ] || fail "Please set TOOLS_PROTO."
 
 [ -n "$MAKE" ] || export MAKE=make
 
@@ -61,7 +61,7 @@ mkreadme() {
 	readme=README.ON-BUILD-TOOLS.$isa
 	sed -e s/@ISA@/$isa/ -e s/@DELIVERY@/ON-BUILD-TOOLS/ \
 	    $SRC/tools/opensolaris/README.binaries.tmpl > $targetdir/$readme
-	(cd $targetdir; find SUNWonbld -type f -print | \
+	(cd $targetdir; find opt -type f -print | \
 	    sort >> $targetdir/$readme)
 }
 
@@ -69,12 +69,19 @@ mkreadme() {
 mkdir -p $stagedir/$subdir || fail "Can't create $stagedir/$subdir."
 
 cd $CODEMGR_WS
-# $MAKE -e to make sure PKGARCHIVE is used.
-(cd usr/src/tools/SUNWonbld; $MAKE -e install) || fail "Can't make package."
+# $MAKE -e to make sure TOOLS_PROTO is used.
+(cd usr/src/tools; $MAKE -e install) || fail "Can't build tools."
 
-[ -d $PKGARCHIVE/SUNWonbld ] || \
-    fail "$PKGARCHIVE/SUNWonbld is missing."
-(cd $PKGARCHIVE; tar cf - SUNWonbld) | (cd $stagedir/$subdir; tar xf -)
+#
+# There is no on-disk package format, and the tools are built and
+# delivered independently of the rest of the consolidation, including
+# leaving them out of the consolidation incorporation to facilitate
+# tools upgrade.  If using the OpenSolaris deliverables, the closest
+# we can get is a tarball of the proto area with all of the files that
+# would have been packaged.
+#
+(cd $TOOLS_PROTO; tar cf - $(find opt -type f)) | \
+    (cd $stagedir/$subdir; tar xf -)
 
 mkreadme $stagedir/$subdir
 cp -p $CODEMGR_WS/THIRDPARTYLICENSE.ON-BUILD-TOOLS $stagedir/$subdir || \

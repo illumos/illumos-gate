@@ -18,12 +18,12 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
 # cmd/vi/port/Makefile
 
 PROG= ex
@@ -79,7 +79,9 @@ lint :=		LDLIBS += -lmapmalloc -lcurses -lgen -lcrypt
 ROOTLIBPROGS= $(LIBPROGS:%=$(ROOTLIB)/%)
 
 # hard links to ex
-ROOTLINKS= $(ROOTBIN)/vi $(ROOTBIN)/view $(ROOTBIN)/edit $(ROOTBIN)/vedit
+ROOTLINKS= $(ROOTBIN)/edit $(ROOTHASBIN)/edit $(ROOTBIN)/vedit \
+	$(ROOTHASBIN)/vedit $(ROOTHASBIN)/vi $(ROOTHASBIN)/view \
+
 ROOTXPG4LINKS= $(ROOTXPG4BIN)/vi $(ROOTXPG4BIN)/view $(ROOTXPG4BIN)/edit \
 	$(ROOTXPG4BIN)/vedit
 ROOTXPG6LINKS= $(ROOTXPG6BIN)/vi $(ROOTXPG6BIN)/view $(ROOTXPG6BIN)/edit \
@@ -138,12 +140,12 @@ $(POFILE): $(POFILES)
 	cat $(POFILES) > $@
 
 
-install: all $(ROOTPROG) $(ROOTLIBPROGS) $(ROOTLINKS) \
+install: all $(ROOTHASBINPROG) $(ROOTLIBPROGS) $(ROOTLINKS) \
 	$(ROOTXPG4PROG) $(ROOTXPG4LINKS) $(ROOTXPG6PROG) $(ROOTXPG6LINKS)
 
-$(ROOTLINKS): $(ROOTPROG)
+$(ROOTLINKS): $(ROOTHASBINPROG)
 	-$(RM) $@
-	-$(LN) -f $(ROOTPROG) $@
+	-$(LN) -f $(ROOTHASBINPROG) $@
 
 $(ROOTXPG4LINKS): $(ROOTXPG4PROG)
 	-$(RM) $@

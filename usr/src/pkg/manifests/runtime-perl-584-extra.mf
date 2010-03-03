@@ -1,0 +1,1483 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri \
+    value=pkg:/runtime/perl-584/extra@5.8.4,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.description value="Perl 5.8.4 programming language (non-core)"
+set name=pkg.summary value="Perl 5.8.4 (non-core)"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/Perl
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/bin
+dir path=usr/perl5
+dir path=usr/perl5/5.8.4
+dir path=usr/perl5/5.8.4/bin
+dir path=usr/perl5/5.8.4/lib
+dir path=usr/perl5/5.8.4/lib/Attribute
+dir path=usr/perl5/5.8.4/lib/Attribute/Handlers
+dir path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo
+dir path=usr/perl5/5.8.4/lib/B
+dir path=usr/perl5/5.8.4/lib/CGI
+dir path=usr/perl5/5.8.4/lib/CGI/eg
+dir path=usr/perl5/5.8.4/lib/CPAN
+dir path=usr/perl5/5.8.4/lib/DBM_Filter
+dir path=usr/perl5/5.8.4/lib/Devel
+dir path=usr/perl5/5.8.4/lib/Encode
+dir path=usr/perl5/5.8.4/lib/Encode/CN
+dir path=usr/perl5/5.8.4/lib/Encode/JP
+dir path=usr/perl5/5.8.4/lib/Encode/KR
+dir path=usr/perl5/5.8.4/lib/Encode/MIME
+dir path=usr/perl5/5.8.4/lib/Encode/Unicode
+dir path=usr/perl5/5.8.4/lib/ExtUtils
+dir path=usr/perl5/5.8.4/lib/ExtUtils/Command
+dir path=usr/perl5/5.8.4/lib/ExtUtils/Liblist
+dir path=usr/perl5/5.8.4/lib/ExtUtils/MakeMaker
+dir path=usr/perl5/5.8.4/lib/I18N
+dir path=usr/perl5/5.8.4/lib/I18N/LangTags
+dir path=usr/perl5/5.8.4/lib/Locale
+dir path=usr/perl5/5.8.4/lib/Locale/Maketext
+dir path=usr/perl5/5.8.4/lib/Memoize
+dir path=usr/perl5/5.8.4/lib/Net
+dir path=usr/perl5/5.8.4/lib/Net/demos
+dir path=usr/perl5/5.8.4/lib/Pod
+dir path=usr/perl5/5.8.4/lib/Pod/Perldoc
+dir path=usr/perl5/5.8.4/lib/Pod/Text
+dir path=usr/perl5/5.8.4/lib/Sun
+dir path=usr/perl5/5.8.4/lib/Sun/Solaris
+dir path=usr/perl5/5.8.4/lib/Sun/Solaris/PerlGcc
+dir path=usr/perl5/5.8.4/lib/Test
+dir path=usr/perl5/5.8.4/lib/Test/Harness
+dir path=usr/perl5/5.8.4/lib/Unicode
+dir path=usr/perl5/5.8.4/lib/Unicode/Collate
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Devel
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Unicode
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/XS
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/B
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/B/C
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/ByteLoader
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Devel
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Devel/DProf
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Devel/PPPort
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Devel/Peek
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Byte
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/CN
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/EBCDIC
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/JP
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/KR
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Symbol
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/TW
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Unicode
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/I18N
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/I18N/Langinfo
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Opcode
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Unicode
+$(i386_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Unicode/Normalize
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/XS
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/XS/APItest
+$(i386_ONLY)dir path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/XS/Typemap
+dir path=usr/perl5/5.8.4/lib/pod
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Devel
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Unicode
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/XS
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/B
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/B/C
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/ByteLoader
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Devel
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Devel/DProf
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Devel/PPPort
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Devel/Peek
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Byte
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/CN
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/EBCDIC
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/JP
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/KR
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Symbol
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/TW
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Unicode
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/I18N
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/I18N/Langinfo
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Opcode
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Unicode
+$(sparc_ONLY)dir \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Unicode/Normalize
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/XS
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/XS/APItest
+$(sparc_ONLY)dir path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/XS/Typemap
+dir path=usr/perl5/5.8.4/lib/unicore
+dir path=usr/perl5/5.8.4/lib/unicore/To
+dir path=usr/perl5/5.8.4/lib/unicore/lib
+file path=usr/perl5/5.8.4/bin/a2p mode=0555
+file path=usr/perl5/5.8.4/bin/c2ph mode=0555
+file path=usr/perl5/5.8.4/bin/cpan mode=0555
+file path=usr/perl5/5.8.4/bin/dprofpp mode=0555
+file path=usr/perl5/5.8.4/bin/enc2xs mode=0555
+file path=usr/perl5/5.8.4/bin/find2perl mode=0555
+file path=usr/perl5/5.8.4/bin/h2ph mode=0555
+file path=usr/perl5/5.8.4/bin/h2xs mode=0555
+file path=usr/perl5/5.8.4/bin/instmodsh mode=0555
+file path=usr/perl5/5.8.4/bin/libnetcfg mode=0555
+file path=usr/perl5/5.8.4/bin/perlbug mode=0555
+file path=usr/perl5/5.8.4/bin/perlcc mode=0555
+file path=usr/perl5/5.8.4/bin/perldoc mode=0555
+file path=usr/perl5/5.8.4/bin/perlgcc mode=0555
+file path=usr/perl5/5.8.4/bin/perlivp mode=0555
+file path=usr/perl5/5.8.4/bin/piconv mode=0555
+file path=usr/perl5/5.8.4/bin/pl2pm mode=0555
+file path=usr/perl5/5.8.4/bin/pod2html mode=0555
+file path=usr/perl5/5.8.4/bin/pod2latex mode=0555
+file path=usr/perl5/5.8.4/bin/pod2man mode=0555
+file path=usr/perl5/5.8.4/bin/pod2text mode=0555
+file path=usr/perl5/5.8.4/bin/pod2usage mode=0555
+file path=usr/perl5/5.8.4/bin/podchecker mode=0555
+file path=usr/perl5/5.8.4/bin/podselect mode=0555
+file path=usr/perl5/5.8.4/bin/prove mode=0555
+file path=usr/perl5/5.8.4/bin/s2p mode=0555
+file path=usr/perl5/5.8.4/bin/splain mode=0555
+file path=usr/perl5/5.8.4/bin/xsubpp mode=0555
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/Demo.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/Descriptions.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/MyClass.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo3.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo4.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_call.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_chain.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_cycle.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_hashdir.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_phases.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_range.pl mode=0444
+file path=usr/perl5/5.8.4/lib/Attribute/Handlers/demo/demo_rawdata.pl mode=0444
+file path=usr/perl5/5.8.4/lib/B/assemble mode=0444
+file path=usr/perl5/5.8.4/lib/B/cc_harness mode=0444
+file path=usr/perl5/5.8.4/lib/B/disassemble mode=0444
+file path=usr/perl5/5.8.4/lib/B/makeliblinks mode=0444
+file path=usr/perl5/5.8.4/lib/Benchmark.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CGI.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/Apache.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/Carp.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/Cookie.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/Fast.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/Pretty.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/Push.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/Switch.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/Util.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/RunMeFirst mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/caution.xbm mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/clickable_image.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/cookie.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/crash.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/customize.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/diff_upload.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/dna_small_gif.uu mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/file_upload.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/frameset.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/index.html mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/internal_links.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/javascript.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/make_links.pl mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/monty.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/multiple_forms.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/nph-clock.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/nph-multipart.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/popup.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/save_state.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/tryit.cgi mode=0444
+file path=usr/perl5/5.8.4/lib/CGI/eg/wilogo_gif.uu mode=0444
+file path=usr/perl5/5.8.4/lib/CPAN.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CPAN/FirstTime.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CPAN/META.yml mode=0444
+file path=usr/perl5/5.8.4/lib/CPAN/Nox.pm mode=0444
+file path=usr/perl5/5.8.4/lib/CPAN/PAUSE2003.pub mode=0444
+file path=usr/perl5/5.8.4/lib/CPAN/SIGNATURE mode=0444
+file path=usr/perl5/5.8.4/lib/DBM_Filter.pm mode=0444
+file path=usr/perl5/5.8.4/lib/DBM_Filter/compress.pm mode=0444
+file path=usr/perl5/5.8.4/lib/DBM_Filter/encode.pm mode=0444
+file path=usr/perl5/5.8.4/lib/DBM_Filter/int32.pm mode=0444
+file path=usr/perl5/5.8.4/lib/DBM_Filter/null.pm mode=0444
+file path=usr/perl5/5.8.4/lib/DBM_Filter/utf8.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Devel/SelfStubber.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/CN/HZ.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/Changes.e2x mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/ConfigLocal_PM.e2x mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/JP/H2Z.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/JP/JIS7.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/KR/2022_KR.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/MIME/Header.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/Makefile_PL.e2x mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/PerlIO.pod mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/README.e2x mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/Supported.pod mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/Unicode/UTF7.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/_PM.e2x mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/_T.e2x mode=0444
+file path=usr/perl5/5.8.4/lib/Encode/encode.h mode=0444
+file path=usr/perl5/5.8.4/lib/English.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Command.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Command/MM.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Constant.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Embed.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Install.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Installed.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Liblist.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Liblist/Kid.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MANIFEST.SKIP mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/META.yml mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_Any.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_BeOS.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_Cygwin.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_DOS.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_MacOS.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_NW5.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_OS2.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_UWIN.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_Unix.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_VMS.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_Win32.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MM_Win95.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MY.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MakeMaker.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MakeMaker/FAQ.pod mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MakeMaker/Tutorial.pod mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MakeMaker/bytes.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/MakeMaker/vmsish.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Manifest.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Miniperl.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Mkbootstrap.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Mksymlists.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/Packlist.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/testlib.pm mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/typemap mode=0444
+file path=usr/perl5/5.8.4/lib/ExtUtils/xsubpp mode=0444
+file path=usr/perl5/5.8.4/lib/I18N/Collate.pm mode=0444
+file path=usr/perl5/5.8.4/lib/I18N/LangTags.pm mode=0444
+file path=usr/perl5/5.8.4/lib/I18N/LangTags/List.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Constants.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Constants.pod mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Country.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Country.pod mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Currency.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Currency.pod mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Language.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Language.pod mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Maketext.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Maketext.pod mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Maketext/Guts.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Maketext/GutsLoader.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Maketext/TPJ13.pod mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Script.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Locale/Script.pod mode=0444
+file path=usr/perl5/5.8.4/lib/Memoize.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Memoize/AnyDBM_File.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Memoize/Expire.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Memoize/ExpireFile.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Memoize/ExpireTest.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Memoize/NDBM_File.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Memoize/SDBM_File.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Memoize/Storable.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Net/Domain.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Net/demos/ftp mode=0444
+file path=usr/perl5/5.8.4/lib/Net/demos/inetd mode=0444
+file path=usr/perl5/5.8.4/lib/Net/demos/nntp mode=0444
+file path=usr/perl5/5.8.4/lib/Net/demos/nntp.mirror mode=0444
+file path=usr/perl5/5.8.4/lib/Net/demos/pop3 mode=0444
+file path=usr/perl5/5.8.4/lib/Net/demos/smtp.self mode=0444
+file path=usr/perl5/5.8.4/lib/Net/demos/time mode=0444
+file path=usr/perl5/5.8.4/lib/Net/libnetFAQ.pod mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Checker.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Find.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Functions.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Html.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/InputObjects.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/LaTeX.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Man.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/ParseLink.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/ParseUtils.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Parser.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Perldoc.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Perldoc/BaseTo.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Perldoc/GetOptsOO.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Perldoc/ToChecker.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Perldoc/ToMan.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Perldoc/ToNroff.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Perldoc/ToPod.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Perldoc/ToRtf.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Perldoc/ToText.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Perldoc/ToTk.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Perldoc/ToXml.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/PlainText.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Plainer.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Select.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Text.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Text/Color.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Text/Overstrike.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Text/Termcap.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Pod/Usage.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Sun/Solaris/PerlGcc/Config.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Test.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Test/Builder.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Test/Harness.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Test/Harness/Assert.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Test/Harness/Iterator.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Test/Harness/Straps.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Test/More.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Test/Simple.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Test/Tutorial.pod mode=0444
+file path=usr/perl5/5.8.4/lib/Unicode/Collate.pm mode=0444
+file path=usr/perl5/5.8.4/lib/Unicode/Collate/keys.txt mode=0444
+file path=usr/perl5/5.8.4/lib/Unicode/UCD.pm mode=0444
+file path=usr/perl5/5.8.4/lib/abbrev.pl mode=0444
+file path=usr/perl5/5.8.4/lib/bigfloat.pl mode=0444
+file path=usr/perl5/5.8.4/lib/bigint.pl mode=0444
+file path=usr/perl5/5.8.4/lib/bigint.pm mode=0444
+file path=usr/perl5/5.8.4/lib/bignum.pm mode=0444
+file path=usr/perl5/5.8.4/lib/bigrat.pl mode=0444
+file path=usr/perl5/5.8.4/lib/bigrat.pm mode=0444
+file path=usr/perl5/5.8.4/lib/blib.pm mode=0444
+file path=usr/perl5/5.8.4/lib/cacheout.pl mode=0444
+file path=usr/perl5/5.8.4/lib/complete.pl mode=0444
+file path=usr/perl5/5.8.4/lib/ctime.pl mode=0444
+file path=usr/perl5/5.8.4/lib/dbm_filter_util.pl mode=0444
+file path=usr/perl5/5.8.4/lib/dotsh.pl mode=0444
+file path=usr/perl5/5.8.4/lib/dumpvar.pl mode=0444
+file path=usr/perl5/5.8.4/lib/exceptions.pl mode=0444
+file path=usr/perl5/5.8.4/lib/fastcwd.pl mode=0444
+file path=usr/perl5/5.8.4/lib/find.pl mode=0444
+file path=usr/perl5/5.8.4/lib/finddepth.pl mode=0444
+file path=usr/perl5/5.8.4/lib/flush.pl mode=0444
+file path=usr/perl5/5.8.4/lib/getcwd.pl mode=0444
+file path=usr/perl5/5.8.4/lib/getopt.pl mode=0444
+file path=usr/perl5/5.8.4/lib/getopts.pl mode=0444
+file path=usr/perl5/5.8.4/lib/hostname.pl mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/.packlist \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B.pm mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Asmdata.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Assembler.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Bblock.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Bytecode.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/C.pm mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/CC.pm mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Concise.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Debug.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Deparse.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Disassembler.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Lint.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Showlex.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Stackobj.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Stash.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Terse.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/B/Xref.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/ByteLoader.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/EXTERN.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/INTERN.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/XSUB.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/av.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/cc_runtime.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/config.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/cop.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/cv.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/dosish.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/embed.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/embedvar.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/fakesdio.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/fakethr.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/form.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/gv.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/handy.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/hv.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/intrpvar.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/iperlsys.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/keywords.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/malloc_ctl.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/mg.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/nostdio.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/op.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/opcode.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/opnames.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/pad.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/patchlevel.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/perl.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/perlapi.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/perlio.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/perliol.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/perlsdio.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/perlsfio.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/perlvars.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/perly.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/pp.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/pp_proto.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/proto.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/reentr.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/reentr.inc \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/regcomp.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/regexp.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/regnodes.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/scope.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/sv.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/thrdvar.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/thread.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/uconfig.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/unixish.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/utf8.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/utfebcdic.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/util.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/warnings.h \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Config.pod \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Devel/DProf.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Devel/PPPort.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Devel/Peek.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Alias.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Byte.pm \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/CJKConstants.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/CN.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Config.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/EBCDIC.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Encoder.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Encoding.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Guess.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/JP.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/KR.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Symbol.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/TW.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Encode/Unicode.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/O.pm mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Opcode.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/POSIX.pod \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Safe.pm mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/Unicode/Normalize.pm mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/XS/APItest.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/XS/Typemap.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/B/B.bs \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/B/B.so \
+    mode=0555
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/B/C/C.bs \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/B/C/C.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/ByteLoader/ByteLoader.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/ByteLoader/ByteLoader.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Devel/DProf/DProf.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Devel/DProf/DProf.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Devel/PPPort/PPPort.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Devel/PPPort/PPPort.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Devel/Peek/Peek.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Devel/Peek/Peek.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Byte/Byte.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Byte/Byte.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/CN/CN.bs mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/CN/CN.so mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/EBCDIC/EBCDIC.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/EBCDIC/EBCDIC.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Encode.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Encode.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/JP/JP.bs mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/JP/JP.so mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/KR/KR.bs mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/KR/KR.so mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Symbol/Symbol.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Symbol/Symbol.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/TW/TW.bs mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/TW/TW.so mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Unicode/Unicode.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Encode/Unicode/Unicode.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/I18N/Langinfo/Langinfo.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/I18N/Langinfo/Langinfo.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/I18N/Langinfo/autosplit.ix \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Opcode/Opcode.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Opcode/Opcode.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Unicode/Normalize/Normalize.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/Unicode/Normalize/Normalize.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/XS/APItest/APItest.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/XS/APItest/APItest.so \
+    mode=0555
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/XS/Typemap/Typemap.bs \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/auto/XS/Typemap/Typemap.so \
+    mode=0555
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/encoding.pm \
+    mode=0444
+$(i386_ONLY)file path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/ops.pm mode=0444
+file path=usr/perl5/5.8.4/lib/importenv.pl mode=0444
+file path=usr/perl5/5.8.4/lib/look.pl mode=0444
+file path=usr/perl5/5.8.4/lib/newgetopt.pl mode=0444
+file path=usr/perl5/5.8.4/lib/open2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/open3.pl mode=0444
+file path=usr/perl5/5.8.4/lib/perl5db.pl mode=0444
+file path=usr/perl5/5.8.4/lib/pod/a2p.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl5004delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl5005delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl561delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl56delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl570delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl571delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl572delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl573delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl581delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl582delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl583delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl584delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perl58delta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlapi.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlapio.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlartistic.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlbook.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlboot.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlbot.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlcall.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlcheat.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlclib.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlcn.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlcompile.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perldata.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perldbmfilter.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perldebguts.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perldebtut.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perldebug.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perldelta.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perldiag.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perldoc.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perldsc.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlebcdic.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlembed.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfaq.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfaq1.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfaq2.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfaq3.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfaq4.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfaq5.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfaq6.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfaq7.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfaq8.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfaq9.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfilter.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlform.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlfunc.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlgpl.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlguts.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlhack.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlhist.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlintern.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlintro.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perliol.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlipc.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perljp.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlko.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perllexwarn.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perllocale.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perllol.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlmod.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlmodinstall.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlmodlib.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlmodstyle.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlnewmod.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlnumber.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlobj.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlop.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlopentut.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlpacktut.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlpod.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlpodspec.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlport.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlre.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlref.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlreftut.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlrequick.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlreref.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlretut.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlrun.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlsec.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlsolaris.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlstyle.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlsub.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlsyn.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perltie.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perltoc.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perltodo.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perltooc.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perltoot.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perltrap.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perltw.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlunicode.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perluniintro.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlutil.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlvar.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlxs.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pod/perlxstut.pod mode=0444
+file path=usr/perl5/5.8.4/lib/pwd.pl mode=0444
+file path=usr/perl5/5.8.4/lib/shellwords.pl mode=0444
+file path=usr/perl5/5.8.4/lib/stat.pl mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/.packlist \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B.pm mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Asmdata.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Assembler.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Bblock.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Bytecode.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/C.pm mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/CC.pm mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Concise.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Debug.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Deparse.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Disassembler.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Lint.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Showlex.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Stackobj.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Stash.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Terse.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/B/Xref.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/ByteLoader.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/EXTERN.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/INTERN.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/XSUB.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/av.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/cc_runtime.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/config.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/cop.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/cv.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/dosish.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/embed.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/embedvar.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/fakesdio.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/fakethr.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/form.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/gv.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/handy.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/hv.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/intrpvar.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/iperlsys.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/keywords.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/malloc_ctl.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/mg.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/nostdio.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/op.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/opcode.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/opnames.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/pad.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/patchlevel.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/perl.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/perlapi.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/perlio.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/perliol.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/perlsdio.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/perlsfio.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/perlvars.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/perly.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/pp.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/pp_proto.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/proto.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/reentr.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/reentr.inc \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/regcomp.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/regexp.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/regnodes.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/scope.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/sv.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/thrdvar.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/thread.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/uconfig.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/unixish.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/utf8.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/utfebcdic.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/util.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/warnings.h \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Config.pod \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Devel/DProf.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Devel/PPPort.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Devel/Peek.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Alias.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Byte.pm \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/CJKConstants.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/CN.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Config.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/EBCDIC.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Encoder.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Encoding.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Guess.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/JP.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/KR.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Symbol.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/TW.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Encode/Unicode.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/O.pm mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Opcode.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/POSIX.pod \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Safe.pm mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/Unicode/Normalize.pm mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/XS/APItest.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/XS/Typemap.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/B/B.bs \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/B/B.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/B/C/C.bs \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/B/C/C.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/ByteLoader/ByteLoader.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/ByteLoader/ByteLoader.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Devel/DProf/DProf.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Devel/DProf/DProf.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Devel/PPPort/PPPort.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Devel/PPPort/PPPort.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Devel/Peek/Peek.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Devel/Peek/Peek.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Byte/Byte.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Byte/Byte.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/CN/CN.bs mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/CN/CN.so mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/EBCDIC/EBCDIC.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/EBCDIC/EBCDIC.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Encode.bs mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Encode.so mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/JP/JP.bs mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/JP/JP.so mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/KR/KR.bs mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/KR/KR.so mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Symbol/Symbol.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Symbol/Symbol.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/TW/TW.bs mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/TW/TW.so mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Unicode/Unicode.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Encode/Unicode/Unicode.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/I18N/Langinfo/Langinfo.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/I18N/Langinfo/Langinfo.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/I18N/Langinfo/autosplit.ix \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Opcode/Opcode.bs mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Opcode/Opcode.so mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Unicode/Normalize/Normalize.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Unicode/Normalize/Normalize.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/XS/APItest/APItest.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/XS/APItest/APItest.so \
+    mode=0555
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/XS/Typemap/Typemap.bs \
+    mode=0444
+$(sparc_ONLY)file \
+    path=usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/XS/Typemap/Typemap.so \
+    mode=0555
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/encoding.pm \
+    mode=0444
+$(sparc_ONLY)file path=usr/perl5/5.8.4/lib/sun4-solaris-64int/ops.pm mode=0444
+file path=usr/perl5/5.8.4/lib/syslog.pl mode=0444
+file path=usr/perl5/5.8.4/lib/tainted.pl mode=0444
+file path=usr/perl5/5.8.4/lib/termcap.pl mode=0444
+file path=usr/perl5/5.8.4/lib/timelocal.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/ArabLink.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/ArabLnkGrp.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/ArabicShaping.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/BidiMirroring.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Bidirectional.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Blocks.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Blocks.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Canonical.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/CaseFolding.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Category.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/CombiningClass.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/CompositionExclusions.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Decomposition.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/EastAsianWidth.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Exact.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/HangulSyllableType.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Index.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Jamo.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/JamoShort.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Lbrk.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/LineBreak.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Name.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/NamesList.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/NormalizationCorrections.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Number.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/PropList.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/PropValueAliases.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Properties mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/PropertyAliases.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Scripts.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/Scripts.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/SpecialCasing.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/StandardizedVariants.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/To/Digit.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/To/Fold.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/To/Lower.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/To/Title.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/To/Upper.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/UnicodeData.txt mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/ASCII.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Alnum.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Alpha.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Alphabet.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Any.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Arabic.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Armenian.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/AsciiHex.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Assigned.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Bengali.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiAL.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiAN.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiB.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiBN.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiCS.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiCont.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiEN.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiES.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiET.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiL.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiLRE.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiLRO.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiNSM.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiON.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiPDF.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiR.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiRLE.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiRLO.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiS.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/BidiWS.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Blank.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Bopomofo.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Braille.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Buhid.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/C.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Canadian.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Canon.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Cc.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Cf.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Cherokee.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Cn.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Cntrl.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Co.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Common.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Compat.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Cs.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Cypriot.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Cyrillic.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCcircle.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCcompat.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCfinal.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCfont.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCfracti.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCinitia.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCisolat.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCmedial.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCnarrow.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCnoBrea.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCsmall.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCsquare.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCsub.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCsuper.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCvertic.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/DCwide.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Dash.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Deprecat.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Deseret.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Devanaga.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Diacriti.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Digit.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Ethiopic.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Extender.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Georgian.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Gothic.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Graph.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Grapheme.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Greek.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Gujarati.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Gurmukhi.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Han.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Hangul.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Hanunoo.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Hebrew.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/HexDigit.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Hiragana.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Hyphen.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/IdContin.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/IdStart.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Ideograp.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/IdsBinar.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/IdsTrina.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InAegean.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InAlphab.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InArabi2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InArabi3.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InArabic.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InArmeni.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InArrows.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InBasicL.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InBengal.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InBlockE.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InBopom2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InBopomo.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InBoxDra.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InBraill.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InBuhid.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InByzant.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCherok.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCjkCo2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCjkCo3.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCjkCo4.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCjkCom.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCjkRad.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCjkSym.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCjkUn2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCjkUn3.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCjkUni.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCombi2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCombi3.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCombin.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InContro.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCurren.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCyprio.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCyril2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InCyrill.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InDesere.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InDevana.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InDingba.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InEnclo2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InEnclos.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InEthiop.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InGenera.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InGeomet.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InGeorgi.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InGothic.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InGreek.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InGreekA.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InGreekE.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InGujara.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InGurmuk.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InHalfwi.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InHangu2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InHangu3.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InHangul.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InHanuno.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InHebrew.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InHighPr.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InHighSu.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InHiraga.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InIdeogr.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InIpaExt.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InKanbun.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InKangxi.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InKannad.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InKatak2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InKataka.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InKhmer.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InKhmerS.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InLao.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InLatin1.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InLatin2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InLatin3.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InLatinE.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InLetter.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InLimbu.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InLinea2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InLinear.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InLowSur.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InMalaya.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InMathe2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InMathem.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InMisce2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InMisce3.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InMisce4.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InMisce5.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InMiscel.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InMongol.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InMusica.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InMyanma.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InNumber.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InOgham.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InOldIta.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InOptica.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InOriya.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InOsmany.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InPhonet.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InPrivat.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InRunic.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InShavia.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InSinhal.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InSmallF.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InSpacin.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InSpecia.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InSupers.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InSuppl2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InSuppl3.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InSuppl4.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InSuppl5.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InSupple.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InSyriac.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InTagalo.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InTagban.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InTags.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InTaiLe.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InTaiXua.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InTamil.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InTelugu.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InThaana.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InThai.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InTibeta.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InUgarit.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InUnifie.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InVaria2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InVariat.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InYiRadi.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InYiSyll.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/InYijing.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Inherite.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/JoinCont.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Kannada.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Katakan2.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Katakana.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Khmer.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/L.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/L_.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Lao.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Latin.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Limbu.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/LinearB.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Ll.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Lm.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Lo.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/LogicalO.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Lower.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Lowercas.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Lt.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Lu.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/M.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Malayala.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Math.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Mc.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Me.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Mirrored.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Mn.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Mongolia.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Myanmar.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/N.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Nd.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Nl.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/No.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Nonchara.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Ogham.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/OldItali.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Oriya.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Osmanya.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/OtherAlp.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/OtherDef.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/OtherGra.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/OtherIdS.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/OtherLow.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/OtherMat.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/OtherUpp.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/P.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Pc.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Pd.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Pe.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Pf.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Pi.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Po.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Print.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Ps.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Punct.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Quotatio.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Radical.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Runic.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/S.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Sc.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Shavian.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Sinhala.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Sk.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Sm.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/So.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/SoftDott.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Space.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/SpacePer.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Sterm.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Syriac.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Tagalog.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Tagbanwa.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/TaiLe.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Tamil.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Telugu.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Terminal.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Thaana.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Thai.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Tibetan.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Title.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Ugaritic.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/UnifiedI.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Upper.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Uppercas.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Variatio.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/WhiteSpa.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Word.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/XDigit.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Yi.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Z.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Zl.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Zp.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/Zs.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/_CanonDC.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/_CaseIgn.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/lib/_CombAbo.pl mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/mktables mode=0444
+file path=usr/perl5/5.8.4/lib/unicore/version mode=0444
+file path=usr/perl5/5.8.4/lib/utf8.pm mode=0444
+file path=usr/perl5/5.8.4/lib/utf8_heavy.pl mode=0444
+file path=usr/perl5/5.8.4/lib/validate.pl mode=0444
+hardlink path=usr/perl5/5.8.4/bin/psed target=s2p
+hardlink path=usr/perl5/5.8.4/bin/pstruct target=c2ph
+legacy pkg=SUNWperl584usr arch=$(ARCH) category=system \
+    desc="Perl 5.8.4 programming language (non-core)" \
+    hotline="Please contact your local service provider" \
+    name="Perl 5.8.4 (non-core)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cmd/perl/THIRDPARTYLICENSE license=cmd/perl/THIRDPARTYLICENSE
+license cr_Sun license=cr_Sun
+link path=usr/perl5/pod target=./5.8.4/lib/pod

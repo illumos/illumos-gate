@@ -1,0 +1,78 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/driver/storage/cpqary3@$(PKGVERS)
+set name=pkg.description value="HP Smart Array HBA Driver 2.2.0.1"
+set name=pkg.summary value="HP Smart Array HBA Driver 2.2.0.1"
+set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
+set name=variant.arch value=i386
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+driver name=cpqary3 class=scsi \
+    devlink=type=ddi_pseudo;minor1=cpqary3\tcpqary3\M2 \
+    alias=pci103c,3211 \
+    alias=pci103c,3212 \
+    alias=pci103c,3223 \
+    alias=pci103c,3225 \
+    alias=pci103c,3234 \
+    alias=pci103c,3235 \
+    alias=pci103c,3237 \
+    alias=pci103c,323d \
+    alias=pci103c,3241 \
+    alias=pci103c,3243 \
+    alias=pci103c,3245 \
+    alias=pci103c,3247 \
+    alias=pci103c,3249 \
+    alias=pci103c,324a \
+    alias=pci103c,324b \
+    alias=pcie11,4070 \
+    alias=pcie11,4080 \
+    alias=pcie11,4082 \
+    alias=pcie11,4083 \
+    alias=pcie11,4091 \
+    alias=pcie11,409a \
+    alias=pcie11,409b \
+    alias=pcie11,409c \
+    alias=pcie11,409d
+file path=kernel/drv/$(ARCH64)/cpqary3 group=sys
+file path=kernel/drv/cpqary3 group=sys
+file path=kernel/drv/cpqary3.conf group=sys reboot-needed=false
+legacy pkg=CPQary3 arch=$(ARCH) category=system \
+    desc="HP Smart Array HBA Driver 2.2.0.1" \
+    hotline="Please contact your local service provider" \
+    name="HP Smart Array HBA Driver 2.2.0.1" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_HP license=lic_HP
+license lic_OSBL license=lic_OSBL

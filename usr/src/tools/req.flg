@@ -19,20 +19,17 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 
 echo_file usr/src/lib/Makefile.lib
 echo_file usr/src/lib/Makefile.targ
 echo_file usr/src/lib/libctf/common/libctf.h
-echo_file usr/src/pkgdefs/Makefile.com
-echo_file usr/src/pkgdefs/bld_awk_pkginfo.ksh
-echo_file usr/src/pkgdefs/build_copyright.sh
-echo_file usr/src/pkgdefs/license_files/cr_Sun
-echo_file usr/src/pkgdefs/license_files/lic_CDDL
-echo_file usr/src/pkgdefs/license_files/lic_GPLv2
+echo_file usr/src/pkg/license_files/lic_GPLv2
 echo_file usr/src/tools/Makefile
 echo_file usr/src/tools/Makefile.targ
 echo_file usr/src/tools/Makefile.tools

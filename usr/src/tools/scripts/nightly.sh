@@ -137,7 +137,7 @@ function crypto_from_proto {
 	# Generate the crypto THIRDPARTYLICENSE file.  This needs to
 	# be done after the build has finished and before we run
 	# cryptodrop.  We'll generate the file twice if we're building
-	# both debug and non-debug, but it's a cheap operation and not
+	# both DEBUG and non-DEBUG, but it's a cheap operation and not
 	# worth the complexity to only do once.
 	#
 	mktpl -c usr/src/tools/opensolaris/license-list >> "$LOGFILE" 2>&1
@@ -188,19 +188,18 @@ function tagstring {
 # non-DEBUG packages.
 #
 # usage: normal_build [-O]
+#
 # -O	OpenSolaris delivery build.  Put the proto area and
-#	(eventually) packages in -open directories.  Use skeleton
-#	closed binaries.  Don't generate archives--that needs to be
-#	done later, after we've generated the closed binaries.  Use
-#	the signed binaries from the earlier full build.  Skip the
-#	package build (until 6414822 is fixed).
+#	packages in -open directories.  Use skeleton closed binaries.
+#	Don't generate archives--that needs to be done later, after
+#	we've generated the closed binaries.  Use the signed binaries
+#	from the earlier full build.
 #
 
 function normal_build {
 
 	typeset orig_p_FLAG="$p_FLAG"
 	typeset orig_a_FLAG="$a_FLAG"
-	typeset orig_zero_FLAG="$zero_FLAG"
 	typeset crypto_in="$ON_CRYPTO_BINS"
 	typeset crypto_signer="$CODESIGN_USER"
 	typeset gencrypto=no
@@ -208,14 +207,13 @@ function normal_build {
 	suffix=""
 	open_only=""
 	[ -n "$CODESIGN_USER" ] && gencrypto=yes
-	while getopts O FLAG $*; do
-		case $FLAG in
-		O)
+
+	if (( $# == 1 )); then
+		if [ "$1" = "-O" ]; then
 			suffix="-open"
 			open_only="open-only"
 			p_FLAG=n
 			a_FLAG=n
-			zero_FLAG=n
 			gencrypto=no
 			if [ -n "$CODESIGN_USER" ]; then
 				#
@@ -228,9 +226,8 @@ function normal_build {
 				crypto_in=$PKGARCHIVE/../on-crypto.$MACH.tar.bz2
 				crypto_signer=""
 			fi
-			;;
-		esac
-	done
+		fi
+	fi
 
 	# non-DEBUG build begins
 
@@ -279,7 +276,6 @@ function normal_build {
 
 	p_FLAG="$orig_p_FLAG"
 	a_FLAG="$orig_a_FLAG"
-	zero_FLAG="$orig_zero_FLAG"
 }
 
 #
@@ -664,7 +660,7 @@ function makebfu_filt {
 
 #
 # Unpack the crypto tarball into the proto area.  We first extract the
-# tarball into a temp directory so that we can handle the non-debug
+# tarball into a temp directory so that we can handle the non-DEBUG
 # tarball correctly with MULTI_PROTO=no.
 # Return 0 on success, non-zero on failure.
 # 
@@ -692,9 +688,9 @@ function unpack_crypto {
 # Function to do the build, including cpio archive and package generation.
 # usage: build LABEL SUFFIX ND MULTIPROTO CRYPTO
 # - LABEL is used to tag build output.
-# - SUFFIX is used to distinguish files (e.g., debug vs non-debug,
+# - SUFFIX is used to distinguish files (e.g., DEBUG vs non-DEBUG,
 #   open-only vs full tree).
-# - ND is "-nd" (non-debug builds) or "" (debug builds).
+# - ND is "-nd" (non-DEBUG builds) or "" (DEBUG builds).
 # - If MULTIPROTO is "yes", it means to name the proto area according to
 #   SUFFIX.  Otherwise ("no"), (re)use the standard proto area.
 # - CRYPTO is the path to the crypto tarball, or null.
@@ -709,9 +705,6 @@ function build {
 	NOISE=noise${SUFFIX}-${MACH}
 	CPIODIR=${CPIODIR_ORIG}${SUFFIX}
 	PKGARCHIVE=${PKGARCHIVE_ORIG}${SUFFIX}
-	if [ "$SPARC_RM_PKGARCHIVE_ORIG" ]; then
-		SPARC_RM_PKGARCHIVE=${SPARC_RM_PKGARCHIVE_ORIG}${SUFFIX}
-	fi
 
 	ORIGROOT=$ROOT
 	[ $MULTIPROTO = no ] || export ROOT=$ROOT$SUFFIX
@@ -892,51 +885,47 @@ function build {
 	#	Building Packages
 	#
 	if [ "$p_FLAG" = "y" -a "$this_build_ok" = "y" ]; then
-		echo "\n==== Creating $LABEL packages at `date` ====\n" \
-			>> $LOGFILE
-		rm -f $SRC/pkgdefs/${INSTALLOG}.out
-		echo "Clearing out $PKGARCHIVE ..." >> "$LOGFILE"
-		rm -rf "$PKGARCHIVE" >> "$LOGFILE" 2>&1
-		mkdir -p "$PKGARCHIVE" >> "$LOGFILE" 2>&1
-
-		#
-		# Optional build of sparc realmode on i386
-		#
-		if [ "$MACH" = "i386" ] && [ "${SPARC_RM_PKGARCHIVE}" ]; then
-			echo "Clearing out ${SPARC_RM_PKGARCHIVE} ..." \
+		if [ -d $SRC/pkg -o -d $SRC/pkgdefs ]; then
+			echo "\n==== Creating $LABEL packages at `date` ====\n" \
 				>> $LOGFILE
-			rm -rf ${SPARC_RM_PKGARCHIVE} >> "$LOGFILE" 2>&1
-			mkdir -p ${SPARC_RM_PKGARCHIVE} >> "$LOGFILE" 2>&1
-		fi
+			echo "Clearing out $PKGARCHIVE ..." >> $LOGFILE
+			rm -rf $PKGARCHIVE
+			mkdir -p $PKGARCHIVE
 
-		cd $SRC/pkgdefs
-		$MAKE -e install 2>&1 | \
-			tee -a $SRC/pkgdefs/${INSTALLOG}.out >> $LOGFILE
-		echo "\n==== Package build errors ($LABEL) ====\n" \
-			>> $mail_msg_file
-		egrep "${MAKE}|ERROR|WARNING" $SRC/pkgdefs/${INSTALLOG}.out | \
-			grep ':' | \
-			grep -v PSTAMP | \
-			egrep -v "Ignoring unknown host" \
-			>> $mail_msg_file
+			for d in pkg pkgdefs; do
+				if [ ! -d $SRC/$d ]; then
+					continue
+				fi
+				rm -f $SRC/$d/${INSTALLOG}.out
+				cd $SRC/$d
+				/bin/time $MAKE -e install 2>&1 | \
+					tee -a $SRC/$d/${INSTALLOG}.out >> $LOGFILE
+			done
+
+			echo "\n==== package build errors ($LABEL) ====\n" \
+				>> $mail_msg_file
+
+			for d in pkg pkgdefs; do
+				if [ ! -d $SRC/$d ]; then
+					continue
+				fi
+
+				egrep "${MAKE}|ERROR|WARNING" $SRC/$d/${INSTALLOG}.out | \
+					grep ':' | \
+					grep -v PSTAMP | \
+					egrep -v "Ignoring unknown host" \
+					>> $mail_msg_file
+			done
+		else
+			#
+			# Handle it gracefully if -p was set but there are
+			# neither pkg nor pkgdefs directories.
+			#
+			echo "\n==== No $LABEL packages to build ====\n" \
+				>> $LOGFILE
+		fi
 	else
 		echo "\n==== Not creating $LABEL packages ====\n" >> $LOGFILE
-	fi
-
-	if [[ "$zero_FLAG" = "y" ]]; then
-		if [[ -d "${G11N_PKGDIR}" ]]; then
-			echo "\n==== Building globalization package" \
-			    "$(basename ${G11N_PKGDIR}) ($LABEL) ====\n" \
-			    >> $LOGFILE
-			cd $G11N_PKGDIR
-			/bin/time $MAKE -e install 2>&1 | \
-			    tee -a $SRC/${INSTALLOG}.out >> $LOGFILE
-			cd $SRC
-		else
-			echo "\n==== Skipping nonexistent globalization" \
-			    "package $(basename ${G11N_PKGDIR})" \
-			    "($LABEL) ====\n" >> $LOGFILE
-		fi
 	fi
 
 	ROOT=$ORIGROOT
@@ -1049,7 +1038,7 @@ function copy_ihv_proto {
 			echo "mkdir -p $ROOT-nd" >> $LOGFILE
 			mkdir -p $ROOT-nd
 		fi
-		# If there's a non-debug version of the IHV proto area,
+		# If there's a non-DEBUG version of the IHV proto area,
 		# copy it, but copy something if there's not.
 		if [ -d "$IA32_IHV_ROOT-nd" ]; then
 			echo "copying $IA32_IHV_ROOT-nd to $ROOT-nd\n" >> $LOGFILE
@@ -1112,7 +1101,7 @@ function build_tools {
 
 	rm -f ${TOOLS}/${INSTALLOG}.out
 	cd ${TOOLS}
-	/bin/time $MAKE ROOT=${DESTROOT} -e install 2>&1 | \
+	/bin/time $MAKE TOOLS_PROTO=${DESTROOT} -e install 2>&1 | \
 	    tee -a ${TOOLS}/${INSTALLOG}.out >> $LOGFILE
 
 	echo "\n==== Tools build errors ====\n" >> $mail_msg_file
@@ -1160,7 +1149,7 @@ function use_tools {
 	PATH="${TOOLSROOT}/opt/onbld/bin:${PATH}"
 	export PATH
 
-	ONBLD_TOOLS=${ONBLD_TOOLS:=${TOOLS_PROTO}/opt/onbld}
+	ONBLD_TOOLS=${ONBLD_TOOLS:=${TOOLSROOT}/opt/onbld}
 	export ONBLD_TOOLS
 
 	echo "\n==== New environment settings. ====\n" >> $LOGFILE
@@ -1241,7 +1230,7 @@ function do_wsdiff {
 }
 
 #
-# Functions for setting build flags (debug/non-debug).  Keep them
+# Functions for setting build flags (DEBUG/non-DEBUG).  Keep them
 # together.
 #
 
@@ -1335,7 +1324,6 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 #
 
 # default values for low-level FLAGS; G I R are group FLAGS
-zero_FLAG=n
 A_FLAG=n
 a_FLAG=n
 C_FLAG=n
@@ -1370,7 +1358,6 @@ SO_FLAG=n
 XMOD_OPT=
 #
 build_ok=y
-tools_build_ok=y
 
 function is_source_build {
 	[ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o \
@@ -1485,6 +1472,13 @@ unset CLASSPATH
 unset NAME
 
 #
+# To get ONBLD_TOOLS from the environment, it must come from the env file.
+# If it comes interactively, it is generally TOOLS_PROTO, which will be
+# clobbered before the compiler version checks, which will therefore fail.
+#
+unset ONBLD_TOOLS
+
+#
 #	Setup environmental variables
 #
 if [ -f /etc/nightly.conf ]; then
@@ -1565,11 +1559,9 @@ check_closed_tree
 #
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
-while getopts 0AaBCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
+while getopts AaBCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
-	  0 )   zero_FLAG=y
-	  	;;
 	  A )	A_FLAG=y
 		;;
 	  a )	a_FLAG=y
@@ -1584,8 +1576,7 @@ do
 		;;
 	  f )	f_FLAG=y
 		;;
-	  G )   zero_FLAG=y
-	  	a_FLAG=y
+	  G )   a_FLAG=y
 		u_FLAG=y
 		;;
 	  I )	a_FLAG=y
@@ -1631,8 +1622,14 @@ do
 			    "present in NIGHTLY_OPTIONS."
 			exit 1
 		fi
+		if [ -z "${PARENT_TOOLS_ROOT}" ]; then
+			echo "PARENT_TOOLS_ROOT must be set if the U flag is" \
+			    "present in NIGHTLY_OPTIONS."
+			exit 1
+		fi
 		U_FLAG=y
 		NIGHTLY_PARENT_ROOT=$PARENT_ROOT
+		NIGHTLY_PARENT_TOOLS_ROOT=$PARENT_TOOLS_ROOT
 		;;
 	  u )	u_FLAG=y
 		;;
@@ -1757,7 +1754,7 @@ export MAKE
 # Make sure the crypto tarball is available if it's needed.
 #
 
-# Echo the non-debug name corresponding to the given crypto tarball path.
+# Echo the non-DEBUG name corresponding to the given crypto tarball path.
 function ndcrypto {
 	typeset dir file
 
@@ -1905,8 +1902,19 @@ chmod 777 $TMPDIR
 SOFTTOKEN_DIR=$TMPDIR
 export SOFTTOKEN_DIR
 
+#
+# Tools should only be built non-DEBUG.  Keep track of the tools proto
+# area path relative to $TOOLS, because the latter changes in an
+# export build.
+#
+# TOOLS_PROTO is included below for builds other than usr/src/tools
+# that look for this location.  For usr/src/tools, this will be
+# overridden on the $MAKE command line in build_tools().
+#
 TOOLS=${SRC}/tools
-TOOLS_PROTO=${TOOLS}/proto
+TOOLS_PROTO_REL=proto/root_${MACH}-nd
+TOOLS_PROTO=${TOOLS}/${TOOLS_PROTO_REL};	export TOOLS_PROTO
+
 
 unset   CFLAGS LD_LIBRARY_PATH LDFLAGS
 
@@ -1956,9 +1964,6 @@ export ENVLDLIBS3 ENVCPPFLAGS1 ENVCPPFLAGS2 ENVCPPFLAGS3 ENVCPPFLAGS4 \
 CPIODIR_ORIG=$CPIODIR
 PKGARCHIVE_ORIG=$PKGARCHIVE
 IA32_IHV_PKGS_ORIG=$IA32_IHV_PKGS
-if [ "$SPARC_RM_PKGARCHIVE" ]; then
-	SPARC_RM_PKGARCHIVE_ORIG=$SPARC_RM_PKGARCHIVE
-fi
 
 #
 # Juggle the logs and optionally send mail on completion.
@@ -2105,7 +2110,7 @@ function create_lock {
 # options.
 #
 function allprotos {
-	roots="$ROOT"
+	roots="$ROOT $TOOLS_PROTO"
 	if [ $O_FLAG = y ]; then
 		# OpenSolaris deliveries require separate proto areas.
 		[ $D_FLAG = y ] && roots="$roots $ROOT-open"
@@ -2247,10 +2252,10 @@ fi
 if [ "$D_FLAG" = "n" -a "$l_FLAG" = "y" ]; then
 	#
 	# In the past we just complained but went ahead with the lint
-	# pass, even though the proto area was built non-debug.  It's
-	# unlikely that non-debug headers will make a difference, but
+	# pass, even though the proto area was built non-DEBUG.  It's
+	# unlikely that non-DEBUG headers will make a difference, but
 	# rather than assuming it's a safe combination, force the user
-	# to specify a debug build.
+	# to specify a DEBUG build.
 	#
 	echo "WARNING: DEBUG build not requested; disabling lint.\n" \
 	    | tee -a $mail_msg_file >> $LOGFILE
@@ -2268,18 +2273,6 @@ if [ "$f_FLAG" = "y" ]; then
 		    "ignoring -f\n" | tee -a $mail_msg_file >> $LOGFILE
 		f_FLAG=n
 	fi
-	if [ "${f_FLAG}${zero_FLAG}" = "yn" ]; then
-		echo "WARNING: the -f flag implies -0; enabling -0\n" \
-		    | tee -a $mail_msg_file >> $LOGFILE
-		zero_FLAG=y
-	fi
-fi
-
-if [ "$zero_FLAG" = "y" -a -z "$G11N_PKGDIR" ]; then
-	echo "WARNING: the -0 flag requires that G11N_PKGDIR be set" \
-	    "in the environment; ignoring -0\n" \
-	    | tee -a $mail_msg_file >> $LOGFILE
-	zero_FLAG=n
 fi
 
 if [ "$w_FLAG" = "y" -a ! -d $ROOT ]; then
@@ -2426,7 +2419,7 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 		echo "\n==== Make tools clobber at `date` ====\n" >> $LOGFILE
 		cd ${TOOLS}
 		rm -f ${TOOLS}/clobber-${MACH}.out
-		$MAKE -ek clobber 2>&1 | \
+		$MAKE TOOLS_PROTO=$TOOLS_PROTO -ek clobber 2>&1 | \
 			tee -a ${TOOLS}/clobber-${MACH}.out >> $LOGFILE
 		echo "\n==== Make tools clobber ERRORS ====\n" \
 			>> $mail_msg_file
@@ -2844,6 +2837,10 @@ echo | tee -a $build_environ_file >> $LOGFILE
 # nightly
 echo "$0 $@" | tee -a $build_environ_file >> $LOGFILE
 if [[ $nightly_path = "/opt/onbld/bin/nightly" ]] &&
+    #
+    # XXX This should work with ips legacy pkginfo for now, but will
+    # fall apart when we stop updating that.
+    #
     pkginfo SUNWonbld > /dev/null 2>&1 ; then
 	pkginfo -l SUNWonbld | egrep "PKGINST:|VERSION:|PSTAMP:"
 else
@@ -2917,41 +2914,7 @@ if [[ "$t_FLAG" = "y" || "$O_FLAG" = y ]]; then
 	set_non_debug_build_flags
 
 	build_tools ${TOOLS_PROTO}
-	if [[ $? = 0 ]]; then
-		tools_build_ok=n
-	fi
-
-	if [[ $tools_build_ok = y ]]; then
-		echo "\n==== Creating protolist tools file at `date` ====" \
-			>> $LOGFILE
-		protolist $TOOLS_PROTO > $ATLOG/proto_list_tools_${MACH}
-		echo "==== protolist tools file created at `date` ====\n" \
-			>> $LOGFILE
-
-		if [ "$N_FLAG" != "y" ]; then
-			echo "\n==== Impact on tools packages ====\n" \
-				>> $mail_msg_file
-
-			# Use the current tools exception list.
-			exc=etc/exception_list_$MACH
-			if [ -f $SRC/tools/$exc ]; then
-				TOOLS_ELIST="-e $SRC/tools/$exc"
-			fi
-			# Compare the build's proto list with current package
-			# definitions to audit the quality of package
-			# definitions and makefile install targets.
-			$PROTOCMPTERSE \
-			    "Files missing from the proto area:" \
-			    "Files missing from packages:" \
-			    "Inconsistencies between pkgdefs and proto area:" \
-			    ${TOOLS_ELIST} \
-			    -d $SRC/tools \
-			    $ATLOG/proto_list_tools_${MACH} \
-			    >> $mail_msg_file
-		fi
-	fi
-
-	if [[ $tools_build_ok = y && "$t_FLAG" = y ]]; then
+	if [[ $? != 0  && "$t_FLAG" = y ]]; then
 		use_tools $TOOLS_PROTO
 	fi
 fi
@@ -2999,7 +2962,7 @@ fi
 if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	#
 	# Generate skeleton (minimal) closed binaries for open-only
-	# build.  There's no need to distinguish debug from non-debug
+	# build.  There's no need to distinguish DEBUG from non-DEBUG
 	# binaries, but it simplifies file management to have separate
 	# trees.
 	#
@@ -3134,7 +3097,7 @@ if is_source_build && [ $build_ok = y ] ; then
 		# source tree (e.g., $EXPORT_SRC).
 		#
 		TOOLS=${SRC}/tools
-		build_tools ${SRC}/tools/proto
+		build_tools ${TOOLS}/${TOOLS_PROTO_REL}
 		TOOLS=$ORIG_TOOLS
 	fi
 
@@ -3165,20 +3128,41 @@ if [ "$build_ok" = "y" ]; then
 		>> $LOGFILE
 
 	if [ "$N_FLAG" != "y" ]; then
-		echo "\n==== Impact on packages ====\n" >> $mail_msg_file
 
-		# If there is a reference proto list, compare the build's proto
-		# list with the reference to see changes in proto areas.
-		# Use the current exception list.
-		exc=etc/exception_list_$MACH
-		if [ -f $SRC/pkgdefs/$exc ]; then
-			ELIST="-e $SRC/pkgdefs/$exc"
+		E1=
+		f1=
+		if [ -d "$SRC/pkgdefs" ]; then
+			f1="$SRC/pkgdefs/etc/exception_list_$MACH"
+			if [ "$X_FLAG" = "y" ]; then
+				f1="$f1 $IA32_IHV_WS/usr/src/pkgdefs/etc/exception_list_$MACH"
+			fi
 		fi
-		if [ "$X_FLAG" = "y" -a -f $IA32_IHV_WS/usr/src/pkgdefs/$exc ]; then
-			ELIST="$ELIST -e $IA32_IHV_WS/usr/src/pkgdefs/$exc"
+
+		for f in $f1; do
+			if [ -f "$f" ]; then
+				E1="$E1 -e $f"
+			fi
+		done
+
+		E2=
+		f2=
+		if [ -d "$SRC/pkg" ]; then
+			f2="$f2 exceptions/packaging"
+			if [ "$CLOSED_IS_PRESENT" = "no" ]; then
+				f2="$f2 exceptions/packaging.open"
+			else
+				f2="$f2 exceptions/packaging.closed"
+			fi
 		fi
+
+		for f in $f2; do
+			if [ -f "$f" ]; then
+				E2="$E2 -e $f"
+			fi
+		done
 
 		if [ -f "$REF_PROTO_LIST" ]; then
+			#
 			# For builds that copy the IHV proto area (-X), add the
 			# IHV proto list to the reference list if the reference
 			# was built without -X.
@@ -3189,7 +3173,8 @@ if [ "$build_ok" = "y" ]; then
 			#
 			# Use the presence of the first file entry of the cached
 			# IHV proto list in the reference list to determine
-			# whether it was build with -X or not.
+			# whether it was built with -X or not.
+			#
 			IHV_REF_PROTO_LIST=$SRC/pkgdefs/etc/proto_list_ihv_$MACH
 			grepfor=$(nawk '$1 == "f" { print $2; exit }' \
 				$IHV_REF_PROTO_LIST 2> /dev/null)
@@ -3208,39 +3193,71 @@ if [ "$build_ok" = "y" ]; then
 					fi
 				fi
 			fi
-
-			$PROTOCMPTERSE \
-			  "Files in yesterday's proto area, but not today's:" \
-			  "Files in today's proto area, but not yesterday's:" \
-			  "Files that changed between yesterday and today:" \
-			  ${ELIST} \
-			  -d $REF_PROTO_LIST \
-			  $REF_IHV_PROTO \
-			  $ATLOG/proto_list_${MACH} \
-			  $IHV_PROTO_LIST \
-				>> $mail_msg_file
 		fi
-		# Compare the build's proto list with current package
-		# definitions to audit the quality of package definitions
-		# and makefile install targets. Use the current exception list.
-		PKGDEFS_LIST=""
-		for d in $abssrcdirs; do
-			if [ -d $d/pkgdefs ]; then
-				PKGDEFS_LIST="$PKGDEFS_LIST -d $d/pkgdefs"
+	fi
+
+	if [ "$N_FLAG" != "y" -a -d $SRC/pkgdefs ]; then
+		echo "\n==== Impact on SVr4 packages ====\n" >> $mail_msg_file
+	    	if [ "$CLOSED_IS_PRESENT" = "no" ]; then
+			#
+			# Traditional SVr4 packages builds don't get along well
+			# with open-only builds.
+			#
+			echo "Skipping: $CLOSED_IS_PRESENT = no" \
+			    >> $mail_msg_file
+		else
+			#
+			# Compare the build's proto list with current package
+			# definitions to audit the quality of package
+			# definitions and makefile install targets. Use the
+			# current exception list.
+			#
+			PKGDEFS_LIST=""
+			for d in $abssrcdirs; do
+				if [ -d $d/pkgdefs ]; then
+					PKGDEFS_LIST="$PKGDEFS_LIST -d $d/pkgdefs"
+				fi
+			done
+			if [ "$X_FLAG" = "y" -a \
+			    -d $IA32_IHV_WS/usr/src/pkgdefs ]; then
+				PKGDEFS_LIST="$PKGDEFS_LIST -d $IA32_IHV_WS/usr/src/pkgdefs"
 			fi
-		done
-		if [ "$X_FLAG" = "y" -a -d $IA32_IHV_WS/usr/src/pkgdefs ]; then
-			PKGDEFS_LIST="$PKGDEFS_LIST -d $IA32_IHV_WS/usr/src/pkgdefs"
+			$PROTOCMPTERSE \
+			    "Files missing from the proto area:" \
+			    "Files missing from packages:" \
+			    "Inconsistencies between pkgdefs and proto area:" \
+			    ${E1} \
+			    ${PKGDEFS_LIST} \
+			    $ATLOG/proto_list_${MACH} \
+			    >> $mail_msg_file
 		fi
+	fi
 
-		$PROTOCMPTERSE \
-		    "Files missing from the proto area:" \
-		    "Files missing from packages:" \
-		    "Inconsistencies between pkgdefs and proto area:" \
-		    ${ELIST} \
-		    ${PKGDEFS_LIST} \
-		    $ATLOG/proto_list_${MACH} \
+	if [ "$N_FLAG" != "y" -a -d $SRC/pkg ]; then
+		echo "\n==== Validating manifests against proto area ====\n" \
 		    >> $mail_msg_file
+		( cd $SRC/pkg ; $MAKE -e protocmp ROOT="$checkroot" ) \
+		    >> $mail_msg_file
+
+	fi
+
+	if [ "$N_FLAG" != "y" -a -f "$REF_PROTO_LIST" ]; then
+		echo "\n==== Impact on proto area ====\n" >> $mail_msg_file
+		if [ -n "$E2" ]; then
+			ELIST=$E2
+		else
+			ELIST=$E1
+		fi
+		$PROTOCMPTERSE \
+			"Files in yesterday's proto area, but not today's:" \
+			"Files in today's proto area, but not yesterday's:" \
+			"Files that changed between yesterday and today:" \
+			${ELIST} \
+			-d $REF_PROTO_LIST \
+			$REF_IHV_PROTO \
+			$ATLOG/proto_list_${MACH} \
+			$IHV_PROTO_LIST \
+			>> $mail_msg_file
 	fi
 fi
 
@@ -3256,36 +3273,29 @@ fi
 if [ "$U_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	echo "\n==== Copying proto area to $NIGHTLY_PARENT_ROOT ====\n" | \
 	    tee -a $LOGFILE >> $mail_msg_file
-	# The rm -rf command below produces predictable errors if
-	# nightly is invoked from the parent's $ROOT/opt/onbld/bin,
-	# and that directory is accessed via NFS.  This is because
-	# deleted-but-still-open files don't actually disappear as
-	# expected, but rather turn into .nfsXXXX junk files, leaving
-	# the directory non-empty.  Since this is a not-unusual usage
-	# pattern, and we still want to catch other errors here, we
-	# take the unusal step of moving aside 'nightly' from that
-	# directory (if we're using it).
-	mypath=${nightly_path##*/root_$MACH/}
-	if [ "$mypath" = $nightly_path ]; then
-		mypath=opt/onbld/bin/${nightly_path##*/}
-	fi
-	if [ $nightly_path -ef $PARENT_WS/proto/root_$MACH/$mypath ]; then
-		mv -f $nightly_path $PARENT_WS/proto/root_$MACH
-	fi
-	rm -rf $PARENT_WS/proto/root_$MACH/*
+	rm -rf $NIGHTLY_PARENT_ROOT/*
 	unset Ulockfile
 	mkdir -p $NIGHTLY_PARENT_ROOT
 	if [[ "$MULTI_PROTO" = no || "$D_FLAG" = y ]]; then
-		cd $ROOT
-		( tar cf - . |
+		( cd $ROOT; tar cf - . |
 		    ( cd $NIGHTLY_PARENT_ROOT;  umask 0; tar xpf - ) ) 2>&1 |
 		    tee -a $mail_msg_file >> $LOGFILE
 	fi
 	if [[ "$MULTI_PROTO" = yes && "$F_FLAG" = n ]]; then
+		rm -rf $NIGHTLY_PARENT_ROOT-nd/*
 		mkdir -p $NIGHTLY_PARENT_ROOT-nd
 		cd $ROOT-nd
 		( tar cf - . |
 		    ( cd $NIGHTLY_PARENT_ROOT-nd; umask 0; tar xpf - ) ) 2>&1 |
+		    tee -a $mail_msg_file >> $LOGFILE
+	fi
+	echo "\n==== Copying tools proto area to $NIGHTLY_PARENT_TOOLS_ROOT ====\n" | \
+	    tee -a $LOGFILE >> $mail_msg_file
+	rm -rf $NIGHTLY_PARENT_TOOLS_ROOT/*
+	mkdir -p $NIGHTLY_PARENT_TOOLS_ROOT
+	if [[ "$MULTI_PROTO" = no || "$D_FLAG" = y ]]; then
+		( cd $TOOLS_PROTO; tar cf - . |
+		    ( cd $NIGHTLY_PARENT_TOOLS_ROOT; umask 0; tar xpf - ) ) 2>&1 |
 		    tee -a $mail_msg_file >> $LOGFILE
 	fi
 fi
@@ -3339,7 +3349,7 @@ if [[ ($build_ok = y) && ( ($A_FLAG = y) || ($r_FLAG = y) ) ]]; then
 		echo "\n==== Check ELF runtime attributes ====\n" | \
 		    tee -a $LOGFILE >> $mail_msg_file
 
-		# If we're doing a debug build the proto area will be left
+		# If we're doing a DEBUG build the proto area will be left
 		# with debuggable objects, thus don't assert -s.
 		if [[ $D_FLAG = y ]]; then
 			rtime_sflag=""
@@ -3492,8 +3502,13 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	cd $CODEMGR_WS
 
 	#
-	# This step grovels through the pkgdefs proto* files, so it
+	# This step grovels through the package manifests, so it
 	# must come after findunref.
+	#
+	# We assume no DEBUG vs non-DEBUG package content variation
+	# here; if that changes, then the "make all" in $SRC/pkg will
+	# need to be moved into the conditionals and repeated for each
+	# different build.
 	#
 	echo "Generating closed binaries tarball(s)..." >> $LOGFILE
 	closed_basename=on-closed-bins
@@ -3514,11 +3529,11 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 		fi
 	fi
 
-	echo "Generating SUNWonbld tarball..." >> $LOGFILE
+	echo "Generating onbld tools tarball..." >> $LOGFILE
 	PKGARCHIVE=$PKGARCHIVE_ORIG
 	onblddrop >> $LOGFILE 2>&1
 	if (( $? != 0 )) ; then
-		echo "Couldn't create SUNWonbld tarball." |
+		echo "Couldn't create onbld tools tarball." |
 		    tee -a $mail_msg_file >> $LOGFILE
 	fi
 
@@ -3578,16 +3593,30 @@ fi
 if [ "$M_FLAG" != "y" -a "$build_ok" = y ]; then
 	echo "\n==== Impact on file permissions ====\n" \
 		>> $mail_msg_file
-	#
-	# Get pkginfo files from usr/src/pkgdefs
-	#
-	pmodes -qvdP \
-	`for d in $abssrcdirs; do
-		if [ -d "$d/pkgdefs" ]
-		then
-			find $d/pkgdefs -name pkginfo.tmpl -print -o -name .del\* -prune
+
+	abspkgdefs=
+	abspkg=
+	for d in $abssrcdirs; do
+		if [ -d "$d/pkgdefs" ]; then
+			abspkgdefs="$abspkgdefs $d"
 		fi
-	 done | sed -e 's:/pkginfo.tmpl$::' | sort -u ` >> $mail_msg_file
+		if [ -d "$d/pkg" ]; then
+			abspkg="$abspkg $d"
+		fi
+	done
+
+	if [ -n "$abspkgdefs" ]; then
+		pmodes -qvdP \
+		    `find $abspkgdefs -name pkginfo.tmpl -print -o \
+		    -name .del\* -prune | sed -e 's:/pkginfo.tmpl$::' | \
+		    sort -u` >> $mail_msg_file
+	fi
+
+	if [ -n "$abspkg" ]; then
+		for d in "$abspkg"; do
+			( cd $d/pkg ; $MAKE -e pmodes ) >> $mail_msg_file
+		done
+	fi
 fi
 
 if [ "$w_FLAG" = "y" -a "$build_ok" = "y" ]; then

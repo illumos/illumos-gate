@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -177,8 +175,7 @@ rm -rf "$scratchdir"
 #
 # Generate the actual archives.
 #
-
-ROOT="$newproto" makebfu
+CLOSED_IS_PRESENT="no" ROOT="$newproto" makebfu
 
 #
 # Bundle up the archives and license files.

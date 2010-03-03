@@ -1,0 +1,102 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/developer/apptrace/platform@$(PKGVERS)
+set name=pkg.description value="Apptrace processor specific shared objects"
+set name=pkg.summary value="Platform specific apptrace support"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=sparc
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/platform group=sys
+dir path=usr/platform/SUNW,A70 group=sys
+dir path=usr/platform/SUNW,A70/lib
+dir path=usr/platform/SUNW,Netra-CP2300 group=sys
+dir path=usr/platform/SUNW,Netra-CP2300/lib
+dir path=usr/platform/SUNW,Netra-CP3010 group=sys
+dir path=usr/platform/SUNW,Netra-CP3010/lib
+dir path=usr/platform/SUNW,Netra-T12 group=sys
+dir path=usr/platform/SUNW,Netra-T12/lib
+dir path=usr/platform/SUNW,Netra-T4 group=sys
+dir path=usr/platform/SUNW,Netra-T4/lib
+dir path=usr/platform/SUNW,Serverblade1 group=sys
+dir path=usr/platform/SUNW,Serverblade1/lib
+dir path=usr/platform/SUNW,Sun-Blade-100 group=sys
+dir path=usr/platform/SUNW,Sun-Blade-100/lib
+dir path=usr/platform/SUNW,Sun-Blade-1000 group=sys
+dir path=usr/platform/SUNW,Sun-Blade-1000/lib
+dir path=usr/platform/SUNW,Sun-Blade-1500 group=sys
+dir path=usr/platform/SUNW,Sun-Blade-1500/lib
+dir path=usr/platform/SUNW,Sun-Blade-2500 group=sys
+dir path=usr/platform/SUNW,Sun-Blade-2500/lib
+dir path=usr/platform/SUNW,Sun-Fire group=sys
+dir path=usr/platform/SUNW,Sun-Fire-15000 group=sys
+dir path=usr/platform/SUNW,Sun-Fire-15000/lib
+dir path=usr/platform/SUNW,Sun-Fire-280R group=sys
+dir path=usr/platform/SUNW,Sun-Fire-280R/lib
+dir path=usr/platform/SUNW,Sun-Fire-480R group=sys
+dir path=usr/platform/SUNW,Sun-Fire-480R/lib
+dir path=usr/platform/SUNW,Sun-Fire-880 group=sys
+dir path=usr/platform/SUNW,Sun-Fire-880/lib
+dir path=usr/platform/SUNW,Sun-Fire-V215 group=sys
+dir path=usr/platform/SUNW,Sun-Fire-V215/lib
+dir path=usr/platform/SUNW,Sun-Fire-V240 group=sys
+dir path=usr/platform/SUNW,Sun-Fire-V240/lib
+dir path=usr/platform/SUNW,Sun-Fire-V250 group=sys
+dir path=usr/platform/SUNW,Sun-Fire-V250/lib
+dir path=usr/platform/SUNW,Sun-Fire-V440 group=sys
+dir path=usr/platform/SUNW,Sun-Fire-V440/lib
+dir path=usr/platform/SUNW,Sun-Fire-V445 group=sys
+dir path=usr/platform/SUNW,Sun-Fire-V445/lib
+dir path=usr/platform/SUNW,Sun-Fire-V490 group=sys
+dir path=usr/platform/SUNW,Sun-Fire-V490/lib
+dir path=usr/platform/SUNW,Sun-Fire-V890 group=sys
+dir path=usr/platform/SUNW,Sun-Fire-V890/lib
+dir path=usr/platform/SUNW,Sun-Fire/lib
+dir path=usr/platform/SUNW,Ultra-2 group=sys
+dir path=usr/platform/SUNW,Ultra-2/lib
+dir path=usr/platform/SUNW,Ultra-250 group=sys
+dir path=usr/platform/SUNW,Ultra-250/lib
+dir path=usr/platform/SUNW,Ultra-4 group=sys
+dir path=usr/platform/SUNW,Ultra-4/lib
+dir path=usr/platform/SUNW,Ultra-Enterprise group=sys
+dir path=usr/platform/SUNW,Ultra-Enterprise-10000 group=sys
+dir path=usr/platform/SUNW,Ultra-Enterprise-10000/lib
+dir path=usr/platform/SUNW,Ultra-Enterprise/lib
+dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40 group=sys
+dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib
+dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60 group=sys
+dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib
+dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract group=sys
+dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract/lib
+legacy pkg=SUNWpstl.u arch=$(ARCH).sun4u category=system \
+    desc="Apptrace processor specific shared objects" \
+    hotline="Please contact your local service provider" \
+    name="Platform specific apptrace support" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

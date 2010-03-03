@@ -57,7 +57,7 @@ install: all $(ROOTONBLDBASEFILES) $(SUBDIRS)
 
 clean clobber: $(SUBDIRS)
 
-THIRDPARTYLICENSE: $(SRC)/pkgdefs/license_files/lic_GPLv2
+THIRDPARTYLICENSE: $(SRC)/pkg/license_files/lic_GPLv2
 	$(RM) $@
 	$(CAT) $? > $@
 

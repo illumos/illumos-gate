@@ -1,0 +1,69 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/storage/sasinfo@$(PKGVERS)
+set name=pkg.description \
+    value="T11 Storage Management HBA API Libraries and CLI"
+set name=pkg.summary value="SM-HBA Libraries and CLI"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Libraries
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/include
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/sbin
+file path=etc/smhba.conf group=sys opensolaris.zone=global \
+    original_name=SUNWsmhba:etc/smhba.conf preserve=true \
+    variant.opensolaris.zone=global
+file path=usr/include/smhbaapi.h
+file path=usr/lib/$(ARCH64)/libSMHBAAPI.so.1
+file path=usr/lib/$(ARCH64)/libsun_sas.so.1
+file path=usr/lib/$(ARCH64)/llib-lSMHBAAPI.ln
+file path=usr/lib/libSMHBAAPI.so.1
+file path=usr/lib/libsun_sas.so.1
+file path=usr/lib/llib-lSMHBAAPI
+file path=usr/lib/llib-lSMHBAAPI.ln
+file path=usr/sbin/sasinfo mode=0555
+legacy pkg=SUNWsmhba arch=$(ARCH) category=system \
+    desc="T11 Storage Management HBA API Libraries and CLI" \
+    hotline="Please contact your local service provider" \
+    name="SM-HBA Libraries and CLI" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWsmhbar arch=$(ARCH) category=system \
+    desc="T11 Storage Management HBA API Libraries and CLI (root)" \
+    hotline="Please contact your local service provider" \
+    name="SM-HBA Libraries and CLI (root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lib/smhba/THIRDPARTYLICENSE license=lib/smhba/THIRDPARTYLICENSE
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/$(ARCH64)/libSMHBAAPI.so target=libSMHBAAPI.so.1
+link path=usr/lib/$(ARCH64)/libsun_sas.so target=libsun_sas.so.1
+link path=usr/lib/libSMHBAAPI.so target=libSMHBAAPI.so.1
+link path=usr/lib/libsun_sas.so target=libsun_sas.so.1

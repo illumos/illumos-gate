@@ -1,0 +1,102 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/file-system/nfs@$(PKGVERS)
+set name=pkg.description value="Network File System (NFS) server support"
+set name=pkg.summary value="Network File System (NFS) server support"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/File System"
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=etc/default group=sys
+dir path=etc/init.d group=sys
+dir path=etc/nfs group=sys
+dir path=kernel group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/misc group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/misc/$(ARCH64) group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/method
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/fs group=sys
+dir path=usr/lib/fs/nfs group=sys
+dir path=usr/lib/fs/nfs/$(ARCH64) group=sys
+dir path=usr/lib/nfs group=sys
+dir path=usr/lib/reparse group=bin
+dir path=usr/lib/reparse/$(ARCH64) group=sys
+dir path=usr/sbin
+dir path=var group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/network group=sys
+dir path=var/svc/manifest/network/nfs group=sys
+file path=etc/default/nfslogd group=sys \
+    original_name=SUNWnfss:etc/default/nfslogd preserve=true
+file path=etc/init.d/nfs.server group=sys mode=0744 \
+    original_name=SUNWnfss:etc/init.d/nfs.server preserve=true
+file path=etc/nfs/nfslog.conf group=sys \
+    original_name=SUNWnfss:etc/nfs/nfslog.conf preserve=true
+file path=kernel/misc/$(ARCH64)/nfssrv group=sys mode=0755 \
+    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
+$(i386_ONLY)file path=kernel/misc/nfssrv group=sys mode=0755 \
+    opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
+file path=lib/svc/method/nfs-server mode=0555
+file path=usr/lib/fs/nfs/$(ARCH64)/libshare_nfs.so.1
+file path=usr/lib/fs/nfs/libshare_nfs.so.1
+file path=usr/lib/nfs/mountd mode=0555
+file path=usr/lib/nfs/nfsd mode=0555
+file path=usr/lib/nfs/nfslogd mode=0555
+file path=usr/lib/nfs/rquotad mode=0555
+file path=usr/lib/reparse/$(ARCH64)/libnfs_basic.so.1
+file path=usr/lib/reparse/libnfs_basic.so.1
+file path=usr/sbin/exportfs mode=0555
+file path=usr/sbin/nfsref mode=0555
+file path=var/svc/manifest/network/nfs/rquota.xml group=sys mode=0444
+file path=var/svc/manifest/network/nfs/server.xml group=sys mode=0444
+legacy pkg=SUNWnfsskr arch=$(ARCH) category=system \
+    desc="Network File System (NFS) server kernel support (Root)" \
+    hotline="Please contact your local service provider" \
+    name="Network File System (NFS) server kernel support (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWnfssr arch=$(ARCH) category=system \
+    desc="Network File System (NFS) server support (Root)" \
+    hotline="Please contact your local service provider" \
+    name="Network File System (NFS) server support (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWnfssu arch=$(ARCH) category=system \
+    desc="Network File System (NFS) server support (Usr)" \
+    hotline="Please contact your local service provider" \
+    name="Network File System (NFS) server support (Usr)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/reparse/$(ARCH64)/libnfs_basic.so target=./libnfs_basic.so.1
+link path=usr/lib/reparse/libnfs_basic.so target=./libnfs_basic.so.1

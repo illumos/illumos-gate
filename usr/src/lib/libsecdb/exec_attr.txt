@@ -219,6 +219,7 @@ Object Access Management:suser:cmd:::/usr/bin/chmod:euid=0
 Object Access Management:suser:cmd:::/usr/bin/chown:euid=0
 Object Access Management:suser:cmd:::/usr/bin/getfacl:euid=0
 Object Access Management:suser:cmd:::/usr/bin/setfacl:euid=0
+Primary Administrator:solaris:cmd:::*:uid=0;gid=0
 Printer Management:suser:cmd:::/usr/lib/lp/local/lpadmin:uid=lp;gid=lp 
 Printer Management:suser:cmd:::/usr/sbin/lpfilter:euid=lp;uid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpforms:euid=lp

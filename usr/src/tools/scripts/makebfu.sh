@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Builds bfu archives. If no arguments, uses the environment variables
@@ -92,32 +90,25 @@ fi
 export I_REALLY_WANT_TO_RUN_MKBFU=YES
 
 echo "Making ${archivetype}archives from $ROOT in $CPIODIR."
-if [ "$o_FLAG" != "y" -a -n "$MACH" -a -n "$SRC" -a -d "$SRC/pkgdefs" ]; then
-	pkg=$SRC/pkgdefs
-	if [[ -d $SRC/../closed/pkgdefs && \
-	    "$CLOSED_IS_PRESENT" != no ]]; then
-		cpkg=$SRC/../closed/pkgdefs
-	else
-		cpkg=""
+if [ "$o_FLAG" != "y" -a -n "$MACH" -a -n "$SRC" -a -d "$SRC/pkg" ]; then
+	cpioxlatecmd="cpiotranslate"
+	exc=$CODEMGR_WS/exception_lists
+	if [ -f $exc/packaging.cpiotranslate ]; then
+		cpioxlatecmd="$cpioxlatecmd -e $exc/packaging.cpiotranslate"
 	fi
-	exc=etc/exception_list_$MACH
-	if [ "$X_FLAG" = "y" ]; then
-		ipkg=$IA32_IHV_WS/usr/src/pkgdefs
-		bpkgargs="-e $ipkg/$exc $ipkg"
-	else
-		bpkgargs=""
+	if [ -f $exc/packaging ]; then
+		cpioxlatecmd="$cpioxlatecmd -e $exc/packaging"
 	fi
-	mkbfu	-f "cpiotranslate -e $pkg/$exc $bpkgargs $pkg $cpkg" \
-		$zflag $ROOT $CPIODIR
+	if [ "$CLOSED_IS_PRESENT" = "yes" ]; then
+		suffix=".closed"
+	else
+		suffix=".open"
+	fi
+	if [ -f $exc/packaging$suffix ]; then
+		cpioxlatecmd="$cpioxlatecmd -e $exc/packaging$suffix"
+	fi
+	cpioxlatecmd="$cpioxlatecmd $SRC/pkg/proto_list_$MACH"
+        mkbfu   -f "$cpioxlatecmd" $zflag $ROOT $CPIODIR
 else
 	mkbfu $zflag $ROOT $CPIODIR
 fi
-
-if [ -n "$MACH" -a -n "$SRC" -a -d "$SRC/pkgdefs" ]; then
-	mkacr $SRC $MACH $CPIODIR
-else
-	cat >&2 <<'EOF'
-$SRC and $MACH need to be set to create a conflict resolution archive.
-EOF
-fi
-

@@ -1,0 +1,90 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/SUNWcsd@$(PKGVERS)
+set name=pkg.description \
+    value="core entries for /dev and /devices needed for the initial boot of Solaris"
+set name=pkg.summary value="Core Solaris Devices"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=dev group=sys
+dir path=dev/dsk group=sys
+dir path=dev/fd group=root mode=0555
+dir path=dev/ipnet group=sys
+dir path=dev/net group=sys
+dir path=dev/pts group=sys
+dir path=dev/rdsk group=sys
+dir path=dev/rmt group=sys
+dir path=dev/sad group=sys
+dir path=dev/swap group=sys
+dir path=dev/term group=root
+dir path=dev/vt group=sys
+dir path=dev/zcons group=sys
+dir path=devices group=sys
+dir path=devices/pseudo group=sys
+dir path=etc group=sys
+dir path=etc/init.d group=sys
+dir path=etc/rcm group=sys
+dir path=etc/rcm/scripts group=sys
+dir path=etc/security group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/method
+dir path=var group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/system group=sys
+file path=etc/dacf.conf group=sys
+file path=etc/devlink.tab group=sys preserve=true
+file path=etc/driver_aliases group=sys preserve=true
+file path=etc/driver_classes group=sys preserve=true
+file path=etc/init.d/devlinks group=sys mode=0744 preserve=true
+file path=etc/init.d/drvconfig group=sys mode=0744 preserve=true
+file path=etc/iu.ap group=sys preserve=true
+file path=etc/minor_perm group=sys preserve=true
+file path=etc/name_to_major group=sys preserve=true
+file path=etc/path_to_inst group=root mode=0444 preserve=true
+file path=etc/security/device_policy group=sys preserve=true
+file path=etc/security/extra_privs group=sys preserve=true
+file path=lib/svc/method/svc-syseventd mode=0555
+file path=var/svc/manifest/system/sysevent.xml group=sys mode=0444
+legacy pkg=SUNWcsd arch=$(ARCH) category=system \
+    desc="core entries for /dev and /devices needed for the initial boot of Solaris" \
+    hotline="Please contact your local service provider" \
+    name="Core Solaris Devices" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=dev/stderr target=./fd/2
+link path=dev/stdin target=./fd/0
+link path=dev/stdout target=./fd/1

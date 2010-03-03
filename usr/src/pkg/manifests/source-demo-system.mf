@@ -1,0 +1,277 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/source/demo/system@$(PKGVERS)
+set name=pkg.description \
+    value="Source code to demonstrate the use of OS interfaces: ELF"
+set name=pkg.summary value="OS demo source"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/demo
+dir path=usr/demo/ELF
+dir path=usr/demo/ksh
+dir path=usr/demo/ksh/bin
+dir path=usr/demo/ksh/fun
+dir path=usr/demo/ksh/src
+dir path=usr/demo/ksh/tests
+dir path=usr/demo/libexacct
+dir path=usr/demo/librtld_db
+dir path=usr/demo/librtld_db/amd64
+dir path=usr/demo/librtld_db/common
+dir path=usr/demo/librtld_db/i386
+dir path=usr/demo/librtld_db/sparc
+dir path=usr/demo/librtld_db/sparcv9
+dir path=usr/demo/librtld_db/tests
+dir path=usr/demo/link_audit
+dir path=usr/demo/link_audit/man
+dir path=usr/demo/link_audit/src
+file path=usr/demo/ELF/Makefile
+file path=usr/demo/ELF/README
+file path=usr/demo/ELF/acom.c
+file path=usr/demo/ELF/dcom.c
+file path=usr/demo/ELF/dispsyms.c
+file path=usr/demo/ELF/pcom.c
+file path=usr/demo/ELF/tpcom.c
+file path=usr/demo/ksh/bin/cpvprint mode=0755
+file path=usr/demo/ksh/bin/crawlsrccomments mode=0755
+file path=usr/demo/ksh/bin/filemutexdemo1 mode=0755
+file path=usr/demo/ksh/bin/filetree1 mode=0755
+file path=usr/demo/ksh/bin/gnaw mode=0755
+file path=usr/demo/ksh/bin/mandelbrotset1 mode=0755
+file path=usr/demo/ksh/bin/multifollow mode=0755
+file path=usr/demo/ksh/bin/numtree1 mode=0755
+file path=usr/demo/ksh/bin/primenumbers1 mode=0755
+file path=usr/demo/ksh/bin/rssread mode=0755
+file path=usr/demo/ksh/bin/shcalc mode=0755
+file path=usr/demo/ksh/bin/shircbot mode=0755
+file path=usr/demo/ksh/bin/shlint mode=0755
+file path=usr/demo/ksh/bin/shman mode=0755
+file path=usr/demo/ksh/bin/shnote mode=0755
+file path=usr/demo/ksh/bin/shpiano mode=0755
+file path=usr/demo/ksh/bin/shtinyurl mode=0755
+file path=usr/demo/ksh/bin/shtwitter mode=0755
+file path=usr/demo/ksh/bin/simplefileattributetree1 mode=0755
+file path=usr/demo/ksh/bin/simplefiletree1 mode=0755
+file path=usr/demo/ksh/bin/svcproptree1 mode=0755
+file path=usr/demo/ksh/bin/termclock mode=0755
+file path=usr/demo/ksh/bin/test_net_sctp mode=0755
+file path=usr/demo/ksh/bin/xmldocumenttree1 mode=0755
+file path=usr/demo/ksh/fun/dirs mode=0755
+file path=usr/demo/ksh/fun/popd mode=0755
+file path=usr/demo/ksh/fun/pushd mode=0755
+file path=usr/demo/ksh/fun/title mode=0755
+file path=usr/demo/ksh/src/cpvprint.sh
+file path=usr/demo/ksh/src/crawlsrccomments.sh
+file path=usr/demo/ksh/src/filemutexdemo1.sh
+file path=usr/demo/ksh/src/filetree1.sh
+file path=usr/demo/ksh/src/gnaw.sh
+file path=usr/demo/ksh/src/mandelbrotset1.sh
+file path=usr/demo/ksh/src/multifollow.sh
+file path=usr/demo/ksh/src/numtree1.sh
+file path=usr/demo/ksh/src/primenumbers1.sh
+file path=usr/demo/ksh/src/rssread.sh
+file path=usr/demo/ksh/src/shcalc.sh
+file path=usr/demo/ksh/src/shircbot.sh
+file path=usr/demo/ksh/src/shlint.sh
+file path=usr/demo/ksh/src/shman.sh
+file path=usr/demo/ksh/src/shnote.sh
+file path=usr/demo/ksh/src/shpiano.sh
+file path=usr/demo/ksh/src/shtinyurl.sh
+file path=usr/demo/ksh/src/shtwitter.sh
+file path=usr/demo/ksh/src/simplefileattributetree1.sh
+file path=usr/demo/ksh/src/simplefiletree1.sh
+file path=usr/demo/ksh/src/svcproptree1.sh
+file path=usr/demo/ksh/src/termclock.sh
+file path=usr/demo/ksh/src/test_net_sctp.sh
+file path=usr/demo/ksh/src/xmldocumenttree1.sh
+file path=usr/demo/ksh/tests/README.tests
+file path=usr/demo/ksh/tests/alias.sh
+file path=usr/demo/ksh/tests/append.sh
+file path=usr/demo/ksh/tests/arith.sh
+file path=usr/demo/ksh/tests/arrays.sh
+file path=usr/demo/ksh/tests/arrays2.sh
+file path=usr/demo/ksh/tests/attributes.sh
+file path=usr/demo/ksh/tests/basic.sh
+file path=usr/demo/ksh/tests/bracket.sh
+file path=usr/demo/ksh/tests/builtins.sh
+file path=usr/demo/ksh/tests/case.sh
+file path=usr/demo/ksh/tests/comvar.sh
+file path=usr/demo/ksh/tests/coprocess.sh
+file path=usr/demo/ksh/tests/cubetype.sh
+file path=usr/demo/ksh/tests/enum.sh
+file path=usr/demo/ksh/tests/exit.sh
+file path=usr/demo/ksh/tests/expand.sh
+file path=usr/demo/ksh/tests/functions.sh
+file path=usr/demo/ksh/tests/glob.sh
+file path=usr/demo/ksh/tests/grep.sh
+file path=usr/demo/ksh/tests/heredoc.sh
+file path=usr/demo/ksh/tests/io.sh
+file path=usr/demo/ksh/tests/nameref.sh
+file path=usr/demo/ksh/tests/options.sh
+file path=usr/demo/ksh/tests/path.sh
+file path=usr/demo/ksh/tests/pointtype.sh
+file path=usr/demo/ksh/tests/quoting.sh
+file path=usr/demo/ksh/tests/quoting2.sh
+file path=usr/demo/ksh/tests/recttype.sh
+file path=usr/demo/ksh/tests/restricted.sh
+file path=usr/demo/ksh/tests/return.sh
+file path=usr/demo/ksh/tests/select.sh
+file path=usr/demo/ksh/tests/shtests mode=0755
+file path=usr/demo/ksh/tests/sigchld.sh
+file path=usr/demo/ksh/tests/signal.sh
+file path=usr/demo/ksh/tests/statics.sh
+file path=usr/demo/ksh/tests/subshell.sh
+file path=usr/demo/ksh/tests/substring.sh
+file path=usr/demo/ksh/tests/sun_solaris_array_default_datatype.sh
+file path=usr/demo/ksh/tests/sun_solaris_builtin_poll.sh
+file path=usr/demo/ksh/tests/sun_solaris_builtin_sum.sh
+file path=usr/demo/ksh/tests/sun_solaris_builtin_tail.sh
+file path=usr/demo/ksh/tests/sun_solaris_command_substitution.sh
+file path=usr/demo/ksh/tests/sun_solaris_compound_nameref.sh
+file path=usr/demo/ksh/tests/sun_solaris_compoundvario.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6687139_command_substitution_exec_redirection_allocation_loop.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6713682_compound_var_bleeds_through_subshell.sh
+file path=usr/demo/ksh/tests/sun_solaris_cr_6722134_background_CHLD_trap.sh
+file path=usr/demo/ksh/tests/sun_solaris_cr_6753538_subshell_leaks_umask.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6754020_weird_square_bracket_expansion.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6763594_command_failure_execs_twice.sh
+file path=usr/demo/ksh/tests/sun_solaris_cr_6766246_pattern_matching_bug.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6769332_substitutions_terminate_shell_after_257_iterations.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6777491_lacks_arithmetric_function_iszero.sh
+file path=usr/demo/ksh/tests/sun_solaris_cr_6778077_sigthaw_trap.sh
+file path=usr/demo/ksh/tests/sun_solaris_cr_6789247_printf_hexfloat_rounding.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6800929_large_command_substitution_hang.sh
+file path=usr/demo/ksh/tests/sun_solaris_cr_6805792_varmovetest1.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6805794_character_to_wchar_not_working.sh
+file path=usr/demo/ksh/tests/sun_solaris_cr_6805795_negative_zero.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6807179_shellpattern_uses_getpwnam.sh
+file path=usr/demo/ksh/tests/sun_solaris_cr_6835835_builtin_cat_n_broken.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6848486_echo_test_with_test_undefined_executes_test_builtin.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6855875_typeset_hexfloat_has_too_few_digits.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6862121_shbinexec_kernel_module_defunct.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6881017_background_process_in_subshell_hangs_caller.sh
+file path=usr/demo/ksh/tests/sun_solaris_getconf.sh
+file path=usr/demo/ksh/tests/sun_solaris_local_compound_nameref001.sh
+file path=usr/demo/ksh/tests/sun_solaris_staticvariables.sh
+file path=usr/demo/ksh/tests/sun_solaris_vartree001.sh
+file path=usr/demo/ksh/tests/sun_solaris_vartree002.sh
+file path=usr/demo/ksh/tests/sun_solaris_vartree003.sh
+file path=usr/demo/ksh/tests/tilde.sh
+file path=usr/demo/ksh/tests/timetype.sh
+file path=usr/demo/ksh/tests/treemove.sh
+file path=usr/demo/ksh/tests/types.sh
+file path=usr/demo/ksh/tests/variables.sh
+file path=usr/demo/ksh/tests/vartree1.sh
+file path=usr/demo/ksh/tests/vartree2.sh
+file path=usr/demo/libexacct/Makefile
+file path=usr/demo/libexacct/README
+file path=usr/demo/libexacct/exdump.c
+file path=usr/demo/librtld_db/00README
+file path=usr/demo/librtld_db/Makefile.com
+file path=usr/demo/librtld_db/Makefile.targ
+file path=usr/demo/librtld_db/amd64/Makefile
+file path=usr/demo/librtld_db/amd64/rdb_mach.h
+file path=usr/demo/librtld_db/amd64/regs.c
+file path=usr/demo/librtld_db/common/bpt.c
+file path=usr/demo/librtld_db/common/callstack.c
+file path=usr/demo/librtld_db/common/dis.c
+file path=usr/demo/librtld_db/common/disasm.c
+file path=usr/demo/librtld_db/common/disasm.h
+file path=usr/demo/librtld_db/common/globals.c
+file path=usr/demo/librtld_db/common/gram.y
+file path=usr/demo/librtld_db/common/help.c
+file path=usr/demo/librtld_db/common/lex.l
+file path=usr/demo/librtld_db/common/main.c
+file path=usr/demo/librtld_db/common/maps.c
+file path=usr/demo/librtld_db/common/ps.c
+file path=usr/demo/librtld_db/common/rdb.h
+file path=usr/demo/librtld_db/common/rdb.man
+file path=usr/demo/librtld_db/common/syms.c
+file path=usr/demo/librtld_db/common/utils.c
+file path=usr/demo/librtld_db/i386/Makefile
+file path=usr/demo/librtld_db/i386/m_utils.c
+file path=usr/demo/librtld_db/i386/rdb_mach.h
+file path=usr/demo/librtld_db/i386/regs.c
+file path=usr/demo/librtld_db/sparc/Makefile
+file path=usr/demo/librtld_db/sparc/m_utils.c
+file path=usr/demo/librtld_db/sparc/rdb_mach.h
+file path=usr/demo/librtld_db/sparc/regs.c
+file path=usr/demo/librtld_db/sparcv9/Makefile
+file path=usr/demo/librtld_db/sparcv9/m_utils.c
+file path=usr/demo/librtld_db/sparcv9/rdb_mach.h
+file path=usr/demo/librtld_db/sparcv9/regs.c
+file path=usr/demo/librtld_db/tests/breaks
+file path=usr/demo/librtld_db/tests/loadmaps
+file path=usr/demo/librtld_db/tests/object_padding_maps
+file path=usr/demo/librtld_db/tests/plt_skip
+file path=usr/demo/librtld_db/tests/simp.c
+file path=usr/demo/librtld_db/tests/steps
+file path=usr/demo/librtld_db/tests/sub.c
+file path=usr/demo/librtld_db/tests/test-sparc-regs
+file path=usr/demo/link_audit/00README
+file path=usr/demo/link_audit/Makefile
+file path=usr/demo/link_audit/man/dumpbind.man
+file path=usr/demo/link_audit/man/perfcnt.man
+file path=usr/demo/link_audit/man/symbindrep.man
+file path=usr/demo/link_audit/src/bindings.c
+file path=usr/demo/link_audit/src/bindings.h
+file path=usr/demo/link_audit/src/dumpbind.c
+file path=usr/demo/link_audit/src/env.c
+file path=usr/demo/link_audit/src/env.h
+file path=usr/demo/link_audit/src/hash.c
+file path=usr/demo/link_audit/src/hash.h
+file path=usr/demo/link_audit/src/mach.h
+file path=usr/demo/link_audit/src/perfcnt.c
+file path=usr/demo/link_audit/src/perfcnt.ksh
+file path=usr/demo/link_audit/src/sotruss.ksh
+file path=usr/demo/link_audit/src/symbindrep.c
+file path=usr/demo/link_audit/src/symbindrep.ksh
+file path=usr/demo/link_audit/src/truss.c
+file path=usr/demo/link_audit/src/who.c
+file path=usr/demo/link_audit/src/who.h
+file path=usr/demo/link_audit/src/whocalls.ksh
+legacy pkg=SUNWosdem arch=$(ARCH) category=system \
+    desc="Source code to demonstrate the use of OS interfaces: ELF" \
+    hotline="Please contact your local service provider" name="OS demo source" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lib/libshell/THIRDPARTYLICENSE license=lib/libshell/THIRDPARTYLICENSE
+license lic_CDDL license=lic_CDDL

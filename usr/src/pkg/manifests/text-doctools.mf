@@ -1,0 +1,386 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/text/doctools@$(PKGVERS)
+set name=pkg.description \
+    value="utilities and fonts for development, display, and production of documentation such as manual pages (nroff/troff)"
+set name=pkg.summary value="Documentation Tools"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Text Tools"
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/bin
+dir path=usr/lib
+dir path=usr/lib/font
+dir path=usr/lib/font/devpost group=lp
+dir path=usr/lib/font/devpost/charlib group=lp
+dir path=usr/lib/refer
+dir path=usr/lib/refer/papers
+dir path=usr/lib/sgml
+dir path=usr/share group=sys
+dir path=usr/share/lib group=sys
+dir path=usr/share/lib/nterm
+dir path=usr/share/lib/pub
+dir path=usr/share/lib/sgml
+dir path=usr/share/lib/sgml/locale
+dir path=usr/share/lib/sgml/locale/C
+dir path=usr/share/lib/sgml/locale/C/dtds
+dir path=usr/share/lib/sgml/locale/C/dtds/solbookv2
+dir path=usr/share/lib/sgml/locale/C/entities
+dir path=usr/share/lib/sgml/locale/C/transpec
+dir path=usr/share/lib/tmac
+dir path=usr/share/man
+file path=usr/bin/addbib mode=0555
+file path=usr/bin/apropos mode=0555
+file path=usr/bin/checkeq mode=0555
+file path=usr/bin/checknr mode=0555
+file path=usr/bin/deroff mode=0555
+file path=usr/bin/diffmk mode=0555
+file path=usr/bin/eqn mode=0555
+file path=usr/bin/indxbib mode=0555
+file path=usr/bin/lookbib mode=0555
+file path=usr/bin/neqn mode=0555
+file path=usr/bin/nroff mode=0555
+file path=usr/bin/refer mode=0555
+file path=usr/bin/roffbib mode=0555
+file path=usr/bin/soelim mode=0555
+file path=usr/bin/sortbib mode=0555
+file path=usr/bin/ta mode=0555
+file path=usr/bin/tbl mode=0555
+file path=usr/bin/troff mode=0555
+file path=usr/bin/ul mode=0555
+file path=usr/bin/vgrind mode=0555
+file path=usr/lib/font/devpost/AB group=lp mode=0444
+file path=usr/lib/font/devpost/AB.name group=lp mode=0444
+file path=usr/lib/font/devpost/AB.out group=lp mode=0444
+file path=usr/lib/font/devpost/AI group=lp mode=0444
+file path=usr/lib/font/devpost/AI.name group=lp mode=0444
+file path=usr/lib/font/devpost/AI.out group=lp mode=0444
+file path=usr/lib/font/devpost/AR group=lp mode=0444
+file path=usr/lib/font/devpost/AR.name group=lp mode=0444
+file path=usr/lib/font/devpost/AR.out group=lp mode=0444
+file path=usr/lib/font/devpost/AX group=lp mode=0444
+file path=usr/lib/font/devpost/AX.name group=lp mode=0444
+file path=usr/lib/font/devpost/AX.out group=lp mode=0444
+file path=usr/lib/font/devpost/B group=lp mode=0444
+file path=usr/lib/font/devpost/B.name group=lp mode=0444
+file path=usr/lib/font/devpost/B.out group=lp mode=0444
+file path=usr/lib/font/devpost/BI group=lp mode=0444
+file path=usr/lib/font/devpost/BI.name group=lp mode=0444
+file path=usr/lib/font/devpost/BI.out group=lp mode=0444
+file path=usr/lib/font/devpost/CB group=lp mode=0444
+file path=usr/lib/font/devpost/CB.name group=lp mode=0444
+file path=usr/lib/font/devpost/CB.out group=lp mode=0444
+file path=usr/lib/font/devpost/CI group=lp mode=0444
+file path=usr/lib/font/devpost/CI.name group=lp mode=0444
+file path=usr/lib/font/devpost/CI.out group=lp mode=0444
+file path=usr/lib/font/devpost/CO group=lp mode=0444
+file path=usr/lib/font/devpost/CO.name group=lp mode=0444
+file path=usr/lib/font/devpost/CO.out group=lp mode=0444
+file path=usr/lib/font/devpost/CW group=lp mode=0444
+file path=usr/lib/font/devpost/CW.name group=lp mode=0444
+file path=usr/lib/font/devpost/CW.out group=lp mode=0444
+file path=usr/lib/font/devpost/CX group=lp mode=0444
+file path=usr/lib/font/devpost/CX.name group=lp mode=0444
+file path=usr/lib/font/devpost/CX.out group=lp mode=0444
+file path=usr/lib/font/devpost/DESC group=lp mode=0444
+file path=usr/lib/font/devpost/DESC.out group=lp mode=0444
+file path=usr/lib/font/devpost/G.out group=lp mode=0444
+file path=usr/lib/font/devpost/GI.out group=lp mode=0444
+file path=usr/lib/font/devpost/GR group=lp mode=0444
+file path=usr/lib/font/devpost/GR.name group=lp mode=0444
+file path=usr/lib/font/devpost/GR.out group=lp mode=0444
+file path=usr/lib/font/devpost/H group=lp mode=0444
+file path=usr/lib/font/devpost/H.name group=lp mode=0444
+file path=usr/lib/font/devpost/H.out group=lp mode=0444
+file path=usr/lib/font/devpost/HB group=lp mode=0444
+file path=usr/lib/font/devpost/HB.name group=lp mode=0444
+file path=usr/lib/font/devpost/HB.out group=lp mode=0444
+file path=usr/lib/font/devpost/HI group=lp mode=0444
+file path=usr/lib/font/devpost/HI.name group=lp mode=0444
+file path=usr/lib/font/devpost/HI.out group=lp mode=0444
+file path=usr/lib/font/devpost/HK.out group=lp mode=0444
+file path=usr/lib/font/devpost/HL.out group=lp mode=0444
+file path=usr/lib/font/devpost/HM.out group=lp mode=0444
+file path=usr/lib/font/devpost/HX group=lp mode=0444
+file path=usr/lib/font/devpost/HX.name group=lp mode=0444
+file path=usr/lib/font/devpost/HX.out group=lp mode=0444
+file path=usr/lib/font/devpost/Hb group=lp mode=0444
+file path=usr/lib/font/devpost/Hb.name group=lp mode=0444
+file path=usr/lib/font/devpost/Hb.out group=lp mode=0444
+file path=usr/lib/font/devpost/Hi group=lp mode=0444
+file path=usr/lib/font/devpost/Hi.name group=lp mode=0444
+file path=usr/lib/font/devpost/Hi.out group=lp mode=0444
+file path=usr/lib/font/devpost/Hr group=lp mode=0444
+file path=usr/lib/font/devpost/Hr.name group=lp mode=0444
+file path=usr/lib/font/devpost/Hr.out group=lp mode=0444
+file path=usr/lib/font/devpost/Hx group=lp mode=0444
+file path=usr/lib/font/devpost/Hx.name group=lp mode=0444
+file path=usr/lib/font/devpost/Hx.out group=lp mode=0444
+file path=usr/lib/font/devpost/I group=lp mode=0444
+file path=usr/lib/font/devpost/I.name group=lp mode=0444
+file path=usr/lib/font/devpost/I.out group=lp mode=0444
+file path=usr/lib/font/devpost/KB group=lp mode=0444
+file path=usr/lib/font/devpost/KB.name group=lp mode=0444
+file path=usr/lib/font/devpost/KB.out group=lp mode=0444
+file path=usr/lib/font/devpost/KI group=lp mode=0444
+file path=usr/lib/font/devpost/KI.name group=lp mode=0444
+file path=usr/lib/font/devpost/KI.out group=lp mode=0444
+file path=usr/lib/font/devpost/KR group=lp mode=0444
+file path=usr/lib/font/devpost/KR.name group=lp mode=0444
+file path=usr/lib/font/devpost/KR.out group=lp mode=0444
+file path=usr/lib/font/devpost/KX group=lp mode=0444
+file path=usr/lib/font/devpost/KX.name group=lp mode=0444
+file path=usr/lib/font/devpost/KX.out group=lp mode=0444
+file path=usr/lib/font/devpost/NB group=lp mode=0444
+file path=usr/lib/font/devpost/NB.name group=lp mode=0444
+file path=usr/lib/font/devpost/NB.out group=lp mode=0444
+file path=usr/lib/font/devpost/NI group=lp mode=0444
+file path=usr/lib/font/devpost/NI.name group=lp mode=0444
+file path=usr/lib/font/devpost/NI.out group=lp mode=0444
+file path=usr/lib/font/devpost/NR group=lp mode=0444
+file path=usr/lib/font/devpost/NR.name group=lp mode=0444
+file path=usr/lib/font/devpost/NR.out group=lp mode=0444
+file path=usr/lib/font/devpost/NX group=lp mode=0444
+file path=usr/lib/font/devpost/NX.name group=lp mode=0444
+file path=usr/lib/font/devpost/NX.out group=lp mode=0444
+file path=usr/lib/font/devpost/PA group=lp mode=0444
+file path=usr/lib/font/devpost/PA.name group=lp mode=0444
+file path=usr/lib/font/devpost/PA.out group=lp mode=0444
+file path=usr/lib/font/devpost/PB group=lp mode=0444
+file path=usr/lib/font/devpost/PB.name group=lp mode=0444
+file path=usr/lib/font/devpost/PB.out group=lp mode=0444
+file path=usr/lib/font/devpost/PI group=lp mode=0444
+file path=usr/lib/font/devpost/PI.name group=lp mode=0444
+file path=usr/lib/font/devpost/PI.out group=lp mode=0444
+file path=usr/lib/font/devpost/PX group=lp mode=0444
+file path=usr/lib/font/devpost/PX.name group=lp mode=0444
+file path=usr/lib/font/devpost/PX.out group=lp mode=0444
+file path=usr/lib/font/devpost/R group=lp mode=0444
+file path=usr/lib/font/devpost/R.name group=lp mode=0444
+file path=usr/lib/font/devpost/R.out group=lp mode=0444
+file path=usr/lib/font/devpost/S group=lp mode=0444
+file path=usr/lib/font/devpost/S.name group=lp mode=0444
+file path=usr/lib/font/devpost/S.out group=lp mode=0444
+file path=usr/lib/font/devpost/S1 group=lp mode=0444
+file path=usr/lib/font/devpost/S1.name group=lp mode=0444
+file path=usr/lib/font/devpost/S1.out group=lp mode=0444
+file path=usr/lib/font/devpost/VB group=lp mode=0444
+file path=usr/lib/font/devpost/VB.name group=lp mode=0444
+file path=usr/lib/font/devpost/VB.out group=lp mode=0444
+file path=usr/lib/font/devpost/VI group=lp mode=0444
+file path=usr/lib/font/devpost/VI.name group=lp mode=0444
+file path=usr/lib/font/devpost/VI.out group=lp mode=0444
+file path=usr/lib/font/devpost/VR group=lp mode=0444
+file path=usr/lib/font/devpost/VR.name group=lp mode=0444
+file path=usr/lib/font/devpost/VR.out group=lp mode=0444
+file path=usr/lib/font/devpost/VX group=lp mode=0444
+file path=usr/lib/font/devpost/VX.name group=lp mode=0444
+file path=usr/lib/font/devpost/VX.out group=lp mode=0444
+file path=usr/lib/font/devpost/ZD group=lp mode=0444
+file path=usr/lib/font/devpost/ZD.name group=lp mode=0444
+file path=usr/lib/font/devpost/ZD.out group=lp mode=0444
+file path=usr/lib/font/devpost/ZI group=lp mode=0444
+file path=usr/lib/font/devpost/ZI.name group=lp mode=0444
+file path=usr/lib/font/devpost/ZI.out group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/12 group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/14 group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/34 group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/BRACKETS_NOTE group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/Fi group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/Fl group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/L1 group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/L1.map group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/LH group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/LH.map group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/Lb group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/Lb.map group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/OLD_LH group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/OLD_LH.map group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/README group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/Sl group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/bx group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/ci group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/ff group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/lc group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/lf group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/lh group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/ob group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/rc group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/rf group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/rh group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/sq group=lp mode=0444
+file path=usr/lib/font/devpost/charlib/~ group=lp mode=0444
+file path=usr/lib/font/makedev group=lp mode=0555
+file path=usr/lib/getNAME mode=0555
+file path=usr/lib/makewhatis mode=0555
+file path=usr/lib/refer/hunt mode=0555
+file path=usr/lib/refer/inv mode=0555
+file path=usr/lib/refer/mkey mode=0555
+file path=usr/lib/refer/papers/Rbstjissue
+file path=usr/lib/refer/papers/Rv7man
+file path=usr/lib/refer/papers/runinv mode=0755
+file path=usr/lib/sgml/instant mode=0755
+file path=usr/lib/sgml/nsgmls mode=0755
+file path=usr/lib/sgml/sgml2roff mode=0755
+file path=usr/lib/vfontedpr mode=0555
+file path=usr/lib/vgrindefs mode=0444
+file path=usr/share/lib/nterm/tab.2631
+file path=usr/share/lib/nterm/tab.2631-c
+file path=usr/share/lib/nterm/tab.2631-e
+file path=usr/share/lib/nterm/tab.300
+file path=usr/share/lib/nterm/tab.300-12
+file path=usr/share/lib/nterm/tab.300S
+file path=usr/share/lib/nterm/tab.300S-12
+file path=usr/share/lib/nterm/tab.37
+file path=usr/share/lib/nterm/tab.382
+file path=usr/share/lib/nterm/tab.4000A
+file path=usr/share/lib/nterm/tab.450
+file path=usr/share/lib/nterm/tab.450-12
+file path=usr/share/lib/nterm/tab.832
+file path=usr/share/lib/nterm/tab.8510
+file path=usr/share/lib/nterm/tab.X
+file path=usr/share/lib/nterm/tab.lp
+file path=usr/share/lib/nterm/tab.tn300
+file path=usr/share/lib/pub/ascii
+file path=usr/share/lib/pub/eqnchar
+file path=usr/share/lib/pub/greek
+file path=usr/share/lib/pub/iso
+file path=usr/share/lib/sgml/locale/C/dtds/catalog
+file path=usr/share/lib/sgml/locale/C/dtds/solbookv2/solbook.dcl
+file path=usr/share/lib/sgml/locale/C/dtds/solbookv2/solbook.dtd
+file path=usr/share/lib/sgml/locale/C/entities/aap-shortref.gml
+file path=usr/share/lib/sgml/locale/C/entities/allisoents.gml
+file path=usr/share/lib/sgml/locale/C/entities/ati-dflt.dcl
+file path=usr/share/lib/sgml/locale/C/entities/ati-eqn1.gml
+file path=usr/share/lib/sgml/locale/C/entities/ati-graph.gml
+file path=usr/share/lib/sgml/locale/C/entities/ati-math.elm
+file path=usr/share/lib/sgml/locale/C/entities/ati-num.gml
+file path=usr/share/lib/sgml/locale/C/entities/ati-tbl.elm
+file path=usr/share/lib/sgml/locale/C/entities/atilogo.eps
+file path=usr/share/lib/sgml/locale/C/entities/basic.dcl
+file path=usr/share/lib/sgml/locale/C/entities/cals-tbl.elm
+file path=usr/share/lib/sgml/locale/C/entities/capref.gml
+file path=usr/share/lib/sgml/locale/C/entities/caution.eps
+file path=usr/share/lib/sgml/locale/C/entities/core.gml
+file path=usr/share/lib/sgml/locale/C/entities/ereview.gml
+file path=usr/share/lib/sgml/locale/C/entities/html-latin.sgml
+file path=usr/share/lib/sgml/locale/C/entities/iso-amsa.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-amsb.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-amsc.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-amsn.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-amso.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-amsr.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-box.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-cyr1.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-cyr2.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-dia.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-grk1.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-grk2.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-grk3.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-grk4.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-lat1.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-lat2.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-num.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-pub.gml
+file path=usr/share/lib/sgml/locale/C/entities/iso-tech.gml
+file path=usr/share/lib/sgml/locale/C/entities/sun_iso.gml
+file path=usr/share/lib/sgml/locale/C/entities/synref.gml
+file path=usr/share/lib/sgml/locale/C/entities/warn.eps
+file path=usr/share/lib/sgml/locale/C/transpec/docbook-to-man.ts
+file path=usr/share/lib/sgml/locale/C/transpec/roff.cmap
+file path=usr/share/lib/sgml/locale/C/transpec/roff.sdata
+file path=usr/share/lib/tmac/acm.me
+file path=usr/share/lib/tmac/an
+file path=usr/share/lib/tmac/ansun
+file path=usr/share/lib/tmac/ansun.tbl
+file path=usr/share/lib/tmac/bib
+file path=usr/share/lib/tmac/chars.me
+file path=usr/share/lib/tmac/deltext.me
+file path=usr/share/lib/tmac/e
+file path=usr/share/lib/tmac/eqn.me
+file path=usr/share/lib/tmac/float.me
+file path=usr/share/lib/tmac/footnote.me
+file path=usr/share/lib/tmac/index.me
+file path=usr/share/lib/tmac/local.me
+file path=usr/share/lib/tmac/m
+file path=usr/share/lib/tmac/mmn
+file path=usr/share/lib/tmac/mmt
+file path=usr/share/lib/tmac/ms.acc
+file path=usr/share/lib/tmac/ms.cov
+file path=usr/share/lib/tmac/ms.eqn
+file path=usr/share/lib/tmac/ms.ref
+file path=usr/share/lib/tmac/ms.tbl
+file path=usr/share/lib/tmac/ms.ths
+file path=usr/share/lib/tmac/ms.toc
+file path=usr/share/lib/tmac/null.me
+file path=usr/share/lib/tmac/refer.me
+file path=usr/share/lib/tmac/s
+file path=usr/share/lib/tmac/sh.me
+file path=usr/share/lib/tmac/tbl.me
+file path=usr/share/lib/tmac/thesis.me
+file path=usr/share/lib/tmac/tmac.bib
+file path=usr/share/lib/tmac/tmac.vgrind
+file path=usr/share/lib/tmac/tz.map
+file path=usr/share/lib/tmac/v
+file path=usr/share/lib/tmac/vgrind
+hardlink path=usr/bin/catman target=../../usr/bin/apropos
+hardlink path=usr/bin/man target=../../usr/bin/apropos
+hardlink path=usr/bin/whatis target=../../usr/bin/apropos
+hardlink path=usr/lib/font/devpost/charlib/~= target=./~
+hardlink path=usr/share/lib/nterm/tab.300s \
+    target=../../../../usr/share/lib/nterm/tab.300S
+hardlink path=usr/share/lib/nterm/tab.300s-12 \
+    target=../../../../usr/share/lib/nterm/tab.300S-12
+hardlink path=usr/share/lib/nterm/tab.4000a \
+    target=../../../../usr/share/lib/nterm/tab.4000A
+legacy pkg=SUNWdoc arch=$(ARCH) category=system \
+    desc="utilities and fonts for development, display, and production of documentation such as manual pages (nroff/troff)" \
+    hotline="Please contact your local service provider" \
+    name="Documentation Tools" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cmd/checkeq/THIRDPARTYLICENSE license=cmd/checkeq/THIRDPARTYLICENSE
+license cmd/checknr/THIRDPARTYLICENSE license=cmd/checknr/THIRDPARTYLICENSE
+license cmd/eqn/THIRDPARTYLICENSE license=cmd/eqn/THIRDPARTYLICENSE
+license cmd/man/src/THIRDPARTYLICENSE license=cmd/man/src/THIRDPARTYLICENSE
+license cmd/man/src/util/THIRDPARTYLICENSE \
+    license=cmd/man/src/util/THIRDPARTYLICENSE
+license cmd/man/src/util/instant.src/THIRDPARTYLICENSE \
+    license=cmd/man/src/util/instant.src/THIRDPARTYLICENSE
+license cmd/man/src/util/nsgmls.src/COPYING \
+    license=cmd/man/src/util/nsgmls.src/COPYING
+license cmd/man/src/util/solbookv2/THIRDPARTYLICENSE \
+    license=cmd/man/src/util/solbookv2/THIRDPARTYLICENSE
+license cmd/refer/THIRDPARTYLICENSE license=cmd/refer/THIRDPARTYLICENSE
+license cmd/soelim/THIRDPARTYLICENSE license=cmd/soelim/THIRDPARTYLICENSE
+license cmd/tbl/THIRDPARTYLICENSE license=cmd/tbl/THIRDPARTYLICENSE
+license cmd/ul/THIRDPARTYLICENSE license=cmd/ul/THIRDPARTYLICENSE
+license cmd/vgrind/THIRDPARTYLICENSE license=cmd/vgrind/THIRDPARTYLICENSE
+license cr_Sun license=cr_Sun
+link path=usr/lib/tmac target=../share/lib/tmac
+link path=usr/man target=./share/man
+depend fmri=text/less type=require

@@ -1,0 +1,71 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/library/storage/libmpapi@$(PKGVERS)
+set name=pkg.description \
+    value="Common Library based on SNIA MP API specification"
+set name=pkg.summary value="SNIA Multipath Management API Common Library"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Libraries
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib/$(ARCH64) opensolaris.zone=global variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/include
+file path=etc/mpapi.conf original_name=SUNWmpapi:etc/mpapi.conf preserve=true
+file path=lib/$(ARCH64)/libMPAPI.so.1 opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=lib/$(ARCH64)/llib-lMPAPI.ln opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=lib/libMPAPI.so.1 opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=lib/llib-lMPAPI opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=lib/llib-lMPAPI.ln opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=usr/include/mpapi-sun.h
+file path=usr/include/mpapi.h
+legacy pkg=SUNWmpapi arch=$(ARCH) category=system \
+    desc="Common Library based on SNIA MP API specification" \
+    hotline="Please contact your local service provider" \
+    name="SNIA Multipath Management API Common Library" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWmpapir arch=$(ARCH) category=system \
+    desc="Common Library based on SNIA MP API specification (Root)" \
+    hotline="Please contact your local service provider" \
+    name="SNIA Multipath Management API Common Library (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lib/mpapi/libmpapi/THIRDPARTYLICENSE \
+    license=lib/mpapi/libmpapi/THIRDPARTYLICENSE
+license lic_CDDL license=lic_CDDL
+link path=lib/$(ARCH64)/libMPAPI.so opensolaris.zone=global target=libMPAPI.so.1 \
+    variant.opensolaris.zone=global
+link path=lib/libMPAPI.so opensolaris.zone=global target=libMPAPI.so.1 \
+    variant.opensolaris.zone=global
+depend fmri=system/library/storage/libmpscsi_vhci type=require

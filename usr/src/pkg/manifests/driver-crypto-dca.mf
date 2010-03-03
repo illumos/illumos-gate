@@ -1,0 +1,81 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/driver/crypto/dca@$(PKGVERS)
+set name=pkg.description value="DCA Crypto Accelerator Supplemental Files"
+set name=pkg.summary value="DCA Crypto Accelerator"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=kernel group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/drv group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/fm
+dir path=usr/lib/fm/dict
+dir path=usr/lib/fm/eft
+dir path=usr/lib/locale
+dir path=usr/lib/locale/C
+dir path=usr/lib/locale/C/LC_MESSAGES
+driver name=dca \
+    alias=pci108e,5454 \
+    alias=pci108e,5455 \
+    alias=pci108e,5456 \
+    alias=pci108e,5457 \
+    alias=pci14e4,5820 \
+    alias=pci14e4,5821 \
+    alias=pci14e4,5822 \
+    alias=pci14e4,5825
+file path=kernel/drv/$(ARCH64)/dca group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+$(i386_ONLY)file path=kernel/drv/dca group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=kernel/drv/dca.conf group=sys opensolaris.zone=global \
+    original_name=SUNWdcaf:kernel/drv/dca.conf preserve=true \
+    reboot-needed=false variant.opensolaris.zone=global
+file path=usr/lib/fm/dict/SCA1000.dict mode=0444
+file path=usr/lib/fm/dict/SCA500.dict mode=0444
+file path=usr/lib/fm/eft/sca1000.eft mode=0444
+file path=usr/lib/fm/eft/sca500.eft mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/SCA1000.mo mode=0444
+file path=usr/lib/locale/C/LC_MESSAGES/SCA500.mo mode=0444
+legacy pkg=SUNWdcaf arch=$(ARCH) category=system \
+    desc="DCA Crypto Accelerator Supplemental Files (usr)" \
+    hotline="Please contact your local service provider" \
+    name="DCA Crypto Accelerator (usr)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWdcar arch=$(ARCH) category=system \
+    desc="DCA Crypto Accelerator driver" \
+    hotline="Please contact your local service provider" \
+    name="DCA Crypto Accelerator (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+$(USE_INTERNAL_CRYPTO)depend fmri=driver/crypto/dprov type=require

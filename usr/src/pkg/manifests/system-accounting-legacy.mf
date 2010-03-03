@@ -1,0 +1,119 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/accounting/legacy@$(PKGVERS)
+set name=pkg.description \
+    value="utilities for accounting and reporting of system activity"
+set name=pkg.summary value="System Accounting"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Administration and Configuration"
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=etc/acct group=adm owner=adm
+dir path=etc/init.d group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/method
+dir path=usr group=sys
+dir path=usr/bin
+dir path=usr/lib
+dir path=usr/lib/acct
+dir path=usr/lib/sa owner=adm
+dir path=usr/sbin
+dir path=var group=sys
+dir path=var/adm group=sys mode=0775
+dir path=var/adm/acct group=adm mode=0775 owner=adm
+dir path=var/adm/acct/fiscal group=adm mode=0775 owner=adm
+dir path=var/adm/acct/nite group=adm mode=0775 owner=adm
+dir path=var/adm/acct/sum group=adm mode=0775 owner=adm
+dir path=var/adm/sa group=sys mode=0775 owner=adm
+dir path=var/spool
+dir path=var/spool/cron group=sys
+dir path=var/spool/cron/crontabs group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/system group=sys
+file path=etc/acct/holidays original_name=SUNWacc:etc/acct/holidays \
+    preserve=true
+file path=etc/init.d/acct group=sys mode=0744 \
+    original_name=SUNWacc:etc/init.d/acct preserve=true
+file path=lib/svc/method/svc-sar group=sys mode=0555
+file path=usr/bin/acctcom mode=0555
+file path=usr/bin/timex group=sys mode=0555
+file path=usr/lib/acct/acctcms mode=0555
+file path=usr/lib/acct/acctcon mode=0555
+file path=usr/lib/acct/acctcon1 mode=0555
+file path=usr/lib/acct/acctcon2 mode=0555
+file path=usr/lib/acct/acctdisk mode=0555
+file path=usr/lib/acct/acctdusg mode=0555
+file path=usr/lib/acct/acctmerg mode=0555
+file path=usr/lib/acct/accton group=adm mode=4755
+file path=usr/lib/acct/acctprc mode=0555
+file path=usr/lib/acct/acctprc1 mode=0555
+file path=usr/lib/acct/acctprc2 mode=0555
+file path=usr/lib/acct/acctwtmp mode=0555
+file path=usr/lib/acct/chargefee mode=0555
+file path=usr/lib/acct/ckpacct mode=0555
+file path=usr/lib/acct/closewtmp mode=0555
+file path=usr/lib/acct/dodisk mode=0555
+file path=usr/lib/acct/fwtmp mode=0555
+file path=usr/lib/acct/lastlogin mode=0555
+file path=usr/lib/acct/monacct mode=0555
+file path=usr/lib/acct/nulladm mode=0555
+file path=usr/lib/acct/prctmp mode=0555
+file path=usr/lib/acct/prdaily mode=0555
+file path=usr/lib/acct/prtacct mode=0555
+file path=usr/lib/acct/ptecms.awk mode=0555
+file path=usr/lib/acct/ptelus.awk mode=0555
+file path=usr/lib/acct/remove mode=0555
+file path=usr/lib/acct/runacct mode=0555
+file path=usr/lib/acct/shutacct mode=0555
+file path=usr/lib/acct/startup mode=0555
+file path=usr/lib/acct/turnacct mode=0555
+file path=usr/lib/acct/utmp2wtmp mode=0555
+file path=usr/lib/acct/wtmpfix mode=0555
+file path=usr/lib/sa/sa1 mode=0555
+file path=usr/lib/sa/sa2 mode=0555
+file path=usr/lib/sa/sadc mode=0555
+file path=usr/sbin/sar mode=0555
+file path=var/spool/cron/crontabs/sys group=sys mode=0600 \
+    original_name=SUNWacc:var/spool/cron/crontabs/sys preserve=true
+file path=var/svc/manifest/system/sar.xml group=sys mode=0444
+legacy pkg=SUNWaccr arch=$(ARCH) category=system \
+    desc="utilities for accounting and reporting of system activity" \
+    hotline="Please contact your local service provider" \
+    name="System Accounting, (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWaccu arch=$(ARCH) category=system \
+    desc="utilities for accounting and reporting of system activity" \
+    hotline="Please contact your local service provider" \
+    name="System Accounting, (Usr)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_ATT license=cr_ATT
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/bin/sar target=../sbin/sar

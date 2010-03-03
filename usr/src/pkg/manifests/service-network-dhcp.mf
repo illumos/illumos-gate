@@ -1,0 +1,83 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/network/dhcp@$(PKGVERS)
+set name=pkg.description \
+    value="Usr filesystem portion of the SunOS BOOTP/DHCP service, which uses the BOOT Protocol and/or Dynamic Host Configuration Protocol to provide network configuration parameters to BOOTP/DHCP clients. Administration utilities for the service are included."
+set name=pkg.summary value="BOOTP/DHCP Server Services"
+set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=etc/inet group=sys
+dir path=etc/init.d group=sys
+dir path=usr group=sys
+dir path=usr/include
+dir path=usr/lib
+dir path=usr/lib/inet
+dir path=usr/lib/inet/dhcp
+dir path=usr/lib/inet/dhcp/nsu
+dir path=usr/lib/inet/dhcp/svc
+dir path=usr/lib/inet/dhcp/svcadm
+dir path=usr/sbin
+dir path=var group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/network group=sys
+file path=etc/init.d/dhcp group=sys mode=0744
+file path=usr/include/dhcp_svc_public.h
+file path=usr/lib/inet/dhcp/nsu/rfc2136.so.1
+file path=usr/lib/inet/dhcp/svc/ds_SUNWfiles.so.0
+file path=usr/lib/inet/dhcp/svc/ds_SUNWfiles.so.1
+file path=usr/lib/inet/dhcp/svcadm/dhcpcli.jar mode=0444
+file path=usr/lib/inet/dhcp/svcadm/dhcpcommon.jar mode=0444
+file path=usr/lib/inet/dhcp/svcadm/dhcpconfig mode=0555
+file path=usr/lib/inet/dhcp/svcadm/dhcpsvc.jar mode=0444
+file path=usr/lib/inet/dhcp/svcadm/dhtadm mode=0555
+file path=usr/lib/inet/dhcp/svcadm/pntadm mode=0555
+file path=usr/lib/inet/dsvclockd mode=0555
+file path=usr/lib/inet/in.dhcpd mode=0555
+file path=usr/lib/libdhcpsvc.so.1
+file path=usr/sbin/dhcpconfig mode=0555
+file path=usr/sbin/dhtadm mode=0555
+file path=usr/sbin/pntadm mode=0555
+file path=var/svc/manifest/network/dhcp-server.xml group=sys mode=0444
+legacy pkg=SUNWdhcsr arch=$(ARCH) category=system \
+    desc="Root filesystem portion of the SunOS BOOTP/DHCP service, which uses the BOOT Protocol and/or Dynamic Host Configuration Protocol to provide network configuration parameters to BOOTP/DHCP clients. Administration utilities for the service are included." \
+    hotline="Please contact your local service provider" \
+    name="BOOTP/DHCP Server Services, (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWdhcsu arch=$(ARCH) category=system \
+    desc="Usr filesystem portion of the SunOS BOOTP/DHCP service, which uses the BOOT Protocol and/or Dynamic Host Configuration Protocol to provide network configuration parameters to BOOTP/DHCP clients. Administration utilities for the service are included." \
+    hotline="Please contact your local service provider" \
+    name="BOOTP/DHCP Server Services, (Usr)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/inet/dhcp/svc/ds_SUNWfiles.so target=./ds_SUNWfiles.so.1
+depend fmri=network/dhcp/dhcpmgr type=require
+depend fmri=network/ftp type=require
+depend fmri=runtime/java type=require

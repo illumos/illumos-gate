@@ -62,6 +62,11 @@ sub maketpl {
 	my $licnum = 1;
 	my $tplname = "$top/THIRDPARTYLICENSE.$suffix";
 
+	if (! @tpllist) {
+		unlink $tplname;
+		return;
+	}
+
 	open(TPL, ">$tplname") or die "Can't create $tplname: $!\n";
 
 	print TPL "DO NOT TRANSLATE OR LOCALIZE.\n\n";
@@ -148,9 +153,9 @@ close IX;
 # Generate each TPL file.
 #
 
-maketpl("ON-BINARIES", @closedlist) if (@closedlist);
-maketpl("ON-BUILD-TOOLS", @toolslist) if (@toolslist);
-maketpl("BFU-ARCHIVES", @bfulist) if (@bfulist);
-maketpl("ON-CRYPTO", @cryptolist) if (@cryptolist);
+maketpl("ON-BINARIES", @closedlist);
+maketpl("ON-BUILD-TOOLS", @toolslist);
+maketpl("BFU-ARCHIVES", @bfulist);
+maketpl("ON-CRYPTO", @cryptolist);
 
 exit $exitstatus;

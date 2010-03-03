@@ -1,0 +1,943 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# Exception List for validate_pkg
+#
+
+#
+# The following entries are built in the /proto area
+# but not included in any packages - this is intentional.
+#
+usr/include/auth_list.h
+usr/include/bsm/audit_door_infc.h
+usr/include/bsm/audit_private.h
+usr/include/bsm/devalloc.h
+usr/include/getxby_door.h
+usr/include/passwdutil.h
+usr/include/priv_utils.h
+usr/include/rpcsvc/daemon_utils.h
+usr/include/rpcsvc/svc_dg_priv.h
+usr/include/security/pam_impl.h
+usr/include/sys/clock_impl.h
+usr/include/sys/ieeefp.h
+usr/include/sys/winlockio.h
+#
+# Private/Internal libraries of the Cryptographic Framework.
+#
+lib/libkcfd.so
+lib/llib-lcryptoutil
+lib/llib-lcryptoutil.ln
+lib/amd64/llib-lcryptoutil.ln		i386
+lib/sparcv9/llib-lcryptoutil.ln		sparc
+lib/llib-lelfsign
+lib/llib-lelfsign.ln
+lib/llib-lkcfd
+lib/llib-lkcfd.ln
+usr/include/cryptoutil.h
+usr/include/libelfsign.h
+usr/lib/llib-lsoftcrypto
+usr/lib/llib-lsoftcrypto.ln
+usr/lib/amd64/llib-lsoftcrypto.ln	i386
+usr/lib/sparcv9/llib-lsoftcrypto.ln	sparc
+#
+# The following files are used by the DHCP service, the
+# standalone's DHCP implementation, and the kernel (nfs_dlboot).
+# They contain interfaces which are currently private.
+#
+usr/include/dhcp_svc_confkey.h
+usr/include/dhcp_svc_confopt.h
+usr/include/dhcp_svc_private.h
+usr/include/dhcp_symbol.h
+usr/include/sys/sunos_dhcp_class.h
+usr/lib/libdhcpsvc.so
+usr/lib/llib-ldhcpsvc
+usr/lib/llib-ldhcpsvc.ln
+#
+# Private MAC driver header files
+#
+usr/include/inet/iptun.h
+usr/include/sys/aggr_impl.h
+usr/include/sys/aggr.h
+usr/include/sys/dld_impl.h
+usr/include/sys/dld_ioc.h
+usr/include/sys/dls_impl.h
+usr/include/sys/dls.h
+usr/include/sys/mac_client_impl.h
+usr/include/sys/mac_client.h
+usr/include/sys/mac_flow_impl.h
+usr/include/sys/mac_impl.h
+usr/include/sys/mac_provider.h
+usr/include/sys/mac_soft_ring.h
+#
+# Private GLDv3 userland libraries and headers
+#
+usr/include/libdladm_impl.h
+usr/include/libdlaggr.h
+usr/include/libdlether.h
+usr/include/libdlflow_impl.h
+usr/include/libdlflow.h
+usr/include/libdliptun.h
+usr/include/libdlmgmt.h
+usr/include/libdlsim.h
+usr/include/libdlstat.h
+usr/include/libdlvnic.h
+usr/include/libdlwlan_impl.h
+usr/include/libdlwlan.h
+#
+# Virtual Network Interface Card (VNIC)
+#
+usr/include/sys/vnic.h
+usr/include/sys/vnic_impl.h
+#
+# IKE and IPsec support library exceptions.  The IKE support
+# library contains exclusively private interfaces, as does
+# libipsecutil.  My apologies for the glut of header files here.
+#
+usr/include/errfp.h
+usr/include/ikedoor.h
+usr/include/ipsec_util.h
+usr/lib/libike.so
+usr/lib/amd64/libike.so			i386
+usr/lib/sparcv9/libike.so		sparc
+usr/lib/libipsecutil.so
+usr/lib/amd64/libipsecutil.so		i386
+usr/lib/sparcv9/libipsecutil.so		sparc
+usr/lib/llib-like
+usr/lib/llib-like.ln
+usr/lib/amd64/llib-like.ln		i386
+usr/lib/sparcv9/llib-like.ln		sparc
+usr/lib/llib-lipsecutil
+usr/lib/llib-lipsecutil.ln
+usr/lib/amd64/llib-lipsecutil.ln	i386
+usr/lib/sparcv9/llib-lipsecutil.ln	sparc
+#
+usr/include/inet/ip_impl.h
+usr/include/inet/ip_ndp.h
+usr/include/inet/ip2mac_impl.h
+usr/include/inet/ip2mac.h
+usr/include/inet/rawip_impl.h
+usr/include/inet/tcp_impl.h
+usr/include/inet/tcp_stats.h
+usr/include/inet/udp_impl.h
+usr/include/libmail.h
+usr/include/libnwam_priv.h
+usr/include/protocols/ripngd.h
+usr/include/s_string.h
+usr/include/sys/logindmux_impl.h
+usr/include/sys/vgareg.h
+#
+# Some IPsec headers can't be shipped lest we hit export controls...
+#
+usr/include/inet/ipsec_impl.h
+usr/include/inet/ipsec_info.h
+usr/include/inet/ipsecah.h
+usr/include/inet/ipsecesp.h
+usr/include/inet/keysock.h
+usr/include/inet/sadb.h
+usr/include/sys/sha1_consts.h
+usr/include/sys/sha2_consts.h
+#
+#
+# Filtering out directories not shipped
+#
+usr/4lib				i386
+#
+# These files contain definitions shared privately between the kernel
+# and libc.  There is no reason for them to be part of a package that
+# a customer should ever see.  They are installed in the proto area by
+# the uts build because libc and and other components, like truss, are
+# dependent upon their contents and should not have their own copies.
+#
+usr/include/sys/libc_kernel.h
+usr/include/sys/synch32.h
+#
+# These files are installed in the proto area by the build of libproc for
+# the benefit of the builds of cmd/truss, cmd/gcore and cmd/ptools, which
+# use libproc as their common process-control library.  These are not
+# interfaces for customer use, so the files are excluded from packaging.
+#
+lib/llib-lproc
+lib/llib-lproc.ln
+lib/amd64/llib-lproc.ln		i386
+lib/sparcv9/llib-lproc.ln	sparc
+usr/include/libproc.h
+#
+# Private interfaces for libdisasm
+#
+usr/include/libdisasm.h
+usr/lib/llib-ldisasm
+usr/lib/llib-ldisasm.ln
+usr/lib/amd64/llib-ldisasm.ln		i386
+usr/lib/sparcv9/llib-ldisasm.ln		sparc
+#
+# Private interfaces for libraidcfg
+#
+usr/include/raidcfg_spi.h
+usr/include/raidcfg.h
+usr/lib/libraidcfg.so
+usr/lib/amd64/libraidcfg.so		i386
+usr/lib/sparcv9/libraidcfg.so		sparc
+usr/lib/llib-lraidcfg
+usr/lib/llib-lraidcfg.ln
+usr/lib/amd64/llib-lraidcfg.ln		i386
+usr/lib/sparcv9/llib-lraidcfg.ln	sparc
+#
+# This file is used for private communication between mdb, drv/kmdb, and
+# misc/kmdb.  The interfaces described herein are not intended for customer
+# use, and are thus excluded from packaging.
+#
+usr/include/sys/kmdb.h
+#
+# These files are installed in the proto area by the build of libdhcpagent
+# and libdhcputil for the benefit of DHCP-related networking commands such
+# as dhcpagent, dhcpinfo, ifconfig, and netstat.  These are not interfaces
+# for customer use, so the files are excluded from packaging.
+#
+lib/libdhcpagent.so
+lib/libdhcputil.so
+lib/llib-ldhcpagent
+lib/llib-ldhcpagent.ln
+lib/llib-ldhcputil
+lib/llib-ldhcputil.ln
+usr/include/dhcp_hostconf.h
+usr/include/dhcp_impl.h
+usr/include/dhcp_inittab.h
+usr/include/dhcp_stable.h
+usr/include/dhcp_symbol_common.h
+usr/include/dhcpagent_ipc.h
+usr/include/dhcpagent_util.h
+usr/include/dhcpmsg.h
+usr/lib/libdhcpagent.so
+usr/lib/libdhcputil.so
+usr/lib/llib-ldhcpagent
+usr/lib/llib-ldhcpagent.ln
+usr/lib/llib-ldhcputil
+usr/lib/llib-ldhcputil.ln
+#
+# These files are installed in the proto area by the build of libinstzones
+# and libpkg
+#
+usr/lib/llib-linstzones
+usr/lib/llib-linstzones.ln
+usr/lib/llib-lpkg
+usr/lib/llib-lpkg.ln
+#
+# These files are installed in the proto area by the build of libinetcfg.
+# Only the shared object is shipped.
+#
+lib/libinetcfg.so
+lib/llib-linetcfg
+lib/llib-linetcfg.ln
+usr/include/inetcfg.h
+usr/lib/libinetcfg.so
+usr/lib/llib-linetcfg
+usr/lib/llib-linetcfg.ln
+#
+# Don't ship header files private to libipmp and in.mpathd
+#
+usr/include/ipmp_query_impl.h
+#
+# These files are installed in the proto area by the build of libinetsvc,
+# an inetd-specific library shared by inetd, inetadm and inetconv. Only
+# the shared object is shipped.
+#
+usr/include/inetsvc.h
+usr/lib/libinetsvc.so
+usr/lib/llib-linetsvc
+usr/lib/llib-linetsvc.ln
+#
+# These files are installed in the proto area by the build of libinetutil,
+# a general purpose library for the benefit of internet utilities. Only
+# the shared object is shipped.
+#
+lib/libinetutil.so
+lib/amd64/libinetutil.so		i386
+lib/sparcv9/libinetutil.so		sparc
+lib/llib-linetutil
+lib/llib-linetutil.ln
+lib/amd64/llib-linetutil.ln		i386
+lib/sparcv9/llib-linetutil.ln		sparc
+usr/include/libinetutil.h
+usr/include/netinet/inetutil.h
+usr/include/ofmt.h
+usr/lib/libinetutil.so
+usr/lib/amd64/libinetutil.so		i386
+usr/lib/sparcv9/libinetutil.so		sparc
+usr/lib/llib-linetutil
+usr/lib/llib-linetutil.ln
+usr/lib/amd64/llib-linetutil.ln		i386
+usr/lib/sparcv9/llib-linetutil.ln	sparc
+#
+# Miscellaneous kernel interfaces or kernel<->user interfaces that are
+# consolidation private and we do not want to export at this time.
+#
+usr/include/sys/cryptmod.h
+usr/include/sys/dumpadm.h
+usr/include/sys/ontrap.h
+usr/include/sys/sysmsg_impl.h
+usr/include/sys/vlan.h
+#
+# These files are installed in the proto area so lvm can use
+# them during the build process.
+#
+lib/llib-lmeta
+lib/llib-lmeta.ln
+usr/include/sdssc.h
+usr/lib/llib-lmeta
+usr/lib/llib-lmeta.ln
+#
+# non-public pci header
+#
+usr/include/sys/pci_impl.h
+usr/include/sys/pci_tools.h
+#
+# Exception list for RCM project, included by librcm and rcm_daemon
+#
+usr/include/librcm_event.h
+usr/include/librcm_impl.h
+#
+# MDB deliverables that are not yet public
+#
+usr/lib/mdb/proc/mdb_test.so
+usr/lib/mdb/proc/sparcv9/mdb_test.so	sparc
+#
+# SNCA project exception list
+#
+usr/include/inet/kssl/kssl.h
+usr/include/inet/kssl/ksslimpl.h
+usr/include/inet/kssl/ksslproto.h
+usr/include/inet/nca
+#
+# other contents (packages removed in source product)
+#
+usr/bin/des
+#
+# these are "removed" from the source product build because the only
+# packages that currently deliver them are removed.
+# they really should't be in here.
+#
+etc/sfw
+#
+# Entries for the libmech_krb5 symlink, which has been included
+# for build purposes only, not delivered to customers.
+#
+usr/lib/gss/libmech_krb5.so
+usr/lib/amd64/gss/libmech_krb5.so	i386
+usr/lib/sparcv9/gss/libmech_krb5.so	sparc
+usr/lib/libmech_krb5.so
+usr/lib/amd64/libmech_krb5.so		i386
+usr/lib/sparcv9/libmech_krb5.so		sparc
+#
+# Entries for headers from efcode project which user does not need to see
+#
+usr/platform/sun4u/include/sys/fc_plat.h			sparc
+usr/platform/sun4u/include/sys/fcode.h				sparc
+#
+# Private net80211 headers
+#
+usr/include/sys/net80211_crypto.h
+usr/include/sys/net80211_ht.h
+usr/include/sys/net80211_proto.h
+usr/include/sys/net80211.h
+#
+usr/include/net/wpa.h
+#
+# PPPoE files not delivered to customers.
+#
+usr/include/net/pppoe.h
+usr/include/net/sppptun.h
+#
+# Simnet
+#
+usr/include/net/simnet.h
+#
+# Bridging internal data structures
+#
+usr/include/net/bridge_impl.h
+#
+# User<->kernel interface used by cfgadm/USB only
+#
+usr/include/sys/usb/hubd/hubd_impl.h
+#
+# User<->kernel interface used by cfgadm/SATA only
+#
+usr/include/sys/sata/sata_cfgadm.h			i386
+#
+# Private ucred kernel header
+#
+usr/include/sys/ucred.h
+#
+# Private and/or platform-specific smf(5) files
+#
+lib/librestart.so
+lib/llib-lrestart
+lib/llib-lrestart.ln
+lib/amd64/llib-lrestart.ln					i386
+lib/sparcv9/llib-lrestart.ln					sparc
+usr/include/libcontract_priv.h
+usr/include/librestart_priv.h
+usr/include/librestart.h
+usr/lib/librestart.so
+usr/lib/sparcv9/librestart.so					sparc
+var/svc/manifest/platform/sun4u					i386
+var/svc/manifest/platform/sun4v					i386
+var/svc/profile/platform_sun4v.xml				i386
+var/svc/profile/platform_SUNW,SPARC-Enterprise.xml		i386
+var/svc/profile/platform_SUNW,Sun-Fire-15000.xml		i386
+var/svc/profile/platform_SUNW,Sun-Fire-880.xml			i386
+var/svc/profile/platform_SUNW,Sun-Fire-V890.xml			i386
+var/svc/profile/platform_SUNW,Sun-Fire.xml			i386
+var/svc/profile/platform_SUNW,Ultra-Enterprise-10000.xml	i386
+var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml	i386
+var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml	i386
+var/svc/profile/platform_SUNW,UltraSPARC-IIi-Netract.xml	i386
+#
+# Private libuutil files
+#
+lib/libuutil.so
+lib/llib-luutil
+lib/llib-luutil.ln
+lib/sparcv9/llib-luutil.ln		sparc
+usr/include/libuutil_impl.h
+usr/lib/libuutil.so
+usr/lib/sparcv9/libuutil.so		sparc
+#
+# Private Multidata file.
+#
+usr/include/sys/multidata_impl.h
+#
+# The following files are used by wanboot.
+# They contain interfaces which are currently private.
+#
+usr/include/sys/wanboot_impl.h
+usr/include/wanboot
+usr/include/wanbootutil.h
+#
+# Even though all the objects built under usr/src/stand are later glommed
+# together into a couple of second-stage boot loaders, we dump the static
+# archives and lint libraries into $(ROOT)/stand for intermediate use
+# (e.g., for lint, linking the second-stage boot loaders, ...).  Since
+# these are merely intermediate objects, they do not need to be packaged.
+#
+stand					sparc
+#
+# Private KCF header files
+#
+usr/include/sys/crypto/elfsign.h
+usr/include/sys/crypto/impl.h
+usr/include/sys/crypto/ioctl.h
+usr/include/sys/crypto/ioctladmin.h
+usr/include/sys/crypto/ops_impl.h
+usr/include/sys/crypto/sched_impl.h
+#
+# The following files are installed in the proto area
+# by the build of libavl (AVL Tree Interface Library).
+# libavl contains interfaces which are all private interfaces.
+#
+lib/libavl.so
+lib/amd64/libavl.so		i386
+lib/sparcv9/libavl.so		sparc
+lib/llib-lavl
+lib/llib-lavl.ln
+lib/amd64/llib-lavl.ln		i386
+lib/sparcv9/llib-lavl.ln	sparc
+usr/lib/libavl.so
+usr/lib/amd64/libavl.so		i386
+usr/lib/sparcv9/libavl.so	sparc
+usr/lib/llib-lavl
+usr/lib/llib-lavl.ln
+usr/lib/amd64/llib-lavl.ln	i386
+usr/lib/sparcv9/llib-lavl.ln	sparc
+#
+# The following files are installed in the proto area
+# by the build of libcmdutils (Command Utilities Library).
+# libcmdutils contains interfaces which are all private interfaces.
+#
+lib/libcmdutils.so
+lib/amd64/libcmdutils.so		i386
+lib/sparcv9/libcmdutils.so		sparc
+lib/llib-lcmdutils
+lib/llib-lcmdutils.ln
+lib/amd64/llib-lcmdutils.ln		i386
+lib/sparcv9/llib-lcmdutils.ln		sparc
+usr/include/libcmdutils.h
+usr/lib/libcmdutils.so
+usr/lib/amd64/libcmdutils.so		i386
+usr/lib/sparcv9/libcmdutils.so		sparc
+usr/lib/llib-lcmdutils
+usr/lib/llib-lcmdutils.ln
+usr/lib/amd64/llib-lcmdutils.ln		i386
+usr/lib/sparcv9/llib-lcmdutils.ln	sparc
+#
+# Private interfaces in libsec
+#
+usr/include/aclutils.h
+#
+# USB skeleton driver stays in sync with the rest of USB but doesn't ship.
+#
+kernel/drv/usbskel		i386
+kernel/drv/amd64/usbskel	i386
+kernel/drv/sparcv9/usbskel	sparc
+kernel/drv/usbskel.conf
+#
+# Consolidation and Sun private libdevid interfaces
+# Public libdevid interfaces provided by devid.h
+#
+usr/include/sys/libdevid.h
+#
+# The following files are installed in the proto area by the build of
+# libprtdiag.  libprtdiag contains interfaces which are all private.
+# Only the shared object is shipped.
+#
+usr/platform/sun4u/lib/llib-lprtdiag				sparc
+usr/platform/sun4u/lib/llib-lprtdiag.ln				sparc
+usr/platform/sun4v/lib/llib-lprtdiag.ln				sparc
+#
+# The following files are installed in the proto area by the build of
+# mdesc driver in sun4v. These header files are used on in the build
+# and do not need to be shipped to customers.
+#
+usr/include/sys/mdesc.h					sparc
+usr/include/sys/mdesc_impl.h				sparc
+usr/platform/sun4v/include/sys/mach_descrip.h		sparc
+#
+# The following files are installed in the proto area by the build of
+# libc_i18n.  libc_i18n.a is used only when linking libc.so.1.
+#
+lib/libc_i18n.a
+lib/amd64/libc_i18n.a		i386
+lib/sparcv9/libc_i18n.a		sparc
+#
+# The following files are installed in the proto area by the build of
+# libpcp.  libpcp contains interfaces which are all private.
+# Only the shared object is shipped.
+#
+usr/platform/sun4v/lib/llib-lpcp.ln				sparc
+usr/platform/SUNW,Netra-CP3060/lib/llib-lpcp.ln			sparc
+usr/platform/SUNW,Netra-CP3260/lib/llib-lpcp.ln			sparc
+usr/platform/SUNW,Netra-T5220/lib/llib-lpcp.ln			sparc
+usr/platform/SUNW,Netra-T5440/lib/llib-lpcp.ln			sparc
+usr/platform/SUNW,SPARC-Enterprise-T5120/lib/llib-lpcp.ln	sparc
+usr/platform/SUNW,Sun-Blade-T6300/lib/llib-lpcp.ln		sparc
+usr/platform/SUNW,Sun-Blade-T6320/lib/llib-lpcp.ln		sparc
+usr/platform/SUNW,Sun-Fire-T200/lib/llib-lpcp.ln		sparc
+usr/platform/SUNW,T5140/lib/llib-lpcp.ln			sparc
+usr/platform/SUNW,USBRDT-5240/lib/llib-lpcp.ln			sparc
+#
+# ZFS internal tools and lint libraries
+#
+usr/lib/llib-lzfs_jni
+usr/lib/llib-lzfs_jni.ln
+usr/lib/amd64/llib-lzfs_jni.ln		i386
+usr/lib/sparcv9/llib-lzfs_jni.ln	sparc
+usr/lib/llib-lzpool
+usr/lib/llib-lzpool.ln			i386
+usr/lib/amd64/llib-lzpool.ln		i386
+usr/lib/sparcv9/llib-lzpool.ln		sparc
+#
+# ZFS JNI headers
+#
+usr/include/libzfs_jni_dataset.h
+usr/include/libzfs_jni_disk.h
+usr/include/libzfs_jni_diskmgt.h
+usr/include/libzfs_jni_ipool.h
+usr/include/libzfs_jni_main.h
+usr/include/libzfs_jni_pool.h
+usr/include/libzfs_jni_property.h
+usr/include/libzfs_jni_util.h
+#
+# These files are installed in the proto area for Solaris scsi_vhci driver
+# (for MPAPI support) and should not be shipped
+#
+usr/include/sys/scsi/adapters/mpapi_impl.h
+usr/include/sys/scsi/adapters/mpapi_scsi_vhci.h
+#
+# This library is installed in the proto area by the build of libdisasm, and is
+# only used when building the KMDB disasm module.
+#
+usr/lib/libstanddisasm.so
+usr/lib/amd64/libstanddisasm.so		i386
+usr/lib/sparcv9/libstanddisasm.so	sparc
+#
+# TSol: tsol doesn't ship lint source, and tsnet isn't for customers at all.
+#
+lib/libtsnet.so
+usr/lib/llib-ltsnet
+usr/lib/llib-ltsol
+#
+# nss interfaces shared between libnsl and other ON libraries.
+#
+usr/include/nss.h
+#
+# AT&T AST (ksh93) files which are currently needed only to build OS/Net
+# (msgcc&co.)
+# libast
+usr/lib/libast.so
+usr/lib/amd64/libast.so			i386
+usr/lib/sparcv9/libast.so		sparc
+usr/lib/llib-last
+usr/lib/llib-last.ln
+usr/lib/amd64/llib-last.ln		i386
+usr/lib/sparcv9/llib-last.ln		sparc
+# libcmd
+usr/lib/llib-lcmd
+usr/lib/llib-lcmd.ln
+usr/lib/amd64/llib-lcmd.ln		i386
+usr/lib/sparcv9/llib-lcmd.ln		sparc
+# libdll
+usr/lib/libdll.so
+usr/lib/amd64/libdll.so			i386
+usr/lib/sparcv9/libdll.so		sparc
+usr/lib/llib-ldll
+usr/lib/llib-ldll.ln
+usr/lib/amd64/llib-ldll.ln		i386
+usr/lib/sparcv9/llib-ldll.ln		sparc
+# libpp (a helper library needed by AST's msgcc)
+usr/lib/libpp.so
+usr/lib/llib-lpp
+usr/lib/llib-lpp.ln
+usr/lib/locale/C/LC_MESSAGES/libpp
+# libshell
+usr/lib/libshell.so
+usr/lib/amd64/libshell.so		i386
+usr/lib/sparcv9/libshell.so		sparc
+usr/lib/llib-lshell
+usr/lib/llib-lshell.ln
+usr/lib/amd64/llib-lshell.ln		i386
+usr/lib/sparcv9/llib-lshell.ln		sparc
+# libsum
+usr/lib/libsum.so
+usr/lib/amd64/libsum.so			i386
+usr/lib/sparcv9/libsum.so		sparc
+usr/lib/llib-lsum
+usr/lib/llib-lsum.ln
+usr/lib/amd64/llib-lsum.ln		i386
+usr/lib/sparcv9/llib-lsum.ln		sparc
+#
+# This file is used in ON to build DSCP clients.  It is not for customers.
+#
+usr/include/libdscp.h		sparc
+#
+# These files are used by the iSCSI Target and the iSCSI Initiator
+#
+usr/include/iscsitgt_impl.h
+usr/include/libiscsitgt.h
+usr/include/sys/iscsi_protocol.h
+usr/include/sys/iscsi_authclient.h
+usr/include/sys/iscsi_authclientglue.h
+usr/lib/libiscsitgt.so
+usr/lib/amd64/libiscsitgt.so		i386
+usr/lib/sparcv9/libiscsitgt.so		sparc
+lib/libiscsitgt.so
+lib/amd64/libiscsitgt.so		i386
+lib/sparcv9/libiscsitgt.so		sparc
+lib/llib-liscsitgt
+lib/llib-liscsitgt.ln
+lib/amd64/llib-liscsitgt.ln		i386
+lib/sparcv9/llib-liscsitgt.ln		sparc
+#
+# These files are used by the COMSTAR iSCSI target port provider
+#
+usr/include/sys/idm
+usr/include/sys/iscsit/chap.h
+usr/include/sys/iscsit/iscsi_if.h
+usr/include/sys/iscsit/isns_protocol.h
+usr/include/sys/iscsit/radius_packet.h
+usr/include/sys/iscsit/radius_protocol.h
+#
+# libshare is private and the 64-bit sharemgr is not delivered.
+#
+usr/lib/libshare.so
+usr/lib/amd64/libshare.so		i386
+usr/lib/sparcv9/libshare.so		sparc
+usr/lib/fs/nfs/libshare_nfs.so
+usr/lib/fs/nfs/amd64/libshare_nfs.so		i386
+usr/lib/fs/nfs/sparcv9/libshare_nfs.so		sparc
+usr/lib/fs/smb/libshare_smb.so
+usr/lib/fs/smb/amd64/libshare_smb.so		i386
+usr/lib/fs/smb/sparcv9/libshare_smb.so		sparc
+usr/lib/fs/smbfs/libshare_smbfs.so
+usr/lib/fs/smbfs/amd64/libshare_smbfs.so	i386
+usr/lib/fs/smbfs/sparcv9/libshare_smbfs.so	sparc
+usr/include/libshare_impl.h
+usr/include/scfutil.h
+#
+# These files are installed in the proto area by the build of libpri for
+# the benefit of the builds of FMA libldom, Zeus, picld plugins, and/or
+# other libpri consumers. However, the libpri interfaces are private to
+# Sun (Consolidation Private) and not intended for customer use. So these
+# files (the symlink and the lint library) are excluded from packaging.
+#
+usr/lib/libpri.so		sparc
+usr/lib/llib-lpri		sparc
+usr/lib/llib-lpri.ln		sparc
+usr/lib/sparcv9/libpri.so	sparc
+usr/lib/sparcv9/llib-lpri.ln	sparc
+#
+# These files are installed in the proto area by the build of libds for
+# the benefit of the builds of sun4v IO FMA and/or other libds
+# consumers.  However, the libds interfaces are private to Sun
+# (Consolidation Private) and not intended for customer use. So these
+# files (the symlink and the lint library) are excluded from packaging.
+#
+usr/lib/libds.so			sparc
+usr/lib/sparcv9/libds.so		sparc
+usr/lib/llib-lds			sparc
+usr/lib/llib-lds.ln			sparc
+usr/lib/sparcv9/llib-lds.ln		sparc
+usr/lib/libdscfg.so
+usr/lib/llib-ldscfg.ln
+usr/platform/sun4v/include/sys/libds.h	sparc
+usr/platform/sun4v/include/sys/vlds.h	sparc
+#
+# Private/Internal u8_textprep header file. Do not ship.
+#
+usr/include/sys/u8_textprep_data.h
+#
+# SQLite is private, used by SMF (svc.configd), idmapd and libsmb.
+#
+usr/include/sqlite
+usr/lib/libsqlite-native.o
+usr/lib/libsqlite.o
+usr/lib/llib-lsqlite.ln
+usr/lib/smbsrv/libsqlite.so
+#
+# Private/Internal kiconv header files. Do not ship.
+#
+usr/include/sys/kiconv_big5_utf8.h
+usr/include/sys/kiconv_cck_common.h
+usr/include/sys/kiconv_cp950hkscs_utf8.h
+usr/include/sys/kiconv_emea1.h
+usr/include/sys/kiconv_emea2.h
+usr/include/sys/kiconv_euckr_utf8.h
+usr/include/sys/kiconv_euctw_utf8.h
+usr/include/sys/kiconv_gb18030_utf8.h
+usr/include/sys/kiconv_gb2312_utf8.h
+usr/include/sys/kiconv_hkscs_utf8.h
+usr/include/sys/kiconv_ja_jis_to_unicode.h
+usr/include/sys/kiconv_ja_unicode_to_jis.h
+usr/include/sys/kiconv_ja.h
+usr/include/sys/kiconv_ko.h
+usr/include/sys/kiconv_latin1.h
+usr/include/sys/kiconv_sc.h
+usr/include/sys/kiconv_tc.h
+usr/include/sys/kiconv_uhc_utf8.h
+usr/include/sys/kiconv_utf8_big5.h
+usr/include/sys/kiconv_utf8_cp950hkscs.h
+usr/include/sys/kiconv_utf8_euckr.h
+usr/include/sys/kiconv_utf8_euctw.h
+usr/include/sys/kiconv_utf8_gb18030.h
+usr/include/sys/kiconv_utf8_gb2312.h
+usr/include/sys/kiconv_utf8_hkscs.h
+usr/include/sys/kiconv_utf8_uhc.h
+#
+# At this time, the ttydefs.cleanup file is only useful on sun4u systems
+#
+etc/flash/postdeployment/ttydefs.cleanup	i386
+#
+# This header file is shared only between the power commands and
+# ppm/srn modules # and should not be in any package
+#
+usr/include/sys/srn.h
+#
+# Private/Internal header files of smbsrv. Do not ship.
+#
+usr/include/smbsrv
+#
+# Private/Internal dtrace scripts of smbsrv. Do not ship.
+#
+usr/lib/smbsrv/dtrace
+#
+# Private/Internal 64-bit libraries of smbsrv. Do not ship.
+#
+usr/lib/smbsrv/amd64			i386
+usr/lib/smbsrv/sparcv9			sparc
+#
+# Private dirent, extended to include flags, for use by SMB server
+#
+usr/include/sys/extdirent.h
+#
+# Private header files for vscan service
+#
+usr/include/libvscan.h
+usr/include/sys/vscan.h
+#
+# libvscan is private
+#
+usr/lib/vscan/llib-lvscan
+usr/lib/vscan/llib-lvscan.ln
+#
+# i86hvm is not a full platform.  It is just a home for paravirtualized
+# drivers.  There is no usr/ component to this sub-platform, but the
+# directory is created in the proto area to keep other tools happy.
+#
+usr/platform/i86hvm						i386
+#
+# Private sdcard framework headers
+#
+usr/include/sys/sdcard
+#
+# libsmbfs is private
+#
+usr/include/netsmb
+usr/lib/libsmbfs.so
+usr/lib/amd64/libsmbfs.so		i386
+usr/lib/sparcv9/libsmbfs.so		sparc
+usr/lib/llib-lsmbfs
+usr/lib/llib-lsmbfs.ln
+usr/lib/amd64/llib-lsmbfs.ln		i386
+usr/lib/sparcv9/llib-lsmbfs.ln		sparc
+#
+# demo & test program for smbfs (private) ACL support
+#
+usr/lib/fs/smbfs/chacl
+usr/lib/fs/smbfs/lsacl
+#
+# FC related files
+kernel/kmdb/fcip		i386
+kernel/kmdb/amd64/fcip		i386
+kernel/kmdb/sparcv9/fcip	sparc
+kernel/kmdb/fcp			i386
+kernel/kmdb/amd64/fcp		i386
+kernel/kmdb/sparcv9/fcp		sparc
+kernel/kmdb/fctl		i386
+kernel/kmdb/amd64/fctl		i386
+kernel/kmdb/sparcv9/fctl	sparc
+kernel/kmdb/qlc			i386
+kernel/kmdb/amd64/qlc		i386
+kernel/kmdb/sparcv9/qlc		sparc
+lib/llib-la5k			sparc
+lib/llib-la5k.ln		sparc
+lib/sparcv9/llib-la5k.ln	sparc
+lib/llib-lg_fc			sparc
+lib/llib-lg_fc.ln		sparc
+lib/sparcv9/llib-lg_fc.ln	sparc
+usr/include/a_state.h		sparc
+usr/include/a5k.h		sparc
+usr/include/exec.h		sparc
+usr/include/g_scsi.h		sparc
+usr/include/g_state.h		sparc
+usr/include/gfc.h		sparc
+usr/include/l_common.h		sparc
+usr/include/l_error.h		sparc
+usr/include/rom.h		sparc
+usr/include/stgcom.h		sparc
+usr/include/sys/fibre-channel
+usr/lib/llib-lHBAAPI
+usr/lib/llib-lHBAAPI.ln
+usr/lib/amd64/llib-lHBAAPI.ln	i386
+usr/lib/sparcv9/llib-lHBAAPI.ln	sparc
+#
+usr/bin/dscfgcli
+usr/bin/sd_diag
+usr/bin/sd_stats
+usr/include/nsctl.h
+usr/include/sys/ncall
+usr/include/sys/nsc_ddi.h
+usr/include/sys/nsc_thread.h
+usr/include/sys/nsctl
+usr/include/sys/nskernd.h
+usr/include/sys/unistat
+usr/lib/libnsctl.so
+usr/lib/librdc.so
+usr/lib/libunistat.so
+usr/lib/llib-lnsctl.ln
+usr/lib/llib-lrdc.ln
+usr/lib/llib-lunistat.ln
+#
+# These files are used by the iSCSI initiator only.
+# No reason to ship them.
+#
+usr/include/sys/scsi/adapters/iscsi_door.h
+usr/include/sys/scsi/adapters/iscsi_if.h
+#
+# qus driver headers not installed
+#
+usr/include/sys/scsi/adapters/quscmd.h			sparc
+usr/include/sys/scsi/adapters/qusmail.h			sparc
+usr/include/sys/scsi/adapters/qusreg.h			sparc
+usr/include/sys/scsi/adapters/qusvar.h			sparc
+#
+# sbd ioctl hdr
+#
+usr/include/sys/stmf_sbd_ioctl.h
+#
+# proxy port provider interface
+#
+usr/include/sys/pppt_ic_if.h
+usr/include/sys/pppt_ioctl.h
+#
+# proxy daemon lint library
+#
+usr/lib/llib-lstmfproxy
+usr/lib/llib-lstmfproxy.ln
+usr/lib/amd64/llib-lstmfproxy.ln	i386
+usr/lib/sparcv9/llib-lstmfproxy.ln	sparc
+#
+# portable object file and dictionary used by libfmd_msg test
+#
+usr/lib/fm/dict/TEST.dict
+usr/lib/locale/C/LC_MESSAGES/TEST.mo
+usr/lib/locale/C/LC_MESSAGES/TEST.po
+#
+# Private idmap RPC protocol
+#
+usr/include/rpcsvc/idmap_prot.h
+usr/include/rpcsvc/idmap_prot.x
+#
+# Private idmap directory API
+#
+usr/include/directory.h
+#
+# librstp is private for bridging
+#
+usr/include/stp_bpdu.h
+usr/include/stp_in.h
+usr/include/stp_vectors.h
+usr/lib/librstp.so
+usr/lib/llib-lrstp
+usr/lib/llib-lrstp.ln
+#
+# Private nvfru API
+#
+usr/include/nvfru.h
+#
+# vrrp
+#
+usr/include/libvrrpadm.h
+usr/lib/libvrrpadm.so
+usr/lib/amd64/libvrrpadm.so		i386
+usr/lib/sparcv9/libvrrpadm.so		sparc
+usr/lib/llib-lvrrpadm
+usr/lib/llib-lvrrpadm.ln
+usr/lib/amd64/llib-lvrrpadm.ln		i386
+usr/lib/sparcv9/llib-lvrrpadm.ln	sparc
+#
+# This is only used during the -t tools build
+#
+opt/onbld/bin/i386/elfsign	i386
+opt/onbld/bin/sparc/elfsign	sparc

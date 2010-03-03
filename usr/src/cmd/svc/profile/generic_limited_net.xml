@@ -147,6 +147,9 @@
     <instance name='default' enabled='true'/>
   </service>
 
+  <service name='network/dns/multicast' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
   <service name='network/dhcp-server' version='1' type='service'>
     <instance name='default' enabled='false' />
   </service>
@@ -310,11 +313,15 @@
   </service>
 
   <!--
-      Enable CDE/GDM services.
+      Disable Avahi mDNS bridge service
   -->
-  <service name='application/cde-printinfo' version='1' type='service'>
-    <instance name='default' enabled='true' />
+  <service name='system/avahi-bridge-dsd' version='1' type='service'>
+    <instance name='default' enabled='false'/>
   </service>
+
+  <!--
+      Enable CDE/ToolTalk/GDM services.
+  -->
   <service name='network/rpc/cde-ttdbserver' version='1' type='service'>
     <instance name='tcp' enabled='true' />
   </service>
@@ -327,13 +334,21 @@
   </service>
 
   <!--
-      Disable CDE/X11 services.
+      Disable X11 services.
   -->
-  <service name='network/cde-spc' version='1' type='service'>
-     <instance name='default' enabled='false' />
-  </service>
   <service name='application/x11/xfs' version='1' type='service'>
     <instance name='default' enabled='false'/>
+  </service>
+
+  <!--
+      Enable VNC config service for xVM
+  -->
+  <service name='system/xvm/vnc-config' version='1' type='service'>
+     <instance name='default' enabled='true'/>
+  </service>
+
+  <service name='system/xvm/ipagent' version='1' type='service'>
+     <instance name='default' enabled='true'/>
   </service>
 
 </service_bundle>

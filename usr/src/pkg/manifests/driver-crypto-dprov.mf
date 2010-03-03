@@ -1,0 +1,62 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/driver/crypto/dprov@$(PKGVERS)
+set name=pkg.description value="Kernel Crypto Framework Test Driver"
+set name=pkg.summary value="Kernel Crypto Framework Test Driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=org.opensolaris.redist value=internal
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+# CRYPT DELETE START
+dir path=etc group=sys
+dir path=etc/certs group=sys
+dir path=etc/crypto group=sys
+dir path=etc/crypto/certs group=sys
+# CRYPT DELETE END
+dir path=kernel group=sys
+dir path=kernel/crypto group=sys
+dir path=kernel/crypto/$(ARCH64) group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+file path=etc/certs/SUNWosnetSE group=sys
+file path=etc/certs/SUNWosnetSolaris group=sys
+file path=etc/crypto/certs/SUNWosnet group=sys
+file path=etc/crypto/certs/SUNWosnetCF group=sys
+file path=kernel/drv/$(ARCH64)/dprov group=sys
+$(i386_ONLY)file path=kernel/drv/dprov group=sys
+file path=kernel/drv/dprov.conf group=sys reboot-needed=false
+legacy pkg=SUNWcryptoint arch=$(ARCH) category=system \
+    desc="Kernel Crypto Framework Test Driver" \
+    hotline="Please contact your local service provider" \
+    name="Kernel Crypto Framework Test Driver" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=kernel/crypto/$(ARCH64)/dprov \
+    target=../../../kernel/drv/$(ARCH64)/dprov
+$(i386_ONLY)link path=kernel/crypto/dprov target=../../kernel/drv/dprov

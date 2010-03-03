@@ -1,0 +1,92 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/driver/graphics/agpgart@$(PKGVERS)
+set name=pkg.description value="AGP GART driver for x86 workstations"
+set name=pkg.summary value="AGP GART Driver"
+set name=info.classification value=org.opensolaris.category.2008:Drivers/Display
+set name=variant.arch value=i386
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+driver name=$(ARCH64)_gart alias=pci1022,1103 perms="* 0644 root sys"
+driver name=agpgart perms="* 0644 root sys"
+driver name=agptarget perms="* 0644 root sys" \
+    alias=pci1022,7454 \
+    alias=pci8086,1130 \
+    alias=pci8086,2560 \
+    alias=pci8086,2570 \
+    alias=pci8086,2580 \
+    alias=pci8086,2590 \
+    alias=pci8086,2770 \
+    alias=pci8086,27a0 \
+    alias=pci8086,27ac \
+    alias=pci8086,2970 \
+    alias=pci8086,2980 \
+    alias=pci8086,2990 \
+    alias=pci8086,29a0 \
+    alias=pci8086,29b0 \
+    alias=pci8086,29c0 \
+    alias=pci8086,29d0 \
+    alias=pci8086,2a00 \
+    alias=pci8086,2a10 \
+    alias=pci8086,2a40 \
+    alias=pci8086,2e00 \
+    alias=pci8086,2e10 \
+    alias=pci8086,2e20 \
+    alias=pci8086,2e30 \
+    alias=pci8086,2e40 \
+    alias=pci8086,3575 \
+    alias=pci8086,3580 \
+    alias=pci8086,40 \
+    alias=pci8086,44 \
+    alias=pci8086,62 \
+    alias=pci8086,6a \
+    alias=pci8086,7120 \
+    alias=pci8086,7122 \
+    alias=pci8086,7124
+file path=kernel/drv/$(ARCH64)/$(ARCH64)_gart group=sys
+file path=kernel/drv/$(ARCH64)/agpgart group=sys
+file path=kernel/drv/$(ARCH64)/agptarget group=sys
+file path=kernel/drv/$(ARCH64)_gart group=sys
+file path=kernel/drv/agpgart group=sys
+file path=kernel/drv/agpgart.conf group=sys reboot-needed=false
+file path=kernel/drv/agptarget group=sys
+legacy pkg=SUNWagp arch=$(ARCH) category=system \
+    desc="AGP GART driver for x86 workstations" \
+    hotline="Please contact your local service provider" name="AGP GART Driver" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license uts/common/sys/THIRDPARTYLICENSE.agpgart \
+    license=uts/common/sys/THIRDPARTYLICENSE.agpgart

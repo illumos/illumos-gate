@@ -1,0 +1,84 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/print/lp/print-manager/legacy@$(PKGVERS)
+set name=pkg.description \
+    value="Graphical tool for managing printers under Solaris."
+set name=pkg.summary value="Solaris Print Manager"
+set name=info.classification value=org.opensolaris.category.2008:System/Printing
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/method
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/lp group=lp
+dir path=usr/lib/lp/bin group=lp
+dir path=usr/sadm
+dir path=usr/sadm/admin
+dir path=usr/sadm/admin/bin
+dir path=usr/sadm/admin/printmgr
+dir path=usr/sadm/admin/printmgr/classes
+dir path=usr/sadm/admin/printmgr/lib
+dir path=usr/sbin
+dir path=var group=sys
+dir path=var/lp group=lp mode=0775 owner=lp
+dir path=var/lp/ppd group=lp
+dir path=var/lp/ppd/caches group=lp
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/application group=sys
+dir path=var/svc/manifest/application/print group=sys
+file path=lib/svc/method/ppd-cache-update mode=0555
+file path=usr/lib/lp/bin/getmakes group=lp mode=0555
+file path=usr/lib/lp/bin/getmodels group=lp mode=0555
+file path=usr/lib/lp/bin/getppdfile group=lp mode=0555
+file path=usr/lib/lp/bin/getppds group=lp mode=0555
+file path=usr/lib/lp/bin/ppdfilename2mmp group=lp mode=0555
+file path=usr/lib/lp/bin/printer-info group=lp mode=0555
+file path=usr/sadm/admin/bin/printmgr group=lp mode=0555
+file path=usr/sadm/admin/printmgr/classes/pmclient.jar group=lp
+file path=usr/sadm/admin/printmgr/classes/pmserver.jar group=lp
+file path=usr/sadm/admin/printmgr/lib/libpmgr.so.1 group=lp
+file path=usr/sbin/ppdmgr group=lp mode=0555
+file path=var/lp/ppd/manufaliases group=lp mode=0444
+file path=var/svc/manifest/application/print/ppd-cache-update.xml group=sys \
+    mode=0444
+legacy pkg=SUNWppm arch=$(ARCH) category=system \
+    desc="Graphical tool for managing printers under Solaris." \
+    hotline="Please contact your local service provider" \
+    name="Solaris Print Manager" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWppmr arch=$(ARCH) category=system \
+    desc="Graphical tool for managing printers under Solaris." \
+    hotline="Please contact your local service provider" \
+    name="Solaris Print Manager (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/sadm/admin/printmgr/lib/libpmgr.so target=./libpmgr.so.1
+link path=usr/sbin/printmgr target=../../usr/sadm/admin/bin/printmgr

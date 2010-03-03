@@ -29,16 +29,16 @@
 # workspace, which will contain the resulting archives. It is based
 # off the onnv release. It sets NIGHTLY_OPTIONS to make nightly do:
 #	DEBUG build only (-D, -F)
-#	do not run protocmp or checkpaths (-N)
 #	do not bringover from the parent (-n)
 #	creates cpio archives for bfu (-a)
 #	runs 'make check' (-C)
 #	runs lint in usr/src (-l plus the LINTDIRS variable)
 #	sends mail on completion (-m and the MAILTO variable)
+#	creates packages for PIT/RE (-p)
 #	checks for changes in ELF runpaths (-r)
 #	build and use this workspace's tools in $SRC/tools (-t)
 #
-NIGHTLY_OPTIONS="-FNnaCDlmrt";		export NIGHTLY_OPTIONS
+NIGHTLY_OPTIONS="-FnaCDlmprt";		export NIGHTLY_OPTIONS
 
 # This is a variable for the rest of the script - GATE doesn't matter to
 # nightly itself
@@ -46,9 +46,6 @@ GATE=testws;			export GATE
 
 # CODEMGR_WS - where is your workspace at (or what should nightly name it)
 CODEMGR_WS="/export/$GATE";			export CODEMGR_WS
-
-# G11N_PKGDIR - where does the globalization package live
-G11N_PKGDIR="$CODEMGR_WS/usr/src/pkgdefs/SUNW0on";	export G11N_PKGDIR
 
 # Location of encumbered binaries.
 ON_CLOSED_BINS="$CODEMGR_WS/closed";		export ON_CLOSED_BINS
@@ -141,11 +138,17 @@ VERSION="$GATE";			export VERSION
 # not applicable given the NIGHTLY_OPTIONS
 #
 PARENT_ROOT=$PARENT_WS/proto/root_$MACH; export PARENT_ROOT
+PARENT_TOOLS_ROOT=$PARENT_WS/usr/src/tools/proto/root_$MACH-nd; export PARENT_TOOLS_ROOT
 
+# Package creation variables.  You probably shouldn't change these,
+# either.
 #
-#       package creation variable. you probably shouldn't change this either.
+# PKGARCHIVE determines where the repository will be created.
+#
+# PKGPUBLISHER_REDIST controls the publisher setting for the repository.
 #
 PKGARCHIVE="${CODEMGR_WS}/packages/${MACH}/nightly";	export PKGARCHIVE
+# PKGPUBLISHER_REDIST="on-redist";			export PKGPUBLISHER_REDIST
 
 # we want make to do as much as it can, just in case there's more than
 # one problem.

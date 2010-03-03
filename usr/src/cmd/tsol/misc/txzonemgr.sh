@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -30,279 +30,462 @@
 # zone as root.
 
 NSCD_PER_LABEL=0
-NSCD_INDICATOR="/var/tsol/doors/nscd_per_label"
-export NSCD_PER_LABEL
-export NSCD_INDICATOR
+NSCD_INDICATOR=/var/tsol/doors/nscd_per_label
 if [ -f $NSCD_INDICATOR ] ; then
 	NSCD_PER_LABEL=1
 fi
+
+TXTMP=/tmp/txzonemgr
+TNRHTP=/etc/security/tsol/tnrhtp
+TNRHDB=/etc/security/tsol/tnrhdb
+TNZONECFG=/etc/security/tsol/tnzonecfg
+PUBZONE=public
+INTZONE=internal
+
 PATH=/usr/bin:/usr/sbin:/usr/lib export PATH
-title="Labeled Zone Manager"
-maxlabel=`chk_encodings -X 2>/dev/null`
-if [[ ! -n $maxlabel ]]; then
-	maxlabel=0x000a-08-f8
-fi
-zonename=""
-export zonename
-config=/tmp/zfg.$$ ;
+title="Labeled Zone Manager 2.1"
+
+msg_defzones=$(gettext "Create default zones using default settings?")
+msg_confirmkill=$(gettext "OK to destroy all zones?")
+msg_continue=$(gettext "(exit to resume $(basename $0) when ready)")
+msg_getlabel=$(gettext "Select a label for the")
+msg_getremote=$(gettext "Select a remote host or network from the list below:")
+msg_getnet=$(gettext "Select a network configuration for the")
+msg_getzone=$(gettext "Select a zone from the list below:
+(select global for zone creation and shared settings)")
+msg_getcmd=$(gettext "Select a command from the list below:")
+msg_inuse=$(gettext "That label is already assigned\nto the")
+msg_getmin=$(gettext "Select the minimum network label for the")
+msg_getmax=$(gettext "Select the maximum network label for the")
+msg_badip=$(gettext " is not a valid IP address")
+
 
 consoleCheck() {
-	zconsole=`pgrep -f "zlogin -C $zonename"`
-	if [ $? != 0 ]; then
-		console="Zone Console...\n"
+	if [ $zonename != global ] ; then
+		zconsole=$(pgrep -f "zlogin -C $zonename")
+		if [ $? != 0 ] ; then
+			console="Zone Console...\n"
+		fi
 	fi
 }
 
 labelCheck() {
-	hexlabel=`/bin/grep "^$zonename:" \
-	    /etc/security/tsol/tnzonecfg|cut -d ":" -f2`;
-	if [ $hexlabel ] ; then
+	hexlabel=$(grep "^$zonename:" $TNZONECFG|cut -d : -f2);
+	if [[ $hexlabel ]] ; then
 		label=
-		curlabel=`hextoalabel $hexlabel`
+		if [ $zonename = global ] ; then
+			template="admin_low"
+			addcipsohost="Add Multilevel Access to Remote Host...\n"
+			removecipsohost="Remove Multilevel Access to Remote Host...\n"
+			setmlps="Configure Multilevel Ports...\n"
+		else
+			template=${zonename}_unlab
+			addcipsohost=
+			removecipsohost=
+			setmlps=
+
+			net=$(zonecfg -z $zonename info net)
+			if [[ -n $net ]] ; then
+				setmlps="Configure Multilevel Ports...\n"
+			elif [ $zonestate = configured ] ; then
+				addnet="Configure Network Interfaces...\n"
+			fi
+		fi
+		addremotehost="Add Single-level Access to Remote Host...\n"
+		remotes=$(grep -v "^#" $TNRHDB|grep $template)
+		if [ $? = 0 ] ; then
+			removeremotehost="Remove Single-level Access to Remote Host...\n"
+		else
+			removeremotehost=
+		fi
 	else
 		label="Select Label...\n"
-		curlabel=...
+		addremotehost=
+		removeremotehost=
+		addcipsohost=
+		removecipsohost=
+		setmlps=
 	fi
 }
 
-copyCheck() {
-	zonelist=""
-	for p in `zoneadm list -ip`; do
-		q=`echo $p|cut -d ":" -f2`
-		if [ $q != $zonename ]; then
-			zonelist="$zonelist $q"
+cloneCheck() {
+	set -A zonelist
+	integer clone_cnt=0
+	for p in $(zoneadm list -ip) ; do
+		z=$(echo "$p"|cut -d : -f2)
+		s=$(echo "$p"|cut -d : -f3)
+		if [ $z = $zonename ] ; then
+			continue
+		elif [ $s = "installed" ] ; then
+			zonelist[clone_cnt]=$z
+			clone_cnt+=1
 		fi
 	done
-	if [[ -n $zonelist ]]; then
-		copy="Copy...\n"; \
-		clone="Clone\n"; \
+	if [ $clone_cnt -gt 0 ] ; then
+		clone="Clone...\n"; \
 	fi
 }
 
 relabelCheck() {
-	macstate=`zonecfg -z $zonename info|grep win_mac_write`
-	if [[ -n $macstate ]]; then
+	macstate=$(zonecfg -z $zonename info|grep win_mac_write)
+	if [[ -n $macstate ]] ; then
 		permitrelabel="Deny Relabeling\n"
 	else
 		permitrelabel="Permit Relabeling\n"
 	fi
 }
 
-selectLabel() {
-	labelList=""
-	for p in `lslabels -h $maxlabel`; do
-		hexlabel=`/bin/grep :$p: /etc/security/tsol/tnzonecfg`
-		if [ $? != 0 ]; then
-			newlabel=`hextoalabel $p`
-			labelList="$labelList $newlabel\n"
-		fi
-	done
-	alabel=$(echo $labelList|zenity --list \
-	    --title="$title" \
-	    --height=300 \
-	    --width=400 \
-	    --column="Available Sensitivity Labels")
-
-	if [[ -n $alabel ]]; then
-		newlabel=`atohexlabel "$alabel" 2>/dev/null`
-		if [[ -n $newlabel ]]; then
-			echo $zonename:$newlabel:0:: >> /etc/security/tsol/tnzonecfg
-		else
-			x=$(zenity --error \
-			    --title="$title" \
-			    --text="$alabel is not valid")
-		fi
+autobootCheck() {
+	bootmode=$(zonecfg -z $zonename info autoboot)
+	if [[ $bootmode == 'autoboot: true' ]] ; then
+		autoboot="Set Manual Booting\n"
+	else
+		autoboot="Set Automatic Booting\n"
 	fi
 }
 
-resolveXdisplay() {
-	export ZONE_PATH
-	export ZONE_ETC_DIR
-	export IPNODES
-	export LIST
-	ERRORLIST=""
-	export ERRORLIST
-	# if using nscd-per-label then we have to be sure the global zone's
-	# hostname resolves because it is used for DISPLAY in X
-	ghostname=`hostname`
-	export ghostname
+newZone() { 
+		if [[ ! -n $zonename ]] ; then
+			zonename=$(zenity --entry \
+			    --title="$title" \
+			    --width=330 \
+			    --entry-text="" \
+			    --text="Enter Zone Name: ")
 
-	if [[ -n "$1" ]] ; then
-		LIST=`zoneadm list -ip | grep ":$1:"`
+			if [[ ! -n $zonename ]] ; then
+				zonename=global
+				return
+			fi
+		fi
+		zonecfg -z $zonename "create -t SUNWtsoldef;\
+		     set zonepath=/zone/$zonename"
+}
+
+removeZoneBEs() {
+	delopt=$*
+
+	zfs list -H $ZDSET/$zonename 1>/dev/null 2>&1
+	if [ $? = 0 ] ; then
+		for zbe in $(zfs list -rHo name $ZDSET/$zonename|grep ROOT/zbe) ; do
+			zfs destroy $delopt $zbe
+		done
+	fi
+}
+
+updateTemplate () {
+	if [ $hostType = cipso ] ; then
+		template=${zonename}_cipso
+		deflabel=
 	else
-		LIST=`zoneadm list -ip | grep -v "global"`
+		template=${zonename}_unlab
+		deflabel="def_label=${hexlabel};"
 	fi
 
-	gipaddress=`getent hosts $ghostname|cut -f1`
-	for i in $LIST; do
-		ZONE_PATH=`echo "$i" |cut -d ":" -f4`
-		ZONE_ETC_DIR=$ZONE_PATH/root/etc
-		IPNODES=${ZONE_ETC_DIR}/inet/ipnodes
+	tnzone=$(grep "^${template}:" $TNRHTP 2>/dev/null)
+	if [ $? -eq 0 ] ; then
+		sed -e "/^${template}/d" $TNRHTP > $TXTMP/tnrhtp.$$ 2>/dev/null
+		mv $TXTMP/tnrhtp.$$ $TNRHTP
+	fi
+	print "${template}:host_type=${hostType};doi=1;min_sl=${minlabel};max_sl=${maxlabel};$deflabel" >> $TNRHTP
+	tnctl -t $template
+}
+		
+setTNdata () {
+	tnzline="$zonename:${hexlabel}:0::"
+	grep "^$tnzline" $TNZONECFG 1>/dev/null 2>&1
+	if [ $? -eq 1 ] ; then
+		print "$tnzline" >> $TNZONECFG
+	fi
 
-		# Rather than toggle on and off with NSCD_PER_LABEL, put the
-		# information in there and a sysadmin can remove it if necessary
-		# $DISPLAY will not work in X without global hostname
-		ENTRY=`grep $ghostname $IPNODES`
-		case "$ENTRY" in
-			127.0.0.1* )
-				if [[ -z $ERRORLIST ]] ; then
-					ERRORLIST="$ghostname address 127.0.0.1 found in:\n"
-				fi
-				ERRORLIST="$ERRORLIST $IPNODES\n"
-				;;
-			"")
-				gipaddress=`getent hosts $ghostname|cut -f1`
-				echo "$gipaddress\t$ghostname" >>  $IPNODES
-				;;
-			*)
-				continue
-				;;
+	#
+	# Add matching entries in tnrhtp if necessary
+	#
+	minlabel=admin_low
+	maxlabel=admin_high
+	hostType=cipso
+	updateTemplate
 
-		esac
-	done
-	if [[ -n "$ERRORLIST" ]] ; then
-		x=$(zenity --error \
+	hostType=unlabeled
+	updateTemplate
+}
+
+selectLabel() {
+	hexlabel=$(tgnome-selectlabel \
+		--title="$title" \
+		--text="$msg_getlabel $zonename zone:" \
+		--min="${DEFAULTLABEL}"  \
+		--default="${DEFAULTLABEL}"  \
+		--max=$(chk_encodings -X) \
+		--accredcheck=yes \
+		--mode=sensitivity \
+		--format=internal)
+	if [ $? = 0 ] ; then
+		x=$(grep -i :{$hexlabel}: $TNZONECFG)
+		if [ $? = 0 ] ; then
+			z=$(print $x|cut -d : -f1)
+			x=$(zenity --error \
+			    --title="$title" \
+			    --text="$msg_inuse $z zone.")
+		else
+			setTNdata
+		fi
+	fi	
+}
+
+getLabelRange() {
+	deflabel=$(hextoalabel $hexlabel)
+	minlabel=$(tgnome-selectlabel \
+		--title="$title" \
+		--text="$msg_getmin $zonename zone:" \
+		--min="${DEFAULTLABEL}"  \
+		--max="$deflabel" \
+		--default="$hexlabel" \
+		--accredcheck=no \
+		--mode=sensitivity \
+		--format=internal)
+	[ $? != 0 ] && return
+	
+	maxlabel=$(tgnome-selectlabel \
+		--title="$title" \
+		--text="$msg_getmax $zonename zone:" \
+		--min="$deflabel"  \
+		--max=$(chk_encodings -X) \
+		--default="$hexlabel" \
+		--accredcheck=no \
+		--mode=sensitivity \
+		--format=internal)
+	[ $? != 0 ] && return
+
+	hostType=cipso
+	updateTemplate
+}
+
+
+encryptionValues() {
+	echo $(zfs get 2>&1 | grep encryption | sed -e s/^.*YES// -e s/\|//g)
+}
+
+getPassphrase() {
+	pass1=$(zenity --entry --title="$title" --text="Enter passphrase:" \
+	    --width=330 --hide-text)
+	pass2=$(zenity --entry --title="$title" --text="Re-enter passphrase:" \
+	    --width=330 --hide-text)
+	if [[ "$pass1" != "$pass2" ]]; then
+		zenity --error --title="$title" \
+			--text="Passphrases do not match"
+		return ""
+	fi
+	file=$(mktemp)
+	echo "$pass1" > $file
+	echo "$file"
+}
+
+createZDSET() {
+	options=$1
+	pool=${2%%/*}
+
+	# First check if ZFS encrytption support is available
+	pversion=$(zpool list -H -o version $pool)
+	cversion=$(zpool upgrade -v | grep Crypto | awk '{ print $1 }')
+
+	if [[ $cversion == "" || $pversion -lt $cversion ]]; then
+		zfs create $options $ZDSET
+		return
+	fi
+
+	encryption=$(zenity --list --title="$title" --height=320 \
+		--text="Select cipher for encryption of all labels:" \
+		--column="encryption" $(encryptionValues))
+
+	if [[ $? != 0 || $encryption == "off" ]]; then
+		zfs create $options $ZDSET
+		return
+	fi
+
+	format=$(zenity --list --title="$title" \
+		--text "Select encryption key source:" \
+		--column="Key format and location" \
+		"Passphrase" "Generate Key in file")
+	[ $? != 0 ] && exit 
+
+	if [[ $format == "Passphrase" ]]; then
+		file=$(getPassphrase)
+		if [[ $file == "" ]]; then
+			exit
+		fi
+		keysource="passphrase,file://$file"
+		removefile=1;
+	elif [[ $format == "Generate Key in file" ]]; then
+		file=$(zenity --file-selection \
+			--title="$title: Location of key file" \
+			--save --confirm-overwrite)
+		[ $? != 0 ] && exit 
+		if [[ $encryption == "on" ]]; then
+			keylen=128
+		else
+			t=${encryption#aes-} && keylen=${t%%-*}
+		fi
+		pktool genkey keystore=file keytype=aes \
+		    keylen=$keylen outkey=$file
+		keysource="raw,file:///$file"
+	fi
+
+	options="$options -o encryption=$encryption -o keysource=$keysource"
+	zfs create $options $ZDSET
+	if [[ $removefile -eq 1 ]]; then
+		zfs set keysource=passphrase,prompt $ZDSET
+		rm $file
+	fi
+}
+
+
+initialize() {
+	zonepath=$(zoneadm -z $zonename list -p|cut -d : -f4)
+	ZONE_ETC_DIR=$zonepath/root/etc
+	SYSIDCFG=${ZONE_ETC_DIR}/sysidcfg
+
+	if [ -f /var/ldap/ldap_client_file ] ; then
+		ldapaddress=$(ldapclient list | \
+		    grep "^NS_LDAP_SERVERS" | cut -d " " -f2)
+		print "name_service=LDAP {" > ${SYSIDCFG}
+		domain=$(domainname)
+		print "domain_name=$domain" >> ${SYSIDCFG}
+		profName=$(ldapclient list | \
+		    grep "^NS_LDAP_PROFILE" | cut -d " " -f2)
+		proxyPwd=$(ldapclient list | \
+		    grep "^NS_LDAP_BINDPASSWD" | cut -d " " -f2)
+		proxyDN=$(ldapclient list | \
+		    grep "^NS_LDAP_BINDDN" | cut -d " " -f 2)
+		if [ "$proxyDN" ] ; then
+			print "proxy_dn=\"$proxyDN\"" >> ${SYSIDCFG}
+			print "proxy_password=\"$proxyPwd\"" >> ${SYSIDCFG}
+		fi
+		print "profile=$profName" >> ${SYSIDCFG}
+		print "profile_server=$ldapaddress }" >> ${SYSIDCFG}
+		cp /etc/nsswitch.conf $ZONE_ETC_DIR/nsswitch.ldap
+	else
+		print "name_service=NONE" > ${SYSIDCFG}
+		if [ $NSCD_PER_LABEL = 0 ] ; then
+			sharePasswd
+		else
+			unsharePasswd
+		fi
+	fi
+
+	print "security_policy=NONE" >> ${SYSIDCFG}
+	locale=$(locale|grep LANG | cut -d "=" -f2)
+	if [[ -z $locale ]] ; then
+		locale="C"
+	fi
+	print "system_locale=$locale" >> ${SYSIDCFG}
+	timezone=$(grep "^TZ" /etc/TIMEZONE|cut -d "=" -f2)
+	print "timezone=$timezone" >> ${SYSIDCFG}
+	print "terminal=vt100" >> ${SYSIDCFG}
+	rootpwd=$(grep "^root:" /etc/shadow|cut -d : -f2)
+	#print "root_password=$rootpwd" >> ${SYSIDCFG}
+	print "nfs4_domain=dynamic" >> ${SYSIDCFG}
+	print "network_interface=PRIMARY {" >> ${SYSIDCFG}
+
+	net=$(zonecfg -z $zonename info net)
+	ipType=$(zonecfg -z $zonename info ip-type|cut -d" " -f2)
+	if [ $ipType = exclusive ] ; then
+		hostname=$(zenity --entry \
 		    --title="$title" \
-		    --text="WARNING:\n\n\n$ERRORLIST\n\n")
+		    --width=330 \
+		    --text="${zonename}0: Enter Hostname or dhcp: ")
+		[ $? != 0 ] && return
+
+		if [ $hostname = dhcp ] ; then
+			print "dhcp" >> ${SYSIDCFG}
+		else
+			print "hostname=$hostname" >> ${SYSIDCFG}
+			ipaddr=$(getent hosts $hostname|cut -f1)
+			if [ $? != 0 ] ; then
+				ipaddr=$(zenity --entry \
+				    --title="$title" \
+				    --text="$nic: Enter IP address: " \
+				    --entry-text a.b.c.d)
+				[ $? != 0 ] && return
+				
+				validateIPaddr
+				if [[ -z $ipaddr ]] ; then
+					return
+				fi
+			fi
+			print "ip_address=$ipaddr" >> ${SYSIDCFG}
+			getNetmask
+			print "netmask=$nm" >> ${SYSIDCFG}
+			print "default_route=none" >> ${SYSIDCFG}
+			template=${zonename}_cipso
+			cidr=32
+			updateTnrhdb
+		fi
+	elif [[ -n $net ]] ; then
+		hostname=$(hostname)
+		hostname=$(zenity --entry \
+		    --title="$title" \
+		    --width=330 \
+		    --text="Enter Hostname: " \
+		    --entry-text $hostname)
+		[ $? != 0 ] && return
+		
+		print "hostname=$hostname" >> ${SYSIDCFG}
+		ipaddr=$(getent hosts $hostname|cut -f1)
+		if [ $? = 0 ] ; then
+			print "ip_address=$ipaddr" >> ${SYSIDCFG}
+		fi
+	else
+		getAllZoneNICs
+		for i in ${aznics[*]} ; do
+			ipaddr=$(ifconfig $i|grep inet|cut -d " " -f2)
+		done
+		print "hostname=$(hostname)" >> ${SYSIDCFG}
+		print "ip_address=$ipaddr" >> ${SYSIDCFG}
 	fi
+		
+	print "protocol_ipv6=no }" >> ${SYSIDCFG}
+	cp /etc/default/nfs ${ZONE_ETC_DIR}/default/nfs
+	touch ${ZONE_ETC_DIR}/.NFS4inst_state.domain
 }
 
 clone() {
-	image=`zenity --list \
-	    --title="$title: Clone From" \
-	    --height=300 \
-	    --column="Installed Zones" $zonelist`
-	if [[ -n $image ]]; then
-		dataset=`zfs list |grep $ZDSET/$zonename |cut -d " " -f1`
-		if [[ -n $dataset ]]; then
-			/usr/sbin/zfs destroy -r $ZDSET/$zonename
-		fi
-		/usr/sbin/zoneadm -z $zonename clone $image
-		/usr/sbin/zoneadm -z $zonename ready
+	image=$1
+	if [[ -z $image ]] ; then
+		msg_clone=$(gettext "Clone the $zonename zone using a
+snapshot of one of the following halted zones:")
+		image=$(zenity --list \
+		    --title="$title" \
+		    --text="$msg_clone" \
+		    --height=300 \
+		    --width=330 \
+		    --column="Installed Zones" ${zonelist[*]})
+	fi
 
-		if [ ! -f /var/ldap/ldap_client_file ]; then
+	if [[ -n $image ]] ; then
+		removeZoneBEs
+		zoneadm -z $zonename clone $image
+
+		if [ ! -f /var/ldap/ldap_client_file ] ; then
 			if [ $NSCD_PER_LABEL = 0 ] ; then
 				sharePasswd
 			else
 				unsharePasswd
-				resolveXdisplay
 			fi
 		fi
-		initialize
-		/usr/sbin/zoneadm -z $zonename halt
-	fi
-}
-
-copy() {
-
-	image=`zenity --list \
-	    --title="$title: Copy From" \
-	    --height=300 \
-	    --column="Installed Zones" $zonelist`
-
-	/usr/bin/gnome-terminal \
-	    --title="$title: Copying $image to $zonename zone" \
-	    --command "zoneadm -z $zonename clone -m copy $image" \
-	    --disable-factory \
-	    --hide-menubar
-
-	if [ ! -f /var/ldap/ldap_client_file ]; then
-		if [ $NSCD_PER_LABEL = 0 ] ; then
-			sharePasswd
-		else
-			unsharePasswd
-			resolveXdisplay
+		ipType=$(zonecfg -z $zonename info ip-type|cut -d" " -f2)
+		if [ $ipType = exclusive ] ; then
+			zoneadm -z $zonename ready
+			zonepath=$(zoneadm -z $zonename list -p|cut -d : -f4)
+			sys-unconfig -R $zonepath/root 2>/dev/null
+			initialize
+			zoneadm -z $zonename halt
 		fi
-	fi
-}
-
-initialize() {
-	hostname=`hostname`
-	hostname=$(zenity --entry \
-	    --title="$title" \
-	    --text="Enter Host Name: " \
-	    --entry-text $hostname)
-	if [ $? != 0 ]; then
-		exit 1
-	fi
-
-	ZONE_PATH=`zoneadm list -ip|grep ":${zonename}:"|cut -d ":" -f4`
-	if [ -z "$ZONE_PATH" ] ; then
-		x=$(zenity --error \
-		    --title="$title" \
-		    --text="$zonename is not an installed zone")
-		exit 1
-	fi
-	ZONE_ETC_DIR=$ZONE_PATH/root/etc
-	ipaddress=`getent hosts $hostname|cut -f1`
-	SYSIDCFG=${ZONE_ETC_DIR}/sysidcfg
-
-	if [ -f /var/ldap/ldap_client_file ]; then
-		ldapaddress=`ldapclient list | \
-		    /bin/grep "^NS_LDAP_SERVERS" | cut -d " " -f2`
-		echo "name_service=LDAP {" > ${SYSIDCFG}
-		domain=`domainname`
-		echo "domain_name=$domain" >> ${SYSIDCFG}
-		profName=`ldapclient list | \
-		    /bin/grep "^NS_LDAP_PROFILE" | cut -d " " -f2`
-		proxyPwd=`ldapclient list | \
-		    /bin/grep "^NS_LDAP_BINDPASSWD" | cut -d " " -f2`
-		proxyDN=`ldapclient list | \
-		    /bin/grep "^NS_LDAP_BINDDN" | cut -d " " -f 2`
-		if [ "$proxyDN" ]; then
-			echo "proxy_dn=\"$proxyDN\"" >> ${SYSIDCFG}
-			echo "proxy_password=\"$proxyPwd\"" >> ${SYSIDCFG}
-		fi
-		echo "profile=$profName" >> ${SYSIDCFG}
-		echo "profile_server=$ldapaddress }" >> ${SYSIDCFG}
-		cp /etc/nsswitch.conf $ZONE_ETC_DIR/nsswitch.ldap
-	else
-		echo "name_service=NONE" > ${SYSIDCFG}
-		if [ $NSCD_PER_LABEL = 0 ] ; then
-			sharePasswd
-		else
-			# had to put resolveXdisplay lower down for this case
-			unsharePasswd
-		fi
-	fi
-
-	echo "security_policy=NONE" >> ${SYSIDCFG}
-	locale=`locale|grep LANG | cut -d "=" -f2`
-	if [[ -z $locale ]]; then
-		locale="C"
-	fi
-	echo "system_locale=$locale" >> ${SYSIDCFG}
-	timezone=`/bin/grep "^TZ" /etc/TIMEZONE|cut -d "=" -f2`
-	echo "timezone=$timezone" >> ${SYSIDCFG}
-	echo "terminal=vt100" >> ${SYSIDCFG}
-	rootpwd=`/bin/grep "^root:" /etc/shadow|cut -d ":" -f2`
-	#echo "root_password=$rootpwd" >> ${SYSIDCFG}
-	echo "nfs4_domain=dynamic" >> ${SYSIDCFG}
-	echo "network_interface=PRIMARY {" >> ${SYSIDCFG}
-	echo "protocol_ipv6=no" >> ${SYSIDCFG}
-	echo "hostname=$hostname" >> ${SYSIDCFG}
-	echo "ip_address=$ipaddress }" >> ${SYSIDCFG}
-	cp /etc/default/nfs ${ZONE_ETC_DIR}/default/nfs
-	touch ${ZONE_ETC_DIR}/.NFS4inst_state.domain
-	rm -f ${ZONE_ETC_DIR}/.UNCONFIGURED
-	if [ $NSCD_PER_LABEL = 1 ] ; then
-		resolveXdisplay
 	fi
 }
 
 install() {
-	# if there is a zfs pool for zone
-	# create a new dataset for the zone
-	# This step is done automatically by zonecfg
-	# in Solaris Express 8/06 or newer
-
-	if [ $ZDSET != none ]; then
-		zfs create -o mountpoint=/zone/$zonename \
-		    $ZDSET/$zonename
-		chmod 700 /zone/$zonename
-	fi
-
-	/usr/bin/gnome-terminal \
+	removeZoneBEs
+	gnome-terminal \
 	    --title="$title: Installing $zonename zone" \
 	    --command "zoneadm -z $zonename install" \
 	    --disable-factory \
@@ -314,89 +497,140 @@ install() {
 }
 
 delete() {
+	delopt=$*
+
 	# if there is an entry for this zone in tnzonecfg, remove it
 	# before deleting the zone.
 
-	tnzone=`egrep "^$zonename:" /etc/security/tsol/tnzonecfg 2>/dev/null`
-	if [ -n "${tnzone}" ]; then
-		sed -e "/^$tnzone:*/d" /etc/security/tsol/tnzonecfg > \
-		    /tmp/tnzonefg.$$ 2>/dev/null
-		mv /tmp/tnzonefg.$$ /etc/security/tsol/tnzonecfg
+	tnzone=$(grep "^$zonename:" $TNZONECFG 2>/dev/null)
+	if [ -n "${tnzone}" ] ; then
+		sed -e "/^$zonename:/d" $TNZONECFG > \
+		    $TXTMP/tnzonefg.$$ 2>/dev/null
+		mv $TXTMP/tnzonefg.$$ $TNZONECFG
 	fi
-	zonecfg -z $zonename delete -F
-	dataset=`zfs list |grep $ZDSET/$zonename |cut -d " " -f1`
-	if [[ -n $dataset ]]; then
-		/usr/sbin/zfs destroy $ZDSET/$zonename
-	fi
-	zonename=
-}
 
-getNIC(){
-
-	nics=
-	for i in `ifconfig -a4|grep  "^[a-z].*:" |grep -v LOOPBACK`
-	do
-		echo $i |grep "^[a-z].*:" >/dev/null 2>&1
-		if [ $? -eq 1 ]; then
-			continue
-		fi
-		i=${i%:} # Remove colon after interface name
-		echo $i |grep ":" >/dev/null 2>&1
-		if [ $? -eq 0 ]; then
-			continue
-		fi
-		nics="$nics $i"
+	for tnzone in $(grep ":${zonename}_unlab" $TNRHDB 2>/dev/null) ; do
+		tnctl -dh "$tnzone"
+		sed -e "/:${zonename}_unlab/d" $TNRHDB > \
+		    $TXTMP/tnrhdb.$$ 2>/dev/null
+		mv $TXTMP/tnrhdb.$$ $TNRHDB
 	done
 
-	nic=$(zenity --list \
-	    --title="$title" \
-	    --column="Interface" \
-	    $nics)
+	for tnzone in $(grep "^${zonename}_unlab:" $TNRHTP 2>/dev/null) ; do
+		tnctl -dt ${zonename}_unlab
+		sed -e "/^${zonename}_unlab:/d" $TNRHTP > \
+		    $TXTMP/tnrhtp.$$ 2>/dev/null
+		mv $TXTMP/tnrhtp.$$ $TNRHTP
+	done
+
+	for tnzone in $(grep ":${zonename}_cipso" $TNRHDB 2>/dev/null) ; do
+		tnctl -dh "$tnzone"
+		sed -e "/:${zonename}_cipso/d" $TNRHDB > \
+		    $TXTMP/tnrhdb.$$ 2>/dev/null
+		mv $TXTMP/tnrhdb.$$ $TNRHDB
+	done
+
+	for tnzone in $(grep "^${zonename}_cipso:" $TNRHTP 2>/dev/null) ; do
+		tnctl -dt ${zonename}_cipso
+		sed -e "/^${zonename}_cipso:/d" $TNRHTP > \
+		    $TXTMP/tnrhtp.$$ 2>/dev/null
+		mv $TXTMP/tnrhtp.$$ $TNRHTP
+	done
+
+	zonecfg -z $zonename delete -F
+
+	removeZoneBEs $delopt
+	for snap in $(zfs list -Ho name -t snapshot|grep "\@${zonename}_snap") ; do
+		zfs destroy -R $snap
+	done
+}
+
+validateIPaddr () {
+	OLDIFS=$IFS
+	IFS=.
+	integer octet_cnt=0
+	integer dummy
+	set -A octets $ipaddr
+	IFS=$OLDIFS
+	if [ ${#octets[*]} == 4 ] ; then
+		while (( octet_cnt < ${#octets[*]} )); do
+			dummy=${octets[octet_cnt]}
+			if [ $dummy = ${octets[octet_cnt]} ] ; then
+				if (( $dummy >= 0 && \
+				    $dummy < 256 )) ; then
+					octet_cnt+=1
+					continue
+				fi
+			else
+				x=$(zenity --error \
+				    --title="$title" \
+				    --text="$ipaddr $msg_badip")
+				ipaddr=
+				return
+			fi
+		done
+	else
+		x=$(zenity --error \
+		    --title="$title" \
+		    --text="$ipaddr $msg_badip")
+		ipaddr=
+	fi
+}
+
+getAllZoneNICs(){
+	integer count=0
+	for i in $(ifconfig -a4|grep  "^[a-z].*:")
+	do
+		print "$i" |grep "^[a-z].*:" >/dev/null 2>&1
+		[ $? -eq 1 ] && continue
+		
+		i=${i%:} # Remove colon after interface name
+		for j in $(ifconfig $i)
+		do
+			case $j in
+				all-zones)
+					aznics[count]=$i
+					count+=1
+					;;
+			esac
+		done
+        done
 }
 
 getNetmask() {
-
 	cidr=
 	nm=$(zenity --entry \
 	    --title="$title" \
+	    --width=330 \
 	    --text="$ipaddr: Enter netmask: " \
 	    --entry-text 255.255.255.0)
-	if [ $? != 0 ]; then
-	       return;
-	fi
+	[ $? != 0 ] && return;
 
-	cidr=`perl -e 'use Socket; print unpack("%32b*",inet_aton($ARGV[0])), "\n";' $nm`
+	cidr=$(perl -e 'use Socket; print unpack("%32b*",inet_aton($ARGV[0])), "\n";' $nm)
 }
 
 addNet() {
-	getNIC
-	if [[ -z $nic ]]; then
-		return;
-	fi
 	getIPaddr
-	if [[ -z $ipaddr ]]; then
+	if [[ -z $ipaddr ]] ; then
 		return;
 	fi
 	getNetmask
-	if [[ -z $cidr ]]; then
+	if [[ -z $cidr ]] ; then
 		return;
 	fi
-	zcfg="
-add net
-set address=${ipaddr}/${cidr}
-set physical=$nic
-end
-commit
-"
-	echo "$zcfg" > $config ;
-	zonecfg -z $zonename -f $config ;
-	rm $config
+	zonecfg -z $zonename "add net; \
+	    set address=${ipaddr}/${cidr}; \
+	    set physical=$nic; \
+	    end"
+	template=${zonename}_cipso
+	cidr=32
+	updateTnrhdb
 }
 
 getAttrs() {
 	zone=global
 	type=ignore
-	for j in `ifconfig $nic`
+	for j in $(ifconfig $nic)
 	do
 		case $j in
 			inet) type=$j;;
@@ -407,141 +641,272 @@ getAttrs() {
 				inet) ipaddr=$j ;;
 				zone) zone=$j ;;
 				*) continue ;;
-			   esac;\
+			   esac;
 			   type=ignore;;
 		esac
 	done
-	if [ $ipaddr != 0.0.0.0 ]; then
-		template=`tninfo -h $ipaddr|grep Template| cut -d" " -f3`
+	if [[ $flags == ~(E).UP, ]] ; then
+		updown=Up
+	else
+		updown=Down
+	fi
+	if [[ $nic == ~(E).: ]] ; then
+		linktype=logical
+	else
+		vnic=$(dladm show-vnic -po link $nic 2>/dev/null)
+		if [[ -n $vnic ]] ; then
+			linktype=virtual
+		else
+			linktype=physical
+		fi
+	fi
+	if [ $ipaddr != 0.0.0.0 ] ; then
+		x=$(grep "^${ipaddr}[^0-9]" $TNRHDB)
+		if [ $? = 1 ] ; then
+			template=cipso
+			cidr=32
+			updateTnrhdb
+		else
+			template=$(print "$x"|cut -d : -f2)
+		fi
 	else
 		template="..."
 		ipaddr="..."
 	fi
 }
+deleteTnrhdbEntry() {
+	remote=$(grep "^${ipaddr}[^0-9]" $TNRHDB)
+	if [ $? = 0 ] ; then
+		ip=$(print $remote|cut -d "/" -f1)
+			if [[ $remote == ~(E)./ ]] ; then
+				pr=$(print $remote|cut -d "/" -f2)
+				remote="$ip\\/$pr"
+			fi
+		sed -e "/^${remote}/d" $TNRHDB > /tmp/tnrhdb.$$ 2>/dev/null
+		mv /tmp/tnrhdb.$$ $TNRHDB
+	fi
+}
 
 updateTnrhdb() {
-	tnctl -h ${ipaddr}:$template
-	x=`grep "^${ipaddr}[^0-9]" /etc/security/tsol/tnrhdb`
-	if [ $? = 0 ]; then
-		sed s/$x/${ipaddr}:$template/g /etc/security/tsol/tnrhdb \
-		    > /tmp/txnetmgr.$$
-		mv /tmp/txnetmgr.$$ /etc/security/tsol/tnrhdb
+	deleteTnrhdbEntry
+	if [[ -n $cidr ]] ; then
+		print "${ipaddr}/$cidr:$template" >> $TNRHDB
+		tnctl -h ${ipaddr}/$cidr:$template
 	else
-		echo ${ipaddr}:$template >> /etc/security/tsol/tnrhdb
+		print "${ipaddr}:$template" >> $TNRHDB
+		tnctl -h ${ipaddr}:$template
 	fi
 }
 
 getIPaddr() {
         hostname=$(zenity --entry \
             --title="$title" \
-            --text="$nic: Enter hostname: ")
+	    --width=330 \
+            --text="$nic: Enter Hostname: ")
 
-        if [ $? != 0 ]; then
-               return;
-	fi
+        [ $? != 0 ] && return
 
-	ipaddr=`getent hosts $hostname|cut -f1`
-        if [[ -z $ipaddr ]]; then
-
+	ipaddr=$(getent hosts $hostname|cut -f1)
+        if [[ -z $ipaddr ]] ; then
 		ipaddr=$(zenity --entry \
 		    --title="$title" \
 		    --text="$nic: Enter IP address: " \
 		    --entry-text a.b.c.d)
-		if [ $? != 0 ]; then
-		       return;
-		fi
+		[ $? != 0 ] && return
+		validateIPaddr
 	fi
 
 }
 
 addHost() {
-	# Update hosts and ipnodes
-        if [[ -z $ipaddr ]]; then
+	# Update hosts
+        if [[ -z $ipaddr ]] ; then
                return;
 	fi
 	grep "^${ipaddr}[^0-9]" /etc/inet/hosts >/dev/null
-	if [ $? -eq 1 ]; then
-		echo "$ipaddr\t$hostname" >> /etc/inet/hosts
-	fi
-
-	grep "^${ipaddr}[^0-9]" /etc/inet/ipnodes >/dev/null
-	if [ $? -eq 1 ]; then
-		echo "$ipaddr\t$hostname" >> /etc/inet/ipnodes
+	if [ $? -eq 1 ] ; then
+		print "$ipaddr\t$hostname" >> /etc/inet/hosts
 	fi
 
 	template=cipso
+	cidr=32
 	updateTnrhdb
 
 	ifconfig $nic $ipaddr netmask + broadcast +
-	echo $hostname > /etc/hostname.$nic
-}
-
-getTemplate() {
-	templates=$(cat /etc/security/tsol/tnrhtp|\
-	    grep "^[A-z]"|grep "type=cipso"|cut -f1 -d":")
-
-	while [ 1 -gt 0 ]; do
-		t_cmd=$(zenity --list \
-		    --title="$title" \
-		    --height=300 \
-		    --column="Network Templates" \
-		    $templates)
-
-		if [ $? != 0 ]; then
-		       break;
-		fi
-
-		t_label=$(tninfo -t $t_cmd | grep sl|zenity --list \
-		    --title="$title" \
-		    --height=300 \
-		    --width=450 \
-		    --column="Click OK to associate $t_cmd template with $ipaddr" )
-
-		if [ $? != 0 ]; then
-			continue
-		fi
-		template=$t_cmd
-		updateTnrhdb
-		break
-	done
+	#
+	# TODO: better integration with nwam
+	# TODO: get/set netmask for IP address
+	#
+	print $hostname > /etc/hostname.$nic
 }
 
 createInterface() {
-	msg=`ifconfig $nic addif 0.0.0.0`
+	msg=$(ifconfig $nic addif 0.0.0.0)
 	$(zenity --info \
 	    --title="$title" \
 	    --text="$msg" )
+	nic=$(print "$msg"|cut -d" " -f5)
+
+}
+		    
+createVNIC() {
+	if [ $zonename != global ] ; then
+		vnicname=${zonename}0
+	else
+		vnicname=$(zenity --entry \
+		    --title="$title" \
+		    --width=330 \
+		    --entry-text="" \
+		    --text="Enter VNIC Name: ")
+
+		if [[ ! -n $vnicname ]] ; then
+			return
+		fi
+	fi
+	x=$(dladm show-vnic|grep "^$vnicname " )
+	if [[ ! -n $x ]] ; then
+		dladm create-vnic -l $nic $vnicname
+	fi
+	if [ $zonename = global ] ; then
+		ifconfig $vnicname plumb
+	else
+		zonecfg -z $zonename "add net; \
+		    set physical=$vnicname; \
+		    end"
+	fi
+	nic=$vnicname
 }
 
 shareInterface() {
+	#
+	# TODO: better integration with nwam
+	#
 	ifconfig $nic all-zones;\
 	if_file=/etc/hostname.$nic
-	sed q | sed -e "s/$/ all-zones/" < $if_file >/tmp/txnetmgr.$$
-	mv /tmp/txnetmgr.$$ $if_file
+	sed q | sed -e "s/$/ all-zones/" < $if_file >$TXTMP/txnetmgr.$$
+	mv $TXTMP/txnetmgr.$$ $if_file
 }
 
-setMacPrivs() {
-	zcfg="
-set limitpriv=default,win_mac_read,win_mac_write,win_selection,win_dac_read,win_dac_write,file_downgrade_sl,file_upgrade_sl,sys_trans_label
-commit
-"
-	echo "$zcfg" > $config ;
-	zonecfg -z $zonename -f $config ;
-	rm $config
+addTnrhdb() {
+	ipaddr=$(zenity --entry \
+	    --title="$title" \
+	    --width=330 \
+	    --text="Zone:$zonename. Enter IP address of remote host or network: " \
+	    --entry-text a.b.c.d)
+	[ $? != 0 ] && return
+	validateIPaddr
+	if [[ -z $ipaddr ]] ; then
+		return;
+	fi
+	if [ ${octets[3]} = 0 ] ; then
+		nic="$ipaddr"
+		getNetmask
+		if [[ -z $cidr ]] ; then
+			return;
+		fi
+	else
+		cidr=32
+	fi
+	print "${ipaddr}/$cidr:$template" > $TXTMP/tnrhdb_new.$$
+	x=$(tnchkdb -h $TXTMP/tnrhdb_new.$$ 2>$TXTMP/syntax_error.$$)
+	if [ $? = 0 ] ; then
+		updateTnrhdb
+	else
+		syntax=$(cat $TXTMP/syntax_error.$$)
+		x=$(zenity --error \
+		    --title="$title" \
+		    --text="$syntax")
+	fi
+	rm $TXTMP/tnrhdb_new.$$
+	rm $TXTMP/syntax_error.$$
 }
 
-resetMacPrivs() {
-	zcfg="
-set limitpriv=default
-commit
-"
-	echo "$zcfg" > $config ;
-	zonecfg -z $zonename -f $config ;
-	rm $config
+removeTnrhdb() {
+	while (( 1 )) do
+		remotes=$(grep "^[^#][0-9.]" $TNRHDB|grep ":$template"|cut -d : -f1-2|tr : " ")
+		if [ $template = cipso ] ; then
+			templateHeading="from All Zones":
+		else
+			templateHeading="from this Zone":
+		fi
+		if [[ -n $remotes ]] ; then
+			ipaddr=$(zenity --list \
+			    --title="$title" \
+			    --text="$msg_getremote" \
+			    --height=250 \
+			    --width=300 \
+			    --column="Remove Access to:" \
+			    --column="$templateHeading" \
+			    $remotes)
+
+			if [[ -n $ipaddr ]] ; then
+				deleteTnrhdbEntry
+				tnctl -dh ${ip}:$template
+			else
+				return
+			fi
+		else
+			return
+		fi
+	done
+}
+
+setMLPs() {
+	tnzone=$(grep "^$zonename:" $TNZONECFG 2>/dev/null)
+	zoneMLPs=:$(print "$tnzone"|cut -d : -f4)
+	sharedMLPs=:$(print "$tnzone"|cut -d : -f5)
+	attrs="Private Interfaces$zoneMLPs\nShared Interfaces$sharedMLPs"
+	ports=$(print "$attrs"|zenity --list \
+	    --title="$title" \
+	    --height=200 \
+	    --width=450 \
+	    --text="Zone: $zonename\nClick once to select, twice to edit.\nShift-click to select both rows." \
+	    --column="Multilevel Ports (example: 80-81/tcp;111/udp;)" \
+	    --editable \
+	    --multiple
+	    )
+
+	if [[ -z $ports ]] ; then
+		return
+	fi
+
+	# getopts needs another a blank and another dash
+	ports=--$(print "$ports"|sed 's/ //g'|sed 's/|/ --/g'|sed 's/Interfaces:/ :/g')
+
+	OPTIND=1
+	while getopts "z:(Private)s:(Shared)" opt $ports ; do
+		case $opt in
+			z) zoneMLPs=$OPTARG ;;
+			s) sharedMLPs=$OPTARG ;;
+		esac
+	done
+
+	sed -e "/^$zonename:*/d" $TNZONECFG > $TXTMP/tnzonecfg.$$ 2>/dev/null
+	tnzone=$(print "$tnzone"|cut -d : -f1-3)
+	echo "${tnzone}${zoneMLPs}${sharedMLPs}" >> $TXTMP/tnzonecfg.$$
+
+	x=$(tnchkdb -z $TXTMP/tnzonecfg.$$ 2>$TXTMP/syntax_error.$$)
+
+	if [ $? = 0 ] ; then
+		mv $TXTMP/tnzonecfg.$$ $TNZONECFG
+		zenity --info \
+		    --title="$title" \
+		    --text="Multilevel ports for the $zonename zone\nwill be interpreted on next reboot."
+		if [ $zonename != global ] ; then
+			getLabelRange
+		fi
+	else
+		syntax=$(cat $TXTMP/syntax_error.$$)
+		x=$(zenity --error \
+		    --title="$title" \
+		    --text="$syntax")
+		rm $TXTMP/tnzonecfg.$$
+	fi
+	rm $TXTMP/syntax_error.$$
 }
 
 unsharePasswd() {
-	for i in `zoneadm list -i | grep -v global`; do
+	for i in $(zoneadm list -i | grep -v global) ; do
 		zonecfg -z $i remove fs dir=/etc/passwd 2>&1 | grep -v such
 		zonecfg -z $i remove fs dir=/etc/shadow 2>&1 | grep -v such
 	done
@@ -551,26 +916,20 @@ sharePasswd() {
 	if [ $NSCD_PER_LABEL -ne 0 ] ; then
 		return
 	fi
-	passwd=`zonecfg -z $zonename info|grep /etc/passwd`
-	if [[ $? -eq 1 ]]; then
-		zcfg="
-add fs
-set special=/etc/passwd
-set dir=/etc/passwd
-set type=lofs
-add options ro
-end
-add fs
-set special=/etc/shadow
-set dir=/etc/shadow
-set type=lofs
-add options ro
-end
-commit
-"
-		echo "$zcfg" > $config ;
-		zonecfg -z $zonename -f $config ;
-		rm $config
+	passwd=$(zonecfg -z $zonename info|grep /etc/passwd)
+	if [ $? -eq 1 ] ; then
+		zonecfg -z $zonename "add fs; \
+		    set special=/etc/passwd; \
+		    set dir=/etc/passwd; \
+		    set type=lofs; \
+		    add options ro; \
+		    end; \
+		    add fs; \
+		    set special=/etc/shadow; \
+		    set dir=/etc/shadow; \
+		    set type=lofs; \
+		    add options ro; \
+		    end"
 	fi
 }
 
@@ -584,131 +943,208 @@ manageNscd() {
 	if [ $NSCD_PER_LABEL -eq 0 ] ; then
 		# this MUST be a regular file for svc-nscd to detect
 		touch $NSCD_INDICATOR
+		NSCD_OPT="Unconfigure per-zone name service"
 		NSCD_PER_LABEL=1
 		unsharePasswd
-		resolveXdisplay
 	else
-		export zonename
 		rm -f $NSCD_INDICATOR
+		NSCD_OPT="Configure per-zone name service"
 		NSCD_PER_LABEL=0
-		for i in `zoneadm list -i | grep -v global`; do
+		for i in $(zoneadm list -i | grep -v global) ; do
 			zonename=$i
 			sharePasswd
 		done
-		zonename=
+		zonename=global
 	fi
 }
 
-manageNets() {
-	while [ 1 -gt 0 ]; do
-		attrs=
-		for i in `ifconfig -au4|grep  "^[a-z].*:" |grep -v LOOPBACK`
-		do
-			echo $i |grep "^[a-z].*:" >/dev/null 2>&1
-			if [ $? -eq 1 ]; then
-				continue
-			fi
-			nic=${i%:} # Remove colon after interface name
-			getAttrs
-			attrs="$nic $zone $ipaddr $template Up $attrs"
-		done
+manageZoneNets () {
+	ncmds[0]="Only use all-zones interfaces"
+	ncmds[1]="Add a logical interface"
+	ncmds[2]="Add a virtual interface (VNIC)"
 
-		for i in `ifconfig -ad4 |grep  "^[a-z].*:" |grep -v LOOPBACK`
-		do
-			echo $i |grep "^[a-z].*:" >/dev/null 2>&1
-			if [ $? -eq 1 ]; then
-				continue
-			fi
-			nic=${i%:} # Remove colon after interface name
-			getAttrs
-			attrs="$nic $zone $ipaddr $template Down $attrs"
-		done
+	stacks[0]="Shared Stack"
+	stacks[1]="Exclusive Stack"
 
-		nic=$(zenity --list \
-		    --title="$title" \
-		    --height=300 \
-		    --width=450 \
-		    --column="Interface" \
-		    --column="Zone Name" \
-		    --column="IP Address" \
-		    --column="Template" \
-		    --column="State" \
-		    $attrs)
+	getAllZoneNICs
+	netOps[0]="1\n${ncmds[0]}\nShared Stack\n${aznics[*]}"
 
-		if [[ -z $nic ]]; then
-			return
-		fi
+	integer nic_cnt=0
+	integer netOp_cnt=2
 
+	set -A nics $(dladm show-phys|grep -v LINK|cut -f1 -d " ")
+
+	while (( nic_cnt < ${#nics[*]} )); do
+		netOps[netOp_cnt - 1]="\n$netOp_cnt\n${ncmds[1]}\n${stacks[0]}\n${nics[nic_cnt]}"
+		netOp_cnt+=1
+		netOps[netOp_cnt - 1]="\n$netOp_cnt\n${ncmds[2]}\n${stacks[1]}\n${nics[nic_cnt]}"
+		netOp_cnt+=1
+		nic_cnt+=1
+	done
+
+	netOp=$(print "${netOps[*]}"|zenity --list \
+	    --title="$title" \
+	    --text="$msg_getnet $zonename zone:" \
+	    --height=300 \
+	    --width=500 \
+	    --column="#" \
+	    --column="Network Configuration " \
+	    --column="IP Type" \
+	    --column="Available Interfaces" \
+	    --hide-column=1
+	)
+	
+	# User picked cancel or no selection
+	if [[ -z $netOp ]] ; then
+		return
+	fi
+
+	# All-zones is the default, so just return
+	if [ $netOp = 1 ] ; then
+		return
+	fi
+
+	cmd=$(print "${netOps[$netOp - 1]}"|tr '\n' ';' |cut -d';' -f 3)
+	nic=$(print "${netOps[$netOp - 1]}"|tr '\n' ';' |cut -d';' -f 5) 
+	case $cmd in
+	    ${ncmds[1]} )
+		addNet;
+		;;	
+	    ${ncmds[2]} )
+		zonecfg -z $zonename set ip-type=exclusive
+		createVNIC
+		;;
+	esac
+}
+
+manageInterface () {
+	while (( 1 )) do
 		getAttrs
 
 		# Clear list of commands
 
 		share=
 		setipaddr=
-		settemplate=
 		newlogical=
+		newvnic=
 		unplumb=
 		bringup=
 		bringdown=
 
-		# Check for physical interface
-
-		hascolon=`echo $nic |grep :`
-		if [ $? != 0 ]; then
-			newlogical="Create Logical Interface\n";
+		if [ $updown = Down ] ; then
+			bringup="Bring Up\n"
 		else
-			up=`echo $flags|grep "UP,"`
-			if [ $? != 0 ]; then
-				unplumb="Remove Logical Interface\n"
-				if [ $ipaddr != "..." ]; then
-					bringup="Bring Up\n"
-				fi
-			else
-				bringdown="Bring Down\n"
-			fi
+			bringdown="Bring Down\n"
 		fi
 
-		if [ $ipaddr = "..." ]; then
-			setipaddr="Set IP address...\n";
-		else
-			settemplate="View Templates...\n"
-			if [ $zone = global ]; then
-				share="Share\n"
-			fi
+		case $linktype in
+		physical )
+			newlogical="Create Logical Interface...\n";
+			newvnic="Create Virtual Interface (VNIC)...\n";
+			;;
+		logical )
+			unplumb="Remove Logical Interface\n"
+			;;
+		virtual )
+			newlogical="Create Logical Interface...\n";
+			unplumb="Remove Virtual Interface\n" ;
+			;;
+		esac
+
+		if [ $ipaddr = "..." ] ; then
+			setipaddr="Set IP address...\n"
+		elif [ $zone != all-zones ] ; then
+			share="Share with Shared-IP Zones\n"
 		fi
 
-		command=$(echo ""\
+		command=$(print ""\
 		    $share \
 		    $setipaddr \
-		    $settemplate \
 		    $newlogical \
+		    $newvnic \
 		    $unplumb \
 		    $bringup \
 		    $bringdown \
 		    | zenity --list \
 		    --title="$title" \
+		    --text="Select a command from the list below:" \
 		    --height=300 \
 		    --column "Interface: $nic" )
 
 		case $command in
-		    " Create Logical Interface")\
+		    " Create Logical Interface...")
 			createInterface;;
-		    " Set IP address...")\
+		    " Create Virtual Interface (VNIC)...")
+			createVNIC ;;	
+		    " Set IP address...")
 			getIPaddr
 			addHost;;
-		    " Share")\
+		    " Share with Shared-IP Zones")
 			shareInterface;;
-		    " View Templates...")\
-			getTemplate;;
-		    " Remove Logical Interface")\
-			ifconfig $nic unplumb;\
-			rm -f /etc/hostname.$nic;;
-		    " Bring Up")\
+		    " Remove Logical Interface")
+			ifconfig $nic unplumb
+			rm -f /etc/hostname.$nic
+			return;;
+		    " Remove Virtual Interface")
+			ifconfig $nic unplumb
+			dladm delete-vnic $nic
+			rm -f /etc/hostname.$nic
+			return;;
+		    " Bring Up")
 			ifconfig $nic up;;
-		    " Bring Down")\
+		    " Bring Down")
 			ifconfig $nic down;;
-		    *) continue;;
+		    *) return;;
 		esac
+	done
+}
+
+sharePrimaryNic() {
+	set -A ip $(getent hosts $(cat /etc/nodename))
+	for i in $(ifconfig -au4|grep  "^[a-z].*:" |grep -v LOOPBACK)
+	do
+		print "$i" |grep "^[a-z].*:" >/dev/null 2>&1
+		[ $? -eq 1 ] && continue
+		
+		nic=${i%:} # Remove colon after interface name
+		getAttrs
+		if [ ${ip[0]} = $ipaddr ]; then
+			shareInterface
+			break
+		fi
+	done
+}
+
+manageNets() {
+	while (( 1 )) do
+		attrs=
+		for i in $(ifconfig -a4|grep  "^[a-z].*:" |grep -v LOOPBACK)
+		do
+			print "$i" |grep "^[a-z].*:" >/dev/null 2>&1
+			[ $? -eq 1 ] && continue
+			
+			nic=${i%:} # Remove colon after interface name
+			getAttrs
+			attrs="$nic $linktype $zone $ipaddr $template $updown $attrs"
+		done
+
+		nic=$(zenity --list \
+		    --title="$title" \
+		    --text="Select an interface from the list below:" \
+		    --height=300 \
+		    --width=500 \
+		    --column="Interface" \
+		    --column="Type" \
+		    --column="Zone Name" \
+		    --column="IP Address" \
+		    --column="Template" \
+		    --column="State" \
+		    $attrs)
+
+		if [[ -z $nic ]] ; then
+			return
+		fi
+		manageInterface
 	done
 }
 
@@ -718,16 +1154,24 @@ createLDAPclient() {
 	    --width=400 \
 	    --title="$ldaptitle" \
 	    --text="Enter Domain Name: ")
+	if [[ -n $ldapdomain ]] ; then
 	ldapserver=$(zenity --entry \
 	    --width=400 \
 	    --title="$ldaptitle" \
 	    --text="Enter Hostname of LDAP Server: ")
+	else
+		return
+	fi
+	if [[ -n $ldapserver ]] ; then
 	ldapserveraddr=$(zenity --entry \
 	    --width=400 \
 	    --title="$ldaptitle" \
 	    --text="Enter IP adddress of LDAP Server $ldapserver: ")
+	else
+		return
+	fi
 	ldappassword=""
-	while [[ -z ${ldappassword} || "x$ldappassword" != "x$ldappasswordconfirm" ]]; do
+	while [[ -z ${ldappassword} || "x$ldappassword" != "x$ldappasswordconfirm" ]] ; do
 	    ldappassword=$(zenity --entry \
 		--width=400 \
 		--title="$ldaptitle" \
@@ -752,35 +1196,33 @@ createLDAPclient() {
 	    "Domain Name" "$ldapdomain" \
 	    "Hostname" "$ldapserver" \
 	    "IP Address" "$ldapserveraddr" \
-	    "Password" "`echo "$ldappassword" | sed 's/./*/g'`" \
+	    "Password" "$(print "$ldappassword" | sed 's/./*/g')" \
 	    "Profile" "$ldapprofile")
-	if [ $? != 0 ]; then
-		return
+	[ $? != 0 ] && return
+
+	grep "^${ldapserveraddr}[^0-9]" /etc/hosts > /dev/null
+	if [ $? -eq 1 ] ; then
+		print "$ldapserveraddr $ldapserver" >> /etc/hosts
 	fi
 
-	/bin/grep "^${ldapserveraddr}[^0-9]" /etc/hosts > /dev/null
-	if [ $? -eq 1 ]; then
-		/bin/echo "$ldapserveraddr $ldapserver" >> /etc/hosts
+	grep "${ldapserver}:" $TNRHDB > /dev/null
+	if [ $? -eq 1 ] ; then
+		print "# ${ldapserver} - ldap server" \
+		    >> $TNRHDB
+		print "${ldapserveraddr}:cipso" \
+		    >> $TNRHDB
+		tnctl -h "${ldapserveraddr}:cipso"
 	fi
 
-	/bin/grep "${ldapserver}:" /etc/security/tsol/tnrhdb > /dev/null
-	if [ $? -eq 1 ]; then
-		/bin/echo "# ${ldapserver} - ldap server" \
-		    >> /etc/security/tsol/tnrhdb
-		/bin/echo "${ldapserveraddr}:cipso" \
-		    >> /etc/security/tsol/tnrhdb
-		/usr/sbin/tnctl -h "${ldapserveraddr}:cipso"
-	fi
-
-	proxyDN=`echo $ldapdomain|awk -F"." \
-	    "{ ORS = \"\" } { for (i = 1; i < NF; i++) print \"dc=\"\\\$i\",\" }{ print \"dc=\"\\\$NF }"`
+	proxyDN=$(print $ldapdomain|awk -F"." \
+	    "{ ORS = \"\" } { for (i = 1; i < NF; i++) print \"dc=\"\\\$i\",\" }{ print \"dc=\"\\\$NF }")
 
 	zenity --info \
 	    --title="$ldaptitle" \
 	    --width=500 \
 	    --text="global zone will be LDAP client of $ldapserver"
 
-	ldapout=/tmp/ldapclient.$$
+	ldapout=$TXTMP/ldapclient.$$
 
 	ldapclient init -a profileName="$ldapprofile" \
 	    -a domainName="$ldapdomain" \
@@ -788,7 +1230,7 @@ createLDAPclient() {
 	    -a proxyPassword="$ldappassword" \
 	    "$ldapserveraddr" >$ldapout 2>&1
 
-	if [ $? -eq 0 ]; then
+	if [ $? -eq 0 ] ; then
 	    ldapstatus=Success
 	else
 	    ldapstatus=Error
@@ -805,16 +1247,142 @@ createLDAPclient() {
 
 }
 
+tearDownZones() {
+	killall=$(zenity --question \
+	    --title="$title" \
+	    --width=330 \
+	    --text="$msg_confirmkill")
+	if [[ $? != 0 ]]; then
+		return
+	fi
+
+	for p in $(zoneadm list -cp|grep -v global:) ; do
+		zonename=$(echo "$p"|cut -d : -f2)
+		zoneadm -z $zonename halt 1>/dev/null 2>&1
+		zoneadm -z $zonename uninstall -F 1>/dev/null 2>&1
+		delete -rRf
+	done
+	zonename=global
+}
+
+createDefaultZones() {
+	msg_choose1=$(gettext "Choose one:")
+	defpub=$(gettext "$PUBZONE zone only")
+	defboth=$(gettext "$PUBZONE and $INTZONE zones")
+	defskip=$(gettext "Main Menu...")
+	command=$(echo ""\
+	    "$defpub\n" \
+	    "$defboth\n" \
+	    "$defskip\n" \
+	    | zenity --list \
+	    --title="$title" \
+	    --text="$msg_defzones" \
+	    --column="$msg_choose1" \
+	    --height=400 \
+	    --width=330 )
+
+	case $command in
+	    " $defpub")
+		createDefaultPublic ;;
+
+	    " $defboth")
+		createDefaultPublic
+		createDefaultInternal ;;
+
+	    *)
+		return;;
+	esac
+}
+
+createDefaultPublic() {
+	zonename=$PUBZONE
+	newZone	
+	zone_cnt+=1 
+	hexlabel=$DEFAULTLABEL
+	setTNdata
+	sharePrimaryNic
+	install
+	zoneadm -z $zonename boot &
+	gnome-terminal \
+	    --disable-factory \
+	    --title="Zone Console: $zonename $msg_continue" \
+	    --command "zlogin -C $zonename"
+}
+
+createDefaultInternal() {
+	zoneadm -z $PUBZONE halt
+
+	zonename=snapshot
+	newZone	
+	zone_cnt+=1 
+	zonecfg -z $zonename set autoboot=false
+
+	clone $PUBZONE
+	zoneadm -z $PUBZONE boot &
+
+	zonename=$INTZONE
+	newZone	
+	zone_cnt+=1 
+	selectLabel
+
+	clone snapshot
+	gnome-terminal \
+	    --title="Zone Console: $zonename" \
+	    --command "zlogin -C $zonename" &
+	zoneadm -z $zonename boot &
+}
+
+selectZone() {
+	set -A zonelist "global\nrunning\nADMIN_HIGH"
+	integer zone_cnt=1
+
+	for p in $(zoneadm list -cp|grep -v global:) ; do
+		zone_cnt+=1
+	done
+	if [ $zone_cnt == 1 ] ; then
+		createDefaultZones
+	fi
+	if [ $zone_cnt == 1 ] ; then
+		zonename=global
+		singleZone
+		return
+	fi
+
+	zone_cnt=1
+	for p in $(zoneadm list -cp|grep -v global:) ; do
+		zonename=$(echo "$p"|cut -d : -f2)
+		state=$(echo "$p"|cut -d : -f3)
+		hexlabel=$(grep "^$zonename:" $TNZONECFG|cut -d : -f2)
+		if [[ $hexlabel ]] ; then
+			curlabel=$(hextoalabel $hexlabel)
+		else
+			curlabel=...
+		fi
+		zonelist[zone_cnt]="\n$zonename\n$state\n$curlabel"
+		zone_cnt+=1
+	done
+	zonename=$(print "${zonelist[*]}"|zenity --list \
+	    --title="$title" \
+	    --text="$msg_getzone" \
+	    --height=300 \
+	    --width=500 \
+	    --column="Zone Name" \
+	    --column="Status" \
+	    --column="Sensitivity Label" \
+	)
+
+	# if the menu choice was a zonename, pop up zone menu
+	if [[ -n $zonename ]] ; then
+		singleZone
+	else
+		exit
+	fi
+}
+
 # Loop for single-zone menu
 singleZone() {
 
-	while [ "${command}" != Exit ]; do
-		if [[ ! -n $zonename ]]; then
-			x=$(zenity --error \
-			    --title="$title" \
-			    --text="zonename \"$zonename\" is not valid")
-			return
-		fi
+	while (( 1 )) do
 		# Clear list of commands
 
 		console=
@@ -823,76 +1391,116 @@ singleZone() {
 		reboot=
 		stop=
 		clone=
-		copy=
 		install=
 		ready=
 		uninstall=
+		autoboot=
 		delete=
-		addnet=
 		deletenet=
 		permitrelabel=
 
-		zonestate=`zoneadm -z $zonename list -p | cut -d ":" -f 3`
+		if [ $zone_cnt -gt 1 ] ; then
+			killZones="Destroy all zones...\n"
+			xit="Select another zone..."
+		else
+			killZones=
+			xit="Exit"
+		fi
+		if [ $zonename = global ] ; then
+			ldapClient="Create LDAP Client...\n"
+			nscdOpt="$NSCD_OPT\n"
+			createZone="Create a new zone...\n"
+			addnet="Configure Network Interfaces...\n"
+		else
+			ldapClient=
+			nscdOpt=
+			createZone=
+			addnet=
+			killZones=
+		fi
+
+		zonestate=$(zoneadm -z $zonename list -p | cut -d : -f 3)
 
 		consoleCheck;
 		labelCheck;
 		delay=0
 
-		case $zonestate in
-			running) ready="Ready\n"; \
-			       reboot="Reboot\n"; \
-			       stop="Halt\n"; \
-			;;
-			ready) start="Boot\n"; \
-			       stop="Halt\n" \
-			;;
-			installed)
-				if [[ -z $label ]]; then \
-					ready="Ready\n"; \
-					start="Boot\n"; \
-				fi; \
-				uninstall="Uninstall\n"; \
-				relabelCheck;
-				addnet="Add Network...\n"
-			;;
-			configured) install="Install...\n"; \
-				copyCheck; \
-				delete="Delete\n"; \
-				console=; \
-			;;
-			incomplete) delete="Delete\n"; \
-			;;
-			*)
-			;;
-		esac
+		if [ $zonename != global ] ; then
+			case $zonestate in
+				running)
+					ready="Ready\n"
+					reboot="Reboot\n"
+					stop="Halt\n"
+					;;
+				ready)
+					start="Boot\n"
+					stop="Halt\n"
+					;;
+				installed)
+					if [[ -z $label ]] ; then
+						ready="Ready\n"
+						start="Boot\n"
+					fi
+					uninstall="Uninstall\n"
+					relabelCheck
+					autobootCheck
+					;;
+				configured) 
+					install="Install...\n"
+					cloneCheck
+					delete="Delete\n"
+					console=
+					;;
+				incomplete)
+					uninstall="Uninstall\n"
+					;;
+				*)
+				;;
+			esac
+		fi
 
 		command=$(echo ""\
+		    $createZone \
 		    $console \
 		    $label \
 		    $start \
 		    $reboot \
 		    $stop \
 		    $clone \
-		    $copy \
 		    $install \
 		    $ready \
 		    $uninstall \
 		    $delete \
 		    $addnet \
 		    $deletenet \
+		    $addremotehost \
+		    $addcipsohost \
+		    $removeremotehost \
+		    $removecipsohost \
+		    $setmlps \
 		    $permitrelabel \
-		    "Return to Main Menu" \
+		    $autoboot \
+		    $ldapClient \
+		    $nscdOpt \
+		    $killZones \
+		    $xit \
 		    | zenity --list \
 		    --title="$title" \
-		    --height=300 \
-		    --column "$zonename: $zonestate" )
+		    --text="$msg_getcmd" \
+		    --height=400 \
+		    --width=330 \
+		    --column "Zone: $zonename   Status: $zonestate" )
 
 		case $command in
+		    " Create a new zone...")
+			zonename=
+			newZone ;;
+
 		    " Zone Console...")
-			delay=2; \
-			/usr/bin/gnome-terminal \
-			    --title="Zone Terminal Console: $zonename" \
-			    --command "/usr/sbin/zlogin -C $zonename" &;;
+			delay=2
+			gnome-terminal \
+			    --title="Zone Console: $zonename" \
+			    --command "zlogin -C $zonename" & ;;
 
 		    " Select Label...")
 			selectLabel;;
@@ -912,11 +1520,8 @@ singleZone() {
 		    " Install...")
 			install;;
 
-		    " Clone")
+		    " Clone...")
 			clone ;;
-
-		    " Copy...")
-			copy ;;
 
 		    " Uninstall")
 			zoneadm -z $zonename uninstall -F;;
@@ -925,18 +1530,63 @@ singleZone() {
 			delete
 			return ;;
 
-		    " Add Network...")
-			addNet ;;
+		    " Configure Network Interfaces...")
+			if [ $zonename = global ] ; then
+				manageNets
+			else
+				manageZoneNets
+			fi;;	
+
+		    " Add Single-level Access to Remote Host...")
+			addTnrhdb ;;
+
+		    " Add Multilevel Access to Remote Host...")
+			template=cipso
+			addTnrhdb ;;
+
+		    " Remove Single-level Access to Remote Host...")
+			removeTnrhdb ;;
+
+		    " Remove Multilevel Access to Remote Host...")
+			template=cipso
+			removeTnrhdb ;;
+
+		    " Configure Multilevel Ports...")
+			setMLPs;;
 
 		    " Permit Relabeling")
-			setMacPrivs ;;
+			zonecfg -z $zonename set limitpriv=default,\
+win_mac_read,win_mac_write,win_selection,win_dac_read,win_dac_write,\
+file_downgrade_sl,file_upgrade_sl,sys_trans_label ;;
 
 		    " Deny Relabeling")
-			resetMacPrivs ;;
+			zonecfg -z $zonename set limitpriv=default ;;
+
+		    " Set Automatic Booting")
+			zonecfg -z $zonename set autoboot=true ;;
+
+		    " Set Manual Booting")
+			zonecfg -z $zonename set autoboot=false ;;
+
+		    " Create LDAP Client...")
+			createLDAPclient ;;
+
+		    " Configure per-zone name service")
+			manageNscd ;;
+
+		    " Unconfigure per-zone name service")
+			manageNscd ;;
+
+		    " Destroy all zones...")
+			tearDownZones
+			return ;;
 
 		    *)
-			zonename=
-			return ;;
+			if [ $zone_cnt == 1 ] ; then
+				exit
+			else
+				return
+			fi;;
 		esac
 		sleep $delay;
 	done
@@ -945,105 +1595,41 @@ singleZone() {
 # Main loop for top-level window
 #
 
+mkdir $TXTMP 2>/dev/null
+deflabel=$(chk_encodings -a|grep "Default User Sensitivity"|\
+   sed 's/= /=/'|sed 's/"/'''/g|cut -d"=" -f2)
+DEFAULTLABEL=$(atohexlabel ${deflabel})
 
-ZDSET=none
 # are there any zfs pools?
+ZDSET=none
 zpool iostat 1>/dev/null 2>&1
-if [ $? = 0 ]; then
+if [ $? = 0 ] ; then
 	# is there a zfs pool named "zone"?
 	zpool list -H zone 1>/dev/null 2>&1
-	if [ $? = 0 ]; then
+	if [ $? = 0 ] ; then
 		# yes
 		ZDSET=zone
 	else
 		# no, but is there a root pool?
-		rootfs=`df -n / | awk '{print $3}'`
-		if [ $rootfs = "zfs" ]; then
+		rootfs=$(df -n / | awk '{print $3}')
+		if [ $rootfs = "zfs" ] ; then
 			# yes, use it
-			ZDSET=`zfs list -Ho name / | cut -d/ -f 1`/zones
+			ZDSET=$(zfs list -Ho name / | cut -d/ -f 1)/zones
 			zfs list -H $ZDSET 1>/dev/null 2>&1
-			if [ $? = 1 ]; then
-				zfs create -o mountpoint=/zone $ZDSET
+			if [ $? = 1 ] ; then
+				createZDSET "-o mountpoint=/zone" $ZDSET
 			fi
 		fi
 	fi
 fi
 
-export NSCD_OPT
-while [ "${command}" != Exit ]; do
-	zonelist=""
-	for p in `zoneadm list -cp |grep -v global:`; do
-		zonename=`echo $p|cut -d : -f2`
-		state=`echo $p|cut -d : -f3`
-		labelCheck
-		zonelist="$zonelist$zonename\n$state\n$curlabel\n"
-	done
+if [ $NSCD_PER_LABEL -eq 0 ]  ; then
+	NSCD_OPT="Configure per-zone name service"
+else
+	NSCD_OPT="Unconfigure per-zone name service"
+fi
 
-	if [ $NSCD_PER_LABEL -eq 0 ]  ; then
-		NSCD_OPT="Configure per-zone name service"
-	else
-		NSCD_OPT="Unconfigure per-zone name service"
-	fi
-	zonelist=${zonelist}"Manage Network Interfaces...\n\n\n"
-	zonelist=${zonelist}"Create a new zone...\n\n\n"
-	zonelist=${zonelist}"${NSCD_OPT}"
-	zonelist=${zonelist}"\n\n\nCreate LDAP Client...\n\n\n"
-	zonelist=${zonelist}"Exit\n\n"
 
-	zonename=""
-	topcommand=$(echo $zonelist|zenity --list \
-	    --title="$title" \
-	    --height=300 \
-	    --width=500 \
-	    --column="Zone Name" \
-	    --column="Status" \
-	    --column="Sensitivity Label" \
-	    )
-
-	if [[ ! -n $topcommand ]]; then
-		command=Exit
-		exit
-	fi
-
-	if [ "$topcommand" = "$NSCD_OPT" ]; then
-		topcommand=
-		manageNscd
-		continue
-	elif [ "$topcommand" = "Manage Network Interfaces..." ]; then
-		topcommand=
-		manageNets
-		continue
-	elif [ "$topcommand" = "Exit" ]; then
-		command=Exit
-		exit
-	elif [ "$topcommand" = "Create a new zone..." ]; then
-		zonename=$(zenity --entry \
-		    --title="$title" \
-		    --entry-text="" \
-		    --text="Enter Zone Name: ")
-
-		if [[ ! -n $zonename ]]; then
-			continue
-		fi
-
-		zcfg="
-create -t SUNWtsoldef
-set zonepath=/zone/$zonename
-commit
-"
-		echo "$zcfg" > $config ;
-		zonecfg -z $zonename -f $config ;
-		rm $config
-		# Now, go to the singleZone menu, using the global
-		# variable zonename, and continue with zone creation
-		singleZone
-		continue
-	elif [ "$topcommand" = "Create LDAP Client..." ]; then
-		command=LDAPclient
-		createLDAPclient
-		continue
-	fi
-	# if the menu choice was a zonename, pop up zone menu
-	zonename=$topcommand
-	singleZone
+while (( 1 )) do
+	selectZone
 done

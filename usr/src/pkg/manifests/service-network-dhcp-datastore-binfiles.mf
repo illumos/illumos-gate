@@ -1,0 +1,52 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/network/dhcp/datastore/binfiles@$(PKGVERS)
+set name=pkg.description \
+    value="Binary File Format Public module exporting Version 1 of the Service Provider Interface. Used to store DHCP data, this module has much better performance than the ASCII files and nisplus public modules."
+set name=pkg.summary \
+    value="Binary File Format Data Module for BOOTP/DHCP Services"
+set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/inet
+dir path=usr/lib/inet/dhcp
+dir path=usr/lib/inet/dhcp/svc
+dir path=usr/sadm
+dir path=usr/sadm/admin
+dir path=usr/sadm/admin/dhcpmgr
+file path=usr/lib/inet/dhcp/svc/ds_SUNWbinfiles.so.1
+file path=usr/sadm/admin/dhcpmgr/SUNWbinfiles.jar mode=0444
+legacy pkg=SUNWdhcsb arch=$(ARCH) category=system \
+    desc="Binary File Format Public module exporting Version 1 of the Service Provider Interface. Used to store DHCP data, this module has much better performance than the ASCII files and nisplus public modules." \
+    hotline="Please contact your local service provider" \
+    name="Binary File Format Data Module for BOOTP/DHCP Services" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/inet/dhcp/svc/ds_SUNWbinfiles.so target=./ds_SUNWbinfiles.so.1

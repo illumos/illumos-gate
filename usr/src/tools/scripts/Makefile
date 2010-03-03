@@ -27,7 +27,6 @@ SHELL=/usr/bin/ksh93
 
 SHFILES= \
 	Install \
-	acr \
 	bfu \
 	bfudrop \
 	bindrop \
@@ -44,11 +43,11 @@ SHFILES= \
 	hgsetup \
 	keywords \
 	makebfu \
-	mkacr \
 	mkbfu \
 	mkclosed \
 	nightly \
 	onblddrop \
+	onu \
 	protocmp.terse \
 	sccscheck \
 	sccscp \
@@ -80,17 +79,17 @@ PERLMODULES= \
 
 
 PYFILES= \
-	cddlchk \
-	copyrightchk \
-	hdrchk \
-	hg-active \
-	mapfilechk \
-	rtichk \
-	wsdiff
+ 	cddlchk \
+ 	copyrightchk \
+ 	hdrchk \
+ 	hg-active \
+ 	mapfilechk \
+ 	rtichk \
+	validate_pkg \
+ 	wsdiff
 
 MAN1FILES= \
 	Install.1 \
-	acr.1 \
 	bldenv.1 \
 	bringovercheck.1 \
 	cddlchk.1 \
@@ -105,8 +104,8 @@ MAN1FILES= \
 	hgsetup.1 \
 	jstyle.1 \
 	mapfilechk.1 \
-	mkacr.1 \
 	nightly.1 \
+	onu.1 \
 	sccscheck.1 \
 	sccscp.1 \
 	sccsmv.1 \

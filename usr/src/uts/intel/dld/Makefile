@@ -36,6 +36,7 @@ OBJECTS		= $(DLD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DLD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/dld
+ROOTDEVLINK	= $(ROOT)/dev/$(MODULE)
 
 #
 # Include common rules.
@@ -85,7 +86,10 @@ modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
-install:	$(INSTALL_DEPS)
+install:	$(INSTALL_DEPS) $(ROOTDEVLINK)
+
+$(ROOTDEVLINK):
+	-$(RM) $@; $(SYMLINK) ../devices/pseudo/$(@F)@0:ctl $@
 
 #
 #	Include common targets.

@@ -67,7 +67,7 @@ Network ILB:::Manage ILB configuration via ilbadm:auths=solaris.network.ilb.conf
 Network VRRP:::Manage VRRP instances:auths=solaris.network.vrrp,solaris.smf.manage.vrrp;help=RtNetVRRP.html
 Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.tnd,solaris.smf.manage.tnctl,solaris.smf.manage.wpa,solaris.smf.value.mdns,solaris.smf.manage.mdns,solaris.smf.manage.ilb;profiles=Network Wifi Management,Inetd Management,Network VRRP,Network Observability;help=RtNetMngmnt.html
 Network Observability:::Allow access to observability devices:privs=net_observability;help=RtNetObservability.html
-Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh,solaris.smf.value.tnd;profiles=Network Wifi Security,Network Link Security,Network IPsec Management;help=RtNetSecure.html
+Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh,solaris.smf.value.tnd,solaris.network.*;profiles=Network Wifi Security,Network Link Security,Network IPsec Management;help=RtNetSecure.html
 Network Wifi Management:::Manage wifi network configuration:auths=solaris.network.wifi.config;help=RtNetWifiMngmnt.html
 Network Wifi Security:::Manage wifi network security:auths=solaris.network.wifi.wep;help=RtNetWifiSecure.html
 Network Link Security:::Manage network link security:auths=solaris.network.link.security;help=RtNetLinkSecure.html
@@ -75,6 +75,8 @@ Network IPsec Management:::Manage IPsec and IKE:auths=solaris.smf.manage.ipsec,s
 Name Service Management:::Non-security name service scripts/commands:help=RtNameServiceAdmin.html
 Name Service Security:::Security related name service scripts/commands:help=RtNameServiceSecure.html
 Object Access Management:::Change ownership and permission on files:help=RtObAccessMngmnt.html
+Operator:::Can perform simple administrative tasks:profiles=Printer Management,Media Backup,All;help=RtOperator.html
+Primary Administrator:::Can perform all administrative tasks:auths=solaris.*,solaris.grant;help=RtPriAdmin.html
 Process Management:::Manage current processes and processors:auths=solaris.smf.manage.cron,solaris.smf.manage.power;help=RtProcManagement.html
 Reparse Management:::Manage the reparse service:auths=solaris.smf.manage.reparse:help=RtReparseMngmnt.html
 Rights Delegation:::Delegate ability to assign rights to users and roles:auths=solaris.role.delegate,solaris.profmgr.delegate,solaris.grant;help=RtRightsDelegate.html
@@ -82,6 +84,7 @@ Rmvolmgr Management:::Manage Removable Volume Manager SMF service:auths=solaris.
 Service Management:::Manage services:auths=solaris.smf.manage,solaris.smf.modify
 Service Operator:::Administer services:auths=solaris.smf.manage,solaris.smf.modify.framework
 Software Installation:::Add application software to the system:help=RtSoftwareInstall.html
+System Administrator:::Can perform most non-security administrative tasks:profiles=Audit Review,Printer Management,Cron Management,Device Management,File System Management,Mail Management,Maintenance and Repair,Media Backup,Media Restore,Name Service Management,Network Management,Object Access Management,Process Management,Software Installation,User Management,Project Management,All;help=RtSysAdmin.html
 System Event Management:::Manage system events and system event channels:help=RtSysEvMngmnt.html
 User Management:::Manage users, groups, home directory:auths=solaris.profmgr.read;help=RtUserMngmnt.html
 User Security:::Manage passwords, clearances:auths=solaris.role.*,solaris.profmgr.*,solaris.label.range;help=RtUserSecurity.html

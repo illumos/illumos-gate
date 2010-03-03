@@ -1,0 +1,52 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/driver/audio/audiosolo@$(PKGVERS)
+set name=pkg.description value="SunOS audio device driver for ESS Solo-1"
+set name=pkg.summary value="ESS Solo-1 Audio Driver"
+set name=info.classification value=org.opensolaris.category.2008:Drivers/Media
+set name=variant.arch value=i386
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+driver name=audiosolo alias=pci125d,1969
+file path=kernel/drv/$(ARCH64)/audiosolo group=sys
+file path=kernel/drv/audiosolo group=sys
+legacy pkg=SUNWaudiosolo arch=$(ARCH) category=system \
+    desc="SunOS audio device driver for ESS Solo-1" \
+    hotline="Please contact your local service provider" \
+    name="ESS Solo-1 Audio Driver" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license uts/common/io/audio/drv/audiosolo/THIRDPARTYLICENSE \
+    license=uts/common/io/audio/drv/audiosolo/THIRDPARTYLICENSE

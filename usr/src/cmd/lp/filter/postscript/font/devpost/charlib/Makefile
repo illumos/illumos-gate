@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/lp/filter/postscript/font/devpost/charlib/Makefile
@@ -48,6 +48,8 @@ all:			$(FILES)
 install:		all $(ROOTCHARLIB) $(ROOTFILES)
 			$(RM) $(ROOTCHARLIB)/~=
 			$(INS) -m $(FILEMODE) -f $(ROOTCHARLIB) ~=
+			$(RM) $(ROOTCHARLIB)/'~'
+			$(LN) $(ROOTCHARLIB)/~= $(ROOTCHARLIB)/'~'
 
 $(ROOTCHARLIB):
 			$(INS.dir)

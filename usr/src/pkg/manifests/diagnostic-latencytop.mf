@@ -1,0 +1,45 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/diagnostic/latencytop@$(PKGVERS)
+set name=pkg.description value="LatencyTOP tool"
+set name=pkg.summary value="LatencyTOP tool"
+set name=info.classification \
+    value="org.opensolaris.category.2008:Applications/System Utilities"
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/bin
+$(i386_ONLY)dir path=usr/bin/$(ARCH32)
+dir path=usr/bin/$(ARCH64)
+$(i386_ONLY)file path=usr/bin/$(ARCH32)/latencytop mode=0555
+file path=usr/bin/$(ARCH64)/latencytop mode=0555
+hardlink path=usr/bin/latencytop target=../../usr/lib/isaexec
+legacy pkg=SUNWlatencytop arch=$(ARCH) category=system desc="LatencyTOP tool" \
+    hotline="Please contact your local service provider" name="LatencyTOP tool" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

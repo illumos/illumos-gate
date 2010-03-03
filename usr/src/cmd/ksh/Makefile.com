@@ -20,19 +20,15 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 SHELL=/usr/bin/ksh93
 
-include ../../../Makefile.ksh93switch
+PROG= ksh
 
-$(BINKSH_IS_KSH93)PROG= ksh
-$(BINKSH_IS_KSH93)USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93 pfksh pfksh93 pfrksh pfrksh93
-
-$(BINKSH_ISNOT_KSH93)PROG= ksh93
-$(BINKSH_ISNOT_KSH93)USRKSH_ALIAS_LIST=ksh93 rksh93
+USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93 pfksh pfksh93 pfrksh pfrksh93
 
 OBJECTS= \
 	pmain.o

@@ -1,0 +1,75 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/network/ftp@$(PKGVERS)
+set name=pkg.description value="FTP Server and Utilities"
+set name=pkg.summary value="FTP Server"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=etc/ftpd group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/method
+dir path=usr group=sys
+dir path=usr/sbin
+dir path=var group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/network group=sys
+file path=etc/ftpd/ftpaccess group=sys original_name=SUNWftp:etc/ftpd/ftpaccess \
+    preserve=true
+file path=etc/ftpd/ftpconversions group=sys \
+    original_name=SUNWftp:etc/ftpd/ftpconversions preserve=true
+file path=etc/ftpd/ftpgroups group=sys original_name=SUNWftp:etc/ftpd/ftpgroups \
+    preserve=true
+file path=etc/ftpd/ftphosts group=sys original_name=SUNWftp:etc/ftpd/ftphosts \
+    preserve=true
+file path=etc/ftpd/ftpservers group=sys \
+    original_name=SUNWftp:etc/ftpd/ftpservers preserve=true
+file path=lib/svc/method/svc-ftp mode=0555
+file path=usr/sbin/ftpaddhost mode=0555
+file path=usr/sbin/ftpconfig mode=0555
+file path=usr/sbin/ftpcount mode=0555
+file path=usr/sbin/ftprestart mode=0555
+file path=usr/sbin/ftpshut mode=0555
+file path=usr/sbin/in.ftpd mode=0555
+file path=usr/sbin/privatepw mode=0555
+file path=var/svc/manifest/network/ftp.xml group=sys mode=0444
+hardlink path=usr/sbin/ftpwho target=../../usr/sbin/ftpcount
+legacy pkg=SUNWftpr arch=$(ARCH) category=system \
+    desc="FTP Server Configuration Files" \
+    hotline="Please contact your local service provider" \
+    name="FTP Server, (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWftpu arch=$(ARCH) category=system desc="FTP Server and Utilities" \
+    hotline="Please contact your local service provider" \
+    name="FTP Server, (Usr)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license ../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE \
+    license=../../cmd/cmd-inet/usr.sbin/in.ftpd/LICENSE
+license cr_Sun license=cr_Sun

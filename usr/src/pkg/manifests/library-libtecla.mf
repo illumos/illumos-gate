@@ -1,0 +1,54 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri \
+    value=pkg:/library/libtecla@1.6.0,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.description value="Tecla command-line editing library"
+set name=pkg.summary value="Tecla command-line editing library"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Libraries
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/bin
+dir path=usr/include
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+file path=usr/bin/enhance mode=0555
+file path=usr/include/libtecla.h
+file path=usr/lib/$(ARCH64)/libtecla.so.1
+file path=usr/lib/$(ARCH64)/llib-ltecla.ln
+file path=usr/lib/libtecla.so.1
+file path=usr/lib/llib-ltecla
+file path=usr/lib/llib-ltecla.ln
+legacy pkg=SUNWtecla arch=$(ARCH) category=system \
+    desc="Tecla command-line editing library" \
+    hotline="Please contact your local service provider" \
+    name="Tecla command-line editing library" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license lib/libtecla/THIRDPARTYLICENSE license=lib/libtecla/THIRDPARTYLICENSE
+link path=usr/lib/$(ARCH64)/libtecla.so target=libtecla.so.1
+link path=usr/lib/libtecla.so target=libtecla.so.1

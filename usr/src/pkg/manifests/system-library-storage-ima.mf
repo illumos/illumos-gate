@@ -1,0 +1,61 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/library/storage/ima@$(PKGVERS)
+set name=pkg.description \
+    value="SNIA iSCSI Managment API plugin library for iSCSI adapters"
+set name=pkg.summary value="Solaris IMA Software Initiator Plugin"
+set name=info.classification \
+    value="org.opensolaris.category.2008:Applications/Plug-ins and Run-times"
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+file path=usr/lib/$(ARCH64)/libsun_ima.so.1
+file path=usr/lib/$(ARCH64)/llib-lima.ln
+file path=usr/lib/$(ARCH64)/llib-lsun_ima.ln
+file path=usr/lib/libsun_ima.so.1
+file path=usr/lib/llib-lima
+file path=usr/lib/llib-lima.ln
+file path=usr/lib/llib-lsun_ima
+file path=usr/lib/llib-lsun_ima.ln
+legacy pkg=SUNWima arch=$(ARCH) category=system \
+    desc="SNIA iSCSI Managment API plugin library for iSCSI adapters" \
+    hotline="Please contact your local service provider" \
+    name="Solaris IMA Software Initiator Plugin" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWimar arch=$(ARCH) category=system \
+    desc="SNIA iSCSI Managment API plugin library for iSCSI adapters (Root)" \
+    hotline="Please contact your local service provider" \
+    name="Solaris IMA Software Initiator Plugin (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lib/libima/THIRDPARTYLICENSE license=lib/libima/THIRDPARTYLICENSE
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/$(ARCH64)/libsun_ima.so target=libsun_ima.so.1
+link path=usr/lib/libsun_ima.so target=libsun_ima.so.1

@@ -1,4 +1,30 @@
-exception_lists/copyright
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+syntax: glob
 exception_lists/cstyle
 exception_lists/hdrchk
 usr/src/cmd/krb5/kadmin/cli/kadmin_ct.c
@@ -294,53 +320,9 @@ usr/src/lib/krb5/ss/mit-sipb-copyright.h
 usr/src/lib/krb5/ss/options.c
 usr/src/lib/krb5/ss/std_rqs.c
 usr/src/lib/krb5/ss/utils.c
-usr/src/lib/librstp/common/base.h
-usr/src/lib/librstp/common/ChangeLog
-usr/src/lib/librstp/common/choose.h
-usr/src/lib/librstp/common/COPYING
-usr/src/lib/librstp/common/edge.c
-usr/src/lib/librstp/common/edge.h
-usr/src/lib/librstp/common/migrate.c
-usr/src/lib/librstp/common/migrate.h
-usr/src/lib/librstp/common/p2p.c
-usr/src/lib/librstp/common/p2p.h
-usr/src/lib/librstp/common/pcost.c
-usr/src/lib/librstp/common/pcost.h
-usr/src/lib/librstp/common/port.c
-usr/src/lib/librstp/common/port.h
-usr/src/lib/librstp/common/portinfo.c
-usr/src/lib/librstp/common/portinfo.h
-usr/src/lib/librstp/common/README
-usr/src/lib/librstp/common/README.authors
-usr/src/lib/librstp/common/README.CVS.HOWTO
-usr/src/lib/librstp/common/README.files
-usr/src/lib/librstp/common/README.news
-usr/src/lib/librstp/common/rolesel.c
-usr/src/lib/librstp/common/rolesel.h
-usr/src/lib/librstp/common/roletrns.c
-usr/src/lib/librstp/common/roletrns.h
-usr/src/lib/librstp/common/statmch.c
-usr/src/lib/librstp/common/statmch.h
-usr/src/lib/librstp/common/stp_bpdu.h
-usr/src/lib/librstp/common/stp_in.c
-usr/src/lib/librstp/common/stp_in.h
-usr/src/lib/librstp/common/stp_to.h
-usr/src/lib/librstp/common/stp_vectors.h
-usr/src/lib/librstp/common/stpm.c
-usr/src/lib/librstp/common/stpm.h
-usr/src/lib/librstp/common/stpmgmt.c
-usr/src/lib/librstp/common/sttrans.c
-usr/src/lib/librstp/common/sttrans.h
-usr/src/lib/librstp/common/times.c
-usr/src/lib/librstp/common/times.h
-usr/src/lib/librstp/common/TODO
-usr/src/lib/librstp/common/topoch.c
-usr/src/lib/librstp/common/topoch.h
-usr/src/lib/librstp/common/transmit.c
-usr/src/lib/librstp/common/transmit.h
-usr/src/lib/librstp/common/uid_stp.h
-usr/src/lib/librstp/common/vector.c
-usr/src/lib/librstp/common/vector.h
+usr/src/lib/librstp/common/*.[ch]
+usr/src/lib/librstp/common/[CRT]*
+usr/src/uts/intel/os/solaris.xpm
 usr/src/uts/common/gssapi/mechs/krb5/crypto/block_size.c
 usr/src/uts/common/gssapi/mechs/krb5/crypto/checksum_length.c
 usr/src/uts/common/gssapi/mechs/krb5/crypto/des/f_parity.c
@@ -366,3 +348,4 @@ usr/src/uts/common/gssapi/mechs/krb5/krb5/os/toffset.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/util_seed.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/util_seqnum.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/val_cred.c
+

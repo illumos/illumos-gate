@@ -1,0 +1,63 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/service/network/legacy@$(PKGVERS)
+set name=pkg.description \
+    value="Common Network Services: time, daytime, echo, discard, chargen"
+set name=pkg.summary \
+    value="Common Network Services: time, daytime, echo, discard, chargen"
+set name=info.classification value=org.opensolaris.category.2008:System/Services
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/inet
+dir path=var group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/network group=sys
+file path=usr/lib/inet/in.chargend mode=0555
+file path=usr/lib/inet/in.daytimed mode=0555
+file path=usr/lib/inet/in.discardd mode=0555
+file path=usr/lib/inet/in.echod mode=0555
+file path=usr/lib/inet/in.timed mode=0555
+file path=var/svc/manifest/network/chargen.xml group=sys mode=0444
+file path=var/svc/manifest/network/daytime.xml group=sys mode=0444
+file path=var/svc/manifest/network/discard.xml group=sys mode=0444
+file path=var/svc/manifest/network/echo.xml group=sys mode=0444
+file path=var/svc/manifest/network/time.xml group=sys mode=0444
+legacy pkg=SUNWcnsr arch=$(ARCH) category=system \
+    desc="Common Network Services (Root): time, daytime, echo, discard, chargen" \
+    hotline="Please contact your local service provider" \
+    name="Common Network Services (Root): time, daytime, echo, discard, chargen" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWcnsu arch=$(ARCH) category=system \
+    desc="Common Network Services (Usr): time, daytime, echo, discard, chargen" \
+    hotline="Please contact your local service provider" \
+    name="Common Network Services (Usr): time, daytime, echo, discard, chargen" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

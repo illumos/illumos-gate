@@ -1,0 +1,44 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# All nonredistributable packages go to extra, for the purposes of the
+# osnet build.
+#
+<transform set name=org.opensolaris.redist value=nonredist|internal -> print REPO=extra>
+
+#
+# Ordering is important here, and the last line wins.
+#
+# The default of "current" is provided by the calling environment,
+# rather than a print operation.
+#
+<transform set name=pkg.renamed value=true -> print PKGSTAT=renamed>
+<transform set name=pkg.obsolete value=true -> print PKGSTAT=obsolete>
+<transform set name=org.opensolaris.noincorp value=true -> print PKGSTAT=noincorp>
+<transform set name=org.opensolaris.noincorp -> drop>
+<transform set name=org.opensolaris.nodepend value=true -> print NODEPEND=true>
+<transform set name=org.opensolaris.nodepend -> drop>

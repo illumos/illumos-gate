@@ -1,10 +1,11 @@
 #!/sbin/sh
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 . /lib/svc/share/ipf_include.sh
+. /lib/svc/share/smf_include.sh
 
 SSHDIR=/etc/ssh
 KEYGEN="/usr/bin/ssh-keygen -q"
@@ -18,15 +19,30 @@ create_key()
 	keytype=$2
 
 	if [ ! -f $keypath ]; then
-		grep "^HostKey $keypath" $SSHDIR/sshd_config > /dev/null 2>&1
+		# 
+		# HostKey keywords in sshd_config may be preceded or
+		# followed by a mix of any number of space or tabs,
+		# and optionally have an = between keyword and
+		# argument.  We use two grep invocations such that we
+		# can match HostKey case insensitively but still have
+		# the case of the path name be significant, keeping
+		# the pattern somewhat more readable.
+		#
+		# The character classes below contain one literal
+		# space and one literal tab.
+		#
+		grep -i "^[ 	]*HostKey[ 	]*=\{0,1\}[ 	]*$keypath" \
+		    $SSHDIR/sshd_config | grep "$keypath" > /dev/null 2>&1
+
 		if [ $? -eq 0 ]; then
 			echo Creating new $keytype public/private host key pair
 			$KEYGEN -f $keypath -t $keytype -N ''
-			return $?
+			if [ $? -ne 0 ]; then
+				echo "Could not create $keytype key: $keypath"
+				exit $SMF_EXIT_ERR_CONFIG
+			fi
 		fi
 	fi
-
-	return 0
 }
 
 create_ipf_rules()
@@ -74,6 +90,14 @@ case $1 in
 	;;
 
 'start')
+	#
+	# If host keys don't exist when the service is started, create
+	# them; sysidconfig is not run in every situation (such as on
+	# the install media).
+	# 
+	create_key $SSHDIR/ssh_host_rsa_key rsa
+	create_key $SSHDIR/ssh_host_dsa_key dsa
+
 	/usr/lib/ssh/sshd
 	;;
 

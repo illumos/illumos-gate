@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -60,11 +60,10 @@ find_files "s.*"	\
 	usr/src/uts/intel/pcicfg
 
 # packaging files
-find_files "s.*"	\
-	usr/src/pkgdefs/common_files	\
-	usr/src/pkgdefs/SUNWckr		\
-	usr/src/pkgdefs/SUNWcakr.i	\
-	usr/src/pkgdefs/SUNWcsu
+find_files "s.*" usr/src/pkg/license_files
+echo_file usr/src/pkg/manifests/SUNWckr.mf
+echo_file usr/src/pkg/manifests/SUNWcakr.mf
+echo_file usr/src/pkg/manifests/SUNWcs.mf
 
 # extra files needed
 find_files "s.*"	\
@@ -113,13 +112,8 @@ echo_file  usr/src/uts/intel/ia32/ml/ia32.il
 echo_file  usr/src/cmd/Makefile
 echo_file  usr/src/cmd/Makefile.cmd
 echo_file  usr/src/cmd/Makefile.targ
-echo_file  usr/src/pkgdefs/awk_procedure
-echo_file  usr/src/pkgdefs/bld_awk_pkginfo.ksh
-echo_file  usr/src/pkgdefs/req.flg
-echo_file  usr/src/pkgdefs/Makefile
-echo_file  usr/src/pkgdefs/Makefile.com
-echo_file  usr/src/pkgdefs/Makefile.prtarg
-echo_file  usr/src/pkgdefs/Makefile.targ
-echo_file  usr/src/pkgdefs/etc/exception_list_sparc
-echo_file  usr/src/pkgdefs/etc/exception_list_i386
+echo_file  usr/src/pkg/Makefile
+echo_file  exception_lists/packaging
+echo_file  exception_lists/packaging.closed
+echo_file  exception_lists/packaging.open
 find_files "s.*" usr/src/common/mapfiles

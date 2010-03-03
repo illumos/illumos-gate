@@ -176,8 +176,6 @@ global_zone_only_files="
 	etc/crypto/kcf.conf
 	etc/devlink.tab
 	etc/dladm/*
-	etc/driver_aliases
-	etc/driver_classes
 	etc/lvm/devpath
 	etc/lvm/lock
 	etc/lvm/md.cf
@@ -186,8 +184,6 @@ global_zone_only_files="
 	etc/lvm/mddb.cf
 	etc/lvm/runtime.cf
 	etc/mach
-	etc/minor_perm
-	etc/name_to_major
 	etc/name_to_sysnum
 	etc/nca/nca.if
 	etc/nca/ncakmod.conf
@@ -199,7 +195,6 @@ global_zone_only_files="
 	etc/ppp/chap-secrets
 	etc/ppp/options
 	etc/ppp/pap-secrets
-	etc/security/device_policy
 	etc/security/extra_privs
 	etc/security/tsol/devalloc_defaults
 	etc/security/tsol/label_encodings
@@ -409,7 +404,12 @@ superfluous_nonglobal_zone_files="
 # "child" versions
 #
 preserve_files="
+	etc/driver_aliases
+	etc/driver_classes
 	etc/hostid
+	etc/minor_perm
+	etc/name_to_major
+	etc/security/device_policy
 	kernel/misc/amd64/sysinit
 	kernel/misc/amd64/usbs49_fw
 	kernel/misc/sparcv9/usbs49_fw
@@ -432,8 +432,7 @@ realmode_files="
 #
 # /usr/sadm/install/scripts/i.build class runs class client provided
 # script. The files below are managed by build class and its build script.
-# They are added /bfu.conflict/NEW and the acr.sh process runs the script
-# as part of conflict resolution. 
+# They are added to /bfu.conflict/NEW.
 #
 build_class_script_files="
 	etc/mpapi.conf
@@ -2557,8 +2556,6 @@ extraction_error() {
 # Make a local copy of bfu in /tmp and execute that instead.
 # This makes us immune to loss of networking and/or changes
 # to the original copy that might occur during execution.
-# While we're doing this, set ACR to the instance of acr in
-# the same directory as bfu (we hope they are a  matched pair).
 #
 cd .
 abspath=`[[ $0 = /* ]] && print $0 || print $PWD/$0`
@@ -2567,12 +2564,6 @@ if [[ $abspath != /tmp/* ]]; then
 	print "Copying $abspath to $localpath"
 	cp $abspath $localpath
 	chmod +x $localpath
-	if [ -z "$ACR" ] ; then
-		acr=`dirname $abspath`/acr
-		if [ -x "$acr" ] ; then
-			export ACR="$acr"
-		fi
-	fi
 	print "Executing $localpath $*\n"
 	exec $localpath $*
 fi
@@ -3132,12 +3123,7 @@ bfucmd="${bfucmd} /tmp/xpg4grep"
 # /tmp/bfubin. The interpreters in /usr/bin may not be compatible with the
 # libraries in the archives being extracted.
 #
-if [ -z "$ACR" ] ; then
-	ACR=${GATE}/public/bin/acr
-fi
-bfuscr="
-	${ACR}
-"
+bfuscr=""
 
 #
 # Tools which may be either scripts or ELF binaries,
@@ -3451,15 +3437,8 @@ ${BFULD-$GATE/public/bin/$bfu_isa/bfuld} /tmp/bfubin/* || fail "bfuld failed"
 
 for x in $bfuscr
 do
-	if [ "$x" = "$ACR" ] ; then	# ACR is special
-		sed -e 's/^#!\/usr\/bin\//#!\/tmp\/bfubin\//' \
-		    -e 's/^#!\/bin\//#!\/tmp\/bfubin\//' \
-		    < $x > /tmp/bfubin/`basename $x`
-	else
-		sed -e 's/\/usr\/bin\//\/tmp\/bfubin\//g' \
-		    -e 's/\/bin\//\/tmp\/bfubin\//g' \
-		    < $x > /tmp/bfubin/`basename $x`
-	fi
+	sed -e 's/\/usr\/bin\//\/tmp\/bfubin\//g' \
+	    -e 's/\/bin\//\/tmp\/bfubin\//g' < $x > /tmp/bfubin/`basename $x`
 	chmod +x /tmp/bfubin/`basename $x`
 done
 
@@ -6215,8 +6194,7 @@ mondo_loop() {
 	#
 	tx_check_update
 
-      	# Reflect SUNWcsr's pre-install change, ensures
-	# the i.hosts action script works during 'acr'	
+      	# Reflect SUNWcsr's pre-install change
 	if [[ -f $rootprefix/etc/inet/ipnodes && \
 			! -h $rootprefix/etc/inet/ipnodes ]]; then
 		rm -f $rootprefix/etc/inet/ipnodes.hostsmerge
@@ -9011,10 +8989,7 @@ if [ -s "$bfu_zone_list" ]; then
 		mondo_loop $zonepath/root $zone
 	done
 
-	#
-	# Normally we would clean up $bfu_zone_list but instead we leave it
-	# behind for ACR to locate and use inside the BFU alternate reality.
-	#
+	rm -f "$bfu_zone_list"
 fi
 
 print "Turning off delayed i/o and syncing filesystems ..."

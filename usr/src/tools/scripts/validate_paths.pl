@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,12 @@
 # CDDL HEADER END
 #
 
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
+#
 # Given either a list of files containing paths on the command line or
 # a set of paths on standard input, validate that the paths actually
 # exist, and complain if they do not.  This is invoked by nightly to
@@ -63,16 +63,19 @@
 #
 #	-b <base>
 #		Base directory for relative paths tested.
+#
+#	-n <name>
+#		String to use in place of file name when using stdin
 
 use strict;
 
-my ($opt_r, $opt_m, @opt_s, @opt_e, @opt_k, $opt_b);
+my ($opt_r, $opt_m, @opt_s, @opt_e, @opt_k, $opt_b, $opt_n);
 my ($keywords, @exclude);
 
 sub usage {
     die "usage: $0 [-r] [-m]\n",
     "\t[-s/from/to/] [-e <pattern>] [-k <keyword>] [-b <base>]\n",
-    "\t[files...]\n";
+    "\t[-n <name> ] [files...]\n";
 }
 
 # process the path list in a given file
@@ -138,11 +141,12 @@ sub next_arg {
 # I'd like to use Perl's getopts here, but it doesn't handle repeated
 # options, and using comma separators is just too ugly.
 # This doesn't handle combined options (as in '-rm'), but I don't care.
-my $arg, $opt_r, $opt_m, @opt_s, @opt_e, @opt_k, $opt_b;
+my $arg, $opt_r, $opt_m, @opt_s, @opt_e, @opt_k, $opt_b, $opt_n;
 while ($#ARGV >= 0) {
     $_ = $ARGV[0];
     last if /^[^-]/;
     shift @ARGV;
+    $opt_n = "standard input";
     last if /^--$/;
     SWITCH: {
 	  /^-r/ && do { $opt_r = 1; last SWITCH; };
@@ -166,6 +170,10 @@ while ($#ARGV >= 0) {
 	      $opt_b = next_arg($1);
 	      last SWITCH;
 	  }
+	  if (/^-n(.*)$/) {
+	      $opt_n = next_arg($1);
+	      last SWITCH;
+	  }
 	  print "$0: unknown option $_\n";
 	  usage();
     }
@@ -184,7 +192,7 @@ $opt_b .= "/" if $opt_b =~ /[^\/]$/;
 my $file;
 
 if ($#ARGV < 0) {
-    process_paths(\*STDIN, "standard input");
+    process_paths(\*STDIN, $opt_n);
 } else {
     foreach $file (@ARGV) {
 	if (! -e $file) {

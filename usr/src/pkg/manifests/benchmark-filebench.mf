@@ -1,0 +1,114 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/benchmark/filebench@$(PKGVERS)
+set name=pkg.description \
+    value="FileBench Commands, Workloads, Scripts, and Config Files"
+set name=pkg.summary value=FileBench
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/benchmarks
+dir path=usr/benchmarks/filebench
+dir path=usr/benchmarks/filebench/bin
+$(i386_ONLY)dir path=usr/benchmarks/filebench/bin/$(ARCH)
+dir path=usr/benchmarks/filebench/bin/$(ARCH64)
+dir path=usr/benchmarks/filebench/config
+dir path=usr/benchmarks/filebench/scripts
+dir path=usr/benchmarks/filebench/workloads
+$(i386_ONLY)file path=usr/benchmarks/filebench/bin/$(ARCH)/go_filebench \
+    mode=0555
+file path=usr/benchmarks/filebench/bin/$(ARCH64)/go_filebench mode=0555
+file path=usr/benchmarks/filebench/bin/filebench mode=0555
+file path=usr/benchmarks/filebench/config/fileio.prof mode=0444
+file path=usr/benchmarks/filebench/config/filemacro.prof mode=0444
+file path=usr/benchmarks/filebench/config/filemicro.prof mode=0444
+file path=usr/benchmarks/filebench/config/generic.func mode=0444
+file path=usr/benchmarks/filebench/config/multi_fileserver.prof mode=0444
+file path=usr/benchmarks/filebench/config/newfeatures.prof mode=0444
+file path=usr/benchmarks/filebench/config/randomread.prof mode=0444
+file path=usr/benchmarks/filebench/config/seqread.prof mode=0444
+file path=usr/benchmarks/filebench/config/videoserver.prof mode=0444
+file path=usr/benchmarks/filebench/scripts/filebench_compare mode=0555
+file path=usr/benchmarks/filebench/scripts/fs_flush mode=0555
+file path=usr/benchmarks/filebench/workloads/bringover.f mode=0444
+file path=usr/benchmarks/filebench/workloads/compflow_demo.f mode=0444
+file path=usr/benchmarks/filebench/workloads/copyfiles.f mode=0444
+file path=usr/benchmarks/filebench/workloads/createfiles.f mode=0444
+file path=usr/benchmarks/filebench/workloads/deletefiles.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_create.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_createfiles.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_createrand.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_delete.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_rread.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_rwrite.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_rwritedsync.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_rwritefsync.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_seqread.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_seqwrite.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_seqwriterand.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_seqwriterandvargam.f \
+    mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_seqwriterandvartab.f \
+    mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_statfile.f mode=0444
+file path=usr/benchmarks/filebench/workloads/filemicro_writefsync.f mode=0444
+file path=usr/benchmarks/filebench/workloads/fileserver.f mode=0444
+file path=usr/benchmarks/filebench/workloads/listdirs.f mode=0444
+file path=usr/benchmarks/filebench/workloads/makedirs.f mode=0444
+file path=usr/benchmarks/filebench/workloads/mongo.f mode=0444
+file path=usr/benchmarks/filebench/workloads/multistreamread.f mode=0444
+file path=usr/benchmarks/filebench/workloads/multistreamreaddirect.f mode=0444
+file path=usr/benchmarks/filebench/workloads/multistreamwrite.f mode=0444
+file path=usr/benchmarks/filebench/workloads/multistreamwritedirect.f mode=0444
+file path=usr/benchmarks/filebench/workloads/networkfs.f mode=0444
+file path=usr/benchmarks/filebench/workloads/oltp.f mode=0444
+file path=usr/benchmarks/filebench/workloads/openfiles.f mode=0444
+file path=usr/benchmarks/filebench/workloads/randomfileaccess.f mode=0444
+file path=usr/benchmarks/filebench/workloads/randomread.f mode=0444
+file path=usr/benchmarks/filebench/workloads/randomrw.f mode=0444
+file path=usr/benchmarks/filebench/workloads/randomwrite.f mode=0444
+file path=usr/benchmarks/filebench/workloads/ratelimcopyfiles.f mode=0444
+file path=usr/benchmarks/filebench/workloads/removedirs.f mode=0444
+file path=usr/benchmarks/filebench/workloads/singlestreamread.f mode=0444
+file path=usr/benchmarks/filebench/workloads/singlestreamreaddirect.f mode=0444
+file path=usr/benchmarks/filebench/workloads/singlestreamwrite.f mode=0444
+file path=usr/benchmarks/filebench/workloads/singlestreamwritedirect.f mode=0444
+file path=usr/benchmarks/filebench/workloads/tpcso.f mode=0444
+file path=usr/benchmarks/filebench/workloads/varmail.f mode=0444
+file path=usr/benchmarks/filebench/workloads/videoserver.f mode=0444
+file path=usr/benchmarks/filebench/workloads/webproxy.f mode=0444
+file path=usr/benchmarks/filebench/workloads/webserver.f mode=0444
+hardlink path=usr/benchmarks/filebench/bin/go_filebench \
+    target=../../../../usr/lib/isaexec
+legacy pkg=SUNWfilebench arch=$(ARCH) category=system \
+    desc="FileBench Commands, Workloads, Scripts, and Config Files" \
+    hotline="Please contact your local service provider" name=FileBench \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

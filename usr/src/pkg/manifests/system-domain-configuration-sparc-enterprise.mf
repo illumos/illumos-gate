@@ -1,0 +1,73 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri \
+    value=pkg:/system/domain-configuration/sparc-enterprise@$(PKGVERS)
+set name=pkg.description value="Domain Configuration Server"
+set name=pkg.summary value="Domain Configuration Server"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=sparc
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib/svc/method opensolaris.zone=global variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/platform group=sys
+dir path=usr/platform/SUNW,SPARC-Enterprise group=sys
+dir path=usr/platform/SUNW,SPARC-Enterprise/lib
+dir path=usr/platform/SUNW,SPARC-Enterprise/lib/$(ARCH64)
+dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
+dir path=var/svc group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=var/svc/manifest group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=var/svc/manifest/platform group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=var/svc/manifest/platform/sun4u group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=lib/svc/method/svc-dcs mode=0555 opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=lib/svc/method/svc-oplhpd mode=0555 opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=usr/lib/dcs mode=0755
+file path=usr/platform/SUNW,SPARC-Enterprise/lib/$(ARCH64)/oplhpd mode=0755
+file path=var/svc/manifest/platform/sun4u/dcs.xml group=sys mode=0444 \
+    opensolaris.zone=global variant.opensolaris.zone=global
+file path=var/svc/manifest/platform/sun4u/oplhpd.xml group=sys mode=0444 \
+    opensolaris.zone=global variant.opensolaris.zone=global
+legacy pkg=SUNWdcsr arch=$(ARCH) category=system \
+    desc="Domain Configuration Server, (Root)" \
+    hotline="Please contact your local service provider" \
+    name="Domain Configuration Server, (Root)" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+legacy pkg=SUNWdcsu arch=$(ARCH) category=system \
+    desc="Domain Configuration Server" \
+    hotline="Please contact your local service provider" \
+    name="Domain Configuration Server" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

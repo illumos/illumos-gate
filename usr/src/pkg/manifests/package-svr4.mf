@@ -1,0 +1,99 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/package/svr4@$(PKGVERS)
+set name=pkg.description value="Solaris System V Release 4 Packaging Commands"
+set name=pkg.summary value="SVr4 packaging commands"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Packaging
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=usr group=sys
+dir path=usr/bin
+dir path=usr/lib
+dir path=usr/sadm
+dir path=usr/sadm/install
+dir path=usr/sadm/install/bin
+dir path=usr/sadm/install/scripts
+dir path=usr/sbin
+dir path=var group=sys
+dir path=var/sadm group=sys
+dir path=var/sadm/install
+dir path=var/sadm/install/admin
+dir path=var/sadm/install/logs mode=0555
+dir path=var/sadm/pkg group=sys mode=0555
+dir path=var/sadm/security group=sys mode=0555
+dir path=var/spool
+dir path=var/spool/pkg mode=1777
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/system group=sys
+file path=usr/bin/pkgadm mode=0555
+file path=usr/bin/pkgcond group=sys mode=0555
+file path=usr/bin/pkginfo group=sys mode=0555
+file path=usr/bin/pkgmk mode=0555
+file path=usr/bin/pkgparam group=sys mode=0555
+file path=usr/bin/pkgproto mode=0555
+file path=usr/bin/pkgtrans mode=0555
+file path=usr/lib/libinstzones.so.1
+file path=usr/lib/libpkg.so.1
+file path=usr/sadm/install/bin/pkginstall group=sys mode=0555
+file path=usr/sadm/install/bin/pkgname group=sys mode=0555
+file path=usr/sadm/install/bin/pkgremove group=sys mode=0555
+file path=usr/sadm/install/bin/pkgserv group=sys mode=0555
+file path=usr/sadm/install/scripts/cmdexec group=sys mode=0555
+file path=usr/sadm/install/scripts/i.CompCpio group=sys mode=0555
+file path=usr/sadm/install/scripts/i.awk group=sys mode=0555
+file path=usr/sadm/install/scripts/i.build group=sys mode=0555
+file path=usr/sadm/install/scripts/i.preserve group=sys mode=0555
+file path=usr/sadm/install/scripts/i.sed group=sys mode=0555
+file path=usr/sadm/install/scripts/r.awk group=sys mode=0555
+file path=usr/sadm/install/scripts/r.build group=sys mode=0555
+file path=usr/sadm/install/scripts/r.sed group=sys mode=0555
+file path=usr/sbin/installf group=sys mode=0555
+file path=usr/sbin/pkgadd group=sys mode=0555
+file path=usr/sbin/pkgchk group=sys mode=0555
+file path=usr/sbin/pkgrm group=sys mode=0555
+file path=var/sadm/install/admin/default group=sys mode=0444
+file path=var/svc/manifest/system/pkgserv.xml group=sys mode=0444
+hardlink path=usr/sadm/install/scripts/i.CONFIG.prsv target=./i.preserve
+hardlink path=usr/sbin/pkgask target=../../usr/sbin/pkgadd
+hardlink path=usr/sbin/removef target=../../usr/sbin/installf
+legacy pkg=SUNWpkgcmdsr arch=$(ARCH) category=system \
+    desc="Solaris System V release 4 Package Commands (root)" \
+    hotline="Please contact your local service provider" \
+    name="SVr4 package commands (root)" vendor="Sun Microsystems, Inc." \
+    version=11.11.1,REV=2009.11.11
+legacy pkg=SUNWpkgcmdsu arch=$(ARCH) category=system \
+    desc="Solaris System V Release 4 Packaging Commands (usr)" \
+    hotline="Please contact your local service provider" \
+    name="SVr4 packaging commands (usr)" vendor="Sun Microsystems, Inc." \
+    version=11.11.1,REV=2009.11.11
+license cr_ATT license=cr_ATT
+license cr_Sun license=cr_Sun
+license lib/libpkg/THIRDPARTYLICENSE license=lib/libpkg/THIRDPARTYLICENSE
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/libpkg.so target=./libpkg.so.1

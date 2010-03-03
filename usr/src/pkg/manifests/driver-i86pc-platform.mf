@@ -1,0 +1,106 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/driver/i86pc/platform@$(PKGVERS)
+set name=pkg.description \
+    value="Platform Support, Bus-independent Device Drivers"
+set name=pkg.summary value="Platform Support, Bus-independent Device Drivers"
+set name=info.classification \
+    value="org.opensolaris.category.2008:Drivers/Other Peripherals"
+set name=variant.arch value=i386
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=kernel/misc group=sys
+dir path=kernel/misc/$(ARCH64) group=sys
+dir path=kernel/strmod group=sys
+dir path=kernel/strmod/$(ARCH64) group=sys
+driver name=asy alias=pci11c1,480 perms="* 0666 root sys" \
+    perms="*,cu 0600 uucp uucp"
+driver name=cmdk perms="* 0640 root sys"
+driver name=ecpp alias=lp perms="* 0666 root sys"
+driver name=fd perms="* 0666 root sys"
+driver name=fdc
+driver name=ncrs class=scsi \
+    alias=pci1000,1 \
+    alias=pci1000,2 \
+    alias=pci1000,3 \
+    alias=pci1000,4 \
+    alias=pci1000,6 \
+    alias=pci1000,8f \
+    alias=pci1000,c \
+    alias=pci1000,f
+file path=kernel/drv/$(ARCH64)/asy group=sys
+file path=kernel/drv/$(ARCH64)/cmdk group=sys
+file path=kernel/drv/$(ARCH64)/ecpp group=sys
+file path=kernel/drv/$(ARCH64)/fd group=sys
+file path=kernel/drv/$(ARCH64)/fdc group=sys
+file path=kernel/drv/asy group=sys
+file path=kernel/drv/asy.conf group=sys reboot-needed=false
+file path=kernel/drv/cmdk group=sys
+file path=kernel/drv/cmdk.conf group=sys reboot-needed=false
+file path=kernel/drv/ecpp group=sys
+file path=kernel/drv/ecpp.conf group=sys reboot-needed=false
+file path=kernel/drv/fd group=sys
+file path=kernel/drv/fd.conf group=sys reboot-needed=false
+file path=kernel/drv/fdc group=sys
+file path=kernel/drv/fdc.conf group=sys reboot-needed=false
+file path=kernel/drv/ncrs group=sys
+file path=kernel/drv/ncrs.conf group=sys reboot-needed=false
+file path=kernel/misc/$(ARCH64)/dadk group=sys mode=0755 reboot-needed=true
+file path=kernel/misc/$(ARCH64)/gda group=sys mode=0755 reboot-needed=true
+file path=kernel/misc/$(ARCH64)/strategy group=sys mode=0755 reboot-needed=true
+file path=kernel/misc/dadk group=sys mode=0755 reboot-needed=true
+file path=kernel/misc/gda group=sys mode=0755 reboot-needed=true
+file path=kernel/misc/strategy group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/$(ARCH64)/vuid2ps2 group=sys mode=0755 \
+    reboot-needed=true
+file path=kernel/strmod/$(ARCH64)/vuid3ps2 group=sys mode=0755 \
+    reboot-needed=true
+file path=kernel/strmod/$(ARCH64)/vuidm3p group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/$(ARCH64)/vuidm4p group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/$(ARCH64)/vuidm5p group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/vuid2ps2 group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/vuid3ps2 group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/vuidm3p group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/vuidm4p group=sys mode=0755 reboot-needed=true
+file path=kernel/strmod/vuidm5p group=sys mode=0755 reboot-needed=true
+legacy pkg=SUNWpsdcr arch=$(ARCH) category=system \
+    desc="Platform Support, Bus-independent Device Drivers, (Root)" \
+    hotline="Please contact your local service provider" \
+    name="Platform Support, Bus-independent Device Drivers (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license lic_OSBL license=lic_OSBL
+license lic_OSBL_preamble license=lic_OSBL_preamble

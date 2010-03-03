@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,10 +52,7 @@ parse_exception_line(char *line, elem_list *list)
 	}
 
 	if ((arch = strtok(NULL, FS)) == NULL) {
-		(void) fprintf(stderr,
-		    "error: no arch field for %s entry in exception file\n",
-		    name);
-		return (0);
+		arch = "all";
 	}
 
 	e = (elem *) malloc(sizeof (elem));
@@ -73,11 +68,10 @@ parse_exception_line(char *line, elem_list *list)
 	e->symsrc = NULL;
 	e->file_type = DIR_T;
 
-	if ((e->arch = assign_arch(arch)) == NULL) {
-		(void) fprintf(stderr,
-		    "warning: Unknown architecture %s found in "
-		    "exception file\n", arch);
-		return (0);
+	while ((e->arch = assign_arch(arch)) == NULL) {
+		if ((arch = strtok(NULL, FS)) == NULL) {
+			return (0);
+		}
 	}
 
 	(void) strcpy(e->name, name);

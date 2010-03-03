@@ -26,8 +26,6 @@ include		../../../Makefile.cmd
 
 BINPROG =	nsgmls instant
 
-SGMLUTILDOCBOOKDIR = $(CLOSED)/cmd/man/src/util/docbook
-SGMLUTILSOLBOOKV1DIR = $(CLOSED)/cmd/man/src/util/solbookv1
 SGMLUTILSOLBOOKV2DIR = solbookv2
 
 LIBSHELL =	sgml2roff
@@ -69,7 +67,6 @@ SGMLENTS =      aap-shortref.gml \
 		sun_iso.gml \
 		synref.gml \
 		warn.eps
-DOCBOOKDTD =	docbook.dtd
 CATALOG =	catalog
 SOLBOOKV2 =	solbook.dcl \
 		solbook.dtd
@@ -96,8 +93,6 @@ TPTDIR =	$(ROOTSHLIB)/sgml/locale/C/transpec
 ROOTPROG =	$(BINPROG:%=$(PROGDIR)/%)
 ROOTLIBSHELL =	$(LIBSHELL:%=$(PROGDIR)/%)
 ROOTENTS =	$(SGMLENTS:%=$(SGMLENTSDIR)/%)
-$(CLOSED_BUILD)ROOTDOCBOOK =	$(DOCBOOKDTD:%=$(DOCBOOKDIR)/%)
-$(CLOSED_BUILD)ROOTSOLBOOKV1 =	$(SOLBOOKV1:%=$(SOLBOOKV1DIR)/%)
 ROOTSOLBOOKV2 = $(SOLBOOKV2:%=$(SOLBOOKV2DIR)/%)
 ROOTCATALOG =	$(CATALOG:%=$(SGMLDTDDIR)/%)
 ROOTTPT =	$(TPTFILES:%=$(TPTDIR)/%)
@@ -115,7 +110,7 @@ all :		$(PROG) $(LIBSHELL)
 install :	all $(PROGDIR) $(SGMLSHLIB) $(SGMLSHLIBLOCALE) \
 	$(SGMLSHLIBLOCALEC) $(SGMLDTDDIR) $(SGMLENTSDIR) $(ROOTPROG) \
 	$(ROOTLIBSHELL) $(TPTDIR) $(ROOTENTS) $(ROOTCATALOG) $(ROOTTPT) \
-	$(ROOTDOCBOOK) $(ROOTSOLBOOKV1) $(ROOTSOLBOOKV2)
+	$(ROOTSOLBOOKV2)
 
 $(PROGDIR) :	
 		$(INS.dir) 
@@ -159,9 +154,7 @@ _localclean:
 		@cd instant.src; pwd; $(MAKE) clean
 		@cd nsgmls.src; pwd; $(MAKE) clean
 
-$(CLOSED_BUILD)CLOSED_CLOBBER = closed_clobber
-
-clobber : clean _localclobber $(CLOSED_CLOBBER)
+clobber : clean _localclobber
 
 _localclobber:
 		@cd instant.src; pwd; $(MAKE) clobber
@@ -170,9 +163,6 @@ _localclobber:
 		$(RM) instant nsgmls sgml2roff
 		$(RM) -r $(PROGDIR)
 		$(RM) -r $(ROOTSHLIB)/sgml
-
-closed_clobber:
-	@cd $(SGMLUTILSOLBOOKV1DIR); pwd; $(MAKE) clobber
 
 $(PROGDIR)/%:	%
 		$(INS.file)
@@ -185,14 +175,6 @@ $(SGMLDTDDIR)/%:	%
 
 $(TPTDIR)/%:	%
 		$(INS.file)
-
-$(ROOTDOCBOOK):
-		cd $(SGMLUTILDOCBOOKDIR); pwd; $(MAKE) install; cd ..; pwd
-
-
-$(ROOTSOLBOOKV1):
-		cd $(SGMLUTILSOLBOOKV1DIR); pwd; $(MAKE) install; cd ..; pwd
-
 
 $(ROOTSOLBOOKV2):
 		cd $(SGMLUTILSOLBOOKV2DIR); pwd; $(MAKE) install; cd ..; pwd

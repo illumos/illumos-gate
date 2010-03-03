@@ -1,0 +1,197 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/driver/network/platform@$(PKGVERS)
+set name=pkg.description value="Platform Support, OS Functionality"
+set name=pkg.summary value="Platform Support, OS Functionality"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=i386
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+driver name=dnet clone_perms="dnet 0666 root sys" perms="* 0666 root sys" \
+    alias=pci1011,14 \
+    alias=pci1011,19 \
+    alias=pci1011,2 \
+    alias=pci1011,9 \
+    alias=pci10b8,2001 \
+    alias=pci1109,1400 \
+    alias=pci1109,2400 \
+    alias=pci2646,1
+driver name=iprb clone_perms="iprb 0666 root sys" perms="* 0666 root sys" \
+    alias=pci8086,1029 \
+    alias=pci8086,1030 \
+    alias=pci8086,1031 \
+    alias=pci8086,1032 \
+    alias=pci8086,1038 \
+    alias=pci8086,1039 \
+    alias=pci8086,103d \
+    alias=pci8086,103d.8086.103d \
+    alias=pci8086,1050 \
+    alias=pci8086,1050.8086.3020 \
+    alias=pci8086,1050.8086.302f \
+    alias=pci8086,1050.8086.3427 \
+    alias=pci8086,1059 \
+    alias=pci8086,1068 \
+    alias=pci8086,1069 \
+    alias=pci8086,1092 \
+    alias=pci8086,1209 \
+    alias=pci8086,1229 \
+    alias=pci8086,1229.8086.1 \
+    alias=pci8086,1229.8086.10 \
+    alias=pci8086,1229.8086.1009 \
+    alias=pci8086,1229.8086.100c \
+    alias=pci8086,1229.8086.1012 \
+    alias=pci8086,1229.8086.1013 \
+    alias=pci8086,1229.8086.1015 \
+    alias=pci8086,1229.8086.1016 \
+    alias=pci8086,1229.8086.1017 \
+    alias=pci8086,1229.8086.1030 \
+    alias=pci8086,1229.8086.1040 \
+    alias=pci8086,1229.8086.1041 \
+    alias=pci8086,1229.8086.1042 \
+    alias=pci8086,1229.8086.1050 \
+    alias=pci8086,1229.8086.1051 \
+    alias=pci8086,1229.8086.1052 \
+    alias=pci8086,1229.8086.10f0 \
+    alias=pci8086,1229.8086.11 \
+    alias=pci8086,1229.8086.12 \
+    alias=pci8086,1229.8086.1229 \
+    alias=pci8086,1229.8086.13 \
+    alias=pci8086,1229.8086.2 \
+    alias=pci8086,1229.8086.2009 \
+    alias=pci8086,1229.8086.200d \
+    alias=pci8086,1229.8086.200e \
+    alias=pci8086,1229.8086.200f \
+    alias=pci8086,1229.8086.2010 \
+    alias=pci8086,1229.8086.2013 \
+    alias=pci8086,1229.8086.2016 \
+    alias=pci8086,1229.8086.2017 \
+    alias=pci8086,1229.8086.2018 \
+    alias=pci8086,1229.8086.2019 \
+    alias=pci8086,1229.8086.2101 \
+    alias=pci8086,1229.8086.2102 \
+    alias=pci8086,1229.8086.2103 \
+    alias=pci8086,1229.8086.2104 \
+    alias=pci8086,1229.8086.2105 \
+    alias=pci8086,1229.8086.2106 \
+    alias=pci8086,1229.8086.2107 \
+    alias=pci8086,1229.8086.2108 \
+    alias=pci8086,1229.8086.2200 \
+    alias=pci8086,1229.8086.2201 \
+    alias=pci8086,1229.8086.2202 \
+    alias=pci8086,1229.8086.2203 \
+    alias=pci8086,1229.8086.2204 \
+    alias=pci8086,1229.8086.2205 \
+    alias=pci8086,1229.8086.2206 \
+    alias=pci8086,1229.8086.2207 \
+    alias=pci8086,1229.8086.2208 \
+    alias=pci8086,1229.8086.2402 \
+    alias=pci8086,1229.8086.2407 \
+    alias=pci8086,1229.8086.2408 \
+    alias=pci8086,1229.8086.2409 \
+    alias=pci8086,1229.8086.240f \
+    alias=pci8086,1229.8086.2410 \
+    alias=pci8086,1229.8086.2411 \
+    alias=pci8086,1229.8086.2412 \
+    alias=pci8086,1229.8086.2413 \
+    alias=pci8086,1229.8086.3 \
+    alias=pci8086,1229.8086.30 \
+    alias=pci8086,1229.8086.3000 \
+    alias=pci8086,1229.8086.3001 \
+    alias=pci8086,1229.8086.3002 \
+    alias=pci8086,1229.8086.3006 \
+    alias=pci8086,1229.8086.3007 \
+    alias=pci8086,1229.8086.3008 \
+    alias=pci8086,1229.8086.3010 \
+    alias=pci8086,1229.8086.3011 \
+    alias=pci8086,1229.8086.3012 \
+    alias=pci8086,1229.8086.301a \
+    alias=pci8086,1229.8086.31 \
+    alias=pci8086,1229.8086.3411 \
+    alias=pci8086,1229.8086.4 \
+    alias=pci8086,1229.8086.40 \
+    alias=pci8086,1229.8086.41 \
+    alias=pci8086,1229.8086.42 \
+    alias=pci8086,1229.8086.5 \
+    alias=pci8086,1229.8086.50 \
+    alias=pci8086,1229.8086.6 \
+    alias=pci8086,1229.8086.7 \
+    alias=pci8086,1229.8086.8 \
+    alias=pci8086,1229.8086.9 \
+    alias=pci8086,1229.8086.a \
+    alias=pci8086,1229.8086.b \
+    alias=pci8086,1229.8086.c \
+    alias=pci8086,1229.8086.d \
+    alias=pci8086,1229.8086.e \
+    alias=pci8086,1229.8086.f \
+    alias=pci8086,2449 \
+    alias=pci8086,2449.8086.3010 \
+    alias=pci8086,2449.8086.3011 \
+    alias=pci8086,2449.8086.3012 \
+    alias=pci8086,2449.8086.3013 \
+    alias=pci8086,2449.8086.3014 \
+    alias=pci8086,2449.8086.3015 \
+    alias=pci8086,2449.8086.3016 \
+    alias=pci8086,2449.8086.3017 \
+    alias=pci8086,2449.8086.3018 \
+    alias=pci8086,27dc \
+    alias=pci8086,27dc.8086.308d
+driver name=pcn clone_perms="pcn 0666 root sys" perms="* 0666 root sys" \
+    alias=pci1022,2000 \
+    alias=pci103c,104c
+file path=etc/bootrc group=sys mode=0755
+file path=etc/mach group=sys original_name=SUNWos86r:etc/mach preserve=true
+file path=kernel/drv/$(ARCH64)/dnet group=sys
+file path=kernel/drv/$(ARCH64)/iprb group=sys
+file path=kernel/drv/$(ARCH64)/pcn group=sys
+file path=kernel/drv/dnet group=sys
+file path=kernel/drv/iprb group=sys
+file path=kernel/drv/pcn group=sys
+file path=kernel/drv/sd group=sys
+file path=kernel/drv/sd.conf group=sys \
+    original_name=SUNWos86r:kernel/drv/sd.conf preserve=true \
+    reboot-needed=false
+legacy pkg=SUNWos86r arch=$(ARCH) category=system \
+    desc="Platform Support, OS Functionality (Root)" \
+    hotline="Please contact your local service provider" \
+    name="Platform Support, OS Functionality (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license lic_OSBL license=lic_OSBL
+license lic_OSBL_preamble license=lic_OSBL_preamble
+# elxl moved out of this package, so create a dependency for upgraded systems
+depend fmri=driver/network/elxl type=require

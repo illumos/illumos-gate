@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -29,13 +29,6 @@
 #
 # See README.exception_lists for details
 #
-
-#
-# Ignore internal packages, scripts, and tools that are intentionally not
-# built or used during a nightly.
-#
-./usr/closed/cmd/zic/makefile.tzpkg
-./usr/closed/cmd/zic/tzpkg.awk
 
 #
 # Ignore files that get used during a EXPORT_SRC or CRYPT_SRC build only.

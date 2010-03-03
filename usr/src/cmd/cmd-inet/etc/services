@@ -1,5 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -88,6 +88,7 @@ netbios-dgm	138/udp				# NETBIOS Datagram Service
 netbios-ssn	139/tcp				# NETBIOS Session Service
 netbios-ssn	139/udp				# NETBIOS Session Service
 NeWS		144/tcp		news		# Window System
+snmpd		161/udp		snmp		# Net-SNMP snmp daemon
 slp		427/tcp		slp		# Service Location Protocol, V2
 slp             427/udp         slp             # Service Location Protocol, V2
 mobile-ip	434/udp		mobile-ip	# Mobile-IP
@@ -102,6 +103,7 @@ uuidgen		697/udp				# UUID Generator
 #
 # these are NOT officially assigned
 #
+rdc		121/tcp				# SNDR server daemon
 exec		512/tcp
 login		513/tcp
 shell		514/tcp		cmd		# no passwords used
@@ -125,6 +127,7 @@ kerberos-adm	749/tcp				# Kerberos V5 Administration
 kerberos-adm	749/udp				# Kerberos V5 Administration
 kerberos-iv	750/udp         		# Kerberos V4 key server
 krb5_prop	754/tcp				# Kerberos V5 KDC propogation
+swat		901/tcp				# Samba Web Adm.Tool
 ufsd		1008/tcp	ufsd		# UFS-aware server
 ufsd		1008/udp	ufsd
 cvc		1495/tcp			# Network Console
@@ -142,5 +145,9 @@ mdns		5353/udp			# Multicast DNS
 mdns		5353/tcp
 vnc-server	5900/tcp			# VNC Server
 dtspc		6112/tcp			# CDE subprocess control
+servicetag	6481/udp
+servicetag	6481/tcp
 fs		7100/tcp			# Font server
 solaris-audit	16162/tcp			# Secure remote audit logging
+wnn6		22273/tcp			# Wnn6 jserver
+wnn6		22273/udp			# Wnn6 jserver

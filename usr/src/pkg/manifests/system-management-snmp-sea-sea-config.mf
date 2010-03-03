@@ -1,0 +1,76 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/management/snmp/sea/sea-config@$(PKGVERS)
+set name=pkg.description \
+    value="Solstice Enterprise Agents 1.0.3 files for root file system"
+set name=pkg.summary \
+    value="Solstice Enterprise Agents 1.0.3 files for root file system"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Enterprise Management"
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys
+dir path=etc/init.d group=sys
+dir path=etc/snmp group=sys
+dir path=etc/snmp/conf group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/method
+dir path=var group=sys
+dir path=var/snmp group=sys
+dir path=var/snmp/mib group=sys
+dir path=var/svc group=sys
+dir path=var/svc/manifest group=sys
+dir path=var/svc/manifest/application group=sys
+dir path=var/svc/manifest/application/management group=sys
+file path=etc/init.d/init.snmpdx group=sys mode=0744
+file path=etc/snmp/conf/enterprises.oid group=sys
+file path=etc/snmp/conf/mibiisa.reg group=sys \
+    original_name=SUNWsacom:etc/snmp/conf/mibiisa.reg preserve=true
+file path=etc/snmp/conf/mibiisa.rsrc- group=sys \
+    original_name=SUNWsacom:etc/snmp/conf/mibiisa.rsrc- preserve=true
+file path=etc/snmp/conf/snmpd.conf group=sys mode=0600 \
+    original_name=SUNWsacom:etc/snmp/conf/snmpd.conf preserve=true
+file path=etc/snmp/conf/snmpdx.acl group=sys mode=0600 \
+    original_name=SUNWsacom:etc/snmp/conf/snmpdx.acl preserve=true
+file path=etc/snmp/conf/snmpdx.reg group=sys \
+    original_name=SUNWsacom:etc/snmp/conf/snmpdx.reg preserve=true
+file path=etc/snmp/conf/snmpdx.rsrc group=sys \
+    original_name=SUNWsacom:etc/snmp/conf/snmpdx.rsrc preserve=true
+file path=lib/svc/method/svc-snmpdx mode=0555
+file path=var/snmp/mib/snmpdx.mib group=sys
+file path=var/snmp/mib/sun.mib group=sys
+file path=var/svc/manifest/application/management/snmpdx.xml group=sys mode=0444
+legacy pkg=SUNWsacom arch=$(ARCH) category=system \
+    desc="Solstice Enterprise Agents 1.0.3 files for root file system" \
+    hotline="Please contact your local service provider" \
+    name="Solstice Enterprise Agents 1.0.3 files for root file system" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license lic_OSBL license=lic_OSBL
+license lic_OSBL_preamble license=lic_OSBL_preamble

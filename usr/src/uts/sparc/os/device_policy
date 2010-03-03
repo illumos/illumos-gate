@@ -1,26 +1,4 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# CDDL HEADER START
-#
-# The contents of this file are subject to the terms of the
-# Common Development and Distribution License (the "License").
-# You may not use this file except in compliance with the License.
-#
-# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or http://www.opensolaris.org/os/licensing.
-# See the License for the specific language governing permissions
-# and limitations under the License.
-#
-# When distributing Covered Code, include this CDDL HEADER in each
-# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-# If applicable, add the following below this CDDL HEADER, with the
-# fields enclosed by brackets "[]" replaced with your own identifying
-# information: Portions Copyright [yyyy] [name of copyright owner]
-#
-# CDDL HEADER END
-#
 # Device policy configuration file.   When devices are opened the
 # additional access controls in this file are enforced.
 #
@@ -30,48 +8,4 @@
 #
 
 *		read_priv_set=none		write_priv_set=none
-
-#
-# Kernel memory devices.
-#
-mm:allkmem	read_priv_set=all		write_priv_set=all
-mm:kmem		read_priv_set=none		write_priv_set=all
-mm:mem		read_priv_set=none		write_priv_set=all
-
-rtvc:rtvc*					write_priv_set=none
-rtvc:rtvcctl*					write_priv_set=sys_config
-#
-# Socket interface access permissions.
-#
-icmp		read_priv_set=net_icmpaccess	write_priv_set=net_icmpaccess
-icmp6		read_priv_set=net_icmpaccess	write_priv_set=net_icmpaccess
-ip		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-ip6		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-keysock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
-ipsecah		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
-ipsecesp	read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
-spdsock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
-bridge		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-
-#
-# IP observability device access permission
-#
-ipnet		read_priv_set=net_observability write_priv_set=net_observability
-
-#
-# Disk devices.
-#
 md:admin					write_priv_set=sys_config
-fssnap:ctl	read_priv_set=sys_config	write_priv_set=sys_config
-scsi_vhci:devctl				write_priv_set=sys_devices
-#
-# Other devices that require a privilege to open.
-#
-envctrltwo	read_priv_set=sys_config	write_priv_set=sys_config
-random						write_priv_set=sys_devices
-openeepr					write_priv_set=all
-#
-# IP Filter
-#
-ipf             read_priv_set=sys_ip_config     write_priv_set=sys_ip_config
-

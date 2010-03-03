@@ -1572,7 +1572,4 @@ get_attribute_list(
  *	    on other configuration values, it should be done here.
  *	8. If an attribute name is a subset of another, parse_ldap_default_conf
  *          should be modified.
- *	9. Add the new attribute to the class action script
- *	   usr/src/pkgdefs/common_files/i.defrpc.nisd, if the user
- *	   configured value has to be preserved across upgrades
  */

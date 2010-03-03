@@ -1,0 +1,118 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set name=pkg.fmri value=pkg:/system/network/http-cache-accelerator@$(PKGVERS)
+set name=pkg.description \
+    value="components to enable the network cache and accelerator"
+set name=pkg.summary value="Solaris Network Cache and Accelerator"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=etc group=sys opensolaris.zone=global variant.opensolaris.zone=global
+dir path=etc/init.d group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=etc/nca group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=etc/rc0.d group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=etc/rc1.d group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=etc/rc2.d group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=etc/rcS.d group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/drv group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/drv/$(ARCH64) group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/strmod group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=kernel/strmod/$(ARCH64) group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/bin
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/inet
+driver name=nca
+file path=etc/init.d/ncakmod group=sys mode=0744 opensolaris.zone=global \
+    original_name=SUNWnca:etc/init.d/ncakmod preserve=true \
+    variant.opensolaris.zone=global
+file path=etc/init.d/ncalogd group=sys mode=0744 opensolaris.zone=global \
+    original_name=SUNWnca:etc/init.d/ncalogd preserve=true \
+    variant.opensolaris.zone=global
+file path=etc/nca/nca.if group=sys opensolaris.zone=global \
+    original_name=SUNWnca:etc/nca/nca.if preserve=true \
+    variant.opensolaris.zone=global
+file path=etc/nca/ncakmod.conf group=sys opensolaris.zone=global \
+    original_name=SUNWnca:etc/nca/ncakmod.conf preserve=true \
+    variant.opensolaris.zone=global
+file path=etc/nca/ncalogd.conf group=sys opensolaris.zone=global \
+    original_name=SUNWnca:etc/nca/ncalogd.conf preserve=true \
+    variant.opensolaris.zone=global
+file path=etc/nca/ncaport.conf group=sys opensolaris.zone=global \
+    original_name=SUNWnca:etc/nca/ncaport.conf preserve=true \
+    variant.opensolaris.zone=global
+file path=kernel/drv/$(ARCH64)/nca group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+$(i386_ONLY)file path=kernel/drv/nca group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=kernel/drv/nca.conf group=sys opensolaris.zone=global \
+    reboot-needed=false variant.opensolaris.zone=global
+file path=usr/bin/ncab2clf mode=0555
+file path=usr/lib/$(ARCH64)/ncad_addr.so.1
+file path=usr/lib/inet/ncaconfd mode=0555
+file path=usr/lib/ncad_addr.so.1
+hardlink path=etc/rc0.d/K34ncalogd opensolaris.zone=global \
+    target=../../etc/init.d/ncalogd variant.opensolaris.zone=global
+hardlink path=etc/rc1.d/K34ncalogd opensolaris.zone=global \
+    target=../../etc/init.d/ncalogd variant.opensolaris.zone=global
+hardlink path=etc/rc2.d/S42ncakmod opensolaris.zone=global \
+    target=../../etc/init.d/ncakmod variant.opensolaris.zone=global
+hardlink path=etc/rc2.d/S94ncalogd opensolaris.zone=global \
+    target=../../etc/init.d/ncalogd variant.opensolaris.zone=global
+hardlink path=etc/rcS.d/K34ncalogd opensolaris.zone=global \
+    target=../../etc/init.d/ncalogd variant.opensolaris.zone=global
+hardlink path=kernel/strmod/$(ARCH64)/nca opensolaris.zone=global \
+    target=../../../kernel/drv/$(ARCH64)/nca variant.opensolaris.zone=global
+$(i386_ONLY)hardlink path=kernel/strmod/nca opensolaris.zone=global \
+    target=../../kernel/drv/nca variant.opensolaris.zone=global
+legacy pkg=SUNWncar arch=$(ARCH) category=system \
+    desc="core components to enable the network cache and accelerator" \
+    hotline="Please contact your local service provider" \
+    name="Solaris Network Cache and Accelerator (Root)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+legacy pkg=SUNWncau arch=$(ARCH) category=system \
+    desc="components to enable the network cache and accelerator" \
+    hotline="Please contact your local service provider" \
+    name="Solaris Network Cache and Accelerator (Usr)" \
+    vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/$(ARCH64)/ncad_addr.so target=./ncad_addr.so.1
+link path=usr/lib/ncad_addr.so target=./ncad_addr.so.1

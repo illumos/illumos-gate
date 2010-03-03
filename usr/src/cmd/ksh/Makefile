@@ -20,19 +20,16 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 SHELL=/usr/bin/ksh93
 
-include ../../Makefile.ksh93switch
+PROG= ksh
 
-$(BINKSH_IS_KSH93)PROG= ksh
-$(BINKSH_IS_KSH93)USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93 pfksh pfksh93 pfrksh pfrksh93
+USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93 pfksh pfksh93 pfrksh pfrksh93
 
-$(BINKSH_ISNOT_KSH93)PROG= ksh93
-$(BINKSH_ISNOT_KSH93)USRKSH_ALIAS_LIST=ksh93 rksh93
 
 include ../Makefile.cmd
 
@@ -40,6 +37,10 @@ SUBDIRS= $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 SUBDIRS += builtins
+
+ARCH32_i386= i86
+ARCH32_sparc= sparcv7
+ARCH32= $(ARCH32_$(MACH))
 
 # Serialise the build to avoid that we run the test suite for 32bit
 # and 64bit in parallel
@@ -75,6 +76,20 @@ install:	$(ISAEXEC) $(SUBDIRS)
 		ln "$(ROOTBIN)/$(PROG)" "$(ROOTBIN)/$$i" ; \
 	done \
 	)
+	$(RM) $(ROOTSBIN)/sh
+	$(SYMLINK) ../usr/bin/$(ARCH32)/ksh93 $(ROOTSBIN)/sh
+	$(RM) $(ROOTSBIN)/jsh
+	$(SYMLINK) ../usr/bin/ksh93 $(ROOTSBIN)/jsh
+	$(RM) $(ROOTBIN)/jsh
+	$(SYMLINK) ksh93 $(ROOTBIN)/jsh
+	$(RM) $(ROOTSBIN)/pfsh
+	$(SYMLINK) ../usr/bin/ksh93 $(ROOTSBIN)/pfsh
+	$(RM) $(ROOTBIN)/pfsh
+	$(SYMLINK) ksh93 $(ROOTBIN)/pfsh
+	$(RM) $(ROOTBIN)/sh
+	$(SYMLINK) $(ARCH32)/ksh93 $(ROOTBIN)/sh
+	$(RM) $(ROOTLIB)/rsh
+	$(SYMLINK) ../bin/ksh93 $(ROOTLIB)/rsh
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

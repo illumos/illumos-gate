@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -35,8 +35,7 @@ include Makefile.subdirs
 install: $(ROOTOPTPKG)/README $(SUBDIRS)
 
 pkg: install
-	@cd $(PKGDEFS) pwd; $(MAKE) awk_pkginfo
-	@cd $(PKGDEFS)/SUNWdtrt; pwd; $(MAKE) install
+	@cd $(SRC)/pkg; pwd; $(MAKE) SUNWdtrt.pub
 
 $(ROOTOPTPKG)/% := FILEMODE = 0444
 

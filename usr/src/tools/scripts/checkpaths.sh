@@ -79,8 +79,29 @@ do
 		;;
 	esac
 	if [ -d $ROOT ]; then
-		validate_paths '-s/\s*'$arch'$//' -e '^opt/onbld' $excl \
-		    -b $ROOT $args $SRC/pkgdefs/etc/exception_list_$arch
+		#
+		# This is the old-style packaging exception list, from
+		# the svr4-specific usr/src/pkgdefs
+		#
+		[ -f $SRC/pkgdefs/etc/exception_list_$arch ] && \
+			validate_paths '-s/\s*'$arch'$//' $excl -b $ROOT \
+			    $args $SRC/pkgdefs/etc/exception_list_$arch
+		#
+		# These are the new-style packaging exception lists,
+		# from the repository-wide exception_lists/ directory.
+		#
+		e="$CODEMGR_WS/exception_lists/packaging"
+		if [ "$CLOSED_IS_PRESENT" = "yes" ]; then
+			e="$e $CODEMGR_WS/exception_lists/packaging.closed"
+		else
+			e="$e $CODEMGR_WS/exception_lists/packaging.open"
+		fi
+		for f in $e; do
+			if [ -f $f ]; then
+				nawk 'NF == 1 || /[ 	]\+'$arch'$/ { print; }' \
+				    < $f | validate_paths -b $ROOT -n $f
+			fi
+		done
 	fi
 done
 
@@ -117,7 +138,7 @@ if [ -f $SRC/tools/opensolaris/license-list ]; then
 		excl="-e ^usr/closed"
 	fi
 	sed -e 's/$/.descrip/' < $SRC/tools/opensolaris/license-list | \
-		validate_paths $excl 
+		validate_paths -n SRC/tools/opensolaris/license-list $excl
 fi
 
 # Finally, make sure the that (req|inc).flg files are in good shape.

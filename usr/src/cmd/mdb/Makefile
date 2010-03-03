@@ -18,11 +18,11 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 include $(SRC)/Makefile.master
 
@@ -54,17 +54,14 @@ dmods install: install_h $(SUBDIRS)
 install_h: FRC
 	@cd common/mdb; pwd; $(MAKE) install_h
 
-clean.lint clean: $(SUBDIRS) packages
+clean.lint clean: $(SUBDIRS)
 
-clobber: $(SUBDIRS) packages
+clobber: $(SUBDIRS)
 
 $($(MACH)_SUBDIRS): tools
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
-pkg: install tools
-	@cd packages; pwd; $(MAKE) install
 
 FRC:
 

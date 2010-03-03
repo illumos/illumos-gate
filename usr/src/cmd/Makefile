@@ -24,7 +24,6 @@
 #
 
 include ../Makefile.master
-include ../Makefile.ksh93switch
 
 #
 #	Note that the commands 'agents', 'lp', 'perl', and 'man' are first in

@@ -129,20 +129,20 @@ delete="
 
 # SUNWsvvs (SVVS test drivers).
 delete="$delete
-	usr/include/sys/lo.h
+	usr/include/sys/svvslo.h
 	usr/include/sys/tidg.h
 	usr/include/sys/tivc.h
 	usr/include/sys/tmux.h
-	usr/kernel/drv/amd64/lo
+	usr/kernel/drv/amd64/svvslo
 	usr/kernel/drv/amd64/tidg
 	usr/kernel/drv/amd64/tivc
 	usr/kernel/drv/amd64/tmux
-	usr/kernel/drv/lo
-	usr/kernel/drv/lo.conf
-	usr/kernel/drv/sparcv9/lo
+	usr/kernel/drv/sparcv9/svvslo
 	usr/kernel/drv/sparcv9/tidg
 	usr/kernel/drv/sparcv9/tivc
 	usr/kernel/drv/sparcv9/tmux
+	usr/kernel/drv/svvslo
+	usr/kernel/drv/svvslo.conf
 	usr/kernel/drv/tidg
 	usr/kernel/drv/tidg.conf
 	usr/kernel/drv/tivc
@@ -170,12 +170,12 @@ delete="$delete
 	kernel/drv/ifp.conf
 	kernel/drv/sparcv9/ifp
 	kernel/drv/sparcv9/isp
+	kernel/drv/sparcv9/qus
 	kernel/drv/spwr
-	kernel/drv/spwr.conf
 	kernel/kmdb/sparcv9/isp
-	usr/bin/ksh
-	usr/bin/pfksh
-	usr/bin/rksh
+	usr/has/bin/ksh
+	usr/has/bin/pfksh
+	usr/has/bin/rksh
 	usr/include/sys/scsi/adapters/ifpcmd.h
 	usr/include/sys/scsi/adapters/ifpio.h
 	usr/include/sys/scsi/adapters/ifpmail.h
@@ -186,7 +186,6 @@ delete="$delete
 	usr/include/sys/scsi/adapters/ispreg.h
 	usr/include/sys/scsi/adapters/ispvar.h
 	usr/lib/mdb/kvm/sparcv9/isp.so
-	usr/platform/SUNW,Netra-T12/
 	usr/platform/sun4u/include/sys/memtestio.h
 	usr/platform/sun4u/include/sys/memtestio_ch.h
 	usr/platform/sun4u/include/sys/memtestio_chp.h
@@ -199,10 +198,6 @@ delete="$delete
 	usr/platform/sun4v/include/sys/memtestio.h
 	usr/platform/sun4v/include/sys/memtestio_ni.h
 	usr/platform/sun4v/include/sys/memtestio_v.h
-	usr/share/lib/sgml/locale/C/dtds/docbook/docbook.dtd
-	usr/share/lib/sgml/locale/C/dtds/docbook/
-	usr/share/lib/sgml/locale/C/dtds/solbookv1/solbook.dtd
-	usr/share/lib/sgml/locale/C/dtds/solbookv1/
 "
 # memory fault injector test framework
 delete="$delete
@@ -211,10 +206,13 @@ delete="$delete
 	platform/sun4u/kernel/drv/memtest.conf
 	platform/sun4v/kernel/drv/sparcv9/memtest
 	platform/sun4v/kernel/drv/memtest.conf
-	platform/i86pc/kernel/drv/memtest.conf
-	platform/i86pc/kernel/drv/memtest
-	platform/i86pc/kernel/drv/amd64/memtest
+	kernel/drv/memtest.conf
+	kernel/drv/memtest
+	kernel/drv/amd64/memtest
 	usr/platform/i86pc/lib/mtst/mtst_AuthenticAMD_15.so
+	usr/platform/i86pc/lib/mtst/mtst_AuthenticAMD.so
+	usr/platform/i86pc/lib/mtst/mtst_generic.so
+	usr/platform/i86pc/lib/mtst/mtst_GenuineIntel.so
 "
 for f in $delete; do
 	rm -rf "$tmpdir/closed/$rootdir/$f"
@@ -230,18 +228,24 @@ done
 # Remove any header files.  If they're in the closed tree, they're
 # probably not freely redistributable.
 #
-(cd "$tmpdir/closed/$rootdir"; find . -name \*.h -exec rm -f {} \;)
+(cd "$tmpdir/closed/$rootdir"; find . -name \*.h \
+	-a \! -name lc_core.h \
+	-a \! -name localedef.h \
+	-exec rm -f {} \;)
+
 
 #
 # Remove empty directories that the open tree doesn't need.
 #
-# Step 1: walk the usr/src/pkgdefs files to find out which directories
+# Step 1: walk the redistributable manifests to find out which directories
 # are specified in the open packages; save that list to a temporary
 # file $needdirs.
 #
-(cd "$SRC/pkgdefs"; \
-	find . -name prototype\* -exec grep "^d" {} \; | awk '{print $3}' > \
-	"$needdirs")
+MACH=$(uname -p)
+(cd "$SRC/pkg/packages.$MACH"; \
+	nawk '/^dir/ {sub(/.+ path=/, ""); print $1;}' *.metadata.*.redist | \
+	sort -u > "$needdirs")
+
 #
 # Step 2: go to our closed directory, and find all the subdirectories,
 # filtering out the ones needed by the open packages (saved in that
@@ -280,8 +284,9 @@ ROOT="$tmpdir/closed/$rootdir" findcrypto "$SRC/tools/codesign/creds" |
 cp -p "$SRC/tools/opensolaris/BINARYLICENSE.txt" "$tmpdir/closed" || \
     fail "can't add BINARYLICENSE.txt"
 mkreadme "$tmpdir/closed"
-cp -p "$CODEMGR_WS/THIRDPARTYLICENSE.ON-BINARIES" "$tmpdir/closed" || \
-    fail "can't add THIRDPARTYLICENSE.ON-BINARIES."
+if [ -f "$CODEMGR_WS/THIRDPARTYLICENSE.ON-BINARIES" ]; then
+    cp -p "$CODEMGR_WS/THIRDPARTYLICENSE.ON-BINARIES" "$tmpdir/closed"
+fi
 
 (cd "$tmpdir"; tar cf "$tarfile" closed) || fail "can't create $tarfile."
 bzip2 -f "$tarfile" || fail "can't compress $tarfile".

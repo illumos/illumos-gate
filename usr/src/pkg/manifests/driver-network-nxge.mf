@@ -1,0 +1,90 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/driver/network/nxge@$(PKGVERS)
+$(sparc_ONLY)set name=pkg.description value="Sun NIU 10Gb/1Gb driver"
+$(i386_ONLY)set name=pkg.description value="Sun NIU 10Gb/1Gb leaf driver"
+set name=pkg.summary value="Sun NIU leaf driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+$(i386_ONLY)dir path=kernel group=sys
+$(i386_ONLY)dir path=kernel/drv group=sys
+$(i386_ONLY)dir path=kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform group=sys
+$(sparc_ONLY)dir path=platform/sun4u group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/drv group=sys
+$(sparc_ONLY)dir path=platform/sun4u/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)dir path=platform/sun4v group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/drv group=sys
+$(sparc_ONLY)dir path=platform/sun4v/kernel/drv/$(ARCH64) group=sys
+$(sparc_ONLY)driver name=nxge perms="* 0600 root sys" \
+    alias=SUNW,niusl \
+    alias=SUNW,niusl-kt \
+    alias=SUNW,rock-pciex108e,abcd \
+    alias=pciex108e,abcd
+$(i386_ONLY)driver name=nxge perms="* 0600 root sys" \
+    alias=SUNW,niusl \
+    alias=pciex108e,abcd
+$(i386_ONLY)file path=kernel/drv/$(ARCH64)/nxge group=sys
+$(i386_ONLY)file path=kernel/drv/nxge group=sys
+$(i386_ONLY)file path=kernel/drv/nxge.conf group=sys \
+    original_name=SUNWnxge:kernel/drv/nxge.conf preserve=renamenew \
+    reboot-needed=false
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/nxge group=sys
+$(sparc_ONLY)file path=platform/sun4u/kernel/drv/nxge.conf group=sys \
+    original_name=SUNWnxge:platform/sun4u/kernel/drv/nxge.conf \
+    preserve=renamenew reboot-needed=false
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/nxge group=sys
+$(sparc_ONLY)file path=platform/sun4v/kernel/drv/nxge.conf group=sys \
+    original_name=SUNWnxge:platform/sun4v/kernel/drv/nxge.conf \
+    preserve=renamenew reboot-needed=false
+$(i386_ONLY)legacy pkg=SUNWnxge arch=$(ARCH) category=system \
+    desc="Sun NIU 10Gb/1Gb leaf driver" \
+    hotline="Please contact your local service provider" \
+    name="Sun NIU leaf driver" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+$(sparc_ONLY)legacy pkg=SUNWnxge.u arch=$(ARCH).sun4u category=system \
+    desc="Sun NIU 10Gb/1Gb driver" \
+    hotline="Please contact your local service provider" \
+    name="Sun NIU leaf driver" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+$(sparc_ONLY)legacy pkg=SUNWnxge.v arch=$(ARCH).sun4v category=system \
+    desc="Sun NIU leaf driver" \
+    hotline="Please contact your local service provider" \
+    name="Sun NIU leaf driver" vendor="Sun Microsystems, Inc." \
+    version=11.11,REV=2009.11.11
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
