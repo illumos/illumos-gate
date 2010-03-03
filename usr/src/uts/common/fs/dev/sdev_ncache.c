@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -622,7 +622,20 @@ sdev_devstate_change(void)
 		case SDEV_BOOT_STATE_RECONFIG:
 			sdcmn_err5(("state change: reconfigure boot\n"));
 			sdev_boot_state = new_state;
-			sdev_reconfig_boot = 1;
+			/*
+			 * The /dev filesystem fills a hot-plug .vs.
+			 * public-namespace gap by invoking 'devfsadm' once
+			 * as a result of the first /dev lookup failure
+			 * (or getdents/readdir). Originally, it was thought
+			 * that a reconfig reboot did not have a hot-plug gap,
+			 * but this is not true - the gap is just smaller:
+			 * it exists from the the time the smf invocation of
+			 * devfsadm completes its forced devinfo snapshot,
+			 * to the time when the smf devfsadmd daemon invocation
+			 * is set up and listening for hotplug sysevents.
+			 * Since there is still a gap with reconfig reboot,
+			 * we no longer set 'sdev_reconfig_boot'.
+			 */
 			if (!sdev_nc_disable_reset)
 				sdev_nc_free_bootonly();
 			break;
@@ -880,8 +893,6 @@ sdev_nc_free_bootonly(void)
 	sdev_nc_list_t	*ncl = sdev_ncache;
 	sdev_nc_node_t *lp;
 	sdev_nc_node_t *next;
-
-	ASSERT(sdev_reconfig_boot);
 
 	rw_enter(&ncl->ncl_lock, RW_WRITER);
 
