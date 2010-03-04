@@ -2439,11 +2439,19 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		 */
 		if (pkt->pkt_comp != NULL) {
 			/* scsi callback required */
-			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-			    (task_func_t *)pkt->pkt_comp,
-			    (void *)pkt, TQ_NOSLEEP) == NULL)
+			if (servicing_interrupt()) {
+				if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+				    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+				    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) ==
+				    NULL) {
+					return (TRAN_BUSY);
+				}
+			} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 				/* Scheduling the callback failed */
 				return (TRAN_BUSY);
+			}
 			return (TRAN_ACCEPT);
 		}
 		/* No callback available */
@@ -3146,12 +3154,19 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx, int *reason, int flag)
 		 */
 		if (spx->txlt_scsi_pkt->pkt_comp != NULL) {
 			/* scsi callback required */
-			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			if (servicing_interrupt()) {
+				if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+				    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+				    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) ==
+				    NULL) {
+					return (TRAN_BUSY);
+				}
+			} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
-			    (void *)spx->txlt_scsi_pkt,
-			    TQ_SLEEP) == NULL)
+			    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 				/* Scheduling the callback failed */
 				return (TRAN_BUSY);
+			}
 
 			return (TRAN_ACCEPT);
 		}
@@ -3364,14 +3379,21 @@ sata_txlt_invalid_command(sata_pkt_txlate_t *spx)
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
-		    (void *)spx->txlt_scsi_pkt,
-		    TQ_SLEEP) == NULL)
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
+	}
 	return (TRAN_ACCEPT);
 }
 
@@ -3405,14 +3427,22 @@ sata_txlt_check_condition(sata_pkt_txlate_t *spx, uchar_t key, uchar_t code)
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsi_hba_pkt_comp,
-		    (void *)spx->txlt_scsi_pkt,
-		    TQ_SLEEP) == NULL)
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
+	}
 	return (TRAN_ACCEPT);
 }
 
@@ -3447,14 +3477,21 @@ sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
 	    spx->txlt_scsi_pkt->pkt_reason);
 
 	if ((spx->txlt_scsi_pkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    spx->txlt_scsi_pkt->pkt_comp != NULL)
+	    spx->txlt_scsi_pkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
-		    (void *)spx->txlt_scsi_pkt,
-		    TQ_SLEEP) == NULL)
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
+	}
 	return (TRAN_ACCEPT);
 }
 
@@ -3668,11 +3705,18 @@ done:
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == NULL)
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
 	}
 	return (TRAN_ACCEPT);
 }
@@ -3807,13 +3851,22 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 	    "Scsi_pkt completion reason %x\n",
 	    scsipkt->pkt_reason);
 
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsi_hba_pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == NULL)
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
+	}
 	return (TRAN_ACCEPT);
 }
 
@@ -3890,13 +3943,22 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsi_hba_pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == NULL)
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
+	}
 
 	return (TRAN_ACCEPT);
 }
@@ -4229,11 +4291,19 @@ err_out:
 	    "synchronous execution status %x\n",
 	    spx->txlt_sata_pkt->satapkt_reason);
 
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0) {
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+	    scsipkt->pkt_comp != NULL) {
 		sata_set_arq_data(spx->txlt_sata_pkt);
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsi_hba_pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == 0) {
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
+			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
 		}
 	}
@@ -4319,13 +4389,21 @@ sata_txlt_read_capacity(sata_pkt_txlate_t *spx)
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == NULL)
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
+	}
 
 	return (TRAN_ACCEPT);
 }
@@ -4360,7 +4438,14 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 	    spx->txlt_scsi_pkt->pkt_cdbp[2] >> 6,
 	    spx->txlt_scsi_pkt->pkt_cdbp[2] & 0x3f);
 
-	buf = kmem_zalloc(1024, KM_SLEEP);
+	if (servicing_interrupt()) {
+		buf = kmem_zalloc(1024, KM_NOSLEEP);
+		if (buf == NULL) {
+			return (TRAN_BUSY);
+		}
+	} else {
+		buf = kmem_zalloc(1024, KM_SLEEP);
+	}
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
@@ -4590,13 +4675,21 @@ done:
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == NULL)
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
+	}
 
 	return (TRAN_ACCEPT);
 }
@@ -4910,13 +5003,21 @@ done:
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == NULL)
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
+	}
 
 	return (rval);
 }
@@ -5182,7 +5283,14 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 	    spx->txlt_scsi_pkt->pkt_cdbp[2] >> 6,
 	    spx->txlt_scsi_pkt->pkt_cdbp[2] & 0x3f);
 
-	buf = kmem_zalloc(MAX_LOG_SENSE_PAGE_SIZE, KM_SLEEP);
+	if (servicing_interrupt()) {
+		buf = kmem_zalloc(MAX_LOG_SENSE_PAGE_SIZE, KM_NOSLEEP);
+		if (buf == NULL) {
+			return (TRAN_BUSY);
+		}
+	} else {
+		buf = kmem_zalloc(MAX_LOG_SENSE_PAGE_SIZE, KM_SLEEP);
+	}
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
@@ -5395,13 +5503,21 @@ done:
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == NULL)
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
+	}
 
 	return (TRAN_ACCEPT);
 }
@@ -6124,11 +6240,17 @@ bad_param:
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == 0) {
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
-			rval = TRAN_BUSY;
+			return (TRAN_BUSY);
 		}
 	}
 	return (rval);
@@ -6545,13 +6667,21 @@ sata_txlt_lba_out_of_range(sata_pkt_txlate_t *spx)
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == NULL)
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
+	}
 	return (TRAN_ACCEPT);
 }
 
@@ -6679,13 +6809,21 @@ sata_txlt_ata_pass_thru_illegal_cmd(sata_pkt_txlate_t *spx)
 	sense->es_add_code = SD_SCSI_ASC_INVALID_FIELD_IN_CDB;
 
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == NULL)
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
+	}
 
 	return (TRAN_ACCEPT);
 }
@@ -6707,11 +6845,18 @@ sata_emul_rw_completion(sata_pkt_txlate_t *spx)
 	*scsipkt->pkt_scbp = STATUS_GOOD;
 	if (!(spx->txlt_sata_pkt->satapkt_op_mode & SATA_OPMODE_SYNCH)) {
 		/* scsi callback required - have to schedule it */
-		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp,
-		    (void *)scsipkt, TQ_SLEEP) == NULL)
+		if (servicing_interrupt()) {
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt, TQ_NOSLEEP) == NULL) {
+				return (TRAN_BUSY);
+			}
+		} else if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt, TQ_SLEEP) == NULL) {
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
+		}
 	}
 	return (TRAN_ACCEPT);
 }
