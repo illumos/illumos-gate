@@ -4715,7 +4715,7 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 	 */
 	if ((reply_addr < mpt->m_reply_frame_dma_addr) ||
 	    (reply_addr >= (mpt->m_reply_frame_dma_addr +
-	    (mpt->m_reply_frame_size * mpt->m_free_queue_depth))) ||
+	    (mpt->m_reply_frame_size * mpt->m_max_replies))) ||
 	    ((reply_addr - mpt->m_reply_frame_dma_addr) %
 	    mpt->m_reply_frame_size != 0)) {
 		mptsas_log(mpt, CE_WARN, "?Received invalid reply frame "
@@ -11425,7 +11425,7 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	 * reply frames.
 	 */
 	cookie.dmac_address = mpt->m_reply_frame_dma_addr;
-	for (i = 0; i < mpt->m_free_queue_depth - 1; i++) {
+	for (i = 0; i < mpt->m_max_replies; i++) {
 		ddi_put32(mpt->m_acc_free_queue_hdl,
 		    &((uint32_t *)(void *)mpt->m_free_queue)[i],
 		    cookie.dmac_address);
