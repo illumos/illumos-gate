@@ -218,9 +218,28 @@ is_pci_bridge(dev_info_t *dip)
 	return (B_FALSE);
 }
 
-static int
-find_fb_dev(dev_info_t *dip, void *found_dip)
+/*
+ * Type for the parameter of find_fb_dev()
+ */
+struct find_fb_dev_param
 {
+	dev_info_t *found_dip;	/* dip found for VGA console */
+	int vga_enable;		/* check PCI_BCNF_BCNTRL_VGA_ENABLE or not */
+};
+
+/*
+ * The VGA device could be under a subtractive PCI bridge on some systems.
+ * Though the PCI_BCNF_BCNTRL_VGA_ENABLE bit is not set on such subtractive
+ * PCI bridge, the subtractive PCI bridge can forward VGA access if no other
+ * agent claims the access.
+ * The vga_enable element in param acts as a flag, if not set, ignore the
+ * checking for the PCI_BCNF_BCNTRL_VGA_ENABLE bit of the PCI bridge during
+ * the search.
+ */
+static int
+find_fb_dev(dev_info_t *dip, void *param)
+{
+	struct find_fb_dev_param *p = param;
 	char *dev_type;
 	dev_info_t *pdip;
 	char *parent_type;
@@ -244,6 +263,9 @@ find_fb_dev(dev_info_t *dip, void *found_dip)
 		char *nodename;
 
 		ddi_prop_free(dev_type);
+
+		if (!p->vga_enable)
+			return (DDI_WALK_CONTINUE);
 
 		nodename = ddi_node_name(dip);
 
@@ -288,7 +310,7 @@ find_fb_dev(dev_info_t *dip, void *found_dip)
 
 	if ((strcmp(parent_type, "isa") == 0) ||
 	    (strcmp(parent_type, "eisa") == 0)) {
-		*(dev_info_t **)found_dip = dip;
+		p->found_dip = dip;
 		ddi_prop_free(parent_type);
 		return (DDI_WALK_TERMINATE);
 	}
@@ -312,7 +334,7 @@ find_fb_dev(dev_info_t *dip, void *found_dip)
 		if (!(data16 & PCI_COMM_IO))
 			return (DDI_WALK_PRUNECHILD);
 
-		*(dev_info_t **)found_dip = dip;
+		p->found_dip = dip;
 		return (DDI_WALK_TERMINATE);
 	}
 
@@ -321,29 +343,47 @@ find_fb_dev(dev_info_t *dip, void *found_dip)
 }
 
 /*
- * Conduct a width-first traverse searching for a display device which
- * has either:
+ * The first round search is to find:
  * 1) a VGA device.
  * 2) a PCI VGA compatible device whose IO space is enabled
  *    and the VGA Enable bit of any PCI-PCI bridge above it is set.
+ * If the first round search succeeds, prune the second round search.
+ *
+ * The second round seach does not check the VGA Enable bit.
  *
  * Return the device path as the console fb path.
  */
 char *
 plat_fbpath(void)
 {
-	dev_info_t *fb_dip = NULL;
+	struct find_fb_dev_param param;
 	static char *fbpath = NULL;
 	static char fbpath_buf[MAXPATHLEN];
 
-	ddi_walk_devs(ddi_root_node(), find_fb_dev, &fb_dip);
+	/* first round search */
+	param.found_dip = NULL;
+	param.vga_enable = 1;
+	ddi_walk_devs(ddi_root_node(), find_fb_dev, &param);
 
-	if (fb_dip == NULL)
+	if (param.found_dip != NULL) {
+		(void) ddi_pathname(param.found_dip, fbpath_buf);
+		fbpath = fbpath_buf;
+		return (fbpath);
+	}
+
+	/*
+	 * second round search, do not check the
+	 * PCI_BCNF_BCNTRL_VGA_ENABLE bit
+	 */
+	param.found_dip = NULL;
+	param.vga_enable = 0;
+	ddi_walk_devs(ddi_root_node(), find_fb_dev, &param);
+
+	if (param.found_dip == NULL)
 		return (NULL);
 
-	(void) ddi_pathname(fb_dip, fbpath_buf);
+	(void) ddi_pathname(param.found_dip, fbpath_buf);
 	fbpath = fbpath_buf;
-
 	return (fbpath);
 }
 
