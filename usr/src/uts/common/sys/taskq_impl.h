@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,6 +111,8 @@ struct taskq {
 	int		tq_nalloc;
 	int		tq_minalloc;
 	int		tq_maxalloc;
+	kcondvar_t	tq_maxalloc_cv;
+	int		tq_maxalloc_wait;
 	taskq_ent_t	*tq_freelist;
 	taskq_ent_t	tq_task;
 	int		tq_maxsize;

@@ -564,6 +564,7 @@ static int  taskq_ent_constructor(void *, void *, int);
 static void taskq_ent_destructor(void *, void *);
 static taskq_ent_t *taskq_ent_alloc(taskq_t *, int);
 static void taskq_ent_free(taskq_t *, taskq_ent_t *);
+static int taskq_ent_exists(taskq_t *, task_func_t, void *);
 static taskq_ent_t *taskq_bucket_dispatch(taskq_bucket_t *, task_func_t,
     void *);
 
@@ -763,6 +764,7 @@ taskq_constructor(void *buf, void *cdrarg, int kmflags)
 	cv_init(&tq->tq_dispatch_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&tq->tq_exit_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&tq->tq_wait_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&tq->tq_maxalloc_cv, NULL, CV_DEFAULT, NULL);
 
 	tq->tq_task.tqent_next = &tq->tq_task;
 	tq->tq_task.tqent_prev = &tq->tq_task;
@@ -786,6 +788,7 @@ taskq_destructor(void *buf, void *cdrarg)
 	cv_destroy(&tq->tq_dispatch_cv);
 	cv_destroy(&tq->tq_exit_cv);
 	cv_destroy(&tq->tq_wait_cv);
+	cv_destroy(&tq->tq_maxalloc_cv);
 }
 
 /*ARGSUSED*/
@@ -952,8 +955,9 @@ static taskq_ent_t *
 taskq_ent_alloc(taskq_t *tq, int flags)
 {
 	int kmflags = (flags & TQ_NOSLEEP) ? KM_NOSLEEP : KM_SLEEP;
-
 	taskq_ent_t *tqe;
+	clock_t wait_time;
+	clock_t	wait_rv;
 
 	ASSERT(MUTEX_HELD(&tq->tq_lock));
 
@@ -961,29 +965,44 @@ taskq_ent_alloc(taskq_t *tq, int flags)
 	 * TQ_NOALLOC allocations are allowed to use the freelist, even if
 	 * we are below tq_minalloc.
 	 */
-	if ((tqe = tq->tq_freelist) != NULL &&
+again:	if ((tqe = tq->tq_freelist) != NULL &&
 	    ((flags & TQ_NOALLOC) || tq->tq_nalloc >= tq->tq_minalloc)) {
 		tq->tq_freelist = tqe->tqent_next;
 	} else {
 		if (flags & TQ_NOALLOC)
 			return (NULL);
 
-		mutex_exit(&tq->tq_lock);
 		if (tq->tq_nalloc >= tq->tq_maxalloc) {
-			if (kmflags & KM_NOSLEEP) {
-				mutex_enter(&tq->tq_lock);
+			if (kmflags & KM_NOSLEEP)
 				return (NULL);
-			}
+
 			/*
 			 * We don't want to exceed tq_maxalloc, but we can't
 			 * wait for other tasks to complete (and thus free up
 			 * task structures) without risking deadlock with
 			 * the caller.  So, we just delay for one second
-			 * to throttle the allocation rate.
+			 * to throttle the allocation rate. If we have tasks
+			 * complete before one second timeout expires then
+			 * taskq_ent_free will signal us and we will
+			 * immediately retry the allocation (reap free).
 			 */
-			delay(hz);
+			wait_time = ddi_get_lbolt() + hz;
+			while (tq->tq_freelist == NULL) {
+				tq->tq_maxalloc_wait++;
+				wait_rv = cv_timedwait(&tq->tq_maxalloc_cv,
+				    &tq->tq_lock, wait_time);
+				tq->tq_maxalloc_wait--;
+				if (wait_rv == -1)
+					break;
+			}
+			if (tq->tq_freelist)
+				goto again;		/* reap freelist */
+
 		}
+		mutex_exit(&tq->tq_lock);
+
 		tqe = kmem_cache_alloc(taskq_ent_cache, kmflags);
+
 		mutex_enter(&tq->tq_lock);
 		if (tqe != NULL)
 			tq->tq_nalloc++;
@@ -1013,6 +1032,30 @@ taskq_ent_free(taskq_t *tq, taskq_ent_t *tqe)
 		kmem_cache_free(taskq_ent_cache, tqe);
 		mutex_enter(&tq->tq_lock);
 	}
+
+	if (tq->tq_maxalloc_wait)
+		cv_signal(&tq->tq_maxalloc_cv);
+}
+
+/*
+ * taskq_ent_exists()
+ *
+ * Return 1 if taskq already has entry for calling 'func(arg)'.
+ *
+ * Assumes: tq->tq_lock is held.
+ */
+static int
+taskq_ent_exists(taskq_t *tq, task_func_t func, void *arg)
+{
+	taskq_ent_t	*tqe;
+
+	ASSERT(MUTEX_HELD(&tq->tq_lock));
+
+	for (tqe = tq->tq_task.tqent_next; tqe != &tq->tq_task;
+	    tqe = tqe->tqent_next)
+		if ((tqe->tqent_func == func) && (tqe->tqent_arg == arg))
+			return (1);
+	return (0);
 }
 
 /*
@@ -1199,15 +1242,19 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 	}
 
 	ASSERT(bucket != NULL);
+
 	/*
-	 * Since there are not enough free entries in the bucket, extend it
-	 * in the background using backing queue.
+	 * Since there are not enough free entries in the bucket, add a
+	 * taskq entry to extend it in the background using backing queue
+	 * (unless we already have a taskq entry to perform that extension).
 	 */
 	mutex_enter(&tq->tq_lock);
-	if ((tqe1 = taskq_ent_alloc(tq, TQ_NOSLEEP)) != NULL) {
-		TQ_ENQUEUE(tq, tqe1, taskq_bucket_extend, bucket);
-	} else {
-		TQ_STAT(bucket, tqs_nomem);
+	if (!taskq_ent_exists(tq, taskq_bucket_extend, bucket)) {
+		if ((tqe1 = taskq_ent_alloc(tq, TQ_NOSLEEP)) != NULL) {
+			TQ_ENQUEUE_FRONT(tq, tqe1, taskq_bucket_extend, bucket);
+		} else {
+			TQ_STAT(bucket, tqs_nomem);
+		}
 	}
 
 	/*

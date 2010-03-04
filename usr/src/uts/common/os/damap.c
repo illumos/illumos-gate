@@ -84,6 +84,8 @@ static int dam_map_alloc(dam_t *);
  */
 #define	DAM_SIZE_BUMP	64
 
+int	damap_taskq_dispatch_retry_usec = 1000;
+
 /*
  * config/unconfig taskq data
  */
@@ -1052,7 +1054,7 @@ dam_addrset_activate(dam_t *mapp, bitset_t *activate)
 				tqd->tqd_mapp = mapp;
 				tqd->tqd_id = i;
 				(void) taskq_dispatch(tqp, dam_tq_config,
-				    tqd, KM_SLEEP);
+				    tqd, TQ_SLEEP);
 			}
 		}
 	}
@@ -1097,7 +1099,7 @@ dam_addrset_deactivate(dam_t *mapp, bitset_t *deactivate)
 				tqd->tqd_mapp = mapp;
 				tqd->tqd_id = i;
 				(void) taskq_dispatch(tqp,
-				    dam_tq_unconfig, tqd, KM_SLEEP);
+				    dam_tq_unconfig, tqd, TQ_SLEEP);
 			}
 		}
 	}
@@ -1330,12 +1332,21 @@ dam_addr_stable_cb(void *arg)
 	 */
 	if (spend) {
 		if (taskq_dispatch(system_taskq, dam_stabilize_map,
-		    mapp, TQ_NOSLEEP)) {
+		    mapp, TQ_NOSLEEP | TQ_NOQUEUE)) {
 			mapp->dam_flags  |= DAM_SPEND;
 			DTRACE_PROBE2(damap__map__addr__stable__start, char *,
 			    mapp->dam_name, dam_t *, mapp);
 		} else {
 			tpend++;
+
+			/*
+			 * Avoid waiting the entire stabalization
+			 * time again if taskq_diskpatch fails.
+			 */
+			tmo_delta = drv_usectohz(
+			    damap_taskq_dispatch_retry_usec);
+			if (tmo_delta < next_tmov)
+				next_tmov = tmo_delta;
 		}
 	}
 
@@ -1371,11 +1382,15 @@ dam_addrset_stable_cb(void *arg)
 	 * else dispatch the task to configure the new stable set of
 	 * addresses.
 	 */
-	if ((mapp->dam_flags & DAM_SPEND) || (taskq_dispatch(system_taskq,
-	    dam_stabilize_map, mapp, TQ_NOSLEEP) == NULL)) {
+	if ((mapp->dam_flags & DAM_SPEND) ||
+	    (taskq_dispatch(system_taskq, dam_stabilize_map, mapp,
+	    TQ_NOSLEEP | TQ_NOQUEUE) == NULL)) {
 		DAM_INCR_STAT(mapp, dam_overrun);
 		mapp->dam_stable_overrun++;
-		dam_sched_tmo(mapp, mapp->dam_stabletmo, dam_addrset_stable_cb);
+		dam_sched_tmo(mapp,
+		    drv_usectohz(damap_taskq_dispatch_retry_usec),
+		    dam_addrset_stable_cb);
+
 		DTRACE_PROBE2(damap__map__addrset__stable__overrun, char *,
 		    mapp->dam_name, dam_t *, mapp);
 		mutex_exit(&mapp->dam_lock);

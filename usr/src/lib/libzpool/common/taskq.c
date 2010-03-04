@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,8 @@ struct taskq {
 	int		tq_nalloc;
 	int		tq_minalloc;
 	int		tq_maxalloc;
+	kcondvar_t	tq_maxalloc_cv;
+	int		tq_maxalloc_wait;
 	task_t		*tq_freelist;
 	task_t		tq_task;
 };
@@ -57,26 +59,36 @@ static task_t *
 task_alloc(taskq_t *tq, int tqflags)
 {
 	task_t *t;
+	int rv;
 
-	if ((t = tq->tq_freelist) != NULL && tq->tq_nalloc >= tq->tq_minalloc) {
+again:	if ((t = tq->tq_freelist) != NULL && tq->tq_nalloc >= tq->tq_minalloc) {
 		tq->tq_freelist = t->task_next;
 	} else {
-		mutex_exit(&tq->tq_lock);
 		if (tq->tq_nalloc >= tq->tq_maxalloc) {
-			if (!(tqflags & KM_SLEEP)) {
-				mutex_enter(&tq->tq_lock);
+			if (!(tqflags & KM_SLEEP))
 				return (NULL);
-			}
+
 			/*
 			 * We don't want to exceed tq_maxalloc, but we can't
 			 * wait for other tasks to complete (and thus free up
 			 * task structures) without risking deadlock with
 			 * the caller.  So, we just delay for one second
-			 * to throttle the allocation rate.
+			 * to throttle the allocation rate. If we have tasks
+			 * complete before one second timeout expires then
+			 * taskq_ent_free will signal us and we will
+			 * immediately retry the allocation.
 			 */
-			delay(hz);
+			tq->tq_maxalloc_wait++;
+			rv = cv_timedwait(&tq->tq_maxalloc_cv,
+			    &tq->tq_lock, ddi_get_lbolt() + hz);
+			tq->tq_maxalloc_wait--;
+			if (rv > 0)
+				goto again;		/* signaled */
 		}
+		mutex_exit(&tq->tq_lock);
+
 		t = kmem_alloc(sizeof (task_t), tqflags);
+
 		mutex_enter(&tq->tq_lock);
 		if (t != NULL)
 			tq->tq_nalloc++;
@@ -96,6 +108,9 @@ task_free(taskq_t *tq, task_t *t)
 		kmem_free(t, sizeof (task_t));
 		mutex_enter(&tq->tq_lock);
 	}
+
+	if (tq->tq_maxalloc_wait)
+		cv_signal(&tq->tq_maxalloc_cv);
 }
 
 taskqid_t
@@ -196,6 +211,7 @@ taskq_create(const char *name, int nthreads, pri_t pri,
 	mutex_init(&tq->tq_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&tq->tq_dispatch_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&tq->tq_wait_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&tq->tq_maxalloc_cv, NULL, CV_DEFAULT, NULL);
 	tq->tq_flags = flags | TASKQ_ACTIVE;
 	tq->tq_active = nthreads;
 	tq->tq_nthreads = nthreads;
@@ -252,6 +268,7 @@ taskq_destroy(taskq_t *tq)
 	mutex_destroy(&tq->tq_lock);
 	cv_destroy(&tq->tq_dispatch_cv);
 	cv_destroy(&tq->tq_wait_cv);
+	cv_destroy(&tq->tq_maxalloc_cv);
 
 	kmem_free(tq, sizeof (taskq_t));
 }
