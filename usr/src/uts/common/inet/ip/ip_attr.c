@@ -396,10 +396,12 @@ ip_xmit_attr_from_mblk(mblk_t *ixamp, ip_xmit_attr_t *ixa)
 	if (ixm->ixm_tsl != NULL) {
 		ixa->ixa_tsl = ixm->ixm_tsl;
 		ixa->ixa_free_flags |= IXA_FREE_TSL;
+		ixm->ixm_tsl = NULL;
 	}
 	if (ixm->ixm_cred != NULL) {
 		ixa->ixa_cred = ixm->ixm_cred;
 		ixa->ixa_free_flags |= IXA_FREE_CRED;
+		ixm->ixm_cred = NULL;
 	}
 	ixa->ixa_cpid = ixm->ixm_cpid;
 
@@ -649,10 +651,12 @@ ip_recv_attr_from_mblk(mblk_t *iramp, ip_recv_attr_t *ira)
 	if (irm->irm_tsl != NULL) {
 		ira->ira_tsl = irm->irm_tsl;
 		ira->ira_free_flags |= IRA_FREE_TSL;
+		irm->irm_tsl = NULL;
 	}
 	if (irm->irm_cred != NULL) {
 		ira->ira_cred = irm->irm_cred;
 		ira->ira_free_flags |= IRA_FREE_CRED;
+		irm->irm_cred = NULL;
 	}
 	ira->ira_cpid = irm->irm_cpid;
 
@@ -1110,15 +1114,15 @@ ira_cleanup(ip_recv_attr_t *ira, boolean_t refrele_ill)
 	if (ira->ira_free_flags & IRA_FREE_TSL) {
 		ASSERT(ira->ira_tsl != NULL);
 		label_rele(ira->ira_tsl);
-		ira->ira_tsl = NULL;
 		ira->ira_free_flags &= ~IRA_FREE_TSL;
 	}
+	ira->ira_tsl = NULL;
 	if (ira->ira_free_flags & IRA_FREE_CRED) {
 		ASSERT(ira->ira_cred != NULL);
 		crfree(ira->ira_cred);
-		ira->ira_cred = NULL;
 		ira->ira_free_flags &= ~IRA_FREE_CRED;
 	}
+	ira->ira_cred = NULL;
 }
 
 /*

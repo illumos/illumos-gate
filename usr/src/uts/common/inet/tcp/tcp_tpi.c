@@ -1162,6 +1162,7 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	if (econnp->conn_cred != NULL)
 		crfree(econnp->conn_cred);
 	econnp->conn_cred = aconnp->conn_cred;
+	ASSERT(!(econnp->conn_ixa->ixa_free_flags & IXA_FREE_CRED));
 	econnp->conn_ixa->ixa_cred = econnp->conn_cred;
 	aconnp->conn_cred = NULL;
 	econnp->conn_cpid = aconnp->conn_cpid;

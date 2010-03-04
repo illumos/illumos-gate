@@ -2838,6 +2838,7 @@ tcp_create_common(cred_t *credp, boolean_t isv6, boolean_t issocket,
 	connp->conn_open_time = ddi_get_lbolt64();
 
 	/* Cache things in the ixa without any refhold */
+	ASSERT(!(connp->conn_ixa->ixa_free_flags & IXA_FREE_CRED));
 	connp->conn_ixa->ixa_cred = credp;
 	connp->conn_ixa->ixa_cpid = connp->conn_cpid;
 
@@ -4861,6 +4862,7 @@ tcp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	connp->conn_cpid = pid;
 
 	/* Cache things in the ixa without any refhold */
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = cr;
 	ixa->ixa_cpid = pid;
 	if (is_system_labeled()) {

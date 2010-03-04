@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -461,6 +461,7 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen,
 
 	/* Cache things in conn_ixa without any refhold */
 	ixa = connp->conn_ixa;
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = cr;
 	ixa->ixa_cpid = pid;
 	if (is_system_labeled()) {

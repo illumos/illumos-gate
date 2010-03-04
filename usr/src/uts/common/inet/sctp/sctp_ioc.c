@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,6 +201,7 @@ sctp_str_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	crhold(connp->conn_cred);
 	connp->conn_cpid = curproc->p_pid;
 	/* Cache things in ixa without an extra refhold */
+	ASSERT(!(connp->conn_ixa->ixa_free_flags & IXA_FREE_CRED));
 	connp->conn_ixa->ixa_cred = connp->conn_cred;
 	connp->conn_ixa->ixa_cpid = connp->conn_cpid;
 	if (is_system_labeled())

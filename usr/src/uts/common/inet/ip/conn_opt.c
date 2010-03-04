@@ -2889,6 +2889,7 @@ conn_inherit_parent(conn_t *lconnp, conn_t *econnp)
 	 * Cache things in the ixa without any refhold.
 	 * Listener might not have set up ixa_cred
 	 */
+	ASSERT(!(econnp->conn_ixa->ixa_free_flags & IXA_FREE_CRED));
 	econnp->conn_ixa->ixa_cred = econnp->conn_cred;
 	econnp->conn_ixa->ixa_cpid = econnp->conn_cpid;
 	if (is_system_labeled())

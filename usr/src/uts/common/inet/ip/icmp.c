@@ -806,6 +806,7 @@ rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 		connp->conn_cred = cr;
 	}
 	connp->conn_cpid = pid;
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = cr;
 	ixa->ixa_cpid = pid;
 	if (is_system_labeled()) {
@@ -1722,6 +1723,7 @@ rawip_do_open(int family, cred_t *credp, int *err, int flags)
 	connp->conn_cpid = curproc->p_pid;
 	connp->conn_open_time = ddi_get_lbolt64();
 	/* Cache things in ixa without an extra refhold */
+	ASSERT(!(connp->conn_ixa->ixa_free_flags & IXA_FREE_CRED));
 	connp->conn_ixa->ixa_cred = connp->conn_cred;
 	connp->conn_ixa->ixa_cpid = connp->conn_cpid;
 	if (is_system_labeled())
@@ -3043,6 +3045,7 @@ icmp_output_hdrincl(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 	 * Caller has a reference on cr; from db_credp or because we
 	 * are running in process context.
 	 */
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = cr;
 	ixa->ixa_cpid = pid;
 	if (is_system_labeled()) {
@@ -3056,6 +3059,7 @@ icmp_output_hdrincl(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 	/* Get a copy of conn_xmit_ipp since the TX label might change it */
 	ipp = kmem_zalloc(sizeof (*ipp), KM_NOSLEEP);
 	if (ipp == NULL) {
+		ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 		ixa->ixa_cred = connp->conn_cred;	/* Restore */
 		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
@@ -3291,6 +3295,7 @@ icmp_output_hdrincl(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 		break;
 	}
 done:
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = connp->conn_cred;	/* Restore */
 	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
@@ -3359,6 +3364,7 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		return (ENOMEM);
 	}
 	ASSERT(cr != NULL);
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = cr;
 	ixa->ixa_cpid = pid;
 	if (is_system_labeled()) {
@@ -3372,6 +3378,7 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 	/* Get a copy of conn_xmit_ipp since the options might change it */
 	ipp = kmem_zalloc(sizeof (*ipp), KM_NOSLEEP);
 	if (ipp == NULL) {
+		ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 		ixa->ixa_cred = connp->conn_cred;	/* Restore */
 		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
@@ -3622,6 +3629,7 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		break;
 	}
 done:
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = connp->conn_cred;	/* Restore */
 	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
@@ -3655,6 +3663,7 @@ icmp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 	}
 
 	ASSERT(cr != NULL);
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = cr;
 	ixa->ixa_cpid = pid;
 
@@ -3675,6 +3684,7 @@ icmp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 	if (mp == NULL) {
 		ASSERT(error != 0);
 		mutex_exit(&connp->conn_lock);
+		ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 		ixa->ixa_cred = connp->conn_cred;	/* Restore */
 		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
@@ -3689,6 +3699,7 @@ icmp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 		if (mp == NULL) {
 			mutex_exit(&connp->conn_lock);
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+			ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 			ixa->ixa_cred = connp->conn_cred;	/* Restore */
 			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
@@ -3745,6 +3756,7 @@ icmp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 			/* FALLTHRU */
 		default:
 		failed:
+			ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 			ixa->ixa_cred = connp->conn_cred;	/* Restore */
 			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
@@ -3777,6 +3789,7 @@ icmp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 		error = ENETUNREACH;
 		break;
 	}
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = connp->conn_cred;	/* Restore */
 	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
@@ -3802,6 +3815,7 @@ icmp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 	ASSERT(ixa != NULL);
 
 	ASSERT(cr != NULL);
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = cr;
 	ixa->ixa_cpid = pid;
 
@@ -3822,6 +3836,7 @@ icmp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 	if (mp == NULL) {
 		ASSERT(error != 0);
 		mutex_exit(&connp->conn_lock);
+		ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 		ixa->ixa_cred = connp->conn_cred;	/* Restore */
 		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
@@ -3836,6 +3851,7 @@ icmp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 		if (mp == NULL) {
 			mutex_exit(&connp->conn_lock);
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+			ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 			ixa->ixa_cred = connp->conn_cred;	/* Restore */
 			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
@@ -3892,6 +3908,7 @@ icmp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 			/* FALLTHRU */
 		default:
 		failed:
+			ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 			ixa->ixa_cred = connp->conn_cred;	/* Restore */
 			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
@@ -3936,6 +3953,7 @@ icmp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 		mutex_exit(&connp->conn_lock);
 		break;
 	}
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = connp->conn_cred;	/* Restore */
 	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
@@ -4374,6 +4392,7 @@ icmp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 	 */
 
 	ASSERT(cr != NULL);
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = cr;
 	ixa->ixa_cpid = pid;
 	if (is_system_labeled()) {
@@ -4653,12 +4672,14 @@ icmp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 		break;
 	}
 done:
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = connp->conn_cred;	/* Restore */
 	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
 	return (error);
 
 ud_error:
+	ASSERT(!(ixa->ixa_free_flags & IXA_FREE_CRED));
 	ixa->ixa_cred = connp->conn_cred;	/* Restore */
 	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);

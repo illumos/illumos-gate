@@ -6213,6 +6213,7 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	connp->conn_cred = credp;
 	connp->conn_cpid = curproc->p_pid;
 	/* Cache things in ixa without an extra refhold */
+	ASSERT(!(connp->conn_ixa->ixa_free_flags & IXA_FREE_CRED));
 	connp->conn_ixa->ixa_cred = connp->conn_cred;
 	connp->conn_ixa->ixa_cpid = connp->conn_cpid;
 	if (is_system_labeled())

@@ -1282,6 +1282,7 @@ iptun_conn_create(iptun_t *iptun, netstack_t *ns, cred_t *credp)
 	ASSERT(connp->conn_ref == 1);
 
 	/* Cache things in ixa without an extra refhold */
+	ASSERT(!(connp->conn_ixa->ixa_free_flags & IXA_FREE_CRED));
 	connp->conn_ixa->ixa_cred = connp->conn_cred;
 	connp->conn_ixa->ixa_cpid = connp->conn_cpid;
 	if (is_system_labeled())

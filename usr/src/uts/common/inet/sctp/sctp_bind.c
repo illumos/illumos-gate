@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,6 +150,7 @@ sctp_listen(sctp_t *sctp)
 	}
 
 	/* Cache things in the ixa without any refhold */
+	ASSERT(!(connp->conn_ixa->ixa_free_flags & IXA_FREE_CRED));
 	connp->conn_ixa->ixa_cred = connp->conn_cred;
 	connp->conn_ixa->ixa_cpid = connp->conn_cpid;
 	if (is_system_labeled())
