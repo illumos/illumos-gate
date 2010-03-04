@@ -7696,6 +7696,20 @@ mondo_loop() {
 	rm -f $usr/include/sys/pcmcia/pcelx.h
 
 	#
+	# Remove bpp, esp, and dma
+	#
+	rm -f $root/kernel/drv/sparcv9/bpp
+	rm -f $root/kernel/drv/sparcv9/esp
+	rm -f $root/platform/sun4u/kernel/drv/sparcv9/dma
+	rm -f $root/platform/sun4v/kernel/drv/sparcv9/dma
+	rm -f $usr/include/sys/dmaga.h
+	rm -f $usr/include/sys/bpp_reg.h
+	rm -f $usr/include/sys/bpp_var.h
+	rm -f $usr/include/sys/scsi/adapters/espcmd.h
+	rm -f $usr/include/sys/scsi/adapters/espreg.h
+	rm -f $usr/include/sys/scsi/adapters/espvar.h
+
+	#
 	# Remove eisa nexus driver and header files for EOF of EISA
 	# support as per PSARC/2003/650
 	#

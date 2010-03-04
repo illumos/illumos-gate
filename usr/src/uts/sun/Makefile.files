@@ -41,10 +41,6 @@ AUDIOCS_OBJS +=	audio_4231.o audio_4231_apcdma.o audio_4231_eb2dma.o
 
 DAD_OBJS +=	dad.o
 
-DMA_OBJS +=	dmaga.o
-
-ESP_OBJS +=	esp.o
-
 FAS_OBJS +=	fas.o fas_callbacks.o
 
 FD_OBJS += fd.o

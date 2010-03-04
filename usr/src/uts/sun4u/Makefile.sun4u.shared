@@ -355,7 +355,7 @@ MACH_NOT_YET_KMODS	 = $(AUTOCONF_OBJS)
 #
 DRV_KMODS	+= bbc_beep
 DRV_KMODS	+= cpc
-DRV_KMODS	+= dma fd
+DRV_KMODS	+= fd
 DRV_KMODS	+= rootnex sbusmem upa64s zs zsh
 DRV_KMODS	+= sbus
 DRV_KMODS	+= pcisch pcipsy simba

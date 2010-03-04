@@ -104,7 +104,6 @@ driver name=devinfo perms="devinfo 0640 root sys" \
     perms="devinfo,ro 0444 root sys"
 driver name=dld perms="* 0666 root sys"
 driver name=dlpistub perms="* 0666 root sys"
-$(sparc_ONLY)driver name=esp class=scsi
 $(sparc_ONLY)driver name=i8042 alias=8042
 $(i386_ONLY)driver name=i8042
 driver name=icmp perms="icmp 0666 root sys" \
@@ -326,7 +325,6 @@ $(sparc_ONLY)file path=kernel/drv/$(ARCH64)/dad group=sys
 file path=kernel/drv/$(ARCH64)/devinfo group=sys
 file path=kernel/drv/$(ARCH64)/dld group=sys
 file path=kernel/drv/$(ARCH64)/dlpistub group=sys
-$(sparc_ONLY)file path=kernel/drv/$(ARCH64)/esp group=sys
 file path=kernel/drv/$(ARCH64)/i8042 group=sys
 file path=kernel/drv/$(ARCH64)/icmp group=sys
 file path=kernel/drv/$(ARCH64)/icmp6 group=sys

@@ -29,7 +29,7 @@ include ../../../Makefile.master
 HDRS=  \
 avintr.h \
 bootconf.h \
-dkmpio.h		dmaga.h	\
+dkmpio.h		\
 fdreg.h			fdvar.h \
 obpdefs.h		\
 promif.h		promimpl.h \
@@ -40,7 +40,7 @@ ttymux.h		ttymuxuser.h \
 zsdev.h
 
 SCSIADHDRS= \
-espcmd.h	espreg.h	espvar.h	fascmd.h	fasdma.h \
+fascmd.h	fasdma.h \
 fasreg.h	fasvar.h	ifpio.h		sfvar.h
 
 CLOSED_SCSIAD = $(CLOSED)/uts/sun/sys/scsi/adapters

@@ -376,7 +376,6 @@ $(sparc_ONLY)driver name=db21554 \
     alias=pci108e,6722 \
     alias=pciclass,060940 \
     alias=pciclass,060980
-$(sparc_ONLY)driver name=dma alias=espdma
 $(sparc_ONLY)driver name=dman perms="* 0600 root sys"
 $(i386_ONLY)driver name=domcaps perms="* 0444 root sys"
 $(sparc_ONLY)driver name=dr
@@ -979,7 +978,6 @@ $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/adm1031 group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/bbc_beep group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/ctsmc group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/db21554 group=sys
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/dma group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/ebus group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/epic group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/fd group=sys
@@ -1111,7 +1109,6 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/crypto/$(ARCH64)/md5 group=sys \
     mode=0755 reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/bge group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/bmc group=sys
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/dma group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/ebus group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/glvc group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/mdesc group=sys
