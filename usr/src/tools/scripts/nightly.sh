@@ -3175,7 +3175,7 @@ if [ "$build_ok" = "y" ]; then
 			# IHV proto list in the reference list to determine
 			# whether it was built with -X or not.
 			#
-			IHV_REF_PROTO_LIST=$SRC/pkgdefs/etc/proto_list_ihv_$MACH
+			IHV_REF_PROTO_LIST=$SRC/pkg/proto_list_ihv_$MACH
 			grepfor=$(nawk '$1 == "f" { print $2; exit }' \
 				$IHV_REF_PROTO_LIST 2> /dev/null)
 			if [ $? = 0 -a -n "$grepfor" ]; then
