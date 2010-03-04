@@ -3196,41 +3196,32 @@ if [ "$build_ok" = "y" ]; then
 		fi
 	fi
 
-	if [ "$N_FLAG" != "y" -a -d $SRC/pkgdefs ]; then
+	if [ "$N_FLAG" != "y" -a -f $SRC/pkgdefs/Makefile ]; then
 		echo "\n==== Impact on SVr4 packages ====\n" >> $mail_msg_file
-	    	if [ "$CLOSED_IS_PRESENT" = "no" ]; then
-			#
-			# Traditional SVr4 packages builds don't get along well
-			# with open-only builds.
-			#
-			echo "Skipping: $CLOSED_IS_PRESENT = no" \
-			    >> $mail_msg_file
-		else
-			#
-			# Compare the build's proto list with current package
-			# definitions to audit the quality of package
-			# definitions and makefile install targets. Use the
-			# current exception list.
-			#
-			PKGDEFS_LIST=""
-			for d in $abssrcdirs; do
-				if [ -d $d/pkgdefs ]; then
-					PKGDEFS_LIST="$PKGDEFS_LIST -d $d/pkgdefs"
-				fi
-			done
-			if [ "$X_FLAG" = "y" -a \
-			    -d $IA32_IHV_WS/usr/src/pkgdefs ]; then
-				PKGDEFS_LIST="$PKGDEFS_LIST -d $IA32_IHV_WS/usr/src/pkgdefs"
+		#
+		# Compare the build's proto list with current package
+		# definitions to audit the quality of package
+		# definitions and makefile install targets. Use the
+		# current exception list.
+		#
+		PKGDEFS_LIST=""
+		for d in $abssrcdirs; do
+			if [ -d $d/pkgdefs ]; then
+				PKGDEFS_LIST="$PKGDEFS_LIST -d $d/pkgdefs"
 			fi
-			$PROTOCMPTERSE \
-			    "Files missing from the proto area:" \
-			    "Files missing from packages:" \
-			    "Inconsistencies between pkgdefs and proto area:" \
-			    ${E1} \
-			    ${PKGDEFS_LIST} \
-			    $ATLOG/proto_list_${MACH} \
-			    >> $mail_msg_file
+		done
+		if [ "$X_FLAG" = "y" -a \
+		    -d $IA32_IHV_WS/usr/src/pkgdefs ]; then
+			PKGDEFS_LIST="$PKGDEFS_LIST -d $IA32_IHV_WS/usr/src/pkgdefs"
 		fi
+		$PROTOCMPTERSE \
+		    "Files missing from the proto area:" \
+		    "Files missing from packages:" \
+		    "Inconsistencies between pkgdefs and proto area:" \
+		    ${E1} \
+		    ${PKGDEFS_LIST} \
+		    $ATLOG/proto_list_${MACH} \
+		    >> $mail_msg_file
 	fi
 
 	if [ "$N_FLAG" != "y" -a -d $SRC/pkg ]; then
