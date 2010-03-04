@@ -1597,10 +1597,16 @@ pmcs_scsa_wq_run_one(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	while ((sp = STAILQ_FIRST(&xp->wq)) != NULL) {
 		pwrk = pmcs_gwork(pwp, PMCS_TAG_TYPE_CBACK, phyp);
 		if (pwrk == NULL) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-			    "%s: out of work structures", __func__);
+			mutex_exit(&xp->wqlock);
+			mutex_enter(&pwp->lock);
+			if (pwp->resource_limited == 0) {
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+				    "%s: out of work structures", __func__);
+			}
+			pwp->resource_limited = 1;
 			SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
-			break;
+			mutex_exit(&pwp->lock);
+			return (B_FALSE);
 		}
 		STAILQ_REMOVE_HEAD(&xp->wq, cmd_next);
 		mutex_exit(&xp->wqlock);
@@ -1694,9 +1700,21 @@ pmcs_scsa_wq_run(pmcs_hw_t *pwp)
 	} while (target != target_start);
 
 	if (rval) {
+		/*
+		 * If we were resource limited, but apparently are not now,
+		 * reschedule the work queues anyway.
+		 */
+		if (pwp->resource_limited) {
+			SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
+		}
 		pwp->resource_limited = 0; /* Not resource-constrained */
 	} else {
-		pwp->resource_limited = 1; /* Give others a chance */
+		/*
+		 * Give everybody a chance, and reschedule to run the queues
+		 * again as long as we're limited.
+		 */
+		pwp->resource_limited = 1;
+		SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
 	}
 
 	pwp->last_wq_dev = target;
@@ -2163,15 +2181,6 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 
 out:
 	pmcs_dma_unload(pwp, sp);
-
-	/*
-	 * If the status is other than OK, determine if it's something that
-	 * is worth re-attempting enumeration.  If so, mark the PHY.
-	 */
-	if (sts != PMCOUT_STATUS_OK) {
-		pmcs_status_disposition(pptr, sts);
-	}
-
 	mutex_enter(&xp->statlock);
 
 	/*
@@ -2218,6 +2227,15 @@ out:
 		}
 	}
 	mutex_exit(&xp->statlock);
+
+	/*
+	 * If the status is other than OK, determine if it's something that
+	 * is worth re-attempting enumeration.  If so, mark the PHY.
+	 */
+	if (sts != PMCOUT_STATUS_OK) {
+		pmcs_status_disposition(pptr, sts);
+	}
+
 	if (dead == 0) {
 #ifdef	DEBUG
 		pmcs_cmd_t *wp;
@@ -2645,15 +2663,6 @@ pmcs_SATA_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 
 out:
 	pmcs_dma_unload(pwp, sp);
-
-	/*
-	 * If the status is other than OK, determine if it's something that
-	 * is worth re-attempting enumeration.  If so, mark the PHY.
-	 */
-	if (sts != PMCOUT_STATUS_OK) {
-		pmcs_status_disposition(pptr, sts);
-	}
-
 	mutex_enter(&xp->statlock);
 	xp->tagmap &= ~(1 << sp->cmd_satltag);
 
@@ -2698,6 +2707,14 @@ out:
 		}
 	}
 	mutex_exit(&xp->statlock);
+
+	/*
+	 * If the status is other than OK, determine if it's something that
+	 * is worth re-attempting enumeration.  If so, mark the PHY.
+	 */
+	if (sts != PMCOUT_STATUS_OK) {
+		pmcs_status_disposition(pptr, sts);
+	}
 
 	if (dead == 0) {
 #ifdef	DEBUG
@@ -3072,10 +3089,10 @@ pmcs_set_resid(struct scsi_pkt *pkt, size_t amt, uint32_t cdbamt)
 }
 
 /*
- * Return the existing target softstate if there is one.  If there is,
- * the PHY is locked as well and that lock must be freed by the caller
- * after the target/PHY linkage is established.  If there isn't one, and
- * alloc_tgt is TRUE, then allocate one.
+ * Return the existing target softstate (unlocked) if there is one.  If so,
+ * the PHY is locked and that lock must be freed by the caller after the
+ * target/PHY linkage is established.  If there isn't one, and alloc_tgt is
+ * TRUE, then allocate one.
  */
 pmcs_xscsi_t *
 pmcs_get_target(pmcs_iport_t *iport, char *tgt_port, boolean_t alloc_tgt)
@@ -3100,6 +3117,7 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port, boolean_t alloc_tgt)
 	tgt = ddi_soft_state_bystr_get(iport->tgt_sstate, tgt_port);
 
 	if (tgt) {
+		mutex_enter(&tgt->statlock);
 		/*
 		 * There's already a target.  Check its PHY pointer to see
 		 * if we need to clear the old linkages
@@ -3115,8 +3133,25 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port, boolean_t alloc_tgt)
 			tgt->phy->target = NULL;
 		}
 
+		/*
+		 * If this target has no PHY pointer and alloc_tgt is FALSE,
+		 * that implies we expect the target to already exist.  This
+		 * implies that there has already been a tran_tgt_init on at
+		 * least one LU.
+		 */
+		if ((tgt->phy == NULL) && !alloc_tgt) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, tgt,
+			    "%s: Establish linkage from new PHY to old target @"
+			    "%s", __func__, tgt->unit_address);
+			for (int idx = 0; idx < tgt->ref_count; idx++) {
+				pmcs_inc_phy_ref_count(phyp);
+			}
+		}
+
 		tgt->phy = phyp;
 		phyp->target = tgt;
+
+		mutex_exit(&tgt->statlock);
 		return (tgt);
 	}
 

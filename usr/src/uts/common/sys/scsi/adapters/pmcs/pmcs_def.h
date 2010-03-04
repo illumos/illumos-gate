@@ -282,6 +282,7 @@ typedef struct {
 #define	PMCS_WORK_DS_ERR_RECOVERY	9
 #define	PMCS_WORK_SSP_EVT_RECOVERY	10
 #define	PMCS_WORK_DEREGISTER_DEV	11
+#define	PMCS_WORK_DUMP_REGS		12
 
 /*
  * The actual values as they appear in work_flags
@@ -296,6 +297,7 @@ typedef struct {
 #define	PMCS_WORK_FLAG_DS_ERR_RECOVERY	(1 << 9)
 #define	PMCS_WORK_FLAG_SSP_EVT_RECOVERY (1 << 10)
 #define	PMCS_WORK_FLAG_DEREGISTER_DEV   (1 << 11)
+#define	PMCS_WORK_FLAG_DUMP_REGS	(1 << 12)
 
 /*
  * This structure is used by this function to test MPI (and interrupts)

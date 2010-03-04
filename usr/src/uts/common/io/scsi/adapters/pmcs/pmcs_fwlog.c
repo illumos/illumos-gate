@@ -89,6 +89,14 @@ pmcs_register_dump_int(pmcs_hw_t *pwp)
 	n = pmcs_dump_ioqs(pwp, buf, size_left);
 	ASSERT(size_left >= n);
 	buf += n; size_left -= n;
+
+	if (pwp->state == STATE_DEAD) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: HBA dead, skipping AAP1/IOP registers and event logs",
+		    __func__);
+		goto skip_logs;
+	}
+
 	mutex_exit(&pwp->lock);
 	slice = (PMCS_REGISTER_DUMP_FLASH_SIZE / PMCS_FLASH_CHUNK_SIZE);
 	n = snprintf(buf, size_left, "\nDump AAP1 register: \n"
@@ -194,6 +202,7 @@ pmcs_register_dump_int(pmcs_hw_t *pwp)
 	}
 	mutex_enter(&pwp->lock);
 
+skip_logs:
 	n = pmcs_dump_gsm_addiregs(pwp, buf, size_left);
 	ASSERT(size_left >= n);
 	buf += n; size_left -= n;
@@ -500,14 +509,12 @@ pmcs_dump_mpi_table(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 		    (pmcs_rd_mpi_tbl(pwp, PMCS_MPI_SSP_TENQ +
 		    (woff << 2)) >> shf) & 0xff);
 	}
-	for (uint8_t i = 0; i < pwp->nphy; i++) {
-		uint32_t woff = i / 4;
-		uint32_t shf = (i % 4) * 8;
-		n += snprintf(&buf[n], (size_left - n), "SMP Target "
-		    "Event Notification Queue - PHY ID %d = 0x%02x\n", i,
-		    (pmcs_rd_mpi_tbl(pwp, PMCS_MPI_SMP_TENQ +
-		    (woff << 2)) >> shf) & 0xff);
-	}
+
+	n += snprintf(&buf[n], (size_left - n), "I/O Abort Delay = 0x%04x\n",
+	    pmcs_rd_mpi_tbl(pwp, PMCS_MPI_IOABTDLY) & 0xffff);
+	n += snprintf(&buf[n], (size_left - n),
+	    "Customization Setting = 0x%08x\n",
+	    pmcs_rd_mpi_tbl(pwp, PMCS_MPI_CUSTSET));
 	n += snprintf(&buf[n], (size_left - n), "MSGU Event Log Buffer Address "
 	    "Higher = 0x%08x\n", pmcs_rd_mpi_tbl(pwp, PMCS_MPI_MELBAH));
 	n += snprintf(&buf[n], (size_left - n), "MSGU Event Log Buffer Address "

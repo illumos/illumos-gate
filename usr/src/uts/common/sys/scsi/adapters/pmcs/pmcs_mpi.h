@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -115,9 +115,17 @@ extern "C" {
 #define	PMCS_MPI_SSP_TENQ	PMCS_DWRD(0x10)
 
 /*
- * SMP Target Event Notification Queue
+ * I/O Abort Delay
  */
-#define	PMCS_MPI_SMP_TENQ	PMCS_DWRD(0x12)
+#define	PMCS_MPI_IOABTDLY	PMCS_DWRD(0x12)
+
+/*
+ * Customization Setting
+ */
+#define	PMCS_MPI_CUSTSET	PMCS_DWRD(0x13)
+
+#define	PMCS_MPI_CUST_HW_RSC_BSY_ALT	0x1	/* Bit 0 */
+#define	PMCS_MPI_CUST_ABORT_ITNL	0x2	/* Bit 1 */
 
 /*
  * This specifies a log buffer in host memory for the MSGU.
@@ -140,6 +148,7 @@ extern "C" {
  */
 #define	PMCS_MPI_FERR		PMCS_DWRD(0x1C)
 #define	PMCS_FERRIE		0x1	/* Fatal Err Interrupt Enable */
+#define	PMCS_PCAD64		0x2	/* PI/CI addresses are 64-bit */
 #define	PMCS_FERIV_MASK		0xff00	/* Fatal Err Interrupt Mask */
 #define	PMCS_FERIV_SHIFT	8	/* Fatal Err Interrupt Shift */
 

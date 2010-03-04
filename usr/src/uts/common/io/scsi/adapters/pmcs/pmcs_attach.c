@@ -1778,6 +1778,12 @@ pmcs_worker(void *arg)
 
 	work_flags = atomic_swap_ulong(&pwp->work_flags, 0);
 
+	if (work_flags & PMCS_WORK_FLAG_DUMP_REGS) {
+		mutex_enter(&pwp->lock);
+		pmcs_register_dump_int(pwp);
+		mutex_exit(&pwp->lock);
+	}
+
 	if (work_flags & PMCS_WORK_FLAG_SAS_HW_ACK) {
 		pmcs_ack_events(pwp);
 	}
