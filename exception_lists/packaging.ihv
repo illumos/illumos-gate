@@ -28,23 +28,12 @@
 # Exception List for packaging during an ihv-copy build
 #
 
-etc/fddi.cfg				i386
-etc/rcS.d/S50sk98sol			i386
 kernel/drv/adp				i386
 kernel/drv/adp.conf			i386
 kernel/drv/cadp				i386
 kernel/drv/cadp.conf			i386
 kernel/drv/cpqhpc			i386
 kernel/drv/cpqhpc.conf			i386
-kernel/drv/hpfc				i386
-kernel/drv/hpfc.conf			i386
-kernel/drv/sd.conf			i386
-kernel/drv/sk98sol			i386
-kernel/drv/sk98sol.conf			i386
-kernel/drv/skfp				i386
-kernel/drv/symhisl			i386
-kernel/drv/symhisl.conf			i386
 platform/i86pc/kernel/drv/amd64/cadp160	i386
 platform/i86pc/kernel/drv/cadp160	i386
 platform/i86pc/kernel/drv/cadp160.conf	i386
-usr/bin/smtpara				i386
