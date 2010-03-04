@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -106,6 +106,11 @@ if [ "$o_FLAG" != "y" -a -n "$MACH" -a -n "$SRC" -a -d "$SRC/pkg" ]; then
 	fi
 	if [ -f $exc/packaging$suffix ]; then
 		cpioxlatecmd="$cpioxlatecmd -e $exc/packaging$suffix"
+	fi
+	if [ "$X_FLAG" = "y" ]; then
+		ipkg=$IA32_IHV_WS/usr/src/pkgdefs
+		ipkgargs="-e $ipkg/etc/exception_list_$MACH $ipkg"
+		cpioxlatecmd="$cpioxlatecmd $ipkgargs"
 	fi
 	cpioxlatecmd="$cpioxlatecmd $SRC/pkg/proto_list_$MACH"
         mkbfu   -f "$cpioxlatecmd" $zflag $ROOT $CPIODIR
