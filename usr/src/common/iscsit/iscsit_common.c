@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -840,12 +840,11 @@ it_tpg_to_nv(it_tpg_t *tpg, nvlist_t **nvl)
 
 
 	if (portalArray) {
-		while (i > 0) {
+		while (--i >= 0) {
 			if (portalArray[i]) {
 				iscsit_free(portalArray[i],
 				    strlen(portalArray[i] + 1));
 			}
-			i--;
 		}
 		iscsit_free(portalArray,
 		    tpg->tpg_portal_count * sizeof (it_portal_t));
