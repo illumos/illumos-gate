@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5903,9 +5903,12 @@ zone_shutdown_global(void)
 int
 zone_dataset_visible(const char *dataset, int *write)
 {
+	static int zfstype = -1;
 	zone_dataset_t *zd;
 	size_t len;
 	zone_t *zone = curproc->p_zone;
+	const char *name = NULL;
+	vfs_t *vfsp = NULL;
 
 	if (dataset[0] == '\0')
 		return (0);
@@ -5951,6 +5954,59 @@ zone_dataset_visible(const char *dataset, int *write)
 		}
 	}
 
+	/*
+	 * We reach here if the given dataset is not found in the zone_dataset
+	 * list. Check if this dataset was added as a filesystem (ie. "add fs")
+	 * instead of delegation. For this we search for the dataset in the
+	 * zone_vfslist of this zone. If found, return true and note that it is
+	 * not writable.
+	 */
+
+	/*
+	 * Initialize zfstype if it is not initialized yet.
+	 */
+	if (zfstype == -1) {
+		struct vfssw *vswp = vfs_getvfssw("zfs");
+		zfstype = vswp - vfssw;
+		vfs_unrefvfssw(vswp);
+	}
+
+	vfs_list_read_lock();
+	vfsp = zone->zone_vfslist;
+	do {
+		ASSERT(vfsp);
+		if (vfsp->vfs_fstype == zfstype) {
+			name = refstr_value(vfsp->vfs_resource);
+
+			/*
+			 * Check if we have an exact match.
+			 */
+			if (strcmp(dataset, name) == 0) {
+				vfs_list_unlock();
+				if (write)
+					*write = 0;
+				return (1);
+			}
+			/*
+			 * We need to check if we are looking for parents of
+			 * a dataset. These should be visible, but read-only.
+			 */
+			len = strlen(dataset);
+			if (dataset[len - 1] == '/')
+				len--;
+
+			if (len < strlen(name) &&
+			    bcmp(dataset, name, len) == 0 && name[len] == '/') {
+				vfs_list_unlock();
+				if (write)
+					*write = 0;
+				return (1);
+			}
+		}
+		vfsp = vfsp->vfs_zone_next;
+	} while (vfsp != zone->zone_vfslist);
+
+	vfs_list_unlock();
 	return (0);
 }
 
