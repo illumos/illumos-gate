@@ -237,7 +237,7 @@ main(int argc, char *argv[])
 		case 'x':
 			if (!krb5_privacy_allowed()) {
 				(void) fprintf(stderr, gettext("rcp: "
-					"Encryption not supported.\n"));
+				    "Encryption not supported.\n"));
 				return (1);
 			}
 			encrypt_flag++;
@@ -247,7 +247,7 @@ main(int argc, char *argv[])
 		case 'k':
 			if ((krb_realm = (char *)strdup(optarg)) == NULL) {
 				(void) fprintf(stderr, gettext("rcp:"
-					" Cannot malloc.\n"));
+				    " Cannot malloc.\n"));
 				return (1);
 			}
 			krb5auth_flag++;
@@ -256,8 +256,8 @@ main(int argc, char *argv[])
 			if (strncmp(optarg, "O", 1) == 0) {
 				if (rcmdoption_done == B_TRUE) {
 					(void) fprintf(stderr, gettext("rcp: "
-						"Only one of -PN and -PO "
-						"allowed.\n"));
+					    "Only one of -PN and -PO "
+					    "allowed.\n"));
 					usage();
 				}
 				kcmd_proto = KCMD_OLD_PROTOCOL;
@@ -265,8 +265,8 @@ main(int argc, char *argv[])
 			} else if (strncmp(optarg, "N", 1) == 0) {
 				if (rcmdoption_done == B_TRUE) {
 					(void) fprintf(stderr, gettext("rcp: "
-						"Only one of -PN and -PO "
-						"allowed.\n"));
+					    "Only one of -PN and -PO "
+					    "allowed.\n"));
 					usage();
 				}
 				kcmd_proto = KCMD_NEW_PROTOCOL;
@@ -315,8 +315,8 @@ main(int argc, char *argv[])
 			 * krb5auth_flag
 			 */
 			(void) profile_get_options_boolean(bsd_context->profile,
-							appdef,
-							autologin_option);
+			    appdef,
+			    autologin_option);
 		}
 	}
 
@@ -374,7 +374,7 @@ main(int argc, char *argv[])
 		status = krb5_get_default_realm(bsd_context, &realmdef[1]);
 		if (status) {
 			com_err("rcp", status,
-				gettext("while getting default realm"));
+			    gettext("while getting default realm"));
 			return (1);
 		}
 		/*
@@ -394,7 +394,7 @@ main(int argc, char *argv[])
 				encrypt_flag++;
 			} else {
 				(void) fprintf(stderr, gettext("rcp: Encryption"
-							" not supported.\n"));
+				    " not supported.\n"));
 				return (1);
 			}
 		}
@@ -406,7 +406,7 @@ main(int argc, char *argv[])
 				kcmd_proto = KCMD_OLD_PROTOCOL;
 			} else {
 				(void) fprintf(stderr, gettext("Unrecognized "
-					"KCMD protocol (%s)"), rcmdproto);
+				    "KCMD protocol (%s)"), rcmdproto);
 				return (1);
 			}
 		}
@@ -437,14 +437,14 @@ main(int argc, char *argv[])
 #ifdef DEBUG
 	if (retval || krb5auth_flag) {
 		(void) fprintf(stderr, gettext("Kerberized rcp session, "
-				"port %d in use "), portnumber);
+		    "port %d in use "), portnumber);
 		if (kcmd_proto == KCMD_OLD_PROTOCOL)
 			(void) fprintf(stderr, gettext("[kcmd ver.1]\n"));
 		else
 			(void) fprintf(stderr, gettext("[kcmd ver.2]\n"));
 	} else {
 		(void) fprintf(stderr, gettext("Normal rcp session, port %d "
-				"in use.\n"), portnumber);
+		    "in use.\n"), portnumber);
 	}
 #endif /* DEBUG */
 
@@ -460,19 +460,19 @@ main(int argc, char *argv[])
 		    sizeof (RCP_ACL " -r -p -z -d"));
 
 		if (((cmd = (char *)malloc(cmdsiz)) == NULL) ||
-			((cmd_sunw_orig = (char *)malloc(cmdsiz)) == NULL) ||
-			((cmd_orig = (char *)malloc(cmdsiz)) == NULL)) {
+		    ((cmd_sunw_orig = (char *)malloc(cmdsiz)) == NULL) ||
+		    ((cmd_orig = (char *)malloc(cmdsiz)) == NULL)) {
 			(void) fprintf(stderr, gettext("rcp: Cannot "
-					"malloc.\n"));
+			    "malloc.\n"));
 			return (1);
 		}
 
 		(void) snprintf(cmd, cmdsiz, "%srcp %s%s%s%s%s",
-			encrypt_flag ? "-x " : "",
-			iamrecursive ? " -r" : "", pflag ? " -p" : "",
-			targetshouldbedirectory ? " -d" : "",
-			krb_realm != NULL ? " -k " : "",
-			krb_realm != NULL ? krb_realm : "");
+		    encrypt_flag ? "-x " : "",
+		    iamrecursive ? " -r" : "", pflag ? " -p" : "",
+		    targetshouldbedirectory ? " -d" : "",
+		    krb_realm != NULL ? " -k " : "",
+		    krb_realm != NULL ? krb_realm : "");
 
 		/*
 		 * We would use cmd-orig as the 'cmd-buffer' if kerberized
@@ -480,16 +480,16 @@ main(int argc, char *argv[])
 		 * save argc & argv for the same purpose
 		 */
 		(void) snprintf(cmd_orig, cmdsiz, "rcp%s%s%s%s",
-			iamrecursive ? " -r" : "",
-			pflag ? " -p" : "",
-			zflag ? " -z" : "",
-			targetshouldbedirectory ? " -d" : "");
+		    iamrecursive ? " -r" : "",
+		    pflag ? " -p" : "",
+		    zflag ? " -z" : "",
+		    targetshouldbedirectory ? " -d" : "");
 
 		(void) snprintf(cmd_sunw_orig, cmdsiz, "%s%s%s%s%s", RCP_ACL,
-			iamrecursive ? " -r" : "",
-			pflag ? " -p" : "",
-			zflag ? " -z" : "",
-			targetshouldbedirectory ? " -d" : "");
+		    iamrecursive ? " -r" : "",
+		    pflag ? " -p" : "",
+		    zflag ? " -z" : "",
+		    targetshouldbedirectory ? " -d" : "");
 
 		prev_argc = argc;
 		prev_argv = save_argv(argc, argv);
@@ -498,15 +498,15 @@ main(int argc, char *argv[])
 		cmdsiz = sizeof ("rcp -r -p -z -d");
 		if (((cmd = (char *)malloc(cmdsiz)) == NULL)) {
 			(void) fprintf(stderr, gettext("rcp: Cannot "
-					"malloc.\n"));
+			    "malloc.\n"));
 			return (1);
 		}
 
 		(void) snprintf(cmd, cmdsiz, "rcp%s%s%s%s",
-			iamrecursive ? " -r" : "",
-			pflag ? " -p" : "",
-			zflag ? " -z" : "",
-			targetshouldbedirectory ? " -d" : "");
+		    iamrecursive ? " -r" : "",
+		    pflag ? " -p" : "",
+		    zflag ? " -z" : "",
+		    targetshouldbedirectory ? " -d" : "");
 	}
 
 	cmdsiz = sizeof (RCP_ACL " -r -p -z -d");
@@ -602,25 +602,25 @@ toremote(char *targ, int argc, char *argv[])
 				if (krb5auth_flag > 0) {
 
 				(void) snprintf(bp, buffersize,
-						"%s -t %s", cmd, targ);
+				    "%s -t %s", cmd, targ);
 				authopts = AP_OPTS_MUTUAL_REQUIRED;
 				status = kcmd(&sock, &host,
-					    portnumber,
-					    pwd->pw_name,
-					    tuser ? tuser :
-					    pwd->pw_name,
-					    bp,
-					    0,
-					    "host",
-					    krb_realm,
-					    bsd_context,
-					    &auth_context,
-					    &cred,
-					    0,	/* No seq # */
-					    0,	/* No server seq # */
-					    authopts,
-					    0,	/* Not any port # */
-					    &kcmd_proto);
+				    portnumber,
+				    pwd->pw_name,
+				    tuser ? tuser :
+				    pwd->pw_name,
+				    bp,
+				    0,
+				    "host",
+				    krb_realm,
+				    bsd_context,
+				    &auth_context,
+				    &cred,
+				    0,	/* No seq # */
+				    0,	/* No server seq # */
+				    authopts,
+				    0,	/* Not any port # */
+				    &kcmd_proto);
 				if (status) {
 					/*
 					 * If new protocol requested, we dont
@@ -629,23 +629,24 @@ toremote(char *targ, int argc, char *argv[])
 
 					if (kcmd_proto == KCMD_NEW_PROTOCOL) {
 						(void) fprintf(stderr,
-							gettext("rcp: kcmdv2 "
-							"to host %s failed - %s"
-							"\nFallback to normal "
-							"rcp denied."), host,
-							error_message(status));
+						    gettext("rcp: kcmdv2 "
+						    "to host %s failed - %s"
+						    "\nFallback to normal "
+						    "rcp denied."), host,
+						    error_message(status));
 						exit(1);
 					}
 					if (status != -1) {
 						(void) fprintf(stderr,
-						gettext("rcp: kcmd to host "
-						"%s failed - %s,\n"
-						"trying normal rcp...\n\n"),
-						host, error_message(status));
+						    gettext("rcp: kcmd to host "
+						    "%s failed - %s,\n"
+						    "trying normal rcp...\n\n"),
+						    host,
+						    error_message(status));
 					} else {
 						(void) fprintf(stderr,
-							gettext("trying normal"
-							" rcp...\n"));
+						    gettext("trying normal"
+						    " rcp...\n"));
 					}
 					/*
 					 * kcmd() failed, so we have to
@@ -660,34 +661,34 @@ toremote(char *targ, int argc, char *argv[])
 						status = krb5_auth_con_getlocalsubkey(bsd_context, auth_context, &session_key);
 						if (status) {
 							com_err("rcp", status,
-								"determining "
-								"subkey for "
-								"session");
+							    "determining "
+							    "subkey for "
+							    "session");
 							exit(1);
 						}
 						if (!session_key) {
 							com_err("rcp", 0,
-								"no subkey "
-								"negotiated for"
-								" connection");
+							    "no subkey "
+							    "negotiated for"
+							    " connection");
 							exit(1);
 						}
 					}
 					eblock.crypto_entry =
-						session_key->enctype;
+					    session_key->enctype;
 					eblock.key =
-						(krb5_keyblock *)session_key;
+					    (krb5_keyblock *)session_key;
 
 					init_encrypt(encrypt_flag,
-						bsd_context, kcmd_proto,
-						&desinbuf, &desoutbuf, CLIENT,
-						&eblock);
+					    bsd_context, kcmd_proto,
+					    &desinbuf, &desoutbuf, CLIENT,
+					    &eblock);
 					if (encrypt_flag > 0) {
 						char *s = gettext("This rcp "
-							"session is using "
-							"encryption for all "
-							"data transmissions."
-							"\r\n");
+						    "session is using "
+						    "encryption for all "
+						    "data transmissions."
+						    "\r\n");
 
 						(void) write(2, s, strlen(s));
 					}
@@ -697,42 +698,23 @@ toremote(char *targ, int argc, char *argv[])
 
 				} else {
 
-				/*
-				 * ACL support: try to find out if the remote
-				 * site is running acl cognizant version of
-				 * rcp. A special binary name is used for this
-				 * purpose.
-				 */
-				aclflag = 1;
-				acl_aclflag = 1;
+					/*
+					 * ACL support: try to find out if the
+					 * remote site is running acl cognizant
+					 * version of rcp. A special binary
+					 * name is used for this purpose.
+					 */
+					aclflag = 1;
+					acl_aclflag = 1;
 
-				/*
-				 * First see if the remote side will support
-				 * both aclent_t and ace_t acl's?
-				 */
-				(void) snprintf(bp, buffersize, "%s -tZ %s",
-							cmd_sunw, targ);
-				rem = rcmd_af(&host, portnumber, pwd->pw_name,
-					    tuser ? tuser : pwd->pw_name,
-					    bp, 0, AF_INET6);
-				if (rem < 0)
-					exit(1);
-
-				/*
-				 * This is similar to routine response().
-				 * If response is not ok, treat the other
-				 * side as non-acl rcp.
-				 */
-				if (read(rem, &resp, sizeof (resp))
-				    != sizeof (resp))
-					lostconn();
-				if (resp != 0) {
-					acl_aclflag = 0;
+					/*
+					 * First see if the remote side will
+					 * support both aclent_t and ace_t
+					 * acl's?
+					 */
 					(void) snprintf(bp, buffersize,
-					    "%s -t %s", cmd_sunw, targ);
-
-					(void) close(rem);
-					host = thost;
+					    "%s -tZ %s",
+					    cmd_sunw, targ);
 					rem = rcmd_af(&host, portnumber,
 					    pwd->pw_name,
 					    tuser ? tuser : pwd->pw_name,
@@ -740,34 +722,62 @@ toremote(char *targ, int argc, char *argv[])
 					if (rem < 0)
 						exit(1);
 
+					/*
+					 * This is similar to routine
+					 * response(). If response is not ok,
+					 * treat the other side as non-acl rcp.
+					 */
 					if (read(rem, &resp, sizeof (resp))
 					    != sizeof (resp))
 						lostconn();
 					if (resp != 0) {
-						/*
-						 * Not OK:
-						 * The other side is running
-						 * non-acl rcp. Try again with
-						 * normal stuff
-						 */
-						aclflag = 0;
+						acl_aclflag = 0;
 						(void) snprintf(bp, buffersize,
-						    "%s -t %s", cmd, targ);
+						    "%s -t %s", cmd_sunw, targ);
+
 						(void) close(rem);
 						host = thost;
 						rem = rcmd_af(&host, portnumber,
 						    pwd->pw_name,
 						    tuser ? tuser :
-						    pwd->pw_name, bp, 0,
-						    AF_INET6);
+						    pwd->pw_name,
+						    bp, 0, AF_INET6);
 						if (rem < 0)
 							exit(1);
-						if (response() < 0)
-						    exit(1);
+
+						if (read(rem, &resp,
+						    sizeof (resp))
+						    != sizeof (resp))
+							lostconn();
+						if (resp != 0) {
+							/*
+							 * Not OK:
+							 * The other side is
+							 * running non-acl rcp.
+							 * Try again with
+							 * normal stuff.
+							 */
+							aclflag = 0;
+							(void) snprintf(bp,
+							    buffersize,
+							    "%s -t %s", cmd,
+							    targ);
+							(void) close(rem);
+							host = thost;
+							rem = rcmd_af(&host,
+							    portnumber,
+							    pwd->pw_name,
+							    tuser ? tuser :
+							    pwd->pw_name, bp, 0,
+							    AF_INET6);
+							if (rem < 0)
+								exit(1);
+							if (response() < 0)
+								exit(1);
+						}
 					}
-				}
-				/* everything should be fine now */
-				(void) setuid(userid);
+					/* everything should be fine now */
+					(void) setuid(userid);
 
 				}
 			}
@@ -819,120 +829,102 @@ tolocal(int argc, char *argv[])
 		lhost = host;
 		if (krb5auth_flag > 0) {
 
-		(void) snprintf(bp, buffersize, "%s -f %s", cmd, src);
-		authopts = AP_OPTS_MUTUAL_REQUIRED;
-		status = kcmd(&sock, &host,
-				portnumber,
-				pwd->pw_name, suser,
-				bp,
-				0,	/* &rfd2 */
-				"host",
-				krb_realm,
-				bsd_context,
-				&auth_context,
-				&cred,
-				0,	/* No seq # */
-				0,	/* No server seq # */
-				authopts,
-				1,	/* Not any port # */
-				&kcmd_proto);
-		if (status) {
-			/*
-			 * If new protocol requested, we dont
-			 * fallback to less secure ones.
-			 */
-			if (kcmd_proto == KCMD_NEW_PROTOCOL) {
-				(void) fprintf(stderr, gettext("rcp: kcmdv2 "
-					"to host %s failed - %s\n"
-					"Fallback to normal rcp denied."),
-					host, error_message(status));
-				exit(1);
-			}
-			if (status != -1) {
-				(void) fprintf(stderr, gettext("rcp: kcmd "
-						"to host %s failed - %s,\n"
-						"trying normal rcp...\n\n"),
-						host, error_message(status));
+			(void) snprintf(bp, buffersize, "%s -f %s", cmd, src);
+			authopts = AP_OPTS_MUTUAL_REQUIRED;
+			status = kcmd(&sock, &host,
+			    portnumber,
+			    pwd->pw_name, suser,
+			    bp,
+			    0,	/* &rfd2 */
+			    "host",
+			    krb_realm,
+			    bsd_context,
+			    &auth_context,
+			    &cred,
+			    0,	/* No seq # */
+			    0,	/* No server seq # */
+			    authopts,
+			    1,	/* Not any port # */
+			    &kcmd_proto);
+			if (status) {
+				/*
+				 * If new protocol requested, we dont
+				 * fallback to less secure ones.
+				 */
+				if (kcmd_proto == KCMD_NEW_PROTOCOL) {
+					(void) fprintf(stderr,
+					    gettext("rcp: kcmdv2 "
+					    "to host %s failed - %s\n"
+					    "Fallback to normal rcp denied."),
+					    host, error_message(status));
+					exit(1);
+				}
+				if (status != -1) {
+					(void) fprintf(stderr,
+					    gettext("rcp: kcmd "
+					    "to host %s failed - %s,\n"
+					    "trying normal rcp...\n\n"),
+					    host, error_message(status));
+				} else {
+					(void) fprintf(stderr,
+					    gettext("trying normal rcp...\n"));
+				}
+				/*
+				 * kcmd() failed, so we have to
+				 * fallback to normal rcp
+				 */
+				try_normal_rcp(prev_argc, prev_argv);
 			} else {
-				(void) fprintf(stderr,
-					gettext("trying normal rcp...\n"));
-			}
-			/*
-			 * kcmd() failed, so we have to
-			 * fallback to normal rcp
-			 */
-			try_normal_rcp(prev_argc, prev_argv);
-		} else {
-			rem = sock;
-			session_key = &cred->keyblock;
-			if (kcmd_proto == KCMD_NEW_PROTOCOL) {
-				status = krb5_auth_con_getlocalsubkey(
-						bsd_context, auth_context,
-						&session_key);
-				if (status) {
-					com_err("rcp", status, "determining "
-						"subkey for session");
-					exit(1);
+				rem = sock;
+				session_key = &cred->keyblock;
+				if (kcmd_proto == KCMD_NEW_PROTOCOL) {
+					status = krb5_auth_con_getlocalsubkey(
+					    bsd_context, auth_context,
+					    &session_key);
+					if (status) {
+						com_err("rcp", status,
+						    "determining "
+						    "subkey for session");
+						exit(1);
+					}
+					if (!session_key) {
+						com_err("rcp", 0,
+						    "no subkey negotiated"
+						    " for connection");
+						exit(1);
+					}
 				}
-				if (!session_key) {
-					com_err("rcp", 0, "no subkey negotiated"
-						" for connection");
-					exit(1);
+				eblock.crypto_entry = session_key->enctype;
+				eblock.key = (krb5_keyblock *)session_key;
+
+				init_encrypt(encrypt_flag, bsd_context,
+				    kcmd_proto,
+				    &desinbuf, &desoutbuf, CLIENT,
+				    &eblock);
+				if (encrypt_flag > 0) {
+					char *s = gettext("This rcp "
+					    "session is using DES "
+					    "encryption for all "
+					    "data transmissions."
+					    "\r\n");
+
+					(void) write(2, s, strlen(s));
 				}
 			}
-			eblock.crypto_entry = session_key->enctype;
-			eblock.key = (krb5_keyblock *)session_key;
-
-			init_encrypt(encrypt_flag, bsd_context, kcmd_proto,
-					&desinbuf, &desoutbuf, CLIENT,
-					&eblock);
-			if (encrypt_flag > 0) {
-				char *s = gettext("This rcp "
-					"session is using DES "
-					"encryption for all "
-					"data transmissions."
-					"\r\n");
-
-				(void) write(2, s, strlen(s));
-			}
-		}
 
 		}
 		else
 		{
 
-		/*
-		 * ACL support: try to find out if the remote site is
-		 * running acl cognizant version of rcp.
-		 */
-		aclflag = 1;
-		acl_aclflag = 1;
-
-		(void) snprintf(bp, buffersize, "%s -Zf %s", cmd_sunw, src);
-		rem = rcmd_af(&host, portnumber, pwd->pw_name, suser,
-			    bp, 0, AF_INET6);
-
-		if (rem < 0) {
-			++errs;
-			continue;
-		}
-
-		/*
-		 * The remote system is supposed to send an ok response.
-		 * If there are any data other than "ok", it must be error
-		 * messages from the remote system. We can assume the
-		 * remote system is running non-acl version rcp.
-		 */
-		if (read(rem, &resp, sizeof (resp)) != sizeof (resp))
-			lostconn();
-		if (resp != 0) {
-
 			/*
-			 * Try again without ace_acl support
+			 * ACL support: try to find out if the remote site is
+			 * running acl cognizant version of rcp.
 			 */
-			acl_aclflag = 0;
-			(void) snprintf(bp, buffersize, "%s -f %s",
-			    cmd_sunw, src);
+			aclflag = 1;
+			acl_aclflag = 1;
+
+			(void) snprintf(bp, buffersize, "%s -Zf %s", cmd_sunw,
+			    src);
 			rem = rcmd_af(&host, portnumber, pwd->pw_name, suser,
 			    bp, 0, AF_INET6);
 
@@ -941,25 +933,56 @@ tolocal(int argc, char *argv[])
 				continue;
 			}
 
+			/*
+			 * The remote system is supposed to send an ok response.
+			 * If there are any data other than "ok", it must be
+			 * error messages from the remote system. We can assume
+			 * the remote system is running non-acl version rcp.
+			 */
 			if (read(rem, &resp, sizeof (resp)) != sizeof (resp))
 				lostconn();
 
-			/*
-			 * NOT ok:
-			 * The other side is running non-acl rcp.
-			 * Try again with normal stuff
-			 */
-			aclflag = 0;
-			(void) snprintf(bp, buffersize, "%s -f %s", cmd, src);
+			if (resp != 0) {
+
+				/*
+				 * Try again without ace_acl support
+				 */
+				acl_aclflag = 0;
+				(void) snprintf(bp, buffersize, "%s -f %s",
+				    cmd_sunw, src);
 				(void) close(rem);
-				host = lhost;
 				rem = rcmd_af(&host, portnumber, pwd->pw_name,
-						suser, bp, 0, AF_INET6);
-			if (rem < 0) {
-				++errs;
-				continue;
+				    suser, bp, 0, AF_INET6);
+
+				if (rem < 0) {
+					++errs;
+					continue;
+				}
+
+				if (read(rem, &resp,
+				    sizeof (resp)) != sizeof (resp))
+					lostconn();
+
+				if (resp != 0) {
+					/*
+					 * NOT ok:
+					 * The other side is running non-acl
+					 * rcp. Try again with normal stuff.
+					 */
+					aclflag = 0;
+					(void) snprintf(bp, buffersize,
+					    "%s -f %s", cmd, src);
+					(void) close(rem);
+					host = lhost;
+					rem = rcmd_af(&host, portnumber,
+					    pwd->pw_name, suser, bp, 0,
+					    AF_INET6);
+					if (rem < 0) {
+						++errs;
+						continue;
+					}
+				}
 			}
-		}
 		}
 
 		sink(1, argv + argc - 1);
@@ -1184,7 +1207,7 @@ notreg:
 				}
 			}
 			(void) snprintf(buf, sizeof (buf), "T%ld 0 %ld 0\n",
-							mtime, atime);
+			    mtime, atime);
 			(void) desrcpwrite(rem, buf, strlen(buf));
 			if (response() < 0) {
 				(void) close(f);
@@ -1192,8 +1215,8 @@ notreg:
 			}
 		}
 		(void) snprintf(buf, sizeof (buf), "C%04o %lld %s\n",
-			(uint_t)(stb.st_mode & 07777), (longlong_t)stb.st_size,
-			last);
+		    (uint_t)(stb.st_mode & 07777), (longlong_t)stb.st_size,
+		    last);
 		(void) desrcpwrite(rem, buf, strlen(buf));
 		if (response() < 0) {
 			(void) close(f);
@@ -1251,11 +1274,11 @@ notreg:
 				error("rcp: %s: %s\n", name, strerror(errno));
 			} else if (cnt == 0 && size != 0) {
 				error("rcp: %s: unexpected end of file\n",
-					name);
+				    name);
 				lingerbuf.l_onoff = 1;
 				lingerbuf.l_linger = 0;
 				(void) setsockopt(rem, SOL_SOCKET, SO_LINGER,
-					&lingerbuf, sizeof (lingerbuf));
+				    &lingerbuf, sizeof (lingerbuf));
 				/*
 				 * When response() (see below) is invoked it
 				 * tries to read data from closed handle which
@@ -1294,7 +1317,7 @@ rsource(char *name, struct stat *statp)
 		last++;
 	if (pflag) {
 		(void) snprintf(path, sizeof (path), "T%ld 0 %ld 0\n",
-				statp->st_mtime, statp->st_atime);
+		    statp->st_mtime, statp->st_atime);
 		(void) desrcpwrite(rem, path, strlen(path));
 		if (response() < 0) {
 			(void) closedir(d);
@@ -1326,12 +1349,12 @@ rsource(char *name, struct stat *statp)
 		    (strcmp(dp->d_name, "..") == 0))
 			continue;
 		if ((uint_t)strlen(name) + 1 + strlen(dp->d_name) >=
-			MAXPATHLEN - 1) {
+		    MAXPATHLEN - 1) {
 			error("%s/%s: name too long.\n", name, dp->d_name);
 			continue;
 		}
 		(void) snprintf(path, sizeof (path), "%s/%s",
-					name, dp->d_name);
+		    name, dp->d_name);
 		vect[0] = path;
 		source(1, vect);
 	}
@@ -1503,11 +1526,12 @@ sink(int argc, char *argv[])
 		if (targisdir) {
 			need = strlen(targ) + sizeof ("/") + strlen(cp);
 			if (need > namebuf_sz) {
-			    if ((namebuf = realloc(namebuf, need)) == NULL) {
+				if ((namebuf = realloc(namebuf, need)) ==
+				    NULL) {
 					error("rcp: out of memory\n");
 					exit(1);
-			    }
-			    namebuf_sz = need;
+				}
+				namebuf_sz = need;
 			}
 			(void) snprintf(namebuf, need, "%s%s%s", targ,
 			    *targ ? "/" : "", cp);
@@ -1566,8 +1590,9 @@ sink(int argc, char *argv[])
 			if (setimes) {
 				setimes = 0;
 				if (utimes(np, tv) < 0)
-				    error("rcp: can't set times on %s: %s\n",
-					np, strerror(errno));
+					error("rcp: can't set "
+					    "times on %s: %s\n",
+					    np, strerror(errno));
 			}
 			continue;
 		}
@@ -1660,7 +1685,6 @@ bad:
 		if (zclose(ofd) < 0)
 			wrerr++;
 
-
 		if ((ftruncate(ofd, size)  == -1) && (errno != EINVAL) &&
 		    (errno != EACCES)) {
 			error(TRUNCERR, np, strerror(errno));
@@ -1717,16 +1741,16 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr, "%s: \t%s\t%s", gettext("Usage"),
-		gettext("\trcp [-p] [-a] [-x] [-k realm] [-PN / -PO] "
+	    gettext("\trcp [-p] [-a] [-x] [-k realm] [-PN / -PO] "
 #ifdef DEBUG
-			"[-D port] "
+	    "[-D port] "
 #endif /* DEBUG */
-			"f1 f2; or:\n"),
-		gettext("\trcp [-r] [-p] [-a] [-x] "
+	    "f1 f2; or:\n"),
+	    gettext("\trcp [-r] [-p] [-a] [-x] "
 #ifdef DEBUG
-			"[-D port] "
+	    "[-D port] "
 #endif /* DEBUG */
-			"[-k realm] [-PN / -PO] f1...fn d2\n"));
+	    "[-k realm] [-PN / -PO] f1...fn d2\n"));
 	exit(1);
 }
 
@@ -1748,8 +1772,8 @@ zopen(int fd, int flag)
 	zlastseek = 0;
 
 	if (flag &&
-		fstat(fd, &st) == 0 &&
-		(st.st_mode & S_IFMT) == S_IFREG)
+	    fstat(fd, &st) == 0 &&
+	    (st.st_mode & S_IFMT) == S_IFREG)
 		zbsize = st.st_blksize;
 }
 
@@ -1791,7 +1815,7 @@ zclose(int fd)
 	zbsize = 0;
 
 	if (zlastseek && (lseek(fd, (off_t)-1, SEEK_CUR) < 0 ||
-		zwrite(fd, "", 1) < 0))
+	    zwrite(fd, "", 1) < 0))
 		return (-1);
 	else
 		return (0);
@@ -2212,8 +2236,8 @@ init_service(int krb5flag)
 		sp = getservbyname("kshell", "tcp");
 		if (sp == NULL) {
 			(void) fprintf(stderr,
-				gettext("rcp: kshell/tcp: unknown service.\n"
-				"trying normal shell/tcp service\n"));
+			    gettext("rcp: kshell/tcp: unknown service.\n"
+			    "trying normal shell/tcp service\n"));
 		} else {
 			portnumber = sp->s_port;
 			success = B_TRUE;
