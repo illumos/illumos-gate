@@ -1280,12 +1280,11 @@ Where:
 non-DEBUG is the default build type. Build options can be set in the
 NIGHTLY_OPTIONS variable in the <env_file> as follows:
 
-	-0	build the globalization package
 	-A	check for ABI differences in .so files
 	-C	check for cstyle/hdrchk errors
 	-D	do a build with DEBUG on
 	-F	do _not_ do a non-DEBUG build
-	-G	gate keeper default group of options (-0au)
+	-G	gate keeper default group of options (-au)
 	-I	integration engineer default group of options (-ampu)
 	-M	do not run pmodes (safe file permission checker)
 	-N	do not run protocmp
@@ -1709,6 +1708,7 @@ DEV_CM="\"@(#)SunOS Internal Development: $LOGNAME $BUILD_DATE [$BASEWSDIR]\""
 
 # we export POUND_SIGN, RELEASE_DATE and DEV_CM to speed up the build process
 # by avoiding repeated shell invocations to evaluate Makefile.master definitions.
+# we export o_FLAG and X_FLAG for use by makebfu, and by usr/src/pkg/Makefile
 export o_FLAG X_FLAG POUND_SIGN RELEASE_DATE DEV_CM
 
 maketype="distributed"
