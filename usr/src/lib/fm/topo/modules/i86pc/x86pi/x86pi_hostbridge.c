@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,20 +97,6 @@ x86pi_hbr_enum_fini(topo_mod_t *mod)
 		topo_mod_unload(pcimp);
 		pcimp = NULL;
 	}
-}
-
-static uint16_t
-x86pi_bdf(topo_mod_t *mod, di_node_t node)
-{
-	int *val;
-
-	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "reg", &val) < 0) {
-		topo_mod_dprintf(mod, "couldn't get \"reg\" prop: %s.\n",
-		    strerror(errno));
-		return ((uint16_t)-1);
-	}
-
-	return (uint16_t)((*val & PCI_REG_BDFR_M) >> PCI_REG_FUNC_SHIFT);
 }
 
 static int

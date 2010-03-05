@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -93,7 +93,9 @@ SUNWprivate_1.1 {
 	smbios_info_extmemdevice;
 	smbios_info_memdevmap;
 	smbios_info_obdevs;
+	smbios_info_obdevs_ext;
 	smbios_info_port;
+	smbios_info_extport;
 	smbios_info_processor;
 	smbios_info_extprocessor;
 	smbios_info_slot;

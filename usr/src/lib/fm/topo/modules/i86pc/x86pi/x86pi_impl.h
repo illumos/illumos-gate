@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,8 @@ extern "C" {
  * --------------------------------------------------------------------------
  * | "systemboard"       | Type 2    | 0x0D - Board Type        | 0x03,0x09,|
  * |                     |           |                          | 0x0B,0x0C |
+ * --------------------------------------------------------------------------
+ * | "bay"               | Type 136  |                                      |
  * --------------------------------------------------------------------------
  * | "hostbridge"        | Type 138  |                                      |
  * --------------------------------------------------------------------------
@@ -172,6 +174,8 @@ int x86pi_gen_memarray(topo_mod_t *, tnode_t *, smbios_hdl_t *, int, int);
 void x86pi_gen_memdev(topo_mod_t *, tnode_t *, smbios_hdl_t *, int, int, int);
 int x86pi_gen_hbr(topo_mod_t *, tnode_t *, smbios_hdl_t *, int,
     topo_instance_t, topo_instance_t *);
+int x86pi_gen_bay(topo_mod_t *, tnode_t *, smbios_hdl_t *, smbios_port_ext_t *,
+    int);
 
 /* support routines */
 int x86pi_enum_generic(topo_mod_t *, x86pi_hcfmri_t *, tnode_t *, tnode_t *,
@@ -179,6 +183,8 @@ int x86pi_enum_generic(topo_mod_t *, x86pi_hcfmri_t *, tnode_t *, tnode_t *,
 tnode_t *x86pi_node_bind(topo_mod_t *, tnode_t *, x86pi_hcfmri_t *, nvlist_t *,
     int);
 void x86pi_hcfmri_info_fini(topo_mod_t *, x86pi_hcfmri_t *);
+uint16_t x86pi_bdf(topo_mod_t *, di_node_t);
+int x86pi_phy(topo_mod_t *, di_node_t);
 
 /* get/set info */
 char *x86pi_get_serverid(topo_mod_t *);

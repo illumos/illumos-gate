@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,11 +122,13 @@ typedef struct smbios_entry {
 #define	SMB_TYPE_MEMCHAN	37	/* memory channel */
 #define	SMB_TYPE_IPMIDEV	38	/* IPMI device information */
 #define	SMB_TYPE_POWERSUP	39	/* system power supply */
+#define	SMB_TYPE_OBDEVEXT	41	/* on-board device extended info */
 #define	SMB_TYPE_INACTIVE	126	/* inactive table entry */
 #define	SMB_TYPE_EOT		127	/* end of table */
 
 #define	SMB_TYPE_OEM_LO		128	/* start of OEM-specific type range */
 #define	SUN_OEM_EXT_PROCESSOR	132	/* processor extended info */
+#define	SUN_OEM_EXT_PORT	136	/* port exteded info */
 #define	SUN_OEM_PCIEXRC		138	/* PCIE RootComplex/RootPort info */
 #define	SUN_OEM_EXT_MEMARRAY	144	/* phys memory array extended info */
 #define	SUN_OEM_EXT_MEMDEVICE	145	/* memory device extended info */
@@ -713,6 +715,9 @@ typedef struct smbios_slot {
 	uint16_t smbl_id;		/* slot ID */
 	uint8_t smbl_ch1;		/* slot characteristics 1 */
 	uint8_t smbl_ch2;		/* slot characteristics 2 */
+	uint16_t smbl_sg;		/* segment group number */
+	uint8_t smbl_bus;		/* bus number */
+	uint8_t smbl_df;		/* device/function number */
 } smbios_slot_t;
 
 #define	SMB_SLT_OTHER		0x01	/* other */
@@ -1079,6 +1084,20 @@ typedef struct smbios_ipmi {
 #define	SMB_IPMI_F_INTREDGE	0x08	/* intr is edge triggered (else lvl) */
 
 /*
+ * SMBIOS Onboard Devices Extended Information.  See DSP0134 Section 3.3.42
+ * for more information.
+ */
+typedef struct smbios_obdev_ext {
+	const char *smboe_name;		/* reference designation */
+	uint8_t smboe_dtype;		/* device type */
+	uint8_t smboe_dti;		/* device type instance */
+	uint16_t smboe_sg;		/* segment group number */
+	uint8_t smboe_bus;		/* bus number */
+	uint8_t smboe_df;		/* device/function number */
+} smbios_obdev_ext_t;
+
+
+/*
  * SMBIOS OEM-specific (Type 132) Processor Extended Information.
  */
 typedef struct smbios_processor_ext {
@@ -1087,6 +1106,17 @@ typedef struct smbios_processor_ext {
 	uint8_t smbpe_n;		/* number of APIC IDs */
 	uint16_t *smbpe_apicid;		/* strand Inital APIC IDs */
 } smbios_processor_ext_t;
+
+/*
+ * SMBIOS OEM-specific (Type 136) Port Extended Information.
+ */
+typedef struct smbios_port_ext {
+	uint16_t smbporte_chassis;	/* chassis handle */
+	uint16_t smbporte_port;		/* port connector handle */
+	uint8_t smbporte_dtype;		/* device type */
+	uint16_t smbporte_devhdl;	/* device handle */
+	uint8_t smbporte_phy;		/* PHY number */
+} smbios_port_ext_t;
 
 /*
  * SMBIOS OEM-specific (Type 138) PCI-Express RC/RP Information.
@@ -1183,8 +1213,10 @@ extern int smbios_info_extprocessor(smbios_hdl_t *, id_t,
     smbios_processor_ext_t *);
 extern int smbios_info_cache(smbios_hdl_t *, id_t, smbios_cache_t *);
 extern int smbios_info_port(smbios_hdl_t *, id_t, smbios_port_t *);
+extern int smbios_info_extport(smbios_hdl_t *, id_t, smbios_port_ext_t *);
 extern int smbios_info_slot(smbios_hdl_t *, id_t, smbios_slot_t *);
 extern int smbios_info_obdevs(smbios_hdl_t *, id_t, int, smbios_obdev_t *);
+extern int smbios_info_obdevs_ext(smbios_hdl_t *, id_t, smbios_obdev_ext_t *);
 extern int smbios_info_strtab(smbios_hdl_t *, id_t, int, const char *[]);
 extern id_t smbios_info_lang(smbios_hdl_t *, smbios_lang_t *);
 extern id_t smbios_info_eventlog(smbios_hdl_t *, smbios_evlog_t *);

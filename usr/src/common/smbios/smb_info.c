@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -551,6 +551,34 @@ smbios_info_slot(smbios_hdl_t *shp, id_t id, smbios_slot_t *sp)
 	sp->smbl_id = s.smbsl_id;
 	sp->smbl_ch1 = s.smbsl_ch1;
 	sp->smbl_ch2 = s.smbsl_ch2;
+	sp->smbl_sg = s.smbsl_sg;
+	sp->smbl_bus = s.smbsl_bus;
+	sp->smbl_df = s.smbsl_df;
+
+	return (0);
+}
+
+int
+smbios_info_obdevs_ext(smbios_hdl_t *shp, id_t id, smbios_obdev_ext_t *oep)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_obdev_ext_t obe;
+
+	if (stp == NULL)
+		return (-1); /* errno is set for us */
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_OBDEVEXT)
+		return (smb_set_errno(shp, ESMB_TYPE));
+
+	smb_info_bcopy(stp->smbst_hdr, &obe, sizeof (obe));
+	bzero(oep, sizeof (smbios_obdev_ext_t));
+
+	oep->smboe_name = smb_strptr(stp, obe.smbobe_name);
+	oep->smboe_dtype = obe.smbobe_dtype;
+	oep->smboe_dti = obe.smbobe_dti;
+	oep->smboe_sg = obe.smbobe_sg;
+	oep->smboe_bus = obe.smbobe_bus;
+	oep->smboe_df = obe.smbobe_df;
 
 	return (0);
 }
@@ -1000,6 +1028,30 @@ smbios_info_extprocessor(smbios_hdl_t *shp, id_t id,
 	epp->smbpe_fru = exp->smbpre_fru;
 	epp->smbpe_n = exp->smbpre_n;
 	epp->smbpe_apicid = exp->smbpre_apicid;
+
+	return (0);
+}
+
+int
+smbios_info_extport(smbios_hdl_t *shp, id_t id, smbios_port_ext_t *eportp)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_port_ext_t *ep;
+
+	if (stp == NULL)
+		return (-1); /* errno is set for us */
+
+	if (stp->smbst_hdr->smbh_type != SUN_OEM_EXT_PORT)
+		return (smb_set_errno(shp, ESMB_TYPE));
+
+	ep = (smb_port_ext_t *)(uintptr_t)stp->smbst_hdr;
+	bzero(eportp, sizeof (smbios_port_ext_t));
+
+	eportp->smbporte_chassis = ep->smbpoe_chassis;
+	eportp->smbporte_port = ep->smbpoe_port;
+	eportp->smbporte_dtype = ep->smbpoe_dtype;
+	eportp->smbporte_devhdl = ep->smbpoe_devhdl;
+	eportp->smbporte_phy = ep->smbpoe_phy;
 
 	return (0);
 }

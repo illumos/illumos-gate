@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,6 +137,39 @@ id_printf(FILE *fp, const char *s, id_t id)
 	default:
 		oprintf(fp, "%s%u\n", s, (uint_t)id);
 	}
+}
+
+static int
+check_oem(smbios_hdl_t *shp)
+{
+	int i;
+	int cnt;
+	int rv;
+	id_t oem_id;
+	smbios_struct_t s;
+	const char **oem_str;
+
+	rv = smbios_lookup_type(shp, SMB_TYPE_OEMSTR, &s);
+	if (rv != 0) {
+		return (-1);
+	}
+
+	oem_id = s.smbstr_id;
+
+	cnt = smbios_info_strtab(shp, oem_id, 0, NULL);
+	if (cnt > 0) {
+		oem_str =  alloca(sizeof (char *) * cnt);
+		(void) smbios_info_strtab(shp, oem_id, cnt, oem_str);
+
+		for (i = 0; i < cnt; i++) {
+			if (strncmp(oem_str[i], SMB_PRMS1,
+			    strlen(SMB_PRMS1) + 1) == 0) {
+				return (0);
+			}
+		}
+	}
+
+	return (-1);
 }
 
 static void
@@ -489,8 +522,10 @@ static void
 print_slot(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
 	smbios_slot_t s;
+	smbios_entry_t e;
 
 	(void) smbios_info_slot(shp, id, &s);
+	(void) smbios_info_smbios(shp, &e);
 
 	oprintf(fp, "  Reference Designator: %s\n", s.smbl_name);
 	oprintf(fp, "  Slot ID: 0x%x\n", s.smbl_id);
@@ -514,6 +549,28 @@ print_slot(smbios_hdl_t *shp, id_t id, FILE *fp)
 	flag_printf(fp, "Slot Characteristics 2",
 	    s.smbl_ch2, sizeof (s.smbl_ch2) * NBBY,
 	    smbios_slot_ch2_name, smbios_slot_ch2_desc);
+
+	if (check_oem(shp) != 0 && (e.smbe_major < 2 || e.smbe_minor < 6))
+		return;
+
+	oprintf(fp, "  Segment Group: %u\n", s.smbl_sg);
+	oprintf(fp, "  Bus Number: %u\n", s.smbl_bus);
+	oprintf(fp, "  Device/Function Number: %u\n", s.smbl_df);
+}
+
+static void
+print_obdevs_ext(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	smbios_obdev_ext_t oe;
+
+	(void) smbios_info_obdevs_ext(shp, id, &oe);
+
+	oprintf(fp, "  Reference Designator: %s\n", oe.smboe_name);
+	oprintf(fp, "  Device Type: %u\n", oe.smboe_dtype);
+	oprintf(fp, "  Device Type Instance: %u\n", oe.smboe_dti);
+	oprintf(fp, "  Segment Group Number: %u\n", oe.smboe_sg);
+	oprintf(fp, "  Bus Number: %u\n", oe.smboe_bus);
+	oprintf(fp, "  Device/Function Number: %u\n", oe.smboe_df);
 }
 
 static void
@@ -814,39 +871,6 @@ print_ipmi(smbios_hdl_t *shp, FILE *fp)
 	    smbios_ipmi_flag_name, smbios_ipmi_flag_desc);
 }
 
-static int
-check_oem(smbios_hdl_t *shp)
-{
-	int i;
-	int cnt;
-	int rv;
-	id_t oem_id;
-	smbios_struct_t s;
-	const char **oem_str;
-
-	rv = smbios_lookup_type(shp, SMB_TYPE_OEMSTR, &s);
-	if (rv != 0) {
-		return (-1);
-	}
-
-	oem_id = s.smbstr_id;
-
-	cnt = smbios_info_strtab(shp, oem_id, 0, NULL);
-	if (cnt > 0) {
-		oem_str =  alloca(sizeof (char *) * cnt);
-		(void) smbios_info_strtab(shp, oem_id, cnt, oem_str);
-
-		for (i = 0; i < cnt; i++) {
-			if (strncmp(oem_str[i], SMB_PRMS1,
-			    strlen(SMB_PRMS1) + 1) == 0) {
-				return (0);
-			}
-		}
-	}
-
-	return (-1);
-}
-
 static void
 print_extprocessor(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
@@ -866,6 +890,23 @@ print_extprocessor(smbios_hdl_t *shp, id_t id, FILE *fp)
 		oprintf(fp, "  Logical Strand %u: Initial APIC ID: %u\n", i,
 		    ep.smbpe_apicid[i]);
 	}
+}
+
+static void
+print_extport(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	smbios_port_ext_t epo;
+
+	if (check_oem(shp) != 0)
+		return;
+
+	(void) smbios_info_extport(shp, id, &epo);
+
+	oprintf(fp, "  Chassis Handle: %u\n", epo.smbporte_chassis);
+	oprintf(fp, "  Port Connector Handle: %u\n", epo.smbporte_port);
+	oprintf(fp, "  Device Type: %u\n", epo.smbporte_dtype);
+	oprintf(fp, "  Device Handle: %u\n", epo.smbporte_devhdl);
+	oprintf(fp, "  PHY: %u\n", epo.smbporte_phy);
 }
 
 static void
@@ -1037,9 +1078,17 @@ print_struct(smbios_hdl_t *shp, const smbios_struct_t *sp, void *fp)
 		oprintf(fp, "\n");
 		print_ipmi(shp, fp);
 		break;
+	case SMB_TYPE_OBDEVEXT:
+		oprintf(fp, "\n");
+		print_obdevs_ext(shp, sp->smbstr_id, fp);
+		break;
 	case SUN_OEM_EXT_PROCESSOR:
 		oprintf(fp, "\n");
 		print_extprocessor(shp, sp->smbstr_id, fp);
+		break;
+	case SUN_OEM_EXT_PORT:
+		oprintf(fp, "\n");
+		print_extport(shp, sp->smbstr_id, fp);
 		break;
 	case SUN_OEM_PCIEXRC:
 		oprintf(fp, "\n");

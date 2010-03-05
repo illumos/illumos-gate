@@ -20,16 +20,15 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DISK_H
 #define	_DISK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/topo_mod.h>
+#include <fm/topo_hc.h>
 #include <libdevinfo.h>
 
 #ifdef __cplusplus
@@ -50,13 +49,6 @@ extern "C" {
 #define	TOPO_STORAGE_SERIAL_NUM		"serial-number"
 #define	TOPO_STORAGE_FIRMWARE_REV	"firmware-revision"
 #define	TOPO_STORAGE_CAPACITY		"capacity-in-bytes"
-
-/*
- * Properties for binding group: The binding group required in platform
- * specific xml that describes 'bay' nodes containing internal disks.
- */
-#define	TOPO_PGROUP_BINDING		"binding"
-#define	TOPO_BINDING_OCCUPANT		"occupant-path"
 
 struct topo_list;
 

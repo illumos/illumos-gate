@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -33,7 +33,7 @@ TOPODIR		= ../../../libtopo/common
 UTILDIR		= ../../common/pcibus
 BRDIR		= ../../common/hostbridge
 UTILSRCS	= did.c did_hash.c did_props.c
-X86PISRCS	= x86pi.c x86pi_bboard.c x86pi_chassis.c \
+X86PISRCS	= x86pi.c x86pi_bay.c x86pi_bboard.c x86pi_chassis.c \
 		  x86pi_generic.c x86pi_hostbridge.c x86pi_subr.c
 MODULESRCS	= $(X86PISRCS) $(UTILSRCS)
 

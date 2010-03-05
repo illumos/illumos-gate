@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <fm/topo_mod.h>
 #include <fm/topo_hc.h>
 #include <sys/devfm.h>
+#include <sys/pci.h>
 #include <sys/systeminfo.h>
 #include <sys/fm/protocol.h>
 #include <sys/utsname.h>
@@ -650,4 +651,38 @@ x86pi_cleanup_smbios_str(topo_mod_t *mod, const char *begin, int str_type)
 		topo_mod_strfree(mod, (char *)begin);
 
 	return (pp);
+}
+
+/*
+ * Return Bus/Dev/Func from "reg" devinfo property.
+ */
+uint16_t
+x86pi_bdf(topo_mod_t *mod, di_node_t node)
+{
+	int *val;
+
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "reg", &val) < 0) {
+		topo_mod_dprintf(mod, "couldn't get \"reg\" prop: %s.\n",
+		    strerror(errno));
+		return ((uint16_t)-1);
+	}
+
+	return (uint16_t)((*val & PCI_REG_BDFR_M) >> PCI_REG_FUNC_SHIFT);
+}
+
+/*
+ * Return PHY from "sata-phy" devinfo proporty.
+ */
+int
+x86pi_phy(topo_mod_t *mod, di_node_t node)
+{
+	int *phy;
+
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "sata-phy", &phy) < 0) {
+		topo_mod_dprintf(mod, "couldn't get \"sata-phy\" prop: %s.\n",
+		    strerror(errno));
+		return (-1);
+	}
+
+	return (*phy);
 }

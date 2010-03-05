@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,6 +105,9 @@ extern "C" {
 #define	TOPO_PCI_BDF		"BDF"
 #define	TOPO_PCI_CLASS		"class-code"
 #define	TOPO_PCI_AADDR		"assigned-addresses"
+
+#define	TOPO_PGROUP_BINDING	"binding"
+#define	TOPO_BINDING_OCCUPANT	"occupant-path"
 
 #ifdef	__cplusplus
 }

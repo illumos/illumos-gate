@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -253,8 +253,10 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 	int		bb_count, ch_count;
 	int		min, max;
 	int		ch_inst = 0;
+	int		disk_inst = 0;
 	topo_instance_t	 hbri = 0, rci = 0;
 	smbios_pciexrc_t hbr;
+	smbios_port_ext_t export;
 	char		*f = "x86pi_enum_gentopo";
 
 	if (t_parent == NULL) {
@@ -301,6 +303,45 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent, smbios_hdl_t *shp)
 			continue;
 		}
 		stypes[SMB_TYPE_CHASSIS].ids[nch].node = chassis_node;
+
+		/* count SMBIOS extended port connector structures */
+		smbc = &stypes[SUN_OEM_EXT_PORT];
+		smbc->type = SUN_OEM_EXT_PORT;
+		x86pi_smb_strcnt(shp, smbc);
+
+		/* enumerate direct attached SATA disks */
+		rv = topo_node_range_create(mod, chassis_node, BAY, 0,
+		    smbc->count + 1);
+		if (rv != 0) {
+			topo_mod_dprintf(mod,
+			    "%s: Failed to create %s range: %s\n",
+			    f, BAY, topo_mod_errmsg(mod));
+			continue;
+		}
+
+		for (i = 0; i < smbc->count; i++) {
+			if (smbios_info_extport(shp, smbc->ids[i].id,
+			    &export) != 0) {
+				topo_mod_dprintf(mod,
+				    "smbios_info_export failed: id = %d\n",
+				    (int)smbc->ids[i].id);
+				continue;
+			}
+			if (export.smbporte_chassis != ch_smbid)
+				continue;
+
+			/*
+			 * x86pi_gen_bay:
+			 *   create "bay" node
+			 *   call "disk" enum passing in "bay" node
+			 */
+			rv = x86pi_gen_bay(mod, chassis_node, shp,
+			    &export, disk_inst);
+			if (rv != 0)
+				topo_mod_dprintf(mod,
+				    "Failed to create disk %d\n", i);
+			disk_inst++;
+		}
 	}
 
 	/*

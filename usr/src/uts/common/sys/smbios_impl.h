@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,6 +185,9 @@ typedef struct smb_slot {
 	uint16_t smbsl_id;		/* slot ID */
 	uint8_t smbsl_ch1;		/* slot characteristics 1 */
 	uint8_t smbsl_ch2;		/* slot characteristics 2 */
+	uint16_t smbsl_sg;		/* segment group number */
+	uint8_t smbsl_bus;		/* bus number */
+	uint8_t smbsl_df;		/* device/function number */
 } smb_slot_t;
 
 typedef struct smb_obdev {
@@ -357,6 +360,16 @@ typedef struct smb_powersup {
 	uint16_t smbpsup_iprobe;	/* current probe handle */
 } smb_powersup_t;
 
+typedef struct smb_obdev_ext {
+	smb_header_t smbobe_hdr;	/* structure header */
+	uint8_t smbobe_name;		/* reference designation */
+	uint8_t smbobe_dtype;		/* device type */
+	uint8_t smbobe_dti;		/* device type instance */
+	uint16_t smbobe_sg;		/* segment group number */
+	uint8_t smbobe_bus;		/* bus number */
+	uint8_t smbobe_df;		/* device/function number */
+} smb_obdev_ext_t;
+
 typedef struct smb_processor_ext {
 	smb_header_t smbpre_hdr;	/* structure header */
 	uint16_t smbpre_processor;	/* processor handle */
@@ -364,6 +377,15 @@ typedef struct smb_processor_ext {
 	uint8_t smbpre_n;		/* number of APIC IDs */
 	uint16_t smbpre_apicid[1];	/* strand initial apic id */
 } smb_processor_ext_t;
+
+typedef struct smb_port_ext {
+	smb_header_t smbpoe_hdr;	/* structure header */
+	uint16_t smbpoe_chassis;	/* chassis handle */
+	uint16_t smbpoe_port;		/* port connector handle */
+	uint8_t smbpoe_dtype;		/* device type */
+	uint16_t smbpoe_devhdl;		/* device handle */
+	uint8_t smbpoe_phy;		/* PHY number */
+} smb_port_ext_t;
 
 typedef struct smb_pciexrc {
 	smb_header_t smbpciexrc_hdr;	/* structure header */

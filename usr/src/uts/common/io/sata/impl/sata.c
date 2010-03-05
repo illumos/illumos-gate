@@ -10370,6 +10370,19 @@ sata_create_target_node(dev_info_t *dip, sata_hba_inst_t *sata_hba_inst,
 		goto fail;
 	}
 
+	if (sdinfo->satadrv_type == SATA_DTYPE_ATADISK) {
+		/*
+		 * Add "sata-phy" property
+		 */
+		if (ndi_prop_update_int(DDI_DEV_T_NONE, cdip, "sata-phy",
+		    (int)sata_addr->cport) != DDI_PROP_SUCCESS) {
+			SATA_LOG_D((sata_hba_inst, CE_WARN,
+			    "sata_create_target_node: failed to create "
+			    "\"sata-phy\" property: port %d",
+			    sata_addr->cport));
+		}
+	}
+
 
 	/*
 	 * Now, try to attach the driver. If probing of the device fails,
