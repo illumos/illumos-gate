@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -159,7 +159,9 @@ sctp_shutdown_received(sctp_t *sctp, sctp_chunk_hdr_t *sch, boolean_t crwsd,
 	/* Extract and process the TSN in the shutdown chunk */
 	if (sch != NULL) {
 		tsn = (uint32_t *)(sch + 1);
-		trysend = sctp_cumack(sctp, ntohl(*tsn), &samp);
+		/* not already acked */
+		if (!SEQ_LT(ntohl(*tsn), sctp->sctp_lastack_rxd))
+			trysend = sctp_cumack(sctp, ntohl(*tsn), &samp);
 	}
 
 	/* Don't allow sending new data */
