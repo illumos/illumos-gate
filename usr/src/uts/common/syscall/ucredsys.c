@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -133,6 +131,7 @@ ucred_get(pid_t pid, void *ubuf)
 	cred_t *pcr;
 	int err;
 	struct ucred_s *uc;
+	uint32_t auditing = AU_AUDITING();
 
 	if (pid == P_MYID || pid == curproc->p_pid) {
 		pcr = CRED();
@@ -144,7 +143,7 @@ ucred_get(pid_t pid, void *ubuf)
 		if (pid < 0)
 			return (set_errno(EINVAL));
 
-		if (audit_active)
+		if (auditing)
 			updcred = cralloc();
 
 		mutex_enter(&pidlock);
@@ -161,7 +160,7 @@ ucred_get(pid_t pid, void *ubuf)
 		 * Assure that audit data in cred is up-to-date.
 		 * updcred will be used or freed.
 		 */
-		if (audit_active)
+		if (auditing)
 			audit_update_context(p, updcred);
 
 		err = priv_proc_cred_perm(CRED(), p, &pcr, VREAD);

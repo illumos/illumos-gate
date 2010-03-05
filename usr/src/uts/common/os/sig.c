@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1267,6 +1267,7 @@ psig(void)
 	id_t ctid = 0;
 	zoneid_t zoneid = -1;
 	sigqueue_t *sqp = NULL;
+	uint32_t auditing = AU_AUDITING();
 
 	mutex_enter(&p->p_lock);
 	schedctl_finish_sigblock(t);
@@ -1447,11 +1448,11 @@ psig(void)
 			sig = SIGKILL;
 			ext = (p->p_flag & SEXTKILLED) != 0;
 		} else {
-			if (audit_active)		/* audit core dump */
+			if (auditing)		/* audit core dump */
 				audit_core_start(sig);
 			if (core(sig, ext) == 0)
 				code = CLD_DUMPED;
-			if (audit_active)		/* audit core dump */
+			if (auditing)		/* audit core dump */
 				audit_core_finish(code);
 		}
 	}
@@ -2649,11 +2650,11 @@ realsigprof_fast(int sysnum, int nsysarg, int error)
 			mutex_enter(&p->p_lock);
 			lwp_exit();
 		}
-		if (audit_active)
+		if (audit_active == C2AUDIT_LOADED)
 			audit_core_start(SIGSEGV);
 		if (core(SIGSEGV, 0) == 0)
 			code = CLD_DUMPED;
-		if (audit_active)
+		if (audit_active == C2AUDIT_LOADED)
 			audit_core_finish(code);
 		exit(code, SIGSEGV);
 	}

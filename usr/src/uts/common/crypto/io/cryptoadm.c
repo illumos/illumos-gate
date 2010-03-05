@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -558,7 +558,7 @@ out:
 		error = EFAULT;
 	}
 out2:
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_cryptoadm(CRYPTO_LOAD_DEV_DISABLED, dev_name, entries,
 		    count, instance, rv, error);
 	return (error);
@@ -636,7 +636,7 @@ out:
 		error = EFAULT;
 	}
 out2:
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_cryptoadm(CRYPTO_LOAD_SOFT_DISABLED, name, entries,
 		    count, 0, rv, error);
 	return (error);
@@ -718,7 +718,7 @@ out:
 		error = EFAULT;
 	}
 out2:
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_cryptoadm(CRYPTO_LOAD_SOFT_CONFIG, name, entries, count,
 		    0, rv, error);
 	return (error);
@@ -763,7 +763,7 @@ out:
 		error = EFAULT;
 	}
 out2:
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_cryptoadm(CRYPTO_UNLOAD_SOFT_MODULE, name, NULL, 0, 0,
 		    rv, error);
 
@@ -799,7 +799,7 @@ out:
 		error = EFAULT;
 
 out2:
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_cryptoadm(CRYPTO_LOAD_DOOR, NULL, NULL,
 		    0, 0, rv, error);
 	return (error);
@@ -882,6 +882,7 @@ static int
 cryptoadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
     int *rval)
 {
+	uint32_t auditing = AU_AUDITING();
 	int error;
 #define	ARG	((caddr_t)arg)
 
@@ -932,7 +933,7 @@ cryptoadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 		 * So, this is a no op. We are keeping this ioctl around
 		 * to be used for any future threadpool related work.
 		 */
-		if (audit_active)
+		if (auditing)
 			audit_cryptoadm(CRYPTO_POOL_CREATE, NULL, NULL,
 			    0, 0, 0, 0);
 		return (0);
@@ -945,7 +946,7 @@ cryptoadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 			    == -1)
 				err = EFAULT;
 		}
-		if (audit_active)
+		if (auditing)
 			audit_cryptoadm(CRYPTO_POOL_WAIT, NULL, NULL,
 			    0, 0, 0, err);
 		return (err);
@@ -955,7 +956,7 @@ cryptoadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 		int err;
 
 		err = kcf_svc_do_run();
-		if (audit_active)
+		if (auditing)
 			audit_cryptoadm(CRYPTO_POOL_RUN, NULL, NULL,
 			    0, 0, 0, err);
 		return (err);
@@ -969,7 +970,7 @@ cryptoadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 		int err;
 
 		err = fips140_actions(dev, ARG, mode, rval, cmd);
-		if (audit_active)
+		if (auditing)
 			audit_cryptoadm(CRYPTO_FIPS140_SET, NULL, NULL,
 			    0, 0, 0, err);
 		return (err);

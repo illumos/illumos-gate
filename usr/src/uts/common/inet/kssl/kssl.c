@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,6 +278,7 @@ kssl_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
     int *rval)
 {
 	int error = EINVAL;
+	uint32_t auditing = AU_AUDITING();
 
 #define	ARG	((caddr_t)arg)
 
@@ -310,7 +311,7 @@ kssl_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 			return (EFAULT);
 		}
 		error = kssl_add_entry(kssl_params);
-	if (audit_active)
+	if (auditing)
 		audit_kssl(KSSL_ADD_ENTRY, kssl_params, error);
 		off = offsetof(kssl_params_t, kssl_token) +
 		    offsetof(kssl_tokinfo_t, ck_rv);
@@ -331,7 +332,7 @@ kssl_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 		}
 
 		error = kssl_delete_entry(&server_addr);
-	if (audit_active)
+	if (auditing)
 		audit_kssl(KSSL_DELETE_ENTRY, &server_addr, error);
 		break;
 	}

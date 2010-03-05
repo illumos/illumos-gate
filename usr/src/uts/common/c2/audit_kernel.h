@@ -208,6 +208,7 @@ struct t_audit_data {
 	int	tad_ctrl;	/* audit control/status flags */
 	void	*tad_errjmp;	/* error longjmp (audit record aborted) */
 	int	tad_flag;	/* to audit or not to audit */
+	uint32_t tad_audit;	/* auditing enabled/disabled */
 	struct audit_path	*tad_aupath;	/* captured at vfs_lookup */
 	struct audit_path	*tad_atpath;	/* openat prefix, path of fd */
 	struct vnode *tad_vn;	/* saved inode from vfs_lookup */
@@ -338,8 +339,6 @@ extern zone_key_t au_zone_key;
  */
 extern int audit_policy;
 extern int audit_active;
-extern int audit_load;
-extern int au_auditstate;
 
 extern struct audit_queue au_queue;
 extern struct p_audit_data *pad0;
@@ -351,6 +350,17 @@ extern struct t_audit_data *tad0;
 void au_pathhold(struct audit_path *);
 void au_pathrele(struct audit_path *);
 struct audit_path *au_pathdup(const struct audit_path *, int, int);
+
+void au_pad_init(void);
+
+int auditctl(int cmd, caddr_t data, int length);
+int auditdoor(int fd);
+int getauid(caddr_t);
+int setauid(caddr_t);
+int getaudit(caddr_t);
+int getaudit_addr(caddr_t, int);
+int setaudit(caddr_t);
+int setaudit_addr(caddr_t, int);
 
 /*
  * Macros to hide asynchronous, non-blocking audit record start and finish
@@ -373,8 +383,9 @@ struct audit_path *au_pathdup(const struct audit_path *, int, int);
 	} \
 }
 
-#define	AUDIT_ASYNC_FINISH(rp, audit_event, event_modifier) \
-	audit_async_finish((caddr_t *)&(rp), audit_event, event_modifier);
+#define	AUDIT_ASYNC_FINISH(rp, audit_event, event_modifier, event_time) \
+	audit_async_finish((caddr_t *)&(rp), audit_event, event_modifier, \
+	event_time);
 
 
 #ifdef	_KERNEL

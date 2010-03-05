@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -610,7 +610,7 @@ getf(int fd)
 	/*
 	 * archive per file audit data
 	 */
-	if (audit_active)
+	if (AU_AUDITING())
 		(void) audit_getf(fd);
 
 	set_active_fd(fd);	/* record the active file descriptor */
@@ -688,7 +688,7 @@ closeandsetf(int fd, file_t *newfp)
 	/*
 	 * archive per file audit data
 	 */
-	if (audit_active)
+	if (AU_AUDITING())
 		(void) audit_getf(fd);
 	ASSERT(ufp->uf_busy);
 	ufp->uf_file = NULL;
@@ -942,7 +942,7 @@ closef(file_t *fp)
 	/*
 	 * audit close of file (may be exit)
 	 */
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_closef(fp);
 	ASSERT(MUTEX_NOT_HELD(&P_FINFO(curproc)->fi_lock));
 
@@ -1167,7 +1167,7 @@ setf(int fd, file_t *fp)
 	uf_info_t *fip = P_FINFO(curproc);
 	uf_entry_t *ufp;
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_setf(fp, fd);
 
 	if (fp == NULL) {

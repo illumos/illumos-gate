@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,86 +50,42 @@
 extern uint_t num_syscall;		/* size of audit_s2e table */
 extern kmutex_t pidlock;		/* proc table lock */
 
-int audit_load = 0;	/* set from /etc/system */
+/*
+ * Obsolete and ignored - Historically, the 'set c2audit:audit_load=1' entry
+ * in /etc/system enabled auditing. The No Reboot Audit project does not
+ * use this entry. However, to prevent the system from printing warning
+ * messages, the audit_load entry is being left in /etc/system. It will be
+ * removed when there is a small chance that the entry is used on currently
+ * running systems.
+ */
+int audit_load = 0;
 
-struct p_audit_data *pad0;
-struct t_audit_data *tad0;
+kmutex_t module_lock;			/* audit_module_state lock */
 
 /*
  * Das Boot. Initialize first process. Also generate an audit record indicating
  * that the system has been booted.
  */
 void
-audit_init()
+audit_init_module()
 {
-	kthread_t *au_thread;
 	token_t *rp = NULL;
 	label_t jb;
-	struct audit_path apempty;
-	auditinfo_addr_t *ainfo;
 
-	if (audit_load == 0) {
-		audit_active = 0;
-		au_auditstate = AUC_DISABLED;
+	/*
+	 * Solaris Auditing module is being loaded -> change the state. The lock
+	 * is here to prevent memory leaks caused by multiple initializations.
+	 */
+	mutex_enter(&module_lock);
+	if (audit_active != C2AUDIT_UNLOADED) {
+		mutex_exit(&module_lock);
 		return;
-#ifdef DEBUG
-	} else if (audit_load == 2) {
-		debug_enter((char *)NULL);
-#endif
 	}
-
-	audit_active = 1;
-	set_all_proc_sys();		/* set pre- and post-syscall flags */
+	audit_active = C2AUDIT_LOADED;
+	mutex_exit(&module_lock);
 
 	/* initialize memory allocators */
 	au_mem_init();
-
-	au_zone_setup();
-
-	/* inital thread structure */
-	tad0 = kmem_zalloc(sizeof (struct t_audit_data), KM_SLEEP);
-
-	/* initial process structure */
-	pad0 = kmem_cache_alloc(au_pad_cache, KM_SLEEP);
-	bzero(&pad0->pad_data, sizeof (pad0->pad_data));
-
-	T2A(curthread) = tad0;
-	P2A(curproc) = pad0;
-
-	/*
-	 * The kernel allocates a bunch of threads make sure they have
-	 * a valid tad
-	 */
-
-	mutex_enter(&pidlock);
-
-	au_thread = curthread;
-	do {
-		if (T2A(au_thread) == NULL) {
-			T2A(au_thread) = tad0;
-		}
-		au_thread = au_thread->t_next;
-	} while (au_thread != curthread);
-
-	tad0->tad_ad   = NULL;
-	mutex_exit(&pidlock);
-
-	/*
-	 * Initialize audit context in our cred (kcred).
-	 * No copy-on-write needed here because it's so early in init.
-	 */
-	ainfo = crgetauinfo_modifiable(kcred);
-	ASSERT(ainfo != NULL);
-	bzero(ainfo, sizeof (auditinfo_addr_t));
-	ainfo->ai_auid = AU_NOAUDITID;
-
-	/* fabricate an empty audit_path to extend */
-	apempty.audp_cnt = 0;
-	apempty.audp_sect[0] = (char *)(&apempty.audp_sect[1]);
-	pad0->pad_root = au_pathdup(&apempty, 1, 2);
-	bcopy("/", pad0->pad_root->audp_sect[0], 2);
-	au_pathhold(pad0->pad_root);
-	pad0->pad_cwd = pad0->pad_root;
 
 	/*
 	 * setup environment for asynchronous auditing. We can't use
@@ -150,82 +106,8 @@ audit_init()
 
 	/* generate a system-booted audit record */
 	au_write((caddr_t *)&rp, au_to_text("booting kernel"));
-
-	audit_async_finish((caddr_t *)&rp, AUE_SYSTEMBOOT, NULL);
-}
-
-void
-audit_free()
-{
-}
-
-/*
- * Check for any pending changes to the audit context for the given proc.
- * p_crlock and pad_lock for the process are acquired here. Caller is
- * responsible for assuring the process doesn't go away. If context is
- * updated, the specified cralloc'ed cred will be used, otherwise it's freed.
- * If no cred is given, it will be cralloc'ed here and caller assures that
- * it is safe to allocate memory.
- */
-void
-audit_update_context(proc_t *p, cred_t *ncr)
-{
-	struct p_audit_data *pad;
-	cred_t	*newcred = ncr;
-
-	pad = P2A(p);
-	if (pad == NULL) {
-		if (newcred != NULL)
-			crfree(newcred);
-		return;
-	}
-
-	/* If a mask update is pending, take care of it. */
-	if (pad->pad_flags & PAD_SETMASK) {
-		auditinfo_addr_t *ainfo;
-
-		if (newcred == NULL)
-			newcred = cralloc();
-
-		mutex_enter(&pad->pad_lock);
-		/* the condition may have been handled by the time we lock */
-		if (pad->pad_flags & PAD_SETMASK) {
-			ainfo = crgetauinfo_modifiable(newcred);
-			if (ainfo == NULL) {
-				mutex_enter(&pad->pad_lock);
-				crfree(newcred);
-				return;
-			}
-
-			mutex_enter(&p->p_crlock);
-			crcopy_to(p->p_cred, newcred);
-			p->p_cred = newcred;
-
-			ainfo->ai_mask = pad->pad_newmask;
-
-			/* Unlock and cleanup. */
-			mutex_exit(&p->p_crlock);
-			pad->pad_flags &= ~PAD_SETMASK;
-
-			/*
-			 * For curproc, assure that our thread points to right
-			 * cred, so CRED() will be correct. Otherwise, no need
-			 * to broadcast changes (via set_proc_pre_sys), since
-			 * t_pre_sys is ALWAYS on when audit is enabled... due
-			 * to syscall auditing.
-			 */
-			if (p == curproc)
-				crset(p, newcred);
-			else
-				crfree(newcred);
-		} else {
-			crfree(newcred);
-		}
-		mutex_exit(&pad->pad_lock);
-	} else {
-		if (newcred != NULL)
-			crfree(newcred);
-	}
+	audit_async_finish((caddr_t *)&rp, AUE_SYSTEMBOOT, NULL,
+	    &(p0.p_user.u_start));
 }
 
 
@@ -241,6 +123,7 @@ int
 audit_start(
 	unsigned type,
 	unsigned scid,
+	uint32_t audit_state,
 	int error,
 	klwp_t *lwp)
 {
@@ -249,6 +132,9 @@ audit_start(
 
 	tad = U2A(u);
 	ASSERT(tad != NULL);
+
+	/* Remember the audit state in the cache */
+	tad->tad_audit = audit_state;
 
 	if (error) {
 		tad->tad_ctrl = 0;
@@ -309,8 +195,7 @@ audit_start(
 	 * if auditing not enabled, then don't generate an audit record
 	 * and don't count it.
 	 */
-	if ((kctx->auk_auditstate != AUC_AUDITING &&
-	    kctx->auk_auditstate != AUC_INIT_AUDIT)) {
+	if (audit_state & ~(AUC_AUDITING | AUC_INIT_AUDIT)) {
 		/*
 		 * we assume that audit_finish will always be called.
 		 */
@@ -323,7 +208,7 @@ audit_start(
 	 * space left to hold audit records. We decide here if records
 	 * should be dropped (but counted).
 	 */
-	if (kctx->auk_auditstate == AUC_NOSPACE) {
+	if (audit_state == AUC_NOSPACE) {
 		if ((kctx->auk_policy & AUDIT_CNT) ||
 		    (kctx->auk_policy & AUDIT_SCNT)) {
 			/* assume that audit_finish will always be called. */
@@ -389,6 +274,7 @@ audit_finish(
 		tad->tad_event = 0;
 		tad->tad_evmod = 0;
 		tad->tad_ctrl  = 0;
+		tad->tad_audit = AUC_UNSET;
 		ASSERT(tad->tad_aupath == NULL);
 		return;
 	}
@@ -479,7 +365,8 @@ audit_finish(
 		}
 
 		/* Close up everything */
-		au_close(kctx, &(u_ad), flag, tad->tad_event, tad->tad_evmod);
+		au_close(kctx, &(u_ad), flag, tad->tad_event, tad->tad_evmod,
+		    NULL);
 	}
 
 	ASSERT(u_ad == NULL);
@@ -505,6 +392,7 @@ audit_finish(
 	tad->tad_event = 0;
 	tad->tad_evmod = 0;
 	tad->tad_ctrl  = 0;
+	tad->tad_audit = AUC_UNSET;
 }
 
 int

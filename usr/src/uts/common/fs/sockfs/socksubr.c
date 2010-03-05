@@ -62,7 +62,6 @@
 #include <sys/socketvar.h>
 #include <netinet/in.h>
 #include <sys/un.h>
-
 #include <sys/ucred.h>
 
 #include <sys/tiuser.h>
@@ -756,7 +755,7 @@ fdbuf_extract(struct fdbuf *fdbuf, void *rights, int rightslen)
 		mutex_exit(&fp->f_tlock);
 		setf(fd, fp);
 		*rp++ = fd;
-		if (audit_active)
+		if (AU_AUDITING())
 			audit_fdrecv(fd, fp);
 		dprint(1, ("fdbuf_extract: [%d] = %d, %p refcnt %d\n",
 		    i, fd, (void *)fp, fp->f_count));
@@ -830,7 +829,7 @@ fdbuf_create(void *rights, int rightslen, struct fdbuf **fdbufp)
 		fdbuf->fd_fds[i] = fp;
 		fdbuf->fd_numfd++;
 		releasef(fds[i]);
-		if (audit_active)
+		if (AU_AUDITING())
 			audit_fdsend(fds[i], fp, 0);
 	}
 	*fdbufp = fdbuf;

@@ -3072,7 +3072,8 @@ zone_chdir(vnode_t *vp, vnode_t **vpp, proc_t *pp)
 	/* we're going to hold a reference here to the directory */
 	VN_HOLD(vp);
 
-	if (audit_active)	/* update abs cwd/root path see c2audit.c */
+	/* update abs cwd/root path see c2/audit.c */
+	if (AU_AUDITING())
 		audit_chdirec(vp, vpp);
 
 	mutex_enter(&pp->p_lock);

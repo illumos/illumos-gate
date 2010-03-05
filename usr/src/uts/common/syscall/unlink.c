@@ -80,7 +80,7 @@ unlinkat(int fd, char *name, int flags)
 		}
 	}
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_setfsat_path(1);
 
 	error = vn_removeat(dirvp, name,

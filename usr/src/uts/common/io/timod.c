@@ -20,7 +20,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -695,6 +695,7 @@ timodprocessinfo(queue_t *q, struct tim_tim *tp, struct T_info_ack *tia)
 static int
 timodrproc(queue_t *q, mblk_t *mp)
 {
+	uint32_t auditing = AU_AUDITING();
 	union T_primitives *pptr;
 	struct tim_tim *tp;
 	struct iocblk *iocbp;
@@ -787,7 +788,7 @@ timodrproc(queue_t *q, mblk_t *mp)
 		default:
 /* ONC_PLUS EXTRACT END */
 
-			if (audit_active)
+			if (auditing)
 				audit_sock(T_UNITDATA_IND, q, mp, TIMOD_ID);
 /* ONC_PLUS EXTRACT START */
 			putnext(q, mp);
@@ -969,23 +970,24 @@ timodrproc(queue_t *q, mblk_t *mp)
 /* ONC_PLUS EXTRACT END */
 		case T_OPTMGMT_ACK:
 
-		tilog("timodrproc: Got T_OPTMGMT_ACK\n", 0);
+			tilog("timodrproc: Got T_OPTMGMT_ACK\n", 0);
 
-		/* Restore db_type - recover() might have change it */
-		mp->b_datap->db_type = M_PCPROTO;
+			/* Restore db_type - recover() might have change it */
+			mp->b_datap->db_type = M_PCPROTO;
 
-		if (((tp->tim_flags & WAITIOCACK) == 0) ||
-		    ((tp->tim_saved_prim != T_SVR4_OPTMGMT_REQ) &&
-		    (tp->tim_saved_prim != T_OPTMGMT_REQ))) {
-			putnext(q, mp);
-		} else {
-			ASSERT(tp->tim_iocsave != NULL);
-			tim_ioctl_send_reply(q, tp->tim_iocsave, mp);
-			tp->tim_iocsave = NULL;
-			tp->tim_saved_prim = -1;
-			tp->tim_flags &= ~(WAITIOCACK | WAIT_IOCINFOACK |
-			    TI_CAP_RECVD | CAP_WANTS_INFO);
-		}
+			if (((tp->tim_flags & WAITIOCACK) == 0) ||
+			    ((tp->tim_saved_prim != T_SVR4_OPTMGMT_REQ) &&
+			    (tp->tim_saved_prim != T_OPTMGMT_REQ))) {
+				putnext(q, mp);
+			} else {
+				ASSERT(tp->tim_iocsave != NULL);
+				tim_ioctl_send_reply(q, tp->tim_iocsave, mp);
+				tp->tim_iocsave = NULL;
+				tp->tim_saved_prim = -1;
+				tp->tim_flags &= ~(WAITIOCACK |
+				    WAIT_IOCINFOACK | TI_CAP_RECVD |
+				    CAP_WANTS_INFO);
+			}
 		break;
 
 		case T_INFO_ACK: {
@@ -1109,31 +1111,31 @@ timodrproc(queue_t *q, mblk_t *mp)
 				    deficit) {
 					mblk_t *tmp = allocb(expected_ack_size,
 					    BPRI_HI);
-				    if (tmp == NULL) {
-					ASSERT(MBLKSIZE(mp) >=
-						sizeof (struct T_error_ack));
+					if (tmp == NULL) {
+						ASSERT(MBLKSIZE(mp) >=
+						    sizeof (struct T_error_ack));
 
-					tilog("timodrproc: allocb failed no "
-					    "recovery attempt\n", 0);
+						tilog("timodrproc: allocb failed no "
+						    "recovery attempt\n", 0);
 
-					mp->b_rptr = mp->b_datap->db_base;
-					pptr = (union T_primitives *)
-					    mp->b_rptr;
-					pptr->error_ack.ERROR_prim = T_INFO_REQ;
-					pptr->error_ack.TLI_error = TSYSERR;
-					pptr->error_ack.UNIX_error = EAGAIN;
-					pptr->error_ack.PRIM_type = T_ERROR_ACK;
-					mp->b_datap->db_type = M_PCPROTO;
-					tim_send_ioc_error_ack(q, tp, mp);
-					break;
-				    } else {
-					bcopy(mp->b_rptr, tmp->b_rptr, blen);
-					tmp->b_wptr += blen;
-					pptr = (union T_primitives *)
-					    tmp->b_rptr;
-					freemsg(mp);
-					mp = tmp;
-				    }
+						mp->b_rptr = mp->b_datap->db_base;
+						pptr = (union T_primitives *)
+						    mp->b_rptr;
+						pptr->error_ack.ERROR_prim = T_INFO_REQ;
+						pptr->error_ack.TLI_error = TSYSERR;
+						pptr->error_ack.UNIX_error = EAGAIN;
+						pptr->error_ack.PRIM_type = T_ERROR_ACK;
+						mp->b_datap->db_type = M_PCPROTO;
+						tim_send_ioc_error_ack(q, tp, mp);
+						break;
+					} else {
+						bcopy(mp->b_rptr, tmp->b_rptr, blen);
+						tmp->b_wptr += blen;
+						pptr = (union T_primitives *)
+						    tmp->b_rptr;
+						freemsg(mp);
+						mp = tmp;
+					}
 				}
 			}
 			/*
@@ -1218,7 +1220,7 @@ timodrproc(queue_t *q, mblk_t *mp)
 				}
 			}
 /* ONC_PLUS EXTRACT END */
-			if (audit_active)
+			if (auditing)
 				audit_sock(T_CONN_IND, q, mp, TIMOD_ID);
 /* ONC_PLUS EXTRACT START */
 			putnext(q, mp);
@@ -1281,16 +1283,16 @@ timodrproc(queue_t *q, mblk_t *mp)
 
 	    case T_ORDREL_IND:
 
-		tilog("timodrproc: Got T_ORDREL_IND\n", 0);
+		    tilog("timodrproc: Got T_ORDREL_IND\n", 0);
 
-		if (tp->tim_flags & LOCORDREL) {
-			tp->tim_flags &= ~(LOCORDREL|REMORDREL);
-			tim_clear_peer(tp);
-		} else {
-			tp->tim_flags |= REMORDREL;
-		}
-		putnext(q, mp);
-		break;
+		    if (tp->tim_flags & LOCORDREL) {
+			    tp->tim_flags &= ~(LOCORDREL|REMORDREL);
+			    tim_clear_peer(tp);
+		    } else {
+			    tp->tim_flags |= REMORDREL;
+		    }
+		    putnext(q, mp);
+		    break;
 
 	    case T_EXDATA_IND:
 	    case T_DATA_IND:
@@ -1430,36 +1432,36 @@ timodrproc(queue_t *q, mblk_t *mp)
 /* ONC_PLUS EXTRACT START */
 	case M_IOCNAK:
 
-	    tilog("timodrproc: Got M_IOCNAK\n", 0);
+		tilog("timodrproc: Got M_IOCNAK\n", 0);
 
-	    iocbp = (struct iocblk *)mp->b_rptr;
-	    if (((iocbp->ioc_cmd == TI_GETMYNAME) ||
-		(iocbp->ioc_cmd == TI_GETPEERNAME)) &&
-		((iocbp->ioc_error == EINVAL) || (iocbp->ioc_error == 0))) {
-		    PI_PROVLOCK(tp->tim_provinfo);
-		    if (iocbp->ioc_cmd == TI_GETMYNAME) {
-			    if (tp->tim_provinfo->tpi_myname == PI_DONTKNOW)
-				    tp->tim_provinfo->tpi_myname = PI_NO;
-		    } else if (iocbp->ioc_cmd == TI_GETPEERNAME) {
-			    if (tp->tim_provinfo->tpi_peername == PI_DONTKNOW)
-				    tp->tim_provinfo->tpi_peername = PI_NO;
-		    }
-		    PI_PROVUNLOCK(tp->tim_provinfo);
-		    /* tim_iocsave may already be overwritten. */
-		    if ((tp->tim_iocsave != NULL) &&
-			(tp->tim_saved_prim == -1)) {
-			    freemsg(mp);
-			    mp = tp->tim_iocsave;
-			    tp->tim_iocsave = NULL;
-			    tp->tim_flags |= NAMEPROC;
-			    if (ti_doname(WR(q), mp) != DONAME_CONT) {
-				    tp->tim_flags &= ~NAMEPROC;
-			    }
-			    break;
-		    }
-	    }
-	    putnext(q, mp);
-	    break;
+		iocbp = (struct iocblk *)mp->b_rptr;
+		if (((iocbp->ioc_cmd == TI_GETMYNAME) ||
+		    (iocbp->ioc_cmd == TI_GETPEERNAME)) &&
+		    ((iocbp->ioc_error == EINVAL) || (iocbp->ioc_error == 0))) {
+			PI_PROVLOCK(tp->tim_provinfo);
+			if (iocbp->ioc_cmd == TI_GETMYNAME) {
+				if (tp->tim_provinfo->tpi_myname == PI_DONTKNOW)
+					tp->tim_provinfo->tpi_myname = PI_NO;
+			} else if (iocbp->ioc_cmd == TI_GETPEERNAME) {
+				if (tp->tim_provinfo->tpi_peername == PI_DONTKNOW)
+					tp->tim_provinfo->tpi_peername = PI_NO;
+			}
+			PI_PROVUNLOCK(tp->tim_provinfo);
+			/* tim_iocsave may already be overwritten. */
+			if ((tp->tim_iocsave != NULL) &&
+			    (tp->tim_saved_prim == -1)) {
+				freemsg(mp);
+				mp = tp->tim_iocsave;
+				tp->tim_iocsave = NULL;
+				tp->tim_flags |= NAMEPROC;
+				if (ti_doname(WR(q), mp) != DONAME_CONT) {
+					tp->tim_flags &= ~NAMEPROC;
+				}
+				break;
+			}
+		}
+		putnext(q, mp);
+		break;
 /* ONC_PLUS EXTRACT END */
 	}
 
@@ -1614,6 +1616,7 @@ timodwproc(queue_t *q, mblk_t *mp)
 {
 	union T_primitives *pptr;
 	struct tim_tim *tp;
+	uint32_t auditing = AU_AUDITING();
 	mblk_t *tmp;
 	struct iocblk *iocbp;
 	int error;
@@ -1997,7 +2000,7 @@ getname:
 					mp = tmp;
 				}
 			}
-			if (audit_active)
+			if (auditing)
 				audit_sock(T_UNITDATA_REQ, q, mp, TIMOD_ID);
 		if (!bcanputnext(q, mp->b_band)) {
 				(void) putbq(q, mp);
@@ -2053,12 +2056,12 @@ getname:
 			if (tp->tim_flags & COTS)
 				tp->tim_flags |= CONNWAIT;
 /* ONC_PLUS EXTRACT END */
-			if (audit_active)
+			if (auditing)
 				audit_sock(T_CONN_REQ, q, mp, TIMOD_ID);
 /* ONC_PLUS EXTRACT START */
 		putnext(q, mp);
 		break;
-	    }
+		}
 
 		case O_T_CONN_RES:
 		case T_CONN_RES: {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -301,8 +301,9 @@ token_t	*au_to_label(bslabel_t *);
 token_t	*au_to_privset(const char *, const priv_set_t *, char, int);
 
 void	au_uwrite();
-void	au_close(au_kcontext_t *, caddr_t *, int, au_event_t, au_emod_t);
-void	au_close_defer(token_t *, int, au_event_t, au_emod_t);
+void	au_close(au_kcontext_t *, caddr_t *, int, au_event_t, au_emod_t,
+    timestruc_t *);
+void	au_close_defer(token_t *, int, au_event_t, au_emod_t, timestruc_t *);
 void	au_close_time(au_kcontext_t *, token_t *, int, au_event_t, au_emod_t,
 	    timestruc_t *);
 void	au_free_rec(au_buff_t *);

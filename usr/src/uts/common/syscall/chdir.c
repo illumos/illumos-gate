@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/isa_defs.h>
@@ -216,7 +214,8 @@ chdirec(vnode_t *vp, int ischroot, int do_traverse)
 		vpp = &PTOU(pp)->u_cdir;
 	}
 
-	if (audit_active)	/* update abs cwd/root path see c2audit.c */
+	/* update abs cwd/root path see c2/audit.c */
+	if (AU_AUDITING())
 		audit_chdirec(vp, vpp);
 
 	mutex_enter(&pp->p_lock);

@@ -90,7 +90,7 @@ __ENABLE_OTHERS
 
 do_bsmconv()
 {
-	# Run bsmconv so audit and device allocation is enabled by
+	# Run bsmconv so device allocation is enabled by
 	# default with Trusted Extensions.
 	if [ "$ROOT_PATH" = "/" -o "$ROOT_PATH" = "" ]; then
 		BSMDIR=""
@@ -100,6 +100,16 @@ do_bsmconv()
 	echo "Running bsmconv ..."
 	echo `TEXTDOMAIN="SUNW_OST_OSCMD" gettext "y"` | \
 	    $ROOT_PATH/etc/security/bsmconv $ROOT_PATH
+	# Run auditd so auditing is enabled by default
+	# with Trusted Extensions.
+	if [ "$BSMDIR" = "" ]; then
+		echo "Starting auditd ..."
+		/usr/sbin/audit -s
+	else
+		cat >> $ROOT_PATH/var/svc/profile/upgrade <<\_ENABLE_AUDITD
+			/usr/sbin/audit -s
+_ENABLE_AUDITD
+	fi
 }
 
 do_nscd()

@@ -21,7 +21,7 @@
 /*
  * Routines for writing audit records.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,7 +102,7 @@ au_write(caddr_t *d, token_t *m)
  */
 void
 au_close(au_kcontext_t *kctx, caddr_t *d, int flag, au_event_t e_type,
-    au_emod_t e_mod)
+    au_emod_t e_mod, timestruc_t *e_time)
 {
 	token_t *dchain;	/* au_membuf chain which is the tokens */
 	t_audit_data_t *tad = U2A(u);
@@ -122,10 +122,10 @@ au_close(au_kcontext_t *kctx, caddr_t *d, int flag, au_event_t e_type,
 	 */
 	if ((flag & AU_DONTBLOCK) || ((flag & AU_DEFER) &&
 	    (tad->tad_scid != 0) && (tad->tad_scid != SYS_exit))) {
-		au_close_defer(dchain, flag, e_type, e_mod);
+		au_close_defer(dchain, flag, e_type, e_mod, e_time);
 		return;
 	}
-	au_close_time(kctx, dchain, flag, e_type, e_mod, NULL);
+	au_close_time(kctx, dchain, flag, e_type, e_mod, e_time);
 }
 
 /*
@@ -134,7 +134,8 @@ au_close(au_kcontext_t *kctx, caddr_t *d, int flag, au_event_t e_type,
  * syscall end time it will be pulled off.
  */
 void
-au_close_defer(token_t *dchain, int flag, au_event_t e_type, au_emod_t e_mod)
+au_close_defer(token_t *dchain, int flag, au_event_t e_type, au_emod_t e_mod,
+    timestruc_t *e_time)
 {
 	au_defer_info_t	*attr;
 	t_audit_data_t *tad = U2A(u);
@@ -159,7 +160,10 @@ au_close_defer(token_t *dchain, int flag, au_event_t e_type, au_emod_t e_mod)
 	attr->audi_e_type = e_type;
 	attr->audi_e_mod = e_mod;
 	attr->audi_flag = flag;
-	gethrestime(&attr->audi_atime);
+	if (e_time != NULL)
+		attr->audi_atime = *e_time;
+	else
+		gethrestime(&attr->audi_atime);
 
 	/*
 	 * All async events must be queued via softcall to avoid possible
@@ -233,6 +237,7 @@ au_close_time(au_kcontext_t *kctx, token_t *dchain, int flag, au_event_t e_type,
 	adr_t		hadr;		/* handle for header token */
 	adr_t		sadr;		/* handle for sequence token */
 	size_t		zone_length;	/* length of zonename token */
+	uint32_t	auditing;
 
 	ASSERT(dchain != NULL);
 
@@ -242,10 +247,14 @@ au_close_time(au_kcontext_t *kctx, token_t *dchain, int flag, au_event_t e_type,
 		return;
 	}
 	/* if auditing not enabled, then don't generate an audit record */
+	ASSERT(U2A(u) != NULL);
 	ASSERT(kctx != NULL);
 
-	if ((kctx->auk_auditstate != AUC_AUDITING) &&
-	    (kctx->auk_auditstate != AUC_INIT_AUDIT)) {
+	auditing = (U2A(u)->tad_audit == AUC_UNSET)
+	    ? kctx->auk_auditstate
+	    : U2A(u)->tad_audit;
+
+	if (auditing & ~(AUC_AUDITING | AUC_INIT_AUDIT)) {
 		/*
 		 * at system boot, neither is set yet we want to generate
 		 * an audit record.
@@ -460,7 +469,9 @@ audit_sync_block(au_kcontext_t *kctx)
 	 * Loop while we are at the high watermark.
 	 */
 	do {
-		if ((kctx->auk_auditstate != AUC_AUDITING) ||
+		if (((U2A(u)->tad_audit != AUC_UNSET)
+		    ? (U2A(u)->tad_audit != AUC_AUDITING)
+		    : (kctx->auk_auditstate != AUC_AUDITING)) ||
 		    (kctx->auk_policy & AUDIT_CNT)) {
 
 			/* just count # of dropped audit records */
@@ -815,13 +826,14 @@ audit_async_start(label_t *jb, au_event_t event, int sorf)
  * work can be done in a safe context.
  */
 void
-audit_async_finish(caddr_t *ad, au_event_t aid, au_emod_t amod)
+audit_async_finish(caddr_t *ad, au_event_t aid, au_emod_t amod,
+    timestruc_t *e_time)
 {
 	au_kcontext_t	*kctx;
 
 	kctx  = GET_KCTX_GZ;
 
-	au_close(kctx, ad, AU_DONTBLOCK | AU_OK, aid, PAD_NONATTR|amod);
+	au_close(kctx, ad, AU_DONTBLOCK | AU_OK, aid, PAD_NONATTR|amod, e_time);
 }
 
 /*

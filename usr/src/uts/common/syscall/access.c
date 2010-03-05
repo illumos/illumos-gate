@@ -152,7 +152,7 @@ faccessat(int fd, char *fname, int fmode, int flag)
 		}
 	}
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_setfsat_path(1);
 
 	/* Do not allow E_OK unless AT_EACCESS flag is set */

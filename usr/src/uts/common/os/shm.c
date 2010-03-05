@@ -935,7 +935,7 @@ top:
 		lock = ipc_commit_end(shm_svc, &sp->shm_perm);
 	}
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_ipcget(AT_IPC_SHM, (void *)sp);
 
 	*rvp = (uintptr_t)(sp->shm_perm.ipc_id);

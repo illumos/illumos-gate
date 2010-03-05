@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1679,6 +1679,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 	union T_primitives *tpr;
 	struct sonode *so;
 	sotpi_info_t *sti;
+	uint32_t auditing = AU_AUDITING();
 
 	so = VTOSO(vp);
 	sti = SOTOTPI(so);
@@ -1788,7 +1789,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			*allmsgsigs = S_INPUT | S_RDNORM;
 			*pollwakeups = POLLIN | POLLRDNORM;
 			*wakeups = RSLEEP;
-			if (audit_active)
+			if (auditing)
 				audit_sock(T_UNITDATA_IND, strvp2wq(vp),
 				    mp, 0);
 			return (mp);
@@ -2279,7 +2280,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			return (NULL);
 		}
 
-		if (audit_active)
+		if (auditing)
 			audit_sock(T_CONN_IND, strvp2wq(vp), mp, 0);
 		if (!(so->so_state & SS_ACCEPTCONN)) {
 			zcmn_err(getzoneid(), CE_WARN,

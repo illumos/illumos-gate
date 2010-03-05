@@ -1824,7 +1824,7 @@ aus_close(struct t_audit_data *tad)
 					tad->tad_flag = 0;
 					tad->tad_evmod = 0;
 					/* free any residual audit data */
-					au_close(kctx, &(u_ad), 0, 0, 0);
+					au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 					releasef(fd);
 					return;
 				}
@@ -3956,7 +3956,7 @@ auf_recvmsg(
 				/* don't want to audit every recvmsg attempt */
 				tad->tad_flag = 0;
 				/* free any residual audit data */
-				au_close(kctx, &(u_ad), 0, 0, 0);
+				au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 				releasef(fd);
 				return;
 			}
@@ -4002,7 +4002,7 @@ auf_recvmsg(
 			/* don't want to audit every recvmsg attempt */
 			tad->tad_flag = 0;
 			/* free any residual audit data */
-			au_close(kctx, &(u_ad), 0, 0, 0);
+			au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 			return;
 		}
 		/*
@@ -4158,7 +4158,7 @@ auf_recvfrom(
 				/* don't want to audit every recvfrom attempt */
 				tad->tad_flag = 0;
 				/* free any residual audit data */
-				au_close(kctx, &(u_ad), 0, 0, 0);
+				au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 				releasef(fd);
 				return;
 			}
@@ -4203,7 +4203,7 @@ auf_recvfrom(
 			/* don't want to audit every recvfrom attempt */
 			tad->tad_flag = 0;
 			/* free any residual audit data */
-			au_close(kctx, &(u_ad), 0, 0, 0);
+			au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 			releasef(fd);
 			return;
 		}
@@ -4348,7 +4348,7 @@ auf_sendmsg(struct t_audit_data *tad, int error, rval_t *rval)
 				/* don't want to audit every sendmsg attempt */
 				tad->tad_flag = 0;
 				/* free any residual audit data */
-				au_close(kctx, &(u_ad), 0, 0, 0);
+				au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 				return;
 			}
 
@@ -4394,7 +4394,7 @@ auf_sendmsg(struct t_audit_data *tad, int error, rval_t *rval)
 			/* don't want to audit every sendmsg attempt */
 			tad->tad_flag = 0;
 			/* free any residual audit data */
-			au_close(kctx, &(u_ad), 0, 0, 0);
+			au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 			return;
 		}
 		/*
@@ -4544,7 +4544,7 @@ auf_sendto(struct t_audit_data *tad, int error, rval_t *rval)
 				/* don't want to audit every sendto attempt */
 				tad->tad_flag = 0;
 				/* free any residual audit data */
-				au_close(kctx, &(u_ad), 0, 0, 0);
+				au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 				releasef(fd);
 				return;
 			}
@@ -4589,7 +4589,7 @@ auf_sendto(struct t_audit_data *tad, int error, rval_t *rval)
 			/* don't want to audit every sendto attempt */
 			tad->tad_flag = 0;
 			/* free any residual audit data */
-			au_close(kctx, &(u_ad), 0, 0, 0);
+			au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 			releasef(fd);
 			return;
 		}
@@ -5243,7 +5243,7 @@ auf_read(tad, error, rval)
 		/* don't really want to audit every read attempt */
 		tad->tad_flag = 0;
 		/* free any residual audit data */
-		au_close(kctx, &(u_ad), 0, 0, 0);
+		au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 		releasef(fd);
 		return;
 	}
@@ -5300,7 +5300,7 @@ auf_write(tad, error, rval)
 		/* don't really want to audit every write attempt */
 		tad->tad_flag = 0;
 		/* free any residual audit data */
-		au_close(kctx, &(u_ad), 0, 0, 0);
+		au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 		releasef(fd);
 		return;
 	}
@@ -5349,7 +5349,7 @@ auf_recv(tad, error, rval)
 		/* Turn off audit record generation here. */
 		tad->tad_flag = 0;
 		/* free any residual audit data */
-		au_close(kctx, &(u_ad), 0, 0, 0);
+		au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 		return;
 	}
 
@@ -5359,7 +5359,7 @@ auf_recv(tad, error, rval)
 		/* Turn off audit record generation here. */
 		tad->tad_flag = 0;
 		/* free any residual audit data */
-		au_close(kctx, &(u_ad), 0, 0, 0);
+		au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 		return;
 	}
 
@@ -5375,7 +5375,7 @@ auf_recv(tad, error, rval)
 		/* don't really want to audit every recv call */
 		tad->tad_flag = 0;
 		/* free any residual audit data */
-		au_close(kctx, &(u_ad), 0, 0, 0);
+		au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 		return;
 	}
 
@@ -5418,7 +5418,7 @@ auf_recv(tad, error, rval)
 		/* don't really want to audit every recv call */
 		tad->tad_flag = 0;
 		/* free any residual audit data */
-		au_close(kctx, &(u_ad), 0, 0, 0);
+		au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 
 		return;
 
@@ -5485,7 +5485,7 @@ auf_send(tad, error, rval)
 		/* Turn off audit record generation here. */
 		tad->tad_flag = 0;
 		/* free any residual audit data */
-		au_close(kctx, &(u_ad), 0, 0, 0);
+		au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 		return;
 	}
 
@@ -5495,7 +5495,7 @@ auf_send(tad, error, rval)
 		/* Turn off audit record generation here. */
 		tad->tad_flag = 0;
 		/* free any residual audit data */
-		au_close(kctx, &(u_ad), 0, 0, 0);
+		au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 		return;
 	}
 
@@ -5511,7 +5511,7 @@ auf_send(tad, error, rval)
 		/* don't really want to audit every send call */
 		tad->tad_flag = 0;
 		/* free any residual audit data */
-		au_close(kctx, &(u_ad), 0, 0, 0);
+		au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 		return;
 	}
 
@@ -5553,7 +5553,7 @@ auf_send(tad, error, rval)
 		/* don't really want to audit every send call */
 		tad->tad_flag = 0;
 		/* free any residual audit data */
-		au_close(kctx, &(u_ad), 0, 0, 0);
+		au_close(kctx, &(u_ad), 0, 0, 0, NULL);
 
 		return;
 

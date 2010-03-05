@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,7 @@
 #include <sys/policy.h>
 #include <sys/dld.h>
 #include <sys/zone.h>
+#include <c2/audit.h>
 
 /*
  * This define helps improve the readability of streams code while
@@ -250,7 +251,7 @@ stropen(vnode_t *vp, dev_t *devp, int flag, cred_t *crp)
 	zoneid_t zoneid;
 	uint_t anchor;
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_stropen(vp, devp, flag, crp);
 
 	/*
@@ -619,7 +620,7 @@ strclose(struct vnode *vp, int flag, cred_t *crp)
 	int freestp = 1;
 	queue_t *rmq;
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_strclose(vp, flag, crp);
 
 	TRACE_1(TR_FAC_STREAMS_FR,
@@ -3210,6 +3211,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 	queue_t *wrq;
 	queue_t *rdq;
 	boolean_t kioctl = B_FALSE;
+	uint32_t auditing = AU_AUDITING();
 
 	if (flag & FKIOCTL) {
 		copyflag = K_TO_K;
@@ -3222,7 +3224,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 	TRACE_3(TR_FAC_STREAMS_FR, TR_IOCTL_ENTER,
 	    "strioctl:stp %p cmd %X arg %lX", stp, cmd, arg);
 
-	if (audit_active)
+	if (auditing)
 		audit_strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp);
 
 	/*
@@ -5296,7 +5298,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		if ((fp = getf((int)arg)) == NULL)
 			return (EBADF);
 		error = do_sendfp(stp, fp, crp);
-		if (audit_active) {
+		if (auditing) {
 			audit_fdsend((int)arg, fp, error);
 		}
 		releasef((int)arg);
@@ -5385,7 +5387,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			mutex_exit(&stp->sd_lock);
 			return (error);
 		}
-		if (audit_active) {
+		if (auditing) {
 			audit_fdrecv(fd, srf->fp);
 		}
 
@@ -7756,7 +7758,7 @@ strputmsg(
 	xpg4 = (flag & MSG_XPG4) ? 1 : 0;
 	flag &= ~MSG_XPG4;
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_strputmsg(vp, mctl, mdata, pri, flag, fmode);
 
 	mutex_enter(&stp->sd_lock);
@@ -7945,7 +7947,7 @@ kstrputmsg(
 	ASSERT(vp->v_stream);
 	stp = vp->v_stream;
 	wqp = stp->sd_wrq;
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_strputmsg(vp, NULL, NULL, pri, flag, fmode);
 	if (mctl == NULL)
 		return (EINVAL);

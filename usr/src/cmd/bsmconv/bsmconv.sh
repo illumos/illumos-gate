@@ -20,22 +20,28 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG=bsmconv
-DEVALLOC=/etc/security/device_allocate
-DEVMAPS=/etc/security/device_maps
+
 TEXTDOMAIN="SUNW_OST_OSCMD"
 export TEXTDOMAIN
+
+DEVALLOC=/etc/security/device_allocate
+DEVMAPS=/etc/security/device_maps
+DEVFSADM=/usr/sbin/devfsadm
+MKDEVALLOC=/usr/sbin/mkdevalloc
+MKDEVMAPS=/usr/sbin/mkdevmaps
+ZONENAME=/sbin/zonename
 
 # Perform required permission checks, depending on value of LOCAL_ROOT
 # (whether we are converting the active OS or just alternative boot
 # environments).
 permission()
 {
-ZONE=`/sbin/zonename`
+ZONE=`${ZONENAME}`
 if [ ! "$ZONE" = "global" -a "$LOCAL_ROOT" = "true" ]
 then
 	form=`gettext "%s: ERROR: you must be in the global zone to run this script."`
@@ -54,7 +60,7 @@ fi
 RESP="x"
 while [ "$RESP" != `gettext "y"` -a "$RESP" != `gettext "n"` ]
 do
-gettext "This script is used to enable Solaris Auditing and device allocation.\n"
+gettext "This script is used to enable device allocation.\n"
 form=`gettext "Shall we continue with the conversion now? [y/n]"`
 echo "$form \c"
 read RESP
@@ -74,7 +80,6 @@ sanity_check()
 {
 for ROOT in $@
 do
-
 	if [ -d $ROOT -a -w $ROOT -a -f $ROOT/etc/system -a -d $ROOT/usr ]
 	then
 		# There is a root directory to write to,
@@ -90,12 +95,11 @@ do
 done
 }
 
-# bsmconvert
+# dev_allocation_convert
 #	All the real work gets done in this function
 
-bsmconvert()
+dev_allocation_convert()
 {
-
 # Prevent automount of removable and hotpluggable volumes
 # by forcing volume.ignore HAL property on all such volumes.
 if [ -d ${ROOT}/etc/hal/fdi ] ; then
@@ -116,27 +120,6 @@ if [ -d ${ROOT}/etc/hal/fdi ] ; then
 FDI
 fi
 
-# Turn on auditing in the loadable module
-
-form=`gettext "%s: INFO: turning on audit module."`
-printf "${form}\n" $PROG
-if [ ! -f ${ROOT}/etc/system ]
-then
-	echo "" > ${ROOT}/etc/system
-fi
-
-grep -v "c2audit:audit_load" ${ROOT}/etc/system > /tmp/etc.system.$$
-echo "set c2audit:audit_load = 1" >> /tmp/etc.system.$$
-mv /tmp/etc.system.$$ ${ROOT}/etc/system
-grep "set c2audit:audit_load = 1" ${ROOT}/etc/system > /dev/null 2>&1
-if [ $? -ne 0 ]
-then
-    form=`gettext "%s: ERROR: cannot 'set c2audit:audit_load = 1' in %s/etc/system"`
-    printf "${form}\n" $PROG $ROOT
-    form=`gettext "%s: Continuing ..."`
-    printf "${form}\n" $PROG
-fi
-
 # Initialize device allocation
 
 form=`gettext "%s: INFO: initializing device allocation."`
@@ -155,23 +138,18 @@ if [ $? = 0 ]; then
 	# This is not currently done for alternate boot environments.
 	if [ -z "$ROOT" -o "$ROOT" = "/" ]
 	then
-		/usr/sbin/devfsadm -e
+		${DEVFSADM} -e
 	fi
 else
 	if [ ! -f ${ROOT}/${DEVALLOC} ]
 	then
-		mkdevalloc > ${ROOT}/$DEVALLOC
+		${MKDEVALLOC} > ${ROOT}/$DEVALLOC
 	fi
 	if [ ! -f ${ROOT}/${DEVMAPS} ]
 	then
-		mkdevmaps > ${ROOT}/$DEVMAPS
+		${MKDEVMAPS} > ${ROOT}/$DEVMAPS
 	fi
 fi
-
-# enable auditd at next boot.
-cat >> ${ROOT}/var/svc/profile/upgrade <<SVC_UPGRADE
-/usr/sbin/svcadm enable system/auditd
-SVC_UPGRADE
 }
 
 # main loop
@@ -184,15 +162,13 @@ then
 	permission
 
 	ROOT=
-	bsmconvert
+	
+	dev_allocation_convert
 
 	echo
-	gettext "Solaris Auditing and device allocation is ready.\n"
-	gettext "If there were any errors, please fix them now.\n"
-	gettext "Configure Solaris Auditing and device allocation by editing "
-	gettext "files\nlocated in /etc/security.\n"
-	gettext "Reboot this system now to come up with auditing "
-	gettext "and device allocation enabled.\n"
+	gettext "Device allocation is ready. If there were any errors, please\n"
+	gettext "fix them now. Reboot this system now to come up with device\n"
+	gettext "allocation enabled."
 else
 	# determine if local root is being converted ("/" passed on
 	# command line), if so, full permission check required
@@ -213,18 +189,15 @@ else
 	do
 		form=`gettext "%s: INFO: converting boot environment %s ..."`
 		printf "${form}\n" $PROG $ROOT
-		bsmconvert $ROOT
+		dev_allocation_convert $ROOT
 		form=`gettext "%s: INFO: done with boot environment %s"`
 		printf "${form}\n" $PROG $ROOT
 	done
+
 	echo
-	gettext "Solaris Auditing and device allocation is ready.\n"
-	gettext "If there were any errors, please fix them now.\n"
-	gettext "Configure Solaris auditing and device allocation by editing "
-	gettext "files\nlocated in /etc/security in the root directories " 
-	gettext "of each host converted.\n"
-	gettext "Reboot each system converted to come up with auditing "
-	gettext "and device\nallocation enabled.\n"
+	gettext "Device allocation is ready. If there were any errors,\n"
+	gettext "please fix them now. Reboot each non-local system\n"
+	gettext "converted to come up with device allocation enabled.\n"
 fi
 
 exit 0

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -871,17 +871,11 @@ stubs_base:
  */
 #ifndef C2AUDIT_MODULE
 	MODULE(c2audit,sys);
-	STUB(c2audit,  audit_init,			nomod_zero);
-	STUB(c2audit,  _auditsys,			nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_free,		nomod_zero);
+	NO_UNLOAD_STUB(c2audit, audit_init_module,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_start, 		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_finish,		nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_newproc,		nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_pfree,		nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_thread_free,	nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_thread_create,	nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_falloc,		nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_unfalloc,		nomod_zero);
+	NO_UNLOAD_STUB(c2audit, audit,			nomod_zero);
+	NO_UNLOAD_STUB(c2audit, auditdoor,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_closef,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_copen,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_core_start,	nomod_zero);
@@ -918,9 +912,12 @@ stubs_base:
 	NO_UNLOAD_STUB(c2audit, audit_devpolicy,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_setfsat_path,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_cryptoadm,	nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_update_context,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_kssl,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_pf_policy,	nomod_zero);
+	NO_UNLOAD_STUB(c2audit, au_doormsg,		nomod_zero);
+	NO_UNLOAD_STUB(c2audit, au_uwrite,		nomod_zero);
+	NO_UNLOAD_STUB(c2audit, au_to_arg32,		nomod_zero);
+	NO_UNLOAD_STUB(c2audit, au_free_rec,		nomod_zero);
 	END_MODULE(c2audit);
 #endif
 

@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
+/*	All Rights Reserved					*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Common Inter-Process Communication routines.
@@ -538,7 +536,7 @@ ipcperm_set(ipc_service_t *service, struct cred *cr,
 	kperm->ipc_gid = gid;
 	kperm->ipc_mode = (mode & 0777) | (kperm->ipc_mode & ~0777);
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_ipcget(service->ipcs_atype, kperm);
 
 	return (0);
@@ -580,7 +578,7 @@ ipcperm_set64(ipc_service_t *service, struct cred *cr,
 	kperm->ipc_mode = (perm64->ipcx_mode & 0777) |
 	    (kperm->ipc_mode & ~0777);
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_ipcget(service->ipcs_atype, kperm);
 
 	return (0);
@@ -806,7 +804,7 @@ ipc_lookup(ipc_service_t *service, int id, kipc_perm_t **perm)
 	ASSERT(IPC_SEQ(id) == service->ipcs_table[index].ipct_seq);
 
 	*perm = result;
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_ipc(service->ipcs_atype, id, result);
 
 	return (&service->ipcs_table[index].ipct_lock);
@@ -928,7 +926,7 @@ ipc_keylookup(ipc_service_t *service, key_t key, int flag, kipc_perm_t **permp)
 		if ((flag & (IPC_CREAT | IPC_EXCL)) == (IPC_CREAT | IPC_EXCL))
 			return (EEXIST);
 		if ((flag & 0777) & ~perm->ipc_mode) {
-			if (audit_active)
+			if (AU_AUDITING())
 				audit_ipcget(NULL, (void *)perm);
 			return (EACCES);
 		}

@@ -561,7 +561,7 @@ proc_exit(int why, int what)
 	/*
 	 * Release any resources associated with C2 auditing
 	 */
-	if (audit_active) {
+	if (AU_AUDITING()) {
 		/*
 		 * audit exit system call
 		 */

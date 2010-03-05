@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2591,7 +2591,7 @@ sotpi_connect(struct sonode *so,
 	soisconnecting(so);
 	mutex_exit(&so->so_lock);
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_sock(T_CONN_REQ, strvp2wq(SOTOV(so)), mp, 0);
 
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
@@ -3857,7 +3857,7 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 	ASSERT(MBLKL(mp) <= (ssize_t)size);
 
 	ASSERT(mp->b_wptr <= mp->b_datap->db_lim);
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
 
 	error = kstrputmsg(SOTOV(so), mp, uiop, len, 0, MSG_BAND, 0);
@@ -4135,7 +4135,7 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 		ASSERT(mp->b_wptr <= mp->b_datap->db_lim);
 	}
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
 
 	error = kstrputmsg(SOTOV(so), mp, uiop, len, 0, MSG_BAND, 0);
@@ -4657,6 +4657,7 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 	boolean_t		connected;
 	mblk_t			*mpdata = NULL;
 	sotpi_info_t		*sti = SOTOTPI(so);
+	uint32_t		auditing = AU_AUDITING();
 
 	ASSERT(name != NULL && namelen != 0);
 	ASSERT(!(so->so_mode & SM_CONNREQUIRED));
@@ -4721,7 +4722,7 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 			linkb(mp, mpdata);
 		else
 			mp = mpdata;
-		if (audit_active)
+		if (auditing)
 			audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
 
 		udp_wput(udp_wq, mp);
@@ -4741,7 +4742,7 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 	if (connected)
 		return (strwrite(SOTOV(so), uiop, CRED()));
 
-	if (audit_active)
+	if (auditing)
 		audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
 
 	error = kstrputmsg(SOTOV(so), mp, uiop, len, 0, MSG_BAND, 0);

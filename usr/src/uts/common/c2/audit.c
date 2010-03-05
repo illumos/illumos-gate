@@ -68,175 +68,6 @@ static void add_return_token(caddr_t *, unsigned int scid, int err, int rval);
 
 static void audit_pathbuild(struct pathname *pnp);
 
-/*
- * ROUTINE:	AUDIT_NEWPROC
- * PURPOSE:	initialize the child p_audit_data structure
- * CALLBY:	GETPROC
- * NOTE:	All threads for the parent process are locked at this point.
- *		We are essentially running singled threaded for this reason.
- *		GETPROC is called when system creates a new process.
- *		By the time AUDIT_NEWPROC is called, the child proc
- *		structure has already been initialized. What we need
- *		to do is to allocate the child p_audit_data and
- *		initialize it with the content of current parent process.
- */
-
-void
-audit_newproc(struct proc *cp)	/* initialized child proc structure */
-{
-	p_audit_data_t *pad;	/* child process audit data */
-	p_audit_data_t *opad;	/* parent process audit data */
-
-	pad = kmem_cache_alloc(au_pad_cache, KM_SLEEP);
-
-	P2A(cp) = pad;
-
-	opad = P2A(curproc);
-
-	/*
-	 * copy the audit data. Note that all threads of current
-	 *   process have been "held". Thus there is no race condition
-	 *   here with mutiple threads trying to alter the cwrd
-	 *   structure (such as releasing it).
-	 *
-	 *   The audit context in the cred is "duplicated" for the new
-	 *   proc by elsewhere crhold'ing the parent's cred which it shares.
-	 *
-	 *   We still want to hold things since auditon() [A_SETUMASK,
-	 *   A_SETSMASK] could be walking through the processes to
-	 *   update things.
-	 */
-	mutex_enter(&opad->pad_lock);	/* lock opad structure during copy */
-	pad->pad_data = opad->pad_data;	/* copy parent's process audit data */
-	au_pathhold(pad->pad_root);
-	au_pathhold(pad->pad_cwd);
-	mutex_exit(&opad->pad_lock);	/* current proc will keep cwrd open */
-
-	/*
-	 * finish auditing of parent here so that it will be done
-	 * before child has a chance to run. We include the child
-	 * pid since the return value in the return token is a dummy
-	 * one and contains no useful information (it is included to
-	 * make the audit record structure consistant).
-	 *
-	 * tad_flag is set if auditing is on
-	 */
-	if (((t_audit_data_t *)T2A(curthread))->tad_flag)
-		au_uwrite(au_to_arg32(0, "child PID", (uint32_t)cp->p_pid));
-
-	/*
-	 * finish up audit record generation here because child process
-	 * is set to run before parent process. We distinguish here
-	 * between FORK, FORK1, or VFORK by the saved system call ID.
-	 */
-	audit_finish(0, ((t_audit_data_t *)T2A(curthread))->tad_scid, 0, 0);
-}
-
-/*
- * ROUTINE:	AUDIT_PFREE
- * PURPOSE:	deallocate the per-process udit data structure
- * CALLBY:	EXIT
- *		FORK_FAIL
- * NOTE:	all lwp except current one have stopped in SEXITLWPS
- * 		why we are single threaded?
- *		. all lwp except current one have stopped in SEXITLWPS.
- */
-void
-audit_pfree(struct proc *p)		/* proc structure to be freed */
-
-{	/* AUDIT_PFREE */
-
-	p_audit_data_t *pad;
-
-	pad = P2A(p);
-
-	/* better be a per process audit data structure */
-	ASSERT(pad != (p_audit_data_t *)0);
-
-	if (pad == pad0) {
-		return;
-	}
-
-	/* deallocate all auditing resources for this process */
-	au_pathrele(pad->pad_root);
-	au_pathrele(pad->pad_cwd);
-
-	/*
-	 * Since the pad structure is completely overwritten after alloc,
-	 * we don't bother to clear it.
-	 */
-
-	kmem_cache_free(au_pad_cache, pad);
-}
-
-/*
- * ROUTINE:	AUDIT_THREAD_CREATE
- * PURPOSE:	allocate per-process thread audit data structure
- * CALLBY:	THREAD_CREATE
- * NOTE:	This is called just after *t was bzero'd.
- *		We are single threaded in this routine.
- * TODO:
- * QUESTION:
- */
-
-void
-audit_thread_create(kthread_id_t t)
-{
-	t_audit_data_t *tad;	/* per-thread audit data */
-
-	tad = kmem_zalloc(sizeof (struct t_audit_data), KM_SLEEP);
-
-	T2A(t) = tad;		/* set up thread audit data ptr */
-	tad->tad_thread = t;	/* back ptr to thread: DEBUG */
-}
-
-/*
- * ROUTINE:	AUDIT_THREAD_FREE
- * PURPOSE:	free the per-thread audit data structure
- * CALLBY:	THREAD_FREE
- * NOTE:	most thread data is clear after return
- */
-void
-audit_thread_free(kthread_t *t)
-{
-	t_audit_data_t *tad;
-	au_defer_info_t	*attr;
-
-	tad = T2A(t);
-
-	/* thread audit data must still be set */
-
-	if (tad == tad0) {
-		return;
-	}
-
-	if (tad == NULL) {
-		return;
-	}
-
-	t->t_audit_data = 0;
-
-	/* must not have any audit record residual */
-	ASSERT(tad->tad_ad == NULL);
-
-	/* saved path must be empty */
-	ASSERT(tad->tad_aupath == NULL);
-
-	if (tad->tad_atpath)
-		au_pathrele(tad->tad_atpath);
-
-	attr = tad->tad_defer_head;
-	while (attr != NULL) {
-		au_defer_info_t	*tmp_attr = attr;
-
-		au_free_rec(attr->audi_ad);
-
-		attr = attr->audi_next;
-		kmem_free(tmp_attr, sizeof (au_defer_info_t));
-	}
-
-	kmem_free(tad, sizeof (*tad));
-}
 
 /*
  * ROUTINE:	AUDIT_SAVEPATH
@@ -446,12 +277,6 @@ audit_addcomponent(struct pathname *pnp)
 	return;
 
 }	/* AUDIT_ADDCOMPONENT */
-
-
-
-
-
-
 
 
 /*
@@ -678,58 +503,6 @@ audit_attributes(struct vnode *vp)
 
 
 /*
- * ROUTINE:	AUDIT_FALLOC
- * PURPOSE:	allocating a new file structure
- * CALLBY:	FALLOC
- * NOTE:	file structure already initialized
- * TODO:
- * QUESTION:
- */
-
-void
-audit_falloc(struct file *fp)
-{	/* AUDIT_FALLOC */
-
-	f_audit_data_t *fad;
-
-	/* allocate per file audit structure if there a'int any */
-	ASSERT(F2A(fp) == NULL);
-
-	fad = kmem_zalloc(sizeof (struct f_audit_data), KM_SLEEP);
-
-	F2A(fp) = fad;
-
-	fad->fad_thread = curthread; 	/* file audit data back ptr; DEBUG */
-}
-
-/*
- * ROUTINE:	AUDIT_UNFALLOC
- * PURPOSE:	deallocate file audit data structure
- * CALLBY:	CLOSEF
- *		UNFALLOC
- * NOTE:
- * TODO:
- * QUESTION:
- */
-
-void
-audit_unfalloc(struct file *fp)
-{
-	f_audit_data_t *fad;
-
-	fad = F2A(fp);
-
-	if (!fad) {
-		return;
-	}
-	if (fad->fad_aupath != NULL) {
-		au_pathrele(fad->fad_aupath);
-	}
-	fp->f_audit_data = 0;
-	kmem_free(fad, sizeof (struct f_audit_data));
-}
-
-/*
  * ROUTINE:	AUDIT_EXIT
  * PURPOSE:
  * CALLBY:	EXIT
@@ -769,7 +542,7 @@ audit_exit(int code, int what)
 	/*
 	 * Generate an audit record for process exit if preselected.
 	 */
-	(void) audit_start(0, SYS_exit, 0, 0);
+	(void) audit_start(0, SYS_exit, AUC_UNSET, 0, 0);
 	audit_finish(0, SYS_exit, 0, 0);
 }
 
@@ -883,7 +656,7 @@ audit_core_finish(int code)
 	}
 
 	/* Close up everything */
-	au_close(kctx, &(u_ad), flag, tad->tad_event, tad->tad_evmod);
+	au_close(kctx, &(u_ad), flag, tad->tad_event, tad->tad_evmod, NULL);
 
 	/* free up any space remaining with the path's */
 	if (tad->tad_aupath != NULL) {
@@ -1010,6 +783,7 @@ audit_closef(struct file *fp)
 	int getattr_ret;
 	cred_t *cr;
 	au_kcontext_t	*kctx = GET_KCTX_PZ;
+	uint32_t auditing;
 
 	fad = F2A(fp);
 	estate = kctx->auk_ets[AUE_CLOSE];
@@ -1024,9 +798,9 @@ audit_closef(struct file *fp)
 	}
 
 	/* if auditing not enabled, then don't generate an audit record */
-	if (!((kctx->auk_auditstate == AUC_AUDITING ||
-	    kctx->auk_auditstate == AUC_INIT_AUDIT) ||
-	    kctx->auk_auditstate == AUC_NOSPACE))
+	auditing = (tad->tad_audit == AUC_UNSET) ?
+	    kctx->auk_auditstate : tad->tad_audit;
+	if (auditing & ~(AUC_AUDITING | AUC_INIT_AUDIT | AUC_NOSPACE))
 		return;
 
 	ainfo = crgetauinfo(cr);
@@ -1094,7 +868,7 @@ audit_closef(struct file *fp)
 	 *   thus we always indicate successful closes.
 	 */
 	au_close(kctx, (caddr_t *)&(ad), AU_OK | AU_DEFER,
-	    AUE_CLOSE, evmod);
+	    AUE_CLOSE, evmod, NULL);
 }
 
 /*
@@ -1281,7 +1055,7 @@ audit_reboot(void)
 
 	/* Close up everything */
 	au_close(kctx, &(u_ad), flag | AU_DONTBLOCK,
-	    tad->tad_event, tad->tad_evmod);
+	    tad->tad_event, tad->tad_evmod, NULL);
 }
 
 void
@@ -1517,7 +1291,7 @@ audit_enterprom(int flg)
 	else
 		au_write((caddr_t *)&(rp), au_to_return32(ECANCELED, 0));
 
-	AUDIT_ASYNC_FINISH(rp, AUE_ENTERPROM, NULL);
+	AUDIT_ASYNC_FINISH(rp, AUE_ENTERPROM, NULL, NULL);
 }
 
 
@@ -1550,7 +1324,7 @@ audit_exitprom(int flg)
 	else
 		au_write((caddr_t *)&(rp), au_to_return32(ECANCELED, 0));
 
-	AUDIT_ASYNC_FINISH(rp, AUE_EXITPROM, NULL);
+	AUDIT_ASYNC_FINISH(rp, AUE_EXITPROM, NULL, NULL);
 }
 
 struct fcntla {
@@ -2218,7 +1992,8 @@ audit_cryptoadm(int cmd, char *module_name, crypto_mech_name_t *mech_names,
 	AS_INC(as_generated, 1, kctx);
 	AS_INC(as_kernel, 1, kctx);
 
-	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CRYPTOADM, tad->tad_evmod);
+	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CRYPTOADM, tad->tad_evmod,
+	    NULL);
 }
 
 /*
@@ -2290,7 +2065,8 @@ audit_kssl(int cmd, void *params, int error)
 	AS_INC(as_generated, 1, kctx);
 	AS_INC(as_kernel, 1, kctx);
 
-	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CONFIGKSSL, tad->tad_evmod);
+	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CONFIGKSSL, tad->tad_evmod,
+	    NULL);
 }
 
 /*
@@ -2422,7 +2198,8 @@ audit_pf_policy(int cmd, cred_t *cred, netstack_t *ns, char *tun,
 		AS_INC(as_kernel, 1, kctx);
 
 	}
-	au_close(kctx, (caddr_t *)&ad, flag, tad->tad_event, tad->tad_evmod);
+	au_close(kctx, (caddr_t *)&ad, flag, tad->tad_event, tad->tad_evmod,
+	    NULL);
 
 	/*
 	 * clear the ctrl flag so that we don't have spurious collection of

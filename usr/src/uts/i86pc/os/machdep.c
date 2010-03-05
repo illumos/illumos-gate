@@ -130,6 +130,7 @@
 #include <sys/traptrace.h>
 #endif	/* TRAPTRACE */
 
+#include <c2/audit.h>
 #include <sys/clock_impl.h>
 
 extern void audit_enterprom(int);
@@ -392,14 +393,14 @@ void
 abort_sequence_enter(char *msg)
 {
 	if (abort_enable == 0) {
-		if (audit_active)
+		if (AU_ZONE_AUDITING(GET_KCTX_GZ))
 			audit_enterprom(0);
 		return;
 	}
-	if (audit_active)
+	if (AU_ZONE_AUDITING(GET_KCTX_GZ))
 		audit_enterprom(1);
 	debug_enter(msg);
-	if (audit_active)
+	if (AU_ZONE_AUDITING(GET_KCTX_GZ))
 		audit_exitprom(1);
 }
 

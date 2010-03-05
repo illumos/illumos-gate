@@ -21,15 +21,18 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=bsmunconv
+PATH=/usr/sbin:/usr/bin:/sbin
+
 TEXTDOMAIN="SUNW_OST_OSCMD"
 export TEXTDOMAIN
+ZONENAME=/sbin/zonename
+DEVFSADM=/usr/sbin/devfsadm
+
 
 # Perform required permission checks, depending on value of LOCAL_ROOT
 # (whether we are converting the active OS or just alternative boot
@@ -37,7 +40,7 @@ export TEXTDOMAIN
 permission()
 {
 cd /usr/lib
-ZONE=`/sbin/zonename`
+ZONE=`${ZONENAME}`
 if [ ! "$ZONE" = "global" -a "$LOCAL_ROOT" = "true" ]
 then
 	form=`gettext "%s: ERROR: you must be in the global zone to run this script."`
@@ -53,24 +56,10 @@ then
 	exit 1
 fi
 
-set -- `/usr/bin/who -r`
-RUNLEVEL="$3"
-if [ "$RUNLEVEL" -ne "S" -a "$LOCAL_ROOT" = "true" ]
-then
-	form=`gettext "%s: ERROR: this script should be run at run level S."`
-	printf "${form}\n" $PROG
-	form=`gettext "Are you sure you want to continue? [y/n]"`
-	echo "$form \c"
-	read RESP
-	case $RESP in
-		`gettext "n"`*|`gettext "N"`* ) exit 1 ;;
-	esac
-fi
-
 RESP="x"
 while [ "$RESP" != `gettext "y"` -a "$RESP" != `gettext "n"` ]
 do
-gettext "This script is used to disable Solaris Auditing and device allocation.\n"
+gettext "This script is used to disable device allocation.\n"
 form=`gettext "Would you like to continue now? [y/n]"`
 echo "$form \c"
 read RESP
@@ -84,56 +73,19 @@ then
 fi
 }
 
-bsmunconvert()
+# disable device allocation
+
+dev_allocation_unconvert()
 {
 # Turn off device allocation. This is not currently done for alternate
 # boot environments.
 if [ -z "$ROOT" -o "$ROOT" = "/" ]
 then
-	/usr/sbin/devfsadm -d
+	${DEVFSADM} -d
 fi
-
-# disable auditd service on next boot
-cat >> ${ROOT}/var/svc/profile/upgrade <<SVC_UPGRADE
-/usr/sbin/svcadm disable system/auditd 
-SVC_UPGRADE
 
 # Restore default policy for removable and hotpluggable volumes
 rm -f ${ROOT}/etc/hal/fdi/policy/30user/90-solaris-device-allocation.fdi
-
-# Turn off auditing in the loadable module
-
-if [ -f ${ROOT}/etc/system ]
-then
-	form=`gettext "%s: INFO: removing c2audit:audit_load from %s/etc/system."`
-	printf "${form}\n" $PROG $ROOT
-	grep -v "c2audit:audit_load" ${ROOT}/etc/system > /tmp/etc.system.$$
-	mv /tmp/etc.system.$$ ${ROOT}/etc/system
-else
-	form=`gettext "%s: ERROR: can't find %s/etc/system."`
-	printf "${form}\n" $PROG $ROOT
-	form=`gettext "%s: ERROR: audit module may not be disabled."`
-	printf "${form}\n" $PROG
-fi
-
-# If we are currently converting the active host (${ROOT}="/") we will
-# need to ensure that cron is not running. cron should not be running
-# at run-level S, but it may have been started by hand.
-
-if [ -z "$ROOT" -o "$ROOT" = "/" ]
-then
-	/usr/bin/pgrep -u root -f /usr/sbin/cron > /dev/null
-	if [ $? -eq 0 ]; then
-		form=`gettext "%s: INFO: stopping the cron daemon."`
-		printf "${form}\n" $PROG
-
-		/usr/sbin/svcadm disable -t system/cron
-	fi
-fi
-
-rm -f ${ROOT}/var/spool/cron/atjobs/*.au
-rm -f ${ROOT}/var/spool/cron/crontabs/*.au
-
 }
 
 # main
@@ -147,10 +99,12 @@ then
 
 	# begin conversion
 	ROOT=
-	bsmunconvert
+
+	dev_allocation_unconvert
+
 	echo
-	gettext "Solaris Auditing and device allocation has been disabled.\n"
-	gettext "Reboot the system now to come up without these features.\n"
+	gettext "Device allocation has been disabled. Reboot the system now\n"
+	gettext "to come up without this feature.\n"
 else
 
 	# determine if local root is being converted ("/" passed on
@@ -170,12 +124,12 @@ else
 
 	for ROOT in $@
 	do
-		bsmunconvert $ROOT
+		dev_allocation_unconvert $ROOT
 	done
 
 	echo
-	gettext "Solaris Auditing and device allocation has been disabled.\n"
-	gettext "Reboot each system that was disabled to come up without these features.\n"
+	gettext "Device allocation has been disabled. Reboot each non-local\n"
+	gettext "system that was disabled to come up without this feature.\n"
 fi
 
 exit 0

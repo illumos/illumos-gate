@@ -87,10 +87,18 @@ proc_t *proc_fsflush;		/* fsflush daemon */
 
 pgcnt_t	maxmem;		/* Maximum available memory in pages.	*/
 pgcnt_t	freemem;	/* Current available memory in pages.	*/
-int	audit_active;
 int	interrupts_unleashed;	/* set when we do the first spl0() */
 
 kmem_cache_t *process_cache;	/* kmem cache for proc structures */
+
+/*
+ * Indicates whether the auditing module (c2audit) is loaded. Possible
+ * values are:
+ * 0 - c2audit module is excluded in /etc/system and cannot be loaded
+ * 1 - c2audit module is not loaded but can be anytime
+ * 2 - c2audit module is loaded
+ */
+int audit_active = C2AUDIT_DISABLED;
 
 /*
  * Process 0's lwp directory and lwpid hash table.

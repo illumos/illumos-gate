@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -35,8 +32,6 @@
 #include <c2/audit.h>
 #include <c2/audit_kernel.h>
 #include <c2/audit_record.h>
-
-kmem_cache_t *au_pad_cache;
 
 static kmem_cache_t *au_buf_cache;
 
@@ -162,7 +157,7 @@ au_append_buf(const char *data, int len, au_buff_t *buf)
 		buf = buf->next_buf;
 
 	new_len = (uint_t)(buf->len + len) > AU_BUFSIZE ?
-		AU_BUFSIZE - buf->len : len;
+	    AU_BUFSIZE - buf->len : len;
 	bcopy(data, (buf->buf + buf->len), (uint_t)new_len);
 	buf->len += (uchar_t)new_len;
 	len -= new_len;
@@ -182,33 +177,9 @@ au_append_buf(const char *data, int len, au_buff_t *buf)
 	return (0);
 }
 
-/*ARGSUSED1*/
-static int
-au_pad_const(void *vpad, void *priv, int flags)
-{
-	p_audit_data_t *pad = vpad;
-
-	mutex_init(&pad->pad_lock, NULL, MUTEX_DEFAULT, NULL);
-
-	return (0);
-}
-
-/*ARGSUSED1*/
-static void
-au_pad_destr(void *vpad, void *priv)
-{
-	p_audit_data_t *pad = vpad;
-
-	mutex_destroy(&pad->pad_lock);
-}
-
 void
 au_mem_init()
 {
 	au_buf_cache = kmem_cache_create("audit_buffer",
-		sizeof (au_buff_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
-
-	au_pad_cache = kmem_cache_create("audit_proc",
-		sizeof (p_audit_data_t), 0, au_pad_const, au_pad_destr,
-		NULL, NULL, NULL, 0);
+	    sizeof (au_buff_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
 }

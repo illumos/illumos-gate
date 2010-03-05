@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -671,6 +671,7 @@ extern void	set_proc_post_sys(proc_t *p);
 extern void	set_proc_sys(proc_t *p);
 extern void	set_proc_ast(proc_t *p);
 extern void	set_all_proc_sys(void);
+extern void	set_all_zone_usr_proc_sys(zoneid_t);
 
 /* thread function prototypes */
 

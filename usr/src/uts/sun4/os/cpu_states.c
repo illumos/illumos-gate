@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/reboot.h>
 #include <sys/systm.h>
@@ -38,6 +37,7 @@
 #include <sys/kdi_machimpl.h>
 #include <sys/callb.h>
 #include <sys/wdt.h>
+#include <c2/audit.h>
 
 #ifdef	TRAPTRACE
 #include <sys/traptrace.h>
@@ -97,8 +97,9 @@ static char	abort_seq_msgbuf[ABORT_SEQ_MSGBUFSZ];
 static uint_t
 abort_seq_softintr(caddr_t arg)
 {
-	char	*msg;
-	char	msgbuf[ABORT_SEQ_MSGBUFSZ];
+	char	    *msg;
+	char	    msgbuf[ABORT_SEQ_MSGBUFSZ];
+	uint32_t    auditing = AU_ZONE_AUDITING(GET_KCTX_GZ);
 
 	mutex_enter(&abort_seq_lock);
 	if (abort_enable != 0 && abort_seq_tstamp != 0LL) {
@@ -109,14 +110,14 @@ abort_seq_softintr(caddr_t arg)
 			msg = NULL;
 		abort_seq_tstamp = 0LL;
 		mutex_exit(&abort_seq_lock);
-		if (audit_active)
+		if (auditing)
 			audit_enterprom(1);
 		(*abort_seq_handler)(msg);
-		if (audit_active)
+		if (auditing)
 			audit_exitprom(1);
 	} else {
 		mutex_exit(&abort_seq_lock);
-		if (audit_active)
+		if (auditing)
 			audit_enterprom(0);
 	}
 	return (1);
@@ -141,6 +142,7 @@ abort_sequence_enter(char *msg)
 	int		s, on_intr;
 	size_t		msglen;
 	hrtime_t	tstamp;
+	int		auditing = AU_ZONE_AUDITING(GET_KCTX_GZ);
 
 	if (abort_enable != 0) {
 		s = splhi();
@@ -183,14 +185,14 @@ abort_sequence_enter(char *msg)
 			 */
 			abort_seq_tstamp = 0LL;
 			mutex_exit(&abort_seq_lock);
-		if (!on_intr && audit_active)
+		if (!on_intr && auditing)
 			audit_enterprom(1);
 			(*abort_seq_handler)(msg);
-		if (!on_intr && audit_active)
+		if (!on_intr && auditing)
 			audit_exitprom(1);
 		}
 	} else {
-		if (audit_active)
+		if (auditing)
 			audit_enterprom(0);
 	}
 }

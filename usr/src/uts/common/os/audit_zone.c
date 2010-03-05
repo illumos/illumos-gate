@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,9 +99,8 @@ au_zone_shutdown(zoneid_t zone, void *arg)
 {
 	au_kcontext_t	*kctx = arg;
 
-	if ((kctx->auk_zid == GLOBAL_ZONEID ||
-	    (audit_policy | AUDIT_PERZONE)) &&
-	    (kctx->auk_current_vp != NULL))
+	if (audit_active == C2AUDIT_LOADED && (kctx->auk_zid == GLOBAL_ZONEID ||
+	    (audit_policy | AUDIT_PERZONE)) && (kctx->auk_current_vp != NULL))
 		(void) au_doormsg(kctx, AU_DBUF_SHUTDOWN, NULL);
 
 	kctx->auk_valid = AUK_INVALID;
@@ -153,4 +152,15 @@ au_zone_setup()
 	zone_key_create(&au_zone_key, au_zone_init, au_zone_shutdown,
 	    au_zone_destroy);
 
+}
+
+int
+au_zone_getstate(const au_kcontext_t *context)
+{
+	au_kcontext_t *tcontext;
+
+	if (context != NULL)
+		return (context->auk_auditstate);
+	tcontext = GET_KCTX_PZ;
+	return (tcontext->auk_auditstate);
 }

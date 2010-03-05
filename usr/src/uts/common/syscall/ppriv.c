@@ -73,7 +73,7 @@ setppriv(priv_op_t op, priv_ptype_t type, priv_set_t *in_pset)
 retry:
 	pcr = p->p_cred;
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_setppriv(op, type, &pset, pcr);
 
 	/*

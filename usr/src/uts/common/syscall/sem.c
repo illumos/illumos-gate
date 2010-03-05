@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -725,8 +725,10 @@ top:
 		}
 		lock = ipc_commit_end(sem_svc, &sp->sem_perm);
 	}
-	if (audit_active)
+
+	if (AU_AUDITING())
 		audit_ipcget(AT_IPC_SEM, (void *)sp);
+
 	id = sp->sem_perm.ipc_id;
 	mutex_exit(lock);
 	return (id);

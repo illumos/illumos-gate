@@ -84,7 +84,7 @@ cfutimesat(int fd, char *fname, int nmflag, vattr_t *vap, int flags, int follow)
 		}
 	}
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_setfsat_path(1);
 
 	if ((nmflag == 1) || ((nmflag == 2) && (fname != NULL))) {

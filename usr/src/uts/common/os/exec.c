@@ -1829,7 +1829,7 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	 */
 	delete_itimer_realprof();
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_exec(args->stk_base, args->stk_base + args->arglen,
 		    args->na - args->ne, args->ne);
 

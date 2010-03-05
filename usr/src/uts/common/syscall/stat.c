@@ -103,7 +103,7 @@ cstatat_getvp(int fd, char *name, int follow, vnode_t **vp, cred_t **cred)
 	}
 	*cred = cr;
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_setfsat_path(1);
 
 lookup:
@@ -144,7 +144,7 @@ static int cstat(vnode_t *vp, struct stat *, int, cred_t *);
 			return (set_errno(EFAULT));		\
 		if ((fp = getf(fd)) == NULL)			\
 			return (set_errno(EBADF));		\
-		if (audit_active)				\
+		if (AU_AUDITING())	                \
 			audit_setfsat_path(1);			\
 		error = statfn(fp->f_vnode, sb, 0, fp->f_cred);	\
 		releasef(fd);					\

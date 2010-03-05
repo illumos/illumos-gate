@@ -1244,6 +1244,7 @@ s10_acctctl(sysret_t *rval, int cmd, void *buf, size_t bufsz)
 
 #define	S10_AUDIT_HMASK	0xffffffc0
 #define	S10_AUDIT_LMASK	0x3f
+#define	S10_AUC_NOSPACE	0x3
 
 int
 s10_auditsys(sysret_t *rval, int bsmcmd, intptr_t a0, intptr_t a1, intptr_t a2)
@@ -1268,6 +1269,22 @@ s10_auditsys(sysret_t *rval, int bsmcmd, intptr_t a0, intptr_t a1, intptr_t a2)
 		if (s10_uucopy((const void *)a1, &m, sizeof (m)) != 0)
 			return (EFAULT);
 		m = ((m >> 1) & S10_AUDIT_HMASK) | (m & S10_AUDIT_LMASK);
+		return (__systemcall(rval, SYS_auditsys + 1024, bsmcmd, a0, &m,
+		    a2));
+	} else if ((int)a0 == A_GETCOND) {
+		if ((err = __systemcall(rval, SYS_auditsys + 1024, bsmcmd, a0,
+		    &m, a2)) != 0)
+			return (err);
+		if (m == AUC_NOSPACE)
+			m = S10_AUC_NOSPACE;
+		if (s10_uucopy(&m, (void *)a1, sizeof (m)) != 0)
+			return (EFAULT);
+		return (0);
+	} else if ((int)a0 == A_SETCOND) {
+		if (s10_uucopy((const void *)a1, &m, sizeof (m)) != 0)
+			return (EFAULT);
+		if (m == S10_AUC_NOSPACE)
+			m = AUC_NOSPACE;
 		return (__systemcall(rval, SYS_auditsys + 1024, bsmcmd, a0, &m,
 		    a2));
 	}

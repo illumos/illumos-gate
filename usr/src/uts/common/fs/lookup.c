@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,7 +92,7 @@ lookupnameatcred(
 
 	error = pn_get_buf(fnamep, seg, &lookpn, namebuf, sizeof (namebuf));
 	if (error == 0) {
-		if (audit_active)
+		if (AU_AUDITING())
 			audit_lookupname();
 		error = lookuppnatcred(&lookpn, NULL, followlink,
 		    dirvpp, compvpp, startvp, cr);
@@ -230,6 +230,7 @@ lookuppnvp(
 	vnode_t *zonevp = curproc->p_zone->zone_rootvp;		/* zone root */
 	int must_be_directory = 0;
 	boolean_t retry_with_kcred;
+	uint32_t auditing = AU_AUDITING();
 
 	CPU_STATS_ADDQ(CPU, sys, namei, 1);
 	nlink = 0;
@@ -244,7 +245,7 @@ lookuppnvp(
 		pp = &presrvd;
 	}
 
-	if (audit_active)
+	if (auditing)
 		audit_anchorpath(pnp, vp == rootvp);
 
 	/*
@@ -276,7 +277,7 @@ next:
 	 * Process the next component of the pathname.
 	 */
 	if (error = pn_getcomponent(pnp, component)) {
-		if (audit_active)
+		if (auditing)
 			audit_addcomponent(pnp);
 		goto bad;
 	}
@@ -408,7 +409,7 @@ checkforroot:
 		 */
 		if (pn_pathleft(pnp) || dirvpp == NULL || error != ENOENT)
 			goto bad;
-		if (audit_active) {	/* directory access */
+		if (auditing) {	/* directory access */
 			if (error = audit_savepath(pnp, vp, error, cr))
 				goto bad_noaudit;
 		}
@@ -466,7 +467,7 @@ checkforroot:
 	 */
 	if (cvp->v_type == VLNK && ((flags & FOLLOW) || pn_pathleft(pnp))) {
 		struct pathname linkpath;
-		if (audit_active) {
+		if (auditing) {
 			if (error = audit_pathcomp(pnp, cvp, cr))
 				goto bad;
 		}
@@ -481,7 +482,7 @@ checkforroot:
 			goto bad;
 		}
 
-		if (audit_active)
+		if (auditing)
 			audit_symlink(pnp, &linkpath);
 
 		if (pn_pathleft(&linkpath) == 0)
@@ -505,7 +506,7 @@ checkforroot:
 			vp = rootvp;
 			VN_HOLD(vp);
 		}
-		if (audit_active)
+		if (auditing)
 			audit_anchorpath(pnp, vp == rootvp);
 		if (pn_fixslash(pnp)) {
 			flags |= FOLLOW;
@@ -578,7 +579,7 @@ checkforroot:
 			 * an alias of the last component.
 			 */
 			if (vn_compare(vp, cvp)) {
-				if (audit_active)
+				if (auditing)
 					(void) audit_savepath(pnp, cvp,
 					    EINVAL, cr);
 				pn_setlast(pnp);
@@ -590,14 +591,14 @@ checkforroot:
 					pn_free(pp);
 				return (EINVAL);
 			}
-			if (audit_active) {
+			if (auditing) {
 				if (error = audit_pathcomp(pnp, vp, cr))
 					goto bad;
 			}
 			*dirvpp = vp;
 		} else
 			VN_RELE(vp);
-		if (audit_active)
+		if (auditing)
 			(void) audit_savepath(pnp, cvp, 0, cr);
 		if (pnp->pn_path == pnp->pn_buf)
 			(void) pn_set(pnp, ".");
@@ -621,7 +622,7 @@ checkforroot:
 		return (0);
 	}
 
-	if (audit_active) {
+	if (auditing) {
 		if (error = audit_pathcomp(pnp, cvp, cr))
 			goto bad;
 	}
@@ -645,7 +646,7 @@ checkforroot:
 	goto next;
 
 bad:
-	if (audit_active)	/* reached end of path */
+	if (auditing)	/* reached end of path */
 		(void) audit_savepath(pnp, cvp, error, cr);
 bad_noaudit:
 	/*

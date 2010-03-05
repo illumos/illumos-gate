@@ -1295,6 +1295,7 @@ vn_createat(
 	struct vattr vattr;
 	enum symfollow follow;
 	int estale_retry = 0;
+	uint32_t auditing = AU_AUDITING();
 
 	ASSERT((vap->va_mask & (AT_TYPE|AT_MODE)) == (AT_TYPE|AT_MODE));
 
@@ -1318,7 +1319,7 @@ top:
 	 */
 	if (error = pn_get(pnamep, seg, &pn))
 		return (error);
-	if (audit_active)
+	if (auditing)
 		audit_vncreate_start();
 	dvp = NULL;
 	*vpp = NULL;
@@ -1526,7 +1527,7 @@ top:
 
 out:
 
-	if (audit_active)
+	if (auditing)
 		audit_vncreate_finish(*vpp, error);
 	if (in_crit) {
 		nbl_end_crit(vp);
@@ -1628,6 +1629,7 @@ vn_renameat(vnode_t *fdvp, char *fname, vnode_t *tdvp,
 	vnode_t *fromvp, *fvp;
 	vnode_t *tovp, *targvp;
 	int estale_retry = 0;
+	uint32_t auditing = AU_AUDITING();
 
 top:
 	fvp = fromvp = tovp = targvp = NULL;
@@ -1651,7 +1653,7 @@ top:
 	 * use the lib directory for the rename.
 	 */
 
-	if (audit_active)
+	if (auditing)
 		audit_setfsat_path(1);
 	/*
 	 * Lookup to and from directories.
@@ -1668,7 +1670,7 @@ top:
 		goto out;
 	}
 
-	if (audit_active)
+	if (auditing)
 		audit_setfsat_path(3);
 	if (error = lookuppnat(&tpn, NULL, NO_FOLLOW, &tovp, &targvp, tdvp)) {
 		goto out;

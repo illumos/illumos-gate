@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@
 #include <sys/idmap.h>
 #include <sys/klpd.h>
 #include <sys/varargs.h>
+#include <sys/sysconf.h>
 #include <util/qsort.h>
 
 
@@ -1063,14 +1064,14 @@ get_c2audit_load(void)
 {
 	static int	gotit = 0;
 	static int	c2audit_load;
-	u_longlong_t	audit_load_val;
 
 	if (gotit)
 		return (c2audit_load);
-	audit_load_val = 0;		/* set default value once */
-	(void) mod_sysvar("c2audit", "audit_load", &audit_load_val);
-	c2audit_load = (int)audit_load_val;
+	c2audit_load = 1;		/* set default value once */
+	if (mod_sysctl(SYS_CHECK_EXCLUDE, "c2audit") != 0)
+		c2audit_load = 0;
 	gotit++;
+
 	return (c2audit_load);
 }
 

@@ -51,10 +51,10 @@ extern "C" {
 #define	AUC_UNSET	0	/* on/off hasn't been decided */
 #define	AUC_ENABLED	1	/* loaded and enabled */
 /* local zone state */
-#define	AUC_INIT_AUDIT	4	/* c2audit is ready but auditd has not run */
-#define	AUC_AUDITING	1	/* auditing is being done */
-#define	AUC_NOAUDIT	2	/* auditing is not being done */
-#define	AUC_NOSPACE	3	/* audit enabled, no space for audit records */
+#define	AUC_INIT_AUDIT	0x4	/* c2audit is ready but auditd has not run */
+#define	AUC_AUDITING	0x1	/* auditing is being done */
+#define	AUC_NOAUDIT	0x2	/* auditing is not being done */
+#define	AUC_NOSPACE	0x8	/* audit enabled, no space for audit records */
 
 /*
  * The user id -2 is never audited - in fact, a setauid(AU_NOAUDITID)
@@ -470,6 +470,7 @@ typedef struct audit_stat au_stat_t;
 #include <c2/audit_door_infc.h>
 #include <sys/crypto/ioctladmin.h>
 #include <sys/netstack.h>
+#include <sys/zone.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -491,12 +492,11 @@ struct auditcalls {
 };
 
 int	audit(caddr_t, int);
-int	_audit(caddr_t, int);
 int	auditsys(struct auditcalls *, union rval *); /* fake stub */
-int	_auditsys(struct auditcalls *, union rval *); /* real deal */
 void	audit_cryptoadm(int, char *, crypto_mech_name_t *,
 	    uint_t, uint_t, uint32_t, int);
 void	audit_init(void);
+void	audit_init_module(void);
 void	audit_newproc(struct proc *);
 void	audit_pfree(struct proc *);
 void	audit_thread_create(kthread_id_t);
@@ -534,11 +534,10 @@ void	audit_enterprom(int);
 void	audit_exitprom(int);
 void	audit_chdirec(struct vnode *, struct vnode **);
 void	audit_sock(int, struct queue *, struct msgb *, int);
-void	audit_free(void);
-int	audit_start(unsigned int, unsigned int, int, klwp_t *);
+int	audit_start(unsigned int, unsigned int, uint32_t, int, klwp_t *);
 void	audit_finish(unsigned int, unsigned int, int, union rval *);
 int	audit_async_start(label_t *, au_event_t, int);
-void	audit_async_finish(caddr_t *, au_event_t, au_emod_t);
+void	audit_async_finish(caddr_t *, au_event_t, au_emod_t, timestruc_t *);
 void	audit_async_discard_backend(void *);
 void	audit_async_done(caddr_t *, int);
 void	audit_async_drop(caddr_t *, int);
@@ -547,6 +546,35 @@ void	audit_async_drop(caddr_t *, int);
 #define	AUK_CONTEXT_T
 typedef struct au_kcontext au_kcontext_t;
 #endif
+
+/* Zone audit context setup routine */
+void au_zone_setup(void);
+
+/*
+ * c2audit module states
+ */
+#define	C2AUDIT_DISABLED    0	/* c2audit module excluded in /etc/system */
+#define	C2AUDIT_UNLOADED    1	/* c2audit module not loaded */
+#define	C2AUDIT_LOADED	    2	/* c2audit module loaded */
+
+uint32_t    audit_getstate(void);
+int	    au_zone_getstate(const au_kcontext_t *);
+
+/* The audit mask defining in which case is auditing enabled */
+#define	AU_AUDIT_MASK	(AUC_AUDITING | AUC_NOSPACE)
+
+/*
+ * Get the given zone audit status. zcontext != NULL serves
+ * as a protection when c2audit module is not loaded.
+ */
+#define	AU_ZONE_AUDITING(zcontext)   \
+	(audit_active == C2AUDIT_LOADED && \
+	    ((AU_AUDIT_MASK) & au_zone_getstate((zcontext))))
+
+/*
+ * Get auditing status
+ */
+#define	AU_AUDITING() (audit_getstate())
 
 int	audit_success(au_kcontext_t *, struct t_audit_data *, int, cred_t *);
 int	auditme(au_kcontext_t *, struct t_audit_data *, au_state_t);

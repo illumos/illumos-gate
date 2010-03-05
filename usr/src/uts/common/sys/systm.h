@@ -98,7 +98,7 @@ extern int	klustsize;
 
 extern int	abort_enable;	/* Platform input-device abort policy */
 
-extern int	audit_active;	/* Solaris Auditing active 1, absent 0. */
+extern int	audit_active;	/* Solaris Auditing module state */
 
 extern int	avenrun[];	/* array of load averages */
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,6 @@
 /* GLOBALS */
 static char	*progname = "audit";
 static char	*usage = "audit [-n] | [-s] | [-t] | [-v filepath]";
-static int	silent = 0;
 
 static void	display_smf_error();
 
@@ -70,9 +69,7 @@ static int	sig_auditd(int);		/* send signal to auditd */
  *	audit -n
  *		- signal audit daemon to use next audit_control audit directory.
  *	audit -t
- *		- signal audit daemon to disable auditing.
- *	audit -T
- *		- signal audit daemon to disable auditing report no errors.
+ *		- signal audit daemon to permanently disable auditing.
  *	audit -v filepath
  *		- validate audit_control parameters but use filepath for
  *		  the name.  Emit errors or "syntax ok"
@@ -95,13 +92,13 @@ main(int argc, char *argv[])
 	(void) textdomain(TEXT_DOMAIN);
 
 	/* first option required */
-	if ((c = getopt(argc, argv, "nstTv:")) == -1) {
+	if ((c = getopt(argc, argv, "nstv:")) == -1) {
 		(void) fprintf(stderr, gettext("usage: %s\n"), usage);
 		exit(3);
 	}
 	first_option = optarg;
 	/* second or more options not allowed; please pick one */
-	if (getopt(argc, argv, "nstTv:") != -1) {
+	if (getopt(argc, argv, "nstv:") != -1) {
 		(void) fprintf(stderr, gettext("usage: %s\n"), usage);
 		exit(5);
 	}
@@ -123,18 +120,8 @@ main(int argc, char *argv[])
 	case 't':
 		if (!is_valid_zone(0))	/* 0 == no error message display */
 			exit(10);
-		/* use bmsunconv to permanently disable, -t for temporary */
-		if (smf_disable_instance(AUDITD_FMRI, SMF_TEMPORARY) != 0) {
+		if (smf_disable_instance(AUDITD_FMRI, 0) != 0) {
 			display_smf_error();
-			exit(11);
-		}
-		break;
-	case 'T':
-		silent = 1;
-		if (!is_valid_zone(0))	/* 0 == no error message display */
-			exit(10);
-
-		if (smf_disable_instance(AUDITD_FMRI, SMF_TEMPORARY) != 0) {
 			exit(11);
 		}
 		break;
@@ -302,11 +289,6 @@ is_audit_control_ok(char *filename) {
 /*
  * The operations that call this function are only valid in the global
  * zone unless the perzone audit policy is set.
- *
- * "!silent" and "show_err" are slightly different; silent is from
- * -T for which no error messages should be displayed and show_err
- * applies to more options (including -T)
- *
  */
 
 static boolean_t
@@ -315,10 +297,9 @@ is_valid_zone(boolean_t show_err)
 	long	policy;
 
 	if (auditon(A_GETPOLICY, (char *)&policy, 0) == -1) {
-		if (!silent)
-			(void) fprintf(stderr, gettext(
-			    "%s: Cannot read audit policy:  %s\n"),
-			    progname, strerror(errno));
+		(void) fprintf(stderr, gettext(
+		    "%s: Cannot read audit policy:  %s\n"),
+		    progname, strerror(errno));
 		return (0);
 	}
 	if (policy & AUDIT_PERZONE)

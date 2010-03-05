@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -349,14 +349,23 @@ pre_syscall()
 		return (1);		/* don't do system call, return EINTR */
 	}
 
-	if (audit_active) {	/* begin auditing for this syscall */
-		int error;
-		if (error = audit_start(T_SYSCALL, code, 0, lwp)) {
-			t->t_pre_sys = 1;	/* repost anyway */
-			(void) set_errno(error);
-			return (1);
+	/*
+	 * begin auditing for this syscall if the c2audit module is loaded
+	 * and auditing is enabled
+	 */
+	if (audit_active == C2AUDIT_LOADED) {
+		uint32_t auditing = au_zone_getstate(NULL);
+
+		if (auditing & AU_AUDIT_MASK) {
+			int error;
+			if (error = audit_start(T_SYSCALL, code, auditing, \
+			    0, lwp)) {
+				t->t_pre_sys = 1;	/* repost anyway */
+				(void) set_errno(error);
+				return (1);
+			}
+			repost = 1;
 		}
-		repost = 1;
 	}
 
 #ifndef NPROBE
@@ -458,7 +467,9 @@ post_syscall(long rval1, long rval2)
 		rp->r_ps &= ~PS_T;
 		aston(curthread);
 	}
-	if (audit_active) {	/* put out audit record for this syscall */
+
+	/* put out audit record for this syscall */
+	if (AU_AUDITING()) {
 		rval_t	rval;
 
 		/* XX64 -- truncation of 64-bit return values? */
@@ -1317,6 +1328,48 @@ set_all_proc_sys()
 		t->t_pre_sys = 1;
 		t->t_post_sys = 1;
 	} while ((t = t->t_next) != first);
+	mutex_exit(&pidlock);
+}
+
+/*
+ * set_all_zone_usr_proc_sys - set pre- and post-syscall processing flags for
+ * all user processes running in the zone of the current process
+ *
+ * This is needed when auditing, tracing, or other facilities which affect
+ * all processes are turned on.
+ */
+void
+set_all_zone_usr_proc_sys(zoneid_t zoneid)
+{
+	proc_t	    *p;
+	kthread_t   *t;
+
+	mutex_enter(&pidlock);
+	for (p = practive; p != NULL; p = p->p_next) {
+		/* skip kernel and incomplete processes */
+		if (p->p_exec == NULLVP || p->p_as == &kas ||
+		    p->p_stat == SIDL || p->p_stat == SZOMB ||
+		    (p->p_flag & (SSYS | SEXITING | SEXITLWPS)))
+			continue;
+		/*
+		 * Only processes in the given zone (eventually in
+		 * all zones) are taken into account
+		 */
+		if (zoneid == ALL_ZONES || p->p_zone->zone_id == zoneid) {
+			mutex_enter(&p->p_lock);
+			if ((t = p->p_tlist) == NULL)
+				continue;
+			/*
+			 * Set pre- and post-syscall processing flags
+			 * for all threads of the process
+			 */
+			do {
+				t->t_pre_sys = 1;
+				t->t_post_sys = 1;
+			} while (p->p_tlist != (t = t->t_forw));
+			mutex_exit(&p->p_lock);
+		}
+	}
 	mutex_exit(&pidlock);
 }
 

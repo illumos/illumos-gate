@@ -48,7 +48,6 @@
 #include <sys/uio.h>
 #include <sys/debug.h>
 #include <c2/audit.h>
-#include <sys/cmn_err.h>
 
 /*
  * Common code for openat().  Check permissions, allocate an open
@@ -68,6 +67,7 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	proc_t *p = curproc;
 	uio_seg_t seg = UIO_USERSPACE;
 	char *open_filename = fname;
+	uint32_t auditing = AU_AUDITING();
 
 	if (startfd == AT_FDCWD) {
 		/*
@@ -101,7 +101,7 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	 * Handle openattrdirat request
 	 */
 	if (filemode & FXATTRDIROPEN) {
-		if (audit_active)
+		if (auditing)
 			audit_setfsat_path(1);
 
 		if (error = lookupnameat(fname, seg, FOLLOW,
@@ -185,7 +185,7 @@ copen(int startfd, char *fname, int filemode, int createmode)
 			filemode &= ~FNDELAY;
 		error = falloc((vnode_t *)NULL, filemode, &fp, &fd);
 		if (error == 0) {
-			if (audit_active)
+			if (auditing)
 				audit_setfsat_path(1);
 			/*
 			 * Last arg is a don't-care term if
@@ -200,7 +200,7 @@ copen(int startfd, char *fname, int filemode, int createmode)
 			if (startvp != NULL)
 				VN_RELE(startvp);
 			if (error == 0) {
-				if (audit_active)
+				if (auditing)
 					audit_copen(fd, fp, vp);
 				if ((vp->v_flag & VDUP) == 0) {
 					fp->f_vnode = vp;

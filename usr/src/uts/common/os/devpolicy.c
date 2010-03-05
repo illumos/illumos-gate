@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Device policy implementation.
@@ -483,7 +481,7 @@ devpolicy_load(int nitems, size_t sz, devplcysys_t *uitmp)
 		lastwild = wild;
 	}
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_devpolicy(nitems, items);
 
 	/*

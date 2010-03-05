@@ -92,6 +92,9 @@ GENUNIX_OBJS +=	\
 		alarm.o		\
 		aio_subr.o	\
 		auditsys.o	\
+		audit_core.o	\
+		audit_zone.o	\
+		audit_memory.o	\
 		autoconf.o	\
 		avl.o		\
 		bdev_dsort.o	\
@@ -1535,7 +1538,7 @@ KSSL_OBJS +=	kssl.o ksslioctl.o ksslapi.o ksslrec.o
 
 C2AUDIT_OBJS +=	adr.o audit.o audit_event.o audit_io.o \
 		audit_path.o audit_start.o audit_syscalls.o audit_token.o \
-		audit_mem.o audit_zone.o
+		audit_mem.o
 
 PCIC_OBJS +=	pcic.o
 

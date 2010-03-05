@@ -106,7 +106,7 @@ fchownat(int fd, char *name, uid_t uid, gid_t gid, int flags)
 		}
 	}
 
-	if (audit_active)
+	if (AU_AUDITING())
 		audit_setfsat_path(1);
 
 	/*
