@@ -34,7 +34,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_MR_SAS_H_
@@ -50,8 +50,8 @@ extern "C" {
 /*
  * MegaRAID SAS2.0 Driver meta data
  */
-#define	MRSAS_VERSION				"LSIv2.3"
-#define	MRSAS_RELDATE				"May 11, 2009"
+#define	MRSAS_VERSION				"LSIv2.4"
+#define	MRSAS_RELDATE				"Feb 28, 2010"
 
 #define	MRSAS_TRUE				1
 #define	MRSAS_FALSE				0
@@ -146,6 +146,7 @@ extern "C" {
 #define	MFI_FRAME_DIR_WRITE			0x0008
 #define	MFI_FRAME_DIR_READ			0x0010
 #define	MFI_FRAME_DIR_BOTH			0x0018
+#define	MFI_FRAME_IEEE				0x0020
 
 /*
  * Definition for cmd_status
@@ -369,7 +370,8 @@ typedef struct mrsas_instance {
 	dma_obj_t	mfi_internal_dma_obj;
 
 	uint8_t		init_id;
-	uint8_t		reserved[3];
+	uint8_t		flag_ieee;
+	uint8_t		reserved[2];
 
 	uint16_t	max_num_sge;
 	uint16_t	max_fw_cmds;
@@ -991,9 +993,16 @@ struct mrsas_sge64 {
 	uint32_t	length;
 };
 
+struct mrsas_sge_ieee {
+	uint64_t 	phys_addr;
+	uint32_t	length;
+	uint32_t	flag;
+};
+
 union mrsas_sgl {
 	struct mrsas_sge32	sge32[1];
 	struct mrsas_sge64	sge64[1];
+	struct mrsas_sge_ieee	sge_ieee[1];
 };
 
 struct mrsas_header {

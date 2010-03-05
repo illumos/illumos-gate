@@ -2,7 +2,7 @@
  * mr_sas.c: source for mr_sas driver
  *
  * MegaRAID device driver for SAS2.0 controllers
- * Copyright (c) 2008-2009, LSI Logic Corporation.
+ * Copyright (c) 2008-2010, LSI Logic Corporation.
  * All rights reserved.
  *
  * Version:
@@ -41,7 +41,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,7 @@ static void	*mrsas_state = NULL;
 static volatile boolean_t	mrsas_relaxed_ordering = B_TRUE;
 static volatile int 	debug_level_g = CL_NONE;
 static volatile int 	msi_enable = 1;
+static volatile int 	ctio_enable = 1;
 
 #pragma weak scsi_hba_open
 #pragma weak scsi_hba_close
@@ -520,6 +521,20 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			}
 
 			added_isr_f = 1;
+
+			if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
+			    "mrsas-enable-ctio", &data) == DDI_SUCCESS) {
+				if (strncmp(data, "no", 3) == 0) {
+					ctio_enable = 0;
+					con_log(CL_ANN1, (CE_WARN,
+					    "ctio_enable = %d disabled",
+					    ctio_enable));
+				}
+				ddi_prop_free(data);
+			}
+
+			con_log(CL_DLEVEL1, (CE_WARN, "ctio_enable = %d",
+			    ctio_enable));
 
 			/* setup the mfi based low level driver */
 			if (init_mfi(instance) != DDI_SUCCESS) {
@@ -1713,7 +1728,7 @@ create_mfi_frame_pool(struct mrsas_instance *instance)
 
 	max_cmd = instance->max_fw_cmds;
 
-	sge_sz	= sizeof (struct mrsas_sge64);
+	sge_sz	= sizeof (struct mrsas_sge_ieee);
 
 	/* calculated the number of 64byte frames required for SGL */
 	sgl_sz		= sge_sz * instance->max_num_sge;
@@ -2214,6 +2229,14 @@ init_mfi(struct mrsas_instance *instance)
 	}
 
 	return_mfi_pkt(instance, cmd);
+
+	if (ctio_enable &&
+	    (instance->func_ptr->read_fw_status_reg(instance) & 0x04000000)) {
+		con_log(CL_ANN, (CE_NOTE, "mr_sas: IEEE SGL's supported"));
+		instance->flag_ieee = 1;
+	} else {
+		instance->flag_ieee = 0;
+	}
 
 	/* gather misc FW related information */
 	if (!get_ctrl_info(instance, &ctrl_info)) {
@@ -3299,6 +3322,7 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 	ddi_acc_handle_t acc_handle;
 	struct mrsas_cmd		*cmd;
 	struct mrsas_sge64		*mfi_sgl;
+	struct mrsas_sge_ieee		*mfi_sgl_ieee;
 	struct scsa_cmd			*acmd = PKT2CMD(pkt);
 	struct mrsas_pthru_frame 	*pthru;
 	struct mrsas_io_frame		*ldio;
@@ -3347,6 +3371,9 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 		flags = MFI_FRAME_DIR_NONE;
 	}
 
+	if (instance->flag_ieee) {
+		flags |= MFI_FRAME_IEEE;
+	}
 	flags |= MFI_FRAME_SGL64;
 
 	switch (pkt->pkt_cdbp[0]) {
@@ -3393,7 +3420,12 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 			    (acmd->cmd_cdblen != 6) ? pkt->pkt_cdbp[1] : 0);
 			ddi_put8(acc_handle, &ldio->sge_count,
 			    acmd->cmd_cookiecnt);
-			mfi_sgl = (struct mrsas_sge64	*)&ldio->sgl;
+			if (instance->flag_ieee) {
+				mfi_sgl_ieee =
+				    (struct mrsas_sge_ieee *)&ldio->sgl;
+			} else {
+				mfi_sgl = (struct mrsas_sge64	*)&ldio->sgl;
+			}
 
 			context = ddi_get32(acc_handle, &ldio->context);
 
@@ -3490,7 +3522,11 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 		ddi_put32(acc_handle, &pthru->data_xfer_len,
 		    acmd->cmd_dmacount);
 		ddi_put8(acc_handle, &pthru->sge_count, acmd->cmd_cookiecnt);
-		mfi_sgl			= (struct mrsas_sge64 *)&pthru->sgl;
+		if (instance->flag_ieee) {
+			mfi_sgl_ieee = (struct mrsas_sge_ieee *)&pthru->sgl;
+		} else {
+			mfi_sgl	= (struct mrsas_sge64 *)&pthru->sgl;
+		}
 
 		bzero(cmd->sense, SENSE_LENGTH);
 		ddi_put8(acc_handle, &pthru->sense_len, SENSE_LENGTH);
@@ -3508,14 +3544,23 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 	context = context;
 #endif
 	/* prepare the scatter-gather list for the firmware */
-	for (i = 0; i < acmd->cmd_cookiecnt; i++, mfi_sgl++) {
-		ddi_put64(acc_handle, &mfi_sgl->phys_addr,
-		    acmd->cmd_dmacookies[i].dmac_laddress);
-		ddi_put32(acc_handle, &mfi_sgl->length,
-		    acmd->cmd_dmacookies[i].dmac_size);
+	if (instance->flag_ieee) {
+		for (i = 0; i < acmd->cmd_cookiecnt; i++, mfi_sgl_ieee++) {
+			ddi_put64(acc_handle, &mfi_sgl_ieee->phys_addr,
+			    acmd->cmd_dmacookies[i].dmac_laddress);
+			ddi_put32(acc_handle, &mfi_sgl_ieee->length,
+			    acmd->cmd_dmacookies[i].dmac_size);
+		}
+		sge_bytes = sizeof (struct mrsas_sge_ieee)*acmd->cmd_cookiecnt;
+	} else {
+		for (i = 0; i < acmd->cmd_cookiecnt; i++, mfi_sgl++) {
+			ddi_put64(acc_handle, &mfi_sgl->phys_addr,
+			    acmd->cmd_dmacookies[i].dmac_laddress);
+			ddi_put32(acc_handle, &mfi_sgl->length,
+			    acmd->cmd_dmacookies[i].dmac_size);
+		}
+		sge_bytes = sizeof (struct mrsas_sge64)*acmd->cmd_cookiecnt;
 	}
-
-	sge_bytes = sizeof (struct mrsas_sge64)*acmd->cmd_cookiecnt;
 
 	cmd->frame_count = (sge_bytes / MRMFI_FRAME_SIZE) +
 	    ((sge_bytes % MRMFI_FRAME_SIZE) ? 1 : 0) + 1;
