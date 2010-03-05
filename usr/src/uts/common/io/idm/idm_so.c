@@ -1793,7 +1793,9 @@ idm_so_rx_rtt(idm_conn_t *ic, idm_pdu_t *pdu)
 
 	idm_so_send_rtt_data(ic, idt, idb, data_offset,
 	    ntohl(rtt_hdr->data_length));
-	mutex_exit(&idt->idt_mutex);
+	/*
+	 * the idt_mutex is released in idm_so_send_rtt_data
+	 */
 
 	idm_pdu_complete(pdu, IDM_STATUS_SUCCESS);
 	idm_task_rele(idt);
@@ -2501,6 +2503,7 @@ idm_so_send_rtt_data(idm_conn_t *ic, idm_task_t *idt, idm_buf_t *idb,
 			idm_conn_event_locked(ic, CE_TRANSPORT_FAIL,
 			    NULL, CT_NONE);
 		mutex_exit(&ic->ic_state_mutex);
+		mutex_exit(&idt->idt_mutex);
 		return;
 	}
 
@@ -2512,6 +2515,13 @@ idm_so_send_rtt_data(idm_conn_t *ic, idm_task_t *idt, idm_buf_t *idb,
 	rtt_buf->idb_task_binding = idt;
 
 	/*
+	 * The new buffer (if any) represents an additional
+	 * reference on the task
+	 */
+	idm_task_hold(idt);
+	mutex_exit(&idt->idt_mutex);
+
+	/*
 	 * Put the idm_buf_t on the tx queue.  It will be transmitted by
 	 * idm_sotx_thread.
 	 */
@@ -2520,13 +2530,9 @@ idm_so_send_rtt_data(idm_conn_t *ic, idm_task_t *idt, idm_buf_t *idb,
 	if (!so_conn->ic_tx_thread_running) {
 		idm_buf_free(rtt_buf);
 		mutex_exit(&so_conn->ic_tx_mutex);
+		idm_task_rele(idt);
 		return;
 	}
-
-	/*
-	 * This new buffer represents an additional reference on the task
-	 */
-	idm_task_hold(idt);
 
 	/*
 	 * Build a template for the data PDU headers we will use so that
