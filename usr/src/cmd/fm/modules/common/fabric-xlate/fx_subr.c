@@ -208,6 +208,12 @@ fab_send_erpt(fmd_hdl_t *hdl, fab_data_t *data, fab_err_tbl_t *tbl)
 			continue;
 		}
 
+		if (data->pcie_rp_send_all) {
+			fab_send_erpt_all_rps(hdl, erpt);
+			nvlist_free(erpt);
+			return;
+		}
+
 		fmd_hdl_debug(hdl, "Sending ereport: %s 0x%x\n", fab_buf, reg);
 		fmd_xprt_post(hdl, fab_fmd_xprt, erpt, 0);
 		if (fmd_xprt_error(hdl, fab_fmd_xprt)) {
@@ -854,4 +860,81 @@ fab_get_rpdev(fmd_hdl_t *hdl)
 	}
 
 	return (NULL);
+}
+
+void
+fab_send_erpt_all_rps(fmd_hdl_t *hdl, nvlist_t *erpt)
+{
+	xmlXPathObjectPtr xpathObj;
+	xmlNodeSetPtr nodes;
+	char 	*rppath, *hbpath;
+	char 	query[600];
+	nvlist_t *detector, *nvl;
+	uint_t	i, size;
+	size_t len;
+
+	/* get hostbridge's path */
+	if (!fab_get_hcpath(hdl, erpt, &hbpath, &len)) {
+		fmd_hdl_debug(hdl,
+		    "fab_send_erpt_on_all_rps: fab_get_hcpath() failed.\n");
+		return;
+	}
+
+	(void) snprintf(query, sizeof (query), "//propval["
+	    "@name='extended-capabilities' and contains(@value, '%s')]"
+	    "/parent::*/parent::*/propgroup[@name='protocol']"
+	    "/propval[@name='resource' and contains(@value, '%s/')"
+	    "]/parent::*/parent::*/propgroup[@name='io']"
+	    "/propval[@name='dev']/@value", PCIEX_ROOT, hbpath);
+
+	fmd_hdl_free(hdl, hbpath, len);
+
+	fmd_hdl_debug(hdl, "xpathObj query %s\n", query);
+
+	xpathObj = xmlXPathEvalExpression((const xmlChar *)query, fab_xpathCtx);
+
+	if (xpathObj == NULL)
+		return;
+
+	nodes = xpathObj->nodesetval;
+	size = (nodes) ? nodes->nodeNr : 0;
+
+	fmd_hdl_debug(hdl, "xpathObj 0x%p type %d size %d\n",
+	    xpathObj, xpathObj->type, size);
+
+	for (i = 0; i < size; i++) {
+		rppath = (char *)xmlNodeGetContent(nodes->nodeTab[i]);
+		fmd_hdl_debug(hdl, "query result: %s\n", rppath);
+
+		nvl = detector = NULL;
+		if (nvlist_dup(erpt, &nvl, NV_UNIQUE_NAME) != 0 ||
+		    nvlist_alloc(&detector, NV_UNIQUE_NAME, 0) != 0) {
+			xmlFree(rppath);
+			nvlist_free(nvl);
+			continue;
+		}
+
+		/*
+		 * set the detector in the original ereport to the root port
+		 */
+		(void) nvlist_add_string(detector, FM_VERSION,
+		    FM_DEV_SCHEME_VERSION);
+		(void) nvlist_add_string(detector, FM_FMRI_SCHEME,
+		    FM_FMRI_SCHEME_DEV);
+		(void) nvlist_add_string(detector, FM_FMRI_DEV_PATH,
+		    rppath);
+		(void) nvlist_remove_all(nvl, FM_EREPORT_DETECTOR);
+		(void) nvlist_add_nvlist(nvl, FM_EREPORT_DETECTOR,
+		    detector);
+		nvlist_free(detector);
+		xmlFree(rppath);
+
+		fmd_hdl_debug(hdl, "Sending ereport: %s\n", fab_buf);
+		fmd_xprt_post(hdl, fab_fmd_xprt, nvl, 0);
+		if (fmd_xprt_error(hdl, fab_fmd_xprt))
+			fmd_hdl_debug(hdl,
+			    "Failed to send PCI ereport\n");
+	}
+
+	xmlXPathFreeObject(xpathObj);
 }

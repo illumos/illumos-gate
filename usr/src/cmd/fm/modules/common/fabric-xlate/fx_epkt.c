@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <sys/types.h>
@@ -244,7 +244,12 @@ fab_xlate_epkt_erpts(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 	/*
 	 * reset the detector in the original ereport to the root port
 	 */
-	if (rppath && nvlist_alloc(&detector, NV_UNIQUE_NAME, 0) == 0) {
+	if (rppath) {
+		if (nvlist_alloc(&detector, NV_UNIQUE_NAME, 0) != 0) {
+			fmd_hdl_error(hdl, "failed to allocate nvlist");
+			fmd_hdl_strfree(hdl, rppath);
+			return;
+		}
 		(void) nvlist_add_string(detector, FM_VERSION,
 		    FM_DEV_SCHEME_VERSION);
 		(void) nvlist_add_string(detector, FM_FMRI_SCHEME,
@@ -253,9 +258,19 @@ fab_xlate_epkt_erpts(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 		(void) nvlist_remove_all(nvl, FM_EREPORT_DETECTOR);
 		(void) nvlist_add_nvlist(nvl, FM_EREPORT_DETECTOR, detector);
 		nvlist_free(detector);
+		fmd_hdl_strfree(hdl, rppath);
+	} else {
+		/*
+		 * We can not locate the root port the error originated from.
+		 * Likely this is because the original ereport is malformed or
+		 * the hw error register has corrupted contents.  In this case,
+		 * the best we can do is send ereports on all root ports.
+		 *
+		 * Set pcie_rp_send_all for fab_send_erpt() to process later.
+		 */
+		fmd_hdl_debug(hdl, "RP not fond. Will translate on all RPs.\n");
+		data.pcie_rp_send_all = B_TRUE;
 	}
-
-	fmd_hdl_strfree(hdl, rppath);
 
 	(void) fab_xlate_epkt(hdl, &data, &epkt);
 	fab_xlate_pcie_erpts(hdl, &data);

@@ -124,6 +124,9 @@ typedef struct fab_data {
 	uint32_t pcie_rp_err_cmd;	/* pcie root complex error cmd reg */
 	uint16_t pcie_rp_ce_src_id;	/* pcie root complex ce sourpe id */
 	uint16_t pcie_rp_ue_src_id;	/* pcie root complex ue sourpe id */
+
+	/* Flags */
+	boolean_t pcie_rp_send_all;	/* need to send ereports on all rps */
 } fab_data_t;
 
 typedef struct fab_erpt_tbl {
@@ -158,15 +161,17 @@ extern void fab_send_erpt(fmd_hdl_t *hdl, fab_data_t *data, fab_err_tbl_t *tbl);
 
 /* Misc Functions */
 extern void fab_pr(fmd_hdl_t *, fmd_event_t *, nvlist_t *);
-extern boolean_t fab_get_rcpath(fmd_hdl_t *hdl, nvlist_t *nvl, char *rcpath);
+extern boolean_t fab_get_hcpath(fmd_hdl_t *, nvlist_t *, char **, size_t *);
+extern boolean_t fab_get_rcpath(fmd_hdl_t *, nvlist_t *, char *);
 extern char *fab_find_rppath_by_df(fmd_hdl_t *, nvlist_t *, uint8_t);
 extern char *fab_find_rppath_by_devbdf(fmd_hdl_t *, nvlist_t *, pcie_req_id_t);
 extern char *fab_find_addr(fmd_hdl_t *hdl, nvlist_t *nvl, uint64_t addr);
 extern char *fab_find_bdf(fmd_hdl_t *hdl, nvlist_t *nvl, pcie_req_id_t bdf);
 extern boolean_t fab_hc2dev(fmd_hdl_t *, const char *, char **);
 extern boolean_t fab_hc2dev_nvl(fmd_hdl_t *, nvlist_t *, char **);
-extern char *fab_get_rpdev(fmd_hdl_t *hdl);
-extern void fab_set_fake_rp(fmd_hdl_t *hdl);
+extern char *fab_get_rpdev(fmd_hdl_t *);
+extern void fab_set_fake_rp(fmd_hdl_t *);
+extern void fab_send_erpt_all_rps(fmd_hdl_t *, nvlist_t *);
 
 #ifdef __cplusplus
 }
