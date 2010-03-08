@@ -2312,8 +2312,11 @@ ztest_split_pool(ztest_ds_t *zd, uint64_t id)
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 
 	/* generate a config from the existing config */
+	mutex_enter(&spa->spa_props_lock);
 	VERIFY(nvlist_lookup_nvlist(spa->spa_config, ZPOOL_CONFIG_VDEV_TREE,
 	    &tree) == 0);
+	mutex_exit(&spa->spa_props_lock);
+
 	VERIFY(nvlist_lookup_nvlist_array(tree, ZPOOL_CONFIG_CHILDREN, &child,
 	    &children) == 0);
 

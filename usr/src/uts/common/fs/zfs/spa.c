@@ -4190,8 +4190,10 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 	    glist, children) == 0);
 	kmem_free(glist, children * sizeof (uint64_t));
 
+	mutex_enter(&spa->spa_props_lock);
 	VERIFY(nvlist_add_nvlist(spa->spa_config, ZPOOL_CONFIG_SPLIT,
 	    nvl) == 0);
+	mutex_exit(&spa->spa_props_lock);
 	spa->spa_config_splitting = nvl;
 	vdev_config_dirty(spa->spa_root_vdev);
 
@@ -4300,6 +4302,14 @@ out:
 	spa_remove(newspa);
 
 	txg = spa_vdev_config_enter(spa);
+
+	/* re-online all offlined disks */
+	for (c = 0; c < children; c++) {
+		if (vml[c] != NULL)
+			vml[c]->vdev_offline = B_FALSE;
+	}
+	vdev_reopen(spa->spa_root_vdev);
+
 	nvlist_free(spa->spa_config_splitting);
 	spa->spa_config_splitting = NULL;
 	(void) spa_vdev_exit(spa, NULL, txg, error);
