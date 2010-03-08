@@ -104,6 +104,7 @@ static au_event_t	aui_forksys(au_event_t);
 static au_event_t	aui_labelsys(au_event_t);
 static au_event_t	aui_setpgrp(au_event_t);
 
+static void	aus_exit(struct t_audit_data *);
 static void	aus_open(struct t_audit_data *);
 static void	aus_openat(struct t_audit_data *);
 static void	aus_acl(struct t_audit_data *);
@@ -199,7 +200,7 @@ struct audit_s2e audit_s2e[] =
  */
 aui_null,	AUE_NULL,	aus_null,	/* 0 unused (indirect) */
 		auf_null,	0,
-aui_null,	AUE_EXIT,	aus_null,	/* 1 exit */
+aui_null,	AUE_EXIT,	aus_exit,	/* 1 exit */
 		auf_null,	S2E_NPT,
 aui_null,	AUE_NULL,	aus_null,	/* 2 (loadable) was forkall */
 		auf_null,	0,
@@ -725,6 +726,20 @@ aui_null,	AUE_UMOUNT2,	aus_umount2,	/* 255 umount2 */
 
 uint_t num_syscall = sizeof (audit_s2e) / sizeof (struct audit_s2e);
 
+
+/* exit start function */
+/*ARGSUSED*/
+static void
+aus_exit(struct t_audit_data *tad)
+{
+	uint32_t rval;
+	struct a {
+		long rval;
+	} *uap = (struct a *)ttolwp(curthread)->lwp_ap;
+
+	rval = (uint32_t)uap->rval;
+	au_uwrite(au_to_arg32(1, "exit status", rval));
+}
 
 /* acct start function */
 /*ARGSUSED*/

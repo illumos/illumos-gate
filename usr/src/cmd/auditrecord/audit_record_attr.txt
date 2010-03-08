@@ -705,7 +705,8 @@ label=AUE_EXECVE
 #	trailer,86
 
 label=AUE_EXIT
-  format=[text]1
+  format=arg1:[text]2
+    comment=1, exit status, "exit status":
     comment=event aborted
 
 label=AUE_EXITPROM
