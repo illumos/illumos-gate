@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -178,7 +178,7 @@ extern int	flags;
 extern int	checkflags;
 extern int	socket_flag;
 extern int	ip_type;
-extern int	ip_ipv6[4];	/* ip ipv6 object identifier */
+extern uchar_t	ip_ipv6[16];	/* ip ipv6 object identifier */
 extern int	obj_flag;	/* 'o' object type */
 extern int	obj_id;		/* object identifier */
 extern gid_t	obj_group;	/* object group */

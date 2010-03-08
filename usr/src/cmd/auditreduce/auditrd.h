@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_AUDITRD_H
 #define	_AUDITRD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -55,7 +53,7 @@ int	flags;
 int	checkflags;
 int	socket_flag;
 int	ip_type;
-int	ip_ipv6[4];		/* ipv6 type object */
+uchar_t	ip_ipv6[16];		/* ipv6 type object */
 int	obj_flag;		/* 'o' object type */
 int	obj_id;			/* object identifier */
 gid_t	obj_group;		/* object group */

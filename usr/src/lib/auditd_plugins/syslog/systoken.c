@@ -415,13 +415,16 @@ ip_addr_token(parse_context_t *ctx)
  * Format of ip_addr_ex token:
  *	ip token id	adr_char
  *	ip type		adr_int32
- *	address		4*adr_int32
+ *	ip address	adr_u_char*type
  *
  */
 int
 ip_addr_ex_token(parse_context_t *ctx)
 {
-	ctx->adr.adr_now += 5 * sizeof (int32_t);
+	int32_t	type;
+
+	adrm_int32(&(ctx->adr), &type, 1);		/* ip type */
+	ctx->adr.adr_now += type * sizeof (uchar_t);	/* ip address */
 
 	return (0);
 }
@@ -868,19 +871,23 @@ process32_token(parse_context_t *ctx)
  *	rgid			adr_int32
  * 	pid			adr_int32
  * 	sid			adr_int32
- * 	termid			adr_int32*6
+ * 	termid
+ *		port		adr_int32
+ *		type		adr_int32
+ *		ip address	adr_u_char*type
  *
  */
 int
 process32_ex_token(parse_context_t *ctx)
 {
-	int32_t port, type, addr[4];
+	int32_t port, type;
+	uchar_t addr[16];
 
 	common_process(ctx);
 
 	adrm_int32(&(ctx->adr), &port, 1);
 	adrm_int32(&(ctx->adr), &type, 1);
-	adrm_int32(&(ctx->adr), &addr[0], 4);
+	adrm_u_char(&(ctx->adr), addr, type);
 
 	return (0);
 }
@@ -913,7 +920,7 @@ process64_token(parse_context_t *ctx)
 }
 
 /*
- * Format of process64 token:
+ * Format of process64_ex token:
  *	process token id	adr_char
  *	auid			adr_int32
  *	euid			adr_int32
@@ -922,20 +929,24 @@ process64_token(parse_context_t *ctx)
  *	rgid			adr_int32
  * 	pid			adr_int32
  * 	sid			adr_int32
- * 	termid			adr_int64+5*adr_int32
+ * 	termid
+ *		port		adr_int64
+ *		type		adr_int32
+ *		ip address	adr_u_char*type
  *
  */
 int
 process64_ex_token(parse_context_t *ctx)
 {
 	int64_t port;
-	int32_t type, addr[4];
+	int32_t type;
+	uchar_t	addr[16];
 
 	common_process(ctx);
 
 	adrm_int64(&(ctx->adr), &port, 1);
 	adrm_int32(&(ctx->adr), &type, 1);
-	adrm_int32(&(ctx->adr), &addr[0], 4);
+	adrm_u_char(&(ctx->adr), addr, type);
 
 	return (0);
 }
@@ -974,7 +985,14 @@ socket_token(parse_context_t *ctx)
 
 
 /*
- * Format of socket token:
+ * Format of socket_ex token:
+ *	socket_domain		adrm_short
+ *	socket_type		adrm_short
+ *	address_type		adrm_short
+ *	local_port		adrm_short
+ *	local_inaddr		adrm_u_char*address_type
+ *	remote_port		adrm_short
+ *	remote_inaddr		adrm_u_char*address_type
  *
  */
 int
@@ -1042,7 +1060,10 @@ subject32_token(parse_context_t *ctx)
  *	rgid			adr_int32
  * 	pid			adr_int32
  * 	sid			adr_int32
- * 	termid_addr		adr_int32*6
+ * 	termid
+ *		port		adr_int32
+ *		type		adr_int32
+ *		ip address	adr_u_char*type
  *
  */
 int
@@ -1054,7 +1075,8 @@ subject32_ex_token(parse_context_t *ctx)
 
 	adrm_int32(&(ctx->adr), &port, 1);
 	adrm_u_int32(&(ctx->adr), &(ctx->out.sf_tid.at_type), 1);
-	adrm_u_char(&(ctx->adr), (uchar_t *)&(ctx->out.sf_tid.at_addr[0]), 16);
+	adrm_u_char(&(ctx->adr), (uchar_t *)&(ctx->out.sf_tid.at_addr[0]),
+	    ctx->out.sf_tid.at_type);
 
 	return (0);
 }
@@ -1087,7 +1109,7 @@ subject64_token(parse_context_t *ctx)
 }
 
 /*
- * Format of subject64 token:
+ * Format of subject64_ex token:
  *	subject token id	adr_char
  *	auid			adr_int32
  *	euid			adr_int32
@@ -1096,7 +1118,10 @@ subject64_token(parse_context_t *ctx)
  *	rgid			adr_int32
  * 	pid			adr_int32
  * 	sid			adr_int32
- * 	termid			adr_int64+5*adr_int32
+ * 	termid
+ *		port		adr_int64
+ *		type		adr_int32
+ *		ip address	adr_u_char*type
  *
  */
 int
@@ -1106,10 +1131,10 @@ subject64_ex_token(parse_context_t *ctx)
 
 	common_subject(ctx);
 
-	adrm_u_int32(&(ctx->adr), (uint32_t *)&(ctx->out.sf_asid), 1);
 	adrm_int64(&(ctx->adr), &port, 1);
 	adrm_u_int32(&(ctx->adr), &(ctx->out.sf_tid.at_type), 1);
-	adrm_u_char(&(ctx->adr), (uchar_t *)&(ctx->out.sf_tid.at_addr[0]), 16);
+	adrm_u_char(&(ctx->adr), (uchar_t *)&(ctx->out.sf_tid.at_addr[0]),
+	    ctx->out.sf_tid.at_type);
 
 	return (0);
 }

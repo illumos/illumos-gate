@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -192,7 +192,6 @@ trailer_token(adr_t *adr)
  *	basic unit		adr_char
  *	unit count		adr_char, specifying number of units of
  *	data items		depends on basic unit
- *
  */
 int
 arbitrary_data_token(adr_t *adr)
@@ -237,7 +236,6 @@ arbitrary_data_token(adr_t *adr)
  *	opaque token id		adr_char
  *	size			adr_short
  *	data			adr_char, size times
- *
  */
 int
 opaque_token(adr_t *adr)
@@ -253,7 +251,6 @@ opaque_token(adr_t *adr)
  * 	return value token id	adr_char
  *	error number		adr_char
  *	return value		adr_u_int32
- *
  */
 int
 return_value32_token(adr_t *adr)
@@ -276,7 +273,6 @@ return_value32_token(adr_t *adr)
  * 	return value token id	adr_char
  *	error number		adr_char
  *	return value		adr_u_int64
- *
  */
 int
 return_value64_token(adr_t *adr)
@@ -299,7 +295,6 @@ return_value64_token(adr_t *adr)
  * Format of sequence token:
  *	sequence token id	adr_char
  *	audit_count		int32_t
- *
  */
 int
 sequence_token(adr_t *adr)
@@ -315,7 +310,6 @@ sequence_token(adr_t *adr)
  * Format of text token:
  *	text token id		adr_char
  * 	text			adr_string
- *
  */
 int
 text_token(adr_t *adr)
@@ -329,7 +323,6 @@ text_token(adr_t *adr)
  * Format of ip_addr token:
  *	ip token id	adr_char
  *	address		adr_int32
- *
  */
 int
 ip_addr_token(adr_t *adr)
@@ -345,17 +338,16 @@ ip_addr_token(adr_t *adr)
  * Format of ip_addr_ex token:
  *	ip token id	adr_char
  *	ip type		adr_int32
- *	address		4*adr_int32
- *
+ *	ip address	adr_u_char*type
  */
 int
 ip_addr_ex_token(adr_t *adr)
 {
-	int32_t	address[4];
 	int32_t type;
+	uchar_t	address[16];
 
 	adrm_int32(adr, (int32_t *)&type, 1);
-	adrm_int32(adr, (int32_t *)&address, 4);
+	adrm_u_char(adr, address, type);
 
 	return (-1);
 }
@@ -373,7 +365,6 @@ ip_addr_ex_token(adr_t *adr)
  *	checksum		adr_u_short
  *	source address		adr_int32
  *	destination address	adr_int32
- *
  */
 int
 ip_token(adr_t *adr)
@@ -404,7 +395,6 @@ ip_token(adr_t *adr)
  * Format of iport token:
  *	ip port address token id	adr_char
  *	port address			adr_short
- *
  */
 int
 iport_token(adr_t *adr)
@@ -421,7 +411,6 @@ iport_token(adr_t *adr)
  * Format of groups token:
  *	group token id		adr_char
  *	group list		adr_int32, 16 times
- *
  */
 int
 group_token(adr_t *adr)
@@ -450,7 +439,6 @@ group_token(adr_t *adr)
  *	group token id		adr_char
  *	number of groups	adr_short
  *	group list		adr_int32, "number" times
- *
  */
 int
 newgroup_token(adr_t *adr)
@@ -478,7 +466,6 @@ newgroup_token(adr_t *adr)
  *	argument number		adr_char
  *	argument value		adr_int32
  *	argument description	adr_string
- *
  */
 int
 argument32_token(adr_t *adr)
@@ -499,7 +486,6 @@ argument32_token(adr_t *adr)
  *	argument number		adr_char
  *	argument value		adr_int64
  *	argument description	adr_string
- *
  */
 int
 argument64_token(adr_t *adr)
@@ -568,7 +554,6 @@ ace_token(adr_t *adr)
  *	file system id		adr_int32
  *	node id			adr_int32
  *	device			adr_int32
- *
  */
 int
 attribute_token(adr_t *adr)
@@ -616,7 +601,6 @@ attribute_token(adr_t *adr)
  *	file system id		adr_int32
  *	node id			adr_int64
  *	device			adr_int32
- *
  */
 int
 attribute32_token(adr_t *adr)
@@ -664,7 +648,6 @@ attribute32_token(adr_t *adr)
  *	file system id		adr_int32
  *	node id			adr_int64
  *	device			adr_int64
- *
  */
 int
 attribute64_token(adr_t *adr)
@@ -719,7 +702,6 @@ attribute64_token(adr_t *adr)
  *	.
  *	.
  *	.
- *
  */
 int
 cmd_token(adr_t *adr)
@@ -746,7 +728,6 @@ cmd_token(adr_t *adr)
  *	attribute token id	adr_char
  *	return value		adr_int32
  *	errno			adr_int32
- *
  */
 int
 exit_token(adr_t *adr)
@@ -925,7 +906,6 @@ s5_IPC_perm_token(adr_t *adr)
  * 	pid			adr_int32
  * 	sid			adr_int32
  * 	termid			adr_int32*2
- *
  */
 int
 process32_token(adr_t *adr)
@@ -983,7 +963,7 @@ process32_token(adr_t *adr)
 }
 
 /*
- * Format of process32 token:
+ * Format of process32_ex token:
  *	process token id	adr_char
  *	auid			adr_int32
  *	euid			adr_int32
@@ -992,15 +972,18 @@ process32_token(adr_t *adr)
  *	rgid			adr_int32
  * 	pid			adr_int32
  * 	sid			adr_int32
- * 	termid			adr_int32*6
- *
+ * 	termid
+ *		port		adr_int32
+ *		type		adr_int32
+ *		ip address	adr_u_char*type
  */
 int
 process32_ex_token(adr_t *adr)
 {
 	int32_t	auid, euid, egid, ruid, rgid, pid;
 	int32_t	sid;
-	int32_t port, type, addr[4];
+	int32_t port, type;
+	uchar_t addr[16];
 
 	adrm_int32(adr, &auid, 1);
 	adrm_int32(adr, &euid, 1);
@@ -1011,7 +994,7 @@ process32_ex_token(adr_t *adr)
 	adrm_int32(adr, &sid, 1);
 	adrm_int32(adr, &port, 1);
 	adrm_int32(adr, &type, 1);
-	adrm_int32(adr, &addr[0], 4);
+	adrm_u_char(adr, addr, type);
 
 	if (!new_mode && (flags & M_USERA)) {
 		if (m_usera == auid)
@@ -1062,7 +1045,6 @@ process32_ex_token(adr_t *adr)
  * 	pid			adr_int32
  * 	sid			adr_int32
  * 	termid			adr_int64+adr_int32
- *
  */
 int
 process64_token(adr_t *adr)
@@ -1121,7 +1103,7 @@ process64_token(adr_t *adr)
 }
 
 /*
- * Format of process64 token:
+ * Format of process64_ex token:
  *	process token id	adr_char
  *	auid			adr_int32
  *	euid			adr_int32
@@ -1130,8 +1112,10 @@ process64_token(adr_t *adr)
  *	rgid			adr_int32
  * 	pid			adr_int32
  * 	sid			adr_int32
- * 	termid			adr_int64+5*adr_int32
- *
+ * 	termid
+ * 		port		adr_int64
+ * 		type		adr_int32
+ * 		ip address	adr_u_char*type
  */
 int
 process64_ex_token(adr_t *adr)
@@ -1139,7 +1123,8 @@ process64_ex_token(adr_t *adr)
 	int32_t	auid, euid, egid, ruid, rgid, pid;
 	int32_t	sid;
 	int64_t port;
-	int32_t type, addr[4];
+	int32_t type;
+	uchar_t addr[16];
 
 	adrm_int32(adr, &auid, 1);
 	adrm_int32(adr, &euid, 1);
@@ -1150,7 +1135,7 @@ process64_ex_token(adr_t *adr)
 	adrm_int32(adr, &sid, 1);
 	adrm_int64(adr, &port, 1);
 	adrm_int32(adr, &type, 1);
-	adrm_int32(adr, &addr[0], 4);
+	adrm_u_char(adr, addr, type);
 
 	if (!new_mode && (flags & M_USERA)) {
 		if (m_usera == auid)
@@ -1245,11 +1230,14 @@ socket_token(adr_t *adr)
 
 
 /*
- * Format of socket token:
+ * Format of socket_ex token:
+ *	socket_domain		adrm_short
  *	socket_type		adrm_short
+ *	address_type		adrm_short
+ *	local_port		adrm_short
+ *	local_inaddr		adrm_u_char*address_type
  *	remote_port		adrm_short
- *	remote_inaddr		adrm_int32
- *
+ *	remote_inaddr		adrm_u_char*address_type
  */
 int
 socket_ex_token(adr_t *adr)
@@ -1258,9 +1246,10 @@ socket_ex_token(adr_t *adr)
 	short	socket_type;
 	short	ip_size;
 	short	local_port;
-	int32_t	local_inaddr[4];
+	uchar_t	local_inaddr[16];
 	short	remote_port;
-	int32_t	remote_inaddr[4];
+	uchar_t	remote_inaddr[16];
+	uchar_t	*caddr = (uchar_t *)&obj_id;
 
 	adrm_short(adr, &socket_domain, 1);
 	adrm_short(adr, &socket_type, 1);
@@ -1282,24 +1271,17 @@ socket_ex_token(adr_t *adr)
 
 	if ((flags & M_OBJECT) && (obj_flag == OBJ_SOCK)) {
 		if (socket_flag == SOCKFLG_MACHINE) {
-			if (ip_type == AU_IPv4) {
-				if ((local_inaddr[0] == obj_id) ||
-				    (remote_inaddr[0] == obj_id))
-					checkflags |= M_OBJECT;
-			} else {
-				if (((local_inaddr[0] == ip_ipv6[0]) &&
-				    (local_inaddr[1] == ip_ipv6[1]) &&
-				    (local_inaddr[2] == ip_ipv6[2]) &&
-				    (local_inaddr[3] == ip_ipv6[3])) ||
-				    ((remote_inaddr[0] == ip_ipv6[0]) &&
-				    (remote_inaddr[1] == ip_ipv6[1]) &&
-				    (remote_inaddr[2] == ip_ipv6[2]) &&
-				    (remote_inaddr[3] == ip_ipv6[3])))
-					checkflags |= M_OBJECT;
+			if (ip_type == AU_IPv6) {
+				caddr = (uchar_t *)ip_ipv6;
+			}
+			if ((memcmp(local_inaddr, caddr, ip_type) == 0) ||
+			    (memcmp(remote_inaddr, caddr, ip_type) == 0)) {
+				checkflags |= M_OBJECT;
 			}
 		} else if (socket_flag == SOCKFLG_PORT) {
-			if ((local_port == obj_id) || (remote_port == obj_id))
+			if ((local_port == obj_id) || (remote_port == obj_id)) {
 				checkflags |= M_OBJECT;
+			}
 		}
 	}
 	return (-1);
@@ -1317,7 +1299,6 @@ socket_ex_token(adr_t *adr)
  * 	pid			adr_int32
  * 	sid			adr_int32
  * 	termid			adr_int32*2
- *
  */
 int
 subject32_token(adr_t *adr)
@@ -1377,15 +1358,18 @@ subject32_token(adr_t *adr)
  *	rgid			adr_int32
  * 	pid			adr_int32
  * 	sid			adr_int32
- * 	termid_addr		adr_int32*6
- *
+ * 	termid
+ * 		port		adr_int32
+ * 		type		adr_int32
+ * 		ip address	adr_u_char*type
  */
 int
 subject32_ex_token(adr_t *adr)
 {
 	int32_t	auid, euid, egid, ruid, rgid, pid;
 	int32_t	sid;
-	int32_t port, type, addr[4];
+	int32_t port, type;
+	uchar_t addr[16];
 
 	adrm_int32(adr, &auid, 1);
 	adrm_int32(adr, &euid, 1);
@@ -1396,7 +1380,7 @@ subject32_ex_token(adr_t *adr)
 	adrm_int32(adr, &sid, 1);
 	adrm_int32(adr, &port, 1);
 	adrm_int32(adr, &type, 1);
-	adrm_int32(adr, &addr[0], 4);
+	adrm_u_char(adr, addr, type);
 
 	if (flags & M_SUBJECT) {
 		if (subj_id == pid)
@@ -1440,7 +1424,6 @@ subject32_ex_token(adr_t *adr)
  * 	pid			adr_int32
  * 	sid			adr_int32
  * 	termid			adr_int64+adr_int32
- *
  */
 int
 subject64_token(adr_t *adr)
@@ -1492,7 +1475,7 @@ subject64_token(adr_t *adr)
 }
 
 /*
- * Format of subject64 token:
+ * Format of subject64_ex token:
  *	subject token id	adr_char
  *	auid			adr_int32
  *	euid			adr_int32
@@ -1501,8 +1484,10 @@ subject64_token(adr_t *adr)
  *	rgid			adr_int32
  * 	pid			adr_int32
  * 	sid			adr_int32
- * 	termid			adr_int64+5*adr_int32
- *
+ * 	termid
+ * 		port		adr_int64
+ * 		type		adr_int32
+ * 		ip address	adr_u_char*type
  */
 int
 subject64_ex_token(adr_t *adr)
@@ -1510,7 +1495,8 @@ subject64_ex_token(adr_t *adr)
 	int32_t	auid, euid, egid, ruid, rgid, pid;
 	int32_t	sid;
 	int64_t port;
-	int32_t type, addr[4];
+	int32_t type;
+	uchar_t	addr[16];
 
 	adrm_int32(adr, &auid, 1);
 	adrm_int32(adr, &euid, 1);
@@ -1521,7 +1507,7 @@ subject64_ex_token(adr_t *adr)
 	adrm_int32(adr, &sid, 1);
 	adrm_int64(adr, &port, 1);
 	adrm_int32(adr, &type, 1);
-	adrm_int32(adr, &addr[0], 4);
+	adrm_u_char(adr, addr, type);
 
 	if (flags & M_SUBJECT) {
 		if (subj_id == pid)
@@ -1811,7 +1797,6 @@ host_token(adr_t *adr)
  * Format of useofauth token:
  *	uauth token id		adr_char
  * 	uauth			adr_string
- *
  */
 int
 useofauth_token(adr_t *adr)
