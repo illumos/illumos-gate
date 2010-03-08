@@ -2872,7 +2872,13 @@ setDiskProp(luResourceImpl *hdl, uint32_t resourceProp, const char *propVal)
 			}
 			diskLu->luAliasValid = B_TRUE;
 			break;
-		case STMF_LU_PROP_BLOCK_SIZE:
+		case STMF_LU_PROP_BLOCK_SIZE: {
+			const char *tmp = propVal;
+			while (*tmp) {
+				if (!isdigit(*tmp++)) {
+					return (STMF_ERROR_INVALID_ARG);
+				}
+			}
 			(void) sscanf(propVal, "%llu", &numericProp);
 			if (numericProp > UINT16_MAX) {
 				return (STMF_ERROR_INVALID_PROPSIZE);
@@ -2880,6 +2886,7 @@ setDiskProp(luResourceImpl *hdl, uint32_t resourceProp, const char *propVal)
 			diskLu->blkSize = numericProp;
 			diskLu->blkSizeValid = B_TRUE;
 			break;
+		}
 		case STMF_LU_PROP_COMPANY_ID:
 			if ((strlcpy(ouiProp, propVal, sizeof (ouiProp))) >=
 			    sizeof (ouiProp)) {
