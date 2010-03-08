@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,6 +76,7 @@ static	int	verbose_mode = 0;
 #define	EM_REF_INVSIZE		14
 #define	EM_TYPE_UNKNOWN		15
 #define	EM_TS_OVERFLOW		16
+#define	EM_TS_INVSIZE		17
 
 /*
  * Error mesage texts
@@ -103,7 +101,8 @@ static	char	*err_msg[] = {
 	"picl_get_propval: invalid table handle size %d\n",	/* 13 */
 	"picl_get_propval: invalid reference size %d\n",	/* 14 */
 	"picl_get_propval: unknown type\n",			/* 15 */
-	"picl_get_propval: timestamp value too large\n"		/* 16 */
+	"picl_get_propval: timestamp value too large\n",	/* 16 */
+	"picl_get_propval: invalid timestamp size\n"		/* 17 */
 };
 
 /*PRINTFLIKE1*/
@@ -213,12 +212,10 @@ print_propval(int lvl, picl_prophdl_t proph, const picl_propinfo_t *propinfo)
 		return (PICL_SUCCESS);
 	}
 
-	assert(vbuf != NULL);
-	assert(propinfo->size > 0);
-
 	switch (propinfo->type) {
 	case PICL_PTYPE_CHARSTRING:
-		(void) printf(" %s ", (char *)vbuf);
+		if (propinfo->size > 0)
+			(void) printf(" %s ", (char *)vbuf);
 		break;
 	case PICL_PTYPE_INT:
 		switch (propinfo->size) {
@@ -277,6 +274,10 @@ print_propval(int lvl, picl_prophdl_t proph, const picl_propinfo_t *propinfo)
 		}
 		break;
 	case PICL_PTYPE_TIMESTAMP:
+		if (propinfo->size != sizeof (val64)) {
+			print_errmsg(gettext(err_msg[EM_TS_INVSIZE]));
+			return (PICL_FAILURE);
+		}
 		val64 = *(uint64_t *)vbuf;
 		tmp = (time_t)val64;
 		if ((uint64_t)tmp != val64) {
@@ -309,7 +310,8 @@ print_propval(int lvl, picl_prophdl_t proph, const picl_propinfo_t *propinfo)
 		(void) printf(" (%" PRIxPICLHDL "H) ", *(picl_nodehdl_t *)vbuf);
 		break;
 	case PICL_PTYPE_BYTEARRAY:
-		print_bytearray(lvl, vbuf, propinfo->size);
+		if (propinfo->size > 0)
+			print_bytearray(lvl, vbuf, propinfo->size);
 		break;
 	default:
 		print_errmsg(gettext(err_msg[EM_TYPE_UNKNOWN]));
@@ -483,8 +485,8 @@ print_tree_by_class(int lvl, picl_nodehdl_t nodeh, char *piclclass)
 
 	for (err = picl_get_propval_by_name(nodeh, PICL_PROP_CHILD, &chdh,
 	    sizeof (picl_nodehdl_t)); err != PICL_PROPNOTFOUND;
-		err = picl_get_propval_by_name(chdh, PICL_PROP_PEER, &chdh,
-		    sizeof (picl_nodehdl_t))) {
+	    err = picl_get_propval_by_name(chdh, PICL_PROP_PEER, &chdh,
+	    sizeof (picl_nodehdl_t))) {
 
 		if (err != PICL_SUCCESS) {
 			print_errmsg(gettext(err_msg[EM_GETPVALBYNAME]),
