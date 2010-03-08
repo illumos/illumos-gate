@@ -537,7 +537,7 @@ filter(const char *input, uint64_t sequence, char *output,
 		initial_ctx.out.sf_egid = (gid_t)-2;
 		initial_ctx.out.sf_tid.at_type = 0;
 		initial_ctx.out.sf_pauid = (uid_t)-2;
-		initial_ctx.out.sf_peuid = (uid_t)2;
+		initial_ctx.out.sf_peuid = (uid_t)-2;
 		initial_ctx.out.sf_uauthlen = 0;
 		initial_ctx.out.sf_uauth = NULL;
 		initial_ctx.out.sf_pathlen = 0;
