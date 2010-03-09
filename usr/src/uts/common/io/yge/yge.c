@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3434,19 +3434,21 @@ yge_error(yge_dev_t *dev, yge_port_t *port, char *fmt, ...)
 {
 	va_list		ap;
 	char		buf[256];
-	dev_info_t	*dip;
+	int		ppa;
 
 	va_start(ap, fmt);
 	(void) vsnprintf(buf, sizeof (buf), fmt, ap);
 	va_end(ap);
 
-	if (dev == NULL)
-		dev = port->p_dev;
-	dip = dev->d_dip;
-	cmn_err(CE_WARN, "%s%d: %s",
-	    ddi_driver_name(dip),
-	    ddi_get_instance(dip) + port ? port->p_ppa : 0,
-	    buf);
+	if (dev == NULL && port == NULL) {
+		cmn_err(CE_WARN, "yge: %s", buf);
+	} else {
+		if (port != NULL)
+			ppa = port->p_ppa;
+		else
+			ppa = ddi_get_instance(dev->d_dip);
+		cmn_err(CE_WARN, "yge%d: %s", ppa, buf);
+	}
 }
 
 static int
