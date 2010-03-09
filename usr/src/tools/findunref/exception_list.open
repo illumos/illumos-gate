@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -250,3 +250,10 @@
 # and sparc prototype files
 #
 ./usr/src/cmd/fps/fptest/singdoub*
+
+#
+# The sharemgr command is built 32-bit only by default, but support
+# for building 64-bit is latent in the Makefiles.
+#
+./usr/src/cmd/dfs.cmds/sharemgr/amd64/Makefile
+./usr/src/cmd/dfs.cmds/sharemgr/sparcv9/Makefile
