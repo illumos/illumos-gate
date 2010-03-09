@@ -93,10 +93,6 @@ static int rtls_m_multicst(void *, boolean_t, const uint8_t *);
 static int rtls_m_promisc(void *, boolean_t);
 static mblk_t *rtls_m_tx(void *, mblk_t *);
 static int rtls_m_stat(void *, uint_t, uint64_t *);
-static int rtls_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
-    uint_t, void *, uint_t *);
-static int rtls_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
-    const void *);
 
 static uint_t rtls_intr(caddr_t);
 
@@ -184,13 +180,7 @@ static mac_callbacks_t rtls_m_callbacks = {
 	rtls_m_promisc,
 	rtls_m_multicst,
 	rtls_m_unicst,
-	rtls_m_tx,
-	NULL,		/* mc_ioctl */
-	NULL,		/* mc_getcapab */
-	NULL,		/* mc_open */
-	NULL,		/* mc_close */
-	rtls_m_setprop,
-	rtls_m_getprop,
+	rtls_m_tx
 };
 
 static mii_ops_t rtls_mii_ops = {
@@ -910,24 +900,6 @@ rtls_m_stat(void *arg, uint_t stat, uint64_t *val)
 #endif
 
 	return (0);
-}
-
-int
-rtls_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
-    uint_t sz, void *val, uint_t *perm)
-{
-	rtls_t	*rtlsp = arg;
-
-	return (mii_m_getprop(rtlsp->mii, name, num, flags, sz, val, perm));
-}
-
-int
-rtls_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
-    const void *val)
-{
-	rtls_t	*rtlsp = arg;
-
-	return (mii_m_setprop(rtlsp->mii, name, num, sz, val));
 }
 
 /*

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,8 @@ extern "C" {
 #include <sys/types.h>
 #include <netinet/in.h>		/* for IPPROTO_* constants */
 #include <sys/ethernet.h>
+
+#define	MAX_RINGS_PER_GROUP	128
 
 /*
  * MAXFLOWNAMELEN defines the longest possible permitted flow name,
@@ -93,28 +95,44 @@ typedef struct flow_desc_s {
 /*
  * In MCM_CPUS mode, cpu bindings is user specified. In MCM_FANOUT mode,
  * user only specifies a fanout count.
- * mc_fanout_cnt gives the number of CPUs used for fanout soft rings.
- * mc_fanout_cpus[] array stores the CPUs used for fanout soft rings.
+ * mc_rx_fanout_cnt gives the number of CPUs used for fanout soft rings.
+ * mc_rx_fanout_cpus[] array stores the CPUs used for fanout soft rings.
  */
 typedef enum {
 	MCM_FANOUT = 1,
 	MCM_CPUS
 } mac_cpu_mode_t;
 
+/*
+ * Structure to store the value of the CPUs to be used to re-target
+ * Tx interrupt.
+ */
+typedef struct mac_tx_intr_cpus_s {
+	/* cpu value to re-target intr to */
+	int32_t		mtc_intr_cpu[MRP_NCPUS];
+	/* re-targeted CPU or -1 if failed */
+	int32_t		mtc_retargeted_cpu[MRP_NCPUS];
+} mac_tx_intr_cpu_t;
+
 typedef struct mac_cpus_props_s {
 	uint32_t		mc_ncpus;		/* num of cpus */
 	uint32_t		mc_cpus[MRP_NCPUS]; 	/* cpu list */
-	uint32_t		mc_fanout_cnt;		/* soft ring cpu cnt */
-	uint32_t		mc_fanout_cpus[MRP_NCPUS]; /* SR cpu list */
-	uint32_t		mc_pollid;		/* poll thr binding */
-	uint32_t		mc_workerid;		/* worker thr binding */
+	uint32_t		mc_rx_fanout_cnt;	/* soft ring cpu cnt */
+	uint32_t		mc_rx_fanout_cpus[MRP_NCPUS]; /* SR cpu list */
+	uint32_t		mc_rx_pollid;		/* poll thr binding */
+	uint32_t		mc_rx_workerid;		/* worker thr binding */
 	/*
 	 * interrupt cpu: mrp_intr_cpu less than 0 implies platform limitation
 	 * in retargetting the interrupt assignment.
 	 */
-	int32_t			mc_intr_cpu;
+	int32_t			mc_rx_intr_cpu;
+	int32_t			mc_tx_fanout_cpus[MRP_NCPUS];
+	mac_tx_intr_cpu_t	mc_tx_intr_cpus;
 	mac_cpu_mode_t		mc_fanout_mode;		/* fanout mode */
 } mac_cpus_t;
+
+#define	mc_tx_intr_cpu		mc_tx_intr_cpus.mtc_intr_cpu
+#define	mc_tx_retargeted_cpu	mc_tx_intr_cpus.mtc_retargeted_cpu
 
 /* Priority values */
 typedef enum {
@@ -126,18 +144,40 @@ typedef enum {
 
 /* Protection types */
 #define	MPT_MACNOSPOOF		0x00000001
-#define	MPT_IPNOSPOOF		0x00000002
-#define	MPT_RESTRICTED		0x00000004
-#define	MPT_ALL			(MPT_MACNOSPOOF|MPT_IPNOSPOOF|MPT_RESTRICTED)
+#define	MPT_RESTRICTED		0x00000002
+#define	MPT_IPNOSPOOF		0x00000004
+#define	MPT_DHCPNOSPOOF		0x00000008
+#define	MPT_ALL			0x0000000f
 #define	MPT_RESET		0xffffffff
-#define	MPT_MAXIPADDR		32
+#define	MPT_MAXCNT		32
+#define	MPT_MAXIPADDR		MPT_MAXCNT
+#define	MPT_MAXCID		MPT_MAXCNT
+#define	MPT_MAXCIDLEN		256
+
+typedef struct mac_ipaddr_s {
+	uint32_t	ip_version;
+	in6_addr_t	ip_addr;
+} mac_ipaddr_t;
+
+typedef enum {
+	CIDFORM_TYPED = 1,
+	CIDFORM_HEX,
+	CIDFORM_STR
+} mac_dhcpcid_form_t;
+
+typedef struct mac_dhcpcid_s {
+	uchar_t			dc_id[MPT_MAXCIDLEN];
+	uint32_t		dc_len;
+	mac_dhcpcid_form_t	dc_form;
+} mac_dhcpcid_t;
 
 typedef struct mac_protect_s {
 	uint32_t	mp_types;
 	uint32_t	mp_ipaddrcnt;
-	ipaddr_t	mp_ipaddrs[MPT_MAXIPADDR];
+	mac_ipaddr_t	mp_ipaddrs[MPT_MAXIPADDR];
+	uint32_t	mp_cidcnt;
+	mac_dhcpcid_t	mp_cids[MPT_MAXCID];
 } mac_protect_t;
-
 
 /* The default priority for links */
 #define	MPL_LINK_DEFAULT		MPL_HIGH
@@ -150,6 +190,12 @@ typedef struct mac_protect_s {
 #define	MRP_CPUS_USERSPEC	0x00000004 	/* CPU/fanout from user */
 #define	MRP_PRIORITY		0x00000008 	/* Priority set */
 #define	MRP_PROTECT		0x00000010	/* Protection set */
+#define	MRP_RX_RINGS		0x00000020	/* Rx rings */
+#define	MRP_TX_RINGS		0x00000040	/* Tx rings */
+#define	MRP_RXRINGS_UNSPEC	0x00000080	/* unspecified rings */
+#define	MRP_TXRINGS_UNSPEC	0x00000100	/* unspecified rings */
+#define	MRP_RINGS_RESET		0x00000200	/* resetting rings */
+#define	MRP_POOL		0x00000400	/* CPU pool */
 
 #define	MRP_THROTTLE		MRP_MAXBW
 
@@ -174,21 +220,24 @@ typedef	struct mac_resource_props_s {
 	mac_priority_level_t	mrp_priority;	/* relative flow priority */
 	mac_cpus_t		mrp_cpus;
 	mac_protect_t		mrp_protect;
+	uint32_t		mrp_nrxrings;
+	uint32_t		mrp_ntxrings;
+	char			mrp_pool[MAXPATHLEN];	/* CPU pool */
 } mac_resource_props_t;
 
-#define	mrp_ncpus	mrp_cpus.mc_ncpus
-#define	mrp_cpu		mrp_cpus.mc_cpus
-#define	mrp_fanout_cnt	mrp_cpus.mc_fanout_cnt
-#define	mrp_fanout_cpu	mrp_cpus.mc_fanout_cpus
-#define	mrp_pollid	mrp_cpus.mc_pollid
-#define	mrp_workerid	mrp_cpus.mc_workerid
-#define	mrp_intr_cpu	mrp_cpus.mc_intr_cpu
-#define	mrp_fanout_mode	mrp_cpus.mc_fanout_mode
+#define	mrp_ncpus		mrp_cpus.mc_ncpus
+#define	mrp_cpu			mrp_cpus.mc_cpus
+#define	mrp_rx_fanout_cnt	mrp_cpus.mc_rx_fanout_cnt
+#define	mrp_rx_pollid		mrp_cpus.mc_rx_pollid
+#define	mrp_rx_workerid		mrp_cpus.mc_rx_workerid
+#define	mrp_rx_intr_cpu		mrp_cpus.mc_rx_intr_cpu
+#define	mrp_fanout_mode		mrp_cpus.mc_fanout_mode
 
 #define	MAC_COPY_CPUS(mrp, fmrp) {					\
 	int	ncpus;							\
 	(fmrp)->mrp_ncpus = (mrp)->mrp_ncpus;				\
-	(fmrp)->mrp_intr_cpu = (mrp)->mrp_intr_cpu;			\
+	(fmrp)->mrp_rx_fanout_cnt = (mrp)->mrp_rx_fanout_cnt;		\
+	(fmrp)->mrp_rx_intr_cpu = (mrp)->mrp_rx_intr_cpu;		\
 	(fmrp)->mrp_fanout_mode = (mrp)->mrp_fanout_mode;		\
 	if ((mrp)->mrp_ncpus == 0) {					\
 		(fmrp)->mrp_mask &= ~MRP_CPUS;				\
@@ -201,24 +250,6 @@ typedef	struct mac_resource_props_s {
 			(fmrp)->mrp_mask |= MRP_CPUS_USERSPEC;		\
 	}								\
 }
-
-typedef struct flow_stats_s {
-	uint64_t	fs_rbytes;
-	uint64_t	fs_ipackets;
-	uint64_t	fs_ierrors;
-	uint64_t	fs_obytes;
-	uint64_t	fs_opackets;
-	uint64_t	fs_oerrors;
-} flow_stats_t;
-
-typedef enum {
-	FLOW_STAT_RBYTES,
-	FLOW_STAT_IPACKETS,
-	FLOW_STAT_IERRORS,
-	FLOW_STAT_OBYTES,
-	FLOW_STAT_OPACKETS,
-	FLOW_STAT_OERRORS
-} flow_stat_t;
 
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()

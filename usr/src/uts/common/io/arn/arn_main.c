@@ -139,11 +139,13 @@ static void	arn_m_ioctl(void *, queue_t *, mblk_t *);
 static int	arn_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int	arn_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+    uint_t, void *);
+static void	arn_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 
 /* MAC Callcack Functions */
 static mac_callbacks_t arn_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	arn_m_stat,
 	arn_m_start,
 	arn_m_stop,
@@ -151,12 +153,14 @@ static mac_callbacks_t arn_m_callbacks = {
 	arn_m_multicst,
 	arn_m_unicst,
 	arn_m_tx,
+	NULL,
 	arn_m_ioctl,
 	NULL,
 	NULL,
 	NULL,
 	arn_m_setprop,
-	arn_m_getprop
+	arn_m_getprop,
+	arn_m_propinfo
 };
 
 /*
@@ -2518,15 +2522,24 @@ arn_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 /* ARGSUSED */
 static int
 arn_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	struct arn_softc *sc = arg;
 	int	err = 0;
 
 	err = ieee80211_getprop(&sc->sc_isc, pr_name, wldp_pr_num,
-	    pr_flags, wldp_length, wldp_buf, perm);
+	    wldp_length, wldp_buf);
 
 	return (err);
+}
+
+static void
+arn_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    mac_prop_info_handle_t prh)
+{
+	struct arn_softc *sc = arg;
+
+	ieee80211_propinfo(&sc->sc_isc, pr_name, wldp_pr_num, prh);
 }
 
 /* return bus cachesize in 4B word units */

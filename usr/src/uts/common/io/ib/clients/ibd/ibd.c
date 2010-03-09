@@ -458,6 +458,7 @@ static mac_callbacks_t ibd_m_callbacks = {
 	ibd_m_unicst,
 	ibd_m_tx,
 	NULL,
+	NULL,
 	ibd_m_getcapab
 };
 
@@ -6256,7 +6257,7 @@ ibd_rc_large_copy:
 	 * ud destination, the opcode and the LSO header information to the
 	 * work request.
 	 */
-	lso_info_get(mp, &mss, &lsoflags);
+	mac_lso_get(mp, &mss, &lsoflags);
 	if ((lsoflags & HW_LSO) != HW_LSO) {
 		node->w_swr.wr_opcode = IBT_WRC_SEND;
 		lsohdr_sz = 0;
@@ -6277,7 +6278,7 @@ ibd_rc_large_copy:
 		lsohdr_sz = (node->w_swr.wr.ud_lso).lso_hdr_sz;
 	}
 
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &hckflags);
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &hckflags);
 	if ((hckflags & HCK_FULLCKSUM) == HCK_FULLCKSUM)
 		node->w_swr.wr_flags |= IBT_WR_SEND_CKSUM;
 	else
@@ -6940,8 +6941,7 @@ ibd_process_rx(ibd_state_t *state, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 	if (((wc->wc_flags & IBT_WC_CKSUM_OK) == IBT_WC_CKSUM_OK) &&
 	    (wc->wc_cksum == 0xFFFF) &&
 	    (iphap->ipha_version_and_hdr_length == IP_SIMPLE_HDR_VERSION)) {
-		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0,
-		    HCK_FULLCKSUM | HCK_FULLCKSUM_OK, 0);
+		mac_hcksum_set(mp, 0, 0, 0, 0, HCK_FULLCKSUM_OK);
 	}
 
 	return (mp);

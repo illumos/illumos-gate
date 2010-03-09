@@ -1910,6 +1910,13 @@ ip_input_cksum_v6(iaflags_t iraflags, mblk_t *mp, ip6_t *ip6h,
 
 	hck_flags = DB_CKSUMFLAGS(mp);
 
+	if (hck_flags & HCK_FULLCKSUM_OK) {
+		/*
+		 * Hardware has already verified the checksum.
+		 */
+		return (B_TRUE);
+	}
+
 	if (hck_flags & HCK_FULLCKSUM) {
 		/*
 		 * Full checksum has been computed by the hardware
@@ -1918,9 +1925,6 @@ ip_input_cksum_v6(iaflags_t iraflags, mblk_t *mp, ip6_t *ip6h,
 		 * order to protect against faulty hardware, compare
 		 * it against -0 (0xFFFF) to see if it's valid.
 		 */
-		if (hck_flags & HCK_FULLCKSUM_OK)
-			return (B_TRUE);
-
 		cksum = DB_CKSUM16(mp);
 		if (cksum == 0xFFFF)
 			return (B_TRUE);

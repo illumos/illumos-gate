@@ -250,8 +250,7 @@ xnb_software_csum(xnb_t *xnbp, mblk_t *mp)
 	 * XXPV dme: shouldn't rely on mac_fix_cksum(), not least
 	 * because it doesn't cover all of the interesting cases :-(
 	 */
-	(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0,
-	    HCK_FULLCKSUM, KM_NOSLEEP);
+	mac_hcksum_set(mp, 0, 0, 0, 0, HCK_FULLCKSUM);
 
 	return (mac_fix_cksum(mp));
 }
@@ -342,9 +341,7 @@ xnb_process_cksum_flags(xnb_t *xnbp, mblk_t *mp, uint32_t capab)
 			 */
 			*stuffp = 0;
 
-			(void) hcksum_assoc(mp, NULL, NULL,
-			    0, 0, 0, 0,
-			    HCK_FULLCKSUM, KM_NOSLEEP);
+			mac_hcksum_set(mp, 0, 0, 0, 0, HCK_FULLCKSUM);
 
 			xnbp->xnb_stat_csum_hardware++;
 
@@ -375,9 +372,8 @@ xnb_process_cksum_flags(xnb_t *xnbp, mblk_t *mp, uint32_t capab)
 				*stuffp = (uint16_t)(cksum ? cksum : ~cksum);
 			}
 
-			(void) hcksum_assoc(mp, NULL, NULL,
-			    start, stuff, length, 0,
-			    HCK_PARTIALCKSUM, KM_NOSLEEP);
+			mac_hcksum_set(mp, start, stuff, length, 0,
+			    HCK_PARTIALCKSUM);
 
 			xnbp->xnb_stat_csum_hardware++;
 
@@ -911,13 +907,13 @@ replace_msg(mblk_t *mp, size_t len, mblk_t *mp_prev, mblk_t *ml_prev)
 	mblk_t		*new_mp;
 
 	new_mp = copyb(mp);
-	if (new_mp == NULL)
+	if (new_mp == NULL) {
 		cmn_err(CE_PANIC, "replace_msg: cannot alloc new message"
 		    "for %p, len %lu", (void *) mp, len);
+	}
 
-	hcksum_retrieve(mp, NULL, NULL, &start, &stuff, &end, &value, &flags);
-	(void) hcksum_assoc(new_mp, NULL, NULL, start, stuff, end, value,
-	    flags, KM_NOSLEEP);
+	mac_hcksum_get(mp, &start, &stuff, &end, &value, &flags);
+	mac_hcksum_set(new_mp, start, stuff, end, value, flags);
 
 	new_mp->b_next = mp->b_next;
 	new_mp->b_prev = mp->b_prev;

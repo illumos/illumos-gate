@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_POOL_H
 #define	_SYS_POOL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -41,6 +38,7 @@ extern "C" {
 
 #define	POOL_DEFAULT		0		/* default pool's ID */
 #define	POOL_MAXID		999999		/* maximum possible pool ID */
+#define	POOL_INVALID		-1
 
 /* pools states */
 #define	POOL_DISABLED		0		/* pools enabled */
@@ -81,6 +79,7 @@ extern size_t	pool_bufsz;	/* size of pool_buf */
  */
 extern pool_t	*pool_lookup_pool_by_id(poolid_t);
 extern pool_t	*pool_lookup_pool_by_name(char *);
+extern pool_t	*pool_lookup_pool_by_pset(int);
 
 /*
  * Configuration routines
@@ -102,6 +101,7 @@ extern int	pool_propput(int, int, id_t, nvpair_t *);
 extern int	pool_proprm(int, int, id_t, char *);
 extern int	pool_propget(char *, int, int, id_t, nvlist_t **);
 extern int	pool_commit(int);
+extern void	pool_get_name(pool_t *, char **);
 
 /*
  * Synchronization routines
@@ -113,6 +113,25 @@ extern void	pool_unlock(void);
 extern void	pool_barrier_enter(void);
 extern void	pool_barrier_exit(void);
 
+typedef enum {
+	POOL_E_ENABLE,
+	POOL_E_DISABLE,
+	POOL_E_CHANGE,
+} pool_event_t;
+
+typedef void pool_event_cb_func_t(pool_event_t, poolid_t,  void *);
+
+typedef struct pool_event_cb {
+	pool_event_cb_func_t	*pec_func;
+	void			*pec_arg;
+	list_node_t		pec_list;
+} pool_event_cb_t;
+
+/*
+ * Routines used to register interest in changes in cpu pools.
+ */
+extern void pool_event_cb_register(pool_event_cb_t *);
+extern void pool_event_cb_unregister(pool_event_cb_t *);
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -375,30 +375,7 @@ main(int argc, char *argv[])
 				}
 			}
 			str2buf(buf, disabled, AC_OFF, type);
-		}
-		if (enabled) {
-			/*
-			 * Lets us get network logging started.
-			 */
-			if (type & AC_NET) {
-				/*
-				 * Default logging interval for AC_NET is
-				 * ACCTADM_NET_LOG_INTERVAL.
-				 */
-				(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
-				    PRIV_SYS_DL_CONFIG, NULL);
-				err = dladm_start_usagelog(dld_handle,
-				    strcmp(enabled, "basic") == 0 ?
-				    DLADM_LOGTYPE_LINK : DLADM_LOGTYPE_FLOW,
-				    ACCTADM_NET_LOG_INTERVAL);
-				(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
-				    PRIV_SYS_DL_CONFIG, NULL);
-				if (err != DLADM_STATUS_OK) {
-					die(gettext("failed to start logging "
-					    "network information, error %d\n"),
-					    errno);
-				}
-			}
+		} else if (enabled) {
 			str2buf(buf, enabled, AC_ON, type);
 		}
 		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_SYS_ACCT, NULL);
@@ -408,7 +385,6 @@ main(int argc, char *argv[])
 			    "resources\n"), ac_type_name(type));
 		}
 		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_SYS_ACCT, NULL);
-
 		tracked = buf2str(buf, AC_BUFSIZE, AC_ON, type);
 		untracked = buf2str(buf, AC_BUFSIZE, AC_OFF, type);
 		if (aconf_set_string(AC_PROP_TRACKED, tracked) == -1)
@@ -446,6 +422,31 @@ main(int argc, char *argv[])
 			die(gettext("cannot update %s property\n"),
 			    AC_PROP_STATE);
 		modified++;
+	}
+
+	/*
+	 * Let's get network logging started. We do this after turning on
+	 * accounting and opening the file so that we can start writing
+	 * immediately.
+	 */
+	if (enabled && (type & AC_NET)) {
+		/*
+		 * Default logging interval for AC_NET is
+		 * ACCTADM_NET_LOG_INTERVAL.
+		 */
+		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
+		    PRIV_SYS_DL_CONFIG, NULL);
+		err = dladm_start_usagelog(dld_handle,
+		    strcmp(enabled, "basic") == 0 ?
+		    DLADM_LOGTYPE_LINK : DLADM_LOGTYPE_FLOW,
+		    ACCTADM_NET_LOG_INTERVAL);
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
+		    PRIV_SYS_DL_CONFIG, NULL);
+		if (err != DLADM_STATUS_OK) {
+			die(gettext("failed to start logging "
+			    "network information, error %d\n"),
+			    errno);
+		}
 	}
 
 	if (Dflg) {

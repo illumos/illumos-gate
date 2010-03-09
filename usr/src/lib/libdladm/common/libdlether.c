@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -299,7 +299,7 @@ dladm_ether_info(dladm_handle_t handle, datalink_id_t linkid,
 	eattr->lei_attr[CURRENT].le_spdx->lesd_speed = (int)(sp64/1000000ull);
 	eattr->lei_attr[CURRENT].le_spdx->lesd_duplex = link_duplex;
 
-	status = i_dladm_get_state(handle, linkid, &eattr->lei_state);
+	status = dladm_get_state(handle, linkid, &eattr->lei_state);
 	if (status != DLADM_STATUS_OK)
 		goto bail;
 

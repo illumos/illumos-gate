@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,13 +85,14 @@ static int	pcwl_m_setprop(void *arg, const char *pr_name,
     mac_prop_id_t wldp_pr_num, uint_t wldp_length,
     const void *wldp_buf);
 static int	pcwl_m_getprop(void *arg, const char *pr_name,
-    mac_prop_id_t wldp_pr_num, uint_t pr_flags,
-    uint_t wldp_length, void *wldp_buf, uint_t *perm);
+    mac_prop_id_t wldp_pr_num, uint_t wldp_length, void *wldp_buf);
+static void	pcwl_m_propinfo(void *arg, const char *pr_name,
+    mac_prop_id_t wlpd_pr_num, mac_prop_info_handle_t mph);
 static void
 pcwl_delay(pcwl_maci_t *, clock_t);
 
 mac_callbacks_t pcwl_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	pcwl_gstat,
 	pcwl_start,
 	pcwl_stop,
@@ -99,12 +100,14 @@ mac_callbacks_t pcwl_m_callbacks = {
 	pcwl_sdmulti,
 	pcwl_saddr,
 	pcwl_tx,
+	NULL,
 	pcwl_ioctl,
 	NULL,
 	NULL,
 	NULL,
 	pcwl_m_setprop,
-	pcwl_m_getprop
+	pcwl_m_getprop,
+	pcwl_m_propinfo
 };
 
 static char *pcwl_name_str = "pcwl";
@@ -4400,17 +4403,10 @@ pcwl_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 /* ARGSUSED */
 static int
 pcwl_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf,  uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	int err = 0;
-
 	pcwl_maci_t *pcwl_p = (pcwl_maci_t *)arg;
-
-	if (wldp_length == 0) {
-		err = EINVAL;
-		return (err);
-	}
-	bzero(wldp_buf, wldp_length);
 
 	mutex_enter(&pcwl_p->pcwl_glock);
 	if (!(pcwl_p->pcwl_flag & PCWL_CARD_READY)) {
@@ -4418,8 +4414,6 @@ pcwl_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 		err = EINVAL;
 		return (err);
 	}
-
-	*perm = MAC_PROP_PERM_RW;
 
 	switch (wldp_pr_num) {
 	/* mac_prop_id */
@@ -4442,19 +4436,15 @@ pcwl_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 		pcwl_get_bsstype(pcwl_p, wldp_buf);
 		break;
 	case MAC_PROP_WL_LINKSTATUS:
-		*perm = MAC_PROP_PERM_READ;
 		err = pcwl_get_linkstatus(pcwl_p, wldp_buf);
 		break;
 	case MAC_PROP_WL_ESS_LIST:
-		*perm = MAC_PROP_PERM_READ;
 		pcwl_get_esslist(pcwl_p, wldp_buf);
 		break;
 	case MAC_PROP_WL_SUPPORTED_RATES:
-		*perm = MAC_PROP_PERM_READ;
 		pcwl_get_suprates(wldp_buf);
 		break;
 	case MAC_PROP_WL_RSSI:
-		*perm = MAC_PROP_PERM_READ;
 		pcwl_get_param_rssi(pcwl_p, wldp_buf);
 		break;
 	case MAC_PROP_WL_RADIO:
@@ -4492,6 +4482,23 @@ pcwl_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 	return (err);
 }
+
+
+static void
+pcwl_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wlpd_pr_num,
+    mac_prop_info_handle_t prh)
+{
+        _NOTE(ARGUNUSED(arg, pr_name));
+
+	switch (wlpd_pr_num) {
+	case MAC_PROP_WL_LINKSTATUS:
+	case MAC_PROP_WL_ESS_LIST:
+	case MAC_PROP_WL_SUPPORTED_RATES:
+	case MAC_PROP_WL_RSSI:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+	}
+}
+
 
 /*
  * quiesce(9E) entry point.

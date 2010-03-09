@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,7 @@
 #define	_SYS_DLD_H
 
 /*
- * Data-Link Driver (public header).
+ * Data-Link Driver ioctl interfaces.
  *
  * Note that the datastructures defined here define an ioctl interface
  * that is shared betwen user and kernel space.  The dld driver thus
@@ -280,10 +280,12 @@ typedef struct dld_ioc_usagelog {
 
 #define	DLDIOC_SETMACPROP	DLDIOC(0x1b)
 #define	DLDIOC_GETMACPROP	DLDIOC(0x1c)
-#define	MAC_PROP_VERSION	1
+
+/* pr_flags can be set to a combination of the following flags */
+#define	DLD_PROP_DEFAULT	0x0001
+#define	DLD_PROP_POSSIBLE	0x0002
 
 typedef struct dld_ioc_macprop_s {
-	int		pr_version;
 	uint_t		pr_flags;
 	datalink_id_t	pr_linkid;
 	mac_prop_id_t	pr_num;
@@ -308,7 +310,7 @@ typedef struct dld_hwgrpinfo {
 	uint_t	dhi_grp_type;
 	uint_t	dhi_n_rings;
 	uint_t	dhi_n_clnts;
-	/* XXXX later we should use dhi_n_clnts * MAXNAMELEN for dhi_clnts */
+	uint_t	dhi_rings[MAX_RINGS_PER_GROUP];
 	char	dhi_clnts[MAXCLIENTNAMELEN];
 } dld_hwgrpinfo_t;
 

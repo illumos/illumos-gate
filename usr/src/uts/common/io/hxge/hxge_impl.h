@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,7 @@ extern "C" {
 
 #include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
+#include <sys/note.h>
 
 /*
  * Handy macros (taken from bge driver)
@@ -258,6 +259,7 @@ struct _hxge_ldg_t {
 	p_hxge_ldv_t		ldvp;
 	hxge_sys_intr_t		sys_intr_handler;
 	p_hxge_t		hxgep;
+	uint32_t		htable_idx;
 };
 
 struct _hxge_ldv_t {
@@ -378,6 +380,8 @@ void hxge_destroy_kstats(p_hxge_t);
 int hxge_port_kstat_update(kstat_t *, int);
 
 int hxge_m_stat(void *arg, uint_t stat, uint64_t *val);
+int hxge_rx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
+int hxge_tx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
 
 /* hxge_hw.c */
 void

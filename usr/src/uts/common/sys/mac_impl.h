@@ -26,10 +26,12 @@
 #ifndef	_SYS_MAC_IMPL_H
 #define	_SYS_MAC_IMPL_H
 
+#include <sys/cpupart.h>
 #include <sys/modhash.h>
 #include <sys/mac_client.h>
 #include <sys/mac_provider.h>
 #include <sys/note.h>
+#include <sys/avl.h>
 #include <net/if.h>
 #include <sys/mac_flow_impl.h>
 #include <netinet/ip6.h>
@@ -84,6 +86,8 @@ typedef	struct mac_chain_s {
 #define	MCB_CONDEMNED		0x1		/* Logically deleted */
 #define	MCB_NOTIFY_CB_T		0x2
 #define	MCB_TX_NOTIFY_CB_T	0x4
+
+extern boolean_t	mac_tx_serialize;
 
 typedef struct mac_cb_s {
 	struct mac_cb_s		*mcb_nextp;	/* Linked list of callbacks */
@@ -189,6 +193,8 @@ typedef enum {
 #define	MR_CONDEMNED	0x2
 #define	MR_QUIESCE	0x4
 
+typedef struct mac_impl_s mac_impl_t;
+
 struct mac_ring_s {
 	int			mr_index;	/* index in the original list */
 	mac_ring_type_t		mr_type;	/* ring type */
@@ -196,10 +202,14 @@ struct mac_ring_s {
 	mac_group_handle_t	mr_gh;		/* reference to group */
 
 	mac_classify_type_t	mr_classify_type;	/* HW vs SW */
-	struct mac_soft_ring_set_s *mr_srs;		/* associated SRS */
-	uint_t			mr_refcnt;		/* Ring references */
+	struct mac_soft_ring_set_s *mr_srs;	/* associated SRS */
+	mac_ring_handle_t	mr_prh;		/* associated pseudo ring hdl */
+	uint_t			mr_refcnt;	/* Ring references */
 	/* ring generation no. to guard against drivers using stale rings */
 	uint64_t		mr_gen_num;
+
+	kstat_t			*mr_ksp;	/* ring kstats */
+	mac_impl_t		*mr_mip;	/* pointer to primary's mip */
 
 	kmutex_t		mr_lock;
 	kcondvar_t		mr_cv;			/* mr_lock */
@@ -211,6 +221,7 @@ struct mac_ring_s {
 #define	mr_driver		mr_info.mri_driver
 #define	mr_start		mr_info.mri_start
 #define	mr_stop			mr_info.mri_stop
+#define	mr_stat			mr_info.mri_stat
 
 #define	MAC_RING_MARK(mr, flag)		\
 	(mr)->mr_flag |= flag;
@@ -245,9 +256,9 @@ typedef struct mac_grp_client {
 	struct mac_client_impl_s	*mgc_client;
 } mac_grp_client_t;
 
-#define	MAC_RX_GROUP_NO_CLIENT(g)	((g)->mrg_clients == NULL)
+#define	MAC_GROUP_NO_CLIENT(g)	((g)->mrg_clients == NULL)
 
-#define	MAC_RX_GROUP_ONLY_CLIENT(g)			\
+#define	MAC_GROUP_ONLY_CLIENT(g)			\
 	((((g)->mrg_clients != NULL) &&			\
 	((g)->mrg_clients->mgc_next == NULL)) ?		\
 	(g)->mrg_clients->mgc_client : NULL)
@@ -267,7 +278,6 @@ struct mac_group_s {
 
 	mac_grp_client_t	*mrg_clients;	/* clients list */
 
-	struct mac_client_impl_s *mrg_tx_client; /* TX client pointer */
 	mac_group_info_t	mrg_info;	/* driver supplied info */
 };
 
@@ -278,8 +288,6 @@ struct mac_group_s {
 #define	GROUP_INTR_HANDLE(g)		(g)->mrg_info.mgi_intr.mi_handle
 #define	GROUP_INTR_ENABLE_FUNC(g)	(g)->mrg_info.mgi_intr.mi_enable
 #define	GROUP_INTR_DISABLE_FUNC(g)	(g)->mrg_info.mgi_intr.mi_disable
-
-#define	MAC_DEFAULT_GROUP(mh)		(((mac_impl_t *)mh)->mi_rx_groups)
 
 #define	MAC_RING_TX(mhp, rh, mp, rest) {				\
 	mac_ring_handle_t mrh = rh;					\
@@ -304,7 +312,8 @@ struct mac_group_s {
  * rh nulled out if the bridge chooses to send output on a different
  * link due to forwarding.
  */
-#define	MAC_TX(mip, rh, mp, share_bound) {				\
+#define	MAC_TX(mip, rh, mp, src_mcip) {					\
+	mac_ring_handle_t	rhandle = (rh);				\
 	/*								\
 	 * If there is a bound Hybrid I/O share, send packets through 	\
 	 * the default tx ring. (When there's a bound Hybrid I/O share,	\
@@ -312,17 +321,19 @@ struct mac_group_s {
 	 * and not accessible from here.)				\
 	 */								\
 	_NOTE(CONSTANTCONDITION)					\
-	if (share_bound)						\
-		rh = NULL;						\
+	if ((src_mcip)->mci_state_flags & MCIS_SHARE_BOUND)		\
+		rhandle = (mip)->mi_default_tx_ring;			\
+	if (mip->mi_promisc_list != NULL)				\
+		mac_promisc_dispatch(mip, mp, src_mcip);		\
 	/*								\
 	 * Grab the proper transmit pointer and handle. Special 	\
 	 * optimization: we can test mi_bridge_link itself atomically,	\
 	 * and if that indicates no bridge send packets through tx ring.\
 	 */								\
 	if (mip->mi_bridge_link == NULL) {				\
-		MAC_RING_TX(mip, rh, mp, mp);				\
+		MAC_RING_TX(mip, rhandle, mp, mp);			\
 	} else {							\
-		mp = mac_bridge_tx(mip, rh, mp);			\
+		mp = mac_bridge_tx(mip, rhandle, mp);			\
 	}								\
 }
 
@@ -345,8 +356,6 @@ typedef enum {
 	MAC_ADDRESS_TYPE_UNICAST_CLASSIFIED = 1,	/* hardware steering */
 	MAC_ADDRESS_TYPE_UNICAST_PROMISC		/* promiscuous mode */
 } mac_address_type_t;
-
-typedef struct mac_impl_s mac_impl_t;
 
 typedef struct mac_address_s {
 	mac_address_type_t	ma_type;		/* address type */
@@ -406,7 +415,6 @@ struct mac_impl_s {
 	link_state_t		mi_lowlinkstate;	/* none */
 	link_state_t		mi_lastlowlinkstate;	/* none */
 	uint_t			mi_devpromisc;		/* SL */
-	kmutex_t		mi_lock;
 	uint8_t			mi_addr[MAXMACADDRLEN];	/* mi_rw_lock */
 	uint8_t			mi_dstaddr[MAXMACADDRLEN]; /* mi_rw_lock */
 	boolean_t		mi_dstaddr_set;
@@ -436,6 +444,11 @@ struct mac_impl_s {
 	mac_group_type_t	mi_rx_group_type;	/* grouping type */
 	uint_t			mi_rx_group_count;
 	mac_group_t		*mi_rx_groups;
+	mac_group_t		*mi_rx_donor_grp;
+	uint_t			mi_rxrings_rsvd;
+	uint_t			mi_rxrings_avail;
+	uint_t			mi_rxhwclnt_avail;
+	uint_t			mi_rxhwclnt_used;
 
 	mac_capab_rings_t	mi_rx_rings_cap;
 
@@ -446,8 +459,11 @@ struct mac_impl_s {
 	uint_t			mi_tx_group_count;
 	uint_t			mi_tx_group_free;
 	mac_group_t		*mi_tx_groups;
-
 	mac_capab_rings_t	mi_tx_rings_cap;
+	uint_t			mi_txrings_rsvd;
+	uint_t			mi_txrings_avail;
+	uint_t			mi_txhwclnt_avail;
+	uint_t			mi_txhwclnt_used;
 
 	mac_ring_handle_t	mi_default_tx_ring;
 
@@ -516,7 +532,7 @@ struct mac_impl_s {
 	 * sorted: the first one has the greatest value.
 	 */
 	mac_margin_req_t	*mi_mmrp;
-	mac_priv_prop_t		*mi_priv_prop;
+	char			**mi_priv_prop;
 	uint_t			mi_priv_prop_count;
 
 	/*
@@ -540,6 +556,72 @@ struct mac_impl_s {
 	pc_t			mi_perim_stack[MAC_PERIM_STACK_DEPTH];
 #endif
 };
+
+/*
+ * The default TX group is the last one in the list.
+ */
+#define	MAC_DEFAULT_TX_GROUP(mip)	\
+	(mip)->mi_tx_groups + (mip)->mi_tx_group_count
+
+/*
+ * The default RX group is the first one in the list
+ */
+#define	MAC_DEFAULT_RX_GROUP(mip)	(mip)->mi_rx_groups
+
+/* Reserved RX rings */
+#define	MAC_RX_RING_RESERVED(m, cnt)	{	\
+	ASSERT((m)->mi_rxrings_avail >= (cnt));	\
+	(m)->mi_rxrings_rsvd += (cnt);		\
+	(m)->mi_rxrings_avail -= (cnt);		\
+}
+
+/* Released RX rings */
+#define	MAC_RX_RING_RELEASED(m, cnt)	{	\
+	ASSERT((m)->mi_rxrings_rsvd >= (cnt));	\
+	(m)->mi_rxrings_rsvd -= (cnt);		\
+	(m)->mi_rxrings_avail += (cnt);		\
+}
+
+/* Reserved a RX group */
+#define	MAC_RX_GRP_RESERVED(m)	{		\
+	ASSERT((m)->mi_rxhwclnt_avail > 0);	\
+	(m)->mi_rxhwclnt_avail--;		\
+	(m)->mi_rxhwclnt_used++;		\
+}
+
+/* Released a RX group */
+#define	MAC_RX_GRP_RELEASED(m)	{		\
+	ASSERT((m)->mi_rxhwclnt_used > 0);	\
+	(m)->mi_rxhwclnt_avail++;		\
+	(m)->mi_rxhwclnt_used--;		\
+}
+
+/* Reserved TX rings */
+#define	MAC_TX_RING_RESERVED(m, cnt)	{	\
+	ASSERT((m)->mi_txrings_avail >= (cnt));	\
+	(m)->mi_txrings_rsvd += (cnt);		\
+	(m)->mi_txrings_avail -= (cnt);		\
+}
+/* Released TX rings */
+#define	MAC_TX_RING_RELEASED(m, cnt)	{	\
+	ASSERT((m)->mi_txrings_rsvd >= (cnt));	\
+	(m)->mi_txrings_rsvd -= (cnt);		\
+	(m)->mi_txrings_avail += (cnt);		\
+}
+
+/* Reserved a TX group */
+#define	MAC_TX_GRP_RESERVED(m)	{		\
+	ASSERT((m)->mi_txhwclnt_avail > 0);	\
+	(m)->mi_txhwclnt_avail--;		\
+	(m)->mi_txhwclnt_used++;		\
+}
+
+/* Released a TX group */
+#define	MAC_TX_GRP_RELEASED(m)	{		\
+	ASSERT((m)->mi_txhwclnt_used > 0);	\
+	(m)->mi_txhwclnt_avail++;		\
+	(m)->mi_txhwclnt_used--;		\
+}
 
 /* for mi_state_flags */
 #define	MIS_DISABLED		0x0001
@@ -570,12 +652,6 @@ typedef struct mac_notify_task_arg {
 	mac_ring_t		*mnt_ring;
 } mac_notify_task_arg_t;
 
-typedef enum {
-	MAC_RX_NO_RESERVE,
-	MAC_RX_RESERVE_DEFAULT,
-	MAC_RX_RESERVE_NONDEFAULT
-} mac_rx_group_reserve_type_t;
-
 /*
  * XXX All MAC_DBG_PRTs must be replaced with call to dtrace probes. For now
  * it may be easier to have these printfs for easier debugging
@@ -599,18 +675,45 @@ extern int mac_dbg;
 	(need_close) = ((uintptr_t)mph & 0x1);		\
 }
 
+/*
+ * Type of property information that can be returned by a driver.
+ * Valid flags of the pr_flags of the mac_prop_info_t data structure.
+ */
+#define	MAC_PROP_INFO_DEFAULT	0x0001
+#define	MAC_PROP_INFO_RANGE	0x0002
+#define	MAC_PROP_INFO_PERM	0x0004
+
+/*
+ * Property information. pr_flags is a combination of one of the
+ * MAC_PROP_INFO_* flags, it is reset by the framework before invoking
+ * the driver's prefix_propinfo() entry point.
+ *
+ * Drivers should use MAC_PROP_INFO_SET_*() macros to provide
+ * information about a property.
+ */
+typedef struct mac_prop_info_state_s {
+	uint8_t			pr_flags;
+	uint8_t			pr_perm;
+	void			*pr_default;
+	size_t			pr_default_size;
+	uint8_t			pr_default_status;
+	mac_propval_range_t	*pr_range;
+} mac_prop_info_state_t;
+
+#define	MAC_PROTECT_ENABLED(mcip, type) \
+	(((mcip)->mci_flent-> \
+	fe_resource_props.mrp_mask & MRP_PROTECT) != 0 && \
+	((mcip)->mci_flent-> \
+	fe_resource_props.mrp_protect.mp_types & (type)) != 0)
+
 typedef struct mac_client_impl_s mac_client_impl_t;
 
 extern void	mac_init(void);
 extern int	mac_fini(void);
 
-extern void	mac_stat_create(mac_impl_t *);
-extern void	mac_stat_destroy(mac_impl_t *);
-extern uint64_t	mac_stat_default(mac_impl_t *, uint_t);
 extern void	mac_ndd_ioctl(mac_impl_t *, queue_t *, mblk_t *);
-extern void	mac_create_soft_ring_kstats(mac_impl_t *, int32_t);
-extern boolean_t mac_ip_hdr_length_v6(mblk_t *, ip6_t *, uint16_t *,
-    uint8_t *, boolean_t *, uint32_t *);
+extern boolean_t mac_ip_hdr_length_v6(ip6_t *, uint8_t *, uint16_t *,
+    uint8_t *, ip6_frag_t **);
 
 extern mblk_t *mac_copymsgchain_cksum(mblk_t *);
 extern mblk_t *mac_fix_cksum(mblk_t *);
@@ -649,10 +752,17 @@ extern int mac_rx_group_add_flow(mac_client_impl_t *, flow_entry_t *,
     mac_group_t *);
 extern mblk_t *mac_hwring_tx(mac_ring_handle_t, mblk_t *);
 extern mblk_t *mac_bridge_tx(mac_impl_t *, mac_ring_handle_t, mblk_t *);
+extern mac_group_t *mac_reserve_rx_group(mac_client_impl_t *, uint8_t *,
+    boolean_t);
+extern void mac_release_rx_group(mac_client_impl_t *, mac_group_t *);
+extern int mac_rx_switch_group(mac_client_impl_t *, mac_group_t *,
+    mac_group_t *);
 extern mac_ring_t *mac_reserve_tx_ring(mac_impl_t *, mac_ring_t *);
-extern void mac_release_tx_ring(mac_ring_handle_t);
-extern mac_group_t *mac_reserve_tx_group(mac_impl_t *, mac_share_handle_t);
-extern void mac_release_tx_group(mac_impl_t *, mac_group_t *);
+extern mac_group_t *mac_reserve_tx_group(mac_client_impl_t *, boolean_t);
+extern void mac_release_tx_group(mac_client_impl_t *, mac_group_t *);
+extern void mac_tx_switch_group(mac_client_impl_t *, mac_group_t *,
+    mac_group_t *);
+extern void mac_rx_switch_grp_to_sw(mac_group_t *);
 
 /*
  * MAC address functions are used internally by MAC layer.
@@ -676,7 +786,7 @@ extern void mac_link_flow_clean(mac_client_handle_t, flow_entry_t *);
  * Fanout update routines called when the link speed of the NIC changes
  * or when a MAC client's share is unbound.
  */
-extern void mac_fanout_recompute_client(mac_client_impl_t *);
+extern void mac_fanout_recompute_client(mac_client_impl_t *, cpupart_t *);
 extern void mac_fanout_recompute(mac_impl_t *);
 
 /*
@@ -687,14 +797,15 @@ extern void mac_fanout_recompute(mac_impl_t *);
 extern int mac_datapath_setup(mac_client_impl_t *, flow_entry_t *, uint32_t);
 extern void mac_datapath_teardown(mac_client_impl_t *, flow_entry_t *,
     uint32_t);
-extern void mac_srs_group_setup(mac_client_impl_t *, flow_entry_t *,
-    mac_group_t *, uint32_t);
-extern void mac_srs_group_teardown(mac_client_impl_t *, flow_entry_t *,
+extern void mac_rx_srs_group_setup(mac_client_impl_t *, flow_entry_t *,
+    uint32_t);
+extern void mac_tx_srs_group_setup(mac_client_impl_t *, flow_entry_t *,
+    uint32_t);
+extern void mac_rx_srs_group_teardown(flow_entry_t *, boolean_t);
+extern void mac_tx_srs_group_teardown(mac_client_impl_t *, flow_entry_t *,
 	    uint32_t);
 extern int mac_rx_classify_flow_quiesce(flow_entry_t *, void *);
 extern int mac_rx_classify_flow_restart(flow_entry_t *, void *);
-extern void mac_tx_client_quiesce(mac_client_impl_t *, uint_t);
-extern void mac_tx_client_restart(mac_client_impl_t *);
 extern void mac_client_quiesce(mac_client_impl_t *);
 extern void mac_client_restart(mac_client_impl_t *);
 
@@ -725,15 +836,17 @@ extern void mac_rx_group_unmark(mac_group_t *, uint_t);
 extern void mac_tx_client_flush(mac_client_impl_t *);
 extern void mac_tx_client_block(mac_client_impl_t *);
 extern void mac_tx_client_unblock(mac_client_impl_t *);
+extern void mac_tx_invoke_callbacks(mac_client_impl_t *, mac_tx_cookie_t);
 extern int i_mac_promisc_set(mac_impl_t *, boolean_t);
 extern void i_mac_promisc_walker_cleanup(mac_impl_t *);
 extern mactype_t *mactype_getplugin(const char *);
 extern void mac_addr_factory_init(mac_impl_t *);
 extern void mac_addr_factory_fini(mac_impl_t *);
-extern void mac_register_priv_prop(mac_impl_t *, mac_priv_prop_t *, uint_t);
+extern void mac_register_priv_prop(mac_impl_t *, char **);
 extern void mac_unregister_priv_prop(mac_impl_t *);
 extern int mac_init_rings(mac_impl_t *, mac_ring_type_t);
 extern void mac_free_rings(mac_impl_t *, mac_ring_type_t);
+extern void mac_compare_ddi_handle(mac_group_t *, uint_t, mac_ring_t *);
 
 extern int mac_start_group(mac_group_t *);
 extern void mac_stop_group(mac_group_t *);
@@ -742,26 +855,48 @@ extern void mac_stop_ring(mac_ring_t *);
 extern int mac_add_macaddr(mac_impl_t *, mac_group_t *, uint8_t *, boolean_t);
 extern int mac_remove_macaddr(mac_address_t *);
 
-extern void mac_set_rx_group_state(mac_group_t *, mac_group_state_t);
-extern void mac_rx_group_add_client(mac_group_t *, mac_client_impl_t *);
-extern void mac_rx_group_remove_client(mac_group_t *, mac_client_impl_t *)
-;
+extern void mac_set_group_state(mac_group_t *, mac_group_state_t);
+extern void mac_group_add_client(mac_group_t *, mac_client_impl_t *);
+extern void mac_group_remove_client(mac_group_t *, mac_client_impl_t *);
+
 extern int i_mac_group_add_ring(mac_group_t *, mac_ring_t *, int);
 extern void i_mac_group_rem_ring(mac_group_t *, mac_ring_t *, boolean_t);
-
+extern int mac_group_ring_modify(mac_client_impl_t *, mac_group_t *,
+    mac_group_t *);
 extern void mac_poll_state_change(mac_handle_t, boolean_t);
+
+extern mac_group_state_t mac_group_next_state(mac_group_t *,
+    mac_client_impl_t **, mac_group_t *, boolean_t);
 
 extern mblk_t *mac_protect_check(mac_client_handle_t, mblk_t *);
 extern int mac_protect_set(mac_client_handle_t, mac_resource_props_t *);
 extern boolean_t mac_protect_enabled(mac_client_handle_t, uint32_t);
 extern int mac_protect_validate(mac_resource_props_t *);
 extern void mac_protect_update(mac_resource_props_t *, mac_resource_props_t *);
+extern void mac_protect_update_v6_local_addr(mac_client_impl_t *);
+extern void mac_protect_intercept_dhcp(mac_client_impl_t *, mblk_t *);
+extern void mac_protect_flush_dhcp(mac_client_impl_t *);
+extern void mac_protect_cancel_timer(mac_client_impl_t *);
+extern void mac_protect_init(mac_client_impl_t *);
+extern void mac_protect_fini(mac_client_impl_t *);
+
+extern int mac_set_resources(mac_handle_t, mac_resource_props_t *);
+extern void mac_get_resources(mac_handle_t, mac_resource_props_t *);
+extern void mac_get_effective_resources(mac_handle_t, mac_resource_props_t *);
+
+extern cpupart_t *mac_pset_find(mac_resource_props_t *, boolean_t *);
+extern void mac_set_pool_effective(boolean_t, cpupart_t *,
+    mac_resource_props_t *, mac_resource_props_t *);
+extern void mac_set_rings_effective(mac_client_impl_t *);
+extern mac_client_impl_t *mac_check_primary_relocation(mac_client_impl_t *,
+    boolean_t);
 
 /* Global callbacks into the bridging module (when loaded) */
 extern mac_bridge_tx_t mac_bridge_tx_cb;
 extern mac_bridge_rx_t mac_bridge_rx_cb;
 extern mac_bridge_ref_t mac_bridge_ref_cb;
 extern mac_bridge_ls_t mac_bridge_ls_cb;
+
 
 #ifdef	__cplusplus
 }

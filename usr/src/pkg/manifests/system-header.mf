@@ -1162,6 +1162,7 @@ file path=usr/include/sys/lwp_timer_impl.h
 file path=usr/include/sys/lwp_upimutex_impl.h
 file path=usr/include/sys/mac.h
 file path=usr/include/sys/mac_flow.h
+file path=usr/include/sys/mac_provider.h
 file path=usr/include/sys/machelf.h
 file path=usr/include/sys/machlock.h
 file path=usr/include/sys/machsig.h

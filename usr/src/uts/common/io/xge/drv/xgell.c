@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,6 +110,7 @@ static mac_callbacks_t xgell_m_callbacks = {
 	xgell_m_stop,
 	xgell_m_promisc,
 	xgell_m_multicst,
+	NULL,
 	NULL,
 	NULL,
 	xgell_m_ioctl,
@@ -613,15 +614,13 @@ xgell_rx_hcksum_assoc(mblk_t *mp, char *vaddr, int pkt_length,
 	if (!(ext_info->proto & XGE_HAL_FRAME_PROTO_IP_FRAGMENTED)) {
 		if (ext_info->proto & XGE_HAL_FRAME_PROTO_TCP_OR_UDP) {
 			if (ext_info->l3_cksum == XGE_HAL_L3_CKSUM_OK) {
-				cksum_flags |= HCK_IPV4_HDRCKSUM;
+				cksum_flags |= HCK_IPV4_HDRCKSUM_OK;
 			}
 			if (ext_info->l4_cksum == XGE_HAL_L4_CKSUM_OK) {
 				cksum_flags |= HCK_FULLCKSUM_OK;
 			}
-			if (cksum_flags) {
-				cksum_flags |= HCK_FULLCKSUM;
-				(void) hcksum_assoc(mp, NULL, NULL, 0,
-				    0, 0, 0, cksum_flags, 0);
+			if (cksum_flags != 0) {
+				mac_hcksum_set(mp, 0, 0, 0, 0, cksum_flags);
 			}
 		}
 	} else if (ext_info->proto &
@@ -640,9 +639,8 @@ xgell_rx_hcksum_assoc(mblk_t *mp, char *vaddr, int pkt_length,
 			start = 40;
 		}
 		cksum_flags |= HCK_PARTIALCKSUM;
-		(void) hcksum_assoc(mp, NULL, NULL, start, 0,
-		    end, ntohs(ext_info->l4_cksum), cksum_flags,
-		    0);
+		mac_hcksum_set(mp, start, 0, end,
+		    ntohs(ext_info->l4_cksum), cksum_flags);
 	}
 }
 
@@ -795,7 +793,8 @@ xgell_rx_1b_callback(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 		xgell_rx_hcksum_assoc(mp, (char *)rx_buffer->vaddr + HEADROOM,
 		    pkt_length, &ext_info);
 
-		ring->received_bytes += pkt_length;
+		ring->rx_pkts++;
+		ring->rx_bytes += pkt_length;
 
 		if (mp_head == NULL) {
 			mp_head = mp;
@@ -954,9 +953,11 @@ xgell_ring_tx(void *arg, mblk_t *mp)
 	uint32_t mss;
 	int handle_cnt, frag_cnt, ret, i, copied;
 	boolean_t used_copy;
+	uint64_t sent_bytes;
 
 _begin:
 	handle_cnt = frag_cnt = 0;
+	sent_bytes = 0;
 
 	if (!lldev->is_initialized || lldev->in_reset)
 		return (mp);
@@ -1041,7 +1042,7 @@ _begin:
 			continue;
 		}
 
-		ring->sent_bytes += mblen;
+		sent_bytes += mblen;
 
 		/*
 		 * Check the message length to decide to DMA or bcopy() data
@@ -1159,14 +1160,14 @@ _begin:
 	 * If LSO is required, just call xge_hal_fifo_dtr_mss_set(dtr, mss) to
 	 * do all necessary work.
 	 */
-	lso_info_get(mp, &mss, &lsoflags);
+	mac_lso_get(mp, &mss, &lsoflags);
 
 	if (lsoflags & HW_LSO) {
 		xge_assert((mss != 0) && (mss <= XGE_HAL_DEFAULT_MTU));
 		xge_hal_fifo_dtr_mss_set(dtr, mss);
 	}
 
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &hckflags);
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &hckflags);
 	if (hckflags & HCK_IPV4_HDRCKSUM) {
 		xge_hal_fifo_dtr_cksum_set_bits(dtr,
 		    XGE_HAL_TXD_TX_CKO_IPV4_EN);
@@ -1177,6 +1178,10 @@ _begin:
 	}
 
 	xge_hal_fifo_dtr_post(ring->channelh, dtr);
+
+	/* Update per-ring tx statistics */
+	atomic_add_64(&ring->tx_pkts, 1);
+	atomic_add_64(&ring->tx_bytes, sent_bytes);
 
 	return (NULL);
 
@@ -1458,6 +1463,7 @@ xgell_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 		infop->mri_start = xgell_rx_ring_start;
 		infop->mri_stop = xgell_rx_ring_stop;
 		infop->mri_poll = xgell_rx_poll;
+		infop->mri_stat = xgell_rx_ring_stat;
 
 		mintr = &infop->mri_intr;
 		mintr->mi_handle = (mac_intr_handle_t)rx_ring;
@@ -1480,6 +1486,7 @@ xgell_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 		infop->mri_start = xgell_tx_ring_start;
 		infop->mri_stop = xgell_tx_ring_stop;
 		infop->mri_tx = xgell_ring_tx;
+		infop->mri_stat = xgell_tx_ring_stat;
 
 		break;
 	}
@@ -1618,7 +1625,6 @@ xgell_rx_ring_open(xgell_rx_ring_t *rx_ring)
 	mutex_init(&rx_ring->ring_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(hldev->irqh));
 
-	rx_ring->received_bytes = 0;
 	rx_ring->poll_bytes = -1;
 	rx_ring->polled_bytes = 0;
 	rx_ring->poll_mp = NULL;
@@ -1769,7 +1775,6 @@ xgell_tx_ring_open(xgell_tx_ring_t *tx_ring)
 		return (B_FALSE);
 	}
 
-	tx_ring->sent_bytes = 0;
 	tx_ring->live = B_TRUE;
 
 	return (B_TRUE);
@@ -2257,6 +2262,56 @@ xgell_m_stat(void *arg, uint_t stat, uint64_t *val)
 	}
 
 	mutex_exit(&lldev->genlock);
+
+	return (0);
+}
+
+/*
+ * Retrieve a value for one of the statistics for a particular rx ring
+ */
+int
+xgell_rx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
+{
+	xgell_rx_ring_t	*rx_ring = (xgell_rx_ring_t *)rh;
+
+	switch (stat) {
+	case MAC_STAT_RBYTES:
+		*val = rx_ring->rx_bytes;
+		break;
+
+	case MAC_STAT_IPACKETS:
+		*val = rx_ring->rx_pkts;
+		break;
+
+	default:
+		*val = 0;
+		return (ENOTSUP);
+	}
+
+	return (0);
+}
+
+/*
+ * Retrieve a value for one of the statistics for a particular tx ring
+ */
+int
+xgell_tx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
+{
+	xgell_tx_ring_t	*tx_ring = (xgell_tx_ring_t *)rh;
+
+	switch (stat) {
+	case MAC_STAT_OBYTES:
+		*val = tx_ring->tx_bytes;
+		break;
+
+	case MAC_STAT_OPACKETS:
+		*val = tx_ring->tx_pkts;
+		break;
+
+	default:
+		*val = 0;
+		return (ENOTSUP);
+	}
 
 	return (0);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <sys/zone.h>
 #include <sys/policy.h>
 #include <sys/schedctl.h>
+#include <sys/taskq.h>
 
 /*
  * RESOURCE POOLS
@@ -153,6 +154,12 @@ static kthread_t	*pool_busy_thread;	/* thread holding "pool_lock" */
 static kmutex_t		pool_barrier_lock;	/* synch. with pool_barrier_* */
 static kcondvar_t	pool_barrier_cv;	/* synch. with pool_barrier_* */
 static int		pool_barrier_count;	/* synch. with pool_barrier_* */
+static list_t		pool_event_cb_list;	/* pool event callbacks */
+static boolean_t	pool_event_cb_init = B_FALSE;
+static kmutex_t		pool_event_cb_lock;
+static taskq_t		*pool_event_cb_taskq = NULL;
+
+void pool_event_dispatch(pool_event_t, poolid_t);
 
 /*
  * Boot-time pool initialization.
@@ -373,6 +380,21 @@ pool_lookup_pool_by_id(poolid_t poolid)
 	return (NULL);
 }
 
+pool_t *
+pool_lookup_pool_by_pset(int id)
+{
+	pool_t *pool = pool_default;
+	psetid_t psetid = (psetid_t)id;
+
+	ASSERT(pool_lock_held());
+	for (pool = list_head(&pool_list); pool != NULL;
+	    pool = list_next(&pool_list, pool)) {
+		if (pool->pool_pset->pset_id == psetid)
+			return (pool);
+	}
+	return (NULL);
+}
+
 /*
  * Create new pool, associate it with default resource sets, and give
  * it a temporary name.
@@ -545,12 +567,14 @@ pool_status(int status)
 		if (ret != 0)
 			return (ret);
 		pool_state = POOL_ENABLED;
+		pool_event_dispatch(POOL_E_ENABLE, NULL);
 		break;
 	case POOL_DISABLED:
 		ret = pool_disable();
 		if (ret != 0)
 			return (ret);
 		pool_state = POOL_DISABLED;
+		pool_event_dispatch(POOL_E_DISABLE, NULL);
 		break;
 	default:
 		ret = EINVAL;
@@ -572,6 +596,8 @@ pool_assoc(poolid_t poolid, int idtype, id_t id)
 	switch (idtype) {
 	case PREC_PSET:
 		ret = pool_pset_assoc(poolid, (psetid_t)id);
+		if (ret == 0)
+			pool_event_dispatch(POOL_E_CHANGE, poolid);
 		break;
 	default:
 		ret = EINVAL;
@@ -595,6 +621,8 @@ pool_dissoc(poolid_t poolid, int idtype)
 	switch (idtype) {
 	case PREC_PSET:
 		ret = pool_pset_assoc(poolid, PS_NONE);
+		if (ret == 0)
+			pool_event_dispatch(POOL_E_CHANGE, poolid);
 		break;
 	default:
 		ret = EINVAL;
@@ -612,24 +640,48 @@ int
 pool_transfer(int type, id_t src, id_t dst, uint64_t qty)
 {
 	int ret = EINVAL;
+
 	return (ret);
+}
+
+static poolid_t
+pool_lookup_id_by_pset(int id)
+{
+	pool_t *pool = pool_default;
+	psetid_t psetid = (psetid_t)id;
+
+	ASSERT(pool_lock_held());
+	for (pool = list_head(&pool_list); pool != NULL;
+	    pool = list_next(&pool_list, pool)) {
+		if (pool->pool_pset->pset_id == psetid)
+			return (pool->pool_id);
+	}
+	return (POOL_INVALID);
 }
 
 /*
  * Transfer resources specified by their IDs between resource sets.
  */
 int
-pool_xtransfer(int type, id_t src, id_t dst, uint_t size, id_t *ids)
+pool_xtransfer(int type, id_t src_pset, id_t dst_pset, uint_t size, id_t *ids)
 {
 	int ret;
+	poolid_t src_pool, dst_pool;
 
 	ASSERT(pool_lock_held());
 	if (pool_state == POOL_DISABLED)
 		return (ENOTACTIVE);
 	switch (type) {
 	case PREC_PSET:
-		ret = pool_pset_xtransfer((psetid_t)src, (psetid_t)dst,
-		    size, ids);
+		ret = pool_pset_xtransfer((psetid_t)src_pset,
+		    (psetid_t)dst_pset, size, ids);
+
+		if ((src_pool =  pool_lookup_id_by_pset(src_pset)) == -1)
+			return (EINVAL);
+		if ((dst_pool =  pool_lookup_id_by_pset(dst_pset)) == -1)
+			return (EINVAL);
+		pool_event_dispatch(POOL_E_CHANGE, src_pool);
+		pool_event_dispatch(POOL_E_CHANGE, dst_pool);
 		break;
 	default:
 		ret = EINVAL;
@@ -643,7 +695,7 @@ pool_xtransfer(int type, id_t src, id_t dst, uint_t size, id_t *ids)
 int
 pool_bind(poolid_t poolid, idtype_t idtype, id_t id)
 {
-	pool_t *pool;
+	pool_t	*pool;
 
 	ASSERT(pool_lock_held());
 
@@ -1234,6 +1286,17 @@ pool_change_class(proc_t *p, id_t cid)
 	kmem_free(bufs, nlwp * sizeof (void *));
 }
 
+void
+pool_get_name(pool_t *pool, char **name)
+{
+	ASSERT(pool_lock_held());
+
+	(void) nvlist_lookup_string(pool->pool_props, "pool.name", name);
+
+	ASSERT(strlen(*name) != 0);
+}
+
+
 /*
  * The meat of the bind operation.  The steps in pool_do_bind are:
  *
@@ -1657,4 +1720,72 @@ out:	switch (idtype) {
 	kmem_free(procs, procs_size * sizeof (proc_t *));
 	ASSERT(pool_barrier_count == 0);
 	return (rv);
+}
+
+void
+pool_event_cb_register(pool_event_cb_t *cb)
+{
+	ASSERT(!pool_lock_held() || panicstr);
+	ASSERT(cb->pec_func != NULL);
+
+	mutex_enter(&pool_event_cb_lock);
+	if (!pool_event_cb_init) {
+		list_create(&pool_event_cb_list,  sizeof (pool_event_cb_t),
+		    offsetof(pool_event_cb_t, pec_list));
+		pool_event_cb_init = B_TRUE;
+	}
+	list_insert_tail(&pool_event_cb_list, cb);
+	mutex_exit(&pool_event_cb_lock);
+}
+
+void
+pool_event_cb_unregister(pool_event_cb_t *cb)
+{
+	ASSERT(!pool_lock_held() || panicstr);
+
+	mutex_enter(&pool_event_cb_lock);
+	list_remove(&pool_event_cb_list, cb);
+	mutex_exit(&pool_event_cb_lock);
+}
+
+typedef struct {
+	pool_event_t	tqd_what;
+	poolid_t	tqd_id;
+} pool_tqd_t;
+
+void
+pool_event_notify(void *arg)
+{
+	pool_tqd_t	*tqd = (pool_tqd_t *)arg;
+	pool_event_cb_t	*cb;
+
+	ASSERT(!pool_lock_held() || panicstr);
+
+	mutex_enter(&pool_event_cb_lock);
+	for (cb = list_head(&pool_event_cb_list); cb != NULL;
+	    cb = list_next(&pool_event_cb_list, cb)) {
+		cb->pec_func(tqd->tqd_what, tqd->tqd_id, cb->pec_arg);
+	}
+	mutex_exit(&pool_event_cb_lock);
+	kmem_free(tqd, sizeof (*tqd));
+}
+
+void
+pool_event_dispatch(pool_event_t what, poolid_t id)
+{
+	pool_tqd_t *tqd = NULL;
+
+	ASSERT(pool_lock_held());
+
+	if (pool_event_cb_taskq == NULL) {
+		pool_event_cb_taskq = taskq_create("pool_event_cb_taskq", 1,
+		    -1, 1, 1, TASKQ_PREPOPULATE);
+	}
+
+	tqd = kmem_alloc(sizeof (*tqd), KM_SLEEP);
+	tqd->tqd_what = what;
+	tqd->tqd_id = id;
+
+	(void) taskq_dispatch(pool_event_cb_taskq, pool_event_notify, tqd,
+	    KM_SLEEP);
 }

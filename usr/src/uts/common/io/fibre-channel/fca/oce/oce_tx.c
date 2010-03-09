@@ -712,11 +712,10 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 	}
 
 	/* Retrieve LSO info */
-	lso_info_get(mp, &mss, &flags);
+	mac_lso_get(mp, &mss, &flags);
 
 	/* get the offload flags */
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL,
-	    NULL, &csum_flags);
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &csum_flags);
 
 	/* Limit should be always less than Tx Buffer Size */
 	if (pkt_len < dev->tx_bcopy_limit) {

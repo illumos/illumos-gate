@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,6 +106,7 @@
 
 static char *progname;
 char *zone_name;	/* zone which we are managing */
+char *pool_name;
 char default_brand[MAXNAMELEN];
 char brand_name[MAXNAMELEN];
 boolean_t zone_isnative;

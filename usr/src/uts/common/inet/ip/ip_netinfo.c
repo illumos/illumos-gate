@@ -1175,10 +1175,10 @@ ip_isvalidchecksum(net_handle_t neti, mblk_t *mp)
 	ASSERT(mp != NULL);
 
 	if (dohwcksum &&
-	    DB_CKSUM16(mp) != 0xFFFF &&
-	    (DB_CKSUMFLAGS(mp) & HCK_FULLCKSUM) &&
-	    (DB_CKSUMFLAGS(mp) & HCK_FULLCKSUM_OK) &&
-	    (DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM))
+	    ((DB_CKSUM16(mp) != 0xFFFF &&
+	    (DB_CKSUMFLAGS(mp) & HCK_FULLCKSUM)) ||
+	    (DB_CKSUMFLAGS(mp) & HCK_FULLCKSUM_OK)) &&
+	    (DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM_OK))
 		return (1);
 
 	hlen = (ipha->ipha_version_and_hdr_length & 0x0F) << 2;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -429,8 +429,9 @@ drv_ioc_hwgrpget(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 	dld_ioc_hwgrpget_t	*hwgrpp = karg;
 	dld_hwgrpinfo_t		hwgrp, *hip;
 	mac_handle_t		mh = NULL;
-	int			i, err, grpnum;
+	int			i, err, rgrpnum, tgrpnum;
 	uint_t			bytes_left;
+	int			totgrps = 0;
 	zoneid_t		zoneid = crgetzoneid(cred);
 
 	if (zoneid != GLOBAL_ZONEID &&
@@ -445,8 +446,10 @@ drv_ioc_hwgrpget(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 	hip = (dld_hwgrpinfo_t *)
 	    ((uchar_t *)arg + sizeof (dld_ioc_hwgrpget_t));
 	bytes_left = hwgrpp->dih_size;
-	grpnum = mac_hwgrp_num(mh);
-	for (i = 0; i < grpnum; i++) {
+
+	rgrpnum = mac_hwgrp_num(mh, MAC_RING_TYPE_RX);
+	/* display the default group information first */
+	if (rgrpnum > 0) {
 		if (sizeof (dld_hwgrpinfo_t) > bytes_left) {
 			err = ENOSPC;
 			goto done;
@@ -455,15 +458,93 @@ drv_ioc_hwgrpget(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		bzero(&hwgrp, sizeof (hwgrp));
 		bcopy(mac_name(mh), hwgrp.dhi_link_name,
 		    sizeof (hwgrp.dhi_link_name));
-		mac_get_hwgrp_info(mh, i, &hwgrp.dhi_grp_num,
-		    &hwgrp.dhi_n_rings, &hwgrp.dhi_grp_type,
+		mac_get_hwrxgrp_info(mh, 0, &hwgrp.dhi_grp_num,
+		    &hwgrp.dhi_n_rings, hwgrp.dhi_rings, &hwgrp.dhi_grp_type,
 		    &hwgrp.dhi_n_clnts, hwgrp.dhi_clnts);
+		if (hwgrp.dhi_n_rings != 0) {
+			if (copyout(&hwgrp, hip, sizeof (hwgrp)) != 0) {
+				err = EFAULT;
+				goto done;
+			}
+		}
+		hip++;
+		totgrps++;
+		bytes_left -= sizeof (dld_hwgrpinfo_t);
+	}
+
+	tgrpnum = mac_hwgrp_num(mh, MAC_RING_TYPE_TX);
+	/* display the default group information first */
+	if (tgrpnum > 0) {
+		if (sizeof (dld_hwgrpinfo_t) > bytes_left) {
+			err = ENOSPC;
+			goto done;
+		}
+
+		bzero(&hwgrp, sizeof (hwgrp));
+		bcopy(mac_name(mh), hwgrp.dhi_link_name,
+		    sizeof (hwgrp.dhi_link_name));
+		mac_get_hwtxgrp_info(mh, tgrpnum - 1, &hwgrp.dhi_grp_num,
+		    &hwgrp.dhi_n_rings, hwgrp.dhi_rings, &hwgrp.dhi_grp_type,
+		    &hwgrp.dhi_n_clnts, hwgrp.dhi_clnts);
+		if (hwgrp.dhi_n_rings != 0) {
+			if (copyout(&hwgrp, hip, sizeof (hwgrp)) != 0) {
+				err = EFAULT;
+				goto done;
+			}
+		}
+		hip++;
+		totgrps++;
+		bytes_left -= sizeof (dld_hwgrpinfo_t);
+	}
+
+	/* Rest of the rx groups */
+	for (i = 1; i < rgrpnum; i++) {
+		if (sizeof (dld_hwgrpinfo_t) > bytes_left) {
+			err = ENOSPC;
+			goto done;
+		}
+
+		bzero(&hwgrp, sizeof (hwgrp));
+		bcopy(mac_name(mh), hwgrp.dhi_link_name,
+		    sizeof (hwgrp.dhi_link_name));
+		mac_get_hwrxgrp_info(mh, i, &hwgrp.dhi_grp_num,
+		    &hwgrp.dhi_n_rings, hwgrp.dhi_rings, &hwgrp.dhi_grp_type,
+		    &hwgrp.dhi_n_clnts, hwgrp.dhi_clnts);
+		if (hwgrp.dhi_n_rings == 0)
+			continue;
 		if (copyout(&hwgrp, hip, sizeof (hwgrp)) != 0) {
 			err = EFAULT;
 			goto done;
 		}
 
 		hip++;
+		totgrps++;
+		bytes_left -= sizeof (dld_hwgrpinfo_t);
+	}
+
+	/* Rest of the tx group */
+	tgrpnum = mac_hwgrp_num(mh, MAC_RING_TYPE_TX);
+	for (i = 0; i < tgrpnum - 1; i++) {
+		if (sizeof (dld_hwgrpinfo_t) > bytes_left) {
+			err = ENOSPC;
+			goto done;
+		}
+
+		bzero(&hwgrp, sizeof (hwgrp));
+		bcopy(mac_name(mh), hwgrp.dhi_link_name,
+		    sizeof (hwgrp.dhi_link_name));
+		mac_get_hwtxgrp_info(mh, i, &hwgrp.dhi_grp_num,
+		    &hwgrp.dhi_n_rings, hwgrp.dhi_rings, &hwgrp.dhi_grp_type,
+		    &hwgrp.dhi_n_clnts, hwgrp.dhi_clnts);
+		if (hwgrp.dhi_n_rings == 0)
+			continue;
+		if (copyout(&hwgrp, hip, sizeof (hwgrp)) != 0) {
+			err = EFAULT;
+			goto done;
+		}
+
+		hip++;
+		totgrps++;
 		bytes_left -= sizeof (dld_hwgrpinfo_t);
 	}
 
@@ -471,7 +552,7 @@ done:
 	if (mh != NULL)
 		dld_mac_close(mh);
 	if (err == 0)
-		hwgrpp->dih_n_groups = grpnum;
+		hwgrpp->dih_n_groups = totgrps;
 	return (err);
 }
 
@@ -542,7 +623,7 @@ done:
 }
 
 /*
- * DLDIOC_SET/GETPROP
+ * DLDIOC_SET/GETMACPROP
  */
 static int
 drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
@@ -552,7 +633,6 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 	dls_dl_handle_t 	dlh = NULL;
 	dls_link_t		*dlp = NULL;
 	mac_perim_handle_t	mph = NULL;
-	mac_prop_t		macprop;
 	dld_ioc_macprop_t	*kprop;
 	datalink_id_t		linkid;
 	datalink_class_t	class;
@@ -606,6 +686,12 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 		goto done;
 	}
 
+	if (!mac_prop_check_size(kprop->pr_num, kprop->pr_valsize,
+	    kprop->pr_flags & DLD_PROP_POSSIBLE)) {
+		err = ENOBUFS;
+		goto done;
+	}
+
 	switch (kprop->pr_num) {
 	case MAC_PROP_ZONE:
 		if (set) {
@@ -630,6 +716,9 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 			else
 				err = drv_ioc_clrap(linkid);
 		} else {
+			if (kprop->pr_valsize == 0)
+				return (ENOBUFS);
+
 			kprop->pr_perm_flags = MAC_PROP_PERM_RW;
 			err = drv_ioc_getap(linkid, dlap);
 		}
@@ -652,19 +741,51 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 			err = 0;
 		}
 		break;
-	default:
-		macprop.mp_name = kprop->pr_name;
-		macprop.mp_id = kprop->pr_num;
-		macprop.mp_flags = kprop->pr_flags;
+	default: {
+		mac_propval_range_t range, *rangep = NULL;
+		void *default_val = NULL;
+		uint_t default_size = 0;
+		void *val = kprop->pr_val;
+		uint_t val_size = kprop->pr_valsize;
 
+		/* set a property value */
 		if (set) {
-			err = mac_set_prop(dlp->dl_mh, &macprop, kprop->pr_val,
-			    kprop->pr_valsize);
-		} else {
-			kprop->pr_perm_flags = MAC_PROP_PERM_RW;
-			err = mac_get_prop(dlp->dl_mh, &macprop, kprop->pr_val,
-			    kprop->pr_valsize, &kprop->pr_perm_flags);
+			err = mac_set_prop(dlp->dl_mh, kprop->pr_num,
+			    kprop->pr_name, kprop->pr_val, kprop->pr_valsize);
+			break;
 		}
+
+		/*
+		 * Get the property value, default, or possible value
+		 * depending on flags passed from the user.
+		 */
+
+		/* a property has RW permissions by default */
+		kprop->pr_perm_flags = MAC_PROP_PERM_RW;
+
+		if (kprop->pr_flags & DLD_PROP_POSSIBLE) {
+			rangep = &range;
+		} else if (kprop->pr_flags & DLD_PROP_DEFAULT) {
+			default_val = val;
+			default_size = val_size;
+		}
+
+		/*
+		 * Always return the permissions, and optionally return
+		 * the default value or possible values range.
+		 */
+		mac_prop_info(dlp->dl_mh, kprop->pr_num, kprop->pr_name,
+		    default_val, default_size, rangep, &kprop->pr_perm_flags);
+		err = 0;
+
+		if (default_val == NULL && rangep == NULL) {
+			err = mac_get_prop(dlp->dl_mh, kprop->pr_num,
+			    kprop->pr_name, kprop->pr_val, kprop->pr_valsize);
+		}
+
+		if (rangep != NULL)
+			bcopy(rangep, val, sizeof (range));
+	}
 	}
 
 done:
@@ -673,6 +794,7 @@ done:
 
 	if (dlp != NULL)
 		dls_link_rele(dlp);
+
 	if (mph != NULL) {
 		int32_t	cpuid;
 		void	*mdip = NULL;
@@ -684,9 +806,10 @@ done:
 
 		mac_perim_exit(mph);
 
-		if (mdip != NULL)
+		if (mdip != NULL && cpuid != -1)
 			mac_client_set_intr_cpu(mdip, dlp->dl_mch, cpuid);
 	}
+
 	if (dlh != NULL)
 		dls_devnet_rele_tmp(dlh);
 
@@ -828,7 +951,8 @@ drv_ioc_getap(datalink_id_t linkid, struct dlautopush *dlap)
 	    (mod_hash_key_t)(uintptr_t)linkid,
 	    (mod_hash_val_t *)&dap) != 0) {
 		rw_exit(&dld_ap_hash_lock);
-		return (ENOENT);
+		dlap->dap_npush = 0;
+		return (0);
 	}
 
 	/*
@@ -1221,7 +1345,7 @@ static dld_ioc_info_t drv_ioc_list[] = {
 	{DLDIOC_GETMACPROP, DLDCOPYIN, sizeof (dld_ioc_macprop_t),
 	    drv_ioc_getprop, NULL},
 	{DLDIOC_GETHWGRP, DLDCOPYINOUT, sizeof (dld_ioc_hwgrpget_t),
-	    drv_ioc_hwgrpget, secpolicy_dl_config},
+	    drv_ioc_hwgrpget, NULL},
 };
 
 typedef struct dld_ioc_modentry {

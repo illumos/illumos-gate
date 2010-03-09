@@ -461,6 +461,7 @@ static mac_callbacks_t vgen_m_callbacks = {
 	vgen_multicst,
 	vgen_unicst,
 	vgen_tx,
+	NULL,
 	vgen_ioctl,
 	NULL,
 	NULL

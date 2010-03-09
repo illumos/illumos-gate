@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,16 +204,18 @@ static int	atge_m_stat(void *, uint_t, uint64_t *);
 static int	atge_m_start(void *);
 static void	atge_m_stop(void *);
 static int	atge_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
-    uint_t, void *, uint_t *);
+    void *);
 static int	atge_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
+static void	atge_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 static int	atge_m_unicst(void *, const uint8_t *);
 static int	atge_m_multicst(void *, boolean_t, const uint8_t *);
 static int	atge_m_promisc(void *, boolean_t);
 static mblk_t	*atge_m_tx(void *, mblk_t *);
 
 static	mac_callbacks_t	atge_m_callbacks = {
-	MC_SETPROP | MC_GETPROP,
+	MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	atge_m_stat,
 	atge_m_start,
 	atge_m_stop,
@@ -221,12 +223,14 @@ static	mac_callbacks_t	atge_m_callbacks = {
 	atge_m_multicst,
 	atge_m_unicst,
 	atge_m_tx,
+	NULL,		/* mc_reserved */
 	NULL,		/* mc_ioctl */
 	NULL,		/* mc_getcapab */
 	NULL,		/* mc_open */
 	NULL,		/* mc_close */
 	atge_m_setprop,
 	atge_m_getprop,
+	atge_m_propinfo
 };
 
 /*
@@ -1724,13 +1728,12 @@ atge_m_stat(void *arg, uint_t stat, uint64_t *val)
 }
 
 int
-atge_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
-    uint_t sz, void *val, uint_t *perm)
+atge_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    void *val)
 {
 	atge_t *atgep = arg;
 
-	return (mii_m_getprop(atgep->atge_mii, name, num, flags, sz, val,
-	    perm));
+	return (mii_m_getprop(atgep->atge_mii, name, num, sz, val));
 }
 
 int
@@ -1757,6 +1760,14 @@ atge_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
 	return (r);
 }
 
+static void
+atge_m_propinfo(void *arg, const char *name, mac_prop_id_t num,
+    mac_prop_info_handle_t prh)
+{
+	atge_t *atgep = arg;
+
+	mii_m_propinfo(atgep->atge_mii, name, num, prh);
+}
 
 void
 atge_program_ether(atge_t *atgep)

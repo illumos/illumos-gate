@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,8 +82,8 @@ static int vnic_m_stat(void *, uint_t, uint64_t *);
 static void vnic_m_ioctl(void *, queue_t *, mblk_t *);
 static int vnic_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
-static int vnic_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
-    uint_t, void *, uint_t *);
+static void vnic_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 static mblk_t *vnic_m_tx(void *, mblk_t *);
 static boolean_t vnic_m_capab_get(void *, mac_capab_t, void *);
 static void vnic_notify_cb(void *, mac_notify_type_t);
@@ -101,7 +101,7 @@ static mod_hash_t	*vnic_hash;
 #define	VNIC_HASH_KEY(vnic_id)	((mod_hash_key_t)(uintptr_t)vnic_id)
 
 #define	VNIC_M_CALLBACK_FLAGS	\
-	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_PROPINFO)
 
 static mac_callbacks_t vnic_m_callbacks = {
 	VNIC_M_CALLBACK_FLAGS,
@@ -112,12 +112,14 @@ static mac_callbacks_t vnic_m_callbacks = {
 	vnic_m_multicst,
 	vnic_m_unicst,
 	vnic_m_tx,
+	NULL,
 	vnic_m_ioctl,
 	vnic_m_capab_get,
 	NULL,
 	NULL,
 	vnic_m_setprop,
-	vnic_m_getprop
+	NULL,
+	vnic_m_propinfo
 };
 
 void
@@ -185,7 +187,7 @@ static int
 vnic_unicast_add(vnic_t *vnic, vnic_mac_addr_type_t vnic_addr_type,
     int *addr_slot, uint_t prefix_len, int *addr_len_ptr_arg,
     uint8_t *mac_addr_arg, uint16_t flags, vnic_ioc_diag_t *diag,
-    uint16_t vid)
+    uint16_t vid, boolean_t req_hwgrp_flag)
 {
 	mac_diag_t mac_diag;
 	uint16_t mac_flags = 0;
@@ -290,7 +292,14 @@ vnic_unicast_add(vnic_t *vnic, vnic_mac_addr_type_t vnic_addr_type,
 		/*
 		 * We get the address here since we copy it in the
 		 * vnic's vn_addr.
+		 * We can't ask for hardware resources since we
+		 * don't currently support hardware classification
+		 * for these MAC clients.
 		 */
+		if (req_hwgrp_flag) {
+			*diag = VNIC_IOC_DIAG_NO_HWRINGS;
+			return (ENOTSUP);
+		}
 		mac_unicast_primary_get(vnic->vn_lower_mh, mac_addr_arg);
 		*addr_len_ptr_arg = mac_addr_len(vnic->vn_lower_mh);
 		mac_flags |= MAC_UNICAST_VNIC_PRIMARY;
@@ -330,8 +339,7 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 	boolean_t is_anchor = ((flags & VNIC_IOC_CREATE_ANCHOR) != 0);
 	char vnic_name[MAXNAMELEN];
 	const mac_info_t *minfop;
-	uint32_t req_hwgrp_flag = ((flags & VNIC_IOC_CREATE_REQ_HWRINGS) != 0) ?
-	    MAC_OPEN_FLAGS_REQ_HWRINGS : 0;
+	uint32_t req_hwgrp_flag = B_FALSE;
 
 	*diag = VNIC_IOC_DIAG_NONE;
 
@@ -394,11 +402,15 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 		(void) dls_mgmt_get_linkinfo(vnic_id, vnic_name, NULL, NULL,
 		    NULL);
 		err = mac_client_open(vnic->vn_lower_mh, &vnic->vn_mch,
-		    vnic_name, MAC_OPEN_FLAGS_IS_VNIC | req_hwgrp_flag);
+		    vnic_name, MAC_OPEN_FLAGS_IS_VNIC);
 		if (err != 0)
 			goto bail;
 
 		if (mrp != NULL) {
+			if ((mrp->mrp_mask & MRP_RX_RINGS) != 0 ||
+			    (mrp->mrp_mask & MRP_TX_RINGS) != 0) {
+				req_hwgrp_flag = B_TRUE;
+			}
 			err = mac_client_set_resources(vnic->vn_mch, mrp);
 			if (err != 0)
 				goto bail;
@@ -406,10 +418,11 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 		/* assign a MAC address to the VNIC */
 
 		err = vnic_unicast_add(vnic, *vnic_addr_type, mac_slot,
-		    mac_prefix_len, mac_len, mac_addr, flags, diag, vid);
+		    mac_prefix_len, mac_len, mac_addr, flags, diag, vid,
+		    req_hwgrp_flag);
 		if (err != 0) {
 			vnic->vn_muh = NULL;
-			if (diag != NULL && req_hwgrp_flag != 0)
+			if (diag != NULL && req_hwgrp_flag)
 				*diag = VNIC_IOC_DIAG_NO_HWRINGS;
 			goto bail;
 		}
@@ -495,7 +508,7 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 
 	/* Set the VNIC's MAC in the client */
 	if (!is_anchor)
-		mac_set_upper_mac(vnic->vn_mch, vnic->vn_mh);
+		mac_set_upper_mac(vnic->vn_mch, vnic->vn_mh, mrp);
 
 	err = dls_devnet_create(vnic->vn_mh, vnic->vn_id, crgetzoneid(credp));
 	if (err != 0) {
@@ -850,37 +863,24 @@ vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 	return (err);
 }
 
-/*ARGSUSED*/
-static int
-vnic_m_getprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+/* ARGSUSED */
+static void vnic_m_propinfo(void *m_driver, const char *pr_name,
+    mac_prop_id_t pr_num, mac_prop_info_handle_t prh)
 {
-	mac_propval_range_t 	range;
-	vnic_t			*vn = m_driver;
-	int 			err = ENOTSUP;
+	vnic_t		*vn = m_driver;
 
 	/* MTU setting allowed only on an etherstub */
 	if (vn->vn_link_id != DATALINK_INVALID_LINKID)
-		return (err);
+		return;
 
 	switch (pr_num) {
 	case MAC_PROP_MTU:
-		if (!(pr_flags & MAC_PROP_POSSIBLE))
-			return (ENOTSUP);
-		if (pr_valsize < sizeof (mac_propval_range_t))
-			return (EINVAL);
-		range.mpr_count = 1;
-		range.mpr_type = MAC_PROPVAL_UINT32;
-		range.range_uint32[0].mpur_min = ANCHOR_VNIC_MIN_MTU;
-		range.range_uint32[0].mpur_max = ANCHOR_VNIC_MAX_MTU;
-		bcopy(&range, pr_val, sizeof (range));
-		return (0);
-	default:
+		mac_prop_info_set_range_uint32(prh,
+		    ANCHOR_VNIC_MIN_MTU, ANCHOR_VNIC_MAX_MTU);
 		break;
 	}
-
-	return (err);
 }
+
 
 int
 vnic_info(vnic_info_t *info, cred_t *credp)

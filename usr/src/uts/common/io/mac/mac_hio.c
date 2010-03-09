@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/mac.h>
 #include <sys/mac_impl.h>
 #include <sys/mac_client_impl.h>
+#include <sys/mac_client_priv.h>
 #include <sys/mac_soft_ring.h>
 
 
@@ -129,7 +130,7 @@ mac_share_bind(mac_client_handle_t mch, uint64_t cookie, uint64_t *rcookie)
 	 * there are no in flight packets through a transmit ring
 	 * which is being bound to another domain.
 	 */
-	mac_tx_client_quiesce(mcip, SRS_QUIESCE);
+	mac_tx_client_quiesce(mch);
 
 	/*
 	 * For the receive path, no traffic will be sent up through
@@ -148,7 +149,7 @@ mac_share_bind(mac_client_handle_t mch, uint64_t cookie, uint64_t *rcookie)
 	/*
 	 * Resume transmit traffic for the MAC client.
 	 */
-	mac_tx_client_restart(mcip);
+	mac_tx_client_restart(mch);
 
 	i_mac_perim_exit(mip);
 
@@ -182,7 +183,7 @@ mac_share_unbind(mac_client_handle_t mch)
 	 * been updated by mac_fanout_recompute(). Do the check here
 	 * now that the share has been unbound.
 	 */
-	mac_fanout_recompute_client(mcip);
+	mac_fanout_recompute_client(mcip, NULL);
 
 	i_mac_perim_exit(mip);
 }

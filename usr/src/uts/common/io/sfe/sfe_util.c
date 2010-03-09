@@ -32,7 +32,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4069,6 +4069,7 @@ static mac_callbacks_t gem_m_callbacks = {
 	gem_m_multicst,
 	gem_m_unicst,
 	gem_m_tx,
+	NULL,
 	gem_m_ioctl,
 	gem_m_getcapab,
 };

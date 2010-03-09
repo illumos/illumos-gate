@@ -476,7 +476,8 @@ proto_bind_req(dld_str_t *dsp, mblk_t *mp)
 	 * etc. since part of mac_client_retarget_intr is to walk the
 	 * device tree in order to find and retarget the interrupts.
 	 */
-	mac_client_set_intr_cpu(mdip, dsp->ds_mch, intr_cpu);
+	if (intr_cpu != -1)
+		mac_client_set_intr_cpu(mdip, dsp->ds_mch, intr_cpu);
 
 	/*
 	 * Copy in MAC address.

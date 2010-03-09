@@ -50,6 +50,7 @@
 #include	<sys/policy.h>
 #include	<sys/ddi.h>
 #include	<sys/sunddi.h>
+#include	<sys/byteorder.h>
 #include	"hme_phy.h"
 #include	"hme_mac.h"
 #include	"hme.h"
@@ -113,11 +114,12 @@ static	int	hme_64bit_enable =	1;	/* Use 64-bit sbus transfers */
 static	int	hme_reject_own =	1;	/* Reject packets with own SA */
 static	int	hme_ngu_enable =	0;	/* Never Give Up mode */
 
-mac_priv_prop_t hme_priv_prop[] = {
-	{	"_ipg0",	MAC_PROP_PERM_RW	},
-	{	"_ipg1",	MAC_PROP_PERM_RW	},
-	{	"_ipg2",	MAC_PROP_PERM_RW	},
-	{	"_lance_mode",	MAC_PROP_PERM_RW	},
+char *hme_priv_prop[] = {
+	"_ipg0",
+	"_ipg1",
+	"_ipg2",
+	"_lance_mode",
+	NULL
 };
 
 static	int	hme_lance_mode =	1;	/* to enable lance mode */
@@ -232,8 +234,9 @@ static int	hme_m_multicst(void *, boolean_t, const uint8_t *);
 static int	hme_m_unicst(void *, const uint8_t *);
 static mblk_t	*hme_m_tx(void *, mblk_t *);
 static boolean_t	hme_m_getcapab(void *, mac_capab_t, void *);
-static int hme_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
-    uint_t, void *, uint_t *);
+static int hme_m_getprop(void *, const char *, mac_prop_id_t, uint_t, void *);
+static void hme_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 static int hme_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
 
@@ -246,7 +249,7 @@ static mii_ops_t hme_mii_ops = {
 };
 
 static mac_callbacks_t hme_m_callbacks = {
-	MC_GETCAPAB | MC_SETPROP | MC_GETPROP,
+	MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	hme_m_stat,
 	hme_m_start,
 	hme_m_stop,
@@ -255,11 +258,13 @@ static mac_callbacks_t hme_m_callbacks = {
 	hme_m_unicst,
 	hme_m_tx,
 	NULL,
+	NULL,
 	hme_m_getcapab,
 	NULL,
 	NULL,
 	hme_m_setprop,
 	hme_m_getprop,
+	hme_m_propinfo
 };
 
 DDI_DEFINE_STREAM_OPS(hme_dev_ops, nulldev, nulldev, hmeattach, hmedetach,
@@ -1506,8 +1511,6 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	macp->m_max_sdu = ETHERMTU;
 	macp->m_margin = VLAN_TAGSZ;
 	macp->m_priv_props = hme_priv_prop;
-	macp->m_priv_prop_count =
-	    sizeof (hme_priv_prop) / sizeof (hme_priv_prop[0]);
 	if (mac_register(macp, &hmep->hme_mh) != 0) {
 		mac_free(macp);
 		goto error_intr;
@@ -1901,15 +1904,14 @@ hmestatinit(struct hme *hmep)
 }
 
 int
-hme_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
-    uint_t sz, void *val, uint_t *perm)
+hme_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    void *val)
 {
 	struct hme *hmep = arg;
 	int value;
-	boolean_t is_default;
 	int rv;
 
-	rv = mii_m_getprop(hmep->hme_mii, name, num, flags, sz, val, perm);
+	rv = mii_m_getprop(hmep->hme_mii, name, num, sz, val);
 	if (rv != ENOTSUP)
 		return (rv);
 
@@ -1920,23 +1922,51 @@ hme_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 		return (ENOTSUP);
 	}
 
-	*perm = MAC_PROP_PERM_RW;
-
-	is_default = (flags & MAC_PROP_DEFAULT) ? B_TRUE : B_FALSE;
 	if (strcmp(name, "_ipg0") == 0) {
-		value = is_default ? hme_ipg0 : hmep->hme_ipg0;
-
+		value = hmep->hme_ipg0;
 	} else if (strcmp(name, "_ipg1") == 0) {
-		value = is_default ? hme_ipg1 : hmep->hme_ipg1;
+		value = hmep->hme_ipg1;
 	} else if (strcmp(name, "_ipg2") == 0) {
-		value = is_default ? hme_ipg2 : hmep->hme_ipg2;
+		value = hmep->hme_ipg2;
 	} else if (strcmp(name, "_lance_mode") == 0) {
-		value = is_default ? hme_lance_mode : hmep->hme_lance_mode;
+		value = hmep->hme_lance_mode;
 	} else {
 		return (ENOTSUP);
 	}
 	(void) snprintf(val, sz, "%d", value);
 	return (0);
+}
+
+static void
+hme_m_propinfo(void *arg, const char *name, mac_prop_id_t num,
+    mac_prop_info_handle_t mph)
+{
+	struct hme *hmep = arg;
+
+	mii_m_propinfo(hmep->hme_mii, name, num, mph);
+
+	switch (num) {
+	case MAC_PROP_PRIVATE: {
+		char valstr[64];
+		int default_val;
+
+		if (strcmp(name, "_ipg0") == 0) {
+			default_val = hme_ipg0;
+		} else if (strcmp(name, "_ipg1") == 0) {
+			default_val = hme_ipg1;
+		} else if (strcmp(name, "_ipg2") == 0) {
+			default_val = hme_ipg2;
+		} if (strcmp(name, "_lance_mode") == 0) {
+			default_val = hme_lance_mode;
+		} else {
+			return;
+		}
+
+		(void) snprintf(valstr, sizeof (valstr), "%d", default_val);
+		mac_prop_info_set_default_str(mph, valstr);
+		break;
+	}
+	}
 }
 
 int
@@ -2267,8 +2297,7 @@ hmestart(struct hme *hmep, mblk_t *mp)
 	uint32_t	start_offset;
 	uint32_t	stuff_offset;
 
-	hcksum_retrieve(mp, NULL, NULL, &start_offset, &stuff_offset,
-	    NULL, NULL, &flags);
+	mac_hcksum_get(mp, &start_offset, &stuff_offset, NULL, NULL, &flags);
 
 	if (flags & HCK_PARTIALCKSUM) {
 		if (get_ether_type(mp->b_rptr) == ETHERTYPE_VLAN) {
@@ -3434,8 +3463,7 @@ hmeread(struct hme *hmep, hmebuf_t *rbuf, uint32_t rflags)
 	if (type == ETHERTYPE_IP || type == ETHERTYPE_IPV6) {
 		uint16_t cksum = ~rflags & HMERMD_CKSUM;
 		uint_t end = len - sizeof (struct ether_header);
-		(void) hcksum_assoc(bp, NULL, NULL, 0,
-		    0, end, htons(cksum), HCK_PARTIALCKSUM, 0);
+		mac_hcksum_set(bp, 0, 0, end, htons(cksum), HCK_PARTIALCKSUM);
 	}
 
 	return (bp);

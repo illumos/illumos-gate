@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1511,6 +1511,26 @@ atu_m_setprop(void *arg, const char *name, mac_prop_id_t id, uint_t len,
 	return (0);
 }
 
+static int
+atu_m_getprop(void *arg, const char *name, mac_prop_id_t id,
+    uint_t length, void *buf)
+{
+	struct atu_softc *sc = (struct atu_softc *)arg;
+	struct ieee80211com *ic = &sc->sc_ic;
+
+	return (ieee80211_getprop(ic, name, id, length, buf));
+}
+
+static void
+atu_m_propinfo(void *arg, const char *name, mac_prop_id_t id,
+    mac_prop_info_handle_t mph)
+{
+	struct atu_softc *sc = (struct atu_softc *)arg;
+	struct ieee80211com *ic = &sc->sc_ic;
+
+	ieee80211_propinfo(ic, name, id, mph);
+}
+
 static void
 atu_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 {
@@ -1635,7 +1655,7 @@ atu_m_stat(void *arg, uint_t stat, uint64_t *val)
 }
 
 static mac_callbacks_t atu_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	atu_m_stat,
 	atu_m_start,
 	atu_m_stop,
@@ -1643,10 +1663,12 @@ static mac_callbacks_t atu_m_callbacks = {
 	atu_m_multicst,
 	atu_m_unicst,
 	atu_m_tx,
+	NULL,
 	atu_m_ioctl,
 	NULL,
 	NULL,
 	NULL,
 	atu_m_setprop,
-	ieee80211_getprop
+	atu_m_getprop,
+	atu_m_propinfo
 };

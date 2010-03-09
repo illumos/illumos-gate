@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +101,7 @@ typedef struct dladm_hwgrp_attr {
 	uint_t		hg_grp_num;
 	dladm_hwgrp_type_t	hg_grp_type;
 	uint_t		hg_n_rings;
+	uint_t		hg_rings[MAX_RINGS_PER_GROUP];
 	uint_t		hg_n_clnts;
 	char		hg_client_names[MAXCLIENTNAMELEN];
 } dladm_hwgrp_attr_t;
@@ -134,6 +135,8 @@ extern dladm_status_t	dladm_walk_linkprop(dladm_handle_t, datalink_id_t,
 			    void *, int (*)(dladm_handle_t, datalink_id_t,
 			    const char *, void *));
 extern boolean_t	dladm_attr_is_linkprop(const char *name);
+extern dladm_status_t	dladm_linkprop_is_set(dladm_handle_t, datalink_id_t,
+			    dladm_prop_type_t, const char *, boolean_t *);
 
 extern dladm_status_t	dladm_set_secobj(dladm_handle_t, const char *,
 			    dladm_secobj_class_t, uint8_t *, uint_t, uint_t);
@@ -207,6 +210,8 @@ extern int		dladm_walk_macaddr(dladm_handle_t, datalink_id_t,
 			    boolean_t (*)(void *, dladm_macaddr_attr_t *));
 extern int		dladm_walk_hwgrp(dladm_handle_t, datalink_id_t, void *,
 			    boolean_t (*)(void *, dladm_hwgrp_attr_t *));
+
+extern void		dladm_sort_index_list(uint_t [], uint_t);
 
 extern dladm_status_t	dladm_link_get_proplist(dladm_handle_t, datalink_id_t,
 			    dladm_arg_list_t **);

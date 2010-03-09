@@ -320,7 +320,7 @@ static cmd_t	cmds[] = {
 	    "    create-vnic      [-t] -l <link> [-m <value> | auto |\n"
 	    "\t\t     {factory [-n <slot-id>]} | {random [-r <prefix>]} |\n"
 	    "\t\t     {vrrp -V <vrid> -A {inet | inet6}} [-v <vid> [-f]]\n"
-	    "\t\t     [-H] [-p <prop>=<value>[,...]] <vnic-link>"	},
+	    "\t\t     [-p <prop>=<value>[,...]] <vnic-link>"	},
 	{ "delete-vnic",	do_delete_vnic,
 	    "    delete-vnic      [-t] <vnic-link>"			},
 	{ "show-vnic",		do_show_vnic,
@@ -810,18 +810,18 @@ static const ofmt_field_t phys_m_fields[] = {
 
 typedef enum {
 	PHYS_H_LINK,
-	PHYS_H_GROUP,
-	PHYS_H_GRPTYPE,
+	PHYS_H_RINGTYPE,
 	PHYS_H_RINGS,
 	PHYS_H_CLIENTS
 } phys_h_field_index_t;
 
+#define	RINGSTRLEN	21
+
 static const ofmt_field_t phys_h_fields[] = {
 { "LINK",	13,	PHYS_H_LINK,	print_phys_one_hwgrp_cb},
-{ "GROUP",	9,	PHYS_H_GROUP,	print_phys_one_hwgrp_cb},
-{ "GROUPTYPE",	7,	PHYS_H_GRPTYPE,	print_phys_one_hwgrp_cb},
-{ "RINGS",	17,	PHYS_H_RINGS,	print_phys_one_hwgrp_cb},
-{ "CLIENTS",	21,	PHYS_H_CLIENTS,	print_phys_one_hwgrp_cb},
+{ "RINGTYPE",	9,	PHYS_H_RINGTYPE,	print_phys_one_hwgrp_cb},
+{ "RINGS",	RINGSTRLEN,	PHYS_H_RINGS,	print_phys_one_hwgrp_cb},
+{ "CLIENTS",	24,	PHYS_H_CLIENTS,	print_phys_one_hwgrp_cb},
 { NULL,		0,	0,		NULL}}
 ;
 
@@ -3694,6 +3694,13 @@ typedef struct {
 static boolean_t
 print_phys_one_hwgrp_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 {
+	int		i;
+	boolean_t	first = B_TRUE;
+	int		start = -1;
+	int		end = -1;
+	char		ringstr[RINGSTRLEN];
+	char		ringsubstr[RINGSTRLEN];
+
 	print_phys_hwgrp_state_t *hg_state = ofarg->ofmt_cbarg;
 	dladm_hwgrp_attr_t *attr = hg_state->hs_grp_attr;
 
@@ -3701,15 +3708,78 @@ print_phys_one_hwgrp_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	case PHYS_H_LINK:
 		(void) snprintf(buf, bufsize, "%s", attr->hg_link_name);
 		break;
-	case PHYS_H_GROUP:
-		(void) snprintf(buf, bufsize, "%d", attr->hg_grp_num);
-		break;
-	case PHYS_H_GRPTYPE:
+	case PHYS_H_RINGTYPE:
 		(void) snprintf(buf, bufsize, "%s",
 		    attr->hg_grp_type == DLADM_HWGRP_TYPE_RX ? "RX" : "TX");
 		break;
 	case PHYS_H_RINGS:
-		(void) snprintf(buf, bufsize, "%d", attr->hg_n_rings);
+		ringstr[0] = '\0';
+		for (i = 0; i < attr->hg_n_rings; i++) {
+			uint_t 	index = attr->hg_rings[i];
+
+			if (start == -1) {
+				start = index;
+				end = index;
+			} else if (index == end + 1) {
+				end = index;
+			} else {
+				if (start == end) {
+					if (first) {
+						(void) snprintf(
+						    ringsubstr,
+						    RINGSTRLEN, "%d",
+						    start);
+						first = B_FALSE;
+					} else {
+						(void) snprintf(
+						    ringsubstr,
+						    RINGSTRLEN, ",%d",
+						    start);
+					}
+				} else {
+					if (first) {
+						(void) snprintf(
+						    ringsubstr,
+						    RINGSTRLEN,
+						    "%d-%d",
+						    start, end);
+						first = B_FALSE;
+					} else {
+						(void) snprintf(
+						    ringsubstr,
+						    RINGSTRLEN,
+						    ",%d-%d",
+						    start, end);
+					}
+				}
+				(void) strlcat(ringstr, ringsubstr,
+				    RINGSTRLEN);
+				start = index;
+				end = index;
+			}
+		}
+		/* The last one */
+		if (start != -1) {
+			if (first) {
+				if (start == end) {
+					(void) snprintf(buf, bufsize, "%d",
+					    start);
+				} else {
+					(void) snprintf(buf, bufsize, "%d-%d",
+					    start, end);
+				}
+			} else {
+				if (start == end) {
+					(void) snprintf(ringsubstr, RINGSTRLEN,
+					    ",%d", start);
+				} else {
+					(void) snprintf(ringsubstr, RINGSTRLEN,
+					    ",%d-%d", start, end);
+				}
+				(void) strlcat(ringstr, ringsubstr, RINGSTRLEN);
+				(void) snprintf(buf, bufsize, "%s", ringstr);
+			}
+		}
 		break;
 	case PHYS_H_CLIENTS:
 		if (attr->hg_client_names[0] == '\0') {
@@ -4232,8 +4302,7 @@ do_show_phys(int argc, char *argv[], const char *use)
 	    "link,media,state,speed,duplex,device";
 	char		*all_inactive_fields = "link,device,media,flags";
 	char		*all_mac_fields = "link,slot,address,inuse,client";
-	char		*all_hwgrp_fields =
-	    "link,group,grouptype,rings,clients";
+	char		*all_hwgrp_fields = "link,ringtype,rings,clients";
 	const ofmt_field_t *pf;
 	ofmt_handle_t	ofmt;
 	ofmt_status_t	oferr;
@@ -4533,9 +4602,6 @@ do_create_vnic(int argc, char *argv[], const char *use)
 			break;
 		case 'f':
 			flags |= DLADM_OPT_FORCE;
-			break;
-		case 'H':
-			flags |= DLADM_OPT_HWRINGS;
 			break;
 		default:
 			die_opterr(optopt, option, use);
@@ -8722,7 +8788,7 @@ warn(const char *format, ...)
 	(void) vfprintf(stderr, format, alist);
 	va_end(alist);
 
-	(void) putchar('\n');
+	(void) putc('\n', stderr);
 }
 
 /* PRINTFLIKE2 */
@@ -8779,7 +8845,7 @@ die(const char *format, ...)
 	(void) vfprintf(stderr, format, alist);
 	va_end(alist);
 
-	(void) putchar('\n');
+	(void) putc('\n', stderr);
 
 	/* close dladm handle if it was opened */
 	if (handle != NULL)

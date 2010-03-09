@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #include <sys/strsubr.h>
 #include <sys/modctl.h>
 #include <sys/devops.h>
+#include <sys/byteorder.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_wifi.h>
 #include <sys/net80211.h>
@@ -264,10 +265,12 @@ static void	ural_m_ioctl(void *, queue_t *, mblk_t *);
 static int	ural_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int	ural_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+    uint_t, void *);
+static void	ural_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 
 static mac_callbacks_t ural_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	ural_m_stat,
 	ural_m_start,
 	ural_m_stop,
@@ -275,12 +278,14 @@ static mac_callbacks_t ural_m_callbacks = {
 	ural_m_multicst,
 	ural_m_unicst,
 	ural_m_tx,
+	NULL,
 	ural_m_ioctl,
 	NULL,		/* mc_getcapab */
 	NULL,
 	NULL,
 	ural_m_setprop,
-	ural_m_getprop
+	ural_m_getprop,
+	ural_m_propinfo
 };
 
 static void ural_amrr_start(struct ural_softc *, struct ieee80211_node *);
@@ -2067,15 +2072,24 @@ ural_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 static int
 ural_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	struct ural_softc *sc = (struct ural_softc *)arg;
 	int err;
 
 	err = ieee80211_getprop(&sc->sc_ic, pr_name, wldp_pr_num,
-	    pr_flags, wldp_length, wldp_buf, perm);
+	    wldp_length, wldp_buf);
 
 	return (err);
+}
+
+static void
+ural_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    mac_prop_info_handle_t mph)
+{
+	struct ural_softc *sc = (struct ural_softc *)arg;
+
+	ieee80211_propinfo(&sc->sc_ic, pr_name, wldp_pr_num, mph);
 }
 
 static void

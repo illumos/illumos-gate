@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -653,7 +653,10 @@ lacp_xmit_sm(aggr_port_t *portp)
 	fill_lacp_pdu(portp,
 	    (lacp_t *)(mp->b_rptr + sizeof (struct ether_header)));
 
-	(void) mac_tx(portp->lp_mch, mp, 0, MAC_DROP_ON_NO_DESC, NULL);
+	/* Send the packet over the first TX ring */
+	mp = mac_hwring_send_priv(portp->lp_mch, portp->lp_tx_rings[0], mp);
+	if (mp != NULL)
+		freemsg(mp);
 
 	pl->NTT = B_FALSE;
 	portp->lp_lacp_stats.LACPDUsTx++;
@@ -1322,8 +1325,14 @@ lacp_selection_logic(aggr_port_t *portp)
 			if (ether_cmp(&tpp->lp_lacp.PartnerOperSystem,
 			    &aggrp->aggr.PartnerSystem) == 0 &&
 			    (tpp->lp_lacp.PartnerOperKey ==
-			    aggrp->aggr.PartnerOperAggrKey))
+			    aggrp->aggr.PartnerOperAggrKey)) {
+				/* Set aggregation Partner MAC and key */
+				aggrp->aggr.PartnerSystem =
+				    pl->PartnerOperSystem;
+				aggrp->aggr.PartnerOperAggrKey =
+				    pl->PartnerOperKey;
 				break;
+			}
 		}
 
 		if (tpp == NULL) {
@@ -2293,7 +2302,11 @@ aggr_lacp_rx(mblk_t *dmp)
 		if (receive_marker_pdu(portp, dmp) != 0)
 			break;
 
-		(void) mac_tx(portp->lp_mch, dmp, 0, MAC_DROP_ON_NO_DESC, NULL);
+		/* Send the packet over the first TX ring */
+		dmp = mac_hwring_send_priv(portp->lp_mch,
+		    portp->lp_tx_rings[0], dmp);
+		if (dmp != NULL)
+			freemsg(dmp);
 		mac_perim_exit(mph);
 		AGGR_PORT_REFRELE(portp);
 		return;

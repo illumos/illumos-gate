@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1333,8 +1333,10 @@ dladm_usage_summary(int (*fn)(dladm_usage_t *, void *), int logtype,
 		ns = ne->net_entry_tstats;
 		nd = ne->net_entry_desc;
 
-		if (ns->net_stat_ibytes + ns->net_stat_obytes == 0)
+		if (ns->net_stat_ibytes + ns->net_stat_obytes == 0) {
+			ne = ne->net_entry_next;
 			continue;
+		}
 		bcopy(&nd->net_desc_name, &usage.du_name,
 		    sizeof (usage.du_name));
 		usage.du_duration = ne->net_entry_ttime;

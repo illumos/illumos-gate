@@ -123,6 +123,7 @@ static mac_callbacks_t rge_m_callbacks = {
 	rge_m_multicst,
 	rge_m_unicst,
 	rge_m_tx,
+	NULL,
 	rge_m_ioctl,
 	rge_m_getcapab
 };

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,6 +195,7 @@ static mac_callbacks_t amd8111s_m_callbacks = {
 	amd8111s_m_multicst,
 	amd8111s_m_unicst,
 	amd8111s_m_tx,
+	NULL,
 	amd8111s_m_ioctl
 };
 

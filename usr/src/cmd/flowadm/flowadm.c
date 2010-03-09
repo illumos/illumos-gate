@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,6 @@
 #include <string.h>
 #include <stropts.h>
 #include <errno.h>
-#include <kstat.h>
 #include <strings.h>
 #include <getopt.h>
 #include <unistd.h>
@@ -51,44 +50,21 @@
 #include <stddef.h>
 #include <ofmt.h>
 
-typedef struct show_usage_state_s {
-	boolean_t	us_plot;
-	boolean_t	us_parsable;
-	boolean_t	us_printheader;
-	boolean_t	us_first;
-	boolean_t	us_showall;
-	ofmt_handle_t	us_ofmt;
-} show_usage_state_t;
-
 typedef struct show_flow_state {
-	boolean_t		fs_firstonly;
-	boolean_t		fs_donefirst;
-	pktsum_t		fs_prevstats;
-	uint32_t		fs_flags;
 	dladm_status_t		fs_status;
 	ofmt_handle_t		fs_ofmt;
 	const char		*fs_flow;
-	const char		*fs_link;
 	boolean_t		fs_parsable;
 	boolean_t		fs_persist;
-	boolean_t		fs_stats;
-	uint64_t		fs_mask;
 } show_flow_state_t;
 
 typedef void cmdfunc_t(int, char **);
 
 static cmdfunc_t do_add_flow, do_remove_flow, do_init_flow, do_show_flow;
 static cmdfunc_t do_show_flowprop, do_set_flowprop, do_reset_flowprop;
-static cmdfunc_t do_show_usage;
 
 static int	show_flow(dladm_handle_t, dladm_flow_attr_t *, void *);
 static int	show_flows_onelink(dladm_handle_t, datalink_id_t, void *);
-
-static void	flow_stats(const char *, datalink_id_t,  uint_t, char *,
-		    show_flow_state_t *);
-static void	get_flow_stats(const char *, pktsum_t *);
-static int	show_flow_stats(dladm_handle_t, dladm_flow_attr_t *, void *);
-static int	show_link_flow_stats(dladm_handle_t, datalink_id_t, void *);
 
 static int	remove_flow(dladm_handle_t, dladm_flow_attr_t *, void *);
 
@@ -104,7 +80,7 @@ static void	warn(const char *, ...);
 static void	warn_dlerr(dladm_status_t, const char *, ...);
 
 /* callback functions for printing output */
-static ofmt_cb_t print_flowprop_cb, print_default_cb, print_flow_stats_cb;
+static ofmt_cb_t print_flowprop_cb, print_default_cb;
 static void flowadm_ofmt_check(ofmt_status_t, boolean_t, ofmt_handle_t);
 
 typedef struct	cmd {
@@ -120,15 +96,12 @@ static cmd_t	cmds[] = {
 	{ "reset-flowprop", do_reset_flowprop },
 	{ "show-flow", do_show_flow },
 	{ "init-flow", do_init_flow },
-	{ "show-usage", do_show_usage }
 };
 
 static const struct option longopts[] = {
 	{"link",		required_argument,	0, 'l'},
 	{"parsable",		no_argument,		0, 'p'},
 	{"parseable",		no_argument,		0, 'p'},
-	{"statistics",		no_argument,		0, 's'},
-	{"interval",		required_argument,	0, 'i'},
 	{"temporary",		no_argument,		0, 't'},
 	{"root-dir",		required_argument,	0, 'R'},
 	{ 0, 0, 0, 0 }
@@ -236,104 +209,6 @@ typedef struct flowprop_args_s {
 	char			*fs_propname;
 	char			*fs_flowname;
 } flowprop_args_t;
-/*
- * structures for 'flowadm show-flow -s' (print statistics)
- */
-typedef enum {
-	FLOW_S_FLOW,
-	FLOW_S_IPKTS,
-	FLOW_S_RBYTES,
-	FLOW_S_IERRORS,
-	FLOW_S_OPKTS,
-	FLOW_S_OBYTES,
-	FLOW_S_OERRORS
-} flow_s_field_index_t;
-
-static ofmt_field_t flow_s_fields[] = {
-/* name,	field width,	index,		callback */
-{ "FLOW",	15,	FLOW_S_FLOW,	print_flow_stats_cb},
-{ "IPACKETS",	10,	FLOW_S_IPKTS,	print_flow_stats_cb},
-{ "RBYTES",	8,	FLOW_S_RBYTES,	print_flow_stats_cb},
-{ "IERRORS",	10,	FLOW_S_IERRORS,	print_flow_stats_cb},
-{ "OPACKETS",	12,	FLOW_S_OPKTS,	print_flow_stats_cb},
-{ "OBYTES",	12,	FLOW_S_OBYTES,	print_flow_stats_cb},
-{ "OERRORS",	8,	FLOW_S_OERRORS,	print_flow_stats_cb},
-NULL_OFMT}
-;
-
-typedef struct flow_args_s {
-	char		*flow_s_flow;
-	pktsum_t	*flow_s_psum;
-} flow_args_t;
-
-/*
- * structures for 'flowadm show-usage'
- */
-typedef struct  usage_fields_buf_s {
-	char	usage_flow[12];
-	char	usage_duration[10];
-	char	usage_ipackets[9];
-	char	usage_rbytes[10];
-	char	usage_opackets[9];
-	char	usage_obytes[10];
-	char	usage_bandwidth[14];
-} usage_fields_buf_t;
-
-static ofmt_field_t usage_fields[] = {
-/* name,	field width,	offset */
-{ "FLOW",	13,
-	offsetof(usage_fields_buf_t, usage_flow), print_default_cb},
-{ "DURATION",	11,
-	offsetof(usage_fields_buf_t, usage_duration), print_default_cb},
-{ "IPACKETS",	10,
-	offsetof(usage_fields_buf_t, usage_ipackets), print_default_cb},
-{ "RBYTES",	11,
-	offsetof(usage_fields_buf_t, usage_rbytes), print_default_cb},
-{ "OPACKETS",	10,
-	offsetof(usage_fields_buf_t, usage_opackets), print_default_cb},
-{ "OBYTES",	11,
-	offsetof(usage_fields_buf_t, usage_obytes), print_default_cb},
-{ "BANDWIDTH",	15,
-	offsetof(usage_fields_buf_t, usage_bandwidth), print_default_cb},
-NULL_OFMT}
-;
-
-/*
- * structures for 'dladm show-usage link'
- */
-
-typedef struct  usage_l_fields_buf_s {
-	char	usage_l_flow[12];
-	char	usage_l_stime[13];
-	char	usage_l_etime[13];
-	char	usage_l_rbytes[8];
-	char	usage_l_obytes[8];
-	char	usage_l_bandwidth[14];
-} usage_l_fields_buf_t;
-
-static ofmt_field_t usage_l_fields[] = {
-/* name,	field width,	offset */
-{ "FLOW",	13,
-	offsetof(usage_l_fields_buf_t, usage_l_flow), print_default_cb},
-{ "START",	14,
-	offsetof(usage_l_fields_buf_t, usage_l_stime), print_default_cb},
-{ "END",	14,
-	offsetof(usage_l_fields_buf_t, usage_l_etime), print_default_cb},
-{ "RBYTES",	9,
-	offsetof(usage_l_fields_buf_t, usage_l_rbytes), print_default_cb},
-{ "OBYTES",	9,
-	offsetof(usage_l_fields_buf_t, usage_l_obytes), print_default_cb},
-{ "BANDWIDTH",	15,
-	offsetof(usage_l_fields_buf_t, usage_l_bandwidth), print_default_cb},
-NULL_OFMT}
-;
-
-#define	PRI_HI		100
-#define	PRI_LO 		10
-#define	PRI_NORM	50
-
-#define	FLOWADM_CONF	"/etc/dladm/flowadm.conf"
-#define	BLANK_LINE(s)	((s[0] == '\0') || (s[0] == '#') || (s[0] == '\n'))
 
 static char *progname;
 
@@ -360,15 +235,12 @@ usage(void)
 	    "    add-flow       [-t] -l <link> -a <attr>=<value>[,...]\n"
 	    "\t\t   [-p <prop>=<value>,...] <flow>\n"
 	    "    remove-flow    [-t] {-l <link> | <flow>}\n"
-	    "    show-flow      [-p] [-s [-i <interval>]] [-l <link>] "
+	    "    show-flow      [-p] [-l <link>] "
 	    "[<flow>]\n\n"
 	    "    set-flowprop   [-t] -p <prop>=<value>[,...] <flow>\n"
 	    "    reset-flowprop [-t] [-p <prop>,...] <flow>\n"
 	    "    show-flowprop  [-cP] [-l <link>] [-p <prop>,...] "
-	    "[<flow>]\n\n"
-	    "    show-usage     [-a] [-d | -F <format>] "
-	    "[-s <DD/MM/YYYY,HH:MM:SS>]\n"
-	    "\t\t   [-e <DD/MM/YYYY,HH:MM:SS>] -f <logfile> [<flow>]\n"));
+	    "[<flow>]\n"));
 
 	/* close dladm handle if it was opened */
 	if (handle != NULL)
@@ -444,275 +316,6 @@ do_init_flow(int argc, char *argv[])
 	status = dladm_flow_init(handle);
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "flows initialization failed");
-}
-
-/* ARGSUSED */
-static int
-show_usage_date(dladm_usage_t *usage, void *arg)
-{
-	show_usage_state_t	*state = (show_usage_state_t *)arg;
-	time_t			stime;
-	char			timebuf[20];
-	dladm_flow_attr_t	attr;
-	dladm_status_t		status;
-
-	/*
-	 * Only show usage information for existing flows unless '-a'
-	 * is specified.
-	 */
-	if (!state->us_showall && ((status = dladm_flow_info(handle,
-	    usage->du_name, &attr)) != DLADM_STATUS_OK)) {
-		return (status);
-	}
-
-	stime = usage->du_stime;
-	(void) strftime(timebuf, sizeof (timebuf), "%m/%d/%Y",
-	    localtime(&stime));
-	(void) printf("%s\n", timebuf);
-
-	return (DLADM_STATUS_OK);
-}
-
-static int
-show_usage_time(dladm_usage_t *usage, void *arg)
-{
-	show_usage_state_t	*state = (show_usage_state_t *)arg;
-	char			buf[DLADM_STRSIZE];
-	usage_l_fields_buf_t 	ubuf;
-	time_t			time;
-	double			bw;
-	dladm_flow_attr_t	attr;
-	dladm_status_t		status;
-
-	/*
-	 * Only show usage information for existing flows unless '-a'
-	 * is specified.
-	 */
-	if (!state->us_showall && ((status = dladm_flow_info(handle,
-	    usage->du_name, &attr)) != DLADM_STATUS_OK)) {
-		return (status);
-	}
-
-	if (state->us_plot) {
-		if (!state->us_printheader) {
-			if (state->us_first) {
-				(void) printf("# Time");
-				state->us_first = B_FALSE;
-			}
-			(void) printf(" %s", usage->du_name);
-			if (usage->du_last) {
-				(void) printf("\n");
-				state->us_first = B_TRUE;
-				state->us_printheader = B_TRUE;
-			}
-		} else {
-			if (state->us_first) {
-				time = usage->du_etime;
-				(void) strftime(buf, sizeof (buf), "%T",
-				    localtime(&time));
-				state->us_first = B_FALSE;
-				(void) printf("%s", buf);
-			}
-			bw = (double)usage->du_bandwidth/1000;
-			(void) printf(" %.2f", bw);
-			if (usage->du_last) {
-				(void) printf("\n");
-				state->us_first = B_TRUE;
-			}
-		}
-		return (DLADM_STATUS_OK);
-	}
-
-	bzero(&ubuf, sizeof (ubuf));
-
-	(void) snprintf(ubuf.usage_l_flow, sizeof (ubuf.usage_l_flow), "%s",
-	    usage->du_name);
-	time = usage->du_stime;
-	(void) strftime(buf, sizeof (buf), "%T", localtime(&time));
-	(void) snprintf(ubuf.usage_l_stime, sizeof (ubuf.usage_l_stime), "%s",
-	    buf);
-	time = usage->du_etime;
-	(void) strftime(buf, sizeof (buf), "%T", localtime(&time));
-	(void) snprintf(ubuf.usage_l_etime, sizeof (ubuf.usage_l_etime), "%s",
-	    buf);
-	(void) snprintf(ubuf.usage_l_rbytes, sizeof (ubuf.usage_l_rbytes),
-	    "%llu", usage->du_rbytes);
-	(void) snprintf(ubuf.usage_l_obytes, sizeof (ubuf.usage_l_obytes),
-	    "%llu", usage->du_obytes);
-	(void) snprintf(ubuf.usage_l_bandwidth, sizeof (ubuf.usage_l_bandwidth),
-	    "%s Mbps", dladm_bw2str(usage->du_bandwidth, buf));
-
-	ofmt_print(state->us_ofmt, (void *)&ubuf);
-	return (DLADM_STATUS_OK);
-}
-
-static int
-show_usage_res(dladm_usage_t *usage, void *arg)
-{
-	show_usage_state_t	*state = (show_usage_state_t *)arg;
-	char			buf[DLADM_STRSIZE];
-	usage_fields_buf_t	ubuf;
-	dladm_flow_attr_t	attr;
-	dladm_status_t		status;
-
-	/*
-	 * Only show usage information for existing flows unless '-a'
-	 * is specified.
-	 */
-	if (!state->us_showall && ((status = dladm_flow_info(handle,
-	    usage->du_name, &attr)) != DLADM_STATUS_OK)) {
-		return (status);
-	}
-
-	bzero(&ubuf, sizeof (ubuf));
-
-	(void) snprintf(ubuf.usage_flow, sizeof (ubuf.usage_flow), "%s",
-	    usage->du_name);
-	(void) snprintf(ubuf.usage_duration, sizeof (ubuf.usage_duration),
-	    "%llu", usage->du_duration);
-	(void) snprintf(ubuf.usage_ipackets, sizeof (ubuf.usage_ipackets),
-	    "%llu", usage->du_ipackets);
-	(void) snprintf(ubuf.usage_rbytes, sizeof (ubuf.usage_rbytes),
-	    "%llu", usage->du_rbytes);
-	(void) snprintf(ubuf.usage_opackets, sizeof (ubuf.usage_opackets),
-	    "%llu", usage->du_opackets);
-	(void) snprintf(ubuf.usage_obytes, sizeof (ubuf.usage_obytes),
-	    "%llu", usage->du_obytes);
-	(void) snprintf(ubuf.usage_bandwidth, sizeof (ubuf.usage_bandwidth),
-	    "%s Mbps", dladm_bw2str(usage->du_bandwidth, buf));
-
-	ofmt_print(state->us_ofmt, (void *)&ubuf);
-
-	return (DLADM_STATUS_OK);
-}
-
-static boolean_t
-valid_formatspec(char *formatspec_str)
-{
-	if (strcmp(formatspec_str, "gnuplot") == 0)
-		return (B_TRUE);
-	return (B_FALSE);
-}
-
-/* ARGSUSED */
-static void
-do_show_usage(int argc, char *argv[])
-{
-	char			*file = NULL;
-	int			opt;
-	dladm_status_t		status;
-	boolean_t		d_arg = B_FALSE;
-	char			*stime = NULL;
-	char			*etime = NULL;
-	char			*resource = NULL;
-	show_usage_state_t	state;
-	boolean_t		o_arg = B_FALSE;
-	boolean_t		F_arg = B_FALSE;
-	char			*fields_str = NULL;
-	char			*formatspec_str = NULL;
-	char			*all_fields =
-	    "flow,duration,ipackets,rbytes,opackets,obytes,bandwidth";
-	char			*all_l_fields =
-	    "flow,start,end,rbytes,obytes,bandwidth";
-	ofmt_handle_t		ofmt;
-	ofmt_status_t		oferr;
-	uint_t			ofmtflags = 0;
-
-	bzero(&state, sizeof (show_usage_state_t));
-	state.us_parsable = B_FALSE;
-	state.us_printheader = B_FALSE;
-	state.us_plot = B_FALSE;
-	state.us_first = B_TRUE;
-
-	while ((opt = getopt(argc, argv, "das:e:o:f:F:")) != -1) {
-		switch (opt) {
-		case 'd':
-			d_arg = B_TRUE;
-			break;
-		case 'a':
-			state.us_showall = B_TRUE;
-			break;
-		case 'f':
-			file = optarg;
-			break;
-		case 's':
-			stime = optarg;
-			break;
-		case 'e':
-			etime = optarg;
-			break;
-		case 'o':
-			o_arg = B_TRUE;
-			fields_str = optarg;
-			break;
-		case 'F':
-			state.us_plot = F_arg = B_TRUE;
-			formatspec_str = optarg;
-			break;
-		default:
-			die_opterr(optopt, opt);
-		}
-	}
-
-	if (file == NULL)
-		die("show-usage requires a file");
-
-	if (optind == (argc-1)) {
-		dladm_flow_attr_t	attr;
-
-		if (!state.us_showall &&
-		    dladm_flow_info(handle, resource, &attr) !=
-		    DLADM_STATUS_OK) {
-			die("invalid flow: '%s'", resource);
-		}
-		resource = argv[optind];
-	}
-
-	if (state.us_parsable)
-		ofmtflags |= OFMT_PARSABLE;
-	if (resource == NULL && stime == NULL && etime == NULL) {
-		if (!o_arg || (o_arg && strcasecmp(fields_str, "all") == 0))
-			fields_str = all_fields;
-		oferr = ofmt_open(fields_str, usage_fields, ofmtflags,
-		    0, &ofmt);
-	} else {
-		if (!o_arg || (o_arg && strcasecmp(fields_str, "all") == 0))
-			fields_str = all_l_fields;
-		oferr = ofmt_open(fields_str, usage_l_fields, ofmtflags,
-		    0, &ofmt);
-	}
-
-	flowadm_ofmt_check(oferr, state.us_parsable, ofmt);
-	state.us_ofmt = ofmt;
-
-	if (F_arg && d_arg)
-		die("incompatible -d and -F options");
-
-	if (F_arg && valid_formatspec(formatspec_str) == B_FALSE)
-		die("Format specifier %s not supported", formatspec_str);
-
-	if (d_arg) {
-		/* Print log dates */
-		status = dladm_usage_dates(show_usage_date,
-		    DLADM_LOGTYPE_FLOW, file, resource, &state);
-	} else if (resource == NULL && stime == NULL && etime == NULL &&
-	    !F_arg) {
-		/* Print summary */
-		status = dladm_usage_summary(show_usage_res,
-		    DLADM_LOGTYPE_FLOW, file, &state);
-	} else if (resource != NULL) {
-		/* Print log entries for named resource */
-		status = dladm_walk_usage_res(show_usage_time,
-		    DLADM_LOGTYPE_FLOW, file, resource, stime, etime, &state);
-	} else {
-		/* Print time and information for each link */
-		status = dladm_walk_usage_time(show_usage_time,
-		    DLADM_LOGTYPE_FLOW, file, stime, etime, &state);
-	}
-
-	ofmt_close(ofmt);
-	if (status != DLADM_STATUS_OK)
-		die_dlerr(status, "show-usage");
 }
 
 static void
@@ -981,176 +584,14 @@ show_flows_onelink(dladm_handle_t dh, datalink_id_t linkid, void *arg)
 }
 
 static void
-get_flow_stats(const char *flowname, pktsum_t *stats)
-{
-	kstat_ctl_t	*kcp;
-	kstat_t		*ksp;
-
-	bzero(stats, sizeof (*stats));
-
-	if ((kcp = kstat_open()) == NULL) {
-		warn("kstat open operation failed");
-		return;
-	}
-
-	ksp = dladm_kstat_lookup(kcp, NULL, -1, flowname, "flow");
-
-	if (ksp != NULL)
-		dladm_get_stats(kcp, ksp, stats);
-
-	(void) kstat_close(kcp);
-}
-
-static boolean_t
-print_flow_stats_cb(ofmt_arg_t *of_arg, char *buf, uint_t bufsize)
-{
-	flow_args_t	*fargs = of_arg->ofmt_cbarg;
-	pktsum_t	*diff_stats = fargs->flow_s_psum;
-
-	switch (of_arg->ofmt_id) {
-	case FLOW_S_FLOW:
-		(void) snprintf(buf, bufsize, "%s", fargs->flow_s_flow);
-		break;
-	case FLOW_S_IPKTS:
-		(void) snprintf(buf, bufsize, "%llu",
-		    diff_stats->ipackets);
-		break;
-	case FLOW_S_RBYTES:
-		(void) snprintf(buf, bufsize, "%llu",
-		    diff_stats->rbytes);
-		break;
-	case FLOW_S_IERRORS:
-		(void) snprintf(buf, bufsize, "%u",
-		    diff_stats->ierrors);
-		break;
-	case FLOW_S_OPKTS:
-		(void) snprintf(buf, bufsize, "%llu",
-		    diff_stats->opackets);
-		break;
-	case FLOW_S_OBYTES:
-		(void) snprintf(buf, bufsize, "%llu",
-		    diff_stats->obytes);
-		break;
-	case FLOW_S_OERRORS:
-		(void) snprintf(buf, bufsize, "%u",
-		    diff_stats->oerrors);
-		break;
-	default:
-		die("invalid input");
-		break;
-	}
-	return (B_TRUE);
-}
-
-/* ARGSUSED */
-static int
-show_flow_stats(dladm_handle_t handle, dladm_flow_attr_t *attr, void *arg)
-{
-	show_flow_state_t	*state = (show_flow_state_t *)arg;
-	char			*name = attr->fa_flowname;
-	pktsum_t		stats, diff_stats;
-	flow_args_t		fargs;
-
-	if (state->fs_firstonly) {
-		if (state->fs_donefirst)
-			return (DLADM_WALK_TERMINATE);
-		state->fs_donefirst = B_TRUE;
-	} else {
-		bzero(&state->fs_prevstats, sizeof (state->fs_prevstats));
-	}
-
-	get_flow_stats(name, &stats);
-	dladm_stats_diff(&diff_stats, &stats, &state->fs_prevstats);
-
-	fargs.flow_s_flow = name;
-	fargs.flow_s_psum = &diff_stats;
-	ofmt_print(state->fs_ofmt, (void *)&fargs);
-	state->fs_prevstats = stats;
-
-	return (DLADM_WALK_CONTINUE);
-}
-
-/*
- * Wrapper of dladm_walk_flow(show_flow,...) to make it usable for
- * dladm_walk_datalink_id(). Used for showing flow stats for
- * all flows on all links.
- */
-static int
-show_link_flow_stats(dladm_handle_t dh, datalink_id_t linkid, void * arg)
-{
-	if (dladm_walk_flow(show_flow_stats, dh, linkid, arg, B_FALSE)
-	    == DLADM_STATUS_OK)
-		return (DLADM_WALK_CONTINUE);
-	else
-		return (DLADM_WALK_TERMINATE);
-}
-
-/* ARGSUSED */
-static void
-flow_stats(const char *flow, datalink_id_t linkid,  uint_t interval,
-    char *fields_str, show_flow_state_t *state)
-{
-	dladm_flow_attr_t	attr;
-	ofmt_handle_t		ofmt;
-	ofmt_status_t		oferr;
-	uint_t			ofmtflags = 0;
-
-	oferr = ofmt_open(fields_str, flow_s_fields, ofmtflags, 0, &ofmt);
-	flowadm_ofmt_check(oferr, state->fs_parsable, ofmt);
-	state->fs_ofmt = ofmt;
-
-	if (flow != NULL &&
-	    dladm_flow_info(handle, flow, &attr) != DLADM_STATUS_OK)
-		die("invalid flow %s", flow);
-
-	/*
-	 * If an interval is specified, continuously show the stats
-	 * for only the first flow.
-	 */
-	state->fs_firstonly = (interval != 0);
-
-	for (;;) {
-		state->fs_donefirst = B_FALSE;
-
-		/* Show stats for named flow */
-		if (flow != NULL)  {
-			state->fs_flow = flow;
-			(void) show_flow_stats(handle, &attr, state);
-
-		/* Show all stats on a link */
-		} else if (linkid != DATALINK_INVALID_LINKID) {
-			(void) dladm_walk_flow(show_flow_stats, handle, linkid,
-			    state, B_FALSE);
-
-		/* Show all stats by datalink */
-		} else {
-			(void) dladm_walk_datalink_id(show_link_flow_stats,
-			    handle, state, DATALINK_CLASS_ALL,
-			    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
-		}
-
-		if (interval == 0)
-			break;
-
-		(void) fflush(stdout);
-		(void) sleep(interval);
-	}
-	ofmt_close(ofmt);
-}
-
-static void
 do_show_flow(int argc, char *argv[])
 {
 	char			flowname[MAXFLOWNAMELEN];
 	char			linkname[MAXLINKNAMELEN];
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	int			option;
-	boolean_t		s_arg = B_FALSE;
-	boolean_t		S_arg = B_FALSE;
-	boolean_t		i_arg = B_FALSE;
 	boolean_t		l_arg = B_FALSE;
 	boolean_t		o_arg = B_FALSE;
-	uint32_t		interval = 0;
 	show_flow_state_t	state;
 	char			*fields_str = NULL;
 	ofmt_handle_t		ofmt;
@@ -1160,7 +601,7 @@ do_show_flow(int argc, char *argv[])
 	bzero(&state, sizeof (state));
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":pPsSi:l:o:",
+	while ((option = getopt_long(argc, argv, ":pPl:o:",
 	    longopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
@@ -1170,33 +611,12 @@ do_show_flow(int argc, char *argv[])
 		case 'P':
 			state.fs_persist = B_TRUE;
 			break;
-		case 's':
-			if (s_arg)
-				die_optdup(option);
-
-			s_arg = B_TRUE;
-			break;
-		case 'S':
-			if (S_arg)
-				die_optdup(option);
-
-			S_arg = B_TRUE;
-			break;
 		case 'o':
 			if (o_arg)
 				die_optdup(option);
 
 			o_arg = B_TRUE;
 			fields_str = optarg;
-			break;
-		case 'i':
-			if (i_arg)
-				die_optdup(option);
-
-			i_arg = B_TRUE;
-
-			if (!dladm_str2interval(optarg, &interval))
-				die("invalid interval value '%s'", optarg);
 			break;
 		case 'l':
 			if (strlcpy(linkname, optarg, MAXLINKNAMELEN)
@@ -1212,11 +632,6 @@ do_show_flow(int argc, char *argv[])
 			break;
 		}
 	}
-	if (i_arg && !(s_arg || S_arg))
-		die("the -i option can be used only with -s or -S");
-
-	if (s_arg && S_arg)
-		die("the -s option cannot be used with -S");
 
 	/* get flow name (optional last argument */
 	if (optind == (argc-1)) {
@@ -1224,17 +639,6 @@ do_show_flow(int argc, char *argv[])
 		    >= MAXFLOWNAMELEN)
 			die("flow name too long");
 		state.fs_flow = flowname;
-	}
-
-	if (S_arg) {
-		dladm_continuous(handle, linkid, state.fs_flow, interval,
-		    FLOW_REPORT);
-		return;
-	}
-
-	if (s_arg) {
-		flow_stats(state.fs_flow, linkid, interval, fields_str, &state);
-		return;
 	}
 
 	oferr = ofmt_open(fields_str, flow_fields, ofmtflags, 0, &ofmt);
@@ -1471,7 +875,7 @@ warn(const char *format, ...)
 	(void) vfprintf(stderr, format, alist);
 	va_end(alist);
 
-	(void) putchar('\n');
+	(void) putc('\n', stderr);
 }
 
 /* PRINTFLIKE2 */
@@ -1503,7 +907,7 @@ die(const char *format, ...)
 	(void) vfprintf(stderr, format, alist);
 	va_end(alist);
 
-	(void) putchar('\n');
+	(void) putc('\n', stderr);
 
 	/* close dladm handle if it was opened */
 	if (handle != NULL)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -172,10 +172,12 @@ static void	rt2560_m_ioctl(void *, queue_t *, mblk_t *);
 static int	rt2560_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int	rt2560_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+    uint_t, void *);
+static void	rt2560_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 
 static mac_callbacks_t rt2560_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	rt2560_m_stat,
 	rt2560_m_start,
 	rt2560_m_stop,
@@ -183,12 +185,14 @@ static mac_callbacks_t rt2560_m_callbacks = {
 	rt2560_m_multicst,
 	rt2560_m_unicst,
 	rt2560_m_tx,
+	NULL,
 	rt2560_m_ioctl,
 	NULL,		/* mc_getcapab */
 	NULL,
 	NULL,
 	rt2560_m_setprop,
-	rt2560_m_getprop
+	rt2560_m_getprop,
+	rt2560_m_propinfo
 };
 
 uint32_t ral_dbg_flags = 0;
@@ -2138,15 +2142,24 @@ rt2560_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 static int
 rt2560_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	struct rt2560_softc *sc = arg;
 	int err;
 
 	err = ieee80211_getprop(&sc->sc_ic, pr_name, wldp_pr_num,
-	    pr_flags, wldp_length, wldp_buf, perm);
+	    wldp_length, wldp_buf);
 
 	return (err);
+}
+
+static void
+rt2560_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    mac_prop_info_handle_t prh)
+{
+	struct rt2560_softc *sc = arg;
+
+	ieee80211_propinfo(&sc->sc_ic, pr_name, wldp_pr_num, prh);
 }
 
 static void

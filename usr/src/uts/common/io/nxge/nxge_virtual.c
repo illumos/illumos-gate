@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2540,10 +2540,6 @@ nxge_set_hw_dma_config(p_nxge_t nxgep)
 		tdc_grp_p->start_tdc = 0;
 		tdc_grp_p->max_tdcs = 0;
 		tdc_grp_p->grp_index = group->index;
-	}
-
-	for (i = 0; i < NXGE_MAX_RDCS; i++) {
-		nxgep->rx_channel_started[i] = B_FALSE;
 	}
 
 	/*

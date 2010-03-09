@@ -379,92 +379,58 @@ iptun_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 /* ARGSUSED */
 static int
 iptun_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	iptun_t			*iptun = barg;
-	mac_propval_range_t	range;
-	boolean_t		is_default = (pr_flags & MAC_PROP_DEFAULT);
-	boolean_t		is_possible = (pr_flags & MAC_PROP_POSSIBLE);
 	int			err;
 
 	if ((err = iptun_enter(iptun)) != 0)
 		return (err);
 
-	if ((pr_flags & ~(MAC_PROP_DEFAULT | MAC_PROP_POSSIBLE)) != 0) {
-		err = ENOTSUP;
-		goto done;
-	}
-	if (is_default && is_possible) {
-		err = EINVAL;
-		goto done;
-	}
-
-	*perm = MAC_PROP_PERM_RW;
-
-	if (is_possible) {
-		if (pr_valsize < sizeof (mac_propval_range_t)) {
-			err = EINVAL;
-			goto done;
-		}
-		range.mpr_count = 1;
-		range.mpr_type = MAC_PROPVAL_UINT32;
-	} else if (pr_valsize < sizeof (uint32_t)) {
-		err = EINVAL;
-		goto done;
-	}
-
 	switch (pr_num) {
 	case MAC_PROP_IPTUN_HOPLIMIT:
-		if (is_possible) {
-			range.range_uint32[0].mpur_min = IPTUN_MIN_HOPLIMIT;
-			range.range_uint32[0].mpur_max = IPTUN_MAX_HOPLIMIT;
-		} else if (is_default) {
-			*(uint32_t *)pr_val = IPTUN_DEFAULT_HOPLIMIT;
-		} else {
-			*(uint32_t *)pr_val = iptun->iptun_hoplimit;
-		}
+		ASSERT(pr_valsize >= sizeof (uint32_t));
+		*(uint32_t *)pr_val = iptun->iptun_hoplimit;
 		break;
-	case MAC_PROP_IPTUN_ENCAPLIMIT:
-		if (iptun->iptun_typeinfo->iti_type != IPTUN_TYPE_IPV6) {
-			err = ENOTSUP;
-			goto done;
-		}
-		if (is_possible) {
-			range.range_uint32[0].mpur_min = IPTUN_MIN_ENCAPLIMIT;
-			range.range_uint32[0].mpur_max = IPTUN_MAX_ENCAPLIMIT;
-		} else if (is_default) {
-			*(uint32_t *)pr_val = IPTUN_DEFAULT_ENCAPLIMIT;
-		} else {
-			*(uint32_t *)pr_val = iptun->iptun_encaplimit;
-		}
-		break;
-	case MAC_PROP_MTU: {
-		uint32_t maxmtu = iptun_get_maxmtu(iptun, NULL, 0);
 
-		if (is_possible) {
-			range.range_uint32[0].mpur_min =
-			    iptun->iptun_typeinfo->iti_minmtu;
-			range.range_uint32[0].mpur_max = maxmtu;
-		} else {
-			/*
-			 * The MAC module knows the current value and should
-			 * never call us for it.  There is also no default
-			 * MTU, as by default, it is a dynamic property.
-			 */
-			err = ENOTSUP;
-			goto done;
-		}
+	case MAC_PROP_IPTUN_ENCAPLIMIT:
+		*(uint32_t *)pr_val = iptun->iptun_encaplimit;
 		break;
-	}
 	default:
-		err = EINVAL;
-		goto done;
+		err = ENOTSUP;
 	}
-	if (is_possible)
-		bcopy(&range, pr_val, sizeof (range));
 done:
 	iptun_exit(iptun);
 	return (err);
+}
+
+/* ARGSUSED */
+static void
+iptun_m_propinfo(void *barg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	iptun_t			*iptun = barg;
+
+	switch (pr_num) {
+	case MAC_PROP_IPTUN_HOPLIMIT:
+		mac_prop_info_set_range_uint32(prh,
+		    IPTUN_MIN_HOPLIMIT, IPTUN_MAX_HOPLIMIT);
+		mac_prop_info_set_default_uint32(prh, IPTUN_DEFAULT_HOPLIMIT);
+		break;
+
+	case MAC_PROP_IPTUN_ENCAPLIMIT:
+		if (iptun->iptun_typeinfo->iti_type != IPTUN_TYPE_IPV6)
+			break;
+		mac_prop_info_set_range_uint32(prh,
+		    IPTUN_MIN_ENCAPLIMIT, IPTUN_MAX_ENCAPLIMIT);
+		mac_prop_info_set_default_uint32(prh, IPTUN_DEFAULT_ENCAPLIMIT);
+		break;
+	case MAC_PROP_MTU:
+		mac_prop_info_set_range_uint32(prh,
+		    iptun->iptun_typeinfo->iti_minmtu,
+		    iptun_get_maxmtu(iptun, NULL, 0));
+		break;
+	}
 }
 
 uint_t
@@ -3514,7 +3480,7 @@ iptun_output_common(iptun_t *iptun, ip_xmit_attr_t *ixa, mblk_t *mp)
 }
 
 static mac_callbacks_t iptun_m_callbacks = {
-	.mc_callbacks	= (MC_SETPROP | MC_GETPROP),
+	.mc_callbacks	= (MC_SETPROP | MC_GETPROP | MC_PROPINFO),
 	.mc_getstat	= iptun_m_getstat,
 	.mc_start	= iptun_m_start,
 	.mc_stop	= iptun_m_stop,
@@ -3522,6 +3488,8 @@ static mac_callbacks_t iptun_m_callbacks = {
 	.mc_multicst	= iptun_m_multicst,
 	.mc_unicst	= iptun_m_unicst,
 	.mc_tx		= iptun_m_tx,
+	.mc_reserved	= NULL,
 	.mc_setprop	= iptun_m_setprop,
-	.mc_getprop	= iptun_m_getprop
+	.mc_getprop	= iptun_m_getprop,
+	.mc_propinfo	= iptun_m_propinfo
 };

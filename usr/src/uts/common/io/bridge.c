@@ -492,36 +492,16 @@ bridge_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 
 static int
 bridge_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	bridge_mac_t *bmp = arg;
 	int err = 0;
 
 	_NOTE(ARGUNUSED(pr_name));
 	switch (pr_num) {
-	case MAC_PROP_MTU: {
-		mac_propval_range_t range;
-
-		if (!(pr_flags & MAC_PROP_POSSIBLE))
-			return (ENOTSUP);
-		if (pr_valsize < sizeof (mac_propval_range_t))
-			return (EINVAL);
-		range.mpr_count = 1;
-		range.mpr_type = MAC_PROPVAL_UINT32;
-		range.range_uint32[0].mpur_min =
-		    range.range_uint32[0].mpur_max = bmp->bm_maxsdu;
-		bcopy(&range, pr_val, sizeof (range));
-		*perm = MAC_PROP_PERM_RW;
-		break;
-	}
 	case MAC_PROP_STATUS:
-		if (pr_valsize < sizeof (bmp->bm_linkstate)) {
-			err = EINVAL;
-		} else {
-			bcopy(&bmp->bm_linkstate, pr_val,
-			    sizeof (&bmp->bm_linkstate));
-			*perm = MAC_PROP_PERM_READ;
-		}
+		ASSERT(pr_valsize >= sizeof (bmp->bm_linkstate));
+		bcopy(&bmp->bm_linkstate, pr_val, sizeof (&bmp->bm_linkstate));
 		break;
 
 	default:
@@ -531,8 +511,27 @@ bridge_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	return (err);
 }
 
+static void
+bridge_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	bridge_mac_t *bmp = arg;
+
+	_NOTE(ARGUNUSED(pr_name));
+
+	switch (pr_num) {
+	case MAC_PROP_MTU:
+		mac_prop_info_set_range_uint32(prh, bmp->bm_maxsdu,
+		    bmp->bm_maxsdu);
+		break;
+	case MAC_PROP_STATUS:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+	}
+}
+
 static mac_callbacks_t bridge_m_callbacks = {
-	MC_SETPROP | MC_GETPROP,
+	MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	bridge_m_getstat,
 	bridge_m_start,
 	bridge_m_stop,
@@ -540,12 +539,14 @@ static mac_callbacks_t bridge_m_callbacks = {
 	bridge_m_multicst,
 	bridge_m_unicst,
 	bridge_m_tx,
+	NULL,	/* reserved */
 	NULL,	/* ioctl */
 	NULL,	/* getcapab */
 	NULL,	/* open */
 	NULL,	/* close */
 	bridge_m_setprop,
-	bridge_m_getprop
+	bridge_m_getprop,
+	bridge_m_propinfo
 };
 
 /*

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -163,8 +163,8 @@ hxge_start(p_hxge_t hxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 		}
 	}
 
-	hcksum_retrieve(mp, NULL, NULL, &start_offset,
-	    &stuff_offset, &end_offset, &value, &cksum_flags);
+	mac_hcksum_get(mp, &start_offset, &stuff_offset, &end_offset, &value,
+	    &cksum_flags);
 	if (!HXGE_IS_VLAN_PACKET(mp->b_rptr)) {
 		start_offset += sizeof (ether_header_t);
 		stuff_offset += sizeof (ether_header_t);
@@ -593,8 +593,8 @@ hxge_start_control_header_only:
 		i = TXDMA_DESC_NEXT_INDEX(i, 1, tx_ring_p->tx_wrap_mask);
 		if (ngathers > hxge_tx_max_gathers) {
 			good_packet = B_FALSE;
-			hcksum_retrieve(mp, NULL, NULL, &start_offset,
-			    &stuff_offset, &end_offset, &value, &cksum_flags);
+			mac_hcksum_get(mp, &start_offset, &stuff_offset,
+			    &end_offset, &value, &cksum_flags);
 
 			HXGE_DEBUG_MSG((NULL, TX_CTL,
 			    "==> hxge_start(14): pull msg - "

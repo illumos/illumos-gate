@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,11 +65,12 @@ extern "C" {
  *  - DLADM_OPT_VLAN:
  *    Signifies VLAN creation code path
  *
- *  - DLADM_OPT_HWRINGS:
- *    Requires a hardware group of rings when creating a vnic.
- *
  *  - DLADM_OPT_NOREFRESH:
  *    Do not refresh the daemon after setting parameter (used by STP mcheck).
+ *
+ *  - DLADM_OPT_BOOT:
+ *    Bypass check functions during boot (used by pool property since pools
+ *    can come up after link properties are set)
  */
 #define	DLADM_OPT_ACTIVE	0x00000001
 #define	DLADM_OPT_PERSIST	0x00000002
@@ -78,8 +79,8 @@ extern "C" {
 #define	DLADM_OPT_PREFIX	0x00000010
 #define	DLADM_OPT_ANCHOR	0x00000020
 #define	DLADM_OPT_VLAN		0x00000040
-#define	DLADM_OPT_HWRINGS	0x00000080
-#define	DLADM_OPT_NOREFRESH	0x00000100
+#define	DLADM_OPT_NOREFRESH	0x00000080
+#define	DLADM_OPT_BOOT		0x00000100
 
 #define	DLADM_WALK_TERMINATE	0
 #define	DLADM_WALK_CONTINUE	-1
@@ -160,7 +161,8 @@ typedef enum {
 	DLADM_STATUS_MINMAXBW,
 	DLADM_STATUS_NO_HWRINGS,
 	DLADM_STATUS_PERMONLY,
-	DLADM_STATUS_OPTMISSING
+	DLADM_STATUS_OPTMISSING,
+	DLADM_STATUS_POOLCPU
 } dladm_status_t;
 
 typedef enum {
@@ -231,6 +233,8 @@ extern dladm_status_t	dladm_str2protect(char *, uint32_t *);
 extern const char	*dladm_protect2str(uint32_t, char *);
 extern dladm_status_t	dladm_str2ipv4addr(char *, void *);
 extern const char	*dladm_ipv4addr2str(void *, char *);
+extern dladm_status_t	dladm_str2ipv6addr(char *, void *);
+extern const char	*dladm_ipv6addr2str(void *, char *);
 
 extern dladm_status_t	dladm_parse_flow_props(char *, dladm_arg_list_t **,
 			    boolean_t);

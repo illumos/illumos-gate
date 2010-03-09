@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 #define	_SYS_NET80211_H
 
 #include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/ethernet.h>
 #include <sys/net80211_proto.h>
 #include <sys/net80211_crypto.h>
@@ -731,8 +732,10 @@ void *ieee80211_malloc(size_t);
 void ieee80211_free(void *);
 int ieee80211_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
-int ieee80211_getprop(void *, const char *, mac_prop_id_t, uint_t, uint_t,
-    void *, uint_t *);
+int ieee80211_getprop(void *, const char *, mac_prop_id_t, uint_t, void *);
+void ieee80211_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
+
 
 struct ieee80211_channel *ieee80211_find_channel(ieee80211com_t *, int, int);
 const struct ieee80211_rateset *ieee80211_get_suprates(ieee80211com_t *,

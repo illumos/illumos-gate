@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -903,26 +903,23 @@ nxge_hio_rdsv_add(
  * Context:
  *	Guest domain
  */
-hv_rv_t
-nxge_hio_ldsv_add(
-	nxge_t *nxge,
-	nxge_hio_dc_t *dc)
+int
+nxge_hio_ldsv_add(nxge_t *nxge, nxge_hio_dc_t *dc)
 {
 	nxge_ldgv_t *control;
 	nxge_ldg_t *group;
 	nxge_ldv_t *device;
-	hv_rv_t hv_rv;
 
 	if (dc->type == VP_BOUND_TX) {
 		NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_ldsv_add(TDC %d)",
 		    dc->channel));
-		if ((hv_rv = nxge_hio_tdsv_add(nxge, dc)) != 0)
-			return (hv_rv);
+		if (nxge_hio_tdsv_add(nxge, dc) != 0)
+			return (EIO);
 	} else {
 		NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_ldsv_add(RDC %d)",
 		    dc->channel));
-		if ((hv_rv = nxge_hio_rdsv_add(nxge, dc)) != 0)
-			return (hv_rv);
+		if (nxge_hio_rdsv_add(nxge, dc) != 0)
+			return (EIO);
 	}
 
 	dc->ldg.map |= (1 << dc->ldg.ldsv);

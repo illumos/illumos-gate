@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 	extern "C" {
 #endif
 
+#include <sys/ethernet.h>
 #include <sys/mac_provider.h>
 #include "atge_l1e_reg.h"
 

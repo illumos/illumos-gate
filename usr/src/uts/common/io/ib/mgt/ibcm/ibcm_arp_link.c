@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #include <inet/ip.h>
 #include <inet/ip_ire.h>
 #include <inet/ip_if.h>
+#include <sys/ethernet.h>
 #include <sys/ib/mgt/ibcm/ibcm_arp.h>
 
 extern char cmlog[];

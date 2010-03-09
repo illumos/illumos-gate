@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -200,6 +200,7 @@ static mac_callbacks_t eri_m_callbacks = {
 	eri_m_multicst,
 	eri_m_unicst,
 	eri_m_tx,
+	NULL,
 	eri_m_ioctl,
 	eri_m_getcapab
 };
@@ -264,9 +265,9 @@ static mac_callbacks_t eri_m_callbacks = {
 	if (type == ETHERTYPE_IP || type == ETHERTYPE_IPV6) {	\
 		start_offset = 0;				\
 		end_offset = MBLKL(bp) - ETHERHEADER_SIZE;	\
-		(void) hcksum_assoc(bp, NULL, NULL,		\
+		mac_hcksum_set(bp,				\
 			start_offset, 0, end_offset, sum, 	\
-			HCK_PARTIALCKSUM, 0);			\
+			HCK_PARTIALCKSUM);			\
 	} else {						\
 		/*						\
 		 * Strip the PADS for 802.3			\
@@ -3469,8 +3470,7 @@ eri_send_msg(struct eri *erip, mblk_t *mp)
 	}
 
 #ifdef ERI_HWCSUM
-	hcksum_retrieve(mp, NULL, NULL, &start_offset, &stuff_offset,
-	    NULL, NULL, &flags);
+	mac_hcksum_get(mp, &start_offset, &stuff_offset, NULL, NULL, &flags);
 
 	if (flags & HCK_PARTIALCKSUM) {
 		if (get_ether_type(mp->b_rptr) == ETHERTYPE_VLAN) {

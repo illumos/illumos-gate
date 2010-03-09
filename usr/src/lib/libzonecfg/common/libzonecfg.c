@@ -4321,6 +4321,26 @@ zonecfg_bind_pool(zone_dochandle_t handle, zoneid_t zoneid, char *pool_err,
 	return (Z_OK);
 }
 
+int
+zonecfg_get_poolname(zone_dochandle_t handle, char *zone, char *pool,
+    size_t poolsize)
+{
+	int err;
+	struct zone_psettab pset_tab;
+
+	err = zonecfg_lookup_pset(handle, &pset_tab);
+	if ((err != Z_NO_ENTRY) && (err != Z_OK))
+		return (err);
+
+	/* pset was found so a temporary pool was created */
+	if (err == Z_OK) {
+		(void) snprintf(pool, poolsize, TMP_POOL_NAME, zone);
+		return (Z_OK);
+	}
+
+	/* lookup the poolname in zonecfg */
+	return (zonecfg_get_pool(handle, pool, poolsize));
+}
 
 static boolean_t
 svc_enabled(char *svc_name)

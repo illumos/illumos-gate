@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,35 +117,71 @@ extern int mac_link_flow_walk(datalink_id_t,
     int (*)(mac_flowinfo_t *, void *), void *);
 extern int mac_link_flow_info(char *, mac_flowinfo_t *);
 
-extern void	*mac_tx_hold(mac_client_handle_t);
-extern void	mac_tx_rele(mac_client_handle_t, void *);
-extern void	mac_rx_client_quiesce(mac_client_handle_t);
-extern void	mac_rx_client_restart(mac_client_handle_t);
-extern void	mac_srs_perm_quiesce(mac_client_handle_t, boolean_t);
-extern int	mac_hwrings_get(mac_client_handle_t, mac_group_handle_t *,
-		    mac_ring_handle_t *, mac_ring_type_t);
-extern void	mac_hwring_setup(mac_ring_handle_t, mac_resource_handle_t);
-extern void	mac_hwring_teardown(mac_ring_handle_t);
-extern int	mac_hwring_disable_intr(mac_ring_handle_t);
-extern int	mac_hwring_enable_intr(mac_ring_handle_t);
-extern int	mac_hwring_start(mac_ring_handle_t);
-extern void	mac_hwring_stop(mac_ring_handle_t);
-extern mblk_t	*mac_hwring_poll(mac_ring_handle_t, int);
-#define		MAC_HWRING_POLL(ring, bytes)		\
-		(((ring)->mr_info.mri_poll)		\
-		((ring)->mr_info.mri_driver, (bytes)))
+extern void mac_rx_client_quiesce(mac_client_handle_t);
+extern void mac_rx_client_restart(mac_client_handle_t);
+extern void mac_tx_client_quiesce(mac_client_handle_t);
+extern void mac_tx_client_condemn(mac_client_handle_t);
+extern void mac_tx_client_restart(mac_client_handle_t);
+extern void mac_srs_perm_quiesce(mac_client_handle_t, boolean_t);
+extern int mac_hwrings_get(mac_client_handle_t, mac_group_handle_t *,
+    mac_ring_handle_t *, mac_ring_type_t);
+extern uint_t mac_hwring_getinfo(mac_ring_handle_t);
+extern void mac_hwring_setup(mac_ring_handle_t, mac_resource_handle_t,
+    mac_ring_handle_t);
+extern void mac_hwring_teardown(mac_ring_handle_t);
+extern int mac_hwring_disable_intr(mac_ring_handle_t);
+extern int mac_hwring_enable_intr(mac_ring_handle_t);
+extern int mac_hwring_start(mac_ring_handle_t);
+extern void mac_hwring_stop(mac_ring_handle_t);
+extern mblk_t *mac_hwring_poll(mac_ring_handle_t, int);
+extern mblk_t *mac_hwring_tx(mac_ring_handle_t, mblk_t *);
+extern int mac_hwring_getstat(mac_ring_handle_t, uint_t, uint64_t *);
+extern mblk_t *mac_hwring_send_priv(mac_client_handle_t,
+    mac_ring_handle_t, mblk_t *);
 
-extern int	mac_hwgroup_addmac(mac_group_handle_t, const uint8_t *);
-extern int	mac_hwgroup_remmac(mac_group_handle_t, const uint8_t *);
+#define	MAC_HWRING_POLL(ring, bytes)			\
+	(((ring)->mr_info.mri_poll)			\
+	((ring)->mr_info.mri_driver, (bytes)))
 
-extern void	mac_set_upper_mac(mac_client_handle_t, mac_handle_t);
+extern int mac_hwgroup_addmac(mac_group_handle_t, const uint8_t *);
+extern int mac_hwgroup_remmac(mac_group_handle_t, const uint8_t *);
+
+extern void mac_set_upper_mac(mac_client_handle_t, mac_handle_t,
+    mac_resource_props_t *);
 
 extern int mac_mark_exclusive(mac_handle_t);
 extern void mac_unmark_exclusive(mac_handle_t);
 
-extern int32_t	mac_client_intr_cpu(mac_client_handle_t);
-extern void	mac_client_set_intr_cpu(void *, mac_client_handle_t, int32_t);
-extern void	*mac_get_devinfo(mac_handle_t);
+extern uint_t mac_hwgrp_num(mac_handle_t, int);
+extern void mac_get_hwrxgrp_info(mac_handle_t, int, uint_t *, uint_t *,
+    uint_t *, uint_t *, uint_t *, char *);
+extern void mac_get_hwtxgrp_info(mac_handle_t, int, uint_t *, uint_t *,
+    uint_t *, uint_t *, uint_t *, char *);
+
+extern uint_t mac_txavail_get(mac_handle_t);
+extern uint_t mac_rxavail_get(mac_handle_t);
+extern uint_t mac_txrsvd_get(mac_handle_t);
+extern uint_t mac_rxrsvd_get(mac_handle_t);
+extern uint_t mac_rxhwlnksavail_get(mac_handle_t);
+extern uint_t mac_rxhwlnksrsvd_get(mac_handle_t);
+extern uint_t mac_txhwlnksavail_get(mac_handle_t);
+extern uint_t mac_txhwlnksrsvd_get(mac_handle_t);
+
+extern int32_t mac_client_intr_cpu(mac_client_handle_t);
+extern void mac_client_set_intr_cpu(void *, mac_client_handle_t, int32_t);
+extern void *mac_get_devinfo(mac_handle_t);
+
+extern boolean_t mac_is_vnic(mac_handle_t);
+extern uint32_t mac_no_notification(mac_handle_t);
+
+extern int mac_set_prop(mac_handle_t, mac_prop_id_t, char *, void *, uint_t);
+extern int mac_get_prop(mac_handle_t, mac_prop_id_t, char *, void *, uint_t);
+extern int mac_prop_info(mac_handle_t, mac_prop_id_t, char *, void *,
+    uint_t, mac_propval_range_t *, uint_t *);
+extern boolean_t mac_prop_check_size(mac_prop_id_t, uint_t, boolean_t);
+
+extern uint64_t mac_pseudo_rx_ring_stat_get(mac_ring_handle_t, uint_t);
+extern uint64_t mac_pseudo_tx_ring_stat_get(mac_ring_handle_t, uint_t);
 
 #endif	/* _KERNEL */
 

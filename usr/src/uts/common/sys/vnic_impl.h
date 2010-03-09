@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,16 +62,6 @@ typedef struct vnic_s {
 
 	uint32_t		vn_hcksum_txflags;
 } vnic_t;
-
-#define	vn_madd_naddr		vn_mma_capab.maddr_naddr
-#define	vn_maddr_naddrfree	vn_mma_capab.maddr_naddrfree
-#define	vn_maddr_flag		vn_mma_capab.maddr_flag
-#define	vn_maddr_handle		vn_mma_capab.maddr_handle
-#define	vn_maddr_reserve	vn_mma_capab.maddr_reserve
-#define	vn_maddr_add		vn_mma_capab.maddr_add
-#define	vn_maddr_remove		vn_mma_capab.maddr_remove
-#define	vn_maddr_modify		vn_mma_capab.maddr_modify
-#define	vn_maddr_get		vn_mma_capab.maddr_get
 
 extern int vnic_dev_create(datalink_id_t, datalink_id_t, vnic_mac_addr_type_t *,
     int *, uchar_t *, int *, uint_t, uint16_t, vrid_t, int,

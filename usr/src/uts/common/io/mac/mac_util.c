@@ -244,14 +244,23 @@ mac_fix_cksum(mblk_t *mp_chain)
 				    offset, cksum);
 				*(up) = (uint16_t)(cksum ? cksum : ~cksum);
 
+				/*
+				 * Flag the packet so that it appears
+				 * that the checksum has already been
+				 * verified by the hardware.
+				 */
+				flags &= ~HCK_FULLCKSUM;
 				flags |= HCK_FULLCKSUM_OK;
-				value = 0xffff;
+				value = 0;
 			}
 
 			if (flags & HCK_IPV4_HDRCKSUM) {
 				ASSERT(ipha != NULL);
 				ipha->ipha_hdr_checksum =
 				    (uint16_t)ip_csum_hdr(ipha);
+				flags &= ~HCK_IPV4_HDRCKSUM;
+				flags |= HCK_IPV4_HDRCKSUM_OK;
+
 			}
 		}
 
@@ -292,8 +301,8 @@ mac_fix_cksum(mblk_t *mp_chain)
 			 * been verified by the hardware.
 			 */
 			flags &= ~HCK_PARTIALCKSUM;
-			flags |= (HCK_FULLCKSUM | HCK_FULLCKSUM_OK);
-			value = 0xffff;
+			flags |= HCK_FULLCKSUM_OK;
+			value = 0;
 		}
 
 		(void) hcksum_assoc(mp, NULL, NULL, start, stuff, end,
@@ -470,27 +479,25 @@ mac_pkt_drop(void *arg, mac_resource_handle_t resource, mblk_t *mp,
  * returns B_TRUE.
  */
 boolean_t
-mac_ip_hdr_length_v6(mblk_t *mp, ip6_t *ip6h, uint16_t *hdr_length,
-    uint8_t *next_hdr, boolean_t *ip_fragmented, uint32_t *ip_frag_ident)
+mac_ip_hdr_length_v6(ip6_t *ip6h, uint8_t *endptr, uint16_t *hdr_length,
+    uint8_t *next_hdr, ip6_frag_t **fragp)
 {
 	uint16_t length;
 	uint_t	ehdrlen;
 	uint8_t *whereptr;
-	uint8_t *endptr;
 	uint8_t *nexthdrp;
 	ip6_dest_t *desthdr;
 	ip6_rthdr_t *rthdr;
 	ip6_frag_t *fraghdr;
 
-	endptr = mp->b_wptr;
 	if (((uchar_t *)ip6h + IPV6_HDR_LEN) > endptr)
 		return (B_FALSE);
 	ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
 	length = IPV6_HDR_LEN;
 	whereptr = ((uint8_t *)&ip6h[1]); /* point to next hdr */
 
-	if (ip_fragmented != NULL)
-		*ip_fragmented = B_FALSE;
+	if (fragp != NULL)
+		*fragp = NULL;
 
 	nexthdrp = &ip6h->ip6_nxt;
 	while (whereptr < endptr) {
@@ -521,10 +528,8 @@ mac_ip_hdr_length_v6(mblk_t *mp, ip6_t *ip6h, uint16_t *hdr_length,
 			if ((uchar_t *)&fraghdr[1] > endptr)
 				return (B_FALSE);
 			nexthdrp = &fraghdr->ip6f_nxt;
-			if (ip_fragmented != NULL)
-				*ip_fragmented = B_TRUE;
-			if (ip_frag_ident != NULL)
-				*ip_frag_ident = fraghdr->ip6f_ident;
+			if (fragp != NULL)
+				*fragp = fraghdr;
 			break;
 		case IPPROTO_NONE:
 			/* No next header means we're finished */
@@ -561,6 +566,13 @@ mac_ip_hdr_length_v6(mblk_t *mp, ip6_t *ip6h, uint16_t *hdr_length,
 	}
 }
 
+/*
+ * The following set of routines are there to take care of interrupt
+ * re-targeting for legacy (fixed) interrupts. Some older versions
+ * of the popular NICs like e1000g do not support MSI-X interrupts
+ * and they reserve fixed interrupts for RX/TX rings. To re-target
+ * these interrupts, PCITOOL ioctls need to be used.
+ */
 typedef struct mac_dladm_intr {
 	int	ino;
 	int	cpu_id;
@@ -807,13 +819,20 @@ mac_client_set_intr_cpu(void *arg, mac_client_handle_t mch, int32_t cpuid)
 	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
 	mac_resource_props_t	*mrp;
 	mac_perim_handle_t	mph;
+	flow_entry_t		*flent = mcip->mci_flent;
+	mac_soft_ring_set_t	*rx_srs;
+	mac_cpus_t		*srs_cpu;
 
-	if (cpuid == -1 || !mac_check_interrupt_binding(mdip, cpuid))
-		return;
-
+	if (!mac_check_interrupt_binding(mdip, cpuid))
+		cpuid = -1;
 	mac_perim_enter_by_mh((mac_handle_t)mcip->mci_mip, &mph);
 	mrp = MCIP_RESOURCE_PROPS(mcip);
-	mrp->mrp_intr_cpu = cpuid;
+	mrp->mrp_rx_intr_cpu = cpuid;
+	if (flent != NULL && flent->fe_rx_srs_cnt == 2) {
+		rx_srs = flent->fe_rx_srs[1];
+		srs_cpu = &rx_srs->srs_cpu;
+		srs_cpu->mc_rx_intr_cpu = cpuid;
+	}
 	mac_perim_exit(mph);
 }
 
@@ -825,18 +844,29 @@ mac_client_intr_cpu(mac_client_handle_t mch)
 	mac_soft_ring_set_t	*rx_srs;
 	flow_entry_t		*flent = mcip->mci_flent;
 	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
+	mac_ring_t		*ring;
+	mac_intr_t		*mintr;
 
 	/*
 	 * Check if we need to retarget the interrupt. We do this only
 	 * for the primary MAC client. We do this if we have the only
-	 *  exclusive ring in the group.
+	 * exclusive ring in the group.
 	 */
 	if (mac_is_primary_client(mcip) && flent->fe_rx_srs_cnt == 2) {
 		rx_srs = flent->fe_rx_srs[1];
 		srs_cpu = &rx_srs->srs_cpu;
-		if (mrp->mrp_intr_cpu == srs_cpu->mc_pollid)
+		ring = rx_srs->srs_ring;
+		mintr = &ring->mr_info.mri_intr;
+		/*
+		 * If ddi_handle is present or the poll CPU is
+		 * already bound to the interrupt CPU, return -1.
+		 */
+		if (mintr->mi_ddi_handle != NULL ||
+		    ((mrp->mrp_ncpus != 0) &&
+		    (mrp->mrp_rx_intr_cpu == srs_cpu->mc_rx_pollid))) {
 			return (-1);
-		return (srs_cpu->mc_pollid);
+		}
+		return (srs_cpu->mc_rx_pollid);
 	}
 	return (-1);
 }
@@ -970,8 +1000,8 @@ mac_pkt_hash(uint_t media, mblk_t *mp, uint8_t policy, boolean_t is_outbound)
 	}
 	case ETHERTYPE_IPV6: {
 		ip6_t *ip6hp;
+		ip6_frag_t *frag = NULL;
 		uint16_t hdr_length;
-		uint32_t ip_frag_ident;
 
 		/*
 		 * If the header is not aligned or the header doesn't fit
@@ -984,8 +1014,8 @@ mac_pkt_hash(uint_t media, mblk_t *mp, uint8_t policy, boolean_t is_outbound)
 		    !OK_32PTR((char *)ip6hp))
 			goto done;
 
-		if (!mac_ip_hdr_length_v6(mp, ip6hp, &hdr_length, &proto,
-		    &ip_fragmented, &ip_frag_ident))
+		if (!mac_ip_hdr_length_v6(ip6hp, mp->b_wptr, &hdr_length,
+		    &proto, &frag))
 			goto done;
 		skip_len += hdr_length;
 
@@ -994,7 +1024,7 @@ mac_pkt_hash(uint_t media, mblk_t *mp, uint8_t policy, boolean_t is_outbound)
 		 * the frag_id to generate the hash inorder to get
 		 * better distribution.
 		 */
-		if (ip_fragmented || (policy & MAC_PKT_HASH_L3) != 0) {
+		if (frag != NULL || (policy & MAC_PKT_HASH_L3) != 0) {
 			uint8_t *ip_src = &(ip6hp->ip6_src.s6_addr8[12]);
 			uint8_t *ip_dst = &(ip6hp->ip6_dst.s6_addr8[12]);
 
@@ -1003,8 +1033,8 @@ mac_pkt_hash(uint_t media, mblk_t *mp, uint8_t policy, boolean_t is_outbound)
 			policy &= ~MAC_PKT_HASH_L3;
 		}
 
-		if (ip_fragmented) {
-			uint8_t *identp = (uint8_t *)&ip_frag_ident;
+		if (frag != NULL) {
+			uint8_t *identp = (uint8_t *)&frag->ip6f_ident;
 			hash ^= PKT_HASH_4BYTES(identp);
 			goto done;
 		}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -271,19 +271,18 @@ nge_rxsta_handle(nge_t *ngep,  uint32_t stflag, uint32_t *pflags)
 
 	case RXD_CK8G_TCP_SUM:
 	case RXD_CK8G_UDP_SUM:
-		*pflags |= HCK_FULLCKSUM;
-		*pflags |= HCK_IPV4_HDRCKSUM;
+		*pflags |= HCK_IPV4_HDRCKSUM_OK;
 		*pflags |= HCK_FULLCKSUM_OK;
 		break;
 
 	case RXD_CK8G_TCP_SUM_ERR:
 	case RXD_CK8G_UDP_SUM_ERR:
 		sw_stp->tcp_hwsum_err++;
-		*pflags |= HCK_IPV4_HDRCKSUM;
+		*pflags |= HCK_IPV4_HDRCKSUM_OK;
 		break;
 
 	case RXD_CK8G_IP_HSUM:
-		*pflags |= HCK_IPV4_HDRCKSUM;
+		*pflags |= HCK_IPV4_HDRCKSUM_OK;
 		break;
 
 	case RXD_CK8G_NO_HSUM:
@@ -379,8 +378,7 @@ nge_recv_ring(nge_t *ngep)
 		}
 		if (mp != NULL) {
 			if (!(flag_err & (RX_SUM_NO | RX_SUM_ERR))) {
-				(void) hcksum_assoc(mp, NULL, NULL,
-				    0, 0, 0, 0, sum_flags, 0);
+				mac_hcksum_set(mp, 0, 0, 0, 0, sum_flags);
 			}
 			*tail = mp;
 			tail = &mp->b_next;

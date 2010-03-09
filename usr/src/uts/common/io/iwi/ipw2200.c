@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,9 +161,9 @@ static mblk_t  *ipw2200_m_tx(void *arg, mblk_t *mp);
 static int	ipw2200_m_setprop(void *arg, const char *pr_name,
     mac_prop_id_t wldp_pr_num, uint_t wldp_length, const void *wldp_buf);
 static int	ipw2200_m_getprop(void *arg, const char *pr_name,
-    mac_prop_id_t wldp_pr_num, uint_t pr_flags, uint_t wldp_length,
-    void *wldp_buf, uint_t *perm);
-
+    mac_prop_id_t wldp_pr_num, uint_t wldp_length, void *wldp_buf);
+static void	ipw2200_m_propinfo(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, mac_prop_info_handle_t mph);
 
 /*
  * Interrupt and Data transferring operations
@@ -205,7 +205,7 @@ extern void	ieee80211_notify_node_leave(ieee80211com_t *ic,
  * Mac Call Back entries
  */
 mac_callbacks_t	ipw2200_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	ipw2200_m_stat,
 	ipw2200_m_start,
 	ipw2200_m_stop,
@@ -213,12 +213,14 @@ mac_callbacks_t	ipw2200_m_callbacks = {
 	ipw2200_m_multicst,
 	ipw2200_m_unicst,
 	ipw2200_m_tx,
+	NULL,
 	ipw2200_m_ioctl,
 	NULL,
 	NULL,
 	NULL,
 	ipw2200_m_setprop,
-	ipw2200_m_getprop
+	ipw2200_m_getprop,
+	ipw2200_m_propinfo
 };
 
 /*
@@ -2558,7 +2560,7 @@ ipw2200_getset(struct ipw2200_softc *sc, mblk_t *m, uint32_t cmd,
  */
 static int
 ipw2200_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	struct ipw2200_softc	*sc = (struct ipw2200_softc *)arg;
 	struct ieee80211com	*ic = &sc->sc_ic;
@@ -2575,12 +2577,22 @@ ipw2200_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 		break;
 	default:
 		/* go through net80211 */
-		err = ieee80211_getprop(ic, pr_name, wldp_pr_num, pr_flags,
-		    wldp_length, wldp_buf, perm);
+		err = ieee80211_getprop(ic, pr_name, wldp_pr_num,
+		    wldp_length, wldp_buf);
 		break;
 	}
 
 	return (err);
+}
+
+static void
+ipw2200_m_propinfo(void *arg, const char *pr_name,
+    mac_prop_id_t wlpd_pr_num, mac_prop_info_handle_t mph)
+{
+	struct ipw2200_softc	*sc = (struct ipw2200_softc *)arg;
+	struct ieee80211com	*ic = &sc->sc_ic;
+
+	ieee80211_propinfo(ic, pr_name, wlpd_pr_num, mph);
 }
 
 static int

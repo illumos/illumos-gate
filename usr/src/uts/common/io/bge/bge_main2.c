@@ -34,10 +34,6 @@
  * This is the string displayed by modinfo, etc.
  */
 static char bge_ident[] = "Broadcom Gb Ethernet";
-/*
- * Make sure you keep the version ID up to date!
- */
-static char bge_version[] = "Broadcom Gb Ethernet v1.14";
 
 /*
  * Property names
@@ -116,13 +112,18 @@ static int		bge_unicst_set(void *, const uint8_t *,
 static int		bge_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int		bge_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+    uint_t, void *);
+static void		bge_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 static int		bge_set_priv_prop(bge_t *, const char *, uint_t,
     const void *);
 static int		bge_get_priv_prop(bge_t *, const char *, uint_t,
-    uint_t, void *);
+    void *);
+static void		bge_priv_propinfo(const char *,
+    mac_prop_info_handle_t);
 
-#define	BGE_M_CALLBACK_FLAGS (MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+#define	BGE_M_CALLBACK_FLAGS (MC_IOCTL | MC_GETCAPAB | MC_SETPROP | \
+    MC_GETPROP | MC_PROPINFO)
 
 static mac_callbacks_t bge_m_callbacks = {
 	BGE_M_CALLBACK_FLAGS,
@@ -133,21 +134,27 @@ static mac_callbacks_t bge_m_callbacks = {
 	bge_m_multicst,
 	NULL,
 	bge_m_tx,
+	NULL,
 	bge_m_ioctl,
 	bge_m_getcapab,
 	NULL,
 	NULL,
 	bge_m_setprop,
-	bge_m_getprop
+	bge_m_getprop,
+	bge_m_propinfo
 };
 
-mac_priv_prop_t bge_priv_prop[] = {
-	{"_adv_asym_pause_cap", MAC_PROP_PERM_RW},
-	{"_adv_pause_cap", MAC_PROP_PERM_RW}
+char *bge_priv_prop[] = {
+	"_adv_asym_pause_cap",
+	"_adv_pause_cap",
+	"_drain_max",
+	"_msi_cnt",
+	"_rx_intr_coalesce_blank_time",
+	"_tx_intr_coalesce_blank_time",
+	"_rx_intr_coalesce_pkt_cnt",
+	"_tx_intr_coalesce_pkt_cnt",
+	NULL
 };
-
-#define	BGE_MAX_PRIV_PROPS \
-	(sizeof (bge_priv_prop) / sizeof (mac_priv_prop_t))
 
 uint8_t zero_addr[6] = {0, 0, 0, 0, 0, 0};
 /*
@@ -716,7 +723,6 @@ bge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	bge_t *bgep = barg;
 	int err = 0;
 	uint32_t cur_mtu, new_mtu;
-	uint_t	maxsdu;
 	link_flowctrl_t fl;
 
 	mutex_enter(bgep->genlock);
@@ -819,16 +825,11 @@ reprogram:
 				err = EINVAL;
 				break;
 			}
-			maxsdu = bgep->chipid.ethmax_size -
-			    sizeof (struct ether_header);
-			err = mac_maxsdu_update(bgep->mh, maxsdu);
-			if (err == 0) {
-				bgep->bge_dma_error = B_TRUE;
-				bgep->manual_reset = B_TRUE;
-				bge_chip_stop(bgep, B_TRUE);
-				bge_wake_factotum(bgep);
-				err = 0;
-			}
+			bgep->bge_dma_error = B_TRUE;
+			bgep->manual_reset = B_TRUE;
+			bge_chip_stop(bgep, B_TRUE);
+			bge_wake_factotum(bgep);
+			err = 0;
 			break;
 		case MAC_PROP_FLOWCTRL:
 			bcopy(pr_val, &fl, sizeof (fl));
@@ -887,71 +888,36 @@ reprogram:
 /* ARGSUSED */
 static int
 bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	bge_t *bgep = barg;
 	int err = 0;
-	link_flowctrl_t fl;
-	uint64_t speed;
-	int flags = bgep->chipid.flags;
-	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
-
-	if (pr_valsize == 0)
-		return (EINVAL);
-	bzero(pr_val, pr_valsize);
-
-	*perm = MAC_PROP_PERM_RW;
-
-	mutex_enter(bgep->genlock);
-	if ((bgep->param_loop_mode != BGE_LOOP_NONE &&
-	    bge_param_locked(pr_num)) ||
-	    ((bgep->chipid.flags & CHIP_FLAG_SERDES) &&
-	    ((pr_num == MAC_PROP_EN_100FDX_CAP) ||
-	    (pr_num == MAC_PROP_EN_100HDX_CAP) ||
-	    (pr_num == MAC_PROP_EN_10FDX_CAP) ||
-	    (pr_num == MAC_PROP_EN_10HDX_CAP))) ||
-	    (DEVICE_5906_SERIES_CHIPSETS(bgep) &&
-	    ((pr_num == MAC_PROP_EN_1000FDX_CAP) ||
-	    (pr_num == MAC_PROP_EN_1000HDX_CAP))))
-		*perm = MAC_PROP_PERM_READ;
-	mutex_exit(bgep->genlock);
 
 	switch (pr_num) {
 		case MAC_PROP_DUPLEX:
-			*perm = MAC_PROP_PERM_READ;
-			if (pr_valsize < sizeof (link_duplex_t))
-				return (EINVAL);
+			ASSERT(pr_valsize >= sizeof (link_duplex_t));
 			bcopy(&bgep->param_link_duplex, pr_val,
 			    sizeof (link_duplex_t));
 			break;
-		case MAC_PROP_SPEED:
-			*perm = MAC_PROP_PERM_READ;
-			if (pr_valsize < sizeof (speed))
-				return (EINVAL);
-			speed = bgep->param_link_speed * 1000000ull;
+		case MAC_PROP_SPEED: {
+			uint64_t speed = bgep->param_link_speed * 1000000ull;
+
+			ASSERT(pr_valsize >= sizeof (speed));
 			bcopy(&speed, pr_val, sizeof (speed));
 			break;
+		}
 		case MAC_PROP_STATUS:
-			*perm = MAC_PROP_PERM_READ;
-			if (pr_valsize < sizeof (link_state_t))
-				return (EINVAL);
+			ASSERT(pr_valsize >= sizeof (link_state_t));
 			bcopy(&bgep->link_state, pr_val,
 			    sizeof (link_state_t));
 			break;
 		case MAC_PROP_AUTONEG:
-			if (is_default)
-				*(uint8_t *)pr_val = 1;
-			else
-				*(uint8_t *)pr_val = bgep->param_adv_autoneg;
+			*(uint8_t *)pr_val = bgep->param_adv_autoneg;
 			break;
-		case MAC_PROP_FLOWCTRL:
-			if (pr_valsize < sizeof (fl))
-				return (EINVAL);
-			if (is_default) {
-				fl = LINK_FLOWCTRL_BI;
-				bcopy(&fl, pr_val, sizeof (fl));
-				break;
-			}
+		case MAC_PROP_FLOWCTRL: {
+			link_flowctrl_t fl;
+
+			ASSERT(pr_valsize >= sizeof (fl));
 
 			if (bgep->param_link_rx_pause &&
 			    !bgep->param_link_tx_pause)
@@ -970,146 +936,133 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 				fl = LINK_FLOWCTRL_BI;
 			bcopy(&fl, pr_val, sizeof (fl));
 			break;
+		}
 		case MAC_PROP_ADV_1000FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				if (DEVICE_5906_SERIES_CHIPSETS(bgep))
-					*(uint8_t *)pr_val = 0;
-				else
-					*(uint8_t *)pr_val = 1;
-			}
-			else
-				*(uint8_t *)pr_val = bgep->param_adv_1000fdx;
+			*(uint8_t *)pr_val = bgep->param_adv_1000fdx;
 			break;
 		case MAC_PROP_EN_1000FDX_CAP:
-			if (is_default) {
-				if (DEVICE_5906_SERIES_CHIPSETS(bgep))
-					*(uint8_t *)pr_val = 0;
-				else
-					*(uint8_t *)pr_val = 1;
-			}
-			else
-				*(uint8_t *)pr_val = bgep->param_en_1000fdx;
+			*(uint8_t *)pr_val = bgep->param_en_1000fdx;
 			break;
 		case MAC_PROP_ADV_1000HDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				if (DEVICE_5906_SERIES_CHIPSETS(bgep))
-					*(uint8_t *)pr_val = 0;
-				else
-					*(uint8_t *)pr_val = 1;
-			}
-			else
-				*(uint8_t *)pr_val = bgep->param_adv_1000hdx;
+			*(uint8_t *)pr_val = bgep->param_adv_1000hdx;
 			break;
 		case MAC_PROP_EN_1000HDX_CAP:
-			if (is_default) {
-				if (DEVICE_5906_SERIES_CHIPSETS(bgep))
-					*(uint8_t *)pr_val = 0;
-				else
-					*(uint8_t *)pr_val = 1;
-			}
-			else
-				*(uint8_t *)pr_val = bgep->param_en_1000hdx;
+			*(uint8_t *)pr_val = bgep->param_en_1000hdx;
 			break;
 		case MAC_PROP_ADV_100FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				*(uint8_t *)pr_val =
-				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
-			} else {
-				*(uint8_t *)pr_val = bgep->param_adv_100fdx;
-			}
+			*(uint8_t *)pr_val = bgep->param_adv_100fdx;
 			break;
 		case MAC_PROP_EN_100FDX_CAP:
-			if (is_default) {
-				*(uint8_t *)pr_val =
-				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
-			} else {
-				*(uint8_t *)pr_val = bgep->param_en_100fdx;
-			}
+			*(uint8_t *)pr_val = bgep->param_en_100fdx;
 			break;
 		case MAC_PROP_ADV_100HDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				*(uint8_t *)pr_val =
-				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
-			} else {
-				*(uint8_t *)pr_val = bgep->param_adv_100hdx;
-			}
+			*(uint8_t *)pr_val = bgep->param_adv_100hdx;
 			break;
 		case MAC_PROP_EN_100HDX_CAP:
-			if (is_default) {
-				*(uint8_t *)pr_val =
-				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
-			} else {
-				*(uint8_t *)pr_val = bgep->param_en_100hdx;
-			}
+			*(uint8_t *)pr_val = bgep->param_en_100hdx;
 			break;
 		case MAC_PROP_ADV_10FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				*(uint8_t *)pr_val =
-				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
-			} else {
-				*(uint8_t *)pr_val = bgep->param_adv_10fdx;
-			}
+			*(uint8_t *)pr_val = bgep->param_adv_10fdx;
 			break;
 		case MAC_PROP_EN_10FDX_CAP:
-			if (is_default) {
-				*(uint8_t *)pr_val =
-				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
-			} else {
-				*(uint8_t *)pr_val = bgep->param_en_10fdx;
-			}
+			*(uint8_t *)pr_val = bgep->param_en_10fdx;
 			break;
 		case MAC_PROP_ADV_10HDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				*(uint8_t *)pr_val =
-				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
-			} else {
-				*(uint8_t *)pr_val = bgep->param_adv_10hdx;
-			}
+			*(uint8_t *)pr_val = bgep->param_adv_10hdx;
 			break;
 		case MAC_PROP_EN_10HDX_CAP:
-			if (is_default) {
-				*(uint8_t *)pr_val =
-				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
-			} else {
-				*(uint8_t *)pr_val = bgep->param_en_10hdx;
-			}
+			*(uint8_t *)pr_val = bgep->param_en_10hdx;
 			break;
 		case MAC_PROP_ADV_100T4_CAP:
 		case MAC_PROP_EN_100T4_CAP:
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = 0;
 			break;
 		case MAC_PROP_PRIVATE:
-			err = bge_get_priv_prop(bgep, pr_name, pr_flags,
+			err = bge_get_priv_prop(bgep, pr_name,
 			    pr_valsize, pr_val);
 			return (err);
-		case MAC_PROP_MTU: {
-			mac_propval_range_t range;
-
-			if (!(pr_flags & MAC_PROP_POSSIBLE))
-				return (ENOTSUP);
-			if (pr_valsize < sizeof (mac_propval_range_t))
-				return (EINVAL);
-			range.mpr_count = 1;
-			range.mpr_type = MAC_PROPVAL_UINT32;
-			range.range_uint32[0].mpur_min =
-			    range.range_uint32[0].mpur_max = BGE_DEFAULT_MTU;
-			if (!(flags & CHIP_FLAG_NO_JUMBO))
-				range.range_uint32[0].mpur_max =
-				    BGE_MAXIMUM_MTU;
-			bcopy(&range, pr_val, sizeof (range));
-			break;
-		}
 		default:
 			return (ENOTSUP);
 	}
 	return (0);
+}
+
+static void
+bge_m_propinfo(void *barg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	bge_t *bgep = barg;
+	int flags = bgep->chipid.flags;
+
+	/*
+	 * By default permissions are read/write unless specified
+	 * otherwise by the driver.
+	 */
+
+	switch (pr_num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_STATUS:
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_ADV_1000HDX_CAP:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_ADV_100T4_CAP:
+	case MAC_PROP_EN_100T4_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_EN_1000FDX_CAP:
+	case MAC_PROP_EN_1000HDX_CAP:
+		if (DEVICE_5906_SERIES_CHIPSETS(bgep))
+			mac_prop_info_set_default_uint8(prh, 0);
+		else
+			mac_prop_info_set_default_uint8(prh, 1);
+		break;
+
+	case MAC_PROP_EN_100FDX_CAP:
+	case MAC_PROP_EN_100HDX_CAP:
+	case MAC_PROP_EN_10FDX_CAP:
+	case MAC_PROP_EN_10HDX_CAP:
+		mac_prop_info_set_default_uint8(prh,
+		    (flags & CHIP_FLAG_SERDES) ? 0 : 1);
+		break;
+
+	case MAC_PROP_AUTONEG:
+		mac_prop_info_set_default_uint8(prh, 1);
+		break;
+
+	case MAC_PROP_FLOWCTRL:
+		mac_prop_info_set_default_link_flowctrl(prh,
+		    LINK_FLOWCTRL_BI);
+		break;
+
+	case MAC_PROP_MTU:
+		mac_prop_info_set_range_uint32(prh, BGE_DEFAULT_MTU,
+		    (flags & CHIP_FLAG_NO_JUMBO) ?
+		    BGE_DEFAULT_MTU : BGE_MAXIMUM_MTU);
+		break;
+
+	case MAC_PROP_PRIVATE:
+		bge_priv_propinfo(pr_name, prh);
+		break;
+	}
+
+	mutex_enter(bgep->genlock);
+	if ((bgep->param_loop_mode != BGE_LOOP_NONE &&
+	    bge_param_locked(pr_num)) ||
+	    ((bgep->chipid.flags & CHIP_FLAG_SERDES) &&
+	    ((pr_num == MAC_PROP_EN_100FDX_CAP) ||
+	    (pr_num == MAC_PROP_EN_100HDX_CAP) ||
+	    (pr_num == MAC_PROP_EN_10FDX_CAP) ||
+	    (pr_num == MAC_PROP_EN_10HDX_CAP))) ||
+	    (DEVICE_5906_SERIES_CHIPSETS(bgep) &&
+	    ((pr_num == MAC_PROP_EN_1000FDX_CAP) ||
+	    (pr_num == MAC_PROP_EN_1000HDX_CAP))))
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+	mutex_exit(bgep->genlock);
 }
 
 /* ARGSUSED */
@@ -1235,53 +1188,61 @@ bge_set_priv_prop(bge_t *bgep, const char *pr_name, uint_t pr_valsize,
 }
 
 static int
-bge_get_priv_prop(bge_t *bge, const char *pr_name, uint_t pr_flags,
-    uint_t pr_valsize, void *pr_val)
+bge_get_priv_prop(bge_t *bge, const char *pr_name, uint_t pr_valsize,
+    void *pr_val)
 {
-	int err = ENOTSUP;
-	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
 	int value;
 
-	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
-		value = (is_default? 1 : bge->param_adv_pause);
-		err = 0;
-		goto done;
-	}
-	if (strcmp(pr_name, "_adv_asym_pause_cap") == 0) {
-		value = (is_default? 1 : bge->param_adv_asym_pause);
-		err = 0;
-		goto done;
-	}
-	if (strcmp(pr_name, "_drain_max") == 0) {
-		value = (is_default? 64 : bge->param_drain_max);
-		err = 0;
-		goto done;
-	}
-	if (strcmp(pr_name, "_msi_cnt") == 0) {
-		value = (is_default? 0 : bge->param_msi_cnt);
-		err = 0;
-		goto done;
-	}
+	if (strcmp(pr_name, "_adv_pause_cap") == 0)
+		value = bge->param_adv_pause;
+	else if (strcmp(pr_name, "_adv_asym_pause_cap") == 0)
+		value = bge->param_adv_asym_pause;
+	else if (strcmp(pr_name, "_drain_max") == 0)
+		value = bge->param_drain_max;
+	else if (strcmp(pr_name, "_msi_cnt") == 0)
+		value = bge->param_msi_cnt;
+	else if (strcmp(pr_name, "_rx_intr_coalesce_blank_time") == 0)
+		value = bge->chipid.rx_ticks_norm;
+	else if (strcmp(pr_name, "_tx_intr_coalesce_blank_time") == 0)
+		value = bge->chipid.tx_ticks_norm;
+	else if (strcmp(pr_name, "_rx_intr_coalesce_pkt_cnt") == 0)
+		value = bge->chipid.rx_count_norm;
+	else if (strcmp(pr_name, "_tx_intr_coalesce_pkt_cnt") == 0)
+		value = bge->chipid.tx_count_norm;
+	else
+		return (ENOTSUP);
 
-	if (strcmp(pr_name, "_intr_coalesce_blank_time") == 0) {
-		value = (is_default? bge_rx_ticks_norm :
-		    bge->chipid.rx_ticks_norm);
-		err = 0;
-		goto done;
-	}
+	(void) snprintf(pr_val, pr_valsize, "%d", value);
+	return (0);
+}
 
-	if (strcmp(pr_name, "_intr_coalesce_pkt_cnt") == 0) {
-		value = (is_default? bge_rx_count_norm :
-		    bge->chipid.rx_count_norm);
-		err = 0;
-		goto done;
-	}
+static void
+bge_priv_propinfo(const char *pr_name, mac_prop_info_handle_t mph)
+{
+	char valstr[64];
+	int value;
 
-done:
-	if (err == 0) {
-		(void) snprintf(pr_val, pr_valsize, "%d", value);
-	}
-	return (err);
+	if (strcmp(pr_name, "_adv_pause_cap") == 0)
+		value = 1;
+	else if (strcmp(pr_name, "_adv_asym_pause_cap") == 0)
+		value = 1;
+	else if (strcmp(pr_name, "_drain_max") == 0)
+		value = 64;
+	else if (strcmp(pr_name, "_msi_cnt") == 0)
+		value = 0;
+	else if (strcmp(pr_name, "_rx_intr_coalesce_blank_time") == 0)
+		value = bge_rx_ticks_norm;
+	else if (strcmp(pr_name, "_tx_intr_coalesce_blank_time") == 0)
+		value = bge_tx_ticks_norm;
+	else if (strcmp(pr_name, "_rx_intr_coalesce_pkt_cnt") == 0)
+		value = bge_rx_count_norm;
+	else if (strcmp(pr_name, "_tx_intr_coalesce_pkt_cnt") == 0)
+		value = bge_tx_count_norm;
+	else
+		return;
+
+	(void) snprintf(valstr, sizeof (valstr), "%d", value);
+	mac_prop_info_set_default_str(mph, valstr);
 }
 
 /*
@@ -1682,6 +1643,7 @@ bge_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 		infop->mri_start = bge_ring_start;
 		infop->mri_stop = NULL;
 		infop->mri_poll = bge_poll_ring;
+		infop->mri_stat = bge_rx_ring_stat;
 
 		mintr = &infop->mri_intr;
 		mintr->mi_handle = (mac_intr_handle_t)rx_ring;
@@ -3517,7 +3479,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	macp->m_max_sdu = cidp->ethmax_size - sizeof (struct ether_header);
 	macp->m_margin = VLAN_TAGSZ;
 	macp->m_priv_props = bge_priv_prop;
-	macp->m_priv_prop_count = BGE_MAX_PRIV_PROPS;
 	macp->m_v12n = MAC_VIRT_LEVEL1;
 
 	/*
@@ -3551,7 +3512,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 #endif
 
 	ddi_report_dev(devinfo);
-	BGE_REPORT((bgep, "bge version: %s", bge_version));
 
 	return (DDI_SUCCESS);
 

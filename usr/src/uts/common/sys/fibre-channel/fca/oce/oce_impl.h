@@ -286,7 +286,10 @@ void oce_m_ioctl(void *arg, queue_t *wq, mblk_t *mp);
 int oce_m_setprop(void *arg, const char *name, mac_prop_id_t id,
     uint_t size, const void *val);
 int oce_m_getprop(void *arg, const char *name, mac_prop_id_t id,
-    uint_t flags, uint_t size, void *val, uint_t *perm);
+    uint_t size, void *val);
+void oce_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh);
+
 int oce_m_stat(void *arg, uint_t stat, uint64_t *val);
 
 /* Hardware start/stop functions */

@@ -8559,18 +8559,6 @@ lso_info_cleanup(mblk_t *mp)
 	DB_LSOMSS(mp) = 0;
 }
 
-void
-lso_info_get(mblk_t *mp, uint32_t *mss, uint32_t *flags)
-{
-	ASSERT(DB_TYPE(mp) == M_DATA);
-
-	if (flags != NULL) {
-		*flags = DB_CKSUMFLAGS(mp) & HW_LSO_FLAGS;
-		if ((*flags != 0) && (mss != NULL))
-			*mss = (uint32_t)DB_LSOMSS(mp);
-	}
-}
-
 /*
  * Checksum buffer *bp for len bytes with psum partial checksum,
  * or 0 if none, and return the 16 bit partial checksum.

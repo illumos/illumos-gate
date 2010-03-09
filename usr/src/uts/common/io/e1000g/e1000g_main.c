@@ -45,8 +45,6 @@
 #include "e1000g_debug.h"
 
 static char ident[] = "Intel PRO/1000 Ethernet";
-static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.22";
 
 /*
  * Proto types for DDI entry points
@@ -76,11 +74,12 @@ static void e1000g_m_ioctl(void *, queue_t *, mblk_t *);
 static int e1000g_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int e1000g_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+			    uint_t, void *);
+static void e1000g_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 static int e1000g_set_priv_prop(struct e1000g *, const char *, uint_t,
     const void *);
-static int e1000g_get_priv_prop(struct e1000g *, const char *, uint_t,
-    uint_t, void *, uint_t *);
+static int e1000g_get_priv_prop(struct e1000g *, const char *, uint_t, void *);
 static void e1000g_init_locks(struct e1000g *);
 static void e1000g_destroy_locks(struct e1000g *);
 static int e1000g_identify_hardware(struct e1000g *);
@@ -154,29 +153,26 @@ static int e1000g_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err,
     const void *impl_data);
 static void e1000g_fm_init(struct e1000g *Adapter);
 static void e1000g_fm_fini(struct e1000g *Adapter);
-static int e1000g_get_def_val(struct e1000g *, mac_prop_id_t, uint_t, void *);
 static void e1000g_param_sync(struct e1000g *);
 static void e1000g_get_driver_control(struct e1000_hw *);
 static void e1000g_release_driver_control(struct e1000_hw *);
 static void e1000g_restore_promisc(struct e1000g *Adapter);
 
-mac_priv_prop_t e1000g_priv_props[] = {
-	{"_tx_bcopy_threshold", MAC_PROP_PERM_RW},
-	{"_tx_interrupt_enable", MAC_PROP_PERM_RW},
-	{"_tx_intr_delay", MAC_PROP_PERM_RW},
-	{"_tx_intr_abs_delay", MAC_PROP_PERM_RW},
-	{"_rx_bcopy_threshold", MAC_PROP_PERM_RW},
-	{"_max_num_rcv_packets", MAC_PROP_PERM_RW},
-	{"_rx_intr_delay", MAC_PROP_PERM_RW},
-	{"_rx_intr_abs_delay", MAC_PROP_PERM_RW},
-	{"_intr_throttling_rate", MAC_PROP_PERM_RW},
-	{"_intr_adaptive", MAC_PROP_PERM_RW},
-	{"_adv_pause_cap", MAC_PROP_PERM_READ},
-	{"_adv_asym_pause_cap", MAC_PROP_PERM_READ},
+char *e1000g_priv_props[] = {
+	"_tx_bcopy_threshold",
+	"_tx_interrupt_enable",
+	"_tx_intr_delay",
+	"_tx_intr_abs_delay",
+	"_rx_bcopy_threshold",
+	"_max_num_rcv_packets",
+	"_rx_intr_delay",
+	"_rx_intr_abs_delay",
+	"_intr_throttling_rate",
+	"_intr_adaptive",
+	"_adv_pause_cap",
+	"_adv_asym_pause_cap",
+	NULL
 };
-#define	E1000G_MAX_PRIV_PROPS	\
-	(sizeof (e1000g_priv_props)/sizeof (mac_priv_prop_t))
-
 
 static struct cb_ops cb_ws_ops = {
 	nulldev,		/* cb_open */
@@ -233,7 +229,7 @@ static ddi_device_acc_attr_t e1000g_regs_acc_attr = {
 };
 
 #define	E1000G_M_CALLBACK_FLAGS \
-	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO)
 
 static mac_callbacks_t e1000g_m_callbacks = {
 	E1000G_M_CALLBACK_FLAGS,
@@ -244,12 +240,14 @@ static mac_callbacks_t e1000g_m_callbacks = {
 	e1000g_m_multicst,
 	NULL,
 	e1000g_m_tx,
+	NULL,
 	e1000g_m_ioctl,
 	e1000g_m_getcapab,
 	NULL,
 	NULL,
 	e1000g_m_setprop,
-	e1000g_m_getprop
+	e1000g_m_getprop,
+	e1000g_m_propinfo
 };
 
 /*
@@ -581,7 +579,6 @@ e1000g_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		mutex_exit(&e1000g_rx_detach_lock);
 	}
 
-	cmn_err(CE_CONT, "!%s, %s\n", e1000g_string, e1000g_version);
 	Adapter->e1000g_state = E1000G_INITIALIZED;
 
 	return (DDI_SUCCESS);
@@ -610,7 +607,6 @@ e1000g_register_mac(struct e1000g *Adapter)
 	mac->m_max_sdu = Adapter->default_mtu;
 	mac->m_margin = VLAN_TAGSZ;
 	mac->m_priv_props = e1000g_priv_props;
-	mac->m_priv_prop_count = E1000G_MAX_PRIV_PROPS;
 	mac->m_v12n = MAC_VIRT_LEVEL1;
 
 	err = mac_register(mac, &Adapter->mh);
@@ -1964,6 +1960,10 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
 	}
 
+	mutex_enter(&Adapter->link_lock);
+	Adapter->link_complete = B_FALSE;
+	mutex_exit(&Adapter->link_lock);
+
 	/* Release resources still held by the TX descriptors */
 	e1000g_tx_clean(Adapter);
 
@@ -2961,12 +2961,15 @@ e1000g_fill_ring(void *arg, mac_ring_type_t rtype, const int grp_index,
 	infop->mri_start = e1000g_ring_start;
 	infop->mri_stop = NULL;
 	infop->mri_poll = e1000g_poll_ring;
+	infop->mri_stat = e1000g_rx_ring_stat;
 
 	/* Ring level interrupts */
 	mintr = &infop->mri_intr;
 	mintr->mi_handle = (mac_intr_handle_t)rx_ring;
 	mintr->mi_enable = e1000g_rx_ring_intr_enable;
 	mintr->mi_disable = e1000g_rx_ring_intr_disable;
+	if (Adapter->msi_enable)
+		mintr->mi_ddi_handle = Adapter->htable[0];
 }
 
 /* ARGSUSED */
@@ -3282,157 +3285,244 @@ reset:
 
 static int
 e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	struct e1000g *Adapter = arg;
 	struct e1000_fc_info *fc = &Adapter->shared.fc;
-	struct e1000_hw *hw = &Adapter->shared;
 	int err = 0;
 	link_flowctrl_t flowctrl;
 	uint64_t tmp = 0;
 
-	if (pr_valsize == 0)
-		return (EINVAL);
-
-	*perm = MAC_PROP_PERM_RW;
-
-	bzero(pr_val, pr_valsize);
-	if ((pr_flags & MAC_PROP_DEFAULT) && (pr_num != MAC_PROP_PRIVATE)) {
-		return (e1000g_get_def_val(Adapter, pr_num,
-		    pr_valsize, pr_val));
-	}
-
 	switch (pr_num) {
 		case MAC_PROP_DUPLEX:
-			*perm = MAC_PROP_PERM_READ;
-			if (pr_valsize >= sizeof (link_duplex_t)) {
-				bcopy(&Adapter->link_duplex, pr_val,
-				    sizeof (link_duplex_t));
-			} else
-				err = EINVAL;
+			ASSERT(pr_valsize >= sizeof (link_duplex_t));
+			bcopy(&Adapter->link_duplex, pr_val,
+			    sizeof (link_duplex_t));
 			break;
 		case MAC_PROP_SPEED:
-			*perm = MAC_PROP_PERM_READ;
-			if (pr_valsize >= sizeof (uint64_t)) {
-				tmp = Adapter->link_speed * 1000000ull;
-				bcopy(&tmp, pr_val, sizeof (tmp));
-			} else
-				err = EINVAL;
+			ASSERT(pr_valsize >= sizeof (uint64_t));
+			tmp = Adapter->link_speed * 1000000ull;
+			bcopy(&tmp, pr_val, sizeof (tmp));
 			break;
 		case MAC_PROP_AUTONEG:
-			if (hw->phy.media_type != e1000_media_type_copper)
-				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_autoneg;
 			break;
 		case MAC_PROP_FLOWCTRL:
-			if (pr_valsize >= sizeof (link_flowctrl_t)) {
-				switch (fc->current_mode) {
-					case e1000_fc_none:
-						flowctrl = LINK_FLOWCTRL_NONE;
-						break;
-					case e1000_fc_rx_pause:
-						flowctrl = LINK_FLOWCTRL_RX;
-						break;
-					case e1000_fc_tx_pause:
-						flowctrl = LINK_FLOWCTRL_TX;
-						break;
-					case e1000_fc_full:
-						flowctrl = LINK_FLOWCTRL_BI;
-						break;
-				}
-				bcopy(&flowctrl, pr_val, sizeof (flowctrl));
-			} else
-				err = EINVAL;
+			ASSERT(pr_valsize >= sizeof (link_flowctrl_t));
+			switch (fc->current_mode) {
+				case e1000_fc_none:
+					flowctrl = LINK_FLOWCTRL_NONE;
+					break;
+				case e1000_fc_rx_pause:
+					flowctrl = LINK_FLOWCTRL_RX;
+					break;
+				case e1000_fc_tx_pause:
+					flowctrl = LINK_FLOWCTRL_TX;
+					break;
+				case e1000_fc_full:
+					flowctrl = LINK_FLOWCTRL_BI;
+					break;
+			}
+			bcopy(&flowctrl, pr_val, sizeof (flowctrl));
 			break;
 		case MAC_PROP_ADV_1000FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_1000fdx;
 			break;
 		case MAC_PROP_EN_1000FDX_CAP:
-			if (hw->phy.media_type != e1000_media_type_copper)
-				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_1000fdx;
 			break;
 		case MAC_PROP_ADV_1000HDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_1000hdx;
 			break;
 		case MAC_PROP_EN_1000HDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_1000hdx;
 			break;
 		case MAC_PROP_ADV_100FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_100fdx;
 			break;
 		case MAC_PROP_EN_100FDX_CAP:
-			if (hw->phy.media_type != e1000_media_type_copper)
-				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_100fdx;
 			break;
 		case MAC_PROP_ADV_100HDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_100hdx;
 			break;
 		case MAC_PROP_EN_100HDX_CAP:
-			if (hw->phy.media_type != e1000_media_type_copper)
-				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_100hdx;
 			break;
 		case MAC_PROP_ADV_10FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_10fdx;
 			break;
 		case MAC_PROP_EN_10FDX_CAP:
-			if (hw->phy.media_type != e1000_media_type_copper)
-				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_10fdx;
 			break;
 		case MAC_PROP_ADV_10HDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_10hdx;
 			break;
 		case MAC_PROP_EN_10HDX_CAP:
-			if (hw->phy.media_type != e1000_media_type_copper)
-				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_10hdx;
 			break;
 		case MAC_PROP_ADV_100T4_CAP:
 		case MAC_PROP_EN_100T4_CAP:
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_100t4;
 			break;
 		case MAC_PROP_PRIVATE:
 			err = e1000g_get_priv_prop(Adapter, pr_name,
-			    pr_flags, pr_valsize, pr_val, perm);
+			    pr_valsize, pr_val);
 			break;
-		case MAC_PROP_MTU: {
-			struct e1000_mac_info *mac = &Adapter->shared.mac;
-			struct e1000_phy_info *phy = &Adapter->shared.phy;
-			mac_propval_range_t range;
-
-			if (!(pr_flags & MAC_PROP_POSSIBLE))
-				return (ENOTSUP);
-			if (pr_valsize < sizeof (mac_propval_range_t))
-				return (EINVAL);
-			range.mpr_count = 1;
-			range.mpr_type = MAC_PROPVAL_UINT32;
-			range.range_uint32[0].mpur_min = DEFAULT_MTU;
-			range.range_uint32[0].mpur_max = Adapter->max_mtu;
-			/* following MAC type do not support jumbo frames */
-			if ((mac->type == e1000_ich8lan) ||
-			    ((mac->type == e1000_ich9lan) && (phy->type ==
-			    e1000_phy_ife))) {
-				range.range_uint32[0].mpur_max = DEFAULT_MTU;
-			}
-			bcopy(&range, pr_val, sizeof (range));
-			break;
-		}
 		default:
 			err = ENOTSUP;
 			break;
 	}
+
 	return (err);
+}
+
+static void
+e1000g_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	struct e1000g *Adapter = arg;
+	struct e1000_hw *hw = &Adapter->shared;
+
+	switch (pr_num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_ADV_1000HDX_CAP:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_ADV_100T4_CAP:
+	case MAC_PROP_EN_100T4_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_EN_1000FDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		} else {
+			mac_prop_info_set_default_uint8(prh,
+			    ((Adapter->phy_ext_status &
+			    IEEE_ESR_1000T_FD_CAPS) ||
+			    (Adapter->phy_ext_status &
+			    IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0);
+		}
+		break;
+
+	case MAC_PROP_EN_100FDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		} else {
+			mac_prop_info_set_default_uint8(prh,
+			    ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
+			    (Adapter->phy_status & MII_SR_100T2_FD_CAPS))
+			    ? 1 : 0);
+		}
+		break;
+
+	case MAC_PROP_EN_100HDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		} else {
+			mac_prop_info_set_default_uint8(prh,
+			    ((Adapter->phy_status & MII_SR_100X_HD_CAPS) ||
+			    (Adapter->phy_status & MII_SR_100T2_HD_CAPS))
+			    ? 1 : 0);
+		}
+		break;
+
+	case MAC_PROP_EN_10FDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		} else {
+			mac_prop_info_set_default_uint8(prh,
+			    (Adapter->phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0);
+		}
+		break;
+
+	case MAC_PROP_EN_10HDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		} else {
+			mac_prop_info_set_default_uint8(prh,
+			    (Adapter->phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0);
+		}
+		break;
+
+	case MAC_PROP_EN_1000HDX_CAP:
+		if (hw->phy.media_type != e1000_media_type_copper)
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_AUTONEG:
+		if (hw->phy.media_type != e1000_media_type_copper) {
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		} else {
+			mac_prop_info_set_default_uint8(prh,
+			    (Adapter->phy_status & MII_SR_AUTONEG_CAPS)
+			    ? 1 : 0);
+		}
+		break;
+
+	case MAC_PROP_FLOWCTRL:
+		mac_prop_info_set_default_link_flowctrl(prh, LINK_FLOWCTRL_BI);
+		break;
+
+	case MAC_PROP_MTU: {
+		struct e1000_mac_info *mac = &Adapter->shared.mac;
+		struct e1000_phy_info *phy = &Adapter->shared.phy;
+		uint32_t max;
+
+		/* some MAC types do not support jumbo frames */
+		if ((mac->type == e1000_ich8lan) ||
+		    ((mac->type == e1000_ich9lan) && (phy->type ==
+		    e1000_phy_ife))) {
+			max = DEFAULT_MTU;
+		} else {
+			max = Adapter->max_mtu;
+		}
+
+		mac_prop_info_set_range_uint32(prh, DEFAULT_MTU, max);
+		break;
+	}
+	case MAC_PROP_PRIVATE: {
+		char valstr[64];
+		int value;
+
+		if (strcmp(pr_name, "_adv_pause_cap") == 0 ||
+		    strcmp(pr_name, "_adv_asym_pause_cap") == 0) {
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+			return;
+		} else if (strcmp(pr_name, "_tx_bcopy_threshold") == 0) {
+			value = DEFAULT_TX_BCOPY_THRESHOLD;
+		} else if (strcmp(pr_name, "_tx_interrupt_enable") == 0) {
+			value = DEFAULT_TX_INTR_ENABLE;
+		} else if (strcmp(pr_name, "_tx_intr_delay") == 0) {
+			value = DEFAULT_TX_INTR_DELAY;
+		} else if (strcmp(pr_name, "_tx_intr_abs_delay") == 0) {
+			value = DEFAULT_TX_INTR_ABS_DELAY;
+		} else if (strcmp(pr_name, "_rx_bcopy_threshold") == 0) {
+			value = DEFAULT_RX_BCOPY_THRESHOLD;
+		} else if (strcmp(pr_name, "_max_num_rcv_packets") == 0) {
+			value = DEFAULT_RX_LIMIT_ON_INTR;
+		} else if (strcmp(pr_name, "_rx_intr_delay") == 0) {
+			value = DEFAULT_RX_INTR_DELAY;
+		} else if (strcmp(pr_name, "_rx_intr_abs_delay") == 0) {
+			value = DEFAULT_RX_INTR_ABS_DELAY;
+		} else if (strcmp(pr_name, "_intr_throttling_rate") == 0) {
+			value = DEFAULT_INTR_THROTTLING;
+		} else if (strcmp(pr_name, "_intr_adaptive") == 0) {
+			value = 1;
+		} else {
+			return;
+		}
+
+		(void) snprintf(valstr, sizeof (valstr), "%d", value);
+		mac_prop_info_set_default_str(prh, valstr);
+		break;
+	}
+	}
 }
 
 /* ARGSUSED2 */
@@ -3643,84 +3733,68 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 
 static int
 e1000g_get_priv_prop(struct e1000g *Adapter, const char *pr_name,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	int err = ENOTSUP;
-	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
 	int value;
 
 	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
-		*perm = MAC_PROP_PERM_READ;
-		if (is_default)
-			goto done;
 		value = Adapter->param_adv_pause;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_adv_asym_pause_cap") == 0) {
-		*perm = MAC_PROP_PERM_READ;
-		if (is_default)
-			goto done;
 		value = Adapter->param_adv_asym_pause;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_tx_bcopy_threshold") == 0) {
-		value = (is_default ? DEFAULT_TX_BCOPY_THRESHOLD :
-		    Adapter->tx_bcopy_thresh);
+		value = Adapter->tx_bcopy_thresh;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_tx_interrupt_enable") == 0) {
-		value = (is_default ? DEFAULT_TX_INTR_ENABLE :
-		    Adapter->tx_intr_enable);
+		value = Adapter->tx_intr_enable;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_tx_intr_delay") == 0) {
-		value = (is_default ? DEFAULT_TX_INTR_DELAY :
-		    Adapter->tx_intr_delay);
+		value = Adapter->tx_intr_delay;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_tx_intr_abs_delay") == 0) {
-		value = (is_default ? DEFAULT_TX_INTR_ABS_DELAY :
-		    Adapter->tx_intr_abs_delay);
+		value = Adapter->tx_intr_abs_delay;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_rx_bcopy_threshold") == 0) {
-		value = (is_default ? DEFAULT_RX_BCOPY_THRESHOLD :
-		    Adapter->rx_bcopy_thresh);
+		value = Adapter->rx_bcopy_thresh;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_max_num_rcv_packets") == 0) {
-		value = (is_default ? DEFAULT_RX_LIMIT_ON_INTR :
-		    Adapter->rx_limit_onintr);
+		value = Adapter->rx_limit_onintr;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_rx_intr_delay") == 0) {
-		value = (is_default ? DEFAULT_RX_INTR_DELAY :
-		    Adapter->rx_intr_delay);
+		value = Adapter->rx_intr_delay;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_rx_intr_abs_delay") == 0) {
-		value = (is_default ? DEFAULT_RX_INTR_ABS_DELAY :
-		    Adapter->rx_intr_abs_delay);
+		value = Adapter->rx_intr_abs_delay;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_intr_throttling_rate") == 0) {
-		value = (is_default ? DEFAULT_INTR_THROTTLING :
-		    Adapter->intr_throttling_rate);
+		value = Adapter->intr_throttling_rate;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_intr_adaptive") == 0) {
-		value = (is_default ? 1 : Adapter->intr_adaptive);
+		value = Adapter->intr_adaptive;
 		err = 0;
 		goto done;
 	}
@@ -6282,88 +6356,6 @@ e1000g_quiesce(dev_info_t *devinfo)
 	E1000_WRITE_REG(&Adapter->shared, E1000_RDT(0), 0);
 
 	return (DDI_SUCCESS);
-}
-
-static int
-e1000g_get_def_val(struct e1000g *Adapter, mac_prop_id_t pr_num,
-    uint_t pr_valsize, void *pr_val)
-{
-	link_flowctrl_t fl;
-	struct e1000_hw *hw = &Adapter->shared;
-	int err = 0;
-
-	ASSERT(pr_valsize > 0);
-	switch (pr_num) {
-	case MAC_PROP_AUTONEG:
-		if (hw->phy.media_type != e1000_media_type_copper)
-			*(uint8_t *)pr_val = 0;
-		else
-			*(uint8_t *)pr_val =
-			    ((Adapter->phy_status & MII_SR_AUTONEG_CAPS)
-			    ? 1 : 0);
-		break;
-	case MAC_PROP_FLOWCTRL:
-		if (pr_valsize < sizeof (link_flowctrl_t))
-			return (EINVAL);
-		fl = LINK_FLOWCTRL_BI;
-		bcopy(&fl, pr_val, sizeof (fl));
-		break;
-	case MAC_PROP_ADV_1000FDX_CAP:
-	case MAC_PROP_EN_1000FDX_CAP:
-		if (hw->phy.media_type != e1000_media_type_copper)
-			*(uint8_t *)pr_val = 1;
-		else
-			*(uint8_t *)pr_val =
-			    ((Adapter->phy_ext_status &
-			    IEEE_ESR_1000T_FD_CAPS) ||
-			    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS))
-			    ? 1 : 0;
-		break;
-	case MAC_PROP_ADV_1000HDX_CAP:
-	case MAC_PROP_EN_1000HDX_CAP:
-		*(uint8_t *)pr_val = 0;
-		break;
-	case MAC_PROP_ADV_100FDX_CAP:
-	case MAC_PROP_EN_100FDX_CAP:
-		if (hw->phy.media_type != e1000_media_type_copper)
-			*(uint8_t *)pr_val = 0;
-		else
-			*(uint8_t *)pr_val =
-			    ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
-			    (Adapter->phy_status & MII_SR_100T2_FD_CAPS))
-			    ? 1 : 0;
-		break;
-	case MAC_PROP_ADV_100HDX_CAP:
-	case MAC_PROP_EN_100HDX_CAP:
-		if (hw->phy.media_type != e1000_media_type_copper)
-			*(uint8_t *)pr_val = 0;
-		else
-			*(uint8_t *)pr_val =
-			    ((Adapter->phy_status & MII_SR_100X_HD_CAPS) ||
-			    (Adapter->phy_status & MII_SR_100T2_HD_CAPS))
-			    ? 1 : 0;
-		break;
-	case MAC_PROP_ADV_10FDX_CAP:
-	case MAC_PROP_EN_10FDX_CAP:
-		if (hw->phy.media_type != e1000_media_type_copper)
-			*(uint8_t *)pr_val = 0;
-		else
-			*(uint8_t *)pr_val =
-			    (Adapter->phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
-		break;
-	case MAC_PROP_ADV_10HDX_CAP:
-	case MAC_PROP_EN_10HDX_CAP:
-		if (hw->phy.media_type != e1000_media_type_copper)
-			*(uint8_t *)pr_val = 0;
-		else
-			*(uint8_t *)pr_val =
-			    (Adapter->phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
-		break;
-	default:
-		err = ENOTSUP;
-		break;
-	}
-	return (err);
 }
 
 /*

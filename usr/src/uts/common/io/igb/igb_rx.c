@@ -6,14 +6,13 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -23,7 +22,7 @@
 
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
 #include "igb_sw.h"
@@ -272,18 +271,17 @@ igb_rx_assoc_hcksum(mblk_t *mp, uint32_t status_error)
 	if (((status_error & E1000_RXD_STAT_TCPCS) ||
 	    (status_error & E1000_RXD_STAT_UDPCS)) &&
 	    !(status_error & E1000_RXDEXT_STATERR_TCPE))
-		hcksum_flags |= HCK_FULLCKSUM | HCK_FULLCKSUM_OK;
+		hcksum_flags |= HCK_FULLCKSUM_OK;
 
 	/*
 	 * Check IP Checksum
 	 */
 	if ((status_error & E1000_RXD_STAT_IPCS) &&
 	    !(status_error & E1000_RXDEXT_STATERR_IPE))
-		hcksum_flags |= HCK_IPV4_HDRCKSUM;
+		hcksum_flags |= HCK_IPV4_HDRCKSUM_OK;
 
 	if (hcksum_flags != 0) {
-		(void) hcksum_assoc(mp,
-		    NULL, NULL, 0, 0, 0, 0, hcksum_flags, 0);
+		mac_hcksum_set(mp, 0, 0, 0, 0, hcksum_flags);
 	}
 }
 
@@ -412,6 +410,10 @@ igb_rx(igb_rx_ring_t *rx_ring, int poll_bytes)
 			*mblk_tail = mp;
 			mblk_tail = &mp->b_next;
 		}
+
+		/* Update per-ring rx statistics */
+		rx_ring->rx_pkts++;
+		rx_ring->rx_bytes += pkt_len;
 
 rx_discard:
 		/*

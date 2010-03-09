@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_hio.h>
@@ -2190,6 +2188,86 @@ nxge_m_tx_stat(
 	}
 
 	return (val);
+}
+
+/*
+ * Retrieve a value for one of the statistics for a particular rx ring
+ */
+int
+nxge_rx_ring_stat(mac_ring_driver_t rdriver, uint_t stat, uint64_t *val)
+{
+	p_nxge_ring_handle_t    rhp = (p_nxge_ring_handle_t)rdriver;
+	p_nxge_t		nxgep = rhp->nxgep;
+	int			r_index;
+	p_nxge_stats_t 		statsp;
+
+	ASSERT(nxgep != NULL);
+	statsp = (p_nxge_stats_t)nxgep->statsp;
+	ASSERT(statsp != NULL);
+	r_index = rhp->index + nxgep->pt_config.hw_config.start_rdc;
+
+	if (statsp->rdc_ksp[r_index] == NULL)
+		return (0);
+
+	switch (stat) {
+	case MAC_STAT_IERRORS:
+		*val = statsp->rdc_stats[r_index].ierrors;
+		break;
+
+	case MAC_STAT_RBYTES:
+		*val = statsp->rdc_stats[r_index].ibytes;
+		break;
+
+	case MAC_STAT_IPACKETS:
+		*val = statsp->rdc_stats[r_index].ipackets;
+		break;
+
+	default:
+		*val = 0;
+		return (ENOTSUP);
+	}
+
+	return (0);
+}
+
+/*
+ * Retrieve a value for one of the statistics for a particular tx ring
+ */
+int
+nxge_tx_ring_stat(mac_ring_driver_t rdriver, uint_t stat, uint64_t *val)
+{
+	p_nxge_ring_handle_t    rhp = (p_nxge_ring_handle_t)rdriver;
+	p_nxge_t		nxgep = rhp->nxgep;
+	int			r_index;
+	p_nxge_stats_t 		statsp;
+
+	ASSERT(nxgep != NULL);
+	statsp = (p_nxge_stats_t)nxgep->statsp;
+	ASSERT(statsp != NULL);
+	r_index = nxgep->pt_config.hw_config.tdc.start + rhp->index;
+
+	if (statsp->tdc_ksp[r_index] == NULL)
+		return (0);
+
+	switch (stat) {
+	case MAC_STAT_OERRORS:
+		*val = statsp->tdc_stats[r_index].oerrors;
+		break;
+
+	case MAC_STAT_OBYTES:
+		*val = statsp->tdc_stats[r_index].obytes;
+		break;
+
+	case MAC_STAT_OPACKETS:
+		*val = statsp->tdc_stats[r_index].opackets;
+		break;
+
+	default:
+		*val = 0;
+		return (ENOTSUP);
+	}
+
+	return (0);
 }
 
 /* ARGSUSED */

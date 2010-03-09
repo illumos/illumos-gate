@@ -6,14 +6,13 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -451,6 +450,12 @@ typedef struct igb_tx_ring {
 	uint32_t		recycle_fail;
 	uint32_t		stall_watchdog;
 
+	/*
+	 * Per-ring statistics
+	 */
+	uint64_t		tx_pkts;	/* Packets Transmitted Count */
+	uint64_t		tx_bytes;	/* Bytes Transmitted Count */
+
 #ifdef IGB_DEBUG
 	/*
 	 * Debug statistics
@@ -515,6 +520,12 @@ typedef struct igb_rx_ring {
 	igb_rx_data_t		*rx_data;	/* Rx software ring */
 
 	kmutex_t		rx_lock;	/* Rx access lock */
+
+	/*
+	 * Per-ring statistics
+	 */
+	uint64_t		rx_pkts;	/* Packets Received Count */
+	uint64_t		rx_bytes;	/* Bytes Received Count */
 
 #ifdef IGB_DEBUG
 	/*
@@ -810,11 +821,12 @@ boolean_t igb_m_getcapab(void *, mac_capab_t, void *);
 void igb_fill_ring(void *, mac_ring_type_t, const int, const int,
     mac_ring_info_t *, mac_ring_handle_t);
 int igb_m_setprop(void *, const char *, mac_prop_id_t, uint_t, const void *);
-int igb_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+int igb_m_getprop(void *, const char *, mac_prop_id_t, uint_t, void *);
+void igb_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 int igb_set_priv_prop(igb_t *, const char *, uint_t, const void *);
-int igb_get_priv_prop(igb_t *, const char *,
-    uint_t, uint_t, void *, uint_t *);
+int igb_get_priv_prop(igb_t *, const char *, uint_t, void *);
+void igb_priv_prop_info(igb_t *, const char *, mac_prop_info_handle_t);
 boolean_t igb_param_locked(mac_prop_id_t);
 void igb_fill_group(void *arg, mac_ring_type_t, const int,
     mac_group_info_t *, mac_group_handle_t);
@@ -850,6 +862,8 @@ int igb_init_stats(igb_t *);
 
 mblk_t *igb_rx_ring_poll(void *, int);
 mblk_t *igb_tx_ring_send(void *, mblk_t *);
+int igb_rx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
+int igb_tx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
 
 #ifdef __cplusplus
 }

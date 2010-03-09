@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1814,7 +1814,7 @@ nxge_rx_intr(void *arg1, void *arg2)
 	channel = ldvp->channel;
 	ldgp = ldvp->ldgp;
 
-	if (!isLDOMguest(nxgep) && (!nxgep->rx_channel_started[channel])) {
+	if (!isLDOMguest(nxgep) && (!rcrp->started)) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
 		    "<== nxge_rx_intr: channel is not started"));
 
@@ -2718,8 +2718,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 		    is_valid, multi, is_tcp_udp, frag, error_type));
 
 		if (is_tcp_udp && !frag && !error_type) {
-			(void) hcksum_assoc(nmp, NULL, NULL, 0, 0, 0, 0,
-			    HCK_FULLCKSUM_OK | HCK_FULLCKSUM, 0);
+			mac_hcksum_set(nmp, 0, 0, 0, 0, HCK_FULLCKSUM_OK);
 			NXGE_DEBUG_MSG((nxgep, RX_CTL,
 			    "==> nxge_receive_packet: Full tcp/udp cksum "
 			    "is_valid 0x%x multi 0x%llx pkt %d frag %d "

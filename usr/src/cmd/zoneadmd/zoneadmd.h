@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,6 +86,7 @@ extern mutex_t msglock;
 extern boolean_t in_death_throes;
 extern boolean_t bringup_failure_recovery;
 extern char *zone_name;
+extern char *pool_name;
 extern char brand_name[MAXNAMELEN];
 extern char default_brand[MAXNAMELEN];
 extern char boot_args[BOOTARGS_MAX];

@@ -379,8 +379,10 @@ static void	iwh_m_ioctl(void *, queue_t *, mblk_t *);
 static int	iwh_m_setprop(void *arg, const char *pr_name,
     mac_prop_id_t wldp_pr_num, uint_t wldp_length, const void *wldp_buf);
 static int	iwh_m_getprop(void *arg, const char *pr_name,
-    mac_prop_id_t wldp_pr_num, uint_t pr_flags, uint_t wldp_length,
-    void *wldp_buf, uint_t *perm);
+    mac_prop_id_t wldp_pr_num, uint_t wldp_length,
+    void *wldp_buf);
+static void	iwh_m_propinfo(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, mac_prop_info_handle_t mph);
 
 /*
  * Supported rates for 802.11b/g modes (in 500Kbps unit).
@@ -466,7 +468,7 @@ _info(struct modinfo *mip)
  * Mac Call Back entries
  */
 mac_callbacks_t	iwh_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	iwh_m_stat,
 	iwh_m_start,
 	iwh_m_stop,
@@ -474,12 +476,14 @@ mac_callbacks_t	iwh_m_callbacks = {
 	iwh_m_multicst,
 	iwh_m_unicst,
 	iwh_m_tx,
+	NULL,
 	iwh_m_ioctl,
 	NULL,
 	NULL,
 	NULL,
 	iwh_m_setprop,
-	iwh_m_getprop
+	iwh_m_getprop,
+	iwh_m_propinfo
 };
 
 #ifdef DEBUG
@@ -3520,7 +3524,7 @@ iwh_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
  */
 static int
 iwh_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	iwh_sc_t *sc;
 	int err = EINVAL;
@@ -3531,9 +3535,18 @@ iwh_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	sc = (iwh_sc_t *)arg;
 
 	err = ieee80211_getprop(&sc->sc_ic, pr_name, wldp_pr_num,
-	    pr_flags, wldp_length, wldp_buf, perm);
+	    wldp_length, wldp_buf);
 
 	return (err);
+}
+
+static void
+iwh_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    mac_prop_info_handle_t mph)
+{
+	iwh_sc_t	*sc = (iwh_sc_t *)arg;
+
+	ieee80211_propinfo(&sc->sc_ic, pr_name, wldp_pr_num, mph);
 }
 
 static int

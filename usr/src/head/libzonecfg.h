@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -422,6 +422,7 @@ extern	int	zonecfg_destroy_tmp_pool(char *, char *, int);
 extern	int	zonecfg_bind_tmp_pool(zone_dochandle_t, zoneid_t, char *, int);
 extern	int	zonecfg_bind_pool(zone_dochandle_t, zoneid_t, char *, int);
 extern	boolean_t zonecfg_warn_poold(zone_dochandle_t);
+extern	int	zonecfg_get_poolname(zone_dochandle_t, char *, char *, size_t);
 
 /*
  * Miscellaneous utility functions.

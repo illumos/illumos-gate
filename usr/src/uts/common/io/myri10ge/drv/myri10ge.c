@@ -2380,8 +2380,7 @@ myri10ge_rx_csum(mblk_t *mp, struct myri10ge_rx_ring_stats *s, uint32_t csum)
 		return;
 	}
 
-	(void) hcksum_assoc(mp, NULL, NULL, start, stuff, end,
-	    csum, HCK_PARTIALCKSUM, 0);
+	mac_hcksum_set(mp, start, stuff, end, csum, HCK_PARTIALCKSUM);
 }
 
 static mblk_t *
@@ -2889,7 +2888,7 @@ static inline void
 myri10ge_lso_info_get(mblk_t *mp, uint32_t *mss, uint32_t *flags)
 {
 	uint32_t lso_flag;
-	lso_info_get(mp, mss, &lso_flag);
+	mac_lso_get(mp, mss, &lso_flag);
 	(*flags) |= lso_flag;
 }
 
@@ -2902,8 +2901,7 @@ myri10ge_pullup(struct myri10ge_slice_state *ss, mblk_t *mp)
 	int ok;
 
 	mss = 0;
-	hcksum_retrieve(mp, NULL, NULL, &start, &stuff, NULL, NULL,
-	    &tx_offload_flags);
+	mac_hcksum_get(mp, &start, &stuff, NULL, NULL, &tx_offload_flags);
 	myri10ge_lso_info_get(mp, &mss, &tx_offload_flags);
 
 	ok = pullupmsg(mp, -1);
@@ -2912,8 +2910,7 @@ myri10ge_pullup(struct myri10ge_slice_state *ss, mblk_t *mp)
 		return (DDI_FAILURE);
 	}
 	MYRI10GE_ATOMIC_SLICE_STAT_INC(xmit_pullup);
-	(void) hcksum_assoc(mp, NULL, NULL, start, stuff, NULL,
-	    NULL, tx_offload_flags, 0);
+	mac_hcksum_set(mp, start, stuff, NULL, NULL, tx_offload_flags);
 	if (tx_offload_flags & HW_LSO)
 		DB_LSOMSS(mp) = (uint16_t)mss;
 	lso_info_set(mp, mss, tx_offload_flags);
@@ -3347,8 +3344,7 @@ myri10ge_send(struct myri10ge_slice_state *ss, mblk_t *mp,
 
 again:
 	/* Setup checksum offloading, if needed */
-	hcksum_retrieve(mp, NULL, NULL, &start, &stuff, NULL, NULL,
-	    &tx_offload_flags);
+	mac_hcksum_get(mp, &start, &stuff, NULL, NULL, &tx_offload_flags);
 	myri10ge_lso_info_get(mp, &mss, &tx_offload_flags);
 	if (tx_offload_flags & HW_LSO) {
 		max_segs = MYRI10GE_MAX_SEND_DESC_TSO;
@@ -3796,6 +3792,58 @@ myri10ge_ring_start(mac_ring_driver_t rh, uint64_t mr_gen_num)
 	return (0);
 }
 
+/*
+ * Retrieve a value for one of the statistics for a particular rx ring
+ */
+int
+myri10ge_rx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
+{
+	struct myri10ge_slice_state *ss;
+
+	ss = (struct myri10ge_slice_state *)rh;
+	switch (stat) {
+	case MAC_STAT_RBYTES:
+		*val = ss->rx_stats.ibytes;
+		break;
+
+	case MAC_STAT_IPACKETS:
+		*val = ss->rx_stats.ipackets;
+		break;
+
+	default:
+		*val = 0;
+		return (ENOTSUP);
+	}
+
+	return (0);
+}
+
+/*
+ * Retrieve a value for one of the statistics for a particular tx ring
+ */
+int
+myri10ge_tx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
+{
+	struct myri10ge_slice_state *ss;
+
+	ss = (struct myri10ge_slice_state *)rh;
+	switch (stat) {
+	case MAC_STAT_OBYTES:
+		*val = ss->tx.stats.obytes;
+		break;
+
+	case MAC_STAT_OPACKETS:
+		*val = ss->tx.stats.opackets;
+		break;
+
+	default:
+		*val = 0;
+		return (ENOTSUP);
+	}
+
+	return (0);
+}
+
 static int
 myri10ge_rx_ring_intr_disable(mac_intr_handle_t intrh)
 {
@@ -3843,6 +3891,7 @@ myri10ge_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 		infop->mri_start = myri10ge_ring_start;
 		infop->mri_stop = NULL;
 		infop->mri_poll = myri10ge_poll_rx;
+		infop->mri_stat = myri10ge_rx_ring_stat;
 		mintr->mi_handle = (mac_intr_handle_t)ss;
 		mintr->mi_enable = myri10ge_rx_ring_intr_enable;
 		mintr->mi_disable = myri10ge_rx_ring_intr_disable;
@@ -3853,6 +3902,7 @@ myri10ge_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 		infop->mri_start = NULL;
 		infop->mri_stop = NULL;
 		infop->mri_tx = myri10ge_send_wrapper;
+		infop->mri_stat = myri10ge_tx_ring_stat;
 		break;
 	default:
 		break;
@@ -5327,6 +5377,7 @@ static mac_callbacks_t myri10ge_m_callbacks = {
 	myri10ge_m_stop,
 	myri10ge_m_promisc,
 	myri10ge_m_multicst,
+	NULL,
 	NULL,
 	NULL,
 	myri10ge_m_ioctl,

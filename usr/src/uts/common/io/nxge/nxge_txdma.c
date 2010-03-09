@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1021,7 +1021,7 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 			    "==> nxge_txdma_reclaim: dump desc:"));
 
 			pkt_len = tx_desc_pp->bits.hdw.tr_len;
-			tdc_stats->obytes += pkt_len;
+			tdc_stats->obytes += (pkt_len - TX_PKT_HEADER_SIZE);
 			tdc_stats->opackets += tx_desc_pp->bits.hdw.sop;
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
 			    "==> nxge_txdma_reclaim: pkt_len %d "

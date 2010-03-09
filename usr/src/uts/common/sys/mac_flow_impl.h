@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -280,7 +280,9 @@ struct flow_entry_s {					/* Protected by */
 	void			*fe_rx_ring_group;	/* SL */
 	void			*fe_rx_srs[MAX_RINGS_PER_GROUP]; /* fe_lock */
 	int			fe_rx_srs_cnt;		/* fe_lock */
+	void			*fe_tx_ring_group;
 	void			*fe_tx_srs;		/* WO */
+	int			fe_tx_ring_cnt;
 
 	/*
 	 * This is a unicast flow, and is a mac_client_impl_t
@@ -317,7 +319,8 @@ struct flow_entry_s {					/* Protected by */
 	flow_tab_t		*fe_flow_tab;
 
 	kstat_t			*fe_ksp;
-	flow_stats_t		fe_flowstats;
+	kstat_t			*fe_misc_stat_ksp;
+
 	boolean_t		fe_desc_logged;
 	uint64_t		fe_nic_speed;
 };
@@ -465,23 +468,36 @@ typedef struct flow_tab_info_s {
 
 #define	FLOW_TAB_EMPTY(ft)	((ft) == NULL || (ft)->ft_flow_count == 0)
 
-/*
- * This is used by mac_tx_send.
- */
-typedef struct mac_tx_stats_s {
-	uint_t			ts_opackets;
-	uint_t			ts_obytes;
-	uint_t			ts_oerrors;
-} mac_tx_stats_t;
 
-#define	FLOW_STAT_UPDATE(f, s, c)  {					\
-	((flow_entry_t *)(f))->fe_flowstats.fs_##s += ((uint64_t)(c));	\
+#define	MCIP_STAT_UPDATE(m, s, c) {					\
+	((mac_client_impl_t *)(m))->mci_misc_stat.mms_##s		\
+	+= ((uint64_t)(c));						\
 }
 
-#define	FLOW_TX_STATS_UPDATE(f, s) {					\
-	FLOW_STAT_UPDATE((f), opackets, (s)->ts_opackets);		\
-	FLOW_STAT_UPDATE((f), obytes, (s)->ts_obytes);			\
-	FLOW_STAT_UPDATE((f), oerrors, (s)->ts_oerrors);		\
+#define	SRS_RX_STAT_UPDATE(m, s, c)  {					\
+	((mac_soft_ring_set_t *)(m))->srs_rx.sr_stat.mrs_##s		\
+	+= ((uint64_t)(c));						\
+}
+
+#define	SRS_TX_STAT_UPDATE(m, s, c)  {					\
+	((mac_soft_ring_set_t *)(m))->srs_tx.st_stat.mts_##s		\
+	+= ((uint64_t)(c));						\
+}
+
+#define	SRS_TX_STATS_UPDATE(m, s) {					\
+	SRS_TX_STAT_UPDATE((m), opackets, (s)->mts_opackets);		\
+	SRS_TX_STAT_UPDATE((m), obytes, (s)->mts_obytes);		\
+	SRS_TX_STAT_UPDATE((m), oerrors, (s)->mts_oerrors);		\
+}
+
+#define	SOFTRING_TX_STAT_UPDATE(m, s, c)  {				\
+	((mac_soft_ring_t *)(m))->s_st_stat.mts_##s += ((uint64_t)(c));	\
+}
+
+#define	SOFTRING_TX_STATS_UPDATE(m, s) {				\
+	SOFTRING_TX_STAT_UPDATE((m), opackets, (s)->mts_opackets);	\
+	SOFTRING_TX_STAT_UPDATE((m), obytes, (s)->mts_obytes);		\
+	SOFTRING_TX_STAT_UPDATE((m), oerrors, (s)->mts_oerrors);	\
 }
 
 extern void	mac_flow_init();

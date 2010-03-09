@@ -40,6 +40,7 @@
 #include <sys/mac_client_impl.h>
 #include <sys/mac_client_priv.h>
 #include <sys/mac_soft_ring.h>
+#include <sys/mac_stat.h>
 #include <sys/dld.h>
 #include <sys/modctl.h>
 #include <sys/fs/dv_node.h>
@@ -53,6 +54,8 @@
 #include <sys/ddi_intr_impl.h>
 #include <sys/disp.h>
 #include <sys/sdt.h>
+#include <sys/pattr.h>
+#include <sys/strsun.h>
 
 /*
  * MAC Provider Interface.
@@ -298,8 +301,7 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	/*
 	 * Register the private properties.
 	 */
-	mac_register_priv_prop(mip, mregp->m_priv_props,
-	    mregp->m_priv_prop_count);
+	mac_register_priv_prop(mip, mregp->m_priv_props);
 
 	/*
 	 * Stash the driver callbacks into the mac_impl_t, but first sanity
@@ -333,6 +335,9 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	/*
 	 * Initialize the capabilities
 	 */
+
+	bzero(&mip->mi_rx_rings_cap, sizeof (mac_capab_rings_t));
+	bzero(&mip->mi_tx_rings_cap, sizeof (mac_capab_rings_t));
 
 	if (i_mac_capab_get((mac_handle_t)mip, MAC_CAPAB_VNIC, NULL))
 		mip->mi_state_flags |= MIS_IS_VNIC;
@@ -371,18 +376,6 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	}
 
 	/*
-	 * The driver must set mc_tx entry point to NULL when it advertises
-	 * CAP_RINGS for tx rings.
-	 */
-	if (mip->mi_tx_groups != NULL) {
-		if (mregp->m_callbacks->mc_tx != NULL)
-			goto fail;
-	} else {
-		if (mregp->m_callbacks->mc_tx == NULL)
-			goto fail;
-	}
-
-	/*
 	 * Initialize MAC addresses. Must be called after mac_init_rings().
 	 */
 	mac_init_macaddr(mip);
@@ -396,7 +389,7 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	/*
 	 * Initialize the kstats for this device.
 	 */
-	mac_stat_create(mip);
+	mac_driver_stat_create(mip);
 
 	/* Zero out any properties. */
 	bzero(&mip->mi_resource_props, sizeof (mac_resource_props_t));
@@ -466,7 +459,7 @@ fail:
 		mip->mi_info.mi_unicst_addr = NULL;
 	}
 
-	mac_stat_destroy(mip);
+	mac_driver_stat_delete(mip);
 
 	if (mip->mi_type != NULL) {
 		atomic_dec_32(&mip->mi_type->mt_ref);
@@ -484,6 +477,7 @@ fail:
 		mac_minor_rele(minor);
 	}
 
+	mip->mi_state_flags = 0;
 	mac_unregister_priv_prop(mip);
 
 	/*
@@ -532,7 +526,7 @@ mac_unregister(mac_handle_t mh)
 	ASSERT(mip->mi_nactiveclients == 0 && !(mip->mi_state_flags &
 	    MIS_EXCLUSIVE));
 
-	mac_stat_destroy(mip);
+	mac_driver_stat_delete(mip);
 
 	(void) mod_hash_remove(i_mac_impl_hash,
 	    (mod_hash_key_t)mip->mi_name, &val);
@@ -772,11 +766,7 @@ mac_rx_common(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 void
 mac_tx_update(mac_handle_t mh)
 {
-	/*
-	 * Walk the list of MAC clients (mac_client_handle)
-	 * and update
-	 */
-	i_mac_tx_srs_notify((mac_impl_t *)mh, NULL);
+	mac_tx_ring_update(mh, NULL);
 }
 
 /*
@@ -957,6 +947,151 @@ mac_maxsdu_update(mac_handle_t mh, uint_t sdu_max)
 	/* Send a MAC_NOTE_SDU_SIZE notification. */
 	i_mac_notify(mip, MAC_NOTE_SDU_SIZE);
 	return (0);
+}
+
+static void
+mac_ring_intr_retarget(mac_group_t *group, mac_ring_t *ring)
+{
+	mac_client_impl_t *mcip;
+	flow_entry_t *flent;
+	mac_soft_ring_set_t *mac_rx_srs;
+	mac_cpus_t *srs_cpu;
+	int i;
+
+	if (((mcip = MAC_GROUP_ONLY_CLIENT(group)) != NULL) &&
+	    (!ring->mr_info.mri_intr.mi_ddi_shared)) {
+		/* interrupt can be re-targeted */
+		ASSERT(group->mrg_state == MAC_GROUP_STATE_RESERVED);
+		flent = mcip->mci_flent;
+		if (ring->mr_type == MAC_RING_TYPE_RX) {
+			for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
+				mac_rx_srs = flent->fe_rx_srs[i];
+				if (mac_rx_srs->srs_ring != ring)
+					continue;
+				srs_cpu = &mac_rx_srs->srs_cpu;
+				mutex_enter(&cpu_lock);
+				mac_rx_srs_retarget_intr(mac_rx_srs,
+				    srs_cpu->mc_rx_intr_cpu);
+				mutex_exit(&cpu_lock);
+				break;
+			}
+		} else {
+			if (flent->fe_tx_srs != NULL) {
+				mutex_enter(&cpu_lock);
+				mac_tx_srs_retarget_intr(
+				    flent->fe_tx_srs);
+				mutex_exit(&cpu_lock);
+			}
+		}
+	}
+}
+
+/*
+ * Clients like aggr create pseudo rings (mac_ring_t) and expose them to
+ * their clients. There is a 1-1 mapping pseudo ring and the hardware
+ * ring. ddi interrupt handles are exported from the hardware ring to
+ * the pseudo ring. Thus when the interrupt handle changes, clients of
+ * aggr that are using the handle need to use the new handle and
+ * re-target their interrupts.
+ */
+static void
+mac_pseudo_ring_intr_retarget(mac_impl_t *mip, mac_ring_t *ring,
+    ddi_intr_handle_t ddh)
+{
+	mac_ring_t *pring;
+	mac_group_t *pgroup;
+	mac_impl_t *pmip;
+	char macname[MAXNAMELEN];
+	mac_perim_handle_t p_mph;
+	uint64_t saved_gen_num;
+
+again:
+	pring = (mac_ring_t *)ring->mr_prh;
+	pgroup = (mac_group_t *)pring->mr_gh;
+	pmip = (mac_impl_t *)pgroup->mrg_mh;
+	saved_gen_num = ring->mr_gen_num;
+	(void) strlcpy(macname, pmip->mi_name, MAXNAMELEN);
+	/*
+	 * We need to enter aggr's perimeter. The locking hierarchy
+	 * dictates that aggr's perimeter should be entered first
+	 * and then the port's perimeter. So drop the port's
+	 * perimeter, enter aggr's and then re-enter port's
+	 * perimeter.
+	 */
+	i_mac_perim_exit(mip);
+	/*
+	 * While we know pmip is the aggr's mip, there is a
+	 * possibility that aggr could have unregistered by
+	 * the time we exit port's perimeter (mip) and
+	 * enter aggr's perimeter (pmip). To avoid that
+	 * scenario, enter aggr's perimeter using its name.
+	 */
+	if (mac_perim_enter_by_macname(macname, &p_mph) != 0)
+		return;
+	i_mac_perim_enter(mip);
+	/*
+	 * Check if the ring got assigned to another aggregation before
+	 * be could enter aggr's and the port's perimeter. When a ring
+	 * gets deleted from an aggregation, it calls mac_stop_ring()
+	 * which increments the generation number. So checking
+	 * generation number will be enough.
+	 */
+	if (ring->mr_gen_num != saved_gen_num && ring->mr_prh != NULL) {
+		i_mac_perim_exit(mip);
+		mac_perim_exit(p_mph);
+		i_mac_perim_enter(mip);
+		goto again;
+	}
+
+	/* Check if pseudo ring is still present */
+	if (ring->mr_prh != NULL) {
+		pring->mr_info.mri_intr.mi_ddi_handle = ddh;
+		pring->mr_info.mri_intr.mi_ddi_shared =
+		    ring->mr_info.mri_intr.mi_ddi_shared;
+		if (ddh != NULL)
+			mac_ring_intr_retarget(pgroup, pring);
+	}
+	i_mac_perim_exit(mip);
+	mac_perim_exit(p_mph);
+}
+/*
+ * API called by driver to provide new interrupt handle for TX/RX rings.
+ * This usually happens when IRM (Interrupt Resource Manangement)
+ * framework either gives the driver more MSI-x interrupts or takes
+ * away MSI-x interrupts from the driver.
+ */
+void
+mac_ring_intr_set(mac_ring_handle_t mrh, ddi_intr_handle_t ddh)
+{
+	mac_ring_t	*ring = (mac_ring_t *)mrh;
+	mac_group_t	*group = (mac_group_t *)ring->mr_gh;
+	mac_impl_t	*mip = (mac_impl_t *)group->mrg_mh;
+
+	i_mac_perim_enter(mip);
+	ring->mr_info.mri_intr.mi_ddi_handle = ddh;
+	if (ddh == NULL) {
+		/* Interrupts being reset */
+		ring->mr_info.mri_intr.mi_ddi_shared = B_FALSE;
+		if (ring->mr_prh != NULL) {
+			mac_pseudo_ring_intr_retarget(mip, ring, ddh);
+			return;
+		}
+	} else {
+		/* New interrupt handle */
+		mac_compare_ddi_handle(mip->mi_rx_groups,
+		    mip->mi_rx_group_count, ring);
+		if (!ring->mr_info.mri_intr.mi_ddi_shared) {
+			mac_compare_ddi_handle(mip->mi_tx_groups,
+			    mip->mi_tx_group_count, ring);
+		}
+		if (ring->mr_prh != NULL) {
+			mac_pseudo_ring_intr_retarget(mip, ring, ddh);
+			return;
+		} else {
+			mac_ring_intr_retarget(group, ring);
+		}
+	}
+	i_mac_perim_exit(mip);
 }
 
 /* PRIVATE FUNCTIONS, FOR INTERNAL USE ONLY */
@@ -1141,16 +1276,8 @@ mac_group_add_ring(mac_group_handle_t gh, int index)
 	int ret;
 
 	i_mac_perim_enter(mip);
-
-	/*
-	 * Only RX rings can be added or removed by drivers currently.
-	 */
-	ASSERT(group->mrg_type == MAC_RING_TYPE_RX);
-
 	ret = i_mac_group_add_ring(group, NULL, index);
-
 	i_mac_perim_exit(mip);
-
 	return (ret);
 }
 
@@ -1166,13 +1293,167 @@ mac_group_rem_ring(mac_group_handle_t gh, mac_ring_handle_t rh)
 	mac_impl_t *mip = (mac_impl_t *)group->mrg_mh;
 
 	i_mac_perim_enter(mip);
-
-	/*
-	 * Only RX rings can be added or removed by drivers currently.
-	 */
-	ASSERT(group->mrg_type == MAC_RING_TYPE_RX);
-
 	i_mac_group_rem_ring(group, (mac_ring_t *)rh, B_TRUE);
-
 	i_mac_perim_exit(mip);
+}
+
+/*
+ * mac_prop_info_*() callbacks called from the driver's prefix_propinfo()
+ * entry points.
+ */
+
+void
+mac_prop_info_set_default_uint8(mac_prop_info_handle_t ph, uint8_t val)
+{
+	mac_prop_info_state_t *pr = (mac_prop_info_state_t *)ph;
+
+	/* nothing to do if the caller doesn't want the default value */
+	if (pr->pr_default == NULL)
+		return;
+
+	ASSERT(pr->pr_default_size >= sizeof (uint8_t));
+
+	*(uint8_t *)(pr->pr_default) = val;
+	pr->pr_flags |= MAC_PROP_INFO_DEFAULT;
+}
+
+void
+mac_prop_info_set_default_uint64(mac_prop_info_handle_t ph, uint64_t val)
+{
+	mac_prop_info_state_t *pr = (mac_prop_info_state_t *)ph;
+
+	/* nothing to do if the caller doesn't want the default value */
+	if (pr->pr_default == NULL)
+		return;
+
+	ASSERT(pr->pr_default_size >= sizeof (uint64_t));
+
+	bcopy(&val, pr->pr_default, sizeof (val));
+
+	pr->pr_flags |= MAC_PROP_INFO_DEFAULT;
+}
+
+void
+mac_prop_info_set_default_uint32(mac_prop_info_handle_t ph, uint32_t val)
+{
+	mac_prop_info_state_t *pr = (mac_prop_info_state_t *)ph;
+
+	/* nothing to do if the caller doesn't want the default value */
+	if (pr->pr_default == NULL)
+		return;
+
+	ASSERT(pr->pr_default_size >= sizeof (uint32_t));
+
+	bcopy(&val, pr->pr_default, sizeof (val));
+
+	pr->pr_flags |= MAC_PROP_INFO_DEFAULT;
+}
+
+void
+mac_prop_info_set_default_str(mac_prop_info_handle_t ph, const char *str)
+{
+	mac_prop_info_state_t *pr = (mac_prop_info_state_t *)ph;
+
+	/* nothing to do if the caller doesn't want the default value */
+	if (pr->pr_default == NULL)
+		return;
+
+	if (strlen(str) > pr->pr_default_size)
+		pr->pr_default_status = ENOBUFS;
+	else
+		(void) strlcpy(pr->pr_default, str, strlen(str));
+	pr->pr_flags |= MAC_PROP_INFO_DEFAULT;
+}
+
+void
+mac_prop_info_set_default_link_flowctrl(mac_prop_info_handle_t ph,
+    link_flowctrl_t val)
+{
+	mac_prop_info_state_t *pr = (mac_prop_info_state_t *)ph;
+
+	/* nothing to do if the caller doesn't want the default value */
+	if (pr->pr_default == NULL)
+		return;
+
+	ASSERT(pr->pr_default_size >= sizeof (link_flowctrl_t));
+
+	bcopy(&val, pr->pr_default, sizeof (val));
+
+	pr->pr_flags |= MAC_PROP_INFO_DEFAULT;
+}
+
+void
+mac_prop_info_set_range_uint32(mac_prop_info_handle_t ph, uint32_t min,
+    uint32_t max)
+{
+	mac_prop_info_state_t *pr = (mac_prop_info_state_t *)ph;
+	mac_propval_range_t *range = pr->pr_range;
+
+	/* nothing to do if the caller doesn't want the range info */
+	if (range == NULL)
+		return;
+
+	range->mpr_count = 1;
+	range->mpr_type = MAC_PROPVAL_UINT32;
+	range->mpr_range_uint32[0].mpur_min = min;
+	range->mpr_range_uint32[0].mpur_max = max;
+	pr->pr_flags |= MAC_PROP_INFO_RANGE;
+}
+
+void
+mac_prop_info_set_perm(mac_prop_info_handle_t ph, uint8_t perm)
+{
+	mac_prop_info_state_t *pr = (mac_prop_info_state_t *)ph;
+
+	pr->pr_perm = perm;
+	pr->pr_flags |= MAC_PROP_INFO_PERM;
+}
+
+void mac_hcksum_get(mblk_t *mp, uint32_t *start, uint32_t *stuff,
+    uint32_t *end, uint32_t *value, uint32_t *flags_ptr)
+{
+	uint32_t flags;
+
+	ASSERT(DB_TYPE(mp) == M_DATA);
+
+	flags = DB_CKSUMFLAGS(mp) & HCK_FLAGS;
+	if ((flags & (HCK_PARTIALCKSUM | HCK_FULLCKSUM)) != 0) {
+		if (value != NULL)
+			*value = (uint32_t)DB_CKSUM16(mp);
+		if ((flags & HCK_PARTIALCKSUM) != 0) {
+			if (start != NULL)
+				*start = (uint32_t)DB_CKSUMSTART(mp);
+			if (stuff != NULL)
+				*stuff = (uint32_t)DB_CKSUMSTUFF(mp);
+			if (end != NULL)
+				*end = (uint32_t)DB_CKSUMEND(mp);
+		}
+	}
+
+	if (flags_ptr != NULL)
+		*flags_ptr = flags;
+}
+
+void mac_hcksum_set(mblk_t *mp, uint32_t start, uint32_t stuff,
+    uint32_t end, uint32_t value, uint32_t flags)
+{
+	ASSERT(DB_TYPE(mp) == M_DATA);
+
+	DB_CKSUMSTART(mp) = (intptr_t)start;
+	DB_CKSUMSTUFF(mp) = (intptr_t)stuff;
+	DB_CKSUMEND(mp) = (intptr_t)end;
+	DB_CKSUMFLAGS(mp) = (uint16_t)flags;
+	DB_CKSUM16(mp) = (uint16_t)value;
+}
+
+void
+mac_lso_get(mblk_t *mp, uint32_t *mss, uint32_t *flags)
+{
+	ASSERT(DB_TYPE(mp) == M_DATA);
+
+	if (flags != NULL) {
+		*flags = DB_CKSUMFLAGS(mp) & HW_LSO;
+		if ((*flags != 0) && (mss != NULL))
+			*mss = (uint32_t)DB_LSOMSS(mp);
+	}
 }

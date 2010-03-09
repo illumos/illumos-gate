@@ -6,14 +6,13 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,8 +21,8 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include "igb_sw.h"
@@ -270,4 +269,54 @@ igb_init_stats(igb_t *igb)
 	kstat_install(ks);
 
 	return (IGB_SUCCESS);
+}
+
+/*
+ * Retrieve a value for one of the statistics for a particular rx ring
+ */
+int
+igb_rx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
+{
+	igb_rx_ring_t *rx_ring = (igb_rx_ring_t *)rh;
+
+	switch (stat) {
+	case MAC_STAT_RBYTES:
+		*val = rx_ring->rx_bytes;
+		break;
+
+	case MAC_STAT_IPACKETS:
+		*val = rx_ring->rx_pkts;
+		break;
+
+	default:
+		*val = 0;
+		return (ENOTSUP);
+	}
+
+	return (0);
+}
+
+/*
+ * Retrieve a value for one of the statistics for a particular tx ring
+ */
+int
+igb_tx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
+{
+	igb_tx_ring_t *tx_ring = (igb_tx_ring_t *)rh;
+
+	switch (stat) {
+	case MAC_STAT_OBYTES:
+		*val = tx_ring->tx_bytes;
+		break;
+
+	case MAC_STAT_OPACKETS:
+		*val = tx_ring->tx_pkts;
+		break;
+
+	default:
+		*val = 0;
+		return (ENOTSUP);
+	}
+
+	return (0);
 }

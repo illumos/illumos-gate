@@ -63,8 +63,6 @@
 #define	MAXLINELEN	1024
 #define	MAXPATHLEN	1024
 
-#define	V4_PART_OF_V6(v6)	((v6)._S6_un._S6_u32[3])
-
 /* database file parameters */
 static const char *BW_LIMIT = "bw_limit";
 static const char *PRIORITY = "priority";

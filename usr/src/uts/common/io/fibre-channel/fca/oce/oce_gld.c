@@ -33,14 +33,12 @@
 #include <oce_ioctl.h>
 
 /* array of properties supported by this driver */
-mac_priv_prop_t oce_priv_props[] = {
-	{"_tx_ring_size", MAC_PROP_PERM_READ},
-	{"_tx_bcopy_limit", MAC_PROP_PERM_RW},
-	{"_rx_bcopy_limit", MAC_PROP_PERM_RW},
-	{"_rx_ring_size", MAC_PROP_PERM_READ},
+char *oce_priv_props[] = {
+	"_tx_ring_size",
+	"_tx_bcopy_limit",
+	"_rx_ring_size",
+	NULL
 };
-uint32_t oce_num_props = sizeof (oce_priv_props) / sizeof (mac_priv_prop_t);
-
 
 /* ---[ static function declarations ]----------------------------------- */
 static int oce_power10(int power);
@@ -48,7 +46,7 @@ static int oce_set_priv_prop(struct oce_dev *dev, const char *name,
     uint_t size, const void *val);
 
 static int oce_get_priv_prop(struct oce_dev *dev, const char *name,
-    uint_t flags, uint_t size, void *val);
+    uint_t size, void *val);
 
 /* ---[ GLD entry points ]----------------------------------------------- */
 int
@@ -446,14 +444,76 @@ oce_m_setprop(void *arg, const char *name, mac_prop_id_t id,
 
 int
 oce_m_getprop(void *arg, const char *name, mac_prop_id_t id,
-    uint_t flags, uint_t size, void *val, uint_t *perm)
+    uint_t size, void *val)
 {
 	struct oce_dev *dev = arg;
 	uint32_t ret = 0;
 
-	*perm = MAC_PROP_PERM_READ;
-
 	switch (id) {
+	case MAC_PROP_ADV_10GFDX_CAP:
+	case MAC_PROP_EN_10GFDX_CAP:
+		*(uint8_t *)val = 0x01;
+		break;
+
+	case MAC_PROP_DUPLEX: {
+		uint32_t *mode = (uint32_t *)val;
+
+		ASSERT(size >= sizeof (link_duplex_t));
+		if (dev->state & STATE_MAC_STARTED)
+			*mode = LINK_DUPLEX_FULL;
+		else
+			*mode = LINK_DUPLEX_UNKNOWN;
+		break;
+	}
+
+	case MAC_PROP_SPEED: {
+		uint64_t *speed = (uint64_t *)val;
+
+		ASSERT(size >= sizeof (uint64_t));
+		*speed = 0;
+		if ((dev->state & STATE_MAC_STARTED) &&
+		    (dev->link.mac_speed != 0)) {
+			*speed = 1000000ull * oce_power10(dev->link.mac_speed);
+		}
+		break;
+	}
+
+	case MAC_PROP_FLOWCTRL: {
+		link_flowctrl_t *fc = (link_flowctrl_t *)val;
+
+		ASSERT(size >= sizeof (link_flowctrl_t));
+		if (dev->flow_control & OCE_FC_TX &&
+		    dev->flow_control & OCE_FC_RX)
+			*fc = LINK_FLOWCTRL_BI;
+		else if (dev->flow_control == OCE_FC_TX)
+			*fc = LINK_FLOWCTRL_TX;
+		else if (dev->flow_control == OCE_FC_RX)
+			*fc = LINK_FLOWCTRL_RX;
+		else if (dev->flow_control == 0)
+			*fc = LINK_FLOWCTRL_NONE;
+		else
+			ret = EINVAL;
+		break;
+	}
+
+	case MAC_PROP_PRIVATE:
+		ret = oce_get_priv_prop(dev, name, size, val);
+		break;
+
+	default:
+		ret = ENOTSUP;
+		break;
+	} /* switch id */
+	return (ret);
+} /* oce_m_getprop */
+
+void
+oce_m_propinfo(void *arg, const char *name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	_NOTE(ARGUNUSED(arg));
+
+	switch (pr_num) {
 	case MAC_PROP_AUTONEG:
 	case MAC_PROP_EN_AUTONEG:
 	case MAC_PROP_ADV_1000FDX_CAP:
@@ -469,102 +529,36 @@ oce_m_getprop(void *arg, const char *name, mac_prop_id_t id,
 	case MAC_PROP_ADV_10HDX_CAP:
 	case MAC_PROP_EN_10HDX_CAP:
 	case MAC_PROP_ADV_100T4_CAP:
-	case MAC_PROP_EN_100T4_CAP: {
-		*(uint8_t *)val = 0x0;
+	case MAC_PROP_EN_100T4_CAP:
+	case MAC_PROP_ADV_10GFDX_CAP:
+	case MAC_PROP_EN_10GFDX_CAP:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_DUPLEX:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		break;
-	}
 
-	case MAC_PROP_ADV_10GFDX_CAP: {
-		*(uint8_t *)val = 0x01;
+	case MAC_PROP_MTU:
+		mac_prop_info_set_range_uint32(prh, OCE_MIN_MTU, OCE_MAX_MTU);
 		break;
-	}
-
-	case MAC_PROP_EN_10GFDX_CAP: {
-		*(uint8_t *)val = 0x01;
-		break;
-	}
-
-	case MAC_PROP_DUPLEX: {
-		if (size >= sizeof (link_duplex_t)) {
-			uint32_t *mode = (uint32_t *)val;
-
-			*perm = MAC_PROP_PERM_READ;
-			if (dev->state & STATE_MAC_STARTED)
-				*mode = LINK_DUPLEX_FULL;
-			else
-				*mode = LINK_DUPLEX_UNKNOWN;
-
-		} else
-			ret = EINVAL;
-		break;
-	}
-
-	case MAC_PROP_SPEED: {
-		if (size >= sizeof (uint64_t)) {
-			uint64_t *speed = (uint64_t *)val;
-
-			*perm = MAC_PROP_PERM_READ;
-			*speed = 0;
-			if ((dev->state & STATE_MAC_STARTED) &&
-			    (dev->link.mac_speed != 0)) {
-				*speed = 1000000ull *
-				    oce_power10(dev->link.mac_speed);
-			}
-		} else
-			ret = EINVAL;
-		break;
-	}
-
-	case MAC_PROP_MTU: {
-		mac_propval_range_t range;
-
-		*perm = MAC_PROP_PERM_RW;
-		if (!(flags & MAC_PROP_POSSIBLE)) {
-			ret = ENOTSUP;
-			break;
-		}
-		range.mpr_count = 1;
-		range.mpr_type = MAC_PROPVAL_UINT32;
-		range.range_uint32[0].mpur_min = OCE_MIN_MTU;
-		range.range_uint32[0].mpur_max = OCE_MAX_MTU;
-		bcopy(&range, val, sizeof (mac_propval_range_t));
-		break;
-	}
-
-	case MAC_PROP_FLOWCTRL: {
-		link_flowctrl_t *fc = (link_flowctrl_t *)val;
-
-		if (size < sizeof (link_flowctrl_t)) {
-			ret = EINVAL;
-			break;
-		}
-
-		if (size >= sizeof (link_flowctrl_t)) {
-			if (dev->flow_control & OCE_FC_TX &&
-			    dev->flow_control & OCE_FC_RX)
-				*fc = LINK_FLOWCTRL_BI;
-			else if (dev->flow_control == OCE_FC_TX)
-				*fc = LINK_FLOWCTRL_TX;
-			else if (dev->flow_control == OCE_FC_RX)
-				*fc = LINK_FLOWCTRL_RX;
-			else if (dev->flow_control == 0)
-				*fc = LINK_FLOWCTRL_NONE;
-			else
-				ret = EINVAL;
-		}
-		break;
-	}
 
 	case MAC_PROP_PRIVATE: {
-		ret = oce_get_priv_prop(dev, name, flags, size, val);
+		char valstr[64];
+		int value;
+
+		if (strcmp(name, "_tx_ring_size") == 0) {
+			value = OCE_DEFAULT_TX_RING_SIZE;
+		} else if (strcmp(name, "_rx_ring_size") == 0) {
+			value = OCE_DEFAULT_RX_RING_SIZE;
+		} else {
+			return;
+		}
+
+		(void) snprintf(valstr, sizeof (valstr), "%d", value);
+		mac_prop_info_set_default_str(prh, valstr);
 		break;
 	}
-	default:
-		ret = ENOTSUP;
-		break;
-	} /* switch id */
-	return (ret);
-} /* oce_m_getprop */
+	}
+} /* oce_m_propinfo */
 
 /*
  * function to handle dlpi streams message from GLDv3 mac layer
@@ -701,7 +695,6 @@ oce_set_priv_prop(struct oce_dev *dev, const char *name,
  *
  * dev - software handle to the device
  * name - string containing the property name
- * flags - flags sent by the OS to get_prop
  * size - length of the string contained name
  * val - [OUT] pointer to the location where the result is returned
  *
@@ -709,46 +702,22 @@ oce_set_priv_prop(struct oce_dev *dev, const char *name,
  */
 static int
 oce_get_priv_prop(struct oce_dev *dev, const char *name,
-    uint_t flags, uint_t size, void *val)
+    uint_t size, void *val)
 {
-	int ret = ENOTSUP;
 	int value;
-	boolean_t is_default = (flags & MAC_PROP_DEFAULT);
-
-	if (NULL == val) {
-		ret = EINVAL;
-		return (ret);
-	}
 
 	if (strcmp(name, "_tx_ring_size") == 0) {
-		value = is_default ? OCE_DEFAULT_TX_RING_SIZE :
-		    dev->tx_ring_size;
-		ret = 0;
-		goto done;
-	}
-
-	if (strcmp(name, "_tx_bcopy_limit") == 0) {
+		value = dev->tx_ring_size;
+	} else if (strcmp(name, "_tx_bcopy_limit") == 0) {
 		value = dev->tx_bcopy_limit;
-		ret = 0;
-		goto done;
-	}
-
-	if (strcmp(name, "_rx_bcopy_limit") == 0) {
+	} else if (strcmp(name, "_rx_ring_size") == 0) {
+		value = dev->rx_ring_size;
+	} else if (strcmp(name, "_rx_bcopy_limit") == 0) {
 		value = dev->rx_bcopy_limit;
-		ret = 0;
-		goto done;
+	} else {
+		return (ENOTSUP);
 	}
 
-	if (strcmp(name, "_rx_ring_size") == 0) {
-		value = is_default ? OCE_DEFAULT_RX_RING_SIZE :
-		    dev->rx_ring_size;
-		ret = 0;
-		goto done;
-	}
-
-done:
-	if (ret == 0) {
-		(void) snprintf(val, size, "%d", value);
-	}
-	return (ret);
+	(void) snprintf(val, size, "%d", value);
+	return (0);
 } /* oce_get_priv_prop */

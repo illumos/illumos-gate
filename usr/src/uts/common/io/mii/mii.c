@@ -650,12 +650,10 @@ mii_m_loop_ioctl(mii_handle_t mh, queue_t *wq, mblk_t *mp)
 
 int
 mii_m_getprop(mii_handle_t mh, const char *name, mac_prop_id_t num,
-    uint_t flags, uint_t sz, void *val, uint_t *permp)
+    uint_t sz, void *val)
 {
 	phy_handle_t	*ph;
 	int		err = 0;
-	uint_t		perm;
-	boolean_t	dfl = flags & MAC_PROP_DEFAULT;
 
 	_NOTE(ARGUNUSED(name));
 
@@ -665,54 +663,36 @@ mii_m_getprop(mii_handle_t mh, const char *name, mac_prop_id_t num,
 	mutex_enter(&mh->m_lock);
 
 	ph = mh->m_phy;
-	perm = MAC_PROP_PERM_RW;
 
 #define	CASE_PROP_ABILITY(PROP, VAR)					\
 	case MAC_PROP_ADV_##PROP:					\
-		perm = MAC_PROP_PERM_READ;				\
-		*(uint8_t *)val =					\
-		    dfl ? ph->phy_cap_##VAR : ph->phy_adv_##VAR;	\
+		*(uint8_t *)val = ph->phy_adv_##VAR;			\
 		break;							\
 									\
 	case MAC_PROP_EN_##PROP:					\
-		if (!ph->phy_cap_##VAR)					\
-			perm = MAC_PROP_PERM_READ;			\
-		*(uint8_t *)val =					\
-		    dfl ? ph->phy_cap_##VAR : ph->phy_en_##VAR;		\
+		*(uint8_t *)val = ph->phy_en_##VAR;			\
 		break;
 
 	switch (num) {
 	case MAC_PROP_DUPLEX:
-		perm = MAC_PROP_PERM_READ;
-		if (sz >= sizeof (link_duplex_t)) {
-			bcopy(&ph->phy_duplex, val, sizeof (link_duplex_t));
-		} else {
-			err = EINVAL;
-		}
+		ASSERT(sz >= sizeof (link_duplex_t));
+		bcopy(&ph->phy_duplex, val, sizeof (link_duplex_t));
 		break;
 
-	case MAC_PROP_SPEED:
-		perm = MAC_PROP_PERM_READ;
-		if (sz >= sizeof (uint64_t)) {
-			uint64_t speed = ph->phy_speed * 1000000ull;
-			bcopy(&speed, val, sizeof (speed));
-		} else {
-			err = EINVAL;
-		}
+	case MAC_PROP_SPEED: {
+		uint64_t speed = ph->phy_speed * 1000000ull;
+		ASSERT(sz >= sizeof (uint64_t));
+		bcopy(&speed, val, sizeof (speed));
 		break;
+	}
 
 	case MAC_PROP_AUTONEG:
-		*(uint8_t *)val =
-		    dfl ? ph->phy_cap_aneg : ph->phy_adv_aneg;
+		*(uint8_t *)val = ph->phy_adv_aneg;
 		break;
 
 	case MAC_PROP_FLOWCTRL:
-		if (sz >= sizeof (link_flowctrl_t)) {
-			bcopy(&ph->phy_flowctrl, val,
-			    sizeof (link_flowctrl_t));
-		} else {
-			err = EINVAL;
-		}
+		ASSERT(sz >= sizeof (link_flowctrl_t));
+		bcopy(&ph->phy_flowctrl, val, sizeof (link_flowctrl_t));
 		break;
 
 	CASE_PROP_ABILITY(1000FDX_CAP, 1000_fdx)
@@ -728,13 +708,55 @@ mii_m_getprop(mii_handle_t mh, const char *name, mac_prop_id_t num,
 		break;
 	}
 
-	if (err == 0) {
-		*permp = perm;
-	}
-
 	mutex_exit(&mh->m_lock);
 
 	return (err);
+}
+
+void
+mii_m_propinfo(mii_handle_t mh, const char *name, mac_prop_id_t num,
+    mac_prop_info_handle_t prh)
+{
+	phy_handle_t	*ph;
+
+	_NOTE(ARGUNUSED(name));
+
+	mutex_enter(&mh->m_lock);
+
+	ph = mh->m_phy;
+
+	switch (num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_AUTONEG:
+		mac_prop_info_set_default_uint8(prh, ph->phy_cap_aneg);
+		break;
+
+#define	CASE_PROP_PERM(PROP, VAR)					\
+	case MAC_PROP_ADV_##PROP:					\
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);	\
+		mac_prop_info_set_default_uint8(prh, ph->phy_cap_##VAR); \
+		break;							\
+									\
+	case MAC_PROP_EN_##PROP:					\
+		if (!ph->phy_cap_##VAR)					\
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ); \
+		mac_prop_info_set_default_uint8(prh, ph->phy_cap_##VAR); \
+		break;
+
+	CASE_PROP_PERM(1000FDX_CAP, 1000_fdx)
+	CASE_PROP_PERM(1000HDX_CAP, 1000_hdx)
+	CASE_PROP_PERM(100T4_CAP, 100_t4)
+	CASE_PROP_PERM(100FDX_CAP, 100_fdx)
+	CASE_PROP_PERM(100HDX_CAP, 100_hdx)
+	CASE_PROP_PERM(10FDX_CAP, 10_fdx)
+	CASE_PROP_PERM(10HDX_CAP, 10_hdx)
+	}
+
+	mutex_exit(&mh->m_lock);
 }
 
 int
@@ -813,65 +835,62 @@ mii_m_setprop(mii_handle_t mh, const char *name, mac_prop_id_t num,
 		advp = &ph->phy_en_aneg;
 		macpp = &mh->m_en_aneg;
 		break;
-	case MAC_PROP_FLOWCTRL:
-		if (sz < sizeof (link_flowctrl_t)) {
-			rv = EINVAL;
-		} else {
-			link_flowctrl_t	fc;
-			boolean_t chg;
+	case MAC_PROP_FLOWCTRL: {
+		link_flowctrl_t	fc;
+		boolean_t chg;
 
-			bcopy(valp, &fc, sizeof (fc));
+		ASSERT(sz >= sizeof (link_flowctrl_t));
+		bcopy(valp, &fc, sizeof (fc));
 
-			chg = fc == ph->phy_en_flowctrl ? B_FALSE : B_TRUE;
-			switch (fc) {
-			case LINK_FLOWCTRL_NONE:
-				ph->phy_en_pause = B_FALSE;
-				ph->phy_en_asmpause = B_FALSE;
+		chg = fc == ph->phy_en_flowctrl ? B_FALSE : B_TRUE;
+		switch (fc) {
+		case LINK_FLOWCTRL_NONE:
+			ph->phy_en_pause = B_FALSE;
+			ph->phy_en_asmpause = B_FALSE;
+			ph->phy_en_flowctrl = fc;
+			break;
+		/*
+		 * Note that while we don't have a way to advertise
+		 * that we can RX pause (we just won't send pause
+		 * frames), we advertise full support.  The MAC driver
+		 * will learn of the configuration via the saved value
+		 * of the tunable.
+		 */
+		case LINK_FLOWCTRL_BI:
+		case LINK_FLOWCTRL_RX:
+			if (ph->phy_cap_pause) {
+				ph->phy_en_pause = B_TRUE;
+				ph->phy_en_asmpause = B_TRUE;
 				ph->phy_en_flowctrl = fc;
-				break;
-			/*
-			 * Note that while we don't have a way to
-			 * advertise that we can RX pause (we just
-			 * won't send pause frames), we advertise full
-			 * support.  The MAC driver will learn of the
-			 * configuration via the saved value of the
-			 * tunable.
-			 */
-			case LINK_FLOWCTRL_BI:
-			case LINK_FLOWCTRL_RX:
-				if (ph->phy_cap_pause) {
-					ph->phy_en_pause = B_TRUE;
-					ph->phy_en_asmpause = B_TRUE;
-					ph->phy_en_flowctrl = fc;
-				} else {
-					rv = EINVAL;
-				}
-				break;
-
-			/*
-			 * Tell the other side that we can assert
-			 * pause, but we cannot resend.
-			 */
-			case LINK_FLOWCTRL_TX:
-				if (ph->phy_cap_asmpause) {
-					ph->phy_en_pause = B_FALSE;
-					ph->phy_en_flowctrl = fc;
-					ph->phy_en_asmpause = B_TRUE;
-				} else {
-					rv = EINVAL;
-				}
-				break;
-			default:
+			} else {
 				rv = EINVAL;
-				break;
 			}
-			if ((rv == 0) && chg) {
-				mh->m_en_flowctrl = fc;
-				mh->m_tstate = MII_STATE_RESET;
-				cv_broadcast(&mh->m_cv);
+			break;
+
+		/*
+		 * Tell the other side that we can assert pause, but
+		 * we cannot resend.
+		 */
+		case LINK_FLOWCTRL_TX:
+			if (ph->phy_cap_asmpause) {
+				ph->phy_en_pause = B_FALSE;
+				ph->phy_en_flowctrl = fc;
+				ph->phy_en_asmpause = B_TRUE;
+			} else {
+				rv = EINVAL;
 			}
+			break;
+		default:
+			rv = EINVAL;
+			break;
+		}
+		if ((rv == 0) && chg) {
+			mh->m_en_flowctrl = fc;
+			mh->m_tstate = MII_STATE_RESET;
+			cv_broadcast(&mh->m_cv);
 		}
 		break;
+	}
 
 	default:
 		rv = ENOTSUP;

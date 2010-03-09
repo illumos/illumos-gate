@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2060,8 +2060,7 @@ hxge_receive_packet(p_hxge_t hxgep, p_rx_rcr_ring_t rcr_p,
 		    pkt_type == RCR_PKT_IS_UDP) ? B_TRUE : B_FALSE);
 
 		if (!no_port_bit && l4_cs_eq_bit && is_tcp_udp && !error_type) {
-			(void) hcksum_assoc(nmp, NULL, NULL, 0, 0, 0, 0,
-			    HCK_FULLCKSUM_OK | HCK_FULLCKSUM, 0);
+			mac_hcksum_set(nmp, 0, 0, 0, 0, HCK_FULLCKSUM_OK);
 
 			HXGE_DEBUG_MSG((hxgep, RX_CTL,
 			    "==> hxge_receive_packet: Full tcp/udp cksum "

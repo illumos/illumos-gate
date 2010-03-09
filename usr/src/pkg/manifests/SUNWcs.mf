@@ -2649,10 +2649,12 @@ link path=usr/sbin/cryptoadm target=../../sbin/cryptoadm
 link path=usr/sbin/dcopy target=./clri
 link path=usr/sbin/devnm target=./df
 link path=usr/sbin/dladm target=../../sbin/dladm
+link path=usr/sbin/dlstat target=../../sbin/dlstat
 link path=usr/sbin/edquota target=../lib/fs/ufs/edquota
 link path=usr/sbin/fdisk target=../../sbin/fdisk
 link path=usr/sbin/fiocompress target=../../sbin/fiocompress
 link path=usr/sbin/flowadm target=../../sbin/flowadm
+link path=usr/sbin/flowstat target=../../sbin/flowstat
 link path=usr/sbin/fsdb target=./clri
 link path=usr/sbin/fsirand target=../lib/fs/ufs/fsirand
 link path=usr/sbin/fssnap target=./clri

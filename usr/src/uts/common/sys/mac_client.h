@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,18 @@ typedef enum {
 	MAC_DIAG_MACNO_HWRINGS
 } mac_diag_t;
 
+/*
+ * These are used when MAC clients what to specify tx and rx rings
+ * properties. MAC_RXRINGS_NONE/MAC_TXRINGS_NONE mean that we should
+ * not reserve any rings while MAC_RXRINGS_DONTCARE/MAC_TXRINGS_DONTCARE
+ * mean that the system can decide if it wants to reserve rings or
+ * not.
+ */
+#define	MAC_RXRINGS_NONE	0
+#define	MAC_TXRINGS_NONE	MAC_RXRINGS_NONE
+#define	MAC_RXRINGS_DONTCARE	-1
+#define	MAC_TXRINGS_DONTCARE	MAC_RXRINGS_DONTCARE
+
 typedef enum {
 	MAC_CLIENT_PROMISC_ALL,
 	MAC_CLIENT_PROMISC_FILTERED,
@@ -87,11 +99,10 @@ typedef enum {
 #define	MAC_OPEN_FLAGS_IS_VNIC			0x0001
 #define	MAC_OPEN_FLAGS_EXCLUSIVE		0x0002
 #define	MAC_OPEN_FLAGS_IS_AGGR_PORT		0x0004
-#define	MAC_OPEN_FLAGS_NO_HWRINGS		0x0008
-#define	MAC_OPEN_FLAGS_SHARES_DESIRED		0x0010
-#define	MAC_OPEN_FLAGS_USE_DATALINK_NAME	0x0020
-#define	MAC_OPEN_FLAGS_REQ_HWRINGS		0x0040
-#define	MAC_OPEN_FLAGS_MULTI_PRIMARY		0x0080
+#define	MAC_OPEN_FLAGS_SHARES_DESIRED		0x0008
+#define	MAC_OPEN_FLAGS_USE_DATALINK_NAME	0x0010
+#define	MAC_OPEN_FLAGS_MULTI_PRIMARY		0x0020
+#define	MAC_OPEN_FLAGS_NO_UNICAST_ADDR		0x0040
 
 /* flags passed to mac_client_close */
 #define	MAC_CLOSE_FLAGS_IS_VNIC		0x0001
@@ -161,11 +172,11 @@ extern uint_t mac_addr_factory_num(mac_handle_t);
 extern mac_tx_notify_handle_t mac_client_tx_notify(mac_client_handle_t,
     mac_tx_notify_t, void *);
 
-extern int mac_set_resources(mac_handle_t, mac_resource_props_t *);
-extern void mac_get_resources(mac_handle_t, mac_resource_props_t *);
 extern int mac_client_set_resources(mac_client_handle_t,
     mac_resource_props_t *);
 extern void mac_client_get_resources(mac_client_handle_t,
+    mac_resource_props_t *);
+extern void mac_client_get_eff_resources(mac_client_handle_t,
     mac_resource_props_t *);
 
 /* bridging-related interfaces */
@@ -180,15 +191,7 @@ extern void mac_share_unbind(mac_client_handle_t);
 
 extern int mac_set_mtu(mac_handle_t, uint_t, uint_t *);
 
-extern uint_t mac_hwgrp_num(mac_handle_t);
-extern void mac_get_hwgrp_info(mac_handle_t, int, uint_t *, uint_t *,
-    uint_t *, uint_t *, char *);
-
-extern uint32_t mac_no_notification(mac_handle_t);
-extern int mac_set_prop(mac_handle_t, mac_prop_t *, void *, uint_t);
-extern int mac_get_prop(mac_handle_t, mac_prop_t *, void *, uint_t, uint_t *);
-
-extern boolean_t mac_is_vnic(mac_handle_t);
+extern void mac_client_set_rings(mac_client_handle_t, int, int);
 
 #endif	/* _KERNEL */
 

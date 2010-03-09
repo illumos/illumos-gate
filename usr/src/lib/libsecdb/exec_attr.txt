@@ -171,8 +171,10 @@ Network Management:solaris:cmd:::/sbin/routeadm:euid=0;\
 	privs=proc_chroot,proc_owner,sys_ip_config
 Network Management:solaris:cmd:::/sbin/dladm:euid=dladm;egid=netadm;\
 	privs=sys_dl_config,net_rawaccess,proc_audit
-Network Management:solaris:cmd:::/sbin/flowadm:euid=dladm;egid=netadm;\
+Network Management:solaris:cmd:::/sbin/dlstat:euid=dladm;egid=sys;
+Network Management:solaris:cmd:::/sbin/flowadm:euid=dladm;egid=sys;\
 	privs=sys_dl_config,net_rawaccess,proc_audit
+Network Management:solaris:cmd:::/sbin/flowstat:euid=dladm;egid=sys;
 Network Management:suser:cmd:::/usr/bin/netstat:uid=0
 Network Management:suser:cmd:::/usr/bin/rup:euid=0
 Network Management:suser:cmd:::/usr/bin/ruptime:euid=0
@@ -189,6 +191,7 @@ Network Management:suser:cmd:::/usr/sbin/spray:euid=0
 Network Observability:solaris:cmd:::/usr/sbin/snoop:privs=net_observability
 Network Link Security:solaris:cmd:::/sbin/dladm:euid=dladm;egid=sys;\
 	privs=sys_dl_config,net_rawaccess,proc_audit
+Network Link Security:solaris:cmd:::/sbin/dlstat:euid=dladm;egid=sys;
 Network IPsec Management:solaris:cmd:::/usr/lib/inet/certdb:euid=0;privs=none
 Network IPsec Management:solaris:cmd:::/usr/lib/inet/certlocal:euid=0;privs=none
 Network IPsec Management:solaris:cmd:::/usr/lib/inet/certrldb:euid=0;privs=none

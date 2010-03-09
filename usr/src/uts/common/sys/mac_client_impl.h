@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/mac_provider.h>
 #include <sys/mac.h>
 #include <sys/mac_impl.h>
+#include <sys/mac_stat.h>
 #include <net/if.h>
 #include <sys/mac_flow_impl.h>
 
@@ -153,16 +154,7 @@ struct mac_client_impl_s {			/* Protected by */
 	uintptr_t		mci_tx_notify_id;
 
 	/* per MAC client stats */			/* None */
-	uint64_t		mci_stat_multircv;
-	uint64_t		mci_stat_brdcstrcv;
-	uint64_t		mci_stat_multixmt;
-	uint64_t		mci_stat_brdcstxmt;
-	uint64_t		mci_stat_obytes;
-	uint64_t		mci_stat_opackets;
-	uint64_t		mci_stat_oerrors;
-	uint64_t		mci_stat_ibytes;
-	uint64_t		mci_stat_ipackets;
-	uint64_t		mci_stat_ierrors;
+	mac_misc_stats_t	mci_misc_stat;
 
 	flow_tab_t		*mci_subflow_tab;	/* Rx quiescence */
 
@@ -180,6 +172,20 @@ struct mac_client_impl_s {			/* Protected by */
 
 	/* for multicast support */
 	struct mac_mcast_addrs_s *mci_mcast_addrs;	/* mi_rw_lock */
+
+	/*
+	 * Mac protection related fields
+	 */
+	kmutex_t		mci_protect_lock;
+	uint32_t		mci_protect_flags;	/* SL */
+	in6_addr_t		mci_v6_local_addr;	/* SL */
+	avl_tree_t		mci_v4_pending_txn;	/* mci_protect_lock */
+	avl_tree_t		mci_v4_completed_txn;	/* mci_protect_lock */
+	avl_tree_t		mci_v4_dyn_ip;		/* mci_protect_lock */
+	avl_tree_t		mci_v6_pending_txn;	/* mci_protect_lock */
+	avl_tree_t		mci_v6_cid;		/* mci_protect_lock */
+	avl_tree_t		mci_v6_dyn_ip;		/* mci_protect_lock */
+	timeout_id_t		mci_txn_cleanup_tid;	/* mci_protect_lock */
 
 	/*
 	 * Protected by mci_tx_pcpu[0].pcpu_tx_lock
@@ -287,12 +293,15 @@ extern	int	mac_tx_percpu_cnt;
 #define	MCIS_CLIENT_POLL_CAPABLE	0x0020
 #define	MCIS_DESC_LOGGED		0x0040
 #define	MCIS_SHARE_BOUND		0x0080
-#define	MCIS_NO_HWRINGS			0x0100
-#define	MCIS_DISABLE_TX_VID_CHECK	0x0200
-#define	MCIS_USE_DATALINK_NAME		0x0400
-#define	MCIS_UNICAST_HW			0x0800
-#define	MCIS_REQ_HWRINGS		0x1000
-#define	MCIS_RX_BYPASS_DISABLE		0x2000
+#define	MCIS_DISABLE_TX_VID_CHECK	0x0100
+#define	MCIS_USE_DATALINK_NAME		0x0200
+#define	MCIS_UNICAST_HW			0x0400
+#define	MCIS_IS_AGGR			0x0800
+#define	MCIS_RX_BYPASS_DISABLE		0x1000
+#define	MCIS_NO_UNICAST_ADDR		0x2000
+
+/* Mac protection flags */
+#define	MPT_FLAG_V6_LOCAL_ADDR_SET	0x0001
 
 /* in mac_client.c */
 extern void mac_promisc_client_dispatch(mac_client_impl_t *, mblk_t *);
@@ -301,7 +310,7 @@ extern void mac_client_fini(void);
 extern void mac_promisc_dispatch(mac_impl_t *, mblk_t *,
     mac_client_impl_t *);
 
-extern int mac_validate_props(mac_resource_props_t *);
+extern int mac_validate_props(mac_impl_t *, mac_resource_props_t *);
 
 extern mac_client_impl_t *mac_vnic_lower(mac_impl_t *);
 extern mac_client_impl_t *mac_primary_client_handle(mac_impl_t *);
@@ -315,6 +324,10 @@ extern void mac_update_resources(mac_resource_props_t *,
 boolean_t mac_client_check_flow_vid(mac_client_impl_t *, uint16_t);
 
 extern boolean_t mac_is_primary_client(mac_client_impl_t *);
+
+extern int mac_client_set_rings_prop(mac_client_impl_t *,
+    mac_resource_props_t *, mac_resource_props_t *);
+extern void mac_set_prim_vlan_rings(mac_impl_t *, mac_resource_props_t *);
 
 #ifdef	__cplusplus
 }

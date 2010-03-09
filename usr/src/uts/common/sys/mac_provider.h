@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,6 @@
 #include <sys/sunddi.h>
 #include <sys/stream.h>
 #include <sys/mkdev.h>
-#include <sys/mac_flow.h>
 #include <sys/mac.h>
 
 /*
@@ -44,18 +43,16 @@ extern "C" {
 #endif
 
 /*
- * MAC version identifier.  This is used by mac_alloc() mac_register() to
+ * MAC version identifiers. Drivers compiled against the stable V1 version
+ * of the API should register with MAC_VERSION_V1. ON drivers should use
+ * MAC_VERSION. This is used by mac_alloc() mac_register() to
  * verify that incompatible drivers don't register.
  */
-#define	MAC_VERSION	0x2
+#define	MAC_VERSION_V1	0x1
+#define	MAC_VERSION	MAC_VERSION_V1
 
 /*
- * Opaque handle types
- */
-typedef struct __mac_rule_handle	*mac_rule_handle_t;
-
-/*
- * Statistics
+ * Possible values for ETHER_STAT_XCVR_INUSE statistic.
  */
 
 #define	XCVR_UNDEFINED		0
@@ -82,28 +79,35 @@ typedef struct __mac_rule_handle	*mac_rule_handle_t;
  */
 typedef enum {
 	/*
-	 * Capabilities reserved for internal use only
+	 * Public Capabilities (MAC_VERSION_V1)
 	 */
-	MAC_CAPAB_VNIC		= 0x0001, /* data is mac_capab_vnic_t */
-	MAC_CAPAB_ANCHOR_VNIC	= 0x0002, /* boolean only, no data */
-	MAC_CAPAB_AGGR		= 0x0004, /* data is mac_capab_aggr_t */
-	MAC_CAPAB_NO_NATIVEVLAN	= 0x0008, /* boolean only, no data */
-	MAC_CAPAB_NO_ZCOPY	= 0x0010, /* boolean only, no data */
-	MAC_CAPAB_LEGACY	= 0x0020, /* data is mac_capab_legacy_t */
-	MAC_CAPAB_VRRP		= 0x0040, /* data is mac_capab_vrrp_t */
+	MAC_CAPAB_HCKSUM	= 0x00000001, /* data is a uint32_t */
+	MAC_CAPAB_LSO		= 0x00000008, /* data is mac_capab_lso_t */
 
 	/*
-	 * Public Capabilities
+	 * Reserved capabilities, do not use
 	 */
-	MAC_CAPAB_HCKSUM	= 0x0100, /* data is a uint32_t */
-	MAC_CAPAB_LSO		= 0x0200, /* data is mac_capab_lso_t */
-	MAC_CAPAB_RINGS		= 0x0400, /* data is mac_capab_rings_t */
-	MAC_CAPAB_MULTIFACTADDR = 0x0800, /* mac_data_multifactaddr_t */
-	MAC_CAPAB_SHARES	= 0x1000 /* data is mac_capab_share_t */
+	MAC_CAPAB_RESERVED1	= 0x00000002,
+	MAC_CAPAB_RESERVED2	= 0x00000004,
 
-	/* add new capabilities here */
+	/*
+	 * Private driver capabilities
+	 */
+	MAC_CAPAB_RINGS		= 0x00000010, /* data is mac_capab_rings_t */
+	MAC_CAPAB_SHARES	= 0x00000020, /* data is mac_capab_share_t */
+	MAC_CAPAB_MULTIFACTADDR = 0x00000040, /* mac_data_multifactaddr_t */
+
+	/*
+	 * Private driver capabilities for use by the GLDv3 framework only
+	 */
+	MAC_CAPAB_VNIC		= 0x00010000, /* data is mac_capab_vnic_t */
+	MAC_CAPAB_ANCHOR_VNIC	= 0x00020000, /* boolean only, no data */
+	MAC_CAPAB_AGGR		= 0x00040000, /* data is mac_capab_aggr_t */
+	MAC_CAPAB_NO_NATIVEVLAN	= 0x00080000, /* boolean only, no data */
+	MAC_CAPAB_NO_ZCOPY	= 0x00100000, /* boolean only, no data */
+	MAC_CAPAB_LEGACY	= 0x00200000, /* data is mac_capab_legacy_t */
+	MAC_CAPAB_VRRP		= 0x00400000  /* data is mac_capab_vrrp_t */
 } mac_capab_t;
-
 
 /*
  * LSO capability
@@ -164,6 +168,8 @@ typedef struct mac_capab_legacy_s {
 	void		(*ml_fastpath_enable)(void *);
 } mac_capab_legacy_t;
 
+typedef struct __mac_prop_info_handle *mac_prop_info_handle_t;
+
 /*
  * MAC driver entry point types.
  */
@@ -182,12 +188,15 @@ typedef void		(*mac_close_t)(void *);
 typedef	int		(*mac_set_prop_t)(void *, const char *, mac_prop_id_t,
 			    uint_t, const void *);
 typedef	int		(*mac_get_prop_t)(void *, const char *, mac_prop_id_t,
-			    uint_t, uint_t, void *, uint_t *);
+			    uint_t, void *);
+typedef void		(*mac_prop_info_t)(void *, const char *, mac_prop_id_t,
+			    mac_prop_info_handle_t);
 
 /*
- * Drivers must set all of these callbacks except for mc_resources,
- * mc_ioctl, and mc_getcapab, which are optional.  If any of these optional
- * callbacks are set, their appropriate flags must be set in mc_callbacks.
+ * Driver callbacks. The following capabilities are optional, and if
+ * implemented by the driver, must have a corresponding MC_ flag set
+ * in the mc_callbacks field.
+ *
  * Any future additions to this list must also be accompanied by an
  * associated mc_callbacks flag so that the framework can grow without
  * affecting the binary compatibility of the interface.
@@ -201,18 +210,31 @@ typedef struct mac_callbacks_s {
 	mac_multicst_t	mc_multicst;	/* Enable or disable a multicast addr */
 	mac_unicst_t	mc_unicst;	/* Set the unicast MAC address */
 	mac_tx_t	mc_tx;		/* Transmit a packet */
+	void		*mc_reserved;	/* Reserved, do not use */
 	mac_ioctl_t	mc_ioctl;	/* Process an unknown ioctl */
 	mac_getcapab_t	mc_getcapab;	/* Get capability information */
 	mac_open_t	mc_open;	/* Open the device */
 	mac_close_t	mc_close;	/* Close the device */
 	mac_set_prop_t	mc_setprop;
 	mac_get_prop_t	mc_getprop;
+	mac_prop_info_t	mc_propinfo;
 } mac_callbacks_t;
 
-typedef struct mac_priv_prop_s {
-	char	mpp_name[MAXLINKPROPNAME];
-	uint_t	mpp_flags;
-} mac_priv_prop_t;
+/*
+ * Flags for mc_callbacks.  Requiring drivers to set the flags associated
+ * with optional callbacks initialized in the structure allows the mac
+ * module to add optional callbacks in the future without requiring drivers
+ * to recompile.
+ */
+#define	MC_RESERVED	0x0001
+#define	MC_IOCTL	0x0002
+#define	MC_GETCAPAB	0x0004
+#define	MC_OPEN		0x0008
+#define	MC_CLOSE	0x0010
+#define	MC_SETPROP	0x0020
+#define	MC_GETPROP	0x0040
+#define	MC_PROPINFO	0x0080
+#define	MC_PROPERTIES	(MC_SETPROP | MC_GETPROP | MC_PROPINFO)
 
 /*
  * Virtualization Capabilities
@@ -245,23 +267,15 @@ typedef	void	(*mac_rx_func_t)(void *, mac_resource_handle_t, mblk_t *,
  *
  * MAC_VIRT_HIO:	Hybrid I/O capable MAC. Require the support
  *			of the MAC_CAPAB_SHARES capability.
- *
- * MAC_VIRT_SERIALIZE:	Temporary flag *ONLY* for nxge. Mac layer
- *			uses this to enable mac Tx serializer on
- *			outbound traffic and to always enqueue
- * 			incoming traffic on Rx soft rings in mac.
  */
 #define	MAC_VIRT_NONE		0x0
 #define	MAC_VIRT_LEVEL1		0x1
 #define	MAC_VIRT_HIO		0x2
-#define	MAC_VIRT_SERIALIZE	0x4
 
 typedef enum {
 	MAC_RING_TYPE_RX = 1,	/* Receive ring */
 	MAC_RING_TYPE_TX	/* Transmit ring */
 } mac_ring_type_t;
-
-#define	MAX_RINGS_PER_GROUP	128
 
 /*
  * Grouping type of a ring group
@@ -313,6 +327,8 @@ typedef	void	(*mac_ring_stop_t)(mac_ring_driver_t);
 typedef	mblk_t	*(*mac_ring_send_t)(void *, mblk_t *);
 typedef	mblk_t	*(*mac_ring_poll_t)(void *, int);
 
+typedef int	(*mac_ring_stat_t)(mac_ring_driver_t, uint_t, uint64_t *);
+
 typedef struct mac_ring_info_s {
 	mac_ring_driver_t	mri_driver;
 	mac_ring_start_t	mri_start;
@@ -322,10 +338,26 @@ typedef struct mac_ring_info_s {
 		mac_ring_send_t	send;
 		mac_ring_poll_t	poll;
 	} mrfunion;
+	mac_ring_stat_t		mri_stat;
+	/*
+	 * mri_flags will have some bits set to indicate some special
+	 * property/feature of a ring like serialization needed for a
+	 * Tx ring or packets should always need enqueuing on Rx side,
+	 * etc.
+	 */
+	uint_t			mri_flags;
 } mac_ring_info_s;
 
 #define	mri_tx			mrfunion.send
 #define	mri_poll		mrfunion.poll
+
+/*
+ * #defines for mri_flags. The flags are temporary flags that are provided
+ * only to workaround issues in specific drivers, and they will be
+ * removed in the future.
+ */
+#define	MAC_RING_TX_SERIALIZE		0x1
+#define	MAC_RING_RX_ENQUEUE		0x2
 
 typedef	int	(*mac_group_start_t)(mac_group_driver_t);
 typedef	void	(*mac_group_stop_t)(mac_group_driver_t);
@@ -415,24 +447,10 @@ typedef struct mac_register_s {
 	uint_t			m_max_sdu;
 	void			*m_pdata;
 	size_t			m_pdata_size;
+	char			**m_priv_props;
 	uint32_t		m_margin;
-	mac_priv_prop_t		*m_priv_props;
-	size_t			m_priv_prop_count;
 	uint32_t		m_v12n;		/* Virtualization level */
 } mac_register_t;
-
-/*
- * Flags for mc_callbacks.  Requiring drivers to set the flags associated
- * with optional callbacks initialized in the structure allows the mac
- * module to add optional callbacks in the future without requiring drivers
- * to recompile.
- */
-#define	MC_IOCTL	0x001
-#define	MC_GETCAPAB	0x002
-#define	MC_OPEN		0x004
-#define	MC_CLOSE	0x008
-#define	MC_SETPROP	0x010
-#define	MC_GETPROP	0x020
 
 /*
  * Driver interface functions.
@@ -476,6 +494,9 @@ extern void			mac_init_ops(struct dev_ops *, const char *);
 extern void			mac_fini_ops(struct dev_ops *);
 extern int			mac_devt_to_instance(dev_t);
 extern minor_t			mac_private_minor(void);
+extern void			mac_ring_intr_set(mac_ring_handle_t,
+				    ddi_intr_handle_t);
+
 
 extern mactype_register_t	*mactype_alloc(uint_t);
 extern void			mactype_free(mactype_register_t *);
@@ -488,6 +509,31 @@ extern boolean_t		mac_unicst_verify(mac_handle_t,
 extern int			mac_group_add_ring(mac_group_handle_t, int);
 extern void			mac_group_rem_ring(mac_group_handle_t,
 				    mac_ring_handle_t);
+extern mac_ring_handle_t	mac_find_ring(mac_group_handle_t, int);
+
+extern void			mac_prop_info_set_default_uint8(
+				    mac_prop_info_handle_t, uint8_t);
+extern void			mac_prop_info_set_default_str(
+				    mac_prop_info_handle_t, const char *);
+extern void			mac_prop_info_set_default_uint64(
+				    mac_prop_info_handle_t, uint64_t);
+extern void			mac_prop_info_set_default_uint32(
+				    mac_prop_info_handle_t, uint32_t);
+extern void			mac_prop_info_set_default_link_flowctrl(
+				    mac_prop_info_handle_t, link_flowctrl_t);
+extern void			mac_prop_info_set_range_uint32(
+				    mac_prop_info_handle_t,
+				    uint32_t, uint32_t);
+extern void			mac_prop_info_set_perm(mac_prop_info_handle_t,
+				    uint8_t);
+
+extern void			mac_hcksum_get(mblk_t *, uint32_t *,
+				    uint32_t *, uint32_t *, uint32_t *,
+				    uint32_t *);
+extern void			mac_hcksum_set(mblk_t *, uint32_t, uint32_t,
+				    uint32_t, uint32_t, uint32_t);
+
+extern void			mac_lso_get(mblk_t *, uint32_t *, uint32_t *);
 
 #endif	/* _KERNEL */
 

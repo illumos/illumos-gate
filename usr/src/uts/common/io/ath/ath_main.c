@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,10 +221,12 @@ static void	ath_m_ioctl(void *, queue_t *, mblk_t *);
 static int	ath_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int	ath_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+    uint_t, void *);
+static void	ath_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 
 static mac_callbacks_t ath_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	ath_m_stat,
 	ath_m_start,
 	ath_m_stop,
@@ -232,12 +234,14 @@ static mac_callbacks_t ath_m_callbacks = {
 	ath_m_multicst,
 	ath_m_unicst,
 	ath_m_tx,
+	NULL,
 	ath_m_ioctl,
 	NULL,		/* mc_getcapab */
 	NULL,
 	NULL,
 	ath_m_setprop,
-	ath_m_getprop
+	ath_m_getprop,
+	ath_m_propinfo
 };
 
 /*
@@ -1779,18 +1783,27 @@ ath_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 	return (err);
 }
-/* ARGSUSED */
+
 static int
 ath_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	ath_t	*asc = arg;
 	int	err = 0;
 
 	err = ieee80211_getprop(&asc->asc_isc, pr_name, wldp_pr_num,
-	    pr_flags, wldp_length, wldp_buf, perm);
+	    wldp_length, wldp_buf);
 
 	return (err);
+}
+
+static void
+ath_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    mac_prop_info_handle_t mph)
+{
+	ath_t	*asc = arg;
+
+	ieee80211_propinfo(&asc->asc_isc, pr_name, wldp_pr_num, mph);
 }
 
 static void

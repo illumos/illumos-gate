@@ -1052,6 +1052,7 @@ void e1000g_rxfree_func(p_rx_sw_packet_t packet);
 
 int e1000g_m_stat(void *arg, uint_t stat, uint64_t *val);
 int e1000g_init_stats(struct e1000g *Adapter);
+int e1000g_rx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
 void e1000_tbi_adjust_stats(struct e1000g *Adapter,
     uint32_t frame_len, uint8_t *mac_addr);
 

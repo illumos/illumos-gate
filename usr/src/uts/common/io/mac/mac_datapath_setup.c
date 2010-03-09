@@ -19,12 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <sys/types.h>
 #include <sys/callb.h>
+#include <sys/cpupart.h>
+#include <sys/pool.h>
+#include <sys/pool_pset.h>
 #include <sys/sdt.h>
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
@@ -40,6 +43,7 @@
 #include <sys/mac_client_priv.h>
 #include <sys/mac_soft_ring.h>
 #include <sys/mac_flow_impl.h>
+#include <sys/mac_stat.h>
 
 static void mac_srs_soft_rings_signal(mac_soft_ring_set_t *, uint_t);
 static void mac_srs_update_fanout_list(mac_soft_ring_set_t *);
@@ -56,13 +60,9 @@ static void mac_srs_remove_glist(mac_soft_ring_set_t *);
 static void mac_srs_fanout_list_free(mac_soft_ring_set_t *);
 static void mac_soft_ring_remove(mac_soft_ring_set_t *, mac_soft_ring_t *);
 
-static int mac_compute_soft_ring_count(flow_entry_t *, int);
+static int mac_compute_soft_ring_count(flow_entry_t *, int, int);
 static void mac_walk_srs_and_bind(int);
 static void mac_walk_srs_and_unbind(int);
-
-extern mac_group_t *mac_reserve_rx_group(mac_client_impl_t *, uint8_t *,
-    mac_rx_group_reserve_type_t);
-extern void mac_release_rx_group(mac_client_impl_t *, mac_group_t *);
 
 extern boolean_t mac_latency_optimize;
 
@@ -92,14 +92,6 @@ int mac_soft_ring_max_q_cnt = 1024;
 int mac_soft_ring_min_q_cnt = 256;
 int mac_soft_ring_poll_thres = 16;
 
-/*
- * Default value of number of TX rings to be assigned to a MAC client.
- * If less than 'mac_tx_ring_count' worth of Tx rings is available, then
- * as many as is available will be assigned to the newly created MAC client.
- * If no TX rings are available, then MAC client(s) will be assigned the
- * default Tx ring. Default Tx ring can be shared among multiple MAC clients.
- */
-uint32_t mac_tx_ring_count = 32;
 boolean_t mac_tx_serialize = B_FALSE;
 
 /*
@@ -157,9 +149,11 @@ static krwlock_t mac_srs_g_lock;
 boolean_t mac_srs_thread_bind = B_TRUE;
 
 /*
- * CPU to fallback to, used by mac_next_bind_cpu().
+ * Whether Rx/Tx interrupts should be re-targeted. Disabled by default.
+ * dladm command would override this.
  */
-processorid_t srs_bind_cpu = 0;
+boolean_t mac_tx_intr_retarget = B_FALSE;
+boolean_t mac_rx_intr_retarget = B_FALSE;
 
 /*
  * If cpu bindings are specified by user, then Tx SRS and its soft
@@ -170,23 +164,38 @@ processorid_t srs_bind_cpu = 0;
  */
 #define	BIND_TX_SRS_AND_SOFT_RINGS(mac_tx_srs, mrp) {			\
 	processorid_t cpuid;						\
-	int i, j;							\
+	int i;								\
 	mac_soft_ring_t *softring;					\
+	mac_cpus_t *srs_cpu;						\
 									\
-	cpuid = mrp->mrp_cpu[mrp->mrp_ncpus - 1];			\
-	mac_srs_worker_bind(mac_tx_srs, cpuid);			\
-	if (TX_MULTI_RING_MODE(mac_tx_srs)) {				\
-		j =  mrp->mrp_ncpus - 1;				\
-		for (i = 0;						\
-		    i < mac_tx_srs->srs_oth_ring_count; i++, j--) {	\
-			if (j < 0)					\
-				j =  mrp->mrp_ncpus - 1;		\
-			cpuid = mrp->mrp_cpu[j];			\
-			softring = mac_tx_srs->srs_oth_soft_rings[i];	\
-			(void) mac_soft_ring_bind(softring, cpuid);	\
+	srs_cpu = &mac_tx_srs->srs_cpu;					\
+	cpuid = srs_cpu->mc_tx_fanout_cpus[0];				\
+	mac_srs_worker_bind(mac_tx_srs, cpuid);				\
+	if (MAC_TX_SOFT_RINGS(mac_tx_srs)) {				\
+		for (i = 0; i < mac_tx_srs->srs_tx_ring_count; i++) {	\
+			cpuid = srs_cpu->mc_tx_fanout_cpus[i];		\
+			softring = mac_tx_srs->srs_tx_soft_rings[i];	\
+			if (cpuid != -1) {				\
+				(void) mac_soft_ring_bind(softring,	\
+				    cpuid);				\
+			}						\
 		}							\
 	}								\
 }
+
+/*
+ * Re-targeting is allowed only for exclusive group or for primary.
+ */
+#define	RETARGETABLE_CLIENT(group, mcip)				\
+	((((group) != NULL) &&						\
+	    ((group)->mrg_state == MAC_GROUP_STATE_RESERVED)) ||	\
+	    mac_is_primary_client(mcip))
+
+#define	MAC_RING_RETARGETABLE(ring)					\
+	(((ring) != NULL) &&						\
+	    ((ring)->mr_info.mri_intr.mi_ddi_handle != NULL) &&		\
+	    !((ring)->mr_info.mri_intr.mi_ddi_shared))
+
 
 /* INIT and FINI ROUTINES */
 
@@ -218,7 +227,7 @@ mac_soft_ring_finish(void)
 }
 
 static void
-mac_srs_soft_rings_free(mac_soft_ring_set_t *mac_srs, boolean_t release_tx_ring)
+mac_srs_soft_rings_free(mac_soft_ring_set_t *mac_srs)
 {
 	mac_soft_ring_t	*softring, *next, *head;
 
@@ -240,7 +249,7 @@ mac_srs_soft_rings_free(mac_soft_ring_set_t *mac_srs, boolean_t release_tx_ring)
 
 	for (softring = head; softring != NULL; softring = next) {
 		next = softring->s_ring_next;
-		mac_soft_ring_free(softring, release_tx_ring);
+		mac_soft_ring_free(softring);
 	}
 }
 
@@ -518,21 +527,30 @@ mac_srs_poll_state_change(mac_soft_ring_set_t *mac_srs,
 
 /*
  * Return the next CPU to be used to bind a MAC kernel thread.
+ * If a cpupart is specified, the cpu chosen must be from that
+ * cpu partition.
  */
 static processorid_t
-mac_next_bind_cpu(void)
+mac_next_bind_cpu(cpupart_t *cpupart)
 {
-	static processorid_t srs_curr_cpu = -1;
-	cpu_t *cp;
+	static cpu_t		*cp = NULL;
+	cpu_t			*cp_start;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
-	srs_curr_cpu++;
-	cp = cpu_get(srs_curr_cpu);
-	if (cp == NULL || !cpu_is_online(cp))
-		srs_curr_cpu = srs_bind_cpu;
+	if (cp == NULL)
+		cp = cpu_list;
 
-	return (srs_curr_cpu);
+	cp = cp->cpu_next_onln;
+	cp_start = cp;
+
+	do {
+		if ((cpupart == NULL) || (cp->cpu_part == cpupart))
+			return (cp->cpu_id);
+
+	} while ((cp = cp->cpu_next_onln) != cp_start);
+
+	return (NULL);
 }
 
 /* ARGSUSED */
@@ -588,7 +606,7 @@ mac_srs_cpu_setup(cpu_setup_t what, int id, void *arg)
  */
 boolean_t mac_use_bw_heuristic = B_TRUE;
 static int
-mac_compute_soft_ring_count(flow_entry_t *flent, int rx_srs_cnt)
+mac_compute_soft_ring_count(flow_entry_t *flent, int rx_srs_cnt, int maxcpus)
 {
 	uint64_t cpu_speed, bw = 0;
 	int srings = 0;
@@ -675,9 +693,82 @@ mac_compute_soft_ring_count(flow_entry_t *flent, int rx_srs_cnt)
 			srings = 0;
 	}
 	/* Do some more massaging */
-	srings = min(srings, ncpus);
+	srings = min(srings, maxcpus);
 	srings = min(srings, MAX_SR_FANOUT);
 	return (srings);
+}
+
+/*
+ * mac_tx_cpu_init:
+ * set up CPUs for Tx interrupt re-targeting and Tx worker
+ * thread binding
+ */
+static void
+mac_tx_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp,
+    cpupart_t *cpupart)
+{
+	mac_soft_ring_set_t *tx_srs = flent->fe_tx_srs;
+	mac_srs_tx_t *srs_tx = &tx_srs->srs_tx;
+	mac_cpus_t *srs_cpu = &tx_srs->srs_cpu;
+	mac_soft_ring_t *sringp;
+	mac_ring_t *ring;
+	processorid_t worker_cpuid;
+	boolean_t retargetable_client = B_FALSE;
+	int i, j;
+
+	if (RETARGETABLE_CLIENT((mac_group_t *)flent->fe_tx_ring_group,
+	    flent->fe_mcip)) {
+		retargetable_client = B_TRUE;
+	}
+
+	if (MAC_TX_SOFT_RINGS(tx_srs)) {
+		if (mrp != NULL)
+			j = mrp->mrp_ncpus - 1;
+		for (i = 0; i < tx_srs->srs_tx_ring_count; i++) {
+			if (mrp != NULL) {
+				if (j < 0)
+					j = mrp->mrp_ncpus - 1;
+				worker_cpuid = mrp->mrp_cpu[j];
+			} else {
+				/*
+				 * Bind interrupt to the next CPU available
+				 * and leave the worker unbound.
+				 */
+				worker_cpuid = -1;
+			}
+			sringp = tx_srs->srs_tx_soft_rings[i];
+			ring = (mac_ring_t *)sringp->s_ring_tx_arg2;
+			srs_cpu->mc_tx_fanout_cpus[i] = worker_cpuid;
+			if (MAC_RING_RETARGETABLE(ring) &&
+			    retargetable_client) {
+				mutex_enter(&cpu_lock);
+				srs_cpu->mc_tx_intr_cpu[i] =
+				    (mrp != NULL) ? mrp->mrp_cpu[j] :
+				    (mac_tx_intr_retarget ?
+				    mac_next_bind_cpu(cpupart) : -1);
+				mutex_exit(&cpu_lock);
+			} else {
+				srs_cpu->mc_tx_intr_cpu[i] = -1;
+			}
+			if (mrp != NULL)
+				j--;
+		}
+	} else {
+		/* Tx mac_ring_handle_t is stored in st_arg2 */
+		srs_cpu->mc_tx_fanout_cpus[0] =
+		    (mrp != NULL) ? mrp->mrp_cpu[mrp->mrp_ncpus - 1] : -1;
+		ring = (mac_ring_t *)srs_tx->st_arg2;
+		if (MAC_RING_RETARGETABLE(ring) && retargetable_client) {
+			mutex_enter(&cpu_lock);
+			srs_cpu->mc_tx_intr_cpu[0] = (mrp != NULL) ?
+			    mrp->mrp_cpu[mrp->mrp_ncpus - 1] :
+			    (mac_tx_intr_retarget ?
+			    mac_next_bind_cpu(cpupart) : -1);
+			mutex_exit(&cpu_lock);
+		} else {
+			srs_cpu->mc_tx_intr_cpu[0] = -1;
+		}
+	}
 }
 
 /*
@@ -719,6 +810,7 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
 	int rx_srs_cnt, reqd_rx_cpu_cnt;
 	int fanout_cpu_cnt, reqd_tx_cpu_cnt;
 	int reqd_poll_worker_cnt, fanout_cnt_per_srs;
+	mac_resource_props_t *emrp = &flent->fe_effective_props;
 
 	ASSERT(mrp->mrp_fanout_mode == MCM_CPUS);
 	/*
@@ -731,12 +823,11 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
 
 	no_of_cpus = mrp->mrp_ncpus;
 
-	if (mrp->mrp_intr_cpu != -1) {
+	if (mrp->mrp_rx_intr_cpu != -1) {
 		/*
 		 * interrupt has been re-targetted. Poll
 		 * thread needs to be bound to interrupt
-		 * CPU. Presently only fixed interrupts
-		 * are re-targetted, MSI-x aren't.
+		 * CPU.
 		 *
 		 * Find where in the list is the intr
 		 * CPU and swap it with the first one.
@@ -744,11 +835,11 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
 		 * list for poll.
 		 */
 		for (i = 0; i < no_of_cpus; i++) {
-			if (mrp->mrp_cpu[i] == mrp->mrp_intr_cpu)
+			if (mrp->mrp_cpu[i] == mrp->mrp_rx_intr_cpu)
 				break;
 		}
 		mrp->mrp_cpu[i] = mrp->mrp_cpu[0];
-		mrp->mrp_cpu[0] = mrp->mrp_intr_cpu;
+		mrp->mrp_cpu[0] = mrp->mrp_rx_intr_cpu;
 	}
 
 	/*
@@ -768,8 +859,8 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
 
 	/* How many CPUs are needed for Tx side? */
 	tx_srs = flent->fe_tx_srs;
-	reqd_tx_cpu_cnt = TX_MULTI_RING_MODE(tx_srs) ?
-	    tx_srs->srs_oth_ring_count : 1;
+	reqd_tx_cpu_cnt = MAC_TX_SOFT_RINGS(tx_srs) ?
+	    tx_srs->srs_tx_ring_count : 1;
 
 	/* CPUs needed for Rx SRSes poll and worker threads */
 	reqd_poll_worker_cnt = mac_latency_optimize ?
@@ -806,14 +897,14 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
 		srs_cpu->mc_ncpus = no_of_cpus;
 		bcopy(mrp->mrp_cpu,
 		    srs_cpu->mc_cpus, sizeof (srs_cpu->mc_cpus));
-		srs_cpu->mc_fanout_cnt = fanout_cnt_per_srs;
-		srs_cpu->mc_pollid = mrp->mrp_cpu[cpu_cnt++];
-		srs_cpu->mc_intr_cpu = mrp->mrp_intr_cpu;
-		srs_cpu->mc_workerid = srs_cpu->mc_pollid;
-		if (!mac_latency_optimize)
-			srs_cpu->mc_workerid = mrp->mrp_cpu[cpu_cnt++];
+		srs_cpu->mc_rx_fanout_cnt = fanout_cnt_per_srs;
+		srs_cpu->mc_rx_pollid = mrp->mrp_cpu[cpu_cnt++];
+		/* Retarget the interrupt to the same CPU as the poll */
+		srs_cpu->mc_rx_intr_cpu = srs_cpu->mc_rx_pollid;
+		srs_cpu->mc_rx_workerid = (mac_latency_optimize ?
+		    srs_cpu->mc_rx_pollid : mrp->mrp_cpu[cpu_cnt++]);
 		for (i = 0; i < fanout_cnt_per_srs; i++)
-			srs_cpu->mc_fanout_cpus[i] = mrp->mrp_cpu[cpu_cnt++];
+			srs_cpu->mc_rx_fanout_cpus[i] = mrp->mrp_cpu[cpu_cnt++];
 
 		/* Do the assignment for h/w Rx SRSes */
 		if (flent->fe_rx_srs_cnt > 1) {
@@ -831,23 +922,22 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
 				srs_cpu->mc_ncpus = no_of_cpus;
 				bcopy(mrp->mrp_cpu, srs_cpu->mc_cpus,
 				    sizeof (srs_cpu->mc_cpus));
-				srs_cpu->mc_fanout_cnt = fanout_cnt_per_srs;
+				srs_cpu->mc_rx_fanout_cnt = fanout_cnt_per_srs;
 				/* The first CPU in the list is the intr CPU */
-				srs_cpu->mc_pollid = mrp->mrp_cpu[cpu_cnt++];
-				srs_cpu->mc_intr_cpu = mrp->mrp_intr_cpu;
-				srs_cpu->mc_workerid = srs_cpu->mc_pollid;
-				if (!mac_latency_optimize) {
-					srs_cpu->mc_workerid =
-					    mrp->mrp_cpu[cpu_cnt++];
-				}
+				srs_cpu->mc_rx_pollid = mrp->mrp_cpu[cpu_cnt++];
+				srs_cpu->mc_rx_intr_cpu = srs_cpu->mc_rx_pollid;
+				srs_cpu->mc_rx_workerid =
+				    (mac_latency_optimize ?
+				    srs_cpu->mc_rx_pollid :
+				    mrp->mrp_cpu[cpu_cnt++]);
 				for (i = 0; i < fanout_cnt_per_srs; i++) {
-					srs_cpu->mc_fanout_cpus[i] =
+					srs_cpu->mc_rx_fanout_cpus[i] =
 					    mrp->mrp_cpu[cpu_cnt++];
 				}
 				ASSERT(cpu_cnt <= no_of_cpus);
 			}
 		}
-		return;
+		goto tx_cpu_init;
 	}
 
 	/*
@@ -885,13 +975,15 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
 		srs_cpu->mc_ncpus = no_of_cpus;
 		bcopy(mrp->mrp_cpu,
 		    srs_cpu->mc_cpus, sizeof (srs_cpu->mc_cpus));
-		srs_cpu->mc_fanout_cnt = 1;
-		srs_cpu->mc_pollid = mrp->mrp_cpu[cpu_cnt++];
-		srs_cpu->mc_intr_cpu = mrp->mrp_intr_cpu;
-		srs_cpu->mc_workerid = srs_cpu->mc_pollid;
-		if (!mac_latency_optimize && worker_assign)
-			srs_cpu->mc_workerid = mrp->mrp_cpu[cpu_cnt++];
-		srs_cpu->mc_fanout_cpus[0] = mrp->mrp_cpu[cpu_cnt];
+		srs_cpu->mc_rx_fanout_cnt = 1;
+		srs_cpu->mc_rx_pollid = mrp->mrp_cpu[cpu_cnt++];
+		/* Retarget the interrupt to the same CPU as the poll */
+		srs_cpu->mc_rx_intr_cpu = srs_cpu->mc_rx_pollid;
+		srs_cpu->mc_rx_workerid =
+		    ((!mac_latency_optimize && worker_assign) ?
+		    mrp->mrp_cpu[cpu_cnt++] : srs_cpu->mc_rx_pollid);
+
+		srs_cpu->mc_rx_fanout_cpus[0] = mrp->mrp_cpu[cpu_cnt];
 
 		/* Do CPU bindings for SRSes having h/w Rx rings */
 		if (flent->fe_rx_srs_cnt > 1) {
@@ -909,22 +1001,21 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
 				srs_cpu->mc_ncpus = no_of_cpus;
 				bcopy(mrp->mrp_cpu, srs_cpu->mc_cpus,
 				    sizeof (srs_cpu->mc_cpus));
-				srs_cpu->mc_pollid =
+				srs_cpu->mc_rx_pollid =
 				    mrp->mrp_cpu[cpu_cnt];
-				srs_cpu->mc_intr_cpu = mrp->mrp_intr_cpu;
-				srs_cpu->mc_workerid = srs_cpu->mc_pollid;
-				if (!mac_latency_optimize && worker_assign) {
-					srs_cpu->mc_workerid =
-					    mrp->mrp_cpu[++cpu_cnt];
-				}
-				srs_cpu->mc_fanout_cnt = 1;
-				srs_cpu->mc_fanout_cpus[0] =
+				srs_cpu->mc_rx_intr_cpu = srs_cpu->mc_rx_pollid;
+				srs_cpu->mc_rx_workerid =
+				    ((!mac_latency_optimize && worker_assign) ?
+				    mrp->mrp_cpu[++cpu_cnt] :
+				    srs_cpu->mc_rx_pollid);
+				srs_cpu->mc_rx_fanout_cnt = 1;
+				srs_cpu->mc_rx_fanout_cpus[0] =
 				    mrp->mrp_cpu[cpu_cnt];
 				cpu_cnt++;
 				ASSERT(cpu_cnt <= no_of_cpus);
 			}
 		}
-		return;
+		goto tx_cpu_init;
 	}
 
 	/*
@@ -942,14 +1033,28 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
 		srs_cpu->mc_ncpus = no_of_cpus;
 		bcopy(mrp->mrp_cpu,
 		    srs_cpu->mc_cpus, sizeof (srs_cpu->mc_cpus));
-		srs_cpu->mc_fanout_cnt = 1;
-		srs_cpu->mc_pollid = mrp->mrp_cpu[cpu_cnt];
-		srs_cpu->mc_intr_cpu = mrp->mrp_intr_cpu;
-		srs_cpu->mc_workerid = mrp->mrp_cpu[cpu_cnt];
-		srs_cpu->mc_fanout_cpus[0] = mrp->mrp_cpu[cpu_cnt];
+		srs_cpu->mc_rx_fanout_cnt = 1;
+		srs_cpu->mc_rx_pollid = mrp->mrp_cpu[cpu_cnt];
+		/* Retarget the interrupt to the same CPU as the poll */
+		srs_cpu->mc_rx_intr_cpu = srs_cpu->mc_rx_pollid;
+		srs_cpu->mc_rx_workerid = mrp->mrp_cpu[cpu_cnt];
+		srs_cpu->mc_rx_fanout_cpus[0] = mrp->mrp_cpu[cpu_cnt];
 		if (++cpu_cnt >= no_of_cpus)
 			cpu_cnt = 0;
 	}
+
+tx_cpu_init:
+	mac_tx_cpu_init(flent, mrp, NULL);
+
+	/*
+	 * Copy the user specified CPUs to the effective CPUs
+	 */
+	for (i = 0; i < mrp->mrp_ncpus; i++) {
+		emrp->mrp_cpu[i] = mrp->mrp_cpu[i];
+	}
+	emrp->mrp_ncpus = mrp->mrp_ncpus;
+	emrp->mrp_mask = mrp->mrp_mask;
+	bzero(emrp->mrp_pool, MAXPATHLEN);
 }
 
 /*
@@ -960,64 +1065,95 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
  * with a flent.
  */
 static void
-mac_flow_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
+mac_flow_cpu_init(flow_entry_t *flent, cpupart_t *cpupart)
 {
 	mac_soft_ring_set_t *rx_srs;
 	processorid_t cpuid;
-	int j, srs_cnt, soft_ring_cnt = 0;
+	int i, j, k, srs_cnt, nscpus, maxcpus, soft_ring_cnt = 0;
 	mac_cpus_t *srs_cpu;
+	mac_resource_props_t *emrp = &flent->fe_effective_props;
+	uint32_t cpus[MRP_NCPUS];
 
-	if (mrp->mrp_mask & MRP_CPUS_USERSPEC) {
-		mac_flow_user_cpu_init(flent, mrp);
-	} else {
+	/*
+	 * The maximum number of CPUs available can either be
+	 * the number of CPUs in the pool or the number of CPUs
+	 * in the system.
+	 */
+	maxcpus = (cpupart != NULL) ? cpupart->cp_ncpus : ncpus;
+
+	/*
+	 * Compute the number of soft rings needed on top for each Rx
+	 * SRS. "rx_srs_cnt-1" indicates the number of Rx SRS
+	 * associated with h/w Rx rings. Soft ring count needed for
+	 * each h/w Rx SRS is computed and the same is applied to
+	 * software classified Rx SRS. The first Rx SRS in fe_rx_srs[]
+	 * is the software classified Rx SRS.
+	 */
+	soft_ring_cnt = mac_compute_soft_ring_count(flent,
+	    flent->fe_rx_srs_cnt - 1, maxcpus);
+	if (soft_ring_cnt == 0) {
 		/*
-		 * Compute the number of soft rings needed on top for each Rx
-		 * SRS. "rx_srs_cnt-1" indicates the number of Rx SRS
-		 * associated with h/w Rx rings. Soft ring count needed for
-		 * each h/w Rx SRS is computed and the same is applied to
-		 * software classified Rx SRS. The first Rx SRS in fe_rx_srs[]
-		 * is the software classified Rx SRS.
+		 * Even when soft_ring_cnt is 0, we still need
+		 * to create a soft ring for TCP, UDP and
+		 * OTHER. So set it to 1.
 		 */
-		soft_ring_cnt = mac_compute_soft_ring_count(flent,
-		    flent->fe_rx_srs_cnt - 1);
-		if (soft_ring_cnt == 0) {
-			/*
-			 * Even when soft_ring_cnt is 0, we still need
-			 * to create a soft ring for TCP, UDP and
-			 * OTHER. So set it to 1.
-			 */
-			soft_ring_cnt = 1;
+		soft_ring_cnt = 1;
+	}
+	for (srs_cnt = 0; srs_cnt < flent->fe_rx_srs_cnt; srs_cnt++) {
+		rx_srs = flent->fe_rx_srs[srs_cnt];
+		srs_cpu = &rx_srs->srs_cpu;
+		if (rx_srs->srs_fanout_state == SRS_FANOUT_INIT)
+			rx_srs->srs_fanout_state = SRS_FANOUT_REINIT;
+		srs_cpu->mc_ncpus = soft_ring_cnt;
+		srs_cpu->mc_rx_fanout_cnt = soft_ring_cnt;
+		mutex_enter(&cpu_lock);
+		for (j = 0; j < soft_ring_cnt; j++) {
+			cpuid = mac_next_bind_cpu(cpupart);
+			srs_cpu->mc_cpus[j] = cpuid;
+			srs_cpu->mc_rx_fanout_cpus[j] = cpuid;
 		}
-		for (srs_cnt = 0; srs_cnt < flent->fe_rx_srs_cnt; srs_cnt++) {
-			rx_srs = flent->fe_rx_srs[srs_cnt];
-			srs_cpu = &rx_srs->srs_cpu;
-			if (rx_srs->srs_fanout_state == SRS_FANOUT_INIT) {
-				if (soft_ring_cnt == srs_cpu->mc_fanout_cnt)
-					continue;
-				rx_srs->srs_fanout_state = SRS_FANOUT_REINIT;
-			}
-			srs_cpu->mc_ncpus = soft_ring_cnt;
-			srs_cpu->mc_fanout_cnt = soft_ring_cnt;
-			mutex_enter(&cpu_lock);
-			for (j = 0; j < soft_ring_cnt; j++) {
-				cpuid = mac_next_bind_cpu();
-				srs_cpu->mc_cpus[j] = cpuid;
-				srs_cpu->mc_fanout_cpus[j] = cpuid;
-			}
-			cpuid = mac_next_bind_cpu();
-			srs_cpu->mc_pollid = cpuid;
-			/* increment ncpus to account for polling cpu */
+		cpuid = mac_next_bind_cpu(cpupart);
+		srs_cpu->mc_rx_pollid = cpuid;
+		srs_cpu->mc_rx_intr_cpu = (mac_rx_intr_retarget ?
+		    srs_cpu->mc_rx_pollid : -1);
+		/* increment ncpus to account for polling cpu */
+		srs_cpu->mc_ncpus++;
+		srs_cpu->mc_cpus[j++] = cpuid;
+		if (!mac_latency_optimize) {
+			cpuid = mac_next_bind_cpu(cpupart);
 			srs_cpu->mc_ncpus++;
 			srs_cpu->mc_cpus[j++] = cpuid;
-			if (!mac_latency_optimize) {
-				cpuid = mac_next_bind_cpu();
-				srs_cpu->mc_ncpus++;
-				srs_cpu->mc_cpus[j++] = cpuid;
-			}
-			srs_cpu->mc_workerid = cpuid;
-			mutex_exit(&cpu_lock);
+		}
+		srs_cpu->mc_rx_workerid = cpuid;
+		mutex_exit(&cpu_lock);
+	}
+
+	nscpus = 0;
+	for (srs_cnt = 0; srs_cnt < flent->fe_rx_srs_cnt; srs_cnt++) {
+		rx_srs = flent->fe_rx_srs[srs_cnt];
+		srs_cpu = &rx_srs->srs_cpu;
+		for (j = 0; j < srs_cpu->mc_ncpus; j++) {
+			cpus[nscpus++] = srs_cpu->mc_cpus[j];
 		}
 	}
+
+
+	/*
+	 * Copy cpu list to fe_effective_props
+	 * without duplicates.
+	 */
+	k = 0;
+	for (i = 0; i < nscpus; i++) {
+		for (j = 0; j < k; j++) {
+			if (emrp->mrp_cpu[j] == cpus[i])
+				break;
+		}
+		if (j == k)
+			emrp->mrp_cpu[k++] = cpus[i];
+	}
+	emrp->mrp_ncpus = k;
+
+	mac_tx_cpu_init(flent, NULL, cpupart);
 }
 
 /*
@@ -1025,15 +1161,46 @@ mac_flow_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
  * (setup SRS and set/update FANOUT, B/W and PRIORITY)
  */
 
+/*
+ * mac_srs_fanout_list_alloc:
+ *
+ * The underlying device can expose upto MAX_RINGS_PER_GROUP worth of
+ * rings to a client. In such a case, MAX_RINGS_PER_GROUP worth of
+ * array space is needed to store Tx soft rings. Thus we allocate so
+ * much array space for srs_tx_soft_rings.
+ *
+ * And when it is an aggr, again we allocate MAX_RINGS_PER_GROUP worth
+ * of space to st_soft_rings. This array is used for quick access to
+ * soft ring associated with a pseudo Tx ring based on the pseudo
+ * ring's index (mr_index).
+ */
 static void
 mac_srs_fanout_list_alloc(mac_soft_ring_set_t *mac_srs)
 {
-	mac_srs->srs_tcp_soft_rings = (mac_soft_ring_t **)
-	    kmem_zalloc(sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT, KM_SLEEP);
-	mac_srs->srs_udp_soft_rings = (mac_soft_ring_t **)
-	    kmem_zalloc(sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT, KM_SLEEP);
-	mac_srs->srs_oth_soft_rings = (mac_soft_ring_t **)
-	    kmem_zalloc(sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT, KM_SLEEP);
+	mac_client_impl_t *mcip = mac_srs->srs_mcip;
+
+	if (mac_srs->srs_type & SRST_TX) {
+		mac_srs->srs_tx_soft_rings = (mac_soft_ring_t **)
+		    kmem_zalloc(sizeof (mac_soft_ring_t *) *
+		    MAX_RINGS_PER_GROUP, KM_SLEEP);
+		if (mcip->mci_state_flags & MCIS_IS_AGGR) {
+			mac_srs_tx_t *tx = &mac_srs->srs_tx;
+
+			tx->st_soft_rings = (mac_soft_ring_t **)
+			    kmem_zalloc(sizeof (mac_soft_ring_t *) *
+			    MAX_RINGS_PER_GROUP, KM_SLEEP);
+		}
+	} else {
+		mac_srs->srs_tcp_soft_rings = (mac_soft_ring_t **)
+		    kmem_zalloc(sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT,
+		    KM_SLEEP);
+		mac_srs->srs_udp_soft_rings = (mac_soft_ring_t **)
+		    kmem_zalloc(sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT,
+		    KM_SLEEP);
+		mac_srs->srs_oth_soft_rings = (mac_soft_ring_t **)
+		    kmem_zalloc(sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT,
+		    KM_SLEEP);
+	}
 }
 
 static void
@@ -1092,6 +1259,121 @@ mac_srs_poll_bind(mac_soft_ring_set_t *mac_srs, processorid_t cpuid)
 
 	thread_affinity_set(mac_srs->srs_poll_thr, cpuid);
 	DTRACE_PROBE1(poll__CPU, processorid_t, cpuid);
+}
+
+/*
+ * Re-target interrupt to the passed CPU. If re-target is successful,
+ * set mc_rx_intr_cpu to the re-targeted CPU. Otherwise set it to -1.
+ */
+void
+mac_rx_srs_retarget_intr(mac_soft_ring_set_t *mac_srs, processorid_t cpuid)
+{
+	cpu_t *cp;
+	mac_ring_t *ring = mac_srs->srs_ring;
+	mac_intr_t *mintr = &ring->mr_info.mri_intr;
+	flow_entry_t *flent = mac_srs->srs_flent;
+	boolean_t primary = mac_is_primary_client(mac_srs->srs_mcip);
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	/*
+	 * Don't re-target the interrupt for these cases:
+	 * 1) ring is NULL
+	 * 2) the interrupt is shared (mi_ddi_shared)
+	 * 3) ddi_handle is NULL and !primary
+	 * 4) primary, ddi_handle is NULL but fe_rx_srs_cnt > 2
+	 * Case 3 & 4 are because of mac_client_intr_cpu() routine.
+	 * This routine will re-target fixed interrupt for primary
+	 * mac client if the client has only one ring. In that
+	 * case, mc_rx_intr_cpu will already have the correct value.
+	 */
+	if (ring == NULL || mintr->mi_ddi_shared || cpuid == -1 ||
+	    (mintr->mi_ddi_handle == NULL && !primary) || (primary &&
+	    mintr->mi_ddi_handle == NULL && flent->fe_rx_srs_cnt > 2)) {
+		mac_srs->srs_cpu.mc_rx_intr_cpu = -1;
+		return;
+	}
+
+	if (mintr->mi_ddi_handle == NULL)
+		return;
+
+	cp = cpu_get(cpuid);
+	if (cp == NULL || !cpu_is_online(cp))
+		return;
+
+	/* Drop the cpu_lock as ddi_intr_set_affinity() holds it */
+	mutex_exit(&cpu_lock);
+	if (ddi_intr_set_affinity(mintr->mi_ddi_handle, cpuid) == DDI_SUCCESS)
+		mac_srs->srs_cpu.mc_rx_intr_cpu = cpuid;
+	else
+		mac_srs->srs_cpu.mc_rx_intr_cpu = -1;
+	mutex_enter(&cpu_lock);
+}
+
+/*
+ * Re-target Tx interrupts
+ */
+void
+mac_tx_srs_retarget_intr(mac_soft_ring_set_t *mac_srs)
+{
+	cpu_t *cp;
+	mac_ring_t *ring;
+	mac_intr_t *mintr;
+	mac_soft_ring_t *sringp;
+	mac_srs_tx_t *srs_tx;
+	mac_cpus_t *srs_cpu;
+	processorid_t cpuid;
+	int i;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	srs_cpu = &mac_srs->srs_cpu;
+	if (MAC_TX_SOFT_RINGS(mac_srs)) {
+		for (i = 0; i < mac_srs->srs_tx_ring_count; i++) {
+			sringp = mac_srs->srs_tx_soft_rings[i];
+			ring = (mac_ring_t *)sringp->s_ring_tx_arg2;
+			cpuid = srs_cpu->mc_tx_intr_cpu[i];
+			cp = cpu_get(cpuid);
+			if (cp == NULL || !cpu_is_online(cp) ||
+			    !MAC_RING_RETARGETABLE(ring)) {
+				srs_cpu->mc_tx_retargeted_cpu[i] = -1;
+				continue;
+			}
+			mintr = &ring->mr_info.mri_intr;
+			/*
+			 * Drop the cpu_lock as ddi_intr_set_affinity()
+			 * holds it
+			 */
+			mutex_exit(&cpu_lock);
+			if (ddi_intr_set_affinity(mintr->mi_ddi_handle,
+			    cpuid) == DDI_SUCCESS) {
+				srs_cpu->mc_tx_retargeted_cpu[i] = cpuid;
+			} else {
+				srs_cpu->mc_tx_retargeted_cpu[i] = -1;
+			}
+			mutex_enter(&cpu_lock);
+		}
+	} else {
+		cpuid = srs_cpu->mc_tx_intr_cpu[0];
+		cp = cpu_get(cpuid);
+		if (cp == NULL || !cpu_is_online(cp)) {
+			srs_cpu->mc_tx_retargeted_cpu[0] = -1;
+			return;
+		}
+		srs_tx = &mac_srs->srs_tx;
+		ring = (mac_ring_t *)srs_tx->st_arg2;
+		if (MAC_RING_RETARGETABLE(ring)) {
+			mintr = &ring->mr_info.mri_intr;
+			mutex_exit(&cpu_lock);
+			if ((ddi_intr_set_affinity(mintr->mi_ddi_handle,
+			    cpuid) == DDI_SUCCESS)) {
+				srs_cpu->mc_tx_retargeted_cpu[0] = cpuid;
+			} else {
+				srs_cpu->mc_tx_retargeted_cpu[0] = -1;
+			}
+			mutex_enter(&cpu_lock);
+		}
+	}
 }
 
 /*
@@ -1231,17 +1513,16 @@ done:
 static void
 mac_tx_srs_update_bwlimit(mac_soft_ring_set_t *srs, mac_resource_props_t *mrp)
 {
-	uint32_t		tx_mode;
+	uint32_t		tx_mode, ring_info = 0;
 	mac_srs_tx_t		*srs_tx = &srs->srs_tx;
 	mac_client_impl_t	*mcip = srs->srs_mcip;
-	mac_impl_t		*mip = mcip->mci_mip;
 
 	/*
 	 * We need to quiesce/restart the client here because mac_tx() and
 	 * srs->srs_tx->st_func do not hold srs->srs_lock while accessing
 	 * st_mode and related fields, which are modified by the code below.
 	 */
-	mac_tx_client_quiesce(mcip, SRS_QUIESCE);
+	mac_tx_client_quiesce((mac_client_handle_t)mcip);
 
 	mutex_enter(&srs->srs_lock);
 	mutex_enter(&srs->srs_bw->mac_bw_lock);
@@ -1250,14 +1531,18 @@ mac_tx_srs_update_bwlimit(mac_soft_ring_set_t *srs, mac_resource_props_t *mrp)
 	if (mrp->mrp_maxbw == MRP_MAXBW_RESETVAL) {
 		/* Reset bandwidth limit */
 		if (tx_mode == SRS_TX_BW) {
+			if (srs_tx->st_arg2 != NULL)
+				ring_info = mac_hwring_getinfo(srs_tx->st_arg2);
 			if (mac_tx_serialize ||
-			    (mip->mi_v12n_level & MAC_VIRT_SERIALIZE)) {
+			    (ring_info & MAC_RING_TX_SERIALIZE)) {
 				srs_tx->st_mode = SRS_TX_SERIALIZE;
 			} else {
 				srs_tx->st_mode = SRS_TX_DEFAULT;
 			}
 		} else if (tx_mode == SRS_TX_BW_FANOUT) {
 			srs_tx->st_mode = SRS_TX_FANOUT;
+		} else if (tx_mode == SRS_TX_BW_AGGR) {
+			srs_tx->st_mode = SRS_TX_AGGR;
 		}
 		srs->srs_type &= ~SRST_BW_CONTROL;
 	} else {
@@ -1270,13 +1555,15 @@ mac_tx_srs_update_bwlimit(mac_soft_ring_set_t *srs, mac_resource_props_t *mrp)
 		srs->srs_bw->mac_bw_drop_threshold =
 		    srs->srs_bw->mac_bw_limit << 1;
 		srs->srs_type |= SRST_BW_CONTROL;
-		if (tx_mode != SRS_TX_BW &&
-		    tx_mode != SRS_TX_BW_FANOUT) {
+		if (tx_mode != SRS_TX_BW && tx_mode != SRS_TX_BW_FANOUT &&
+		    tx_mode != SRS_TX_BW_AGGR) {
 			if (tx_mode == SRS_TX_SERIALIZE ||
 			    tx_mode == SRS_TX_DEFAULT) {
 				srs_tx->st_mode = SRS_TX_BW;
 			} else if (tx_mode == SRS_TX_FANOUT) {
 				srs_tx->st_mode = SRS_TX_BW_FANOUT;
+			} else if (tx_mode == SRS_TX_AGGR) {
+				srs_tx->st_mode = SRS_TX_BW_AGGR;
 			} else {
 				ASSERT(0);
 			}
@@ -1287,7 +1574,7 @@ done:
 	mutex_exit(&srs->srs_bw->mac_bw_lock);
 	mutex_exit(&srs->srs_lock);
 
-	mac_tx_client_restart(mcip);
+	mac_tx_client_restart((mac_client_handle_t)mcip);
 }
 
 /*
@@ -1392,9 +1679,7 @@ mac_client_update_classifier(mac_client_impl_t *mcip, boolean_t enable)
 static void
 mac_srs_update_fanout_list(mac_soft_ring_set_t *mac_srs)
 {
-	int		tcp_count = 0;
-	int		udp_count = 0;
-	int		oth_count = 0;
+	int tcp_count = 0, udp_count = 0, oth_count = 0, tx_count = 0;
 	mac_soft_ring_t *softring;
 
 	softring = mac_srs->srs_soft_ring_head;
@@ -1403,33 +1688,35 @@ mac_srs_update_fanout_list(mac_soft_ring_set_t *mac_srs)
 		mac_srs->srs_tcp_ring_count = 0;
 		mac_srs->srs_udp_ring_count = 0;
 		mac_srs->srs_oth_ring_count = 0;
+		mac_srs->srs_tx_ring_count = 0;
 		return;
 	}
 
-	softring = mac_srs->srs_soft_ring_head;
-	tcp_count = udp_count = oth_count = 0;
-
 	while (softring != NULL) {
-		if (softring->s_ring_type & ST_RING_TCP)
+		if (softring->s_ring_type & ST_RING_TCP) {
 			mac_srs->srs_tcp_soft_rings[tcp_count++] = softring;
-		else if (softring->s_ring_type & ST_RING_UDP)
+		} else if (softring->s_ring_type & ST_RING_UDP) {
 			mac_srs->srs_udp_soft_rings[udp_count++] = softring;
-		else
+		} else if (softring->s_ring_type & ST_RING_OTH) {
 			mac_srs->srs_oth_soft_rings[oth_count++] = softring;
+		} else {
+			ASSERT(softring->s_ring_type & ST_RING_TX);
+			mac_srs->srs_tx_soft_rings[tx_count++] = softring;
+		}
 		softring = softring->s_ring_next;
 	}
 
 	ASSERT(mac_srs->srs_soft_ring_count ==
-	    (tcp_count + udp_count + oth_count));
-
+	    (tcp_count + udp_count + oth_count + tx_count));
 	mac_srs->srs_tcp_ring_count = tcp_count;
 	mac_srs->srs_udp_ring_count = udp_count;
 	mac_srs->srs_oth_ring_count = oth_count;
+	mac_srs->srs_tx_ring_count = tx_count;
 }
 
 void
-mac_srs_create_proto_softrings(int id, void *flent, uint16_t type,
-    pri_t pri, mac_client_impl_t *mcip, mac_soft_ring_set_t *mac_srs,
+mac_srs_create_proto_softrings(int id, uint16_t type, pri_t pri,
+    mac_client_impl_t *mcip, mac_soft_ring_set_t *mac_srs,
     processorid_t cpuid, mac_direct_rx_t rx_func, void *x_arg1,
     mac_resource_handle_t x_arg2, boolean_t set_bypass)
 {
@@ -1446,7 +1733,7 @@ mac_srs_create_proto_softrings(int id, void *flent, uint16_t type,
 	mrf.mrf_flow_priority = pri;
 
 	softring = mac_soft_ring_create(id, mac_soft_ring_worker_wait,
-	    (void *)flent, (type|ST_RING_TCP), pri, mcip, mac_srs,
+	    (type|ST_RING_TCP), pri, mcip, mac_srs,
 	    cpuid, rx_func, x_arg1, x_arg2);
 	softring->s_ring_rx_arg2 = NULL;
 
@@ -1481,7 +1768,7 @@ mac_srs_create_proto_softrings(int id, void *flent, uint16_t type,
 	 * bypass the DLS layer.
 	 */
 	softring = mac_soft_ring_create(id, mac_soft_ring_worker_wait,
-	    (void *)flent, (type|ST_RING_UDP), pri, mcip, mac_srs,
+	    (type|ST_RING_UDP), pri, mcip, mac_srs,
 	    cpuid, rx_func, x_arg1, x_arg2);
 	softring->s_ring_rx_arg2 = NULL;
 
@@ -1493,7 +1780,7 @@ mac_srs_create_proto_softrings(int id, void *flent, uint16_t type,
 
 	/* Create the Oth softrings which has to go through the DLS */
 	softring = mac_soft_ring_create(id, mac_soft_ring_worker_wait,
-	    (void *)flent, (type|ST_RING_OTH), pri, mcip, mac_srs,
+	    (type|ST_RING_OTH), pri, mcip, mac_srs,
 	    cpuid, rx_func, x_arg1, x_arg2);
 	softring->s_ring_rx_arg2 = NULL;
 }
@@ -1507,19 +1794,16 @@ mac_srs_create_proto_softrings(int id, void *flent, uint16_t type,
  * same CPU as that of the soft ring's.
  */
 static void
-mac_srs_fanout_modify(mac_client_impl_t *mcip, flow_entry_t *flent,
-    mac_resource_props_t *mrp, mac_direct_rx_t rx_func, void *x_arg1,
-    mac_resource_handle_t x_arg2, mac_soft_ring_set_t *mac_rx_srs,
-    mac_soft_ring_set_t *mac_tx_srs)
+mac_srs_fanout_modify(mac_client_impl_t *mcip, mac_direct_rx_t rx_func,
+    void *x_arg1, mac_resource_handle_t x_arg2,
+    mac_soft_ring_set_t *mac_rx_srs, mac_soft_ring_set_t *mac_tx_srs)
 {
 	mac_soft_ring_t *softring;
 	uint32_t soft_ring_flag = 0;
 	processorid_t cpuid = -1;
-	boolean_t user_specified;
 	int i, srings_present, new_fanout_cnt;
 	mac_cpus_t *srs_cpu;
 
-	user_specified = mrp->mrp_mask & MRP_CPUS_USERSPEC;
 	/* fanout state is REINIT. Set it back to INIT */
 	ASSERT(mac_rx_srs->srs_fanout_state == SRS_FANOUT_REINIT);
 	mac_rx_srs->srs_fanout_state = SRS_FANOUT_INIT;
@@ -1528,7 +1812,7 @@ mac_srs_fanout_modify(mac_client_impl_t *mcip, flow_entry_t *flent,
 	srings_present = mac_rx_srs->srs_tcp_ring_count;
 	/* new request */
 	srs_cpu = &mac_rx_srs->srs_cpu;
-	new_fanout_cnt = srs_cpu->mc_fanout_cnt;
+	new_fanout_cnt = srs_cpu->mc_rx_fanout_cnt;
 
 	mutex_enter(&mac_rx_srs->srs_lock);
 	if (mac_rx_srs->srs_type & SRST_BW_CONTROL)
@@ -1547,8 +1831,7 @@ mac_srs_fanout_modify(mac_client_impl_t *mcip, flow_entry_t *flent,
 			 * Create the protocol softrings and set the
 			 * DLS bypass where possible.
 			 */
-			mac_srs_create_proto_softrings(i,
-			    (void *)flent, soft_ring_flag,
+			mac_srs_create_proto_softrings(i, soft_ring_flag,
 			    mac_rx_srs->srs_pri, mcip, mac_rx_srs, cpuid,
 			    rx_func, x_arg1, x_arg2, B_TRUE);
 		}
@@ -1583,7 +1866,7 @@ mac_srs_fanout_modify(mac_client_impl_t *mcip, flow_entry_t *flent,
 	ASSERT(new_fanout_cnt == mac_rx_srs->srs_tcp_ring_count);
 	mutex_enter(&cpu_lock);
 	for (i = 0; i < mac_rx_srs->srs_tcp_ring_count; i++) {
-		cpuid = srs_cpu->mc_fanout_cpus[i];
+		cpuid = srs_cpu->mc_rx_fanout_cpus[i];
 		(void) mac_soft_ring_bind(mac_rx_srs->srs_udp_soft_rings[i],
 		    cpuid);
 		(void) mac_soft_ring_bind(mac_rx_srs->srs_oth_soft_rings[i],
@@ -1597,15 +1880,16 @@ mac_srs_fanout_modify(mac_client_impl_t *mcip, flow_entry_t *flent,
 		}
 	}
 
-	mac_srs_worker_bind(mac_rx_srs, srs_cpu->mc_pollid);
-	mac_srs_poll_bind(mac_rx_srs, srs_cpu->mc_workerid);
-
+	mac_srs_worker_bind(mac_rx_srs, srs_cpu->mc_rx_workerid);
+	mac_srs_poll_bind(mac_rx_srs, srs_cpu->mc_rx_pollid);
+	mac_rx_srs_retarget_intr(mac_rx_srs, srs_cpu->mc_rx_intr_cpu);
 	/*
 	 * Bind Tx srs and soft ring threads too. Let's bind tx
 	 * srs to the last cpu in mrp list.
 	 */
-	if (mac_tx_srs != NULL && user_specified) {
+	if (mac_tx_srs != NULL) {
 		BIND_TX_SRS_AND_SOFT_RINGS(mac_tx_srs, mrp);
+		mac_tx_srs_retarget_intr(mac_tx_srs);
 	}
 	mutex_exit(&cpu_lock);
 }
@@ -1614,16 +1898,15 @@ mac_srs_fanout_modify(mac_client_impl_t *mcip, flow_entry_t *flent,
  * Bind SRS threads and soft rings to CPUs/create fanout list.
  */
 void
-mac_srs_fanout_init(mac_client_impl_t *mcip, flow_entry_t *flent,
-    mac_resource_props_t *mrp, mac_direct_rx_t rx_func, void *x_arg1,
-    mac_resource_handle_t x_arg2, mac_soft_ring_set_t *mac_rx_srs,
-    mac_soft_ring_set_t *mac_tx_srs)
+mac_srs_fanout_init(mac_client_impl_t *mcip, mac_resource_props_t *mrp,
+    mac_direct_rx_t rx_func, void *x_arg1, mac_resource_handle_t x_arg2,
+    mac_soft_ring_set_t *mac_rx_srs, mac_soft_ring_set_t *mac_tx_srs,
+    cpupart_t *cpupart)
 {
 	int		i;
-	processorid_t	cpuid, worker_cpuid, poll_cpuid;
+	processorid_t	cpuid;
 	uint32_t	soft_ring_flag = 0;
 	int soft_ring_cnt;
-	boolean_t user_specified = B_FALSE;
 	mac_cpus_t *srs_cpu = &mac_rx_srs->srs_cpu;
 
 	/*
@@ -1641,31 +1924,27 @@ mac_srs_fanout_init(mac_client_impl_t *mcip, flow_entry_t *flent,
 
 	ASSERT(mac_rx_srs->srs_fanout_state == SRS_FANOUT_UNINIT);
 	mac_rx_srs->srs_fanout_state = SRS_FANOUT_INIT;
-	user_specified = mrp->mrp_mask & MRP_CPUS_USERSPEC;
 	/*
 	 * Ring count can be 0 if no fanout is required and no cpu
 	 * were specified. Leave the SRS worker and poll thread
 	 * unbound
 	 */
 	ASSERT(mrp != NULL);
-	soft_ring_cnt = srs_cpu->mc_fanout_cnt;
+	soft_ring_cnt = srs_cpu->mc_rx_fanout_cnt;
 
 	/* Step 1: bind cpu contains cpu list where threads need to bind */
 	if (soft_ring_cnt > 0) {
 		mutex_enter(&cpu_lock);
 		for (i = 0; i < soft_ring_cnt; i++) {
-			cpuid = srs_cpu->mc_fanout_cpus[i];
+			cpuid = srs_cpu->mc_rx_fanout_cpus[i];
 			/* Create the protocol softrings */
-			mac_srs_create_proto_softrings(i, (void *)flent,
-			    soft_ring_flag, mac_rx_srs->srs_pri,
-			    mcip, mac_rx_srs, cpuid, rx_func,
-			    x_arg1, x_arg2, B_FALSE);
+			mac_srs_create_proto_softrings(i, soft_ring_flag,
+			    mac_rx_srs->srs_pri, mcip, mac_rx_srs, cpuid,
+			    rx_func, x_arg1, x_arg2, B_FALSE);
 		}
-		worker_cpuid = srs_cpu->mc_workerid;
-		poll_cpuid = srs_cpu->mc_pollid;
-		mac_srs_worker_bind(mac_rx_srs, worker_cpuid);
-		mac_srs_poll_bind(mac_rx_srs, poll_cpuid);
-
+		mac_srs_worker_bind(mac_rx_srs, srs_cpu->mc_rx_workerid);
+		mac_srs_poll_bind(mac_rx_srs, srs_cpu->mc_rx_pollid);
+		mac_rx_srs_retarget_intr(mac_rx_srs, srs_cpu->mc_rx_intr_cpu);
 		/*
 		 * Bind Tx srs and soft ring threads too.
 		 * Let's bind tx srs to the last cpu in
@@ -1676,9 +1955,8 @@ mac_srs_fanout_init(mac_client_impl_t *mcip, flow_entry_t *flent,
 			goto alldone;
 		}
 
-		if (user_specified) {
-			BIND_TX_SRS_AND_SOFT_RINGS(mac_tx_srs, mrp);
-		}
+		BIND_TX_SRS_AND_SOFT_RINGS(mac_tx_srs, mrp);
+		mac_tx_srs_retarget_intr(mac_tx_srs);
 		mutex_exit(&cpu_lock);
 	} else {
 		mutex_enter(&cpu_lock);
@@ -1686,8 +1964,8 @@ mac_srs_fanout_init(mac_client_impl_t *mcip, flow_entry_t *flent,
 		 * For a subflow, mrp_workerid and mrp_pollid
 		 * is not set.
 		 */
-		mac_srs_worker_bind(mac_rx_srs, mrp->mrp_workerid);
-		mac_srs_poll_bind(mac_rx_srs, mrp->mrp_pollid);
+		mac_srs_worker_bind(mac_rx_srs, mrp->mrp_rx_workerid);
+		mac_srs_poll_bind(mac_rx_srs, mrp->mrp_rx_pollid);
 		mutex_exit(&cpu_lock);
 		goto no_softrings;
 	}
@@ -1702,12 +1980,11 @@ alldone:
 no_softrings:
 	if (mac_rx_srs->srs_type & SRST_FANOUT_PROTO) {
 		mutex_enter(&cpu_lock);
-		cpuid = mac_next_bind_cpu();
+		cpuid = mac_next_bind_cpu(cpupart);
 		/* Create the protocol softrings */
-		mac_srs_create_proto_softrings(0, (void *)flent,
-		    soft_ring_flag, mac_rx_srs->srs_pri,
-		    mcip, mac_rx_srs, cpuid, rx_func,
-		    x_arg1, x_arg2, B_FALSE);
+		mac_srs_create_proto_softrings(0, soft_ring_flag,
+		    mac_rx_srs->srs_pri, mcip, mac_rx_srs, cpuid,
+		    rx_func, x_arg1, x_arg2, B_FALSE);
 		mutex_exit(&cpu_lock);
 	} else {
 		/*
@@ -1729,7 +2006,7 @@ no_softrings:
 void
 mac_fanout_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
     mac_resource_props_t *mrp, mac_direct_rx_t rx_func, void *x_arg1,
-    mac_resource_handle_t x_arg2)
+    mac_resource_handle_t x_arg2, cpupart_t *cpupart)
 {
 	mac_soft_ring_set_t *mac_rx_srs, *mac_tx_srs;
 	int i, rx_srs_cnt;
@@ -1739,7 +2016,7 @@ mac_fanout_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 	 * This is an aggregation port. Fanout will be setup
 	 * over the aggregation itself.
 	 */
-	if (mcip->mci_state_flags & MCIS_IS_AGGR_PORT)
+	if (mcip->mci_state_flags & MCIS_EXCLUSIVE)
 		return;
 
 	mac_rx_srs = flent->fe_rx_srs[0];
@@ -1754,12 +2031,18 @@ mac_fanout_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 
 	/* No fanout for subflows */
 	if (flent->fe_type & FLOW_USER) {
-		mac_srs_fanout_init(mcip, flent, mrp, rx_func,
-		    x_arg1, x_arg2, mac_rx_srs, mac_tx_srs);
+		mac_srs_fanout_init(mcip, mrp, rx_func,
+		    x_arg1, x_arg2, mac_rx_srs, mac_tx_srs,
+		    cpupart);
 		return;
 	}
 
-	mac_flow_cpu_init(flent, mrp);
+	if (mrp->mrp_mask & MRP_CPUS_USERSPEC)
+		mac_flow_user_cpu_init(flent, mrp);
+	else
+		mac_flow_cpu_init(flent, cpupart);
+
+	mrp->mrp_rx_fanout_cnt = mac_rx_srs->srs_cpu.mc_rx_fanout_cnt;
 
 	/*
 	 * Set up fanout for both SW (0th SRS) and HW classified
@@ -1771,15 +2054,16 @@ mac_fanout_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 			mac_tx_srs = NULL;
 		switch (mac_rx_srs->srs_fanout_state) {
 		case SRS_FANOUT_UNINIT:
-			mac_srs_fanout_init(mcip, flent, mrp, rx_func,
-			    x_arg1, x_arg2, mac_rx_srs, mac_tx_srs);
+			mac_srs_fanout_init(mcip, mrp, rx_func,
+			    x_arg1, x_arg2, mac_rx_srs, mac_tx_srs,
+			    cpupart);
 			break;
 		case SRS_FANOUT_INIT:
 			break;
 		case SRS_FANOUT_REINIT:
 			mac_rx_srs_quiesce(mac_rx_srs, SRS_QUIESCE);
-			mac_srs_fanout_modify(mcip, flent, mrp, rx_func,
-			    x_arg1, x_arg2, mac_rx_srs, mac_tx_srs);
+			mac_srs_fanout_modify(mcip, rx_func, x_arg1,
+			    x_arg2, mac_rx_srs, mac_tx_srs);
 			mac_rx_srs_restart(mac_rx_srs);
 			break;
 		default:
@@ -1791,7 +2075,7 @@ mac_fanout_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 }
 
 /*
- * mac_create_soft_ring_set:
+ * mac_srs_create:
  *
  * Create a mac_soft_ring_set_t (SRS). If soft_ring_fanout_type is
  * SRST_TX, an SRS for Tx side is created. Otherwise an SRS for Rx side
@@ -1867,6 +2151,7 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 	mac_srs->srs_type = (srs_type | SRST_NO_SOFT_RINGS);
 	mac_srs->srs_worker_cpuid = mac_srs->srs_worker_cpuid_save = -1;
 	mac_srs->srs_poll_cpuid = mac_srs->srs_poll_cpuid_save = -1;
+	mac_srs->srs_mcip = mcip;
 	mac_srs_fanout_list_alloc(mac_srs);
 
 	/*
@@ -1881,7 +2166,6 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 	} else {
 		mac_srs->srs_pri = mcip->mci_max_pri;
 	}
-	mac_srs->srs_mcip = mcip;
 	/*
 	 * We need to insert the SRS in the global list before
 	 * binding the SRS and SR threads. Otherwise there is a
@@ -1959,7 +2243,7 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 		    mac_tx_srs_max_q_cnt : mac_tx_srs_hiwat;
 		srs_tx->st_arg1 = x_arg1;
 		srs_tx->st_arg2 = x_arg2;
-		return (mac_srs);
+		goto done;
 	}
 
 	if ((srs_type & SRST_FLOW) != 0 ||
@@ -1973,11 +2257,13 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 	srs_rx->sr_arg2 = x_arg2;
 
 	if (ring != NULL) {
+		uint_t ring_info;
+
 		/* Is the mac_srs created over the RX default group? */
 		if (ring->mr_gh == (mac_group_handle_t)
-		    (&mcip->mci_mip->mi_rx_groups[0]))
+		    MAC_DEFAULT_RX_GROUP(mcip->mci_mip)) {
 			mac_srs->srs_type |= SRST_DEFAULT_GRP;
-
+		}
 		mac_srs->srs_ring = ring;
 		ring->mr_srs = mac_srs;
 		ring->mr_classify_type = MAC_HW_CLASSIFIER;
@@ -1997,9 +2283,12 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 		 * so that we get a chance to switch into a polling
 		 * mode under backlog.
 		 */
-		if (mcip->mci_mip->mi_v12n_level & MAC_VIRT_SERIALIZE)
+		ring_info = mac_hwring_getinfo((mac_ring_handle_t)ring);
+		if (ring_info & MAC_RING_RX_ENQUEUE)
 			mac_srs->srs_state |= SRS_SOFTRING_QUEUE;
 	}
+done:
+	mac_srs_stat_create(mac_srs);
 	return (mac_srs);
 }
 
@@ -2043,7 +2332,7 @@ mac_find_fanout(flow_entry_t *flent, uint32_t link_type)
 /*
  * Change a group from h/w to s/w classification.
  */
-static void
+void
 mac_rx_switch_grp_to_sw(mac_group_t *group)
 {
 	mac_ring_t		*ring;
@@ -2063,11 +2352,11 @@ mac_rx_switch_grp_to_sw(mac_group_t *group)
 
 		if (ring->mr_state != MR_INUSE)
 			(void) mac_start_ring(ring);
+
 		/*
 		 * We need to perform SW classification
 		 * for packets landing in these rings
 		 */
-		ring->mr_state = MR_INUSE;
 		ring->mr_flag = 0;
 		ring->mr_classify_type = MAC_SW_CLASSIFIER;
 	}
@@ -2079,14 +2368,38 @@ mac_rx_switch_grp_to_sw(mac_group_t *group)
  */
 void
 mac_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
-    mac_group_t *group, uint32_t link_type)
+    uint32_t link_type)
+{
+	cpupart_t		*cpupart;
+	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
+	mac_resource_props_t	*emrp = MCIP_EFFECTIVE_PROPS(mcip);
+	boolean_t		use_default = B_FALSE;
+
+	mac_rx_srs_group_setup(mcip, flent, link_type);
+	mac_tx_srs_group_setup(mcip, flent, link_type);
+
+	pool_lock();
+	cpupart = mac_pset_find(mrp, &use_default);
+	mac_fanout_setup(mcip, flent, MCIP_RESOURCE_PROPS(mcip),
+	    mac_rx_deliver, mcip, NULL, cpupart);
+	mac_set_pool_effective(use_default, cpupart, mrp, emrp);
+	pool_unlock();
+}
+
+/*
+ * Set up the RX SRSs. If the S/W SRS is not set, set  it up, if there
+ * is a group associated with this MAC client, set up SRSs for individual
+ * h/w rings.
+ */
+void
+mac_rx_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
+    uint32_t link_type)
 {
 	mac_impl_t		*mip = mcip->mci_mip;
 	mac_soft_ring_set_t	*mac_srs;
-	mac_soft_ring_set_t	*tx_srs = NULL;
 	mac_ring_t 		*ring;
 	uint32_t		fanout_type;
-	boolean_t		created_srs = B_FALSE;
+	mac_group_t		*rx_group = flent->fe_rx_ring_group;
 
 	fanout_type = mac_find_fanout(flent, link_type);
 
@@ -2096,64 +2409,23 @@ mac_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 		/* Setup the Rx SRS */
 		mac_srs = mac_srs_create(mcip, flent, fanout_type | link_type,
 		    mac_rx_deliver, mcip, NULL, NULL);
-
 		mutex_enter(&flent->fe_lock);
 		flent->fe_cb_fn = (flow_fn_t)mac_srs->srs_rx.sr_lower_proc;
 		flent->fe_cb_arg1 = (void *)mip;
 		flent->fe_cb_arg2 = (void *)mac_srs;
 		mutex_exit(&flent->fe_lock);
-
-		/* Setup the Tx SRS as well */
-		ASSERT(flent->fe_tx_srs == NULL);
-		tx_srs = mac_srs_create(mcip, flent, SRST_TX | link_type,
-		    NULL, mcip, NULL, NULL);
-
-		if (mcip->mci_share != NULL) {
-			mac_srs_tx_t	*tx = &tx_srs->srs_tx;
-			ASSERT((mcip->mci_state_flags & MCIS_NO_HWRINGS) == 0);
-			/*
-			 * A share requires a dedicated TX group.
-			 * mac_reserve_tx_group() does the work needed to
-			 * allocate a new group and populate that group
-			 * with rings according to the driver requirements
-			 * and limitations.
-			 */
-			tx->st_group =
-			    mac_reserve_tx_group(mip, mcip->mci_share);
-			ASSERT(tx->st_group != NULL);
-			tx->st_group->mrg_tx_client = mcip;
-		}
-		mac_tx_srs_setup(mcip, flent, link_type);
-		created_srs = B_TRUE;
 	}
 
-	if (group == NULL) {
-		if (created_srs) {
-			mac_fanout_setup(mcip, flent,
-			    MCIP_RESOURCE_PROPS(mcip), mac_rx_deliver,
-			    mcip, NULL);
-		}
+	if (rx_group == NULL)
 		return;
-	}
-
 	/*
 	 * fanout for default SRS is done when default SRS are created
 	 * above. As each ring is added to the group, we setup the
 	 * SRS and fanout to it.
 	 */
-	switch (group->mrg_state) {
+	switch (rx_group->mrg_state) {
 	case MAC_GROUP_STATE_RESERVED:
-		/*
-		 * The group is exclusively ours. Create a SRS
-		 * for each ring in the group and allow the
-		 * individual SRS to dynamically poll their
-		 * Rx ring. Do this only if the  client is not
-		 * a VLAN MAC client since for VLAN we do
-		 * s/w classification for the VID check.
-		 */
-		if (i_mac_flow_vid(mcip->mci_flent) != VLAN_ID_NONE)
-			break;
-		for (ring = group->mrg_rings; ring != NULL;
+		for (ring = rx_group->mrg_rings; ring != NULL;
 		    ring = ring->mr_next) {
 			switch (ring->mr_state) {
 			case MR_INUSE:
@@ -2163,14 +2435,28 @@ mac_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 				if (ring->mr_state != MR_INUSE)
 					(void) mac_start_ring(ring);
 
-				ring->mr_state = MR_INUSE;
-
+				/*
+				 * Since the group is exclusively ours create
+				 * an SRS for this ring to allow the
+				 * individual SRS to dynamically poll the
+				 * ring. Do this only if the  client is not
+				 * a VLAN MAC client, since for VLAN we do
+				 * s/w classification for the VID check, and
+				 * if it has a unicast address.
+				 */
+				if ((mcip->mci_state_flags &
+				    MCIS_NO_UNICAST_ADDR) ||
+				    i_mac_flow_vid(mcip->mci_flent) !=
+				    VLAN_ID_NONE) {
+					break;
+				}
 				mac_srs = mac_srs_create(mcip, flent,
 				    fanout_type | link_type,
 				    mac_rx_deliver, mcip, NULL, ring);
 				break;
 			default:
-				cmn_err(CE_PANIC, "srs_setup: mcip = %p "
+				cmn_err(CE_PANIC,
+				    "srs_setup: mcip = %p "
 				    "trying to add UNKNOWN ring = %p\n",
 				    (void *)mcip, (void *)ring);
 				break;
@@ -2181,43 +2467,102 @@ mac_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 		/*
 		 * Set all rings of this group to software classified.
 		 *
-		 * If the group is current RESERVED, the existing mac client
-		 * (the only client on this group) is using this group
-		 * exclusively.  In that case we need to disable polling on
-		 * the rings of the group (if it was enabled), and free the
-		 * SRS associated with the rings.
+		 * If the group is current RESERVED, the existing mac
+		 * client (the only client on this group) is using
+		 * this group exclusively.  In that case we need to
+		 * disable polling on the rings of the group (if it
+		 * was enabled), and free the SRS associated with the
+		 * rings.
 		 */
-		mac_rx_switch_grp_to_sw(group);
+		mac_rx_switch_grp_to_sw(rx_group);
 		break;
 	default:
 		ASSERT(B_FALSE);
 		break;
 	}
-	mac_fanout_setup(mcip, flent, MCIP_RESOURCE_PROPS(mcip),
-	    mac_rx_deliver, mcip, NULL);
 }
 
+/*
+ * Set up the TX SRS.
+ */
 void
-mac_srs_group_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
+mac_tx_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
     uint32_t link_type)
 {
-	mac_soft_ring_set_t	*mac_srs;
-	mac_soft_ring_set_t	*tx_srs;
-	mac_srs_tx_t		*tx;
-	int			i;
+	int			cnt;
+	int			ringcnt;
+	mac_ring_t		*ring;
+	mac_group_t		*grp;
 
-	for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
+	/*
+	 * If we are opened exclusively (like aggr does for aggr_ports),
+	 * don't set up Tx SRS and Tx soft rings as they won't be used.
+	 * The same thing has to be done for Rx side also. See bug:
+	 * 6880080
+	 */
+	if (mcip->mci_state_flags & MCIS_EXCLUSIVE) {
+		/*
+		 * If we have rings, start them here.
+		 */
+		if (flent->fe_tx_ring_group == NULL)
+			return;
+		grp = (mac_group_t *)flent->fe_tx_ring_group;
+		ringcnt = grp->mrg_cur_count;
+		ring = grp->mrg_rings;
+		for (cnt = 0; cnt < ringcnt; cnt++) {
+			if (ring->mr_state != MR_INUSE) {
+				(void) mac_start_ring(ring);
+			}
+			ring = ring->mr_next;
+		}
+		return;
+	}
+	if (flent->fe_tx_srs == NULL) {
+		(void) mac_srs_create(mcip, flent, SRST_TX | link_type,
+		    NULL, mcip, NULL, NULL);
+	}
+	mac_tx_srs_setup(mcip, flent);
+}
+
+/*
+ * Remove all the RX SRSs. If we want to remove only the SRSs associated
+ * with h/w rings, leave the S/W SRS alone. This is used when we want to
+ * move the MAC client from one group to another, so we need to teardown
+ * on the h/w SRSs.
+ */
+void
+mac_rx_srs_group_teardown(flow_entry_t *flent, boolean_t hwonly)
+{
+	mac_soft_ring_set_t	*mac_srs;
+	int			i;
+	int			count = flent->fe_rx_srs_cnt;
+
+	for (i = 0; i < count; i++) {
+		if (i == 0 && hwonly)
+			continue;
 		mac_srs = flent->fe_rx_srs[i];
 		mac_rx_srs_quiesce(mac_srs, SRS_CONDEMNED);
-		/*
-		 * Deal with all fanout tear down etc.
-		 */
 		mac_srs_free(mac_srs);
 		flent->fe_rx_srs[i] = NULL;
+		flent->fe_rx_srs_cnt--;
 	}
-	flent->fe_rx_srs_cnt = 0;
+	ASSERT(!hwonly || flent->fe_rx_srs_cnt == 1);
+	ASSERT(hwonly || flent->fe_rx_srs_cnt == 0);
+}
 
-	tx_srs = flent->fe_tx_srs;
+/*
+ * Remove the TX SRS.
+ */
+void
+mac_tx_srs_group_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
+    uint32_t link_type)
+{
+	mac_soft_ring_set_t	*tx_srs;
+	mac_srs_tx_t		*tx;
+
+	if ((tx_srs = flent->fe_tx_srs) == NULL)
+		return;
+
 	tx = &tx_srs->srs_tx;
 	switch (link_type) {
 	case SRST_FLOW:
@@ -2228,25 +2573,16 @@ mac_srs_group_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 		mac_tx_srs_quiesce(tx_srs, SRS_CONDEMNED);
 		break;
 	case SRST_LINK:
-		mac_tx_client_quiesce(mcip, SRS_CONDEMNED);
-		/*
-		 * Release the TX resources. First the TX group, if any
-		 * was assigned to the MAC client, which will cause the
-		 * TX rings to be moved back to the pool. Then free the
-		 * rings themselves.
-		 */
-		if (tx->st_group != NULL) {
-			mac_release_tx_group(tx_srs->srs_mcip->mci_mip,
-			    tx->st_group);
-			tx->st_group = NULL;
-		}
-		if (tx->st_ring_count != 0) {
-			kmem_free(tx->st_rings,
-			    sizeof (mac_ring_handle_t) * tx->st_ring_count);
-		}
+		mac_tx_client_condemn((mac_client_handle_t)mcip);
 		if (tx->st_arg2 != NULL) {
 			ASSERT(tx_srs->srs_type & SRST_TX);
-			mac_release_tx_ring(tx->st_arg2);
+			/*
+			 * The ring itself will be stopped when
+			 * we release the group or in the
+			 * mac_datapath_teardown (for the default
+			 * group)
+			 */
+			tx->st_arg2 = NULL;
 		}
 		break;
 	default:
@@ -2258,7 +2594,9 @@ mac_srs_group_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 }
 
 /*
- * This is the group state machine. The state of an Rx group is given by
+ * This is the group state machine.
+ *
+ * The state of an Rx group is given by
  * the following table. The default group and its rings are started in
  * mac_start itself and the default group stays in SHARED state until
  * mac_stop at which time the group and rings are stopped and and it
@@ -2276,15 +2614,27 @@ mac_srs_group_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
  *
  * Non-default		0		N.A.			REGISTERED
  * Non-default		1		N.A.			RESERVED
- * Non-default		> 1		N.A.			SHARED
  *
  * Default		0		N.A.			SHARED
  * Default		1		1			RESERVED
  * Default		1		> 1			SHARED
  * Default		> 1		N.A.			SHARED
+ *
+ * For a TX group, the following is the state table.
+ *
+ * Group type		# of clients	Group State
+ *			in the group
+ *
+ * Non-default		0		REGISTERED
+ * Non-default		1		RESERVED
+ *
+ * Default		0		REGISTERED
+ * Default		1		RESERVED
+ * Default		> 1		SHARED
  */
 mac_group_state_t
-mac_rx_group_next_state(mac_group_t *grp, mac_client_impl_t **group_only_mcip)
+mac_group_next_state(mac_group_t *grp, mac_client_impl_t **group_only_mcip,
+    mac_group_t *defgrp, boolean_t rx_group)
 {
 	mac_impl_t		*mip = (mac_impl_t *)grp->mrg_mh;
 
@@ -2292,11 +2642,11 @@ mac_rx_group_next_state(mac_group_t *grp, mac_client_impl_t **group_only_mcip)
 
 	/* Non-default group */
 
-	if (grp != mip->mi_rx_groups) {
-		if (MAC_RX_GROUP_NO_CLIENT(grp))
+	if (grp != defgrp) {
+		if (MAC_GROUP_NO_CLIENT(grp))
 			return (MAC_GROUP_STATE_REGISTERED);
 
-		*group_only_mcip = MAC_RX_GROUP_ONLY_CLIENT(grp);
+		*group_only_mcip = MAC_GROUP_ONLY_CLIENT(grp);
 		if (*group_only_mcip != NULL)
 			return (MAC_GROUP_STATE_RESERVED);
 
@@ -2305,10 +2655,19 @@ mac_rx_group_next_state(mac_group_t *grp, mac_client_impl_t **group_only_mcip)
 
 	/* Default group */
 
-	if (MAC_RX_GROUP_NO_CLIENT(grp) || mip->mi_nactiveclients != 1)
+	if (MAC_GROUP_NO_CLIENT(grp)) {
+		if (rx_group)
+			return (MAC_GROUP_STATE_SHARED);
+		else
+			return (MAC_GROUP_STATE_REGISTERED);
+	}
+	*group_only_mcip = MAC_GROUP_ONLY_CLIENT(grp);
+	if (*group_only_mcip == NULL)
 		return (MAC_GROUP_STATE_SHARED);
 
-	*group_only_mcip = MAC_RX_GROUP_ONLY_CLIENT(grp);
+	if (rx_group && mip->mi_nactiveclients != 1)
+		return (MAC_GROUP_STATE_SHARED);
+
 	ASSERT(*group_only_mcip != NULL);
 	return (MAC_GROUP_STATE_RESERVED);
 }
@@ -2456,13 +2815,12 @@ mac_rx_group_next_state(mac_group_t *grp, mac_client_impl_t **group_only_mcip)
  *
  * For NICs which have only 1 Rx ring (we treat  NICs with no Rx rings
  * as NIC with a single default ring), we assign the only ring to
- * primary Link as MAC_RX_HW_DEFAULT_RING. The primary Link SRS can do
- * polling on it as long as it is the only link in use and we compare
- * the MAC address for unicast packets before accepting an incoming
- * packet (there is no need for S/W classification in this case). We
- * disable polling on the only ring the moment 2nd link gets created
- * (the polling remains enabled even though there are broadcast and
- * multicast flows created).
+ * primary Link. The primary Link SRS can do polling on it as long as
+ * it is the only link in use and we compare the MAC address for unicast
+ * packets before accepting an incoming packet (there is no need for S/W
+ * classification in this case). We disable polling on the only ring the
+ * moment 2nd link gets created (the polling remains enabled even though
+ * there are broadcast and * multicast flows created).
  *
  * If the NIC has more than 1 Rx ring, we assign the default ring (the
  * 1st ring) to deal with broadcast, multicast and traffic for other
@@ -2471,10 +2829,6 @@ mac_rx_group_next_state(mac_group_t *grp, mac_client_impl_t **group_only_mcip)
  * primary unicast MAC address to the selected ring. The primary Link
  * (and its SRS) can continue to poll the assigned Rx ring at all times
  * independantly.
- *
- * Right now we just assign MAC_RX_HW_DEFAULT_RING to note that it is
- * primary NIC and later we will check to see how many Rx rings we
- * have and can we get a non default Rx ring for the primary MAC.
  *
  * Note: In future, if no fanout is specified, we try to assign 2 Rx
  * rings for the primary Link with the primary MAC address + TCP going
@@ -2487,56 +2841,128 @@ mac_rx_group_next_state(mac_group_t *grp, mac_client_impl_t **group_only_mcip)
  * As an optimization, when a new NIC or VNIC is created, we can get
  * only one Rx ring and make it a TCP specific Rx ring and use the
  * H/W default Rx ring for the rest (this Rx ring is never polled).
+ *
+ * For clients that don't have MAC address, but want to receive and
+ * transmit packets (e.g, bpf, gvrp etc.), we need to setup the datapath.
+ * For such clients (identified by the MCIS_NO_UNICAST_ADDR flag) we
+ * always give the default group and use software classification (i.e.
+ * even if this is the only client in the default group, we will
+ * leave group as shared).
  */
 int
 mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
     uint32_t link_type)
 {
 	mac_impl_t		*mip = mcip->mci_mip;
-	mac_group_t		*group = NULL;
-	mac_group_t		*default_group;
+	mac_group_t		*rgroup = NULL;
+	mac_group_t		*tgroup = NULL;
+	mac_group_t		*default_rgroup;
+	mac_group_t		*default_tgroup;
 	int			err;
 	uint8_t 		*mac_addr;
-	mac_rx_group_reserve_type_t	rtype = MAC_RX_RESERVE_NONDEFAULT;
 	mac_group_state_t	next_state;
 	mac_client_impl_t	*group_only_mcip;
+	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
+	mac_resource_props_t	*emrp = MCIP_EFFECTIVE_PROPS(mcip);
+	boolean_t		rxhw;
+	boolean_t		txhw;
+	boolean_t		use_default = B_FALSE;
+	cpupart_t		*cpupart;
+	boolean_t		no_unicast;
+	boolean_t		isprimary = flent->fe_type & FLOW_PRIMARY_MAC;
+	mac_client_impl_t	*reloc_pmcip = NULL;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
 	switch (link_type) {
 	case SRST_FLOW:
-		mac_srs_group_setup(mcip, flent, NULL, link_type);
+		mac_srs_group_setup(mcip, flent, link_type);
 		return (0);
 
 	case SRST_LINK:
+		no_unicast = mcip->mci_state_flags & MCIS_NO_UNICAST_ADDR;
 		mac_addr = flent->fe_flow_desc.fd_dst_mac;
 
-		/* Check if we need to reserve the default group */
-		if (flent->fe_type & FLOW_PRIMARY_MAC)
-			rtype = MAC_RX_RESERVE_DEFAULT;
+		/* Default RX group */
+		default_rgroup = MAC_DEFAULT_RX_GROUP(mip);
 
-		if ((mcip->mci_state_flags & MCIS_NO_HWRINGS) == 0) {
-			/*
-			 * Check to see if we can get an exclusive group for
-			 * this mac address or if there already exists a
-			 * group that has this mac address (case of VLANs).
-			 * If no groups are available, use the default group.
-			 */
-			group = mac_reserve_rx_group(mcip, mac_addr, rtype);
+		/* Default TX group */
+		default_tgroup = MAC_DEFAULT_TX_GROUP(mip);
+
+		if (no_unicast) {
+			rgroup = default_rgroup;
+			tgroup = default_tgroup;
+			goto grp_found;
 		}
+		rxhw = (mrp->mrp_mask & MRP_RX_RINGS) &&
+		    (mrp->mrp_nrxrings > 0 ||
+		    (mrp->mrp_mask & MRP_RXRINGS_UNSPEC));
+		txhw = (mrp->mrp_mask & MRP_TX_RINGS) &&
+		    (mrp->mrp_ntxrings > 0 ||
+		    (mrp->mrp_mask & MRP_TXRINGS_UNSPEC));
 
-		if (group == NULL) {
-			if ((mcip->mci_state_flags & MCIS_REQ_HWRINGS) != 0)
-				return (ENOSPC);
-			group = &mip->mi_rx_groups[0];
+		/*
+		 * By default we have given the primary all the rings
+		 * i.e. the default group. Let's see if the primary
+		 * needs to be relocated so that the addition of this
+		 * client doesn't impact the primary's performance,
+		 * i.e. if the primary is in the default group and
+		 * we add this client, the primary will lose polling.
+		 * We do this only for NICs supporting dynamic ring
+		 * grouping and only when this is the first client
+		 * after the primary (i.e. nactiveclients is 2)
+		 */
+		if (!isprimary && mip->mi_nactiveclients == 2 &&
+		    (group_only_mcip = mac_primary_client_handle(mip)) !=
+		    NULL && mip->mi_rx_group_type == MAC_GROUP_TYPE_DYNAMIC) {
+			reloc_pmcip = mac_check_primary_relocation(
+			    group_only_mcip, rxhw);
+		}
+		/*
+		 * Check to see if we can get an exclusive group for
+		 * this mac address or if there already exists a
+		 * group that has this mac address (case of VLANs).
+		 * If no groups are available, use the default group.
+		 */
+		rgroup = mac_reserve_rx_group(mcip, mac_addr, B_FALSE);
+		if (rgroup == NULL && rxhw) {
+			err = ENOSPC;
+			goto setup_failed;
+		} else if (rgroup == NULL) {
+			rgroup = default_rgroup;
+		}
+		/*
+		 * Check to see if we can get an exclusive group for
+		 * this mac client. If no groups are available, use
+		 * the default group.
+		 */
+		tgroup = mac_reserve_tx_group(mcip, B_FALSE);
+		if (tgroup == NULL && txhw) {
+			if (rgroup != NULL && rgroup != default_rgroup)
+				mac_release_rx_group(mcip, rgroup);
+			err = ENOSPC;
+			goto setup_failed;
+		} else if (tgroup == NULL) {
+			tgroup = default_tgroup;
 		}
 
 		/*
 		 * Some NICs don't support any Rx rings, so there may not
 		 * even be a default group.
 		 */
-		if (group != NULL) {
-			flent->fe_rx_ring_group = group;
+	grp_found:
+		if (rgroup != NULL) {
+			if (rgroup != default_rgroup &&
+			    MAC_GROUP_NO_CLIENT(rgroup) &&
+			    (rxhw || mcip->mci_share != NULL)) {
+				MAC_RX_GRP_RESERVED(mip);
+				if (mip->mi_rx_group_type ==
+				    MAC_GROUP_TYPE_DYNAMIC) {
+					MAC_RX_RING_RESERVED(mip,
+					    rgroup->mrg_cur_count);
+				}
+			}
+			flent->fe_rx_ring_group = rgroup;
 			/*
 			 * Add the client to the group. This could cause
 			 * either this group to move to the shared state or
@@ -2545,18 +2971,29 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 			 * actions on the default group are postponed to
 			 * the end of this function.
 			 */
-			mac_rx_group_add_client(group, mcip);
-			next_state = mac_rx_group_next_state(group,
-			    &group_only_mcip);
-
-			ASSERT((next_state == MAC_GROUP_STATE_RESERVED &&
-			    mcip == group_only_mcip) ||
-			    (next_state == MAC_GROUP_STATE_SHARED &&
-			    group_only_mcip == NULL));
-
-			mac_set_rx_group_state(group, next_state);
+			mac_group_add_client(rgroup, mcip);
+			next_state = mac_group_next_state(rgroup,
+			    &group_only_mcip, default_rgroup, B_TRUE);
+			mac_set_group_state(rgroup, next_state);
 		}
 
+		if (tgroup != NULL) {
+			if (tgroup != default_tgroup &&
+			    MAC_GROUP_NO_CLIENT(tgroup) &&
+			    (txhw || mcip->mci_share != NULL)) {
+				MAC_TX_GRP_RESERVED(mip);
+				if (mip->mi_tx_group_type ==
+				    MAC_GROUP_TYPE_DYNAMIC) {
+					MAC_TX_RING_RESERVED(mip,
+					    tgroup->mrg_cur_count);
+				}
+			}
+			flent->fe_tx_ring_group = tgroup;
+			mac_group_add_client(tgroup, mcip);
+			next_state = mac_group_next_state(tgroup,
+			    &group_only_mcip, default_tgroup, B_FALSE);
+			tgroup->mrg_state = next_state;
+		}
 		/*
 		 * Setup the Rx and Tx SRSes. If we got a pristine group
 		 * exclusively above, mac_srs_group_setup would simply create
@@ -2564,18 +3001,23 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 		 * reserved group, mac_srs_group_setup would also dismantle the
 		 * SRSes of the previously exclusive group
 		 */
-		mac_srs_group_setup(mcip, flent, group, link_type);
+		mac_srs_group_setup(mcip, flent, link_type);
 
+		/* We are setting up minimal datapath only */
+		if (no_unicast)
+			break;
 		/* Program the S/W Classifer */
 		if ((err = mac_flow_add(mip->mi_flow_tab, flent)) != 0)
 			goto setup_failed;
 
 		/* Program the H/W Classifier */
-		if ((err = mac_add_macaddr(mip, group, mac_addr,
+		if ((err = mac_add_macaddr(mip, rgroup, mac_addr,
 		    (mcip->mci_state_flags & MCIS_UNICAST_HW) != 0)) != 0)
 			goto setup_failed;
 		mcip->mci_unicast = mac_find_macaddr(mip, mac_addr);
 		ASSERT(mcip->mci_unicast != NULL);
+		/* Initialize the v6 local addr used by link protection */
+		mac_protect_update_v6_local_addr(mcip);
 		break;
 
 	default:
@@ -2590,38 +3032,53 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 	 * incoming broadcast traffic to the other groups and dismantle the
 	 * SRSes over the default group.
 	 */
-	if (group != NULL) {
-		if (group != mip->mi_rx_groups) {
-			default_group = mip->mi_rx_groups;
-			if (default_group->mrg_state ==
+	if (rgroup != NULL) {
+		if (rgroup != default_rgroup) {
+			if (default_rgroup->mrg_state ==
 			    MAC_GROUP_STATE_RESERVED) {
-				group_only_mcip = MAC_RX_GROUP_ONLY_CLIENT(
-				    default_group);
+				group_only_mcip = MAC_GROUP_ONLY_CLIENT(
+				    default_rgroup);
 				ASSERT(group_only_mcip != NULL &&
 				    mip->mi_nactiveclients > 1);
 
-				mac_set_rx_group_state(default_group,
+				mac_set_group_state(default_rgroup,
 				    MAC_GROUP_STATE_SHARED);
-				mac_srs_group_setup(group_only_mcip,
+				mac_rx_srs_group_setup(group_only_mcip,
+				    group_only_mcip->mci_flent, SRST_LINK);
+				pool_lock();
+				cpupart = mac_pset_find(mrp, &use_default);
+				mac_fanout_setup(group_only_mcip,
 				    group_only_mcip->mci_flent,
-				    default_group, SRST_LINK);
+				    MCIP_RESOURCE_PROPS(group_only_mcip),
+				    mac_rx_deliver, group_only_mcip, NULL,
+				    cpupart);
+				mac_set_pool_effective(use_default, cpupart,
+				    mrp, emrp);
+				pool_unlock();
 			}
-			ASSERT(default_group->mrg_state ==
+			ASSERT(default_rgroup->mrg_state ==
 			    MAC_GROUP_STATE_SHARED);
 		}
 		/*
 		 * If we get an exclusive group for a VLAN MAC client we
 		 * need to take the s/w path to make the additional check for
 		 * the vid. Disable polling and set it to s/w classification.
+		 * Similarly for clients that don't have a unicast address.
 		 */
-		if (group->mrg_state == MAC_GROUP_STATE_RESERVED &&
-		    i_mac_flow_vid(mcip->mci_flent) != VLAN_ID_NONE) {
-			mac_rx_switch_grp_to_sw(group);
+		if (rgroup->mrg_state == MAC_GROUP_STATE_RESERVED &&
+		    (i_mac_flow_vid(flent) != VLAN_ID_NONE || no_unicast)) {
+			mac_rx_switch_grp_to_sw(rgroup);
 		}
 	}
+	mac_set_rings_effective(mcip);
 	return (0);
 
 setup_failed:
+	/* Switch the primary back to default group */
+	if (reloc_pmcip != NULL) {
+		(void) mac_rx_switch_group(reloc_pmcip,
+		    reloc_pmcip->mci_flent->fe_rx_ring_group, default_rgroup);
+	}
 	mac_datapath_teardown(mcip, flent, link_type);
 	return (err);
 }
@@ -2637,12 +3094,14 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 	mac_group_t		*default_group;
 	boolean_t		check_default_group = B_FALSE;
 	mac_group_state_t	next_state;
+	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
 	switch (link_type) {
 	case SRST_FLOW:
-		mac_srs_group_teardown(mcip, flent, SRST_FLOW);
+		mac_rx_srs_group_teardown(flent, B_FALSE);
+		mac_tx_srs_group_teardown(mcip, flent, SRST_FLOW);
 		return;
 
 	case SRST_LINK:
@@ -2666,7 +3125,9 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 		mac_flow_wait(flent, FLOW_DRIVER_UPCALL);
 
 		/* Now quiesce and destroy all SRS and soft rings */
-		mac_srs_group_teardown(mcip, flent, SRST_LINK);
+		mac_rx_srs_group_teardown(flent, B_FALSE);
+		mac_tx_srs_group_teardown(mcip, flent, SRST_LINK);
+
 		ASSERT((mcip->mci_flent == flent) &&
 		    (flent->fe_next == NULL));
 
@@ -2677,16 +3138,17 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 		 * were the last client, release the group.
 		 */
 		group = flent->fe_rx_ring_group;
+		default_group = MAC_DEFAULT_RX_GROUP(mip);
 		if (group != NULL) {
-			mac_rx_group_remove_client(group, mcip);
-			next_state = mac_rx_group_next_state(group,
-			    &grp_only_mcip);
+			mac_group_remove_client(group, mcip);
+			next_state = mac_group_next_state(group,
+			    &grp_only_mcip, default_group, B_TRUE);
 			if (next_state == MAC_GROUP_STATE_RESERVED) {
 				/*
 				 * Only one client left on this RX group.
 				 */
 				ASSERT(grp_only_mcip != NULL);
-				mac_set_rx_group_state(group,
+				mac_set_group_state(group,
 				    MAC_GROUP_STATE_RESERVED);
 				group_only_flent = grp_only_mcip->mci_flent;
 
@@ -2695,9 +3157,14 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 				 * access on the group. Allow it to
 				 * dynamically poll the H/W rings etc.
 				 */
-				mac_srs_group_setup(grp_only_mcip,
-				    group_only_flent, group, SRST_LINK);
+				mac_rx_srs_group_setup(grp_only_mcip,
+				    group_only_flent, SRST_LINK);
+				mac_fanout_setup(grp_only_mcip,
+				    group_only_flent,
+				    MCIP_RESOURCE_PROPS(grp_only_mcip),
+				    mac_rx_deliver, grp_only_mcip, NULL, NULL);
 				mac_rx_group_unmark(group, MR_INCIPIENT);
+				mac_set_rings_effective(grp_only_mcip);
 			} else if (next_state == MAC_GROUP_STATE_REGISTERED) {
 				/*
 				 * This is a non-default group being freed up.
@@ -2705,18 +3172,94 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 				 * to see if the primary client can get
 				 * exclusive access to the default group.
 				 */
-				ASSERT(group != mip->mi_rx_groups);
+				ASSERT(group != MAC_DEFAULT_RX_GROUP(mip));
+				if (mrp->mrp_mask & MRP_RX_RINGS) {
+					MAC_RX_GRP_RELEASED(mip);
+					if (mip->mi_rx_group_type ==
+					    MAC_GROUP_TYPE_DYNAMIC) {
+						MAC_RX_RING_RELEASED(mip,
+						    group->mrg_cur_count);
+					}
+				}
 				mac_release_rx_group(mcip, group);
-				mac_set_rx_group_state(group,
+				mac_set_group_state(group,
 				    MAC_GROUP_STATE_REGISTERED);
 				check_default_group = B_TRUE;
 			} else {
 				ASSERT(next_state == MAC_GROUP_STATE_SHARED);
-				mac_set_rx_group_state(group,
+				mac_set_group_state(group,
 				    MAC_GROUP_STATE_SHARED);
 				mac_rx_group_unmark(group, MR_CONDEMNED);
 			}
 			flent->fe_rx_ring_group = NULL;
+		}
+		/*
+		 * Remove the client from the TX group. Additionally, if
+		 * this a non-default group, then we also need to release
+		 * the group.
+		 */
+		group = flent->fe_tx_ring_group;
+		default_group = MAC_DEFAULT_TX_GROUP(mip);
+		if (group != NULL) {
+			mac_group_remove_client(group, mcip);
+			next_state = mac_group_next_state(group,
+			    &grp_only_mcip, default_group, B_FALSE);
+			if (next_state == MAC_GROUP_STATE_REGISTERED) {
+				if (group != default_group) {
+					if (mrp->mrp_mask & MRP_TX_RINGS) {
+						MAC_TX_GRP_RELEASED(mip);
+						if (mip->mi_tx_group_type ==
+						    MAC_GROUP_TYPE_DYNAMIC) {
+							MAC_TX_RING_RELEASED(
+							    mip, group->
+							    mrg_cur_count);
+						}
+					}
+					mac_release_tx_group(mcip, group);
+					/*
+					 * If the default group is reserved,
+					 * then we need to set the effective
+					 * rings as we would have given
+					 * back some rings when the group
+					 * was released
+					 */
+					if (mip->mi_tx_group_type ==
+					    MAC_GROUP_TYPE_DYNAMIC &&
+					    default_group->mrg_state ==
+					    MAC_GROUP_STATE_RESERVED) {
+						grp_only_mcip =
+						    MAC_GROUP_ONLY_CLIENT
+						    (default_group);
+						mac_set_rings_effective(
+						    grp_only_mcip);
+					}
+				} else {
+					mac_ring_t	*ring;
+					int		cnt;
+					int		ringcnt;
+
+					/*
+					 * Stop all the rings except the
+					 * default ring.
+					 */
+					ringcnt = group->mrg_cur_count;
+					ring = group->mrg_rings;
+					for (cnt = 0; cnt < ringcnt; cnt++) {
+						if (ring->mr_state ==
+						    MR_INUSE && ring !=
+						    (mac_ring_t *)
+						    mip->mi_default_tx_ring) {
+							mac_stop_ring(ring);
+							ring->mr_flag = 0;
+						}
+						ring = ring->mr_next;
+					}
+				}
+			} else if (next_state == MAC_GROUP_STATE_RESERVED) {
+				mac_set_rings_effective(grp_only_mcip);
+			}
+			flent->fe_tx_ring_group = NULL;
+			group->mrg_state = next_state;
 		}
 		break;
 	default:
@@ -2731,20 +3274,52 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 	 * over the default group.
 	 */
 	if (check_default_group) {
-		default_group = mip->mi_rx_groups;
+		default_group = MAC_DEFAULT_RX_GROUP(mip);
 		ASSERT(default_group->mrg_state == MAC_GROUP_STATE_SHARED);
-		next_state = mac_rx_group_next_state(default_group,
-		    &grp_only_mcip);
+		next_state = mac_group_next_state(default_group,
+		    &grp_only_mcip, default_group, B_TRUE);
 		if (next_state == MAC_GROUP_STATE_RESERVED) {
 			ASSERT(grp_only_mcip != NULL &&
 			    mip->mi_nactiveclients == 1);
-			mac_set_rx_group_state(default_group,
+			mac_set_group_state(default_group,
 			    MAC_GROUP_STATE_RESERVED);
-			mac_srs_group_setup(grp_only_mcip,
+			mac_rx_srs_group_setup(grp_only_mcip,
+			    grp_only_mcip->mci_flent, SRST_LINK);
+			mac_fanout_setup(grp_only_mcip,
 			    grp_only_mcip->mci_flent,
-			    default_group, SRST_LINK);
+			    MCIP_RESOURCE_PROPS(grp_only_mcip), mac_rx_deliver,
+			    grp_only_mcip, NULL, NULL);
 			mac_rx_group_unmark(default_group, MR_INCIPIENT);
+			mac_set_rings_effective(grp_only_mcip);
 		}
+	}
+
+	/*
+	 * If the primary is the only one left and the MAC supports
+	 * dynamic grouping, we need to see if the primary needs to
+	 * be moved to the default group so that it can use all the
+	 * H/W rings.
+	 */
+	if (!(flent->fe_type & FLOW_PRIMARY_MAC) &&
+	    mip->mi_nactiveclients == 1 &&
+	    mip->mi_rx_group_type == MAC_GROUP_TYPE_DYNAMIC) {
+		default_group = MAC_DEFAULT_RX_GROUP(mip);
+		grp_only_mcip = mac_primary_client_handle(mip);
+		if (grp_only_mcip == NULL)
+			return;
+		group_only_flent = grp_only_mcip->mci_flent;
+		mrp = MCIP_RESOURCE_PROPS(grp_only_mcip);
+		/*
+		 * If the primary has an explicit property set, leave it
+		 * alone.
+		 */
+		if (mrp->mrp_mask & MRP_RX_RINGS)
+			return;
+		/*
+		 * Switch the primary to the default group.
+		 */
+		(void) mac_rx_switch_group(grp_only_mcip,
+		    group_only_flent->fe_rx_ring_group, default_group);
 	}
 }
 
@@ -2753,18 +3328,36 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 static void
 mac_srs_fanout_list_free(mac_soft_ring_set_t *mac_srs)
 {
-	ASSERT(mac_srs->srs_tcp_soft_rings != NULL);
-	kmem_free(mac_srs->srs_tcp_soft_rings,
-	    sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT);
-	mac_srs->srs_tcp_soft_rings = NULL;
-	ASSERT(mac_srs->srs_udp_soft_rings != NULL);
-	kmem_free(mac_srs->srs_udp_soft_rings,
-	    sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT);
-	mac_srs->srs_udp_soft_rings = NULL;
-	ASSERT(mac_srs->srs_oth_soft_rings != NULL);
-	kmem_free(mac_srs->srs_oth_soft_rings,
-	    sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT);
-	mac_srs->srs_oth_soft_rings = NULL;
+	if (mac_srs->srs_type & SRST_TX) {
+		mac_srs_tx_t *tx;
+
+		ASSERT(mac_srs->srs_tcp_soft_rings == NULL);
+		ASSERT(mac_srs->srs_udp_soft_rings == NULL);
+		ASSERT(mac_srs->srs_oth_soft_rings == NULL);
+		ASSERT(mac_srs->srs_tx_soft_rings != NULL);
+		kmem_free(mac_srs->srs_tx_soft_rings,
+		    sizeof (mac_soft_ring_t *) * MAX_RINGS_PER_GROUP);
+		mac_srs->srs_tx_soft_rings = NULL;
+		tx = &mac_srs->srs_tx;
+		if (tx->st_soft_rings != NULL) {
+			kmem_free(tx->st_soft_rings,
+			    sizeof (mac_soft_ring_t *) * MAX_RINGS_PER_GROUP);
+		}
+	} else {
+		ASSERT(mac_srs->srs_tx_soft_rings == NULL);
+		ASSERT(mac_srs->srs_tcp_soft_rings != NULL);
+		kmem_free(mac_srs->srs_tcp_soft_rings,
+		    sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT);
+		mac_srs->srs_tcp_soft_rings = NULL;
+		ASSERT(mac_srs->srs_udp_soft_rings != NULL);
+		kmem_free(mac_srs->srs_udp_soft_rings,
+		    sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT);
+		mac_srs->srs_udp_soft_rings = NULL;
+		ASSERT(mac_srs->srs_oth_soft_rings != NULL);
+		kmem_free(mac_srs->srs_oth_soft_rings,
+		    sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT);
+		mac_srs->srs_oth_soft_rings = NULL;
+	}
 }
 
 /*
@@ -2815,10 +3408,11 @@ mac_srs_free(mac_soft_ring_set_t *mac_srs)
 
 	mac_pkt_drop(NULL, NULL, mac_srs->srs_first, B_FALSE);
 	mac_srs_ring_free(mac_srs);
-	mac_srs_soft_rings_free(mac_srs, B_TRUE);
+	mac_srs_soft_rings_free(mac_srs);
 	mac_srs_fanout_list_free(mac_srs);
 
 	mac_srs->srs_bw = NULL;
+	mac_srs_stat_delete(mac_srs);
 	kmem_cache_free(mac_srs_cache, mac_srs);
 }
 
@@ -3126,13 +3720,19 @@ mac_tx_srs_add_ring(mac_soft_ring_set_t *mac_srs, mac_ring_t *tx_ring)
 {
 	mac_client_impl_t *mcip = mac_srs->srs_mcip;
 	mac_soft_ring_t *soft_ring;
-	int count = mac_srs->srs_oth_ring_count;
+	int count = mac_srs->srs_tx_ring_count;
+	uint32_t soft_ring_type = ST_RING_TX;
+	uint_t ring_info;
 
 	ASSERT(mac_srs->srs_state & SRS_QUIESCE);
-	soft_ring = mac_soft_ring_create(count, 0, NULL,
-	    (ST_RING_OTH | ST_RING_TX), maxclsyspri, mcip, mac_srs, -1,
+	ring_info = mac_hwring_getinfo((mac_ring_handle_t)tx_ring);
+	if (mac_tx_serialize || (ring_info & MAC_RING_TX_SERIALIZE))
+		soft_ring_type |= ST_RING_WORKER_ONLY;
+	soft_ring = mac_soft_ring_create(count, 0,
+	    soft_ring_type, maxclsyspri, mcip, mac_srs, -1,
 	    NULL, mcip, (mac_resource_handle_t)tx_ring);
-	mac_srs->srs_oth_ring_count++;
+	mac_srs->srs_tx_ring_count++;
+	mac_srs_update_fanout_list(mac_srs);
 	/*
 	 * put this soft ring in quiesce mode too so when we restart
 	 * all soft rings in the srs are in the same state.
@@ -3177,7 +3777,7 @@ mac_soft_ring_remove(mac_soft_ring_set_t *mac_srs, mac_soft_ring_t *softring)
 	mac_srs->srs_soft_ring_condemned_count--;
 	mutex_exit(&mac_srs->srs_lock);
 
-	mac_soft_ring_free(softring, B_FALSE);
+	mac_soft_ring_free(softring);
 }
 
 void
@@ -3185,70 +3785,59 @@ mac_tx_srs_del_ring(mac_soft_ring_set_t *mac_srs, mac_ring_t *tx_ring)
 {
 	int i;
 	mac_soft_ring_t *soft_ring, *remove_sring;
+	mac_client_impl_t *mcip = mac_srs->srs_mcip;
 
 	mutex_enter(&mac_srs->srs_lock);
-	for (i = 0; i < mac_srs->srs_oth_ring_count; i++) {
-		soft_ring =  mac_srs->srs_oth_soft_rings[i];
+	for (i = 0; i < mac_srs->srs_tx_ring_count; i++) {
+		soft_ring =  mac_srs->srs_tx_soft_rings[i];
 		if (soft_ring->s_ring_tx_arg2 == tx_ring)
 			break;
 	}
 	mutex_exit(&mac_srs->srs_lock);
-	ASSERT(i < mac_srs->srs_oth_ring_count);
+	ASSERT(i < mac_srs->srs_tx_ring_count);
 	remove_sring = soft_ring;
+	/*
+	 * In the case of aggr, the soft ring associated with a Tx ring
+	 * is also stored in st_soft_rings[] array. That entry should
+	 * be removed.
+	 */
+	if (mcip->mci_state_flags & MCIS_IS_AGGR) {
+		mac_srs_tx_t *tx = &mac_srs->srs_tx;
+
+		ASSERT(tx->st_soft_rings[tx_ring->mr_index] == remove_sring);
+		tx->st_soft_rings[tx_ring->mr_index] = NULL;
+	}
 	mac_soft_ring_remove(mac_srs, remove_sring);
 	mac_srs_update_fanout_list(mac_srs);
 }
 
 /*
  * mac_tx_srs_setup():
- *
  * Used to setup Tx rings. If no free Tx ring is available, then default
  * Tx ring is used.
  */
 void
-mac_tx_srs_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
-    uint32_t srs_type)
+mac_tx_srs_setup(mac_client_impl_t *mcip, flow_entry_t *flent)
 {
-	mac_impl_t *mip = mcip->mci_mip;
-	mac_soft_ring_set_t *tx_srs;
-	int i, tx_ring_count = 0, tx_rings_reserved = 0;
-	mac_ring_handle_t *tx_rings = NULL;
-	uint32_t soft_ring_type;
-	mac_group_t *grp = NULL;
-	mac_ring_t *ring;
-	mac_srs_tx_t *tx;
-	boolean_t serialize = B_FALSE;
+	mac_impl_t		*mip = mcip->mci_mip;
+	mac_soft_ring_set_t	*tx_srs = flent->fe_tx_srs;
+	int			i;
+	int			tx_ring_count = 0;
+	uint32_t		soft_ring_type;
+	mac_group_t		*grp = NULL;
+	mac_ring_t		*ring;
+	mac_srs_tx_t		*tx = &tx_srs->srs_tx;
+	boolean_t		is_aggr;
+	uint_t			ring_info = 0;
 
-	tx_srs = flent->fe_tx_srs;
-	tx = &tx_srs->srs_tx;
-
-	if (tx->st_group != NULL) {
-		grp = tx->st_group;
-		tx_ring_count = grp->mrg_cur_count;
-	} else {
-		tx_ring_count = mac_tx_ring_count;
+	is_aggr = (mcip->mci_state_flags & MCIS_IS_AGGR) != 0;
+	grp = flent->fe_tx_ring_group;
+	if (grp == NULL) {
+		ring = (mac_ring_t *)mip->mi_default_tx_ring;
+		goto no_group;
 	}
-
-	if (tx_ring_count != 0) {
-		tx_rings = kmem_zalloc(sizeof (mac_ring_handle_t) *
-		    tx_ring_count, KM_SLEEP);
-	}
-
-	/*
-	 * Just use the default ring for now. We need to use
-	 * the underlying link's ring set instead of the underlying
-	 * NIC's.
-	 */
-	if (srs_type == SRST_FLOW ||
-	    (mcip->mci_state_flags & MCIS_NO_HWRINGS) != 0) {
-		/* use default ring */
-		tx_rings[0] = (void *)mip->mi_default_tx_ring;
-		tx_rings_reserved++;
-		goto rings_assigned;
-	}
-
-	if (mcip->mci_share != NULL)
-		ring = grp->mrg_rings;
+	tx_ring_count = grp->mrg_cur_count;
+	ring = grp->mrg_rings;
 	/*
 	 * An attempt is made to reserve 'tx_ring_count' number
 	 * of Tx rings. If tx_ring_count is 0, default Tx ring
@@ -3258,87 +3847,80 @@ mac_tx_srs_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 	 * then each Tx ring will have a Tx-side soft ring. All
 	 * these soft rings will be hang off Tx SRS.
 	 */
-	for (i = 0; i < tx_ring_count; i++) {
-		if (mcip->mci_share != NULL) {
-			/*
-			 * The ring was already chosen and associated
-			 * with the TX group. Save it in the new
-			 * array to keep as much of the code below common
-			 * between the share and non-share cases.
-			 */
-			ASSERT(ring != NULL);
-			tx_rings[i] = (mac_ring_handle_t)ring;
-			ring = ring->mr_next;
-		} else {
-			tx_rings[i] =
-			    (mac_ring_handle_t)mac_reserve_tx_ring(mip, NULL);
-			if (tx_rings[i] == NULL) {
-				/*
-				 * We have run out of Tx rings. So
-				 * give the default ring too.
-				 */
-				tx_rings[i] = (void *)mip->mi_default_tx_ring;
-				tx_rings_reserved++;
+	switch (grp->mrg_state) {
+		case MAC_GROUP_STATE_SHARED:
+		case MAC_GROUP_STATE_RESERVED:
+			if (tx_ring_count <= 1 && !is_aggr) {
+no_group:
+				if (ring != NULL &&
+				    ring->mr_state != MR_INUSE) {
+					(void) mac_start_ring(ring);
+					ring_info = mac_hwring_getinfo(
+					    (mac_ring_handle_t)ring);
+				}
+				tx->st_arg2 = (void *)ring;
+				mac_tx_srs_stat_recreate(tx_srs, B_FALSE);
+				if (tx_srs->srs_type & SRST_BW_CONTROL) {
+					tx->st_mode = SRS_TX_BW;
+				} else if (mac_tx_serialize ||
+				    (ring_info & MAC_RING_TX_SERIALIZE)) {
+					tx->st_mode = SRS_TX_SERIALIZE;
+				} else {
+					tx->st_mode = SRS_TX_DEFAULT;
+				}
 				break;
 			}
-		}
-		tx_rings_reserved++;
-	}
+			soft_ring_type = ST_RING_TX;
+			if (tx_srs->srs_type & SRST_BW_CONTROL) {
+				tx->st_mode = is_aggr ?
+				    SRS_TX_BW_AGGR : SRS_TX_BW_FANOUT;
+			} else {
+				tx->st_mode = is_aggr ? SRS_TX_AGGR :
+				    SRS_TX_FANOUT;
+			}
+			for (i = 0; i < tx_ring_count; i++) {
+				ASSERT(ring != NULL);
+				switch (ring->mr_state) {
+				case MR_INUSE:
+				case MR_FREE:
+					ASSERT(ring->mr_srs == NULL);
 
-rings_assigned:
-	if (mac_tx_serialize || (mip->mi_v12n_level & MAC_VIRT_SERIALIZE))
-		serialize = B_TRUE;
-	/*
-	 * Did we get the requested number of tx rings?
-	 * There are 2 actions we can take depending upon the number
-	 * of tx_rings we got.
-	 * 1) If we got one, then get the tx_ring from the soft ring,
-	 * save it in SRS and free up the soft ring.
-	 * 2) If we got more than 1, then do the tx fanout among the
-	 * rings we obtained.
-	 */
-	ASSERT(tx_rings_reserved != 0);
-	if (tx_rings_reserved == 1) {
-		tx->st_arg2 = (void *)tx_rings[0];
-		/* For ring_count of 0 or 1, set the tx_mode and return */
-		if (tx_srs->srs_type & SRST_BW_CONTROL)
-			tx->st_mode = SRS_TX_BW;
-		else if (serialize)
-			tx->st_mode = SRS_TX_SERIALIZE;
-		else
-			tx->st_mode = SRS_TX_DEFAULT;
-	} else {
-		/*
-		 * We got multiple Tx rings for Tx fanout.
-		 */
-		soft_ring_type = ST_RING_OTH | ST_RING_TX;
-		if (tx_srs->srs_type & SRST_BW_CONTROL) {
-			tx->st_mode = SRS_TX_BW_FANOUT;
-		} else {
-			tx->st_mode = SRS_TX_FANOUT;
-			if (serialize)
-				soft_ring_type |= ST_RING_WORKER_ONLY;
-		}
-		for (i = 0; i < tx_rings_reserved; i++) {
-			(void) mac_soft_ring_create(i, 0, NULL, soft_ring_type,
-			    maxclsyspri, mcip, tx_srs, -1, NULL, mcip,
-			    (mac_resource_handle_t)tx_rings[i]);
-		}
-		mac_srs_update_fanout_list(tx_srs);
+					if (ring->mr_state != MR_INUSE)
+						(void) mac_start_ring(ring);
+					ring_info = mac_hwring_getinfo(
+					    (mac_ring_handle_t)ring);
+					if (mac_tx_serialize || (ring_info &
+					    MAC_RING_TX_SERIALIZE)) {
+						soft_ring_type |=
+						    ST_RING_WORKER_ONLY;
+					}
+					(void) mac_soft_ring_create(i, 0,
+					    soft_ring_type, maxclsyspri,
+					    mcip, tx_srs, -1, NULL, mcip,
+					    (mac_resource_handle_t)ring);
+					break;
+				default:
+					cmn_err(CE_PANIC,
+					    "srs_setup: mcip = %p "
+					    "trying to add UNKNOWN ring = %p\n",
+					    (void *)mcip, (void *)ring);
+					break;
+				}
+				ring = ring->mr_next;
+			}
+			mac_srs_update_fanout_list(tx_srs);
+			break;
+		default:
+			ASSERT(B_FALSE);
+			break;
 	}
 	tx->st_func = mac_tx_get_func(tx->st_mode);
-
-	DTRACE_PROBE3(tx__srs___setup__return, mac_soft_ring_set_t *, tx_srs,
-	    int, tx->st_mode, int, tx_srs->srs_oth_ring_count);
-
-	if (tx_ring_count != 0) {
-		tx->st_ring_count = tx_rings_reserved;
-		tx->st_rings = kmem_zalloc(sizeof (mac_ring_handle_t) *
-		    tx_rings_reserved, KM_SLEEP);
-		for (i = 0; i < tx->st_ring_count; i++)
-			tx->st_rings[i] = tx_rings[i];
-		kmem_free(tx_rings, sizeof (mac_ring_handle_t) * tx_ring_count);
+	if (is_aggr) {
+		VERIFY(i_mac_capab_get((mac_handle_t)mip,
+		    MAC_CAPAB_AGGR, &tx->st_capab_aggr));
 	}
+	DTRACE_PROBE3(tx__srs___setup__return, mac_soft_ring_set_t *, tx_srs,
+	    int, tx->st_mode, int, tx_srs->srs_tx_ring_count);
 }
 
 /*
@@ -3346,10 +3928,14 @@ rings_assigned:
  * its current link speed.
  */
 void
-mac_fanout_recompute_client(mac_client_impl_t *mcip)
+mac_fanout_recompute_client(mac_client_impl_t *mcip, cpupart_t *cpupart)
 {
 	uint64_t link_speed;
 	mac_resource_props_t *mcip_mrp;
+	flow_entry_t *flent = mcip->mci_flent;
+	mac_soft_ring_set_t *rx_srs;
+	mac_cpus_t *srs_cpu;
+	int soft_ring_count, maxcpus;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mcip->mci_mip));
 
@@ -3359,8 +3945,31 @@ mac_fanout_recompute_client(mac_client_impl_t *mcip)
 	if ((link_speed != 0) &&
 	    (link_speed != mcip->mci_flent->fe_nic_speed)) {
 		mcip_mrp = MCIP_RESOURCE_PROPS(mcip);
-		mac_fanout_setup(mcip, mcip->mci_flent,
-		    mcip_mrp, mac_rx_deliver, mcip, NULL);
+		/*
+		 * Before calling mac_fanout_setup(), check to see if
+		 * the SRSes already have the right number of soft
+		 * rings. mac_fanout_setup() is a heavy duty operation
+		 * where new cpu bindings are done for SRS and soft
+		 * ring threads and interrupts re-targeted.
+		 */
+		maxcpus = (cpupart != NULL) ? cpupart->cp_ncpus : ncpus;
+		soft_ring_count = mac_compute_soft_ring_count(flent,
+		    flent->fe_rx_srs_cnt - 1, maxcpus);
+		/*
+		 * If soft_ring_count returned by
+		 * mac_compute_soft_ring_count() is 0, bump it
+		 * up by 1 because we always have atleast one
+		 * TCP, UDP, and OTH soft ring associated with
+		 * an SRS.
+		 */
+		soft_ring_count = (soft_ring_count == 0) ?
+		    1 : soft_ring_count;
+		rx_srs = flent->fe_rx_srs[0];
+		srs_cpu = &rx_srs->srs_cpu;
+		if (soft_ring_count != srs_cpu->mc_rx_fanout_cnt) {
+			mac_fanout_setup(mcip, flent, mcip_mrp,
+			    mac_rx_deliver, mcip, NULL, cpupart);
+		}
 	}
 }
 
@@ -3376,6 +3985,9 @@ void
 mac_fanout_recompute(mac_impl_t *mip)
 {
 	mac_client_impl_t	*mcip;
+	cpupart_t		*cpupart;
+	boolean_t		use_default;
+	mac_resource_props_t	*mrp, *emrp;
 
 	i_mac_perim_enter(mip);
 	if ((mip->mi_state_flags & MIS_IS_VNIC) != 0 ||
@@ -3389,7 +4001,14 @@ mac_fanout_recompute(mac_impl_t *mip)
 		if ((mcip->mci_state_flags & MCIS_SHARE_BOUND) != 0 ||
 		    !MCIP_DATAPATH_SETUP(mcip))
 			continue;
-		mac_fanout_recompute_client(mcip);
+		mrp = MCIP_RESOURCE_PROPS(mcip);
+		emrp = MCIP_EFFECTIVE_PROPS(mcip);
+		use_default = B_FALSE;
+		pool_lock();
+		cpupart = mac_pset_find(mrp, &use_default);
+		mac_fanout_recompute_client(mcip, cpupart);
+		mac_set_pool_effective(use_default, cpupart, mrp, emrp);
+		pool_unlock();
 	}
 	i_mac_perim_exit(mip);
 }

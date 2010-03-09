@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,7 +117,6 @@ i_dladm_vnic_create_sys(dladm_handle_t handle, dladm_vnic_attr_t *attr)
 	ioc.vc_vrid = attr->va_vrid;
 	ioc.vc_af = attr->va_af;
 	ioc.vc_flags = attr->va_force ? VNIC_IOC_CREATE_FORCE : 0;
-	ioc.vc_flags |= attr->va_hwrings ? VNIC_IOC_CREATE_REQ_HWRINGS : 0;
 
 	if (attr->va_mac_len > 0 || ioc.vc_mac_prefix_len > 0)
 		bcopy(attr->va_mac_addr, ioc.vc_mac_addr, MAXMACADDRLEN);
@@ -217,14 +216,6 @@ i_dladm_vnic_info_persist(dladm_handle_t handle, datalink_id_t linkid,
 		    &attrp->va_link_id, NULL, NULL, NULL)) != DLADM_STATUS_OK)
 			goto done;
 	}
-
-	status = dladm_get_conf_field(handle, conf, FHWRINGS,
-	    &attrp->va_hwrings, sizeof (boolean_t));
-
-	if (status != DLADM_STATUS_OK && status != DLADM_STATUS_NOTFOUND)
-		goto done;
-	if (status == DLADM_STATUS_NOTFOUND)
-		attrp->va_hwrings = B_FALSE;
 
 	if ((status = dladm_datalink_id2info(handle, linkid, NULL, &class,
 	    NULL, NULL, 0)) != DLADM_STATUS_OK)
@@ -521,7 +512,7 @@ dladm_vnic_create(dladm_handle_t handle, const char *vnic, datalink_id_t linkid,
 	/* Extract resource_ctl and cpu_list from proplist */
 	if (proplist != NULL) {
 		status = dladm_link_proplist_extract(handle, proplist,
-		    &attr.va_resource_props);
+		    &attr.va_resource_props, 0);
 		if (status != DLADM_STATUS_OK)
 			goto done;
 	}
@@ -541,7 +532,6 @@ dladm_vnic_create(dladm_handle_t handle, const char *vnic, datalink_id_t linkid,
 	attr.va_vrid = vrid;
 	attr.va_af = af;
 	attr.va_force = (flags & DLADM_OPT_FORCE) != 0;
-	attr.va_hwrings = (flags & DLADM_OPT_HWRINGS) != 0;
 
 	status = i_dladm_vnic_create_sys(handle, &attr);
 	if (status != DLADM_STATUS_OK)
@@ -745,14 +735,6 @@ dladm_vnic_persist_conf(dladm_handle_t handle, const char *name,
 			goto done;
 	}
 
-	if (attrp->va_hwrings) {
-		boolean_t hwrings = attrp->va_hwrings;
-		status = dladm_set_conf_field(handle, conf, FHWRINGS,
-		    DLADM_TYPE_BOOLEAN, &hwrings);
-		if (status != DLADM_STATUS_OK)
-			goto done;
-	}
-
 	if (attrp->va_vid != 0) {
 		u64 = attrp->va_vid;
 		status = dladm_set_conf_field(handle, conf, FVLANID,
@@ -776,9 +758,6 @@ typedef struct dladm_vnic_up_arg_s {
 	dladm_status_t	status;
 } dladm_vnic_up_arg_t;
 
-#define	DLADM_VNIC_UP_FIRST_WALK	0x1
-#define	DLADM_VNIC_UP_SECOND_WALK	0x2
-
 static int
 i_dladm_vnic_up(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
@@ -786,21 +765,12 @@ i_dladm_vnic_up(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 	dladm_vnic_attr_t attr;
 	dladm_status_t status;
 	dladm_arg_list_t *proplist;
-	uint32_t flags = ((dladm_vnic_up_arg_t *)arg)->flags;
 
 	bzero(&attr, sizeof (attr));
 
 	status = dladm_vnic_info(handle, linkid, &attr, DLADM_OPT_PERSIST);
 	if (status != DLADM_STATUS_OK)
 		goto done;
-
-	/*
-	 * Create the vnics that request hardware group first
-	 * Create the vnics that don't request hardware group in the second walk
-	 */
-	if ((flags == DLADM_VNIC_UP_FIRST_WALK && !attr.va_hwrings) ||
-	    (flags == DLADM_VNIC_UP_SECOND_WALK && attr.va_hwrings))
-			goto done;
 
 	/* Get all properties for this vnic */
 	status = dladm_link_get_proplist(handle, linkid, &proplist);
@@ -809,7 +779,7 @@ i_dladm_vnic_up(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 
 	if (proplist != NULL) {
 		status = dladm_link_proplist_extract(handle, proplist,
-		    &attr.va_resource_props);
+		    &attr.va_resource_props, DLADM_OPT_BOOT);
 	}
 
 	status = i_dladm_vnic_create_sys(handle, &attr);
@@ -834,11 +804,6 @@ dladm_vnic_up(dladm_handle_t handle, datalink_id_t linkid, uint32_t flags)
 	    (DATALINK_CLASS_VNIC | DATALINK_CLASS_ETHERSTUB);
 
 	if (linkid == DATALINK_ALL_LINKID) {
-		vnic_arg.flags = DLADM_VNIC_UP_FIRST_WALK;
-		(void) dladm_walk_datalink_id(i_dladm_vnic_up, handle,
-		    &vnic_arg, class, DATALINK_ANY_MEDIATYPE,
-		    DLADM_OPT_PERSIST);
-		vnic_arg.flags = DLADM_VNIC_UP_SECOND_WALK;
 		(void) dladm_walk_datalink_id(i_dladm_vnic_up, handle,
 		    &vnic_arg, class, DATALINK_ANY_MEDIATYPE,
 		    DLADM_OPT_PERSIST);

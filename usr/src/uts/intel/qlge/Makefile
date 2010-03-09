@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This makefile drives the production of the qlge driver kernel module.
@@ -57,8 +57,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 MODSTUBS_DIR	 = $(OBJS_DIR)
 
-INC_PATH	+= -I$(ROOT)/usr/include
-INC_PATH	+= -I$(UTSBASE)/common/sys
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/qlge
 
 LDFLAGS		+= -dy -Nmisc/mac -Ndrv/ip

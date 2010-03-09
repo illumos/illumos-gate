@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -470,10 +470,10 @@ e1000g_retrieve_context(mblk_t *mp, context_data_t *cur_context,
 	bzero(cur_context, sizeof (context_data_t));
 
 	/* first check lso information */
-	lso_info_get(mp, &mss, &lsoflags);
+	mac_lso_get(mp, &mss, &lsoflags);
 
 	/* retrieve checksum info */
-	hcksum_retrieve(mp, NULL, NULL, &cur_context->cksum_start,
+	mac_hcksum_get(mp, &cur_context->cksum_start,
 	    &cur_context->cksum_stuff, NULL, NULL, &cur_context->cksum_flags);
 	/* retrieve ethernet header size */
 	if (((struct ether_vlan_header *)(uintptr_t)mp->b_rptr)->ether_tpid ==

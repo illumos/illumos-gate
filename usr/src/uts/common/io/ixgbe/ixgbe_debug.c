@@ -6,14 +6,13 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *      http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,7 +21,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,8 +39,8 @@ ixgbe_dump_interrupt(void *adapter, char *tag)
 {
 	ixgbe_t *ixgbe = (ixgbe_t *)adapter;
 	struct ixgbe_hw	*hw = &ixgbe->hw;
-	ixgbe_intr_vector_t	*vect;
-	uint32_t		ivar, reg;
+	ixgbe_intr_vector_t *vect;
+	uint32_t ivar, reg, hw_index;
 	int i, j;
 
 	/*
@@ -74,10 +73,11 @@ ixgbe_dump_interrupt(void *adapter, char *tag)
 	/* for each rx ring bit set */
 	j = bt_getlowbit(vect->rx_map, 0, (ixgbe->num_rx_rings - 1));
 	while (j >= 0) {
+		hw_index = ixgbe->rx_rings[j].hw_index;
 		ixgbe_log(ixgbe, "rx %d  ivar %d  rxdctl: 0x%x  srrctl: 0x%x\n",
-		    j, IXGBE_IVAR_RX_QUEUE(j),
-		    IXGBE_READ_REG(hw, IXGBE_RXDCTL(j)),
-		    IXGBE_READ_REG(hw, IXGBE_SRRCTL(j)));
+		    hw_index, IXGBE_IVAR_RX_QUEUE(hw_index),
+		    IXGBE_READ_REG(hw, IXGBE_RXDCTL(hw_index)),
+		    IXGBE_READ_REG(hw, IXGBE_SRRCTL(hw_index)));
 		j = bt_getlowbit(vect->rx_map, (j + 1),
 		    (ixgbe->num_rx_rings - 1));
 	}
@@ -427,7 +427,7 @@ void
 ixgbe_dump_regs(void *adapter)
 {
 	ixgbe_t *ixgbe = (ixgbe_t *)adapter;
-	uint32_t reg_val;
+	uint32_t reg_val, hw_index;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	int i;
 	DEBUGFUNC("ixgbe_dump_regs");
@@ -460,10 +460,11 @@ ixgbe_dump_regs(void *adapter)
 	reg_val = IXGBE_READ_REG(hw, IXGBE_RXCTRL);
 	ixgbe_log(ixgbe, "\tRXCTRL=%x\n", reg_val);
 	for (i = 0; i < ixgbe->num_rx_rings; i++) {
-		reg_val = IXGBE_READ_REG(hw, IXGBE_RXDCTL(i));
-		ixgbe_log(ixgbe, "\tRXDCTL(%d)=%x\n", i, reg_val);
-		reg_val = IXGBE_READ_REG(hw, IXGBE_SRRCTL(i));
-		ixgbe_log(ixgbe, "\tSRRCTL(%d)=%x\n", i, reg_val);
+		hw_index = ixgbe->rx_rings[i].hw_index;
+		reg_val = IXGBE_READ_REG(hw, IXGBE_RXDCTL(hw_index));
+		ixgbe_log(ixgbe, "\tRXDCTL(%d)=%x\n", hw_index, reg_val);
+		reg_val = IXGBE_READ_REG(hw, IXGBE_SRRCTL(hw_index));
+		ixgbe_log(ixgbe, "\tSRRCTL(%d)=%x\n", hw_index, reg_val);
 	}
 	reg_val = IXGBE_READ_REG(hw, IXGBE_RXCSUM);
 	ixgbe_log(ixgbe, "\tRXCSUM=%x\n", reg_val);

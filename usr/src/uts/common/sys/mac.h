@@ -92,7 +92,7 @@ typedef enum {
 } link_tagmode_t;
 
 /*
- * Defines range of uint32 values
+ * Defines range of uint32_t values
  */
 typedef struct mac_propval_uint32_range_s {
 	uint32_t mpur_min;
@@ -100,10 +100,12 @@ typedef struct mac_propval_uint32_range_s {
 } mac_propval_uint32_range_t;
 
 /*
- * Data type of the value
+ * Data type of property values.
  */
 typedef enum {
-	MAC_PROPVAL_UINT32 = 0x1
+	MAC_PROPVAL_UINT8,
+	MAC_PROPVAL_UINT32,
+	MAC_PROPVAL_STR
 } mac_propval_type_t;
 
 /*
@@ -111,8 +113,6 @@ typedef enum {
  * range of values (int32, int64, uint32, uint64, et al) or collection/
  * enumeration of values (strings).
  * Can be used as a value-result parameter.
- *
- * See PSARC 2009/235 for more information.
  */
 typedef struct mac_propval_range_s {
 	uint_t mpr_count;			/* count of ranges */
@@ -122,7 +122,7 @@ typedef struct mac_propval_range_s {
 	} u;
 } mac_propval_range_t;
 
-#define	range_uint32	u.mpr_uint32
+#define	mpr_range_uint32	u.mpr_uint32
 
 /*
  * Maximum MAC address length
@@ -134,26 +134,15 @@ typedef enum {
 	MAC_LOGTYPE_FLOW
 } mac_logtype_t;
 
+#define	MAXLINKPROPNAME		256		/* max property name len */
+
 /*
- * Encodings for public properties.
- * A most significant bit value of 1 indicates private property, intended
- * to allow private property implementations to use internal encodings
- * if desired.
+ * Public properties.
  *
- * Note that there are 2 sets of parameters: the *_EN_*
- * values are those that the Administrator configures for autonegotiation.
- * The _ADV_* values are those that are currently exposed over the wire.
+ * Note that there are 2 sets of parameters: the *_EN_* values are
+ * those that the Administrator configures for autonegotiation. The
+ * _ADV_* values are those that are currently exposed over the wire.
  */
-#define	MAXLINKPROPNAME		256
-#define	MAC_PROP_DEFAULT	0x0001		/* default property value */
-
-/*
- * Indicates the linkprop framework is interested in knowing the list of
- * possible property values. When used to obtain possible values for a
- * property, one may have to change all the drivers. See PSARC 2009/235.
- */
-#define	MAC_PROP_POSSIBLE	0x0002		/* possible property values */
-
 typedef enum {
 	MAC_PROP_DUPLEX = 0x00000001,
 	MAC_PROP_SPEED,
@@ -202,16 +191,20 @@ typedef enum {
 	MAC_PROP_WL_DELKEY,
 	MAC_PROP_WL_KEY,
 	MAC_PROP_WL_MLME,
-	MAC_PROP_MAXBW,
-	MAC_PROP_PRIO,
-	MAC_PROP_BIND_CPU,
 	MAC_PROP_TAGMODE,
 	MAC_PROP_ADV_10GFDX_CAP,
 	MAC_PROP_EN_10GFDX_CAP,
 	MAC_PROP_PVID,
 	MAC_PROP_LLIMIT,
 	MAC_PROP_LDECAY,
-	MAC_PROP_PROTECT,
+	MAC_PROP_RESOURCE,
+	MAC_PROP_RESOURCE_EFF,
+	MAC_PROP_RXRINGSRANGE,
+	MAC_PROP_TXRINGSRANGE,
+	MAC_PROP_MAX_TX_RINGS_AVAIL,
+	MAC_PROP_MAX_RX_RINGS_AVAIL,
+	MAC_PROP_MAX_RXHWCLNT_AVAIL,
+	MAC_PROP_MAX_TXHWCLNT_AVAIL,
 	MAC_PROP_PRIVATE = -1
 } mac_prop_id_t;
 
@@ -248,7 +241,8 @@ enum mac_mod_stat {
 	MAC_STAT_LINK_STATE,
 	MAC_STAT_LINK_UP,
 	MAC_STAT_PROMISC,
-	MAC_STAT_LOWLINK_STATE
+	MAC_STAT_LOWLINK_STATE,
+	MAC_STAT_HDROPS
 };
 
 /*
@@ -328,9 +322,13 @@ typedef struct mac_capab_vnic_s {
 } mac_capab_vnic_t;
 
 typedef void (*mac_rename_fn_t)(const char *, void *);
+typedef mblk_t *(*mac_tx_ring_fn_t)(void *, mblk_t *, uintptr_t,
+    mac_ring_handle_t *);
 typedef struct mac_capab_aggr_s {
 	mac_rename_fn_t mca_rename_fn;
 	int (*mca_unicst)(void *, const uint8_t *);
+	mac_tx_ring_fn_t mca_find_tx_ring_fn;
+	void *mca_arg;
 } mac_capab_aggr_t;
 
 /* Bridge transmit and receive function signatures */
@@ -373,6 +371,8 @@ typedef	struct mac_intr_s {
 	mac_intr_handle_t	mi_handle;
 	mac_intr_enable_t	mi_enable;
 	mac_intr_disable_t	mi_disable;
+	ddi_intr_handle_t	mi_ddi_handle;
+	boolean_t		mi_ddi_shared;
 } mac_intr_t;
 
 typedef struct mac_rx_fifo_s {
@@ -571,12 +571,6 @@ typedef struct mactype_register_s {
 	size_t		mtr_mappingcount;
 } mactype_register_t;
 
-typedef struct mac_prop_s {
-	mac_prop_id_t	mp_id;
-	char		*mp_name;
-	uint_t		mp_flags;
-} mac_prop_t;
-
 /*
  * Driver interface functions.
  */
@@ -617,6 +611,7 @@ extern int			mac_start_logusage(mac_logtype_t, uint_t);
 extern void			mac_stop_logusage(mac_logtype_t);
 
 extern mac_handle_t		mac_get_lower_mac_handle(mac_handle_t);
+extern boolean_t		mac_is_vnic_primary(mac_handle_t);
 
 /*
  * Packet hashing for distribution to multiple ports and rings.

@@ -6,14 +6,13 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -121,20 +120,18 @@ static void igb_fm_init(igb_t *);
 static void igb_fm_fini(igb_t *);
 static void igb_release_multicast(igb_t *);
 
-mac_priv_prop_t igb_priv_props[] = {
-	{"_tx_copy_thresh", MAC_PROP_PERM_RW},
-	{"_tx_recycle_thresh", MAC_PROP_PERM_RW},
-	{"_tx_overload_thresh", MAC_PROP_PERM_RW},
-	{"_tx_resched_thresh", MAC_PROP_PERM_RW},
-	{"_rx_copy_thresh", MAC_PROP_PERM_RW},
-	{"_rx_limit_per_intr", MAC_PROP_PERM_RW},
-	{"_intr_throttling", MAC_PROP_PERM_RW},
-	{"_adv_pause_cap", MAC_PROP_PERM_READ},
-	{"_adv_asym_pause_cap", MAC_PROP_PERM_READ}
+char *igb_priv_props[] = {
+	"_tx_copy_thresh",
+	"_tx_recycle_thresh",
+	"_tx_overload_thresh",
+	"_tx_resched_thresh",
+	"_rx_copy_thresh",
+	"_rx_limit_per_intr",
+	"_intr_throttling",
+	"_adv_pause_cap",
+	"_adv_asym_pause_cap",
+	NULL
 };
-
-#define	IGB_MAX_PRIV_PROPS \
-	(sizeof (igb_priv_props) / sizeof (mac_priv_prop_t))
 
 static struct cb_ops igb_cb_ops = {
 	nulldev,		/* cb_open */
@@ -191,7 +188,7 @@ ddi_device_acc_attr_t igb_regs_acc_attr = {
 };
 
 #define	IGB_M_CALLBACK_FLAGS \
-	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO)
 
 static mac_callbacks_t igb_m_callbacks = {
 	IGB_M_CALLBACK_FLAGS,
@@ -202,12 +199,14 @@ static mac_callbacks_t igb_m_callbacks = {
 	igb_m_multicst,
 	NULL,
 	NULL,
+	NULL,
 	igb_m_ioctl,
 	igb_m_getcapab,
 	NULL,
 	NULL,
 	igb_m_setprop,
-	igb_m_getprop
+	igb_m_getprop,
+	igb_m_propinfo
 };
 
 /*
@@ -783,7 +782,6 @@ igb_register_mac(igb_t *igb)
 	    sizeof (struct ether_vlan_header) - ETHERFCSL;
 	mac->m_margin = VLAN_TAGSZ;
 	mac->m_priv_props = igb_priv_props;
-	mac->m_priv_prop_count = IGB_MAX_PRIV_PROPS;
 	mac->m_v12n = MAC_VIRT_LEVEL1;
 
 	status = mac_register(mac, &igb->mac_hdl);

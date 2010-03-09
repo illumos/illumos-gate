@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include <sys/mac_provider.h>
 #include <sys/mac_wifi.h>
 #include <sys/net80211.h>
+#include <sys/byteorder.h>
 #include "rtwreg.h"
 #include "rtwvar.h"
 #include "smc93cx6var.h"
@@ -139,10 +140,12 @@ static void	rtw_m_ioctl(void *, queue_t *, mblk_t *);
 static int	rtw_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int	rtw_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+    uint_t, void *);
+static void	rtw_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 
 static mac_callbacks_t rtw_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	rtw_m_stat,
 	rtw_m_start,
 	rtw_m_stop,
@@ -150,12 +153,14 @@ static mac_callbacks_t rtw_m_callbacks = {
 	rtw_m_multicst,
 	rtw_m_unicst,
 	rtw_m_tx,
+	NULL,
 	rtw_m_ioctl,
 	NULL,		/* mc_getcapab */
 	NULL,
 	NULL,
 	rtw_m_setprop,
-	rtw_m_getprop
+	rtw_m_getprop,
+	rtw_m_propinfo
 };
 
 DDI_DEFINE_STREAM_OPS(rtw_dev_ops, nulldev, nulldev, rtw_attach, rtw_detach,
@@ -2914,17 +2919,25 @@ rtw_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 static int
 rtw_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	rtw_softc_t *rsc = arg;
 	int err;
 
 	err = ieee80211_getprop(&rsc->sc_ic, pr_name, wldp_pr_num,
-	    pr_flags, wldp_length, wldp_buf, perm);
+	    wldp_length, wldp_buf);
 
 	return (err);
 }
 
+static void
+rtw_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    mac_prop_info_handle_t prh)
+{
+	rtw_softc_t *rsc = arg;
+
+	ieee80211_propinfo(&rsc->sc_ic, pr_name, wldp_pr_num, prh);
+}
 
 static int
 rtw_m_start(void *arg)

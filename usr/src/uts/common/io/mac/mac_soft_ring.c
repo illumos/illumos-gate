@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +88,7 @@
 #include <sys/mac_client_impl.h>
 #include <sys/mac_soft_ring.h>
 #include <sys/mac_flow_impl.h>
+#include <sys/mac_stat.h>
 
 static void mac_rx_soft_ring_drain(mac_soft_ring_t *);
 static void mac_soft_ring_fire(void *);
@@ -145,7 +146,7 @@ mac_soft_ring_worker_wakeup(mac_soft_ring_t *ringp)
  * thread to the assigned CPU.
  */
 mac_soft_ring_t *
-mac_soft_ring_create(int id, clock_t wait, void *flent, uint16_t type,
+mac_soft_ring_create(int id, clock_t wait, uint16_t type,
     pri_t pri, mac_client_impl_t *mcip, mac_soft_ring_set_t *mac_srs,
     processorid_t cpuid, mac_direct_rx_t rx_func, void *x_arg1,
     mac_resource_handle_t x_arg2)
@@ -162,9 +163,13 @@ mac_soft_ring_create(int id, clock_t wait, void *flent, uint16_t type,
 	} else if (type & ST_RING_UDP) {
 		(void) snprintf(name, sizeof (name),
 		    "mac_udp_soft_ring_%d_%p", id, (void *)mac_srs);
-	} else {
+	} else if (type & ST_RING_OTH) {
 		(void) snprintf(name, sizeof (name),
 		    "mac_oth_soft_ring_%d_%p", id, (void *)mac_srs);
+	} else {
+		ASSERT(type & ST_RING_TX);
+		(void) snprintf(name, sizeof (name),
+		    "mac_tx_soft_ring_%d_%p", id, (void *)mac_srs);
 	}
 
 	bzero(ringp, sizeof (mac_soft_ring_t));
@@ -177,7 +182,6 @@ mac_soft_ring_create(int id, clock_t wait, void *flent, uint16_t type,
 	ringp->s_ring_wait = MSEC_TO_TICK(wait);
 	ringp->s_ring_mcip = mcip;
 	ringp->s_ring_set = mac_srs;
-	ringp->s_ring_flent = flent;
 
 	/*
 	 * Protect against access from DR callbacks (mac_walk_srs_bind/unbind)
@@ -202,6 +206,14 @@ mac_soft_ring_create(int id, clock_t wait, void *flent, uint16_t type,
 		ringp->s_ring_tx_hiwat =
 		    (mac_tx_soft_ring_hiwat > mac_tx_soft_ring_max_q_cnt) ?
 		    mac_tx_soft_ring_max_q_cnt : mac_tx_soft_ring_hiwat;
+		if (mcip->mci_state_flags & MCIS_IS_AGGR) {
+			mac_srs_tx_t *tx = &mac_srs->srs_tx;
+
+			ASSERT(tx->st_soft_rings[
+			    ((mac_ring_t *)x_arg2)->mr_index] == NULL);
+			tx->st_soft_rings[((mac_ring_t *)x_arg2)->mr_index] =
+			    ringp;
+		}
 	} else {
 		ringp->s_ring_drain_func = mac_rx_soft_ring_drain;
 		ringp->s_ring_rx_func = rx_func;
@@ -213,6 +225,8 @@ mac_soft_ring_create(int id, clock_t wait, void *flent, uint16_t type,
 	if (cpuid != -1)
 		(void) mac_soft_ring_bind(ringp, cpuid);
 
+	mac_soft_ring_stat_create(ringp);
+
 	return (ringp);
 }
 
@@ -222,18 +236,14 @@ mac_soft_ring_create(int id, clock_t wait, void *flent, uint16_t type,
  * Free the soft ring once we are done with it.
  */
 void
-mac_soft_ring_free(mac_soft_ring_t *softring, boolean_t release_tx_ring)
+mac_soft_ring_free(mac_soft_ring_t *softring)
 {
 	ASSERT((softring->s_ring_state &
 	    (S_RING_CONDEMNED | S_RING_CONDEMNED_DONE | S_RING_PROC)) ==
 	    (S_RING_CONDEMNED | S_RING_CONDEMNED_DONE));
 	mac_pkt_drop(NULL, NULL, softring->s_ring_first, B_FALSE);
-	if (release_tx_ring && softring->s_ring_tx_arg2 != NULL) {
-		ASSERT(softring->s_ring_type & ST_RING_TX);
-		mac_release_tx_ring(softring->s_ring_tx_arg2);
-	}
-	if (softring->s_ring_ksp)
-		kstat_delete(softring->s_ring_ksp);
+	softring->s_ring_tx_arg2 = NULL;
+	mac_soft_ring_stat_delete(softring);
 	mac_callback_free(softring->s_ring_notify_cb_list);
 	kmem_cache_free(mac_soft_ring_cache, softring);
 }
@@ -642,7 +652,6 @@ mac_tx_soft_ring_drain(mac_soft_ring_t *ringp)
 	void 			*arg2;
 	mblk_t 			*tail;
 	uint_t			saved_pkt_count, saved_size;
-	boolean_t		is_subflow;
 	mac_tx_stats_t		stats;
 	mac_soft_ring_set_t	*mac_srs = ringp->s_ring_set;
 
@@ -652,7 +661,6 @@ mac_tx_soft_ring_drain(mac_soft_ring_t *ringp)
 	ASSERT(!(ringp->s_ring_state & S_RING_PROC));
 
 	ringp->s_ring_state |= S_RING_PROC;
-	is_subflow = ((mac_srs->srs_type & SRST_FLOW) != 0);
 	arg1 = ringp->s_ring_tx_arg1;
 	arg2 = ringp->s_ring_tx_arg2;
 
@@ -675,8 +683,8 @@ mac_tx_soft_ring_drain(mac_soft_ring_t *ringp)
 			tail->b_next = ringp->s_ring_first;
 			ringp->s_ring_first = mp;
 			ringp->s_ring_count +=
-			    (saved_pkt_count - stats.ts_opackets);
-			ringp->s_ring_size += (saved_size - stats.ts_obytes);
+			    (saved_pkt_count - stats.mts_opackets);
+			ringp->s_ring_size += (saved_size - stats.mts_obytes);
 			if (ringp->s_ring_last == NULL)
 				ringp->s_ring_last = tail;
 
@@ -684,7 +692,7 @@ mac_tx_soft_ring_drain(mac_soft_ring_t *ringp)
 				ringp->s_ring_tx_woken_up = B_FALSE;
 			} else {
 				ringp->s_ring_state |= S_RING_BLOCK;
-				ringp->s_ring_blocked_cnt++;
+				ringp->s_st_stat.mts_blockcnt++;
 			}
 
 			ringp->s_ring_state &= ~S_RING_PROC;
@@ -692,17 +700,13 @@ mac_tx_soft_ring_drain(mac_soft_ring_t *ringp)
 			return;
 		} else {
 			ringp->s_ring_tx_woken_up = B_FALSE;
-			if (is_subflow) {
-				FLOW_TX_STATS_UPDATE(
-				    mac_srs->srs_flent, &stats);
-			}
+			SRS_TX_STATS_UPDATE(mac_srs, &stats);
+			SOFTRING_TX_STATS_UPDATE(ringp, &stats);
 		}
 	}
 
 	if (ringp->s_ring_count == 0 && ringp->s_ring_state &
 	    (S_RING_TX_HIWAT | S_RING_WAKEUP_CLIENT | S_RING_ENQUEUED)) {
-		mac_tx_notify_cb_t *mtnfp;
-		mac_cb_t *mcb;
 		mac_client_impl_t *mcip =  ringp->s_ring_mcip;
 		boolean_t wakeup_required = B_FALSE;
 
@@ -714,16 +718,7 @@ mac_tx_soft_ring_drain(mac_soft_ring_t *ringp)
 		    ~(S_RING_TX_HIWAT | S_RING_WAKEUP_CLIENT | S_RING_ENQUEUED);
 		mutex_exit(&ringp->s_ring_lock);
 		if (wakeup_required) {
-			/* Wakeup callback registered clients */
-			MAC_CALLBACK_WALKER_INC(&mcip->mci_tx_notify_cb_info);
-			for (mcb = mcip->mci_tx_notify_cb_list; mcb != NULL;
-			    mcb = mcb->mcb_nextp) {
-				mtnfp = (mac_tx_notify_cb_t *)mcb->mcb_objp;
-				mtnfp->mtnf_fn(mtnfp->mtnf_arg,
-				    (mac_tx_cookie_t)ringp);
-			}
-			MAC_CALLBACK_WALKER_DCR(&mcip->mci_tx_notify_cb_info,
-			    &mcip->mci_tx_notify_cb_list);
+			mac_tx_invoke_callbacks(mcip, (mac_tx_cookie_t)ringp);
 			/*
 			 * If the client is not the primary MAC client, then we
 			 * need to send the notification to the clients upper

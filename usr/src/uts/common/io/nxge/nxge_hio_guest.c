@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,7 +169,6 @@ static void nxge_check_guest_state(nxge_hio_vr_t *);
  * Context:
  *	Guest domain
  */
-/* ARGSUSED */
 int
 nxge_hio_vr_add(nxge_t *nxge)
 {
@@ -409,6 +408,20 @@ nxge_guest_dc_alloc(
 	MUTEX_EXIT(&nhd->lock);
 
 	return (0);
+}
+
+int
+nxge_hio_get_dc_htable_idx(nxge_t *nxge, vpc_type_t type, uint32_t channel)
+{
+	nxge_hio_dc_t   *dc;
+
+	ASSERT(isLDOMguest(nxge));
+
+	dc = nxge_grp_dc_find(nxge, type, channel);
+	if (dc == NULL)
+		return (-1);
+
+	return (dc->ldg.vector);
 }
 
 /*

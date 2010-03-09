@@ -6,14 +6,13 @@
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -418,6 +417,10 @@ adjust_threshold:
 
 	ASSERT((desc_num == desc_total) || (desc_num == (desc_total + 1)));
 
+	/* Update per-ring tx statistics */
+	tx_ring->tx_pkts++;
+	tx_ring->tx_bytes += mbsize;
+
 	mutex_exit(&tx_ring->tx_lock);
 
 	return (B_TRUE);
@@ -599,7 +602,7 @@ igb_get_tx_context(mblk_t *mp, tx_context_t *ctx)
 
 	ASSERT(mp != NULL);
 
-	hcksum_retrieve(mp, NULL, NULL, &start, NULL, NULL, NULL, &flags);
+	mac_hcksum_get(mp, &start, NULL, NULL, NULL, &flags);
 	bzero(ctx, sizeof (tx_context_t));
 
 	ctx->hcksum_flags = flags;
@@ -607,7 +610,7 @@ igb_get_tx_context(mblk_t *mp, tx_context_t *ctx)
 	if (flags == 0)
 		return (TX_CXT_SUCCESS);
 
-	lso_info_get(mp, &mss, &lso_flag);
+	mac_lso_get(mp, &mss, &lso_flag);
 	ctx->mss = mss;
 	ctx->lso_flag = (lso_flag == HW_LSO);
 

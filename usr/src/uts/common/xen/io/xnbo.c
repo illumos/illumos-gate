@@ -173,8 +173,7 @@ xnbo_cksum_to_peer(xnb_t *xnbp, mblk_t *mp)
 	 * gain some advantage.
 	 */
 
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL,
-	    NULL, &csum, &pflags);
+	mac_hcksum_get(mp, NULL, NULL, NULL, &csum, &pflags);
 
 	/*
 	 * If the MAC driver has asserted that the checksum is

@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,9 +114,11 @@ static int	mxfe_m_stat(void *, uint_t, uint64_t *);
 static int	mxfe_m_start(void *);
 static void	mxfe_m_stop(void *);
 static int	mxfe_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
-    uint_t, void *, uint_t *);
+    void *);
 static int	mxfe_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
+static void	mxfe_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 static unsigned	mxfe_intr(caddr_t);
 static void	mxfe_startmac(mxfe_t *);
 static void	mxfe_stopmac(mxfe_t *);
@@ -170,7 +172,7 @@ static void	mxfe_dprintf(mxfe_t *, const char *, int, char *, ...);
 #define	KIOIP	KSTAT_INTR_PTR(mxfep->mxfe_intrstat)
 
 static mac_callbacks_t mxfe_m_callbacks = {
-	MC_SETPROP | MC_GETPROP,
+	MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	mxfe_m_stat,
 	mxfe_m_start,
 	mxfe_m_stop,
@@ -178,12 +180,14 @@ static mac_callbacks_t mxfe_m_callbacks = {
 	mxfe_m_multicst,
 	mxfe_m_unicst,
 	mxfe_m_tx,
+	NULL,
 	NULL,		/* mc_ioctl */
 	NULL,		/* mc_getcapab */
 	NULL,		/* mc_open */
 	NULL,		/* mc_close */
 	mxfe_m_setprop,
-	mxfe_m_getprop
+	mxfe_m_getprop,
+	mxfe_m_propinfo
 };
 
 /*
@@ -2877,90 +2881,50 @@ mxfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 /*ARGSUSED*/
 int
-mxfe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
-    uint_t sz, void *val, uint_t *perm)
+mxfe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    void *val)
 {
 	mxfe_t		*mxfep = arg;
 	int		err = 0;
-	boolean_t	dfl = flags & MAC_PROP_DEFAULT;
 
-	if (sz == 0)
-		return (EINVAL);
-
-	*perm = MAC_PROP_PERM_RW;
 	switch (num) {
 	case MAC_PROP_DUPLEX:
-		*perm = MAC_PROP_PERM_READ;
-		if (sz >= sizeof (link_duplex_t)) {
-			bcopy(&mxfep->mxfe_duplex, val,
-			    sizeof (link_duplex_t));
-		} else {
-			err = EINVAL;
-		}
+		ASSERT(sz >= sizeof (link_duplex_t));
+		bcopy(&mxfep->mxfe_duplex, val, sizeof (link_duplex_t));
 		break;
 
 	case MAC_PROP_SPEED:
-		*perm = MAC_PROP_PERM_READ;
-		if (sz >= sizeof (uint64_t)) {
-			bcopy(&mxfep->mxfe_ifspeed, val, sizeof (uint64_t));
-		} else {
-			err = EINVAL;
-		}
+		ASSERT(sz >= sizeof (uint64_t));
+		bcopy(&mxfep->mxfe_ifspeed, val, sizeof (uint64_t));
 		break;
 
 	case MAC_PROP_AUTONEG:
-		*(uint8_t *)val =
-		    dfl ? mxfep->mxfe_cap_aneg : mxfep->mxfe_adv_aneg;
+		*(uint8_t *)val = mxfep->mxfe_adv_aneg;
 		break;
 
 	case MAC_PROP_ADV_100FDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? mxfep->mxfe_cap_100fdx : mxfep->mxfe_adv_100fdx;
-		break;
 	case MAC_PROP_EN_100FDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? mxfep->mxfe_cap_100fdx : mxfep->mxfe_adv_100fdx;
+		*(uint8_t *)val = mxfep->mxfe_adv_100fdx;
 		break;
 
 	case MAC_PROP_ADV_100HDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? mxfep->mxfe_cap_100hdx : mxfep->mxfe_adv_100hdx;
-		break;
 	case MAC_PROP_EN_100HDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? mxfep->mxfe_cap_100hdx : mxfep->mxfe_adv_100hdx;
+		*(uint8_t *)val = mxfep->mxfe_adv_100hdx;
 		break;
 
 	case MAC_PROP_ADV_10FDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? mxfep->mxfe_cap_10fdx : mxfep->mxfe_adv_10fdx;
-		break;
 	case MAC_PROP_EN_10FDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? mxfep->mxfe_cap_10fdx : mxfep->mxfe_adv_10fdx;
+		*(uint8_t *)val = mxfep->mxfe_adv_10fdx;
 		break;
 
 	case MAC_PROP_ADV_10HDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? mxfep->mxfe_cap_10hdx : mxfep->mxfe_adv_10hdx;
-		break;
 	case MAC_PROP_EN_10HDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? mxfep->mxfe_cap_10hdx : mxfep->mxfe_adv_10hdx;
+		*(uint8_t *)val = mxfep->mxfe_adv_10hdx;
 		break;
 
 	case MAC_PROP_ADV_100T4_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? mxfep->mxfe_cap_100T4 : mxfep->mxfe_adv_100T4;
-		break;
 	case MAC_PROP_EN_100T4_CAP:
-		*(uint8_t *)val =
-		    dfl ? mxfep->mxfe_cap_100T4 : mxfep->mxfe_adv_100T4;
+		*(uint8_t *)val = mxfep->mxfe_adv_100T4;
 		break;
 
 	default:
@@ -3039,6 +3003,51 @@ mxfe_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
 	mutex_exit(&mxfep->mxfe_intrlock);
 
 	return (0);
+}
+
+static void
+mxfe_m_propinfo(void *arg, const char *name, mac_prop_id_t num,
+    mac_prop_info_handle_t mph)
+{
+	mxfe_t		*mxfep = arg;
+
+        _NOTE(ARGUNUSED(name));
+
+	switch (num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_ADV_100T4_CAP:
+		mac_prop_info_set_perm(mph, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_AUTONEG:
+		mac_prop_info_set_default_uint8(mph, mxfep->mxfe_cap_aneg);
+		break;
+
+	case MAC_PROP_EN_100FDX_CAP:
+		mac_prop_info_set_default_uint8(mph, mxfep->mxfe_cap_100fdx);
+		break;
+
+	case MAC_PROP_EN_100HDX_CAP:
+		mac_prop_info_set_default_uint8(mph, mxfep->mxfe_cap_100hdx);
+		break;
+
+	case MAC_PROP_EN_10FDX_CAP:
+		mac_prop_info_set_default_uint8(mph, mxfep->mxfe_cap_10fdx);
+		break;
+
+	case MAC_PROP_EN_10HDX_CAP:
+		mac_prop_info_set_default_uint8(mph, mxfep->mxfe_cap_10hdx);
+		break;
+
+	case MAC_PROP_EN_100T4_CAP:
+		mac_prop_info_set_default_uint8(mph, mxfep->mxfe_cap_100T4);
+		break;
+	}
 }
 
 /*

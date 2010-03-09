@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,6 @@ typedef struct dladm_vnic_attr {
 	uint_t			va_mac_prefix_len;
 	uint16_t		va_vid;
 	boolean_t		va_force;
-	boolean_t		va_hwrings;
 	vrid_t			va_vrid;
 	int			va_af;
 	mac_resource_props_t	va_resource_props;

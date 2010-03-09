@@ -2203,13 +2203,13 @@ ql_set_rx_cksum(mblk_t *mp, struct ib_mac_iocb_rsp *net_rsp)
 	/* TCP or UDP packet and checksum valid */
 	if (((net_rsp->flags2 & IB_MAC_IOCB_RSP_T) != 0) &&
 	    ((net_rsp->flags1 & IB_MAC_IOCB_RSP_NU) == 0)) {
-		flags = HCK_FULLCKSUM | HCK_FULLCKSUM_OK;
-		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0, flags, 0);
+		flags = HCK_FULLCKSUM_OK;
+		mac_hcksum_set(mp, 0, 0, 0, 0, flags);
 	}
 	if (((net_rsp->flags2 & IB_MAC_IOCB_RSP_U) != 0) &&
 	    ((net_rsp->flags1 & IB_MAC_IOCB_RSP_NU) == 0)) {
-		flags = HCK_FULLCKSUM | HCK_FULLCKSUM_OK;
-		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0, flags, 0);
+		flags = HCK_FULLCKSUM_OK;
+		mac_hcksum_set(mp, 0, 0, 0, 0, flags);
 	}
 }
 
@@ -4750,13 +4750,12 @@ ql_send_common(struct tx_ring *tx_ring, mblk_t *mp)
 		tx_mode = USE_COPY;
 
 	if (qlge->chksum_cap) {
-		hcksum_retrieve(mp, NULL, NULL, NULL,
-		    NULL, NULL, NULL, &pflags);
+		mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &pflags);
 		QL_PRINT(DBG_TX, ("checksum flag is :0x%x, card capability "
 		    "is 0x%x \n", pflags, qlge->chksum_cap));
 		if (qlge->lso_enable) {
 			uint32_t lso_flags = 0;
-			lso_info_get(mp, &mss, &lso_flags);
+			mac_lso_get(mp, &mss, &lso_flags);
 			use_lso = (lso_flags == HW_LSO);
 		}
 		QL_PRINT(DBG_TX, ("mss :%d, use_lso %x \n",

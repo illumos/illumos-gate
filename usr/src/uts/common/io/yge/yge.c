@@ -228,8 +228,9 @@ static mblk_t *yge_m_tx(void *, mblk_t *);
 static int yge_m_stat(void *, uint_t, uint64_t *);
 static int yge_m_start(void *);
 static void yge_m_stop(void *);
-static int yge_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
-    uint_t, void *, uint_t *);
+static int yge_m_getprop(void *, const char *, mac_prop_id_t, uint_t, void *);
+static void yge_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 static int yge_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
 static void yge_m_ioctl(void *, queue_t *, mblk_t *);
@@ -240,7 +241,7 @@ extern int yge_phys_restart(yge_port_t *, boolean_t);
 extern int yge_phys_init(yge_port_t *, phy_readreg_t, phy_writereg_t);
 
 static mac_callbacks_t yge_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	yge_m_stat,
 	yge_m_start,
 	yge_m_stop,
@@ -248,12 +249,14 @@ static mac_callbacks_t yge_m_callbacks = {
 	yge_m_multicst,
 	yge_m_unicst,
 	yge_m_tx,
+	NULL,
 	yge_m_ioctl,
 	NULL,		/* mc_getcapab */
 	NULL,		/* mc_open */
 	NULL,		/* mc_close */
 	yge_m_setprop,
 	yge_m_getprop,
+	yge_m_propinfo
 };
 
 static mii_ops_t yge_mii_ops = {
@@ -3348,47 +3351,30 @@ err:
 
 int
 yge_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	yge_port_t	*port = arg;
-	mac_propval_range_t range;
-	int err;
 
-	err = mii_m_getprop(port->p_mii, pr_name, pr_num, pr_flags,
-	    pr_valsize, pr_val, perm);
-	if (err != ENOTSUP) {
-		return (err);
-	}
+	return (mii_m_getprop(port->p_mii, pr_name, pr_num, pr_valsize,
+	    pr_val));
+}
 
-	if (pr_valsize == 0)
-		return (EINVAL);
-
-	bzero(pr_val, pr_valsize);
-	*perm = MAC_PROP_PERM_RW;
+static void
+yge_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	yge_port_t	*port = arg;
 
 	switch (pr_num) {
 	case MAC_PROP_MTU:
-		if (!(pr_flags & MAC_PROP_POSSIBLE)) {
-			err = ENOTSUP;
-			break;
-		}
-		if (pr_valsize < sizeof (mac_propval_range_t))
-			return (EINVAL);
-		range.mpr_count = 1;
-		range.mpr_type = MAC_PROPVAL_UINT32;
-		range.range_uint32[0].mpur_min = ETHERMTU;
-		range.range_uint32[0].mpur_max =
+		mac_prop_info_set_range_uint32(prh, ETHERMTU,
 		    port->p_flags & PORT_FLAG_NOJUMBO ?
-		    ETHERMTU : YGE_JUMBO_MTU;
-		bcopy(&range, pr_val, sizeof (range));
-		err = 0;
+		    ETHERMTU : YGE_JUMBO_MTU);
 		break;
-
 	default:
-		err = ENOTSUP;
+		mii_m_propinfo(port->p_mii, pr_name, pr_num, prh);
 		break;
 	}
-	return (err);
 }
 
 void

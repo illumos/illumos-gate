@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -533,7 +533,7 @@ bge_ring_tx(void *arg, mblk_t *mp)
 	/*
 	 * Retrieve checksum offloading info.
 	 */
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &pflags);
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &pflags);
 
 	/*
 	 * Calculate pseudo checksum if needed.

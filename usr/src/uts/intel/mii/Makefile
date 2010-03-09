@@ -21,7 +21,7 @@
 #
 # uts/intel/mii/Makefile
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the mii support module.
@@ -55,7 +55,7 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS		+= -dy
+LDFLAGS		+= -dy -N misc/mac
 
 #
 #	Default build targets.

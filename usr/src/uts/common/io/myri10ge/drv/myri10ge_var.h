@@ -57,9 +57,7 @@ extern "C" {
 #include <sys/sunddi.h>
 #include <sys/strsubr.h>  	/* for hw cksum stuff */
 #include <sys/pattr.h>		/* for hw cksum stuff */
-#ifdef MYRICOM_PRIV
 #include <netinet/in.h>		/* for hw cksum stuff */
-#endif
 #include <netinet/ip.h>		/* for hw cksum stuff */
 #include <netinet/ip6.h>	/* for hw cksum stuff */
 #include <netinet/tcp.h>	/* for hw cksum stuff */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,7 +57,7 @@
 static uchar_t	zero_mac[] = {0, 0, 0, 0, 0, 0};
 #define	VALID_PORT_MAC(mac)						\
 	(((mac) != NULL) && (bcmp(zero_mac, (mac), ETHERADDRL) != 0) &&	\
-	(!(mac)[0] & 0x01))
+	(!((mac)[0] & 0x01)))
 
 #define	PORT_DELIMITER	":"
 

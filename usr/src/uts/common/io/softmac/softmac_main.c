@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,11 +84,13 @@ static boolean_t softmac_m_getcapab(void *, mac_capab_t, void *);
 static int softmac_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int softmac_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
-
+    uint_t, void *);
+static void softmac_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 
 #define	SOFTMAC_M_CALLBACK_FLAGS	\
-	(MC_IOCTL | MC_GETCAPAB | MC_OPEN | MC_CLOSE | MC_SETPROP | MC_GETPROP)
+	(MC_IOCTL | MC_GETCAPAB | MC_OPEN | MC_CLOSE | MC_SETPROP | \
+	MC_GETPROP | MC_PROPINFO)
 
 static mac_callbacks_t softmac_m_callbacks = {
 	SOFTMAC_M_CALLBACK_FLAGS,
@@ -99,12 +101,14 @@ static mac_callbacks_t softmac_m_callbacks = {
 	softmac_m_multicst,
 	softmac_m_unicst,
 	softmac_m_tx,
+	NULL,
 	softmac_m_ioctl,
 	softmac_m_getcapab,
 	softmac_m_open,
 	softmac_m_close,
 	softmac_m_setprop,
-	softmac_m_getprop
+	softmac_m_getprop,
+	softmac_m_propinfo
 };
 
 /*ARGSUSED*/
@@ -1468,8 +1472,8 @@ softmac_m_setprop(void *arg, const char *name, mac_prop_id_t id,
 }
 
 static int
-softmac_m_getprop(void *arg, const char *name, mac_prop_id_t id, uint_t flags,
-    uint_t valsize, void *val, uint_t *perm)
+softmac_m_getprop(void *arg, const char *name, mac_prop_id_t id,
+    uint_t valsize, void *val)
 {
 	softmac_t	*softmac = arg;
 	char		*fpstr;
@@ -1478,23 +1482,37 @@ softmac_m_getprop(void *arg, const char *name, mac_prop_id_t id, uint_t flags,
 		return (ENOTSUP);
 
 	if (strcmp(name, "_fastpath") == 0) {
-		if ((flags & MAC_PROP_DEFAULT) != 0)
-			return (ENOTSUP);
-
-		*perm = MAC_PROP_PERM_READ;
 		mutex_enter(&softmac->smac_fp_mutex);
 		fpstr = (DATAPATH_MODE(softmac) == SOFTMAC_SLOWPATH) ?
 		    "disabled" : "enabled";
 		mutex_exit(&softmac->smac_fp_mutex);
 	} else if (strcmp(name, "_disable_fastpath") == 0) {
-		*perm = MAC_PROP_PERM_RW;
-		fpstr = ((flags & MAC_PROP_DEFAULT) != 0) ? "false" :
-		    (softmac->smac_fastpath_admin_disabled ? "true" : "false");
+		fpstr = softmac->smac_fastpath_admin_disabled ?
+		    "true" : "false";
+	} else if (strcmp(name, "_softmac") == 0) {
+		fpstr = "true";
 	} else {
 		return (ENOTSUP);
 	}
 
 	return (strlcpy(val, fpstr, valsize) >= valsize ? EINVAL : 0);
+}
+
+static void
+softmac_m_propinfo(void *arg, const char *name, mac_prop_id_t id,
+    mac_prop_info_handle_t prh)
+{
+        _NOTE(ARGUNUSED(arg));
+
+	if (id != MAC_PROP_PRIVATE)
+		return;
+
+	if (strcmp(name, "_fastpath") == 0) {
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+	} else if (strcmp(name, "_disable_fastpath") == 0) {
+		mac_prop_info_set_default_str(prh, "false");
+	}
+
 }
 
 int

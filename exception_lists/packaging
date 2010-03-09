@@ -90,8 +90,8 @@ usr/include/sys/mac_client_impl.h
 usr/include/sys/mac_client.h
 usr/include/sys/mac_flow_impl.h
 usr/include/sys/mac_impl.h
-usr/include/sys/mac_provider.h
 usr/include/sys/mac_soft_ring.h
+usr/include/sys/mac_stat.h
 #
 # Private GLDv3 userland libraries and headers
 #

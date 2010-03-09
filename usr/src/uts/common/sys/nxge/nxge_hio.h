@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -367,6 +367,8 @@ extern int nxge_hio_rxdma_bind_intr(nxge_t *, rx_rcr_ring_t *, int);
 
 				/* nxge_hio_guest.c */
 extern void nxge_hio_unregister(nxge_t *);
+extern int nxge_hio_get_dc_htable_idx(nxge_t *nxge, vpc_type_t type,
+    uint32_t channel);
 
 extern int nxge_guest_regs_map(nxge_t *);
 extern void nxge_guest_regs_map_free(nxge_t *);
@@ -392,7 +394,7 @@ extern nxge_status_t nxge_hio_intr_remove(nxge_t *, vpc_type_t, int);
 extern nxge_status_t nxge_hio_intr_add(nxge_t *, vpc_type_t, int);
 extern nxge_status_t nxge_hio_intr_rem(nxge_t *, int);
 
-extern hv_rv_t nxge_hio_ldsv_add(nxge_t *, nxge_hio_dc_t *);
+extern int nxge_hio_ldsv_add(nxge_t *, nxge_hio_dc_t *);
 
 extern void nxge_hio_ldsv_im(nxge_t *, nxge_ldg_t *, pio_ld_op_t, uint64_t *);
 extern void nxge_hio_ldgimgn(nxge_t *, nxge_ldg_t *);

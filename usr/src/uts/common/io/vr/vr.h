@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -487,11 +487,13 @@ int			vr_mac_set_ether_addr(void *vrp,
 			    const uint8_t *macaddr);
 mblk_t			*vr_mac_tx_enqueue_list(void *p, mblk_t *mp);
 int			vr_mac_getprop(void *arg, const char *pr_name,
-			    mac_prop_id_t pr_num, uint_t pr_flags,
-			    uint_t pr_valsize, void *pr_val, uint_t *perm);
+			    mac_prop_id_t pr_num, uint_t pr_valsize,
+			    void *pr_val);
 int			vr_mac_setprop(void *arg, const char *pr_name,
 			    mac_prop_id_t pr_num,
 			    uint_t pr_valsize, const void *pr_val);
+void			vr_mac_propinfo(void *arg, const char *pr_name,
+			    mac_prop_id_t pr_num, mac_prop_info_handle_t prh);
 uint_t			vr_intr(caddr_t arg1, caddr_t arg2);
 #ifdef __cplusplus
 }

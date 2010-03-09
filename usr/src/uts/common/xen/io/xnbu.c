@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,7 @@ static mac_callbacks_t xnbu_callbacks = {
 	xnbu_m_set_multicast,
 	xnbu_m_set_mac_addr,
 	xnbu_m_send,
+	NULL,
 	NULL,
 	xnbu_m_getcapab
 };
@@ -130,16 +131,8 @@ xnbu_cksum_from_peer(xnb_t *xnbp, mblk_t *mp, uint16_t flags)
 	if ((flags & NETTXF_data_validated) != 0) {
 		/*
 		 * The checksum is asserted valid.
-		 *
-		 * The hardware checksum offload specification says
-		 * that we must provide the actual checksum as well as
-		 * an assertion that it is valid, but the protocol
-		 * stack doesn't actually use it so we don't bother.
-		 * If it was necessary we could grovel in the packet
-		 * to find it.
 		 */
-		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0,
-		    HCK_FULLCKSUM | HCK_FULLCKSUM_OK, KM_NOSLEEP);
+		mac_hcksum_set(mp, 0, 0, 0, 0, HCK_FULLCKSUM_OK);
 	}
 
 	return (mp);
@@ -152,8 +145,7 @@ xnbu_cksum_to_peer(xnb_t *xnbp, mblk_t *mp)
 	uint16_t r = 0;
 	uint32_t pflags;
 
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL,
-	    NULL, NULL, &pflags);
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &pflags);
 
 	/*
 	 * If the protocol stack has requested checksum

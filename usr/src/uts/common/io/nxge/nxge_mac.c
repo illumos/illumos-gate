@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3340,16 +3340,46 @@ fail:
 	return (NXGE_ERROR | rs);
 }
 
+static npi_status_t
+nxge_rx_mac_mcast_hash_table(p_nxge_t nxgep)
+{
+	uint32_t		i;
+	uint16_t		hashtab_e;
+	p_hash_filter_t		hash_filter;
+	uint8_t			portn;
+	npi_handle_t		handle;
+	npi_status_t		rs = NPI_SUCCESS;
 
-/* Initialize the RxMAC sub-block */
+	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+	handle = nxgep->npi_handle;
 
+	/*
+	 * Load the multicast hash filter bits.
+	 */
+	hash_filter = nxgep->hash_filter;
+	for (i = 0; i < MAC_MAX_HASH_ENTRY; i++) {
+		if (hash_filter != NULL) {
+			hashtab_e = (uint16_t)hash_filter->hash_filter_regs[
+			    (NMCFILTER_REGS - 1) - i];
+		} else {
+			hashtab_e = 0;
+		}
+
+		if ((rs = npi_mac_hashtab_entry(handle, OP_SET, portn, i,
+		    (uint16_t *)&hashtab_e)) != NPI_SUCCESS)
+			return (rs);
+	}
+
+	return (NPI_SUCCESS);
+}
+
+/*
+ * Initialize the RxMAC sub-block
+ */
 nxge_status_t
 nxge_rx_mac_init(p_nxge_t nxgep)
 {
 	npi_attr_t		ap;
-	uint32_t		i;
-	uint16_t		hashtab_e;
-	p_hash_filter_t		hash_filter;
 	nxge_port_t		portt;
 	uint8_t			portn;
 	npi_handle_t		handle;
@@ -3370,9 +3400,8 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 	addr0 = ntohs(addr16p[2]);
 	addr1 = ntohs(addr16p[1]);
 	addr2 = ntohs(addr16p[0]);
-	SET_MAC_ATTR3(handle, ap, portn, MAC_PORT_ADDR, addr0, addr1, addr2,
-	    rs);
-
+	SET_MAC_ATTR3(handle, ap, portn, MAC_PORT_ADDR,
+	    addr0, addr1, addr2, rs);
 	if (rs != NPI_SUCCESS)
 		goto fail;
 	SET_MAC_ATTR3(handle, ap, portn, MAC_PORT_ADDR_FILTER, 0, 0, 0, rs);
@@ -3382,22 +3411,9 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 	if (rs != NPI_SUCCESS)
 		goto fail;
 
-	/*
-	 * Load the multicast hash filter bits.
-	 */
-	hash_filter = nxgep->hash_filter;
-	for (i = 0; i < MAC_MAX_HASH_ENTRY; i++) {
-		if (hash_filter != NULL) {
-			hashtab_e = (uint16_t)hash_filter->hash_filter_regs[
-			    (NMCFILTER_REGS - 1) - i];
-		} else {
-			hashtab_e = 0;
-		}
-
-		if ((rs = npi_mac_hashtab_entry(handle, OP_SET, portn, i,
-		    (uint16_t *)&hashtab_e)) != NPI_SUCCESS)
-			goto fail;
-	}
+	rs = nxge_rx_mac_mcast_hash_table(nxgep);
+	if (rs != NPI_SUCCESS)
+		goto fail;
 
 	if (portt == PORT_TYPE_XMAC) {
 		if ((rs = npi_xmac_rx_iconfig(handle, INIT, portn,
@@ -3413,48 +3429,51 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 
 		if (nxgep->filter.all_phys_cnt != 0)
 			xconfig |= CFG_XMAC_RX_PROMISCUOUS;
-
 		if (nxgep->filter.all_multicast_cnt != 0)
 			xconfig |= CFG_XMAC_RX_PROMISCUOUSGROUP;
 
 		xconfig |= CFG_XMAC_RX_HASH_FILTER;
 
-		if ((rs = npi_xmac_rx_config(handle, INIT, portn,
-		    xconfig)) != NPI_SUCCESS)
+		if ((rs = npi_xmac_rx_config(handle, INIT,
+		    portn, xconfig)) != NPI_SUCCESS)
 			goto fail;
 		nxgep->mac.rx_config = xconfig;
 
-		/* Comparison of mac unique address is always enabled on XMAC */
-
+		/*
+		 * Comparison of mac unique address is always
+		 * enabled on XMAC
+		 */
 		if ((rs = npi_xmac_zap_rx_counters(handle, portn))
 		    != NPI_SUCCESS)
 			goto fail;
 	} else {
-		(void) nxge_fflp_init_hostinfo(nxgep);
-
 		if (npi_bmac_rx_iconfig(nxgep->npi_handle, INIT, portn,
 		    0) != NPI_SUCCESS)
 			goto fail;
+
 		nxgep->mac.rx_iconfig = NXGE_BMAC_RX_INTRS;
+
+		(void) nxge_fflp_init_hostinfo(nxgep);
 
 		bconfig = CFG_BMAC_RX_DISCARD_ON_ERR | CFG_BMAC_RX &
 		    ~CFG_BMAC_RX_STRIP_CRC;
 
 		if (nxgep->filter.all_phys_cnt != 0)
 			bconfig |= CFG_BMAC_RX_PROMISCUOUS;
-
 		if (nxgep->filter.all_multicast_cnt != 0)
 			bconfig |= CFG_BMAC_RX_PROMISCUOUSGROUP;
 
 		bconfig |= CFG_BMAC_RX_HASH_FILTER;
-		if ((rs = npi_bmac_rx_config(handle, INIT, portn,
-		    bconfig)) != NPI_SUCCESS)
+		if ((rs = npi_bmac_rx_config(handle, INIT,
+		    portn, bconfig)) != NPI_SUCCESS)
 			goto fail;
 		nxgep->mac.rx_config = bconfig;
 
-		/* Always enable comparison of mac unique address */
-		if ((rs = npi_mac_altaddr_enable(handle, portn, 0))
-		    != NPI_SUCCESS)
+		/*
+		 * Always enable comparison of mac unique address
+		 */
+		if ((rs = npi_mac_altaddr_enable(handle,
+		    portn, 0)) != NPI_SUCCESS)
 			goto fail;
 	}
 
@@ -4919,9 +4938,9 @@ nxge_add_mcast_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 	uint32_t mchash;
 	p_hash_filter_t hash_filter;
 	uint16_t hash_bit;
-	boolean_t rx_init = B_FALSE;
 	uint_t j;
 	nxge_status_t status = NXGE_OK;
+	npi_status_t rs;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_add_mcast_addr"));
 
@@ -4933,6 +4952,7 @@ nxge_add_mcast_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 		nxgep->hash_filter = KMEM_ZALLOC(sizeof (hash_filter_t),
 		    KM_SLEEP);
 	}
+
 	hash_filter = nxgep->hash_filter;
 	j = mchash / HASH_REG_WIDTH;
 	hash_bit = (1 << (mchash % HASH_REG_WIDTH));
@@ -4940,19 +4960,14 @@ nxge_add_mcast_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 	hash_filter->hash_bit_ref_cnt[mchash]++;
 	if (hash_filter->hash_bit_ref_cnt[mchash] == 1) {
 		hash_filter->hash_ref_cnt++;
-		rx_init = B_TRUE;
 	}
-	if (rx_init) {
-		if ((status = nxge_rx_mac_disable(nxgep)) != NXGE_OK)
-			goto fail;
-		if ((status = nxge_rx_mac_enable(nxgep)) != NXGE_OK)
-			goto fail;
-	}
+
+	rs = nxge_rx_mac_mcast_hash_table(nxgep);
+	if (rs != NPI_SUCCESS)
+		goto fail;
 
 	RW_EXIT(&nxgep->filter_lock);
-
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_add_mcast_addr"));
-
 	return (NXGE_OK);
 fail:
 	RW_EXIT(&nxgep->filter_lock);
@@ -4969,9 +4984,9 @@ nxge_del_mcast_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 	uint32_t mchash;
 	p_hash_filter_t hash_filter;
 	uint16_t hash_bit;
-	boolean_t rx_init = B_FALSE;
 	uint_t j;
 	nxge_status_t status = NXGE_OK;
+	npi_status_t rs;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_del_mcast_addr"));
 	RW_ENTER_WRITER(&nxgep->filter_lock);
@@ -4990,8 +5005,8 @@ nxge_del_mcast_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 		hash_bit = (1 << (mchash % HASH_REG_WIDTH));
 		hash_filter->hash_filter_regs[j] &= ~hash_bit;
 		hash_filter->hash_ref_cnt--;
-		rx_init = B_TRUE;
 	}
+
 	if (hash_filter->hash_ref_cnt == 0) {
 		NXGE_DEBUG_MSG((NULL, STR_CTL,
 		    "De-allocating hash filter storage."));
@@ -4999,12 +5014,10 @@ nxge_del_mcast_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 		nxgep->hash_filter = NULL;
 	}
 
-	if (rx_init) {
-		if ((status = nxge_rx_mac_disable(nxgep)) != NXGE_OK)
-			goto fail;
-		if ((status = nxge_rx_mac_enable(nxgep)) != NXGE_OK)
-			goto fail;
-	}
+	rs = nxge_rx_mac_mcast_hash_table(nxgep);
+	if (rs != NPI_SUCCESS)
+		goto fail;
+
 	RW_EXIT(&nxgep->filter_lock);
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_del_mcast_addr"));
 

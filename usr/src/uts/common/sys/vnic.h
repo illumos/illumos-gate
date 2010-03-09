@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,9 +110,6 @@ typedef enum {
  * undelying MAC supports the margin size.
  */
 #define	VNIC_IOC_CREATE_FORCE			0x00000004
-
-/* Allocate a hardware ring to the vnic */
-#define	VNIC_IOC_CREATE_REQ_HWRINGS		0x00000008
 
 typedef struct vnic_ioc_create {
 	datalink_id_t	vc_vnic_id;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,6 +152,8 @@ typedef enum {
  */
 typedef struct ofmt_arg_s {
 	uint_t	ofmt_id;
+	uint_t	ofmt_width;
+	uint_t	ofmt_index;
 	void	*ofmt_cbarg;
 } ofmt_arg_t;
 
@@ -178,6 +180,7 @@ extern ofmt_status_t ofmt_open(const char *, const ofmt_field_t *, uint_t,
 #define	OFMT_PARSABLE	0x00000001 /* machine parsable mode */
 #define	OFMT_WRAP	0x00000002 /* wrap output if field width is exceeded */
 #define	OFMT_MULTILINE	0x00000004 /* "long" output: "name: value" lines */
+#define	OFMT_RIGHTJUST	0x00000008 /* right justified output */
 
 /*
  * ofmt_close() must be called to free resources associated

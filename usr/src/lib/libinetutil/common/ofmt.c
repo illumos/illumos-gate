@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <errno.h>
@@ -62,11 +62,9 @@ typedef struct ofmt_state_s {
 	uint_t		os_overflow;
 	struct winsize	os_winsize;
 	int		os_nrow;
-	boolean_t	os_parsable;
-	boolean_t	os_wrap;
+	uint_t		os_flags;
 	int		os_nbad;
 	char		**os_badfields;
-	boolean_t	os_multiline;
 	int		os_maxnamelen;	/* longest name (f. multiline) */
 } ofmt_state_t;
 /*
@@ -187,8 +185,8 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 	ofmt_state_t	*os;
 	int		nfields = 0;
 	ofmt_status_t	err = OFMT_SUCCESS;
-	boolean_t	parsable = ((flags & OFMT_PARSABLE) != 0);
-	boolean_t	wrap = ((flags & OFMT_WRAP) != 0);
+	boolean_t	parsable = (flags & OFMT_PARSABLE);
+	boolean_t	wrap = (flags & OFMT_WRAP);
 	boolean_t	multiline = (flags & OFMT_MULTILINE);
 
 	*ofmt = NULL;
@@ -231,10 +229,8 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 		goto nomem;
 	*ofmt = os;
 	os->os_fields = (ofmt_field_t *)&os[1];
-	os->os_parsable = parsable;
-	os->os_wrap = wrap;
+	os->os_flags = flags;
 
-	os->os_multiline = multiline;
 	of = os->os_fields;
 	of_index = 0;
 	/*
@@ -321,13 +317,16 @@ ofmt_print_field(ofmt_state_t *os, ofmt_field_t *ofp, const char *value,
 	uint_t	width = ofp->of_width;
 	uint_t	valwidth;
 	uint_t	compress;
+	boolean_t parsable = (os->os_flags & OFMT_PARSABLE);
+	boolean_t multiline = (os->os_flags & OFMT_MULTILINE);
+	boolean_t rightjust = (os->os_flags & OFMT_RIGHTJUST);
 	char	c;
 
 	/*
 	 * Parsable fields are separated by ':'. If such a field contains
 	 * a ':' or '\', this character is prefixed by a '\'.
 	 */
-	if (os->os_parsable) {
+	if (parsable) {
 		if (os->os_nfields == 1) {
 			(void) printf("%s", value);
 			return;
@@ -339,7 +338,7 @@ ofmt_print_field(ofmt_state_t *os, ofmt_field_t *ofp, const char *value,
 		}
 		if (!os->os_lastfield)
 			(void) putchar(':');
-	} else if (os->os_multiline) {
+	} else if (multiline) {
 		if (value[0] == '\0')
 			value = OFMT_VAL_UNDEF;
 		(void) printf("%*.*s: %s", os->os_maxnamelen,
@@ -348,7 +347,10 @@ ofmt_print_field(ofmt_state_t *os, ofmt_field_t *ofp, const char *value,
 			(void) putchar('\n');
 	} else {
 		if (os->os_lastfield) {
-			(void) printf("%s", value);
+			if (rightjust)
+				(void) printf("%*s", width, value);
+			else
+				(void) printf("%s", value);
 			os->os_overflow = 0;
 			return;
 		}
@@ -356,7 +358,10 @@ ofmt_print_field(ofmt_state_t *os, ofmt_field_t *ofp, const char *value,
 		valwidth = strlen(value);
 		if (valwidth + os->os_overflow >= width) {
 			os->os_overflow += valwidth - width + 1;
-			(void) printf("%s ", value);
+			if (rightjust)
+				(void) printf("%*s ", width, value);
+			else
+				(void) printf("%s ", value);
 			return;
 		}
 
@@ -365,7 +370,10 @@ ofmt_print_field(ofmt_state_t *os, ofmt_field_t *ofp, const char *value,
 			os->os_overflow -= compress;
 			width -= compress;
 		}
-		(void) printf("%-*s", width, value);
+		if (rightjust)
+			(void) printf("%*s ", width, value);
+		else
+			(void) printf("%-*s", width, value);
 	}
 }
 
@@ -417,20 +425,23 @@ ofmt_print(ofmt_handle_t ofmt, void *arg)
 	boolean_t escsep, more_rows;
 	ofmt_arg_t ofarg;
 	split_t **sp = NULL;
+	boolean_t parsable = (os->os_flags & OFMT_PARSABLE);
+	boolean_t multiline = (os->os_flags & OFMT_MULTILINE);
+	boolean_t wrap = (os->os_flags & OFMT_WRAP);
 
-	if (os->os_wrap) {
+	if (wrap) {
 		sp = calloc(sizeof (split_t *), os->os_nfields);
 		if (sp == NULL)
 			return;
 	}
 
-	if ((os->os_nrow++ % os->os_winsize.ws_row) == 0 && !os->os_parsable &&
-	    !os->os_multiline) {
+	if ((os->os_nrow++ % os->os_winsize.ws_row) == 0 &&
+	    !parsable && !multiline) {
 		ofmt_print_header(os);
 		os->os_nrow++;
 	}
 
-	if (os->os_multiline && os->os_nrow > 1)
+	if (multiline && os->os_nrow > 1)
 		(void) putchar('\n');
 
 	of = os->os_fields;
@@ -443,7 +454,7 @@ ofmt_print(ofmt_handle_t ofmt, void *arg)
 		ofarg.ofmt_cbarg = arg;
 
 		if ((*of[i].of_cb)(&ofarg, value, sizeof (value))) {
-			if (os->os_wrap) {
+			if (wrap) {
 				/*
 				 * 'value' will be split at comma boundaries
 				 * and stored into sp[i].
@@ -454,8 +465,9 @@ ofmt_print(ofmt_handle_t ofmt, void *arg)
 				    sp[i]->s_currfield < sp[i]->s_nfields)
 					more_rows = B_TRUE;
 			}
+
 			ofmt_print_field(os, &of[i],
-			    (*value == '\0' && !os->os_parsable) ?
+			    (*value == '\0' && !parsable) ?
 			    OFMT_VAL_UNDEF : value, escsep);
 		} else {
 			ofmt_print_field(os, &of[i], OFMT_VAL_UNKNOWN, escsep);
@@ -531,6 +543,7 @@ ofmt_strerror(ofmt_handle_t ofmt, ofmt_status_t err, char *buf, uint_t bufsize)
 	int i;
 	const char *s;
 	char ebuf[OFMT_BUFSIZE];
+	boolean_t parsable;
 
 	/*
 	 * ebuf is intended for optional error-specific data to be appended
@@ -547,7 +560,8 @@ ofmt_strerror(ofmt_handle_t ofmt, ofmt_status_t err, char *buf, uint_t bufsize)
 		 * Enumerate the singular/plural version of the warning
 		 * and error to simplify and improve localization.
 		 */
-		if (!os->os_parsable) {
+		parsable = (os->os_flags & OFMT_PARSABLE);
+		if (!parsable) {
 			if (os->os_nbad > 1)
 				s = "ignoring unknown output fields:";
 			else

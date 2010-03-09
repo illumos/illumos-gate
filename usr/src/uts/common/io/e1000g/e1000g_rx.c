@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -709,8 +709,7 @@ rx_copy:
 				    E1000_RXD_STAT_TCPCS) &&
 				    !(current_desc->errors &
 				    E1000_RXD_ERR_TCPE))
-					cksumflags |= HCK_FULLCKSUM |
-					    HCK_FULLCKSUM_OK;
+					cksumflags |= HCK_FULLCKSUM_OK;
 				/*
 				 * Check IP Checksum
 				 */
@@ -718,7 +717,7 @@ rx_copy:
 				    E1000_RXD_STAT_IPCS) &&
 				    !(current_desc->errors &
 				    E1000_RXD_ERR_IPE))
-					cksumflags |= HCK_IPV4_HDRCKSUM;
+					cksumflags |= HCK_IPV4_HDRCKSUM_OK;
 			}
 		}
 
@@ -771,8 +770,8 @@ rx_end_of_packet:
 		 * Process the last fragment.
 		 */
 		if (cksumflags != 0) {
-			(void) hcksum_assoc(rx_data->rx_mblk,
-			    NULL, NULL, 0, 0, 0, 0, cksumflags, 0);
+			mac_hcksum_set(rx_data->rx_mblk,
+			    0, 0, 0, 0, cksumflags);
 			cksumflags = 0;
 		}
 

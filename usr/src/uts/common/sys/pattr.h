@@ -67,20 +67,24 @@ typedef struct pattr_hcksum_s {
  */
 #define	HCK_IPV4_HDRCKSUM	0x01	/* On Transmit: Compute IP header */
 					/* checksum in hardware. */
-					/* On Receive: IP header checksum */
+
+#define	HCK_IPV4_HDRCKSUM_OK	0x01	/* On Receive: IP header checksum */
 					/* was verified by h/w and is */
 					/* correct. */
+
 #define	HCK_PARTIALCKSUM	0x02	/* On Transmit: Compute partial 1's */
 					/* complement checksum based on */
 					/* start, stuff and end offsets. */
 					/* On Receive : Partial checksum */
 					/* computed and attached. */
+
 #define	HCK_FULLCKSUM		0x04	/* On Transmit: Compute full(in case */
 					/* of TCP/UDP, full is pseudo-header */
 					/* + header + payload) checksum for */
 					/* this packet. */
 					/* On Receive : Full checksum  */
 					/* computed in h/w and is attached */
+
 #define	HCK_FULLCKSUM_OK	0x08	/* On Transmit: N/A */
 					/* On Receive: Full checksum status */
 					/* If set, implies full checksum */

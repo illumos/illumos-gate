@@ -77,7 +77,9 @@ file path=etc/nwam/loc/NoNet/ipf.conf.dfl group=netadm owner=netadm \
 file path=etc/nwam/loc/NoNet/ipf6.conf.dfl group=netadm owner=netadm \
     preserve=true
 file path=sbin/dladm mode=0555
+file path=sbin/dlstat mode=0555
 file path=sbin/flowadm mode=0555
+file path=sbin/flowstat mode=0555
 legacy pkg=SUNWcnetr arch=$(ARCH) category=system \
     desc="core software for network infrastructure configuration" \
     hotline="Please contact your local service provider" \

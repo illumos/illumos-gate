@@ -50,6 +50,8 @@ static mac_tx_cookie_t mac_tx_fanout_mode(mac_soft_ring_set_t *, mblk_t *,
     uintptr_t, uint16_t, mblk_t **);
 static mac_tx_cookie_t mac_tx_bw_mode(mac_soft_ring_set_t *, mblk_t *,
     uintptr_t, uint16_t, mblk_t **);
+static mac_tx_cookie_t mac_tx_aggr_mode(mac_soft_ring_set_t *, mblk_t *,
+    uintptr_t, uint16_t, mblk_t **);
 
 typedef struct mac_tx_mode_s {
 	mac_tx_srs_mode_t	mac_tx_mode;
@@ -57,18 +59,34 @@ typedef struct mac_tx_mode_s {
 } mac_tx_mode_t;
 
 /*
- * There are five modes of operation on the Tx side. These modes get set
+ * There are seven modes of operation on the Tx side. These modes get set
  * in mac_tx_srs_setup(). Except for the experimental TX_SERIALIZE mode,
  * none of the other modes are user configurable. They get selected by
  * the system depending upon whether the link (or flow) has multiple Tx
- * rings or a bandwidth configured, etc.
+ * rings or a bandwidth configured, or if the link is an aggr, etc.
+ *
+ * When the Tx SRS is operating in aggr mode (st_mode) or if there are
+ * multiple Tx rings owned by Tx SRS, then each Tx ring (pseudo or
+ * otherwise) will have a soft ring associated with it. These soft rings
+ * are stored in srs_tx_soft_rings[] array.
+ *
+ * Additionally in the case of aggr, there is the st_soft_rings[] array
+ * in the mac_srs_tx_t structure. This array is used to store the same
+ * set of soft rings that are present in srs_tx_soft_rings[] array but
+ * in a different manner. The soft ring associated with the pseudo Tx
+ * ring is saved at mr_index (of the pseudo ring) in st_soft_rings[]
+ * array. This helps in quickly getting the soft ring associated with the
+ * Tx ring when aggr_find_tx_ring() returns the pseudo Tx ring that is to
+ * be used for transmit.
  */
 mac_tx_mode_t mac_tx_mode_list[] = {
 	{SRS_TX_DEFAULT,	mac_tx_single_ring_mode},
 	{SRS_TX_SERIALIZE,	mac_tx_serializer_mode},
 	{SRS_TX_FANOUT,		mac_tx_fanout_mode},
 	{SRS_TX_BW,		mac_tx_bw_mode},
-	{SRS_TX_BW_FANOUT,	mac_tx_bw_mode}
+	{SRS_TX_BW_FANOUT,	mac_tx_bw_mode},
+	{SRS_TX_AGGR,		mac_tx_aggr_mode},
+	{SRS_TX_BW_AGGR,	mac_tx_bw_mode}
 };
 
 /*
@@ -307,21 +325,16 @@ int mac_srs_worker_wakeup_ticks = 0;
 	}								\
 }
 
-#define	TX_SINGLE_RING_MODE(mac_srs)				\
-	((mac_srs)->srs_tx.st_mode == SRS_TX_DEFAULT || 	\
-	    (mac_srs)->srs_tx.st_mode == SRS_TX_SERIALIZE ||	\
-	    (mac_srs)->srs_tx.st_mode == SRS_TX_BW)
-
 #define	TX_BANDWIDTH_MODE(mac_srs)				\
 	((mac_srs)->srs_tx.st_mode == SRS_TX_BW ||		\
-	    (mac_srs)->srs_tx.st_mode == SRS_TX_BW_FANOUT)
+	    (mac_srs)->srs_tx.st_mode == SRS_TX_BW_FANOUT ||	\
+	    (mac_srs)->srs_tx.st_mode == SRS_TX_BW_AGGR)
 
 #define	TX_SRS_TO_SOFT_RING(mac_srs, head, hint) {			\
-	uint_t hash, indx;						\
-	hash = HASH_HINT(hint);					\
-	indx = COMPUTE_INDEX(hash, mac_srs->srs_oth_ring_count);	\
-	softring = mac_srs->srs_oth_soft_rings[indx];			\
-	(void) (mac_tx_soft_ring_process(softring, head, 0, NULL));	\
+	if (tx_mode == SRS_TX_BW_FANOUT)				\
+		(void) mac_tx_fanout_mode(mac_srs, head, hint, 0, NULL);\
+	else								\
+		(void) mac_tx_aggr_mode(mac_srs, head, hint, 0, NULL);	\
 }
 
 /*
@@ -341,7 +354,7 @@ int mac_srs_worker_wakeup_ticks = 0;
 	} else {						\
 		ASSERT(!((srs)->srs_state & SRS_TX_BLOCKED));	\
 		(srs)->srs_state |= SRS_TX_BLOCKED;		\
-		(srs)->srs_tx.st_blocked_cnt++;			\
+		(srs)->srs_tx.st_stat.mts_blockcnt++;		\
 	}							\
 }
 
@@ -364,7 +377,7 @@ int mac_srs_worker_wakeup_ticks = 0;
 		(srs)->srs_tx.st_hiwat_cnt++;				\
 		if ((srs)->srs_count > (srs)->srs_tx.st_max_q_cnt) {	\
 			/* increment freed stats */			\
-			(srs)->srs_tx.st_drop_count += cnt;		\
+			(srs)->srs_tx.st_stat.mts_sdrops += cnt;	\
 			/*						\
 			 * b_prev may be set to the fanout hint		\
 			 * hence can't use freemsg directly		\
@@ -391,7 +404,7 @@ int mac_srs_worker_wakeup_ticks = 0;
 #define	MAC_TX_SRS_DROP_MESSAGE(srs, mp, cookie) {		\
 	mac_pkt_drop(NULL, NULL, mp, B_FALSE);			\
 	/* increment freed stats */				\
-	mac_srs->srs_tx.st_drop_count++;			\
+	mac_srs->srs_tx.st_stat.mts_sdrops++;			\
 	cookie = (mac_tx_cookie_t)srs;				\
 }
 
@@ -415,7 +428,7 @@ mac_rx_drop_pkt(mac_soft_ring_set_t *srs, mblk_t *mp)
 	MAC_UPDATE_SRS_SIZE_LOCKED(srs, msgdsize(mp));
 	mutex_exit(&srs->srs_lock);
 
-	srs_rx->sr_drop_count++;
+	srs_rx->sr_stat.mrs_sdrops++;
 	freemsg(mp);
 }
 
@@ -448,7 +461,7 @@ mac_srs_fire(void *arg)
  * 'hint' is fanout_hint (type of uint64_t) which is given by the TCP/IP stack,
  * and it is used on the TX path.
  */
-#define	HASH_HINT(hint) \
+#define	HASH_HINT(hint)	\
 	((hint) ^ ((hint) >> 24) ^ ((hint) >> 16) ^ ((hint) >> 8))
 
 
@@ -797,8 +810,8 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 		 * packets or because mblk's need to be concatenated using
 		 * pullupmsg().
 		 */
-		if (mac_src_ipv6_fanout || !mac_ip_hdr_length_v6(mp, ip6h,
-		    &hdr_len, &nexthdr, NULL, NULL)) {
+		if (mac_src_ipv6_fanout || !mac_ip_hdr_length_v6(ip6h,
+		    mp->b_wptr, &hdr_len, &nexthdr, NULL)) {
 			goto src_based_fanout;
 		}
 		whereptr = (uint8_t *)ip6h + hdr_len;
@@ -1302,13 +1315,8 @@ check_again:
 			tail->b_next = NULL;
 			smcip = mac_srs->srs_mcip;
 
-			if ((mac_srs->srs_type & SRST_FLOW) ||
-			    (smcip == NULL)) {
-				FLOW_STAT_UPDATE(mac_srs->srs_flent,
-				    rbytes, sz);
-				FLOW_STAT_UPDATE(mac_srs->srs_flent,
-				    ipackets, count);
-			}
+			SRS_RX_STAT_UPDATE(mac_srs, pollbytes, sz);
+			SRS_RX_STAT_UPDATE(mac_srs, pollcnt, count);
 
 			/*
 			 * If there are any promiscuous mode callbacks
@@ -1316,9 +1324,6 @@ check_again:
 			 * if appropriate and also update the counters.
 			 */
 			if (smcip != NULL) {
-				smcip->mci_stat_ibytes += sz;
-				smcip->mci_stat_ipackets += count;
-
 				if (smcip->mci_mip->mi_promisc_list != NULL) {
 					mutex_exit(lock);
 					mac_promisc_dispatch(smcip->mci_mip,
@@ -1331,15 +1336,14 @@ check_again:
 				mac_srs->srs_bw->mac_bw_polled += sz;
 				mutex_exit(&mac_srs->srs_bw->mac_bw_lock);
 			}
-			srs_rx->sr_poll_count += count;
 			MAC_RX_SRS_ENQUEUE_CHAIN(mac_srs, head, tail,
 			    count, sz);
 			if (count <= 10)
-				srs_rx->sr_chain_cnt_undr10++;
+				srs_rx->sr_stat.mrs_chaincntundr10++;
 			else if (count > 10 && count <= 50)
-				srs_rx->sr_chain_cnt_10to50++;
+				srs_rx->sr_stat.mrs_chaincnt10to50++;
 			else
-				srs_rx->sr_chain_cnt_over50++;
+				srs_rx->sr_stat.mrs_chaincntover50++;
 		}
 
 		/*
@@ -1637,10 +1641,17 @@ again:
 	 * callbacks for broadcast and multicast packets are delivered from
 	 * mac_rx() and we don't need to worry about that case in this path
 	 */
-	if (mcip != NULL && mcip->mci_promisc_list != NULL) {
-		mutex_exit(&mac_srs->srs_lock);
-		mac_promisc_client_dispatch(mcip, head);
-		mutex_enter(&mac_srs->srs_lock);
+	if (mcip != NULL) {
+		if (mcip->mci_promisc_list != NULL) {
+			mutex_exit(&mac_srs->srs_lock);
+			mac_promisc_client_dispatch(mcip, head);
+			mutex_enter(&mac_srs->srs_lock);
+		}
+		if (MAC_PROTECT_ENABLED(mcip, MPT_IPNOSPOOF)) {
+			mutex_exit(&mac_srs->srs_lock);
+			mac_protect_intercept_dhcp(mcip, head);
+			mutex_enter(&mac_srs->srs_lock);
+		}
 	}
 
 	/*
@@ -1886,7 +1897,7 @@ again:
 	/* zero bandwidth: drop all and return to interrupt mode */
 	mutex_enter(&mac_srs->srs_bw->mac_bw_lock);
 	if (mac_srs->srs_bw->mac_bw_limit == 0) {
-		srs_rx->sr_drop_count += cnt;
+		srs_rx->sr_stat.mrs_sdrops += cnt;
 		ASSERT(mac_srs->srs_bw->mac_bw_sz >= sz);
 		mac_srs->srs_bw->mac_bw_sz -= sz;
 		mac_srs->srs_bw->mac_bw_drop_bytes += sz;
@@ -1908,10 +1919,17 @@ again:
 	 * callbacks for broadcast and multicast packets are delivered from
 	 * mac_rx() and we don't need to worry about that case in this path
 	 */
-	if (mcip != NULL && mcip->mci_promisc_list != NULL) {
-		mutex_exit(&mac_srs->srs_lock);
-		mac_promisc_client_dispatch(mcip, head);
-		mutex_enter(&mac_srs->srs_lock);
+	if (mcip != NULL) {
+		if (mcip->mci_promisc_list != NULL) {
+			mutex_exit(&mac_srs->srs_lock);
+			mac_promisc_client_dispatch(mcip, head);
+			mutex_enter(&mac_srs->srs_lock);
+		}
+		if (MAC_PROTECT_ENABLED(mcip, MPT_IPNOSPOOF)) {
+			mutex_exit(&mac_srs->srs_lock);
+			mac_protect_intercept_dhcp(mcip, head);
+			mutex_enter(&mac_srs->srs_lock);
+		}
 	}
 
 	/*
@@ -2285,7 +2303,6 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 	size_t			sz = 0;
 	size_t			chain_sz, sz1;
 	mac_bw_ctl_t		*mac_bw;
-	mac_client_impl_t	*smcip;
 	mac_srs_rx_t		*srs_rx = &mac_srs->srs_rx;
 
 	/*
@@ -2302,15 +2319,14 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 	}
 
 	mutex_enter(&mac_srs->srs_lock);
-	smcip = mac_srs->srs_mcip;
 
-	if (mac_srs->srs_type & SRST_FLOW || smcip == NULL) {
-		FLOW_STAT_UPDATE(mac_srs->srs_flent, rbytes, sz);
-		FLOW_STAT_UPDATE(mac_srs->srs_flent, ipackets, count);
-	}
-	if (smcip != NULL) {
-		smcip->mci_stat_ibytes += sz;
-		smcip->mci_stat_ipackets += count;
+	if (loopback) {
+		SRS_RX_STAT_UPDATE(mac_srs, lclbytes, sz);
+		SRS_RX_STAT_UPDATE(mac_srs, lclcnt, count);
+
+	} else {
+		SRS_RX_STAT_UPDATE(mac_srs, intrbytes, sz);
+		SRS_RX_STAT_UPDATE(mac_srs, intrcnt, count);
 	}
 
 	/*
@@ -2323,12 +2339,10 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 		mac_bw = mac_srs->srs_bw;
 		ASSERT(mac_bw != NULL);
 		mutex_enter(&mac_bw->mac_bw_lock);
-		/* Count the packets and bytes via interrupt */
-		srs_rx->sr_intr_count += count;
 		mac_bw->mac_bw_intr += sz;
 		if (mac_bw->mac_bw_limit == 0) {
 			/* zero bandwidth: drop all */
-			srs_rx->sr_drop_count += count;
+			srs_rx->sr_stat.mrs_sdrops += count;
 			mac_bw->mac_bw_drop_bytes += sz;
 			mutex_exit(&mac_bw->mac_bw_lock);
 			mutex_exit(&mac_srs->srs_lock);
@@ -2370,7 +2384,7 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 				}
 				if (head != NULL) {
 					/* Drop any packet over the threshold */
-					srs_rx->sr_drop_count += count;
+					srs_rx->sr_stat.mrs_sdrops += count;
 					mutex_enter(&mac_bw->mac_bw_lock);
 					mac_bw->mac_bw_drop_bytes += sz;
 					mutex_exit(&mac_bw->mac_bw_lock);
@@ -2392,7 +2406,7 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 	if (!(mac_srs->srs_type & SRST_BW_CONTROL) &&
 	    (srs_rx->sr_poll_pkt_cnt > srs_rx->sr_hiwat)) {
 		mac_bw = mac_srs->srs_bw;
-		srs_rx->sr_drop_count += count;
+		srs_rx->sr_stat.mrs_sdrops += count;
 		mutex_enter(&mac_bw->mac_bw_lock);
 		mac_bw->mac_bw_drop_bytes += sz;
 		mutex_exit(&mac_bw->mac_bw_lock);
@@ -2402,8 +2416,6 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 	}
 
 	MAC_RX_SRS_ENQUEUE_CHAIN(mac_srs, mp_chain, tail, count, sz);
-	/* Count the packets entering via interrupt path */
-	srs_rx->sr_intr_count += count;
 
 	if (!(mac_srs->srs_state & SRS_PROC)) {
 		/*
@@ -2510,7 +2522,7 @@ mac_tx_srs_enqueue(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 	/*
 	 * Ignore fanout hint if we don't have multiple tx rings.
 	 */
-	if (!TX_MULTI_RING_MODE(mac_srs))
+	if (!MAC_TX_SOFT_RINGS(mac_srs))
 		fanout_hint = 0;
 
 	if (mac_srs->srs_first != NULL)
@@ -2550,25 +2562,30 @@ mac_tx_srs_enqueue(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 }
 
 /*
- * There are five tx modes:
+ * There are seven tx modes:
  *
  * 1) Default mode (SRS_TX_DEFAULT)
  * 2) Serialization mode (SRS_TX_SERIALIZE)
  * 3) Fanout mode (SRS_TX_FANOUT)
  * 4) Bandwdith mode (SRS_TX_BW)
  * 5) Fanout and Bandwidth mode (SRS_TX_BW_FANOUT)
+ * 6) aggr Tx mode (SRS_TX_AGGR)
+ * 7) aggr Tx bw mode (SRS_TX_BW_AGGR)
  *
  * The tx mode in which an SRS operates is decided in mac_tx_srs_setup()
  * based on the number of Tx rings requested for an SRS and whether
  * bandwidth control is requested or not.
  *
- * In the default mode (i.e., no fanout/no bandwidth), the SRS acts as a
- * pass-thru. Packets will go directly to mac_tx_send(). When the underlying
- * Tx ring runs out of Tx descs, it starts queueing up packets in SRS.
- * When flow-control is relieved, the srs_worker drains the queued
- * packets and informs blocked clients to restart sending packets.
+ * The default mode (i.e., no fanout/no bandwidth) is used when the
+ * underlying NIC does not have Tx rings or just one Tx ring. In this mode,
+ * the SRS acts as a pass-thru. Packets will go directly to mac_tx_send().
+ * When the underlying Tx ring runs out of Tx descs, it starts queueing up
+ * packets in SRS. When flow-control is relieved, the srs_worker drains
+ * the queued packets and informs blocked clients to restart sending
+ * packets.
  *
- * In the SRS_TX_SERIALIZE mode, all calls to mac_tx() are serialized.
+ * In the SRS_TX_SERIALIZE mode, all calls to mac_tx() are serialized. This
+ * mode is used when the link has no Tx rings or only one Tx ring.
  *
  * In the SRS_TX_FANOUT mode, packets will be fanned out to multiple
  * Tx rings. Each Tx ring will have a soft ring associated with it.
@@ -2580,6 +2597,19 @@ mac_tx_srs_enqueue(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
  * only if bw is available. Otherwise the packets will be queued in
  * SRS. If fanout to multiple Tx rings is configured, the packets will
  * be fanned out among the soft rings associated with the Tx rings.
+ *
+ * In SRS_TX_AGGR mode, mac_tx_aggr_mode() routine is called. This routine
+ * invokes an aggr function, aggr_find_tx_ring(), to find a pseudo Tx ring
+ * belonging to a port on which the packet has to be sent. Aggr will
+ * always have a pseudo Tx ring associated with it even when it is an
+ * aggregation over a single NIC that has no Tx rings. Even in such a
+ * case, the single pseudo Tx ring will have a soft ring associated with
+ * it and the soft ring will hang off the SRS.
+ *
+ * If a bandwidth is specified for an aggr, SRS_TX_BW_AGGR mode is used.
+ * In this mode, the bandwidth is first applied on the outgoing packets
+ * and later mac_tx_addr_mode() function is called to send the packet out
+ * of one of the pseudo Tx rings.
  *
  * Four flags are used in srs_state for indicating flow control
  * conditions : SRS_TX_BLOCKED, SRS_TX_HIWAT, SRS_TX_WAKEUP_CLIENT.
@@ -2625,7 +2655,6 @@ mac_tx_single_ring_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
     uintptr_t fanout_hint, uint16_t flag, mblk_t **ret_mp)
 {
 	mac_srs_tx_t		*srs_tx = &mac_srs->srs_tx;
-	boolean_t		is_subflow;
 	mac_tx_stats_t		stats;
 	mac_tx_cookie_t		cookie = NULL;
 
@@ -2656,10 +2685,8 @@ mac_tx_single_ring_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 		mutex_exit(&mac_srs->srs_lock);
 	}
 
-	is_subflow = ((mac_srs->srs_type & SRST_FLOW) != 0);
-
 	mp_chain = mac_tx_send(srs_tx->st_arg1, srs_tx->st_arg2,
-	    mp_chain, (is_subflow ? &stats : NULL));
+	    mp_chain, &stats);
 
 	/*
 	 * Multiple threads could be here sending packets.
@@ -2676,9 +2703,7 @@ mac_tx_single_ring_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 		mutex_exit(&mac_srs->srs_lock);
 		return (cookie);
 	}
-
-	if (is_subflow)
-		FLOW_TX_STATS_UPDATE(mac_srs->srs_flent, &stats);
+	SRS_TX_STATS_UPDATE(mac_srs, &stats);
 
 	return (NULL);
 }
@@ -2696,7 +2721,6 @@ static mac_tx_cookie_t
 mac_tx_serializer_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
     uintptr_t fanout_hint, uint16_t flag, mblk_t **ret_mp)
 {
-	boolean_t		is_subflow;
 	mac_tx_stats_t		stats;
 	mac_tx_cookie_t		cookie = NULL;
 	mac_srs_tx_t		*srs_tx = &mac_srs->srs_tx;
@@ -2726,10 +2750,8 @@ mac_tx_serializer_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 	mac_srs->srs_state |= SRS_PROC;
 	mutex_exit(&mac_srs->srs_lock);
 
-	is_subflow = ((mac_srs->srs_type & SRST_FLOW) != 0);
-
 	mp_chain = mac_tx_send(srs_tx->st_arg1, srs_tx->st_arg2,
-	    mp_chain, (is_subflow ? &stats : NULL));
+	    mp_chain, &stats);
 
 	mutex_enter(&mac_srs->srs_lock);
 	mac_srs->srs_state &= ~SRS_PROC;
@@ -2747,8 +2769,8 @@ mac_tx_serializer_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 	}
 	mutex_exit(&mac_srs->srs_lock);
 
-	if (is_subflow && cookie == NULL)
-		FLOW_TX_STATS_UPDATE(mac_srs->srs_flent, &stats);
+	if (cookie == NULL)
+		SRS_TX_STATS_UPDATE(mac_srs, &stats);
 
 	return (cookie);
 }
@@ -2766,8 +2788,8 @@ mac_tx_serializer_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
  */
 
 #define	MAC_TX_SOFT_RING_PROCESS(chain) {		       		\
-	index = COMPUTE_INDEX(hash, mac_srs->srs_oth_ring_count),	\
-	softring = mac_srs->srs_oth_soft_rings[index];			\
+	index = COMPUTE_INDEX(hash, mac_srs->srs_tx_ring_count),	\
+	softring = mac_srs->srs_tx_soft_rings[index];			\
 	cookie = mac_tx_soft_ring_process(softring, chain, flag, ret_mp); \
 	DTRACE_PROBE2(tx__fanout, uint64_t, hash, uint_t, index);	\
 }
@@ -2781,7 +2803,8 @@ mac_tx_fanout_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 	uint_t			index;
 	mac_tx_cookie_t		cookie = NULL;
 
-	ASSERT(mac_srs->srs_tx.st_mode == SRS_TX_FANOUT);
+	ASSERT(mac_srs->srs_tx.st_mode == SRS_TX_FANOUT ||
+	    mac_srs->srs_tx.st_mode == SRS_TX_BW_FANOUT);
 	if (fanout_hint != 0) {
 		/*
 		 * The hint is specified by the caller, simply pass the
@@ -2926,18 +2949,18 @@ mac_tx_bw_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 
 		hash = HASH_HINT(fanout_hint);
 		indx = COMPUTE_INDEX(hash,
-		    mac_srs->srs_oth_ring_count);
-		softring = mac_srs->srs_oth_soft_rings[indx];
+		    mac_srs->srs_tx_ring_count);
+		softring = mac_srs->srs_tx_soft_rings[indx];
 		return (mac_tx_soft_ring_process(softring, mp_chain, flag,
 		    ret_mp));
+	} else if (srs_tx->st_mode == SRS_TX_BW_AGGR) {
+		return (mac_tx_aggr_mode(mac_srs, mp_chain,
+		    fanout_hint, flag, ret_mp));
 	} else {
-		boolean_t		is_subflow;
 		mac_tx_stats_t		stats;
 
-		is_subflow = ((mac_srs->srs_type & SRST_FLOW) != 0);
-
 		mp_chain = mac_tx_send(srs_tx->st_arg1, srs_tx->st_arg2,
-		    mp_chain, (is_subflow ? &stats : NULL));
+		    mp_chain, &stats);
 
 		if (mp_chain != NULL) {
 			mutex_enter(&mac_srs->srs_lock);
@@ -2951,11 +2974,66 @@ mac_tx_bw_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 			mutex_exit(&mac_srs->srs_lock);
 			return (cookie);
 		}
-		if (is_subflow)
-			FLOW_TX_STATS_UPDATE(mac_srs->srs_flent, &stats);
+		SRS_TX_STATS_UPDATE(mac_srs, &stats);
 
 		return (NULL);
 	}
+}
+
+/*
+ * mac_tx_aggr_mode
+ *
+ * This routine invokes an aggr function, aggr_find_tx_ring(), to find
+ * a (pseudo) Tx ring belonging to a port on which the packet has to
+ * be sent. aggr_find_tx_ring() first finds the outgoing port based on
+ * L2/L3/L4 policy and then uses the fanout_hint passed to it to pick
+ * a Tx ring from the selected port.
+ *
+ * Note that a port can be deleted from the aggregation. In such a case,
+ * the aggregation layer first separates the port from the rest of the
+ * ports making sure that port (and thus any Tx rings associated with
+ * it) won't get selected in the call to aggr_find_tx_ring() function.
+ * Later calls are made to mac_group_rem_ring() passing pseudo Tx ring
+ * handles one by one which in turn will quiesce the Tx SRS and remove
+ * the soft ring associated with the pseudo Tx ring. Unlike Rx side
+ * where a cookie is used to protect against mac_rx_ring() calls on
+ * rings that have been removed, no such cookie is needed on the Tx
+ * side as the pseudo Tx ring won't be available anymore to
+ * aggr_find_tx_ring() once the port has been removed.
+ */
+static mac_tx_cookie_t
+mac_tx_aggr_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
+    uintptr_t fanout_hint, uint16_t flag, mblk_t **ret_mp)
+{
+	mac_srs_tx_t		*srs_tx = &mac_srs->srs_tx;
+	mac_tx_ring_fn_t	find_tx_ring_fn;
+	mac_ring_handle_t	ring = NULL;
+	void			*arg;
+	mac_soft_ring_t		*sringp;
+
+	find_tx_ring_fn = srs_tx->st_capab_aggr.mca_find_tx_ring_fn;
+	arg = srs_tx->st_capab_aggr.mca_arg;
+	if (find_tx_ring_fn(arg, mp_chain, fanout_hint, &ring) == NULL)
+		return (NULL);
+	sringp = srs_tx->st_soft_rings[((mac_ring_t *)ring)->mr_index];
+	return (mac_tx_soft_ring_process(sringp, mp_chain, flag, ret_mp));
+}
+
+void
+mac_tx_invoke_callbacks(mac_client_impl_t *mcip, mac_tx_cookie_t cookie)
+{
+	mac_cb_t *mcb;
+	mac_tx_notify_cb_t *mtnfp;
+
+	/* Wakeup callback registered clients */
+	MAC_CALLBACK_WALKER_INC(&mcip->mci_tx_notify_cb_info);
+	for (mcb = mcip->mci_tx_notify_cb_list; mcb != NULL;
+	    mcb = mcb->mcb_nextp) {
+		mtnfp = (mac_tx_notify_cb_t *)mcb->mcb_objp;
+		mtnfp->mtnf_fn(mtnfp->mtnf_arg, cookie);
+	}
+	MAC_CALLBACK_WALKER_DCR(&mcip->mci_tx_notify_cb_info,
+	    &mcip->mci_tx_notify_cb_list);
 }
 
 /* ARGSUSED */
@@ -2966,7 +3044,6 @@ mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 	size_t			sz;
 	uint32_t		tx_mode;
 	uint_t			saved_pkt_count;
-	boolean_t		is_subflow;
 	mac_tx_stats_t		stats;
 	mac_srs_tx_t		*srs_tx = &mac_srs->srs_tx;
 	clock_t			now;
@@ -2977,7 +3054,6 @@ mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 
 	mac_srs->srs_state |= SRS_PROC;
 
-	is_subflow = ((mac_srs->srs_type & SRST_FLOW) != 0);
 	tx_mode = srs_tx->st_mode;
 	if (tx_mode == SRS_TX_DEFAULT || tx_mode == SRS_TX_SERIALIZE) {
 		if (mac_srs->srs_first != NULL) {
@@ -3000,16 +3076,13 @@ mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 				tail->b_next = mac_srs->srs_first;
 				mac_srs->srs_first = head;
 				mac_srs->srs_count +=
-				    (saved_pkt_count - stats.ts_opackets);
+				    (saved_pkt_count - stats.mts_opackets);
 				if (mac_srs->srs_last == NULL)
 					mac_srs->srs_last = tail;
 				MAC_TX_SRS_BLOCK(mac_srs, head);
 			} else {
 				srs_tx->st_woken_up = B_FALSE;
-				if (is_subflow) {
-					FLOW_TX_STATS_UPDATE(
-					    mac_srs->srs_flent, &stats);
-				}
+				SRS_TX_STATS_UPDATE(mac_srs, &stats);
 			}
 		}
 	} else if (tx_mode == SRS_TX_BW) {
@@ -3065,10 +3138,10 @@ mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 				tail->b_next = mac_srs->srs_first;
 				mac_srs->srs_first = head;
 				mac_srs->srs_count +=
-				    (saved_pkt_count - stats.ts_opackets);
+				    (saved_pkt_count - stats.mts_opackets);
 				if (mac_srs->srs_last == NULL)
 					mac_srs->srs_last = tail;
-				size_sent = sz - stats.ts_obytes;
+				size_sent = sz - stats.mts_obytes;
 				mac_srs->srs_size += size_sent;
 				mac_srs->srs_bw->mac_bw_sz += size_sent;
 				if (mac_srs->srs_bw->mac_bw_used > size_sent) {
@@ -3080,15 +3153,11 @@ mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 				MAC_TX_SRS_BLOCK(mac_srs, head);
 			} else {
 				srs_tx->st_woken_up = B_FALSE;
-				if (is_subflow) {
-					FLOW_TX_STATS_UPDATE(
-					    mac_srs->srs_flent, &stats);
-				}
+				SRS_TX_STATS_UPDATE(mac_srs, &stats);
 			}
 		}
-	} else if (tx_mode == SRS_TX_BW_FANOUT) {
+	} else if (tx_mode == SRS_TX_BW_FANOUT || tx_mode == SRS_TX_BW_AGGR) {
 		mblk_t *prev;
-		mac_soft_ring_t *softring;
 		uint64_t hint;
 
 		/*
@@ -3155,8 +3224,6 @@ mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 	 */
 	if (mac_srs->srs_count == 0 && (mac_srs->srs_state &
 	    (SRS_TX_HIWAT | SRS_TX_WAKEUP_CLIENT | SRS_ENQUEUED))) {
-		mac_tx_notify_cb_t *mtnfp;
-		mac_cb_t *mcb;
 		mac_client_impl_t *mcip = mac_srs->srs_mcip;
 		boolean_t wakeup_required = B_FALSE;
 
@@ -3168,16 +3235,7 @@ mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 		    SRS_TX_WAKEUP_CLIENT | SRS_ENQUEUED);
 		mutex_exit(&mac_srs->srs_lock);
 		if (wakeup_required) {
-			/* Wakeup callback registered clients */
-			MAC_CALLBACK_WALKER_INC(&mcip->mci_tx_notify_cb_info);
-			for (mcb = mcip->mci_tx_notify_cb_list; mcb != NULL;
-			    mcb = mcb->mcb_nextp) {
-				mtnfp = (mac_tx_notify_cb_t *)mcb->mcb_objp;
-				mtnfp->mtnf_fn(mtnfp->mtnf_arg,
-				    (mac_tx_cookie_t)mac_srs);
-			}
-			MAC_CALLBACK_WALKER_DCR(&mcip->mci_tx_notify_cb_info,
-			    &mcip->mci_tx_notify_cb_list);
+			mac_tx_invoke_callbacks(mcip, (mac_tx_cookie_t)mac_srs);
 			/*
 			 * If the client is not the primary MAC client, then we
 			 * need to send the notification to the clients upper
@@ -3276,11 +3334,10 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 	}
 
 	/*
-	 * Fastpath: if there's only one client, and there's no
-	 * multicast listeners, we simply send the packet down to the
-	 * underlying NIC.
+	 * Fastpath: if there's only one client, we simply send
+	 * the packet down to the underlying NIC.
 	 */
-	if (mip->mi_nactiveclients == 1 && mip->mi_promisc_list == NULL)  {
+	if (mip->mi_nactiveclients == 1) {
 		DTRACE_PROBE2(fastpath,
 		    mac_client_impl_t *, src_mcip, mblk_t *, mp_chain);
 
@@ -3293,9 +3350,7 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 			    msgdsize(mp));
 
 			CHECK_VID_AND_ADD_TAG(mp);
-			MAC_TX(mip, ring, mp,
-			    ((src_mcip->mci_state_flags & MCIS_SHARE_BOUND) !=
-			    0));
+			MAC_TX(mip, ring, mp, src_mcip);
 
 			/*
 			 * If the driver is out of descriptors and does a
@@ -3334,12 +3389,6 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 		pkt_size = (mp->b_cont == NULL ? MBLKL(mp) : msgdsize(mp));
 		obytes += pkt_size;
 		CHECK_VID_AND_ADD_TAG(mp);
-
-		/*
-		 * Check if there are promiscuous mode callbacks defined.
-		 */
-		if (mip->mi_promisc_list != NULL)
-			mac_promisc_dispatch(mip, mp, src_mcip);
 
 		/*
 		 * Find the destination.
@@ -3395,15 +3444,30 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 				    B_TRUE);
 			} else {
 				/*
-				 * loopback the packet to a
-				 * local MAC client. We force a context
-				 * switch if both source and destination
-				 * MAC clients are used by IP, i.e. bypass
-				 * is set.
+				 * loopback the packet to a local MAC
+				 * client. We force a context switch
+				 * if both source and destination MAC
+				 * clients are used by IP, i.e.
+				 * bypass is set.
 				 */
 				boolean_t do_switch;
 				mac_client_impl_t *dst_mcip =
 				    dst_flow_ent->fe_mcip;
+
+				/*
+				 * Check if there are promiscuous mode
+				 * callbacks defined. This check is
+				 * done here in the 'else' case and
+				 * not in other cases because this
+				 * path is for local loopback
+				 * communication which does not go
+				 * through MAC_TX(). For paths that go
+				 * through MAC_TX(), the promisc_list
+				 * check is done inside the MAC_TX()
+				 * macro.
+				 */
+				if (mip->mi_promisc_list != NULL)
+					mac_promisc_dispatch(mip, mp, src_mcip);
 
 				do_switch = ((src_mcip->mci_state_flags &
 				    dst_mcip->mci_state_flags &
@@ -3422,9 +3486,7 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 			 * Unknown destination, send via the underlying
 			 * NIC.
 			 */
-			MAC_TX(mip, ring, mp,
-			    ((src_mcip->mci_state_flags & MCIS_SHARE_BOUND) !=
-			    0));
+			MAC_TX(mip, ring, mp, src_mcip);
 			if (mp != NULL) {
 				/*
 				 * Adjust for the last packet that
@@ -3440,15 +3502,9 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 	}
 
 done:
-	src_mcip->mci_stat_obytes += obytes;
-	src_mcip->mci_stat_opackets += opackets;
-	src_mcip->mci_stat_oerrors += oerrors;
-
-	if (stats != NULL) {
-		stats->ts_opackets = opackets;
-		stats->ts_obytes = obytes;
-		stats->ts_oerrors = oerrors;
-	}
+	stats->mts_obytes = obytes;
+	stats->mts_opackets = opackets;
+	stats->mts_oerrors = oerrors;
 	return (mp);
 }
 
@@ -3466,13 +3522,36 @@ mac_tx_srs_ring_present(mac_soft_ring_set_t *srs, mac_ring_t *tx_ring)
 	if (srs->srs_tx.st_arg2 == tx_ring)
 		return (B_TRUE);
 
-	for (i = 0; i < srs->srs_oth_ring_count; i++) {
-		soft_ring =  srs->srs_oth_soft_rings[i];
+	for (i = 0; i < srs->srs_tx_ring_count; i++) {
+		soft_ring =  srs->srs_tx_soft_rings[i];
 		if (soft_ring->s_ring_tx_arg2 == tx_ring)
 			return (B_TRUE);
 	}
 
 	return (B_FALSE);
+}
+
+/*
+ * mac_tx_srs_get_soft_ring
+ *
+ * Returns the TX soft ring associated with the given ring, if present.
+ */
+mac_soft_ring_t *
+mac_tx_srs_get_soft_ring(mac_soft_ring_set_t *srs, mac_ring_t *tx_ring)
+{
+	int		i;
+	mac_soft_ring_t	*soft_ring;
+
+	if (srs->srs_tx.st_arg2 == tx_ring)
+		return (NULL);
+
+	for (i = 0; i < srs->srs_tx_ring_count; i++) {
+		soft_ring =  srs->srs_tx_soft_rings[i];
+		if (soft_ring->s_ring_tx_arg2 == tx_ring)
+			return (soft_ring);
+	}
+
+	return (NULL);
 }
 
 /*
@@ -3490,11 +3569,16 @@ mac_tx_srs_wakeup(mac_soft_ring_set_t *mac_srs, mac_ring_handle_t ring)
 	mac_srs_tx_t *srs_tx = &mac_srs->srs_tx;
 
 	mutex_enter(&mac_srs->srs_lock);
-	if (TX_SINGLE_RING_MODE(mac_srs)) {
+	/*
+	 * srs_tx_ring_count == 0 is the single ring mode case. In
+	 * this mode, there will not be Tx soft rings associated
+	 * with the SRS.
+	 */
+	if (!MAC_TX_SOFT_RINGS(mac_srs)) {
 		if (srs_tx->st_arg2 == ring &&
 		    mac_srs->srs_state & SRS_TX_BLOCKED) {
 			mac_srs->srs_state &= ~SRS_TX_BLOCKED;
-			srs_tx->st_unblocked_cnt++;
+			srs_tx->st_stat.mts_unblockcnt++;
 			cv_signal(&mac_srs->srs_async);
 		}
 		/*
@@ -3507,15 +3591,17 @@ mac_tx_srs_wakeup(mac_soft_ring_set_t *mac_srs, mac_ring_handle_t ring)
 		return;
 	}
 
-	/* If you are here, it is for FANOUT or BW_FANOUT case */
-	ASSERT(TX_MULTI_RING_MODE(mac_srs));
-	for (i = 0; i < mac_srs->srs_oth_ring_count; i++) {
-		sringp = mac_srs->srs_oth_soft_rings[i];
+	/*
+	 * If you are here, it is for FANOUT, BW_FANOUT,
+	 * AGGR_MODE or AGGR_BW_MODE case
+	 */
+	for (i = 0; i < mac_srs->srs_tx_ring_count; i++) {
+		sringp = mac_srs->srs_tx_soft_rings[i];
 		mutex_enter(&sringp->s_ring_lock);
 		if (sringp->s_ring_tx_arg2 == ring) {
 			if (sringp->s_ring_state & S_RING_BLOCK) {
 				sringp->s_ring_state &= ~S_RING_BLOCK;
-				sringp->s_ring_unblocked_cnt++;
+				sringp->s_st_stat.mts_unblockcnt++;
 				cv_signal(&sringp->s_ring_async);
 			}
 			sringp->s_ring_tx_woken_up = B_TRUE;
@@ -3619,6 +3705,7 @@ mac_rx_soft_ring_process(mac_client_impl_t *mcip, mac_soft_ring_t *ringp,
 
 	mutex_enter(&ringp->s_ring_lock);
 	ringp->s_ring_total_inpkt += cnt;
+	ringp->s_ring_total_rbytes += sz;
 	if ((mac_srs->srs_rx.sr_poll_pkt_cnt <= 1) &&
 	    !(ringp->s_ring_type & ST_RING_WORKER_ONLY)) {
 		/* If on processor or blanking on, then enqueue and return */
@@ -3831,11 +3918,14 @@ mac_tx_soft_ring_process(mac_soft_ring_t *ringp, mblk_t *mp_chain,
 	ASSERT(mp_chain != NULL);
 	ASSERT(MUTEX_NOT_HELD(&ringp->s_ring_lock));
 	/*
-	 * Only two modes can come here; either it can be
-	 * SRS_TX_BW_FANOUT or SRS_TX_FANOUT
+	 * The following modes can come here: SRS_TX_BW_FANOUT,
+	 * SRS_TX_FANOUT, SRS_TX_AGGR, SRS_TX_BW_AGGR.
 	 */
+	ASSERT(MAC_TX_SOFT_RINGS(mac_srs));
 	ASSERT(mac_srs->srs_tx.st_mode == SRS_TX_FANOUT ||
-	    mac_srs->srs_tx.st_mode == SRS_TX_BW_FANOUT);
+	    mac_srs->srs_tx.st_mode == SRS_TX_BW_FANOUT ||
+	    mac_srs->srs_tx.st_mode == SRS_TX_AGGR ||
+	    mac_srs->srs_tx.st_mode == SRS_TX_BW_AGGR);
 
 	if (ringp->s_ring_type & ST_RING_WORKER_ONLY) {
 		/* Serialization mode */
@@ -3871,7 +3961,6 @@ mac_tx_soft_ring_process(mac_soft_ring_t *ringp, mblk_t *mp_chain,
 		 * tx_srs_drain() completely drains out the
 		 * messages.
 		 */
-		boolean_t		is_subflow;
 		mac_tx_stats_t		stats;
 
 		if (ringp->s_ring_state & S_RING_ENQUEUED) {
@@ -3890,11 +3979,9 @@ mac_tx_soft_ring_process(mac_soft_ring_t *ringp, mblk_t *mp_chain,
 			 */
 			mutex_exit(&ringp->s_ring_lock);
 		}
-		is_subflow = ((mac_srs->srs_type & SRST_FLOW) != 0);
 
 		mp_chain = mac_tx_send(ringp->s_ring_tx_arg1,
-		    ringp->s_ring_tx_arg2, mp_chain,
-		    (is_subflow ? &stats : NULL));
+		    ringp->s_ring_tx_arg2, mp_chain, &stats);
 
 		/*
 		 * Multiple threads could be here sending packets.
@@ -3912,9 +3999,9 @@ mac_tx_soft_ring_process(mac_soft_ring_t *ringp, mblk_t *mp_chain,
 			mutex_exit(&ringp->s_ring_lock);
 			return (cookie);
 		}
-		if (is_subflow) {
-			FLOW_TX_STATS_UPDATE(mac_srs->srs_flent, &stats);
-		}
+		SRS_TX_STATS_UPDATE(mac_srs, &stats);
+		SOFTRING_TX_STATS_UPDATE(ringp, &stats);
+
 		return (NULL);
 	}
 }

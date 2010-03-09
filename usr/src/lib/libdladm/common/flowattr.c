@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,8 +40,6 @@
 #include <libdladm.h>
 #include <libdlflow.h>
 #include <libdlflow_impl.h>
-
-#define	V4_PART_OF_V6(v6)	((v6)._S6_un._S6_u32[3])
 
 /* max port number for UDP, TCP & SCTP */
 #define	MAX_PORT	65535

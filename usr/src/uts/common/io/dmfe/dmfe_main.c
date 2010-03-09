@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,12 +197,14 @@ static void		dmfe_m_ioctl(void *, queue_t *, mblk_t *);
 static mblk_t		*dmfe_m_tx(void *, mblk_t *);
 static int 		dmfe_m_stat(void *, uint_t, uint64_t *);
 static int		dmfe_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+    uint_t, void *);
 static int		dmfe_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t,  const void *);
+static void		dmfe_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 
 static mac_callbacks_t dmfe_m_callbacks = {
-	(MC_IOCTL | MC_SETPROP | MC_GETPROP),
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	dmfe_m_stat,
 	dmfe_m_start,
 	dmfe_m_stop,
@@ -210,12 +212,14 @@ static mac_callbacks_t dmfe_m_callbacks = {
 	dmfe_m_multicst,
 	dmfe_m_unicst,
 	dmfe_m_tx,
+	NULL,
 	dmfe_m_ioctl,
 	NULL,	/* getcapab */
 	NULL,	/* open */
 	NULL,	/* close */
 	dmfe_m_setprop,
-	dmfe_m_getprop
+	dmfe_m_getprop,
+	dmfe_m_propinfo
 };
 
 
@@ -2178,12 +2182,12 @@ dmfe_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 }
 
 int
-dmfe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
-    uint_t sz, void *val, uint_t *perm)
+dmfe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    void *val)
 {
 	dmfe_t		*dmfep = arg;
 
-	return (mii_m_getprop(dmfep->mii, name, num, flags, sz, val, perm));
+	return (mii_m_getprop(dmfep->mii, name, num, sz, val));
 }
 
 int
@@ -2195,6 +2199,14 @@ dmfe_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
 	return (mii_m_setprop(dmfep->mii, name, num, sz, val));
 }
 
+static void
+dmfe_m_propinfo(void *arg, const char *name, mac_prop_id_t num,
+    mac_prop_info_handle_t mph)
+{
+	dmfe_t		*dmfep = arg;
+
+	mii_m_propinfo(dmfep->mii, name, num, mph);
+}
 
 /*
  * ========== Per-instance setup/teardown code ==========

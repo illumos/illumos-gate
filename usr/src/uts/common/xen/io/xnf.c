@@ -257,6 +257,7 @@ static mac_callbacks_t xnf_callbacks = {
 	xnf_set_mac_addr,
 	xnf_send,
 	NULL,
+	NULL,
 	xnf_getcapab
 };
 
@@ -1619,8 +1620,7 @@ xnf_send(void *arg, mblk_t *mp)
 		txp->tx_txreq.size = length;
 		txp->tx_txreq.offset = (uintptr_t)txp->tx_bufp & PAGEOFFSET;
 		txp->tx_txreq.flags = 0;
-		hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL,
-		    &pflags);
+		mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &pflags);
 		if (pflags != 0) {
 			/*
 			 * If the local protocol stack requests checksum
@@ -2104,21 +2104,9 @@ xnf_rx_collect(xnf_t *xnfp)
 				 * blank" flag, and hence could have a
 				 * packet here that we are asserting
 				 * is good with a blank checksum.
-				 *
-				 * The hardware checksum offload
-				 * specification says that we must
-				 * provide the actual checksum as well
-				 * as an assertion that it is valid,
-				 * but the protocol stack doesn't
-				 * actually use it and some other
-				 * drivers don't bother, so we don't.
-				 * If it was necessary we could grovel
-				 * in the packet to find it.
 				 */
-				(void) hcksum_assoc(mp, NULL,
-				    NULL, 0, 0, 0, 0,
-				    HCK_FULLCKSUM |
-				    HCK_FULLCKSUM_OK, 0);
+				mac_hcksum_set(mp, 0, 0, 0, 0,
+				    HCK_FULLCKSUM_OK);
 				xnfp->xnf_stat_rx_cksum_no_need++;
 			}
 			if (head == NULL) {

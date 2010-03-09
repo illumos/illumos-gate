@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,11 +65,12 @@ bge_refill(bge_t *bgep, buff_ring_t *brp, sw_rbd_t *srbdp)
 	bge_mbx_put(bgep, brp->chip_mbx_reg, slot);
 }
 
-static mblk_t *bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p);
+static mblk_t *bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p,
+    recv_ring_t *rrp);
 #pragma	inline(bge_receive_packet)
 
 static mblk_t *
-bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
+bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p, recv_ring_t *rrp)
 {
 	bge_rbd_t hw_rbd;
 	buff_ring_t *brp;
@@ -237,10 +238,13 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 	if (hw_rbd.flags & RBD_FLAG_TCP_UDP_CHECKSUM)
 		pflags |= HCK_FULLCKSUM;
 	if (hw_rbd.flags & RBD_FLAG_IP_CHECKSUM)
-		pflags |= HCK_IPV4_HDRCKSUM;
+		pflags |= HCK_IPV4_HDRCKSUM_OK;
 	if (pflags != 0)
-		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0,
-		    hw_rbd.tcp_udp_cksum, pflags, 0);
+		mac_hcksum_set(mp, 0, 0, 0, hw_rbd.tcp_udp_cksum, pflags);
+
+	/* Update per-ring rx statistics */
+	rrp->rx_pkts++;
+	rrp->rx_bytes += len;
 
 refill:
 	/*
@@ -313,7 +317,8 @@ bge_receive_ring(bge_t *bgep, recv_ring_t *rrp)
 
 	while ((slot != *rrp->prod_index_p) && /* Note: volatile	*/
 	    (recv_cnt < BGE_MAXPKT_RCVED)) {
-		if ((mp = bge_receive_packet(bgep, &hw_rbd_p[slot])) != NULL) {
+		if ((mp = bge_receive_packet(bgep, &hw_rbd_p[slot], rrp))
+		    != NULL) {
 			*tail = mp;
 			tail = &mp->b_next;
 			recv_cnt++;
@@ -383,7 +388,8 @@ bge_poll_ring(void *arg, int bytes_to_pickup)
 
 	/* Note: volatile */
 	while ((slot != *rrp->prod_index_p) && (sz <= bytes_to_pickup)) {
-		if ((mp = bge_receive_packet(bgep, &hw_rbd_p[slot])) != NULL) {
+		if ((mp = bge_receive_packet(bgep, &hw_rbd_p[slot], rrp))
+		    != NULL) {
 			*tail = mp;
 			sz += msgdsize(mp);
 			tail = &mp->b_next;

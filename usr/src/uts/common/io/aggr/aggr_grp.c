@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,38 @@
  * aggregation group.
  *
  * A set of MAC ports are associated with each association group.
+ *
+ * Aggr pseudo TX rings
+ * --------------------
+ * The underlying ports (NICs) in an aggregation can have TX rings. To
+ * enhance aggr's performance, these TX rings are made available to the
+ * aggr layer as pseudo TX rings. The concept of pseudo rings are not new.
+ * They are already present and implemented on the RX side. It is called
+ * as pseudo RX rings. The same concept is extended to the TX side where
+ * each TX ring of an underlying port is reflected in aggr as a pseudo
+ * TX ring. Thus each pseudo TX ring will map to a specific hardware TX
+ * ring. Even in the case of a NIC that does not have a TX ring, a pseudo
+ * TX ring is given to the aggregation layer.
+ *
+ * With this change, the outgoing stack depth looks much better:
+ *
+ * mac_tx() -> mac_tx_aggr_mode() -> mac_tx_soft_ring_process() ->
+ * mac_tx_send() -> aggr_ring_rx() -> <driver>_ring_tx()
+ *
+ * Two new modes are introduced to mac_tx() to handle aggr pseudo TX rings:
+ * SRS_TX_AGGR and SRS_TX_BW_AGGR.
+ *
+ * In SRS_TX_AGGR mode, mac_tx_aggr_mode() routine is called. This routine
+ * invokes an aggr function, aggr_find_tx_ring(), to find a (pseudo) TX
+ * ring belonging to a port on which the packet has to be sent.
+ * aggr_find_tx_ring() first finds the outgoing port based on L2/L3/L4
+ * policy and then uses the fanout_hint passed to it to pick a TX ring from
+ * the selected port.
+ *
+ * In SRS_TX_BW_AGGR mode, mac_tx_bw_mode() function is called where
+ * bandwidth limit is applied first on the outgoing packet and the packets
+ * allowed to go out would call mac_tx_aggr_mode() to send the packet on a
+ * particular TX ring.
  */
 
 #include <sys/types.h>
@@ -71,9 +103,8 @@ static void aggr_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t aggr_m_capab_get(void *, mac_capab_t, void *);
 static int aggr_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
-static int aggr_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
-    uint_t, void *, uint_t *);
-
+static void aggr_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 
 static aggr_port_t *aggr_grp_port_lookup(aggr_grp_t *, datalink_id_t);
 static int aggr_grp_rem_port(aggr_grp_t *, aggr_port_t *, boolean_t *,
@@ -113,7 +144,7 @@ static id_space_t	*key_ids;
 static uchar_t aggr_zero_mac[] = {0, 0, 0, 0, 0, 0};
 
 #define	AGGR_M_CALLBACK_FLAGS	\
-	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_PROPINFO)
 
 static mac_callbacks_t aggr_m_callbacks = {
 	AGGR_M_CALLBACK_FLAGS,
@@ -123,13 +154,15 @@ static mac_callbacks_t aggr_m_callbacks = {
 	aggr_m_promisc,
 	aggr_m_multicst,
 	NULL,
-	aggr_m_tx,
+	NULL,
+	NULL,
 	aggr_m_ioctl,
 	aggr_m_capab_get,
 	NULL,
 	NULL,
 	aggr_m_setprop,
-	aggr_m_getprop
+	NULL,
+	aggr_m_propinfo
 };
 
 /*ARGSUSED*/
@@ -144,6 +177,8 @@ aggr_grp_constructor(void *buf, void *arg, int kmflag)
 	rw_init(&grp->lg_tx_lock, NULL, RW_DRIVER, NULL);
 	mutex_init(&grp->lg_port_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&grp->lg_port_cv, NULL, CV_DEFAULT, NULL);
+	mutex_init(&grp->lg_tx_flowctl_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&grp->lg_tx_flowctl_cv, NULL, CV_DEFAULT, NULL);
 	grp->lg_link_state = LINK_STATE_UNKNOWN;
 	return (0);
 }
@@ -164,6 +199,8 @@ aggr_grp_destructor(void *buf, void *arg)
 	mutex_destroy(&grp->lg_port_lock);
 	cv_destroy(&grp->lg_port_cv);
 	rw_destroy(&grp->lg_tx_lock);
+	mutex_destroy(&grp->lg_tx_flowctl_lock);
+	cv_destroy(&grp->lg_tx_flowctl_cv);
 }
 
 void
@@ -536,7 +573,7 @@ aggr_grp_add_port(aggr_grp_t *grp, datalink_id_t port_linkid, boolean_t force,
 }
 
 /*
- * Add a pseudo Rx ring for the given HW ring handle.
+ * Add a pseudo RX ring for the given HW ring handle.
  */
 static int
 aggr_add_pseudo_rx_ring(aggr_port_t *port,
@@ -553,7 +590,7 @@ aggr_add_pseudo_rx_ring(aggr_port_t *port,
 	}
 
 	/*
-	 * No slot for this new Rx ring.
+	 * No slot for this new RX ring.
 	 */
 	if (j == MAX_RINGS_PER_GROUP)
 		return (EIO);
@@ -567,19 +604,20 @@ aggr_add_pseudo_rx_ring(aggr_port_t *port,
 	 * The group is already registered, dynamically add a new ring to the
 	 * mac group.
 	 */
-	mac_hwring_setup(hw_rh, (mac_resource_handle_t)ring);
 	if ((err = mac_group_add_ring(rx_grp->arg_gh, j)) != 0) {
 		ring->arr_flags &= ~MAC_PSEUDO_RING_INUSE;
 		ring->arr_hw_rh = NULL;
 		ring->arr_port = NULL;
 		rx_grp->arg_ring_cnt--;
-		mac_hwring_teardown(hw_rh);
+	} else {
+		mac_hwring_setup(hw_rh, (mac_resource_handle_t)ring,
+		    mac_find_ring(rx_grp->arg_gh, j));
 	}
 	return (err);
 }
 
 /*
- * Remove the pseudo Rx ring of the given HW ring handle.
+ * Remove the pseudo RX ring of the given HW ring handle.
  */
 static void
 aggr_rem_pseudo_rx_ring(aggr_pseudo_rx_group_t *rx_grp, mac_ring_handle_t hw_rh)
@@ -632,8 +670,8 @@ aggr_add_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
 	/*
 	 * Get the list the the underlying HW rings.
 	 */
-	hw_rh_cnt = mac_hwrings_get(port->lp_mch, &port->lp_hwgh, hw_rh,
-	    MAC_RING_TYPE_RX);
+	hw_rh_cnt = mac_hwrings_get(port->lp_mch,
+	    &port->lp_hwgh, hw_rh, MAC_RING_TYPE_RX);
 
 	if (port->lp_hwgh != NULL) {
 		/*
@@ -671,7 +709,7 @@ aggr_add_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
 			port->lp_hwgh = NULL;
 		}
 	} else {
-		port->lp_grp_added = B_TRUE;
+		port->lp_rx_grp_added = B_TRUE;
 	}
 done:
 	mac_perim_exit(pmph);
@@ -695,12 +733,12 @@ aggr_rem_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
 	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 	mac_perim_enter_by_mh(port->lp_mh, &pmph);
 
-	if (!port->lp_grp_added)
+	if (!port->lp_rx_grp_added)
 		goto done;
 
 	ASSERT(rx_grp->arg_gh != NULL);
-	hw_rh_cnt = mac_hwrings_get(port->lp_mch, &hwgh, hw_rh,
-	    MAC_RING_TYPE_RX);
+	hw_rh_cnt = mac_hwrings_get(port->lp_mch,
+	    &hwgh, hw_rh, MAC_RING_TYPE_RX);
 
 	/*
 	 * If hw_rh_cnt is 0, it means that the underlying port does not
@@ -725,7 +763,196 @@ aggr_rem_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
 		mac_rx_client_restart(port->lp_mch);
 	}
 
-	port->lp_grp_added = B_FALSE;
+	port->lp_rx_grp_added = B_FALSE;
+done:
+	mac_perim_exit(pmph);
+}
+
+/*
+ * Add a pseudo TX ring for the given HW ring handle.
+ */
+static int
+aggr_add_pseudo_tx_ring(aggr_port_t *port,
+    aggr_pseudo_tx_group_t *tx_grp, mac_ring_handle_t hw_rh,
+    mac_ring_handle_t *pseudo_rh)
+{
+	aggr_pseudo_tx_ring_t	*ring;
+	int			err;
+	int			i;
+
+	ASSERT(MAC_PERIM_HELD(port->lp_mh));
+	for (i = 0; i < MAX_RINGS_PER_GROUP; i++) {
+		ring = tx_grp->atg_rings + i;
+		if (!(ring->atr_flags & MAC_PSEUDO_RING_INUSE))
+			break;
+	}
+	/*
+	 * No slot for this new TX ring.
+	 */
+	if (i == MAX_RINGS_PER_GROUP)
+		return (EIO);
+	/*
+	 * The following 4 statements needs to be done before
+	 * calling mac_group_add_ring(). Otherwise it will
+	 * result in an assertion failure in mac_init_ring().
+	 */
+	ring->atr_flags |= MAC_PSEUDO_RING_INUSE;
+	ring->atr_hw_rh = hw_rh;
+	ring->atr_port = port;
+	tx_grp->atg_ring_cnt++;
+
+	/*
+	 * The TX side has no concept of ring groups unlike RX groups.
+	 * There is just a single group which stores all the TX rings.
+	 * This group will be used to store aggr's pseudo TX rings.
+	 */
+	if ((err = mac_group_add_ring(tx_grp->atg_gh, i)) != 0) {
+		ring->atr_flags &= ~MAC_PSEUDO_RING_INUSE;
+		ring->atr_hw_rh = NULL;
+		ring->atr_port = NULL;
+		tx_grp->atg_ring_cnt--;
+	} else {
+		*pseudo_rh = mac_find_ring(tx_grp->atg_gh, i);
+		if (hw_rh != NULL) {
+			mac_hwring_setup(hw_rh, (mac_resource_handle_t)ring,
+			    mac_find_ring(tx_grp->atg_gh, i));
+		}
+	}
+	return (err);
+}
+
+/*
+ * Remove the pseudo TX ring of the given HW ring handle.
+ */
+static void
+aggr_rem_pseudo_tx_ring(aggr_pseudo_tx_group_t *tx_grp,
+    mac_ring_handle_t pseudo_hw_rh)
+{
+	aggr_pseudo_tx_ring_t	*ring;
+	int			i;
+
+	for (i = 0; i < MAX_RINGS_PER_GROUP; i++) {
+		ring = tx_grp->atg_rings + i;
+		if (ring->atr_rh != pseudo_hw_rh)
+			continue;
+
+		ASSERT(ring->atr_flags & MAC_PSEUDO_RING_INUSE);
+		mac_group_rem_ring(tx_grp->atg_gh, pseudo_hw_rh);
+		ring->atr_flags &= ~MAC_PSEUDO_RING_INUSE;
+		mac_hwring_teardown(ring->atr_hw_rh);
+		ring->atr_hw_rh = NULL;
+		ring->atr_port = NULL;
+		tx_grp->atg_ring_cnt--;
+		break;
+	}
+}
+
+/*
+ * This function is called to create pseudo rings over hardware rings of
+ * the underlying device. There is a 1:1 mapping between the pseudo TX
+ * rings of the aggr and the hardware rings of the underlying port.
+ */
+static int
+aggr_add_pseudo_tx_group(aggr_port_t *port, aggr_pseudo_tx_group_t *tx_grp)
+{
+	aggr_grp_t		*grp = port->lp_grp;
+	mac_ring_handle_t	hw_rh[MAX_RINGS_PER_GROUP], pseudo_rh;
+	mac_perim_handle_t	pmph;
+	int			hw_rh_cnt, i = 0, j;
+	int			err = 0;
+
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+	mac_perim_enter_by_mh(port->lp_mh, &pmph);
+
+	/*
+	 * Get the list the the underlying HW rings.
+	 */
+	hw_rh_cnt = mac_hwrings_get(port->lp_mch,
+	    NULL, hw_rh, MAC_RING_TYPE_TX);
+
+	/*
+	 * Even if the underlying NIC does not have TX rings, we
+	 * still make a psuedo TX ring for that NIC with NULL as
+	 * the ring handle.
+	 */
+	if (hw_rh_cnt == 0)
+		port->lp_tx_ring_cnt = 1;
+	else
+		port->lp_tx_ring_cnt = hw_rh_cnt;
+
+	port->lp_tx_rings = kmem_zalloc((sizeof (mac_ring_handle_t *) *
+	    port->lp_tx_ring_cnt), KM_SLEEP);
+	port->lp_pseudo_tx_rings = kmem_zalloc((sizeof (mac_ring_handle_t *) *
+	    port->lp_tx_ring_cnt), KM_SLEEP);
+
+	if (hw_rh_cnt == 0) {
+		if ((err = aggr_add_pseudo_tx_ring(port, tx_grp,
+		    NULL, &pseudo_rh)) == 0) {
+			port->lp_tx_rings[0] = NULL;
+			port->lp_pseudo_tx_rings[0] = pseudo_rh;
+		}
+	} else {
+		for (i = 0; err == 0 && i < hw_rh_cnt; i++) {
+			err = aggr_add_pseudo_tx_ring(port,
+			    tx_grp, hw_rh[i], &pseudo_rh);
+			if (err != 0)
+				break;
+			port->lp_tx_rings[i] = hw_rh[i];
+			port->lp_pseudo_tx_rings[i] = pseudo_rh;
+		}
+	}
+
+	if (err != 0) {
+		if (hw_rh_cnt != 0) {
+			for (j = 0; j < i; j++) {
+				aggr_rem_pseudo_tx_ring(tx_grp,
+				    port->lp_pseudo_tx_rings[j]);
+			}
+		}
+		kmem_free(port->lp_tx_rings,
+		    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_cnt));
+		kmem_free(port->lp_pseudo_tx_rings,
+		    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_cnt));
+		port->lp_tx_ring_cnt = 0;
+	} else {
+		port->lp_tx_grp_added = B_TRUE;
+		port->lp_tx_notify_mh = mac_client_tx_notify(port->lp_mch,
+		    aggr_tx_ring_update, port);
+	}
+	mac_perim_exit(pmph);
+	return (err);
+}
+
+/*
+ * This function is called by aggr to remove pseudo TX rings over the
+ * HW rings of the underlying port.
+ */
+static void
+aggr_rem_pseudo_tx_group(aggr_port_t *port, aggr_pseudo_tx_group_t *tx_grp)
+{
+	aggr_grp_t		*grp = port->lp_grp;
+	mac_perim_handle_t	pmph;
+	int			i;
+
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+	mac_perim_enter_by_mh(port->lp_mh, &pmph);
+
+	if (!port->lp_tx_grp_added)
+		goto done;
+
+	ASSERT(tx_grp->atg_gh != NULL);
+
+	for (i = 0; i < port->lp_tx_ring_cnt; i++)
+		aggr_rem_pseudo_tx_ring(tx_grp, port->lp_pseudo_tx_rings[i]);
+
+	kmem_free(port->lp_tx_rings,
+	    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_cnt));
+	kmem_free(port->lp_pseudo_tx_rings,
+	    (sizeof (mac_ring_handle_t *) * port->lp_tx_ring_cnt));
+
+	port->lp_tx_ring_cnt = 0;
+	(void) mac_client_tx_notify(port->lp_mch, NULL, port->lp_tx_notify_mh);
+	port->lp_tx_grp_added = B_FALSE;
 done:
 	mac_perim_exit(pmph);
 }
@@ -813,6 +1040,9 @@ aggr_grp_add_ports(datalink_id_t linkid, uint_t nports, boolean_t force,
 		 * Create the pseudo ring for each HW ring of the underlying
 		 * port.
 		 */
+		rc = aggr_add_pseudo_tx_group(port, &grp->lg_tx_group);
+		if (rc != 0)
+			goto bail;
 		rc = aggr_add_pseudo_rx_group(port, &grp->lg_rx_group);
 		if (rc != 0)
 			goto bail;
@@ -877,6 +1107,7 @@ bail:
 				aggr_port_stop(port);
 				mac_perim_exit(pmph);
 			}
+			aggr_rem_pseudo_tx_group(port, &grp->lg_tx_group);
 			aggr_rem_pseudo_rx_group(port, &grp->lg_rx_group);
 			(void) aggr_grp_rem_port(grp, port, NULL, NULL);
 		}
@@ -1001,6 +1232,7 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	mac_perim_handle_t mph;
 	int err;
 	int i;
+	kt_did_t tid = 0;
 
 	/* need at least one port */
 	if (nports == 0)
@@ -1029,10 +1261,17 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	grp->lg_started = B_FALSE;
 	grp->lg_promisc = B_FALSE;
 	grp->lg_lacp_done = B_FALSE;
+	grp->lg_tx_notify_done = B_FALSE;
 	grp->lg_lacp_head = grp->lg_lacp_tail = NULL;
 	grp->lg_lacp_rx_thread = thread_create(NULL, 0,
 	    aggr_lacp_rx_thread, grp, 0, &p0, TS_RUN, minclsyspri);
+	grp->lg_tx_notify_thread = thread_create(NULL, 0,
+	    aggr_tx_notify_thread, grp, 0, &p0, TS_RUN, minclsyspri);
+	grp->lg_tx_blocked_rings = kmem_zalloc((sizeof (mac_ring_handle_t *) *
+	    MAX_RINGS_PER_GROUP), KM_SLEEP);
+	grp->lg_tx_blocked_cnt = 0;
 	bzero(&grp->lg_rx_group, sizeof (aggr_pseudo_rx_group_t));
+	bzero(&grp->lg_tx_group, sizeof (aggr_pseudo_tx_group_t));
 	aggr_lacp_init_grp(grp);
 
 	/* add MAC ports to group */
@@ -1127,6 +1366,7 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 		 * port. Note that this is done after the aggr registers the
 		 * mac.
 		 */
+		VERIFY(aggr_add_pseudo_tx_group(port, &grp->lg_tx_group) == 0);
 		VERIFY(aggr_add_pseudo_rx_group(port, &grp->lg_rx_group) == 0);
 		if (aggr_port_notify_link(grp, port))
 			link_state_changed = B_TRUE;
@@ -1172,7 +1412,21 @@ bail:
 	while (grp->lg_lacp_rx_thread != NULL)
 		cv_wait(&grp->lg_lacp_cv, &grp->lg_lacp_lock);
 	mutex_exit(&grp->lg_lacp_lock);
+	/*
+	 * Inform the tx_notify thread to exit.
+	 */
+	mutex_enter(&grp->lg_tx_flowctl_lock);
+	if (grp->lg_tx_notify_thread != NULL) {
+		tid = grp->lg_tx_notify_thread->t_did;
+		grp->lg_tx_notify_done = B_TRUE;
+		cv_signal(&grp->lg_tx_flowctl_cv);
+	}
+	mutex_exit(&grp->lg_tx_flowctl_lock);
+	if (tid != 0)
+		thread_join(tid);
 
+	kmem_free(grp->lg_tx_blocked_rings,
+	    (sizeof (mac_ring_handle_t *) * MAX_RINGS_PER_GROUP));
 	rw_exit(&aggr_grp_lock);
 	AGGR_GRP_REFRELE(grp);
 	return (err);
@@ -1272,6 +1526,7 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 	grp->lg_nports--;
 	mac_perim_exit(mph);
 
+	aggr_rem_pseudo_tx_group(port, &grp->lg_tx_group);
 	aggr_port_delete(port);
 
 	/*
@@ -1378,7 +1633,20 @@ aggr_grp_rem_ports(datalink_id_t linkid, uint_t nports, laioc_port_t *ports)
 			mac_perim_exit(pmph);
 		}
 
+		/*
+		 * aggr_rem_pseudo_tx_group() is not called here. Instead
+		 * it is called from inside aggr_grp_rem_port() after the
+		 * port has been detached. The reason is that
+		 * aggr_rem_pseudo_tx_group() removes one ring at a time
+		 * and if there is still traffic going on, then there
+		 * is the possibility of aggr_find_tx_ring() returning a
+		 * removed ring for transmission. Once the port has been
+		 * detached, that port will not be used and
+		 * aggr_find_tx_ring() will not return any rings
+		 * belonging to it.
+		 */
 		aggr_rem_pseudo_rx_group(port, &grp->lg_rx_group);
+
 		/* remove port from group */
 		rc = aggr_grp_rem_port(grp, port, &mac_addr_changed,
 		    &link_state_changed);
@@ -1408,6 +1676,7 @@ aggr_grp_delete(datalink_id_t linkid, cred_t *cred)
 	mod_hash_val_t val;
 	mac_perim_handle_t mph, pmph;
 	int err;
+	kt_did_t tid = 0;
 
 	rw_enter(&aggr_grp_lock, RW_WRITER);
 
@@ -1455,6 +1724,18 @@ aggr_grp_delete(datalink_id_t linkid, cred_t *cred)
 	while (grp->lg_lacp_rx_thread != NULL)
 		cv_wait(&grp->lg_lacp_cv, &grp->lg_lacp_lock);
 	mutex_exit(&grp->lg_lacp_lock);
+	/*
+	 * Inform the tx_notify_thread to exit.
+	 */
+	mutex_enter(&grp->lg_tx_flowctl_lock);
+	if (grp->lg_tx_notify_thread != NULL) {
+		tid = grp->lg_tx_notify_thread->t_did;
+		grp->lg_tx_notify_done = B_TRUE;
+		cv_signal(&grp->lg_tx_flowctl_cv);
+	}
+	mutex_exit(&grp->lg_tx_flowctl_lock);
+	if (tid != 0)
+		thread_join(tid);
 
 	mac_perim_enter_by_mh(grp->lg_mh, &mph);
 
@@ -1468,6 +1749,7 @@ aggr_grp_delete(datalink_id_t linkid, cred_t *cred)
 			aggr_port_stop(port);
 		(void) aggr_grp_detach_port(grp, port);
 		mac_perim_exit(pmph);
+		aggr_rem_pseudo_tx_group(port, &grp->lg_tx_group);
 		aggr_rem_pseudo_rx_group(port, &grp->lg_rx_group);
 		aggr_port_delete(port);
 		port = cport;
@@ -1475,6 +1757,8 @@ aggr_grp_delete(datalink_id_t linkid, cred_t *cred)
 
 	mac_perim_exit(mph);
 
+	kmem_free(grp->lg_tx_blocked_rings,
+	    (sizeof (mac_ring_handle_t *) * MAX_RINGS_PER_GROUP));
 	/*
 	 * Wait for the port's lacp timer thread and its notification callback
 	 * to exit before calling mac_unregister() since both needs to access
@@ -1596,6 +1880,37 @@ aggr_grp_stat(aggr_grp_t *grp, uint_t stat, uint64_t *val)
 			*val -= port->lp_ether_stat[stat_index];
 			*val += grp->lg_ether_stat[stat_index];
 		}
+	}
+	return (0);
+}
+
+int
+aggr_rx_ring_stat(mac_ring_driver_t rdriver, uint_t stat, uint64_t *val)
+{
+	aggr_pseudo_rx_ring_t   *rx_ring = (aggr_pseudo_rx_ring_t *)rdriver;
+
+	if (rx_ring->arr_hw_rh != NULL) {
+		*val = mac_pseudo_rx_ring_stat_get(rx_ring->arr_hw_rh, stat);
+	} else {
+		aggr_port_t	*port = rx_ring->arr_port;
+
+		*val = mac_stat_get(port->lp_mh, stat);
+
+	}
+	return (0);
+}
+
+int
+aggr_tx_ring_stat(mac_ring_driver_t rdriver, uint_t stat, uint64_t *val)
+{
+	aggr_pseudo_tx_ring_t   *tx_ring = (aggr_pseudo_tx_ring_t *)rdriver;
+
+	if (tx_ring->atr_hw_rh != NULL) {
+		*val = mac_pseudo_tx_ring_stat_get(tx_ring->atr_hw_rh, stat);
+	} else {
+		aggr_port_t	*port = tx_ring->atr_port;
+
+		*val = mac_stat_get(port->lp_mh, stat);
 	}
 	return (0);
 }
@@ -1821,7 +2136,6 @@ aggr_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 		if (cap_rings->mr_type == MAC_RING_TYPE_RX) {
 			cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
 			cap_rings->mr_rnum = grp->lg_rx_group.arg_ring_cnt;
-			cap_rings->mr_rget = aggr_fill_ring;
 
 			/*
 			 * An aggregation advertises only one (pseudo) RX
@@ -1829,12 +2143,15 @@ aggr_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 			 * the underlying devices.
 			 */
 			cap_rings->mr_gnum = 1;
-			cap_rings->mr_gget = aggr_fill_group;
 			cap_rings->mr_gaddring = NULL;
 			cap_rings->mr_gremring = NULL;
 		} else {
-			return (B_FALSE);
+			cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
+			cap_rings->mr_rnum = grp->lg_tx_group.atg_ring_cnt;
+			cap_rings->mr_gnum = 0;
 		}
+		cap_rings->mr_rget = aggr_fill_ring;
+		cap_rings->mr_gget = aggr_fill_group;
 		break;
 	}
 	case MAC_CAPAB_AGGR:
@@ -1845,6 +2162,8 @@ aggr_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 			aggr_cap = cap_data;
 			aggr_cap->mca_rename_fn = aggr_grp_port_rename;
 			aggr_cap->mca_unicst = aggr_m_unicst;
+			aggr_cap->mca_find_tx_ring_fn = aggr_find_tx_ring;
+			aggr_cap->mca_arg = arg;
 		}
 		return (B_TRUE);
 	}
@@ -1863,18 +2182,24 @@ aggr_fill_group(void *arg, mac_ring_type_t rtype, const int index,
 {
 	aggr_grp_t *grp = arg;
 	aggr_pseudo_rx_group_t *rx_group;
+	aggr_pseudo_tx_group_t *tx_group;
 
-	ASSERT(rtype == MAC_RING_TYPE_RX && index == 0);
-	rx_group = &grp->lg_rx_group;
-	rx_group->arg_gh = gh;
-	rx_group->arg_grp = grp;
+	ASSERT(index == 0);
+	if (rtype == MAC_RING_TYPE_RX) {
+		rx_group = &grp->lg_rx_group;
+		rx_group->arg_gh = gh;
+		rx_group->arg_grp = grp;
 
-	infop->mgi_driver = (mac_group_driver_t)rx_group;
-	infop->mgi_start = NULL;
-	infop->mgi_stop = NULL;
-	infop->mgi_addmac = aggr_addmac;
-	infop->mgi_remmac = aggr_remmac;
-	infop->mgi_count = rx_group->arg_ring_cnt;
+		infop->mgi_driver = (mac_group_driver_t)rx_group;
+		infop->mgi_start = NULL;
+		infop->mgi_stop = NULL;
+		infop->mgi_addmac = aggr_addmac;
+		infop->mgi_remmac = aggr_remmac;
+		infop->mgi_count = rx_group->arg_ring_cnt;
+	} else {
+		tx_group = &grp->lg_tx_group;
+		tx_group->atg_gh = gh;
+	}
 }
 
 /*
@@ -1905,6 +2230,7 @@ aggr_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 		aggr_mac_intr.mi_handle = (mac_intr_handle_t)rx_ring;
 		aggr_mac_intr.mi_enable = aggr_pseudo_enable_intr;
 		aggr_mac_intr.mi_disable = aggr_pseudo_disable_intr;
+		aggr_mac_intr.mi_ddi_handle = NULL;
 
 		infop->mri_driver = (mac_ring_driver_t)rx_ring;
 		infop->mri_start = aggr_pseudo_start_ring;
@@ -1912,6 +2238,34 @@ aggr_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 
 		infop->mri_intr = aggr_mac_intr;
 		infop->mri_poll = aggr_rx_poll;
+
+		infop->mri_stat = aggr_rx_ring_stat;
+		break;
+	}
+	case MAC_RING_TYPE_TX: {
+		aggr_pseudo_tx_group_t	*tx_group = &grp->lg_tx_group;
+		aggr_pseudo_tx_ring_t	*tx_ring;
+
+		ASSERT(rg_index == -1);
+		ASSERT(index < tx_group->atg_ring_cnt);
+
+		tx_ring = &tx_group->atg_rings[index];
+		tx_ring->atr_rh = rh;
+
+		infop->mri_driver = (mac_ring_driver_t)tx_ring;
+		infop->mri_start = NULL;
+		infop->mri_stop = NULL;
+		infop->mri_tx = aggr_ring_tx;
+		infop->mri_stat = aggr_tx_ring_stat;
+		/*
+		 * Use the hw TX ring handle to find if the ring needs
+		 * serialization or not. For NICs that do not expose
+		 * Tx rings, atr_hw_rh will be NULL.
+		 */
+		if (tx_ring->atr_hw_rh != NULL) {
+			infop->mri_flags =
+			    mac_hwring_getinfo(tx_ring->atr_hw_rh);
+		}
 		break;
 	}
 	default:
@@ -2399,34 +2753,33 @@ aggr_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 }
 
 int
-aggr_grp_possible_mtu_range(aggr_grp_t *grp, mac_propval_range_t *range)
+aggr_grp_possible_mtu_range(aggr_grp_t *grp, uint32_t *min, uint32_t *max)
 {
 	mac_propval_range_t		*vals;
 	mac_propval_uint32_range_t	*ur;
 	aggr_port_t			*port;
 	mac_perim_handle_t		mph;
-	mac_prop_t 			macprop;
-	uint_t 				perm, i;
-	uint32_t 			min = 0, max = (uint32_t)-1;
+	uint_t 				i;
 	int 				err = 0;
 
 	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 
+	*min = 0;
+	*max = (uint32_t)-1;
+
 	vals = kmem_alloc(sizeof (mac_propval_range_t) * grp->lg_nports,
 	    KM_SLEEP);
-	macprop.mp_id = MAC_PROP_MTU;
-	macprop.mp_name = "mtu";
-	macprop.mp_flags = MAC_PROP_POSSIBLE;
 
 	for (port = grp->lg_ports, i = 0; port != NULL;
 	    port = port->lp_next, i++) {
 		mac_perim_enter_by_mh(port->lp_mh, &mph);
-		err = mac_get_prop(port->lp_mh, &macprop, vals + i,
-		    sizeof (mac_propval_range_t), &perm);
+		err = mac_prop_info(port->lp_mh, MAC_PROP_MTU, NULL,
+		    NULL, 0, vals + i, NULL);
 		mac_perim_exit(mph);
 		if (err != 0)
 			break;
 	}
+
 	/*
 	 * if any of the underlying ports does not support changing MTU then
 	 * just return ENOTSUP
@@ -2435,47 +2788,42 @@ aggr_grp_possible_mtu_range(aggr_grp_t *grp, mac_propval_range_t *range)
 		ASSERT(err != 0);
 		goto done;
 	}
-	range->mpr_count = 1;
-	range->mpr_type = MAC_PROPVAL_UINT32;
+
 	for (i = 0; i < grp->lg_nports; i++) {
-		ur = &((vals + i)->range_uint32[0]);
+		ur = &((vals + i)->mpr_range_uint32[0]);
 		/*
 		 * Take max of the min, for range_min; that is the minimum
 		 * MTU value for an aggregation is the maximum of the
 		 * minimum values of all the underlying ports
 		 */
-		if (ur->mpur_min > min)
-			min = ur->mpur_min;
+		if (ur->mpur_min > *min)
+			*min = ur->mpur_min;
 		/* Take min of the max, for range_max */
-		if (ur->mpur_max < max)
-			max = ur->mpur_max;
+		if (ur->mpur_max < *max)
+			*max = ur->mpur_max;
 	}
-	range->range_uint32[0].mpur_min = min;
-	range->range_uint32[0].mpur_max = max;
 done:
 	kmem_free(vals, sizeof (mac_propval_range_t) * grp->lg_nports);
+
 	return (err);
 }
 
-/*ARGSUSED*/
-static int
-aggr_m_getprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+static void
+aggr_m_propinfo(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
 {
-	mac_propval_range_t 	range;
-	int 			err = ENOTSUP;
 	aggr_grp_t		*grp = m_driver;
 
+	_NOTE(ARGUNUSED(pr_name));
+
 	switch (pr_num) {
-	case MAC_PROP_MTU:
-		if (!(pr_flags & MAC_PROP_POSSIBLE))
-			return (ENOTSUP);
-		if (pr_valsize < sizeof (mac_propval_range_t))
-			return (EINVAL);
-		if ((err = aggr_grp_possible_mtu_range(grp, &range)) != 0)
-			return (err);
-		bcopy(&range, pr_val, sizeof (range));
-		return (0);
+	case MAC_PROP_MTU: {
+		uint32_t min, max;
+
+		if (aggr_grp_possible_mtu_range(grp, &min, &max) != 0)
+			return;
+		mac_prop_info_set_range_uint32(prh, min, max);
+		break;
 	}
-	return (err);
+	}
 }

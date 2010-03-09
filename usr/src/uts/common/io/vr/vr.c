@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,7 +148,7 @@ static ddi_dma_attr_t vr_data_dma_attr = {
 };
 
 static mac_callbacks_t vr_mac_callbacks = {
-	MC_SETPROP|MC_GETPROP,	/* Which callbacks are set */
+	MC_SETPROP|MC_GETPROP|MC_PROPINFO, /* Which callbacks are set */
 	vr_mac_getstat,		/* Get the value of a statistic */
 	vr_mac_start,		/* Start the device */
 	vr_mac_stop,		/* Stop the device */
@@ -156,12 +156,14 @@ static mac_callbacks_t vr_mac_callbacks = {
 	vr_mac_set_multicast,	/* Enable or disable a multicast addr */
 	vr_mac_set_ether_addr,	/* Set the unicast MAC address */
 	vr_mac_tx_enqueue_list,	/* Transmit a packet */
+	NULL,
 	NULL,			/* Process an unknown ioctl */
 	NULL,			/* Get capability information */
 	NULL,			/* Open the device */
 	NULL,			/* Close the device */
 	vr_mac_setprop,		/* Set properties of the device */
-	vr_mac_getprop		/* Get properties of the device */
+	vr_mac_getprop,		/* Get properties of the device */
+	vr_mac_propinfo		/* Get properties attributes */
 };
 
 /*
@@ -3157,7 +3159,7 @@ vr_remove_kstats(vr_t *vrp)
  */
 int
 vr_mac_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	vr_t		*vrp;
 	uint32_t	err;
@@ -3168,215 +3170,105 @@ vr_mac_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 
 	err = 0;
 	vrp = (vr_t *)arg;
-	if ((pr_flags & MAC_PROP_DEFAULT) != 0) {
-		/*
-		 * Defaults depend on the PHY/MAC's capabilities
-		 * All defaults are read/write, otherwise reset-linkprop fails
-		 * with enotsup ....
-		 */
-		*perm = MAC_PROP_PERM_RW;
-		switch (pr_num) {
-			case MAC_PROP_ADV_1000FDX_CAP:
-			case MAC_PROP_EN_1000FDX_CAP:
-			case MAC_PROP_ADV_1000HDX_CAP:
-			case MAC_PROP_EN_1000HDX_CAP:
-				val = 0;
-				break;
+	switch (pr_num) {
+		case MAC_PROP_ADV_1000FDX_CAP:
+		case MAC_PROP_ADV_1000HDX_CAP:
+		case MAC_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_EN_1000HDX_CAP:
+			val = 0;
+			break;
 
-			case MAC_PROP_ADV_100FDX_CAP:
-			case MAC_PROP_EN_100FDX_CAP:
-				val = (vrp->chip.mii.status &
-				    MII_STATUS_100_BASEX_FD) != 0;
-				break;
+		case MAC_PROP_ADV_100FDX_CAP:
+			val = (vrp->chip.mii.anadv &
+			    MII_ABILITY_100BASE_TX_FD) != 0;
+			break;
 
-			case MAC_PROP_ADV_100HDX_CAP:
-			case MAC_PROP_EN_100HDX_CAP:
-				val = (vrp->chip.mii.status &
-				    MII_STATUS_100_BASEX) != 0;
-				break;
+		case MAC_PROP_ADV_100HDX_CAP:
+			val = (vrp->chip.mii.anadv &
+			    MII_ABILITY_100BASE_TX) != 0;
+			break;
 
-			case MAC_PROP_ADV_100T4_CAP:
-			case MAC_PROP_EN_100T4_CAP:
-				val = (vrp->chip.mii.status &
-				    MII_STATUS_100_BASE_T4) != 0;
-				break;
+		case MAC_PROP_ADV_100T4_CAP:
+			val = (vrp->chip.mii.anadv &
+			    MII_ABILITY_100BASE_T4) != 0;
+			break;
 
-			case MAC_PROP_ADV_10FDX_CAP:
-			case MAC_PROP_EN_10FDX_CAP:
-				val = (vrp->chip.mii.status &
-				    MII_STATUS_10_FD) != 0;
-				break;
+		case MAC_PROP_ADV_10FDX_CAP:
+			val = (vrp->chip.mii.anadv &
+			    MII_ABILITY_10BASE_T_FD) != 0;
+			break;
 
-			case MAC_PROP_ADV_10HDX_CAP:
-			case MAC_PROP_EN_10HDX_CAP:
-				val = (vrp->chip.mii.status &
-				    MII_STATUS_10) != 0;
-				break;
+		case MAC_PROP_ADV_10HDX_CAP:
+			val = (vrp->chip.mii.anadv &
+			    MII_ABILITY_10BASE_T) != 0;
+			break;
 
-			case MAC_PROP_AUTONEG:
-			case MAC_PROP_EN_AUTONEG:
-				val = (vrp->chip.mii.status &
-				    MII_STATUS_CANAUTONEG) != 0;
-				break;
+		case MAC_PROP_AUTONEG:
+			val = (vrp->chip.mii.control &
+			    MII_CONTROL_ANE) != 0;
+			break;
 
-			case MAC_PROP_DUPLEX:
-				val = VR_LINK_DUPLEX_FULL;
-				break;
+		case MAC_PROP_DUPLEX:
+			val = vrp->chip.link.duplex;
+			break;
 
-			case MAC_PROP_FLOWCTRL:
-				val = VR_PAUSE_BIDIRECTIONAL;
-				break;
+		case MAC_PROP_EN_100FDX_CAP:
+			val = (vrp->param.anadv_en &
+			    MII_ABILITY_100BASE_TX_FD) != 0;
+			break;
 
-			case MAC_PROP_MTU:
-				val = ETHERMTU;
-				break;
+		case MAC_PROP_EN_100HDX_CAP:
+			val = (vrp->param.anadv_en &
+			    MII_ABILITY_100BASE_TX) != 0;
+			break;
 
-			case MAC_PROP_SPEED:
+		case MAC_PROP_EN_100T4_CAP:
+			val = (vrp->param.anadv_en &
+			    MII_ABILITY_100BASE_T4) != 0;
+			break;
+
+		case MAC_PROP_EN_10FDX_CAP:
+			val = (vrp->param.anadv_en &
+			    MII_ABILITY_10BASE_T_FD) != 0;
+			break;
+
+		case MAC_PROP_EN_10HDX_CAP:
+			val = (vrp->param.anadv_en &
+			    MII_ABILITY_10BASE_T) != 0;
+			break;
+
+		case MAC_PROP_EN_AUTONEG:
+			val = vrp->param.an_en == VR_LINK_AUTONEG_ON;
+			break;
+
+		case MAC_PROP_FLOWCTRL:
+			val = vrp->chip.link.flowctrl;
+			break;
+
+		case MAC_PROP_MTU:
+			val = vrp->param.mtu;
+			break;
+
+		case MAC_PROP_SPEED:
+			if (vrp->chip.link.speed ==
+			    VR_LINK_SPEED_100MBS)
 				val = 100 * 1000 * 1000;
-				break;
-
-			case MAC_PROP_STATUS:
-				val = VR_LINK_STATE_UP;
-				break;
-
-			default:
-				return (ENOTSUP);
-		}
-	} else {
-		switch (pr_num) {
-			case MAC_PROP_ADV_1000FDX_CAP:
-			case MAC_PROP_ADV_1000HDX_CAP:
+			else if (vrp->chip.link.speed ==
+			    VR_LINK_SPEED_10MBS)
+				val = 10 * 1000 * 1000;
+			else
 				val = 0;
-				*perm = MAC_PROP_PERM_READ;
-				break;
+			break;
 
-			case MAC_PROP_EN_1000FDX_CAP:
-			case MAC_PROP_EN_1000HDX_CAP:
-				*perm = MAC_PROP_PERM_READ;
-				val = 0;
-				break;
+		case MAC_PROP_STATUS:
+			val = vrp->chip.link.state;
+			break;
 
-			case MAC_PROP_ADV_100FDX_CAP:
-				*perm = MAC_PROP_PERM_READ;
-				val = (vrp->chip.mii.anadv &
-				    MII_ABILITY_100BASE_TX_FD) != 0;
-				break;
-
-			case MAC_PROP_ADV_100HDX_CAP:
-				*perm = MAC_PROP_PERM_READ;
-				val = (vrp->chip.mii.anadv &
-				    MII_ABILITY_100BASE_TX) != 0;
-				break;
-
-			case MAC_PROP_ADV_100T4_CAP:
-				*perm = MAC_PROP_PERM_READ;
-				val = (vrp->chip.mii.anadv &
-				    MII_ABILITY_100BASE_T4) != 0;
-				break;
-
-			case MAC_PROP_ADV_10FDX_CAP:
-				*perm = MAC_PROP_PERM_READ;
-				val = (vrp->chip.mii.anadv &
-				    MII_ABILITY_10BASE_T_FD) != 0;
-				break;
-
-			case MAC_PROP_ADV_10HDX_CAP:
-				*perm = MAC_PROP_PERM_READ;
-				val = (vrp->chip.mii.anadv &
-				    MII_ABILITY_10BASE_T) != 0;
-				break;
-
-			case MAC_PROP_AUTONEG:
-				*perm = MAC_PROP_PERM_RW;
-				val = (vrp->chip.mii.control &
-				    MII_CONTROL_ANE) != 0;
-				break;
-
-			case MAC_PROP_DUPLEX:
-				/*
-				 * Writability depends on autoneg.
-				 */
-				if ((vrp->chip.mii.control &
-				    MII_CONTROL_ANE) == 0)
-					*perm = MAC_PROP_PERM_RW;
-				else
-					*perm = MAC_PROP_PERM_READ;
-				val = vrp->chip.link.duplex;
-				break;
-
-			case MAC_PROP_EN_100FDX_CAP:
-				*perm = MAC_PROP_PERM_RW;
-				val = (vrp->param.anadv_en &
-				    MII_ABILITY_100BASE_TX_FD) != 0;
-				break;
-
-			case MAC_PROP_EN_100HDX_CAP:
-				*perm = MAC_PROP_PERM_RW;
-				val = (vrp->param.anadv_en &
-				    MII_ABILITY_100BASE_TX) != 0;
-				break;
-
-			case MAC_PROP_EN_100T4_CAP:
-				*perm = MAC_PROP_PERM_READ;
-				val = (vrp->param.anadv_en &
-				    MII_ABILITY_100BASE_T4) != 0;
-				break;
-
-			case MAC_PROP_EN_10FDX_CAP:
-				*perm = MAC_PROP_PERM_RW;
-				val = (vrp->param.anadv_en &
-				    MII_ABILITY_10BASE_T_FD) != 0;
-				break;
-
-			case MAC_PROP_EN_10HDX_CAP:
-				*perm = MAC_PROP_PERM_RW;
-				val = (vrp->param.anadv_en &
-				    MII_ABILITY_10BASE_T) != 0;
-				break;
-
-			case MAC_PROP_EN_AUTONEG:
-				*perm = MAC_PROP_PERM_RW;
-				val = vrp->param.an_en == VR_LINK_AUTONEG_ON;
-				break;
-
-			case MAC_PROP_FLOWCTRL:
-				*perm = MAC_PROP_PERM_RW;
-				val = vrp->chip.link.flowctrl;
-				break;
-
-			case MAC_PROP_MTU:
-				*perm = MAC_PROP_PERM_RW;
-				val = vrp->param.mtu;
-				break;
-
-			case MAC_PROP_SPEED:
-				/*
-				 * Writability depends on autoneg.
-				 */
-				if ((vrp->chip.mii.control &
-				    MII_CONTROL_ANE) == 0)
-					*perm = MAC_PROP_PERM_RW;
-				else
-					*perm = MAC_PROP_PERM_READ;
-				if (vrp->chip.link.speed ==
-				    VR_LINK_SPEED_100MBS)
-					val = 100 * 1000 * 1000;
-				else if (vrp->chip.link.speed ==
-				    VR_LINK_SPEED_10MBS)
-					val = 10 * 1000 * 1000;
-				else
-					val = 0;
-				break;
-
-			case MAC_PROP_STATUS:
-				val = vrp->chip.link.state;
-				break;
-
-			default:
-				err = ENOTSUP;
-				break;
-		}
+		default:
+			err = ENOTSUP;
+			break;
 	}
+
 	if (err == 0 && pr_num != MAC_PROP_PRIVATE) {
 		if (pr_valsize == sizeof (uint64_t))
 			*(uint64_t *)pr_val = val;
@@ -3390,6 +3282,108 @@ vr_mac_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			err = EINVAL;
 	}
 	return (err);
+}
+
+void
+vr_mac_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	vr_t		*vrp = (vr_t *)arg;
+	uint8_t		val, perm;
+
+	/* Since we have no private properties */
+	_NOTE(ARGUNUSED(pr_name))
+
+	switch (pr_num) {
+		case MAC_PROP_ADV_1000FDX_CAP:
+		case MAC_PROP_ADV_1000HDX_CAP:
+		case MAC_PROP_EN_1000FDX_CAP:
+		case MAC_PROP_EN_1000HDX_CAP:
+		case MAC_PROP_ADV_100FDX_CAP:
+		case MAC_PROP_ADV_100HDX_CAP:
+		case MAC_PROP_ADV_100T4_CAP:
+		case MAC_PROP_ADV_10FDX_CAP:
+		case MAC_PROP_ADV_10HDX_CAP:
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+			return;
+
+		case MAC_PROP_EN_100FDX_CAP:
+			val = (vrp->chip.mii.status &
+			    MII_STATUS_100_BASEX_FD) != 0;
+			break;
+
+		case MAC_PROP_EN_100HDX_CAP:
+			val = (vrp->chip.mii.status &
+			    MII_STATUS_100_BASEX) != 0;
+			break;
+
+		case MAC_PROP_EN_100T4_CAP:
+			val = (vrp->chip.mii.status &
+			    MII_STATUS_100_BASE_T4) != 0;
+			break;
+
+		case MAC_PROP_EN_10FDX_CAP:
+			val = (vrp->chip.mii.status &
+			    MII_STATUS_10_FD) != 0;
+			break;
+
+		case MAC_PROP_EN_10HDX_CAP:
+			val = (vrp->chip.mii.status &
+			    MII_STATUS_10) != 0;
+			break;
+
+		case MAC_PROP_AUTONEG:
+		case MAC_PROP_EN_AUTONEG:
+			val = (vrp->chip.mii.status &
+			    MII_STATUS_CANAUTONEG) != 0;
+			break;
+
+		case MAC_PROP_FLOWCTRL:
+			mac_prop_info_set_default_link_flowctrl(prh,
+			    LINK_FLOWCTRL_BI);
+			return;
+
+		case MAC_PROP_MTU:
+			mac_prop_info_set_range_uint32(prh,
+			    ETHERMTU, ETHERMTU);
+			return;
+
+		case MAC_PROP_DUPLEX:
+			/*
+			 * Writability depends on autoneg.
+			 */
+			perm = ((vrp->chip.mii.control &
+			    MII_CONTROL_ANE) == 0) ? MAC_PROP_PERM_RW :
+			    MAC_PROP_PERM_READ;
+			mac_prop_info_set_perm(prh, perm);
+
+			if (perm == MAC_PROP_PERM_RW) {
+				mac_prop_info_set_default_uint8(prh,
+				    VR_LINK_DUPLEX_FULL);
+			}
+			return;
+
+		case MAC_PROP_SPEED:
+			perm = ((vrp->chip.mii.control &
+			    MII_CONTROL_ANE) == 0) ?
+			    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
+			mac_prop_info_set_perm(prh, perm);
+
+			if (perm == MAC_PROP_PERM_RW) {
+				mac_prop_info_set_default_uint64(prh,
+				    100 * 1000 * 1000);
+			}
+			return;
+
+		case MAC_PROP_STATUS:
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+			return;
+
+		default:
+			return;
+		}
+
+		mac_prop_info_set_default_uint8(prh, val);
 }
 
 /*

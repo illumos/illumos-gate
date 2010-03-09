@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,6 +105,11 @@ typedef struct vnet_hio_kstats {
 	kstat_named_t	norcvbuf; 	/* MIB - ifInDiscards */
 	kstat_named_t	noxmtbuf; 	/* MIB - ifOutDiscards */
 } vnet_hio_kstats_t;
+
+typedef struct vnet_tx_ring_stats {
+	uint64_t	opackets;	/* # tx packets */
+	uint64_t	obytes;		/* # bytes transmitted */
+} vnet_tx_ring_stats_t;
 
 /*
  * A vnet resource structure.
@@ -214,6 +219,8 @@ typedef struct vnet_pseudo_tx_ring {
 					/* ring handle. Hybrid res: ring hdl */
 					/* of hardware rx ring; LDC res: hdl */
 					/* to the res itself (vnet_res_t)    */
+	boolean_t		woken_up;
+	vnet_tx_ring_stats_t	tx_ring_stats;	/* ring statistics */
 } vnet_pseudo_tx_ring_t;
 
 /*
@@ -241,6 +248,11 @@ typedef struct vnet_pseudo_tx_group {
 	mac_group_handle_t	handle;		/* grp handle in mac layer */
 	uint_t			ring_cnt;	/* total # of rings in grp */
 	vnet_pseudo_tx_ring_t	*rings;		/* array of rings */
+	kmutex_t		flowctl_lock;	/* flow control lock */
+	kcondvar_t		flowctl_cv;
+	kthread_t		*flowctl_thread;
+	boolean_t		flowctl_done;
+	void			*tx_notify_handle; /* Tx ring notification */
 } vnet_pseudo_tx_group_t;
 
 /*
@@ -298,7 +310,6 @@ typedef struct vnet {
 	mac_handle_t		hio_mh;		/* HIO mac hdl */
 	mac_client_handle_t	hio_mch;	/* HIO mac client hdl */
 	mac_unicast_handle_t	hio_muh;	/* HIO mac unicst hdl */
-	mac_notify_handle_t	hio_mnh;	/* HIO notify cb hdl */
 	mac_group_handle_t	rx_hwgh;	/* HIO rx ring-group hdl */
 	mac_group_handle_t	tx_hwgh;	/* HIO tx ring-group hdl */
 } vnet_t;

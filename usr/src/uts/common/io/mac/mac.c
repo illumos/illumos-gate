@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -280,6 +280,7 @@
 #include <sys/mac_provider.h>
 #include <sys/mac_client_impl.h>
 #include <sys/mac_soft_ring.h>
+#include <sys/mac_stat.h>
 #include <sys/mac_impl.h>
 #include <sys/mac.h>
 #include <sys/dls.h>
@@ -306,6 +307,11 @@
 #include <sys/exacct_impl.h>
 #include <inet/nd.h>
 #include <sys/ethernet.h>
+#include <sys/pool.h>
+#include <sys/pool_pset.h>
+#include <sys/cpupart.h>
+#include <inet/wifi_ioctl.h>
+#include <net/wpa.h>
 
 #define	IMPL_HASHSZ	67	/* prime */
 
@@ -316,6 +322,7 @@ uint_t			i_mac_impl_count;
 static kmem_cache_t	*mac_ring_cache;
 static id_space_t	*minor_ids;
 static uint32_t		minor_count;
+static pool_event_cb_t	mac_pool_event_reg;
 
 /*
  * Logging stuff. Perhaps mac_logging_interval could be broken into
@@ -370,6 +377,7 @@ void mac_tx_client_block(mac_client_impl_t *);
 static void mac_rx_ring_quiesce(mac_ring_t *, uint_t);
 static int mac_start_group_and_rings(mac_group_t *);
 static void mac_stop_group_and_rings(mac_group_t *);
+static void mac_pool_event_cb(pool_event_t, int, void *);
 
 /*
  * Module initialization functions.
@@ -440,13 +448,21 @@ mac_init(void)
 	mac_flow_log_enable = B_FALSE;
 	mac_link_log_enable = B_FALSE;
 	mac_logging_timer = 0;
+
+	/* Register to be notified of noteworthy pools events */
+	mac_pool_event_reg.pec_func =  mac_pool_event_cb;
+	mac_pool_event_reg.pec_arg = NULL;
+	pool_event_cb_register(&mac_pool_event_reg);
 }
 
 int
 mac_fini(void)
 {
+
 	if (i_mac_impl_count > 0 || minor_count > 0)
 		return (EBUSY);
+
+	pool_event_cb_unregister(&mac_pool_event_reg);
 
 	id_space_destroy(minor_ids);
 	mac_flow_fini();
@@ -459,6 +475,8 @@ mac_fini(void)
 
 	mod_hash_destroy_hash(i_mactype_hash);
 	mac_soft_ring_finish();
+
+
 	return (0);
 }
 
@@ -501,7 +519,6 @@ i_mac_constructor(void *buf, void *arg, int kmflag)
 
 	mip->mi_linkstate = LINK_STATE_UNKNOWN;
 
-	mutex_init(&mip->mi_lock, NULL, MUTEX_DRIVER, NULL);
 	rw_init(&mip->mi_rw_lock, NULL, RW_DRIVER, NULL);
 	mutex_init(&mip->mi_notify_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&mip->mi_promisc_lock, NULL, MUTEX_DRIVER, NULL);
@@ -554,7 +571,6 @@ i_mac_destructor(void *buf, void *arg)
 	ASSERT(mip->mi_bcast_ngrps == 0 && mip->mi_bcast_grp == NULL);
 	ASSERT(mip->mi_perim_owner == NULL && mip->mi_perim_ocnt == 0);
 
-	mutex_destroy(&mip->mi_lock);
 	rw_destroy(&mip->mi_rw_lock);
 
 	mutex_destroy(&mip->mi_promisc_lock);
@@ -1049,6 +1065,7 @@ mac_start(mac_handle_t mh)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
 	int		err = 0;
+	mac_group_t	*defgrp;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 	ASSERT(mip->mi_start != NULL);
@@ -1074,33 +1091,31 @@ mac_start(mac_handle_t mh)
 		if (mip->mi_default_tx_ring != NULL) {
 
 			ring = (mac_ring_t *)mip->mi_default_tx_ring;
-			err = mac_start_ring(ring);
-			if (err != 0) {
-				mip->mi_active--;
-				return (err);
+			if (ring->mr_state != MR_INUSE) {
+				err = mac_start_ring(ring);
+				if (err != 0) {
+					mip->mi_active--;
+					return (err);
+				}
 			}
-			ring->mr_state = MR_INUSE;
 		}
 
-		if (mip->mi_rx_groups != NULL) {
+		if ((defgrp = MAC_DEFAULT_RX_GROUP(mip)) != NULL) {
 			/*
 			 * Start the default ring, since it will be needed
 			 * to receive broadcast and multicast traffic for
 			 * both primary and non-primary MAC clients.
 			 */
-			mac_group_t *grp = &mip->mi_rx_groups[0];
-
-			ASSERT(grp->mrg_state == MAC_GROUP_STATE_REGISTERED);
-			err = mac_start_group_and_rings(grp);
+			ASSERT(defgrp->mrg_state == MAC_GROUP_STATE_REGISTERED);
+			err = mac_start_group_and_rings(defgrp);
 			if (err != 0) {
 				mip->mi_active--;
-				if (ring != NULL) {
+				if ((ring != NULL) &&
+				    (ring->mr_state == MR_INUSE))
 					mac_stop_ring(ring);
-					ring->mr_state = MR_FREE;
-				}
 				return (err);
 			}
-			mac_set_rx_group_state(grp, MAC_GROUP_STATE_SHARED);
+			mac_set_group_state(defgrp, MAC_GROUP_STATE_SHARED);
 		}
 	}
 
@@ -1114,6 +1129,7 @@ void
 mac_stop(mac_handle_t mh)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
+	mac_group_t	*grp;
 
 	ASSERT(mip->mi_stop != NULL);
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
@@ -1123,15 +1139,12 @@ mac_stop(mac_handle_t mh)
 	 */
 	ASSERT(mip->mi_active != 0);
 	if (--mip->mi_active == 0) {
-		if (mip->mi_rx_groups != NULL) {
+		if ((grp = MAC_DEFAULT_RX_GROUP(mip)) != NULL) {
 			/*
 			 * There should be no more active clients since the
 			 * MAC is being stopped. Stop the default RX group
 			 * and transition it back to registered state.
-			 */
-			mac_group_t *grp = &mip->mi_rx_groups[0];
-
-			/*
+			 *
 			 * When clients are torn down, the groups
 			 * are release via mac_release_rx_group which
 			 * knows the the default group is always in
@@ -1141,18 +1154,20 @@ mac_stop(mac_handle_t mh)
 			 * as a client) and group is in SHARED state.
 			 */
 			ASSERT(grp->mrg_state == MAC_GROUP_STATE_SHARED);
-			ASSERT(MAC_RX_GROUP_NO_CLIENT(grp) &&
+			ASSERT(MAC_GROUP_NO_CLIENT(grp) &&
 			    mip->mi_nactiveclients == 0);
 			mac_stop_group_and_rings(grp);
-			mac_set_rx_group_state(grp, MAC_GROUP_STATE_REGISTERED);
+			mac_set_group_state(grp, MAC_GROUP_STATE_REGISTERED);
 		}
 
 		if (mip->mi_default_tx_ring != NULL) {
 			mac_ring_t *ring;
 
 			ring = (mac_ring_t *)mip->mi_default_tx_ring;
-			mac_stop_ring(ring);
-			ring->mr_state = MR_FREE;
+			if (ring->mr_state == MR_INUSE) {
+				mac_stop_ring(ring);
+				ring->mr_flag = 0;
+			}
 		}
 
 		/*
@@ -1460,74 +1475,111 @@ mac_hwrings_get(mac_client_handle_t mch, mac_group_handle_t *hwgh,
     mac_ring_handle_t *hwrh, mac_ring_type_t rtype)
 {
 	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+	flow_entry_t		*flent = mcip->mci_flent;
+	mac_group_t		*grp;
+	mac_ring_t		*ring;
 	int			cnt = 0;
 
-	switch (rtype) {
-	case MAC_RING_TYPE_RX: {
-		flow_entry_t	*flent = mcip->mci_flent;
-		mac_group_t	*grp;
-		mac_ring_t	*ring;
-
+	if (rtype == MAC_RING_TYPE_RX) {
 		grp = flent->fe_rx_ring_group;
-		/*
-		 * The mac client did not reserve any RX group, return directly.
-		 * This is probably because the underlying MAC does not support
-		 * any groups.
-		 */
-		*hwgh = NULL;
-		if (grp == NULL)
-			return (0);
-		/*
-		 * This group must be reserved by this mac client.
-		 */
-		ASSERT((grp->mrg_state == MAC_GROUP_STATE_RESERVED) &&
-		    (mch == (mac_client_handle_t)
-		    (MAC_RX_GROUP_ONLY_CLIENT(grp))));
-		for (ring = grp->mrg_rings;
-		    ring != NULL; ring = ring->mr_next, cnt++) {
-			ASSERT(cnt < MAX_RINGS_PER_GROUP);
-			hwrh[cnt] = (mac_ring_handle_t)ring;
-		}
-		*hwgh = (mac_group_handle_t)grp;
-		return (cnt);
-	}
-	case MAC_RING_TYPE_TX: {
-		mac_soft_ring_set_t	*tx_srs;
-		mac_srs_tx_t		*tx;
-
-		tx_srs = MCIP_TX_SRS(mcip);
-		tx = &tx_srs->srs_tx;
-		for (; cnt < tx->st_ring_count; cnt++)
-			hwrh[cnt] = tx->st_rings[cnt];
-		return (cnt);
-	}
-	default:
+	} else if (rtype == MAC_RING_TYPE_TX) {
+		grp = flent->fe_tx_ring_group;
+	} else {
 		ASSERT(B_FALSE);
 		return (-1);
 	}
+	/*
+	 * The mac client did not reserve any RX group, return directly.
+	 * This is probably because the underlying MAC does not support
+	 * any groups.
+	 */
+	if (hwgh != NULL)
+		*hwgh = NULL;
+	if (grp == NULL)
+		return (0);
+	/*
+	 * This group must be reserved by this mac client.
+	 */
+	ASSERT((grp->mrg_state == MAC_GROUP_STATE_RESERVED) &&
+	    (mcip == MAC_GROUP_ONLY_CLIENT(grp)));
+
+	for (ring = grp->mrg_rings; ring != NULL; ring = ring->mr_next, cnt++) {
+		ASSERT(cnt < MAX_RINGS_PER_GROUP);
+		hwrh[cnt] = (mac_ring_handle_t)ring;
+	}
+	if (hwgh != NULL)
+		*hwgh = (mac_group_handle_t)grp;
+
+	return (cnt);
 }
 
 /*
- * Setup the RX callback of the mac client which exclusively controls HW ring.
+ * This function is called to get info about Tx/Rx rings.
+ *
+ * Return value: returns uint_t which will have various bits set
+ * that indicates different properties of the ring.
+ */
+uint_t
+mac_hwring_getinfo(mac_ring_handle_t rh)
+{
+	mac_ring_t *ring = (mac_ring_t *)rh;
+	mac_ring_info_t *info = &ring->mr_info;
+
+	return (info->mri_flags);
+}
+
+/*
+ * Export ddi interrupt handles from the HW ring to the pseudo ring and
+ * setup the RX callback of the mac client which exclusively controls
+ * HW ring.
  */
 void
-mac_hwring_setup(mac_ring_handle_t hwrh, mac_resource_handle_t prh)
+mac_hwring_setup(mac_ring_handle_t hwrh, mac_resource_handle_t prh,
+    mac_ring_handle_t pseudo_rh)
 {
 	mac_ring_t		*hw_ring = (mac_ring_t *)hwrh;
+	mac_ring_t		*pseudo_ring;
 	mac_soft_ring_set_t	*mac_srs = hw_ring->mr_srs;
 
-	mac_srs->srs_mrh = prh;
-	mac_srs->srs_rx.sr_lower_proc = mac_hwrings_rx_process;
+	if (pseudo_rh != NULL) {
+		pseudo_ring = (mac_ring_t *)pseudo_rh;
+		/* Export the ddi handles to pseudo ring */
+		pseudo_ring->mr_info.mri_intr.mi_ddi_handle =
+		    hw_ring->mr_info.mri_intr.mi_ddi_handle;
+		pseudo_ring->mr_info.mri_intr.mi_ddi_shared =
+		    hw_ring->mr_info.mri_intr.mi_ddi_shared;
+		/*
+		 * Save a pointer to pseudo ring in the hw ring. If
+		 * interrupt handle changes, the hw ring will be
+		 * notified of the change (see mac_ring_intr_set())
+		 * and the appropriate change has to be made to
+		 * the pseudo ring that has exported the ddi handle.
+		 */
+		hw_ring->mr_prh = pseudo_rh;
+	}
+
+	if (hw_ring->mr_type == MAC_RING_TYPE_RX) {
+		ASSERT(!(mac_srs->srs_type & SRST_TX));
+		mac_srs->srs_mrh = prh;
+		mac_srs->srs_rx.sr_lower_proc = mac_hwrings_rx_process;
+	}
 }
 
 void
 mac_hwring_teardown(mac_ring_handle_t hwrh)
 {
 	mac_ring_t		*hw_ring = (mac_ring_t *)hwrh;
-	mac_soft_ring_set_t	*mac_srs = hw_ring->mr_srs;
+	mac_soft_ring_set_t	*mac_srs;
 
-	mac_srs->srs_rx.sr_lower_proc = mac_rx_srs_process;
-	mac_srs->srs_mrh = NULL;
+	if (hw_ring == NULL)
+		return;
+	hw_ring->mr_prh = NULL;
+	if (hw_ring->mr_type == MAC_RING_TYPE_RX) {
+		mac_srs = hw_ring->mr_srs;
+		ASSERT(!(mac_srs->srs_type & SRST_TX));
+		mac_srs->srs_rx.sr_lower_proc = mac_rx_srs_process;
+		mac_srs->srs_mrh = NULL;
+	}
 }
 
 int
@@ -1575,7 +1627,7 @@ mac_hwring_poll(mac_ring_handle_t rh, int bytes_to_pickup)
 }
 
 /*
- * Send packets through the selected tx ring.
+ * Send packets through a selected tx ring.
  */
 mblk_t *
 mac_hwring_tx(mac_ring_handle_t rh, mblk_t *mp)
@@ -1586,6 +1638,35 @@ mac_hwring_tx(mac_ring_handle_t rh, mblk_t *mp)
 	ASSERT(ring->mr_type == MAC_RING_TYPE_TX &&
 	    ring->mr_state >= MR_INUSE);
 	return (info->mri_tx(info->mri_driver, mp));
+}
+
+/*
+ * Query stats for a particular rx/tx ring
+ */
+int
+mac_hwring_getstat(mac_ring_handle_t rh, uint_t stat, uint64_t *val)
+{
+	mac_ring_t	*ring = (mac_ring_t *)rh;
+	mac_ring_info_t *info = &ring->mr_info;
+
+	return (info->mri_stat(info->mri_driver, stat, val));
+}
+
+/*
+ * Private function that is only used by aggr to send packets through
+ * a port/Tx ring. Since aggr exposes a pseudo Tx ring even for ports
+ * that does not expose Tx rings, aggr_ring_tx() entry point needs
+ * access to mac_impl_t to send packets through m_tx() entry point.
+ * It accomplishes this by calling mac_hwring_send_priv() function.
+ */
+mblk_t *
+mac_hwring_send_priv(mac_client_handle_t mch, mac_ring_handle_t rh, mblk_t *mp)
+{
+	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
+	mac_impl_t *mip = mcip->mci_mip;
+
+	MAC_TX(mip, rh, mp, mcip);
+	return (mp);
 }
 
 int
@@ -1609,7 +1690,7 @@ mac_hwgroup_remmac(mac_group_handle_t gh, const uint8_t *addr)
  * started/stopped outside of this function.
  */
 void
-mac_set_rx_group_state(mac_group_t *grp, mac_group_state_t state)
+mac_set_group_state(mac_group_t *grp, mac_group_state_t state)
 {
 	/*
 	 * If there is no change in the group state, just return.
@@ -1629,9 +1710,10 @@ mac_set_rx_group_state(mac_group_t *grp, mac_group_state_t state)
 		 */
 		ASSERT(MAC_PERIM_HELD(grp->mrg_mh));
 
-		if (GROUP_INTR_DISABLE_FUNC(grp) != NULL)
+		if (grp->mrg_type == MAC_RING_TYPE_RX &&
+		    GROUP_INTR_DISABLE_FUNC(grp) != NULL) {
 			GROUP_INTR_DISABLE_FUNC(grp)(GROUP_INTR_HANDLE(grp));
-
+		}
 		break;
 
 	case MAC_GROUP_STATE_SHARED:
@@ -1641,9 +1723,10 @@ mac_set_rx_group_state(mac_group_t *grp, mac_group_state_t state)
 		 */
 		ASSERT(MAC_PERIM_HELD(grp->mrg_mh));
 
-		if (GROUP_INTR_ENABLE_FUNC(grp) != NULL)
+		if (grp->mrg_type == MAC_RING_TYPE_RX &&
+		    GROUP_INTR_ENABLE_FUNC(grp) != NULL) {
 			GROUP_INTR_ENABLE_FUNC(grp)(GROUP_INTR_HANDLE(grp));
-
+		}
 		/* The ring is not available for reservations any more */
 		break;
 
@@ -1921,7 +2004,8 @@ mac_rx_srs_restart(mac_soft_ring_set_t *srs)
 	if (mr != NULL) {
 		MAC_RING_UNMARK(mr, MR_QUIESCE);
 		/* In case the ring was stopped, safely restart it */
-		(void) mac_start_ring(mr);
+		if (mr->mr_state != MR_INUSE)
+			(void) mac_start_ring(mr);
 	} else {
 		FLOW_UNMARK(flent, FE_QUIESCE);
 	}
@@ -2088,9 +2172,11 @@ mac_tx_flow_restart(flow_entry_t *flent, void *arg)
 	return (0);
 }
 
-void
-mac_tx_client_quiesce(mac_client_impl_t *mcip, uint_t srs_quiesce_flag)
+static void
+i_mac_tx_client_quiesce(mac_client_handle_t mch, uint_t srs_quiesce_flag)
 {
+	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mcip->mci_mip));
 
 	mac_tx_client_block(mcip);
@@ -2102,8 +2188,22 @@ mac_tx_client_quiesce(mac_client_impl_t *mcip, uint_t srs_quiesce_flag)
 }
 
 void
-mac_tx_client_restart(mac_client_impl_t *mcip)
+mac_tx_client_quiesce(mac_client_handle_t mch)
 {
+	i_mac_tx_client_quiesce(mch, SRS_QUIESCE);
+}
+
+void
+mac_tx_client_condemn(mac_client_handle_t mch)
+{
+	i_mac_tx_client_quiesce(mch, SRS_CONDEMNED);
+}
+
+void
+mac_tx_client_restart(mac_client_handle_t mch)
+{
+	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
+
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mcip->mci_mip));
 
 	mac_tx_client_unblock(mcip);
@@ -2119,22 +2219,22 @@ mac_tx_client_flush(mac_client_impl_t *mcip)
 {
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mcip->mci_mip));
 
-	mac_tx_client_quiesce(mcip, SRS_QUIESCE);
-	mac_tx_client_restart(mcip);
+	mac_tx_client_quiesce((mac_client_handle_t)mcip);
+	mac_tx_client_restart((mac_client_handle_t)mcip);
 }
 
 void
 mac_client_quiesce(mac_client_impl_t *mcip)
 {
 	mac_rx_client_quiesce((mac_client_handle_t)mcip);
-	mac_tx_client_quiesce(mcip, SRS_QUIESCE);
+	mac_tx_client_quiesce((mac_client_handle_t)mcip);
 }
 
 void
 mac_client_restart(mac_client_impl_t *mcip)
 {
 	mac_rx_client_restart((mac_client_handle_t)mcip);
-	mac_tx_client_restart(mcip);
+	mac_tx_client_restart((mac_client_handle_t)mcip);
 }
 
 /*
@@ -2386,8 +2486,21 @@ i_mac_tx_srs_notify(mac_impl_t *mip, mac_ring_handle_t ring)
 	rw_enter(&mip->mi_rw_lock, RW_READER);
 	for (cclient = mip->mi_clients_list; cclient != NULL;
 	    cclient = cclient->mci_client_next) {
-		if ((mac_srs = MCIP_TX_SRS(cclient)) != NULL)
+		if ((mac_srs = MCIP_TX_SRS(cclient)) != NULL) {
 			mac_tx_srs_wakeup(mac_srs, ring);
+		} else {
+			/*
+			 * Aggr opens underlying ports in exclusive mode
+			 * and registers flow control callbacks using
+			 * mac_tx_client_notify(). When opened in
+			 * exclusive mode, Tx SRS won't be created
+			 * during mac_unicast_add().
+			 */
+			if (cclient->mci_state_flags & MCIS_EXCLUSIVE) {
+				mac_tx_invoke_callbacks(cclient,
+				    (mac_tx_cookie_t)ring);
+			}
+		}
 		(void) mac_flow_walk(cclient->mci_subflow_tab,
 		    mac_tx_flow_srs_wakeup, ring);
 	}
@@ -2724,43 +2837,196 @@ done:
 }
 
 /*
- * mac_set_prop() sets mac or hardware driver properties:
- * 	MAC resource properties include maxbw, priority, and cpu binding list.
- *	Driver properties are private properties to the hardware, such as mtu
- *	and speed.  There's one other MAC property -- the PVID.
- * If the property is a driver property, mac_set_prop() calls driver's callback
- * function to set it.
- * If the property is a mac resource property, mac_set_prop() invokes
- * mac_set_resources() which will cache the property value in mac_impl_t and
- * may call mac_client_set_resource() to update property value of the primary
- * mac client, if it exists.
+ * Checks the size of the value size specified for a property as
+ * part of a property operation. Returns B_TRUE if the size is
+ * correct, B_FALSE otherwise.
+ */
+boolean_t
+mac_prop_check_size(mac_prop_id_t id, uint_t valsize, boolean_t is_range)
+{
+	uint_t minsize = 0;
+
+	if (is_range)
+		return (valsize >= sizeof (mac_propval_range_t));
+
+	switch (id) {
+	case MAC_PROP_ZONE:
+		minsize = sizeof (dld_ioc_zid_t);
+		break;
+	case MAC_PROP_AUTOPUSH:
+		if (valsize != 0)
+			minsize = sizeof (struct dlautopush);
+		break;
+	case MAC_PROP_TAGMODE:
+		minsize = sizeof (link_tagmode_t);
+		break;
+	case MAC_PROP_RESOURCE:
+	case MAC_PROP_RESOURCE_EFF:
+		minsize = sizeof (mac_resource_props_t);
+		break;
+	case MAC_PROP_DUPLEX:
+		minsize = sizeof (link_duplex_t);
+		break;
+	case MAC_PROP_SPEED:
+		minsize = sizeof (uint64_t);
+		break;
+	case MAC_PROP_STATUS:
+		minsize = sizeof (link_state_t);
+		break;
+	case MAC_PROP_AUTONEG:
+	case MAC_PROP_EN_AUTONEG:
+		minsize = sizeof (uint8_t);
+		break;
+	case MAC_PROP_MTU:
+	case MAC_PROP_LLIMIT:
+	case MAC_PROP_LDECAY:
+		minsize = sizeof (uint32_t);
+		break;
+	case MAC_PROP_FLOWCTRL:
+		minsize = sizeof (link_flowctrl_t);
+		break;
+	case MAC_PROP_ADV_10GFDX_CAP:
+	case MAC_PROP_EN_10GFDX_CAP:
+	case MAC_PROP_ADV_1000HDX_CAP:
+	case MAC_PROP_EN_1000HDX_CAP:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_EN_100HDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_EN_10FDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_EN_10HDX_CAP:
+	case MAC_PROP_ADV_100T4_CAP:
+	case MAC_PROP_EN_100T4_CAP:
+		minsize = sizeof (uint8_t);
+		break;
+	case MAC_PROP_PVID:
+		minsize = sizeof (uint16_t);
+		break;
+	case MAC_PROP_IPTUN_HOPLIMIT:
+		minsize = sizeof (uint32_t);
+		break;
+	case MAC_PROP_IPTUN_ENCAPLIMIT:
+		minsize = sizeof (uint32_t);
+		break;
+	case MAC_PROP_MAX_TX_RINGS_AVAIL:
+	case MAC_PROP_MAX_RX_RINGS_AVAIL:
+	case MAC_PROP_MAX_RXHWCLNT_AVAIL:
+	case MAC_PROP_MAX_TXHWCLNT_AVAIL:
+		minsize = sizeof (uint_t);
+		break;
+	case MAC_PROP_WL_ESSID:
+		minsize = sizeof (wl_linkstatus_t);
+		break;
+	case MAC_PROP_WL_BSSID:
+		minsize = sizeof (wl_bssid_t);
+		break;
+	case MAC_PROP_WL_BSSTYPE:
+		minsize = sizeof (wl_bss_type_t);
+		break;
+	case MAC_PROP_WL_LINKSTATUS:
+		minsize = sizeof (wl_linkstatus_t);
+		break;
+	case MAC_PROP_WL_DESIRED_RATES:
+		minsize = sizeof (wl_rates_t);
+		break;
+	case MAC_PROP_WL_SUPPORTED_RATES:
+		minsize = sizeof (wl_rates_t);
+		break;
+	case MAC_PROP_WL_AUTH_MODE:
+		minsize = sizeof (wl_authmode_t);
+		break;
+	case MAC_PROP_WL_ENCRYPTION:
+		minsize = sizeof (wl_encryption_t);
+		break;
+	case MAC_PROP_WL_RSSI:
+		minsize = sizeof (wl_rssi_t);
+		break;
+	case MAC_PROP_WL_PHY_CONFIG:
+		minsize = sizeof (wl_phy_conf_t);
+		break;
+	case MAC_PROP_WL_CAPABILITY:
+		minsize = sizeof (wl_capability_t);
+		break;
+	case MAC_PROP_WL_WPA:
+		minsize = sizeof (wl_wpa_t);
+		break;
+	case MAC_PROP_WL_SCANRESULTS:
+		minsize = sizeof (wl_wpa_ess_t);
+		break;
+	case MAC_PROP_WL_POWER_MODE:
+		minsize = sizeof (wl_ps_mode_t);
+		break;
+	case MAC_PROP_WL_RADIO:
+		minsize = sizeof (wl_radio_t);
+		break;
+	case MAC_PROP_WL_ESS_LIST:
+		minsize = sizeof (wl_ess_list_t);
+		break;
+	case MAC_PROP_WL_KEY_TAB:
+		minsize = sizeof (wl_wep_key_tab_t);
+		break;
+	case MAC_PROP_WL_CREATE_IBSS:
+		minsize = sizeof (wl_create_ibss_t);
+		break;
+	case MAC_PROP_WL_SETOPTIE:
+		minsize = sizeof (wl_wpa_ie_t);
+		break;
+	case MAC_PROP_WL_DELKEY:
+		minsize = sizeof (wl_del_key_t);
+		break;
+	case MAC_PROP_WL_KEY:
+		minsize = sizeof (wl_key_t);
+		break;
+	case MAC_PROP_WL_MLME:
+		minsize = sizeof (wl_mlme_t);
+		break;
+	}
+
+	return (valsize >= minsize);
+}
+
+/*
+ * mac_set_prop() sets MAC or hardware driver properties:
+ *
+ * - MAC-managed properties such as resource properties include maxbw,
+ *   priority, and cpu binding list, as well as the default port VID
+ *   used by bridging. These properties are consumed by the MAC layer
+ *   itself and not passed down to the driver. For resource control
+ *   properties, this function invokes mac_set_resources() which will
+ *   cache the property value in mac_impl_t and may call
+ *   mac_client_set_resource() to update property value of the primary
+ *   mac client, if it exists.
+ *
+ * - Properties which act on the hardware and must be passed to the
+ *   driver, such as MTU, through the driver's mc_setprop() entry point.
  */
 int
-mac_set_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
+mac_set_prop(mac_handle_t mh, mac_prop_id_t id, char *name, void *val,
+    uint_t valsize)
 {
 	int err = ENOTSUP;
 	mac_impl_t *mip = (mac_impl_t *)mh;
 
 	ASSERT(MAC_PERIM_HELD(mh));
 
-	switch (macprop->mp_id) {
-	case MAC_PROP_MAXBW:
-	case MAC_PROP_PRIO:
-	case MAC_PROP_PROTECT:
-	case MAC_PROP_BIND_CPU: {
-		mac_resource_props_t mrp;
+	switch (id) {
+	case MAC_PROP_RESOURCE: {
+		mac_resource_props_t *mrp;
 
-		/* If it is mac property, call mac_set_resources() */
-		if (valsize < sizeof (mac_resource_props_t))
-			return (EINVAL);
-		bcopy(val, &mrp, sizeof (mrp));
-		err = mac_set_resources(mh, &mrp);
+		/* call mac_set_resources() for MAC properties */
+		ASSERT(valsize >= sizeof (mac_resource_props_t));
+		mrp = kmem_zalloc(sizeof (*mrp), KM_SLEEP);
+		bcopy(val, mrp, sizeof (*mrp));
+		err = mac_set_resources(mh, mrp);
+		kmem_free(mrp, sizeof (*mrp));
 		break;
 	}
 
 	case MAC_PROP_PVID:
-		if (valsize < sizeof (uint16_t) ||
-		    (mip->mi_state_flags & MIS_IS_VNIC))
+		ASSERT(valsize >= sizeof (uint16_t));
+		if (mip->mi_state_flags & MIS_IS_VNIC)
 			return (EINVAL);
 		err = mac_set_pvid(mh, *(uint16_t *)val);
 		break;
@@ -2768,8 +3034,7 @@ mac_set_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 	case MAC_PROP_MTU: {
 		uint32_t mtu;
 
-		if (valsize < sizeof (mtu))
-			return (EINVAL);
+		ASSERT(valsize >= sizeof (uint32_t));
 		bcopy(val, &mtu, sizeof (mtu));
 		err = mac_set_mtu(mh, mtu, NULL);
 		break;
@@ -2783,9 +3048,9 @@ mac_set_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 		    (mip->mi_state_flags & MIS_IS_VNIC))
 			return (EINVAL);
 		bcopy(val, &learnval, sizeof (learnval));
-		if (learnval == 0 && macprop->mp_id == MAC_PROP_LDECAY)
+		if (learnval == 0 && id == MAC_PROP_LDECAY)
 			return (EINVAL);
-		if (macprop->mp_id == MAC_PROP_LLIMIT)
+		if (id == MAC_PROP_LLIMIT)
 			mip->mi_llimit = learnval;
 		else
 			mip->mi_ldecay = learnval;
@@ -2797,60 +3062,68 @@ mac_set_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 		/* For other driver properties, call driver's callback */
 		if (mip->mi_callbacks->mc_callbacks & MC_SETPROP) {
 			err = mip->mi_callbacks->mc_setprop(mip->mi_driver,
-			    macprop->mp_name, macprop->mp_id, valsize, val);
+			    name, id, valsize, val);
 		}
 	}
 	return (err);
 }
 
 /*
- * mac_get_prop() gets mac or hardware driver properties.
+ * mac_get_prop() gets MAC or device driver properties.
  *
  * If the property is a driver property, mac_get_prop() calls driver's callback
- * function to get it.
- * If the property is a mac property, mac_get_prop() invokes mac_get_resources()
+ * entry point to get it.
+ * If the property is a MAC property, mac_get_prop() invokes mac_get_resources()
  * which returns the cached value in mac_impl_t.
  */
 int
-mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize,
-    uint_t *perm)
+mac_get_prop(mac_handle_t mh, mac_prop_id_t id, char *name, void *val,
+    uint_t valsize)
 {
 	int err = ENOTSUP;
 	mac_impl_t *mip = (mac_impl_t *)mh;
-	link_state_t link_state;
-	boolean_t is_getprop, is_setprop;
+	uint_t	rings;
+	uint_t	vlinks;
 
-	is_getprop = (mip->mi_callbacks->mc_callbacks & MC_GETPROP);
-	is_setprop = (mip->mi_callbacks->mc_callbacks & MC_SETPROP);
+	bzero(val, valsize);
 
-	switch (macprop->mp_id) {
-	case MAC_PROP_MAXBW:
-	case MAC_PROP_PRIO:
-	case MAC_PROP_PROTECT:
-	case MAC_PROP_BIND_CPU: {
-		mac_resource_props_t mrp;
+	switch (id) {
+	case MAC_PROP_RESOURCE: {
+		mac_resource_props_t *mrp;
 
 		/* If mac property, read from cache */
-		if (valsize < sizeof (mac_resource_props_t))
-			return (EINVAL);
-		mac_get_resources(mh, &mrp);
-		bcopy(&mrp, val, sizeof (mac_resource_props_t));
+		ASSERT(valsize >= sizeof (mac_resource_props_t));
+		mrp = kmem_zalloc(sizeof (*mrp), KM_SLEEP);
+		mac_get_resources(mh, mrp);
+		bcopy(mrp, val, sizeof (*mrp));
+		kmem_free(mrp, sizeof (*mrp));
+		return (0);
+	}
+	case MAC_PROP_RESOURCE_EFF: {
+		mac_resource_props_t *mrp;
+
+		/* If mac effective property, read from client */
+		ASSERT(valsize >= sizeof (mac_resource_props_t));
+		mrp = kmem_zalloc(sizeof (*mrp), KM_SLEEP);
+		mac_get_effective_resources(mh, mrp);
+		bcopy(mrp, val, sizeof (*mrp));
+		kmem_free(mrp, sizeof (*mrp));
 		return (0);
 	}
 
 	case MAC_PROP_PVID:
-		if (valsize < sizeof (uint16_t) ||
-		    (mip->mi_state_flags & MIS_IS_VNIC))
+		ASSERT(valsize >= sizeof (uint16_t));
+		if (mip->mi_state_flags & MIS_IS_VNIC)
 			return (EINVAL);
 		*(uint16_t *)val = mac_get_pvid(mh);
 		return (0);
 
 	case MAC_PROP_LLIMIT:
 	case MAC_PROP_LDECAY:
-		if (valsize < sizeof (uint32_t) ||
-		    (mip->mi_state_flags & MIS_IS_VNIC))
+		ASSERT(valsize >= sizeof (uint32_t));
+		if (mip->mi_state_flags & MIS_IS_VNIC)
 			return (EINVAL);
-		if (macprop->mp_id == MAC_PROP_LLIMIT)
+		if (id == MAC_PROP_LLIMIT)
 			bcopy(&mip->mi_llimit, val, sizeof (mip->mi_llimit));
 		else
 			bcopy(&mip->mi_ldecay, val, sizeof (mip->mi_ldecay));
@@ -2858,76 +3131,259 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize,
 
 	case MAC_PROP_MTU: {
 		uint32_t sdu;
-		mac_propval_range_t range;
 
-		if ((macprop->mp_flags & MAC_PROP_POSSIBLE) != 0) {
-			if (valsize < sizeof (mac_propval_range_t))
-				return (EINVAL);
-			if (is_getprop) {
-				err = mip->mi_callbacks->mc_getprop(mip->
-				    mi_driver, macprop->mp_name, macprop->mp_id,
-				    macprop->mp_flags, valsize, val, perm);
-			}
-			/*
-			 * If the driver doesn't have *_m_getprop defined or
-			 * if the driver doesn't support setting MTU then
-			 * return the CURRENT value as POSSIBLE value.
-			 */
-			if (!is_getprop || err == ENOTSUP) {
-				mac_sdu_get(mh, NULL, &sdu);
-				range.mpr_count = 1;
-				range.mpr_type = MAC_PROPVAL_UINT32;
-				range.range_uint32[0].mpur_min =
-				    range.range_uint32[0].mpur_max = sdu;
-				bcopy(&range, val, sizeof (range));
-				err = 0;
-			}
-			return (err);
-		}
-		if (valsize < sizeof (sdu))
-			return (EINVAL);
-		if ((macprop->mp_flags & MAC_PROP_DEFAULT) == 0) {
-			mac_sdu_get(mh, NULL, &sdu);
-			bcopy(&sdu, val, sizeof (sdu));
-			if (is_setprop && (mip->mi_callbacks->mc_setprop(mip->
-			    mi_driver, macprop->mp_name, macprop->mp_id,
-			    valsize, val) == 0)) {
-				*perm = MAC_PROP_PERM_RW;
-			} else {
-				*perm = MAC_PROP_PERM_READ;
-			}
-			return (0);
-		} else {
-			if (mip->mi_info.mi_media == DL_ETHER) {
-				sdu = ETHERMTU;
-				bcopy(&sdu, val, sizeof (sdu));
+		ASSERT(valsize >= sizeof (uint32_t));
+		mac_sdu_get(mh, NULL, &sdu);
+		bcopy(&sdu, val, sizeof (sdu));
 
-				return (0);
-			}
-			/*
-			 * ask driver for its default.
-			 */
-			break;
-		}
+		return (0);
 	}
-	case MAC_PROP_STATUS:
+	case MAC_PROP_STATUS: {
+		link_state_t link_state;
+
 		if (valsize < sizeof (link_state))
 			return (EINVAL);
-		*perm = MAC_PROP_PERM_READ;
 		link_state = mac_link_get(mh);
 		bcopy(&link_state, val, sizeof (link_state));
+
 		return (0);
+	}
+
+	case MAC_PROP_MAX_RX_RINGS_AVAIL:
+	case MAC_PROP_MAX_TX_RINGS_AVAIL:
+		ASSERT(valsize >= sizeof (uint_t));
+		rings = id == MAC_PROP_MAX_RX_RINGS_AVAIL ?
+		    mac_rxavail_get(mh) : mac_txavail_get(mh);
+		bcopy(&rings, val, sizeof (uint_t));
+		return (0);
+
+	case MAC_PROP_MAX_RXHWCLNT_AVAIL:
+	case MAC_PROP_MAX_TXHWCLNT_AVAIL:
+		ASSERT(valsize >= sizeof (uint_t));
+		vlinks = id == MAC_PROP_MAX_RXHWCLNT_AVAIL ?
+		    mac_rxhwlnksavail_get(mh) : mac_txhwlnksavail_get(mh);
+		bcopy(&vlinks, val, sizeof (uint_t));
+		return (0);
+
+	case MAC_PROP_RXRINGSRANGE:
+	case MAC_PROP_TXRINGSRANGE:
+		/*
+		 * The value for these properties are returned through
+		 * the MAC_PROP_RESOURCE property.
+		 */
+		return (0);
+
 	default:
 		break;
 
 	}
+
 	/* If driver property, request from driver */
-	if (is_getprop) {
-		err = mip->mi_callbacks->mc_getprop(mip->mi_driver,
-		    macprop->mp_name, macprop->mp_id, macprop->mp_flags,
-		    valsize, val, perm);
+	if (mip->mi_callbacks->mc_callbacks & MC_GETPROP) {
+		err = mip->mi_callbacks->mc_getprop(mip->mi_driver, name, id,
+		    valsize, val);
 	}
+
 	return (err);
+}
+
+/*
+ * Helper function to initialize the range structure for use in
+ * mac_get_prop. If the type can be other than uint32, we can
+ * pass that as an arg.
+ */
+static void
+_mac_set_range(mac_propval_range_t *range, uint32_t min, uint32_t max)
+{
+	range->mpr_count = 1;
+	range->mpr_type = MAC_PROPVAL_UINT32;
+	range->mpr_range_uint32[0].mpur_min = min;
+	range->mpr_range_uint32[0].mpur_max = max;
+}
+
+/*
+ * Returns information about the specified property, such as default
+ * values or permissions.
+ */
+int
+mac_prop_info(mac_handle_t mh, mac_prop_id_t id, char *name,
+    void *default_val, uint_t default_size, mac_propval_range_t *range,
+    uint_t *perm)
+{
+	mac_prop_info_state_t state;
+	mac_impl_t *mip = (mac_impl_t *)mh;
+	uint_t	max;
+
+	/*
+	 * A property is read/write by default unless the driver says
+	 * otherwise.
+	 */
+	if (perm != NULL)
+		*perm = MAC_PROP_PERM_RW;
+
+	if (default_val != NULL)
+		bzero(default_val, default_size);
+
+	/*
+	 * First, handle framework properties for which we don't need to
+	 * involve the driver.
+	 */
+	switch (id) {
+	case MAC_PROP_RESOURCE:
+	case MAC_PROP_PVID:
+	case MAC_PROP_LLIMIT:
+	case MAC_PROP_LDECAY:
+		return (0);
+
+	case MAC_PROP_MAX_RX_RINGS_AVAIL:
+	case MAC_PROP_MAX_TX_RINGS_AVAIL:
+	case MAC_PROP_MAX_RXHWCLNT_AVAIL:
+	case MAC_PROP_MAX_TXHWCLNT_AVAIL:
+		if (perm != NULL)
+			*perm = MAC_PROP_PERM_READ;
+		return (0);
+
+	case MAC_PROP_RXRINGSRANGE:
+	case MAC_PROP_TXRINGSRANGE:
+		/*
+		 * Currently, we support range for RX and TX rings properties.
+		 * When we extend this support to maxbw, cpus and priority,
+		 * we should move this to mac_get_resources.
+		 * There is no default value for RX or TX rings.
+		 */
+		if ((mip->mi_state_flags & MIS_IS_VNIC) &&
+		    mac_is_vnic_primary(mh)) {
+			/*
+			 * We don't support setting rings for a VLAN
+			 * data link because it shares its ring with the
+			 * primary MAC client.
+			 */
+			if (perm != NULL)
+				*perm = MAC_PROP_PERM_READ;
+			if (range != NULL)
+				range->mpr_count = 0;
+		} else if (range != NULL) {
+			if (mip->mi_state_flags & MIS_IS_VNIC)
+				mh = mac_get_lower_mac_handle(mh);
+			mip = (mac_impl_t *)mh;
+			if ((id == MAC_PROP_RXRINGSRANGE &&
+			    mip->mi_rx_group_type == MAC_GROUP_TYPE_STATIC) ||
+			    (id == MAC_PROP_TXRINGSRANGE &&
+			    mip->mi_tx_group_type == MAC_GROUP_TYPE_STATIC)) {
+				if (id == MAC_PROP_RXRINGSRANGE) {
+					if ((mac_rxhwlnksavail_get(mh) +
+					    mac_rxhwlnksrsvd_get(mh)) <= 1) {
+						/*
+						 * doesn't support groups or
+						 * rings
+						 */
+						range->mpr_count = 0;
+					} else {
+						/*
+						 * supports specifying groups,
+						 * but not rings
+						 */
+						_mac_set_range(range, 0, 0);
+					}
+				} else {
+					if ((mac_txhwlnksavail_get(mh) +
+					    mac_txhwlnksrsvd_get(mh)) <= 1) {
+						/*
+						 * doesn't support groups or
+						 * rings
+						 */
+						range->mpr_count = 0;
+					} else {
+						/*
+						 * supports specifying groups,
+						 * but not rings
+						 */
+						_mac_set_range(range, 0, 0);
+					}
+				}
+			} else {
+				max = id == MAC_PROP_RXRINGSRANGE ?
+				    mac_rxavail_get(mh) + mac_rxrsvd_get(mh) :
+				    mac_txavail_get(mh) + mac_txrsvd_get(mh);
+				if (max <= 1) {
+					/*
+					 * doesn't support groups or
+					 * rings
+					 */
+					range->mpr_count = 0;
+				} else  {
+					/*
+					 * -1 because we have to leave out the
+					 * default ring.
+					 */
+					_mac_set_range(range, 1, max - 1);
+				}
+			}
+		}
+		return (0);
+
+	case MAC_PROP_STATUS:
+		if (perm != NULL)
+			*perm = MAC_PROP_PERM_READ;
+		return (0);
+	}
+
+	/*
+	 * Get the property info from the driver if it implements the
+	 * property info entry point.
+	 */
+	bzero(&state, sizeof (state));
+
+	if (mip->mi_callbacks->mc_callbacks & MC_PROPINFO) {
+		state.pr_default = default_val;
+		state.pr_default_size = default_size;
+		state.pr_range = range;
+
+		mip->mi_callbacks->mc_propinfo(mip->mi_driver, name, id,
+		    (mac_prop_info_handle_t)&state);
+
+		/*
+		 * The operation could fail if the buffer supplied by
+		 * the user was too small for the range or default
+		 * value of the property.
+		 */
+		if (state.pr_default_status != 0)
+			return (state.pr_default_status);
+
+		if (perm != NULL && state.pr_flags & MAC_PROP_INFO_PERM)
+			*perm = state.pr_perm;
+	}
+
+	/*
+	 * The MAC layer may want to provide default values or allowed
+	 * ranges for properties if the driver does not provide a
+	 * property info entry point, or that entry point exists, but
+	 * it did not provide a default value or allowed ranges for
+	 * that property.
+	 */
+	switch (id) {
+	case MAC_PROP_MTU: {
+		uint32_t sdu;
+
+		mac_sdu_get(mh, NULL, &sdu);
+
+		if (range != NULL && !(state.pr_flags &
+		    MAC_PROP_INFO_RANGE)) {
+			/* MTU range */
+			_mac_set_range(range, sdu, sdu);
+		}
+
+		if (default_val != NULL && !(state.pr_flags &
+		    MAC_PROP_INFO_DEFAULT)) {
+			if (mip->mi_info.mi_media == DL_ETHER)
+				sdu = ETHERMTU;
+			/* default MTU value */
+			bcopy(&sdu, default_val, sizeof (sdu));
+		}
+	}
+	}
+
+	return (0);
 }
 
 int
@@ -2953,29 +3409,47 @@ mac_fastpath_enable(mac_handle_t mh)
 }
 
 void
-mac_register_priv_prop(mac_impl_t *mip, mac_priv_prop_t *mpp, uint_t nprop)
+mac_register_priv_prop(mac_impl_t *mip, char **priv_props)
 {
-	mac_priv_prop_t *mpriv;
+	uint_t nprops, i;
 
-	if (mpp == NULL)
+	if (priv_props == NULL)
 		return;
 
-	mpriv = kmem_zalloc(nprop * sizeof (*mpriv), KM_SLEEP);
-	(void) memcpy(mpriv, mpp, nprop * sizeof (*mpriv));
-	mip->mi_priv_prop = mpriv;
-	mip->mi_priv_prop_count = nprop;
+	nprops = 0;
+	while (priv_props[nprops] != NULL)
+		nprops++;
+	if (nprops == 0)
+		return;
+
+
+	mip->mi_priv_prop = kmem_zalloc(nprops * sizeof (char *), KM_SLEEP);
+
+	for (i = 0; i < nprops; i++) {
+		mip->mi_priv_prop[i] = kmem_zalloc(MAXLINKPROPNAME, KM_SLEEP);
+		(void) strlcpy(mip->mi_priv_prop[i], priv_props[i],
+		    MAXLINKPROPNAME);
+	}
+
+	mip->mi_priv_prop_count = nprops;
 }
 
 void
 mac_unregister_priv_prop(mac_impl_t *mip)
 {
-	mac_priv_prop_t	*mpriv;
+	uint_t i;
 
-	mpriv = mip->mi_priv_prop;
-	if (mpriv != NULL) {
-		kmem_free(mpriv, mip->mi_priv_prop_count * sizeof (*mpriv));
-		mip->mi_priv_prop = NULL;
+	if (mip->mi_priv_prop_count == 0) {
+		ASSERT(mip->mi_priv_prop == NULL);
+		return;
 	}
+
+	for (i = 0; i < mip->mi_priv_prop_count; i++)
+		kmem_free(mip->mi_priv_prop[i], MAXLINKPROPNAME);
+	kmem_free(mip->mi_priv_prop, mip->mi_priv_prop_count *
+	    sizeof (char *));
+
+	mip->mi_priv_prop = NULL;
 	mip->mi_priv_prop_count = 0;
 }
 
@@ -2990,22 +3464,19 @@ mac_unregister_priv_prop(mac_impl_t *mip)
  * count mechanism) will drop such packets.
  */
 static mac_ring_t *
-mac_ring_alloc(mac_impl_t *mip, mac_capab_rings_t *cap_rings)
+mac_ring_alloc(mac_impl_t *mip)
 {
 	mac_ring_t *ring;
 
-	if (cap_rings->mr_type == MAC_RING_TYPE_RX) {
-		mutex_enter(&mip->mi_ring_lock);
-		if (mip->mi_ring_freelist != NULL) {
-			ring = mip->mi_ring_freelist;
-			mip->mi_ring_freelist = ring->mr_next;
-			bzero(ring, sizeof (mac_ring_t));
-		} else {
-			ring = kmem_cache_alloc(mac_ring_cache, KM_SLEEP);
-		}
+	mutex_enter(&mip->mi_ring_lock);
+	if (mip->mi_ring_freelist != NULL) {
+		ring = mip->mi_ring_freelist;
+		mip->mi_ring_freelist = ring->mr_next;
+		bzero(ring, sizeof (mac_ring_t));
 		mutex_exit(&mip->mi_ring_lock);
 	} else {
-		ring = kmem_zalloc(sizeof (mac_ring_t), KM_SLEEP);
+		mutex_exit(&mip->mi_ring_lock);
+		ring = kmem_cache_alloc(mac_ring_cache, KM_SLEEP);
 	}
 	ASSERT((ring != NULL) && (ring->mr_state == MR_FREE));
 	return (ring);
@@ -3014,16 +3485,16 @@ mac_ring_alloc(mac_impl_t *mip, mac_capab_rings_t *cap_rings)
 static void
 mac_ring_free(mac_impl_t *mip, mac_ring_t *ring)
 {
-	if (ring->mr_type == MAC_RING_TYPE_RX) {
-		mutex_enter(&mip->mi_ring_lock);
-		ring->mr_state = MR_FREE;
-		ring->mr_flag = 0;
-		ring->mr_next = mip->mi_ring_freelist;
-		mip->mi_ring_freelist = ring;
-		mutex_exit(&mip->mi_ring_lock);
-	} else {
-		kmem_free(ring, sizeof (mac_ring_t));
-	}
+	ASSERT(ring->mr_state == MR_FREE);
+
+	mutex_enter(&mip->mi_ring_lock);
+	ring->mr_state = MR_FREE;
+	ring->mr_flag = 0;
+	ring->mr_next = mip->mi_ring_freelist;
+	ring->mr_mip = NULL;
+	mip->mi_ring_freelist = ring;
+	mac_ring_stat_delete(ring);
+	mutex_exit(&mip->mi_ring_lock);
 }
 
 static void
@@ -3046,17 +3517,27 @@ mac_start_ring(mac_ring_t *ring)
 {
 	int rv = 0;
 
-	if (ring->mr_start != NULL)
-		rv = ring->mr_start(ring->mr_driver, ring->mr_gen_num);
+	ASSERT(ring->mr_state == MR_FREE);
 
+	if (ring->mr_start != NULL) {
+		rv = ring->mr_start(ring->mr_driver, ring->mr_gen_num);
+		if (rv != 0)
+			return (rv);
+	}
+
+	ring->mr_state = MR_INUSE;
 	return (rv);
 }
 
 void
 mac_stop_ring(mac_ring_t *ring)
 {
+	ASSERT(ring->mr_state == MR_INUSE);
+
 	if (ring->mr_stop != NULL)
 		ring->mr_stop(ring->mr_driver);
+
+	ring->mr_state = MR_FREE;
 
 	/*
 	 * Increment the ring generation number for this ring.
@@ -3104,7 +3585,6 @@ mac_start_group_and_rings(mac_group_t *group)
 		ASSERT(ring->mr_state == MR_FREE);
 		if ((rv = mac_start_ring(ring)) != 0)
 			goto error;
-		ring->mr_state = MR_INUSE;
 		ring->mr_classify_type = MAC_SW_CLASSIFIER;
 	}
 	return (0);
@@ -3123,7 +3603,6 @@ mac_stop_group_and_rings(mac_group_t *group)
 	for (ring = group->mrg_rings; ring != NULL; ring = ring->mr_next) {
 		if (ring->mr_state != MR_FREE) {
 			mac_stop_ring(ring);
-			ring->mr_state = MR_FREE;
 			ring->mr_flag = 0;
 			ring->mr_classify_type = MAC_NO_CLASSIFIER;
 		}
@@ -3136,13 +3615,24 @@ static mac_ring_t *
 mac_init_ring(mac_impl_t *mip, mac_group_t *group, int index,
     mac_capab_rings_t *cap_rings)
 {
-	mac_ring_t *ring;
+	mac_ring_t *ring, *rnext;
 	mac_ring_info_t ring_info;
+	ddi_intr_handle_t ddi_handle;
 
-	ring = mac_ring_alloc(mip, cap_rings);
+	ring = mac_ring_alloc(mip);
 
 	/* Prepare basic information of ring */
-	ring->mr_index = index;
+
+	/*
+	 * Ring index is numbered to be unique across a particular device.
+	 * Ring index computation makes following assumptions:
+	 *	- For drivers with static grouping (e.g. ixgbe, bge),
+	 *	ring index exchanged with the driver (e.g. during mr_rget)
+	 *	is unique only across the group the ring belongs to.
+	 *	- Drivers with dynamic grouping (e.g. nxge), start
+	 *	with single group (mrg_index = 0).
+	 */
+	ring->mr_index = group->mrg_index * group->mrg_info.mgi_count + index;
 	ring->mr_type = group->mrg_type;
 	ring->mr_gh = (mac_group_handle_t)group;
 
@@ -3159,12 +3649,63 @@ mac_init_ring(mac_impl_t *mip, mac_group_t *group, int index,
 
 	ring->mr_info = ring_info;
 
+	/*
+	 * The interrupt handle could be shared among multiple rings.
+	 * Thus if there is a bunch of rings that are sharing an
+	 * interrupt, then only one ring among the bunch will be made
+	 * available for interrupt re-targeting; the rest will have
+	 * ddi_shared flag set to TRUE and would not be available for
+	 * be interrupt re-targeting.
+	 */
+	if ((ddi_handle = ring_info.mri_intr.mi_ddi_handle) != NULL) {
+		rnext = ring->mr_next;
+		while (rnext != NULL) {
+			if (rnext->mr_info.mri_intr.mi_ddi_handle ==
+			    ddi_handle) {
+				/*
+				 * If default ring (mr_index == 0) is part
+				 * of a group of rings sharing an
+				 * interrupt, then set ddi_shared flag for
+				 * the default ring and give another ring
+				 * the chance to be re-targeted.
+				 */
+				if (rnext->mr_index == 0 &&
+				    !rnext->mr_info.mri_intr.mi_ddi_shared) {
+					rnext->mr_info.mri_intr.mi_ddi_shared =
+					    B_TRUE;
+				} else {
+					ring->mr_info.mri_intr.mi_ddi_shared =
+					    B_TRUE;
+				}
+				break;
+			}
+			rnext = rnext->mr_next;
+		}
+		/*
+		 * If rnext is NULL, then no matching ddi_handle was found.
+		 * Rx rings get registered first. So if this is a Tx ring,
+		 * then go through all the Rx rings and see if there is a
+		 * matching ddi handle.
+		 */
+		if (rnext == NULL && ring->mr_type == MAC_RING_TYPE_TX) {
+			mac_compare_ddi_handle(mip->mi_rx_groups,
+			    mip->mi_rx_group_count, ring);
+		}
+	}
+
 	/* Update ring's status */
 	ring->mr_state = MR_FREE;
 	ring->mr_flag = 0;
 
 	/* Update the ring count of the group */
 	group->mrg_cur_count++;
+
+	/* Create per ring kstats */
+	if (ring->mr_stat != NULL) {
+		ring->mr_mip = mip;
+		mac_ring_stat_create(ring);
+	}
+
 	return (ring);
 }
 
@@ -3188,13 +3729,17 @@ mac_init_group(mac_impl_t *mip, mac_group_t *group, int size,
 int
 mac_init_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 {
-	mac_capab_rings_t *cap_rings;
-	mac_group_t *group, *groups;
-	mac_group_info_t group_info;
-	uint_t group_free = 0;
-	uint_t ring_left;
-	mac_ring_t *ring;
-	int g, err = 0;
+	mac_capab_rings_t	*cap_rings;
+	mac_group_t		*group;
+	mac_group_t		*groups;
+	mac_group_info_t	group_info;
+	uint_t			group_free = 0;
+	uint_t			ring_left;
+	mac_ring_t		*ring;
+	int			g;
+	int			err = 0;
+	uint_t			grpcnt;
+	boolean_t		pseudo_txgrp = B_FALSE;
 
 	switch (rtype) {
 	case MAC_RING_TYPE_RX:
@@ -3213,15 +3758,32 @@ mac_init_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 		ASSERT(B_FALSE);
 	}
 
-	if (!i_mac_capab_get((mac_handle_t)mip, MAC_CAPAB_RINGS,
-	    cap_rings))
+	if (!i_mac_capab_get((mac_handle_t)mip, MAC_CAPAB_RINGS, cap_rings))
 		return (0);
+	grpcnt = cap_rings->mr_gnum;
+
+	/*
+	 * If we have multiple TX rings, but only one TX group, we can
+	 * create pseudo TX groups (one per TX ring) in the MAC layer,
+	 * except for an aggr. For an aggr currently we maintain only
+	 * one group with all the rings (for all its ports), going
+	 * forwards we might change this.
+	 */
+	if (rtype == MAC_RING_TYPE_TX &&
+	    cap_rings->mr_gnum == 0 && cap_rings->mr_rnum >  0 &&
+	    (mip->mi_state_flags & MIS_IS_AGGR) == 0) {
+		/*
+		 * The -1 here is because we create a default TX group
+		 * with all the rings in it.
+		 */
+		grpcnt = cap_rings->mr_rnum - 1;
+		pseudo_txgrp = B_TRUE;
+	}
 
 	/*
 	 * Allocate a contiguous buffer for all groups.
 	 */
-	groups = kmem_zalloc(sizeof (mac_group_t) * (cap_rings->mr_gnum + 1),
-	    KM_SLEEP);
+	groups = kmem_zalloc(sizeof (mac_group_t) * (grpcnt+ 1), KM_SLEEP);
 
 	ring_left = cap_rings->mr_rnum;
 
@@ -3229,7 +3791,7 @@ mac_init_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 	 * Get all ring groups if any, and get their ring members
 	 * if any.
 	 */
-	for (g = 0; g < cap_rings->mr_gnum; g++) {
+	for (g = 0; g < grpcnt; g++) {
 		group = groups + g;
 
 		/* Prepare basic information of the group */
@@ -3242,6 +3804,16 @@ mac_init_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 		/* Zero to reuse the info data structure */
 		bzero(&group_info, sizeof (group_info));
 
+		if (pseudo_txgrp) {
+			/*
+			 * This is a pseudo group that we created, apart
+			 * from setting the state there is nothing to be
+			 * done.
+			 */
+			group->mrg_state = MAC_GROUP_STATE_REGISTERED;
+			group_free++;
+			continue;
+		}
 		/* Query group information from driver */
 		cap_rings->mr_gget(mip->mi_driver, rtype, g, &group_info,
 		    (mac_group_handle_t)group);
@@ -3321,15 +3893,16 @@ mac_init_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 		 */
 		if (rtype == MAC_RING_TYPE_RX) {
 			if ((group_info.mgi_addmac == NULL) ||
-			    (group_info.mgi_addmac == NULL))
+			    (group_info.mgi_addmac == NULL)) {
 				goto bail;
+			}
 		}
 
 		/* Cache driver-supplied information */
 		group->mrg_info = group_info;
 
 		/* Update the group's status and group count. */
-		mac_set_rx_group_state(group, MAC_GROUP_STATE_REGISTERED);
+		mac_set_group_state(group, MAC_GROUP_STATE_REGISTERED);
 		group_free++;
 
 		group->mrg_rings = NULL;
@@ -3342,7 +3915,7 @@ mac_init_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 	}
 
 	/* Build up a dummy group for free resources as a pool */
-	group = groups + cap_rings->mr_gnum;
+	group = groups + grpcnt;
 
 	/* Prepare basic information of the group */
 	group->mrg_index = -1;
@@ -3366,36 +3939,88 @@ mac_init_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 		ring_left = 0;
 
 		/* Update this group's status */
-		mac_set_rx_group_state(group, MAC_GROUP_STATE_REGISTERED);
+		mac_set_group_state(group, MAC_GROUP_STATE_REGISTERED);
 	} else
 		group->mrg_rings = NULL;
 
 	ASSERT(ring_left == 0);
 
 bail:
+
 	/* Cache other important information to finalize the initialization */
 	switch (rtype) {
 	case MAC_RING_TYPE_RX:
 		mip->mi_rx_group_type = cap_rings->mr_group_type;
 		mip->mi_rx_group_count = cap_rings->mr_gnum;
 		mip->mi_rx_groups = groups;
+		mip->mi_rx_donor_grp = groups;
+		if (mip->mi_rx_group_type == MAC_GROUP_TYPE_DYNAMIC) {
+			/*
+			 * The default ring is reserved since it is
+			 * used for sending the broadcast etc. packets.
+			 */
+			mip->mi_rxrings_avail =
+			    mip->mi_rx_groups->mrg_cur_count - 1;
+			mip->mi_rxrings_rsvd = 1;
+		}
+		/*
+		 * The default group cannot be reserved. It is used by
+		 * all the clients that do not have an exclusive group.
+		 */
+		mip->mi_rxhwclnt_avail = mip->mi_rx_group_count - 1;
+		mip->mi_rxhwclnt_used = 1;
 		break;
 	case MAC_RING_TYPE_TX:
-		mip->mi_tx_group_type = cap_rings->mr_group_type;
-		mip->mi_tx_group_count = cap_rings->mr_gnum;
+		mip->mi_tx_group_type = pseudo_txgrp ? MAC_GROUP_TYPE_DYNAMIC :
+		    cap_rings->mr_group_type;
+		mip->mi_tx_group_count = grpcnt;
 		mip->mi_tx_group_free = group_free;
 		mip->mi_tx_groups = groups;
 
-		/*
-		 * Ring 0 is used as the default one and it could be assigned
-		 * to a client as well.
-		 */
-		group = groups + cap_rings->mr_gnum;
+		group = groups + grpcnt;
 		ring = group->mrg_rings;
-		while ((ring->mr_index != 0) && (ring->mr_next != NULL))
-			ring = ring->mr_next;
-		ASSERT(ring->mr_index == 0);
-		mip->mi_default_tx_ring = (mac_ring_handle_t)ring;
+		/*
+		 * The ring can be NULL in the case of aggr. Aggr will
+		 * have an empty Tx group which will get populated
+		 * later when pseudo Tx rings are added after
+		 * mac_register() is done.
+		 */
+		if (ring == NULL) {
+			ASSERT(mip->mi_state_flags & MIS_IS_AGGR);
+			/*
+			 * pass the group to aggr so it can add Tx
+			 * rings to the group later.
+			 */
+			cap_rings->mr_gget(mip->mi_driver, rtype, 0, NULL,
+			    (mac_group_handle_t)group);
+			/*
+			 * Even though there are no rings at this time
+			 * (rings will come later), set the group
+			 * state to registered.
+			 */
+			group->mrg_state = MAC_GROUP_STATE_REGISTERED;
+		} else {
+			/*
+			 * Ring 0 is used as the default one and it could be
+			 * assigned to a client as well.
+			 */
+			while ((ring->mr_index != 0) && (ring->mr_next != NULL))
+				ring = ring->mr_next;
+			ASSERT(ring->mr_index == 0);
+			mip->mi_default_tx_ring = (mac_ring_handle_t)ring;
+		}
+		if (mip->mi_tx_group_type == MAC_GROUP_TYPE_DYNAMIC)
+			mip->mi_txrings_avail = group->mrg_cur_count - 1;
+			/*
+			 * The default ring cannot be reserved.
+			 */
+			mip->mi_txrings_rsvd = 1;
+		/*
+		 * The default group cannot be reserved. It will be shared
+		 * by clients that do not have an exclusive group.
+		 */
+		mip->mi_txhwclnt_avail = mip->mi_tx_group_count;
+		mip->mi_txhwclnt_used = 1;
 		break;
 	default:
 		ASSERT(B_FALSE);
@@ -3408,8 +4033,45 @@ bail:
 }
 
 /*
- * Called to free all ring groups with particular type. It's supposed all groups
- * have been released by clinet.
+ * The ddi interrupt handle could be shared amoung rings. If so, compare
+ * the new ring's ddi handle with the existing ones and set ddi_shared
+ * flag.
+ */
+void
+mac_compare_ddi_handle(mac_group_t *groups, uint_t grpcnt, mac_ring_t *cring)
+{
+	mac_group_t *group;
+	mac_ring_t *ring;
+	ddi_intr_handle_t ddi_handle;
+	int g;
+
+	ddi_handle = cring->mr_info.mri_intr.mi_ddi_handle;
+	for (g = 0; g < grpcnt; g++) {
+		group = groups + g;
+		for (ring = group->mrg_rings; ring != NULL;
+		    ring = ring->mr_next) {
+			if (ring == cring)
+				continue;
+			if (ring->mr_info.mri_intr.mi_ddi_handle ==
+			    ddi_handle) {
+				if (cring->mr_type == MAC_RING_TYPE_RX &&
+				    ring->mr_index == 0 &&
+				    !ring->mr_info.mri_intr.mi_ddi_shared) {
+					ring->mr_info.mri_intr.mi_ddi_shared =
+					    B_TRUE;
+				} else {
+					cring->mr_info.mri_intr.mi_ddi_shared =
+					    B_TRUE;
+				}
+				return;
+			}
+		}
+	}
+}
+
+/*
+ * Called to free all groups of particular type (RX or TX). It's assumed that
+ * no clients are using these groups.
  */
 void
 mac_free_rings(mac_impl_t *mip, mac_ring_type_t rtype)
@@ -3426,6 +4088,7 @@ mac_free_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 		group_count = mip->mi_rx_group_count;
 
 		mip->mi_rx_groups = NULL;
+		mip->mi_rx_donor_grp = NULL;
 		mip->mi_rx_group_count = 0;
 		break;
 	case MAC_RING_TYPE_TX:
@@ -3501,32 +4164,6 @@ mac_group_remmac(mac_group_t *group, const uint8_t *addr)
 }
 
 /*
- * Release a ring in use by marking it MR_FREE.
- * Any other client may reserve it for its use.
- */
-void
-mac_release_tx_ring(mac_ring_handle_t rh)
-{
-	mac_ring_t *ring = (mac_ring_t *)rh;
-	mac_group_t *group = (mac_group_t *)ring->mr_gh;
-	mac_impl_t *mip = (mac_impl_t *)group->mrg_mh;
-
-	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
-	ASSERT(ring->mr_state != MR_FREE);
-
-	/*
-	 * Default tx ring will be released by mac_stop().
-	 */
-	if (rh == mip->mi_default_tx_ring)
-		return;
-
-	mac_stop_ring(ring);
-
-	ring->mr_state = MR_FREE;
-	ring->mr_flag = 0;
-}
-
-/*
  * This is the entry point for packets transmitted through the bridging code.
  * If no bridge is in place, MAC_RING_TX transmits using tx ring. The 'rh'
  * pointer may be NULL to select the default ring.
@@ -3558,16 +4195,17 @@ mac_bridge_tx(mac_impl_t *mip, mac_ring_handle_t rh, mblk_t *mp)
 /*
  * Find a ring from its index.
  */
-mac_ring_t *
-mac_find_ring(mac_group_t *group, int index)
+mac_ring_handle_t
+mac_find_ring(mac_group_handle_t gh, int index)
 {
+	mac_group_t *group = (mac_group_t *)gh;
 	mac_ring_t *ring = group->mrg_rings;
 
 	for (ring = group->mrg_rings; ring != NULL; ring = ring->mr_next)
 		if (ring->mr_index == index)
 			break;
 
-	return (ring);
+	return ((mac_ring_handle_t)ring);
 }
 /*
  * Add a ring to an existing group.
@@ -3586,6 +4224,7 @@ i_mac_group_add_ring(mac_group_t *group, mac_ring_t *ring, int index)
 	boolean_t driver_call = (ring == NULL);
 	mac_group_type_t group_type;
 	int ret = 0;
+	flow_entry_t *flent;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
@@ -3606,8 +4245,8 @@ i_mac_group_add_ring(mac_group_t *group, mac_ring_t *ring, int index)
 	 * There should be no ring with the same ring index in the target
 	 * group.
 	 */
-	ASSERT(mac_find_ring(group, driver_call ? index : ring->mr_index) ==
-	    NULL);
+	ASSERT(mac_find_ring((mac_group_handle_t)group,
+	    driver_call ? index : ring->mr_index) == NULL);
 
 	if (driver_call) {
 		/*
@@ -3627,7 +4266,8 @@ i_mac_group_add_ring(mac_group_t *group, mac_ring_t *ring, int index)
 		 * and the mac_ring_t already exists.
 		 */
 		ASSERT(group_type == MAC_GROUP_TYPE_DYNAMIC);
-		ASSERT(cap_rings->mr_gaddring != NULL);
+		ASSERT(group->mrg_driver == NULL ||
+		    cap_rings->mr_gaddring != NULL);
 		ASSERT(ring->mr_gh == NULL);
 	}
 
@@ -3667,6 +4307,27 @@ i_mac_group_add_ring(mac_group_t *group, mac_ring_t *ring, int index)
 		return (0);
 
 	/*
+	 * Start the ring if needed. Failure causes to undo the grouping action.
+	 */
+	if (ring->mr_state != MR_INUSE) {
+		if ((ret = mac_start_ring(ring)) != 0) {
+			if (!driver_call) {
+				cap_rings->mr_gremring(group->mrg_driver,
+				    ring->mr_driver, ring->mr_type);
+			}
+			group->mrg_cur_count--;
+			group->mrg_rings = ring->mr_next;
+
+			ring->mr_gh = NULL;
+
+			if (driver_call)
+				mac_ring_free(mip, ring);
+
+			return (ret);
+		}
+	}
+
+	/*
 	 * Set up SRS/SR according to the ring type.
 	 */
 	switch (ring->mr_type) {
@@ -3676,58 +4337,98 @@ i_mac_group_add_ring(mac_group_t *group, mac_ring_t *ring, int index)
 		 * reserved for someones exclusive use.
 		 */
 		if (group->mrg_state == MAC_GROUP_STATE_RESERVED) {
-			flow_entry_t *flent;
 			mac_client_impl_t *mcip;
 
-			mcip = MAC_RX_GROUP_ONLY_CLIENT(group);
-			ASSERT(mcip != NULL);
-			flent = mcip->mci_flent;
-			ASSERT(flent->fe_rx_srs_cnt > 0);
-			mac_srs_group_setup(mcip, flent, group, SRST_LINK);
+			mcip = MAC_GROUP_ONLY_CLIENT(group);
+			/*
+			 * Even though this group is reserved we migth still
+			 * have multiple clients, i.e a VLAN shares the
+			 * group with the primary mac client.
+			 */
+			if (mcip != NULL) {
+				flent = mcip->mci_flent;
+				ASSERT(flent->fe_rx_srs_cnt > 0);
+				mac_rx_srs_group_setup(mcip, flent, SRST_LINK);
+				mac_fanout_setup(mcip, flent,
+				    MCIP_RESOURCE_PROPS(mcip), mac_rx_deliver,
+				    mcip, NULL, NULL);
+			} else {
+				ring->mr_classify_type = MAC_SW_CLASSIFIER;
+			}
 		}
 		break;
 	case MAC_RING_TYPE_TX:
+	{
+		mac_grp_client_t	*mgcp = group->mrg_clients;
+		mac_client_impl_t	*mcip;
+		mac_soft_ring_set_t	*mac_srs;
+		mac_srs_tx_t		*tx;
+
+		if (MAC_GROUP_NO_CLIENT(group)) {
+			if (ring->mr_state == MR_INUSE)
+				mac_stop_ring(ring);
+			ring->mr_flag = 0;
+			break;
+		}
 		/*
-		 * For TX this function is only invoked during the
-		 * initial creation of a group when a share is
-		 * associated with a MAC client. So the datapath is not
-		 * yet setup, and will be setup later after the
-		 * group has been reserved and populated.
+		 * If the rings are being moved to a group that has
+		 * clients using it, then add the new rings to the
+		 * clients SRS.
 		 */
+		while (mgcp != NULL) {
+			boolean_t	is_aggr;
+
+			mcip = mgcp->mgc_client;
+			flent = mcip->mci_flent;
+			is_aggr = (mcip->mci_state_flags & MCIS_IS_AGGR);
+			mac_srs = MCIP_TX_SRS(mcip);
+			tx = &mac_srs->srs_tx;
+			mac_tx_client_quiesce((mac_client_handle_t)mcip);
+			/*
+			 * If we are  growing from 1 to multiple rings.
+			 */
+			if (tx->st_mode == SRS_TX_BW ||
+			    tx->st_mode == SRS_TX_SERIALIZE ||
+			    tx->st_mode == SRS_TX_DEFAULT) {
+				mac_ring_t	*tx_ring = tx->st_arg2;
+
+				tx->st_arg2 = NULL;
+				mac_tx_srs_stat_recreate(mac_srs, B_TRUE);
+				mac_tx_srs_add_ring(mac_srs, tx_ring);
+				if (mac_srs->srs_type & SRST_BW_CONTROL) {
+					tx->st_mode = is_aggr ? SRS_TX_BW_AGGR :
+					    SRS_TX_BW_FANOUT;
+				} else {
+					tx->st_mode = is_aggr ? SRS_TX_AGGR :
+					    SRS_TX_FANOUT;
+				}
+				tx->st_func = mac_tx_get_func(tx->st_mode);
+			}
+			mac_tx_srs_add_ring(mac_srs, ring);
+			mac_fanout_setup(mcip, flent, MCIP_RESOURCE_PROPS(mcip),
+			    mac_rx_deliver, mcip, NULL, NULL);
+			mac_tx_client_restart((mac_client_handle_t)mcip);
+			mgcp = mgcp->mgc_next;
+		}
 		break;
+	}
 	default:
 		ASSERT(B_FALSE);
 	}
-
 	/*
-	 * Start the ring if needed. Failure causes to undo the grouping action.
+	 * For aggr, the default ring will be NULL to begin with. If it
+	 * is NULL, then pick the first ring that gets added as the
+	 * default ring. Any ring in an aggregation can be removed at
+	 * any time (by the user action of removing a link) and if the
+	 * current default ring gets removed, then a new one gets
+	 * picked (see i_mac_group_rem_ring()).
 	 */
-	if ((ret = mac_start_ring(ring)) != 0) {
-		if (ring->mr_type == MAC_RING_TYPE_RX) {
-			if (ring->mr_srs != NULL) {
-				mac_rx_srs_remove(ring->mr_srs);
-				ring->mr_srs = NULL;
-			}
-		}
-		if (!driver_call) {
-			cap_rings->mr_gremring(group->mrg_driver,
-			    ring->mr_driver, ring->mr_type);
-		}
-		group->mrg_cur_count--;
-		group->mrg_rings = ring->mr_next;
-
-		ring->mr_gh = NULL;
-
-		if (driver_call)
-			mac_ring_free(mip, ring);
-
-		return (ret);
+	if (mip->mi_state_flags & MIS_IS_AGGR &&
+	    mip->mi_default_tx_ring == NULL &&
+	    ring->mr_type == MAC_RING_TYPE_TX) {
+		mip->mi_default_tx_ring = (mac_ring_handle_t)ring;
 	}
 
-	/*
-	 * Update the ring's state.
-	 */
-	ring->mr_state = MR_INUSE;
 	MAC_RING_UNMARK(ring, MR_INCIPIENT);
 	return (0);
 }
@@ -3748,17 +4449,17 @@ i_mac_group_rem_ring(mac_group_t *group, mac_ring_t *ring,
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
-	ASSERT(mac_find_ring(group, ring->mr_index) == ring);
+	ASSERT(mac_find_ring((mac_group_handle_t)group,
+	    ring->mr_index) == (mac_ring_handle_t)ring);
 	ASSERT((mac_group_t *)ring->mr_gh == group);
 	ASSERT(ring->mr_type == group->mrg_type);
 
+	if (ring->mr_state == MR_INUSE)
+		mac_stop_ring(ring);
 	switch (ring->mr_type) {
 	case MAC_RING_TYPE_RX:
 		group_type = mip->mi_rx_group_type;
 		cap_rings = &mip->mi_rx_rings_cap;
-
-		if (group->mrg_state >= MAC_GROUP_STATE_RESERVED)
-			mac_stop_ring(ring);
 
 		/*
 		 * Only hardware classified packets hold a reference to the
@@ -3771,13 +4472,20 @@ i_mac_group_rem_ring(mac_group_t *group, mac_ring_t *ring,
 			mac_rx_srs_remove(ring->mr_srs);
 			ring->mr_srs = NULL;
 		}
-		ring->mr_state = MR_FREE;
-		ring->mr_flag = 0;
 
 		break;
 	case MAC_RING_TYPE_TX:
+	{
+		mac_grp_client_t	*mgcp;
+		mac_client_impl_t	*mcip;
+		mac_soft_ring_set_t	*mac_srs;
+		mac_srs_tx_t		*tx;
+		mac_ring_t		*rem_ring;
+		mac_group_t		*defgrp;
+		uint_t			ring_info = 0;
+
 		/*
-		 * For TX this function is only invoked in two
+		 * For TX this function is invoked in three
 		 * cases:
 		 *
 		 * 1) In the case of a failure during the
@@ -3789,13 +4497,120 @@ i_mac_group_rem_ring(mac_group_t *group, mac_ring_t *ring,
 		 * 2) From mac_release_tx_group() when freeing
 		 * a TX SRS.
 		 *
-		 * In both cases the SRS and its soft rings are
-		 * already quiesced.
+		 * 3) In the case of aggr, when a port gets removed,
+		 * the pseudo Tx rings that it exposed gets removed.
+		 *
+		 * In the first two cases the SRS and its soft
+		 * rings are already quiesced.
 		 */
-		ASSERT(!driver_call);
+		if (driver_call) {
+			mac_client_impl_t *mcip;
+			mac_soft_ring_set_t *mac_srs;
+			mac_soft_ring_t *sringp;
+			mac_srs_tx_t *srs_tx;
+
+			if (mip->mi_state_flags & MIS_IS_AGGR &&
+			    mip->mi_default_tx_ring ==
+			    (mac_ring_handle_t)ring) {
+				/* pick a new default Tx ring */
+				mip->mi_default_tx_ring =
+				    (group->mrg_rings != ring) ?
+				    (mac_ring_handle_t)group->mrg_rings :
+				    (mac_ring_handle_t)(ring->mr_next);
+			}
+			/* Presently only aggr case comes here */
+			if (group->mrg_state != MAC_GROUP_STATE_RESERVED)
+				break;
+
+			mcip = MAC_GROUP_ONLY_CLIENT(group);
+			ASSERT(mcip != NULL);
+			ASSERT(mcip->mci_state_flags & MCIS_IS_AGGR);
+			mac_srs = MCIP_TX_SRS(mcip);
+			ASSERT(mac_srs->srs_tx.st_mode == SRS_TX_AGGR ||
+			    mac_srs->srs_tx.st_mode == SRS_TX_BW_AGGR);
+			srs_tx = &mac_srs->srs_tx;
+			/*
+			 * Wakeup any callers blocked on this
+			 * Tx ring due to flow control.
+			 */
+			sringp = srs_tx->st_soft_rings[ring->mr_index];
+			ASSERT(sringp != NULL);
+			mac_tx_invoke_callbacks(mcip, (mac_tx_cookie_t)sringp);
+			mac_tx_client_quiesce((mac_client_handle_t)mcip);
+			mac_tx_srs_del_ring(mac_srs, ring);
+			mac_tx_client_restart((mac_client_handle_t)mcip);
+			break;
+		}
+		ASSERT(ring != (mac_ring_t *)mip->mi_default_tx_ring);
 		group_type = mip->mi_tx_group_type;
 		cap_rings = &mip->mi_tx_rings_cap;
+		/*
+		 * See if we need to take it out of the MAC clients using
+		 * this group
+		 */
+		if (MAC_GROUP_NO_CLIENT(group))
+			break;
+		mgcp = group->mrg_clients;
+		defgrp = MAC_DEFAULT_TX_GROUP(mip);
+		while (mgcp != NULL) {
+			mcip = mgcp->mgc_client;
+			mac_srs = MCIP_TX_SRS(mcip);
+			tx = &mac_srs->srs_tx;
+			mac_tx_client_quiesce((mac_client_handle_t)mcip);
+			/*
+			 * If we are here when removing rings from the
+			 * defgroup, mac_reserve_tx_ring would have
+			 * already deleted the ring from the MAC
+			 * clients in the group.
+			 */
+			if (group != defgrp) {
+				mac_tx_invoke_callbacks(mcip,
+				    (mac_tx_cookie_t)
+				    mac_tx_srs_get_soft_ring(mac_srs, ring));
+				mac_tx_srs_del_ring(mac_srs, ring);
+			}
+			/*
+			 * Additionally, if  we are left with only
+			 * one ring in the group after this, we need
+			 * to modify the mode etc. to. (We haven't
+			 * yet taken the ring out, so we check with 2).
+			 */
+			if (group->mrg_cur_count == 2) {
+				if (ring->mr_next == NULL)
+					rem_ring = group->mrg_rings;
+				else
+					rem_ring = ring->mr_next;
+				mac_tx_invoke_callbacks(mcip,
+				    (mac_tx_cookie_t)
+				    mac_tx_srs_get_soft_ring(mac_srs,
+				    rem_ring));
+				mac_tx_srs_del_ring(mac_srs, rem_ring);
+				if (rem_ring->mr_state != MR_INUSE) {
+					(void) mac_start_ring(rem_ring);
+				}
+				tx->st_arg2 = (void *)rem_ring;
+				mac_tx_srs_stat_recreate(mac_srs, B_FALSE);
+				ring_info = mac_hwring_getinfo(
+				    (mac_ring_handle_t)rem_ring);
+				/*
+				 * We are  shrinking from multiple
+				 * to 1 ring.
+				 */
+				if (mac_srs->srs_type & SRST_BW_CONTROL) {
+					tx->st_mode = SRS_TX_BW;
+				} else if (mac_tx_serialize ||
+				    (ring_info & MAC_RING_TX_SERIALIZE)) {
+					tx->st_mode = SRS_TX_SERIALIZE;
+				} else {
+					tx->st_mode = SRS_TX_DEFAULT;
+				}
+				tx->st_func = mac_tx_get_func(tx->st_mode);
+			}
+			mac_tx_client_restart((mac_client_handle_t)mcip);
+			mgcp = mgcp->mgc_next;
+		}
 		break;
+	}
 	default:
 		ASSERT(B_FALSE);
 	}
@@ -3817,7 +4632,8 @@ i_mac_group_rem_ring(mac_group_t *group, mac_ring_t *ring,
 
 	if (!driver_call) {
 		ASSERT(group_type == MAC_GROUP_TYPE_DYNAMIC);
-		ASSERT(cap_rings->mr_gremring != NULL);
+		ASSERT(group->mrg_driver == NULL ||
+		    cap_rings->mr_gremring != NULL);
 
 		/*
 		 * Remove the driver level hardware ring.
@@ -3829,12 +4645,10 @@ i_mac_group_rem_ring(mac_group_t *group, mac_ring_t *ring,
 	}
 
 	ring->mr_gh = NULL;
-	if (driver_call) {
+	if (driver_call)
 		mac_ring_free(mip, ring);
-	} else {
-		ring->mr_state = MR_FREE;
+	else
 		ring->mr_flag = 0;
-	}
 }
 
 /*
@@ -3982,7 +4796,9 @@ mac_add_macaddr(mac_impl_t *mip, mac_group_t *group, uint8_t *mac_addr,
 		allocated_map = B_TRUE;
 	}
 
-	ASSERT(map->ma_group == group);
+	ASSERT(map->ma_group == NULL || map->ma_group == group);
+	if (map->ma_group == NULL)
+		map->ma_group = group;
 
 	/*
 	 * If the MAC address is already in use, simply account for the
@@ -4082,6 +4898,8 @@ mac_remove_macaddr(mac_address_t *map)
 			return (0);
 
 		err = mac_group_remmac(map->ma_group, map->ma_addr);
+		if (err == 0)
+			map->ma_group = NULL;
 		break;
 	case MAC_ADDRESS_TYPE_UNICAST_PROMISC:
 		err = i_mac_promisc_set(mip, B_FALSE);
@@ -4122,7 +4940,7 @@ mac_update_macaddr(mac_address_t *map, uint8_t *mac_addr)
 		 * Update the primary address for drivers that are not
 		 * RINGS capable.
 		 */
-		if (map->ma_group == NULL) {
+		if (mip->mi_rx_groups == NULL) {
 			err = mip->mi_unicst(mip->mi_driver, (const uint8_t *)
 			    mac_addr);
 			if (err != 0)
@@ -4223,11 +5041,6 @@ mac_init_macaddr(mac_impl_t *mip)
 	if (mip->mi_rx_groups == NULL)
 		map->ma_type = MAC_ADDRESS_TYPE_UNICAST_CLASSIFIED;
 
-	/*
-	 * The primary MAC address is reserved for default group according
-	 * to current design.
-	 */
-	map->ma_group = mip->mi_rx_groups;
 	map->ma_mip = mip;
 
 	mip->mi_addresses = map;
@@ -4258,6 +5071,11 @@ mac_fini_macaddr(mac_impl_t *mip)
 
 /*
  * Logging related functions.
+ *
+ * Note that Kernel statistics have been extended to maintain fine
+ * granularity of statistics viz. hardware lane, software lane, fanout
+ * stats etc. However, extended accounting continues to support only
+ * aggregate statistics like before.
  */
 
 /* Write the Flow description to the log file */
@@ -4304,18 +5122,33 @@ mac_write_flow_desc(flow_entry_t *flent, mac_client_impl_t *mcip)
 int
 mac_write_flow_stats(flow_entry_t *flent)
 {
-	flow_stats_t	*fl_stats;
-	net_stat_t	nstat;
+	net_stat_t		nstat;
+	mac_soft_ring_set_t	*mac_srs;
+	mac_rx_stats_t		*mac_rx_stat;
+	mac_tx_stats_t		*mac_tx_stat;
+	int			i;
 
-	fl_stats = &flent->fe_flowstats;
+	bzero(&nstat, sizeof (net_stat_t));
 	nstat.ns_name = flent->fe_flow_name;
-	nstat.ns_ibytes = fl_stats->fs_rbytes;
-	nstat.ns_obytes = fl_stats->fs_obytes;
-	nstat.ns_ipackets = fl_stats->fs_ipackets;
-	nstat.ns_opackets = fl_stats->fs_opackets;
-	nstat.ns_ierrors = fl_stats->fs_ierrors;
-	nstat.ns_oerrors = fl_stats->fs_oerrors;
+	for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
+		mac_srs = (mac_soft_ring_set_t *)flent->fe_rx_srs[i];
+		mac_rx_stat = &mac_srs->srs_rx.sr_stat;
 
+		nstat.ns_ibytes += mac_rx_stat->mrs_intrbytes +
+		    mac_rx_stat->mrs_pollbytes + mac_rx_stat->mrs_lclbytes;
+		nstat.ns_ipackets += mac_rx_stat->mrs_intrcnt +
+		    mac_rx_stat->mrs_pollcnt + mac_rx_stat->mrs_lclcnt;
+		nstat.ns_oerrors += mac_rx_stat->mrs_ierrors;
+	}
+
+	mac_srs = (mac_soft_ring_set_t *)(flent->fe_tx_srs);
+	if (mac_srs != NULL) {
+		mac_tx_stat = &mac_srs->srs_tx.st_stat;
+
+		nstat.ns_obytes = mac_tx_stat->mts_obytes;
+		nstat.ns_opackets = mac_tx_stat->mts_opackets;
+		nstat.ns_oerrors = mac_tx_stat->mts_oerrors;
+	}
 	return (exacct_commit_netinfo((void *)&nstat, EX_NET_FLSTAT_REC));
 }
 
@@ -4347,16 +5180,38 @@ mac_write_link_desc(mac_client_impl_t *mcip)
 int
 mac_write_link_stats(mac_client_impl_t *mcip)
 {
-	net_stat_t	nstat;
+	net_stat_t		nstat;
+	flow_entry_t		*flent;
+	mac_soft_ring_set_t	*mac_srs;
+	mac_rx_stats_t		*mac_rx_stat;
+	mac_tx_stats_t		*mac_tx_stat;
+	int			i;
 
+	bzero(&nstat, sizeof (net_stat_t));
 	nstat.ns_name = mcip->mci_name;
-	nstat.ns_ibytes = mcip->mci_stat_ibytes;
-	nstat.ns_obytes = mcip->mci_stat_obytes;
-	nstat.ns_ipackets = mcip->mci_stat_ipackets;
-	nstat.ns_opackets = mcip->mci_stat_opackets;
-	nstat.ns_ierrors = mcip->mci_stat_ierrors;
-	nstat.ns_oerrors = mcip->mci_stat_oerrors;
+	flent = mcip->mci_flent;
+	if (flent != NULL)  {
+		for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
+			mac_srs = (mac_soft_ring_set_t *)flent->fe_rx_srs[i];
+			mac_rx_stat = &mac_srs->srs_rx.sr_stat;
 
+			nstat.ns_ibytes += mac_rx_stat->mrs_intrbytes +
+			    mac_rx_stat->mrs_pollbytes +
+			    mac_rx_stat->mrs_lclbytes;
+			nstat.ns_ipackets += mac_rx_stat->mrs_intrcnt +
+			    mac_rx_stat->mrs_pollcnt + mac_rx_stat->mrs_lclcnt;
+			nstat.ns_oerrors += mac_rx_stat->mrs_ierrors;
+		}
+	}
+
+	mac_srs = (mac_soft_ring_set_t *)(mcip->mci_flent->fe_tx_srs);
+	if (mac_srs != NULL) {
+		mac_tx_stat = &mac_srs->srs_tx.st_stat;
+
+		nstat.ns_obytes = mac_tx_stat->mts_obytes;
+		nstat.ns_opackets = mac_tx_stat->mts_opackets;
+		nstat.ns_oerrors = mac_tx_stat->mts_oerrors;
+	}
 	return (exacct_commit_netinfo((void *)&nstat, EX_NET_LNSTAT_REC));
 }
 
@@ -4706,179 +5561,253 @@ mac_flow_update_priority(mac_client_impl_t *mcip, flow_entry_t *flent)
 mac_ring_t *
 mac_reserve_tx_ring(mac_impl_t *mip, mac_ring_t *desired_ring)
 {
-	mac_group_t *group;
-	mac_ring_t *ring;
+	mac_group_t		*group;
+	mac_grp_client_t	*mgcp;
+	mac_client_impl_t	*mcip;
+	mac_soft_ring_set_t	*srs;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
-
-	if (mip->mi_tx_groups == NULL)
-		return (NULL);
 
 	/*
 	 * Find an available ring and start it before changing its status.
 	 * The unassigned rings are at the end of the mi_tx_groups
 	 * array.
 	 */
-	group = mip->mi_tx_groups + mip->mi_tx_group_count;
+	group = MAC_DEFAULT_TX_GROUP(mip);
 
-	for (ring = group->mrg_rings; ring != NULL;
-	    ring = ring->mr_next) {
-		if (desired_ring == NULL) {
-			if (ring->mr_state == MR_FREE)
-				/* wanted any free ring and found one */
-				break;
-		} else {
-			mac_ring_t *sring;
-			mac_client_impl_t *client;
-			mac_soft_ring_set_t *srs;
+	/* Can't take the default ring out of the default group */
+	ASSERT(desired_ring != (mac_ring_t *)mip->mi_default_tx_ring);
 
-			if (ring != desired_ring)
-				/* wants a desired ring but this one ain't it */
-				continue;
-
-			if (ring->mr_state == MR_FREE)
-				break;
-
-			/*
-			 * Found the desired ring but it's already in use.
-			 * Swap it with a new ring.
-			 */
-
-			/* find the client which owns that ring */
-			for (client = mip->mi_clients_list; client != NULL;
-			    client = client->mci_client_next) {
-				srs = MCIP_TX_SRS(client);
-				if (srs != NULL && mac_tx_srs_ring_present(srs,
-				    desired_ring)) {
-					/* found our ring */
-					break;
-				}
-			}
-			if (client == NULL) {
-				/*
-				 * The TX ring is in use, but it's not
-				 * associated with any clients, so it
-				 * has to be the default ring. In that
-				 * case we can simply assign a new ring
-				 * as the default ring, and we're done.
-				 */
-				ASSERT(mip->mi_default_tx_ring ==
-				    (mac_ring_handle_t)desired_ring);
-
-				/*
-				 * Quiesce all clients on top of
-				 * the NIC to make sure there are no
-				 * pending threads still relying on
-				 * that default ring, for example
-				 * the multicast path.
-				 */
-				for (client = mip->mi_clients_list;
-				    client != NULL;
-				    client = client->mci_client_next) {
-					mac_tx_client_quiesce(client,
-					    SRS_QUIESCE);
-				}
-
-				mip->mi_default_tx_ring = (mac_ring_handle_t)
-				    mac_reserve_tx_ring(mip, NULL);
-
-				/* resume the clients */
-				for (client = mip->mi_clients_list;
-				    client != NULL;
-				    client = client->mci_client_next)
-					mac_tx_client_restart(client);
-
-				break;
-			}
-
-			/*
-			 * Note that we cannot simply invoke the group
-			 * add/rem routines since the client doesn't have a
-			 * TX group. So we need to instead add/remove
-			 * the rings from the SRS.
-			 */
-			ASSERT(client->mci_share == NULL);
-
-			/* first quiece the client */
-			mac_tx_client_quiesce(client, SRS_QUIESCE);
-
-			/* give a new ring to the client... */
-			sring = mac_reserve_tx_ring(mip, NULL);
-			if (sring != NULL) {
-				/*
-				 * There are no other available ring
-				 * on that MAC instance. The client
-				 * will fallback to the shared TX
-				 * ring.
-				 */
-				mac_tx_srs_add_ring(srs, sring);
-			}
-
-			/* ... in exchange for our desired ring */
-			mac_tx_srs_del_ring(srs, desired_ring);
-
-			/* restart the client */
-			mac_tx_client_restart(client);
-
-			if (mip->mi_default_tx_ring ==
-			    (mac_ring_handle_t)desired_ring) {
-				/*
-				 * The desired ring is the default ring,
-				 * and there are one or more clients
-				 * using that default ring directly.
-				 */
-				mip->mi_default_tx_ring =
-				    (mac_ring_handle_t)sring;
-				/*
-				 * Find clients using default ring and
-				 * swap it with the new default ring.
-				 */
-				for (client = mip->mi_clients_list;
-				    client != NULL;
-				    client = client->mci_client_next) {
-					srs = MCIP_TX_SRS(client);
-					if (srs != NULL &&
-					    mac_tx_srs_ring_present(srs,
-					    desired_ring)) {
-						/* first quiece the client */
-						mac_tx_client_quiesce(client,
-						    SRS_QUIESCE);
-
-						/*
-						 * Give it the new default
-						 * ring, and remove the old
-						 * one.
-						 */
-						if (sring != NULL) {
-							mac_tx_srs_add_ring(srs,
-							    sring);
-						}
-						mac_tx_srs_del_ring(srs,
-						    desired_ring);
-
-						/* restart the client */
-						mac_tx_client_restart(client);
-					}
-				}
-			}
-			break;
-		}
-	}
-
-	if (ring != NULL) {
-		if (mac_start_ring(ring) != 0)
+	if (desired_ring->mr_state == MR_FREE) {
+		ASSERT(MAC_GROUP_NO_CLIENT(group));
+		if (mac_start_ring(desired_ring) != 0)
 			return (NULL);
-		ring->mr_state = MR_INUSE;
+		return (desired_ring);
 	}
-
-	return (ring);
+	/*
+	 * There are clients using this ring, so let's move the clients
+	 * away from using this ring.
+	 */
+	for (mgcp = group->mrg_clients; mgcp != NULL; mgcp = mgcp->mgc_next) {
+		mcip = mgcp->mgc_client;
+		mac_tx_client_quiesce((mac_client_handle_t)mcip);
+		srs = MCIP_TX_SRS(mcip);
+		ASSERT(mac_tx_srs_ring_present(srs, desired_ring));
+		mac_tx_invoke_callbacks(mcip,
+		    (mac_tx_cookie_t)mac_tx_srs_get_soft_ring(srs,
+		    desired_ring));
+		mac_tx_srs_del_ring(srs, desired_ring);
+		mac_tx_client_restart((mac_client_handle_t)mcip);
+	}
+	return (desired_ring);
 }
 
 /*
- * Minimum number of rings to leave in the default TX group when allocating
- * rings to new clients.
+ * For a reserved group with multiple clients, return the primary client.
  */
-static uint_t mac_min_rx_default_rings = 1;
+static mac_client_impl_t *
+mac_get_grp_primary(mac_group_t *grp)
+{
+	mac_grp_client_t	*mgcp = grp->mrg_clients;
+	mac_client_impl_t	*mcip;
+
+	while (mgcp != NULL) {
+		mcip = mgcp->mgc_client;
+		if (mcip->mci_flent->fe_type & FLOW_PRIMARY_MAC)
+			return (mcip);
+		mgcp = mgcp->mgc_next;
+	}
+	return (NULL);
+}
+
+/*
+ * Hybrid I/O specifies the ring that should be given to a share.
+ * If the ring is already used by clients, then we need to release
+ * the ring back to the default group so that we can give it to
+ * the share. This means the clients using this ring now get a
+ * replacement ring. If there aren't any replacement rings, this
+ * function returns a failure.
+ */
+static int
+mac_reclaim_ring_from_grp(mac_impl_t *mip, mac_ring_type_t ring_type,
+    mac_ring_t *ring, mac_ring_t **rings, int nrings)
+{
+	mac_group_t		*group = (mac_group_t *)ring->mr_gh;
+	mac_resource_props_t	*mrp;
+	mac_client_impl_t	*mcip;
+	mac_group_t		*defgrp;
+	mac_ring_t		*tring;
+	mac_group_t		*tgrp;
+	int			i;
+	int			j;
+
+	mcip = MAC_GROUP_ONLY_CLIENT(group);
+	if (mcip == NULL)
+		mcip = mac_get_grp_primary(group);
+	ASSERT(mcip != NULL);
+	ASSERT(mcip->mci_share == NULL);
+
+	mrp = MCIP_RESOURCE_PROPS(mcip);
+	if (ring_type == MAC_RING_TYPE_RX) {
+		defgrp = mip->mi_rx_donor_grp;
+		if ((mrp->mrp_mask & MRP_RX_RINGS) == 0) {
+			/* Need to put this mac client in the default group */
+			if (mac_rx_switch_group(mcip, group, defgrp) != 0)
+				return (ENOSPC);
+		} else {
+			/*
+			 * Switch this ring with some other ring from
+			 * the default group.
+			 */
+			for (tring = defgrp->mrg_rings; tring != NULL;
+			    tring = tring->mr_next) {
+				if (tring->mr_index == 0)
+					continue;
+				for (j = 0; j < nrings; j++) {
+					if (rings[j] == tring)
+						break;
+				}
+				if (j >= nrings)
+					break;
+			}
+			if (tring == NULL)
+				return (ENOSPC);
+			if (mac_group_mov_ring(mip, group, tring) != 0)
+				return (ENOSPC);
+			if (mac_group_mov_ring(mip, defgrp, ring) != 0) {
+				(void) mac_group_mov_ring(mip, defgrp, tring);
+				return (ENOSPC);
+			}
+		}
+		ASSERT(ring->mr_gh == (mac_group_handle_t)defgrp);
+		return (0);
+	}
+
+	defgrp = MAC_DEFAULT_TX_GROUP(mip);
+	if (ring == (mac_ring_t *)mip->mi_default_tx_ring) {
+		/*
+		 * See if we can get a spare ring to replace the default
+		 * ring.
+		 */
+		if (defgrp->mrg_cur_count == 1) {
+			/*
+			 * Need to get a ring from another client, see if
+			 * there are any clients that can be moved to
+			 * the default group, thereby freeing some rings.
+			 */
+			for (i = 0; i < mip->mi_tx_group_count; i++) {
+				tgrp = &mip->mi_tx_groups[i];
+				if (tgrp->mrg_state ==
+				    MAC_GROUP_STATE_REGISTERED) {
+					continue;
+				}
+				mcip = MAC_GROUP_ONLY_CLIENT(tgrp);
+				if (mcip == NULL)
+					mcip = mac_get_grp_primary(tgrp);
+				ASSERT(mcip != NULL);
+				mrp = MCIP_RESOURCE_PROPS(mcip);
+				if ((mrp->mrp_mask & MRP_TX_RINGS) == 0) {
+					ASSERT(tgrp->mrg_cur_count == 1);
+					/*
+					 * If this ring is part of the
+					 * rings asked by the share we cannot
+					 * use it as the default ring.
+					 */
+					for (j = 0; j < nrings; j++) {
+						if (rings[j] == tgrp->mrg_rings)
+							break;
+					}
+					if (j < nrings)
+						continue;
+					mac_tx_client_quiesce(
+					    (mac_client_handle_t)mcip);
+					mac_tx_switch_group(mcip, tgrp,
+					    defgrp);
+					mac_tx_client_restart(
+					    (mac_client_handle_t)mcip);
+					break;
+				}
+			}
+			/*
+			 * All the rings are reserved, can't give up the
+			 * default ring.
+			 */
+			if (defgrp->mrg_cur_count <= 1)
+				return (ENOSPC);
+		}
+		/*
+		 * Swap the default ring with another.
+		 */
+		for (tring = defgrp->mrg_rings; tring != NULL;
+		    tring = tring->mr_next) {
+			/*
+			 * If this ring is part of the rings asked by the
+			 * share we cannot use it as the default ring.
+			 */
+			for (j = 0; j < nrings; j++) {
+				if (rings[j] == tring)
+					break;
+			}
+			if (j >= nrings)
+				break;
+		}
+		ASSERT(tring != NULL);
+		mip->mi_default_tx_ring = (mac_ring_handle_t)tring;
+		return (0);
+	}
+	/*
+	 * The Tx ring is with a group reserved by a MAC client. See if
+	 * we can swap it.
+	 */
+	ASSERT(group->mrg_state == MAC_GROUP_STATE_RESERVED);
+	mcip = MAC_GROUP_ONLY_CLIENT(group);
+	if (mcip == NULL)
+		mcip = mac_get_grp_primary(group);
+	ASSERT(mcip !=  NULL);
+	mrp = MCIP_RESOURCE_PROPS(mcip);
+	mac_tx_client_quiesce((mac_client_handle_t)mcip);
+	if ((mrp->mrp_mask & MRP_TX_RINGS) == 0) {
+		ASSERT(group->mrg_cur_count == 1);
+		/* Put this mac client in the default group */
+		mac_tx_switch_group(mcip, group, defgrp);
+	} else {
+		/*
+		 * Switch this ring with some other ring from
+		 * the default group.
+		 */
+		for (tring = defgrp->mrg_rings; tring != NULL;
+		    tring = tring->mr_next) {
+			if (tring == (mac_ring_t *)mip->mi_default_tx_ring)
+				continue;
+			/*
+			 * If this ring is part of the rings asked by the
+			 * share we cannot use it for swapping.
+			 */
+			for (j = 0; j < nrings; j++) {
+				if (rings[j] == tring)
+					break;
+			}
+			if (j >= nrings)
+				break;
+		}
+		if (tring == NULL) {
+			mac_tx_client_restart((mac_client_handle_t)mcip);
+			return (ENOSPC);
+		}
+		if (mac_group_mov_ring(mip, group, tring) != 0) {
+			mac_tx_client_restart((mac_client_handle_t)mcip);
+			return (ENOSPC);
+		}
+		if (mac_group_mov_ring(mip, defgrp, ring) != 0) {
+			(void) mac_group_mov_ring(mip, defgrp, tring);
+			mac_tx_client_restart((mac_client_handle_t)mcip);
+			return (ENOSPC);
+		}
+	}
+	mac_tx_client_restart((mac_client_handle_t)mcip);
+	ASSERT(ring->mr_gh == (mac_group_handle_t)defgrp);
+	return (0);
+}
 
 /*
  * Populate a zero-ring group with rings. If the share is non-NULL,
@@ -4889,15 +5818,17 @@ static uint_t mac_min_rx_default_rings = 1;
  */
 int
 i_mac_group_allocate_rings(mac_impl_t *mip, mac_ring_type_t ring_type,
-    mac_group_t *src_group, mac_group_t *new_group, mac_share_handle_t share)
+    mac_group_t *src_group, mac_group_t *new_group, mac_share_handle_t share,
+    uint32_t ringcnt)
 {
-	mac_ring_t **rings, *tmp_ring[1], *ring;
+	mac_ring_t **rings, *ring;
 	uint_t nrings;
-	int rv, i, j;
+	int rv = 0, i = 0, j;
 
-	ASSERT(mip->mi_rx_group_type == MAC_GROUP_TYPE_DYNAMIC &&
-	    mip->mi_tx_group_type == MAC_GROUP_TYPE_DYNAMIC);
-	ASSERT(new_group->mrg_cur_count == 0);
+	ASSERT((ring_type == MAC_RING_TYPE_RX &&
+	    mip->mi_rx_group_type == MAC_GROUP_TYPE_DYNAMIC) ||
+	    (ring_type == MAC_RING_TYPE_TX &&
+	    mip->mi_tx_group_type == MAC_GROUP_TYPE_DYNAMIC));
 
 	/*
 	 * First find the rings to allocate to the group.
@@ -4910,9 +5841,23 @@ i_mac_group_allocate_rings(mac_impl_t *mip, mac_ring_type_t ring_type,
 		    KM_SLEEP);
 		mip->mi_share_capab.ms_squery(share, ring_type,
 		    (mac_ring_handle_t *)rings, &nrings);
+		for (i = 0; i < nrings; i++) {
+			/*
+			 * If we have given this ring to a non-default
+			 * group, we need to check if we can get this
+			 * ring.
+			 */
+			ring = rings[i];
+			if (ring->mr_gh != (mac_group_handle_t)src_group ||
+			    ring == (mac_ring_t *)mip->mi_default_tx_ring) {
+				if (mac_reclaim_ring_from_grp(mip, ring_type,
+				    ring, rings, nrings) != 0) {
+					rv = ENOSPC;
+					goto bail;
+				}
+			}
+		}
 	} else {
-		/* this function is called for TX only with a share */
-		ASSERT(ring_type == MAC_RING_TYPE_RX);
 		/*
 		 * Pick one ring from default group.
 		 *
@@ -4922,23 +5867,37 @@ i_mac_group_allocate_rings(mac_impl_t *mip, mac_ring_type_t ring_type,
 		 * We need a better way for a driver to indicate this,
 		 * for example a per-ring flag.
 		 */
+		rings = kmem_alloc(ringcnt * sizeof (mac_ring_handle_t),
+		    KM_SLEEP);
 		for (ring = src_group->mrg_rings; ring != NULL;
 		    ring = ring->mr_next) {
-			if (ring->mr_index != 0)
+			if (ring_type == MAC_RING_TYPE_RX &&
+			    ring->mr_index == 0) {
+				continue;
+			}
+			if (ring_type == MAC_RING_TYPE_TX &&
+			    ring == (mac_ring_t *)mip->mi_default_tx_ring) {
+				continue;
+			}
+			rings[i++] = ring;
+			if (i == ringcnt)
 				break;
 		}
 		ASSERT(ring != NULL);
-		nrings = 1;
-		tmp_ring[0] = ring;
-		rings = tmp_ring;
+		nrings = i;
+		/* Not enough rings as required */
+		if (nrings != ringcnt) {
+			rv = ENOSPC;
+			goto bail;
+		}
 	}
 
 	switch (ring_type) {
 	case MAC_RING_TYPE_RX:
-		if (src_group->mrg_cur_count - nrings <
-		    mac_min_rx_default_rings) {
+		if (src_group->mrg_cur_count - nrings < 1) {
 			/* we ran out of rings */
-			return (ENOSPC);
+			rv = ENOSPC;
+			goto bail;
 		}
 
 		/* move receive rings to new group */
@@ -4950,7 +5909,7 @@ i_mac_group_allocate_rings(mac_impl_t *mip, mac_ring_type_t ring_type,
 					(void) mac_group_mov_ring(mip,
 					    src_group, rings[j]);
 				}
-				return (rv);
+				goto bail;
 			}
 		}
 		break;
@@ -4959,37 +5918,42 @@ i_mac_group_allocate_rings(mac_impl_t *mip, mac_ring_type_t ring_type,
 		mac_ring_t *tmp_ring;
 
 		/* move the TX rings to the new group */
-		ASSERT(src_group == NULL);
 		for (i = 0; i < nrings; i++) {
 			/* get the desired ring */
 			tmp_ring = mac_reserve_tx_ring(mip, rings[i]);
+			if (tmp_ring == NULL) {
+				rv = ENOSPC;
+				goto bail;
+			}
 			ASSERT(tmp_ring == rings[i]);
 			rv = mac_group_mov_ring(mip, new_group, rings[i]);
 			if (rv != 0) {
 				/* cleanup on failure */
 				for (j = 0; j < i; j++) {
 					(void) mac_group_mov_ring(mip,
-					    mip->mi_tx_groups +
-					    mip->mi_tx_group_count, rings[j]);
+					    MAC_DEFAULT_TX_GROUP(mip),
+					    rings[j]);
 				}
+				goto bail;
 			}
 		}
 		break;
 	}
 	}
 
-	if (share != NULL) {
-		/* add group to share */
+	/* add group to share */
+	if (share != NULL)
 		mip->mi_share_capab.ms_sadd(share, new_group->mrg_driver);
-		/* free temporary array of rings */
-		kmem_free(rings, nrings * sizeof (mac_ring_handle_t));
-	}
 
-	return (0);
+bail:
+	/* free temporary array of rings */
+	kmem_free(rings, nrings * sizeof (mac_ring_handle_t));
+
+	return (rv);
 }
 
 void
-mac_rx_group_add_client(mac_group_t *grp, mac_client_impl_t *mcip)
+mac_group_add_client(mac_group_t *grp, mac_client_impl_t *mcip)
 {
 	mac_grp_client_t *mgcp;
 
@@ -5008,7 +5972,7 @@ mac_rx_group_add_client(mac_group_t *grp, mac_client_impl_t *mcip)
 }
 
 void
-mac_rx_group_remove_client(mac_group_t *grp, mac_client_impl_t *mcip)
+mac_group_remove_client(mac_group_t *grp, mac_client_impl_t *mcip)
 {
 	mac_grp_client_t *mgcp, **pprev;
 
@@ -5034,65 +5998,149 @@ mac_rx_group_remove_client(mac_group_t *grp, mac_client_impl_t *mcip)
  * largest number of rings, otherwise the default ring when available.
  */
 mac_group_t *
-mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr,
-    mac_rx_group_reserve_type_t rtype)
+mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr, boolean_t move)
 {
 	mac_share_handle_t	share = mcip->mci_share;
 	mac_impl_t		*mip = mcip->mci_mip;
 	mac_group_t		*grp = NULL;
-	int			i, start, loopcount;
-	int			err;
+	int			i;
+	int			err = 0;
 	mac_address_t		*map;
+	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
+	int			nrings;
+	int			donor_grp_rcnt;
+	boolean_t		need_exclgrp = B_FALSE;
+	int			need_rings = 0;
+	mac_group_t		*candidate_grp = NULL;
+	mac_client_impl_t	*gclient;
+	mac_resource_props_t	*gmrp;
+	mac_group_t		*donorgrp = NULL;
+	boolean_t		rxhw = mrp->mrp_mask & MRP_RX_RINGS;
+	boolean_t		unspec = mrp->mrp_mask & MRP_RXRINGS_UNSPEC;
+	boolean_t		isprimary;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
-	/* Check if a group already has this mac address (case of VLANs) */
-	if ((map = mac_find_macaddr(mip, mac_addr)) != NULL)
-		return (map->ma_group);
+	isprimary = mcip->mci_flent->fe_type & FLOW_PRIMARY_MAC;
 
-	if (mip->mi_rx_groups == NULL || mip->mi_rx_group_count == 0 ||
-	    rtype == MAC_RX_NO_RESERVE)
+	/*
+	 * Check if a group already has this mac address (case of VLANs)
+	 * unless we are moving this MAC client from one group to another.
+	 */
+	if (!move && (map = mac_find_macaddr(mip, mac_addr)) != NULL) {
+		if (map->ma_group != NULL)
+			return (map->ma_group);
+	}
+	if (mip->mi_rx_groups == NULL || mip->mi_rx_group_count == 0)
 		return (NULL);
+	/*
+	 * If exclusive open, return NULL which will enable the
+	 * caller to use the default group.
+	 */
+	if (mcip->mci_state_flags & MCIS_EXCLUSIVE)
+		return (NULL);
+
+	/* For dynamic groups default unspecified to 1 */
+	if (rxhw && unspec &&
+	    mip->mi_rx_group_type == MAC_GROUP_TYPE_DYNAMIC) {
+		mrp->mrp_nrxrings = 1;
+	}
+	/*
+	 * For static grouping we allow only specifying rings=0 and
+	 * unspecified
+	 */
+	if (rxhw && mrp->mrp_nrxrings > 0 &&
+	    mip->mi_rx_group_type == MAC_GROUP_TYPE_STATIC) {
+		return (NULL);
+	}
+	if (rxhw) {
+		/*
+		 * We have explicitly asked for a group (with nrxrings,
+		 * if unspec).
+		 */
+		if (unspec || mrp->mrp_nrxrings > 0) {
+			need_exclgrp = B_TRUE;
+			need_rings = mrp->mrp_nrxrings;
+		} else if (mrp->mrp_nrxrings == 0) {
+			/*
+			 * We have asked for a software group.
+			 */
+			return (NULL);
+		}
+	} else if (isprimary && mip->mi_nactiveclients == 1 &&
+	    mip->mi_rx_group_type == MAC_GROUP_TYPE_DYNAMIC) {
+		/*
+		 * If the primary is the only active client on this
+		 * mip and we have not asked for any rings, we give
+		 * it the default group so that the primary gets to
+		 * use all the rings.
+		 */
+		return (NULL);
+	}
+
+	/* The group that can donate rings */
+	donorgrp = mip->mi_rx_donor_grp;
+
+	/*
+	 * The number of rings that the default group can donate.
+	 * We need to leave at least one ring.
+	 */
+	donor_grp_rcnt = donorgrp->mrg_cur_count - 1;
 
 	/*
 	 * Try to exclusively reserve a RX group.
 	 *
-	 * For flows requires SW_RING it always goes to the default group
-	 * (Until we can explicitely call out default groups (CR 6695600),
-	 * we assume that the default group is always at position zero);
+	 * For flows requiring HW_DEFAULT_RING (unicast flow of the primary
+	 * client), try to reserve the a non-default RX group and give
+	 * it all the rings from the donor group, except the default ring
 	 *
-	 * For flows requires HW_DEFAULT_RING (unicast flow of the primary
-	 * client), try to reserve the default RX group only.
+	 * For flows requiring HW_RING (unicast flow of other clients), try
+	 * to reserve non-default RX group with the specified number of
+	 * rings, if available.
 	 *
-	 * For flows requires HW_RING (unicast flow of other clients), try
-	 * to reserve non-default RX group then the default group.
+	 * For flows that have not asked for software or hardware ring,
+	 * try to reserve a non-default group with 1 ring, if available.
 	 */
-	switch (rtype) {
-	case MAC_RX_RESERVE_DEFAULT:
-		start = 0;
-		loopcount = 1;
-		break;
-	case MAC_RX_RESERVE_NONDEFAULT:
-		start = 1;
-		loopcount = mip->mi_rx_group_count;
-	}
-
-	for (i = start; i < start + loopcount; i++) {
-		grp = &mip->mi_rx_groups[i % mip->mi_rx_group_count];
+	for (i = 1; i < mip->mi_rx_group_count; i++) {
+		grp = &mip->mi_rx_groups[i];
 
 		DTRACE_PROBE3(rx__group__trying, char *, mip->mi_name,
 		    int, grp->mrg_index, mac_group_state_t, grp->mrg_state);
 
 		/*
-		 * Check to see whether this mac client is the only client
-		 * on this RX group. If not, we cannot exclusively reserve
-		 * this RX group.
+		 * Check if this group could be a candidate group for
+		 * eviction if we need a group for this MAC client,
+		 * but there aren't any. A candidate group is one
+		 * that didn't ask for an exclusive group, but got
+		 * one and it has enough rings (combined with what
+		 * the donor group can donate) for the new MAC
+		 * client
 		 */
-		if (!MAC_RX_GROUP_NO_CLIENT(grp) &&
-		    (MAC_RX_GROUP_ONLY_CLIENT(grp) != mcip)) {
+		if (grp->mrg_state >= MAC_GROUP_STATE_RESERVED) {
+			/*
+			 * If the primary/donor group is not the default
+			 * group, don't bother looking for a candidate group.
+			 * If we don't have enough rings we will check
+			 * if the primary group can be vacated.
+			 */
+			if (candidate_grp == NULL &&
+			    donorgrp == MAC_DEFAULT_RX_GROUP(mip)) {
+				ASSERT(!MAC_GROUP_NO_CLIENT(grp));
+				gclient = MAC_GROUP_ONLY_CLIENT(grp);
+				if (gclient == NULL)
+					gclient = mac_get_grp_primary(grp);
+				ASSERT(gclient != NULL);
+				gmrp = MCIP_RESOURCE_PROPS(gclient);
+				if (gclient->mci_share == NULL &&
+				    (gmrp->mrp_mask & MRP_RX_RINGS) == 0 &&
+				    (unspec ||
+				    (grp->mrg_cur_count + donor_grp_rcnt >=
+				    need_rings))) {
+					candidate_grp = grp;
+				}
+			}
 			continue;
 		}
-
 		/*
 		 * This group could already be SHARED by other multicast
 		 * flows on this client. In that case, the group would
@@ -5105,35 +6153,133 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr,
 			continue;
 		}
 
-		if ((i % mip->mi_rx_group_count) == 0 ||
-		    mip->mi_rx_group_type != MAC_GROUP_TYPE_DYNAMIC) {
+		if (mip->mi_rx_group_type != MAC_GROUP_TYPE_DYNAMIC)
 			break;
-		}
-
 		ASSERT(grp->mrg_cur_count == 0);
 
 		/*
 		 * Populate the group. Rings should be taken
-		 * from the default group at position 0 for now.
+		 * from the donor group.
 		 */
+		nrings = rxhw ? need_rings : isprimary ? donor_grp_rcnt: 1;
 
-		err = i_mac_group_allocate_rings(mip, MAC_RING_TYPE_RX,
-		    &mip->mi_rx_groups[0], grp, share);
-		if (err == 0)
-			break;
+		/*
+		 * If the donor group can't donate, let's just walk and
+		 * see if someone can vacate a group, so that we have
+		 * enough rings for this, unless we already have
+		 * identified a candiate group..
+		 */
+		if (nrings <= donor_grp_rcnt) {
+			err = i_mac_group_allocate_rings(mip, MAC_RING_TYPE_RX,
+			    donorgrp, grp, share, nrings);
+			if (err == 0) {
+				/*
+				 * For a share i_mac_group_allocate_rings gets
+				 * the rings from the driver, let's populate
+				 * the property for the client now.
+				 */
+				if (share != NULL) {
+					mac_client_set_rings(
+					    (mac_client_handle_t)mcip,
+					    grp->mrg_cur_count, -1);
+				}
+				if (mac_is_primary_client(mcip) && !rxhw)
+					mip->mi_rx_donor_grp = grp;
+				break;
+			}
+		}
 
 		DTRACE_PROBE3(rx__group__reserve__alloc__rings, char *,
 		    mip->mi_name, int, grp->mrg_index, int, err);
 
 		/*
-		 * It's a dynamic group but the grouping operation failed.
+		 * It's a dynamic group but the grouping operation
+		 * failed.
 		 */
 		mac_stop_group(grp);
 	}
+	/* We didn't find an exclusive group for this MAC client */
+	if (i >= mip->mi_rx_group_count) {
 
-	if (i == start + loopcount)
+		if (!need_exclgrp)
+			return (NULL);
+
+		/*
+		 * If we found a candidate group then we switch the
+		 * MAC client from the candidate_group to the default
+		 * group and give the group to this MAC client. If
+		 * we didn't find a candidate_group, check if the
+		 * primary is in its own group and if it can make way
+		 * for this MAC client.
+		 */
+		if (candidate_grp == NULL &&
+		    donorgrp != MAC_DEFAULT_RX_GROUP(mip) &&
+		    donorgrp->mrg_cur_count >= need_rings) {
+			candidate_grp = donorgrp;
+		}
+		if (candidate_grp != NULL) {
+			boolean_t	prim_grp = B_FALSE;
+
+			/*
+			 * Switch the MAC client from the candidate group
+			 * to the default group.. If this group was the
+			 * donor group, then after the switch we need
+			 * to update the donor group too.
+			 */
+			grp = candidate_grp;
+			gclient = MAC_GROUP_ONLY_CLIENT(grp);
+			if (gclient == NULL)
+				gclient = mac_get_grp_primary(grp);
+			if (grp == mip->mi_rx_donor_grp)
+				prim_grp = B_TRUE;
+			if (mac_rx_switch_group(gclient, grp,
+			    MAC_DEFAULT_RX_GROUP(mip)) != 0) {
+				return (NULL);
+			}
+			if (prim_grp) {
+				mip->mi_rx_donor_grp =
+				    MAC_DEFAULT_RX_GROUP(mip);
+				donorgrp = MAC_DEFAULT_RX_GROUP(mip);
+			}
+
+
+			/*
+			 * Now give this group with the required rings
+			 * to this MAC client.
+			 */
+			ASSERT(grp->mrg_state == MAC_GROUP_STATE_REGISTERED);
+			if (mac_start_group(grp) != 0)
+				return (NULL);
+
+			if (mip->mi_rx_group_type != MAC_GROUP_TYPE_DYNAMIC)
+				return (grp);
+
+			donor_grp_rcnt = donorgrp->mrg_cur_count - 1;
+			ASSERT(grp->mrg_cur_count == 0);
+			ASSERT(donor_grp_rcnt >= need_rings);
+			err = i_mac_group_allocate_rings(mip, MAC_RING_TYPE_RX,
+			    donorgrp, grp, share, need_rings);
+			if (err == 0) {
+				/*
+				 * For a share i_mac_group_allocate_rings gets
+				 * the rings from the driver, let's populate
+				 * the property for the client now.
+				 */
+				if (share != NULL) {
+					mac_client_set_rings(
+					    (mac_client_handle_t)mcip,
+					    grp->mrg_cur_count, -1);
+				}
+				DTRACE_PROBE2(rx__group__reserved,
+				    char *, mip->mi_name, int, grp->mrg_index);
+				return (grp);
+			}
+			DTRACE_PROBE3(rx__group__reserve__alloc__rings, char *,
+			    mip->mi_name, int, grp->mrg_index, int, err);
+			mac_stop_group(grp);
+		}
 		return (NULL);
-
+	}
 	ASSERT(grp != NULL);
 
 	DTRACE_PROBE2(rx__group__reserved,
@@ -5152,10 +6298,13 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr,
 void
 mac_release_rx_group(mac_client_impl_t *mcip, mac_group_t *group)
 {
-	mac_impl_t	*mip = mcip->mci_mip;
-	mac_ring_t	*ring;
+	mac_impl_t		*mip = mcip->mci_mip;
+	mac_ring_t		*ring;
 
-	ASSERT(group != &mip->mi_rx_groups[0]);
+	ASSERT(group != MAC_DEFAULT_RX_GROUP(mip));
+
+	if (mip->mi_rx_donor_grp == group)
+		mip->mi_rx_donor_grp = MAC_DEFAULT_RX_GROUP(mip);
 
 	/*
 	 * This is the case where there are no clients left. Any
@@ -5170,10 +6319,12 @@ mac_release_rx_group(mac_client_impl_t *mcip, mac_group_t *group)
 			 */
 			ring->mr_srs = NULL;
 		}
-		ASSERT(ring->mr_state == MR_INUSE);
-		mac_stop_ring(ring);
-		ring->mr_state = MR_FREE;
-		ring->mr_flag = 0;
+		ASSERT(group->mrg_state < MAC_GROUP_STATE_RESERVED ||
+		    ring->mr_state == MR_INUSE);
+		if (ring->mr_state == MR_INUSE) {
+			mac_stop_ring(ring);
+			ring->mr_flag = 0;
+		}
 	}
 
 	/* remove group from share */
@@ -5190,8 +6341,8 @@ mac_release_rx_group(mac_client_impl_t *mcip, mac_group_t *group)
 		 * Move rings back to default group.
 		 */
 		while ((ring = group->mrg_rings) != NULL) {
-			(void) mac_group_mov_ring(mip,
-			    &mip->mi_rx_groups[0], ring);
+			(void) mac_group_mov_ring(mip, mip->mi_rx_donor_grp,
+			    ring);
 		}
 	}
 	mac_stop_group(group);
@@ -5202,83 +6353,634 @@ mac_release_rx_group(mac_client_impl_t *mcip, mac_group_t *group)
 }
 
 /*
+ * When we move the primary's mac address between groups, we need to also
+ * take all the clients sharing the same mac address along with it (VLANs)
+ * We remove the mac address for such clients from the group after quiescing
+ * them. When we add the mac address we restart the client. Note that
+ * the primary's mac address is removed from the group after all the
+ * other clients sharing the address are removed. Similarly, the primary's
+ * mac address is added before all the other client's mac address are
+ * added. While grp is the group where the clients reside, tgrp is
+ * the group where the addresses have to be added.
+ */
+static void
+mac_rx_move_macaddr_prim(mac_client_impl_t *mcip, mac_group_t *grp,
+    mac_group_t *tgrp, uint8_t *maddr, boolean_t add)
+{
+	mac_impl_t		*mip = mcip->mci_mip;
+	mac_grp_client_t	*mgcp = grp->mrg_clients;
+	mac_client_impl_t	*gmcip;
+	boolean_t		prim;
+
+	prim = (mcip->mci_state_flags & MCIS_UNICAST_HW) != 0;
+
+	/*
+	 * If the clients are in a non-default group, we just have to
+	 * walk the group's client list. If it is in the default group
+	 * (which will be shared by other clients as well, we need to
+	 * check if the unicast address matches mcip's unicast.
+	 */
+	while (mgcp != NULL) {
+		gmcip = mgcp->mgc_client;
+		if (gmcip != mcip &&
+		    (grp != MAC_DEFAULT_RX_GROUP(mip) ||
+		    mcip->mci_unicast == gmcip->mci_unicast)) {
+			if (!add) {
+				mac_rx_client_quiesce(
+				    (mac_client_handle_t)gmcip);
+				(void) mac_remove_macaddr(mcip->mci_unicast);
+			} else {
+				(void) mac_add_macaddr(mip, tgrp, maddr, prim);
+				mac_rx_client_restart(
+				    (mac_client_handle_t)gmcip);
+			}
+		}
+		mgcp = mgcp->mgc_next;
+	}
+}
+
+
+/*
+ * Move the MAC address from fgrp to tgrp. If this is the primary client,
+ * we need to take any VLANs etc. together too.
+ */
+static int
+mac_rx_move_macaddr(mac_client_impl_t *mcip, mac_group_t *fgrp,
+    mac_group_t *tgrp)
+{
+	mac_impl_t		*mip = mcip->mci_mip;
+	uint8_t			maddr[MAXMACADDRLEN];
+	int			err = 0;
+	boolean_t		prim;
+	boolean_t		multiclnt = B_FALSE;
+
+	mac_rx_client_quiesce((mac_client_handle_t)mcip);
+	ASSERT(mcip->mci_unicast != NULL);
+	bcopy(mcip->mci_unicast->ma_addr, maddr, mcip->mci_unicast->ma_len);
+
+	prim = (mcip->mci_state_flags & MCIS_UNICAST_HW) != 0;
+	if (mcip->mci_unicast->ma_nusers > 1) {
+		mac_rx_move_macaddr_prim(mcip, fgrp, NULL, maddr, B_FALSE);
+		multiclnt = B_TRUE;
+	}
+	ASSERT(mcip->mci_unicast->ma_nusers == 1);
+	err = mac_remove_macaddr(mcip->mci_unicast);
+	if (err != 0) {
+		mac_rx_client_restart((mac_client_handle_t)mcip);
+		if (multiclnt) {
+			mac_rx_move_macaddr_prim(mcip, fgrp, fgrp, maddr,
+			    B_TRUE);
+		}
+		return (err);
+	}
+	/*
+	 * Program the H/W Classifier first, if this fails we need
+	 * not proceed with the other stuff.
+	 */
+	if ((err = mac_add_macaddr(mip, tgrp, maddr, prim)) != 0) {
+		/* Revert back the H/W Classifier */
+		if ((err = mac_add_macaddr(mip, fgrp, maddr, prim)) != 0) {
+			/*
+			 * This should not fail now since it worked earlier,
+			 * should we panic?
+			 */
+			cmn_err(CE_WARN,
+			    "mac_rx_switch_group: switching %p back"
+			    " to group %p failed!!", (void *)mcip,
+			    (void *)fgrp);
+		}
+		mac_rx_client_restart((mac_client_handle_t)mcip);
+		if (multiclnt) {
+			mac_rx_move_macaddr_prim(mcip, fgrp, fgrp, maddr,
+			    B_TRUE);
+		}
+		return (err);
+	}
+	mcip->mci_unicast = mac_find_macaddr(mip, maddr);
+	mac_rx_client_restart((mac_client_handle_t)mcip);
+	if (multiclnt)
+		mac_rx_move_macaddr_prim(mcip, fgrp, tgrp, maddr, B_TRUE);
+	return (err);
+}
+
+/*
+ * Switch the MAC client from one group to another. This means we need
+ * to remove the MAC address from the group, remove the MAC client,
+ * teardown the SRSs and revert the group state. Then, we add the client
+ * to the destination group, set the SRSs, and add the MAC address to the
+ * group.
+ */
+int
+mac_rx_switch_group(mac_client_impl_t *mcip, mac_group_t *fgrp,
+    mac_group_t *tgrp)
+{
+	int			err;
+	mac_group_state_t	next_state;
+	mac_client_impl_t	*group_only_mcip;
+	mac_client_impl_t	*gmcip;
+	mac_impl_t		*mip = mcip->mci_mip;
+	mac_grp_client_t	*mgcp;
+
+	ASSERT(fgrp == mcip->mci_flent->fe_rx_ring_group);
+
+	if ((err = mac_rx_move_macaddr(mcip, fgrp, tgrp)) != 0)
+		return (err);
+
+	/*
+	 * The group might be reserved, but SRSs may not be set up, e.g.
+	 * primary and its vlans using a reserved group.
+	 */
+	if (fgrp->mrg_state == MAC_GROUP_STATE_RESERVED &&
+	    MAC_GROUP_ONLY_CLIENT(fgrp) != NULL) {
+		mac_rx_srs_group_teardown(mcip->mci_flent, B_TRUE);
+	}
+	if (fgrp != MAC_DEFAULT_RX_GROUP(mip)) {
+		mgcp = fgrp->mrg_clients;
+		while (mgcp != NULL) {
+			gmcip = mgcp->mgc_client;
+			mgcp = mgcp->mgc_next;
+			mac_group_remove_client(fgrp, gmcip);
+			mac_group_add_client(tgrp, gmcip);
+			gmcip->mci_flent->fe_rx_ring_group = tgrp;
+		}
+		mac_release_rx_group(mcip, fgrp);
+		ASSERT(MAC_GROUP_NO_CLIENT(fgrp));
+		mac_set_group_state(fgrp, MAC_GROUP_STATE_REGISTERED);
+	} else {
+		mac_group_remove_client(fgrp, mcip);
+		mac_group_add_client(tgrp, mcip);
+		mcip->mci_flent->fe_rx_ring_group = tgrp;
+		/*
+		 * If there are other clients (VLANs) sharing this address
+		 * we should be here only for the primary.
+		 */
+		if (mcip->mci_unicast->ma_nusers > 1) {
+			/*
+			 * We need to move all the clients that are using
+			 * this h/w address.
+			 */
+			mgcp = fgrp->mrg_clients;
+			while (mgcp != NULL) {
+				gmcip = mgcp->mgc_client;
+				mgcp = mgcp->mgc_next;
+				if (mcip->mci_unicast == gmcip->mci_unicast) {
+					mac_group_remove_client(fgrp, gmcip);
+					mac_group_add_client(tgrp, gmcip);
+					gmcip->mci_flent->fe_rx_ring_group =
+					    tgrp;
+				}
+			}
+		}
+		/*
+		 * The default group will still take the multicast,
+		 * broadcast traffic etc., so it won't go to
+		 * MAC_GROUP_STATE_REGISTERED.
+		 */
+		if (fgrp->mrg_state == MAC_GROUP_STATE_RESERVED)
+			mac_rx_group_unmark(fgrp, MR_CONDEMNED);
+		mac_set_group_state(fgrp, MAC_GROUP_STATE_SHARED);
+	}
+	next_state = mac_group_next_state(tgrp, &group_only_mcip,
+	    MAC_DEFAULT_RX_GROUP(mip), B_TRUE);
+	mac_set_group_state(tgrp, next_state);
+	/*
+	 * If the destination group is reserved, setup the SRSs etc.
+	 */
+	if (tgrp->mrg_state == MAC_GROUP_STATE_RESERVED) {
+		mac_rx_srs_group_setup(mcip, mcip->mci_flent, SRST_LINK);
+		mac_fanout_setup(mcip, mcip->mci_flent,
+		    MCIP_RESOURCE_PROPS(mcip), mac_rx_deliver, mcip, NULL,
+		    NULL);
+		mac_rx_group_unmark(tgrp, MR_INCIPIENT);
+	} else {
+		mac_rx_switch_grp_to_sw(tgrp);
+	}
+	return (0);
+}
+
+/*
  * Reserves a TX group for the specified share. Invoked by mac_tx_srs_setup()
  * when a share was allocated to the client.
  */
 mac_group_t *
-mac_reserve_tx_group(mac_impl_t *mip, mac_share_handle_t share)
+mac_reserve_tx_group(mac_client_impl_t *mcip, boolean_t move)
 {
-	mac_group_t *grp;
-	int rv, i;
+	mac_impl_t		*mip = mcip->mci_mip;
+	mac_group_t		*grp = NULL;
+	int			rv;
+	int			i;
+	int			err;
+	mac_group_t		*defgrp;
+	mac_share_handle_t	share = mcip->mci_share;
+	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
+	int			nrings;
+	int			defnrings;
+	boolean_t		need_exclgrp = B_FALSE;
+	int			need_rings = 0;
+	mac_group_t		*candidate_grp = NULL;
+	mac_client_impl_t	*gclient;
+	mac_resource_props_t	*gmrp;
+	boolean_t		txhw = mrp->mrp_mask & MRP_TX_RINGS;
+	boolean_t		unspec = mrp->mrp_mask & MRP_TXRINGS_UNSPEC;
+	boolean_t		isprimary;
 
+	isprimary = mcip->mci_flent->fe_type & FLOW_PRIMARY_MAC;
 	/*
-	 * TX groups are currently allocated only to MAC clients
-	 * which are associated with a share. Since we have a fixed
-	 * number of share and groups, and we already successfully
-	 * allocated a share, find an available TX group.
+	 * When we come here for a VLAN on the primary (dladm create-vlan),
+	 * we need to pair it along with the primary (to keep it consistent
+	 * with the RX side). So, we check if the primary is already assigned
+	 * to a group and return the group if so. The other way is also
+	 * true, i.e. the VLAN is already created and now we are plumbing
+	 * the primary.
 	 */
-	ASSERT(share != NULL);
-	ASSERT(mip->mi_tx_group_free > 0);
-
-	for (i = 0; i <  mip->mi_tx_group_count; i++) {
-		grp = &mip->mi_tx_groups[i];
-
-		if ((grp->mrg_state == MAC_GROUP_STATE_RESERVED) ||
-		    (grp->mrg_state == MAC_GROUP_STATE_UNINIT))
-			continue;
-
-		rv = mac_start_group(grp);
-		ASSERT(rv == 0);
-
-		grp->mrg_state = MAC_GROUP_STATE_RESERVED;
-		break;
+	if (!move && isprimary) {
+		for (gclient = mip->mi_clients_list; gclient != NULL;
+		    gclient = gclient->mci_client_next) {
+			if (gclient->mci_flent->fe_type & FLOW_PRIMARY_MAC &&
+			    gclient->mci_flent->fe_tx_ring_group != NULL) {
+				return (gclient->mci_flent->fe_tx_ring_group);
+			}
+		}
 	}
 
-	ASSERT(grp != NULL);
+	if (mip->mi_tx_groups == NULL || mip->mi_tx_group_count == 0)
+		return (NULL);
 
+	/* For dynamic groups, default unspec to 1 */
+	if (txhw && unspec &&
+	    mip->mi_tx_group_type == MAC_GROUP_TYPE_DYNAMIC) {
+		mrp->mrp_ntxrings = 1;
+	}
 	/*
-	 * Populate the group. Rings should be taken from the group
-	 * of unassigned rings, which is past the array of TX
-	 * groups adversized by the driver.
+	 * For static grouping we allow only specifying rings=0 and
+	 * unspecified
 	 */
-	rv = i_mac_group_allocate_rings(mip, MAC_RING_TYPE_TX, NULL,
-	    grp, share);
-	if (rv != 0) {
-		DTRACE_PROBE3(tx__group__reserve__alloc__rings,
-		    char *, mip->mi_name, int, grp->mrg_index, int, rv);
-
-		mac_stop_group(grp);
-		grp->mrg_state = MAC_GROUP_STATE_UNINIT;
-
+	if (txhw && mrp->mrp_ntxrings > 0 &&
+	    mip->mi_tx_group_type == MAC_GROUP_TYPE_STATIC) {
 		return (NULL);
 	}
 
-	mip->mi_tx_group_free--;
+	if (txhw) {
+		/*
+		 * We have explicitly asked for a group (with ntxrings,
+		 * if unspec).
+		 */
+		if (unspec || mrp->mrp_ntxrings > 0) {
+			need_exclgrp = B_TRUE;
+			need_rings = mrp->mrp_ntxrings;
+		} else if (mrp->mrp_ntxrings == 0) {
+			/*
+			 * We have asked for a software group.
+			 */
+			return (NULL);
+		}
+	}
+	defgrp = MAC_DEFAULT_TX_GROUP(mip);
+	/*
+	 * The number of rings that the default group can donate.
+	 * We need to leave at least one ring - the default ring - in
+	 * this group.
+	 */
+	defnrings = defgrp->mrg_cur_count - 1;
 
+	/*
+	 * Primary gets default group unless explicitly told not
+	 * to  (i.e. rings > 0).
+	 */
+	if (isprimary && !need_exclgrp)
+		return (NULL);
+
+	nrings = (mrp->mrp_mask & MRP_TX_RINGS) != 0 ? mrp->mrp_ntxrings : 1;
+	for (i = 0; i <  mip->mi_tx_group_count; i++) {
+		grp = &mip->mi_tx_groups[i];
+		if ((grp->mrg_state == MAC_GROUP_STATE_RESERVED) ||
+		    (grp->mrg_state == MAC_GROUP_STATE_UNINIT)) {
+			/*
+			 * Select a candidate for replacement if we don't
+			 * get an exclusive group. A candidate group is one
+			 * that didn't ask for an exclusive group, but got
+			 * one and it has enough rings (combined with what
+			 * the default group can donate) for the new MAC
+			 * client.
+			 */
+			if (grp->mrg_state == MAC_GROUP_STATE_RESERVED &&
+			    candidate_grp == NULL) {
+				gclient = MAC_GROUP_ONLY_CLIENT(grp);
+				if (gclient == NULL)
+					gclient = mac_get_grp_primary(grp);
+				gmrp = MCIP_RESOURCE_PROPS(gclient);
+				if (gclient->mci_share == NULL &&
+				    (gmrp->mrp_mask & MRP_TX_RINGS) == 0 &&
+				    (unspec ||
+				    (grp->mrg_cur_count + defnrings) >=
+				    need_rings)) {
+					candidate_grp = grp;
+				}
+			}
+			continue;
+		}
+		/*
+		 * If the default can't donate let's just walk and
+		 * see if someone can vacate a group, so that we have
+		 * enough rings for this.
+		 */
+		if (mip->mi_tx_group_type != MAC_GROUP_TYPE_DYNAMIC ||
+		    nrings <= defnrings) {
+			if (grp->mrg_state == MAC_GROUP_STATE_REGISTERED) {
+				rv = mac_start_group(grp);
+				ASSERT(rv == 0);
+			}
+			break;
+		}
+	}
+
+	/* The default group */
+	if (i >= mip->mi_tx_group_count) {
+		/*
+		 * If we need an exclusive group and have identified a
+		 * candidate group we switch the MAC client from the
+		 * candidate group to the default group and give the
+		 * candidate group to this client.
+		 */
+		if (need_exclgrp && candidate_grp != NULL) {
+			/*
+			 * Switch the MAC client from the candidate group
+			 * to the default group.
+			 */
+			grp = candidate_grp;
+			gclient = MAC_GROUP_ONLY_CLIENT(grp);
+			if (gclient == NULL)
+				gclient = mac_get_grp_primary(grp);
+			mac_tx_client_quiesce((mac_client_handle_t)gclient);
+			mac_tx_switch_group(gclient, grp, defgrp);
+			mac_tx_client_restart((mac_client_handle_t)gclient);
+
+			/*
+			 * Give the candidate group with the specified number
+			 * of rings to this MAC client.
+			 */
+			ASSERT(grp->mrg_state == MAC_GROUP_STATE_REGISTERED);
+			rv = mac_start_group(grp);
+			ASSERT(rv == 0);
+
+			if (mip->mi_tx_group_type != MAC_GROUP_TYPE_DYNAMIC)
+				return (grp);
+
+			ASSERT(grp->mrg_cur_count == 0);
+			ASSERT(defgrp->mrg_cur_count > need_rings);
+
+			err = i_mac_group_allocate_rings(mip, MAC_RING_TYPE_TX,
+			    defgrp, grp, share, need_rings);
+			if (err == 0) {
+				/*
+				 * For a share i_mac_group_allocate_rings gets
+				 * the rings from the driver, let's populate
+				 * the property for the client now.
+				 */
+				if (share != NULL) {
+					mac_client_set_rings(
+					    (mac_client_handle_t)mcip, -1,
+					    grp->mrg_cur_count);
+				}
+				mip->mi_tx_group_free--;
+				return (grp);
+			}
+			DTRACE_PROBE3(tx__group__reserve__alloc__rings, char *,
+			    mip->mi_name, int, grp->mrg_index, int, err);
+			mac_stop_group(grp);
+		}
+		return (NULL);
+	}
+	/*
+	 * We got an exclusive group, but it is not dynamic.
+	 */
+	if (mip->mi_tx_group_type != MAC_GROUP_TYPE_DYNAMIC) {
+		mip->mi_tx_group_free--;
+		return (grp);
+	}
+
+	rv = i_mac_group_allocate_rings(mip, MAC_RING_TYPE_TX, defgrp, grp,
+	    share, nrings);
+	if (rv != 0) {
+		DTRACE_PROBE3(tx__group__reserve__alloc__rings,
+		    char *, mip->mi_name, int, grp->mrg_index, int, rv);
+		mac_stop_group(grp);
+		return (NULL);
+	}
+	/*
+	 * For a share i_mac_group_allocate_rings gets the rings from the
+	 * driver, let's populate the property for the client now.
+	 */
+	if (share != NULL) {
+		mac_client_set_rings((mac_client_handle_t)mcip, -1,
+		    grp->mrg_cur_count);
+	}
+	mip->mi_tx_group_free--;
 	return (grp);
 }
 
 void
-mac_release_tx_group(mac_impl_t *mip, mac_group_t *grp)
+mac_release_tx_group(mac_client_impl_t *mcip, mac_group_t *grp)
 {
-	mac_client_impl_t *mcip = grp->mrg_tx_client;
-	mac_share_handle_t share = mcip->mci_share;
-	mac_ring_t *ring;
+	mac_impl_t		*mip = mcip->mci_mip;
+	mac_share_handle_t	share = mcip->mci_share;
+	mac_ring_t		*ring;
+	mac_soft_ring_set_t	*srs = MCIP_TX_SRS(mcip);
+	mac_group_t		*defgrp;
 
-	ASSERT(mip->mi_tx_group_type == MAC_GROUP_TYPE_DYNAMIC);
-	ASSERT(share != NULL);
-	ASSERT(grp->mrg_state == MAC_GROUP_STATE_RESERVED);
+	defgrp = MAC_DEFAULT_TX_GROUP(mip);
+	if (srs != NULL) {
+		if (srs->srs_soft_ring_count > 0) {
+			for (ring = grp->mrg_rings; ring != NULL;
+			    ring = ring->mr_next) {
+				ASSERT(mac_tx_srs_ring_present(srs, ring));
+				mac_tx_invoke_callbacks(mcip,
+				    (mac_tx_cookie_t)
+				    mac_tx_srs_get_soft_ring(srs, ring));
+				mac_tx_srs_del_ring(srs, ring);
+			}
+		} else {
+			ASSERT(srs->srs_tx.st_arg2 != NULL);
+			srs->srs_tx.st_arg2 = NULL;
+			mac_srs_stat_delete(srs);
+		}
+	}
+	if (share != NULL)
+		mip->mi_share_capab.ms_sremove(share, grp->mrg_driver);
 
-	mip->mi_share_capab.ms_sremove(share, grp->mrg_driver);
-	while ((ring = grp->mrg_rings) != NULL) {
-		/* move the ring back to the pool */
-		(void) mac_group_mov_ring(mip, mip->mi_tx_groups +
-		    mip->mi_tx_group_count, ring);
+	/* move the ring back to the pool */
+	if (mip->mi_tx_group_type == MAC_GROUP_TYPE_DYNAMIC) {
+		while ((ring = grp->mrg_rings) != NULL)
+			(void) mac_group_mov_ring(mip, defgrp, ring);
 	}
 	mac_stop_group(grp);
-	mac_set_rx_group_state(grp, MAC_GROUP_STATE_REGISTERED);
-	grp->mrg_tx_client = NULL;
 	mip->mi_tx_group_free++;
+}
+
+/*
+ * Disassociate a MAC client from a group, i.e go through the rings in the
+ * group and delete all the soft rings tied to them.
+ */
+static void
+mac_tx_dismantle_soft_rings(mac_group_t *fgrp, flow_entry_t *flent)
+{
+	mac_client_impl_t	*mcip = flent->fe_mcip;
+	mac_soft_ring_set_t	*tx_srs;
+	mac_srs_tx_t		*tx;
+	mac_ring_t		*ring;
+
+	tx_srs = flent->fe_tx_srs;
+	tx = &tx_srs->srs_tx;
+
+	/* Single ring case we haven't created any soft rings */
+	if (tx->st_mode == SRS_TX_BW || tx->st_mode == SRS_TX_SERIALIZE ||
+	    tx->st_mode == SRS_TX_DEFAULT) {
+		tx->st_arg2 = NULL;
+		mac_srs_stat_delete(tx_srs);
+	/* Fanout case, where we have to dismantle the soft rings */
+	} else {
+		for (ring = fgrp->mrg_rings; ring != NULL;
+		    ring = ring->mr_next) {
+			ASSERT(mac_tx_srs_ring_present(tx_srs, ring));
+			mac_tx_invoke_callbacks(mcip,
+			    (mac_tx_cookie_t)mac_tx_srs_get_soft_ring(tx_srs,
+			    ring));
+			mac_tx_srs_del_ring(tx_srs, ring);
+		}
+		ASSERT(tx->st_arg2 == NULL);
+	}
+}
+
+/*
+ * Switch the MAC client from one group to another. This means we need
+ * to remove the MAC client, teardown the SRSs and revert the group state.
+ * Then, we add the client to the destination roup, set the SRSs etc.
+ */
+void
+mac_tx_switch_group(mac_client_impl_t *mcip, mac_group_t *fgrp,
+    mac_group_t *tgrp)
+{
+	mac_client_impl_t	*group_only_mcip;
+	mac_impl_t		*mip = mcip->mci_mip;
+	flow_entry_t		*flent = mcip->mci_flent;
+	mac_group_t		*defgrp;
+	mac_grp_client_t	*mgcp;
+	mac_client_impl_t	*gmcip;
+	flow_entry_t		*gflent;
+
+	defgrp = MAC_DEFAULT_TX_GROUP(mip);
+	ASSERT(fgrp == flent->fe_tx_ring_group);
+
+	if (fgrp == defgrp) {
+		/*
+		 * If this is the primary we need to find any VLANs on
+		 * the primary and move them too.
+		 */
+		mac_group_remove_client(fgrp, mcip);
+		mac_tx_dismantle_soft_rings(fgrp, flent);
+		if (mcip->mci_unicast->ma_nusers > 1) {
+			mgcp = fgrp->mrg_clients;
+			while (mgcp != NULL) {
+				gmcip = mgcp->mgc_client;
+				mgcp = mgcp->mgc_next;
+				if (mcip->mci_unicast != gmcip->mci_unicast)
+					continue;
+				mac_tx_client_quiesce(
+				    (mac_client_handle_t)gmcip);
+
+				gflent = gmcip->mci_flent;
+				mac_group_remove_client(fgrp, gmcip);
+				mac_tx_dismantle_soft_rings(fgrp, gflent);
+
+				mac_group_add_client(tgrp, gmcip);
+				gflent->fe_tx_ring_group = tgrp;
+				/* We could directly set this to SHARED */
+				tgrp->mrg_state = mac_group_next_state(tgrp,
+				    &group_only_mcip, defgrp, B_FALSE);
+
+				mac_tx_srs_group_setup(gmcip, gflent,
+				    SRST_LINK);
+				mac_fanout_setup(gmcip, gflent,
+				    MCIP_RESOURCE_PROPS(gmcip), mac_rx_deliver,
+				    gmcip, NULL, NULL);
+
+				mac_tx_client_restart(
+				    (mac_client_handle_t)gmcip);
+			}
+		}
+		if (MAC_GROUP_NO_CLIENT(fgrp)) {
+			mac_ring_t	*ring;
+			int		cnt;
+			int		ringcnt;
+
+			fgrp->mrg_state = MAC_GROUP_STATE_REGISTERED;
+			/*
+			 * Additionally, we also need to stop all
+			 * the rings in the default group, except
+			 * the default ring. The reason being
+			 * this group won't be released since it is
+			 * the default group, so the rings won't
+			 * be stopped otherwise.
+			 */
+			ringcnt = fgrp->mrg_cur_count;
+			ring = fgrp->mrg_rings;
+			for (cnt = 0; cnt < ringcnt; cnt++) {
+				if (ring->mr_state == MR_INUSE &&
+				    ring !=
+				    (mac_ring_t *)mip->mi_default_tx_ring) {
+					mac_stop_ring(ring);
+					ring->mr_flag = 0;
+				}
+				ring = ring->mr_next;
+			}
+		} else if (MAC_GROUP_ONLY_CLIENT(fgrp) != NULL) {
+			fgrp->mrg_state = MAC_GROUP_STATE_RESERVED;
+		} else {
+			ASSERT(fgrp->mrg_state == MAC_GROUP_STATE_SHARED);
+		}
+	} else {
+		/*
+		 * We could have VLANs sharing the non-default group with
+		 * the primary.
+		 */
+		mgcp = fgrp->mrg_clients;
+		while (mgcp != NULL) {
+			gmcip = mgcp->mgc_client;
+			mgcp = mgcp->mgc_next;
+			if (gmcip == mcip)
+				continue;
+			mac_tx_client_quiesce((mac_client_handle_t)gmcip);
+			gflent = gmcip->mci_flent;
+
+			mac_group_remove_client(fgrp, gmcip);
+			mac_tx_dismantle_soft_rings(fgrp, gflent);
+
+			mac_group_add_client(tgrp, gmcip);
+			gflent->fe_tx_ring_group = tgrp;
+			/* We could directly set this to SHARED */
+			tgrp->mrg_state = mac_group_next_state(tgrp,
+			    &group_only_mcip, defgrp, B_FALSE);
+			mac_tx_srs_group_setup(gmcip, gflent, SRST_LINK);
+			mac_fanout_setup(gmcip, gflent,
+			    MCIP_RESOURCE_PROPS(gmcip), mac_rx_deliver,
+			    gmcip, NULL, NULL);
+
+			mac_tx_client_restart((mac_client_handle_t)gmcip);
+		}
+		mac_group_remove_client(fgrp, mcip);
+		mac_release_tx_group(mcip, fgrp);
+		fgrp->mrg_state = MAC_GROUP_STATE_REGISTERED;
+	}
+
+	/* Add it to the tgroup */
+	mac_group_add_client(tgrp, mcip);
+	flent->fe_tx_ring_group = tgrp;
+	tgrp->mrg_state = mac_group_next_state(tgrp, &group_only_mcip,
+	    defgrp, B_FALSE);
+
+	mac_tx_srs_group_setup(mcip, flent, SRST_LINK);
+	mac_fanout_setup(mcip, flent, MCIP_RESOURCE_PROPS(mcip),
+	    mac_rx_deliver, mcip, NULL, NULL);
 }
 
 /*
@@ -5415,4 +7117,600 @@ mac_no_active(mac_handle_t mh)
 	i_mac_perim_enter(mip);
 	mip->mi_state_flags |= MIS_NO_ACTIVE;
 	i_mac_perim_exit(mip);
+}
+
+/*
+ * Walk the primary VLAN clients whenever the primary's rings property
+ * changes and update the mac_resource_props_t for the VLAN's client.
+ * We need to do this since we don't support setting these properties
+ * on the primary's VLAN clients, but the VLAN clients have to
+ * follow the primary w.r.t the rings property;
+ */
+void
+mac_set_prim_vlan_rings(mac_impl_t  *mip, mac_resource_props_t *mrp)
+{
+	mac_client_impl_t	*vmcip;
+	mac_resource_props_t	*vmrp;
+
+	for (vmcip = mip->mi_clients_list; vmcip != NULL;
+	    vmcip = vmcip->mci_client_next) {
+		if (!(vmcip->mci_flent->fe_type & FLOW_PRIMARY_MAC) ||
+		    mac_client_vid((mac_client_handle_t)vmcip) ==
+		    VLAN_ID_NONE) {
+			continue;
+		}
+		vmrp = MCIP_RESOURCE_PROPS(vmcip);
+
+		vmrp->mrp_nrxrings =  mrp->mrp_nrxrings;
+		if (mrp->mrp_mask & MRP_RX_RINGS)
+			vmrp->mrp_mask |= MRP_RX_RINGS;
+		else if (vmrp->mrp_mask & MRP_RX_RINGS)
+			vmrp->mrp_mask &= ~MRP_RX_RINGS;
+
+		vmrp->mrp_ntxrings =  mrp->mrp_ntxrings;
+		if (mrp->mrp_mask & MRP_TX_RINGS)
+			vmrp->mrp_mask |= MRP_TX_RINGS;
+		else if (vmrp->mrp_mask & MRP_TX_RINGS)
+			vmrp->mrp_mask &= ~MRP_TX_RINGS;
+
+		if (mrp->mrp_mask & MRP_RXRINGS_UNSPEC)
+			vmrp->mrp_mask |= MRP_RXRINGS_UNSPEC;
+		else
+			vmrp->mrp_mask &= ~MRP_RXRINGS_UNSPEC;
+
+		if (mrp->mrp_mask & MRP_TXRINGS_UNSPEC)
+			vmrp->mrp_mask |= MRP_TXRINGS_UNSPEC;
+		else
+			vmrp->mrp_mask &= ~MRP_TXRINGS_UNSPEC;
+	}
+}
+
+/*
+ * We are adding or removing ring(s) from a group. The source for taking
+ * rings is the default group. The destination for giving rings back is
+ * the default group.
+ */
+int
+mac_group_ring_modify(mac_client_impl_t *mcip, mac_group_t *group,
+    mac_group_t *defgrp)
+{
+	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
+	uint_t			modify;
+	int			count;
+	mac_ring_t		*ring;
+	mac_ring_t		*next;
+	mac_impl_t		*mip = mcip->mci_mip;
+	mac_ring_t		**rings;
+	uint_t			ringcnt;
+	int			i = 0;
+	boolean_t		rx_group = group->mrg_type == MAC_RING_TYPE_RX;
+	int			start;
+	int			end;
+	mac_group_t		*tgrp;
+	int			j;
+	int			rv = 0;
+
+	/*
+	 * If we are asked for just a group, we give 1 ring, else
+	 * the specified number of rings.
+	 */
+	if (rx_group) {
+		ringcnt = (mrp->mrp_mask & MRP_RXRINGS_UNSPEC) ? 1:
+		    mrp->mrp_nrxrings;
+	} else {
+		ringcnt = (mrp->mrp_mask & MRP_TXRINGS_UNSPEC) ? 1:
+		    mrp->mrp_ntxrings;
+	}
+
+	/* don't allow modifying rings for a share for now. */
+	ASSERT(mcip->mci_share == NULL);
+
+	if (ringcnt == group->mrg_cur_count)
+		return (0);
+
+	if (group->mrg_cur_count > ringcnt) {
+		modify = group->mrg_cur_count - ringcnt;
+		if (rx_group) {
+			if (mip->mi_rx_donor_grp == group) {
+				ASSERT(mac_is_primary_client(mcip));
+				mip->mi_rx_donor_grp = defgrp;
+			} else {
+				defgrp = mip->mi_rx_donor_grp;
+			}
+		}
+		ring = group->mrg_rings;
+		rings = kmem_alloc(modify * sizeof (mac_ring_handle_t),
+		    KM_SLEEP);
+		j = 0;
+		for (count = 0; count < modify; count++) {
+			next = ring->mr_next;
+			rv = mac_group_mov_ring(mip, defgrp, ring);
+			if (rv != 0) {
+				/* cleanup on failure */
+				for (j = 0; j < count; j++) {
+					(void) mac_group_mov_ring(mip, group,
+					    rings[j]);
+				}
+				break;
+			}
+			rings[j++] = ring;
+			ring = next;
+		}
+		kmem_free(rings, modify * sizeof (mac_ring_handle_t));
+		return (rv);
+	}
+	if (ringcnt >= MAX_RINGS_PER_GROUP)
+		return (EINVAL);
+
+	modify = ringcnt - group->mrg_cur_count;
+
+	if (rx_group) {
+		if (group != mip->mi_rx_donor_grp)
+			defgrp = mip->mi_rx_donor_grp;
+		else
+			/*
+			 * This is the donor group with all the remaining
+			 * rings. Default group now gets to be the donor
+			 */
+			mip->mi_rx_donor_grp = defgrp;
+		start = 1;
+		end = mip->mi_rx_group_count;
+	} else {
+		start = 0;
+		end = mip->mi_tx_group_count - 1;
+	}
+	/*
+	 * If the default doesn't have any rings, lets see if we can
+	 * take rings given to an h/w client that doesn't need it.
+	 * For now, we just see if there is  any one client that can donate
+	 * all the required rings.
+	 */
+	if (defgrp->mrg_cur_count < (modify + 1)) {
+		for (i = start; i < end; i++) {
+			if (rx_group) {
+				tgrp = &mip->mi_rx_groups[i];
+				if (tgrp == group || tgrp->mrg_state <
+				    MAC_GROUP_STATE_RESERVED) {
+					continue;
+				}
+				mcip = MAC_GROUP_ONLY_CLIENT(tgrp);
+				if (mcip == NULL)
+					mcip = mac_get_grp_primary(tgrp);
+				ASSERT(mcip != NULL);
+				mrp = MCIP_RESOURCE_PROPS(mcip);
+				if ((mrp->mrp_mask & MRP_RX_RINGS) != 0)
+					continue;
+				if ((tgrp->mrg_cur_count +
+				    defgrp->mrg_cur_count) < (modify + 1)) {
+					continue;
+				}
+				if (mac_rx_switch_group(mcip, tgrp,
+				    defgrp) != 0) {
+					return (ENOSPC);
+				}
+			} else {
+				tgrp = &mip->mi_tx_groups[i];
+				if (tgrp == group || tgrp->mrg_state <
+				    MAC_GROUP_STATE_RESERVED) {
+					continue;
+				}
+				mcip = MAC_GROUP_ONLY_CLIENT(tgrp);
+				if (mcip == NULL)
+					mcip = mac_get_grp_primary(tgrp);
+				mrp = MCIP_RESOURCE_PROPS(mcip);
+				if ((mrp->mrp_mask & MRP_TX_RINGS) != 0)
+					continue;
+				if ((tgrp->mrg_cur_count +
+				    defgrp->mrg_cur_count) < (modify + 1)) {
+					continue;
+				}
+				/* OK, we can switch this to s/w */
+				mac_tx_client_quiesce(
+				    (mac_client_handle_t)mcip);
+				mac_tx_switch_group(mcip, tgrp, defgrp);
+				mac_tx_client_restart(
+				    (mac_client_handle_t)mcip);
+			}
+		}
+		if (defgrp->mrg_cur_count < (modify + 1))
+			return (ENOSPC);
+	}
+	if ((rv = i_mac_group_allocate_rings(mip, group->mrg_type, defgrp,
+	    group, mcip->mci_share, modify)) != 0) {
+		return (rv);
+	}
+	return (0);
+}
+
+/*
+ * Given the poolname in mac_resource_props, find the cpupart
+ * that is associated with this pool.  The cpupart will be used
+ * later for finding the cpus to be bound to the networking threads.
+ *
+ * use_default is set B_TRUE if pools are enabled and pool_default
+ * is returned.  This avoids a 2nd lookup to set the poolname
+ * for pool-effective.
+ *
+ * returns:
+ *
+ *    NULL -   pools are disabled or if the 'cpus' property is set.
+ *    cpupart of pool_default  - pools are enabled and the pool
+ *             is not available or poolname is blank
+ *    cpupart of named pool    - pools are enabled and the pool
+ *             is available.
+ */
+cpupart_t *
+mac_pset_find(mac_resource_props_t *mrp, boolean_t *use_default)
+{
+	pool_t		*pool;
+	cpupart_t	*cpupart;
+
+	*use_default = B_FALSE;
+
+	/* CPUs property is set */
+	if (mrp->mrp_mask & MRP_CPUS)
+		return (NULL);
+
+	ASSERT(pool_lock_held());
+
+	/* Pools are disabled, no pset */
+	if (pool_state == POOL_DISABLED)
+		return (NULL);
+
+	/* Pools property is set */
+	if (mrp->mrp_mask & MRP_POOL) {
+		if ((pool = pool_lookup_pool_by_name(mrp->mrp_pool)) == NULL) {
+			/* Pool not found */
+			DTRACE_PROBE1(mac_pset_find_no_pool, char *,
+			    mrp->mrp_pool);
+			*use_default = B_TRUE;
+			pool = pool_default;
+		}
+	/* Pools property is not set */
+	} else {
+		*use_default = B_TRUE;
+		pool = pool_default;
+	}
+
+	/* Find the CPU pset that corresponds to the pool */
+	mutex_enter(&cpu_lock);
+	if ((cpupart = cpupart_find(pool->pool_pset->pset_id)) == NULL) {
+		DTRACE_PROBE1(mac_find_pset_no_pset, psetid_t,
+		    pool->pool_pset->pset_id);
+	}
+	mutex_exit(&cpu_lock);
+
+	return (cpupart);
+}
+
+void
+mac_set_pool_effective(boolean_t use_default, cpupart_t *cpupart,
+    mac_resource_props_t *mrp, mac_resource_props_t *emrp)
+{
+	ASSERT(pool_lock_held());
+
+	if (cpupart != NULL) {
+		emrp->mrp_mask |= MRP_POOL;
+		if (use_default) {
+			(void) strcpy(emrp->mrp_pool,
+			    "pool_default");
+		} else {
+			ASSERT(strlen(mrp->mrp_pool) != 0);
+			(void) strcpy(emrp->mrp_pool,
+			    mrp->mrp_pool);
+		}
+	} else {
+		emrp->mrp_mask &= ~MRP_POOL;
+		bzero(emrp->mrp_pool, MAXPATHLEN);
+	}
+}
+
+struct mac_pool_arg {
+	char		mpa_poolname[MAXPATHLEN];
+	pool_event_t	mpa_what;
+};
+
+/*ARGSUSED*/
+static uint_t
+mac_pool_link_update(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+{
+	struct mac_pool_arg	*mpa = arg;
+	mac_impl_t		*mip = (mac_impl_t *)val;
+	mac_client_impl_t	*mcip;
+	mac_resource_props_t	*mrp, *emrp;
+	boolean_t		pool_update = B_FALSE;
+	boolean_t		pool_clear = B_FALSE;
+	boolean_t		use_default = B_FALSE;
+	cpupart_t		*cpupart = NULL;
+
+	mrp = kmem_zalloc(sizeof (*mrp), KM_SLEEP);
+	i_mac_perim_enter(mip);
+	for (mcip = mip->mi_clients_list; mcip != NULL;
+	    mcip = mcip->mci_client_next) {
+		pool_update = B_FALSE;
+		pool_clear = B_FALSE;
+		use_default = B_FALSE;
+		mac_client_get_resources((mac_client_handle_t)mcip, mrp);
+		emrp = MCIP_EFFECTIVE_PROPS(mcip);
+
+		/*
+		 * When pools are enabled
+		 */
+		if ((mpa->mpa_what == POOL_E_ENABLE) &&
+		    ((mrp->mrp_mask & MRP_CPUS) == 0)) {
+			mrp->mrp_mask |= MRP_POOL;
+			pool_update = B_TRUE;
+		}
+
+		/*
+		 * When pools are disabled
+		 */
+		if ((mpa->mpa_what == POOL_E_DISABLE) &&
+		    ((mrp->mrp_mask & MRP_CPUS) == 0)) {
+			mrp->mrp_mask |= MRP_POOL;
+			pool_clear = B_TRUE;
+		}
+
+		/*
+		 * Look for links with the pool property set and the poolname
+		 * matching the one which is changing.
+		 */
+		if (strcmp(mrp->mrp_pool, mpa->mpa_poolname) == 0) {
+			/*
+			 * The pool associated with the link has changed.
+			 */
+			if (mpa->mpa_what == POOL_E_CHANGE) {
+				mrp->mrp_mask |= MRP_POOL;
+				pool_update = B_TRUE;
+			}
+		}
+
+		/*
+		 * This link is associated with pool_default and
+		 * pool_default has changed.
+		 */
+		if ((mpa->mpa_what == POOL_E_CHANGE) &&
+		    (strcmp(emrp->mrp_pool, "pool_default") == 0) &&
+		    (strcmp(mpa->mpa_poolname, "pool_default") == 0)) {
+			mrp->mrp_mask |= MRP_POOL;
+			pool_update = B_TRUE;
+		}
+
+		/*
+		 * Get new list of cpus for the pool, bind network
+		 * threads to new list of cpus and update resources.
+		 */
+		if (pool_update) {
+			if (MCIP_DATAPATH_SETUP(mcip)) {
+				pool_lock();
+				cpupart = mac_pset_find(mrp, &use_default);
+				mac_fanout_setup(mcip, mcip->mci_flent, mrp,
+				    mac_rx_deliver, mcip, NULL, cpupart);
+				mac_set_pool_effective(use_default, cpupart,
+				    mrp, emrp);
+				pool_unlock();
+			}
+			mac_update_resources(mrp, MCIP_RESOURCE_PROPS(mcip),
+			    B_FALSE);
+		}
+
+		/*
+		 * Clear the effective pool and bind network threads
+		 * to any available CPU.
+		 */
+		if (pool_clear) {
+			if (MCIP_DATAPATH_SETUP(mcip)) {
+				emrp->mrp_mask &= ~MRP_POOL;
+				bzero(emrp->mrp_pool, MAXPATHLEN);
+				mac_fanout_setup(mcip, mcip->mci_flent, mrp,
+				    mac_rx_deliver, mcip, NULL, NULL);
+			}
+			mac_update_resources(mrp, MCIP_RESOURCE_PROPS(mcip),
+			    B_FALSE);
+		}
+	}
+	i_mac_perim_exit(mip);
+	kmem_free(mrp, sizeof (*mrp));
+	return (MH_WALK_CONTINUE);
+}
+
+static void
+mac_pool_update(void *arg)
+{
+	mod_hash_walk(i_mac_impl_hash, mac_pool_link_update, arg);
+	kmem_free(arg, sizeof (struct mac_pool_arg));
+}
+
+/*
+ * Callback function to be executed when a noteworthy pool event
+ * takes place.
+ */
+/* ARGSUSED */
+static void
+mac_pool_event_cb(pool_event_t what, poolid_t id, void *arg)
+{
+	pool_t			*pool;
+	char			*poolname = NULL;
+	struct mac_pool_arg	*mpa;
+
+	pool_lock();
+	mpa = kmem_zalloc(sizeof (struct mac_pool_arg), KM_SLEEP);
+
+	switch (what) {
+	case POOL_E_ENABLE:
+	case POOL_E_DISABLE:
+		break;
+
+	case POOL_E_CHANGE:
+		pool = pool_lookup_pool_by_id(id);
+		if (pool == NULL) {
+			kmem_free(mpa, sizeof (struct mac_pool_arg));
+			pool_unlock();
+			return;
+		}
+		pool_get_name(pool, &poolname);
+		(void) strlcpy(mpa->mpa_poolname, poolname,
+		    sizeof (mpa->mpa_poolname));
+		break;
+
+	default:
+		kmem_free(mpa, sizeof (struct mac_pool_arg));
+		pool_unlock();
+		return;
+	}
+	pool_unlock();
+
+	mpa->mpa_what = what;
+
+	mac_pool_update(mpa);
+}
+
+/*
+ * Set effective rings property. This could be called from datapath_setup/
+ * datapath_teardown or set-linkprop.
+ * If the group is reserved we just go ahead and set the effective rings.
+ * Additionally, for TX this could mean the default  group has lost/gained
+ * some rings, so if the default group is reserved, we need to adjust the
+ * effective rings for the default group clients. For RX, if we are working
+ * with the non-default group, we just need * to reset the effective props
+ * for the default group clients.
+ */
+void
+mac_set_rings_effective(mac_client_impl_t *mcip)
+{
+	mac_impl_t		*mip = mcip->mci_mip;
+	mac_group_t		*grp;
+	mac_group_t		*defgrp;
+	flow_entry_t		*flent = mcip->mci_flent;
+	mac_resource_props_t	*emrp = MCIP_EFFECTIVE_PROPS(mcip);
+	mac_grp_client_t	*mgcp;
+	mac_client_impl_t	*gmcip;
+
+	grp = flent->fe_rx_ring_group;
+	if (grp != NULL) {
+		defgrp = MAC_DEFAULT_RX_GROUP(mip);
+		/*
+		 * If we have reserved a group, set the effective rings
+		 * to the ring count in the group.
+		 */
+		if (grp->mrg_state == MAC_GROUP_STATE_RESERVED) {
+			emrp->mrp_mask |= MRP_RX_RINGS;
+			emrp->mrp_nrxrings = grp->mrg_cur_count;
+		}
+
+		/*
+		 * We go through the clients in the shared group and
+		 * reset the effective properties. It is possible this
+		 * might have already been done for some client (i.e.
+		 * if some client is being moved to a group that is
+		 * already shared). The case where the default group is
+		 * RESERVED is taken care of above (note in the RX side if
+		 * there is a non-default group, the default group is always
+		 * SHARED).
+		 */
+		if (grp != defgrp || grp->mrg_state == MAC_GROUP_STATE_SHARED) {
+			if (grp->mrg_state == MAC_GROUP_STATE_SHARED)
+				mgcp = grp->mrg_clients;
+			else
+				mgcp = defgrp->mrg_clients;
+			while (mgcp != NULL) {
+				gmcip = mgcp->mgc_client;
+				emrp = MCIP_EFFECTIVE_PROPS(gmcip);
+				if (emrp->mrp_mask & MRP_RX_RINGS) {
+					emrp->mrp_mask &= ~MRP_RX_RINGS;
+					emrp->mrp_nrxrings = 0;
+				}
+				mgcp = mgcp->mgc_next;
+			}
+		}
+	}
+
+	/* Now the TX side */
+	grp = flent->fe_tx_ring_group;
+	if (grp != NULL) {
+		defgrp = MAC_DEFAULT_TX_GROUP(mip);
+
+		if (grp->mrg_state == MAC_GROUP_STATE_RESERVED) {
+			emrp->mrp_mask |= MRP_TX_RINGS;
+			emrp->mrp_ntxrings = grp->mrg_cur_count;
+		} else if (grp->mrg_state == MAC_GROUP_STATE_SHARED) {
+			mgcp = grp->mrg_clients;
+			while (mgcp != NULL) {
+				gmcip = mgcp->mgc_client;
+				emrp = MCIP_EFFECTIVE_PROPS(gmcip);
+				if (emrp->mrp_mask & MRP_TX_RINGS) {
+					emrp->mrp_mask &= ~MRP_TX_RINGS;
+					emrp->mrp_ntxrings = 0;
+				}
+				mgcp = mgcp->mgc_next;
+			}
+		}
+
+		/*
+		 * If the group is not the default group and the default
+		 * group is reserved, the ring count in the default group
+		 * might have changed, update it.
+		 */
+		if (grp != defgrp &&
+		    defgrp->mrg_state == MAC_GROUP_STATE_RESERVED) {
+			gmcip = MAC_GROUP_ONLY_CLIENT(defgrp);
+			emrp = MCIP_EFFECTIVE_PROPS(gmcip);
+			emrp->mrp_ntxrings = defgrp->mrg_cur_count;
+		}
+	}
+	emrp = MCIP_EFFECTIVE_PROPS(mcip);
+}
+
+/*
+ * Check if the primary is in the default group. If so, see if we
+ * can give it a an exclusive group now that another client is
+ * being configured. We take the primary out of the default group
+ * because the multicast/broadcast packets for the all the clients
+ * will land in the default ring in the default group which means
+ * any client in the default group, even if it is the only on in
+ * the group, will lose exclusive access to the rings, hence
+ * polling.
+ */
+mac_client_impl_t *
+mac_check_primary_relocation(mac_client_impl_t *mcip, boolean_t rxhw)
+{
+	mac_impl_t		*mip = mcip->mci_mip;
+	mac_group_t		*defgrp = MAC_DEFAULT_RX_GROUP(mip);
+	flow_entry_t		*flent = mcip->mci_flent;
+	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
+	uint8_t			*mac_addr;
+	mac_group_t		*ngrp;
+
+	/*
+	 * Check if the primary is in the default group, if not
+	 * or if it is explicitly configured to be in the default
+	 * group OR set the RX rings property, return.
+	 */
+	if (flent->fe_rx_ring_group != defgrp || mrp->mrp_mask & MRP_RX_RINGS)
+		return (NULL);
+
+	/*
+	 * If the new client needs an exclusive group and we
+	 * don't have another for the primary, return.
+	 */
+	if (rxhw && mip->mi_rxhwclnt_avail < 2)
+		return (NULL);
+
+	mac_addr = flent->fe_flow_desc.fd_dst_mac;
+	/*
+	 * We call this when we are setting up the datapath for
+	 * the first non-primary.
+	 */
+	ASSERT(mip->mi_nactiveclients == 2);
+	/*
+	 * OK, now we have the primary that needs to be relocated.
+	 */
+	ngrp =  mac_reserve_rx_group(mcip, mac_addr, B_TRUE);
+	if (ngrp == NULL)
+		return (NULL);
+	if (mac_rx_switch_group(mcip, defgrp, ngrp) != 0) {
+		mac_stop_group(ngrp);
+		return (NULL);
+	}
+	return (mcip);
 }

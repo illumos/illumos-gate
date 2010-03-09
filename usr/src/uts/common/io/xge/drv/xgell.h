@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -329,8 +329,8 @@ struct xgell_rx_ring {
 
 	xgell_multi_mac_t	mmac;		/* per group multiple addrs */
 	xgell_rx_buffer_pool_t	bf_pool;	/* per ring buffer pool */
-	int			received_bytes;	/* total received bytes */
-	int			intr_bytes;	/* interrupt received bytes */
+	uint64_t		rx_pkts;	/* total received packets */
+	uint64_t		rx_bytes;	/* total received bytes */
 	int			poll_bytes;	/* bytes to be polled up */
 	int			polled_bytes;	/* total polled bytes */
 	mblk_t			*poll_mp;	/* polled messages */
@@ -344,7 +344,8 @@ struct xgell_tx_ring {
 	xge_hal_channel_h	channelh;	/* hardware channel */
 	xgelldev_t		*lldev;		/* driver device */
 	mac_ring_handle_t	ring_handle;	/* call back ring handle */
-	int			sent_bytes;	/* bytes sent though the ring */
+	uint64_t		tx_pkts;	/* packets sent */
+	uint64_t		tx_bytes;	/* bytes sent though the ring */
 
 	boolean_t		need_resched;
 };
@@ -418,8 +419,9 @@ void xge_disable_intrs(xgelldev_t *lldev);
 
 void xge_rem_intrs(xgelldev_t *lldev);
 
+int xgell_rx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val);
 
-
+int xgell_tx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val);
 
 #ifdef __cplusplus
 }

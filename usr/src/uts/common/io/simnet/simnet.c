@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,10 +109,12 @@ static mblk_t *simnet_m_tx(void *, mblk_t *);
 static int simnet_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int simnet_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+    uint_t, void *);
+static void simnet_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 
 static mac_callbacks_t simnet_m_callbacks = {
-	(MC_IOCTL | MC_SETPROP | MC_GETPROP),
+	(MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO),
 	simnet_m_stat,
 	simnet_m_start,
 	simnet_m_stop,
@@ -120,12 +122,14 @@ static mac_callbacks_t simnet_m_callbacks = {
 	simnet_m_multicst,
 	simnet_m_unicst,
 	simnet_m_tx,
+	NULL,
 	simnet_m_ioctl,
 	NULL,
 	NULL,
 	NULL,
 	simnet_m_setprop,
-	simnet_m_getprop
+	simnet_m_getprop,
+	simnet_m_propinfo
 };
 
 /*
@@ -1228,17 +1232,16 @@ simnet_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 }
 
 static int
-simnet_get_priv_prop(simnet_dev_t *sdev, const char *pr_name, uint_t pr_flags,
+simnet_get_priv_prop(simnet_dev_t *sdev, const char *pr_name,
     uint_t pr_valsize, void *pr_val)
 {
 	simnet_wifidev_t *wdev = sdev->sd_wifidev;
-	boolean_t is_default = ((pr_flags & MAC_PROP_DEFAULT) != 0);
 	int err = 0;
 	int value;
 
 	if (strcmp(pr_name, "_wl_esslist") == 0) {
 		/* Returns num of _wl_ess_conf_t that have been set */
-		value = (is_default ? 0:wdev->swd_esslist_num);
+		value = wdev->swd_esslist_num;
 	} else if (strcmp(pr_name, "_wl_connected") == 0) {
 		value = ((wdev->swd_linkstatus == WL_CONNECTED) ? 1:0);
 	} else {
@@ -1252,7 +1255,7 @@ simnet_get_priv_prop(simnet_dev_t *sdev, const char *pr_name, uint_t pr_flags,
 
 static int
 simnet_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	simnet_dev_t *sdev = arg;
 	simnet_wifidev_t *wdev = sdev->sd_wifidev;
@@ -1276,9 +1279,6 @@ simnet_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	case MAC_PROP_WL_AUTH_MODE:
 	case MAC_PROP_WL_ENCRYPTION:
 		break;
-	case MAC_PROP_WL_BSSTYPE:
-		*perm = MAC_PROP_PERM_READ;
-		break;
 	case MAC_PROP_WL_LINKSTATUS:
 		(void) memcpy(wldp_buf, &wdev->swd_linkstatus,
 		    sizeof (wdev->swd_linkstatus));
@@ -1286,7 +1286,6 @@ simnet_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	case MAC_PROP_WL_ESS_LIST: {
 		wl_ess_conf_t *w_ess_conf;
 
-		*perm = MAC_PROP_PERM_READ;
 		((wl_ess_list_t *)wldp_buf)->wl_ess_list_num =
 		    wdev->swd_esslist_num;
 		/* LINTED E_BAD_PTR_CAST_ALIGN */
@@ -1299,11 +1298,7 @@ simnet_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 		}
 		break;
 	}
-	case MAC_PROP_WL_SUPPORTED_RATES:
-		*perm = MAC_PROP_PERM_READ;
-		break;
 	case MAC_PROP_WL_RSSI:
-		*perm = MAC_PROP_PERM_READ;
 		*(wl_rssi_t *)wldp_buf = wdev->swd_rssi;
 		break;
 	case MAC_PROP_WL_RADIO:
@@ -1314,8 +1309,8 @@ simnet_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	case MAC_PROP_WL_DESIRED_RATES:
 		break;
 	case MAC_PROP_PRIVATE:
-		err = simnet_get_priv_prop(sdev, pr_name, pr_flags,
-		    wldp_length, wldp_buf);
+		err = simnet_get_priv_prop(sdev, pr_name, wldp_length,
+		    wldp_buf);
 		break;
 	default:
 		err = ENOTSUP;
@@ -1323,4 +1318,41 @@ simnet_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	}
 
 	return (err);
+}
+
+static void
+simnet_priv_propinfo(const char *pr_name, mac_prop_info_handle_t prh)
+{
+	char valstr[MAXNAMELEN];
+
+	bzero(valstr, sizeof (valstr));
+
+	if (strcmp(pr_name, "_wl_esslist") == 0) {
+		(void) snprintf(valstr, sizeof (valstr), "%d", 0);
+	}
+
+	if (strlen(valstr) > 0)
+		mac_prop_info_set_default_str(prh, valstr);
+}
+
+static void
+simnet_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    mac_prop_info_handle_t prh)
+{
+	simnet_dev_t *sdev = arg;
+
+	if (sdev->sd_type == DL_ETHER)
+		return;
+
+	switch (wldp_pr_num) {
+	case MAC_PROP_WL_BSSTYPE:
+	case MAC_PROP_WL_ESS_LIST:
+	case MAC_PROP_WL_SUPPORTED_RATES:
+	case MAC_PROP_WL_RSSI:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+	case MAC_PROP_PRIVATE:
+		simnet_priv_propinfo(pr_name, prh);
+		break;
+	}
 }

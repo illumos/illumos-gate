@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -362,8 +362,7 @@ nge_send_copy(nge_t *ngep, mblk_t *mp, send_ring_t *srp)
 	sw_tx_sbd_t *ssbdp;
 	boolean_t tfint;
 
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL,
-	    NULL, NULL, &flags);
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &flags);
 	bds = 0x1;
 
 	if ((uint32_t)-1 == (start_index = nge_tx_alloc(ngep, bds)))
@@ -476,7 +475,7 @@ nge_send_mapped(nge_t *ngep, mblk_t *mp, size_t fragno)
 	slot = 0;
 	dmah = dmah_list.head;
 
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &flags);
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &flags);
 
 	for (bp = mp; bp != NULL; bp = bp->b_cont)	{
 

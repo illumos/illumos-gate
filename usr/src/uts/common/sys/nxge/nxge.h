@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -601,6 +601,8 @@ typedef struct _nxge_ring_handle_t {
 	p_nxge_t		nxgep;
 	int			index;		/* port-wise */
 	mac_ring_handle_t	ring_handle;
+	uint64_t		ring_gen_num;	/* For RX Ring Start */
+	uint32_t		channel;
 } nxge_ring_handle_t, *p_nxge_ring_handle_t;
 
 /*
@@ -790,8 +792,6 @@ struct _nxge_t {
 	nxge_grp_set_t		rx_set;
 	nxge_grp_set_t		tx_set;
 	boolean_t		tdc_is_shared[NXGE_MAX_TDCS];
-
-	boolean_t		rx_channel_started[NXGE_MAX_RDCS];
 
 	/* Ring Handles */
 	nxge_ring_handle_t	tx_ring_handles[NXGE_MAX_TDCS];

@@ -514,18 +514,17 @@ ixgbe_rx_assoc_hcksum(mblk_t *mp, uint32_t status_error)
 	 */
 	if ((status_error & IXGBE_RXD_STAT_L4CS) &&
 	    !(status_error & IXGBE_RXDADV_ERR_TCPE))
-		hcksum_flags |= HCK_FULLCKSUM | HCK_FULLCKSUM_OK;
+		hcksum_flags |= HCK_FULLCKSUM_OK;
 
 	/*
 	 * Check IP Checksum
 	 */
 	if ((status_error & IXGBE_RXD_STAT_IPCS) &&
 	    !(status_error & IXGBE_RXDADV_ERR_IPE))
-		hcksum_flags |= HCK_IPV4_HDRCKSUM;
+		hcksum_flags |= HCK_IPV4_HDRCKSUM_OK;
 
 	if (hcksum_flags != 0) {
-		(void) hcksum_assoc(mp,
-		    NULL, NULL, 0, 0, 0, 0, hcksum_flags, 0);
+		mac_hcksum_set(mp, 0, 0, 0, 0, hcksum_flags);
 	}
 }
 
@@ -722,6 +721,9 @@ rx_discard:
 		status_error = current_rbd->wb.upper.status_error;
 	}
 
+	rx_ring->stat_rbytes += received_bytes;
+	rx_ring->stat_ipackets += pkt_num;
+
 	DMA_SYNC(&rx_data->rbd_area, DDI_DMA_SYNC_FORDEV);
 
 	rx_data->rbd_next = rx_next;
@@ -735,7 +737,7 @@ rx_discard:
 	} else
 		rx_tail = PREV_INDEX(rx_next, 1, rx_data->ring_size);
 
-	IXGBE_WRITE_REG(&ixgbe->hw, IXGBE_RDT(rx_ring->index), rx_tail);
+	IXGBE_WRITE_REG(&ixgbe->hw, IXGBE_RDT(rx_ring->hw_index), rx_tail);
 
 	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);

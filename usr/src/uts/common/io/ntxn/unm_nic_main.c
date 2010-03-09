@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <sys/types.h>
@@ -649,8 +649,7 @@ unm_tx_csum(cmdDescType0_t *desc, mblk_t *mp, pktinfo_t *pktinfo)
 	if (pktinfo->etype == htons(ETHERTYPE_IP)) {
 		uint32_t	start, flags;
 
-		hcksum_retrieve(mp, NULL, NULL, &start, NULL, NULL, NULL,
-		    &flags);
+		mac_hcksum_get(mp, &start, NULL, NULL, NULL, &flags);
 		if ((flags & (HCK_FULLCKSUM | HCK_IPV4_HDRCKSUM)) == 0)
 			return;
 
@@ -1306,11 +1305,11 @@ unm_process_rcv(unm_adapter *adapter, statusDesc_t *desc)
 	if (desc->u1.s1.status == STATUS_CKSUM_OK) {
 		adapter->stats.csummed++;
 		cksum_flags =
-		    HCK_FULLCKSUM_OK | HCK_IPV4_HDRCKSUM | HCK_FULLCKSUM;
+		    HCK_FULLCKSUM_OK | HCK_IPV4_HDRCKSUM_OK;
 	} else {
 		cksum_flags = 0;
 	}
-	(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0, cksum_flags, 0);
+	mac_hcksum_set(mp, 0, 0, 0, 0, cksum_flags);
 
 	adapter->stats.no_rcv++;
 	adapter->stats.rxbytes += pkt_length;
@@ -2533,9 +2532,7 @@ static mac_callbacks_t ntxn_m_callbacks = {
 	ntxn_m_multicst,
 	ntxn_m_unicst,
 	ntxn_m_tx,
-#ifndef SOLARIS11
-	NULL,			/* mc_resources */
-#endif
+	NULL,			/* mc_reserved */
 	ntxn_m_ioctl,
 	ntxn_m_getcapab,
 	NULL,			/* mc_open */

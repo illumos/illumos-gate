@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -314,6 +314,7 @@ static mac_callbacks_t dnet_m_callbacks = {
 	dnet_m_multicst,	/* mc_multicst */
 	dnet_m_unicst,		/* mc_unicst */
 	dnet_m_tx,		/* mc_tx */
+	NULL,
 	NULL,			/* mc_ioctl */
 	NULL,			/* mc_getcapab */
 	NULL,			/* mc_open */

@@ -287,11 +287,11 @@ rge_receive_packet(rge_t *rgep, uint32_t slot)
 	proto = rx_status & RBD_FLAG_PROTOCOL;
 	if ((proto == RBD_FLAG_TCP && !(rx_status & RBD_TCP_CKSUM_ERR)) ||
 	    (proto == RBD_FLAG_UDP && !(rx_status & RBD_UDP_CKSUM_ERR)))
-		pflags |= HCK_FULLCKSUM | HCK_FULLCKSUM_OK;
+		pflags |= HCK_FULLCKSUM_OK;
 	if (proto != RBD_FLAG_NONE_IP && !(rx_status & RBD_IP_CKSUM_ERR))
-		pflags |= HCK_IPV4_HDRCKSUM;
+		pflags |= HCK_IPV4_HDRCKSUM_OK;
 	if (pflags != 0)  {
-		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0, pflags, 0);
+		mac_hcksum_set(mp, 0, 0, 0, 0, pflags);
 	}
 
 	return (mp);
@@ -574,7 +574,7 @@ rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci)
 	/*
 	 * h/w checksum offload flags
 	 */
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &pflags);
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &pflags);
 	if (pflags & HCK_FULLCKSUM) {
 		ASSERT(totlen >= sizeof (struct ether_header) +
 		    sizeof (struct ip));

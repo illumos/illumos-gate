@@ -84,9 +84,11 @@ static int elxl_m_promisc(void *, boolean_t);
 static int elxl_m_multicst(void *, boolean_t, const uint8_t *);
 static int elxl_m_unicst(void *, const uint8_t *);
 static int elxl_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
-    uint_t, void *, uint_t *);
+    void *);
 static int elxl_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
+static void elxl_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 static boolean_t elxl_m_getcapab(void *, mac_capab_t cap, void *);
 static uint_t elxl_intr(caddr_t, caddr_t);
 static void elxl_error(elxl_t *, char *, ...);
@@ -198,9 +200,10 @@ static const struct ex_product {
 	{ 0, NULL, 0 },
 };
 
-mac_priv_prop_t ex_priv_prop[] = {
-	{ "_media", MAC_PROP_PERM_RW },
-	{ "_available_media", MAC_PROP_PERM_READ },
+static char *ex_priv_prop[] = {
+	"_media",
+	"_available_media",
+	NULL
 };
 
 static mii_ops_t ex_mii_ops = {
@@ -211,7 +214,7 @@ static mii_ops_t ex_mii_ops = {
 };
 
 static mac_callbacks_t elxl_m_callbacks = {
-	MC_GETCAPAB | MC_SETPROP | MC_GETPROP,
+	MC_GETCAPAB | MC_PROPERTIES,
 	elxl_m_stat,
 	elxl_m_start,
 	elxl_m_stop,
@@ -220,11 +223,13 @@ static mac_callbacks_t elxl_m_callbacks = {
 	elxl_m_unicst,
 	elxl_m_tx,
 	NULL,
+	NULL,
 	elxl_m_getcapab,
 	NULL,
 	NULL,
 	elxl_m_setprop,
-	elxl_m_getprop
+	elxl_m_getprop,
+	elxl_m_propinfo
 };
 
 /*
@@ -575,7 +580,6 @@ elxl_attach(dev_info_t *dip)
 	macp->m_max_sdu = ETHERMTU;
 	macp->m_margin = VLAN_TAGSZ;
 	macp->m_priv_props = ex_priv_prop;
-	macp->m_priv_prop_count = 2;
 
 	(void) ddi_intr_enable(sc->ex_intrh);
 
@@ -1387,38 +1391,32 @@ elxl_m_getcapab(void *arg, mac_capab_t cap, void *data)
 }
 
 static int
-elxl_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
-    uint_t sz, void *val, uint_t *perm)
+elxl_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    void *val)
 {
 	elxl_t		*sc = arg;
 	int		rv;
-	boolean_t	isdef = (flags & MAC_PROP_DEFAULT);
 
 	if (sc->ex_mii_active) {
-		rv = mii_m_getprop(sc->ex_miih, name, num, flags, sz,
-		    val, perm);
+		rv = mii_m_getprop(sc->ex_miih, name, num, sz, val);
 		if (rv != ENOTSUP)
 			return (rv);
 	}
 
 	switch (num) {
 	case MAC_PROP_DUPLEX:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val = isdef ? LINK_DUPLEX_HALF : sc->ex_duplex;
+		*(uint8_t *)val = sc->ex_duplex;
 		break;
 	case MAC_PROP_SPEED:
-		*perm = MAC_PROP_PERM_READ;
 		*(uint8_t *)val = sc->ex_speed;
 		break;
 	case MAC_PROP_STATUS:
-		*perm  = MAC_PROP_PERM_READ;
 		bcopy(&sc->ex_link, val, sizeof (link_state_t));
 		break;
 
 	case MAC_PROP_PRIVATE:
 		if (strcmp(name, "_media") == 0) {
 			char *str;
-			*perm = MAC_PROP_PERM_RW;
 
 			switch (sc->ex_xcvr) {
 			case XCVR_SEL_AUTO:
@@ -1456,7 +1454,6 @@ elxl_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 		 * MAC_PROP_POSSIBLE with private properties.)
 		 */
 		if (strcmp(name, "_available_media") == 0) {
-			*perm = MAC_PROP_PERM_READ;
 			(void) snprintf(val, sz, "%s", sc->ex_medias);
 			return (0);
 		}
@@ -1575,6 +1572,29 @@ reset:
 	mutex_exit(&sc->ex_txlock);
 	mutex_exit(&sc->ex_intrlock);
 	return (0);
+}
+
+static void
+elxl_m_propinfo(void *arg, const char *name, mac_prop_id_t num,
+    mac_prop_info_handle_t prh)
+{
+	elxl_t		*sc = arg;
+
+	if (sc->ex_mii_active)
+		mii_m_propinfo(sc->ex_miih, name, num, prh);
+
+	switch (num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_STATUS:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_PRIVATE:
+		if (strcmp(name, "_available_media") == 0)
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+	}
 }
 
 static int

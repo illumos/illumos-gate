@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,9 +119,11 @@ static int	afe_m_stat(void *, uint_t, uint64_t *);
 static int	afe_m_start(void *);
 static void	afe_m_stop(void *);
 static int	afe_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
-    uint_t, void *, uint_t *);
+    void *);
 static int	afe_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
+static void	afe_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 static unsigned	afe_intr(caddr_t);
 static void	afe_startmac(afe_t *);
 static void	afe_stopmac(afe_t *);
@@ -173,7 +175,7 @@ static mii_ops_t afe_mii_ops = {
 };
 
 static mac_callbacks_t afe_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	afe_m_stat,
 	afe_m_start,
 	afe_m_stop,
@@ -181,12 +183,14 @@ static mac_callbacks_t afe_m_callbacks = {
 	afe_m_multicst,
 	afe_m_unicst,
 	afe_m_tx,
+	NULL,
 	afe_m_ioctl,	/* mc_ioctl */
 	NULL,		/* mc_getcapab */
 	NULL,		/* mc_open */
 	NULL,		/* mc_close */
 	afe_m_setprop,
 	afe_m_getprop,
+	afe_m_propinfo
 };
 
 
@@ -2372,12 +2376,12 @@ afe_m_stat(void *arg, uint_t stat, uint64_t *val)
 }
 
 int
-afe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
-    uint_t sz, void *val, uint_t *perm)
+afe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    void *val)
 {
 	afe_t		*afep = arg;
 
-	return (mii_m_getprop(afep->afe_mii, name, num, flags, sz, val, perm));
+	return (mii_m_getprop(afep->afe_mii, name, num, sz, val));
 }
 
 int
@@ -2387,6 +2391,15 @@ afe_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
 	afe_t		*afep = arg;
 
 	return (mii_m_setprop(afep->afe_mii, name, num, sz, val));
+}
+
+static void
+afe_m_propinfo(void *arg, const char *name, mac_prop_id_t num,
+    mac_prop_info_handle_t prh)
+{
+	afe_t		*afep = arg;
+
+	mii_m_propinfo(afep->afe_mii, name, num, prh);
 }
 
 /*

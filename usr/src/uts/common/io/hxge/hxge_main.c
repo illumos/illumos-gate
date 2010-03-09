@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,28 +146,29 @@ static boolean_t hxge_param_locked(mac_prop_id_t pr_num);
 static int hxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, const void *pr_val);
 static int hxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *);
-static int hxge_get_def_val(hxge_t *hxgep, mac_prop_id_t pr_num,
     uint_t pr_valsize, void *pr_val);
+static void hxge_m_propinfo(void *barg, const char *pr_name,
+    mac_prop_id_t pr_num, mac_prop_info_handle_t mph);
 static int hxge_set_priv_prop(p_hxge_t hxgep, const char *pr_name,
     uint_t pr_valsize, const void *pr_val);
 static int hxge_get_priv_prop(p_hxge_t hxgep, const char *pr_name,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val);
+    uint_t pr_valsize, void *pr_val);
 static void hxge_link_poll(void *arg);
 static void hxge_link_update(p_hxge_t hxge, link_state_t state);
 static void hxge_msix_init(p_hxge_t hxgep);
 
-mac_priv_prop_t hxge_priv_props[] = {
-	{"_rxdma_intr_time", MAC_PROP_PERM_RW},
-	{"_rxdma_intr_pkts", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv4_tcp", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv4_udp", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv4_ah", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv4_sctp", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv6_tcp", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv6_udp", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv6_ah", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv6_sctp", MAC_PROP_PERM_RW}
+char *hxge_priv_props[] = {
+	"_rxdma_intr_time",
+	"_rxdma_intr_pkts",
+	"_class_opt_ipv4_tcp",
+	"_class_opt_ipv4_udp",
+	"_class_opt_ipv4_ah",
+	"_class_opt_ipv4_sctp",
+	"_class_opt_ipv6_tcp",
+	"_class_opt_ipv6_udp",
+	"_class_opt_ipv6_ah",
+	"_class_opt_ipv6_sctp",
+	NULL
 };
 
 #define	HXGE_MAX_PRIV_PROPS	\
@@ -177,7 +178,7 @@ mac_priv_prop_t hxge_priv_props[] = {
 #define	MAX_DUMP_SZ 256
 
 #define	HXGE_M_CALLBACK_FLAGS	\
-	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO)
 
 extern hxge_status_t hxge_pfc_set_default_mac_addr(p_hxge_t hxgep);
 
@@ -190,12 +191,14 @@ static mac_callbacks_t hxge_m_callbacks = {
 	hxge_m_multicst,
 	NULL,
 	NULL,
+	NULL,
 	hxge_m_ioctl,
 	hxge_m_getcapab,
 	NULL,
 	NULL,
 	hxge_m_setprop,
-	hxge_m_getprop
+	hxge_m_getprop,
+	hxge_m_propinfo
 };
 
 /* PSARC/2007/453 MSI-X interrupt limit override. */
@@ -2935,6 +2938,41 @@ hxge_group_get(void *arg, mac_ring_type_t type, int groupid,
 	}
 }
 
+static int
+hxge_ring_get_htable_idx(p_hxge_t hxgep, mac_ring_type_t type, uint32_t channel)
+{
+	int i;
+
+	ASSERT(hxgep->ldgvp != NULL);
+
+	switch (type) {
+	case MAC_RING_TYPE_RX:
+		for (i = 0; i < hxgep->ldgvp->maxldvs; i++) {
+			if ((hxgep->ldgvp->ldvp[i].is_rxdma) &&
+			    (hxgep->ldgvp->ldvp[i].channel == channel)) {
+				return ((int)
+				    hxgep->ldgvp->ldvp[i].ldgp->htable_idx);
+			}
+		}
+		break;
+
+	case MAC_RING_TYPE_TX:
+		for (i = 0; i < hxgep->ldgvp->maxldvs; i++) {
+			if ((hxgep->ldgvp->ldvp[i].is_txdma) &&
+			    (hxgep->ldgvp->ldvp[i].channel == channel)) {
+				return ((int)
+				    hxgep->ldgvp->ldvp[i].ldgp->htable_idx);
+			}
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	return (-1);
+}
+
 /*
  * Callback function for the GLDv3 layer to register all rings.
  */
@@ -2945,9 +2983,15 @@ hxge_fill_ring(void *arg, mac_ring_type_t type, const int rg_index,
 {
 	p_hxge_t	hxgep = arg;
 
+	ASSERT(hxgep != NULL);
+	ASSERT(infop != NULL);
+
 	switch (type) {
 	case MAC_RING_TYPE_TX: {
 		p_hxge_ring_handle_t	rhp;
+		mac_intr_t		*mintr = &infop->mri_intr;
+		p_hxge_intr_t		intrp;
+		int			htable_idx;
 
 		ASSERT((index >= 0) && (index < HXGE_MAX_TDCS));
 		rhp = &hxgep->tx_ring_handles[index];
@@ -2958,11 +3002,22 @@ hxge_fill_ring(void *arg, mac_ring_type_t type, const int rg_index,
 		infop->mri_start = hxge_tx_ring_start;
 		infop->mri_stop = hxge_tx_ring_stop;
 		infop->mri_tx = hxge_tx_ring_send;
+		infop->mri_stat = hxge_tx_ring_stat;
+
+		intrp = (p_hxge_intr_t)&hxgep->hxge_intr_type;
+		htable_idx = hxge_ring_get_htable_idx(hxgep, type, index);
+		if (htable_idx >= 0)
+			mintr->mi_ddi_handle = intrp->htable[htable_idx];
+		else
+			mintr->mi_ddi_handle = NULL;
 		break;
 	}
+
 	case MAC_RING_TYPE_RX: {
 		p_hxge_ring_handle_t    rhp;
 		mac_intr_t		hxge_mac_intr;
+		p_hxge_intr_t		intrp;
+		int			htable_idx;
 
 		ASSERT((index >= 0) && (index < HXGE_MAX_RDCS));
 		rhp = &hxgep->rx_ring_handles[index];
@@ -2975,17 +3030,25 @@ hxge_fill_ring(void *arg, mac_ring_type_t type, const int rg_index,
 		 * disable interrupt (enable poll).
 		 */
 		hxge_mac_intr.mi_handle = (mac_intr_handle_t)rhp;
-		hxge_mac_intr.mi_enable =
-		    (mac_intr_enable_t)hxge_disable_poll;
-		hxge_mac_intr.mi_disable =
-		    (mac_intr_disable_t)hxge_enable_poll;
+		hxge_mac_intr.mi_enable = (mac_intr_enable_t)hxge_disable_poll;
+		hxge_mac_intr.mi_disable = (mac_intr_disable_t)hxge_enable_poll;
+
+		intrp = (p_hxge_intr_t)&hxgep->hxge_intr_type;
+		htable_idx = hxge_ring_get_htable_idx(hxgep, type, index);
+		if (htable_idx >= 0)
+			hxge_mac_intr.mi_ddi_handle = intrp->htable[htable_idx];
+		else
+			hxge_mac_intr.mi_ddi_handle = NULL;
+
 		infop->mri_driver = (mac_ring_driver_t)rhp;
 		infop->mri_start = hxge_rx_ring_start;
 		infop->mri_stop = hxge_rx_ring_stop;
 		infop->mri_intr = hxge_mac_intr;
 		infop->mri_poll = hxge_rx_poll;
+		infop->mri_stat = hxge_rx_ring_stat;
 		break;
 	}
+
 	default:
 		break;
 	}
@@ -3186,37 +3249,9 @@ hxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	return (err);
 }
 
-/* ARGSUSED */
-static int
-hxge_get_def_val(hxge_t *hxgep, mac_prop_id_t pr_num, uint_t pr_valsize,
-    void *pr_val)
-{
-	int		err = 0;
-	link_flowctrl_t	fl;
-
-	switch (pr_num) {
-	case MAC_PROP_DUPLEX:
-		*(uint8_t *)pr_val = 2;
-		break;
-	case MAC_PROP_AUTONEG:
-		*(uint8_t *)pr_val = 0;
-		break;
-	case MAC_PROP_FLOWCTRL:
-		if (pr_valsize < sizeof (link_flowctrl_t))
-			return (EINVAL);
-		fl = LINK_FLOWCTRL_TX;
-		bcopy(&fl, pr_val, sizeof (fl));
-		break;
-	default:
-		err = ENOTSUP;
-		break;
-	}
-	return (err);
-}
-
 static int
 hxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	hxge_t 		*hxgep = barg;
 	p_hxge_stats_t	statsp = hxgep->statsp;
@@ -3228,20 +3263,8 @@ hxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	HXGE_DEBUG_MSG((hxgep, DLADM_CTL,
 	    "==> hxge_m_getprop: pr_num %d", pr_num));
 
-	if (pr_valsize == 0)
-		return (EINVAL);
-
-	*perm = MAC_PROP_PERM_RW;
-
-	if ((pr_flags & MAC_PROP_DEFAULT) && (pr_num != MAC_PROP_PRIVATE)) {
-		err = hxge_get_def_val(hxgep, pr_num, pr_valsize, pr_val);
-		return (err);
-	}
-
-	bzero(pr_val, pr_valsize);
 	switch (pr_num) {
 		case MAC_PROP_DUPLEX:
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = statsp->mac_stats.link_duplex;
 			HXGE_DEBUG_MSG((hxgep, DLADM_CTL,
 			    "==> hxge_m_getprop: duplex mode %d",
@@ -3249,17 +3272,13 @@ hxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 
 		case MAC_PROP_SPEED:
-			*perm = MAC_PROP_PERM_READ;
-			if (pr_valsize < sizeof (uint64_t))
-				return (EINVAL);
+			ASSERT(pr_valsize >= sizeof (uint64_t));
 			tmp = statsp->mac_stats.link_speed * 1000000ull;
 			bcopy(&tmp, pr_val, sizeof (tmp));
 			break;
 
 		case MAC_PROP_STATUS:
-			*perm = MAC_PROP_PERM_READ;
-			if (pr_valsize < sizeof (link_state_t))
-				return (EINVAL);
+			ASSERT(pr_valsize >= sizeof (link_state_t));
 			if (!statsp->mac_stats.link_up)
 				ls = LINK_STATE_DOWN;
 			else
@@ -3272,15 +3291,12 @@ hxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			 * Flow control is supported by the shared domain and
 			 * it is currently transmit only
 			 */
-			*perm = MAC_PROP_PERM_READ;
-			if (pr_valsize < sizeof (link_flowctrl_t))
-				return (EINVAL);
+			ASSERT(pr_valsize < sizeof (link_flowctrl_t));
 			fl = LINK_FLOWCTRL_TX;
 			bcopy(&fl, pr_val, sizeof (fl));
 			break;
 		case MAC_PROP_AUTONEG:
 			/* 10G link only and it is not negotiable */
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = 0;
 			break;
 		case MAC_PROP_ADV_1000FDX_CAP:
@@ -3299,25 +3315,10 @@ hxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 
 		case MAC_PROP_PRIVATE:
-			err = hxge_get_priv_prop(hxgep, pr_name, pr_flags,
-			    pr_valsize, pr_val);
+			err = hxge_get_priv_prop(hxgep, pr_name, pr_valsize,
+			    pr_val);
 			break;
-		case MAC_PROP_MTU: {
-			mac_propval_range_t range;
 
-			if (!(pr_flags & MAC_PROP_POSSIBLE))
-				return (ENOTSUP);
-			if (pr_valsize < sizeof (mac_propval_range_t))
-				return (EINVAL);
-			range.mpr_count = 1;
-			range.mpr_type = MAC_PROPVAL_UINT32;
-			range.range_uint32[0].mpur_min = MIN_FRAME_SIZE -
-			    MTU_TO_FRAME_SIZE;
-			range.range_uint32[0].mpur_max = MAX_FRAME_SIZE -
-			    MTU_TO_FRAME_SIZE;
-			bcopy(&range, pr_val, sizeof (range));
-			break;
-		}
 		default:
 			err = EINVAL;
 			break;
@@ -3327,6 +3328,60 @@ hxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 
 	return (err);
 }
+
+static void
+hxge_m_propinfo(void *arg, const char *pr_name,
+    mac_prop_id_t pr_num, mac_prop_info_handle_t prh)
+{
+	_NOTE(ARGUNUSED(arg));
+	switch (pr_num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_STATUS:
+	case MAC_PROP_AUTONEG:
+	case MAC_PROP_FLOWCTRL:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_MTU:
+		mac_prop_info_set_range_uint32(prh,
+		    MIN_FRAME_SIZE - MTU_TO_FRAME_SIZE,
+		    MAX_FRAME_SIZE - MTU_TO_FRAME_SIZE);
+		break;
+
+	case MAC_PROP_PRIVATE: {
+		char valstr[MAXNAMELEN];
+
+		bzero(valstr, sizeof (valstr));
+
+		/* Receive Interrupt Blanking Parameters */
+		if (strcmp(pr_name, "_rxdma_intr_time") == 0) {
+			(void) snprintf(valstr, sizeof (valstr), "%d",
+			    RXDMA_RCR_TO_DEFAULT);
+		} else if (strcmp(pr_name, "_rxdma_intr_pkts") == 0) {
+			(void) snprintf(valstr, sizeof (valstr), "%d",
+			    RXDMA_RCR_PTHRES_DEFAULT);
+
+		/* Classification and Load Distribution Configuration */
+		} else if (strcmp(pr_name, "_class_opt_ipv4_tcp") == 0 ||
+		    strcmp(pr_name, "_class_opt_ipv4_udp") == 0 ||
+		    strcmp(pr_name, "_class_opt_ipv4_ah") == 0 ||
+		    strcmp(pr_name, "_class_opt_ipv4_sctp") == 0 ||
+		    strcmp(pr_name, "_class_opt_ipv6_tcp") == 0 ||
+		    strcmp(pr_name, "_class_opt_ipv6_udp") == 0 ||
+		    strcmp(pr_name, "_class_opt_ipv6_ah") == 0 ||
+		    strcmp(pr_name, "_class_opt_ipv6_sctp") == 0) {
+			(void) snprintf(valstr, sizeof (valstr), "%d",
+			    HXGE_CLASS_TCAM_LOOKUP);
+		}
+
+		if (strlen(valstr) > 0)
+			mac_prop_info_set_default_str(prh, valstr);
+		break;
+	}
+	}
+}
+
 
 /* ARGSUSED */
 static int
@@ -3387,8 +3442,8 @@ hxge_set_priv_prop(p_hxge_t hxgep, const char *pr_name, uint_t pr_valsize,
 }
 
 static int
-hxge_get_priv_prop(p_hxge_t hxgep, const char *pr_name, uint_t pr_flags,
-    uint_t pr_valsize, void *pr_val)
+hxge_get_priv_prop(p_hxge_t hxgep, const char *pr_name, uint_t pr_valsize,
+    void *pr_val)
 {
 	p_hxge_param_t	param_arr = hxgep->param_arr;
 	char		valstr[MAXNAMELEN];
@@ -3399,77 +3454,55 @@ hxge_get_priv_prop(p_hxge_t hxgep, const char *pr_name, uint_t pr_flags,
 	HXGE_DEBUG_MSG((hxgep, DLADM_CTL,
 	    "==> hxge_get_priv_prop: property %s", pr_name));
 
-	if (pr_flags & MAC_PROP_DEFAULT) {
-		/* Receive Interrupt Blanking Parameters */
-		if (strcmp(pr_name, "_rxdma_intr_time") == 0) {
-			value = RXDMA_RCR_TO_DEFAULT;
-		} else if (strcmp(pr_name, "_rxdma_intr_pkts") == 0) {
-			value = RXDMA_RCR_PTHRES_DEFAULT;
+	/* Receive Interrupt Blanking Parameters */
+	if (strcmp(pr_name, "_rxdma_intr_time") == 0) {
+		value = hxgep->intr_timeout;
+	} else if (strcmp(pr_name, "_rxdma_intr_pkts") == 0) {
+		value = hxgep->intr_threshold;
 
-		/* Classification and Load Distribution Configuration */
-		} else if (strcmp(pr_name, "_class_opt_ipv4_tcp") == 0 ||
-		    strcmp(pr_name, "_class_opt_ipv4_udp") == 0 ||
-		    strcmp(pr_name, "_class_opt_ipv4_ah") == 0 ||
-		    strcmp(pr_name, "_class_opt_ipv4_sctp") == 0 ||
-		    strcmp(pr_name, "_class_opt_ipv6_tcp") == 0 ||
-		    strcmp(pr_name, "_class_opt_ipv6_udp") == 0 ||
-		    strcmp(pr_name, "_class_opt_ipv6_ah") == 0 ||
-		    strcmp(pr_name, "_class_opt_ipv6_sctp") == 0) {
-			value = HXGE_CLASS_TCAM_LOOKUP;
-		} else {
-			err = EINVAL;
-		}
+	/* Classification and Load Distribution Configuration */
+	} else if (strcmp(pr_name, "_class_opt_ipv4_tcp") == 0) {
+		err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
+		    (caddr_t)&param_arr[param_class_opt_ipv4_tcp]);
+
+		value = (int)param_arr[param_class_opt_ipv4_tcp].value;
+	} else if (strcmp(pr_name, "_class_opt_ipv4_udp") == 0) {
+		err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
+		    (caddr_t)&param_arr[param_class_opt_ipv4_udp]);
+
+		value = (int)param_arr[param_class_opt_ipv4_udp].value;
+	} else if (strcmp(pr_name, "_class_opt_ipv4_ah") == 0) {
+		err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
+		    (caddr_t)&param_arr[param_class_opt_ipv4_ah]);
+
+		value = (int)param_arr[param_class_opt_ipv4_ah].value;
+	} else if (strcmp(pr_name, "_class_opt_ipv4_sctp") == 0) {
+		err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
+		    (caddr_t)&param_arr[param_class_opt_ipv4_sctp]);
+
+		value = (int)param_arr[param_class_opt_ipv4_sctp].value;
+	} else if (strcmp(pr_name, "_class_opt_ipv6_tcp") == 0) {
+		err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
+		    (caddr_t)&param_arr[param_class_opt_ipv6_tcp]);
+
+		value = (int)param_arr[param_class_opt_ipv6_tcp].value;
+	} else if (strcmp(pr_name, "_class_opt_ipv6_udp") == 0) {
+		err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
+		    (caddr_t)&param_arr[param_class_opt_ipv6_udp]);
+
+		value = (int)param_arr[param_class_opt_ipv6_udp].value;
+	} else if (strcmp(pr_name, "_class_opt_ipv6_ah") == 0) {
+		err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
+		    (caddr_t)&param_arr[param_class_opt_ipv6_ah]);
+
+		value = (int)param_arr[param_class_opt_ipv6_ah].value;
+	} else if (strcmp(pr_name, "_class_opt_ipv6_sctp") == 0) {
+		err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
+		    (caddr_t)&param_arr[param_class_opt_ipv6_sctp]);
+
+		value = (int)param_arr[param_class_opt_ipv6_sctp].value;
 	} else {
-		/* Receive Interrupt Blanking Parameters */
-		if (strcmp(pr_name, "_rxdma_intr_time") == 0) {
-			value = hxgep->intr_timeout;
-		} else if (strcmp(pr_name, "_rxdma_intr_pkts") == 0) {
-			value = hxgep->intr_threshold;
-
-		/* Classification and Load Distribution Configuration */
-		} else if (strcmp(pr_name, "_class_opt_ipv4_tcp") == 0) {
-			err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
-			    (caddr_t)&param_arr[param_class_opt_ipv4_tcp]);
-
-			value = (int)param_arr[param_class_opt_ipv4_tcp].value;
-		} else if (strcmp(pr_name, "_class_opt_ipv4_udp") == 0) {
-			err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
-			    (caddr_t)&param_arr[param_class_opt_ipv4_udp]);
-
-			value = (int)param_arr[param_class_opt_ipv4_udp].value;
-		} else if (strcmp(pr_name, "_class_opt_ipv4_ah") == 0) {
-			err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
-			    (caddr_t)&param_arr[param_class_opt_ipv4_ah]);
-
-			value = (int)param_arr[param_class_opt_ipv4_ah].value;
-		} else if (strcmp(pr_name, "_class_opt_ipv4_sctp") == 0) {
-			err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
-			    (caddr_t)&param_arr[param_class_opt_ipv4_sctp]);
-
-			value = (int)param_arr[param_class_opt_ipv4_sctp].value;
-		} else if (strcmp(pr_name, "_class_opt_ipv6_tcp") == 0) {
-			err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
-			    (caddr_t)&param_arr[param_class_opt_ipv6_tcp]);
-
-			value = (int)param_arr[param_class_opt_ipv6_tcp].value;
-		} else if (strcmp(pr_name, "_class_opt_ipv6_udp") == 0) {
-			err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
-			    (caddr_t)&param_arr[param_class_opt_ipv6_udp]);
-
-			value = (int)param_arr[param_class_opt_ipv6_udp].value;
-		} else if (strcmp(pr_name, "_class_opt_ipv6_ah") == 0) {
-			err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
-			    (caddr_t)&param_arr[param_class_opt_ipv6_ah]);
-
-			value = (int)param_arr[param_class_opt_ipv6_ah].value;
-		} else if (strcmp(pr_name, "_class_opt_ipv6_sctp") == 0) {
-			err = hxge_param_get_ip_opt(hxgep, NULL, NULL,
-			    (caddr_t)&param_arr[param_class_opt_ipv6_sctp]);
-
-			value = (int)param_arr[param_class_opt_ipv6_sctp].value;
-		} else {
-			err = EINVAL;
-		}
+		err = EINVAL;
 	}
 
 	if (err == 0) {
@@ -3916,6 +3949,7 @@ hxge_add_intrs_adv_type(p_hxge_t hxgep, uint32_t int_type)
 			return (HXGE_ERROR | HXGE_DDI_FAILED);
 		}
 
+		ldgp->htable_idx = x;
 		intrp->intr_added++;
 	}
 	intrp->msi_intx_cnt = nactual;
@@ -4219,7 +4253,6 @@ hxge_mac_register(p_hxge_t hxgep)
 	macp->m_max_sdu = hxgep->vmac.maxframesize - MTU_TO_FRAME_SIZE;
 	macp->m_margin = VLAN_TAGSZ;
 	macp->m_priv_props = hxge_priv_props;
-	macp->m_priv_prop_count = HXGE_MAX_PRIV_PROPS;
 	macp->m_v12n = MAC_VIRT_LEVEL1;
 
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL,

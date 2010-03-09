@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,8 +54,9 @@ static int zyd_m_promisc(void *arg, boolean_t on);
 static void zyd_m_ioctl(void *arg, queue_t *wq, mblk_t *mp);
 static mblk_t *zyd_m_tx(void *arg, mblk_t *mp);
 static int zyd_m_getprop(void *arg, const char *pr_name,
-    mac_prop_id_t wldp_pr_num, uint_t pr_flags,
-    uint_t wldp_length, void *wldp_buf, uint_t *perm);
+    mac_prop_id_t wldp_pr_num, uint_t wldp_length, void *wldp_buf);
+static void zyd_m_propinfo(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, mac_prop_info_handle_t mph);
 static int zyd_m_setprop(void *arg, const char *pr_name,
     mac_prop_id_t wldp_pr_num, uint_t wldp_length, const void *wldp_buf);
 
@@ -72,7 +73,7 @@ void *zyd_ssp;
  * Mac Call Back entries
  */
 static mac_callbacks_t zyd_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	zyd_m_stat,		/* Get the value of a statistic */
 	zyd_m_start,		/* Start the device */
 	zyd_m_stop,		/* Stop the device */
@@ -80,12 +81,14 @@ static mac_callbacks_t zyd_m_callbacks = {
 	zyd_m_multicst,		/* Enable or disable a multicast addr */
 	zyd_m_unicst,		/* Set the unicast MAC address */
 	zyd_m_tx,		/* Transmit a packet */
+	NULL,
 	zyd_m_ioctl,		/* Process an unknown ioctl */
 	NULL,			/* mc_getcapab */
 	NULL,
 	NULL,
 	zyd_m_setprop,
-	zyd_m_getprop
+	zyd_m_getprop,
+	zyd_m_propinfo
 };
 
 /*
@@ -893,7 +896,7 @@ zyd_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 static int
 zyd_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	struct zyd_softc *sc = (struct zyd_softc *)arg;
 	int err;
@@ -903,9 +906,18 @@ zyd_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	}
 
 	err = ieee80211_getprop(&sc->ic, pr_name, wldp_pr_num,
-	    pr_flags, wldp_length, wldp_buf, perm);
+	    wldp_length, wldp_buf);
 
 	return (err);
+}
+
+static void
+zyd_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    mac_prop_info_handle_t mph)
+{
+	struct zyd_softc *sc = (struct zyd_softc *)arg;
+
+	ieee80211_propinfo(&sc->ic, pr_name, wldp_pr_num, mph);
 }
 
 /*

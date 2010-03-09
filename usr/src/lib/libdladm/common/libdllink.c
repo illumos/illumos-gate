@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 #include <libdevinfo.h>
 #include <libdlaggr.h>
 #include <libdlvlan.h>
+#include <libdlvnic.h>
 #include <libdllink.h>
 #include <libdlmgmt.h>
 #include <libdladm_impl.h>
@@ -156,9 +157,10 @@ dladm_walk_hwgrp(dladm_handle_t handle, datalink_id_t linkid, void *arg,
 
 	ret = ioctl(dladm_dld_fd(handle), DLDIOC_GETHWGRP, iomp);
 	if (ret == 0) {
-		int i;
-		dld_hwgrpinfo_t *dhip;
-		dladm_hwgrp_attr_t attr;
+		int			i;
+		int			j;
+		dld_hwgrpinfo_t 	*dhip;
+		dladm_hwgrp_attr_t	attr;
 
 		dhip = (dld_hwgrpinfo_t *)(iomp + 1);
 		for (i = 0; i < iomp->dih_n_groups; i++) {
@@ -169,6 +171,9 @@ dladm_walk_hwgrp(dladm_handle_t handle, datalink_id_t linkid, void *arg,
 			attr.hg_grp_num = dhip->dhi_grp_num;
 			attr.hg_grp_type = dhip->dhi_grp_type;
 			attr.hg_n_rings = dhip->dhi_n_rings;
+			for (j = 0; j < dhip->dhi_n_rings; j++)
+				attr.hg_rings[j] = dhip->dhi_rings[j];
+			dladm_sort_index_list(attr.hg_rings, attr.hg_n_rings);
 			attr.hg_n_clnts = dhip->dhi_n_clnts;
 			(void) strlcpy(attr.hg_client_names,
 			    dhip->dhi_clnts, sizeof (attr.hg_client_names));

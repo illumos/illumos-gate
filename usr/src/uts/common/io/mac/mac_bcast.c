@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,10 +212,15 @@ mac_bcast_send(void *arg1, void *arg2, mblk_t *mp_chain, boolean_t is_loopback)
 		rw_enter(&mip->mi_rw_lock, RW_READER);
 
 		/* update stats */
-		if (grp->mbg_addrtype == MAC_ADDRTYPE_MULTICAST)
-			dst_mcip->mci_stat_multircv++;
-		else
-			dst_mcip->mci_stat_brdcstrcv++;
+		if (grp->mbg_addrtype == MAC_ADDRTYPE_MULTICAST) {
+			MCIP_STAT_UPDATE(dst_mcip, multircv, 1);
+			MCIP_STAT_UPDATE(dst_mcip, multircvbytes,
+			    msgdsize(mp_chain));
+		} else {
+			MCIP_STAT_UPDATE(dst_mcip, brdcstrcv, 1);
+			MCIP_STAT_UPDATE(dst_mcip, brdcstrcvbytes,
+			    msgdsize(mp_chain));
+		}
 
 		if (grp->mbg_clients_gen != gen) {
 			/*
@@ -236,10 +241,12 @@ mac_bcast_send(void *arg1, void *arg2, mblk_t *mp_chain, boolean_t is_loopback)
 		 * so we need to send a copy of the packet to the
 		 * underlying NIC so that it can be sent on the wire.
 		 */
-		src_mcip->mci_stat_multixmt++;
-		src_mcip->mci_stat_brdcstxmt++;
+		MCIP_STAT_UPDATE(src_mcip, multixmt, 1);
+		MCIP_STAT_UPDATE(src_mcip, multixmtbytes, msgdsize(mp_chain));
+		MCIP_STAT_UPDATE(src_mcip, brdcstxmt, 1);
+		MCIP_STAT_UPDATE(src_mcip, brdcstxmtbytes, msgdsize(mp_chain));
 
-		MAC_TX(mip, mip->mi_default_tx_ring, mp_chain, B_FALSE);
+		MAC_TX(mip, mip->mi_default_tx_ring, mp_chain, src_mcip);
 		if (mp_chain != NULL)
 			freemsgchain(mp_chain);
 	} else {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@ extern npi_status_t npi_rxdma_dump_rdc_table(npi_handle_t, uint8_t);
 extern int nxge_m_mmac_remove(void *arg, int slot);
 extern int nxge_m_mmac_add_g(void *arg, const uint8_t *maddr, int rdctbl,
 	boolean_t usetbl);
+extern int nxge_rx_ring_start(mac_ring_driver_t rdriver, uint64_t mr_gen_num);
 
 /* The following function may be found in nxge_[t|r]xdma.c */
 extern npi_status_t nxge_txdma_channel_disable(nxge_t *, int);
@@ -428,6 +429,7 @@ nxge_grp_dc_add(
 	nxge_hio_dc_t *dc;
 	nxge_grp_set_t *set;
 	nxge_status_t status = NXGE_OK;
+	int error = 0;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_grp_dc_add"));
 
@@ -501,8 +503,13 @@ nxge_grp_dc_add(
 
 	dc->group = group;
 
-	if (isLDOMguest(nxge))
-		(void) nxge_hio_ldsv_add(nxge, dc);
+	if (isLDOMguest(nxge)) {
+		error = nxge_hio_ldsv_add(nxge, dc);
+		if (error != 0) {
+			MUTEX_EXIT(&nhd->lock);
+			return (NXGE_ERROR);
+		}
+	}
 
 	NXGE_DC_SET(set->owned.map, channel);
 	set->owned.count++;
@@ -1778,6 +1785,10 @@ nxge_hio_share_bind(mac_share_handle_t shandle, uint64_t cookie,
 	uint64_t		rmap, tmap, hv_rmap, hv_tmap;
 	int			rv;
 
+	ASSERT(shp != NULL);
+	ASSERT(shp->nxgep != NULL);
+	ASSERT(shp->vrp != NULL);
+
 	nxge = shp->nxgep;
 	vr = (nxge_hio_vr_t *)shp->vrp;
 
@@ -1956,16 +1967,17 @@ nxge_hio_unshare(
 int
 nxge_hio_addres(nxge_hio_vr_t *vr, mac_ring_type_t type, uint64_t *map)
 {
-	nxge_t		*nxge = (nxge_t *)vr->nxge;
+	nxge_t		*nxge;
 	nxge_grp_t	*group;
 	int		groupid;
 	int		i, rv = 0;
 	int		max_dcs;
 
-	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_addres"));
+	ASSERT(vr != NULL);
+	ASSERT(vr->nxge != NULL);
+	nxge = (nxge_t *)vr->nxge;
 
-	if (!nxge)
-		return (EINVAL);
+	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_addres"));
 
 	/*
 	 * For each ring associated with the group, add the resources
@@ -1983,6 +1995,8 @@ nxge_hio_addres(nxge_hio_vr_t *vr, mac_ring_type_t type, uint64_t *map)
 		    nxge->pt_config.hw_config.def_mac_rxdma_grpid;
 		group = nxge->rx_set.group[groupid];
 	}
+
+	ASSERT(group != NULL);
 
 	if (group->map == 0) {
 		NXGE_DEBUG_MSG((nxge, HIO_CTL, "There is no rings associated "
@@ -2424,6 +2438,7 @@ nxge_hio_rdc_unshare(
 	nxge_grp_set_t		*set = &nxge->rx_set;
 	nxge_grp_t		*group;
 	int			grpid;
+	int			i;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_rdc_unshare"));
 
@@ -2484,6 +2499,14 @@ nxge_hio_rdc_unshare(
 	}
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_hio_rdc_unshare"));
+
+	for (i = 0; i < NXGE_MAX_RDCS; i++) {
+		if (nxge->rx_ring_handles[i].channel == channel) {
+			nxge_rx_ring_start(
+			    (mac_ring_driver_t)&nxge->rx_ring_handles[i],
+			    nxge->rx_ring_handles[i].ring_gen_num);
+		}
+	}
 }
 
 /*

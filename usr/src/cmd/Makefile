@@ -126,6 +126,7 @@ COMMON_SUBDIRS=		\
 	diskmgtd	\
 	dispadmin	\
 	dladm		\
+	dlstat		\
 	dmesg		\
 	dodatadm	\
 	dtrace		\
@@ -157,6 +158,7 @@ COMMON_SUBDIRS=		\
 	filebench	\
 	find		\
 	flowadm		\
+	flowstat	\
 	fm		\
 	fmli		\
 	fmt		\
@@ -563,6 +565,7 @@ MSGSUBDIRS=		\
 	diff		\
 	diffmk		\
 	dladm		\
+	dlstat		\
 	du		\
 	dumpcs		\
 	ed		\
@@ -577,6 +580,7 @@ MSGSUBDIRS=		\
 	filesync	\
 	find		\
 	flowadm		\
+	flowstat	\
 	fm		\
 	fold		\
 	fs.d		\

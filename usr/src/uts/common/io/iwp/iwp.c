@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -347,8 +347,9 @@ static void	iwp_m_ioctl(void *, queue_t *, mblk_t *);
 static int	iwp_m_setprop(void *arg, const char *pr_name,
     mac_prop_id_t wldp_pr_num, uint_t wldp_length, const void *wldp_buf);
 static int	iwp_m_getprop(void *arg, const char *pr_name,
-    mac_prop_id_t wldp_pr_num, uint_t pr_flags, uint_t wldp_length,
-    void *wldp_buf, uint_t *perm);
+    mac_prop_id_t wldp_pr_num, uint_t wldp_length, void *wldp_buf);
+static void	iwp_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 
 /*
  * Supported rates for 802.11b/g modes (in 500Kbps unit).
@@ -429,7 +430,7 @@ _info(struct modinfo *mip)
  * Mac Call Back entries
  */
 mac_callbacks_t	iwp_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	iwp_m_stat,
 	iwp_m_start,
 	iwp_m_stop,
@@ -437,12 +438,14 @@ mac_callbacks_t	iwp_m_callbacks = {
 	iwp_m_multicst,
 	iwp_m_unicst,
 	iwp_m_tx,
+	NULL,
 	iwp_m_ioctl,
 	NULL,
 	NULL,
 	NULL,
 	iwp_m_setprop,
-	iwp_m_getprop
+	iwp_m_getprop,
+	iwp_m_propinfo
 };
 
 #ifdef DEBUG
@@ -3355,7 +3358,7 @@ iwp_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
  */
 static int
 iwp_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	iwp_sc_t	*sc;
 	int		err = EINVAL;
@@ -3366,9 +3369,19 @@ iwp_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	sc = (iwp_sc_t *)arg;
 
 	err = ieee80211_getprop(&sc->sc_ic, pr_name, wldp_pr_num,
-	    pr_flags, wldp_length, wldp_buf, perm);
+	    wldp_length, wldp_buf);
 
 	return (err);
+}
+
+static void
+iwp_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    mac_prop_info_handle_t prh)
+{
+	iwp_sc_t	*sc;
+
+	sc = (iwp_sc_t *)arg;
+	ieee80211_propinfo(&sc->sc_ic, pr_name, wldp_pr_num, prh);
 }
 
 static int

@@ -356,6 +356,7 @@ CHKHDRS=			\
 	mac_impl.h		\
 	mac_provider.h		\
 	mac_soft_ring.h		\
+	mac_stat.h		\
 	machelf.h		\
 	map.h			\
 	md4.h			\

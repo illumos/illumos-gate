@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -448,6 +449,7 @@ nxge_main_mac_assign_rdc_table(p_nxge_t nxgep)
 	npi_status_t rs = NPI_SUCCESS;
 	hostinfo_t mac_rdc;
 	npi_handle_t handle;
+	int i;
 
 	handle = nxgep->npi_reg_handle;
 	mac_rdc.value = 0;
@@ -456,6 +458,12 @@ nxge_main_mac_assign_rdc_table(p_nxge_t nxgep)
 	switch (nxgep->function_num) {
 	case 0:
 	case 1:
+		/*
+		 * Tests indicate that it is OK not to re-initialize the
+		 * hostinfo registers for the XMAC's alternate MAC
+		 * addresses. But that is necessary for BMAC (case 2
+		 * and case 3 below)
+		 */
 		rs = npi_mac_hostinfo_entry(handle, OP_SET,
 		    nxgep->function_num, XMAC_UNIQUE_HOST_INFO_ENTRY, &mac_rdc);
 		break;
@@ -463,6 +471,9 @@ nxge_main_mac_assign_rdc_table(p_nxge_t nxgep)
 	case 3:
 		rs = npi_mac_hostinfo_entry(handle, OP_SET,
 		    nxgep->function_num, BMAC_UNIQUE_HOST_INFO_ENTRY, &mac_rdc);
+		for (i = 1; i <= BMAC_MAX_ALT_ADDR_ENTRY; i++)
+			rs |= npi_mac_hostinfo_entry(handle, OP_SET,
+			    nxgep->function_num, i, &mac_rdc);
 		break;
 	default:
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -488,7 +499,6 @@ nxge_alt_mcast_mac_assign_rdc_table(p_nxge_t nxgep)
 	npi_status_t rs = NPI_SUCCESS;
 	hostinfo_t mac_rdc;
 	npi_handle_t handle;
-	int i;
 
 	handle = nxgep->npi_reg_handle;
 	mac_rdc.value = 0;
@@ -497,25 +507,13 @@ nxge_alt_mcast_mac_assign_rdc_table(p_nxge_t nxgep)
 	switch (nxgep->function_num) {
 	case 0:
 	case 1:
-		/*
-		 * Tests indicate that it is OK not to re-initialize the
-		 * hostinfo registers for the XMAC's alternate MAC
-		 * addresses. But that is necessary for BMAC (case 2
-		 * and case 3 below)
-		 */
 		rs = npi_mac_hostinfo_entry(handle, OP_SET,
-		    nxgep->function_num,
-		    XMAC_MULTI_HOST_INFO_ENTRY, &mac_rdc);
+		    nxgep->function_num, XMAC_MULTI_HOST_INFO_ENTRY, &mac_rdc);
 		break;
 	case 2:
 	case 3:
-		for (i = 1; i <= BMAC_MAX_ALT_ADDR_ENTRY; i++)
-			rs |= npi_mac_hostinfo_entry(handle, OP_SET,
-			    nxgep->function_num, i, &mac_rdc);
-
-		rs |= npi_mac_hostinfo_entry(handle, OP_SET,
-		    nxgep->function_num,
-		    BMAC_MULTI_HOST_INFO_ENTRY, &mac_rdc);
+		rs = npi_mac_hostinfo_entry(handle, OP_SET,
+		    nxgep->function_num, BMAC_MULTI_HOST_INFO_ENTRY, &mac_rdc);
 		break;
 	default:
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,11 +103,12 @@ static int	pcan_m_setprop(void *arg, const char *pr_name,
     mac_prop_id_t wldp_pr_num, uint_t wldp_length,
     const void *wldp_buf);
 static int	pcan_m_getprop(void *arg, const char *pr_name,
-    mac_prop_id_t wldp_pr_num, uint_t pr_flags,
-    uint_t wldp_length, void *wldp_buf, uint_t *perm);
+    mac_prop_id_t wldp_pr_num, uint_t wldp_length, void *wldp_buf);
+static void	pcan_m_propinfo(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, mac_prop_info_handle_t mph);
 
 mac_callbacks_t pcan_m_callbacks = {
-	MC_IOCTL | MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	pcan_gstat,
 	pcan_start,
 	pcan_stop,
@@ -115,12 +116,14 @@ mac_callbacks_t pcan_m_callbacks = {
 	pcan_sdmulti,
 	pcan_saddr,
 	pcan_tx,
+	NULL,
 	pcan_ioctl,
 	NULL,
 	NULL,
 	NULL,
 	pcan_m_setprop,
-	pcan_m_getprop
+	pcan_m_getprop,
+	pcan_m_propinfo
 };
 
 static char *pcan_name_str = "pcan";
@@ -4525,7 +4528,7 @@ pcan_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 /* ARGSUSED */
 static int
 pcan_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	int err = 0;
 	pcan_maci_t *pcan_p = (pcan_maci_t *)arg;
@@ -4536,9 +4539,6 @@ pcan_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 		err = EINVAL;
 		return (err);
 	}
-	bzero(wldp_buf, wldp_length);
-
-	*perm = MAC_PROP_PERM_RW;
 
 	switch (wldp_pr_num) {
 	/* mac_prop_id */
@@ -4558,22 +4558,18 @@ pcan_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 		pcan_get_encrypt(pcan_p, wldp_buf);
 		break;
 	case MAC_PROP_WL_BSSTYPE:
-		*perm = MAC_PROP_PERM_READ;
 		pcan_get_bsstype(pcan_p, wldp_buf);
 		break;
 	case MAC_PROP_WL_LINKSTATUS:
 		pcan_get_linkstatus(pcan_p, wldp_buf);
 		break;
 	case MAC_PROP_WL_ESS_LIST:
-		*perm = MAC_PROP_PERM_READ;
 		pcan_get_esslist(pcan_p, wldp_buf);
 		break;
 	case MAC_PROP_WL_SUPPORTED_RATES:
-		*perm = MAC_PROP_PERM_READ;
 		pcan_get_suprates(wldp_buf);
 		break;
 	case MAC_PROP_WL_RSSI:
-		*perm = MAC_PROP_PERM_READ;
 		err = pcan_get_rssi(pcan_p, wldp_buf);
 		break;
 	case MAC_PROP_WL_RADIO:
@@ -4609,6 +4605,23 @@ pcan_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 	return (err);
 }
+
+static void
+pcan_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    mac_prop_info_handle_t mph)
+{
+	_NOTE(ARGUNUSED(arg, pr_name));
+
+	switch (wldp_pr_num) {
+	case MAC_PROP_WL_BSSTYPE:
+	case MAC_PROP_WL_ESS_LIST:
+	case MAC_PROP_WL_SUPPORTED_RATES:
+	case MAC_PROP_WL_RSSI:
+		mac_prop_info_set_perm(mph, MAC_PROP_PERM_READ);
+		break;
+	}
+}
+
 
 /*
  * quiesce(9E) entry point.

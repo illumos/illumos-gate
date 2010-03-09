@@ -23,6 +23,7 @@
  * Copyright 2009 QLogic Corporation. All rights reserved.
  */
 
+#include <sys/note.h>
 #include <qlge.h>
 #include <sys/strsubr.h>
 #include <netinet/in.h>
@@ -46,9 +47,12 @@ static int	ql_unicst_set(qlge_t *qlge, const uint8_t *macaddr, int slot);
 
 static int ql_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
-static int ql_m_getprop(void *, const char *, mac_prop_id_t, uint_t, uint_t,
-    void *, uint_t *);
-#define	QL_M_CALLBACK_FLAGS (MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+static int ql_m_getprop(void *, const char *, mac_prop_id_t, uint_t, void *);
+static void ql_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
+
+#define	QL_M_CALLBACK_FLAGS (MC_IOCTL | MC_GETCAPAB | MC_SETPROP | \
+    MC_GETPROP | MC_PROPINFO)
 static mac_callbacks_t ql_m_callbacks = {
 	QL_M_CALLBACK_FLAGS,
 	ql_m_getstat,
@@ -58,19 +62,20 @@ static mac_callbacks_t ql_m_callbacks = {
 	ql_m_multicst,
 	NULL,
 	NULL,
+	NULL,
 	ql_m_ioctl,
 	ql_m_getcapab,
 	NULL,
 	NULL,
 	ql_m_setprop,
-	ql_m_getprop
-};
-mac_priv_prop_t qlge_priv_prop[] = {
-	{"_adv_pause_mode", MAC_PROP_PERM_RW}
+	ql_m_getprop,
+	ql_m_propinfo
 };
 
-#define	QLGE_MAX_PRIV_PROPS \
-	(sizeof (qlge_priv_prop) / sizeof (mac_priv_prop_t))
+char *qlge_priv_prop[] = {
+	"_adv_pause_mode",
+	NULL
+};
 
 /*
  * This function starts the driver
@@ -689,27 +694,6 @@ qlge_set_priv_prop(qlge_t *qlge, const char *pr_name, uint_t pr_valsize,
 	return (ENOTSUP);
 }
 
-static int
-qlge_get_priv_prop(qlge_t *qlge, const char *pr_name, uint_t pr_flags,
-    uint_t pr_valsize, void *pr_val)
-{
-	int err = ENOTSUP;
-	boolean_t is_default = (boolean_t)(pr_flags & MAC_PROP_DEFAULT);
-	uint32_t value;
-
-	if (strcmp(pr_name, "_adv_pause_mode") == 0) {
-		value = (is_default? 2 : qlge->pause);
-		err = 0;
-		goto done;
-	}
-
-done:
-	if (err == 0) {
-		(void) snprintf(pr_val, pr_valsize, "%d", value);
-	}
-	return (err);
-}
-
 /*
  * callback functions for set/get of properties
  */
@@ -778,10 +762,30 @@ ql_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	return (err);
 }
 
+static int
+qlge_get_priv_prop(qlge_t *qlge, const char *pr_name, uint_t pr_valsize,
+    void *pr_val)
+{
+	int err = ENOTSUP;
+	uint32_t value;
+
+	if (strcmp(pr_name, "_adv_pause_mode") == 0) {
+		value = qlge->pause;
+		err = 0;
+		goto done;
+	}
+
+done:
+	if (err == 0) {
+		(void) snprintf(pr_val, pr_valsize, "%d", value);
+	}
+	return (err);
+}
+
 /* ARGSUSED */
 static int
 ql_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	qlge_t *qlge = barg;
 	uint64_t speed;
@@ -795,20 +799,9 @@ ql_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		goto out;
 	}
 
-	if (pr_valsize == 0) {
-		err = EINVAL;
-		goto out;
-	}
-	bzero(pr_val, pr_valsize);
-	/* mostly read only */
-	*perm = MAC_PROP_PERM_READ;
-
 	switch (pr_num) {
 	case MAC_PROP_DUPLEX:
-		if (pr_valsize < sizeof (link_duplex_t)) {
-			err = EINVAL;
-			goto out;
-		}
+		ASSERT(pr_valsize >= sizeof (link_duplex_t));
 		if (qlge->duplex)
 			link_duplex = LINK_DUPLEX_FULL;
 		else
@@ -818,18 +811,12 @@ ql_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		    sizeof (link_duplex_t));
 		break;
 	case MAC_PROP_SPEED:
-		if (pr_valsize < sizeof (speed)) {
-			err = EINVAL;
-			goto out;
-		}
+		ASSERT(pr_valsize >= sizeof (speed));
 		speed = qlge->speed * 1000000ull;
 		bcopy(&speed, pr_val, sizeof (speed));
 		break;
 	case MAC_PROP_STATUS:
-		if (pr_valsize < sizeof (link_state_t)) {
-			err = EINVAL;
-			goto out;
-		}
+		ASSERT(pr_valsize >= sizeof (link_state_t));
 		if (qlge->port_link_state == LS_DOWN)
 			link_state = LINK_STATE_DOWN;
 		else
@@ -839,8 +826,7 @@ ql_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		break;
 
 	case MAC_PROP_PRIVATE:
-		err = qlge_get_priv_prop(qlge, pr_name, pr_flags,
-		    pr_valsize, pr_val);
+		err = qlge_get_priv_prop(qlge, pr_name, pr_valsize, pr_val);
 		break;
 
 	default:
@@ -849,6 +835,35 @@ ql_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 out:
 	mutex_exit(&qlge->gen_mutex);
 	return (err);
+}
+
+static void
+ql_m_propinfo(void *barg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+        _NOTE(ARGUNUSED(barg));
+
+	switch (pr_num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_STATUS:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_PRIVATE: {
+		char val_str[64];
+		int default_val;
+
+		if (strcmp(pr_name, "_adv_pause_mode") == 0)
+			default_val = 2;
+		else
+			return;
+
+		(void) snprintf(val_str, sizeof (val_str), "%d", default_val);
+		mac_prop_info_set_default_str(prh, val_str);
+		break;
+	}
+	}
 }
 
 /* ARGSUSED */
@@ -911,7 +926,6 @@ ql_gld3_init(qlge_t *qlge, mac_register_t *macp)
 	macp->m_max_sdu = qlge->mtu;
 	macp->m_margin = VLAN_TAGSZ;
 	macp->m_priv_props = qlge_priv_prop;
-	macp->m_priv_prop_count = QLGE_MAX_PRIV_PROPS;
 	macp->m_v12n = 0;
 	ql_m_callbacks.mc_unicst = ql_m_unicst;
 	ql_m_callbacks.mc_tx = ql_m_tx;

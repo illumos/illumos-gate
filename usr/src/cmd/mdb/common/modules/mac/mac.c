@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <sys/mac_client_impl.h>
 #include <sys/mac_flow_impl.h>
 #include <sys/mac_soft_ring.h>
+#include <sys/mac_stat.h>
 
 #define	STRSIZE	64
 #define	MAC_RX_SRS_SIZE	 (MAX_RINGS_PER_GROUP * sizeof (uintptr_t))
@@ -59,12 +60,15 @@
 #define	MAC_SRS_STAT		0x04
 #define	MAC_SRS_CPU		0x08
 #define	MAC_SRS_VERBOSE		0x10
+#define	MAC_SRS_INTR		0x20
 #define	MAC_SRS_RXSTAT		(MAC_SRS_RX|MAC_SRS_STAT)
 #define	MAC_SRS_TXSTAT		(MAC_SRS_TX|MAC_SRS_STAT)
 #define	MAC_SRS_RXCPU		(MAC_SRS_RX|MAC_SRS_CPU)
 #define	MAC_SRS_TXCPU		(MAC_SRS_TX|MAC_SRS_CPU)
 #define	MAC_SRS_RXCPUVERBOSE	(MAC_SRS_RXCPU|MAC_SRS_VERBOSE)
 #define	MAC_SRS_TXCPUVERBOSE	(MAC_SRS_TXCPU|MAC_SRS_VERBOSE)
+#define	MAC_SRS_RXINTR		(MAC_SRS_RX|MAC_SRS_INTR)
+#define	MAC_SRS_TXINTR		(MAC_SRS_TX|MAC_SRS_INTR)
 
 static char *
 mac_flow_proto2str(uint8_t protocol)
@@ -314,9 +318,28 @@ mac_flow_dcmd_output(uintptr_t addr, uint_t flags, uint_t args)
 		break;
 	}
 	case MAC_FLOW_STATS: {
+		uint64_t  		totibytes = 0;
+		uint64_t  		totobytes = 0;
+		mac_soft_ring_set_t	*mac_srs;
+		mac_rx_stats_t		*mac_rx_stat;
+		mac_tx_stats_t		*mac_tx_stat;
+		int			i;
+
+		for (i = 0; i < fe.fe_rx_srs_cnt; i++) {
+			mac_srs = (mac_soft_ring_set_t *)(fe.fe_rx_srs[i]);
+			mac_rx_stat = &mac_srs->srs_rx.sr_stat;
+			totibytes += mac_rx_stat->mrs_intrbytes +
+			    mac_rx_stat->mrs_pollbytes +
+			    mac_rx_stat->mrs_lclbytes;
+		}
+		mac_srs = (mac_soft_ring_set_t *)(fe.fe_tx_srs);
+		if (mac_srs != NULL) {
+			mac_tx_stat = &mac_srs->srs_tx.st_stat;
+			totobytes = mac_tx_stat->mts_obytes;
+		}
 		mdb_printf("%?p %-32s %16llu %16llu\n",
-		    addr, fe.fe_flow_name, fe.fe_flowstats.fs_rbytes,
-		    fe.fe_flowstats.fs_obytes);
+		    addr, fe.fe_flow_name, totibytes, totobytes);
+
 		break;
 	}
 	}
@@ -444,6 +467,10 @@ mac_srs_txmode2str(mac_tx_srs_mode_t mode)
 		return ("BW");
 	case SRS_TX_BW_FANOUT:
 		return ("BWFO");
+	case SRS_TX_AGGR:
+		return ("AG");
+	case SRS_TX_BW_AGGR:
+		return ("BWAG");
 	}
 	return ("--");
 }
@@ -460,6 +487,7 @@ mac_srs_help(void)
 	    "\t-s\tdisplay statistics for RX or TX side\n"
 	    "\t-c\tdisplay CPU binding for RX or TX side\n"
 	    "\t-v\tverbose flag for CPU binding to list cpus\n"
+	    "\t-i\tdisplay mac_ring_t and interrupt information\n"
 	    "Note: use -r or -t (to specify RX or TX side respectively) along "
 	    "with -c or -s\n");
 	mdb_printf("\n%<u>Interpreting TX Modes%</u>\n");
@@ -468,6 +496,8 @@ mac_srs_help(void)
 	mdb_printf("\t  FO --> Fanout\n");
 	mdb_printf("\t  BW --> Bandwidth\n");
 	mdb_printf("\tBWFO --> Bandwidth Fanout\n");
+	mdb_printf("\t  AG --> Aggr\n");
+	mdb_printf("\tBWAG --> Bandwidth Aggr\n");
 }
 
 /*
@@ -520,6 +550,7 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    't', MDB_OPT_SETBITS, MAC_SRS_TX, &args,
 	    'c', MDB_OPT_SETBITS, MAC_SRS_CPU, &args,
 	    'v', MDB_OPT_SETBITS, MAC_SRS_VERBOSE, &args,
+	    'i', MDB_OPT_SETBITS, MAC_SRS_INTR, &args,
 	    's', MDB_OPT_SETBITS, MAC_SRS_STAT, &args) != argc) {
 		return (DCMD_USAGE);
 	}
@@ -576,7 +607,7 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    "%08x %08x %8d %8d %3d\n",
 		    addr, mci.mci_name, mac_srs_txmode2str(srs.srs_tx.st_mode),
 		    srs.srs_state, srs.srs_type, srs.srs_count, srs.srs_size,
-		    srs.srs_oth_ring_count);
+		    srs.srs_tx_ring_count);
 		break;
 	}
 	case MAC_SRS_RXCPU: {
@@ -596,30 +627,148 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_OK);
 		mdb_printf("%?p %-20s %-4d %-4d "
 		    "%-6d %-4d %-7d\n",
-		    addr, mci.mci_name, mc.mc_ncpus, mc.mc_pollid,
-		    mc.mc_workerid, mc.mc_intr_cpu, mc.mc_fanout_cnt);
+		    addr, mci.mci_name, mc.mc_ncpus, mc.mc_rx_pollid,
+		    mc.mc_rx_workerid, mc.mc_rx_intr_cpu, mc.mc_rx_fanout_cnt);
 		break;
 
 	}
 	case MAC_SRS_TXCPU: {
 		mac_cpus_t	mc = srs.srs_cpu;
+		mac_soft_ring_t *s_ringp, s_ring;
+		boolean_t	first = B_TRUE;
+		int		i;
 
 		if (DCMD_HDRSPEC(flags)) {
-			mdb_printf("%?s %-20s %-4s %-6s "
-			    "%-4s %-7s\n",
-			    "", "", "NUM", "WORKER",
-			    "INTR", "FANOUT");
-			mdb_printf("%<u>%?s %-20s %-4s %-6s "
-			    "%-4s %-7s%</u>\n",
-			    "ADDR", "LINK_NAME", "CPUS", "CPU",
-			    "CPU", "CPU_CNT");
+			mdb_printf("%?s %-12s %?s %8s %8s %8s\n",
+			    "", "", "SOFT", "WORKER", "INTR", "RETARGETED");
+			mdb_printf("%<u>%?s %-12s %?s %8s %8s %8s%</u>\n",
+			    "ADDR", "LINK_NAME", "RING", "CPU", "CPU", "CPU");
 		}
-		if ((args & MAC_SRS_TX) && !(srs.srs_type & SRST_TX))
+		if (!(srs.srs_type & SRST_TX))
 			return (DCMD_OK);
-		mdb_printf("%?p %-20s %-4d "
-		    "%-6d %-4d %-7d\n",
-		    addr, mci.mci_name, mc.mc_ncpus,
-		    mc.mc_workerid, mc.mc_intr_cpu, mc.mc_fanout_cnt);
+
+		mdb_printf("%?p %-12s ", addr, mci.mci_name);
+
+		/*
+		 * Case of no soft rings, print the info from
+		 * mac_srs_tx_t.
+		 */
+		if (srs.srs_tx_ring_count == 0) {
+			mdb_printf("%?p %8d %8d %8d\n",
+			    0, mc.mc_tx_fanout_cpus[0],
+			    mc.mc_tx_intr_cpu[0],
+			    mc.mc_tx_retargeted_cpu[0]);
+			break;
+		}
+
+		for (s_ringp = srs.srs_soft_ring_head, i = 0; s_ringp != NULL;
+		    s_ringp = s_ring.s_ring_next, i++) {
+			(void) mdb_vread(&s_ring, sizeof (s_ring),
+			    (uintptr_t)s_ringp);
+			if (first) {
+				mdb_printf("%?p %8d %8d %8d\n",
+				    s_ringp, mc.mc_tx_fanout_cpus[i],
+				    mc.mc_tx_intr_cpu[i],
+				    mc.mc_tx_retargeted_cpu[i]);
+				first = B_FALSE;
+				continue;
+			}
+			mdb_printf("%?s %-12s %?p %8d %8d %8d\n",
+			    "", "", s_ringp, mc.mc_tx_fanout_cpus[i],
+			    mc.mc_tx_intr_cpu[i], mc.mc_tx_retargeted_cpu[i]);
+		}
+		break;
+	}
+	case MAC_SRS_TXINTR: {
+		mac_cpus_t	mc = srs.srs_cpu;
+		mac_soft_ring_t *s_ringp, s_ring;
+		mac_ring_t	*m_ringp, m_ring;
+		boolean_t	first = B_TRUE;
+		int		i;
+
+		if (DCMD_HDRSPEC(flags)) {
+			mdb_printf("%?s %-12s %?s %8s %?s %6s %6s\n",
+			    "", "", "SOFT", "WORKER", "MAC", "", "INTR");
+			mdb_printf("%<u>%?s %-12s %?s %8s %?s %6s %6s%</u>\n",
+			    "ADDR", "LINK_NAME", "RING", "CPU", "RING",
+			    "SHARED", "CPU");
+		}
+		if (!(srs.srs_type & SRST_TX))
+			return (DCMD_OK);
+
+		mdb_printf("%?p %-12s ", addr, mci.mci_name);
+
+		/*
+		 * Case of no soft rings, print the info from
+		 * mac_srs_tx_t.
+		 */
+		if (srs.srs_tx_ring_count == 0) {
+			m_ringp = srs.srs_tx.st_arg2;
+			if (m_ringp != NULL) {
+				(void) mdb_vread(&m_ring, sizeof (m_ring),
+				    (uintptr_t)m_ringp);
+				mdb_printf("%?p %8d %?p %6d %6d\n",
+				    0, mc.mc_tx_fanout_cpus[0], m_ringp,
+				    m_ring.mr_info.mri_intr.mi_ddi_shared,
+				    mc.mc_tx_retargeted_cpu[0]);
+			} else {
+				mdb_printf("%?p %8d %?p %6d %6d\n",
+				    0, mc.mc_tx_fanout_cpus[0], 0,
+				    0, mc.mc_tx_retargeted_cpu[0]);
+			}
+			break;
+		}
+
+		for (s_ringp = srs.srs_soft_ring_head, i = 0; s_ringp != NULL;
+		    s_ringp = s_ring.s_ring_next, i++) {
+			(void) mdb_vread(&s_ring, sizeof (s_ring),
+			    (uintptr_t)s_ringp);
+			m_ringp = s_ring.s_ring_tx_arg2;
+			(void) mdb_vread(&m_ring, sizeof (m_ring),
+			    (uintptr_t)m_ringp);
+			if (first) {
+				mdb_printf("%?p %8d %?p %6d %6d\n",
+				    s_ringp, mc.mc_tx_fanout_cpus[i],
+				    m_ringp,
+				    m_ring.mr_info.mri_intr.mi_ddi_shared,
+				    mc.mc_tx_retargeted_cpu[i]);
+				first = B_FALSE;
+				continue;
+			}
+			mdb_printf("%?s %-12s %?p %8d %?p %6d %6d\n",
+			    "", "", s_ringp, mc.mc_tx_fanout_cpus[i],
+			    m_ringp, m_ring.mr_info.mri_intr.mi_ddi_shared,
+			    mc.mc_tx_retargeted_cpu[i]);
+		}
+		break;
+	}
+	case MAC_SRS_RXINTR: {
+		mac_cpus_t	mc = srs.srs_cpu;
+		mac_ring_t	*m_ringp, m_ring;
+
+		if (DCMD_HDRSPEC(flags)) {
+			mdb_printf("%?s %-12s %?s %8s %6s %6s\n",
+			    "", "", "MAC", "", "POLL", "INTR");
+			mdb_printf("%<u>%?s %-12s %?s %8s %6s %6s%</u>\n",
+			    "ADDR", "LINK_NAME", "RING", "SHARED", "CPU",
+			    "CPU");
+		}
+		if ((args & MAC_SRS_RX) && (srs.srs_type & SRST_TX))
+			return (DCMD_OK);
+
+		mdb_printf("%?p %-12s ", addr, mci.mci_name);
+
+		m_ringp = srs.srs_ring;
+		if (m_ringp != NULL) {
+			(void) mdb_vread(&m_ring, sizeof (m_ring),
+			    (uintptr_t)m_ringp);
+			mdb_printf("%?p %8d %6d %6d\n",
+			    m_ringp, m_ring.mr_info.mri_intr.mi_ddi_shared,
+			    mc.mc_rx_pollid, mc.mc_rx_intr_cpu);
+		} else {
+			mdb_printf("%?p %8d %6d %6d\n",
+			    0, 0, mc.mc_rx_pollid, mc.mc_rx_intr_cpu);
+		}
 		break;
 	}
 	case MAC_SRS_RXCPUVERBOSE:
@@ -640,8 +789,8 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    ((args & MAC_SRS_RX) && (srs.srs_type & SRST_TX)))
 			return (DCMD_OK);
 		mdb_printf("%?p %-20s %-20d %-20d\n", addr, mci.mci_name,
-		    mc.mc_ncpus, mc.mc_fanout_cnt);
-		if (mc.mc_ncpus == 0 && mc.mc_fanout_cnt == 0)
+		    mc.mc_ncpus, mc.mc_rx_fanout_cnt);
+		if (mc.mc_ncpus == 0 && mc.mc_rx_fanout_cnt == 0)
 			break;
 		/* print all cpus and cpus for soft rings */
 		while (!cpu_done || !fanout_done) {
@@ -658,14 +807,15 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				else
 					mdb_printf("%*s", len, "");
 				fanout_done = mac_srs_print_cpu(&fanout_index,
-				    mc.mc_fanout_cnt, mc.mc_fanout_cpus, NULL);
+				    mc.mc_rx_fanout_cnt,
+				    mc.mc_rx_fanout_cpus, NULL);
 			}
 			mdb_printf("\n");
 		}
 		break;
 	}
 	case MAC_SRS_RXSTAT: {
-		mac_srs_rx_t srs_rx = srs.srs_rx;
+		mac_rx_stats_t *mac_rx_stat = &srs.srs_rx.sr_stat;
 
 		if (DCMD_HDRSPEC(flags)) {
 			mdb_printf("%?s %-16s %8s %8s "
@@ -682,13 +832,14 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%?p %-16s %8d "
 		    "%8d %8d "
 		    "%8d %8d\n",
-		    addr, mci.mci_name, srs_rx.sr_intr_count,
-		    srs_rx.sr_poll_count, srs_rx.sr_chain_cnt_undr10,
-		    srs_rx.sr_chain_cnt_10to50, srs_rx.sr_chain_cnt_over50);
+		    addr, mci.mci_name, mac_rx_stat->mrs_intrcnt,
+		    mac_rx_stat->mrs_pollcnt, mac_rx_stat->mrs_chaincntundr10,
+		    mac_rx_stat->mrs_chaincnt10to50,
+		    mac_rx_stat->mrs_chaincntover50);
 		break;
 	}
 	case MAC_SRS_TXSTAT: {
-		mac_srs_tx_t srs_tx = srs.srs_tx;
+		mac_tx_stats_t *mac_tx_stat = &srs.srs_tx.st_stat;
 		mac_soft_ring_t *s_ringp, s_ring;
 		boolean_t	first = B_TRUE;
 
@@ -708,10 +859,11 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		 * Case of no soft rings, print the info from
 		 * mac_srs_tx_t.
 		 */
-		if (srs.srs_oth_ring_count == 0) {
+		if (srs.srs_tx_ring_count == 0) {
 			mdb_printf("%?p %8d %8d %8d\n",
-			    0, srs_tx.st_drop_count, srs_tx.st_blocked_cnt,
-			    srs_tx.st_unblocked_cnt);
+			    0, mac_tx_stat->mts_sdrops,
+			    mac_tx_stat->mts_blockcnt,
+			    mac_tx_stat->mts_unblockcnt);
 			break;
 		}
 
@@ -719,18 +871,19 @@ mac_srs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    s_ringp = s_ring.s_ring_next) {
 			(void) mdb_vread(&s_ring, sizeof (s_ring),
 			    (uintptr_t)s_ringp);
+			mac_tx_stat = &s_ring.s_st_stat;
 			if (first) {
 				mdb_printf("%?p %8d %8d %8d\n",
-				    s_ringp, s_ring.s_ring_drops,
-				    s_ring.s_ring_blocked_cnt,
-				    s_ring.s_ring_unblocked_cnt);
+				    s_ringp, mac_tx_stat->mts_sdrops,
+				    mac_tx_stat->mts_blockcnt,
+				    mac_tx_stat->mts_unblockcnt);
 				first = B_FALSE;
 				continue;
 			}
 			mdb_printf("%?s %-20s %?p %8d %8d %8d\n",
-			    "", "", s_ringp, s_ring.s_ring_drops,
-			    s_ring.s_ring_blocked_cnt,
-			    s_ring.s_ring_unblocked_cnt);
+			    "", "", s_ringp, mac_tx_stat->mts_sdrops,
+			    mac_tx_stat->mts_blockcnt,
+			    mac_tx_stat->mts_unblockcnt);
 		}
 		break;
 	}
@@ -853,8 +1006,9 @@ mac_ring_help(void)
 static const mdb_dcmd_t dcmds[] = {
 	{"mac_flow", "?[-u] [-aprtsm]", "display Flow Entry structures",
 	    mac_flow_dcmd, mac_flow_help},
-	{"mac_srs", "?[ -r[s|c[v]] | -t[s|c[v]] ]", "display MAC Soft Ring Set"
-	    " structures", mac_srs_dcmd, mac_srs_help},
+	{"mac_srs", "?[ -r[i|s|c[v]] | -t[i|s|c[v]] ]",
+	    "display MAC Soft Ring Set" " structures", mac_srs_dcmd,
+	    mac_srs_help},
 	{"mac_ring", "?", "display MAC ring (hardware) structures",
 	    mac_ring_dcmd, mac_ring_help},
 	{ NULL }

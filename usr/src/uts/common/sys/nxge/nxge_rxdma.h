@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -209,7 +209,7 @@ typedef struct _rx_rcr_ring_t {
 
 	p_nxge_rx_ring_stats_t	rdc_stats;
 
-	int			poll_flag; /* 1 if polling mode */
+	boolean_t		poll_flag;	/* B_TRUE, if polling mode */
 
 	rcrcfig_a_t		rcr_cfga;
 	rcrcfig_b_t		rcr_cfgb;
@@ -244,6 +244,7 @@ typedef struct _rx_rcr_ring_t {
 	uint32_t		rcvd_pkt_bytes; /* Received bytes of a packet */
 	p_nxge_ldv_t		ldvp;
 	p_nxge_ldg_t		ldgp;
+	boolean_t		started;
 } rx_rcr_ring_t, *p_rx_rcr_ring_t;
 
 

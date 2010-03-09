@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/param.h>
+#include <sys/callb.h>
 #include <sys/stream.h>
 #include <sys/kmem.h>
 #include <sys/conf.h>
@@ -84,8 +85,12 @@ static void vnet_get_group(void *arg, mac_ring_type_t type, const int index,
 	mac_group_info_t *infop, mac_group_handle_t handle);
 static int vnet_rx_ring_start(mac_ring_driver_t rdriver, uint64_t mr_gen_num);
 static void vnet_rx_ring_stop(mac_ring_driver_t rdriver);
+static int vnet_rx_ring_stat(mac_ring_driver_t rdriver, uint_t stat,
+	uint64_t *val);
 static int vnet_tx_ring_start(mac_ring_driver_t rdriver, uint64_t mr_gen_num);
 static void vnet_tx_ring_stop(mac_ring_driver_t rdriver);
+static int vnet_tx_ring_stat(mac_ring_driver_t rdriver, uint_t stat,
+	uint64_t *val);
 static int vnet_ring_enable_intr(void *arg);
 static int vnet_ring_disable_intr(void *arg);
 static mblk_t *vnet_rx_poll(void *arg, int bytes_to_pickup);
@@ -107,7 +112,6 @@ static void vnet_unbind_rings(vnet_res_t *vresp);
 static int vnet_hio_stat(void *, uint_t, uint64_t *);
 static int vnet_hio_start(void *);
 static void vnet_hio_stop(void *);
-static void vnet_hio_notify_cb(void *arg, mac_notify_type_t type);
 mblk_t *vnet_hio_tx(void *, mblk_t *);
 
 /* Forwarding database (FDB) routines */
@@ -129,6 +133,7 @@ static void vnet_res_start_task(void *arg);
 static void vnet_handle_res_err(vio_net_handle_t vrh, vio_net_err_val_t err);
 static void vnet_add_resource(vnet_t *vnetp, vnet_res_t *vresp);
 static vnet_res_t *vnet_rem_resource(vnet_t *vnetp, vnet_res_t *vresp);
+static void vnet_tx_notify_thread(void *);
 
 /* Exported to vnet_gen */
 int vnet_mtu_update(vnet_t *vnetp, uint32_t mtu);
@@ -168,8 +173,7 @@ extern void vdds_process_dds_msg(vnet_t *vnetp, vio_dds_msg_t *dmsg);
 extern void vdds_cleanup_hybrid_res(void *arg);
 extern void vdds_cleanup_hio(vnet_t *vnetp);
 
-/* Externs imported from mac_impl */
-extern mblk_t *mac_hwring_tx(mac_ring_handle_t, mblk_t *);
+extern pri_t	minclsyspri;
 
 #define	DRV_NAME	"vnet"
 #define	VNET_FDBE_REFHOLD(p)						\
@@ -199,6 +203,7 @@ static mac_callbacks_t vnet_m_callbacks = {
 	vnet_m_multicst,
 	NULL,	/* m_unicst entry must be NULL while rx rings are exposed */
 	NULL,	/* m_tx entry must be NULL while tx rings are exposed */
+	NULL,
 	vnet_m_ioctl,
 	vnet_m_capab,
 	NULL
@@ -232,6 +237,8 @@ uint32_t vnet_ldc_mtu = VNET_LDC_MTU;		/* ldc mtu */
 
 /* Configure tx serialization in mac layer for the vnet device */
 boolean_t vnet_mac_tx_serialize = B_TRUE;
+/* Configure enqueing at Rx soft rings in mac layer for the vnet device */
+boolean_t vnet_mac_rx_queuing = B_TRUE;
 
 /*
  * Set this to non-zero to enable additional internal receive buffer pools
@@ -785,6 +792,7 @@ mblk_t *
 vnet_tx_ring_send(void *arg, mblk_t *mp)
 {
 	vnet_pseudo_tx_ring_t	*tx_ringp;
+	vnet_tx_ring_stats_t	*statsp;
 	vnet_t			*vnetp;
 	vnet_res_t		*vresp;
 	mblk_t			*next;
@@ -795,8 +803,10 @@ vnet_tx_ring_send(void *arg, mblk_t *mp)
 	boolean_t		is_pvid;	/* non-default pvid ? */
 	boolean_t		hres;		/* Hybrid resource ? */
 	void			*tx_arg;
+	size_t			size;
 
 	tx_ringp = (vnet_pseudo_tx_ring_t *)arg;
+	statsp = &tx_ringp->tx_ring_stats;
 	vnetp = (vnet_t *)tx_ringp->vnetp;
 	DBG1(vnetp, "enter\n");
 	ASSERT(mp != NULL);
@@ -807,6 +817,9 @@ vnet_tx_ring_send(void *arg, mblk_t *mp)
 
 		next = mp->b_next;
 		mp->b_next = NULL;
+
+		/* update stats */
+		size = msgsize(mp);
 
 		/*
 		 * Find fdb entry for the destination
@@ -911,6 +924,8 @@ vnet_tx_ring_send(void *arg, mblk_t *mp)
 			}
 		}
 
+		statsp->obytes += size;
+		statsp->opackets++;
 		mp = next;
 	}
 
@@ -971,6 +986,10 @@ vnet_ring_grp_init(vnet_t *vnetp)
 	}
 	tx_grp->rings = tx_ringp;
 	tx_grp->ring_cnt = VNET_NUM_PSEUDO_TXRINGS;
+	mutex_init(&tx_grp->flowctl_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&tx_grp->flowctl_cv, NULL, CV_DRIVER, NULL);
+	tx_grp->flowctl_thread = thread_create(NULL, 0,
+	    vnet_tx_notify_thread, tx_grp, 0, &p0, TS_RUN, minclsyspri);
 
 	rx_grp = &vnetp->rx_grp[0];
 	rx_grp->max_ring_cnt = MAX_RINGS_PER_GROUP;
@@ -1005,8 +1024,21 @@ vnet_ring_grp_uninit(vnet_t *vnetp)
 {
 	vnet_pseudo_rx_group_t	*rx_grp;
 	vnet_pseudo_tx_group_t	*tx_grp;
+	kt_did_t		tid = 0;
 
 	tx_grp = &vnetp->tx_grp[0];
+
+	/* Inform tx_notify_thread to exit */
+	mutex_enter(&tx_grp->flowctl_lock);
+	if (tx_grp->flowctl_thread != NULL) {
+		tid = tx_grp->flowctl_thread->t_did;
+		tx_grp->flowctl_done = B_TRUE;
+		cv_signal(&tx_grp->flowctl_cv);
+	}
+	mutex_exit(&tx_grp->flowctl_lock);
+	if (tid != 0)
+		thread_join(tid);
+
 	if (tx_grp->rings != NULL) {
 		ASSERT(tx_grp->ring_cnt == VNET_NUM_PSEUDO_TXRINGS);
 		kmem_free(tx_grp->rings, sizeof (vnet_pseudo_tx_ring_t) *
@@ -1090,14 +1122,7 @@ vnet_mac_register(vnet_t *vnetp)
 	macp->m_max_sdu = vnetp->mtu;
 	macp->m_margin = VLAN_TAGSZ;
 
-	/*
-	 * MAC_VIRT_SERIALIZE flag is needed while hybridIO is enabled to
-	 * workaround tx lock contention issues in nxge.
-	 */
 	macp->m_v12n = MAC_VIRT_LEVEL1;
-	if (vnet_mac_tx_serialize == B_TRUE) {
-		macp->m_v12n |= MAC_VIRT_SERIALIZE;
-	}
 
 	/*
 	 * Finally, we're ready to register ourselves with the MAC layer
@@ -1400,6 +1425,73 @@ vnet_tx_update(vio_net_handle_t vrh)
 	for (i = 0; i < tx_grp->ring_cnt; i++) {
 		tx_ringp = &tx_grp->rings[i];
 		mac_tx_ring_update(vnetp->mh, tx_ringp->handle);
+	}
+}
+
+/*
+ * vnet_tx_notify_thread:
+ *
+ * vnet_tx_ring_update() callback function wakes up this thread when
+ * it gets called. This thread will call mac_tx_ring_update() to
+ * notify upper mac of flow control getting relieved. Note that
+ * vnet_tx_ring_update() cannot call mac_tx_ring_update() directly
+ * because vnet_tx_ring_update() is called from lower mac with
+ * mi_rw_lock held and mac_tx_ring_update() would also try to grab
+ * the same lock.
+ */
+static void
+vnet_tx_notify_thread(void *arg)
+{
+	callb_cpr_t		cprinfo;
+	vnet_pseudo_tx_group_t	*tx_grp = (vnet_pseudo_tx_group_t *)arg;
+	vnet_pseudo_tx_ring_t	*tx_ringp;
+	vnet_t			*vnetp;
+	int			i;
+
+	CALLB_CPR_INIT(&cprinfo, &tx_grp->flowctl_lock, callb_generic_cpr,
+	    "vnet_tx_notify_thread");
+
+	mutex_enter(&tx_grp->flowctl_lock);
+	while (!tx_grp->flowctl_done) {
+		CALLB_CPR_SAFE_BEGIN(&cprinfo);
+		cv_wait(&tx_grp->flowctl_cv, &tx_grp->flowctl_lock);
+		CALLB_CPR_SAFE_END(&cprinfo, &tx_grp->flowctl_lock);
+
+		for (i = 0; i < tx_grp->ring_cnt; i++) {
+			tx_ringp = &tx_grp->rings[i];
+			if (tx_ringp->woken_up) {
+				tx_ringp->woken_up = B_FALSE;
+				vnetp = tx_ringp->vnetp;
+				mac_tx_ring_update(vnetp->mh, tx_ringp->handle);
+			}
+		}
+	}
+	/*
+	 * The tx_grp is being destroyed, exit the thread.
+	 */
+	tx_grp->flowctl_thread = NULL;
+	CALLB_CPR_EXIT(&cprinfo);
+	thread_exit();
+}
+
+void
+vnet_tx_ring_update(void *arg1, uintptr_t arg2)
+{
+	vnet_t			*vnetp = (vnet_t *)arg1;
+	vnet_pseudo_tx_group_t	*tx_grp;
+	vnet_pseudo_tx_ring_t	*tx_ringp;
+	int			i;
+
+	tx_grp = &vnetp->tx_grp[0];
+	for (i = 0; i < tx_grp->ring_cnt; i++) {
+		tx_ringp = &tx_grp->rings[i];
+		if (tx_ringp->hw_rh == (mac_ring_handle_t)arg2) {
+			mutex_enter(&tx_grp->flowctl_lock);
+			tx_ringp->woken_up = B_TRUE;
+			cv_signal(&tx_grp->flowctl_cv);
+			mutex_exit(&tx_grp->flowctl_lock);
+			break;
+		}
 	}
 }
 
@@ -2053,6 +2145,22 @@ vnet_m_capab(void *arg, mac_capab_t cap, void *cap_data)
 		 * we unmap ring->hw_rh. For rings mapped to LDC resources, we
 		 * stop the rx callbacks (in vgen) before we remove ring->hw_rh
 		 * (vio_net_resource_unreg()).
+		 * Also, we access ring->hw_rh in vnet_rx_ring_stat().
+		 * Note that for rings mapped to Hybrid resource, though the
+		 * rings are statically registered with the mac layer, its
+		 * hardware ring mapping (ringp->hw_rh) can be torn down in
+		 * vnet_unbind_hwrings() while the kstat operation is in
+		 * progress. To protect against this, we hold a reference to
+		 * the resource in FDB; this ensures that the thread in
+		 * vio_net_resource_unreg() waits for the reference to be
+		 * dropped before unbinding the ring.
+		 *
+		 * We don't need to do this for rings mapped to LDC resources.
+		 * These rings are registered/unregistered dynamically with
+		 * the mac layer and so any attempt to unregister the ring
+		 * while kstat operation is in progress will block in
+		 * mac_group_rem_ring(). Thus implicitly protects the
+		 * resource (ringp->hw_rh) from disappearing.
 		 */
 
 		if (cap_rings->mr_type == MAC_RING_TYPE_RX) {
@@ -2148,10 +2256,22 @@ vnet_get_ring(void *arg, mac_ring_type_t rtype, const int g_index,
 		infop->mri_driver = (mac_ring_driver_t)rx_ringp;
 		infop->mri_start = vnet_rx_ring_start;
 		infop->mri_stop = vnet_rx_ring_stop;
+		infop->mri_stat = vnet_rx_ring_stat;
 
 		/* Set the poll function, as this is an rx ring */
 		infop->mri_poll = vnet_rx_poll;
-
+		/*
+		 * MAC_RING_RX_ENQUEUE bit needed to be set for nxge
+		 * which was not sending packet chains in interrupt
+		 * context. For such drivers, packets are queued in
+		 * Rx soft rings so that we get a chance to switch
+		 * into a polling mode under backlog. This bug (not
+		 * sending packet chains) has now been fixed. Once
+		 * the performance impact is measured, this change
+		 * will be removed.
+		 */
+		infop->mri_flags = (vnet_mac_rx_queuing ?
+		    MAC_RING_RX_ENQUEUE : 0);
 		break;
 	}
 
@@ -2178,10 +2298,17 @@ vnet_get_ring(void *arg, mac_ring_type_t rtype, const int g_index,
 		infop->mri_driver = (mac_ring_driver_t)tx_ringp;
 		infop->mri_start = vnet_tx_ring_start;
 		infop->mri_stop = vnet_tx_ring_stop;
+		infop->mri_stat = vnet_tx_ring_stat;
 
 		/* Set the transmit function, as this is a tx ring */
 		infop->mri_tx = vnet_tx_ring_send;
-
+		/*
+		 * MAC_RING_TX_SERIALIZE bit needs to be set while
+		 * hybridIO is enabled to workaround tx lock
+		 * contention issues in nxge.
+		 */
+		infop->mri_flags = (vnet_mac_tx_serialize ?
+		    MAC_RING_TX_SERIALIZE : 0);
 		break;
 	}
 
@@ -2325,6 +2452,44 @@ vnet_rx_ring_stop(mac_ring_driver_t arg)
 	rx_ringp->state &= ~VNET_RXRING_STARTED;
 }
 
+static int
+vnet_rx_ring_stat(mac_ring_driver_t rdriver, uint_t stat, uint64_t *val)
+{
+	vnet_pseudo_rx_ring_t	*rx_ringp = (vnet_pseudo_rx_ring_t *)rdriver;
+	vnet_t			*vnetp = (vnet_t *)rx_ringp->vnetp;
+	vnet_res_t		*vresp;
+	mac_register_t		*macp;
+	mac_callbacks_t		*cbp;
+
+	/*
+	 * Refer to vnet_m_capab() function for detailed comments on ring
+	 * synchronization.
+	 */
+	if ((rx_ringp->state & VNET_RXRING_HYBRID) != 0) {
+		READ_ENTER(&vnetp->vsw_fp_rw);
+		if (vnetp->hio_fp == NULL) {
+			RW_EXIT(&vnetp->vsw_fp_rw);
+			return (0);
+		}
+
+		VNET_FDBE_REFHOLD(vnetp->hio_fp);
+		RW_EXIT(&vnetp->vsw_fp_rw);
+		mac_hwring_getstat(rx_ringp->hw_rh, stat, val);
+		VNET_FDBE_REFRELE(vnetp->hio_fp);
+		return (0);
+	}
+
+	ASSERT((rx_ringp->state &
+	    (VNET_RXRING_LDC_SERVICE|VNET_RXRING_LDC_GUEST)) != 0);
+	vresp = (vnet_res_t *)rx_ringp->hw_rh;
+	macp = &vresp->macreg;
+	cbp = macp->m_callbacks;
+
+	cbp->mc_getstat(macp->m_driver, stat, val);
+
+	return (0);
+}
+
 /* ARGSUSED */
 static int
 vnet_tx_ring_start(mac_ring_driver_t arg, uint64_t mr_gen_num)
@@ -2341,6 +2506,31 @@ vnet_tx_ring_stop(mac_ring_driver_t arg)
 	vnet_pseudo_tx_ring_t	*tx_ringp = (vnet_pseudo_tx_ring_t *)arg;
 
 	tx_ringp->state &= ~VNET_TXRING_STARTED;
+}
+
+static int
+vnet_tx_ring_stat(mac_ring_driver_t rdriver, uint_t stat, uint64_t *val)
+{
+	vnet_pseudo_tx_ring_t	*tx_ringp = (vnet_pseudo_tx_ring_t *)rdriver;
+	vnet_tx_ring_stats_t	*statsp;
+
+	statsp = &tx_ringp->tx_ring_stats;
+
+	switch (stat) {
+	case MAC_STAT_OPACKETS:
+		*val = statsp->opackets;
+		break;
+
+	case MAC_STAT_OBYTES:
+		*val = statsp->obytes;
+		break;
+
+	default:
+		*val = 0;
+		return (ENOTSUP);
+	}
+
+	return (0);
 }
 
 /*
@@ -2569,10 +2759,6 @@ vnet_hio_mac_init(vnet_t *vnetp, char *ifname)
 	/* add the recv callback */
 	mac_rx_set(vnetp->hio_mch, vnet_hio_rx_cb, vnetp);
 
-	/* add the notify callback - only tx updates for now */
-	vnetp->hio_mnh = mac_notify_add(vnetp->hio_mh, vnet_hio_notify_cb,
-	    vnetp);
-
 	return (0);
 
 fail:
@@ -2584,11 +2770,6 @@ fail:
 void
 vnet_hio_mac_cleanup(vnet_t *vnetp)
 {
-	if (vnetp->hio_mnh != NULL) {
-		(void) mac_notify_remove(vnetp->hio_mnh, B_TRUE);
-		vnetp->hio_mnh = NULL;
-	}
-
 	if (vnetp->hio_vhp != NULL) {
 		vio_net_resource_unreg(vnetp->hio_vhp);
 		vnetp->hio_vhp = NULL;
@@ -2666,7 +2847,7 @@ vnet_bind_hwrings(vnet_t *vnetp)
 
 		/* Bind the pseudo ring to the underlying hwring */
 		mac_hwring_setup(rx_ringp->hw_rh,
-		    (mac_resource_handle_t)rx_ringp);
+		    (mac_resource_handle_t)rx_ringp, NULL);
 
 		/* Start the hwring if needed */
 		if (rx_ringp->state & VNET_RXRING_STARTED) {
@@ -2703,6 +2884,8 @@ vnet_bind_hwrings(vnet_t *vnetp)
 		tx_ringp->hw_rh = hw_rh[i];
 		tx_ringp->state |= VNET_TXRING_HYBRID;
 	}
+	tx_grp->tx_notify_handle =
+	    mac_client_tx_notify(vnetp->hio_mch, vnet_tx_ring_update, vnetp);
 
 	mac_perim_exit(mph1);
 	return (0);
@@ -2734,6 +2917,8 @@ vnet_unbind_hwrings(vnet_t *vnetp)
 			tx_ringp->hw_rh = NULL;
 		}
 	}
+	(void) mac_client_tx_notify(vnetp->hio_mch, NULL,
+	    tx_grp->tx_notify_handle);
 
 	rx_grp = &vnetp->rx_grp[0];
 	for (i = 0; i < VNET_NUM_HYBRID_RINGS; i++) {
@@ -2978,24 +3163,6 @@ vnet_hio_tx(void *arg, mblk_t *mp)
 			break;
 	}
 	return (mp);
-}
-
-static void
-vnet_hio_notify_cb(void *arg, mac_notify_type_t type)
-{
-	vnet_t			*vnetp = (vnet_t *)arg;
-	mac_perim_handle_t	mph;
-
-	mac_perim_enter_by_mh(vnetp->hio_mh, &mph);
-	switch (type) {
-	case MAC_NOTE_TX:
-		vnet_tx_update(vnetp->hio_vhp);
-		break;
-
-	default:
-		break;
-	}
-	mac_perim_exit(mph);
 }
 
 #ifdef	VNET_IOC_DEBUG

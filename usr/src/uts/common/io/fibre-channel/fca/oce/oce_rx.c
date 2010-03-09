@@ -25,7 +25,7 @@
  */
 
 /*
- * Source file containing the Recieve Path handling
+ * Source file containing the Receive Path handling
  * functions
  */
 #include <oce_impl.h>
@@ -420,7 +420,7 @@ oce_set_rx_oflags(mblk_t *mp, struct oce_nic_rx_cqe *cqe)
 
 	/* set flags */
 	if (cqe->u0.s.ip_cksum_pass) {
-		csum_flags |= HCK_IPV4_HDRCKSUM;
+		csum_flags |= HCK_IPV4_HDRCKSUM_OK;
 	}
 
 	if (cqe->u0.s.l4_cksum_pass) {
@@ -428,8 +428,7 @@ oce_set_rx_oflags(mblk_t *mp, struct oce_nic_rx_cqe *cqe)
 	}
 
 	if (csum_flags) {
-		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0,
-		    csum_flags, 0);
+		(void) mac_hcksum_set(mp, 0, 0, 0, 0, csum_flags);
 	}
 }
 

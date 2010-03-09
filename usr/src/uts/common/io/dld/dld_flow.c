@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,20 +69,23 @@ static int
 dld_walk_flow_cb(mac_flowinfo_t *finfo, void *arg)
 {
 	flowinfo_state_t		*statep = arg;
-	dld_flowinfo_t			fi;
+	dld_flowinfo_t			*fi;
 
 	if (statep->fi_bufsize < sizeof (dld_flowinfo_t))
 		return (ENOSPC);
 
-	(void) strlcpy(fi.fi_flowname, finfo->fi_flow_name,
-	    sizeof (fi.fi_flowname));
-	fi.fi_linkid = finfo->fi_link_id;
-	fi.fi_flow_desc = finfo->fi_flow_desc;
-	fi.fi_resource_props = finfo->fi_resource_props;
+	fi = kmem_zalloc(sizeof (*fi), KM_SLEEP);
+	(void) strlcpy(fi->fi_flowname, finfo->fi_flow_name,
+	    sizeof (fi->fi_flowname));
+	fi->fi_linkid = finfo->fi_link_id;
+	fi->fi_flow_desc = finfo->fi_flow_desc;
+	fi->fi_resource_props = finfo->fi_resource_props;
 
-	if (copyout(&fi, statep->fi_fl, sizeof (fi)) != 0) {
+	if (copyout(fi, statep->fi_fl, sizeof (*fi)) != 0) {
+		kmem_free(fi, sizeof (*fi));
 		return (EFAULT);
 	}
+	kmem_free(fi, sizeof (*fi));
 	statep->fi_nflows++;
 	statep->fi_bufsize -= sizeof (dld_flowinfo_t);
 	statep->fi_fl += sizeof (dld_flowinfo_t);
@@ -98,13 +101,14 @@ int
 dld_walk_flow(dld_ioc_walkflow_t *wf, intptr_t uaddr, cred_t *credp)
 {
 	flowinfo_state_t	state;
-	mac_flowinfo_t		finfo;
+	mac_flowinfo_t		*finfo;
 	int			err = 0;
 
 	/* For now, one can only view flows from the global zone. */
 	if (crgetzoneid(credp) != GLOBAL_ZONEID)
 		return (EPERM);
 
+	finfo = kmem_zalloc(sizeof (*finfo), KM_SLEEP);
 	state.fi_bufsize = wf->wf_len;
 	state.fi_fl = (uchar_t *)uaddr + sizeof (*wf);
 	state.fi_nflows = 0;
@@ -113,12 +117,14 @@ dld_walk_flow(dld_ioc_walkflow_t *wf, intptr_t uaddr, cred_t *credp)
 		err = mac_link_flow_walk(wf->wf_linkid, dld_walk_flow_cb,
 		    &state);
 	} else {
-		err = mac_link_flow_info(wf->wf_name, &finfo);
-		if (err != 0)
+		err = mac_link_flow_info(wf->wf_name, finfo);
+		if (err != 0) {
+			kmem_free(finfo, sizeof (*finfo));
 			return (err);
-
-		err = dld_walk_flow_cb(&finfo, &state);
+		}
+		err = dld_walk_flow_cb(finfo, &state);
 	}
+	kmem_free(finfo, sizeof (*finfo));
 	wf->wf_nflows = state.fi_nflows;
 	return (err);
 }

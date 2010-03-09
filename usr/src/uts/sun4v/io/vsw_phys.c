@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -497,17 +497,12 @@ vsw_mac_client_init(vsw_t *vswp, vsw_port_t *port, int type)
  * Open a MAC client for a port or an interface.
  * The flags and their purpose as below:
  *
- *	MAC_OPEN_FLAGS_NO_HWRINGS -- This flag is used by default
- *	for all ports/interface so that they are associated with
- *	default group & resources. It will not be used for the
- *	ports that have HybridIO is enabled so that the h/w resources
- *	assigned to it.
- *
  *	MAC_OPEN_FLAGS_SHARES_DESIRED -- This flag is used to indicate
  *	that a port desires a Share. This will be the case with the
  *	the ports that have hybrid mode enabled. This will only cause
  *	MAC layer to allocate a share and corresponding resources
- *	ahead of time.
+ *	ahead of time. Ports that are not HybridIO enabled are
+ *	associated with default group & resources.
  *
  *	MAC_UNICAST_TAG_DISABLE -- This flag is used for VLAN
  *	support. It will cause MAC to not add any tags, but expect
@@ -525,7 +520,7 @@ vsw_maccl_open(vsw_t *vswp, vsw_port_t *port, int type)
 	char		mac_cl_name[MAXNAMELEN];
 	const char	*dev_name;
 	mac_client_handle_t *mchp;
-	uint64_t flags = MAC_OPEN_FLAGS_NO_HWRINGS;
+	uint64_t flags = 0;
 
 	ASSERT(MUTEX_HELD(&vswp->mac_lock));
 	if (vswp->mh == NULL) {
@@ -545,10 +540,8 @@ vsw_maccl_open(vsw_t *vswp, vsw_port_t *port, int type)
 	dev_name = ddi_driver_name(vswp->dip);
 	instance = ddi_get_instance(vswp->dip);
 	if (type == VSW_VNETPORT) {
-		if (port->p_hio_enabled == B_TRUE) {
-			flags &= ~MAC_OPEN_FLAGS_NO_HWRINGS;
+		if (port->p_hio_enabled)
 			flags |= MAC_OPEN_FLAGS_SHARES_DESIRED;
-		}
 		(void) snprintf(mac_cl_name, MAXNAMELEN, "%s%d%s%d", dev_name,
 		    instance, "_port", port->p_instance);
 	} else {
@@ -561,6 +554,10 @@ vsw_maccl_open(vsw_t *vswp, vsw_port_t *port, int type)
 		cmn_err(CE_NOTE, "!vsw%d:%s mac_client_open() failed\n",
 		    vswp->instance, mac_cl_name);
 	}
+
+	if (type != VSW_VNETPORT || !port->p_hio_enabled)
+		mac_client_set_rings(*mchp, MAC_RXRINGS_NONE, MAC_TXRINGS_NONE);
+
 	return (rv);
 }
 
@@ -1389,7 +1386,7 @@ vsw_maccl_set_bandwidth(vsw_t *vswp, vsw_port_t *port, int type, uint64_t maxbw)
 {
 	int			rv = 0;
 	uint64_t		*bw;
-	mac_resource_props_t	mrp;
+	mac_resource_props_t	*mrp;
 	mac_client_handle_t	mch;
 
 	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
@@ -1409,15 +1406,15 @@ vsw_maccl_set_bandwidth(vsw_t *vswp, vsw_port_t *port, int type, uint64_t maxbw)
 	}
 
 	if (maxbw >= MRP_MAXBW_MINVAL || maxbw == 0) {
-		bzero(&mrp, sizeof (mac_resource_props_t));
+		mrp = kmem_zalloc(sizeof (*mrp), KM_SLEEP);
 		if (maxbw == 0) {
-			mrp.mrp_maxbw = MRP_MAXBW_RESETVAL;
+			mrp->mrp_maxbw = MRP_MAXBW_RESETVAL;
 		} else {
-			mrp.mrp_maxbw = maxbw;
+			mrp->mrp_maxbw = maxbw;
 		}
-		mrp.mrp_mask |= MRP_MAXBW;
+		mrp->mrp_mask |= MRP_MAXBW;
 
-		rv = mac_client_set_resources(mch, &mrp);
+		rv = mac_client_set_resources(mch, mrp);
 		if (rv != 0) {
 			if (type == VSW_VNETPORT) {
 				cmn_err(CE_NOTE, "!port%d: cannot set "
@@ -1434,5 +1431,6 @@ vsw_maccl_set_bandwidth(vsw_t *vswp, vsw_port_t *port, int type, uint64_t maxbw)
 			 */
 			*bw = maxbw;
 		}
+		kmem_free(mrp, sizeof (*mrp));
 	}
 }

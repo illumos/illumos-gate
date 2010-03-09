@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,7 @@ static fprop_desc_t	prop_table[] = {
 	{ "maxbw",	{ "", NULL }, NULL, 0, B_FALSE,
 	    do_set_maxbw, NULL,
 	    do_get_maxbw, do_check_maxbw},
-	{ "priority",	{ "", NULL }, NULL, 0, B_FALSE,
+	{ "priority",	{ "", MPL_RESET }, NULL, 0, B_FALSE,
 	    do_set_priority, NULL,
 	    do_get_priority, do_check_priority}
 };
@@ -77,8 +77,8 @@ static prop_table_t	prop_tbl = {
 };
 
 static resource_prop_t rsrc_prop_table[] = {
-	{"maxbw",	do_extract_maxbw},
-	{"priority",	do_extract_priority}
+	{"maxbw",	extract_maxbw},
+	{"priority",	extract_priority}
 };
 #define	DLADM_MAX_RSRC_PROP (sizeof (rsrc_prop_table) / \
 	sizeof (resource_prop_t))
@@ -387,15 +387,14 @@ do_set_priority(dladm_handle_t handle, const char *flow, val_desc_t *vdp,
 {
 	dld_ioc_modifyflow_t	attr;
 	mac_resource_props_t	mrp;
-	void			*val;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
 
 	bzero(&mrp, sizeof (mrp));
-	if (vdp != NULL && (val = (void *)vdp->vd_val) != NULL) {
-		bcopy(val, &mrp.mrp_priority, sizeof (mac_priority_level_t));
-		free(val);
+	if (vdp != NULL) {
+		bcopy(&vdp->vd_val, &mrp.mrp_priority,
+		    sizeof (mac_priority_level_t));
 	} else {
 		mrp.mrp_priority = MPL_RESET;
 	}
@@ -416,35 +415,25 @@ static dladm_status_t
 do_check_priority(fprop_desc_t *pdp, char **prop_val, uint_t val_cnt,
     val_desc_t **vdpp)
 {
-	mac_priority_level_t	*pri;
+	mac_priority_level_t	pri;
 	val_desc_t	*vdp = NULL;
 	dladm_status_t	status = DLADM_STATUS_OK;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
 
-	pri = malloc(sizeof (mac_priority_level_t));
-	if (pri == NULL)
-		return (DLADM_STATUS_NOMEM);
-
-	status = dladm_str2pri(*prop_val, pri);
-	if (status != DLADM_STATUS_OK) {
-		free(pri);
+	status = dladm_str2pri(*prop_val, &pri);
+	if (status != DLADM_STATUS_OK)
 		return (status);
-	}
 
-	if (*pri == -1) {
-		free(pri);
+	if (pri == -1)
 		return (DLADM_STATUS_BADVAL);
-	}
 
 	vdp = malloc(sizeof (val_desc_t));
-	if (vdp == NULL) {
-		free(pri);
+	if (vdp == NULL)
 		return (DLADM_STATUS_NOMEM);
-	}
 
-	vdp->vd_val = (uintptr_t)pri;
+	vdp->vd_val = (uint_t)pri;
 	*vdpp = vdp;
 	return (DLADM_STATUS_OK);
 }

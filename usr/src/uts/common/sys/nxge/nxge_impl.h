@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -641,6 +641,7 @@ struct _nxge_ldg_t {
 	p_nxge_ldv_t		ldvp;
 	nxge_sys_intr_t		sys_intr_handler;
 	p_nxge_t		nxgep;
+	uint32_t		htable_idx;
 };
 
 struct _nxge_ldv_t {
@@ -885,6 +886,8 @@ int nxge_port_kstat_update(kstat_t *, int);
 void nxge_save_cntrs(p_nxge_t);
 
 int nxge_m_stat(void *arg, uint_t, uint64_t *);
+int nxge_rx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
+int nxge_tx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
 
 /* nxge_hw.c */
 void

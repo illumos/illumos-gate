@@ -108,6 +108,7 @@
 #include <sys/mac_impl.h>
 #include <sys/mac_client_impl.h>
 #include <sys/mac_soft_ring.h>
+#include <sys/mac_stat.h>
 #include <sys/dls.h>
 #include <sys/dld.h>
 #include <sys/modctl.h>
@@ -144,6 +145,10 @@ static void mac_client_remove_flow_from_list(mac_client_impl_t *,
 static void mac_client_add_to_flow_list(mac_client_impl_t *, flow_entry_t *);
 static void mac_rename_flow_names(mac_client_impl_t *, const char *);
 static void mac_virtual_link_update(mac_impl_t *);
+static int mac_client_datapath_setup(mac_client_impl_t *, uint16_t,
+    uint8_t *, mac_resource_props_t *, boolean_t, mac_unicast_impl_t *);
+static void mac_client_datapath_teardown(mac_client_handle_t,
+    mac_unicast_impl_t *, flow_entry_t *);
 
 /* ARGSUSED */
 static int
@@ -560,6 +565,14 @@ mac_client_link_state(mac_client_impl_t *mcip)
 }
 
 /*
+ * These statistics are consumed by dladm show-link -s <vnic>,
+ * dladm show-vnic -s and netstat. With the introduction of dlstat,
+ * dladm show-link -s and dladm show-vnic -s witll be EOL'ed while
+ * netstat will consume from kstats introduced for dlstat. This code
+ * will be removed at that time.
+ */
+
+/*
  * Return the statistics of a MAC client. These statistics are different
  * then the statistics of the underlying MAC which are returned by
  * mac_stat_get().
@@ -567,9 +580,17 @@ mac_client_link_state(mac_client_impl_t *mcip)
 uint64_t
 mac_client_stat_get(mac_client_handle_t mch, uint_t stat)
 {
-	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
-	mac_impl_t *mip = mcip->mci_mip;
-	uint64_t val;
+	mac_client_impl_t 	*mcip = (mac_client_impl_t *)mch;
+	mac_impl_t 		*mip = mcip->mci_mip;
+	flow_entry_t 		*flent = mcip->mci_flent;
+	mac_soft_ring_set_t 	*mac_srs;
+	mac_rx_stats_t		*mac_rx_stat;
+	mac_tx_stats_t		*mac_tx_stat;
+	int i;
+	uint64_t val = 0;
+
+	mac_srs = (mac_soft_ring_set_t *)(flent->fe_tx_srs);
+	mac_tx_stat = &mac_srs->srs_tx.st_stat;
 
 	switch (stat) {
 	case MAC_STAT_LINK_STATE:
@@ -588,37 +609,52 @@ mac_client_stat_get(mac_client_handle_t mch, uint_t stat)
 		val = mac_client_ifspeed(mcip);
 		break;
 	case MAC_STAT_MULTIRCV:
-		val = mcip->mci_stat_multircv;
+		val = mcip->mci_misc_stat.mms_multircv;
 		break;
 	case MAC_STAT_BRDCSTRCV:
-		val = mcip->mci_stat_brdcstrcv;
+		val = mcip->mci_misc_stat.mms_brdcstrcv;
 		break;
 	case MAC_STAT_MULTIXMT:
-		val = mcip->mci_stat_multixmt;
+		val = mcip->mci_misc_stat.mms_multixmt;
 		break;
 	case MAC_STAT_BRDCSTXMT:
-		val = mcip->mci_stat_brdcstxmt;
+		val = mcip->mci_misc_stat.mms_brdcstxmt;
 		break;
 	case MAC_STAT_OBYTES:
-		val = mcip->mci_stat_obytes;
+		val = mac_tx_stat->mts_obytes;
 		break;
 	case MAC_STAT_OPACKETS:
-		val = mcip->mci_stat_opackets;
+		val = mac_tx_stat->mts_opackets;
 		break;
 	case MAC_STAT_OERRORS:
-		val = mcip->mci_stat_oerrors;
+		val = mac_tx_stat->mts_oerrors;
 		break;
 	case MAC_STAT_IPACKETS:
-		val = mcip->mci_stat_ipackets;
+		for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
+			mac_srs = (mac_soft_ring_set_t *)flent->fe_rx_srs[i];
+			mac_rx_stat = &mac_srs->srs_rx.sr_stat;
+			val += mac_rx_stat->mrs_intrcnt +
+			    mac_rx_stat->mrs_pollcnt + mac_rx_stat->mrs_lclcnt;
+		}
 		break;
 	case MAC_STAT_RBYTES:
-		val = mcip->mci_stat_ibytes;
+		for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
+			mac_srs = (mac_soft_ring_set_t *)flent->fe_rx_srs[i];
+			mac_rx_stat = &mac_srs->srs_rx.sr_stat;
+			val += mac_rx_stat->mrs_intrbytes +
+			    mac_rx_stat->mrs_pollbytes +
+			    mac_rx_stat->mrs_lclbytes;
+		}
 		break;
 	case MAC_STAT_IERRORS:
-		val = mcip->mci_stat_ierrors;
+		for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
+			mac_srs = (mac_soft_ring_set_t *)flent->fe_rx_srs[i];
+			mac_rx_stat = &mac_srs->srs_rx.sr_stat;
+			val += mac_rx_stat->mrs_ierrors;
+		}
 		break;
 	default:
-		val = mac_stat_default(mip, stat);
+		val = mac_driver_stat_default(mip, stat);
 		break;
 	}
 
@@ -676,9 +712,27 @@ mac_stat_get(mac_handle_t mh, uint_t stat)
 		 * The driver doesn't support this statistic.  Get the
 		 * statistic's default value.
 		 */
-		val = mac_stat_default(mip, stat);
+		val = mac_driver_stat_default(mip, stat);
 	}
 	return (val);
+}
+
+/*
+ * Query hardware rx ring corresponding to the pseudo ring.
+ */
+uint64_t
+mac_pseudo_rx_ring_stat_get(mac_ring_handle_t handle, uint_t stat)
+{
+	return (mac_rx_ring_stat_get(handle, stat));
+}
+
+/*
+ * Query hardware tx ring corresponding to the pseudo ring.
+ */
+uint64_t
+mac_pseudo_tx_ring_stat_get(mac_ring_handle_t handle, uint_t stat)
+{
+	return (mac_tx_ring_stat_get(handle, stat));
 }
 
 /*
@@ -750,6 +804,12 @@ mac_unicast_update_client_flow(mac_client_impl_t *mcip)
 
 	bcopy(map->ma_addr, flow_desc.fd_dst_mac, map->ma_len);
 	mac_flow_set_desc(flent, &flow_desc);
+
+	/*
+	 * The v6 local addr (used by mac protection) needs to be
+	 * regenerated because our mac address has changed.
+	 */
+	mac_protect_update_v6_local_addr(mcip);
 
 	/*
 	 * A MAC client could have one MAC address but multiple
@@ -1184,20 +1244,14 @@ int
 mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
     uint16_t flags)
 {
-	mac_impl_t *mip = (mac_impl_t *)mh;
-	mac_client_impl_t *mcip;
-	int err = 0;
-	boolean_t share_desired =
-	    ((flags & MAC_OPEN_FLAGS_SHARES_DESIRED) != 0);
-	boolean_t no_hwrings = ((flags & MAC_OPEN_FLAGS_NO_HWRINGS) != 0);
-	boolean_t req_hwrings = ((flags & MAC_OPEN_FLAGS_REQ_HWRINGS) != 0);
-	flow_entry_t	*flent = NULL;
+	mac_impl_t		*mip = (mac_impl_t *)mh;
+	mac_client_impl_t	*mcip;
+	int			err = 0;
+	boolean_t		share_desired;
+	flow_entry_t		*flent = NULL;
 
+	share_desired = (flags & MAC_OPEN_FLAGS_SHARES_DESIRED) != 0;
 	*mchp = NULL;
-	if (share_desired && no_hwrings) {
-		/* can't have shares but no hardware rings */
-		return (EINVAL);
-	}
 
 	i_mac_perim_enter(mip);
 
@@ -1249,6 +1303,9 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 	if ((flags & MAC_OPEN_FLAGS_IS_AGGR_PORT) != 0)
 		mcip->mci_state_flags |= MCIS_IS_AGGR_PORT;
 
+	if (mip->mi_state_flags & MIS_IS_AGGR)
+		mcip->mci_state_flags |= MCIS_IS_AGGR;
+
 	if ((flags & MAC_OPEN_FLAGS_USE_DATALINK_NAME) != 0) {
 		datalink_id_t	linkid;
 
@@ -1283,19 +1340,18 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 	if (flags & MAC_OPEN_FLAGS_MULTI_PRIMARY)
 		mcip->mci_flags |= MAC_CLIENT_FLAGS_MULTI_PRIMARY;
 
+	if (flags & MAC_OPEN_FLAGS_NO_UNICAST_ADDR)
+		mcip->mci_state_flags |= MCIS_NO_UNICAST_ADDR;
+
+	mac_protect_init(mcip);
+
 	/* the subflow table will be created dynamically */
 	mcip->mci_subflow_tab = NULL;
-	mcip->mci_stat_multircv = 0;
-	mcip->mci_stat_brdcstrcv = 0;
-	mcip->mci_stat_multixmt = 0;
-	mcip->mci_stat_brdcstxmt = 0;
 
-	mcip->mci_stat_obytes = 0;
-	mcip->mci_stat_opackets = 0;
-	mcip->mci_stat_oerrors = 0;
-	mcip->mci_stat_ibytes = 0;
-	mcip->mci_stat_ipackets = 0;
-	mcip->mci_stat_ierrors = 0;
+	mcip->mci_misc_stat.mms_multircv = 0;
+	mcip->mci_misc_stat.mms_brdcstrcv = 0;
+	mcip->mci_misc_stat.mms_multixmt = 0;
+	mcip->mci_misc_stat.mms_brdcstxmt = 0;
 
 	/* Create an initial flow */
 
@@ -1321,20 +1377,25 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 	 */
 	mac_client_add(mcip);
 
-	if (no_hwrings)
-		mcip->mci_state_flags |= MCIS_NO_HWRINGS;
-	if (req_hwrings)
-		mcip->mci_state_flags |= MCIS_REQ_HWRINGS;
 	mcip->mci_share = NULL;
-	if (share_desired) {
-		ASSERT(!no_hwrings);
+	if (share_desired)
 		i_mac_share_alloc(mcip);
-	}
 
 	DTRACE_PROBE2(mac__client__open__allocated, mac_impl_t *,
 	    mcip->mci_mip, mac_client_impl_t *, mcip);
 	*mchp = (mac_client_handle_t)mcip;
 
+	/*
+	 * We will do mimimal datapath setup to allow a MAC client to
+	 * transmit or receive non-unicast packets without waiting
+	 * for mac_unicast_add.
+	 */
+	if (mcip->mci_state_flags & MCIS_NO_UNICAST_ADDR) {
+		if ((err = mac_client_datapath_setup(mcip, VLAN_ID_NONE,
+		    NULL, NULL, B_TRUE, NULL)) != 0) {
+			goto done;
+		}
+	}
 	i_mac_perim_exit(mip);
 	return (0);
 
@@ -1373,6 +1434,13 @@ mac_client_close(mac_client_handle_t mch, uint16_t flags)
 		return;
 	}
 
+	/* If we have only setup up minimal datapth setup, tear it down */
+	if (mcip->mci_state_flags & MCIS_NO_UNICAST_ADDR) {
+		mac_client_datapath_teardown((mac_client_handle_t)mcip, NULL,
+		    mcip->mci_flent);
+		mcip->mci_state_flags &= ~MCIS_NO_UNICAST_ADDR;
+	}
+
 	/*
 	 * Remove the flent associated with the MAC client
 	 */
@@ -1389,7 +1457,7 @@ mac_client_close(mac_client_handle_t mch, uint16_t flags)
 	ASSERT(mcip->mci_tx_notify_cb_list == NULL);
 
 	i_mac_share_free(mcip);
-
+	mac_protect_fini(mcip);
 	mac_client_remove(mcip);
 
 	i_mac_perim_exit(mip);
@@ -1495,6 +1563,335 @@ mac_update_subflow_priority(mac_client_impl_t *mcip)
 }
 
 /*
+ * Modify the TX or RX ring properties. We could either just move around
+ * rings, i.e add/remove rings given to a client. Or this might cause the
+ * client to move from hardware based to software or the other way around.
+ * If we want to reset this property, then we clear the mask, additionally
+ * if the client was given a non-default group we remove all rings except
+ * for 1 and give it back to the default group.
+ */
+int
+mac_client_set_rings_prop(mac_client_impl_t *mcip, mac_resource_props_t *mrp,
+    mac_resource_props_t *tmrp)
+{
+	mac_impl_t		*mip = mcip->mci_mip;
+	flow_entry_t		*flent = mcip->mci_flent;
+	uint8_t			*mac_addr;
+	int			err = 0;
+	mac_group_t		*defgrp;
+	mac_group_t		*group;
+	mac_group_t		*ngrp;
+	mac_resource_props_t	*cmrp = MCIP_RESOURCE_PROPS(mcip);
+	uint_t			ringcnt;
+	boolean_t		unspec;
+
+	if (mcip->mci_share != NULL)
+		return (EINVAL);
+
+	if (mrp->mrp_mask & MRP_RX_RINGS) {
+		unspec = mrp->mrp_mask & MRP_RXRINGS_UNSPEC;
+		group = flent->fe_rx_ring_group;
+		defgrp = MAC_DEFAULT_RX_GROUP(mip);
+		mac_addr = flent->fe_flow_desc.fd_dst_mac;
+
+		/*
+		 * No resulting change. If we are resetting on a client on
+		 * which there was no rx rings property. For dynamic group
+		 * if we are setting the same number of rings already set.
+		 * For static group if we are requesting a group again.
+		 */
+		if (mrp->mrp_mask & MRP_RINGS_RESET) {
+			if (!(tmrp->mrp_mask & MRP_RX_RINGS))
+				return (0);
+		} else {
+			if (unspec) {
+				if (tmrp->mrp_mask & MRP_RXRINGS_UNSPEC)
+					return (0);
+			} else if (mip->mi_rx_group_type ==
+			    MAC_GROUP_TYPE_DYNAMIC) {
+				if ((tmrp->mrp_mask & MRP_RX_RINGS) &&
+				    !(tmrp->mrp_mask & MRP_RXRINGS_UNSPEC) &&
+				    mrp->mrp_nrxrings == tmrp->mrp_nrxrings) {
+					return (0);
+				}
+			}
+		}
+		/* Resetting the prop */
+		if (mrp->mrp_mask & MRP_RINGS_RESET) {
+			/*
+			 * We will just keep one ring and give others back if
+			 * we are not the primary. For the primary we give
+			 * all the rings in the default group except the
+			 * default ring. If it is a static group, then
+			 * we don't do anything, but clear the MRP_RX_RINGS
+			 * flag.
+			 */
+			if (group != defgrp) {
+				if (mip->mi_rx_group_type ==
+				    MAC_GROUP_TYPE_DYNAMIC) {
+					/*
+					 * This group has reserved rings
+					 * that need to be released now,
+					 * so does the group.
+					 */
+					MAC_RX_RING_RELEASED(mip,
+					    group->mrg_cur_count);
+					MAC_RX_GRP_RELEASED(mip);
+					if ((flent->fe_type &
+					    FLOW_PRIMARY_MAC) != 0) {
+						if (mip->mi_nactiveclients ==
+						    1) {
+							(void)
+							    mac_rx_switch_group(
+							    mcip, group,
+							    defgrp);
+							return (0);
+						} else {
+							cmrp->mrp_nrxrings =
+							    group->
+							    mrg_cur_count +
+							    defgrp->
+							    mrg_cur_count - 1;
+						}
+					} else {
+						cmrp->mrp_nrxrings = 1;
+					}
+					(void) mac_group_ring_modify(mcip,
+					    group, defgrp);
+				} else {
+					/*
+					 * If this is a static group, we
+					 * need to release the group. The
+					 * client will remain in the same
+					 * group till some other client
+					 * needs this group.
+					 */
+					MAC_RX_GRP_RELEASED(mip);
+				}
+			/* Let check if we can give this an excl group */
+			} else if (group == defgrp) {
+				ngrp = 	mac_reserve_rx_group(mcip, mac_addr,
+				    B_TRUE);
+				/* Couldn't give it a group, that's fine */
+				if (ngrp == NULL)
+					return (0);
+				/* Switch to H/W */
+				if (mac_rx_switch_group(mcip, defgrp, ngrp) !=
+				    0) {
+					mac_stop_group(ngrp);
+					return (0);
+				}
+			}
+			/*
+			 * If the client is in the default group, we will
+			 * just clear the MRP_RX_RINGS and leave it as
+			 * it rather than look for an exclusive group
+			 * for it.
+			 */
+			return (0);
+		}
+
+		if (group == defgrp && ((mrp->mrp_nrxrings > 0) || unspec)) {
+			ngrp = 	mac_reserve_rx_group(mcip, mac_addr, B_TRUE);
+			if (ngrp == NULL)
+				return (ENOSPC);
+
+			/* Switch to H/W */
+			if (mac_rx_switch_group(mcip, defgrp, ngrp) != 0) {
+				mac_release_rx_group(mcip, ngrp);
+				return (ENOSPC);
+			}
+			MAC_RX_GRP_RESERVED(mip);
+			if (mip->mi_rx_group_type == MAC_GROUP_TYPE_DYNAMIC)
+				MAC_RX_RING_RESERVED(mip, ngrp->mrg_cur_count);
+		} else if (group != defgrp && !unspec &&
+		    mrp->mrp_nrxrings == 0) {
+			/* Switch to S/W */
+			ringcnt = group->mrg_cur_count;
+			if (mac_rx_switch_group(mcip, group, defgrp) != 0)
+				return (ENOSPC);
+			if (tmrp->mrp_mask & MRP_RX_RINGS) {
+				MAC_RX_GRP_RELEASED(mip);
+				if (mip->mi_rx_group_type ==
+				    MAC_GROUP_TYPE_DYNAMIC) {
+					MAC_RX_RING_RELEASED(mip, ringcnt);
+				}
+			}
+		} else if (group != defgrp && mip->mi_rx_group_type ==
+		    MAC_GROUP_TYPE_DYNAMIC) {
+			ringcnt = group->mrg_cur_count;
+			err = mac_group_ring_modify(mcip, group, defgrp);
+			if (err != 0)
+				return (err);
+			/*
+			 * Update the accounting. If this group
+			 * already had explicitly reserved rings,
+			 * we need to update the rings based on
+			 * the new ring count. If this group
+			 * had not explicitly reserved rings,
+			 * then we just reserve the rings asked for
+			 * and reserve the group.
+			 */
+			if (tmrp->mrp_mask & MRP_RX_RINGS) {
+				if (ringcnt > group->mrg_cur_count) {
+					MAC_RX_RING_RELEASED(mip,
+					    ringcnt - group->mrg_cur_count);
+				} else {
+					MAC_RX_RING_RESERVED(mip,
+					    group->mrg_cur_count - ringcnt);
+				}
+			} else {
+				MAC_RX_RING_RESERVED(mip, group->mrg_cur_count);
+				MAC_RX_GRP_RESERVED(mip);
+			}
+		}
+	}
+	if (mrp->mrp_mask & MRP_TX_RINGS) {
+		unspec = mrp->mrp_mask & MRP_TXRINGS_UNSPEC;
+		group = flent->fe_tx_ring_group;
+		defgrp = MAC_DEFAULT_TX_GROUP(mip);
+
+		/*
+		 * For static groups we only allow rings=0 or resetting the
+		 * rings property.
+		 */
+		if (mrp->mrp_ntxrings > 0 &&
+		    mip->mi_tx_group_type != MAC_GROUP_TYPE_DYNAMIC) {
+			return (ENOTSUP);
+		}
+		if (mrp->mrp_mask & MRP_RINGS_RESET) {
+			if (!(tmrp->mrp_mask & MRP_TX_RINGS))
+				return (0);
+		} else {
+			if (unspec) {
+				if (tmrp->mrp_mask & MRP_TXRINGS_UNSPEC)
+					return (0);
+			} else if (mip->mi_tx_group_type ==
+			    MAC_GROUP_TYPE_DYNAMIC) {
+				if ((tmrp->mrp_mask & MRP_TX_RINGS) &&
+				    !(tmrp->mrp_mask & MRP_TXRINGS_UNSPEC) &&
+				    mrp->mrp_ntxrings == tmrp->mrp_ntxrings) {
+					return (0);
+				}
+			}
+		}
+		/* Resetting the prop */
+		if (mrp->mrp_mask & MRP_RINGS_RESET) {
+			if (group != defgrp) {
+				if (mip->mi_tx_group_type ==
+				    MAC_GROUP_TYPE_DYNAMIC) {
+					ringcnt = group->mrg_cur_count;
+					if ((flent->fe_type &
+					    FLOW_PRIMARY_MAC) != 0) {
+						mac_tx_client_quiesce(
+						    (mac_client_handle_t)
+						    mcip);
+						mac_tx_switch_group(mcip,
+						    group, defgrp);
+						mac_tx_client_restart(
+						    (mac_client_handle_t)
+						    mcip);
+						MAC_TX_GRP_RELEASED(mip);
+						MAC_TX_RING_RELEASED(mip,
+						    ringcnt);
+						return (0);
+					}
+					cmrp->mrp_ntxrings = 1;
+					(void) mac_group_ring_modify(mcip,
+					    group, defgrp);
+					/*
+					 * This group has reserved rings
+					 * that need to be released now.
+					 */
+					MAC_TX_RING_RELEASED(mip, ringcnt);
+				}
+				/*
+				 * If this is a static group, we
+				 * need to release the group. The
+				 * client will remain in the same
+				 * group till some other client
+				 * needs this group.
+				 */
+				MAC_TX_GRP_RELEASED(mip);
+			} else if (group == defgrp &&
+			    (flent->fe_type & FLOW_PRIMARY_MAC) == 0) {
+				ngrp = mac_reserve_tx_group(mcip, B_TRUE);
+				if (ngrp == NULL)
+					return (0);
+				mac_tx_client_quiesce(
+				    (mac_client_handle_t)mcip);
+				mac_tx_switch_group(mcip, defgrp, ngrp);
+				mac_tx_client_restart(
+				    (mac_client_handle_t)mcip);
+			}
+			/*
+			 * If the client is in the default group, we will
+			 * just clear the MRP_TX_RINGS and leave it as
+			 * it rather than look for an exclusive group
+			 * for it.
+			 */
+			return (0);
+		}
+
+		/* Switch to H/W */
+		if (group == defgrp && ((mrp->mrp_ntxrings > 0) || unspec)) {
+			ngrp = 	mac_reserve_tx_group(mcip, B_TRUE);
+			if (ngrp == NULL)
+				return (ENOSPC);
+			mac_tx_client_quiesce((mac_client_handle_t)mcip);
+			mac_tx_switch_group(mcip, defgrp, ngrp);
+			mac_tx_client_restart((mac_client_handle_t)mcip);
+			MAC_TX_GRP_RESERVED(mip);
+			if (mip->mi_tx_group_type == MAC_GROUP_TYPE_DYNAMIC)
+				MAC_TX_RING_RESERVED(mip, ngrp->mrg_cur_count);
+		/* Switch to S/W */
+		} else if (group != defgrp && !unspec &&
+		    mrp->mrp_ntxrings == 0) {
+			/* Switch to S/W */
+			ringcnt = group->mrg_cur_count;
+			mac_tx_client_quiesce((mac_client_handle_t)mcip);
+			mac_tx_switch_group(mcip, group, defgrp);
+			mac_tx_client_restart((mac_client_handle_t)mcip);
+			if (tmrp->mrp_mask & MRP_TX_RINGS) {
+				MAC_TX_GRP_RELEASED(mip);
+				if (mip->mi_tx_group_type ==
+				    MAC_GROUP_TYPE_DYNAMIC) {
+					MAC_TX_RING_RELEASED(mip, ringcnt);
+				}
+			}
+		} else if (group != defgrp && mip->mi_tx_group_type ==
+		    MAC_GROUP_TYPE_DYNAMIC) {
+			ringcnt = group->mrg_cur_count;
+			err = mac_group_ring_modify(mcip, group, defgrp);
+			if (err != 0)
+				return (err);
+			/*
+			 * Update the accounting. If this group
+			 * already had explicitly reserved rings,
+			 * we need to update the rings based on
+			 * the new ring count. If this group
+			 * had not explicitly reserved rings,
+			 * then we just reserve the rings asked for
+			 * and reserve the group.
+			 */
+			if (tmrp->mrp_mask & MRP_TX_RINGS) {
+				if (ringcnt > group->mrg_cur_count) {
+					MAC_TX_RING_RELEASED(mip,
+					    ringcnt - group->mrg_cur_count);
+				} else {
+					MAC_TX_RING_RESERVED(mip,
+					    group->mrg_cur_count - ringcnt);
+				}
+			} else {
+				MAC_TX_RING_RESERVED(mip, group->mrg_cur_count);
+				MAC_TX_GRP_RESERVED(mip);
+			}
+		}
+	}
+	return (0);
+}
+
+/*
  * When the MAC client is being brought up (i.e. we do a unicast_add) we need
  * to initialize the cpu and resource control structure in the
  * mac_client_impl_t from the mac_impl_t (i.e if there are any cached
@@ -1506,15 +1903,72 @@ mac_resource_ctl_set(mac_client_handle_t mch, mac_resource_props_t *mrp)
 	mac_client_impl_t 	*mcip = (mac_client_impl_t *)mch;
 	mac_impl_t		*mip = (mac_impl_t *)mcip->mci_mip;
 	int			err = 0;
+	flow_entry_t		*flent = mcip->mci_flent;
+	mac_resource_props_t	*omrp, *nmrp = MCIP_RESOURCE_PROPS(mcip);
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
-	err = mac_validate_props(mrp);
+	err = mac_validate_props(mcip->mci_state_flags & MCIS_IS_VNIC ?
+	    mcip->mci_upper_mip : mip, mrp);
 	if (err != 0)
 		return (err);
 
+	/*
+	 * Copy over the existing properties since mac_update_resources
+	 * will modify the client's mrp. Currently, the saved property
+	 * is used to determine the difference between existing and
+	 * modified rings property.
+	 */
+	omrp = kmem_zalloc(sizeof (*omrp), KM_SLEEP);
+	bcopy(nmrp, omrp, sizeof (*omrp));
 	mac_update_resources(mrp, MCIP_RESOURCE_PROPS(mcip), B_FALSE);
 	if (MCIP_DATAPATH_SETUP(mcip)) {
+		/*
+		 * We support rings only for primary client when there are
+		 * multiple clients sharing the same MAC address (e.g. VLAN).
+		 */
+		if (mrp->mrp_mask & MRP_RX_RINGS ||
+		    mrp->mrp_mask & MRP_TX_RINGS) {
+
+			if ((err = mac_client_set_rings_prop(mcip, mrp,
+			    omrp)) != 0) {
+				if (omrp->mrp_mask & MRP_RX_RINGS) {
+					nmrp->mrp_mask |= MRP_RX_RINGS;
+					nmrp->mrp_nrxrings = omrp->mrp_nrxrings;
+				} else {
+					nmrp->mrp_mask &= ~MRP_RX_RINGS;
+					nmrp->mrp_nrxrings = 0;
+				}
+				if (omrp->mrp_mask & MRP_TX_RINGS) {
+					nmrp->mrp_mask |= MRP_TX_RINGS;
+					nmrp->mrp_ntxrings = omrp->mrp_ntxrings;
+				} else {
+					nmrp->mrp_mask &= ~MRP_TX_RINGS;
+					nmrp->mrp_ntxrings = 0;
+				}
+				if (omrp->mrp_mask & MRP_RXRINGS_UNSPEC)
+					omrp->mrp_mask |= MRP_RXRINGS_UNSPEC;
+				else
+					omrp->mrp_mask &= ~MRP_RXRINGS_UNSPEC;
+
+				if (omrp->mrp_mask & MRP_TXRINGS_UNSPEC)
+					omrp->mrp_mask |= MRP_TXRINGS_UNSPEC;
+				else
+					omrp->mrp_mask &= ~MRP_TXRINGS_UNSPEC;
+				kmem_free(omrp, sizeof (*omrp));
+				return (err);
+			}
+
+			/*
+			 * If we modified the rings property of the primary
+			 * we need to update the property fields of its
+			 * VLANs as they inherit the primary's properites.
+			 */
+			if (mac_is_primary_client(mcip)) {
+				mac_set_prim_vlan_rings(mip,
+				    MCIP_RESOURCE_PROPS(mcip));
+			}
+		}
 		/*
 		 * We have to set this prior to calling mac_flow_modify.
 		 */
@@ -1528,11 +1982,11 @@ mac_resource_ctl_set(mac_client_handle_t mch, mac_resource_props_t *mrp)
 			}
 		}
 
-		mac_flow_modify(mip->mi_flow_tab, mcip->mci_flent, mrp);
+		mac_flow_modify(mip->mi_flow_tab, flent, mrp);
 		if (mrp->mrp_mask & MRP_PRIORITY)
 			mac_update_subflow_priority(mcip);
-		return (0);
 	}
+	kmem_free(omrp, sizeof (*omrp));
 	return (0);
 }
 
@@ -1562,8 +2016,12 @@ mac_unicast_flow_create(mac_client_impl_t *mcip, uint8_t *mac_addr,
 	 */
 	bzero(&flow_desc, sizeof (flow_desc));
 
-	flow_desc.fd_mac_len = mip->mi_type->mt_addr_length;
-	bcopy(mac_addr, flow_desc.fd_dst_mac, flow_desc.fd_mac_len);
+	ASSERT(mac_addr != NULL ||
+	    (mcip->mci_state_flags & MCIS_NO_UNICAST_ADDR));
+	if (mac_addr != NULL) {
+		flow_desc.fd_mac_len = mip->mi_type->mt_addr_length;
+		bcopy(mac_addr, flow_desc.fd_dst_mac, flow_desc.fd_mac_len);
+	}
 	flow_desc.fd_mask = FLOW_LINK_DST;
 	if (vid != 0) {
 		flow_desc.fd_vid = vid;
@@ -1612,6 +2070,7 @@ mac_unicast_flow_create(mac_client_impl_t *mcip, uint8_t *mac_addr,
 	    flent_flags, flent)) != 0)
 		return (err);
 
+	mac_misc_stat_create(*flent);
 	FLOW_MARK(*flent, FE_INCIPIENT);
 	(*flent)->fe_mcip = mcip;
 
@@ -1700,6 +2159,9 @@ mac_client_datapath_setup(mac_client_impl_t *mcip, uint16_t vid,
 	boolean_t	nactiveclients_added = B_FALSE;
 	flow_entry_t	*flent;
 	int		err = 0;
+	boolean_t	no_unicast;
+
+	no_unicast = mcip->mci_state_flags & MCIS_NO_UNICAST_ADDR;
 
 	if ((err = mac_start((mac_handle_t)mip)) != 0)
 		goto bail;
@@ -1725,10 +2187,11 @@ mac_client_datapath_setup(mac_client_impl_t *mcip, uint16_t vid,
 	/* We are configuring the unicast flow now */
 	if (!MCIP_DATAPATH_SETUP(mcip)) {
 
-		MAC_CLIENT_SET_PRIORITY_RANGE(mcip,
-		    (mrp->mrp_mask & MRP_PRIORITY) ? mrp->mrp_priority :
-		    MPL_LINK_DEFAULT);
-
+		if (mrp != NULL) {
+			MAC_CLIENT_SET_PRIORITY_RANGE(mcip,
+			    (mrp->mrp_mask & MRP_PRIORITY) ? mrp->mrp_priority :
+			    MPL_LINK_DEFAULT);
+		}
 		if ((err = mac_unicast_flow_create(mcip, mac_addr, vid,
 		    isprimary, B_TRUE, &flent, mrp)) != 0)
 			goto bail;
@@ -1743,6 +2206,8 @@ mac_client_datapath_setup(mac_client_impl_t *mcip, uint16_t vid,
 		if ((err = mac_datapath_setup(mcip, flent, SRST_LINK)) != 0)
 			goto bail;
 
+		if (no_unicast)
+			goto done_setup;
 		/*
 		 * The unicast MAC address must have been added successfully.
 		 */
@@ -1756,6 +2221,7 @@ mac_client_datapath_setup(mac_client_impl_t *mcip, uint16_t vid,
 	} else {
 		mac_address_t *map = mcip->mci_unicast;
 
+		ASSERT(!no_unicast);
 		/*
 		 * A unicast flow already exists for that MAC client,
 		 * this flow must be the same mac address but with
@@ -1794,7 +2260,7 @@ mac_client_datapath_setup(mac_client_impl_t *mcip, uint16_t vid,
 	mcip->mci_unicast_list = muip;
 	rw_exit(&mcip->mci_rw_lock);
 
-
+done_setup:
 	/*
 	 * First add the flent to the flow list of this mcip. Then set
 	 * the mip's mi_single_active_client if needed. The Rx path assumes
@@ -1802,7 +2268,6 @@ mac_client_datapath_setup(mac_client_impl_t *mcip, uint16_t vid,
 	 * flent.
 	 */
 	mac_client_add_to_flow_list(mcip, flent);
-
 	if (nactiveclients_added)
 		mac_update_single_active_client(mip);
 	/*
@@ -1889,7 +2354,7 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	boolean_t		fastpath_disabled = B_FALSE;
 	boolean_t		is_primary = (flags & MAC_UNICAST_PRIMARY);
 	boolean_t		is_unicast_hw = (flags & MAC_UNICAST_HW);
-	mac_resource_props_t	mrp;
+	mac_resource_props_t	*mrp;
 	boolean_t		passive_client = B_FALSE;
 	mac_unicast_impl_t	*muip;
 	boolean_t		is_vnic_primary =
@@ -1897,6 +2362,13 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 
 	/* when VID is non-zero, the underlying MAC can not be VNIC */
 	ASSERT(!((mip->mi_state_flags & MIS_IS_VNIC) && (vid != 0)));
+
+	/*
+	 * Can't unicast add if the client asked only for minimal datapath
+	 * setup.
+	 */
+	if (mcip->mci_state_flags & MCIS_NO_UNICAST_ADDR)
+		return (ENOTSUP);
 
 	/*
 	 * Check for an attempted use of the current Port VLAN ID, if enabled.
@@ -2020,7 +2492,7 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		mip->mi_state_flags |= MIS_EXCLUSIVE;
 	}
 
-	bzero(&mrp, sizeof (mac_resource_props_t));
+	mrp = kmem_zalloc(sizeof (*mrp), KM_SLEEP);
 	if (is_primary && !(mcip->mci_state_flags & (MCIS_IS_VNIC |
 	    MCIS_IS_AGGR_PORT))) {
 		/*
@@ -2029,11 +2501,40 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		 * port, its property should be set in the mcip when the
 		 * VNIC/aggr was created.
 		 */
-		mac_get_resources((mac_handle_t)mip, &mrp);
-		(void) mac_client_set_resources(mch, &mrp);
+		mac_get_resources((mac_handle_t)mip, mrp);
+		(void) mac_client_set_resources(mch, mrp);
 	} else if (mcip->mci_state_flags & MCIS_IS_VNIC) {
-		bcopy(MCIP_RESOURCE_PROPS(mcip), &mrp,
-		    sizeof (mac_resource_props_t));
+		/*
+		 * This is a primary VLAN client, we don't support
+		 * specifying rings property for this as it inherits the
+		 * rings property from its MAC.
+		 */
+		if (is_vnic_primary) {
+			mac_resource_props_t	*vmrp;
+
+			vmrp = MCIP_RESOURCE_PROPS(mcip);
+			if (vmrp->mrp_mask & MRP_RX_RINGS ||
+			    vmrp->mrp_mask & MRP_TX_RINGS) {
+				if (fastpath_disabled)
+					mac_fastpath_enable((mac_handle_t)mip);
+				kmem_free(mrp, sizeof (*mrp));
+				return (ENOTSUP);
+			}
+			/*
+			 * Additionally we also need to inherit any
+			 * rings property from the MAC.
+			 */
+			mac_get_resources((mac_handle_t)mip, mrp);
+			if (mrp->mrp_mask & MRP_RX_RINGS) {
+				vmrp->mrp_mask |= MRP_RX_RINGS;
+				vmrp->mrp_nrxrings = mrp->mrp_nrxrings;
+			}
+			if (mrp->mrp_mask & MRP_TX_RINGS) {
+				vmrp->mrp_mask |= MRP_TX_RINGS;
+				vmrp->mrp_ntxrings = mrp->mrp_ntxrings;
+			}
+		}
+		bcopy(MCIP_RESOURCE_PROPS(mcip), mrp, sizeof (*mrp));
 	}
 
 	muip = kmem_zalloc(sizeof (mac_unicast_impl_t), KM_SLEEP);
@@ -2151,6 +2652,7 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		ASSERT((mcip->mci_flags &
 		    MAC_CLIENT_FLAGS_PASSIVE_PRIMARY) == 0);
 		mcip->mci_flags |= MAC_CLIENT_FLAGS_PASSIVE_PRIMARY;
+		kmem_free(mrp, sizeof (*mrp));
 
 		/*
 		 * Stash the unicast address handle, we will use it when
@@ -2161,10 +2663,12 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		return (0);
 	}
 
-	err = mac_client_datapath_setup(mcip, vid, mac_addr, &mrp,
+	err = mac_client_datapath_setup(mcip, vid, mac_addr, mrp,
 	    is_primary || is_vnic_primary, muip);
 	if (err != 0)
 		goto bail_out;
+
+	kmem_free(mrp, sizeof (*mrp));
 	*mah = (mac_unicast_handle_t)muip;
 	return (0);
 
@@ -2178,6 +2682,7 @@ bail_out:
 			    mip->mi_driver);
 		}
 	}
+	kmem_free(mrp, sizeof (*mrp));
 	kmem_free(muip, sizeof (mac_unicast_impl_t));
 	return (err);
 }
@@ -2227,25 +2732,33 @@ mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	return (err);
 }
 
-void
+static void
 mac_client_datapath_teardown(mac_client_handle_t mch, mac_unicast_impl_t *muip,
     flow_entry_t *flent)
 {
 	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
 	mac_impl_t		*mip = mcip->mci_mip;
+	boolean_t		no_unicast;
 
 	/*
-	 * We would have initialized subflows etc. only if we brought up
-	 * the primary client and set the unicast unicast address etc.
-	 * Deactivate the flows. The flow entry will be removed from the
-	 * active flow tables, and the associated SRS, softrings etc will
-	 * be deleted. But the flow entry itself won't be destroyed, instead
-	 * it will continue to be archived off the  the global flow hash
-	 * list, for a possible future activation when say IP is plumbed
-	 * again.
+	 * If we have not added a unicast address for this MAC client, just
+	 * teardown the datapath.
 	 */
-	mac_link_release_flows(mch);
+	no_unicast = mcip->mci_state_flags & MCIS_NO_UNICAST_ADDR;
 
+	if (!no_unicast) {
+		/*
+		 * We would have initialized subflows etc. only if we brought
+		 * up the primary client and set the unicast unicast address
+		 * etc. Deactivate the flows. The flow entry will be removed
+		 * from the active flow tables, and the associated SRS,
+		 * softrings etc will be deleted. But the flow entry itself
+		 * won't be destroyed, instead it will continue to be archived
+		 * off the  the global flow hash list, for a possible future
+		 * activation when say IP is plumbed again.
+		 */
+		mac_link_release_flows(mch);
+	}
 	mip->mi_nactiveclients--;
 	mac_update_single_active_client(mip);
 
@@ -2287,6 +2800,7 @@ mac_client_datapath_teardown(mac_client_handle_t mch, mac_unicast_impl_t *muip,
 	    flent->fe_tx_srs == NULL && flent->fe_rx_srs_cnt == 0);
 	flent->fe_flags = FE_MC_NO_DATAPATH;
 	flow_stat_destroy(flent);
+	mac_misc_stat_delete(flent);
 
 	/* Initialize the receiver function to a safe routine */
 	flent->fe_cb_fn = (flow_fn_t)mac_pkt_drop;
@@ -2297,8 +2811,9 @@ mac_client_datapath_teardown(mac_client_handle_t mch, mac_unicast_impl_t *muip,
 	mutex_exit(&flent->fe_lock);
 
 	if (mip->mi_type->mt_brdcst_addr != NULL) {
+		ASSERT(muip != NULL || no_unicast);
 		mac_bcast_delete(mcip, mip->mi_type->mt_brdcst_addr,
-		    muip->mui_vid);
+		    muip != NULL ? muip->mui_vid : VLAN_ID_NONE);
 	}
 
 	if (mip->mi_nactiveclients == 1) {
@@ -2324,8 +2839,12 @@ mac_client_datapath_teardown(mac_client_handle_t mch, mac_unicast_impl_t *muip,
 	if (mcip->mci_state_flags & MCIS_DISABLE_TX_VID_CHECK)
 		mcip->mci_state_flags &= ~MCIS_DISABLE_TX_VID_CHECK;
 
-	kmem_free(muip, sizeof (mac_unicast_impl_t));
+	if (muip != NULL)
+		kmem_free(muip, sizeof (mac_unicast_impl_t));
+	mac_protect_cancel_timer(mcip);
+	mac_protect_flush_dhcp(mcip);
 
+	bzero(&mcip->mci_misc_stat, sizeof (mcip->mci_misc_stat));
 	/*
 	 * Disable fastpath if this is a VNIC or a VLAN.
 	 */
@@ -2345,7 +2864,7 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 	mac_unicast_impl_t *pre;
 	mac_impl_t *mip = mcip->mci_mip;
 	flow_entry_t		*flent;
-	boolean_t		isprimary = B_FALSE;
+	uint16_t mui_vid;
 
 	i_mac_perim_enter(mip);
 	if (mcip->mci_flags & MAC_CLIENT_FLAGS_VNIC_PRIMARY) {
@@ -2436,11 +2955,6 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 		rw_exit(&mcip->mci_rw_lock);
 	}
 
-	if ((mcip->mci_flags & MAC_CLIENT_FLAGS_PRIMARY) &&
-	    muip->mui_vid == 0) {
-		mcip->mci_flags &= ~MAC_CLIENT_FLAGS_PRIMARY;
-		isprimary = B_TRUE;
-	}
 	if (!mac_client_single_rcvr(mcip)) {
 		/*
 		 * This MAC client is shared by more than one unicast
@@ -2490,34 +3004,39 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 		return (0);
 	}
 
+	mui_vid = muip->mui_vid;
 	mac_client_datapath_teardown(mch, muip, flent);
+
+	if ((mcip->mci_flags & MAC_CLIENT_FLAGS_PRIMARY) && mui_vid == 0) {
+		mcip->mci_flags &= ~MAC_CLIENT_FLAGS_PRIMARY;
+	} else {
+		i_mac_perim_exit(mip);
+		return (0);
+	}
 
 	/*
 	 * If we are removing the primary, check if we have a passive primary
 	 * client that we need to activate now.
 	 */
-	if (!isprimary) {
-		i_mac_perim_exit(mip);
-		return (0);
-	}
 	mcip = mac_get_passive_primary_client(mip);
 	if (mcip != NULL) {
-		mac_resource_props_t	mrp;
+		mac_resource_props_t	*mrp;
 		mac_unicast_impl_t	*muip;
 
 		mcip->mci_flags &= ~MAC_CLIENT_FLAGS_PASSIVE_PRIMARY;
-		bzero(&mrp, sizeof (mac_resource_props_t));
+		mrp = kmem_zalloc(sizeof (*mrp), KM_SLEEP);
+
 		/*
 		 * Apply the property cached in the mac_impl_t to the
 		 * primary mac client.
 		 */
-		mac_get_resources((mac_handle_t)mip, &mrp);
-		(void) mac_client_set_resources(mch, &mrp);
+		mac_get_resources((mac_handle_t)mip, mrp);
+		(void) mac_client_set_resources(mch, mrp);
 		ASSERT(mcip->mci_p_unicast_list != NULL);
 		muip = mcip->mci_p_unicast_list;
 		mcip->mci_p_unicast_list = NULL;
 		if (mac_client_datapath_setup(mcip, VLAN_ID_NONE,
-		    mip->mi_addr, &mrp, B_TRUE, muip) == 0) {
+		    mip->mi_addr, mrp, B_TRUE, muip) == 0) {
 			if (mcip->mci_rx_p_fn != NULL) {
 				mac_rx_set(mch, mcip->mci_rx_p_fn,
 				    mcip->mci_rx_p_arg);
@@ -2527,6 +3046,7 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 		} else {
 			kmem_free(muip, sizeof (mac_unicast_impl_t));
 		}
+		kmem_free(mrp, sizeof (*mrp));
 	}
 	i_mac_perim_exit(mip);
 	return (0);
@@ -2775,36 +3295,6 @@ mac_promisc_remove(mac_promisc_handle_t mph)
 }
 
 /*
- * Bump the count of the number of active Tx threads. This is maintained as
- * a per CPU counter. On (CMT kind of) machines with large number of CPUs,
- * a single mci_tx_lock may become contended. However a count of the total
- * number of Tx threads per client is needed in order to quiesce the Tx side
- * prior to reassigning a Tx ring dynamically to another client. The thread
- * that needs to quiesce the Tx traffic grabs all the percpu locks and checks
- * the sum of the individual percpu refcnts. Each Tx data thread only grabs
- * its own percpu lock and increments its own refcnt.
- */
-void *
-mac_tx_hold(mac_client_handle_t mch)
-{
-	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
-	mac_tx_percpu_t	*mytx;
-	int error;
-
-	MAC_TX_TRY_HOLD(mcip, mytx, error);
-	return (error == 0 ? (void *)mytx : NULL);
-}
-
-void
-mac_tx_rele(mac_client_handle_t mch, void *mytx_handle)
-{
-	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
-	mac_tx_percpu_t	*mytx = mytx_handle;
-
-	MAC_TX_RELE(mcip, mytx)
-}
-
-/*
  * Send function invoked by MAC clients.
  */
 mac_tx_cookie_t
@@ -2872,8 +3362,7 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 	srs_tx = &srs->srs_tx;
 	if (srs_tx->st_mode == SRS_TX_DEFAULT &&
 	    (srs->srs_state & SRS_ENQUEUED) == 0 &&
-	    mip->mi_nactiveclients == 1 && mip->mi_promisc_list == NULL &&
-	    mp_chain->b_next == NULL) {
+	    mip->mi_nactiveclients == 1 && mp_chain->b_next == NULL) {
 		uint64_t	obytes;
 
 		/*
@@ -2891,7 +3380,7 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 				MAC_VID_CHECK(mcip, mp_chain, err);
 				if (err != 0) {
 					freemsg(mp_chain);
-					mcip->mci_stat_oerrors++;
+					mcip->mci_misc_stat.mms_txerrors++;
 					goto done;
 				}
 			}
@@ -2899,7 +3388,7 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 				mp_chain = mac_add_vlan_tag(mp_chain, 0,
 				    mac_client_vid(mch));
 				if (mp_chain == NULL) {
-					mcip->mci_stat_oerrors++;
+					mcip->mci_misc_stat.mms_txerrors++;
 					goto done;
 				}
 			}
@@ -2908,17 +3397,11 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 		obytes = (mp_chain->b_cont == NULL ? MBLKL(mp_chain) :
 		    msgdsize(mp_chain));
 
-		MAC_TX(mip, srs_tx->st_arg2, mp_chain,
-		    ((mcip->mci_state_flags & MCIS_SHARE_BOUND) != 0));
-
+		MAC_TX(mip, srs_tx->st_arg2, mp_chain, mcip);
 		if (mp_chain == NULL) {
 			cookie = NULL;
-			mcip->mci_stat_obytes += obytes;
-			mcip->mci_stat_opackets += 1;
-			if ((srs->srs_type & SRST_FLOW) != 0) {
-				FLOW_STAT_UPDATE(flent, obytes, obytes);
-				FLOW_STAT_UPDATE(flent, opackets, 1);
-			}
+			SRS_TX_STAT_UPDATE(srs, opackets, 1);
+			SRS_TX_STAT_UPDATE(srs, obytes, obytes);
 		} else {
 			mutex_enter(&srs->srs_lock);
 			cookie = mac_tx_srs_no_desc(srs, mp_chain,
@@ -2978,7 +3461,14 @@ mac_tx_is_flow_blocked(mac_client_handle_t mch, mac_tx_cookie_t cookie)
 	}
 
 	mutex_enter(&mac_srs->srs_lock);
-	if (mac_srs->srs_tx.st_mode == SRS_TX_FANOUT) {
+	/*
+	 * Only in the case of TX_FANOUT and TX_AGGR, the underlying
+	 * softring (s_ring_state) will have the HIWAT set. This is
+	 * the multiple Tx ring flow control case. For all other
+	 * case, SRS (srs_state) will store the condition.
+	 */
+	if (mac_srs->srs_tx.st_mode == SRS_TX_FANOUT ||
+	    mac_srs->srs_tx.st_mode == SRS_TX_AGGR) {
 		if (cookie != NULL) {
 			sringp = (mac_soft_ring_t *)cookie;
 			mutex_enter(&sringp->s_ring_lock);
@@ -2986,8 +3476,8 @@ mac_tx_is_flow_blocked(mac_client_handle_t mch, mac_tx_cookie_t cookie)
 				blocked = B_TRUE;
 			mutex_exit(&sringp->s_ring_lock);
 		} else {
-			for (i = 0; i < mac_srs->srs_oth_ring_count; i++) {
-				sringp = mac_srs->srs_oth_soft_rings[i];
+			for (i = 0; i < mac_srs->srs_tx_ring_count; i++) {
+				sringp = mac_srs->srs_tx_soft_rings[i];
 				mutex_enter(&sringp->s_ring_lock);
 				if (sringp->s_ring_state & S_RING_TX_HIWAT) {
 					blocked = B_TRUE;
@@ -3228,9 +3718,10 @@ mac_cpu_set(mac_client_handle_t mch, mac_resource_props_t *mrp)
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
-	if ((err = mac_validate_props(mrp)) != 0)
+	if ((err = mac_validate_props(mcip->mci_state_flags & MCIS_IS_VNIC ?
+	    mcip->mci_upper_mip : mip, mrp)) != 0) {
 		return (err);
-
+	}
 	if (MCIP_DATAPATH_SETUP(mcip))
 		mac_flow_modify(mip->mi_flow_tab, mcip->mci_flent, mrp);
 
@@ -3256,14 +3747,20 @@ mac_client_set_resources(mac_client_handle_t mch, mac_resource_props_t *mrp)
 			goto done;
 	}
 
-	if (mrp->mrp_mask & MRP_CPUS) {
+	if (mrp->mrp_mask & (MRP_CPUS|MRP_POOL)) {
 		err = mac_cpu_set(mch, mrp);
 		if (err != 0)
 			goto done;
 	}
 
-	if (mrp->mrp_mask & MRP_PROTECT)
+	if (mrp->mrp_mask & MRP_PROTECT) {
 		err = mac_protect_set(mch, mrp);
+		if (err != 0)
+			goto done;
+	}
+
+	if ((mrp->mrp_mask & MRP_RX_RINGS) || (mrp->mrp_mask & MRP_TX_RINGS))
+		err = mac_resource_ctl_set(mch, mrp);
 
 done:
 	i_mac_perim_exit(mip);
@@ -3278,6 +3775,20 @@ mac_client_get_resources(mac_client_handle_t mch, mac_resource_props_t *mrp)
 {
 	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
 	mac_resource_props_t	*mcip_mrp = MCIP_RESOURCE_PROPS(mcip);
+
+	bcopy(mcip_mrp, mrp, sizeof (mac_resource_props_t));
+}
+
+/*
+ * Return the effective properties currently associated with the specified
+ * MAC client.
+ */
+void
+mac_client_get_effective_resources(mac_client_handle_t mch,
+    mac_resource_props_t *mrp)
+{
+	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+	mac_resource_props_t	*mcip_mrp = MCIP_EFFECTIVE_PROPS(mcip);
 
 	bcopy(mcip_mrp, mrp, sizeof (mac_resource_props_t));
 }
@@ -3708,6 +4219,16 @@ mac_get_lower_mac_handle(mac_handle_t mh)
 	return (((vnic_t *)mip->mi_driver)->vn_lower_mh);
 }
 
+boolean_t
+mac_is_vnic_primary(mac_handle_t mh)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	ASSERT(mac_is_vnic(mh));
+	return (((vnic_t *)mip->mi_driver)->vn_addr_type ==
+	    VNIC_MAC_ADDR_TYPE_PRIMARY);
+}
+
 void
 mac_update_resources(mac_resource_props_t *nmrp, mac_resource_props_t *cmrp,
     boolean_t is_user_flow)
@@ -3728,17 +4249,66 @@ mac_update_resources(mac_resource_props_t *nmrp, mac_resource_props_t *cmrp,
 			}
 		}
 		if (nmrp->mrp_mask & MRP_MAXBW) {
-			cmrp->mrp_maxbw = nmrp->mrp_maxbw;
-			if (nmrp->mrp_maxbw == MRP_MAXBW_RESETVAL)
+			if (nmrp->mrp_maxbw == MRP_MAXBW_RESETVAL) {
 				cmrp->mrp_mask &= ~MRP_MAXBW;
-			else
+				cmrp->mrp_maxbw = 0;
+			} else {
 				cmrp->mrp_mask |= MRP_MAXBW;
+				cmrp->mrp_maxbw = nmrp->mrp_maxbw;
+			}
 		}
 		if (nmrp->mrp_mask & MRP_CPUS)
 			MAC_COPY_CPUS(nmrp, cmrp);
 
+		if (nmrp->mrp_mask & MRP_POOL) {
+			if (strlen(nmrp->mrp_pool) == 0) {
+				cmrp->mrp_mask &= ~MRP_POOL;
+				bzero(cmrp->mrp_pool, sizeof (cmrp->mrp_pool));
+			} else {
+				cmrp->mrp_mask |= MRP_POOL;
+				(void) strncpy(cmrp->mrp_pool, nmrp->mrp_pool,
+				    sizeof (cmrp->mrp_pool));
+			}
+
+		}
+
 		if (nmrp->mrp_mask & MRP_PROTECT)
 			mac_protect_update(nmrp, cmrp);
+
+		/*
+		 * Update the rings specified.
+		 */
+		if (nmrp->mrp_mask & MRP_RX_RINGS) {
+			if (nmrp->mrp_mask & MRP_RINGS_RESET) {
+				cmrp->mrp_mask &= ~MRP_RX_RINGS;
+				if (cmrp->mrp_mask & MRP_RXRINGS_UNSPEC)
+					cmrp->mrp_mask &= ~MRP_RXRINGS_UNSPEC;
+				cmrp->mrp_nrxrings = 0;
+			} else {
+				cmrp->mrp_mask |= MRP_RX_RINGS;
+				cmrp->mrp_nrxrings = nmrp->mrp_nrxrings;
+			}
+		}
+		if (nmrp->mrp_mask & MRP_TX_RINGS) {
+			if (nmrp->mrp_mask & MRP_RINGS_RESET) {
+				cmrp->mrp_mask &= ~MRP_TX_RINGS;
+				if (cmrp->mrp_mask & MRP_TXRINGS_UNSPEC)
+					cmrp->mrp_mask &= ~MRP_TXRINGS_UNSPEC;
+				cmrp->mrp_ntxrings = 0;
+			} else {
+				cmrp->mrp_mask |= MRP_TX_RINGS;
+				cmrp->mrp_ntxrings = nmrp->mrp_ntxrings;
+			}
+		}
+		if (nmrp->mrp_mask & MRP_RXRINGS_UNSPEC)
+			cmrp->mrp_mask |= MRP_RXRINGS_UNSPEC;
+		else if (cmrp->mrp_mask & MRP_RXRINGS_UNSPEC)
+			cmrp->mrp_mask &= ~MRP_RXRINGS_UNSPEC;
+
+		if (nmrp->mrp_mask & MRP_TXRINGS_UNSPEC)
+			cmrp->mrp_mask |= MRP_TXRINGS_UNSPEC;
+		else if (cmrp->mrp_mask & MRP_TXRINGS_UNSPEC)
+			cmrp->mrp_mask &= ~MRP_TXRINGS_UNSPEC;
 	}
 }
 
@@ -3757,26 +4327,29 @@ i_mac_set_resources(mac_handle_t mh, mac_resource_props_t *mrp)
 	mac_client_impl_t	*mcip;
 	int			err = 0;
 	uint32_t		resmask, newresmask;
-	mac_resource_props_t	tmrp, umrp;
+	mac_resource_props_t	*tmrp, *umrp;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
-	err = mac_validate_props(mrp);
+	err = mac_validate_props(mip, mrp);
 	if (err != 0)
 		return (err);
 
-	bcopy(&mip->mi_resource_props, &umrp, sizeof (mac_resource_props_t));
-	resmask = umrp.mrp_mask;
-	mac_update_resources(mrp, &umrp, B_FALSE);
-	newresmask = umrp.mrp_mask;
+	umrp = kmem_zalloc(sizeof (*umrp), KM_SLEEP);
+	bcopy(&mip->mi_resource_props, umrp, sizeof (*umrp));
+	resmask = umrp->mrp_mask;
+	mac_update_resources(mrp, umrp, B_FALSE);
+	newresmask = umrp->mrp_mask;
 
 	if (resmask == 0 && newresmask != 0) {
 		/*
-		 * Bandwidth, priority or cpu link properties configured,
+		 * Bandwidth, priority, cpu or pool link properties configured,
 		 * must disable fastpath.
 		 */
-		if ((err = mac_fastpath_disable((mac_handle_t)mip)) != 0)
+		if ((err = mac_fastpath_disable((mac_handle_t)mip)) != 0) {
+			kmem_free(umrp, sizeof (*umrp));
 			return (err);
+		}
 	}
 
 	/*
@@ -3784,19 +4357,93 @@ i_mac_set_resources(mac_handle_t mh, mac_resource_props_t *mrp)
 	 * we use a copy of bind_cpu and finally cache bind_cpu in mip.
 	 * This allows us to cache only user edits in mip.
 	 */
-	bcopy(mrp, &tmrp, sizeof (mac_resource_props_t));
+	tmrp = kmem_zalloc(sizeof (*tmrp), KM_SLEEP);
+	bcopy(mrp, tmrp, sizeof (*tmrp));
 	mcip = mac_primary_client_handle(mip);
 	if (mcip != NULL && (mcip->mci_state_flags & MCIS_IS_AGGR_PORT) == 0) {
-		err =
-		    mac_client_set_resources((mac_client_handle_t)mcip, &tmrp);
+		err = mac_client_set_resources((mac_client_handle_t)mcip, tmrp);
+	} else if ((mrp->mrp_mask & MRP_RX_RINGS ||
+	    mrp->mrp_mask & MRP_TX_RINGS)) {
+		mac_client_impl_t	*vmcip;
+
+		/*
+		 * If the primary is not up, we need to check if there
+		 * are any VLANs on this primary. If there are then
+		 * we need to set this property on the VLANs since
+		 * VLANs follow the primary they are based on. Just
+		 * look for the first VLAN and change its properties,
+		 * all the other VLANs should be in the same group.
+		 */
+		for (vmcip = mip->mi_clients_list; vmcip != NULL;
+		    vmcip = vmcip->mci_client_next) {
+			if ((vmcip->mci_flent->fe_type & FLOW_PRIMARY_MAC) &&
+			    mac_client_vid((mac_client_handle_t)vmcip) !=
+			    VLAN_ID_NONE) {
+				break;
+			}
+		}
+		if (vmcip != NULL) {
+			mac_resource_props_t	*omrp;
+			mac_resource_props_t	*vmrp;
+
+			omrp = kmem_zalloc(sizeof (*omrp), KM_SLEEP);
+			bcopy(MCIP_RESOURCE_PROPS(vmcip), omrp, sizeof (*omrp));
+			/*
+			 * We dont' call mac_update_resources since we
+			 * want to take only the ring properties and
+			 * not all the properties that may have changed.
+			 */
+			vmrp = MCIP_RESOURCE_PROPS(vmcip);
+			if (mrp->mrp_mask & MRP_RX_RINGS) {
+				if (mrp->mrp_mask & MRP_RINGS_RESET) {
+					vmrp->mrp_mask &= ~MRP_RX_RINGS;
+					if (vmrp->mrp_mask &
+					    MRP_RXRINGS_UNSPEC) {
+						vmrp->mrp_mask &=
+						    ~MRP_RXRINGS_UNSPEC;
+					}
+					vmrp->mrp_nrxrings = 0;
+				} else {
+					vmrp->mrp_mask |= MRP_RX_RINGS;
+					vmrp->mrp_nrxrings = mrp->mrp_nrxrings;
+				}
+			}
+			if (mrp->mrp_mask & MRP_TX_RINGS) {
+				if (mrp->mrp_mask & MRP_RINGS_RESET) {
+					vmrp->mrp_mask &= ~MRP_TX_RINGS;
+					if (vmrp->mrp_mask &
+					    MRP_TXRINGS_UNSPEC) {
+						vmrp->mrp_mask &=
+						    ~MRP_TXRINGS_UNSPEC;
+					}
+					vmrp->mrp_ntxrings = 0;
+				} else {
+					vmrp->mrp_mask |= MRP_TX_RINGS;
+					vmrp->mrp_ntxrings = mrp->mrp_ntxrings;
+				}
+			}
+			if (mrp->mrp_mask & MRP_RXRINGS_UNSPEC)
+				vmrp->mrp_mask |= MRP_RXRINGS_UNSPEC;
+
+			if (mrp->mrp_mask & MRP_TXRINGS_UNSPEC)
+				vmrp->mrp_mask |= MRP_TXRINGS_UNSPEC;
+
+			if ((err = mac_client_set_rings_prop(vmcip, mrp,
+			    omrp)) != 0) {
+				bcopy(omrp, MCIP_RESOURCE_PROPS(vmcip),
+				    sizeof (*omrp));
+			} else {
+				mac_set_prim_vlan_rings(mip, vmrp);
+			}
+			kmem_free(omrp, sizeof (*omrp));
+		}
 	}
 
 	/* Only update the values if mac_client_set_resources succeeded */
 	if (err == 0) {
-		bcopy(&umrp, &mip->mi_resource_props,
-		    sizeof (mac_resource_props_t));
+		bcopy(umrp, &mip->mi_resource_props, sizeof (*umrp));
 		/*
-		 * If bankwidth, priority or cpu link properties cleared,
+		 * If bandwidth, priority or cpu link properties cleared,
 		 * renable fastpath.
 		 */
 		if (resmask != 0 && newresmask == 0)
@@ -3804,6 +4451,8 @@ i_mac_set_resources(mac_handle_t mh, mac_resource_props_t *mrp)
 	} else if (resmask == 0 && newresmask != 0) {
 		mac_fastpath_enable((mac_handle_t)mip);
 	}
+	kmem_free(tmrp, sizeof (*tmrp));
+	kmem_free(umrp, sizeof (*umrp));
 	return (err);
 }
 
@@ -3827,15 +4476,31 @@ mac_get_resources(mac_handle_t mh, mac_resource_props_t *mrp)
 	mac_impl_t 		*mip = (mac_impl_t *)mh;
 	mac_client_impl_t	*mcip;
 
-	if (mip->mi_state_flags & MIS_IS_VNIC) {
-		mcip = mac_primary_client_handle(mip);
-		if (mcip != NULL) {
-			mac_client_get_resources((mac_client_handle_t)mcip,
-			    mrp);
-			return;
-		}
+	mcip = mac_primary_client_handle(mip);
+	if (mcip != NULL) {
+		mac_client_get_resources((mac_client_handle_t)mcip, mrp);
+		return;
 	}
 	bcopy(&mip->mi_resource_props, mrp, sizeof (mac_resource_props_t));
+}
+
+/*
+ * Get the effective properties from the primary client of the
+ * specified MAC instance.
+ */
+void
+mac_get_effective_resources(mac_handle_t mh, mac_resource_props_t *mrp)
+{
+	mac_impl_t 		*mip = (mac_impl_t *)mh;
+	mac_client_impl_t	*mcip;
+
+	mcip = mac_primary_client_handle(mip);
+	if (mcip != NULL) {
+		mac_client_get_effective_resources((mac_client_handle_t)mcip,
+		    mrp);
+		return;
+	}
+	bzero(mrp, sizeof (mac_resource_props_t));
 }
 
 int
@@ -3904,8 +4569,10 @@ mac_rename_primary(mac_handle_t mh, const char *new_name)
 	 * the associated flow kstat.
 	 */
 	if (mip->mi_state_flags & MIS_IS_VNIC) {
+		mac_client_impl_t *mcip = mac_vnic_lower(mip);
 		ASSERT(new_name != NULL);
-		mac_rename_flow_names(mac_vnic_lower(mip), new_name);
+		mac_rename_flow_names(mcip, new_name);
+		mac_stat_rename(mcip);
 		goto done;
 	}
 	/*
@@ -3953,6 +4620,10 @@ mac_rename_primary(mac_handle_t mh, const char *new_name)
 			break;
 		}
 	}
+
+	/* Recreate kstats associated with aggr pseudo rings */
+	if (mip->mi_state_flags & MIS_IS_AGGR)
+		mac_pseudo_ring_stat_rename(mip);
 
 done:
 	i_mac_perim_exit(mip);
@@ -4187,8 +4858,14 @@ mac_client_single_rcvr(mac_client_impl_t *mcip)
 }
 
 int
-mac_validate_props(mac_resource_props_t *mrp)
+mac_validate_props(mac_impl_t *mip, mac_resource_props_t *mrp)
 {
+	boolean_t		reset;
+	uint32_t		rings_needed;
+	uint32_t		rings_avail;
+	mac_group_type_t	gtype;
+	mac_resource_props_t	*mip_mrp;
+
 	if (mrp == NULL)
 		return (0);
 
@@ -4246,6 +4923,100 @@ mac_validate_props(mac_resource_props_t *mrp)
 		if (err != 0)
 			return (err);
 	}
+
+	if (!(mrp->mrp_mask & MRP_RX_RINGS) &&
+	    !(mrp->mrp_mask & MRP_TX_RINGS)) {
+		return (0);
+	}
+
+	/*
+	 * mip will be null when we come from mac_flow_create or
+	 * mac_link_flow_modify. In the latter case it is a user flow,
+	 * for which we don't support rings. In the former we would
+	 * have validated the props beforehand (i_mac_unicast_add ->
+	 * mac_client_set_resources -> validate for the primary and
+	 * vnic_dev_create -> mac_client_set_resources -> validate for
+	 * a vnic.
+	 */
+	if (mip == NULL)
+		return (0);
+
+	/*
+	 * We don't support setting rings property for a VNIC that is using a
+	 * primary address (VLAN)
+	 */
+	if ((mip->mi_state_flags & MIS_IS_VNIC) &&
+	    mac_is_vnic_primary((mac_handle_t)mip)) {
+		return (ENOTSUP);
+	}
+
+	mip_mrp = &mip->mi_resource_props;
+	/*
+	 * The rings property should be validated against the NICs
+	 * resources
+	 */
+	if (mip->mi_state_flags & MIS_IS_VNIC)
+		mip = (mac_impl_t *)mac_get_lower_mac_handle((mac_handle_t)mip);
+
+	reset = mrp->mrp_mask & MRP_RINGS_RESET;
+	/*
+	 * If groups are not supported, return error.
+	 */
+	if (((mrp->mrp_mask & MRP_RX_RINGS) && mip->mi_rx_groups == NULL) ||
+	    ((mrp->mrp_mask & MRP_TX_RINGS) && mip->mi_tx_groups == NULL)) {
+		return (EINVAL);
+	}
+	/*
+	 * If we are just resetting, there is no validation needed.
+	 */
+	if (reset)
+		return (0);
+
+	if (mrp->mrp_mask & MRP_RX_RINGS) {
+		rings_needed = mrp->mrp_nrxrings;
+		/*
+		 * We just want to check if the number of additional
+		 * rings requested is available.
+		 */
+		if (mip_mrp->mrp_mask & MRP_RX_RINGS) {
+			if (mrp->mrp_nrxrings > mip_mrp->mrp_nrxrings)
+				/* Just check for the additional rings */
+				rings_needed -= mip_mrp->mrp_nrxrings;
+			else
+				/* We are not asking for additional rings */
+				rings_needed = 0;
+		}
+		rings_avail = mip->mi_rxrings_avail;
+		gtype = mip->mi_rx_group_type;
+	} else {
+		rings_needed = mrp->mrp_ntxrings;
+		/* Similarly for the TX rings */
+		if (mip_mrp->mrp_mask & MRP_TX_RINGS) {
+			if (mrp->mrp_ntxrings > mip_mrp->mrp_ntxrings)
+				/* Just check for the additional rings */
+				rings_needed -= mip_mrp->mrp_ntxrings;
+			else
+				/* We are not asking for additional rings */
+				rings_needed = 0;
+		}
+		rings_avail = mip->mi_txrings_avail;
+		gtype = mip->mi_tx_group_type;
+	}
+
+	/* Error if the group is dynamic .. */
+	if (gtype == MAC_GROUP_TYPE_DYNAMIC) {
+		/*
+		 * .. and rings specified are more than available.
+		 */
+		if (rings_needed > rings_avail)
+			return (EINVAL);
+	} else {
+		/*
+		 * OR group is static and we have specified some rings.
+		 */
+		if (rings_needed > 0)
+			return (EINVAL);
+	}
 	return (0);
 }
 
@@ -4266,11 +5037,18 @@ mac_virtual_link_update(mac_impl_t *mip)
  * mac handle in the client.
  */
 void
-mac_set_upper_mac(mac_client_handle_t mch, mac_handle_t mh)
+mac_set_upper_mac(mac_client_handle_t mch, mac_handle_t mh,
+    mac_resource_props_t *mrp)
 {
 	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+	mac_impl_t		*mip = (mac_impl_t *)mh;
 
-	mcip->mci_upper_mip = (mac_impl_t *)mh;
+	mcip->mci_upper_mip = mip;
+	/* If there are any properties, copy it over too */
+	if (mrp != NULL) {
+		bcopy(mrp, &mip->mi_resource_props,
+		    sizeof (mac_resource_props_t));
+	}
 }
 
 /*
@@ -4326,15 +5104,7 @@ mac_unmark_exclusive(mac_handle_t mh)
 }
 
 /*
- * Set the MTU for the specified MAC.  Note that this mechanism depends on
- * the driver calling mac_maxsdu_update() to update the link MTU if it was
- * successful in setting its MTU.
- *
- * Note that there is potential for improvement here.  A better model might be
- * to not require drivers to call mac_maxsdu_update(), but rather have this
- * function update mi_sdu_max and send notifications if the driver setprop
- * callback succeeds.  This would remove the burden and complexity from
- * drivers.
+ * Set the MTU for the specified MAC.
  */
 int
 mac_set_mtu(mac_handle_t mh, uint_t new_mtu, uint_t *old_mtu_arg)
@@ -4352,9 +5122,18 @@ mac_set_mtu(mac_handle_t mh, uint_t new_mtu, uint_t *old_mtu_arg)
 
 	old_mtu = mip->mi_sdu_max;
 
+	if (new_mtu == 0 || new_mtu < mip->mi_sdu_min) {
+		rv = EINVAL;
+		goto bail;
+	}
+
 	if (old_mtu != new_mtu) {
 		rv = mip->mi_callbacks->mc_setprop(mip->mi_driver,
 		    "mtu", MAC_PROP_MTU, sizeof (uint_t), &new_mtu);
+		if (rv != 0)
+			goto bail;
+		rv = mac_maxsdu_update(mh, new_mtu);
+		ASSERT(rv == 0);
 	}
 
 bail:
@@ -4365,13 +5144,18 @@ bail:
 	return (rv);
 }
 
+/*
+ * Return the RX h/w information for the group indexed by grp_num.
+ */
 void
-mac_get_hwgrp_info(mac_handle_t mh, int grp_index, uint_t *grp_num,
-    uint_t *n_rings, uint_t *type, uint_t *n_clnts, char *clnts_name)
+mac_get_hwrxgrp_info(mac_handle_t mh, int grp_index, uint_t *grp_num,
+    uint_t *n_rings, uint_t *rings, uint_t *type, uint_t *n_clnts,
+    char *clnts_name)
 {
 	mac_impl_t *mip = (mac_impl_t *)mh;
 	mac_grp_client_t *mcip;
 	uint_t i = 0, index = 0;
+	mac_ring_t	*ring;
 
 	/* Revisit when we implement fully dynamic group allocation */
 	ASSERT(grp_index >= 0 && grp_index < mip->mi_rx_group_count);
@@ -4380,6 +5164,19 @@ mac_get_hwgrp_info(mac_handle_t mh, int grp_index, uint_t *grp_num,
 	*grp_num = mip->mi_rx_groups[grp_index].mrg_index;
 	*type = mip->mi_rx_groups[grp_index].mrg_type;
 	*n_rings = mip->mi_rx_groups[grp_index].mrg_cur_count;
+	ring = mip->mi_rx_groups[grp_index].mrg_rings;
+	for (index = 0; index < mip->mi_rx_groups[grp_index].mrg_cur_count;
+	    index++) {
+		rings[index] = ring->mr_index;
+		ring = ring->mr_next;
+	}
+	/* Assuming the 1st is the default group */
+	index = 0;
+	if (grp_index == 0) {
+		(void) strlcpy(clnts_name, "<default,mcast>,",
+		    MAXCLIENTNAMELEN);
+		index += strlen("<default,mcast>,");
+	}
 	for (mcip = mip->mi_rx_groups[grp_index].mrg_clients; mcip != NULL;
 	    mcip = mcip->mgc_next) {
 		int name_len = strlen(mcip->mgc_client->mci_name);
@@ -4410,10 +5207,194 @@ mac_get_hwgrp_info(mac_handle_t mh, int grp_index, uint_t *grp_num,
 	rw_exit(&mip->mi_rw_lock);
 }
 
+/*
+ * Return the TX h/w information for the group indexed by grp_num.
+ */
+void
+mac_get_hwtxgrp_info(mac_handle_t mh, int grp_index, uint_t *grp_num,
+    uint_t *n_rings, uint_t *rings, uint_t *type, uint_t *n_clnts,
+    char *clnts_name)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+	mac_grp_client_t *mcip;
+	uint_t i = 0, index = 0;
+	mac_ring_t	*ring;
+
+	/* Revisit when we implement fully dynamic group allocation */
+	ASSERT(grp_index >= 0 && grp_index <= mip->mi_tx_group_count);
+
+	rw_enter(&mip->mi_rw_lock, RW_READER);
+	*grp_num = mip->mi_tx_groups[grp_index].mrg_index > 0 ?
+	    mip->mi_tx_groups[grp_index].mrg_index : grp_index;
+	*type = mip->mi_tx_groups[grp_index].mrg_type;
+	*n_rings = mip->mi_tx_groups[grp_index].mrg_cur_count;
+	ring = mip->mi_tx_groups[grp_index].mrg_rings;
+	for (index = 0; index < mip->mi_tx_groups[grp_index].mrg_cur_count;
+	    index++) {
+		rings[index] = ring->mr_index;
+		ring = ring->mr_next;
+	}
+	index = 0;
+	/* Default group has an index of -1 */
+	if (mip->mi_tx_groups[grp_index].mrg_index < 0) {
+		(void) strlcpy(clnts_name, "<default>,",
+		    MAXCLIENTNAMELEN);
+		index += strlen("<default>,");
+	}
+	for (mcip = mip->mi_tx_groups[grp_index].mrg_clients; mcip != NULL;
+	    mcip = mcip->mgc_next) {
+		int name_len = strlen(mcip->mgc_client->mci_name);
+
+		/*
+		 * MAXCLIENTNAMELEN is the buffer size reserved for client
+		 * names.
+		 * XXXX Formating the client name string needs to be moved
+		 * to user land when fixing the size of dhi_clnts in
+		 * dld_hwgrpinfo_t. We should use n_clients * client_name for
+		 * dhi_clntsin instead of MAXCLIENTNAMELEN
+		 */
+		if (index + name_len >= MAXCLIENTNAMELEN) {
+			index = MAXCLIENTNAMELEN;
+			break;
+		}
+		bcopy(mcip->mgc_client->mci_name, &(clnts_name[index]),
+		    name_len);
+		index += name_len;
+		clnts_name[index++] = ',';
+		i++;
+	}
+
+	/* Get rid of the last , */
+	if (index > 0)
+		clnts_name[index - 1] = '\0';
+	*n_clnts = i;
+	rw_exit(&mip->mi_rw_lock);
+}
+
+/*
+ * Return the group count for RX or TX.
+ */
 uint_t
-mac_hwgrp_num(mac_handle_t mh)
+mac_hwgrp_num(mac_handle_t mh, int type)
 {
 	mac_impl_t *mip = (mac_impl_t *)mh;
 
-	return (mip->mi_rx_group_count);
+	/*
+	 * Return the Rx and Tx group count; for the Tx we need to
+	 * include the default too.
+	 */
+	return (type == MAC_RING_TYPE_RX ? mip->mi_rx_group_count :
+	    mip->mi_tx_groups != NULL ? mip->mi_tx_group_count + 1 : 0);
+}
+
+/*
+ * The total number of free TX rings for this MAC.
+ */
+uint_t
+mac_txavail_get(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	return (mip->mi_txrings_avail);
+}
+
+/*
+ * The total number of free RX rings for this MAC.
+ */
+uint_t
+mac_rxavail_get(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	return (mip->mi_rxrings_avail);
+}
+
+/*
+ * The total number of reserved RX rings on this MAC.
+ */
+uint_t
+mac_rxrsvd_get(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	return (mip->mi_rxrings_rsvd);
+}
+
+/*
+ * The total number of reserved TX rings on this MAC.
+ */
+uint_t
+mac_txrsvd_get(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	return (mip->mi_txrings_rsvd);
+}
+
+/*
+ * Total number of free RX groups on this MAC.
+ */
+uint_t
+mac_rxhwlnksavail_get(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	return (mip->mi_rxhwclnt_avail);
+}
+
+/*
+ * Total number of RX groups reserved on this MAC.
+ */
+uint_t
+mac_rxhwlnksrsvd_get(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	return (mip->mi_rxhwclnt_used);
+}
+
+/*
+ * Total number of free TX groups on this MAC.
+ */
+uint_t
+mac_txhwlnksavail_get(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	return (mip->mi_txhwclnt_avail);
+}
+
+/*
+ * Total number of TX groups reserved on this MAC.
+ */
+uint_t
+mac_txhwlnksrsvd_get(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	return (mip->mi_txhwclnt_used);
+}
+
+/*
+ * Initialize the rings property for a mac client. A non-0 value for
+ * rxring or txring specifies the number of rings required, a value
+ * of MAC_RXRINGS_NONE/MAC_TXRINGS_NONE specifies that it doesn't need
+ * any RX/TX rings and a value of MAC_RXRINGS_DONTCARE/MAC_TXRINGS_DONTCARE
+ * means the system can decide whether it can give any rings or not.
+ */
+void
+mac_client_set_rings(mac_client_handle_t mch, int rxrings, int txrings)
+{
+	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
+
+	if (rxrings != MAC_RXRINGS_DONTCARE) {
+		mrp->mrp_mask |= MRP_RX_RINGS;
+		mrp->mrp_nrxrings = rxrings;
+	}
+
+	if (txrings != MAC_TXRINGS_DONTCARE) {
+		mrp->mrp_mask |= MRP_TX_RINGS;
+		mrp->mrp_ntxrings = txrings;
+	}
 }

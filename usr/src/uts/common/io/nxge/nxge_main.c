@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,12 +296,13 @@ static	boolean_t nxge_m_getcapab(void *, mac_capab_t, void *);
 static int nxge_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int nxge_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+    uint_t, void *);
+static void nxge_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
+static void nxge_priv_propinfo(const char *, mac_prop_info_handle_t);
 static int nxge_set_priv_prop(nxge_t *, const char *, uint_t,
     const void *);
-static int nxge_get_priv_prop(nxge_t *, const char *, uint_t, uint_t,
-    void *, uint_t *);
-static int nxge_get_def_val(nxge_t *, mac_prop_id_t, uint_t, void *);
+static int nxge_get_priv_prop(nxge_t *, const char *, uint_t, void *);
 static void nxge_fill_ring(void *, mac_ring_type_t, const int, const int,
     mac_ring_info_t *, mac_ring_handle_t);
 static void nxge_group_add_ring(mac_group_driver_t, mac_ring_driver_t,
@@ -312,34 +313,32 @@ static void nxge_group_rem_ring(mac_group_driver_t, mac_ring_driver_t,
 static void nxge_niu_peu_reset(p_nxge_t nxgep);
 static void nxge_set_pci_replay_timeout(nxge_t *);
 
-mac_priv_prop_t nxge_priv_props[] = {
-	{"_adv_10gfdx_cap", MAC_PROP_PERM_RW},
-	{"_adv_pause_cap", MAC_PROP_PERM_RW},
-	{"_function_number", MAC_PROP_PERM_READ},
-	{"_fw_version", MAC_PROP_PERM_READ},
-	{"_port_mode", MAC_PROP_PERM_READ},
-	{"_hot_swap_phy", MAC_PROP_PERM_READ},
-	{"_rxdma_intr_time", MAC_PROP_PERM_RW},
-	{"_rxdma_intr_pkts", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv4_tcp", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv4_udp", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv4_ah", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv4_sctp", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv6_tcp", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv6_udp", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv6_ah", MAC_PROP_PERM_RW},
-	{"_class_opt_ipv6_sctp", MAC_PROP_PERM_RW},
-	{"_soft_lso_enable", MAC_PROP_PERM_RW}
+char *nxge_priv_props[] = {
+	"_adv_10gfdx_cap",
+	"_adv_pause_cap",
+	"_function_number",
+	"_fw_version",
+	"_port_mode",
+	"_hot_swap_phy",
+	"_rxdma_intr_time",
+	"_rxdma_intr_pkts",
+	"_class_opt_ipv4_tcp",
+	"_class_opt_ipv4_udp",
+	"_class_opt_ipv4_ah",
+	"_class_opt_ipv4_sctp",
+	"_class_opt_ipv6_tcp",
+	"_class_opt_ipv6_udp",
+	"_class_opt_ipv6_ah",
+	"_class_opt_ipv6_sctp",
+	"_soft_lso_enable",
+	NULL
 };
-
-#define	NXGE_MAX_PRIV_PROPS	\
-	(sizeof (nxge_priv_props)/sizeof (mac_priv_prop_t))
 
 #define	NXGE_NEPTUNE_MAGIC	0x4E584745UL
 #define	MAX_DUMP_SZ 256
 
 #define	NXGE_M_CALLBACK_FLAGS	\
-	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO)
 
 mac_callbacks_t nxge_m_callbacks = {
 	NXGE_M_CALLBACK_FLAGS,
@@ -350,12 +349,14 @@ mac_callbacks_t nxge_m_callbacks = {
 	nxge_m_multicst,
 	NULL,
 	NULL,
+	NULL,
 	nxge_m_ioctl,
 	nxge_m_getcapab,
 	NULL,
 	NULL,
 	nxge_m_setprop,
-	nxge_m_getprop
+	nxge_m_getprop,
+	nxge_m_propinfo
 };
 
 void
@@ -4547,16 +4548,12 @@ nxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, const void *pr_val)
 {
 	nxge_t		*nxgep = barg;
-	p_nxge_param_t	param_arr;
-	p_nxge_stats_t	statsp;
+	p_nxge_param_t	param_arr = nxgep->param_arr;
+	p_nxge_stats_t	statsp = nxgep->statsp;
 	int		err = 0;
-	uint8_t		val;
-	uint32_t	cur_mtu, new_mtu, old_framesize;
-	link_flowctrl_t	fl;
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_setprop"));
-	param_arr = nxgep->param_arr;
-	statsp = nxgep->statsp;
+
 	mutex_enter(nxgep->genlock);
 	if (statsp->port_stats.lb_mode != nxge_lb_normal &&
 	    nxge_param_locked(pr_num)) {
@@ -4570,139 +4567,115 @@ nxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		return (EBUSY);
 	}
 
-	val = *(uint8_t *)pr_val;
 	switch (pr_num) {
-		case MAC_PROP_EN_1000FDX_CAP:
-			nxgep->param_en_1000fdx = val;
-			param_arr[param_anar_1000fdx].value = val;
+	case MAC_PROP_EN_1000FDX_CAP:
+		nxgep->param_en_1000fdx =
+		    param_arr[param_anar_1000fdx].value = *(uint8_t *)pr_val;
+		goto reprogram;
 
-			goto reprogram;
+	case MAC_PROP_EN_100FDX_CAP:
+		nxgep->param_en_100fdx =
+		    param_arr[param_anar_100fdx].value = *(uint8_t *)pr_val;
+		goto reprogram;
 
-		case MAC_PROP_EN_100FDX_CAP:
-			nxgep->param_en_100fdx = val;
-			param_arr[param_anar_100fdx].value = val;
+	case MAC_PROP_EN_10FDX_CAP:
+		nxgep->param_en_10fdx =
+		    param_arr[param_anar_10fdx].value = *(uint8_t *)pr_val;
+		goto reprogram;
 
-			goto reprogram;
+	case MAC_PROP_AUTONEG:
+		param_arr[param_autoneg].value = *(uint8_t *)pr_val;
+		goto reprogram;
 
-		case MAC_PROP_EN_10FDX_CAP:
-			nxgep->param_en_10fdx = val;
-			param_arr[param_anar_10fdx].value = val;
+	case MAC_PROP_MTU: {
+		uint32_t cur_mtu, new_mtu, old_framesize;
 
-			goto reprogram;
+		cur_mtu = nxgep->mac.default_mtu;
+		ASSERT(pr_valsize >= sizeof (new_mtu));
+		bcopy(pr_val, &new_mtu, sizeof (new_mtu));
 
-		case MAC_PROP_EN_1000HDX_CAP:
-		case MAC_PROP_EN_100HDX_CAP:
-		case MAC_PROP_EN_10HDX_CAP:
-		case MAC_PROP_ADV_1000FDX_CAP:
-		case MAC_PROP_ADV_1000HDX_CAP:
-		case MAC_PROP_ADV_100FDX_CAP:
-		case MAC_PROP_ADV_100HDX_CAP:
-		case MAC_PROP_ADV_10FDX_CAP:
-		case MAC_PROP_ADV_10HDX_CAP:
-		case MAC_PROP_STATUS:
-		case MAC_PROP_SPEED:
-		case MAC_PROP_DUPLEX:
-			err = EINVAL; /* cannot set read-only properties */
-			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-			    "==> nxge_m_setprop:  read only property %d",
-			    pr_num));
+		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
+		    "==> nxge_m_setprop: set MTU: %d is_jumbo %d",
+		    new_mtu, nxgep->mac.is_jumbo));
+
+		if (new_mtu == cur_mtu) {
+			err = 0;
+			break;
+		}
+
+		if (nxgep->nxge_mac_state == NXGE_MAC_STARTED) {
+			err = EBUSY;
+			break;
+		}
+
+		if ((new_mtu < NXGE_DEFAULT_MTU) ||
+		    (new_mtu > NXGE_MAXIMUM_MTU)) {
+			err = EINVAL;
+			break;
+		}
+
+		old_framesize = (uint32_t)nxgep->mac.maxframesize;
+		nxgep->mac.maxframesize = (uint16_t)
+		    (new_mtu + NXGE_EHEADER_VLAN_CRC);
+		if (nxge_mac_set_framesize(nxgep)) {
+			nxgep->mac.maxframesize =
+			    (uint16_t)old_framesize;
+			err = EINVAL;
+			break;
+		}
+
+		nxgep->mac.default_mtu = new_mtu;
+		nxgep->mac.is_jumbo = (new_mtu > NXGE_DEFAULT_MTU);
+
+		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
+		    "==> nxge_m_setprop: set MTU: %d maxframe %d",
+		    new_mtu, nxgep->mac.maxframesize));
+		break;
+	}
+
+	case MAC_PROP_FLOWCTRL: {
+		link_flowctrl_t	fl;
+
+		ASSERT(pr_valsize >= sizeof (fl));
+		bcopy(pr_val, &fl, sizeof (fl));
+
+		switch (fl) {
+		case LINK_FLOWCTRL_NONE:
+			param_arr[param_anar_pause].value = 0;
 			break;
 
-		case MAC_PROP_AUTONEG:
-			param_arr[param_autoneg].value = val;
-
-			goto reprogram;
-
-		case MAC_PROP_MTU:
-			cur_mtu = nxgep->mac.default_mtu;
-			bcopy(pr_val, &new_mtu, sizeof (new_mtu));
-			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-			    "==> nxge_m_setprop: set MTU: %d is_jumbo %d",
-			    new_mtu, nxgep->mac.is_jumbo));
-
-			if (new_mtu == cur_mtu) {
-				err = 0;
-				break;
-			}
-
-			if (nxgep->nxge_mac_state == NXGE_MAC_STARTED) {
-				err = EBUSY;
-				break;
-			}
-
-			if ((new_mtu < NXGE_DEFAULT_MTU) ||
-			    (new_mtu > NXGE_MAXIMUM_MTU)) {
-				err = EINVAL;
-				break;
-			}
-
-			old_framesize = (uint32_t)nxgep->mac.maxframesize;
-			nxgep->mac.maxframesize = (uint16_t)
-			    (new_mtu + NXGE_EHEADER_VLAN_CRC);
-			if (nxge_mac_set_framesize(nxgep)) {
-				nxgep->mac.maxframesize =
-				    (uint16_t)old_framesize;
-				err = EINVAL;
-				break;
-			}
-
-			err = mac_maxsdu_update(nxgep->mach, new_mtu);
-			if (err) {
-				nxgep->mac.maxframesize =
-				    (uint16_t)old_framesize;
-				err = EINVAL;
-				break;
-			}
-
-			nxgep->mac.default_mtu = new_mtu;
-			if (new_mtu > NXGE_DEFAULT_MTU)
-				nxgep->mac.is_jumbo = B_TRUE;
-			else
-				nxgep->mac.is_jumbo = B_FALSE;
-
-			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-			    "==> nxge_m_setprop: set MTU: %d maxframe %d",
-			    new_mtu, nxgep->mac.maxframesize));
+		case LINK_FLOWCTRL_RX:
+			param_arr[param_anar_pause].value = 1;
 			break;
 
-		case MAC_PROP_FLOWCTRL:
-			bcopy(pr_val, &fl, sizeof (fl));
-			switch (fl) {
-			default:
-				err = EINVAL;
-				break;
-
-			case LINK_FLOWCTRL_NONE:
-				param_arr[param_anar_pause].value = 0;
-				break;
-
-			case LINK_FLOWCTRL_RX:
-				param_arr[param_anar_pause].value = 1;
-				break;
-
-			case LINK_FLOWCTRL_TX:
-			case LINK_FLOWCTRL_BI:
-				err = EINVAL;
-				break;
-			}
-
-reprogram:
-			if (err == 0) {
-				if (!nxge_param_link_update(nxgep)) {
-					err = EINVAL;
-				}
-			}
+		case LINK_FLOWCTRL_TX:
+		case LINK_FLOWCTRL_BI:
+			err = EINVAL;
 			break;
-		case MAC_PROP_PRIVATE:
-			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-			    "==> nxge_m_setprop: private property"));
-			err = nxge_set_priv_prop(nxgep, pr_name, pr_valsize,
-			    pr_val);
-			break;
-
 		default:
-			err = ENOTSUP;
+			err = EINVAL;
 			break;
+		}
+reprogram:
+		if ((err == 0) && !isLDOMguest(nxgep)) {
+			if (!nxge_param_link_update(nxgep)) {
+				err = EINVAL;
+			}
+		} else {
+			err = EINVAL;
+		}
+		break;
+	}
+
+	case MAC_PROP_PRIVATE:
+		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
+		    "==> nxge_m_setprop: private property"));
+		err = nxge_set_priv_prop(nxgep, pr_name, pr_valsize, pr_val);
+		break;
+
+	default:
+		err = ENOTSUP;
+		break;
 	}
 
 	mutex_exit(nxgep->genlock);
@@ -4714,142 +4687,198 @@ reprogram:
 
 static int
 nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	nxge_t 		*nxgep = barg;
 	p_nxge_param_t	param_arr = nxgep->param_arr;
 	p_nxge_stats_t	statsp = nxgep->statsp;
-	int		err = 0;
-	link_flowctrl_t	fl;
-	uint64_t	tmp = 0;
-	link_state_t	ls;
-	boolean_t	is_default = (pr_flags & MAC_PROP_DEFAULT);
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 	    "==> nxge_m_getprop: pr_num %d", pr_num));
 
-	if (pr_valsize == 0)
-		return (EINVAL);
-
-	*perm = MAC_PROP_PERM_RW;
-
-	if ((is_default) && (pr_num != MAC_PROP_PRIVATE)) {
-		err = nxge_get_def_val(nxgep, pr_num, pr_valsize, pr_val);
-		return (err);
-	}
-
-	bzero(pr_val, pr_valsize);
 	switch (pr_num) {
-		case MAC_PROP_DUPLEX:
-			*perm = MAC_PROP_PERM_READ;
-			*(uint8_t *)pr_val = statsp->mac_stats.link_duplex;
-			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-			    "==> nxge_m_getprop: duplex mode %d",
-			    *(uint8_t *)pr_val));
-			break;
+	case MAC_PROP_DUPLEX:
+		*(uint8_t *)pr_val = statsp->mac_stats.link_duplex;
+		break;
 
-		case MAC_PROP_SPEED:
-			if (pr_valsize < sizeof (uint64_t))
-				return (EINVAL);
-			*perm = MAC_PROP_PERM_READ;
-			tmp = statsp->mac_stats.link_speed * 1000000ull;
-			bcopy(&tmp, pr_val, sizeof (tmp));
-			break;
+	case MAC_PROP_SPEED: {
+		uint64_t val = statsp->mac_stats.link_speed * 1000000ull;
 
-		case MAC_PROP_STATUS:
-			if (pr_valsize < sizeof (link_state_t))
-				return (EINVAL);
-			*perm = MAC_PROP_PERM_READ;
-			if (!statsp->mac_stats.link_up)
-				ls = LINK_STATE_DOWN;
-			else
-				ls = LINK_STATE_UP;
-			bcopy(&ls, pr_val, sizeof (ls));
-			break;
-
-		case MAC_PROP_AUTONEG:
-			*(uint8_t *)pr_val =
-			    param_arr[param_autoneg].value;
-			break;
-
-		case MAC_PROP_FLOWCTRL:
-			if (pr_valsize < sizeof (link_flowctrl_t))
-				return (EINVAL);
-
-			fl = LINK_FLOWCTRL_NONE;
-			if (param_arr[param_anar_pause].value) {
-				fl = LINK_FLOWCTRL_RX;
-			}
-			bcopy(&fl, pr_val, sizeof (fl));
-			break;
-
-		case MAC_PROP_ADV_1000FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			*(uint8_t *)pr_val =
-			    param_arr[param_anar_1000fdx].value;
-			break;
-
-		case MAC_PROP_EN_1000FDX_CAP:
-			*(uint8_t *)pr_val = nxgep->param_en_1000fdx;
-			break;
-
-		case MAC_PROP_ADV_100FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			*(uint8_t *)pr_val =
-			    param_arr[param_anar_100fdx].value;
-			break;
-
-		case MAC_PROP_EN_100FDX_CAP:
-			*(uint8_t *)pr_val = nxgep->param_en_100fdx;
-			break;
-
-		case MAC_PROP_ADV_10FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			*(uint8_t *)pr_val =
-			    param_arr[param_anar_10fdx].value;
-			break;
-
-		case MAC_PROP_EN_10FDX_CAP:
-			*(uint8_t *)pr_val = nxgep->param_en_10fdx;
-			break;
-
-		case MAC_PROP_EN_1000HDX_CAP:
-		case MAC_PROP_EN_100HDX_CAP:
-		case MAC_PROP_EN_10HDX_CAP:
-		case MAC_PROP_ADV_1000HDX_CAP:
-		case MAC_PROP_ADV_100HDX_CAP:
-		case MAC_PROP_ADV_10HDX_CAP:
-			err = ENOTSUP;
-			break;
-
-		case MAC_PROP_PRIVATE:
-			err = nxge_get_priv_prop(nxgep, pr_name, pr_flags,
-			    pr_valsize, pr_val, perm);
-			break;
-
-		case MAC_PROP_MTU: {
-			mac_propval_range_t	range;
-
-			if (!(pr_flags & MAC_PROP_POSSIBLE))
-				return (ENOTSUP);
-			if (pr_valsize < sizeof (mac_propval_range_t))
-				return (EINVAL);
-			range.mpr_count = 1;
-			range.mpr_type = MAC_PROPVAL_UINT32;
-			range.range_uint32[0].mpur_min =
-			    range.range_uint32[0].mpur_max = NXGE_DEFAULT_MTU;
-			range.range_uint32[0].mpur_max = NXGE_MAXIMUM_MTU;
-			bcopy(&range, pr_val, sizeof (range));
-			break;
-		}
-		default:
-			err = EINVAL;
-			break;
+		ASSERT(pr_valsize >= sizeof (val));
+		bcopy(&val, pr_val, sizeof (val));
+		break;
 	}
 
-	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "<== nxge_m_getprop"));
+	case MAC_PROP_STATUS: {
+		link_state_t state = statsp->mac_stats.link_up ?
+		    LINK_STATE_UP : LINK_STATE_DOWN;
 
-	return (err);
+		ASSERT(pr_valsize >= sizeof (state));
+		bcopy(&state, pr_val, sizeof (state));
+		break;
+	}
+
+	case MAC_PROP_AUTONEG:
+		*(uint8_t *)pr_val = param_arr[param_autoneg].value;
+		break;
+
+	case MAC_PROP_FLOWCTRL: {
+		link_flowctrl_t fl = param_arr[param_anar_pause].value != 0 ?
+		    LINK_FLOWCTRL_RX : LINK_FLOWCTRL_NONE;
+
+		ASSERT(pr_valsize >= sizeof (fl));
+		bcopy(&fl, pr_val, sizeof (fl));
+		break;
+	}
+
+	case MAC_PROP_ADV_1000FDX_CAP:
+		*(uint8_t *)pr_val = param_arr[param_anar_1000fdx].value;
+		break;
+
+	case MAC_PROP_EN_1000FDX_CAP:
+		*(uint8_t *)pr_val = nxgep->param_en_1000fdx;
+		break;
+
+	case MAC_PROP_ADV_100FDX_CAP:
+		*(uint8_t *)pr_val = param_arr[param_anar_100fdx].value;
+		break;
+
+	case MAC_PROP_EN_100FDX_CAP:
+		*(uint8_t *)pr_val = nxgep->param_en_100fdx;
+		break;
+
+	case MAC_PROP_ADV_10FDX_CAP:
+		*(uint8_t *)pr_val = param_arr[param_anar_10fdx].value;
+		break;
+
+	case MAC_PROP_EN_10FDX_CAP:
+		*(uint8_t *)pr_val = nxgep->param_en_10fdx;
+		break;
+
+	case MAC_PROP_PRIVATE:
+		return (nxge_get_priv_prop(nxgep, pr_name, pr_valsize,
+		    pr_val));
+
+	default:
+		return (ENOTSUP);
+	}
+
+	return (0);
+}
+
+static void
+nxge_m_propinfo(void *barg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	nxge_t		*nxgep = barg;
+	p_nxge_stats_t	statsp = nxgep->statsp;
+
+	/*
+	 * By default permissions are read/write unless specified
+	 * otherwise by the driver.
+	 */
+
+	switch (pr_num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_STATUS:
+	case MAC_PROP_EN_1000HDX_CAP:
+	case MAC_PROP_EN_100HDX_CAP:
+	case MAC_PROP_EN_10HDX_CAP:
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_ADV_1000HDX_CAP:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+		/*
+		 * Note that read-only properties don't need to
+		 * provide default values since they cannot be
+		 * changed by the administrator.
+		 */
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_EN_1000FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
+	case MAC_PROP_EN_10FDX_CAP:
+		mac_prop_info_set_default_uint8(prh, 1);
+		break;
+
+	case MAC_PROP_AUTONEG:
+		mac_prop_info_set_default_uint8(prh, 1);
+		break;
+
+	case MAC_PROP_FLOWCTRL:
+		mac_prop_info_set_default_link_flowctrl(prh, LINK_FLOWCTRL_RX);
+		break;
+
+	case MAC_PROP_MTU:
+		mac_prop_info_set_range_uint32(prh,
+		    NXGE_DEFAULT_MTU, NXGE_MAXIMUM_MTU);
+		break;
+
+	case MAC_PROP_PRIVATE:
+		nxge_priv_propinfo(pr_name, prh);
+		break;
+	}
+
+	mutex_enter(nxgep->genlock);
+	if (statsp->port_stats.lb_mode != nxge_lb_normal &&
+	    nxge_param_locked(pr_num)) {
+		/*
+		 * Some properties are locked (read-only) while the
+		 * device is in any sort of loopback mode.
+		 */
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+	}
+	mutex_exit(nxgep->genlock);
+}
+
+static void
+nxge_priv_propinfo(const char *pr_name, mac_prop_info_handle_t prh)
+{
+	char valstr[64];
+
+	bzero(valstr, sizeof (valstr));
+
+	if (strcmp(pr_name, "_function_number") == 0 ||
+	    strcmp(pr_name, "_fw_version") == 0 ||
+	    strcmp(pr_name, "_port_mode") == 0 ||
+	    strcmp(pr_name, "_hot_swap_phy") == 0) {
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+
+	} else if (strcmp(pr_name, "_rxdma_intr_time") == 0) {
+		(void) snprintf(valstr, sizeof (valstr),
+		    "%d", RXDMA_RCR_TO_DEFAULT);
+
+	} else if (strcmp(pr_name, "_rxdma_intr_pkts") == 0) {
+		(void) snprintf(valstr, sizeof (valstr),
+		    "%d", RXDMA_RCR_PTHRES_DEFAULT);
+
+	} else 	if (strcmp(pr_name, "_class_opt_ipv4_tcp") == 0 ||
+	    strcmp(pr_name, "_class_opt_ipv4_udp") == 0 ||
+	    strcmp(pr_name, "_class_opt_ipv4_ah") == 0 ||
+	    strcmp(pr_name, "_class_opt_ipv4_sctp") == 0 ||
+	    strcmp(pr_name, "_class_opt_ipv6_tcp") == 0 ||
+	    strcmp(pr_name, "_class_opt_ipv6_udp") == 0 ||
+	    strcmp(pr_name, "_class_opt_ipv6_ah") == 0 ||
+	    strcmp(pr_name, "_class_opt_ipv6_sctp") == 0) {
+		(void) snprintf(valstr, sizeof (valstr), "%x",
+		    NXGE_CLASS_FLOW_GEN_SERVER);
+
+	} else if (strcmp(pr_name, "_soft_lso_enable") == 0) {
+		(void) snprintf(valstr, sizeof (valstr), "%d", 0);
+
+	} else 	if (strcmp(pr_name, "_adv_10gfdx_cap") == 0) {
+		(void) snprintf(valstr, sizeof (valstr), "%d", 1);
+
+	} else if (strcmp(pr_name, "_adv_pause_cap") == 0) {
+		(void) snprintf(valstr, sizeof (valstr), "%d", 1);
+	}
+
+	if (strlen(valstr) > 0)
+		mac_prop_info_set_default_str(prh, valstr);
 }
 
 /* ARGSUSED */
@@ -5104,23 +5133,19 @@ nxge_set_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 }
 
 static int
-nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
-    uint_t pr_valsize, void *pr_val, uint_t *perm)
+nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
+    void *pr_val)
 {
 	p_nxge_param_t	param_arr = nxgep->param_arr;
 	char		valstr[MAXNAMELEN];
 	int		err = EINVAL;
 	uint_t		strsize;
-	boolean_t	is_default = (pr_flags & MAC_PROP_DEFAULT);
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 	    "==> nxge_get_priv_prop: property %s", pr_name));
 
 	/* function number */
 	if (strcmp(pr_name, "_function_number") == 0) {
-		if (is_default)
-			return (ENOTSUP);
-		*perm = MAC_PROP_PERM_READ;
 		(void) snprintf(valstr, sizeof (valstr), "%d",
 		    nxgep->function_num);
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5134,9 +5159,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 
 	/* Neptune firmware version */
 	if (strcmp(pr_name, "_fw_version") == 0) {
-		if (is_default)
-			return (ENOTSUP);
-		*perm = MAC_PROP_PERM_READ;
 		(void) snprintf(valstr, sizeof (valstr), "%s",
 		    nxgep->vpd_info.ver);
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5150,9 +5172,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 
 	/* port PHY mode */
 	if (strcmp(pr_name, "_port_mode") == 0) {
-		if (is_default)
-			return (ENOTSUP);
-		*perm = MAC_PROP_PERM_READ;
 		switch (nxgep->mac.portmode) {
 		case PORT_1G_COPPER:
 			(void) snprintf(valstr, sizeof (valstr), "1G copper %s",
@@ -5221,9 +5240,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 
 	/* Hot swappable PHY */
 	if (strcmp(pr_name, "_hot_swap_phy") == 0) {
-		if (is_default)
-			return (ENOTSUP);
-		*perm = MAC_PROP_PERM_READ;
 		(void) snprintf(valstr, sizeof (valstr), "%s",
 		    nxgep->hot_swappable_phy ?
 		    "yes" : "no");
@@ -5241,12 +5257,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	/* Receive Interrupt Blanking Parameters */
 	if (strcmp(pr_name, "_rxdma_intr_time") == 0) {
 		err = 0;
-		if (is_default) {
-			(void) snprintf(valstr, sizeof (valstr),
-			    "%d", RXDMA_RCR_TO_DEFAULT);
-			goto done;
-		}
-
 		(void) snprintf(valstr, sizeof (valstr), "%d",
 		    nxgep->intr_timeout);
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5258,11 +5268,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 
 	if (strcmp(pr_name, "_rxdma_intr_pkts") == 0) {
 		err = 0;
-		if (is_default) {
-			(void) snprintf(valstr, sizeof (valstr),
-			    "%d", RXDMA_RCR_PTHRES_DEFAULT);
-			goto done;
-		}
 		(void) snprintf(valstr, sizeof (valstr), "%d",
 		    nxgep->intr_threshold);
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5274,12 +5279,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 
 	/* Classification and Load Distribution Configuration */
 	if (strcmp(pr_name, "_class_opt_ipv4_tcp") == 0) {
-		if (is_default) {
-			(void) snprintf(valstr, sizeof (valstr), "%x",
-			    NXGE_CLASS_FLOW_GEN_SERVER);
-			err = 0;
-			goto done;
-		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv4_tcp]);
 
@@ -5292,12 +5291,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv4_udp") == 0) {
-		if (is_default) {
-			(void) snprintf(valstr, sizeof (valstr), "%x",
-			    NXGE_CLASS_FLOW_GEN_SERVER);
-			err = 0;
-			goto done;
-		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv4_udp]);
 
@@ -5309,12 +5302,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 		goto done;
 	}
 	if (strcmp(pr_name, "_class_opt_ipv4_ah") == 0) {
-		if (is_default) {
-			(void) snprintf(valstr, sizeof (valstr), "%x",
-			    NXGE_CLASS_FLOW_GEN_SERVER);
-			err = 0;
-			goto done;
-		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv4_ah]);
 
@@ -5327,12 +5314,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv4_sctp") == 0) {
-		if (is_default) {
-			(void) snprintf(valstr, sizeof (valstr), "%x",
-			    NXGE_CLASS_FLOW_GEN_SERVER);
-			err = 0;
-			goto done;
-		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv4_sctp]);
 
@@ -5345,12 +5326,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv6_tcp") == 0) {
-		if (is_default) {
-			(void) snprintf(valstr, sizeof (valstr), "%x",
-			    NXGE_CLASS_FLOW_GEN_SERVER);
-			err = 0;
-			goto done;
-		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv6_tcp]);
 
@@ -5363,12 +5338,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv6_udp") == 0) {
-		if (is_default) {
-			(void) snprintf(valstr, sizeof (valstr), "%x",
-			    NXGE_CLASS_FLOW_GEN_SERVER);
-			err = 0;
-			goto done;
-		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv6_udp]);
 
@@ -5381,12 +5350,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv6_ah") == 0) {
-		if (is_default) {
-			(void) snprintf(valstr, sizeof (valstr), "%x",
-			    NXGE_CLASS_FLOW_GEN_SERVER);
-			err = 0;
-			goto done;
-		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv6_ah]);
 
@@ -5399,12 +5362,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	}
 
 	if (strcmp(pr_name, "_class_opt_ipv6_sctp") == 0) {
-		if (is_default) {
-			(void) snprintf(valstr, sizeof (valstr), "%x",
-			    NXGE_CLASS_FLOW_GEN_SERVER);
-			err = 0;
-			goto done;
-		}
 		err = nxge_dld_get_ip_opt(nxgep,
 		    (caddr_t)&param_arr[param_class_opt_ipv6_sctp]);
 
@@ -5418,11 +5375,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 
 	/* Software LSO */
 	if (strcmp(pr_name, "_soft_lso_enable") == 0) {
-		if (is_default) {
-			(void) snprintf(valstr, sizeof (valstr), "%d", 0);
-			err = 0;
-			goto done;
-		}
 		(void) snprintf(valstr, sizeof (valstr),
 		    "%d", nxgep->soft_lso_enable);
 		err = 0;
@@ -5434,8 +5386,7 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	}
 	if (strcmp(pr_name, "_adv_10gfdx_cap") == 0) {
 		err = 0;
-		if (is_default ||
-		    nxgep->param_arr[param_anar_10gfdx].value != 0) {
+		if (nxgep->param_arr[param_anar_10gfdx].value != 0) {
 			(void) snprintf(valstr, sizeof (valstr), "%d", 1);
 			goto done;
 		} else {
@@ -5445,8 +5396,7 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	}
 	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
 		err = 0;
-		if (is_default ||
-		    nxgep->param_arr[param_anar_pause].value != 0) {
+		if (nxgep->param_arr[param_anar_pause].value != 0) {
 			(void) snprintf(valstr, sizeof (valstr), "%d", 1);
 			goto done;
 		} else {
@@ -5587,6 +5537,7 @@ nxge_tx_ring_start(mac_ring_driver_t rdriver, uint64_t mr_gen_num)
 	ring = nxgep->tx_rings->rings[channel];
 
 	MUTEX_ENTER(&ring->lock);
+	ASSERT(ring->tx_ring_handle == NULL);
 	ring->tx_ring_handle = rhp->ring_handle;
 	MUTEX_EXIT(&ring->lock);
 
@@ -5605,11 +5556,12 @@ nxge_tx_ring_stop(mac_ring_driver_t rdriver)
 	ring = nxgep->tx_rings->rings[channel];
 
 	MUTEX_ENTER(&ring->lock);
+	ASSERT(ring->tx_ring_handle != NULL);
 	ring->tx_ring_handle = (mac_ring_handle_t)NULL;
 	MUTEX_EXIT(&ring->lock);
 }
 
-static int
+int
 nxge_rx_ring_start(mac_ring_driver_t rdriver, uint64_t mr_gen_num)
 {
 	p_nxge_ring_handle_t	rhp = (p_nxge_ring_handle_t)rdriver;
@@ -5623,23 +5575,25 @@ nxge_rx_ring_start(mac_ring_driver_t rdriver, uint64_t mr_gen_num)
 
 	MUTEX_ENTER(&ring->lock);
 
-	if (nxgep->rx_channel_started[channel] == B_TRUE) {
+	if (ring->started) {
+		ASSERT(ring->started == B_FALSE);
 		MUTEX_EXIT(&ring->lock);
 		return (0);
 	}
 
 	/* set rcr_ring */
 	for (i = 0; i < nxgep->ldgvp->maxldvs; i++) {
-		if ((nxgep->ldgvp->ldvp[i].is_rxdma == 1) &&
+		if ((nxgep->ldgvp->ldvp[i].is_rxdma) &&
 		    (nxgep->ldgvp->ldvp[i].channel == channel)) {
 			ring->ldvp = &nxgep->ldgvp->ldvp[i];
 			ring->ldgp = nxgep->ldgvp->ldvp[i].ldgp;
 		}
 	}
 
-	nxgep->rx_channel_started[channel] = B_TRUE;
 	ring->rcr_mac_handle = rhp->ring_handle;
 	ring->rcr_gen_num = mr_gen_num;
+	ring->started = B_TRUE;
+	rhp->ring_gen_num = mr_gen_num;
 	MUTEX_EXIT(&ring->lock);
 
 	return (0);
@@ -5657,9 +5611,51 @@ nxge_rx_ring_stop(mac_ring_driver_t rdriver)
 	ring =  nxgep->rx_rcr_rings->rcr_rings[channel];
 
 	MUTEX_ENTER(&ring->lock);
-	nxgep->rx_channel_started[channel] = B_FALSE;
+	ASSERT(ring->started == B_TRUE);
 	ring->rcr_mac_handle = NULL;
+	ring->ldvp = NULL;
+	ring->ldgp = NULL;
+	ring->started = B_FALSE;
 	MUTEX_EXIT(&ring->lock);
+}
+
+static int
+nxge_ring_get_htable_idx(p_nxge_t nxgep, mac_ring_type_t type, uint32_t channel)
+{
+	int	i;
+
+#if defined(sun4v)
+	if (isLDOMguest(nxgep)) {
+		return (nxge_hio_get_dc_htable_idx(nxgep,
+		    (type == MAC_RING_TYPE_TX) ? VP_BOUND_TX : VP_BOUND_RX,
+		    channel));
+	}
+#endif
+
+	ASSERT(nxgep->ldgvp != NULL);
+
+	switch (type) {
+	case MAC_RING_TYPE_TX:
+		for (i = 0; i < nxgep->ldgvp->maxldvs; i++) {
+			if ((nxgep->ldgvp->ldvp[i].is_txdma) &&
+			    (nxgep->ldgvp->ldvp[i].channel == channel)) {
+				return ((int)
+				    nxgep->ldgvp->ldvp[i].ldgp->htable_idx);
+			}
+		}
+		break;
+
+	case MAC_RING_TYPE_RX:
+		for (i = 0; i < nxgep->ldgvp->maxldvs; i++) {
+			if ((nxgep->ldgvp->ldvp[i].is_rxdma) &&
+			    (nxgep->ldgvp->ldvp[i].channel == channel)) {
+				return ((int)
+				    nxgep->ldgvp->ldvp[i].ldgp->htable_idx);
+			}
+		}
+	}
+
+	return (-1);
 }
 
 /*
@@ -5671,13 +5667,22 @@ nxge_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 {
 	p_nxge_t		nxgep = (p_nxge_t)arg;
 	p_nxge_hw_pt_cfg_t	p_cfgp = &nxgep->pt_config.hw_config;
+	p_nxge_intr_t		intrp;
+	uint32_t		channel;
+	int			htable_idx;
+	p_nxge_ring_handle_t	rhandlep;
 
-	NXGE_DEBUG_MSG((nxgep, TX_CTL,
+	ASSERT(nxgep != NULL);
+	ASSERT(p_cfgp != NULL);
+	ASSERT(infop != NULL);
+
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 	    "==> nxge_fill_ring 0x%x index %d", rtype, index));
+
 
 	switch (rtype) {
 	case MAC_RING_TYPE_TX: {
-		p_nxge_ring_handle_t	rhandlep;
+		mac_intr_t	*mintr = &infop->mri_intr;
 
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
 		    "==> nxge_fill_ring (TX) 0x%x index %d ntdcs %d",
@@ -5689,17 +5694,31 @@ nxge_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 		rhandlep->index = index;
 		rhandlep->ring_handle = rh;
 
+		channel = nxgep->pt_config.hw_config.tdc.start + index;
+		rhandlep->channel = channel;
+		intrp = (p_nxge_intr_t)&nxgep->nxge_intr_type;
+		htable_idx = nxge_ring_get_htable_idx(nxgep, rtype,
+		    channel);
+		if (htable_idx >= 0)
+			mintr->mi_ddi_handle = intrp->htable[htable_idx];
+		else
+			mintr->mi_ddi_handle = NULL;
+
 		infop->mri_driver = (mac_ring_driver_t)rhandlep;
 		infop->mri_start = nxge_tx_ring_start;
 		infop->mri_stop = nxge_tx_ring_stop;
 		infop->mri_tx = nxge_tx_ring_send;
-
+		infop->mri_stat = nxge_tx_ring_stat;
+		infop->mri_flags = MAC_RING_TX_SERIALIZE;
 		break;
 	}
+
 	case MAC_RING_TYPE_RX: {
-		p_nxge_ring_handle_t	rhandlep;
-		int			nxge_rindex;
 		mac_intr_t		nxge_mac_intr;
+		int			nxge_rindex;
+		p_nxge_intr_t		intrp;
+
+		intrp = (p_nxge_intr_t)&nxgep->nxge_intr_type;
 
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
 		    "==> nxge_fill_ring (RX) 0x%x index %d nrdcs %d",
@@ -5710,34 +5729,47 @@ nxge_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 		 * Find the ring index in the nxge instance.
 		 */
 		nxge_rindex = nxge_get_rxring_index(nxgep, rg_index, index);
+		channel = nxgep->pt_config.hw_config.start_rdc + index;
+		intrp = (p_nxge_intr_t)&nxgep->nxge_intr_type;
 
 		ASSERT((nxge_rindex >= 0) && (nxge_rindex < p_cfgp->max_rdcs));
 		rhandlep = &nxgep->rx_ring_handles[nxge_rindex];
 		rhandlep->nxgep = nxgep;
 		rhandlep->index = nxge_rindex;
 		rhandlep->ring_handle = rh;
+		rhandlep->channel = channel;
 
 		/*
 		 * Entrypoint to enable interrupt (disable poll) and
 		 * disable interrupt (enable poll).
 		 */
+		bzero(&nxge_mac_intr, sizeof (nxge_mac_intr));
 		nxge_mac_intr.mi_handle = (mac_intr_handle_t)rhandlep;
 		nxge_mac_intr.mi_enable = (mac_intr_enable_t)nxge_disable_poll;
 		nxge_mac_intr.mi_disable = (mac_intr_disable_t)nxge_enable_poll;
+
+		htable_idx =  nxge_ring_get_htable_idx(nxgep, rtype,
+		    channel);
+		if (htable_idx >= 0)
+			nxge_mac_intr.mi_ddi_handle = intrp->htable[htable_idx];
+		else
+			nxge_mac_intr.mi_ddi_handle = NULL;
+
 		infop->mri_driver = (mac_ring_driver_t)rhandlep;
 		infop->mri_start = nxge_rx_ring_start;
 		infop->mri_stop = nxge_rx_ring_stop;
-		infop->mri_intr = nxge_mac_intr; /* ??? */
+		infop->mri_intr = nxge_mac_intr;
 		infop->mri_poll = nxge_rx_poll;
-
+		infop->mri_stat = nxge_rx_ring_stat;
+		infop->mri_flags = MAC_RING_RX_ENQUEUE;
 		break;
 	}
+
 	default:
 		break;
 	}
 
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_fill_ring 0x%x",
-	    rtype));
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_fill_ring 0x%x", rtype));
 }
 
 static void
@@ -6181,6 +6213,8 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 
 			return (NXGE_ERROR | NXGE_DDI_FAILED);
 		}
+
+		ldgp->htable_idx = x;
 		intrp->intr_added++;
 	}
 
@@ -6341,6 +6375,8 @@ nxge_add_intrs_adv_type_fix(p_nxge_t nxgep, uint32_t int_type)
 
 			return (NXGE_ERROR | NXGE_DDI_FAILED);
 		}
+
+		ldgp->htable_idx = x;
 		intrp->intr_added++;
 	}
 
@@ -6516,13 +6552,10 @@ nxge_mac_register(p_nxge_t nxgep)
 	macp->m_max_sdu = nxgep->mac.default_mtu;
 	macp->m_margin = VLAN_TAGSZ;
 	macp->m_priv_props = nxge_priv_props;
-	macp->m_priv_prop_count = NXGE_MAX_PRIV_PROPS;
-	if (isLDOMguest(nxgep)) {
-		macp->m_v12n = MAC_VIRT_LEVEL1 | MAC_VIRT_SERIALIZE;
-	} else {
-		macp->m_v12n = MAC_VIRT_HIO | MAC_VIRT_LEVEL1 | \
-		    MAC_VIRT_SERIALIZE;
-	}
+	if (isLDOMguest(nxgep))
+		macp->m_v12n = MAC_VIRT_LEVEL1;
+	else
+		macp->m_v12n = MAC_VIRT_HIO | MAC_VIRT_LEVEL1;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "==> nxge_mac_register: instance %d "
@@ -6974,40 +7007,6 @@ nxge_create_msi_property(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "<==nxge_create_msi_property"));
 	return (nmsi);
 }
-
-/* ARGSUSED */
-static int
-nxge_get_def_val(nxge_t *nxgep, mac_prop_id_t pr_num, uint_t pr_valsize,
-    void *pr_val)
-{
-	int err = 0;
-	link_flowctrl_t fl;
-
-	switch (pr_num) {
-	case MAC_PROP_AUTONEG:
-		*(uint8_t *)pr_val = 1;
-		break;
-	case MAC_PROP_FLOWCTRL:
-		if (pr_valsize < sizeof (link_flowctrl_t))
-			return (EINVAL);
-		fl = LINK_FLOWCTRL_RX;
-		bcopy(&fl, pr_val, sizeof (fl));
-		break;
-	case MAC_PROP_ADV_1000FDX_CAP:
-	case MAC_PROP_EN_1000FDX_CAP:
-		*(uint8_t *)pr_val = 1;
-		break;
-	case MAC_PROP_ADV_100FDX_CAP:
-	case MAC_PROP_EN_100FDX_CAP:
-		*(uint8_t *)pr_val = 1;
-		break;
-	default:
-		err = ENOTSUP;
-		break;
-	}
-	return (err);
-}
-
 
 /*
  * The following is a software around for the Neptune hardware's

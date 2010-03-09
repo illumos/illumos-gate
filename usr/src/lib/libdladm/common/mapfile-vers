@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -57,6 +57,7 @@ SUNWprivate_1.1 {
 	dladm_set_linkprop;
 	dladm_walk_linkprop;
 	dladm_attr_is_linkprop;
+	dladm_linkprop_is_set;
 	dladm_valid_secobj_name;
 	dladm_init_secobj;
 	dladm_get_secobj;
@@ -161,6 +162,8 @@ SUNWprivate_1.1 {
 	dladm_str2protect;
 	dladm_ipv4addr2str;
 	dladm_str2ipv4addr;
+	dladm_ipv6addr2str;
+	dladm_str2ipv6addr;
 	dladm_start_usagelog;
 	dladm_stop_usagelog;
 	dladm_walk_usage_res;
@@ -241,6 +244,18 @@ SUNWprivate_1.1 {
 	dladm_bridge_get_nick;
 	dladm_bridge_set_nick;
 	dladm_bridge_get_privprop;
+
+	dladm_link_stat_query;
+	dladm_link_stat_diffchain;
+	dladm_link_stat_free;
+	dladm_link_stat_query_all;
+	dladm_link_stat_query_all_free;
+
+	dladm_flow_stat_query;
+	dladm_flow_stat_diff;
+	dladm_flow_stat_free;
+	dladm_flow_stat_query_all;
+	dladm_flow_stat_query_all_free;
     local:
 	*;
 };

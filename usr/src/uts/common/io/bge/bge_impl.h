@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -441,7 +441,11 @@ typedef struct recv_ring {
 	bge_rule_info_t		*mac_addr_rule;
 	uint8_t			mac_addr_val[ETHERADDRL];
 	int			poll_flag;	/* Polling flag		*/
-} recv_ring_t;					/* 0x90 (144) bytes	*/
+
+	/* Per-ring statistics */
+	uint64_t		rx_pkts;	/* Received Packets Count */
+	uint64_t		rx_bytes;	/* Received Bytes Count */
+} recv_ring_t;
 
 
 /*
@@ -1196,6 +1200,7 @@ void   bge_chip_msi_trig(bge_t *bgep);
 void bge_init_kstats(bge_t *bgep, int instance);
 void bge_fini_kstats(bge_t *bgep);
 int bge_m_stat(void *arg, uint_t stat, uint64_t *val);
+int bge_rx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
 
 /* bge_log.c */
 #if	BGE_DEBUGGING

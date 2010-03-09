@@ -118,8 +118,8 @@ myri10ge_lro_flush(struct myri10ge_slice_state *ss, struct lro_entry *lro,
 		tcp->th_sum = 0xffff ^ tcp_csum;
 	}
 
-	(void) hcksum_assoc(lro->m_head, NULL, NULL, 0, 0, 0,
-	    0, HCK_IPV4_HDRCKSUM | HCK_FULLCKSUM | HCK_FULLCKSUM_OK, 0);
+	mac_hcksum_set(lro->m_head, 0, 0, 0,
+	    0, HCK_IPV4_HDRCKSUM_OK | HCK_FULLCKSUM_OK);
 
 	mbl->cnt += lro->append_cnt;
 	myri10ge_mbl_append(ss, mbl, lro->m_head);

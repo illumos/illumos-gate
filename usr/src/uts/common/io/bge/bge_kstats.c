@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1121,6 +1121,31 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	default:
+		return (ENOTSUP);
+	}
+
+	return (0);
+}
+
+/*
+ * Retrieve a value for one of the statistics for a particular rx ring
+ */
+int
+bge_rx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
+{
+	recv_ring_t *rx_ring = (recv_ring_t *)rh;
+
+	switch (stat) {
+	case MAC_STAT_RBYTES:
+		*val = rx_ring->rx_bytes;
+		break;
+
+	case MAC_STAT_IPACKETS:
+		*val = rx_ring->rx_pkts;
+		break;
+
+	default:
+		*val = 0;
 		return (ENOTSUP);
 	}
 

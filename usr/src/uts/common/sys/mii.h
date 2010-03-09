@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -428,11 +428,8 @@ boolean_t mii_m_loop_ioctl(mii_handle_t mii, queue_t *wq, mblk_t *msg);
  * 	mii		MII handle.
  *	name		Property name.
  *	id		Property ID.
- *	flags		Property flags (MAC_PROP_DEFAULT).
  *	sz		Size of property in bytes.
  *	val		Location to receive property value.
- *	perm		Location to receive property permissions (either
- *			MAC_PROP_PERM_READ or MAC_PROP_PERM_RW).
  *
  * Returns
  *
@@ -441,7 +438,7 @@ boolean_t mii_m_loop_ioctl(mii_handle_t mii, queue_t *wq, mblk_t *msg);
  *	ENOTSUP	if the prooperty is not supported by MII or the PHY.
  */
 int mii_m_getprop(mii_handle_t mii, const char *name, mac_prop_id_t id,
-    uint_t flags, uint_t sz, void *val, uint_t *perm);
+    uint_t sz, void *val);
 
 /*
  * mii_m_setprop
@@ -469,6 +466,25 @@ int mii_m_getprop(mii_handle_t mii, const char *name, mac_prop_id_t id,
  */
 int mii_m_setprop(mii_handle_t mii, const char *name, mac_prop_id_t id,
     uint_t sz, const void *val);
+
+/*
+ * mii_m_propinfo
+ *
+ *	Used to support the driver's mc_setprop() mac callback,
+ *	and only to be called from that function (and without any
+ *	locks held).
+ *
+ * Arguments
+ *
+ * 	mii		MII handle.
+ *	name		Property name.
+ *	id		Property ID.
+ *	prh		Property info handle.
+ *
+ */
+void mii_m_propinfo(mii_handle_t mii, const char *name, mac_prop_id_t id,
+    mac_prop_info_handle_t prh);
+
 
 /*
  * mii_m_getstat

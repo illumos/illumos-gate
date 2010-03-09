@@ -116,7 +116,8 @@ static struct modlinkage oce_mod_linkage = {
 	MODREV_1, &oce_drv, NULL
 };
 
-#define	OCE_M_CB_FLAGS	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+#define	OCE_M_CB_FLAGS	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP | \
+    MC_PROPINFO)
 static mac_callbacks_t oce_mac_cb = {
 	OCE_M_CB_FLAGS,		/* mc_callbacks */
 	oce_m_stat,		/* mc_getstat */
@@ -126,16 +127,17 @@ static mac_callbacks_t oce_mac_cb = {
 	oce_m_multicast,	/* mc_multicast */
 	oce_m_unicast,		/* mc_unicast */
 	oce_m_send,		/* mc_tx */
+	NULL,
 	oce_m_ioctl,		/* mc_ioctl */
 	oce_m_getcap,		/* mc_getcapab */
 	NULL,			/* open */
 	NULL,			/* close */
 	oce_m_setprop,		/* set properties */
-	oce_m_getprop		/* get properties */
+	oce_m_getprop,		/* get properties */
+	oce_m_propinfo		/* properties info */
 };
 
-extern mac_priv_prop_t oce_priv_props[];
-extern uint32_t oce_num_props;
+extern char *oce_priv_props[];
 
 /* Module Init */
 int
@@ -293,7 +295,6 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mac->m_max_sdu = dev->mtu;
 	mac->m_margin = VLAN_TAGSZ;
 	mac->m_priv_props = oce_priv_props;
-	mac->m_priv_prop_count = oce_num_props;
 
 	oce_log(dev, CE_NOTE, MOD_CONFIG,
 	    "Driver Private structure = 0x%p", (void *)dev);

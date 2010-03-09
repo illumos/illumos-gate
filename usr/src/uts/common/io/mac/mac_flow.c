@@ -29,16 +29,30 @@
 #include <sys/mac.h>
 #include <sys/mac_impl.h>
 #include <sys/mac_client_impl.h>
+#include <sys/mac_stat.h>
 #include <sys/dls.h>
 #include <sys/dls_impl.h>
 #include <sys/mac_soft_ring.h>
 #include <sys/ethernet.h>
+#include <sys/cpupart.h>
+#include <sys/pool.h>
+#include <sys/pool_pset.h>
 #include <sys/vlan.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 #include <netinet/sctp.h>
+
+typedef struct flow_stats_s {
+	uint64_t	fs_obytes;
+	uint64_t	fs_opackets;
+	uint64_t	fs_oerrors;
+	uint64_t	fs_ibytes;
+	uint64_t	fs_ipackets;
+	uint64_t	fs_ierrors;
+} flow_stats_t;
+
 
 /* global flow table, will be a per exclusive-zone table later */
 static mod_hash_t	*flow_hash;
@@ -55,7 +69,7 @@ typedef struct {
 
 #define	FS_OFF(f)	(offsetof(flow_stats_t, f))
 static flow_stats_info_t flow_stats_list[] = {
-	{"rbytes",	FS_OFF(fs_rbytes)},
+	{"rbytes",	FS_OFF(fs_ibytes)},
 	{"ipackets",	FS_OFF(fs_ipackets)},
 	{"ierrors",	FS_OFF(fs_ierrors)},
 	{"obytes",	FS_OFF(fs_obytes)},
@@ -83,19 +97,48 @@ flow_stat_init(kstat_named_t *knp)
 static int
 flow_stat_update(kstat_t *ksp, int rw)
 {
-	flow_entry_t	*fep = ksp->ks_private;
-	flow_stats_t 	*fsp = &fep->fe_flowstats;
-	kstat_named_t	*knp = ksp->ks_data;
-	uint64_t	*statp;
-	int		i;
+	flow_entry_t		*fep = ksp->ks_private;
+	kstat_named_t		*knp = ksp->ks_data;
+	uint64_t		*statp;
+	int			i;
+	mac_rx_stats_t		*mac_rx_stat;
+	mac_tx_stats_t		*mac_tx_stat;
+	flow_stats_t		flow_stats;
+	mac_soft_ring_set_t	*mac_srs;
 
 	if (rw != KSTAT_READ)
 		return (EACCES);
 
+	bzero(&flow_stats, sizeof (flow_stats_t));
+
+	for (i = 0; i < fep->fe_rx_srs_cnt; i++) {
+		mac_srs = (mac_soft_ring_set_t *)fep->fe_rx_srs[i];
+		if (mac_srs == NULL) 		/* Multicast flow */
+			break;
+		mac_rx_stat = &mac_srs->srs_rx.sr_stat;
+
+		flow_stats.fs_ibytes += mac_rx_stat->mrs_intrbytes +
+		    mac_rx_stat->mrs_pollbytes + mac_rx_stat->mrs_lclbytes;
+
+		flow_stats.fs_ipackets += mac_rx_stat->mrs_intrcnt +
+		    mac_rx_stat->mrs_pollcnt + mac_rx_stat->mrs_lclcnt;
+
+		flow_stats.fs_ierrors += mac_rx_stat->mrs_ierrors;
+	}
+
+	mac_srs = (mac_soft_ring_set_t *)fep->fe_tx_srs;
+	if (mac_srs == NULL) 		/* Multicast flow */
+		goto done;
+	mac_tx_stat = &mac_srs->srs_tx.st_stat;
+
+	flow_stats.fs_obytes = mac_tx_stat->mts_obytes;
+	flow_stats.fs_opackets = mac_tx_stat->mts_opackets;
+	flow_stats.fs_oerrors = mac_tx_stat->mts_oerrors;
+
+done:
 	for (i = 0; i < FS_SIZE; i++, knp++) {
 		statp = (uint64_t *)
-		    ((uchar_t *)fsp + flow_stats_list[i].fs_offset);
-
+		    ((uchar_t *)&flow_stats + flow_stats_list[i].fs_offset);
 		knp->value.ui64 = *statp;
 	}
 	return (0);
@@ -170,11 +213,11 @@ int
 mac_flow_create(flow_desc_t *fd, mac_resource_props_t *mrp, char *name,
     void *client_cookie, uint_t type, flow_entry_t **flentp)
 {
-	flow_entry_t	*flent = *flentp;
-	int		err = 0;
+	flow_entry_t		*flent = *flentp;
+	int			err = 0;
 
 	if (mrp != NULL) {
-		err = mac_validate_props(mrp);
+		err = mac_validate_props(NULL, mrp);
 		if (err != 0)
 			return (err);
 	}
@@ -221,6 +264,8 @@ mac_flow_create(flow_desc_t *fd, mac_resource_props_t *mrp, char *name,
 			mrp->mrp_priority = MPL_SUBFLOW_DEFAULT;
 		else
 			mrp->mrp_priority = MPL_LINK_DEFAULT;
+		bzero(mrp->mrp_pool, MAXPATHLEN);
+		bzero(&mrp->mrp_cpus, sizeof (mac_cpus_t));
 		bcopy(mrp, &flent->fe_effective_props,
 		    sizeof (mac_resource_props_t));
 	}
@@ -593,7 +638,7 @@ mac_flow_destroy(flow_entry_t *flent)
 	} else {
 		mac_flow_cleanup(flent);
 	}
-
+	mac_misc_stat_delete(flent);
 	mutex_destroy(&flent->fe_lock);
 	cv_destroy(&flent->fe_cv);
 	flow_stat_destroy(flent);
@@ -617,13 +662,15 @@ mac_flow_modify_props(flow_entry_t *flent, mac_resource_props_t *mrp)
 	int			i;
 
 	if ((mrp->mrp_mask & MRP_MAXBW) != 0 &&
-	    (fmrp->mrp_maxbw != mrp->mrp_maxbw)) {
+	    (!(fmrp->mrp_mask & MRP_MAXBW) ||
+	    (fmrp->mrp_maxbw != mrp->mrp_maxbw))) {
 		changed_mask |= MRP_MAXBW;
-		fmrp->mrp_maxbw = mrp->mrp_maxbw;
 		if (mrp->mrp_maxbw == MRP_MAXBW_RESETVAL) {
 			fmrp->mrp_mask &= ~MRP_MAXBW;
+			fmrp->mrp_maxbw = 0;
 		} else {
 			fmrp->mrp_mask |= MRP_MAXBW;
+			fmrp->mrp_maxbw = mrp->mrp_maxbw;
 		}
 	}
 
@@ -658,6 +705,22 @@ mac_flow_modify_props(flow_entry_t *flent, mac_resource_props_t *mrp)
 		changed_mask |= MRP_CPUS;
 		MAC_COPY_CPUS(mrp, fmrp);
 	}
+
+	/*
+	 * Modify the rings property.
+	 */
+	if (mrp->mrp_mask & MRP_RX_RINGS || mrp->mrp_mask & MRP_TX_RINGS)
+		mac_set_rings_effective(flent->fe_mcip);
+
+	if ((mrp->mrp_mask & MRP_POOL) != 0) {
+		if (strcmp(fmrp->mrp_pool, mrp->mrp_pool) != 0)
+			changed_mask |= MRP_POOL;
+		if (strlen(mrp->mrp_pool) == 0)
+			fmrp->mrp_mask &= ~MRP_POOL;
+		else
+			fmrp->mrp_mask |= MRP_POOL;
+		(void) strncpy(fmrp->mrp_pool, mrp->mrp_pool, MAXPATHLEN);
+	}
 	return (changed_mask);
 }
 
@@ -667,6 +730,9 @@ mac_flow_modify(flow_tab_t *ft, flow_entry_t *flent, mac_resource_props_t *mrp)
 	uint32_t changed_mask;
 	mac_client_impl_t *mcip = flent->fe_mcip;
 	mac_resource_props_t *mcip_mrp = MCIP_RESOURCE_PROPS(mcip);
+	mac_resource_props_t *emrp = MCIP_EFFECTIVE_PROPS(mcip);
+	cpupart_t *cpupart = NULL;
+	boolean_t use_default = B_FALSE;
 
 	ASSERT(flent != NULL);
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)ft->ft_mip));
@@ -693,14 +759,24 @@ mac_flow_modify(flow_tab_t *ft, flow_entry_t *flent, mac_resource_props_t *mrp)
 		    !(changed_mask & MRP_CPUS) &&
 		    !(mcip_mrp->mrp_mask & MRP_CPUS_USERSPEC)) {
 			mac_fanout_setup(mcip, flent, mcip_mrp,
-			    mac_rx_deliver, mcip, NULL);
+			    mac_rx_deliver, mcip, NULL, NULL);
 		}
 	}
 	if (mrp->mrp_mask & MRP_PRIORITY)
 		mac_flow_update_priority(mcip, flent);
 
 	if (changed_mask & MRP_CPUS)
-		mac_fanout_setup(mcip, flent, mrp, mac_rx_deliver, mcip, NULL);
+		mac_fanout_setup(mcip, flent, mrp, mac_rx_deliver, mcip, NULL,
+		    NULL);
+
+	if (mrp->mrp_mask & MRP_POOL) {
+		pool_lock();
+		cpupart = mac_pset_find(mrp, &use_default);
+		mac_fanout_setup(mcip, flent, mrp, mac_rx_deliver, mcip, NULL,
+		    cpupart);
+		mac_set_pool_effective(use_default, cpupart, mrp, emrp);
+		pool_unlock();
+	}
 }
 
 /*
@@ -1368,7 +1444,7 @@ mac_link_flow_modify(char *flow_name, mac_resource_props_t *mrp)
 	datalink_id_t		linkid;
 	flow_tab_t		*flow_tab;
 
-	err = mac_validate_props(mrp);
+	err = mac_validate_props(NULL, mrp);
 	if (err != 0)
 		return (err);
 
@@ -1445,10 +1521,14 @@ static int
 mac_link_flow_walk_cb(flow_entry_t *flent, void *arg)
 {
 	flow_walk_state_t	*statep = arg;
-	mac_flowinfo_t		finfo;
+	mac_flowinfo_t		*finfo;
+	int			err;
 
-	mac_link_flowinfo_copy(&finfo, flent);
-	return (statep->ws_func(&finfo, statep->ws_arg));
+	finfo = kmem_zalloc(sizeof (*finfo), KM_SLEEP);
+	mac_link_flowinfo_copy(finfo, flent);
+	err = statep->ws_func(finfo, statep->ws_arg);
+	kmem_free(finfo, sizeof (*finfo));
+	return (err);
 }
 
 /*
@@ -1885,18 +1965,19 @@ flow_ip_accept(flow_tab_t *ft, flow_state_t *s)
 		break;
 	}
 	case ETHERTYPE_IPV6: {
-		ip6_t   *ip6h = (ip6_t *)l3_start;
-		uint16_t ip6_hdrlen;
-		uint8_t	 nexthdr;
+		ip6_t		*ip6h = (ip6_t *)l3_start;
+		ip6_frag_t	*frag = NULL;
+		uint16_t	ip6_hdrlen;
+		uint8_t		nexthdr;
 
-		if (!mac_ip_hdr_length_v6(s->fs_mp, ip6h, &ip6_hdrlen,
-		    &nexthdr, NULL, NULL)) {
+		if (!mac_ip_hdr_length_v6(ip6h, s->fs_mp->b_wptr, &ip6_hdrlen,
+		    &nexthdr, &frag)) {
 			return (ENOBUFS);
 		}
 		l3info->l3_hdrsize = ip6_hdrlen;
 		l3info->l3_protocol = nexthdr;
 		l3info->l3_version = IPV6_VERSION;
-		l3info->l3_fragmented = B_FALSE;
+		l3info->l3_fragmented = (frag != NULL);
 		break;
 	}
 	default:

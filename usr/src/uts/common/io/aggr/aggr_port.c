@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,7 @@ aggr_port_destructor(void *buf, void *arg)
 
 	ASSERT(port->lp_mnh == NULL);
 	ASSERT(port->lp_mphp == NULL);
-	ASSERT(!port->lp_grp_added);
+	ASSERT(!port->lp_rx_grp_added && !port->lp_tx_grp_added);
 	ASSERT(port->lp_hwgh == NULL);
 }
 
@@ -111,7 +111,7 @@ aggr_port_init_callbacks(aggr_port_t *port)
 	port->lp_mnh = mac_notify_add(port->lp_mh, aggr_port_notify_cb, port);
 	/*
 	 * Hold a reference of the grp and the port and this reference will
-	 * be release when the thread exits.
+	 * be released when the thread exits.
 	 *
 	 * The reference on the port is used for aggr_port_delete() to
 	 * continue without waiting for the thread to exit; the reference

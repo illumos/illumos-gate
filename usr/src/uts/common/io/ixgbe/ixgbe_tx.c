@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -501,6 +501,9 @@ adjust_threshold:
 
 	ASSERT((desc_num == desc_total) || (desc_num == (desc_total + 1)));
 
+	tx_ring->stat_obytes += mbsize;
+	tx_ring->stat_opackets ++;
+
 	mutex_exit(&tx_ring->tx_lock);
 
 	/*
@@ -696,7 +699,7 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 
 	ASSERT(mp != NULL);
 
-	hcksum_retrieve(mp, NULL, NULL, &start, NULL, NULL, NULL, &hckflags);
+	mac_hcksum_get(mp, &start, NULL, NULL, NULL, &hckflags);
 	bzero(ctx, sizeof (ixgbe_tx_context_t));
 
 	if (hckflags == 0) {
@@ -705,7 +708,7 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 
 	ctx->hcksum_flags = hckflags;
 
-	lso_info_get(mp, &mss, &lsoflags);
+	mac_lso_get(mp, &mss, &lsoflags);
 	ctx->mss = mss;
 	ctx->lso_flag = (lsoflags == HW_LSO);
 

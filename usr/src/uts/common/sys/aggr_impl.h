@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,19 @@ typedef struct aggr_pseudo_rx_group_s {
 	uint_t			arg_ring_cnt;
 } aggr_pseudo_rx_group_t;
 
+typedef struct aggr_pseudo_tx_ring_s {
+	mac_ring_handle_t	atr_rh;	/* filled in by aggr_fill_ring() */
+	struct aggr_port_s	*atr_port;
+	mac_ring_handle_t	atr_hw_rh;
+	uint_t			atr_flags;
+} aggr_pseudo_tx_ring_t;
+
+typedef struct aggr_pseudo_tx_group_s {
+	mac_group_handle_t	atg_gh;	/* filled in by aggr_fill_group() */
+	uint_t			atg_ring_cnt;
+	aggr_pseudo_tx_ring_t	atg_rings[MAX_RINGS_PER_GROUP];
+} aggr_pseudo_tx_group_t;
+
 /*
  * A link aggregation MAC port.
  * Note that lp_next is protected by the lg_lock of the group the
@@ -93,9 +106,10 @@ typedef struct aggr_port_s {
 			lp_collector_enabled : 1,
 			lp_promisc_on : 1,
 			lp_no_link_update : 1,
-			lp_grp_added : 1,
+			lp_rx_grp_added : 1,
+			lp_tx_grp_added : 1,
 			lp_closing : 1,
-			lp_pad_bits : 25;
+			lp_pad_bits : 24;
 	mac_handle_t	lp_mh;
 	mac_client_handle_t lp_mch;
 	const mac_info_t *lp_mip;
@@ -116,6 +130,17 @@ typedef struct aggr_port_s {
 	aggr_unicst_addr_t	*lp_prom_addr;
 	/* handle of the underlying HW RX group */
 	mac_group_handle_t	lp_hwgh;
+	int			lp_tx_ring_cnt;
+	/* handles of the underlying HW TX rings */
+	mac_ring_handle_t	*lp_tx_rings;
+	/*
+	 * Handles of the pseudo TX rings. Each of them maps to
+	 * corresponding hardware TX ring in lp_tx_rings[]. A
+	 * pseudo TX ring is presented to aggr primary mac
+	 * client even when underlying NIC has no TX ring.
+	 */
+	mac_ring_handle_t	*lp_pseudo_tx_rings;
+	void			*lp_tx_notify_mh;
 } aggr_port_t;
 
 /*
@@ -187,7 +212,16 @@ typedef struct aggr_grp_s {
 	mblk_t		*lg_lacp_tail;
 	kthread_t	*lg_lacp_rx_thread;
 	boolean_t	lg_lacp_done;
+
 	aggr_pseudo_rx_group_t	lg_rx_group;
+	aggr_pseudo_tx_group_t	lg_tx_group;
+
+	kmutex_t	lg_tx_flowctl_lock;
+	kcondvar_t	lg_tx_flowctl_cv;
+	uint_t		lg_tx_blocked_cnt;
+	mac_ring_handle_t	*lg_tx_blocked_rings;
+	kthread_t	*lg_tx_notify_thread;
+	boolean_t	lg_tx_notify_done;
 
 	/*
 	 * The following fields are used by aggr to wait for all the
@@ -274,7 +308,8 @@ extern void aggr_port_init_callbacks(aggr_port_t *);
 
 extern void aggr_recv_cb(void *, mac_resource_handle_t, mblk_t *, boolean_t);
 
-extern mblk_t *aggr_m_tx(void *, mblk_t *);
+extern void aggr_tx_ring_update(void *, uintptr_t);
+extern void aggr_tx_notify_thread(void *);
 extern void aggr_send_port_enable(aggr_port_t *);
 extern void aggr_send_port_disable(aggr_port_t *);
 extern void aggr_send_update_policy(aggr_grp_t *, uint32_t);
@@ -301,6 +336,10 @@ extern void aggr_grp_port_wait(aggr_grp_t *);
 
 extern int aggr_port_addmac(aggr_port_t *, const uint8_t *);
 extern void aggr_port_remmac(aggr_port_t *, const uint8_t *);
+
+extern mblk_t *aggr_ring_tx(void *, mblk_t *);
+extern mblk_t *aggr_find_tx_ring(void *, mblk_t *,
+    uintptr_t, mac_ring_handle_t *);
 
 #endif	/* _KERNEL */
 

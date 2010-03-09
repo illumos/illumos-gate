@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <sys/stream.h>
@@ -161,7 +161,7 @@ static	void	bfe_clear_stats(bfe_t *);
 static	void	bfe_gather_stats(bfe_t *);
 static	void	bfe_error(dev_info_t *, char *, ...);
 static	int	bfe_mac_getprop(void *, const char *, mac_prop_id_t, uint_t,
-    uint_t, void *, uint_t *);
+    void *);
 static	int	bfe_mac_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
 static	int	bfe_tx_reclaim(bfe_ring_t *);
@@ -1651,92 +1651,66 @@ bfe_mac_getstat(void *arg, uint_t stat, uint64_t *val)
 	return (err);
 }
 
-/*ARGSUSED*/
 int
-bfe_mac_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
-    uint_t sz, void *val, uint_t *perm)
+bfe_mac_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    void *val)
 {
 	bfe_t		*bfe = (bfe_t *)arg;
 	int		err = 0;
-	boolean_t	dfl = flags & MAC_PROP_DEFAULT;
 
-	if (sz == 0)
-		return (EINVAL);
-
-	*perm = MAC_PROP_PERM_RW;
 	switch (num) {
 	case MAC_PROP_DUPLEX:
-		*perm = MAC_PROP_PERM_READ;
-		if (sz >= sizeof (link_duplex_t)) {
-			bcopy(&bfe->bfe_chip.duplex, val,
-			    sizeof (link_duplex_t));
-		} else {
-			err = EINVAL;
-		}
+		ASSERT(sz >= sizeof (link_duplex_t));
+		bcopy(&bfe->bfe_chip.duplex, val, sizeof (link_duplex_t));
 		break;
 
 	case MAC_PROP_SPEED:
-		*perm = MAC_PROP_PERM_READ;
-		if (sz >= sizeof (uint64_t)) {
-			bcopy(&bfe->bfe_chip.speed, val, sizeof (uint64_t));
-		} else {
-			err = EINVAL;
-		}
+		ASSERT(sz >= sizeof (uint64_t));
+		bcopy(&bfe->bfe_chip.speed, val, sizeof (uint64_t));
 		break;
 
 	case MAC_PROP_AUTONEG:
-		*(uint8_t *)val =
-		    dfl ? bfe->bfe_cap_aneg : bfe->bfe_adv_aneg;
+		*(uint8_t *)val = bfe->bfe_adv_aneg;
 		break;
 
 	case MAC_PROP_ADV_100FDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? bfe->bfe_cap_100fdx : bfe->bfe_adv_100fdx;
+		*(uint8_t *)val = bfe->bfe_adv_100fdx;
 		break;
+
 	case MAC_PROP_EN_100FDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? bfe->bfe_cap_100fdx : bfe->bfe_adv_100fdx;
+		*(uint8_t *)val = bfe->bfe_adv_100fdx;
 		break;
 
 	case MAC_PROP_ADV_100HDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? bfe->bfe_cap_100hdx : bfe->bfe_adv_100hdx;
+		*(uint8_t *)val = bfe->bfe_adv_100hdx;
 		break;
+
 	case MAC_PROP_EN_100HDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? bfe->bfe_cap_100hdx : bfe->bfe_adv_100hdx;
+		*(uint8_t *)val = bfe->bfe_adv_100hdx;
 		break;
 
 	case MAC_PROP_ADV_10FDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? bfe->bfe_cap_10fdx : bfe->bfe_adv_10fdx;
+		*(uint8_t *)val = bfe->bfe_adv_10fdx;
 		break;
+
 	case MAC_PROP_EN_10FDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? bfe->bfe_cap_10fdx : bfe->bfe_adv_10fdx;
+		*(uint8_t *)val = bfe->bfe_adv_10fdx;
 		break;
 
 	case MAC_PROP_ADV_10HDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? bfe->bfe_cap_10hdx : bfe->bfe_adv_10hdx;
+		*(uint8_t *)val = bfe->bfe_adv_10hdx;
 		break;
+
 	case MAC_PROP_EN_10HDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? bfe->bfe_cap_10hdx : bfe->bfe_adv_10hdx;
+		*(uint8_t *)val = bfe->bfe_adv_10hdx;
 		break;
 
 	case MAC_PROP_ADV_100T4_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? bfe->bfe_cap_100T4 : bfe->bfe_adv_100T4;
+		*(uint8_t *)val = bfe->bfe_adv_100T4;
 		break;
+
 	case MAC_PROP_EN_100T4_CAP:
-		*(uint8_t *)val =
-		    dfl ? bfe->bfe_cap_100T4 : bfe->bfe_adv_100T4;
+		*(uint8_t *)val = bfe->bfe_adv_100T4;
 		break;
 
 	default:
@@ -1745,6 +1719,51 @@ bfe_mac_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 
 	return (err);
 }
+
+
+static void
+bfe_mac_propinfo(void *arg, const char *name, mac_prop_id_t num,
+    mac_prop_info_handle_t prh)
+{
+	bfe_t		*bfe = (bfe_t *)arg;
+
+	switch (num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_ADV_100T4_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_AUTONEG:
+		mac_prop_info_set_default_uint8(prh, bfe->bfe_cap_aneg);
+		break;
+
+	case MAC_PROP_EN_100FDX_CAP:
+		mac_prop_info_set_default_uint8(prh, bfe->bfe_cap_100fdx);
+		break;
+
+	case MAC_PROP_EN_100HDX_CAP:
+		mac_prop_info_set_default_uint8(prh, bfe->bfe_cap_100hdx);
+		break;
+
+	case MAC_PROP_EN_10FDX_CAP:
+		mac_prop_info_set_default_uint8(prh, bfe->bfe_cap_10fdx);
+		break;
+
+	case MAC_PROP_EN_10HDX_CAP:
+		mac_prop_info_set_default_uint8(prh, bfe->bfe_cap_10hdx);
+		break;
+
+	case MAC_PROP_EN_100T4_CAP:
+		mac_prop_info_set_default_uint8(prh, bfe->bfe_cap_100T4);
+		break;
+	}
+}
+
 
 /*ARGSUSED*/
 int
@@ -2067,7 +2086,7 @@ bfe_mac_set_multicast(void *arg, boolean_t add, const uint8_t *macaddr)
 }
 
 static mac_callbacks_t bfe_mac_callbacks = {
-	MC_SETPROP | MC_GETPROP,
+	MC_SETPROP | MC_GETPROP | MC_PROPINFO,
 	bfe_mac_getstat,	/* gets stats */
 	bfe_mac_start,		/* starts mac */
 	bfe_mac_stop,		/* stops mac */
@@ -2075,12 +2094,14 @@ static mac_callbacks_t bfe_mac_callbacks = {
 	bfe_mac_set_multicast,	/* multicast implementation */
 	bfe_mac_set_ether_addr,	/* sets ethernet address (unicast) */
 	bfe_mac_transmit_packet, /* transmits packet */
+	NULL,
 	NULL,			/* ioctl */
 	NULL,			/* getcap */
 	NULL,			/* open */
 	NULL,			/* close */
 	bfe_mac_setprop,
 	bfe_mac_getprop,
+	bfe_mac_propinfo
 };
 
 static void

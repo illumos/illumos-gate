@@ -28,7 +28,7 @@
 #include "ixgbe_sw.h"
 
 static char ixgbe_ident[] = "Intel 10Gb Ethernet";
-static char ixgbe_version[] = "driver version 1.1.4";
+static char ixgbe_version[] = "ixgbe 1.1.4";
 
 /*
  * Local function protoypes
@@ -57,11 +57,13 @@ static void ixgbe_setup_tx(ixgbe_t *);
 static void ixgbe_setup_rx_ring(ixgbe_rx_ring_t *);
 static void ixgbe_setup_tx_ring(ixgbe_tx_ring_t *);
 static void ixgbe_setup_rss(ixgbe_t *);
+static void ixgbe_setup_vmdq(ixgbe_t *);
+static void ixgbe_setup_vmdq_rss(ixgbe_t *);
 static void ixgbe_init_unicst(ixgbe_t *);
-static int ixgbe_unicst_set(ixgbe_t *, const uint8_t *, int);
 static int ixgbe_unicst_find(ixgbe_t *, const uint8_t *);
 static void ixgbe_setup_multicst(ixgbe_t *);
 static void ixgbe_get_hw_state(ixgbe_t *);
+static void ixgbe_setup_vmdq_rss_conf(ixgbe_t *ixgbe);
 static void ixgbe_get_conf(ixgbe_t *);
 static void ixgbe_init_params(ixgbe_t *);
 static int ixgbe_get_prop(ixgbe_t *, char *, int, int, int);
@@ -86,6 +88,7 @@ static void ixgbe_map_txring_to_vector(ixgbe_t *, int, int);
 static void ixgbe_setup_ivar(ixgbe_t *, uint16_t, uint8_t, int8_t);
 static void ixgbe_enable_ivar(ixgbe_t *, uint16_t, int8_t);
 static void ixgbe_disable_ivar(ixgbe_t *, uint16_t, int8_t);
+static uint32_t ixgbe_get_hw_rx_index(ixgbe_t *ixgbe, uint32_t sw_rx_index);
 static int ixgbe_map_intrs_to_vectors(ixgbe_t *);
 static void ixgbe_setup_adapter_vector(ixgbe_t *);
 static void ixgbe_rem_intr_handlers(ixgbe_t *);
@@ -109,22 +112,26 @@ static int ixgbe_resume(dev_info_t *);
 static int ixgbe_suspend(dev_info_t *);
 static void ixgbe_unconfigure(dev_info_t *, ixgbe_t *);
 static uint8_t *ixgbe_mc_table_itr(struct ixgbe_hw *, uint8_t **, uint32_t *);
+static int ixgbe_cbfunc(dev_info_t *, ddi_cb_action_t, void *, void *, void *);
+static int ixgbe_intr_cb_register(ixgbe_t *);
+static int ixgbe_intr_adjust(ixgbe_t *, ddi_cb_action_t, int);
 
 static int ixgbe_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err,
     const void *impl_data);
 static void ixgbe_fm_init(ixgbe_t *);
 static void ixgbe_fm_fini(ixgbe_t *);
 
-mac_priv_prop_t ixgbe_priv_props[] = {
-	{"_tx_copy_thresh", MAC_PROP_PERM_RW},
-	{"_tx_recycle_thresh", MAC_PROP_PERM_RW},
-	{"_tx_overload_thresh", MAC_PROP_PERM_RW},
-	{"_tx_resched_thresh", MAC_PROP_PERM_RW},
-	{"_rx_copy_thresh", MAC_PROP_PERM_RW},
-	{"_rx_limit_per_intr", MAC_PROP_PERM_RW},
-	{"_intr_throttling", MAC_PROP_PERM_RW},
-	{"_adv_pause_cap", MAC_PROP_PERM_READ},
-	{"_adv_asym_pause_cap", MAC_PROP_PERM_READ}
+char *ixgbe_priv_props[] = {
+	"_tx_copy_thresh",
+	"_tx_recycle_thresh",
+	"_tx_overload_thresh",
+	"_tx_resched_thresh",
+	"_rx_copy_thresh",
+	"_rx_limit_per_intr",
+	"_intr_throttling",
+	"_adv_pause_cap",
+	"_adv_asym_pause_cap",
+	NULL
 };
 
 #define	IXGBE_MAX_PRIV_PROPS \
@@ -202,7 +209,7 @@ static lb_property_t lb_external = {
 };
 
 #define	IXGBE_M_CALLBACK_FLAGS \
-	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO)
 
 static mac_callbacks_t ixgbe_m_callbacks = {
 	IXGBE_M_CALLBACK_FLAGS,
@@ -213,12 +220,14 @@ static mac_callbacks_t ixgbe_m_callbacks = {
 	ixgbe_m_multicst,
 	NULL,
 	NULL,
+	NULL,
 	ixgbe_m_ioctl,
 	ixgbe_m_getcapab,
 	NULL,
 	NULL,
 	ixgbe_m_setprop,
-	ixgbe_m_getprop
+	ixgbe_m_getprop,
+	ixgbe_m_propinfo
 };
 
 /*
@@ -227,7 +236,10 @@ static mac_callbacks_t ixgbe_m_callbacks = {
 static adapter_info_t ixgbe_82598eb_cap = {
 	64,		/* maximum number of rx queues */
 	1,		/* minimum number of rx queues */
-	8,		/* default number of rx queues */
+	64,		/* default number of rx queues */
+	16,		/* maximum number of rx groups */
+	1,		/* minimum number of rx groups */
+	1,		/* default number of rx groups */
 	32,		/* maximum number of tx queues */
 	1,		/* minimum number of tx queues */
 	8,		/* default number of tx queues */
@@ -247,7 +259,10 @@ static adapter_info_t ixgbe_82598eb_cap = {
 static adapter_info_t ixgbe_82599eb_cap = {
 	128,		/* maximum number of rx queues */
 	1,		/* minimum number of rx queues */
-	8,		/* default number of rx queues */
+	128,		/* default number of rx queues */
+	64,		/* maximum number of rx groups */
+	1,		/* minimum number of rx groups */
+	1,		/* default number of rx groups */
 	128,		/* maximum number of tx queues */
 	1,		/* minimum number of tx queues */
 	8,		/* default number of tx queues */
@@ -404,6 +419,14 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	ixgbe_init_properties(ixgbe);
 	ixgbe->attach_progress |= ATTACH_PROGRESS_PROPS;
+
+	/*
+	 * Register interrupt callback
+	 */
+	if (ixgbe_intr_cb_register(ixgbe) != IXGBE_SUCCESS) {
+		ixgbe_error(ixgbe, "Failed to register interrupt callback");
+		goto attach_fail;
+	}
 
 	/*
 	 * Allocate interrupts
@@ -662,6 +685,11 @@ ixgbe_unconfigure(dev_info_t *devinfo, ixgbe_t *ixgbe)
 	}
 
 	/*
+	 * Unregister interrupt callback handler
+	 */
+	(void) ddi_cb_unregister(ixgbe->cb_hdl);
+
+	/*
 	 * Remove driver properties
 	 */
 	if (ixgbe->attach_progress & ATTACH_PROGRESS_PROPS) {
@@ -745,7 +773,6 @@ ixgbe_register_mac(ixgbe_t *ixgbe)
 	mac->m_max_sdu = ixgbe->default_mtu;
 	mac->m_margin = VLAN_TAGSZ;
 	mac->m_priv_props = ixgbe_priv_props;
-	mac->m_priv_prop_count = IXGBE_MAX_PRIV_PROPS;
 	mac->m_v12n = MAC_VIRT_LEVEL1;
 
 	status = mac_register(mac, &ixgbe->mac_hdl);
@@ -879,9 +906,11 @@ ixgbe_init_driver_settings(ixgbe_t *ixgbe)
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	dev_info_t *devinfo = ixgbe->dip;
 	ixgbe_rx_ring_t *rx_ring;
+	ixgbe_rx_group_t *rx_group;
 	ixgbe_tx_ring_t *tx_ring;
 	uint32_t rx_size;
 	uint32_t tx_size;
+	uint32_t ring_per_group;
 	int i;
 
 	/*
@@ -915,12 +944,21 @@ ixgbe_init_driver_settings(ixgbe_t *ixgbe)
 	    ((tx_size & (((uint32_t)1 << 10) - 1)) > 0 ? 1 : 0)) << 10;
 
 	/*
-	 * Initialize rx/tx rings parameters
+	 * Initialize rx/tx rings/groups parameters
 	 */
+	ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
 	for (i = 0; i < ixgbe->num_rx_rings; i++) {
 		rx_ring = &ixgbe->rx_rings[i];
 		rx_ring->index = i;
 		rx_ring->ixgbe = ixgbe;
+		rx_ring->group_index = i / ring_per_group;
+		rx_ring->hw_index = ixgbe_get_hw_rx_index(ixgbe, i);
+	}
+
+	for (i = 0; i < ixgbe->num_rx_groups; i++) {
+		rx_group = &ixgbe->rx_groups[i];
+		rx_group->index = i;
+		rx_group->ixgbe = ixgbe;
 	}
 
 	for (i = 0; i < ixgbe->num_tx_rings; i++) {
@@ -1605,6 +1643,218 @@ ixgbe_stop(ixgbe_t *ixgbe, boolean_t free_buffer)
 }
 
 /*
+ * ixgbe_cbfunc - Driver interface for generic DDI callbacks
+ */
+/* ARGSUSED */
+static int
+ixgbe_cbfunc(dev_info_t *dip, ddi_cb_action_t cbaction, void *cbarg,
+    void *arg1, void *arg2)
+{
+	ixgbe_t *ixgbe = (ixgbe_t *)arg1;
+
+	switch (cbaction) {
+	/* IRM callback */
+	int count;
+	case DDI_CB_INTR_ADD:
+	case DDI_CB_INTR_REMOVE:
+		count = (int)(uintptr_t)cbarg;
+		ASSERT(ixgbe->intr_type == DDI_INTR_TYPE_MSIX);
+		DTRACE_PROBE2(ixgbe__irm__callback, int, count,
+		    int, ixgbe->intr_cnt);
+		if (ixgbe_intr_adjust(ixgbe, cbaction, count) !=
+		    DDI_SUCCESS) {
+			ixgbe_error(ixgbe,
+			    "IRM CB: Failed to adjust interrupts");
+			goto cb_fail;
+		}
+		break;
+	default:
+		IXGBE_DEBUGLOG_1(ixgbe, "DDI CB: action 0x%x NOT supported",
+		    cbaction);
+		return (DDI_ENOTSUP);
+	}
+	return (DDI_SUCCESS);
+cb_fail:
+	return (DDI_FAILURE);
+}
+
+/*
+ * ixgbe_intr_adjust - Adjust interrupt to respond to IRM request.
+ */
+static int
+ixgbe_intr_adjust(ixgbe_t *ixgbe, ddi_cb_action_t cbaction, int count)
+{
+	int i, rc, actual;
+
+	if (count == 0)
+		return (DDI_SUCCESS);
+
+	if ((cbaction == DDI_CB_INTR_ADD &&
+	    ixgbe->intr_cnt + count > ixgbe->intr_cnt_max) ||
+	    (cbaction == DDI_CB_INTR_REMOVE &&
+	    ixgbe->intr_cnt - count < ixgbe->intr_cnt_min))
+		return (DDI_FAILURE);
+
+	if (!(ixgbe->ixgbe_state & IXGBE_STARTED)) {
+		return (DDI_FAILURE);
+	}
+
+	for (i = 0; i < ixgbe->num_rx_rings; i++)
+		mac_ring_intr_set(ixgbe->rx_rings[i].ring_handle, NULL);
+	for (i = 0; i < ixgbe->num_tx_rings; i++)
+		mac_ring_intr_set(ixgbe->tx_rings[i].ring_handle, NULL);
+
+	mutex_enter(&ixgbe->gen_lock);
+	ixgbe->ixgbe_state &= ~IXGBE_STARTED;
+	ixgbe->ixgbe_state |= IXGBE_INTR_ADJUST;
+	ixgbe->ixgbe_state |= IXGBE_SUSPENDED;
+	mac_link_update(ixgbe->mac_hdl, LINK_STATE_UNKNOWN);
+
+	ixgbe_stop(ixgbe, B_FALSE);
+	/*
+	 * Disable interrupts
+	 */
+	if (ixgbe->attach_progress & ATTACH_PROGRESS_ENABLE_INTR) {
+		rc = ixgbe_disable_intrs(ixgbe);
+		ASSERT(rc == IXGBE_SUCCESS);
+	}
+	ixgbe->attach_progress &= ~ATTACH_PROGRESS_ENABLE_INTR;
+
+	/*
+	 * Remove interrupt handlers
+	 */
+	if (ixgbe->attach_progress & ATTACH_PROGRESS_ADD_INTR) {
+		ixgbe_rem_intr_handlers(ixgbe);
+	}
+	ixgbe->attach_progress &= ~ATTACH_PROGRESS_ADD_INTR;
+
+	/*
+	 * Clear vect_map
+	 */
+	bzero(&ixgbe->vect_map, sizeof (ixgbe->vect_map));
+	switch (cbaction) {
+	case DDI_CB_INTR_ADD:
+		rc = ddi_intr_alloc(ixgbe->dip, ixgbe->htable,
+		    DDI_INTR_TYPE_MSIX, ixgbe->intr_cnt, count, &actual,
+		    DDI_INTR_ALLOC_NORMAL);
+		if (rc != DDI_SUCCESS || actual != count) {
+			ixgbe_log(ixgbe, "Adjust interrupts failed."
+			    "return: %d, irm cb size: %d, actual: %d",
+			    rc, count, actual);
+			goto intr_adjust_fail;
+		}
+		ixgbe->intr_cnt += count;
+		break;
+
+	case DDI_CB_INTR_REMOVE:
+		for (i = ixgbe->intr_cnt - count;
+		    i < ixgbe->intr_cnt; i ++) {
+			rc = ddi_intr_free(ixgbe->htable[i]);
+			ixgbe->htable[i] = NULL;
+			if (rc != DDI_SUCCESS) {
+				ixgbe_log(ixgbe, "Adjust interrupts failed."
+				    "return: %d, irm cb size: %d, actual: %d",
+				    rc, count, actual);
+				goto intr_adjust_fail;
+			}
+		}
+		ixgbe->intr_cnt -= count;
+		break;
+	}
+
+	/*
+	 * Get priority for first vector, assume remaining are all the same
+	 */
+	rc = ddi_intr_get_pri(ixgbe->htable[0], &ixgbe->intr_pri);
+	if (rc != DDI_SUCCESS) {
+		ixgbe_log(ixgbe,
+		    "Get interrupt priority failed: %d", rc);
+		goto intr_adjust_fail;
+	}
+	rc = ddi_intr_get_cap(ixgbe->htable[0], &ixgbe->intr_cap);
+	if (rc != DDI_SUCCESS) {
+		ixgbe_log(ixgbe, "Get interrupt cap failed: %d", rc);
+		goto intr_adjust_fail;
+	}
+	ixgbe->attach_progress |= ATTACH_PROGRESS_ALLOC_INTR;
+
+	/*
+	 * Map rings to interrupt vectors
+	 */
+	if (ixgbe_map_intrs_to_vectors(ixgbe) != IXGBE_SUCCESS) {
+		ixgbe_error(ixgbe,
+		    "IRM CB: Failed to map interrupts to vectors");
+		goto intr_adjust_fail;
+	}
+
+	/*
+	 * Add interrupt handlers
+	 */
+	if (ixgbe_add_intr_handlers(ixgbe) != IXGBE_SUCCESS) {
+		ixgbe_error(ixgbe, "IRM CB: Failed to add interrupt handlers");
+		goto intr_adjust_fail;
+	}
+	ixgbe->attach_progress |= ATTACH_PROGRESS_ADD_INTR;
+
+	/*
+	 * Now that mutex locks are initialized, and the chip is also
+	 * initialized, enable interrupts.
+	 */
+	if (ixgbe_enable_intrs(ixgbe) != IXGBE_SUCCESS) {
+		ixgbe_error(ixgbe, "IRM CB: Failed to enable DDI interrupts");
+		goto intr_adjust_fail;
+	}
+	ixgbe->attach_progress |= ATTACH_PROGRESS_ENABLE_INTR;
+	if (ixgbe_start(ixgbe, B_FALSE) != IXGBE_SUCCESS) {
+		ixgbe_error(ixgbe, "IRM CB: Failed to start");
+		goto intr_adjust_fail;
+	}
+	ixgbe->ixgbe_state &= ~IXGBE_INTR_ADJUST;
+	ixgbe->ixgbe_state &= ~IXGBE_SUSPENDED;
+	ixgbe->ixgbe_state |= IXGBE_STARTED;
+	mutex_exit(&ixgbe->gen_lock);
+
+	for (i = 0; i < ixgbe->num_rx_rings; i++) {
+		mac_ring_intr_set(ixgbe->rx_rings[i].ring_handle,
+		    ixgbe->htable[ixgbe->rx_rings[i].intr_vector]);
+	}
+	for (i = 0; i < ixgbe->num_tx_rings; i++) {
+		mac_ring_intr_set(ixgbe->tx_rings[i].ring_handle,
+		    ixgbe->htable[ixgbe->tx_rings[i].intr_vector]);
+	}
+
+	/* Wakeup all Tx rings */
+	for (i = 0; i < ixgbe->num_tx_rings; i++) {
+		mac_tx_ring_update(ixgbe->mac_hdl,
+		    ixgbe->tx_rings[i].ring_handle);
+	}
+
+	IXGBE_DEBUGLOG_3(ixgbe,
+	    "IRM CB: interrupts new value: 0x%x(0x%x:0x%x).",
+	    ixgbe->intr_cnt, ixgbe->intr_cnt_min, ixgbe->intr_cnt_max);
+	return (DDI_SUCCESS);
+
+intr_adjust_fail:
+	ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_LOST);
+	mutex_exit(&ixgbe->gen_lock);
+	return (DDI_FAILURE);
+}
+
+/*
+ * ixgbe_intr_cb_register - Register interrupt callback function.
+ */
+static int
+ixgbe_intr_cb_register(ixgbe_t *ixgbe)
+{
+	if (ddi_cb_register(ixgbe->dip, DDI_CB_FLAG_INTR, ixgbe_cbfunc,
+	    ixgbe, NULL, &ixgbe->cb_hdl) != DDI_SUCCESS) {
+		return (IXGBE_FAILURE);
+	}
+	IXGBE_DEBUGLOG_0(ixgbe, "Interrupt callback function registered.");
+	return (IXGBE_SUCCESS);
+}
+
+/*
  * ixgbe_alloc_rings - Allocate memory space for rx/tx rings.
  */
 static int
@@ -1771,21 +2021,22 @@ ixgbe_setup_rx_ring(ixgbe_rx_ring_t *rx_ring)
 	 * Initialize the length register
 	 */
 	size = rx_data->ring_size * sizeof (union ixgbe_adv_rx_desc);
-	IXGBE_WRITE_REG(hw, IXGBE_RDLEN(rx_ring->index), size);
+	IXGBE_WRITE_REG(hw, IXGBE_RDLEN(rx_ring->hw_index), size);
 
 	/*
 	 * Initialize the base address registers
 	 */
 	buf_low = (uint32_t)rx_data->rbd_area.dma_address;
 	buf_high = (uint32_t)(rx_data->rbd_area.dma_address >> 32);
-	IXGBE_WRITE_REG(hw, IXGBE_RDBAH(rx_ring->index), buf_high);
-	IXGBE_WRITE_REG(hw, IXGBE_RDBAL(rx_ring->index), buf_low);
+	IXGBE_WRITE_REG(hw, IXGBE_RDBAH(rx_ring->hw_index), buf_high);
+	IXGBE_WRITE_REG(hw, IXGBE_RDBAL(rx_ring->hw_index), buf_low);
 
 	/*
 	 * Setup head & tail pointers
 	 */
-	IXGBE_WRITE_REG(hw, IXGBE_RDT(rx_ring->index), rx_data->ring_size - 1);
-	IXGBE_WRITE_REG(hw, IXGBE_RDH(rx_ring->index), 0);
+	IXGBE_WRITE_REG(hw, IXGBE_RDT(rx_ring->hw_index),
+	    rx_data->ring_size - 1);
+	IXGBE_WRITE_REG(hw, IXGBE_RDH(rx_ring->hw_index), 0);
 
 	rx_data->rbd_next = 0;
 	rx_data->lro_first = 0;
@@ -1796,14 +2047,14 @@ ixgbe_setup_rx_ring(ixgbe_rx_ring_t *rx_ring)
 	 * HTHRESH=0 descriptors (to minimize latency on fetch)
 	 * WTHRESH defaults to 1 (writeback each descriptor)
 	 */
-	reg_val = IXGBE_READ_REG(hw, IXGBE_RXDCTL(rx_ring->index));
+	reg_val = IXGBE_READ_REG(hw, IXGBE_RXDCTL(rx_ring->hw_index));
 	reg_val |= IXGBE_RXDCTL_ENABLE;	/* enable queue */
 
 	/* Not a valid value for 82599 */
 	if (hw->mac.type < ixgbe_mac_82599EB) {
 		reg_val |= 0x0020;	/* pthresh */
 	}
-	IXGBE_WRITE_REG(hw, IXGBE_RXDCTL(rx_ring->index), reg_val);
+	IXGBE_WRITE_REG(hw, IXGBE_RXDCTL(rx_ring->hw_index), reg_val);
 
 	if (hw->mac.type == ixgbe_mac_82599EB) {
 		reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
@@ -1818,7 +2069,7 @@ ixgbe_setup_rx_ring(ixgbe_rx_ring_t *rx_ring)
 	reg_val = (ixgbe->rx_buf_size >> IXGBE_SRRCTL_BSIZEPKT_SHIFT) |
 	    IXGBE_SRRCTL_DESCTYPE_ADV_ONEBUF;
 	reg_val |= IXGBE_SRRCTL_DROP_EN;
-	IXGBE_WRITE_REG(hw, IXGBE_SRRCTL(rx_ring->index), reg_val);
+	IXGBE_WRITE_REG(hw, IXGBE_SRRCTL(rx_ring->hw_index), reg_val);
 }
 
 static void
@@ -1826,18 +2077,33 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 {
 	ixgbe_rx_ring_t *rx_ring;
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	ixgbe_rx_group_t *rx_group;
 	uint32_t reg_val;
 	uint32_t ring_mapping;
-	int i;
+	uint32_t i, index;
+	uint32_t psrtype_rss_bit;
 
 	/* PSRTYPE must be configured for 82599 */
-	reg_val = IXGBE_PSRTYPE_TCPHDR | IXGBE_PSRTYPE_UDPHDR |
-	    IXGBE_PSRTYPE_IPV4HDR | IXGBE_PSRTYPE_IPV6HDR;
-#define	IXGBE_PSRTYPE_L2_PKT	0x00001000
-	reg_val |= IXGBE_PSRTYPE_L2_PKT;
-	reg_val |= 0xE0000000;
-	IXGBE_WRITE_REG(hw, IXGBE_PSRTYPE(0), reg_val);
+	if (ixgbe->classify_mode != IXGBE_CLASSIFY_VMDQ &&
+	    ixgbe->classify_mode != IXGBE_CLASSIFY_VMDQ_RSS) {
+		reg_val = IXGBE_PSRTYPE_TCPHDR | IXGBE_PSRTYPE_UDPHDR |
+		    IXGBE_PSRTYPE_IPV4HDR | IXGBE_PSRTYPE_IPV6HDR;
+		reg_val |= IXGBE_PSRTYPE_L2HDR;
+		reg_val |= 0x80000000;
+		IXGBE_WRITE_REG(hw, IXGBE_PSRTYPE(0), reg_val);
+	} else {
+		if (ixgbe->num_rx_groups > 32) {
+			psrtype_rss_bit = 0x20000000;
+		} else {
+			psrtype_rss_bit = 0x40000000;
+		}
+		for (i = 0; i < ixgbe->capab->max_rx_grp_num; i++) {
+			reg_val = IXGBE_PSRTYPE_TCPHDR | IXGBE_PSRTYPE_UDPHDR |
+			    IXGBE_PSRTYPE_IPV4HDR | IXGBE_PSRTYPE_IPV6HDR;
+			reg_val |= IXGBE_PSRTYPE_L2HDR;
+			reg_val |= psrtype_rss_bit;
+			IXGBE_WRITE_REG(hw, IXGBE_PSRTYPE(i), reg_val);
+		}
+	}
 
 	/*
 	 * Set filter control in FCTRL to accept broadcast packets and do
@@ -1848,6 +2114,46 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 	reg_val |= IXGBE_FCTRL_BAM;	/* broadcast accept mode */
 	reg_val |= IXGBE_FCTRL_DPF;	/* discard pause frames */
 	IXGBE_WRITE_REG(hw, IXGBE_FCTRL, reg_val);
+
+	/*
+	 * Hardware checksum settings
+	 */
+	if (ixgbe->rx_hcksum_enable) {
+		reg_val = IXGBE_RXCSUM_IPPCSE;	/* IP checksum */
+		IXGBE_WRITE_REG(hw, IXGBE_RXCSUM, reg_val);
+	}
+
+	/*
+	 * Setup VMDq and RSS for multiple receive queues
+	 */
+	switch (ixgbe->classify_mode) {
+	case IXGBE_CLASSIFY_RSS:
+		/*
+		 * One group, only RSS is needed when more than
+		 * one ring enabled.
+		 */
+		ixgbe_setup_rss(ixgbe);
+		break;
+
+	case IXGBE_CLASSIFY_VMDQ:
+		/*
+		 * Multiple groups, each group has one ring,
+		 * only VMDq is needed.
+		 */
+		ixgbe_setup_vmdq(ixgbe);
+		break;
+
+	case IXGBE_CLASSIFY_VMDQ_RSS:
+		/*
+		 * Multiple groups and multiple rings, both
+		 * VMDq and RSS are needed.
+		 */
+		ixgbe_setup_vmdq_rss(ixgbe);
+		break;
+
+	default:
+		break;
+	}
 
 	/*
 	 * Enable the receive unit.  This must be done after filter
@@ -1866,27 +2172,15 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * Setup rx groups.
-	 */
-	for (i = 0; i < ixgbe->num_rx_groups; i++) {
-		rx_group = &ixgbe->rx_groups[i];
-		rx_group->index = i;
-		rx_group->ixgbe = ixgbe;
-	}
-
-	/*
 	 * Setup the per-ring statistics mapping.
 	 */
 	ring_mapping = 0;
 	for (i = 0; i < ixgbe->num_rx_rings; i++) {
-		ring_mapping |= (i & 0xF) << (8 * (i & 0x3));
-		if ((i & 0x3) == 0x3) {
-			IXGBE_WRITE_REG(hw, IXGBE_RQSMR(i >> 2), ring_mapping);
-			ring_mapping = 0;
-		}
+		index = ixgbe->rx_rings[i].hw_index;
+		ring_mapping = IXGBE_READ_REG(hw, IXGBE_RQSMR(index >> 2));
+		ring_mapping |= (i & 0xF) << (8 * (index & 0x3));
+		IXGBE_WRITE_REG(hw, IXGBE_RQSMR(index >> 2), ring_mapping);
 	}
-	if ((i & 0x3) != 0x3)
-		IXGBE_WRITE_REG(hw, IXGBE_RQSMR(i >> 2), ring_mapping);
 
 	/*
 	 * The Max Frame Size in MHADD/MAXFRS will be internally increased
@@ -1905,50 +2199,6 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 		reg_val = IXGBE_READ_REG(hw, IXGBE_HLREG0);
 		reg_val |= IXGBE_HLREG0_JUMBOEN;
 		IXGBE_WRITE_REG(hw, IXGBE_HLREG0, reg_val);
-	}
-
-	/*
-	 * Hardware checksum settings
-	 */
-	if (ixgbe->rx_hcksum_enable) {
-		reg_val = IXGBE_RXCSUM_IPPCSE;	/* IP checksum */
-		IXGBE_WRITE_REG(hw, IXGBE_RXCSUM, reg_val);
-	}
-
-	/*
-	 * Setup RSS for multiple receive queues
-	 */
-	if (ixgbe->num_rx_rings > 1)
-		ixgbe_setup_rss(ixgbe);
-
-	/*
-	 * Setup RSC for multiple receive queues.
-	 */
-	if (ixgbe->lro_enable) {
-		for (i = 0; i < ixgbe->num_rx_rings; i++) {
-			/*
-			 * Make sure rx_buf_size * MAXDESC not greater
-			 * than 65535.
-			 * Intel recommends 4 for MAXDESC field value.
-			 */
-			reg_val = IXGBE_READ_REG(hw, IXGBE_RSCCTL(i));
-			reg_val |= IXGBE_RSCCTL_RSCEN;
-			if (ixgbe->rx_buf_size == IXGBE_PKG_BUF_16k)
-				reg_val |= IXGBE_RSCCTL_MAXDESC_1;
-			else
-				reg_val |= IXGBE_RSCCTL_MAXDESC_4;
-			IXGBE_WRITE_REG(hw,  IXGBE_RSCCTL(i), reg_val);
-		}
-
-		reg_val = IXGBE_READ_REG(hw, IXGBE_RSCDBU);
-		reg_val |= IXGBE_RSCDBU_RSCACKDIS;
-		IXGBE_WRITE_REG(hw, IXGBE_RSCDBU, reg_val);
-
-		reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
-		reg_val |= IXGBE_RDRXCTL_RSCACKC;
-		reg_val &= ~IXGBE_RDRXCTL_RSCFRSTSIZE;
-
-		IXGBE_WRITE_REG(hw, IXGBE_RDRXCTL, reg_val);
 	}
 }
 
@@ -2114,13 +2364,17 @@ ixgbe_setup_rss(ixgbe_t *ixgbe)
 	uint32_t i, mrqc, rxcsum;
 	uint32_t random;
 	uint32_t reta;
+	uint32_t ring_per_group;
 
 	/*
 	 * Fill out redirection table
 	 */
 	reta = 0;
+	ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
+
 	for (i = 0; i < 128; i++) {
-		reta = (reta << 8) | (i % ixgbe->num_rx_rings);
+		reta = (reta << 8) | (i % ring_per_group) |
+		    ((i % ring_per_group) << 4);
 		if ((i & 3) == 3)
 			IXGBE_WRITE_REG(hw, IXGBE_RETA(i >> 2), reta);
 	}
@@ -2161,6 +2415,185 @@ ixgbe_setup_rss(ixgbe_t *ixgbe)
 }
 
 /*
+ * ixgbe_setup_vmdq - Setup MAC classification feature
+ */
+static void
+ixgbe_setup_vmdq(ixgbe_t *ixgbe)
+{
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	uint32_t vmdctl, i, vtctl;
+
+	/*
+	 * Setup the VMDq Control register, enable VMDq based on
+	 * packet destination MAC address:
+	 */
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		/*
+		 * VMDq Enable = 1;
+		 * VMDq Filter = 0; MAC filtering
+		 * Default VMDq output index = 0;
+		 */
+		vmdctl = IXGBE_VMD_CTL_VMDQ_EN;
+		IXGBE_WRITE_REG(hw, IXGBE_VMD_CTL, vmdctl);
+		break;
+
+	case ixgbe_mac_82599EB:
+		/*
+		 * Enable VMDq-only.
+		 */
+		vmdctl = IXGBE_MRQC_VMDQEN;
+		IXGBE_WRITE_REG(hw, IXGBE_MRQC, vmdctl);
+
+		for (i = 0; i < hw->mac.num_rar_entries; i++) {
+			IXGBE_WRITE_REG(hw, IXGBE_MPSAR_LO(i), 0);
+			IXGBE_WRITE_REG(hw, IXGBE_MPSAR_HI(i), 0);
+		}
+
+		/*
+		 * Enable Virtualization and Replication.
+		 */
+		vtctl = IXGBE_VT_CTL_VT_ENABLE | IXGBE_VT_CTL_REPLEN;
+		IXGBE_WRITE_REG(hw, IXGBE_VT_CTL, vtctl);
+
+		/*
+		 * Enable receiving packets to all VFs
+		 */
+		IXGBE_WRITE_REG(hw, IXGBE_VFRE(0), IXGBE_VFRE_ENABLE_ALL);
+		IXGBE_WRITE_REG(hw, IXGBE_VFRE(1), IXGBE_VFRE_ENABLE_ALL);
+
+		break;
+
+	default:
+		break;
+	}
+}
+
+/*
+ * ixgbe_setup_vmdq_rss - Setup both vmdq feature and rss feature.
+ */
+static void
+ixgbe_setup_vmdq_rss(ixgbe_t *ixgbe)
+{
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	uint32_t i, mrqc, rxcsum;
+	uint32_t random;
+	uint32_t reta;
+	uint32_t ring_per_group;
+	uint32_t vmdctl, vtctl;
+
+	/*
+	 * Fill out redirection table
+	 */
+	reta = 0;
+	ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
+	for (i = 0; i < 128; i++) {
+		reta = (reta << 8) | (i % ring_per_group) |
+		    ((i % ring_per_group) << 4);
+		if ((i & 3) == 3)
+			IXGBE_WRITE_REG(hw, IXGBE_RETA(i >> 2), reta);
+	}
+
+	/*
+	 * Fill out hash function seeds with a random constant
+	 */
+	for (i = 0; i < 10; i++) {
+		(void) random_get_pseudo_bytes((uint8_t *)&random,
+		    sizeof (uint32_t));
+		IXGBE_WRITE_REG(hw, IXGBE_RSSRK(i), random);
+	}
+
+	/*
+	 * Enable and setup RSS and VMDq
+	 */
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		/*
+		 * Enable RSS & Setup RSS Hash functions
+		 */
+		mrqc = IXGBE_MRQC_RSSEN |
+		    IXGBE_MRQC_RSS_FIELD_IPV4 |
+		    IXGBE_MRQC_RSS_FIELD_IPV4_TCP |
+		    IXGBE_MRQC_RSS_FIELD_IPV4_UDP |
+		    IXGBE_MRQC_RSS_FIELD_IPV6_EX_TCP |
+		    IXGBE_MRQC_RSS_FIELD_IPV6_EX |
+		    IXGBE_MRQC_RSS_FIELD_IPV6 |
+		    IXGBE_MRQC_RSS_FIELD_IPV6_TCP |
+		    IXGBE_MRQC_RSS_FIELD_IPV6_UDP |
+		    IXGBE_MRQC_RSS_FIELD_IPV6_EX_UDP;
+		IXGBE_WRITE_REG(hw, IXGBE_MRQC, mrqc);
+
+		/*
+		 * Enable and Setup VMDq
+		 * VMDq Filter = 0; MAC filtering
+		 * Default VMDq output index = 0;
+		 */
+		vmdctl = IXGBE_VMD_CTL_VMDQ_EN;
+		IXGBE_WRITE_REG(hw, IXGBE_VMD_CTL, vmdctl);
+		break;
+
+	case ixgbe_mac_82599EB:
+		/*
+		 * Enable RSS & Setup RSS Hash functions
+		 */
+		mrqc = IXGBE_MRQC_RSS_FIELD_IPV4 |
+		    IXGBE_MRQC_RSS_FIELD_IPV4_TCP |
+		    IXGBE_MRQC_RSS_FIELD_IPV4_UDP |
+		    IXGBE_MRQC_RSS_FIELD_IPV6_EX_TCP |
+		    IXGBE_MRQC_RSS_FIELD_IPV6_EX |
+		    IXGBE_MRQC_RSS_FIELD_IPV6 |
+		    IXGBE_MRQC_RSS_FIELD_IPV6_TCP |
+		    IXGBE_MRQC_RSS_FIELD_IPV6_UDP |
+		    IXGBE_MRQC_RSS_FIELD_IPV6_EX_UDP;
+
+		/*
+		 * Enable VMDq+RSS.
+		 */
+		if (ixgbe->num_rx_groups > 32)  {
+			mrqc = mrqc | IXGBE_MRQC_VMDQRSS64EN;
+		} else {
+			mrqc = mrqc | IXGBE_MRQC_VMDQRSS32EN;
+		}
+
+		IXGBE_WRITE_REG(hw, IXGBE_MRQC, mrqc);
+
+		for (i = 0; i < hw->mac.num_rar_entries; i++) {
+			IXGBE_WRITE_REG(hw, IXGBE_MPSAR_LO(i), 0);
+			IXGBE_WRITE_REG(hw, IXGBE_MPSAR_HI(i), 0);
+		}
+		break;
+
+	default:
+		break;
+
+	}
+
+	/*
+	 * Disable Packet Checksum to enable RSS for multiple receive queues.
+	 * It is an adapter hardware limitation that Packet Checksum is
+	 * mutually exclusive with RSS.
+	 */
+	rxcsum = IXGBE_READ_REG(hw, IXGBE_RXCSUM);
+	rxcsum |= IXGBE_RXCSUM_PCSD;
+	rxcsum &= ~IXGBE_RXCSUM_IPPCSE;
+	IXGBE_WRITE_REG(hw, IXGBE_RXCSUM, rxcsum);
+
+	if (hw->mac.type == ixgbe_mac_82599EB) {
+		/*
+		 * Enable Virtualization and Replication.
+		 */
+		vtctl = IXGBE_VT_CTL_VT_ENABLE | IXGBE_VT_CTL_REPLEN;
+		IXGBE_WRITE_REG(hw, IXGBE_VT_CTL, vtctl);
+
+		/*
+		 * Enable receiving packets to all VFs
+		 */
+		IXGBE_WRITE_REG(hw, IXGBE_VFRE(0), IXGBE_VFRE_ENABLE_ALL);
+		IXGBE_WRITE_REG(hw, IXGBE_VFRE(1), IXGBE_VFRE_ENABLE_ALL);
+	}
+}
+
+/*
  * ixgbe_init_unicst - Initialize the unicast addresses.
  */
 static void
@@ -2183,7 +2616,7 @@ ixgbe_init_unicst(ixgbe_t *ixgbe)
 		/*
 		 * Initialize the multiple unicast addresses
 		 */
-		ixgbe->unicst_total = MAX_NUM_UNICAST_ADDRESSES;
+		ixgbe->unicst_total = hw->mac.num_rar_entries;
 		ixgbe->unicst_avail = ixgbe->unicst_total;
 		for (slot = 0; slot < ixgbe->unicst_total; slot++) {
 			mac_addr = ixgbe->unicst_addr[slot].mac.addr;
@@ -2198,7 +2631,8 @@ ixgbe_init_unicst(ixgbe_t *ixgbe)
 			mac_addr = ixgbe->unicst_addr[slot].mac.addr;
 			if (ixgbe->unicst_addr[slot].mac.set == 1) {
 				(void) ixgbe_set_rar(hw, slot, mac_addr,
-				    NULL, IXGBE_RAH_AV);
+				    ixgbe->unicst_addr[slot].mac.group_index,
+				    IXGBE_RAH_AV);
 			} else {
 				bzero(mac_addr, ETHERADDRL);
 				(void) ixgbe_set_rar(hw, slot, mac_addr,
@@ -2206,35 +2640,6 @@ ixgbe_init_unicst(ixgbe_t *ixgbe)
 			}
 		}
 	}
-}
-
-/*
- * ixgbe_unicst_set - Set the unicast address to the specified slot.
- */
-int
-ixgbe_unicst_set(ixgbe_t *ixgbe, const uint8_t *mac_addr,
-    int slot)
-{
-	struct ixgbe_hw *hw = &ixgbe->hw;
-
-	ASSERT(mutex_owned(&ixgbe->gen_lock));
-
-	/*
-	 * Save the unicast address in the software data structure
-	 */
-	bcopy(mac_addr, ixgbe->unicst_addr[slot].mac.addr, ETHERADDRL);
-
-	/*
-	 * Set the unicast address to the RAR register
-	 */
-	(void) ixgbe_set_rar(hw, slot, (uint8_t *)mac_addr, NULL, IXGBE_RAH_AV);
-
-	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
-		return (EIO);
-	}
-
-	return (0);
 }
 
 /*
@@ -2352,6 +2757,81 @@ ixgbe_setup_multicst(ixgbe_t *ixgbe)
 }
 
 /*
+ * ixgbe_setup_vmdq_rss_conf - Configure vmdq and rss (number and mode).
+ *
+ * Configure the rx classification mode (vmdq & rss) and vmdq & rss numbers.
+ * Different chipsets may have different allowed configuration of vmdq and rss.
+ */
+static void
+ixgbe_setup_vmdq_rss_conf(ixgbe_t *ixgbe)
+{
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	uint32_t ring_per_group;
+
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		/*
+		 * 82598 supports the following combination:
+		 * vmdq no. x rss no.
+		 * [5..16]  x 1
+		 * [1..4]   x [1..16]
+		 * However 8 rss queue per pool (vmdq) is sufficient for
+		 * most cases.
+		 */
+		ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
+		if (ixgbe->num_rx_groups > 4) {
+			ixgbe->num_rx_rings = ixgbe->num_rx_groups;
+		} else {
+			ixgbe->num_rx_rings = ixgbe->num_rx_groups *
+			    min(8, ring_per_group);
+		}
+
+		break;
+
+	case ixgbe_mac_82599EB:
+		/*
+		 * 82599 supports the following combination:
+		 * vmdq no. x rss no.
+		 * [33..64] x [1..2]
+		 * [2..32]  x [1..4]
+		 * 1 x [1..16]
+		 * However 8 rss queue per pool (vmdq) is sufficient for
+		 * most cases.
+		 */
+		ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
+		if (ixgbe->num_rx_groups == 1) {
+			ixgbe->num_rx_rings = min(8, ring_per_group);
+		} else if (ixgbe->num_rx_groups <= 32) {
+			ixgbe->num_rx_rings = ixgbe->num_rx_groups *
+			    min(4, ring_per_group);
+		} else if (ixgbe->num_rx_groups <= 64) {
+			ixgbe->num_rx_rings = ixgbe->num_rx_groups *
+			    min(2, ring_per_group);
+		}
+
+		break;
+
+	default:
+		break;
+	}
+
+	ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
+
+	if (ixgbe->num_rx_groups == 1 && ring_per_group == 1) {
+		ixgbe->classify_mode = IXGBE_CLASSIFY_NONE;
+	} else if (ixgbe->num_rx_groups != 1 && ring_per_group == 1) {
+		ixgbe->classify_mode = IXGBE_CLASSIFY_VMDQ;
+	} else if (ixgbe->num_rx_groups != 1 && ring_per_group != 1) {
+		ixgbe->classify_mode = IXGBE_CLASSIFY_VMDQ_RSS;
+	} else {
+		ixgbe->classify_mode = IXGBE_CLASSIFY_RSS;
+	}
+
+	ixgbe_log(ixgbe, "rx group number:%d, rx ring number:%d",
+	    ixgbe->num_rx_groups, ixgbe->num_rx_rings);
+}
+
+/*
  * ixgbe_get_conf - Get driver configurations set in driver.conf.
  *
  * This routine gets user-configured values out of the configuration
@@ -2434,7 +2914,8 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	 * Multiple groups configuration
 	 */
 	ixgbe->num_rx_groups = ixgbe_get_prop(ixgbe, PROP_RX_GROUP_NUM,
-	    MIN_RX_GROUP_NUM, MAX_RX_GROUP_NUM, DEFAULT_RX_GROUP_NUM);
+	    ixgbe->capab->min_rx_grp_num, ixgbe->capab->max_rx_grp_num,
+	    ixgbe->capab->def_rx_grp_num);
 
 	ixgbe->mr_enable = ixgbe_get_prop(ixgbe, PROP_MR_ENABLE,
 	    0, 1, DEFAULT_MR_ENABLE);
@@ -2443,6 +2924,16 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 		ixgbe->num_tx_rings = 1;
 		ixgbe->num_rx_rings = 1;
 		ixgbe->num_rx_groups = 1;
+		ixgbe->classify_mode = IXGBE_CLASSIFY_NONE;
+	} else {
+		ixgbe->num_rx_rings = ixgbe->num_rx_groups *
+		    max(ixgbe->num_rx_rings / ixgbe->num_rx_groups, 1);
+		/*
+		 * The combination of num_rx_rings and num_rx_groups
+		 * may be not supported by h/w. We need to adjust
+		 * them to appropriate values.
+		 */
+		ixgbe_setup_vmdq_rss_conf(ixgbe);
 	}
 
 	/*
@@ -3699,6 +4190,7 @@ ixgbe_alloc_intrs(ixgbe_t *ixgbe)
 	ixgbe->num_rx_rings = 1;
 	ixgbe->num_rx_groups = 1;
 	ixgbe->num_tx_rings = 1;
+	ixgbe->classify_mode = IXGBE_CLASSIFY_NONE;
 	ixgbe_log(ixgbe,
 	    "MSI-X not used, force rings and groups number to 1");
 
@@ -3745,9 +4237,10 @@ static int
 ixgbe_alloc_intr_handles(ixgbe_t *ixgbe, int intr_type)
 {
 	dev_info_t *devinfo;
-	int request, count, avail, actual;
+	int request, count, actual;
 	int minimum;
 	int rc;
+	uint32_t ring_per_group;
 
 	devinfo = ixgbe->dip;
 
@@ -3767,12 +4260,13 @@ ixgbe_alloc_intr_handles(ixgbe_t *ixgbe, int intr_type)
 	case DDI_INTR_TYPE_MSIX:
 		/*
 		 * Best number of vectors for the adapter is
-		 * # rx rings + # tx rings.
+		 * (# rx rings + # tx rings), however we will
+		 * limit the request number.
 		 */
-		request = ixgbe->num_rx_rings + ixgbe->num_tx_rings;
+		request = min(16, ixgbe->num_rx_rings + ixgbe->num_tx_rings);
 		if (request > ixgbe->capab->max_ring_vect)
 			request = ixgbe->capab->max_ring_vect;
-		minimum = 2;
+		minimum = 1;
 		IXGBE_DEBUGLOG_0(ixgbe, "interrupt type: MSI-X");
 		break;
 
@@ -3797,26 +4291,10 @@ ixgbe_alloc_intr_handles(ixgbe_t *ixgbe, int intr_type)
 	}
 	IXGBE_DEBUGLOG_1(ixgbe, "interrupts supported: %d", count);
 
-	/*
-	 * Get number of available interrupts
-	 */
-	rc = ddi_intr_get_navail(devinfo, intr_type, &avail);
-	if ((rc != DDI_SUCCESS) || (avail < minimum)) {
-		ixgbe_log(ixgbe,
-		    "Get interrupt available number failed. "
-		    "Return: %d, available: %d", rc, avail);
-		return (IXGBE_FAILURE);
-	}
-	IXGBE_DEBUGLOG_1(ixgbe, "interrupts available: %d", avail);
-
-	if (avail < request) {
-		ixgbe_log(ixgbe, "Request %d handles, %d available",
-		    request, avail);
-		request = avail;
-	}
-
 	actual = 0;
 	ixgbe->intr_cnt = 0;
+	ixgbe->intr_cnt_max = 0;
+	ixgbe->intr_cnt_min = 0;
 
 	/*
 	 * Allocate an array of interrupt handles
@@ -3834,7 +4312,24 @@ ixgbe_alloc_intr_handles(ixgbe_t *ixgbe, int intr_type)
 	}
 	IXGBE_DEBUGLOG_1(ixgbe, "interrupts actually allocated: %d", actual);
 
+	/*
+	 * upper/lower limit of interrupts
+	 */
 	ixgbe->intr_cnt = actual;
+	ixgbe->intr_cnt_max = request;
+	ixgbe->intr_cnt_min = minimum;
+
+	/*
+	 * rss number per group should not exceed the rx interrupt number,
+	 * else need to adjust rx ring number.
+	 */
+	ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
+	ASSERT((ixgbe->num_rx_rings % ixgbe->num_rx_groups) == 0);
+	if (min(actual, ixgbe->num_rx_rings) < ring_per_group) {
+		ixgbe->num_rx_rings = ixgbe->num_rx_groups *
+		    min(actual, ixgbe->num_rx_rings);
+		ixgbe_setup_vmdq_rss_conf(ixgbe);
+	}
 
 	/*
 	 * Now we know the actual number of vectors.  Here we map the vector
@@ -4147,6 +4642,53 @@ ixgbe_disable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, int8_t cause)
 }
 
 /*
+ * Convert the rx ring index driver maintained to the rx ring index
+ * in h/w.
+ */
+static uint32_t
+ixgbe_get_hw_rx_index(ixgbe_t *ixgbe, uint32_t sw_rx_index)
+{
+
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	uint32_t rx_ring_per_group, hw_rx_index;
+
+	if (ixgbe->classify_mode == IXGBE_CLASSIFY_RSS ||
+	    ixgbe->classify_mode == IXGBE_CLASSIFY_NONE) {
+		return (sw_rx_index);
+	} else if (ixgbe->classify_mode == IXGBE_CLASSIFY_VMDQ) {
+		if (hw->mac.type == ixgbe_mac_82598EB) {
+			return (sw_rx_index);
+		} else if (hw->mac.type == ixgbe_mac_82599EB) {
+			return (sw_rx_index * 2);
+		}
+	} else if (ixgbe->classify_mode == IXGBE_CLASSIFY_VMDQ_RSS) {
+		rx_ring_per_group = ixgbe->num_rx_rings / ixgbe->num_rx_groups;
+
+		if (hw->mac.type == ixgbe_mac_82598EB) {
+			hw_rx_index = (sw_rx_index / rx_ring_per_group) *
+			    16 + (sw_rx_index % rx_ring_per_group);
+			return (hw_rx_index);
+		} else if (hw->mac.type == ixgbe_mac_82599EB) {
+			if (ixgbe->num_rx_groups > 32) {
+				hw_rx_index = (sw_rx_index /
+				    rx_ring_per_group) * 2 +
+				    (sw_rx_index % rx_ring_per_group);
+			} else {
+				hw_rx_index = (sw_rx_index /
+				    rx_ring_per_group) * 4 +
+				    (sw_rx_index % rx_ring_per_group);
+			}
+			return (hw_rx_index);
+		}
+	}
+
+	/*
+	 * Should never reach. Just to make compiler happy.
+	 */
+	return (sw_rx_index);
+}
+
+/*
  * ixgbe_map_intrs_to_vectors - Map different interrupts to MSI-X vectors.
  *
  * For MSI-X, here will map rx interrupt, tx interrupt and other interrupt
@@ -4183,7 +4725,6 @@ ixgbe_map_intrs_to_vectors(ixgbe_t *ixgbe)
 	 */
 	BT_SET(ixgbe->vect_map[vector].other_map, 0);
 	ixgbe->vect_map[vector].other_cnt++;
-	vector++;
 
 	/*
 	 * Map rx ring interrupts to vectors
@@ -4217,6 +4758,7 @@ ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 	ixgbe_intr_vector_t *vect;	/* vector bitmap */
 	int r_idx;	/* ring index */
 	int v_idx;	/* vector index */
+	uint32_t hw_index;
 
 	/*
 	 * Clear any previous entries
@@ -4265,7 +4807,8 @@ ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 		    (ixgbe->num_rx_rings - 1));
 
 		while (r_idx >= 0) {
-			ixgbe_setup_ivar(ixgbe, r_idx, v_idx, 0);
+			hw_index = ixgbe->rx_rings[r_idx].hw_index;
+			ixgbe_setup_ivar(ixgbe, hw_index, v_idx, 0);
 			r_idx = bt_getlowbit(vect->rx_map, (r_idx + 1),
 			    (ixgbe->num_rx_rings - 1));
 		}
@@ -4637,11 +5180,31 @@ ixgbe_ring_start(mac_ring_driver_t rh, uint64_t mr_gen_num)
 }
 
 /*
+ * Get the global ring index by a ring index within a group.
+ */
+static int
+ixgbe_get_rx_ring_index(ixgbe_t *ixgbe, int gindex, int rindex)
+{
+	ixgbe_rx_ring_t *rx_ring;
+	int i;
+
+	for (i = 0; i < ixgbe->num_rx_rings; i++) {
+		rx_ring = &ixgbe->rx_rings[i];
+		if (rx_ring->group_index == gindex)
+			rindex--;
+		if (rindex < 0)
+			return (i);
+	}
+
+	return (-1);
+}
+
+/*
  * Callback funtion for MAC layer to register all rings.
  */
 /* ARGSUSED */
 void
-ixgbe_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
+ixgbe_fill_ring(void *arg, mac_ring_type_t rtype, const int group_index,
     const int ring_index, mac_ring_info_t *infop, mac_ring_handle_t rh)
 {
 	ixgbe_t *ixgbe = (ixgbe_t *)arg;
@@ -4649,25 +5212,37 @@ ixgbe_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 
 	switch (rtype) {
 	case MAC_RING_TYPE_RX: {
-		ASSERT(rg_index == 0);
-		ASSERT(ring_index < ixgbe->num_rx_rings);
+		/*
+		 * 'index' is the ring index within the group.
+		 * Need to get the global ring index by searching in groups.
+		 */
+		int global_ring_index = ixgbe_get_rx_ring_index(
+		    ixgbe, group_index, ring_index);
 
-		ixgbe_rx_ring_t *rx_ring = &ixgbe->rx_rings[ring_index];
+		ASSERT(global_ring_index >= 0);
+
+		ixgbe_rx_ring_t *rx_ring = &ixgbe->rx_rings[global_ring_index];
 		rx_ring->ring_handle = rh;
 
 		infop->mri_driver = (mac_ring_driver_t)rx_ring;
 		infop->mri_start = ixgbe_ring_start;
 		infop->mri_stop = NULL;
 		infop->mri_poll = ixgbe_ring_rx_poll;
+		infop->mri_stat = ixgbe_rx_ring_stat;
 
 		mintr->mi_handle = (mac_intr_handle_t)rx_ring;
 		mintr->mi_enable = ixgbe_rx_ring_intr_enable;
 		mintr->mi_disable = ixgbe_rx_ring_intr_disable;
+		if (ixgbe->intr_type &
+		    (DDI_INTR_TYPE_MSIX | DDI_INTR_TYPE_MSI)) {
+			mintr->mi_ddi_handle =
+			    ixgbe->htable[rx_ring->intr_vector];
+		}
 
 		break;
 	}
 	case MAC_RING_TYPE_TX: {
-		ASSERT(rg_index == -1);
+		ASSERT(group_index == -1);
 		ASSERT(ring_index < ixgbe->num_tx_rings);
 
 		ixgbe_tx_ring_t *tx_ring = &ixgbe->tx_rings[ring_index];
@@ -4677,7 +5252,12 @@ ixgbe_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 		infop->mri_start = NULL;
 		infop->mri_stop = NULL;
 		infop->mri_tx = ixgbe_ring_tx;
-
+		infop->mri_stat = ixgbe_tx_ring_stat;
+		if (ixgbe->intr_type &
+		    (DDI_INTR_TYPE_MSIX | DDI_INTR_TYPE_MSI)) {
+			mintr->mi_ddi_handle =
+			    ixgbe->htable[tx_ring->intr_vector];
+		}
 		break;
 	}
 	default:
@@ -4726,16 +5306,26 @@ ixgbe_rx_ring_intr_enable(mac_intr_handle_t intrh)
 	ixgbe_rx_ring_t *rx_ring = (ixgbe_rx_ring_t *)intrh;
 	ixgbe_t *ixgbe = rx_ring->ixgbe;
 	int r_idx = rx_ring->index;
+	int hw_r_idx = rx_ring->hw_index;
 	int v_idx = rx_ring->intr_vector;
 
 	mutex_enter(&ixgbe->gen_lock);
-	ASSERT(BT_TEST(ixgbe->vect_map[v_idx].rx_map, r_idx) == 0);
+	if (ixgbe->ixgbe_state & IXGBE_INTR_ADJUST) {
+		mutex_exit(&ixgbe->gen_lock);
+		/*
+		 * Simply return 0.
+		 * Interrupts are being adjusted. ixgbe_intr_adjust()
+		 * will eventually re-enable the interrupt when it's
+		 * done with the adjustment.
+		 */
+		return (0);
+	}
 
 	/*
 	 * To enable interrupt by setting the VAL bit of given interrupt
 	 * vector allocation register (IVAR).
 	 */
-	ixgbe_enable_ivar(ixgbe, r_idx, 0);
+	ixgbe_enable_ivar(ixgbe, hw_r_idx, 0);
 
 	BT_SET(ixgbe->vect_map[v_idx].rx_map, r_idx);
 
@@ -4759,16 +5349,34 @@ ixgbe_rx_ring_intr_disable(mac_intr_handle_t intrh)
 	ixgbe_rx_ring_t *rx_ring = (ixgbe_rx_ring_t *)intrh;
 	ixgbe_t *ixgbe = rx_ring->ixgbe;
 	int r_idx = rx_ring->index;
+	int hw_r_idx = rx_ring->hw_index;
 	int v_idx = rx_ring->intr_vector;
 
 	mutex_enter(&ixgbe->gen_lock);
-	ASSERT(BT_TEST(ixgbe->vect_map[v_idx].rx_map, r_idx) == 1);
+	if (ixgbe->ixgbe_state & IXGBE_INTR_ADJUST) {
+		mutex_exit(&ixgbe->gen_lock);
+		/*
+		 * Simply return 0.
+		 * In the rare case where an interrupt is being
+		 * disabled while interrupts are being adjusted,
+		 * we don't fail the operation. No interrupts will
+		 * be generated while they are adjusted, and
+		 * ixgbe_intr_adjust() will cause the interrupts
+		 * to be re-enabled once it completes. Note that
+		 * in this case, packets may be delivered to the
+		 * stack via interrupts before xgbe_rx_ring_intr_enable()
+		 * is called again. This is acceptable since interrupt
+		 * adjustment is infrequent, and the stack will be
+		 * able to handle these packets.
+		 */
+		return (0);
+	}
 
 	/*
 	 * To disable interrupt by clearing the VAL bit of given interrupt
 	 * vector allocation register (IVAR).
 	 */
-	ixgbe_disable_ivar(ixgbe, r_idx, 0);
+	ixgbe_disable_ivar(ixgbe, hw_r_idx, 0);
 
 	BT_CLEAR(ixgbe->vect_map[v_idx].rx_map, r_idx);
 
@@ -4785,8 +5393,8 @@ ixgbe_addmac(void *arg, const uint8_t *mac_addr)
 {
 	ixgbe_rx_group_t *rx_group = (ixgbe_rx_group_t *)arg;
 	ixgbe_t *ixgbe = rx_group->ixgbe;
-	int slot;
-	int err;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	int slot, i;
 
 	mutex_enter(&ixgbe->gen_lock);
 
@@ -4801,21 +5409,40 @@ ixgbe_addmac(void *arg, const uint8_t *mac_addr)
 		return (ENOSPC);
 	}
 
-	for (slot = 0; slot < ixgbe->unicst_total; slot++) {
-		if (ixgbe->unicst_addr[slot].mac.set == 0)
-			break;
+	/*
+	 * The first ixgbe->num_rx_groups slots are reserved for each respective
+	 * group. The rest slots are shared by all groups. While adding a
+	 * MAC address, reserved slots are firstly checked then the shared
+	 * slots are searched.
+	 */
+	slot = -1;
+	if (ixgbe->unicst_addr[rx_group->index].mac.set == 1) {
+		for (i = ixgbe->num_rx_groups; i < ixgbe->unicst_total; i++) {
+			if (ixgbe->unicst_addr[i].mac.set == 0) {
+				slot = i;
+				break;
+			}
+		}
+	} else {
+		slot = rx_group->index;
 	}
 
-	ASSERT((slot >= 0) && (slot < ixgbe->unicst_total));
-
-	if ((err = ixgbe_unicst_set(ixgbe, mac_addr, slot)) == 0) {
-		ixgbe->unicst_addr[slot].mac.set = 1;
-		ixgbe->unicst_avail--;
+	if (slot == -1) {
+		/* no slots available */
+		mutex_exit(&ixgbe->gen_lock);
+		return (ENOSPC);
 	}
+
+	bcopy(mac_addr, ixgbe->unicst_addr[slot].mac.addr, ETHERADDRL);
+	(void) ixgbe_set_rar(hw, slot, ixgbe->unicst_addr[slot].mac.addr,
+	    rx_group->index, IXGBE_RAH_AV);
+	ixgbe->unicst_addr[slot].mac.set = 1;
+	ixgbe->unicst_addr[slot].mac.group_index = rx_group->index;
+	ixgbe->unicst_avail--;
 
 	mutex_exit(&ixgbe->gen_lock);
 
-	return (err);
+	return (0);
 }
 
 /*
@@ -4826,8 +5453,8 @@ ixgbe_remmac(void *arg, const uint8_t *mac_addr)
 {
 	ixgbe_rx_group_t *rx_group = (ixgbe_rx_group_t *)arg;
 	ixgbe_t *ixgbe = rx_group->ixgbe;
+	struct ixgbe_hw *hw = &ixgbe->hw;
 	int slot;
-	int err;
 
 	mutex_enter(&ixgbe->gen_lock);
 
@@ -4848,13 +5475,11 @@ ixgbe_remmac(void *arg, const uint8_t *mac_addr)
 	}
 
 	bzero(ixgbe->unicst_addr[slot].mac.addr, ETHERADDRL);
-	if ((err = ixgbe_unicst_set(ixgbe,
-	    ixgbe->unicst_addr[slot].mac.addr, slot)) == 0) {
-		ixgbe->unicst_addr[slot].mac.set = 0;
-		ixgbe->unicst_avail++;
-	}
+	(void) ixgbe_clear_rar(hw, slot);
+	ixgbe->unicst_addr[slot].mac.set = 0;
+	ixgbe->unicst_avail++;
 
 	mutex_exit(&ixgbe->gen_lock);
 
-	return (err);
+	return (0);
 }

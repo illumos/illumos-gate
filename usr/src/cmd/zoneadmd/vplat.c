@@ -2530,6 +2530,7 @@ static int
 add_datalink(zlog_t *zlogp, char *zone_name, datalink_id_t linkid, char *dlname)
 {
 	dladm_status_t err;
+	boolean_t cpuset, poolset;
 
 	/* First check if it's in use by global zone. */
 	if (zonecfg_ifname_exists(AF_INET, dlname) ||
@@ -2546,6 +2547,36 @@ add_datalink(zlog_t *zlogp, char *zone_name, datalink_id_t linkid, char *dlname)
 		zdlerror(zlogp, err, dlname,
 		    "WARNING: unable to add network interface");
 		return (-1);
+	}
+
+	/*
+	 * Set the pool of this link if the zone has a pool and
+	 * neither the cpus nor the pool datalink property is
+	 * already set.
+	 */
+	err = dladm_linkprop_is_set(dld_handle, linkid, DLADM_PROP_VAL_CURRENT,
+	    "cpus", &cpuset);
+	if (err != DLADM_STATUS_OK) {
+		zdlerror(zlogp, err, dlname,
+		    "WARNING: unable to check if cpus link property is set");
+	}
+	err = dladm_linkprop_is_set(dld_handle, linkid, DLADM_PROP_VAL_CURRENT,
+	    "pool", &poolset);
+	if (err != DLADM_STATUS_OK) {
+		zdlerror(zlogp, err, dlname,
+		    "WARNING: unable to check if pool link property is set");
+	}
+
+	if ((strlen(pool_name) != 0) && !cpuset && !poolset) {
+		err = dladm_set_linkprop(dld_handle, linkid, "pool",
+		    &pool_name, 1, DLADM_OPT_ACTIVE);
+		if (err != DLADM_STATUS_OK) {
+			zerror(zlogp, B_FALSE, "WARNING: unable to set "
+			    "pool %s to datalink %s", pool_name, dlname);
+			bzero(pool_name, MAXPATHLEN);
+		}
+	} else {
+		bzero(pool_name, MAXPATHLEN);
 	}
 	return (0);
 }
@@ -2640,6 +2671,72 @@ configure_exclusive_network_interfaces(zlog_t *zlogp)
 	if (prof != NULL)
 		di_prof_fini(prof);
 
+	return (0);
+}
+
+static int
+remove_datalink_pool(zlog_t *zlogp, zoneid_t zoneid)
+{
+	ushort_t flags;
+	zone_iptype_t iptype;
+	int i, dlnum = 0;
+	datalink_id_t *dllink, *dllinks = NULL;
+	dladm_status_t err;
+
+	if (strlen(pool_name) == 0)
+		return (0);
+
+	if (zone_getattr(zoneid, ZONE_ATTR_FLAGS, &flags,
+	    sizeof (flags)) < 0) {
+		if (vplat_get_iptype(zlogp, &iptype) < 0) {
+			zerror(zlogp, B_TRUE, "unable to determine "
+			    "ip-type");
+			return (-1);
+		}
+	} else {
+		if (flags & ZF_NET_EXCL)
+			iptype = ZS_EXCLUSIVE;
+		else
+			iptype = ZS_SHARED;
+	}
+
+	if (iptype == ZS_EXCLUSIVE) {
+		/*
+		 * Get the datalink count and for each datalink,
+		 * attempt to clear the pool property and clear
+		 * the pool_name.
+		 */
+		if (zone_list_datalink(zoneid, &dlnum, NULL) != 0) {
+			zerror(zlogp, B_TRUE, "unable to count network "
+			    "interfaces");
+			return (-1);
+		}
+
+		if (dlnum == 0)
+			return (0);
+
+		if ((dllinks = malloc(dlnum * sizeof (datalink_id_t)))
+		    == NULL) {
+			zerror(zlogp, B_TRUE, "memory allocation failed");
+			return (-1);
+		}
+		if (zone_list_datalink(zoneid, &dlnum, dllinks) != 0) {
+			zerror(zlogp, B_TRUE, "unable to list network "
+			    "interfaces");
+			return (-1);
+		}
+
+		bzero(pool_name, MAXPATHLEN);
+		for (i = 0, dllink = dllinks; i < dlnum; i++, dllink++) {
+			err = dladm_set_linkprop(dld_handle, *dllink, "pool",
+			    NULL, 0, DLADM_OPT_ACTIVE);
+			if (err != DLADM_STATUS_OK) {
+				zerror(zlogp, B_TRUE,
+				    "WARNING: unable to clear pool");
+			}
+		}
+		free(dllinks);
+	}
 	return (0);
 }
 
@@ -4006,6 +4103,7 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 			zerror(zlogp, B_FALSE, "WARNING: %s",
 			    zonecfg_strerror(res));
 	}
+	(void) zonecfg_get_poolname(handle, zone_name, pool_name, MAXPATHLEN);
 
 	zonecfg_fini_handle(handle);
 	return (Z_OK);
@@ -4252,6 +4350,12 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		zerror(zlogp, B_TRUE, "cannot add mapfile entry");
 		goto error;
 	}
+
+	if ((pool_name = malloc(MAXPATHLEN)) == NULL) {
+		zerror(zlogp, B_TRUE, "memory allocation failed");
+		return (Z_NOMEM);
+	}
+	bzero(pool_name, MAXPATHLEN);
 
 	/*
 	 * The following actions are not performed when merely mounting a zone
@@ -4575,6 +4679,11 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 		goto error;
 	}
 
+	if (remove_datalink_pool(zlogp, zoneid) != 0) {
+		zerror(zlogp, B_FALSE, "unable clear datalink pool property");
+		goto error;
+	}
+
 	if (zone_shutdown(zoneid) != 0) {
 		zerror(zlogp, B_TRUE, "unable to shutdown zone");
 		goto error;
@@ -4698,6 +4807,8 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 			}
 		}
 	}
+
+	free(pool_name);
 
 	remove_mlps(zlogp, zoneid);
 

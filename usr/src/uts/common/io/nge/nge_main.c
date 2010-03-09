@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,14 +177,17 @@ static boolean_t	nge_m_getcapab(void *, mac_capab_t, void *);
 static int		nge_m_setprop(void *, const char *, mac_prop_id_t,
 	uint_t, const void *);
 static int		nge_m_getprop(void *, const char *, mac_prop_id_t,
-	uint_t, uint_t, void *, uint_t *);
+	uint_t, void *);
+static void		nge_m_propinfo(void *, const char *, mac_prop_id_t,
+	mac_prop_info_handle_t);
 static int		nge_set_priv_prop(nge_t *, const char *, uint_t,
 	const void *);
 static int		nge_get_priv_prop(nge_t *, const char *, uint_t,
-	uint_t, void *);
+	void *);
 
 #define		NGE_M_CALLBACK_FLAGS\
-		(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+		(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP | \
+		MC_PROPINFO)
 
 static mac_callbacks_t nge_m_callbacks = {
 	NGE_M_CALLBACK_FLAGS,
@@ -195,26 +198,26 @@ static mac_callbacks_t nge_m_callbacks = {
 	nge_m_multicst,
 	nge_m_unicst,
 	nge_m_tx,
+	NULL,
 	nge_m_ioctl,
 	nge_m_getcapab,
 	NULL,
 	NULL,
 	nge_m_setprop,
-	nge_m_getprop
+	nge_m_getprop,
+	nge_m_propinfo
 };
 
-mac_priv_prop_t nge_priv_props[] = {
-	{"_tx_bcopy_threshold", MAC_PROP_PERM_RW},
-	{"_rx_bcopy_threshold", MAC_PROP_PERM_RW},
-	{"_recv_max_packet", MAC_PROP_PERM_RW},
-	{"_poll_quiet_time", MAC_PROP_PERM_RW},
-	{"_poll_busy_time", MAC_PROP_PERM_RW},
-	{"_rx_intr_hwater", MAC_PROP_PERM_RW},
-	{"_rx_intr_lwater", MAC_PROP_PERM_RW},
+char *nge_priv_props[] = {
+	"_tx_bcopy_threshold",
+	"_rx_bcopy_threshold",
+	"_recv_max_packet",
+	"_poll_quiet_time",
+	"_poll_busy_time",
+	"_rx_intr_hwater",
+	"_rx_intr_lwater",
+	NULL
 };
-
-#define	NGE_MAX_PRIV_PROPS \
-	(sizeof (nge_priv_props)/sizeof (mac_priv_prop_t))
 
 static int nge_add_intrs(nge_t *, int);
 static void nge_rem_intrs(nge_t *);
@@ -1750,191 +1753,165 @@ reprogram:
 
 static int
 nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	nge_t *ngep = barg;
 	int err = 0;
 	link_flowctrl_t fl;
 	uint64_t speed;
-	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
-
-	if (pr_valsize == 0)
-		return (EINVAL);
-
-	*perm = MAC_PROP_PERM_RW;
-
-	bzero(pr_val, pr_valsize);
 
 	switch (pr_num) {
 		case MAC_PROP_DUPLEX:
-			*perm = MAC_PROP_PERM_READ;
-			if (pr_valsize >= sizeof (link_duplex_t)) {
-				bcopy(&ngep->param_link_duplex, pr_val,
-				    sizeof (link_duplex_t));
-			} else
-				err = EINVAL;
+			ASSERT(pr_valsize >= sizeof (link_duplex_t));
+			bcopy(&ngep->param_link_duplex, pr_val,
+			    sizeof (link_duplex_t));
 			break;
 		case MAC_PROP_SPEED:
-			*perm = MAC_PROP_PERM_READ;
-			if (pr_valsize >= sizeof (uint64_t)) {
-				speed = ngep->param_link_speed * 1000000ull;
-				bcopy(&speed, pr_val, sizeof (speed));
-			} else
-				err = EINVAL;
+			ASSERT(pr_valsize >= sizeof (uint64_t));
+			speed = ngep->param_link_speed * 1000000ull;
+			bcopy(&speed, pr_val, sizeof (speed));
 			break;
 		case MAC_PROP_AUTONEG:
-			if (is_default) {
-				*(uint8_t *)pr_val = 1;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_adv_autoneg;
-			}
+			*(uint8_t *)pr_val = ngep->param_adv_autoneg;
 			break;
 		case MAC_PROP_FLOWCTRL:
-			if (pr_valsize >= sizeof (link_flowctrl_t)) {
-				if (pr_flags & MAC_PROP_DEFAULT) {
-					fl = LINK_FLOWCTRL_BI;
-					bcopy(&fl, pr_val, sizeof (fl));
-					break;
-				}
-				if (ngep->param_link_rx_pause &&
-				    !ngep->param_link_tx_pause)
-					fl = LINK_FLOWCTRL_RX;
+			ASSERT(pr_valsize >= sizeof (link_flowctrl_t));
+			if (ngep->param_link_rx_pause &&
+			    !ngep->param_link_tx_pause)
+				fl = LINK_FLOWCTRL_RX;
 
-				if (!ngep->param_link_rx_pause &&
-				    !ngep->param_link_tx_pause)
-					fl = LINK_FLOWCTRL_NONE;
+			if (!ngep->param_link_rx_pause &&
+			    !ngep->param_link_tx_pause)
+				fl = LINK_FLOWCTRL_NONE;
 
-				if (!ngep->param_link_rx_pause &&
-				    ngep->param_link_tx_pause)
-					fl = LINK_FLOWCTRL_TX;
+			if (!ngep->param_link_rx_pause &&
+			    ngep->param_link_tx_pause)
+				fl = LINK_FLOWCTRL_TX;
 
-				if (ngep->param_link_rx_pause &&
-				    ngep->param_link_tx_pause)
-					fl = LINK_FLOWCTRL_BI;
-				bcopy(&fl, pr_val, sizeof (fl));
-			} else
-				err = EINVAL;
+			if (ngep->param_link_rx_pause &&
+			    ngep->param_link_tx_pause)
+				fl = LINK_FLOWCTRL_BI;
+			bcopy(&fl, pr_val, sizeof (fl));
 			break;
 		case MAC_PROP_ADV_1000FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				*(uint8_t *)pr_val = 1;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_adv_1000fdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_adv_1000fdx;
 			break;
 		case MAC_PROP_EN_1000FDX_CAP:
-			if (is_default) {
-				*(uint8_t *)pr_val = 1;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_en_1000fdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_en_1000fdx;
 			break;
 		case MAC_PROP_ADV_1000HDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				*(uint8_t *)pr_val = 0;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_adv_1000hdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_adv_1000hdx;
 			break;
 		case MAC_PROP_EN_1000HDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				*(uint8_t *)pr_val = 0;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_en_1000hdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_en_1000hdx;
 			break;
 		case MAC_PROP_ADV_100FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				*(uint8_t *)pr_val = 1;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_adv_100fdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_adv_100fdx;
 			break;
 		case MAC_PROP_EN_100FDX_CAP:
-			if (is_default) {
-				*(uint8_t *)pr_val = 1;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_en_100fdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_en_100fdx;
 			break;
 		case MAC_PROP_ADV_100HDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				*(uint8_t *)pr_val = 1;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_adv_100hdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_adv_100hdx;
 			break;
 		case MAC_PROP_EN_100HDX_CAP:
-			if (is_default) {
-				*(uint8_t *)pr_val = 1;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_en_100hdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_en_100hdx;
 			break;
 		case MAC_PROP_ADV_10FDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				*(uint8_t *)pr_val = 1;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_adv_10fdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_adv_10fdx;
 			break;
 		case MAC_PROP_EN_10FDX_CAP:
-			if (is_default) {
-				*(uint8_t *)pr_val = 1;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_en_10fdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_en_10fdx;
 			break;
 		case MAC_PROP_ADV_10HDX_CAP:
-			*perm = MAC_PROP_PERM_READ;
-			if (is_default) {
-				*(uint8_t *)pr_val = 1;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_adv_10hdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_adv_10hdx;
 			break;
 		case MAC_PROP_EN_10HDX_CAP:
-			if (is_default) {
-				*(uint8_t *)pr_val = 1;
-			} else {
-				*(uint8_t *)pr_val = ngep->param_en_10hdx;
-			}
+			*(uint8_t *)pr_val = ngep->param_en_10hdx;
 			break;
 		case MAC_PROP_ADV_100T4_CAP:
 		case MAC_PROP_EN_100T4_CAP:
-			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = 0;
 			break;
 		case MAC_PROP_PRIVATE:
-			err = nge_get_priv_prop(ngep, pr_name, pr_flags,
+			err = nge_get_priv_prop(ngep, pr_name,
 			    pr_valsize, pr_val);
 			break;
-		case MAC_PROP_MTU: {
-			mac_propval_range_t range;
-
-			if (!(pr_flags & MAC_PROP_POSSIBLE))
-				return (ENOTSUP);
-			if (pr_valsize < sizeof (mac_propval_range_t))
-				return (EINVAL);
-			range.mpr_count = 1;
-			range.mpr_type = MAC_PROPVAL_UINT32;
-			range.range_uint32[0].mpur_min =
-			    range.range_uint32[0].mpur_max = ETHERMTU;
-			if (ngep->dev_spec_param.jumbo)
-				range.range_uint32[0].mpur_max = NGE_MAX_MTU;
-			bcopy(&range, pr_val, sizeof (range));
-			break;
-		}
 		default:
 			err = ENOTSUP;
 	}
 	return (err);
+}
+
+static void
+nge_m_propinfo(void *barg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	nge_t *ngep = barg;
+
+	switch (pr_num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_ADV_1000HDX_CAP:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_EN_1000HDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_ADV_100T4_CAP:
+	case MAC_PROP_EN_100T4_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_EN_1000FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
+	case MAC_PROP_EN_100HDX_CAP:
+	case MAC_PROP_EN_10FDX_CAP:
+	case MAC_PROP_EN_10HDX_CAP:
+		mac_prop_info_set_default_uint8(prh, 1);
+		break;
+
+	case MAC_PROP_AUTONEG:
+		mac_prop_info_set_default_uint8(prh, 1);
+		break;
+
+	case MAC_PROP_FLOWCTRL:
+		mac_prop_info_set_default_link_flowctrl(prh, LINK_FLOWCTRL_BI);
+		break;
+
+	case MAC_PROP_MTU:
+		mac_prop_info_set_range_uint32(prh, ETHERMTU,
+		    ngep->dev_spec_param.jumbo ? NGE_MAX_MTU : ETHERMTU);
+		break;
+
+	case MAC_PROP_PRIVATE: {
+		char valstr[64];
+		int value;
+
+		bzero(valstr, sizeof (valstr));
+		if (strcmp(pr_name, "_tx_bcopy_threshold") == 0) {
+			value = NGE_TX_COPY_SIZE;
+		} else 	if (strcmp(pr_name, "_rx_bcopy_threshold") == 0) {
+			value = NGE_RX_COPY_SIZE;
+		} else 	if (strcmp(pr_name, "_recv_max_packet") == 0) {
+			value = 128;
+		} else 	if (strcmp(pr_name, "_poll_quiet_time") == 0) {
+			value = NGE_POLL_QUIET_TIME;
+		} else 	if (strcmp(pr_name, "_poll_busy_time") == 0) {
+			value = NGE_POLL_BUSY_TIME;
+		} else	if (strcmp(pr_name, "_rx_intr_hwater") == 0) {
+			value = 1;
+		} else 	if (strcmp(pr_name, "_rx_intr_lwater") == 0) {
+			value = 8;
+		} else {
+			return;
+		}
+
+		(void) snprintf(valstr, sizeof (valstr), "%d", value);
+	}
+	}
+
 }
 
 /* ARGSUSED */
@@ -2056,49 +2033,44 @@ reprogram:
 }
 
 static int
-nge_get_priv_prop(nge_t *ngep, const char *pr_name, uint_t pr_flags,
-    uint_t pr_valsize, void *pr_val)
+nge_get_priv_prop(nge_t *ngep, const char *pr_name, uint_t pr_valsize,
+    void *pr_val)
 {
 	int err = ENOTSUP;
-	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
 	int value;
 
 	if (strcmp(pr_name, "_tx_bcopy_threshold") == 0) {
-		value = (is_default ? NGE_TX_COPY_SIZE :
-		    ngep->param_txbcopy_threshold);
+		value = ngep->param_txbcopy_threshold;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_rx_bcopy_threshold") == 0) {
-		value = (is_default ? NGE_RX_COPY_SIZE :
-		    ngep->param_rxbcopy_threshold);
+		value = ngep->param_rxbcopy_threshold;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_recv_max_packet") == 0) {
-		value = (is_default ? 128 : ngep->param_recv_max_packet);
+		value = ngep->param_recv_max_packet;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_poll_quiet_time") == 0) {
-		value = (is_default ? NGE_POLL_QUIET_TIME :
-		    ngep->param_poll_quiet_time);
+		value = ngep->param_poll_quiet_time;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_poll_busy_time") == 0) {
-		value = (is_default ? NGE_POLL_BUSY_TIME :
-		    ngep->param_poll_busy_time);
+		value = ngep->param_poll_busy_time;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_rx_intr_hwater") == 0) {
-		value = (is_default ? 1 : ngep->param_rx_intr_hwater);
+		value = ngep->param_rx_intr_hwater;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_rx_intr_lwater") == 0) {
-		value = (is_default ? 8 : ngep->param_rx_intr_lwater);
+		value = ngep->param_rx_intr_lwater;
 		err = 0;
 		goto done;
 	}
@@ -2561,7 +2533,6 @@ nge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	macp->m_max_sdu = ngep->default_mtu;
 	macp->m_margin = VTAG_SIZE;
 	macp->m_priv_props = nge_priv_props;
-	macp->m_priv_prop_count = NGE_MAX_PRIV_PROPS;
 	/*
 	 * Finally, we're ready to register ourselves with the mac
 	 * interface; if this succeeds, we're all ready to start()

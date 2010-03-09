@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2457,21 +2457,13 @@ ieee80211_setprop(void *ic_arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 /* ARGSUSED */
 int
 ieee80211_getprop(void *ic_arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+    uint_t wldp_length, void *wldp_buf)
 {
 	int err = 0;
 	struct ieee80211com *ic = ic_arg;
 
-	if (wldp_length == 0) {
-		err = EINVAL;
-		return (err);
-	}
-	bzero(wldp_buf, wldp_length);
-
 	ASSERT(ic != NULL);
 	IEEE80211_LOCK(ic);
-
-	*perm = MAC_PROP_PERM_RW;
 
 	switch (wldp_pr_num) {
 	/* mac_prop_id */
@@ -2497,34 +2489,27 @@ ieee80211_getprop(void *ic_arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 		wl_get_desrates(ic, wldp_buf);
 		break;
 	case MAC_PROP_WL_LINKSTATUS:
-		*perm = MAC_PROP_PERM_READ;
 		wl_get_linkstatus(ic, wldp_buf);
 		break;
 	case MAC_PROP_WL_ESS_LIST:
-		*perm = MAC_PROP_PERM_READ;
 		wl_get_esslist(ic, wldp_buf);
 		break;
 	case MAC_PROP_WL_SUPPORTED_RATES:
-		*perm = MAC_PROP_PERM_READ;
 		wl_get_suprates(ic, wldp_buf);
 		break;
 	case MAC_PROP_WL_RSSI:
-		*perm = MAC_PROP_PERM_READ;
 		wl_get_rssi(ic, wldp_buf);
 		break;
 	case MAC_PROP_WL_CAPABILITY:
-		*perm = MAC_PROP_PERM_READ;
 		wl_get_capability(ic, wldp_buf);
 		break;
 	case MAC_PROP_WL_WPA:
 		wl_get_wpa(ic, wldp_buf);
 		break;
 	case MAC_PROP_WL_SCANRESULTS:
-		*perm = MAC_PROP_PERM_READ;
 		wl_get_scanresults(ic, wldp_buf);
 		break;
 	case MAC_PROP_WL_CREATE_IBSS:
-		*perm = MAC_PROP_PERM_READ;
 		wl_get_createibss(ic, wldp_buf);
 		break;
 	case MAC_PROP_WL_KEY_TAB:
@@ -2544,4 +2529,26 @@ ieee80211_getprop(void *ic_arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	IEEE80211_UNLOCK(ic);
 
 	return (err);
+}
+
+void ieee80211_propinfo(void *ic_arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, mac_prop_info_handle_t prh)
+{
+        _NOTE(ARGUNUSED(pr_name, ic_arg));
+
+	/*
+	 * By default permissions are read/write unless specified
+	 * otherwise by the driver.
+	 */
+
+	switch (wldp_pr_num) {
+	case MAC_PROP_WL_LINKSTATUS:
+	case MAC_PROP_WL_ESS_LIST:
+	case MAC_PROP_WL_SUPPORTED_RATES:
+	case MAC_PROP_WL_RSSI:
+	case MAC_PROP_WL_CAPABILITY:
+	case MAC_PROP_WL_SCANRESULTS:
+	case MAC_PROP_WL_CREATE_IBSS:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+	}
 }

@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -970,4 +970,61 @@ e1000g_read_phy_stat(struct e1000_hw *hw, int reg)
 	}
 
 	return (val);
+}
+
+/*
+ * Retrieve a value for one of the statistics for a particular rx ring
+ */
+int
+e1000g_rx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
+{
+	e1000g_rx_ring_t *rx_ring = (e1000g_rx_ring_t *)rh;
+	struct e1000g *Adapter = rx_ring->adapter;
+	struct e1000_hw *hw = &Adapter->shared;
+	p_e1000g_stat_t e1000g_ksp =
+	    (p_e1000g_stat_t)Adapter->e1000g_ksp->ks_data;
+	uint32_t low_val, high_val;
+
+	rw_enter(&Adapter->chip_lock, RW_READER);
+
+	if (Adapter->e1000g_state & E1000G_SUSPENDED) {
+		rw_exit(&Adapter->chip_lock);
+		return (ECANCELED);
+	}
+
+	switch (stat) {
+	case MAC_STAT_RBYTES:
+		/*
+		 * The 64-bit register will reset whenever the upper
+		 * 32 bits are read. So we need to read the lower
+		 * 32 bits first, then read the upper 32 bits.
+		 */
+		low_val = E1000_READ_REG(hw, E1000_TORL);
+		high_val = E1000_READ_REG(hw, E1000_TORH);
+		*val = (uint64_t)e1000g_ksp->Torh.value.ul << 32 |
+		    (uint64_t)e1000g_ksp->Torl.value.ul;
+		*val += (uint64_t)high_val << 32 | (uint64_t)low_val;
+
+		e1000g_ksp->Torl.value.ul = (uint32_t)*val;
+		e1000g_ksp->Torh.value.ul = (uint32_t)(*val >> 32);
+		break;
+
+	case MAC_STAT_IPACKETS:
+		e1000g_ksp->Tpr.value.ul +=
+		    E1000_READ_REG(hw, E1000_TPR);
+		*val = e1000g_ksp->Tpr.value.ul;
+		break;
+
+	default:
+		*val = 0;
+		rw_exit(&Adapter->chip_lock);
+		return (ENOTSUP);
+	}
+
+	rw_exit(&Adapter->chip_lock);
+
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_UNAFFECTED);
+
+	return (0);
 }

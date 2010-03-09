@@ -21,306 +21,11 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "ixgbe_sw.h"
-
-/*
- * Retrieve a value for one of the statistics.
- */
-int
-ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
-{
-	ixgbe_t *ixgbe = (ixgbe_t *)arg;
-	struct ixgbe_hw *hw = &ixgbe->hw;
-	ixgbe_stat_t *ixgbe_ks;
-	int i;
-
-	ixgbe_ks = (ixgbe_stat_t *)ixgbe->ixgbe_ks->ks_data;
-
-	mutex_enter(&ixgbe->gen_lock);
-
-	if (ixgbe->ixgbe_state & IXGBE_SUSPENDED) {
-		mutex_exit(&ixgbe->gen_lock);
-		return (ECANCELED);
-	}
-
-	switch (stat) {
-	case MAC_STAT_IFSPEED:
-		*val = ixgbe->link_speed * 1000000ull;
-		break;
-
-	case MAC_STAT_MULTIRCV:
-		ixgbe_ks->mprc.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_MPRC);
-		*val = ixgbe_ks->mprc.value.ui64;
-		break;
-
-	case MAC_STAT_BRDCSTRCV:
-		ixgbe_ks->bprc.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_BPRC);
-		*val = ixgbe_ks->bprc.value.ui64;
-		break;
-
-	case MAC_STAT_MULTIXMT:
-		ixgbe_ks->mptc.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_MPTC);
-		*val = ixgbe_ks->mptc.value.ui64;
-		break;
-
-	case MAC_STAT_BRDCSTXMT:
-		ixgbe_ks->bptc.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_BPTC);
-		*val = ixgbe_ks->bptc.value.ui64;
-		break;
-
-	case MAC_STAT_NORCVBUF:
-		for (i = 0; i < 8; i++) {
-			ixgbe_ks->rnbc.value.ui64 +=
-			    IXGBE_READ_REG(hw, IXGBE_RNBC(i));
-		}
-		*val = ixgbe_ks->rnbc.value.ui64;
-		break;
-
-	case MAC_STAT_IERRORS:
-		ixgbe_ks->crcerrs.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_CRCERRS);
-		ixgbe_ks->illerrc.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_ILLERRC);
-		ixgbe_ks->errbc.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_ERRBC);
-		ixgbe_ks->rlec.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_RLEC);
-		*val = ixgbe_ks->crcerrs.value.ui64 +
-		    ixgbe_ks->illerrc.value.ui64 +
-		    ixgbe_ks->errbc.value.ui64 +
-		    ixgbe_ks->rlec.value.ui64;
-		break;
-
-	case MAC_STAT_RBYTES:
-		ixgbe_ks->tor.value.ui64 = 0;
-		for (i = 0; i < 16; i++) {
-			ixgbe_ks->qbrc[i].value.ui64 +=
-			    IXGBE_READ_REG(hw, IXGBE_QBRC(i));
-			ixgbe_ks->tor.value.ui64 +=
-			    ixgbe_ks->qbrc[i].value.ui64;
-		}
-		*val = ixgbe_ks->tor.value.ui64;
-		break;
-
-	case MAC_STAT_OBYTES:
-		ixgbe_ks->tot.value.ui64 = 0;
-		for (i = 0; i < 16; i++) {
-			if (hw->mac.type >= ixgbe_mac_82599EB) {
-				ixgbe_ks->qbtc[i].value.ui64 +=
-				    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
-				ixgbe_ks->qbtc[i].value.ui64 += ((uint64_t)
-				    IXGBE_READ_REG(hw, IXGBE_QBTC_H(i))) << 32;
-			} else {
-				ixgbe_ks->qbtc[i].value.ui64 +=
-				    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
-			}
-			ixgbe_ks->tot.value.ui64 +=
-			    ixgbe_ks->qbtc[i].value.ui64;
-		}
-		*val = ixgbe_ks->tot.value.ui64;
-		break;
-
-	case MAC_STAT_IPACKETS:
-		ixgbe_ks->tpr.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_TPR);
-		*val = ixgbe_ks->tpr.value.ui64;
-		break;
-
-	case MAC_STAT_OPACKETS:
-		ixgbe_ks->tpt.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_TPT);
-		*val = ixgbe_ks->tpt.value.ui64;
-		break;
-
-	/* RFC 1643 stats */
-	case ETHER_STAT_FCS_ERRORS:
-		ixgbe_ks->crcerrs.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_CRCERRS);
-		*val = ixgbe_ks->crcerrs.value.ui64;
-		break;
-
-	case ETHER_STAT_TOOLONG_ERRORS:
-		ixgbe_ks->roc.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_ROC);
-		*val = ixgbe_ks->roc.value.ui64;
-		break;
-
-	case ETHER_STAT_MACRCV_ERRORS:
-		ixgbe_ks->crcerrs.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_CRCERRS);
-		ixgbe_ks->illerrc.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_ILLERRC);
-		ixgbe_ks->errbc.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_ERRBC);
-		ixgbe_ks->rlec.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_RLEC);
-		*val = ixgbe_ks->crcerrs.value.ui64 +
-		    ixgbe_ks->illerrc.value.ui64 +
-		    ixgbe_ks->errbc.value.ui64 +
-		    ixgbe_ks->rlec.value.ui64;
-		break;
-
-	/* MII/GMII stats */
-	case ETHER_STAT_XCVR_ADDR:
-		/* The Internal PHY's MDI address for each MAC is 1 */
-		*val = 1;
-		break;
-
-	case ETHER_STAT_XCVR_ID:
-		*val = hw->phy.id;
-		break;
-
-	case ETHER_STAT_XCVR_INUSE:
-		switch (ixgbe->link_speed) {
-		case IXGBE_LINK_SPEED_1GB_FULL:
-			*val =
-			    (hw->phy.media_type == ixgbe_media_type_copper) ?
-			    XCVR_1000T : XCVR_1000X;
-			break;
-		case IXGBE_LINK_SPEED_100_FULL:
-			*val = (hw->phy.media_type == ixgbe_media_type_copper) ?
-			    XCVR_100T2 : XCVR_100X;
-			break;
-		default:
-			*val = XCVR_NONE;
-			break;
-		}
-		break;
-
-	case ETHER_STAT_CAP_10GFDX:
-		*val = 1;
-		break;
-
-	case ETHER_STAT_CAP_1000FDX:
-		*val = 1;
-		break;
-
-	case ETHER_STAT_CAP_100FDX:
-		*val = 1;
-		break;
-
-	case ETHER_STAT_CAP_ASMPAUSE:
-		*val = ixgbe->param_asym_pause_cap;
-		break;
-
-	case ETHER_STAT_CAP_PAUSE:
-		*val = ixgbe->param_pause_cap;
-		break;
-
-	case ETHER_STAT_CAP_AUTONEG:
-		*val = 1;
-		break;
-
-	case ETHER_STAT_ADV_CAP_10GFDX:
-		*val = ixgbe->param_adv_10000fdx_cap;
-		break;
-
-	case ETHER_STAT_ADV_CAP_1000FDX:
-		*val = ixgbe->param_adv_1000fdx_cap;
-		break;
-
-	case ETHER_STAT_ADV_CAP_100FDX:
-		*val = ixgbe->param_adv_100fdx_cap;
-		break;
-
-	case ETHER_STAT_ADV_CAP_ASMPAUSE:
-		*val = ixgbe->param_adv_asym_pause_cap;
-		break;
-
-	case ETHER_STAT_ADV_CAP_PAUSE:
-		*val = ixgbe->param_adv_pause_cap;
-		break;
-
-	case ETHER_STAT_ADV_CAP_AUTONEG:
-		*val = ixgbe->param_adv_autoneg_cap;
-		break;
-
-	case ETHER_STAT_LP_CAP_10GFDX:
-		*val = ixgbe->param_lp_10000fdx_cap;
-		break;
-
-	case ETHER_STAT_LP_CAP_1000FDX:
-		*val = ixgbe->param_lp_1000fdx_cap;
-		break;
-
-	case ETHER_STAT_LP_CAP_100FDX:
-		*val = ixgbe->param_lp_100fdx_cap;
-		break;
-
-	case ETHER_STAT_LP_CAP_ASMPAUSE:
-		*val = ixgbe->param_lp_asym_pause_cap;
-		break;
-
-	case ETHER_STAT_LP_CAP_PAUSE:
-		*val = ixgbe->param_lp_pause_cap;
-		break;
-
-	case ETHER_STAT_LP_CAP_AUTONEG:
-		*val = ixgbe->param_lp_autoneg_cap;
-		break;
-
-	case ETHER_STAT_LINK_ASMPAUSE:
-		*val = ixgbe->param_asym_pause_cap;
-		break;
-
-	case ETHER_STAT_LINK_PAUSE:
-		*val = ixgbe->param_pause_cap;
-		break;
-
-	case ETHER_STAT_LINK_AUTONEG:
-		*val = ixgbe->param_adv_autoneg_cap;
-		break;
-
-	case ETHER_STAT_LINK_DUPLEX:
-		*val = ixgbe->link_duplex;
-		break;
-
-	case ETHER_STAT_TOOSHORT_ERRORS:
-		ixgbe_ks->ruc.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_RUC);
-		*val = ixgbe_ks->ruc.value.ui64;
-		break;
-
-	case ETHER_STAT_CAP_REMFAULT:
-		*val = ixgbe->param_rem_fault;
-		break;
-
-	case ETHER_STAT_ADV_REMFAULT:
-		*val = ixgbe->param_adv_rem_fault;
-		break;
-
-	case ETHER_STAT_LP_REMFAULT:
-		*val = ixgbe->param_lp_rem_fault;
-		break;
-
-	case ETHER_STAT_JABBER_ERRORS:
-		ixgbe_ks->rjc.value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_RJC);
-		*val = ixgbe_ks->rjc.value.ui64;
-		break;
-
-	default:
-		mutex_exit(&ixgbe->gen_lock);
-		return (ENOTSUP);
-	}
-
-	mutex_exit(&ixgbe->gen_lock);
-
-	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
-		return (EIO);
-	}
-
-	return (0);
-}
 
 /*
  * Bring the device out of the reset/quiesced state that it
@@ -732,121 +437,146 @@ setup_link:
 
 int
 ixgbe_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	ixgbe_t *ixgbe = (ixgbe_t *)arg;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	int err = 0;
 	uint32_t flow_control;
 	uint64_t tmp = 0;
-	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
-	mac_propval_range_t range;
-
-	if (pr_valsize == 0)
-		return (EINVAL);
-
-	*perm = MAC_PROP_PERM_READ;
-
-	bzero(pr_val, pr_valsize);
 
 	switch (pr_num) {
 	case MAC_PROP_DUPLEX:
-		if (pr_valsize >= sizeof (link_duplex_t)) {
-			bcopy(&ixgbe->link_duplex, pr_val,
-			    sizeof (link_duplex_t));
-		} else
-			err = EINVAL;
+		ASSERT(pr_valsize >= sizeof (link_duplex_t));
+		bcopy(&ixgbe->link_duplex, pr_val,
+		    sizeof (link_duplex_t));
 		break;
 	case MAC_PROP_SPEED:
-		if (pr_valsize >= sizeof (uint64_t)) {
-			tmp = ixgbe->link_speed * 1000000ull;
-			bcopy(&tmp, pr_val, sizeof (tmp));
-		} else
-			err = EINVAL;
+		ASSERT(pr_valsize >= sizeof (uint64_t));
+		tmp = ixgbe->link_speed * 1000000ull;
+		bcopy(&tmp, pr_val, sizeof (tmp));
 		break;
 	case MAC_PROP_AUTONEG:
-		if (ixgbe->hw.phy.media_type == ixgbe_media_type_copper)
-			*perm = MAC_PROP_PERM_RW;
-		*(uint8_t *)pr_val =
-		    (is_default ? 1 : ixgbe->param_adv_autoneg_cap);
+		*(uint8_t *)pr_val = ixgbe->param_adv_autoneg_cap;
 		break;
 	case MAC_PROP_FLOWCTRL:
-		*perm = MAC_PROP_PERM_RW;
-		if (pr_valsize >= sizeof (uint32_t)) {
-			if (is_default) {
+		ASSERT(pr_valsize >= sizeof (uint32_t));
+
+		switch (hw->fc.requested_mode) {
+			case ixgbe_fc_none:
 				flow_control = LINK_FLOWCTRL_NONE;
-				bcopy(&flow_control, pr_val,
-				    sizeof (flow_control));
 				break;
-			}
-			switch (hw->fc.requested_mode) {
-				case ixgbe_fc_none:
-					flow_control = LINK_FLOWCTRL_NONE;
-					break;
-				case ixgbe_fc_rx_pause:
-					flow_control = LINK_FLOWCTRL_RX;
-					break;
-				case ixgbe_fc_tx_pause:
-					flow_control = LINK_FLOWCTRL_TX;
-					break;
-				case ixgbe_fc_full:
-					flow_control = LINK_FLOWCTRL_BI;
-					break;
-			}
-			bcopy(&flow_control, pr_val, sizeof (flow_control));
-		} else
-			err = EINVAL;
+			case ixgbe_fc_rx_pause:
+				flow_control = LINK_FLOWCTRL_RX;
+				break;
+			case ixgbe_fc_tx_pause:
+				flow_control = LINK_FLOWCTRL_TX;
+				break;
+			case ixgbe_fc_full:
+				flow_control = LINK_FLOWCTRL_BI;
+				break;
+		}
+		bcopy(&flow_control, pr_val, sizeof (flow_control));
 		break;
 	case MAC_PROP_ADV_10GFDX_CAP:
-		*(uint8_t *)pr_val = (is_default ? 1 :
-		    ixgbe->param_adv_10000fdx_cap);
+		*(uint8_t *)pr_val = ixgbe->param_adv_10000fdx_cap;
 		break;
 	case MAC_PROP_EN_10GFDX_CAP:
-		if (ixgbe->hw.phy.media_type == ixgbe_media_type_copper)
-			*perm = MAC_PROP_PERM_RW;
-		*(uint8_t *)pr_val =
-		    (is_default ? 1 : ixgbe->param_en_10000fdx_cap);
+		*(uint8_t *)pr_val = ixgbe->param_en_10000fdx_cap;
 		break;
 	case MAC_PROP_ADV_1000FDX_CAP:
-		*(uint8_t *)pr_val = (is_default ? 1 :
-		    ixgbe->param_adv_1000fdx_cap);
+		*(uint8_t *)pr_val = ixgbe->param_adv_1000fdx_cap;
 		break;
 	case MAC_PROP_EN_1000FDX_CAP:
-		if (ixgbe->hw.phy.media_type == ixgbe_media_type_copper)
-			*perm = MAC_PROP_PERM_RW;
-		*(uint8_t *)pr_val =
-		    (is_default ? 1 : ixgbe->param_en_1000fdx_cap);
+		*(uint8_t *)pr_val = ixgbe->param_en_1000fdx_cap;
 		break;
 	case MAC_PROP_ADV_100FDX_CAP:
-		*(uint8_t *)pr_val =
-		    (is_default ? 1 : ixgbe->param_adv_100fdx_cap);
+		*(uint8_t *)pr_val = ixgbe->param_adv_100fdx_cap;
 		break;
 	case MAC_PROP_EN_100FDX_CAP:
-		if (ixgbe->hw.phy.media_type == ixgbe_media_type_copper)
-			*perm = MAC_PROP_PERM_RW;
-		*(uint8_t *)pr_val =
-		    (is_default ? 1 : ixgbe->param_en_100fdx_cap);
+		*(uint8_t *)pr_val = ixgbe->param_en_100fdx_cap;
 		break;
 	case MAC_PROP_PRIVATE:
 		err = ixgbe_get_priv_prop(ixgbe, pr_name,
-		    pr_flags, pr_valsize, pr_val, perm);
-		break;
-	case MAC_PROP_MTU:
-		if (!(pr_flags & MAC_PROP_POSSIBLE))
-			return (ENOTSUP);
-		if (pr_valsize < sizeof (mac_propval_range_t))
-			return (EINVAL);
-		range.mpr_count = 1;
-		range.mpr_type = MAC_PROPVAL_UINT32;
-		range.range_uint32[0].mpur_min = DEFAULT_MTU;
-		range.range_uint32[0].mpur_max = ixgbe->capab->max_mtu;
-		bcopy(&range, pr_val, sizeof (range));
+		    pr_valsize, pr_val);
 		break;
 	default:
 		err = EINVAL;
 		break;
 	}
 	return (err);
+}
+
+void
+ixgbe_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	ixgbe_t *ixgbe = (ixgbe_t *)arg;
+	uint_t perm;
+
+	switch (pr_num) {
+	case MAC_PROP_DUPLEX:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_ADV_10GFDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_AUTONEG:
+	case MAC_PROP_EN_10GFDX_CAP:
+	case MAC_PROP_EN_1000FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
+		perm = (ixgbe->hw.phy.media_type == ixgbe_media_type_copper) ?
+		    MAC_PROP_PERM_RW : MAC_PROP_PERM_READ;
+		if (perm == MAC_PROP_PERM_RW)
+			mac_prop_info_set_default_uint8(prh, 1);
+		mac_prop_info_set_perm(prh, perm);
+		break;
+
+	case MAC_PROP_FLOWCTRL:
+		mac_prop_info_set_default_link_flowctrl(prh,
+		    LINK_FLOWCTRL_NONE);
+		break;
+
+	case MAC_PROP_MTU:
+		mac_prop_info_set_range_uint32(prh,
+		    DEFAULT_MTU, ixgbe->capab->max_mtu);
+		break;
+
+	case MAC_PROP_PRIVATE: {
+		char valstr[64];
+		int value;
+
+		bzero(valstr, sizeof (valstr));
+
+		if (strcmp(pr_name, "_adv_pause_cap") == 0 ||
+		    strcmp(pr_name, "_adv_asym_pause_cap") == 0) {
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+			return;
+		}
+
+		if (strcmp(pr_name, "_tx_copy_thresh") == 0) {
+			value = DEFAULT_TX_COPY_THRESHOLD;
+		} else if (strcmp(pr_name, "_tx_recycle_thresh") == 0) {
+			value = DEFAULT_TX_RECYCLE_THRESHOLD;
+		} else if (strcmp(pr_name, "_tx_overload_thresh") == 0) {
+			value = DEFAULT_TX_OVERLOAD_THRESHOLD;
+		} else if (strcmp(pr_name, "_tx_resched_thresh") == 0) {
+			value = DEFAULT_TX_RESCHED_THRESHOLD;
+		} else 	if (strcmp(pr_name, "_rx_copy_thresh") == 0) {
+			value = DEFAULT_RX_COPY_THRESHOLD;
+		} else 	if (strcmp(pr_name, "_rx_limit_per_intr") == 0) {
+			value = DEFAULT_RX_LIMIT_PER_INTR;
+		} 	if (strcmp(pr_name, "_intr_throttling") == 0) {
+			value = ixgbe->capab->def_intr_throttle;
+		} else {
+			return;
+		}
+
+		(void) snprintf(valstr, sizeof (valstr), "%x", value);
+	}
+	}
 }
 
 boolean_t
@@ -999,65 +729,53 @@ ixgbe_set_priv_prop(ixgbe_t *ixgbe, const char *pr_name,
 
 int
 ixgbe_get_priv_prop(ixgbe_t *ixgbe, const char *pr_name,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+    uint_t pr_valsize, void *pr_val)
 {
 	int err = ENOTSUP;
-	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
 	int value;
 
-	*perm = MAC_PROP_PERM_RW;
-
 	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
-		*perm = MAC_PROP_PERM_READ;
-		value = (is_default ? 1 : ixgbe->param_adv_pause_cap);
+		value = ixgbe->param_adv_pause_cap;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_adv_asym_pause_cap") == 0) {
-		*perm = MAC_PROP_PERM_READ;
-		value = (is_default ? 1 : ixgbe->param_adv_asym_pause_cap);
+		value = ixgbe->param_adv_asym_pause_cap;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_tx_copy_thresh") == 0) {
-		value = (is_default ? DEFAULT_TX_COPY_THRESHOLD :
-		    ixgbe->tx_copy_thresh);
+		value = ixgbe->tx_copy_thresh;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_tx_recycle_thresh") == 0) {
-		value = (is_default ? DEFAULT_TX_RECYCLE_THRESHOLD :
-		    ixgbe->tx_recycle_thresh);
+		value = ixgbe->tx_recycle_thresh;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_tx_overload_thresh") == 0) {
-		value = (is_default ? DEFAULT_TX_OVERLOAD_THRESHOLD :
-		    ixgbe->tx_overload_thresh);
+		value = ixgbe->tx_overload_thresh;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_tx_resched_thresh") == 0) {
-		value = (is_default ? DEFAULT_TX_RESCHED_THRESHOLD :
-		    ixgbe->tx_resched_thresh);
+		value = ixgbe->tx_resched_thresh;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_rx_copy_thresh") == 0) {
-		value = (is_default ? DEFAULT_RX_COPY_THRESHOLD :
-		    ixgbe->rx_copy_thresh);
+		value = ixgbe->rx_copy_thresh;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_rx_limit_per_intr") == 0) {
-		value = (is_default ? DEFAULT_RX_LIMIT_PER_INTR :
-		    ixgbe->rx_limit_per_intr);
+		value = ixgbe->rx_limit_per_intr;
 		err = 0;
 		goto done;
 	}
 	if (strcmp(pr_name, "_intr_throttling") == 0) {
-		value = (is_default ? ixgbe->capab->def_intr_throttle :
-		    ixgbe->intr_throttling[0]);
+		value = ixgbe->intr_throttling[0];
 		err = 0;
 		goto done;
 	}

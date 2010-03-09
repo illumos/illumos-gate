@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -295,10 +295,7 @@ static	mac_callbacks_t	vsw_m_callbacks = {
 	vsw_m_promisc,
 	vsw_m_multicst,
 	vsw_m_unicst,
-	vsw_m_tx,
-	NULL,
-	NULL,
-	NULL
+	vsw_m_tx
 };
 
 static	struct	cb_ops	vsw_cb_ops = {

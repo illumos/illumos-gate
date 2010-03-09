@@ -89,8 +89,9 @@ typedef struct {
 
 static link_protect_t link_protect_types[] = {
 	{ MPT_MACNOSPOOF, "mac-nospoof" },
+	{ MPT_RESTRICTED, "restricted" },
 	{ MPT_IPNOSPOOF, "ip-nospoof" },
-	{ MPT_RESTRICTED, "restricted" }
+	{ MPT_DHCPNOSPOOF, "dhcp-nospoof" }
 };
 #define	LPTYPES	(sizeof (link_protect_types) / sizeof (link_protect_t))
 
@@ -380,6 +381,9 @@ dladm_status2str(dladm_status_t status, char *buf)
 		break;
 	case DLADM_STATUS_ADDRINUSE:
 		s = "address already in use";
+		break;
+	case DLADM_STATUS_POOLCPU:
+		s = "pool and cpus property are mutually exclusive";
 		break;
 	default:
 		s = "<unknown error>";
@@ -901,7 +905,7 @@ const char *
 dladm_ipv4addr2str(void *addr, char *buf)
 {
 	if (inet_ntop(AF_INET, addr, buf, INET_ADDRSTRLEN) == NULL)
-		buf[0] = 0;
+		buf[0] = '\0';
 
 	return (buf);
 }
@@ -910,6 +914,22 @@ dladm_status_t
 dladm_str2ipv4addr(char *token, void *addr)
 {
 	return (inet_pton(AF_INET, token, addr) == 1 ?
+	    DLADM_STATUS_OK : DLADM_STATUS_INVALID_IP);
+}
+
+const char *
+dladm_ipv6addr2str(void *addr, char *buf)
+{
+	if (inet_ntop(AF_INET6, addr, buf, INET6_ADDRSTRLEN) == NULL)
+		buf[0] = '\0';
+
+	return (buf);
+}
+
+dladm_status_t
+dladm_str2ipv6addr(char *token, void *addr)
+{
+	return (inet_pton(AF_INET6, token, addr) == 1 ?
 	    DLADM_STATUS_OK : DLADM_STATUS_INVALID_IP);
 }
 
