@@ -1126,7 +1126,7 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
 		 * maintain a count of such faults caught.
 		 */
 
-		if (!scan_mmu_pagesize && !on_trap(&otd, OT_DATA_EC)) {
+		if (!on_trap(&otd, OT_DATA_EC) && !scan_mmu_pagesize) {
 			memscrub_read(va, bpp);
 			/*
 			 * Check if CEs require logging
