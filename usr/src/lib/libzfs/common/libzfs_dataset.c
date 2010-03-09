@@ -938,19 +938,6 @@ zfs_valid_proplist(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 			}
 			break;
 
-		case ZFS_PROP_SHAREISCSI:
-			if (strcmp(strval, "off") != 0 &&
-			    strcmp(strval, "on") != 0 &&
-			    strcmp(strval, "type=disk") != 0) {
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "'%s' must be 'on', 'off', or 'type=disk'"),
-				    propname);
-				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
-				goto error;
-			}
-
-			break;
-
 		case ZFS_PROP_MLSLABEL:
 		{
 			/*
@@ -1313,6 +1300,14 @@ zfs_setprop_error(libzfs_handle_t *hdl, zfs_prop_t prop, int err,
 			    "property setting is not allowed on "
 			    "bootable datasets"));
 			(void) zfs_error(hdl, EZFS_NOTSUP, errbuf);
+		} else {
+			(void) zfs_standard_error(hdl, err, errbuf);
+		}
+		break;
+
+	case EINVAL:
+		if (prop == ZPROP_INVAL) {
+			(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 		} else {
 			(void) zfs_standard_error(hdl, err, errbuf);
 		}
@@ -2936,15 +2931,6 @@ zfs_destroy(zfs_handle_t *zhp, boolean_t defer)
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 
 	if (ZFS_IS_VOLUME(zhp)) {
-		/*
-		 * If user doesn't have permissions to unshare volume, then
-		 * abort the request.  This would only happen for a
-		 * non-privileged user.
-		 */
-		if (zfs_unshare_iscsi(zhp) != 0) {
-			return (-1);
-		}
-
 		zc.zc_objset_type = DMU_OST_ZVOL;
 	} else {
 		zc.zc_objset_type = DMU_OST_ZFS;
@@ -3737,52 +3723,6 @@ zfs_expand_proplist(zfs_handle_t *zhp, zprop_list_t **plp, boolean_t received)
 	}
 
 	return (0);
-}
-
-int
-zfs_iscsi_perm_check(libzfs_handle_t *hdl, char *dataset, ucred_t *cred)
-{
-	zfs_cmd_t zc = { 0 };
-	nvlist_t *nvp;
-	gid_t gid;
-	uid_t uid;
-	const gid_t *groups;
-	int group_cnt;
-	int error;
-
-	if (nvlist_alloc(&nvp, NV_UNIQUE_NAME, 0) != 0)
-		return (no_memory(hdl));
-
-	uid = ucred_geteuid(cred);
-	gid = ucred_getegid(cred);
-	group_cnt = ucred_getgroups(cred, &groups);
-
-	if (uid == (uid_t)-1 || gid == (uid_t)-1 || group_cnt == (uid_t)-1)
-		return (1);
-
-	if (nvlist_add_uint32(nvp, ZFS_DELEG_PERM_UID, uid) != 0) {
-		nvlist_free(nvp);
-		return (1);
-	}
-
-	if (nvlist_add_uint32(nvp, ZFS_DELEG_PERM_GID, gid) != 0) {
-		nvlist_free(nvp);
-		return (1);
-	}
-
-	if (nvlist_add_uint32_array(nvp,
-	    ZFS_DELEG_PERM_GROUPS, (uint32_t *)groups, group_cnt) != 0) {
-		nvlist_free(nvp);
-		return (1);
-	}
-	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
-
-	if (zcmd_write_src_nvlist(hdl, &zc, nvp))
-		return (-1);
-
-	error = ioctl(hdl->libzfs_fd, ZFS_IOC_ISCSI_PERM_CHECK, &zc);
-	nvlist_free(nvp);
-	return (error);
 }
 
 int

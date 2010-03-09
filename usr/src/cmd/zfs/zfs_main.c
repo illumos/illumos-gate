@@ -3189,41 +3189,8 @@ share_mount_one(zfs_handle_t *zhp, int op, int flags, char *protocol,
 				return (1);
 			break;
 		}
-	} else {
+	} else
 		assert(op == OP_SHARE);
-
-		/*
-		 * Ignore any volumes that aren't shared.
-		 */
-		verify(zfs_prop_get(zhp, ZFS_PROP_SHAREISCSI, shareopts,
-		    sizeof (shareopts), NULL, NULL, 0, B_FALSE) == 0);
-
-		if (strcmp(shareopts, "off") == 0) {
-			if (!explicit)
-				return (0);
-
-			(void) fprintf(stderr, gettext("cannot share '%s': "
-			    "'shareiscsi' property not set\n"),
-			    zfs_get_name(zhp));
-			(void) fprintf(stderr, gettext("set 'shareiscsi' "
-			    "property or use iscsitadm(1M) to share this "
-			    "volume\n"));
-			return (1);
-		}
-
-		if (zfs_is_shared_iscsi(zhp)) {
-			if (!explicit)
-				return (0);
-
-			(void) fprintf(stderr, gettext("cannot share "
-			    "'%s': volume already shared\n"),
-			    zfs_get_name(zhp));
-			return (1);
-		}
-
-		if (zfs_share_iscsi(zhp) != 0)
-			return (1);
-	}
 
 	return (0);
 }
@@ -3345,11 +3312,9 @@ share_mount(int op, int argc, char **argv)
 			if (strcmp(argv[0], "nfs") == 0 ||
 			    strcmp(argv[0], "smb") == 0) {
 				types = ZFS_TYPE_FILESYSTEM;
-			} else if (strcmp(argv[0], "iscsi") == 0) {
-				types = ZFS_TYPE_VOLUME;
 			} else {
 				(void) fprintf(stderr, gettext("share type "
-				    "must be 'nfs', 'smb' or 'iscsi'\n"));
+				    "must be 'nfs' or 'smb'\n"));
 				usage(B_FALSE);
 			}
 			protocol = argv[0];
@@ -3432,7 +3397,7 @@ share_mount(int op, int argc, char **argv)
 }
 
 /*
- * zfs mount -a [nfs | iscsi]
+ * zfs mount -a [nfs]
  * zfs mount filesystem
  *
  * Mount all filesystems, or mount the given filesystem.
@@ -3444,7 +3409,7 @@ zfs_do_mount(int argc, char **argv)
 }
 
 /*
- * zfs share -a [nfs | iscsi | smb]
+ * zfs share -a [nfs | smb]
  * zfs share filesystem
  *
  * Share all filesystems, or share the given filesystem.
@@ -3600,7 +3565,7 @@ unshare_unmount(int op, int argc, char **argv)
 	int ret = 0;
 	int types, c;
 	zfs_handle_t *zhp;
-	char nfsiscsi_mnt_prop[ZFS_MAXPROPLEN];
+	char nfs_mnt_prop[ZFS_MAXPROPLEN];
 	char sharesmb[ZFS_MAXPROPLEN];
 
 	/* check options */
@@ -3685,25 +3650,25 @@ unshare_unmount(int op, int argc, char **argv)
 			switch (op) {
 			case OP_SHARE:
 				verify(zfs_prop_get(zhp, ZFS_PROP_SHARENFS,
-				    nfsiscsi_mnt_prop,
-				    sizeof (nfsiscsi_mnt_prop),
+				    nfs_mnt_prop,
+				    sizeof (nfs_mnt_prop),
 				    NULL, NULL, 0, B_FALSE) == 0);
-				if (strcmp(nfsiscsi_mnt_prop, "off") != 0)
+				if (strcmp(nfs_mnt_prop, "off") != 0)
 					break;
 				verify(zfs_prop_get(zhp, ZFS_PROP_SHARESMB,
-				    nfsiscsi_mnt_prop,
-				    sizeof (nfsiscsi_mnt_prop),
+				    nfs_mnt_prop,
+				    sizeof (nfs_mnt_prop),
 				    NULL, NULL, 0, B_FALSE) == 0);
-				if (strcmp(nfsiscsi_mnt_prop, "off") == 0)
+				if (strcmp(nfs_mnt_prop, "off") == 0)
 					continue;
 				break;
 			case OP_MOUNT:
 				/* Ignore legacy mounts */
 				verify(zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT,
-				    nfsiscsi_mnt_prop,
-				    sizeof (nfsiscsi_mnt_prop),
+				    nfs_mnt_prop,
+				    sizeof (nfs_mnt_prop),
 				    NULL, NULL, 0, B_FALSE) == 0);
-				if (strcmp(nfsiscsi_mnt_prop, "legacy") == 0)
+				if (strcmp(nfs_mnt_prop, "legacy") == 0)
 					continue;
 				/* Ignore canmount=noauto mounts */
 				if (zfs_prop_get_int(zhp, ZFS_PROP_CANMOUNT) ==
@@ -3771,29 +3736,6 @@ unshare_unmount(int op, int argc, char **argv)
 		uu_avl_destroy(tree);
 		uu_avl_pool_destroy(pool);
 
-		if (op == OP_SHARE) {
-			/*
-			 * Finally, unshare any volumes shared via iSCSI.
-			 */
-			zfs_handle_t **dslist = NULL;
-			size_t i, count = 0;
-
-			get_all_datasets(ZFS_TYPE_VOLUME, &dslist, &count,
-			    B_FALSE);
-
-			if (count != 0) {
-				qsort(dslist, count, sizeof (void *),
-				    dataset_cmp);
-
-				for (i = 0; i < count; i++) {
-					if (zfs_unshare_iscsi(dslist[i]) != 0)
-						ret = 1;
-					zfs_close(dslist[i]);
-				}
-
-				free(dslist);
-			}
-		}
 	} else {
 		if (argc != 1) {
 			if (argc == 0)
@@ -3825,20 +3767,20 @@ unshare_unmount(int op, int argc, char **argv)
 		if (zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM) {
 			verify(zfs_prop_get(zhp, op == OP_SHARE ?
 			    ZFS_PROP_SHARENFS : ZFS_PROP_MOUNTPOINT,
-			    nfsiscsi_mnt_prop, sizeof (nfsiscsi_mnt_prop), NULL,
+			    nfs_mnt_prop, sizeof (nfs_mnt_prop), NULL,
 			    NULL, 0, B_FALSE) == 0);
 
 			switch (op) {
 			case OP_SHARE:
 				verify(zfs_prop_get(zhp, ZFS_PROP_SHARENFS,
-				    nfsiscsi_mnt_prop,
-				    sizeof (nfsiscsi_mnt_prop),
+				    nfs_mnt_prop,
+				    sizeof (nfs_mnt_prop),
 				    NULL, NULL, 0, B_FALSE) == 0);
 				verify(zfs_prop_get(zhp, ZFS_PROP_SHARESMB,
 				    sharesmb, sizeof (sharesmb), NULL, NULL,
 				    0, B_FALSE) == 0);
 
-				if (strcmp(nfsiscsi_mnt_prop, "off") == 0 &&
+				if (strcmp(nfs_mnt_prop, "off") == 0 &&
 				    strcmp(sharesmb, "off") == 0) {
 					(void) fprintf(stderr, gettext("cannot "
 					    "unshare '%s': legacy share\n"),
@@ -3858,7 +3800,7 @@ unshare_unmount(int op, int argc, char **argv)
 				break;
 
 			case OP_MOUNT:
-				if (strcmp(nfsiscsi_mnt_prop, "legacy") == 0) {
+				if (strcmp(nfs_mnt_prop, "legacy") == 0) {
 					(void) fprintf(stderr, gettext("cannot "
 					    "unmount '%s': legacy "
 					    "mountpoint\n"), zfs_get_name(zhp));
@@ -3876,29 +3818,6 @@ unshare_unmount(int op, int argc, char **argv)
 					ret = 1;
 				}
 				break;
-			}
-		} else {
-			assert(op == OP_SHARE);
-
-			verify(zfs_prop_get(zhp, ZFS_PROP_SHAREISCSI,
-			    nfsiscsi_mnt_prop, sizeof (nfsiscsi_mnt_prop),
-			    NULL, NULL, 0, B_FALSE) == 0);
-
-			if (strcmp(nfsiscsi_mnt_prop, "off") == 0) {
-				(void) fprintf(stderr, gettext("cannot unshare "
-				    "'%s': 'shareiscsi' property not set\n"),
-				    zfs_get_name(zhp));
-				(void) fprintf(stderr, gettext("set "
-				    "'shareiscsi' property or use "
-				    "iscsitadm(1M) to share this volume\n"));
-				ret = 1;
-			} else if (!zfs_is_shared_iscsi(zhp)) {
-				(void) fprintf(stderr, gettext("cannot "
-				    "unshare '%s': not currently shared\n"),
-				    zfs_get_name(zhp));
-				ret = 1;
-			} else if (zfs_unshare_iscsi(zhp) != 0) {
-				ret = 1;
 			}
 		}
 

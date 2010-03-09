@@ -644,21 +644,9 @@ usr/include/libdscp.h		sparc
 #
 # These files are used by the iSCSI Target and the iSCSI Initiator
 #
-usr/include/iscsitgt_impl.h
-usr/include/libiscsitgt.h
 usr/include/sys/iscsi_protocol.h
 usr/include/sys/iscsi_authclient.h
 usr/include/sys/iscsi_authclientglue.h
-usr/lib/libiscsitgt.so
-usr/lib/amd64/libiscsitgt.so		i386
-usr/lib/sparcv9/libiscsitgt.so		sparc
-lib/libiscsitgt.so
-lib/amd64/libiscsitgt.so		i386
-lib/sparcv9/libiscsitgt.so		sparc
-lib/llib-liscsitgt
-lib/llib-liscsitgt.ln
-lib/amd64/llib-liscsitgt.ln		i386
-lib/sparcv9/llib-liscsitgt.ln		sparc
 #
 # These files are used by the COMSTAR iSCSI target port provider
 #

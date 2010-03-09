@@ -194,7 +194,6 @@ file path=usr/lib/help/auths/locale/SmfValueHeader.html
 file path=usr/lib/help/auths/locale/SmfValueIPsec.html
 file path=usr/lib/help/auths/locale/SmfValueIdmap.html
 file path=usr/lib/help/auths/locale/SmfValueInetd.html
-file path=usr/lib/help/auths/locale/SmfValueIscsitgt.html
 file path=usr/lib/help/auths/locale/SmfValueMDNS.html
 file path=usr/lib/help/auths/locale/SmfValueMMS.html
 file path=usr/lib/help/auths/locale/SmfValueNADD.html

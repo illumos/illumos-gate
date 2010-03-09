@@ -44,17 +44,14 @@
  *
  * 	zfs_is_shared_nfs()
  * 	zfs_is_shared_smb()
- * 	zfs_is_shared_iscsi()
  * 	zfs_share_proto()
  * 	zfs_shareall();
- * 	zfs_share_iscsi()
  * 	zfs_unshare_nfs()
  * 	zfs_unshare_smb()
  * 	zfs_unshareall_nfs()
  *	zfs_unshareall_smb()
  *	zfs_unshareall()
  *	zfs_unshareall_bypath()
- * 	zfs_unshare_iscsi()
  *
  * The following functions are available for pool consumers, and will
  * mount/unmount and share/unshare all datasets within pool:
@@ -89,11 +86,6 @@ static int zfs_share_proto(zfs_handle_t *, zfs_share_proto_t *);
 zfs_share_type_t zfs_is_shared_proto(zfs_handle_t *, char **,
     zfs_share_proto_t);
 
-static int (*iscsitgt_zfs_share)(const char *);
-static int (*iscsitgt_zfs_unshare)(const char *);
-static int (*iscsitgt_zfs_is_shared)(const char *);
-static int (*iscsitgt_svc_online)();
-
 /*
  * The share protocols table must be in the same order as the zfs_share_prot_t
  * enum in libzfs_impl.h
@@ -124,29 +116,6 @@ zfs_share_proto_t share_all_proto[] = {
 	PROTO_SMB,
 	PROTO_END
 };
-
-#pragma init(zfs_iscsi_init)
-static void
-zfs_iscsi_init(void)
-{
-	void *libiscsitgt;
-
-	if ((libiscsitgt = dlopen("/lib/libiscsitgt.so.1",
-	    RTLD_LAZY | RTLD_GLOBAL)) == NULL ||
-	    (iscsitgt_zfs_share = (int (*)(const char *))dlsym(libiscsitgt,
-	    "iscsitgt_zfs_share")) == NULL ||
-	    (iscsitgt_zfs_unshare = (int (*)(const char *))dlsym(libiscsitgt,
-	    "iscsitgt_zfs_unshare")) == NULL ||
-	    (iscsitgt_zfs_is_shared = (int (*)(const char *))dlsym(libiscsitgt,
-	    "iscsitgt_zfs_is_shared")) == NULL ||
-	    (iscsitgt_svc_online = (int (*)(const char *))dlsym(libiscsitgt,
-	    "iscsitgt_svc_online")) == NULL) {
-		iscsitgt_zfs_share = NULL;
-		iscsitgt_zfs_unshare = NULL;
-		iscsitgt_zfs_is_shared = NULL;
-		iscsitgt_svc_online = NULL;
-	}
-}
 
 /*
  * Search the sharetab for the given mountpoint and protocol, returning
@@ -455,7 +424,7 @@ zfs_is_shared(zfs_handle_t *zhp)
 	zfs_share_proto_t *curr_proto;
 
 	if (ZFS_IS_VOLUME(zhp))
-		return (zfs_is_shared_iscsi(zhp));
+		return (B_FALSE);
 
 	for (curr_proto = share_all_proto; *curr_proto != PROTO_END;
 	    curr_proto++)
@@ -468,7 +437,7 @@ int
 zfs_share(zfs_handle_t *zhp)
 {
 	if (ZFS_IS_VOLUME(zhp))
-		return (zfs_share_iscsi(zhp));
+		return (0);
 
 	return (zfs_share_proto(zhp, share_all_proto));
 }
@@ -477,7 +446,7 @@ int
 zfs_unshare(zfs_handle_t *zhp)
 {
 	if (ZFS_IS_VOLUME(zhp))
-		return (zfs_unshare_iscsi(zhp));
+		return (0);
 
 	return (zfs_unshareall(zhp));
 }
@@ -1009,81 +978,6 @@ remove_mountpoint(zfs_handle_t *zhp)
 	}
 }
 
-boolean_t
-zfs_is_shared_iscsi(zfs_handle_t *zhp)
-{
-
-	/*
-	 * If iscsi deamon isn't running then we aren't shared
-	 */
-	if (iscsitgt_svc_online && iscsitgt_svc_online() == 1)
-		return (B_FALSE);
-	else
-		return (iscsitgt_zfs_is_shared != NULL &&
-		    iscsitgt_zfs_is_shared(zhp->zfs_name) != 0);
-}
-
-int
-zfs_share_iscsi(zfs_handle_t *zhp)
-{
-	char shareopts[ZFS_MAXPROPLEN];
-	const char *dataset = zhp->zfs_name;
-	libzfs_handle_t *hdl = zhp->zfs_hdl;
-
-	/*
-	 * Return success if there are no share options.
-	 */
-	if (zfs_prop_get(zhp, ZFS_PROP_SHAREISCSI, shareopts,
-	    sizeof (shareopts), NULL, NULL, 0, B_FALSE) != 0 ||
-	    strcmp(shareopts, "off") == 0)
-		return (0);
-
-	if (iscsitgt_zfs_share == NULL || iscsitgt_zfs_share(dataset) != 0) {
-		int error = EZFS_SHAREISCSIFAILED;
-
-		/*
-		 * If service isn't availabele and EPERM was
-		 * returned then use special error.
-		 */
-		if (iscsitgt_svc_online && errno == EPERM &&
-		    (iscsitgt_svc_online() != 0))
-			error = EZFS_ISCSISVCUNAVAIL;
-
-		return (zfs_error_fmt(hdl, error,
-		    dgettext(TEXT_DOMAIN, "cannot share '%s'"), dataset));
-	}
-
-	return (0);
-}
-
-int
-zfs_unshare_iscsi(zfs_handle_t *zhp)
-{
-	const char *dataset = zfs_get_name(zhp);
-	libzfs_handle_t *hdl = zhp->zfs_hdl;
-
-	/*
-	 * Return if the volume is not shared
-	 */
-	if (zfs_is_shared_iscsi(zhp) != SHARED_ISCSI)
-		return (0);
-
-	/*
-	 * If this fails with ENODEV it indicates that zvol wasn't shared so
-	 * we should return success in that case.
-	 */
-	if (iscsitgt_zfs_unshare == NULL ||
-	    (iscsitgt_zfs_unshare(dataset) != 0 && errno != ENODEV)) {
-		if (errno == EPERM)
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "Insufficient privileges to unshare iscsi"));
-		return (zfs_error_fmt(hdl, EZFS_UNSHAREISCSIFAILED,
-		    dgettext(TEXT_DOMAIN, "cannot unshare '%s'"), dataset));
-	}
-
-	return (0);
-}
-
 typedef struct mount_cbdata {
 	zfs_handle_t	**cb_datasets;
 	int 		cb_used;
@@ -1225,21 +1119,6 @@ out:
 	return (ret);
 }
 
-/*ARGSUSED1*/
-static int
-zvol_cb(zfs_handle_t *zhp, void *unused)
-{
-	int error = 0;
-
-	if (zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM)
-		(void) zfs_iter_children(zhp, zvol_cb, NULL);
-	if (zfs_get_type(zhp) == ZFS_TYPE_VOLUME)
-		error = zfs_unshare_iscsi(zhp);
-	zfs_close(zhp);
-
-	return (error);
-}
-
 static int
 mountpoint_compare(const void *a, const void *b)
 {
@@ -1265,22 +1144,11 @@ zpool_disable_datasets(zpool_handle_t *zhp, boolean_t force)
 	struct mnttab entry;
 	size_t namelen;
 	char **mountpoints = NULL;
-	zfs_handle_t *zfp;
 	zfs_handle_t **datasets = NULL;
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
 	int i;
 	int ret = -1;
 	int flags = (force ? MS_FORCE : 0);
-
-	/*
-	 * First unshare all zvols.
-	 */
-	zfp = zfs_open(zhp->zpool_hdl, zhp->zpool_name,
-	    ZFS_TYPE_FILESYSTEM);
-	if (zfp != NULL) {
-		(void) zfs_iter_children(zfp, zvol_cb, NULL);
-		zfs_close(zfp);
-	}
 
 	namelen = strlen(zhp->zpool_name);
 

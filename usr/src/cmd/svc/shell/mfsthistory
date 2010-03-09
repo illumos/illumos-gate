@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 # This file is for historical purposes only, and should not be modified.
@@ -371,8 +371,6 @@ svc:/system/nws_ii:default var/svc/manifest/system/nws_ii.xml
 svc:/system/nws_ii var/svc/manifest/system/nws_ii.xml
 svc:/network/ipmievd:default var/svc/manifest/network/ipmievd.xml
 svc:/network/ipmievd var/svc/manifest/network/ipmievd.xml
-svc:/system/iscsitgt:default var/svc/manifest/system/iscsi_target.xml
-svc:/system/iscsitgt var/svc/manifest/system/iscsi_target.xml
 svc:/network/isns_server:default var/svc/manifest/network/isns_server.xml
 svc:/network/isns_server var/svc/manifest/network/isns_server.xml
 svc:/application/wnn8/server:default var/svc/manifest/application/wnn8/wnn8-server.xml

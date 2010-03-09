@@ -91,7 +91,6 @@ typedef enum {
 	ZFS_PROP_CREATETXG,		/* not exposed to the user */
 	ZFS_PROP_NAME,			/* not exposed to the user */
 	ZFS_PROP_CANMOUNT,
-	ZFS_PROP_SHAREISCSI,
 	ZFS_PROP_ISCSIOPTIONS,		/* not exposed to the user */
 	ZFS_PROP_XATTR,
 	ZFS_PROP_NUMCLONES,		/* not exposed to the user */
@@ -707,7 +706,6 @@ typedef enum zfs_ioc {
 	ZFS_IOC_POOL_GET_PROPS,
 	ZFS_IOC_SET_FSACL,
 	ZFS_IOC_GET_FSACL,
-	ZFS_IOC_ISCSI_PERM_CHECK,
 	ZFS_IOC_SHARE,
 	ZFS_IOC_INHERIT_PROP,
 	ZFS_IOC_SMB_ACL,

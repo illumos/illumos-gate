@@ -106,7 +106,6 @@ HTMLENTS = \
 	SmfValueHeader.html \
 	SmfValueInetd.html \
 	SmfValueIPsec.html \
-	SmfValueIscsitgt.html \
 	SmfValueMDNS.html \
 	SmfValueNADD.html \
 	SmfValueNDMP.html \

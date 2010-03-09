@@ -2888,8 +2888,7 @@ iscsit_config_merge(it_config_t *in_cfg)
  * Compare serial numbers using serial number arithmetic as defined in
  * RFC 1982.
  *
- * NOTE: This code is duplicated in the isns server as well as iscsitgtd.  It
- * ought to be common.
+ * NOTE: This code is duplicated in the isns server. It ought to be common.
  */
 
 static int

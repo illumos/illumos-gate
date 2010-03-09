@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -117,7 +117,6 @@ MANIFEST_SUBDIRS=			\
 	hostid/smf			\
 	idmap/idmapd			\
 	ipf/svc				\
-	iscsi/iscsitgtd			\
 	isns/isnsd			\
 	krb5/kadmin/server		\
 	krb5/krb5kdc			\

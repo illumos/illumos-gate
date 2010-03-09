@@ -136,10 +136,6 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "smb remove share failed"));
 	case EZFS_SHARESMBFAILED:
 		return (dgettext(TEXT_DOMAIN, "smb add share failed"));
-	case EZFS_ISCSISVCUNAVAIL:
-		return (dgettext(TEXT_DOMAIN,
-		    "iscsitgt service need to be enabled by "
-		    "a privileged user"));
 	case EZFS_PERM:
 		return (dgettext(TEXT_DOMAIN, "permission denied"));
 	case EZFS_NOSPC:
@@ -159,12 +155,6 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "recursive dataset dependency"));
 	case EZFS_NOHISTORY:
 		return (dgettext(TEXT_DOMAIN, "no history available"));
-	case EZFS_UNSHAREISCSIFAILED:
-		return (dgettext(TEXT_DOMAIN,
-		    "iscsitgtd failed request to unshare"));
-	case EZFS_SHAREISCSIFAILED:
-		return (dgettext(TEXT_DOMAIN,
-		    "iscsitgtd failed request to share"));
 	case EZFS_POOLPROPS:
 		return (dgettext(TEXT_DOMAIN, "failed to retrieve "
 		    "pool properties"));

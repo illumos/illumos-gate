@@ -1216,8 +1216,6 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_GET_FSACL,		"ZFS_IOC_GET_FSACL",
 		"zfs_cmd_t" },
-	{ (uint_t)ZFS_IOC_ISCSI_PERM_CHECK,	"ZFS_IOC_ISCSI_PERM_CHECK",
-		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_SHARE,		"ZFS_IOC_SHARE",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_INHERIT_PROP,		"ZFS_IOC_INHERIT_PROP",

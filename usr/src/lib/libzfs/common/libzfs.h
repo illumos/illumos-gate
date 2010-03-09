@@ -93,8 +93,6 @@ enum {
 	EZFS_INVALCONFIG,	/* invalid vdev configuration */
 	EZFS_RECURSIVE,		/* recursive dependency */
 	EZFS_NOHISTORY,		/* no history object */
-	EZFS_UNSHAREISCSIFAILED, /* iscsitgtd failed request to unshare */
-	EZFS_SHAREISCSIFAILED,	/* iscsitgtd failed request to share */
 	EZFS_POOLPROPS,		/* couldn't retrieve pool props */
 	EZFS_POOL_NOTSUP,	/* ops not supported for this type of pool */
 	EZFS_POOL_INVALARG,	/* invalid argument for this pool operation */
@@ -102,7 +100,6 @@ enum {
 	EZFS_OPENFAILED,	/* open of device failed */
 	EZFS_NOCAP,		/* couldn't get capacity */
 	EZFS_LABELFAILED,	/* write of label failed */
-	EZFS_ISCSISVCUNAVAIL,	/* iscsi service unavailable */
 	EZFS_BADWHO,		/* invalid permission who */
 	EZFS_BADPERM,		/* invalid permission */
 	EZFS_BADPERMSET,	/* invalid permission set name */
@@ -621,10 +618,6 @@ extern int zfs_unshareall_nfs(zfs_handle_t *);
 extern int zfs_unshareall_smb(zfs_handle_t *);
 extern int zfs_unshareall_bypath(zfs_handle_t *, const char *);
 extern int zfs_unshareall(zfs_handle_t *);
-extern boolean_t zfs_is_shared_iscsi(zfs_handle_t *);
-extern int zfs_share_iscsi(zfs_handle_t *);
-extern int zfs_unshare_iscsi(zfs_handle_t *);
-extern int zfs_iscsi_perm_check(libzfs_handle_t *, char *, ucred_t *);
 extern int zfs_deleg_share_nfs(libzfs_handle_t *, char *, char *, char *,
     void *, void *, int, zfs_share_op_t);
 

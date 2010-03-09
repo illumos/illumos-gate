@@ -1532,6 +1532,7 @@ smf_obsolete_manifests="
 	var/svc/manifest/network/iscsi_initiator.xml
 	var/svc/manifest/network/fcoe_config.xml
 	var/svc/manifest/network/rpc/ocfserv.xml
+	var/svc/manifest/system/iscsi_target.xml
 "
 
 # smf services whose manifests have been renamed
@@ -1555,6 +1556,7 @@ smf_obsolete_methods="
 	lib/svc/share/krb_include.sh
 	lib/svc/method/iscsid
 	lib/svc/method/fcoeconfig
+	lib/svc/method/svc-iscsitgt
 "
 
 smf_cleanup () {
@@ -4074,6 +4076,59 @@ SUNWocfr SUNWpamsc SUNWscmhdlr'
 		$root/platform/sun4u/kernel/drv/sparcv9/scmi2c
 
 	printf 'done.\n'
+}
+
+#
+# Remove iSCSI Target Daemon
+#
+remove_eof_iscsitgtd()
+{
+	# Packages to remove
+	typeset -r iscsitgtd_pkgs='SUNWiscsitgtu SUNWiscsitgtr'
+	typeset pkg
+
+	printf 'Removing iSCSI Target Daemon... '
+
+	#
+	# First, attempt to remove the packages cleanly if possible.
+	#
+	for pkg in $iscsitgtd_pkgs
+	do
+		if pkginfo $pkgroot -q $pkg; then
+			printf ' %s' $pkg
+			pkgrm $pkgroot -n $pkg >/dev/null 2>&1
+		fi
+	done
+	printf '\n'
+
+	#
+	# In case that didn't work, do it manually.
+	# Remove iSCSI Target Daemon from $rootprefix/var/sadm/install/contents
+	#
+	for pkg in $iscsitgtd_pkgs
+	do
+		if [ -d $rootprefix/var/sadm/pkg/$pkg ]; then
+			rm -rf $rootprefix/var/sadm/pkg/$pkg
+			grep -vw $pkg $rootprefix/var/sadm/install/contents > \
+			    /tmp/contents.$$
+			cp /tmp/contents.$$ $rootprefix/var/sadm/install/contents.$$
+			rm /tmp/contents.$$
+		fi
+	done
+
+	#
+	# Cleanup if any remaining files, symlinks, and directories.
+	#
+	rm -f $usr/sbin/iscsitadm
+	rm -f $usr/sbin/amd64/iscsitgtd
+	rm -f $usr/sbin/i86/iscsitgtd
+	rm -f $usr/sbin/sparv9/iscsitgtd
+	rm -f $usr/sbin/iscsitgtd
+	rm -f $usr/lib/dtrace/iscsi.d
+	rm -f $usr/lib/amd64/libiscsitgt.so.1
+	rm -f $usr/lib/sparcv9/libiscsitgt.so.1
+	rm -f $usr/lib/libiscsitgt.so.1
+	rm -f $usr/svc/method/svc-iscsitgt
 }
 
 remove_properties() {
@@ -6840,6 +6895,13 @@ mondo_loop() {
 	if [[ -f $rootprefix/etc/init.d/mipagent || \
 	    -f $rootprefix/usr/lib/inet/mipagent ]]; then
 		remove_eof_mobileip
+	fi
+
+	#
+	# Remove obsolete iSCSI Target Daemon software
+	#
+	if [ -f $usr/sbin/iscsitadm ]; then
+		remove_eof_iscsitgtd
 	fi
 
 	#

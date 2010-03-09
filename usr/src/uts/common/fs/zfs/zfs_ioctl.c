@@ -625,16 +625,6 @@ zfs_secpolicy_destroy_snaps(zfs_cmd_t *zc, cred_t *cr)
 	return (error);
 }
 
-/*
- * Must have sys_config privilege to check the iscsi permission
- */
-/* ARGSUSED */
-static int
-zfs_secpolicy_iscsi(zfs_cmd_t *zc, cred_t *cr)
-{
-	return (secpolicy_zfs(cr));
-}
-
 int
 zfs_secpolicy_rename_perms(const char *from, const char *to, cred_t *cr)
 {
@@ -2420,53 +2410,6 @@ zfs_ioc_pool_get_props(zfs_cmd_t *zc)
 		error = EFAULT;
 
 	nvlist_free(nvp);
-	return (error);
-}
-
-static int
-zfs_ioc_iscsi_perm_check(zfs_cmd_t *zc)
-{
-	nvlist_t *nvp;
-	int error;
-	uint32_t uid;
-	uint32_t gid;
-	uint32_t *groups;
-	uint_t group_cnt;
-	cred_t	*usercred;
-
-	if ((error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
-	    zc->zc_iflags, &nvp)) != 0) {
-		return (error);
-	}
-
-	if ((error = nvlist_lookup_uint32(nvp,
-	    ZFS_DELEG_PERM_UID, &uid)) != 0) {
-		nvlist_free(nvp);
-		return (EPERM);
-	}
-
-	if ((error = nvlist_lookup_uint32(nvp,
-	    ZFS_DELEG_PERM_GID, &gid)) != 0) {
-		nvlist_free(nvp);
-		return (EPERM);
-	}
-
-	if ((error = nvlist_lookup_uint32_array(nvp, ZFS_DELEG_PERM_GROUPS,
-	    &groups, &group_cnt)) != 0) {
-		nvlist_free(nvp);
-		return (EPERM);
-	}
-	usercred = cralloc();
-	if ((crsetugid(usercred, uid, gid) != 0) ||
-	    (crsetgroups(usercred, group_cnt, (gid_t *)groups) != 0)) {
-		nvlist_free(nvp);
-		crfree(usercred);
-		return (EPERM);
-	}
-	nvlist_free(nvp);
-	error = dsl_deleg_access(zc->zc_name,
-	    zfs_prop_to_name(ZFS_PROP_SHAREISCSI), usercred);
-	crfree(usercred);
 	return (error);
 }
 
@@ -4357,8 +4300,6 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_set_fsacl, zfs_secpolicy_fsacl, DATASET_NAME, B_TRUE,
 	    B_TRUE },
 	{ zfs_ioc_get_fsacl, zfs_secpolicy_read, DATASET_NAME, B_FALSE,
-	    B_FALSE },
-	{ zfs_ioc_iscsi_perm_check, zfs_secpolicy_iscsi, DATASET_NAME, B_FALSE,
 	    B_FALSE },
 	{ zfs_ioc_share, zfs_secpolicy_share, DATASET_NAME, B_FALSE, B_FALSE },
 	{ zfs_ioc_inherit_prop, zfs_secpolicy_inherit, DATASET_NAME, B_TRUE,

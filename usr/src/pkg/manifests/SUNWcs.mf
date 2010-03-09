@@ -992,7 +992,6 @@ file path=usr/lib/help/auths/locale/C/SmfValueHeader.html
 file path=usr/lib/help/auths/locale/C/SmfValueIPsec.html
 file path=usr/lib/help/auths/locale/C/SmfValueIdmap.html
 file path=usr/lib/help/auths/locale/C/SmfValueInetd.html
-file path=usr/lib/help/auths/locale/C/SmfValueIscsitgt.html
 file path=usr/lib/help/auths/locale/C/SmfValueMDNS.html
 file path=usr/lib/help/auths/locale/C/SmfValueMMS.html
 file path=usr/lib/help/auths/locale/C/SmfValueNADD.html

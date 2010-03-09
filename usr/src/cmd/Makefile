@@ -207,7 +207,6 @@ COMMON_SUBDIRS=		\
 	ipf		\
 	isainfo		\
 	isalist		\
-	iscsi		\
 	itutools	\
 	iscsiadm	\
 	iscsid		\
@@ -599,7 +598,6 @@ MSGSUBDIRS=		\
 	id		\
 	idmap		\
 	isaexec		\
-	iscsi		\
 	iscsiadm	\
 	iscsid		\
 	isns		\
