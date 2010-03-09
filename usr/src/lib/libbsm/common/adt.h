@@ -21,7 +21,7 @@
 /*
  * adt.h
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This is a contract private interface and is subject to change
@@ -103,12 +103,6 @@ extern	size_t	adt_get_session_id(const adt_session_data_t *, char **);
 
 extern	size_t	adt_export_session_data(const adt_session_data_t *,
 		    adt_export_data_t **);
-extern	size_t	adt_import_proc(pid_t pid,
-		    uid_t euid,
-		    gid_t egid,
-		    uid_t ruid,
-		    gid_t rgid,
-		    adt_export_data_t **external);
 
 extern	adt_event_data_t
 		*adt_alloc_event(const adt_session_data_t *, au_event_t);
