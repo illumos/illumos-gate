@@ -21,7 +21,7 @@
 /*
  * adt_xlate.h
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -206,7 +206,7 @@ struct adt_internal_state {
 
 	uint32_t		as_have_user_data;
 
-	int			as_kernel_audit_policy;
+	uint32_t		as_kernel_audit_policy;
 	int			as_session_model;
 	adt_session_flags_t	as_flags;
 	pid_t			as_pid;

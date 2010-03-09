@@ -294,7 +294,7 @@ is_audit_control_ok(char *filename) {
 static boolean_t
 is_valid_zone(boolean_t show_err)
 {
-	long	policy;
+	uint32_t	policy;
 
 	if (auditon(A_GETPOLICY, (char *)&policy, 0) == -1) {
 		(void) fprintf(stderr, gettext(

@@ -1249,8 +1249,8 @@ s10_acctctl(sysret_t *rval, int cmd, void *buf, size_t bufsz)
 int
 s10_auditsys(sysret_t *rval, int bsmcmd, intptr_t a0, intptr_t a1, intptr_t a2)
 {
-	int	err;
-	uint_t	m;
+	int	    err;
+	uint32_t    m;
 
 	if (bsmcmd != BSM_AUDITCTL)
 		return (__systemcall(rval, SYS_auditsys + 1024, bsmcmd, a0, a1,

@@ -599,7 +599,7 @@ loadauditlist()
 	int		acresult;
 	int		wait_count = 0;
 	kva_t		*kvlist;
-	long		policy;
+	uint32_t	policy;
 	int		cnt_flag;
 	struct au_qctrl	kqmax;
 	au_acinfo_t	*ach = NULL;

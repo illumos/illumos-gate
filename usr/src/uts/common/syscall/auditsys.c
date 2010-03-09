@@ -35,7 +35,7 @@
 
 extern kmutex_t pidlock;
 
-int audit_policy; /* global audit policies in force */
+uint32_t audit_policy; /* global audit policies in force */
 
 
 /*ARGSUSED1*/
@@ -406,12 +406,12 @@ setaudit_addr(caddr_t info_p, int len)
 static int
 getpolicy(caddr_t data)
 {
-	int	policy;
+	uint32_t	policy;
 	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	policy = audit_policy | kctx->auk_policy;
 
-	if (copyout(&policy, data, sizeof (int)))
+	if (copyout(&policy, data, sizeof (policy)))
 		return (EFAULT);
 	return (0);
 }
@@ -437,10 +437,10 @@ getpolicy(caddr_t data)
 static int
 setpolicy(caddr_t data)
 {
-	int	policy;
+	uint32_t	policy;
 	au_kcontext_t	*kctx;
 
-	if (copyin(data, &policy, sizeof (int)))
+	if (copyin(data, &policy, sizeof (policy)))
 		return (EFAULT);
 
 	kctx = GET_KCTX_NGZ;

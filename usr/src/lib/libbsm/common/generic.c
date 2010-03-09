@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,7 +68,7 @@ static char		*aug_text2;	/* misc text to be written to trail */
 static au_asid_t	aug_asid;	/* asid of process writing record */
 static int 		(*aug_afunc)();	/* write additional tokens if needed */
 static char		*aug_path;	/* path token */
-static int		aug_policy;	/* kernel audit policy */
+static uint32_t		aug_policy;	/* kernel audit policy */
 
 /*
  * cannot_audit:
@@ -377,7 +377,7 @@ aug_save_path(char *s)
 int
 aug_save_policy()
 {
-	int policy;
+	uint32_t policy;
 
 	if (auditon(A_GETPOLICY, (caddr_t)&policy, sizeof (policy))) {
 		return (-1);

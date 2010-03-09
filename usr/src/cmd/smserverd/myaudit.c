@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,7 +78,7 @@ can_audit(void)
 static int
 audit_save_policy(door_data_t *door_dp)
 {
-	int policy;
+	uint32_t policy;
 
 	if (auditon(A_GETPOLICY, (caddr_t)&policy, sizeof (policy))) {
 		return (-1);

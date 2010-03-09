@@ -89,7 +89,7 @@ audit_allocate_record(status)
 {
 	auditinfo_addr_t mask;		/* audit ID */
 	au_event_t	event;		/* audit event number */
-	int		policy;		/* audit policy */
+	uint32_t	policy;		/* audit policy */
 	int		ng;		/* number of groups in process */
 
 #ifdef DEBUG

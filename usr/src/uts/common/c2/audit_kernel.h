@@ -307,7 +307,7 @@ struct au_kcontext {
 	int			auk_auditstate;
 	int			auk_output_active;
 	struct vnode		*auk_current_vp;
-	int			auk_policy;
+	uint32_t		auk_policy;
 
 	struct audit_queue	auk_queue;
 
@@ -337,7 +337,7 @@ extern zone_key_t au_zone_key;
 /*
  * Kernel auditing external variables
  */
-extern int audit_policy;
+extern uint32_t audit_policy;
 extern int audit_active;
 
 extern struct audit_queue au_queue;
