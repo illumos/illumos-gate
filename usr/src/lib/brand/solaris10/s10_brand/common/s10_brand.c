@@ -1772,7 +1772,11 @@ s10_close_fh(FILE *file)
 	if ((fd = fileno(file)) < 0)
 		return;
 
-	fd_new = dup(fd);
+	/*
+	 * We're a branded process but our handler isn't installed yet.  We
+	 * can't use the dup() syscall since it no longer exists.
+	 */
+	fd_new = fcntl(fd, F_DUPFD, 0);
 	if (fd_new == -1)
 		return;
 
