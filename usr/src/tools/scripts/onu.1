@@ -25,9 +25,9 @@
 .I onu
 \- Os/Net Update
 .SH SYNOPSIS
-\fBonu [-e <URI> [-E <publisher>]] [ -O ] [-s <beName>] -t <beName> [-u <URI> [-U <publisher>]] [-v]\fP
+\fBonu [-e <URI> [-E <publisher>]] [ -O ] [-s <beName>] -t <beName> [-u <URI> [-U <publisher>]] [-vZ]\fP
 .br
-\fBonu [-d <dir>] [ -O ] [-s <beName>] -t <beName> [-v]\fP
+\fBonu [-d <dir>] [ -O ] [-s <beName>] -t <beName> [-vZ]\fP
 .LP
 .SH DESCRIPTION
 .IX "OS-Net build tools" "onu" "" "\fBonu\fP"
@@ -85,6 +85,9 @@ the packaging repository.  See \fBONPUB\fP below for default values.
 .TP 4
 .B \-v
 Verbose mode.
+.TP 4
+.B \-Z
+Do not update any installed zones.
 .SH EXIT STATUS
 .LP
 The following exit values are returned:
@@ -128,6 +131,28 @@ If the -E option is not provided, and this variable is set, it will be
 used as the publisher name for the extra repository.  If -E is not
 provided and this variable is not set, on-extra will be used.
 .LP
+.SH NOTES
+.LP
+Use of
+.I onu
+will prevent use of zone attach for ipkg-brand zones in the new BE,
+since the
+.B entire
+incorporation is removed.
+.LP
+By default,
+.I onu
+will attempt to update any ipkg-brand installed zones on the system; the
+.B -Z
+option may be used to disable this behavior.
+.LP
+If the
+.B -d
+option is given to specify a repository directory, subsequent zone
+installs in the new BE will not work. In this case, a suitable
+repository matching the one used must be set up in the global zone
+before a zone install is attempted, otherwise the package contents of
+the zone may differ incompatibly from the global zone version.
 .SH SEE ALSO
 .BR beadm "(1M), "
 .BR bfu "(1), "

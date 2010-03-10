@@ -35,8 +35,8 @@ DEFAULTONEXTRAPUB="on-extra"
 
 usage()
 {
-	echo "usage: $0 [-e URI [-E pub]] [-O] [-s beName] -t beName [-u URI [-U pub]] [-v]"
-	echo "usage: $0 [ -d dir ][ -O ][ -s beName ] -t beName [ -v ]"
+	echo "usage: $0 [-e URI [-E pub]] [-O] [-s beName] -t beName [-u URI [-U pub]] [-vZ]"
+	echo "usage: $0 [ -d dir ][ -O ][ -s beName ] -t beName [-vZ]"
 	echo "Use -s to specify the source BE to clone (default is the active BE)."
 	echo "Use -t to specify the target BE name."
 	echo "Use -u to specify the origin URI for the publisher packaging repository"
@@ -55,6 +55,7 @@ usage()
 	echo "\tNote that -d overrides -u, -U, -e and -E."
 	echo "Use -O for open mode, meaning that no extra repository will be used."
 	echo "Use -v for verbose mode."
+	echo "Use -Z to skip updating zones."
 	exit 1
 }
 
@@ -63,6 +64,14 @@ exit_error()
 	echo $*
 	cleanup
 	exit 2
+}
+
+cleanup()
+{
+	[ $redistpid -gt 0 ] && kill $redistpid
+	[ $extrapid -gt 0 ] && kill $extrapid
+	[ -d /tmp/redist.$$ ] && /bin/rm -rf /tmp/redist.$$
+	[ -d /tmp/extra.$$ ] && /bin/rm -rf /tmp/extra.$$
 }
 
 do_cmd()
@@ -76,6 +85,57 @@ do_cmd()
 	exit_error "$*" failed: exit code $exit_code
 }
 
+update()
+{
+	tmpdir=$1
+
+	do_cmd pkg -R $tmpdir set-publisher --non-sticky opensolaris.org
+	pkg -R $tmpdir list entire > /dev/null 2>&1
+	[ $? -eq 0 ] && do_cmd pkg -R $tmpdir uninstall entire
+	do_cmd pkg -R $tmpdir set-publisher -P -O $uri $redistpub
+	[ $open -eq 0 ] && do_cmd pkg -R $tmpdir set-publisher -O $extrauri $extrapub
+	do_cmd pkg -R $tmpdir refresh --full
+	do_cmd pkg -R $tmpdir image-update
+}
+
+update_zone()
+{
+	zone=$1
+
+	name=`echo $zone | cut -d: -f 2`
+	if [ $name = "global" ]; then
+		return
+	fi
+
+	brand=`echo $zone | cut -d: -f 6`
+	if [ $brand != "ipkg" ]; then
+		return
+	fi
+
+	if [ "$zone_warned" = 0 ]; then
+		echo "WARNING: Use of onu(1) will prevent use of zone attach in the new BE" >&2
+		if [ -n "$repodir" ]; then
+			echo "WARNING: use of -d option will prevent new zone installs in the new BE" >&2
+		fi
+
+		echo "See onu(1)" >&2
+		zone_warned=1
+	fi
+
+	state=`echo $zone | cut -d: -f 3`
+
+	case "$state" in 
+	configured|incomplete)
+		return
+		;;
+	esac
+
+	zoneroot=`echo $zone | cut -d: -f 4`
+
+	echo "Updating zone $name"
+	update $zoneroot/root
+}
+
 sourcebe=""
 targetbe=""
 uri=""
@@ -87,18 +147,12 @@ redistpid=0
 extrapid=0
 redistport=13000
 extraport=13001
-
-cleanup()
-{
-	[ $redistpid -gt 0 ] && kill $redistpid
-	[ $extrapid -gt 0 ] && kill $extrapid
-	[ -d /tmp/redist.$$ ] && /bin/rm -rf /tmp/redist.$$
-	[ -d /tmp/extra.$$ ] && /bin/rm -rf /tmp/extra.$$
-}
+no_zones=0
+zone_warned=0
 
 trap cleanup 1 2 3 15
 
-while getopts :d:E:e:Os:t:U:u:v i ; do
+while getopts :d:E:e:Os:t:U:u:v:Z i ; do
 	case $i in
 	d)
 		repodir=$OPTARG
@@ -126,6 +180,9 @@ while getopts :d:E:e:Os:t:U:u:v i ; do
 		;;
 	v)
 		verbose=1
+		;;
+	Z)
+		no_zones=1
 		;;
 	*)
 		usage
@@ -186,15 +243,14 @@ tmpdir=`/usr/bin/mktemp -d /tmp/onu.XXXXXX`
 
 do_cmd beadm create $createargs $targetbe
 do_cmd beadm mount $targetbe $tmpdir
-do_cmd pkg -R $tmpdir set-publisher --non-sticky opensolaris.org
-pkg -R $tmpdir list entire > /dev/null 2>&1
-[ $? -eq 0 ] && do_cmd pkg -R $tmpdir uninstall entire
-do_cmd pkg -R $tmpdir set-publisher -P -O $uri $redistpub
-[ $open -eq 0 ] && do_cmd pkg -R $tmpdir set-publisher -O $extrauri $extrapub
-do_cmd pkg -R $tmpdir refresh --full
-do_cmd pkg -R $tmpdir image-update
+update $tmpdir
 do_cmd beadm activate $targetbe
 
-cleanup
+if [ "$no_zones" != 1 ]; then
+	for zone in `do_cmd zoneadm -R $tmpdir list -cip`; do
+		update_zone $zone
+	done
+fi
 
+cleanup
 exit 0
