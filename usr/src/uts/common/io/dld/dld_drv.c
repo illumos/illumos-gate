@@ -774,7 +774,7 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 		 * Always return the permissions, and optionally return
 		 * the default value or possible values range.
 		 */
-		mac_prop_info(dlp->dl_mh, kprop->pr_num, kprop->pr_name,
+		(void) mac_prop_info(dlp->dl_mh, kprop->pr_num, kprop->pr_name,
 		    default_val, default_size, rangep, &kprop->pr_perm_flags);
 		err = 0;
 
