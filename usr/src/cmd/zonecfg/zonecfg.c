@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -754,6 +754,29 @@ cmd_to_str(int cmd_num)
 	return (helptab[cmd_num].cmd_name);
 }
 
+/* PRINTFLIKE1 */
+static void
+zerr(const char *fmt, ...)
+{
+	va_list alist;
+	static int last_lineno;
+
+	/* lex_lineno has already been incremented in the lexer; compensate */
+	if (cmd_file_mode && lex_lineno > last_lineno) {
+		if (strcmp(cmd_file_name, "-") == 0)
+			(void) fprintf(stderr, gettext("On line %d:\n"),
+			    lex_lineno - 1);
+		else
+			(void) fprintf(stderr, gettext("On line %d of %s:\n"),
+			    lex_lineno - 1, cmd_file_name);
+		last_lineno = lex_lineno;
+	}
+	va_start(alist, fmt);
+	(void) vfprintf(stderr, fmt, alist);
+	(void) fprintf(stderr, "\n");
+	va_end(alist);
+}
+
 /*
  * This is a separate function rather than a set of define's because of the
  * gettext() wrapping.
@@ -867,20 +890,29 @@ long_help(int cmd_num)
 void
 usage(boolean_t verbose, uint_t flags)
 {
-	FILE *fp = verbose ? stdout : stderr, *newfp;
+	FILE *fp = verbose ? stdout : stderr;
+	FILE *newfp;
 	boolean_t need_to_close = B_FALSE;
 	char *pager;
 	int i;
+	struct stat statbuf;
 
 	/* don't page error output */
 	if (verbose && interactive_mode) {
 		if ((pager = getenv("PAGER")) == NULL)
 			pager = PAGER;
-		if ((newfp = popen(pager, "w")) != NULL) {
-			need_to_close = B_TRUE;
-			fp = newfp;
+
+		if (stat(pager, &statbuf) == 0) {
+			if ((newfp = popen(pager, "w")) != NULL) {
+				need_to_close = B_TRUE;
+				fp = newfp;
+			}
+		} else {
+			zerr(gettext("PAGER %s does not exist (%s)."),
+			    pager, strerror(errno));
 		}
 	}
+
 	if (flags & HELP_META) {
 		(void) fprintf(fp, gettext("More help is available for the "
 		    "following:\n"));
@@ -1189,29 +1221,6 @@ usage(boolean_t verbose, uint_t flags)
 	}
 	if (need_to_close)
 		(void) pclose(fp);
-}
-
-/* PRINTFLIKE1 */
-static void
-zerr(const char *fmt, ...)
-{
-	va_list alist;
-	static int last_lineno;
-
-	/* lex_lineno has already been incremented in the lexer; compensate */
-	if (cmd_file_mode && lex_lineno > last_lineno) {
-		if (strcmp(cmd_file_name, "-") == 0)
-			(void) fprintf(stderr, gettext("On line %d:\n"),
-			    lex_lineno - 1);
-		else
-			(void) fprintf(stderr, gettext("On line %d of %s:\n"),
-			    lex_lineno - 1, cmd_file_name);
-		last_lineno = lex_lineno;
-	}
-	va_start(alist, fmt);
-	(void) vfprintf(stderr, fmt, alist);
-	(void) fprintf(stderr, "\n");
-	va_end(alist);
 }
 
 static void
@@ -5162,6 +5171,7 @@ info_func(cmd_t *cmd)
 	int res1, res2;
 	uint64_t swap_limit;
 	uint64_t locked_limit;
+	struct stat statbuf;
 
 	assert(cmd != NULL);
 
@@ -5172,8 +5182,17 @@ info_func(cmd_t *cmd)
 	if (interactive_mode) {
 		if ((pager = getenv("PAGER")) == NULL)
 			pager = PAGER;
-		if ((fp = popen(pager, "w")) != NULL)
-			need_to_close = B_TRUE;
+
+		if (stat(pager, &statbuf) == 0) {
+			if ((fp = popen(pager, "w")) != NULL)
+				need_to_close = B_TRUE;
+			else
+				fp = stdout;
+		} else {
+			zerr(gettext("PAGER %s does not exist (%s)."),
+			    pager, strerror(errno));
+		}
+
 		setbuf(fp, NULL);
 	}
 
