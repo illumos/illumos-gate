@@ -2502,7 +2502,7 @@ nxge_hio_rdc_unshare(
 
 	for (i = 0; i < NXGE_MAX_RDCS; i++) {
 		if (nxge->rx_ring_handles[i].channel == channel) {
-			nxge_rx_ring_start(
+			(void) nxge_rx_ring_start(
 			    (mac_ring_driver_t)&nxge->rx_ring_handles[i],
 			    nxge->rx_ring_handles[i].ring_gen_num);
 		}

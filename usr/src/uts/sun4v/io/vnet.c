@@ -2474,7 +2474,7 @@ vnet_rx_ring_stat(mac_ring_driver_t rdriver, uint_t stat, uint64_t *val)
 
 		VNET_FDBE_REFHOLD(vnetp->hio_fp);
 		RW_EXIT(&vnetp->vsw_fp_rw);
-		mac_hwring_getstat(rx_ringp->hw_rh, stat, val);
+		(void) mac_hwring_getstat(rx_ringp->hw_rh, stat, val);
 		VNET_FDBE_REFRELE(vnetp->hio_fp);
 		return (0);
 	}
