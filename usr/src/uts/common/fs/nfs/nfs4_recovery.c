@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1940,26 +1940,36 @@ recov_filehandle(nfs4_recov_t action, mntinfo4_t *mi, vnode_t *vp)
 	needrecov = nfs4_needs_recovery(&e, FALSE, mi->mi_vfsp);
 
 	/*
-	 * If we get BADHANDLE or FHEXPIRED in their handler, something is
-	 * broken.  Don't try to recover, just mark the file dead.
+	 * If we get BADHANDLE, FHEXPIRED or STALE in their handler,
+	 * something is broken. Don't try to recover, just mark the
+	 * file dead.
 	 */
-	if (needrecov && e.error == 0 &&
-	    (e.stat == NFS4ERR_BADHANDLE || e.stat == NFS4ERR_FHEXPIRED))
-		needrecov = FALSE;
+	DTRACE_PROBE2(recov__filehandle, nfs4_error_t, &e, vnode_t, vp);
 	if (needrecov) {
-		(void) nfs4_start_recovery(&e, mi, vp,
-		    NULL, NULL, NULL, OP_LOOKUP, NULL, NULL, NULL);
+		if (e.error == 0) {
+			switch (e.stat) {
+			case NFS4ERR_BADHANDLE:
+			case NFS4ERR_FHEXPIRED:
+			case NFS4ERR_STALE:
+				goto norec;	/* Unrecoverable errors */
+			default:
+				break;
+			}
+		}
+		(void) nfs4_start_recovery(&e, mi, vp, NULL,
+		    NULL, NULL, OP_LOOKUP, NULL, NULL, NULL);
+
 	} else if (e.error != EINTR &&
 	    !NFS4_FRC_UNMT_ERR(e.error, mi->mi_vfsp) &&
 	    (e.error != 0 || e.stat != NFS4_OK)) {
 		nfs4_recov_fh_fail(vp, e.error, e.stat);
 		/*
-		 * Don't set r_error to ESTALE.  Higher-level code (e.g.,
+		 * Don't set r_error to ESTALE. Higher-level code (e.g.,
 		 * cstatat_getvp()) retries on ESTALE, which would cause
 		 * an infinite loop.
 		 */
 	}
-
+norec:
 	mutex_enter(&rp->r_statelock);
 	rp->r_flags &= ~R4RECEXPFH;
 	cv_broadcast(&rp->r_cv);
@@ -2021,15 +2031,21 @@ recov_stale(mntinfo4_t *mi, vnode_t *vp)
 	 * Handle non-STALE recoverable errors
 	 */
 	needrecov = nfs4_needs_recovery(&e, FALSE, vp->v_vfsp);
-	if (needrecov && (e.error != 0 || e.stat != NFS4ERR_STALE)) {
-		(void) nfs4_start_recovery(&e, mi, vp,
-		    NULL, NULL, NULL, OP_GETATTR, NULL, NULL, NULL);
-		NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
-		    "recov_stale: error=%d, stat=%d seen on rp %s",
-		    e.error, e.stat, rnode4info(rp)));
+	if (needrecov) {
+		if (e.error == 0) {
+			switch (e.stat) {
+			case NFS4ERR_STALE:
+			case NFS4ERR_BADHANDLE:
+				goto norec;	/* Unrecoverable */
+			default:
+				break;
+			}
+		}
+		(void) nfs4_start_recovery(&e, mi, vp, NULL,
+		    NULL, NULL, OP_GETATTR, NULL, NULL, NULL);
 		goto out;
 	}
-
+norec:
 	/* Are things OK for this vnode? */
 	if (!e.error && e.stat == NFS4_OK) {
 		NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
@@ -2067,20 +2083,21 @@ recov_stale(mntinfo4_t *mi, vnode_t *vp)
 		nfs4_error_zinit(&e);
 		nfs4_getattr_otw_norecovery(rootvp, &gar, &e, CRED(), 0);
 
-		/* Try recovery? */
-		if (e.error != 0 || e.stat != NFS4ERR_STALE) {
-			needrecov = nfs4_needs_recovery(&e, FALSE, vp->v_vfsp);
-			if (needrecov) {
-				(void) nfs4_start_recovery(&e,
-				    mi, rootvp, NULL, NULL, NULL,
-				    OP_GETATTR, NULL, NULL, NULL);
-				NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
-				    "recov_stale: error=%d, stat=%d seen "
-				    "on rp %s", e.error, e.stat,
-				    rnode4info(rp)));
+		needrecov = nfs4_needs_recovery(&e, FALSE, vp->v_vfsp);
+		if (needrecov) {
+			if (e.error == 0) {
+				switch (e.stat) {
+				case NFS4ERR_STALE:
+				case NFS4ERR_BADHANDLE:
+					goto unrec;	/* Unrecoverable */
+				default:
+					break;
+				}
 			}
+			(void) nfs4_start_recovery(&e, mi, rootvp, NULL,
+			    NULL, NULL, OP_GETATTR, NULL, NULL, NULL);
 		}
-
+unrec:
 		/*
 		 * Check to see if a failover attempt is warranted
 		 * NB: nfs4_try_failover doesn't check for STALE
@@ -2537,6 +2554,8 @@ recov_openfiles(recov_info_t *recovp, nfs4_server_t *sp)
 				nfs4_remap_file(mi, rep->re_vp,
 				    NFS4_REMAP_CKATTRS, &e);
 			}
+			DTRACE_PROBE2(recov__openfiles, nfs4_error_t, &e,
+			    vnode_t, rep->re_vp);
 			if (e.error == ENOENT || e.stat == NFS4ERR_NOENT) {
 				/*
 				 * The current server does not have the file
@@ -2580,13 +2599,15 @@ recov_openfiles(recov_info_t *recovp, nfs4_server_t *sp)
 			if (nfs4_recovdelay > 0)
 				delay(MSEC_TO_TICK(nfs4_recovdelay * 1000));
 #endif
-			if (e.error == 0 && e.stat == NFS4_OK)
+			if (e.error == 0 && e.stat == NFS4_OK) {
 				relock_file(rep->re_vp, mi, &e, pre_change);
 
-			if (nfs4_needs_recovery(&e, TRUE, mi->mi_vfsp))
-				(void) nfs4_start_recovery(&e, mi,
-				    rep->re_vp, NULL, NULL, NULL, OP_LOCK,
-				    NULL, NULL, NULL);
+				if (nfs4_needs_recovery(&e, TRUE, mi->mi_vfsp))
+					(void) nfs4_start_recovery(&e, mi,
+					    rep->re_vp, NULL, NULL, NULL,
+					    OP_LOCK, NULL, NULL, NULL);
+			}
+
 			if (e.error != 0 || e.stat != NFS4_OK)
 				break;
 		}

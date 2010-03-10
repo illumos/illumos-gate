@@ -1871,6 +1871,7 @@ again:
 		break;
 	case NFS4ERR_FHEXPIRED:
 	case NFS4ERR_BADHANDLE:
+	case NFS4ERR_STALE:
 		/*
 		 * If we ran into filehandle problems, we should try to
 		 * remap the root vnode first and hope life gets better.
