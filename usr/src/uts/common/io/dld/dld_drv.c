@@ -1351,6 +1351,7 @@ static dld_ioc_info_t drv_ioc_list[] = {
 typedef struct dld_ioc_modentry {
 	uint16_t	dim_modid;	/* Top 16 bits of ioctl command */
 	char		*dim_modname;	/* Module to be loaded */
+	int		ctrl_node_inst;	/* Ctrl node instance */
 	dld_ioc_info_t	*dim_list;	/* array of ioctl structures */
 	uint_t		dim_count;	/* number of elements in dim_list */
 } dld_ioc_modentry_t;
@@ -1359,15 +1360,20 @@ typedef struct dld_ioc_modentry {
  * For all modules except for dld, dim_list and dim_count are assigned
  * when the modules register their ioctls in dld_ioc_register().  We
  * can statically initialize dld's ioctls in-line here; there's no
- * need for it to call dld_ioc_register() itself.
+ * need for it to call dld_ioc_register() itself. ctrl_node_inst controls
+ * whether an instance of the device will be held or the driver. If set to
+ * a non-negative integer, device instance specified in ctrl_node_inst will
+ * be held; so dld_ioc_register() _must_ be called in xxx_attach() routine of
+ * the driver. If set to -1, driver will be held; so dld_ioc_register() _must_
+ * be called in xxx_init() routine of the driver.
  */
 static dld_ioc_modentry_t dld_ioc_modtable[] = {
-	{DLD_IOC,	"dld",	drv_ioc_list,	DLDIOCCNT(drv_ioc_list)},
-	{AGGR_IOC,	"aggr",	NULL, 0},
-	{VNIC_IOC,	"vnic",	NULL, 0},
-	{SIMNET_IOC,	"simnet", NULL, 0},
-	{BRIDGE_IOC,	"bridge", NULL, 0},
-	{IPTUN_IOC,	"iptun", NULL, 0}
+	{DLD_IOC,	"dld", 0, drv_ioc_list, DLDIOCCNT(drv_ioc_list)},
+	{AGGR_IOC,	"aggr", 0, NULL, 0},
+	{VNIC_IOC,	"vnic",	0, NULL, 0},
+	{SIMNET_IOC,	"simnet", 0, NULL, 0},
+	{BRIDGE_IOC,	"bridge", 0, NULL, 0},
+	{IPTUN_IOC,	"iptun", 0, NULL, 0}
 };
 #define	DLDIOC_CNT	\
 	(sizeof (dld_ioc_modtable) / sizeof (dld_ioc_modentry_t))
@@ -1410,12 +1416,12 @@ dld_ioc_unregister(uint16_t modid)
  * dld_ioc_modtable.
  *
  * When an ioctl is received, this function looks for the associated
- * module-id-specific ioctl information using dld_ioc_findmod().  The
- * call to ddi_hold_devi_by_instance() on the associated device will
- * cause the kernel module responsible for the ioctl to be loaded if
- * it's not already loaded, which should result in that module calling
- * dld_ioc_register(), thereby filling in the dim_list containing the
- * details for the ioctl being processed.
+ * module-id-specific ioctl information using dld_ioc_findmod(). The
+ * call to ddi_hold_driver() or ddi_hold_devi_by_instance() on the
+ * associated device will cause the kernel module responsible for the
+ * ioctl to be loaded if it's not already loaded, which should result
+ * in that module calling dld_ioc_register(), thereby filling in the
+ * dim_list containing the details for the ioctl being processed.
  *
  * This function can then perform operations such as copyin() data and
  * do credential checks based on the registered ioctl information,
@@ -1430,6 +1436,8 @@ drv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 	dld_ioc_modentry_t *dim;
 	dld_ioc_info_t	*info;
 	dev_info_t	*dip = NULL;
+	struct dev_ops	*dops = NULL;
+	major_t		major;
 	void		*buf = NULL;
 	size_t		sz;
 	int		i, err;
@@ -1437,9 +1445,23 @@ drv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 	if ((dim = dld_ioc_findmod(DLD_IOC_MODID(cmd))) == NULL)
 		return (ENOTSUP);
 
-	dip = ddi_hold_devi_by_instance(ddi_name_to_major(dim->dim_modname),
-	    0, 0);
-	if (dip == NULL || dim->dim_list == NULL) {
+	major = ddi_name_to_major(dim->dim_modname);
+
+	if (dim->ctrl_node_inst == -1) {
+		/*
+		 * No dedicated instance to process ioctls.
+		 * dld_ioc_register() is called in xxx_init().
+		 */
+		dops = ddi_hold_driver(major);
+	} else {
+		/*
+		 * Dedicated instance to handle ioctl.
+		 * dld_ioc_register() is called in xxx_attach().
+		 */
+		dip = ddi_hold_devi_by_instance(major, dim->ctrl_node_inst, 0);
+	}
+
+	if ((dip == NULL && dops == NULL) || dim->dim_list == NULL) {
 		err = ENODEV;
 		goto done;
 	}
@@ -1482,5 +1504,7 @@ done:
 		kmem_free(buf, sz);
 	if (dip != NULL)
 		ddi_release_devi(dip);
+	if (dops != NULL)
+		ddi_rele_driver(major);
 	return (err);
 }
