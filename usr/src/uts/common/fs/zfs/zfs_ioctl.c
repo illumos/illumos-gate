@@ -1949,9 +1949,19 @@ zfs_prop_set_special(const char *dsname, zprop_source_t source,
 	case ZFS_PROP_VERSION:
 	{
 		zfsvfs_t *zfsvfs;
+		uint64_t maxzplver = ZPL_VERSION;
 
 		if ((err = zfsvfs_hold(dsname, FTAG, &zfsvfs)) != 0)
 			break;
+
+		if (zfs_earlier_version(dsname, SPA_VERSION_USERSPACE))
+			maxzplver = ZPL_VERSION_USERSPACE - 1;
+		if (zfs_earlier_version(dsname, SPA_VERSION_FUID))
+			maxzplver = ZPL_VERSION_FUID - 1;
+		if (intval > maxzplver) {
+			zfsvfs_rele(zfsvfs, FTAG);
+			return (ENOTSUP);
+		}
 
 		err = zfs_set_version(zfsvfs, intval);
 		zfsvfs_rele(zfsvfs, FTAG);
