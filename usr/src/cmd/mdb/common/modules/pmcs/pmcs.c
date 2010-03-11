@@ -2109,6 +2109,14 @@ pmcs_next_sibling(pmcs_phy_t *phyp)
 			break;
 		}
 
+		/*
+		 * If this PHY's sibling is NULL and it's a root phy,
+		 * we're done.
+		 */
+		if (parent.level == 0) {
+			return (NULL);
+		}
+
 		phyp = phyp->parent;
 	}
 
