@@ -59,7 +59,6 @@ depend fmri=library/samba/libsmbclient type=require
 depend fmri=network/iscsi/initiator type=require
 depend fmri=network/iscsi/iser type=require
 depend fmri=network/iscsi/target type=require
-depend fmri=network/iscsi/target/legacy type=require
 depend fmri=service/file-system/nfs type=require
 depend fmri=service/file-system/smb type=require
 depend fmri=service/network/samba type=require

@@ -59,7 +59,6 @@ depend fmri=library/nspr/header-nspr@0.5.11-0.133 type=require
 depend fmri=library/perl-5/xml-parser@0.5.11-0.133 type=require
 depend fmri=library/security/trousers@0.3.2-0.133 type=require
 depend fmri=library/tooltalk@0.5.11-0.133 type=require
-depend fmri=network/iscsi/target/legacy@0.5.11-0.133 type=require
 depend fmri=package/svr4@0.5.11-0.133 type=require
 depend fmri=runtime/perl-584/extra@5.8.4-0.133 type=require
 depend fmri=storage/svm@0.5.11-0.133 type=require
