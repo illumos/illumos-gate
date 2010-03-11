@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1442,6 +1442,25 @@ dhstr(int grp)
 		return (gettext("6144-bit MODP (group 17)"));
 	case IKE_GRP_DESC_MODP_8192:
 		return (gettext("8192-bit MODP (group 18)"));
+	case IKE_GRP_DESC_ECP_256:
+		return (gettext("256-bit ECP (group 19)"));
+	case IKE_GRP_DESC_ECP_384:
+		return (gettext("384-bit ECP (group 20)"));
+	case IKE_GRP_DESC_ECP_521:
+		return (gettext("521-bit ECP (group 21)"));
+	case IKE_GRP_DESC_MODP_1024_160:
+		return (
+		    gettext("1024-bit MODP with 160-bit subprime (group 22)"));
+	case IKE_GRP_DESC_MODP_2048_224:
+		return (
+		    gettext("2048-bit MODP with 224-bit subprime (group 23)"));
+	case IKE_GRP_DESC_MODP_2048_256:
+		return (
+		    gettext("2048-bit MODP with 256-bit subprime (group 24)"));
+	case IKE_GRP_DESC_ECP_192:
+		return (gettext("192-bit ECP (group 25)"));
+	case IKE_GRP_DESC_ECP_224:
+		return (gettext("224-bit ECP (group 26)"));
 	default:
 		(void) snprintf(rtn, MAXLINESIZE, gettext("<unknown %d>"), grp);
 		return (rtn);

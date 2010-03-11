@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -277,12 +277,21 @@ typedef struct {
 #define	IKE_GRP_DESC_EC2N_155	3
 #define	IKE_GRP_DESC_EC2N_185	4
 /* values for p1xf_dh_group (aligned with RFC3526) */
-#define	IKE_GRP_DESC_MODP_1536	5
-#define	IKE_GRP_DESC_MODP_2048	14
-#define	IKE_GRP_DESC_MODP_3072	15
-#define	IKE_GRP_DESC_MODP_4096	16
-#define	IKE_GRP_DESC_MODP_6144	17
-#define	IKE_GRP_DESC_MODP_8192	18
+#define	IKE_GRP_DESC_MODP_1536		5
+#define	IKE_GRP_DESC_MODP_2048		14
+#define	IKE_GRP_DESC_MODP_3072		15
+#define	IKE_GRP_DESC_MODP_4096		16
+#define	IKE_GRP_DESC_MODP_6144		17
+#define	IKE_GRP_DESC_MODP_8192		18
+#define	IKE_GRP_DESC_ECP_256		19
+#define	IKE_GRP_DESC_ECP_384		20
+#define	IKE_GRP_DESC_ECP_521		21
+/* values for p1xf_dh_group (aligned with RFC5114) */
+#define	IKE_GRP_DESC_MODP_1024_160 	22
+#define	IKE_GRP_DESC_MODP_2048_224 	23
+#define	IKE_GRP_DESC_MODP_2048_256 	24
+#define	IKE_GRP_DESC_ECP_192		25
+#define	IKE_GRP_DESC_ECP_224		26
 
 /* values for p1xf_auth_meth (aligned with RFC2409, Appendix A) */
 #define	IKE_AUTH_METH_PRE_SHARED_KEY	1
