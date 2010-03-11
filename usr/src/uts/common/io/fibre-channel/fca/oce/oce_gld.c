@@ -37,6 +37,7 @@ char *oce_priv_props[] = {
 	"_tx_ring_size",
 	"_tx_bcopy_limit",
 	"_rx_ring_size",
+	"_rx_bcopy_limit",
 	NULL
 };
 

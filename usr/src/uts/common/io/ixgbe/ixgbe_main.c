@@ -2200,6 +2200,36 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 		reg_val |= IXGBE_HLREG0_JUMBOEN;
 		IXGBE_WRITE_REG(hw, IXGBE_HLREG0, reg_val);
 	}
+
+	/*
+	 * Setup RSC for multiple receive queues.
+	 */
+	if (ixgbe->lro_enable) {
+		for (i = 0; i < ixgbe->num_rx_rings; i++) {
+			/*
+			 * Make sure rx_buf_size * MAXDESC not greater
+			 * than 65535.
+			 * Intel recommends 4 for MAXDESC field value.
+			 */
+			reg_val = IXGBE_READ_REG(hw, IXGBE_RSCCTL(i));
+			reg_val |= IXGBE_RSCCTL_RSCEN;
+			if (ixgbe->rx_buf_size == IXGBE_PKG_BUF_16k)
+				reg_val |= IXGBE_RSCCTL_MAXDESC_1;
+			else
+				reg_val |= IXGBE_RSCCTL_MAXDESC_4;
+			IXGBE_WRITE_REG(hw,  IXGBE_RSCCTL(i), reg_val);
+		}
+
+		reg_val = IXGBE_READ_REG(hw, IXGBE_RSCDBU);
+		reg_val |= IXGBE_RSCDBU_RSCACKDIS;
+		IXGBE_WRITE_REG(hw, IXGBE_RSCDBU, reg_val);
+
+		reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
+		reg_val |= IXGBE_RDRXCTL_RSCACKC;
+		reg_val &= ~IXGBE_RDRXCTL_RSCFRSTSIZE;
+
+		IXGBE_WRITE_REG(hw, IXGBE_RDRXCTL, reg_val);
+	}
 }
 
 static void
