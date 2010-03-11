@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -22,8 +22,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-    ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
@@ -172,6 +170,13 @@
 <xsl:template match="fmri">
 	<BR/>
 	<I>FMRI: </I>   <xsl:value-of select="."/>
+</xsl:template>
+
+<xsl:template match="user">
+	<BR/>
+	<I>USER </I>
+	<I> uid: </I><xsl:value-of select="@uid"/>
+	<I> username: </I><xsl:value-of select="@username"/>
 </xsl:template>
 
 <xsl:template match="group">

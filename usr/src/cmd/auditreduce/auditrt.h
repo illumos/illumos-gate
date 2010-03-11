@@ -154,6 +154,7 @@ typedef struct audit_pcb audit_pcb_t;
 #define	OBJ_SHMGROUP	0x08000  /* 'o' shared memory [c]group */
 #define	OBJ_SHMOWNER	0x10000  /* 'o' shared memory [c]owner */
 #define	OBJ_FMRI	0x20000  /* 'o' fmri object */
+#define	OBJ_USER	0x40000  /* 'o' user object */
 
 #define	SOCKFLG_MACHINE 0	/* search socket token by machine name */
 #define	SOCKFLG_PORT    1	/* search socket token by port number */
@@ -186,6 +187,7 @@ extern uid_t	obj_owner;	/* object owner */
 extern int	subj_id; 	/* subject identifier */
 extern char	ipc_type;	/* 'o' object type - tell what type of IPC */
 extern scf_pattern_t fmri;	/* 'o' fmri value */
+extern uid_t	obj_user;	/* 'o' user value */
 
 /*
  * File selection options

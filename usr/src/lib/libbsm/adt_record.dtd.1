@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -22,8 +22,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-    ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 
@@ -102,6 +100,7 @@ tokens.
 			socket			|
 			subject			|
 			text			|
+			user			|
 			use_of_authorization	|
 			use_of_privilege	|
 			X_atom			|
@@ -157,6 +156,13 @@ first token (which is the record token):
 
 <!-- text token -->
 <!ELEMENT text		(#PCDATA)>
+
+<!-- user token -->
+<!ELEMENT user	EMPTY>
+<!ATTLIST user
+		uid		CDATA #REQUIRED
+		username	CDATA #REQUIRED
+>
 
 <!-- path token -->
 <!ELEMENT path		(#PCDATA)>

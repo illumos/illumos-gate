@@ -61,6 +61,7 @@ token=text:text
 token=tid:terminal_adr
 token=uauth:use_of_authorization
 token=upriv:use_of_privilege
+token=user:user_object
 token=zone:zonename
 token=fmri:service_instance
 token=label:mandatory_label

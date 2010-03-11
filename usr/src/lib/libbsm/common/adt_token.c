@@ -844,6 +844,36 @@ adt_to_uauth(datadef *def, void *p_data, int required,
 }
 
 /*
+ * AUT_USER
+ */
+
+/* ARGSUSED */
+static void
+adt_to_user(datadef *def, void *p_data, int required,
+    struct adt_event_state *event, char *format)
+{
+	uid_t	uid;
+	char	*username;
+
+	DPRINTF(("  adt_to_user dd_datatype=%d\n", def->dd_datatype));
+
+	uid = ((union convert *)p_data)->tuid;
+	p_data = adt_adjust_address(p_data, sizeof (uid_t), sizeof (uid_t));
+
+	username = ((union convert *)p_data)->tcharstar;
+
+	if (username == NULL) {
+		if (required) {
+			username = empty;
+		} else {
+			return;
+		}
+	}
+	DPRINTF(("  username=%s\n", username));
+	(void) au_write(event->ae_event_handle, au_to_user(uid, username));
+}
+
+/*
  * AUT_ZONENAME
  */
 
@@ -993,7 +1023,7 @@ adt_to_iport(datadef *def, void *p_data, int required,
  * adt_xlate.h), and the -AUT_PATH value.
  */
 
-#define	MAX_TOKEN_JMP 20
+#define	MAX_TOKEN_JMP 21
 
 static struct token_jmp token_table[MAX_TOKEN_JMP] =
 {
@@ -1016,6 +1046,7 @@ static struct token_jmp token_table[MAX_TOKEN_JMP] =
 	{AUT_TEXT, adt_to_text},
 	{AUT_TID, adt_to_tid},
 	{AUT_UAUTH, adt_to_uauth},
+	{AUT_USER, adt_to_user},
 	{AUT_ZONENAME, adt_to_zonename}
 };
 

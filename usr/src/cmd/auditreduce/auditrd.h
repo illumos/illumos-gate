@@ -61,6 +61,7 @@ uid_t	obj_owner;		/* object owner */
 int	subj_id;		/* subject identifier  */
 char	ipc_type;		/* 'o' object type - tell what type of IPC */
 scf_pattern_t fmri;		/* 'o' fmri value */
+uid_t	obj_user;		/* 'o' user value */
 
 /*
  * File selection options

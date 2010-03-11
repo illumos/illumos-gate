@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2006,6 +2006,28 @@ int
 useofauth_token(pr_context_t *context)
 {
 	return (pa_adr_string(context, 0, 1));
+}
+
+/*
+ * -----------------------------------------------------------------------
+ * user_token(): Process user token and display contents
+ * return codes	: -1 - error
+ *		:  0 - successful
+ * NOTE: At the time of call, the user token id has been retrieved
+ *
+ * Format of user token:
+ *	user token id		adr_char
+ *	user id			adr_uid
+ * 	user name		adr_string
+ * -----------------------------------------------------------------------
+ */
+int
+user_token(pr_context_t *context)
+{
+	int	returnstat;
+
+	returnstat = process_tag(context, TAG_UID, 0, 0);
+	return (process_tag(context, TAG_USERNAME, returnstat, 1));
 }
 
 /*

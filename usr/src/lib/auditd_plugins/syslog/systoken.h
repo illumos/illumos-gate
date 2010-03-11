@@ -105,6 +105,7 @@ extern void	exec_args_token(adr_t *, parse_context_t *);
 extern void	exec_env_token(adr_t *, parse_context_t *);
 extern void	attribute32_token(adr_t *, parse_context_t *);
 extern void	useofauth_token(adr_t *, parse_context_t *);
+extern void	user_token(adr_t *, parse_context_t *);
 
 /*
  * X windows tokens
@@ -157,6 +158,7 @@ extern void	subject64_ex_token(adr_t *, parse_context_t *);
 extern void	process64_ex_token(adr_t *, parse_context_t *);
 extern void	ip_addr_ex_token(adr_t *, parse_context_t *);
 extern void	socket_ex_token(adr_t *, parse_context_t *);
+extern void	tid_token(adr_t *, parse_context_t *);
 #endif
 
 #ifdef __cplusplus

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Solaris Audit Token Table.
@@ -108,7 +106,6 @@ init_tokens(void)
 	table_initx(AUT_SOCKET, "socket", "old_socket",
 	    socket_token, T_ENCLOSED);
 	table_init(AUT_SEQ, "sequence", sequence_token, T_ENCLOSED);
-	table_init(AUT_ZONENAME, "zone", zonename_token, T_ENCLOSED);
 
 	/*
 	 * Modifier token types
@@ -131,7 +128,8 @@ init_tokens(void)
 	table_init(AUT_ATTR32, "attribute", attribute32_token, T_ENCLOSED);
 	table_initx(AUT_UAUTH, "use of authorization",
 	    "use_of_authorization", useofauth_token, T_ELEMENT);
-	table_init(AUT_TID, "tid", tid_token, T_EXTENDED);
+	table_init(AUT_USER, "user", user_token, T_ENCLOSED);
+	table_init(AUT_ZONENAME, "zone", zonename_token, T_ENCLOSED);
 
 	/*
 	 * X windows token types
@@ -196,6 +194,7 @@ init_tokens(void)
 	table_initx(AUT_IN_ADDR_EX, "ip address", "ip_address",
 	    ip_addr_ex_token, T_ELEMENT);
 	table_init(AUT_SOCKET_EX, "socket", socket_ex_token, T_ENCLOSED);
+	table_init(AUT_TID, "tid", tid_token, T_EXTENDED);
 
 #ifdef _PRAUDIT
 	/*
@@ -305,5 +304,6 @@ init_tokens(void)
 	table_init(TAG_ARBCOUNT, "count", NOFUNC, T_ATTRIBUTE);
 
 	table_init(TAG_HOSTID, "host", NOFUNC, T_ATTRIBUTE);
+	table_init(TAG_USERNAME, "username", pa_adr_string, T_ATTRIBUTE);
 #endif	/* _PRAUDIT */
 }

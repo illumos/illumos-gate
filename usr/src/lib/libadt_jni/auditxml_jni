@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -787,7 +787,6 @@ sub generateTableC {
 		  'groups'      	=> 'AUT_GROUPS',
 	#	  'header'      	=> 'AUT_HEADER',	# not used
 		  'in_addr'     	=> 'AUT_IN_ADDR',
-		  'tid'          	=> 'AUT_TID',
 		  'ipc'         	=> 'AUT_IPC',
 		  'ipc_perm'    	=> 'AUT_IPC_PERM',
 		  'iport'		=> 'AUT_IPORT',
@@ -806,8 +805,10 @@ sub generateTableC {
 		  'socket-inet' 	=> 'AUT_SOCKET_INET',
 		  'subject'     	=> 'AUT_SUBJECT',
 		  'text'        	=> 'AUT_TEXT',
+		  'tid'          	=> 'AUT_TID',
 	#	  'trailer'     	=> 'AUT_TRAILER',	# not used
 		  'uauth'		=> 'AUT_UAUTH',
+		  'user'		=> 'AUT_USER',
 		  'zonename'		=> 'AUT_ZONENAME'
 		 );
 

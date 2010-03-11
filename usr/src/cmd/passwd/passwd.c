@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -290,11 +290,13 @@ main(int argc, char *argv[])
 			(void) fprintf(stderr, gettext(MSG_INFO), prognamep,
 			    usrname);
 		}
-	} else
+	} else {
 		usrname = argv[optind];
+	}
 
-	if (pam_start("passwd", usrname, &pam_conv, &pamh) != PAM_SUCCESS)
+	if (pam_start("passwd", usrname, &pam_conv, &pamh) != PAM_SUCCESS) {
 		passwd_exit(NOPERM);
+	}
 
 	auth_rep.type = repository.type;
 	auth_rep.scope = repository.scope;
@@ -374,10 +376,6 @@ main(int argc, char *argv[])
 		if ((event = adt_alloc_event(ah, ADT_passwd)) == NULL) {
 			perror("adt_alloc_event");
 			passwd_exit(NOMEM);
-		}
-		if (argc >= 1) {
-			/* save target user */
-			event->adt_passwd.username = usrname;
 		}
 
 		/* Don't check account expiration when invoked by root */
@@ -1549,6 +1547,17 @@ passwd_exit(int retcode)
 	}
 	/* write password record */
 	if (event != NULL) {
+		struct passwd *pass;
+
+		if ((pass = getpwnam(usrname)) == NULL) {
+			/* unlikely to ever get here, but ... */
+			event->adt_passwd.username = usrname;
+		} else if (pass->pw_uid != uid) {
+			/* save target user */
+			event->adt_passwd.uid = pass->pw_uid;
+			event->adt_passwd.username = pass->pw_name;
+		}
+
 		if (adt_put_event(event,
 		    retcode == SUCCESS ? ADT_SUCCESS : ADT_FAILURE,
 		    retcode == SUCCESS ? ADT_SUCCESS : ADT_FAIL_PAM +

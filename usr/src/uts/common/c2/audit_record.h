@@ -98,7 +98,8 @@ extern "C" {
 #define	AUT_ARG32		AUT_ARG
 #define	AUT_SOCKET		((char)0x2E)
 #define	AUT_SEQ			((char)0x2F)
-#define	AUT_TID			((char)0x61)
+#define	AUT_USER		((char)0x36)	/* out of order */
+#define	AUT_TID			((char)0x61)	/* out of order */
 
 /*
  * Modifier token types
@@ -110,9 +111,7 @@ extern "C" {
 #define	AUT_LABEL		((char)0x33)
 #define	AUT_GROUPS		((char)0x34)
 #define	AUT_ACE			((char)0x35)
-/*
- * 0x36, 0x37 unused
- */
+	/* 0x37 unused */
 #define	AUT_PRIV		((char)0x38)
 #define	AUT_UPRIV		((char)0x39)
 #define	AUT_LIAISON		((char)0x3A)
@@ -121,7 +120,7 @@ extern "C" {
 #define	AUT_EXEC_ENV		((char)0x3D)
 #define	AUT_ATTR32		((char)0x3E)
 #define	AUT_UAUTH		((char)0x3F)
-#define	AUT_ZONENAME		((char)0x60)
+#define	AUT_ZONENAME		((char)0x60)	/* out of order */
 
 /*
  * X windows token types
@@ -430,6 +429,7 @@ extern token_t *au_to_tid(au_generic_tid_t *);
 extern token_t *au_to_trailer(void);
 extern token_t *au_to_uauth(char *);
 extern token_t *au_to_upriv(char, char *);
+extern token_t *au_to_user(uid_t, char *);
 extern token_t *au_to_xatom(char *);
 extern token_t *au_to_xselect(char *, char *, char *);
 extern token_t *au_to_xcolormap(int32_t, uid_t);

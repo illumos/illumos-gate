@@ -276,6 +276,7 @@ SUNWprivate_1.1 {
 	au_to_trailer;
 	au_to_uauth;
 	au_to_upriv;
+	au_to_user;
 	au_to_xatom;
 	au_to_xcolormap;
 	au_to_xclient;

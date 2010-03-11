@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1206,6 +1206,34 @@ au_to_upriv(char sorf, char *priv)
 	adr_char(&adr, &sorf, 1);	/* success/failure */
 	adr_short(&adr, &bytes, 1);
 	adr_char(&adr, priv, bytes);
+
+	return (token);
+}
+
+/*
+ * au_to_user
+ * return s:
+ *	pointer to a user token.
+ */
+token_t *
+au_to_user(uid_t uid,  char *username)
+{
+	token_t *token;			/* local token */
+	adr_t adr;			/* adr memory stream header */
+	char data_header = AUT_USER;	/* header for this token */
+	short  bytes;			/* length of string */
+
+	bytes = (short)strlen(username) + 1;
+
+	token = get_token(sizeof (char) + sizeof (uid_t) + sizeof (short) +
+	    bytes);
+	if (token == NULL)
+		return (NULL);
+	adr_start(&adr, token->tt_data);
+	adr_char(&adr, &data_header, 1);
+	adr_uid(&adr, &uid, 1);
+	adr_short(&adr, &bytes, 1);
+	adr_char(&adr, username, bytes);
 
 	return (token);
 }

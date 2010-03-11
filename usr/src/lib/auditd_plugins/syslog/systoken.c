@@ -1332,6 +1332,22 @@ useofauth_token(parse_context_t *ctx)
 }
 
 /*
+ * Format of user token:
+ *	user token id		adr_char
+ *	uid			adr_uid
+ * 	username		adr_string
+ *
+ */
+int
+user_token(parse_context_t *ctx)
+{
+	ctx->adr.adr_now += sizeof (uid_t);
+	skip_bytes(ctx);
+
+	return (0);
+}
+
+/*
  * Format of zonename token:
  *	zonename token id		adr_char
  * 	zonename			adr_string

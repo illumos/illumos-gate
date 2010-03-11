@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_TOKTABLE_H
 #define	_TOKTABLE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -157,6 +155,7 @@ enum tagnum_t { TAG_INVALID = MAXTOKEN,
 	TAG_ACEFLAGS,			/* with ace token */
 	TAG_ACETYPE,			/* with ace token */
 	TAG_ACEID,			/* with ace token */
+	TAG_USERNAME,			/* with user token */
 	MAXTAG
 };
 
@@ -194,7 +193,6 @@ extern int	iport_token();
 extern int	argument32_token();
 extern int	socket_token();
 extern int	sequence_token();
-extern int	zonename_token();
 
 /*
  * Modifier tokens
@@ -214,6 +212,8 @@ extern int	exec_args_token();
 extern int	exec_env_token();
 extern int	attribute32_token();
 extern int	useofauth_token();
+extern int	user_token();
+extern int	zonename_token();
 
 /*
  * X windows tokens

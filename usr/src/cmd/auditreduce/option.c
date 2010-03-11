@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,7 +68,8 @@ static obj_ent_t obj_tbl[] = {
 			{ "shmid", OBJ_SHM  },
 			{ "shmgroup", OBJ_SHMGROUP  },
 			{ "shmowner", OBJ_SHMOWNER  },
-			{ "sock", OBJ_SOCK } };
+			{ "sock", OBJ_SOCK },
+			{ "user", OBJ_USER } };
 
 extern int	derive_date(char *, struct tm *);
 extern int	parse_time(char *, int);
@@ -412,6 +413,9 @@ proc_object(char *optarg)
 		/* NOTREACHED */
 	case OBJ_FMRI:
 		return (proc_fmri(obj_val));
+		/* NOTREACHED */
+	case OBJ_USER:
+		return (proc_user(obj_val, &obj_user));
 		/* NOTREACHED */
 	case OBJ_LP: /* lp objects have not yet been defined */
 	default: /* impossible */

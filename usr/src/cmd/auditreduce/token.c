@@ -1179,7 +1179,6 @@ process64_ex_token(adr_t *adr)
  * Format of System V IPC token:
  *	System V IPC token id	adr_char
  *	object id		adr_int32
- *
  */
 int
 s5_IPC_token(adr_t *adr)
@@ -1203,7 +1202,6 @@ s5_IPC_token(adr_t *adr)
  *	socket_type		adrm_short
  *	remote_port		adrm_short
  *	remote_inaddr		adrm_int32
- *
  */
 int
 socket_token(adr_t *adr)
@@ -1802,6 +1800,28 @@ int
 useofauth_token(adr_t *adr)
 {
 	skip_string(adr);
+	return (-1);
+}
+
+/*
+ * Format of user token:
+ *	user token id		adr_char
+ *	uid			adr_uid
+ * 	username		adr_string
+ */
+int
+user_token(adr_t *adr)
+{
+	uid_t	uid;
+
+	adrm_uid(adr, &uid, 1);
+	skip_string(adr);
+
+	if ((flags & M_OBJECT) && (obj_flag == OBJ_USER) &&
+	    (uid == obj_user)) {
+		checkflags |= M_OBJECT;
+	}
+
 	return (-1);
 }
 

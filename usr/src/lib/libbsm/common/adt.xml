@@ -693,10 +693,10 @@ Use is subject to license terms.
 	    <internal token="subject"/>
 	    <external opt="none"/>
 	</entry>
-	<entry id="username">
-	    <internal token="text"/>
-	    <external opt="optional" type="char *"/>
-	    <comment>username if different than caller</comment>
+	<entry id="uid,username">
+	    <internal token="user"/>
+	    <external opt="optional" type="uid_t,char *"/>
+	    <comment>user if different than caller</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -2656,9 +2656,6 @@ Use is subject to license terms.
     <!-- pseudo token; path list generates 0 or more path tokens -->
     <token id="path_list">
     </token>
-    <token id="tid">
-    </token>
-
     <!--
 	privilege token is implemented as one of the pseudo tokens
 	priv_limit, priv_effective, or priv_inherit
@@ -2686,7 +2683,11 @@ Use is subject to license terms.
     </token>
     <token id="text">
     </token>
+    <token id="tid">
+    </token>
     <token id="uauth">
+    </token>
+    <token id="user">
     </token>
     <token id="zonename">
     </token>
