@@ -4117,14 +4117,16 @@ cmlb_dkio_get_efi(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 
 	user_efi.dki_data = (void *)(uintptr_t)user_efi.dki_data_64;
 
-	if (user_efi.dki_length > cmlb_tg_max_efi_xfer)
+	if (user_efi.dki_length == 0 ||
+	    user_efi.dki_length > cmlb_tg_max_efi_xfer)
 		return (EINVAL);
 
 	tgt_lba = user_efi.dki_lba;
 
 	mutex_enter(CMLB_MUTEX(cl));
 	if ((cmlb_check_update_blockcount(cl, tg_cookie) != 0) ||
-	    (cl->cl_tgt_blocksize == 0)) {
+	    (cl->cl_tgt_blocksize == 0) ||
+	    (user_efi.dki_length % cl->cl_sys_blocksize)) {
 		mutex_exit(CMLB_MUTEX(cl));
 		return (EINVAL);
 	}
@@ -4934,8 +4936,23 @@ cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 
 	user_efi.dki_data = (void *)(uintptr_t)user_efi.dki_data_64;
 
-	if (user_efi.dki_length > cmlb_tg_max_efi_xfer)
+	if (user_efi.dki_length == 0 ||
+	    user_efi.dki_length > cmlb_tg_max_efi_xfer)
 		return (EINVAL);
+
+	tgt_lba = user_efi.dki_lba;
+
+	mutex_enter(CMLB_MUTEX(cl));
+	if ((cmlb_check_update_blockcount(cl, tg_cookie) != 0) ||
+	    (cl->cl_tgt_blocksize == 0) ||
+	    (user_efi.dki_length % cl->cl_sys_blocksize)) {
+		mutex_exit(CMLB_MUTEX(cl));
+		return (EINVAL);
+	}
+	if (cl->cl_tgt_blocksize != cl->cl_sys_blocksize)
+		tgt_lba = tgt_lba *
+		    cl->cl_tgt_blocksize / cl->cl_sys_blocksize;
+	mutex_exit(CMLB_MUTEX(cl));
 
 	buffer = kmem_alloc(user_efi.dki_length, KM_SLEEP);
 	if (ddi_copyin(user_efi.dki_data, buffer, user_efi.dki_length, flag)) {
@@ -4966,20 +4983,6 @@ cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 		} else
 			mutex_exit(CMLB_MUTEX(cl));
 
-		tgt_lba = user_efi.dki_lba;
-
-		mutex_enter(CMLB_MUTEX(cl));
-		if ((cmlb_check_update_blockcount(cl, tg_cookie) != 0) ||
-		    (cl->cl_tgt_blocksize == 0)) {
-			kmem_free(buffer, user_efi.dki_length);
-			mutex_exit(CMLB_MUTEX(cl));
-			return (EINVAL);
-		}
-		if (cl->cl_tgt_blocksize != cl->cl_sys_blocksize)
-			tgt_lba = tgt_lba *
-			    cl->cl_tgt_blocksize / cl->cl_sys_blocksize;
-
-		mutex_exit(CMLB_MUTEX(cl));
 		rval = DK_TG_WRITE(cl, buffer, tgt_lba, user_efi.dki_length,
 		    tg_cookie);
 

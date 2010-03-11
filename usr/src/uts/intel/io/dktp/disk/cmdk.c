@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1458,6 +1458,7 @@ cmdk_lb_rdwr(dev_info_t *dip, uchar_t cmd, void *bufaddr,
 	opaque_t	handle;
 	int		rc = 0;
 	char		*bufa;
+	size_t		buflen;
 
 	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
 	if (dkp == NULL)
@@ -1466,9 +1467,9 @@ cmdk_lb_rdwr(dev_info_t *dip, uchar_t cmd, void *bufaddr,
 	if (cmd != TG_READ && cmd != TG_WRITE)
 		return (EINVAL);
 
-	/* count must be multiple of 512 */
-	count = (count + NBPSCTR - 1) & -NBPSCTR;
-	handle = dadk_iob_alloc(DKTP_DATA, start, count, KM_SLEEP);
+	/* buflen must be multiple of 512 */
+	buflen = (count + NBPSCTR - 1) & -NBPSCTR;
+	handle = dadk_iob_alloc(DKTP_DATA, start, buflen, KM_SLEEP);
 	if (!handle)
 		return (ENOMEM);
 
