@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,8 +217,8 @@ pvn_read_kluster(
 		}
 	}
 	TRACE_3(TR_FAC_VM, TR_PVN_READ_KLUSTER,
-		"pvn_read_kluster:seg %p addr %x isra %x",
-		seg, addr, isra);
+	    "pvn_read_kluster:seg %p addr %x isra %x",
+	    seg, addr, isra);
 	return (plist);
 }
 
@@ -460,7 +460,7 @@ pvn_write_done(page_t *plist, int flags)
 			pgout = 1;
 			pgpgout++;
 			TRACE_1(TR_FAC_VM, TR_PAGE_WS_OUT,
-				"page_ws_out:pp %p", pp);
+			    "page_ws_out:pp %p", pp);
 
 			/*
 			 * The page_struct_lock need not be acquired to
@@ -483,7 +483,7 @@ pvn_write_done(page_t *plist, int flags)
 				 * to avoid having to flush the cache.
 				 */
 				ppattr = hat_pagesync(pp, HAT_SYNC_DONTZERO |
-					HAT_SYNC_STOPON_MOD);
+				    HAT_SYNC_STOPON_MOD);
 			ck_refmod:
 				if (!(ppattr & (P_REF | P_MOD))) {
 					if (hat_page_is_mapped(pp)) {
@@ -502,9 +502,9 @@ pvn_write_done(page_t *plist, int flags)
 						 * lock on the page.
 						 */
 						(void) hat_pageunload(pp,
-							HAT_FORCE_PGUNLOAD);
+						    HAT_FORCE_PGUNLOAD);
 						ppattr = hat_page_getattr(pp,
-							P_REF | P_MOD);
+						    P_REF | P_MOD);
 						goto ck_refmod;
 					}
 					/*
@@ -525,7 +525,7 @@ pvn_write_done(page_t *plist, int flags)
 					}
 					/*LINTED: constant in conditional ctx*/
 					VN_DISPOSE(pp, B_FREE,
-						(flags & B_DONTNEED), kcred);
+					    (flags & B_DONTNEED), kcred);
 					dfree++;
 				} else {
 					page_unlock(pp);
@@ -567,10 +567,10 @@ pvn_write_done(page_t *plist, int flags)
 
 	/* Kernel probe */
 	TNF_PROBE_4(pageout, "vm pageio io", /* CSTYLED */,
-		tnf_opaque,	vnode,			vp,
-		tnf_ulong,	pages_pageout,		pgpgout,
-		tnf_ulong,	pages_freed,		dfree,
-		tnf_ulong,	pages_reclaimed,	pgrec);
+	    tnf_opaque,	vnode,			vp,
+	    tnf_ulong,	pages_pageout,		pgpgout,
+	    tnf_ulong,	pages_freed,		dfree,
+	    tnf_ulong,	pages_reclaimed,	pgrec);
 }
 
 /*
@@ -699,6 +699,7 @@ marker_constructor(void *buf, void *cdrarg, int kmflags)
 {
 	page_t *mark = buf;
 	bzero(mark, sizeof (page_t));
+	mark->p_hash = PVN_VPLIST_HASH_TAG;
 	return (0);
 }
 
@@ -990,6 +991,58 @@ leave:
 	cv_broadcast(&vp->v_cv);
 	mutex_exit(&vp->v_lock);
 	return (err);
+}
+
+/*
+ * Walk the vp->v_pages list, for every page call the callback function
+ * pointed by *page_check. If page_check returns non-zero, then mark the
+ * page as modified and if VMODSORT is set, move it to the end of v_pages
+ * list. Moving makes sense only if we have at least two pages - this also
+ * avoids having v_pages temporarily being NULL after calling page_vpsub()
+ * if there was just one page.
+ */
+void
+pvn_vplist_setdirty(vnode_t *vp, int (*page_check)(page_t *))
+{
+	page_t	*pp, *next, *end;
+	kmutex_t	*vphm;
+	int	shuffle;
+
+	vphm = page_vnode_mutex(vp);
+	mutex_enter(vphm);
+
+	if (vp->v_pages == NULL) {
+		mutex_exit(vphm);
+		return;
+	}
+
+	end = vp->v_pages->p_vpprev;
+	shuffle = IS_VMODSORT(vp) && (vp->v_pages != end);
+	pp = vp->v_pages;
+
+	for (;;) {
+		next = pp->p_vpnext;
+		if (pp->p_hash != PVN_VPLIST_HASH_TAG && page_check(pp)) {
+			/*
+			 * hat_setmod_only() in contrast to hat_setmod() does
+			 * not shuffle the pages and does not grab the mutex
+			 * page_vnode_mutex. Exactly what we need.
+			 */
+			hat_setmod_only(pp);
+			if (shuffle) {
+				page_vpsub(&vp->v_pages, pp);
+				ASSERT(vp->v_pages != NULL);
+				page_vpadd(&vp->v_pages->p_vpprev->p_vpnext,
+				    pp);
+			}
+		}
+		/* Stop if we have just processed the last page. */
+		if (pp == end)
+			break;
+		pp = next;
+	}
+
+	mutex_exit(vphm);
 }
 
 /*

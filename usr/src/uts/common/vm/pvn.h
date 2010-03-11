@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +38,6 @@
 
 #ifndef	_VM_PVN_H
 #define	_VM_PVN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/buf.h>
 #include <vm/seg.h>
@@ -73,6 +70,7 @@ int		pvn_vplist_dirty(struct vnode *vp, u_offset_t off,
 			int (*putapage)(vnode_t *, struct page *, u_offset_t *,
 				size_t *, int, cred_t *),
 			int flags, struct cred *cred);
+void		pvn_vplist_setdirty(vnode_t *vp, int (*page_check)(page_t *));
 int		pvn_getdirty(struct page *pp, int flags);
 void		pvn_vpzero(struct vnode *vp, u_offset_t vplen, size_t zbytes);
 int		pvn_getpages(
@@ -86,6 +84,12 @@ int		pvn_getpages(
 void		pvn_plist_init(struct page *pp, struct page **pl, size_t plsz,
 			u_offset_t off, size_t io_len, enum seg_rw rw);
 void		pvn_init(void);
+
+/*
+ * The value is put in p_hash to identify marker pages. It is safe to
+ * test p_hash ==(!=) PVN_VPLIST_HASH_TAG even without holding p_selock.
+ */
+#define	PVN_VPLIST_HASH_TAG	((page_t *)-1)
 
 /*
  * When requesting pages from the getpage routines, pvn_getpages will

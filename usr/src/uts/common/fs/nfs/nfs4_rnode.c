@@ -61,6 +61,8 @@
 #include <sys/callb.h>
 #include <sys/sdt.h>
 
+#include <vm/pvn.h>
+
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 #include <rpc/auth.h>
@@ -173,7 +175,8 @@ nfs4_dross_pages(vnode_t *vp)
 	mutex_enter(vphm);
 	if ((pp = vp->v_pages) != NULL) {
 		do {
-			if (pp->p_fsdata != C_NOCOMMIT) {
+			if (pp->p_hash != PVN_VPLIST_HASH_TAG &&
+			    pp->p_fsdata != C_NOCOMMIT) {
 				mutex_exit(vphm);
 				return (1);
 			}
@@ -679,6 +682,7 @@ start:
 	vp->v_vfsp = vfsp;
 	VFS_HOLD(vfsp);
 	vp->v_type = VNON;
+	vp->v_flag |= VMODSORT;
 	if (isrootfh(fh, rp))
 		vp->v_flag = VROOT;
 	vn_exists(vp);

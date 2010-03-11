@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,6 +110,16 @@ typedef struct commit {
 /*
  * The various values for the commit states.  These are stored in
  * the p_fsdata byte in the page struct.
+ * NFSv3,4 can use asynchronous writes - the NFS server can send a response
+ * before storing the data to the stable store (disk). The response contains
+ * information if the data are on a disk or not. NFS client marks pages
+ * which are already on the stable store as C_NOCOMMIT. The pages which were
+ * sent but are not yet on the stable store are only partially 'safe' and are
+ * marked as C_DELAYCOMMIT, which can be later changed to C_COMMIT if the
+ * commit operation is in progress. If the NFS server is e.g. rebooted, the
+ * client needs to resend all the uncommitted data. The client walks all the
+ * vp->v_pages and if C_DELAYCOMMIT or C_COMMIT is set, the page is marked as
+ * dirty and thus will be written to the server again.
  */
 #define	C_NOCOMMIT	0	/* no commit is required */
 #define	C_COMMIT	1	/* a commit is required so do it now */

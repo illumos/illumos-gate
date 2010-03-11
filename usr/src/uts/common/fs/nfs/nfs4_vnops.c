@@ -11859,36 +11859,10 @@ recov_retry:
 static void
 nfs4_set_mod(vnode_t *vp)
 {
-	page_t *pp;
-	kmutex_t *vphm;
-	rnode4_t *rp;
-
 	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	/* make sure we're looking at the master vnode, not a shadow */
-
-	rp = VTOR4(vp);
-	if (IS_SHADOW(vp, rp))
-		vp = RTOV4(rp);
-
-	vphm = page_vnode_mutex(vp);
-	mutex_enter(vphm);
-	/*
-	 * If there are no pages associated with this vnode, then
-	 * just return.
-	 */
-	if ((pp = vp->v_pages) == NULL) {
-		mutex_exit(vphm);
-		return;
-	}
-
-	do {
-		if (pp->p_fsdata != C_NOCOMMIT) {
-			hat_setmod(pp);
-			pp->p_fsdata = C_NOCOMMIT;
-		}
-	} while ((pp = pp->p_vpnext) != vp->v_pages);
-	mutex_exit(vphm);
+	pvn_vplist_setdirty(RTOV4(VTOR4(vp)), nfs_setmod_check);
 }
 
 /*
@@ -11939,6 +11913,10 @@ nfs4_get_commit(vnode_t *vp)
 	 * looking for pages which need to be committed.
 	 */
 	do {
+		/* Skip marker pages. */
+		if (pp->p_hash == PVN_VPLIST_HASH_TAG)
+			continue;
+
 		/*
 		 * First short-cut everything (without the page_lock)
 		 * and see if this page does not need to be committed

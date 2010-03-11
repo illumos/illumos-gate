@@ -954,6 +954,7 @@ extern void	nfs_srv_quiesce_all(void);
 extern void	(*nfs_srv_quiesce_func)(void);
 extern int	rfs4_dss_setpaths(char *, size_t);
 extern int	(*nfs_srv_dss_func)(char *, size_t);
+extern int	nfs_setmod_check(page_t *pp);
 extern time_t	rfs4_lease_time;
 extern time_t	rfs4_grace_period;
 extern nvlist_t	*rfs4_dss_paths, *rfs4_dss_oldpaths;

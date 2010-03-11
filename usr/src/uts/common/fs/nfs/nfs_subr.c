@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2590,6 +2590,7 @@ start:
 	vp->v_data = (caddr_t)rp;
 	vp->v_vfsp = vfsp;
 	vp->v_type = VNON;
+	vp->v_flag |= VMODSORT;
 	nfs_set_vroot(vp);
 
 	/*
@@ -2610,6 +2611,20 @@ start:
 	rp_addhash(rp);
 	*newnode = 1;
 	return (vp);
+}
+
+/*
+ * Callback function to check if the page should be marked as
+ * modified. In the positive case, p_fsdata is set to C_NOCOMMIT.
+ */
+int
+nfs_setmod_check(page_t *pp)
+{
+	if (pp->p_fsdata != C_NOCOMMIT) {
+		pp->p_fsdata = C_NOCOMMIT;
+		return (1);
+	}
+	return (0);
 }
 
 static void
