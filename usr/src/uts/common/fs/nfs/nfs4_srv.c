@@ -1427,9 +1427,7 @@ rfs4_op_commit(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	error = VOP_PUTPAGE(vp, args->offset, args->count, 0, cr, NULL);
-	if (!error)
-		error = VOP_FSYNC(vp, FNODSYNC, cr, NULL);
+	error = VOP_FSYNC(vp, FSYNC, cr, NULL);
 
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);

@@ -4459,9 +4459,7 @@ rfs3_commit(COMMIT3args *args, COMMIT3res *resp, struct exportinfo *exi,
 	    (error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL)))
 		goto out;
 
-	error = VOP_PUTPAGE(vp, args->offset, args->count, 0, cr, NULL);
-	if (!error)
-		error = VOP_FSYNC(vp, FNODSYNC, cr, NULL);
+	error = VOP_FSYNC(vp, FSYNC, cr, NULL);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
