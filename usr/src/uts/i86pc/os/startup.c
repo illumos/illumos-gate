@@ -133,7 +133,6 @@ struct xen_evt_data cpu0_evt_data;
 #endif /* __xpv */
 
 extern void progressbar_init(void);
-extern void progressbar_start(void);
 extern void brand_init(void);
 extern void pcf_init(void);
 extern void pg_init(void);
@@ -707,7 +706,6 @@ startup(void)
 	startup_modules();
 
 	startup_end();
-	progressbar_start();
 }
 
 static void
