@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,11 +120,10 @@ typedef struct si_port_state {
 
 	/*
 	 * We mop the commands for either abort, reset, timeout or
-	 * error handling cases. Only one such mopping thread is allowed
-	 * at a time.
+	 * error handling cases. This counts how many mops are in progress.
+	 * It is also used to return BUSY in tran_start if a mop is going on.
 	 */
 	int mopping_in_progress;
-	kmutex_t siport_mop_mutex; 	/* limits one mop at a time */
 
 	/* error recovery related info */
 	uint32_t siport_err_tags_SDBERROR;

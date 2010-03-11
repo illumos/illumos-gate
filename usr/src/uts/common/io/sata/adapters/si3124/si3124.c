@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1219,7 +1219,7 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 		return (SATA_TRAN_BUSY);
 	}
 
-	if (si_portp->mopping_in_progress) {
+	if (si_portp->mopping_in_progress > 0) {
 		spkt->satapkt_reason = SATA_PKT_BUSY;
 		SIDBG1(SIDBG_ERRS, si_ctlp,
 		    "si_tran_start returning BUSY while "
@@ -1286,8 +1286,7 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
  * In all these scenarios, we need to send any pending unfinished
  * commands up to sata framework.
  *
- * Only one mopping process at a time is allowed; this is achieved
- * by using siport_mop_mutex.
+ * WARNING!!! siport_mutex should be acquired before the function is called.
  */
 static void
 si_mop_commands(si_ctl_state_t *si_ctlp,
@@ -1318,18 +1317,12 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 	    timedout_tags,
 	    aborting_tags,
 	    reset_tags);
+
 	/*
 	 * We could be here for four reasons: abort, reset,
 	 * timeout or error handling. Only one such mopping
 	 * is allowed at a time.
-	 *
-	 * Note that we are already holding the main per port
-	 * mutex; all we need now is siport_mop_mutex.
 	 */
-	mutex_enter(&si_portp->siport_mop_mutex);
-	mutex_enter(&si_portp->siport_mutex);
-
-	si_portp->mopping_in_progress = 1;
 
 	finished_tags =  si_portp->siport_pending_tags &
 	    ~slot_status & SI_SLOT_MASK;
@@ -1466,7 +1459,7 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 
 	/* Send up aborting packets with SATA_PKT_ABORTED. */
 	while (aborting_tags) {
-		tmpslot = ddi_ffs(unfinished_tags) - 1;
+		tmpslot = ddi_ffs(aborting_tags) - 1;
 		if (tmpslot == -1) {
 			break;
 		}
@@ -1529,11 +1522,8 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 
 	ASSERT(unfinished_tags == 0);
 
-	si_portp->mopping_in_progress = 0;
-
-	mutex_exit(&si_portp->siport_mutex);
-	mutex_exit(&si_portp->siport_mop_mutex);
-
+	si_portp->mopping_in_progress--;
+	ASSERT(si_portp->mopping_in_progress >= 0);
 }
 
 /*
@@ -1561,6 +1551,17 @@ si_tran_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 	SIDBG1(SIDBG_ENTRY, si_ctlp, "si_tran_abort on port: %x", port);
 
 	mutex_enter(&si_portp->siport_mutex);
+
+	/*
+	 * If already mopping, then no need to abort anything.
+	 */
+	if (si_portp->mopping_in_progress > 0) {
+		SIDBG1(SIDBG_INFO, si_ctlp,
+		    "si_tran_abort: port %d mopping "
+		    "in progress, so just return", port);
+		mutex_exit(&si_portp->siport_mutex);
+		return (SATA_SUCCESS);
+	}
 
 	if ((si_portp->siport_port_type == PORT_TYPE_NODEV) ||
 	    !si_portp->siport_active) {
@@ -1599,6 +1600,7 @@ si_tran_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 		}
 	}
 
+	si_portp->mopping_in_progress++;
 
 	slot_status = ddi_get32(si_ctlp->sictl_port_acc_handle,
 	    (uint32_t *)(PORT_SLOT_STATUS(si_ctlp, port)));
@@ -1616,7 +1618,6 @@ si_tran_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 	    ~slot_status & SI_SLOT_MASK;
 	aborting_tags &= ~finished_tags;
 
-	mutex_exit(&si_portp->siport_mutex);
 	si_mop_commands(si_ctlp,
 	    si_portp,
 	    port,
@@ -1625,7 +1626,6 @@ si_tran_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 	    0, /* timedout_tags */
 	    aborting_tags,
 	    0); /* reset_tags */
-	mutex_enter(&si_portp->siport_mutex);
 
 	fill_dev_sregisters(si_ctlp, port, &spkt->satapkt_device);
 	mutex_exit(&si_portp->siport_mutex);
@@ -1661,7 +1661,8 @@ si_reject_all_reset_pkts(
 	/* Compute which tags need to be sent up. */
 	reset_tags = slot_status & SI_SLOT_MASK;
 
-	mutex_exit(&si_portp->siport_mutex);
+	si_portp->mopping_in_progress++;
+
 	si_mop_commands(si_ctlp,
 	    si_portp,
 	    port,
@@ -1670,8 +1671,6 @@ si_reject_all_reset_pkts(
 	    0, /* timedout_tags */
 	    0, /* aborting_tags */
 	    reset_tags);
-	mutex_enter(&si_portp->siport_mutex);
-
 }
 
 
@@ -1700,6 +1699,19 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 		mutex_exit(&si_ctlp->sictl_mutex);
 
 		mutex_enter(&si_portp->siport_mutex);
+
+		/*
+		 * If already mopping, then no need to reset or mop again.
+		 */
+		if (si_portp->mopping_in_progress > 0) {
+			SIDBG1(SIDBG_INFO, si_ctlp,
+			    "si_tran_reset_dport: CPORT port %d mopping "
+			    "in progress, so just return", port);
+			mutex_exit(&si_portp->siport_mutex);
+			retval = SI_SUCCESS;
+			break;
+		}
+
 		retval = si_reset_dport_wait_till_ready(si_ctlp, si_portp, port,
 		    SI_PORT_RESET);
 		si_reject_all_reset_pkts(si_ctlp,  si_portp, port);
@@ -1721,6 +1733,18 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 			break;
 		}
 
+		/*
+		 * If already mopping, then no need to reset or mop again.
+		 */
+		if (si_portp->mopping_in_progress > 0) {
+			SIDBG1(SIDBG_INFO, si_ctlp,
+			    "si_tran_reset_dport: DCPORT port %d mopping "
+			    "in progress, so just return", port);
+			mutex_exit(&si_portp->siport_mutex);
+			retval = SI_SUCCESS;
+			break;
+		}
+
 		retval = si_reset_dport_wait_till_ready(si_ctlp, si_portp, port,
 		    SI_DEVICE_RESET);
 		si_reject_all_reset_pkts(si_ctlp,  si_portp, port);
@@ -1731,17 +1755,31 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 	case SATA_ADDR_CNTRL:
 		for (i = 0; i < si_ctlp->sictl_num_ports; i++) {
 			mutex_enter(&si_ctlp->sictl_mutex);
-			si_portp = si_ctlp->sictl_ports[port];
+			si_portp = si_ctlp->sictl_ports[i];
 			mutex_exit(&si_ctlp->sictl_mutex);
 
 			mutex_enter(&si_portp->siport_mutex);
+
+			/*
+			 * If mopping, then all the pending commands are being
+			 * mopped, therefore there is nothing else to do.
+			 */
+			if (si_portp->mopping_in_progress > 0) {
+				SIDBG1(SIDBG_INFO, si_ctlp,
+				    "si_tran_reset_dport: CNTRL port %d mopping"
+				    " in progress, so just return", i);
+				mutex_exit(&si_portp->siport_mutex);
+				retval = SI_SUCCESS;
+				break;
+			}
+
 			retval = si_reset_dport_wait_till_ready(si_ctlp,
 			    si_portp, i, SI_PORT_RESET);
 			if (retval) {
 				mutex_exit(&si_portp->siport_mutex);
 				break;
 			}
-			si_reject_all_reset_pkts(si_ctlp,  si_portp, port);
+			si_reject_all_reset_pkts(si_ctlp,  si_portp, i);
 			mutex_exit(&si_portp->siport_mutex);
 		}
 		break;
@@ -1868,8 +1906,6 @@ si_alloc_port_state(si_ctl_state_t *si_ctlp, int port)
 	si_portp = si_ctlp->sictl_ports[port];
 	mutex_init(&si_portp->siport_mutex, NULL, MUTEX_DRIVER,
 	    (void *)(uintptr_t)si_ctlp->sictl_intr_pri);
-	mutex_init(&si_portp->siport_mop_mutex, NULL, MUTEX_DRIVER,
-	    (void *)(uintptr_t)si_ctlp->sictl_intr_pri);
 	mutex_enter(&si_portp->siport_mutex);
 
 	/* allocate prb & sgt pkts for this port. */
@@ -1907,7 +1943,6 @@ si_dealloc_port_state(si_ctl_state_t *si_ctlp, int port)
 	mutex_exit(&si_portp->siport_mutex);
 
 	mutex_destroy(&si_portp->siport_mutex);
-	mutex_destroy(&si_portp->siport_mop_mutex);
 
 	kmem_free(si_ctlp->sictl_ports[port], sizeof (si_port_state_t));
 
@@ -3752,7 +3787,8 @@ si_intr_command_error(
 	    slot_status,
 	    si_portp->siport_pending_tags);
 
-	mutex_exit(&si_portp->siport_mutex);
+	si_portp->mopping_in_progress++;
+
 	si_mop_commands(si_ctlp,
 	    si_portp,
 	    port,
@@ -3761,7 +3797,6 @@ si_intr_command_error(
 	    0, 	/* timedout_tags */
 	    0, 	/* aborting_tags */
 	    0); 	/* reset_tags */
-	mutex_enter(&si_portp->siport_mutex);
 
 	ASSERT(si_portp->siport_pending_tags == 0);
 
@@ -5239,6 +5274,8 @@ si_timeout_pkts(
 	slot_status = ddi_get32(si_ctlp->sictl_port_acc_handle,
 	    (uint32_t *)(PORT_SLOT_STATUS(si_ctlp, port)));
 
+	si_portp->mopping_in_progress++;
+
 	/*
 	 * Initialize the controller. The only way to timeout the commands
 	 * is to reset or initialize the controller. We mop commands after
@@ -5259,7 +5296,6 @@ si_timeout_pkts(
 	    finished_tags,
 	    timedout_tags);
 
-	mutex_exit(&si_portp->siport_mutex);
 	si_mop_commands(si_ctlp,
 	    si_portp,
 	    port,
@@ -5269,6 +5305,7 @@ si_timeout_pkts(
 	    0, /* aborting_tags */
 	    0);  /* reset_tags */
 
+	mutex_exit(&si_portp->siport_mutex);
 }
 
 
@@ -5307,6 +5344,15 @@ si_watchdog_handler(si_ctl_state_t *si_ctlp)
 		mutex_enter(&si_portp->siport_mutex);
 
 		if (si_portp->siport_port_type == PORT_TYPE_NODEV) {
+			mutex_exit(&si_portp->siport_mutex);
+			continue;
+		}
+
+		/* Skip the check for those ports in error recovery */
+		if (si_portp->mopping_in_progress > 0) {
+			SIDBG1(SIDBG_INFO, si_ctlp,
+			    "si_watchdog_handler: port %d mopping "
+			    "in progress, so just return", port);
 			mutex_exit(&si_portp->siport_mutex);
 			continue;
 		}
