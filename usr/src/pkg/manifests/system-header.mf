@@ -411,6 +411,7 @@ file path=usr/include/inet/snmpcom.h
 file path=usr/include/inet/tcp.h
 file path=usr/include/inet/tcp_sack.h
 file path=usr/include/inet/tcp_stack.h
+file path=usr/include/inet/tcp_stats.h
 file path=usr/include/inet/wifi_ioctl.h
 file path=usr/include/inttypes.h
 file path=usr/include/ipmp.h

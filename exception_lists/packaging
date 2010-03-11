@@ -141,7 +141,6 @@ usr/include/inet/ip2mac_impl.h
 usr/include/inet/ip2mac.h
 usr/include/inet/rawip_impl.h
 usr/include/inet/tcp_impl.h
-usr/include/inet/tcp_stats.h
 usr/include/inet/udp_impl.h
 usr/include/libmail.h
 usr/include/libnwam_priv.h
