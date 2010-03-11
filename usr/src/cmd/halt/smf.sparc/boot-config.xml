@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -91,9 +91,9 @@
 	<property_group name='config' type='application'>
 		<stability value='Stable' />
 		<propval name='fastreboot_default' type='boolean'
-		    value='true' />
+		    value='false' />
 		<propval name='fastreboot_onpanic' type='boolean'
-		    value='true' />
+		    value='false' />
 		<propval name='value_authorization' type='astring'
 		    value='solaris.system.shutdown' />
 		<propval name='uadmin_boot_archive_sync' type='boolean'

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,7 +79,7 @@ bootflags(struct bootops *ops)
 
 #if defined(_OBP)
 	/* skip bootblk args */
-	params.gos_opts = "abcdDF:gGHhi:km:o:O:rsvVwxZ:";
+	params.gos_opts = "abcdDf:F:gGHhi:km:o:O:rsvVwxZ:";
 #else
 	params.gos_opts = "abcdgGhi:km:O:rsvwx";
 #endif
@@ -103,6 +103,11 @@ bootflags(struct bootops *ops)
 #if defined(_OBP)
 		case 'D':
 		case 'F':
+			break;
+		case 'f':
+			(void)prom_setprop(prom_optionsnode(), "diag-level",
+			    (char *)params.gos_optargp,
+			    params.gos_optarglen + 1);
 			break;
 #endif
 		case 'g':

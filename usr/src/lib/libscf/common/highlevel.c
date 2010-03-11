@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,9 +162,6 @@ scf_get_boot_config(uint8_t *boot_config)
 	assert(boot_config);
 	*boot_config = 0;
 
-#ifndef	__x86
-	return;
-#else
 	{
 		/*
 		 * Property vector for BOOT_CONFIG_PG_PARAMS property group.
@@ -183,6 +180,8 @@ scf_get_boot_config(uint8_t *boot_config)
 		prop = NULL;
 		if (scf_read_propvec(FMRI_BOOT_CONFIG, BOOT_CONFIG_PG_PARAMS,
 		    B_TRUE, ua_boot_config, &prop) != SCF_FAILED) {
+
+#ifdef	__x86
 			/*
 			 * Unset both flags if the platform has been
 			 * blacklisted.
@@ -190,6 +189,7 @@ scf_get_boot_config(uint8_t *boot_config)
 			if (scf_is_fb_blacklisted())
 				*boot_config &= ~(UA_FASTREBOOT_DEFAULT |
 				    UA_FASTREBOOT_ONPANIC);
+#endif	/* __x86 */
 			return;
 		}
 #if defined(FASTREBOOT_DEBUG)
@@ -204,7 +204,6 @@ scf_get_boot_config(uint8_t *boot_config)
 		}
 #endif	/* FASTREBOOT_DEBUG */
 	}
-#endif	/* __x86 */
 }
 
 /*

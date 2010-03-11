@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -223,6 +223,7 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 		if (bootstr == NULL) {
 			switch (fcn) {
 
+			case AD_FASTREBOOT:
 			case AD_BOOT:
 				bootstr = "";
 				break;

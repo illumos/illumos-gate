@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,6 +128,7 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 		if (bootstr == NULL) {
 			switch (fcn) {
 
+			case AD_FASTREBOOT:
 			case AD_BOOT:
 				bootstr = "";
 				break;
@@ -148,6 +149,31 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 				    "mdboot: invalid function %d", fcn);
 				bootstr = "";
 				break;
+			}
+		}
+		if (fcn == AD_FASTREBOOT) {
+			pnode_t onode;
+			int dllen;
+			onode = prom_optionsnode();
+			if ((onode == OBP_NONODE) || (onode == OBP_BADNODE)) {
+				cmn_err(CE_WARN, "Unable to set diag level for"
+				    " quick reboot");
+			} else {
+				dllen = prom_getproplen(onode, "diag-level");
+				if (dllen != -1) {
+					int newstrlen;
+					char *newstr = kmem_alloc(strlen(
+					    bootstr) + dllen + 5, KM_SLEEP);
+					(void) strcpy(newstr, bootstr);
+					(void) strcat(newstr, " -f ");
+					newstrlen = strlen(bootstr) + 4;
+					(void) prom_getprop(onode, "diag-level",
+					    (caddr_t)&(newstr[newstrlen]));
+					newstr[newstrlen + dllen] = '\0';
+					bootstr = newstr;
+				}
+				(void) prom_setprop(onode, "diag-level",
+				    "off", 4);
 			}
 		}
 		reboot_machine(bootstr);

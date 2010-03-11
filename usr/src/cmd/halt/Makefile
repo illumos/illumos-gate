@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -32,8 +32,8 @@ include ../Makefile.cmd
 # A new propery config/uadmin_boot_archive_sync is added to
 # boot-config service. Which needs a support on sparc also.
 #
-sparc_SUBDIRS = smf
-i386_SUBDIRS = smf
+sparc_SUBDIRS = smf.sparc
+i386_SUBDIRS = smf.i386
 SUBDIRS = $($(MACH)_SUBDIRS)
 
 ROOTLINKS = $(ROOTUSRSBIN)/poweroff $(ROOTUSRSBIN)/reboot

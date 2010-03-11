@@ -1,4 +1,3 @@
-#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -20,21 +19,22 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Start and refresh method script for the boot-config service.
-#
 
-. /lib/svc/share/smf_include.sh
+include ../../Makefile.cmd
 
-#
-# This service is only valid in the global zone.
-#
-smf_is_globalzone || exit $SMF_EXIT_OK
+MANIFEST=	boot-config.xml
+SVCMETHOD=	svc-boot-config
 
-#
-# uadmin A_CONFIG AD_UPDATE_BOOT_CONFIG
-#
-/usr/sbin/uadmin 23 1
-exit $SMF_EXIT_OK
+ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
+
+all clean clobber lint:
+
+install:	all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+check:	 $(CHKMANIFEST)
+
+include ../../Makefile.targ

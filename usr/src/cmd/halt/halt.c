@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,6 +132,7 @@ static ctid_t startdct = -1;
  * Fast Reboot related variables
  */
 static char	fastboot_mounted[MAXPATHLEN];
+
 #if defined(__i386)
 static grub_boot_args_t	fbarg;
 static grub_boot_args_t	*fbarg_used;
@@ -1287,8 +1288,8 @@ main(int argc, char *argv[])
 		optstring = "dlnqpfe:";
 		usage = gettext("usage: %s [ -dlnq(p|fe:) ] [ boot args ]\n");
 #else
-		optstring = "dlnq";
-		usage = gettext("usage: %s [ -dlnq ] [ boot args ]\n");
+		optstring = "dlnqfp";
+		usage = gettext("usage: %s [ -dlnq(p|f) ] [ boot args ]\n");
 #endif
 		cmd = A_SHUTDOWN;
 		fcn = AD_BOOT;
@@ -1322,13 +1323,13 @@ main(int argc, char *argv[])
 		case 'y':
 			ttyn = NULL;
 			break;
-#if defined(__i386)
-		case 'p':
-			prom_reboot = 1;
-			break;
 		case 'f':
 			fast_reboot = 1;
 			break;
+		case 'p':
+			prom_reboot = 1;
+			break;
+#if defined(__i386)
 		case 'e':
 			bename = optarg;
 			break;
@@ -1382,13 +1383,14 @@ main(int argc, char *argv[])
 		    cmdname);
 		return (EINVAL);
 	}
-
 	/*
 	 * Check whether fast reboot is the default operating mode
 	 */
 	if (fcn == AD_BOOT && !fast_reboot && !prom_reboot &&
-	    zoneid == GLOBAL_ZONEID)
+	    zoneid == GLOBAL_ZONEID) {
 		fast_reboot = scf_is_fastboot_default();
+
+	}
 
 	if (bename && !fast_reboot)	{
 		(void) fprintf(stderr, gettext("%s: -e only valid with -f\n"),
@@ -1396,10 +1398,16 @@ main(int argc, char *argv[])
 		return (EINVAL);
 	}
 
+#if defined(__sparc)
+	if (fast_reboot) {
+		fast_reboot = 2;	/* need to distinguish each case */
+	}
+#endif
+
 	/*
 	 * If fast reboot, do some sanity check on the argument
 	 */
-	if (fast_reboot) {
+	if (fast_reboot == 1) {
 		int rc;
 		int is_dryrun = 0;
 
@@ -1543,7 +1551,7 @@ main(int argc, char *argv[])
 	 * Try to stop gdm so X has a chance to return the screen and
 	 * keyboard to a sane state.
 	 */
-	if (fast_reboot && stop_gdm() != 0) {
+	if (fast_reboot == 1 && stop_gdm() != 0) {
 		(void) fprintf(stderr,
 		    gettext("%s: Falling back to regular reboot.\n"), cmdname);
 		fast_reboot = 0;
@@ -1650,7 +1658,7 @@ fail:
 	else
 		(void) audit_halt_fail();
 
-	if (fast_reboot) {
+	if (fast_reboot == 1) {
 		if (bename) {
 			(void) halt_exec(LUUMOUNT_PROG, "-n", bename, NULL);
 
