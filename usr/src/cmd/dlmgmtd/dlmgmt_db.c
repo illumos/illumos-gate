@@ -42,6 +42,7 @@
 #include <unistd.h>
 #include <wait.h>
 #include <libcontract.h>
+#include <libcontract_priv.h>
 #include <sys/contract/process.h>
 #include "dlmgmt_impl.h"
 
