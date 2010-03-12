@@ -1,10 +1,6 @@
-#ifndef lint
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#endif
-
 /*
  * Open Boot Prom eeprom utility
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,6 +251,24 @@ print_one(char *var)
 {
 	Oppbuf	oppbuf;
 	struct openpromio *opp = &(oppbuf.opp);
+	char bootargs[MAXVALSIZE];
+
+	if (strcmp(var, "bootcmd") == 0) {
+		opp->oprom_size = MAXVALSIZE;
+		if (ioctl(prom_fd, OPROMGETBOOTARGS, opp) < 0) {
+			(void) _error(PERROR, "OPROMGETBOOTARGS");
+			return;
+		}
+		(void) strlcpy(bootargs, opp->oprom_array, MAXVALSIZE);
+
+		opp->oprom_size = MAXVALSIZE;
+		if (ioctl(prom_fd, OPROMGETBOOTPATH, opp) < 0) {
+			(void) _error(PERROR, "OPROMGETBOOTPATH");
+			return;
+		}
+		(void) printf("%s=%s %s\n", var, opp->oprom_array, bootargs);
+		return;
+	}
 
 	(void) strlcpy(opp->oprom_array, var, MAXNAMESIZE);
 	if (getpropval(opp) || opp->oprom_size <= 0)

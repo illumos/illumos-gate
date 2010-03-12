@@ -399,7 +399,18 @@ struct safefile {
 };
 
 static struct safefile *safefiles = NULL;
+
+/*
+ * svc:/system/filesystem/usr:default service checks for this file and
+ * does a boot archive update and then reboot the system.
+ */
 #define	NEED_UPDATE_FILE "/etc/svc/volatile/boot_archive_needs_update"
+
+/*
+ * svc:/system/boot-archive-update:default checks for this file and
+ * updates the boot archive.
+ */
+#define	NEED_UPDATE_SAFE_FILE "/etc/svc/volatile/boot_archive_safefile_update"
 
 /* Thanks growisofs */
 #define	CD_BLOCK	((off64_t)2048)
@@ -2061,7 +2072,8 @@ cmpstat(
 					    file + bam_rootlen, 0, NULL, 0);
 					regfree(&re);
 					if (status == 0) {
-						(void) creat(NEED_UPDATE_FILE,
+						(void) creat(
+						    NEED_UPDATE_SAFE_FILE,
 						    0644);
 						return (0);
 					}

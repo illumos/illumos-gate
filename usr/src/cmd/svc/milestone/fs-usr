@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
@@ -29,6 +29,8 @@
 #
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/fs_include.sh
+
+UPDATEFILE=/etc/svc/volatile/boot_archive_needs_update
 
 #
 # Once root is read/write we can enable the dedicated dumpdevice if it exists
@@ -149,6 +151,44 @@ fi
 readvfstab /dev/fd < $vfstab
 if [ "$mountp" -a -d /dev/fd ]; then
 	mountfs - /dev/fd - - - || exit $SMF_EXIT_ERR_FATAL
+fi
+
+if [ -f "${UPDATEFILE}" ]; then
+	/usr/sbin/bootadm update-archive
+	if [ $? != 0 ]; then
+		cecho ""
+		cecho "WARNING: Automatic update of the boot archive failed."
+		cecho "Try update the archives using 'bootadm update-archive'"
+		cecho "command and then reboot the system from the same device that"
+		cecho "was previously booted." 
+		cecho ""
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+	rm -f $UPDATEFILE
+	bootcmd=`/usr/sbin/eeprom bootcmd | /usr/bin/sed -e 's#bootcmd=##g'`
+	if [ `uname -p` = "i386" ]; then
+		/usr/sbin/reboot -f dryrun
+		if [ $? = 0 ]; then
+			/usr/sbin/reboot -f -- "$bootcmd" 
+			exit $SMF_EXIT_OK
+		fi
+		boot_prop=`/usr/sbin/svccfg -s svc:/system/boot-config:default listprop config/trust-bios-boot-device | \
+			/usr/bin/nawk '{ print $3}'`
+		if [ "$boot_prop" != "true" ]; then 
+			cecho ""
+			cecho "WARNING: Reboot required."
+			cecho "The system has updated the cache of files (boot archive) that is used"
+			cecho "during the early boot sequence. To avoid booting and running the system"
+			cecho "with the previously out-of-sync version of these files, reboot the"
+			cecho "system from the same device that was previously booted."
+			cecho ""
+			exit $SMF_EXIT_ERR_FATAL
+		else
+			/usr/sbin/reboot -p 
+			exit $SMF_EXIT_OK
+		fi 
+	fi
+	/usr/sbin/reboot -- "$bootcmd"
 fi
 
 exit $SMF_EXIT_OK

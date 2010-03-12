@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@ extern void get_kbenv(void);
 extern void close_kbenv(void);
 extern caddr_t get_propval(char *name, char *node);
 extern void setprogname(char *prog);
+extern char *getbootcmd(void);
 
 char *boottree;
 struct utsname uts_buf;
@@ -949,6 +950,8 @@ add_cmd(benv_des_t *bd, char *last, char **next, int *line)
 		add_bent(bd->elist, NULL, cmd, name, val);
 		(*line)++;
 	};
+
+	add_bent(bd->elist, NULL, "getprop", "bootcmd", getbootcmd());
 }
 
 /*

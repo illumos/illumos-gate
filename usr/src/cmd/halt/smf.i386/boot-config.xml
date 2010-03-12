@@ -90,6 +90,8 @@
 
 	<property_group name='config' type='application'>
 		<stability value='Stable' />
+		<propval name='trust-bios-boot-device' type='boolean'
+		    value='false' />	
 		<propval name='fastreboot_default' type='boolean'
 		    value='true' />
 		<propval name='fastreboot_onpanic' type='boolean'

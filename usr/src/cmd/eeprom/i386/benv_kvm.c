@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "benv.h"
 #include <sys/sunddi.h>
@@ -149,6 +147,16 @@ getnextprop(struct openpromio *opp, char *prop)
 	if (opp->oprom_size == 0)
 		return (0);
 	return (1);
+}
+
+char *
+getbootcmd(void)
+{
+	struct openpromio *opp = &(oppbuf.opp);
+	opp->oprom_size = MAXVALSIZE;
+	if (ioctl(prom_fd, OPROMGETBOOTPATH, opp) < 0)
+		return (NULL);
+	return (opp->oprom_array);
 }
 
 /*

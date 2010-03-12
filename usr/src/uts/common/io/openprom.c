@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,9 @@
 #include <sys/wanboot_impl.h>
 #include <sys/zone.h>
 #include <sys/consplat.h>
+#include <sys/bootconf.h>
+#include <sys/systm.h>
+#include <sys/bootprops.h>
 
 #define	MAX_OPENS	32	/* Up to this many simultaneous opens */
 
@@ -315,6 +318,30 @@ opromclose(dev_t dev, int flag, int otype, cred_t *cred_p)
 	return (0);
 }
 
+#ifdef __sparc
+static int
+get_bootpath_prop(char *bootpath)
+{
+	if (root_is_ramdisk) {
+		if (BOP_GETPROP(bootops, "bootarchive", bootpath) == -1)
+			return (-1);
+		(void) strlcat(bootpath, ":a", BO_MAXOBJNAME);
+	} else {
+		if ((BOP_GETPROP(bootops, "bootpath", bootpath) == -1) ||
+		    strlen(bootpath) == 0) {
+			if (BOP_GETPROP(bootops,
+			    "boot-path", bootpath) == -1)
+				return (-1);
+		}
+		if (memcmp(bootpath, BP_ISCSI_DISK,
+		    strlen(BP_ISCSI_DISK)) == 0) {
+			get_iscsi_bootpath_vhci(bootpath);
+		}
+	}
+	return (0);
+}
+#endif
+
 struct opromioctl_args {
 	struct oprom_state *st;
 	int cmd;
@@ -457,6 +484,7 @@ opromioctl_cb(void *avp, int has_changed)
 	case OPROMSNAPSHOT:
 	case OPROMGETCONS:
 	case OPROMGETBOOTARGS:
+	case OPROMGETBOOTPATH:
 	case OPROMGETVERSION:
 	case OPROMPATH2DRV:
 	case OPROMPROM2DEVNAME:
@@ -704,6 +732,37 @@ opromioctl_cb(void *avp, int has_changed)
 		(void) strcpy(opp->oprom_array, kern_bootargs);
 		opp->oprom_size = valsize - 1;
 
+		if (copyout(opp, (void *)arg, valsize + sizeof (uint_t)) != 0)
+			error = EFAULT;
+		break;
+	}
+
+	case OPROMGETBOOTPATH: {
+#if defined(__sparc) && defined(_OBP)
+
+		char bpath[OBP_MAXPATHLEN];
+		if (get_bootpath_prop(bpath) != 0) {
+			error = EINVAL;
+			break;
+		}
+		valsize = strlen(bpath) + 1;
+		if (valsize > userbufsize) {
+			error = EINVAL;
+			break;
+		}
+		(void) strcpy(opp->oprom_array, bpath);
+
+#elif defined(__i386) || defined(__amd64)
+
+		extern char saved_cmdline[];
+		valsize = strlen(saved_cmdline) + 1;
+		if (valsize > userbufsize) {
+			error = EINVAL;
+			break;
+		}
+		(void) strcpy(opp->oprom_array, saved_cmdline);
+#endif
+		opp->oprom_size = valsize - 1;
 		if (copyout(opp, (void *)arg, valsize + sizeof (uint_t)) != 0)
 			error = EFAULT;
 		break;

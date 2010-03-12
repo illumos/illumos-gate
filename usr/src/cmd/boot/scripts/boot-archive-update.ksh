@@ -20,15 +20,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/fs_include.sh
 
-UPDATEFILE=/etc/svc/volatile/boot_archive_needs_update
+UPDATEFILE=/etc/svc/volatile/boot_archive_safefile_update
 
 smf_is_globalzone || exit $SMF_EXIT_OK
 
