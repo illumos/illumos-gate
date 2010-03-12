@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -737,34 +737,51 @@ sctp_faddr_t *
 sctp_rotate_faddr(sctp_t *sctp, sctp_faddr_t *ofp)
 {
 	sctp_faddr_t *nfp = NULL;
+	sctp_faddr_t *saved_fp = NULL;
+	int min_strikes;
 
 	if (ofp == NULL) {
 		ofp = sctp->sctp_current;
 	}
+	/* Nothing to do */
+	if (sctp->sctp_nfaddrs < 2)
+		return (ofp);
 
-	/* Find the next live one */
-	for (nfp = ofp->next; nfp != NULL; nfp = nfp->next) {
-		if (nfp->state == SCTP_FADDRS_ALIVE) {
-			break;
+	min_strikes = ofp->strikes;
+
+	/*
+	 * Find the next live peer address with zero strikes. In case
+	 * there is none, find the one with the lowest number of strikes.
+	 */
+	for (nfp = ofp->next; nfp != ofp; nfp = nfp->next) {
+		/* If reached end of list, continue scan from the head */
+		if (nfp == NULL) {
+			nfp = sctp->sctp_faddrs;
+			continue;
 		}
-	}
-
-	if (nfp == NULL) {
-		/* Continue from beginning of list */
-		for (nfp = sctp->sctp_faddrs; nfp != ofp; nfp = nfp->next) {
-			if (nfp->state == SCTP_FADDRS_ALIVE) {
+		if (nfp->state == SCTP_FADDRS_ALIVE) {
+			if (nfp->strikes == 0)
 				break;
+			if (nfp->strikes < min_strikes) {
+				min_strikes = nfp->strikes;
+				saved_fp = nfp;
 			}
 		}
 	}
+	/* If reached the old address, there is no zero strike path */
+	if (nfp == ofp)
+		nfp = NULL;
 
 	/*
-	 * nfp could only be NULL if all faddrs are down, and when
-	 * this happens, faddr_dead() should have killed the
-	 * association. Hence this assertion...
+	 * If there is a peer address with zero strikes  we use that, if not
+	 * return a peer address with fewer strikes than the one last used,
+	 * if neither exist we may as well stay with the old one.
 	 */
-	ASSERT(nfp != NULL);
-	return (nfp);
+	if (nfp != NULL)
+		return (nfp);
+	if (saved_fp != NULL)
+		return (saved_fp);
+	return (ofp);
 }
 
 void
