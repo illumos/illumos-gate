@@ -7248,7 +7248,7 @@ retry:
 				return (0);
 			}
 		}
-		if (retry_cnt++ < 3) {
+		if (retry_cnt++ < 6) {
 			VHCI_DEBUG(1, (CE_WARN, NULL,
 			    "!v_s_do_s_c:retry packet 0x%p "
 			    "status 0x%x reason %s",
