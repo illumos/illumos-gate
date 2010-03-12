@@ -32,10 +32,8 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/siginfo.h>
 #include <sys/time.h>
 #include <sys/poll.h>
-#include <sys/wait.h>
 #include <sys/file.h>
 #include <sys/syscall.h>
 
@@ -476,54 +474,4 @@ int
 s10_umount(sysret_t *rval, const char *path)
 {
 	return (__systemcall(rval, SYS_umount2 + 1024, path, 0));
-}
-
-/*
- * Convert the siginfo_t code and status fields to an old style
- * wait status for s10_wait(), below.
- */
-static int
-wstat(int code, int status)
-{
-	int stat = (status & 0377);
-
-	switch (code) {
-	case CLD_EXITED:
-		stat <<= 8;
-		break;
-	case CLD_DUMPED:
-		stat |= WCOREFLG;
-		break;
-	case CLD_KILLED:
-		break;
-	case CLD_TRAPPED:
-	case CLD_STOPPED:
-		stat <<= 8;
-		stat |= WSTOPFLG;
-		break;
-	case CLD_CONTINUED:
-		stat = WCONTFLG;
-		break;
-	}
-	return (stat);
-}
-
-/*
- * Interposition upon SYS_wait
- */
-int
-s10_wait(sysret_t *rval)
-{
-	int err;
-	siginfo_t info;
-
-	err = __systemcall(rval, SYS_waitid + 1024,
-	    P_ALL, 0, &info, WEXITED | WTRAPPED);
-	if (err != 0)
-		return (err);
-
-	rval->sys_rval1 = info.si_pid;
-	rval->sys_rval2 = wstat(info.si_code, info.si_status);
-
-	return (0);
 }

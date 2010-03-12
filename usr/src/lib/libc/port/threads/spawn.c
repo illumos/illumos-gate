@@ -68,9 +68,6 @@ typedef struct file_attr {
 	int		fa_newfiledes;	/* new file descriptor for dup2() */
 } file_attr_t;
 
-extern	int	__lwp_sigmask(int, const sigset_t *, sigset_t *);
-extern	int	__sigaction(int, const struct sigaction *, struct sigaction *);
-
 #if defined(_LP64)
 #define	__open64	__open
 #define	getdents64	getdents
@@ -145,7 +142,7 @@ perform_flag_actions(spawn_attr_t *sap)
 	struct sigaction action;
 
 	if (sap->sa_psflags & POSIX_SPAWN_SETSIGMASK) {
-		(void) __lwp_sigmask(SIG_SETMASK, &sap->sa_sigmask, NULL);
+		(void) __lwp_sigmask(SIG_SETMASK, &sap->sa_sigmask);
 	}
 
 	if (sap->sa_psflags & POSIX_SPAWN_SETSIGIGN_NP) {

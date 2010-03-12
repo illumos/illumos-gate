@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,7 +78,7 @@ Abort(const char *msg)
 	/* delete SIGABRT from the signal mask */
 	(void) sigemptyset(&sigmask);
 	(void) sigaddset(&sigmask, SIGABRT);
-	(void) __lwp_sigmask(SIG_UNBLOCK, &sigmask, NULL);
+	(void) __lwp_sigmask(SIG_UNBLOCK, &sigmask);
 
 	(void) _lwp_kill(lwpid, SIGABRT);	/* never returns */
 	(void) kill(getpid(), SIGABRT);	/* if it does, try harder */

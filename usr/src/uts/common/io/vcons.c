@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -627,7 +627,7 @@ vt_proc_exists(pid_t pid)
 	return (0);
 }
 
-#define	SIG_VALID(x)	(((x) > 0) && ((x) < _SIGRTMAX) && \
+#define	SIG_VALID(x)	(((x) > 0) && ((x) <= MAXSIG) && \
 			((x) != SIGKILL) && ((x) != SIGSTOP))
 
 static int

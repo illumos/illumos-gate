@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,8 +37,9 @@
 #include <sys/schedctl.h>
 #include <sys/debug.h>
 
+/* ARGSUSED4 */
 int64_t
-lwp_sigmask(int how, uint_t bits0, uint_t bits1)
+lwp_sigmask(int how, uint_t bits0, uint_t bits1, uint_t bits2, uint_t bits3)
 {
 	kthread_t *t = curthread;
 	proc_t *p = ttoproc(t);
@@ -53,7 +54,13 @@ lwp_sigmask(int how, uint_t bits0, uint_t bits1)
 
 	bits0 &= (FILLSET0 & ~CANTMASK0);
 	bits1 &= (FILLSET1 & ~CANTMASK1);
+	bits2 &= (FILLSET2 & ~CANTMASK2);
 
+	/*
+	 * As a sop to the s10 brand, we continue to return
+	 * the first two words of the signal mask, regardless
+	 * of the value of 'how', even though libc doesn't use them.
+	 */
 	rv.r_val1 = t->t_hold.__sigbits[0];
 	rv.r_val2 = t->t_hold.__sigbits[1];
 
@@ -61,16 +68,19 @@ lwp_sigmask(int how, uint_t bits0, uint_t bits1)
 	case SIG_BLOCK:
 		t->t_hold.__sigbits[0] |= bits0;
 		t->t_hold.__sigbits[1] |= bits1;
+		t->t_hold.__sigbits[2] |= bits2;
 		break;
 	case SIG_UNBLOCK:
 		t->t_hold.__sigbits[0] &= ~bits0;
 		t->t_hold.__sigbits[1] &= ~bits1;
+		t->t_hold.__sigbits[2] &= ~bits2;
 		if (sigcheck(p, t))
 			t->t_sig_check = 1;
 		break;
 	case SIG_SETMASK:
 		t->t_hold.__sigbits[0] = bits0;
 		t->t_hold.__sigbits[1] = bits1;
+		t->t_hold.__sigbits[2] = bits2;
 		if (sigcheck(p, t))
 			t->t_sig_check = 1;
 		break;
@@ -79,21 +89,16 @@ lwp_sigmask(int how, uint_t bits0, uint_t bits1)
 	return (rv.r_vals);
 }
 
-/*
- * This system call is no longer called from libc.
- * It exists solely for the benefit of statically-linked
- * binaries from the past.  It should be eliminated.
- */
 int
 sigprocmask(int how, sigset_t *setp, sigset_t *osetp)
 {
 	sigset_t set;
+	sigset_t oset;
 	k_sigset_t kset;
-	rval_t rv;
 
 	/*
-	 * User's oset and set might be the same address, so copyin first and
-	 * save before copying out.
+	 * User's osetp and setp might be the same address,
+	 * so copyin first and save before copying out.
 	 */
 	if (setp) {
 		switch (how) {
@@ -107,20 +112,20 @@ sigprocmask(int how, sigset_t *setp, sigset_t *osetp)
 		if (copyin((caddr_t)setp, (caddr_t)&set, sizeof (sigset_t)))
 			return (set_errno(EFAULT));
 		sigutok(&set, &kset);
-	} else {
-		/* none of SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK equals 0 */
-		how = 0;
-		sigemptyset(&kset);
 	}
 
-	rv.r_vals = lwp_sigmask(how, kset.__sigbits[0], kset.__sigbits[1]);
-
 	if (osetp) {
-		kset.__sigbits[0] = rv.r_val1;
-		kset.__sigbits[1] = rv.r_val2;
-		sigktou(&kset, &set);
-		if (copyout((caddr_t)&set, (caddr_t)osetp, sizeof (sigset_t)))
+		sigktou(&curthread->t_hold, &oset);
+		if (copyout((caddr_t)&oset, (caddr_t)osetp, sizeof (sigset_t)))
 			return (set_errno(EFAULT));
+	}
+
+	if (setp) {
+		(void) lwp_sigmask(how,
+		    kset.__sigbits[0],
+		    kset.__sigbits[1],
+		    kset.__sigbits[2],
+		    0);
 	}
 
 	return (0);

@@ -60,31 +60,35 @@
 #include <sys/dtrace.h>
 #include <sys/sdt.h>
 
-				/* MUST be contiguous */
-k_sigset_t nullsmask = {0, 0};
+const k_sigset_t nullsmask = {0, 0, 0};
 
-k_sigset_t fillset = {FILLSET0, FILLSET1};
+const k_sigset_t fillset =	/* MUST be contiguous */
+	{FILLSET0, FILLSET1, FILLSET2};
 
-k_sigset_t cantmask = {CANTMASK0, CANTMASK1};
+const k_sigset_t cantmask =
+	{CANTMASK0, CANTMASK1, CANTMASK2};
 
-k_sigset_t cantreset = {(sigmask(SIGILL)|sigmask(SIGTRAP)|sigmask(SIGPWR)), 0};
+const k_sigset_t cantreset =
+	{(sigmask(SIGILL)|sigmask(SIGTRAP)|sigmask(SIGPWR)), 0, 0};
 
-k_sigset_t ignoredefault = {(sigmask(SIGCONT)|sigmask(SIGCLD)|sigmask(SIGPWR)
-			|sigmask(SIGWINCH)|sigmask(SIGURG)|sigmask(SIGWAITING)),
-			(sigmask(SIGLWP)|sigmask(SIGCANCEL)|sigmask(SIGFREEZE)
-			|sigmask(SIGTHAW)|sigmask(SIGXRES)|sigmask(SIGJVM1)
-			|sigmask(SIGJVM2))};
+const k_sigset_t ignoredefault =
+	{(sigmask(SIGCONT)|sigmask(SIGCLD)|sigmask(SIGPWR)
+	|sigmask(SIGWINCH)|sigmask(SIGURG)|sigmask(SIGWAITING)),
+	(sigmask(SIGLWP)|sigmask(SIGCANCEL)|sigmask(SIGFREEZE)
+	|sigmask(SIGTHAW)|sigmask(SIGXRES)|sigmask(SIGJVM1)
+	|sigmask(SIGJVM2)), 0};
 
-k_sigset_t stopdefault = {(sigmask(SIGSTOP)|sigmask(SIGTSTP)
-			|sigmask(SIGTTOU)|sigmask(SIGTTIN)), 0};
+const k_sigset_t stopdefault =
+	{(sigmask(SIGSTOP)|sigmask(SIGTSTP)|sigmask(SIGTTOU)|sigmask(SIGTTIN)),
+	0, 0};
 
-k_sigset_t coredefault = {(sigmask(SIGQUIT)|sigmask(SIGILL)|sigmask(SIGTRAP)
-			|sigmask(SIGIOT)|sigmask(SIGEMT)|sigmask(SIGFPE)
-			|sigmask(SIGBUS)|sigmask(SIGSEGV)|sigmask(SIGSYS)
-			|sigmask(SIGXCPU)|sigmask(SIGXFSZ)), 0};
+const k_sigset_t coredefault =
+	{(sigmask(SIGQUIT)|sigmask(SIGILL)|sigmask(SIGTRAP)|sigmask(SIGIOT)
+	|sigmask(SIGEMT)|sigmask(SIGFPE)|sigmask(SIGBUS)|sigmask(SIGSEGV)
+	|sigmask(SIGSYS)|sigmask(SIGXCPU)|sigmask(SIGXFSZ)), 0, 0};
 
-k_sigset_t holdvfork = {(sigmask(SIGTTOU)|sigmask(SIGTTIN)|sigmask(SIGTSTP)),
-			0};
+const k_sigset_t holdvfork =
+	{(sigmask(SIGTTOU)|sigmask(SIGTTIN)|sigmask(SIGTSTP)), 0, 0};
 
 static	int	isjobstop(int);
 static	void	post_sigcld(proc_t *, sigqueue_t *);
@@ -1403,7 +1407,7 @@ psig(void)
 		if (!sigismember(&PTOU(curproc)->u_signodefer, sig))
 			sigaddset(&t->t_hold, sig);
 		if (sigismember(&PTOU(curproc)->u_sigresethand, sig))
-			setsigact(sig, SIG_DFL, nullsmask, 0);
+			setsigact(sig, SIG_DFL, &nullsmask, 0);
 
 		DTRACE_PROC3(signal__handle, int, sig, k_siginfo_t *,
 		    sip, void (*)(void), func);
@@ -1539,7 +1543,7 @@ fsig(k_sigset_t *ssp, kthread_t *t)
 }
 
 void
-setsigact(int sig, void (*disp)(), k_sigset_t mask, int flags)
+setsigact(int sig, void (*disp)(), const k_sigset_t *mask, int flags)
 {
 	proc_t *p = ttoproc(curthread);
 	kthread_t *t;
@@ -1562,7 +1566,7 @@ setsigact(int sig, void (*disp)(), k_sigset_t mask, int flags)
 
 	if (disp != SIG_DFL && disp != SIG_IGN) {
 		sigdelset(&p->p_ignore, sig);
-		PTOU(curproc)->u_sigmask[sig - 1] = mask;
+		PTOU(curproc)->u_sigmask[sig - 1] = *mask;
 		if (!sigismember(&cantreset, sig)) {
 			if (flags & SA_RESETHAND)
 				sigaddset(&PTOU(curproc)->u_sigresethand, sig);
@@ -2162,24 +2166,27 @@ stop_on_fault(uint_t fault, k_siginfo_t *sip)
 }
 
 void
-sigorset(k_sigset_t *s1, k_sigset_t *s2)
+sigorset(k_sigset_t *s1, const k_sigset_t *s2)
 {
 	s1->__sigbits[0] |= s2->__sigbits[0];
 	s1->__sigbits[1] |= s2->__sigbits[1];
+	s1->__sigbits[2] |= s2->__sigbits[2];
 }
 
 void
-sigandset(k_sigset_t *s1, k_sigset_t *s2)
+sigandset(k_sigset_t *s1, const k_sigset_t *s2)
 {
 	s1->__sigbits[0] &= s2->__sigbits[0];
 	s1->__sigbits[1] &= s2->__sigbits[1];
+	s1->__sigbits[2] &= s2->__sigbits[2];
 }
 
 void
-sigdiffset(k_sigset_t *s1, k_sigset_t *s2)
+sigdiffset(k_sigset_t *s1, const k_sigset_t *s2)
 {
 	s1->__sigbits[0] &= ~(s2->__sigbits[0]);
 	s1->__sigbits[1] &= ~(s2->__sigbits[1]);
+	s1->__sigbits[2] &= ~(s2->__sigbits[2]);
 }
 
 /*
@@ -2196,15 +2203,28 @@ sigcheck(proc_t *p, kthread_t *t)
 	/*
 	 * If signals are blocked via the schedctl interface
 	 * then we only check for the unmaskable signals.
+	 * The unmaskable signal numbers should all be contained
+	 * in __sigbits[0] and we assume this for speed.
 	 */
+#if (CANTMASK1 == 0 && CANTMASK2 == 0)
 	if (tdp != NULL && tdp->sc_sigblock)
 		return ((p->p_sig.__sigbits[0] | t->t_sig.__sigbits[0]) &
 		    CANTMASK0);
+#else
+#error "fix me: CANTMASK1 and CANTMASK2 are not zero"
+#endif
 
+/* see uts/common/sys/signal.h for why this must be true */
+#if ((MAXSIG > (2 * 32)) && (MAXSIG <= (3 * 32)))
 	return (((p->p_sig.__sigbits[0] | t->t_sig.__sigbits[0]) &
 	    ~t->t_hold.__sigbits[0]) |
-	    (((p->p_sig.__sigbits[1] | t->t_sig.__sigbits[1]) &
-	    ~t->t_hold.__sigbits[1]) & FILLSET1));
+	    ((p->p_sig.__sigbits[1] | t->t_sig.__sigbits[1]) &
+	    ~t->t_hold.__sigbits[1]) |
+	    (((p->p_sig.__sigbits[2] | t->t_sig.__sigbits[2]) &
+	    ~t->t_hold.__sigbits[2]) & FILLSET2));
+#else
+#error "fix me: MAXSIG out of bounds"
+#endif
 }
 
 /* ONC_PLUS EXTRACT START */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1289,7 +1289,9 @@ libc_init(void)
 	 */
 	setmask =
 	    ((self->ul_sigmask.__sigbits[0] ^ uc.uc_sigmask.__sigbits[0]) |
-	    (self->ul_sigmask.__sigbits[1] ^ uc.uc_sigmask.__sigbits[1]));
+	    (self->ul_sigmask.__sigbits[1] ^ uc.uc_sigmask.__sigbits[1]) |
+	    (self->ul_sigmask.__sigbits[2] ^ uc.uc_sigmask.__sigbits[2]) |
+	    (self->ul_sigmask.__sigbits[3] ^ uc.uc_sigmask.__sigbits[3]));
 
 #ifdef __sparc
 	/*

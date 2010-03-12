@@ -961,6 +961,7 @@ _init(void)
 	s10_emulation_table[S10_SYS_fstat] = 1;			/*  28 */
 	s10_emulation_table[S10_SYS_utime] = 1;			/*  30 */
 	s10_emulation_table[S10_SYS_access] = 1;		/*  33 */
+	s10_emulation_table[SYS_kill] = 1;			/*  37 */
 	s10_emulation_table[S10_SYS_dup] = 1;			/*  41 */
 	s10_emulation_table[SYS_ioctl] = 1;			/*  54 */
 	s10_emulation_table[SYS_execve] = 1;			/*  59 */
@@ -972,6 +973,13 @@ _init(void)
 	s10_emulation_table[S10_SYS_poll] = 1;			/*  87 */
 	s10_emulation_table[S10_SYS_lstat] = 1;			/*  88 */
 	s10_emulation_table[S10_SYS_fchown] = 1;		/*  94 */
+	s10_emulation_table[SYS_sigprocmask] = 1;		/*  95 */
+	s10_emulation_table[SYS_sigsuspend] = 1;		/*  96 */
+	s10_emulation_table[SYS_sigaction] = 1;			/*  98 */
+	s10_emulation_table[SYS_sigpending] = 1;		/*  99 */
+	s10_emulation_table[SYS_context] = 1;			/* 100 */
+	s10_emulation_table[SYS_waitid] = 1;			/* 107 */
+	s10_emulation_table[SYS_sigsendsys] = 1;		/* 108 */
 #if defined(__x86)
 	s10_emulation_table[S10_SYS_xstat] = 1;			/* 123 */
 	s10_emulation_table[S10_SYS_lxstat] = 1;		/* 124 */
@@ -981,18 +989,23 @@ _init(void)
 	s10_emulation_table[S10_SYS_lchown] = 1;		/* 130 */
 	s10_emulation_table[S10_SYS_rename] = 1;		/* 134 */
 	s10_emulation_table[SYS_uname] = 1;			/* 135 */
+	s10_emulation_table[SYS_sysconfig] = 1;			/* 137 */
 	s10_emulation_table[SYS_systeminfo] = 1;		/* 139 */
 	s10_emulation_table[S10_SYS_fork1] = 1;			/* 143 */
+	s10_emulation_table[SYS_sigtimedwait] = 1;		/* 144 */
 	s10_emulation_table[S10_SYS_lwp_sema_wait] = 1;		/* 147 */
 	s10_emulation_table[S10_SYS_utimes] = 1;		/* 154 */
-#if defined(__amd64)
 	s10_emulation_table[SYS_lwp_create] = 1;		/* 159 */
+	s10_emulation_table[SYS_lwp_kill] = 1;			/* 163 */
+	s10_emulation_table[SYS_lwp_sigmask] = 1;		/* 165 */
+#if defined(__amd64)
 	s10_emulation_table[SYS_lwp_private] = 1;		/* 166 */
 #endif	/* __amd64 */
 	s10_emulation_table[S10_SYS_lwp_mutex_lock] = 1;	/* 169 */
 	s10_emulation_table[SYS_pwrite] = 1;			/* 174 */
 	s10_emulation_table[SYS_auditsys] = 1;			/* 186 */
 	s10_emulation_table[SYS_sigqueue] = 1;			/* 190 */
+	s10_emulation_table[SYS_signotify] = 1;			/* 205 */
 	s10_emulation_table[SYS_lwp_mutex_timedlock] = 1;	/* 210 */
 	s10_emulation_table[SYS_getdents64] = 1;		/* 213 */
 	s10_emulation_table[S10_SYS_stat64] = 1;		/* 215 */

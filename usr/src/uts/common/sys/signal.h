@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +39,6 @@
 
 #ifndef _SYS_SIGNAL_H
 #define	_SYS_SIGNAL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/iso/signal_iso.h>
@@ -67,21 +65,10 @@ extern "C" {
 typedef struct {		/* signal set type */
 	unsigned int	__sigbits[4];
 } sigset_t;
-
-#if defined(_SYSCALL32)
-
-/* Kernel view of the ILP32 user sigset_t structure */
-
-typedef struct {
-	uint32_t	__sigbits[4];
-} sigset32_t;
-
-#endif	/* _SYSCALL32 */
-
 #endif	/* _SIGSET_T */
 
 typedef	struct {
-	unsigned int	__sigbits[2];
+	unsigned int	__sigbits[3];
 } k_sigset_t;
 
 /*
@@ -130,7 +117,7 @@ struct sigaction32 {
 		caddr32_t	_handler;
 		caddr32_t	_sigaction;
 	}	_funcptr;
-	sigset32_t	sa_mask;
+	sigset_t	sa_mask;
 	int32_t		sa_resv[2];
 };
 
@@ -171,8 +158,8 @@ struct sigaction32 {
  * use of these symbols by applications is injurious
  *	to binary compatibility
  */
-#define	NSIG	49	/* valid signals range from 1 to NSIG-1 */
-#define	MAXSIG	48	/* size of u_signal[], NSIG-1 <= MAXSIG */
+#define	NSIG	73	/* valid signals range from 1 to NSIG-1 */
+#define	MAXSIG	72	/* size of u_signal[], NSIG-1 <= MAXSIG */
 #endif /* defined(__EXTENSIONS__) || !defined(_XPG4_2) */
 
 #define	MINSIGSTKSZ	2048
@@ -261,42 +248,45 @@ struct sigstack {
 #ifdef _KERNEL
 #include <sys/t_lock.h>
 
-extern k_sigset_t
-	nullsmask,		/* a null signal mask */
-	fillset,		/* valid signals, guaranteed contiguous */
-	holdvfork,		/* held while doing vfork */
-	cantmask,		/* cannot be caught or ignored */
-	cantreset,		/* cannot be reset after catching */
-	ignoredefault,		/* ignored by default */
-	stopdefault,		/* stop by default */
-	coredefault;		/* dumps core by default */
+extern const k_sigset_t nullsmask;	/* a null signal mask */
+extern const k_sigset_t fillset;	/* all signals, guaranteed contiguous */
+extern const k_sigset_t cantmask;	/* cannot be caught or ignored */
+extern const k_sigset_t cantreset;	/* cannot be reset after catching */
+extern const k_sigset_t ignoredefault;	/* ignored by default */
+extern const k_sigset_t stopdefault;	/* stop by default */
+extern const k_sigset_t coredefault;	/* dumps core by default */
+extern const k_sigset_t holdvfork;	/* held while doing vfork */
 
 #define	sigmask(n)		((unsigned int)1 << (((n) - 1) & (32 - 1)))
 #define	sigword(n)		(((unsigned int)((n) - 1))>>5)
 
-#if	((MAXSIG > 32) && (MAXSIG <= 64))
+#if ((MAXSIG > (2 * 32)) && (MAXSIG <= (3 * 32)))
 #define	FILLSET0	0xffffffffu
-#define	FILLSET1	((1u << (MAXSIG - 32)) - 1)
+#define	FILLSET1	0xffffffffu
+#define	FILLSET2	((1u << (MAXSIG - 64)) - 1)
 #else
 #error "fix me: MAXSIG out of bounds"
 #endif
 
 #define	CANTMASK0	(sigmask(SIGKILL)|sigmask(SIGSTOP))
 #define	CANTMASK1	0
+#define	CANTMASK2	0
 
 #define	sigemptyset(s)		(*(s) = nullsmask)
 #define	sigfillset(s)		(*(s) = fillset)
 #define	sigaddset(s, n)		((s)->__sigbits[sigword(n)] |= sigmask(n))
 #define	sigdelset(s, n)		((s)->__sigbits[sigword(n)] &= ~sigmask(n))
 #define	sigismember(s, n)	(sigmask(n) & (s)->__sigbits[sigword(n)])
-#define	sigisempty(s)		(!(((s)->__sigbits[0]) | ((s)->__sigbits[1])))
+#define	sigisempty(s)		(!((s)->__sigbits[0] | (s)->__sigbits[1] | \
+				(s)->__sigbits[2]))
 #define	sigutok(us, ks)		\
 	((ks)->__sigbits[0] = (us)->__sigbits[0] & (FILLSET0 & ~CANTMASK0), \
-	    (ks)->__sigbits[1] = (us)->__sigbits[1] & (FILLSET1 & ~CANTMASK1))
+	(ks)->__sigbits[1] = (us)->__sigbits[1] & (FILLSET1 & ~CANTMASK1), \
+	(ks)->__sigbits[2] = (us)->__sigbits[2] & (FILLSET2 & ~CANTMASK2))
 #define	sigktou(ks, us)		((us)->__sigbits[0] = (ks)->__sigbits[0], \
-				    (us)->__sigbits[1] = (ks)->__sigbits[1], \
-				    (us)->__sigbits[2] = 0, \
-				    (us)->__sigbits[3] = 0)
+				(us)->__sigbits[1] = (ks)->__sigbits[1], \
+				(us)->__sigbits[2] = (ks)->__sigbits[2], \
+				(us)->__sigbits[3] = 0)
 typedef struct {
 	int	sig;				/* signal no.		*/
 	int	perm;				/* flag for EPERM	*/
@@ -325,10 +315,10 @@ typedef struct sigqhdr {		/* sigqueue pool header		*/
 #define	_SIGQUEUE_MAX	32
 #define	_SIGNOTIFY_MAX	32
 
-extern	void	setsigact(int, void (*)(int), k_sigset_t, int);
-extern	void	sigorset(k_sigset_t *, k_sigset_t *);
-extern	void	sigandset(k_sigset_t *, k_sigset_t *);
-extern	void	sigdiffset(k_sigset_t *, k_sigset_t *);
+extern	void	setsigact(int, void (*)(int), const k_sigset_t *, int);
+extern	void	sigorset(k_sigset_t *, const k_sigset_t *);
+extern	void	sigandset(k_sigset_t *, const k_sigset_t *);
+extern	void	sigdiffset(k_sigset_t *, const k_sigset_t *);
 extern	void	sigintr(k_sigset_t *, int);
 extern	void	sigunintr(k_sigset_t *);
 extern	void	sigreplace(k_sigset_t *, k_sigset_t *);

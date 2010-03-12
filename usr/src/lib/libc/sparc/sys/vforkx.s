@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,30 +59,34 @@
 
 	ENTRY_NP(vforkx)
 	ba	0f
-	mov	%o0, %o3		/* flags */
+	mov	%o0, %o5		/* flags */
 	ENTRY_NP(vfork)
-	clr	%o3			/* flags = 0 */
+	clr	%o5			/* flags = 0 */
 0:
 	mov	SIG_SETMASK, %o0	/* block all signals */
 	set	MASKSET0, %o1
 	set	MASKSET1, %o2
-	SYSTRAP_2RVALS(lwp_sigmask)
+	set	MASKSET2, %o3
+	set	MASKSET3, %o4
+	SYSTRAP_RVAL1(lwp_sigmask)
 
-	mov	%o3, %o1		/* flags */
+	mov	%o5, %o1		/* flags */
 	mov	2, %o0
 	SYSTRAP_2RVALS(forksys)		/* vforkx(flags) */
 	bcc,a,pt %icc, 1f
 	tst	%o1
 
-	mov	%o0, %o3		/* save the vfork() error number */
+	mov	%o0, %o5		/* save the vfork() error number */
 
 	mov	SIG_SETMASK, %o0	/* reinstate signals */
 	ld	[%g7 + UL_SIGMASK], %o1
 	ld	[%g7 + UL_SIGMASK + 4], %o2
-	SYSTRAP_2RVALS(lwp_sigmask)
+	ld	[%g7 + UL_SIGMASK + 8], %o3
+	ld	[%g7 + UL_SIGMASK + 12], %o4
+	SYSTRAP_RVAL1(lwp_sigmask)
 
 	ba	__cerror
-	mov	%o3, %o0		/* restore the vfork() error number */
+	mov	%o5, %o0		/* restore the vfork() error number */
 
 1:
 	/*
@@ -108,14 +112,16 @@
 	 */
 	stn	%g0, [%g7 + UL_SCHEDCTL]
 	stn	%g0, [%g7 + UL_SCHEDCTL_CALLED]
-	mov	%o0, %o3		/* save the vfork() return value */
+	mov	%o0, %o5		/* save the vfork() return value */
 
 	mov	SIG_SETMASK, %o0	/* reinstate signals */
 	ld	[%g7 + UL_SIGMASK], %o1
 	ld	[%g7 + UL_SIGMASK + 4], %o2
-	SYSTRAP_2RVALS(lwp_sigmask)
+	ld	[%g7 + UL_SIGMASK + 8], %o3
+	ld	[%g7 + UL_SIGMASK + 12], %o4
+	SYSTRAP_RVAL1(lwp_sigmask)
 
 	retl
-	mov	%o3, %o0		/* restore the vfork() return value */
+	mov	%o5, %o0		/* restore the vfork() return value */
 	SET_SIZE(vfork)
 	SET_SIZE(vforkx)

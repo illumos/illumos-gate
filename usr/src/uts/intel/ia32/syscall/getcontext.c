@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,7 @@
  * Save user context.
  */
 void
-savecontext(ucontext_t *ucp, k_sigset_t mask)
+savecontext(ucontext_t *ucp, const k_sigset_t *mask)
 {
 	proc_t *p = ttoproc(curthread);
 	klwp_t *lwp = ttolwp(curthread);
@@ -124,7 +124,7 @@ savecontext(ucontext_t *ucp, k_sigset_t mask)
 	else
 		ucp->uc_flags &= ~UC_FPU;
 
-	sigktou(&mask, &ucp->uc_sigmask);
+	sigktou(mask, &ucp->uc_sigmask);
 }
 
 /*
@@ -198,7 +198,7 @@ getsetcontext(int flag, void *arg)
 
 	case GETCONTEXT:
 		schedctl_finish_sigblock(curthread);
-		savecontext(&uc, curthread->t_hold);
+		savecontext(&uc, &curthread->t_hold);
 		if (copyout(&uc, arg, sizeof (uc)))
 			return (set_errno(EFAULT));
 		return (0);
@@ -249,7 +249,7 @@ getsetcontext(int flag, void *arg)
  * Save user context for 32-bit processes.
  */
 void
-savecontext32(ucontext32_t *ucp, k_sigset_t mask)
+savecontext32(ucontext32_t *ucp, const k_sigset_t *mask)
 {
 	proc_t *p = ttoproc(curthread);
 	klwp_t *lwp = ttolwp(curthread);
@@ -306,7 +306,7 @@ savecontext32(ucontext32_t *ucp, k_sigset_t mask)
 	else
 		ucp->uc_flags &= ~UC_FPU;
 
-	sigktou(&mask, &ucp->uc_sigmask);
+	sigktou(mask, &ucp->uc_sigmask);
 }
 
 int
@@ -325,7 +325,7 @@ getsetcontext32(int flag, void *arg)
 
 	case GETCONTEXT:
 		schedctl_finish_sigblock(curthread);
-		savecontext32(&uc, curthread->t_hold);
+		savecontext32(&uc, &curthread->t_hold);
 		if (copyout(&uc, arg, sizeof (uc)))
 			return (set_errno(EFAULT));
 		return (0);

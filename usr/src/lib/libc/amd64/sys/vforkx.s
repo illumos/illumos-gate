@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,26 +62,31 @@
 	xorq	%r8, %r8		/* flags = 0 */
 0:
 	popq	%r9			/* save return %rip in %r9 */
-	movl	$MASKSET1, %edx		/* block all signals */
+	pushq	%r8			/* save the flags on the stack */
+	movl	$MASKSET3, %r8d		/* block all signals */
+	movl	$MASKSET2, %ecx
+	movl	$MASKSET1, %edx
 	movl	$MASKSET0, %esi
 	movl	$SIG_SETMASK, %edi
 	__SYSCALL(lwp_sigmask)
 
-	movq	%r8, %rsi		/* flags */
+	popq	%rsi			/* fetch flags from the stack */
 	movl	$2, %edi
 	__SYSCALL(forksys)		/* vforkx(flags) */
 	jae 	1f
 
 	/* reconstruct stack before jumping to __cerror */
 	pushq	%r9
-	movq	%rax, %r8		/* save the vfork() error number */
+	movq	%rax, %r9		/* save the vfork() error number */
 
-	movl	%fs:UL_SIGMASK+4, %edx	/* reinstate signals */
+	movl	%fs:UL_SIGMASK+12, %r8d	/* reinstate signals */
+	movl	%fs:UL_SIGMASK+8, %ecx
+	movl	%fs:UL_SIGMASK+4, %edx
 	movl	%fs:UL_SIGMASK, %esi
 	movl	$SIG_SETMASK, %edi
 	__SYSCALL(lwp_sigmask)
 
-	movq	%r8, %rax		/* restore the vfork() error number */
+	movq	%r9, %rax		/* restore the vfork() error number */
 	jmp	__cerror
 
 1:
@@ -112,14 +117,16 @@
 	xorq	%rdx, %rdx
 	movq	%rdx, %fs:UL_SCHEDCTL
 	movq	%rdx, %fs:UL_SCHEDCTL_CALLED
-	movq	%rax, %r8		/* save the vfork() return value */
+	pushq	%rax			/* save the vfork() return value */
 
-	movl	%fs:UL_SIGMASK+4, %edx	/* reinstate signals */
+	movl	%fs:UL_SIGMASK+12, %r8d	/* reinstate signals */
+	movl	%fs:UL_SIGMASK+8, %ecx
+	movl	%fs:UL_SIGMASK+4, %edx
 	movl	%fs:UL_SIGMASK, %esi
 	movl	$SIG_SETMASK, %edi
 	__SYSCALL(lwp_sigmask)
 
-	movq	%r8, %rax		/* restore the vfork() return value */
+	popq	%rax			/* restore the vfork() return value */
 	jmp	*%r9			/* jump back to the caller */
 	SET_SIZE(vfork)
 	SET_SIZE(vforkx)

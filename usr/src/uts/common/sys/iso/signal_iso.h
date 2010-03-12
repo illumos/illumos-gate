@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,7 +94,7 @@ extern "C" {
 
 /* insert new signals here, and move _SIGRTM* appropriately */
 #define	_SIGRTMIN 41	/* first (highest-priority) realtime signal */
-#define	_SIGRTMAX 48	/* last (lowest-priority) realtime signal */
+#define	_SIGRTMAX 72	/* last (lowest-priority) realtime signal */
 extern long _sysconf(int);	/* System Private interface to sysconf() */
 #define	SIGRTMIN ((int)_sysconf(_SC_SIGRT_MIN))	/* first realtime signal */
 #define	SIGRTMAX ((int)_sysconf(_SC_SIGRT_MAX))	/* last realtime signal */

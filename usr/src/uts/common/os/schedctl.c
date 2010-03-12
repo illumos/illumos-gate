@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -344,6 +344,7 @@ schedctl_finish_sigblock(kthread_t *t)
 	if (tdp != NULL && tdp->sc_sigblock) {
 		t->t_hold.__sigbits[0] = FILLSET0 & ~CANTMASK0;
 		t->t_hold.__sigbits[1] = FILLSET1 & ~CANTMASK1;
+		t->t_hold.__sigbits[2] = FILLSET2 & ~CANTMASK2;
 		tdp->sc_sigblock = 0;
 	}
 }

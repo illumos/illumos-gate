@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -938,17 +938,17 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	lxpr_uiobuf_printf(uiobuf,
 	    "\n"
-	    "SigPnd:\t%08x%08x\n"
-	    "SigBlk:\t%08x%08x\n"
-	    "SigIgn:\t%08x%08x\n"
-	    "SigCgt:\t%08x%08x\n"
+	    "SigPnd:\t%08x%08x%08x\n"
+	    "SigBlk:\t%08x%08x%08x\n"
+	    "SigIgn:\t%08x%08x%08x\n"
+	    "SigCgt:\t%08x%08x%08x\n"
 	    "CapInh:\t%016x\n"
 	    "CapPrm:\t%016x\n"
 	    "CapEff:\t%016x\n",
-	    current.__sigbits[1], current.__sigbits[0],
-	    0, 0, /* signals blocked on per thread basis */
-	    ignore.__sigbits[1], ignore.__sigbits[0],
-	    handle.__sigbits[1], handle.__sigbits[0],
+	    current.__sigbits[2], current.__sigbits[1], current.__sigbits[0],
+	    0, 0, 0, /* signals blocked on per thread basis */
+	    ignore.__sigbits[2], ignore.__sigbits[1], ignore.__sigbits[0],
+	    handle.__sigbits[2], handle.__sigbits[1], handle.__sigbits[0],
 	    /* Can't do anything with linux capabilities */
 	    0,
 	    0,

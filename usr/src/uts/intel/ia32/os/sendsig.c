@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -288,7 +288,7 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	 */
 	uc = (ucontext_t *)(sp + sizeof (struct sigframe));
 	tuc = kmem_alloc(sizeof (*tuc), KM_SLEEP);
-	savecontext(tuc, lwp->lwp_sigoldmask);
+	savecontext(tuc, &lwp->lwp_sigoldmask);
 	copyout_noerr(tuc, uc, sizeof (*tuc));
 	kmem_free(tuc, sizeof (*tuc));
 	tuc = NULL;
@@ -506,7 +506,7 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	fp -= SA32(sizeof (*tuc));
 	uc = (ucontext32_t *)fp;
 	tuc = kmem_alloc(sizeof (*tuc), KM_SLEEP);
-	savecontext32(tuc, lwp->lwp_sigoldmask);
+	savecontext32(tuc, &lwp->lwp_sigoldmask);
 	copyout_noerr(tuc, uc, sizeof (*tuc));
 	kmem_free(tuc, sizeof (*tuc));
 	tuc = NULL;
@@ -726,7 +726,7 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	fp -= SA(sizeof (*tuc));
 	uc = (ucontext_t *)fp;
 	tuc = kmem_alloc(sizeof (*tuc), KM_SLEEP);
-	savecontext(tuc, lwp->lwp_sigoldmask);
+	savecontext(tuc, &lwp->lwp_sigoldmask);
 	copyout_noerr(tuc, uc, sizeof (*tuc));
 	kmem_free(tuc, sizeof (*tuc));
 	tuc = NULL;

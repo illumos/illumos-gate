@@ -673,18 +673,24 @@ typedef struct ulwp {
 
 #define	SIGMASK(sig)	((uint32_t)1 << (((sig) - 1) & (32 - 1)))
 
-#if (MAXSIG > 32 && MAXSIG <= 64)
+#if (MAXSIG > (2 * 32) && MAXSIG <= (3 * 32))
 #define	FILLSET0	0xffffffffu
-#define	FILLSET1	((1u << (MAXSIG - 32)) - 1)
+#define	FILLSET1	0xffffffffu
+#define	FILLSET2	((1u << (MAXSIG - 64)) - 1)
+#define	FILLSET3	0
 #else
 #error "fix me: MAXSIG out of bounds"
 #endif
 
 #define	CANTMASK0	(SIGMASK(SIGKILL) | SIGMASK(SIGSTOP))
 #define	CANTMASK1	0
+#define	CANTMASK2	0
+#define	CANTMASK3	0
 
 #define	MASKSET0	(FILLSET0 & ~CANTMASK0)
 #define	MASKSET1	(FILLSET1 & ~CANTMASK1)
+#define	MASKSET2	(FILLSET2 & ~CANTMASK2)
+#define	MASKSET3	(FILLSET3 & ~CANTMASK3)
 
 extern	const sigset_t maskset;		/* set of all maskable signals */
 
@@ -1057,8 +1063,8 @@ typedef struct ulwp32 {
 	uint_t		ul_pilocks;	/* count of PI locks held */
 		/* the following members *must* be last in the structure */
 		/* they are discarded when ulwp is replaced on thr_exit() */
-	sigset32_t	ul_sigmask;	/* thread's current signal mask */
-	sigset32_t	ul_tmpmask;	/* signal mask for sigsuspend/pollsys */
+	sigset_t	ul_sigmask;	/* thread's current signal mask */
+	sigset_t	ul_tmpmask;	/* signal mask for sigsuspend/pollsys */
 	siginfo32_t	ul_siginfo;	/* deferred siginfo */
 	mutex_t		ul_spinlock;	/* used when suspending/continuing */
 	fpuenv32_t	ul_fpuenv;	/* floating point state */
@@ -1286,8 +1292,8 @@ extern	void	_sigon(void);
 #define	delete_reserved_signals(s)			\
 	(((s)->__sigbits[0] &= MASKSET0),		\
 	((s)->__sigbits[1] &= (MASKSET1 & ~SIGMASK(SIGCANCEL))),\
-	((s)->__sigbits[2] = 0),			\
-	((s)->__sigbits[3] = 0))
+	((s)->__sigbits[2] &= MASKSET2),		\
+	((s)->__sigbits[3] &= MASKSET3))
 
 extern	void	block_all_signals(ulwp_t *self);
 
@@ -1302,7 +1308,7 @@ extern	void	block_all_signals(ulwp_t *self);
 #define	restore_signals(self)						\
 	((void) ((self)->ul_cursig?					\
 	(ASSERT((self)->ul_critical + (self)->ul_sigdefer != 0), 0) :	\
-	__lwp_sigmask(SIG_SETMASK, &(self)->ul_sigmask, NULL)))
+	__lwp_sigmask(SIG_SETMASK, &(self)->ul_sigmask)))
 
 extern	void	set_cancel_pending_flag(ulwp_t *, int);
 extern	void	set_cancel_eintr_flag(ulwp_t *);
@@ -1378,7 +1384,8 @@ extern	void	abstime_to_reltime(clockid_t, const timespec_t *, timespec_t *);
 extern	void	hrt2ts(hrtime_t, timespec_t *);
 
 extern	int	__sigaction(int, const struct sigaction *, struct sigaction *);
-extern	int	__lwp_sigmask(int, const sigset_t *, sigset_t *);
+extern	int	__sigprocmask(int, const sigset_t *, sigset_t *);
+extern	int	__lwp_sigmask(int, const sigset_t *);
 extern	void	__sighndlr(int, siginfo_t *, ucontext_t *, void (*)());
 extern	caddr_t	__sighndlrend;
 #pragma unknown_control_flow(__sighndlr)

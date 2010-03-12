@@ -40,7 +40,8 @@
 #include <siginfo.h>
 #include <sys/systm.h>
 
-const sigset_t maskset = {MASKSET0, MASKSET1, 0, 0};	/* maskable signals */
+/* maskable signals */
+const sigset_t maskset = {MASKSET0, MASKSET1, MASKSET2, MASKSET3};
 
 /*
  * Return true if the valid signal bits in both sets are the same.
@@ -53,8 +54,14 @@ sigequalset(const sigset_t *s1, const sigset_t *s2)
 	 * (for speed).  Algorithm:
 	 * if (s1 & fillset) == (s2 & fillset) then (s1 ^ s2) & fillset == 0
 	 */
+/* see lib/libc/inc/thr_uberdata.h for why this must be true */
+#if (MAXSIG > (2 * 32) && MAXSIG <= (3 * 32))
 	return (!((s1->__sigbits[0] ^ s2->__sigbits[0]) |
-	    ((s1->__sigbits[1] ^ s2->__sigbits[1]) & FILLSET1)));
+	    (s1->__sigbits[1] ^ s2->__sigbits[1]) |
+	    ((s1->__sigbits[2] ^ s2->__sigbits[2]) & FILLSET2)));
+#else
+#error "fix me: MAXSIG out of bounds"
+#endif
 }
 
 /*
@@ -150,7 +157,7 @@ call_user_handler(int sig, siginfo_t *sip, ucontext_t *ucp)
 		(void) sigaddset(&uact.sa_mask, sig);
 	self->ul_sigmask = uact.sa_mask;
 	self->ul_siglink = ucp;
-	(void) __lwp_sigmask(SIG_SETMASK, &uact.sa_mask, NULL);
+	(void) __lwp_sigmask(SIG_SETMASK, &uact.sa_mask);
 
 	/*
 	 * If this thread has been sent SIGCANCEL from the kernel
@@ -487,7 +494,7 @@ block_all_signals(ulwp_t *self)
 	    (scp = setup_schedctl()) != NULL)
 		scp->sc_sigblock = 1;
 	else
-		(void) __lwp_sigmask(SIG_SETMASK, &maskset, NULL);
+		(void) __lwp_sigmask(SIG_SETMASK, &maskset);
 	exit_critical(self);
 }
 
@@ -615,14 +622,20 @@ thr_sigsetmask(int how, const sigset_t *set, sigset_t *oset)
 		case SIG_BLOCK:
 			self->ul_sigmask.__sigbits[0] |= set->__sigbits[0];
 			self->ul_sigmask.__sigbits[1] |= set->__sigbits[1];
+			self->ul_sigmask.__sigbits[2] |= set->__sigbits[2];
+			self->ul_sigmask.__sigbits[3] |= set->__sigbits[3];
 			break;
 		case SIG_UNBLOCK:
 			self->ul_sigmask.__sigbits[0] &= ~set->__sigbits[0];
 			self->ul_sigmask.__sigbits[1] &= ~set->__sigbits[1];
+			self->ul_sigmask.__sigbits[2] &= ~set->__sigbits[2];
+			self->ul_sigmask.__sigbits[3] &= ~set->__sigbits[3];
 			break;
 		case SIG_SETMASK:
 			self->ul_sigmask.__sigbits[0] = set->__sigbits[0];
 			self->ul_sigmask.__sigbits[1] = set->__sigbits[1];
+			self->ul_sigmask.__sigbits[2] = set->__sigbits[2];
+			self->ul_sigmask.__sigbits[3] = set->__sigbits[3];
 			break;
 		}
 		delete_reserved_signals(&self->ul_sigmask);
@@ -651,7 +664,7 @@ sigprocmask(int how, const sigset_t *set, sigset_t *oset)
 	 * Guard against children of vfork().
 	 */
 	if (curthread->ul_vfork)
-		return (__lwp_sigmask(how, set, oset));
+		return (__sigprocmask(how, set, oset));
 
 	if ((error = thr_sigsetmask(how, set, oset)) != 0) {
 		errno = error;

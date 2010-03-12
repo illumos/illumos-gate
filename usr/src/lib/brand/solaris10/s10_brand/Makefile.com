@@ -25,7 +25,7 @@
 
 LIBRARY =	s10_brand.a
 VERS =		.1
-COBJS =		s10_brand.o s10_deleted.o
+COBJS =		s10_brand.o s10_deleted.o s10_signal.o
 ASOBJS =	s10_crt.o s10_handler.o s10_runexe.o
 OFFSETS_SRC =	../common/offsets.in
 OFFSETS_H =	assym.h

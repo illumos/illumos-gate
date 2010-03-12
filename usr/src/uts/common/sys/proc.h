@@ -272,11 +272,6 @@ typedef struct	proc {
 	struct prof p_prof;		/* profile arguments */
 
 	/*
-	 * The user structure
-	 */
-	struct user p_user;		/* (see sys/user.h) */
-
-	/*
 	 * Doors.
 	 */
 	door_pool_t		p_server_threads; /* common thread pool */
@@ -361,6 +356,11 @@ typedef struct	proc {
 	rctl_qty_t	p_crypto_mem;	/* /dev/crypto memory charged to proc */
 					/* protected by p_lock */
 	clock_t	p_ttime;		/* buffered task time */
+
+	/*
+	 * The user structure
+	 */
+	struct user p_user;		/* (see sys/user.h) */
 } proc_t;
 
 #define	PROC_T				/* headers relying on proc_t are OK */

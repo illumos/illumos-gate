@@ -413,8 +413,7 @@ forkall(void)
 	if (!self->ul_vfork) {						\
 		if (sigmask) {						\
 			block_all_signals(self);			\
-			self->ul_tmpmask.__sigbits[0] = sigmask->__sigbits[0]; \
-			self->ul_tmpmask.__sigbits[1] = sigmask->__sigbits[1]; \
+			self->ul_tmpmask = *sigmask;			\
 			delete_reserved_signals(&self->ul_tmpmask);	\
 			self->ul_sigsuspend = 1;			\
 		}							\

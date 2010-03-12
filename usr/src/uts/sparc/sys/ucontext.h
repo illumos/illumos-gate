@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,19 +18,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
 #ifndef _SYS_UCONTEXT_H
 #define	_SYS_UCONTEXT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.10 */
 
 #include <sys/feature_tests.h>
 
@@ -100,7 +97,7 @@ struct	__ucontext {
 typedef struct ucontext32 {
 	uint32_t	uc_flags;
 	caddr32_t	uc_link;
-	sigset32_t	uc_sigmask;
+	sigset_t	uc_sigmask;
 	stack32_t	uc_stack;
 	mcontext32_t	uc_mcontext;
 	int32_t		uc_filler[23];
@@ -145,11 +142,11 @@ extern void fpuregset_nto32(const fpregset_t *, fpregset32_t *, struct fq32 *);
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 
 #ifdef _KERNEL
-extern void savecontext(ucontext_t *, k_sigset_t);
+extern void savecontext(ucontext_t *, const k_sigset_t *);
 extern void restorecontext(ucontext_t *);
 
 #ifdef _SYSCALL32
-extern void savecontext32(ucontext32_t *, k_sigset_t, struct fq32 *);
+extern void savecontext32(ucontext32_t *, const k_sigset_t *, struct fq32 *);
 #endif
 #endif
 

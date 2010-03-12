@@ -1021,7 +1021,7 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 		goto badstack;
 
 	tuc = kmem_alloc(sizeof (ucontext_t), KM_SLEEP);
-	savecontext(tuc, lwp->lwp_sigoldmask);
+	savecontext(tuc, &lwp->lwp_sigoldmask);
 
 	/*
 	 * save extra register state if it exists
@@ -1351,7 +1351,7 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 		goto badstack;
 
 	tuc = kmem_alloc(sizeof (ucontext32_t), KM_SLEEP);
-	savecontext32(tuc, lwp->lwp_sigoldmask, dfq);
+	savecontext32(tuc, &lwp->lwp_sigoldmask, dfq);
 
 	/*
 	 * save extra register state if it exists

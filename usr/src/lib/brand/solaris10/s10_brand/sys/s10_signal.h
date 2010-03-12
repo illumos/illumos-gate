@@ -24,16 +24,35 @@
  * Use is subject to license terms.
  */
 
-#include "lint.h"
-#include <signal.h>
-#include <sys/syscall.h>
+#ifndef _S10_SIGNAL_H
+#define	_S10_SIGNAL_H
 
-int
-__lwp_sigmask(int how, const sigset_t *set)
-{
-	return (syscall(SYS_lwp_sigmask, how,
-	    set->__sigbits[0],
-	    set->__sigbits[1],
-	    set->__sigbits[2],
-	    set->__sigbits[3]));
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+#if !defined(_ASM)
+
+#include <sys/types.h>
+#include <sys/signal.h>
+
+extern pid_t zone_init_pid;
+
+typedef void (*s10_sighandler_t)(int, siginfo_t *, void *);
+
+#endif	/* !_ASM */
+
+#define	S10_NSIG	49
+
+/*
+ * Configurable in native Solaris, stick with the values assigned
+ * by default as _SIGRTMIN and _SIGRTMAX in S10.
+ */
+#define	S10_SIGRTMIN	41
+#define	S10_SIGRTMAX	48
+
+#ifdef	__cplusplus
 }
+#endif
+
+#endif	/* _S10_SIGNAL_H */

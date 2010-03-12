@@ -134,7 +134,6 @@ cluster_wrapper(void)
 
 char initname[INITNAME_SZ] = "/sbin/init";	/* also referenced by zone0 */
 char initargs[BOOTARGS_MAX] = "";		/* also referenced by zone0 */
-extern int64_t lwp_sigmask(int, uint_t, uint_t);
 
 /*
  * Construct a stack for init containing the arguments to it, then
@@ -264,7 +263,7 @@ exec_init(const char *initpath, const char *args)
 	 * parent process's signal mask.  Clear it now so that we behave in
 	 * the same way as when started from the global zone.
 	 */
-	(void) lwp_sigmask(SIG_UNBLOCK, 0xffffffff, 0xffffffff);
+	sigemptyset(&curthread->t_hold);
 
 	brand_action = ZONE_IS_BRANDED(p->p_zone) ? EBA_BRAND : EBA_NONE;
 again:

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,22 +18,21 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1992-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include "lint.h"
 #include <signal.h>
 #include <siginfo.h>
 
-#undef _sys_siginfolist
-#define	OLDNSIG 34
+#undef	_sys_siginfolist
+#define	OLDNSIG	34
 
 const char *_sys_traplist[NSIGTRAP] = {
 	"breakpoint trap",
@@ -46,7 +44,7 @@ const char *_sys_traplist[NSIGTRAP] = {
 };
 
 const char *_sys_illlist[NSIGILL] = {
-	"illegal opcode",
+	"illegal instruction",
 	"illegal operand",
 	"illegal addressing mode",
 	"illegal trap",
@@ -69,7 +67,7 @@ const char *_sys_fpelist[NSIGFPE] = {
 
 const char *_sys_segvlist[NSIGSEGV] = {
 	"address not mapped to object",
-	"invalid permissions",
+	"invalid permissions"
 };
 
 const char *_sys_buslist[NSIGBUS] = {
@@ -177,6 +175,30 @@ static const struct siginfolist _sys_siginfolist_data[NSIG-1] = {
 	0,		0,			/* SIGRTMIN+1 */
 	0,		0,			/* SIGRTMIN+2 */
 	0,		0,			/* SIGRTMIN+3 */
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,			/* SIGRTMIN+15 */
+	0,		0,			/* SIGRTMAX-15 */
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
 	0,		0,			/* SIGRTMAX-3 */
 	0,		0,			/* SIGRTMAX-2 */
 	0,		0,			/* SIGRTMAX-1 */

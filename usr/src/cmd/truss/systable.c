@@ -382,7 +382,7 @@ const struct systable systable[] = {
 {"lwp_continue", 1, DEC, NOV, DEC},				/* 162 */
 {"lwp_kill",	2, DEC, NOV, DEC, SIG},				/* 163 */
 {"lwp_self",	0, DEC, NOV},					/* 164 */
-{"lwp_sigmask",	3, HEX, HEX, SPM, HEX, HEX},			/* 165 */
+{"lwp_sigmask",	5, HEX, HEX, SPM, HEX, HEX, HEX, HEX},		/* 165 */
 {"lwp_private",	3, HEX, NOV, DEC, DEC, HEX},			/* 166 */
 {"lwp_wait",	2, DEC, NOV, DEC, HEX},				/* 167 */
 {"lwp_mutex_wakeup", 2, DEC, NOV, HEX, DEC},			/* 168 */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +115,7 @@ sigaction(int sig, struct sigaction *actp, struct sigaction *oactp)
 		if (sig == SIGCLD)
 			sigcld_look = 1;
 		sigutok(&act.sa_mask, &set);
-		setsigact(sig, act.sa_handler, set, act.sa_flags);
+		setsigact(sig, act.sa_handler, &set, act.sa_flags);
 	}
 
 	mutex_exit(&p->p_lock);
@@ -208,7 +208,7 @@ sigaction32(int sig, struct sigaction32 *actp, struct sigaction32 *oactp)
 		if (sig == SIGCLD)
 			sigcld_look = 1;
 		sigutok(&act32.sa_mask, &set);
-		setsigact(sig, (void (*)())(uintptr_t)act32.sa_handler, set,
+		setsigact(sig, (void (*)())(uintptr_t)act32.sa_handler, &set,
 		    act32.sa_flags);
 	}
 

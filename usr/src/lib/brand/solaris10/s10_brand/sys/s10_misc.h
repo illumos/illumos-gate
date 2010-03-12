@@ -227,7 +227,27 @@ extern int s10_fxstat();
 extern int s10_xmknod();
 extern int s10_fsat();
 extern int s10_umount();
+
+/*
+ * From s10_signal.c
+ */
+extern int s10sigset_to_native(const sigset_t *, sigset_t *);
+
+extern int s10_context();
+extern int s10_kill();
+extern int s10_lwp_create();
+extern int s10_lwp_kill();
+extern int s10_lwp_sigmask();
+extern int s10_sigaction();
+extern int s10_signotify();
+extern int s10_sigpending();
+extern int s10_sigprocmask();
+extern int s10_sigqueue();
+extern int s10_sigsendsys();
+extern int s10_sigsuspend();
+extern int s10_sigtimedwait();
 extern int s10_wait();
+extern int s10_waitid();
 
 #endif	/* !_ASM */
 

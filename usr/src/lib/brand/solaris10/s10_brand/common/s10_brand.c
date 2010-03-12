@@ -40,6 +40,7 @@
 #include <sys/syscall.h>
 #include <sys/systm.h>
 #include <sys/utsname.h>
+#include <sys/sysconfig.h>
 #include <sys/systeminfo.h>
 #include <sys/zone.h>
 #include <sys/stat.h>
@@ -60,6 +61,7 @@
 
 #include <s10_brand.h>
 #include <s10_misc.h>
+#include <s10_signal.h>
 
 /*
  * Principles of emulation 101.
@@ -1378,17 +1380,6 @@ s10_issetugid(sysret_t *rval)
 	    0, 0, 0, 0, 0));
 }
 
-/*
- * New last arg "block" flag should be zero.  The block flag is used by
- * the Opensolaris AIO implementation, which is now part of libc.
- */
-static int
-s10_sigqueue(sysret_t *rval, pid_t pid, int signo, void *value, int si_code)
-{
-	return (__systemcall(rval, SYS_sigqueue + 1024, pid, signo, value,
-	    si_code, 0));
-}
-
 static long
 s10_uname(sysret_t *rv, uintptr_t p1)
 {
@@ -1407,6 +1398,37 @@ s10_uname(sysret_t *rv, uintptr_t p1)
 
 	/* copy out the modified uname info */
 	return (s10_uucopy(&un, unp, sizeof (un)));
+}
+
+int
+s10_sysconfig(sysret_t *rv, int which)
+{
+	long value;
+
+	/*
+	 * We must interpose on the sysconfig(2) requests
+	 * that deal with the realtime signal number range.
+	 * All others get passed to the native sysconfig(2).
+	 */
+	switch (which) {
+	case _CONFIG_RTSIG_MAX:
+		value = S10_SIGRTMAX - S10_SIGRTMIN + 1;
+		break;
+	case _CONFIG_SIGRT_MIN:
+		value = S10_SIGRTMIN;
+		break;
+	case _CONFIG_SIGRT_MAX:
+		value = S10_SIGRTMAX;
+		break;
+	default:
+		return (__systemcall(rv, SYS_sysconfig + 1024, which));
+	}
+
+	(void) S10_TRUSS_POINT_1(rv, SYS_sysconfig, 0, which);
+	rv->sys_rval1 = value;
+	rv->sys_rval2 = 0;
+
+	return (0);
 }
 
 int
@@ -1564,6 +1586,11 @@ s10_lwp_create_correct_fs(sysret_t *rval, ucontext_t *ucp, int flags,
 	s10_uc.uc_mcontext.gregs[REG_R14] = s10_uc.uc_mcontext.gregs[REG_RIP];
 	s10_uc.uc_mcontext.gregs[REG_RIP] = (greg_t)s10_lwp_create_entry_point;
 
+	/*  fix up the signal mask */
+	if (s10_uc.uc_flags & UC_SIGMASK)
+		(void) s10sigset_to_native(&s10_uc.uc_sigmask,
+		    &s10_uc.uc_sigmask);
+
 	/*
 	 * Issue SYS_lwp_create to create the new LWP.  We pass the
 	 * modified ucontext_t to make sure that the new LWP starts at
@@ -1573,18 +1600,6 @@ s10_lwp_create_correct_fs(sysret_t *rval, ucontext_t *ucp, int flags,
 	    flags, new_lwp));
 }
 #endif	/* __amd64 */
-
-/*
- * This function is invoked on x86 systems when SYS_lwp_create is issued but no
- * %fs register correction is necessary.
- *
- * See the comment above s10_lwp_create_correct_fs() above for more details.
- */
-static int
-s10_lwp_create(sysret_t *rval, ucontext_t *ucp, int flags, id_t *new_lwp)
-{
-	return (__systemcall(rval, SYS_lwp_create + 1024, ucp, flags, new_lwp));
-}
 
 /*
  * SYS_lwp_private is issued by libc_init() to set %fsbase in 64-bit x86
@@ -2027,7 +2042,7 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/*  34 */
 	NOSYS,					/*  35 */
 	NOSYS,					/*  36 */
-	NOSYS,					/*  37 */
+	EMULATE(s10_kill, 2 | RV_DEFAULT),	/*  37 */
 	NOSYS,					/*  38 */
 	NOSYS,					/*  39 */
 	NOSYS,					/*  40 */
@@ -2085,20 +2100,20 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/*  92 */
 	NOSYS,					/*  93 */
 	EMULATE(s10_fchown, 3 | RV_DEFAULT),	/*  94 */
-	NOSYS,					/*  95 */
-	NOSYS,					/*  96 */
+	EMULATE(s10_sigprocmask, 3 | RV_DEFAULT), /*  95 */
+	EMULATE(s10_sigsuspend, 1 | RV_DEFAULT), /*  96 */
 	NOSYS,					/*  97 */
-	NOSYS,					/*  98 */
-	NOSYS,					/*  99 */
-	NOSYS,					/* 100 */
+	EMULATE(s10_sigaction, 3 | RV_DEFAULT),	/*  98 */
+	EMULATE(s10_sigpending, 2 | RV_DEFAULT), /*  99 */
+	EMULATE(s10_context, 2 | RV_DEFAULT),	/* 100 */
 	NOSYS,					/* 101 */
 	NOSYS,					/* 102 */
 	NOSYS,					/* 103 */
 	NOSYS,					/* 104 */
 	NOSYS,					/* 105 */
 	NOSYS,					/* 106 */
-	NOSYS,					/* 107 */
-	NOSYS,					/* 108 */
+	EMULATE(s10_waitid, 4 | RV_DEFAULT),	/* 107 */
+	EMULATE(s10_sigsendsys, 2 | RV_DEFAULT), /* 108 */
 	NOSYS,					/* 109 */
 	NOSYS,					/* 110 */
 	NOSYS,					/* 111 */
@@ -2134,14 +2149,14 @@ s10_sysent_table_t s10_sysent_table[] = {
 	EMULATE(s10_rename, 2 | RV_DEFAULT),	/* 134 */
 	EMULATE(s10_uname, 1 | RV_DEFAULT),	/* 135 */
 	NOSYS,					/* 136 */
-	NOSYS,					/* 137 */
+	EMULATE(s10_sysconfig, 1 | RV_DEFAULT),	/* 137 */
 	NOSYS,					/* 138 */
 	EMULATE(s10_sysinfo, 3 | RV_DEFAULT),	/* 139 */
 	NOSYS,					/* 140 */
 	NOSYS,					/* 141 */
 	NOSYS,					/* 142 */
 	EMULATE(s10_fork1, 0 | RV_32RVAL2),	/* 143 */
-	NOSYS,					/* 144 */
+	EMULATE(s10_sigtimedwait, 3 | RV_DEFAULT), /* 144 */
 	NOSYS,					/* 145 */
 	NOSYS,					/* 146 */
 	EMULATE(s10_lwp_sema_wait, 1 | RV_DEFAULT), /* 147 */
@@ -2156,17 +2171,13 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/* 156 */
 	NOSYS,					/* 157 */
 	NOSYS,					/* 158 */
-#ifdef	__x86
 	EMULATE(s10_lwp_create, 3 | RV_DEFAULT), /* 159 */
-#else	/* !__x86 */
-	NOSYS,					/* 159 */
-#endif	/* !__x86 */
 	NOSYS,					/* 160 */
 	NOSYS,					/* 161 */
 	NOSYS,					/* 162 */
-	NOSYS,					/* 163 */
+	EMULATE(s10_lwp_kill, 2 | RV_DEFAULT),	/* 163 */
 	NOSYS,					/* 164 */
-	NOSYS,					/* 165 */
+	EMULATE(s10_lwp_sigmask, 3 | RV_32RVAL2), /* 165 */
 #if defined(__x86)
 	EMULATE(s10_lwp_private, 3 | RV_DEFAULT), /* 166 */
 #else
@@ -2210,7 +2221,7 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/* 202 */
 	NOSYS,					/* 203 */
 	NOSYS,					/* 204 */
-	NOSYS,					/* 205 */
+	EMULATE(s10_signotify, 3 | RV_DEFAULT),	/* 205 */
 	NOSYS,					/* 206 */
 	NOSYS,					/* 207 */
 	NOSYS,					/* 208 */

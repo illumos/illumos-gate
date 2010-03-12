@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,12 +63,14 @@
 0:
 	popl	%ecx			/* save return %eip in %ecx */
 	pushl	%eax			/* flags */
-	pushl	$MASKSET1		/* block all signals */
+	pushl	$MASKSET3		/* block all signals */
+	pushl	$MASKSET2
+	pushl	$MASKSET1
 	pushl	$MASKSET0
 	pushl	$SIG_SETMASK
 	pushl	%ecx
 	__SYSCALLINT(lwp_sigmask)
-	addl	$16, %esp
+	addl	$24, %esp
 
 	pushl	$2
 	pushl	%ecx
@@ -80,12 +82,14 @@
 	pushl	%ecx
 	pushl	%eax			/* save the vfork() error number */
 
-	pushl	%gs:UL_SIGMASK+4	/* reinstate signals */
+	pushl	%gs:UL_SIGMASK+12	/* reinstate signals */
+	pushl	%gs:UL_SIGMASK+8
+	pushl	%gs:UL_SIGMASK+4
 	pushl	%gs:UL_SIGMASK
 	pushl	$SIG_SETMASK
 	pushl	%ecx
 	__SYSCALLINT(lwp_sigmask)
-	addl	$16, %esp
+	addl	$24, %esp
 
 	popl	%eax			/* restore the vfork() error number */
 	jmp	__cerror
@@ -121,12 +125,14 @@
 	movl	%edx, %gs:UL_SCHEDCTL_CALLED
 	pushl	%eax			/* save the vfork() return value */
 
-	pushl	%gs:UL_SIGMASK+4	/* reinstate signals */
+	pushl	%gs:UL_SIGMASK+12	/* reinstate signals */
+	pushl	%gs:UL_SIGMASK+8
+	pushl	%gs:UL_SIGMASK+4
 	pushl	%gs:UL_SIGMASK
 	pushl	$SIG_SETMASK
 	pushl	%ecx
 	__SYSCALLINT(lwp_sigmask)
-	addl	$16, %esp
+	addl	$24, %esp
 
 	popl	%eax			/* restore the vfork() return value */
 	jmp	*%ecx			/* jump back to the caller */

@@ -590,7 +590,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 144 */ SYSENT_CI("sigtimedwait",	sigtimedwait,	3),
 	/* 145 */ SYSENT_CI("lwp_info",		lwp_info,	1),
 	/* 146 */ SYSENT_CI("yield",		yield,		0),
-	/* 147 */ SYSENT_LOADABLE(),		/* (was lwp_sema_wait) */
+	/* 147 */ SYSENT_LOADABLE(),		    /* (was lwp_sema_wait) */
 	/* 148 */ SYSENT_CI("lwp_sema_post",	lwp_sema_post,	1),
 	/* 149 */ SYSENT_CI("lwp_sema_trywait",	lwp_sema_trywait, 1),
 	/* 150 */ SYSENT_CI("lwp_detach",	lwp_detach,	1),
@@ -608,7 +608,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 162 */ SYSENT_CI("lwp_continue",	syslwp_continue, 1),
 	/* 163 */ SYSENT_CI("lwp_kill",		lwp_kill,	2),
 	/* 164 */ SYSENT_CI("lwp_self",		lwp_self,	0),
-	/* 165 */ SYSENT_2CI("lwp_sigmask",	lwp_sigmask,	3),
+	/* 165 */ SYSENT_2CI("lwp_sigmask",	lwp_sigmask,	5),
 	/* 166 */ IF_x86(
 			SYSENT_CI("lwp_private", syslwp_private, 3),
 			SYSENT_NOSYS()),
@@ -952,7 +952,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 144 */ SYSENT_CI("sigtimedwait",	sigtimedwait,	3),
 	/* 145 */ SYSENT_CI("lwp_info",		lwp_info,	1),
 	/* 146 */ SYSENT_CI("yield",		yield,		0),
-	/* 147 */ SYSENT_LOADABLE32(),		/* (was lwp_sema_wait) */
+	/* 147 */ SYSENT_LOADABLE32(),		    /* (was lwp_sema_wait) */
 	/* 148 */ SYSENT_CI("lwp_sema_post",	lwp_sema_post,	1),
 	/* 149 */ SYSENT_CI("lwp_sema_trywait",	lwp_sema_trywait, 1),
 	/* 150 */ SYSENT_CI("lwp_detach",	lwp_detach,	1),
@@ -970,13 +970,13 @@ struct sysent sysent32[NSYSCALL] =
 	/* 162 */ SYSENT_CI("lwp_continue",	syslwp_continue, 1),
 	/* 163 */ SYSENT_CI("lwp_kill",		lwp_kill,	2),
 	/* 164 */ SYSENT_CI("lwp_self",		lwp_self,	0),
-	/* 165 */ SYSENT_2CI("lwp_sigmask",	lwp_sigmask,	3),
+	/* 165 */ SYSENT_2CI("lwp_sigmask",	lwp_sigmask,	5),
 	/* 166 */ IF_x86(
 			SYSENT_CI("lwp_private", syslwp_private, 3),
 			SYSENT_NOSYS()),
 	/* 167 */ SYSENT_CI("lwp_wait",		lwp_wait,	2),
 	/* 168 */ SYSENT_CI("lwp_mutex_wakeup",	lwp_mutex_wakeup,	2),
-	/* 169 */ SYSENT_LOADABLE32(),		/* (was lwp_mutex_lock) */
+	/* 169 */ SYSENT_LOADABLE32(),		    /* (was lwp_mutex_lock) */
 	/* 170 */ SYSENT_CI("lwp_cond_wait",	lwp_cond_wait,		4),
 	/* 171 */ SYSENT_CI("lwp_cond_signal",	lwp_cond_signal,	1),
 	/* 172 */ SYSENT_CI("lwp_cond_broadcast", lwp_cond_broadcast,	1),

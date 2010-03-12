@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <signal.h>
@@ -46,11 +44,11 @@ const char *_sys_traplist[NSIGTRAP] = {
 };
 
 const char *_sys_illlist[NSIGILL] = {
-	"illegal opcode",
+	"illegal instruction",
 	"illegal operand",
 	"illegal addressing mode",
 	"illegal trap",
-	"privileged opcode",
+	"privileged instruction",
 	"privileged register",
 	"co-processor",
 	"bad stack"
@@ -177,6 +175,30 @@ static const struct siginfolist _sys_siginfolist_data[NSIG-1] = {
 	0,		0,			/* SIGRTMIN+1 */
 	0,		0,			/* SIGRTMIN+2 */
 	0,		0,			/* SIGRTMIN+3 */
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,			/* SIGRTMIN+15 */
+	0,		0,			/* SIGRTMAX-15 */
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
+	0,		0,
 	0,		0,			/* SIGRTMAX-3 */
 	0,		0,			/* SIGRTMAX-2 */
 	0,		0,			/* SIGRTMAX-1 */

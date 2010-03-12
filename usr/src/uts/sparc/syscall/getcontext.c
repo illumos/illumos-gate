@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,7 @@
  * Save user context.
  */
 void
-savecontext(ucontext_t *ucp, k_sigset_t mask)
+savecontext(ucontext_t *ucp, const k_sigset_t *mask)
 {
 	proc_t *p = ttoproc(curthread);
 	klwp_t *lwp = ttolwp(curthread);
@@ -112,7 +112,7 @@ savecontext(ucontext_t *ucp, k_sigset_t mask)
 	/*
 	 * Save signal mask.
 	 */
-	sigktou(&mask, &ucp->uc_sigmask);
+	sigktou(mask, &ucp->uc_sigmask);
 }
 
 
@@ -199,7 +199,7 @@ getsetcontext(int flag, void *arg)
 
 	case GETCONTEXT:
 		schedctl_finish_sigblock(curthread);
-		savecontext(&uc, curthread->t_hold);
+		savecontext(&uc, &curthread->t_hold);
 		/*
 		 * When using floating point it should not be possible to
 		 * get here with a fpu_qcnt other than zero since we go
@@ -346,7 +346,7 @@ getsetcontext(int flag, void *arg)
  * Save user context for 32-bit processes.
  */
 void
-savecontext32(ucontext32_t *ucp, k_sigset_t mask, struct fq32 *dfq)
+savecontext32(ucontext32_t *ucp, const k_sigset_t *mask, struct fq32 *dfq)
 {
 	proc_t *p = ttoproc(curthread);
 	klwp_t *lwp = ttolwp(curthread);
@@ -411,7 +411,7 @@ savecontext32(ucontext32_t *ucp, k_sigset_t mask, struct fq32 *dfq)
 	 * Save signal mask (the 32- and 64-bit sigset_t structures are
 	 * identical).
 	 */
-	sigktou(&mask, (sigset_t *)&ucp->uc_sigmask);
+	sigktou(mask, (sigset_t *)&ucp->uc_sigmask);
 }
 
 int
@@ -445,7 +445,7 @@ getsetcontext32(int flag, void *arg)
 
 	case GETCONTEXT:
 		schedctl_finish_sigblock(curthread);
-		savecontext32(&uc, curthread->t_hold, NULL);
+		savecontext32(&uc, &curthread->t_hold, NULL);
 		/*
 		 * When using floating point it should not be possible to
 		 * get here with a fpu_qcnt other than zero since we go
