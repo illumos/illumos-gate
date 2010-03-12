@@ -427,6 +427,19 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 	blockp = ctx->gcm_pt_buf;
 	remainder = pt_len;
 	while (remainder > 0) {
+		/* Incomplete last block */
+		if (remainder < block_size) {
+			bcopy(blockp, ctx->gcm_remainder, remainder);
+			ctx->gcm_remainder_len = remainder;
+			/*
+			 * not expecting anymore ciphertext, just
+			 * compute plaintext for the remaining input
+			 */
+			gcm_decrypt_incomplete_block(ctx, block_size,
+			    processed, encrypt_block, xor_block);
+			ctx->gcm_remainder_len = 0;
+			goto out;
+		}
 		/* add ciphertext to the hash */
 		GHASH(ctx, blockp, ghash);
 
@@ -448,20 +461,6 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 		processed += block_size;
 		blockp += block_size;
 		remainder -= block_size;
-
-		/* Incomplete last block */
-		if (remainder > 0 && remainder < block_size) {
-			bcopy(blockp, ctx->gcm_remainder, remainder);
-			ctx->gcm_remainder_len = remainder;
-			/*
-			 * not expecting anymore ciphertext, just
-			 * compute plaintext for the remaining input
-			 */
-			gcm_decrypt_incomplete_block(ctx, block_size,
-			    processed, encrypt_block, xor_block);
-			ctx->gcm_remainder_len = 0;
-			goto out;
-		}
 	}
 out:
 	ctx->gcm_len_a_len_c[1] = htonll(CRYPTO_BYTES2BITS(pt_len));
