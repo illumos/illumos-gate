@@ -771,6 +771,8 @@ WUSB_CA_OBJS += wusb_ca.o
 
 USBFTDI_OBJS += usbser_uftdi.o uftdi_dsd.o
 
+USBECM_OBJS += usbecm.o
+
 WC_OBJS += wscons.o vcons.o
 
 VCONS_CONF_OBJS += vcons_conf.o

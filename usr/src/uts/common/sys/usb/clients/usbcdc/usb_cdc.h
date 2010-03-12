@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,6 @@
 
 #include <sys/types.h>
 #include <sys/dditypes.h>
-#include <sys/usb/clients/usbser/usbser_dsdi.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -96,6 +95,19 @@ typedef struct usb_cdc_union_descr {
 	/* more slave interafce may follow */
 } usb_cdc_union_descr_t;
 
+/* Ethernet Control Model Functional Descriptor */
+typedef struct usb_cdc_ecm_descr {
+	uint8_t		bFunctionalLength;
+	uint8_t		bDescriptorType;
+	uint8_t		bDescriptorSubtype;
+	uint8_t		iMACAddress;
+	uint32_t	bmEthernetStatistics;
+	uint16_t	wMaxSegmentSize;
+	uint16_t	wNumberMCFilters;
+	uint8_t		bNumberPowerFilters;
+} usb_cdc_ecm_descr_t;
+
+
 /*
  * Class-specific requests
  */
@@ -115,6 +127,7 @@ typedef struct usb_cdc_line_coding {
 } usb_cdc_line_coding_t;
 
 #define	USB_CDC_LINE_CODING_LEN			7
+#define	USB_CDC_ECM_LEN				13
 
 #define	USB_CDC_STOP_BITS_1			0
 #define	USB_CDC_STOP_BITS_1_5			1

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/intel/warlock/Makefile
@@ -79,6 +79,7 @@ warlock.usb:
 	@cd ../usbsksp; $(MAKE) clean; $(MAKE) warlock
 	@cd ../usbsprl; $(MAKE) clean; $(MAKE) warlock
 	@cd ../usbsacm; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usbecm; $(MAKE) clean; $(MAKE) warlock
 	@cd ../usbskel; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/usbser_edge; \
 		$(MAKE) clean; $(MAKE) warlock
