@@ -829,6 +829,7 @@ auto_sense(
 	int				force_generic = 0;
 	u_ioparam_t			ioparam;
 	int				deflt;
+	char				*buf;
 
 	/*
 	 * First, if expert mode, find out if the user
@@ -895,9 +896,13 @@ auto_sense(
 		err_print("disk name:  `%s`\n", disk_name);
 	}
 
-	if (scsi_rdwr(DIR_READ, fd, (diskaddr_t)0, 1, (caddr_t)label,
-	    F_SILENT, NULL))
+	buf = zalloc(cur_blksz);
+	if (scsi_rdwr(DIR_READ, fd, (diskaddr_t)0, 1, (caddr_t)buf,
+	    F_SILENT, NULL)) {
+		free(buf);
 		return ((struct disk_type *)NULL);
+	}
+	free(buf);
 
 	/*
 	 * Figure out which method we use for auto sense.
