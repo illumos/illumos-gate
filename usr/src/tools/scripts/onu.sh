@@ -152,7 +152,7 @@ zone_warned=0
 
 trap cleanup 1 2 3 15
 
-while getopts :d:E:e:Os:t:U:u:v:Z i ; do
+while getopts :d:E:e:Os:t:U:u:vZ i ; do
 	case $i in
 	d)
 		repodir=$OPTARG
