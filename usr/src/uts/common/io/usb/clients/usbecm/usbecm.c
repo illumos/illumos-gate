@@ -716,7 +716,7 @@ usbecm_m_stop(void *arg)
 	USB_DPRINTF_L4(PRINT_MASK_OPS, ecmp->ecm_lh,
 	    "usbecm_m_stop: entry");
 
-	usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
+	(void) usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
 	if (ECM_DS_OP_VALID(ecm_ds_stop)) {
 		if (ecmp->ecm_ds_ops->ecm_ds_stop(ecmp) != USB_SUCCESS) {
 			USB_DPRINTF_L4(PRINT_MASK_OPS, ecmp->ecm_lh,
@@ -771,7 +771,7 @@ usbecm_m_unicst(void *arg, const uint8_t *macaddr)
 	filter = ecmp->ecm_pkt_flt |= CDC_ECM_PKT_TYPE_DIRECTED;
 	mutex_exit(&ecmp->ecm_mutex);
 
-	usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
+	(void) usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
 	rval = usbecm_ctrl_write(ecmp, CDC_ECM_SET_ETH_PKT_FLT,
 	    filter, NULL);
 	usb_release_access(ecmp->ecm_ser_acc);
@@ -810,7 +810,7 @@ usbecm_m_multicst(void *arg, boolean_t add, const uint8_t *m)
 	filter = ecmp->ecm_pkt_flt;
 	mutex_exit(&ecmp->ecm_mutex);
 
-	usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
+	(void) usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
 	if (ecmp->ecm_compatibility &&
 	    (ecmp->ecm_desc.wNumberMCFilters & 0x7F)) {
 	/* Device supports SetEthernetMulticastFilters request */
@@ -856,7 +856,7 @@ usbecm_m_promisc(void *arg, boolean_t on)
 	filter = ecmp->ecm_pkt_flt;
 	mutex_exit(&ecmp->ecm_mutex);
 
-	usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
+	(void) usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
 	rval = usbecm_ctrl_write(ecmp, CDC_ECM_SET_ETH_PKT_FLT,
 	    filter, NULL);
 	usb_release_access(ecmp->ecm_ser_acc);
@@ -902,7 +902,7 @@ usbecm_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	iocp->ioc_error = 0;
 	cmd = iocp->ioc_cmd;
 
-	usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
+	(void) usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
 
 	switch (cmd) {
 	default:
@@ -980,7 +980,7 @@ usbecm_m_tx(void *arg, mblk_t *mp)
 	}
 	mutex_exit(&ecmp->ecm_mutex);
 
-	usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
+	(void) usb_serialize_access(ecmp->ecm_ser_acc, USB_WAIT, 0);
 
 	/*
 	 * To make use of the device maximum capability,
@@ -1944,7 +1944,7 @@ usbecm_cleanup(usbecm_state_t *ecmp)
 	}
 
 	if (ecmp->ecm_init_flags & USBECM_INIT_MAC) {
-		usbecm_mac_fini(ecmp);
+		(void) usbecm_mac_fini(ecmp);
 	}
 
 	if (ecmp->ecm_init_flags & USBECM_INIT_SER) {
@@ -2642,7 +2642,7 @@ usbecm_get_descriptors(usbecm_state_t *ecmp)
 static void
 generate_ether_addr(uint8_t *mac_addr)
 {
-	random_get_bytes(mac_addr, 6);
+	(void) random_get_bytes(mac_addr, 6);
 	mac_addr [0] &= 0xfe;	/* unicast only */
 	mac_addr [0] |= 0x02;	/* set locally administered bit */
 }
