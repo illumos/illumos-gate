@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- *ident	"%Z%%M%	%I%	%E% SMI"
  *
  */
 
@@ -57,7 +54,7 @@ public class Value {
 			throw new PoolsException();
 		setName(name);
 	}
-	
+
 	/**
 	 * Constructor
 	 * @param name The name of the value.
@@ -124,28 +121,59 @@ public class Value {
 		setValue(value);
 	}
 
-        /**
-         * Explicitly reclaim the memory allocated for this value by
-         * the C proxy.
-         */
+
+	private boolean _locked = false;
+
+	/**
+	 * Check whether the value is locked or not
+	 * @return returns the value of _locked
+	 */
+	public boolean islocked() throws PoolsException
+        {
+                return (_locked);
+        }
+
+	/**
+	 * Lock the value
+	 */
+	public void lock() throws PoolsException
+	{
+		_locked = true;
+	}
+
+	/**
+	 * Unlock the value
+	 */
+	public void unlock() throws PoolsException
+	{
+		_locked = false;
+	}
+
+	/**
+	 * Explicitly reclaim the memory (if not locked)
+	 * allocated for this value by the C proxy.
+	 */
 	public void close()
 	{
-		if (_this != 0) {
-			PoolInternal.pool_value_free(_this);
-			_this = 0;
+		if (_locked == false) {
+			if (_this != 0) {
+				PoolInternal.pool_value_free(_this);
+				_this = 0;
+			}
 		}
 	}
-		
-        /**
-         * Reclaim the memory allocated for this value by the C
+
+	/**
+	 * Reclaim the memory allocated for this value by the C
 	 * proxy.
-         *
-         * @throws Throwable If freeing this configuration fails.
-         */
+	 *
+	 * @throws Throwable If freeing this configuration fails.
+	 */
 	protected void finalize() throws Throwable
 	{
 		try
 		{
+			unlock();
 			close();
 		}
 		finally
@@ -256,10 +284,10 @@ public class Value {
 	}
 
 	/**
-         * Returns a string representation of this value.
-         *
-         * @return a string representation of this value.
-         */
+	 * Returns a string representation of this value.
+	 *
+	 * @return a string representation of this value.
+	 */
 	public String toString()
 	{
 		int type = PoolInternal.pool_value_get_type(_this);

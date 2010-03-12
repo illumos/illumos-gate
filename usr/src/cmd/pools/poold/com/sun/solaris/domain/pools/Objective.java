@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 
 package com.sun.solaris.domain.pools;
@@ -566,6 +565,281 @@ final class WeightedLoadObjective extends AbstractObjective
 	}
 }
 
+    /*
+     * The following LGroupData and Resulttuple and PSETData classes
+     * are used for the purposes of calculating and storing
+     * results sets for the LocalityObjective calculate method.
+     */
+
+    /*
+     * To store data for a Localitygroup.
+     *
+     * The lgroup is the LocalityGroup.
+     * The numcpu is the number of cpu in the LocalityGroup.
+     * The factor is a value required in calculating the LocalityGroup quotient.
+     *
+     * The value of factor will always be a finite number
+     * because the LocalityGroup will never be empty.
+     */
+    final class LGroupData
+    {
+            private LocalityGroup lgroup;
+            private int numcpu = 0;
+            private double factor;
+
+            LGroupData(LocalityGroup l) {
+                lgroup = l;
+                int numcpuinlgroup = lgroup.getCPUIDs().length;
+                factor = 2.0 / ((numcpuinlgroup * numcpuinlgroup)
+                        + numcpuinlgroup);
+            }
+
+            int getNumcpu() {
+                return numcpu;
+            }
+
+            double getFactor() {
+                return factor;
+            }
+
+            void incNumcpu() {
+                numcpu++;
+            }
+    }
+
+    /*
+     * Stores the results of caclulated locality quotients for a PSET.
+     *
+     * The AsIsResult is the quotient without any move.
+     * The FromResult is the quotient when a cpu is taken from it.
+     * The To result is the quotient when a cpu is added to it.
+     */
+    final class ResultTuple
+    {
+            private double AsIsResult = 0;
+            private double FromResult = 0;
+            private double ToResult = 0;
+
+            ResultTuple(double a, double f, double t) {
+                setAsIsResult(a);
+                setFromResult(f);
+                setToResult(t);
+            }
+
+            double getAsIsResult() {
+                return AsIsResult;
+            }
+
+            double getFromResult() {
+                return FromResult;
+            }
+
+            double getToResult() {
+                return ToResult;
+            }
+
+            void setAsIsResult(double asis) {
+                AsIsResult = asis;
+            }
+
+            void setFromResult(double from) {
+                FromResult = from;
+            }
+
+            void setToResult(double to) {
+                ToResult = to;
+            }
+    }
+
+    /*
+     * The PSETData class enables storage and population of the data
+     * required for the LocalityObjective calculate() method.
+     *
+     * The lgroupdata HashMap stores LGroupData objects
+     * for each LGroup in the pset.
+     * The results HashMap stores resultsTuple objects for each LGroup.
+     * The countLgroups() method populates the lgroupdata HashMap.
+     * The calcQ() method calculates the quotient for any given
+     * value of intersection and lgroup size.
+     * The calcResults() method populates the results HashMap.
+     */
+    final class PSETData
+    {
+            private Resource pset;
+            private Map<LocalityGroup, LGroupData> lgroupdata
+                 = new HashMap<LocalityGroup, LGroupData>();
+            private Map<LocalityGroup, ResultTuple> results
+                 = new HashMap<LocalityGroup, ResultTuple>();
+            double AsIsTotal = 0;
+            int numlg = 0;
+
+            double getAsIsTotal() {
+                return AsIsTotal;
+            }
+
+            Map<LocalityGroup, ResultTuple> getResults() {
+                return results;
+            }
+
+            /*
+             * Count the number of cpu in each locality group in this pset
+             * and count the number of locality groups in this pset.
+             *
+             * @param allCPUData Map of all cpu and their LocalityGroup.
+             *
+             * @throws new PoolsException if no lgroups found, i.e numlg = 0;
+             */
+            private void countLgroups(Map allCPUData)
+                    throws PoolsException
+            {
+                List cpuList = pset.getComponents(null);
+                Iterator cpuIt = cpuList.iterator();
+                while (cpuIt.hasNext()) {
+                    Component currentCPU = (Component) cpuIt.next();
+                    int cpuid = (int) currentCPU.getLongProperty("cpu.sys_id");
+                    if (allCPUData.containsKey(new Integer(cpuid))) {
+                        LocalityGroup lg =
+                            (LocalityGroup) allCPUData.get(new Integer(cpuid));
+                        if (lgroupdata.containsKey(lg)) {
+                            LGroupData cpulgp = (LGroupData) lgroupdata.get(lg);
+                            cpulgp.incNumcpu();
+                        }
+                    }
+                }
+                Set groups = lgroupdata.keySet();
+                Iterator groupsIt = groups.iterator();
+                while (groupsIt.hasNext()) {
+                    LocalityGroup lg = (LocalityGroup) groupsIt.next();
+                    LGroupData cpulgp = (LGroupData) lgroupdata.get(lg);
+                    if (cpulgp.getNumcpu() > 0) {
+                        numlg++;
+                    }
+                }
+                if (numlg == 0) {
+                    throw new PoolsException();
+                }
+            }
+
+            /**
+             * Calculate the final quotient with the given
+             * factor and intersection values.
+             *
+             * @param factor double value of factor for this move.
+             * @param intersection int value of intersection for this move.
+             */
+	    private double calcQ(double factor, int intersection)
+            {
+                double q = factor * ((intersection * intersection)
+                        + intersection) / 2.0;
+                return (q);
+            }
+
+            /*
+             * Calulate results for all locality groups for this pset.
+             *
+             * The logic considers all cases of pset populations;
+             * i) pset is empty; ii) pset has only one cpu;
+             * iii) pset more than one  cpu.
+             * numlg is never zero so we need not try and catch that here.
+             */
+            private void calcqA()
+                    throws PoolsException
+            {
+                Set allgroups = (Set) results.keySet();
+                Iterator groupIt = (Iterator) allgroups.iterator();
+                while (groupIt.hasNext()) {
+                    LocalityGroup lgroup = (LocalityGroup) groupIt.next();
+                    if (lgroupdata.containsKey(lgroup)) {
+                        LGroupData cpulgp =
+                                (LGroupData) lgroupdata.get(lgroup);
+                        ResultTuple rst = (ResultTuple) results.get(lgroup);
+                        if (cpulgp.getNumcpu() == 0) {
+                            double toresult =
+                                    (AsIsTotal + rst.getToResult())/(numlg + 1);
+                            rst.setToResult(toresult);
+                        }
+                        if (cpulgp.getNumcpu() == 1) {
+                            double fromresult =
+                                    (AsIsTotal + rst.getFromResult())
+                                    /(numlg - 1);
+                            rst.setFromResult(fromresult);
+                        }
+                        if (cpulgp.getNumcpu() > 1) {
+                            double toresult = (AsIsTotal
+                                    - rst.getAsIsResult()
+                                    + rst.getToResult())/(numlg);
+                            rst.setToResult(toresult);
+                            double fromresult = (AsIsTotal
+                                    - rst.getAsIsResult()
+                                    + rst.getFromResult())/(numlg);
+                            rst.setFromResult(fromresult);
+                        }
+                        results.put(lgroup, rst);
+                    }
+                }
+            }
+
+            /*
+             * Populates the results map for each locality group.
+             *
+             * numlg is never zero so do not need to try and catch it.
+             *
+             * @param allLGroups Set of all Locality groups in this config.
+             */
+            private void calcResults(Set allLGroups)
+                    throws PoolsException
+            {
+                Iterator groupIt = (Iterator) allLGroups.iterator();
+                while (groupIt.hasNext()) {
+                    int intersection = 0;
+                    double factor = 0;
+                    LocalityGroup lgroup = (LocalityGroup) groupIt.next();
+                    if (lgroup.getCPUIDs().length != 0) {
+                        if (lgroupdata.containsKey(lgroup)) {
+                            LGroupData cpulgp =
+                                    (LGroupData)lgroupdata.get(lgroup);
+                            intersection = cpulgp.getNumcpu();
+                            factor = cpulgp.getFactor();
+                        }
+                        ResultTuple thisresult = new ResultTuple(
+                            calcQ(factor, intersection),
+                            calcQ(factor, intersection-1),
+                            calcQ(factor, intersection+1));
+                        AsIsTotal += thisresult.getAsIsResult();
+                        results.put(lgroup, thisresult);
+                    }
+                }
+                calcqA();
+                AsIsTotal /= numlg;
+            }
+
+            /*
+             * Constructor for PSETData.
+             *
+             * @param allLGroups Set of all Locality groups in this config.
+             * @param allCPUData Map of all cpu and their locality group.
+             * @param p Resource (pset) for which the calculations are made.
+             *
+             * @throws PoolsException if accessing the supplied resource
+             * fails.
+             */
+            PSETData(Set allLGroups, Map allCPUData, Resource p)
+                    throws PoolsException
+            {
+                pset = p;
+                Iterator groupIt = (Iterator) allLGroups.iterator();
+                while (groupIt.hasNext()) {
+                    LocalityGroup lgroup = (LocalityGroup) groupIt.next();
+                    if (lgroup.getCPUIDs().length != 0) {
+                        LGroupData cpulgp = new LGroupData(lgroup);
+                        lgroupdata.put(lgroup, cpulgp);
+                    }
+                }
+                countLgroups(allCPUData);
+                calcResults(allLGroups);
+            }
+        }
+
 /**
  * A locality based objective which will assess moves in terms of
  * their impact on the locality of the sets of resources which are
@@ -585,20 +859,54 @@ final class WeightedLoadObjective extends AbstractObjective
  */
 final class LocalityObjective extends AbstractObjective
 {
-	/**
+	/*
 	 * The name of the class.
 	 */
 	static final String name = "locality";
 
-	/**
+	/*
 	 * The locality domain used to describe locality for this
 	 * objective.
 	 */
 	private LocalityDomain ldom;
 
+        /*
+         * The set of LocalityGroups in this ldom.
+         */
+        private Set allLGroups;
+
+        /*
+         * Map of all cpu id and their locality groups
+         */
+        private Map<Integer, LocalityGroup> allCPUData
+                = new HashMap<Integer, LocalityGroup>();
+
+        /*
+         * Method to populate the allCPUData cpu locality map.
+         */
+        private void getCPUData()
+	{
+            allLGroups = ldom.getGroups();
+            Iterator LGroupIt = allLGroups.iterator();
+            while (LGroupIt.hasNext()) {
+                LocalityGroup lg = (LocalityGroup) LGroupIt.next();
+                int cpu_ids[] = lg.getCPUIDs();
+                for (int i = 0; i < cpu_ids.length; i++) {
+                    allCPUData.put(new Integer(cpu_ids[i]), lg);
+                }
+            }
+
+	}
+
+        /*
+         * Map to store all PSET LocalityGroup quotient results.
+         */
+        private Map<Resource, PSETData> allPSETData
+                = new HashMap<Resource, PSETData>();
+
 	/**
-	 * Prepare the calculation for this objective for the resource
-	 * to which it applies.
+	 * Prepare the calculation for this objective for the resource to
+	 * which it applies.
 	 *
 	 * @param ldom LocalityDomain containing these resources.
 	 * @param res Resource to which this objective is applied.
@@ -612,7 +920,7 @@ final class LocalityObjective extends AbstractObjective
 		this.ldom = ldom;
 	}
 
-	/**
+	/*
 	 * Calculates the value of a configuration in terms of this
 	 * objective.
 	 *
@@ -622,6 +930,23 @@ final class LocalityObjective extends AbstractObjective
 	 * set being evaluated. The objective scores moves in terms of
 	 * their impact upon the quotient of cpus contained in each
 	 * locality group.
+	 *
+	 * Moves which involve a cpu in the same locality group are equivalent.
+	 * i.e for a given pset, the quotient calculation is the same
+	 * for a move involving cpu x in localitygroup Z,
+	 * as the calculation for cpu y in localitygroup Z,
+	 * So we store the quotient calculation of the PSET
+	 * i) as it is; ii) a cpu is added; iii) a cpu is removed;
+	 *
+	 * For each move we encounter, we store the quotient caclulations
+	 * on a pset basis, holding a map of results for each pset we evaluate.
+	 * The map contains results for each locality group in the system.
+	 * The results contains the quotient value for a move of a cpu
+	 * to, from and without any move.
+	 *
+	 * For a given configuration, for each cpu we make one JNI call
+	 * to getLongProperty() (which is the most expensive call in this code)
+	 * so the time spent in calculate() scales linearly with number of cpu.
 	 *
 	 * @param conf Configuration to be scored.
 	 * @param move Move to be scored.
@@ -635,20 +960,20 @@ final class LocalityObjective extends AbstractObjective
 		double ret = 0;
 		double qA = 0;
 		double qB = 0;
-		Resource res = (Resource) elem;
+		Resource pset = (Resource) elem;
 		ComponentMove cm = (ComponentMove) move;
 		Poold.MON_LOG.log(Severity.DEBUG,
 		    "Calculating objective type: " + name + " for: " + elem);
 
 		/*
 		 * If we are set to "none" then we don't care which
-		 * configuration so just return 0
+		 * configuration so just return 0.
 		 */
 		if (kve.getValue().compareTo("none") == 0)
 			return (ret);
 		/*
 		 * If the maximum latency is 0, we don't care about
-		 * latency
+		 * latency.
 		 */
 		if (ldom.getMaxLatency() == 0)
 			return (ret);
@@ -660,86 +985,59 @@ final class LocalityObjective extends AbstractObjective
 		    elem.equals(move.getTo()) == false)
 			return (ret);
 
-		/*
-		 * Assess the effect on lgrp quotient for all
-		 * moves. Try to maximise lgrp quotient for "tight"
-		 * objectives and minimize if for "loose" objectives.
-		 */
-		/*
-		 * All contained cpus
-		 */
-		List contains = res.getComponents(null);
-		/*
-		 * All lgrps
-		 */
-		Set groups = ldom.foreignGroups(new HashSet(), contains);
+                /*
+                 * Populate the map of cpu - locality data if it is empty.
+                 */
+                if (allCPUData.isEmpty()) {
+                    getCPUData();
+                }
 
-		qB = calcQ(contains, groups);
+                /*
+                 * Lookup in the pset results map if the pset entry exists.
+                 * If this pset entry exists then use it otherwise add it.
+                 */
+                PSETData psetlg;
 
-		if (elem.equals(move.getFrom()))
-			contains.removeAll(cm.getComponents());
-		else
-			contains.addAll(cm.getComponents());
-		/*
-		 * Recalculate lgrps to take account of new components
-		 */
-		groups = ldom.foreignGroups(new HashSet(), contains);
-		qA = calcQ(contains, groups);
+                if (allPSETData.containsKey(pset))
+                    psetlg = (PSETData) allPSETData.get(pset);
+                else {
+                    psetlg = new PSETData(allLGroups, allCPUData, pset);
+                    allPSETData.put(pset, psetlg);
+                }
+
+                /*
+                 * Check the locality group of the cpu involved in this move.
+                 * If it is a cpu from a locality group we have already seen,
+                 * then we can retrieve the results from the pset results map.
+                 */
+                List cpulist = (List) cm.getComponents();
+                Component cpu = (Component) cpulist.get(0);
+		int cpuid = (int) cpu.getLongProperty("cpu.sys_id");
+                LocalityGroup lgroup =
+                        (LocalityGroup) allCPUData.get(new Integer(cpuid));
+                HashMap allresults = (HashMap) psetlg.getResults();
+                ResultTuple result = (ResultTuple) allresults.get(lgroup);
+
+                qB = psetlg.getAsIsTotal();
+                if (elem.equals(move.getFrom()))
+                    qA = result.getFromResult();
+                else
+                    qA = result.getToResult();
 
 		ret = qA - qB;
 
+                /*
+                 * We return the value based on what locality objective
+                 * we want to achieve - tight or loose. The calculations
+                 * are based on tightness, so the value is reversed if the
+                 * objective specified "loose" locality.
+                 */
 		if (kve.getValue().compareTo("loose") == 0)
-			ret = 0 - ret;
-
-		Poold.MON_LOG.log(Severity.DEBUG, "ret: " + ret);
+                    ret = 0 - ret;
+                Poold.MON_LOG.log(Severity.DEBUG, "ret: " + ret);
 		return (ret);
 	}
-
-	/**
-	 * Calculate a quotient using the supplied list of components
-	 * and set of locality groups. The quotient represents the
-	 * average (as in mean) number of CPUs (from the population in
-	 * contains) present in each of the LocalityGroups contained
-	 * in groups.
-	 *
-	 * @param contains The population of Components.
-	 * @param groups The population of LocalityGroups.
-	 *
-	 * @throws PoolsException if there is an error accessing the
-	 * CPUs.
-	 */
-	private double calcQ(List contains, Set groups) throws PoolsException
-	{
-		Iterator groupIt = groups.iterator();
-		double q = 0.0;
-		while (groupIt.hasNext()) {
-			LocalityGroup grp = (LocalityGroup)groupIt.next();
-			int cpu_ids[] = grp.getCPUIDs();
-			Iterator containsIt = contains.iterator();
-			int intersection = 0;
-			double total = 0;
-			while (containsIt.hasNext()) {
-				Component comp = (Component) containsIt.next();
-				for (int i = 0; i < cpu_ids.length; i++) {
-					if (cpu_ids[i] == (int) comp.
-					    getLongProperty("cpu.sys_id")) {
-						intersection++;
-						break;
-					}
-				}
-			}
-			double factor = 0;
-			for (int i = 1; i <= cpu_ids.length; i++)
-				factor += i;
-			factor = 1 / factor;
-			for (int i = 1; i <= intersection; i++)
-				q += i * factor;
-		}
-		q /= groups.size();
-		return (q);
-	}
 }
-
 /**
  * A resource set utilization based objective which will assess moves
  * in terms of their (likely) impact on the future performance of a

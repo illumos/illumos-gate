@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- *ident	"%Z%%M%	%I%	%E% SMI"
  *
  */
 
@@ -31,6 +28,8 @@ package com.sun.solaris.service.pools;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Arrays;
 
 /**
  * The <code>Element</code> class represents a pools configuration
@@ -69,6 +68,19 @@ public abstract class Element implements Property, PropertyWalk
 	public abstract String getInformation(int deep) throws PoolsException;
 
 	/**
+	 * A list of properties that are chosen to be cached.
+	 */
+	private static final List cachedProperties
+			= Arrays.asList(new String[] {"cpu.sys_id",
+			"pool.default", "pool.sys_id", "pset.default",
+			"pset.sys_id", "pset.type", "pset.units"});
+
+        /**
+         * hashmap of property values that are determined readonly
+         */
+        private HashMap readOnlyValues = new HashMap();
+
+	/**
 	 * Get the property with the supplied name.
 	 *
 	 * @param name The name of the property to be retrieved.
@@ -77,13 +89,23 @@ public abstract class Element implements Property, PropertyWalk
 	 */
         private Value getProperty(String name) throws PoolsException
 	{
-		Value value = new Value(name);
-
-		if (PoolInternal.pool_get_property(_conf.getConf(), getElem(),
-			name, value.getValue()) == PoolInternal.POC_INVAL)
-			throw new PoolsException();
-		return (value);
-	}
+            if (readOnlyValues.containsKey(name)) {
+                Value value = (Value) readOnlyValues.get(name);
+                return (value);
+            } else {
+                Value value = new Value(name);
+                if (PoolInternal.pool_get_property(_conf.getConf(), getElem(),
+                        name, value.getValue()) == PoolInternal.POC_INVAL) {
+                    throw new PoolsException();
+                } else {
+                    if (cachedProperties.contains(name)) {
+                        value.lock();
+                        readOnlyValues.put(name, value);
+                    }
+                    return (value);
+                }
+            }
+        }
 
 	/**
 	 * Get the property with the supplied name using the supplied
@@ -97,13 +119,23 @@ public abstract class Element implements Property, PropertyWalk
         protected Value getProperty(String name, long proxy)
 	    throws PoolsException
 	{
-		Value value = new Value(name);
-
-		if (PoolInternal.pool_get_property(_conf.getConf(), proxy, name,
-		    value.getValue()) == PoolInternal.POC_INVAL)
-			throw new PoolsException();
-		return (value);
-	}
+            if (readOnlyValues.containsKey(name)) {
+                Value value = (Value) readOnlyValues.get(name);
+                return (value);
+            } else {
+                Value value = new Value(name);
+                if (PoolInternal.pool_get_property(_conf.getConf(), proxy, name,
+                        value.getValue()) == PoolInternal.POC_INVAL) {
+                    throw new PoolsException();
+                } else {
+                    if (cachedProperties.contains(name)) {
+                        value.lock();
+                        readOnlyValues.put(name, value);
+                    }
+                    return (value);
+                }
+            }
+        }
 
 	/**
 	 * Put the supplied value as an element property with the supplied
@@ -146,7 +178,7 @@ public abstract class Element implements Property, PropertyWalk
 	public String getStringProperty(String name) throws PoolsException
 	{
 		Value val = getProperty(name);
-		
+
 		if (val != null) {
 			String ret = val.getString();
 			val.close();
@@ -168,7 +200,7 @@ public abstract class Element implements Property, PropertyWalk
 	public long getLongProperty(String name) throws PoolsException
 	{
 		Value val = getProperty(name);
-		
+
 		if (val != null) {
 			long ret = val.getLong();
 			val.close();
@@ -190,7 +222,7 @@ public abstract class Element implements Property, PropertyWalk
 	public double getDoubleProperty(String name) throws PoolsException
 	{
 		Value val = getProperty(name);
-		
+
 		if (val != null) {
 			double ret = val.getDouble();
 			val.close();
@@ -212,7 +244,7 @@ public abstract class Element implements Property, PropertyWalk
 	public boolean getBoolProperty(String name) throws PoolsException
 	{
 		Value val = getProperty(name);
-		
+
 		if (val != null) {
 			boolean ret = val.getBool();
 			val.close();
@@ -222,7 +254,7 @@ public abstract class Element implements Property, PropertyWalk
 	}
 
 	/**
-	 * Walk all properties of the invoking object. 
+	 * Walk all properties of the invoking object.
 	 *
 	 * @param elem The element to whom the property belongs.
 	 * @param val The value representing the current element.
@@ -238,7 +270,7 @@ public abstract class Element implements Property, PropertyWalk
 		val.close();
 		return (0);
 	}
-	
+
 	/**
 	 * Return the pointer to this subtype as an element.
 	 *
@@ -257,7 +289,7 @@ public abstract class Element implements Property, PropertyWalk
 	 * @throws PoolsExecption If there is an error during the walk.
 	 */
 	public int walkProperties(PropertyWalk handler, Object user)
-	    throws PoolsException 
+	    throws PoolsException
 	{
 		return (walkProps(_conf.getConf(), getElem(), handler, user));
 	}
