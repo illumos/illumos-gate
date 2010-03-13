@@ -5671,33 +5671,13 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		}
 
 		/*
-		 * Create a copy of the IRE_LOOPBACK, IRE_IF_NORESOLVER or
-		 * IRE_IF_RESOLVER with the modified address, netmask, and
-		 * gateway.
-		 */
-		ire = ire_create(
-		    (uchar_t *)&dst_addr,
-		    (uint8_t *)&mask,
-		    (uint8_t *)&gw_addr,
-		    ill->ill_net_type,
-		    ill,
-		    zoneid,
-		    flags,
-		    NULL,
-		    ipst);
-		if (ire == NULL) {
-			ipif_refrele(ipif);
-			return (ENOMEM);
-		}
-
-		/*
 		 * Some software (for example, GateD and Sun Cluster) attempts
 		 * to create (what amount to) IRE_PREFIX routes with the
 		 * loopback address as the gateway.  This is primarily done to
 		 * set up prefixes with the RTF_REJECT flag set (for example,
 		 * when generating aggregate routes.)
 		 *
-		 * If the IRE type (as defined by ill->ill_net_type) is
+		 * If the IRE type (as defined by ill->ill_net_type) would be
 		 * IRE_LOOPBACK, then we map the request into a
 		 * IRE_IF_NORESOLVER. We also OR in the RTF_BLACKHOLE flag as
 		 * these interface routes, by definition, can only be that.
@@ -5706,9 +5686,30 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		 * routine, but rather using ire_create() directly.
 		 *
 		 */
-		if (ill->ill_net_type == IRE_LOOPBACK) {
-			ire->ire_type = IRE_IF_NORESOLVER;
-			ire->ire_flags |= RTF_BLACKHOLE;
+		type = ill->ill_net_type;
+		if (type == IRE_LOOPBACK) {
+			type = IRE_IF_NORESOLVER;
+			flags |= RTF_BLACKHOLE;
+		}
+
+		/*
+		 * Create a copy of the IRE_IF_NORESOLVER or
+		 * IRE_IF_RESOLVER with the modified address, netmask, and
+		 * gateway.
+		 */
+		ire = ire_create(
+		    (uchar_t *)&dst_addr,
+		    (uint8_t *)&mask,
+		    (uint8_t *)&gw_addr,
+		    type,
+		    ill,
+		    zoneid,
+		    flags,
+		    NULL,
+		    ipst);
+		if (ire == NULL) {
+			ipif_refrele(ipif);
+			return (ENOMEM);
 		}
 
 		/* src address assigned by the caller? */
@@ -6057,9 +6058,9 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 
 		match_flags |= MATCH_IRE_ILL;
 		if (ipif->ipif_ire_type == IRE_LOOPBACK) {
-			ire = ire_ftable_lookup_v4(dst_addr, 0, 0, IRE_LOOPBACK,
-			    ill_match, ALL_ZONES, NULL, match_flags, 0, ipst,
-			    NULL);
+			ire = ire_ftable_lookup_v4(dst_addr, mask, 0,
+			    IRE_LOOPBACK, ill_match, ALL_ZONES, NULL,
+			    match_flags, 0, ipst, NULL);
 		}
 		if (ire == NULL) {
 			match_flags |= MATCH_IRE_GW;

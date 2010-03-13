@@ -616,7 +616,29 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		}
 
 		/*
-		 * Create a copy of the IRE_LOOPBACK, IRE_IF_NORESOLVER or
+		 * Some software (for example, GateD and Sun Cluster) attempts
+		 * to create (what amount to) IRE_PREFIX routes with the
+		 * loopback address as the gateway.  This is primarily done to
+		 * set up prefixes with the RTF_REJECT flag set (for example,
+		 * when generating aggregate routes). We also OR in the
+		 * RTF_BLACKHOLE flag as these interface routes, by
+		 * definition, can only be that.
+		 *
+		 * If the IRE type (as defined by ill->ill_net_type) would be
+		 * IRE_LOOPBACK, then we map the request into a
+		 * IRE_IF_NORESOLVER.
+		 *
+		 * Needless to say, the real IRE_LOOPBACK is NOT created by this
+		 * routine, but rather using ire_create_v6() directly.
+		 */
+		type = ill->ill_net_type;
+		if (type == IRE_LOOPBACK) {
+			type = IRE_IF_NORESOLVER;
+			flags |= RTF_BLACKHOLE;
+		}
+
+		/*
+		 * Create a copy of the IRE_IF_NORESOLVER or
 		 * IRE_IF_RESOLVER with the modified address, netmask, and
 		 * gateway.
 		 */
@@ -624,7 +646,7 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		    dst_addr,
 		    mask,
 		    gw_addr,
-		    ill->ill_net_type,
+		    type,
 		    ill,
 		    zoneid,
 		    flags,
@@ -635,26 +657,6 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 			return (ENOMEM);
 		}
 
-		/*
-		 * Some software (for example, GateD and Sun Cluster) attempts
-		 * to create (what amount to) IRE_PREFIX routes with the
-		 * loopback address as the gateway.  This is primarily done to
-		 * set up prefixes with the RTF_REJECT flag set (for example,
-		 * when generating aggregate routes). We also OR in the
-		 * RTF_BLACKHOLE flag as these interface routes, by
-		 * definition, can only be that.
-		 *
-		 * If the IRE type (as defined by ill->ill_net_type) is
-		 * IRE_LOOPBACK, then we map the request into a
-		 * IRE_IF_NORESOLVER.
-		 *
-		 * Needless to say, the real IRE_LOOPBACK is NOT created by this
-		 * routine, but rather using ire_create_v6() directly.
-		 */
-		if (ill->ill_net_type == IRE_LOOPBACK) {
-			ire->ire_type = IRE_IF_NORESOLVER;
-			ire->ire_flags |= RTF_BLACKHOLE;
-		}
 		/* src address assigned by the caller? */
 		if ((flags & RTF_SETSRC) && !IN6_IS_ADDR_UNSPECIFIED(src_addr))
 			ire->ire_setsrc_addr_v6 = *src_addr;
@@ -992,9 +994,9 @@ ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 
 		match_flags |= MATCH_IRE_ILL;
 		if (ipif->ipif_ire_type == IRE_LOOPBACK) {
-			ire = ire_ftable_lookup_v6(dst_addr, 0, 0, IRE_LOOPBACK,
-			    ill_match, ALL_ZONES, NULL, match_flags, 0, ipst,
-			    NULL);
+			ire = ire_ftable_lookup_v6(dst_addr, mask, 0,
+			    IRE_LOOPBACK, ill_match, ALL_ZONES, NULL,
+			    match_flags, 0, ipst, NULL);
 		}
 		if (ire == NULL) {
 			match_flags |= MATCH_IRE_GW;
