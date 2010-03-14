@@ -506,7 +506,16 @@ main(int argc, char *argv[])
 	 */
 	nwamd_create_timed_condition_check_event();
 
-	nwamd_drop_unneeded_privs();
+	/*
+	 * These two routines safely minimize our privilege set.  They
+	 * use reference counting to be safe in a threaded program.  It is
+	 * gross that we escalate/deescalate to initialize this functionality
+	 * but a real fix is to add functionality to do fine grained privs
+	 * (and if necessary set uid to 0) in this threaded daemon.
+	 */
+	nwamd_escalate();
+	nwamd_deescalate();
+
 	/*
 	 * Start the various agents (hooks on fds, threads) which collect events
 	 */

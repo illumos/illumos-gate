@@ -1455,7 +1455,14 @@ nwamd_plumb_unplumb_interface(nwamd_ncu_t *ncu, uint_t lifnum,
 void
 nwamd_plumb_interface(nwamd_ncu_t *ncu, uint_t lifnum, int af)
 {
+	/*
+	 * We get all posssible privs by calling nwamd_deescalate().  During
+	 * startup opening /dev/dld (data link management) needs all privs
+	 * because we don't have access to /etc/security/device_policy yet.
+	 */
+	nwamd_escalate();
 	nwamd_plumb_unplumb_interface(ncu, lifnum, af, B_TRUE);
+	nwamd_deescalate();
 }
 
 void
@@ -1481,9 +1488,9 @@ start_dhcp_thread(void *arg)
 	type = thread_arg->type;
 
 	/* Try starting agent, though it may already be there */
-	nwamd_to_root();
+	nwamd_escalate();
 	rc = dhcp_start_agent(DHCP_IPC_MAX_WAIT);
-	nwamd_from_root();
+	nwamd_deescalate();
 	if (rc == -1) {
 		nlog(LOG_DEBUG, "Unable to start %s", DHCP_AGENT_PATH);
 		goto failed;

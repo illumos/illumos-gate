@@ -80,8 +80,8 @@ extern void nwamd_door_fini(void);
 /* util.c: utility & ipc functions */
 extern int nwamd_start_childv(const char *, const char * const *);
 extern boolean_t nwamd_link_belongs_to_this_zone(const char *);
-extern void nwamd_to_root(void);
-extern void nwamd_from_root(void);
+extern void nwamd_escalate(void);
+extern void nwamd_deescalate(void);
 extern void nwamd_drop_unneeded_privs(void);
 extern void nwamd_escalate_privs(void);
 

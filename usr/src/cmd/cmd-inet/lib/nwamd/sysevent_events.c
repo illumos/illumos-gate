@@ -120,9 +120,9 @@ sysevent_initialization(void *arg)
 	const char *subclass = ESC_NETWORK;
 
 	do {
-		nwamd_to_root();
+		nwamd_escalate();
 		sysevent_handle = sysevent_bind_handle(sysevent_handler);
-		nwamd_from_root();
+		nwamd_deescalate();
 
 		(void) sleep(1);
 	} while (sysevent_handle == NULL);
@@ -177,9 +177,9 @@ void
 nwamd_sysevent_events_fini(void)
 {
 	if (sysevent_handle != NULL) {
-		nwamd_to_root();
+		nwamd_escalate();
 		sysevent_unbind_handle(sysevent_handle);
-		nwamd_from_root();
+		nwamd_deescalate();
 	}
 	sysevent_handle = NULL;
 }

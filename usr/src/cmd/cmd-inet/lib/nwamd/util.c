@@ -82,29 +82,96 @@ static uid_t uid;
 static int uid_cnt;
 
 void
-nwamd_to_root(void) {
+nwamd_escalate(void) {
+	priv_set_t *priv_set;
+	priv_set = priv_str_to_set("zone", ",", NULL);
+
+	if (priv_set == NULL)
+		pfail("creating privilege set: %s", strerror(errno));
+
 	(void) pthread_mutex_lock(&uid_mutex);
 	if (uid == 0)
 		uid = getuid();
 	if (uid_cnt++ == 0) {
-		nwamd_escalate_privs();
+		if (setppriv(PRIV_SET, PRIV_EFFECTIVE, priv_set) == -1) {
+			priv_freeset(priv_set);
+			pfail("setppriv effective: %s", strerror(errno));
+		}
 		if (setuid(0) == -1)
 			nlog(LOG_ERR, "setuid(0) failed %s", strerror(errno));
 	}
 	(void) pthread_mutex_unlock(&uid_mutex);
+
+	priv_freeset(priv_set);
 }
 
 void
-nwamd_from_root(void) {
+nwamd_deescalate(void) {
+	priv_set_t *priv_set, *allpriv_set;
+
 	(void) pthread_mutex_lock(&uid_mutex);
 	assert(uid_cnt > 0);
 	if (--uid_cnt == 0) {
 		if (setuid(uid) == -1)
 			nlog(LOG_ERR, "setuid(%d) failed %s", uid,
 			    strerror(errno));
-		nwamd_drop_unneeded_privs();
+
+		/* build up our minimal set of privs. */
+		priv_set = priv_str_to_set("basic", ",", NULL);
+		allpriv_set = priv_str_to_set("zone", ",", NULL);
+		if (priv_set == NULL || allpriv_set == NULL)
+			pfail("converting privilege sets: %s", strerror(errno));
+
+		(void) priv_addset(priv_set, PRIV_FILE_CHOWN_SELF);
+		(void) priv_addset(priv_set, PRIV_FILE_DAC_READ);
+		(void) priv_addset(priv_set, PRIV_FILE_DAC_WRITE);
+		(void) priv_addset(priv_set, PRIV_NET_RAWACCESS);
+		(void) priv_addset(priv_set, PRIV_NET_PRIVADDR);
+		(void) priv_addset(priv_set, PRIV_PROC_AUDIT);
+		(void) priv_addset(priv_set, PRIV_PROC_OWNER);
+		(void) priv_addset(priv_set, PRIV_PROC_SETID);
+		(void) priv_addset(priv_set, PRIV_SYS_CONFIG);
+		(void) priv_addset(priv_set, PRIV_SYS_IP_CONFIG);
+		(void) priv_addset(priv_set, PRIV_SYS_IPC_CONFIG);
+		(void) priv_addset(priv_set, PRIV_SYS_MOUNT);
+		(void) priv_addset(priv_set, PRIV_SYS_NET_CONFIG);
+		(void) priv_addset(priv_set, PRIV_SYS_RES_CONFIG);
+		(void) priv_addset(priv_set, PRIV_SYS_RESOURCE);
+
+		/*
+		 * Since our zone might not have all these privs,
+		 * just ask for those that are available.
+		 */
+		priv_intersect(allpriv_set, priv_set);
+
+		if (setppriv(PRIV_SET, PRIV_INHERITABLE, priv_set) == -1) {
+			priv_freeset(allpriv_set);
+			priv_freeset(priv_set);
+			pfail("setppriv inheritable: %s", strerror(errno));
+		}
+		/*
+		 * Need to ensure permitted set contains all privs so we can
+		 * escalate later.
+		 */
+		if (setppriv(PRIV_SET, PRIV_PERMITTED, allpriv_set) == -1) {
+			priv_freeset(allpriv_set);
+			priv_freeset(priv_set);
+			pfail("setppriv permitted: %s", strerror(errno));
+		}
+		/*
+		 * We need to find a smaller set of privs that are important to
+		 * us.  Otherwise we really are not gaining much by doing this.
+		 */
+		if (setppriv(PRIV_SET, PRIV_EFFECTIVE, priv_set) == -1) {
+			priv_freeset(allpriv_set);
+			priv_freeset(priv_set);
+			pfail("setppriv effective: %s", strerror(errno));
+		}
 	}
 	(void) pthread_mutex_unlock(&uid_mutex);
+
+	priv_freeset(priv_set);
+	priv_freeset(allpriv_set);
 }
 
 /*
@@ -222,82 +289,6 @@ nwamd_link_belongs_to_this_zone(const char *linkname)
 		}
 	}
 	return (B_TRUE);
-}
-
-void
-nwamd_drop_unneeded_privs(void)
-{
-	priv_set_t *priv_set, *allpriv_set;
-
-	/* build up our minimal set of privs; start with the basic set */
-	priv_set = priv_str_to_set("basic", ",", NULL);
-	allpriv_set = priv_str_to_set("zone", ",", NULL);
-	if (priv_set == NULL || allpriv_set == NULL)
-		pfail("converting privilege sets: %s", strerror(errno));
-
-	(void) priv_addset(priv_set, PRIV_FILE_CHOWN_SELF);
-	(void) priv_addset(priv_set, PRIV_FILE_DAC_READ);
-	(void) priv_addset(priv_set, PRIV_FILE_DAC_WRITE);
-	(void) priv_addset(priv_set, PRIV_NET_RAWACCESS);
-	(void) priv_addset(priv_set, PRIV_NET_PRIVADDR);
-	(void) priv_addset(priv_set, PRIV_PROC_AUDIT);
-	(void) priv_addset(priv_set, PRIV_PROC_OWNER);
-	(void) priv_addset(priv_set, PRIV_PROC_SETID);
-	(void) priv_addset(priv_set, PRIV_SYS_CONFIG);
-	(void) priv_addset(priv_set, PRIV_SYS_IP_CONFIG);
-	(void) priv_addset(priv_set, PRIV_SYS_IPC_CONFIG);
-	(void) priv_addset(priv_set, PRIV_SYS_MOUNT);
-	(void) priv_addset(priv_set, PRIV_SYS_NET_CONFIG);
-	(void) priv_addset(priv_set, PRIV_SYS_RES_CONFIG);
-	(void) priv_addset(priv_set, PRIV_SYS_RESOURCE);
-
-	/*
-	 * Since our zone might not have all these privs,
-	 * just ask for those that are available.
-	 */
-	priv_intersect(allpriv_set, priv_set);
-
-	if (setppriv(PRIV_SET, PRIV_INHERITABLE, priv_set) == -1) {
-		priv_freeset(allpriv_set);
-		priv_freeset(priv_set);
-		pfail("setppriv inheritable: %s", strerror(errno));
-	}
-	/*
-	 * Need to ensure permitted set contains all privs so we can escalate
-	 * later.
-	 */
-	if (setppriv(PRIV_SET, PRIV_PERMITTED, allpriv_set) == -1) {
-		priv_freeset(allpriv_set);
-		priv_freeset(priv_set);
-		pfail("setppriv permitted: %s", strerror(errno));
-	}
-	/*
-	 * We need to find a smaller set of privs that are important to us.
-	 * Otherwise we really are not gaining much by doing this.
-	 */
-	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, priv_set) == -1) {
-		priv_freeset(allpriv_set);
-		priv_freeset(priv_set);
-		pfail("setppriv effective: %s", strerror(errno));
-	}
-
-	priv_freeset(priv_set);
-	priv_freeset(allpriv_set);
-}
-
-void
-nwamd_escalate_privs(void)
-{
-	priv_set_t *priv_set;
-	priv_set = priv_str_to_set("zone", ",", NULL);
-	if (priv_set == NULL)
-		pfail("creating privilege set: %s", strerror(errno));
-
-	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, priv_set) == -1) {
-		priv_freeset(priv_set);
-		pfail("setppriv effective: %s", strerror(errno));
-	}
-	priv_freeset(priv_set);
 }
 
 /*
