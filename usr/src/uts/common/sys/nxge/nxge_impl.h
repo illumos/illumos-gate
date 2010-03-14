@@ -1152,23 +1152,23 @@ uint64_t hv_niu_vrtx_logical_page_info(uint32_t cookie, uint64_t chidx,
 
 uint64_t hv_niu_cfgh_rx_logical_page_conf(uint64_t, uint64_t, uint64_t,
 	uint64_t, uint64_t);
-#pragma weak	hv_niu_rx_logical_page_conf
+#pragma weak	hv_niu_cfgh_rx_logical_page_conf
 
 uint64_t hv_niu_cfgh_rx_logical_page_info(uint64_t, uint64_t, uint64_t,
 	uint64_t *, uint64_t *);
-#pragma weak	hv_niu_rx_logical_page_info
+#pragma weak	hv_niu_cfgh_rx_logical_page_info
 
 uint64_t hv_niu_cfgh_tx_logical_page_conf(uint64_t, uint64_t, uint64_t,
 	uint64_t, uint64_t);
-#pragma weak	hv_niu_tx_logical_page_conf
+#pragma weak	hv_niu_cfgh_tx_logical_page_conf
 
 uint64_t hv_niu_cfgh_tx_logical_page_info(uint64_t, uint64_t, uint64_t,
 	uint64_t *, uint64_t *);
-#pragma weak	hv_niu_tx_logical_page_info
+#pragma weak	hv_niu_cfgh_tx_logical_page_info
 
 uint64_t hv_niu_cfgh_vr_assign(uint64_t, uint64_t vridx, uint64_t ldc_id,
 	uint32_t *cookie);
-#pragma weak	hv_niu_vr_assign
+#pragma weak	hv_niu_cfgh_vr_assign
 
 //
 // NIU-specific interrupt API
