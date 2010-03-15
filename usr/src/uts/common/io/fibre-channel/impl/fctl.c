@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Fibre channel Transport Library (fctl)
@@ -6627,7 +6627,9 @@ fctl_tc_destructor(timed_counter_t *tc)
 	mutex_enter(&tc->mutex);
 	if (tc->active) {
 		tc->active = B_FALSE;
+		mutex_exit(&tc->mutex);
 		(void) untimeout(tc->tid);
+		mutex_enter(&tc->mutex);
 		tc->sig = NULL;
 	}
 	mutex_exit(&tc->mutex);
