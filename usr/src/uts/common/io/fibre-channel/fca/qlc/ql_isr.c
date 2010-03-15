@@ -48,6 +48,7 @@
 #include <ql_isr.h>
 #include <ql_init.h>
 #include <ql_mbx.h>
+#include <ql_nx.h>
 #include <ql_xioctl.h>
 
 /*
@@ -196,7 +197,7 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 			    ha->flags & ONLINE) {
 				ql_srb_t	*sp;
 
-				mbx = RD16_IO_REG(ha, mailbox[23]);
+				mbx = RD16_IO_REG(ha, mailbox_out[23]);
 
 				if ((mbx & 3) == MBX23_SCSI_COMPLETION) {
 					/* Release mailbox registers. */
@@ -269,7 +270,7 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 					WRT16_IO_REG(ha, semaphore, 0);
 
 					/* Get mailbox data. */
-					mbx = RD16_IO_REG(ha, mailbox[0]);
+					mbx = RD16_IO_REG(ha, mailbox_out[0]);
 					if (mbx > 0x3fff && mbx < 0x8000) {
 						ql_mbx_completion(ha, mbx,
 						    &set_flags, &reset_flags,
@@ -328,13 +329,22 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 			}
 		}
 	} else {
-		while ((stat = RD32_IO_REG(ha, intr_info_lo)) & RH_RISC_INT) {
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			ql_8021_clr_hw_intr(ha);
+		}
+		while ((stat = RD32_IO_REG(ha, risc2host)) & RH_RISC_INT) {
 			/* Capture FW defined interrupt info */
 			mbx = MSW(stat);
 
 			/* Reset idle timer. */
 			ha->idle_timer = 0;
 			rval = DDI_INTR_CLAIMED;
+
+			if (CFG_IST(ha, CFG_CTRL_8021) &&
+			    RD32_IO_REG(ha, nx_risc_int) == 0) {
+				break;
+			}
+
 			if (intr_loop) {
 				intr_loop--;
 			}
@@ -346,7 +356,7 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 				    &reset_flags, intr_loop);
 
 				/* Release mailbox registers. */
-				if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+				if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 					WRT16_IO_REG(ha, semaphore, 0);
 				}
 				break;
@@ -354,7 +364,7 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 			case MBX_SUCCESS:
 			case MBX_ERR:
 				/* Sun FW, Release mailbox registers. */
-				if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+				if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 					WRT16_IO_REG(ha, semaphore, 0);
 				}
 				ql_mbx_completion(ha, mbx, &set_flags,
@@ -363,7 +373,7 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 
 			case ASYNC_EVENT:
 				/* Sun FW, Release mailbox registers. */
-				if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+				if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 					WRT16_IO_REG(ha, semaphore, 0);
 				}
 				ql_async_event(ha, (uint32_t)mbx, &isr_done_q,
@@ -454,9 +464,14 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 			/* Clear RISC interrupt */
 			if (intr || intr_loop == 0) {
 				intr = B_FALSE;
-				CFG_IST(ha, CFG_CTRL_242581) ?
-				    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
-				    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+				if (CFG_IST(ha, CFG_CTRL_8021)) {
+					ql_8021_clr_fw_intr(ha);
+				} else if (CFG_IST(ha, CFG_CTRL_242581)) {
+					WRT32_IO_REG(ha, hccr,
+					    HC24_CLR_RISC_INT);
+				} else {
+					WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+				}
 			}
 
 			if (set_flags != 0 || reset_flags != 0) {
@@ -554,8 +569,7 @@ ql_handle_uncommon_risc_intr(ql_adapter_state_t *ha, uint32_t stat,
 		}
 
 		if (ha->parity_pause_errors == 0) {
-			(void) ql_flash_errlog(ha, FLASH_ERRLOG_PARITY_ERR,
-			    0, MSW(stat), LSW(stat));
+			ha->log_parity_pause = B_TRUE;
 		}
 
 		if (ha->parity_pause_errors < 0xffffffff) {
@@ -565,7 +579,8 @@ ql_handle_uncommon_risc_intr(ql_adapter_state_t *ha, uint32_t stat,
 		*set_flags |= ISP_ABORT_NEEDED;
 
 		/* Disable ISP interrupts. */
-		WRT16_IO_REG(ha, ictrl, 0);
+		CFG_IST(ha, CFG_CTRL_8021) ? ql_8021_disable_intrs(ha) :
+		    WRT16_IO_REG(ha, ictrl, 0);
 		ADAPTER_STATE_LOCK(ha);
 		ha->flags &= ~INTERRUPTS_ENABLED;
 		ADAPTER_STATE_UNLOCK(ha);
@@ -601,9 +616,13 @@ ql_spurious_intr(ql_adapter_state_t *ha, int intr_clr)
 
 	/* Clear RISC interrupt */
 	if (intr_clr) {
-		CFG_IST(ha, CFG_CTRL_242581) ?
-		    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
-		    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			ql_8021_clr_fw_intr(ha);
+		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
+			WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
+		} else {
+			WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+		}
 	}
 
 	state = ddi_get_devstate(ha->dip);
@@ -649,7 +668,7 @@ ql_mbx_completion(ql_adapter_state_t *ha, uint16_t mb0, uint32_t *set_flags,
 			index >>= 1;
 			if (index & MBX_0) {
 				ha->mcp->mb[cnt] = RD16_IO_REG(ha,
-				    mailbox[cnt]);
+				    mailbox_out[cnt]);
 			}
 		}
 
@@ -659,9 +678,13 @@ ql_mbx_completion(ql_adapter_state_t *ha, uint16_t mb0, uint32_t *set_flags,
 
 	if (intr_clr) {
 		/* Clear RISC interrupt. */
-		CFG_IST(ha, CFG_CTRL_242581) ?
-		    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
-		    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			ql_8021_clr_fw_intr(ha);
+		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
+			WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
+		} else {
+			WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+		}
 	}
 
 	ha->mailbox_flags = (uint8_t)(ha->mailbox_flags | MBX_INTERRUPT);
@@ -709,8 +732,8 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 	mb[0] = LSW(mbx);
 	switch (mb[0]) {
 	case MBA_SCSI_COMPLETION:
-		handle = SHORT_TO_LONG(RD16_IO_REG(ha, mailbox[1]),
-		    RD16_IO_REG(ha, mailbox[2]));
+		handle = SHORT_TO_LONG(RD16_IO_REG(ha, mailbox_out[1]),
+		    RD16_IO_REG(ha, mailbox_out[2]));
 		break;
 
 	case MBA_CMPLT_1_16BIT:
@@ -719,15 +742,17 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		break;
 
 	case MBA_CMPLT_1_32BIT:
-		handle = SHORT_TO_LONG(MSW(mbx), RD16_IO_REG(ha, mailbox[2]));
+		handle = SHORT_TO_LONG(MSW(mbx),
+		    RD16_IO_REG(ha, mailbox_out[2]));
 		mb[0] = MBA_SCSI_COMPLETION;
 		break;
 
 	case MBA_CTIO_COMPLETION:
 	case MBA_IP_COMPLETION:
 		handle = CFG_IST(ha, CFG_CTRL_2200) ? SHORT_TO_LONG(
-		    RD16_IO_REG(ha, mailbox[1]), RD16_IO_REG(ha, mailbox[2])) :
-		    SHORT_TO_LONG(MSW(mbx), RD16_IO_REG(ha, mailbox[2]));
+		    RD16_IO_REG(ha, mailbox_out[1]),
+		    RD16_IO_REG(ha, mailbox_out[2])) :
+		    SHORT_TO_LONG(MSW(mbx), RD16_IO_REG(ha, mailbox_out[2]));
 		mb[0] = MBA_SCSI_COMPLETION;
 		break;
 
@@ -743,9 +768,13 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 		if (intr_clr) {
 			/* Clear RISC interrupt */
-			CFG_IST(ha, CFG_CTRL_242581) ?
-			    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
-			    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+			if (CFG_IST(ha, CFG_CTRL_8021)) {
+				ql_8021_clr_fw_intr(ha);
+			} else if (CFG_IST(ha, CFG_CTRL_242581)) {
+				WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
+			} else {
+				WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+			}
 			intr = B_FALSE;
 		}
 
@@ -788,11 +817,11 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 			EL(ha, "%xh Fast post, mbx1=%xh, mbx2=%xh, mbx3=%xh,"
 			    "mbx6=%xh, mbx7=%xh\n", mb[0],
-			    RD16_IO_REG(ha, mailbox[1]),
-			    RD16_IO_REG(ha, mailbox[2]),
-			    RD16_IO_REG(ha, mailbox[3]),
-			    RD16_IO_REG(ha, mailbox[6]),
-			    RD16_IO_REG(ha, mailbox[7]));
+			    RD16_IO_REG(ha, mailbox_out[1]),
+			    RD16_IO_REG(ha, mailbox_out[2]),
+			    RD16_IO_REG(ha, mailbox_out[3]),
+			    RD16_IO_REG(ha, mailbox_out[6]),
+			    RD16_IO_REG(ha, mailbox_out[7]));
 
 			(void) ql_binary_fw_dump(ha, FALSE);
 
@@ -811,44 +840,51 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		break;
 
 	case MBA_SYSTEM_ERR:		/* System Error */
-		mb[1] = RD16_IO_REG(ha, mailbox[1]);
-		mb[2] = RD16_IO_REG(ha, mailbox[2]);
-		mb[3] = RD16_IO_REG(ha, mailbox[3]);
-		mb[7] = RD16_IO_REG(ha, mailbox[7]);
+		mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
+		mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
+		mb[3] = RD16_IO_REG(ha, mailbox_out[3]);
+		mb[7] = RD16_IO_REG(ha, mailbox_out[7]);
 
 		EL(ha, "%xh ISP System Error, isp_abort_needed\n mbx1=%xh, "
 		    "mbx2=%xh, mbx3=%xh, mbx4=%xh, mbx5=%xh, mbx6=%xh,\n "
 		    "mbx7=%xh, mbx8=%xh, mbx9=%xh, mbx10=%xh, mbx11=%xh, "
 		    "mbx12=%xh,\n", mb[0], mb[1], mb[2], mb[3],
-		    RD16_IO_REG(ha, mailbox[4]), RD16_IO_REG(ha, mailbox[5]),
-		    RD16_IO_REG(ha, mailbox[6]), mb[7],
-		    RD16_IO_REG(ha, mailbox[8]), RD16_IO_REG(ha, mailbox[9]),
-		    RD16_IO_REG(ha, mailbox[10]), RD16_IO_REG(ha, mailbox[11]),
-		    RD16_IO_REG(ha, mailbox[12]));
+		    RD16_IO_REG(ha, mailbox_out[4]),
+		    RD16_IO_REG(ha, mailbox_out[5]),
+		    RD16_IO_REG(ha, mailbox_out[6]), mb[7],
+		    RD16_IO_REG(ha, mailbox_out[8]),
+		    RD16_IO_REG(ha, mailbox_out[9]),
+		    RD16_IO_REG(ha, mailbox_out[10]),
+		    RD16_IO_REG(ha, mailbox_out[11]),
+		    RD16_IO_REG(ha, mailbox_out[12]));
 
 		EL(ha, "%xh ISP System Error, isp_abort_needed\n mbx13=%xh, "
 		    "mbx14=%xh, mbx15=%xh, mbx16=%xh, mbx17=%xh, mbx18=%xh,\n"
 		    "mbx19=%xh, mbx20=%xh, mbx21=%xh, mbx22=%xh, mbx23=%xh\n",
-		    mb[0], RD16_IO_REG(ha, mailbox[13]),
-		    RD16_IO_REG(ha, mailbox[14]), RD16_IO_REG(ha, mailbox[15]),
-		    RD16_IO_REG(ha, mailbox[16]), RD16_IO_REG(ha, mailbox[17]),
-		    RD16_IO_REG(ha, mailbox[18]), RD16_IO_REG(ha, mailbox[19]),
-		    RD16_IO_REG(ha, mailbox[20]), RD16_IO_REG(ha, mailbox[21]),
-		    RD16_IO_REG(ha, mailbox[22]),
-		    RD16_IO_REG(ha, mailbox[23]));
+		    mb[0], RD16_IO_REG(ha, mailbox_out[13]),
+		    RD16_IO_REG(ha, mailbox_out[14]),
+		    RD16_IO_REG(ha, mailbox_out[15]),
+		    RD16_IO_REG(ha, mailbox_out[16]),
+		    RD16_IO_REG(ha, mailbox_out[17]),
+		    RD16_IO_REG(ha, mailbox_out[18]),
+		    RD16_IO_REG(ha, mailbox_out[19]),
+		    RD16_IO_REG(ha, mailbox_out[20]),
+		    RD16_IO_REG(ha, mailbox_out[21]),
+		    RD16_IO_REG(ha, mailbox_out[22]),
+		    RD16_IO_REG(ha, mailbox_out[23]));
 
 		if (ha->reg_off->mbox_cnt > 24) {
 			EL(ha, "%xh ISP System Error, mbx24=%xh, mbx25=%xh, "
 			    "mbx26=%xh,\n mbx27=%xh, mbx28=%xh, mbx29=%xh, "
 			    "mbx30=%xh, mbx31=%xh\n", mb[0],
-			    RD16_IO_REG(ha, mailbox[24]),
-			    RD16_IO_REG(ha, mailbox[25]),
-			    RD16_IO_REG(ha, mailbox[26]),
-			    RD16_IO_REG(ha, mailbox[27]),
-			    RD16_IO_REG(ha, mailbox[28]),
-			    RD16_IO_REG(ha, mailbox[29]),
-			    RD16_IO_REG(ha, mailbox[30]),
-			    RD16_IO_REG(ha, mailbox[31]));
+			    RD16_IO_REG(ha, mailbox_out[24]),
+			    RD16_IO_REG(ha, mailbox_out[25]),
+			    RD16_IO_REG(ha, mailbox_out[26]),
+			    RD16_IO_REG(ha, mailbox_out[27]),
+			    RD16_IO_REG(ha, mailbox_out[28]),
+			    RD16_IO_REG(ha, mailbox_out[29]),
+			    RD16_IO_REG(ha, mailbox_out[30]),
+			    RD16_IO_REG(ha, mailbox_out[31]));
 		}
 
 		(void) ql_binary_fw_dump(ha, FALSE);
@@ -871,8 +907,9 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		    "isp_abort_needed\n", mb[0]);
 
 		(void) ql_flash_errlog(ha, FLASH_ERRLOG_AEN_8003,
-		    RD16_IO_REG(ha, mailbox[1]), RD16_IO_REG(ha, mailbox[2]),
-		    RD16_IO_REG(ha, mailbox[3]));
+		    RD16_IO_REG(ha, mailbox_out[1]),
+		    RD16_IO_REG(ha, mailbox_out[2]),
+		    RD16_IO_REG(ha, mailbox_out[3]));
 
 		*set_flags |= ISP_ABORT_NEEDED;
 		ha->xioctl->ControllerErrorCount++;
@@ -883,8 +920,9 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		    " isp_abort_needed\n", mb[0]);
 
 		(void) ql_flash_errlog(ha, FLASH_ERRLOG_AEN_8004,
-		    RD16_IO_REG(ha, mailbox[1]), RD16_IO_REG(ha, mailbox[2]),
-		    RD16_IO_REG(ha, mailbox[3]));
+		    RD16_IO_REG(ha, mailbox_out[1]),
+		    RD16_IO_REG(ha, mailbox_out[2]),
+		    RD16_IO_REG(ha, mailbox_out[3]));
 
 		*set_flags |= ISP_ABORT_NEEDED;
 		ha->xioctl->ControllerErrorCount++;
@@ -896,9 +934,9 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		break;
 
 	case MBA_MENLO_ALERT:	/* Menlo Alert Notification */
-		mb[1] = RD16_IO_REG(ha, mailbox[1]);
-		mb[2] = RD16_IO_REG(ha, mailbox[2]);
-		mb[3] = RD16_IO_REG(ha, mailbox[3]);
+		mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
+		mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
+		mb[3] = RD16_IO_REG(ha, mailbox_out[3]);
 
 		EL(ha, "%xh Menlo Alert Notification received, mbx1=%xh,"
 		    " mbx2=%xh, mbx3=%xh\n", mb[0], mb[1], mb[2], mb[3]);
@@ -921,10 +959,10 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 	case MBA_LIP_F8:	/* Received a LIP F8. */
 	case MBA_LIP_RESET:	/* LIP reset occurred. */
 	case MBA_LIP_OCCURRED:	/* Loop Initialization Procedure */
-		if (CFG_IST(ha, CFG_CTRL_81XX)) {
+		if (CFG_IST(ha, CFG_CTRL_8081)) {
 			EL(ha, "%xh DCBX_STARTED received, mbx1=%xh, mbx2=%xh"
-			    "\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
-			    RD16_IO_REG(ha, mailbox[2]));
+			    "\n", mb[0], RD16_IO_REG(ha, mailbox_out[1]),
+			    RD16_IO_REG(ha, mailbox_out[2]));
 		} else {
 			EL(ha, "%xh LIP received\n", mb[0]);
 		}
@@ -954,8 +992,8 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 	case MBA_LOOP_UP:
 		if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322 |
-		    CFG_CTRL_242581))) {
-			mb[1] = RD16_IO_REG(ha, mailbox[1]);
+		    CFG_CTRL_24258081))) {
+			mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
 			if (mb[1] == IIDMA_RATE_1GB) {		/* 1GB */
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state) | FC_STATE_1GBIT_SPEED;
@@ -1001,9 +1039,10 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 	case MBA_LOOP_DOWN:
 		EL(ha, "%xh Loop Down received, mbx1=%xh, mbx2=%xh, mbx3=%xh, "
-		    "mbx4=%xh\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
-		    RD16_IO_REG(ha, mailbox[2]), RD16_IO_REG(ha, mailbox[3]),
-		    RD16_IO_REG(ha, mailbox[4]));
+		    "mbx4=%xh\n", mb[0], RD16_IO_REG(ha, mailbox_out[1]),
+		    RD16_IO_REG(ha, mailbox_out[2]),
+		    RD16_IO_REG(ha, mailbox_out[3]),
+		    RD16_IO_REG(ha, mailbox_out[4]));
 
 		if (!(ha->task_daemon_flags & LOOP_DOWN)) {
 			*set_flags |= LOOP_DOWN;
@@ -1015,8 +1054,8 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 			ha->loop_down_timer = LOOP_DOWN_TIMER_START;
 		}
 
-		if (CFG_IST(ha, CFG_CTRL_2581)) {
-			ha->sfp_stat = RD16_IO_REG(ha, mailbox[2]);
+		if (CFG_IST(ha, CFG_CTRL_258081)) {
+			ha->sfp_stat = RD16_IO_REG(ha, mailbox_out[2]);
 		}
 
 		/* Update AEN queue. */
@@ -1026,10 +1065,10 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		break;
 
 	case MBA_PORT_UPDATE:
-		mb[1] = RD16_IO_REG(ha, mailbox[1]);
-		mb[2] = RD16_IO_REG(ha, mailbox[2]);
+		mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
+		mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
 		mb[3] = (uint16_t)(ha->flags & VP_ENABLED ?
-		    RD16_IO_REG(ha, mailbox[3]) : 0);
+		    RD16_IO_REG(ha, mailbox_out[3]) : 0);
 
 		/* Locate port state structure. */
 		for (vha = ha; vha != NULL; vha = vha->vp_next) {
@@ -1040,29 +1079,38 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		if (vha == NULL) {
 			break;
 		}
+
+		if (CFG_IST(ha, CFG_CTRL_8081) && mb[1] == 0xffff &&
+		    mb[2] == 7 && (MSB(mb[3]) == 0xe || MSB(mb[3]) == 0x1a ||
+		    MSB(mb[3]) == 0x1c || MSB(mb[3]) == 0x1d ||
+		    MSB(mb[3]) == 0x1e)) {
+			/*
+			 * received FLOGI reject
+			 * received FLOGO
+			 * FCF configuration changed
+			 * FIP Clear Virtual Link received
+			 * FKA timeout
+			 */
+			if (!(ha->task_daemon_flags & LOOP_DOWN)) {
+				*set_flags |= LOOP_DOWN;
+			}
+			ql_port_state(ha, FC_STATE_OFFLINE, FC_STATE_CHANGE |
+			    COMMAND_WAIT_NEEDED | LOOP_DOWN);
+			if (ha->loop_down_timer == LOOP_DOWN_TIMER_OFF) {
+				ha->loop_down_timer = LOOP_DOWN_TIMER_START;
+			}
 		/*
 		 * In N port 2 N port topology the FW provides a port
 		 * database entry at loop_id 0x7fe which we use to
 		 * acquire the Ports WWPN.
 		 */
-		if ((mb[1] != 0x7fe) &&
+		} else if ((mb[1] != 0x7fe) &&
 		    ((FC_PORT_STATE_MASK(vha->state) != FC_STATE_OFFLINE ||
-		    (CFG_IST(ha, CFG_CTRL_242581) &&
+		    (CFG_IST(ha, CFG_CTRL_24258081) &&
 		    (mb[1] != 0xffff || mb[2] != 6 || mb[3] != 0))))) {
 			EL(ha, "%xh Port Database Update, Login/Logout "
 			    "received, mbx1=%xh, mbx2=%xh, mbx3=%xh\n",
 			    mb[0], mb[1], mb[2], mb[3]);
-		} else if (CFG_IST(ha, CFG_CTRL_81XX) && mb[1] == 0xffff &&
-		    mb[2] == 0x7 && MSB(mb[3]) == 0xe) {
-			if (!(ha->task_daemon_flags & LOOP_DOWN)) {
-				*set_flags |= LOOP_DOWN;
-			}
-			ql_port_state(ha, FC_STATE_OFFLINE,
-			    FC_STATE_CHANGE | COMMAND_WAIT_NEEDED | LOOP_DOWN);
-
-			if (ha->loop_down_timer == LOOP_DOWN_TIMER_OFF) {
-				ha->loop_down_timer = LOOP_DOWN_TIMER_START;
-			}
 		} else {
 			EL(ha, "%xh Port Database Update received, mbx1=%xh,"
 			    " mbx2=%xh, mbx3=%xh\n", mb[0], mb[1], mb[2],
@@ -1088,10 +1136,10 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		break;
 
 	case MBA_RSCN_UPDATE:
-		mb[1] = RD16_IO_REG(ha, mailbox[1]);
-		mb[2] = RD16_IO_REG(ha, mailbox[2]);
+		mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
+		mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
 		mb[3] = (uint16_t)(ha->flags & VP_ENABLED ?
-		    RD16_IO_REG(ha, mailbox[3]) : 0);
+		    RD16_IO_REG(ha, mailbox_out[3]) : 0);
 
 		/* Locate port state structure. */
 		for (vha = ha; vha != NULL; vha = vha->vp_next) {
@@ -1130,14 +1178,14 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 	case MBA_LIP_ERROR:	/* Loop initialization errors. */
 		EL(ha, "%xh LIP error received, mbx1=%xh\n", mb[0],
-		    RD16_IO_REG(ha, mailbox[1]));
+		    RD16_IO_REG(ha, mailbox_out[1]));
 		break;
 
 	case MBA_IP_RECEIVE:
 	case MBA_IP_BROADCAST:
-		mb[1] = RD16_IO_REG(ha, mailbox[1]);
-		mb[2] = RD16_IO_REG(ha, mailbox[2]);
-		mb[3] = RD16_IO_REG(ha, mailbox[3]);
+		mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
+		mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
+		mb[3] = RD16_IO_REG(ha, mailbox_out[3]);
 
 		EL(ha, "%xh IP packet/broadcast received, mbx1=%xh, "
 		    "mbx2=%xh, mbx3=%xh\n", mb[0], mb[1], mb[2], mb[3]);
@@ -1151,7 +1199,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 			break;
 		}
 
-		cnt = (uint16_t)(CFG_IST(ha, CFG_CTRL_242581) ?
+		cnt = (uint16_t)(CFG_IST(ha, CFG_CTRL_24258081) ?
 		    CHAR_TO_SHORT(ha->ip_init_ctrl_blk.cb24.buf_size[0],
 		    ha->ip_init_ctrl_blk.cb24.buf_size[1]) :
 		    CHAR_TO_SHORT(ha->ip_init_ctrl_blk.cb.buf_size[0],
@@ -1166,14 +1214,14 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 		for (index = 10; index < ha->reg_off->mbox_cnt && index < cnt;
 		    index++) {
-			mb[index] = RD16_IO_REG(ha, mailbox[index]);
+			mb[index] = RD16_IO_REG(ha, mailbox_out[index]);
 		}
 
 		tq->ub_seq_id = ++ha->ub_seq_id;
 		tq->ub_seq_cnt = 0;
 		tq->ub_frame_ro = 0;
 		tq->ub_loop_id = (uint16_t)(mb[0] == MBA_IP_BROADCAST ?
-		    (CFG_IST(ha, CFG_CTRL_242581) ? BROADCAST_24XX_HDL :
+		    (CFG_IST(ha, CFG_CTRL_24258081) ? BROADCAST_24XX_HDL :
 		    IP_BROADCAST_LOOP_ID) : tq->loop_id);
 		ha->rcv_dev_q = tq;
 
@@ -1202,13 +1250,14 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 	case MBA_ERROR_LOGGING_DISABLED:
 		EL(ha, "%xh error logging disabled received, "
-		    "mbx1=%xh\n", mb[0], RD16_IO_REG(ha, mailbox[1]));
+		    "mbx1=%xh\n", mb[0], RD16_IO_REG(ha, mailbox_out[1]));
 		break;
 
 	case MBA_POINT_TO_POINT:
 	/* case MBA_DCBX_COMPLETED: */
-		if (CFG_IST(ha, CFG_CTRL_81XX)) {
+		if (CFG_IST(ha, CFG_CTRL_8081)) {
 			EL(ha, "%xh DCBX completed received\n", mb[0]);
+			ha->async_event_wait |= BIT_1;
 		} else {
 			EL(ha, "%xh Point to Point Mode received\n", mb[0]);
 		}
@@ -1219,16 +1268,16 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 	case MBA_FCF_CONFIG_ERROR:
 		EL(ha, "%xh FCF configuration Error received, mbx1=%xh\n",
-		    mb[0], RD16_IO_REG(ha, mailbox[1]));
+		    mb[0], RD16_IO_REG(ha, mailbox_out[1]));
 		break;
 
 	case MBA_DCBX_PARAM_CHANGED:
 		EL(ha, "%xh DCBX parameters changed received, mbx1=%xh\n",
-		    mb[0], RD16_IO_REG(ha, mailbox[1]));
+		    mb[0], RD16_IO_REG(ha, mailbox_out[1]));
 		break;
 
 	case MBA_CHG_IN_CONNECTION:
-		mb[1] = RD16_IO_REG(ha, mailbox[1]);
+		mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
 		if (mb[1] == 2) {
 			EL(ha, "%xh Change In Connection received, "
 			    "mbx1=%xh\n",  mb[0], mb[1]);
@@ -1258,7 +1307,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 	case MBA_PORT_BYPASS_CHANGED:
 		EL(ha, "%xh Port Bypass Changed received, mbx1=%xh\n",
-		    mb[0], RD16_IO_REG(ha, mailbox[1]));
+		    mb[0], RD16_IO_REG(ha, mailbox_out[1]));
 		/*
 		 * Event generated when there is a transition on
 		 * port bypass of crystal+.
@@ -1273,34 +1322,42 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 	case MBA_RECEIVE_ERROR:
 		EL(ha, "%xh Receive Error received, mbx1=%xh, mbx2=%xh\n",
-		    mb[0], RD16_IO_REG(ha, mailbox[1]),
-		    RD16_IO_REG(ha, mailbox[2]));
+		    mb[0], RD16_IO_REG(ha, mailbox_out[1]),
+		    RD16_IO_REG(ha, mailbox_out[2]));
 		break;
 
 	case MBA_LS_RJT_SENT:
 		EL(ha, "%xh LS_RJT Response Sent ELS=%xh\n", mb[0],
-		    RD16_IO_REG(ha, mailbox[1]));
+		    RD16_IO_REG(ha, mailbox_out[1]));
 		break;
 
 	case MBA_FW_RESTART_COMP:
 		EL(ha, "%xh firmware restart complete received mb1=%xh\n",
-		    mb[0], RD16_IO_REG(ha, mailbox[1]));
+		    mb[0], RD16_IO_REG(ha, mailbox_out[1]));
 		break;
 
 	case MBA_IDC_COMPLETE:
 		EL(ha, "%xh Inter-driver communication complete received, "
-		    "mbx1=%xh, mbx2=%xh\n", mb[0],
-		    RD16_IO_REG(ha, mailbox[1]), RD16_IO_REG(ha, mailbox[2]));
+		    " mbx1=%xh, mbx2=%xh, mbx3=%xh, mbx4=%xh, mbx5=%xh,"
+		    " mbx6=%xh, mbx7=%xh\n", mb[0],
+		    RD16_IO_REG(ha, mailbox_out[1]),
+		    RD16_IO_REG(ha, mailbox_out[2]),
+		    RD16_IO_REG(ha, mailbox_out[3]),
+		    RD16_IO_REG(ha, mailbox_out[4]),
+		    RD16_IO_REG(ha, mailbox_out[5]),
+		    RD16_IO_REG(ha, mailbox_out[6]),
+		    RD16_IO_REG(ha, mailbox_out[7]));
+		ha->async_event_wait |= BIT_0;
 		break;
 
 	case MBA_IDC_NOTIFICATION:
-		ha->idc_mb[1] = RD16_IO_REG(ha, mailbox[1]);
-		ha->idc_mb[2] = RD16_IO_REG(ha, mailbox[2]);
-		ha->idc_mb[3] = RD16_IO_REG(ha, mailbox[3]);
-		ha->idc_mb[4] = RD16_IO_REG(ha, mailbox[4]);
-		ha->idc_mb[5] = RD16_IO_REG(ha, mailbox[5]);
-		ha->idc_mb[6] = RD16_IO_REG(ha, mailbox[6]);
-		ha->idc_mb[7] = RD16_IO_REG(ha, mailbox[7]);
+		ha->idc_mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
+		ha->idc_mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
+		ha->idc_mb[3] = RD16_IO_REG(ha, mailbox_out[3]);
+		ha->idc_mb[4] = RD16_IO_REG(ha, mailbox_out[4]);
+		ha->idc_mb[5] = RD16_IO_REG(ha, mailbox_out[5]);
+		ha->idc_mb[6] = RD16_IO_REG(ha, mailbox_out[6]);
+		ha->idc_mb[7] = RD16_IO_REG(ha, mailbox_out[7]);
 		EL(ha, "%xh Inter-driver communication request notification "
 		    "received, mbx1=%xh, mbx2=%xh, mbx3=%xh, mbx4=%xh, "
 		    "mbx5=%xh, mbx6=%xh, mbx7=%xh\n", mb[0], ha->idc_mb[1],
@@ -1312,21 +1369,27 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 	case MBA_IDC_TIME_EXTENDED:
 		EL(ha, "%xh Inter-driver communication time extended received,"
 		    " mbx1=%xh, mbx2=%xh\n", mb[0],
-		    RD16_IO_REG(ha, mailbox[1]), RD16_IO_REG(ha, mailbox[2]));
+		    RD16_IO_REG(ha, mailbox_out[1]),
+		    RD16_IO_REG(ha, mailbox_out[2]));
 		break;
 
 	default:
 		EL(ha, "%xh UNKNOWN event received, mbx1=%xh, mbx2=%xh, "
-		    "mbx3=%xh\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
-		    RD16_IO_REG(ha, mailbox[2]), RD16_IO_REG(ha, mailbox[3]));
+		    "mbx3=%xh\n", mb[0], RD16_IO_REG(ha, mailbox_out[1]),
+		    RD16_IO_REG(ha, mailbox_out[2]),
+		    RD16_IO_REG(ha, mailbox_out[3]));
 		break;
 	}
 
 	/* Clear RISC interrupt */
 	if (intr && intr_clr) {
-		CFG_IST(ha, CFG_CTRL_242581) ?
-		    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
-		    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			ql_8021_clr_fw_intr(ha);
+		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
+			WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
+		} else {
+			WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+		}
 	}
 
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
@@ -1444,9 +1507,13 @@ ql_response_pkt(ql_adapter_state_t *ha, ql_head_t *done_q, uint32_t *set_flags,
 
 	/* Clear RISC interrupt */
 	if (intr_clr) {
-		CFG_IST(ha, CFG_CTRL_242581) ?
-		    WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT) :
-		    WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			ql_8021_clr_fw_intr(ha);
+		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
+			WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
+		} else {
+			WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
+		}
 	}
 
 	if (ha->isp_rsp_index >= RESPONSE_ENTRY_CNT) {
@@ -1514,7 +1581,7 @@ ql_response_pkt(ql_adapter_state_t *ha, ql_head_t *done_q, uint32_t *set_flags,
 			ha->status_srb = NULL;
 		}
 
-		pkt->entry_status = (uint8_t)(CFG_IST(ha, CFG_CTRL_242581) ?
+		pkt->entry_status = (uint8_t)(CFG_IST(ha, CFG_CTRL_24258081) ?
 		    pkt->entry_status & 0x3c : pkt->entry_status & 0x7e);
 
 		if (pkt->entry_status != 0) {
@@ -1523,7 +1590,7 @@ ql_response_pkt(ql_adapter_state_t *ha, ql_head_t *done_q, uint32_t *set_flags,
 		} else {
 			switch (pkt->entry_type) {
 			case STATUS_TYPE:
-				status |= CFG_IST(ha, CFG_CTRL_242581) ?
+				status |= CFG_IST(ha, CFG_CTRL_24258081) ?
 				    ql_24xx_status_entry(ha,
 				    (sts_24xx_entry_t *)pkt, done_q, set_flags,
 				    reset_flags) :
@@ -2040,7 +2107,7 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_242581)) {
+	if (CFG_IST(ha, CFG_CTRL_24258081)) {
 		sts_24xx_entry_t *pkt24 = (sts_24xx_entry_t *)pkt23;
 
 		/* Setup status. */
@@ -2441,7 +2508,8 @@ ql_status_error(ql_adapter_state_t *ha, ql_srb_t *sp, sts_entry_t *pkt23,
 
 				sp->request_sense_ptr += sense_sz;
 				sp->request_sense_length -= sense_sz;
-				if (sp->request_sense_length != 0) {
+				if (sp->request_sense_length != 0 &&
+				    !(CFG_IST(ha, CFG_CTRL_8021))) {
 					ha->status_srb = sp;
 				}
 			}
@@ -2521,7 +2589,7 @@ ql_status_cont_entry(ql_adapter_state_t *ha, sts_cont_entry_t *pkt,
 			sense_sz = sp->request_sense_length;
 		}
 
-		if (CFG_IST(ha, CFG_CTRL_242581)) {
+		if (CFG_IST(ha, CFG_CTRL_24258081)) {
 			for (index = 0; index < sense_sz; index += 4) {
 				ql_chg_endian((uint8_t *)
 				    &pkt->req_sense_data[0] + index, 4);
@@ -2604,7 +2672,7 @@ ql_ip_entry(ql_adapter_state_t *ha, ip_entry_t *pkt23, ql_head_t *done_q,
 		tq = sp->lun_queue->target_queue;
 
 		/* Set ISP completion status */
-		if (CFG_IST(ha, CFG_CTRL_242581)) {
+		if (CFG_IST(ha, CFG_CTRL_24258081)) {
 			ip_cmd_entry_t	*pkt24 = (ip_cmd_entry_t *)pkt23;
 
 			sp->pkt->pkt_reason = ddi_get16(
@@ -2917,7 +2985,7 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 		tq = sp->lun_queue->target_queue;
 
 		/* Set ISP completion status */
-		if (CFG_IST(ha, CFG_CTRL_242581)) {
+		if (CFG_IST(ha, CFG_CTRL_24258081)) {
 			sp->pkt->pkt_reason = ddi_get16(
 			    ha->hba_buf.acc_handle, &pkt24->status);
 		} else {
@@ -2985,7 +3053,7 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 			/* Set retry status. */
 			sp->flags |= SRB_RETRY;
 
-		} else if (CFG_IST(ha, CFG_CTRL_242581) &&
+		} else if (CFG_IST(ha, CFG_CTRL_24258081) &&
 		    sp->pkt->pkt_reason == CS_DATA_UNDERRUN) {
 			cnt = ddi_get32(ha->hba_buf.acc_handle,
 			    &pkt24->resp_byte_count);
@@ -3032,7 +3100,7 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
  *
  * Input:
  *	ha:		adapter state pointer.
- *	pkt23:		entry pointer.
+ *	pkt:		entry pointer.
  *	done_q:		done queue pointer.
  *	set_flags:	task daemon flags to set.
  *	reset_flags:	task daemon flags to reset.
@@ -3220,7 +3288,7 @@ ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
 				tq->logout_sent = 0;
 				tq->flags &= ~TQF_NEED_AUTHENTICATION;
 
-				if (CFG_IST(ha, CFG_CTRL_242581)) {
+				if (CFG_IST(ha, CFG_CTRL_24258081)) {
 					tq->flags |= TQF_IIDMA_NEEDED;
 				}
 			srb->pkt->pkt_state = FC_PKT_SUCCESS;

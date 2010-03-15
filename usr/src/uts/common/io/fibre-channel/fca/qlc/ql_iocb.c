@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2009 QLogic Corporation; ql_iocb.c"
+#pragma ident	"Copyright 2010 QLogic Corporation; ql_iocb.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -216,7 +216,19 @@ ql_start_iocb(ql_adapter_state_t *vha, ql_srb_t *sp)
 		 * used to notify the isp that a new iocb has been
 		 * placed on the request ring.
 		 */
-		WRT16_IO_REG(ha, req_in, ha->req_ring_index);
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			uint32_t	w32;
+
+			w32 = ha->req_ring_index << 16 |
+			    ha->function_number << 5 | 4;
+			do {
+				ddi_put32(ha->db_dev_handle, ha->nx_req_in,
+				    w32);
+			} while (RD_REG_DWORD(ha, ha->db_read) != w32);
+
+		} else {
+			WRT16_IO_REG(ha, req_in, ha->req_ring_index);
+		}
 
 		/* Update outstanding command count statistic. */
 		ha->adapter_stats->ncmds++;
@@ -320,7 +332,7 @@ ql_req_pkt(ql_adapter_state_t *vha, request_t **pktp)
 		 * hit this case as req slot was available
 		 */
 		if ((!(curthread->t_flag & T_INTR_THREAD)) &&
-		    (RD16_IO_REG(ha, istatus) & RISC_INT)) {
+		    INTERRUPT_PENDING(ha)) {
 			(void) ql_isr((caddr_t)ha);
 			INTR_LOCK(ha);
 			ha->intr_claimed = TRUE;
@@ -378,7 +390,18 @@ ql_isp_cmd(ql_adapter_state_t *vha)
 	}
 
 	/* Set chip new ring index. */
-	WRT16_IO_REG(ha, req_in, ha->req_ring_index);
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		uint32_t	w32;
+
+		w32 = ha->req_ring_index << 16 |
+		    ha->function_number << 5 | 4;
+		do {
+			ddi_put32(ha->db_dev_handle, ha->nx_req_in, w32);
+		} while (RD_REG_DWORD(ha, ha->db_read) != w32);
+
+	} else {
+		WRT16_IO_REG(ha, req_in, ha->req_ring_index);
+	}
 
 	/* Release ring lock. */
 	REQUEST_RING_UNLOCK(ha);
@@ -752,7 +775,7 @@ ql_marker(ql_adapter_state_t *ha, uint16_t loop_id, uint16_t lun,
 	if (rval == QL_SUCCESS) {
 		pkt->entry_type = MARKER_TYPE;
 
-		if (CFG_IST(ha, CFG_CTRL_242581)) {
+		if (CFG_IST(ha, CFG_CTRL_24258081)) {
 			marker_24xx_entry_t	*pkt24 =
 			    (marker_24xx_entry_t *)pkt;
 
@@ -1128,7 +1151,7 @@ ql_isp_rcvbuf(ql_adapter_state_t *ha)
 	fc_unsol_buf_t	*ubp;
 	int		ring_updated = FALSE;
 
-	if (CFG_IST(ha, CFG_CTRL_242581)) {
+	if (CFG_IST(ha, CFG_CTRL_24258081)) {
 		ql_isp24xx_rcvbuf(ha);
 		return;
 	}
@@ -1139,9 +1162,9 @@ ql_isp_rcvbuf(ql_adapter_state_t *ha)
 	ADAPTER_STATE_LOCK(ha);
 
 	/* Calculate number of free receive buffer entries. */
-	index = RD16_IO_REG(ha, mailbox[8]);
+	index = RD16_IO_REG(ha, mailbox_out[8]);
 	do {
-		index1 = RD16_IO_REG(ha, mailbox[8]);
+		index1 = RD16_IO_REG(ha, mailbox_out[8]);
 		if (index1 == index) {
 			break;
 		} else {
@@ -1226,7 +1249,7 @@ ql_isp_rcvbuf(ql_adapter_state_t *ha)
 		    DDI_DMA_SYNC_FORDEV);
 
 		/* Set chip new ring index. */
-		WRT16_IO_REG(ha, mailbox[8], ha->rcvbuf_ring_index);
+		WRT16_IO_REG(ha, mailbox_in[8], ha->rcvbuf_ring_index);
 	}
 
 	/* Release adapter state lock. */

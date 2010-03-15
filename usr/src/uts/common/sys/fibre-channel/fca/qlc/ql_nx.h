@@ -1,0 +1,1209 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2010 QLogic Corporation.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef	_QL_NX_H
+#define	_QL_NX_H
+
+/*
+ * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver header file.
+ *
+ * ***********************************************************************
+ * *									**
+ * *				NOTICE					**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
+ * *			ALL RIGHTS RESERVED				**
+ * *									**
+ * ***********************************************************************
+ *
+ */
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+#define	NX_P3_A0	0x30
+#define	NX_P3_A2	0x32
+#define	NX_P3_B0	0x40
+#define	NX_P3_B1	0x41
+#define	NX_P3_B2	0x42
+#define	NX_P3P_A0	0x50
+
+#define	NX_IS_REVISION_P3(REVISION)	(REVISION >= NX_P3_A0)
+#define	NX_IS_REVISION_P3PLUS(REVISION)	(REVISION >= NX_P3P_A0)
+
+/*
+ * Following are the states of the Phantom. Phantom will set them and
+ * Host will read to check if the fields are correct.
+ */
+#define	PHAN_INITIALIZE_START		0xff00
+#define	PHAN_INITIALIZE_FAILED		0xffff
+#define	PHAN_INITIALIZE_COMPLETE	0xff01
+
+/* Host writes the following to notify that it has done the init-handshake */
+#define	PHAN_INITIALIZE_ACK		0xf00f
+#define	PHAN_PEG_RCV_INITIALIZED	0xff01
+#define	PHAN_PEG_RCV_START_INITIALIZE	0xff00
+
+/* CRB_RELATED */
+#define	NIC_CRB_BASE		(UNM_CAM_RAM(0x200))
+#define	NIC_CRB_BASE_2		(UNM_CAM_RAM(0x700))
+#define	UNM_NIC_REG(X)		(NIC_CRB_BASE + (X))
+#define	UNM_NIC_REG_2(X)	(NIC_CRB_BASE_2 + (X))
+
+#define	CRB_CUT_THRU_PAGE_SIZE	(UNM_CAM_RAM(0x170))
+
+#define	CRB_DEV_PARTITION_INFO	(UNM_CAM_RAM(0x14c))
+#define	CRB_DEV_STATE		(UNM_CAM_RAM(0x140))
+#define	CRB_DRV_IDC_VERSION	(UNM_CAM_RAM(0x174))
+#define	CRB_DRV_ACTIVE		(UNM_CAM_RAM(0x138))
+#define	CRB_DRV_STATE		(UNM_CAM_RAM(0x144))
+#define	CRB_DRV_SCRATCH		(UNM_CAM_RAM(0x148))
+
+/* Every driver should use these Device State */
+#define	NX_DEV_COLD		1
+#define	NX_DEV_INITIALIZING 	2
+#define	NX_DEV_READY		3
+#define	NX_DEV_NEED_RESET	4
+#define	NX_DEV_NEED_QUIESCENT 	5
+#define	NX_DEV_FAILED		6
+#define	NX_DEV_QUIESCENT	7
+
+#define	NX_IDC_VERSION		0x1
+
+#define	CRB_CMD_PRODUCER_OFFSET	(UNM_NIC_REG(0x08))
+#define	CRB_CMD_CONSUMER_OFFSET	(UNM_NIC_REG(0x0c))
+#define	CRB_PAUSE_ADDR_LO	(UNM_NIC_REG(0x10)) /* C0 EPG BUG  */
+#define	CRB_PAUSE_ADDR_HI	(UNM_NIC_REG(0x14))
+#define	NX_CDRP_CRB_OFFSET	(UNM_NIC_REG(0x18))
+#define	NX_ARG1_CRB_OFFSET	(UNM_NIC_REG(0x1c))
+#define	NX_ARG2_CRB_OFFSET	(UNM_NIC_REG(0x20))
+#define	NX_ARG3_CRB_OFFSET	(UNM_NIC_REG(0x24))
+#define	NX_SIGN_CRB_OFFSET	(UNM_NIC_REG(0x28))
+#define	CRB_CMDPEG_CMDRING	(UNM_NIC_REG(0x38))
+#define	CRB_HOST_DUMMY_BUF_ADDR_HI	(UNM_NIC_REG(0x3c))
+#define	CRB_HOST_DUMMY_BUF_ADDR_LO	(UNM_NIC_REG(0x40))
+#define	CRB_CMDPEG_STATE	(UNM_NIC_REG(0x50))
+#define	BOOT_LOADER_DIMM_STATUS	(UNM_NIC_REG(0x54))
+#define	CRB_GLOBAL_INT_COAL	(UNM_NIC_REG(0x64)) /* intrt coalescing */
+#define	CRB_INT_COAL_MODE	(UNM_NIC_REG(0x68))
+#define	CRB_MAX_RCV_BUFS	(UNM_NIC_REG(0x6c))
+#define	CRB_TX_INT_THRESHOLD	(UNM_NIC_REG(0x70))
+#define	CRB_RX_PKT_TIMER	(UNM_NIC_REG(0x74))
+#define	CRB_TX_PKT_TIMER	(UNM_NIC_REG(0x78))
+#define	CRB_RX_PKT_CNT		(UNM_NIC_REG(0x7c))
+#define	CRB_RX_TMR_CNT		(UNM_NIC_REG(0x80))
+#define	CRB_RCV_INTR_COUNT	(UNM_NIC_REG(0x84))
+#define	CRB_XG_STATE		(UNM_NIC_REG(0x94)) /* XG Link status */
+#define	CRB_XG_STATE_P3		(UNM_NIC_REG(0x98)) /* XG PF Link status */
+#define	CRB_TX_STATE		(UNM_NIC_REG(0xac)) /* Debug -performance */
+#define	CRB_TX_COUNT		(UNM_NIC_REG(0xb0))
+#define	CRB_RX_STATE		(UNM_NIC_REG(0xb4))
+#define	CRB_RX_PERF_DEBUG_1	(UNM_NIC_REG(0xb8))
+#define	CRB_RX_LRO_CONTROL	(UNM_NIC_REG(0xbc)) /* LRO On/OFF */
+#define	CRB_MPORT_MODE		(UNM_NIC_REG(0xc4)) /* Multiport Mode */
+#define	CRB_DMA_SHIFT		(UNM_NIC_REG(0xcc)) /* DMA mask extension */
+#define	CRB_INT_VECTOR		(UNM_NIC_REG(0xd4))
+#define	CRB_PF_LINK_SPEED_1	(UNM_NIC_REG(0xe8))
+#define	CRB_PF_LINK_SPEED_2	(UNM_NIC_REG(0xec))
+#define	CRB_PF_MAX_LINK_SPEED_1	(UNM_NIC_REG(0xf0))
+#define	CRB_PF_MAX_LINK_SPEED_2	(UNM_NIC_REG(0xf4))
+#define	CRB_HOST_DUMMY_BUF	(UNM_NIC_REG(0xfc))
+
+/* used for ethtool tests */
+#define	CRB_SCRATCHPAD_TEST	(UNM_NIC_REG(0x280))
+
+#define	CRB_RCVPEG_STATE	(UNM_NIC_REG(0x13c))
+
+#define	UNM_PEG_HALT_STATUS1	(UNM_CAM_RAM(0xa8))
+#define	UNM_PEG_HALT_STATUS2	(UNM_CAM_RAM(0xac))
+#define	UNM_PEG_ALIVE_COUNTER	(UNM_CAM_RAM(0x0b0))
+#define	UNM_FW_CAPABILITIES_1	(UNM_CAM_RAM(0x128))
+
+/* 12 registers to store MAC addresses for 8 PCI functions */
+#define	CRB_MAC_BLOCK_START		(UNM_CAM_RAM(0x1c0))
+
+#define	CRB_CMD_PRODUCER_OFFSET_1	(UNM_NIC_REG(0x1ac))
+#define	CRB_CMD_CONSUMER_OFFSET_1	(UNM_NIC_REG(0x1b0))
+#define	CRB_TEMP_STATE			(UNM_NIC_REG(0x1b4))
+#define	CRB_CMD_PRODUCER_OFFSET_2	(UNM_NIC_REG(0x1b8))
+#define	CRB_CMD_CONSUMER_OFFSET_2	(UNM_NIC_REG(0x1bc))
+
+#define	CRB_CMD_PRODUCER_OFFSET_3	(UNM_NIC_REG(0x1d0))
+#define	CRB_CMD_CONSUMER_OFFSET_3	(UNM_NIC_REG(0x1d4))
+/* sw int status/mask registers */
+#define	CRB_SW_INT_MASK_OFFSET_0	0x1d8
+#define	CRB_SW_INT_MASK_OFFSET_1	0x1e0
+#define	CRB_SW_INT_MASK_OFFSET_2	0x1e4
+#define	CRB_SW_INT_MASK_OFFSET_3	0x1e8
+#define	CRB_SW_INT_MASK_OFFSET_4	0x450
+#define	CRB_SW_INT_MASK_OFFSET_5	0x454
+#define	CRB_SW_INT_MASK_OFFSET_6	0x458
+#define	CRB_SW_INT_MASK_OFFSET_7	0x45c
+#define	CRB_SW_INT_MASK_0		(UNM_NIC_REG(CRB_SW_INT_MASK_OFFSET_0))
+#define	CRB_SW_INT_MASK_1		(UNM_NIC_REG(CRB_SW_INT_MASK_OFFSET_1))
+#define	CRB_SW_INT_MASK_2		(UNM_NIC_REG(CRB_SW_INT_MASK_OFFSET_2))
+#define	CRB_SW_INT_MASK_3		(UNM_NIC_REG(CRB_SW_INT_MASK_OFFSET_3))
+#define	CRB_SW_INT_MASK_4		(UNM_NIC_REG(CRB_SW_INT_MASK_OFFSET_4))
+#define	CRB_SW_INT_MASK_5		(UNM_NIC_REG(CRB_SW_INT_MASK_OFFSET_5))
+#define	CRB_SW_INT_MASK_6		(UNM_NIC_REG(CRB_SW_INT_MASK_OFFSET_6))
+#define	CRB_SW_INT_MASK_7		(UNM_NIC_REG(CRB_SW_INT_MASK_OFFSET_7))
+
+#define	CRB_NIC_DEBUG_STRUCT_BASE	(UNM_NIC_REG(0x288))
+
+#define	CRB_NIC_CAPABILITIES_HOST	(UNM_NIC_REG(0x1a8))
+#define	CRB_NIC_CAPABILITIES_FW		(UNM_NIC_REG(0x1dc))
+#define	CRB_NIC_MSI_MODE_HOST		(UNM_NIC_REG(0x270))
+#define	CRB_NIC_MSI_MODE_FW		(UNM_NIC_REG(0x274))
+
+#define	INTR_SCHEME_PERPORT		0x1
+#define	MSI_MODE_MULTIFUNC		0x1
+
+#define	CRB_EPG_QUEUE_BUSY_COUNT	(UNM_NIC_REG(0x200))
+
+#define	CRB_V2P_0			(UNM_NIC_REG(0x290))
+#define	CRB_V2P_1			(UNM_NIC_REG(0x294))
+#define	CRB_V2P_2			(UNM_NIC_REG(0x298))
+#define	CRB_V2P_3			(UNM_NIC_REG(0x29c))
+#define	CRB_V2P(port)			(CRB_V2P_0 + ((port) * 4))
+#define	CRB_DRIVER_VERSION		(UNM_NIC_REG(0x2a0))
+
+#define	CRB_CNT_DBG1			(UNM_NIC_REG(0x2a4))
+#define	CRB_CNT_DBG2			(UNM_NIC_REG(0x2a8))
+#define	CRB_CNT_DBG3			(UNM_NIC_REG(0x2ac))
+
+/* ends here */
+#define	UNM_HW_H0_CH_HUB_ADR	0x05
+#define	UNM_HW_H1_CH_HUB_ADR	0x0E
+#define	UNM_HW_H2_CH_HUB_ADR	0x03
+#define	UNM_HW_H3_CH_HUB_ADR	0x01
+#define	UNM_HW_H4_CH_HUB_ADR	0x06
+#define	UNM_HW_H5_CH_HUB_ADR	0x07
+#define	UNM_HW_H6_CH_HUB_ADR	0x08
+/*
+ * WARNING:  pex_tgt_adr.v assumes if MSB of hub adr is set then it is an
+ * ILLEGAL hub!!!!!
+ */
+
+/* Hub 0 */
+#define	UNM_HW_MN_CRB_AGT_ADR	0x15
+#define	UNM_HW_MS_CRB_AGT_ADR	0x25
+
+/* Hub 1 */
+#define	UNM_HW_PS_CRB_AGT_ADR		0x73
+#define	UNM_HW_SS_CRB_AGT_ADR		0x20
+#define	UNM_HW_RPMX3_CRB_AGT_ADR	0x0b
+#define	UNM_HW_QMS_CRB_AGT_ADR		0x00
+#define	UNM_HW_SQGS0_CRB_AGT_ADR	0x01
+#define	UNM_HW_SQGS1_CRB_AGT_ADR	0x02
+#define	UNM_HW_SQGS2_CRB_AGT_ADR	0x03
+#define	UNM_HW_SQGS3_CRB_AGT_ADR	0x04
+#define	UNM_HW_C2C0_CRB_AGT_ADR		0x58
+#define	UNM_HW_C2C1_CRB_AGT_ADR		0x59
+#define	UNM_HW_C2C2_CRB_AGT_ADR		0x5a
+#define	UNM_HW_RPMX2_CRB_AGT_ADR	0x0a
+#define	UNM_HW_RPMX4_CRB_AGT_ADR	0x0c
+#define	UNM_HW_RPMX7_CRB_AGT_ADR	0x0f
+#define	UNM_HW_RPMX9_CRB_AGT_ADR	0x12
+#define	UNM_HW_SMB_CRB_AGT_ADR		0x18
+
+/* Hub 2 */
+#define	UNM_HW_NIU_CRB_AGT_ADR		0x31
+#define	UNM_HW_I2C0_CRB_AGT_ADR		0x19
+#define	UNM_HW_I2C1_CRB_AGT_ADR		0x29
+
+#define	UNM_HW_SN_CRB_AGT_ADR		0x10
+#define	UNM_HW_I2Q_CRB_AGT_ADR		0x20
+#define	UNM_HW_LPC_CRB_AGT_ADR		0x22
+#define	UNM_HW_ROMUSB_CRB_AGT_ADR	0x21
+#define	UNM_HW_QM_CRB_AGT_ADR		0x66
+#define	UNM_HW_SQG0_CRB_AGT_ADR		0x60
+#define	UNM_HW_SQG1_CRB_AGT_ADR		0x61
+#define	UNM_HW_SQG2_CRB_AGT_ADR		0x62
+#define	UNM_HW_SQG3_CRB_AGT_ADR		0x63
+#define	UNM_HW_RPMX1_CRB_AGT_ADR	0x09
+#define	UNM_HW_RPMX5_CRB_AGT_ADR	0x0d
+#define	UNM_HW_RPMX6_CRB_AGT_ADR	0x0e
+#define	UNM_HW_RPMX8_CRB_AGT_ADR	0x11
+
+/* Hub 3 */
+#define	UNM_HW_PH_CRB_AGT_ADR		0x1A
+#define	UNM_HW_SRE_CRB_AGT_ADR		0x50
+#define	UNM_HW_EG_CRB_AGT_ADR		0x51
+#define	UNM_HW_RPMX0_CRB_AGT_ADR	0x08
+
+/* Hub 4 */
+#define	UNM_HW_PEGN0_CRB_AGT_ADR	0x40
+#define	UNM_HW_PEGN1_CRB_AGT_ADR	0x41
+#define	UNM_HW_PEGN2_CRB_AGT_ADR	0x42
+#define	UNM_HW_PEGN3_CRB_AGT_ADR	0x43
+#define	UNM_HW_PEGNI_CRB_AGT_ADR	0x44
+#define	UNM_HW_PEGND_CRB_AGT_ADR	0x45
+#define	UNM_HW_PEGNC_CRB_AGT_ADR	0x46
+#define	UNM_HW_PEGR0_CRB_AGT_ADR	0x47
+#define	UNM_HW_PEGR1_CRB_AGT_ADR	0x48
+#define	UNM_HW_PEGR2_CRB_AGT_ADR	0x49
+#define	UNM_HW_PEGR3_CRB_AGT_ADR	0x4a
+#define	UNM_HW_PEGN4_CRB_AGT_ADR	0x4b
+
+/* Hub 5 */
+#define	UNM_HW_PEGS0_CRB_AGT_ADR	0x40
+#define	UNM_HW_PEGS1_CRB_AGT_ADR	0x41
+#define	UNM_HW_PEGS2_CRB_AGT_ADR	0x42
+#define	UNM_HW_PEGS3_CRB_AGT_ADR	0x43
+#define	UNM_HW_PEGSI_CRB_AGT_ADR	0x44
+#define	UNM_HW_PEGSD_CRB_AGT_ADR	0x45
+#define	UNM_HW_PEGSC_CRB_AGT_ADR	0x46
+
+/* Hub 6 */
+#define	UNM_HW_CAS0_CRB_AGT_ADR		0x46
+#define	UNM_HW_CAS1_CRB_AGT_ADR		0x47
+#define	UNM_HW_CAS2_CRB_AGT_ADR		0x48
+#define	UNM_HW_CAS3_CRB_AGT_ADR		0x49
+#define	UNM_HW_NCM_CRB_AGT_ADR		0x16
+#define	UNM_HW_TMR_CRB_AGT_ADR		0x17
+#define	UNM_HW_XDMA_CRB_AGT_ADR		0x05
+#define	UNM_HW_OCM0_CRB_AGT_ADR		0x06
+#define	UNM_HW_OCM1_CRB_AGT_ADR		0x07
+
+/* This field defines PCI/X adr [25:20] of agents on the CRB */
+
+#define	UNM_HW_PX_MAP_CRB_PH	0
+#define	UNM_HW_PX_MAP_CRB_PS	1
+#define	UNM_HW_PX_MAP_CRB_MN	2
+#define	UNM_HW_PX_MAP_CRB_MS	3
+#define	UNM_HW_PX_MAP_CRB_SRE	5
+#define	UNM_HW_PX_MAP_CRB_NIU	6
+#define	UNM_HW_PX_MAP_CRB_QMN	7
+#define	UNM_HW_PX_MAP_CRB_SQN0	8
+#define	UNM_HW_PX_MAP_CRB_SQN1	9
+#define	UNM_HW_PX_MAP_CRB_SQN2	10
+#define	UNM_HW_PX_MAP_CRB_SQN3	11
+#define	UNM_HW_PX_MAP_CRB_QMS	12
+#define	UNM_HW_PX_MAP_CRB_SQS0	13
+#define	UNM_HW_PX_MAP_CRB_SQS1	14
+#define	UNM_HW_PX_MAP_CRB_SQS2	15
+#define	UNM_HW_PX_MAP_CRB_SQS3	16
+#define	UNM_HW_PX_MAP_CRB_PGN0	17
+#define	UNM_HW_PX_MAP_CRB_PGN1	18
+#define	UNM_HW_PX_MAP_CRB_PGN2	19
+#define	UNM_HW_PX_MAP_CRB_PGN3	20
+#define	UNM_HW_PX_MAP_CRB_PGN4	(UNM_HW_PX_MAP_CRB_SQS2)
+#define	UNM_HW_PX_MAP_CRB_PGND	21
+#define	UNM_HW_PX_MAP_CRB_PGNI	22
+#define	UNM_HW_PX_MAP_CRB_PGS0	23
+#define	UNM_HW_PX_MAP_CRB_PGS1	24
+#define	UNM_HW_PX_MAP_CRB_PGS2	25
+#define	UNM_HW_PX_MAP_CRB_PGS3	26
+#define	UNM_HW_PX_MAP_CRB_PGSD	27
+#define	UNM_HW_PX_MAP_CRB_PGSI	28
+#define	UNM_HW_PX_MAP_CRB_SN	29
+#define	UNM_HW_PX_MAP_CRB_EG	31
+#define	UNM_HW_PX_MAP_CRB_PH2	32
+#define	UNM_HW_PX_MAP_CRB_PS2	33
+#define	UNM_HW_PX_MAP_CRB_CAM	34
+#define	UNM_HW_PX_MAP_CRB_CAS0	35
+#define	UNM_HW_PX_MAP_CRB_CAS1	36
+#define	UNM_HW_PX_MAP_CRB_CAS2	37
+#define	UNM_HW_PX_MAP_CRB_C2C0	38
+#define	UNM_HW_PX_MAP_CRB_C2C1	39
+#define	UNM_HW_PX_MAP_CRB_TIMR	40
+/*
+ * #define PX_MAP_CRB_SS      41
+ */
+#define	UNM_HW_PX_MAP_CRB_RPMX1		42
+#define	UNM_HW_PX_MAP_CRB_RPMX2		43
+#define	UNM_HW_PX_MAP_CRB_RPMX3		44
+#define	UNM_HW_PX_MAP_CRB_RPMX4		45
+#define	UNM_HW_PX_MAP_CRB_RPMX5		46
+#define	UNM_HW_PX_MAP_CRB_RPMX6		47
+#define	UNM_HW_PX_MAP_CRB_RPMX7		48
+#define	UNM_HW_PX_MAP_CRB_XDMA		49
+#define	UNM_HW_PX_MAP_CRB_I2Q		50
+#define	UNM_HW_PX_MAP_CRB_ROMUSB	51
+#define	UNM_HW_PX_MAP_CRB_CAS3		52
+#define	UNM_HW_PX_MAP_CRB_RPMX0		53
+#define	UNM_HW_PX_MAP_CRB_RPMX8		54
+#define	UNM_HW_PX_MAP_CRB_RPMX9		55
+#define	UNM_HW_PX_MAP_CRB_OCM0		56
+#define	UNM_HW_PX_MAP_CRB_OCM1		57
+#define	UNM_HW_PX_MAP_CRB_SMB		58
+#define	UNM_HW_PX_MAP_CRB_I2C0		59
+#define	UNM_HW_PX_MAP_CRB_I2C1		60
+#define	UNM_HW_PX_MAP_CRB_LPC		61
+#define	UNM_HW_PX_MAP_CRB_PGNC		62
+#define	UNM_HW_PX_MAP_CRB_PGR0		63
+#define	UNM_HW_PX_MAP_CRB_PGR1		4
+#define	UNM_HW_PX_MAP_CRB_PGR2		30
+#define	UNM_HW_PX_MAP_CRB_PGR3		41
+
+/*  This field defines CRB adr [31:20] of the agents */
+
+#define	UNM_HW_CRB_HUB_AGT_ADR_MN	((UNM_HW_H0_CH_HUB_ADR << 7) | \
+    UNM_HW_MN_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PH	((UNM_HW_H0_CH_HUB_ADR << 7) | \
+    UNM_HW_PH_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_MS	((UNM_HW_H0_CH_HUB_ADR << 7) | \
+    UNM_HW_MS_CRB_AGT_ADR)
+
+#define	UNM_HW_CRB_HUB_AGT_ADR_PS	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_PS_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_SS	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_SS_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_RPMX3	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_RPMX3_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_QMS	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_QMS_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_SQS0	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_SQGS0_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_SQS1	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_SQGS1_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_SQS2	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_SQGS2_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_SQS3	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_SQGS3_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_C2C0	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_C2C0_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_C2C1	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_C2C1_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_RPMX2	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_RPMX2_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_RPMX4	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_RPMX4_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_RPMX7	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_RPMX7_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_RPMX9	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_RPMX9_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_SMB	((UNM_HW_H1_CH_HUB_ADR << 7) | \
+    UNM_HW_SMB_CRB_AGT_ADR)
+
+#define	UNM_HW_CRB_HUB_AGT_ADR_NIU	((UNM_HW_H2_CH_HUB_ADR << 7) | \
+    UNM_HW_NIU_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_I2C0	((UNM_HW_H2_CH_HUB_ADR << 7) | \
+    UNM_HW_I2C0_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_I2C1	((UNM_HW_H2_CH_HUB_ADR << 7) | \
+    UNM_HW_I2C1_CRB_AGT_ADR)
+
+#define	UNM_HW_CRB_HUB_AGT_ADR_SRE	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_SRE_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_EG	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_EG_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_RPMX0	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_RPMX0_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_QMN	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_QM_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_SQN0	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_SQG0_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_SQN1	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_SQG1_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_SQN2	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_SQG2_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_SQN3	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_SQG3_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_RPMX1	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_RPMX1_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_RPMX5	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_RPMX5_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_RPMX6	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_RPMX6_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_RPMX8	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_RPMX8_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_CAS0	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_CAS0_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_CAS1	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_CAS1_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_CAS2	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_CAS2_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_CAS3	((UNM_HW_H3_CH_HUB_ADR << 7) | \
+    UNM_HW_CAS3_CRB_AGT_ADR)
+
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGNI	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGNI_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGND	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGND_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGN0	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGN0_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGN1	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGN1_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGN2	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGN2_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGN3	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGN3_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGN4	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGN4_CRB_AGT_ADR)
+
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGNC	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGNC_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGR0	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGR0_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGR1	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGR1_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGR2	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGR2_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGR3	((UNM_HW_H4_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGR3_CRB_AGT_ADR)
+
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGSI	((UNM_HW_H5_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGSI_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGSD	((UNM_HW_H5_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGSD_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGS0	((UNM_HW_H5_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGS0_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGS1	((UNM_HW_H5_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGS1_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGS2	((UNM_HW_H5_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGS2_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGS3	((UNM_HW_H5_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGS3_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_PGSC	((UNM_HW_H5_CH_HUB_ADR << 7) | \
+    UNM_HW_PEGSC_CRB_AGT_ADR)
+
+#define	UNM_HW_CRB_HUB_AGT_ADR_CAM	((UNM_HW_H6_CH_HUB_ADR << 7) | \
+    UNM_HW_NCM_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_TIMR	((UNM_HW_H6_CH_HUB_ADR << 7) | \
+    UNM_HW_TMR_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_XDMA	((UNM_HW_H6_CH_HUB_ADR << 7) | \
+    UNM_HW_XDMA_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_SN	((UNM_HW_H6_CH_HUB_ADR << 7) | \
+    UNM_HW_SN_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_I2Q	((UNM_HW_H6_CH_HUB_ADR << 7) | \
+    UNM_HW_I2Q_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_ROMUSB	((UNM_HW_H6_CH_HUB_ADR << 7) | \
+    UNM_HW_ROMUSB_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_OCM0	((UNM_HW_H6_CH_HUB_ADR << 7) | \
+    UNM_HW_OCM0_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_OCM1	((UNM_HW_H6_CH_HUB_ADR << 7) | \
+    UNM_HW_OCM1_CRB_AGT_ADR)
+#define	UNM_HW_CRB_HUB_AGT_ADR_LPC	((UNM_HW_H6_CH_HUB_ADR << 7) | \
+    UNM_HW_LPC_CRB_AGT_ADR)
+
+/*
+ * ROM USB CRB space is divided into 4 regions depending on decode of
+ * address bits [19:16]
+ */
+#define	ROMUSB_GLB		(UNM_CRB_ROMUSB + 0x00000)
+#define	ROMUSB_ROM		(UNM_CRB_ROMUSB + 0x10000)
+#define	ROMUSB_USB		(UNM_CRB_ROMUSB + 0x20000)
+#define	ROMUSB_DIRECT_ROM	(UNM_CRB_ROMUSB + 0x30000)
+#define	ROMUSB_TAP		(UNM_CRB_ROMUSB + 0x40000)
+
+/* ROMUSB  GLB register definitions */
+#define	UNM_ROMUSB_GLB_CONTROL		(ROMUSB_GLB + 0x0000)
+#define	UNM_ROMUSB_GLB_STATUS		(ROMUSB_GLB + 0x0004)
+#define	UNM_ROMUSB_GLB_SW_RESET		(ROMUSB_GLB + 0x0008)
+#define	UNM_ROMUSB_GLB_PAD_GPIO_I	(ROMUSB_GLB + 0x000c)
+#define	UNM_ROMUSB_GLB_RNG_PLL_CTL	(ROMUSB_GLB + 0x0010)
+#define	UNM_ROMUSB_GLB_TEST_MUX_O	(ROMUSB_GLB + 0x0014)
+#define	UNM_ROMUSB_GLB_PLL0_CTRL	(ROMUSB_GLB + 0x0018)
+#define	UNM_ROMUSB_GLB_PLL1_CTRL	(ROMUSB_GLB + 0x001c)
+#define	UNM_ROMUSB_GLB_PLL2_CTRL	(ROMUSB_GLB + 0x0020)
+#define	UNM_ROMUSB_GLB_PLL3_CTRL	(ROMUSB_GLB + 0x0024)
+#define	UNM_ROMUSB_GLB_PLL_LOCK		(ROMUSB_GLB + 0x0028)
+#define	UNM_ROMUSB_GLB_EXTERN_INT	(ROMUSB_GLB + 0x002c)
+#define	UNM_ROMUSB_GLB_PH_RST		(ROMUSB_GLB + 0x0030)
+#define	UNM_ROMUSB_GLB_PS_RST		(ROMUSB_GLB + 0x0034)
+#define	UNM_ROMUSB_GLB_CAS_RST		(ROMUSB_GLB + 0x0038)
+#define	UNM_ROMUSB_GLB_MIU_RST		(ROMUSB_GLB + 0x003c)
+#define	UNM_ROMUSB_GLB_CRB_RST		(ROMUSB_GLB + 0x0040)
+#define	UNM_ROMUSB_GLB_TEST_MUX_SEL	(ROMUSB_GLB + 0x0044)
+#define	UNM_ROMUSB_GLB_MN_COM_A2T	(ROMUSB_GLB + 0x0050)
+#define	UNM_ROMUSB_GLB_MN_COM_A2T	(ROMUSB_GLB + 0x0050)
+#define	UNM_ROMUSB_GLB_REV_ID		(ROMUSB_GLB + 0x0054)
+#define	UNM_ROMUSB_GLB_PEGTUNE_DONE	(ROMUSB_GLB + 0x005c)
+#define	UNM_ROMUSB_GLB_VENDOR_DEV_ID	(ROMUSB_GLB + 0x0058)
+#define	UNM_ROMUSB_GLB_CHIP_CLK_CTRL	(ROMUSB_GLB + 0x00a8)
+
+#define	UNM_ROMUSB_GPIO(n) ((n) <= 15 ? (ROMUSB_GLB + 0x60 + (4 * (n))): \
+	((n) <= 18) ? (ROMUSB_GLB + 0x70 + (4 * (n))) : \
+	(ROMUSB_GLB + 0x70 + (4 * (19))))
+
+#define	UNM_ROMUSB_ROM_CONTROL		(ROMUSB_ROM + 0x0000)
+#define	UNM_ROMUSB_ROM_INSTR_OPCODE	(ROMUSB_ROM + 0x0004)
+#define	UNM_ROMUSB_ROM_ADDRESS		(ROMUSB_ROM + 0x0008)
+#define	UNM_ROMUSB_ROM_WDATA		(ROMUSB_ROM + 0x000c)
+#define	UNM_ROMUSB_ROM_ABYTE_CNT	(ROMUSB_ROM + 0x0010)
+#define	UNM_ROMUSB_ROM_DUMMY_BYTE_CNT	(ROMUSB_ROM + 0x0014)
+#define	UNM_ROMUSB_ROM_RDATA		(ROMUSB_ROM + 0x0018)
+#define	UNM_ROMUSB_ROM_AGT_TAG		(ROMUSB_ROM + 0x001c)
+#define	UNM_ROMUSB_ROM_TIME_PARM	(ROMUSB_ROM + 0x0020)
+#define	UNM_ROMUSB_ROM_CLK_DIV		(ROMUSB_ROM + 0x0024)
+#define	UNM_ROMUSB_ROM_MISS_INSTR	(ROMUSB_ROM + 0x0028)
+
+#define	UNM_ROMUSB_ROM_WRSR_INSTR	0x01
+#define	UNM_ROMUSB_ROM_PP_INSTR		0x02
+#define	UNM_ROMUSB_ROM_READ_INSTR	0x03
+#define	UNM_ROMUSB_ROM_WRDI_INSTR	0x04
+#define	UNM_ROMUSB_ROM_RDSR_INSTR	0x05
+#define	UNM_ROMUSB_ROM_WREN_INSTR	0x06
+#define	UNM_ROMUSB_ROM_FAST_RD_INSTR	0x0B
+#define	UNM_ROMUSB_ROM_RES_INSTR	0xAB
+#define	UNM_ROMUSB_ROM_BE_INSTR		0xC7
+#define	UNM_ROMUSB_ROM_DP_INSTR		0xC9
+#define	UNM_ROMUSB_ROM_SE_INSTR		0xD8
+
+/* Lock IDs for ROM lock */
+#define	ROM_LOCK_DRIVER		0x0d417340
+
+/* Lock IDs for PHY lock */
+#define	PHY_LOCK_DRIVER		0x44524956
+
+#define	UNM_PCI_CRB_WINDOWSIZE	0x00100000    /* all are 1MB windows */
+#define	UNM_PCI_CRB_WINDOW(A)	(UNM_PCI_CRBSPACE + (A)*UNM_PCI_CRB_WINDOWSIZE)
+#define	UNM_CRB_C2C_0		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_C2C0))
+#define	UNM_CRB_C2C_1		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_C2C1))
+#define	UNM_CRB_C2C_2		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_C2C2))
+#define	UNM_CRB_CAM		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_CAM))
+#define	UNM_CRB_CASPER		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_CAS))
+#define	UNM_CRB_CASPER_0	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_CAS0))
+#define	UNM_CRB_CASPER_1	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_CAS1))
+#define	UNM_CRB_CASPER_2	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_CAS2))
+#define	UNM_CRB_DDR_MD		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_MS))
+#define	UNM_CRB_DDR_NET		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_MN))
+#define	UNM_CRB_EPG		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_EG))
+#define	UNM_CRB_I2Q		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_I2Q))
+#define	UNM_CRB_NIU		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_NIU))
+/* HACK upon HACK upon HACK (for PCIE builds) */
+#define	UNM_CRB_PCIX_HOST	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PH))
+#define	UNM_CRB_PCIX_HOST2	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PH2))
+#define	UNM_CRB_PCIX_MD		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PS))
+#define	UNM_CRB_PCIE		(UNM_CRB_PCIX_MD)
+/* window 1 pcie slot */
+#define	UNM_CRB_PCIE2		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PS2))
+
+#define	UNM_CRB_PEG_MD_0	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGS0))
+#define	UNM_CRB_PEG_MD_1	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGS1))
+#define	UNM_CRB_PEG_MD_2	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGS2))
+#define	UNM_CRB_PEG_MD_3	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGS3))
+#define	UNM_CRB_PEG_MD_3	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGS3))
+#define	UNM_CRB_PEG_MD_D	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGSD))
+#define	UNM_CRB_PEG_MD_I	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGSI))
+#define	UNM_CRB_PEG_NET_0	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGN0))
+#define	UNM_CRB_PEG_NET_1	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGN1))
+#define	UNM_CRB_PEG_NET_2	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGN2))
+#define	UNM_CRB_PEG_NET_3	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGN3))
+#define	UNM_CRB_PEG_NET_4	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGN4))
+#define	UNM_CRB_PEG_NET_D	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGND))
+#define	UNM_CRB_PEG_NET_I	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_PGNI))
+#define	UNM_CRB_PQM_MD		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_QMS))
+#define	UNM_CRB_PQM_NET		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_QMN))
+#define	UNM_CRB_QDR_MD		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SS))
+#define	UNM_CRB_QDR_NET		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SN))
+#define	UNM_CRB_ROMUSB		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_ROMUSB))
+#define	UNM_CRB_RPMX_0		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_RPMX0))
+#define	UNM_CRB_RPMX_1		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_RPMX1))
+#define	UNM_CRB_RPMX_2		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_RPMX2))
+#define	UNM_CRB_RPMX_3		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_RPMX3))
+#define	UNM_CRB_RPMX_4		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_RPMX4))
+#define	UNM_CRB_RPMX_5		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_RPMX5))
+#define	UNM_CRB_RPMX_6		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_RPMX6))
+#define	UNM_CRB_RPMX_7		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_RPMX7))
+#define	UNM_CRB_SQM_MD_0	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SQS0))
+#define	UNM_CRB_SQM_MD_1	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SQS1))
+#define	UNM_CRB_SQM_MD_2	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SQS2))
+#define	UNM_CRB_SQM_MD_3	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SQS3))
+#define	UNM_CRB_SQM_NET_0	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SQN0))
+#define	UNM_CRB_SQM_NET_1	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SQN1))
+#define	UNM_CRB_SQM_NET_2	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SQN2))
+#define	UNM_CRB_SQM_NET_3	(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SQN3))
+#define	UNM_CRB_SRE		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SRE))
+#define	UNM_CRB_TIMER		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_TIMR))
+#define	UNM_CRB_XDMA		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_XDMA))
+#define	UNM_CRB_I2C0		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_I2C0))
+#define	UNM_CRB_I2C1		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_I2C1))
+#define	UNM_CRB_OCM0		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_OCM0))
+#define	UNM_CRB_SMB		(UNM_PCI_CRB_WINDOW(UNM_HW_PX_MAP_CRB_SMB))
+
+#define	UNM_CRB_MAX		(UNM_PCI_CRB_WINDOW(64))
+
+/*
+ * ====================== BASE ADDRESSES ON-CHIP ======================
+ * Base addresses of major components on-chip.
+ * ====================== BASE ADDRESSES ON-CHIP ======================
+ */
+#define	UNM_ADDR_DDR_NET	0x0000000000000000
+#define	UNM_ADDR_DDR_NET_MAX	0x000000000fffffff
+
+/*
+ * Imbus address bit used to indicate a host address. This bit is
+ * eliminated by the pcie bar and bar select before presentation
+ * over pcie.
+ */
+/* host memory via IMBUS */
+#define	NX_P2_ADDR_PCIE		0x0000000800000000
+#define	NX_P3_ADDR_PCIE		0x0000008000000000
+#define	UNM_ADDR_PCIE_MAX	0x0000000FFFFFFFFF
+#define	UNM_ADDR_OCM0		0x0000000200000000
+#define	UNM_ADDR_OCM0_MAX	0x00000002000fffff
+#define	UNM_ADDR_OCM1		0x0000000200400000
+#define	UNM_ADDR_OCM1_MAX	0x00000002004fffff
+#define	UNM_ADDR_QDR_NET	0x0000000300000000
+
+#define	NX_P2_ADDR_QDR_NET_MAX	0x00000003001fffff
+#define	NX_P3_ADDR_QDR_NET_MAX	0x0000000303ffffff
+/*
+ * The ifdef at the bottom should go. All drivers should start using the above
+ * 2 defines.
+ */
+#ifdef P3
+#define	UNM_ADDR_QDR_NET_MAX	(NX_P3_ADDR_QDR_NET_MAX)
+#else
+#define	UNM_ADDR_QDR_NET_MAX	(NX_P2_ADDR_QDR_NET_MAX)
+#endif
+
+#define	D3_CRB_REG_FUN0		(UNM_PCIX_PS_REG(0x0084))
+#define	D3_CRB_REG_FUN1		(UNM_PCIX_PS_REG(0x1084))
+#define	D3_CRB_REG_FUN2		(UNM_PCIX_PS_REG(0x2084))
+#define	D3_CRB_REG_FUN3		(UNM_PCIX_PS_REG(0x3084))
+
+
+#define	ISR_I2Q_CLR_PCI_LO	(UNM_PCIX_PS_REG(UNM_I2Q_CLR_PCI_LO))
+#define	ISR_I2Q_CLR_PCI_HI	(UNM_PCIX_PS_REG(UNM_I2Q_CLR_PCI_HI))
+#define	UNM_PCI_ARCH_CRB_BASE	(UNM_PCI_DIRECT_CRB)
+
+#define	UNM_PCI_MAPSIZE		128 /* we're mapping 128MB of mem on PCI bus */
+#define	UNM_PCI_DDR_NET		0x00000000
+#define	UNM_PCI_DDR_NET_MAX	0x01ffffff
+#define	UNM_PCI_DDR_MD		0x02000000
+#define	UNM_PCI_DDR_MD_MAX	0x03ffffff
+#define	UNM_PCI_QDR_NET		0x04000000
+#define	UNM_PCI_QDR_NET_MAX	0x043fffff
+#define	UNM_PCI_DIRECT_CRB	0x04400000
+#define	UNM_PCI_DIRECT_CRB_MAX	0x047fffff
+#define	UNM_PCI_CAMQM		0x04800000
+#define	UNM_PCI_CAMQM_MAX	0x04ffffff
+#define	UNM_PCI_OCM0		0x05000000
+#define	UNM_PCI_OCM0_MAX	0x050fffff
+#define	UNM_PCI_OCM1		0x05100000
+#define	UNM_PCI_OCM1_MAX	0x051fffff
+#define	UNM_PCI_CRBSPACE	0x06000000
+#define	UNM_PCI_CRBSPACE_MAX	0x07ffffff
+#define	UNM_PCI_128MB_SIZE	0x08000000
+#define	UNM_PCI_32MB_SIZE	0x02000000
+#define	UNM_PCI_2MB_SIZE	0x00200000
+
+/*
+ * Definitions relating to access/control of the Network Interface Unit
+ * h/w block.
+ */
+/*
+ * Configuration registers.
+ */
+#define	UNM_NIU_MODE		(UNM_CRB_NIU + 0x00000)
+
+/*
+ *   Register offsets for MN
+ */
+#define	MIU_CONTROL			(0x000)
+#define	MIU_TAG				(0x004)
+#define	MIU_TEST_AGT_CTRL		(0x090)
+#define	MIU_TEST_AGT_ADDR_LO		(0x094)
+#define	MIU_TEST_AGT_ADDR_HI		(0x098)
+#define	MIU_TEST_AGT_WRDATA_LO		(0x0a0)
+#define	MIU_TEST_AGT_WRDATA_HI		(0x0a4)
+#define	MIU_TEST_AGT_WRDATA(i)		(0x0a0 + (4 * (i)))
+#define	MIU_TEST_AGT_RDDATA_LO		(0x0a8)
+#define	MIU_TEST_AGT_RDDATA_HI		(0x0ac)
+#define	MIU_TEST_AGT_WRDATA_UPPER_LO	(0x0b0)
+#define	MIU_TEST_AGT_WRDATA_UPPER_HI	(0x0b4)
+#define	MIU_TEST_AGT_RDDATA_UPPER_LO	(0x0b8)
+#define	MIU_TEST_AGT_RDDATA_UPPER_HI	(0x0bc)
+#define	MIU_TEST_AGT_RDDATA(i)		(0x0a8 + (4 * (i)))
+#define	MIU_TEST_AGT_ADDR_MASK		0xfffffff8
+#define	MIU_TEST_AGT_UPPER_ADDR(off)	(0)
+
+/* MIU_TEST_AGT_CTRL flags. work for SIU as well */
+#define	MIU_TA_CTL_START	1
+#define	MIU_TA_CTL_ENABLE	2
+#define	MIU_TA_CTL_WRITE	4
+#define	MIU_TA_CTL_BUSY		8
+
+#define	SIU_TEST_AGT_CTRL	(0x060)
+#define	SIU_TEST_AGT_ADDR_LO	(0x064)
+#define	SIU_TEST_AGT_ADDR_HI	(0x078)
+#define	SIU_TEST_AGT_WRDATA_LO	(0x068)
+#define	SIU_TEST_AGT_WRDATA_HI	(0x06c)
+#define	SIU_TEST_AGT_WRDATA(i)	(0x068 + (4 * (i)))
+#define	SIU_TEST_AGT_RDDATA_LO	(0x070)
+#define	SIU_TEST_AGT_RDDATA_HI	(0x074)
+#define	SIU_TEST_AGT_RDDATA(i)	(0x070 + (4 * (i)))
+
+#define	SIU_TEST_AGT_ADDR_MASK	0x3ffff8
+#define	SIU_TEST_AGT_UPPER_ADDR(off)	((off) >> 22)
+#define	XG_LINK_UP		0x10
+
+
+/* ======================  Configuration Constants ======================== */
+#define	UNM_NIU_PHY_WAITLEN	200000    /* 200ms delay in each loop */
+#define	UNM_NIU_PHY_WAITMAX	50    /* 10 seconds before we give up */
+#define	UNM_NIU_MAX_GBE_PORTS	4
+#define	UNM_NIU_MAX_XG_PORTS	2
+#define	MIN_CORE_CLK_SPEED	200
+#define	MAX_CORE_CLK_SPEED	400
+#define	ACCEPTABLE_CORE_CLK_RANGE(speed) ((speed >= MIN_CORE_CLK_SPEED) && \
+	(speed <= MAX_CORE_CLK_SPEED))
+
+#define	P2_TICKS_PER_SEC	2048
+#define	P2_MIN_TICKS_PER_SEC	(P2_TICKS_PER_SEC - 10)
+#define	P2_MAX_TICKS_PER_SEC	(P2_TICKS_PER_SEC + 10)
+#define	CHECK_TICKS_PER_SEC(ticks)	((ticks >= P2_MIN_TICKS_PER_SEC) &&  \
+	(ticks <= P2_MAX_TICKS_PER_SEC))
+
+/* CAM RAM */
+#define	UNM_CAM_RAM_BASE	 (UNM_CRB_CAM + 0x02000)
+#define	UNM_CAM_RAM(reg)	 (UNM_CAM_RAM_BASE + (reg))
+
+#define	UNM_PORT_MODE_NONE		0
+#define	UNM_PORT_MODE_XG		1
+#define	UNM_PORT_MODE_GB		2
+#define	UNM_PORT_MODE_802_3_AP		3
+#define	UNM_PORT_MODE_AUTO_NEG		4
+#define	UNM_PORT_MODE_AUTO_NEG_1G	5
+#define	UNM_PORT_MODE_AUTO_NEG_XG	6
+#define	UNM_PORT_MODE_ADDR		(UNM_CAM_RAM(0x24))
+#define	UNM_FW_PORT_MODE_ADDR		(UNM_CAM_RAM(0x28))
+#define	UNM_WOL_PORT_MODE		(UNM_CAM_RAM(0x198))
+#define	UNM_RAM_COLD_BOOT		(UNM_CAM_RAM(0x1fc))
+#define	UNM_BUS_DEV_NO			(UNM_CAM_RAM(0x114))
+
+#define	NX_PEG_TUNE_MN_SPD_ZEROED	0x80000000
+#define	NX_BOOT_LOADER_MN_OTHER		0x100  	/* other problem with DIMM */
+#define	NX_BOOT_LOADER_MN_NOT_DDR2	0x80    /* not a DDR2 DIMM */
+#define	NX_BOOT_LOADER_MN_NO_ECC	0x40    /* ECC not supported */
+#define	NX_BOOT_LOADER_MN_WRONG_CAS	0x20    /* CL 5 not supported */
+#define	NX_BOOT_LOADER_MN_NOT_REG	0x10    /* not a registered DIMM */
+#define	NX_BOOT_LOADER_MN_ISSUE		0xff00ffff
+#define	NX_PEG_TUNE_MN_PRESENT		0x1
+#define	NX_PEG_TUNE_CAPABILITY		(UNM_CAM_RAM(0x02c))
+
+#define	UNM_ROM_LOCK_ID			(UNM_CAM_RAM(0x100))
+#define	UNM_I2C_ROM_LOCK_ID		(UNM_CAM_RAM(0x104))
+#define	UNM_PHY_LOCK_ID			(UNM_CAM_RAM(0x120))
+#define	UNM_CRB_WIN_LOCK_ID		(UNM_CAM_RAM(0x124))
+#define	CAM_RAM_DMA_WATCHDOG_CTRL	0x14    /* See dma_watchdog_ctrl_t */
+#define	UNM_EFUSE_CHIP_ID_HIGH		(UNM_CAM_RAM(0x18))
+#define	UNM_EFUSE_CHIP_ID_LOW		(UNM_CAM_RAM(0x1c))
+
+#define	UNM_FW_VERSION_MAJOR		(UNM_CAM_RAM(0x150))
+#define	UNM_FW_VERSION_MINOR		(UNM_CAM_RAM(0x154))
+#define	UNM_FW_VERSION_SUB		(UNM_CAM_RAM(0x158))
+#define	UNM_TCP_FW_VERSION_MAJOR_ADDR	(UNM_CAM_RAM(0x15c))
+#define	UNM_TCP_FW_VERSION_MINOR_ADDR	(UNM_CAM_RAM(0x160))
+#define	UNM_TCP_FW_VERSION_SUB_ADDR	(UNM_CAM_RAM(0x164))
+#define	UNM_FW_VERSION_BUILD		(UNM_CAM_RAM(0x168))
+#define	UNM_PCIE_REG(reg)		(UNM_CRB_PCIE + (reg))
+
+#define	PCIE_DCR		(0x00d8)
+#define	PCIE_DB_DATA2		(0x10070)
+#define	PCIE_DB_CTRL		(0x100a0)
+#define	PCIE_DB_ADDR		(0x100a4)
+#define	PCIE_DB_DATA		(0x100a8)
+#define	PCIE_IMBUS_CONTROL	(0x101b8)
+#define	PCIE_SETUP_FUNCTION	(0x12040)
+#define	PCIE_SETUP_FUNCTION2	(0x12048)
+#define	PCIE_TGT_SPLIT_CHICKEN	(0x12080)
+#define	PCIE_CHICKEN3		(0x120c8)
+#define	PCIE_MAX_MASTER_SPLIT	(0x14048)
+#define	PCIE_MAX_DMA_XFER_SIZE	(0x1404c)
+#define	UNM_WOL_WAKE		(UNM_CAM_RAM(0x180))
+#define	UNM_WOL_CONFIG_NV	(UNM_CAM_RAM(0x184))
+#define	UNM_WOL_CONFIG		(UNM_CAM_RAM(0x188))
+#define	UNM_PRE_WOL_RX_ENABLE	(UNM_CAM_RAM(0x18c))
+#define	UNM_FW_RESET		(UNM_CAM_RAM(0x138))
+/*
+ * Following define address space withing PCIX CRB space to talk with
+ * devices on the storage side PCI bus.
+ */
+#define	PCIX_PS_MEM_SPACE	(0x90000)
+
+#define	UNM_PCIX_PH_REG(reg)	(UNM_CRB_PCIE + (reg))
+
+/*
+ * Configuration registers. These are the same offsets on both host and
+ * storage side PCI blocks.
+ */
+#define	PCIX_PS_OP_ADDR_LO	(0x10000) /* Used for PS PCI Memory access */
+#define	PCIX_PS_OP_ADDR_HI	(0x10004) /* via CRB  (PS side only) */
+
+#define	PCIX_MS_WINDOW		(0x10204) /* UNUSED */
+
+#define	PCIX_CRB_WINDOW		(0x10210)
+#define	PCIX_CRB_WINDOW_F0	(0x10210)
+#define	PCIX_CRB_WINDOW_F1	(0x10230)
+#define	PCIX_CRB_WINDOW_F2	(0x10250)
+#define	PCIX_CRB_WINDOW_F3	(0x10270)
+#define	PCIX_CRB_WINDOW_F4	(0x102ac)
+#define	PCIX_CRB_WINDOW_F5	(0x102bc)
+#define	PCIX_CRB_WINDOW_F6	(0x102cc)
+#define	PCIX_CRB_WINDOW_F7	(0x102dc)
+#define	PCIE_CRB_WINDOW_REG(func)	(((func) < 4) ? \
+	(PCIX_CRB_WINDOW_F0 + (0x20 * (func))) : \
+	(PCIX_CRB_WINDOW_F4 + (0x10 * ((func) - 4))))
+
+#define	PCIX_MN_WINDOW		(0x10200)
+#define	PCIX_MN_WINDOW_F0	(0x10200)
+#define	PCIX_MN_WINDOW_F1	(0x10220)
+#define	PCIX_MN_WINDOW_F2	(0x10240)
+#define	PCIX_MN_WINDOW_F3	(0x10260)
+#define	PCIX_MN_WINDOW_F4	(0x102a0)
+#define	PCIX_MN_WINDOW_F5	(0x102b0)
+#define	PCIX_MN_WINDOW_F6	(0x102c0)
+#define	PCIX_MN_WINDOW_F7	(0x102d0)
+#define	PCIE_MN_WINDOW_REG(func)	(((func) < 4) ? \
+	(PCIX_MN_WINDOW_F0 + (0x20 * (func))) : \
+	(PCIX_MN_WINDOW_F4 + (0x10 * ((func) - 4))))
+
+#define	PCIX_SN_WINDOW		(0x10208)
+#define	PCIX_SN_WINDOW_F0	(0x10208)
+#define	PCIX_SN_WINDOW_F1	(0x10228)
+#define	PCIX_SN_WINDOW_F2	(0x10248)
+#define	PCIX_SN_WINDOW_F3	(0x10268)
+#define	PCIX_SN_WINDOW_F4	(0x102a8)
+#define	PCIX_SN_WINDOW_F5	(0x102b8)
+#define	PCIX_SN_WINDOW_F6	(0x102c8)
+#define	PCIX_SN_WINDOW_F7	(0x102d8)
+#define	PCIE_SN_WINDOW_REG(func)	(((func) < 4) ? \
+	(PCIX_SN_WINDOW_F0 + (0x20 * (func))) : \
+	(PCIX_SN_WINDOW_F4 + (0x10 * ((func) - 4))))
+
+#define	UNM_PCIX_PS_REG(reg)	(UNM_CRB_PCIX_MD + (reg))
+#define	UNM_PCIX_PS2_REG(reg)	(UNM_CRB_PCIE2 + (reg))
+#define	MANAGEMENT_COMMAND_REG	(UNM_CRB_PCIE + (4))
+
+#define	UNM_PH_INT_MASK		(UNM_CRB_PCIE + PCIX_INT_MASK)
+
+/*
+ * Definitions relating to access/control of the I2Q h/w block.
+ */
+/*
+ * Configuration registers.
+ */
+#define	UNM_I2Q_CONFIG		(UNM_CRB_I2Q + 0x00000)
+#define	UNM_I2Q_ENA_PCI_LO	(UNM_CRB_I2Q + 0x00010)
+#define	UNM_I2Q_ENA_PCI_HI	(UNM_CRB_I2Q + 0x00014)
+#define	UNM_I2Q_ENA_CASPER_LO	(UNM_CRB_I2Q + 0x00018)
+#define	UNM_I2Q_ENA_CASPER_HI	(UNM_CRB_I2Q + 0x0001c)
+#define	UNM_I2Q_ENA_QM_LO	(UNM_CRB_I2Q + 0x00020)
+#define	UNM_I2Q_ENA_QM_HI	(UNM_CRB_I2Q + 0x00024)
+#define	UNM_I2Q_CLR_PCI_LO	(UNM_CRB_I2Q + 0x00030)
+#define	UNM_I2Q_CLR_PCI_HI	(UNM_CRB_I2Q + 0x00034)
+#define	UNM_I2Q_CLR_CASPER_LO	(UNM_CRB_I2Q + 0x00038)
+#define	UNM_I2Q_CLR_CASPER_HI	(UNM_CRB_I2Q + 0x0003c)
+#define	UNM_I2Q_MSG_HDR_LO(I)	(UNM_CRB_I2Q + 0x00100 + (I) * 0x8)
+#define	UNM_I2Q_MSG_HDR_HI(I)	(UNM_CRB_I2Q + 0x00104 + (I) * 0x8)
+
+#ifdef PCIX
+#define	UNM_DMA_BASE(U)		(UNM_CRB_PCIX_HOST + 0x20000 + ((U) << 16))
+#else
+#define	UNM_DMA_BASE(U)		(UNM_CRB_PCIX_MD + 0x20000 + ((U) << 6))
+#endif
+#define	UNM_DMA_COMMAND(U)	(UNM_DMA_BASE(U) + 0x00008)
+
+#define	PCIE_SEM2_LOCK		(0x1c010)	/* Flash lock */
+#define	PCIE_SEM2_UNLOCK	(0x1c014)	/* Flash unlock */
+#define	PCIE_SEM3_LOCK		(0x1c018)	/* Phy lock */
+#define	PCIE_SEM3_UNLOCK	(0x1c01c)	/* Phy unlock */
+#define	PCIE_SEM4_LOCK		(0x1c020)	/* I2C lock */
+#define	PCIE_SEM4_UNLOCK	(0x1c024)	/* I2C unlock */
+#define	PCIE_SEM5_LOCK		(0x1c028)	/* API lock */
+#define	PCIE_SEM5_UNLOCK	(0x1c02c)	/* API unlock */
+#define	PCIE_SEM6_LOCK		(0x1c030)	/* sw lock */
+#define	PCIE_SEM6_UNLOCK	(0x1c034)	/* sw unlock */
+#define	PCIE_SEM7_LOCK		(0x1c038)	/* crb win lock */
+#define	PCIE_SEM7_UNLOCK	(0x1c03c)	/* crbwin unlock */
+
+#define	PCIE_PS_STRAP_RESET	(0x18000)
+
+#define	M25P_INSTR_WREN		0x06
+#define	M25P_INSTR_RDSR		0x05
+#define	M25P_INSTR_PP		0x02
+#define	M25P_INSTR_SE		0xd8
+#define	CAM_RAM_P2I_ENABLE	0xc
+#define	CAM_RAM_P2D_ENABLE	0x8
+#define	PCIX_IMBTAG		(0x18004)
+
+#define	CAM_RAM_PEG_ENABLES	0x4
+
+/*
+ * The PCI VendorID and DeviceID for our board.
+ */
+#define	PCI_VENDOR_ID_NX8021		0x4040
+#define	PCI_DEVICE_ID_NX8021_FC		0x0101
+
+/* ISP 3031 related declarations  */
+
+#define	NX_MSIX_MEM_REGION_THRESHOLD	0x2000000
+#define	UNM_MSIX_TBL_SPACE  		8192
+#define	UNM_PCI_REG_MSIX_TBL		0x44
+#define	NX_PCI_MSIX_CONTROL		0x40
+
+typedef struct {
+	uint32_t	valid;
+	uint32_t	start_128M;
+	uint32_t	end_128M;
+	uint32_t	start_2M;
+} crb_128M_2M_sub_block_map_t;
+
+typedef struct {
+	crb_128M_2M_sub_block_map_t sub_block[16];
+} crb_128M_2M_block_map_t;
+
+struct crb_addr_pair {
+	uint32_t	addr;
+	uint32_t	data;
+};
+
+#define	ADDR_ERROR	((unsigned long) 0xffffffff)
+#define	MAX_CTL_CHECK	1000
+
+/*
+ * ************************************************************************
+ *      	PCI related defines.
+ * ************************************************************************
+ */
+
+/*
+ * Interrupt related defines.
+ */
+#define	PCIX_TARGET_STATUS	(0x10118)
+#define	PCIX_TARGET_STATUS_F1	(0x10160)
+#define	PCIX_TARGET_STATUS_F2	(0x10164)
+#define	PCIX_TARGET_STATUS_F3	(0x10168)
+#define	PCIX_TARGET_STATUS_F4	(0x10360)
+#define	PCIX_TARGET_STATUS_F5	(0x10364)
+#define	PCIX_TARGET_STATUS_F6	(0x10368)
+#define	PCIX_TARGET_STATUS_F7	(0x1036c)
+
+#define	PCIX_TARGET_MASK	(0x10128)
+#define	PCIX_TARGET_MASK_F1	(0x10170)
+#define	PCIX_TARGET_MASK_F2	(0x10174)
+#define	PCIX_TARGET_MASK_F3	(0x10178)
+#define	PCIX_TARGET_MASK_F4	(0x10370)
+#define	PCIX_TARGET_MASK_F5	(0x10374)
+#define	PCIX_TARGET_MASK_F6	(0x10378)
+#define	PCIX_TARGET_MASK_F7	(0x1037c)
+
+/*
+ * Message Signaled Interrupts
+ */
+#define	PCIX_MSI_F0		(0x13000)
+#define	PCIX_MSI_F1		(0x13004)
+#define	PCIX_MSI_F2		(0x13008)
+#define	PCIX_MSI_F3		(0x1300c)
+#define	PCIX_MSI_F4		(0x13010)
+#define	PCIX_MSI_F5		(0x13014)
+#define	PCIX_MSI_F6		(0x13018)
+#define	PCIX_MSI_F7		(0x1301c)
+#define	PCIX_MSI_F(FUNC)	(0x13000 +((FUNC) * 4))
+
+/*
+ *
+ */
+#define	PCIX_INT_VECTOR		(0x10100)
+#define	PCIX_INT_MASK		(0x10104)
+
+/*
+ * Interrupt state machine and other bits.
+ */
+#define	PCIE_MISCCFG_RC		(0x1206c)
+
+
+#define	ISR_INT_TARGET_STATUS		(UNM_PCIX_PS_REG(PCIX_TARGET_STATUS))
+#define	ISR_INT_TARGET_STATUS_F1	(UNM_PCIX_PS_REG(PCIX_TARGET_STATUS_F1))
+#define	ISR_INT_TARGET_STATUS_F2	(UNM_PCIX_PS_REG(PCIX_TARGET_STATUS_F2))
+#define	ISR_INT_TARGET_STATUS_F3	(UNM_PCIX_PS_REG(PCIX_TARGET_STATUS_F3))
+#define	ISR_INT_TARGET_STATUS_F4	(UNM_PCIX_PS_REG(PCIX_TARGET_STATUS_F4))
+#define	ISR_INT_TARGET_STATUS_F5	(UNM_PCIX_PS_REG(PCIX_TARGET_STATUS_F5))
+#define	ISR_INT_TARGET_STATUS_F6	(UNM_PCIX_PS_REG(PCIX_TARGET_STATUS_F6))
+#define	ISR_INT_TARGET_STATUS_F7	(UNM_PCIX_PS_REG(PCIX_TARGET_STATUS_F7))
+
+#define	ISR_INT_TARGET_MASK		(UNM_PCIX_PS_REG(PCIX_TARGET_MASK))
+#define	ISR_INT_TARGET_MASK_F1		(UNM_PCIX_PS_REG(PCIX_TARGET_MASK_F1))
+#define	ISR_INT_TARGET_MASK_F2		(UNM_PCIX_PS_REG(PCIX_TARGET_MASK_F2))
+#define	ISR_INT_TARGET_MASK_F3		(UNM_PCIX_PS_REG(PCIX_TARGET_MASK_F3))
+#define	ISR_INT_TARGET_MASK_F4		(UNM_PCIX_PS_REG(PCIX_TARGET_MASK_F4))
+#define	ISR_INT_TARGET_MASK_F5		(UNM_PCIX_PS_REG(PCIX_TARGET_MASK_F5))
+#define	ISR_INT_TARGET_MASK_F6		(UNM_PCIX_PS_REG(PCIX_TARGET_MASK_F6))
+#define	ISR_INT_TARGET_MASK_F7		(UNM_PCIX_PS_REG(PCIX_TARGET_MASK_F7))
+
+#define	ISR_INT_VECTOR			(UNM_PCIX_PS_REG(PCIX_INT_VECTOR))
+#define	ISR_INT_MASK			(UNM_PCIX_PS_REG(PCIX_INT_MASK))
+#define	ISR_INT_STATE_REG		(UNM_PCIX_PS_REG(PCIE_MISCCFG_RC))
+
+#define	ISR_MSI_INT_TRIGGER(FUNC)	(UNM_PCIX_PS_REG(PCIX_MSI_F(FUNC)))
+
+
+#define	ISR_IS_LEGACY_INTR_IDLE(VAL)		(((VAL) & 0x300) == 0)
+#define	ISR_IS_LEGACY_INTR_TRIGGERED(VAL)	(((VAL) & 0x300) == 0x200)
+
+/*
+ * PCI Interrupt Vector Values.
+ */
+#define	PCIX_INT_VECTOR_BIT_F0	0x0080
+#define	PCIX_INT_VECTOR_BIT_F1	0x0100
+#define	PCIX_INT_VECTOR_BIT_F2	0x0200
+#define	PCIX_INT_VECTOR_BIT_F3	0x0400
+#define	PCIX_INT_VECTOR_BIT_F4	0x0800
+#define	PCIX_INT_VECTOR_BIT_F5	0x1000
+#define	PCIX_INT_VECTOR_BIT_F6	0x2000
+#define	PCIX_INT_VECTOR_BIT_F7	0x4000
+
+#define	NX_LEGACY_INTR_CONFIG   				\
+{       							\
+	{       						\
+		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F0, 	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS,  	\
+		.tgt_mask_reg   = ISR_INT_TARGET_MASK,    	\
+		.pci_int_reg    = ISR_MSI_INT_TRIGGER(0) },     \
+								\
+	{       						\
+		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F1, 	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F1,     \
+		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F1, 	\
+		.pci_int_reg    = ISR_MSI_INT_TRIGGER(1) },     \
+								\
+	{       						\
+		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F2, 	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F2,     \
+		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F2, 	\
+		.pci_int_reg    = ISR_MSI_INT_TRIGGER(2) },     \
+								\
+	{       						\
+		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F3, 	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F3,     \
+		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F3, 	\
+		.pci_int_reg    = ISR_MSI_INT_TRIGGER(3) },     \
+							        \
+	{       					        \
+		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F4, 	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F4,     \
+		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F4, 	\
+		.pci_int_reg    = ISR_MSI_INT_TRIGGER(4) },     \
+								\
+	{       						\
+		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F5, 	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F5,     \
+		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F5, 	\
+		.pci_int_reg    = ISR_MSI_INT_TRIGGER(5) },     \
+								\
+	{       						\
+		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F6, 	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F6,     \
+		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F6, 	\
+		.pci_int_reg    = ISR_MSI_INT_TRIGGER(6) },     \
+								\
+	{       						\
+		.int_vec_bit    = PCIX_INT_VECTOR_BIT_F7, 	\
+		.tgt_status_reg = ISR_INT_TARGET_STATUS_F7,     \
+		.tgt_mask_reg   = ISR_INT_TARGET_MASK_F7, 	\
+		.pci_int_reg    = ISR_MSI_INT_TRIGGER(7) },     \
+}
+
+#define	BOOTLD_START		0x10000
+#define	IMAGE_START		0x43000
+
+/* Magic number to let user know flash is programmed */
+#define	UNM_BDINFO_MAGIC	0x12345678
+#define	FW_SIZE_OFFSET		0x3e840c
+
+#define	PCI_CAP_ID_GEN		0x10
+#define	PCI_CAP_ID_PCI_E	0x10    /* PCI Express supported */
+#define	PCI_CAP_ID_EXP		0x10	/* PCI Express */
+#define	PCI_EXP_LNKSTA		18	/* Link Status */
+#define	MAX_CRB_XFORM		60
+#define	MTU_FUDGE_FACTOR	100
+
+#define	crb_addr_transform(name) \
+	(crb_addr_xform[UNM_HW_PX_MAP_CRB_##name] = \
+	UNM_HW_CRB_HUB_AGT_ADR_##name << 20)
+
+#define	MASK(n)		((1ULL << (n)) - 1)
+#define	MN_WIN(addr)	(((addr & 0x1fc0000) >> 1) | ((addr >> 25) & 0x3ff))
+/* 64K? */
+#define	OCM_WIN(addr)	(((addr & 0x1ff0000) >> 1) | ((addr >> 25) & 0x3ff))
+
+#define	MS_WIN(addr)		(addr & 0x0ffc0000)
+#define	UNM_PCI_MN_2M		(0)
+#define	UNM_PCI_MS_2M		(0x80000)
+#define	UNM_PCI_OCM0_2M		(0xc0000)
+#define	VALID_OCM_ADDR(addr)	(((addr) & 0x3f800) != 0x3f800)
+#define	GET_MEM_OFFS_2M(addr)	(addr & MASK(18))
+
+#define	UNM_BOARDTYPE		0x4008
+#define	UNM_BOARDNUM		0x400c
+#define	UNM_CHIPNUM		0x4010
+
+/* CRB window related */
+#define	CRB_BLK(off)		((off >> 20) & 0x3f)
+#define	CRB_SUBBLK(off)		((off >> 16) & 0xf)
+#define	CRB_WINDOW_2M		(0x130060)
+#define	UNM_PCI_CAMQM_2M_END	(0x04800800UL)
+#define	CRB_HI(off)		((crb_hub_agt[CRB_BLK(off)] << 20) | \
+	((off) & 0xf0000))
+#define	UNM_PCI_CAMQM_2M_BASE	(0x000ff800UL)
+#define	CRB_INDIRECT_2M		(0x1e0000UL)
+/* #define	ADDR_ERROR ((unsigned long ) 0xffffffff) */
+
+/* PCI Windowing for DDR regions.  */
+#define	QL_8021_ADDR_IN_RANGE(addr, low, high)	\
+	(((addr) <= (high)) && ((addr) >= (low)))
+
+#define	CRB_WIN_LOCK_TIMEOUT	100000000
+#define	ROM_LOCK_TIMEOUT	100
+#define	ROM_MAX_TIMEOUT		100
+#define	IDC_LOCK_TIMEOUT	100000000
+
+/*
+ * IDC parameters are defined in “user area” in the flash
+ */
+#define	ROM_DEV_INIT_TIMEOUT		0x3e885c
+#define	ROM_DRV_RESET_ACK_TIMEOUT	0x3e8860
+
+/*
+ * Global Data in ql_nx.c source file.
+ */
+
+/*
+ * Global Function Prototypes in ql_nx.c source file.
+ */
+void ql_8021_reset_chip(ql_adapter_state_t *);
+int ql_8021_load_risc(ql_adapter_state_t *);
+void ql_8021_clr_hw_intr(ql_adapter_state_t *);
+void ql_8021_clr_fw_intr(ql_adapter_state_t *);
+void ql_8021_enable_intrs(ql_adapter_state_t *);
+void ql_8021_disable_intrs(ql_adapter_state_t *);
+void ql_8021_update_crb_int_ptr(ql_adapter_state_t *);
+int ql_8021_rom_read(ql_adapter_state_t *, uint32_t, uint32_t *);
+int ql_8021_rom_write(ql_adapter_state_t *, uint32_t, uint32_t);
+int ql_8021_rom_erase(ql_adapter_state_t *, uint32_t);
+int ql_8021_rom_wrsr(ql_adapter_state_t *, uint32_t);
+void ql_8021_set_drv_active(ql_adapter_state_t *);
+void ql_8021_clr_drv_active(ql_adapter_state_t *);
+uint32_t ql_8021_idc_handler(ql_adapter_state_t *);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _QL_NX_H */

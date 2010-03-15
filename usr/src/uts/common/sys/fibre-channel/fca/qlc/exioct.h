@@ -19,7 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/*
+ * Copyright 2010 QLogic Corporation.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 /*
  * File Name: exioct.h
@@ -34,7 +37,7 @@
  * ***********************************************************************
  * *                                                                    **
  * *                            NOTICE                                  **
- * *            COPYRIGHT (C) 2000-2009 QLOGIC CORPORATION              **
+ * *            COPYRIGHT (C) 2000-2010 QLOGIC CORPORATION              **
  * *                    ALL RIGHTS RESERVED                             **
  * *                                                                    **
  * ***********************************************************************
@@ -241,15 +244,16 @@ typedef union _ext_signature {
  * Query.
  * Uses with EXT_QUERY as the ioctl code.
  */
-#define	EXT_SC_QUERY_HBA_NODE	1
-#define	EXT_SC_QUERY_HBA_PORT	2
-#define	EXT_SC_QUERY_DISC_PORT	3
-#define	EXT_SC_QUERY_DISC_TGT	4
-#define	EXT_SC_QUERY_DISC_LUN	5	/* Currently Not Supported */
-#define	EXT_SC_QUERY_DRIVER	6
-#define	EXT_SC_QUERY_FW		7
-#define	EXT_SC_QUERY_CHIP	8
-#define	EXT_SC_QUERY_CNA_PORT	9
+#define	EXT_SC_QUERY_HBA_NODE		1
+#define	EXT_SC_QUERY_HBA_PORT		2
+#define	EXT_SC_QUERY_DISC_PORT		3
+#define	EXT_SC_QUERY_DISC_TGT		4
+#define	EXT_SC_QUERY_DISC_LUN		5	/* Currently Not Supported */
+#define	EXT_SC_QUERY_DRIVER		6
+#define	EXT_SC_QUERY_FW			7
+#define	EXT_SC_QUERY_CHIP		8
+#define	EXT_SC_QUERY_CNA_PORT		9
+#define	EXT_SC_QUERY_ADAPTER_VERSIONS	10
 
 /*
  * Get.
@@ -265,6 +269,8 @@ typedef union _ext_signature {
 #define	EXT_SC_GET_FLASH_RAM		7
 #define	EXT_SC_GET_BEACON_STATE		8
 #define	EXT_SC_GET_DCBX_PARAM		9
+#define	EXT_SC_GET_FCF_LIST		10
+#define	EXT_SC_GET_RESOURCE_CNTS	11
 
 /* 100 - 199 FC_INTF_TYPE */
 #define	EXT_SC_GET_LINK_STATUS		101	/* Currently Not Supported */
@@ -653,6 +659,27 @@ typedef struct _EXT_CNA_PORT {
 /* Fabric Parameters */
 #define	EXT_DEF_MAC_ADDR_MODE_FPMA	0x8000
 
+#define	NO_OF_VERSIONS			2
+#define	FLASH_VERSION			0
+#define	RUNNING_VERSION			1
+#define	EXT_OPT_ROM_REGION_MPI_RISC_FW	0x40
+#define	EXT_OPT_ROM_REGION_EDC_PHY_FW	0x45
+
+typedef struct _EXT_REGIONVERSION {
+	UINT16	Region;
+	UINT16	SubRegion;	/* If all boot codes are under region 0x7 */
+	UINT16	Location;	/* 0: Flash, 1: Running */
+	UINT16	VersionLength;
+	UINT8	Version[8];
+	UINT8	Reserved[8];
+} EXT_REGIONVERSION, *PEXT_REGIONVERSION;
+
+typedef struct _EXT_ADAPTERREGIONVERSION {
+	UINT32	Length;		/* number of struct REGIONVERSION */
+	UINT32	Reserved;
+	EXT_REGIONVERSION RegionVersion[1];	/* variable length */
+} EXT_ADAPTERREGIONVERSION, *PEXT_ADAPTERREGIONVERSION;
+
 /* Request Buffer for RNID */
 typedef struct _EXT_RNID_REQ {
 	EXT_FC_ADDR	Addr;				/* 14 */
@@ -1016,12 +1043,11 @@ typedef struct _EXT_MENLO_ACCESS_PARAMETERS {
 					/* Statistics, Configuration) */
 
 typedef struct _EXT_MENLO_MANAGE_INFO {
-	UINT64				pDataBytes;	/* 8 */
-	EXT_MENLO_ACCESS_PARAMETERS	Parameters;	/* 12 */
-	UINT32				TotalByteCount;	/* 4 */
-	UINT16				Operation;	/* 2 */
-	UINT16				Reserved;	/* 2 */
-	UINT16				Reserved1[2];	/* 4 */
+	UINT64				pDataBytes;
+	EXT_MENLO_ACCESS_PARAMETERS	Parameters;
+	UINT32				TotalByteCount;
+	UINT16				Operation;
+	UINT16				Reserved;
 } EXT_MENLO_MANAGE_INFO, *PEXT_MENLO_MANAGE_INFO;
 
 #define	MENLO_FC_CHECKSUM_FAILURE	0x01
@@ -1080,6 +1106,49 @@ typedef struct _EXT_VPORT_INFO {
 	UINT8		wwpn[EXT_DEF_WWN_NAME_SIZE];
 	UINT8		reserved[220];
 } EXT_VPORT_INFO, *PEXT_VPORT_INFO;
+
+#define	EXT_DEF_FCF_LIST_SIZE	4096	/* Bytes */
+#define	FCF_INFO_RETURN_ALL	0
+#define	FCF_INFO_RETURN_ONE	1
+
+typedef	struct	_EXT_FCF_INFO {
+	UINT16	CntrlFlags;	/* 2 */
+	UINT16	FcfId;		/* 2 */
+	UINT16	VlanId;		/* 2 */
+	UINT16	FcfFlags;	/* 2 */
+	UINT16	FcfAdvertPri;	/* 2 */
+	UINT16	FcfMacAddr1;	/* 2 */
+	UINT16	FcfMacAddr2;	/* 2 */
+	UINT16	FcfMacAddr3;	/* 2 */
+	UINT16	FcfMapHi;	/* 2 */
+	UINT16	FcfMapLow;	/* 2 */
+	UINT8	SwitchName[8];	/* 8 */
+	UINT8	FabricName[8];	/* 8 */
+	UINT8	Reserved1[8];	/* 8 */
+	UINT16	CommFeatures;	/* 2 */
+	UINT16	Reserved2;	/* 2 */
+	UINT32	RATovVal;	/* 4 */
+	UINT32	EDTovVal;	/* 4 */
+	UINT8	Reserved3[8];	/* 8 */
+} EXT_FCF_INFO, *PEXT_FCF_INFO;
+
+typedef struct _EXT_FCF_LIST {
+	UINT32		Options;
+	UINT32		FcfIndex;
+	UINT32		BufSize;
+	EXT_FCF_INFO	pFcfInfo[1];
+} EXT_FCF_LIST, *PEXT_FCF_LIST;
+
+typedef	struct	_EXT_RESOURCE_CNTS {
+	UINT32	OrgTgtXchgCtrlCnt;	/* 4 */
+	UINT32	CurTgtXchgCtrlCnt;	/* 4 */
+	UINT32	CurXchgCtrlCnt;		/* 4 */
+	UINT32	OrgXchgCtrlCnt;		/* 4 */
+	UINT32	CurIocbBufCnt;		/* 4 */
+	UINT32	OrgIocbBufCnt;		/* 4 */
+	UINT32	NoOfSupVPs;		/* 4 */
+	UINT32	NoOfSupFCFs;		/* 4 */
+} EXT_RESOURCE_CNTS, *PEXT_RESOURCE_CNTS;
 
 #ifdef	__cplusplus
 }

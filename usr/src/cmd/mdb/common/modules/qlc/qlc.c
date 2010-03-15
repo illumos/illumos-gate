@@ -19,7 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/*
+ * Copyright 2010 QLogic Corporation.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) qlc mdb source file.
@@ -27,14 +30,14 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
  *
  */
 
-#pragma ident	"Copyright 2009 QLogic Corporation; ql_mdb.c"
+#pragma ident	"Copyright 2010 QLogic Corporation; ql_mdb.c"
 
 #include <sys/mdb_modapi.h>
 #include <ql_apps.h>
@@ -130,6 +133,9 @@ int8_t *adapter_config_flags[] = {
 	"ENABLE_FWFCETRACE",
 	"FW_MISMATCH",
 	"CTRL_81XX",
+	"CTRL_8021",
+	"ENABLE_FAST_TIMEOUT",
+	"LR_SUPPORT",
 	NULL
 };
 
@@ -1820,7 +1826,7 @@ qlc_getdump_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		(void) ql_25xx_dump_dcmd(ha, flags, argc, argv);
 	} else if (CFG_IST(ha, CFG_CTRL_81XX))  {
 		(void) ql_81xx_dump_dcmd(ha, flags, argc, argv);
-	} else {
+	} else if (!(CFG_IST(ha, CFG_CTRL_8021)))  {
 		(void) ql_23xx_dump_dcmd(ha, flags, argc, argv);
 	}
 

@@ -412,7 +412,7 @@ ql_get_feature_bits(ql_adapter_state_t *ha, uint16_t *features)
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+	if (CFG_IST(ha, CFG_CTRL_24258081)) {
 		EL(ha, "Not supported for 24xx\n");
 		return (EINVAL);
 	}
@@ -493,7 +493,7 @@ ql_set_feature_bits(ql_adapter_state_t *ha, uint16_t features)
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_242581)) {
+	if (CFG_IST(ha, CFG_CTRL_24258081)) {
 		EL(ha, "Not supported for 24xx\n");
 		return (EINVAL);
 	}
@@ -600,7 +600,7 @@ ql_set_nvram_adapter_defaults(ql_adapter_state_t *ha)
 	}
 	rval = 0;
 
-	if (CFG_IST(ha, CFG_CTRL_242581)) {
+	if (CFG_IST(ha, CFG_CTRL_24258081)) {
 		nvram_24xx_t	*nv;
 		uint32_t	*longptr;
 		uint32_t	csum = 0;
@@ -872,7 +872,7 @@ ql_24xx_load_nvram(ql_adapter_state_t *ha, uint32_t addr, uint32_t value)
 	int	rval;
 
 	/* Enable flash write. */
-	if (!(CFG_IST(ha, CFG_CTRL_81XX))) {
+	if (!(CFG_IST(ha, CFG_CTRL_8081))) {
 		WRT32_IO_REG(ha, ctrl_status,
 		    RD32_IO_REG(ha, ctrl_status) | ISP_FLASH_ENABLE);
 		RD32_IO_REG(ha, ctrl_status);	/* PCI Posting. */
@@ -971,7 +971,7 @@ ql_nv_util_load(ql_adapter_state_t *ha, void *bp, int mode)
 	}
 
 	/* Load NVRAM. */
-	if (CFG_IST(ha, CFG_CTRL_2581)) {
+	if (CFG_IST(ha, CFG_CTRL_258081)) {
 		GLOBAL_HW_UNLOCK();
 		start_addr &= ~ha->flash_data_addr;
 		start_addr <<= 2;
@@ -1088,8 +1088,6 @@ ql_nv_util_dump(ql_adapter_state_t *ha, void *bp, int mode)
 		return (EFAULT);
 	}
 
-	EL(ha, "nvram cache accessed.");
-
 	QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
 
 	return (0);
@@ -1102,7 +1100,7 @@ ql_get_nvram(ql_adapter_state_t *ha, void *dest_addr, uint32_t src_addr,
 	int rval = QL_SUCCESS;
 	int cnt;
 	/* Dump NVRAM. */
-	if (CFG_IST(ha, CFG_CTRL_242581)) {
+	if (CFG_IST(ha, CFG_CTRL_24258081)) {
 		uint32_t	*lptr = (uint32_t *)dest_addr;
 
 		for (cnt = 0; cnt < size / 4; cnt++) {
@@ -1152,7 +1150,7 @@ ql_vpd_load(ql_adapter_state_t *ha, void *bp, int mode)
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+	if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 		EL(ha, "unsupported adapter feature\n");
 		return (ENOTSUP);
 	}
@@ -1206,7 +1204,7 @@ ql_vpd_load(ql_adapter_state_t *ha, void *bp, int mode)
 	}
 
 	/* Load VPD. */
-	if (CFG_IST(ha, CFG_CTRL_2581)) {
+	if (CFG_IST(ha, CFG_CTRL_258081)) {
 		GLOBAL_HW_UNLOCK();
 		start_addr &= ~ha->flash_data_addr;
 		start_addr <<= 2;
@@ -1282,7 +1280,7 @@ ql_vpd_dump(ql_adapter_state_t *ha, void *bp, int mode)
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+	if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 		EL(ha, "unsupported adapter feature\n");
 		return (EACCES);
 	}
@@ -1467,7 +1465,7 @@ ql_vpd_lookup(ql_adapter_state_t *ha, uint8_t *opcode, uint8_t *bp,
 		return (len);
 	}
 
-	if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+	if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 		return (len);
 	}
 
@@ -1746,7 +1744,7 @@ ql_adm_adapter_info(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 
 	hba.device_id = ha->device_id;
 
-	dp = CFG_IST(ha, CFG_CTRL_242581) ?
+	dp = CFG_IST(ha, CFG_CTRL_24258081) ?
 	    &ha->init_ctrl_blk.cb24.port_name[0] :
 	    &ha->init_ctrl_blk.cb.port_name[0];
 	bcopy(dp, hba.wwpn, 8);
@@ -1769,7 +1767,7 @@ ql_adm_adapter_info(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 		}
 
 		/* Resume I/O */
-		if (CFG_IST(ha, CFG_CTRL_242581)) {
+		if (CFG_IST(ha, CFG_CTRL_24258081)) {
 			ql_restart_driver(ha);
 		} else {
 			EL(ha, "isp_abort_needed for restart\n");
@@ -2236,7 +2234,7 @@ ql_adm_flash_load(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 		return (EBUSY);
 	}
 
-	rval = (CFG_IST(ha, CFG_CTRL_242581) ?
+	rval = (CFG_IST(ha, CFG_CTRL_24258081) ?
 	    ql_24xx_load_flash(ha, dp, dop->length, dop->option) :
 	    ql_load_flash(ha, dp, dop->length));
 
@@ -2275,7 +2273,7 @@ ql_adm_vpd_dump(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+	if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 		EL(ha, "hba does not support VPD\n");
 		return (EINVAL);
 	}
@@ -2318,7 +2316,7 @@ ql_adm_vpd_load(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+	if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 		EL(ha, "hba does not support VPD\n");
 		return (EINVAL);
 	}
@@ -2362,7 +2360,7 @@ ql_adm_vpd_gettag(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+	if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 		EL(ha, "hba does not support VPD\n");
 		return (EINVAL);
 	}

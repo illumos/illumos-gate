@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2009 QLogic Corporation; ql_hba_fru.c"
+#pragma ident	"Copyright 2010 QLogic Corporation; ql_hba_fru.c"
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
@@ -34,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -327,7 +327,7 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 	}
 
 	attrs->vendor_specific_id = ha->adapter_features;
-	attrs->max_frame_size = CFG_IST(ha, CFG_CTRL_242581) ?
+	attrs->max_frame_size = CFG_IST(ha, CFG_CTRL_24258081) ?
 	    (ha->init_ctrl_blk.cb24.max_frame_length[1] << 8 |
 	    ha->init_ctrl_blk.cb24.max_frame_length[0]) :
 	    (ha->init_ctrl_blk.cb.max_frame_length[1] << 8 |
@@ -549,6 +549,13 @@ ql_setup_fruinfo(ql_adapter_state_t *ha)
 			 * fru port index to be like previous FCAs.
 			 */
 			ha->fru_port_index -= 2;
+		}
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			/*
+			 * The FC functions on 80xx hbas are functions 6 and 7.
+			 *  Adjust fru port index to be like previous FCAs.
+			 */
+			ha->fru_port_index -= 6;
 		}
 
 		GLOBAL_STATE_UNLOCK();

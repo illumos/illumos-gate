@@ -152,7 +152,7 @@ extern "C" {
 
 /* Driver defined. */
 #define	MBA_CMPLT_1_32BIT	0x9000	/* Completion 1 32bit IOSB. */
-
+#define	MBC_ASYNC_EVENT_WAIT	30	/* loopback async event wait time */
 /*
  * Mailbox 23 event codes
  */
@@ -193,6 +193,7 @@ extern "C" {
 #define	MBC_WRITE_RAM_EXTENDED		0xd	/* Write RAM word. */
 #define	MBC_READ_RAM_EXTENDED		0xf	/* Read RAM extended. */
 #define	MBC_SERDES_TRANSMIT_PARAMETERS	0x10	/* Serdes Xmit Parameters */
+#define	MBC_TOGGLE_INTERRUPT		0x10	/* 82XX enable/disable intr */
 #define	MBC_2300_EXECUTE_IOCB		0x12	/* ISP2300 Execute IOCB cmd */
 #define	MBC_GET_IO_STATUS		0x12	/* ISP2422 Get I/O Status */
 #define	MBC_STOP_FIRMWARE		0x14	/* Stop firmware */
@@ -220,6 +221,7 @@ extern "C" {
 #define	MBC_ONLINE_SELF_TEST		0x46	/* Online self-test. */
 #define	MBC_ENHANCED_GET_PORT_DATABASE	0x47	/* Get Port Database + login */
 #define	MBC_INITIALIZE_MULTI_ID_FW	0x48	/* Initialize multi-id fw */
+#define	MBC_GET_FCF_LIST		0x50	/* Get FCF List */
 #define	MBC_GET_DCBX_PARAMS		0x51	/* Get DCBX parameters */
 #define	MBC_RESET_LINK_STATUS		0x52	/* Reset Link Error Status */
 #define	MBC_EXECUTE_IOCB		0x54	/* 64 Bit Execute IOCB cmd. */
@@ -348,7 +350,11 @@ extern "C" {
 /*
  * MBC_DIAGNOSTIC_LOOP_BACK
  */
-#define	MBC_LOOP_BACK_POINT_MASK	0x07
+#define	MBC_LOOPBACK_POINT_MASK		0x07
+#define	MBC_LOOPBACK_POINT_10BIT	0x00	/* 2425xx	*/
+#define	MBC_LOOPBACK_POINT_1BIT		0x01	/* 2425xx	*/
+#define	MBC_LOOPBACK_POINT_INTERNAL	0x01	/* 81xx		*/
+#define	MBC_LOOPBACK_POINT_EXTERNAL	0x02	/* 242581xx	*/
 
 /*
  * Mbc 20h (Get ID) returns the switch capabilities in mailbox7.
@@ -678,6 +684,18 @@ typedef struct port_database_24 {
 #define	LINK_CONFIG2_JUMBO_FRM_ENA	BIT_0
 
 /*
+ *
+ */
+#define	FCF_LIST_RETURN_ALL	BIT_0
+#define	FCF_LIST_RETURN_ONE	BIT_1
+
+typedef struct fcf_desc {
+	uint16_t	options;
+	uint16_t	fcf_index;
+	uint32_t	buffer_size;
+} ql_fcf_list_desc_t;
+
+/*
  * Global Data in ql_mbx.c source file.
  */
 
@@ -734,7 +752,7 @@ int ql_set_firmware_option(ql_adapter_state_t *, ql_mbx_data_t *);
 int ql_init_firmware(ql_adapter_state_t *);
 int ql_get_firmware_state(ql_adapter_state_t *, ql_mbx_data_t *);
 int ql_get_adapter_id(ql_adapter_state_t *, ql_mbx_data_t *);
-int ql_get_fw_version(ql_adapter_state_t *, ql_mbx_data_t *);
+int ql_get_fw_version(ql_adapter_state_t *, ql_mbx_data_t *, uint16_t);
 int ql_data_rate(ql_adapter_state_t *, ql_mbx_data_t *);
 int ql_diag_loopback(ql_adapter_state_t *, uint16_t, caddr_t, uint32_t,
     uint16_t, uint32_t, ql_mbx_data_t *);
@@ -758,6 +776,9 @@ int ql_flash_access(ql_adapter_state_t *, uint16_t, uint32_t, uint32_t,
     uint32_t *);
 int ql_get_xgmac_stats(ql_adapter_state_t *, size_t, caddr_t);
 int ql_get_dcbx_params(ql_adapter_state_t *, uint32_t, caddr_t);
+int ql_get_fcf_list_mbx(ql_adapter_state_t *, ql_fcf_list_desc_t *, caddr_t);
+int ql_get_resource_cnts(ql_adapter_state_t *, ql_mbx_data_t *);
+int ql_toggle_interrupt(ql_adapter_state_t *, uint16_t);
 /*
  * Mailbox command table initializer
  */
@@ -776,7 +797,8 @@ int ql_get_dcbx_params(ql_adapter_state_t *, uint32_t, caddr_t);
 	{MBC_DUMP_RAM_EXTENDED, "MBC_DUMP_RAM_EXTENDED"},		\
 	{MBC_WRITE_RAM_EXTENDED, "MBC_WRITE_RAM_EXTENDED"},		\
 	{MBC_READ_RAM_EXTENDED, "MBC_READ_RAM_EXTENDED"},		\
-	{MBC_SERDES_TRANSMIT_PARAMETERS, "MBC_SERDES_TRANSMIT_PARAMETERS"},\
+	{MBC_SERDES_TRANSMIT_PARAMETERS, \
+	"MBC_SERDES_TRANSMIT_PARAMETERS or MBC_TOGGLE_INTERRUPT"},\
 	{MBC_2300_EXECUTE_IOCB, "MBC_2300_EXECUTE_IOCB"},		\
 	{MBC_GET_IO_STATUS, "MBC_GET_IO_STATUS"},			\
 	{MBC_STOP_FIRMWARE, "MBC_STOP_FIRMWARE"},			\
@@ -804,6 +826,7 @@ int ql_get_dcbx_params(ql_adapter_state_t *, uint32_t, caddr_t);
 	{MBC_ONLINE_SELF_TEST, "MBC_ONLINE_SELF_TEST"},			\
 	{MBC_ENHANCED_GET_PORT_DATABASE, "MBC_ENHANCED_GET_PORT_DATABASE"},\
 	{MBC_INITIALIZE_MULTI_ID_FW, "MBC_INITIALIZE_MULTI_ID_FW"},	\
+	{MBC_GET_FCF_LIST, "MBC_GET_FCF_LIST"},				\
 	{MBC_GET_DCBX_PARAMS, "MBC_GET_DCBX_PARAMS"},			\
 	{MBC_RESET_LINK_STATUS, "MBC_RESET_LINK_STATUS"},		\
 	{MBC_EXECUTE_IOCB, "MBC_EXECUTE_IOCB"},				\

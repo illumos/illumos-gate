@@ -53,7 +53,8 @@ $(i386_ONLY)driver name=qlc class=fibre-channel perms="* 0666 root sys" \
     alias=pciex1077,2432 \
     alias=pciex1077,2532 \
     alias=pciex1077,5432 \
-    alias=pciex1077,8001
+    alias=pciex1077,8001 \
+    alias=pciex1077,8021
 $(sparc_ONLY)driver name=qlc class=fibre-channel perms="* 0666 root sys" \
     alias=pci1077,2200 \
     alias=pci1077,2300 \
@@ -62,7 +63,8 @@ $(sparc_ONLY)driver name=qlc class=fibre-channel perms="* 0666 root sys" \
     alias=pciex1077,2432 \
     alias=pciex1077,2532 \
     alias=pciex1077,5432 \
-    alias=pciex1077,8001
+    alias=pciex1077,8001 \
+    alias=pciex1077,8021
 driver name=qlge alias=pciex1077,8000 perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/qlc group=sys
 file path=kernel/drv/$(ARCH64)/qlge group=sys

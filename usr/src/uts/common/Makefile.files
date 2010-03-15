@@ -1029,7 +1029,7 @@ FCTL_OBJS += fctl.o
 FP_OBJS += fp.o
 
 QLC_OBJS += ql_api.o ql_debug.o ql_hba_fru.o ql_init.o ql_iocb.o ql_ioctl.o \
-	ql_isr.o ql_mbx.o ql_xioctl.o ql_fw_table.o
+	ql_isr.o ql_mbx.o ql_nx.o ql_xioctl.o ql_fw_table.o
 
 QLC_FW_2200_OBJS += ql_fw_2200.o
 

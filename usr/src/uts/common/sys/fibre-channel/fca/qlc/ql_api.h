@@ -22,7 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,18 +206,22 @@ extern int ddi_intr_remove_handler();
  * I/O register
  */
 #define	RD_REG_BYTE(ha, addr) \
-	(uint8_t)ddi_get8(ha->dev_handle, (uint8_t *)addr)
+	(uint8_t)ddi_get8(ha->dev_handle, (uint8_t *)(addr))
 #define	RD_REG_WORD(ha, addr) \
-	(uint16_t)ddi_get16(ha->dev_handle, (uint16_t *)addr)
+	(uint16_t)ddi_get16(ha->dev_handle, (uint16_t *)(addr))
 #define	RD_REG_DWORD(ha, addr) \
-	(uint32_t)ddi_get32(ha->dev_handle, (uint32_t *)addr)
+	(uint32_t)ddi_get32(ha->dev_handle, (uint32_t *)(addr))
+#define	RD_REG_DDWORD(ha, addr) \
+	(uint64_t)ddi_get64(ha->dev_handle, (uint64_t *)(addr))
 
 #define	WRT_REG_BYTE(ha, addr, data) \
-	ddi_put8(ha->dev_handle, (uint8_t *)addr, (uint8_t)data)
+	ddi_put8(ha->dev_handle, (uint8_t *)(addr), (uint8_t)(data))
 #define	WRT_REG_WORD(ha, addr, data) \
-	ddi_put16(ha->dev_handle, (uint16_t *)addr, (uint16_t)data)
+	ddi_put16(ha->dev_handle, (uint16_t *)(addr), (uint16_t)(data))
 #define	WRT_REG_DWORD(ha, addr, data) \
-	ddi_put32(ha->dev_handle, (uint32_t *)addr, (uint32_t)data)
+	ddi_put32(ha->dev_handle, (uint32_t *)(addr), (uint32_t)(data))
+#define	WRT_REG_DDWORD(ha, addr, data) \
+	ddi_put64(ha->dev_handle, (uint64_t *)(addr), (uint64_t)(data))
 
 #define	RD8_IO_REG(ha, regname) \
 	RD_REG_BYTE(ha, (ha->iobase + ha->reg_off->regname))
@@ -227,25 +231,25 @@ extern int ddi_intr_remove_handler();
 	RD_REG_DWORD(ha, (ha->iobase + ha->reg_off->regname))
 
 #define	WRT8_IO_REG(ha, regname, data) \
-	WRT_REG_BYTE(ha, (ha->iobase + ha->reg_off->regname), data)
+	WRT_REG_BYTE(ha, (ha->iobase + ha->reg_off->regname), (data))
 #define	WRT16_IO_REG(ha, regname, data) \
-	WRT_REG_WORD(ha, (ha->iobase + ha->reg_off->regname), data)
+	WRT_REG_WORD(ha, (ha->iobase + ha->reg_off->regname), (data))
 #define	WRT32_IO_REG(ha, regname, data) \
-	WRT_REG_DWORD(ha, (ha->iobase + ha->reg_off->regname), data)
+	WRT_REG_DWORD(ha, (ha->iobase + ha->reg_off->regname), (data))
 
 #define	RD_IOREG_BYTE(ha, addr) \
-	(uint8_t)ddi_get8(ha->iomap_dev_handle, (uint8_t *)addr)
+	(uint8_t)ddi_get8(ha->iomap_dev_handle, (uint8_t *)(addr))
 #define	RD_IOREG_WORD(ha, addr) \
-	(uint16_t)ddi_get16(ha->iomap_dev_handle, (uint16_t *)addr)
+	(uint16_t)ddi_get16(ha->iomap_dev_handle, (uint16_t *)(addr))
 #define	RD_IOREG_DWORD(ha, addr) \
-	(uint32_t)ddi_get32(ha->iomap_dev_handle, (uint32_t *)addr)
+	(uint32_t)ddi_get32(ha->iomap_dev_handle, (uint32_t *)(addr))
 
 #define	WRT_IOREG_BYTE(ha, addr, data) \
-	ddi_put8(ha->iomap_dev_handle, (uint8_t *)addr, (uint8_t)data)
+	ddi_put8(ha->iomap_dev_handle, (uint8_t *)addr, (uint8_t)(data))
 #define	WRT_IOREG_WORD(ha, addr, data) \
-	ddi_put16(ha->iomap_dev_handle, (uint16_t *)addr, (uint16_t)data)
+	ddi_put16(ha->iomap_dev_handle, (uint16_t *)addr, (uint16_t)(data))
 #define	WRT_IOREG_DWORD(ha, addr, data) \
-	ddi_put32(ha->iomap_dev_handle, (uint32_t *)addr, (uint32_t)data)
+	ddi_put32(ha->iomap_dev_handle, (uint32_t *)addr, (uint32_t)(data))
 
 #define	RD8_IOMAP_REG(ha, regname) \
 	RD_IOREG_BYTE(ha, (ha->iomap_iobase + ha->reg_off->regname))
@@ -255,11 +259,11 @@ extern int ddi_intr_remove_handler();
 	RD_IOREG_DWORD(ha, (ha->iomap_iobase + ha->reg_off->regname))
 
 #define	WRT8_IOMAP_REG(ha, regname, data) \
-	WRT_IOREG_BYTE(ha, (ha->iomap_iobase + ha->reg_off->regname), data)
+	WRT_IOREG_BYTE(ha, (ha->iomap_iobase + ha->reg_off->regname), (data))
 #define	WRT16_IOMAP_REG(ha, regname, data) \
-	WRT_IOREG_WORD(ha, (ha->iomap_iobase + ha->reg_off->regname), data)
+	WRT_IOREG_WORD(ha, (ha->iomap_iobase + ha->reg_off->regname), (data))
 #define	WRT32_IOMAP_REG(ha, regname, data) \
-	WRT_IOREG_DWORD(ha, (ha->iomap_iobase + ha->reg_off->regname), data)
+	WRT_IOREG_DWORD(ha, (ha->iomap_iobase + ha->reg_off->regname), (data))
 
 /*
  * FCA definitions
@@ -454,34 +458,36 @@ typedef union  {
  */
 #define	MAX_MBOX_COUNT		32
 typedef struct {
-	uint8_t flash_address;	/* Flash BIOS address */
-	uint8_t flash_data;	/* Flash BIOS data */
-	uint8_t ctrl_status;	/* Control/Status */
-	uint8_t ictrl;		/* Interrupt control */
-	uint8_t istatus;	/* Interrupt status */
-	uint8_t semaphore;	/* Semaphore */
-	uint8_t nvram;		/* NVRAM register. */
-	uint8_t	req_in;		/* for 2200 MBX 4 Write */
-	uint8_t	req_out;	/* for 2200 MBX 4 read */
-	uint8_t	resp_in;	/* for 2200 MBX 5 Read */
-	uint8_t	resp_out;	/* for 2200 MBX 5 Write */
-	uint8_t	intr_info_lo;
-	uint8_t	intr_info_hi;
-	uint8_t mbox_cnt;	/* Number of mailboxes */
-	uint8_t mailbox[MAX_MBOX_COUNT]; /* Mailbox registers */
-	uint8_t fpm_diag_config;
-	uint8_t pcr;		/* Processor Control Register. */
-	uint8_t mctr;		/* Memory Configuration and Timing. */
-	uint8_t fb_cmd;
-	uint8_t hccr;		/* Host command & control register. */
-	uint8_t gpiod;		/* GPIO Data register. */
-	uint8_t gpioe;		/* GPIO Enable register. */
-	uint8_t host_to_host_sema;	/* 2312 resource lock register */
-	uint8_t	pri_req_in;	/* 2400 */
-	uint8_t	pri_req_out;	/* 2400 */
-	uint8_t	atio_req_in;	/* 2400 */
-	uint8_t	atio_req_out;	/* 2400 */
-	uint8_t	io_base_addr;	/* 2400 */
+	uint16_t flash_address;	/* Flash BIOS address */
+	uint16_t flash_data;	/* Flash BIOS data */
+	uint16_t ctrl_status;	/* Control/Status */
+	uint16_t ictrl;		/* Interrupt control */
+	uint16_t istatus;	/* Interrupt status */
+	uint16_t semaphore;	/* Semaphore */
+	uint16_t nvram;		/* NVRAM register. */
+	uint16_t req_in;		/* for 2200 MBX 4 Write */
+	uint16_t req_out;	/* for 2200 MBX 4 read */
+	uint16_t resp_in;	/* for 2200 MBX 5 Read */
+	uint16_t resp_out;	/* for 2200 MBX 5 Write */
+	uint16_t risc2host;
+	uint16_t mbox_cnt;	/* Number of mailboxes */
+	uint16_t mailbox_in[MAX_MBOX_COUNT]; /* Mailbox registers */
+	uint16_t mailbox_out[MAX_MBOX_COUNT]; /* Mailbox registers */
+	uint16_t fpm_diag_config;
+	uint16_t pcr;		/* Processor Control Register. */
+	uint16_t mctr;		/* Memory Configuration and Timing. */
+	uint16_t fb_cmd;
+	uint16_t hccr;		/* Host command & control register. */
+	uint16_t gpiod;		/* GPIO Data register. */
+	uint16_t gpioe;		/* GPIO Enable register. */
+	uint16_t host_to_host_sema;	/* 2312 resource lock register */
+	uint16_t pri_req_in;	/* 2400 */
+	uint16_t pri_req_out;	/* 2400 */
+	uint16_t atio_req_in;	/* 2400 */
+	uint16_t atio_req_out;	/* 2400 */
+	uint16_t io_base_addr;	/* 2400 */
+	uint16_t nx_host_int;	/* NetXen */
+	uint16_t nx_risc_int;	/* NetXen */
 } reg_off_t;
 
 /*
@@ -525,6 +531,12 @@ typedef struct {
 #define	RISC_INT		BIT_3	/* RISC interrupt */
 
 /*
+ * NetXen Host/Risc Interrupt register definitions
+ */
+#define	NX_MBX_CMD		BIT_0	/* Mailbox command present */
+#define	NX_RISC_INT		BIT_0	/* RISC interrupt present */
+
+/*
  * NVRAM register definitions.
  */
 #define	NV_DESELECT		0
@@ -557,6 +569,8 @@ typedef struct {
 #define	NVRAM_2500_FUNC1_ADDR		0x48180
 #define	NVRAM_8100_FUNC0_ADDR		0xD0080
 #define	NVRAM_8100_FUNC1_ADDR		0xD0180
+#define	NVRAM_8021_FUNC0_ADDR		0xF0080
+#define	NVRAM_8021_FUNC1_ADDR		0xF0180
 
 #define	VPD_2400_FUNC0_ADDR		0
 #define	VPD_2400_FUNC1_ADDR		0x100
@@ -564,6 +578,8 @@ typedef struct {
 #define	VPD_2500_FUNC1_ADDR		0x48100
 #define	VPD_8100_FUNC0_ADDR		0xD0000
 #define	VPD_8100_FUNC1_ADDR		0xD0400
+#define	VPD_8021_FUNC0_ADDR		0xFA300
+#define	VPD_8021_FUNC1_ADDR		0xFA300
 #define	VPD_SIZE			0x80
 
 #define	FLASH_2200_FIRMWARE_ADDR	0x20000
@@ -571,6 +587,10 @@ typedef struct {
 #define	FLASH_2400_FIRMWARE_ADDR	0x20000
 #define	FLASH_2500_FIRMWARE_ADDR	0x20000
 #define	FLASH_8100_FIRMWARE_ADDR	0xA0000
+#define	FLASH_8021_FIRMWARE_ADDR	0x40000
+#define	FLASH_8021_FIRMWARE_SIZE	0x80000
+#define	FLASH_8021_BOOTLOADER_ADDR	0x4000
+#define	FLASH_8021_BOOTLOADER_SIZE	0x8000
 
 #define	FLASH_2400_ERRLOG_START_ADDR_0	0
 #define	FLASH_2400_ERRLOG_START_ADDR_1	0
@@ -584,10 +604,12 @@ typedef struct {
 #define	FLASH_2400_DESCRIPTOR_TABLE	0
 #define	FLASH_2500_DESCRIPTOR_TABLE	0x50000
 #define	FLASH_8100_DESCRIPTOR_TABLE	0xD8000
+#define	FLASH_8021_DESCRIPTOR_TABLE	0
 
 #define	FLASH_2400_LAYOUT_TABLE		0x11400
 #define	FLASH_2500_LAYOUT_TABLE		0x50400
 #define	FLASH_8100_LAYOUT_TABLE		0xD8400
+#define	FLASH_8021_LAYOUT_TABLE		0xFC400
 
 /*
  * Flash Error Log Event Codes.
@@ -1376,8 +1398,16 @@ typedef struct nvram_cache_desc {
 #define	QL_FCA_ATTACH_DONE		BIT_10
 #define	QL_IOMAP_IOBASE_MAPPED		BIT_11
 #define	QL_N_PORT_INFO_CREATED		BIT_12
+#define	QL_DB_IOBASE_MAPPED		BIT_13
 /* Device queue head list size (based on AL_PA address). */
 #define	DEVICE_HEAD_LIST_SIZE	0x81
+
+struct legacy_intr_set {
+	uint32_t	int_vec_bit;
+	uint32_t	tgt_status_reg;
+	uint32_t	tgt_mask_reg;
+	uint32_t	pci_int_reg;
+};
 
 /*
  * Adapter state structure.
@@ -1410,7 +1440,7 @@ typedef struct ql_adapter_state {
 
 	/* Interrupt context. */
 	kmutex_t		intr_mutex;
-	uint8_t			*iobase;
+	caddr_t			iobase;
 	uint8_t			rev_id;
 	uint16_t		device_id;
 	uint16_t		subsys_id;
@@ -1494,12 +1524,13 @@ typedef struct ql_adapter_state {
 	la_els_logi_t		loginparams;
 	fc_fca_bind_info_t	bind_info;
 	ddi_modhandle_t		fw_module;
-	uint16_t		fw_major_version;
-	uint16_t		fw_minor_version;
-	uint16_t		fw_subminor_version;
+	uint32_t		fw_major_version;
+	uint32_t		fw_minor_version;
+	uint32_t		fw_subminor_version;
 	uint16_t		fw_attributes;
 	uint32_t		fw_ext_memory_size;
 	uint32_t		parity_pause_errors;
+	boolean_t		log_parity_pause;
 	uint16_t		parity_hccr_err;
 	uint32_t		parity_stat_err;
 	reg_off_t		*reg_off;
@@ -1624,6 +1655,26 @@ typedef struct ql_adapter_state {
 	uint16_t		fcoe_vlan_id;
 	uint16_t		fcoe_fcf_idx;
 	nvram_cache_desc_t	*nvram_cache;
+	uint32_t		async_event_wait;
+
+	/* NetXen context */
+	ddi_acc_handle_t	db_dev_handle;
+	caddr_t			db_iobase;
+	uint64_t		first_page_group_start;
+	uint64_t		first_page_group_end;
+	uint64_t		mn_win_crb;
+	caddr_t			nx_pcibase;	/* BAR0 base I/O address */
+	uint32_t		crb_win;
+	uint32_t		ddr_mn_window;
+	uint32_t		qdr_sn_window;
+	uint32_t		*nx_req_in;
+	caddr_t			db_read;
+	uint32_t		pci_bus_addr;
+	struct legacy_intr_set	nx_legacy_intr;
+	uint32_t		bootloader_size;
+	uint32_t		bootloader_addr;
+	uint32_t		flash_fw_size;
+	uint8_t			function_number;
 } ql_adapter_state_t;
 
 /*
@@ -1722,11 +1773,17 @@ typedef struct ql_adapter_state {
 #define	CFG_ENABLE_FWFCETRACE			BIT_26
 #define	CFG_FW_MISMATCH				BIT_27
 #define	CFG_CTRL_81XX				BIT_28
-#define	CFG_FAST_TIMEOUT			BIT_29
+#define	CFG_CTRL_8021				BIT_29
+#define	CFG_FAST_TIMEOUT			BIT_30
+#define	CFG_LR_SUPPORT				BIT_31
 
 #define	CFG_CTRL_2425  		(CFG_CTRL_2422 | CFG_CTRL_25XX)
+#define	CFG_CTRL_8081  		(CFG_CTRL_8021 | CFG_CTRL_81XX)
 #define	CFG_CTRL_2581  		(CFG_CTRL_25XX | CFG_CTRL_81XX)
 #define	CFG_CTRL_242581		(CFG_CTRL_2422 | CFG_CTRL_25XX | CFG_CTRL_81XX)
+#define	CFG_CTRL_24258081	(CFG_CTRL_2425 | CFG_CTRL_8081)
+#define	CFG_CTRL_258081  	(CFG_CTRL_25XX | CFG_CTRL_8081)
+#define	CFG_CTRL_2480  		(CFG_CTRL_2422 | CFG_CTRL_8021)
 
 #define	CFG_IST(ha, cfgflags)	(ha->cfg_flags & cfgflags)
 
@@ -1800,13 +1857,13 @@ typedef struct ql_adapter_state {
 #define	VALID_N_PORT_HDL(x)	(x <= LAST_N_PORT_HDL || \
 	(x >= SNS_24XX_HDL && x <= BROADCAST_24XX_HDL))
 
-#define	VALID_DEVICE_ID(ha, x)  (CFG_IST(ha, CFG_CTRL_242581) ? \
+#define	VALID_DEVICE_ID(ha, x)  (CFG_IST(ha, CFG_CTRL_24258081) ? \
 	VALID_N_PORT_HDL(x) : VALID_LOOP_ID(x))
 
-#define	VALID_TARGET_ID(ha, x)  (CFG_IST(ha, CFG_CTRL_242581) ? \
+#define	VALID_TARGET_ID(ha, x)  (CFG_IST(ha, CFG_CTRL_24258081) ? \
 	(x <= LAST_N_PORT_HDL) : (LOCAL_LOOP_ID(x) || SNS_LOOP_ID(x)))
 
-#define	RESERVED_LOOP_ID(ha, x) (CFG_IST(ha, CFG_CTRL_242581) ? \
+#define	RESERVED_LOOP_ID(ha, x) (CFG_IST(ha, CFG_CTRL_24258081) ? \
 	(x > LAST_N_PORT_HDL && x <= FL_PORT_24XX_HDL) : \
 	(x >= FL_PORT_LOOP_ID && x <= SIMPLE_NAME_SERVER_LOOP_ID))
 
@@ -1839,6 +1896,17 @@ typedef struct ql_adapter_state {
 #define	QL_DAEMON_SUSPENDED(ha)	(\
 	(((ha)->cprinfo.cc_events & CALLB_CPR_START) ||\
 	((ha)->flags & ADAPTER_SUSPENDED)))
+
+#define	INTERRUPT_PENDING(ha)	(CFG_IST(ha, CFG_CTRL_8021) ? \
+				RD32_IO_REG(ha, nx_risc_int) & NX_RISC_INT : \
+				RD16_IO_REG(ha, istatus) & RISC_INT)
+
+#define	QL_MAX_FRAME_SIZE(ha) \
+	    (uint16_t)(CFG_IST(ha, CFG_CTRL_24258081) ? CHAR_TO_SHORT( \
+	    ha->init_ctrl_blk.cb24.max_frame_length[0], \
+	    ha->init_ctrl_blk.cb24.max_frame_length[1]) : CHAR_TO_SHORT( \
+	    ha->init_ctrl_blk.cb.max_frame_length[0], \
+	    ha->init_ctrl_blk.cb.max_frame_length[1]))
 
 /*
  * Locking Macro Definitions
@@ -2159,10 +2227,10 @@ void ql_isp_els_handle_cmd_endian(ql_adapter_state_t *ha, ql_srb_t *srb);
 void ql_isp_els_handle_rsp_endian(ql_adapter_state_t *ha, ql_srb_t *srb);
 void ql_isp_els_handle_endian(ql_adapter_state_t *ha, uint8_t *ptr,
     uint8_t ls_code);
-int ql_el_trace_desc_ctor(ql_adapter_state_t *ha);
-int ql_el_trace_desc_dtor(ql_adapter_state_t *ha);
-int ql_nvram_cache_desc_ctor(ql_adapter_state_t *ha);
-int ql_nvram_cache_desc_dtor(ql_adapter_state_t *ha);
+int ql_el_trace_desc_ctor(ql_adapter_state_t *);
+int ql_el_trace_desc_dtor(ql_adapter_state_t *);
+int ql_nvram_cache_desc_ctor(ql_adapter_state_t *);
+int ql_nvram_cache_desc_dtor(ql_adapter_state_t *);
 int ql_wwn_cmp(ql_adapter_state_t *, la_wwn_t *, la_wwn_t *);
 void ql_dev_free(ql_adapter_state_t *, ql_tgt_t *);
 

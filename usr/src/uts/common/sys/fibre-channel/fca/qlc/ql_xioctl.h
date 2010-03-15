@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -35,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -341,6 +341,11 @@ typedef struct ql_flash_layout_region {
 #define	FLASH_ERROR_LOG_0_REGION	0x1D
 #define	FLASH_ERROR_LOG_1_REGION	0x1F
 #define	FLASH_GOLDEN_FW_REGION		0x2F
+
+#define	FLASH_8021_FW_REGION		0x74
+#define	FLASH_8021_GOLDEN_FW_REGION	0x75
+#define	FLASH_8021_BOOTLOADER_REGION	0x72
+#define	FLASH_8021_VPD_REGION		0x81
 
 #define	FLASH_LAYOUT_TABLE_SIZE		4096
 

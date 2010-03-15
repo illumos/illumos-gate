@@ -49,6 +49,7 @@
 #include <ql_ioctl.h>
 #include <ql_isr.h>
 #include <ql_mbx.h>
+#include <ql_nx.h>
 #include <ql_xioctl.h>
 
 /*
@@ -267,64 +268,184 @@ static uint8_t ql_index_to_alpa[] = {
 
 /* 2200 register offsets */
 static reg_off_t reg_off_2200 = {
-	0x00, 0x02, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
-	0x18, 0x18, 0x1A, 0x1A, /* req in, out, resp in, out */
-	0x00, 0x00, /* intr info lo, hi */
-	24, /* Number of mailboxes */
-	/* Mailbox register offsets */
+	0x00,	/* flash_address */
+	0x02,	/* flash_data */
+	0x06,	/* ctrl_status */
+	0x08,	/* ictrl */
+	0x0a,	/* istatus */
+	0x0c,	/* semaphore */
+	0x0e,	/* nvram */
+	0x18,	/* req_in */
+	0x18,	/* req_out */
+	0x1a,	/* resp_in */
+	0x1a,	/* resp_out */
+	0xff,	/* risc2host - n/a */
+	24,	/* Number of mailboxes */
+
+	/* Mailbox in register offsets 0 - 23 */
 	0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
 	0xe0, 0xe2, 0xe4, 0xe6, 0xe8, 0xea, 0xec, 0xee,
 	0xf0, 0xf2, 0xf4, 0xf6, 0xf8, 0xfa, 0xfc, 0xfe,
-	/* 2200 does not have mailbox 24-31 */
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x96, 0xa4, 0xb0, 0xb8, 0xc0, 0xcc, 0xce,
-	/* host to host sema */
-	0x00,
-	/* 2200 does not have pri_req_in, pri_req_out, */
-	/* atio_req_in, atio_req_out, io_base_addr */
-	0xff, 0xff, 0xff, 0xff,	0xff
+	/* 2200 does not have mailbox 24-31 - n/a */
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+
+	/* Mailbox out register offsets 0 - 23 */
+	0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
+	0xe0, 0xe2, 0xe4, 0xe6, 0xe8, 0xea, 0xec, 0xee,
+	0xf0, 0xf2, 0xf4, 0xf6, 0xf8, 0xfa, 0xfc, 0xfe,
+	/* 2200 does not have mailbox 24-31 - n/a */
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+
+	0x96,	/* fpm_diag_config */
+	0xa4,	/* pcr */
+	0xb0,	/* mctr */
+	0xb8,	/* fb_cmd */
+	0xc0,	/* hccr */
+	0xcc,	/* gpiod */
+	0xce,	/* gpioe */
+	0xff,	/* host_to_host_sema - n/a */
+	0xff,	/* pri_req_in - n/a */
+	0xff,	/* pri_req_out - n/a */
+	0xff,	/* atio_req_in - n/a */
+	0xff,	/* atio_req_out - n/a */
+	0xff,	/* io_base_addr - n/a */
+	0xff,	/* nx_host_int - n/a */
+	0xff	/* nx_risc_int - n/a */
 };
 
 /* 2300 register offsets */
 static reg_off_t reg_off_2300 = {
-	0x00, 0x02, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
-	0x10, 0x12, 0x14, 0x16, /* req in, out, resp in, out */
-	0x18, 0x1A, /* intr info lo, hi */
-	32, /* Number of mailboxes */
-	/* Mailbox register offsets */
+	0x00,	/* flash_address */
+	0x02,	/* flash_data */
+	0x06,	/* ctrl_status */
+	0x08,	/* ictrl */
+	0x0a,	/* istatus */
+	0x0c,	/* semaphore */
+	0x0e,	/* nvram */
+	0x10,	/* req_in */
+	0x12,	/* req_out */
+	0x14,	/* resp_in */
+	0x16,	/* resp_out */
+	0x18,	/* risc2host */
+	32,	/* Number of mailboxes */
+
+	/* Mailbox in register offsets 0 - 31 */
 	0x40, 0x42, 0x44, 0x46, 0x48, 0x4a, 0x4c, 0x4e,
 	0x50, 0x52, 0x54, 0x56, 0x58, 0x5a, 0x5c, 0x5e,
 	0x60, 0x62, 0x64, 0x66, 0x68, 0x6a, 0x6c, 0x6e,
 	0x70, 0x72, 0x74, 0x76, 0x78, 0x7a, 0x7c, 0x7e,
-	0x96, 0xa4, 0xb0, 0x80, 0xc0, 0xcc, 0xce,
-	/* host to host sema */
-	0x1c,
-	/* 2300 does not have pri_req_in, pri_req_out, */
-	/* atio_req_in, atio_req_out, io_base_addr */
-	0xff, 0xff, 0xff, 0xff,	0xff
+
+	/* Mailbox out register offsets 0 - 31 */
+	0x40, 0x42, 0x44, 0x46, 0x48, 0x4a, 0x4c, 0x4e,
+	0x50, 0x52, 0x54, 0x56, 0x58, 0x5a, 0x5c, 0x5e,
+	0x60, 0x62, 0x64, 0x66, 0x68, 0x6a, 0x6c, 0x6e,
+	0x70, 0x72, 0x74, 0x76, 0x78, 0x7a, 0x7c, 0x7e,
+
+	0x96,	/* fpm_diag_config */
+	0xa4,	/* pcr */
+	0xb0,	/* mctr */
+	0x80,	/* fb_cmd */
+	0xc0,	/* hccr */
+	0xcc,	/* gpiod */
+	0xce,	/* gpioe */
+	0x1c,	/* host_to_host_sema */
+	0xff,	/* pri_req_in - n/a */
+	0xff,	/* pri_req_out - n/a */
+	0xff,	/* atio_req_in - n/a */
+	0xff,	/* atio_req_out - n/a */
+	0xff,	/* io_base_addr - n/a */
+	0xff,	/* nx_host_int - n/a */
+	0xff	/* nx_risc_int - n/a */
 };
 
 /* 2400/2500 register offsets */
 reg_off_t reg_off_2400_2500 = {
-	0x00, 0x04,		/* flash_address, flash_data */
-	0x08, 0x0c, 0x10,	/* ctrl_status, ictrl, istatus */
-	/* 2400 does not have semaphore, nvram */
-	0x14, 0x18,
-	0x1c, 0x20, 0x24, 0x28, /* req_in, req_out, resp_in, resp_out */
-	0x44, 0x46,		/* intr info lo, hi */
-	32,			/* Number of mailboxes */
-	/* Mailbox register offsets */
+	0x00,	/* flash_address */
+	0x04,	/* flash_data */
+	0x08,	/* ctrl_status */
+	0x0c,	/* ictrl */
+	0x10,	/* istatus */
+	0xff,	/* semaphore - n/a */
+	0xff,	/* nvram - n/a */
+	0x1c,	/* req_in */
+	0x20,	/* req_out */
+	0x24,	/* resp_in */
+	0x28,	/* resp_out */
+	0x44,	/* risc2host */
+	32,	/* Number of mailboxes */
+
+	/* Mailbox in register offsets 0 - 31 */
 	0x80, 0x82, 0x84, 0x86, 0x88, 0x8a, 0x8c, 0x8e,
 	0x90, 0x92, 0x94, 0x96, 0x98, 0x9a, 0x9c, 0x9e,
 	0xa0, 0xa2, 0xa4, 0xa6, 0xa8, 0xaa, 0xac, 0xae,
 	0xb0, 0xb2, 0xb4, 0xb6, 0xb8, 0xba, 0xbc, 0xbe,
-	/* 2400 does not have fpm_diag_config, pcr, mctr, fb_cmd */
-	0xff, 0xff, 0xff, 0xff,
-	0x48, 0x4c, 0x50,	/* hccr, gpiod, gpioe */
-	0xff,			/* host to host sema */
-	0x2c, 0x30,		/* pri_req_in, pri_req_out */
-	0x3c, 0x40,		/* atio_req_in, atio_req_out */
-	0x54			/* io_base_addr */
+
+	/* Mailbox out register offsets 0 - 31 */
+	0x80, 0x82, 0x84, 0x86, 0x88, 0x8a, 0x8c, 0x8e,
+	0x90, 0x92, 0x94, 0x96, 0x98, 0x9a, 0x9c, 0x9e,
+	0xa0, 0xa2, 0xa4, 0xa6, 0xa8, 0xaa, 0xac, 0xae,
+	0xb0, 0xb2, 0xb4, 0xb6, 0xb8, 0xba, 0xbc, 0xbe,
+
+	0xff,	/* fpm_diag_config  - n/a */
+	0xff,	/* pcr - n/a */
+	0xff,	/* mctr - n/a */
+	0xff,	/* fb_cmd - n/a */
+	0x48,	/* hccr */
+	0x4c,	/* gpiod */
+	0x50,	/* gpioe */
+	0xff,	/* host_to_host_sema - n/a */
+	0x2c,	/* pri_req_in */
+	0x30,	/* pri_req_out */
+	0x3c,	/* atio_req_in */
+	0x40,	/* atio_req_out */
+	0x54,	/* io_base_addr */
+	0xff,	/* nx_host_int - n/a */
+	0xff	/* nx_risc_int - n/a */
+};
+
+/* P3 register offsets */
+static reg_off_t reg_off_8021 = {
+	0x00,	/* flash_address */
+	0x04,	/* flash_data */
+	0x08,	/* ctrl_status */
+	0x0c,	/* ictrl */
+	0x10,	/* istatus */
+	0xff,	/* semaphore - n/a */
+	0xff,	/* nvram - n/a */
+	0xff,	/* req_in - n/a */
+	0x0,	/* req_out */
+	0x100,	/* resp_in */
+	0x200,	/* resp_out */
+	0x500,	/* risc2host */
+	32,	/* Number of mailboxes */
+
+	/* Mailbox in register offsets 0 - 31 */
+	0x300, 0x302, 0x304, 0x306, 0x308, 0x30a, 0x30c, 0x30e,
+	0x310, 0x312, 0x314, 0x316, 0x318, 0x31a, 0x31c, 0x31e,
+	0x320, 0x322, 0x324, 0x326, 0x328, 0x32a, 0x32c, 0x32e,
+	0x330, 0x332, 0x334, 0x336, 0x338, 0x33a, 0x33c, 0x33e,
+
+	/* Mailbox out register offsets 0 - 31 */
+	0x400, 0x402, 0x404, 0x406, 0x408, 0x40a, 0x40c, 0x40e,
+	0x410, 0x412, 0x414, 0x416, 0x418, 0x41a, 0x41c, 0x41e,
+	0x420, 0x422, 0x424, 0x426, 0x428, 0x42a, 0x42c, 0x42e,
+	0x430, 0x432, 0x434, 0x436, 0x438, 0x43a, 0x43c, 0x43e,
+
+	0xff,	/* fpm_diag_config  - n/a */
+	0xff,	/* pcr - n/a */
+	0xff,	/* mctr - n/a */
+	0xff,	/* fb_cmd - n/a */
+	0x48,	/* hccr */
+	0x4c,	/* gpiod */
+	0x50,	/* gpioe */
+	0xff,	/* host_to_host_sema - n/a */
+	0x2c,	/* pri_req_in */
+	0x30,	/* pri_req_out */
+	0x3c,	/* atio_req_in */
+	0x40,	/* atio_req_out */
+	0x54,	/* io_base_addr */
+	0x380,	/* nx_host_int */
+	0x504	/* nx_risc_int */
 };
 
 /* mutex for protecting variables shared by all instances of the driver */
@@ -682,8 +803,9 @@ ql_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 static int
 ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
+	off_t			regsize;
 	uint32_t		size;
-	int			rval;
+	int			rval, *ptr;
 	int			instance;
 	uint_t			progress = 0;
 	char			*buf;
@@ -798,23 +920,67 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 *	: 0x100 - 0x3FF PCI IO Space for fpga
 			 */
 			if (ddi_regs_map_setup(dip, 0, (caddr_t *)&ha->iobase,
-			    0x100, 0x300, &ql_dev_acc_attr, &ha->dev_handle)
-			    != DDI_SUCCESS) {
+			    0x100, 0x300, &ql_dev_acc_attr, &ha->dev_handle) !=
+			    DDI_SUCCESS) {
 				cmn_err(CE_WARN, "%s(%d): Unable to map device"
 				    " registers", QL_NAME, instance);
 				goto attach_failed;
 			}
 			if (ddi_regs_map_setup(dip, 1,
 			    (caddr_t *)&ha->sbus_fpga_iobase, 0, 0x400,
-			    &ql_dev_acc_attr, &ha->sbus_fpga_dev_handle)
-			    != DDI_SUCCESS) {
+			    &ql_dev_acc_attr, &ha->sbus_fpga_dev_handle) !=
+			    DDI_SUCCESS) {
 				/* We should not fail attach here */
 				cmn_err(CE_WARN, "%s(%d): Unable to map FPGA",
 				    QL_NAME, instance);
 				ha->sbus_fpga_iobase = NULL;
 			}
 			progress |= QL_REGS_MAPPED;
+
+			/*
+			 * We should map config space before adding interrupt
+			 * So that the chip type (2200 or 2300) can be
+			 * determined before the interrupt routine gets a
+			 * chance to execute.
+			 */
+			if (ddi_regs_map_setup(dip, 0,
+			    (caddr_t *)&ha->sbus_config_base, 0, 0x100,
+			    &ql_dev_acc_attr, &ha->sbus_config_handle) !=
+			    DDI_SUCCESS) {
+				cmn_err(CE_WARN, "%s(%d): Unable to map sbus "
+				    "config registers", QL_NAME, instance);
+				goto attach_failed;
+			}
+			progress |= QL_CONFIG_SPACE_SETUP;
 		} else {
+			/*LINTED [Solaris DDI_DEV_T_ANY Lint error]*/
+			rval = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
+			    DDI_PROP_DONTPASS, "reg", &ptr, &size);
+			if (rval != DDI_PROP_SUCCESS) {
+				cmn_err(CE_WARN, "%s(%d): Unable to get PCI "
+				    "address registers", QL_NAME, instance);
+				goto attach_failed;
+			} else {
+				ha->pci_bus_addr = ptr[0];
+				ha->function_number = (uint8_t)
+				    (ha->pci_bus_addr >> 8 & 7);
+				ddi_prop_free(ptr);
+			}
+
+			/*
+			 * We should map config space before adding interrupt
+			 * So that the chip type (2200 or 2300) can be
+			 * determined before the interrupt routine gets a
+			 * chance to execute.
+			 */
+			if (pci_config_setup(ha->dip, &ha->pci_handle) !=
+			    DDI_SUCCESS) {
+				cmn_err(CE_WARN, "%s(%d): can't setup PCI "
+				    "config space", QL_NAME, instance);
+				goto attach_failed;
+			}
+			progress |= QL_CONFIG_SPACE_SETUP;
+
 			/*
 			 * Setup the ISP2200 registers address mapping to be
 			 * accessed by this particular driver.
@@ -823,10 +989,14 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 * 0x2   32-bit Memory Space address
 			 * 0x3   64-bit Memory Space address
 			 */
-			if (ddi_regs_map_setup(dip, 2, (caddr_t *)&ha->iobase,
-			    0, 0x100, &ql_dev_acc_attr,
-			    &ha->dev_handle) != DDI_SUCCESS) {
-				cmn_err(CE_WARN, "%s(%d): regs_map_setup "
+			size = ql_pci_config_get32(ha, PCI_CONF_BASE0) & BIT_0 ?
+			    2 : 1;
+			if (ddi_dev_regsize(dip, size, &regsize) !=
+			    DDI_SUCCESS ||
+			    ddi_regs_map_setup(dip, size, &ha->iobase,
+			    0, regsize, &ql_dev_acc_attr, &ha->dev_handle) !=
+			    DDI_SUCCESS) {
+				cmn_err(CE_WARN, "%s(%d): regs_map_setup(mem) "
 				    "failed", QL_NAME, instance);
 				goto attach_failed;
 			}
@@ -838,40 +1008,24 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 * which loading flash fails through mem space
 			 * mappings in PCI-X mode.
 			 */
-			if (ddi_regs_map_setup(dip, 1,
-			    (caddr_t *)&ha->iomap_iobase, 0, 0x100,
-			    &ql_dev_acc_attr,
-			    &ha->iomap_dev_handle) != DDI_SUCCESS) {
-				cmn_err(CE_WARN, "%s(%d): regs_map_setup(I/O)"
-				    " failed", QL_NAME, instance);
-				goto attach_failed;
-			}
-			progress |= QL_IOMAP_IOBASE_MAPPED;
-		}
-
-		/*
-		 * We should map config space before adding interrupt
-		 * So that the chip type (2200 or 2300) can be determined
-		 * before the interrupt routine gets a chance to execute.
-		 */
-		if (CFG_IST(ha, CFG_SBUS_CARD)) {
-			if (ddi_regs_map_setup(dip, 0,
-			    (caddr_t *)&ha->sbus_config_base, 0, 0x100,
-			    &ql_dev_acc_attr, &ha->sbus_config_handle) !=
-			    DDI_SUCCESS) {
-				cmn_err(CE_WARN, "%s(%d): Unable to map sbus "
-				    "config registers", QL_NAME, instance);
-				goto attach_failed;
-			}
-		} else {
-			if (pci_config_setup(ha->dip, &ha->pci_handle) !=
-			    DDI_SUCCESS) {
-				cmn_err(CE_WARN, "%s(%d): can't setup PCI "
-				    "config space", QL_NAME, instance);
-				goto attach_failed;
+			if (size == 1) {
+				ha->iomap_iobase = ha->iobase;
+				ha->iomap_dev_handle = ha->dev_handle;
+			} else {
+				if (ddi_dev_regsize(dip, 1, &regsize) !=
+				    DDI_SUCCESS ||
+				    ddi_regs_map_setup(dip, 1,
+				    &ha->iomap_iobase, 0, regsize,
+				    &ql_dev_acc_attr, &ha->iomap_dev_handle) !=
+				    DDI_SUCCESS) {
+					cmn_err(CE_WARN, "%s(%d): regs_map_"
+					    "setup(I/O) failed", QL_NAME,
+					    instance);
+					goto attach_failed;
+				}
+				progress |= QL_IOMAP_IOBASE_MAPPED;
 			}
 		}
-		progress |= QL_CONFIG_SPACE_SETUP;
 
 		ha->subsys_id = (uint16_t)ql_pci_config_get16(ha,
 		    PCI_CONF_SUBSYSID);
@@ -1030,6 +1184,43 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			ha->cmd_cont_segs = CONT_TYPE_1_DATA_SEGMENTS;
 			break;
 
+		case 0x8021:
+			if (ha->function_number == 7) {
+				ha->flags |= FUNCTION_1;
+			}
+			ha->cfg_flags |= CFG_CTRL_8021;
+			ha->reg_off = &reg_off_8021;
+			ha->risc_dump_size = QL_25XX_FW_DUMP_SIZE;
+			ha->fcp_cmd = ql_command_24xx_iocb;
+			ha->ms_cmd = ql_ms_24xx_iocb;
+			ha->cmd_segs = CMD_TYPE_7_DATA_SEGMENTS;
+			ha->cmd_cont_segs = CONT_TYPE_1_DATA_SEGMENTS;
+
+			ha->nx_pcibase = ha->iobase;
+			ha->iobase += 0xBC000 + (ha->function_number << 11);
+			ha->iomap_iobase += 0xBC000 +
+			    (ha->function_number << 11);
+
+			/* map doorbell */
+			if (ddi_dev_regsize(dip, 2, &regsize) != DDI_SUCCESS ||
+			    ddi_regs_map_setup(dip, 2, &ha->db_iobase,
+			    0, regsize, &ql_dev_acc_attr, &ha->db_dev_handle) !=
+			    DDI_SUCCESS) {
+				cmn_err(CE_WARN, "%s(%d): regs_map_setup"
+				    "(doorbell) failed", QL_NAME, instance);
+				goto attach_failed;
+			}
+			progress |= QL_DB_IOBASE_MAPPED;
+
+			ha->nx_req_in = (uint32_t *)(ha->db_iobase +
+			    (ha->function_number << 12));
+			ha->db_read = ha->nx_pcibase + (512 * 1024) +
+			    (ha->function_number * 8);
+
+			ql_8021_update_crb_int_ptr(ha);
+			ql_8021_set_drv_active(ha);
+			break;
+
 		default:
 			cmn_err(CE_WARN, "%s(%d): Unsupported device id: %x",
 			    QL_NAME, instance, ha->device_id);
@@ -1038,7 +1229,7 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* Setup hba buffer. */
 
-		size = CFG_IST(ha, CFG_CTRL_242581) ?
+		size = CFG_IST(ha, CFG_CTRL_24258081) ?
 		    (REQUEST_QUEUE_SIZE + RESPONSE_QUEUE_SIZE) :
 		    (REQUEST_QUEUE_SIZE + RESPONSE_QUEUE_SIZE +
 		    RCVBUF_QUEUE_SIZE);
@@ -1388,6 +1579,11 @@ attach_failed:
 			progress &= ~QL_TASK_DAEMON_STARTED;
 		}
 
+		if (progress & QL_DB_IOBASE_MAPPED) {
+			ql_8021_clr_drv_active(ha);
+			ddi_regs_map_free(&ha->db_dev_handle);
+			progress &= ~QL_DB_IOBASE_MAPPED;
+		}
 		if (progress & QL_IOMAP_IOBASE_MAPPED) {
 			ddi_regs_map_free(&ha->iomap_dev_handle);
 			progress &= ~QL_IOMAP_IOBASE_MAPPED;
@@ -1725,7 +1921,13 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		if (CFG_IST(ha, CFG_SBUS_CARD)) {
 			ddi_regs_map_free(&ha->sbus_config_handle);
 		} else {
-			ddi_regs_map_free(&ha->iomap_dev_handle);
+			if (CFG_IST(ha, CFG_CTRL_8021)) {
+				ql_8021_clr_drv_active(ha);
+				ddi_regs_map_free(&ha->db_dev_handle);
+			}
+			if (ha->iomap_dev_handle != ha->dev_handle) {
+				ddi_regs_map_free(&ha->iomap_dev_handle);
+			}
 			pci_config_teardown(&ha->pci_handle);
 		}
 
@@ -2006,8 +2208,8 @@ ql_power(dev_info_t *dip, int component, int level)
 		 * Don't enable interrupts. Running mailbox commands with
 		 * interrupts enabled could cause hangs since pm_run_scan()
 		 * runs out of a callout thread and on single cpu systems
-		 * cv_timedwait(), called from ql_mailbox_command(), would
-		 * not get to run.
+		 * cv_reltimedwait_sig(), called from ql_mailbox_command(),
+		 * would not get to run.
 		 */
 		TASK_DAEMON_LOCK(ha);
 		ha->task_daemon_flags |= TASK_DAEMON_POWERING_DOWN;
@@ -2074,12 +2276,14 @@ ql_quiesce(dev_info_t *dip)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_242581)) {
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		(void) ql_stop_firmware(ha);
+	} else if (CFG_IST(ha, CFG_CTRL_242581)) {
 		WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
-		WRT16_IO_REG(ha, mailbox[0], MBC_STOP_FIRMWARE);
+		WRT16_IO_REG(ha, mailbox_in[0], MBC_STOP_FIRMWARE);
 		WRT32_IO_REG(ha, hccr, HC24_SET_HOST_INT);
 		for (timer = 0; timer < 30000; timer++) {
-			stat = RD32_IO_REG(ha, intr_info_lo);
+			stat = RD32_IO_REG(ha, risc2host);
 			if (stat & BIT_15) {
 				if ((stat & 0xff) < 0x12) {
 					WRT32_IO_REG(ha, hccr,
@@ -2252,7 +2456,7 @@ ql_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 		port_info->pi_hard_addr.hard_addr = 0;
 		if (bind_info->port_num == 0) {
 			d_id.b24 = ha->d_id.b24;
-			if (CFG_IST(ha, CFG_CTRL_242581)) {
+			if (CFG_IST(ha, CFG_CTRL_24258081)) {
 				if (ha->init_ctrl_blk.cb24.
 				    firmware_options_1[0] & BIT_0) {
 					d_id.b.al_pa = ql_index_to_alpa[ha->
@@ -2738,7 +2942,7 @@ ql_get_cap(opaque_t fca_handle, char *cap, void *ptr)
 		}
 		rval = FC_CAP_FOUND;
 	} else if (strcmp(cap, FC_CAP_PAYLOAD_SIZE) == 0) {
-		if (CFG_IST(ha, CFG_CTRL_242581)) {
+		if (CFG_IST(ha, CFG_CTRL_24258081)) {
 			*rptr = (uint32_t)CHAR_TO_SHORT(
 			    ha->init_ctrl_blk.cb24.max_frame_length[0],
 			    ha->init_ctrl_blk.cb24.max_frame_length[1]);
@@ -3920,7 +4124,7 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 		break;
 	case FC_PORT_DOWNLOAD_FW:
 		PORTMANAGE_LOCK(ha);
-		if (CFG_IST(ha, CFG_CTRL_242581)) {
+		if (CFG_IST(ha, CFG_CTRL_24258081)) {
 			if (ql_24xx_load_flash(ha, (uint8_t *)cmd->pm_data_buf,
 			    (uint32_t)cmd->pm_data_len,
 			    ha->flash_fw_addr << 2) != QL_SUCCESS) {
@@ -4154,13 +4358,7 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 			lb->receive_data_address =
 			    buffer_rcv.cookie.dmac_address;
 
-			if ((lb->options & 7) == 2 &&
-			    pha->task_daemon_flags &
-			    (QL_LOOP_TRANSITION | LOOP_DOWN)) {
-				/* Loop must be up for external */
-				EL(ha, "failed, QL_DIAG_LPBDTA FC_TRAN_BUSY\n");
-				rval = FC_TRAN_BUSY;
-			} else if (ql_loop_back(ha, 0, lb,
+			if (ql_loop_back(ha, 0, lb,
 			    buffer_xmt.cookie.dmac_notused,
 			    buffer_rcv.cookie.dmac_notused) == QL_SUCCESS) {
 				bzero((void *)cmd->pm_stat_buf,
@@ -4169,6 +4367,7 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 				    (uint8_t *)cmd->pm_stat_buf,
 				    (uint8_t *)buffer_rcv.bp,
 				    cmd->pm_stat_len, DDI_DEV_AUTOINCR);
+				rval = FC_SUCCESS;
 			} else {
 				EL(ha, "failed, QL_DIAG_LPBDTA FC_FAILURE\n");
 				rval = FC_FAILURE;
@@ -4243,7 +4442,7 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 			 */
 			echo.options = BIT_15;
 			if (CFG_IST(ha, CFG_ENABLE_64BIT_ADDRESSING) &&
-			    !(CFG_IST(ha, CFG_CTRL_81XX))) {
+			    !(CFG_IST(ha, CFG_CTRL_8081))) {
 				echo.options = (uint16_t)
 				    (echo.options | BIT_6);
 			}
@@ -4452,7 +4651,7 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 		break;
 	case FC_PORT_DOWNLOAD_FCODE:
 		PORTMANAGE_LOCK(ha);
-		if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+		if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 			rval = ql_load_flash(ha, (uint8_t *)cmd->pm_data_buf,
 			    (uint32_t)cmd->pm_data_len);
 		} else {
@@ -4773,13 +4972,7 @@ ql_els_plogi(ql_adapter_state_t *ha, fc_packet_t *pkt)
 		acc.ls_code.ls_code = LA_ELS_ACC;
 		acc.common_service.fcph_version = 0x2006;
 		acc.common_service.cmn_features = 0x8800;
-		CFG_IST(ha, CFG_CTRL_242581) ?
-		    (acc.common_service.rx_bufsize = CHAR_TO_SHORT(
-		    ha->init_ctrl_blk.cb24.max_frame_length[0],
-		    ha->init_ctrl_blk.cb24.max_frame_length[1])) :
-		    (acc.common_service.rx_bufsize = CHAR_TO_SHORT(
-		    ha->init_ctrl_blk.cb.max_frame_length[0],
-		    ha->init_ctrl_blk.cb.max_frame_length[1]));
+		acc.common_service.rx_bufsize = QL_MAX_FRAME_SIZE(ha);
 		acc.common_service.conc_sequences = 0xff;
 		acc.common_service.relative_offset = 0x03;
 		acc.common_service.e_d_tov = 0x7d0;
@@ -4807,12 +5000,12 @@ ql_els_plogi(ql_adapter_state_t *ha, fc_packet_t *pkt)
 			DEVICE_QUEUE_LOCK(tq);
 			tq->logout_sent = 0;
 			tq->flags &= ~TQF_NEED_AUTHENTICATION;
-			if (CFG_IST(ha, CFG_CTRL_242581)) {
+			if (CFG_IST(ha, CFG_CTRL_24258081)) {
 				tq->flags |= TQF_IIDMA_NEEDED;
 			}
 			DEVICE_QUEUE_UNLOCK(tq);
 
-			if (CFG_IST(ha, CFG_CTRL_242581)) {
+			if (CFG_IST(ha, CFG_CTRL_24258081)) {
 				TASK_DAEMON_LOCK(ha);
 				ha->task_daemon_flags |= TD_IIDMA_NEEDED;
 				TASK_DAEMON_UNLOCK(ha);
@@ -5053,7 +5246,7 @@ ql_els_flogi(ql_adapter_state_t *ha, fc_packet_t *pkt)
 		} else {
 			acc.common_service.cmn_features = 0x1b00;
 		}
-		CFG_IST(ha, CFG_CTRL_242581) ?
+		CFG_IST(ha, CFG_CTRL_24258081) ?
 		    (acc.common_service.rx_bufsize = CHAR_TO_SHORT(
 		    ha->init_ctrl_blk.cb24.max_frame_length[0],
 		    ha->init_ctrl_blk.cb24.max_frame_length[1])) :
@@ -6213,7 +6406,7 @@ ql_login_port(ql_adapter_state_t *ha, port_id_t d_id)
 
 	/* Special case for Nameserver */
 	if (d_id.b24 == 0xFFFFFC) {
-		loop_id = (uint16_t)(CFG_IST(ha, CFG_CTRL_242581) ?
+		loop_id = (uint16_t)(CFG_IST(ha, CFG_CTRL_24258081) ?
 		    SNS_24XX_HDL : SIMPLE_NAME_SERVER_LOOP_ID);
 		if (tq == NULL) {
 			ADAPTER_STATE_LOCK(ha);
@@ -6225,11 +6418,14 @@ ql_login_port(ql_adapter_state_t *ha, port_id_t d_id)
 				return (QL_FUNCTION_FAILED);
 			}
 		}
-		rval = ql_login_fabric_port(ha, tq, loop_id);
-		if (rval == QL_SUCCESS) {
-			tq->loop_id = loop_id;
-			tq->flags |= TQF_FABRIC_DEVICE;
-			(void) ql_get_port_database(ha, tq, PDF_NONE);
+		if (!(CFG_IST(ha, CFG_CTRL_8021))) {
+			rval = ql_login_fabric_port(ha, tq, loop_id);
+			if (rval == QL_SUCCESS) {
+				tq->loop_id = loop_id;
+				tq->flags |= TQF_FABRIC_DEVICE;
+				(void) ql_get_port_database(ha, tq, PDF_NONE);
+			}
+		} else {
 			ha->topology = (uint8_t)
 			    (ha->topology | QL_SNS_CONNECTION);
 		}
@@ -6252,7 +6448,7 @@ ql_login_port(ql_adapter_state_t *ha, port_id_t d_id)
 		}
 	} else if (ha->topology & QL_SNS_CONNECTION) {
 		/* Locate unused loop ID. */
-		if (CFG_IST(ha, CFG_CTRL_242581)) {
+		if (CFG_IST(ha, CFG_CTRL_24258081)) {
 			first_loop_id = 0;
 			last_loop_id = LAST_N_PORT_HDL;
 		} else if (ha->topology & QL_F_PORT) {
@@ -7424,9 +7620,7 @@ ql_poll_cmd(ql_adapter_state_t *vha, ql_srb_t *sp, time_t poll_wait)
 				TASK_DAEMON_UNLOCK(ha);
 			}
 
-			if ((CFG_IST(ha, CFG_CTRL_242581) ?
-			    RD32_IO_REG(ha, istatus) :
-			    RD16_IO_REG(ha, istatus)) & RISC_INT) {
+			if (INTERRUPT_PENDING(ha)) {
 				(void) ql_isr((caddr_t)ha);
 				INTR_LOCK(ha);
 				ha->intr_claimed = TRUE;
@@ -7672,7 +7866,7 @@ ql_done(ql_link_t *link)
 				/* Issue marker command on reset status. */
 				if (!(ha->task_daemon_flags & LOOP_DOWN) &&
 				    (sp->pkt->pkt_reason == CS_RESET ||
-				    (CFG_IST(ha, CFG_CTRL_242581) &&
+				    (CFG_IST(ha, CFG_CTRL_24258081) &&
 				    sp->pkt->pkt_reason == CS_ABORTED))) {
 					(void) ql_marker(ha, tq->loop_id, 0,
 					    MK_SYNC_ID);
@@ -8055,6 +8249,13 @@ ql_task_thread(ql_adapter_state_t *ha)
 
 		if (ha->task_daemon_flags & ISP_ABORT_NEEDED) {
 			TASK_DAEMON_UNLOCK(ha);
+			if (ha->log_parity_pause == B_TRUE) {
+				(void) ql_flash_errlog(ha,
+				    FLASH_ERRLOG_PARITY_ERR, 0,
+				    MSW(ha->parity_stat_err),
+				    LSW(ha->parity_stat_err));
+				ha->log_parity_pause = B_FALSE;
+			}
 			ql_port_state(ha, FC_STATE_OFFLINE, FC_STATE_CHANGE);
 			TASK_DAEMON_LOCK(ha);
 			loop_again = TRUE;
@@ -8654,7 +8855,7 @@ ql_send_plogi(ql_adapter_state_t *ha, ql_tgt_t *tq, ql_head_t *done_q)
 	payload->common_service.fcph_version = 0x2006;
 	payload->common_service.cmn_features = 0x8800;
 
-	CFG_IST(ha, CFG_CTRL_242581) ?
+	CFG_IST(ha, CFG_CTRL_24258081) ?
 	    (payload->common_service.rx_bufsize = CHAR_TO_SHORT(
 	    ha->init_ctrl_blk.cb24.max_frame_length[0],
 	    ha->init_ctrl_blk.cb24.max_frame_length[1])) :
@@ -9325,7 +9526,7 @@ ql_ub_frame_hdr(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t index,
 	    (sp->ub_type == FC_TYPE_IS8802_SNAP) &&
 	    (!(sp->flags & SRB_UB_ACQUIRED))) {
 		/* set broadcast D_ID */
-		loop_id = (uint16_t)(CFG_IST(ha, CFG_CTRL_242581) ?
+		loop_id = (uint16_t)(CFG_IST(ha, CFG_CTRL_24258081) ?
 		    BROADCAST_24XX_HDL : IP_BROADCAST_LOOP_ID);
 		if (tq->ub_loop_id == loop_id) {
 			if (ha->topology & QL_FL_PORT) {
@@ -9590,6 +9791,10 @@ ql_timer(void *arg)
 			ha->xioctl->IOOutputByteCnt %= 0x100000;
 		}
 
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			(void) ql_8021_idc_handler(ha);
+		}
+
 		ADAPTER_STATE_LOCK(ha);
 		ha->flags &= ~ADAPTER_TIMER_BUSY;
 		ADAPTER_STATE_UNLOCK(ha);
@@ -9843,9 +10048,9 @@ ql_cmd_timeout(ql_adapter_state_t *ha, ql_tgt_t *tq, ql_srb_t *sp,
 		DEVICE_QUEUE_LOCK(tq);
 	} else {
 		EL(ha, "command timed out in isp=%ph, osc=%ph, index=%xh, "
-		    "isp_abort_needed\n", (void *)sp,
+		    "spf=%xh, isp_abort_needed\n", (void *)sp,
 		    (void *)ha->outstanding_cmds[sp->handle & OSC_INDEX_MASK],
-		    sp->handle & OSC_INDEX_MASK);
+		    sp->handle & OSC_INDEX_MASK, sp->flags);
 
 		/* Release device queue lock. */
 		DEVICE_QUEUE_UNLOCK(tq);
@@ -10051,7 +10256,7 @@ ql_iidma(ql_adapter_state_t *ha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+	if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 		return;
 	}
@@ -10120,7 +10325,7 @@ ql_iidma(ql_adapter_state_t *ha)
 
 			/* Set the firmware's iiDMA rate */
 			if (tq->iidma_rate <= IIDMA_RATE_MAX &&
-			    !(CFG_IST(ha, CFG_CTRL_81XX))) {
+			    !(CFG_IST(ha, CFG_CTRL_8081))) {
 				data = ql_iidma_rate(ha, tq->loop_id,
 				    &tq->iidma_rate, EXT_IIDMA_MODE_SET);
 				if (data != QL_SUCCESS) {
@@ -10549,7 +10754,7 @@ ql_load_flash(ql_adapter_state_t *ha, uint8_t *dp, uint32_t size)
 	uint32_t	size_to_compare;
 	int		erase_all;
 
-	if (CFG_IST(ha, CFG_CTRL_242581)) {
+	if (CFG_IST(ha, CFG_CTRL_24258081)) {
 		return (ql_24xx_load_flash(ha, dp, size, 0));
 	}
 
@@ -11128,7 +11333,17 @@ ql_24xx_load_flash(ql_adapter_state_t *vha, uint8_t *dp, uint32_t size,
 	while (cnt < size) {
 		/* Beginning of a sector? */
 		if ((faddr & rest_addr) == 0) {
-			if (CFG_IST(ha, CFG_CTRL_81XX)) {
+			if (CFG_IST(ha, CFG_CTRL_8021)) {
+				fdata = ha->flash_data_addr | faddr;
+				rval = ql_8021_rom_erase(ha, fdata);
+				if (rval != QL_SUCCESS) {
+					EL(ha, "8021 erase sector status="
+					    "%xh, start=%xh, end=%xh"
+					    "\n", rval, fdata,
+					    fdata + rest_addr);
+					break;
+				}
+			} else if (CFG_IST(ha, CFG_CTRL_81XX)) {
 				fdata = ha->flash_data_addr | faddr;
 				rval = ql_flash_access(ha,
 				    FAC_ERASE_SECTOR, fdata, fdata +
@@ -11252,6 +11467,13 @@ ql_24xx_read_flash(ql_adapter_state_t *vha, uint32_t faddr, uint32_t *bp)
 	int			rval = QL_SUCCESS;
 	ql_adapter_state_t	*ha = vha->pha;
 
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		if ((rval = ql_8021_rom_read(ha, faddr, bp)) != QL_SUCCESS) {
+			EL(ha, "8021 access error\n");
+		}
+		return (rval);
+	}
+
 	/* Clear access error flag */
 	WRT32_IO_REG(ha, ctrl_status,
 	    RD32_IO_REG(ha, ctrl_status) | FLASH_NVRAM_ACCESS_ERROR);
@@ -11301,6 +11523,12 @@ ql_24xx_write_flash(ql_adapter_state_t *vha, uint32_t addr, uint32_t data)
 	int			rval = QL_SUCCESS;
 	ql_adapter_state_t	*ha = vha->pha;
 
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		if ((rval = ql_8021_rom_write(ha, addr, data)) != QL_SUCCESS) {
+			EL(ha, "8021 access error\n");
+		}
+		return (rval);
+	}
 	/* Clear access error flag */
 	WRT32_IO_REG(ha, ctrl_status,
 	    RD32_IO_REG(ha, ctrl_status) | FLASH_NVRAM_ACCESS_ERROR);
@@ -11358,6 +11586,14 @@ ql_24xx_unprotect_flash(ql_adapter_state_t *vha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		(void) ql_8021_rom_wrsr(ha, xp->fdesc.write_enable_bits);
+		rval = ql_8021_rom_wrsr(ha, xp->fdesc.write_enable_bits);
+		if (rval != QL_SUCCESS) {
+			EL(ha, "8021 access error\n");
+		}
+		return (rval);
+	}
 	if (CFG_IST(ha, CFG_CTRL_81XX)) {
 		if (ha->task_daemon_flags & FIRMWARE_UP) {
 			if ((rval = ql_flash_access(ha, FAC_WRT_ENABLE, 0, 0,
@@ -11422,6 +11658,14 @@ ql_24xx_protect_flash(ql_adapter_state_t *vha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		(void) ql_8021_rom_wrsr(ha, xp->fdesc.write_enable_bits);
+		rval = ql_8021_rom_wrsr(ha, xp->fdesc.write_disable_bits);
+		if (rval != QL_SUCCESS) {
+			EL(ha, "8021 access error\n");
+		}
+		return;
+	}
 	if (CFG_IST(ha, CFG_CTRL_81XX)) {
 		if (ha->task_daemon_flags & FIRMWARE_UP) {
 			if ((rval = ql_flash_access(ha, FAC_WRT_PROTECT, 0, 0,
@@ -11577,6 +11821,11 @@ ql_binary_fw_dump(ql_adapter_state_t *vha, int lock_needed)
 	ql_adapter_state_t	*ha = vha->pha;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		EL(ha, "8021 not supported\n");
+		return (QL_NOT_SUPPORTED);
+	}
 
 	QL_DUMP_LOCK(ha);
 
@@ -13009,7 +13258,7 @@ ql_2200_binary_fw_dump(ql_adapter_state_t *ha, ql_fw_dump_t *fw)
 
 		/* Wait for RISC to recover from reset. */
 		timer = 30000;
-		while (RD16_IO_REG(ha, mailbox[0]) == MBS_BUSY) {
+		while (RD16_IO_REG(ha, mailbox_out[0]) == MBS_BUSY) {
 			if (timer-- != 0) {
 				drv_usecwait(MILLISEC);
 			} else {
@@ -13045,22 +13294,22 @@ ql_2200_binary_fw_dump(ql_adapter_state_t *ha, ql_fw_dump_t *fw)
 
 		/* Get RISC SRAM. */
 		risc_address = 0x1000;
-		WRT16_IO_REG(ha, mailbox[0], MBC_READ_RAM_WORD);
+		WRT16_IO_REG(ha, mailbox_in[0], MBC_READ_RAM_WORD);
 		for (cnt = 0; cnt < 0xf000; cnt++) {
-			WRT16_IO_REG(ha, mailbox[1], risc_address++);
+			WRT16_IO_REG(ha, mailbox_in[1], risc_address++);
 			WRT16_IO_REG(ha, hccr, HC_SET_HOST_INT);
 			for (timer = 6000000; timer != 0; timer--) {
 				/* Check for pending interrupts. */
-				if (RD16_IO_REG(ha, istatus) & RISC_INT) {
+				if (INTERRUPT_PENDING(ha)) {
 					if (RD16_IO_REG(ha, semaphore) &
 					    BIT_0) {
 						WRT16_IO_REG(ha, hccr,
 						    HC_CLR_RISC_INT);
 						mcp->mb[0] = RD16_IO_REG(ha,
-						    mailbox[0]);
+						    mailbox_out[0]);
 						fw->risc_ram[cnt] =
 						    RD16_IO_REG(ha,
-						    mailbox[2]);
+						    mailbox_out[2]);
 						WRT16_IO_REG(ha,
 						    semaphore, 0);
 						break;
@@ -13222,7 +13471,7 @@ ql_2300_binary_fw_dump(ql_adapter_state_t *ha, ql_fw_dump_t *fw)
 
 		/* Wait for RISC to recover from reset. */
 		timer = 30000;
-		while (RD16_IO_REG(ha, mailbox[0]) == MBS_BUSY) {
+		while (RD16_IO_REG(ha, mailbox_out[0]) == MBS_BUSY) {
 			if (timer-- != 0) {
 				drv_usecwait(MILLISEC);
 			} else {
@@ -13279,13 +13528,13 @@ ql_24xx_binary_fw_dump(ql_adapter_state_t *ha, ql_24xx_fw_dump_t *fw)
 	fw->hccr = RD32_IO_REG(ha, hccr);
 
 	/* Pause RISC. */
-	if ((RD32_IO_REG(ha, intr_info_lo) & RH_RISC_PAUSED) == 0) {
+	if ((RD32_IO_REG(ha, risc2host) & RH_RISC_PAUSED) == 0) {
 		/* Disable ISP interrupts. */
 		WRT16_IO_REG(ha, ictrl, 0);
 
 		WRT32_IO_REG(ha, hccr, HC24_PAUSE_RISC);
 		for (timer = 30000;
-		    (RD32_IO_REG(ha, intr_info_lo) & RH_RISC_PAUSED) == 0 &&
+		    (RD32_IO_REG(ha, risc2host) & RH_RISC_PAUSED) == 0 &&
 		    rval == QL_SUCCESS; timer--) {
 			if (timer) {
 				drv_usecwait(100);
@@ -13713,16 +13962,16 @@ ql_25xx_binary_fw_dump(ql_adapter_state_t *ha, ql_25xx_fw_dump_t *fw)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	fw->r2h_status = RD32_IO_REG(ha, intr_info_lo);
+	fw->r2h_status = RD32_IO_REG(ha, risc2host);
 
 	/* Pause RISC. */
-	if ((RD32_IO_REG(ha, intr_info_lo) & RH_RISC_PAUSED) == 0) {
+	if ((RD32_IO_REG(ha, risc2host) & RH_RISC_PAUSED) == 0) {
 		/* Disable ISP interrupts. */
 		WRT16_IO_REG(ha, ictrl, 0);
 
 		WRT32_IO_REG(ha, hccr, HC24_PAUSE_RISC);
 		for (timer = 30000;
-		    (RD32_IO_REG(ha, intr_info_lo) & RH_RISC_PAUSED) == 0 &&
+		    (RD32_IO_REG(ha, risc2host) & RH_RISC_PAUSED) == 0 &&
 		    rval == QL_SUCCESS; timer--) {
 			if (timer) {
 				drv_usecwait(100);
@@ -14250,16 +14499,16 @@ ql_81xx_binary_fw_dump(ql_adapter_state_t *ha, ql_81xx_fw_dump_t *fw)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	fw->r2h_status = RD32_IO_REG(ha, intr_info_lo);
+	fw->r2h_status = RD32_IO_REG(ha, risc2host);
 
 	/* Pause RISC. */
-	if ((RD32_IO_REG(ha, intr_info_lo) & RH_RISC_PAUSED) == 0) {
+	if ((RD32_IO_REG(ha, risc2host) & RH_RISC_PAUSED) == 0) {
 		/* Disable ISP interrupts. */
 		WRT16_IO_REG(ha, ictrl, 0);
 
 		WRT32_IO_REG(ha, hccr, HC24_PAUSE_RISC);
 		for (timer = 30000;
-		    (RD32_IO_REG(ha, intr_info_lo) & RH_RISC_PAUSED) == 0 &&
+		    (RD32_IO_REG(ha, risc2host) & RH_RISC_PAUSED) == 0 &&
 		    rval == QL_SUCCESS; timer--) {
 			if (timer) {
 				drv_usecwait(100);
@@ -14693,7 +14942,7 @@ ql_81xx_binary_fw_dump(ql_adapter_state_t *ha, ql_81xx_fw_dump_t *fw)
 		}
 	}
 
-	/* Get the respons queue */
+	/* Get the response queue */
 	if (rval == QL_SUCCESS) {
 		uint32_t	cnt;
 		uint32_t	*w32 = (uint32_t *)ha->response_ring_bp;
@@ -14799,34 +15048,42 @@ ql_read_risc_ram(ql_adapter_state_t *ha, uint32_t risc_address, uint32_t len,
 	int		rval = QL_SUCCESS;
 
 	for (cnt = 0; cnt < len; cnt++, risc_address++) {
-		WRT16_IO_REG(ha, mailbox[0], MBC_READ_RAM_EXTENDED);
-		WRT16_IO_REG(ha, mailbox[1], LSW(risc_address));
-		WRT16_IO_REG(ha, mailbox[8], MSW(risc_address));
-		CFG_IST(ha, CFG_CTRL_242581) ?
-		    WRT32_IO_REG(ha, hccr, HC24_SET_HOST_INT) :
-		    WRT16_IO_REG(ha, hccr, HC_SET_HOST_INT);
+		WRT16_IO_REG(ha, mailbox_in[0], MBC_READ_RAM_EXTENDED);
+		WRT16_IO_REG(ha, mailbox_in[1], LSW(risc_address));
+		WRT16_IO_REG(ha, mailbox_in[8], MSW(risc_address));
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			WRT32_IO_REG(ha, nx_host_int, NX_MBX_CMD);
+		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
+			WRT32_IO_REG(ha, hccr, HC24_SET_HOST_INT);
+		} else {
+			WRT16_IO_REG(ha, hccr, HC_SET_HOST_INT);
+		}
 		for (timer = 6000000; timer && rval == QL_SUCCESS; timer--) {
-			if (RD16_IO_REG(ha, istatus) & RISC_INT) {
+			if (INTERRUPT_PENDING(ha)) {
 				stat = (uint16_t)
-				    (RD16_IO_REG(ha, intr_info_lo) & 0xff);
+				    (RD16_IO_REG(ha, risc2host) & 0xff);
 				if ((stat == 1) || (stat == 0x10)) {
-					if (CFG_IST(ha, CFG_CTRL_242581)) {
+					if (CFG_IST(ha, CFG_CTRL_24258081)) {
 						buf32[cnt] = SHORT_TO_LONG(
 						    RD16_IO_REG(ha,
-						    mailbox[2]),
+						    mailbox_out[2]),
 						    RD16_IO_REG(ha,
-						    mailbox[3]));
+						    mailbox_out[3]));
 					} else {
 						buf16[cnt] =
-						    RD16_IO_REG(ha, mailbox[2]);
+						    RD16_IO_REG(ha,
+						    mailbox_out[2]);
 					}
 
 					break;
 				} else if ((stat == 2) || (stat == 0x11)) {
-					rval = RD16_IO_REG(ha, mailbox[0]);
+					rval = RD16_IO_REG(ha, mailbox_out[0]);
 					break;
 				}
-				if (CFG_IST(ha, CFG_CTRL_242581)) {
+				if (CFG_IST(ha, CFG_CTRL_8021)) {
+					ql_8021_clr_hw_intr(ha);
+					ql_8021_clr_fw_intr(ha);
+				} else if (CFG_IST(ha, CFG_CTRL_242581)) {
 					WRT32_IO_REG(ha, hccr,
 					    HC24_CLR_RISC_INT);
 					RD32_IO_REG(ha, hccr);
@@ -14837,7 +15094,10 @@ ql_read_risc_ram(ql_adapter_state_t *ha, uint32_t risc_address, uint32_t len,
 			}
 			drv_usecwait(5);
 		}
-		if (CFG_IST(ha, CFG_CTRL_242581)) {
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			ql_8021_clr_hw_intr(ha);
+			ql_8021_clr_fw_intr(ha);
+		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
 			WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
 			RD32_IO_REG(ha, hccr);
 		} else {
@@ -15918,7 +16178,7 @@ ql_stall_driver(ql_adapter_state_t *ha, uint32_t options)
 			continue;
 		}
 
-		ql_delay(ha, 10000);
+		ql_delay(ha2, 10000);
 		timer--;
 		link = ha == NULL ? ql_hba.first : &ha->hba;
 	}
@@ -15986,7 +16246,7 @@ ql_restart_driver(ql_adapter_state_t *ha)
 		QL_PRINT_2(CE_CONT, "(%d,%d): failed, tdf=%xh\n",
 		    ha2->instance, ha2->vp_index, ha2->task_daemon_flags);
 
-		ql_delay(ha, 10000);
+		ql_delay(ha2, 10000);
 		timer--;
 		link = ha == NULL ? ql_hba.first : &ha->hba;
 	}
@@ -16100,7 +16360,7 @@ ql_setup_msi(ql_adapter_state_t *ha)
 	}
 
 	/* MSI support is only suported on 24xx HBA's. */
-	if (!(CFG_IST(ha, CFG_CTRL_242581))) {
+	if (!(CFG_IST(ha, CFG_CTRL_24258081))) {
 		EL(ha, "HBA does not support MSI\n");
 		return (DDI_FAILURE);
 	}
@@ -16226,7 +16486,8 @@ ql_setup_msix(ql_adapter_state_t *ha)
 	 * rev A2 parts (revid = 3) or greater.
 	 */
 	if (!((ha->device_id == 0x2532) || (ha->device_id == 0x2432) ||
-	    (ha->device_id == 0x8432) || (ha->device_id == 0x8001))) {
+	    (ha->device_id == 0x8432) || (ha->device_id == 0x8001) ||
+	    (ha->device_id == 0x8021))) {
 		EL(ha, "HBA does not support MSI-X\n");
 		return (DDI_FAILURE);
 	}
@@ -17485,7 +17746,7 @@ ql_nvram_cache_desc_ctor(ql_adapter_state_t *ha)
 		    " descriptor", QL_NAME, ha->instance);
 		rval = DDI_FAILURE;
 	} else {
-		if (CFG_IST(ha, CFG_CTRL_242581)) {
+		if (CFG_IST(ha, CFG_CTRL_24258081)) {
 			ha->nvram_cache->size = sizeof (nvram_24xx_t);
 		} else {
 			ha->nvram_cache->size = sizeof (nvram_t);

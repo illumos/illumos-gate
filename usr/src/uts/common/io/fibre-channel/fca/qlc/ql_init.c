@@ -48,6 +48,7 @@
 #include <ql_iocb.h>
 #include <ql_isr.h>
 #include <ql_mbx.h>
+#include <ql_nx.h>
 #include <ql_xioctl.h>
 
 /*
@@ -137,7 +138,7 @@ ql_initialize_adapter(ql_adapter_state_t *ha)
 		}
 
 		/* Set login parameters. */
-		if (CFG_IST(ha, CFG_CTRL_242581)) {
+		if (CFG_IST(ha, CFG_CTRL_24258081)) {
 			els->common_service.rx_bufsize = CHAR_TO_SHORT(
 			    ha->init_ctrl_blk.cb24.max_frame_length[0],
 			    ha->init_ctrl_blk.cb24.max_frame_length[1]);
@@ -156,11 +157,10 @@ ql_initialize_adapter(ql_adapter_state_t *ha)
 		}
 
 		/* Determine which RISC code to use. */
-		(void) ql_check_isp_firmware(ha);
-
-		rval = ql_chip_diag(ha);
-		if (rval == QL_SUCCESS) {
-			rval = ql_load_isp_firmware(ha);
+		if ((rval = ql_check_isp_firmware(ha)) != QL_SUCCESS) {
+			if ((rval = ql_chip_diag(ha)) == QL_SUCCESS) {
+				rval = ql_load_isp_firmware(ha);
+			}
 		}
 
 		if (rval == QL_SUCCESS && (rval = ql_set_cache_line(ha)) ==
@@ -198,8 +198,13 @@ ql_initialize_adapter(ql_adapter_state_t *ha)
 	cmn_err(CE_NOTE, "!Qlogic %s(%d): %s", QL_NAME, ha->instance, msg);
 
 	/* Enable ISP interrupts and login parameters. */
-	CFG_IST(ha, CFG_CTRL_242581) ? WRT32_IO_REG(ha, ictrl, ISP_EN_RISC):
-	    WRT16_IO_REG(ha, ictrl, ISP_EN_INT + ISP_EN_RISC);
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		ql_8021_enable_intrs(ha);
+	} else if (CFG_IST(ha, CFG_CTRL_242581)) {
+		WRT32_IO_REG(ha, ictrl, ISP_EN_RISC);
+	} else {
+		WRT16_IO_REG(ha, ictrl, ISP_EN_INT + ISP_EN_RISC);
+	}
 
 	ADAPTER_STATE_LOCK(ha);
 	ha->flags |= (INTERRUPTS_ENABLED | ONLINE);
@@ -322,8 +327,8 @@ ql_pci_sbus_config(ql_adapter_state_t *ha)
 			}
 		}
 
-		/* max memory read byte cnt override */
-		if (ha->pci_max_read_req != 0) {
+		if (!(CFG_IST(ha, CFG_CTRL_8021)) &&
+		    ha->pci_max_read_req != 0) {
 			ql_set_max_read_req(ha);
 		}
 
@@ -445,7 +450,7 @@ ql_nvram_config(ql_adapter_state_t *ha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_242581)) {
+	if (CFG_IST(ha, CFG_CTRL_24258081)) {
 		return (ql_nvram_24xx_config(ha));
 	}
 
@@ -961,6 +966,7 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 		nv->version[0] = 1;
 		nv->max_frame_length[1] = 8;
 		nv->execution_throttle[0] = 16;
+		nv->exchange_count[0] = 128;
 		nv->max_luns_per_target[0] = 8;
 
 		idpromlen = 32;
@@ -1014,13 +1020,18 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 		nv->port_down_retry_count[0] = 30;
 		nv->link_down_timeout[0] = 30;
 
-		if (CFG_IST(ha, CFG_CTRL_81XX)) {
+		if (CFG_IST(ha, CFG_CTRL_8081)) {
 			nv->firmware_options_3[2] = BIT_4;
 			nv->feature_mask_l[0] = 9;
 			nv->ext_blk.version[0] = 1;
 			nv->ext_blk.fcf_vlan_match = 1;
 			nv->ext_blk.fcf_vlan_id[0] = LSB(1002);
 			nv->ext_blk.fcf_vlan_id[1] = MSB(1002);
+			nv->fw.isp8001.e_node_mac_addr[1] = 2;
+			nv->fw.isp8001.e_node_mac_addr[2] = 3;
+			nv->fw.isp8001.e_node_mac_addr[3] = 4;
+			nv->fw.isp8001.e_node_mac_addr[4] = MSB(ha->instance);
+			nv->fw.isp8001.e_node_mac_addr[5] = LSB(ha->instance);
 		}
 
 		rval = QL_FUNCTION_FAILED;
@@ -1081,7 +1092,7 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 	/*
 	 * Setup driver firmware options.
 	 */
-	if (CFG_IST(ha, CFG_CTRL_81XX)) {
+	if (CFG_IST(ha, CFG_CTRL_8081)) {
 		dst = (caddr_t)icb->enode_mac_addr;
 		src = (caddr_t)nv->fw.isp8001.e_node_mac_addr;
 		index = sizeof (nv->fw.isp8001.e_node_mac_addr);
@@ -1142,9 +1153,12 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 	    (ha->cfg_flags &= ~CFG_ENABLE_FULL_LIP_LOGIN);
 	nv->host_p[1] & BIT_3 ? (ha->cfg_flags |= CFG_ENABLE_TARGET_RESET) :
 	    (ha->cfg_flags &= ~CFG_ENABLE_TARGET_RESET);
-	ha->cfg_flags &= ~(CFG_DISABLE_RISC_CODE_LOAD |
+	ha->cfg_flags &= ~(CFG_DISABLE_RISC_CODE_LOAD | CFG_LR_SUPPORT |
 	    CFG_SET_CACHE_LINE_SIZE_1 | CFG_MULTI_CHIP_ADAPTER);
 	ha->cfg_flags |= CFG_ENABLE_64BIT_ADDRESSING;
+	if (CFG_IST(ha, CFG_CTRL_81XX) && nv->enhanced_features[0] & BIT_0) {
+		ha->cfg_flags |= CFG_LR_SUPPORT;
+	}
 	ADAPTER_STATE_UNLOCK(ha);
 
 	ha->execution_throttle = CHAR_TO_SHORT(nv->execution_throttle[0],
@@ -1281,7 +1295,7 @@ ql_lock_nvram(ql_adapter_state_t *ha, uint32_t *addr, uint32_t flags)
 		}
 
 		GLOBAL_HW_LOCK();
-	} else if (CFG_IST(ha, CFG_CTRL_2581)) {
+	} else if (CFG_IST(ha, CFG_CTRL_258081)) {
 		if (flags & LNF_VPD_DATA) {
 			*addr = ha->flash_data_addr | ha->flash_vpd_addr;
 		} else if (flags & LNF_NVRAM_DATA) {
@@ -1736,7 +1750,7 @@ ql_common_properties(ql_adapter_state_t *ha)
 	 * Set default fw wait, adjusted for slow FCF's.
 	 * Revisit when FCF's as fast as FC switches.
 	 */
-	ha->fwwait = (uint8_t)(CFG_IST(ha, CFG_CTRL_81XX) ? 45 : 10);
+	ha->fwwait = (uint8_t)(CFG_IST(ha, CFG_CTRL_8081) ? 45 : 10);
 	/* Get the attach fw_ready override value. */
 	if ((data = ql_get_prop(ha, "init-loop-sync-wait")) != 0xffffffff) {
 		if (data > 0 && data <= 240) {
@@ -1777,7 +1791,7 @@ ql_24xx_properties(ql_adapter_state_t *ha, nvram_24xx_t *nv)
 	if ((data = ql_get_prop(ha, "max-frame-length")) == 0xffffffff) {
 		data = 2048;
 	}
-	if (data == 512 || data == 1024 || data == 2048) {
+	if (data == 512 || data == 1024 || data == 2048 || data == 2112) {
 		nv->max_frame_length[0] = LSB(data);
 		nv->max_frame_length[1] = MSB(data);
 	} else {
@@ -1921,35 +1935,39 @@ ql_24xx_properties(ql_adapter_state_t *ha, nvram_24xx_t *nv)
 		    nv->port_down_retry_count[1]));
 	}
 
-	/* Get connection mode setting. */
-	if ((data = ql_get_prop(ha, "connection-options")) == 0xffffffff) {
-		data = 2;
-	}
-	if (data <= 2) {
-		nv->firmware_options_2[0] = (uint8_t)
-		    (nv->firmware_options_2[0] & ~(BIT_6 | BIT_5 | BIT_4));
-		nv->firmware_options_2[0] = (uint8_t)
-		    (nv->firmware_options_2[0] | (uint8_t)(data << 4));
-	} else {
-		EL(ha, "invalid parameter value for 'connection-options':"
-		    " %d; using nvram value of %d\n", data,
-		    (nv->firmware_options_2[0] >> 4) & 0x3);
-	}
+	if (!(CFG_IST(ha, CFG_CTRL_8081))) {
+		/* Get connection mode setting. */
+		if ((data = ql_get_prop(ha, "connection-options")) ==
+		    0xffffffff) {
+			data = 2;
+		}
+		if (data <= 2) {
+			nv->firmware_options_2[0] = (uint8_t)
+			    (nv->firmware_options_2[0] &
+			    ~(BIT_6 | BIT_5 | BIT_4));
+			nv->firmware_options_2[0] = (uint8_t)
+			    (nv->firmware_options_2[0] | (uint8_t)(data << 4));
+		} else {
+			EL(ha, "invalid parameter value for 'connection-"
+			    "options': %d; using nvram value of %d\n", data,
+			    (nv->firmware_options_2[0] >> 4) & 0x3);
+		}
 
-	/* Get data rate setting. */
-	if ((data = ql_get_prop(ha, "fc-data-rate")) == 0xffffffff) {
-		data = 2;
-	}
-	if ((CFG_IST(ha, CFG_CTRL_2422) && data < 4) ||
-	    (CFG_IST(ha, CFG_CTRL_2581) && data < 5)) {
-		nv->firmware_options_3[1] = (uint8_t)
-		    (nv->firmware_options_3[1] & 0x1f);
-		nv->firmware_options_3[1] = (uint8_t)
-		    (nv->firmware_options_3[1] | (uint8_t)(data << 5));
-	} else {
-		EL(ha, "invalid parameter value for 'fc-data-rate': %d; "
-		    "using nvram value of %d\n", data,
-		    (nv->firmware_options_3[1] >> 5) & 0x7);
+		/* Get data rate setting. */
+		if ((data = ql_get_prop(ha, "fc-data-rate")) == 0xffffffff) {
+			data = 2;
+		}
+		if ((CFG_IST(ha, CFG_CTRL_2422) && data < 4) ||
+		    (CFG_IST(ha, CFG_CTRL_258081) && data < 5)) {
+			nv->firmware_options_3[1] = (uint8_t)
+			    (nv->firmware_options_3[1] & 0x1f);
+			nv->firmware_options_3[1] = (uint8_t)
+			    (nv->firmware_options_3[1] | (uint8_t)(data << 5));
+		} else {
+			EL(ha, "invalid parameter value for 'fc-data-rate': "
+			    "%d; using nvram value of %d\n", data,
+			    (nv->firmware_options_3[1] >> 5) & 0x7);
+		}
 	}
 
 	/* Get IP FW container count. */
@@ -2023,7 +2041,7 @@ ql_get_prop(ql_adapter_state_t *ha, char *string)
 	/*
 	 * Look for a adapter instance NPIV (virtual port) specific parameter
 	 */
-	if (CFG_IST(ha, CFG_CTRL_242581)) {
+	if (CFG_IST(ha, CFG_CTRL_24258081)) {
 		(void) sprintf(buf, "hba%d-vp%d-%s", ha->instance,
 		    ha->vp_index, string);
 		/*LINTED [Solaris DDI_DEV_T_ANY Lint warning]*/
@@ -2078,7 +2096,14 @@ ql_check_isp_firmware(ql_adapter_state_t *ha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_DISABLE_RISC_CODE_LOAD)) {
+	/* Test for firmware running. */
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		if (ql_8021_idc_handler(ha) != NX_DEV_READY) {
+			rval = QL_FUNCTION_FAILED;
+		} else {
+			rval = ql_start_firmware(ha);
+		}
+	} else if (CFG_IST(ha, CFG_DISABLE_RISC_CODE_LOAD)) {
 		if (ha->risc_code != NULL) {
 			kmem_free(ha->risc_code, ha->risc_code_size);
 			ha->risc_code = NULL;
@@ -2134,6 +2159,7 @@ ql_check_isp_firmware(ql_adapter_state_t *ha)
 					bufp	+= byte_count;
 				} while (fw_size != 0);
 			}
+			rval = QL_FUNCTION_FAILED;
 		}
 	} else {
 		rval = QL_FUNCTION_FAILED;
@@ -2165,7 +2191,7 @@ static int
 ql_chip_diag(ql_adapter_state_t *ha)
 {
 	ql_mbx_data_t	mr;
-	int32_t		rval = QL_FUNCTION_FAILED;
+	int		rval;
 	int32_t		retries = 4;
 	uint16_t	id;
 
@@ -2176,45 +2202,59 @@ ql_chip_diag(ql_adapter_state_t *ha)
 		TASK_DAEMON_LOCK(ha);
 		ha->task_daemon_flags &= ~ISP_ABORT_NEEDED;
 		TASK_DAEMON_UNLOCK(ha);
-		ql_reset_chip(ha);
 
 		/* For ISP2200A reduce firmware load size. */
 		if (CFG_IST(ha, CFG_CTRL_2200) &&
-		    RD16_IO_REG(ha, mailbox[7]) == 4) {
+		    RD16_IO_REG(ha, mailbox_out[7]) == 4) {
 			ha->fw_transfer_size = 128;
 		} else {
 			ha->fw_transfer_size = REQUEST_QUEUE_SIZE;
 		}
 
-		/* Check product ID of chip */
-		mr.mb[1] = RD16_IO_REG(ha, mailbox[1]);
-		mr.mb[2] = RD16_IO_REG(ha, mailbox[2]);
-		mr.mb[3] = RD16_IO_REG(ha, mailbox[3]);
+		bcopy(QL_VERSION, ha->adapter_stats->revlvl.qlddv,
+		    strlen(QL_VERSION));
 
-		if (ha->device_id == 0x5432 || ha->device_id == 0x8432) {
-			id = 0x2432;
-		} else if (ha->device_id == 0x5422 ||
-		    ha->device_id == 0x8422) {
-			id = 0x2422;
-		} else {
-			id = ha->device_id;
+		rval = QL_SUCCESS;
+		if (!(CFG_IST(ha, CFG_CTRL_8021))) {
+			ql_reset_chip(ha);
+
+			/* Check product ID of chip */
+			mr.mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
+			mr.mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
+			mr.mb[3] = RD16_IO_REG(ha, mailbox_out[3]);
+
+			if (ha->device_id == 0x5432 ||
+			    ha->device_id == 0x8432) {
+				id = 0x2432;
+			} else if (ha->device_id == 0x5422 ||
+			    ha->device_id == 0x8422) {
+				id = 0x2422;
+			} else {
+				id = ha->device_id;
+			}
+
+			if (mr.mb[1] == PROD_ID_1 &&
+			    (mr.mb[2] == PROD_ID_2 || mr.mb[2] == PROD_ID_2a) &&
+			    (mr.mb[3] == PROD_ID_3 || mr.mb[3] == id)) {
+				ha->adapter_stats->revlvl.isp2200 =
+				    RD16_IO_REG(ha, mailbox_out[4]);
+				ha->adapter_stats->revlvl.risc =
+				    RD16_IO_REG(ha, mailbox_out[5]);
+				ha->adapter_stats->revlvl.frmbfr =
+				    RD16_IO_REG(ha, mailbox_out[6]);
+				ha->adapter_stats->revlvl.riscrom =
+				    RD16_IO_REG(ha, mailbox_out[7]);
+			} else {
+				cmn_err(CE_WARN, "%s(%d) - prod id failed!, "
+				    "mb1=%xh, mb2=%xh, mb3=%xh", QL_NAME,
+				    ha->instance, mr.mb[1], mr.mb[2], mr.mb[3]);
+				rval = QL_FUNCTION_FAILED;
+			}
+		} else if (!(ha->task_daemon_flags & FIRMWARE_LOADED)) {
+			break;
 		}
 
-		if (mr.mb[1] == PROD_ID_1 &&
-		    (mr.mb[2] == PROD_ID_2 || mr.mb[2] == PROD_ID_2a) &&
-		    (mr.mb[3] == PROD_ID_3 || mr.mb[3] == id)) {
-
-			ha->adapter_stats->revlvl.isp2200 = RD16_IO_REG(ha,
-			    mailbox[4]);
-			ha->adapter_stats->revlvl.risc = RD16_IO_REG(ha,
-			    mailbox[5]);
-			ha->adapter_stats->revlvl.frmbfr = RD16_IO_REG(ha,
-			    mailbox[6]);
-			ha->adapter_stats->revlvl.riscrom = RD16_IO_REG(ha,
-			    mailbox[7]);
-			bcopy(QL_VERSION, ha->adapter_stats->revlvl.qlddv,
-			    strlen(QL_VERSION));
-
+		if (rval == QL_SUCCESS) {
 			/* Wrap Incoming Mailboxes Test. */
 			mr.mb[1] = 0xAAAA;
 			mr.mb[2] = 0x5555;
@@ -2242,10 +2282,6 @@ ql_chip_diag(ql_adapter_state_t *ha)
 				cmn_err(CE_WARN, "%s(%d) - reg test failed="
 				    "%xh!", QL_NAME, ha->instance, rval);
 			}
-		} else {
-			cmn_err(CE_WARN, "%s(%d) - prod id failed!, mb1=%xh, "
-			    "mb2=%xh, mb3=%xh", QL_NAME, ha->instance,
-			    mr.mb[1], mr.mb[2], mr.mb[3]);
 		}
 	} while ((retries-- != 0) && (rval != QL_SUCCESS));
 
@@ -2282,64 +2318,68 @@ ql_load_isp_firmware(ql_adapter_state_t *vha)
 	size_t			byte_count;
 	ql_adapter_state_t	*ha = vha->pha;
 
-	if (CFG_IST(ha, CFG_CTRL_81XX)) {
-		ql_mps_reset(ha);
-	}
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		rval = ql_8021_load_risc(ha);
+	} else {
+		if (CFG_IST(ha, CFG_CTRL_81XX)) {
+			ql_mps_reset(ha);
+		}
 
-	if (CFG_IST(ha, CFG_LOAD_FLASH_FW)) {
-		return (ql_load_flash_fw(ha));
-	}
+		if (CFG_IST(ha, CFG_LOAD_FLASH_FW)) {
+			return (ql_load_flash_fw(ha));
+		}
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+		QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	/* Load firmware segments */
-	for (cnt = 0; cnt < MAX_RISC_CODE_SEGMENTS &&
-	    ha->risc_fw[cnt].code != NULL; cnt++) {
+		/* Load firmware segments */
+		for (cnt = 0; cnt < MAX_RISC_CODE_SEGMENTS &&
+		    ha->risc_fw[cnt].code != NULL; cnt++) {
 
-		risc_code_address = ha->risc_fw[cnt].code;
-		risc_address = ha->risc_fw[cnt].addr;
-		risc_code_size = ha->risc_fw[cnt].length;
+			risc_code_address = ha->risc_fw[cnt].code;
+			risc_address = ha->risc_fw[cnt].addr;
+			risc_code_size = ha->risc_fw[cnt].length;
 
-		while (risc_code_size) {
-			if (CFG_IST(ha, CFG_CTRL_242581)) {
-				word_count = ha->fw_transfer_size >> 2;
-				if (word_count > risc_code_size) {
-					word_count = risc_code_size;
+			while (risc_code_size) {
+				if (CFG_IST(ha, CFG_CTRL_242581)) {
+					word_count = ha->fw_transfer_size >> 2;
+					if (word_count > risc_code_size) {
+						word_count = risc_code_size;
+					}
+					byte_count = word_count << 2;
+
+					ddi_rep_put32(ha->hba_buf.acc_handle,
+					    (uint32_t *)risc_code_address,
+					    (uint32_t *)ha->request_ring_bp,
+					    word_count, DDI_DEV_AUTOINCR);
+				} else {
+					word_count = ha->fw_transfer_size >> 1;
+					if (word_count > risc_code_size) {
+						word_count = risc_code_size;
+					}
+					byte_count = word_count << 1;
+
+					ddi_rep_put16(ha->hba_buf.acc_handle,
+					    (uint16_t *)risc_code_address,
+					    (uint16_t *)ha->request_ring_bp,
+					    word_count, DDI_DEV_AUTOINCR);
 				}
-				byte_count = word_count << 2;
 
-				ddi_rep_put32(ha->hba_buf.acc_handle,
-				    (uint32_t *)risc_code_address,
-				    (uint32_t *)ha->request_ring_bp,
-				    word_count, DDI_DEV_AUTOINCR);
-			} else {
-				word_count = ha->fw_transfer_size >> 1;
-				if (word_count > risc_code_size) {
-					word_count = risc_code_size;
+				(void) ddi_dma_sync(ha->hba_buf.dma_handle,
+				    REQUEST_Q_BUFFER_OFFSET, byte_count,
+				    DDI_DMA_SYNC_FORDEV);
+
+				rval = ql_wrt_risc_ram(ha, risc_address,
+				    ha->request_dvma, word_count);
+				if (rval != QL_SUCCESS) {
+					EL(ha, "failed, load=%xh\n", rval);
+					cnt = MAX_RISC_CODE_SEGMENTS;
+					break;
 				}
-				byte_count = word_count << 1;
 
-				ddi_rep_put16(ha->hba_buf.acc_handle,
-				    (uint16_t *)risc_code_address,
-				    (uint16_t *)ha->request_ring_bp,
-				    word_count, DDI_DEV_AUTOINCR);
+				risc_address += word_count;
+				risc_code_size -= word_count;
+				risc_code_address += byte_count;
 			}
-
-			(void) ddi_dma_sync(ha->hba_buf.dma_handle,
-			    REQUEST_Q_BUFFER_OFFSET, byte_count,
-			    DDI_DMA_SYNC_FORDEV);
-
-			rval = ql_wrt_risc_ram(ha, risc_address,
-			    ha->request_dvma, word_count);
-			if (rval != QL_SUCCESS) {
-				EL(ha, "failed, load=%xh\n", rval);
-				cnt = MAX_RISC_CODE_SEGMENTS;
-				break;
-			}
-
-			risc_address += word_count;
-			risc_code_size -= word_count;
-			risc_code_address += byte_count;
 		}
 	}
 
@@ -2471,14 +2511,19 @@ ql_start_firmware(ql_adapter_state_t *vha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	/* Verify checksum of loaded RISC code. */
-	rval = ql_verify_checksum(ha);
-	if (rval == QL_SUCCESS) {
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		/* Save firmware version. */
+		rval = ql_get_fw_version(ha, &mr, MAILBOX_TOV);
+		ha->fw_major_version = mr.mb[1];
+		ha->fw_minor_version = mr.mb[2];
+		ha->fw_subminor_version = mr.mb[3];
+	} else if ((rval = ql_verify_checksum(ha)) == QL_SUCCESS) {
+		/* Verify checksum of loaded RISC code. */
 		/* Start firmware execution. */
 		(void) ql_execute_fw(ha);
 
 		/* Save firmware version. */
-		(void) ql_get_fw_version(ha, &mr);
+		(void) ql_get_fw_version(ha, &mr, MAILBOX_TOV);
 		ha->fw_major_version = mr.mb[1];
 		ha->fw_minor_version = mr.mb[2];
 		ha->fw_subminor_version = mr.mb[3];
@@ -2633,9 +2678,17 @@ ql_init_rings(ql_adapter_state_t *vha2)
 		}
 	}
 
-	rval = ql_init_firmware(ha);
+	for (index = 0; index < 2; index++) {
+		rval = ql_init_firmware(ha);
+		if (rval == QL_COMMAND_ERROR) {
+			EL(ha, "stopping firmware\n");
+			(void) ql_stop_firmware(ha);
+		} else {
+			break;
+		}
+	}
 
-	if (rval == QL_SUCCESS && (CFG_IST(ha, CFG_CTRL_242581)) == 0) {
+	if (rval == QL_SUCCESS && (CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
 		/* Tell firmware to enable MBA_PORT_BYPASS_CHANGED event */
 		rval = ql_get_firmware_option(ha, &mr);
 		if (rval == QL_SUCCESS) {
@@ -2686,7 +2739,7 @@ ql_init_rings(ql_adapter_state_t *vha2)
 
 			if (!(ha->flags & INTERRUPTS_ENABLED) ||
 			    ddi_in_panic()) {
-				if (RD16_IO_REG(ha, istatus) & RISC_INT) {
+				if (INTERRUPT_PENDING(ha)) {
 					(void) ql_isr((caddr_t)ha);
 					INTR_LOCK(ha);
 					ha->intr_claimed = B_TRUE;
@@ -2965,7 +3018,7 @@ ql_configure_n_port_info(ql_adapter_state_t *ha)
 		port_id_t		d_id = {0, 0, 0, 0};
 		uint16_t		loop_id = 0;
 
-		cb_port_name = (uint8_t *)(CFG_IST(ha, CFG_CTRL_242581) ?
+		cb_port_name = (uint8_t *)(CFG_IST(ha, CFG_CTRL_24258081) ?
 		    &ha->init_ctrl_blk.cb24.port_name[0] :
 		    &ha->init_ctrl_blk.cb.port_name[0]);
 
@@ -3091,12 +3144,12 @@ ql_configure_hba(ql_adapter_state_t *ha)
 			ha->topology = (uint8_t)(ha->topology | QL_F_PORT);
 
 			/* Get supported option. */
-			if (CFG_IST(ha, CFG_CTRL_242581) &&
+			if (CFG_IST(ha, CFG_CTRL_24258081) &&
 			    mr.mb[7] & GID_FP_NPIV_SUPPORT) {
 				ha->flags |= FDISC_ENABLED;
 			}
 			/* Get VLAN ID, mac address */
-			if (CFG_IST(ha, CFG_CTRL_81XX)) {
+			if (CFG_IST(ha, CFG_CTRL_8081)) {
 				ha->fabric_params = mr.mb[7];
 				ha->fcoe_vlan_id = (uint16_t)(mr.mb[9] & 0xfff);
 				ha->fcoe_fcf_idx = mr.mb[10];
@@ -3118,7 +3171,7 @@ ql_configure_hba(ql_adapter_state_t *ha)
 		ADAPTER_STATE_UNLOCK(ha);
 
 		if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322 |
-		    CFG_CTRL_242581))) {
+		    CFG_CTRL_24258081))) {
 			mr.mb[1] = 0;
 			mr.mb[2] = 0;
 			rval = ql_data_rate(ha, &mr);
@@ -3259,7 +3312,7 @@ ql_configure_device_d_id(ql_adapter_state_t *ha)
 		}
 
 		/* 24xx does not report switch devices in ID list. */
-		if ((CFG_IST(ha, CFG_CTRL_242581)) &&
+		if ((CFG_IST(ha, CFG_CTRL_24258081)) &&
 		    ha->topology & (QL_F_PORT | QL_FL_PORT)) {
 			d_id.b24 = 0xfffffe;
 			tq = ql_dev_init(ha, d_id, FL_PORT_24XX_HDL);
@@ -3288,7 +3341,7 @@ ql_configure_device_d_id(ql_adapter_state_t *ha)
 		d_id.b24 = 0;
 		if (ha->dev[index].first != NULL) {
 			tq = ql_dev_init(ha, d_id, (uint16_t)
-			    (CFG_IST(ha, CFG_CTRL_242581) ?
+			    (CFG_IST(ha, CFG_CTRL_24258081) ?
 			    FL_PORT_24XX_HDL : FL_PORT_LOOP_ID));
 			if (tq != NULL) {
 				tq->flags |= TQF_FABRIC_DEVICE;
@@ -3301,7 +3354,7 @@ ql_configure_device_d_id(ql_adapter_state_t *ha)
 		/* Allocate queue for broadcast. */
 		d_id.b24 = 0xffffff;
 		(void) ql_dev_init(ha, d_id, (uint16_t)
-		    (CFG_IST(ha, CFG_CTRL_242581) ? BROADCAST_24XX_HDL :
+		    (CFG_IST(ha, CFG_CTRL_24258081) ? BROADCAST_24XX_HDL :
 		    IP_BROADCAST_LOOP_ID));
 
 		/* Check for any devices lost. */
@@ -3359,7 +3412,7 @@ void
 ql_dev_list(ql_adapter_state_t *ha, union ql_dev_id_list *list,
     uint32_t index, port_id_t *d_id, uint16_t *id)
 {
-	if (CFG_IST(ha, CFG_CTRL_242581)) {
+	if (CFG_IST(ha, CFG_CTRL_24258081)) {
 		struct ql_24_dev_id	*list24 = (struct ql_24_dev_id *)list;
 
 		d_id->b.al_pa = list24[index].al_pa;
@@ -3469,7 +3522,13 @@ ql_reset_chip(ql_adapter_state_t *vha)
 
 	/* Reset all outbound mailbox registers */
 	for (cnt = 0; cnt < ha->reg_off->mbox_cnt; cnt++) {
-		WRT16_IO_REG(ha, mailbox[cnt], (uint16_t)0);
+		WRT16_IO_REG(ha, mailbox_in[cnt], (uint16_t)0);
+	}
+
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		ql_8021_reset_chip(ha);
+		QL_PRINT_3(CE_CONT, "(%d): 8021 exit\n", ha->instance);
+		return;
 	}
 
 	/* Disable ISP interrupts. */
@@ -3579,7 +3638,7 @@ ql_reset_chip(ql_adapter_state_t *vha)
 
 	/* Wait for RISC to recover from reset. */
 	for (cnt = 0; cnt < 30000; cnt++) {
-		if (RD16_IO_REG(ha, mailbox[0]) != MBS_BUSY) {
+		if (RD16_IO_REG(ha, mailbox_out[0]) != MBS_BUSY) {
 			break;
 		}
 		drv_usecwait(MILLISEC);
@@ -3609,7 +3668,7 @@ ql_reset_chip(ql_adapter_state_t *vha)
 		WRT16_IO_REG(ha, ctrl_status, 0x30);
 
 		/* Set probe register */
-		WRT16_IO_REG(ha, mailbox[23], 0x204c);
+		WRT16_IO_REG(ha, mailbox_in[23], 0x204c);
 
 		/* Select RISC module registers. */
 		WRT16_IO_REG(ha, ctrl_status, 0);
@@ -3650,10 +3709,10 @@ ql_reset_24xx_chip(ql_adapter_state_t *ha)
 
 	/* Stop the firmware. */
 	WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
-	WRT16_IO_REG(ha, mailbox[0], MBC_STOP_FIRMWARE);
+	WRT16_IO_REG(ha, mailbox_in[0], MBC_STOP_FIRMWARE);
 	WRT32_IO_REG(ha, hccr, HC24_SET_HOST_INT);
 	for (timer = 0; timer < 30000; timer++) {
-		stat = RD32_IO_REG(ha, intr_info_lo);
+		stat = RD32_IO_REG(ha, risc2host);
 		if (stat & BIT_15) {
 			if ((stat & 0xff) < 0x12) {
 				WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
@@ -3671,7 +3730,7 @@ ql_reset_24xx_chip(ql_adapter_state_t *ha)
 
 	/* Wait for idle status from ROM firmware. */
 	for (timer = 0; timer < 30000; timer++) {
-		if (RD16_IO_REG(ha, mailbox[0]) == 0) {
+		if (RD16_IO_REG(ha, mailbox_out[0]) == 0) {
 			break;
 		}
 		drv_usecwait(100);
@@ -3694,10 +3753,10 @@ ql_reset_24xx_chip(ql_adapter_state_t *ha)
 
 	if (ha->flags & MPI_RESET_NEEDED) {
 		WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
-		WRT16_IO_REG(ha, mailbox[0], MBC_RESTART_MPI);
+		WRT16_IO_REG(ha, mailbox_in[0], MBC_RESTART_MPI);
 		WRT32_IO_REG(ha, hccr, HC24_SET_HOST_INT);
 		for (timer = 0; timer < 30000; timer++) {
-			stat = RD32_IO_REG(ha, intr_info_lo);
+			stat = RD32_IO_REG(ha, risc2host);
 			if (stat & BIT_15) {
 				if ((stat & 0xff) < 0x12) {
 					WRT32_IO_REG(ha, hccr,
@@ -3928,9 +3987,10 @@ ql_abort_isp(ql_adapter_state_t *vha)
 		}
 	}
 
-	rval = ql_chip_diag(ha);
-	if (rval == QL_SUCCESS) {
-		(void) ql_load_isp_firmware(ha);
+	if ((rval = ql_check_isp_firmware(ha)) != QL_SUCCESS) {
+		if ((rval = ql_chip_diag(ha)) == QL_SUCCESS) {
+			rval = ql_load_isp_firmware(ha);
+		}
 	}
 
 	if (rval == QL_SUCCESS && (rval = ql_set_cache_line(ha)) ==
@@ -3944,9 +4004,13 @@ ql_abort_isp(ql_adapter_state_t *vha)
 		TASK_DAEMON_UNLOCK(ha);
 
 		/* Enable ISP interrupts. */
-		CFG_IST(ha, CFG_CTRL_242581) ?
-		    WRT32_IO_REG(ha, ictrl, ISP_EN_RISC) :
-		    WRT16_IO_REG(ha, ictrl, ISP_EN_INT + ISP_EN_RISC);
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			ql_8021_enable_intrs(ha);
+		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
+			WRT32_IO_REG(ha, ictrl, ISP_EN_RISC);
+		} else {
+			WRT16_IO_REG(ha, ictrl, ISP_EN_INT + ISP_EN_RISC);
+		}
 
 		ADAPTER_STATE_LOCK(ha);
 		ha->flags |= INTERRUPTS_ENABLED;
@@ -3963,9 +4027,13 @@ ql_abort_isp(ql_adapter_state_t *vha)
 		}
 	} else {
 		/* Enable ISP interrupts. */
-		CFG_IST(ha, CFG_CTRL_242581) ?
-		    WRT32_IO_REG(ha, ictrl, ISP_EN_RISC) :
-		    WRT16_IO_REG(ha, ictrl, ISP_EN_INT + ISP_EN_RISC);
+		if (CFG_IST(ha, CFG_CTRL_8021)) {
+			ql_8021_enable_intrs(ha);
+		} else if (CFG_IST(ha, CFG_CTRL_242581)) {
+			WRT32_IO_REG(ha, ictrl, ISP_EN_RISC);
+		} else {
+			WRT16_IO_REG(ha, ictrl, ISP_EN_INT + ISP_EN_RISC);
+		}
 
 		ADAPTER_STATE_LOCK(ha);
 		ha->flags |= INTERRUPTS_ENABLED;
