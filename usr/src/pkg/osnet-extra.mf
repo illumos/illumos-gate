@@ -30,4 +30,3 @@ set name=org.opensolaris.redist value=nonredist
 set name=pkg.description value="This group package installs all packages from the OS/Net consolidation."
 set name=pkg.summary value="OS/Net consolidation group package"
 <include packages.extra.current>
-<include packages.extra.renamed>

@@ -307,7 +307,7 @@ PUB_PKGS= $(SYNTH_PKGS:%=$(PDIR)/%.pub) $(PKGS:%=$(PDIR)/%.pub)
 # 	----------	----------------------------------------------------
 # 	noincorp	Do not include in incorporation or group package
 #	obsolete	Include in incorporation, but not group package
-#	renamed		Include in incorporation and group package
+#	renamed		Include in incorporation, but not group package
 #	current		Include in incorporation and group package
 #
 # Since the semantics of the "noincorp" package status dictate that
@@ -603,10 +603,6 @@ $(PDIR)/%.pub: $(PDIR)/%.res
 # dependency checking for the real manifest processing, or failing to
 # express the (indirect) dependency of synthetic manifests on real
 # manifests, we simply split this rule out from the one above.
-#
-# Technically speaking, the dependency of the synthetic packages on
-# the package lists could be more granular, because the incorporation
-# doesn't need the obsolete lists.
 #
 # The implementation notes from the previous rule are applicable
 # here, too.

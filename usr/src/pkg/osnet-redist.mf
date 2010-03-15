@@ -29,4 +29,3 @@ set name=variant.arch value=$(ARCH)
 set name=pkg.description value="This group package installs all packages from the OS/Net consolidation."
 set name=pkg.summary value="OS/Net consolidation group package"
 <include packages.redist.current>
-<include packages.redist.renamed>
