@@ -704,6 +704,11 @@ extern const char pmcs_nowrk[];
 extern const char pmcs_nomsg[];
 extern const char pmcs_timeo[];
 
+/*
+ * Other externs
+ */
+extern int modrootloaded;
+
 #ifdef	__cplusplus
 }
 #endif

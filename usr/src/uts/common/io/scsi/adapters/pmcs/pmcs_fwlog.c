@@ -1299,6 +1299,14 @@ pmcs_gather_fwlog(pmcs_hw_t *pwp)
 	}
 
 	/*
+	 * We also can't write the event log out if it's too early in boot
+	 * (i.e. the root fs isn't mounted yet).
+	 */
+	if (!modrootloaded) {
+		return;
+	}
+
+	/*
 	 * Write out the necessary log file(s), update the "oldest" pointers
 	 * and the suffix to the written filenames.
 	 */
