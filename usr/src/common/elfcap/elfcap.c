@@ -235,18 +235,12 @@ static const elfcap_desc_t hw1_386[ELFCAP_NUM_HW1_386] = {
 		AV_386_SSE2, STRDESC("AV_386_SSE2"),
 		STRDESC("SSE2"), STRDESC("sse2"),
 	},
-	{						/* 0x00002000 */
-		AV_386_PAUSE, STRDESC("AV_386_PAUSE"),
-		STRDESC("PAUSE"), STRDESC("pause"),
-	},
+	/* 0x02000 withdrawn - do not assign */
 	{						/* 0x00004000 */
 		AV_386_SSE3, STRDESC("AV_386_SSE3"),
 		STRDESC("SSE3"), STRDESC("sse3"),
 	},
-	{						/* 0x00008000 */
-		AV_386_MON, STRDESC("AV_386_MON"),
-		STRDESC("MON"), STRDESC("mon"),
-	},
+	/* 0x08000 withdrawn - do not assign */
 	{						/* 0x00010000 */
 		AV_386_CX16, STRDESC("AV_386_CX16"),
 		STRDESC("CX16"), STRDESC("cx16"),

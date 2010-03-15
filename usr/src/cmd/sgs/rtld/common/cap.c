@@ -262,6 +262,12 @@ cap_check(Cap *cptr, char *strs, int alt, Fdesc *fdp, Rej_desc *rej)
 
 		switch (cptr->c_tag) {
 		case CA_SUNW_HW_1:
+			/*
+			 * Remove any historic values that should not be
+			 * involved with any validation.
+			 */
+			val &= ~AV_HW1_IGNORE;
+
 			if (hwcap1_check(scapset, val, rej) == 0)
 				return (0);
 			if (fdp)
@@ -1081,6 +1087,12 @@ sym_cap_check(Cap *cptr, uint_t cndx, Syscapset *bestcapset, Rt_map *lmp,
 
 		switch (cptr->c_tag) {
 		case CA_SUNW_HW_1:
+			/*
+			 * Remove any historic values that should not be
+			 * involved with any validation.
+			 */
+			val &= ~AV_HW1_IGNORE;
+
 			bestcapset->sc_hw_1 = val;
 			DBG_CALL(Dbg_syms_cap_lookup(lmp, DBG_CAP_HW_1,
 			    name, ndx, M_MACH, bestcapset));

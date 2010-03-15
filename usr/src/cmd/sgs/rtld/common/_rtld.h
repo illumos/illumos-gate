@@ -497,6 +497,23 @@ typedef struct {
 } rtld_stat_t;
 #endif
 
+/*
+ * Some capabilities aux vector definitions have been removed over time.
+ * However, existing objects may define these capabilities.  Establish
+ * capability masks that provide for deleting any removed capabilities, so
+ * that these capabilities are not used to validate the associated object.
+ *
+ * These masks are tightly coupled to the aux vector definitions in auxv_386.h
+ * and auxv_SPARC.h, however they are maintained here, as only ld.so.1 needs
+ * to remove these capabilities.  These definitions also describe where the
+ * flags are associated and allow for providing multi-architecture definitions
+ * should they become necessary, without having to pollute global header files.
+ */
+#if	defined(__x86)
+#define	AV_HW1_IGNORE	(0x8000 | 0x2000)	/* withdrawn MON and PAUSE */
+#else						/*    auxv_386.h flags */
+#define	AV_HW1_IGNORE	0
+#endif
 
 /*
  * Data declarations.

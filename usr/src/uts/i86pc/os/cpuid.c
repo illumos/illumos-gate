@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -2280,14 +2280,9 @@ cpuid_pass4(cpu_t *cpu)
 			hwcap_flags |= AV_386_CX8;
 		if (*edx & CPUID_INTC_EDX_CMOV)
 			hwcap_flags |= AV_386_CMOV;
-		if (*ecx & CPUID_INTC_ECX_MON)
-			hwcap_flags |= AV_386_MON;
 		if (*ecx & CPUID_INTC_ECX_CX16)
 			hwcap_flags |= AV_386_CX16;
 	}
-
-	if (x86_feature & X86_HTT)
-		hwcap_flags |= AV_386_PAUSE;
 
 	if (cpi->cpi_xmaxeax < 0x80000001)
 		goto pass4_done;

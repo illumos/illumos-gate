@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,9 +53,9 @@ extern "C" {
 #define	AV_386_FXSR		0x00400	/* fxsave and fxrstor */
 #define	AV_386_SSE		0x00800	/* SSE insns and regs */
 #define	AV_386_SSE2		0x01000	/* SSE2 insns and regs */
-#define	AV_386_PAUSE		0x02000	/* use pause insn (in spin loops) */
+					/* 0x02000 withdrawn - do not assign */
 #define	AV_386_SSE3		0x04000	/* SSE3 insns and regs */
-#define	AV_386_MON		0x08000	/* monitor/mwait insns */
+					/* 0x08000 withdrawn - do not assign */
 #define	AV_386_CX16		0x10000	/* cmpxchg16b insn */
 #define	AV_386_AHF		0x20000	/* lahf/sahf insns */
 #define	AV_386_TSCP		0x40000	/* rdtscp instruction */
@@ -75,7 +75,7 @@ extern "C" {
 	"\32movbe\31sse4.2"						\
 	"\30sse4.1\27ssse3\26amd_lzcnt\25popcnt"			\
 	"\24amd_sse4a\23tscp\22ahf\21cx16"				\
-	"\20mon\17sse3\16pause\15sse2\14sse\13fxsr\12amd3dx\11amd3d"	\
+	"\17sse3\15sse2\14sse\13fxsr\12amd3dx\11amd3d"	\
 	"\10amdmmx\7mmx\6cmov\5amdsysc\4sep\3cx8\2tsc\1fpu"
 
 #ifdef __cplusplus
