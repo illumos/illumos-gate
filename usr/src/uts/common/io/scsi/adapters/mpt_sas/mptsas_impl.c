@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 2000 to 2009, LSI Corporation.
+ * Copyright (c) 2000 to 2010, LSI Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms of all code within
@@ -357,10 +357,20 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 	}
 
 	/*
-	 * Wait for the command to complete or timeout.
+	 * If this is a request for a RAID info page, or any page called during
+	 * the RAID info page request, poll because these config page requests
+	 * are nested.  Poll to avoid data corruption due to one page's data
+	 * overwriting the outer page request's data.  This can happen when
+	 * the mutex is released in cv_wait.
 	 */
-	while ((cmd->cmd_flags & CFLAG_FINISHED) == 0) {
-		cv_wait(&mpt->m_config_cv, &mpt->m_mutex);
+	if ((page_type == MPI2_CONFIG_EXTPAGETYPE_RAID_CONFIG) ||
+	    (page_type == MPI2_CONFIG_PAGETYPE_RAID_VOLUME) ||
+	    (page_type == MPI2_CONFIG_PAGETYPE_RAID_PHYSDISK)) {
+		(void) mptsas_poll(mpt, cmd, pkt->pkt_time * 1000);
+	} else {
+		while ((cmd->cmd_flags & CFLAG_FINISHED) == 0) {
+			cv_wait(&mpt->m_config_cv, &mpt->m_mutex);
+		}
 	}
 
 	/*
@@ -507,10 +517,20 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 	mptsas_start_config_page_access(mpt, cmd);
 
 	/*
-	 * Wait for the command to complete or timeout.
+	 * If this is a request for a RAID info page, or any page called during
+	 * the RAID info page request, poll because these config page requests
+	 * are nested.  Poll to avoid data corruption due to one page's data
+	 * overwriting the outer page request's data.  This can happen when
+	 * the mutex is released in cv_wait.
 	 */
-	while ((cmd->cmd_flags & CFLAG_FINISHED) == 0) {
-		cv_wait(&mpt->m_config_cv, &mpt->m_mutex);
+	if ((page_type == MPI2_CONFIG_EXTPAGETYPE_RAID_CONFIG) ||
+	    (page_type == MPI2_CONFIG_PAGETYPE_RAID_VOLUME) ||
+	    (page_type == MPI2_CONFIG_PAGETYPE_RAID_PHYSDISK)) {
+		(void) mptsas_poll(mpt, cmd, pkt->pkt_time * 1000);
+	} else {
+		while ((cmd->cmd_flags & CFLAG_FINISHED) == 0) {
+			cv_wait(&mpt->m_config_cv, &mpt->m_mutex);
+		}
 	}
 
 	/*
@@ -1068,7 +1088,7 @@ mptsas_return_to_pool(mptsas_t *mpt, mptsas_cmd_t *cmd)
  */
 int
 mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
-	int lun)
+	int lun, uint8_t *reply, uint32_t reply_size, int mode)
 {
 	/*
 	 * In order to avoid allocating variables on the stack,
@@ -1082,7 +1102,8 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 	mptsas_cmd_t				*cmd;
 	struct scsi_pkt				*pkt;
 	mptsas_slots_t				*slots = mpt->m_active;
-	uint32_t				request_desc_low;
+	uint32_t				request_desc_low, i;
+	pMPI2DefaultReply_t			reply_msg;
 
 	/*
 	 * Can't start another task management routine.
@@ -1144,6 +1165,32 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 
 	if (pkt->pkt_reason == CMD_INCOMPLETE)
 		rval = FALSE;
+
+	/*
+	 * If a reply frame was used and there is a reply buffer to copy the
+	 * reply data into, copy it.  If this fails, log a message, but don't
+	 * fail the TM request.
+	 */
+	if (cmd->cmd_rfm && reply) {
+		(void) ddi_dma_sync(mpt->m_dma_reply_frame_hdl, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
+		reply_msg = (pMPI2DefaultReply_t)
+		    (mpt->m_reply_frame + (cmd->cmd_rfm -
+		    mpt->m_reply_frame_dma_addr));
+		if (reply_size > sizeof (MPI2_SCSI_TASK_MANAGE_REPLY)) {
+			reply_size = sizeof (MPI2_SCSI_TASK_MANAGE_REPLY);
+		}
+		mutex_exit(&mpt->m_mutex);
+		for (i = 0; i < reply_size; i++) {
+			if (ddi_copyout((uint8_t *)reply_msg + i, reply + i, 1,
+			    mode)) {
+				mptsas_log(mpt, CE_WARN, "failed to copy out "
+				    "reply data for TM request");
+				break;
+			}
+		}
+		mutex_enter(&mpt->m_mutex);
+	}
 
 	/*
 	 * clear the TM slot before returning

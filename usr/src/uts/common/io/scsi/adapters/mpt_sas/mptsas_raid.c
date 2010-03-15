@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 2000 to 2009, LSI Corporation.
+ * Copyright (c) 2000 to 2010, LSI Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms of all code within
@@ -173,7 +173,7 @@ mptsas_raidconf_page_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	element = (pMpi2RaidConfig0ConfigElement_t)
 	    &raidconfig_page0->ConfigElement;
 
-	for (i = 0; i < numelements; i++, element++) {
+	for (i = 0; ((i < numelements) && native); i++, element++) {
 		/*
 		 * Get the element type.  Could be Volume,
 		 * PhysDisk, Hot Spare, or Online Capacity
@@ -560,31 +560,34 @@ mptsas_get_physdisk_settings(mptsas_t *mpt, mptsas_raidvol_t *raidvol,
 }
 
 /*
- * The only RAID Action needed throughout the driver is for System Shutdown.
- * Since this is the only RAID Action and because this Action does not require
- * waiting for a reply, make this a non-generic function.  If it turns out that
- * other RAID Actions are required later, a generic function should be used.
+ * RAID Action for System Shutdown. This request uses the dedicated TM slot to
+ * avoid a call to mptsas_save_cmd.  Since Solaris requires that the mutex is
+ * not held during the mptsas_quiesce function, this RAID action must not use
+ * the normal code path of requests and replies.
  */
 void
 mptsas_raid_action_system_shutdown(mptsas_t *mpt)
 {
 	pMpi2RaidActionRequest_t	action;
-	uint8_t				ir_active = FALSE;
+	uint8_t				ir_active = FALSE, reply_type;
+	uint8_t				function, found_reply = FALSE;
+	uint16_t			SMID, action_type;
 	mptsas_slots_t			*slots = mpt->m_active;
-	int				config, vol, action_flags = 0;
+	int				config, vol;
 	mptsas_cmd_t			*cmd;
-	struct scsi_pkt			*pkt;
-	uint32_t			request_desc_low;
-
-	ASSERT(mutex_owned(&mpt->m_mutex));
+	uint32_t			request_desc_low, reply_addr;
+	int				cnt;
+	pMpi2ReplyDescriptorsUnion_t	reply_desc_union;
+	pMPI2DefaultReply_t		reply;
+	pMpi2AddressReplyDescriptor_t	address_reply;
 
 	/*
 	 * Before doing the system shutdown RAID Action, make sure that the IOC
 	 * supports IR and make sure there is a valid volume for the request.
 	 */
 	if (mpt->m_ir_capable) {
-		for (config = 0; config < slots->m_num_raid_configs;
-		    config++) {
+		for (config = 0; (config < slots->m_num_raid_configs) &&
+		    (!ir_active); config++) {
 			for (vol = 0; vol < MPTSAS_MAX_RAIDVOLS; vol++) {
 				if (slots->m_raidconfig[config].m_raidvol[vol].
 				    m_israid) {
@@ -599,81 +602,166 @@ mptsas_raid_action_system_shutdown(mptsas_t *mpt)
 	}
 
 	/*
-	 * Get a command from the pool.
+	 * If TM slot is already being used (highly unlikely), show message and
+	 * don't issue the RAID action.
 	 */
-	if (mptsas_request_from_pool(mpt, &cmd, &pkt) == -1) {
-		mptsas_log(mpt, CE_NOTE, "command pool is full for RAID "
-		    "action request");
+	if (slots->m_slot[MPTSAS_TM_SLOT(mpt)] != NULL) {
+		mptsas_log(mpt, CE_WARN, "RAID Action slot in use.  Cancelling"
+		    " System Shutdown RAID Action.\n");
 		return;
 	}
-	action_flags |= MPTSAS_REQUEST_POOL_CMD;
 
+	/*
+	 * Create the cmd and put it in the dedicated TM slot.
+	 */
+	cmd = &(mpt->m_event_task_mgmt.m_event_cmd);
 	bzero((caddr_t)cmd, sizeof (*cmd));
-	bzero((caddr_t)pkt, scsi_pkt_size());
-
-	pkt->pkt_cdbp		= (opaque_t)&cmd->cmd_cdb[0];
-	pkt->pkt_scbp		= (opaque_t)&cmd->cmd_scb;
-	pkt->pkt_ha_private	= (opaque_t)cmd;
-	pkt->pkt_flags		= (FLAG_NOINTR | FLAG_HEAD);
-	pkt->pkt_time		= 5;
-	cmd->cmd_pkt		= pkt;
-	cmd->cmd_flags		= CFLAG_CMDIOC;
+	cmd->cmd_pkt = NULL;
+	cmd->cmd_slot = MPTSAS_TM_SLOT(mpt);
+	slots->m_slot[MPTSAS_TM_SLOT(mpt)] = cmd;
 
 	/*
-	 * Send RAID Action.  We don't care what the reply is so just exit
-	 * after sending the request.  This is just sent to the controller to
-	 * keep the volume from having to resync the next time it starts.  If
-	 * the request doesn't work for whatever reason, we're not going to
-	 * bother wondering why.
+	 * Form message for raid action.
 	 */
-	if (mptsas_save_cmd(mpt, cmd) == TRUE) {
-		cmd->cmd_flags |= CFLAG_PREPARED;
+	action = (pMpi2RaidActionRequest_t)(mpt->m_req_frame +
+	    (mpt->m_req_frame_size * cmd->cmd_slot));
+	bzero(action, mpt->m_req_frame_size);
+	action->Function = MPI2_FUNCTION_RAID_ACTION;
+	action->Action = MPI2_RAID_ACTION_SYSTEM_SHUTDOWN_INITIATED;
+
+	/*
+	 * Send RAID Action.
+	 */
+	(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
+	    DDI_DMA_SYNC_FORDEV);
+	request_desc_low = (cmd->cmd_slot << 16) +
+	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
+	MPTSAS_START_CMD(mpt, request_desc_low, 0);
+
+	/*
+	 * Even though reply does not matter because the system is shutting
+	 * down, wait no more than 5 seconds here to get the reply just because
+	 * we don't want to leave it hanging if it's coming.  Poll because
+	 * interrupts are disabled when this function is called.
+	 */
+	for (cnt = 0; cnt < 5000; cnt++) {
 		/*
-		 * Form message for raid action
+		 * Check for a reply.
 		 */
-		action = (pMpi2RaidActionRequest_t)(mpt->m_req_frame +
-		    (mpt->m_req_frame_size * cmd->cmd_slot));
-		bzero(action, mpt->m_req_frame_size);
-		action->Function = MPI2_FUNCTION_RAID_ACTION;
-		action->Action = MPI2_RAID_ACTION_SYSTEM_SHUTDOWN_INITIATED;
+		(void) ddi_dma_sync(mpt->m_dma_post_queue_hdl, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
+
+		reply_desc_union = (pMpi2ReplyDescriptorsUnion_t)
+		    MPTSAS_GET_NEXT_REPLY(mpt, mpt->m_post_index);
+
+		if (ddi_get32(mpt->m_acc_post_queue_hdl,
+		    &reply_desc_union->Words.Low) == 0xFFFFFFFF ||
+		    ddi_get32(mpt->m_acc_post_queue_hdl,
+		    &reply_desc_union->Words.High) == 0xFFFFFFFF) {
+			drv_usecwait(1000);
+			continue;
+		}
 
 		/*
-		 * Send request
+		 * There is a reply.  If it's not an address reply, ignore it.
 		 */
-		(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
+		reply_type = ddi_get8(mpt->m_acc_post_queue_hdl,
+		    &reply_desc_union->Default.ReplyFlags);
+		reply_type &= MPI2_RPY_DESCRIPT_FLAGS_TYPE_MASK;
+		if (reply_type != MPI2_RPY_DESCRIPT_FLAGS_ADDRESS_REPLY) {
+			goto clear_and_continue;
+		}
+
+		/*
+		 * SMID must be the TM slot since that's what we're using for
+		 * this RAID action.  If not, ignore this reply.
+		 */
+		address_reply =
+		    (pMpi2AddressReplyDescriptor_t)reply_desc_union;
+		SMID = ddi_get16(mpt->m_acc_post_queue_hdl,
+		    &address_reply->SMID);
+		if (SMID != MPTSAS_TM_SLOT(mpt)) {
+			goto clear_and_continue;
+		}
+
+		/*
+		 * If reply frame is not in the proper range ignore it.
+		 */
+		reply_addr = ddi_get32(mpt->m_acc_post_queue_hdl,
+		    &address_reply->ReplyFrameAddress);
+		if ((reply_addr < mpt->m_reply_frame_dma_addr) ||
+		    (reply_addr >= (mpt->m_reply_frame_dma_addr +
+		    (mpt->m_reply_frame_size * mpt->m_free_queue_depth))) ||
+		    ((reply_addr - mpt->m_reply_frame_dma_addr) %
+		    mpt->m_reply_frame_size != 0)) {
+			goto clear_and_continue;
+		}
+
+		/*
+		 * If not a RAID action reply ignore it.
+		 */
+		(void) ddi_dma_sync(mpt->m_dma_reply_frame_hdl, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
+		reply = (pMPI2DefaultReply_t)(mpt->m_reply_frame +
+		    (reply_addr - mpt->m_reply_frame_dma_addr));
+		function = ddi_get8(mpt->m_acc_reply_frame_hdl,
+		    &reply->Function);
+		if (function != MPI2_FUNCTION_RAID_ACTION) {
+			goto clear_and_continue;
+		}
+
+		/*
+		 * Finally, make sure this is the System Shutdown RAID action.
+		 * If not, ignore reply.
+		 */
+		action_type = ddi_get16(mpt->m_acc_reply_frame_hdl,
+		    &reply->FunctionDependent1);
+		if (action_type !=
+		    MPI2_RAID_ACTION_SYSTEM_SHUTDOWN_INITIATED) {
+			goto clear_and_continue;
+		}
+		found_reply = TRUE;
+
+clear_and_continue:
+		/*
+		 * Clear the reply descriptor for re-use and increment index.
+		 */
+		ddi_put64(mpt->m_acc_post_queue_hdl,
+		    &((uint64_t *)(void *)mpt->m_post_queue)[mpt->m_post_index],
+		    0xFFFFFFFFFFFFFFFF);
+		(void) ddi_dma_sync(mpt->m_dma_post_queue_hdl, 0, 0,
 		    DDI_DMA_SYNC_FORDEV);
-		request_desc_low = (cmd->cmd_slot << 16) +
-		    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
-		MPTSAS_START_CMD(mpt, request_desc_low, 0);
 
 		/*
-		 * Even though reply does not matter, wait no more than 5
-		 * seconds here to get the reply just because we don't want to
-		 * leave it hanging if it's coming.  Use the FW diag cv.
+		 * Update the global reply index and keep looking for the
+		 * reply if not found yet.
 		 */
-		(void) cv_reltimedwait(&mpt->m_fw_diag_cv, &mpt->m_mutex,
-		    drv_usectohz(5 * MICROSEC), TR_CLOCK_TICK);
+		if (++mpt->m_post_index == mpt->m_post_queue_depth) {
+			mpt->m_post_index = 0;
+		}
+		ddi_put32(mpt->m_datap, &mpt->m_reg->ReplyPostHostIndex,
+		    mpt->m_post_index);
+		if (!found_reply) {
+			continue;
+		}
+
+		break;
 	}
 
 	/*
-	 * Be sure to deallocate cmd before leaving.
+	 * clear the used slot as the last step.
 	 */
-	if (cmd && (cmd->cmd_flags & CFLAG_PREPARED)) {
-		mptsas_remove_cmd(mpt, cmd);
-		action_flags &= (~MPTSAS_REQUEST_POOL_CMD);
-	}
-	if (action_flags & MPTSAS_REQUEST_POOL_CMD)
-		mptsas_return_to_pool(mpt, cmd);
-
+	slots->m_slot[MPTSAS_TM_SLOT(mpt)] = NULL;
 }
 
 int
 mptsas_delete_volume(mptsas_t *mpt, uint16_t volid)
 {
-	int		config, i, vol = (-1);
+	int		config, i = 0, vol = (-1);
 	mptsas_slots_t	*slots = mpt->m_active;
 
-	for (config = 0; config < slots->m_num_raid_configs; config++) {
+	for (config = 0; (config < slots->m_num_raid_configs) && (vol != i);
+	    config++) {
 		for (i = 0; i < MPTSAS_MAX_RAIDVOLS; i++) {
 			if (slots->m_raidconfig[config].m_raidvol[i].
 			    m_raidhandle == volid) {

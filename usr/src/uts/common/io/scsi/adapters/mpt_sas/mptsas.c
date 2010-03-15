@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2000 to 2009, LSI Corporation.
+ * Copyright (c) 2000 to 2010, LSI Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms of all code within
@@ -115,7 +115,9 @@ static int mptsas_power(dev_info_t *dip, int component, int level);
  */
 static int mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 	cred_t *credp, int *rval);
-#ifndef	__sparc
+#ifdef __sparc
+static int mptsas_reset(dev_info_t *devi, ddi_reset_cmd_t cmd);
+#else  /* __sparc */
 static int mptsas_quiesce(dev_info_t *devi);
 #endif	/* __sparc */
 
@@ -507,7 +509,11 @@ static struct dev_ops mptsas_ops = {
 	nulldev,		/* probe */
 	mptsas_attach,		/* attach */
 	mptsas_detach,		/* detach */
+#ifdef  __sparc
+	mptsas_reset,
+#else
 	nodev,			/* reset */
+#endif  /* __sparc */
 	&mptsas_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
 	mptsas_power,		/* power management */
@@ -519,7 +525,7 @@ static struct dev_ops mptsas_ops = {
 };
 
 
-#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.21"
+#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.22"
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module. This one is a driver */
@@ -1537,11 +1543,6 @@ mptsas_suspend(dev_info_t *devi)
 
 	mutex_enter(&mpt->m_mutex);
 
-	/*
-	 * Send RAID action system shutdown to sync IR
-	 */
-	mptsas_raid_action_system_shutdown(mpt);
-
 	if (mpt->m_suspended++) {
 		mutex_exit(&mpt->m_mutex);
 		return (DDI_SUCCESS);
@@ -1625,6 +1626,10 @@ mptsas_suspend(dev_info_t *devi)
 
 	/* Disable HBA interrupts in hardware */
 	MPTSAS_DISABLE_INTR(mpt);
+	/*
+	 * Send RAID action system shutdown to sync IR
+	 */
+	mptsas_raid_action_system_shutdown(mpt);
 
 	mutex_exit(&mpt->m_mutex);
 
@@ -1635,6 +1640,36 @@ mptsas_suspend(dev_info_t *devi)
 	return (DDI_SUCCESS);
 }
 
+#ifdef	__sparc
+/*ARGSUSED*/
+static int
+mptsas_reset(dev_info_t *devi, ddi_reset_cmd_t cmd)
+{
+	mptsas_t	*mpt;
+	scsi_hba_tran_t *tran;
+
+	/*
+	 * If this call is for iport, just return.
+	 */
+	if (scsi_hba_iport_unit_address(devi))
+		return (DDI_SUCCESS);
+
+	if ((tran = ddi_get_driver_private(devi)) == NULL)
+		return (DDI_SUCCESS);
+
+	if ((mpt = TRAN2MPT(tran)) == NULL)
+		return (DDI_SUCCESS);
+
+	/*
+	 * Send RAID action system shutdown to sync IR.  Disable HBA
+	 * interrupts in hardware first.
+	 */
+	MPTSAS_DISABLE_INTR(mpt);
+	mptsas_raid_action_system_shutdown(mpt);
+
+	return (DDI_SUCCESS);
+}
+#else /* __sparc */
 /*
  * quiesce(9E) entry point.
  *
@@ -1645,12 +1680,17 @@ mptsas_suspend(dev_info_t *devi)
  * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
  * DDI_FAILURE indicates an error condition and should almost never happen.
  */
-#ifndef	__sparc
 static int
 mptsas_quiesce(dev_info_t *devi)
 {
 	mptsas_t	*mpt;
 	scsi_hba_tran_t *tran;
+
+	/*
+	 * If this call is for iport, just return.
+	 */
+	if (scsi_hba_iport_unit_address(devi))
+		return (DDI_SUCCESS);
 
 	if ((tran = ddi_get_driver_private(devi)) == NULL)
 		return (DDI_SUCCESS);
@@ -1660,6 +1700,8 @@ mptsas_quiesce(dev_info_t *devi)
 
 	/* Disable HBA interrupts in hardware */
 	MPTSAS_DISABLE_INTR(mpt);
+	/* Send RAID action system shutdonw to sync IR */
+	mptsas_raid_action_system_shutdown(mpt);
 
 	return (DDI_SUCCESS);
 }
@@ -1757,11 +1799,6 @@ mptsas_do_detach(dev_info_t *dip)
 	}
 
 	mutex_enter(&mpt->m_mutex);
-
-	/*
-	 * Send RAID action system shutdown to sync IR
-	 */
-	mptsas_raid_action_system_shutdown(mpt);
 	MPTSAS_DISABLE_INTR(mpt);
 	mutex_exit(&mpt->m_mutex);
 	mptsas_rem_intrs(mpt);
@@ -3161,6 +3198,24 @@ mptsas_accept_pkt(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		NDBG23(("reset throttle"));
 		ASSERT(ptgt->m_reset_delay == 0);
 		mptsas_set_throttle(mpt, ptgt, MAX_THROTTLE);
+	}
+
+	/*
+	 * If HBA is being reset, the DevHandles are being re-initialized,
+	 * which means that they could be invalid even if the target is still
+	 * attached.  Check if being reset and if DevHandle is being
+	 * re-initialized.  If this is the case, return BUSY so the I/O can be
+	 * retried later.
+	 */
+	if ((ptgt->m_devhdl == MPTSAS_INVALID_DEVHDL) && mpt->m_in_reset) {
+		mptsas_set_pkt_reason(mpt, cmd, CMD_RESET, STAT_BUS_RESET);
+		if (cmd->cmd_flags & CFLAG_TXQ) {
+			mptsas_doneq_add(mpt, cmd);
+			mptsas_doneq_empty(mpt);
+			return (rval);
+		} else {
+			return (TRAN_BUSY);
+		}
 	}
 
 	/*
@@ -4695,7 +4750,7 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 	pMPI2DefaultReply_t		reply;
 	mptsas_fw_diagnostic_buffer_t	*pBuffer;
 	uint32_t			reply_addr;
-	uint16_t			SMID, iocstatus, action;
+	uint16_t			SMID, iocstatus;
 	mptsas_slots_t			*slots = mpt->m_active;
 	mptsas_cmd_t			*cmd = NULL;
 	uint8_t				function, buffer_type;
@@ -4736,22 +4791,6 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 	 */
 	if ((function != MPI2_FUNCTION_EVENT_NOTIFICATION) &&
 	    (function != MPI2_FUNCTION_DIAG_BUFFER_POST)) {
-		/*
-		 * If this is a raid action reply for system shutdown just exit
-		 * because the reply doesn't matter.  Signal that we got the
-		 * reply even though it's not really necessary since we're
-		 * shutting down.
-		 */
-		if (function == MPI2_FUNCTION_RAID_ACTION) {
-			action = ddi_get16(mpt->m_acc_reply_frame_hdl,
-			    &reply->FunctionDependent1);
-			if (action ==
-			    MPI2_RAID_ACTION_SYSTEM_SHUTDOWN_INITIATED) {
-				cv_broadcast(&mpt->m_fw_diag_cv);
-				return;
-			}
-		}
-
 		/*
 		 * This could be a TM reply, which use the last allocated SMID,
 		 * so allow for that.
@@ -4797,6 +4836,7 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 		mptsas_check_scsi_io_error(mpt, (pMpi2SCSIIOReply_t)reply, cmd);
 		break;
 	case MPI2_FUNCTION_SCSI_TASK_MGMT:
+		cmd->cmd_rfm = reply_addr;
 		mptsas_check_task_mgt(mpt, (pMpi2SCSIManagementReply_t)reply,
 		    cmd);
 		break;
@@ -5940,9 +5980,12 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		}
 		ASSERT(ptgt->m_devhdl == devhdl);
 
-		if (topo_node->flags == MPTSAS_TOPO_FLAG_RAID_ASSOCIATED) {
+		if ((topo_node->flags == MPTSAS_TOPO_FLAG_RAID_ASSOCIATED) ||
+		    (topo_node->flags ==
+		    MPTSAS_TOPO_FLAG_RAID_PHYSDRV_ASSOCIATED)) {
 			/*
-			 * Get latest RAID info, if RAID volume status change
+			 * Get latest RAID info if RAID volume status changes
+			 * or Phys Disk status changes
 			 */
 			(void) mptsas_get_raid_info(mpt);
 		}
@@ -7101,8 +7144,8 @@ mptsas_handle_event(void *args)
 		 * just exit the event.
 		 */
 		(void) mptsas_get_raid_info(mpt);
-		for (config = 0; config < slots->m_num_raid_configs;
-		    config++) {
+		for (config = 0; (config < slots->m_num_raid_configs) &&
+		    (!found); config++) {
 			for (vol = 0; vol < MPTSAS_MAX_RAIDVOLS; vol++) {
 				if (slots->m_raidconfig[config].m_raidvol[vol].
 				    m_raidhandle == devhandle) {
@@ -8187,7 +8230,7 @@ mptsas_do_scsi_reset(mptsas_t *mpt, uint16_t devhdl)
 	}
 
 	rval = mptsas_ioc_task_management(mpt,
-	    MPI2_SCSITASKMGMT_TASKTYPE_TARGET_RESET, devhdl, 0);
+	    MPI2_SCSITASKMGMT_TASKTYPE_TARGET_RESET, devhdl, 0, NULL, 0, 0);
 
 	mptsas_doneq_empty(mpt);
 	return (rval);
@@ -8283,9 +8326,9 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 		switch (tasktype) {
 		case MPI2_SCSITASKMGMT_TASKTYPE_TARGET_RESET:
 			if (Tgt(cmd) == target) {
-				mptsas_log(mpt, CE_NOTE, "mptsas_flush_target "
-				    "discovered non-NULL cmd in slot %d, "
-				    "tasktype 0x%x", slot, tasktype);
+				NDBG25(("mptsas_flush_target discovered non-"
+				    "NULL cmd in slot %d, tasktype 0x%x", slot,
+				    tasktype));
 				mptsas_dump_cmd(mpt, cmd);
 				mptsas_remove_cmd(mpt, cmd);
 				mptsas_set_pkt_reason(mpt, cmd, reason, stat);
@@ -8299,9 +8342,9 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 		case MPI2_SCSITASKMGMT_TASKTYPE_LOGICAL_UNIT_RESET:
 			if ((Tgt(cmd) == target) && (Lun(cmd) == lun)) {
 
-				mptsas_log(mpt, CE_NOTE, "mptsas_flush_target "
-				    "discovered non-NULL cmd in slot %d, "
-				    "tasktype 0x%x", slot, tasktype);
+				NDBG25(("mptsas_flush_target discovered non-"
+				    "NULL cmd in slot %d, tasktype 0x%x", slot,
+				    tasktype));
 				mptsas_dump_cmd(mpt, cmd);
 				mptsas_remove_cmd(mpt, cmd);
 				mptsas_set_pkt_reason(mpt, cmd, reason,
@@ -8433,8 +8476,8 @@ mptsas_flush_hba(mptsas_t *mpt)
 			continue;
 		}
 
-		mptsas_log(mpt, CE_NOTE, "mptsas_flush_hba discovered non-NULL "
-		    "cmd in slot %d", slot);
+		NDBG25(("mptsas_flush_hba discovered non-NULL cmd in slot %d",
+		    slot));
 		mptsas_dump_cmd(mpt, cmd);
 
 		mptsas_remove_cmd(mpt, cmd);
@@ -8688,7 +8731,7 @@ mptsas_do_scsi_abort(mptsas_t *mpt, int target, int lun, struct scsi_pkt *pkt)
 		if (slots->m_slot[sp->cmd_slot] != NULL) {
 			rval = mptsas_ioc_task_management(mpt,
 			    MPI2_SCSITASKMGMT_TASKTYPE_ABORT_TASK, target,
-			    lun);
+			    lun, NULL, 0, 0);
 
 			/*
 			 * The transport layer expects only TRUE and FALSE.
@@ -8705,7 +8748,7 @@ mptsas_do_scsi_abort(mptsas_t *mpt, int target, int lun, struct scsi_pkt *pkt)
 	 * If pkt is NULL then abort task set
 	 */
 	rval = mptsas_ioc_task_management(mpt,
-	    MPI2_SCSITASKMGMT_TASKTYPE_ABRT_TASK_SET, target, lun);
+	    MPI2_SCSITASKMGMT_TASKTYPE_ABRT_TASK_SET, target, lun, NULL, 0, 0);
 
 	/*
 	 * The transport layer expects only TRUE and FALSE.
@@ -9314,6 +9357,7 @@ mptsas_ncmds_checkdrain(void *arg)
 	mutex_exit(&mpt->m_mutex);
 }
 
+/*ARGSUSED*/
 static void
 mptsas_dump_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 {
@@ -9322,20 +9366,19 @@ mptsas_dump_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	char	buf[128];
 
 	buf[0] = '\0';
-	mptsas_log(mpt, CE_NOTE, "?Cmd (0x%p) dump for Target %d Lun %d:\n",
-	    (void *)cmd, Tgt(cmd), Lun(cmd));
+	NDBG25(("?Cmd (0x%p) dump for Target %d Lun %d:\n", (void *)cmd,
+	    Tgt(cmd), Lun(cmd)));
 	(void) sprintf(&buf[0], "\tcdb=[");
 	for (i = 0; i < (int)cmd->cmd_cdblen; i++) {
 		(void) sprintf(&buf[strlen(buf)], " 0x%x", *cp++);
 	}
 	(void) sprintf(&buf[strlen(buf)], " ]");
-	mptsas_log(mpt, CE_NOTE, "?%s\n", buf);
-	mptsas_log(mpt, CE_NOTE,
-	    "?pkt_flags=0x%x pkt_statistics=0x%x pkt_state=0x%x\n",
+	NDBG25(("?%s\n", buf));
+	NDBG25(("?pkt_flags=0x%x pkt_statistics=0x%x pkt_state=0x%x\n",
 	    cmd->cmd_pkt->pkt_flags, cmd->cmd_pkt->pkt_statistics,
-	    cmd->cmd_pkt->pkt_state);
-	mptsas_log(mpt, CE_NOTE, "?pkt_scbp=0x%x cmd_flags=0x%x\n",
-	    *(cmd->cmd_pkt->pkt_scbp), cmd->cmd_flags);
+	    cmd->cmd_pkt->pkt_state));
+	NDBG25(("?pkt_scbp=0x%x cmd_flags=0x%x\n", *(cmd->cmd_pkt->pkt_scbp),
+	    cmd->cmd_flags));
 }
 
 static void
@@ -9453,9 +9496,13 @@ mptsas_start_passthru(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		    offsetof(MPI2_SCSI_IO_REQUEST, SGL) / 4);
 
 		/*
-		 * Setup descriptor info
+		 * Setup descriptor info.  RAID passthrough must use the
+		 * default request descriptor which is already set, so if this
+		 * is a SCSI IO request, change the descriptor to SCSI IO.
 		 */
-		desc_type = MPI2_REQ_DESCRIPT_FLAGS_SCSI_IO;
+		if (function == MPI2_FUNCTION_SCSI_IO_REQUEST) {
+			desc_type = MPI2_REQ_DESCRIPT_FLAGS_SCSI_IO;
+		}
 		request_desc_high = (ddi_get16(acc_hdl,
 		    &scsi_io_req->DevHandle) << 16);
 	}
@@ -9523,7 +9570,8 @@ mptsas_do_passthru(mptsas_t *mpt, uint8_t *request, uint8_t *reply,
 		task = (pMpi2SCSITaskManagementRequest_t)request_msg;
 		mptsas_setup_bus_reset_delay(mpt);
 		rv = mptsas_ioc_task_management(mpt, task->TaskType,
-		    task->DevHandle, (int)task->LUN[1]);
+		    task->DevHandle, (int)task->LUN[1], reply, reply_size,
+		    mode);
 
 		if (rv != TRUE) {
 			status = EIO;
@@ -10867,13 +10915,13 @@ mptsas_lookup_pci_data(mptsas_t *mpt, mptsas_adapter_data_t *adapter_data)
 		 * Bits 16 - 23 8-bit Bus number
 		 * Bits 24 - 25 2-bit Address Space type identifier
 		 *
-		 * Store the device number in PCIDeviceHwId.
-		 * Store the function number in MpiPortNumber.
-		 * PciInformation stores bus, device, and function together
 		 */
-		adapter_data->PCIDeviceHwId = (reg_data[0] & 0x0000F800) >> 11;
-		adapter_data->MpiPortNumber = (reg_data[0] & 0x00000700) >> 8;
-		adapter_data->PciInformation = (reg_data[0] & 0x00FFFF00) >> 8;
+		adapter_data->PciInformation.u.bits.BusNumber =
+		    (reg_data[0] & 0x00FF0000) >> 16;
+		adapter_data->PciInformation.u.bits.DeviceNumber =
+		    (reg_data[0] & 0x0000F800) >> 11;
+		adapter_data->PciInformation.u.bits.FunctionNumber =
+		    (reg_data[0] & 0x00000700) >> 8;
 		ddi_prop_free((void *)reg_data);
 	} else {
 		/*
@@ -10882,7 +10930,7 @@ mptsas_lookup_pci_data(mptsas_t *mpt, mptsas_adapter_data_t *adapter_data)
 		 */
 		adapter_data->PCIDeviceHwId = 0xFFFFFFFF;
 		adapter_data->MpiPortNumber = 0xFFFFFFFF;
-		adapter_data->PciInformation = 0xFFFFFFFF;
+		adapter_data->PciInformation.u.AsDWORD = 0xFFFFFFFF;
 	}
 
 	/*
@@ -11240,6 +11288,15 @@ mptsas_restart_ioc(mptsas_t *mpt)
 	ASSERT(mutex_owned(&mpt->m_mutex));
 
 	/*
+	 * Set a flag telling I/O path that we're processing a reset.  This is
+	 * needed because after the reset is complete, the hash table still
+	 * needs to be rebuilt.  If I/Os are started before the hash table is
+	 * rebuilt, I/O errors will occur.  This flag allows I/Os to be marked
+	 * so that they can be retried.
+	 */
+	mpt->m_in_reset = TRUE;
+
+	/*
 	 * Set all throttles to HOLD
 	 */
 	ptgt = (mptsas_target_t *)mptsas_hash_traverse(&mpt->m_active->m_tgttbl,
@@ -11300,6 +11357,12 @@ mptsas_restart_ioc(mptsas_t *mpt)
 		mptsas_fm_ereport(mpt, DDI_FM_DEVICE_NO_RESPONSE);
 		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_LOST);
 	}
+
+	/*
+	 * Clear the reset flag so that I/Os can continue.
+	 */
+	mpt->m_in_reset = FALSE;
+
 	return (rval);
 }
 
@@ -13221,7 +13284,8 @@ mptsas_create_lun(dev_info_t *pdip, struct scsi_inquiry *sd_inq,
 	 * scsi_vhci, so no need to try page83
 	 */
 	if (sd_inq && (sd_inq->inq_dtype == DTYPE_RODIRECT ||
-	    sd_inq->inq_dtype == DTYPE_OPTICAL))
+	    sd_inq->inq_dtype == DTYPE_OPTICAL ||
+	    sd_inq->inq_dtype == DTYPE_ESI))
 		goto create_lun;
 
 	/*

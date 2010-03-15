@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 2000 to 2009, LSI Corporation.
+ * Copyright (c) 2000 to 2010, LSI Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms of all code within
@@ -847,6 +847,11 @@ typedef struct mptsas {
 	uint8_t			m_ir_capable;
 
 	/*
+	 * Is HBA processing a diag reset?
+	 */
+	uint8_t			m_in_reset;
+
+	/*
 	 * per instance cmd data structures for task management cmds
 	 */
 	m_event_struct_t	m_event_task_mgmt;	/* must be last */
@@ -1244,7 +1249,8 @@ int mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
     caddr_t, ddi_acc_handle_t, uint16_t, uint32_t, va_list), ...);
 
 int mptsas_ioc_task_management(mptsas_t *mpt, int task_type,
-    uint16_t dev_handle, int lun);
+    uint16_t dev_handle, int lun, uint8_t *reply, uint32_t reply_size,
+    int mode);
 int mptsas_send_event_ack(mptsas_t *mpt, uint32_t event, uint32_t eventcntx);
 void mptsas_send_pending_event_ack(mptsas_t *mpt);
 void mptsas_set_throttle(struct mptsas *mpt, mptsas_target_t *ptgt, int what);

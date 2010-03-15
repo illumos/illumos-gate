@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 2000 to 2009, LSI Corporation.
+ * Copyright (c) 2000 to 2010, LSI Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms of all code within
@@ -80,6 +80,18 @@ extern "C" {
 #define	MPTIOCTL_STATUS_GOOD		0
 #define	MPTIOCTL_STATUS_LEN_TOO_SHORT	1
 
+typedef struct mptsas_pci_bits
+{
+	union {
+		struct {
+			uint32_t	DeviceNumber	:5;
+			uint32_t	FunctionNumber	:3;
+			uint32_t	BusNumber	:24;
+		} bits;
+		uint32_t	AsDWORD;
+	} u;
+	uint32_t	PciSegmentId;
+} mptsas_pci_bits_t;
 /*
  *  The following is the MPTIOCTL_GET_ADAPTER_DATA data structure.  This data
  *  structure is setup so that we hopefully are properly aligned for both
@@ -95,22 +107,21 @@ extern "C" {
 #define	MPTIOCTL_ADAPTER_TYPE_SAS2	4
 typedef struct mptsas_adapter_data
 {
-	uint32_t	StructureLength;
-	uint32_t	AdapterType;
-	uint32_t	MpiPortNumber;
-	uint32_t	PCIDeviceHwId;
-	uint32_t	PCIDeviceHwRev;
-	uint32_t	SubSystemId;
-	uint32_t	SubsystemVendorId;
-	uint32_t	Reserved1;
-	uint32_t	MpiFirmwareVersion;
-	uint32_t	BiosVersion;
-	uint8_t		DriverVersion[32];
-	uint8_t		Reserved2;
-	uint8_t		ScsiId;
-	uint16_t	Reserved3;
-	uint32_t	PciInformation;
-	uint32_t	PciSegmentId;
+	uint32_t		StructureLength;
+	uint32_t		AdapterType;
+	uint32_t		MpiPortNumber;
+	uint32_t		PCIDeviceHwId;
+	uint32_t		PCIDeviceHwRev;
+	uint32_t		SubSystemId;
+	uint32_t		SubsystemVendorId;
+	uint32_t		Reserved1;
+	uint32_t		MpiFirmwareVersion;
+	uint32_t		BiosVersion;
+	uint8_t			DriverVersion[32];
+	uint8_t			Reserved2;
+	uint8_t			ScsiId;
+	uint16_t		Reserved3;
+	mptsas_pci_bits_t	PciInformation;
 } mptsas_adapter_data_t;
 
 
