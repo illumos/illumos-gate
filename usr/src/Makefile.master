@@ -678,6 +678,13 @@ SPRO_ROOT=		$(BUILD_TOOLS)/SUNWspro
 SPRO_VROOT=		$(SPRO_ROOT)/SS12
 GNU_ROOT=		$(SFW_ROOT)
 
+# Till SS12u1 formally becomes the NV CBE, LINT is hard
+# coded to be picked up from the $SPRO_ROOT/sunstudio12.1/
+# location. Impacted variables are sparc_LINT, sparcv9_LINT,
+# i386_LINT, amd64_LINT.
+# Reset them when SS12u1 is rolled out.
+#
+
 # Specify platform compiler versions for languages
 # that we use (currently only c and c++).
 #
@@ -688,7 +695,7 @@ $(__GNUC)sparc_CCC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_g++
 sparc_CPP=		/usr/ccs/lib/cpp
 sparc_AS=		/usr/ccs/bin/as -xregsym=no
 sparc_LD=		/usr/ccs/bin/ld
-sparc_LINT=		$(SPRO_VROOT)/bin/lint
+sparc_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
 sparcv9_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
 $(__GNUC64)sparcv9_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
@@ -697,7 +704,7 @@ $(__GNUC64)sparcv9_CCC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_g++
 sparcv9_CPP=		/usr/ccs/lib/cpp
 sparcv9_AS=		/usr/ccs/bin/as -xregsym=no
 sparcv9_LD=		/usr/ccs/bin/ld
-sparcv9_LINT=		$(SPRO_VROOT)/bin/lint
+sparcv9_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
 # We compile 32-bit objects with cc by default
 i386_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
@@ -708,7 +715,7 @@ i386_CPP=		/usr/ccs/lib/cpp
 i386_AS=		/usr/ccs/bin/as
 $(__GNUC)i386_AS=	$(ONBLD_TOOLS)/bin/$(MACH)/aw
 i386_LD=		/usr/ccs/bin/ld
-i386_LINT=		$(SPRO_VROOT)/bin/lint
+i386_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
 # We compile 64-bit objects with gcc
 amd64_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
@@ -718,7 +725,7 @@ $(__GNUC64)amd64_CCC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_g++
 amd64_CPP=		/usr/ccs/lib/cpp
 amd64_AS=		$(ONBLD_TOOLS)/bin/$(MACH)/aw
 amd64_LD=		/usr/ccs/bin/ld
-amd64_LINT=		$(SPRO_VROOT)/bin/lint
+amd64_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
 NATIVECC=		$($(NATIVE_MACH)_CC)
 NATIVECCC=		$($(NATIVE_MACH)_CCC)
