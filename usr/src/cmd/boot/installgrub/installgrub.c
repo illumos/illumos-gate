@@ -360,6 +360,7 @@ found_part:
 		if (getchar() != 'y') {
 			write_mboot = 0;
 			(void) fprintf(stdout, MBOOT_NOT_UPDATED);
+			exit(-1);
 		}
 	}
 
@@ -368,8 +369,7 @@ found_part:
 	 * write GRUB to the MBR. Check for this.
 	 */
 	if (log_part && !write_mboot) {
-		(void) fprintf(stderr, EXTSOLPAR);
-		exit(-1);
+		write_mboot = 1;
 	}
 
 	/*

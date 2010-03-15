@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,9 +44,6 @@ extern "C" {
 
 #define	BOOTPAR_NOTFOUND	\
     gettext("Solaris boot partition not found on %s\n")
-
-#define	EXTSOLPAR	\
-	gettext("Solaris in extended partition. -m (MBR) option required\n")
 
 #define	NOT_RAW_DEVICE	gettext("device %s is not a char special device\n")
 
