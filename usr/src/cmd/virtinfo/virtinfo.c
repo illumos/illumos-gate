@@ -32,10 +32,15 @@
 #include <libgen.h>
 #include <libintl.h>
 #include <libv12n.h>
+#include <locale.h>
 #include <zone.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <uuid/uuid.h>
+
+#if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it wasn't */
+#endif
 
 static char *cmdname;
 
@@ -67,6 +72,10 @@ main(int argc, char *argv[])
 	int errflg = 0;
 	int aflg = 0, cflg = 0, dflg = 0, pflg = 0, sflg = 0, tflg = 0,
 	    uflg = 0;
+
+	/* Set locale environment variables local definitions */
+	(void) setlocale(LC_ALL, "");
+	(void) textdomain(TEXT_DOMAIN);
 
 	cmdname = basename(argv[0]);
 
