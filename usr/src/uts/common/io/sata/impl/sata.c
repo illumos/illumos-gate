@@ -3511,8 +3511,10 @@ sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
 
 #define	EVPD			1	/* Extended Vital Product Data flag */
 #define	CMDDT			2	/* Command Support Data - Obsolete */
-#define	INQUIRY_SUP_VPD_PAGE	0	/* Supported VDP Pages Page COde */
+#define	INQUIRY_SUP_VPD_PAGE	0	/* Supported VPD Pages Page Code */
 #define	INQUIRY_USN_PAGE	0x80	/* Unit Serial Number Page Code */
+#define	INQUIRY_BDC_PAGE	0xB1	/* Block Device Characteristics Page */
+					/* Code */
 #define	INQUIRY_DEV_IDENTIFICATION_PAGE 0x83 /* Not needed yet */
 
 static int
@@ -3527,6 +3529,7 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 	int i, j;
 	uint8_t page_buf[0xff]; /* Max length */
 	int rval, reason;
+	ushort_t rate;
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
@@ -3606,11 +3609,12 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 				page_buf[0] = peripheral_device_type;
 				page_buf[1] = INQUIRY_SUP_VPD_PAGE;
 				page_buf[2] = 0;
-				page_buf[3] = 2; /* page length */
+				page_buf[3] = 3; /* page length */
 				page_buf[4] = INQUIRY_SUP_VPD_PAGE;
 				page_buf[5] = INQUIRY_USN_PAGE;
+				page_buf[6] = INQUIRY_BDC_PAGE;
 				/* Copy no more than requested */
-				count = MIN(bp->b_bcount, 6);
+				count = MIN(bp->b_bcount, 7);
 				bcopy(page_buf, bp->b_un.b_addr, count);
 				break;
 
@@ -3670,6 +3674,29 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 
 				count = MIN(bp->b_bcount,
 				    SATA_ID_SERIAL_LEN + 4);
+				bcopy(page_buf, bp->b_un.b_addr, count);
+				break;
+
+			case INQUIRY_BDC_PAGE:
+				/*
+				 * Request for Block Device Characteristics
+				 * page.  Set-up the page.
+				 */
+				page_buf[0] = peripheral_device_type;
+				page_buf[1] = INQUIRY_BDC_PAGE;
+				page_buf[2] = 0;
+				/* remaining page length */
+				page_buf[3] = SATA_ID_BDC_LEN;
+
+				rate = sdinfo->satadrv_id.ai_medrotrate;
+				page_buf[4] = (rate >> 8) & 0xff;
+				page_buf[5] = rate & 0xff;
+				page_buf[6] = 0;
+				page_buf[7] = sdinfo->satadrv_id.
+				    ai_nomformfactor & 0xf;
+
+				count = MIN(bp->b_bcount,
+				    SATA_ID_BDC_LEN + 4);
 				bcopy(page_buf, bp->b_un.b_addr, count);
 				break;
 
