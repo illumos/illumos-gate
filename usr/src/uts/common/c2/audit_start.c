@@ -71,6 +71,7 @@ audit_init_module()
 {
 	token_t *rp = NULL;
 	label_t jb;
+	t_audit_data_t *tad = U2A(u);
 
 	/*
 	 * Solaris Auditing module is being loaded -> change the state. The lock
@@ -100,9 +101,9 @@ audit_init_module()
 		return;
 	}
 
-	ASSERT(tad0->tad_errjmp == NULL);
-	tad0->tad_errjmp = (void *)&jb;
-	tad0->tad_ctrl |= PAD_ERRJMP;
+	ASSERT(tad->tad_errjmp == NULL);
+	tad->tad_errjmp = (void *)&jb;
+	tad->tad_ctrl |= PAD_ERRJMP;
 
 	/* generate a system-booted audit record */
 	au_write((caddr_t *)&rp, au_to_text("booting kernel"));
