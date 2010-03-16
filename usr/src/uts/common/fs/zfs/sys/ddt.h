@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,7 +101,7 @@ enum ddt_phys_type {
 	DDT_PHYS_DOUBLE = 2,
 	DDT_PHYS_TRIPLE = 3,
 	DDT_PHYS_TYPES
-} ddt_phys_type_t;
+};
 
 /*
  * In-core ddt entry
@@ -132,6 +132,8 @@ struct ddt {
 	uint64_t	ddt_stat_object;
 	uint64_t	ddt_object[DDT_TYPES][DDT_CLASSES];
 	ddt_histogram_t	ddt_histogram[DDT_TYPES][DDT_CLASSES];
+	ddt_histogram_t	ddt_histogram_cache[DDT_TYPES][DDT_CLASSES];
+	ddt_object_t	ddt_object_stats[DDT_TYPES][DDT_CLASSES];
 	avl_node_t	ddt_node;
 };
 
