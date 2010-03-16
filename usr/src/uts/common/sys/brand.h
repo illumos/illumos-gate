@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,6 +96,7 @@ struct brand_ops {
 	    struct uarg *args, struct intpdata *idata, int level,
 	    long *execsz, int setid, caddr_t exec_file,
 	    struct cred *cred, int brand_action);
+	int	b_nsig;
 };
 
 /*

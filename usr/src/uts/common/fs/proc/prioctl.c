@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -38,6 +39,7 @@
 #include <sys/inline.h>
 #include <sys/kmem.h>
 #include <sys/proc.h>
+#include <sys/brand.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
 #include <sys/vfs.h>
@@ -153,6 +155,7 @@ prioctl(
 	caller_context_t *ct)
 #endif	/* _SYSCALL32_IMPL */
 {
+	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
 	caddr_t cmaddr = (caddr_t)arg;
 	proc_t *p;
 	user_t *up;
@@ -260,7 +263,7 @@ prioctl(
 #endif
 		break;
 	case PIOCACTION:
-		thingsize = (NSIG-1) * sizeof (struct sigaction);
+		thingsize = (nsig-1) * sizeof (struct sigaction);
 		break;
 	case PIOCGHOLD:
 	case PIOCNMAP:
@@ -913,7 +916,7 @@ startover:
 
 	case PIOCMAXSIG:	/* get maximum signal number */
 	{
-		int n = NSIG-1;
+		int n = nsig-1;
 
 		prunlock(pnp);
 		if (copyout(&n, cmaddr, sizeof (n)))
@@ -927,12 +930,12 @@ startover:
 		struct sigaction *sap = thing;
 
 		up = PTOU(p);
-		for (sig = 1; sig < NSIG; sig++)
+		for (sig = 1; sig < nsig; sig++)
 			prgetaction(p, up, sig, &sap[sig-1]);
 		prunlock(pnp);
-		if (copyout(sap, cmaddr, (NSIG-1) * sizeof (struct sigaction)))
+		if (copyout(sap, cmaddr, (nsig-1) * sizeof (struct sigaction)))
 			error = EFAULT;
-		kmem_free(sap, (NSIG-1) * sizeof (struct sigaction));
+		kmem_free(sap, (nsig-1) * sizeof (struct sigaction));
 		thing = NULL;
 		break;
 	}
@@ -1690,6 +1693,7 @@ prioctl32(
 	int *rvalp,
 	caller_context_t *ct)
 {
+	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
 	caddr_t cmaddr = (caddr_t)arg;
 	proc_t *p;
 	user_t *up;
@@ -1822,7 +1826,7 @@ prioctl32(
 #endif
 		break;
 	case PIOCACTION:
-		thingsize = (NSIG-1) * sizeof (struct sigaction32);
+		thingsize = (nsig-1) * sizeof (struct sigaction32);
 		break;
 	case PIOCGHOLD:
 	case PIOCNMAP:
@@ -2534,7 +2538,7 @@ startover:
 
 	case PIOCMAXSIG:	/* get maximum signal number */
 	{
-		int n = NSIG-1;
+		int n = nsig-1;
 
 		prunlock(pnp);
 		if (copyout(&n, cmaddr, sizeof (int)))
@@ -2551,14 +2555,14 @@ startover:
 			error = EOVERFLOW;
 		else {
 			up = PTOU(p);
-			for (sig = 1; sig < NSIG; sig++)
+			for (sig = 1; sig < nsig; sig++)
 				prgetaction32(p, up, sig, &sap[sig-1]);
 		}
 		prunlock(pnp);
 		if (error == 0 &&
-		    copyout(sap, cmaddr, (NSIG-1)*sizeof (struct sigaction32)))
+		    copyout(sap, cmaddr, (nsig-1)*sizeof (struct sigaction32)))
 			error = EFAULT;
-		kmem_free(sap, (NSIG-1)*sizeof (struct sigaction32));
+		kmem_free(sap, (nsig-1)*sizeof (struct sigaction32));
 		thing = NULL;
 		break;
 	}

@@ -42,8 +42,6 @@ typedef void (*s10_sighandler_t)(int, siginfo_t *, void *);
 
 #endif	/* !_ASM */
 
-#define	S10_NSIG	49
-
 /*
  * Configurable in native Solaris, stick with the values assigned
  * by default as _SIGRTMIN and _SIGRTMAX in S10.

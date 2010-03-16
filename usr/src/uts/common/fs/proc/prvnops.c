@@ -18,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -40,6 +40,7 @@
 #include <sys/kmem.h>
 #include <sys/pathname.h>
 #include <sys/proc.h>
+#include <sys/brand.h>
 #include <sys/signal.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
@@ -979,6 +980,7 @@ out:
 static int
 pr_read_sigact(prnode_t *pnp, uio_t *uiop)
 {
+	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
 	proc_t *p;
 	struct sigaction *sap;
 	int sig;
@@ -991,26 +993,26 @@ pr_read_sigact(prnode_t *pnp, uio_t *uiop)
 	 * We kmem_alloc() the sigaction array because
 	 * it is so big it might blow the kernel stack.
 	 */
-	sap = kmem_alloc((NSIG-1) * sizeof (struct sigaction), KM_SLEEP);
+	sap = kmem_alloc((nsig-1) * sizeof (struct sigaction), KM_SLEEP);
 
 	if ((error = prlock(pnp, ZNO)) != 0)
 		goto out;
 	p = pnp->pr_common->prc_proc;
 	ASSERT(p != NULL);
 
-	if (uiop->uio_offset >= (NSIG-1)*sizeof (struct sigaction)) {
+	if (uiop->uio_offset >= (nsig-1)*sizeof (struct sigaction)) {
 		prunlock(pnp);
 		goto out;
 	}
 
 	up = PTOU(p);
-	for (sig = 1; sig < NSIG; sig++)
+	for (sig = 1; sig < nsig; sig++)
 		prgetaction(p, up, sig, &sap[sig-1]);
 	prunlock(pnp);
 
-	error = pr_uioread(sap, (NSIG - 1) * sizeof (struct sigaction), uiop);
+	error = pr_uioread(sap, (nsig - 1) * sizeof (struct sigaction), uiop);
 out:
-	kmem_free(sap, (NSIG-1) * sizeof (struct sigaction));
+	kmem_free(sap, (nsig-1) * sizeof (struct sigaction));
 	return (error);
 }
 
@@ -2002,6 +2004,7 @@ pr_read_xmap_32(prnode_t *pnp, uio_t *uiop)
 static int
 pr_read_sigact_32(prnode_t *pnp, uio_t *uiop)
 {
+	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
 	proc_t *p;
 	struct sigaction32 *sap;
 	int sig;
@@ -2014,7 +2017,7 @@ pr_read_sigact_32(prnode_t *pnp, uio_t *uiop)
 	 * We kmem_alloc() the sigaction32 array because
 	 * it is so big it might blow the kernel stack.
 	 */
-	sap = kmem_alloc((NSIG-1) * sizeof (struct sigaction32), KM_SLEEP);
+	sap = kmem_alloc((nsig-1) * sizeof (struct sigaction32), KM_SLEEP);
 
 	if ((error = prlock(pnp, ZNO)) != 0)
 		goto out;
@@ -2026,19 +2029,19 @@ pr_read_sigact_32(prnode_t *pnp, uio_t *uiop)
 		goto out;
 	}
 
-	if (uiop->uio_offset >= (NSIG-1) * sizeof (struct sigaction32)) {
+	if (uiop->uio_offset >= (nsig-1) * sizeof (struct sigaction32)) {
 		prunlock(pnp);
 		goto out;
 	}
 
 	up = PTOU(p);
-	for (sig = 1; sig < NSIG; sig++)
+	for (sig = 1; sig < nsig; sig++)
 		prgetaction32(p, up, sig, &sap[sig-1]);
 	prunlock(pnp);
 
-	error = pr_uioread(sap, (NSIG - 1) * sizeof (struct sigaction32), uiop);
+	error = pr_uioread(sap, (nsig - 1) * sizeof (struct sigaction32), uiop);
 out:
-	kmem_free(sap, (NSIG-1) * sizeof (struct sigaction32));
+	kmem_free(sap, (nsig-1) * sizeof (struct sigaction32));
 	return (error);
 }
 
@@ -2704,6 +2707,7 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	timestruc_t now;
 	extern uint_t nproc;
 	int ngroups;
+	int nsig;
 
 	/*
 	 * This ugly bit of code allows us to keep both versions of this
@@ -2959,7 +2963,8 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		vap->va_size = prgetprivsize();
 		break;
 	case PR_SIGACT:
-		vap->va_size = (NSIG-1) *
+		nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
+		vap->va_size = (nsig-1) *
 		    PR_OBJSIZE(struct sigaction32, struct sigaction);
 		break;
 	case PR_AUXV:

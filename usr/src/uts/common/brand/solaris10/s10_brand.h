@@ -58,6 +58,11 @@ extern "C" {
 #endif /* !_LP64 */
 
 /*
+ * Solaris 10 value of NSIG
+ */
+#define	S10_NSIG	49
+
+/*
  * Brand system call subcodes.  0-127 are reserved for generic subcodes.
  */
 #define	B_S10_PIDINFO		128

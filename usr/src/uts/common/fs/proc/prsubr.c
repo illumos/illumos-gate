@@ -39,6 +39,7 @@
 #include <sys/kmem.h>
 #include <sys/mman.h>
 #include <sys/proc.h>
+#include <sys/brand.h>
 #include <sys/sobject.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
@@ -1309,9 +1310,11 @@ prgetlwpstatus(kthread_t *t, lwpstatus_t *sp, zone_t *zp)
 void
 prgetaction(proc_t *p, user_t *up, uint_t sig, struct sigaction *sp)
 {
+	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
+
 	bzero(sp, sizeof (*sp));
 
-	if (sig != 0 && (unsigned)sig < NSIG) {
+	if (sig != 0 && (unsigned)sig < nsig) {
 		sp->sa_handler = up->u_signal[sig-1];
 		prassignset(&sp->sa_mask, &up->u_sigmask[sig-1]);
 		if (sigismember(&up->u_sigonstack, sig))
@@ -1337,9 +1340,11 @@ prgetaction(proc_t *p, user_t *up, uint_t sig, struct sigaction *sp)
 void
 prgetaction32(proc_t *p, user_t *up, uint_t sig, struct sigaction32 *sp)
 {
+	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
+
 	bzero(sp, sizeof (*sp));
 
-	if (sig != 0 && (unsigned)sig < NSIG) {
+	if (sig != 0 && (unsigned)sig < nsig) {
 		sp->sa_handler = (caddr32_t)(uintptr_t)up->u_signal[sig-1];
 		prassignset(&sp->sa_mask, &up->u_sigmask[sig-1]);
 		if (sigismember(&up->u_sigonstack, sig))

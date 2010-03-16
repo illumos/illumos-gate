@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +104,8 @@ struct brand_ops lx_brops = {
 	lx_forklwp,
 	lx_freelwp,
 	lx_exitlwp,
-	lx_elfexec
+	lx_elfexec,
+	NSIG
 };
 
 struct brand_mach_ops lx_mops = {

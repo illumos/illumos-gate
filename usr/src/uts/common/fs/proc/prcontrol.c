@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <sys/inline.h>
 #include <sys/kmem.h>
 #include <sys/proc.h>
+#include <sys/brand.h>
 #include <sys/regset.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
@@ -1375,6 +1376,7 @@ pr_settrace(proc_t *p, sigset_t *sp)
 int
 pr_setsig(prnode_t *pnp, siginfo_t *sip)
 {
+	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
 	int sig = sip->si_signo;
 	prcommon_t *pcp = pnp->pr_common;
 	proc_t *p = pcp->prc_proc;
@@ -1385,7 +1387,7 @@ pr_setsig(prnode_t *pnp, siginfo_t *sip)
 	t = pr_thread(pnp);	/* returns locked thread */
 	thread_unlock(t);
 	lwp = ttolwp(t);
-	if (sig < 0 || sig >= NSIG)
+	if (sig < 0 || sig >= nsig)
 		/* Zero allowed here */
 		error = EINVAL;
 	else if (lwp->lwp_cursig == SIGKILL)
@@ -1503,11 +1505,12 @@ pr_setsig(prnode_t *pnp, siginfo_t *sip)
 int
 pr_kill(prnode_t *pnp, int sig, cred_t *cr)
 {
+	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
 	prcommon_t *pcp = pnp->pr_common;
 	proc_t *p = pcp->prc_proc;
 	k_siginfo_t info;
 
-	if (sig <= 0 || sig >= NSIG)
+	if (sig <= 0 || sig >= nsig)
 		return (EINVAL);
 
 	bzero(&info, sizeof (info));
@@ -1526,11 +1529,12 @@ pr_kill(prnode_t *pnp, int sig, cred_t *cr)
 int
 pr_unkill(prnode_t *pnp, int sig)
 {
+	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
 	prcommon_t *pcp = pnp->pr_common;
 	proc_t *p = pcp->prc_proc;
 	sigqueue_t *infop = NULL;
 
-	if (sig <= 0 || sig >= NSIG || sig == SIGKILL)
+	if (sig <= 0 || sig >= nsig || sig == SIGKILL)
 		return (EINVAL);
 
 	if (pcp->prc_flags & PRC_LWP)
