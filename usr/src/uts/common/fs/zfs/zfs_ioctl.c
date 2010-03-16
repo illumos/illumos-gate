@@ -1861,6 +1861,7 @@ zfs_prop_set_userquota(const char *dsname, nvpair_t *pair)
 	uint64_t *valary;
 	unsigned int vallen;
 	const char *domain;
+	char *dash;
 	zfs_userquota_prop_t type;
 	uint64_t rid;
 	uint64_t quota;
@@ -1870,20 +1871,24 @@ zfs_prop_set_userquota(const char *dsname, nvpair_t *pair)
 	if (nvpair_type(pair) == DATA_TYPE_NVLIST) {
 		nvlist_t *attrs;
 		VERIFY(nvpair_value_nvlist(pair, &attrs) == 0);
-		VERIFY(nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
-		    &pair) == 0);
+		if (nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
+		    &pair) != 0)
+			return (EINVAL);
 	}
 
-	VERIFY(nvpair_value_uint64_array(pair, &valary, &vallen) == 0);
-	VERIFY(vallen == 3);
+	/*
+	 * A correctly constructed propname is encoded as
+	 * userquota@<rid>-<domain>.
+	 */
+	if ((dash = strchr(propname, '-')) == NULL ||
+	    nvpair_value_uint64_array(pair, &valary, &vallen) != 0 ||
+	    vallen != 3)
+		return (EINVAL);
+
+	domain = dash + 1;
 	type = valary[0];
 	rid = valary[1];
 	quota = valary[2];
-	/*
-	 * The propname is encoded as
-	 * userquota@<rid>-<domain>.
-	 */
-	domain = strchr(propname, '-') + 1;
 
 	err = zfsvfs_hold(dsname, FTAG, &zfsvfs);
 	if (err == 0) {
@@ -1899,7 +1904,7 @@ zfs_prop_set_userquota(const char *dsname, nvpair_t *pair)
  * return 0 on success and a positive error code on failure; otherwise if it is
  * not one of the special properties handled by this function, return -1.
  *
- * XXX: It would be better for callers of the properety interface if we handled
+ * XXX: It would be better for callers of the property interface if we handled
  * these special cases in dsl_prop.c (in the dsl layer).
  */
 static int
@@ -2024,12 +2029,13 @@ retry:
 		if (nvpair_type(pair) == DATA_TYPE_NVLIST) {
 			nvlist_t *attrs;
 			VERIFY(nvpair_value_nvlist(pair, &attrs) == 0);
-			VERIFY(nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
-			    &propval) == 0);
+			if (nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
+			    &propval) != 0)
+				err = EINVAL;
 		}
 
 		/* Validate value type */
-		if (prop == ZPROP_INVAL) {
+		if (err == 0 && prop == ZPROP_INVAL) {
 			if (zfs_prop_user(propname)) {
 				if (nvpair_type(propval) != DATA_TYPE_STRING)
 					err = EINVAL;
@@ -2038,7 +2044,7 @@ retry:
 				    DATA_TYPE_UINT64_ARRAY)
 					err = EINVAL;
 			}
-		} else {
+		} else if (err == 0) {
 			if (nvpair_type(propval) == DATA_TYPE_STRING) {
 				if (zfs_prop_get_type(prop) != PROP_TYPE_STRING)
 					err = EINVAL;
@@ -3810,13 +3816,15 @@ static int
 zfs_ioc_userspace_many(zfs_cmd_t *zc)
 {
 	zfsvfs_t *zfsvfs;
-	int error;
+	int bufsize = zc->zc_nvlist_dst_size;
 
-	error = zfsvfs_hold(zc->zc_name, FTAG, &zfsvfs);
+	if (bufsize <= 0)
+		return (ENOMEM);
+
+	int error = zfsvfs_hold(zc->zc_name, FTAG, &zfsvfs);
 	if (error)
 		return (error);
 
-	int bufsize = zc->zc_nvlist_dst_size;
 	void *buf = kmem_alloc(bufsize, KM_SLEEP);
 
 	error = zfs_userspace_many(zfsvfs, zc->zc_objset_type, &zc->zc_cookie,
