@@ -21,7 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -275,7 +275,7 @@ audio_strclose(queue_t *rq, int flag, cred_t *credp)
 	 * avoids leaving record data stuck in queues.
 	 */
 	if (c->c_istream.s_engine != NULL)
-		audio_engine_produce(c->c_istream.s_engine);
+		auimpl_input_callback(c->c_istream.s_engine);
 
 	/* get a local hold on the device */
 	d = c->c_dev;
@@ -322,7 +322,7 @@ audio_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	 * avoids leaving record data stuck in queues.
 	 */
 	if (c->c_istream.s_engine != NULL)
-		audio_engine_produce(c->c_istream.s_engine);
+		auimpl_input_callback(c->c_istream.s_engine);
 
 	/* get a local hold on the device */
 	d = c->c_dev;
@@ -358,7 +358,10 @@ audio_write(dev_t dev, struct uio *uio, cred_t *credp)
 	if ((c = auclnt_hold_by_devt(dev)) == NULL) {
 		return (ENXIO);
 	}
-	rv = (c->c_write == NULL) ? ENXIO : c->c_write(c, uio, credp);
+	if ((rv = auclnt_serialize(c)) == 0) {
+		rv = (c->c_write == NULL) ? ENXIO : c->c_write(c, uio, credp);
+		auclnt_unserialize(c);
+	}
 	auclnt_release(c);
 
 	return (rv);
@@ -373,7 +376,10 @@ audio_read(dev_t dev, struct uio *uio, cred_t *credp)
 	if ((c = auclnt_hold_by_devt(dev)) == NULL) {
 		return (ENXIO);
 	}
-	rv = (c->c_read == NULL) ? ENXIO : c->c_read(c, uio, credp);
+	if ((rv = auclnt_serialize(c)) == 0) {
+		rv = (c->c_read == NULL) ? ENXIO : c->c_read(c, uio, credp);
+		auclnt_unserialize(c);
+	}
 	auclnt_release(c);
 
 	return (rv);

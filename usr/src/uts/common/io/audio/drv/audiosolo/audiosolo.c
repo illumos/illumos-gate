@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,14 +101,11 @@ static ddi_device_acc_attr_t buf_attr = {
 
 /*
  * For the sake of simplicity, this driver fixes a few parameters with
- * constants.  If you want these values to be tunable, upgrade to a
- * nicer and newer device.  This is all tuned for 100 Hz (10
- * millisecs) latency.
+ * constants.
  */
 #define	SOLO_RATE	48000
-#define	SOLO_INTRS	100
-#define	SOLO_FRAGFR	(SOLO_RATE / SOLO_INTRS)
-#define	SOLO_NFRAGS	8
+#define	SOLO_FRAGFR	1024
+#define	SOLO_NFRAGS	2
 #define	SOLO_NCHAN	2
 #define	SOLO_SAMPSZ	2
 #define	SOLO_FRAGSZ	(SOLO_FRAGFR * (SOLO_NCHAN * SOLO_SAMPSZ))
@@ -147,6 +144,7 @@ typedef struct solo_engine {
 	uint32_t		paddr;
 
 	bool			started;
+	bool			trigger;
 	uint64_t		count;
 	uint16_t		offset;
 	int			syncdir;
@@ -340,8 +338,6 @@ static uint_t
 solo_intr(caddr_t arg1, caddr_t arg2)
 {
 	solo_dev_t	*dev = (void *)arg1;
-	audio_engine_t	*prod = NULL;
-	audio_engine_t	*cons = NULL;
 	uint8_t		status;
 	uint_t		rv = DDI_INTR_UNCLAIMED;
 
@@ -357,26 +353,16 @@ solo_intr(caddr_t arg1, caddr_t arg2)
 	status = PORT_RD8(dev->io, 0x7);
 	if (status & 0x20) {
 		rv = DDI_INTR_CLAIMED;
-		cons = dev->play.engine;
 		/* ack the interrupt */
 		solo_setmixer(dev, 0x7a, solo_getmixer(dev, 0x7a) & ~0x80);
 	}
 
 	if (status & 0x10) {
 		rv = DDI_INTR_CLAIMED;
-		prod = dev->rec.engine;
 		/* ack the interrupt */
 		(void) PORT_RD8(dev->sb, 0xe);
 	}
 	mutex_exit(&dev->mutex);
-
-	if (cons) {
-		audio_engine_consume(cons);
-	}
-
-	if (prod) {
-		audio_engine_produce(prod);
-	}
 
 	return (rv);
 }
@@ -488,8 +474,7 @@ solo_set_mixsrc(void *arg, uint64_t val)
 
 	mutex_enter(&dev->mutex);
 	pc->val = val;
-	if (!dev->suspended)
-		solo_configure_mixer(dev);
+	solo_configure_mixer(dev);
 	mutex_exit(&dev->mutex);
 	return (0);
 }
@@ -508,8 +493,7 @@ solo_set_mono(void *arg, uint64_t val)
 
 	mutex_enter(&dev->mutex);
 	pc->val = val;
-	if (!dev->suspended)
-		solo_configure_mixer(dev);
+	solo_configure_mixer(dev);
 	mutex_exit(&dev->mutex);
 	return (0);
 }
@@ -530,8 +514,7 @@ solo_set_stereo(void *arg, uint64_t val)
 
 	mutex_enter(&dev->mutex);
 	pc->val = val;
-	if (!dev->suspended)
-		solo_configure_mixer(dev);
+	solo_configure_mixer(dev);
 	mutex_exit(&dev->mutex);
 	return (0);
 }
@@ -544,8 +527,7 @@ solo_set_bool(void *arg, uint64_t val)
 
 	mutex_enter(&dev->mutex);
 	pc->val = val;
-	if (!dev->suspended)
-		solo_configure_mixer(dev);
+	solo_configure_mixer(dev);
 	mutex_exit(&dev->mutex);
 	return (0);
 }
@@ -751,23 +733,45 @@ solo_aud1_update(solo_engine_t *e)
 	uint32_t	ptr;
 	uint32_t	count;
 	uint32_t	diff;
+	int		tries;
 
 	ASSERT(mutex_owned(&dev->mutex));
 
 	/*
 	 * During recording, this register is known to give back
 	 * garbage if it's not quiescent while being read.  This hack
-	 * attempts to work around it.
+	 * attempts to work around it.  We also suspend the DMA
+	 * while we do this, to minimize record distortion.
 	 */
-	ptr = PORT_RD32(dev->vc, 0);
-	count = PORT_RD16(dev->vc, 4);
-	diff = e->paddr + SOLO_BUFSZ - ptr - count;
-	if ((diff > 3) || (ptr < e->paddr) ||
-	    (ptr >= (e->paddr + SOLO_BUFSZ))) {
-		ptr = dev->last_capture;
-	} else {
-		dev->last_capture = ptr;
+	if (e->trigger) {
+		drv_usecwait(20);
 	}
+	for (tries = 10; tries; tries--) {
+		drv_usecwait(10);
+		ptr = PORT_RD32(dev->vc, 0);
+		count = PORT_RD16(dev->vc, 4);
+		diff = e->paddr + SOLO_BUFSZ - ptr - count;
+		if ((diff > 3) || (ptr < e->paddr) ||
+		    (ptr >= (e->paddr + SOLO_BUFSZ))) {
+			ptr = dev->last_capture;
+		} else {
+			break;
+		}
+	}
+	if (e->trigger) {
+		PORT_WR8(dev->vc, 0xf, 0);	/* restart DMA */
+	}
+	if (!tries) {
+		/*
+		 * Note, this is a pretty bad situation, because we'll
+		 * not have an accurate idea of our position.  But its
+		 * better than making a bad alteration.  If we had FMA
+		 * for audio devices, this would be a good point to
+		 * raise a fault.
+		 */
+		return;
+	}
+	dev->last_capture = ptr;
 	offset = ptr - e->paddr;
 	offset /= (SOLO_NCHAN * SOLO_SAMPSZ);
 
@@ -831,6 +835,7 @@ solo_aud1_start(solo_engine_t *e)
 	PORT_WR8(dev->vc, 0xf, 0);	/* start DMA */
 
 	dev->last_capture = e->paddr;
+	e->trigger = true;
 }
 
 static void
@@ -840,6 +845,7 @@ solo_aud1_stop(solo_engine_t *e)
 
 	/* NB: We might be in quiesce, without a lock held */
 	solo_write(dev, 0xb8, solo_read(dev, 0xb8) & ~0x01);
+	e->trigger = false;
 }
 
 static void
@@ -900,6 +906,8 @@ solo_aud2_start(solo_engine_t *e)
 	v = solo_mixer_scale(dev, CTL_VOLUME);
 	v = v | (v << 4);
 	solo_setmixer(dev, 0x7c, v & 0xff);
+
+	e->trigger = true;
 }
 
 static void
@@ -910,6 +918,8 @@ solo_aud2_stop(solo_engine_t *e)
 	/* NB: We might be in quiesce, without a lock held */
 	PORT_WR8(dev->io, 0x6, 0);
 	solo_setmixer(dev, 0x78, solo_getmixer(dev, 0x78) & ~0x03);
+
+	e->trigger = false;
 }
 
 /*
@@ -968,8 +978,7 @@ solo_count(void *arg)
 	uint64_t	count;
 
 	mutex_enter(&dev->mutex);
-	if (!dev->suspended)
-		e->update(e);
+	e->update(e);
 	count = e->count;
 	mutex_exit(&dev->mutex);
 
@@ -977,16 +986,14 @@ solo_count(void *arg)
 }
 
 static int
-solo_open(void *arg, int f, unsigned *ffr, unsigned *nfr, caddr_t *buf)
+solo_open(void *arg, int f, unsigned *nframes, caddr_t *buf)
 {
 	solo_engine_t	*e = arg;
 	solo_dev_t	*dev = e->dev;
 
 	_NOTE(ARGUNUSED(f));
 
-	/* NB: For simplicity, we just fix the interrupt rate at 100 Hz */
-	*ffr = SOLO_FRAGFR;
-	*nfr = SOLO_NFRAGS;
+	*nframes = SOLO_NFRAGS * SOLO_FRAGFR;
 	*buf = e->kaddr;
 
 	mutex_enter(&dev->mutex);
@@ -1004,8 +1011,7 @@ solo_close(void *arg)
 	solo_dev_t	*dev = e->dev;
 
 	mutex_enter(&dev->mutex);
-	if (!dev->suspended)
-		e->stop(e);
+	e->stop(e);
 	e->started = false;
 	mutex_exit(&dev->mutex);
 }
@@ -1019,8 +1025,7 @@ solo_start(void *arg)
 
 	mutex_enter(&dev->mutex);
 	if (!e->started) {
-		if (!dev->suspended)
-			e->start(e);
+		e->start(e);
 		e->started = true;
 	}
 	mutex_exit(&dev->mutex);
@@ -1036,8 +1041,7 @@ solo_stop(void *arg)
 
 	mutex_enter(&dev->mutex);
 	if (e->started) {
-		if (!dev->suspended)
-			e->stop(e);
+		e->stop(e);
 		e->started = false;
 	}
 	mutex_exit(&dev->mutex);
@@ -1332,14 +1336,9 @@ solo_alloc_engine(solo_dev_t *dev, int engno)
 static int
 solo_suspend(solo_dev_t *dev)
 {
-	mutex_enter(&dev->mutex);
-	/* play */
-	solo_aud2_stop(&dev->play);
-	solo_aud2_update(&dev->play);
-	/* record */
-	solo_aud1_stop(&dev->rec);
-	solo_aud1_update(&dev->rec);
+	audio_dev_suspend(dev->adev);
 
+	mutex_enter(&dev->mutex);
 	dev->suspended = true;
 	mutex_exit(&dev->mutex);
 
@@ -1349,43 +1348,16 @@ solo_suspend(solo_dev_t *dev)
 static int
 solo_resume(solo_dev_t *dev)
 {
-	solo_engine_t	*e;
-	audio_engine_t	*prod = NULL;
-	audio_engine_t	*cons = NULL;
-
-	audio_engine_reset(dev->rec.engine);
-	audio_engine_reset(dev->play.engine);
-
 	mutex_enter(&dev->mutex);
 	if (!solo_init_hw(dev)) {
 		/* yikes! */
 		audio_dev_warn(dev->adev, "unable to resume audio!");
 		audio_dev_warn(dev->adev, "reboot or reload driver to reset");
-		mutex_exit(&dev->mutex);
-		return (DDI_SUCCESS);
 	}
 	dev->suspended = false;
-
-	/* record - audio 1 */
-	e = &dev->rec;
-	if (e->started) {
-		e->start(e);
-		prod = e->engine;
-	}
-
-	/* play - audio 2 */
-	e = &dev->play;
-	if (e->started) {
-		e->start(e);
-		cons = e->engine;
-	}
-
 	mutex_exit(&dev->mutex);
 
-	if (cons)
-		audio_engine_consume(cons);
-	if (prod)
-		audio_engine_produce(prod);
+	audio_dev_resume(dev->adev);
 
 	return (DDI_SUCCESS);
 }

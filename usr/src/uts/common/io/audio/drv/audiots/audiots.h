@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,17 +47,6 @@
 #define	TS_RATE			(48000)
 #define	TS_STEREO		(2)		/* stereo */
 #define	TS_FRAMESZ		(4)		/* 16-bit stereo */
-/*
- * This is how much buffer space we at minimum need.  The worst
- * (biggest) case is 48000 kHz, at 4 bytes per frame (16-bit stereo),
- * with the lowest interrupt frequency.  48000 x 4 bytes per sample /
- * 24 is 8000 bytes per fragment.  Two such fragments would be 16000.
- * (At higher data rates, we get better buffering, with more frags.)
- */
-#define	TS_BUFSZ		(16000)		/* maximum buffer size */
-#define	TS_INTS			(175)		/* default interrupt rate */
-#define	TS_MIN_INTS		(24)		/* minimum interrupt rate */
-#define	TS_MAX_INTS		(2000)		/* maximum interrupt rate */
 
 /*
  * Misc. defines
@@ -77,7 +66,6 @@
 
 #define	TS_MAX_HW_CHANNELS	(32)
 
-#define	TS_KIOP(X)		((kstat_intr_t *)(X->ts_ksp->ks_data))
 #define	TS_WAIT_CNT		(512)
 #define	TS_LOOP_CNT		(10)
 #define	TS_DELAY_CNT		(25)
@@ -439,14 +427,10 @@ struct audiots_port {
 	struct audiots_state	*tp_state;
 	int			tp_num;
 	int			tp_dma_stream;
-	int			tp_int_stream;
 
 	uint32_t		tp_dma_mask;
-	uint32_t		tp_int_mask;
 
 	boolean_t		tp_started;
-	unsigned		tp_intrs;
-	unsigned		tp_fragfr;
 	unsigned		tp_nframes;
 	unsigned		tp_rate;
 	uint64_t		tp_count;
@@ -467,10 +451,7 @@ typedef struct audiots_port audiots_port_t;
  * audiots_state_t	- per instance state and operation data
  */
 struct audiots_state {
-	kmutex_t		ts_lock;	/* state protection lock */
-	ddi_iblock_cookie_t	ts_iblock;	/* iblock cookie */
 	uint_t			ts_flags;	/* flags */
-	kstat_t			*ts_ksp;	/* kernel statistics */
 	dev_info_t		*ts_dip;	/* used by ts_getinfo() */
 	audio_dev_t		*ts_adev;	/* audio device handle */
 	ac97_t			*ts_ac97;	/* ac97 common handle */
@@ -480,7 +461,6 @@ struct audiots_state {
 
 	ddi_acc_handle_t	ts_pcih;	/* handle to config regs */
 	ddi_acc_handle_t	ts_acch;	/* handle to mapped regs */
-	boolean_t		ts_suspended;	/* power management state */
 
 	uint32_t		ts_devid;
 	uint8_t			ts_revid;	/* SB Chip Revision ID */
@@ -488,14 +468,7 @@ struct audiots_state {
 };
 typedef struct audiots_state audiots_state_t;
 
-_NOTE(MUTEX_PROTECTS_DATA(audiots_state::ts_lock, audiots_state))
-_NOTE(READ_ONLY_DATA(audiots_state::ts_instance))
-_NOTE(READ_ONLY_DATA(audiots_state::ts_dip))
-_NOTE(READ_ONLY_DATA(audiots_state::ts_adev))
-
 /* audiots_state.ts_flags defines */
-#define	TS_MUTEX_INIT			0x0001u	/* mutex initialized */
-#define	TS_INTR_INSTALLED		0x0002u	/* intr handler installeld */
 #define	TS_AUDIO_READ_FAILED		0x0020u /* reading the AC97 register */
 						/* has stopped working */
 #define	TS_READ_FAILURE_PRINTED		0x0040u /* Flag to avoid flooding the */

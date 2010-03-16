@@ -21,7 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,17 +34,16 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sysmacros.h>
+#include <sys/sdt.h>
 #include "audio_impl.h"
 
 #define	DECL_AUDIO_IMPORT(NAME, TYPE, SWAP, SHIFT)			\
 void									\
-auimpl_import_##NAME(audio_engine_t *eng, audio_stream_t *sp)		\
+auimpl_import_##NAME(audio_engine_t *e, uint_t nfr, audio_stream_t *sp)	\
 {									\
-	int		fragfr = eng->e_fragfr;				\
-	int		nch = eng->e_nchan;				\
-	unsigned	tidx = eng->e_tidx;				\
-	int32_t 	*out = (void *)sp->s_cnv_src;			\
-	TYPE		*in = (void *)eng->e_data;			\
+	int		nch = e->e_nchan;				\
+	int32_t		*out = (void *)sp->s_cnv_src;			\
+	TYPE		*in = (void *)e->e_data;			\
 	int		ch = 0;						\
 	int		vol = sp->s_gain_eff;				\
 									\
@@ -52,13 +51,14 @@ auimpl_import_##NAME(audio_engine_t *eng, audio_stream_t *sp)		\
 		TYPE 	*ip;						\
 		int32_t *op;						\
 		int 	i;						\
-		int 	incr = eng->e_chincr[ch];			\
+		int 	incr = e->e_chincr[ch];				\
+		uint_t	tidx = e->e_tidx;				\
 									\
 		/* get value and adjust next channel offset */		\
 		op = out++;						\
-		ip = in + eng->e_choffs[ch] + (tidx * incr);		\
+		ip = in + e->e_choffs[ch] + (tidx * incr);		\
 									\
-		i = fragfr;						\
+		i = nfr;						\
 									\
 		do {	/* for each frame */				\
 			int32_t	sample = (TYPE)SWAP(*ip);		\
@@ -68,9 +68,13 @@ auimpl_import_##NAME(audio_engine_t *eng, audio_stream_t *sp)		\
 			scaled /= AUDIO_VOL_SCALE;			\
 									\
 			*op = scaled;					\
-			ip += incr;					\
 			op += nch;					\
 									\
+			ip += incr;					\
+			if (++tidx == e->e_nframes) {			\
+				tidx = 0;				\
+				ip = in + e->e_choffs[ch];		\
+			}						\
 		} while (--i);						\
 		ch++;							\
 	} while (ch < nch);						\
@@ -84,18 +88,16 @@ DECL_AUDIO_IMPORT(24ne, int32_t, /* nop */, /* nop */)
 DECL_AUDIO_IMPORT(24oe, int32_t, ddi_swap32, /* nop */)
 
 /*
- * Produce a fragment's worth of data.  This is called when the data in
- * the conversion buffer is exhausted, and we need to refill it from the
- * source buffer.  We always consume data from the client in quantities of
- * a fragment at a time (assuming that a fragment is available.)
+ * Produce capture data.  This takes data from the conversion buffer
+ * and copies it into the stream data buffer.
  */
 static void
-auimpl_produce_fragment(audio_stream_t *sp, unsigned count)
+auimpl_produce_data(audio_stream_t *sp, uint_t count)
 {
-	unsigned	nframes;
-	unsigned	framesz;
-	caddr_t		cnvsrc;
-	caddr_t		data;
+	uint_t	nframes;
+	uint_t	framesz;
+	caddr_t	cnvsrc;
+	caddr_t	data;
 
 	nframes = sp->s_nframes;
 	framesz = sp->s_framesz;
@@ -114,7 +116,6 @@ auimpl_produce_fragment(audio_stream_t *sp, unsigned count)
 		unsigned nf;
 		unsigned nb;
 
-		ASSERT(sp->s_hidx < nframes);
 		nf = min(nframes - sp->s_hidx, count);
 		nb = nf * framesz;
 
@@ -125,50 +126,92 @@ auimpl_produce_fragment(audio_stream_t *sp, unsigned count)
 		sp->s_head += nf;
 		count -= nf;
 		sp->s_samples += nf;
-		if (sp->s_hidx >= nframes) {
-			sp->s_hidx -= nframes;
-			data -= sp->s_nbytes;
+		if (sp->s_hidx == nframes) {
+			sp->s_hidx = 0;
+			data = sp->s_data;
 		}
 	} while (count);
 
 	ASSERT(sp->s_tail <= sp->s_head);
 	ASSERT(sp->s_hidx < nframes);
-	ASSERT(sp->s_tail <= sp->s_head);
-	ASSERT(sp->s_hidx < nframes);
 }
 
 void
-auimpl_input_callback(audio_engine_t *eng)
+auimpl_input_callback(void *arg)
 {
-	int		fragfr = eng->e_fragfr;
+	audio_engine_t	*e = arg;
+	uint_t		fragfr = e->e_fragfr;
+	audio_stream_t	*sp;
 	audio_client_t	*c;
+	audio_client_t	*clist = NULL;
+	list_t		*l = &e->e_streams;
+	uint64_t	h;
+
+	mutex_enter(&e->e_lock);
+
+	if (e->e_suspended || e->e_failed) {
+		mutex_exit(&e->e_lock);
+		return;
+	}
+
+	if (e->e_need_start) {
+		int rv;
+		if ((rv = ENG_START(e)) != 0) {
+			e->e_failed = B_TRUE;
+			mutex_exit(&e->e_lock);
+			audio_dev_warn(e->e_dev,
+			    "failed starting input, rv = %d", rv);
+			return;
+		}
+		e->e_need_start = B_FALSE;
+	}
+
+	h = ENG_COUNT(e);
+	ASSERT(h >= e->e_head);
+	if (h < e->e_head) {
+		/*
+		 * This is a sign of a serious bug.  We should
+		 * probably offline the device via FMA, if we ever
+		 * support FMA for audio devices.
+		 */
+		e->e_failed = B_TRUE;
+		ENG_STOP(e);
+		mutex_exit(&e->e_lock);
+		audio_dev_warn(e->e_dev,
+		    "device malfunction: broken capture sample counter");
+		return;
+	}
+	e->e_head = h;
+	ASSERT(e->e_head >= e->e_tail);
+
+	if ((e->e_head - e->e_tail) > e->e_nframes) {
+		/* no room for data, not much we can do */
+		e->e_errors++;
+		e->e_overruns++;
+	}
 
 	/* consume all fragments in the buffer */
-	while ((eng->e_head - eng->e_tail) > fragfr) {
+	while ((e->e_head - e->e_tail) > fragfr) {
 
 		/*
 		 * Consider doing the SYNC outside of the lock.
 		 */
-		ENG_SYNC(eng, fragfr);
+		ENG_SYNC(e, fragfr);
 
-		for (audio_stream_t *sp = list_head(&eng->e_streams);
-		    sp != NULL;
-		    sp = list_next(&eng->e_streams, sp)) {
+		for (sp = list_head(l); sp != NULL; sp = list_next(l, sp)) {
 			int space;
 			int count;
 
-			c = sp->s_client;
-
 			mutex_enter(&sp->s_lock);
 			/* skip over streams paused or not running */
-			if (sp->s_paused || (!sp->s_running) ||
-			    eng->e_suspended) {
+			if (sp->s_paused || !sp->s_running) {
 				mutex_exit(&sp->s_lock);
 				continue;
 			}
 			sp->s_cnv_src = sp->s_cnv_buf0;
 			sp->s_cnv_dst = sp->s_cnv_buf1;
-			eng->e_import(eng, sp);
+
+			e->e_import(e, fragfr, sp);
 
 			/*
 			 * Optionally convert fragment to requested sample
@@ -180,33 +223,56 @@ auimpl_input_callback(audio_engine_t *eng)
 				count = fragfr;
 			}
 
+			ASSERT(sp->s_head >= sp->s_tail);
 			space = sp->s_nframes - (sp->s_head - sp->s_tail);
 			if (count > space) {
-				eng->e_stream_overruns++;
-				eng->e_errors++;
+				e->e_stream_overruns++;
+				e->e_errors++;
 				sp->s_errors += count - space;
 				count = space;
 			}
 
-			auimpl_produce_fragment(sp, count);
+			auimpl_produce_data(sp, count);
 
 			/* wake blocked threads (blocking reads, etc.) */
 			cv_broadcast(&sp->s_cv);
 
 			mutex_exit(&sp->s_lock);
 
-			if (c->c_input != NULL) {
-				c->c_input(c);
+			/*
+			 * Add client to notification list.  We'll
+			 * process it after dropping the lock.
+			 */
+			c = sp->s_client;
+
+			if ((c->c_input != NULL) &&
+			    (c->c_next_input == NULL)) {
+				auclnt_hold(c);
+				c->c_next_input = clist;
+				clist = c;
 			}
 		}
 
 		/*
 		 * Update the tail pointer, and the data pointer.
 		 */
-		eng->e_tail += fragfr;
-		eng->e_tidx += fragfr;
-		if (eng->e_tidx >= eng->e_nframes) {
-			eng->e_tidx -= eng->e_nframes;
+		e->e_tail += fragfr;
+		e->e_tidx += fragfr;
+		if (e->e_tidx >= e->e_nframes) {
+			e->e_tidx -= e->e_nframes;
 		}
+	}
+
+	mutex_exit(&e->e_lock);
+
+	/*
+	 * Notify client personalities.
+	 */
+
+	while ((c = clist) != NULL) {
+		clist = c->c_next_input;
+		c->c_next_input = NULL;
+		c->c_input(c);
+		auclnt_release(c);
 	}
 }

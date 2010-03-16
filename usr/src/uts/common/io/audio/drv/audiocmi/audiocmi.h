@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -265,8 +265,6 @@ struct cmpci_port {
 	ddi_dma_handle_t	dmah;
 	caddr_t			kaddr;
 	uint32_t		paddr;
-	unsigned		fragfr;
-	unsigned		nfrags;
 	unsigned		nframes;
 	unsigned		bufsz;
 	unsigned		nchan;
@@ -311,8 +309,6 @@ struct cmpci_dev {
 
 	int			maxch;
 
-	boolean_t		suspended;
-
 	kmutex_t		mutex;
 	cmpci_port_t		port[PORT_MAX];
 	cmpci_ctrl_t		controls[CTL_NUM];
@@ -344,8 +340,6 @@ struct cmpci_dev {
 #define	SET16(dev, offset, v)	PUT16(dev, offset, GET16(dev, offset) | (v))
 #define	CLR32(dev, offset, v)	PUT32(dev, offset, GET32(dev, offset) & ~(v))
 #define	SET32(dev, offset, v)	PUT32(dev, offset, GET32(dev, offset) | (v))
-
-#define	KSINTR(dev)	((kstat_intr_t *)((dev)->ksp->ks_data))
 
 #define	BIT(n)		(1U << (n))
 

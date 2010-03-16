@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -653,8 +653,6 @@ int ac97_control_set(ac97_ctrl_t *, uint64_t);
  * Bits common to both new style and old style initialization.
  */
 void ac97_free(ac97_t *);
-void ac97_suspend(ac97_t *);
-void ac97_resume(ac97_t *);
 void ac97_reset(ac97_t *);
 int ac97_num_channels(ac97_t *);
 

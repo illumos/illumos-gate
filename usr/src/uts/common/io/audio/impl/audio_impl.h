@@ -21,7 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,10 @@
 #define	AUDIO_VOL_SCALE		256
 #define	AUDIO_DB_SIZE		50
 
+#define	AUDIO_INTRHZ		100
+#define	AUDIO_INTRHZ_MIN	50	/* 20 msec max */
+#define	AUDIO_INTRHZ_MAX	500
+
 struct audio_parms {
 	int		p_format;
 	int		p_rate;
@@ -54,14 +58,10 @@ struct audio_buffer {
 	caddr_t			b_data;
 	uint64_t		b_head;
 	uint64_t		b_tail;
-	unsigned		b_hidx;		/* head % nframes */
-	unsigned		b_tidx;		/* tail % nframes */
-	unsigned		b_fragfr;	/* frames per frag */
-	unsigned		b_fragbytes;	/* bytes per frag */
-	unsigned		b_nframes;	/* total frames */
-	unsigned		b_nbytes;	/* total bytes */
-	unsigned		b_nfrags;	/* total frags */
-	unsigned		b_framesz;	/* bytes per frame  */
+	uint_t			b_hidx;		/* head % nframes */
+	uint_t			b_tidx;		/* tail % nframes */
+	uint_t			b_nframes;	/* total frames */
+	uint_t			b_framesz;	/* bytes per frame  */
 };
 
 /*
@@ -75,14 +75,14 @@ struct audio_stream {
 #define	s_bufsz			s_buf.b_size
 #define	s_head			s_buf.b_head
 #define	s_tail			s_buf.b_tail
-#define	s_nfrags		s_buf.b_nfrags
 #define	s_framesz		s_buf.b_framesz
-#define	s_fragfr		s_buf.b_fragfr
-#define	s_fragbytes		s_buf.b_fragbytes
 #define	s_nframes		s_buf.b_nframes
-#define	s_nbytes		s_buf.b_nbytes
 #define	s_tidx			s_buf.b_tidx
 #define	s_hidx			s_buf.b_hidx
+	uint_t			s_nfrags;
+	uint_t			s_fragfr;
+	uint_t			s_nbytes;
+	uint_t			s_fragbytes;
 	ddi_umem_cookie_t	s_cookie;
 	uint32_t		s_allocsz;
 	uint32_t		s_hintsz;	/* latency hints */
@@ -102,7 +102,7 @@ struct audio_stream {
 	 * Sample rate conversion (SRC) and format conversion details.
 	 */
 	struct grc3state	*s_src_state[AUDIO_MAX_CHANNELS];
-	unsigned		s_src_quality;
+	uint_t			s_src_quality;
 	int			s_cnv_max;
 	audio_cnv_func_t	s_converter;
 	uint32_t		*s_cnv_buf0;
@@ -152,7 +152,7 @@ struct audio_stream {
 	/*
 	 * Other bits.
 	 */
-	unsigned		s_engcap;	/* ENGINE_xxx_CAP */
+	uint_t			s_engcap;	/* ENGINE_xxx_CAP */
 };
 
 /*
@@ -164,6 +164,14 @@ struct audio_client {
 	audio_stream_t		c_istream;
 	audio_stream_t		c_ostream;
 	void			*c_private;
+
+	/*
+	 * We can keep a linked list of clients to "notify" so that
+	 * we can do this outside of locked context.
+	 */
+	audio_client_t		*c_next_input;
+	audio_client_t		*c_next_output;
+	audio_client_t		*c_next_drain;
 
 	/*
 	 * DDI support.
@@ -180,6 +188,7 @@ struct audio_client {
 	list_node_t		c_global_linkage;
 	list_node_t		c_dev_linkage;
 	int			c_refcnt;
+	boolean_t		c_serialize;
 
 	kmutex_t		c_lock;
 	kcondvar_t		c_cv;
@@ -188,7 +197,7 @@ struct audio_client {
 	/*
 	 * Client wide settings... e.g. ops vector, etc.
 	 */
-	unsigned		c_omode;	/* open mode */
+	uint_t			c_omode;	/* open mode */
 	pid_t			c_pid;		/* opening process id */
 	audio_dev_t		*c_dev;
 	cred_t			*c_cred;
@@ -220,7 +229,6 @@ struct audio_stats {
 	kstat_named_t		st_head;
 	kstat_named_t		st_tail;
 	kstat_named_t		st_flags;
-	kstat_named_t		st_fragfr;
 	kstat_named_t		st_nfrags;
 	kstat_named_t		st_framesz;
 	kstat_named_t		st_nbytes;
@@ -235,8 +243,13 @@ struct audio_stats {
 	kstat_named_t		st_engine_overruns;
 	kstat_named_t		st_stream_underruns;
 	kstat_named_t		st_stream_overruns;
+	kstat_named_t		st_playahead;
 	kstat_named_t		st_suspended;
+	kstat_named_t		st_failed;
 };
+
+typedef void (*audio_import_fn_t)(audio_engine_t *, uint_t, audio_stream_t *);
+typedef void (*audio_export_fn_t)(audio_engine_t *, uint_t, uint_t);
 
 /*
  * An audio engine corresponds to a single DMA transfer channel.  It can
@@ -247,17 +260,17 @@ struct audio_stats {
 struct audio_engine {
 	audio_engine_ops_t	e_ops;
 	void			*e_private;
-	unsigned		e_flags;
+	uint_t			e_flags;
 
 	/*
 	 * Mixing related fields.
 	 */
-	unsigned		e_limiter_state;
+	uint_t			e_limiter_state;
 	int32_t			*e_chbufs[AUDIO_MAX_CHANNELS];
-	unsigned		e_choffs[AUDIO_MAX_CHANNELS];
-	unsigned		e_chincr[AUDIO_MAX_CHANNELS];
-	void			(*e_export)(audio_engine_t *);
-	void			(*e_import)(audio_engine_t *, audio_stream_t *);
+	uint_t			e_choffs[AUDIO_MAX_CHANNELS];
+	uint_t			e_chincr[AUDIO_MAX_CHANNELS];
+	audio_export_fn_t	e_export;
+	audio_import_fn_t	e_import;
 
 	/*
 	 * Underlying physical buffer shared with device driver.
@@ -266,16 +279,12 @@ struct audio_engine {
 #define	e_head			e_buf.b_head
 #define	e_tail			e_buf.b_tail
 #define	e_data			e_buf.b_data
-#define	e_fragfr		e_buf.b_fragfr
-#define	e_fragbytes		e_buf.b_fragbytes
 #define	e_framesz		e_buf.b_framesz
-#define	e_nbytes		e_buf.b_nbytes
 #define	e_nframes		e_buf.b_nframes
-#define	e_nfrags		e_buf.b_nfrags
 #define	e_hidx			e_buf.b_hidx
 #define	e_tidx			e_buf.b_tidx
-
-	unsigned		e_playahead;
+	uint_t			e_fragfr;
+	uint_t			e_playahead;
 
 	int			e_intrs;
 	int			e_errors;
@@ -300,6 +309,8 @@ struct audio_engine {
 	 * Synchronization.
 	 */
 	kmutex_t		e_lock;
+	kcondvar_t		e_cv;
+	ddi_periodic_t		e_periodic;
 
 	/*
 	 * Linkage for per-device list.
@@ -313,7 +324,10 @@ struct audio_engine {
 	 */
 	list_t			e_streams;
 	int			e_nrunning;
-	boolean_t		e_suspended;
+	int			e_suspended;
+	boolean_t		e_failed;
+
+	boolean_t		e_need_start;
 };
 
 struct audio_dev {
@@ -342,9 +356,12 @@ struct audio_dev {
 	 */
 	kmutex_t		d_lock;
 	kcondvar_t		d_cv;
-	krwlock_t		d_ctrl_lock;	/* leaf lock */
+	kmutex_t		d_ctrl_lock;	/* leaf lock */
+	kcondvar_t		d_ctrl_cv;
 	krwlock_t		d_clnt_lock;
-	unsigned		d_refcnt;
+	uint_t			d_refcnt;
+	int			d_suspended;
+	boolean_t		d_failed;
 
 	/*
 	 * Lists of virtual clients, controls and engines.  Protected by
@@ -356,7 +373,7 @@ struct audio_dev {
 	audio_ctrl_t		*d_pcmvol_ctrl;
 	uint64_t		d_pcmvol;
 
-	volatile unsigned	d_serial;
+	volatile uint_t		d_serial;
 
 	/*
 	 * Linkage onto global list of devices.
@@ -403,8 +420,9 @@ struct	audio_ctrl {
 	audio_ctrl_rd_t		ctrl_read_fn;
 	audio_ctrl_wr_t		ctrl_write_fn;
 	list_node_t		ctrl_linkage;
-	kmutex_t		ctrl_lock;
 	void			*ctrl_arg;
+	uint64_t		ctrl_saved;	/* the saved value */
+	boolean_t		ctrl_saved_ok;
 };
 
 
@@ -418,22 +436,23 @@ void auimpl_format_free(audio_stream_t *);
 int auimpl_format_setup(audio_stream_t *, audio_parms_t *);
 
 /* audio_output.c */
-void auimpl_export_16ne(audio_engine_t *);
-void auimpl_export_16oe(audio_engine_t *);
-void auimpl_export_24ne(audio_engine_t *);
-void auimpl_export_24oe(audio_engine_t *);
-void auimpl_export_32ne(audio_engine_t *);
-void auimpl_export_32oe(audio_engine_t *);
-void auimpl_output_callback(audio_engine_t *);
+void auimpl_export_16ne(audio_engine_t *, uint_t, uint_t);
+void auimpl_export_16oe(audio_engine_t *, uint_t, uint_t);
+void auimpl_export_24ne(audio_engine_t *, uint_t, uint_t);
+void auimpl_export_24oe(audio_engine_t *, uint_t, uint_t);
+void auimpl_export_32ne(audio_engine_t *, uint_t, uint_t);
+void auimpl_export_32oe(audio_engine_t *, uint_t, uint_t);
+void auimpl_output_callback(void *);
+void auimpl_output_preload(audio_engine_t *);
 
 /* audio_input.c */
-void auimpl_import_16ne(audio_engine_t *, audio_stream_t *);
-void auimpl_import_16oe(audio_engine_t *, audio_stream_t *);
-void auimpl_import_24ne(audio_engine_t *, audio_stream_t *);
-void auimpl_import_24oe(audio_engine_t *, audio_stream_t *);
-void auimpl_import_32ne(audio_engine_t *, audio_stream_t *);
-void auimpl_import_32oe(audio_engine_t *, audio_stream_t *);
-void auimpl_input_callback(audio_engine_t *);
+void auimpl_import_16ne(audio_engine_t *, uint_t, audio_stream_t *);
+void auimpl_import_16oe(audio_engine_t *, uint_t, audio_stream_t *);
+void auimpl_import_24ne(audio_engine_t *, uint_t, audio_stream_t *);
+void auimpl_import_24oe(audio_engine_t *, uint_t, audio_stream_t *);
+void auimpl_import_32ne(audio_engine_t *, uint_t, audio_stream_t *);
+void auimpl_import_32oe(audio_engine_t *, uint_t, audio_stream_t *);
+void auimpl_input_callback(void *);
 int auimpl_input_drain(audio_stream_t *);
 
 /* audio_client.c */
@@ -448,7 +467,12 @@ void auimpl_remove_minors(audio_dev_t *);
 int auimpl_set_pcmvol(void *, uint64_t);
 int auimpl_get_pcmvol(void *, uint64_t *);
 
+/* audio_ctrl.c */
+int auimpl_save_controls(audio_dev_t *);
+int auimpl_restore_controls(audio_dev_t *);
+
 /* audio_engine.c */
+extern int audio_priority;
 void auimpl_dev_init(void);
 void auimpl_dev_fini(void);
 void auimpl_dev_hold(audio_dev_t *);
@@ -478,7 +502,7 @@ void auimpl_dev_vwarn(audio_dev_t *, const char *, va_list);
 #define	ENG_QLEN(e)		E_OP(e, qlen)(E_PRV(e))
 #define	ENG_PLAYAHEAD(e)	E_OP(e, playahead)(E_PRV(e))
 #define	ENG_CLOSE(e)		E_OP(e, close)(E_PRV(e))
-#define	ENG_OPEN(e, s, nf, d) 	E_OP(e, open)(E_PRV(e), e->e_flags, s, nf, d)
+#define	ENG_OPEN(e, nf, d) 	E_OP(e, open)(E_PRV(e), e->e_flags, nf, d)
 #define	ENG_CHINFO(e, c, o, i)	E_OP(e, chinfo(E_PRV(e), c, o, i))
 
 /* audio_sun.c */

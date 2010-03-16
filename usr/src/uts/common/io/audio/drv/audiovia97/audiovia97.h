@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,14 +38,9 @@
 #define	VIA97_NUM_PORTC		2
 #define	VIA97_PLAY_SGD_NUM	0
 #define	VIA97_REC_SGD_NUM	1
-#define	VIA97_NUM_SGD	512		/* Max number of SGD entries (4k/8) */
 
 #define	VIA_VENDOR_ID		0x1106
 #define	VIA_82C686		0x3058
-
-#define	VIA97_MAX_INTRS		256
-#define	VIA97_MIN_INTRS		24
-#define	VIA97_INTRS		175
 
 #define	CODEC_TIMEOUT_COUNT	500
 #define	AC97CODEC	0x80	/* Access AC97 Codec */
@@ -63,12 +58,9 @@ struct _via97_portc_t
 	via97_devc_t *devc;
 	audio_engine_t *engine;
 
-	int started;
-	unsigned		intrs;
-	unsigned		fragfr;
-	unsigned		fragsz;
-	unsigned		cur_frag;
-	unsigned		resid;
+	int			started;
+	unsigned		nframes;
+	unsigned		pos;
 	caddr_t			base;
 
 	ddi_dma_handle_t	sgd_dmah;	/* dma for descriptors */
@@ -90,15 +82,10 @@ struct _via97_devc_t
 	dev_info_t		*dip;
 	audio_dev_t		*adev;
 	ac97_t			*ac97;
-	kstat_t			*ksp;
 
-	boolean_t		suspended;
 	ddi_acc_handle_t	pcih;
 	ddi_acc_handle_t	regsh;
 	caddr_t			base;
-	kmutex_t		mutex;		/* For normal locking */
-	kmutex_t		low_mutex;	/* For low level routines */
-	ddi_intr_handle_t	ih;
 
 	via97_portc_t *portc[VIA97_NUM_PORTC];
 };

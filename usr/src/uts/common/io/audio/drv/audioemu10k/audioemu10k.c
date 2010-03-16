@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,9 +109,6 @@ static uint8_t clfe_routing[MAX_SENDS] = {
 static uint8_t side_routing[MAX_SENDS] = {
 	SEND_SIDEL, SEND_SIDER, 0x3f, 0x3f
 };
-static uint8_t no_routing[MAX_SENDS] = {
-	0x3f, 0x3f, 0x3f, 0x3f
-};
 
 /*
  * SB Live! cannot do DMA above 2G addresses. Audigy/2/4 have special 8k page
@@ -142,7 +139,7 @@ static int emu10k_resume(dev_info_t *);
 static int emu10k_detach(emu10k_devc_t *);
 static int emu10k_suspend(emu10k_devc_t *);
 
-static int emu10k_open(void *, int, unsigned *, unsigned *, caddr_t *);
+static int emu10k_open(void *, int, unsigned *, caddr_t *);
 static void emu10k_close(void *);
 static int emu10k_start(void *);
 static void emu10k_stop(void *);
@@ -157,9 +154,7 @@ static uint16_t emu10k_read_ac97(void *, uint8_t);
 static void emu10k_write_ac97(void *, uint8_t, uint16_t);
 static int emu10k_alloc_port(emu10k_devc_t *, int);
 static void emu10k_destroy(emu10k_devc_t *);
-static int emu10k_setup_intrs(emu10k_devc_t *);
 static int emu10k_hwinit(emu10k_devc_t *);
-static uint_t emu10k_intr(caddr_t, caddr_t);
 static void emu10k_init_effects(emu10k_devc_t *);
 
 static audio_engine_ops_t emu10k_engine_ops = {
@@ -290,58 +285,6 @@ emu10k_write_efx(emu10k_devc_t *devc, int reg, unsigned int value)
 	emu10k_write_reg(devc, reg, 0, value);
 }
 
-static uint_t
-emu10k_intr(caddr_t argp, caddr_t nocare)
-{
-	emu10k_devc_t *devc = (void *) argp;
-	emu10k_portc_t *portc;
-	uint32_t status;
-	audio_engine_t *cons = NULL, *prod = NULL;
-
-
-	_NOTE(ARGUNUSED (nocare));
-
-	mutex_enter(&devc->mutex);
-	if (devc->suspended) {
-		mutex_exit(&devc->mutex);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	status = INL(devc, devc->regs + INTPEND);
-
-	if (status == 0) {
-		mutex_exit(&devc->mutex);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	if (status & INT_CL) {	/* channel loop */
-		emu10k_write_reg(devc, CLIPL, 0, (1U << 8));
-		OUTL(devc, INT_CL, devc->regs + INTPEND);
-		portc = devc->portc[EMU10K_PLAY];
-		if (portc->active) {
-			cons = portc->engine;
-		}
-	}
-	if (status & (INT_AF|INT_AH|INT_MF|INT_MH)) {	/* ADC interrupt */
-		OUTL(devc, INT_AF|INT_AH|INT_MF|INT_MH, devc->regs + INTPEND);
-		portc = devc->portc[EMU10K_REC];
-		if (portc->active) {
-			prod = portc->engine;
-		}
-	}
-
-	mutex_exit(&devc->mutex);
-
-	if (cons) {
-		audio_engine_consume(cons);
-	}
-	if (prod) {
-		audio_engine_produce(prod);
-	}
-
-	return (DDI_INTR_CLAIMED);
-}
-
 /*
  * Audio routines
  */
@@ -443,68 +386,19 @@ emu10k_setup_voice(emu10k_portc_t *portc, int voice, int chn, int buf_offset)
 	emu10k_write_reg(devc, PEFE_PITCHAMOUNT, voice, 0x00);
 }
 
-static void
-emu10k_setup_silence(emu10k_portc_t *portc, int voice)
-{
-	emu10k_devc_t *devc = portc->devc;
-
-	emu10k_write_reg(devc, VEDS, voice, 0x0);	/* OFF */
-	emu10k_write_reg(devc, VTFT, voice, 0xffff);
-	emu10k_write_reg(devc, CVCF, voice, 0xffff);
-
-	/* set stereo */
-	emu10k_write_reg(devc, CPF, voice, 0x8000);
-
-	/* SDL, ST, CA */
-	emu10k_write_reg(devc, SDL, voice, portc->fragfr);
-	emu10k_write_reg(devc, SCSA, voice, 0);
-	emu10k_write_reg(devc, PTAB, voice, 0);
-	emu10k_write_reg(devc, QKBCA, voice, 0);
-
-	emu10k_write_reg(devc, Z1, voice, 0);
-	emu10k_write_reg(devc, Z2, voice, 0);
-
-	/* This is really a physical address */
-	emu10k_write_reg(devc, MAPA, voice,
-	    0x1fff | (devc->silence_paddr << 1));
-	emu10k_write_reg(devc, MAPB, voice,
-	    0x1fff | (devc->silence_paddr << 1));
-
-	emu10k_write_reg(devc, VTFT, voice, 0x0000ffff);
-	emu10k_write_reg(devc, CVCF, voice, 0x0000ffff);
-	emu10k_write_reg(devc, MEHA, voice, 0);
-	emu10k_write_reg(devc, MEDS, voice, 0x7f);
-	emu10k_write_reg(devc, MLV, voice, 0x8000);
-	emu10k_write_reg(devc, VLV, voice, 0x8000);
-	emu10k_write_reg(devc, VFM, voice, 0);
-	emu10k_write_reg(devc, TMFQ, voice, 0);
-	emu10k_write_reg(devc, VVFQ, voice, 0);
-	emu10k_write_reg(devc, MEV, voice, 0x8000);
-	emu10k_write_reg(devc, VEHA, voice, 0x7f7f);	/* OK */
-	/* No volume envelope delay (OK) */
-	emu10k_write_reg(devc, VEV, voice, 0x8000);
-	emu10k_write_reg(devc, PEFE_FILTERAMOUNT, voice, 0x7f);
-	emu10k_write_reg(devc, PEFE_PITCHAMOUNT, voice, 0x00);
-}
-
 int
-emu10k_open(void *arg, int flag,
-    unsigned *fragfrp, unsigned *nfragsp, caddr_t *bufp)
+emu10k_open(void *arg, int flag, unsigned *nframes, caddr_t *bufp)
 {
 	emu10k_portc_t *portc = arg;
 	emu10k_devc_t *devc = portc->devc;
 
 	_NOTE(ARGUNUSED(flag));
 
-	portc->started = B_FALSE;
 	portc->active = B_FALSE;
-	*fragfrp = portc->fragfr;
-	*nfragsp = portc->nfrags;
+	*nframes = portc->nframes;
 	*bufp = portc->buf_kaddr;
 
 	mutex_enter(&devc->mutex);
-	if (!devc->suspended)
-		portc->reset_port(portc);
 	portc->count = 0;
 	mutex_exit(&devc->mutex);
 
@@ -514,14 +408,7 @@ emu10k_open(void *arg, int flag,
 void
 emu10k_close(void *arg)
 {
-	emu10k_portc_t *portc = arg;
-	emu10k_devc_t *devc = portc->devc;
-
-	mutex_enter(&devc->mutex);
-	if (!devc->suspended)
-		portc->stop_port(portc);
-	portc->started = B_FALSE;
-	mutex_exit(&devc->mutex);
+	_NOTE(ARGUNUSED(arg));
 }
 
 int
@@ -531,11 +418,8 @@ emu10k_start(void *arg)
 	emu10k_devc_t *devc = portc->devc;
 
 	mutex_enter(&devc->mutex);
-	if (!portc->started) {
-		if (!devc->suspended)
-			portc->start_port(portc);
-		portc->started = B_TRUE;
-	}
+	portc->reset_port(portc);
+	portc->start_port(portc);
 	mutex_exit(&devc->mutex);
 	return (0);
 }
@@ -547,11 +431,7 @@ emu10k_stop(void *arg)
 	emu10k_devc_t *devc = portc->devc;
 
 	mutex_enter(&devc->mutex);
-	if (portc->started) {
-		if (!devc->suspended)
-			portc->stop_port(portc);
-		portc->started = B_FALSE;
-	}
+	portc->stop_port(portc);
 	mutex_exit(&devc->mutex);
 }
 
@@ -596,8 +476,7 @@ emu10k_count(void *arg)
 	uint64_t count;
 
 	mutex_enter(&devc->mutex);
-	if (!devc->suspended)
-		portc->update_port(portc);
+	portc->update_port(portc);
 	count = portc->count;
 	mutex_exit(&devc->mutex);
 
@@ -804,17 +683,6 @@ emu10k_start_play(emu10k_portc_t *portc)
 	emu10k_prepare_voice(devc, 6);
 	emu10k_prepare_voice(devc, 7);
 
-	emu10k_prepare_voice(devc, 8);
-	emu10k_prepare_voice(devc, 9);
-
-	/* arrange to receive full loop interrupts on channel 8 */
-	emu10k_write_reg(devc, CLIEL, 0, (1U << 8));
-
-	/* initialize our position counter... */
-	portc->pos =
-	    (emu10k_read_reg(devc, QKBCA, 0) & 0xffffff) -
-	    (portc->memptr >> 2);
-
 	/* Trigger playback on all voices */
 	emu10k_write_reg(devc, VEDS, 0, 0x7f7f);
 	emu10k_write_reg(devc, VEDS, 1, 0x7f7f);
@@ -824,8 +692,6 @@ emu10k_start_play(emu10k_portc_t *portc)
 	emu10k_write_reg(devc, VEDS, 5, 0x7f7f);
 	emu10k_write_reg(devc, VEDS, 6, 0x7f7f);
 	emu10k_write_reg(devc, VEDS, 7, 0x7f7f);
-	emu10k_write_reg(devc, VEDS, 8, 0x7f7f);
-	emu10k_write_reg(devc, VEDS, 9, 0x7f7f);
 
 	portc->active = B_TRUE;
 }
@@ -843,8 +709,6 @@ emu10k_stop_play(emu10k_portc_t *portc)
 	emu10k_stop_voice(devc, 5);
 	emu10k_stop_voice(devc, 6);
 	emu10k_stop_voice(devc, 7);
-	emu10k_stop_voice(devc, 8);
-	emu10k_stop_voice(devc, 9);
 
 	portc->active = B_FALSE;
 }
@@ -870,16 +734,7 @@ emu10k_reset_play(emu10k_portc_t *portc)
 		emu10k_reset_pair(portc, 0, front_routing, 0);
 		emu10k_reset_pair(portc, 2, surr_routing, offs);
 	}
-	emu10k_setup_silence(portc, 8);
-	emu10k_setup_silence(portc, 9);
 
-	/*
-	 * This way we can use voices 8 and 9 for timing, we have
-	 * programmed them to be just the size of a single fragment,
-	 * that way when they loop we get a clean interrupt.
-	 */
-	emu10k_write_routing(devc, 8, no_routing);
-	emu10k_write_routing(devc, 9, no_routing);
 	portc->pos = 0;
 }
 
@@ -896,13 +751,23 @@ emu10k_update_play(emu10k_portc_t *portc)
 	 */
 	pos = emu10k_read_reg(devc, QKBCA, 0) & 0xffffff;
 	pos -= (portc->memptr >> 2);
+	if (pos > portc->nframes) {
+		/*
+		 * This should never happen!  If it happens, we should
+		 * throw an FMA fault.  (When we support FMA.)  For now
+		 * we just assume the device is stuck, and report no
+		 * change in position.
+		 */
+		pos = portc->pos;
+	}
+	ASSERT(pos <= portc->nframes);
 
-	if (pos <= portc->pos) {
-		cnt = portc->nframes - portc->pos;
-		cnt += pos;
+	if (pos < portc->pos) {
+		cnt = (portc->nframes - portc->pos) + pos;
 	} else {
 		cnt = (pos - portc->pos);
 	}
+	ASSERT(cnt <= portc->nframes);
 	if (portc->dopos) {
 		emu10k_vars[0] = portc->pos;
 		emu10k_vars[1] = pos;
@@ -910,11 +775,6 @@ emu10k_update_play(emu10k_portc_t *portc)
 		emu10k_vars[3] = cnt;
 		portc->dopos = 0;
 	}
-	if (cnt > portc->nframes) {
-		printf("Got bogus count %u\n", cnt);
-		cnt = portc->fragfr;
-	}
-	ASSERT(cnt <= portc->nframes);
 	portc->count += cnt;
 	portc->pos = pos;
 }
@@ -924,10 +784,6 @@ emu10k_start_rec(emu10k_portc_t *portc)
 {
 	emu10k_devc_t *devc = portc->devc;
 	uint32_t tmp;
-
-	/* Intr enable */
-	OUTL(devc, INL(devc, devc->regs + IE) | IE_MB | IE_AB,
-	    devc->regs + IE);
 
 	tmp = 0;			/* setup 48Kz */
 	if (devc->feature_mask & (SB_AUDIGY|SB_AUDIGY2|SB_AUDIGY2VAL))
@@ -976,8 +832,6 @@ emu10k_reset_rec(emu10k_portc_t *portc)
 	emu10k_write_reg(devc, ADCBS, 0, sz);
 	emu10k_write_reg(devc, ADCSR, 0, 0);	/* reset for phase */
 	portc->pos = 0;
-	OUTL(devc, INL(devc, devc->regs + IE) & ~(IE_MB | IE_AB),
-	    devc->regs + IE);
 }
 
 void
@@ -1015,7 +869,6 @@ emu10k_alloc_port(emu10k_devc_t *devc, int num)
 	portc = kmem_zalloc(sizeof (*portc), KM_SLEEP);
 	devc->portc[num] = portc;
 	portc->devc = devc;
-	portc->started = B_FALSE;
 
 	portc->memptr = devc->audio_memptr;
 	devc->audio_memptr += (DMABUF_SIZE + 4095) & ~4095;
@@ -1032,9 +885,7 @@ emu10k_alloc_port(emu10k_devc_t *devc, int num)
 		portc->update_port = emu10k_update_rec;
 		/* This is the minimum record buffer size. */
 		portc->buf_size = 4096;
-		portc->nfrags = 2;
-		portc->nframes = 4096 / 4;
-		portc->fragfr = portc->nframes / portc->nfrags;
+		portc->nframes = portc->buf_size / 4;
 		break;
 	case EMU10K_PLAY:
 		portc->syncdir = DDI_DMA_SYNC_FORDEV;
@@ -1045,10 +896,8 @@ emu10k_alloc_port(emu10k_devc_t *devc, int num)
 		portc->stop_port = emu10k_stop_play;
 		portc->reset_port = emu10k_reset_play;
 		portc->update_port = emu10k_update_play;
-		/* XXX: this could probably be tunable */
-		portc->nfrags = 2;
-		portc->fragfr = 288;
-		portc->nframes = portc->nfrags * portc->fragfr;
+		/* This could probably be tunable. */
+		portc->nframes = 2048;
 		portc->buf_size = portc->nframes * portc->channels * 2;
 		break;
 	default:
@@ -1122,54 +971,10 @@ emu10k_alloc_port(emu10k_devc_t *devc, int num)
 	return (DDI_SUCCESS);
 }
 
-int
-emu10k_setup_intrs(emu10k_devc_t *devc)
-{
-	uint_t ipri;
-	int actual;
-	int rv;
-	ddi_intr_handle_t ih[1];
-
-	rv = ddi_intr_alloc(devc->dip, ih, DDI_INTR_TYPE_FIXED,
-	    0, 1, &actual, DDI_INTR_ALLOC_STRICT);
-	if ((rv != DDI_SUCCESS) || (actual != 1)) {
-		audio_dev_warn(devc->adev,
-		    "Can't alloc interrupt handle (rv %d actual %d)",
-		    rv, actual);
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_get_pri(ih[0], &ipri) != DDI_SUCCESS) {
-		audio_dev_warn(devc->adev, "Can't get interrupt priority");
-		(void) ddi_intr_free(ih[0]);
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_add_handler(ih[0], emu10k_intr, devc, NULL) !=
-	    DDI_SUCCESS) {
-		audio_dev_warn(devc->adev, "Can't add interrupt handler");
-		(void) ddi_intr_free(ih[0]);
-		return (DDI_FAILURE);
-	}
-
-	devc->ih = ih[0];
-	mutex_init(&devc->mutex, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-	return (DDI_SUCCESS);
-}
-
 void
 emu10k_destroy(emu10k_devc_t *devc)
 {
-	if (devc->ih != NULL) {
-		(void) ddi_intr_disable(devc->ih);
-		(void) ddi_intr_remove_handler(devc->ih);
-		(void) ddi_intr_free(devc->ih);
-		mutex_destroy(&devc->mutex);
-	}
-
-	if (devc->ksp) {
-		kstat_delete(devc->ksp);
-	}
+	mutex_destroy(&devc->mutex);
 
 	if (devc->silence_paddr) {
 		(void) ddi_dma_unbind_handle(devc->silence_dmah);
@@ -1282,38 +1087,6 @@ emu10k_init_voice(emu10k_devc_t *devc, int voice)
 	}
 }
 
-static void
-emu10k_refresh_mixer(emu10k_devc_t *devc)
-{
-	uint32_t val;
-	uint32_t set;
-
-	for (int gpr = 0; gpr < MAX_GPR; gpr++) {
-		if (devc->gpr_shadow[gpr].valid) {
-			emu10k_write_reg(devc, gpr + GPR0, 0,
-			    devc->gpr_shadow[gpr].value);
-		}
-	}
-
-	set = devc->ctrls[CTL_JACK3].val;
-	if (devc->feature_mask & SB_INVSP) {
-		set = !set;
-	}
-
-	if (devc->feature_mask & (SB_AUDIGY|SB_AUDIGY2|SB_AUDIGY2VAL)) {
-		val = INL(devc, devc->regs + 0x18);
-		val &= ~A_IOCFG_GPOUT0;
-		val |= set ? 0x44 : 0x40;
-		OUTL(devc, val, devc->regs + 0x18);
-
-	} else if (devc->feature_mask & SB_LIVE) {
-		val = INL(devc, devc->regs + HCFG);
-		val &= ~HCFG_GPOUT0;
-		val |= set ? HCFG_GPOUT0 : 0;
-		OUTL(devc, val, devc->regs + HCFG);
-	}
-}
-
 int
 emu10k_hwinit(emu10k_devc_t *devc)
 {
@@ -1337,6 +1110,7 @@ emu10k_hwinit(emu10k_devc_t *devc)
 	emu10k_write_reg(devc, ADCBS, 0, 0x0);
 	emu10k_write_reg(devc, ADCBA, 0, 0x0);
 
+	/* Ensure all interrupts are disabled */
 	OUTL(devc, 0, devc->regs + IE);
 	emu10k_write_reg(devc, CLIEL, 0, 0x0);
 	emu10k_write_reg(devc, CLIEH, 0, 0x0);
@@ -1550,9 +1324,7 @@ emu10k_write_gpr(emu10k_devc_t *devc, int gpr, uint32_t value)
 	ASSERT(gpr < MAX_GPR);
 	devc->gpr_shadow[gpr].valid = B_TRUE;
 	devc->gpr_shadow[gpr].value = value;
-	if (!devc->suspended) {
-		emu10k_write_reg(devc, gpr + GPR0, 0, value);
-	}
+	emu10k_write_reg(devc, gpr + GPR0, 0, value);
 }
 
 static int
@@ -1659,19 +1431,17 @@ emu10k_set_jack3(void *arg, uint64_t value)
 	if (devc->feature_mask & SB_INVSP) {
 		set_val = !set_val;
 	}
-	if (!devc->suspended) {
-		if (devc->feature_mask & (SB_AUDIGY|SB_AUDIGY2|SB_AUDIGY2VAL)) {
-			val = INL(devc, devc->regs + 0x18);
-			val &= ~A_IOCFG_GPOUT0;
-			val |= set_val ? 0x44 : 0x40;
-			OUTL(devc, val, devc->regs + 0x18);
+	if (devc->feature_mask & (SB_AUDIGY|SB_AUDIGY2|SB_AUDIGY2VAL)) {
+		val = INL(devc, devc->regs + 0x18);
+		val &= ~A_IOCFG_GPOUT0;
+		val |= set_val ? 0x44 : 0x40;
+		OUTL(devc, val, devc->regs + 0x18);
 
-		} else if (devc->feature_mask & SB_LIVE) {
-			val = INL(devc, devc->regs + HCFG);
-			val &= ~HCFG_GPOUT0;
-			val |= set_val ? HCFG_GPOUT0 : 0;
-			OUTL(devc, val, devc->regs + HCFG);
-		}
+	} else if (devc->feature_mask & SB_LIVE) {
+		val = INL(devc, devc->regs + HCFG);
+		val &= ~HCFG_GPOUT0;
+		val |= set_val ? HCFG_GPOUT0 : 0;
+		OUTL(devc, val, devc->regs + HCFG);
 	}
 	mutex_exit(&devc->mutex);
 	return (0);
@@ -2240,8 +2010,7 @@ emu10k_attach(dev_info_t *dip)
 	audio_dev_set_description(devc->adev, namebuf);
 	audio_dev_set_version(devc->adev, model);
 
-	if (emu10k_setup_intrs(devc) != DDI_SUCCESS)
-		goto error;
+	mutex_init(&devc->mutex, NULL, MUTEX_DRIVER, 0);
 
 	/* allocate static page table memory */
 
@@ -2260,7 +2029,7 @@ emu10k_attach(dev_info_t *dip)
 	    &devc->pt_dmah) != DDI_SUCCESS) {
 		audio_dev_warn(devc->adev,
 		    "failed to allocate page table handle");
-		return (DDI_FAILURE);
+		goto error;
 	}
 
 	if (ddi_dma_mem_alloc(devc->pt_dmah, devc->max_pages * 4,
@@ -2269,7 +2038,7 @@ emu10k_attach(dev_info_t *dip)
 	    DDI_SUCCESS) {
 		audio_dev_warn(devc->adev,
 		    "failed to allocate memory for page table");
-		return (DDI_FAILURE);
+		goto error;
 	}
 
 	if (ddi_dma_addr_bind_handle(devc->pt_dmah, NULL,
@@ -2277,7 +2046,7 @@ emu10k_attach(dev_info_t *dip)
 	    DDI_DMA_SLEEP, NULL, &cookie, &count) != DDI_SUCCESS) {
 		audio_dev_warn(devc->adev,
 		    "failed binding page table DMA handle");
-		return (DDI_FAILURE);
+		goto error;
 	}
 
 	devc->page_map = (void *)devc->pt_kaddr;
@@ -2289,7 +2058,7 @@ emu10k_attach(dev_info_t *dip)
 	    &devc->silence_dmah) != DDI_SUCCESS) {
 		audio_dev_warn(devc->adev,
 		    "failed to allocate silent page handle");
-		return (DDI_FAILURE);
+		goto error;
 	}
 
 	if (ddi_dma_mem_alloc(devc->silence_dmah, 4096,
@@ -2298,7 +2067,7 @@ emu10k_attach(dev_info_t *dip)
 	    &devc->silence_acch) != DDI_SUCCESS) {
 		audio_dev_warn(devc->adev,
 		    "failed to allocate silent page memory");
-		return (DDI_FAILURE);
+		goto error;
 	}
 
 	(void) ddi_dma_sync(devc->silence_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
@@ -2308,7 +2077,7 @@ emu10k_attach(dev_info_t *dip)
 	    DDI_DMA_SLEEP, NULL, &cookie, &count) != DDI_SUCCESS) {
 		audio_dev_warn(devc->adev,
 		    "failed binding silent page DMA handle");
-		return (DDI_FAILURE);
+		goto error;
 	}
 
 	devc->silence_paddr = cookie.dmac_address;
@@ -2346,19 +2115,11 @@ emu10k_attach(dev_info_t *dip)
 
 	emu10k_create_controls(devc);
 
-	/* set up kernel statistics */
-	if ((devc->ksp = kstat_create(EMU10K_NAME, ddi_get_instance(dip),
-	    EMU10K_NAME, "controller", KSTAT_TYPE_INTR,
-	    1, KSTAT_FLAG_PERSISTENT)) != NULL) {
-		kstat_install(devc->ksp);
-	}
-
 	if (audio_dev_register(devc->adev) != DDI_SUCCESS) {
 		audio_dev_warn(devc->adev, "unable to register audio device");
 		goto error;
 	}
 
-	(void) ddi_intr_enable(devc->ih);
 	ddi_report_dev(dip);
 
 	return (DDI_SUCCESS);
@@ -2372,14 +2133,8 @@ int
 emu10k_resume(dev_info_t *dip)
 {
 	emu10k_devc_t *devc;
-	emu10k_portc_t *portc;
 
 	devc = ddi_get_driver_private(dip);
-
-	for (int i = 0; i < EMU10K_NUM_PORTC; i++) {
-		portc = devc->portc[i];
-		audio_engine_reset(portc->engine);
-	}
 
 	mutex_enter(&devc->mutex);
 	if (emu10k_hwinit(devc) != DDI_SUCCESS) {
@@ -2393,27 +2148,12 @@ emu10k_resume(dev_info_t *dip)
 		return (DDI_SUCCESS);
 	}
 
-	emu10k_refresh_mixer(devc);
-
-	devc->suspended = B_FALSE;
-
-	for (int i = 0; i < EMU10K_NUM_PORTC; i++) {
-
-		portc = devc->portc[i];
-
-		portc->stop_port(portc);
-
-		portc->dopos = 1;
-		if (portc->started) {
-			portc->reset_port(portc);
-			portc->start_port(portc);
-		}
-	}
-
 	mutex_exit(&devc->mutex);
 
 	/* resume ac97 */
-	ac97_resume(devc->ac97);
+	ac97_reset(devc->ac97);
+
+	audio_dev_resume(devc->adev);
 
 	return (DDI_SUCCESS);
 }
@@ -2431,50 +2171,7 @@ emu10k_detach(emu10k_devc_t *devc)
 int
 emu10k_suspend(emu10k_devc_t *devc)
 {
-	ac97_suspend(devc->ac97);
-
-	mutex_enter(&devc->mutex);
-
-	devc->suspended = B_TRUE;
-
-	emu10k_write_reg(devc, CLIEL, 0, 0);
-	emu10k_write_reg(devc, CLIEH, 0, 0);
-	if (!(devc->feature_mask & SB_LIVE)) {
-		emu10k_write_reg(devc, HLIEL, 0, 0x0);
-		emu10k_write_reg(devc, HLIEH, 0, 0x0);
-	}
-	OUTL(devc, 0, devc->regs + IE);	/* Intr enable (all off) */
-
-	for (int i = 0; i < EMU10K_NUM_PORTC; i++) {
-		emu10k_portc_t *portc = devc->portc[i];
-		portc->stop_port(portc);
-	}
-
-	/* stop all voices */
-	for (int i = 0; i < 64; i++) {
-		emu10k_write_reg(devc, VEDS, i, 0);
-	}
-	for (int i = 0; i < 64; i++) {
-		emu10k_write_reg(devc, VTFT, i, 0);
-		emu10k_write_reg(devc, CVCF, i, 0);
-		emu10k_write_reg(devc, PTAB, i, 0);
-		emu10k_write_reg(devc, CPF, i, 0);
-	}
-	/*
-	 * Turn off the hardware
-	 */
-	OUTL(devc,
-	    HCFG_LOCKSOUNDCACHE | HCFG_LOCKTANKCACHE_MASK |
-	    HCFG_MUTEBUTTONENABLE, devc->regs + HCFG);
-
-	/* stop ADC recording */
-	emu10k_write_reg(devc, ADCSR, 0, 0x0);
-	emu10k_write_reg(devc, ADCBA, 0, 0x0);
-	emu10k_write_reg(devc, ADCBA, 0, 0x0);
-
-	emu10k_write_reg(devc, PTBA, 0, 0);
-
-	mutex_exit(&devc->mutex);
+	audio_dev_suspend(devc->adev);
 
 	return (DDI_SUCCESS);
 }
@@ -2593,7 +2290,6 @@ emu10k_ddi_quiesce(dev_info_t *dip)
 	/*
 	 * Turn off the hardware
 	 */
-	OUTL(devc, 0, devc->regs + IE);	/* Intr enable (all off) */
 	OUTL(devc,
 	    HCFG_LOCKSOUNDCACHE | HCFG_LOCKTANKCACHE_MASK |
 	    HCFG_MUTEBUTTONENABLE, devc->regs + HCFG);

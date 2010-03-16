@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,12 +44,7 @@
 #define	IXP_PLAY		0
 #define	IXP_REC			1
 
-#define	IXP_ROUNDUP(x, algn)		(((x) + ((algn) - 1)) & ~((algn) - 1))
-#define	IXP_KIOP(X)			((kstat_intr_t *)(X->ksp->ks_data))
-
 #define	IXP_BD_NUMS			(8)
-#define	IXP_MOD_SIZE			(32)
-
 
 /*
  * PCI configuration registers and bits
@@ -214,7 +209,7 @@ struct audioixp_port {
 	caddr_t			bdl_kaddr;
 	uint32_t		bdl_paddr;
 
-	unsigned		intrs;
+	unsigned		nframes;
 	unsigned		fragfr;
 	unsigned		fragsz;
 	uint64_t		count;
@@ -245,7 +240,6 @@ typedef struct	audioixp_bd_entry	audioixp_bd_entry_t;
  */
 struct audioixp_state {
 	kmutex_t		inst_lock;	/* state protection lock */
-	ddi_iblock_cookie_t	iblock;
 	dev_info_t		*dip;
 	audio_dev_t		*adev;		/* audio handle */
 	ac97_t			*ac97;
@@ -257,10 +251,7 @@ struct audioixp_state {
 	caddr_t			regsp;		/* base of audio mixer regs */
 
 	boolean_t		suspended;
-	boolean_t		intr_added;
 	boolean_t		swap_out;	/* swap line-out and sur-out */
-
-	kstat_t			*ksp;		/* kernel statistics */
 
 	uint32_t		ixp_codec_not_ready_bits; /* for codec detect */
 };

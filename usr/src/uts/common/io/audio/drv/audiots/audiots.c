@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,6 +103,30 @@
  *		audio subsystem. All PM support is now removed.
  */
 
+/*
+ * Synchronization notes:
+ *
+ * The audio framework guarantees that our entry points are exclusive
+ * with suspend and resume.  This includes data flow and control entry
+ * points alike.
+ *
+ * The audio framework guarantees that only one control is being
+ * accessed on any given audio device at a time.
+ *
+ * The audio framework guarantees that entry points are themselves
+ * serialized for a given engine.
+ *
+ * We have no interrupt routine or other internal asynchronous routines.
+ *
+ * Our device uses completely separate registers for each engine,
+ * except for the start/stop registers, which are implemented in a
+ * manner that allows for them to be accessed concurrently safely from
+ * different threads.
+ *
+ * Hence, it turns out that we simply don't need any locking in this
+ * driver.
+ */
+
 #include <sys/modctl.h>
 #include <sys/kmem.h>
 #include <sys/pci.h>
@@ -124,7 +148,7 @@ static int audiots_quiesce(dev_info_t *);
 /*
  * Entry point routine prototypes
  */
-static int audiots_open(void *, int, unsigned *, unsigned *, caddr_t *);
+static int audiots_open(void *, int, unsigned *, caddr_t *);
 static void audiots_close(void *);
 static int audiots_start(void *);
 static void audiots_stop(void *);
@@ -159,16 +183,11 @@ static void audiots_chip_init(audiots_state_t *);
 static uint16_t audiots_get_ac97(void *, uint8_t);
 static void audiots_set_ac97(void *, uint8_t, uint16_t);
 static int audiots_init_state(audiots_state_t *, dev_info_t *);
-static uint_t audiots_intr(caddr_t);
 static int audiots_map_regs(dev_info_t *, audiots_state_t *);
-static void audiots_update_port(audiots_port_t *);
-static void audiots_start_port(audiots_port_t *);
-static void audiots_stop_port(audiots_port_t *);
 static uint16_t audiots_read_ac97(audiots_state_t *, int);
 static void audiots_stop_everything(audiots_state_t *);
 static void audiots_destroy(audiots_state_t *);
 static int audiots_alloc_port(audiots_state_t *, int);
-static void audiots_reset_port(audiots_port_t *);
 
 /*
  * Global variables, but viewable only by this file.
@@ -176,9 +195,6 @@ static void audiots_reset_port(audiots_port_t *);
 
 /* anchor for soft state structures */
 static void *audiots_statep;
-
-/* driver name, so we don't have to call ddi_driver_name() or hard code strs */
-static char *audiots_name = TS_NAME;
 
 /*
  * DDI Structures
@@ -370,15 +386,7 @@ audiots_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_RESUME:
 
 		/* we've already allocated the state structure so get ptr */
-		if ((state = ddi_get_soft_state(audiots_statep, instance)) ==
-		    NULL) {
-			/* this will probably panic */
-			cmn_err(CE_WARN,
-			    "!%s%d: RESUME get soft state failed",
-			    audiots_name, instance);
-			return (DDI_FAILURE);
-		}
-
+		state = ddi_get_soft_state(audiots_statep, instance);
 		ASSERT(dip == state->ts_dip);
 
 		/* suspend/resume resets the chip, so we have no more faults */
@@ -394,59 +402,29 @@ audiots_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		audiots_power_up(state);
 		audiots_chip_init(state);
-		ac97_resume(state->ts_ac97);
 
-		mutex_enter(&state->ts_lock);
-		/*
-		 * Initialize/reset ports.  Done under the lock, to
-		 * avoid race with interrupt service routine.
-		 */
-		state->ts_suspended = B_FALSE;
-		for (int i = 0; i < TS_NUM_PORTS; i++) {
-			audiots_port_t	*port = state->ts_ports[i];
-			if (port != NULL) {
-				/* relocate any streams properly */
-				if (port->tp_engine)
-					audio_engine_reset(port->tp_engine);
+		ac97_reset(state->ts_ac97);
 
-				/* do a hardware reset on the port */
-				audiots_reset_port(port);
-				if (port->tp_started) {
-					audiots_start_port(port);
-				} else {
-					audiots_stop_port(port);
-				}
-			}
-		}
-		mutex_exit(&state->ts_lock);
+		audio_dev_resume(state->ts_adev);
 
 		return (DDI_SUCCESS);
 
 	default:
-		cmn_err(CE_WARN, "!%s%d: attach() unknown command: 0x%x",
-		    audiots_name, instance, cmd);
 		return (DDI_FAILURE);
 	}
 
 	/* before we do anything make sure that we haven't had a h/w failure */
 	if (ddi_get_devstate(dip) == DDI_DEVSTATE_DOWN) {
 		cmn_err(CE_WARN, "%s%d: The audio hardware has "
-		    "been disabled.", audiots_name, instance);
+		    "been disabled.", ddi_driver_name(dip), instance);
 		cmn_err(CE_CONT, "Please reboot to restore audio.");
-		return (DDI_FAILURE);
-	}
-
-	/* we don't support high level interrupts in this driver */
-	if (ddi_intr_hilevel(dip, 0) != 0) {
-		cmn_err(CE_WARN, "!%s%d: unsupported high level interrupt",
-		    audiots_name, instance);
 		return (DDI_FAILURE);
 	}
 
 	/* allocate the state structure */
 	if (ddi_soft_state_zalloc(audiots_statep, instance) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "!%s%d: soft state allocate failed",
-		    audiots_name, instance);
+		    ddi_driver_name(dip), instance);
 		return (DDI_FAILURE);
 	}
 
@@ -497,22 +475,6 @@ audiots_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto error;
 	}
 
-	/* set up kernel statistics */
-	state->ts_ksp = kstat_create(TS_NAME, instance, TS_NAME,
-	    "controller", KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
-	if (state->ts_ksp != NULL) {
-		kstat_install(state->ts_ksp);
-	}
-
-	/* set up the interrupt handler */
-	if (ddi_add_intr(dip, 0, NULL, NULL, audiots_intr,
-	    (caddr_t)state) != DDI_SUCCESS) {
-		audio_dev_warn(state->ts_adev,
-		    "failed to register interrupt handler");
-		goto error;
-	}
-	state->ts_flags |= TS_INTR_INSTALLED;
-
 	/* everything worked out, so report the device */
 	ddi_report_dev(dip);
 
@@ -548,7 +510,7 @@ audiots_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/* get the state structure */
 	if ((state = ddi_get_soft_state(audiots_statep, instance)) == NULL) {
 		cmn_err(CE_WARN, "!%s%d: detach get soft state failed",
-		    audiots_name, instance);
+		    ddi_driver_name(dip), instance);
 		return (DDI_FAILURE);
 	}
 
@@ -557,18 +519,10 @@ audiots_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		break;
 	case DDI_SUSPEND:
 
-		ac97_suspend(state->ts_ac97);
-
-		mutex_enter(&state->ts_lock);
-
-		state->ts_suspended = B_TRUE;	/* stop new ops */
-
-		/* we may already be powered down, so only save state if up */
+		audio_dev_suspend(state->ts_adev);
 
 		/* stop playing and recording */
 		(void) audiots_stop_everything(state);
-
-		mutex_exit(&state->ts_lock);
 
 		return (DDI_SUCCESS);
 
@@ -687,9 +641,6 @@ audiots_power_up(audiots_state_t *state)
  *
  * Arguments:
  *	audiots_state_t	*state		The device's state structure
- *
- * Returns:
- *	void
  */
 static void
 audiots_chip_init(audiots_state_t *state)
@@ -865,101 +816,13 @@ audiots_init_state(audiots_state_t *state, dev_info_t *dip)
 	/* save the device info pointer */
 	state->ts_dip = dip;
 
-	/* get the iblock cookie needed for interrupt context */
-	if (ddi_get_iblock_cookie(dip, 0, &state->ts_iblock) != DDI_SUCCESS) {
-		audio_dev_warn(state->ts_adev,
-		    "cannot get iblock cookie");
-		return (DDI_FAILURE);
-	}
-
-	/* initialize the state mutexes and condition variables */
-	mutex_init(&state->ts_lock, NULL, MUTEX_DRIVER, state->ts_iblock);
-	state->ts_flags |= TS_MUTEX_INIT;
-
 	for (int i = 0; i < TS_NUM_PORTS; i++) {
 		if (audiots_alloc_port(state, i) != DDI_SUCCESS) {
 			return (DDI_FAILURE);
 		}
 	}
-	/* init power management state */
-	state->ts_suspended = B_FALSE;
 
 	return (DDI_SUCCESS);
-
-}
-
-/*
- * audiots_intr()
- *
- * Description:
- *	Interrupt service routine for both play and record. For play we
- *	get the next buffers worth of audio. For record we send it on to
- *	the mixer.
- *
- *	NOTE: This device needs to make sure any PIO access required to clear
- *	its interrupt has made it out on the PCI bus before returning from its
- *	interrupt handler so that the interrupt has been deasserted. This is
- *	done by rereading the address engine interrupt register.
- *
- * Arguments:
- *	caddr_t		T	Pointer to the interrupting device's state
- *				structure
- *
- * Returns:
- *	DDI_INTR_CLAIMED	Interrupt claimed and processed
- *	DDI_INTR_UNCLAIMED	Interrupt not claimed, and thus ignored
- */
-static uint_t
-audiots_intr(caddr_t T)
-{
-	audiots_state_t		*state = (void *)T;
-	audiots_regs_t		*regs = state->ts_regs;
-	ddi_acc_handle_t	handle = state->ts_acch;
-	uint32_t		interrupts;
-
-	mutex_enter(&state->ts_lock);
-
-	if (state->ts_suspended) {
-		mutex_exit(&state->ts_lock);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	interrupts = ddi_get32(handle, &regs->aud_regs.ap_aint);
-	if (interrupts == 0) {
-		mutex_exit(&state->ts_lock);
-		/* no interrupts to process, so it's not us */
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	/*
-	 * Clear the interrupts to acknowledge.  Also, reread the
-	 * interrupt reg to ensure that PIO write has completed.
-	 */
-	ddi_put32(handle, &regs->aud_regs.ap_aint, interrupts);
-	(void) ddi_get32(handle, &regs->aud_regs.ap_aint);
-
-	/* update the kernel interrupt statistics */
-	if (state->ts_ksp) {
-		TS_KIOP(state)->intrs[KSTAT_INTR_HARD]++;
-	}
-
-	mutex_exit(&state->ts_lock);
-
-	for (int i = 0; i < TS_NUM_PORTS; i++) {
-		audiots_port_t	*port = state->ts_ports[i];
-
-		if (((interrupts & port->tp_int_mask) == 0) ||
-		    (!port->tp_started))
-			continue;
-
-		if (i == TS_INPUT_PORT) {
-			audio_engine_produce(port->tp_engine);
-		} else {
-			audio_engine_consume(port->tp_engine);
-		}
-	}
-
-	return (DDI_INTR_CLAIMED);
 
 }
 
@@ -1055,7 +918,6 @@ audiots_alloc_port(audiots_state_t *state, int num)
 	audiots_port_t		*port;
 	dev_info_t		*dip = state->ts_dip;
 	audio_dev_t		*adev = state->ts_adev;
-	char			*prop;
 	int			dir;
 	unsigned		caps;
 	ddi_dma_cookie_t	cookie;
@@ -1068,49 +930,23 @@ audiots_alloc_port(audiots_state_t *state, int num)
 	state->ts_ports[num] = port;
 	port->tp_num = num;
 	port->tp_state = state;
-	port->tp_started = B_FALSE;
-	port->tp_rate = 48000;
+	port->tp_rate = TS_RATE;
 
 	if (num == TS_INPUT_PORT) {
-		prop = "record-interrupts";
 		dir = DDI_DMA_READ;
 		caps = ENGINE_INPUT_CAP;
 		port->tp_dma_stream = 31;
-		port->tp_int_stream = 2;
 		port->tp_sync_dir = DDI_DMA_SYNC_FORKERNEL;
 	} else {
-		prop = "play-interrupts";
 		dir = DDI_DMA_WRITE;
 		caps = ENGINE_OUTPUT_CAP;
 		port->tp_dma_stream = 0;
-		port->tp_int_stream = 1;
 		port->tp_sync_dir = DDI_DMA_SYNC_FORDEV;
 	}
-	port->tp_int_mask = (1U << port->tp_int_stream);
+
 	port->tp_dma_mask = (1U << port->tp_dma_stream);
-
-	/* get the number of interrupts per second */
-	port->tp_intrs = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, prop, TS_INTS);
-
-	/* make sure the values are good */
-	if (port->tp_intrs < TS_MIN_INTS) {
-		audio_dev_warn(adev, "%s too low, %d, resetting to %d",
-		    prop, port->tp_intrs, TS_INTS);
-		port->tp_intrs = TS_INTS;
-	} else if (port->tp_intrs > TS_MAX_INTS) {
-		audio_dev_warn(adev, "%s too high, %d, resetting to %d",
-		    prop, port->tp_intrs, TS_INTS);
-		port->tp_intrs = TS_INTS;
-	}
-
-	/*
-	 * Now allocate space.  We configure for the worst case.  The
-	 * worst (biggest) case is 48000 kHz, at 4 bytes per frame
-	 * (16-bit stereo), with the lowest interrupt frequency.  We
-	 * need two fragments though, and each half has to be rounded
-	 * up to allow for alignment considerations.
-	 */
+	port->tp_nframes = 4096;
+	port->tp_size = port->tp_nframes * TS_FRAMESZ;
 
 	/* allocate dma handle */
 	rc = ddi_dma_alloc_handle(dip, &audiots_attr, DDI_DMA_SLEEP,
@@ -1120,7 +956,7 @@ audiots_alloc_port(audiots_state_t *state, int num)
 		return (DDI_FAILURE);
 	}
 	/* allocate DMA buffer */
-	rc = ddi_dma_mem_alloc(port->tp_dmah, TS_BUFSZ, &ts_acc_attr,
+	rc = ddi_dma_mem_alloc(port->tp_dmah, port->tp_size, &ts_acc_attr,
 	    DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL, &port->tp_kaddr,
 	    &port->tp_size, &port->tp_acch);
 	if (rc == DDI_FAILURE) {
@@ -1305,9 +1141,6 @@ second_read:
  *	audiots_state_t	*state		The device's state structure
  *	int		reg		AC-97 register number
  *	uint16_t	value		The value to write
- *
- * Returns:
- *	void
  */
 static void
 audiots_set_ac97(void *arg, uint8_t reg8, uint16_t data)
@@ -1369,99 +1202,6 @@ audiots_set_ac97(void *arg, uint8_t reg8, uint16_t data)
 }	/* audiots_set_ac97() */
 
 /*
- * audiots_reset_port()
- *
- * Description:
- *	Initializes the hardware for a DMA engine.
- *	We only support stereo 16-bit linear PCM (signed native endian).
- *
- *	The audio core uses a single DMA buffer which is divided into two
- *	halves. An interrupt is generated when the middle of the buffer has
- *	been reached and at the end. The audio core resets the pointer back
- *	to the beginning automatically. After the interrupt the driver clears
- *	the buffer and asks the mixer for more audio samples. If there aren't
- *	enough then silence is played out.
- *
- * Arguments:
- *	audiots_port_t	*port		The DMA engine to reset
- *
- * Returns:
- *	void
- */
-static void
-audiots_reset_port(audiots_port_t *port)
-{
-	audiots_state_t		*state = port->tp_state;
-	ddi_acc_handle_t	handle = state->ts_acch;
-	audiots_regs_t		*regs = state->ts_regs;
-	audiots_aram_t		*aram;
-	audiots_eram_t		*eram;
-	unsigned		delta;
-	uint16_t		ctrl;
-	uint16_t		gvsel;
-	uint16_t		eso;
-
-	if (state->ts_suspended)
-		return;
-
-	port->tp_cso = 0;
-
-	gvsel = ERAM_WAVE_VOL | ERAM_PAN_0dB | ERAM_VOL_DEFAULT;
-	ctrl = ERAM_16_BITS | ERAM_STEREO | ERAM_LOOP_MODE | ERAM_SIGNED_PCM;
-	for (int i = 0; i < 2; i++) {
-
-		delta = (port->tp_rate << TS_SRC_SHIFT) / TS_RATE;
-
-		if (i == 0) {
-			/* first do the DMA stream */
-			aram = &regs->aud_ram[port->tp_dma_stream].aram;
-			eram = &regs->aud_ram[port->tp_dma_stream].eram;
-			if (port->tp_num == TS_INPUT_PORT) {
-				delta = (TS_RATE << TS_SRC_SHIFT) /
-				    port->tp_rate;
-			}
-			eso = port->tp_nframes - 1;
-		} else {
-			/* else do the interrupt stream */
-			aram = &regs->aud_ram[port->tp_int_stream].aram;
-			eram = &regs->aud_ram[port->tp_int_stream].eram;
-			/* interrupt stream is silent */
-			gvsel |= ERAM_VOL_MAX_ATTEN;
-			eso = port->tp_fragfr - 1;
-		}
-
-		/* program the sample rate */
-		ddi_put16(handle, &aram->aram_delta, (uint16_t)delta);
-
-		/* program the precision, number of channels and loop mode */
-		ddi_put16(handle, &eram->eram_ctrl_ec, ctrl);
-
-		/* program the volume settings */
-		ddi_put16(handle, &eram->eram_gvsel_pan_vol, gvsel);
-
-		/* set ALPHA and FMS to 0 */
-		ddi_put16(handle, &aram->aram_alpha_fms, 0x0);
-
-		/* set CSO to 0 */
-		ddi_put16(handle, &aram->aram_cso, 0x0);
-
-		/* set LBA */
-		ddi_put32(handle, &aram->aram_cptr_lba,
-		    port->tp_paddr & ARAM_LBA_MASK);
-
-		/* set ESO */
-		ddi_put16(handle, &aram->aram_eso, eso);
-	}
-
-	/* stop the DMA & interrupt engines */
-	ddi_put32(handle, &regs->aud_regs.ap_stop,
-	    port->tp_int_mask | port->tp_dma_mask);
-
-	/* enable interrupts */
-	OR_SET_WORD(handle, &regs->aud_regs.ap_ainten, port->tp_int_mask);
-}
-
-/*
  * audiots_open()
  *
  * Description:
@@ -1471,8 +1211,7 @@ audiots_reset_port(audiots_port_t *port)
  * Arguments:
  *	void		*arg		The DMA engine to set up
  *	int		flag		Open flags
- *	unsigned	*fragfrp	Receives number of frames per fragment
- *	unsigned	*nfragsp	Receives number of fragments
+ *	unsigned	*nframesp	Receives number of frames
  *	caddr_t		*bufp		Receives kernel data buffer
  *
  * Returns:
@@ -1480,39 +1219,16 @@ audiots_reset_port(audiots_port_t *port)
  *	errno	on failure
  */
 static int
-audiots_open(void *arg, int flag,
-    unsigned *fragfrp, unsigned *nfragsp, caddr_t *bufp)
+audiots_open(void *arg, int flag, unsigned *nframesp, caddr_t *bufp)
 {
 	audiots_port_t	*port = arg;
-	unsigned	nfrag;
 
 	_NOTE(ARGUNUSED(flag));
 
-	/*
-	 * Round up - we have to have a sample that is a whole number
-	 * of 64-bit words.  Since our frames are 4 bytes wide, we
-	 * just need an even number of frames.
-	 */
-	port->tp_fragfr = port->tp_rate / port->tp_intrs;
-	port->tp_fragfr = (port->tp_fragfr + 1) & ~1;
-	nfrag = port->tp_size / (port->tp_fragfr * TS_FRAMESZ);
-	port->tp_nframes = nfrag * port->tp_fragfr;
-	port->tp_started = B_FALSE;
 	port->tp_count = 0;
 	port->tp_cso = 0;
-	*fragfrp = port->tp_fragfr;
-	*nfragsp = nfrag;
+	*nframesp = port->tp_nframes;
 	*bufp = port->tp_kaddr;
-
-	/*
-	 * This should always be true because we used a worst case
-	 * assumption when calculating the port->tp_size.
-	 */
-	ASSERT((port->tp_fragfr * nfrag) <= port->tp_size);
-
-	mutex_enter(&port->tp_state->ts_lock);
-	audiots_reset_port(port);
-	mutex_exit(&port->tp_state->ts_lock);
 
 	return (0);
 }
@@ -1522,25 +1238,16 @@ audiots_open(void *arg, int flag,
  *
  * Description:
  *	Closes an audio DMA engine that was previously opened.  Since
- *	nobody is using it, we take this opportunity to possibly power
- *	down the entire device.
+ *	nobody is using it, we could take this opportunity to possibly power
+ *	down the entire device, or at least the DMA engine.
  *
  * Arguments:
  *	void	*arg		The DMA engine to shut down
- *
- * Returns:
- *	void
  */
 static void
 audiots_close(void *arg)
 {
-	audiots_port_t	*port = arg;
-	audiots_state_t	*state = port->tp_state;
-
-	mutex_enter(&state->ts_lock);
-	audiots_stop_port(port);
-	port->tp_started = B_FALSE;
-	mutex_exit(&state->ts_lock);
+	_NOTE(ARGUNUSED(arg));
 }
 
 /*
@@ -1552,9 +1259,6 @@ audiots_close(void *arg)
  *
  * Arguments:
  *	void	*arg		The DMA engine to stop
- *
- * Returns:
- *	void
  */
 static void
 audiots_stop(void *arg)
@@ -1562,12 +1266,8 @@ audiots_stop(void *arg)
 	audiots_port_t	*port = arg;
 	audiots_state_t	*state = port->tp_state;
 
-	mutex_enter(&state->ts_lock);
-	if (port->tp_started) {
-		audiots_stop_port(port);
-	}
-	port->tp_started = B_FALSE;
-	mutex_exit(&state->ts_lock);
+	ddi_put32(state->ts_acch, &state->ts_regs->aud_regs.ap_stop,
+	    port->tp_dma_mask);
 }
 
 /*
@@ -1585,15 +1285,60 @@ audiots_stop(void *arg)
 static int
 audiots_start(void *arg)
 {
-	audiots_port_t	*port = arg;
-	audiots_state_t	*state = port->tp_state;
+	audiots_port_t		*port = arg;
+	audiots_state_t		*state = port->tp_state;
+	ddi_acc_handle_t	handle = state->ts_acch;
+	audiots_regs_t		*regs = state->ts_regs;
+	audiots_aram_t		*aram;
+	audiots_eram_t		*eram;
+	unsigned		delta;
+	uint16_t		ctrl;
+	uint16_t		gvsel;
+	uint16_t		eso;
 
-	mutex_enter(&state->ts_lock);
-	if (!port->tp_started) {
-		audiots_start_port(port);
-		port->tp_started = B_TRUE;
+	aram = &regs->aud_ram[port->tp_dma_stream].aram;
+	eram = &regs->aud_ram[port->tp_dma_stream].eram;
+
+	port->tp_cso = 0;
+
+	gvsel = ERAM_WAVE_VOL | ERAM_PAN_0dB | ERAM_VOL_DEFAULT;
+	ctrl = ERAM_16_BITS | ERAM_STEREO | ERAM_LOOP_MODE | ERAM_SIGNED_PCM;
+
+	delta = (port->tp_rate << TS_SRC_SHIFT) / TS_RATE;
+
+	if (port->tp_num == TS_INPUT_PORT) {
+		delta = (TS_RATE << TS_SRC_SHIFT) / port->tp_rate;
 	}
-	mutex_exit(&state->ts_lock);
+	eso = port->tp_nframes - 1;
+
+	/* program the sample rate */
+	ddi_put16(handle, &aram->aram_delta, (uint16_t)delta);
+
+	/* program the precision, number of channels and loop mode */
+	ddi_put16(handle, &eram->eram_ctrl_ec, ctrl);
+
+	/* program the volume settings */
+	ddi_put16(handle, &eram->eram_gvsel_pan_vol, gvsel);
+
+	/* set ALPHA and FMS to 0 */
+	ddi_put16(handle, &aram->aram_alpha_fms, 0x0);
+
+	/* set CSO to 0 */
+	ddi_put16(handle, &aram->aram_cso, 0x0);
+
+	/* set LBA */
+	ddi_put32(handle, &aram->aram_cptr_lba,
+	    port->tp_paddr & ARAM_LBA_MASK);
+
+	/* set ESO */
+	ddi_put16(handle, &aram->aram_eso, eso);
+
+	/* stop the DMA engines */
+	ddi_put32(handle, &regs->aud_regs.ap_stop, port->tp_dma_mask);
+
+	/* now make sure it starts playing */
+	ddi_put32(handle, &regs->aud_regs.ap_start, port->tp_dma_mask);
+
 	return (0);
 }
 
@@ -1701,131 +1446,8 @@ audiots_count(void *arg)
 	audiots_port_t	*port = arg;
 	audiots_state_t	*state = port->tp_state;
 	uint64_t	val;
-
-	mutex_enter(&state->ts_lock);
-	audiots_update_port(port);
-
-	val = port->tp_count;
-	mutex_exit(&state->ts_lock);
-	return (val);
-}
-
-/*
- * audiots_sync()
- *
- * Description:
- *	This is called by the framework to synchronize DMA caches.
- *	We also leverage this do some endian swapping, because on SPARC
- *	the chip accesses the DMA region using 32-bit little-endian
- *	accesses.  Its not enough to just use the framework's sample
- *	conversion logic, because the channels will also be backwards.
- *
- * Arguments:
- *	void	*arg		The DMA engine to sync
- *
- * Returns:
- *	void
- */
-static void
-audiots_sync(void *arg, unsigned nframes)
-{
-	audiots_port_t *port = arg;
-	_NOTE(ARGUNUSED(nframes));
-
-	(void) ddi_dma_sync(port->tp_dmah, 0, 0, port->tp_sync_dir);
-}
-
-/*
- * audiots_start_port()
- *
- * Description:
- *	The audio core uses a single DMA buffer which is divided into two
- *	halves. An interrupt is generated when the middle of the buffer has
- *	been reached and at the end. The audio core resets the pointer back
- *	to the beginning automatically. After the interrupt the driver clears
- *	the buffer and asks the mixer for more audio samples. If there aren't
- *	enough then silence is played out.
- *
- * Arguments:
- *	audiots_port_t	*port		The DMA engine to start up
- *
- * Returns:
- *	void
- */
-static void
-audiots_start_port(audiots_port_t *port)
-{
-	audiots_state_t		*state = port->tp_state;
-	audiots_regs_t		*regs = state->ts_regs;
-	ddi_acc_handle_t	handle = state->ts_acch;
-
-	ASSERT(mutex_owned(&state->ts_lock));
-
-	/* if suspended then do nothing else */
-	if (state->ts_suspended)  {
-		return;
-	}
-
-	/* make sure it starts playing */
-	ddi_put32(handle, &regs->aud_regs.ap_start,
-	    port->tp_dma_mask | port->tp_int_mask);
-
-	ASSERT(mutex_owned(&state->ts_lock));
-}
-
-/*
- * audiots_stop_port()
- *
- * Description:
- *	This routine stops a DMA engine.
- *
- * Arguments:
- *	audiots_port_t	*port		The port to stop
- *
- * Returns:
- *	void
- */
-static void
-audiots_stop_port(audiots_port_t *port)
-{
-	audiots_state_t *state = port->tp_state;
-
-	ASSERT(mutex_owned(&state->ts_lock));
-
-	if (state->ts_suspended)
-		return;
-
-	ddi_put32(state->ts_acch, &state->ts_regs->aud_regs.ap_stop,
-	    port->tp_int_mask | port->tp_dma_mask);
-
-	ASSERT(mutex_owned(&state->ts_lock));
-}
-
-/*
- * audiots_update_port()
- *
- * Description:
- *	This routine updates the ports frame counter from hardware, and
- *	gracefully handles wraps.
- *
- * Arguments:
- *	audiots_port_t	*port		The port to stop
- *
- * Returns:
- *	void
- */
-static void
-audiots_update_port(audiots_port_t *port)
-{
-	audiots_state_t		*state = port->tp_state;
-
-	uint16_t		cso;
-	unsigned		n;
-
-	ASSERT(mutex_owned(&state->ts_lock));
-
-	if (state->ts_suspended)
-		return;
+	uint16_t	cso;
+	unsigned	n;
 
 	cso = ddi_get16(state->ts_acch,
 	    &state->ts_regs->aud_ram[port->tp_dma_stream].aram.aram_cso);
@@ -1836,6 +1458,27 @@ audiots_update_port(audiots_port_t *port)
 
 	port->tp_cso = cso;
 	port->tp_count += n;
+	val = port->tp_count;
+
+	return (val);
+}
+
+/*
+ * audiots_sync()
+ *
+ * Description:
+ *	This is called by the framework to synchronize DMA caches.
+ *
+ * Arguments:
+ *	void	*arg		The DMA engine to sync
+ */
+static void
+audiots_sync(void *arg, unsigned nframes)
+{
+	audiots_port_t *port = arg;
+	_NOTE(ARGUNUSED(nframes));
+
+	(void) ddi_dma_sync(port->tp_dmah, 0, 0, port->tp_sync_dir);
 }
 
 /*
@@ -1858,9 +1501,6 @@ audiots_update_port(audiots_port_t *port)
  *
  * Arguments:
  *	audiots_state_t	*state		The device's state structure
- *
- * Returns:
- *	void
  */
 static void
 audiots_stop_everything(audiots_state_t *state)
@@ -1887,9 +1527,6 @@ audiots_stop_everything(audiots_state_t *state)
  *
  * Arguments:
  *	audiots_port_t	*port	The port structure for a device stream.
- *
- * Returns:
- *	None
  */
 void
 audiots_free_port(audiots_port_t *port)
@@ -1923,20 +1560,11 @@ audiots_free_port(audiots_port_t *port)
  *
  * Arguments:
  *	audiots_state_t	*state	The device soft state.
- *
- * Returns:
- *	None
  */
 void
 audiots_destroy(audiots_state_t *state)
 {
 	audiots_stop_everything(state);
-
-	if (state->ts_flags & TS_INTR_INSTALLED)
-		ddi_remove_intr(state->ts_dip, 0, NULL);
-
-	if (state->ts_ksp)
-		kstat_delete(state->ts_ksp);
 
 	for (int i = 0; i < TS_NUM_PORTS; i++)
 		audiots_free_port(state->ts_ports[i]);
@@ -1952,10 +1580,6 @@ audiots_destroy(audiots_state_t *state)
 
 	if (state->ts_adev)
 		audio_dev_free(state->ts_adev);
-
-	if (state->ts_flags & TS_MUTEX_INIT) {
-		mutex_destroy(&state->ts_lock);
-	}
 
 	ddi_soft_state_free(audiots_statep, ddi_get_instance(state->ts_dip));
 }

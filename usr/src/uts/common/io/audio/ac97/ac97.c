@@ -21,7 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,7 @@
  * This is the initial value for many controls. This is
  * a 75% level.
  */
-#define	INIT_VAL_MAIN	((75 << 8) | 75)
+#define	INIT_VAL_MAIN	75
 #define	INIT_VAL_ST	((75 << 8) | 75)
 #define	INIT_VAL_MN	75
 #define	INIT_IGAIN_ST	((50 << 8) | 50)
@@ -102,8 +102,6 @@ struct ac97 {
 
 	uint16_t	shadow[NUM_SHADOW];
 
-	boolean_t	suspended;		/* true if suspended */
-	kt_did_t	resumer;		/* resumer if suspended */
 	uint32_t	flags;
 #define	AC97_FLAG_AMPLIFIER	(1 << 0)	/* ext. amp on by default */
 #define	AC97_FLAG_MICBOOST	(1 << 1)	/* micboost on by default */
@@ -128,7 +126,6 @@ struct ac97 {
 	void		(*codec_init)(ac97_t *);
 	void		(*codec_reset)(ac97_t *);
 
-	kmutex_t	ac_lock;
 	list_t		ctrls;
 
 	uint64_t	inputs;
@@ -657,13 +654,7 @@ ac_wr(ac97_t *ac, uint8_t reg, uint16_t val)
 		SHADOW(ac, reg) = val;
 	}
 
-	/*
-	 * Don't touch hardware _unless_ if we are suspended, unless we
-	 * are in the process of resuming.
-	 */
-	if ((!ac->suspended) || (ac->resumer == ddi_get_kt_did())) {
-		ac->wr(ac->private, reg, val);
-	}
+	ac->wr(ac->private, reg, val);
 }
 
 /*
@@ -678,10 +669,7 @@ ac_rd(ac97_t *ac, uint8_t reg)
 	if ((reg < LAST_SHADOW_REG) && (reg > 0)) {
 		return (SHADOW(ac, reg));
 	}
-	if ((!ac->suspended) || (ac->resumer == ddi_get_kt_did())) {
-		return (ac->rd(ac->private, reg));
-	}
-	return (0);
+	return (ac->rd(ac->private, reg));
 }
 
 /*
@@ -739,16 +727,6 @@ ac_restore(ac97_t *ac)
 	for (int i = 2; i < LAST_SHADOW_REG; i += sizeof (uint16_t)) {
 		ac->wr(ac->private, i, SHADOW(ac, i));
 	}
-
-	/*
-	 * Then go and do the controls.  This is important because some of
-	 * the controls might use registers that aren't shadowed.  Doing it
-	 * a second time also may help guarantee that it all works.
-	 */
-	for (ac97_ctrl_t *ctrl = list_head(&ac->ctrls); ctrl;
-	    ctrl = list_next(&ac->ctrls, ctrl)) {
-		ctrl->actrl_write_fn(ctrl, ctrl->actrl_value);
-	}
 }
 
 /*
@@ -760,13 +738,11 @@ ac_init_values(ac97_t *ac)
 {
 	ac97_ctrl_t	*ctrl;
 
-	mutex_enter(&ac->ac_lock);
 	for (ctrl = list_head(&ac->ctrls); ctrl;
 	    ctrl = list_next(&ac->ctrls, ctrl)) {
 		ctrl->actrl_value = ctrl->actrl_initval;
 		ctrl->actrl_write_fn(ctrl, ctrl->actrl_initval);
 	}
-	mutex_exit(&ac->ac_lock);
 }
 
 /*
@@ -1057,11 +1033,7 @@ ac97_micboost_set(ac97_ctrl_t *ctrl, uint64_t value)
 int
 ac97_control_get(ac97_ctrl_t *ctrl, uint64_t *value)
 {
-	ac97_t		*ac = ctrl->actrl_ac97;
-
-	mutex_enter(&ac->ac_lock);
 	*value = ctrl->actrl_value;
-	mutex_exit(&ac->ac_lock);
 
 	return (0);
 }
@@ -1069,7 +1041,6 @@ ac97_control_get(ac97_ctrl_t *ctrl, uint64_t *value)
 int
 ac97_control_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_t			*ac = ctrl->actrl_ac97;
 	uint8_t			v1, v2;
 
 	/* a bit of quick checking */
@@ -1100,10 +1071,8 @@ ac97_control_set(ac97_ctrl_t *ctrl, uint64_t value)
 		break;
 	}
 
-	mutex_enter(&ac->ac_lock);
 	ctrl->actrl_value = value;
 	ctrl->actrl_write_fn(ctrl, value);
-	mutex_exit(&ac->ac_lock);
 
 	return (0);
 }
@@ -1118,28 +1087,6 @@ static int
 ac_set_value(void *arg, uint64_t value)
 {
 	return (ac97_control_set(arg, value));
-}
-
-/*
- * This simply sets a flag to block calls to the underlying
- * hardware driver to get or set hardware controls. This is usually
- * called just before a power down of devices. Once this gets called any
- * calls to set controls will not touch the real hardware. But
- * since all control updates are always saved in soft registers it
- * is a simple mater to update the hardware with the latest values
- * on resume which also unblocks calls to the hardware controls.
- */
-void
-ac97_suspend(ac97_t *ac)
-{
-	mutex_enter(&ac->ac_lock);
-
-	/* This will prevent any new operations from starting! */
-	ac->suspended = B_TRUE;
-	ac->resumer = 0;
-
-	/* XXX - should we powerdown codec's here?? */
-	mutex_exit(&ac->ac_lock);
 }
 
 /*
@@ -1278,59 +1225,15 @@ ac_hw_reset(ac97_t *ac)
 }
 
 /*
- * This will reset and re-initialize the device.
- * It has two modes of operation that affect how it handles
- * all controls.
- *
- * It re-initializes the device and then can either reset
- * all controls back to their initial values or it can
- * re-load all controls with their last updated values.
- *
- * initval         - If this is none zero then all controls will
- *                   be restored to their initial values.
+ * This will reset and re-initialize the device.  It is still incumbent
+ * on the caller (or the audio framework) to replay control settings!
  */
 void
 ac97_reset(ac97_t *ac)
 {
-	/* If we are about to suspend so no point in going on */
-	mutex_enter(&ac->ac_lock);
-	if (ac->suspended) {
-		mutex_exit(&ac->ac_lock);
-		return;
-	}
 	ac_analog_reset(ac);
 	ac_hw_reset(ac);
 	ac_restore(ac);
-
-	mutex_exit(&ac->ac_lock);
-}
-
-/*
- * Given the need to resume the hardware this reloads the base hardware
- * and then takes the stored values for each control and sends them
- * to the hardware again.
- */
-void
-ac97_resume(ac97_t *ac)
-{
-
-	/*
-	 * This should only be called when already suspended.
-	 * this takes us out of suspend state after it brings the
-	 * controls back to life.
-	 */
-	ASSERT(ac->suspended);
-	mutex_enter(&ac->ac_lock);
-	ac->resumer = ddi_get_kt_did();
-
-	/* We simply call reset since the operation is the same */
-	ac_analog_reset(ac);
-	ac_hw_reset(ac);
-	ac_restore(ac);
-
-	ac->resumer = 0;
-	ac->suspended = B_FALSE;
-	mutex_exit(&ac->ac_lock);
 }
 
 /*
@@ -1699,8 +1602,6 @@ ac97_alloc(dev_info_t *dip, ac97_rd_t rd, ac97_wr_t wr, void *priv)
 	list_create(&ac->ctrls, sizeof (struct ac97_ctrl),
 	    offsetof(struct ac97_ctrl, actrl_linkage));
 
-	mutex_init(&ac->ac_lock, NULL, MUTEX_DRIVER, NULL);
-
 #define	PROP_FLAG(prop, flag, def)				    \
 	if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, \
 	    (prop), (def))) {					    \
@@ -1808,7 +1709,6 @@ ac97_free(ac97_t *ac)
 	}
 
 	list_destroy(&ac->ctrls);
-	mutex_destroy(&ac->ac_lock);
 	kmem_free(ac, sizeof (ac97_t));
 }
 

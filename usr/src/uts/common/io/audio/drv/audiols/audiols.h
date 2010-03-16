@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,19 +45,8 @@
 #define	AUDIGYLS_PLAY_PORT	0
 #define	AUDIGYLS_REC_PORT	1
 
-/*
- * Number of fragments must be multiple of 2 because the
- * hardware supports only full and half buffer interrupts. In
- * addition it looks like 8 fragments is the minimum.
- */
-#define	AUDIGYLS_NUM_FRAGS		(8*2)
-
 #define	PCI_VENDOR_ID_CREATIVE 		0x1102
 #define	PCI_DEVICE_ID_CREATIVE_AUDIGYLS 0x0007
-
-#define	AUDIGYLS_MAX_INTRS		256
-#define	AUDIGYLS_MIN_INTRS		24
-#define	AUDIGYLS_INTRS			100
 
 /*
  * PCI registers
@@ -216,11 +205,7 @@ struct _audigyls_port_t
 	audio_engine_t *engine;
 
 	int			direction;
-	int			started;
-	boolean_t		active;
 
-	unsigned		fragfr;
-	unsigned		fragsz;
 	unsigned		nchan;
 
 	ddi_dma_handle_t	buf_dmah;	/* dma for buffers */
@@ -239,20 +224,15 @@ struct _audigyls_dev_t
 	dev_info_t		*dip;
 	audio_dev_t		*adev;
 	ac97_t			*ac97;
-	kstat_t			*ksp;
-	unsigned		intrs;
-	unsigned		timer;
 
 	int			nactive;	/* Num active ports */
 	char			digital_enable;	/* Orange combo-jack mode */
 
-	boolean_t		suspended;
 	ddi_acc_handle_t	pcih;
 	ddi_acc_handle_t	regsh;
 	caddr_t			base;
 	kmutex_t		mutex;		/* For normal locking */
 	kmutex_t		low_mutex;	/* For low level routines */
-	ddi_intr_handle_t	ih;
 
 	audigyls_port_t		*port[AUDIGYLS_NUM_PORT];
 	audigyls_ctrl_t		controls[CTL_NUM];
@@ -276,7 +256,5 @@ struct _audigyls_dev_t
 	ddi_get32(dev->regsh, (void *)(dev->base + reg))
 #define	OUTL(dev, reg, val)	\
 	ddi_put32(dev->regsh, (void *)(dev->base + reg), (val))
-
-#define	AUDIGYLS_KIOP(X)	((kstat_intr_t *)(X->ksp->ks_data))
 
 #endif /* AUDIGYLS_H */

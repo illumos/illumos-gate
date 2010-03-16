@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/audiots/Makefile
@@ -39,7 +39,6 @@ MODULE		= audiots
 OBJECTS		= $(AUDIOTS_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AUDIOTS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/io/audio/drv/audiots
 
 #
 #	Include common rules.
@@ -59,16 +58,15 @@ LDFLAGS		+= -dy -N misc/ac97 -N drv/audio
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE_64)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #       Overrides
 #
 ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
-CLEANLINTFILES	+= $(LINT32_FILES)
 
 #
 #	Default build targets.
@@ -85,7 +83,7 @@ clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
-modlintlib:	$(MODLINTLIB_DEPS) lint32
+modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 

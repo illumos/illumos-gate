@@ -29,8 +29,8 @@
 #include <sys/pci.h>
 #include "audiohd.h"
 
-#define	DEFINTS			175
 #define	DRVNAME			"audiohd"
+
 /*
  * Module linkage routines for the kernel
  */
@@ -631,9 +631,7 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_report_dev(dip);
 
 	/* enable interrupt */
-	AUDIOHD_REG_SET32(AUDIOHD_REG_INTCTL,
-	    AUDIOHD_INTCTL_BIT_GIE |
-	    AUDIOHD_INTCTL_BIT_SIE);
+	AUDIOHD_REG_SET32(AUDIOHD_REG_INTCTL, AUDIOHD_INTCTL_BIT_GIE);
 	return (DDI_SUCCESS);
 error:
 	audiohd_destroy(statep);
@@ -984,14 +982,14 @@ audiohd_init_path(audiohd_state_t *statep)
 		if (!path)
 			continue;
 		switch (path->path_type) {
-			case PLAY:
-				audiohd_init_play_path(path);
-				break;
-			case RECORD:
-				audiohd_init_record_path(path);
-				break;
-			default:
-				break;
+		case PLAY:
+			audiohd_init_play_path(path);
+			break;
+		case RECORD:
+			audiohd_init_record_path(path);
+			break;
+		default:
+			break;
 		}
 	}
 	statep->in_port = 0;
@@ -1032,7 +1030,7 @@ audiohd_reset_port(audiohd_port_t *port)
 	if (!bTmp) {
 		audio_dev_warn(statep->adev, "Failed to reset stream %d",
 		    port->index);
-		return (DDI_FAILURE);
+		return (EIO);
 	}
 
 	/* Empirical testing time, which works well */
@@ -1055,7 +1053,7 @@ audiohd_reset_port(audiohd_port_t *port)
 		audio_dev_warn(statep->adev,
 		    "Failed to exit reset state for"
 		    " stream %d, bTmp=0x%02x", port->index, bTmp);
-		return (DDI_FAILURE);
+		return (EIO);
 	}
 
 	AUDIOHD_REG_SET32(regbase + AUDIOHD_SDREG_OFFSET_BDLPL,
@@ -1064,8 +1062,7 @@ audiohd_reset_port(audiohd_port_t *port)
 	    (uint32_t)(port->bdl_paddr >> 32));
 	AUDIOHD_REG_SET16(regbase + AUDIOHD_SDREG_OFFSET_LVI,
 	    AUDIOHD_BDLE_NUMS - 1);
-	AUDIOHD_REG_SET32(regbase + AUDIOHD_SDREG_OFFSET_CBL,
-	    port->samp_size * AUDIOHD_BDLE_NUMS);
+	AUDIOHD_REG_SET32(regbase + AUDIOHD_SDREG_OFFSET_CBL, port->bufsize);
 
 	AUDIOHD_REG_SET16(regbase + AUDIOHD_SDREG_OFFSET_FORMAT,
 	    port->format << 4 | port->nchan - 1);
@@ -1080,59 +1077,22 @@ audiohd_reset_port(audiohd_port_t *port)
 	    AUDIOHD_PLAY_CTL_OFF,
 	    (port->index) << AUDIOHD_PLAY_TAG_OFF);
 
-	return (DDI_SUCCESS);
-}
-
-static int
-audiohd_engine_open(void *arg, int flag,
-    unsigned *fragfrp, unsigned *nfragsp, caddr_t *bufp)
-{
-	audiohd_port_t	*port = arg;
-	audiohd_state_t	*statep = port->statep;
-
-	_NOTE(ARGUNUSED(flag));
-
-	mutex_enter(&statep->hda_mutex);
-	(void) audiohd_reset_port(port);
-	mutex_exit(&statep->hda_mutex);
-
-	port->started = B_FALSE;
-	port->count = 0;
-	port->curpos = 0;
-	*fragfrp = port->fragfr;
-	*nfragsp = AUDIOHD_BDLE_NUMS;
-	*bufp = port->samp_kaddr;
-
 	return (0);
 }
 
-static void
-audiohd_start_port(audiohd_port_t *port)
+static int
+audiohd_engine_open(void *arg, int flag, unsigned *nframes, caddr_t *bufp)
 {
-	audiohd_state_t	*statep = port->statep;
+	audiohd_port_t	*port = arg;
 
-	ASSERT(mutex_owned(&statep->hda_mutex));
-	/* if suspended, then do nothing else */
-	if (statep->suspended) {
-		return;
-	}
+	_NOTE(ARGUNUSED(flag));
 
-	/* Enable interrupt and start DMA */
-	AUDIOHD_REG_SET8(port->regoff + AUDIOHD_SDREG_OFFSET_CTL,
-	    AUDIOHDR_SD_CTL_INTS | AUDIOHDR_SD_CTL_SRUN);
-}
+	port->count = 0;
+	port->curpos = 0;
+	*nframes = port->nframes;
+	*bufp = port->samp_kaddr;
 
-static void
-audiohd_stop_port(audiohd_port_t *port)
-{
-	audiohd_state_t	*statep = port->statep;
-
-	ASSERT(mutex_owned(&statep->hda_mutex));
-	/* if suspended, then do nothing else */
-	if (statep->suspended) {
-		return;
-	}
-	AUDIOHD_REG_SET8(port->regoff + AUDIOHD_SDREG_OFFSET_CTL, 0);
+	return (0);
 }
 
 static int
@@ -1140,13 +1100,17 @@ audiohd_engine_start(void *arg)
 {
 	audiohd_port_t		*port = arg;
 	audiohd_state_t		*statep = port->statep;
+	int			rv;
 
 	mutex_enter(&statep->hda_mutex);
-	if (!port->started) {
-		audiohd_start_port(port);
-		port->started = B_TRUE;
-		port->triggered = B_TRUE;
+
+	if ((rv = audiohd_reset_port(port)) != 0) {
+		return (rv);
 	}
+	/* Start DMA */
+	AUDIOHD_REG_SET8(port->regoff + AUDIOHD_SDREG_OFFSET_CTL,
+	    AUDIOHDR_SD_CTL_SRUN);
+
 	mutex_exit(&statep->hda_mutex);
 	return (0);
 }
@@ -1158,17 +1122,14 @@ audiohd_engine_stop(void *arg)
 	audiohd_state_t		*statep = port->statep;
 
 	mutex_enter(&statep->hda_mutex);
-	if (port->started) {
-		audiohd_stop_port(port);
-	}
-	port->started = B_FALSE;
+	AUDIOHD_REG_SET8(port->regoff + AUDIOHD_SDREG_OFFSET_CTL, 0);
 	mutex_exit(&statep->hda_mutex);
 }
 
 static void
 audiohd_update_port(audiohd_port_t *port)
 {
-	int			pos;
+	uint32_t		pos;
 	uint32_t		len;
 	audiohd_state_t		*statep = port->statep;
 
@@ -1176,9 +1137,10 @@ audiohd_update_port(audiohd_port_t *port)
 	/* Convert the position into a frame count */
 	pos /= (port->nchan * 2);
 
-	if (pos >= port->curpos)
+	ASSERT(pos <= port->nframes);
+	if (pos >= port->curpos) {
 		len = (pos - port->curpos);
-	else {
+	} else {
 		len = pos + port->nframes - port->curpos;
 	}
 
@@ -1195,8 +1157,7 @@ audiohd_engine_count(void *arg)
 	uint64_t	val;
 
 	mutex_enter(&statep->hda_mutex);
-	if (port->started && !statep->suspended)
-		audiohd_update_port(port);
+	audiohd_update_port(port);
 	val = port->count;
 	mutex_exit(&statep->hda_mutex);
 	return (val);
@@ -1205,14 +1166,7 @@ audiohd_engine_count(void *arg)
 static void
 audiohd_engine_close(void *arg)
 {
-	audiohd_port_t		*port = arg;
-	audiohd_state_t		*statep = port->statep;
-
-	mutex_enter(&statep->hda_mutex);
-	audiohd_stop_port(port);
-	port->started = B_FALSE;
-	port->triggered = B_FALSE;
-	mutex_exit(&statep->hda_mutex);
+	_NOTE(ARGUNUSED(arg));
 }
 
 static void
@@ -1222,8 +1176,7 @@ audiohd_engine_sync(void *arg, unsigned nframes)
 
 	_NOTE(ARGUNUSED(nframes));
 
-	(void) ddi_dma_sync(port->samp_dmah, 0,
-	    0, port->sync_dir);
+	(void) ddi_dma_sync(port->samp_dmah, 0, 0, port->sync_dir);
 
 }
 
@@ -1247,11 +1200,8 @@ static int
 audiohd_get_value(void *arg, uint64_t *val)
 {
 	audiohd_ctrl_t	*pc = arg;
-	audiohd_state_t	*statep = pc->statep;
 
-	mutex_enter(&statep->hda_mutex);
 	*val = pc->val;
-	mutex_exit(&statep->hda_mutex);
 	return (0);
 }
 
@@ -5121,7 +5071,6 @@ audiohd_allocate_port(audiohd_state_t *statep)
 	audiohd_port_t		*port;
 	int			dir;
 	unsigned		caps;
-	char			*prop;
 	int			rc;
 	audio_dev_t		*adev;
 	dev_info_t		*dip;
@@ -5156,13 +5105,10 @@ audiohd_allocate_port(audiohd_state_t *statep)
 
 	for (i = 0; i < PORT_MAX; i++) {
 		port = kmem_zalloc(sizeof (*port), KM_SLEEP);
-		port->started = B_FALSE;
-		port->triggered = B_FALSE;
 		statep->port[i] = port;
 		port->statep = statep;
 		switch (i) {
 		case PORT_ADC:
-			prop = "record-interrupts";
 			dir = DDI_DMA_READ | DDI_DMA_CONSISTENT;
 			caps = ENGINE_INPUT_CAP;
 			port->sync_dir = DDI_DMA_SYNC_FORKERNEL;
@@ -5171,7 +5117,6 @@ audiohd_allocate_port(audiohd_state_t *statep)
 			port->regoff = AUDIOHD_REG_SD_BASE;
 			break;
 		case PORT_DAC:
-			prop = "play-interrupts";
 			dir = DDI_DMA_WRITE | DDI_DMA_CONSISTENT;
 			caps = ENGINE_OUTPUT_CAP;
 			port->sync_dir = DDI_DMA_SYNC_FORDEV;
@@ -5185,29 +5130,10 @@ audiohd_allocate_port(audiohd_state_t *statep)
 			return (DDI_FAILURE);
 		}
 
-		port->intrs = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS, prop, AUDIOHD_INTS);
-
-		/* make sure the values are good */
-		if (port->intrs < AUDIOHD_MIN_INTS) {
-			audio_dev_warn(adev, "%s too low, %d, resetting to %d",
-			    prop, port->intrs, AUDIOHD_INTS);
-			port->intrs = AUDIOHD_INTS;
-		} else if (port->intrs > AUDIOHD_MAX_INTS) {
-			audio_dev_warn(adev, "%s too high, %d, resetting to %d",
-			    prop, port->intrs, AUDIOHD_INTS);
-			port->intrs = AUDIOHD_INTS;
-		}
-
 		port->format = AUDIOHD_FMT_PCM;
-		port->fragfr = 48000 / port->intrs;
-		port->fragfr = AUDIOHD_ROUNDUP(port->fragfr,
-		    AUDIOHD_FRAGFR_ALIGN);
-		port->samp_size = port->fragfr * port->nchan * 2;
-		port->samp_size = AUDIOHD_ROUNDUP(port->samp_size,
-		    AUDIOHD_BDLE_BUF_ALIGN);
-		port->nframes = port->samp_size * AUDIOHD_BDLE_NUMS /
-		    (port->nchan * 2);
+		port->nframes = 1024 * AUDIOHD_BDLE_NUMS;
+		port->fragsize = 1024 * port->nchan * 2;
+		port->bufsize = port->nframes * port->nchan * 2;
 
 		/* allocate dma handle */
 		rc = ddi_dma_alloc_handle(dip, &dma_attr, DDI_DMA_SLEEP,
@@ -5228,17 +5154,13 @@ audiohd_allocate_port(audiohd_state_t *statep)
 		 * complex architectures with nested IO caches,
 		 * reliance on this flag might lead to failure.
 		 */
-		rc = ddi_dma_mem_alloc(port->samp_dmah, port->samp_size *
-		    AUDIOHD_BDLE_NUMS,
-		    &hda_dev_accattr,
-		    DDI_DMA_CONSISTENT | IOMEM_DATA_UNCACHED,
+		rc = ddi_dma_mem_alloc(port->samp_dmah, port->bufsize,
+		    &hda_dev_accattr, DDI_DMA_CONSISTENT | IOMEM_DATA_UNCACHED,
 		    DDI_DMA_SLEEP, NULL, &port->samp_kaddr,
 		    &real_size, &port->samp_acch);
 		if (rc == DDI_FAILURE) {
-			if (ddi_dma_mem_alloc(port->samp_dmah,
-			    port->samp_size * AUDIOHD_BDLE_NUMS,
-			    &hda_dev_accattr,
-			    DDI_DMA_CONSISTENT,
+			if (ddi_dma_mem_alloc(port->samp_dmah, port->bufsize,
+			    &hda_dev_accattr, DDI_DMA_CONSISTENT,
 			    DDI_DMA_SLEEP, NULL,
 			    &port->samp_kaddr, &real_size,
 			    &port->samp_acch) != DDI_SUCCESS) {
@@ -5302,9 +5224,9 @@ audiohd_allocate_port(audiohd_state_t *statep)
 
 		for (j = 0; j < AUDIOHD_BDLE_NUMS; j++) {
 			entry->sbde_addr = buf_phys_addr;
-			entry->sbde_len = port->samp_size;
+			entry->sbde_len = port->fragsize;
 			entry->sbde_ioc = 1;
-			buf_phys_addr += port->samp_size;
+			buf_phys_addr += port->fragsize;
 			entry++;
 		}
 		(void) ddi_dma_sync(port->bdl_dmah, 0, sizeof (sd_bdle_t) *
@@ -5415,32 +5337,6 @@ audiohd_restore_path(audiohd_state_t *statep)
 }
 
 /*
- * restore_play_and_record()
- */
-static void
-audiohd_restore_play_and_record(audiohd_state_t *statep)
-{
-	int		i;
-	audiohd_port_t	*port;
-
-	mutex_enter(&statep->hda_mutex);
-	for (i = 0; i < PORT_MAX; i++) {
-		port = statep->port[i];
-		if (port == NULL)
-			continue;
-
-		audio_engine_reset(port->engine);
-		if (port->triggered) {
-			(void) audiohd_reset_port(port);
-			audiohd_start_port(port);
-		} else {
-			audiohd_stop_port(port);
-
-		}
-	}
-	mutex_exit(&statep->hda_mutex);
-}
-/*
  * audiohd_reset_pins_ur_cap()
  * Description:
  * 	Enable the unsolicited response of the pins which have the unsolicited
@@ -5539,20 +5435,18 @@ audiohd_resume(audiohd_state_t *statep)
 	/* reset to enable the capability of unsolicited response for pin */
 	audiohd_reset_pins_ur_cap(statep);
 	/* Enable interrupt */
-	AUDIOHD_REG_SET32(AUDIOHD_REG_INTCTL,
-	    AUDIOHD_INTCTL_BIT_GIE |
-	    AUDIOHD_INTCTL_BIT_SIE);
+	AUDIOHD_REG_SET32(AUDIOHD_REG_INTCTL, AUDIOHD_INTCTL_BIT_GIE);
 	/* clear the unsolicited response interrupt */
 	rirbsts = AUDIOHD_REG_GET8(AUDIOHD_REG_RIRBSTS);
 	AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBSTS, rirbsts);
-	mutex_exit(&statep->hda_mutex);
-
-	audiohd_restore_play_and_record(statep);
-	audiohd_configure_output(statep);
-	audiohd_configure_input(statep);
-
 	/* set widget power to D0 */
 	audiohd_change_widget_power_state(statep, AUDIOHD_PW_D0);
+
+	audiohd_configure_output(statep);
+	audiohd_configure_input(statep);
+	mutex_exit(&statep->hda_mutex);
+
+	audio_dev_resume(statep->adev);
 
 	return (DDI_SUCCESS);
 }	/* audiohd_resume */
@@ -5563,6 +5457,8 @@ audiohd_resume(audiohd_state_t *statep)
 static int
 audiohd_suspend(audiohd_state_t *statep)
 {
+	audio_dev_suspend(statep->adev);
+
 	mutex_enter(&statep->hda_mutex);
 	statep->suspended = B_TRUE;
 
@@ -5580,22 +5476,38 @@ audiohd_suspend(audiohd_state_t *statep)
 /*
  * audiohd_disable_pin()
  */
-static int
+static void
 audiohd_disable_pin(audiohd_state_t *statep, int caddr, wid_t wid)
 {
-	AUDIOHD_DISABLE_PIN_OUT(statep, caddr, wid);
-	return (DDI_SUCCESS);
+	uint32_t	tmp;
+
+	tmp = audioha_codec_verb_get(statep, caddr, wid,
+	    AUDIOHDC_VERB_GET_PIN_CTRL, 0);
+	if (tmp == AUDIOHD_CODEC_FAILURE)
+		return;
+	tmp = audioha_codec_verb_get(statep, caddr, wid,
+	    AUDIOHDC_VERB_SET_PIN_CTRL,
+	    (tmp & ~AUDIOHDC_PIN_CONTROL_OUT_ENABLE));
 }
 
 /*
  * audiohd_enable_pin()
  */
-static int
+static void
 audiohd_enable_pin(audiohd_state_t *statep, int caddr, wid_t wid)
 {
-	AUDIOHD_ENABLE_PIN_OUT(statep, caddr, wid);
-	return (DDI_SUCCESS);
+	uint32_t	tmp;
+
+	tmp = audioha_codec_verb_get(statep, caddr, wid,
+	    AUDIOHDC_VERB_GET_PIN_CTRL, 0);
+	if (tmp == AUDIOHD_CODEC_FAILURE)
+		return;
+	tmp = audioha_codec_verb_get(statep, caddr, wid,
+	    AUDIOHDC_VERB_SET_PIN_CTRL,
+	    tmp | AUDIOHDC_PIN_CONTROL_OUT_ENABLE |
+	    AUDIOHDC_PIN_CONTROL_HP_ENABLE);
 }
+
 /*
  * audiohd_change_speaker_state()
  */
@@ -5618,8 +5530,7 @@ audiohd_change_speaker_state(audiohd_state_t *statep, int on)
 				widget = path->codec->widget[wid];
 				pin = (audiohd_pin_t *)widget->priv;
 				if (pin->device == DTYPE_SPEAKER) {
-					(void) audiohd_enable_pin(
-					    statep,
+					audiohd_enable_pin(statep,
 					    path->codec->index,
 					    pin->wid);
 				}
@@ -5631,8 +5542,7 @@ audiohd_change_speaker_state(audiohd_state_t *statep, int on)
 				widget = path->codec->widget[wid];
 				pin = (audiohd_pin_t *)widget->priv;
 				if (pin->device == DTYPE_SPEAKER) {
-					(void) audiohd_disable_pin(
-					    statep,
+					audiohd_disable_pin(statep,
 					    path->codec->index,
 					    pin->wid);
 				}
@@ -5830,15 +5740,11 @@ audiohd_intr(caddr_t arg1, caddr_t arg2)
 {
 	audiohd_state_t	*statep = (void *)arg1;
 	uint32_t	status;
-	uint32_t	regbase;
 	uint32_t	resp, respex;
-	uint8_t		sdstatus, rirbsts;
+	uint8_t		rirbsts;
 	int		i, ret;
 
 	_NOTE(ARGUNUSED(arg2))
-	audio_engine_t	*do_adc = NULL;
-	audio_engine_t	*do_dac = NULL;
-
 
 	mutex_enter(&statep->hda_mutex);
 	if (statep->suspended) {
@@ -5889,22 +5795,6 @@ audiohd_intr(caddr_t arg1, caddr_t arg2)
 		}
 	}
 
-	/* stream intr */
-	for (i = 0; i < statep->hda_streams_nums; i++) {
-		if ((status & (1<<i)) == 0)
-			continue;
-
-		regbase = AUDIOHD_REG_SD_BASE + AUDIOHD_REG_SD_LEN * i;
-		sdstatus = AUDIOHD_REG_GET8(regbase + AUDIOHD_SDREG_OFFSET_STS);
-
-		/* clear intrs */
-		AUDIOHD_REG_SET8(regbase + AUDIOHD_SDREG_OFFSET_STS, sdstatus);
-		if (i < statep->hda_input_streams)
-			do_adc = statep->port[PORT_ADC]->engine;
-		else
-			do_dac = statep->port[PORT_DAC]->engine;
-	}
-
 	/* update the kernel interrupt statistics */
 	if (statep->hda_ksp) {
 		((kstat_intr_t *)
@@ -5913,10 +5803,6 @@ audiohd_intr(caddr_t arg1, caddr_t arg2)
 
 	mutex_exit(&statep->hda_mutex);
 
-	if (do_adc)
-		audio_engine_produce(do_adc);
-	if (do_dac)
-		audio_engine_consume(do_dac);
 	return (DDI_INTR_CLAIMED);
 }	/* audiohd_intr() */
 

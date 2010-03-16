@@ -43,15 +43,14 @@ extern "C" {
 
 struct audio_engine_ops {
 	int	audio_engine_version;
-#define	AUDIO_ENGINE_VERSION	1
+#define	AUDIO_ENGINE_VERSION	2
 
 	/*
 	 * Initialize engine, including buffer allocation.  Arguments
 	 * that are pointers are hints.  On return, they are updated with
 	 * the actual values configured by the driver.
 	 */
-	int	(*audio_engine_open)(void *, int flags,
-		    unsigned *fragfr, unsigned *nfrags, caddr_t *buf);
+	int	(*audio_engine_open)(void *, int, uint_t *, caddr_t *);
 	void	(*audio_engine_close)(void *);
 
 	/*
@@ -98,13 +97,13 @@ struct audio_engine_ops {
 	 * flags passed to ae_open()), and dealing with any partial
 	 * synchronization if any is needed.
 	 */
-	void	(*audio_engine_sync)(void *, unsigned);
+	void	(*audio_engine_sync)(void *, uint_t);
 
 	/*
 	 * The framework may like to know how deep the device queues data.
 	 * This can be used to provide a more accurate latency calculation.
 	 */
-	unsigned	(*audio_engine_qlen)(void *);
+	uint_t	(*audio_engine_qlen)(void *);
 
 	/*
 	 * If the driver doesn't use simple interleaving, then we need to
@@ -114,8 +113,8 @@ struct audio_engine_ops {
 	 * samples.  If this entry point is NULL, the framework assumes
 	 * that simple interlevaing is used instead.
 	 */
-	void	(*audio_engine_chinfo)(void *, int chan, unsigned *offset,
-	    unsigned *incr);
+	void	(*audio_engine_chinfo)(void *, int chan, uint_t *offset,
+	    uint_t *incr);
 
 	/*
 	 * The following entry point is used to determine the play ahead
@@ -123,9 +122,12 @@ struct audio_engine_ops {
 	 * or with a need for deeper queuing, implement this.  If not
 	 * implemented, the framework assumes 1.5 * fragfr.
 	 */
-	unsigned	(*audio_engine_playahead)(void *);
+	uint_t	(*audio_engine_playahead)(void *);
 };
 
+/*
+ * Drivers call these.
+ */
 void audio_init_ops(struct dev_ops *, const char *);
 void audio_fini_ops(struct dev_ops *);
 
@@ -136,7 +138,7 @@ void audio_dev_set_description(audio_dev_t *, const char *);
 void audio_dev_set_version(audio_dev_t *, const char *);
 void audio_dev_add_info(audio_dev_t *, const char *);
 
-audio_engine_t *audio_engine_alloc(audio_engine_ops_t *, unsigned);
+audio_engine_t *audio_engine_alloc(audio_engine_ops_t *, uint_t);
 void audio_engine_set_private(audio_engine_t *, void *);
 void *audio_engine_get_private(audio_engine_t *);
 void audio_engine_free(audio_engine_t *);
@@ -145,20 +147,15 @@ void audio_dev_add_engine(audio_dev_t *, audio_engine_t *);
 void audio_dev_remove_engine(audio_dev_t *, audio_engine_t *);
 int audio_dev_register(audio_dev_t *);
 int audio_dev_unregister(audio_dev_t *);
+void audio_dev_suspend(audio_dev_t *);
+void audio_dev_resume(audio_dev_t *);
 void audio_dev_warn(audio_dev_t *, const char *, ...);
+
 /* DEBUG ONLY */
 void audio_dump_bytes(const uint8_t *w, int dcount);
 void audio_dump_words(const uint16_t *w, int dcount);
 void audio_dump_dwords(const uint32_t *w, int dcount);
 
-/*
- * Drivers call these.
- */
-void audio_engine_consume(audio_engine_t *);
-void audio_engine_produce(audio_engine_t *);
-void audio_engine_reset(audio_engine_t *);
-void audio_engine_lock(audio_engine_t *);
-void audio_engine_unlock(audio_engine_t *);
 
 /* Engine flags */
 #define	ENGINE_OUTPUT_CAP	(1U << 2)
@@ -172,7 +169,6 @@ void audio_engine_unlock(audio_engine_t *);
 #define	ENGINE_RUNNING		(1U << 19)
 #define	ENGINE_EXCLUSIVE	(1U << 20)	/* exclusive use, e.g. AC3 */
 #define	ENGINE_NDELAY		(1U << 21)	/* non-blocking open */
-#define	ENGINE_WAKE		(1U << 22)	/* wakeup tq running */
 
 /*
  * entry points used by legacy SADA drivers

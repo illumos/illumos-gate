@@ -67,7 +67,7 @@ static int audioixp_suspend(dev_info_t *);
 /*
  * Entry point routine prototypes
  */
-static int audioixp_open(void *, int, unsigned *, unsigned *, caddr_t *);
+static int audioixp_open(void *, int, unsigned *, caddr_t *);
 static void audioixp_close(void *);
 static int audioixp_start(void *);
 static void audioixp_stop(void *);
@@ -107,19 +107,11 @@ const char *audioixp_remove_ac97[] = {
 };
 
 /*
- * interrupt handler
- */
-static uint_t	audioixp_intr(caddr_t);
-
-/*
  * Local Routine Prototypes
  */
 static int audioixp_attach(dev_info_t *);
 static int audioixp_detach(dev_info_t *);
 static int audioixp_alloc_port(audioixp_state_t *, int);
-static void audioixp_start_port(audioixp_port_t *);
-static void audioixp_stop_port(audioixp_port_t *);
-static void audioixp_reset_port(audioixp_port_t *);
 static void audioixp_update_port(audioixp_port_t *);
 
 static int audioixp_codec_sync(audioixp_state_t *);
@@ -357,20 +349,6 @@ audioixp_ddi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 }
 
-static void
-audioixp_stop_dma(audioixp_state_t *statep)
-{
-	CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT_DMA);
-	CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN_DMA);
-}
-
-static void
-audioixp_disable_intr(audioixp_state_t *statep)
-{
-	PUT32(IXP_AUDIO_INT, GET32(IXP_AUDIO_INT));
-	PUT32(IXP_AUDIO_INT_EN, 0);
-}
-
 /*
  * quiesce(9E) entry point.
  *
@@ -388,11 +366,11 @@ audioixp_quiesce(dev_info_t *dip)
 	statep = ddi_get_driver_private(dip);
 	ASSERT(statep != NULL);
 
-	/* disable HW interrupt */
-	audioixp_disable_intr(statep);
-
 	/* stop DMA engines */
-	audioixp_stop_dma(statep);
+	CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT);
+	CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT_DMA);
+	CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN);
+	CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN_DMA);
 
 	return (DDI_SUCCESS);
 }
@@ -405,135 +383,28 @@ audioixp_suspend(dev_info_t *dip)
 	statep = ddi_get_driver_private(dip);
 	ASSERT(statep != NULL);
 
-	ac97_suspend(statep->ac97);
-	mutex_enter(&statep->inst_lock);
+	audio_dev_suspend(statep->adev);
 
-	statep->suspended = B_TRUE;
-
-	audioixp_disable_intr(statep);
-	audioixp_stop_dma(statep);
-
-	mutex_exit(&statep->inst_lock);
 	return (DDI_SUCCESS);
-}
-
-static void
-audioixp_resume_port(audioixp_port_t *port)
-{
-	if (port != NULL) {
-		if (port->engine != NULL) {
-			audio_engine_reset(port->engine);
-		}
-	}
-	audioixp_reset_port(port);
-	if (port->started) {
-		audioixp_start_port(port);
-	} else {
-		audioixp_stop_port(port);
-	}
 }
 
 static int
 audioixp_resume(dev_info_t *dip)
 {
 	audioixp_state_t		*statep;
-	audio_dev_t			*adev;
-	audioixp_port_t			*rec_port, *play_port;
 
 	statep = ddi_get_driver_private(dip);
-	adev = statep->adev;
 	ASSERT(statep != NULL);
 
 	if (audioixp_chip_init(statep) != DDI_SUCCESS) {
-		audio_dev_warn(adev, "DDI_RESUME failed to init chip");
+		audio_dev_warn(statep->adev, "DDI_RESUME failed to init chip");
 		return (DDI_SUCCESS);
 	}
 
-	ac97_resume(statep->ac97);
-	mutex_enter(&statep->inst_lock);
-	statep->suspended = B_FALSE;
+	ac97_reset(statep->ac97);
+	audio_dev_resume(statep->adev);
 
-	rec_port = statep->rec_port;
-	play_port = statep->play_port;
-
-	audioixp_resume_port(rec_port);
-	audioixp_resume_port(play_port);
-
-	mutex_exit(&statep->inst_lock);
 	return (DDI_SUCCESS);
-}
-/*
- * audioixp_intr()
- *
- * Description:
- *	Interrupt service routine for both play and record. For play we
- *	get the next buffers worth of audio. For record we send it on to
- *	the mixer.
- *
- *	There's a hardware pointer which indicate memory location where
- *	the hardware is processing. We check this pointer to decide whether
- *	to handle the buffer and how many buffers should be handled.
- *	Refer to ATI IXP400/450 Register Reference Manual, page 193,194.
- *
- * Arguments:
- *	caddr_t		arg	Pointer to the interrupting device's state
- *				structure
- *
- * Returns:
- *	DDI_INTR_CLAIMED	Interrupt claimed and processed
- *	DDI_INTR_UNCLAIMED	Interrupt not claimed, and thus ignored
- */
-static uint_t
-audioixp_intr(caddr_t arg)
-{
-	audioixp_state_t	*statep;
-	uint32_t		sr;
-	int			claimed = DDI_INTR_UNCLAIMED;
-
-	statep = (void *)arg;
-	mutex_enter(&statep->inst_lock);
-
-	sr = GET32(IXP_AUDIO_INT);
-
-	/* PCM in interrupt */
-	if (sr & IXP_AUDIO_INT_IN_DMA) {
-		claimed = DDI_INTR_CLAIMED;
-		PUT32(IXP_AUDIO_INT, IXP_AUDIO_INT_IN_DMA);
-	}
-
-	/* PCM out interrupt */
-	if (sr & IXP_AUDIO_INT_OUT_DMA) {
-		claimed = DDI_INTR_CLAIMED;
-		PUT32(IXP_AUDIO_INT, IXP_AUDIO_INT_OUT_DMA);
-	}
-
-	/* system is too busy to process the input stream, ignore it */
-	if (sr & IXP_AUDIO_INT_IN_DMA_OVERFLOW) {
-		claimed = DDI_INTR_CLAIMED;
-		PUT32(IXP_AUDIO_INT, IXP_AUDIO_INT_IN_DMA_OVERFLOW);
-	}
-
-	/* System is too busy, ignore it */
-	if (sr & IXP_AUDIO_INT_OUT_DMA_UNDERFLOW) {
-		claimed = DDI_INTR_CLAIMED;
-		PUT32(IXP_AUDIO_INT, IXP_AUDIO_INT_OUT_DMA_UNDERFLOW);
-	}
-
-	/* update the kernel interrupt statistics */
-	if ((claimed == DDI_INTR_CLAIMED) && statep->ksp) {
-		IXP_KIOP(statep)->intrs[KSTAT_INTR_HARD]++;
-	}
-
-	mutex_exit(&statep->inst_lock);
-
-	if (sr & IXP_AUDIO_INT_IN_DMA) {
-		audio_engine_produce(statep->rec_port->engine);
-	}
-	if (sr & IXP_AUDIO_INT_OUT_DMA) {
-		audio_engine_consume(statep->play_port->engine);
-	}
-
-	return (claimed);
 }
 
 /*
@@ -545,8 +416,7 @@ audioixp_intr(caddr_t arg)
  * Arguments:
  *	void		*arg		The DMA engine to set up
  *	int		flag		Open flags
- *	unsigned	*fragfrp	Receives number of frames per fragment
- *	unsigned	*nfragsp	Receives number of fragments
+ *	unsigned	*nframesp	Receives number of frames
  *	caddr_t		*bufp		Receives kernel data buffer
  *
  * Returns:
@@ -554,8 +424,7 @@ audioixp_intr(caddr_t arg)
  *	errno	on failure
  */
 static int
-audioixp_open(void *arg, int flag,
-    unsigned *fragfrp, unsigned *nfragsp, caddr_t *bufp)
+audioixp_open(void *arg, int flag, unsigned *nframesp, caddr_t *bufp)
 {
 	audioixp_port_t	*port = arg;
 
@@ -564,13 +433,8 @@ audioixp_open(void *arg, int flag,
 	port->started = B_FALSE;
 	port->count = 0;
 	port->offset = 0;
-	*fragfrp = port->fragfr;
-	*nfragsp = IXP_BD_NUMS;
+	*nframesp = port->nframes;
 	*bufp = port->samp_kaddr;
-
-	mutex_enter(&port->statep->inst_lock);
-	audioixp_reset_port(port);
-	mutex_exit(&port->statep->inst_lock);
 
 	return (0);
 }
@@ -589,13 +453,7 @@ audioixp_open(void *arg, int flag,
 static void
 audioixp_close(void *arg)
 {
-	audioixp_port_t		*port = arg;
-	audioixp_state_t	*statep = port->statep;
-
-	mutex_enter(&statep->inst_lock);
-	audioixp_stop_port(port);
-	port->started = B_FALSE;
-	mutex_exit(&statep->inst_lock);
+	_NOTE(ARGUNUSED(arg));
 }
 
 /*
@@ -615,10 +473,13 @@ audioixp_stop(void *arg)
 	audioixp_state_t	*statep = port->statep;
 
 	mutex_enter(&statep->inst_lock);
-	if (port->started) {
-		audioixp_stop_port(port);
+	if (port->num == IXP_REC) {
+		CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN);
+		CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN_DMA);
+	} else {
+		CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT);
+		CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT_DMA);
 	}
-	port->started = B_FALSE;
 	mutex_exit(&statep->inst_lock);
 }
 
@@ -641,9 +502,53 @@ audioixp_start(void *arg)
 	audioixp_state_t	*statep = port->statep;
 
 	mutex_enter(&statep->inst_lock);
-	if (!port->started) {
-		audioixp_start_port(port);
-		port->started = B_TRUE;
+
+	port->offset = 0;
+
+	if (port->num == IXP_REC) {
+		PUT32(IXP_AUDIO_FIFO_FLUSH, IXP_AUDIO_FIFO_FLUSH_IN);
+		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_INTER_IN);
+
+		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN_DMA);
+		PUT32(IXP_AUDIO_IN_DMA_LINK_P,
+		    port->bdl_paddr | IXP_AUDIO_IN_DMA_LINK_P_EN);
+
+		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN);
+	} else {
+		uint32_t slot = GET32(IXP_AUDIO_OUT_DMA_SLOT_EN_THRESHOLD);
+		PUT32(IXP_AUDIO_FIFO_FLUSH, IXP_AUDIO_FIFO_FLUSH_OUT);
+		/* clear all slots */
+		slot &= ~ (IXP_AUDIO_OUT_DMA_SLOT_3 |
+		    IXP_AUDIO_OUT_DMA_SLOT_4 |
+		    IXP_AUDIO_OUT_DMA_SLOT_5 |
+		    IXP_AUDIO_OUT_DMA_SLOT_6 |
+		    IXP_AUDIO_OUT_DMA_SLOT_7 |
+		    IXP_AUDIO_OUT_DMA_SLOT_8 |
+		    IXP_AUDIO_OUT_DMA_SLOT_9 |
+		    IXP_AUDIO_OUT_DMA_SLOT_10 |
+		    IXP_AUDIO_OUT_DMA_SLOT_11 |
+		    IXP_AUDIO_OUT_DMA_SLOT_12);
+		/* enable AC'97 output slots (depending on output channels) */
+		slot |= IXP_AUDIO_OUT_DMA_SLOT_3 |
+		    IXP_AUDIO_OUT_DMA_SLOT_4;
+		if (port->nchan >= 4) {
+			slot |= IXP_AUDIO_OUT_DMA_SLOT_6 |
+			    IXP_AUDIO_OUT_DMA_SLOT_9;
+		}
+		if (port->nchan >= 6) {
+			slot |= IXP_AUDIO_OUT_DMA_SLOT_7 |
+			    IXP_AUDIO_OUT_DMA_SLOT_8;
+		}
+
+		PUT32(IXP_AUDIO_OUT_DMA_SLOT_EN_THRESHOLD, slot);
+
+		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_INTER_OUT);
+
+		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT_DMA);
+		PUT32(IXP_AUDIO_OUT_DMA_LINK_P,
+		    port->bdl_paddr | IXP_AUDIO_OUT_DMA_LINK_P_EN);
+
+		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT);
 	}
 	mutex_exit(&statep->inst_lock);
 	return (0);
@@ -778,7 +683,6 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 	uint_t			count;
 	int			dir;
 	unsigned		caps;
-	char			*prop;
 	audio_dev_t		*adev;
 	audioixp_port_t		*port;
 	uint32_t		paddr;
@@ -797,7 +701,6 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 	switch (num) {
 	case IXP_REC:
 		statep->rec_port = port;
-		prop = "record-interrupts";
 		dir = DDI_DMA_READ;
 		caps = ENGINE_INPUT_CAP;
 		port->sync_dir = DDI_DMA_SYNC_FORKERNEL;
@@ -805,7 +708,6 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 		break;
 	case IXP_PLAY:
 		statep->play_port = port;
-		prop = "play-interrupts";
 		dir = DDI_DMA_WRITE;
 		caps = ENGINE_OUTPUT_CAP;
 		port->sync_dir = DDI_DMA_SYNC_FORDEV;
@@ -836,29 +738,10 @@ audioixp_alloc_port(audioixp_state_t *statep, int num)
 		return (DDI_FAILURE);
 	}
 
-	port->intrs = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, prop, IXP_INTS);
-
-	/* make sure the values are good */
-	if (port->intrs < IXP_MIN_INTS) {
-		audio_dev_warn(adev, "%s too low, %d, resetting to %d",
-		    prop, port->intrs, IXP_INTS);
-		port->intrs = IXP_INTS;
-	} else if (port->intrs > IXP_MAX_INTS) {
-		audio_dev_warn(adev, "%s too high, %d, resetting to %d",
-		    prop, port->intrs, IXP_INTS);
-		port->intrs = IXP_INTS;
-	}
-
-	/*
-	 * Figure out how much space we need.  Sample rate is 48kHz, and
-	 * we need to store 8 chunks.  (Note that this means that low
-	 * interrupt frequencies will require more RAM.)
-	 */
-	port->fragfr = 48000 / port->intrs;
-	port->fragfr = IXP_ROUNDUP(port->fragfr, IXP_MOD_SIZE);
+	port->nframes = 4096;
+	port->fragfr = port->nframes / IXP_BD_NUMS;
 	port->fragsz = port->fragfr * port->nchan * 2;
-	port->samp_size = port->fragsz * IXP_BD_NUMS;
+	port->samp_size = port->nframes * port->nchan * 2;
 
 	/* allocate dma handle */
 	rc = ddi_dma_alloc_handle(dip, &sample_buf_dma_attr, DDI_DMA_SLEEP,
@@ -992,130 +875,6 @@ audioixp_free_port(audioixp_port_t *port)
 }
 
 /*
- * audioixp_start_port()
- *
- * Description:
- *	This routine starts the DMA engine.
- *
- * Arguments:
- *	audioixp_port_t	*port		Port of DMA engine to start.
- */
-static void
-audioixp_start_port(audioixp_port_t *port)
-{
-	audioixp_state_t	*statep = port->statep;
-
-	ASSERT(mutex_owned(&statep->inst_lock));
-
-	/* if suspended, then do nothing else */
-	if (statep->suspended) {
-		return;
-	}
-
-	if (port->num == IXP_REC) {
-		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN);
-	} else {
-		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT);
-	}
-}
-
-/*
- * audioixp_stop_port()
- *
- * Description:
- *	This routine stops the DMA engine.
- *
- * Arguments:
- *	audioixp_port_t	*port		Port of DMA engine to stop.
- */
-static void
-audioixp_stop_port(audioixp_port_t *port)
-{
-	audioixp_state_t	*statep = port->statep;
-
-	ASSERT(mutex_owned(&statep->inst_lock));
-
-	/* if suspended, then do nothing else */
-	if (statep->suspended) {
-		return;
-	}
-	if (port->num == IXP_REC) {
-		CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN);
-	} else {
-		CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT);
-	}
-}
-
-/*
- * audioixp_reset_port()
- *
- * Description:
- *	This routine resets the DMA engine pareparing it for work.
- *
- * Arguments:
- *	audioixp_port_t	*port		Port of DMA engine to reset.
- */
-static void
-audioixp_reset_port(audioixp_port_t *port)
-{
-	audioixp_state_t	*statep = port->statep;
-
-	ASSERT(mutex_owned(&statep->inst_lock));
-
-	port->offset = 0;
-
-	if (statep->suspended)
-		return;
-
-	/*
-	 * Perform full reset of the engine, and enable its interrupts
-	 * but leave it turned off.
-	 */
-	if (port->num == IXP_REC) {
-		PUT32(IXP_AUDIO_FIFO_FLUSH, IXP_AUDIO_FIFO_FLUSH_IN);
-		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_INTER_IN);
-
-		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN_DMA);
-		PUT32(IXP_AUDIO_IN_DMA_LINK_P,
-		    port->bdl_paddr | IXP_AUDIO_IN_DMA_LINK_P_EN);
-
-	} else {
-		uint32_t slot = GET32(IXP_AUDIO_OUT_DMA_SLOT_EN_THRESHOLD);
-		PUT32(IXP_AUDIO_FIFO_FLUSH, IXP_AUDIO_FIFO_FLUSH_OUT);
-		/* clear all slots */
-		slot &= ~ (IXP_AUDIO_OUT_DMA_SLOT_3 |
-		    IXP_AUDIO_OUT_DMA_SLOT_4 |
-		    IXP_AUDIO_OUT_DMA_SLOT_5 |
-		    IXP_AUDIO_OUT_DMA_SLOT_6 |
-		    IXP_AUDIO_OUT_DMA_SLOT_7 |
-		    IXP_AUDIO_OUT_DMA_SLOT_8 |
-		    IXP_AUDIO_OUT_DMA_SLOT_9 |
-		    IXP_AUDIO_OUT_DMA_SLOT_10 |
-		    IXP_AUDIO_OUT_DMA_SLOT_11 |
-		    IXP_AUDIO_OUT_DMA_SLOT_12);
-		/* enable AC'97 output slots (depending on output channels) */
-		slot |= IXP_AUDIO_OUT_DMA_SLOT_3 |
-		    IXP_AUDIO_OUT_DMA_SLOT_4;
-		if (port->nchan >= 4) {
-			slot |= IXP_AUDIO_OUT_DMA_SLOT_6 |
-			    IXP_AUDIO_OUT_DMA_SLOT_9;
-		}
-		if (port->nchan >= 6) {
-			slot |= IXP_AUDIO_OUT_DMA_SLOT_7 |
-			    IXP_AUDIO_OUT_DMA_SLOT_8;
-		}
-
-		PUT32(IXP_AUDIO_OUT_DMA_SLOT_EN_THRESHOLD, slot);
-
-		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_INTER_OUT);
-
-		SET32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT_DMA);
-		PUT32(IXP_AUDIO_OUT_DMA_LINK_P,
-		    port->bdl_paddr | IXP_AUDIO_OUT_DMA_LINK_P_EN);
-	}
-}
-
-/*
  * audioixp_update_port()
  *
  * Description:
@@ -1135,9 +894,6 @@ audioixp_update_port(audioixp_port_t *port)
 	uint32_t		offset;
 	uint32_t		paddr;
 
-	if (statep->suspended) {
-		return;
-	}
 	if (port->num == IXP_REC) {
 		regoff = IXP_AUDIO_IN_DMA_DT_CUR;
 	} else {
@@ -1453,13 +1209,6 @@ audioixp_chip_init(audioixp_state_t *statep)
 		return (DDI_FAILURE);
 	}
 
-	/* enable interrupts */
-	PUT32(IXP_AUDIO_INT, 0xffffffff);
-	PUT32(
-	    IXP_AUDIO_INT_EN,
-	    IXP_AUDIO_INT_EN_IN_DMA_OVERFLOW |
-	    IXP_AUDIO_INT_EN_STATUS |
-	    IXP_AUDIO_INT_EN_OUT_DMA_UNDERFLOW);
 	return (DDI_SUCCESS);
 
 }	/* audioixp_chip_init() */
@@ -1489,27 +1238,11 @@ audioixp_attach(dev_info_t *dip)
 	const char		*name;
 	const char		*rev;
 
-	/* we don't support high level interrupts in the driver */
-	if (ddi_intr_hilevel(dip, 0) != 0) {
-		cmn_err(CE_WARN,
-		    "!%s%d: unsupported high level interrupt",
-		    ddi_driver_name(dip), ddi_get_instance(dip));
-		return (DDI_FAILURE);
-	}
-
 	/* allocate the soft state structure */
 	statep = kmem_zalloc(sizeof (*statep), KM_SLEEP);
 	statep->dip = dip;
 	ddi_set_driver_private(dip, statep);
-
-	if (ddi_get_iblock_cookie(dip, 0, &statep->iblock) != DDI_SUCCESS) {
-		cmn_err(CE_WARN,
-		    "!%s%d: cannot get iblock cookie",
-		    ddi_driver_name(dip), ddi_get_instance(dip));
-		kmem_free(statep, sizeof (*statep));
-		return (DDI_FAILURE);
-	}
-	mutex_init(&statep->inst_lock, NULL, MUTEX_DRIVER, statep->iblock);
+	mutex_init(&statep->inst_lock, NULL, MUTEX_DRIVER, NULL);
 
 	/* allocate framework audio device */
 	if ((adev = audio_dev_alloc(dip, 0)) == NULL) {
@@ -1588,14 +1321,6 @@ audioixp_attach(dev_info_t *dip)
 		}
 	}
 
-	/* set up kernel statistics */
-	if ((statep->ksp = kstat_create(IXP_NAME, ddi_get_instance(dip),
-	    IXP_NAME, "controller", KSTAT_TYPE_INTR, 1,
-	    KSTAT_FLAG_PERSISTENT)) != NULL) {
-		kstat_install(statep->ksp);
-	}
-
-
 	if (audioixp_chip_init(statep) != DDI_SUCCESS) {
 		audio_dev_warn(statep->adev, "failed to init chip");
 		goto error;
@@ -1606,13 +1331,6 @@ audioixp_attach(dev_info_t *dip)
 		audio_dev_warn(adev, "ac'97 initialization failed");
 		goto error;
 	}
-
-	/* set up the interrupt handler */
-	if (ddi_add_intr(dip, 0, &statep->iblock, NULL, audioixp_intr,
-	    (caddr_t)statep) != DDI_SUCCESS) {
-		audio_dev_warn(adev, "bad interrupt specification");
-	}
-	statep->intr_added = B_TRUE;
 
 	if (audio_dev_register(adev) != DDI_SUCCESS) {
 		audio_dev_warn(adev, "unable to register with framework");
@@ -1666,26 +1384,14 @@ audioixp_detach(dev_info_t *dip)
  * Arguments:
  *	audioixp_state_t	*state	The device soft state.
  */
-void
+static void
 audioixp_destroy(audioixp_state_t *statep)
 {
-	if (!statep->suspended) {
-		PUT32(IXP_AUDIO_INT, GET32(IXP_AUDIO_INT));
-		PUT32(IXP_AUDIO_INT_EN, 0);
-
-		/*
-		 * put the audio controller into quiet state, everything off
-		 */
-		CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT_DMA);
-		CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN_DMA);
-	}
-
-	if (statep->intr_added) {
-		ddi_remove_intr(statep->dip, 0, statep->iblock);
-	}
-	if (statep->ksp) {
-		kstat_delete(statep->ksp);
-	}
+	/*
+	 * put the audio controller into quiet state, everything off
+	 */
+	CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_OUT_DMA);
+	CLR32(IXP_AUDIO_CMD, IXP_AUDIO_CMD_EN_IN_DMA);
 
 	audioixp_free_port(statep->play_port);
 	audioixp_free_port(statep->rec_port);

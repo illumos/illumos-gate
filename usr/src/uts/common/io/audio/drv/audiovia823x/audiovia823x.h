@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,10 +61,6 @@
 #define	AUVIA_REC_SGD_NUM	0
 #define	AUVIA_NUM_PORTC		2
 #define	AUVIA_NUM_SGD		16	/* number of fragments */
-
-#define	AUVIA_MAX_INTRS		256
-#define	AUVIA_MIN_INTRS		24
-#define	AUVIA_INTRS		175
 
 #define	AUVIA_SGD_EOL		0x80000000
 #define	AUVIA_SGD_FLAG		0x40000000
@@ -127,7 +123,6 @@ struct auvia_portc {
 	auvia_devc_t		*devc;
 	audio_engine_t		*engine;
 	caddr_t			base;		/* base for registers */
-	boolean_t		started;
 	int			nchan;
 
 	ddi_dma_handle_t	sgd_dmah;	/* dma for descriptors */
@@ -142,11 +137,8 @@ struct auvia_portc {
 	size_t			buf_size;
 	int			syncdir;
 
-	unsigned		intrs;
-	unsigned		fragfr;
-	unsigned		fragsz;
-	unsigned		cur_frag;
-	unsigned		resid;
+	unsigned		nframes;
+	unsigned		pos;
 
 	uint64_t		count;
 
@@ -159,8 +151,6 @@ struct auvia_devc {
 	dev_info_t		*dip;
 	audio_dev_t		*adev;
 	ac97_t			*ac97;
-	kstat_t			*ksp;
-	boolean_t		suspended;
 
 	char			*chip_name;
 	int			chip_type;
@@ -172,9 +162,6 @@ struct auvia_devc {
 	ddi_acc_handle_t	regsh;
 	caddr_t			base;
 
-	kmutex_t		mutex;		/* For normal locking */
-	kmutex_t		low_mutex;	/* For low level routines */
-	ddi_intr_handle_t	ih;
 	auvia_portc_t		*portc[AUVIA_NUM_PORTC];
 };
 

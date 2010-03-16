@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,10 +46,6 @@
 #define	CREATIVE_VENDOR_ID	0x1102
 #define	SB_P16X_ID		0x0006
 
-#define	P16X_MAX_INTRS	256
-#define	P16X_MIN_INTRS	24
-#define	P16X_DEF_INTRS	175
-
 typedef struct _p16x_dev_t p16x_dev_t;
 typedef struct _p16x_port_t p16x_port_t;
 
@@ -58,10 +54,7 @@ struct _p16x_port_t
 	p16x_dev_t 		*dev;
 	audio_engine_t 		*engine;
 
-	unsigned		intrs;
 	caddr_t			base;
-	boolean_t		started;
-	boolean_t		suspended;
 
 	int			port_num;
 #define	P16X_PLAY		0
@@ -74,10 +67,6 @@ struct _p16x_port_t
 	uint32_t		buf_frames;
 	int			syncdir;
 	int			nchan;
-	unsigned		fragfr;
-	unsigned		nfrags;
-	unsigned		fragsz;
-	unsigned		nframes;
 	uint64_t		count;
 	uint32_t		offset;
 };
@@ -87,16 +76,11 @@ struct _p16x_dev_t
 	dev_info_t		*dip;
 	audio_dev_t		*adev;
 	ac97_t			*ac97;
-	kstat_t			*ksp;
-	ddi_iblock_cookie_t	iblock;
 	boolean_t		suspended;
-	boolean_t		intr_added;
 	ddi_acc_handle_t	pcih;
 	ddi_acc_handle_t	regsh;
 	caddr_t			base;
-	kmutex_t		mutex;		/* For normal locking */
-	kmutex_t		low_mutex;	/* For low level routines */
-	ddi_intr_handle_t	ih;
+	kmutex_t		mutex;	/* For low level routines */
 
 	p16x_port_t 		*port[P16X_NUM_PORT];
 };
@@ -114,8 +98,6 @@ struct _p16x_dev_t
 	ddi_put16(dev->regsh, (void *)((char *)dev->base+(reg)), (val))
 #define	OUTB(dev, val, reg)	\
 	ddi_put8(dev->regsh, (void *)((char *)dev->base+(reg)), (val))
-
-#define	P16X_KIOP(X)	((kstat_intr_t *)(X->ksp->ks_data))
 
 /*
  * SB P16X Registers

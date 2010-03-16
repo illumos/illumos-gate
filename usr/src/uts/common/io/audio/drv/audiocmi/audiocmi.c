@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -89,66 +89,39 @@ static ddi_dma_attr_t dma_attr = {
 	0			/* dma_attr_flags */
 };
 
-static uint_t
-cmpci_intr(caddr_t arg1, caddr_t arg2)
+
+static int
+cmpci_open(void *arg, int flag, uint_t *nframesp, caddr_t *bufp)
 {
-	cmpci_dev_t	*dev = (void *)arg1;
+	cmpci_port_t *port = arg;
+	cmpci_dev_t *dev = port->dev;
 
-	uint32_t	intstat, intctrl, intclear;
-	void		(*cb0)(audio_engine_t *) = NULL;
-	void		(*cb1)(audio_engine_t *) = NULL;
-	uint_t		rv;
-
-	_NOTE(ARGUNUSED(arg2));
-
-	rv = DDI_INTR_UNCLAIMED;
+	_NOTE(ARGUNUSED(flag));
 
 	mutex_enter(&dev->mutex);
-	if (dev->suspended) {
-		mutex_exit(&dev->mutex);
-		return (rv);
-	}
 
-	intclear = 0;
-	intstat = GET32(dev, REG_INTSTAT);
-	intctrl = GET32(dev, REG_INTCTRL);
-	if ((intstat & INTSTAT_CH0_INT) && (intctrl & INTCTRL_CH0_EN)) {
-		intclear |= INTCTRL_CH0_EN;
-		cb0 = dev->port[0].callb;
-	}
-	if ((intstat & INTSTAT_CH1_INT) && (intctrl & INTCTRL_CH1_EN)) {
-		intclear |= INTCTRL_CH1_EN;
-		cb1 = dev->port[1].callb;
-	}
+	*nframesp = port->nframes;
+	*bufp = port->kaddr;
 
-	/* toggle the bits that we are going to handle */
-	if (intclear) {
-		CLR32(dev, REG_INTCTRL, intclear);
-		SET32(dev, REG_INTCTRL, intclear);
-		rv = DDI_INTR_CLAIMED;
-
-		KSINTR(dev)->intrs[KSTAT_INTR_HARD]++;
-	}
-
+	port->count = 0;
 	mutex_exit(&dev->mutex);
 
-	if (cb0) {
-		(*cb0)(dev->port[0].engine);
-	}
-	if (cb1) {
-		(*cb1)(dev->port[1].engine);
-	}
-
-	return (rv);
+	return (0);
 }
 
 static void
-cmpci_reset_port(cmpci_port_t *port)
+cmpci_close(void *arg)
 {
-	cmpci_dev_t *dev = port->dev;
+	_NOTE(ARGUNUSED(arg));
+}
 
-	if (dev->suspended)
-		return;
+static int
+cmpci_start(void *arg)
+{
+	cmpci_port_t	*port = arg;
+	cmpci_dev_t	*dev = port->dev;
+
+	mutex_enter(&dev->mutex);
 
 	port->offset = 0;
 
@@ -222,7 +195,7 @@ cmpci_reset_port(cmpci_port_t *port)
 
 	PUT32(dev, port->reg_paddr, port->paddr);
 	PUT16(dev, port->reg_bufsz, (port->bufsz / 4) - 1);
-	PUT16(dev, port->reg_fragsz, (port->fragfr *  port->nchan / 2) - 1);
+	PUT16(dev, port->reg_fragsz, (port->bufsz  / 4) - 1);
 
 	/* Analog output */
 	if (port->capture) {
@@ -231,77 +204,33 @@ cmpci_reset_port(cmpci_port_t *port)
 	} else {
 		CLR32(dev, REG_FUNCTRL0, port->fc0_rec_bit);
 	}
-}
-
-static void
-cmpci_start_port(cmpci_port_t *port)
-{
-	cmpci_dev_t	*dev = port->dev;
-
-	if (dev->suspended)
-		return;
 
 	SET32(dev, REG_FUNCTRL0, port->fc0_en_bit);
-	SET32(dev, REG_INTCTRL, port->int_en_bit);
-}
-
-static void
-cmpci_stop_port(cmpci_port_t *port)
-{
-	cmpci_dev_t	*dev = port->dev;
-
-	if (dev->suspended)
-		return;
-
-	CLR32(dev, REG_FUNCTRL0, port->fc0_en_bit);
-	CLR32(dev, REG_INTCTRL, port->int_en_bit);
-}
-
-static int
-cmpci_open(void *arg, int flag, uint_t *fragfrp, uint_t *nfp, caddr_t *bufp)
-{
-	cmpci_port_t *port = arg;
-	cmpci_dev_t *dev = port->dev;
-
-	_NOTE(ARGUNUSED(flag));
-
-	mutex_enter(&dev->mutex);
-
-	*fragfrp = port->fragfr;
-	*nfp = port->nfrags;
-	*bufp = port->kaddr;
-
-	port->count = 0;
-	port->open = B_TRUE;
-
-	cmpci_reset_port(port);
-	cmpci_start_port(port);
-
 	mutex_exit(&dev->mutex);
+
 	return (0);
 }
 
 static void
-cmpci_close(void *arg)
+cmpci_stop(void *arg)
 {
-	cmpci_port_t *port = arg;
-	cmpci_dev_t *dev = port->dev;
+	cmpci_port_t	*port = arg;
+	cmpci_dev_t	*dev = port->dev;
 
 	mutex_enter(&dev->mutex);
-	port->open = B_FALSE;
-	cmpci_stop_port(port);
+	CLR32(dev, REG_FUNCTRL0, port->fc0_en_bit);
 	mutex_exit(&dev->mutex);
 }
 
-static void
-cmpci_update_port(cmpci_port_t *port)
+static uint64_t
+cmpci_count(void *arg)
 {
+	cmpci_port_t	*port = arg;
 	cmpci_dev_t	*dev = port->dev;
-	uint32_t	count;
+	uint64_t	count;
 	uint32_t	offset;
 
-	if ((dev->suspended) || (!port->open))
-		return;
+	mutex_enter(&dev->mutex);
 
 	/* this gives us the offset in dwords */
 	offset = (port->bufsz / 4) - (GET16(dev, port->reg_bufsz) + 1);
@@ -314,19 +243,6 @@ cmpci_update_port(cmpci_port_t *port)
 	}
 	port->count += count;
 	port->offset = offset;
-}
-
-static uint64_t
-cmpci_count(void *arg)
-{
-	cmpci_port_t	*port = arg;
-	cmpci_dev_t	*dev = port->dev;
-	uint64_t	count;
-
-	mutex_enter(&dev->mutex);
-	cmpci_update_port(port);
-
-	/* the count is in dwords */
 	count = port->count;
 
 	mutex_exit(&dev->mutex);
@@ -337,41 +253,6 @@ cmpci_count(void *arg)
 	 */
 	return (count / (port->nchan / 2));
 }
-
-
-static int
-cmpci_setup_interrupts(cmpci_dev_t *dev)
-{
-	int actual;
-	uint_t ipri;
-
-	if ((ddi_intr_alloc(dev->dip, &dev->ihandle, DDI_INTR_TYPE_FIXED,
-	    0, 1, &actual, DDI_INTR_ALLOC_NORMAL) != DDI_SUCCESS) ||
-	    (actual != 1)) {
-		audio_dev_warn(dev->adev, "can't alloc intr handle");
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_get_pri(dev->ihandle, &ipri) != DDI_SUCCESS) {
-		audio_dev_warn(dev->adev,  "can't determine intr priority");
-		(void) ddi_intr_free(dev->ihandle);
-		dev->ihandle = NULL;
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_add_handler(dev->ihandle, cmpci_intr, dev,
-	    NULL) != DDI_SUCCESS) {
-		audio_dev_warn(dev->adev, "can't add intr handler");
-		(void) ddi_intr_free(dev->ihandle);
-		dev->ihandle = NULL;
-		return (DDI_FAILURE);
-	}
-
-	mutex_init(&dev->mutex, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-
-	return (DDI_SUCCESS);
-}
-
 
 #define	MASK(nbits)	((1 << (nbits)) - 1)
 #define	SCALE(val, nbits)	\
@@ -404,9 +285,6 @@ cmpci_configure_mixer(cmpci_dev_t *dev)
 	uint8_t		inmix[2];
 	uint64_t	recsrcs;
 	uint64_t	monsrcs;
-
-	if (dev->suspended)
-		return;
 
 	/* reset all mix values */
 	outmix = inmix[0] = inmix[1] = 0;
@@ -814,8 +692,8 @@ audio_engine_ops_t cmpci_engine_ops = {
 	AUDIO_ENGINE_VERSION,		/* version number */
 	cmpci_open,
 	cmpci_close,
-	NULL,		/* start */
-	NULL,		/* stop */
+	cmpci_start,
+	cmpci_stop,
 	cmpci_count,
 	cmpci_format,
 	cmpci_channels,
@@ -831,13 +709,6 @@ cmpci_init(cmpci_dev_t *dev)
 {
 	audio_dev_t	*adev = dev->adev;
 	int		playch;
-	int		intrs;
-
-	dev->pintrs = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, "play-interrupts", DEFINTS);
-
-	dev->rintrs = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, "record-interrupts", DEFINTS);
 
 	playch  = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
 	    DDI_PROP_DONTPASS, "channels", dev->maxch);
@@ -877,58 +748,35 @@ cmpci_init(cmpci_dev_t *dev)
 		case 0:
 			caps = ENGINE_INPUT_CAP;
 			dmaflags = DDI_DMA_READ | DDI_DMA_CONSISTENT;
-			port->callb = audio_engine_produce;
 			port->reg_paddr = REG_CH0_PADDR;
 			port->reg_bufsz = REG_CH0_BUFSZ;
 			port->reg_fragsz = REG_CH0_FRAGSZ;
 			port->fc0_rst_bit = FUNCTRL0_CH0_RST;
 			port->fc0_rec_bit = FUNCTRL0_CH0_REC;
 			port->fc0_en_bit = FUNCTRL0_CH0_EN;
-			port->int_en_bit = INTCTRL_CH0_EN;
 			port->sync_dir = DDI_DMA_SYNC_FORKERNEL;
 			port->capture = B_TRUE;
 			port->fc1_rate_mask = FUNCTRL1_ADC_RATE_48K;
 			port->chformat_mask = CHFORMAT_CH0_16ST;
 			port->nchan = 2;
-			intrs = dev->rintrs;
 			break;
 
 		case 1:
 			caps = ENGINE_OUTPUT_CAP;
 			dmaflags = DDI_DMA_WRITE | DDI_DMA_CONSISTENT;
-			port->callb = audio_engine_consume;
 			port->reg_paddr = REG_CH1_PADDR;
 			port->reg_bufsz = REG_CH1_BUFSZ;
 			port->reg_fragsz = REG_CH1_FRAGSZ;
 			port->fc0_rst_bit = FUNCTRL0_CH1_RST;
 			port->fc0_rec_bit = FUNCTRL0_CH1_REC;
 			port->fc0_en_bit = FUNCTRL0_CH1_EN;
-			port->int_en_bit = INTCTRL_CH1_EN;
 			port->sync_dir = DDI_DMA_SYNC_FORDEV;
 			port->capture = B_FALSE;
 			port->fc1_rate_mask = FUNCTRL1_DAC_RATE_48K;
 			port->chformat_mask = CHFORMAT_CH1_16ST;
 			port->nchan = playch;
-			intrs = dev->pintrs;
 			break;
 		}
-
-		/*
-		 * Calculate fragfr, nfrags, buf.
-		 *
-		 * 48 as minimum is chosen to ensure that we will have
-		 * at least 4 fragments.  512 is just an arbitrary
-		 * limit, and at the smallest frame size will result
-		 * in no more than 176 fragments.
-		 */
-		intrs = min(512, max(48, intrs));
-
-		/*
-		 * Two fragments are enough to get ping-pong buffers.
-		 * The hardware could support considerably more than
-		 * this, but it just wastes memory.
-		 */
-		port->nfrags = 2;
 
 		/*
 		 * For efficiency, we'd like to have the fragments
@@ -937,8 +785,7 @@ cmpci_init(cmpci_dev_t *dev)
 		 * is adequate.  For a typical configuration (175 Hz
 		 * requested) this will translate to 166 Hz.
 		 */
-		port->fragfr = P2ROUNDUP((48000 / intrs), 16);
-		port->nframes = port->nfrags * port->fragfr;
+		port->nframes = 2048;
 		port->bufsz = port->nframes * port->nchan * 2;
 
 		if (ddi_dma_alloc_handle(dev->dip, &dma_attr, DDI_DMA_DONTWAIT,
@@ -973,13 +820,6 @@ cmpci_init(cmpci_dev_t *dev)
 
 	cmpci_add_controls(dev);
 
-	dev->ksp = kstat_create(ddi_driver_name(dev->dip),
-	    ddi_get_instance(dev->dip), ddi_driver_name(dev->dip),
-	    "controller", KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
-	if (dev->ksp != NULL) {
-		kstat_install(dev->ksp);
-	}
-
 	cmpci_reset(dev);
 	cmpci_configure_mixer(dev);
 
@@ -994,16 +834,7 @@ cmpci_init(cmpci_dev_t *dev)
 void
 cmpci_destroy(cmpci_dev_t *dev)
 {
-	if (dev->ihandle != NULL) {
-		(void) ddi_intr_disable(dev->ihandle);
-		(void) ddi_intr_remove_handler(dev->ihandle);
-		(void) ddi_intr_free(dev->ihandle);
-		mutex_destroy(&dev->mutex);
-	}
-
-	if (dev->ksp != NULL) {
-		kstat_delete(dev->ksp);
-	}
+	mutex_destroy(&dev->mutex);
 
 	/* free up ports, including DMA resources for ports */
 	for (int i = 0; i < PORT_MAX; i++) {
@@ -1069,6 +900,7 @@ cmpci_attach(dev_info_t *dip)
 
 	dev = kmem_zalloc(sizeof (*dev), KM_SLEEP);
 	dev->dip = dip;
+	mutex_init(&dev->mutex, NULL, MUTEX_DRIVER, NULL);
 
 	ddi_set_driver_private(dip, dev);
 
@@ -1130,17 +962,11 @@ cmpci_attach(dev_info_t *dip)
 		break;
 	}
 
-	if (cmpci_setup_interrupts(dev) != DDI_SUCCESS) {
-		audio_dev_warn(dev->adev, "can't register interrupts");
-		goto err_exit;
-	}
-
 	if (cmpci_init(dev) != DDI_SUCCESS) {
 		audio_dev_warn(dev->adev, "can't init device");
 		goto err_exit;
 	}
 
-	(void) ddi_intr_enable(dev->ihandle);
 	return (DDI_SUCCESS);
 
 err_exit:
@@ -1151,27 +977,14 @@ err_exit:
 static int
 cmpci_resume(cmpci_dev_t *dev)
 {
-	audio_engine_reset(dev->port[0].engine);
-	audio_engine_reset(dev->port[1].engine);
-
 	mutex_enter(&dev->mutex);
-	dev->suspended = B_FALSE;
-
 	cmpci_reset(dev);
 	/* wait one millisecond, to give reset a chance to get up */
 	drv_usecwait(1000);
-
-	cmpci_configure_mixer(dev);
-
-	for (int i = 0; i < PORT_MAX; i++) {
-		cmpci_port_t *port = &dev->port[i];
-
-		cmpci_reset_port(port);
-		if (port->open) {
-			cmpci_start_port(port);
-		}
-	}
 	mutex_exit(&dev->mutex);
+
+	audio_dev_resume(dev->adev);
+
 	return (DDI_SUCCESS);
 }
 
@@ -1182,9 +995,6 @@ cmpci_detach(cmpci_dev_t *dev)
 		return (DDI_FAILURE);
 
 	mutex_enter(&dev->mutex);
-
-	/* disable interrupts */
-	CLR32(dev, REG_INTCTRL, INTCTRL_CH1_EN | INTCTRL_CH0_EN);
 
 	/* disable channels */
 	PUT32(dev, REG_FUNCTRL0, 0);
@@ -1197,23 +1007,6 @@ cmpci_detach(cmpci_dev_t *dev)
 }
 
 static int
-cmpci_suspend(cmpci_dev_t *dev)
-{
-	mutex_enter(&dev->mutex);
-
-	cmpci_update_port(&dev->port[0]);
-	cmpci_stop_port(&dev->port[0]);
-
-	cmpci_update_port(&dev->port[1]);
-	cmpci_stop_port(&dev->port[1]);
-
-	dev->suspended = B_TRUE;
-	mutex_exit(&dev->mutex);
-
-	return (DDI_SUCCESS);
-}
-
-static int
 cmpci_quiesce(dev_info_t *dip)
 {
 	cmpci_dev_t	*dev;
@@ -1221,9 +1014,6 @@ cmpci_quiesce(dev_info_t *dip)
 	if ((dev = ddi_get_driver_private(dip)) == NULL) {
 		return (DDI_FAILURE);
 	}
-
-	/* disable interrupts */
-	PUT32(dev, REG_INTCTRL, 0);
 
 	/* disable channels */
 	PUT32(dev, REG_FUNCTRL0, 0);
@@ -1265,7 +1055,9 @@ cmpci_ddi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (cmpci_detach(dev));
 
 	case DDI_SUSPEND:
-		return (cmpci_suspend(dev));
+		audio_dev_suspend(dev->adev);
+		return (DDI_SUCCESS);
+
 	default:
 		return (DDI_FAILURE);
 	}

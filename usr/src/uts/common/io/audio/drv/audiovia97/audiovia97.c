@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,7 +92,7 @@ static int via97_resume(dev_info_t *);
 static int via97_detach(via97_devc_t *);
 static int via97_suspend(via97_devc_t *);
 
-static int via97_open(void *, int, unsigned *, unsigned *, caddr_t *);
+static int via97_open(void *, int, unsigned *, caddr_t *);
 static void via97_close(void *);
 static int via97_start(void *);
 static void via97_stop(void *);
@@ -101,18 +101,13 @@ static int via97_channels(void *);
 static int via97_rate(void *);
 static uint64_t via97_count(void *);
 static void via97_sync(void *, unsigned);
+static uint_t via97_playahead(void *);
 
 static uint16_t via97_read_ac97(void *, uint8_t);
 static void via97_write_ac97(void *, uint8_t, uint16_t);
 static int via97_alloc_port(via97_devc_t *, int);
-static void via97_start_port(via97_portc_t *);
-static void via97_stop_port(via97_portc_t *);
-static void via97_update_port(via97_portc_t *);
-static void via97_reset_port(via97_portc_t *);
 static void via97_destroy(via97_devc_t *);
-static int via97_setup_intrs(via97_devc_t *);
 static void via97_hwinit(via97_devc_t *);
-static uint_t via97_intr(caddr_t, caddr_t);
 
 static audio_engine_ops_t via97_engine_ops = {
 	AUDIO_ENGINE_VERSION,
@@ -127,7 +122,7 @@ static audio_engine_ops_t via97_engine_ops = {
 	via97_sync,
 	NULL,
 	NULL,
-	NULL
+	via97_playahead
 };
 
 static uint16_t
@@ -140,7 +135,6 @@ via97_read_ac97(void *arg, uint8_t index)
 	if (index > 0x7F)
 		return (0xffff);
 
-	mutex_enter(&devc->low_mutex);
 	addr = (index << 16) + CODEC_RD;
 	OUTL(devc, devc->base + AC97CODEC, addr);
 	drv_usecwait(100);
@@ -153,7 +147,6 @@ via97_read_ac97(void *arg, uint8_t index)
 		drv_usecwait(50);
 	}
 	if (i == CODEC_TIMEOUT_COUNT) {
-		mutex_exit(&devc->low_mutex);
 		return (0xffff);
 	}
 
@@ -161,10 +154,8 @@ via97_read_ac97(void *arg, uint8_t index)
 	tmp = INL(devc, devc->base + AC97CODEC);
 	OUTB(devc, devc->base + AC97CODEC + 3, 0x02);
 	if (((tmp & CODEC_INDEX) >> 16) == index) {
-		mutex_exit(&devc->low_mutex);
 		return ((int)tmp & CODEC_DATA);
 	}
-	mutex_exit(&devc->low_mutex);
 	return (0xffff);
 }
 
@@ -175,7 +166,6 @@ via97_write_ac97(void *arg, uint8_t index, uint16_t data)
 	int value = 0;
 	unsigned int i = 0;
 
-	mutex_enter(&devc->low_mutex);
 	value = (index << 16) + data;
 	OUTL(devc, devc->base + AC97CODEC, value);
 	drv_usecwait(100);
@@ -187,61 +177,6 @@ via97_write_ac97(void *arg, uint8_t index, uint16_t data)
 			break;
 		drv_usecwait(50);
 	}
-	mutex_exit(&devc->low_mutex);
-}
-
-static uint_t
-via97_recintr(via97_devc_t *devc)
-{
-	int status;
-
-	status = INB(devc, devc->base + 0x10);
-
-	if (!(status & 0x01)) /* No interrupt */
-		return (B_FALSE);
-
-	audio_engine_produce(devc->portc[VIA97_REC_SGD_NUM]->engine);
-
-	OUTB(devc, devc->base + 0x10, status | 0x01); /* Ack */
-	return (B_TRUE);
-}
-
-static uint_t
-via97_playintr(via97_devc_t *devc)
-{
-	int status;
-
-	status = INB(devc, devc->base + 0x00);
-
-	if (!(status & 0x01)) /* No interrupt */
-		return (B_FALSE);
-
-	audio_engine_consume(devc->portc[VIA97_PLAY_SGD_NUM]->engine);
-
-	OUTB(devc, devc->base + 0x00, status | 0x01); /* Ack */
-	return (B_TRUE);
-}
-
-static uint_t
-via97_intr(caddr_t argp, caddr_t nocare)
-{
-	via97_devc_t	*devc = (void *)argp;
-
-	_NOTE(ARGUNUSED(nocare));
-
-	if (devc->suspended) {
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	if (!via97_recintr(devc) && !via97_playintr(devc)) {
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	if (devc->ksp) {
-		VIA97_KIOP(devc)->intrs[KSTAT_INTR_HARD]++;
-	}
-
-	return (DDI_INTR_CLAIMED);
 }
 
 /*
@@ -249,23 +184,15 @@ via97_intr(caddr_t argp, caddr_t nocare)
  */
 
 int
-via97_open(void *arg, int flag,
-    unsigned *fragfrp, unsigned *nfragsp, caddr_t *bufp)
+via97_open(void *arg, int flag, unsigned *nframesp, caddr_t *bufp)
 {
 	via97_portc_t	 *portc = arg;
-	via97_devc_t	 *devc = portc->devc;
 
 	_NOTE(ARGUNUSED(flag));
 
-	portc->started = B_FALSE;
 	portc->count = 0;
-	*fragfrp = portc->fragfr;
-	*nfragsp = VIA97_NUM_SGD;
+	*nframesp = portc->nframes;
 	*bufp = portc->buf_kaddr;
-
-	mutex_enter(&devc->mutex);
-	via97_reset_port(portc);
-	mutex_exit(&devc->mutex);
 
 	return (0);
 }
@@ -273,13 +200,7 @@ via97_open(void *arg, int flag,
 void
 via97_close(void *arg)
 {
-	via97_portc_t	 *portc = arg;
-	via97_devc_t	 *devc = portc->devc;
-
-	mutex_enter(&devc->mutex);
-	via97_stop_port(portc);
-	portc->started = B_FALSE;
-	mutex_exit(&devc->mutex);
+	_NOTE(ARGUNUSED(arg));
 }
 
 int
@@ -288,12 +209,18 @@ via97_start(void *arg)
 	via97_portc_t	*portc = arg;
 	via97_devc_t	*devc = portc->devc;
 
-	mutex_enter(&devc->mutex);
-	if (!portc->started) {
-		via97_start_port(portc);
-		portc->started = B_TRUE;
-	}
-	mutex_exit(&devc->mutex);
+	portc->pos = 0;
+
+	OUTB(devc, portc->base + 0x01, 0x40); /* Stop */
+	OUTL(devc, portc->base + 4, portc->sgd_paddr);
+	/* Set autostart at EOL, stereo, 16 bits */
+	OUTB(devc, portc->base + 0x02,
+	    0x80 |	/* Set autostart at EOL */
+	    0x20 |	/* 16 bits */
+	    0x10);	/* Stereo */
+
+	OUTB(devc, portc->base + 0x01, 0x80); /* Start */
+
 	return (0);
 }
 
@@ -303,12 +230,7 @@ via97_stop(void *arg)
 	via97_portc_t	*portc = arg;
 	via97_devc_t	*devc = portc->devc;
 
-	mutex_enter(&devc->mutex);
-	if (portc->started) {
-		via97_stop_port(portc);
-		portc->started = B_FALSE;
-	}
-	mutex_exit(&devc->mutex);
+	OUTB(devc, portc->base + 0x01, 0x40); /* Stop */
 }
 
 int
@@ -344,111 +266,44 @@ via97_sync(void *arg, unsigned nframes)
 	(void) ddi_dma_sync(portc->buf_dmah, 0, 0, portc->syncdir);
 }
 
+uint_t
+via97_playahead(void *arg)
+{
+	_NOTE(ARGUNUSED(arg));
+
+	/*
+	 * We see some situations where the default 1.5 fragments from
+	 * the framework is not enough.  800-900 frame jitter is not
+	 * uncommon.  Especially at startup.
+	 */
+	return (1024);
+}
+
 uint64_t
 via97_count(void *arg)
 {
 	via97_portc_t	*portc = arg;
 	via97_devc_t	*devc = portc->devc;
-	uint64_t	val;
+	uint32_t	pos;
+	uint32_t	n;
 
-	mutex_enter(&devc->mutex);
-	via97_update_port(portc);
-	/*
-	 * The residual is in bytes.  We have to convert to frames,
-	 * and then subtract it from the fragment size to get the
-	 * number of frames processed.  Note that we have 16 bit
-	 * stereo frames.
-	 */
-	val = portc->count +
-	    (portc->fragfr - (portc->resid / (2 * 2)));
-	mutex_exit(&devc->mutex);
+	pos = INL(devc, portc->base + 0x0c) & 0xffffff;
+	/* convert from bytes to 16-bit stereo frames */
+	pos /= (sizeof (int16_t) * 2);
 
-	return (val);
+	if (pos >= portc->pos) {
+		n = portc->nframes - (pos - portc->pos);
+	} else {
+		n = portc->pos - pos;
+	}
+	portc->pos = pos;
+	portc->count += n;
+
+	return (portc->count);
 }
 
 
 /* private implementation bits */
-
-void
-via97_start_port(via97_portc_t *portc)
-{
-	via97_devc_t	*devc = portc->devc;
-
-	ASSERT(mutex_owned(&devc->mutex));
-
-	if (devc->suspended)
-		return;
-	OUTB(devc, portc->base + 0x01, 0x80); /* Start */
-}
-
-void
-via97_stop_port(via97_portc_t *portc)
-{
-	via97_devc_t	*devc = portc->devc;
-
-	if (devc->suspended)
-		return;
-
-	OUTB(devc, portc->base + 0x01, 0x40); /* Stop */
-}
-
-void
-via97_update_port(via97_portc_t *portc)
-{
-/*
- * Unfortunately the controller seems to raise interrupt about 32 bytes before
- * the DMA pointer moves to a new fragment. This means that the bytes value
- * returned will be bogus during few samples before
- * the pointer wraps back to the beginning of buffer.
- */
-	via97_devc_t	*devc = portc->devc;
-	uint32_t	frag, resid;
-	uint32_t	n;
-
-	ASSERT(mutex_owned(&devc->mutex));
-	if (devc->suspended) {
-		portc->cur_frag = 0;
-		portc->resid = portc->fragsz;
-		n = 0;
-	} else {
-		resid = INL(devc, portc->base + 0x0c) & 0xffffff;
-		resid = portc->fragsz - resid;
-
-		frag =
-		    ((INL(devc, portc->base + 0x04) - portc->sgd_paddr) / 8) -
-		    1;
-
-		portc->resid = resid;
-
-		if (frag >= portc->cur_frag) {
-			n = frag - portc->cur_frag;
-		} else {
-			n = frag + VIA97_NUM_SGD - portc->cur_frag;
-		}
-		portc->count += (n * portc->fragfr);
-		portc->cur_frag = frag;
-	}
-}
-
-void
-via97_reset_port(via97_portc_t *portc)
-{
-	via97_devc_t	*devc = portc->devc;
-
-	portc->cur_frag = 0;
-	portc->resid = portc->fragsz;
-
-	if (devc->suspended)
-		return;
-
-	OUTB(devc, portc->base + 0x01, 0x40); /* Stop */
-	OUTL(devc, portc->base + 4, portc->sgd_paddr);
-	/* Set autostart at EOL, interrupt on FLAG, stereo, 16 bits */
-	OUTB(devc, portc->base + 0x02,
-	    0x81 |	/* Set autostart at EOL, interrupt on FLAG */
-	    0x20 |	/* 16 bits */
-	    0x10);	/* Stereo */
-}
 
 int
 via97_alloc_port(via97_devc_t *devc, int num)
@@ -458,28 +313,23 @@ via97_alloc_port(via97_devc_t *devc, int num)
 	ddi_dma_cookie_t	cookie;
 	uint_t			count;
 	int			dir;
-	char			*prop;
 	unsigned		caps;
 	audio_dev_t		*adev;
 	uint32_t		*desc;
-	uint32_t		paddr;
 
 	adev = devc->adev;
 	portc = kmem_zalloc(sizeof (*portc), KM_SLEEP);
 	devc->portc[num] = portc;
 	portc->devc = devc;
-	portc->started = B_FALSE;
 	portc->base = devc->base + num * 0x10;
 
 	switch (num) {
 	case VIA97_REC_SGD_NUM:
-		prop = "record-interrupts";
 		portc->syncdir = DDI_DMA_SYNC_FORKERNEL;
 		caps = ENGINE_INPUT_CAP;
 		dir = DDI_DMA_READ;
 		break;
 	case VIA97_PLAY_SGD_NUM:
-		prop = "play-interrupts";
 		portc->syncdir = DDI_DMA_SYNC_FORDEV;
 		caps = ENGINE_OUTPUT_CAP;
 		dir = DDI_DMA_WRITE;
@@ -488,24 +338,9 @@ via97_alloc_port(via97_devc_t *devc, int num)
 		return (DDI_FAILURE);
 	}
 
-	/* figure out fragment configuration */
-	portc->intrs = ddi_prop_get_int(DDI_DEV_T_ANY, devc->dip,
-	    DDI_PROP_DONTPASS, prop, VIA97_INTRS);
-
-	/* make sure the values are good */
-	if (portc->intrs < VIA97_MIN_INTRS) {
-		audio_dev_warn(adev, "%s too low, %d, reset to %d",
-		    prop, portc->intrs, VIA97_INTRS);
-		portc->intrs = VIA97_INTRS;
-	} else if (portc->intrs > VIA97_MAX_INTRS) {
-		audio_dev_warn(adev, "%s too high, %d, reset to %d",
-		    prop, portc->intrs, VIA97_INTRS);
-		portc->intrs = VIA97_INTRS;
-	}
-
-	portc->fragfr = 48000 / portc->intrs;
-	portc->fragsz = portc->fragfr * 2 * 2; /* 16 bit stereo frames */
-	portc->buf_size = portc->fragsz * VIA97_NUM_SGD;
+	/* Simplicity -- a single contiguous looping buffer */
+	portc->nframes = 2048;
+	portc->buf_size = portc->nframes * sizeof (int16_t) * 2;
 
 	/* first allocate up space for SGD list */
 	if (ddi_dma_alloc_handle(devc->dip, &dma_attr_sgd,
@@ -514,8 +349,8 @@ via97_alloc_port(via97_devc_t *devc, int num)
 		return (DDI_FAILURE);
 	}
 
-	if (ddi_dma_mem_alloc(portc->sgd_dmah,
-	    VIA97_NUM_SGD * 2 *sizeof (uint32_t), &dev_attr,
+	/* a single SGD entry is only 8 bytes long */
+	if (ddi_dma_mem_alloc(portc->sgd_dmah, 8, &dev_attr,
 	    DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL, &portc->sgd_kaddr,
 	    &len, &portc->sgd_acch) != DDI_SUCCESS) {
 		audio_dev_warn(adev, "failed to allocate SGD memory");
@@ -552,22 +387,10 @@ via97_alloc_port(via97_devc_t *devc, int num)
 	}
 	portc->buf_paddr = cookie.dmac_address;
 
-	/* now wire descriptors up */
+	/* now wire descriptor up -- we only use one (which has EOL set)! */
 	desc = (void *)portc->sgd_kaddr;
-	paddr = portc->buf_paddr;
-	for (int i = 0; i < VIA97_NUM_SGD; i++) {
-		uint32_t	flags;
-
-		flags = 0x40000000 | portc->fragsz;
-
-		if (i == (VIA97_NUM_SGD - 1)) {
-			flags |= 0x80000000; /* EOL */
-		}
-
-		ddi_put32(portc->sgd_acch, desc++, paddr);
-		ddi_put32(portc->sgd_acch, desc++, flags);
-		paddr += portc->fragsz;
-	}
+	ddi_put32(portc->sgd_acch, desc++, portc->buf_paddr);
+	ddi_put32(portc->sgd_acch, desc++, 0x80000000U | portc->buf_size);
 
 	OUTL(devc, portc->base + 4, portc->sgd_paddr);
 	(void) ddi_dma_sync(portc->sgd_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
@@ -584,57 +407,9 @@ via97_alloc_port(via97_devc_t *devc, int num)
 	return (DDI_SUCCESS);
 }
 
-int
-via97_setup_intrs(via97_devc_t *devc)
-{
-	uint_t			ipri;
-	int			actual;
-	int			rv;
-	ddi_intr_handle_t	ih[1];
-
-	rv = ddi_intr_alloc(devc->dip, ih, DDI_INTR_TYPE_FIXED,
-	    0, 1, &actual, DDI_INTR_ALLOC_STRICT);
-	if ((rv != DDI_SUCCESS) || (actual != 1)) {
-		audio_dev_warn(devc->adev,
-		    "Can't alloc interrupt handle (rv %d actual %d)",
-		    rv, actual);
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_get_pri(ih[0], &ipri) != DDI_SUCCESS) {
-		audio_dev_warn(devc->adev, "Can't get interrupt priority");
-		(void) ddi_intr_free(ih[0]);
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_add_handler(ih[0], via97_intr, devc, NULL) !=
-	    DDI_SUCCESS) {
-		audio_dev_warn(devc->adev, "Can't add interrupt handler");
-		(void) ddi_intr_free(ih[0]);
-		return (DDI_FAILURE);
-	}
-
-	devc->ih = ih[0];
-	mutex_init(&devc->mutex, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-	mutex_init(&devc->low_mutex, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-	return (DDI_SUCCESS);
-}
-
 void
 via97_destroy(via97_devc_t *devc)
 {
-	if (devc->ih != NULL) {
-		(void) ddi_intr_disable(devc->ih);
-		(void) ddi_intr_remove_handler(devc->ih);
-		(void) ddi_intr_free(devc->ih);
-		mutex_destroy(&devc->mutex);
-		mutex_destroy(&devc->low_mutex);
-	}
-
-	if (devc->ksp) {
-		kstat_delete(devc->ksp);
-	}
-
 	for (int i = 0; i < VIA97_NUM_PORTC; i++) {
 		via97_portc_t *portc = devc->portc[i];
 		if (!portc)
@@ -753,10 +528,6 @@ via97_attach(dev_info_t *dip)
 		goto error;
 	}
 
-	if (via97_setup_intrs(devc) != DDI_SUCCESS) {
-		goto error;
-	}
-
 	devc->ac97 = ac97_alloc(dip, via97_read_ac97, via97_write_ac97, devc);
 	if (devc->ac97 == NULL) {
 		audio_dev_warn(devc->adev, "failed to allocate ac97 handle");
@@ -768,19 +539,11 @@ via97_attach(dev_info_t *dip)
 		goto error;
 	}
 
-	/* set up kernel statistics */
-	if ((devc->ksp = kstat_create(VIA97_NAME, ddi_get_instance(dip),
-	    VIA97_NAME, "controller", KSTAT_TYPE_INTR, 1,
-	    KSTAT_FLAG_PERSISTENT)) != NULL) {
-		kstat_install(devc->ksp);
-	}
-
 	if (audio_dev_register(devc->adev) != DDI_SUCCESS) {
 		audio_dev_warn(devc->adev, "unable to register with framework");
 		goto error;
 	}
 
-	(void) ddi_intr_enable(devc->ih);
 	ddi_report_dev(dip);
 
 	return (DDI_SUCCESS);
@@ -799,28 +562,9 @@ via97_resume(dev_info_t *dip)
 
 	via97_hwinit(devc);
 
-	/* allow ac97 operations again */
-	ac97_resume(devc->ac97);
+	ac97_reset(devc->ac97);
 
-	mutex_enter(&devc->mutex);
-	devc->suspended = B_FALSE;
-	for (int i = 0; i < VIA97_NUM_PORTC; i++) {
-
-		via97_portc_t *portc = devc->portc[i];
-
-		if (portc->engine != NULL)
-			audio_engine_reset(portc->engine);
-
-		/* reset the port */
-		via97_reset_port(portc);
-
-		if (portc->started) {
-			via97_start_port(portc);
-		} else {
-			via97_stop_port(portc);
-		}
-	}
-	mutex_exit(&devc->mutex);
+	audio_dev_resume(devc->adev);
 	return (DDI_SUCCESS);
 }
 
@@ -837,16 +581,7 @@ via97_detach(via97_devc_t *devc)
 int
 via97_suspend(via97_devc_t *devc)
 {
-	ac97_suspend(devc->ac97);
-
-	mutex_enter(&devc->mutex);
-	for (int i = 0; i < VIA97_NUM_PORTC; i++) {
-
-		via97_portc_t *portc = devc->portc[i];
-		via97_stop_port(portc);
-	}
-	devc->suspended = B_TRUE;
-	mutex_exit(&devc->mutex);
+	audio_dev_suspend(devc->adev);
 	return (DDI_SUCCESS);
 }
 
@@ -949,12 +684,6 @@ via97_ddi_quiesce(dev_info_t *dip)
 	via97_devc_t	*devc;
 
 	devc = ddi_get_driver_private(dip);
-
-	for (int i = 0; i < VIA97_NUM_PORTC; i++) {
-
-		via97_portc_t *portc = devc->portc[i];
-		via97_stop_port(portc);
-	}
 
 	/*
 	 * Turn off the hardware

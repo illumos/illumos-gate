@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,11 +36,6 @@
 #define	I810_NAME			"audio810"
 #define	I810_MOD_NAME			"audio810 audio driver"
 
-#define	I810_INTS			(120)	/* default interrupt rate */
-#define	I810_MIN_INTS			(24)	/* minimum interrupt rate */
-#define	I810_MAX_INTS			(500)	/* maximum interrupt rate */
-#define	I810_NFRAGS			(8)	/* default # fragments */
-
 /*
  * Misc. defines
  */
@@ -50,7 +45,6 @@
 #define	I810_MOD_SIZE			(16)
 
 #define	I810_ROUNDUP(x, algn)		(((x) + ((algn) - 1)) & ~((algn) - 1))
-#define	I810_KIOP(X)			((kstat_intr_t *)(X->ksp->ks_data))
 
 /* The size of each entry of "reg" property is 5 integers */
 #define	I810_INTS_PER_REG_PROP		5
@@ -156,6 +150,7 @@ struct audio810_port {
 	int			num;
 	ddi_dma_handle_t	samp_dmah;
 	ddi_acc_handle_t	samp_acch;
+	uint32_t		samp_frames;
 	size_t			samp_size;
 	caddr_t			samp_kaddr;
 	uint32_t		samp_paddr;
@@ -166,21 +161,14 @@ struct audio810_port {
 	caddr_t			bdl_kaddr;
 	uint32_t		bdl_paddr;
 
-	unsigned		intrs;
-	unsigned		fragfr;
-	unsigned		fragsz;
+	uint32_t		offset;
 	uint64_t		count;
-	uint8_t			nfrag;
 	uint8_t			nchan;
 
 	uint8_t			regoff;
 	uint8_t			stsoff;		/* status offset */
 	uint8_t			picboff;	/* picb offset */
-	uint8_t			civ;
-	uint16_t		picb;
 	unsigned		sync_dir;
-
-	boolean_t		started;
 
 	audio_engine_t		*engine;
 };
@@ -200,6 +188,7 @@ typedef struct	i810_bd_entry	i810_bd_entry_t;
 
 typedef enum i810_quirk {
 	QUIRK_NONE = 0,
+	QUIRK_OLDICH,		/* likely emulated, needs deeper playahead */
 	QUIRK_SIS7012,		/* weird registers and such */
 } i810_quirk_t;
 
@@ -207,9 +196,6 @@ typedef enum i810_quirk {
  * audio810_state_t	-per instance state and operation data
  */
 struct audio810_state {
-	kmutex_t		inst_lock;	/* state protection lock */
-	kmutex_t		ac_lock;
-	ddi_iblock_cookie_t	iblock;
 	dev_info_t		*dip;	/* used by audio810_getinfo() */
 	audio_dev_t		*adev;
 	ac97_t			*ac97;
@@ -222,8 +208,6 @@ struct audio810_state {
 
 	kstat_t			*ksp;		/* kernel statistics */
 
-	boolean_t		intr_added;
-	boolean_t		suspended;	/* suspend/resume state */
 	uint8_t			maxch;
 	i810_quirk_t		quirk;
 };

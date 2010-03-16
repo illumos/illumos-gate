@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,7 +97,7 @@ static int auvia_resume(dev_info_t *);
 static int auvia_detach(auvia_devc_t *);
 static int auvia_suspend(auvia_devc_t *);
 
-static int auvia_open(void *, int, unsigned *, unsigned *, caddr_t *);
+static int auvia_open(void *, int, unsigned *, caddr_t *);
 static void auvia_close(void *);
 static int auvia_start(void *);
 static void auvia_stop(void *);
@@ -110,15 +110,10 @@ static void auvia_sync(void *, unsigned);
 static uint16_t auvia_read_ac97(void *, uint8_t);
 static void auvia_write_ac97(void *, uint8_t, uint16_t);
 static int auvia_alloc_port(auvia_devc_t *, int);
-static void auvia_start_port(auvia_portc_t *);
-static void auvia_stop_port(auvia_portc_t *);
-static void auvia_update_port(auvia_portc_t *);
 static void auvia_reset_input(auvia_portc_t *);
 static void auvia_reset_output(auvia_portc_t *);
 static void auvia_destroy(auvia_devc_t *);
-static int auvia_setup_intrs(auvia_devc_t *);
 static void auvia_hwinit(auvia_devc_t *);
-static uint_t auvia_intr(caddr_t, caddr_t);
 
 static audio_engine_ops_t auvia_engine_ops = {
 	AUDIO_ENGINE_VERSION,
@@ -143,8 +138,6 @@ auvia_read_ac97(void *arg, uint8_t index)
 	uint32_t val = 0;
 	int i;
 
-	mutex_enter(&devc->low_mutex);
-
 	val = ((uint32_t)index << 16) | CODEC_RD;
 	OUTL(devc, devc->base + REG_CODEC, val);
 	drv_usecwait(100);
@@ -166,12 +159,10 @@ auvia_read_ac97(void *arg, uint8_t index)
 	val = INL(devc, devc->base + REG_CODEC);
 	OUTB(devc, devc->base + REG_CODEC + 3, 0x02);
 	if (((val & CODEC_INDEX) >> 16) == index) {
-		mutex_exit(&devc->low_mutex);
 		return (val & CODEC_DATA);
 	}
 
 failed:
-	mutex_exit(&devc->low_mutex);
 	return (0xffff);
 }
 
@@ -181,8 +172,6 @@ auvia_write_ac97(void *arg, uint8_t index, uint16_t data)
 	auvia_devc_t *devc = arg;
 	uint32_t val = 0;
 	int i = 0;
-
-	mutex_enter(&devc->low_mutex);
 
 	val = ((uint32_t)index << 16) | data | CODEC_WR;
 	OUTL(devc, devc->base + REG_CODEC, val);
@@ -196,70 +185,6 @@ auvia_write_ac97(void *arg, uint8_t index, uint16_t data)
 		drv_usecwait(50);
 	}
 
-	mutex_exit(&devc->low_mutex);
-}
-
-static uint_t
-auvia_intr(caddr_t argp, caddr_t nocare)
-{
-	auvia_devc_t	*devc = (void *)argp;
-	auvia_portc_t	*portc;
-	uint8_t		status;
-	unsigned	intrs = 0;
-	boolean_t	claimed = B_FALSE;
-
-	_NOTE(ARGUNUSED(nocare));
-
-	mutex_enter(&devc->mutex);
-	if (devc->suspended) {
-		mutex_exit(&devc->mutex);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	for (int i = 0; i < AUVIA_NUM_PORTC; i++) {
-
-		portc = devc->portc[i];
-
-		status = INB(devc, portc->base + OFF_STATUS);
-		if ((status & STATUS_INTR) == 0) {
-			/* clear any other interrupts */
-			continue;
-		}
-
-		/*
-		 * NB: The old code did some goofy things to update
-		 * the last valid SGD.  However, since we don't ever
-		 * reach the last valid SGD (because we loop first), I
-		 * don't believe we need to do that.  It would appear
-		 * that NetBSD does the same.
-		 */
-		/* port interrupt */
-		if (portc->started) {
-			intrs |= (1U << i);
-		}
-		/* let the chip know we are acking the interrupt */
-		OUTB(devc, portc->base + OFF_STATUS, status);
-
-		claimed = B_TRUE;
-	}
-
-	mutex_exit(&devc->mutex);
-
-	if (!claimed) {
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	if (intrs & (1U << AUVIA_PLAY_SGD_NUM)) {
-		audio_engine_consume(devc->portc[AUVIA_PLAY_SGD_NUM]->engine);
-	}
-	if (intrs & (1U << AUVIA_REC_SGD_NUM)) {
-		audio_engine_produce(devc->portc[AUVIA_REC_SGD_NUM]->engine);
-	}
-	if (devc->ksp) {
-		AUVIA_KIOP(devc)->intrs[KSTAT_INTR_HARD]++;
-	}
-
-	return (DDI_INTR_CLAIMED);
 }
 
 /*
@@ -267,23 +192,15 @@ auvia_intr(caddr_t argp, caddr_t nocare)
  */
 
 int
-auvia_open(void *arg, int flag,
-    unsigned *fragfrp, unsigned *nfragsp, caddr_t *bufp)
+auvia_open(void *arg, int flag, unsigned *nframesp, caddr_t *bufp)
 {
 	auvia_portc_t	 *portc = arg;
-	auvia_devc_t	 *devc = portc->devc;
 
 	_NOTE(ARGUNUSED(flag));
 
-	portc->started = B_FALSE;
 	portc->count = 0;
-	*fragfrp = portc->fragfr;
-	*nfragsp = AUVIA_NUM_SGD;
+	*nframesp = portc->nframes;
 	*bufp = portc->buf_kaddr;
-
-	mutex_enter(&devc->mutex);
-	portc->reset(portc);
-	mutex_exit(&devc->mutex);
 
 	return (0);
 }
@@ -291,13 +208,7 @@ auvia_open(void *arg, int flag,
 void
 auvia_close(void *arg)
 {
-	auvia_portc_t	 *portc = arg;
-	auvia_devc_t	 *devc = portc->devc;
-
-	mutex_enter(&devc->mutex);
-	auvia_stop_port(portc);
-	portc->started = B_FALSE;
-	mutex_exit(&devc->mutex);
+	_NOTE(ARGUNUSED(arg));
 }
 
 int
@@ -306,12 +217,8 @@ auvia_start(void *arg)
 	auvia_portc_t	*portc = arg;
 	auvia_devc_t	*devc = portc->devc;
 
-	mutex_enter(&devc->mutex);
-	if (!portc->started) {
-		auvia_start_port(portc);
-		portc->started = B_TRUE;
-	}
-	mutex_exit(&devc->mutex);
+	portc->reset(portc);
+	OUTB(devc, portc->base + OFF_CTRL, CTRL_START | CTRL_AUTOSTART);
 	return (0);
 }
 
@@ -321,12 +228,7 @@ auvia_stop(void *arg)
 	auvia_portc_t	*portc = arg;
 	auvia_devc_t	*devc = portc->devc;
 
-	mutex_enter(&devc->mutex);
-	if (portc->started) {
-		auvia_stop_port(portc);
-		portc->started = B_FALSE;
-	}
-	mutex_exit(&devc->mutex);
+	OUTB(devc, portc->base + OFF_CTRL, CTRL_TERMINATE);
 }
 
 int
@@ -367,84 +269,26 @@ auvia_count(void *arg)
 {
 	auvia_portc_t	*portc = arg;
 	auvia_devc_t	*devc = portc->devc;
-	uint64_t	val;
+	uint32_t	pos;
+	uint32_t	n;
 
-	mutex_enter(&devc->mutex);
-	auvia_update_port(portc);
-	/*
-	 * The residual is in bytes.  We have to convert to frames,
-	 * and then subtract it from the fragment size to get the
-	 * number of frames processed.  It is somewhat unfortunate thta
-	 * this (the division) has to happen under the lock.  If we
-	 * restricted ourself to stereo out, this would be a simple
-	 * shift.
-	 */
-	val = portc->count +
-	    (portc->fragfr - (portc->resid / (portc->nchan * 2)));
-	mutex_exit(&devc->mutex);
+	pos = INL(devc, portc->base + OFF_COUNT);
+	pos &= 0xffffff;
+	pos /= (sizeof (int16_t) * portc->nchan);
 
-	return (val);
+	if (pos >= portc->pos) {
+		n = portc->nframes - (pos - portc->pos);
+	} else {
+		n = portc->pos - pos;
+	}
+	portc->pos = pos;
+	portc->count += n;
+
+	return (portc->count);
 }
 
 
 /* private implementation bits */
-
-void
-auvia_start_port(auvia_portc_t *portc)
-{
-	auvia_devc_t	*devc = portc->devc;
-
-	ASSERT(mutex_owned(&devc->mutex));
-
-	if (devc->suspended)
-		return;
-
-	/*
-	 * Start with autoinit and SGD flag
-	 * interrupts enabled.
-	 */
-	OUTB(devc, portc->base + OFF_CTRL,
-	    CTRL_START | CTRL_AUTOSTART | CTRL_FLAG);
-}
-
-void
-auvia_stop_port(auvia_portc_t *portc)
-{
-	auvia_devc_t	*devc = portc->devc;
-
-	if (devc->suspended)
-		return;
-
-	OUTB(devc, portc->base + OFF_CTRL, CTRL_TERMINATE);
-}
-
-void
-auvia_update_port(auvia_portc_t *portc)
-{
-	auvia_devc_t	*devc = portc->devc;
-	uint32_t	frag;
-	uint32_t	n;
-
-	ASSERT(mutex_owned(&devc->mutex));
-	if (devc->suspended) {
-		portc->cur_frag = 0;
-		portc->resid = portc->fragsz;
-		n = 0;
-	} else {
-		frag = INL(devc, portc->base + OFF_COUNT);
-		portc->resid = (frag & 0xffffff);
-		frag >>= 24;
-		frag &= 0xff;
-
-		if (frag >= portc->cur_frag) {
-			n = frag - portc->cur_frag;
-		} else {
-			n = frag + AUVIA_NUM_SGD - portc->cur_frag;
-		}
-		portc->count += (n * portc->fragfr);
-		portc->cur_frag = frag;
-	}
-}
 
 void
 auvia_reset_output(auvia_portc_t *portc)
@@ -452,11 +296,7 @@ auvia_reset_output(auvia_portc_t *portc)
 	auvia_devc_t	*devc = portc->devc;
 	uint32_t	cmap;
 
-	portc->cur_frag = 0;
-	portc->resid = portc->fragsz;
-
-	if (devc->suspended)
-		return;
+	portc->pos = 0;
 
 	OUTB(devc, portc->base + OFF_CTRL, CTRL_TERMINATE);	/* Stop */
 	OUTL(devc, portc->base + OFF_DMA, portc->sgd_paddr);
@@ -504,11 +344,7 @@ auvia_reset_input(auvia_portc_t *portc)
 	auvia_devc_t	*devc = portc->devc;
 	uint32_t	fmt;
 
-	portc->cur_frag = 0;
-	portc->resid = portc->fragsz;
-
-	if (devc->suspended)
-		return;
+	portc->pos = 0;
 
 	OUTB(devc, portc->base + OFF_CTRL, CTRL_TERMINATE);	/* Stop */
 	OUTL(devc, portc->base + OFF_DMA, portc->sgd_paddr);
@@ -531,21 +367,17 @@ auvia_alloc_port(auvia_devc_t *devc, int num)
 	ddi_dma_cookie_t	cookie;
 	uint_t			count;
 	int			dir;
-	char			*prop;
 	unsigned		caps;
 	audio_dev_t		*adev;
 	uint32_t		*desc;
-	uint32_t		paddr;
 
 	adev = devc->adev;
 	portc = kmem_zalloc(sizeof (*portc), KM_SLEEP);
 	devc->portc[num] = portc;
 	portc->devc = devc;
-	portc->started = B_FALSE;
 
 	switch (num) {
 	case AUVIA_REC_SGD_NUM:
-		prop = "record-interrupts";
 		portc->base = devc->base + REG_RECBASE;
 		portc->syncdir = DDI_DMA_SYNC_FORKERNEL;
 		portc->nchan = 2;
@@ -554,7 +386,6 @@ auvia_alloc_port(auvia_devc_t *devc, int num)
 		dir = DDI_DMA_READ;
 		break;
 	case AUVIA_PLAY_SGD_NUM:
-		prop = "play-interrupts";
 		portc->base = devc->base + REG_PLAYBASE;
 		portc->syncdir = DDI_DMA_SYNC_FORDEV;
 		portc->nchan = 6;
@@ -569,24 +400,8 @@ auvia_alloc_port(auvia_devc_t *devc, int num)
 	/* make sure port is shut down */
 	OUTB(portc->devc, portc->base + OFF_CTRL, CTRL_TERMINATE);
 
-	/* figure out fragment configuration */
-	portc->intrs = ddi_prop_get_int(DDI_DEV_T_ANY, devc->dip,
-	    DDI_PROP_DONTPASS, prop, AUVIA_INTRS);
-
-	/* make sure the values are good */
-	if (portc->intrs < AUVIA_MIN_INTRS) {
-		audio_dev_warn(adev, "%s too low, %d, reset to %d",
-		    prop, portc->intrs, AUVIA_INTRS);
-		portc->intrs = AUVIA_INTRS;
-	} else if (portc->intrs > AUVIA_MAX_INTRS) {
-		audio_dev_warn(adev, "%s too high, %d, reset to %d",
-		    prop, portc->intrs, AUVIA_INTRS);
-		portc->intrs = AUVIA_INTRS;
-	}
-
-	portc->fragfr = 48000 / portc->intrs;
-	portc->fragsz = portc->fragfr * portc->nchan * 2;
-	portc->buf_size = portc->fragsz * AUVIA_NUM_SGD;
+	portc->nframes = 4096;
+	portc->buf_size = portc->nframes * portc->nchan * sizeof (int16_t);
 
 	/* first allocate up space for SGD list */
 	if (ddi_dma_alloc_handle(devc->dip, &dma_attr_sgd,
@@ -595,8 +410,7 @@ auvia_alloc_port(auvia_devc_t *devc, int num)
 		return (DDI_FAILURE);
 	}
 
-	if (ddi_dma_mem_alloc(portc->sgd_dmah,
-	    AUVIA_NUM_SGD * 2 * sizeof (uint32_t), &dev_attr,
+	if (ddi_dma_mem_alloc(portc->sgd_dmah, 2 * sizeof (uint32_t), &dev_attr,
 	    DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL, &portc->sgd_kaddr,
 	    &len, &portc->sgd_acch) != DDI_SUCCESS) {
 		audio_dev_warn(adev, "failed to allocate SGD memory");
@@ -633,21 +447,11 @@ auvia_alloc_port(auvia_devc_t *devc, int num)
 	}
 	portc->buf_paddr = cookie.dmac_address;
 
-	/* now wire descriptors up */
+	/* now wire up descriptor -- just one */
 	desc = (void *)portc->sgd_kaddr;
-	paddr = portc->buf_paddr;
-	for (int i = 0; i < AUVIA_NUM_SGD; i++) {
-		uint32_t	flags;
 
-		flags = AUVIA_SGD_FLAG | portc->fragsz;
-
-		if (i == (AUVIA_NUM_SGD - 1)) {
-			flags |= AUVIA_SGD_EOL;
-		}
-		ddi_put32(portc->sgd_acch, desc++, paddr);
-		ddi_put32(portc->sgd_acch, desc++, flags);
-		paddr += portc->fragsz;
-	}
+	ddi_put32(portc->sgd_acch, desc++, portc->buf_paddr);
+	ddi_put32(portc->sgd_acch, desc++, AUVIA_SGD_EOL | portc->buf_size);
 
 	(void) ddi_dma_sync(portc->sgd_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
 
@@ -663,57 +467,9 @@ auvia_alloc_port(auvia_devc_t *devc, int num)
 	return (DDI_SUCCESS);
 }
 
-int
-auvia_setup_intrs(auvia_devc_t *devc)
-{
-	uint_t			ipri;
-	int			actual;
-	int			rv;
-	ddi_intr_handle_t	ih[1];
-
-	rv = ddi_intr_alloc(devc->dip, ih, DDI_INTR_TYPE_FIXED,
-	    0, 1, &actual, DDI_INTR_ALLOC_STRICT);
-	if ((rv != DDI_SUCCESS) || (actual != 1)) {
-		audio_dev_warn(devc->adev,
-		    "Can't alloc interrupt handle (rv %d actual %d)",
-		    rv, actual);
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_get_pri(ih[0], &ipri) != DDI_SUCCESS) {
-		audio_dev_warn(devc->adev, "Can't get interrupt priority");
-		(void) ddi_intr_free(ih[0]);
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_add_handler(ih[0], auvia_intr, devc, NULL) !=
-	    DDI_SUCCESS) {
-		audio_dev_warn(devc->adev, "Can't add interrupt handler");
-		(void) ddi_intr_free(ih[0]);
-		return (DDI_FAILURE);
-	}
-
-	devc->ih = ih[0];
-	mutex_init(&devc->mutex, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-	mutex_init(&devc->low_mutex, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-	return (DDI_SUCCESS);
-}
-
 void
 auvia_destroy(auvia_devc_t *devc)
 {
-	if (devc->ih != NULL) {
-		(void) ddi_intr_disable(devc->ih);
-		(void) ddi_intr_remove_handler(devc->ih);
-		(void) ddi_intr_free(devc->ih);
-		mutex_destroy(&devc->mutex);
-		mutex_destroy(&devc->low_mutex);
-	}
-
-	if (devc->ksp) {
-		kstat_delete(devc->ksp);
-	}
-
 	for (int i = 0; i < AUVIA_NUM_PORTC; i++) {
 		auvia_portc_t *portc = devc->portc[i];
 		if (!portc)
@@ -856,10 +612,6 @@ auvia_attach(dev_info_t *dip)
 		goto error;
 	}
 
-	if (auvia_setup_intrs(devc) != DDI_SUCCESS) {
-		goto error;
-	}
-
 	devc->ac97 = ac97_alloc(dip, auvia_read_ac97, auvia_write_ac97, devc);
 	if (devc->ac97 == NULL) {
 		audio_dev_warn(devc->adev, "failed to allocate ac97 handle");
@@ -871,19 +623,11 @@ auvia_attach(dev_info_t *dip)
 		goto error;
 	}
 
-	/* set up kernel statistics */
-	if ((devc->ksp = kstat_create(AUVIA_NAME, ddi_get_instance(dip),
-	    AUVIA_NAME, "controller", KSTAT_TYPE_INTR, 1,
-	    KSTAT_FLAG_PERSISTENT)) != NULL) {
-		kstat_install(devc->ksp);
-	}
-
 	if (audio_dev_register(devc->adev) != DDI_SUCCESS) {
 		audio_dev_warn(devc->adev, "unable to register with framework");
 		goto error;
 	}
 
-	(void) ddi_intr_enable(devc->ih);
 	ddi_report_dev(dip);
 
 	return (DDI_SUCCESS);
@@ -902,28 +646,10 @@ auvia_resume(dev_info_t *dip)
 
 	auvia_hwinit(devc);
 
-	/* allow ac97 operations again */
-	ac97_resume(devc->ac97);
+	ac97_reset(devc->ac97);
 
-	mutex_enter(&devc->mutex);
-	devc->suspended = B_TRUE;
-	for (int i = 0; i < AUVIA_NUM_PORTC; i++) {
+	audio_dev_resume(devc->adev);
 
-		auvia_portc_t *portc = devc->portc[i];
-
-		if (portc->engine != NULL)
-			audio_engine_reset(portc->engine);
-
-		/* reset the port */
-		portc->reset(portc);
-
-		if (portc->started) {
-			auvia_start_port(portc);
-		} else {
-			auvia_stop_port(portc);
-		}
-	}
-	mutex_exit(&devc->mutex);
 	return (DDI_SUCCESS);
 }
 
@@ -941,16 +667,8 @@ auvia_detach(auvia_devc_t *devc)
 int
 auvia_suspend(auvia_devc_t *devc)
 {
-	ac97_suspend(devc->ac97);
+	audio_dev_suspend(devc->adev);
 
-	mutex_enter(&devc->mutex);
-	for (int i = 0; i < AUVIA_NUM_PORTC; i++) {
-
-		auvia_portc_t *portc = devc->portc[i];
-		auvia_stop_port(portc);
-	}
-	devc->suspended = B_TRUE;
-	mutex_exit(&devc->mutex);
 	return (DDI_SUCCESS);
 }
 
@@ -1057,7 +775,7 @@ auvia_ddi_quiesce(dev_info_t *dip)
 	for (int i = 0; i < AUVIA_NUM_PORTC; i++) {
 
 		auvia_portc_t *portc = devc->portc[i];
-		auvia_stop_port(portc);
+		OUTB(devc, portc->base + OFF_CTRL, CTRL_TERMINATE);
 	}
 	return (DDI_SUCCESS);
 }

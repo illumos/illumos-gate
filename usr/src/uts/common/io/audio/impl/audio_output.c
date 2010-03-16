@@ -21,7 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,11 +38,10 @@
 
 #define	DECL_AUDIO_EXPORT(NAME, TYPE, SAMPLE)				\
 void									\
-auimpl_export_##NAME(audio_engine_t *eng)				\
+auimpl_export_##NAME(audio_engine_t *eng, uint_t nfr, uint_t froff)	\
 {									\
-	int		fragfr = eng->e_fragfr;				\
 	int		nch = eng->e_nchan;				\
-	unsigned	hidx = eng->e_hidx;				\
+	uint_t		hidx = eng->e_hidx;				\
 	TYPE		*out = (void *)eng->e_data;			\
 	int		ch = 0;						\
 									\
@@ -55,8 +54,9 @@ auimpl_export_##NAME(audio_engine_t *eng)				\
 		/* get value and adjust next channel offset */		\
 		op = out + eng->e_choffs[ch] + (hidx * incr);		\
 		ip = eng->e_chbufs[ch];					\
+		ip += froff;						\
 									\
-		i = fragfr;						\
+		i = nfr;						\
 									\
 		do {	/* for each frame */				\
 			int32_t sample = *ip;				\
@@ -85,18 +85,18 @@ static void
 auimpl_output_limiter(audio_engine_t *eng)
 {
 	int k, t;
-	unsigned int q, amp, amp2;
+	uint_t q, amp, amp2;
 	int nchan = eng->e_nchan;
-	int fragfr = eng->e_fragfr;
+	uint_t fragfr = eng->e_fragfr;
 	int32_t **chbufs = eng->e_chbufs;
-	unsigned int statevar = eng->e_limiter_state;
+	uint_t statevar = eng->e_limiter_state;
 
 	for (t = 0; t < fragfr; t++) {
 
-		amp = (unsigned)ABS(chbufs[0][t]);
+		amp = (uint_t)ABS(chbufs[0][t]);
 
 		for (k = 1; k < nchan; k++)	{
-			amp2 = (unsigned)ABS(chbufs[k][t]);
+			amp2 = (uint_t)ABS(chbufs[k][t]);
 			if (amp2 > amp)
 				amp = amp2;
 		}
@@ -130,7 +130,7 @@ auimpl_output_limiter(audio_engine_t *eng)
 		for (k = 0; k < nchan; k++) {
 			int32_t in = chbufs[k][t];
 			int32_t out = 0;
-			unsigned int p;
+			uint_t p;
 
 			if (in >= 0) {
 				p = in;
@@ -221,12 +221,12 @@ auimpl_output_mix(audio_stream_t *sp, int offset, int nfr)
 static void
 auimpl_consume_fragment(audio_stream_t *sp)
 {
-	unsigned	count;
-	unsigned	avail;
-	unsigned	nframes;
-	unsigned	fragfr;
-	unsigned	framesz;
-	caddr_t		cnvbuf;
+	uint_t	count;
+	uint_t	avail;
+	uint_t	nframes;
+	uint_t	fragfr;
+	uint_t	framesz;
+	caddr_t	cnvbuf;
 
 	sp->s_cnv_src = sp->s_cnv_buf0;
 	sp->s_cnv_dst = sp->s_cnv_buf1;
@@ -247,8 +247,8 @@ auimpl_consume_fragment(audio_stream_t *sp)
 	 * do...while to minimize the number of tests.
 	 */
 	do {
-		unsigned n;
-		unsigned nbytes;
+		uint_t n;
+		uint_t nbytes;
 
 		n = min(nframes - sp->s_tidx, count);
 		nbytes = framesz * n;
@@ -272,9 +272,11 @@ auimpl_consume_fragment(audio_stream_t *sp)
 }
 
 static void
-auimpl_output_callback_impl(audio_engine_t *eng)
+auimpl_output_callback_impl(audio_engine_t *eng, audio_client_t **output,
+    audio_client_t **drain)
 {
-	int		fragfr = eng->e_fragfr;
+	uint_t	fragfr = eng->e_fragfr;
+	uint_t	resid;
 
 	/* clear any preexisting mix results */
 	for (int i = 0; i < eng->e_nchan; i++)
@@ -303,7 +305,7 @@ auimpl_output_callback_impl(audio_engine_t *eng)
 
 		mutex_enter(&sp->s_lock);
 		/* skip over streams not running or paused */
-		if ((!sp->s_running) || (sp->s_paused) || eng->e_suspended) {
+		if ((!sp->s_running) || (sp->s_paused)) {
 			mutex_exit(&sp->s_lock);
 			continue;
 		}
@@ -402,12 +404,18 @@ auimpl_output_callback_impl(audio_engine_t *eng)
 		 * the client's stream from engine.  So we're safe.
 		 */
 
-		if (c->c_output != NULL) {
-			c->c_output(c);
+		if (output && (c->c_output != NULL) &&
+		    (c->c_next_output == NULL)) {
+			auclnt_hold(c);
+			c->c_next_output = *output;
+			*output = c;
 		}
 
-		if (drained && (c->c_drain != NULL)) {
-			c->c_drain(c);
+		if (drain && drained && (c->c_drain != NULL) &&
+		    (c->c_next_drain == NULL)) {
+			auclnt_hold(c);
+			c->c_next_drain = *drain;
+			*drain = c;
 		}
 	}
 
@@ -417,19 +425,20 @@ auimpl_output_callback_impl(audio_engine_t *eng)
 	auimpl_output_limiter(eng);
 
 	/*
-	 * Export the data (a whole fragment) to the device.
+	 * Export the data (a whole fragment) to the device.  Deal
+	 * properly with wraps.  Note that the test and subtraction is
+	 * faster for dealing with wrap than modulo.
 	 */
-	eng->e_export(eng);
-
-	/*
-	 * Update the head and offset.  The head counts without
-	 * wrapping, whereas the offset wraps.  Note that the test +
-	 * subtraction is faster for dealing with wrap than modulo.
-	 */
-	eng->e_head += fragfr;
-	eng->e_hidx += fragfr;
-	if (eng->e_hidx >= eng->e_nframes)
-		eng->e_hidx -= eng->e_nframes;
+	resid = fragfr;
+	do {
+		uint_t part = min(resid, eng->e_nframes - eng->e_hidx);
+		eng->e_export(eng, part, fragfr - resid);
+		eng->e_head += part;
+		eng->e_hidx += part;
+		if (eng->e_hidx == eng->e_nframes)
+			eng->e_hidx = 0;
+		resid -= part;
+	} while (resid);
 
 	/*
 	 * Consider doing the SYNC outside of the lock.
@@ -442,15 +451,105 @@ auimpl_output_callback_impl(audio_engine_t *eng)
  */
 
 void
-auimpl_output_callback(audio_engine_t *eng)
+auimpl_output_callback(void *arg)
 {
-	int64_t cnt;
+	audio_engine_t	*e = arg;
+	int64_t		cnt;
+	audio_client_t	*c;
+	audio_client_t	*output = NULL;
+	audio_client_t	*drain = NULL;
+	uint64_t	t;
 
-	cnt = eng->e_head - eng->e_tail;
+	mutex_enter(&e->e_lock);
+
+	if (e->e_suspended || e->e_failed) {
+		mutex_exit(&e->e_lock);
+		return;
+	}
+
+	if (e->e_need_start) {
+		int rv;
+		if ((rv = ENG_START(e)) != 0) {
+			e->e_failed = B_TRUE;
+			mutex_exit(&e->e_lock);
+			audio_dev_warn(e->e_dev,
+			    "failed starting output, rv = %d", rv);
+			return;
+		}
+		e->e_need_start = B_FALSE;
+	}
+
+	t = ENG_COUNT(e);
+	if (t < e->e_tail) {
+		/*
+		 * This is a sign of a serious bug.  We should
+		 * probably offline the device via FMA, if we ever
+		 * support FMA for audio devices.
+		 */
+		e->e_failed = B_TRUE;
+		ENG_STOP(e);
+		mutex_exit(&e->e_lock);
+		audio_dev_warn(e->e_dev,
+		    "device malfunction: broken play back sample counter");
+		return;
+
+	}
+	e->e_tail = t;
+
+	if (e->e_tail > e->e_head) {
+		/* want more than we have */
+		e->e_errors++;
+		e->e_underruns++;
+	}
+
+	cnt = e->e_head - e->e_tail;
 
 	/* stay a bit ahead */
-	while (cnt < eng->e_playahead) {
-		auimpl_output_callback_impl(eng);
-		cnt = eng->e_head - eng->e_tail;
+	while (cnt < e->e_playahead) {
+		auimpl_output_callback_impl(e, &output, &drain);
+		cnt = e->e_head - e->e_tail;
+	}
+	mutex_exit(&e->e_lock);
+
+	/*
+	 * Notify client personalities.
+	 */
+	while ((c = output) != NULL) {
+
+		output = c->c_next_output;
+		c->c_next_output = NULL;
+		c->c_output(c);
+		auclnt_release(c);
+	}
+
+	while ((c = drain) != NULL) {
+
+		drain = c->c_next_drain;
+		c->c_next_drain = NULL;
+		c->c_drain(c);
+		auclnt_release(c);
+	}
+
+}
+
+void
+auimpl_output_preload(audio_engine_t *e)
+{
+	int64_t	cnt;
+
+	ASSERT(mutex_owned(&e->e_lock));
+
+	if (e->e_tail > e->e_head) {
+		/* want more than we have */
+		e->e_errors++;
+		e->e_underruns++;
+		e->e_tail = e->e_head;
+	}
+	cnt = e->e_head - e->e_tail;
+
+	/* stay a bit ahead */
+	while (cnt < e->e_playahead) {
+		auimpl_output_callback_impl(e, NULL, NULL);
+		cnt = e->e_head - e->e_tail;
 	}
 }

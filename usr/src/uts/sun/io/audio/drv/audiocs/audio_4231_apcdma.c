@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,22 +61,16 @@ static ddi_device_acc_attr_t acc_attr = {
 };
 
 /*
- * Local routines
- */
-static uint_t apc_intr(caddr_t);
-static void apc_load_fragment(CS_engine_t *);
-
-/*
  * DMA ops vector functions
  */
 static int apc_map_regs(CS_state_t *);
 static void apc_unmap_regs(CS_state_t *);
 static void apc_reset(CS_state_t *);
-static int apc_add_intr(CS_state_t *);
-static void apc_rem_intr(CS_state_t *);
 static int apc_start_engine(CS_engine_t *);
 static void apc_stop_engine(CS_engine_t *);
 static void apc_power(CS_state_t *, int);
+static void apc_reload(CS_engine_t *);
+static uint32_t apc_addr(CS_engine_t *);
 
 cs4231_dma_ops_t cs4231_apcdma_ops = {
 	"APC DMA controller",
@@ -84,11 +78,11 @@ cs4231_dma_ops_t cs4231_apcdma_ops = {
 	apc_map_regs,
 	apc_unmap_regs,
 	apc_reset,
-	apc_add_intr,
-	apc_rem_intr,
 	apc_start_engine,
 	apc_stop_engine,
 	apc_power,
+	apc_reload,
+	apc_addr,
 };
 
 /*
@@ -182,69 +176,6 @@ apc_reset(CS_state_t *state)
 }	/* apc_reset() */
 
 /*
- * apc_add_intr()
- *
- * Description:
- *	Register the APC interrupts with the kernel.
- *
- *	NOTE: This does NOT turn on interrupts.
- *
- *	CAUTION: While the interrupts are added, the Codec interrupts are
- *		not enabled.
- *
- * Arguments:
- *	CS_state_t	*state	Pointer to the device's state structure
- *
- * Returns:
- *	DDI_SUCCESS		Registers successfully mapped
- *	DDI_FAILURE		Registers not successfully mapped
- */
-static int
-apc_add_intr(CS_state_t *state)
-{
-	dev_info_t	*dip = state->cs_dip;
-
-	/* first we make sure this isn't a high level interrupt */
-	if (ddi_intr_hilevel(dip, 0) != 0) {
-		audio_dev_warn(state->cs_adev,
-		    "unsupported high level interrupt");
-		return (DDI_FAILURE);
-	}
-
-	/* okay to register the interrupt */
-	if (ddi_add_intr(dip, 0, NULL, NULL, apc_intr, (caddr_t)state) !=
-	    DDI_SUCCESS) {
-		audio_dev_warn(state->cs_adev, "bad interrupt specification");
-		return (DDI_FAILURE);
-	}
-
-	return (DDI_SUCCESS);
-
-}	/* apc_add_intr() */
-
-/*
- * apc_rem_intr()
- *
- * Description:
- *	Unregister the APC interrupts from the kernel.
- *
- *	CAUTION: While the interrupts are removed, the Codec interrupts are
- *		not disabled, but then, they never should have been on in
- *		the first place.
- *
- * Arguments:
- *	CS_state_t	*state	Pointer to the device's state structure
- *
- * Returns:
- *	void
- */
-static void
-apc_rem_intr(CS_state_t *state)
-{
-	ddi_remove_intr(state->cs_dip, 0, NULL);
-}	/* apc_rem_intr() */
-
-/*
  * apc_start_engine()
  *
  * Description:
@@ -279,10 +210,10 @@ apc_start_engine(CS_engine_t *eng)
 	ASSERT(mutex_owned(&state->cs_lock));
 
 	if (eng->ce_num == CS4231_PLAY) {
-		enable = APC_PLAY_ENABLE;
+		enable = APC_PDMA_GO;
 		dirty = APC_PD;
 	} else {
-		enable = APC_CAP_ENABLE;
+		enable = APC_CDMA_GO;
 		dirty = APC_CD;
 	}
 
@@ -301,7 +232,7 @@ apc_start_engine(CS_engine_t *eng)
 	/*
 	 * Program the first fragment.
 	 */
-	apc_load_fragment(eng);
+	apc_reload(eng);
 
 	/*
 	 * Start the DMA engine, including interrupts.
@@ -309,9 +240,9 @@ apc_start_engine(CS_engine_t *eng)
 	OR_SET_WORD(handle, &APC_DMACSR, enable);
 
 	/*
-	 * Program the second fragment.
+	 * Program the double buffering.
 	 */
-	apc_load_fragment(eng);
+	apc_reload(eng);
 
 	return (DDI_SUCCESS);
 }
@@ -338,7 +269,6 @@ apc_stop_engine(CS_engine_t *eng)
 	CS_state_t		*state = eng->ce_state;
 	ddi_acc_handle_t	handle = APC_HANDLE;
 	uint32_t		reg;
-	uint32_t		intren;
 	uint32_t		abort;
 	uint32_t		drainbit;
 	uint32_t		disable;
@@ -346,19 +276,14 @@ apc_stop_engine(CS_engine_t *eng)
 	ASSERT(mutex_owned(&state->cs_lock));
 
 	if (eng->ce_num == CS4231_PLAY) {
-		intren = APC_PINTR_ENABLE;
 		abort = APC_P_ABORT;
 		drainbit = APC_PM;
 		disable = APC_PLAY_DISABLE;
 	} else {
-		intren = APC_CINTR_ENABLE;
 		abort = APC_C_ABORT;
 		drainbit = APC_CX;
 		disable = APC_CAP_DISABLE;
 	}
-
-	/* clear the interrupts so the ISR doesn't get involved */
-	AND_SET_WORD(handle, &APC_DMACSR, ~intren);
 
 	/* first, abort the DMA engine */
 	OR_SET_WORD(handle, &APC_DMACSR, abort);
@@ -391,9 +316,6 @@ apc_stop_engine(CS_engine_t *eng)
  * Arguments:
  *	CS_state_t	*state		Ptr to the device's state structure
  *	int		level		Power level to set
- *
- * Returns:
- *	void
  */
 static void
 apc_power(CS_state_t *state, int level)
@@ -417,119 +339,8 @@ apc_power(CS_state_t *state, int level)
 }	/* apc_power() */
 
 
-/* *******  Local Routines ************************************************** */
-
-/*
- * apc_intr()
- *
- * Description:
- *	APC interrupt service routine, which services both play and capture
- *	interrupts. First we find out why there was an interrupt, then we
- *	take the appropriate action.
- *
- *	Because this ISR deals with both play and record interrupts we have
- *	to be careful to not lose an interrupt. So we service the record
- *	interrupt first and save the incoming data until later. This is all
- *	done without releasing the lock, thus there can be no race conditions.
- *	Then we process the play interrupt. While processing the play interrupt
- *	we have to release the lock. When this happens we send recorded data
- *	to the mixer and then get the next chunk of data to play. If there
- *	wasn't a play interrupt then we finish by sending the recorded data,
- *	if any.
- *
- * Arguments:
- *	caddr_t		T	Pointer to the interrupting device's state
- *				structure
- *
- * Returns:
- *	DDI_INTR_CLAIMED	Interrupt claimed and processed
- *	DDI_INTR_UNCLAIMED	Interrupt not claimed, and thus ignored
- */
-static uint_t
-apc_intr(caddr_t T)
-{
-	CS_state_t		*state = (void *)T;
-	ddi_acc_handle_t	handle = APC_HANDLE;
-	uint_t			csr;
-	int			rc = DDI_INTR_UNCLAIMED;
-
-	/* the state must be protected */
-	mutex_enter(&state->cs_lock);
-
-	if (state->cs_suspended) {
-		mutex_exit(&state->cs_lock);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	/* get the APC CSR */
-	csr = ddi_get32(handle, &APC_DMACSR);
-
-	/* make sure this device sent the interrupt */
-	if (!(csr & APC_IP)) {
-		if (csr & APC_PMI_EN) {
-			/*
-			 * Clear device generated interrupt while play is
-			 * active (Only seen while playing and insane mode
-			 * switching)
-			 */
-			mutex_exit(&state->cs_lock);
-			return (DDI_INTR_CLAIMED);
-		} else {
-			/* nope, this isn't our interrupt */
-			mutex_exit(&state->cs_lock);
-			return (DDI_INTR_UNCLAIMED);
-		}
-	}
-
-	/* clear all interrupts we captured this time */
-	ddi_put32(handle, &APC_DMACSR, csr);
-
-	if (csr & APC_CINTR_MASK) {
-		/* try to load the next record buffer */
-		apc_load_fragment(state->cs_engines[CS4231_REC]);
-		rc = DDI_INTR_CLAIMED;
-	}
-
-	if (csr & APC_PINTR_MASK) {
-		/* try to load the next play buffer */
-		apc_load_fragment(state->cs_engines[CS4231_PLAY]);
-		rc = DDI_INTR_CLAIMED;
-	}
-
-done:
-
-	/* APC error interrupt, not sure what to do here */
-	if (csr & APC_EI) {
-		audio_dev_warn(state->cs_adev, "error interrupt: 0x%x", csr);
-		rc = DDI_INTR_CLAIMED;
-	}
-
-	/* update the kernel interrupt statistics */
-	if (state->cs_ksp) {
-		if (rc == DDI_INTR_CLAIMED) {
-			KIOP(state)->intrs[KSTAT_INTR_HARD]++;
-		}
-	}
-
-	mutex_exit(&state->cs_lock);
-
-	if (csr & APC_CINTR_MASK) {
-		CS_engine_t	*eng = state->cs_engines[CS4231_REC];
-		if (eng->ce_started)
-			audio_engine_produce(eng->ce_engine);
-	}
-	if (csr & APC_PINTR_MASK) {
-		CS_engine_t	*eng = state->cs_engines[CS4231_PLAY];
-		if (eng->ce_started)
-			audio_engine_consume(eng->ce_engine);
-	}
-
-	return (rc);
-
-}	/* apc_intr() */
-
 static void
-apc_load_fragment(CS_engine_t *eng)
+apc_reload(CS_engine_t *eng)
 {
 	CS_state_t		*state = eng->ce_state;
 	ddi_acc_handle_t	handle = APC_HANDLE;
@@ -556,12 +367,40 @@ apc_load_fragment(CS_engine_t *eng)
 	(void) ddi_get32(handle, nva);
 
 	/* write the address of the next fragment */
-	ddi_put32(handle, nva, eng->ce_paddr[eng->ce_cfrag]);
+	ddi_put32(handle, nva,
+	    eng->ce_paddr + (CS4231_FRAGSZ * eng->ce_curidx));
+	eng->ce_curidx++;
+	eng->ce_curidx %= CS4231_NFRAGS;
 
 	/* now program the NC reg., which enables the state machine */
-	ddi_put32(handle, nc, eng->ce_fragsz);
+	ddi_put32(handle, nc, CS4231_FRAGSZ);
+}
 
-	eng->ce_cfrag++;
-	eng->ce_cfrag %= CS4231_NFRAGS;
-	eng->ce_count += eng->ce_fragfr;
+/*
+ * apc_addr()
+ *
+ * Description:
+ *	This routine returns the current DMA address for the engine (the
+ *	next address being accessed).
+ *
+ * Arguments:
+ *	CS_engine_t	*eng		The engine
+ *
+ * Returns:
+ *	Physical DMA address for current transfer.
+ */
+static uint32_t
+apc_addr(CS_engine_t *eng)
+{
+	CS_state_t		*state = eng->ce_state;
+	ddi_acc_handle_t	handle = APC_HANDLE;
+	uint32_t		*va;	/* VA reg */
+
+	if (eng->ce_num == CS4231_PLAY) {
+		va = &APC_DMAPVA;
+	} else {
+		va = &APC_DMACVA;
+	}
+
+	return (ddi_get32(handle, va));
 }

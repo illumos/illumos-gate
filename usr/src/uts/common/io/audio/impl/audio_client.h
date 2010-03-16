@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,26 +94,26 @@ boolean_t auclnt_is_paused(audio_stream_t *);
 
 void auclnt_flush(audio_stream_t *);
 
-void auclnt_get_output_qlen(audio_client_t *, unsigned *, unsigned *);
+void auclnt_get_output_qlen(audio_client_t *, uint_t *, uint_t *);
 
-unsigned auclnt_get_fragsz(audio_stream_t *);
-unsigned auclnt_get_framesz(audio_stream_t *);
-unsigned auclnt_get_nfrags(audio_stream_t *);
-unsigned auclnt_get_nframes(audio_stream_t *);
-unsigned auclnt_get_count(audio_stream_t *);
+uint_t auclnt_get_fragsz(audio_stream_t *);
+uint_t auclnt_get_framesz(audio_stream_t *);
+uint_t auclnt_get_nfrags(audio_stream_t *);
+uint_t auclnt_get_nframes(audio_stream_t *);
+uint_t auclnt_get_count(audio_stream_t *);
 uint64_t auclnt_get_head(audio_stream_t *);
 uint64_t auclnt_get_tail(audio_stream_t *);
-unsigned auclnt_get_hidx(audio_stream_t *);
-unsigned auclnt_get_tidx(audio_stream_t *);
+uint_t auclnt_get_hidx(audio_stream_t *);
+uint_t auclnt_get_tidx(audio_stream_t *);
 
-void auclnt_set_latency(audio_stream_t *, unsigned, unsigned);
+void auclnt_set_latency(audio_stream_t *, uint_t, uint_t);
 
 audio_stream_t *auclnt_input_stream(audio_client_t *);
 audio_stream_t *auclnt_output_stream(audio_client_t *);
 
 int auclnt_get_oflag(audio_client_t *);
 
-int auclnt_open(audio_client_t *, unsigned, int);
+int auclnt_open(audio_client_t *, uint_t, int);
 void auclnt_close(audio_client_t *);
 
 void auclnt_register_ops(minor_t, audio_client_ops_t *);
@@ -124,10 +124,10 @@ minor_t auclnt_get_minor_type(audio_client_t *);
 queue_t *auclnt_get_rq(audio_client_t *);
 queue_t *auclnt_get_wq(audio_client_t *);
 
-unsigned auclnt_produce(audio_stream_t *, unsigned);
-unsigned auclnt_produce_data(audio_stream_t *, caddr_t, unsigned);
-unsigned auclnt_consume(audio_stream_t *, unsigned);
-unsigned auclnt_consume_data(audio_stream_t *, caddr_t, unsigned);
+uint_t auclnt_produce(audio_stream_t *, uint_t);
+uint_t auclnt_produce_data(audio_stream_t *, caddr_t, uint_t);
+uint_t auclnt_consume(audio_stream_t *, uint_t);
+uint_t auclnt_consume_data(audio_stream_t *, caddr_t, uint_t);
 int auclnt_read(audio_client_t *, struct uio *);
 int auclnt_write(audio_client_t *, struct uio *);
 int auclnt_chpoll(audio_client_t *, short, int, short *, struct pollhead **);
@@ -159,7 +159,7 @@ int auclnt_get_dev_instance(audio_dev_t *);
 const char *auclnt_get_dev_description(audio_dev_t *);
 const char *auclnt_get_dev_version(audio_dev_t *);
 const char *auclnt_get_dev_hw_info(audio_dev_t *, void **);
-unsigned auclnt_get_dev_capab(audio_dev_t *);
+uint_t auclnt_get_dev_capab(audio_dev_t *);
 #define	AUDIO_CLIENT_CAP_PLAY		(1U << 0)
 #define	AUDIO_CLIENT_CAP_RECORD		(1U << 1)
 #define	AUDIO_CLIENT_CAP_DUPLEX		(1U << 2)
@@ -181,7 +181,7 @@ void auclnt_dev_walk_clients(audio_dev_t *,
  * need, and its far lighter weight than forcing an asynchronous
  * callback on everything.
  */
-unsigned auclnt_dev_get_serial(audio_dev_t *);
+uint_t auclnt_dev_get_serial(audio_dev_t *);
 
 /*
  * Audio control functions for use by clients.
@@ -246,6 +246,9 @@ void auclnt_walk_devs_by_number(int (*walker)(audio_dev_t *, void *), void *);
 
 audio_client_t *auclnt_hold_by_devt(dev_t);
 void auclnt_release(audio_client_t *);
+void auclnt_hold(audio_client_t *);
+int auclnt_serialize(audio_client_t *);
+void auclnt_unserialize(audio_client_t *);
 
 /*
  * Engine rlated accesses.  Note that normally clients don't need this level
@@ -256,7 +259,7 @@ void auclnt_dev_walk_engines(audio_dev_t *,
 int auclnt_engine_get_format(audio_engine_t *);
 int auclnt_engine_get_rate(audio_engine_t *);
 int auclnt_engine_get_channels(audio_engine_t *);
-unsigned auclnt_engine_get_capab(audio_engine_t *);
+uint_t auclnt_engine_get_capab(audio_engine_t *);
 
 /*
  * Retrieve minor-specific data for the instance.  This allows for

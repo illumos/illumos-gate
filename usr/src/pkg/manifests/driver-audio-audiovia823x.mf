@@ -43,12 +43,10 @@ dir path=kernel/drv/$(ARCH64) group=sys
 driver name=audiovia823x alias=pci1106,3059
 file path=kernel/drv/$(ARCH64)/audiovia823x group=sys
 file path=kernel/drv/audiovia823x group=sys
-file path=kernel/drv/audiovia823x.conf group=sys reboot-needed=false
 legacy pkg=SUNWvia823x arch=$(ARCH) category=system \
     desc="SunOS audio device driver for VIA VT823x south bridges" \
     hotline="Please contact your local service provider" \
     name="SUNW Audio Driver for VIA VT823x" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
-license lic_OSBL license=lic_OSBL
-license lic_OSBL_preamble license=lic_OSBL_preamble
+license lic_CDDL license=lic_CDDL

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,22 +67,16 @@ static ddi_device_acc_attr_t eb2_attr = {
 };
 
 /*
- * Local routines
- */
-static uint_t eb2_intr(caddr_t);
-static void eb2_load_fragment(CS_engine_t *);
-
-/*
  * DMA ops vector functions
  */
 static int eb2_map_regs(CS_state_t *);
 static void eb2_unmap_regs(CS_state_t *);
 static void eb2_reset(CS_state_t *);
-static int eb2_add_intr(CS_state_t *);
-static void eb2_rem_intr(CS_state_t *);
 static int eb2_start_engine(CS_engine_t *);
 static void eb2_stop_engine(CS_engine_t *);
 static void eb2_power(CS_state_t *, int);
+static void eb2_reload(CS_engine_t *);
+static uint32_t eb2_addr(CS_engine_t *);
 
 cs4231_dma_ops_t cs4231_eb2dma_ops = {
 	"EB2 DMA controller",
@@ -90,11 +84,11 @@ cs4231_dma_ops_t cs4231_eb2dma_ops = {
 	eb2_map_regs,
 	eb2_unmap_regs,
 	eb2_reset,
-	eb2_add_intr,
-	eb2_rem_intr,
 	eb2_start_engine,
 	eb2_stop_engine,
 	eb2_power,
+	eb2_reload,
+	eb2_addr,
 };
 
 /*
@@ -177,9 +171,6 @@ error:
  *
  * Arguments:
  *	CS_state_t	*state	The device's state
- *
- * Returns:
- *	void
  */
 static void
 eb2_unmap_regs(CS_state_t *state)
@@ -205,9 +196,6 @@ eb2_unmap_regs(CS_state_t *state)
  * Arguments:
  *	dev_info_t	*dip	Pointer to the device's devinfo structure
  *	CS_state_t	*state	The device's state structure
- *
- * Returns:
- *	void
  */
 static void
 eb2_reset(CS_state_t *state)
@@ -240,80 +228,6 @@ eb2_reset(CS_state_t *state)
 	ddi_put32(rhandle, &EB2_REC_CSR, EB2_RCLEAR_RESET_VALUE);
 
 }	/* eb2_reset() */
-
-/*
- * eb2_add_intr()
- *
- * Description:
- *	Register the EB2 interrupts with the kernel.
- *
- *	NOTE: This does NOT turn on interrupts.
- *
- *	CAUTION: While the interrupts are added, the Codec interrupts are
- *		not enabled.
- *
- * Arguments:
- *	CS_state_t	*state	Pointer to the device's state structure
- *
- * Returns:
- *	DDI_SUCCESS		Interrupts added
- *	DDI_FAILURE		Interrupts not added
- */
-static int
-eb2_add_intr(CS_state_t *state)
-{
-	dev_info_t	*dip = state->cs_dip;
-
-	/* first we make sure these aren't high level interrupts */
-	if (ddi_intr_hilevel(dip, 0) != 0) {
-		audio_dev_warn(state->cs_adev, "unsupported hi level intr 0");
-		return (DDI_FAILURE);
-	}
-	if (ddi_intr_hilevel(dip, 1) != 0) {
-		audio_dev_warn(state->cs_adev, "unsupported hi level intr 1");
-		return (DDI_FAILURE);
-	}
-
-	/* okay to register the interrupts */
-	if (ddi_add_intr(dip, 0, NULL, NULL, eb2_intr,
-	    (caddr_t)state->cs_engines[CS4231_REC]) != DDI_SUCCESS) {
-		audio_dev_warn(state->cs_adev, "bad record interrupt spec");
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_add_intr(dip, 1, NULL, NULL, eb2_intr,
-	    (caddr_t)state->cs_engines[CS4231_PLAY]) != DDI_SUCCESS) {
-		audio_dev_warn(state->cs_adev, "play interrupt spec");
-		ddi_remove_intr(dip, 0, NULL);
-		return (DDI_FAILURE);
-	}
-
-	return (DDI_SUCCESS);
-
-}	/* eb2_add_intr() */
-
-/*
- * eb2_rem_intr()
- *
- * Description:
- *	Unregister the EB2 interrupts from the kernel.
- *
- *	CAUTION: While the interrupts are removed, the Codec interrupts are
- *		not disabled, but then, they never should have been on in
- *		the first place.
- *
- * Arguments:
- *	CS_state_t	*state	Pointer to the device's soft state
- *
- * Returns:
- *	void
- */
-static void
-eb2_rem_intr(CS_state_t *state)
-{
-	ddi_remove_intr(state->cs_dip, 0, NULL);
-	ddi_remove_intr(state->cs_dip, 1, NULL);
-}	/* eb2_rem_intr() */
 
 /*
  * eb2_start_engine()
@@ -375,7 +289,7 @@ eb2_start_engine(CS_engine_t *eng)
 	/*
 	 * Program the DMA engine.
 	 */
-	eb2_load_fragment(eng);
+	eb2_reload(eng);
 
 	/*
 	 * Start playing before we load the next fragment.
@@ -383,9 +297,9 @@ eb2_start_engine(CS_engine_t *eng)
 	OR_SET_WORD(handle, &regs->eb2csr, enable);
 
 	/*
-	 * Program a 2nd fragment.
+	 * Program the next address, too.
 	 */
-	eb2_load_fragment(eng);
+	eb2_reload(eng);
 
 	return (DDI_SUCCESS);
 
@@ -401,9 +315,6 @@ eb2_start_engine(CS_engine_t *eng)
  *
  * Arguments:
  *	CS_engine_t	*eng	The engine to stop
- *
- * Returns:
- *	void
  */
 static void
 eb2_stop_engine(CS_engine_t *eng)
@@ -449,9 +360,6 @@ eb2_stop_engine(CS_engine_t *eng)
  * Arguments:
  *	CS_state_t	*state		Ptr to the device's state structure
  *	int		level		Power level to set
- *
- * Returns:
- *	void
  */
 static void
 eb2_power(CS_state_t *state, int level)
@@ -466,90 +374,18 @@ eb2_power(CS_state_t *state, int level)
 
 }	/* eb2_power() */
 
-
-/* *******  Local Routines ************************************************** */
-
 /*
- * eb2_intr()
+ * eb2_reload()
  *
  * Description:
- *	EB2 interrupt serivce routine. First we find out why there was an
- *	interrupt, then we take the appropriate action.
+ *	This routine reloads the DMA address, so that we can continue
+ *	double buffer round-robin fashion.
  *
  * Arguments:
- *	caddr_t		T	Pointer to the interrupting device's state
- *				structure
- *
- * Returns:
- *	DDI_INTR_CLAIMED	Interrupt claimed and processed
- *	DDI_INTR_UNCLAIMED	Interrupt not claimed, and thus ignored
+ *	CS_engine_t	*eng		The engine
  */
-static uint_t
-eb2_intr(caddr_t T)
-{
-	CS_engine_t		*eng = (void *)T;
-	CS_state_t		*state = eng->ce_state;
-	cs4231_eb2regs_t	*regs = eng->ce_eb2regs;
-	ddi_acc_handle_t	handle = eng->ce_regsh;
-	uint32_t		csr;
-	boolean_t		doit = B_FALSE;
-
-	/* the state must be protected */
-	mutex_enter(&state->cs_lock);
-	if (state->cs_suspended) {
-		mutex_exit(&state->cs_lock);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	/* get the EB2 CSR */
-	csr = ddi_get32(handle, &regs->eb2csr);
-
-	/* make sure this device sent the interrupt */
-	if (!(csr & EB2_INT_PEND)) {
-		mutex_exit(&state->cs_lock);
-		/* nope, this isn't our interrupt */
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	/* clear all interrupts we captured at this time */
-	ddi_put32(handle, &regs->eb2csr, (csr|EB2_TC));
-
-	if (csr & EB2_TC) {
-
-		/* try to load the next audio buffer */
-		eb2_load_fragment(eng);
-
-		/* if engine was started, then we want to consume later */
-		doit = eng->ce_started;
-
-	} else if (csr & EB2_ERR_PEND) {
-		audio_dev_warn(state->cs_adev, "error intr: 0x%x", csr);
-
-	} else {
-		audio_dev_warn(state->cs_adev, "unknown intr: 0x%x", csr);
-	}
-
-	/* update the kernel interrupt statisitcs */
-	if (state->cs_ksp) {
-		KIOP(state)->intrs[KSTAT_INTR_HARD]++;
-	}
-
-	mutex_exit(&state->cs_lock);
-
-	if (doit) {
-		if (eng->ce_num == CS4231_PLAY) {
-			audio_engine_consume(eng->ce_engine);
-		} else {
-			audio_engine_produce(eng->ce_engine);
-		}
-	}
-
-	return (DDI_INTR_CLAIMED);
-
-}	/* eb2_intr() */
-
 static void
-eb2_load_fragment(CS_engine_t *eng)
+eb2_reload(CS_engine_t *eng)
 {
 	ddi_acc_handle_t	handle = eng->ce_regsh;
 	cs4231_eb2regs_t	*regs = eng->ce_eb2regs;
@@ -562,12 +398,34 @@ eb2_load_fragment(CS_engine_t *eng)
 	/*
 	 * For eb2 we first program the Next Byte Count Register.
 	 */
-	ddi_put32(handle, &regs->eb2bcr, eng->ce_fragsz);
+	ddi_put32(handle, &regs->eb2bcr, CS4231_FRAGSZ);
 
 	/* now program the Next Address Register */
-	ddi_put32(handle, &regs->eb2acr, eng->ce_paddr[eng->ce_cfrag]);
+	ddi_put32(handle, &regs->eb2acr,
+	    eng->ce_paddr + (CS4231_FRAGSZ * eng->ce_curidx));
 
-	eng->ce_cfrag++;
-	eng->ce_cfrag %= CS4231_NFRAGS;
-	eng->ce_count += eng->ce_fragfr;
+	eng->ce_curidx++;
+	eng->ce_curidx %= CS4231_NFRAGS;
+}
+
+/*
+ * eb2_addr()
+ *
+ * Description:
+ *	This routine returns the current DMA address for the engine (the
+ *	next address being accessed).
+ *
+ * Arguments:
+ *	CS_engine_t	*eng		The engine
+ *
+ * Returns:
+ *	Physical DMA address for current transfer.
+ */
+static uint32_t
+eb2_addr(CS_engine_t *eng)
+{
+	ddi_acc_handle_t	handle = eng->ce_regsh;
+	cs4231_eb2regs_t	*regs = eng->ce_eb2regs;
+
+	return (ddi_get32(handle, &regs->eb2acr));
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,7 +73,7 @@ static int audiocs_ddi_power(dev_info_t *, int, int);
 /*
  * Entry point routine prototypes
  */
-static int audiocs_open(void *, int, unsigned *, unsigned *, caddr_t *);
+static int audiocs_open(void *, int, unsigned *, caddr_t *);
 static void audiocs_close(void *);
 static int audiocs_start(void *);
 static void audiocs_stop(void *);
@@ -82,7 +82,6 @@ static int audiocs_channels(void *);
 static int audiocs_rate(void *);
 static uint64_t audiocs_count(void *);
 static void audiocs_sync(void *, unsigned);
-static unsigned audiocs_qlen(void *);
 
 /*
  * Control callbacks.
@@ -106,9 +105,6 @@ static int audiocs_init_state(CS_state_t *);
 static int audiocs_chip_init(CS_state_t *);
 static int audiocs_alloc_engine(CS_state_t *, int);
 static void audiocs_free_engine(CS_engine_t *);
-static void audiocs_reset_engine(CS_engine_t *);
-static int audiocs_start_engine(CS_engine_t *);
-static void audiocs_stop_engine(CS_engine_t *);
 static void audiocs_get_ports(CS_state_t *);
 static void audiocs_configure_input(CS_state_t *);
 static void audiocs_configure_output(CS_state_t *);
@@ -130,6 +126,7 @@ static void audiocs_sel_index(CS_state_t *, uint8_t);
 #define	SELIDX(s, idx)		audiocs_sel_index(s, idx)
 #define	PUTIDX(s, val, mask)	audiocs_put_index(s, val, mask)
 #endif
+#define	GETIDX(s)		ddi_get8((handle), &CS4231_IDR)
 
 #define	ORIDX(s, val, mask)						\
 	PUTIDX(s,							\
@@ -151,9 +148,9 @@ static audio_engine_ops_t audiocs_engine_ops = {
 	audiocs_channels,
 	audiocs_rate,
 	audiocs_sync,
-	audiocs_qlen,
 	NULL,
-	NULL
+	NULL,
+	NULL,
 };
 
 #define	OUTPUT_SPEAKER		0
@@ -470,21 +467,10 @@ audiocs_destroy(CS_state_t *state)
 	if (state == NULL)
 		return;
 
-	/*
-	 * Unregister any interrupts. That way we can't get called by and
-	 * interrupt after the audio framework is removed.
-	 */
-	CS4231_DMA_REM_INTR(state);
-
 	for (int i = CS4231_PLAY; i <= CS4231_REC; i++) {
 		audiocs_free_engine(state->cs_engines[i]);
 	}
 	audiocs_del_controls(state);
-
-	/* free the kernel statistics structure */
-	if (state->cs_ksp) {
-		kstat_delete(state->cs_ksp);
-	}
 
 	if (state->cs_adev) {
 		audio_dev_free(state->cs_adev);
@@ -524,15 +510,8 @@ audiocs_attach(dev_info_t *dip)
 	state->cs_dip = dip;
 	ddi_set_driver_private(dip, state);
 
-	/* get the iblock cookie needed for interrupt context */
-	if (ddi_get_iblock_cookie(dip, 0, &state->cs_iblock) != DDI_SUCCESS) {
-		audio_dev_warn(NULL, "cannot get iblock cookie");
-		kmem_free(state, sizeof (*state));
-		return (DDI_FAILURE);
-	}
-
 	/* now fill it in, initialize the state mutexs first */
-	mutex_init(&state->cs_lock, NULL, MUTEX_DRIVER, state->cs_iblock);
+	mutex_init(&state->cs_lock, NULL, MUTEX_DRIVER, NULL);
 
 	/*
 	 * audio state initialization... should always succeed,
@@ -562,18 +541,6 @@ audiocs_attach(dev_info_t *dip)
 	/* chip init will have powered us up */
 	state->cs_powered = B_TRUE;
 
-	/* set up kernel statistics */
-	if ((state->cs_ksp = kstat_create(ddi_driver_name(dip),
-	    ddi_get_instance(dip), ddi_driver_name(dip),
-	    "controller", KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT)) != NULL) {
-		kstat_install(state->cs_ksp);
-	}
-
-	/* we're ready, set up the interrupt handler */
-	if (CS4231_DMA_ADD_INTR(state) != DDI_SUCCESS) {
-		mutex_exit(&state->cs_lock);
-		goto error;
-	}
 	mutex_exit(&state->cs_lock);
 
 	/* finally register with framework to kick everything off */
@@ -636,16 +603,6 @@ audiocs_resume(dev_info_t *dip)
 
 	state->cs_suspended = B_FALSE;
 
-	for (int i = CS4231_PLAY; i <= CS4231_REC; i++) {
-		CS_engine_t	*eng = state->cs_engines[i];
-
-		audiocs_reset_engine(eng);
-		if (eng->ce_started) {
-			(void) audiocs_start_engine(eng);
-		} else {
-			audiocs_stop_engine(eng);
-		}
-	}
 	mutex_exit(&state->cs_lock);
 
 	/*
@@ -654,6 +611,8 @@ audiocs_resume(dev_info_t *dip)
 	 */
 	(void) pm_raise_power(dip, CS4231_COMPONENT, CS4231_PWR_ON);
 	(void) pm_idle_component(state->cs_dip, CS4231_COMPONENT);
+
+	audio_dev_resume(state->cs_adev);
 
 	return (DDI_SUCCESS);
 }
@@ -731,17 +690,13 @@ audiocs_suspend(dev_info_t *dip)
 	/* get the state structure */
 	state = ddi_get_driver_private(dip);
 
-	ASSERT(!mutex_owned(&state->cs_lock));
-
 	mutex_enter(&state->cs_lock);
 
 	ASSERT(!state->cs_suspended);
 
-	if (state->cs_powered) {
-		/* stop playing and recording */
-		CS4231_DMA_STOP(state, state->cs_engines[CS4231_PLAY]);
-		CS4231_DMA_STOP(state, state->cs_engines[CS4231_REC]);
+	audio_dev_suspend(state->cs_adev);
 
+	if (state->cs_powered) {
 		/* now we can power down the Codec */
 		audiocs_power_down(state);
 		state->cs_powered = B_FALSE;
@@ -749,7 +704,6 @@ audiocs_suspend(dev_info_t *dip)
 	state->cs_suspended = B_TRUE;	/* stop new ops */
 	mutex_exit(&state->cs_lock);
 
-	ASSERT(!mutex_owned(&state->cs_lock));
 	return (DDI_SUCCESS);
 }
 
@@ -1033,6 +987,7 @@ audiocs_chip_init(CS_state_t *state)
 	} else {
 		PUTIDX(state, 0, AFE2_VALID_MASK);
 	}
+
 
 	/* clear the play and capture interrupt flags */
 	SELIDX(state, AFS_REG);
@@ -1371,9 +1326,6 @@ audiocs_configure_input(CS_state_t *state)
 
 	ASSERT(mutex_owned(&state->cs_lock));
 
-	if (state->cs_suspended)
-		return;
-
 	inputs = state->cs_inputs->cc_val;
 	micboost = state->cs_micboost->cc_val;
 	r = (state->cs_igain->cc_val & 0xff);
@@ -1438,9 +1390,6 @@ audiocs_configure_output(CS_state_t *state)
 	rmute = lmute = 0;
 
 	ASSERT(mutex_owned(&state->cs_lock));
-
-	if (state->cs_suspended)
-		return;
 
 	outputs = state->cs_outputs->cc_val;
 
@@ -1710,8 +1659,7 @@ audiocs_set_mgain(void *arg, uint64_t gain)
  * Arguments:
  *	void		*arg		The DMA engine to set up
  *	int		flag		Open flags
- *	unsigned	*fragfrp	Receives number of frames per fragment
- *	unsigned	*nfragsp	Receives number of fragments
+ *	unsigned	*nframesp	Receives number of frames
  *	caddr_t		*bufp		Receives kernel data buffer
  *
  * Returns:
@@ -1719,8 +1667,7 @@ audiocs_set_mgain(void *arg, uint64_t gain)
  *	errno	on failure
  */
 static int
-audiocs_open(void *arg, int flag,
-    unsigned *fragfrp, unsigned *nfragsp, caddr_t *bufp)
+audiocs_open(void *arg, int flag, unsigned *nframesp, caddr_t *bufp)
 {
 	CS_engine_t	*eng = arg;
 	CS_state_t	*state = eng->ce_state;
@@ -1738,16 +1685,10 @@ audiocs_open(void *arg, int flag,
 		audio_dev_warn(state->cs_adev, "power up failed");
 	}
 
-	eng->ce_started = B_FALSE;
 	eng->ce_count = 0;
-
-	*fragfrp = eng->ce_fragfr;
-	*nfragsp = CS4231_NFRAGS;
+	*nframesp = CS4231_NFRAMES;
 	*bufp = eng->ce_kaddr;
 
-	mutex_enter(&state->cs_lock);
-	audiocs_reset_engine(eng);
-	mutex_exit(&state->cs_lock);
 	return (0);
 }
 
@@ -1768,11 +1709,6 @@ audiocs_close(void *arg)
 	CS_engine_t	*eng = arg;
 	CS_state_t	*state = eng->ce_state;
 
-	mutex_enter(&state->cs_lock);
-	audiocs_stop_engine(eng);
-	eng->ce_started = B_FALSE;
-	mutex_exit(&state->cs_lock);
-
 	(void) pm_idle_component(state->cs_dip, CS4231_COMPONENT);
 }
 
@@ -1789,14 +1725,21 @@ audiocs_close(void *arg)
 static void
 audiocs_stop(void *arg)
 {
-	CS_engine_t	*eng = arg;
-	CS_state_t	*state = eng->ce_state;
+	CS_engine_t		*eng = arg;
+	CS_state_t		*state = eng->ce_state;
+	ddi_acc_handle_t	handle = CODEC_HANDLE;
 
 	mutex_enter(&state->cs_lock);
-	if (eng->ce_started) {
-		audiocs_stop_engine(eng);
-		eng->ce_started = B_FALSE;
-	}
+	/*
+	 * Stop the DMA engine.
+	 */
+	CS4231_DMA_STOP(state, eng);
+
+	/*
+	 * Stop the codec.
+	 */
+	SELIDX(state, INTC_REG);
+	ANDIDX(state, ~(eng->ce_codec_en), INTC_VALID_MASK);
 	mutex_exit(&state->cs_lock);
 }
 
@@ -1815,18 +1758,45 @@ audiocs_stop(void *arg)
 static int
 audiocs_start(void *arg)
 {
-	CS_engine_t	*eng = arg;
-	CS_state_t	*state = eng->ce_state;
-	int		rv = 0;
+	CS_engine_t		*eng = arg;
+	CS_state_t		*state = eng->ce_state;
+	ddi_acc_handle_t	handle = CODEC_HANDLE;
+	uint8_t			mask;
+	uint8_t			value;
+	uint8_t			reg;
+	int			rv;
 
 	mutex_enter(&state->cs_lock);
-	if (!eng->ce_started) {
-		if (audiocs_start_engine(eng) == DDI_SUCCESS) {
-			eng->ce_started = B_TRUE;
-		} else {
-			rv = EIO;
-		}
+
+	if (eng->ce_num == CS4231_PLAY) {
+		/* sample rate only set on play side */
+		value = FS_48000 | PDF_STEREO | PDF_LINEAR16NE;
+		reg = FSDF_REG;
+		mask = FSDF_VALID_MASK;
+	} else {
+		value = CDF_STEREO | CDF_LINEAR16NE;
+		reg = CDF_REG;
+		mask = CDF_VALID_MASK;
 	}
+	eng->ce_curoff = 0;
+	eng->ce_curidx = 0;
+
+	SELIDX(state, reg | IAR_MCE);
+	PUTIDX(state, value, mask);
+
+	if (audiocs_poll_ready(state) != DDI_SUCCESS) {
+		rv = EIO;
+	} else if (CS4231_DMA_START(state, eng) != DDI_SUCCESS) {
+		rv = EIO;
+	} else {
+		/*
+		 * Start the codec.
+		 */
+		SELIDX(state, INTC_REG);
+		ORIDX(state, eng->ce_codec_en, INTC_VALID_MASK);
+		rv = 0;
+	}
+
 	mutex_exit(&state->cs_lock);
 	return (rv);
 }
@@ -1906,12 +1876,40 @@ audiocs_rate(void *arg)
 static uint64_t
 audiocs_count(void *arg)
 {
-	CS_engine_t	*eng = arg;
-	CS_state_t	*state = eng->ce_state;
-	uint64_t	val;
+	CS_engine_t		*eng = arg;
+	CS_state_t		*state = eng->ce_state;
+	uint64_t		val;
+	uint32_t		off;
 
 	mutex_enter(&state->cs_lock);
+
+	off = CS4231_DMA_ADDR(state, eng);
+	ASSERT(off >= eng->ce_paddr);
+	off -= eng->ce_paddr;
+
+	/*
+	 * Every now and then, we get a value that is just a wee bit
+	 * too large.  This seems to be a small value related to
+	 * prefetch.  Rather than believe it, we just assume the last
+	 * offset in the buffer.  This should allow us to handle
+	 * wraps, but without inserting bogus sample counts.
+	 */
+	if (off >= CS4231_BUFSZ) {
+		off = CS4231_BUFSZ - 4;
+	}
+
+	off /= 4;
+
+	val = (off >= eng->ce_curoff) ?
+	    off - eng->ce_curoff :
+	    off + CS4231_NFRAMES - eng->ce_curoff;
+
+	eng->ce_count += val;
+	eng->ce_curoff = off;
 	val = eng->ce_count;
+
+	/* while here, possibly reload the next address */
+	CS4231_DMA_RELOAD(state, eng);
 	mutex_exit(&state->cs_lock);
 
 	return (val);
@@ -1936,61 +1934,6 @@ audiocs_sync(void *arg, unsigned nframes)
 }
 
 /*
- * audiocs_qlen()
- *
- * Description:
- *	This is called by the framework to determine on-device queue length.
- *
- * Arguments:
- *	void	*arg		The DMA engine to query
- *
- * Returns:
- *	hardware queue length not reported by count (0 for this device)
- */
-static unsigned
-audiocs_qlen(void *arg)
-{
-	CS_engine_t	*eng = arg;
-
-	return (eng->ce_fragfr);
-}
-
-
-/*
- * audiocs_reset_engine()
- *
- * Description:
- *	This routine resets the DMA engine pareparing it for work.
- *
- * Arguments:
- *	CS_engine_t	*engine		DMA engine to stop.
- */
-void
-audiocs_reset_engine(CS_engine_t *eng)
-{
-	CS_state_t	*state = eng->ce_state;
-	uint8_t		mask;
-	uint8_t		value;
-	uint8_t		reg;
-
-	if (eng->ce_num == CS4231_PLAY) {
-		/* sample rate only set on play side */
-		value = FS_48000 | PDF_STEREO | PDF_LINEAR16NE;
-		reg = FSDF_REG;
-		mask = FSDF_VALID_MASK;
-	} else {
-		value = CDF_STEREO | CDF_LINEAR16NE;
-		reg = CDF_REG;
-		mask = CDF_VALID_MASK;
-	}
-
-	SELIDX(state, reg | IAR_MCE);
-	PUTIDX(state, value, mask);
-
-	(void) audiocs_poll_ready(state);
-}
-
-/*
  * audiocs_alloc_engine()
  *
  * Description:
@@ -2007,7 +1950,6 @@ audiocs_reset_engine(CS_engine_t *eng)
 int
 audiocs_alloc_engine(CS_state_t *state, int num)
 {
-	char			*prop;
 	unsigned		caps;
 	int			dir;
 	int			rc;
@@ -2016,6 +1958,7 @@ audiocs_alloc_engine(CS_state_t *state, int num)
 	CS_engine_t		*eng;
 	uint_t			ccnt;
 	ddi_dma_cookie_t	dmac;
+	size_t			bufsz;
 
 	static ddi_device_acc_attr_t buf_attr = {
 		DDI_DEVICE_ATTR_V0,
@@ -2033,14 +1976,12 @@ audiocs_alloc_engine(CS_state_t *state, int num)
 
 	switch (num) {
 	case CS4231_REC:
-		prop = "record-interrupts";
 		dir = DDI_DMA_READ;
 		caps = ENGINE_INPUT_CAP;
 		eng->ce_syncdir = DDI_DMA_SYNC_FORKERNEL;
 		eng->ce_codec_en = INTC_CEN;
 		break;
 	case CS4231_PLAY:
-		prop = "play-interrupts";
 		dir = DDI_DMA_WRITE;
 		caps = ENGINE_OUTPUT_CAP;
 		eng->ce_syncdir = DDI_DMA_SYNC_FORDEV;
@@ -2053,32 +1994,6 @@ audiocs_alloc_engine(CS_state_t *state, int num)
 	}
 	state->cs_engines[num] = eng;
 
-	eng->ce_intrs = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, prop, CS4231_INTS);
-
-	/* make sure the values are good */
-	if (eng->ce_intrs < CS4231_MIN_INTS) {
-		audio_dev_warn(adev, "%s too low, %d, resetting to %d",
-		    prop, eng->ce_intrs, CS4231_INTS);
-		eng->ce_intrs = CS4231_INTS;
-	} else if (eng->ce_intrs > CS4231_MAX_INTS) {
-		audio_dev_warn(adev, "%s too high, %d, resetting to %d",
-		    prop, eng->ce_intrs, CS4231_INTS);
-		eng->ce_intrs = CS4231_INTS;
-	}
-
-	/*
-	 * Figure out how much space we need.  Sample rate is 48kHz, and
-	 * we need to store 8 chunks.  (Note that this means that low
-	 * interrupt frequencies will require more RAM.  We could probably
-	 * do some cleverness to use a more dynamic list.)
-	 */
-	eng->ce_fragfr = 48000 / eng->ce_intrs;
-	eng->ce_fragfr &= ~(64 - 1);	/* align @ 64B boundaries */
-	eng->ce_fragfr = max(eng->ce_fragfr, 64);
-	eng->ce_fragsz = eng->ce_fragfr * 4;	/* each frame is 4 bytes */
-	eng->ce_size = eng->ce_fragsz * CS4231_NFRAGS;
-
 	/* allocate dma handle */
 	rc = ddi_dma_alloc_handle(dip, CS4231_DMA_ATTR(state), DDI_DMA_SLEEP,
 	    NULL, &eng->ce_dmah);
@@ -2087,9 +2002,9 @@ audiocs_alloc_engine(CS_state_t *state, int num)
 		return (DDI_FAILURE);
 	}
 	/* allocate DMA buffer */
-	rc = ddi_dma_mem_alloc(eng->ce_dmah, eng->ce_size, &buf_attr,
+	rc = ddi_dma_mem_alloc(eng->ce_dmah, CS4231_BUFSZ, &buf_attr,
 	    DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL, &eng->ce_kaddr,
-	    &eng->ce_size, &eng->ce_acch);
+	    &bufsz, &eng->ce_acch);
 	if (rc == DDI_FAILURE) {
 		audio_dev_warn(adev, "dma_mem_alloc failed");
 		return (DDI_FAILURE);
@@ -2097,7 +2012,7 @@ audiocs_alloc_engine(CS_state_t *state, int num)
 
 	/* bind DMA buffer */
 	rc = ddi_dma_addr_bind_handle(eng->ce_dmah, NULL,
-	    eng->ce_kaddr, eng->ce_size, dir | DDI_DMA_CONSISTENT,
+	    eng->ce_kaddr, CS4231_BUFSZ, dir | DDI_DMA_CONSISTENT,
 	    DDI_DMA_SLEEP, NULL, &dmac, &ccnt);
 	if ((rc != DDI_DMA_MAPPED) || (ccnt != 1)) {
 		audio_dev_warn(adev,
@@ -2105,11 +2020,7 @@ audiocs_alloc_engine(CS_state_t *state, int num)
 		return (DDI_FAILURE);
 	}
 
-	/* save off phys addresses for each frag */
-	for (int i = 0; i < CS4231_NFRAGS; i++) {
-		eng->ce_paddr[i] = dmac.dmac_address;
-		dmac.dmac_address += eng->ce_fragsz;
-	}
+	eng->ce_paddr = dmac.dmac_address;
 
 	eng->ce_engine = audio_engine_alloc(&audiocs_engine_ops, caps);
 	if (eng->ce_engine == NULL) {
@@ -2143,7 +2054,7 @@ audiocs_free_engine(CS_engine_t *eng)
 		audio_dev_remove_engine(adev, eng->ce_engine);
 		audio_engine_free(eng->ce_engine);
 	}
-	if (eng->ce_paddr[0]) {
+	if (eng->ce_paddr) {
 		(void) ddi_dma_unbind_handle(eng->ce_dmah);
 	}
 	if (eng->ce_acch) {
@@ -2153,83 +2064,6 @@ audiocs_free_engine(CS_engine_t *eng)
 		ddi_dma_free_handle(&eng->ce_dmah);
 	}
 	kmem_free(eng, sizeof (*eng));
-}
-
-/*
- * audiocs_start_port()
- *
- * Description:
- *	This routine starts the DMA engine.
- *
- * Arguments:
- *	CS_engine_t	*eng		Port of DMA engine to start.
- *
- * Returns:
- *	DDI_SUCCESS	DMA engine started.
- *	DDI_FAILURE	DMA engine not started.
- */
-int
-audiocs_start_engine(CS_engine_t *eng)
-{
-	CS_state_t		*state = eng->ce_state;
-	ddi_acc_handle_t	handle = CODEC_HANDLE;
-
-	ASSERT(mutex_owned(&state->cs_lock));
-
-	/*
-	 * If we are suspended, we can't touch hardware.
-	 */
-	if (state->cs_suspended)
-		return (DDI_SUCCESS);
-
-	/*
-	 * Start the DMA engine.
-	 */
-	if (CS4231_DMA_START(state, eng) != DDI_SUCCESS)
-		return (DDI_FAILURE);
-
-	/*
-	 * Start the codec.
-	 */
-	SELIDX(state, INTC_REG);
-	ORIDX(state, eng->ce_codec_en, INTC_VALID_MASK);
-
-	return (DDI_SUCCESS);
-}
-
-/*
- * audiocs_stop_engine()
- *
- * Description:
- *	This routine stop the DMA engine.
- *
- * Arguments:
- *	CS_engine_t	*eng		DMA engine to stop.
- */
-void
-audiocs_stop_engine(CS_engine_t *eng)
-{
-	CS_state_t	*state = eng->ce_state;
-	ddi_acc_handle_t	handle = CODEC_HANDLE;
-
-	ASSERT(mutex_owned(&state->cs_lock));
-
-	/*
-	 * If we are suspended, we can't touch hardware.
-	 */
-	if (state->cs_suspended)
-		return;
-
-	/*
-	 * Stop the DMA engine.
-	 */
-	CS4231_DMA_STOP(state, eng);
-
-	/*
-	 * Stop the codec.
-	 */
-	SELIDX(state, INTC_REG);
-	ANDIDX(state, ~(eng->ce_codec_en), INTC_VALID_MASK);
 }
 
 /*
@@ -2311,9 +2145,6 @@ audiocs_poll_ready(CS_state_t *state)
  *	ddi_acc_handle_t handle		A handle to the device's registers
  *	uint8_t		addr		The register address to program
  *	int		reg		The register to select
- *
- * Returns:
- *	void
  */
 void
 #ifdef	DEBUG
@@ -2364,9 +2195,6 @@ audiocs_sel_index(CS_state_t *state, uint8_t reg)
  *	CS_state_t	state		Handle to this device
  *	uint8_t		mask		Mask to not set reserved register bits
  *	int		val		The value to program
- *
- * Returns:
- *	void
  */
 void
 #ifdef DEBUG

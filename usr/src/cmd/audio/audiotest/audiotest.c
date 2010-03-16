@@ -21,7 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -386,14 +386,14 @@ test_device(char *dn, int flags, testcfg_t *tcfg)
 		perror(dn);
 		errno = err;
 		describe_error(errno);
-		return (0);
+		return (-1);
 	}
 
 	ainfo.dev = -1;
 	if (ioctl(fd, SNDCTL_AUDIOINFO, &ainfo) == -1) {
 		perror("SNDCTL_AUDIOINFO");
 		(void) close(fd);
-		return (1);
+		return (-1);
 	}
 
 	(void) printf(_("\n*** Scanning sound adapter #%d ***\n"),
@@ -405,13 +405,13 @@ test_device(char *dn, int flags, testcfg_t *tcfg)
 	if (!ainfo.enabled) {
 		(void) printf(_("  - Device not present - Skipping\n"));
 		(void) close(fd);
-		return (1);
+		return (0);
 	}
 
 	if (!(ainfo.caps & PCM_CAP_OUTPUT)) {
 		(void) printf(_("  - Skipping input only device\n"));
 		(void) close(fd);
-		return (1);
+		return (0);
 	}
 
 	(void) printf(_("  - Performing audio playback test... "));
@@ -419,6 +419,9 @@ test_device(char *dn, int flags, testcfg_t *tcfg)
 
 	code = testdsp(fd, flags, tcfg);
 	(void) close(fd);
+	if (code < 0) {
+		return (code);
+	}
 
 	return (code == 1);
 }
@@ -472,6 +475,7 @@ main(int argc, char *argv[])
 	int maxdev;
 	int flags = 0;
 	int status = 0;
+	int errors = 0;
 	int numdev;
 	extern int optind;
 	testcfg_t	*tcfg;
@@ -540,12 +544,18 @@ main(int argc, char *argv[])
 	do {
 		char *dn;
 		oss_audioinfo	ainfo;
+		int rv;
 
+		status = 0;
 		if (numdev > 0) {
 			for (t = 0; t < numdev; t++) {
 				dn = argv[optind + t];
-				if (!test_device(dn, flags, tcfg))
+				rv = test_device(dn, flags, tcfg);
+				if (rv < 0) {
+					errors++;
+				} else if (rv) {
 					status++;
+				}
 			}
 		} else {
 			for (t = 0; t < maxdev; t++) {
@@ -557,17 +567,21 @@ main(int argc, char *argv[])
 					continue;
 				}
 				dn = ainfo.devnode;
-				if (!test_device(dn, flags, tcfg))
+				rv = test_device(dn, flags, tcfg);
+				if (rv < 0) {
+					errors++;
+				} else if (rv) {
 					status++;
+				}
 			}
 		}
 
-		if (status == 0)
+		if (errors == 0)
 			(void) printf(_("\n*** All tests completed OK ***\n"));
 		else
 			(void) printf(_("\n*** Errors were detected ***\n"));
 
-	} while (flags & TF_LOOP);
+	} while (status && (flags & TF_LOOP));
 
 	(void) close(mixerfd);
 

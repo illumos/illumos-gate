@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,10 +54,6 @@ extern "C" {
  */
 #define	CS4231_NAME		"audiocs"
 #define	CS4231_MOD_NAME		"CS4231 audio driver"
-
-#define	CS4231_INTS		(175)		/* default interrupt rate */
-#define	CS4231_MIN_INTS		(10)		/* minimum interrupt rate */
-#define	CS4231_MAX_INTS		(2000)		/* maximum interrupt rate */
 
 /*
  * Implementation specific header file for the audiocs device driver.
@@ -148,15 +144,10 @@ typedef struct cs4231_apc cs4231_apc_t;
 #define	APC_CINTR_ENABLE	(APC_CIE|APC_CXI_EN)
 #define	APC_COMMON_ENABLE	(APC_IE|APC_EIE)
 
-#define	APC_PLAY_ENABLE		(APC_PINTR_MASK|APC_COMMON_MASK|\
-			APC_PINTR_ENABLE|APC_COMMON_ENABLE|APC_PDMA_GO)
-
-#define	APC_PLAY_DISABLE	(APC_PINTR_MASK|APC_PINTR_ENABLE|APC_PDMA_GO)
-
-#define	APC_CAP_ENABLE		(APC_CINTR_MASK|APC_COMMON_MASK|\
-			APC_CINTR_ENABLE|APC_COMMON_ENABLE|APC_CDMA_GO)
-
-#define	APC_CAP_DISABLE		(APC_CINTR_MASK|APC_CINTR_ENABLE|APC_CDMA_GO)
+#define	APC_PLAY_ENABLE		(APC_PDMA_GO)
+#define	APC_PLAY_DISABLE	(APC_PDMA_GO)
+#define	APC_CAP_ENABLE		(APC_CDMA_GO)
+#define	APC_CAP_DISABLE		(APC_CDMA_GO)
 
 /*
  * These are the registers for the EBUS2 DMA channel interface to the
@@ -219,10 +210,10 @@ typedef struct cs4231_eb2regs cs4231_eb2regs_t;
 #define	EB2_PCLEAR_RESET_VALUE	(EB2_READ|EB2_EN_NEXT|EB2_EN_CNT)
 #define	EB2_RCLEAR_RESET_VALUE	(EB2_WRITE|EB2_EN_NEXT|EB2_EN_CNT)
 
-#define	EB2_PLAY_ENABLE		(EB2_INT_EN|EB2_EN_DMA|EB2_EN_CNT|EB2_64|\
+#define	EB2_PLAY_ENABLE		(EB2_EN_DMA|EB2_EN_CNT|EB2_64|\
 					EB2_PCLEAR_RESET_VALUE)
 
-#define	EB2_REC_ENABLE		(EB2_INT_EN|EB2_EN_DMA|EB2_EN_CNT|EB2_64|\
+#define	EB2_REC_ENABLE		(EB2_EN_DMA|EB2_EN_CNT|EB2_64|\
 					EB2_RCLEAR_RESET_VALUE)
 
 #define	EB2_FIFO_DRAIN		(EB2_DRAIN|EB2_CYC_PENDING)
@@ -239,7 +230,10 @@ typedef struct cs4231_eb2regs cs4231_eb2regs_t;
 #define	CS4231_300MS			(300*1000)
 #define	CS4231_PLAY			0
 #define	CS4231_REC			1
-#define	CS4231_NFRAGS			8
+#define	CS4231_NFRAMES			4096
+#define	CS4231_NFRAGS			2
+#define	CS4231_FRAGSZ			((CS4231_NFRAMES / CS4231_NFRAGS) * 4)
+#define	CS4231_BUFSZ			(CS4231_NFRAMES * 4)
 
 /*
  * Supported dma engines and the ops vector
@@ -305,19 +299,15 @@ struct CS_engine {
 	audio_engine_t		*ce_engine;
 	int			ce_num;
 	unsigned		ce_syncdir;
-	unsigned		ce_intrs;
-	unsigned		ce_fragfr;
-	unsigned		ce_fragsz;
-	unsigned		ce_nframes;
-	unsigned		ce_cfrag;
 	boolean_t		ce_started;
 	uint64_t		ce_count;
 
-	size_t			ce_size;
 	caddr_t			ce_kaddr;
 	ddi_dma_handle_t	ce_dmah;
 	ddi_acc_handle_t	ce_acch;
-	uint32_t		ce_paddr[CS4231_NFRAGS];
+	uint32_t		ce_paddr;
+	uint32_t		ce_curoff;
+	int			ce_curidx;
 
 	/* registers (EB2 only) */
 	ddi_acc_handle_t	ce_regsh;
@@ -340,8 +330,6 @@ struct CS_ctrl {
 struct CS_state {
 	kmutex_t		cs_lock;	/* state protection lock */
 	kcondvar_t		cs_cv;		/* suspend/resume cond. var. */
-	ddi_iblock_cookie_t	cs_iblock;	/* iblock cookie */
-	kstat_t			*cs_ksp;	/* kernel statistics */
 	dev_info_t		*cs_dip;	/* used by cs4231_getinfo() */
 	audio_dev_t		*cs_adev;	/* audio device state */
 
@@ -374,8 +362,6 @@ struct CS_state {
 	CS_ctrl_t		*cs_inputs;
 };
 
-#define	KIOP(X)			((kstat_intr_t *)(X->cs_ksp->ks_data))
-
 /*
  * DMA ops vector definition
  */
@@ -385,11 +371,11 @@ struct cs4231_dma_ops {
 	int	(*cs_dma_map_regs)(CS_state_t *);
 	void	(*cs_dma_unmap_regs)(CS_state_t *);
 	void	(*cs_dma_reset)(CS_state_t *);
-	int	(*cs_dma_add_intr)(CS_state_t *);
-	void	(*cs_dma_rem_intr)(CS_state_t *);
 	int 	(*cs_dma_start)(CS_engine_t *);
 	void	(*cs_dma_stop)(CS_engine_t *);
 	void	(*cs_dma_power)(CS_state_t *, int);
+	void	(*cs_dma_reload)(CS_engine_t *);
+	uint32_t	(*cs_dma_addr)(CS_engine_t *);
 };
 typedef struct cs4231_dma_ops cs4231_dma_ops_t;
 
@@ -399,12 +385,12 @@ extern cs4231_dma_ops_t cs4231_eb2dma_ops;
 #define	CS4231_DMA_MAP_REGS(S)		((S)->cs_dma_ops->cs_dma_map_regs)(S)
 #define	CS4231_DMA_UNMAP_REGS(S)	((S)->cs_dma_ops->cs_dma_unmap_regs)(S)
 #define	CS4231_DMA_RESET(S)		((S)->cs_dma_ops->cs_dma_reset)(S)
-#define	CS4231_DMA_ADD_INTR(S)		((S)->cs_dma_ops->cs_dma_add_intr)(S)
-#define	CS4231_DMA_REM_INTR(S)		((S)->cs_dma_ops->cs_dma_rem_intr)(S)
 #define	CS4231_DMA_START(S, E)		((S)->cs_dma_ops->cs_dma_start)(E)
 #define	CS4231_DMA_STOP(S, E)		((S)->cs_dma_ops->cs_dma_stop)(E)
 #define	CS4231_DMA_POWER(S, L)		((S)->cs_dma_ops->cs_dma_power)(S, L)
 #define	CS4231_DMA_ATTR(S)		((S)->cs_dma_ops->cs_dma_attr)
+#define	CS4231_DMA_RELOAD(S, E)		((S)->cs_dma_ops->cs_dma_reload)(E)
+#define	CS4231_DMA_ADDR(S, E)		((S)->cs_dma_ops->cs_dma_addr)(E)
 
 /*
  * Useful bit twiddlers

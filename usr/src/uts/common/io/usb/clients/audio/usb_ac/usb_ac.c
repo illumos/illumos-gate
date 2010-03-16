@@ -326,7 +326,7 @@ static struct modlinkage usb_ac_modlinkage = {
 static int usb_audio_register(usb_ac_state_t *);
 static int usb_audio_unregister(usb_ac_state_t *);
 
-static int usb_engine_open(void *, int, unsigned *, unsigned *, caddr_t *);
+static int usb_engine_open(void *, int, unsigned *, caddr_t *);
 static void usb_engine_close(void *);
 static uint64_t usb_engine_count(void *);
 static int usb_engine_start(void *);
@@ -5340,7 +5340,6 @@ usb_ac_get_audio(void *handle, void *buf, int samples)
 	unsigned frames;
 	unsigned i;
 	size_t sz;
-	int bufcnt = 0;
 	caddr_t bp = buf;
 
 	mutex_enter(&engp->lock);
@@ -5362,15 +5361,12 @@ usb_ac_get_audio(void *handle, void *buf, int samples)
 
 		sz = (frames << engp->frsmshift) << engp->smszshift;
 
-		bufcnt++;
-
 		/* must move data before updating framework */
 		usb_eng_bufio(engp, bp, sz);
 		engp->frames += frames;
 		bp += sz;
 
 		mutex_exit(&engp->lock);
-		audio_engine_consume(engp->af_engp);
 	}
 
 	mutex_enter(&engp->lock);
@@ -5393,7 +5389,6 @@ usb_ac_send_audio(void *handle, void *buf, int samples)
 	unsigned frames;
 	unsigned i;
 	size_t sz;
-	int bufcnt = 0;
 	caddr_t bp = buf;
 
 	mutex_enter(&engp->lock);
@@ -5416,15 +5411,12 @@ usb_ac_send_audio(void *handle, void *buf, int samples)
 
 		sz = (frames << engp->frsmshift) << engp->smszshift;
 
-		bufcnt++;
-
 		/* must move data before updating framework */
 		usb_eng_bufio(engp, bp, sz);
 		engp->frames += frames;
 		bp += sz;
 
 		mutex_exit(&engp->lock);
-		audio_engine_produce(engp->af_engp);
 	}
 
 	mutex_enter(&engp->lock);
@@ -5439,15 +5431,14 @@ usb_ac_send_audio(void *handle, void *buf, int samples)
  * **************************************************************************
  * audio framework engine callbacks
  */
-/*ARGSUSED*/
 static int
-usb_engine_open(void *arg, int flag,
-    unsigned *fragfrp, unsigned *nfragsp, caddr_t *bufp)
+usb_engine_open(void *arg, int flag, unsigned *nframesp, caddr_t *bufp)
 {
 	usb_audio_eng_t *engp = (usb_audio_eng_t *)arg;
 	usb_ac_state_t *statep = engp->statep;
 	int rv = EIO;
 
+	_NOTE(ARGUNUSED(flag));
 
 	if (usb_ac_open(statep->usb_ac_dip) != USB_SUCCESS) {
 
@@ -5504,8 +5495,7 @@ usb_engine_open(void *arg, int flag,
 	engp->started = B_FALSE;
 	engp->busy = B_FALSE;
 
-	*fragfrp = engp->fragfr;
-	*nfragsp = engp->nfrags;
+	*nframesp = engp->nfrags * engp->fragfr;
 	*bufp = engp->bufp;
 
 	mutex_exit(&engp->lock);
@@ -5539,14 +5529,12 @@ usb_engine_close(void *arg)
 	usb_audio_eng_t *engp = (usb_audio_eng_t *)arg;
 	usb_ac_state_t *statep = engp->statep;
 
-	audio_engine_unlock(engp->af_engp);
 	mutex_enter(&engp->lock);
 	while (engp->busy) {
 		cv_wait(&engp->usb_audio_cv, &engp->lock);
 	}
 
 	mutex_exit(&engp->lock);
-	audio_engine_lock(engp->af_engp);
 
 	if (statep->flags & AD_SETUP) {
 		usb_ac_teardown(statep, engp);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -362,7 +362,6 @@ struct _emu10k_portc_t {
 
 	boolean_t		started;
 	boolean_t		active;
-	unsigned		fragfr;
 	unsigned		nframes;
 	unsigned		nfrags;
 	unsigned		fragsz;
@@ -384,13 +383,10 @@ struct _emu10k_portc_t {
 struct _emu10k_devc_t {
 	dev_info_t		*dip;
 	audio_dev_t		*adev;
-	kstat_t			*ksp;
-	boolean_t		suspended;
 	ddi_acc_handle_t	pcih;
 	ddi_acc_handle_t	regsh;
 	caddr_t			regs;
 	kmutex_t		mutex;
-	ddi_intr_handle_t	ih;
 
 	/*
 	 * Page table
@@ -445,8 +441,6 @@ struct _emu10k_devc_t {
 
 #define	INL(devc, reg)		ddi_get32(devc->regsh, (void *)(reg))
 #define	OUTL(devc, val, reg)	ddi_put32(devc->regsh, (void *)(reg), (val))
-
-#define	EMU10K_KIOP(X)	((kstat_intr_t *)(X->ksp->ks_data))
 
 #endif	/* _KERNEL */
 

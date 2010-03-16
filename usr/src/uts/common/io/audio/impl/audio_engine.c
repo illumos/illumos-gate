@@ -40,6 +40,16 @@
  * Audio Engine functions.
  */
 
+/*
+ * Globals
+ */
+uint_t		audio_intrhz = AUDIO_INTRHZ;
+/*
+ * We need to operate at fairly high interrupt priority to avoid
+ * underruns due to other less time sensitive processing.
+ */
+int		audio_priority = DDI_IPL_8;
+
 audio_dev_t *
 audio_dev_alloc(dev_info_t *dip, int instance)
 {
@@ -74,7 +84,8 @@ audio_dev_alloc(dev_info_t *dip, int instance)
 	d->d_pcmvol = 100;
 	mutex_init(&d->d_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&d->d_cv, NULL, CV_DRIVER, NULL);
-	rw_init(&d->d_ctrl_lock, NULL, RW_DRIVER, NULL);
+	mutex_init(&d->d_ctrl_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&d->d_ctrl_cv, NULL, CV_DRIVER, NULL);
 	list_create(&d->d_clients, sizeof (struct audio_client),
 	    offsetof(struct audio_client, c_dev_linkage));
 	list_create(&d->d_engines, sizeof (struct audio_engine),
@@ -93,6 +104,7 @@ void
 audio_dev_free(audio_dev_t *d)
 {
 	struct audio_infostr *isp;
+
 	while ((isp = list_remove_head(&d->d_hwinfo)) != NULL) {
 		kmem_free(isp, sizeof (*isp));
 	}
@@ -103,9 +115,10 @@ audio_dev_free(audio_dev_t *d)
 	list_destroy(&d->d_engines);
 	list_destroy(&d->d_controls);
 	list_destroy(&d->d_clients);
-	rw_destroy(&d->d_ctrl_lock);
+	mutex_destroy(&d->d_ctrl_lock);
 	mutex_destroy(&d->d_lock);
 	cv_destroy(&d->d_cv);
+	cv_destroy(&d->d_ctrl_cv);
 	kmem_free(d, sizeof (*d));
 }
 
@@ -136,72 +149,36 @@ audio_dev_add_info(audio_dev_t *d, const char *info)
 	}
 }
 
-void
-audio_engine_consume(audio_engine_t *e)
-{
-	mutex_enter(&e->e_lock);
-	e->e_tail = ENG_COUNT(e);
-	if (e->e_tail > e->e_head) {
-		/* want more data than we have, not much we can do */
-		e->e_errors++;
-		e->e_underruns++;
-	}
-	auimpl_output_callback(e);
-	mutex_exit(&e->e_lock);
-}
-
-void
-audio_engine_produce(audio_engine_t *e)
-{
-	mutex_enter(&e->e_lock);
-	e->e_head = ENG_COUNT(e);
-	if ((e->e_head - e->e_tail) > e->e_nframes) {
-		/* no room for engine data, not much we can do */
-		e->e_errors++;
-		e->e_overruns++;
-	}
-	auimpl_input_callback(e);
-	mutex_exit(&e->e_lock);
-}
-
-void
-audio_engine_reset(audio_engine_t *e)
+static void
+auimpl_engine_reset(audio_engine_t *e)
 {
 	char	*buf;
 	char	*ptr;
-	int	nfr;
-	int	tail;
+	int	nfr, resid, cnt;
+	int	tidx;
 
-
-	if ((e->e_flags & (ENGINE_INPUT | ENGINE_OUTPUT)) == 0) {
-		/* engine not open, nothing to do */
-		return;
-	}
-
-	buf = kmem_alloc(e->e_nbytes, KM_SLEEP);
-	ptr = buf;
-
-	mutex_enter(&e->e_lock);
-
-	tail = e->e_tidx;
+	tidx = e->e_tidx;
 	nfr = min(e->e_head - e->e_tail, e->e_nframes);
-	while (nfr) {
-		int	cnt;
+	buf = kmem_alloc(nfr * e->e_framesz, KM_SLEEP);
+	ptr = buf;
+	cnt = 0;
+
+	ASSERT(e->e_nframes);
+
+	for (resid = nfr; resid; resid -= cnt) {
 		int	nbytes;
 
-		cnt = min((e->e_nframes - tail), nfr);
+		cnt = min((e->e_nframes - tidx), resid);
 		nbytes = cnt * e->e_framesz;
 
-		bcopy(e->e_data + (tail * e->e_framesz), ptr, nbytes);
+		bcopy(e->e_data + (tidx * e->e_framesz), ptr, nbytes);
 		ptr += nbytes;
-		tail += cnt;
-		if (tail >= e->e_framesz) {
-			tail -= e->e_framesz;
+		tidx += cnt;
+		if (tidx == e->e_nframes) {
+			tidx = 0;
 		}
-		nfr -= cnt;
 	}
 
-	nfr = min(e->e_head - e->e_tail, e->e_nframes);
 	if (e->e_flags & ENGINE_INPUT) {
 		/* record */
 		e->e_hidx = 0;
@@ -214,16 +191,18 @@ audio_engine_reset(audio_engine_t *e)
 
 	/* relocate from scratch area to destination */
 	bcopy(buf, e->e_data + (e->e_tidx * e->e_framesz), nfr * e->e_framesz);
-	mutex_exit(&e->e_lock);
-
-	kmem_free(buf, e->e_nbytes);
+	kmem_free(buf, nfr * e->e_framesz);
 }
 
+static volatile uint_t auimpl_engno = 0;
+
 audio_engine_t *
-audio_engine_alloc(audio_engine_ops_t *ops, unsigned flags)
+audio_engine_alloc(audio_engine_ops_t *ops, uint_t flags)
 {
 	int i;
 	audio_engine_t *e;
+	char tname[32];
+	int num;
 
 	if (ops->audio_engine_version != AUDIO_ENGINE_VERSION) {
 		audio_dev_warn(NULL, "audio engine version mismatch: %d != %d",
@@ -238,7 +217,9 @@ audio_engine_alloc(audio_engine_ops_t *ops, unsigned flags)
 		return (NULL);
 	}
 	e->e_ops = *ops;
-	mutex_init(&e->e_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&e->e_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(audio_priority));
+	cv_init(&e->e_cv, NULL, CV_DRIVER, NULL);
 	list_create(&e->e_streams, sizeof (struct audio_stream),
 	    offsetof(struct audio_stream, s_eng_linkage));
 
@@ -251,6 +232,10 @@ audio_engine_alloc(audio_engine_ops_t *ops, unsigned flags)
 			return (NULL);
 		}
 	}
+
+	num = atomic_inc_uint_nv(&auimpl_engno);
+
+	(void) snprintf(tname, sizeof (tname), "audio_engine_%d", num);
 
 	e->e_flags = flags & ENGINE_DRIVER_FLAGS;
 	return (e);
@@ -267,8 +252,10 @@ audio_engine_free(audio_engine_t *e)
 			    sizeof (int32_t) * AUDIO_CHBUFS);
 		}
 	}
+
 	list_destroy(&e->e_streams);
 	mutex_destroy(&e->e_lock);
+	cv_destroy(&e->e_cv);
 	kmem_free(e, sizeof (*e));
 }
 
@@ -377,11 +364,12 @@ auimpl_engine_open(audio_dev_t *d, int fmts, int flags, audio_stream_t *sp)
 {
 	audio_engine_t	*e = NULL;
 	list_t		*list;
-	unsigned	caps;
+	uint_t		caps;
 	int		priority = 0;
 	int		rv = ENODEV;
 	int		sampsz;
 	int		i;
+	int		fragfr;
 
 	/*
 	 * Engine selection:
@@ -411,6 +399,11 @@ auimpl_engine_open(audio_dev_t *d, int fmts, int flags, audio_stream_t *sp)
 	 * and output engines.
 	 */
 
+	/* if engine suspended, wait for it not to be */
+	while (d->d_suspended) {
+		cv_wait(&d->d_ctrl_cv, &d->d_lock);
+	}
+
 again:
 
 	for (audio_engine_t *t = list_head(list); t; t = list_next(list, t)) {
@@ -418,9 +411,17 @@ again:
 
 		/* make sure the engine can do what we want it to */
 		mutex_enter(&t->e_lock);
+
 		if ((((t->e_flags & caps) & caps) == 0) ||
 		    ((ENG_FORMAT(t) & fmts) == 0)) {
 			mutex_exit(&t->e_lock);
+			continue;
+		}
+
+		/* if in failed state, don't assign a new stream here */
+		if (t->e_failed) {
+			mutex_exit(&t->e_lock);
+			rv = EIO;
 			continue;
 		}
 
@@ -558,6 +559,13 @@ again:
 		goto done;
 	}
 
+	fragfr = e->e_rate / audio_intrhz;
+	if ((fragfr > AUDIO_CHBUFS) || (fragfr < 1)) {
+		audio_dev_warn(d, "invalid fragment configration");
+		rv = EINVAL;
+		goto done;
+	}
+
 	/* sanity test a few values */
 	if ((e->e_nchan < 0) || (e->e_nchan > AUDIO_MAX_CHANNELS) ||
 	    (e->e_rate < 5000) || (e->e_rate > 192000)) {
@@ -566,52 +574,44 @@ again:
 		goto done;
 	}
 
-	rv = ENG_OPEN(e, &e->e_fragfr, &e->e_nfrags, &e->e_data);
+	rv = ENG_OPEN(e, &e->e_nframes, &e->e_data);
 	if (rv != 0) {
 		audio_dev_warn(d, "unable to open engine");
 		goto done;
 	}
-	if ((e->e_fragfr < 1) || (e->e_data == NULL)) {
+	if ((e->e_nframes <= (fragfr * 2)) || (e->e_data == NULL)) {
 		audio_dev_warn(d, "improper engine configuration");
 		rv = EINVAL;
 		goto done;
 	}
 
-	if ((e->e_fragfr > AUDIO_CHBUFS) || (e->e_nfrags < 2)) {
-		rv = EINVAL;
-		audio_dev_warn(d, "invalid fragment configuration");
-		goto done;
-	}
-
 	e->e_framesz = e->e_nchan * sampsz;
-	e->e_fragbytes = e->e_fragfr * e->e_framesz;
-	e->e_nframes = e->e_nfrags * e->e_fragfr;
-	e->e_intrs = e->e_rate / e->e_fragfr;
-	e->e_nbytes = e->e_nframes * e->e_framesz;
+	e->e_intrs = audio_intrhz;
+	e->e_fragfr = fragfr;
 	e->e_head = 0;
 	e->e_tail = 0;
 	e->e_hidx = 0;
 	e->e_tidx = 0;
 	e->e_limiter_state = 0x10000;
-	bzero(e->e_data, e->e_nbytes);
+	bzero(e->e_data, e->e_nframes * e->e_framesz);
 
 	if (e->e_ops.audio_engine_playahead == NULL) {
-		e->e_playahead = (e->e_fragfr * 3) / 2;
+		e->e_playahead = (fragfr * 3) / 2;
 	} else {
 		e->e_playahead = ENG_PLAYAHEAD(e);
 		/*
 		 * Need to have at least a fragment plus some extra to
 		 * avoid underruns.
 		 */
-		if (e->e_playahead < ((e->e_fragfr * 3) / 2)) {
-			e->e_playahead = (e->e_fragfr * 3) / 2;
+		if (e->e_playahead < ((fragfr * 3) / 2)) {
+			e->e_playahead = (fragfr * 3) / 2;
 		}
 
 		/*
 		 * Impossible to queue more frames than FIFO can hold.
 		 */
 		if (e->e_playahead > e->e_nframes) {
-			e->e_playahead = (e->e_fragfr * 3) / 2;
+			e->e_playahead = (fragfr * 3) / 2;
 		}
 	}
 
@@ -632,24 +632,26 @@ again:
 	 * starting up.
 	 */
 	if (flags & ENGINE_OUTPUT) {
-		auimpl_output_callback(e);
+		auimpl_output_preload(e);
 	}
 
 	/*
-	 * Start the engine up now.
-	 *
-	 * AC3: Note that this will need to be modified for AC3, since
-	 * for AC3 we can't start the device until we actually have
-	 * some data for it from the application.  Probably the best
-	 * way to do this would be to add a flag, ENGINE_DEFERRED or
-	 * somesuch.
+	 * Arrange for the engine to be started.  We defer this to the
+	 * periodic callback, to ensure that the start happens near
+	 * the edge of the periodic callback.  This is necessary to
+	 * ensure that the first fragment processed is about the same
+	 * size as the usual fragment size.  (Basically, the problem
+	 * is that we have only 10 msec resolution with the periodic
+	 * interface, whch is rather unfortunate.)
 	 */
-	if (e->e_ops.audio_engine_start != NULL) {
-		rv = ENG_START(e);
-		if (rv != 0) {
-			ENG_CLOSE(e);
-			goto done;
-		}
+	e->e_need_start = B_TRUE;
+
+	if (e->e_flags & ENGINE_OUTPUT) {
+		e->e_periodic = ddi_periodic_add(auimpl_output_callback, e,
+		    NANOSEC / audio_intrhz, audio_priority);
+	} else {
+		e->e_periodic = ddi_periodic_add(auimpl_input_callback, e,
+		    NANOSEC / audio_intrhz, audio_priority);
 	}
 
 ok:
@@ -670,6 +672,7 @@ auimpl_engine_close(audio_stream_t *sp)
 {
 	audio_engine_t	*e = sp->s_engine;
 	audio_dev_t	*d;
+	ddi_periodic_t	p = 0;
 
 	if (e == NULL)
 		return;
@@ -677,20 +680,24 @@ auimpl_engine_close(audio_stream_t *sp)
 	d = e->e_dev;
 
 	mutex_enter(&d->d_lock);
+	while (d->d_suspended) {
+		cv_wait(&d->d_ctrl_cv, &d->d_lock);
+	}
 	mutex_enter(&e->e_lock);
 	sp->s_engine = NULL;
 	list_remove(&e->e_streams, sp);
 	if (list_is_empty(&e->e_streams)) {
-		/* if last client holding engine open, close it all down */
-		if (e->e_ops.audio_engine_stop != NULL)
-			ENG_STOP(e);
+		ENG_STOP(e);
+		p = e->e_periodic;
 		e->e_flags &= ENGINE_DRIVER_FLAGS;
 		ENG_CLOSE(e);
 	}
 	mutex_exit(&e->e_lock);
-
 	cv_broadcast(&d->d_cv);
 	mutex_exit(&d->d_lock);
+	if (p != 0) {
+		ddi_periodic_delete(p);
+	}
 }
 
 int
@@ -720,6 +727,7 @@ audio_dev_register(audio_dev_t *d)
 		start = 1;
 	}
 	d->d_index = start;
+
 	rw_enter(&auimpl_dev_lock, RW_WRITER);
 	l = &auimpl_devs_by_index;
 	for (srch = list_head(l); srch; srch = list_next(l, srch)) {
@@ -798,10 +806,8 @@ auimpl_engine_ksupdate(kstat_t *ksp, int rw)
 	st->st_head.value.ui64 = e->e_head;
 	st->st_tail.value.ui64 = e->e_tail;
 	st->st_flags.value.ui32 = e->e_flags;
-	st->st_fragfr.value.ui32 = e->e_fragfr;
-	st->st_nfrags.value.ui32 = e->e_nfrags;
+	st->st_nbytes.value.ui32 = e->e_framesz * e->e_nframes;
 	st->st_framesz.value.ui32 = e->e_framesz;
-	st->st_nbytes.value.ui32 = e->e_nbytes;
 	st->st_hidx.value.ui32 = e->e_hidx;
 	st->st_tidx.value.ui32 = e->e_tidx;
 	st->st_format.value.ui32 = e->e_format;
@@ -814,6 +820,8 @@ auimpl_engine_ksupdate(kstat_t *ksp, int rw)
 	st->st_stream_underruns.value.ui32 = e->e_stream_underruns;
 	st->st_stream_overruns.value.ui32 = e->e_stream_overruns;
 	st->st_suspended.value.ui32 = e->e_suspended;
+	st->st_failed.value.ui32 = e->e_failed;
+	st->st_playahead.value.ui32 = e->e_playahead;
 	mutex_exit(&e->e_lock);
 
 	return (0);
@@ -844,10 +852,8 @@ auimpl_engine_ksinit(audio_dev_t *d, audio_engine_t *e)
 	kstat_named_init(&st->st_head, "head", KSTAT_DATA_UINT64);
 	kstat_named_init(&st->st_tail, "tail", KSTAT_DATA_UINT64);
 	kstat_named_init(&st->st_flags, "flags", KSTAT_DATA_UINT32);
-	kstat_named_init(&st->st_fragfr, "fragfr", KSTAT_DATA_UINT32);
-	kstat_named_init(&st->st_nfrags, "nfrags", KSTAT_DATA_UINT32);
-	kstat_named_init(&st->st_framesz, "framesz", KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_nbytes, "nbytes", KSTAT_DATA_UINT32);
+	kstat_named_init(&st->st_framesz, "framesz", KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_hidx, "hidx", KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_tidx, "tidx", KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_format, "format", KSTAT_DATA_UINT32);
@@ -863,16 +869,18 @@ auimpl_engine_ksinit(audio_dev_t *d, audio_engine_t *e)
 	    KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_stream_underruns, "stream_underruns",
 	    KSTAT_DATA_UINT32);
+	kstat_named_init(&st->st_playahead, "playahead", KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_suspended, "suspended", KSTAT_DATA_UINT32);
+	kstat_named_init(&st->st_failed, "failed", KSTAT_DATA_UINT32);
 	kstat_install(e->e_ksp);
 }
 
 void
 audio_dev_add_engine(audio_dev_t *d, audio_engine_t *e)
 {
-	e->e_num = d->d_engno++;
-
 	mutex_enter(&d->d_lock);
+
+	e->e_num = d->d_engno++;
 
 	auimpl_engine_ksinit(d, e);
 
@@ -941,9 +949,7 @@ auclnt_walk_devs(int (*walker)(audio_dev_t *, void *), void *arg)
 	l = &auimpl_devs_by_index;
 	rw_enter(&auimpl_dev_lock, RW_READER);
 	for (d = list_head(l); d; d = list_next(l, d)) {
-		mutex_enter(&d->d_lock);
 		cont = walker(d, arg);
-		mutex_exit(&d->d_lock);
 		if (cont == AUDIO_WALK_STOP)
 			break;
 	}
@@ -960,9 +966,7 @@ auclnt_walk_devs_by_number(int (*walker)(audio_dev_t *, void *), void *arg)
 	l = &auimpl_devs_by_number;
 	rw_enter(&auimpl_dev_lock, RW_READER);
 	for (d = list_head(l); d; d = list_next(l, d)) {
-		mutex_enter(&d->d_lock);
 		cont = walker(d, arg);
-		mutex_exit(&d->d_lock);
 		if (cont == AUDIO_WALK_STOP)
 			break;
 	}
@@ -1004,10 +1008,10 @@ auclnt_engine_get_rate(audio_engine_t *e)
 	return (ENG_RATE(e));
 }
 
-unsigned
+uint_t
 auclnt_engine_get_capab(audio_engine_t *e)
 {
-	unsigned capab = 0;
+	uint_t capab = 0;
 
 	if (e->e_flags & ENGINE_INPUT_CAP) {
 		capab |= AUDIO_CLIENT_CAP_RECORD;
@@ -1016,33 +1020,6 @@ auclnt_engine_get_capab(audio_engine_t *e)
 		capab |= AUDIO_CLIENT_CAP_PLAY;
 	}
 	return (capab);
-}
-
-static void
-auimpl_walk_engines(int (*walker)(audio_engine_t *, void *), void *arg)
-{
-	audio_dev_t	*d;
-	audio_engine_t	*e;
-	list_t		*l1;
-	list_t		*l2;
-	boolean_t	done = B_FALSE;
-
-	rw_enter(&auimpl_dev_lock, RW_READER);
-	l1 = &auimpl_devs_by_index;
-	for (d = list_head(l1); d; d = list_next(l1, d)) {
-		mutex_enter(&d->d_lock);
-		l2 = &d->d_engines;
-		for (e = list_head(l2); e; e = list_next(l2, e)) {
-			if (walker(e, arg) == AUDIO_WALK_STOP) {
-				done = B_TRUE;
-				break;
-			}
-		}
-		mutex_exit(&d->d_lock);
-		if (done)
-			break;
-	}
-	rw_exit(&auimpl_dev_lock);
 }
 
 /*
@@ -1063,25 +1040,116 @@ auimpl_walk_engines(int (*walker)(audio_engine_t *, void *), void *arg)
  * driver gets resumed well in advance of the time when user threads
  * are ready to start operation.
  */
-static int
-auimpl_engine_suspend(audio_engine_t *e, void *dontcare)
+static void
+auimpl_engine_suspend(audio_engine_t *e)
 {
+	ASSERT(mutex_owned(&e->e_lock));
+
+	if (e->e_failed || e->e_suspended) {
+		e->e_suspended = B_TRUE;
+		return;
+	}
+	e->e_suspended = B_TRUE;
+	if (e->e_flags & ENGINE_INPUT) {
+		e->e_head = ENG_COUNT(e);
+		ENG_STOP(e);
+	}
+	if (e->e_flags & ENGINE_OUTPUT) {
+		e->e_tail = ENG_COUNT(e);
+		ENG_STOP(e);
+	}
+}
+
+static void
+auimpl_engine_resume(audio_engine_t *e)
+{
+	ASSERT(mutex_owned(&e->e_lock));
+	ASSERT(e->e_suspended);
+
+	if (e->e_failed) {
+		/* No longer suspended, but still failed! */
+		e->e_suspended = B_FALSE;
+		return;
+	}
+
+	if (e->e_flags & (ENGINE_INPUT | ENGINE_OUTPUT)) {
+
+		auimpl_engine_reset(e);
+
+		if (e->e_flags & ENGINE_OUTPUT) {
+			auimpl_output_preload(e);
+		}
+
+		e->e_need_start = B_TRUE;
+	}
+	e->e_suspended = B_FALSE;
+	cv_broadcast(&e->e_cv);
+}
+
+static int
+auimpl_dev_suspend(audio_dev_t *d, void *dontcare)
+{
+	list_t		*l;
+	audio_engine_t	*e;
+
 	_NOTE(ARGUNUSED(dontcare));
 
-	mutex_enter(&e->e_lock);
-	e->e_suspended = B_TRUE;
-	mutex_exit(&e->e_lock);
+	mutex_enter(&d->d_lock);
+	mutex_enter(&d->d_ctrl_lock);
+	if (d->d_suspended) {
+		d->d_suspended++;
+		mutex_exit(&d->d_ctrl_lock);
+		mutex_exit(&d->d_lock);
+		return (AUDIO_WALK_CONTINUE);
+	}
+
+	d->d_suspended++;
+
+	(void) auimpl_save_controls(d);
+	mutex_exit(&d->d_ctrl_lock);
+
+	l = &d->d_engines;
+	for (e = list_head(l); e != NULL; e = list_next(l, e)) {
+		mutex_enter(&e->e_lock);
+		auimpl_engine_suspend(e);
+		mutex_exit(&e->e_lock);
+	}
+	mutex_exit(&d->d_lock);
 
 	return (AUDIO_WALK_CONTINUE);
 }
 
 static int
-auimpl_engine_resume(audio_engine_t *e, void *dontcare)
+auimpl_dev_resume(audio_dev_t *d, void *dontcare)
 {
+	list_t		*l;
+	audio_engine_t	*e;
+
 	_NOTE(ARGUNUSED(dontcare));
-	mutex_enter(&e->e_lock);
-	e->e_suspended = B_FALSE;
-	mutex_exit(&e->e_lock);
+
+	mutex_enter(&d->d_lock);
+	mutex_enter(&d->d_ctrl_lock);
+
+	ASSERT(d->d_suspended);
+	d->d_suspended--;
+	if (d->d_suspended) {
+		mutex_exit(&d->d_ctrl_lock);
+		mutex_exit(&d->d_lock);
+		return (AUDIO_WALK_CONTINUE);
+	}
+
+	(void) auimpl_restore_controls(d);
+	cv_broadcast(&d->d_ctrl_cv);
+	mutex_exit(&d->d_ctrl_lock);
+
+	l = &d->d_engines;
+	for (e = list_head(l); e != NULL; e = list_next(l, e)) {
+		mutex_enter(&e->e_lock);
+		auimpl_engine_resume(e);
+		mutex_exit(&e->e_lock);
+	}
+	mutex_exit(&d->d_lock);
+
 	return (AUDIO_WALK_CONTINUE);
 }
 
@@ -1092,16 +1160,28 @@ auimpl_cpr(void *arg, int code)
 
 	switch (code) {
 	case CB_CODE_CPR_CHKPT:
-		auimpl_walk_engines(auimpl_engine_suspend, NULL);
+		auclnt_walk_devs(auimpl_dev_suspend, NULL);
 		return (B_TRUE);
 
 	case CB_CODE_CPR_RESUME:
-		auimpl_walk_engines(auimpl_engine_resume, NULL);
+		auclnt_walk_devs(auimpl_dev_resume, NULL);
 		return (B_TRUE);
 
 	default:
 		return (B_FALSE);
 	}
+}
+
+void
+audio_dev_suspend(audio_dev_t *d)
+{
+	(void) auimpl_dev_suspend(d, NULL);
+}
+
+void
+audio_dev_resume(audio_dev_t *d)
+{
+	(void) auimpl_dev_resume(d, NULL);
 }
 
 static callb_id_t	auimpl_cpr_id = 0;
@@ -1235,23 +1315,4 @@ audio_dump_dwords(const uint32_t *w, int dcount)
 	if ((i % wrap) != 0) {
 		cmn_err(CE_NOTE, "%08x:%s", i - (i % wrap), line);
 	}
-}
-
-/*
- * The following two functions are a temporary workaround for CR6924018
- * in usb audio, and are not to be used for anything else, they WILL be
- * removed in the future.
- */
-void
-audio_engine_lock(audio_engine_t *e)
-{
-	mutex_enter(&e->e_lock);
-
-}
-
-void
-audio_engine_unlock(audio_engine_t *e)
-{
-	mutex_exit(&e->e_lock);
-
 }

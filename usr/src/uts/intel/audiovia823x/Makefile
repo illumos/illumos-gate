@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/intel/audiovia823x/Makefile
@@ -40,7 +40,6 @@ MODULE		= audiovia823x
 OBJECTS		= $(AUDIOVIA823X_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AUDIOVIA823X_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/io/audio/drv/audiovia823x
 
 #
 #	Include common rules.
@@ -55,9 +54,9 @@ LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Default build targets.

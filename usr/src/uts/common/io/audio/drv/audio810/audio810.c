@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,24 +28,20 @@
  * audio810 Audio Driver
  *
  * The driver is primarily targeted at providing audio support for the
- * W1100z and W2100z systems, which use the AMD 8111 audio core and
- * the Realtek ALC 655 codec. The ALC 655 chip supports only fixed 48k
- * sample rate. However, the audio core of AMD 8111 is completely
- * compatible to the Intel ICHx chips (Intel 8x0 chipsets), so the
- * driver can work for the ICHx.  We only support the 48k maximum
- * rate, since we only have a single PCM out channel.
+ * Intel ICHx family of AC'97 controllers and compatible parts (such
+ * as those from nVidia and AMD.)
  *
- * The AMD 8111 audio core, as an AC'97 controller, has independent
- * channels for PCM in, PCM out, mic in, modem in, and modem out.
- * The AC'97 controller is a PCI bus master with scatter/gather
- * support. Each channel has a DMA engine. Currently, we use only
- * the PCM in and PCM out channels. Each DMA engine uses one buffer
- * descriptor list. And the buffer descriptor list is an array of up
- * to 32 entries, each of which describes a data buffer. Each entry
- * contains a pointer to a data buffer, control bits, and the length
- * of the buffer being pointed to, where the length is expressed as
- * the number of samples. This, combined with the 16-bit sample size,
- * gives the actual physical length of the buffer.
+ * These audio parts have independent channels for PCM in, PCM out,
+ * mic in, and sometimes modem in, and modem out.  The AC'97
+ * controller is a PCI bus master with scatter/gather support. Each
+ * channel has a DMA engine. Currently, we use only the PCM in and PCM
+ * out channels. Each DMA engine uses one buffer descriptor list. And
+ * the buffer descriptor list is an array of up to 32 entries, each of
+ * which describes a data buffer.  Each entry contains a pointer to a
+ * data buffer, control bits, and the length of the buffer being
+ * pointed to, where the length is expressed as the number of
+ * samples. This, combined with the 16-bit sample size, gives the
+ * actual physical length of the buffer.
  *
  * A workaround for the AD1980 and AD1985 codec:
  *	Most vendors connect the surr-out of the codecs to the line-out jack.
@@ -60,6 +56,26 @@
  * 	NOTE:
  * 	This driver depends on the drv/audio and misc/ac97
  * 	modules being loaded first.
+ *
+ * The audio framework guarantees that our entry points are exclusive
+ * with suspend and resume.  This includes data flow and control entry
+ * points alike.
+ *
+ * The audio framework guarantees that only one control is being
+ * accessed on any given audio device at a time.
+ *
+ * The audio framework guarantees that entry points are themselves
+ * serialized for a given engine.
+ *
+ * We have no interrupt routine or other internal asynchronous routines.
+ *
+ * Our device uses completely separate registers for each engine,
+ * except for the start/stop registers, which are implemented in a
+ * manner that allows for them to be accessed concurrently safely from
+ * different threads.
+ *
+ * Hence, it turns out that we simply don't need any locking in this
+ * driver.
  */
 #include <sys/types.h>
 #include <sys/modctl.h>
@@ -83,7 +99,7 @@ static int audio810_ddi_quiesce(dev_info_t *);
 /*
  * Entry point routine prototypes
  */
-static int audio810_open(void *, int, unsigned *, unsigned *, caddr_t *);
+static int audio810_open(void *, int, unsigned *, caddr_t *);
 static void audio810_close(void *);
 static int audio810_start(void *);
 static void audio810_stop(void *);
@@ -111,11 +127,6 @@ static audio_engine_ops_t audio810_engine_ops = {
 };
 
 /*
- * interrupt handler
- */
-static uint_t	audio810_intr(caddr_t);
-
-/*
  * Local Routine Prototypes
  */
 static int audio810_attach(dev_info_t *);
@@ -124,10 +135,6 @@ static int audio810_detach(dev_info_t *);
 static int audio810_suspend(dev_info_t *);
 
 static int audio810_alloc_port(audio810_state_t *, int, uint8_t);
-static void audio810_start_port(audio810_port_t *);
-static void audio810_stop_port(audio810_port_t *);
-static void audio810_reset_port(audio810_port_t *);
-static void audio810_update_port(audio810_port_t *);
 static int audio810_codec_sync(audio810_state_t *);
 static void audio810_write_ac97(void *, uint8_t, uint16_t);
 static uint16_t audio810_read_ac97(void *, uint8_t);
@@ -135,15 +142,12 @@ static int audio810_map_regs(dev_info_t *, audio810_state_t *);
 static void audio810_unmap_regs(audio810_state_t *);
 static void audio810_stop_dma(audio810_state_t *);
 static int audio810_chip_init(audio810_state_t *);
+static void audio810_set_channels(audio810_state_t *);
 static void audio810_destroy(audio810_state_t *);
 
 /*
  * Global variables, but used only by this file.
  */
-
-/* driver name, so we don't have to call ddi_driver_name() or hard code strs */
-static char	*audio810_name = I810_NAME;
-
 
 /*
  * DDI Structures
@@ -385,92 +389,6 @@ audio810_ddi_quiesce(dev_info_t *dip)
 }
 
 /*
- * audio810_intr()
- *
- * Description:
- *	Interrupt service routine for both play and record. For play we
- *	get the next buffers worth of audio. For record we send it on to
- *	the mixer.
- *
- *	Each of buffer descriptor has a field IOC(interrupt on completion)
- *	When both this and the IOC bit of correspondent dma control register
- *	is set, it means that the controller should issue an interrupt upon
- *	completion of this buffer.
- *	(AMD 8111 hypertransport I/O hub data sheet. 3.8.3 page 71)
- *
- * Arguments:
- *	caddr_t		arg	Pointer to the interrupting device's state
- *				structure
- *
- * Returns:
- *	DDI_INTR_CLAIMED	Interrupt claimed and processed
- *	DDI_INTR_UNCLAIMED	Interrupt not claimed, and thus ignored
- */
-static uint_t
-audio810_intr(caddr_t arg)
-{
-	audio810_state_t	*statep;
-	uint16_t		gsr;
-
-	statep = (void *)arg;
-	mutex_enter(&statep->inst_lock);
-
-	if (statep->suspended) {
-		mutex_exit(&statep->inst_lock);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	gsr = I810_BM_GET32(I810_REG_GSR);
-
-	/* check if device is interrupting */
-	if ((gsr & I810_GSR_USE_INTR) == 0) {
-		mutex_exit(&statep->inst_lock);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	for (int pnum = 0; pnum < I810_NUM_PORTS; pnum++) {
-		audio810_port_t	*port;
-		uint8_t		regoff, index;
-
-		port = statep->ports[pnum];
-		if (port == NULL) {
-			continue;
-		}
-		regoff = port->regoff;
-
-		if (!(I810_BM_GET8(port->stsoff) & I810_BM_SR_BCIS))
-			continue;
-
-		/* update the LVI -- we just set it to the current value - 1 */
-		index = I810_BM_GET8(regoff + I810_OFFSET_CIV);
-		index = (index - 1) % I810_BD_NUMS;
-
-		I810_BM_PUT8(regoff + I810_OFFSET_LVI, index);
-
-		/* clear any interrupt */
-		I810_BM_PUT8(port->stsoff,
-		    I810_BM_SR_LVBCI | I810_BM_SR_BCIS | I810_BM_SR_FIFOE);
-	}
-
-	/* update the kernel interrupt statistics */
-	if (statep->ksp) {
-		I810_KIOP(statep)->intrs[KSTAT_INTR_HARD]++;
-	}
-
-	mutex_exit(&statep->inst_lock);
-
-	/* notify the framework */
-	if (gsr & I810_GSR_INTR_PIN) {
-		audio_engine_produce(statep->ports[I810_PCM_IN]->engine);
-	}
-	if (gsr & I810_GSR_INTR_POUT) {
-		audio_engine_consume(statep->ports[I810_PCM_OUT]->engine);
-	}
-
-	return (DDI_INTR_CLAIMED);
-}
-
-/*
  * audio810_open()
  *
  * Description:
@@ -479,8 +397,7 @@ audio810_intr(caddr_t arg)
  * Arguments:
  *	void		*arg		The DMA engine to set up
  *	int		flag		Open flags
- *	unsigned	*fragfrp	Receives number of frames per fragment
- *	unsigned	*nfragsp	Receives number of fragments
+ *	unsigned	*nframes	Receives total number of frames
  *	caddr_t		*bufp		Receives kernel data buffer
  *
  * Returns:
@@ -488,22 +405,15 @@ audio810_intr(caddr_t arg)
  *	errno	on failure
  */
 static int
-audio810_open(void *arg, int flag, unsigned *fragfrp, unsigned *nfragsp,
-    caddr_t *bufp)
+audio810_open(void *arg, int flag, unsigned *nframes, caddr_t *bufp)
 {
 	audio810_port_t	*port = arg;
 
 	_NOTE(ARGUNUSED(flag));
 
-	port->started = B_FALSE;
 	port->count = 0;
-	*fragfrp = port->fragfr;
-	*nfragsp = port->nfrag;
+	*nframes = port->samp_frames;
 	*bufp = port->samp_kaddr;
-
-	mutex_enter(&port->statep->inst_lock);
-	audio810_reset_port(port);
-	mutex_exit(&port->statep->inst_lock);
 
 	return (0);
 }
@@ -522,13 +432,7 @@ audio810_open(void *arg, int flag, unsigned *fragfrp, unsigned *nfragsp,
 static void
 audio810_close(void *arg)
 {
-	audio810_port_t		*port = arg;
-	audio810_state_t	*statep = port->statep;
-
-	mutex_enter(&statep->inst_lock);
-	audio810_stop_port(port);
-	port->started = B_FALSE;
-	mutex_exit(&statep->inst_lock);
+	_NOTE(ARGUNUSED(arg));
 }
 
 /*
@@ -546,13 +450,11 @@ audio810_stop(void *arg)
 {
 	audio810_port_t		*port = arg;
 	audio810_state_t	*statep = port->statep;
+	uint8_t			cr;
 
-	mutex_enter(&statep->inst_lock);
-	if (port->started) {
-		audio810_stop_port(port);
-	}
-	port->started = B_FALSE;
-	mutex_exit(&statep->inst_lock);
+	cr = I810_BM_GET8(port->regoff + I810_OFFSET_CR);
+	cr &= ~I810_BM_CR_RUN;
+	I810_BM_PUT8(port->regoff + I810_OFFSET_CR, cr);
 }
 
 /*
@@ -572,13 +474,41 @@ audio810_start(void *arg)
 {
 	audio810_port_t		*port = arg;
 	audio810_state_t	*statep = port->statep;
+	uint8_t			regoff, cr;
 
-	mutex_enter(&statep->inst_lock);
-	if (!port->started) {
-		audio810_start_port(port);
-		port->started = B_TRUE;
+	regoff = port->regoff;
+	port->offset = 0;
+
+	/* program multiple channel settings */
+	if (port->num == I810_PCM_OUT) {
+		audio810_set_channels(statep);
+
+		if (statep->quirk == QUIRK_SIS7012) {
+			/*
+			 * SiS 7012 has special unmute bit.
+			 */
+			I810_BM_PUT8(I810_REG_SISCTL, I810_SISCTL_UNMUTE);
+		}
 	}
-	mutex_exit(&statep->inst_lock);
+
+	/*
+	 * Perform full reset of the engine, but leave it turned off.
+	 */
+	I810_BM_PUT8(regoff + I810_OFFSET_CR, 0);
+	I810_BM_PUT8(regoff + I810_OFFSET_CR, I810_BM_CR_RST);
+
+	/* program the offset of the BD list */
+	I810_BM_PUT32(regoff + I810_OFFSET_BD_BASE, port->bdl_paddr);
+
+	/* we set the last index to the full count -- all buffers are valid */
+	I810_BM_PUT8(regoff + I810_OFFSET_LVI, I810_BD_NUMS - 1);
+
+	cr = I810_BM_GET8(regoff + I810_OFFSET_CR);
+	cr |= I810_BM_CR_RUN;
+	I810_BM_PUT8(regoff + I810_OFFSET_CR, cr);
+
+	(void) I810_BM_GET8(regoff + I810_OFFSET_CR);
+
 	return (0);
 }
 
@@ -660,23 +590,35 @@ audio810_count(void *arg)
 {
 	audio810_port_t		*port = arg;
 	audio810_state_t	*statep = port->statep;
+	uint8_t			regoff = port->regoff;
 	uint64_t		val;
-	uint16_t		picb;
-	uint64_t		count;
-	uint8_t			nchan;
+	uint32_t		offset;
+	uint8_t			civ;
 
-	mutex_enter(&statep->inst_lock);
-	audio810_update_port(port);
-	count = port->count;
-	picb = port->picb;
-	nchan = port->nchan;
-	mutex_exit(&statep->inst_lock);
+	/*
+	 * Read the position counters.  We also take this opportunity
+	 * to update the last valid index to the one just previous to
+	 * the one we're working on (so we'll fully loop.)
+	 */
+	offset = I810_BM_GET16(port->picboff);
+	civ = I810_BM_GET8(regoff + I810_OFFSET_CIV);
+	I810_BM_PUT8(port->regoff + I810_OFFSET_LVI, (civ - 1) % I810_BD_NUMS);
 
-	if (statep->quirk == QUIRK_SIS7012) {
-		val = count + picb / (2 * nchan);
+	/* SiS counts in bytes, all others in words. */
+	if (statep->quirk != QUIRK_SIS7012)
+		offset *= 2;
+
+	/* counter is reversed */
+	offset = port->samp_size - offset;
+
+	if (offset < port->offset) {
+		val = (port->samp_size - port->offset) + offset;
 	} else {
-		val = count + (picb / nchan);
+		val = offset - port->offset;
 	}
+	port->offset = offset;
+	port->count += (val / (port->nchan * 2));
+	val = port->count;
 
 	return (val);
 }
@@ -712,223 +654,21 @@ audio810_sync(void *arg, unsigned nframes)
  *	void	*arg		The DMA engine to query
  *
  * Returns:
- *	Play ahead in frames (4 fragments).
+ *	Play ahead in frames.
  */
 static unsigned
 audio810_playahead(void *arg)
 {
 	audio810_port_t *port = arg;
+	audio810_state_t	*statep = port->statep;
 
-	return (4 * port->fragfr);
+	/* Older ICH is likely to be emulated, deeper (40 ms) playahead */
+	return (statep->quirk == QUIRK_OLDICH ? 1920 : 0);
 }
 
 
 
 /* *********************** Local Routines *************************** */
-
-/*
- * audio810_start_port()
- *
- * Description:
- *	This routine starts the DMA engine.
- *
- * Arguments:
- *	audio810_port_t	*port		Port of DMA engine to start.
- */
-static void
-audio810_start_port(audio810_port_t *port)
-{
-	audio810_state_t	*statep = port->statep;
-	uint8_t			cr;
-
-	ASSERT(mutex_owned(&statep->inst_lock));
-
-	/* if suspended, then do nothing else */
-	if (statep->suspended) {
-		return;
-	}
-
-	cr = I810_BM_GET8(port->regoff + I810_OFFSET_CR);
-	cr |= I810_BM_CR_IOCE;
-	I810_BM_PUT8(port->regoff + I810_OFFSET_CR, cr);
-	cr |= I810_BM_CR_RUN;
-	I810_BM_PUT8(port->regoff + I810_OFFSET_CR, cr);
-}
-
-/*
- * audio810_stop_port()
- *
- * Description:
- *	This routine stops the DMA engine.
- *
- * Arguments:
- *	audio810_port_t	*port		Port of DMA engine to stop.
- */
-static void
-audio810_stop_port(audio810_port_t *port)
-{
-	audio810_state_t	*statep = port->statep;
-	uint8_t			cr;
-
-	ASSERT(mutex_owned(&statep->inst_lock));
-
-	/* if suspended, then do nothing else */
-	if (statep->suspended) {
-		return;
-	}
-
-	cr = I810_BM_GET8(port->regoff + I810_OFFSET_CR);
-	cr &= ~I810_BM_CR_RUN;
-	I810_BM_PUT8(port->regoff + I810_OFFSET_CR, cr);
-}
-
-/*
- * audio810_reset_port()
- *
- * Description:
- *	This routine resets the DMA engine pareparing it for work.
- *
- * Arguments:
- *	audio810_port_t	*port		Port of DMA engine to reset.
- */
-static void
-audio810_reset_port(audio810_port_t *port)
-{
-	audio810_state_t	*statep = port->statep;
-	uint32_t		gcr;
-
-	ASSERT(mutex_owned(&statep->inst_lock));
-
-	port->civ = 0;
-	port->picb = 0;
-
-	if (statep->suspended)
-		return;
-
-	/*
-	 * Make sure we put once in stereo, to ensure we always start from
-	 * front left.
-	 */
-	if (port->num == I810_PCM_OUT) {
-
-		if (statep->quirk == QUIRK_SIS7012) {
-			/*
-			 * SiS 7012 needs its own special multichannel config.
-			 */
-			gcr = I810_BM_GET32(I810_REG_GCR);
-			gcr &= ~I810_GCR_SIS_CHANNELS_MASK;
-			I810_BM_PUT32(I810_REG_GCR, gcr);
-			delay(drv_usectohz(50000));	/* 50 msec */
-
-			switch (statep->maxch) {
-			case 2:
-				gcr |= I810_GCR_SIS_2_CHANNELS;
-				break;
-			case 4:
-				gcr |= I810_GCR_SIS_4_CHANNELS;
-				break;
-			case 6:
-				gcr |= I810_GCR_SIS_6_CHANNELS;
-				break;
-			}
-			I810_BM_PUT32(I810_REG_GCR, gcr);
-			delay(drv_usectohz(50000));	/* 50 msec */
-
-			/*
-			 * SiS 7012 has special unmute bit.
-			 */
-			I810_BM_PUT8(I810_REG_SISCTL, I810_SISCTL_UNMUTE);
-
-		} else {
-
-			/*
-			 * All other devices work the same.
-			 */
-			gcr = I810_BM_GET32(I810_REG_GCR);
-			gcr &= ~I810_GCR_CHANNELS_MASK;
-
-			I810_BM_PUT32(I810_REG_GCR, gcr);
-			delay(drv_usectohz(50000));	/* 50 msec */
-
-			switch (statep->maxch) {
-			case 2:
-				gcr |= I810_GCR_2_CHANNELS;
-				break;
-			case 4:
-				gcr |= I810_GCR_4_CHANNELS;
-				break;
-			case 6:
-				gcr |= I810_GCR_6_CHANNELS;
-				break;
-			}
-			I810_BM_PUT32(I810_REG_GCR, gcr);
-			delay(drv_usectohz(50000));	/* 50 msec */
-		}
-	}
-
-	/*
-	 * Perform full reset of the engine, but leave it turned off.
-	 */
-	I810_BM_PUT8(port->regoff + I810_OFFSET_CR, 0);
-	I810_BM_PUT8(port->regoff + I810_OFFSET_CR, I810_BM_CR_RST);
-
-	/* program the offset of the BD list */
-	I810_BM_PUT32(port->regoff + I810_OFFSET_BD_BASE, port->bdl_paddr);
-
-	/* we set the last index to the full count -- all buffers are valid */
-	I810_BM_PUT8(port->regoff + I810_OFFSET_LVI, I810_BD_NUMS - 1);
-}
-
-/*
- * audio810_update_port()
- *
- * Description:
- *	This routine updates the ports frame counter from hardware, and
- *	gracefully handles wraps.
- *
- * Arguments:
- *	audio810_port_t	*port		The port to update.
- */
-static void
-audio810_update_port(audio810_port_t *port)
-{
-	audio810_state_t	*statep = port->statep;
-	uint8_t			regoff = port->regoff;
-	uint8_t			civ;
-	uint16_t		picb;
-	unsigned		n;
-
-	if (statep->suspended) {
-		civ = 0;
-		picb = 0;
-	} else {
-		/*
-		 * We read the position counters, but we're careful to avoid
-		 * the situation where the position counter resets at the end
-		 * of a buffer.
-		 */
-		for (int i = 0; i < 2; i++) {
-			civ = I810_BM_GET8(regoff + I810_OFFSET_CIV);
-			picb = I810_BM_GET16(port->picboff);
-			if (I810_BM_GET8(regoff + I810_OFFSET_CIV) == civ) {
-				/*
-				 * Chip did not start a new index,
-				 * so the picb is valid.
-				 */
-				break;
-			}
-		}
-
-		if (civ >= port->civ) {
-			n = civ - port->civ;
-		} else {
-			n = civ + (I810_BD_NUMS - port->civ);
-		}
-		port->count += (n * port->fragfr);
-	}
-	port->civ = civ;
-	port->picb = picb;
-}
 
 /*
  * audio810_attach()
@@ -959,30 +699,13 @@ audio810_attach(dev_info_t *dip)
 	uint8_t			nch;
 	int			maxch;
 
-	/* we don't support high level interrupts in the driver */
-	if (ddi_intr_hilevel(dip, 0) != 0) {
-		cmn_err(CE_WARN, "!%s: unsupported high level interrupt",
-		    audio810_name);
-		return (DDI_FAILURE);
-	}
-
 	/* allocate the soft state structure */
 	statep = kmem_zalloc(sizeof (*statep), KM_SLEEP);
 	ddi_set_driver_private(dip, statep);
 
-	/* get iblock cookie information */
-	if (ddi_get_iblock_cookie(dip, 0, &statep->iblock) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "!%s: cannot get iblock cookie",
-		    audio810_name);
-		kmem_free(statep, sizeof (*statep));
-		return (DDI_FAILURE);
-	}
-	mutex_init(&statep->inst_lock, NULL, MUTEX_DRIVER, statep->iblock);
-	mutex_init(&statep->ac_lock, NULL, MUTEX_DRIVER, statep->iblock);
-
 	if ((adev = audio_dev_alloc(dip, 0)) == NULL) {
-		cmn_err(CE_WARN, "!%s: unable to allocate audio dev",
-		    audio810_name);
+		cmn_err(CE_WARN, "!%s%d: unable to allocate audio dev",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		goto error;
 	}
 	statep->adev = adev;
@@ -1015,6 +738,7 @@ audio810_attach(dev_info_t *dip)
 	case 0x80862415:
 		name = "Intel AC'97";
 		vers = "ICH";
+		statep->quirk = QUIRK_OLDICH;
 		break;
 	case 0x80862425:
 		name = "Intel AC'97";
@@ -1160,21 +884,6 @@ audio810_attach(dev_info_t *dip)
 		goto error;
 	}
 
-	/* set up kernel statistics */
-	if ((statep->ksp = kstat_create(I810_NAME, ddi_get_instance(dip),
-	    I810_NAME, "controller", KSTAT_TYPE_INTR, 1,
-	    KSTAT_FLAG_PERSISTENT)) != NULL) {
-		kstat_install(statep->ksp);
-	}
-
-	/* set up the interrupt handler */
-	if (ddi_add_intr(dip, 0, &statep->iblock,
-	    NULL, audio810_intr, (caddr_t)statep) != DDI_SUCCESS) {
-		audio_dev_warn(adev, "bad interrupt specification");
-		goto error;
-	}
-	statep->intr_added = B_TRUE;
-
 	if (audio_dev_register(adev) != DDI_SUCCESS) {
 		audio_dev_warn(adev, "unable to register with framework");
 		goto error;
@@ -1221,43 +930,33 @@ audio810_resume(dev_info_t *dip)
 	/* Restore the audio810 chip's state */
 	if (audio810_chip_init(statep) != DDI_SUCCESS) {
 		/*
-		 * Note that PM gurus say we should return
-		 * success here.  Failure of audio shouldn't
-		 * be considered FATAL to the system.  The
-		 * upshot is that audio will not progress.
+		 * Note that PM gurus say we should return success
+		 * here.  Failure of audio shouldn't be considered
+		 * FATAL to the system.
+		 *
+		 * It turns out that the only way that the
+		 * audio810_chip_init fails is that the codec won't
+		 * re-initialize.  Audio streams may or may not make
+		 * progress; setting changes may or may not have the
+		 * desired effect.  What we'd really to do at this
+		 * point is use FMA to offline the part.  In the
+		 * meantime, we just muddle on logging the error.
+		 *
+		 * Note that returning from this routine without
+		 * allowing the audio_dev_resume() to take place can
+		 * have bad effects, as the framework does not know
+		 * what to do in the event of a failure of this
+		 * nature.  (It may be unsafe to call ENG_CLOSE(), for
+		 * example.)
 		 */
-		audio_dev_warn(adev, "DDI_RESUME failed to init chip");
-		return (DDI_SUCCESS);
+		audio_dev_warn(adev, "failure to resume codec");
 	}
 
-	/* allow ac97 operations again */
-	ac97_resume(statep->ac97);
+	/* Reset the AC'97 codec. */
+	ac97_reset(statep->ac97);
 
-	mutex_enter(&statep->inst_lock);
-
-	ASSERT(statep->suspended);
-	statep->suspended = B_FALSE;
-
-	for (int i = 0; i < I810_NUM_PORTS; i++) {
-
-		audio810_port_t *port = statep->ports[i];
-
-		if (port != NULL) {
-			/* reset framework DMA engine buffer */
-			if (port->engine != NULL) {
-				audio_engine_reset(port->engine);
-			}
-
-			/* reset and initialize hardware ports */
-			audio810_reset_port(port);
-			if (port->started) {
-				audio810_start_port(port);
-			} else {
-				audio810_stop_port(port);
-			}
-		}
-	}
-	mutex_exit(&statep->inst_lock);
+	/* And let the framework know we're ready for business again. */
+	audio_dev_resume(statep->adev);
 
 	return (DDI_SUCCESS);
 }
@@ -1313,18 +1012,10 @@ audio810_suspend(dev_info_t *dip)
 	statep = ddi_get_driver_private(dip);
 	ASSERT(statep != NULL);
 
-	ac97_suspend(statep->ac97);
+	audio_dev_suspend(statep->adev);
 
-	mutex_enter(&statep->inst_lock);
-
-	ASSERT(statep->suspended == B_FALSE);
-
-	statep->suspended = B_TRUE; /* stop new ops */
-
-	/* stop DMA engines */
+	/* stop DMA engines - should be redundant (paranoia) */
 	audio810_stop_dma(statep);
-
-	mutex_exit(&statep->inst_lock);
 
 	return (DDI_SUCCESS);
 }
@@ -1351,11 +1042,8 @@ audio810_alloc_port(audio810_state_t *statep, int num, uint8_t nchan)
 	uint_t			count;
 	int			dir;
 	unsigned		caps;
-	char			*prop;
-	char			*nfprop;
 	audio_dev_t		*adev;
 	audio810_port_t		*port;
-	uint32_t		paddr;
 	int			rc;
 	dev_info_t		*dip;
 	i810_bd_entry_t		*bdentry;
@@ -1366,22 +1054,17 @@ audio810_alloc_port(audio810_state_t *statep, int num, uint8_t nchan)
 	port = kmem_zalloc(sizeof (*port), KM_SLEEP);
 	statep->ports[num] = port;
 	port->statep = statep;
-	port->started = B_FALSE;
 	port->nchan = nchan;
 	port->num = num;
 
 	switch (num) {
 	case I810_PCM_IN:
-		prop = "record-interrupts";
-		nfprop = "record-fragments";
 		dir = DDI_DMA_READ;
 		caps = ENGINE_INPUT_CAP;
 		port->sync_dir = DDI_DMA_SYNC_FORKERNEL;
 		port->regoff = I810_BASE_PCM_IN;
 		break;
 	case I810_PCM_OUT:
-		prop = "play-interrupts";
-		nfprop = "play-fragments";
 		dir = DDI_DMA_WRITE;
 		caps = ENGINE_OUTPUT_CAP;
 		port->sync_dir = DDI_DMA_SYNC_FORDEV;
@@ -1403,45 +1086,15 @@ audio810_alloc_port(audio810_state_t *statep, int num, uint8_t nchan)
 		port->picboff = port->regoff + I810_OFFSET_PICB;
 	}
 
-	port->intrs = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, prop, I810_INTS);
-
-	/* make sure the values are good */
-	if (port->intrs < I810_MIN_INTS) {
-		audio_dev_warn(adev, "%s too low, %d, resetting to %d",
-		    prop, port->intrs, I810_INTS);
-		port->intrs = I810_INTS;
-	} else if (port->intrs > I810_MAX_INTS) {
-		audio_dev_warn(adev, "%s too high, %d, resetting to %d",
-		    prop, port->intrs, I810_INTS);
-		port->intrs = I810_INTS;
-	}
-
-	port->nfrag = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, nfprop, I810_NFRAGS);
-
 	/*
-	 * Note that fragments must divide evenly into I810_BD_NUMS (32).
-	 * We also insist that the value be larger than our "playahead".
+	 * We use one big sample area.  The sample area must be larger
+	 * than about 1.5 framework fragment sizes.  (Currently 480 *
+	 * 1.5 = 720 frames.)  This is necessary to ensure that we
+	 * don't have to involve an interrupt service routine on our
+	 * own, to keep the last valid index updated reasonably.
 	 */
-	if (port->nfrag <= 8) {
-		port->nfrag = 8;
-	} else if (port->nfrag <= 16) {
-		port->nfrag = 16;
-	} else {
-		port->nfrag = I810_BD_NUMS;
-	}
-
-	/*
-	 * Figure out how much space we need.  Sample rate is 48kHz, and
-	 * we need to store 32 chunks.  (Note that this means that low
-	 * interrupt frequencies will require more RAM.  We could probably
-	 * do some cleverness to use a shorter BD list.)
-	 */
-	port->fragfr = 48000 / port->intrs;
-	port->fragfr = I810_ROUNDUP(port->fragfr, I810_MOD_SIZE);
-	port->fragsz = port->fragfr * port->nchan * 2;
-	port->samp_size = port->fragsz * port->nfrag;
+	port->samp_frames = 4096;
+	port->samp_size = port->samp_frames * port->nchan * sizeof (int16_t);
 
 	/* allocate dma handle */
 	rc = ddi_dma_alloc_handle(dip, &sample_buf_dma_attr, DDI_DMA_SLEEP,
@@ -1506,26 +1159,18 @@ audio810_alloc_port(audio810_state_t *statep, int num, uint8_t nchan)
 	/*
 	 * Wire up the BD list.
 	 */
-	paddr = port->samp_paddr;
 	bdentry = (void *)port->bdl_kaddr;
 	for (int i = 0; i < I810_BD_NUMS; i++) {
 
 		/* set base address of buffer */
-		ddi_put32(port->bdl_acch, &bdentry->buf_base, paddr);
-		/*
-		 * SiS 7012 counts samples in bytes, all other count
-		 * in words.
-		 */
+		ddi_put32(port->bdl_acch, &bdentry->buf_base,
+		    port->samp_paddr);
+		/* SiS 7012 counts in bytes, all others in words */
 		ddi_put16(port->bdl_acch, &bdentry->buf_len,
-		    statep->quirk == QUIRK_SIS7012 ? port->fragsz :
-		    port->fragsz / 2);
-		ddi_put16(port->bdl_acch, &bdentry->buf_cmd,
-		    BUF_CMD_IOC | BUF_CMD_BUP);
-		paddr += port->fragsz;
-		if ((i % port->nfrag) == (port->nfrag - 1)) {
-			/* handle wrap */
-			paddr = port->samp_paddr;
-		}
+		    statep->quirk == QUIRK_SIS7012 ? port->samp_size :
+		    port->samp_size / 2);
+		ddi_put16(port->bdl_acch, &bdentry->buf_cmd, BUF_CMD_BUP);
+
 		bdentry++;
 	}
 	(void) ddi_dma_sync(port->bdl_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
@@ -1742,8 +1387,7 @@ audio810_unmap_regs(audio810_state_t *statep)
  * audio810_chip_init()
  *
  * Description:
- *	This routine initializes the AMD 8111 audio controller.
- *	codec.
+ *	This routine initializes the audio controller.
  *
  * Arguments:
  *	audio810_state_t	*state		The device's state structure
@@ -1828,6 +1472,72 @@ audio810_chip_init(audio810_state_t *statep)
 }
 
 /*
+ * audio810_set_channels()
+ *
+ * Description:
+ *	This routine initializes the multichannel configuration.
+ *
+ * Arguments:
+ *	audio810_state_t	*state		The device's state structure
+ */
+static void
+audio810_set_channels(audio810_state_t *statep)
+{
+	uint32_t	gcr;
+
+	/*
+	 * Configure multi-channel.
+	 */
+	if (statep->quirk == QUIRK_SIS7012) {
+		/*
+		 * SiS 7012 needs its own special multichannel config.
+		 */
+		gcr = I810_BM_GET32(I810_REG_GCR);
+		gcr &= ~I810_GCR_SIS_CHANNELS_MASK;
+		I810_BM_PUT32(I810_REG_GCR, gcr);
+		delay(drv_usectohz(50000));	/* 50 msec */
+
+		switch (statep->maxch) {
+		case 2:
+			gcr |= I810_GCR_SIS_2_CHANNELS;
+			break;
+		case 4:
+			gcr |= I810_GCR_SIS_4_CHANNELS;
+			break;
+		case 6:
+			gcr |= I810_GCR_SIS_6_CHANNELS;
+			break;
+		}
+		I810_BM_PUT32(I810_REG_GCR, gcr);
+		delay(drv_usectohz(50000));	/* 50 msec */
+	} else {
+
+		/*
+		 * All other devices work the same.
+		 */
+		gcr = I810_BM_GET32(I810_REG_GCR);
+		gcr &= ~I810_GCR_CHANNELS_MASK;
+
+		I810_BM_PUT32(I810_REG_GCR, gcr);
+		delay(drv_usectohz(50000));	/* 50 msec */
+
+		switch (statep->maxch) {
+		case 2:
+			gcr |= I810_GCR_2_CHANNELS;
+			break;
+		case 4:
+			gcr |= I810_GCR_4_CHANNELS;
+			break;
+		case 6:
+			gcr |= I810_GCR_6_CHANNELS;
+			break;
+		}
+		I810_BM_PUT32(I810_REG_GCR, gcr);
+		delay(drv_usectohz(50000));	/* 50 msec */
+	}
+}
+
+/*
  * audio810_stop_dma()
  *
  * Description:
@@ -1901,11 +1611,9 @@ audio810_write_ac97(void *arg, uint8_t reg, uint16_t data)
 {
 	audio810_state_t	*statep = arg;
 
-	mutex_enter(&statep->ac_lock);
 	if (audio810_codec_sync(statep) == DDI_SUCCESS) {
 		I810_AM_PUT16(reg, data);
 	}
-	mutex_exit(&statep->ac_lock);
 
 	(void) audio810_read_ac97(statep, reg);
 }
@@ -1929,11 +1637,9 @@ audio810_read_ac97(void *arg, uint8_t reg)
 	audio810_state_t	*statep = arg;
 	uint16_t		val = 0xffff;
 
-	mutex_enter(&statep->ac_lock);
 	if (audio810_codec_sync(statep) == DDI_SUCCESS) {
 		val = I810_AM_GET16(reg);
 	}
-	mutex_exit(&statep->ac_lock);
 	return (val);
 }
 
@@ -1953,14 +1659,6 @@ audio810_destroy(audio810_state_t *statep)
 	/* stop DMA engines */
 	audio810_stop_dma(statep);
 
-	if (statep->intr_added) {
-		ddi_remove_intr(statep->dip, 0, NULL);
-	}
-
-	if (statep->ksp) {
-		kstat_delete(statep->ksp);
-	}
-
 	for (int i = 0; i < I810_NUM_PORTS; i++) {
 		audio810_free_port(statep->ports[i]);
 	}
@@ -1973,7 +1671,5 @@ audio810_destroy(audio810_state_t *statep)
 	if (statep->adev)
 		audio_dev_free(statep->adev);
 
-	mutex_destroy(&statep->inst_lock);
-	mutex_destroy(&statep->ac_lock);
 	kmem_free(statep, sizeof (*statep));
 }

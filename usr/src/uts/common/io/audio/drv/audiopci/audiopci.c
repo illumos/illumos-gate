@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -53,7 +53,6 @@
 #define	CREATIVE_VENDOR_ID	0x1102
 #define	ENSONIQ_ES1370		0x5000
 
-#define	DEFINTS			75
 #define	DRVNAME			"audiopci"
 
 #define	INPUT_MIC	0
@@ -75,8 +74,6 @@ static const char *audiopci_insrcs[] = {
 typedef struct audiopci_port
 {
 	/* Audio parameters */
-	boolean_t		trigger;
-
 	int			speed;
 	int			fmt;
 
@@ -90,14 +87,12 @@ typedef struct audiopci_port
 	uint32_t		paddr;
 	ddi_acc_handle_t	acch;
 	ddi_dma_handle_t	dmah;
-	unsigned		fragfr;
-	unsigned		nfrags;
 	unsigned		nframes;
 	unsigned		frameno;
 	uint64_t		count;
 
 	struct audiopci_dev	*dev;
-	audio_engine_t	*engine;
+	audio_engine_t		*engine;
 } audiopci_port_t;
 
 typedef enum {
@@ -130,11 +125,6 @@ typedef struct audiopci_dev
 	kmutex_t		mutex;
 	uint16_t		devid;
 	dev_info_t		*dip;
-	boolean_t		enabled;
-	boolean_t		suspended;
-
-	int			pintrs;
-	int			rintrs;
 
 	uint8_t			ak_regs[0x20];
 	int			micbias;
@@ -147,14 +137,11 @@ typedef struct audiopci_dev
 	audiopci_ctrl_t		*micbias;
 #endif
 
-	kstat_t			*ksp;
-
 	audiopci_port_t		port[PORT_MAX + 1];
 
 
 	caddr_t			regs;
 	ddi_acc_handle_t	acch;
-	ddi_intr_handle_t	ihandle[1];
 } audiopci_dev_t;
 
 static ddi_device_acc_attr_t acc_attr = {
@@ -171,15 +158,9 @@ static ddi_device_acc_attr_t buf_attr = {
 
 /*
  * The hardware appears to be able to address up to 16-bits worth of longwords,
- * giving a total address space of 256K.  Note, however, that we will restrict
- * this further when we do fragment and memory allocation.  At its very highest
- * clock rate (48 kHz) and sample size (16-bit stereo), and lowest interrupt
- * rate (32 Hz), we only need 6000 bytes per fragment.
- *
- * So with an allocated buffer size of 64K, we can support at least 10 frags,
- * which is more than enough.  (The legacy Sun driver used only 2 fragments.)
+ * giving a total address space of 256K.  But we need substantially less.
  */
-#define	AUDIOPCI_BUF_LEN	(65536)
+#define	AUDIOPCI_BUF_LEN	(16384)
 
 static ddi_dma_attr_t dma_attr = {
 	DMA_ATTR_VERSION,	/* dma_attr_version */
@@ -214,13 +195,8 @@ static ddi_dma_attr_t dma_attr = {
 #define	CLR16(dev, offset, v)	PUT16(dev, offset, GET16(dev, offset) & ~(v))
 #define	SET16(dev, offset, v)	PUT16(dev, offset, GET16(dev, offset) | (v))
 
-#define	KSINTR(dev)	((kstat_intr_t *)((dev)->ksp->ks_data))
-
 static void audiopci_init_hw(audiopci_dev_t *);
 static void audiopci_init_port(audiopci_port_t *);
-static void audiopci_start_port(audiopci_port_t *);
-static void audiopci_stop_port(audiopci_port_t *);
-static void audiopci_update_port(audiopci_port_t *);
 static uint16_t audiopci_dac_rate(int);
 static int audiopci_add_controls(audiopci_dev_t *);
 static void audiopci_del_controls(audiopci_dev_t *);
@@ -252,9 +228,6 @@ audiopci_ak_write(audiopci_dev_t *dev, uint16_t addr, uint8_t data)
 {
 	uint8_t	wstat;
 
-	if (dev->suspended)
-		return;
-
 	/* shadow the value */
 	dev->ak_regs[addr] = data;
 
@@ -282,111 +255,6 @@ audiopci_readmem(audiopci_dev_t *dev, uint32_t page, uint32_t offs)
 {
 	PUT32(dev, CONC_bMEMPAGE_OFF, page);	/* Select memory page */
 	return (GET32(dev, offs));
-}
-
-static uint_t
-audiopci_intr(caddr_t arg1, caddr_t arg2)
-{
-	audiopci_dev_t *dev = (void *)arg1;
-	int stats;
-	int tmp;
-	unsigned char ackbits = 0;
-	audiopci_port_t *port;
-	audio_engine_t *do_syn, *do_dac, *do_adc;
-
-	_NOTE(ARGUNUSED(arg2));
-
-	/*
-	 * NB: The old driver didn't report spurious interrupts.  On
-	 * a system with shared interrupts (typical!) there will
-	 * normally be lots of these (each time the "other" device
-	 * interrupts).
-	 *
-	 * Also, because of the way the interrupt chain handling
-	 * works, reporting of spurious interrupts is probably not
-	 * terribly useful.
-	 *
-	 * However, we can count interrupts where the master interrupt
-	 * bit is set but none of the ackbits that we are prepared to
-	 * process is set.  That is probably useful.
-	 */
-	mutex_enter(&dev->mutex);
-	if (!dev->enabled) {
-
-		mutex_exit(&dev->mutex);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	stats = GET32(dev, CONC_dSTATUS_OFF);
-
-	if (!(stats & CONC_INTSTAT_PENDING)) {	/* No interrupt pending */
-		mutex_exit(&dev->mutex);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	do_syn = do_dac = do_adc = NULL;
-
-	/* synth interrupt */
-	if (stats & CONC_INTSTAT_SYNINT) {
-
-		ackbits |= CONC_SERCTL_SYNIE;
-		port = &dev->port[PORT_SYN];
-		if (port->trigger) {
-			do_syn = port->engine;
-		}
-	}
-
-	/* DAC interrupt */
-	if (stats & CONC_INTSTAT_DACINT) {
-
-		ackbits |= CONC_SERCTL_DACIE;
-		port = &dev->port[PORT_DAC];
-		if (port->trigger) {
-			do_dac = port->engine;
-		}
-	}
-
-	/* ADC interrupt */
-	if (stats & CONC_INTSTAT_ADCINT) {
-
-		ackbits |= CONC_SERCTL_ADCIE;
-		port = &dev->port[PORT_ADC];
-
-		if (port->trigger) {
-			do_adc = port->engine;
-		}
-	}
-
-	/* UART interrupt - we shouldn't get this! */
-	if (stats & CONC_INTSTAT_UARTINT) {
-		uint8_t uart_stat = GET8(dev, CONC_bUARTCSTAT_OFF);
-		while (uart_stat & CONC_UART_RXRDY)
-			uart_stat = GET8(dev, CONC_bUARTCSTAT_OFF);
-	}
-
-	/* Ack the interrupt */
-	tmp = GET8(dev, CONC_bSERCTL_OFF);
-	PUT8(dev, CONC_bSERCTL_OFF, tmp & (~ackbits));	/* Clear bits */
-	PUT8(dev, CONC_bSERCTL_OFF, tmp | ackbits);	/* Turn them back on */
-
-	if (dev->ksp) {
-		if (ackbits == 0) {
-			KSINTR(dev)->intrs[KSTAT_INTR_SPURIOUS]++;
-		} else {
-			KSINTR(dev)->intrs[KSTAT_INTR_HARD]++;
-		}
-	}
-
-	mutex_exit(&dev->mutex);
-
-	if (do_syn)
-		audio_engine_consume(do_syn);
-	if (do_dac)
-		audio_engine_consume(do_dac);
-	if (do_adc)
-		audio_engine_produce(do_adc);
-
-	return (DDI_INTR_CLAIMED);
 }
 
 /*
@@ -421,9 +289,6 @@ audiopci_init_port(audiopci_port_t *port)
 	audiopci_dev_t	*dev = port->dev;
 	unsigned tmp;
 
-	if (dev->suspended)
-		return;
-
 	switch (port->num) {
 	case PORT_DAC:
 
@@ -447,7 +312,7 @@ audiopci_init_port(audiopci_port_t *port)
 		    port->nframes - 1);
 
 		/* Set # of frames between interrupts */
-		PUT16(dev, CONC_wDACIC_OFF, port->fragfr - 1);
+		PUT16(dev, CONC_wDACIC_OFF, port->nframes - 1);
 
 		break;
 
@@ -472,7 +337,7 @@ audiopci_init_port(audiopci_port_t *port)
 		    port->nframes - 1);
 
 		/* Set # of frames between interrupts */
-		PUT16(dev, CONC_wSYNIC_OFF, port->fragfr - 1);
+		PUT16(dev, CONC_wSYNIC_OFF, port->nframes - 1);
 
 		break;
 
@@ -498,7 +363,7 @@ audiopci_init_port(audiopci_port_t *port)
 		    port->nframes - 1);
 
 		/* Set # of frames between interrupts */
-		PUT16(dev, CONC_wADCIC_OFF, port->fragfr - 1);
+		PUT16(dev, CONC_wADCIC_OFF, port->nframes - 1);
 
 		break;
 	}
@@ -507,94 +372,20 @@ audiopci_init_port(audiopci_port_t *port)
 }
 
 static int
-audiopci_open(void *arg, int flag, unsigned *fragfrp, unsigned *nfragsp,
-    caddr_t *bufp)
+audiopci_open(void *arg, int flag, unsigned *nframes, caddr_t *bufp)
 {
 	audiopci_port_t	*port = arg;
-	audiopci_dev_t	*dev = port->dev;
-	int intrs;
 
 	_NOTE(ARGUNUSED(flag));
 
-
-	mutex_enter(&dev->mutex);
-	switch (port->num) {
-	case PORT_ADC:
-		intrs = dev->rintrs;
-		break;
-	case PORT_DAC:
-		intrs = dev->pintrs;
-		break;
-	case PORT_SYN:
-		intrs = dev->pintrs;
-		break;
-	}
-
-	/* interrupt at least at 25 Hz, and not more than 250 Hz */
-	intrs = min(250, max(25, intrs));
-
 	/* NB: frame size = 4 (16-bit stereo) */
-	port->fragfr = (port->speed / intrs);
-	port->nfrags = AUDIOPCI_BUF_LEN / (port->fragfr * 4);
-	port->nfrags = max(4, min(port->nfrags, 1024));
-	port->nframes = port->nfrags * port->fragfr;
-	port->trigger = B_FALSE;
+	port->nframes = AUDIOPCI_BUF_LEN / 4;
 	port->count = 0;
 
-	audiopci_init_port(port);
-
-	*fragfrp = port->fragfr;
-	*nfragsp = port->nfrags;
+	*nframes = port->nframes;
 	*bufp = port->kaddr;
-	mutex_exit(&dev->mutex);
 
 	return (0);
-}
-
-static void
-audiopci_start_port(audiopci_port_t *port)
-{
-	audiopci_dev_t *dev = port->dev;
-
-	if (!dev->suspended) {
-		switch (port->num) {
-		case PORT_DAC:
-			SET8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_DAC_EN);
-			SET8(dev, CONC_bSERCTL_OFF, CONC_SERCTL_DACIE);
-			break;
-		case PORT_SYN:
-			SET8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_SYN_EN);
-			SET8(dev, CONC_bSERCTL_OFF, CONC_SERCTL_SYNIE);
-			break;
-		case PORT_ADC:
-			SET8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_ADC_EN);
-			SET8(dev, CONC_bSERCTL_OFF, CONC_SERCTL_ADCIE);
-			break;
-		}
-	}
-}
-
-static void
-audiopci_stop_port(audiopci_port_t *port)
-{
-	audiopci_dev_t *dev = port->dev;
-
-	if (!dev->suspended) {
-		switch (port->num) {
-		case PORT_DAC:
-			CLR8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_DAC_EN);
-			CLR8(dev, CONC_bSERCTL_OFF, CONC_SERCTL_DACIE);
-			break;
-		case PORT_SYN:
-			CLR8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_SYN_EN);
-			CLR8(dev, CONC_bSERCTL_OFF, CONC_SERCTL_SYNIE);
-			break;
-		case PORT_ADC:
-			CLR8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_ADC_EN);
-			CLR8(dev, CONC_bSERCTL_OFF, CONC_SERCTL_ADCIE);
-			break;
-		}
-	}
 }
 
 static int
@@ -604,9 +395,19 @@ audiopci_start(void *arg)
 	audiopci_dev_t *dev = port->dev;
 
 	mutex_enter(&dev->mutex);
-	if (!port->trigger) {
-		port->trigger = B_TRUE;
-		audiopci_start_port(port);
+
+	audiopci_init_port(port);
+
+	switch (port->num) {
+	case PORT_DAC:
+		SET8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_DAC_EN);
+		break;
+	case PORT_SYN:
+		SET8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_SYN_EN);
+		break;
+	case PORT_ADC:
+		SET8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_ADC_EN);
+		break;
 	}
 	mutex_exit(&dev->mutex);
 
@@ -620,16 +421,26 @@ audiopci_stop(void *arg)
 	audiopci_dev_t *dev = port->dev;
 
 	mutex_enter(&dev->mutex);
-	if (port->trigger) {
-		port->trigger = B_FALSE;
-		audiopci_stop_port(port);
+	switch (port->num) {
+	case PORT_DAC:
+		CLR8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_DAC_EN);
+		break;
+	case PORT_SYN:
+		CLR8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_SYN_EN);
+		break;
+	case PORT_ADC:
+		CLR8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_ADC_EN);
+		break;
 	}
 	mutex_exit(&dev->mutex);
 }
 
-static void
-audiopci_update_port(audiopci_port_t *port)
+static uint64_t
+audiopci_count(void *arg)
 {
+	audiopci_port_t *port = arg;
+	audiopci_dev_t *dev = port->dev;
+	uint64_t val;
 	uint32_t page, offs;
 	int frameno, n;
 
@@ -653,36 +464,24 @@ audiopci_update_port(audiopci_port_t *port)
 	/*
 	 * Note that the current frame counter is in the high nybble.
 	 */
+	mutex_enter(&dev->mutex);
 	frameno = audiopci_readmem(port->dev, page, offs) >> 16;
+	mutex_exit(&dev->mutex);
+
 	n = frameno >= port->frameno ?
 	    frameno - port->frameno :
 	    frameno + port->nframes - port->frameno;
 	port->frameno = frameno;
 	port->count += n;
-}
 
-static uint64_t
-audiopci_count(void *arg)
-{
-	audiopci_port_t *port = arg;
-	audiopci_dev_t *dev = port->dev;
-	uint64_t val;
-
-	mutex_enter(&dev->mutex);
-	if (!dev->suspended) {
-		audiopci_update_port(port);
-	}
 	val = port->count;
-	mutex_exit(&dev->mutex);
 	return (val);
 }
 
 static void
 audiopci_close(void *arg)
 {
-	audiopci_port_t *port = arg;
-
-	audiopci_stop(port);
+	_NOTE(ARGUNUSED(arg));
 }
 
 static void
@@ -797,8 +596,6 @@ audiopci_init_hw(audiopci_dev_t *dev)
 	if (dev->micbias) {
 		SET16(dev, 2, CONC_DEVCTL_MICBIAS);
 	}
-
-	dev->enabled = B_TRUE;
 }
 
 static int
@@ -807,12 +604,6 @@ audiopci_init(audiopci_dev_t *dev)
 	dev->micbias = 1;
 
 	audiopci_init_hw(dev);
-
-	dev->pintrs = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, "play-interrupts", DEFINTS);
-
-	dev->rintrs = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, "record-interrupts", DEFINTS);
 
 	for (int i = 0; i <= PORT_MAX; i++) {
 		audiopci_port_t *port;
@@ -896,15 +687,6 @@ audiopci_init(audiopci_dev_t *dev)
 		return (DDI_FAILURE);
 	}
 
-	/*
-	 * Set up kstats for interrupt reporting.
-	 */
-	dev->ksp = kstat_create(ddi_driver_name(dev->dip),
-	    ddi_get_instance(dev->dip), ddi_driver_name(dev->dip),
-	    "controller", KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
-	if (dev->ksp != NULL) {
-		kstat_install(dev->ksp);
-	}
 
 	if (audio_dev_register(dev->adev) != DDI_SUCCESS) {
 		audio_dev_warn(dev->adev,
@@ -915,54 +697,12 @@ audiopci_init(audiopci_dev_t *dev)
 	return (DDI_SUCCESS);
 }
 
-int
-audiopci_setup_interrupts(audiopci_dev_t *dev)
-{
-	int actual;
-	uint_t ipri;
-
-	if ((ddi_intr_alloc(dev->dip, dev->ihandle, DDI_INTR_TYPE_FIXED,
-	    0, 1, &actual, DDI_INTR_ALLOC_NORMAL) != DDI_SUCCESS) ||
-	    (actual != 1)) {
-		audio_dev_warn(dev->adev, "can't alloc intr handle");
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_get_pri(dev->ihandle[0], &ipri) != DDI_SUCCESS) {
-		audio_dev_warn(dev->adev,  "can't determine intr priority");
-		(void) ddi_intr_free(dev->ihandle[0]);
-		dev->ihandle[0] = NULL;
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_add_handler(dev->ihandle[0], audiopci_intr, dev,
-	    NULL) != DDI_SUCCESS) {
-		audio_dev_warn(dev->adev, "can't add intr handler");
-		(void) ddi_intr_free(dev->ihandle[0]);
-		dev->ihandle[0] = NULL;
-		return (DDI_FAILURE);
-	}
-
-	mutex_init(&dev->mutex, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-
-	return (DDI_SUCCESS);
-}
-
-void
+static void
 audiopci_destroy(audiopci_dev_t *dev)
 {
 	int	i;
 
-	if (dev->ihandle[0] != NULL) {
-		(void) ddi_intr_disable(dev->ihandle[0]);
-		(void) ddi_intr_remove_handler(dev->ihandle[0]);
-		(void) ddi_intr_free(dev->ihandle[0]);
-		mutex_destroy(&dev->mutex);
-	}
-
-	if (dev->ksp != NULL) {
-		kstat_delete(dev->ksp);
-	}
+	mutex_destroy(&dev->mutex);
 
 	/* free up ports, including DMA resources for ports */
 	for (i = 0; i <= PORT_MAX; i++) {
@@ -1046,11 +786,9 @@ static int
 audiopci_get_value(void *arg, uint64_t *val)
 {
 	audiopci_ctrl_t	*pc = arg;
-	audiopci_dev_t	*dev = pc->dev;
 
-	mutex_enter(&dev->mutex);
 	*val = pc->val;
-	mutex_exit(&dev->mutex);
+
 	return (0);
 }
 
@@ -1425,7 +1163,7 @@ audiopci_add_controls(audiopci_dev_t *dev)
 	return (DDI_SUCCESS);
 }
 
-void
+static void
 audiopci_del_controls(audiopci_dev_t *dev)
 {
 	for (int i = 0; i < CTL_NUM; i++) {
@@ -1435,7 +1173,7 @@ audiopci_del_controls(audiopci_dev_t *dev)
 	}
 }
 
-int
+static int
 audiopci_attach(dev_info_t *dip)
 {
 	uint16_t pci_command, vendor, device;
@@ -1446,8 +1184,11 @@ audiopci_attach(dev_info_t *dip)
 	dev->dip = dip;
 	ddi_set_driver_private(dip, dev);
 
+	mutex_init(&dev->mutex, NULL, MUTEX_DRIVER, NULL);
+
 	if (pci_config_setup(dip, &pcih) != DDI_SUCCESS) {
 		audio_dev_warn(dev->adev, "pci_config_setup failed");
+		mutex_destroy(&dev->mutex);
 		kmem_free(dev, sizeof (*dev));
 		return (DDI_FAILURE);
 	}
@@ -1482,18 +1223,12 @@ audiopci_attach(dev_info_t *dip)
 		goto err_exit;
 	}
 
-	if (audiopci_setup_interrupts(dev) != DDI_SUCCESS) {
-		audio_dev_warn(dev->adev, "can't register interrupts");
-		goto err_exit;
-	}
 
 	/* This allocates and configures the engines */
 	if (audiopci_init(dev) != DDI_SUCCESS) {
 		audio_dev_warn(dev->adev, "can't init device");
 		goto err_exit;
 	}
-
-	(void) ddi_intr_enable(dev->ihandle[0]);
 
 	pci_config_teardown(&pcih);
 
@@ -1502,6 +1237,7 @@ audiopci_attach(dev_info_t *dip)
 	return (DDI_SUCCESS);
 
 err_exit:
+	mutex_destroy(&dev->mutex);
 	pci_config_teardown(&pcih);
 
 	audiopci_destroy(dev);
@@ -1509,7 +1245,7 @@ err_exit:
 	return (DDI_FAILURE);
 }
 
-int
+static int
 audiopci_detach(audiopci_dev_t *dev)
 {
 	int tmp;
@@ -1534,8 +1270,6 @@ audiopci_detach(audiopci_dev_t *dev)
 	PUT8(dev, CONC_bDEVCTL_OFF, tmp);
 	PUT8(dev, CONC_bDEVCTL_OFF, tmp);
 
-	dev->enabled = B_FALSE;
-
 	mutex_exit(&dev->mutex);
 
 	audiopci_destroy(dev);
@@ -1546,55 +1280,17 @@ audiopci_detach(audiopci_dev_t *dev)
 static int
 audiopci_resume(audiopci_dev_t *dev)
 {
-	/* ask framework to reset/relocate engine data */
-	for (int i = 0; i <= PORT_MAX; i++) {
-		audio_engine_reset(dev->port[i].engine);
-	}
-
-	mutex_enter(&dev->mutex);
-	dev->suspended = B_FALSE;
-
 	/* reinitialize hardware */
 	audiopci_init_hw(dev);
 
-	/* restore mixer settings */
-	audiopci_configure_output(dev);
-	audiopci_configure_input(dev);
-
-	/* restart ports */
-	for (int i = 0; i < PORT_MAX; i++) {
-		audiopci_port_t	*port = &dev->port[i];
-		audiopci_init_port(port);
-		/* possibly start it up if was going when we suspended */
-		if (port->trigger) {
-			audiopci_start_port(port);
-
-			/* signal callbacks on resume */
-			if (port->num == PORT_ADC) {
-				audio_engine_produce(port->engine);
-			} else {
-				audio_engine_consume(port->engine);
-			}
-		}
-	}
-	mutex_exit(&dev->mutex);
+	audio_dev_resume(dev->adev);
 	return (DDI_SUCCESS);
 }
 
 static int
 audiopci_suspend(audiopci_dev_t *dev)
 {
-	/*
-	 * Stop all engines/DMA data.
-	 */
-	mutex_enter(&dev->mutex);
-	for (int i = 0; i <= PORT_MAX; i++) {
-		audiopci_stop_port(&dev->port[i]);
-		audiopci_update_port(&dev->port[i]);
-	}
-	dev->suspended = B_TRUE;
-	dev->enabled = B_FALSE;
-	mutex_exit(&dev->mutex);
+	audio_dev_suspend(dev->adev);
 
 	return (DDI_SUCCESS);
 }

@@ -21,7 +21,7 @@
 #
 # uts/intel/audiopci/Makefile
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the audiopci driver.
@@ -39,7 +39,6 @@ MODULE		= audiopci
 OBJECTS		= $(AUDIOPCI_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AUDIOPCI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/io/audio/drv/audiopci
 
 #
 #	Include common rules.
@@ -49,9 +48,9 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 LDFLAGS		+= -dy -Ndrv/audio
 

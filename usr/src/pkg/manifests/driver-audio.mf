@@ -58,14 +58,9 @@ file path=kernel/drv/$(ARCH64)/audiots group=sys
 $(i386_ONLY)file path=kernel/drv/audio group=sys
 file path=kernel/drv/audio.conf group=sys reboot-needed=false
 $(i386_ONLY)file path=kernel/drv/audio1575 group=sys
-file path=kernel/drv/audio1575.conf group=sys reboot-needed=false
-$(sparc_ONLY)file path=kernel/drv/audiocs.conf group=sys reboot-needed=false
 $(i386_ONLY)file path=kernel/drv/audioens group=sys
-file path=kernel/drv/audioens.conf group=sys reboot-needed=false
 $(i386_ONLY)file path=kernel/drv/audiopci group=sys
-file path=kernel/drv/audiopci.conf group=sys reboot-needed=false
 $(i386_ONLY)file path=kernel/drv/audiots group=sys
-file path=kernel/drv/audiots.conf group=sys reboot-needed=false
 file path=kernel/misc/$(ARCH64)/ac97 group=sys mode=0755 reboot-needed=true
 $(i386_ONLY)file path=kernel/misc/ac97 group=sys mode=0755 reboot-needed=true
 legacy pkg=SUNWaudd arch=$(ARCH) category=system \

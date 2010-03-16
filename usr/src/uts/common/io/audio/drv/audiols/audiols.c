@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,7 +77,7 @@ static int audigyls_resume(dev_info_t *);
 static int audigyls_detach(audigyls_dev_t *);
 static int audigyls_suspend(audigyls_dev_t *);
 
-static int audigyls_open(void *, int, unsigned *, unsigned *, caddr_t *);
+static int audigyls_open(void *, int, unsigned *, caddr_t *);
 static void audigyls_close(void *);
 static int audigyls_start(void *);
 static void audigyls_stop(void *);
@@ -92,14 +92,8 @@ static void audigyls_chinfo(void *, int, unsigned *, unsigned *);
 static uint16_t audigyls_read_ac97(void *, uint8_t);
 static void audigyls_write_ac97(void *, uint8_t, uint16_t);
 static int audigyls_alloc_port(audigyls_dev_t *, int);
-static void audigyls_start_port(audigyls_port_t *);
-static void audigyls_stop_port(audigyls_port_t *);
-static void audigyls_update_port(audigyls_port_t *);
-static void audigyls_reset_port(audigyls_port_t *);
 static void audigyls_destroy(audigyls_dev_t *);
-static int audigyls_setup_intrs(audigyls_dev_t *);
 static void audigyls_hwinit(audigyls_dev_t *);
-static uint_t audigyls_intr(caddr_t, caddr_t);
 static void audigyls_configure_mixer(audigyls_dev_t *dev);
 
 static audio_engine_ops_t audigyls_engine_ops = {
@@ -309,92 +303,12 @@ audigyls_spi_write(audigyls_dev_t *dev, int data)
 	return (1);
 }
 
-static void
-audigyls_update_port(audigyls_port_t *port)
-{
-	audigyls_dev_t *dev = port->dev;
-	uint32_t	offset, n;
-
-	if (dev->suspended)
-		return;
-
-	if (port->direction == AUDIGYLS_PLAY_PORT) {
-		offset = read_chan(dev, CPFA, 0);
-	} else {
-		offset = read_chan(dev, CRFA, 2);
-	}
-
-
-	/* get the offset, and switch to frames */
-	offset /= (2 * sizeof (uint16_t));
-
-	if (offset >= port->offset) {
-		n = offset - port->offset;
-	} else {
-		n = offset + (port->buf_frames - port->offset);
-	}
-	port->offset = offset;
-	port->count += n;
-}
-
-static void
-check_play_intr(audigyls_dev_t *dev)
-{
-	audigyls_port_t *port = dev->port[AUDIGYLS_PLAY_PORT];
-
-	if (!port->started)
-		return;
-	audio_engine_consume(port->engine);
-}
-
-static void
-check_rec_intr(audigyls_dev_t *dev)
-{
-	audigyls_port_t *port = dev->port[AUDIGYLS_REC_PORT];
-
-	if (!port->started)
-		return;
-	audio_engine_produce(port->engine);
-}
-
-static uint_t
-audigyls_intr(caddr_t argp, caddr_t nocare)
-{
-	audigyls_dev_t	*dev = (void *)argp;
-	uint32_t	status;
-
-	_NOTE(ARGUNUSED(nocare));
-	status = INL(dev, IPR);
-
-	if (dev->suspended) {
-		OUTL(dev, IPR, status);		/* Acknowledge */
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	if (!(status & (INTR_IT1 | INTR_PCI))) {
-		/* No audio interrupts pending */
-		OUTL(dev, IPR, status);		/* Acknowledge */
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	check_play_intr(dev);
-	check_rec_intr(dev);
-
-	if (dev->ksp) {
-		AUDIGYLS_KIOP(dev)->intrs[KSTAT_INTR_HARD]++;
-	}
-
-	OUTL(dev, IPR, status);		/* Acknowledge */
-	return (DDI_INTR_CLAIMED);
-}
-
 /*
  * Audio routines
  */
 
 int
-audigyls_open(void *arg, int flag,
-    unsigned *fragfrp, unsigned *nfragsp, caddr_t *bufp)
+audigyls_open(void *arg, int flag, unsigned *nframesp, caddr_t *bufp)
 {
 	audigyls_port_t	 *port = arg;
 	audigyls_dev_t	 *dev = port->dev;
@@ -403,12 +317,9 @@ audigyls_open(void *arg, int flag,
 
 	mutex_enter(&dev->mutex);
 
-	port->started = B_FALSE;
 	port->count = 0;
-	*fragfrp = port->fragfr;
-	*nfragsp = AUDIGYLS_NUM_FRAGS;
+	*nframesp = port->buf_frames;
 	*bufp = port->buf_kaddr;
-	audigyls_reset_port(port);
 	mutex_exit(&dev->mutex);
 
 	return (0);
@@ -417,13 +328,7 @@ audigyls_open(void *arg, int flag,
 void
 audigyls_close(void *arg)
 {
-	audigyls_port_t *port = arg;
-	audigyls_dev_t	 *dev = port->dev;
-
-	mutex_enter(&dev->mutex);
-	audigyls_stop_port(port);
-	port->started = B_FALSE;
-	mutex_exit(&dev->mutex);
+	_NOTE(ARGUNUSED(arg));
 }
 
 int
@@ -431,12 +336,41 @@ audigyls_start(void *arg)
 {
 	audigyls_port_t *port = arg;
 	audigyls_dev_t	*dev = port->dev;
+	uint32_t	tmp;
 
 	mutex_enter(&dev->mutex);
-	if (!port->started) {
-		audigyls_start_port(port);
-		port->started = B_TRUE;
+
+	port->offset = 0;
+
+	switch (port->direction) {
+	case AUDIGYLS_PLAY_PORT:
+		write_chan(dev, PTCA, 0, 0);
+		write_chan(dev, CPFA, 0, 0);
+		write_chan(dev, CPCAV, 0, 0);
+		write_chan(dev, PTCA, 1, 0);
+		write_chan(dev, CPFA, 1, 0);
+		write_chan(dev, CPCAV, 1, 0);
+		write_chan(dev, PTCA, 3, 0);
+		write_chan(dev, CPFA, 3, 0);
+		write_chan(dev, CPCAV, 3, 0);
+
+		tmp = read_reg(dev, SA);
+		tmp |= SA_SPA(0);
+		tmp |= SA_SPA(1);
+		tmp |= SA_SPA(3);
+		write_reg(dev, SA, tmp);
+		break;
+
+	case AUDIGYLS_REC_PORT:
+		write_chan(dev, CRFA, 2, 0);
+		write_chan(dev, CRCAV, 2, 0);
+
+		tmp = read_reg(dev, SA);
+		tmp |= SA_SRA(2);
+		write_reg(dev, SA, tmp);
+		break;
 	}
+
 	mutex_exit(&dev->mutex);
 	return (0);
 }
@@ -446,12 +380,26 @@ audigyls_stop(void *arg)
 {
 	audigyls_port_t	*port = arg;
 	audigyls_dev_t	*dev = port->dev;
+	uint32_t	tmp;
 
 	mutex_enter(&dev->mutex);
-	if (port->started) {
-		audigyls_stop_port(port);
-		port->started = B_FALSE;
+
+	switch (port->direction) {
+	case AUDIGYLS_PLAY_PORT:
+		tmp = read_reg(dev, SA);
+		tmp &= ~SA_SPA(0);
+		tmp &= ~SA_SPA(1);
+		tmp &= ~SA_SPA(3);
+		write_reg(dev, SA, tmp);
+		break;
+
+	case AUDIGYLS_REC_PORT:
+		tmp = read_reg(dev, SA);
+		tmp &= ~SA_SRA(2);
+		write_reg(dev, SA, tmp);
+		break;
 	}
+
 	mutex_exit(&dev->mutex);
 }
 
@@ -494,10 +442,27 @@ audigyls_count(void *arg)
 	audigyls_port_t	*port = arg;
 	audigyls_dev_t	*dev = port->dev;
 	uint64_t	count;
+	uint32_t	offset, n;
 
 	mutex_enter(&dev->mutex);
-	if (!dev->suspended)
-		audigyls_update_port(port);
+
+	if (port->direction == AUDIGYLS_PLAY_PORT) {
+		offset = read_chan(dev, CPFA, 0);
+	} else {
+		offset = read_chan(dev, CRFA, 2);
+	}
+
+	/* get the offset, and switch to frames */
+	offset /= (2 * sizeof (uint16_t));
+
+	if (offset >= port->offset) {
+		n = offset - port->offset;
+	} else {
+		n = offset + (port->buf_frames - port->offset);
+	}
+	port->offset = offset;
+	port->count += n;
+
 	count = port->count;
 	mutex_exit(&dev->mutex);
 	return (count);
@@ -519,107 +484,6 @@ audigyls_chinfo(void *arg, int chan, unsigned *offset, unsigned *incr)
 
 /* private implementation bits */
 
-void
-audigyls_start_port(audigyls_port_t *port)
-{
-	audigyls_dev_t	*dev = port->dev;
-	uint32_t tmp;
-
-	ASSERT(mutex_owned(&dev->mutex));
-
-	if (dev->suspended || port->active)
-		return;
-
-	port->active = B_TRUE;
-	port->offset = 0;
-	dev->nactive++;
-
-	if (dev->nactive == 1) {
-		write_reg(dev, IT, dev->timer);
-		OUTL(dev, IER, INL(dev, IER) | INTR_IT1);
-	}
-
-	switch (port->direction) {
-	case AUDIGYLS_PLAY_PORT:
-		tmp = read_reg(dev, SA);
-		tmp |= SA_SPA(0);
-		tmp |= SA_SPA(1);
-		tmp |= SA_SPA(3);
-		write_reg(dev, SA, tmp);
-		break;
-
-	case AUDIGYLS_REC_PORT:
-		tmp = read_reg(dev, SA);
-		tmp |= SA_SRA(2);
-		write_reg(dev, SA, tmp);
-		break;
-	}
-
-}
-
-void
-audigyls_stop_port(audigyls_port_t *port)
-{
-	audigyls_dev_t	*dev = port->dev;
-	uint32_t tmp;
-
-	if (dev->suspended || !port->active)
-		return;
-
-	port->active = B_FALSE;
-	dev->nactive--;
-
-	switch (port->direction) {
-	case AUDIGYLS_PLAY_PORT:
-		tmp = read_reg(dev, SA);
-		tmp &= ~SA_SPA(0);
-		tmp &= ~SA_SPA(1);
-		tmp &= ~SA_SPA(3);
-		write_reg(dev, SA, tmp);
-		break;
-
-	case AUDIGYLS_REC_PORT:
-		tmp = read_reg(dev, SA);
-		tmp &= ~SA_SRA(2);
-		write_reg(dev, SA, tmp);
-		break;
-	}
-
-	if (dev->nactive == 0) {
-		OUTL(dev, IER, INL(dev, IER) & ~INTR_IT1);
-	}
-}
-
-void
-audigyls_reset_port(audigyls_port_t *port)
-{
-	audigyls_dev_t	*dev = port->dev;
-
-	ASSERT(mutex_owned(&dev->mutex));
-
-	if (dev->suspended)
-		return;
-
-	switch (port->direction) {
-	case AUDIGYLS_PLAY_PORT:
-		write_chan(dev, PTCA, 0, 0);
-		write_chan(dev, CPFA, 0, 0);
-		write_chan(dev, CPCAV, 0, 0);
-		write_chan(dev, PTCA, 1, 0);
-		write_chan(dev, CPFA, 1, 0);
-		write_chan(dev, CPCAV, 1, 0);
-		write_chan(dev, PTCA, 3, 0);
-		write_chan(dev, CPFA, 3, 0);
-		write_chan(dev, CPCAV, 3, 0);
-		break;
-
-	case AUDIGYLS_REC_PORT:
-		write_chan(dev, CRFA, 2, 0);
-		write_chan(dev, CRCAV, 2, 0);
-		break;
-	}
-}
-
 int
 audigyls_alloc_port(audigyls_dev_t *dev, int num)
 {
@@ -635,7 +499,6 @@ audigyls_alloc_port(audigyls_dev_t *dev, int num)
 	port = kmem_zalloc(sizeof (*port), KM_SLEEP);
 	dev->port[num] = port;
 	port->dev = dev;
-	port->started = B_FALSE;
 	port->direction = num;
 
 	switch (num) {
@@ -655,15 +518,8 @@ audigyls_alloc_port(audigyls_dev_t *dev, int num)
 		return (DDI_FAILURE);
 	}
 
-	/* figure out fragment configuration */
-	port->fragfr = 48000 / dev->intrs;
-	/* we want to make sure that we are aligning on reasonable chunks */
-	port->fragfr = (port->fragfr + 63) & ~(63);
-
-	/* 16 bit frames */
-	port->fragsz = port->fragfr * 2 * port->nchan;
-	port->buf_size = port->fragsz * AUDIGYLS_NUM_FRAGS;
-	port->buf_frames = port->fragfr * AUDIGYLS_NUM_FRAGS;
+	port->buf_frames = 2048;
+	port->buf_size = port->buf_frames * port->nchan * sizeof (int16_t);
 
 	/* Alloc buffers */
 	if (ddi_dma_alloc_handle(dev->dip, &dma_attr_buf, DDI_DMA_SLEEP, NULL,
@@ -699,42 +555,6 @@ audigyls_alloc_port(audigyls_dev_t *dev, int num)
 	return (DDI_SUCCESS);
 }
 
-int
-audigyls_setup_intrs(audigyls_dev_t *dev)
-{
-	uint_t			ipri;
-	int			actual;
-	int			rv;
-	ddi_intr_handle_t	ih[1];
-
-	rv = ddi_intr_alloc(dev->dip, ih, DDI_INTR_TYPE_FIXED,
-	    0, 1, &actual, DDI_INTR_ALLOC_STRICT);
-	if ((rv != DDI_SUCCESS) || (actual != 1)) {
-		audio_dev_warn(dev->adev,
-		    "Can't alloc interrupt handle (rv %d actual %d)",
-		    rv, actual);
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_get_pri(ih[0], &ipri) != DDI_SUCCESS) {
-		audio_dev_warn(dev->adev, "Can't get interrupt priority");
-		(void) ddi_intr_free(ih[0]);
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_add_handler(ih[0], audigyls_intr, dev, NULL) !=
-	    DDI_SUCCESS) {
-		audio_dev_warn(dev->adev, "Can't add interrupt handler");
-		(void) ddi_intr_free(ih[0]);
-		return (DDI_FAILURE);
-	}
-
-	dev->ih = ih[0];
-	mutex_init(&dev->mutex, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-	mutex_init(&dev->low_mutex, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-	return (DDI_SUCCESS);
-}
-
 void
 audigyls_del_controls(audigyls_dev_t *dev)
 {
@@ -749,17 +569,8 @@ audigyls_del_controls(audigyls_dev_t *dev)
 void
 audigyls_destroy(audigyls_dev_t *dev)
 {
-	if (dev->ih != NULL) {
-		(void) ddi_intr_disable(dev->ih);
-		(void) ddi_intr_remove_handler(dev->ih);
-		(void) ddi_intr_free(dev->ih);
-		mutex_destroy(&dev->mutex);
-		mutex_destroy(&dev->low_mutex);
-	}
-
-	if (dev->ksp) {
-		kstat_delete(dev->ksp);
-	}
+	mutex_destroy(&dev->mutex);
+	mutex_destroy(&dev->low_mutex);
 
 	for (int i = 0; i < AUDIGYLS_NUM_PORT; i++) {
 		audigyls_port_t *port = dev->port[i];
@@ -868,7 +679,7 @@ audigyls_hwinit(audigyls_dev_t *dev)
 		}
 	}
 
-	OUTL(dev, IER, INTR_PCI);
+	OUTL(dev, IER, 0);
 	OUTL(dev, HC, 0x00000009);	/* Enable audio, use 48 kHz */
 
 	tmp = read_chan(dev, SRCTL, 0);
@@ -1051,7 +862,7 @@ audigyls_configure_mixer(audigyls_dev_t *dev)
 	if (dev->controls[CTL_LOOP].val) {
 		r = 0;
 		v1 = RECSEL_I2SOUT;
-		r |= (v1 << 28) | (v1 << 24) | (v1 << 20) | (v1 << 16) | v2;
+		r |= (v1 << 28) | (v1 << 24) | (v1 << 20) | (v1 << 16) | v1;
 	} else {
 		/*
 		 * You'd think this would be the same as the logic
@@ -1119,9 +930,8 @@ audigyls_set_control(void *arg, uint64_t val)
 
 	mutex_enter(&dev->mutex);
 	pc->val = val;
-	if (!dev->suspended) {
-		audigyls_configure_mixer(dev);
-	}
+	audigyls_configure_mixer(dev);
+
 	mutex_exit(&dev->mutex);
 
 	return (0);
@@ -1300,6 +1110,8 @@ audigyls_attach(dev_info_t *dip)
 	dev = kmem_zalloc(sizeof (*dev), KM_SLEEP);
 	dev->dip = dip;
 	ddi_set_driver_private(dip, dev);
+	mutex_init(&dev->mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&dev->low_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	if ((dev->adev = audio_dev_alloc(dip, 0)) == NULL) {
 		cmn_err(CE_WARN, "audio_dev_alloc failed");
@@ -1337,27 +1149,6 @@ audigyls_attach(dev_info_t *dip)
 	/* Function of the orange jack: 0=analog, 1=digital */
 	dev->digital_enable = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
 	    DDI_PROP_DONTPASS, "digital-enable", 0);
-
-	if (audigyls_setup_intrs(dev) != DDI_SUCCESS)
-		goto error;
-
-	dev->intrs = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, "interrupt-rate", AUDIGYLS_INTRS);
-
-	/* make sure the values are good */
-	if (dev->intrs < AUDIGYLS_MIN_INTRS) {
-		audio_dev_warn(dev->adev,
-		    "interrupt-rate too low, %d, reset to %d",
-		    dev->intrs, AUDIGYLS_INTRS);
-		dev->intrs = AUDIGYLS_INTRS;
-	} else if (dev->intrs > AUDIGYLS_MAX_INTRS) {
-		audio_dev_warn(dev->adev,
-		    "interrupt-rate too high, %d, reset to %d",
-		    dev->intrs, AUDIGYLS_INTRS);
-		dev->intrs = AUDIGYLS_INTRS;
-	}
-
-	dev->timer = (192000 / dev->intrs) << 16;
 
 	switch (subdevice) {
 	case 0x11021001:	/* SB0310 */
@@ -1453,19 +1244,11 @@ audigyls_attach(dev_info_t *dip)
 
 	audigyls_configure_mixer(dev);
 
-	/* set up kernel statistics */
-	if ((dev->ksp = kstat_create(AUDIGYLS_NAME, ddi_get_instance(dip),
-	    AUDIGYLS_NAME, "controller", KSTAT_TYPE_INTR, 1,
-	    KSTAT_FLAG_PERSISTENT)) != NULL) {
-		kstat_install(dev->ksp);
-	}
-
 	if (audio_dev_register(dev->adev) != DDI_SUCCESS) {
 		audio_dev_warn(dev->adev, "unable to register with framework");
 		goto error;
 	}
 
-	(void) ddi_intr_enable(dev->ih);
 	ddi_report_dev(dip);
 
 	return (DDI_SUCCESS);
@@ -1479,38 +1262,17 @@ int
 audigyls_resume(dev_info_t *dip)
 {
 	audigyls_dev_t *dev;
-	audigyls_port_t *port;
 
 	dev = ddi_get_driver_private(dip);
-
-	for (int i = 0; i < AUDIGYLS_NUM_PORT; i++) {
-		port = dev->port[i];
-		audio_engine_reset(port->engine);
-	}
 
 	audigyls_hwinit(dev);
 
 	/* allow ac97 operations again */
 	if (dev->ac97)
-		ac97_resume(dev->ac97);
+		ac97_reset(dev->ac97);
 
-	audigyls_configure_mixer(dev);
+	audio_dev_resume(dev->adev);
 
-	mutex_enter(&dev->mutex);
-	dev->suspended = B_FALSE;
-
-	for (int i = 0; i < AUDIGYLS_NUM_PORT; i++) {
-
-		port = dev->port[i];
-
-		audigyls_reset_port(port);
-
-		if (port->started) {
-			audigyls_start_port(port);
-		}
-	}
-
-	mutex_exit(&dev->mutex);
 	return (DDI_SUCCESS);
 }
 
@@ -1527,17 +1289,8 @@ audigyls_detach(audigyls_dev_t *dev)
 int
 audigyls_suspend(audigyls_dev_t *dev)
 {
-	if (dev->ac97)
-		ac97_suspend(dev->ac97);
+	audio_dev_suspend(dev->adev);
 
-	mutex_enter(&dev->mutex);
-	for (int i = 0; i < AUDIGYLS_NUM_PORT; i++) {
-
-		audigyls_port_t *port = dev->port[i];
-		audigyls_stop_port(port);
-	}
-	dev->suspended = B_TRUE;
-	mutex_exit(&dev->mutex);
 	return (DDI_SUCCESS);
 }
 
@@ -1640,17 +1393,10 @@ audigyls_ddi_quiesce(dev_info_t *dip)
 	audigyls_dev_t	*dev;
 	uint32_t status;
 
-	dev = ddi_get_driver_private(dip);
-
-	for (int i = 0; i < AUDIGYLS_NUM_PORT; i++) {
-
-		audigyls_port_t *port = dev->port[i];
-		audigyls_stop_port(port);
-	}
-
 	/*
 	 * Turn off the hardware
 	 */
+	dev = ddi_get_driver_private(dip);
 
 	write_reg(dev, SA, 0);
 	OUTL(dev, IER, 0);	/* Interrupt disable */

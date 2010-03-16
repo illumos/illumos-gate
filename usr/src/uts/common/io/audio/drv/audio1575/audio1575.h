@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,10 +35,6 @@
  */
 #define	M1575_NAME			"audio1575"
 #define	M1575_MOD_NAME			"M1575 audio driver"
-
-#define	M1575_INTS			(175)	/* default interrupt rate */
-#define	M1575_MIN_INTS			(25)	/* minimum interrupt rate */
-#define	M1575_MAX_INTS			(5000)	/* maximum interrupt rate */
 
 /*
  * Implementation specific header file for the audio1575 device driver.
@@ -59,7 +55,6 @@
 #define	M1575_MOD_SIZE			(16)
 
 /* kstat interrupt counter define */
-#define	M1575_KIOP(X)			((kstat_intr_t *)(X->ksp->ks_data))
 #define	M1575_ROUNDUP(x, algn)		(((x) + ((algn) - 1)) & ~((algn) - 1))
 
 /* PCI CFG SPACE REGISTERS for Audio (Device 29, Function 0) */
@@ -365,16 +360,12 @@ struct audio1575_port {
 	uint32_t		bdl_paddr;
 
 	int			num;
-	unsigned		intrs;
-	unsigned		fragfr;
+	unsigned		nframes;
+	uint32_t		offset;
 	uint64_t		count;
 	uint8_t			nchan;
 
-	uint8_t			civ;
-	uint16_t		picb;
 	unsigned		sync_dir;
-
-	boolean_t		started;
 
 	audio_engine_t		*engine;
 };
@@ -386,22 +377,16 @@ typedef struct audio1575_port audio1575_port_t;
  */
 struct audio1575_state	{
 	kmutex_t		lock;			/* intr mutex */
-	kmutex_t		ac_lock;		/* ac'97 mutex */
 	dev_info_t		*dip;			/* dev instance ptr */
 	audio_dev_t		*adev;			/* audio handle */
 	ac97_t			*ac97;			/* ac'97 handle */
 	audio1575_port_t	*ports[2];		/* DMA engines */
-
-	ddi_intr_handle_t	ih;			/* intr handle */
 
 	ddi_acc_handle_t	pcih;			/* pci config space */
 
 	ddi_acc_handle_t	regsh;			/* audio i/o regs */
 	caddr_t			regsp;			/* base of i/o regs */
 
-	kstat_t			*ksp;			/* kernel statistics */
-
-	boolean_t		suspended;		/* if DDI_SUSPENDed */
 	uint8_t			maxch;			/* maximum channels */
 };
 typedef struct audio1575_state audio1575_state_t;

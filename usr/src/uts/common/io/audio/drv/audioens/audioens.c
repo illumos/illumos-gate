@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -45,12 +45,6 @@
 #include <sys/note.h>
 #include <sys/pci.h>
 #include "audioens.h"
-
-/*
- * The original OSS driver used a single duplex engine and a separate
- * playback only engine.  Instead, we expose three engines, one for input
- * and two for output.
- */
 
 /*
  * Set the latency to 32, 64, 96, 128 clocks - some APCI97 devices exhibit
@@ -84,15 +78,11 @@ int audioens_spdif = 0;
 #define	ECTIVA_ES1938		0x8938
 
 #define	DEFRATE			48000
-#define	DEFINTS			75
 #define	DRVNAME			"audioens"
 
 typedef struct audioens_port
 {
 	/* Audio parameters */
-	boolean_t		trigger;
-	boolean_t		suspended;
-
 	int			speed;
 
 	int			num;
@@ -105,8 +95,6 @@ typedef struct audioens_port
 	ddi_acc_handle_t	acch;
 	ddi_dma_handle_t	dmah;
 	int			nchan;
-	unsigned		fragfr;
-	unsigned		nfrags;
 	unsigned		nframes;
 	unsigned		frameno;
 	uint64_t		count;
@@ -122,13 +110,6 @@ typedef struct audioens_dev
 	uint16_t		devid;
 	uint8_t			revision;
 	dev_info_t		*dip;
-	boolean_t		enabled;
-
-
-	int			pintrs;
-	int			rintrs;
-
-	kstat_t			*ksp;
 
 	audioens_port_t		port[PORT_MAX + 1];
 
@@ -136,7 +117,6 @@ typedef struct audioens_dev
 
 	caddr_t			regs;
 	ddi_acc_handle_t	acch;
-	ddi_intr_handle_t	ihandle[1];
 } audioens_dev_t;
 
 static ddi_device_acc_attr_t acc_attr = {
@@ -153,15 +133,9 @@ static ddi_device_acc_attr_t buf_attr = {
 
 /*
  * The hardware appears to be able to address up to 16-bits worth of longwords,
- * giving a total address space of 256K.  Note, however, that we will restrict
- * this further when we do fragment and memory allocation.  At its very highest
- * clock rate (48 kHz) and sample size (16-bit stereo), and lowest interrupt
- * rate (32 Hz), we only need 6000 bytes per fragment.
- *
- * So with an allocated buffer size of 64K, we can support at least 10 frags,
- * which is more than enough.  (The legacy Sun driver used only 2 fragments.)
+ * giving a total address space of 256K.  But we need substantially less.
  */
-#define	AUDIOENS_BUF_LEN	(65536)
+#define	AUDIOENS_BUF_LEN	(16384)
 
 static ddi_dma_attr_t dma_attr = {
 	DMA_ATTR_VERSION,	/* dma_attr_version */
@@ -196,13 +170,7 @@ static ddi_dma_attr_t dma_attr = {
 #define	CLR32(dev, offset, v)	PUT32(dev, offset, GET32(dev, offset) & ~(v))
 #define	SET32(dev, offset, v)	PUT32(dev, offset, GET32(dev, offset) | (v))
 
-#define	KSINTR(dev)	((kstat_intr_t *)((dev)->ksp->ks_data))
-
 static void audioens_init_hw(audioens_dev_t *);
-static void audioens_init_port(audioens_port_t *);
-static void audioens_start_port(audioens_port_t *);
-static void audioens_stop_port(audioens_port_t *);
-static void audioens_update_port(audioens_port_t *);
 
 static uint16_t
 audioens_rd97(void *dev_, uint8_t wAddr)
@@ -422,105 +390,6 @@ audioens_readmem(audioens_dev_t *dev, uint32_t page, uint32_t offs)
 	return (GET32(dev, offs));
 }
 
-static uint_t
-audioens_intr(caddr_t arg1, caddr_t arg2)
-{
-	audioens_dev_t *dev = (void *)arg1;
-	int stats;
-	int tmp;
-	unsigned char ackbits = 0;
-	audioens_port_t *port;
-	audio_engine_t *do_dac, *do_adc;
-
-	_NOTE(ARGUNUSED(arg2));
-
-	/*
-	 * NB: The old audioens didn't report spurious interrupts.  On
-	 * a system with shared interrupts (typical!) there will
-	 * normally be lots of these (each time the "other" device
-	 * interrupts).
-	 *
-	 * Also, because of the way the interrupt chain handling
-	 * works, reporting of spurious interrupts is probably not
-	 * terribly useful.
-	 *
-	 * However, we can count interrupts where the master interrupt
-	 * bit is set but none of the ackbits that we are prepared to
-	 * process is set.  That is probably useful.
-	 */
-	mutex_enter(&dev->mutex);
-	if (!dev->enabled) {
-
-		mutex_exit(&dev->mutex);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	stats = GET32(dev, CONC_dSTATUS_OFF);
-
-	if (!(stats & CONC_STATUS_PENDING)) {	/* No interrupt pending */
-		mutex_exit(&dev->mutex);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	do_dac = do_adc = NULL;
-
-	/* DAC1 (synth) interrupt */
-	if (stats & CONC_STATUS_DAC1INT) {
-
-		ackbits |= CONC_SERCTL_DAC1IE;
-		port = &dev->port[PORT_DAC];
-		if (port->trigger) {
-			do_dac = port->engine;
-		}
-	}
-
-	/* DAC2 interrupt */
-	if (stats & CONC_STATUS_DAC2INT) {
-
-		ackbits |= CONC_SERCTL_DAC2IE;
-	}
-
-	/* ADC interrupt */
-	if (stats & CONC_STATUS_ADCINT) {
-
-		ackbits |= CONC_SERCTL_ADCIE;
-		port = &dev->port[PORT_ADC];
-
-		if (port->trigger) {
-			do_adc = port->engine;
-		}
-	}
-
-	/* UART interrupt - we shouldn't get this! */
-	if (stats & CONC_STATUS_UARTINT) {
-		uint8_t uart_stat = GET8(dev, CONC_bUARTCSTAT_OFF);
-		while (uart_stat & CONC_UART_RXRDY)
-			uart_stat = GET8(dev, CONC_bUARTCSTAT_OFF);
-	}
-
-	/* Ack the interrupt */
-	tmp = GET8(dev, CONC_bSERCTL_OFF);
-	PUT8(dev, CONC_bSERCTL_OFF, tmp & (~ackbits));	/* Clear bits */
-	PUT8(dev, CONC_bSERCTL_OFF, tmp | ackbits);	/* Turn them back on */
-
-	if (dev->ksp) {
-		if (ackbits == 0) {
-			KSINTR(dev)->intrs[KSTAT_INTR_SPURIOUS]++;
-		} else {
-			KSINTR(dev)->intrs[KSTAT_INTR_HARD]++;
-		}
-	}
-
-	mutex_exit(&dev->mutex);
-
-	if (do_dac)
-		audio_engine_consume(do_dac);
-	if (do_adc)
-		audio_engine_produce(do_adc);
-
-	return (DDI_INTR_CLAIMED);
-}
-
 /*
  * Audio routines
  */
@@ -549,14 +418,34 @@ audioens_rate(void *arg)
 	return (port->speed);
 }
 
-static void
-audioens_init_port(audioens_port_t *port)
+static int
+audioens_open(void *arg, int flag, unsigned *nframes, caddr_t *bufp)
 {
+	audioens_port_t	*port = arg;
 	audioens_dev_t	*dev = port->dev;
-	unsigned tmp;
 
-	if (port->suspended)
-		return;
+	_NOTE(ARGUNUSED(flag));
+
+	mutex_enter(&dev->mutex);
+
+	port->nframes = AUDIOENS_BUF_LEN / (port->nchan * sizeof (int16_t));
+	port->count = 0;
+
+	*nframes = port->nframes;
+	*bufp = port->kaddr;
+	mutex_exit(&dev->mutex);
+
+	return (0);
+}
+
+static int
+audioens_start(void *arg)
+{
+	audioens_port_t *port = arg;
+	audioens_dev_t *dev = port->dev;
+	uint32_t tmp;
+
+	mutex_enter(&dev->mutex);
 
 	switch (port->num) {
 	case PORT_DAC:
@@ -589,8 +478,12 @@ audioens_init_port(audioens_port_t *port)
 		    port->nframes - 1);
 
 		/* Set # of frames between interrupts */
-		PUT16(dev, CONC_wDAC1IC_OFF, port->fragfr - 1);
-		PUT16(dev, CONC_wDAC2IC_OFF, port->fragfr - 1);
+		PUT16(dev, CONC_wDAC1IC_OFF, port->nframes - 1);
+		PUT16(dev, CONC_wDAC2IC_OFF, port->nframes - 1);
+
+		SET8(dev, CONC_bDEVCTL_OFF,
+		    CONC_DEVCTL_DAC2_EN | CONC_DEVCTL_DAC1_EN);
+
 		break;
 
 	case PORT_ADC:
@@ -615,104 +508,13 @@ audioens_init_port(audioens_port_t *port)
 		    port->nframes - 1);
 
 		/* Set # of frames between interrupts */
-		PUT16(dev, CONC_wADCIC_OFF, port->fragfr - 1);
+		PUT16(dev, CONC_wADCIC_OFF, port->nframes - 1);
 
+		SET8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_ADC_EN);
 		break;
 	}
 
 	port->frameno = 0;
-}
-
-static int
-audioens_open(void *arg, int flag, unsigned *fragfrp, unsigned *nfragsp,
-    caddr_t *bufp)
-{
-	audioens_port_t	*port = arg;
-	audioens_dev_t	*dev = port->dev;
-	int intrs;
-
-	_NOTE(ARGUNUSED(flag));
-
-	mutex_enter(&dev->mutex);
-
-	if (port->num == PORT_ADC) {
-		intrs = dev->rintrs;
-	} else {
-		intrs = dev->pintrs;
-	}
-
-	/* interrupt at least at 25 Hz, and not more than 250 Hz */
-	intrs = min(250, max(25, intrs));
-
-	port->fragfr = (port->speed / intrs);
-	port->nfrags = AUDIOENS_BUF_LEN /
-	    (port->fragfr * port->nchan * sizeof (int16_t));
-	port->nfrags = max(4, min(port->nfrags, 1024));
-	port->nframes = port->nfrags * port->fragfr;
-	port->trigger = B_FALSE;
-	port->count = 0;
-
-	audioens_init_port(port);
-
-	*fragfrp = port->fragfr;
-	*nfragsp = port->nfrags;
-	*bufp = port->kaddr;
-	mutex_exit(&dev->mutex);
-
-	return (0);
-}
-
-static void
-audioens_start_port(audioens_port_t *port)
-{
-	audioens_dev_t *dev = port->dev;
-
-	if (!port->suspended) {
-		switch (port->num) {
-		case PORT_DAC:
-			SET8(dev, CONC_bDEVCTL_OFF,
-			    CONC_DEVCTL_DAC2_EN | CONC_DEVCTL_DAC1_EN);
-			SET8(dev, CONC_bSERCTL_OFF, CONC_SERCTL_DAC1IE);
-			break;
-		case PORT_ADC:
-			SET8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_ADC_EN);
-			SET8(dev, CONC_bSERCTL_OFF, CONC_SERCTL_ADCIE);
-			break;
-		}
-	}
-}
-
-static void
-audioens_stop_port(audioens_port_t *port)
-{
-	audioens_dev_t *dev = port->dev;
-
-	if (!port->suspended) {
-		switch (port->num) {
-		case PORT_DAC:
-			CLR8(dev, CONC_bDEVCTL_OFF,
-			    CONC_DEVCTL_DAC2_EN | CONC_DEVCTL_DAC1_EN);
-			CLR8(dev, CONC_bSERCTL_OFF, CONC_SERCTL_DAC1IE);
-			break;
-		case PORT_ADC:
-			CLR8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_ADC_EN);
-			CLR8(dev, CONC_bSERCTL_OFF, CONC_SERCTL_ADCIE);
-			break;
-		}
-	}
-}
-
-static int
-audioens_start(void *arg)
-{
-	audioens_port_t *port = arg;
-	audioens_dev_t *dev = port->dev;
-
-	mutex_enter(&dev->mutex);
-	if (!port->trigger) {
-		port->trigger = B_TRUE;
-		audioens_start_port(port);
-	}
 	mutex_exit(&dev->mutex);
 
 	return (0);
@@ -725,16 +527,24 @@ audioens_stop(void *arg)
 	audioens_dev_t *dev = port->dev;
 
 	mutex_enter(&dev->mutex);
-	if (port->trigger) {
-		port->trigger = B_FALSE;
-		audioens_stop_port(port);
+	switch (port->num) {
+	case PORT_DAC:
+		CLR8(dev, CONC_bDEVCTL_OFF,
+		    CONC_DEVCTL_DAC2_EN | CONC_DEVCTL_DAC1_EN);
+		break;
+	case PORT_ADC:
+		CLR8(dev, CONC_bDEVCTL_OFF, CONC_DEVCTL_ADC_EN);
+		break;
 	}
 	mutex_exit(&dev->mutex);
 }
 
-static void
-audioens_update_port(audioens_port_t *port)
+static uint64_t
+audioens_count(void *arg)
 {
+	audioens_port_t *port = arg;
+	audioens_dev_t *dev = port->dev;
+	uint64_t val;
 	uint32_t page, offs;
 	int frameno, n;
 
@@ -750,6 +560,7 @@ audioens_update_port(audioens_port_t *port)
 		break;
 	}
 
+	mutex_enter(&dev->mutex);
 	/*
 	 * Note that the current frame counter is in the high nybble.
 	 */
@@ -759,30 +570,17 @@ audioens_update_port(audioens_port_t *port)
 	    frameno + port->nframes - port->frameno;
 	port->frameno = frameno;
 	port->count += n;
-}
 
-static uint64_t
-audioens_count(void *arg)
-{
-	audioens_port_t *port = arg;
-	audioens_dev_t *dev = port->dev;
-	uint64_t val;
-
-	mutex_enter(&dev->mutex);
-	if (!port->suspended) {
-		audioens_update_port(port);
-	}
 	val = port->count;
 	mutex_exit(&dev->mutex);
+
 	return (val);
 }
 
 static void
 audioens_close(void *arg)
 {
-	audioens_port_t *port = arg;
-
-	audioens_stop(port);
+	_NOTE(ARGUNUSED(arg));
 }
 
 static void
@@ -793,7 +591,7 @@ audioens_sync(void *arg, unsigned nframes)
 	_NOTE(ARGUNUSED(nframes));
 
 	if (port->num == PORT_ADC) {
-		(void) ddi_dma_sync(port->dmah, 0, 0, DDI_DMA_SYNC_FORCPU);
+		(void) ddi_dma_sync(port->dmah, 0, 0, DDI_DMA_SYNC_FORKERNEL);
 	} else {
 		(void) ddi_dma_sync(port->dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
 	}
@@ -850,12 +648,6 @@ audioens_init_hw(audioens_dev_t *dev)
 
 	SRCInit(dev);
 
-#if 0
-	PUT8(dev, CONC_bSERCTL_OFF, 0x00);
-	PUT8(dev, CONC_bNMIENA_OFF, 0x00); /* NMI off */
-	PUT8(dev, CONC_wNMISTAT_OFF, 0x00); /* PUT8? */
-#endif
-
 	/*
 	 * Turn on CODEC (UART and joystick left disabled)
 	 */
@@ -889,8 +681,6 @@ audioens_init_hw(audioens_dev_t *dev)
 		/* we want to run each channel independently */
 		CLR32(dev, CONC_dSTATUS_OFF, CONC_STATUS_ECHO);
 	}
-
-	dev->enabled = B_TRUE;
 }
 
 static int
@@ -918,12 +708,6 @@ audioens_init(audioens_dev_t *dev)
 	if (ac97_init(dev->ac97, dev->osdev) != 0) {
 		return (DDI_FAILURE);
 	}
-
-	dev->pintrs = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, "play-interrupts", DEFINTS);
-
-	dev->rintrs = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
-	    DDI_PROP_DONTPASS, "record-interrupts", DEFINTS);
 
 	for (int i = 0; i <= PORT_MAX; i++) {
 		audioens_port_t *port;
@@ -999,13 +783,6 @@ audioens_init(audioens_dev_t *dev)
 	/*
 	 * Set up kstats for interrupt reporting.
 	 */
-	dev->ksp = kstat_create(ddi_driver_name(dev->dip),
-	    ddi_get_instance(dev->dip), ddi_driver_name(dev->dip),
-	    "controller", KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
-	if (dev->ksp != NULL) {
-		kstat_install(dev->ksp);
-	}
-
 	if (audio_dev_register(dev->osdev) != DDI_SUCCESS) {
 		audio_dev_warn(dev->osdev,
 		    "unable to register with audio framework");
@@ -1015,54 +792,12 @@ audioens_init(audioens_dev_t *dev)
 	return (DDI_SUCCESS);
 }
 
-int
-audioens_setup_interrupts(audioens_dev_t *dev)
-{
-	int actual;
-	uint_t ipri;
-
-	if ((ddi_intr_alloc(dev->dip, dev->ihandle, DDI_INTR_TYPE_FIXED,
-	    0, 1, &actual, DDI_INTR_ALLOC_NORMAL) != DDI_SUCCESS) ||
-	    (actual != 1)) {
-		audio_dev_warn(dev->osdev, "can't alloc intr handle");
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_get_pri(dev->ihandle[0], &ipri) != DDI_SUCCESS) {
-		audio_dev_warn(dev->osdev,  "can't determine intr priority");
-		(void) ddi_intr_free(dev->ihandle[0]);
-		dev->ihandle[0] = NULL;
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_add_handler(dev->ihandle[0], audioens_intr, dev,
-	    NULL) != DDI_SUCCESS) {
-		audio_dev_warn(dev->osdev, "can't add intr handler");
-		(void) ddi_intr_free(dev->ihandle[0]);
-		dev->ihandle[0] = NULL;
-		return (DDI_FAILURE);
-	}
-
-	mutex_init(&dev->mutex, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-
-	return (DDI_SUCCESS);
-}
-
 void
 audioens_destroy(audioens_dev_t *dev)
 {
 	int	i;
 
-	if (dev->ihandle[0] != NULL) {
-		(void) ddi_intr_disable(dev->ihandle[0]);
-		(void) ddi_intr_remove_handler(dev->ihandle[0]);
-		(void) ddi_intr_free(dev->ihandle[0]);
-		mutex_destroy(&dev->mutex);
-	}
-
-	if (dev->ksp != NULL) {
-		kstat_delete(dev->ksp);
-	}
+	mutex_destroy(&dev->mutex);
 
 	/* free up ports, including DMA resources for ports */
 	for (i = 0; i <= PORT_MAX; i++) {
@@ -1109,10 +844,12 @@ audioens_attach(dev_info_t *dip)
 	dev = kmem_zalloc(sizeof (*dev), KM_SLEEP);
 	dev->dip = dip;
 	ddi_set_driver_private(dip, dev);
+	mutex_init(&dev->mutex, NULL, MUTEX_DRIVER, NULL);
 
 	if (pci_config_setup(dip, &pcih) != DDI_SUCCESS) {
 		audio_dev_warn(dev->osdev, "pci_config_setup failed");
 		kmem_free(dev, sizeof (*dev));
+		mutex_destroy(&dev->mutex);
 		return (DDI_FAILURE);
 	}
 
@@ -1197,18 +934,11 @@ audioens_attach(dev_info_t *dip)
 		goto err_exit;
 	}
 
-	if (audioens_setup_interrupts(dev) != DDI_SUCCESS) {
-		audio_dev_warn(dev->osdev, "can't register interrupts");
-		goto err_exit;
-	}
-
 	/* This allocates and configures the engines */
 	if (audioens_init(dev) != DDI_SUCCESS) {
 		audio_dev_warn(dev->osdev, "can't init device");
 		goto err_exit;
 	}
-
-	(void) ddi_intr_enable(dev->ihandle[0]);
 
 	pci_config_teardown(&pcih);
 
@@ -1249,8 +979,6 @@ audioens_detach(audioens_dev_t *dev)
 	PUT8(dev, CONC_bDEVCTL_OFF, tmp);
 	PUT8(dev, CONC_bDEVCTL_OFF, tmp);
 
-	dev->enabled = B_FALSE;
-
 	mutex_exit(&dev->mutex);
 
 	audioens_destroy(dev);
@@ -1258,68 +986,24 @@ audioens_detach(audioens_dev_t *dev)
 	return (DDI_SUCCESS);
 }
 
-/*ARGSUSED*/
 static int
 audioens_resume(audioens_dev_t *dev)
 {
-	/* ask framework to reset/relocate engine data */
-	for (int i = 0; i <= PORT_MAX; i++) {
-		audio_engine_reset(dev->port[i].engine);
-	}
-
 	/* reinitialize hardware */
 	audioens_init_hw(dev);
 
 	/* restore AC97 state */
-	ac97_resume(dev->ac97);
+	ac97_reset(dev->ac97);
 
-	/* restart ports */
-	mutex_enter(&dev->mutex);
-	for (int i = 0; i < PORT_MAX; i++) {
-		audioens_port_t	*port = &dev->port[i];
-		port->suspended = B_FALSE;
-		audioens_init_port(port);
-		/* possibly start it up if was going when we suspended */
-		if (port->trigger) {
-			audioens_start_port(port);
+	audio_dev_resume(dev->osdev);
 
-		}
-	}
-	mutex_exit(&dev->mutex);
-	for (int i = 0; i < PORT_MAX; i++) {
-		audioens_port_t	*port = &dev->port[i];
-		/* signal callbacks on resume */
-		if (!port->trigger)
-			continue;
-		if (port->num == PORT_ADC) {
-			audio_engine_produce(port->engine);
-		} else {
-			audio_engine_consume(port->engine);
-		}
-	}
 	return (DDI_SUCCESS);
 }
 
-/*ARGSUSED*/
 static int
 audioens_suspend(audioens_dev_t *dev)
 {
-	/*
-	 * Stop all engines/DMA data.
-	 */
-	mutex_enter(&dev->mutex);
-	for (int i = 0; i <= PORT_MAX; i++) {
-		audioens_stop_port(&dev->port[i]);
-		audioens_update_port(&dev->port[i]);
-		dev->port[i].suspended = B_TRUE;
-	}
-	dev->enabled = B_FALSE;
-	mutex_exit(&dev->mutex);
-
-	/*
-	 * Framework needs to save off AC'97 state.
-	 */
-	ac97_suspend(dev->ac97);
+	audio_dev_suspend(dev->osdev);
 
 	return (DDI_SUCCESS);
 }

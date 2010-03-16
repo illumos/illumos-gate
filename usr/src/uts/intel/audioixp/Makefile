@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/intel/audioixp/Makefile
@@ -40,7 +40,6 @@ MODULE		= audioixp
 OBJECTS		= $(AUDIOIXP_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AUDIOIXP_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/io/audio/drv/audioixp
 
 #
 #	Include common rules.
@@ -51,8 +50,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Overrides, lint pass one enforcement 
 # 
 CFLAGS		+= $(CCVERBOSE)
-DEBUG_FLGS	=
-$(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 
 #
 #	Depends on misc/audiosup
@@ -62,9 +59,9 @@ LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Default build targets.

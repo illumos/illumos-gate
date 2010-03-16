@@ -21,7 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,32 +109,32 @@ auclnt_get_rate(audio_stream_t *sp)
 	return (sp->s_user_parms->p_rate);
 }
 
-unsigned
+uint_t
 auclnt_get_fragsz(audio_stream_t *sp)
 {
 	return (sp->s_fragbytes);
 }
 
-unsigned
+uint_t
 auclnt_get_framesz(audio_stream_t *sp)
 {
 	return (sp->s_framesz);
 }
 
-unsigned
+uint_t
 auclnt_get_nfrags(audio_stream_t *sp)
 {
 	return (sp->s_nfrags);
 }
 
-unsigned
+uint_t
 auclnt_get_nframes(audio_stream_t *sp)
 {
 	return (sp->s_nframes);
 }
 
 void
-auclnt_set_latency(audio_stream_t *sp, unsigned frags, unsigned bytes)
+auclnt_set_latency(audio_stream_t *sp, uint_t frags, uint_t bytes)
 {
 	mutex_enter(&sp->s_lock);
 	sp->s_hintfrags = (uint16_t)frags;
@@ -154,13 +154,13 @@ auclnt_get_tail(audio_stream_t *sp)
 	return (sp->s_tail);
 }
 
-unsigned
+uint_t
 auclnt_get_hidx(audio_stream_t *sp)
 {
 	return (sp->s_hidx);
 }
 
-unsigned
+uint_t
 auclnt_get_tidx(audio_stream_t *sp)
 {
 	return (sp->s_tidx);
@@ -178,21 +178,21 @@ auclnt_output_stream(audio_client_t *c)
 	return (&c->c_ostream);
 }
 
-unsigned
+uint_t
 auclnt_get_count(audio_stream_t *sp)
 {
-	unsigned	count;
+	uint_t	count;
 
 	mutex_enter(&sp->s_lock);
 	ASSERT((sp->s_head - sp->s_tail) <= sp->s_nframes);
-	count = (unsigned)(sp->s_head - sp->s_tail);
+	count = (uint_t)(sp->s_head - sp->s_tail);
 	mutex_exit(&sp->s_lock);
 
 	return (count);
 }
 
-unsigned
-auclnt_consume(audio_stream_t *sp, unsigned n)
+uint_t
+auclnt_consume(audio_stream_t *sp, uint_t n)
 {
 	mutex_enter(&sp->s_lock);
 
@@ -212,12 +212,12 @@ auclnt_consume(audio_stream_t *sp, unsigned n)
 	return (n);
 }
 
-unsigned
-auclnt_consume_data(audio_stream_t *sp, caddr_t dst, unsigned n)
+uint_t
+auclnt_consume_data(audio_stream_t *sp, caddr_t dst, uint_t n)
 {
-	unsigned nframes;
-	unsigned framesz;
-	unsigned cnt;
+	uint_t nframes;
+	uint_t framesz;
+	uint_t cnt;
 	caddr_t	data;
 
 	mutex_enter(&sp->s_lock);
@@ -233,7 +233,7 @@ auclnt_consume_data(audio_stream_t *sp, caddr_t dst, unsigned n)
 	cnt = n = min(n, sp->s_head - sp->s_tail);
 	data = sp->s_data + (sp->s_tidx * framesz);
 	do {
-		unsigned nf, nb;
+		uint_t nf, nb;
 
 		nf = min(nframes - sp->s_tidx, n);
 		nb = nf * framesz;
@@ -259,8 +259,8 @@ auclnt_consume_data(audio_stream_t *sp, caddr_t dst, unsigned n)
 	return (cnt);
 }
 
-unsigned
-auclnt_produce(audio_stream_t *sp, unsigned n)
+uint_t
+auclnt_produce(audio_stream_t *sp, uint_t n)
 {
 	mutex_enter(&sp->s_lock);
 
@@ -280,12 +280,12 @@ auclnt_produce(audio_stream_t *sp, unsigned n)
 	return (n);
 }
 
-unsigned
-auclnt_produce_data(audio_stream_t *sp, caddr_t src, unsigned n)
+uint_t
+auclnt_produce_data(audio_stream_t *sp, caddr_t src, uint_t n)
 {
-	unsigned nframes;
-	unsigned framesz;
-	unsigned cnt;
+	uint_t nframes;
+	uint_t framesz;
+	uint_t cnt;
 	caddr_t data;
 
 	mutex_enter(&sp->s_lock);
@@ -301,7 +301,7 @@ auclnt_produce_data(audio_stream_t *sp, caddr_t src, unsigned n)
 	cnt = n = min(n, nframes - (sp->s_head - sp->s_tail));
 	data = sp->s_data + (sp->s_hidx * framesz);
 	do {
-		unsigned nf, nb;
+		uint_t nf, nb;
 
 		nf = min(nframes - sp->s_hidx, n);
 		nb = nf * framesz;
@@ -332,10 +332,12 @@ int
 auclnt_read(audio_client_t *c, struct uio *uio)
 {
 	audio_stream_t	*sp = &c->c_istream;
-	unsigned	cnt;
+	uint_t		cnt;
 	int		rv = 0;
 	offset_t	loff;
 	int		eagain;
+	uint_t		tidx;
+	uint_t		framesz;
 
 	loff = uio->uio_loffset;
 	eagain = EAGAIN;
@@ -348,11 +350,13 @@ auclnt_read(audio_client_t *c, struct uio *uio)
 		mutex_enter(&sp->s_lock);
 	}
 
+
+	framesz = sp->s_framesz;
+
 	ASSERT(sp->s_head >= sp->s_tail);
 	ASSERT(sp->s_tidx < sp->s_nframes);
-	ASSERT(sp->s_hidx < sp->s_nframes);
 
-	while (uio->uio_resid >= sp->s_framesz) {
+	while (uio->uio_resid >= framesz) {
 
 		while ((cnt = (sp->s_head - sp->s_tail)) == 0) {
 			if (uio->uio_fmode & (FNONBLOCK|FNDELAY)) {
@@ -365,19 +369,22 @@ auclnt_read(audio_client_t *c, struct uio *uio)
 			}
 		}
 
-		cnt = min(cnt, sp->s_nframes - sp->s_tidx);
-		cnt = min(cnt, (uio->uio_resid / sp->s_framesz));
+		tidx = sp->s_tidx;
+		cnt = min(cnt, sp->s_nframes - tidx);
+		cnt = min(cnt, (uio->uio_resid / framesz));
 
-		rv = uiomove(sp->s_data + (sp->s_tidx * sp->s_framesz),
-		    cnt * sp->s_framesz, UIO_READ, uio);
+		mutex_exit(&sp->s_lock);
+		rv = uiomove(sp->s_data + (tidx * framesz),
+		    cnt * framesz, UIO_READ, uio);
+
 		uio->uio_loffset = loff;
 		eagain = 0;
 
 		if (rv != 0) {
-			mutex_exit(&sp->s_lock);
 			return (rv);
 		}
 
+		mutex_enter(&sp->s_lock);
 		sp->s_tail += cnt;
 		sp->s_tidx += cnt;
 		if (sp->s_tidx == sp->s_nframes) {
@@ -400,21 +407,24 @@ int
 auclnt_write(audio_client_t *c, struct uio *uio)
 {
 	audio_stream_t *sp = &c->c_ostream;
-	unsigned	cnt;
+	uint_t		cnt;
 	int		rv = 0;
 	offset_t	loff;
 	int		eagain;
+	uint_t		framesz;
+	uint_t		hidx;
 
 	loff = uio->uio_loffset;
 	eagain = EAGAIN;
 
 	mutex_enter(&sp->s_lock);
 
+	framesz = sp->s_framesz;
+
 	ASSERT(sp->s_head >= sp->s_tail);
-	ASSERT(sp->s_tidx < sp->s_nframes);
 	ASSERT(sp->s_hidx < sp->s_nframes);
 
-	while (uio->uio_resid >= sp->s_framesz) {
+	while (uio->uio_resid >= framesz) {
 
 		while ((cnt = sp->s_nframes - (sp->s_head - sp->s_tail)) == 0) {
 			if (uio->uio_fmode & (FNONBLOCK|FNDELAY)) {
@@ -427,18 +437,30 @@ auclnt_write(audio_client_t *c, struct uio *uio)
 			}
 		}
 
-		cnt = min(cnt, sp->s_nframes - sp->s_hidx);
-		cnt = min(cnt, (uio->uio_resid / sp->s_framesz));
+		hidx = sp->s_hidx;
+		cnt = min(cnt, sp->s_nframes - hidx);
+		cnt = min(cnt, (uio->uio_resid / framesz));
 
-		rv = uiomove(sp->s_data + (sp->s_hidx * sp->s_framesz),
-		    cnt * sp->s_framesz, UIO_WRITE, uio);
+		/*
+		 * We have to drop the stream lock, because the
+		 * uiomove might require doing a page in, which could
+		 * get blocked behind the PIL of the audio processing
+		 * thread which also grabs the s_lock.  (Hence, there
+		 * is a risk of deadlock due to priority inversion.)
+		 */
+		mutex_exit(&sp->s_lock);
+
+		rv = uiomove(sp->s_data + (hidx * framesz),
+		    cnt * framesz, UIO_WRITE, uio);
+
 		uio->uio_loffset = loff;
 		eagain = 0;
 
 		if (rv != 0) {
-			mutex_exit(&sp->s_lock);
 			return (rv);
 		}
+
+		mutex_enter(&sp->s_lock);
 
 		sp->s_head += cnt;
 		sp->s_hidx += cnt;
@@ -509,12 +531,12 @@ auclnt_pollwakeup(audio_client_t *c, short events)
 }
 
 void
-auclnt_get_output_qlen(audio_client_t *c, unsigned *slen, unsigned *flen)
+auclnt_get_output_qlen(audio_client_t *c, uint_t *slen, uint_t *flen)
 {
 	audio_stream_t	*sp = &c->c_ostream;
 	audio_engine_t	*e = sp->s_engine;
 	uint64_t	el, sl;
-	unsigned	cnt, er, sr;
+	uint_t		cnt, er, sr;
 
 	if (e == NULL) {
 		/* if no output engine, can't do it! */
@@ -533,13 +555,13 @@ auclnt_get_output_qlen(audio_client_t *c, unsigned *slen, unsigned *flen)
 	er = e->e_rate;
 	sl = sp->s_cnv_cnt;
 	sr = sp->s_user_parms->p_rate;
-	cnt = (unsigned)(sp->s_head - sp->s_tail);
+	cnt = (uint_t)(sp->s_head - sp->s_tail);
 	mutex_exit(&sp->s_lock);
 	mutex_exit(&e->e_lock);
 
 	/* engine frames converted to stream rate, plus stream frames */
 	*slen = cnt;
-	*flen = ((unsigned)(((el * sr) / er) + sl));
+	*flen = ((uint_t)(((el * sr) / er) + sl));
 }
 
 int
@@ -1197,6 +1219,39 @@ auclnt_hold_by_devt(dev_t dev)
 	return (c);
 }
 
+int
+auclnt_serialize(audio_client_t *c)
+{
+	mutex_enter(&c->c_lock);
+	while (c->c_serialize) {
+		if (cv_wait_sig(&c->c_cv, &c->c_lock) == 0) {
+			mutex_exit(&c->c_lock);
+			return (EINTR);
+		}
+	}
+	c->c_serialize = B_TRUE;
+	mutex_exit(&c->c_lock);
+	return (0);
+}
+
+void
+auclnt_unserialize(audio_client_t *c)
+{
+	mutex_enter(&c->c_lock);
+	ASSERT(c->c_serialize);
+	c->c_serialize = B_FALSE;
+	cv_broadcast(&c->c_cv);
+	mutex_exit(&c->c_lock);
+}
+
+void
+auclnt_hold(audio_client_t *c)
+{
+	mutex_enter(&c->c_lock);
+	c->c_refcnt++;
+	mutex_exit(&c->c_lock);
+}
+
 void
 auclnt_release(audio_client_t *c)
 {
@@ -1208,7 +1263,7 @@ auclnt_release(audio_client_t *c)
 	mutex_exit(&c->c_lock);
 }
 
-unsigned
+uint_t
 auclnt_dev_get_serial(audio_dev_t *d)
 {
 	return (d->d_serial);
@@ -1240,7 +1295,7 @@ restart:
 
 
 int
-auclnt_open(audio_client_t *c, unsigned fmts, int oflag)
+auclnt_open(audio_client_t *c, uint_t fmts, int oflag)
 {
 	audio_stream_t	*sp;
 	audio_dev_t	*d = c->c_dev;
@@ -1412,11 +1467,11 @@ auclnt_get_dev_version(audio_dev_t *dev)
 	return (dev->d_vers);
 }
 
-unsigned
+uint_t
 auclnt_get_dev_capab(audio_dev_t *dev)
 {
 	uint32_t	flags;
-	unsigned	caps = 0;
+	uint_t		caps = 0;
 
 	flags = dev->d_flags;
 
@@ -1577,13 +1632,13 @@ auclnt_walk_controls(audio_dev_t *d,
 {
 	audio_ctrl_t *ctrl;
 
-	rw_enter(&d->d_ctrl_lock, RW_READER);
+	mutex_enter(&d->d_ctrl_lock);
 	for (ctrl = list_head(&d->d_controls); ctrl;
 	    ctrl = list_next(&d->d_controls, ctrl)) {
 		if (walker(ctrl, arg) == AUDIO_WALK_STOP)
 			break;
 	}
-	rw_exit(&d->d_ctrl_lock);
+	mutex_exit(&d->d_ctrl_lock);
 }
 
 /*
@@ -1604,15 +1659,15 @@ auclnt_find_control(audio_dev_t *d, const char *name)
 	/* Verify argument */
 	ASSERT(d);
 
-	rw_enter(&d->d_ctrl_lock, RW_READER);
+	mutex_enter(&d->d_ctrl_lock);
 	for (ctrl = list_head(&d->d_controls); ctrl;
 	    ctrl = list_next(&d->d_controls, ctrl)) {
 		if (strcmp(ctrl->ctrl_name, name) == 0) {
-			rw_exit(&d->d_ctrl_lock);
+			mutex_exit(&d->d_ctrl_lock);
 			return (ctrl);
 		}
 	}
-	rw_exit(&d->d_ctrl_lock);
+	mutex_exit(&d->d_ctrl_lock);
 	return (NULL);
 }
 

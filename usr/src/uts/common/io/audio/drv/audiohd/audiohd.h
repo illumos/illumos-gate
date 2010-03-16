@@ -56,10 +56,6 @@ extern "C" {
 #define	NO_SPDIF	0x00000004
 #define	EN_PIN_BEEP	0x00000008
 
-#define	AUDIOHD_INTS		50
-#define	AUDIOHD_MAX_INTS	1500
-#define	AUDIOHD_MIN_INTS	32
-
 #define	AUDIOHD_DEV_CONFIG	"onboard1"
 #define	AUDIOHD_DEV_VERSION	"a"
 
@@ -179,7 +175,6 @@ extern "C" {
 #define	AUDIOHD_CODEC_TYPE_MASK	0x000000ff
 
 #define	AUDIOHD_ROUNDUP(x, algn)	(((x) + ((algn) - 1)) & ~((algn) - 1))
-#define	AUDIOHD_FRAGFR_ALIGN	64
 #define	AUDIOHD_BDLE_BUF_ALIGN	128
 #define	AUDIOHD_CMDIO_ENT_MASK	0x00ff	/* 256 entries for CORB/RIRB */
 #define	AUDIOHD_CDBIO_CORB_LEN	1024	/* 256 entries for CORB, 1024B */
@@ -267,11 +262,6 @@ extern "C" {
 #define	AUDIOHDR_SD_CTL_IOCE		0x000004
 #define	AUDIOHDR_SD_CTL_SRUN		0x000002
 #define	AUDIOHDR_SD_CTL_SRST		0x000001
-#define	AUDIOHDR_SD_CTL_INTS	\
-	(AUDIOHDR_SD_CTL_DEIE |	\
-	AUDIOHDR_SD_CTL_FEIE |	\
-	AUDIOHDR_SD_CTL_IOCE)
-
 
 /* bits for stream descriptor status register */
 #define	AUDIOHDR_SD_STS_BCIS		0x0004
@@ -680,21 +670,18 @@ typedef struct audiohd_port
 	uint8_t			nchan;
 	int			index;
 	uint16_t		regoff;
-	boolean_t		started;
-	boolean_t		triggered;
 
-	unsigned		fragfr;
 	unsigned		nframes;
+	size_t			bufsize;
+	size_t			fragsize;
 	uint64_t		count;
 	int			curpos;
-	int			intrs;
 
 	uint_t			format;
 	unsigned		sync_dir;
 
 	ddi_dma_handle_t	samp_dmah;
 	ddi_acc_handle_t	samp_acch;
-	size_t			samp_size;
 	caddr_t			samp_kaddr;
 	uint64_t		samp_paddr;
 
@@ -817,10 +804,6 @@ struct audiohd_state {
 	audio_dev_t	*adev;
 	uint32_t	devid;
 
-
-	int		hda_pint_freq;	/* play intr frequence */
-	int		hda_rint_freq;	/* record intr frequence */
-
 	int		hda_input_streams;	/* # of input stream */
 	int		hda_output_streams;	/* # of output stream */
 	int		hda_streams_nums;	/* # of stream */
@@ -908,43 +891,6 @@ struct audiohd_codec_info {
 	ddi_put64(statep->hda_reg_handle, \
 	(void *)((char *)statep->hda_reg_base + (reg)), (val))
 
-
-/*
- * enable a pin widget to output
- */
-#define	AUDIOHD_ENABLE_PIN_OUT(statep, caddr, wid) \
-{ \
-	uint32_t	lTmp; \
-\
-	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
-	    AUDIOHDC_VERB_GET_PIN_CTRL, 0); \
-	if (lTmp == AUDIOHD_CODEC_FAILURE) \
-		return (DDI_FAILURE); \
-	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
-	    AUDIOHDC_VERB_SET_PIN_CTRL, \
-	    (lTmp | AUDIOHDC_PIN_CONTROL_OUT_ENABLE | \
-	    AUDIOHDC_PIN_CONTROL_HP_ENABLE)); \
-	if (lTmp == AUDIOHD_CODEC_FAILURE) \
-		return (DDI_FAILURE); \
-}
-
-/*
- * disable output pin
- */
-#define	AUDIOHD_DISABLE_PIN_OUT(statep, caddr, wid) \
-{ \
-	uint32_t	lTmp; \
-\
-	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
-	    AUDIOHDC_VERB_GET_PIN_CTRL, 0); \
-	if (lTmp == AUDIOHD_CODEC_FAILURE) \
-		return (DDI_FAILURE); \
-	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
-	    AUDIOHDC_VERB_SET_PIN_CTRL, \
-	    (lTmp & ~AUDIOHDC_PIN_CONTROL_OUT_ENABLE)); \
-	if (lTmp == AUDIOHD_CODEC_FAILURE) \
-		return (DDI_FAILURE); \
-}
 
 /*
  * enable a pin widget to input

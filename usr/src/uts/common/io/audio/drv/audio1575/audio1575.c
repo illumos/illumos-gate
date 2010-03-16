@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,7 @@ static int audio1575_ddi_quiesce(dev_info_t *);
 /*
  * Entry point routine prototypes
  */
-static int audio1575_open(void *, int, unsigned *, unsigned *, caddr_t *);
+static int audio1575_open(void *, int, unsigned *, caddr_t *);
 static void audio1575_close(void *);
 static int audio1575_start(void *);
 static void audio1575_stop(void *);
@@ -97,11 +97,6 @@ static audio_engine_ops_t audio1575_engine_ops = {
 };
 
 /*
- * interrupt handler
- */
-static uint_t	audio1575_intr(caddr_t, caddr_t);
-
-/*
  * Local Routine Prototypes
  */
 static int audio1575_attach(dev_info_t *);
@@ -111,12 +106,7 @@ static int audio1575_suspend(dev_info_t *);
 
 static int audio1575_alloc_port(audio1575_state_t *, int, uint8_t);
 static void audio1575_free_port(audio1575_port_t *);
-static void audio1575_start_port(audio1575_port_t *);
-static void audio1575_stop_port(audio1575_port_t *);
-static void audio1575_reset_port(audio1575_port_t *);
-static void audio1575_update_port(audio1575_port_t *);
 
-static int audio1575_setup_intr(audio1575_state_t *);
 static int audio1575_codec_sync(audio1575_state_t *);
 static void audio1575_write_ac97(void *, uint8_t, uint16_t);
 static uint16_t audio1575_read_ac97(void *, uint8_t);
@@ -374,119 +364,6 @@ audio1575_ddi_quiesce(dev_info_t *dip)
 	return (DDI_SUCCESS);
 }
 
-
-/*
- * audio1575_intr()
- *
- * Description:
- *	Interrupt service routine for both play and record. For play we
- *	get the next buffers worth of audio. For record we send it on to
- *	the mixer.
- *
- *	Each of buffer descriptor has a field IOC(interrupt on completion)
- *	When both this and the IOC bit of correspondent dma control register
- *	is set, it means that the controller should issue an interrupt upon
- *	completion of this buffer. Note that in the clearing of the interrupts
- *	below that the PCM IN and PCM out interrupts ar cleared by their
- *	respective control registers and not by writing a '1' to the INTRSR
- *	the interrupt status register. Only CPRINTR,SPINTR,and GPIOINTR
- *	require a '1' written to the INTRSR register to clear those
- *	interrupts. See comments below.
- *
- * Arguments:
- *	caddr_t		arg	Pointer to the interrupting device's state
- *				structure
- *
- * Returns:
- *	DDI_INTR_CLAIMED	Interrupt claimed and processed
- *	DDI_INTR_UNCLAIMED	Interrupt not claimed, and thus ignored
- */
-static uint_t
-audio1575_intr(caddr_t arg, caddr_t dontcare)
-{
-	audio1575_state_t	*statep = (void *)arg;
-	uint32_t		intrsr;
-	uint8_t			index;
-	audio1575_port_t	*consume = NULL;
-	audio1575_port_t	*produce = NULL;
-
-	_NOTE(ARGUNUSED(dontcare));
-
-	mutex_enter(&statep->lock);
-
-	intrsr = GET32(M1575_INTRSR_REG);
-
-	/* check if device is interrupting */
-	if (intrsr == 0) {
-		if (statep->ksp) {
-			/* increment the spurious ino5 interrupt cnt */
-			M1575_KIOP(statep)->intrs[KSTAT_INTR_SPURIOUS]++;
-		}
-
-		mutex_exit(&statep->lock);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	/* update the kernel interrupt statistics */
-	if (statep->ksp) {
-		M1575_KIOP(statep)->intrs[KSTAT_INTR_HARD]++;
-	}
-
-	/*
-	 * The Uli M1575 generates an interrupt for each interrupt
-	 * type. therefore we only process one interrupt type
-	 * per invocation of the audio1575_intr() routine.
-	 * WARNING: DO NOT attempt to optimize this by looping
-	 * until the INTRSR register is clear as this will
-	 * generate spurious ino5 interrupts.
-	 */
-	if (GET16(M1575_PCMISR_REG) & M1575_PCMISR_BCIS) {
-		/* Clear PCM IN interrupt */
-		PUT16(M1575_PCMISR_REG, M1575_SR_CLR);
-		/*
-		 * Note: This interrupt is not cleared by writing a '1'
-		 * to the M1575_INTRSR_REG according to the M1575 Super I/O
-		 * data sheet on page 189.
-		 */
-
-		/* update the LVI -- we just set it to the current value - 1 */
-		index = GET8(M1575_PCMICIV_REG);
-		index = (index - 1) % M1575_BD_NUMS;
-		PUT8(M1575_PCMILVIV_REG, index);
-		produce = statep->ports[M1575_REC];
-
-	} else if (GET16(M1575_PCMOSR_REG) & M1575_PCMOSR_BCIS) {
-		/* Clear PCM OUT interrupt */
-		PUT16(M1575_PCMOSR_REG, M1575_SR_CLR);
-		/*
-		 * Note: This interrupt is not cleared by writing a '1'
-		 * to the M1575_INTRSR_REG according to the M1575 Super I/O
-		 * data sheet on page 189.
-		 */
-
-		/* update the LVI -- we just set it to the current value - 1 */
-		index = GET8(M1575_PCMOCIV_REG);
-		index = (index - 1) % M1575_BD_NUMS;
-		PUT8(M1575_PCMOLVIV_REG, index);
-		consume = statep->ports[M1575_PLAY];
-
-	} else {
-		/* Clear other interrupts (there should not be any) */
-		PUT32(M1575_INTRSR_REG, (intrsr & M1575_INTR_MASK));
-	}
-
-	mutex_exit(&statep->lock);
-
-	if (produce) {
-		audio_engine_produce(produce->engine);
-	}
-	if (consume) {
-		audio_engine_consume(consume->engine);
-	}
-
-	return (DDI_INTR_CLAIMED);
-}
-
 /*
  * audio1575_open()
  *
@@ -496,8 +373,7 @@ audio1575_intr(caddr_t arg, caddr_t dontcare)
  * Arguments:
  *	void		*arg		The DMA engine to set up
  *	int		flag		Open flags
- *	unsigned	*fragfrp	Receives number of frames per fragment
- *	unsigned	*nfragsp	Receives number of fragments
+ *	unsigned	*nframesp	Receives number of frames
  *	caddr_t		*bufp		Receives kernel data buffer
  *
  * Returns:
@@ -505,22 +381,15 @@ audio1575_intr(caddr_t arg, caddr_t dontcare)
  *	errno	on failure
  */
 static int
-audio1575_open(void *arg, int flag,
-    unsigned *fragfrp, unsigned *nfragsp, caddr_t *bufp)
+audio1575_open(void *arg, int flag, unsigned *nframesp, caddr_t *bufp)
 {
 	audio1575_port_t	*port = arg;
 
 	_NOTE(ARGUNUSED(flag));
 
-	port->started = B_FALSE;
 	port->count = 0;
-	*fragfrp = port->fragfr;
-	*nfragsp = M1575_BD_NUMS;
+	*nframesp = port->nframes;
 	*bufp = port->samp_kaddr;
-
-	mutex_enter(&port->statep->lock);
-	audio1575_reset_port(port);
-	mutex_exit(&port->statep->lock);
 
 	return (0);
 }
@@ -540,13 +409,7 @@ audio1575_open(void *arg, int flag,
 static void
 audio1575_close(void *arg)
 {
-	audio1575_port_t	*port = arg;
-	audio1575_state_t	*statep = port->statep;
-
-	mutex_enter(&statep->lock);
-	audio1575_stop_port(port);
-	port->started = B_FALSE;
-	mutex_exit(&statep->lock);
+	_NOTE(ARGUNUSED(arg));
 }
 
 /*
@@ -566,10 +429,11 @@ audio1575_stop(void *arg)
 	audio1575_state_t	*statep = port->statep;
 
 	mutex_enter(&statep->lock);
-	if (port->started) {
-		audio1575_stop_port(port);
+	if (port->num == M1575_REC) {
+		SET32(M1575_DMACR_REG, M1575_DMACR_PCMIPAUSE);
+	} else {
+		SET32(M1575_DMACR_REG, M1575_DMACR_PCMOPAUSE);
 	}
-	port->started = B_FALSE;
 	mutex_exit(&statep->lock);
 }
 
@@ -592,13 +456,69 @@ audio1575_start(void *arg)
 	audio1575_state_t	*statep = port->statep;
 
 	mutex_enter(&statep->lock);
-	if (!port->started) {
-		audio1575_start_port(port);
-		port->started = B_TRUE;
+
+	port->offset = 0;
+
+	if (port->num == M1575_REC) {
+		/* Uli FIFO madness ... */
+		SET32(M1575_FIFOCR1_REG, M1575_FIFOCR1_PCMIRST);
+		SET32(M1575_DMACR_REG, M1575_DMACR_PCMIPAUSE);
+
+		PUT8(M1575_PCMICR_REG, 0);
+		PUT8(M1575_PCMICR_REG, M1575_CR_RR);
+
+		PUT32(M1575_PCMIBDBAR_REG, port->bdl_paddr);
+		PUT8(M1575_PCMILVIV_REG, M1575_BD_NUMS - 1);
+
+		CLR32(M1575_DMACR_REG, M1575_DMACR_PCMIPAUSE);
+
+		/* ULi says do fifo resets here */
+		SET32(M1575_FIFOCR1_REG, M1575_FIFOCR1_PCMIRST);
+		CLR32(M1575_DMACR_REG, M1575_DMACR_PCMIPAUSE);
+		PUT8(M1575_PCMICR_REG, 0);
+		SET32(M1575_DMACR_REG, M1575_DMACR_PCMISTART);
+
+	} else {
+
+		uint32_t	scr;
+
+		/* Uli FIFO madness ... */
+		SET32(M1575_FIFOCR1_REG, M1575_FIFOCR1_PCMORST);
+		SET32(M1575_DMACR_REG, M1575_DMACR_PCMOPAUSE);
+
+		/* configure the number of channels properly */
+		scr = GET32(M1575_SCR_REG);
+		scr &= ~(M1575_SCR_6CHL_MASK | M1575_SCR_CHAMOD_MASK);
+		scr |= M1575_SCR_6CHL_2;	/* select our proper ordering */
+		switch (port->nchan) {
+		case 2:
+			scr |= M1575_SCR_CHAMOD_2;
+			break;
+		case 4:
+			scr |= M1575_SCR_CHAMOD_4;
+			break;
+		case 6:
+			scr |= M1575_SCR_CHAMOD_6;
+			break;
+		}
+		PUT32(M1575_SCR_REG, scr);
+
+		PUT8(M1575_PCMOCR_REG, 0);
+		PUT8(M1575_PCMOCR_REG, M1575_CR_RR);
+
+		PUT32(M1575_PCMOBDBAR_REG, port->bdl_paddr);
+		PUT8(M1575_PCMOLVIV_REG, M1575_BD_NUMS - 1);
+
+		CLR32(M1575_DMACR_REG, M1575_DMACR_PCMOPAUSE);
+		PUT8(M1575_PCMOCR_REG, 0);
+		SET32(M1575_DMACR_REG, M1575_DMACR_PCMOSTART);
 	}
+
 	mutex_exit(&statep->lock);
 	return (0);
 }
+
+
 
 /*
  * audio1575_format()
@@ -678,10 +598,42 @@ audio1575_count(void *arg)
 	audio1575_port_t	*port = arg;
 	audio1575_state_t	*statep = port->statep;
 	uint64_t		val;
+	uint8_t			civ;
+	unsigned		n;
+	int			civoff;
+	int			lvioff;
+	int			picoff;
 
 	mutex_enter(&statep->lock);
-	audio1575_update_port(port);
-	val = port->count + (port->picb / port->nchan);
+
+	if (port->num == M1575_REC) {
+		civoff = M1575_PCMICIV_REG;
+		lvioff = M1575_PCMILVIV_REG;
+		picoff = M1575_PCMIPICB_REG;
+	} else {
+		civoff = M1575_PCMOCIV_REG;
+		lvioff = M1575_PCMOLVIV_REG;
+		picoff = M1575_PCMOPICB_REG;
+	}
+
+	/*
+	 * Read the position counters.  We also take this opportunity
+	 * to update the last valid index to the one just previous to
+	 * the one we're working on (so we'll fully loop.)
+	 */
+	n = GET16(picoff);
+	civ = GET8(civoff);
+	PUT8(lvioff, (civ - 1) % M1575_BD_NUMS);
+
+	n = port->samp_size - (n * sizeof (int16_t));
+	if (n < port->offset) {
+		val = (port->samp_size - port->offset) + n;
+	} else {
+		val = n - port->offset;
+	}
+	port->offset = n;
+	port->count += (val / (port->nchan * sizeof (int16_t)));
+	val = port->count;
 	mutex_exit(&statep->lock);
 
 	return (val);
@@ -703,197 +655,6 @@ audio1575_sync(void *arg, unsigned nframes)
 	_NOTE(ARGUNUSED(nframes));
 
 	(void) ddi_dma_sync(port->samp_dmah, 0, 0, port->sync_dir);
-}
-
-/*
- * audio1575_start_port()
- *
- * Description:
- *	This routine starts the DMA engine.
- *
- * Arguments:
- *	audio1575_port_t	*port	Port of DMA engine to start.
- */
-static void
-audio1575_start_port(audio1575_port_t *port)
-{
-	audio1575_state_t	*statep = port->statep;
-
-	ASSERT(mutex_owned(&statep->lock));
-
-	/* if suspended, then do nothing else */
-	if (statep->suspended) {
-		return;
-	}
-
-	if (port->num == M1575_REC) {
-		/* ULi says do fifo resets here */
-		SET32(M1575_FIFOCR1_REG, M1575_FIFOCR1_PCMIRST);
-		CLR32(M1575_DMACR_REG, M1575_DMACR_PCMIPAUSE);
-		PUT8(M1575_PCMICR_REG, M1575_PCMICR_IOCE);
-		SET32(M1575_DMACR_REG, M1575_DMACR_PCMISTART);
-	} else {
-		CLR32(M1575_DMACR_REG, M1575_DMACR_PCMOPAUSE);
-		PUT8(M1575_PCMOCR_REG, M1575_PCMOCR_IOCE);
-		SET32(M1575_DMACR_REG, M1575_DMACR_PCMOSTART);
-	}
-}
-
-/*
- * audio1575_stop_port()
- *
- * Description:
- *	This routine stops the DMA engine.
- *
- * Arguments:
- *	audio1575_port_t	*port	Port of DMA engine to stop.
- */
-static void
-audio1575_stop_port(audio1575_port_t *port)
-{
-	audio1575_state_t	*statep = port->statep;
-
-	ASSERT(mutex_owned(&statep->lock));
-
-	/* if suspended, then do nothing else */
-	if (statep->suspended) {
-		return;
-	}
-
-	if (port->num == M1575_REC) {
-		SET32(M1575_DMACR_REG, M1575_DMACR_PCMIPAUSE);
-	} else {
-		SET32(M1575_DMACR_REG, M1575_DMACR_PCMOPAUSE);
-	}
-}
-
-/*
- * audio1575_reset_port()
- *
- * Description:
- *	This routine resets the DMA engine pareparing it for work.
- *
- * Arguments:
- *	audio1575_port_t	*port	Port of DMA engine to reset.
- */
-static void
-audio1575_reset_port(audio1575_port_t *port)
-{
-	audio1575_state_t	*statep = port->statep;
-
-	ASSERT(mutex_owned(&statep->lock));
-
-	port->civ = 0;
-	port->picb = 0;
-
-	if (statep->suspended)
-		return;
-
-	if (port->num == M1575_REC) {
-		/* Uli FIFO madness ... */
-		SET32(M1575_FIFOCR1_REG, M1575_FIFOCR1_PCMIRST);
-		SET32(M1575_DMACR_REG, M1575_DMACR_PCMIPAUSE);
-
-		PUT8(M1575_PCMICR_REG, 0);
-		PUT8(M1575_PCMICR_REG, M1575_CR_RR | M1575_CR_IOCE);
-
-		PUT32(M1575_PCMIBDBAR_REG, port->bdl_paddr);
-		PUT8(M1575_PCMILVIV_REG, M1575_BD_NUMS - 1);
-
-		CLR32(M1575_DMACR_REG, M1575_DMACR_PCMIPAUSE);
-
-	} else {
-
-		uint32_t	scr;
-
-		/* Uli FIFO madness ... */
-		SET32(M1575_FIFOCR1_REG, M1575_FIFOCR1_PCMORST);
-		SET32(M1575_DMACR_REG, M1575_DMACR_PCMOPAUSE);
-
-		/* configure the number of channels properly */
-		scr = GET32(M1575_SCR_REG);
-		scr &= ~(M1575_SCR_6CHL_MASK | M1575_SCR_CHAMOD_MASK);
-		scr |= M1575_SCR_6CHL_2;	/* select our proper ordering */
-		switch (port->nchan) {
-		case 2:
-			scr |= M1575_SCR_CHAMOD_2;
-			break;
-		case 4:
-			scr |= M1575_SCR_CHAMOD_4;
-			break;
-		case 6:
-			scr |= M1575_SCR_CHAMOD_6;
-			break;
-		}
-		PUT32(M1575_SCR_REG, scr);
-
-		PUT8(M1575_PCMOCR_REG, 0);
-		PUT8(M1575_PCMOCR_REG, M1575_CR_RR | M1575_CR_IOCE);
-
-		PUT32(M1575_PCMOBDBAR_REG, port->bdl_paddr);
-		PUT8(M1575_PCMOLVIV_REG, M1575_BD_NUMS - 1);
-
-		CLR32(M1575_DMACR_REG, M1575_DMACR_PCMOPAUSE);
-	}
-}
-
-/*
- * audio1575_update_port()
- *
- * Description:
- *	This routine updates the ports frame counter from hardware, and
- *	gracefully handles wraps.
- *
- * Arguments:
- *	audio1575_port_t	*port		The port to update.
- */
-static void
-audio1575_update_port(audio1575_port_t *port)
-{
-	audio1575_state_t	*statep = port->statep;
-	uint8_t			civ;
-	uint16_t		picb;
-	unsigned		n;
-	int			civoff;
-	int			picoff;
-
-	if (port->num == M1575_REC) {
-		civoff = M1575_PCMICIV_REG;
-		picoff = M1575_PCMIPICB_REG;
-	} else {
-		civoff = M1575_PCMOCIV_REG;
-		picoff = M1575_PCMOPICB_REG;
-	}
-
-	if (statep->suspended) {
-		civ = 0;
-		picb = 0;
-	} else {
-		/*
-		 * We read the position counters, but we're careful to avoid
-		 * the situation where the position counter resets at the end
-		 * of a buffer.
-		 */
-		for (int i = 0; i < 2; i++) {
-			civ = GET8(civoff);
-			picb = GET16(picoff);
-			if (GET8(civoff) == civ) {
-				/*
-				 * Chip did not start a new index, so
-				 * the picb is valid.
-				 */
-				break;
-			}
-		}
-		if (civ >= port->civ) {
-			n = civ - port->civ;
-		} else {
-			n = civ + (M1575_BD_NUMS - port->civ);
-		}
-		port->count += (n * port->fragfr);
-	}
-	port->civ = civ;
-	port->picb = picb;
 }
 
 /*
@@ -942,11 +703,6 @@ audio1575_attach(dev_info_t *dip)
 	/* map in the audio registers */
 	if (audio1575_map_regs(statep) != DDI_SUCCESS) {
 		audio_dev_warn(adev, "couldn't map registers");
-		goto error;
-	}
-
-	if (audio1575_setup_intr(statep) != DDI_SUCCESS) {
-		/* message already noted */
 		goto error;
 	}
 
@@ -1003,22 +759,6 @@ audio1575_attach(dev_info_t *dip)
 		goto error;
 	}
 
-	/* set up kernel statistics */
-	if ((statep->ksp = kstat_create(M1575_NAME,
-	    ddi_get_instance(dip), M1575_NAME, "controller",
-	    KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT)) != NULL) {
-		kstat_install(statep->ksp);
-	}
-
-	/* Enable PCI Interrupts */
-	pci_config_put8(statep->pcih, M1575_PCIMISC_REG, M1575_PCIMISC_INTENB);
-
-	/* enable audio interrupts */
-	if (ddi_intr_enable(statep->ih) != DDI_SUCCESS) {
-		audio_dev_warn(adev, "ddi_intr_enable() failure");
-		goto error;
-	}
-
 	/* register with the framework */
 	if (audio_dev_register(adev) != DDI_SUCCESS) {
 		audio_dev_warn(adev, "unable to register with framework");
@@ -1066,82 +806,6 @@ audio1575_detach(dev_info_t *dip)
 /* *********************** Local Routines *************************** */
 
 /*
- * audio1575_setup_intr()
- *
- * Description:
- *	This routine initializes the audio driver's interrupt handle and
- *	mutex.
- *
- * Arguments:
- *	audio1575_state_t	*state		The device's state structure
- *
- * Returns:
- *	DDI_SUCCESS		Interrupt handle & mutex initialized
- *	DDI_FAILURE		Interrupt handle & mutex not initialized
- */
-int
-audio1575_setup_intr(audio1575_state_t *statep)
-{
-	audio_dev_t		*adev;
-	dev_info_t		*dip;
-	uint_t			ipri;
-	int			actual;
-	int			rv;
-	int			itype;
-	int			count;
-	ddi_intr_handle_t	ih = NULL;
-
-	dip = statep->dip;
-	adev = statep->adev;
-
-	/* get supported interrupt types */
-	rv = ddi_intr_get_supported_types(dip, &itype);
-	if ((rv != DDI_SUCCESS) || (!(itype & DDI_INTR_TYPE_FIXED))) {
-		audio_dev_warn(adev, "Fixed type interrupts not supported");
-		return (DDI_FAILURE);
-	}
-
-	/* make sure we only have one fixed type interrupt */
-	rv = ddi_intr_get_nintrs(dip, DDI_INTR_TYPE_FIXED, &count);
-	if ((rv != DDI_SUCCESS) || (count != 1)) {
-		audio_dev_warn(adev, "No fixed interrupts");
-		return (DDI_FAILURE);
-	}
-
-	rv = ddi_intr_alloc(statep->dip, &ih, DDI_INTR_TYPE_FIXED,
-	    0, 1, &actual, DDI_INTR_ALLOC_STRICT);
-	if ((rv != DDI_SUCCESS) || (actual != 1)) {
-		audio_dev_warn(adev, "Can't alloc interrupt handle");
-		return (DDI_FAILURE);
-	}
-
-	/* test for a high level interrupt */
-	if (ddi_intr_get_pri(ih, &ipri) != DDI_SUCCESS) {
-		audio_dev_warn(adev, "Can't get interrupt priority");
-		(void) ddi_intr_free(ih);
-		return (DDI_FAILURE);
-	}
-	if (ipri >= ddi_intr_get_hilevel_pri()) {
-		audio_dev_warn(adev, "Unsupported high level interrupt");
-		(void) ddi_intr_free(ih);
-		return (DDI_FAILURE);
-	}
-
-	if (ddi_intr_add_handler(ih, audio1575_intr, statep, NULL) !=
-	    DDI_SUCCESS) {
-		audio_dev_warn(adev, "Can't add interrupt handler");
-		(void) ddi_intr_free(ih);
-		return (DDI_FAILURE);
-	}
-
-	statep->ih = ih;
-	mutex_init(&statep->lock, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-	mutex_init(&statep->ac_lock, NULL, MUTEX_DRIVER, DDI_INTR_PRI(ipri));
-
-	return (DDI_SUCCESS);
-}
-
-/*
  * audio1575_alloc_port()
  *
  * Description:
@@ -1165,11 +829,9 @@ audio1575_alloc_port(audio1575_state_t *statep, int num, uint8_t nchan)
 	uint_t			count;
 	int			dir;
 	unsigned		caps;
-	char			*prop;
 	audio_dev_t		*adev;
 	audio1575_port_t	*port;
 	uint32_t		*kaddr;
-	uint32_t		paddr;
 	int			rc;
 	dev_info_t		*dip;
 
@@ -1180,45 +842,27 @@ audio1575_alloc_port(audio1575_state_t *statep, int num, uint8_t nchan)
 	statep->ports[num] = port;
 	port->num = num;
 	port->statep = statep;
-	port->started = B_FALSE;
 	port->nchan = nchan;
 
 	if (num == M1575_REC) {
-		prop = "record-interrupts";
 		dir = DDI_DMA_READ;
 		caps = ENGINE_INPUT_CAP;
 		port->sync_dir = DDI_DMA_SYNC_FORKERNEL;
 	} else {
-		prop = "play-interrupts";
 		dir = DDI_DMA_WRITE;
 		caps = ENGINE_OUTPUT_CAP;
 		port->sync_dir = DDI_DMA_SYNC_FORDEV;
 	}
 
-	port->intrs = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, prop, M1575_INTS);
-
-	/* make sure the values are good */
-	if (port->intrs < M1575_MIN_INTS) {
-		audio_dev_warn(adev, "%s too low, %d, resetting to %d",
-		    prop, port->intrs, M1575_INTS);
-		port->intrs = M1575_INTS;
-	} else if (port->intrs > M1575_MAX_INTS) {
-		audio_dev_warn(adev, "%s too high, %d, resetting to %d",
-		    prop, port->intrs, M1575_INTS);
-		port->intrs = M1575_INTS;
-	}
-
 	/*
-	 * Figure out how much space we need.  Sample rate is 48kHz, and
-	 * we need to store 32 chunks.  (Note that this means that low
-	 * interrupt frequencies will require more RAM.  We could probably
-	 * do some cleverness to use a shorter BD list.)
+	 * We use one big sample area.  The sample area must be larger
+	 * than about 1.5 framework fragment sizes.  (Currently 480 *
+	 * 1.5 = 720 frames.)  This is necessary to ensure that we
+	 * don't have to involve an interrupt service routine on our
+	 * own, to keep the last valid index updated reasonably.
 	 */
-	port->fragfr = 48000 / port->intrs;
-	port->fragfr = M1575_ROUNDUP(port->fragfr, M1575_MOD_SIZE);
-	port->samp_size = port->fragfr * port->nchan * 2;
-	port->samp_size *= M1575_BD_NUMS;
+	port->nframes = 2048;
+	port->samp_size = port->nframes * port->nchan * sizeof (int16_t);
 
 	/* allocate dma handle */
 	rc = ddi_dma_alloc_handle(dip, &sample_buf_dma_attr, DDI_DMA_SLEEP,
@@ -1274,20 +918,17 @@ audio1575_alloc_port(audio1575_state_t *statep, int num, uint8_t nchan)
 	 * Wire up the BD list.  We do this *before* binding the BD list
 	 * so that we don't have to do an extra ddi_dma_sync.
 	 */
-	paddr = port->samp_paddr;
 	kaddr = (void *)port->bdl_kaddr;
 	for (int i = 0; i < M1575_BD_NUMS; i++) {
 
 		/* set base address of buffer */
-		ddi_put32(port->bdl_acch, kaddr, paddr);
+		ddi_put32(port->bdl_acch, kaddr, port->samp_paddr);
 		kaddr++;
 
 		/* set size in frames, and enable IOC interrupt */
 		ddi_put32(port->bdl_acch, kaddr,
-		    ((port->fragfr * port->nchan) | (1U << 31)));
+		    ((port->samp_size / sizeof (int16_t)) | (1U << 31)));
 		kaddr++;
-
-		paddr += (port->fragfr * port->nchan * 2);
 	}
 
 	rc = ddi_dma_addr_bind_handle(port->bdl_dmah, NULL, port->bdl_kaddr,
@@ -1319,7 +960,7 @@ audio1575_alloc_port(audio1575_state_t *statep, int num, uint8_t nchan)
  *	deallocates the DMA handles.
  *
  * Arguments:
- *	audio810_port_t	*port	The port structure for a DMA engine.
+ *	audio1575_port_t	*port	The port structure for a DMA engine.
  */
 static void
 audio1575_free_port(audio1575_port_t *port)
@@ -1628,8 +1269,7 @@ audio1575_dma_stop(audio1575_state_t *statep, boolean_t quiesce)
 
 	/*
 	 * clear the interrupt control and status register
-	 * READ/WRITE/READ workaround required
-	 * for buggy hardware
+	 * READ/WRITE/READ workaround required to flush PCI caches
 	 */
 
 	PUT32(M1575_INTRCR_REG, 0);
@@ -1693,10 +1333,7 @@ audio1575_write_ac97(void *arg, uint8_t reg, uint16_t data)
 	audio1575_state_t	*statep = arg;
 	int			i;
 
-	mutex_enter(&statep->ac_lock);
-
 	if (audio1575_codec_sync(statep) != DDI_SUCCESS) {
-		mutex_exit(&statep->ac_lock);
 		return;
 	}
 
@@ -1714,8 +1351,6 @@ audio1575_write_ac97(void *arg, uint8_t reg, uint16_t data)
 		}
 		drv_usecwait(1);
 	}
-
-	mutex_exit(&statep->ac_lock);
 
 	if (i < M1575_LOOP_CTR) {
 		(void) audio1575_read_ac97(statep, reg);
@@ -1744,9 +1379,7 @@ audio1575_read_ac97(void *arg, uint8_t reg)
 	uint16_t		data = 0xffff;
 	int			i;
 
-	mutex_enter(&statep->ac_lock);
 	if ((audio1575_codec_sync(statep)) != DDI_SUCCESS) {
-		mutex_exit(&statep->ac_lock);
 		return (data);
 	}
 
@@ -1779,7 +1412,6 @@ audio1575_read_ac97(void *arg, uint8_t reg)
 		}
 	}
 
-	mutex_exit(&statep->ac_lock);
 	return (data);
 }
 
@@ -1860,33 +1492,9 @@ audio1575_resume(dev_info_t *dip)
 	}
 
 	/* allow ac97 operations again */
-	ac97_resume(statep->ac97);
+	ac97_reset(statep->ac97);
 
-	mutex_enter(&statep->lock);
-
-	ASSERT(statep->suspended);
-	statep->suspended = B_FALSE;
-
-	for (int i = 0; i < M1575_NUM_PORTS; i++) {
-
-		audio1575_port_t *port = statep->ports[i];
-
-		if (port != NULL) {
-			/* reset framework DMA engine buffer */
-			if (port->engine != NULL) {
-				audio_engine_reset(port->engine);
-			}
-
-			/* reset and initialize hardware ports */
-			audio1575_reset_port(port);
-			if (port->started) {
-				audio1575_start_port(port);
-			} else {
-				audio1575_stop_port(port);
-			}
-		}
-	}
-	mutex_exit(&statep->lock);
+	audio_dev_resume(adev);
 
 	return (DDI_SUCCESS);
 }
@@ -1910,18 +1518,7 @@ audio1575_suspend(dev_info_t *dip)
 
 	statep = ddi_get_driver_private(dip);
 
-	ac97_suspend(statep->ac97);
-
-	mutex_enter(&statep->lock);
-
-	statep->suspended = B_TRUE;
-
-	/*
-	 * stop all DMA operations
-	 */
-	audio1575_dma_stop(statep, B_FALSE);
-
-	mutex_exit(&statep->lock);
+	audio_dev_suspend(statep->adev);
 
 	return (DDI_SUCCESS);
 }
@@ -1935,9 +1532,6 @@ audio1575_suspend(dev_info_t *dip)
  *
  * Arguments:
  *	audio1575_state_t	*state	The device soft state.
- *
- * Returns:
- *	None
  */
 void
 audio1575_destroy(audio1575_state_t *statep)
@@ -1961,18 +1555,6 @@ audio1575_destroy(audio1575_state_t *statep)
 
 	/* Disable PCI I/O and Memory Spaces */
 	audio1575_pci_disable(statep);
-
-	if (statep->ih != NULL) {
-		(void) ddi_intr_disable(statep->ih);
-		(void) ddi_intr_remove_handler(statep->ih);
-		(void) ddi_intr_free(statep->ih);
-		mutex_destroy(&statep->lock);
-		mutex_destroy(&statep->ac_lock);
-	}
-
-	if (statep->ksp != NULL) {
-		kstat_delete(statep->ksp);
-	}
 
 	audio1575_free_port(statep->ports[M1575_PLAY]);
 	audio1575_free_port(statep->ports[M1575_REC]);

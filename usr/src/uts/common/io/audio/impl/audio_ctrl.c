@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,16 +139,15 @@ audio_dev_add_control(audio_dev_t *d, audio_ctrl_desc_t *desc,
 		 * Also by doing this we can use the normal add code to do
 		 * what it normally does below.
 		 */
-		rw_enter(&d->d_ctrl_lock, RW_WRITER);
+		mutex_enter(&d->d_ctrl_lock);
 		list_remove(&d->d_controls, ctrl);
-		rw_exit(&d->d_ctrl_lock);
+		mutex_exit(&d->d_ctrl_lock);
 
 		audio_control_freenames(ctrl);
 		ctrl->ctrl_read_fn = NULL;
 		ctrl->ctrl_write_fn = NULL;
 		ctrl->ctrl_arg = NULL;
 		ctrl->ctrl_dev = NULL;
-		mutex_destroy(&ctrl->ctrl_lock);
 	}
 	new_desc = &ctrl->ctrl_des;
 
@@ -198,11 +197,9 @@ audio_dev_add_control(audio_dev_t *d, audio_ctrl_desc_t *desc,
 		ctrl->ctrl_arg = arg;
 	}
 
-	mutex_init(&ctrl->ctrl_lock, NULL, MUTEX_DRIVER, NULL);
-
-	rw_enter(&d->d_ctrl_lock, RW_WRITER);
+	mutex_enter(&d->d_ctrl_lock);
 	list_insert_tail(&d->d_controls, ctrl);
-	rw_exit(&d->d_ctrl_lock);
+	mutex_exit(&d->d_ctrl_lock);
 
 	return (ctrl);
 
@@ -230,11 +227,9 @@ audio_dev_del_control(audio_ctrl_t *ctrl)
 	d = ctrl->ctrl_dev;
 	ASSERT(d);
 
-	rw_enter(&d->d_ctrl_lock, RW_WRITER);
+	mutex_enter(&d->d_ctrl_lock);
 	list_remove(&d->d_controls, ctrl);
-	rw_exit(&d->d_ctrl_lock);
-
-	mutex_destroy(&ctrl->ctrl_lock);
+	mutex_exit(&d->d_ctrl_lock);
 
 	audio_control_freenames(ctrl);
 	kmem_free(ctrl, sizeof (*ctrl));
@@ -289,25 +284,30 @@ audio_dev_update_controls(audio_dev_t *d)
 int
 audio_control_read(audio_ctrl_t *ctrl, uint64_t *value)
 {
-	uint64_t my_value;
-	int ret;
+	audio_dev_t	*d = ctrl->ctrl_dev;
+	uint64_t	my_value;
+	int		ret;
 
-	/* Verify arguments */
-	ASSERT(ctrl);
 	ASSERT(value);
-	ASSERT(ctrl->ctrl_dev);
+
+	mutex_enter(&d->d_ctrl_lock);
+	while (d->d_suspended) {
+		cv_wait(&d->d_ctrl_cv, &d->d_ctrl_lock);
+	}
 
 	if (!(ctrl->ctrl_flags & AUDIO_CTRL_FLAG_READABLE)) {
+		mutex_exit(&d->d_ctrl_lock);
 		return (ENXIO);
 	}
 
 	ASSERT(ctrl->ctrl_read_fn);
 
-	if ((ret = ctrl->ctrl_read_fn(ctrl->ctrl_arg, &my_value)) != 0) {
-		return (ret);
-	}
+	ret = ctrl->ctrl_read_fn(ctrl->ctrl_arg, &my_value);
+	mutex_exit(&d->d_ctrl_lock);
 
-	*value = my_value;
+	if (ret == 0) {
+		*value = my_value;
+	}
 
 	return (ret);
 }
@@ -328,20 +328,85 @@ audio_control_write(audio_ctrl_t *ctrl, uint64_t value)
 	int		ret;
 	audio_dev_t	*d = ctrl->ctrl_dev;
 
-	/* Verify arguments */
-	ASSERT(ctrl);
-	ASSERT(d);
+	mutex_enter(&d->d_ctrl_lock);
+	while (d->d_suspended) {
+		cv_wait(&d->d_ctrl_cv, &d->d_ctrl_lock);
+	}
 
 	if (!(ctrl->ctrl_flags & AUDIO_CTRL_FLAG_WRITEABLE)) {
+		mutex_exit(&d->d_ctrl_lock);
 		return (ENXIO);
 	}
 
 	ASSERT(ctrl->ctrl_write_fn);
 
 	ret = ctrl->ctrl_write_fn(ctrl->ctrl_arg, value);
+	if (ret == 0) {
+		ctrl->ctrl_saved = value;
+		ctrl->ctrl_saved_ok = B_TRUE;
+	}
+	mutex_exit(&d->d_ctrl_lock);
 
-	if (ret == 0)
+	if (ret == 0) {
 		audio_dev_update_controls(d);
+	}
 
 	return (ret);
+}
+
+/*
+ * This is used to save control values.
+ */
+int
+auimpl_save_controls(audio_dev_t *d)
+{
+	audio_ctrl_t	*ctrl;
+	list_t		*l;
+	int		ret;
+
+	ASSERT(mutex_owned(&d->d_ctrl_lock));
+	l = &d->d_controls;
+
+	for (ctrl = list_head(l); ctrl; ctrl = list_next(l, ctrl)) {
+		if ((!(ctrl->ctrl_flags & AUDIO_CTRL_FLAG_WRITEABLE)) ||
+		    (!(ctrl->ctrl_flags & AUDIO_CTRL_FLAG_WRITEABLE))) {
+			continue;
+		}
+		ret = ctrl->ctrl_read_fn(ctrl->ctrl_arg, &ctrl->ctrl_saved);
+		if (ret != 0) {
+			audio_dev_warn(d,
+			    "Unable to save value of control %s",
+			    ctrl->ctrl_name);
+			return (ret);
+		} else {
+			ctrl->ctrl_saved_ok = B_TRUE;
+		}
+	}
+	return (0);
+}
+
+int
+auimpl_restore_controls(audio_dev_t *d)
+{
+	audio_ctrl_t	*ctrl;
+	list_t		*l;
+	int		ret;
+	int		rv = 0;
+
+	ASSERT(mutex_owned(&d->d_ctrl_lock));
+	l = &d->d_controls;
+
+	for (ctrl = list_head(l); ctrl; ctrl = list_next(l, ctrl)) {
+		if (!ctrl->ctrl_saved_ok) {
+			continue;
+		}
+		ret = ctrl->ctrl_write_fn(ctrl->ctrl_arg, ctrl->ctrl_saved);
+		if (ret != 0) {
+			audio_dev_warn(d,
+			    "Unable to restore value of control %s",
+			    ctrl->ctrl_name);
+			rv = ret;
+		}
+	}
+	return (rv);
 }
