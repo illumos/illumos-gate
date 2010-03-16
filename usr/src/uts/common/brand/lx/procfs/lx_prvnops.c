@@ -922,33 +922,33 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	sigemptyset(&ignore);
 	sigemptyset(&handle);
 
-	for (i = 1; i < MAXSIG; i++) {
+	for (i = 1; i < NSIG; i++) {
 		lx_sig = stol_signo[i];
 
-		if ((lx_sig > 0) && (lx_sig < MAXSIG)) {
+		if ((lx_sig > 0) && (lx_sig < LX_NSIG)) {
 			if (sigismember(&p->p_sig, i))
 				sigaddset(&current, lx_sig);
 
-			if (up->u_signal[i] == SIG_IGN)
+			if (up->u_signal[i - 1] == SIG_IGN)
 				sigaddset(&ignore, lx_sig);
-			else if (up->u_signal[i] != SIG_DFL)
+			else if (up->u_signal[i - 1] != SIG_DFL)
 				sigaddset(&handle, lx_sig);
 		}
 	}
 
 	lxpr_uiobuf_printf(uiobuf,
 	    "\n"
-	    "SigPnd:\t%08x%08x%08x\n"
-	    "SigBlk:\t%08x%08x%08x\n"
-	    "SigIgn:\t%08x%08x%08x\n"
-	    "SigCgt:\t%08x%08x%08x\n"
+	    "SigPnd:\t%08x%08x\n"
+	    "SigBlk:\t%08x%08x\n"
+	    "SigIgn:\t%08x%08x\n"
+	    "SigCgt:\t%08x%08x\n"
 	    "CapInh:\t%016x\n"
 	    "CapPrm:\t%016x\n"
 	    "CapEff:\t%016x\n",
-	    current.__sigbits[2], current.__sigbits[1], current.__sigbits[0],
-	    0, 0, 0, /* signals blocked on per thread basis */
-	    ignore.__sigbits[2], ignore.__sigbits[1], ignore.__sigbits[0],
-	    handle.__sigbits[2], handle.__sigbits[1], handle.__sigbits[0],
+	    current.__sigbits[1], current.__sigbits[0],
+	    0, 0, /* signals blocked on per thread basis */
+	    ignore.__sigbits[1], ignore.__sigbits[0],
+	    handle.__sigbits[1], handle.__sigbits[0],
 	    /* Can't do anything with linux capabilities */
 	    0,
 	    0,
