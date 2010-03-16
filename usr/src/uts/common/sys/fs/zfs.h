@@ -324,14 +324,15 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_21			21ULL
 #define	SPA_VERSION_22			22ULL
 #define	SPA_VERSION_23			23ULL
+#define	SPA_VERSION_24			24ULL
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
  * format change. Go to usr/src/grub/grub-0.97/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.  Also bump the version number in
  * usr/src/grub/capability.
  */
-#define	SPA_VERSION			SPA_VERSION_23
-#define	SPA_VERSION_STRING		"23"
+#define	SPA_VERSION			SPA_VERSION_24
+#define	SPA_VERSION_STRING		"24"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -376,6 +377,7 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_DEDUP		SPA_VERSION_21
 #define	SPA_VERSION_RECVD_PROPS		SPA_VERSION_22
 #define	SPA_VERSION_SLIM_ZIL		SPA_VERSION_23
+#define	SPA_VERSION_SA			SPA_VERSION_24
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change
@@ -389,8 +391,9 @@ typedef enum zfs_cache_type {
 #define	ZPL_VERSION_2			2ULL
 #define	ZPL_VERSION_3			3ULL
 #define	ZPL_VERSION_4			4ULL
-#define	ZPL_VERSION			ZPL_VERSION_4
-#define	ZPL_VERSION_STRING		"4"
+#define	ZPL_VERSION_5			5ULL
+#define	ZPL_VERSION			ZPL_VERSION_5
+#define	ZPL_VERSION_STRING		"5"
 
 #define	ZPL_VERSION_INITIAL		ZPL_VERSION_1
 #define	ZPL_VERSION_DIRENT_TYPE		ZPL_VERSION_2
@@ -398,6 +401,7 @@ typedef enum zfs_cache_type {
 #define	ZPL_VERSION_NORMALIZATION	ZPL_VERSION_3
 #define	ZPL_VERSION_SYSATTR		ZPL_VERSION_3
 #define	ZPL_VERSION_USERSPACE		ZPL_VERSION_4
+#define	ZPL_VERSION_SA			ZPL_VERSION_5
 
 /* Rewind request information */
 #define	ZPOOL_NO_REWIND		1  /* No policy - default behavior */

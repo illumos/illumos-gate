@@ -19,13 +19,13 @@
 \ CDDL HEADER END
 \
 \
-\ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 
 
 purpose: ZFS file system support package
-copyright: Copyright 2009 Sun Microsystems, Inc. All Rights Reserved
+copyright: Copyright 2010 Sun Microsystems, Inc. All Rights Reserved
 
 " /packages" get-package  push-package
 
@@ -395,13 +395,18 @@ new-device
    \	ZFS dnode (DMU) routines
    \
 
+   d# 44  constant ot-sa#
+
    d# 512 constant /dnode
 
-   : dn_indblkshift   ( dn -- n )  h#  1 +  c@  ;
-   : dn_nlevels       ( dn -- n )  h#  2 +  c@  ;
-   : dn_datablkszsec  ( dn -- n )  h#  8 +  w@  ;
-   : dn_blkptr        ( dn -- p )  h# 40 +      ;
-   : dn_bonus         ( dn -- p )  h# c0 +      ;
+   : dn_indblkshift   ( dn -- n )  h#   1 +  c@  ;
+   : dn_nlevels       ( dn -- n )  h#   2 +  c@  ;
+   : dn_bonustype     ( dn -- n )  h#   4 +  c@  ;
+   : dn_datablkszsec  ( dn -- n )  h#   8 +  w@  ;
+   : dn_bonuslen      ( dn -- n )  h#   a +  w@  ;
+   : dn_blkptr        ( dn -- p )  h#  40 +      ;
+   : dn_bonus         ( dn -- p )  h#  c0 +      ;
+   : dn_spill         ( dn -- p )  h# 180 +      ;
 
    0 instance value dnode
 
@@ -755,7 +760,6 @@ new-device
    0 instance value mos-dn
    0 instance value obj-dir
    0 instance value root-dsl
-   0 instance value root-dsl#
    0 instance value fs-dn
 
    \ dn-cache contains dc-dn's contents at dc-blk#
@@ -819,7 +823,6 @@ new-device
       obj-dir " root_dataset"  zap-lookup  if
          " no root_dataset"  die
       then                                   ( obj# )
-      dup to root-dsl#
       get-mos-dnode                          (  )
       dnode root-dsl  /dnode  move
    ;
@@ -888,6 +891,20 @@ new-device
    \
 
    1       constant master-node#
+
+   0 instance value bootfs-obj#
+   0 instance value root-obj#
+   0 instance value current-obj#
+   0 instance value search-obj#
+
+   instance defer fsize         ( dn -- size )
+   instance defer mode          ( dn -- mode )
+   instance defer parent        ( dn -- obj# )
+   instance defer readlink      ( dst dn -- )
+
+   \
+   \ routines when bonus pool contains a znode
+   \
    d# 264  constant /znode
    d#  56  constant /zn-slink
 
@@ -895,15 +912,77 @@ new-device
    : zp_size    ( zn -- n )  h# 50 +  x@  ;
    : zp_parent  ( zn -- n )  h# 58 +  x@  ;
 
-   0 instance value bootfs-obj#
-   0 instance value root-obj#
-   0 instance value current-obj#
-   0 instance value search-obj#
-
    alias  >znode  dn_bonus
 
-   : fsize     ( dn -- n )     >znode zp_size  ;
-   : ftype     ( dn -- n )     >znode zp_mode  h# f000  and  ;
+   : zn-fsize     ( dn -- n )  >znode zp_size    ;
+   : zn-mode      ( dn -- n )  >znode zp_mode    ;
+   : zn-parent    ( dn -- n )  >znode zp_parent  ;
+
+   \ copy symlink target to dst
+   : zn-readlink  ( dst dn -- )
+      dup zn-fsize  tuck /zn-slink  >  if ( dst size dn )
+         \ contents in 1st block
+         temp-space  over dn-bsize        ( dst size dn t-adr bsize )
+         rot  0 lblk#>bp  read-bp         ( dst size )
+         temp-space                       ( dst size src )
+      else                                ( dst size dn )
+         \ contents in dnode
+         >znode  /znode +                 ( dst size src )
+      then                                ( dst size src )
+      -rot  move                          (  )
+   ;
+
+   \
+   \ routines when bonus pool contains sa's
+   \
+
+   \ SA header size when link is in dn_bonus
+   d# 16  constant  /sahdr-link
+
+   : sa_props  ( sa -- n )   h# 4 +  w@  ;
+
+   : sa-hdrsz  ( sa -- sz )  sa_props h# 7  >>  ;
+
+   alias  >sa  dn_bonus
+
+   : >sadata    ( dn -- adr )  >sa dup  sa-hdrsz  +  ;
+   : sa-mode    ( dn -- n )    >sadata           x@  ;
+   : sa-fsize   ( dn -- n )    >sadata  h#  8 +  x@  ;
+   : sa-parent  ( dn -- n )    >sadata  h# 28 +  x@  ;
+
+   \ copy symlink target to dst
+   : sa-readlink  ( dst dn -- )
+      dup  >sa sa-hdrsz  /sahdr-link  <>  if
+         \ contents in 1st attr of dn_spill
+         temp-space  over dn_spill           ( dst dn t-adr bp )
+         dup bp-lsize  swap  read-bp         ( dst dn )
+         sa-fsize                            ( dst size )
+         temp-space dup sa-hdrsz  +          ( dst size src )
+      else                                   ( dst dn )
+         \ content in bonus buf
+         dup dn_bonus  over  dn_bonuslen  +  ( dst dn ebonus )
+         swap sa-fsize  tuck  -              ( dst size src )
+      then                                   ( dst size src )
+      -rot  move                             (  )
+   ;
+
+
+   \ setup attr routines for dn
+   : set-attr  ( dn -- )
+      dn_bonustype  ot-sa#  =  if
+         ['] sa-fsize     to  fsize
+         ['] sa-mode      to  mode
+         ['] sa-parent    to  parent
+         ['] sa-readlink  to  readlink
+      else
+         ['] zn-fsize     to  fsize
+         ['] zn-mode      to  mode
+         ['] zn-parent    to  parent
+         ['] zn-readlink  to  readlink
+      then
+   ;
+
+   : ftype     ( dn -- type )  mode   h# f000  and  ;
    : dir?      ( dn -- flag )  ftype  h# 4000  =  ;
    : symlink?  ( dn -- flag )  ftype  h# a000  =  ;
 
@@ -959,7 +1038,7 @@ new-device
       then
 
       2dup " .."  $=  if
-         2drop  >znode zp_parent  ( obj# )
+         2drop  parent            ( obj# )
       else                        ( dn file$ )
          \ search dir
          current-obj# to search-obj#
@@ -967,38 +1046,32 @@ new-device
             true  exit            ( not-found )
          then                     ( obj# )
       then                        ( obj# )
-      get-fs-dnode  false         ( found )
+      get-fs-dnode
+      dnode  set-attr
+      false                       ( found )
    ;
 
    /buf-len  instance buffer: fpath-buf
-   : clr-fpath-buf  ( -- )  fpath-buf /buf-len  erase  ;
+   /buf-len  instance buffer: tpath-buf
 
+   : tpath-buf$  ( -- path$ )  tpath-buf cscount  ;
    : fpath-buf$  ( -- path$ )  fpath-buf cscount  ;
-
-   \ copy symlink target to adr
-   : readlink  ( dst dn -- )
-      dup fsize  tuck /zn-slink  >  if    ( dst size dn )
-         \ contents in 1st block
-         temp-space  over dn-bsize        ( dst size dn t-adr bsize )
-         rot  0 lblk#>bp  read-bp         ( dst size )
-         temp-space                       ( dst size src )
-      else                                ( dst size dn )
-         \ contents in dnode
-         >znode  /znode +                 ( dst size src )
-      then                                ( dst size src )
-      -rot  move                          (  )
-   ;
 
    \ modify tail to account for symlink
    : follow-symlink  ( tail$ -- tail$' )
-      clr-fpath-buf                             ( tail$ )
-      fpath-buf dnode  readlink
+      \ read target
+      tpath-buf /buf-len  erase
+      tpath-buf dnode  readlink
 
-      \ append to current path
+      \ append current path
       ?dup  if                                  ( tail$ )
-	 " /" fpath-buf$  $append               ( tail$ )
-	 fpath-buf$  $append                    (  )
+	 " /" tpath-buf$  $append               ( tail$ )
+	 tpath-buf$  $append                    (  )
       else  drop  then                          (  )
+
+      \ copy to fpath
+      fpath-buf  /buf-len  erase
+      tpath-buf$  fpath-buf  swap move
       fpath-buf$                                ( path$ )
 
       \ get directory that starts changed path
@@ -1008,6 +1081,7 @@ new-device
          search-obj#                            ( path$ obj# )
       then                                      ( path$ obj# )
       get-fs-dnode                              ( path$ )
+      dnode  set-attr
    ;
 
    \ open dnode at path
@@ -1020,6 +1094,7 @@ new-device
          current-obj#                             ( path$ obj# )
       then                                        ( path$ obj# )
       get-fs-dnode                                ( path$ )
+      dnode  set-attr
 
       \ lookup each path component
       begin                                       ( path$ )
@@ -1173,7 +1248,7 @@ new-device
 
       \ zero instance buffers
       file-records /file-records  erase
-      bootprop-buf /buf-len  erase 
+      bootprop-buf /buf-len  erase
    ;
 
    : release-buffers  ( -- )

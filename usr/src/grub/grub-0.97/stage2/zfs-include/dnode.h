@@ -17,14 +17,12 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_DNODE_H
 #define	_SYS_DNODE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Fixed constants.
@@ -49,6 +47,8 @@
 #define	DNODES_PER_BLOCK	(1ULL << DNODES_PER_BLOCK_SHIFT)
 #define	DNODES_PER_LEVEL_SHIFT	(DN_MAX_INDBLKSHIFT - SPA_BLKPTRSHIFT)
 
+#define	DNODE_FLAG_SPILL_BLKPTR (1<<2)
+
 #define	DN_BONUS(dnp)	((void*)((dnp)->dn_bonus + \
 	(((dnp)->dn_nblkptr - 1) * sizeof (blkptr_t))))
 
@@ -72,7 +72,8 @@ typedef struct dnode_phys {
 	uint64_t dn_pad3[4];
 
 	blkptr_t dn_blkptr[1];
-	uint8_t dn_bonus[DN_MAX_BONUSLEN];
+	uint8_t dn_bonus[DN_MAX_BONUSLEN - sizeof (blkptr_t)];
+	blkptr_t dn_spill;
 } dnode_phys_t;
 
 #endif	/* _SYS_DNODE_H */

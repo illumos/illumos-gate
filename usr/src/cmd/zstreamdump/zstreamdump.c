@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +88,7 @@ main(int argc, char *argv[])
 	struct drr_write *drrw = &thedrr.drr_u.drr_write;
 	struct drr_write_byref *drrwbr = &thedrr.drr_u.drr_write_byref;
 	struct drr_free *drrf = &thedrr.drr_u.drr_free;
+	struct drr_spill *drrs = &thedrr.drr_u.drr_spill;
 	char c;
 	boolean_t verbose = B_FALSE;
 	boolean_t first = B_TRUE;
@@ -378,6 +379,18 @@ main(int argc, char *argv[])
 				    (longlong_t)drrf->drr_length);
 			}
 			break;
+		case DRR_SPILL:
+			if (do_byteswap) {
+				drrs->drr_object = BSWAP_64(drrs->drr_object);
+				drrs->drr_length = BSWAP_64(drrs->drr_length);
+			}
+			if (verbose) {
+				(void) printf("SPILL block for object = %llu "
+				    "length = %llu\n", drrs->drr_object,
+				    drrs->drr_length);
+			}
+			(void) ssread(buf, drrs->drr_length, &zc);
+			break;
 		}
 		pcksum = zc;
 	}
@@ -398,12 +411,15 @@ main(int argc, char *argv[])
 	    (u_longlong_t)drr_record_count[DRR_WRITE]);
 	(void) printf("\tTotal DRR_FREE records = %lld\n",
 	    (u_longlong_t)drr_record_count[DRR_FREE]);
+	(void) printf("\tTotal DRR_SPILL records = %lld\n",
+	    (u_longlong_t)drr_record_count[DRR_SPILL]);
 	(void) printf("\tTotal records = %lld\n",
 	    (u_longlong_t)(drr_record_count[DRR_BEGIN] +
 	    drr_record_count[DRR_OBJECT] +
 	    drr_record_count[DRR_FREEOBJECTS] +
 	    drr_record_count[DRR_WRITE] +
 	    drr_record_count[DRR_FREE] +
+	    drr_record_count[DRR_SPILL] +
 	    drr_record_count[DRR_END]));
 	(void) printf("\tTotal write size = %lld (0x%llx)\n",
 	    (u_longlong_t)total_write_size, (u_longlong_t)total_write_size);

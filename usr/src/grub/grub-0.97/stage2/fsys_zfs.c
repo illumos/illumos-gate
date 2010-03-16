@@ -670,6 +670,7 @@ zap_lookup(dnode_phys_t *zap_dnode, char *name, uint64_t *val, char *stack)
 	zapbuf = stack;
 	size = zap_dnode->dn_datablkszsec << SPA_MINBLOCKSHIFT;
 	stack += size;
+
 	if (errnum = dmu_read(zap_dnode, 0, zapbuf, stack))
 		return (errnum);
 
@@ -1425,7 +1426,44 @@ zfs_open(char *filename)
 	}
 
 	/* get the file size and set the file position to 0 */
-	filemax = ((znode_phys_t *)DN_BONUS(DNODE))->zp_size;
+
+	/*
+	 * For DMU_OT_SA we will need to locate the SIZE attribute
+	 * attribute, which could be either in the bonus buffer
+	 * or the "spill" block.
+	 */
+	if (DNODE->dn_bonustype == DMU_OT_SA) {
+		sa_hdr_phys_t *sahdrp;
+		int hdrsize;
+
+		sahdrp = (sa_hdr_phys_t *)DN_BONUS(DNODE);
+		if (DNODE->dn_bonuslen != 0) {
+			sahdrp = (sa_hdr_phys_t *)DN_BONUS(DNODE);
+		} else {
+			if (DNODE->dn_flags & DNODE_FLAG_SPILL_BLKPTR) {
+				blkptr_t *bp = &DNODE->dn_spill;
+				void *buf;
+
+				buf = (void *)stack;
+				stack += BP_GET_LSIZE(bp);
+
+				/* reset errnum to rawread() failure */
+				errnum = 0;
+				if (zio_read(bp, buf, stack) != 0) {
+					return (0);
+				}
+				sahdrp = buf;
+			} else {
+				errnum = ERR_FSYS_CORRUPT;
+				return (0);
+			}
+		}
+		hdrsize = SA_HDR_SIZE(sahdrp);
+		filemax = *(uint64_t *)((char *)sahdrp + hdrsize +
+		    SA_SIZE_OFFSET);
+	} else {
+		filemax = ((znode_phys_t *)DN_BONUS(DNODE))->zp_size;
+	}
 	filepos = 0;
 
 	dnode_buf = NULL;

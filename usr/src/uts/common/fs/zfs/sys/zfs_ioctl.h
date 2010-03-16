@@ -71,12 +71,13 @@ typedef enum drr_headertype {
 
 #define	DMU_BACKUP_FEATURE_DEDUP	(0x1)
 #define	DMU_BACKUP_FEATURE_DEDUPPROPS	(0x2)
+#define	DMU_BACKUP_FEATURE_SA_SPILL	(0x4)
 
 /*
  * Mask of all supported backup features
  */
 #define	DMU_BACKUP_FEATURE_MASK	(DMU_BACKUP_FEATURE_DEDUP | \
-		DMU_BACKUP_FEATURE_DEDUPPROPS)
+		DMU_BACKUP_FEATURE_DEDUPPROPS | DMU_BACKUP_FEATURE_SA_SPILL)
 
 /* Are all features in the given flag word currently supported? */
 #define	DMU_STREAM_SUPPORTED(x)	(!((x) & ~DMU_BACKUP_FEATURE_MASK))
@@ -118,7 +119,7 @@ typedef struct dmu_replay_record {
 	enum {
 		DRR_BEGIN, DRR_OBJECT, DRR_FREEOBJECTS,
 		DRR_WRITE, DRR_FREE, DRR_END, DRR_WRITE_BYREF,
-		DRR_NUMTYPES
+		DRR_SPILL, DRR_NUMTYPES
 	} drr_type;
 	uint32_t drr_payloadlen;
 	union {
@@ -188,6 +189,13 @@ typedef struct dmu_replay_record {
 			uint8_t drr_pad2[6];
 			ddt_key_t drr_key; /* deduplication key */
 		} drr_write_byref;
+		struct drr_spill {
+			uint64_t drr_object;
+			uint64_t drr_length;
+			uint64_t drr_toguid;
+			uint64_t drr_pad[4]; /* needed for crypto */
+			/* spill data follows */
+		} drr_spill;
 	} drr_u;
 } dmu_replay_record_t;
 

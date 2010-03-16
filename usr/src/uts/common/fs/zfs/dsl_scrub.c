@@ -42,6 +42,8 @@
 #include <sys/zil_impl.h>
 #include <sys/zio_checksum.h>
 #include <sys/ddt.h>
+#include <sys/sa.h>
+#include <sys/sa_impl.h>
 
 typedef int (scrub_cb_t)(dsl_pool_t *, const blkptr_t *, const zbookmark_t *);
 
@@ -612,6 +614,12 @@ scrub_visitdnode(dsl_pool_t *dp, dnode_phys_t *dnp, arc_buf_t *buf,
 
 		SET_BOOKMARK(&czb, objset, object, dnp->dn_nlevels - 1, j);
 		scrub_visitbp(dp, dnp, buf, &dnp->dn_blkptr[j], &czb);
+
+		if (dnp->dn_flags & DNODE_FLAG_SPILL_BLKPTR) {
+			zbookmark_t czb;
+			SET_BOOKMARK(&czb, objset, object, 0, DMU_SPILL_BLKID);
+			scrub_visitbp(dp, dnp, buf, &dnp->dn_spill, &czb);
+		}
 	}
 }
 

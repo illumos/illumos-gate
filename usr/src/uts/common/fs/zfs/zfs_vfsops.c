@@ -46,6 +46,7 @@
 #include <sys/dsl_deleg.h>
 #include <sys/spa.h>
 #include <sys/zap.h>
+#include <sys/sa.h>
 #include <sys/varargs.h>
 #include <sys/policy.h>
 #include <sys/atomic.h>
@@ -60,6 +61,8 @@
 #include <sys/dnlc.h>
 #include <sys/dmu_objset.h>
 #include <sys/spa_boot.h>
+#include <sys/sa.h>
+#include "zfs_comutil.h"
 
 int zfsfstype;
 vfsops_t *zfs_vfsops = NULL;
@@ -582,6 +585,7 @@ uidacct(objset_t *os, boolean_t isgroup, uint64_t fuid,
 
 	(void) snprintf(buf, sizeof (buf), "%llx", (longlong_t)fuid);
 	err = zap_lookup(os, obj, buf, 8, 1, &used);
+
 	ASSERT(err == 0 || err == ENOENT);
 	/* no underflow/overflow */
 	ASSERT(delta > 0 || used >= -delta);
@@ -592,20 +596,38 @@ uidacct(objset_t *os, boolean_t isgroup, uint64_t fuid,
 	else
 		err = zap_update(os, obj, buf, 8, 1, &used, tx);
 	ASSERT(err == 0);
+
 }
 
 static int
-zfs_space_delta_cb(dmu_object_type_t bonustype, void *bonus,
+zfs_space_delta_cb(dmu_object_type_t bonustype, void *data,
     uint64_t *userp, uint64_t *groupp)
 {
-	znode_phys_t *znp = bonus;
+	znode_phys_t *znp = data;
+	int error = 0;
 
-	if (bonustype != DMU_OT_ZNODE)
+	if (bonustype != DMU_OT_ZNODE && bonustype != DMU_OT_SA)
 		return (ENOENT);
 
-	*userp = znp->zp_uid;
-	*groupp = znp->zp_gid;
-	return (0);
+	if (bonustype == DMU_OT_ZNODE) {
+		*userp = znp->zp_uid;
+		*groupp = znp->zp_gid;
+	} else {
+		int hdrsize;
+
+		ASSERT(bonustype == DMU_OT_SA);
+		hdrsize = sa_hdrsize(data);
+
+		if (hdrsize != 0) {
+			*userp = *((uint64_t *)((uintptr_t)data + hdrsize +
+			    SA_UID_OFFSET));
+			*groupp = *((uint64_t *)((uintptr_t)data + hdrsize +
+			    SA_GID_OFFSET));
+		} else {
+			error = ENOENT;
+		}
+	}
+	return (error);
 }
 
 static void
@@ -792,7 +814,7 @@ zfs_set_userquota(zfsvfs_t *zfsvfs, zfs_userquota_prop_t type,
 }
 
 boolean_t
-zfs_usergroup_overquota(zfsvfs_t *zfsvfs, boolean_t isgroup, uint64_t fuid)
+zfs_fuid_overquota(zfsvfs_t *zfsvfs, boolean_t isgroup, uint64_t fuid)
 {
 	char buf[32];
 	uint64_t used, quota, usedobj, quotaobj;
@@ -815,6 +837,32 @@ zfs_usergroup_overquota(zfsvfs_t *zfsvfs, boolean_t isgroup, uint64_t fuid)
 	return (used >= quota);
 }
 
+boolean_t
+zfs_owner_overquota(zfsvfs_t *zfsvfs, znode_t *zp, boolean_t isgroup)
+{
+	uint64_t fuid;
+	uint64_t quotaobj;
+	uid_t id;
+
+	quotaobj = isgroup ? zfsvfs->z_groupquota_obj : zfsvfs->z_userquota_obj;
+
+	id = isgroup ? zp->z_gid : zp->z_uid;
+
+	if (quotaobj == 0 || zfsvfs->z_replay)
+		return (B_FALSE);
+
+	if (IS_EPHEMERAL(id)) {
+		VERIFY(0 == sa_lookup(zp->z_sa_hdl,
+		    isgroup ? SA_ZPL_GID(zfsvfs) : SA_ZPL_UID(zfsvfs),
+		    &fuid, sizeof (fuid)));
+	} else {
+		fuid = (uint64_t)id;
+	}
+
+	return (zfs_fuid_overquota(zfsvfs, isgroup, fuid));
+}
+
+
 int
 zfsvfs_create(const char *osname, zfsvfs_t **zfvp)
 {
@@ -822,6 +870,7 @@ zfsvfs_create(const char *osname, zfsvfs_t **zfvp)
 	zfsvfs_t *zfsvfs;
 	uint64_t zval;
 	int i, error;
+	uint64_t sa_obj;
 
 	zfsvfs = kmem_zalloc(sizeof (zfsvfs_t), KM_SLEEP);
 
@@ -879,6 +928,26 @@ zfsvfs_create(const char *osname, zfsvfs_t **zfvp)
 		zfsvfs->z_norm |= U8_TEXTPREP_TOUPPER;
 
 	zfsvfs->z_use_fuids = USE_FUIDS(zfsvfs->z_version, zfsvfs->z_os);
+	zfsvfs->z_use_sa = USE_SA(zfsvfs->z_version, zfsvfs->z_os);
+
+	if (zfsvfs->z_use_sa) {
+		/* should either have both of these objects or none */
+		error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_SA_ATTRS, 8, 1,
+		    &sa_obj);
+		if (error)
+			return (error);
+	} else {
+		/*
+		 * Pre SA versions file systems should never touch
+		 * either the attribute registration or layout objects.
+		 */
+		sa_obj = 0;
+	}
+
+	zfsvfs->z_attr_table = sa_setup(os, sa_obj, zfs_attr_table, ZPL_END);
+
+	if (zfsvfs->z_version >= ZPL_VERSION_SA)
+		sa_register_update_callback(os, zfs_sa_upgrade);
 
 	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_ROOT_OBJ, 8, 1,
 	    &zfsvfs->z_root);
@@ -1051,6 +1120,7 @@ zfs_set_fuid_feature(zfsvfs_t *zfsvfs)
 		vfs_set_feature(zfsvfs->z_vfs, VFSFT_ACCESS_FILTER);
 		vfs_set_feature(zfsvfs->z_vfs, VFSFT_REPARSE);
 	}
+	zfsvfs->z_use_sa = USE_SA(zfsvfs->z_version, zfsvfs->z_os);
 }
 
 static int
@@ -1732,7 +1802,7 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 	mutex_enter(&zfsvfs->z_znodes_lock);
 	for (zp = list_head(&zfsvfs->z_all_znodes); zp != NULL;
 	    zp = list_next(&zfsvfs->z_all_znodes, zp))
-		if (zp->z_dbuf) {
+		if (zp->z_sa_hdl) {
 			ASSERT(ZTOV(zp)->v_count > 0);
 			zfs_znode_dmu_fini(zp);
 		}
@@ -1927,7 +1997,9 @@ zfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 		ZFS_EXIT(zfsvfs);
 		return (err);
 	}
-	zp_gen = zp->z_phys->zp_gen & gen_mask;
+	(void) sa_lookup(zp->z_sa_hdl, SA_ZPL_GEN(zfsvfs), &zp_gen,
+	    sizeof (uint64_t));
+	zp_gen = zp_gen & gen_mask;
 	if (zp_gen == 0)
 		zp_gen = 1;
 	if (zp->z_unlinked || zp_gen != fid_gen) {
@@ -1966,7 +2038,7 @@ zfs_suspend_fs(zfsvfs_t *zfsvfs)
 int
 zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname)
 {
-	int err;
+	int err, err2;
 
 	ASSERT(RRW_WRITE_HELD(&zfsvfs->z_teardown_lock));
 	ASSERT(RW_WRITE_HELD(&zfsvfs->z_teardown_inactive_lock));
@@ -1977,6 +2049,17 @@ zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname)
 		zfsvfs->z_os = NULL;
 	} else {
 		znode_t *zp;
+		uint64_t sa_obj = 0;
+
+		err2 = zap_lookup(zfsvfs->z_os, MASTER_NODE_OBJ,
+		    ZFS_SA_ATTRS, 8, 1, &sa_obj);
+
+		if ((err || err2) && zfsvfs->z_version >= ZPL_VERSION_SA)
+			goto bail;
+
+
+		zfsvfs->z_attr_table = sa_setup(zfsvfs->z_os, sa_obj,
+		    zfs_attr_table,  ZPL_END);
 
 		VERIFY(zfsvfs_setup(zfsvfs, B_FALSE) == 0);
 
@@ -1995,6 +2078,7 @@ zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname)
 
 	}
 
+bail:
 	/* release the VOPs */
 	rw_exit(&zfsvfs->z_teardown_inactive_lock);
 	rrw_exit(&zfsvfs->z_teardown_lock, FTAG);
@@ -2111,19 +2195,45 @@ zfs_set_version(zfsvfs_t *zfsvfs, uint64_t newvers)
 	if (newvers < zfsvfs->z_version)
 		return (EINVAL);
 
+	if (zfs_spa_version_map(newvers) >
+	    spa_version(dmu_objset_spa(zfsvfs->z_os)))
+		return (ENOTSUP);
+
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, B_FALSE, ZPL_VERSION_STR);
+	if (newvers >= ZPL_VERSION_SA && !zfsvfs->z_use_sa) {
+		dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, B_TRUE,
+		    ZFS_SA_ATTRS);
+		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
+	}
 	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
 		dmu_tx_abort(tx);
 		return (error);
 	}
+
 	error = zap_update(os, MASTER_NODE_OBJ, ZPL_VERSION_STR,
 	    8, 1, &newvers, tx);
 
 	if (error) {
 		dmu_tx_commit(tx);
 		return (error);
+	}
+
+	if (newvers >= ZPL_VERSION_SA && !zfsvfs->z_use_sa) {
+		uint64_t sa_obj;
+
+		ASSERT3U(spa_version(dmu_objset_spa(zfsvfs->z_os)), >=,
+		    SPA_VERSION_SA);
+		sa_obj = zap_create(os, DMU_OT_SA_MASTER_NODE,
+		    DMU_OT_NONE, 0, tx);
+
+		error = zap_add(os, MASTER_NODE_OBJ,
+		    ZFS_SA_ATTRS, 8, 1, &sa_obj, tx);
+		ASSERT3U(error, ==, 0);
+
+		VERIFY(0 == sa_set_sa_object(os, sa_obj));
+		sa_register_update_callback(os, zfs_sa_upgrade);
 	}
 
 	spa_history_internal_log(LOG_DS_UPGRADE,

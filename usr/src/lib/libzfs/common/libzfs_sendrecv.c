@@ -203,6 +203,7 @@ cksummer(void *arg)
 	struct drr_end *drre = &thedrr.drr_u.drr_end;
 	struct drr_object *drro = &thedrr.drr_u.drr_object;
 	struct drr_write *drrw = &thedrr.drr_u.drr_write;
+	struct drr_spill *drrs = &thedrr.drr_u.drr_spill;
 	FILE *ofp;
 	int outfd;
 	dmu_replay_record_t wbr_drr = {0};
@@ -299,6 +300,18 @@ cksummer(void *arg)
 				    &stream_cksum, outfd) == -1)
 					goto out;
 			}
+			break;
+		}
+
+		case DRR_SPILL:
+		{
+			if (cksum_and_write(drr, sizeof (dmu_replay_record_t),
+			    &stream_cksum, outfd) == -1)
+				goto out;
+			(void) ssread(buf, drrs->drr_length, ofp);
+			if (cksum_and_write(buf, drrs->drr_length,
+			    &stream_cksum, outfd) == -1)
+				goto out;
 			break;
 		}
 
@@ -1153,6 +1166,14 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	int pipefd[2];
 	dedup_arg_t dda = { 0 };
 	int featureflags = 0;
+
+	if (zhp->zfs_type == ZFS_TYPE_FILESYSTEM) {
+		uint64_t version;
+		version = zfs_prop_get_int(zhp, ZFS_PROP_VERSION);
+		if (version >= ZPL_VERSION_SA) {
+			featureflags |= DMU_BACKUP_FEATURE_SA_SPILL;
+		}
+	}
 
 	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
 	    "cannot send '%s'"), zhp->zfs_name);
@@ -2180,7 +2201,14 @@ recv_skip(libzfs_handle_t *hdl, int fd, boolean_t byteswap)
 			(void) recv_read(hdl, fd, buf,
 			    drr->drr_u.drr_write.drr_length, B_FALSE, NULL);
 			break;
-
+		case DRR_SPILL:
+			if (byteswap) {
+				drr->drr_u.drr_write.drr_length =
+				    BSWAP_64(drr->drr_u.drr_spill.drr_length);
+			}
+			(void) recv_read(hdl, fd, buf,
+			    drr->drr_u.drr_spill.drr_length, B_FALSE, NULL);
+			break;
 		case DRR_WRITE_BYREF:
 		case DRR_FREEOBJECTS:
 		case DRR_FREE:

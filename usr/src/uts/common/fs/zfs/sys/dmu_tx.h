@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,7 @@ enum dmu_tx_hold_type {
 	THT_FREE,
 	THT_ZAP,
 	THT_SPACE,
+	THT_SPILL,
 	THT_NUMTYPES
 };
 

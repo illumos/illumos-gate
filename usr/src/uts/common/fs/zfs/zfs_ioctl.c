@@ -68,6 +68,7 @@
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
 #include "zfs_deleg.h"
+#include "zfs_comutil.h"
 
 extern struct modlfs zfs_modlfs;
 
@@ -1954,19 +1955,9 @@ zfs_prop_set_special(const char *dsname, zprop_source_t source,
 	case ZFS_PROP_VERSION:
 	{
 		zfsvfs_t *zfsvfs;
-		uint64_t maxzplver = ZPL_VERSION;
 
 		if ((err = zfsvfs_hold(dsname, FTAG, &zfsvfs)) != 0)
 			break;
-
-		if (zfs_earlier_version(dsname, SPA_VERSION_USERSPACE))
-			maxzplver = ZPL_VERSION_USERSPACE - 1;
-		if (zfs_earlier_version(dsname, SPA_VERSION_FUID))
-			maxzplver = ZPL_VERSION_FUID - 1;
-		if (intval > maxzplver) {
-			zfsvfs_rele(zfsvfs, FTAG);
-			return (ENOTSUP);
-		}
 
 		err = zfs_set_version(zfsvfs, intval);
 		zfsvfs_rele(zfsvfs, FTAG);
@@ -2558,8 +2549,8 @@ zfs_create_cb(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx)
  */
 static int
 zfs_fill_zplprops_impl(objset_t *os, uint64_t zplver,
-    boolean_t fuids_ok, nvlist_t *createprops, nvlist_t *zplprops,
-    boolean_t *is_ci)
+    boolean_t fuids_ok, boolean_t sa_ok, nvlist_t *createprops,
+    nvlist_t *zplprops, boolean_t *is_ci)
 {
 	uint64_t sense = ZFS_PROP_UNDEFINED;
 	uint64_t norm = ZFS_PROP_UNDEFINED;
@@ -2595,6 +2586,7 @@ zfs_fill_zplprops_impl(objset_t *os, uint64_t zplver,
 	 */
 	if ((zplver < ZPL_VERSION_INITIAL || zplver > ZPL_VERSION) ||
 	    (zplver >= ZPL_VERSION_FUID && !fuids_ok) ||
+	    (zplver >= ZPL_VERSION_SA && !sa_ok) ||
 	    (zplver < ZPL_VERSION_NORMALIZATION &&
 	    (norm != ZFS_PROP_UNDEFINED || u8 != ZFS_PROP_UNDEFINED ||
 	    sense != ZFS_PROP_UNDEFINED)))
@@ -2636,11 +2628,13 @@ static int
 zfs_fill_zplprops(const char *dataset, nvlist_t *createprops,
     nvlist_t *zplprops, boolean_t *is_ci)
 {
-	boolean_t fuids_ok = B_TRUE;
+	boolean_t fuids_ok, sa_ok;
 	uint64_t zplver = ZPL_VERSION;
 	objset_t *os = NULL;
 	char parentname[MAXNAMELEN];
 	char *cp;
+	spa_t *spa;
+	uint64_t spa_vers;
 	int error;
 
 	(void) strlcpy(parentname, dataset, sizeof (parentname));
@@ -2648,12 +2642,15 @@ zfs_fill_zplprops(const char *dataset, nvlist_t *createprops,
 	ASSERT(cp != NULL);
 	cp[0] = '\0';
 
-	if (zfs_earlier_version(dataset, SPA_VERSION_USERSPACE))
-		zplver = ZPL_VERSION_USERSPACE - 1;
-	if (zfs_earlier_version(dataset, SPA_VERSION_FUID)) {
-		zplver = ZPL_VERSION_FUID - 1;
-		fuids_ok = B_FALSE;
-	}
+	if ((error = spa_open(dataset, &spa, FTAG)) != 0)
+		return (error);
+
+	spa_vers = spa_version(spa);
+	spa_close(spa, FTAG);
+
+	zplver = zfs_zpl_version_map(spa_vers);
+	fuids_ok = (zplver >= ZPL_VERSION_FUID);
+	sa_ok = (zplver >= ZPL_VERSION_SA);
 
 	/*
 	 * Open parent object set so we can inherit zplprop values.
@@ -2661,7 +2658,7 @@ zfs_fill_zplprops(const char *dataset, nvlist_t *createprops,
 	if ((error = dmu_objset_hold(parentname, FTAG, &os)) != 0)
 		return (error);
 
-	error = zfs_fill_zplprops_impl(os, zplver, fuids_ok, createprops,
+	error = zfs_fill_zplprops_impl(os, zplver, fuids_ok, sa_ok, createprops,
 	    zplprops, is_ci);
 	dmu_objset_rele(os, FTAG);
 	return (error);
@@ -2671,17 +2668,17 @@ static int
 zfs_fill_zplprops_root(uint64_t spa_vers, nvlist_t *createprops,
     nvlist_t *zplprops, boolean_t *is_ci)
 {
-	boolean_t fuids_ok = B_TRUE;
+	boolean_t fuids_ok;
+	boolean_t sa_ok;
 	uint64_t zplver = ZPL_VERSION;
 	int error;
 
-	if (spa_vers < SPA_VERSION_FUID) {
-		zplver = ZPL_VERSION_FUID - 1;
-		fuids_ok = B_FALSE;
-	}
+	zplver = zfs_zpl_version_map(spa_vers);
+	fuids_ok = (zplver >= ZPL_VERSION_FUID);
+	sa_ok = (zplver >= ZPL_VERSION_SA);
 
-	error = zfs_fill_zplprops_impl(NULL, zplver, fuids_ok, createprops,
-	    zplprops, is_ci);
+	error = zfs_fill_zplprops_impl(NULL, zplver, fuids_ok, sa_ok,
+	    createprops, zplprops, is_ci);
 	return (error);
 }
 

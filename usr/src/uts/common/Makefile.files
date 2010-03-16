@@ -1338,6 +1338,7 @@ ZFS_COMMON_OBJS +=		\
 	lzjb.o			\
 	metaslab.o		\
 	refcount.o		\
+	sa.o			\
 	sha256.o		\
 	spa.o			\
 	spa_config.o		\
@@ -1363,6 +1364,7 @@ ZFS_COMMON_OBJS +=		\
 	zfs_byteswap.o		\
 	zfs_fm.o		\
 	zfs_fuid.o		\
+	zfs_sa.o		\
 	zfs_znode.o		\
 	zil.o			\
 	zio.o			\

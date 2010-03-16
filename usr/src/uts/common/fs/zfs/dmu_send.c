@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,6 +183,31 @@ dump_data(struct backuparg *ba, dmu_object_type_t type,
 }
 
 static int
+dump_spill(struct backuparg *ba, uint64_t object, int blksz, void *data)
+{
+	struct drr_spill *drrs = &(ba->drr->drr_u.drr_spill);
+
+	if (ba->pending_op != PENDING_NONE) {
+		if (dump_bytes(ba, ba->drr, sizeof (dmu_replay_record_t)) != 0)
+			return (EINTR);
+		ba->pending_op = PENDING_NONE;
+	}
+
+	/* write a SPILL record */
+	bzero(ba->drr, sizeof (dmu_replay_record_t));
+	ba->drr->drr_type = DRR_SPILL;
+	drrs->drr_object = object;
+	drrs->drr_length = blksz;
+	drrs->drr_toguid = ba->toguid;
+
+	if (dump_bytes(ba, ba->drr, sizeof (dmu_replay_record_t)))
+		return (EINTR);
+	if (dump_bytes(ba, data, blksz))
+		return (EINTR);
+	return (0);
+}
+
+static int
 dump_freeobjects(struct backuparg *ba, uint64_t firstobj, uint64_t numobjs)
 {
 	struct drr_freeobjects *drrfo = &(ba->drr->drr_u.drr_freeobjects);
@@ -318,6 +343,18 @@ backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 			if (err)
 				break;
 		}
+		(void) arc_buf_remove_ref(abuf, &abuf);
+	} else if (type == DMU_OT_SA) {
+		uint32_t aflags = ARC_WAIT;
+		arc_buf_t *abuf;
+		int blksz = BP_GET_LSIZE(bp);
+
+		if (arc_read_nolock(NULL, spa, bp,
+		    arc_getbuf_func, &abuf, ZIO_PRIORITY_ASYNC_READ,
+		    ZIO_FLAG_CANFAIL, &aflags, zb) != 0)
+			return (EIO);
+
+		err = dump_spill(ba, zb->zb_object, blksz, abuf->b_data);
 		(void) arc_buf_remove_ref(abuf, &abuf);
 	} else { /* it's a level-0 block of a regular object */
 		uint32_t aflags = ARC_WAIT;
@@ -908,6 +945,11 @@ backup_byteswap(dmu_replay_record_t *drr)
 		DO64(drr_free.drr_length);
 		DO64(drr_free.drr_toguid);
 		break;
+	case DRR_SPILL:
+		DO64(drr_spill.drr_object);
+		DO64(drr_spill.drr_length);
+		DO64(drr_spill.drr_toguid);
+		break;
 	case DRR_END:
 		DO64(drr_end.drr_checksum.zc_word[0]);
 		DO64(drr_end.drr_checksum.zc_word[1]);
@@ -969,8 +1011,9 @@ restore_object(struct restorearg *ra, objset_t *os, struct drr_object *drro)
 		    drro->drr_type, drro->drr_blksz,
 		    drro->drr_bonustype, drro->drr_bonuslen);
 	}
-	if (err)
+	if (err) {
 		return (EINVAL);
+	}
 
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_bonus(tx, drro->drr_object);
@@ -1117,6 +1160,56 @@ restore_write_byref(struct restorearg *ra, objset_t *os,
 	dmu_write(os, drrwbr->drr_object,
 	    drrwbr->drr_offset, drrwbr->drr_length, dbp->db_data, tx);
 	dmu_buf_rele(dbp, FTAG);
+	dmu_tx_commit(tx);
+	return (0);
+}
+
+static int
+restore_spill(struct restorearg *ra, objset_t *os, struct drr_spill *drrs)
+{
+	dmu_tx_t *tx;
+	void *data;
+	dmu_buf_t *db, *db_spill;
+	int err;
+
+	if (drrs->drr_length < SPA_MINBLOCKSIZE ||
+	    drrs->drr_length > SPA_MAXBLOCKSIZE)
+		return (EINVAL);
+
+	data = restore_read(ra, drrs->drr_length);
+	if (data == NULL)
+		return (ra->err);
+
+	if (dmu_object_info(os, drrs->drr_object, NULL) != 0)
+		return (EINVAL);
+
+	VERIFY(0 == dmu_bonus_hold(os, drrs->drr_object, FTAG, &db));
+	if ((err = dmu_spill_hold_by_bonus(db, FTAG, &db_spill)) != 0) {
+		dmu_buf_rele(db, FTAG);
+		return (err);
+	}
+
+	tx = dmu_tx_create(os);
+
+	dmu_tx_hold_spill(tx, db->db_object);
+
+	err = dmu_tx_assign(tx, TXG_WAIT);
+	if (err) {
+		dmu_buf_rele(db, FTAG);
+		dmu_buf_rele(db_spill, FTAG);
+		dmu_tx_abort(tx);
+		return (err);
+	}
+	dmu_buf_will_dirty(db_spill, tx);
+
+	if (db_spill->db_size < drrs->drr_length)
+		VERIFY(0 == dbuf_spill_set_blksz(db_spill,
+		    drrs->drr_length, tx));
+	bcopy(data, db_spill->db_data, drrs->drr_length);
+
+	dmu_buf_rele(db, FTAG);
+	dmu_buf_rele(db_spill, FTAG);
+
 	dmu_tx_commit(tx);
 	return (0);
 }
@@ -1275,6 +1368,12 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp)
 			if (!ZIO_CHECKSUM_EQUAL(drre.drr_checksum, pcksum))
 				ra.err = ECKSUM;
 			goto out;
+		}
+		case DRR_SPILL:
+		{
+			struct drr_spill drrs = drr->drr_u.drr_spill;
+			ra.err = restore_spill(&ra, os, &drrs);
+			break;
 		}
 		default:
 			ra.err = EINVAL;

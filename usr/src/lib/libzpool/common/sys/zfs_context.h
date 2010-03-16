@@ -536,6 +536,9 @@ extern char hw_serial[];	/* for userland-emulated hostid access */
 extern int ddi_strtoul(const char *str, char **nptr, int base,
     unsigned long *result);
 
+extern int ddi_strtoull(const char *str, char **nptr, int base,
+    u_longlong_t *result);
+
 /* ZFS Boot Related stuff. */
 
 struct _buf {

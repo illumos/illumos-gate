@@ -776,6 +776,17 @@ ddi_strtoul(const char *hw_serial, char **nptr, int base, unsigned long *result)
 	return (0);
 }
 
+int
+ddi_strtoull(const char *str, char **nptr, int base, u_longlong_t *result)
+{
+	char *end;
+
+	*result = strtoull(str, &end, base);
+	if (*result == 0)
+		return (errno);
+	return (0);
+}
+
 /*
  * =========================================================================
  * kernel emulation setup & teardown

@@ -134,6 +134,7 @@ SUNWprivate_1.1 {
 	zfs_smb_acl_rename;
 	zfs_snapshot;
 	zfs_spa_version;
+	zfs_spa_version_map;
 	zfs_type_to_name;
 	zfs_unmount;
 	zfs_unmountall;
@@ -146,6 +147,7 @@ SUNWprivate_1.1 {
 	zfs_unshareall_smb;
 	zfs_userspace;
 	zfs_userquota_prop_prefixes;
+	zfs_zpl_version_map;
 	zpool_add;
 	zpool_clear;
 	zpool_clear_label;

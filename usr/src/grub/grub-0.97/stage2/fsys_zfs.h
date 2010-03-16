@@ -53,6 +53,7 @@ typedef	unsigned int size_t;
 #include <zfs-include/dsl_dataset.h>
 #include <zfs-include/zil.h>
 #include <zfs-include/dmu_objset.h>
+#include <zfs-include/sa_impl.h>
 
 /*
  * Global Memory addresses to store MOS and DNODE data

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -215,6 +215,7 @@ zfsctl_create(zfsvfs_t *zfsvfs)
 {
 	vnode_t *vp, *rvp;
 	zfsctl_node_t *zcp;
+	uint64_t crtime[2];
 
 	ASSERT(zfsvfs->z_ctldir == NULL);
 
@@ -225,7 +226,9 @@ zfsctl_create(zfsvfs_t *zfsvfs)
 	zcp->zc_id = ZFSCTL_INO_ROOT;
 
 	VERIFY(VFS_ROOT(zfsvfs->z_vfs, &rvp) == 0);
-	ZFS_TIME_DECODE(&zcp->zc_cmtime, VTOZ(rvp)->z_phys->zp_crtime);
+	VERIFY(0 == sa_lookup(VTOZ(rvp)->z_sa_hdl, SA_ZPL_CRTIME(zfsvfs),
+	    &crtime, sizeof (crtime)));
+	ZFS_TIME_DECODE(&zcp->zc_cmtime, crtime);
 	VN_RELE(rvp);
 
 	/*

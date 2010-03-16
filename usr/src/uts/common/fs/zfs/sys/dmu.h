@@ -63,6 +63,7 @@ struct spa;
 struct nvlist;
 struct arc_buf;
 struct zio_prop;
+struct sa_handle;
 
 typedef struct objset objset_t;
 typedef struct dmu_tx dmu_tx_t;
@@ -122,6 +123,10 @@ typedef enum dmu_object_type {
 	DMU_OT_USERREFS,		/* ZAP */
 	DMU_OT_DDT_ZAP,			/* ZAP */
 	DMU_OT_DDT_STATS,		/* ZAP */
+	DMU_OT_SA,			/* System attr */
+	DMU_OT_SA_MASTER_NODE,		/* ZAP */
+	DMU_OT_SA_ATTR_REGISTRATION,	/* ZAP */
+	DMU_OT_SA_ATTR_LAYOUTS,		/* ZAP */
 	DMU_OT_NUMTYPES
 } dmu_object_type_t;
 
@@ -158,6 +163,11 @@ void zfs_znode_byteswap(void *buf, size_t size);
 #define	DMU_GROUPUSED_OBJECT	(-2ULL)
 #define	DMU_DEADLIST_OBJECT	(-3ULL)
 
+/*
+ * artificial blkids for bonus buffer and spill blocks
+ */
+#define	DMU_BONUS_BLKID		(-1ULL)
+#define	DMU_SPILL_BLKID		(-2ULL)
 /*
  * Public routines to create, destroy, open, and close objsets.
  */
@@ -314,6 +324,7 @@ void dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
  */
 #define	WP_NOFILL	0x1
 #define	WP_DMU_SYNC	0x2
+#define	WP_SPILL	0x4
 
 void dmu_write_policy(objset_t *os, struct dnode *dn, int level, int wp,
     struct zio_prop *zp);
@@ -330,6 +341,17 @@ void dmu_write_policy(objset_t *os, struct dnode *dn, int level, int wp,
 int dmu_bonus_hold(objset_t *os, uint64_t object, void *tag, dmu_buf_t **);
 int dmu_bonus_max(void);
 int dmu_set_bonus(dmu_buf_t *, int, dmu_tx_t *);
+int dmu_set_bonustype(dmu_buf_t *, dmu_object_type_t, dmu_tx_t *);
+int dmu_rm_spill(objset_t *, uint64_t, dmu_tx_t *);
+
+/*
+ * Special spill buffer support used by "SA" framework
+ */
+
+int dmu_spill_hold_by_bonus(dmu_buf_t *bonus, void *tag, dmu_buf_t **dbp);
+int dmu_spill_hold_by_dnode(struct dnode *dn, uint32_t flags,
+    void *tag, dmu_buf_t **dbp);
+int dmu_spill_hold_existing(dmu_buf_t *bonus, void *tag, dmu_buf_t **dbp);
 
 /*
  * Obtain the DMU buffer from the specified object which contains the
@@ -443,6 +465,9 @@ void dmu_tx_hold_free(dmu_tx_t *tx, uint64_t object, uint64_t off,
     uint64_t len);
 void dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, const char *name);
 void dmu_tx_hold_bonus(dmu_tx_t *tx, uint64_t object);
+void dmu_tx_hold_spill(dmu_tx_t *tx, uint64_t object);
+void dmu_tx_hold_sa(dmu_tx_t *tx, struct sa_handle *hdl, boolean_t may_grow);
+void dmu_tx_hold_sa_create(dmu_tx_t *tx, int total_size);
 void dmu_tx_abort(dmu_tx_t *tx);
 int dmu_tx_assign(dmu_tx_t *tx, uint64_t txg_how);
 void dmu_tx_wait(dmu_tx_t *tx);

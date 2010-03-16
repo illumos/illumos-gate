@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -39,10 +39,12 @@ USRLIBFSTYPE=	$(ROOTLIB)/fs/$(FSTYPE)
 
 LDLIBS += -lzfs -luutil -lumem -lnvpair
 
+INCS += -I../../common/zfs
+
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
-CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
+CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
 # lint complains about unused _umem_* functions

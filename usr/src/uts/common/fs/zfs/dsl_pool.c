@@ -343,7 +343,7 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 
 	for (ds = list_head(&dp->dp_synced_datasets); ds;
 	    ds = list_next(&dp->dp_synced_datasets, ds))
-		dmu_objset_do_userquota_callbacks(ds->ds_objset, tx);
+		dmu_objset_do_userquota_updates(ds->ds_objset, tx);
 
 	/*
 	 * Sync the datasets again to push out the changes due to

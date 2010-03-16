@@ -23,35 +23,16 @@
  * Use is subject to license terms.
  */
 
-/* LINTLIBRARY */
-/* PROTOLIB1 */
+#ifndef	_SYS_SA_IMPL_H
+#define	_SYS_SA_IMPL_H
 
-#include <sys/zfs_context.h>
-#include <sys/list.h>
-#include <sys/list_impl.h>
-#include <sys/sysmacros.h>
-#include <sys/debug.h>
-#include <sys/dmu_traverse.h>
-#include <sys/dnode.h>
-#include <sys/dsl_prop.h>
-#include <sys/dsl_dataset.h>
-#include <sys/spa.h>
-#include <sys/spa_impl.h>
-#include <sys/space_map.h>
-#include <sys/vdev.h>
-#include <sys/vdev_impl.h>
-#include <sys/zap.h>
-#include <sys/zio.h>
-#include <sys/zio_compress.h>
-#include <sys/zil.h>
-#include <sys/bplist.h>
-#include <sys/zfs_znode.h>
-#include <sys/arc.h>
-#include <sys/dbuf.h>
-#include <sys/zio_checksum.h>
-#include <sys/ddt.h>
-#include <sys/sa.h>
-#include <sys/zfs_sa.h>
+typedef struct sa_hdr_phys {
+	uint32_t sa_magic;
+	uint16_t sa_layout_info;
+	uint16_t sa_lengths[1];
+} sa_hdr_phys_t;
 
-extern uint64_t metaslab_gang_bang;
-extern uint64_t metaslab_df_alloc_threshold;
+#define	SA_HDR_SIZE(hdr)	BF32_GET_SB(hdr->sa_layout_info, 10, 16, 3, 0)
+#define	SA_SIZE_OFFSET	0x8
+
+#endif	/* _SYS_SA_IMPL_H */

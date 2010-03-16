@@ -33,7 +33,10 @@
 #include <sys/dsl_pool.h>
 #include <sys/zap_impl.h> /* for fzap_default_block_shift */
 #include <sys/spa.h>
+#include <sys/sa.h>
+#include <sys/sa_impl.h>
 #include <sys/zfs_context.h>
+#include <sys/varargs.h>
 
 typedef void (*dmu_tx_hold_func_t)(dmu_tx_t *tx, struct dnode *dn,
     uint64_t arg1, uint64_t arg2);
@@ -813,10 +816,11 @@ dmu_tx_dirty_buf(dmu_tx_t *tx, dmu_buf_impl_t *db)
 					match_offset = TRUE;
 				/*
 				 * We will let this hold work for the bonus
-				 * buffer so that we don't need to hold it
-				 * when creating a new object.
+				 * or spill buffer so that we don't need to
+				 * hold it when creating a new object.
 				 */
-				if (blkid == DB_BONUS_BLKID)
+				if (blkid == DMU_BONUS_BLKID ||
+				    blkid == DMU_SPILL_BLKID)
 					match_offset = TRUE;
 				/*
 				 * They might have to increase nlevels,
@@ -837,8 +841,12 @@ dmu_tx_dirty_buf(dmu_tx_t *tx, dmu_buf_impl_t *db)
 				    txh->txh_arg2 == DMU_OBJECT_END))
 					match_offset = TRUE;
 				break;
+			case THT_SPILL:
+				if (blkid == DMU_SPILL_BLKID)
+					match_offset = TRUE;
+				break;
 			case THT_BONUS:
-				if (blkid == DB_BONUS_BLKID)
+				if (blkid == DMU_BONUS_BLKID)
 					match_offset = TRUE;
 				break;
 			case THT_ZAP:
@@ -1202,5 +1210,143 @@ dmu_tx_do_callbacks(list_t *cb_list, int error)
 		list_remove(cb_list, dcb);
 		dcb->dcb_func(dcb->dcb_data, error);
 		kmem_free(dcb, sizeof (dmu_tx_callback_t));
+	}
+}
+
+/*
+ * Interface to hold a bunch of attributes.
+ * used for creating new files.
+ * attrsize is the total size of all attributes
+ * to be added during object creation
+ *
+ * For updating/adding a single attribute dmu_tx_hold_sa() should be used.
+ */
+
+/*
+ * hold necessary attribute name for attribute registration.
+ * should be a very rare case where this is needed.  If it does
+ * happen it would only happen on the first write to the file system.
+ */
+static void
+dmu_tx_sa_registration_hold(sa_os_t *sa, dmu_tx_t *tx)
+{
+	int i;
+
+	if (!sa->sa_need_attr_registration)
+		return;
+
+	for (i = 0; i != sa->sa_num_attrs; i++) {
+		if (!sa->sa_attr_table[i].sa_registered) {
+			if (sa->sa_reg_attr_obj)
+				dmu_tx_hold_zap(tx, sa->sa_reg_attr_obj,
+				    B_TRUE, sa->sa_attr_table[i].sa_name);
+			else
+				dmu_tx_hold_zap(tx, DMU_NEW_OBJECT,
+				    B_TRUE, sa->sa_attr_table[i].sa_name);
+		}
+	}
+}
+
+
+void
+dmu_tx_hold_spill(dmu_tx_t *tx, uint64_t object)
+{
+	dnode_t *dn;
+	dmu_tx_hold_t *txh;
+	blkptr_t *bp;
+
+	txh = dmu_tx_hold_object_impl(tx, tx->tx_objset, object,
+	    THT_SPILL, 0, 0);
+
+	dn = txh->txh_dnode;
+
+	if (dn == NULL)
+		return;
+
+	/* If blkptr doesn't exist then add space to towrite */
+	bp = &dn->dn_phys->dn_spill;
+	if (BP_IS_HOLE(bp)) {
+		txh->txh_space_towrite += SPA_MAXBLOCKSIZE;
+		txh->txh_space_tounref = 0;
+	} else {
+		if (dsl_dataset_block_freeable(dn->dn_objset->os_dsl_dataset,
+		    bp->blk_birth))
+			txh->txh_space_tooverwrite += SPA_MAXBLOCKSIZE;
+		else
+			txh->txh_space_towrite += SPA_MAXBLOCKSIZE;
+		if (bp->blk_birth)
+			txh->txh_space_tounref += SPA_MAXBLOCKSIZE;
+	}
+}
+
+void
+dmu_tx_hold_sa_create(dmu_tx_t *tx, int attrsize)
+{
+	sa_os_t *sa = tx->tx_objset->os_sa;
+
+	dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
+
+	if (tx->tx_objset->os_sa->sa_master_obj == 0)
+		return;
+
+	if (tx->tx_objset->os_sa->sa_layout_attr_obj)
+		dmu_tx_hold_zap(tx, sa->sa_layout_attr_obj, B_TRUE, NULL);
+	else {
+		dmu_tx_hold_zap(tx, sa->sa_master_obj, B_TRUE, SA_LAYOUTS);
+		dmu_tx_hold_zap(tx, sa->sa_master_obj, B_TRUE, SA_REGISTRY);
+		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, B_TRUE, NULL);
+		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, B_TRUE, NULL);
+	}
+
+	dmu_tx_sa_registration_hold(sa, tx);
+
+	if (attrsize <= DN_MAX_BONUSLEN && !sa->sa_force_spill)
+		return;
+
+	(void) dmu_tx_hold_object_impl(tx, tx->tx_objset, DMU_NEW_OBJECT,
+	    THT_SPILL, 0, 0);
+}
+
+/*
+ * Hold SA attribute
+ *
+ * dmu_tx_hold_sa(dmu_tx_t *tx, sa_handle_t *, attribute, add, size)
+ *
+ * variable_size is the total size of all variable sized attributes
+ * passed to this function.  It is not the total size of all
+ * variable size attributes that *may* exist on this object.
+ */
+void
+dmu_tx_hold_sa(dmu_tx_t *tx, sa_handle_t *hdl, boolean_t may_grow)
+{
+	uint64_t object;
+	sa_os_t *sa = tx->tx_objset->os_sa;
+
+	ASSERT(hdl != NULL);
+
+	object = sa_handle_object(hdl);
+
+	dmu_tx_hold_bonus(tx, object);
+
+	if (tx->tx_objset->os_sa->sa_master_obj == 0)
+		return;
+
+	if (tx->tx_objset->os_sa->sa_reg_attr_obj == 0 ||
+	    tx->tx_objset->os_sa->sa_layout_attr_obj == 0) {
+		dmu_tx_hold_zap(tx, sa->sa_master_obj, B_TRUE, SA_LAYOUTS);
+		dmu_tx_hold_zap(tx, sa->sa_master_obj, B_TRUE, SA_REGISTRY);
+		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, B_TRUE, NULL);
+		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, B_TRUE, NULL);
+	}
+
+	dmu_tx_sa_registration_hold(sa, tx);
+
+	if (may_grow && tx->tx_objset->os_sa->sa_layout_attr_obj)
+		dmu_tx_hold_zap(tx, sa->sa_layout_attr_obj, B_TRUE, NULL);
+
+	if (sa->sa_force_spill || may_grow || hdl->sa_spill ||
+	    ((dmu_buf_impl_t *)hdl->sa_bonus)->db_dnode->dn_have_spill) {
+		ASSERT(tx->tx_txg == 0);
+		dmu_tx_hold_spill(tx, object);
 	}
 }

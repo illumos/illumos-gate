@@ -17,14 +17,12 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_DMU_H
 #define	_SYS_DMU_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file describes the interface that the DMU provides for its
@@ -75,7 +73,22 @@ typedef enum dmu_object_type {
 	DMU_OT_SPA_HISTORY,		/* UINT8 */
 	DMU_OT_SPA_HISTORY_OFFSETS,	/* spa_his_phys_t */
 	DMU_OT_POOL_PROPS,		/* ZAP */
-
+	DMU_OT_DSL_PERMS,		/* ZAP */
+	DMU_OT_ACL,			/* ACL */
+	DMU_OT_SYSACL,			/* SYSACL */
+	DMU_OT_FUID,			/* FUID table (Packed NVLIST UINT8) */
+	DMU_OT_FUID_SIZE,		/* FUID table size UINT64 */
+	DMU_OT_NEXT_CLONES,		/* ZAP */
+	DMU_OT_SCRUB_QUEUE,		/* ZAP */
+	DMU_OT_USERGROUP_USED,		/* ZAP */
+	DMU_OT_USERGROUP_QUOTA,		/* ZAP */
+	DMU_OT_USERREFS,		/* ZAP */
+	DMU_OT_DDT_ZAP,			/* ZAP */
+	DMU_OT_DDT_STATS,		/* ZAP */
+	DMU_OT_SA,			/* System attr */
+	DMU_OT_SA_MASTER_NODE,		/* ZAP */
+	DMU_OT_SA_ATTR_REGISTRATION,	/* ZAP */
+	DMU_OT_SA_ATTR_LAYOUTS,		/* ZAP */
 	DMU_OT_NUMTYPES
 } dmu_object_type_t;
 

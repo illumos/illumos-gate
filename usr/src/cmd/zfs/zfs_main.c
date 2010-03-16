@@ -53,6 +53,7 @@
 
 #include "zfs_iter.h"
 #include "zfs_util.h"
+#include "zfs_comutil.h"
 
 libzfs_handle_t *g_zfs;
 
@@ -1594,31 +1595,25 @@ upgrade_set_callback(zfs_handle_t *zhp, void *data)
 {
 	upgrade_cbdata_t *cb = data;
 	int version = zfs_prop_get_int(zhp, ZFS_PROP_VERSION);
-	int i;
-	static struct { int zplver; int spaver; } table[] = {
-		{ZPL_VERSION_FUID, SPA_VERSION_FUID},
-		{ZPL_VERSION_USERSPACE, SPA_VERSION_USERSPACE},
-		{0, 0}
-	};
+	int needed_spa_version;
+	int spa_version;
 
+	if (zfs_spa_version(zhp, &spa_version) < 0)
+		return (-1);
 
-	for (i = 0; table[i].zplver; i++) {
-		if (cb->cb_version >= table[i].zplver) {
-			int spa_version;
+	needed_spa_version = zfs_spa_version_map(cb->cb_version);
 
-			if (zfs_spa_version(zhp, &spa_version) < 0)
-				return (-1);
+	if (needed_spa_version < 0)
+		return (-1);
 
-			if (spa_version < table[i].spaver) {
-				/* can't upgrade */
-				(void) printf(gettext("%s: can not be "
-				    "upgraded; the pool version needs to first "
-				    "be upgraded\nto version %d\n\n"),
-				    zfs_get_name(zhp), table[i].spaver);
-				cb->cb_numfailed++;
-				return (0);
-			}
-		}
+	if (spa_version < needed_spa_version) {
+		/* can't upgrade */
+		(void) printf(gettext("%s: can not be "
+		    "upgraded; the pool version needs to first "
+		    "be upgraded\nto version %d\n\n"),
+		    zfs_get_name(zhp), needed_spa_version);
+		cb->cb_numfailed++;
+		return (0);
 	}
 
 	/* upgrade */
@@ -1720,6 +1715,7 @@ zfs_do_upgrade(int argc, char **argv)
 		    "unique identifier (FUID)\n"));
 		(void) printf(gettext(" 4   userquota, groupquota "
 		    "properties\n"));
+		(void) printf(gettext(" 5   System attributes\n"));
 		(void) printf(gettext("\nFor more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"

@@ -38,6 +38,8 @@
 #include <sys/zap_leaf.h>
 #include <sys/zap_impl.h>
 #include <ctype.h>
+#include <sys/zfs_acl.h>
+#include <sys/sa_impl.h>
 
 #ifndef _KERNEL
 #include "../genunix/list.h"
@@ -217,7 +219,7 @@ static int
 objset_name(uintptr_t addr, char *buf)
 {
 	static int gotid;
-	static mdb_ctf_id_t os_id, ds_id;
+	static mdb_ctf_id_t osi_id, ds_id;
 	uintptr_t os_dsl_dataset;
 	char ds_snapname[MAXNAMELEN];
 	uintptr_t ds_dir;
@@ -225,9 +227,9 @@ objset_name(uintptr_t addr, char *buf)
 	buf[0] = '\0';
 
 	if (!gotid) {
-		if (mdb_ctf_lookup_by_name("struct objset",
-		    &os_id) == -1) {
-			mdb_warn("couldn't find struct objset");
+		if (mdb_ctf_lookup_by_name("struct objset_impl",
+		    &osi_id) == -1) {
+			mdb_warn("couldn't find struct objset_impl");
 			return (DCMD_ERR);
 		}
 		if (mdb_ctf_lookup_by_name("struct dsl_dataset",
@@ -239,7 +241,7 @@ objset_name(uintptr_t addr, char *buf)
 		gotid = TRUE;
 	}
 
-	if (GETMEMBID(addr, &os_id, os_dsl_dataset, os_dsl_dataset))
+	if (GETMEMBID(addr, &osi_id, os_dsl_dataset, os_dsl_dataset))
 		return (DCMD_ERR);
 
 	if (os_dsl_dataset == 0) {
@@ -429,7 +431,7 @@ dbuf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		(void) mdb_snprintf(objectname, sizeof (objectname), "%llx",
 		    (u_longlong_t)db.db_object);
 
-	if (blkid == DB_BONUS_BLKID)
+	if (blkid == DMU_BONUS_BLKID)
 		(void) strcpy(blkidname, "bonus");
 	else
 		(void) mdb_snprintf(blkidname, sizeof (blkidname), "%llx",
@@ -716,7 +718,7 @@ dbufs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (blkid) {
 		if (strcmp(blkid, "bonus") == 0) {
-			data.blkid = DB_BONUS_BLKID;
+			data.blkid = DMU_BONUS_BLKID;
 		} else {
 			data.blkid = mdb_strtoull(blkid);
 		}
@@ -2291,6 +2293,602 @@ refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+/* ARGSUSED */
+static int
+sa_attr_table(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	sa_attr_table_t *table;
+	sa_os_t sa_os;
+	char *name;
+	int i;
+
+	if (mdb_vread(&sa_os, sizeof (sa_os_t), addr) == -1) {
+		mdb_warn("failed to read sa_os at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	table = mdb_alloc(sizeof (sa_attr_table_t) * sa_os.sa_num_attrs,
+	    UM_SLEEP | UM_GC);
+	name = mdb_alloc(MAXPATHLEN, UM_SLEEP | UM_GC);
+
+	if (mdb_vread(table, sizeof (sa_attr_table_t) * sa_os.sa_num_attrs,
+	    (uintptr_t)sa_os.sa_attr_table) == -1) {
+		mdb_warn("failed to read sa_os at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%<u>%-10s %-10s %-10s %-10s %s%</u>\n",
+	    "ATTR ID", "REGISTERED", "LENGTH", "BSWAP", "NAME");
+	for (i = 0; i != sa_os.sa_num_attrs; i++) {
+		mdb_readstr(name, MAXPATHLEN, (uintptr_t)table[i].sa_name);
+		mdb_printf("%5x   %8x %8x %8x          %-s\n",
+		    (int)table[i].sa_attr, (int)table[i].sa_registered,
+		    (int)table[i].sa_length, table[i].sa_byteswap, name);
+	}
+
+	return (DCMD_OK);
+}
+
+static int
+sa_get_off_table(uintptr_t addr, uint32_t **off_tab, int attr_count)
+{
+	uintptr_t idx_table;
+
+	if (GETMEMB(addr, struct sa_idx_tab, sa_idx_tab, idx_table)) {
+		mdb_printf("can't find offset table in sa_idx_tab\n");
+		return (-1);
+	}
+
+	*off_tab = mdb_alloc(attr_count * sizeof (uint32_t),
+	    UM_SLEEP | UM_GC);
+
+	if (mdb_vread(*off_tab,
+	    attr_count * sizeof (uint32_t), idx_table) == -1) {
+		mdb_warn("failed to attribute offset table %p", idx_table);
+		return (-1);
+	}
+
+	return (DCMD_OK);
+}
+
+/*ARGSUSED*/
+static int
+sa_attr_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint32_t *offset_tab;
+	int attr_count;
+	uint64_t attr_id;
+	uintptr_t attr_addr;
+	uintptr_t bonus_tab, spill_tab;
+	uintptr_t db_bonus, db_spill;
+	uintptr_t os, os_sa;
+	uintptr_t db_data;
+
+	if (argc != 1)
+		return (DCMD_USAGE);
+
+	if (argv[0].a_type == MDB_TYPE_STRING)
+		attr_id = mdb_strtoull(argv[0].a_un.a_str);
+	else
+		return (DCMD_USAGE);
+
+	if (GETMEMB(addr, struct sa_handle, sa_bonus_tab, bonus_tab) ||
+	    GETMEMB(addr, struct sa_handle, sa_spill_tab, spill_tab) ||
+	    GETMEMB(addr, struct sa_handle, sa_os, os) ||
+	    GETMEMB(addr, struct sa_handle, sa_bonus, db_bonus) ||
+	    GETMEMB(addr, struct sa_handle, sa_spill, db_spill)) {
+		mdb_printf("Can't find necessary information in sa_handle "
+		    "in sa_handle\n");
+		return (DCMD_ERR);
+	}
+
+	if (GETMEMB(os, struct objset, os_sa, os_sa)) {
+		mdb_printf("Can't find os_sa in objset\n");
+		return (DCMD_ERR);
+	}
+
+	if (GETMEMB(os_sa, struct sa_os, sa_num_attrs, attr_count)) {
+		mdb_printf("Can't find sa_num_attrs\n");
+		return (DCMD_ERR);
+	}
+
+	if (attr_id > attr_count) {
+		mdb_printf("attribute id number is out of range\n");
+		return (DCMD_ERR);
+	}
+
+	if (bonus_tab) {
+		if (sa_get_off_table(bonus_tab, &offset_tab,
+		    attr_count) == -1) {
+			return (DCMD_ERR);
+		}
+
+		if (GETMEMB(db_bonus, struct dmu_buf, db_data, db_data)) {
+			mdb_printf("can't find db_data in bonus dbuf\n");
+			return (DCMD_ERR);
+		}
+	}
+
+	if (bonus_tab && !TOC_ATTR_PRESENT(offset_tab[attr_id]) &&
+	    spill_tab == NULL) {
+		mdb_printf("Attribute does not exist\n");
+		return (DCMD_ERR);
+	} else if (!TOC_ATTR_PRESENT(offset_tab[attr_id]) && spill_tab) {
+		if (sa_get_off_table(spill_tab, &offset_tab,
+		    attr_count) == -1) {
+			return (DCMD_ERR);
+		}
+		if (GETMEMB(db_spill, struct dmu_buf, db_data, db_data)) {
+			mdb_printf("can't find db_data in spill dbuf\n");
+			return (DCMD_ERR);
+		}
+		if (!TOC_ATTR_PRESENT(offset_tab[attr_id])) {
+			mdb_printf("Attribute does not exist\n");
+			return (DCMD_ERR);
+		}
+	}
+	attr_addr = db_data + TOC_OFF(offset_tab[attr_id]);
+	mdb_printf("%p\n", attr_addr);
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+zfs_ace_print_common(uintptr_t addr, uint_t flags,
+    uint64_t id, uint32_t access_mask, uint16_t ace_flags,
+    uint16_t ace_type, int verbose)
+{
+	if (DCMD_HDRSPEC(flags) && !verbose)
+		mdb_printf("%<u>%-?s %-8s %-8s %-8s %s%</u>\n",
+		    "ADDR", "FLAGS", "MASK", "TYPE", "ID");
+
+	if (!verbose) {
+		mdb_printf("%0?p %-8x %-8x %-8x %-llx\n", addr,
+		    ace_flags, access_mask, ace_type, id);
+		return (DCMD_OK);
+	}
+
+	switch (ace_flags & ACE_TYPE_FLAGS) {
+	case ACE_OWNER:
+		mdb_printf("owner@:");
+		break;
+	case (ACE_IDENTIFIER_GROUP | ACE_GROUP):
+		mdb_printf("group@:");
+		break;
+	case ACE_EVERYONE:
+		mdb_printf("everyone@:");
+		break;
+	case ACE_IDENTIFIER_GROUP:
+		mdb_printf("group:%llx:", (u_longlong_t)id);
+		break;
+	case 0: /* User entry */
+		mdb_printf("user:%llx:", (u_longlong_t)id);
+		break;
+	}
+
+	/* print out permission mask */
+	if (access_mask & ACE_READ_DATA)
+		mdb_printf("r");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_WRITE_DATA)
+		mdb_printf("w");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_EXECUTE)
+		mdb_printf("x");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_APPEND_DATA)
+		mdb_printf("p");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_DELETE)
+		mdb_printf("d");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_DELETE_CHILD)
+		mdb_printf("D");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_READ_ATTRIBUTES)
+		mdb_printf("a");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_WRITE_ATTRIBUTES)
+		mdb_printf("A");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_READ_NAMED_ATTRS)
+		mdb_printf("R");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_WRITE_NAMED_ATTRS)
+		mdb_printf("W");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_READ_ACL)
+		mdb_printf("c");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_WRITE_ACL)
+		mdb_printf("C");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_WRITE_OWNER)
+		mdb_printf("o");
+	else
+		mdb_printf("-");
+	if (access_mask & ACE_SYNCHRONIZE)
+		mdb_printf("s");
+	else
+		mdb_printf("-");
+
+	mdb_printf(":");
+
+	/* Print out inheritance flags */
+	if (ace_flags & ACE_FILE_INHERIT_ACE)
+		mdb_printf("f");
+	else
+		mdb_printf("-");
+	if (ace_flags & ACE_DIRECTORY_INHERIT_ACE)
+		mdb_printf("d");
+	else
+		mdb_printf("-");
+	if (ace_flags & ACE_INHERIT_ONLY_ACE)
+		mdb_printf("i");
+	else
+		mdb_printf("-");
+	if (ace_flags & ACE_NO_PROPAGATE_INHERIT_ACE)
+		mdb_printf("n");
+	else
+		mdb_printf("-");
+	if (ace_flags & ACE_SUCCESSFUL_ACCESS_ACE_FLAG)
+		mdb_printf("S");
+	else
+		mdb_printf("-");
+	if (ace_flags & ACE_FAILED_ACCESS_ACE_FLAG)
+		mdb_printf("F");
+	else
+		mdb_printf("-");
+	if (ace_flags & ACE_INHERITED_ACE)
+		mdb_printf("I");
+	else
+		mdb_printf("-");
+
+	switch (ace_type) {
+	case ACE_ACCESS_ALLOWED_ACE_TYPE:
+		mdb_printf(":allow\n");
+		break;
+	case ACE_ACCESS_DENIED_ACE_TYPE:
+		mdb_printf(":deny\n");
+		break;
+	case ACE_SYSTEM_AUDIT_ACE_TYPE:
+		mdb_printf(":audit\n");
+		break;
+	case ACE_SYSTEM_ALARM_ACE_TYPE:
+		mdb_printf(":alarm\n");
+		break;
+	default:
+		mdb_printf(":?\n");
+	}
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+zfs_ace_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	zfs_ace_t zace;
+	int verbose = FALSE;
+	uint64_t id;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose, TRUE, NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&zace, sizeof (zfs_ace_t), addr) == -1) {
+		mdb_warn("failed to read zfs_ace_t");
+		return (DCMD_ERR);
+	}
+
+	if ((zace.z_hdr.z_flags & ACE_TYPE_FLAGS) == 0 ||
+	    (zace.z_hdr.z_flags & ACE_TYPE_FLAGS) == ACE_IDENTIFIER_GROUP)
+		id = zace.z_fuid;
+	else
+		id = -1;
+
+	return (zfs_ace_print_common(addr, flags, id, zace.z_hdr.z_access_mask,
+	    zace.z_hdr.z_flags, zace.z_hdr.z_type, verbose));
+}
+
+/* ARGSUSED */
+static int
+zfs_ace0_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	ace_t ace;
+	uint64_t id;
+	int verbose = FALSE;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose, TRUE, NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&ace, sizeof (ace_t), addr) == -1) {
+		mdb_warn("failed to read ace_t");
+		return (DCMD_ERR);
+	}
+
+	if ((ace.a_flags & ACE_TYPE_FLAGS) == 0 ||
+	    (ace.a_flags & ACE_TYPE_FLAGS) == ACE_IDENTIFIER_GROUP)
+		id = ace.a_who;
+	else
+		id = -1;
+
+	return (zfs_ace_print_common(addr, flags, id, ace.a_access_mask,
+	    ace.a_flags, ace.a_type, verbose));
+}
+
+typedef struct acl_dump_args {
+	int a_argc;
+	const mdb_arg_t *a_argv;
+	uint16_t a_version;
+	int a_flags;
+} acl_dump_args_t;
+
+/* ARGSUSED */
+static int
+acl_aces_cb(uintptr_t addr, const void *unknown, void *arg)
+{
+	acl_dump_args_t *acl_args = (acl_dump_args_t *)arg;
+
+	if (acl_args->a_version == 1) {
+		if (mdb_call_dcmd("zfs_ace", addr,
+		    DCMD_ADDRSPEC|acl_args->a_flags, acl_args->a_argc,
+		    acl_args->a_argv) != DCMD_OK) {
+			return (WALK_ERR);
+		}
+	} else {
+		if (mdb_call_dcmd("zfs_ace0", addr,
+		    DCMD_ADDRSPEC|acl_args->a_flags, acl_args->a_argc,
+		    acl_args->a_argv) != DCMD_OK) {
+			return (WALK_ERR);
+		}
+	}
+	acl_args->a_flags = DCMD_LOOP;
+	return (WALK_NEXT);
+}
+
+/* ARGSUSED */
+static int
+acl_cb(uintptr_t addr, const void *unknown, void *arg)
+{
+	acl_dump_args_t *acl_args = (acl_dump_args_t *)arg;
+
+	if (acl_args->a_version == 1) {
+		if (mdb_pwalk("zfs_acl_node_aces", acl_aces_cb,
+		    arg, addr) != 0) {
+			mdb_warn("can't walk ACEs");
+			return (DCMD_ERR);
+		}
+	} else {
+		if (mdb_pwalk("zfs_acl_node_aces0", acl_aces_cb,
+		    arg, addr) != 0) {
+			mdb_warn("can't walk ACEs");
+			return (DCMD_ERR);
+		}
+	}
+	return (WALK_NEXT);
+}
+
+/* ARGSUSED */
+static int
+zfs_acl_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	zfs_acl_t zacl;
+	int verbose = FALSE;
+	acl_dump_args_t acl_args;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose, TRUE, NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&zacl, sizeof (zfs_acl_t), addr) == -1) {
+		mdb_warn("failed to read zfs_acl_t");
+		return (DCMD_ERR);
+	}
+
+	acl_args.a_argc = argc;
+	acl_args.a_argv = argv;
+	acl_args.a_version = zacl.z_version;
+	acl_args.a_flags = DCMD_LOOPFIRST;
+
+	if (mdb_pwalk("zfs_acl_node", acl_cb, &acl_args, addr) != 0) {
+		mdb_warn("can't walk ACL");
+		return (DCMD_ERR);
+	}
+
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+zfs_acl_node_walk_init(mdb_walk_state_t *wsp)
+{
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("must supply address of zfs_acl_node_t\n");
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr += OFFSETOF(zfs_acl_t, z_acl);
+
+	if (mdb_layered_walk("list", wsp) == -1) {
+		mdb_warn("failed to walk 'list'\n");
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+zfs_acl_node_walk_step(mdb_walk_state_t *wsp)
+{
+	zfs_acl_node_t	aclnode;
+
+	if (mdb_vread(&aclnode, sizeof (zfs_acl_node_t),
+	    wsp->walk_addr) == -1) {
+		mdb_warn("failed to read zfs_acl_node at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	return (wsp->walk_callback(wsp->walk_addr, &aclnode, wsp->walk_cbdata));
+}
+
+typedef struct ace_walk_data {
+	int		ace_count;
+	int		ace_version;
+} ace_walk_data_t;
+
+static int
+zfs_aces_walk_init_common(mdb_walk_state_t *wsp, int version,
+    int ace_count, uintptr_t ace_data)
+{
+	ace_walk_data_t *ace_walk_data;
+
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("must supply address of zfs_acl_node_t\n");
+		return (WALK_ERR);
+	}
+
+	ace_walk_data = mdb_alloc(sizeof (ace_walk_data_t), UM_SLEEP | UM_GC);
+
+	ace_walk_data->ace_count = ace_count;
+	ace_walk_data->ace_version = version;
+
+	wsp->walk_addr = ace_data;
+	wsp->walk_data = ace_walk_data;
+
+	return (WALK_NEXT);
+}
+
+static int
+zfs_acl_node_aces_walk_init_common(mdb_walk_state_t *wsp, int version)
+{
+	static int gotid;
+	static mdb_ctf_id_t acl_id;
+	int z_ace_count;
+	uintptr_t z_acldata;
+
+	if (!gotid) {
+		if (mdb_ctf_lookup_by_name("struct zfs_acl_node",
+		    &acl_id) == -1) {
+			mdb_warn("couldn't find struct zfs_acl_node");
+			return (DCMD_ERR);
+		}
+		gotid = TRUE;
+	}
+
+	if (GETMEMBID(wsp->walk_addr, &acl_id, z_ace_count, z_ace_count)) {
+		return (DCMD_ERR);
+	}
+	if (GETMEMBID(wsp->walk_addr, &acl_id, z_acldata, z_acldata)) {
+		return (DCMD_ERR);
+	}
+
+	return (zfs_aces_walk_init_common(wsp, version,
+	    z_ace_count, z_acldata));
+}
+
+/* ARGSUSED */
+static int
+zfs_acl_node_aces_walk_init(mdb_walk_state_t *wsp)
+{
+	return (zfs_acl_node_aces_walk_init_common(wsp, 1));
+}
+
+/* ARGSUSED */
+static int
+zfs_acl_node_aces0_walk_init(mdb_walk_state_t *wsp)
+{
+	return (zfs_acl_node_aces_walk_init_common(wsp, 0));
+}
+
+static int
+zfs_aces_walk_step(mdb_walk_state_t *wsp)
+{
+	ace_walk_data_t *ace_data = wsp->walk_data;
+	zfs_ace_t zace;
+	ace_t *acep;
+	int status;
+	int entry_type;
+	int allow_type;
+	uintptr_t ptr;
+
+	if (ace_data->ace_count == 0)
+		return (WALK_DONE);
+
+	if (mdb_vread(&zace, sizeof (zfs_ace_t), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read zfs_ace_t at %#lx",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	switch (ace_data->ace_version) {
+	case 0:
+		acep = (ace_t *)&zace;
+		entry_type = acep->a_flags & ACE_TYPE_FLAGS;
+		allow_type = acep->a_type;
+		break;
+	case 1:
+		entry_type = zace.z_hdr.z_flags & ACE_TYPE_FLAGS;
+		allow_type = zace.z_hdr.z_type;
+		break;
+	default:
+		return (WALK_ERR);
+	}
+
+	ptr = (uintptr_t)wsp->walk_addr;
+	switch (entry_type) {
+	case ACE_OWNER:
+	case ACE_EVERYONE:
+	case (ACE_IDENTIFIER_GROUP | ACE_GROUP):
+		ptr += ace_data->ace_version == 0 ?
+		    sizeof (ace_t) : sizeof (zfs_ace_hdr_t);
+		break;
+	case ACE_IDENTIFIER_GROUP:
+	default:
+		switch (allow_type) {
+		case ACE_ACCESS_ALLOWED_OBJECT_ACE_TYPE:
+		case ACE_ACCESS_DENIED_OBJECT_ACE_TYPE:
+		case ACE_SYSTEM_AUDIT_OBJECT_ACE_TYPE:
+		case ACE_SYSTEM_ALARM_OBJECT_ACE_TYPE:
+			ptr += ace_data->ace_version == 0 ?
+			    sizeof (ace_t) : sizeof (zfs_object_ace_t);
+			break;
+		default:
+			ptr += ace_data->ace_version == 0 ?
+			    sizeof (ace_t) : sizeof (zfs_ace_t);
+			break;
+		}
+	}
+
+	ace_data->ace_count--;
+	status = wsp->walk_callback(wsp->walk_addr,
+	    (void *)(uintptr_t)&zace, wsp->walk_cbdata);
+
+	wsp->walk_addr = ptr;
+	return (status);
+}
+
 /*
  * MDB module linkage information:
  *
@@ -2304,7 +2902,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "dbuf", ":", "print dmu_buf_impl_t", dbuf },
 	{ "dbuf_stats", ":", "dbuf stats", dbuf_stats },
 	{ "dbufs",
-	    "\t[-O objset_t*] [-n objset_name | \"mos\"] "
+	    "\t[-O objset_impl_t*] [-n objset_name | \"mos\"] "
 	    "[-o object | \"mdn\"] \n"
 	    "\t[-l level] [-b blkid | \"bonus\"]",
 	    "find dmu_buf_impl_t's that match specified criteria", dbufs },
@@ -2333,6 +2931,14 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "zfs_params", "", "print zfs tunable parameters", zfs_params },
 	{ "refcount", "", "print refcount_t holders", refcount },
 	{ "zap_leaf", "", "print zap_leaf_phys_t", zap_leaf },
+	{ "zfs_aces", ":[-v]", "print all ACEs from a zfs_acl_t",
+	    zfs_acl_dump },
+	{ "zfs_ace", ":[-v]", "print zfs_ace", zfs_ace_print },
+	{ "zfs_ace0", ":[-v]", "print zfs_ace0", zfs_ace0_print },
+	{ "sa_attr_table", ":", "print SA attribute table from sa_os_t",
+	    sa_attr_table},
+	{ "sa_attr", ": attr_id",
+	    "print SA attribute address when given sa_handle_t", sa_attr_print},
 	{ NULL }
 };
 
@@ -2366,6 +2972,13 @@ static const mdb_walker_t walkers[] = {
 		spa_walk_init, spa_walk_step, NULL },
 	{ "metaslab", "given a spa_t *, walk all metaslab_t structures",
 		metaslab_walk_init, metaslab_walk_step, NULL },
+	{ "zfs_acl_node", "given a zfs_acl_t, walk all zfs_acl_nodes",
+	    zfs_acl_node_walk_init, zfs_acl_node_walk_step, NULL },
+	{ "zfs_acl_node_aces", "given a zfs_acl_node_t, walk all ACEs",
+	    zfs_acl_node_aces_walk_init, zfs_aces_walk_step, NULL },
+	{ "zfs_acl_node_aces0",
+	    "given a zfs_acl_node_t, walk all ACEs as ace_t",
+	    zfs_acl_node_aces0_walk_init, zfs_aces_walk_step, NULL },
 	{ NULL }
 };
 

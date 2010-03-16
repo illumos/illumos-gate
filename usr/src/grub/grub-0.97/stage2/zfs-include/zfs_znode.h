@@ -17,7 +17,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,8 +27,9 @@
 #define	MASTER_NODE_OBJ	1
 #define	ZFS_ROOT_OBJ		"ROOT"
 #define	ZPL_VERSION_STR		"VERSION"
+#define	ZFS_SA_ATTRS		"SA_ATTRS"
 
-#define	ZPL_VERSION		4ULL
+#define	ZPL_VERSION		5ULL
 
 #define	ZFS_DIRENT_OBJ(de) BF64_GET(de, 0, 48)
 

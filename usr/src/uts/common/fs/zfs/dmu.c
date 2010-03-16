@@ -40,6 +40,7 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/zap.h>
 #include <sys/zio_checksum.h>
+#include <sys/sa.h>
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
 #include <sys/zfs_znode.h>
@@ -90,7 +91,10 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	zap_byteswap,		TRUE,	"snapshot refcount tags"},
 	{	zap_byteswap,		TRUE,	"DDT ZAP algorithm"	},
 	{	zap_byteswap,		TRUE,	"DDT statistics"	},
-};
+	{	byteswap_uint8_array,	TRUE,	"System attributes"	},
+	{	zap_byteswap,		TRUE,	"SA master node"	},
+	{	zap_byteswap,		TRUE,	"SA attr registration"	},
+	{	zap_byteswap,		TRUE,	"SA attr layouts"	}, };
 
 int
 dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset,
@@ -142,6 +146,33 @@ dmu_set_bonus(dmu_buf_t *db, int newsize, dmu_tx_t *tx)
 	return (0);
 }
 
+int
+dmu_set_bonustype(dmu_buf_t *db, dmu_object_type_t type, dmu_tx_t *tx)
+{
+	dnode_t *dn = ((dmu_buf_impl_t *)db)->db_dnode;
+
+	if (type > DMU_OT_NUMTYPES)
+		return (EINVAL);
+
+	if (dn->dn_bonus != (dmu_buf_impl_t *)db)
+		return (EINVAL);
+
+	dnode_setbonus_type(dn, type, tx);
+	return (0);
+}
+
+int
+dmu_rm_spill(objset_t *os, uint64_t object, dmu_tx_t *tx)
+{
+	dnode_t *dn;
+	int error;
+
+	error = dnode_hold(os, object, FTAG, &dn);
+	dbuf_rm_spill(dn, tx);
+	dnode_rele(dn, FTAG);
+	return (error);
+}
+
 /*
  * returns ENOENT, EIO, or 0.
  */
@@ -176,6 +207,61 @@ dmu_bonus_hold(objset_t *os, uint64_t object, void *tag, dmu_buf_t **dbp)
 
 	*dbp = &db->db;
 	return (0);
+}
+
+/*
+ * returns ENOENT, EIO, or 0.
+ *
+ * This interface will allocate a blank spill dbuf when a spill blk
+ * doesn't already exist on the dnode.
+ *
+ * if you only want to find an already existing spill db, then
+ * dmu_spill_hold_existing() should be used.
+ */
+int
+dmu_spill_hold_by_dnode(dnode_t *dn, uint32_t flags, void *tag, dmu_buf_t **dbp)
+{
+	dmu_buf_impl_t *db = NULL;
+	int err;
+
+	if ((flags & DB_RF_HAVESTRUCT) == 0)
+		rw_enter(&dn->dn_struct_rwlock, RW_READER);
+
+	db = dbuf_hold(dn, DMU_SPILL_BLKID, tag);
+
+	if ((flags & DB_RF_HAVESTRUCT) == 0)
+		rw_exit(&dn->dn_struct_rwlock);
+
+	ASSERT(db != NULL);
+	err = dbuf_read(db, NULL, DB_RF_MUST_SUCCEED | flags);
+	*dbp = &db->db;
+	return (err);
+}
+
+int
+dmu_spill_hold_existing(dmu_buf_t *bonus, void *tag, dmu_buf_t **dbp)
+{
+	dnode_t *dn = ((dmu_buf_impl_t *)bonus)->db_dnode;
+	int err;
+
+	if (spa_version(dn->dn_objset->os_spa) < SPA_VERSION_SA)
+		return (EINVAL);
+	rw_enter(&dn->dn_struct_rwlock, RW_READER);
+
+	if (!dn->dn_have_spill) {
+		rw_exit(&dn->dn_struct_rwlock);
+		return (ENOENT);
+	}
+	err = dmu_spill_hold_by_dnode(dn, DB_RF_HAVESTRUCT, tag, dbp);
+	rw_exit(&dn->dn_struct_rwlock);
+	return (err);
+}
+
+int
+dmu_spill_hold_by_bonus(dmu_buf_t *bonus, void *tag, dmu_buf_t **dbp)
+{
+	return (dmu_spill_hold_by_dnode(((dmu_buf_impl_t *)bonus)->db_dnode,
+	    0, tag, dbp));
 }
 
 /*
@@ -1349,7 +1435,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 
 	zp->zp_checksum = checksum;
 	zp->zp_compress = compress;
-	zp->zp_type = type;
+	zp->zp_type = (wp & WP_SPILL) ? dn->dn_bonustype : type;
 	zp->zp_level = level;
 	zp->zp_copies = MIN(copies + ismd, spa_max_replication(os->os_spa));
 	zp->zp_dedup = dedup;
@@ -1514,6 +1600,7 @@ dmu_init(void)
 	arc_init();
 	l2arc_init();
 	xuio_stat_init();
+	sa_cache_init();
 }
 
 void
@@ -1525,4 +1612,5 @@ dmu_fini(void)
 	dbuf_fini();
 	l2arc_fini();
 	xuio_stat_fini();
+	sa_cache_fini();
 }

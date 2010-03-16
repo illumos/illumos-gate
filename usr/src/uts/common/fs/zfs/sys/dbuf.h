@@ -38,7 +38,6 @@
 extern "C" {
 #endif
 
-#define	DB_BONUS_BLKID (-1ULL)
 #define	IN_DMU_SYNC 2
 
 /*
@@ -242,6 +241,10 @@ uint64_t dbuf_whichblock(struct dnode *di, uint64_t offset);
 
 dmu_buf_impl_t *dbuf_create_tlib(struct dnode *dn, char *data);
 void dbuf_create_bonus(struct dnode *dn);
+int dbuf_spill_set_blksz(dmu_buf_t *db, uint64_t blksz, dmu_tx_t *tx);
+void dbuf_spill_hold(struct dnode *dn, dmu_buf_impl_t **dbp, void *tag);
+
+void dbuf_rm_spill(struct dnode *dn, dmu_tx_t *tx);
 
 dmu_buf_impl_t *dbuf_hold(struct dnode *dn, uint64_t blkid, void *tag);
 dmu_buf_impl_t *dbuf_hold_level(struct dnode *dn, int level, uint64_t blkid,

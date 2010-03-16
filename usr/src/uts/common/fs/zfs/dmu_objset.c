@@ -41,6 +41,7 @@
 #include <sys/dmu_impl.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/sunddi.h>
+#include <sys/sa.h>
 
 spa_t *
 dmu_objset_spa(objset_t *os)
@@ -499,6 +500,9 @@ dmu_objset_evict(objset_t *os)
 		VERIFY(0 == dsl_prop_unregister(ds, "secondarycache",
 		    secondary_cache_changed_cb, os));
 	}
+
+	if (os->os_sa)
+		sa_tear_down(os);
 
 	/*
 	 * We should need only a single pass over the dnode list, since
@@ -1066,20 +1070,11 @@ dmu_objset_userused_enabled(objset_t *os)
 }
 
 static void
-do_userquota_callback(objset_t *os, dnode_phys_t *dnp,
-    boolean_t subtract, dmu_tx_t *tx)
+do_userquota_update(objset_t *os, uint64_t used, uint64_t flags,
+    uint64_t user, uint64_t group, boolean_t subtract, dmu_tx_t *tx)
 {
-	static const char zerobuf[DN_MAX_BONUSLEN] = {0};
-	uint64_t user, group;
-
-	ASSERT(dnp->dn_type != 0 ||
-	    (bcmp(DN_BONUS(dnp), zerobuf, DN_MAX_BONUSLEN) == 0 &&
-	    DN_USED_BYTES(dnp) == 0));
-
-	if ((dnp->dn_flags & DNODE_FLAG_USERUSED_ACCOUNTED) &&
-	    0 == used_cbs[os->os_phys->os_type](dnp->dn_bonustype,
-	    DN_BONUS(dnp), &user, &group)) {
-		int64_t delta = DNODE_SIZE + DN_USED_BYTES(dnp);
+	if ((flags & DNODE_FLAG_USERUSED_ACCOUNTED)) {
+		int64_t delta = DNODE_SIZE + used;
 		if (subtract)
 			delta = -delta;
 		VERIFY3U(0, ==, zap_increment_int(os, DMU_USERUSED_OBJECT,
@@ -1090,7 +1085,7 @@ do_userquota_callback(objset_t *os, dnode_phys_t *dnp,
 }
 
 void
-dmu_objset_do_userquota_callbacks(objset_t *os, dmu_tx_t *tx)
+dmu_objset_do_userquota_updates(objset_t *os, dmu_tx_t *tx)
 {
 	dnode_t *dn;
 	list_t *list = &os->os_synced_dnodes;
@@ -1099,7 +1094,6 @@ dmu_objset_do_userquota_callbacks(objset_t *os, dmu_tx_t *tx)
 
 	while (dn = list_head(list)) {
 		ASSERT(!DMU_OBJECT_IS_SPECIAL(dn->dn_object));
-		ASSERT(dn->dn_oldphys);
 		ASSERT(dn->dn_phys->dn_type == DMU_OT_NONE ||
 		    dn->dn_phys->dn_flags &
 		    DNODE_FLAG_USERUSED_ACCOUNTED);
@@ -1116,25 +1110,109 @@ dmu_objset_do_userquota_callbacks(objset_t *os, dmu_tx_t *tx)
 
 		/*
 		 * We intentionally modify the zap object even if the
-		 * net delta (due to phys-oldphys) is zero.  Otherwise
+		 * net delta is zero.  Otherwise
 		 * the block of the zap obj could be shared between
 		 * datasets but need to be different between them after
 		 * a bprewrite.
 		 */
-		do_userquota_callback(os, dn->dn_oldphys, B_TRUE, tx);
-		do_userquota_callback(os, dn->dn_phys, B_FALSE, tx);
 
 		/*
 		 * The mutex is needed here for interlock with dnode_allocate.
 		 */
 		mutex_enter(&dn->dn_mtx);
-		zio_buf_free(dn->dn_oldphys, sizeof (dnode_phys_t));
-		dn->dn_oldphys = NULL;
+		ASSERT(dn->dn_id_flags);
+		if (dn->dn_id_flags & DN_ID_OLD_EXIST)  {
+			do_userquota_update(os, dn->dn_oldused, dn->dn_oldflags,
+			    dn->dn_olduid, dn->dn_oldgid, B_TRUE, tx);
+		}
+		if (dn->dn_id_flags & DN_ID_NEW_EXIST) {
+			do_userquota_update(os, DN_USED_BYTES(dn->dn_phys),
+			    dn->dn_phys->dn_flags,  dn->dn_newuid,
+			    dn->dn_newgid, B_FALSE, tx);
+		}
+
+		dn->dn_oldused = 0;
+		dn->dn_oldflags = 0;
+		if (dn->dn_id_flags & DN_ID_NEW_EXIST) {
+			dn->dn_olduid = dn->dn_newuid;
+			dn->dn_oldgid = dn->dn_newgid;
+			dn->dn_id_flags |= DN_ID_OLD_EXIST;
+			if (dn->dn_bonuslen == 0)
+				dn->dn_id_flags |= DN_ID_CHKED_SPILL;
+			else
+				dn->dn_id_flags |= DN_ID_CHKED_BONUS;
+		}
+		dn->dn_id_flags &= ~(DN_ID_NEW_EXIST|DN_ID_SYNC);
 		mutex_exit(&dn->dn_mtx);
 
 		list_remove(list, dn);
 		dnode_rele(dn, list);
 	}
+}
+
+void
+dmu_objset_userquota_get_ids(dnode_t *dn, boolean_t before)
+{
+	objset_t *os = dn->dn_objset;
+	void *data = NULL;
+	dmu_buf_t *spilldb = NULL;
+	uint64_t *user, *group;
+	int flags = dn->dn_id_flags;
+	int error;
+
+	if (!dmu_objset_userused_enabled(dn->dn_objset))
+		return;
+
+	if (before && (flags & (DN_ID_CHKED_BONUS|DN_ID_OLD_EXIST|
+	    DN_ID_CHKED_SPILL)))
+		return;
+
+	if (before && dn->dn_bonuslen != 0)
+		data = DN_BONUS(dn->dn_phys);
+	else if (!before && dn->dn_bonuslen != 0)
+		data = dn->dn_bonus != NULL ?
+		    dn->dn_bonus->db.db_data : DN_BONUS(dn->dn_phys);
+	else if (dn->dn_bonuslen == 0 && dn->dn_bonustype == DMU_OT_SA) {
+			int rf = 0;
+
+			if (RW_WRITE_HELD(&dn->dn_struct_rwlock))
+				rf |= DB_RF_HAVESTRUCT;
+			error = dmu_spill_hold_by_dnode(dn, rf, FTAG, &spilldb);
+			ASSERT(error == 0);
+			data = spilldb->db_data;
+	} else {
+		mutex_enter(&dn->dn_mtx);
+		dn->dn_id_flags |= DN_ID_CHKED_BONUS;
+		mutex_exit(&dn->dn_mtx);
+		return;
+	}
+
+	if (before) {
+		user = &dn->dn_olduid;
+		group = &dn->dn_oldgid;
+	} else {
+		user = &dn->dn_newuid;
+		group = &dn->dn_newgid;
+	}
+
+	ASSERT(data);
+	error = used_cbs[os->os_phys->os_type](dn->dn_bonustype, data,
+	    user, group);
+
+	mutex_enter(&dn->dn_mtx);
+	if (error == 0 && before)
+		dn->dn_id_flags |= DN_ID_OLD_EXIST;
+	if (error == 0 && !before)
+		dn->dn_id_flags |= DN_ID_NEW_EXIST;
+
+	if (spilldb) {
+		dn->dn_id_flags |= DN_ID_CHKED_SPILL;
+	} else {
+		dn->dn_id_flags |= DN_ID_CHKED_BONUS;
+	}
+	mutex_exit(&dn->dn_mtx);
+	if (spilldb)
+		dmu_buf_rele(spilldb, FTAG);
 }
 
 boolean_t

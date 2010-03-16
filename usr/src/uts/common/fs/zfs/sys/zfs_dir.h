@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,7 +57,7 @@ extern int zfs_link_destroy(zfs_dirlock_t *, znode_t *, dmu_tx_t *, int,
 extern int zfs_dirlook(znode_t *, char *, vnode_t **, int, int *,
     pathname_t *);
 extern void zfs_mknode(znode_t *, vattr_t *, dmu_tx_t *, cred_t *,
-    uint_t, znode_t **, int, zfs_acl_ids_t *);
+    uint_t, znode_t **, zfs_acl_ids_t *);
 extern void zfs_rmnode(znode_t *);
 extern void zfs_dl_name_switch(zfs_dirlock_t *dl, char *new, char **old);
 extern boolean_t zfs_dirempty(znode_t *);

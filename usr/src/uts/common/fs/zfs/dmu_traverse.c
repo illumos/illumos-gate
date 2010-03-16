@@ -33,6 +33,8 @@
 #include <sys/spa.h>
 #include <sys/zio.h>
 #include <sys/dmu_impl.h>
+#include <sys/sa.h>
+#include <sys/sa_impl.h>
 #include <sys/callb.h>
 
 struct prefetch_data {
@@ -272,6 +274,17 @@ traverse_dnode(struct traverse_data *td, const dnode_phys_t *dnp,
 			if (!hard)
 				break;
 			lasterr = err;
+		}
+		if (dnp->dn_flags & DNODE_FLAG_SPILL_BLKPTR) {
+			SET_BOOKMARK(&czb, objset,
+			    object, 0, DMU_SPILL_BLKID);
+			err = traverse_visitbp(td, dnp, buf,
+			    (blkptr_t *)&dnp->dn_spill, &czb);
+			if (err) {
+				if (!hard)
+					break;
+				lasterr = err;
+			}
 		}
 	}
 	return (err != 0 ? err : lasterr);

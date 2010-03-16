@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -276,21 +276,25 @@ zfs_log_create(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
 	lr = (lr_create_t *)&itx->itx_lr;
 	lr->lr_doid = dzp->z_id;
 	lr->lr_foid = zp->z_id;
-	lr->lr_mode = zp->z_phys->zp_mode;
-	if (!IS_EPHEMERAL(zp->z_phys->zp_uid)) {
-		lr->lr_uid = (uint64_t)zp->z_phys->zp_uid;
+	lr->lr_mode = zp->z_mode;
+	if (!IS_EPHEMERAL(zp->z_uid)) {
+		lr->lr_uid = (uint64_t)zp->z_uid;
 	} else {
 		lr->lr_uid = fuidp->z_fuid_owner;
 	}
-	if (!IS_EPHEMERAL(zp->z_phys->zp_gid)) {
-		lr->lr_gid = (uint64_t)zp->z_phys->zp_gid;
+	if (!IS_EPHEMERAL(zp->z_gid)) {
+		lr->lr_gid = (uint64_t)zp->z_gid;
 	} else {
 		lr->lr_gid = fuidp->z_fuid_group;
 	}
-	lr->lr_gen = zp->z_phys->zp_gen;
-	lr->lr_crtime[0] = zp->z_phys->zp_crtime[0];
-	lr->lr_crtime[1] = zp->z_phys->zp_crtime[1];
-	lr->lr_rdev = zp->z_phys->zp_rdev;
+	(void) sa_lookup(zp->z_sa_hdl, SA_ZPL_GEN(zp->z_zfsvfs), &lr->lr_gen,
+	    sizeof (uint64_t));
+	(void) sa_lookup(zp->z_sa_hdl, SA_ZPL_CRTIME(zp->z_zfsvfs),
+	    lr->lr_crtime, sizeof (uint64_t) * 2);
+
+	if (sa_lookup(zp->z_sa_hdl, SA_ZPL_RDEV(zp->z_zfsvfs), &lr->lr_rdev,
+	    sizeof (lr->lr_rdev)) != 0)
+		lr->lr_rdev = 0;
 
 	/*
 	 * Fill in xvattr info if any
@@ -404,12 +408,13 @@ zfs_log_symlink(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
 	lr = (lr_create_t *)&itx->itx_lr;
 	lr->lr_doid = dzp->z_id;
 	lr->lr_foid = zp->z_id;
-	lr->lr_mode = zp->z_phys->zp_mode;
-	lr->lr_uid = zp->z_phys->zp_uid;
-	lr->lr_gid = zp->z_phys->zp_gid;
-	lr->lr_gen = zp->z_phys->zp_gen;
-	lr->lr_crtime[0] = zp->z_phys->zp_crtime[0];
-	lr->lr_crtime[1] = zp->z_phys->zp_crtime[1];
+	lr->lr_uid = zp->z_uid;
+	lr->lr_gid = zp->z_gid;
+	lr->lr_mode = zp->z_mode;
+	(void) sa_lookup(zp->z_sa_hdl, SA_ZPL_GEN(zp->z_zfsvfs), &lr->lr_gen,
+	    sizeof (uint64_t));
+	(void) sa_lookup(zp->z_sa_hdl, SA_ZPL_CRTIME(zp->z_zfsvfs),
+	    lr->lr_crtime, sizeof (uint64_t) * 2);
 	bcopy(name, (char *)(lr + 1), namesize);
 	bcopy(link, (char *)(lr + 1) + namesize, linksize);
 

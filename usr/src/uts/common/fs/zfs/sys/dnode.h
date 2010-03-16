@@ -63,6 +63,19 @@ extern "C" {
 #define	DN_MAX_OFFSET_SHIFT	64	/* 2^64 bytes in a dnode */
 
 /*
+ * dnode id flags
+ *
+ * Note: a file will never ever have its
+ * ids moved from bonus->spill
+ * and only in a crypto environment would it be on spill
+ */
+#define	DN_ID_CHKED_BONUS	0x1
+#define	DN_ID_CHKED_SPILL	0x2
+#define	DN_ID_OLD_EXIST		0x4
+#define	DN_ID_NEW_EXIST		0x8
+#define	DN_ID_SYNC		0x10
+
+/*
  * Derived constants.
  */
 #define	DNODE_SIZE	(1 << DNODE_SHIFT)
@@ -70,6 +83,7 @@ extern "C" {
 #define	DN_MAX_BONUSLEN	(DNODE_SIZE - DNODE_CORE_SIZE - (1 << SPA_BLKPTRSHIFT))
 #define	DN_MAX_OBJECT	(1ULL << DN_MAX_OBJECT_SHIFT)
 #define	DN_ZERO_BONUSLEN	(DN_MAX_BONUSLEN + 1)
+#define	DN_KILL_SPILLBLK (1)
 
 #define	DNODES_PER_BLOCK_SHIFT	(DNODE_BLOCK_SHIFT - DNODE_SHIFT)
 #define	DNODES_PER_BLOCK	(1ULL << DNODES_PER_BLOCK_SHIFT)
@@ -102,6 +116,9 @@ enum dnode_dirtycontext {
 #define	DNODE_FLAG_USED_BYTES		(1<<0)
 #define	DNODE_FLAG_USERUSED_ACCOUNTED	(1<<1)
 
+/* Does dnode have a SA spill blkptr in bonus? */
+#define	DNODE_FLAG_SPILL_BLKPTR	(1<<2)
+
 typedef struct dnode_phys {
 	uint8_t dn_type;		/* dmu_object_type_t */
 	uint8_t dn_indblkshift;		/* ln2(indirect block size) */
@@ -122,7 +139,8 @@ typedef struct dnode_phys {
 	uint64_t dn_pad3[4];
 
 	blkptr_t dn_blkptr[1];
-	uint8_t dn_bonus[DN_MAX_BONUSLEN];
+	uint8_t dn_bonus[DN_MAX_BONUSLEN - sizeof (blkptr_t)];
+	blkptr_t dn_spill;
 } dnode_phys_t;
 
 typedef struct dnode {
@@ -162,6 +180,8 @@ typedef struct dnode {
 	uint8_t dn_next_nblkptr[TXG_SIZE];
 	uint8_t dn_next_nlevels[TXG_SIZE];
 	uint8_t dn_next_indblkshift[TXG_SIZE];
+	uint8_t dn_next_bonustype[TXG_SIZE];
+	uint8_t dn_rm_spillblk[TXG_SIZE];	/* for removing spill blk */
 	uint16_t dn_next_bonuslen[TXG_SIZE];
 	uint32_t dn_next_blksz[TXG_SIZE];	/* next block size in bytes */
 
@@ -186,12 +206,17 @@ typedef struct dnode {
 	kmutex_t dn_dbufs_mtx;
 	list_t dn_dbufs;		/* linked list of descendent dbuf_t's */
 	struct dmu_buf_impl *dn_bonus;	/* bonus buffer dbuf */
+	boolean_t dn_have_spill;	/* have spill or are spilling */
 
 	/* parent IO for current sync write */
 	zio_t *dn_zio;
 
 	/* used in syncing context */
-	dnode_phys_t *dn_oldphys;
+	uint64_t dn_oldused;	/* old phys used bytes */
+	uint64_t dn_oldflags;	/* old phys dn_flags */
+	uint64_t dn_olduid, dn_oldgid;
+	uint64_t dn_newuid, dn_newgid;
+	int dn_id_flags;
 
 	/* holds prefetch structure */
 	struct zfetch	dn_zfetch;
@@ -208,6 +233,9 @@ dnode_t *dnode_special_open(struct objset *dd, dnode_phys_t *dnp,
 void dnode_special_close(dnode_t *dn);
 
 void dnode_setbonuslen(dnode_t *dn, int newsize, dmu_tx_t *tx);
+void dnode_setbonus_type(dnode_t *dn, dmu_object_type_t, dmu_tx_t *tx);
+void dnode_rm_spill(dnode_t *dn, dmu_tx_t *tx);
+
 int dnode_hold(struct objset *dd, uint64_t object,
     void *ref, dnode_t **dnp);
 int dnode_hold_impl(struct objset *dd, uint64_t object, int flag,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -645,7 +645,7 @@ zfs_replay_write(zfsvfs_t *zfsvfs, lr_write_t *lr, boolean_t byteswap)
 	length = lr->lr_length;
 	eod = offset + length;		/* end of data for this write */
 
-	orig_eof = zp->z_phys->zp_size;
+	orig_eof = zp->z_size;
 
 	/* If it's a dmu_sync() block, write the whole block */
 	if (lr->lr_common.lrc_reclen == sizeof (lr_write_t)) {
@@ -667,8 +667,8 @@ zfs_replay_write(zfsvfs_t *zfsvfs, lr_write_t *lr, boolean_t byteswap)
 	 * write needs to be there. So we write the whole block and
 	 * reduce the eof.
 	 */
-	if (orig_eof < zp->z_phys->zp_size) /* file length grew ? */
-		zp->z_phys->zp_size = eod;
+	if (orig_eof < zp->z_size) /* file length grew ? */
+		zp->z_size = eod;
 
 	VN_RELE(ZTOV(zp));
 
@@ -695,9 +695,9 @@ zfs_replay_write2(zfsvfs_t *zfsvfs, lr_write_t *lr, boolean_t byteswap)
 		return (error);
 
 	end = lr->lr_offset + lr->lr_length;
-	if (end > zp->z_phys->zp_size) {
-		ASSERT3U(end - zp->z_phys->zp_size, <, zp->z_blksz);
-		zp->z_phys->zp_size = end;
+	if (end > zp->z_size) {
+		ASSERT3U(end - zp->z_size, <, zp->z_blksz);
+		zp->z_size = end;
 	}
 
 	VN_RELE(ZTOV(zp));

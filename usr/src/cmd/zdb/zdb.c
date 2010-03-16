@@ -34,6 +34,9 @@
 #include <sys/zap.h>
 #include <sys/fs/zfs.h>
 #include <sys/zfs_znode.h>
+#include <sys/zfs_sa.h>
+#include <sys/sa.h>
+#include <sys/sa_impl.h>
 #include <sys/vdev.h>
 #include <sys/vdev_impl.h>
 #include <sys/metaslab_impl.h>
@@ -366,6 +369,71 @@ dump_ddt_zap(objset_t *os, uint64_t object, void *data, size_t size)
 {
 	dump_zap_stats(os, object);
 	/* contents are printed elsewhere, properly decoded */
+}
+
+/*ARGSUSED*/
+static void
+dump_sa_attrs(objset_t *os, uint64_t object, void *data, size_t size)
+{
+	zap_cursor_t zc;
+	zap_attribute_t attr;
+
+	dump_zap_stats(os, object);
+	(void) printf("\n");
+
+	for (zap_cursor_init(&zc, os, object);
+	    zap_cursor_retrieve(&zc, &attr) == 0;
+	    zap_cursor_advance(&zc)) {
+		(void) printf("\t\t%s = ", attr.za_name);
+		if (attr.za_num_integers == 0) {
+			(void) printf("\n");
+			continue;
+		}
+		(void) printf(" %llx : [%d:%d:%d]\n",
+		    (u_longlong_t)attr.za_first_integer,
+		    (int)ATTR_LENGTH(attr.za_first_integer),
+		    (int)ATTR_BSWAP(attr.za_first_integer),
+		    (int)ATTR_NUM(attr.za_first_integer));
+	}
+	zap_cursor_fini(&zc);
+}
+
+/*ARGSUSED*/
+static void
+dump_sa_layouts(objset_t *os, uint64_t object, void *data, size_t size)
+{
+	zap_cursor_t zc;
+	zap_attribute_t attr;
+	uint16_t *layout_attrs;
+	int i;
+
+	dump_zap_stats(os, object);
+	(void) printf("\n");
+
+	for (zap_cursor_init(&zc, os, object);
+	    zap_cursor_retrieve(&zc, &attr) == 0;
+	    zap_cursor_advance(&zc)) {
+		(void) printf("\t\t%s = [", attr.za_name);
+		if (attr.za_num_integers == 0) {
+			(void) printf("\n");
+			continue;
+		}
+
+		VERIFY(attr.za_integer_length == 2);
+		layout_attrs = umem_zalloc(attr.za_num_integers *
+		    attr.za_integer_length, UMEM_NOFAIL);
+
+		VERIFY(zap_lookup(os, object, attr.za_name,
+		    attr.za_integer_length,
+		    attr.za_num_integers, layout_attrs) == 0);
+
+		for (i = 0; i != attr.za_num_integers; i++)
+			(void) printf(" %d ", (int)layout_attrs[i]);
+		(void) printf("]\n");
+		umem_free(layout_attrs,
+		    attr.za_num_integers * attr.za_integer_length);
+	}
+	zap_cursor_fini(&zc);
 }
 
 /*ARGSUSED*/
@@ -1106,6 +1174,8 @@ dump_bplist(objset_t *mos, uint64_t object, char *name)
 static avl_tree_t idx_tree;
 static avl_tree_t domain_tree;
 static boolean_t fuid_table_loaded;
+static boolean_t sa_loaded;
+sa_attr_type_t *sa_attr_table;
 
 static void
 fuid_table_destroy()
@@ -1138,12 +1208,12 @@ print_idstr(uint64_t id, const char *id_type)
 }
 
 static void
-dump_uidgid(objset_t *os, znode_phys_t *zp)
+dump_uidgid(objset_t *os, uint64_t uid, uint64_t gid)
 {
 	uint32_t uid_idx, gid_idx;
 
-	uid_idx = FUID_INDEX(zp->zp_uid);
-	gid_idx = FUID_INDEX(zp->zp_gid);
+	uid_idx = FUID_INDEX(uid);
+	gid_idx = FUID_INDEX(gid);
 
 	/* Load domain table, if not already loaded */
 	if (!fuid_table_loaded && (uid_idx || gid_idx)) {
@@ -1158,50 +1228,103 @@ dump_uidgid(objset_t *os, znode_phys_t *zp)
 		fuid_table_loaded = B_TRUE;
 	}
 
-	print_idstr(zp->zp_uid, "uid");
-	print_idstr(zp->zp_gid, "gid");
+	print_idstr(uid, "uid");
+	print_idstr(gid, "gid");
 }
 
 /*ARGSUSED*/
 static void
 dump_znode(objset_t *os, uint64_t object, void *data, size_t size)
 {
-	znode_phys_t *zp = data;
-	time_t z_crtime, z_atime, z_mtime, z_ctime;
 	char path[MAXPATHLEN * 2];	/* allow for xattr and failure prefix */
+	sa_handle_t *hdl;
+	uint64_t xattr, rdev, gen;
+	uint64_t uid, gid, mode, fsize, parent, links;
+	uint64_t acctm[2], modtm[2], chgtm[2], crtm[2];
+	time_t z_crtime, z_atime, z_mtime, z_ctime;
+	sa_bulk_attr_t bulk[11];
+	int idx = 0;
 	int error;
 
-	ASSERT(size >= sizeof (znode_phys_t));
+	if (!sa_loaded) {
+		uint64_t sa_attrs = 0;
+		uint64_t version;
+
+		VERIFY(zap_lookup(os, MASTER_NODE_OBJ, ZPL_VERSION_STR,
+		    8, 1, &version) == 0);
+		if (version >= ZPL_VERSION_SA) {
+			VERIFY(zap_lookup(os, MASTER_NODE_OBJ, ZFS_SA_ATTRS,
+			    8, 1, &sa_attrs) == 0);
+		}
+		sa_attr_table = sa_setup(os, sa_attrs,
+		    zfs_attr_table, ZPL_END);
+		sa_loaded = B_TRUE;
+	}
+
+	if (sa_handle_get(os, object, NULL, SA_HDL_PRIVATE, &hdl)) {
+		(void) printf("Failed to get handle for SA znode\n");
+		return;
+	}
+
+	SA_ADD_BULK_ATTR(bulk, idx, sa_attr_table[ZPL_UID], NULL, &uid, 8);
+	SA_ADD_BULK_ATTR(bulk, idx, sa_attr_table[ZPL_GID], NULL, &gid, 8);
+	SA_ADD_BULK_ATTR(bulk, idx, sa_attr_table[ZPL_LINKS], NULL,
+	    &links, 8);
+	SA_ADD_BULK_ATTR(bulk, idx, sa_attr_table[ZPL_GEN], NULL, &gen, 8);
+	SA_ADD_BULK_ATTR(bulk, idx, sa_attr_table[ZPL_MODE], NULL,
+	    &mode, 8);
+	SA_ADD_BULK_ATTR(bulk, idx, sa_attr_table[ZPL_PARENT],
+	    NULL, &parent, 8);
+	SA_ADD_BULK_ATTR(bulk, idx, sa_attr_table[ZPL_SIZE], NULL,
+	    &fsize, 8);
+	SA_ADD_BULK_ATTR(bulk, idx, sa_attr_table[ZPL_ATIME], NULL,
+	    acctm, 16);
+	SA_ADD_BULK_ATTR(bulk, idx, sa_attr_table[ZPL_MTIME], NULL,
+	    modtm, 16);
+	SA_ADD_BULK_ATTR(bulk, idx, sa_attr_table[ZPL_CRTIME], NULL,
+	    crtm, 16);
+	SA_ADD_BULK_ATTR(bulk, idx, sa_attr_table[ZPL_CTIME], NULL,
+	    chgtm, 16);
+
+	if (sa_bulk_lookup(hdl, bulk, idx)) {
+		(void) sa_handle_destroy(hdl);
+		return;
+	}
 
 	error = zfs_obj_to_path(os, object, path, sizeof (path));
 	if (error != 0) {
 		(void) snprintf(path, sizeof (path), "\?\?\?<object#%llu>",
 		    (u_longlong_t)object);
 	}
-
 	if (dump_opt['d'] < 3) {
 		(void) printf("\t%s\n", path);
+		(void) sa_handle_destroy(hdl);
 		return;
 	}
 
-	z_crtime = (time_t)zp->zp_crtime[0];
-	z_atime = (time_t)zp->zp_atime[0];
-	z_mtime = (time_t)zp->zp_mtime[0];
-	z_ctime = (time_t)zp->zp_ctime[0];
+	z_crtime = (time_t)crtm[0];
+	z_atime = (time_t)acctm[0];
+	z_mtime = (time_t)modtm[0];
+	z_ctime = (time_t)chgtm[0];
 
 	(void) printf("\tpath	%s\n", path);
-	dump_uidgid(os, zp);
+	dump_uidgid(os, uid, gid);
 	(void) printf("\tatime	%s", ctime(&z_atime));
 	(void) printf("\tmtime	%s", ctime(&z_mtime));
 	(void) printf("\tctime	%s", ctime(&z_ctime));
 	(void) printf("\tcrtime	%s", ctime(&z_crtime));
-	(void) printf("\tgen	%llu\n", (u_longlong_t)zp->zp_gen);
-	(void) printf("\tmode	%llo\n", (u_longlong_t)zp->zp_mode);
-	(void) printf("\tsize	%llu\n", (u_longlong_t)zp->zp_size);
-	(void) printf("\tparent	%llu\n", (u_longlong_t)zp->zp_parent);
-	(void) printf("\tlinks	%llu\n", (u_longlong_t)zp->zp_links);
-	(void) printf("\txattr	%llu\n", (u_longlong_t)zp->zp_xattr);
-	(void) printf("\trdev	0x%016llx\n", (u_longlong_t)zp->zp_rdev);
+	(void) printf("\tgen	%llu\n", (u_longlong_t)gen);
+	(void) printf("\tmode	%llo\n", (u_longlong_t)mode);
+	(void) printf("\tsize	%llu\n", (u_longlong_t)fsize);
+	(void) printf("\tparent	%llu\n", (u_longlong_t)parent);
+	(void) printf("\tlinks	%llu\n", (u_longlong_t)links);
+	if (sa_lookup(hdl, sa_attr_table[ZPL_XATTR], &xattr,
+	    sizeof (uint64_t)) == 0)
+		(void) printf("\txattr	%llu\n", (u_longlong_t)xattr);
+	if (sa_lookup(hdl, sa_attr_table[ZPL_RDEV], &rdev,
+	    sizeof (uint64_t)) == 0)
+		(void) printf("\trdev	0x%016llx\n", (u_longlong_t)rdev);
+	sa_handle_destroy(hdl);
 }
 
 /*ARGSUSED*/
@@ -1261,7 +1384,11 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES + 1] = {
 	dump_zap,		/* snapshot refcount tags	*/
 	dump_ddt_zap,		/* DDT ZAP object		*/
 	dump_zap,		/* DDT statistics		*/
-	dump_unknown		/* Unknown type, must be last	*/
+	dump_znode,		/* SA object			*/
+	dump_zap,		/* SA Master Node		*/
+	dump_sa_attrs,		/* SA attribute registration	*/
+	dump_sa_layouts,	/* SA attribute layouts		*/
+	dump_unknown,		/* Unknown type, must be last	*/
 };
 
 static void
@@ -1328,11 +1455,13 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 	}
 
 	if (verbosity >= 4) {
-		(void) printf("\tdnode flags: %s%s\n",
+		(void) printf("\tdnode flags: %s%s%s\n",
 		    (dn->dn_phys->dn_flags & DNODE_FLAG_USED_BYTES) ?
 		    "USED_BYTES " : "",
 		    (dn->dn_phys->dn_flags & DNODE_FLAG_USERUSED_ACCOUNTED) ?
-		    "USERUSED_ACCOUNTED " : "");
+		    "USERUSED_ACCOUNTED " : "",
+		    (dn->dn_phys->dn_flags & DNODE_FLAG_SPILL_BLKPTR) ?
+		    "SPILL_BLKPTR" : "");
 		(void) printf("\tdnode maxblkid: %llu\n",
 		    (longlong_t)dn->dn_phys->dn_maxblkid);
 
@@ -1685,6 +1814,7 @@ dump_one_dir(const char *dsname, void *arg)
 	dump_dir(os);
 	dmu_objset_disown(os, FTAG);
 	fuid_table_destroy();
+	sa_loaded = B_FALSE;
 	return (0);
 }
 
@@ -2961,6 +3091,7 @@ main(int argc, char **argv)
 	(os != NULL) ? dmu_objset_disown(os, FTAG) : spa_close(spa, FTAG);
 
 	fuid_table_destroy();
+	sa_loaded = B_FALSE;
 
 	libzfs_fini(g_zfs);
 	kernel_fini();
