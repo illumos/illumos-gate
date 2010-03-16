@@ -344,7 +344,7 @@ spa_history_get(spa_t *spa, uint64_t *offp, uint64_t *len, char *buf)
 	 * the first chunk of history, make sure everything has been
 	 * synced to disk so that we get it.
 	 */
-	if (*offp == 0)
+	if (*offp == 0 && spa_writeable(spa))
 		txg_wait_synced(spa_get_dsl(spa), 0);
 
 	if ((err = dmu_bonus_hold(mos, spa->spa_history, FTAG, &dbp)) != 0)

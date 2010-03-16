@@ -239,7 +239,7 @@ zio_handle_device_injection(vdev_t *vd, zio_t *zio, int error)
 
 		if (offset < VDEV_LABEL_START_SIZE ||
 		    offset >= vd->vdev_psize - VDEV_LABEL_END_SIZE)
-		return (0);
+			return (0);
 	}
 
 	rw_enter(&inject_lock, RW_READER);
