@@ -5315,7 +5315,7 @@ spa_sync(spa_t *spa, uint64_t txg)
 
 	} while (dmu_objset_is_dirty(mos, txg));
 
-	ASSERT(free_bpl->bpl_queue == NULL);
+	ASSERT(list_is_empty(&free_bpl->bpl_queue));
 
 	bplist_close(defer_bpl);
 
@@ -5405,8 +5405,8 @@ spa_sync(spa_t *spa, uint64_t txg)
 	ASSERT(txg_list_empty(&dp->dp_dirty_datasets, txg));
 	ASSERT(txg_list_empty(&dp->dp_dirty_dirs, txg));
 	ASSERT(txg_list_empty(&spa->spa_vdev_txg_list, txg));
-	ASSERT(defer_bpl->bpl_queue == NULL);
-	ASSERT(free_bpl->bpl_queue == NULL);
+	ASSERT(list_is_empty(&defer_bpl->bpl_queue));
+	ASSERT(list_is_empty(&free_bpl->bpl_queue));
 
 	spa->spa_sync_pass = 0;
 

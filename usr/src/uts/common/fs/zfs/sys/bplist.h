@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@ typedef struct bplist_phys {
 
 typedef struct bplist_q {
 	blkptr_t	bpq_blk;
-	void		*bpq_next;
+	list_node_t	bpq_node;
 } bplist_q_t;
 
 typedef struct bplist {
@@ -62,7 +62,8 @@ typedef struct bplist {
 	uint8_t		bpl_blockshift;
 	uint8_t		bpl_bpshift;
 	uint8_t		bpl_havecomp;
-	bplist_q_t	*bpl_queue;
+	kmutex_t	bpl_q_lock;
+	list_t		bpl_queue;
 	bplist_phys_t	*bpl_phys;
 	dmu_buf_t	*bpl_dbuf;
 	dmu_buf_t	*bpl_cached_dbuf;
