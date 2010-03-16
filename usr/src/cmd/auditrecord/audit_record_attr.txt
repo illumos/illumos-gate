@@ -814,12 +814,15 @@ label=AUE_FCHROOT
 
 label=AUE_FCNTL
   case=With a valid file descriptor
-    format=arg1:path:attr
-      comment=2, command, "cmd"
-  case=With an invalid file descriptor
-    format=arg1:arg2
+    format=arg1:[arg]2:path:attr
       comment=2, command, "cmd":
+      comment=3, flags, "flags"
+  case=With an invalid file descriptor
+    format=arg1:[arg]2:arg3
+      comment=2, command, "cmd":
+      comment=3, flags, "flags":
       comment=1, file descriptor, "no path fd"
+  note=Flags are included only when cmd is F_SETFL.
 
 label=AUE_FLOCK
   skip=Not used.

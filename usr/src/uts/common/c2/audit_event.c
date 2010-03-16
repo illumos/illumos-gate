@@ -1383,7 +1383,7 @@ static void
 aus_fcntl(struct t_audit_data *tad)
 {
 	klwp_t *clwp = ttolwp(curthread);
-	uint32_t cmd, fd;
+	uint32_t cmd, fd, flags;
 	struct file  *fp;
 	struct vnode *vp;
 	struct f_audit_data *fad;
@@ -1394,10 +1394,14 @@ aus_fcntl(struct t_audit_data *tad)
 		long	arg;
 	} *uap = (struct a *)clwp->lwp_ap;
 
-	cmd = (uint32_t)uap->cmd;
-	fd  = (uint32_t)uap->fd;
+	cmd	= (uint32_t)uap->cmd;
+	fd	= (uint32_t)uap->fd;
+	flags	= (uint32_t)uap->arg;
 
 	au_uwrite(au_to_arg32(2, "cmd", cmd));
+
+	if (cmd == F_SETFL)
+		au_uwrite(au_to_arg32(3, "flags", flags));
 
 		/*
 		 * convert file pointer to file descriptor
