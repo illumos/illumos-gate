@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -287,10 +287,11 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 			if (ptype & SCTP_REPORT_THIS_PARAM) {
 				if (!got_errchunk && want_cookie != NULL) {
 					/*
-					 * Processing an INIT_ACK, this is the
-					 * first reportable param, create an
-					 * ERROR chunk and populate it with a
-					 * CAUSE block for this parameter.
+					 * The incoming pointer want_cookie is
+					 * NULL so processing an INIT_ACK.
+					 * This is the first reportable param,
+					 * create an ERROR chunk and populate
+					 * it with a CAUSE block for this parm.
 					 */
 					*errmp = sctp_make_err(sctp,
 					    PARM_UNRECOGNIZED,
@@ -299,9 +300,15 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 					got_errchunk = B_TRUE;
 				} else {
 					/*
-					 * If processing an INIT chunk add
-					 * an additional CAUSE block to an
-					 * INIT_ACK, got_errchunk is B_FALSE.
+					 * If processing an INIT_ACK, we already
+					 * have an ERROR chunk, just add a new
+					 * CAUSE block and update ERROR chunk
+					 * length.
+					 * If processing an INIT chunk add a new
+					 * CAUSE block to the INIT_ACK, in this
+					 * case there is no ERROR chunk thus
+					 * got_errchunk will be B_FALSE. Chunk
+					 * length is computed by our caller.
 					 */
 					sctp_add_unrec_parm(cph, errmp,
 					    got_errchunk);
@@ -525,7 +532,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 		errlen = msgdsize(errmp);
 	if (connp->conn_family == AF_INET) {
 		/*
-		 * Irregardless of the supported address in the INIT, v4
+		 * Regardless of the supported address in the INIT, v4
 		 * must be supported.
 		 */
 		supp_af = PARM_SUPP_V4;
@@ -582,9 +589,16 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 		iacklen += sctp_addr_params(sctp, supp_af, NULL, B_FALSE);
 	ipsctplen += sizeof (*iacksh) + iacklen;
 	iacklen += errlen;
-	if ((pad = ipsctplen % 4) != 0) {
-		pad = 4 - pad;
+	/*
+	 * Padding is applied after the cookie which is the end of chunk
+	 * unless CAUSE blocks are appended when the pad must also be
+	 * accounted for in iacklen.
+	 */
+	if ((pad = ipsctplen % SCTP_ALIGN) != 0) {
+		pad = SCTP_ALIGN - pad;
 		ipsctplen += pad;
+		if (errmp != NULL)
+			iacklen += pad;
 	}
 
 	/*
