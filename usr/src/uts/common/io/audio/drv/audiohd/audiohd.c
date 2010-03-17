@@ -73,7 +73,7 @@ static void audiohd_change_speaker_state(audiohd_state_t *, int);
 static int audiohd_allocate_port(audiohd_state_t *);
 static void audiohd_free_port(audiohd_state_t *);
 static void audiohd_restore_path(audiohd_state_t *);
-static int audiohd_add_controls(audiohd_state_t *);
+static void audiohd_create_controls(audiohd_state_t *);
 static void audiohd_get_channels(audiohd_state_t *);
 static void audiohd_init_path(audiohd_state_t *);
 static void audiohd_del_controls(audiohd_state_t *);
@@ -115,28 +115,10 @@ static const char *audiohd_dtypes[] = {
 	AUDIO_PORT_PHONE,
 	AUDIO_PORT_SPDIFIN,
 	AUDIO_PORT_DIGIN,
+	AUDIO_PORT_STEREOMIX,
 	AUDIO_PORT_NONE,	/* reserved port, don't use */
 	AUDIO_PORT_OTHER,
 	NULL,
-};
-
-enum {
-	CTL_VOLUME = 0,
-	CTL_FRONT,
-	CTL_SPEAKER,
-	CTL_HEADPHONE,
-	CTL_REAR,
-	CTL_CENTER,
-	CTL_SURROUND,
-	CTL_LFE,
-	CTL_IGAIN,
-	CTL_LINEIN,
-	CTL_MIC,
-	CTL_CD,
-	CTL_MONGAIN,
-	CTL_MONSRC,
-	CTL_RECSRC,
-	CTL_BEEP
 };
 
 static audiohd_codec_info_t audiohd_codecs[] = {
@@ -618,11 +600,8 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Register audio controls.
 	 */
-	if (audiohd_add_controls(statep) == DDI_FAILURE) {
-		audio_dev_warn(statep->adev,
-		    "unable to allocate controls");
-		goto error;
-	}
+	audiohd_create_controls(statep);
+
 	if (audio_dev_register(statep->adev) != DDI_SUCCESS) {
 		audio_dev_warn(statep->adev,
 		    "unable to register with framework");
@@ -969,8 +948,8 @@ audiohd_init_record_path(audiohd_path_t *path)
 	    path->adda_wid,
 	    AUDIOHDC_VERB_SET_CONV_FMT,
 	    AUDIOHD_FMT_PCM << 4 | statep->rchan - 1);
-
 }
+
 static void
 audiohd_init_path(audiohd_state_t *statep)
 {
@@ -1197,11 +1176,11 @@ audio_engine_ops_t audiohd_engine_ops = {
 };
 
 static int
-audiohd_get_value(void *arg, uint64_t *val)
+audiohd_get_control(void *arg, uint64_t *val)
 {
-	audiohd_ctrl_t	*pc = arg;
+	audiohd_ctrl_t	*ac = arg;
 
-	*val = pc->val;
+	*val = ac->val;
 	return (0);
 }
 
@@ -1218,7 +1197,7 @@ audiohd_set_output_gain(audiohd_state_t *statep)
 
 	if (statep->soft_volume)
 		return;
-	gain = (uint8_t)statep->controls[CTL_VOLUME]->val;
+	gain = (uint8_t)statep->ctrls[CTL_VOLUME].val;
 	for (i = 0; i < statep->pathnum; i++) {
 		path = statep->path[i];
 		if (!path || path->path_type != PLAY)
@@ -1320,45 +1299,32 @@ audiohd_set_pin_volume(audiohd_state_t *statep, audiohda_device_type_t type)
 	audiohd_pin_t			*pin;
 	hda_codec_t			*codec;
 	uint64_t			val;
-	audiohd_ctrl_t			*control;
+	audiohd_ctrl_t			control;
 
 	switch (type) {
 		case DTYPE_SPEAKER:
-			control = statep->controls[CTL_SPEAKER];
-			if (control == NULL)
-				return;
-			val = control->val;
+			control = statep->ctrls[CTL_SPEAKER];
+			val = control.val;
 			break;
 		case DTYPE_HP_OUT:
-			control = statep->controls[CTL_HEADPHONE];
-			if (control == NULL)
-				return;
-			val = control->val;
+			control = statep->ctrls[CTL_HEADPHONE];
+			val = control.val;
 			break;
 		case DTYPE_LINEOUT:
-			control = statep->controls[CTL_FRONT];
-			if (control == NULL)
-				return;
-			val = control->val;
+			control = statep->ctrls[CTL_FRONT];
+			val = control.val;
 			break;
-
 		case DTYPE_CD:
-			control = statep->controls[CTL_CD];
-			if (control == NULL)
-				return;
-			val = control->val;
+			control = statep->ctrls[CTL_CD];
+			val = control.val;
 			break;
 		case DTYPE_LINE_IN:
-			control = statep->controls[CTL_LINEIN];
-			if (control == NULL)
-				return;
-			val = control->val;
+			control = statep->ctrls[CTL_LINEIN];
+			val = control.val;
 			break;
 		case DTYPE_MIC_IN:
-			control = statep->controls[CTL_MIC];
-			if (control == NULL)
-				return;
-			val = control->val;
+			control = statep->ctrls[CTL_MIC];
+			val = control.val;
 			break;
 	}
 
@@ -1392,37 +1358,27 @@ audiohd_set_pin_volume_by_color(audiohd_state_t *statep,
 	uint8_t			l, r;
 	uint64_t		val;
 	audiohd_pin_color_t	clr;
-	audiohd_ctrl_t		*control;
+	audiohd_ctrl_t		control;
 
 	switch (color) {
 		case AUDIOHD_PIN_GREEN:
-			control = statep->controls[CTL_FRONT];
-			if (control == NULL)
-				return;
-			val = control->val;
+			control = statep->ctrls[CTL_FRONT];
+			val = control.val;
 			break;
 		case AUDIOHD_PIN_BLACK:
-			control = statep->controls[CTL_REAR];
-			if (control == NULL)
-				return;
-			val = control->val;
+			control = statep->ctrls[CTL_REAR];
+			val = control.val;
 			break;
 		case AUDIOHD_PIN_ORANGE:
-			control = statep->controls[CTL_CENTER];
-			if (control == NULL)
-				return;
-			l = control->val;
-			control = statep->controls[CTL_LFE];
-			if (control == NULL)
-				return;
-			r = control->val;
+			control = statep->ctrls[CTL_CENTER];
+			l = control.val;
+			control = statep->ctrls[CTL_LFE];
+			r = control.val;
 			val = (l << 8) | r;
 			break;
 		case AUDIOHD_PIN_GREY:
-			control = statep->controls[CTL_SURROUND];
-			if (control == NULL)
-				return;
-			val = control->val;
+			control = statep->ctrls[CTL_SURROUND];
+			val = control.val;
 			break;
 	}
 
@@ -1454,13 +1410,16 @@ audiohd_set_input_pin(audiohd_state_t *statep)
 	audiohd_widget_t	*widget, *w;
 	int			i, j;
 	wid_t			wid, pin_wid = 0;
+	uint32_t		set_val;
 
-	val = statep->controls[CTL_RECSRC]->val;
+	val = statep->ctrls[CTL_RECSRC].val;
+	set_val = ddi_ffs(val & 0xffff) - 1;
 	for (i = 0; i < statep->pathnum; i++) {
 		path = statep->path[i];
-		if (!path || path->path_type != RECORD)
+		if (path == NULL || path->path_type != RECORD)
 			continue;
-		switch ((ddi_ffs(val & 0xffff)) - 1) {
+
+		switch (set_val) {
 		case DTYPE_LINE_IN:
 		case DTYPE_MIC_IN:
 		case DTYPE_CD:
@@ -1577,13 +1536,11 @@ audiohd_set_monitor_gain(audiohd_state_t *statep)
 	audiohd_widget_t	*w;
 	wid_t			wid;
 	audiohd_pin_t		*pin;
-	audiohd_ctrl_t		*ctrl;
+	audiohd_ctrl_t		ctrl;
 	uint64_t		val;
 
-	ctrl = statep->controls[CTL_MONGAIN];
-	if (ctrl == NULL)
-		return;
-	val = ctrl->val;
+	ctrl = statep->ctrls[CTL_MONGAIN];
+	val = ctrl.val;
 
 	for (i = 0; i < statep->pathnum; i++) {
 		path = statep->path[i];
@@ -1609,13 +1566,11 @@ audiohd_set_beep_volume(audiohd_state_t *statep)
 	hda_codec_t		*codec;
 	uint64_t		val;
 	uint_t			tmp;
-	audiohd_ctrl_t		*control;
+	audiohd_ctrl_t		control;
 	uint32_t		vid;
 
-	control = statep->controls[CTL_BEEP];
-	if (control == NULL)
-		return;
-	val = control->val;
+	control = statep->ctrls[CTL_BEEP];
+	val = control.val;
 	for (i = 0; i < statep->pathnum; i++) {
 		path = statep->path[i];
 		if (!path || path->path_type != BEEP)
@@ -1956,278 +1911,211 @@ audiohd_set_beep(void *arg, uint64_t val)
 #define	RECVOL	(RECCTL | AUDIO_CTRL_FLAG_RECVOL)
 #define	RWCTL	AUDIO_CTRL_FLAG_RW
 
-static audiohd_ctrl_t *
-audiohd_alloc_ctrl(audiohd_state_t *statep, uint32_t num, uint64_t val)
-{
-	audio_ctrl_desc_t	desc;
-	audio_ctrl_wr_t		fn;
-	audiohd_ctrl_t		*pc;
-
-	pc = kmem_zalloc(sizeof (*pc), KM_SLEEP);
-	pc->statep = statep;
-	pc->num = num;
-
-	bzero(&desc, sizeof (desc));
-
-	switch (num) {
-	case CTL_VOLUME:
-		desc.acd_name = AUDIO_CTRL_ID_VOLUME;
-		desc.acd_type = AUDIO_CTRL_TYPE_MONO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = PCMVOL;
-		fn = audiohd_set_volume;
-		break;
-
-	case CTL_FRONT:
-		desc.acd_name = AUDIO_CTRL_ID_FRONT;
-		desc.acd_type = AUDIO_CTRL_TYPE_STEREO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = MAINVOL;
-		fn = audiohd_set_front;
-		break;
-
-	case CTL_SPEAKER:
-		desc.acd_name = AUDIO_CTRL_ID_SPEAKER;
-		desc.acd_type = AUDIO_CTRL_TYPE_STEREO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = MAINVOL;
-		fn = audiohd_set_speaker;
-		break;
-
-	case CTL_HEADPHONE:
-		desc.acd_name = AUDIO_CTRL_ID_HEADPHONE;
-		desc.acd_type = AUDIO_CTRL_TYPE_STEREO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = MAINVOL;
-		fn = audiohd_set_headphone;
-		break;
-
-	case CTL_REAR:
-		desc.acd_name = AUDIO_CTRL_ID_REAR;
-		desc.acd_type = AUDIO_CTRL_TYPE_STEREO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = MAINVOL;
-		fn = audiohd_set_rear;
-		break;
-
-	case CTL_CENTER:
-		desc.acd_name = AUDIO_CTRL_ID_CENTER;
-		desc.acd_type = AUDIO_CTRL_TYPE_MONO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = MAINVOL;
-		fn = audiohd_set_center;
-		break;
-
-	case CTL_SURROUND:
-		desc.acd_name = AUDIO_CTRL_ID_SURROUND;
-		desc.acd_type = AUDIO_CTRL_TYPE_STEREO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = MAINVOL;
-		fn = audiohd_set_surround;
-		break;
-
-	case CTL_LFE:
-		desc.acd_name = AUDIO_CTRL_ID_LFE;
-		desc.acd_type = AUDIO_CTRL_TYPE_MONO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = MAINVOL;
-		fn = audiohd_set_lfe;
-		break;
-
-	case CTL_LINEIN:
-		desc.acd_name = AUDIO_CTRL_ID_LINEIN;
-		desc.acd_type = AUDIO_CTRL_TYPE_STEREO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = RECVOL;
-		fn = audiohd_set_linein;
-		break;
-
-	case CTL_MIC:
-		desc.acd_name = AUDIO_CTRL_ID_MIC;
-		desc.acd_type = AUDIO_CTRL_TYPE_STEREO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = RECVOL;
-		fn = audiohd_set_mic;
-		break;
-
-	case CTL_CD:
-		desc.acd_name = AUDIO_CTRL_ID_CD;
-		desc.acd_type = AUDIO_CTRL_TYPE_STEREO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = RECVOL;
-		fn = audiohd_set_cd;
-		break;
-
-	case CTL_MONGAIN:
-		desc.acd_name = AUDIO_CTRL_ID_MONGAIN;
-		desc.acd_type = AUDIO_CTRL_TYPE_STEREO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = MONVOL;
-		fn = audiohd_set_mongain;
-		break;
-
-	case CTL_RECSRC:
-		desc.acd_name = AUDIO_CTRL_ID_RECSRC;
-		desc.acd_type = AUDIO_CTRL_TYPE_ENUM;
-		desc.acd_minvalue = statep->inmask;
-		desc.acd_maxvalue = statep->inmask;
-		desc.acd_flags = RECCTL;
-		for (int i = 0; audiohd_dtypes[i]; i++) {
-			desc.acd_enum[i] = audiohd_dtypes[i];
-		}
-		fn = audiohd_set_recsrc;
-		break;
-
-	case CTL_BEEP:
-		desc.acd_name = AUDIO_CTRL_ID_BEEP;
-		desc.acd_type =	AUDIO_CTRL_TYPE_MONO;
-		desc.acd_minvalue = 0;
-		desc.acd_maxvalue = 100;
-		desc.acd_flags = RWCTL;
-		fn = audiohd_set_beep;
-		break;
-	}
-
-	pc->val = val;
-	pc->ctrl = audio_dev_add_control(statep->adev, &desc,
-	    audiohd_get_value, fn, pc);
-
-	return (pc);
-}
-
-static void
-audiohd_free_ctrl(audiohd_ctrl_t *pc)
-{
-	if (pc == NULL)
-		return;
-	if (pc->ctrl)
-		audio_dev_del_control(pc->ctrl);
-	kmem_free(pc, sizeof (*pc));
-}
-
 static void
 audiohd_del_controls(audiohd_state_t *statep)
 {
 	int		i;
-	for (i = 0; i < CTRL_NUM; i++) {
-		if (statep->controls[i])
-			audiohd_free_ctrl(statep->controls[i]);
+	for (i = 0; i < CTL_MAX; i++) {
+		audiohd_ctrl_t *ac = &statep->ctrls[i];
+		if (ac->ctrl != NULL) {
+			audio_dev_del_control(ac->ctrl);
+			ac->ctrl = NULL;
+		}
 	}
 }
 
-static int
-audiohd_add_controls(audiohd_state_t *statep)
+static void
+audiohd_create_mono(audiohd_state_t *statep, int ctl,
+    const char *id, int flags, int defval, audio_ctrl_wr_t fn)
 {
-	int			i, j;
-	audiohd_path_t		*path;
-	wid_t			wid;
-	audiohd_pin_t		*pin;
-	audiohd_widget_t	*widget, *w;
-	hda_codec_t		*codec;
-	audiohd_pin_color_t	clr;
+	audiohd_ctrl_t		*ac;
+	audio_ctrl_desc_t	desc;
 
-#define	ADD_CTRL(ID, VAL)	\
-	if (statep->controls[ID] == NULL) \
-		statep->controls[ID] = audiohd_alloc_ctrl(statep, ID, VAL);\
-	if (statep->controls[ID] == NULL) {				\
-		audio_dev_warn(statep->adev,				\
-		    "Unable to allocate %s control", #ID);		\
-		return (DDI_FAILURE);					\
+	bzero(&desc, sizeof (desc));
+
+	ac = &statep->ctrls[ctl];
+	ac->statep = statep;
+	ac->num = ctl;
+
+	desc.acd_name = id;
+	desc.acd_type = AUDIO_CTRL_TYPE_MONO;
+	desc.acd_minvalue = 0;
+	desc.acd_maxvalue = 100;
+	desc.acd_flags = flags;
+
+	ac->val = defval;
+	ac->ctrl = audio_dev_add_control(statep->adev, &desc,
+	    audiohd_get_control, fn, ac);
+}
+
+static void
+audiohd_create_stereo(audiohd_state_t *statep, int ctl,
+    const char *id, int flags, int defval, audio_ctrl_wr_t fn)
+{
+	audiohd_ctrl_t		*ac;
+	audio_ctrl_desc_t	desc;
+
+	bzero(&desc, sizeof (desc));
+
+	ac = &statep->ctrls[ctl];
+	ac->statep = statep;
+	ac->num = ctl;
+
+	desc.acd_name = id;
+	desc.acd_type = AUDIO_CTRL_TYPE_STEREO;
+	desc.acd_minvalue = 0;
+	desc.acd_maxvalue = 100;
+	desc.acd_flags = flags;
+
+	ac->val = (defval << 8) | defval;
+	ac->ctrl = audio_dev_add_control(statep->adev, &desc,
+	    audiohd_get_control, fn, ac);
+}
+
+static void
+audiohd_create_recsrc(audiohd_state_t *statep)
+{
+	audiohd_ctrl_t *ac;
+	audio_ctrl_desc_t desc;
+
+	bzero(&desc, sizeof (desc));
+
+	ac = &statep->ctrls[CTL_RECSRC];
+	ac->statep = statep;
+	ac->num = CTL_RECSRC;
+
+	desc.acd_name = AUDIO_CTRL_ID_RECSRC;
+	desc.acd_type = AUDIO_CTRL_TYPE_ENUM;
+	desc.acd_flags = RECCTL;
+	desc.acd_minvalue = statep->inmask;
+	desc.acd_maxvalue = statep->inmask;
+	for (int i = 0; audiohd_dtypes[i]; i++) {
+		desc.acd_enum[i] = audiohd_dtypes[i];
 	}
+
+	ac->val = (1U << DTYPE_MIC_IN);
+	ac->ctrl = audio_dev_add_control(statep->adev, &desc,
+	    audiohd_get_control, audiohd_set_recsrc, ac);
+}
+
+static void
+audiohd_create_controls(audiohd_state_t *statep)
+{
+	wid_t			wid;
+	audiohd_widget_t	*widget;
+	audiohd_path_t		*path;
+	hda_codec_t		*codec;
+	audiohd_pin_t		*pin;
+	audiohd_pin_color_t	color;
+	int			i, j;
 
 	for (i = 0; i < statep->pathnum; i++) {
 		path = statep->path[i];
-		if (!path || path->path_type != PLAY)
+		if (path == NULL || path->path_type != PLAY)
 			continue;
 		/*
 		 * Firstly we check if all the DACs on the play paths
-		 * have amplifiers. If any of them doesn't have, we just use
-		 * the soft volume control to adjust the PCM volume.
+		 * have amplifiers.
 		 */
 		wid = path->adda_wid;
-		w = path->codec->widget[wid];
-		if (!w->outamp_cap) {
-			(void) audio_dev_add_soft_volume(statep->adev);
+		widget = path->codec->widget[wid];
+		if (!widget->outamp_cap) {
 			statep->soft_volume = B_TRUE;
 			break;
 		}
 	}
+
 	/*
-	 * if all the DACs on the play paths have the amplifiers, we use DACs'
-	 * amplifiers to adjust volume.
+	 * If all the DACs on the play paths have the amplifiers, we use DACs'
+	 * amplifiers to adjust volume, otherwise use soft volume control to
+	 * to adjust PCM volume.
 	 */
 	if (!statep->soft_volume) {
-		ADD_CTRL(CTL_VOLUME, 0x4b);
+		audiohd_create_mono(statep, CTL_VOLUME,
+		    AUDIO_CTRL_ID_VOLUME, PCMVOL, 75, audiohd_set_volume);
+	} else {
+		(void) audio_dev_add_soft_volume(statep->adev);
 	}
-	/* allocate other controls */
+
+	/* Allocate other controls */
 	for (i = 0; i < statep->pathnum; i++) {
 		path = statep->path[i];
-		if (!path)
+		if (path == NULL)
 			continue;
 		codec = path->codec;
-		if (path->path_type == BEEP) {
-			widget = codec->widget[path->beep_wid];
-			if (widget->type == WTYPE_BEEP &&
-			    path->gain_wid != 0) {
-				ADD_CTRL(CTL_BEEP, 0x4b4b);
-				break;
-			}
-		}
 
 		for (j = 0; j < path->pin_nums; j++) {
 			wid = path->pin_wid[j];
 			widget = codec->widget[wid];
 			pin = (audiohd_pin_t *)widget->priv;
-			if (pin->device == DTYPE_SPEAKER) {
-				ADD_CTRL(CTL_SPEAKER, 0x4b4b);
-			} else if (pin->device == DTYPE_HP_OUT) {
-				ADD_CTRL(CTL_HEADPHONE, 0x4b4b);
-			} else if (pin->device == DTYPE_LINE_IN) {
-				ADD_CTRL(CTL_LINEIN, 0x3232);
-			} else if (pin->device == DTYPE_MIC_IN) {
-				ADD_CTRL(CTL_MIC, 0x3232);
-			} else if (pin->device == DTYPE_CD) {
-				ADD_CTRL(CTL_CD, 0x3232);
-			}
-			clr = (pin->config >> AUDIOHD_PIN_CLR_OFF) &
+			color = (pin->config >> AUDIOHD_PIN_CLR_OFF) &
 			    AUDIOHD_PIN_CLR_MASK;
-			if (clr == AUDIOHD_PIN_GREEN) {
-				ADD_CTRL(CTL_FRONT, 0x4b4b);
-			} else if (clr == AUDIOHD_PIN_BLACK &&
+			if (color == AUDIOHD_PIN_GREEN) {
+				audiohd_create_stereo(statep, CTL_FRONT,
+				    AUDIO_CTRL_ID_FRONT, MAINVOL, 75,
+				    audiohd_set_front);
+			} else if (color == AUDIOHD_PIN_BLACK &&
 			    pin->device != DTYPE_HP_OUT &&
 			    pin->device != DTYPE_MIC_IN) {
-				ADD_CTRL(CTL_REAR, 0x4b4b);
-			} else if (clr == AUDIOHD_PIN_ORANGE) {
-				ADD_CTRL(CTL_CENTER, 0x4b);
-				ADD_CTRL(CTL_LFE, 0x4b);
-			} else if (clr == AUDIOHD_PIN_GREY) {
-				ADD_CTRL(CTL_SURROUND, 0x4b4b);
+				audiohd_create_stereo(statep, CTL_REAR,
+				    AUDIO_CTRL_ID_REAR, MAINVOL, 75,
+				    audiohd_set_rear);
+			} else if (color == AUDIOHD_PIN_ORANGE) {
+				audiohd_create_mono(statep, CTL_CENTER,
+				    AUDIO_CTRL_ID_CENTER, MAINVOL, 75,
+				    audiohd_set_center);
+				audiohd_create_mono(statep, CTL_LFE,
+				    AUDIO_CTRL_ID_LFE, MAINVOL, 75,
+				    audiohd_set_lfe);
+			} else if (color == AUDIOHD_PIN_GREY) {
+				audiohd_create_stereo(statep, CTL_SURROUND,
+				    AUDIO_CTRL_ID_SURROUND, MAINVOL, 75,
+				    audiohd_set_surround);
+			}
+			if (pin->device == DTYPE_SPEAKER) {
+				audiohd_create_stereo(statep, CTL_SPEAKER,
+				    AUDIO_CTRL_ID_SPEAKER, MAINVOL, 75,
+				    audiohd_set_speaker);
+			} else if (pin->device == DTYPE_HP_OUT) {
+				audiohd_create_stereo(statep, CTL_HEADPHONE,
+				    AUDIO_CTRL_ID_HEADPHONE, MAINVOL, 75,
+				    audiohd_set_headphone);
+			} else if (pin->device == DTYPE_LINE_IN) {
+				audiohd_create_stereo(statep, CTL_LINEIN,
+				    AUDIO_CTRL_ID_LINEIN, RECVOL, 50,
+				    audiohd_set_linein);
+			} else if (pin->device == DTYPE_MIC_IN) {
+				audiohd_create_stereo(statep, CTL_MIC,
+				    AUDIO_CTRL_ID_MIC, RECVOL, 50,
+				    audiohd_set_mic);
+			} else if (pin->device == DTYPE_CD) {
+				audiohd_create_stereo(statep, CTL_CD,
+				    AUDIO_CTRL_ID_CD, RECVOL, 50,
+				    audiohd_set_cd);
+			}
+		}
+
+		if (path->path_type == BEEP) {
+			widget = codec->widget[path->beep_wid];
+			if (widget->type == WTYPE_BEEP &&
+			    path->gain_wid != 0) {
+				audiohd_create_mono(statep, CTL_BEEP,
+				    AUDIO_CTRL_ID_BEEP, RWCTL, 75,
+				    audiohd_set_beep);
+				continue;
 			}
 		}
 	}
 
 	if (!statep->monitor_unsupported) {
-		ADD_CTRL(CTL_MONGAIN, 0);
+		audiohd_create_stereo(statep, CTL_MONGAIN,
+		    AUDIO_CTRL_ID_MONGAIN, MONVOL, 0,
+		    audiohd_set_mongain);
 	}
 
-	ADD_CTRL(CTL_RECSRC, (1U << DTYPE_MIC_IN));
-
+	audiohd_create_recsrc(statep);
 	audiohd_configure_output(statep);
 	audiohd_configure_input(statep);
-
-	return (DDI_SUCCESS);
 }
 
 /*

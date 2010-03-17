@@ -545,8 +545,6 @@ enum audiohd_pin_color {
 	AUDIOHD_PIN_OTHER = 0xf,
 };
 
-#define	CTRL_NUM	16
-
 /* values for audiohd_widget.path_flags */
 #define	AUDIOHD_PATH_DAC	(1 << 0)
 #define	AUDIOHD_PATH_ADC	(1 << 1)
@@ -695,11 +693,33 @@ typedef struct audiohd_port
 	audiohd_state_t		*statep;
 }audiohd_port_t;
 
+enum {
+	CTL_VOLUME = 0,
+	CTL_FRONT,
+	CTL_SPEAKER,
+	CTL_HEADPHONE,
+	CTL_REAR,
+	CTL_CENTER,
+	CTL_SURROUND,
+	CTL_LFE,
+	CTL_IGAIN,
+	CTL_LINEIN,
+	CTL_MIC,
+	CTL_CD,
+	CTL_MONGAIN,
+	CTL_MONSRC,
+	CTL_RECSRC,
+	CTL_BEEP,
+
+	/* this one must be last */
+	CTL_MAX
+};
+
 typedef struct audiohd_ctrl
 {
 	audiohd_state_t		*statep;
 	audio_ctrl_t		*ctrl;
-	uint32_t		num;
+	int			num;
 	uint64_t		val;
 } audiohd_ctrl_t;
 
@@ -825,7 +845,6 @@ struct audiohd_state {
 	 * Suspend/Resume used fields
 	 */
 	boolean_t	suspended;
-	boolean_t	monitor_unsupported;
 
 	audiohd_path_t	*path[AUDIOHD_PORT_MAX];
 	uint8_t		pathnum;
@@ -841,7 +860,8 @@ struct audiohd_state {
 	/*
 	 * Controls
 	 */
-	audiohd_ctrl_t		*controls[CTRL_NUM];
+	audiohd_ctrl_t		ctrls[CTL_MAX];
+	boolean_t		monitor_unsupported;
 
 	/* for multichannel */
 	uint8_t			chann[AUDIOHD_MAX_ASSOC];
