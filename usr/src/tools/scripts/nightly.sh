@@ -889,11 +889,11 @@ function build {
 			echo "\n==== Creating $LABEL packages at `date` ====\n" \
 				>> $LOGFILE
 			echo "Clearing out $PKGARCHIVE ..." >> $LOGFILE
-			rm -rf $PKGARCHIVE
-			mkdir -p $PKGARCHIVE
+			rm -rf $PKGARCHIVE >> "$LOGFILE" 2>&1
+			mkdir -p $PKGARCHIVE >> "$LOGFILE" 2>&1
 
 			for d in pkg pkgdefs; do
-				if [ ! -d $SRC/$d ]; then
+				if [ ! -f "$SRC/$d/Makefile" ]; then
 					continue
 				fi
 				rm -f $SRC/$d/${INSTALLOG}.out
@@ -906,7 +906,7 @@ function build {
 				>> $mail_msg_file
 
 			for d in pkg pkgdefs; do
-				if [ ! -d $SRC/$d ]; then
+				if [ ! -f "$SRC/$d/Makefile" ]; then
 					continue
 				fi
 
@@ -1615,20 +1615,16 @@ do
 		;; # obsolete
 	 +t )	t_FLAG=n
 		;;
-	  U )
-		if [ -z "${PARENT_ROOT}" ]; then
+	  U )   if [ -z "${PARENT_ROOT}" ]; then
 			echo "PARENT_ROOT must be set if the U flag is" \
 			    "present in NIGHTLY_OPTIONS."
 			exit 1
 		fi
-		if [ -z "${PARENT_TOOLS_ROOT}" ]; then
-			echo "PARENT_TOOLS_ROOT must be set if the U flag is" \
-			    "present in NIGHTLY_OPTIONS."
-			exit 1
+		NIGHTLY_PARENT_ROOT=$PARENT_ROOT
+		if [ -n "${PARENT_TOOLS_ROOT}" ]; then
+			NIGHTLY_PARENT_TOOLS_ROOT=$PARENT_TOOLS_ROOT
 		fi
 		U_FLAG=y
-		NIGHTLY_PARENT_ROOT=$PARENT_ROOT
-		NIGHTLY_PARENT_TOOLS_ROOT=$PARENT_TOOLS_ROOT
 		;;
 	  u )	u_FLAG=y
 		;;
@@ -1914,7 +1910,6 @@ export SOFTTOKEN_DIR
 TOOLS=${SRC}/tools
 TOOLS_PROTO_REL=proto/root_${MACH}-nd
 TOOLS_PROTO=${TOOLS}/${TOOLS_PROTO_REL};	export TOOLS_PROTO
-
 
 unset   CFLAGS LD_LIBRARY_PATH LDFLAGS
 
@@ -3280,14 +3275,17 @@ if [ "$U_FLAG" = "y" -a "$build_ok" = "y" ]; then
 		    ( cd $NIGHTLY_PARENT_ROOT-nd; umask 0; tar xpf - ) ) 2>&1 |
 		    tee -a $mail_msg_file >> $LOGFILE
 	fi
-	echo "\n==== Copying tools proto area to $NIGHTLY_PARENT_TOOLS_ROOT ====\n" | \
-	    tee -a $LOGFILE >> $mail_msg_file
-	rm -rf $NIGHTLY_PARENT_TOOLS_ROOT/*
-	mkdir -p $NIGHTLY_PARENT_TOOLS_ROOT
-	if [[ "$MULTI_PROTO" = no || "$D_FLAG" = y ]]; then
-		( cd $TOOLS_PROTO; tar cf - . |
-		    ( cd $NIGHTLY_PARENT_TOOLS_ROOT; umask 0; tar xpf - ) ) 2>&1 |
-		    tee -a $mail_msg_file >> $LOGFILE
+	if [ -n "${NIGHTLY_PARENT_TOOLS_ROOT}" ]; then
+		echo "\n==== Copying tools proto area to $NIGHTLY_PARENT_TOOLS_ROOT ====\n" | \
+		    tee -a $LOGFILE >> $mail_msg_file
+		rm -rf $NIGHTLY_PARENT_TOOLS_ROOT/*
+		mkdir -p $NIGHTLY_PARENT_TOOLS_ROOT
+		if [[ "$MULTI_PROTO" = no || "$D_FLAG" = y ]]; then
+			( cd $TOOLS_PROTO; tar cf - . |
+			    ( cd $NIGHTLY_PARENT_TOOLS_ROOT; 
+			    umask 0; tar xpf - ) ) 2>&1 |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
 	fi
 fi
 
