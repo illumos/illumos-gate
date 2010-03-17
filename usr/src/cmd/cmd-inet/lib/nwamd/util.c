@@ -107,11 +107,12 @@ nwamd_escalate(void) {
 
 void
 nwamd_deescalate(void) {
-	priv_set_t *priv_set, *allpriv_set;
-
 	(void) pthread_mutex_lock(&uid_mutex);
+
 	assert(uid_cnt > 0);
 	if (--uid_cnt == 0) {
+		priv_set_t *priv_set, *allpriv_set;
+
 		if (setuid(uid) == -1)
 			nlog(LOG_ERR, "setuid(%d) failed %s", uid,
 			    strerror(errno));
@@ -167,11 +168,11 @@ nwamd_deescalate(void) {
 			priv_freeset(priv_set);
 			pfail("setppriv effective: %s", strerror(errno));
 		}
+
+		priv_freeset(priv_set);
+		priv_freeset(allpriv_set);
 	}
 	(void) pthread_mutex_unlock(&uid_mutex);
-
-	priv_freeset(priv_set);
-	priv_freeset(allpriv_set);
 }
 
 /*
