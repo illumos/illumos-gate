@@ -41,6 +41,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <strings.h>
+#include <sys/systeminfo.h>
 #include <libipmi.h>
 #include <fm/fmd_api.h>
 
@@ -100,6 +101,8 @@ static const fmd_hdl_ops_t fmd_ops = {
 	NULL,		/* fmdo_close */
 	NULL,		/* fmdo_stats */
 	NULL,		/* fmdo_gc */
+	NULL,		/* fmdo_send */
+	NULL,		/* fmdo_topo */
 };
 
 static const fmd_prop_t fmd_props[] = {
@@ -117,6 +120,12 @@ _fmd_init(fmd_hdl_t *hdl)
 	ipmi_handle_t	*ipmi_hdl;
 	int error;
 	char *msg;
+	char isa[8];
+
+	/* For now the module only sends message to ILOM on i386 platforms */
+	if ((sysinfo(SI_ARCHITECTURE, isa, sizeof (isa)) == -1) ||
+	    (strncmp(isa, "i386", 4) != 0))
+		return;
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0)
 		return;
@@ -152,7 +161,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	/*
 	 * Setup the timer.
 	 */
-	(void) fmd_timer_install(hdl, NULL, NULL, 0);
+	(void) fmd_timer_install(hdl, NULL, NULL, 2000000000ULL);
 }
 
 void
