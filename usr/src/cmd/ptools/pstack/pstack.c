@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +101,26 @@ static jvm_agent_t *load_libjvm(struct ps_prochandle *P);
 static void reset_libjvm(jvm_agent_t *);
 
 /*
+ * Similar to what's done for debugging java programs, here are prototypes for
+ * the library that allows us to debug Python programs.
+ */
+#define	PYDB_VERSION	1
+static void *libpython;
+
+typedef struct pydb_agent pydb_agent_t;
+
+typedef pydb_agent_t *(*pydb_agent_create_f)(struct ps_prochandle *P, int vers);
+typedef void (*pydb_agent_destroy_f)(pydb_agent_t *py);
+typedef int (*pydb_pc_frameinfo_f)(pydb_agent_t *py, uintptr_t pc,
+    uintptr_t frame_addr, char *fbuf, size_t bufsz);
+
+static pydb_agent_create_f pydb_agent_create;
+static pydb_agent_destroy_f pydb_agent_destroy;
+static pydb_pc_frameinfo_f pydb_pc_frameinfo;
+
+static pydb_agent_t *load_libpython(struct ps_prochandle *P);
+static void reset_libpython(pydb_agent_t *);
+/*
  * Since we must maintain both a proc handle and a jvm handle, this structure
  * is the basic type that gets passed around.
  */
@@ -110,6 +130,7 @@ typedef struct pstack_handle {
 	int ignore_frame;
 	const char *lwps;
 	int count;
+	pydb_agent_t *pydb;
 } pstack_handle_t;
 
 static	int	thr_stack(const td_thrhandle_t *, void *);
@@ -261,6 +282,7 @@ main(int argc, char **argv)
 
 		handle.proc = Pr;
 		handle.jvm = load_libjvm(Pr);
+		handle.pydb = load_libpython(Pr);
 		handle.lwps = lwps;
 		handle.count = 0;
 
@@ -270,6 +292,7 @@ main(int argc, char **argv)
 			free_threadinfo();
 
 		reset_libjvm(handle.jvm);
+		reset_libpython(handle.pydb);
 		Prelease(Pr, 0);
 
 		if (handle.count == 0)
@@ -559,6 +582,17 @@ print_frame(void *cd, prgregset_t gregs, uint_t argc, const long *argv)
 		(void) printf("...");
 	(void) printf((start != pc) ? ") + %lx\n" : ")\n", (long)(pc - start));
 
+	if (h->pydb != NULL && argc > 0) {
+		char buf_py[1024];
+		int rc;
+
+		rc = pydb_pc_frameinfo(h->pydb, pc, argv[0], buf_py,
+		    sizeof (buf_py));
+		if (rc == 0) {
+			(void) printf("   %s", buf_py);
+		}
+	}
+
 	/*
 	 * If the frame's pc is in the "sigh" (a.k.a. signal handler, signal
 	 * hack, or *sigh* ...) range, then we're about to cross a signal
@@ -726,4 +760,88 @@ reset_libjvm(jvm_agent_t *agent)
 	j_agent_destroy = NULL;
 	j_frame_iter = NULL;
 	libjvm = NULL;
+}
+
+/*ARGSUSED*/
+static int
+python_object_iter(void *cd, const prmap_t *pmp, const char *obj)
+{
+	char path[PATH_MAX];
+	char *name;
+	char *s1, *s2;
+	struct ps_prochandle *Pr = cd;
+
+	name = strstr(obj, "/libpython");
+
+	if (name) {
+		(void) strcpy(path, obj);
+		if (Pstatus(Pr)->pr_dmodel != PR_MODEL_NATIVE) {
+			s1 = name;
+			s2 = path + (s1 - obj);
+			(void) strcpy(s2, "/64");
+			s2 += 3;
+			(void) strcpy(s2, s1);
+		}
+
+		s1 = strstr(obj, ".so");
+		s2 = strstr(path, ".so");
+		(void) strcpy(s2, "_db");
+		s2 += 3;
+		(void) strcpy(s2, s1);
+
+		if ((libpython = dlopen(path, RTLD_LAZY|RTLD_GLOBAL)) != NULL)
+			return (1);
+	}
+
+	return (0);
+}
+
+static pydb_agent_t *
+load_libpython(struct ps_prochandle *Pr)
+{
+	pydb_agent_t *pdb;
+
+	(void) Pobject_iter(Pr, python_object_iter, Pr);
+
+	if (libpython) {
+		pydb_agent_create = (pydb_agent_create_f)
+		    dlsym(libpython, "pydb_agent_create");
+		pydb_agent_destroy = (pydb_agent_destroy_f)
+		    dlsym(libpython, "pydb_agent_destroy");
+		pydb_pc_frameinfo = (pydb_pc_frameinfo_f)
+		    dlsym(libpython, "pydb_pc_frameinfo");
+
+		if (pydb_agent_create == NULL || pydb_agent_destroy == NULL ||
+		    pydb_pc_frameinfo == NULL) {
+			(void) dlclose(libpython);
+			libpython = NULL;
+			return (NULL);
+		}
+
+		pdb = pydb_agent_create(Pr, PYDB_VERSION);
+		if (pdb == NULL) {
+			(void) dlclose(libpython);
+			libpython = NULL;
+			return (NULL);
+		}
+		return (pdb);
+	}
+
+	return (NULL);
+}
+
+static void
+reset_libpython(pydb_agent_t *pdb)
+{
+	if (libpython != NULL) {
+		if (pdb != NULL) {
+			pydb_agent_destroy(pdb);
+		}
+		(void) dlclose(libpython);
+	}
+
+	libpython = NULL;
+	pydb_agent_create = NULL;
+	pydb_agent_destroy = NULL;
+	pydb_pc_frameinfo = NULL;
 }

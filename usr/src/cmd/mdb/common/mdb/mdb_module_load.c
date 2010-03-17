@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <unistd.h>
@@ -61,22 +58,22 @@ mdb_module_load(const char *name, int mode)
 		/*
 		 * Remove any .so(.[0-9]+)? suffix
 		 */
-		if ((p = strrchr(buf, '.')) != NULL) {
+		while ((p = strrchr(buf, '.')) != NULL) {
 			for (q = p + 1; isdigit(*q); q++)
 				;
 
 			if (*q == '\0') {
 				/* found digits to remove */
 				*p = '\0';
-				p = strrchr(buf, '.'); /* search for ".so" */
+				continue;
 			}
-		}
 
-		if (p != NULL) {
-			if (strcmp(p, ".so") == 0)
+			if (strcmp(p, ".so") == 0) {
 				*p = '\0';
-		}
+				break;
+			}
 
+		}
 		fullname = name;
 		name = buf;
 	}
@@ -97,7 +94,7 @@ mdb_module_load(const char *name, int mode)
 	 * The module path is searched in order, and for each element we
 	 * look for the following files:
 	 *
-	 * 1. If the module name ends in ".so.[0-9]+", search for the literal
+	 * 1. If the module name ends in ".so(.[0-9]+)?", search for the literal
 	 *    name and then search for the name without the [0-9]+ suffix.
 	 * 2. If the module name ends in ".so", search for the literal name.
 	 * 3. Search for the module name with ".so" appended.
@@ -118,7 +115,7 @@ mdb_module_load(const char *name, int mode)
 				}
 			}
 
-			if (strisnum(p) && (p = strrchr(buf, '.')) != NULL) {
+			while (strisnum(p) && (p = strrchr(buf, '.')) != NULL) {
 				*p = '\0'; /* strip trailing digits */
 				mdb_dprintf(MDB_DBG_MODULE,
 				    "checking for %s\n", buf);
