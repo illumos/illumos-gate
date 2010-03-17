@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <netdb.h>
@@ -457,7 +456,6 @@ _getaddrinfo(const char *hostname, const char *servname,
 		bzero(nai->ai_addr, addrlen);
 		nai->ai_addrlen = addrlen;
 		nai->ai_family = PF_INET6;
-		nai->ai_protocol = 0;
 		nai->ai_canonname = NULL;
 		if (nai->ai_flags & AI_PASSIVE) {
 			ai2sin6(nai)->sin6_addr = in6addr_any;
@@ -496,7 +494,6 @@ v4only:
 		bzero(nai->ai_addr, addrlen);
 		nai->ai_addrlen = addrlen;
 		nai->ai_family = PF_INET;
-		nai->ai_protocol = 0;
 		nai->ai_canonname = NULL;
 		if (nai->ai_flags & AI_PASSIVE) {
 			ai2sin(nai)->sin_addr.s_addr = INADDR_ANY;
@@ -660,7 +657,6 @@ get_addr(int family, const char *hostname, struct addrinfo *aip, struct
 			bzero(nai->ai_addr, addrlen);
 			nai->ai_addrlen = addrlen;
 			nai->ai_family = PF_INET6;
-			nai->ai_protocol = 0;
 
 			(void) memcpy(ai2sin6(nai)->sin6_addr.s6_addr,
 			    hp->h_addr_list[i], sizeof (struct in6_addr));
@@ -705,7 +701,6 @@ get_addr(int family, const char *hostname, struct addrinfo *aip, struct
 			bzero(nai->ai_addr, addrlen);
 			nai->ai_addrlen = addrlen;
 			nai->ai_family = PF_INET;
-			nai->ai_protocol = 0;
 			(void) memcpy(&(ai2sin(nai)->sin_addr.s_addr),
 			    &v4addr, sizeof (struct in_addr));
 			nai->ai_canonname = NULL;
