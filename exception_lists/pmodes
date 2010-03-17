@@ -28,8 +28,18 @@
 # Exception List for permission mode checking
 #
 
+#
+# NWAM Phase 1 -- nwamd running as netadm:netadm must be able to
+# modify secobj.conf, which has ownership dladm:netadm.
+#
 etc/dladm/secobj.conf
+
 etc/dumpdates
+
+#
+# Lp stuff is chmod'ed back by the lp system; prevent pkgchk errors
+# later by listing them here.
+#
 etc/lp
 etc/lp/classes
 etc/lp/forms
@@ -37,6 +47,14 @@ etc/lp/interfaces
 etc/lp/ppd
 etc/lp/printers
 etc/lp/pwheels
+var/lp
+var/lp/logs
+var/spool/lp
+var/spool/lp/admins
+var/spool/lp/requests
+var/spool/lp/system
+
+# /var/adm stuff added because std cron jobs for sys/adm expect this
 var/adm
 var/adm/acct
 var/adm/acct/fiscal
@@ -44,12 +62,9 @@ var/adm/acct/nite
 var/adm/acct/sum
 var/adm/sa
 var/adm/spellhist
-var/lp
-var/lp/logs
-var/mail/:saved
+
+# sendmail 8.12
 var/spool/clientmqueue
-var/spool/lp
-var/spool/lp/admins
-var/spool/lp/requests
-var/spool/lp/system
+
+var/mail/:saved
 var/spool/uucppublic

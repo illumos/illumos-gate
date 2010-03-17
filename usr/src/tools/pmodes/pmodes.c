@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * $Id: pmodes.c,v 1.23 1999/03/22 14:51:16 casper Exp $
@@ -57,8 +58,6 @@
  * Casper Dik (Casper.Dik@Holland.Sun.COM)
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -71,7 +70,8 @@
 #include "binsearch.h"
 
 static char *exceptions[] = {
-#include "exceptions.h"
+	"/etc/lp",
+	"/var/cache/cups",
 };
 
 static char *exempt_pkgs[] = {
