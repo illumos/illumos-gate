@@ -77,7 +77,7 @@ zfs_sa_readlink(znode_t *zp, uio_t *uio)
 	int error;
 
 	bufsz = zp->z_size;
-	if (bufsz + ZFS_OLD_ZNODE_PHYS_SIZE < db->db_size) {
+	if (bufsz + ZFS_OLD_ZNODE_PHYS_SIZE <= db->db_size) {
 		error = uiomove((caddr_t)db->db_data +
 		    ZFS_OLD_ZNODE_PHYS_SIZE,
 		    MIN((size_t)bufsz, uio->uio_resid), UIO_READ, uio);
