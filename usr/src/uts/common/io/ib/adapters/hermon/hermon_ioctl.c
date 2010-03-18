@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2275,6 +2275,14 @@ hermon_flash_read(hermon_state_t *state, uint32_t addr, int *err)
 		} while ((data & HERMON_HW_FLASH_CMD_MASK) &&
 		    (timeout < hermon_hw_flash_timeout_config));
 
+		if (timeout == hermon_hw_flash_timeout_config) {
+			cmn_err(CE_WARN, "hermon_flash_read: command timed "
+			    "out.\n");
+			*err = EIO;
+			hermon_fm_ereport(state, HCA_SYS_ERR, HCA_ERR_IOCTL);
+			return (data);
+		}
+
 		data = hermon_flash_read_cfg(state, hdl, HERMON_HW_FLASH_DATA);
 		break;
 
@@ -2286,12 +2294,6 @@ hermon_flash_read(hermon_state_t *state, uint32_t addr, int *err)
 		break;
 	}
 
-	if (timeout == hermon_hw_flash_timeout_config) {
-		cmn_err(CE_WARN, "hermon_flash_read: command timed out.\n");
-		*err = EIO;
-		hermon_fm_ereport(state, HCA_SYS_ERR, HCA_ERR_IOCTL);
-		return (data);
-	}
 
 	/* the FMA retry loop ends. */
 	hermon_pio_end(state, hdl, pio_error, fm_loop_cnt, fm_status, fm_test);

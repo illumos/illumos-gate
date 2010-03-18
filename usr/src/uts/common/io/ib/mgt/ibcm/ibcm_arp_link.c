@@ -104,7 +104,7 @@ ibcm_arp_check_interface(ill_t *ill)
 
 int
 ibcm_resolver_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
-    ibt_ip_addr_t *src_addr)
+    ibt_ip_addr_t *src_addr, zoneid_t myzoneid)
 {
 	ibcm_arp_prwqn_t *wqnp;
 	ire_t	*ire = NULL;
@@ -112,7 +112,6 @@ ibcm_resolver_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 	ill_t	*ill = NULL;
 	ill_t	*hwaddr_ill = NULL;
 	ip_stack_t *ipst;
-	int		len;
 	ipaddr_t	setsrcv4;
 	in6_addr_t	setsrcv6;
 
@@ -126,30 +125,16 @@ ibcm_resolver_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 		return (1);
 	}
 
-	ipst = netstack_find_by_zoneid(GLOBAL_ZONEID)->netstack_ip;
+	ipst = netstack_find_by_zoneid(myzoneid)->netstack_ip;
 	if (dst_addr->family == AF_INET) {
-		/*
-		 * A local address is always specified, and it is used
-		 * to find the zoneid.
-		 */
-		ipif = ipif_lookup_addr(src_addr->un.ip4addr, NULL, ALL_ZONES,
-		    ipst);
-		if (ipif == NULL) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_resolver_pr_lookup: "
-			    "ipif_lookup_addr failed");
-			ib_s->status = EFAULT;
-			goto fail;
-		}
-
 		/*
 		 * get an ire for the destination adress.
 		 * Note that we can't use MATCH_IRE_ILL since that would
-		 * require that the first ill we find have ire_ill set. Thus
-		 * we compare ire_ill against ipif_ill after the lookup.
+		 * require that the first ill we find have ire_ill set.
 		 */
 		setsrcv4 = INADDR_ANY;
 		ire = ire_route_recursive_v4(dst_addr->un.ip4addr, 0, NULL,
-		    ipif->ipif_zoneid, NULL, MATCH_IRE_DSTONLY, B_TRUE, 0, ipst,
+		    myzoneid, NULL, MATCH_IRE_DSTONLY, B_TRUE, 0, ipst,
 		    &setsrcv4, NULL, NULL);
 
 		ASSERT(ire != NULL);
@@ -166,34 +151,21 @@ ibcm_resolver_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 			ib_s->status = EFAULT;
 			goto fail;
 		}
-		if (ill != ipif->ipif_ill) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_resolver_pr_lookup: "
-			    "wrong ill");
-			ib_s->status = EFAULT;
+
+		/* Pick a source address */
+		if (ip_select_source_v4(ill, setsrcv4, dst_addr->un.ip4addr,
+		    INADDR_ANY, myzoneid, ipst, &wqnp->src_addr.un.ip4addr,
+		    NULL, NULL) != 0) {
+			ib_s->status = EADDRNOTAVAIL;
 			goto fail;
 		}
 
 		wqnp->gateway.un.ip4addr = ire->ire_gateway_addr;
 		wqnp->netmask.un.ip4addr = ire->ire_mask;
-		wqnp->src_addr.un.ip4addr = src_addr->un.ip4addr;
 		wqnp->src_addr.family = wqnp->gateway.family =
 		    wqnp->netmask.family = AF_INET;
 
 	} else if (dst_addr->family == AF_INET6) {
-		/*
-		 * A local address is always specified, and it is used
-		 * to find the zoneid.
-		 * We should really match on scopeid for link locals here.
-		 */
-		ipif = ipif_lookup_addr_v6(&src_addr->un.ip6addr, NULL,
-		    ALL_ZONES, ipst);
-		if (ipif == NULL) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_resolver_pr_lookup: "
-			    "ipif_lookup_addr_v6 failed");
-			ib_s->status = EFAULT;
-			goto fail;
-		}
-
 		/*
 		 * get an ire for the destination adress.
 		 * Note that we can't use MATCH_IRE_ILL since that would
@@ -202,7 +174,7 @@ ibcm_resolver_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 		 */
 		setsrcv6 = ipv6_all_zeros;
 		ire = ire_route_recursive_v6(&dst_addr->un.ip6addr, 0, NULL,
-		    ipif->ipif_zoneid, NULL, MATCH_IRE_DSTONLY, B_TRUE, 0, ipst,
+		    myzoneid, NULL, MATCH_IRE_DSTONLY, B_TRUE, 0, ipst,
 		    &setsrcv6, NULL, NULL);
 
 		ASSERT(ire != NULL);
@@ -220,16 +192,16 @@ ibcm_resolver_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 			goto fail;
 		}
 
-		if (ill != ipif->ipif_ill) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_resolver_pr_lookup: "
-			    "wrong ill");
-			ib_s->status = EFAULT;
+		/* Pick a source address */
+		if (ip_select_source_v6(ill, &setsrcv6, &dst_addr->un.ip6addr,
+		    myzoneid, ipst, B_FALSE, IPV6_PREFER_SRC_DEFAULT,
+		    &wqnp->src_addr.un.ip6addr, NULL, NULL) != 0) {
+			ib_s->status = EADDRNOTAVAIL;
 			goto fail;
 		}
 
 		wqnp->gateway.un.ip6addr = ire->ire_gateway_addr_v6;
 		wqnp->netmask.un.ip6addr = ire->ire_mask_v6;
-		wqnp->src_addr.un.ip6addr = src_addr->un.ip6addr;
 		wqnp->src_addr.family = wqnp->gateway.family =
 		    wqnp->netmask.family = AF_INET6;
 	}
@@ -241,6 +213,18 @@ ibcm_resolver_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 	 * interface bound to the given address.
 	 */
 	if (IS_IPMP(ill)) {
+		if (wqnp->src_addr.family == AF_INET) {
+			ipif = ipif_lookup_addr(wqnp->src_addr.un.ip4addr, ill,
+			    myzoneid, ipst);
+		} else {
+			ipif = ipif_lookup_addr_v6(&wqnp->src_addr.un.ip6addr,
+			    ill, myzoneid, ipst);
+		}
+		if (ipif == NULL) {
+			ib_s->status = ENETUNREACH;
+			goto fail;
+		}
+
 		if ((hwaddr_ill = ipmp_ipif_hold_bound_ill(ipif)) == NULL) {
 			IBTF_DPRINTF_L2(cmlog, "ibcm_resolver_pr_lookup: "
 			    "no bound ill for IPMP interface %s",
@@ -266,25 +250,11 @@ ibcm_resolver_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 	    wqnp->ifname);
 
 	/*
-	 * if the user supplied a address, then verify rts returned
-	 * the same address
-	 */
-	if (wqnp->usrc_addr.family) {
-		len = (wqnp->usrc_addr.family == AF_INET) ?
-		    IP_ADDR_LEN : sizeof (in6_addr_t);
-		if (bcmp(&wqnp->usrc_addr.un, &wqnp->src_addr.un, len)) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_resolver_pr_lookup: "
-			    "srcaddr mismatch:%d", ENETUNREACH);
-			goto fail;
-		}
-	}
-
-	/*
 	 * at this stage, we have the source address and the IB
 	 * interface, now get the destination mac address from
 	 * arp or ipv6 drivers
 	 */
-	ib_s->status = ibcm_nce_lookup(wqnp, ill, getzoneid());
+	ib_s->status = ibcm_nce_lookup(wqnp, ill, myzoneid);
 	if (ib_s->status != 0) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_resolver_pr_lookup: "
 		    "ibcm_nce_lookup failed: %d", ib_s->status);
@@ -294,7 +264,8 @@ ibcm_resolver_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 	ill_refrele(hwaddr_ill);
 	ill_refrele(ill);
 	ire_refrele(ire);
-	ipif_refrele(ipif);
+	if (ipif != NULL)
+		ipif_refrele(ipif);
 	netstack_rele(ipst->ips_netstack);
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_resolver_pr_lookup: Return: 0x%p", wqnp);

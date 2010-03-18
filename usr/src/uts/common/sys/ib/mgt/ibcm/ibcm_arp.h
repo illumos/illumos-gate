@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,10 +101,9 @@ typedef struct ibcm_arp_ibd_insts_s {
 	ibcm_arp_ip_t	*ibcm_arp_ip;
 } ibcm_arp_ibd_insts_t;
 
-ibt_status_t ibcm_arp_get_ibaddr(ibt_ip_addr_t srcip, ibt_ip_addr_t destip,
-    ib_gid_t *sgid, ib_gid_t *dgid);
-ibt_status_t ibcm_arp_get_srcip_plist(ibt_ip_path_attr_t *attr,
-    ibt_path_flags_t flags, ibtl_cm_port_list_t **list_p);
+ibt_status_t ibcm_arp_get_ibaddr(zoneid_t zoneid, ibt_ip_addr_t srcip,
+    ibt_ip_addr_t destip, ib_gid_t *sgid, ib_gid_t *dgid,
+    ibt_ip_addr_t *saddr_p);
 ibt_status_t ibcm_arp_get_ibds(ibcm_arp_ibd_insts_t *ibdp, sa_family_t fam);
 
 #ifdef	__cplusplus

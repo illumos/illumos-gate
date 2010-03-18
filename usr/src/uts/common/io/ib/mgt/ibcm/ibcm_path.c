@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,9 +63,6 @@ typedef struct ibcm_path_tqargs_s {
 
 
 /* Prototype Declarations. */
-static ibt_status_t ibcm_get_path_rec(ibcm_path_tqargs_t *, ibcm_dinfo_t *,
-    uint8_t *, ibt_path_info_t *);
-
 static ibt_status_t ibcm_saa_path_rec(ibcm_path_tqargs_t *,
     ibtl_cm_port_list_t *, ibcm_dinfo_t *, uint8_t *);
 
@@ -660,8 +657,8 @@ ibcm_process_get_paths(void *tq_arg)
 	ibt_status_t		retval;
 	ib_gid_t		*d_gids_p = NULL;
 	ibtl_cm_port_list_t	*slistp = NULL;
-	uint_t			dnum = 0, num_dest;
-	uint_t			i, j;
+	uint_t			dnum = 0;
+	uint8_t			num_dest, i, j;
 	ibcm_hca_info_t		*hcap;
 	ibmf_saa_handle_t	saa_handle;
 
@@ -899,7 +896,7 @@ ibcm_saa_path_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 {
 	uint8_t		num_path = *max_count;
 	uint8_t		num_path_plus;
-	uint_t		extra, idx, rec_found = 0;
+	uint8_t		extra, idx, rec_found = 0;
 	ibt_status_t	retval = IBT_SUCCESS;
 	int		unicast_dgid_present = 0;
 	uint8_t		i;
@@ -1126,7 +1123,7 @@ ibcm_get_single_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	size_t			length;
 	ibt_status_t		retval;
 	int			i, j, k;
-	int			found, p_fnd;
+	uint8_t			found, p_fnd;
 	ibt_path_attr_t		*attrp = &p_arg->attr;
 	ibmf_saa_handle_t	saa_handle;
 
@@ -1386,7 +1383,8 @@ ibcm_get_multi_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	uint64_t		c_mask = 0;
 	ib_gid_t		*gid_ptr, *gid_s_ptr;
 	size_t			length;
-	int			template_len, found, num_rec;
+	int			template_len;
+	uint8_t			found, num_rec;
 	int			i, k;
 	ibt_status_t		retval;
 	uint8_t			sgid_cnt, dgid_cnt;
@@ -3023,15 +3021,10 @@ typedef struct ibcm_ip_path_tqargs_s {
 	uint_t			len;
 } ibcm_ip_path_tqargs_t;
 
-typedef struct ibcm_ip_dest_s {
-	ib_gid_t	d_gid;
-	ibt_ip_addr_t	d_ip;
-} ibcm_ip_dest_t;
-
 /* Holds destination information needed to fill in ibt_path_info_t. */
 typedef struct ibcm_ip_dinfo_s {
 	uint8_t		num_dest;
-	ibcm_ip_dest_t	dest[1];
+	ib_gid_t	d_gid[1];
 } ibcm_ip_dinfo_t;
 
 _NOTE(SCHEME_PROTECTS_DATA("Temporary path storage", ibcm_ip_dinfo_s))
@@ -3052,7 +3045,7 @@ ibcm_saa_ip_pr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
     ibcm_ip_dinfo_t *dinfo, uint8_t *max_count)
 {
 	uint8_t		num_path = *max_count;
-	uint_t		rec_found = 0;
+	uint8_t		rec_found = 0;
 	ibt_status_t	retval = IBT_SUCCESS;
 	uint8_t		i, j;
 
@@ -3173,7 +3166,7 @@ ibcm_get_ip_spr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	size_t			length;
 	ibt_status_t		retval;
 	int			i, j, k;
-	int			found, p_fnd;
+	uint8_t			found, p_fnd;
 	ibt_ip_path_attr_t	*attrp = &p_arg->attr;
 	ibmf_saa_handle_t	saa_handle;
 
@@ -3278,15 +3271,15 @@ ibcm_get_ip_spr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 
 		for (k = 0; k < dinfo->num_dest; k++) {
 			if (pathrec_req.SGID.gid_prefix !=
-			    dinfo->dest[k].d_gid.gid_prefix) {
+			    dinfo->d_gid[k].gid_prefix) {
 				IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr: "
 				    "SGID_pfx=%llX DGID_pfx=%llX doesn't match",
 				    pathrec_req.SGID.gid_prefix,
-				    dinfo->dest[k].d_gid.gid_prefix);
+				    dinfo->d_gid[k].gid_prefix);
 				continue;
 			}
 
-			pathrec_req.DGID = dinfo->dest[k].d_gid;
+			pathrec_req.DGID = dinfo->d_gid[k];
 			c_mask |= SA_PR_COMPMASK_DGID;
 
 			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr: "
@@ -3390,7 +3383,8 @@ ibcm_get_ip_mpr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	uint64_t		c_mask = 0;
 	ib_gid_t		*gid_ptr, *gid_s_ptr;
 	size_t			length;
-	int			template_len, found, num_rec;
+	int			template_len;
+	uint8_t			found, num_rec;
 	int			i;
 	ibt_status_t		retval;
 	uint8_t			sgid_cnt, dgid_cnt;
@@ -3446,7 +3440,7 @@ ibcm_get_ip_mpr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 
 	/* DGIDs */
 	for (i = 0; i < dgid_cnt; i++) {
-		*gid_ptr = dinfo->dest[i].d_gid;
+		*gid_ptr = dinfo->d_gid[i];
 
 		IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: DGID[%d] = "
 		    "%llX:%llX", i, gid_ptr->gid_prefix, gid_ptr->gid_guid);
@@ -3749,9 +3743,11 @@ ibcm_process_get_ip_paths(void *tq_arg)
 	ibt_status_t		retval = IBT_SUCCESS;
 	ibtl_cm_port_list_t	*sl = NULL;
 	uint_t			dnum = 0;
-	uint_t			i, j;
+	uint8_t			i;
 	ibcm_hca_info_t		*hcap;
 	ibmf_saa_handle_t	saa_handle;
+	ibt_path_attr_t		attr;
+	ibt_ip_addr_t		src_ip_p;
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_ip_paths(%p, 0x%X) ",
 	    p_arg, p_arg->flags);
@@ -3770,109 +3766,64 @@ ibcm_process_get_ip_paths(void *tq_arg)
 	 */
 	dgid1.gid_prefix = dgid1.gid_guid = 0;
 	sgid.gid_prefix = sgid.gid_guid = 0;
-	if ((p_arg->attr.ipa_src_ip.family != AF_UNSPEC) &&
-	    (!(p_arg->flags & IBT_PATH_APM))) {
-		ibt_path_attr_t		attr;
 
-		retval = ibcm_arp_get_ibaddr(p_arg->attr.ipa_src_ip,
-		    p_arg->attr.ipa_dst_ip[0], &sgid, &dgid1);
-		if (retval) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
-			    "ibcm_arp_get_ibaddr() failed: %d", retval);
-			goto ippath_error;
-		}
+	retval = ibcm_arp_get_ibaddr(getzoneid(), p_arg->attr.ipa_src_ip,
+	    p_arg->attr.ipa_dst_ip[0], &sgid, &dgid1, &src_ip_p);
+	if (retval) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
+		    "ibcm_arp_get_ibaddr() failed: %d", retval);
+		goto ippath_error;
+	}
 
-		bzero(&attr, sizeof (ibt_path_attr_t));
-		attr.pa_hca_guid = p_arg->attr.ipa_hca_guid;
-		attr.pa_hca_port_num = p_arg->attr.ipa_hca_port_num;
-		attr.pa_sgid = sgid;
-		bcopy(&p_arg->attr.ipa_mtu, &attr.pa_mtu,
-		    sizeof (ibt_mtu_req_t));
-		bcopy(&p_arg->attr.ipa_srate, &attr.pa_srate,
-		    sizeof (ibt_srate_req_t));
-		bcopy(&p_arg->attr.ipa_pkt_lt, &attr.pa_pkt_lt,
-		    sizeof (ibt_pkt_lt_req_t));
-		retval = ibtl_cm_get_active_plist(&attr, p_arg->flags, &sl);
-		if (retval == IBT_SUCCESS) {
-			bcopy(&p_arg->attr.ipa_src_ip, &sl->p_src_ip,
-			    sizeof (ibt_ip_addr_t));
-		} else {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
-			    "ibtl_cm_get_active_plist: Failed %d", retval);
-			goto ippath_error;
-		}
+	bzero(&attr, sizeof (ibt_path_attr_t));
+	attr.pa_hca_guid = p_arg->attr.ipa_hca_guid;
+	attr.pa_hca_port_num = p_arg->attr.ipa_hca_port_num;
+	attr.pa_sgid = sgid;
+	bcopy(&p_arg->attr.ipa_mtu, &attr.pa_mtu, sizeof (ibt_mtu_req_t));
+	bcopy(&p_arg->attr.ipa_srate, &attr.pa_srate, sizeof (ibt_srate_req_t));
+	bcopy(&p_arg->attr.ipa_pkt_lt, &attr.pa_pkt_lt,
+	    sizeof (ibt_pkt_lt_req_t));
+	retval = ibtl_cm_get_active_plist(&attr, p_arg->flags, &sl);
+	if (retval == IBT_SUCCESS) {
+		bcopy(&src_ip_p, &sl->p_src_ip, sizeof (ibt_ip_addr_t));
 	} else {
-		boolean_t	arp_nd_lookup = B_FALSE;
-
-		/*
-		 * Get list of active HCA-Port list, that matches input
-		 * specified attr.
-		 */
-		retval = ibcm_arp_get_srcip_plist(&p_arg->attr, p_arg->flags,
-		    &sl);
-		if (retval != IBT_SUCCESS) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
-			    "ibcm_arp_get_srcip_plist: Failed %d", retval);
-			goto ippath_error;
-		}
-
-		/*
-		 * Accumulate all destination information.
-		 * Get GID info for the specified input ip-addr.
-		 */
-		for (j = 0; j < sl->p_count; j++) {
-			retval = ibcm_arp_get_ibaddr(sl[j].p_src_ip,
-			    p_arg->attr.ipa_dst_ip[0], NULL, &dgid1);
-			if (retval == IBT_SUCCESS) {
-				arp_nd_lookup = B_TRUE; /* found */
-				IBCM_PRINT_IP("ibcm_process_get_ip_paths: "
-				    "SrcIP ", &sl[j].p_src_ip);
-				IBCM_PRINT_IP("ibcm_process_get_ip_paths: "
-				    "DstIP ", &p_arg->attr.ipa_dst_ip[0]);
-				break;
-			}
-			IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_ip_paths: "
-			    "ibcm_arp_get_ibaddr() failed: %d", retval);
-		}
-		if (!arp_nd_lookup)
-			goto ippath_error1;
+		IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
+		    "ibtl_cm_get_active_plist: Failed %d", retval);
+		goto ippath_error;
 	}
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_process_get_ip_paths: SGID %llX:%llX, "
 	    "DGID0: %llX:%llX", sl->p_sgid.gid_prefix, sl->p_sgid.gid_guid,
 	    dgid1.gid_prefix, dgid1.gid_guid);
 
-	len = p_arg->attr.ipa_ndst + 1;
-	len = (len * sizeof (ibcm_ip_dest_t)) + sizeof (ibcm_ip_dinfo_t);
+	len = p_arg->attr.ipa_ndst - 1;
+	len = (len * sizeof (ib_gid_t)) + sizeof (ibcm_ip_dinfo_t);
 	dinfo = kmem_zalloc(len, KM_SLEEP);
 
-	dinfo->dest[0].d_gid = dgid1;
-	bcopy(&p_arg->attr.ipa_dst_ip[0], &dinfo->dest[0].d_ip,
-	    sizeof (ibt_ip_addr_t));
+	dinfo->d_gid[0] = dgid1;
 
 	i = 1;
 	if (p_arg->attr.ipa_ndst > 1) {
 		/* Get DGID for all specified Dest IP Addr */
 		for (; i < p_arg->attr.ipa_ndst; i++) {
-			retval = ibcm_arp_get_ibaddr(sl->p_src_ip,
-			    p_arg->attr.ipa_dst_ip[i], NULL, &dgid2);
+			retval = ibcm_arp_get_ibaddr(getzoneid(),
+			    p_arg->attr.ipa_src_ip, p_arg->attr.ipa_dst_ip[i],
+			    NULL, &dgid2, NULL);
 			if (retval) {
 				IBTF_DPRINTF_L2(cmlog,
 				    "ibcm_process_get_ip_paths: "
 				    "ibcm_arp_get_ibaddr failed: %d", retval);
 				goto ippath_error2;
 			}
-			dinfo->dest[i].d_gid = dgid2;
+			dinfo->d_gid[i] = dgid2;
 
 			IBTF_DPRINTF_L4(cmlog, "ibcm_process_get_ip_paths: "
 			    "DGID%d: %llX:%llX", i, dgid2.gid_prefix,
 			    dgid2.gid_guid);
-			bcopy(&p_arg->attr.ipa_dst_ip[i], &dinfo->dest[i].d_ip,
-			    sizeof (ibt_ip_addr_t));
 		}
 
 		if (p_arg->flags & IBT_PATH_APM) {
-			dgid2 = dinfo->dest[1].d_gid;
+			dgid2 = dinfo->d_gid[1];
 
 			retval = ibcm_get_comp_pgids(dgid1, dgid2, 0,
 			    &d_gids_p, &dnum);
@@ -3887,8 +3838,7 @@ ibcm_process_get_ip_paths(void *tq_arg)
 			    "Found %d Comp DGID", dnum);
 
 			if (dnum) {
-				dinfo->dest[i].d_gid = d_gids_p[0];
-				dinfo->dest[i].d_ip.family = AF_UNSPEC;
+				dinfo->d_gid[i] = d_gids_p[0];
 				i++;
 			}
 		}
@@ -4334,8 +4284,8 @@ ibt_get_ip_alt_path(ibt_channel_hdl_t rc_chan, ibt_path_flags_t flags,
 	/* If optional attributes are specified, validate them. */
 	if (attrp) {
 		/* Get SGID and DGID for the specified input ip-addr */
-		retval = ibcm_arp_get_ibaddr(attrp->apa_src_ip,
-		    attrp->apa_dst_ip, &new_sgid, &new_dgid);
+		retval = ibcm_arp_get_ibaddr(getzoneid(), attrp->apa_src_ip,
+		    attrp->apa_dst_ip, &new_sgid, &new_dgid, NULL);
 		if (retval) {
 			IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: "
 			    "ibcm_arp_get_ibaddr() failed: %d", retval);

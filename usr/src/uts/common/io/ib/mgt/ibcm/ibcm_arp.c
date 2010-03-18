@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@
 extern char cmlog[];
 
 extern int ibcm_resolver_pr_lookup(ibcm_arp_streams_t *ib_s,
-    ibt_ip_addr_t *dst_addr, ibt_ip_addr_t *src_addr);
+    ibt_ip_addr_t *dst_addr, ibt_ip_addr_t *src_addr, zoneid_t myzoneid);
 extern void ibcm_arp_delete_prwqn(ibcm_arp_prwqn_t *wqnp);
 
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", ibt_ip_addr_s))
@@ -78,15 +78,17 @@ ibcm_ip_print(char *label, ibt_ip_addr_t *ipaddr)
 
 
 ibt_status_t
-ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
-    ib_gid_t *sgid, ib_gid_t *dgid)
+ibcm_arp_get_ibaddr(zoneid_t myzoneid, ibt_ip_addr_t srcaddr,
+    ibt_ip_addr_t destaddr, ib_gid_t *sgid, ib_gid_t *dgid,
+    ibt_ip_addr_t *saddrp)
 {
 	ibcm_arp_streams_t	*ib_s;
 	ibcm_arp_prwqn_t	*wqnp;
 	int			ret = 0;
+	int			len;
 
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibaddr(%p, %p, %p, %p)",
-	    srcaddr, destaddr, sgid, dgid);
+	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibaddr(%d, %p, %p, %p, %p, %p)",
+	    myzoneid, srcaddr, destaddr, sgid, dgid, saddrp);
 
 	ib_s = (ibcm_arp_streams_t *)kmem_zalloc(sizeof (ibcm_arp_streams_t),
 	    KM_SLEEP);
@@ -98,7 +100,7 @@ ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
 	ib_s->done = B_FALSE;
 	mutex_exit(&ib_s->lock);
 
-	ret = ibcm_resolver_pr_lookup(ib_s, &destaddr, &srcaddr);
+	ret = ibcm_resolver_pr_lookup(ib_s, &destaddr, &srcaddr, myzoneid);
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_arp_get_ibaddr: ibcm_resolver_pr_lookup "
 	    "returned: %d", ret);
@@ -113,14 +115,66 @@ ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
 	wqnp = ib_s->wqnp;
 	if (ib_s->status == 0) {
 		if (sgid)
-			*sgid = ib_s->wqnp->sgid;
+			*sgid = wqnp->sgid;
 		if (dgid)
-			*dgid = ib_s->wqnp->dgid;
+			*dgid = wqnp->dgid;
+		/*
+		 * If the user supplied a address, then verify we got
+		 * for the same address.
+		 */
+		if (wqnp->usrc_addr.family && sgid) {
+			len = (wqnp->usrc_addr.family == AF_INET) ?
+			    IP_ADDR_LEN : sizeof (in6_addr_t);
+			if (bcmp(&wqnp->usrc_addr.un,
+			    &wqnp->src_addr.un, len)) {
+				IBTF_DPRINTF_L3(cmlog, "ibcm_arp_get_ibaddr: "
+				    "srcaddr mismatch");
+
+				/* Clean-up old data, and reset the done flag */
+				ibcm_arp_delete_prwqn(wqnp);
+				ib_s->done = B_FALSE;
+				mutex_exit(&ib_s->lock);
+
+				ret = ibcm_resolver_pr_lookup(ib_s, &srcaddr,
+				    &srcaddr, myzoneid);
+				if (ret == 0) {
+					mutex_enter(&ib_s->lock);
+					while (ib_s->done != B_TRUE)
+						cv_wait(&ib_s->cv, &ib_s->lock);
+					mutex_exit(&ib_s->lock);
+				}
+				mutex_enter(&ib_s->lock);
+				wqnp = ib_s->wqnp;
+				if (ib_s->status == 0) {
+					if (sgid)
+						*sgid = wqnp->dgid;
+
+					if (saddrp)
+						bcopy(&wqnp->src_addr, saddrp,
+						    sizeof (ibt_ip_addr_t));
+
+					IBTF_DPRINTF_L4(cmlog,
+					    "ibcm_arp_get_ibaddr: "
+					    "SGID: %llX:%llX DGID: %llX:%llX",
+					    sgid->gid_prefix, sgid->gid_guid,
+					    dgid->gid_prefix, dgid->gid_guid);
+
+					ibcm_arp_delete_prwqn(wqnp);
+				} else if (ret == 0) {
+					if (wqnp)
+						kmem_free(wqnp,
+						    sizeof (ibcm_arp_prwqn_t));
+				}
+				goto arp_ibaddr_done;
+			}
+		}
+
+		if (saddrp)
+			bcopy(&wqnp->src_addr, saddrp, sizeof (ibt_ip_addr_t));
 
 		IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibaddr: SGID: %llX:%llX"
-		    " DGID: %llX:%llX",
-		    ib_s->wqnp->sgid.gid_prefix, ib_s->wqnp->sgid.gid_guid,
-		    ib_s->wqnp->dgid.gid_prefix, ib_s->wqnp->dgid.gid_guid);
+		    " DGID: %llX:%llX", sgid->gid_prefix, sgid->gid_guid,
+		    dgid->gid_prefix, dgid->gid_guid);
 
 		ibcm_arp_delete_prwqn(wqnp);
 	} else if (ret == 0) {
@@ -132,6 +186,7 @@ ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
 		if (wqnp)
 			kmem_free(wqnp, sizeof (ibcm_arp_prwqn_t));
 	}
+arp_ibaddr_done:
 	ret = ib_s->status;
 	mutex_exit(&ib_s->lock);
 
@@ -147,76 +202,6 @@ arp_ibaddr_error:
 		return (IBT_SUCCESS);
 }
 
-
-/*
- * Routine to get list of "local" IP-ADDR to GID/P_KEY mapping information.
- * Optionally, if "gid" and/or "p_key" info are specified, then retrieve the
- * IP-ADDR info for that attribute only.
- */
-
-static ibcm_arp_ip_t *
-ibcm_arp_ibd_gid2mac(ib_gid_t *gid, ib_pkey_t pkey, ibcm_arp_ibd_insts_t *ibdp)
-{
-	ibcm_arp_ip_t		*ipp;
-	int			i;
-
-	for (i = 0, ipp = ibdp->ibcm_arp_ip; i < ibdp->ibcm_arp_ibd_cnt;
-	    i++, ipp++) {
-		if ((ipp->ip_port_gid.gid_prefix == gid->gid_prefix) &&
-		    (ipp->ip_port_gid.gid_guid == gid->gid_guid)) {
-			if (pkey) {
-				if (ipp->ip_pkey == pkey)
-					return (ipp);
-				else
-					continue;
-			}
-			return (ipp);
-		}
-	}
-	return (NULL);
-}
-
-static ibt_status_t
-ibcm_arp_ibd_mac2gid(ibcm_arp_ibd_insts_t *ibdp, ibt_ip_addr_t *srcip,
-    ib_gid_t *sgid)
-{
-	ibcm_arp_ip_t		*ipp;
-	int			i;
-	boolean_t		found = B_FALSE;
-
-	for (i = 0, ipp = ibdp->ibcm_arp_ip; i < ibdp->ibcm_arp_ibd_cnt;
-	    i++, ipp++) {
-
-		IBTF_DPRINTF_L4(cmlog, "ibcm_arp_ibd_mac2gid: GID %llX:%llX",
-		    ipp->ip_port_gid.gid_prefix, ipp->ip_port_gid.gid_guid);
-
-		if (srcip->family == ipp->ip_inet_family) {
-			if ((srcip->family == AF_INET) &&
-			    (bcmp(&srcip->un.ip4addr, &ipp->ip_cm_sin.sin_addr,
-			    sizeof (in_addr_t)) == 0)) {
-				found = B_TRUE;
-			} else if ((srcip->family == AF_INET6) &&
-			    IN6_ARE_ADDR_EQUAL(&srcip->un.ip6addr,
-			    &ipp->ip_cm_sin6.sin6_addr)) {
-				found = B_TRUE;
-			}
-			if (found) {
-				*sgid = ipp->ip_port_gid;
-
-				IBTF_DPRINTF_L4(cmlog, "ibcm_arp_ibd_mac2gid: "
-				    "Found GID %llX:%llX", sgid->gid_prefix,
-				    sgid->gid_guid);
-				return (IBT_SUCCESS);
-			}
-		} else {
-			IBTF_DPRINTF_L3(cmlog, "ibcm_arp_ibd_mac2gid: Different"
-			    " family keep searching...");
-		}
-	}
-	IBTF_DPRINTF_L3(cmlog, "ibcm_arp_ibd_mac2gid: Matching SRC info "
-	    "NOT Found");
-	return (IBT_SRC_IP_NOT_FOUND);
-}
 
 static int
 ibcm_arp_get_ibd_insts_cb(dev_info_t *dip, void *arg)
@@ -443,159 +428,4 @@ ibcm_arp_get_ibds(ibcm_arp_ibd_insts_t *ibdp, sa_family_t family_loc)
 #endif
 
 	return (IBT_SUCCESS);
-}
-
-_NOTE(SCHEME_PROTECTS_DATA("Unshared data", ibtl_cm_port_list_t))
-
-ibt_status_t
-ibcm_arp_get_srcip_plist(ibt_ip_path_attr_t *ipattr, ibt_path_flags_t flags,
-    ibtl_cm_port_list_t **port_list_p)
-{
-	ibt_path_attr_t		attr;
-	ibt_status_t		ret;
-	ibcm_arp_ibd_insts_t	ibds;
-	ibcm_arp_ip_t		*ipp;
-	ibtl_cm_port_list_t	*plistp;
-	ib_gid_t		sgid;
-	sa_family_t		family_interested = AF_UNSPEC;
-
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_srcip_plist(%p, %llX)",
-	    ipattr, flags);
-
-	if (ipattr->ipa_src_ip.family != AF_UNSPEC)
-		family_interested = ipattr->ipa_src_ip.family;
-	else
-		family_interested = ipattr->ipa_dst_ip[0].family;
-
-	sgid.gid_prefix = sgid.gid_guid = 0;
-	bzero(&ibds, sizeof (ibcm_arp_ibd_insts_t));
-	ibds.ibcm_arp_ibd_alloc = IBCM_ARP_IBD_INSTANCES;
-	ibds.ibcm_arp_ibd_cnt = 0;
-	ibds.ibcm_arp_ip = (ibcm_arp_ip_t *)kmem_zalloc(
-	    ibds.ibcm_arp_ibd_alloc * sizeof (ibcm_arp_ip_t), KM_SLEEP);
-
-	ret = ibcm_arp_get_ibds(&ibds, family_interested);
-	if (ret != IBT_SUCCESS) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_get_srcip_plist: "
-		    "ibcm_arp_get_ibds failed : 0x%x", ret);
-		goto srcip_plist_end;
-	}
-
-	if (ipattr->ipa_src_ip.family != AF_UNSPEC) {
-		ret = ibcm_arp_ibd_mac2gid(&ibds, &ipattr->ipa_src_ip, &sgid);
-		if (ret != IBT_SUCCESS) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_get_srcip_plist: "
-			    "SGID for the specified SRCIP Not found %X", ret);
-			goto srcip_plist_end;
-		}
-		IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_srcip_plist: SGID "
-		    "%llX:%llX", sgid.gid_prefix, sgid.gid_guid);
-	}
-
-	bzero(&attr, sizeof (ibt_path_attr_t));
-	attr.pa_hca_guid = ipattr->ipa_hca_guid;
-	attr.pa_hca_port_num = ipattr->ipa_hca_port_num;
-	attr.pa_sgid = sgid;
-	bcopy(&ipattr->ipa_mtu,  &attr.pa_mtu, sizeof (ibt_mtu_req_t));
-	bcopy(&ipattr->ipa_srate,  &attr.pa_srate, sizeof (ibt_srate_req_t));
-	bcopy(&ipattr->ipa_pkt_lt,  &attr.pa_pkt_lt, sizeof (ibt_pkt_lt_req_t));
-
-	ret = ibtl_cm_get_active_plist(&attr, flags, port_list_p);
-	if (ret == IBT_SUCCESS) {
-		int		i;
-		uint8_t		cnt;
-		boolean_t	no_srcip_configured = B_FALSE;
-		uint8_t		no_srcip_cnt = 0;
-
-		plistp = port_list_p[0];
-		cnt = plistp->p_count;
-		for (i = 0; i < cnt; i++, plistp++) {
-			ipp = ibcm_arp_ibd_gid2mac(&plistp->p_sgid, 0, &ibds);
-			if ((ipp == NULL) ||
-			    (ipp->ip_inet_family == AF_UNSPEC)) {
-				plistp->p_src_ip.family = AF_UNSPEC;
-				no_srcip_configured = B_TRUE;
-				no_srcip_cnt++;
-				IBTF_DPRINTF_L3(cmlog,
-				    "ibcm_arp_get_srcip_plist: SrcIP NOT "
-				    "Configured for GID %llX:%llX",
-				    plistp->p_sgid.gid_prefix,
-				    plistp->p_sgid.gid_guid);
-			} else {
-				IBTF_DPRINTF_L4(cmlog,
-				    "ibcm_arp_get_srcip_plist: GID %llX:%llX",
-				    plistp->p_sgid.gid_prefix,
-				    plistp->p_sgid.gid_guid);
-				if (ipp->ip_inet_family == AF_INET) {
-					plistp->p_src_ip.family = AF_INET;
-					bcopy(&ipp->ip_cm_sin.sin_addr,
-					    &plistp->p_src_ip.un.ip4addr,
-					    sizeof (in_addr_t));
-
-				} else if (ipp->ip_inet_family == AF_INET6) {
-					plistp->p_src_ip.family = AF_INET6;
-					bcopy(&ipp->ip_cm_sin6.sin6_addr,
-					    &plistp->p_src_ip.un.ip6addr,
-					    sizeof (in6_addr_t));
-				}
-				IBCM_PRINT_IP("ibcm_arp_get_srcip_plist: "
-				    "IP Addr is:", &plistp->p_src_ip);
-			}
-		}
-		if (no_srcip_configured) {
-			ibtl_cm_port_list_t	*n_plistp, *tmp_n_plistp;
-			uint8_t			new_cnt;
-
-			new_cnt = cnt - no_srcip_cnt;
-
-			/*
-			 * Looks like some of the SRC GID we found have no
-			 * IP ADDR configured, so remove these entries from
-			 * our list.
-			 */
-			plistp = port_list_p[0];
-			IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_srcip_plist: "
-			    "Only %d SGID (%d/%d) have SrcIP Configured",
-			    new_cnt, no_srcip_cnt, cnt);
-			if (new_cnt) {
-				/* Allocate Memory to hold Src Point info. */
-				n_plistp = kmem_zalloc(new_cnt *
-				    sizeof (ibtl_cm_port_list_t), KM_SLEEP);
-
-				tmp_n_plistp = n_plistp;
-				for (i = 0; i < cnt; i++, plistp++) {
-					if (plistp->p_src_ip.family ==
-					    AF_UNSPEC)
-						continue;
-
-					bcopy(plistp, n_plistp,
-					    sizeof (ibtl_cm_port_list_t));
-					n_plistp->p_count = new_cnt;
-					n_plistp++;
-				}
-				plistp = port_list_p[0];
-				*port_list_p = tmp_n_plistp;
-			} else {
-				/*
-				 * All entries we have, do not have IP-Addr
-				 * configured so return empty hand.
-				 */
-				IBTF_DPRINTF_L2(cmlog,
-				    "ibcm_arp_get_srcip_plist: None of SGID "
-				    "found have SrcIP Configured");
-				*port_list_p = NULL;
-				ret = IBT_SRC_IP_NOT_FOUND;
-			}
-			IBTF_DPRINTF_L4(cmlog, "FREE OLD list %p, NEW list is "
-			    "%p - %p", plistp, port_list_p, *port_list_p);
-			kmem_free(plistp, cnt * sizeof (ibtl_cm_port_list_t));
-		}
-	}
-
-srcip_plist_end:
-	if (ibds.ibcm_arp_ip)
-		kmem_free(ibds.ibcm_arp_ip, ibds.ibcm_arp_ibd_alloc *
-		    sizeof (ibcm_arp_ip_t));
-
-	return (ret);
 }
