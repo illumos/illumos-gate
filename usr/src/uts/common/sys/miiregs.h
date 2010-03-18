@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,6 +148,7 @@ extern "C" {
 /*
  * PHY manufacturer OUIs
  */
+#define	MII_OUI_ALTIMA			0x000895
 #define	MII_OUI_AMD			0x00001a
 #define	MII_OUI_AMD_2			0x000058
 #define	MII_OUI_ATTANSIC		0x001374
@@ -171,6 +172,9 @@ extern "C" {
 /*
  * PHY models
  */
+#define	MII_MODEL_ALTIMA_AC101			0x21	/* also Am79C874 */
+#define	MII_MODEL_ALTIMA_AC101L			0x12
+#define	MII_MODEL_ALTIMA_AM79C875		0x14
 
 #define	MII_MODEL_AMD_AM79C901			0x37
 #define	MII_MODEL_AMD_AM79C972			0x01

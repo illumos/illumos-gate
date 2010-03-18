@@ -24,7 +24,7 @@
  */
 
 /*
- * MII overrides for Quality Semiconductor PHYs.
+ * MII overrides for other PHYs.
  */
 
 #include <sys/types.h>
@@ -40,6 +40,7 @@ static const struct {
 	uint32_t	oui;
 	const char	*vendor;
 } other_vendors[] = {
+	OUI(ALTIMA, "Altima Communications"),
 	OUI(AMD, "Advanced Micro Devices"),
 	OUI(AMD_2, "Advanced Micro Devices"),
 	OUI(ATTANSIC, "Atheros/Attansic"),
@@ -70,6 +71,14 @@ static const struct {
 	uint32_t	model;
 	const char	*desc;
 } other_phys[] = {
+
+	/*
+	 * Altima phys are standard compliant.
+	 * AMD Am79C874 and Am79C875 phys are work-alikes.
+	 */
+	ID(ALTIMA, AC101, "AC101/Am79C874"),
+	ID(ALTIMA, AC101L, "AC101L"),
+	ID(ALTIMA, AM79C875, "Am79C875"),
 
 	/*
 	 * AMD phys are pretty much standard.
