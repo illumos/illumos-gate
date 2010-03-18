@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -361,12 +361,12 @@ sctp_intf_event(sctp_t *sctp, in6_addr_t addr, int state, int error)
 }
 
 void
-sctp_error_event(sctp_t *sctp, sctp_chunk_hdr_t *ch)
+sctp_error_event(sctp_t *sctp, sctp_chunk_hdr_t *ch, boolean_t is_asconf)
 {
 	struct sctp_remote_error *sre;
 	mblk_t *mp;
 	size_t len;
-	sctp_parm_hdr_t *errh;
+	sctp_parm_hdr_t *errh = NULL;
 	uint16_t dlen = 0;
 	uint16_t error = 0;
 	void *dtail = NULL;
@@ -375,8 +375,31 @@ sctp_error_event(sctp_t *sctp, sctp_chunk_hdr_t *ch)
 		return;
 	}
 
-	if (ntohs(ch->sch_len) > sizeof (*ch)) {
-		errh = (sctp_parm_hdr_t *)(ch + 1);
+	/*
+	 * ASCONF PARM error chunks :
+	 * PARM_ERROR_IND parm type is always followed by correlation id.
+	 * See sctp_asconf_adderr() and sctp_asconf_prepend_errwrap() as to
+	 * how these error chunks are build.
+	 * error cause wrapper (PARM_ERROR_IND) + correlation id +
+	 * error cause + error cause details.
+	 *
+	 * Regular error chunks :
+	 * See sctp_make_err() as to how these error chunks are build.
+	 * error chunk header (CHUNK_ERROR) + error cause + error cause details.
+	 */
+	if (is_asconf) {
+		if (ntohs(ch->sch_len) >
+		    (sizeof (*ch) + sizeof (uint32_t))) {
+			errh = (sctp_parm_hdr_t *)((char *)ch +
+			    sizeof (uint32_t) + sizeof (sctp_parm_hdr_t));
+		}
+	} else {
+		if (ntohs(ch->sch_len) > sizeof (*ch)) {
+			errh = (sctp_parm_hdr_t *)(ch + 1);
+		}
+	}
+
+	if (errh != NULL) {
 		error = ntohs(errh->sph_type);
 		dlen = ntohs(errh->sph_len) - sizeof (*errh);
 		if (dlen > 0) {
@@ -395,7 +418,7 @@ sctp_error_event(sctp_t *sctp, sctp_chunk_hdr_t *ch)
 	sre->sre_length = len;
 	sre->sre_assoc_id = 0;
 	sre->sre_error = error;
-	if (dtail) {
+	if (dtail != NULL) {
 		bcopy(dtail, sre + 1, dlen);
 	}
 

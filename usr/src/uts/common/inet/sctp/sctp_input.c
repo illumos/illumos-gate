@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4040,7 +4040,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 					    htons(SCTP_ERR_STALE_COOKIE)) {
 						BUMP_MIB(&sctps->sctps_mib,
 						    sctpAborted);
-						sctp_error_event(sctp, ch);
+						sctp_error_event(sctp,
+						    ch, B_FALSE);
 						sctp_assoc_event(sctp,
 						    SCTP_COMM_LOST, 0, NULL);
 						sctp_clean_death(sctp,

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -613,7 +613,7 @@ sctp_handle_error(sctp_t *sctp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ch,
 		return (0);
 	}
 	errh = (sctp_parm_hdr_t *)(ch + 1);
-	sctp_error_event(sctp, ch);
+	sctp_error_event(sctp, ch, B_FALSE);
 
 	switch (errh->sph_type) {
 	/*

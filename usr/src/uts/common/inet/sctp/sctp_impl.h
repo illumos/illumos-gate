@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -937,7 +937,7 @@ extern void	sctp_dispatch_rput(queue_t *, sctp_t *, sctp_hdr_t *, mblk_t *,
 extern char	*sctp_display(sctp_t *, char *);
 extern void	sctp_display_all(sctp_stack_t *);
 
-extern void	sctp_error_event(sctp_t *, sctp_chunk_hdr_t *);
+extern void	sctp_error_event(sctp_t *, sctp_chunk_hdr_t *, boolean_t);
 
 extern void	sctp_faddr_alive(sctp_t *, sctp_faddr_t *);
 extern int	sctp_faddr_dead(sctp_t *, sctp_faddr_t *, int);

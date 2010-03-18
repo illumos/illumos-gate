@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -227,7 +227,7 @@ sctp_asconf_ack_unrec_parm(sctp_t *sctp, sctp_parm_hdr_t *ph,
     sctp_parm_hdr_t *oph, sctp_faddr_t *fp, in6_addr_t *laddr)
 {
 	ASSERT(ph);
-	sctp_error_event(sctp, (sctp_chunk_hdr_t *)ph);
+	sctp_error_event(sctp, (sctp_chunk_hdr_t *)ph, B_TRUE);
 }
 
 static void
@@ -1299,7 +1299,7 @@ sctp_addip_ack(sctp_t *sctp, sctp_parm_hdr_t *ph, sctp_parm_hdr_t *oph,
 	 */
 	if (ph != NULL && ph->sph_type != htons(PARM_SUCCESS)) {
 		backout = B_TRUE;
-		sctp_error_event(sctp, (sctp_chunk_hdr_t *)ph);
+		sctp_error_event(sctp, (sctp_chunk_hdr_t *)ph, B_TRUE);
 	}
 
 	type = ntohs(oph->sph_type);
@@ -1349,6 +1349,15 @@ sctp_setprim_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 	in6_addr_t addr;
 
 	*cont = 1;
+
+	/* Does the peer understand ASCONF and Add-IP? */
+	if (!sctp->sctp_understands_asconf || !sctp->sctp_understands_addip) {
+		mp = sctp_asconf_adderr(SCTP_ERR_UNAUTHORIZED, ph, cid);
+		if (mp == NULL) {
+			*cont = -1;
+		}
+		return (mp);
+	}
 
 	/* Check input */
 	if (ntohs(ph->sph_len) < (sizeof (*ph) * 2)) {
@@ -1401,7 +1410,7 @@ sctp_setprim_ack(sctp_t *sctp, sctp_parm_hdr_t *ph, sctp_parm_hdr_t *oph,
 		if (ph->sph_type == htons(PARM_UNRECOGNIZED)) {
 			sctp->sctp_understands_addip = B_FALSE;
 		}
-		sctp_error_event(sctp, (sctp_chunk_hdr_t *)ph);
+		sctp_error_event(sctp, (sctp_chunk_hdr_t *)ph, B_TRUE);
 	}
 
 	/* On success we do nothing */
