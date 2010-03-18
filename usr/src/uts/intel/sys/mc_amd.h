@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -198,9 +198,11 @@ enum mc_funcnum {
 #define	MC_CTL_REG_SCRUBADDR_HI	0x60	/* DRAM Scrub Address High */
 #define	MC_CTL_REG_SPARECTL	0xb0	/* On-line spare control register */
 #define	MC_CTL_REG_NBCAP	0xe8	/* NB Capabilities */
+#define	MC_CTL_REG_EXTNBCFG	0x180	/* Ext. MCA NB configuration register */
 
 #define	MC_NBCAP_L3CAPABLE	(1U << 25)
 #define	MC_NBCAP_MULTINODECPU	(1U << 29)
+#define	MC_EXTNBCFG_ECCSYMSZ	(1U << 25)
 
 /*
  * MC4_MISC MSR and MC4_MISCj MSRs

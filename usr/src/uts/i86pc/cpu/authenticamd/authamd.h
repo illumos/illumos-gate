@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,13 +67,14 @@ typedef struct authamd_logout {
  * Per node shared state
  */
 struct authamd_nodeshared {
-	uint_t acs_chipid;
-	uint_t acs_procnodeid;
-	uint_t acs_family;		/* family number */
-	uint32_t acs_rev;		/* revision per cpuid_getchiprev */
-	volatile ulong_t acs_cfgonce;	/* Config performed once per chip */
-	hrtime_t acs_poll_timestamp;	/* Checks poll owner is alive */
-	cmi_hdl_t acs_pollowner;	/* poller of shared resources */
+	uint_t ans_chipid;
+	uint_t ans_procnodeid;
+	uint_t ans_family;		/* family number */
+	uint32_t ans_rev;		/* revision per cpuid_getchiprev */
+	volatile ulong_t ans_cfgonce;	/* Config performed once per chip */
+	hrtime_t ans_poll_timestamp;	/* Checks poll owner is alive */
+	cmi_hdl_t ans_pollowner;	/* poller of shared resources */
+	char *ans_eccsymsz;		/* DRAM ChipKill ECC Symbol Size */
 };
 
 enum authamd_cfgonce_bitnum {
@@ -81,7 +82,8 @@ enum authamd_cfgonce_bitnum {
 	AUTHAMD_CFGONCE_NBTHRESH,
 	AUTHAMD_CFGONCE_NBMCACFG,
 	AUTHAMD_CFGONCE_CACHESCRUB,
-	AUTHAMD_CFGONCE_NBMCA
+	AUTHAMD_CFGONCE_NBMCA,
+	AUTHAMD_CFGONCE_ECCSYMSZ
 };
 
 /*

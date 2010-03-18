@@ -40,6 +40,7 @@
 #include <sys/ksynch.h>
 #include <sys/x_call.h>
 #include <sys/pghw.h>
+#include <sys/pci_cfgacc.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/archsystm.h>
 #include <sys/ontrap.h>
@@ -1763,19 +1764,22 @@ cmi_pci_get_cmn(int bus, int dev, int func, int reg, int asz,
 		if (hdl)
 			val = pci_config_get8(hdl, (off_t)reg);
 		else
-			val = (*pci_getb_func)(bus, dev, func, reg);
+			val = pci_cfgacc_get8(NULL, PCI_GETBDF(bus, dev, func),
+			    reg);
 		break;
 	case 2:
 		if (hdl)
 			val = pci_config_get16(hdl, (off_t)reg);
 		else
-			val = (*pci_getw_func)(bus, dev, func, reg);
+			val = pci_cfgacc_get16(NULL, PCI_GETBDF(bus, dev, func),
+			    reg);
 		break;
 	case 4:
 		if (hdl)
 			val = pci_config_get32(hdl, (off_t)reg);
 		else
-			val = (*pci_getl_func)(bus, dev, func, reg);
+			val = pci_cfgacc_get32(NULL, PCI_GETBDF(bus, dev, func),
+			    reg);
 		break;
 	default:
 		val = 0;
@@ -1841,21 +1845,24 @@ cmi_pci_put_cmn(int bus, int dev, int func, int reg, int asz,
 		if (hdl)
 			pci_config_put8(hdl, (off_t)reg, (uint8_t)val);
 		else
-			(*pci_putb_func)(bus, dev, func, reg, (uint8_t)val);
+			pci_cfgacc_put8(NULL, PCI_GETBDF(bus, dev, func), reg,
+			    (uint8_t)val);
 		break;
 
 	case 2:
 		if (hdl)
 			pci_config_put16(hdl, (off_t)reg, (uint16_t)val);
 		else
-			(*pci_putw_func)(bus, dev, func, reg, (uint16_t)val);
+			pci_cfgacc_put16(NULL, PCI_GETBDF(bus, dev, func), reg,
+			    (uint16_t)val);
 		break;
 
 	case 4:
 		if (hdl)
 			pci_config_put32(hdl, (off_t)reg, val);
 		else
-			(*pci_putl_func)(bus, dev, func, reg, val);
+			pci_cfgacc_put32(NULL, PCI_GETBDF(bus, dev, func), reg,
+			    val);
 		break;
 
 	default:

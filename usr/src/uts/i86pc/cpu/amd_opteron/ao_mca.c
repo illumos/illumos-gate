@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -724,7 +724,7 @@ ao_ms_ereport_add_logout(cmi_hdl_t hdl, nvlist_t *ereport,
 	if (members & FM_EREPORT_PAYLOAD_FLAG_SYND_TYPE) {
 		fm_payload_set(ereport, FM_EREPORT_PAYLOAD_NAME_SYND_TYPE,
 		    DATA_TYPE_STRING, (syndtype == AMD_SYNDTYPE_CHIPKILL ?
-		    "C" : "E"), NULL);
+		    "C4" : "E"), NULL);
 	}
 
 	if (members & FM_EREPORT_PAYLOAD_FLAG_RESOURCE) {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,6 +135,12 @@ int authamd_ms_support_disable = 0;
 	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
 
 /*
+ * Families/revisions that support x8 ChipKill ECC
+ */
+#define	AUTHAMD_SUPPORTS_X8ECC(rev) \
+	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_D))
+
+/*
  * We recognise main memory ECC errors for AUTHAMD_MEMECC_RECOGNISED
  * revisions as:
  *
@@ -214,7 +220,7 @@ static struct authamd_nodeshared *authamd_shared[AUTHAMD_MAX_NODES];
 static int
 authamd_chip_once(authamd_data_t *authamd, enum authamd_cfgonce_bitnum what)
 {
-	return (atomic_set_long_excl(&authamd->amd_shared->acs_cfgonce,
+	return (atomic_set_long_excl(&authamd->amd_shared->ans_cfgonce,
 	    what) == 0 ?  B_TRUE : B_FALSE);
 }
 
@@ -223,7 +229,7 @@ authamd_pcicfg_write(uint_t procnodeid, uint_t func, uint_t reg, uint32_t val)
 {
 	ASSERT(procnodeid + 24 <= 31);
 	ASSERT((func & 7) == func);
-	ASSERT((reg & 3) == 0 && reg < 256);
+	ASSERT((reg & 3) == 0 && reg < 4096);
 
 	cmi_pci_putl(0, procnodeid + 24, func, reg, 0, val);
 }
@@ -233,7 +239,7 @@ authamd_pcicfg_read(uint_t procnodeid, uint_t func, uint_t reg)
 {
 	ASSERT(procnodeid + 24 <= 31);
 	ASSERT((func & 7) == func);
-	ASSERT((reg & 3) == 0 && reg < 256);
+	ASSERT((reg & 3) == 0 && reg < 4096);
 
 	return (cmi_pci_getl(0, procnodeid + 24, func, reg, 0, 0));
 }
@@ -283,9 +289,9 @@ static int
 authamd_read_ecccnt(authamd_data_t *authamd, struct authamd_logout *msl)
 {
 	union mcreg_sparectl sparectl;
-	uint_t procnodeid = authamd->amd_shared->acs_procnodeid;
-	uint_t family = authamd->amd_shared->acs_family;
-	uint32_t rev = authamd->amd_shared->acs_rev;
+	uint_t procnodeid = authamd->amd_shared->ans_procnodeid;
+	uint_t family = authamd->amd_shared->ans_family;
+	uint32_t rev = authamd->amd_shared->ans_rev;
 	int chan, cs;
 
 	/*
@@ -375,9 +381,9 @@ static void
 authamd_clear_ecccnt(authamd_data_t *authamd, boolean_t clrint)
 {
 	union mcreg_sparectl sparectl;
-	uint_t procnodeid = authamd->amd_shared->acs_procnodeid;
-	uint_t family = authamd->amd_shared->acs_family;
-	uint32_t rev = authamd->amd_shared->acs_rev;
+	uint_t procnodeid = authamd->amd_shared->ans_procnodeid;
+	uint_t family = authamd->amd_shared->ans_family;
+	uint32_t rev = authamd->amd_shared->ans_rev;
 	int chan, cs;
 
 	if (!AUTHAMD_HAS_ONLINESPARECTL(rev))
@@ -502,10 +508,10 @@ authamd_init(cmi_hdl_t hdl, void **datap)
 
 	if ((sp = authamd_shared[procnodeid]) == NULL) {
 		sp = kmem_zalloc(sizeof (struct authamd_nodeshared), KM_SLEEP);
-		sp->acs_chipid = chipid;
-		sp->acs_procnodeid = procnodeid;
-		sp->acs_family = family;
-		sp->acs_rev = rev;
+		sp->ans_chipid = chipid;
+		sp->ans_procnodeid = procnodeid;
+		sp->ans_family = family;
+		sp->ans_rev = rev;
 		membar_producer();
 
 		osp = atomic_cas_ptr(&authamd_shared[procnodeid], NULL, sp);
@@ -555,9 +561,9 @@ boolean_t
 authamd_bankctl_skipinit(cmi_hdl_t hdl, int bank)
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
-	uint32_t rev = authamd->amd_shared->acs_rev;
+	uint32_t rev = authamd->amd_shared->ans_rev;
 
-	if (authamd->amd_shared->acs_family == AUTHAMD_FAMILY_6)
+	if (authamd->amd_shared->ans_family == AUTHAMD_FAMILY_6)
 		return (bank == 0 ?  B_TRUE : B_FALSE);
 
 	if (AUTHAMD_NBONCHIP(rev) && bank == AMD_MCA_BANK_NB) {
@@ -575,7 +581,7 @@ uint64_t
 authamd_bankctl_val(cmi_hdl_t hdl, int bank, uint64_t proposed)
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
-	uint32_t rev = authamd->amd_shared->acs_rev;
+	uint32_t rev = authamd->amd_shared->ans_rev;
 	uint64_t val = proposed;
 
 	/*
@@ -672,8 +678,8 @@ void
 authamd_mca_init(cmi_hdl_t hdl, int nbanks)
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
-	uint32_t rev = authamd->amd_shared->acs_rev;
-	uint_t procnodeid = authamd->amd_shared->acs_procnodeid;
+	uint32_t rev = authamd->amd_shared->ans_rev;
+	uint_t procnodeid = authamd->amd_shared->ans_procnodeid;
 
 	/*
 	 * On chips with a NB online spare control register take control
@@ -809,6 +815,17 @@ authamd_mca_init(cmi_hdl_t hdl, int nbanks)
 		    MC_CTL_REG_SCRUBCTL, val);
 	}
 
+	/*
+	 * ECC symbol size. Defaults to 4.
+	 * Set to 8 on systems that support x8 ECC and have it enabled.
+	 */
+	if (authamd_chip_once(authamd, AUTHAMD_CFGONCE_ECCSYMSZ)) {
+		authamd->amd_shared->ans_eccsymsz = "C4";
+		if (AUTHAMD_SUPPORTS_X8ECC(rev) &&
+		    (authamd_pcicfg_read(procnodeid, MC_FUNC_MISCCTL,
+		    MC_CTL_REG_EXTNBCFG) & MC_EXTNBCFG_ECCSYMSZ))
+			authamd->amd_shared->ans_eccsymsz = "C8";
+	}
 }
 
 /*
@@ -818,20 +835,20 @@ uint64_t
 authamd_poll_ownermask(cmi_hdl_t hdl, hrtime_t pintvl)
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
-	struct authamd_nodeshared *acsp = authamd->amd_shared;
+	struct authamd_nodeshared *ansp = authamd->amd_shared;
 	hrtime_t now = gethrtime_waitfree();
-	hrtime_t last = acsp->acs_poll_timestamp;
+	hrtime_t last = ansp->ans_poll_timestamp;
 	int dopoll = 0;
 
 	if (now - last > 2 * pintvl || last == 0) {
-		acsp->acs_pollowner = hdl;
+		ansp->ans_pollowner = hdl;
 		dopoll = 1;
-	} else if (acsp->acs_pollowner == hdl) {
+	} else if (ansp->ans_pollowner == hdl) {
 		dopoll = 1;
 	}
 
 	if (dopoll)
-		acsp->acs_poll_timestamp = now;
+		ansp->ans_poll_timestamp = now;
 
 	return (dopoll ? -1ULL : ~(1 << AMD_MCA_BANK_NB));
 
@@ -847,7 +864,7 @@ authamd_bank_logout(cmi_hdl_t hdl, int bank, uint64_t status,
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
 	struct authamd_logout *msl = mslogout;
-	uint32_t rev = authamd->amd_shared->acs_rev;
+	uint32_t rev = authamd->amd_shared->ans_rev;
 
 	if (msl == NULL)
 		return;
@@ -923,7 +940,7 @@ authamd_disp_match(cmi_hdl_t hdl, int bank, uint64_t status,
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
 	/* uint16_t errcode = MCAX86_ERRCODE(status); */
 	uint16_t exterrcode = AMD_EXT_ERRCODE(status);
-	uint32_t rev = authamd->amd_shared->acs_rev;
+	uint32_t rev = authamd->amd_shared->ans_rev;
 
 	/*
 	 * Recognise main memory ECC errors
@@ -984,7 +1001,7 @@ authamd_ereport_add_resource(cmi_hdl_t hdl, authamd_data_t *authamd,
 		return;
 
 	/* Assume all processors have the same number of nodes */
-	mc = authamd->amd_shared->acs_procnodeid %
+	mc = authamd->amd_shared->ans_procnodeid %
 	    cpuid_get_procnodes_per_pkg(CPU);
 
 	for (chan = 0; chan < AUTHAMD_DRAM_NCHANNEL; chan++) {
@@ -1012,7 +1029,7 @@ authamd_ereport_add_resource(cmi_hdl_t hdl, authamd_data_t *authamd,
 				fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION,
 				    NULL, NULL, 5,
 				    "motherboard", 0,
-				    "chip", authamd->amd_shared->acs_chipid,
+				    "chip", authamd->amd_shared->ans_chipid,
 				    "memory-controller", mc,
 				    "dram-channel", chan,
 				    "chip-select", cs);
@@ -1074,7 +1091,7 @@ authamd_ereport_add_logout(cmi_hdl_t hdl, nvlist_t *ereport, nv_alloc_t *nva,
 		if (members & FM_EREPORT_GENAMD_PAYLOAD_FLAG_SYNDTYPE) {
 			fm_payload_set(ereport,
 			    FM_EREPORT_GENAMD_PAYLOAD_NAME_SYNDTYPE,
-			    DATA_TYPE_STRING, "C",
+			    DATA_TYPE_STRING, authamd->amd_shared->ans_eccsymsz,
 			    NULL);
 		}
 	}
