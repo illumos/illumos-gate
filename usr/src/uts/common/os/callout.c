@@ -2060,7 +2060,7 @@ callout_mp_init(void)
 		 * available physical memory.
 		 */
 		min = CALLOUT_MIN_HEAP_SIZE;
-		max = ptob(physmem) / CALLOUT_MEM_FRACTION;
+		max = ptob(physmem / CALLOUT_MEM_FRACTION);
 		if (min > max)
 			min = max;
 		callout_chunk = min / sizeof (callout_heap_t);

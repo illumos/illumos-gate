@@ -260,6 +260,9 @@ struct callout_list {
 typedef struct callout_heap {
 	hrtime_t	ch_expiration;
 	callout_list_t	*ch_list;
+#ifndef _LP64
+	char		ch_pad[4];	/* pad to power of 2 */
+#endif
 } callout_heap_t;
 
 /*
