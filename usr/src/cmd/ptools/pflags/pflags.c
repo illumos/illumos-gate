@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -135,8 +133,8 @@ look(char *arg)
 	fltset_t fltmask;
 	sysset_t entryset;
 	sysset_t exitset;
-	uint32_t sigtrace, sigtrace2, fltbits;
-	uint32_t sigpend, sigpend2;
+	uint32_t sigtrace, sigtrace1, sigtrace2, fltbits;
+	uint32_t sigpend, sigpend1, sigpend2;
 	uint32_t *bits;
 	char buf[PRSIGBUFSZ];
 	look_arg_t lookarg;
@@ -151,7 +149,7 @@ look(char *arg)
 			return (0);
 		}
 		(void) fprintf(stderr, "%s: cannot examine %s: %s\n",
-			command, arg, Pgrab_error(gcode));
+		    command, arg, Pgrab_error(gcode));
 		return (1);
 	}
 
@@ -189,41 +187,50 @@ look(char *arg)
 	if (fltbits)
 		(void) printf("\tflttrace = 0x%.8x\n", fltbits);
 
+#if (MAXSIG > 2 * 32) && (MAXSIG <= 3 * 32)	/* assumption */
 	sigtrace = *((uint32_t *)&sigmask);
-	sigtrace2 = *((uint32_t *)&sigmask + 1);
-	if (sigtrace | sigtrace2) {
-		(void) printf("\tsigtrace = 0x%.8x 0x%.8x\n\t    %s\n",
-		    sigtrace, sigtrace2,
+	sigtrace1 = *((uint32_t *)&sigmask + 1);
+	sigtrace2 = *((uint32_t *)&sigmask + 2);
+#else
+#error "fix me: MAXSIG out of bounds"
+#endif
+	if (sigtrace | sigtrace1 | sigtrace2)
+		(void) printf("\tsigtrace = 0x%.8x 0x%.8x 0x%.8x\n\t    %s\n",
+		    sigtrace, sigtrace1, sigtrace2,
 		    proc_sigset2str(&sigmask, "|", 1, buf, sizeof (buf)));
-	}
 
 	bits = ((uint32_t *)&entryset);
 	if (bits[0] | bits[1] | bits[2] | bits[3] |
 	    bits[4] | bits[5] | bits[6] | bits[7])
 		(void) printf(
-			"\tentryset = "
-			"0x%.8x 0x%.8x 0x%.8x 0x%.8x\n"
-			"\t           "
-			"0x%.8x 0x%.8x 0x%.8x 0x%.8x\n",
-			bits[0], bits[1], bits[2], bits[3],
-			bits[4], bits[5], bits[6], bits[7]);
+		    "\tentryset = "
+		    "0x%.8x 0x%.8x 0x%.8x 0x%.8x\n"
+		    "\t           "
+		    "0x%.8x 0x%.8x 0x%.8x 0x%.8x\n",
+		    bits[0], bits[1], bits[2], bits[3],
+		    bits[4], bits[5], bits[6], bits[7]);
 
 	bits = ((uint32_t *)&exitset);
 	if (bits[0] | bits[1] | bits[2] | bits[3] |
 	    bits[4] | bits[5] | bits[6] | bits[7])
 		(void) printf(
-			"\texitset  = "
-			"0x%.8x 0x%.8x 0x%.8x 0x%.8x\n"
-			"\t           "
-			"0x%.8x 0x%.8x 0x%.8x 0x%.8x\n",
-			bits[0], bits[1], bits[2], bits[3],
-			bits[4], bits[5], bits[6], bits[7]);
+		    "\texitset  = "
+		    "0x%.8x 0x%.8x 0x%.8x 0x%.8x\n"
+		    "\t           "
+		    "0x%.8x 0x%.8x 0x%.8x 0x%.8x\n",
+		    bits[0], bits[1], bits[2], bits[3],
+		    bits[4], bits[5], bits[6], bits[7]);
 
+#if (MAXSIG > 2 * 32) && (MAXSIG <= 3 * 32)	/* assumption */
 	sigpend  = *((uint32_t *)&pstatus.pr_sigpend);
-	sigpend2 = *((uint32_t *)&pstatus.pr_sigpend + 1);
-	if (sigpend | sigpend2)
-		(void) printf("\tsigpend = 0x%.8x,0x%.8x\n",
-			sigpend, sigpend2);
+	sigpend1 = *((uint32_t *)&pstatus.pr_sigpend + 1);
+	sigpend2 = *((uint32_t *)&pstatus.pr_sigpend + 2);
+#else
+#error "fix me: MAXSIG out of bounds"
+#endif
+	if (sigpend | sigpend1 | sigpend2)
+		(void) printf("\tsigpend = 0x%.8x,0x%.8x,0x%.8x\n",
+		    sigpend, sigpend1, sigpend2);
 
 	lookarg.pflags = pstatus.pr_flags;
 	lookarg.count = 0;
@@ -249,8 +256,8 @@ static int
 lwplook(look_arg_t *arg, const lwpstatus_t *psp, const lwpsinfo_t *pip)
 {
 	int flags;
-	uint32_t sighold, sighold2;
-	uint32_t sigpend, sigpend2;
+	uint32_t sighold, sighold1, sighold2;
+	uint32_t sigpend, sigpend1, sigpend2;
 	int cursig;
 	char buf[32];
 
@@ -298,35 +305,31 @@ lwplook(look_arg_t *arg, const lwpstatus_t *psp, const lwpsinfo_t *pip)
 		if (psp->pr_why != PR_REQUESTED &&
 		    psp->pr_why != PR_SUSPENDED)
 			(void) printf("  what = %s",
-				prwhat(psp->pr_why, psp->pr_what));
+			    prwhat(psp->pr_why, psp->pr_what));
 		(void) printf("\n");
 	}
 
+#if (MAXSIG > 2 * 32) && (MAXSIG <= 3 * 32)	/* assumption */
 	sighold  = *((uint32_t *)&psp->pr_lwphold);
-	sighold2 = *((uint32_t *)&psp->pr_lwphold + 1);
+	sighold1 = *((uint32_t *)&psp->pr_lwphold + 1);
+	sighold2 = *((uint32_t *)&psp->pr_lwphold + 2);
 	sigpend  = *((uint32_t *)&psp->pr_lwppend);
-	sigpend2 = *((uint32_t *)&psp->pr_lwppend + 1);
+	sigpend1 = *((uint32_t *)&psp->pr_lwppend + 1);
+	sigpend2 = *((uint32_t *)&psp->pr_lwppend + 2);
+#else
+#error "fix me: MAXSIG out of bounds"
+#endif
 	cursig   = psp->pr_cursig;
 
-	if (sighold | sighold2 | sigpend | sigpend2 | cursig) {
-		(void) printf("\t");
-		if (sighold | sighold2) {
-			(void) printf("sigmask = 0x%.8x,0x%.8x",
-				sighold, sighold2);
-			if (sigpend | sigpend2 | cursig)
-				(void) printf("  ");
-		}
-		if (sigpend | sigpend2) {
-			(void) printf("lwppend = 0x%.8x,0x%.8x",
-				sigpend, sigpend2);
-			if (cursig)
-				(void) printf("  ");
-		}
-		if (cursig)
-			(void) printf("cursig = %s",
-			    proc_signame(cursig, buf, sizeof (buf)));
-		(void) printf("\n");
-	}
+	if (sighold | sighold1 | sighold2)
+		(void) printf("\tsigmask = 0x%.8x,0x%.8x,0x%.8x\n",
+		    sighold, sighold1, sighold2);
+	if (sigpend | sigpend1 | sigpend2)
+		(void) printf("\tlwppend = 0x%.8x,0x%.8x,0x%.8x\n",
+		    sigpend, sigpend1, sigpend2);
+	if (cursig)
+		(void) printf("\tcursig = %s\n",
+		    proc_signame(cursig, buf, sizeof (buf)));
 
 	if (rflag) {
 		if (Pstate(Pr) == PS_DEAD || (arg->pflags & PR_STOPPED)) {
@@ -557,7 +560,7 @@ dumpregs32(const prgregset_t reg)
 
 	for (i = 0; i < NPRGREG32; i++) {
 		(void) printf("  %s = 0x%.8X",
-			regname32[i], reg32[i]);
+		    regname32[i], reg32[i]);
 		if ((i+1) % 4 == 0)
 			(void) putchar('\n');
 	}
@@ -582,7 +585,7 @@ dumpregs(const prgregset_t reg, int is64)
 
 	for (i = 0; i < NPRGREG; i++) {
 		(void) printf("  %s = 0x%.*lX",
-			regname[i], width, (long)reg[i]);
+		    regname[i], width, (long)reg[i]);
 		if ((i+1) % cols == 0)
 			(void) putchar('\n');
 	}
