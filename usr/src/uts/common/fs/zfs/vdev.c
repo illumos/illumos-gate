@@ -1420,6 +1420,35 @@ vdev_close(vdev_t *vd)
 	vd->vdev_stat.vs_aux = VDEV_AUX_NONE;
 }
 
+void
+vdev_hold(vdev_t *vd)
+{
+	spa_t *spa = vd->vdev_spa;
+
+	ASSERT(spa_is_root(spa));
+	if (spa->spa_state == POOL_STATE_UNINITIALIZED)
+		return;
+
+	for (int c = 0; c < vd->vdev_children; c++)
+		vdev_hold(vd->vdev_child[c]);
+
+	if (vd->vdev_ops->vdev_op_leaf)
+		vd->vdev_ops->vdev_op_hold(vd);
+}
+
+void
+vdev_rele(vdev_t *vd)
+{
+	spa_t *spa = vd->vdev_spa;
+
+	ASSERT(spa_is_root(spa));
+	for (int c = 0; c < vd->vdev_children; c++)
+		vdev_rele(vd->vdev_child[c]);
+
+	if (vd->vdev_ops->vdev_op_leaf)
+		vd->vdev_ops->vdev_op_rele(vd);
+}
+
 /*
  * Reopen all interior vdevs and any unopened leaves.  We don't actually
  * reopen leaf vdevs which had previously been opened as they might deadlock

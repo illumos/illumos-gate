@@ -591,9 +591,14 @@ dnode_hold_impl(objset_t *os, uint64_t object, int flag,
 
 	/*
 	 * If you are holding the spa config lock as writer, you shouldn't
-	 * be asking the DMU to do *anything*.
+	 * be asking the DMU to do *anything* unless it's the root pool
+	 * which may require us to read from the root filesystem while
+	 * holding some (not all) of the locks as writer.
 	 */
-	ASSERT(spa_config_held(os->os_spa, SCL_ALL, RW_WRITER) == 0);
+	ASSERT(spa_config_held(os->os_spa, SCL_ALL, RW_WRITER) == 0 ||
+	    (spa_is_root(os->os_spa) &&
+	    spa_config_held(os->os_spa, SCL_STATE, RW_WRITER) &&
+	    !spa_config_held(os->os_spa, SCL_ZIO, RW_WRITER)));
 
 	if (object == DMU_USERUSED_OBJECT || object == DMU_GROUPUSED_OBJECT) {
 		dn = (object == DMU_USERUSED_OBJECT) ?

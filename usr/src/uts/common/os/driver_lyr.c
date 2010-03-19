@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -533,7 +533,7 @@ ldi_vp_from_dev(dev_t dev, int otyp, vnode_t **vpp)
 }
 
 /* get a vnode to a device by pathname */
-static int
+int
 ldi_vp_from_name(char *path, vnode_t **vpp)
 {
 	vnode_t			*vp = NULL;
@@ -668,7 +668,7 @@ ldi_devid_match(ddi_devid_t devid, dev_info_t *dip, dev_t dev)
 }
 
 /* get a handle to a device by devid and minor name */
-static int
+int
 ldi_vp_from_devid(ddi_devid_t devid, char *minor_name, vnode_t **vpp)
 {
 	dev_info_t		*dip;

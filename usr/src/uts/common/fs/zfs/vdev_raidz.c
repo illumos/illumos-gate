@@ -2139,6 +2139,8 @@ vdev_ops_t vdev_raidz_ops = {
 	vdev_raidz_io_start,
 	vdev_raidz_io_done,
 	vdev_raidz_state_change,
+	NULL,
+	NULL,
 	VDEV_TYPE_RAIDZ,	/* name of this vdev type */
 	B_FALSE			/* not a leaf vdev */
 };

@@ -959,7 +959,22 @@ spa_vdev_state_enter(spa_t *spa, int oplocks)
 {
 	int locks = SCL_STATE_ALL | oplocks;
 
-	spa_config_enter(spa, locks, spa, RW_WRITER);
+	/*
+	 * Root pools may need to read of the underlying devfs filesystem
+	 * when opening up a vdev.  Unfortunately if we're holding the
+	 * SCL_ZIO lock it will result in a deadlock when we try to issue
+	 * the read from the root filesystem.  Instead we "prefetch"
+	 * the associated vnodes that we need prior to opening the
+	 * underlying devices and cache them so that we can prevent
+	 * any I/O when we are doing the actual open.
+	 */
+	if (spa_is_root(spa)) {
+		spa_config_enter(spa, SCL_STATE | SCL_L2ARC, spa, RW_WRITER);
+		vdev_hold(spa->spa_root_vdev);
+		spa_config_enter(spa, SCL_ZIO | oplocks, spa, RW_WRITER);
+	} else {
+		spa_config_enter(spa, locks, spa, RW_WRITER);
+	}
 	spa->spa_vdev_locks = locks;
 }
 
@@ -977,6 +992,9 @@ spa_vdev_state_exit(spa_t *spa, vdev_t *vd, int error)
 		config_changed = B_TRUE;
 		spa->spa_config_generation++;
 	}
+
+	if (spa_is_root(spa))
+		vdev_rele(spa->spa_root_vdev);
 
 	ASSERT3U(spa->spa_vdev_locks, >=, SCL_STATE_ALL);
 	spa_config_exit(spa, spa->spa_vdev_locks, spa);

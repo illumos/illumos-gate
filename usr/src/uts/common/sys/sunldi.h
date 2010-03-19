@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SUNLDI_H
 #define	_SYS_SUNLDI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <sys/stream.h>
@@ -101,6 +99,8 @@ extern int ldi_open_by_name(char *, int, cred_t *,
     ldi_handle_t *, ldi_ident_t);
 extern int ldi_open_by_devid(ddi_devid_t, char *, int, cred_t *,
     ldi_handle_t *, ldi_ident_t);
+extern int ldi_vp_from_name(char *, vnode_t **);
+extern int ldi_vp_from_devid(ddi_devid_t, char *, vnode_t **);
 
 extern int ldi_close(ldi_handle_t, int flag, cred_t *);
 
