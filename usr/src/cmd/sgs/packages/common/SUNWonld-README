@@ -1571,3 +1571,4 @@ Bugid   Risk Synopsis
 6910387 .tdata and .tbss separation invalidates TLS program header information
 6478684 isainfo/cpuid reports pause instruction not supported on amd64
 	PSARC/2010/089 Removal of AV_386_PAUSE and AV_386_MON
+6934123 elfdump -d coredumps on PA-RISC elf

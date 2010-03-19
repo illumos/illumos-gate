@@ -31,6 +31,7 @@
 #include <decl.h>
 #include <msg.h>
 #include <sgs.h>
+#include <stddef.h>
 
 /*
  * fmsize:  Array used to determine what size the the structures
@@ -1080,8 +1081,13 @@ static void
 $1(unsigned char *dst, Elf64_Nhdr *src, size_t cnt)
 {
 	/* LINTED */
-	Elf64_Nhdr *	end = (Elf64_Nhdr *)((char *)src + cnt);
+	Elf64_Nhdr 	*end = (Elf64_Nhdr *)((char *)src + cnt);
 
+	/*
+	 * Copy the note data to the source, translating the
+	 * length fields. Clip against the size of the actual buffer
+	 * to guard against corrupt note data.
+	 */
 	do {
 		Elf64_Word	descsz, namesz;
 
@@ -1095,8 +1101,19 @@ $1(unsigned char *dst, Elf64_Nhdr *src, size_t cnt)
 		/*
 		 * Copy contents of Elf64_Nhdr
 		 */
+		if ((offsetof(Elf64_Nhdr, n_namesz) + sizeof(Elf64_Word) +
+		    (char *) src) >= (char *) end)
+			break;
 		tofw(dst, src->n_namesz, N1_namesz_$2);
+
+		if ((offsetof(Elf64_Nhdr, n_descsz) + sizeof(Elf64_Word) +
+		    (char *) src) >= (char *) end)
+			break;
 		tofw(dst, src->n_descsz, N1_descsz_$2);
+
+		if ((offsetof(Elf64_Nhdr, n_type) + sizeof(Elf64_Word) +
+		    (char *) src) >= (char *) end)
+			break;
 		tofw(dst, src->n_type, N1_type_$2);
 
 		/*
@@ -1104,6 +1121,11 @@ $1(unsigned char *dst, Elf64_Nhdr *src, size_t cnt)
 		 */
 		dst += N1_sizeof;
 		src++;
+		if ((namesz + (char *) src) > (char *) end) {
+			namesz = (char *) end - (char *) src;
+			if (namesz == 0)
+				break;
+		}
 		(void)memcpy(dst, src, namesz);
 
 		/*
@@ -1111,7 +1133,13 @@ $1(unsigned char *dst, Elf64_Nhdr *src, size_t cnt)
 		 */
 		dst += namesz;
 		src = (Elf64_Nhdr *)((uintptr_t)src + namesz);
+		if ((descsz + (char *) src) > (char *) end) {
+			descsz = (char *) end - (char *) src;
+			if (descsz == 0)
+				break;
+		}
 		(void)memcpy(dst, src, descsz);
+
 		descsz = S_ROUND(descsz, sizeof (Elf64_Word));
 		dst += descsz;
 		src = (Elf64_Nhdr *)((uintptr_t)src + descsz);
@@ -1635,28 +1663,56 @@ $1(Elf64_Nhdr *dst, unsigned char *src, size_t cnt)
 	/* LINTED */
 	Elf64_Nhdr	*end = (Elf64_Nhdr *)((char *)dst + cnt);
 
-	while (dst < end)
-	{
-		Elf64_Nhdr *	nhdr;
-		unsigned char *	namestr;
-		void *		desc;
+	/*
+	 * Copy the note data to the destination, translating the
+	 * length fields. Clip against the size of the actual buffer
+	 * to guard against corrupt note data.
+	 */
+	while (dst < end) {
+		Elf64_Nhdr	*nhdr;
+		unsigned char	*namestr;
+		void		*desc;
 		Elf64_Word	field_sz;
 
+		if ((offsetof(Elf64_Nhdr, n_namesz) + sizeof(Elf64_Word) +
+		    (char *) dst) >= (char *) end)
+			break;
 		dst->n_namesz = tomw(src, N1_namesz_$2);
+
+		if ((offsetof(Elf64_Nhdr, n_descsz) + sizeof(Elf64_Word) +
+		    (char *) dst) >= (char *) end)
+			break;
 		dst->n_descsz = tomw(src, N1_descsz_$2);
+
+		if ((offsetof(Elf64_Nhdr, n_type) + sizeof(Elf64_Word) +
+		    (char *) dst) >= (char *) end)
+			break;
 		dst->n_type = tomw(src, N1_type_$2);
 		nhdr = dst;
+
 		/* LINTED */
 		dst = (Elf64_Nhdr *)((char *)dst + sizeof (Elf64_Nhdr));
 		namestr = src + N1_sizeof;
 		field_sz = S_ROUND(nhdr->n_namesz, sizeof (Elf64_Word));
+		if ((field_sz + (char *) dst) > (char *) end) {
+			field_sz = (char *) end - (char *) dst;
+			if (field_sz == 0)
+				break;
+		}
 		(void)memcpy((void *)dst, namestr, field_sz);
 		desc = namestr + field_sz;
+
 		/* LINTED */
 		dst = (Elf64_Nhdr *)((char *)dst + field_sz);
 		field_sz = nhdr->n_descsz;
+		if ((field_sz + (char *) dst) > (char *) end) {
+			field_sz = (char *) end - (char *) dst;
+			if (field_sz == 0)
+				break;
+		}
 		(void)memcpy(dst, desc, field_sz);
 		field_sz = S_ROUND(field_sz, sizeof (Elf64_Word));
+
 		/* LINTED */
 		dst = (Elf64_Nhdr *)((char *)dst + field_sz);
 		src = (unsigned char *)desc + field_sz;

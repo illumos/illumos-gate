@@ -2615,7 +2615,7 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
 		}
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_DYNNOBCKSEC), file,
 		    name, conv_dyn_tag(dyn->d_tag, osabi, ehdr->e_machine,
-		    0, &buf2));
+		    CONV_FMT_ALT_CF, &buf2));
 		return;
 	}
 
@@ -2627,7 +2627,7 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
 			(void) fprintf(stderr,
 			    MSG_INTL(MSG_ERR_DYNBADADDR), file,
 			    conv_dyn_tag(dyn->d_tag, osabi, ehdr->e_machine,
-			    0, &buf1), EC_ADDR(dyn->d_un.d_val),
+			    CONV_FMT_ALT_CF, &buf1), EC_ADDR(dyn->d_un.d_val),
 			    sec_cache->c_ndx, sec_cache->c_name,
 			    EC_ADDR(sec_cache->c_shdr->sh_addr));
 		break;
@@ -2638,7 +2638,7 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
 			(void) fprintf(stderr,
 			    MSG_INTL(MSG_ERR_DYNBADSIZE), file,
 			    conv_dyn_tag(dyn->d_tag, osabi, ehdr->e_machine,
-			    0, &buf1), EC_XWORD(dyn->d_un.d_val),
+			    CONV_FMT_ALT_CF, &buf1), EC_XWORD(dyn->d_un.d_val),
 			    sec_cache->c_ndx, sec_cache->c_name,
 			    EC_XWORD(sec_cache->c_shdr->sh_size));
 		break;
@@ -2649,7 +2649,7 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
 			(void) fprintf(stderr,
 			    MSG_INTL(MSG_ERR_DYNBADENTSIZE), file,
 			    conv_dyn_tag(dyn->d_tag, osabi, ehdr->e_machine,
-			    0, &buf1), EC_XWORD(dyn->d_un.d_val),
+			    CONV_FMT_ALT_CF, &buf1), EC_XWORD(dyn->d_un.d_val),
 			    sec_cache->c_ndx, sec_cache->c_name,
 			    EC_XWORD(sec_cache->c_shdr->sh_entsize));
 		break;
@@ -2703,7 +2703,7 @@ dyn_symtest(Dyn *dyn, const char *symname, Cache *symtab_cache,
 		    _cache, file) && (sym->st_value != dyn->d_un.d_val))
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_DYNSYMVAL),
 			    file, _cache->c_name, conv_dyn_tag(dyn->d_tag,
-			    osabi, ehdr->e_machine, 0, &buf),
+			    osabi, ehdr->e_machine, CONV_FMT_ALT_CF, &buf),
 			    symname, EC_ADDR(sym->st_value));
 	}
 }
@@ -3114,15 +3114,20 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 				break;
 
 			case DT_SUNW_CAP:
-				TEST_ADDR(SHT_SUNW_cap, sunw_cap);
+				if (osabi_solaris)
+					TEST_ADDR(SHT_SUNW_cap, sunw_cap);
 				break;
 
 			case DT_SUNW_CAPINFO:
-				TEST_ADDR(SHT_SUNW_capinfo, sunw_capinfo);
+				if (osabi_solaris)
+					TEST_ADDR(SHT_SUNW_capinfo,
+					    sunw_capinfo);
 				break;
 
 			case DT_SUNW_CAPCHAIN:
-				TEST_ADDR(SHT_SUNW_capchain, sunw_capchain);
+				if (osabi_solaris)
+					TEST_ADDR(SHT_SUNW_capchain,
+					    sunw_capchain);
 				break;
 
 			case DT_SUNW_SYMTAB:

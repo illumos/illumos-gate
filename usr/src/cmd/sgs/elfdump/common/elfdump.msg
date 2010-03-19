@@ -140,16 +140,16 @@
 @ MSG_ERR_SHDRMEMOVER	"%s: memory overlap between section header table: \
 			 %llx:%llx and section[%d]: %s: %llx:%llx\n"
 @ MSG_ERR_MULTDYN	"%s: %d dynamic sections seen (1 expected)\n"
-@ MSG_ERR_DYNNOBCKSEC	"%s: object lacks %s section required by DT_%s dynamic \
+@ MSG_ERR_DYNNOBCKSEC	"%s: object lacks %s section required by %s dynamic \
 			 entry\n"
-@ MSG_ERR_DYNBADADDR	"%s: DT_%s (%#llx) does not match \
+@ MSG_ERR_DYNBADADDR	"%s: %s (%#llx) does not match \
 			 shdr[%d: %s].sh_addr (%#llx)\n"
-@ MSG_ERR_DYNBADSIZE	"%s: DT_%s (%#llx) does not match \
+@ MSG_ERR_DYNBADSIZE	"%s: %s (%#llx) does not match \
 			 shdr[%d: %s].sh_size (%#llx)\n"
-@ MSG_ERR_DYNBADENTSIZE	"%s: DT_%s (%#llx) does not match \
+@ MSG_ERR_DYNBADENTSIZE	"%s: %s (%#llx) does not match \
 			 shdr[%d: %s].sh_entsize (%#llx)\n"
 @ MSG_ERR_DYNSYMVAL	"%s: %s: symbol value does not match \
-			 DT_%s entry: %s: value: %#llx\n"
+			 %s entry: %s: value: %#llx\n"
 @ MSG_ERR_MALSTR	"%s: %s: malformed string table, initial or final \
 			 byte\n"
 @ MSG_ERR_MULTEHFRMHDR	"%s: [%d: %s] multiple .eh_frame_hdr sections seen \
