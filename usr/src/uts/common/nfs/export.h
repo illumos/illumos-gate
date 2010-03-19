@@ -214,13 +214,51 @@ struct ex_vol_rename {
 #endif /* VOLATILE_FH_TEST */
 
 /*
+ * An auth cache entry can exist in 4 active states, with the inactive
+ * state being indicated by no entry in the cache.
+ *
+ * A FRESH entry is one which is either new or has been refreshed at
+ * least once.
+ *
+ * A STALE entry is one which has been detected to be too old. The
+ * transistion from FRESH to STALE prevents multiple threads from
+ * submitting refresh requests.
+ *
+ * A REFRESHING entry is one which is actively engaging the user land
+ * mountd code to re-authenticate the cache entry.
+ *
+ * An INVALID entry was one which was either STALE or REFRESHING
+ * and was deleted out of the encapsulating exi. Since we can't
+ * delete it yet, we mark it as INVALID, which lets the refreshq
+ * know not to work on it.
+ *
+ * Note that the auth state of the entry is always valid, even if the
+ * entry is STALE. Just as you can eat stale bread, you can consume
+ * a stale cache entry. The only time the contents change could be
+ * during the transistion from REFRESHING to FRESH.
+ */
+typedef enum auth_state {
+	NFS_AUTH_FRESH,
+	NFS_AUTH_STALE,
+	NFS_AUTH_REFRESHING,
+	NFS_AUTH_INVALID
+} auth_state_t;
+
+/*
  * An authorization cache entry
+ *
+ * Either the state in auth_state will protect the
+ * contents or auth_lock must be held.
  */
 struct auth_cache {
 	struct netbuf		auth_addr;
 	int			auth_flavor;
 	int			auth_access;
 	time_t			auth_time;
+	time_t			auth_freshness;
+	auth_state_t		auth_state;
+	char			*auth_netid;
+	kmutex_t		auth_lock;
 	struct auth_cache	*auth_next;
 };
 
@@ -390,6 +428,7 @@ extern treenode_t *ns_root;
  *
  * exi_count+exi_lock protects an individual exportinfo from being freed
  * when in use.
+ *
  * You must have the writer lock on exported_lock to add/delete an exportinfo
  * structure to/from the list.
  *
@@ -510,6 +549,7 @@ extern vnode_t *lm_fhtovp(fhandle_t *fh);
 extern vnode_t *lm_nfs3_fhtovp(nfs_fh3 *fh);
 extern struct	exportinfo *checkexport(fsid_t *, struct fid *);
 extern struct	exportinfo *checkexport4(fsid_t *, struct fid *, vnode_t *vp);
+extern void	exi_hold(struct exportinfo *);
 extern void	exi_rele(struct exportinfo *);
 extern struct exportinfo *nfs_vptoexi(vnode_t *, vnode_t *, cred_t *, int *,
     int *, bool_t);

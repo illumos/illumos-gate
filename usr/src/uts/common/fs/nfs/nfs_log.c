@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cred.h>
 #include <sys/cmn_err.h>
@@ -1559,10 +1557,7 @@ nfslog_get_exi(
 		 * so exi->exi_count must be incremented before it can
 		 * be returned, to make it uniform with exi_ret->exi_count
 		 */
-		mutex_enter(&exi->exi_lock);
-		exi->exi_count++;
-		mutex_exit(&exi->exi_lock);
-
+		exi_hold(exi);
 		return (exi);
 	}
 
