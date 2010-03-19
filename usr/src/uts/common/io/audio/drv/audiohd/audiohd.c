@@ -1208,25 +1208,20 @@ audiohd_set_output_gain(audiohd_state_t *statep)
 		maxgain = w->outamp_cap &
 		    AUDIOHDC_AMP_CAP_STEP_NUMS;
 		maxgain >>= AUDIOHD_GAIN_OFF;
-		if (w->outamp_cap) {
-			verb = AUDIOHDC_AMP_SET_OUTPUT |
-			    (gain * maxgain / 100);
-			if (gain == 0) {
-				/* set mute bit in amplifier */
-				verb |= AUDIOHDC_AMP_SET_MUTE;
-			}
 
-			(void) audioha_codec_4bit_verb_get(statep,
-			    path->codec->index,
-			    wid,
-			    AUDIOHDC_VERB_SET_AMP_MUTE,
-			    AUDIOHDC_AMP_SET_LEFT | verb);
-			(void) audioha_codec_4bit_verb_get(statep,
-			    path->codec->index,
-			    wid,
-			    AUDIOHDC_VERB_SET_AMP_MUTE,
-			    AUDIOHDC_AMP_SET_RIGHT | verb);
+		verb = AUDIOHDC_AMP_SET_OUTPUT | AUDIOHDC_AMP_SET_INPUT
+		    | (gain * maxgain / 100);
+		if (gain == 0) {
+			/* set mute bit in amplifier */
+			verb |= AUDIOHDC_AMP_SET_MUTE;
 		}
+
+		(void) audioha_codec_4bit_verb_get(statep,
+		    path->codec->index, wid, AUDIOHDC_VERB_SET_AMP_MUTE,
+		    AUDIOHDC_AMP_SET_LEFT | verb);
+		(void) audioha_codec_4bit_verb_get(statep,
+		    path->codec->index, wid, AUDIOHDC_VERB_SET_AMP_MUTE,
+		    AUDIOHDC_AMP_SET_RIGHT | verb);
 	}
 }
 
