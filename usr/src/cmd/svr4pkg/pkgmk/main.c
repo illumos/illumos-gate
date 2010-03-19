@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -730,7 +730,7 @@ outvol(struct cfent **eptlist, unsigned int eptnum, int part, int nparts)
 			progerr(gettext(ERR_TEMP), errno);
 			quit(99);
 		}
-		(void) fprintf(fp, ": %d %ld\n", nparts, limit);
+		(void) fprintf(fp, ": %d %llu\n", nparts, limit);
 		for (i = 0; eptlist[i]; i++) {
 			svpt = eptlist[i]->ainfo.local;
 			if (!strchr("sl", eptlist[i]->ftype))
