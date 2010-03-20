@@ -68,10 +68,16 @@ static char *winreg_keys[] = {
 	"Security",
 	"System",
 	"CurrentControlSet",
+	"SunOS",
+	"Solaris",
 	"System\\CurrentControlSet\\Services\\Eventlog",
 	"System\\CurrentControlSet\\Services\\Eventlog\\Application",
+	"System\\CurrentControlSet\\Services\\Eventlog\\"
+						"Application\\Application",
 	"System\\CurrentControlSet\\Services\\Eventlog\\Security",
+	"System\\CurrentControlSet\\Services\\Eventlog\\Security\\Security",
 	"System\\CurrentControlSet\\Services\\Eventlog\\System",
+	"System\\CurrentControlSet\\Services\\Eventlog\\System\\System",
 	"System\\CurrentControlSet\\Control\\ProductOptions",
 	"SOFTWARE",
 	"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
@@ -90,7 +96,10 @@ typedef struct winreg_keylist {
 } winreg_keylist_t;
 
 static winreg_keylist_t winreg_keylist;
+static mutex_t winreg_mutex;
 
+static ndr_hdid_t *winreg_alloc_id(ndr_xa_t *, const char *);
+static void winreg_dealloc_id(ndr_xa_t *, ndr_hdid_t *);
 static boolean_t winreg_key_has_subkey(const char *);
 static char *winreg_enum_subkey(ndr_xa_t *, const char *, uint32_t);
 static char *winreg_lookup_value(const char *);
@@ -171,6 +180,7 @@ static ndr_service_t winreg_service = {
 };
 
 static char winreg_sysname[SYS_NMLN];
+static char winreg_sysver[SMB_VERSTR_LEN];
 
 /*
  * winreg_initialize
@@ -183,9 +193,12 @@ void
 winreg_initialize(void)
 {
 	winreg_subkey_t *key;
+	smb_version_t version;
 	struct utsname name;
 	char *sysname;
 	int i;
+
+	(void) mutex_lock(&winreg_mutex);
 
 	list_create(&winreg_keylist.kl_list, sizeof (winreg_subkey_t),
 	    offsetof(winreg_subkey_t, sk_lnd));
@@ -197,10 +210,13 @@ winreg_initialize(void)
 			(void) strlcpy(key->sk_name, winreg_keys[i],
 			    MAXPATHLEN);
 			key->sk_predefined = B_TRUE;
+
 			list_insert_tail(&winreg_keylist.kl_list, key);
 			++winreg_keylist.kl_count;
 		}
 	}
+
+	(void) mutex_unlock(&winreg_mutex);
 
 	if (uname(&name) < 0)
 		sysname = "Solaris";
@@ -208,6 +224,11 @@ winreg_initialize(void)
 		sysname = name.sysname;
 
 	(void) strlcpy(winreg_sysname, sysname, SYS_NMLN);
+
+	smb_config_get_version(&version);
+	(void) snprintf(winreg_sysver, SMB_VERSTR_LEN, "%d.%d",
+	    version.sv_major, version.sv_minor);
+
 	(void) ndr_svc_register(&winreg_service);
 }
 
@@ -275,16 +296,10 @@ winreg_s_OpenHK(void *arg, ndr_xa_t *mxa, const char *hkey)
 {
 	struct winreg_OpenHKCR *param = arg;
 	ndr_hdid_t *id;
-	char *dupkey;
 
-	if ((dupkey = strdup(hkey)) == NULL) {
-		bzero(&param->handle, sizeof (winreg_handle_t));
-		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (NDR_DRC_OK);
-	}
+	(void) mutex_lock(&winreg_mutex);
 
-	if ((id = ndr_hdalloc(mxa, dupkey)) == NULL) {
-		free(dupkey);
+	if ((id = winreg_alloc_id(mxa, hkey)) == NULL) {
 		bzero(&param->handle, sizeof (winreg_handle_t));
 		param->status = ERROR_ACCESS_DENIED;
 	} else {
@@ -292,6 +307,7 @@ winreg_s_OpenHK(void *arg, ndr_xa_t *mxa, const char *hkey)
 		param->status = ERROR_SUCCESS;
 	}
 
+	(void) mutex_unlock(&winreg_mutex);
 	return (NDR_DRC_OK);
 }
 
@@ -308,6 +324,40 @@ winreg_s_Close(void *arg, ndr_xa_t *mxa)
 {
 	struct winreg_Close *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+
+	(void) mutex_lock(&winreg_mutex);
+	winreg_dealloc_id(mxa, id);
+	(void) mutex_unlock(&winreg_mutex);
+
+	bzero(&param->result_handle, sizeof (winreg_handle_t));
+	param->status = ERROR_SUCCESS;
+	return (NDR_DRC_OK);
+}
+
+static ndr_hdid_t *
+winreg_alloc_id(ndr_xa_t *mxa, const char *key)
+{
+	ndr_handle_t	*hd;
+	ndr_hdid_t	*id;
+	char		*data;
+
+	if ((data = strdup(key)) == NULL)
+		return (NULL);
+
+	if ((id = ndr_hdalloc(mxa, data)) == NULL) {
+		free(data);
+		return (NULL);
+	}
+
+	if ((hd = ndr_hdlookup(mxa, id)) != NULL)
+		hd->nh_data_free = free;
+
+	return (id);
+}
+
+static void
+winreg_dealloc_id(ndr_xa_t *mxa, ndr_hdid_t *id)
+{
 	ndr_handle_t *hd;
 
 	if ((hd = ndr_hdlookup(mxa, id)) != NULL) {
@@ -316,10 +366,6 @@ winreg_s_Close(void *arg, ndr_xa_t *mxa)
 	}
 
 	ndr_hdfree(mxa, id);
-
-	bzero(&param->result_handle, sizeof (winreg_handle_t));
-	param->status = ERROR_SUCCESS;
-	return (NDR_DRC_OK);
 }
 
 /*
@@ -333,7 +379,6 @@ winreg_s_CreateKey(void *arg, ndr_xa_t *mxa)
 	ndr_handle_t *hd;
 	winreg_subkey_t *key;
 	char *subkey;
-	char *dupkey;
 	DWORD *action;
 
 	subkey = (char *)param->subkey.str;
@@ -344,14 +389,18 @@ winreg_s_CreateKey(void *arg, ndr_xa_t *mxa)
 		return (NDR_DRC_OK);
 	}
 
+	(void) mutex_lock(&winreg_mutex);
+
 	hd = ndr_hdlookup(mxa, id);
 	if (hd == NULL) {
+		(void) mutex_unlock(&winreg_mutex);
 		bzero(param, sizeof (struct winreg_CreateKey));
 		param->status = ERROR_INVALID_HANDLE;
 		return (NDR_DRC_OK);
 	}
 
 	if ((action = NDR_NEW(mxa, DWORD)) == NULL) {
+		(void) mutex_unlock(&winreg_mutex);
 		bzero(param, sizeof (struct winreg_CreateKey));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
 		return (NDR_DRC_OK);
@@ -368,6 +417,8 @@ winreg_s_CreateKey(void *arg, ndr_xa_t *mxa)
 		if (strcasecmp(subkey, key->sk_name) == 0) {
 			bcopy(&key->sk_handle, &param->result_handle,
 			    sizeof (winreg_handle_t));
+
+			(void) mutex_unlock(&winreg_mutex);
 			*action = WINREG_ACTION_EXISTING_KEY;
 			param->action = action;
 			param->status = ERROR_SUCCESS;
@@ -379,20 +430,12 @@ new_key:
 	/*
 	 * Create a new key.
 	 */
-	if ((dupkey = strdup(subkey)) == NULL) {
-		bzero(param, sizeof (struct winreg_CreateKey));
-		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (NDR_DRC_OK);
-	}
+	if ((id = winreg_alloc_id(mxa, subkey)) == NULL)
+		goto no_memory;
 
-	id = ndr_hdalloc(mxa, dupkey);
-	key = malloc(sizeof (winreg_subkey_t));
-
-	if ((id == NULL) || (key == NULL)) {
-		free(dupkey);
-		bzero(param, sizeof (struct winreg_CreateKey));
-		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (NDR_DRC_OK);
+	if ((key = malloc(sizeof (winreg_subkey_t))) == NULL) {
+		winreg_dealloc_id(mxa, id);
+		goto no_memory;
 	}
 
 	bcopy(id, &key->sk_handle, sizeof (ndr_hdid_t));
@@ -402,9 +445,17 @@ new_key:
 	++winreg_keylist.kl_count;
 
 	bcopy(id, &param->result_handle, sizeof (winreg_handle_t));
+
+	(void) mutex_unlock(&winreg_mutex);
 	*action = WINREG_ACTION_NEW_KEY;
 	param->action = action;
 	param->status = ERROR_SUCCESS;
+	return (NDR_DRC_OK);
+
+no_memory:
+	(void) mutex_unlock(&winreg_mutex);
+	bzero(param, sizeof (struct winreg_CreateKey));
+	param->status = ERROR_NOT_ENOUGH_MEMORY;
 	return (NDR_DRC_OK);
 }
 
@@ -416,7 +467,6 @@ winreg_s_DeleteKey(void *arg, ndr_xa_t *mxa)
 {
 	struct winreg_DeleteKey *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
-	ndr_handle_t *hd;
 	winreg_subkey_t *key;
 	char *subkey;
 
@@ -427,9 +477,12 @@ winreg_s_DeleteKey(void *arg, ndr_xa_t *mxa)
 		return (NDR_DRC_OK);
 	}
 
+	(void) mutex_lock(&winreg_mutex);
+
 	if ((ndr_hdlookup(mxa, id) == NULL) ||
 	    list_is_empty(&winreg_keylist.kl_list) ||
 	    winreg_key_has_subkey(subkey)) {
+		(void) mutex_unlock(&winreg_mutex);
 		param->status = ERROR_ACCESS_DENIED;
 		return (NDR_DRC_OK);
 	}
@@ -444,24 +497,23 @@ winreg_s_DeleteKey(void *arg, ndr_xa_t *mxa)
 
 			list_remove(&winreg_keylist.kl_list, key);
 			--winreg_keylist.kl_count;
-
-			hd = ndr_hdlookup(mxa, &key->sk_handle);
-			if (hd != NULL) {
-				free(hd->nh_data);
-				hd->nh_data = NULL;
-			}
-
-			ndr_hdfree(mxa, &key->sk_handle);
+			winreg_dealloc_id(mxa, &key->sk_handle);
 			free(key);
+
+			(void) mutex_unlock(&winreg_mutex);
 			param->status = ERROR_SUCCESS;
 			return (NDR_DRC_OK);
 		}
 	} while ((key = list_next(&winreg_keylist.kl_list, key)) != NULL);
 
+	(void) mutex_unlock(&winreg_mutex);
 	param->status = ERROR_ACCESS_DENIED;
 	return (NDR_DRC_OK);
 }
 
+/*
+ * Call with the winreg_mutex held.
+ */
 static boolean_t
 winreg_key_has_subkey(const char *subkey)
 {
@@ -488,6 +540,9 @@ winreg_key_has_subkey(const char *subkey)
 	return (B_FALSE);
 }
 
+/*
+ * Call with the winreg_mutex held.
+ */
 static char *
 winreg_enum_subkey(ndr_xa_t *mxa, const char *subkey, uint32_t index)
 {
@@ -563,10 +618,13 @@ winreg_s_EnumKey(void *arg, ndr_xa_t *mxa)
 	char *subkey;
 	char *name = NULL;
 
+	(void) mutex_lock(&winreg_mutex);
+
 	if ((hd = ndr_hdlookup(mxa, id)) != NULL)
 		name = hd->nh_data;
 
 	if (hd == NULL || name == NULL) {
+		(void) mutex_unlock(&winreg_mutex);
 		bzero(param, sizeof (struct winreg_EnumKey));
 		param->status = ERROR_NO_MORE_ITEMS;
 		return (NDR_DRC_OK);
@@ -574,21 +632,25 @@ winreg_s_EnumKey(void *arg, ndr_xa_t *mxa)
 
 	subkey = winreg_enum_subkey(mxa, name, param->index);
 	if (subkey == NULL) {
+		(void) mutex_unlock(&winreg_mutex);
 		bzero(param, sizeof (struct winreg_EnumKey));
 		param->status = ERROR_NO_MORE_ITEMS;
 		return (NDR_DRC_OK);
 	}
 
 	if (NDR_MSTRING(mxa, subkey, (ndr_mstring_t *)&param->name_out) == -1) {
+		(void) mutex_unlock(&winreg_mutex);
 		bzero(param, sizeof (struct winreg_EnumKey));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
 		return (NDR_DRC_OK);
 	}
+
+	(void) mutex_unlock(&winreg_mutex);
+
 	/*
 	 * This request requires that the length includes the null.
 	 */
 	param->name_out.length = param->name_out.allosize;
-
 	param->status = ERROR_SUCCESS;
 	return (NDR_DRC_OK);
 }
@@ -734,7 +796,8 @@ winreg_s_OpenKey(void *arg, ndr_xa_t *mxa)
 	ndr_handle_t *hd;
 	char *subkey = (char *)param->name.str;
 	winreg_subkey_t *key;
-	char *dupkey;
+
+	(void) mutex_lock(&winreg_mutex);
 
 	if (subkey == NULL || *subkey == '\0') {
 		if ((hd = ndr_hdlookup(mxa, id)) != NULL)
@@ -744,6 +807,7 @@ winreg_s_OpenKey(void *arg, ndr_xa_t *mxa)
 	id = NULL;
 
 	if (subkey == NULL || list_is_empty(&winreg_keylist.kl_list)) {
+		(void) mutex_unlock(&winreg_mutex);
 		bzero(&param->result_handle, sizeof (winreg_handle_t));
 		param->status = ERROR_FILE_NOT_FOUND;
 		return (NDR_DRC_OK);
@@ -752,27 +816,24 @@ winreg_s_OpenKey(void *arg, ndr_xa_t *mxa)
 	key = list_head(&winreg_keylist.kl_list);
 	do {
 		if (strcasecmp(subkey, key->sk_name) == 0) {
-			if (key->sk_predefined == B_TRUE) {
-				if ((dupkey = strdup(subkey)) == NULL)
-					break;
-
-				id = ndr_hdalloc(mxa, dupkey);
-				if (id == NULL)
-					free(dupkey);
-			} else {
+			if (key->sk_predefined == B_TRUE)
+				id = winreg_alloc_id(mxa, subkey);
+			else
 				id = &key->sk_handle;
-			}
 
 			if (id == NULL)
 				break;
 
 			bcopy(id, &param->result_handle,
 			    sizeof (winreg_handle_t));
+
+			(void) mutex_unlock(&winreg_mutex);
 			param->status = ERROR_SUCCESS;
 			return (NDR_DRC_OK);
 		}
 	} while ((key = list_next(&winreg_keylist.kl_list, key)) != NULL);
 
+	(void) mutex_unlock(&winreg_mutex);
 	bzero(&param->result_handle, sizeof (winreg_handle_t));
 	param->status = ERROR_FILE_NOT_FOUND;
 	return (NDR_DRC_OK);
@@ -791,6 +852,7 @@ winreg_s_QueryKey(void *arg, ndr_xa_t *mxa)
 
 	name = (winreg_string_t	*)&param->name;
 	bzero(param, sizeof (struct winreg_QueryKey));
+
 	if ((name = NDR_NEW(mxa, winreg_string_t)) != NULL)
 		rc = NDR_MSTRING(mxa, "", (ndr_mstring_t *)name);
 
@@ -888,20 +950,18 @@ winreg_lookup_value(const char *name)
 		char *name;
 		char *value;
 	} registry[] = {
-		{ "CurrentVersion", "4.0" },
-		{ "ProductType", "ServerNT" },
-		{ "Sources",	 NULL }	/* product name */
+		{ "SystemRoot",		"C:\\" },
+		{ "CurrentVersion",	winreg_sysver },
+		{ "ProductType",	"ServerNT" },
+		{ "Sources",		winreg_sysname }, /* product name */
+		{ "EventMessageFile",	"C:\\windows\\system32\\eventlog.dll" }
 	};
 
 	int i;
 
 	for (i = 0; i < sizeof (registry)/sizeof (registry[0]); ++i) {
-		if (strcasecmp(registry[i].name, name) == 0) {
-			if (registry[i].value == NULL)
-				return (winreg_sysname);
-			else
-				return (registry[i].value);
-		}
+		if (strcasecmp(registry[i].name, name) == 0)
+			return (registry[i].value);
 	}
 
 	return (NULL);

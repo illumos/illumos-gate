@@ -77,7 +77,7 @@ typedef struct smb_setinfo {
  * They set error details in the sr when appropriate.
  */
 static int smb_set_by_fid(smb_request_t *, smb_xa_t *, uint16_t);
-static int smb_set_by_path(smb_request_t *, smb_xa_t *, uint16_t, char *);
+static int smb_set_by_path(smb_request_t *, smb_xa_t *, uint16_t);
 static int smb_set_fileinfo(smb_request_t *, smb_setinfo_t *);
 static int smb_set_information(smb_request_t *, smb_setinfo_t *);
 static int smb_set_information2(smb_request_t *, smb_setinfo_t *);
@@ -112,8 +112,8 @@ smb_com_trans2_set_file_information(smb_request_t *sr, smb_xa_t *xa)
 smb_sdrc_t
 smb_com_trans2_set_path_information(smb_request_t *sr, smb_xa_t *xa)
 {
-	uint16_t infolev;
-	char *path;
+	uint16_t	infolev;
+	smb_fqi_t	*fqi = &sr->arg.dirop.fqi;
 
 	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_INVALID_DEVICE_REQUEST,
@@ -122,10 +122,10 @@ smb_com_trans2_set_path_information(smb_request_t *sr, smb_xa_t *xa)
 	}
 
 	if (smb_mbc_decodef(&xa->req_param_mb, "%w4.u",
-	    sr, &infolev, &path) != 0)
+	    sr, &infolev, &fqi->fq_path.pn_path) != 0)
 		return (SDRC_ERROR);
 
-	if (smb_set_by_path(sr, xa, infolev, path) != 0)
+	if (smb_set_by_path(sr, xa, infolev) != 0)
 		return (SDRC_ERROR);
 
 	return (SDRC_SUCCESS);
@@ -150,8 +150,8 @@ smb_post_set_information(smb_request_t *sr)
 smb_sdrc_t
 smb_com_set_information(smb_request_t *sr)
 {
-	uint16_t infolev = SMB_SET_INFORMATION;
-	char *path;
+	uint16_t	infolev = SMB_SET_INFORMATION;
+	smb_fqi_t	*fqi = &sr->arg.dirop.fqi;
 
 	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
@@ -159,10 +159,10 @@ smb_com_set_information(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if (smbsr_decode_data(sr, "%S", sr, &path) != 0)
+	if (smbsr_decode_data(sr, "%S", sr, &fqi->fq_path.pn_path) != 0)
 		return (SDRC_ERROR);
 
-	if (smb_set_by_path(sr, NULL, infolev, path) != 0)
+	if (smb_set_by_path(sr, NULL, infolev) != 0)
 		return (SDRC_ERROR);
 
 	if (smbsr_encode_empty_result(sr) != 0)
@@ -258,18 +258,21 @@ smb_set_by_fid(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
  * Use the file name to identify the node object and invoke
  * smb_set_fileinfo for that node.
  *
+ * Path should be set in sr->arg.dirop.fqi.fq_path prior to
+ * calling smb_set_by_path.
+ *
  * Setting attributes on a named pipe by name is an error and
  * is handled in the calling functions so that they can return
  * the appropriate error status code (which differs by caller).
  */
 static int
-smb_set_by_path(smb_request_t *sr, smb_xa_t *xa,
-    uint16_t infolev, char *path)
+smb_set_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 {
 	int rc;
 	smb_setinfo_t sinfo;
 	smb_node_t *node, *dnode;
 	char *name;
+	smb_pathname_t	*pn;
 
 	if (SMB_TREE_IS_READONLY(sr)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
@@ -277,8 +280,13 @@ smb_set_by_path(smb_request_t *sr, smb_xa_t *xa,
 		return (-1);
 	}
 
+	pn = &sr->arg.dirop.fqi.fq_path;
+	smb_pathname_init(sr, pn, pn->pn_path);
+	if (!smb_pathname_validate(sr, pn))
+		return (-1);
+
 	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	rc = smb_pathname_reduce(sr, sr->user_cr, path,
+	rc = smb_pathname_reduce(sr, sr->user_cr, pn->pn_path,
 	    sr->tid_tree->t_snode, sr->tid_tree->t_snode, &dnode, name);
 	if (rc == 0) {
 		rc = smb_fsop_lookup_name(sr, sr->user_cr, SMB_FOLLOW_LINKS,

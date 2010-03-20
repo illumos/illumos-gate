@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,6 +145,16 @@ size_t oemtoucs(smb_wchar_t *, const char *, size_t, uint32_t);
 char *strsubst(char *, char, char);
 char *strsep(char **, const char *);
 char *strcanon(char *, const char *);
+
+typedef struct smb_unc {
+	char		 *unc_server;
+	char		 *unc_share;
+	char		 *unc_path;
+	char		 *unc_buf;
+} smb_unc_t;
+
+int smb_unc_init(const char *, smb_unc_t *);
+void smb_unc_free(smb_unc_t *);
 
 #ifdef __cplusplus
 }

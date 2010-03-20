@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,7 +118,7 @@ int smb_vop_setattr(vnode_t *, vnode_t *, smb_attr_t *, int, cred_t *);
 int smb_vop_access(vnode_t *, int, int, vnode_t *, cred_t *);
 void smb_vop_eaccess(vnode_t *, int *, int, vnode_t *, cred_t *);
 int smb_vop_lookup(vnode_t *, char *, vnode_t **, char *, int, int *, vnode_t *,
-    cred_t *);
+    smb_attr_t *, cred_t *);
 int smb_vop_create(vnode_t *, char *, smb_attr_t *, vnode_t **, int, cred_t *,
     vsecattr_t *);
 int smb_vop_link(vnode_t *, vnode_t *, char *, int, cred_t *);

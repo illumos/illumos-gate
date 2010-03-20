@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,7 +102,11 @@ extern "C" {
  * SMB_PI_MAX_WORKERS_MIN must therefore be < 256
  */
 #define	SMB_PI_MAX_WORKERS_MIN		64
-#define	SMB_LM_COMPATIBILITY_DEFAULT_LEV 3
+
+typedef struct smb_version {
+	uint8_t sv_major;
+	uint8_t sv_minor;
+} smb_version_t;
 
 typedef struct smb_kmod_cfg {
 	uint32_t skc_maxworkers;
@@ -115,18 +119,45 @@ typedef struct smb_kmod_cfg {
 	int32_t skc_sync_enable;
 	int32_t skc_secmode;
 	int32_t skc_ipv6_enable;
+	smb_version_t skc_version;
 	char skc_nbdomain[NETBIOS_NAME_SZ];
 	char skc_fqdn[SMB_PI_MAX_DOMAIN];
 	char skc_hostname[SMB_PI_MAX_HOST];
 	char skc_system_comment[SMB_PI_MAX_COMMENT];
 } smb_kmod_cfg_t;
 
-#define	SMB_VERSION_MAJOR  4
-#define	SMB_VERSION_MINOR  0
+/*
+ * Major version numbers
+ */
+#define	SMB_MAJOR_NT		4
+#define	SMB_MAJOR_2000		5
+#define	SMB_MAJOR_XP		5
+#define	SMB_MAJOR_2003		5
+#define	SMB_MAJOR_VISTA		6
+#define	SMB_MAJOR_2008		6
+#define	SMB_MAJOR_2008R2	6
+
+/*
+ * Minor version numbers
+ */
+#define	SMB_MINOR_NT		0
+#define	SMB_MINOR_2000		0
+#define	SMB_MINOR_XP		1
+#define	SMB_MINOR_2003		2
+#define	SMB_MINOR_VISTA		0
+#define	SMB_MINOR_2008		0
+#define	SMB_MINOR_2008R2	1
+
+/*
+ * Max version length in string format
+ */
+#define	SMB_VERSTR_LEN		8
 
 int smbnative_os_value(const char *);
 int smbnative_lm_value(const char *);
 int smbnative_pdc_value(const char *);
+const char *smbnative_os_str(smb_version_t *);
+const char *smbnative_lm_str(smb_version_t *);
 
 /*
  * Support for passthrough authentication.
@@ -134,7 +165,6 @@ int smbnative_pdc_value(const char *);
 #define	AUTH_USER_GRANT			0x00000000
 #define	AUTH_GUEST_GRANT		0x00000001
 #define	AUTH_IPC_ONLY_GRANT		0x00000002
-#define	AUTH_CONEXUS_GRANT		0x00000004
 
 #ifdef __cplusplus
 }

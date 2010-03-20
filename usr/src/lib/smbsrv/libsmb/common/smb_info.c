@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +101,7 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 	    sizeof (kcfg->skc_hostname));
 	(void) smb_config_getstr(SMB_CI_SYS_CMNT, kcfg->skc_system_comment,
 	    sizeof (kcfg->skc_system_comment));
+	smb_config_get_version(&kcfg->skc_version);
 }
 
 /*
@@ -114,7 +115,7 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 int
 smb_getnetbiosname(char *buf, size_t buflen)
 {
-	if (smb_gethostname(buf, buflen, 1) != 0)
+	if (smb_gethostname(buf, buflen, SMB_CASE_UPPER) != 0)
 		return (-1);
 
 	if (buflen >= NETBIOS_NAME_SZ)
@@ -141,14 +142,14 @@ smb_getsamaccount(char *buf, size_t buflen)
  * Get the current system node name.  The returned name is guaranteed
  * to be null-terminated (gethostname may not null terminate the name).
  * If the hostname has been fully-qualified for some reason, the domain
- * part will be removed.  If the caller would like the name in upper
- * case, it is folded to uppercase.
+ * part will be removed.  The returned hostname is converted to the
+ * specified case (lower, upper, or preserved).
  *
  * If gethostname fails, the returned buffer will contain an empty
  * string.
  */
 int
-smb_gethostname(char *buf, size_t buflen, int upcase)
+smb_gethostname(char *buf, size_t buflen, smb_caseconv_t which)
 {
 	char *p;
 
@@ -165,16 +166,27 @@ smb_gethostname(char *buf, size_t buflen, int upcase)
 	if ((p = strchr(buf, '.')) != NULL)
 		*p = '\0';
 
-	if (upcase)
+	switch (which) {
+	case SMB_CASE_LOWER:
+		(void) smb_strlwr(buf);
+		break;
+
+	case SMB_CASE_UPPER:
 		(void) smb_strupr(buf);
+		break;
+
+	case SMB_CASE_PRESERVE:
+	default:
+		break;
+	}
 
 	return (0);
 }
 
 /*
- * Obtain the fully-qualified name for this machine.  If the
- * hostname is fully-qualified, accept it.  Otherwise, try to
- * find an appropriate domain name to append to the hostname.
+ * Obtain the fully-qualified name for this machine in lower case.  If
+ * the hostname is fully-qualified, accept it.  Otherwise, try to find an
+ * appropriate domain name to append to the hostname.
  */
 int
 smb_getfqhostname(char *buf, size_t buflen)
@@ -185,7 +197,8 @@ smb_getfqhostname(char *buf, size_t buflen)
 	hostname[0] = '\0';
 	domain[0] = '\0';
 
-	if (smb_gethostname(hostname, MAXHOSTNAMELEN, 0) != 0)
+	if (smb_gethostname(hostname, MAXHOSTNAMELEN,
+	    SMB_CASE_LOWER) != 0)
 		return (-1);
 
 	if (smb_getfqdomainname(domain, MAXHOSTNAMELEN) != 0)

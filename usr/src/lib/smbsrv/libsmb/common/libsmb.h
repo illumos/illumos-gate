@@ -32,6 +32,7 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/list.h>
+#include <sys/avl.h>
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <inet/tcp.h>
@@ -42,6 +43,7 @@ extern "C" {
 #include <libshare.h>
 #include <sqlite/sqlite.h>
 #include <uuid/uuid.h>
+#include <synch.h>
 
 #include <smbsrv/string.h>
 #include <smbsrv/smb_idmap.h>
@@ -49,7 +51,7 @@ extern "C" {
 #include <smbsrv/smb_share.h>
 #include <smbsrv/nterror.h>
 #include <smbsrv/ntstatus.h>
-#include <smbsrv/smb_door_svc.h>
+#include <smbsrv/smb_door.h>
 #include <smbsrv/alloc.h>
 #include <smbsrv/hash_table.h>
 #include <smbsrv/msgbuf.h>
@@ -99,7 +101,8 @@ typedef struct smb_scfhandle {
  * CIFS Configuration Management
  */
 typedef enum {
-	SMB_CI_OPLOCK_ENABLE = 0,
+	SMB_CI_VERSION = 0,
+	SMB_CI_OPLOCK_ENABLE,
 
 	SMB_CI_AUTOHOME_MAP,
 
@@ -190,6 +193,7 @@ extern int smb_config_set_secmode(int);
 extern int smb_config_set_idmap_domain(char *);
 extern int smb_config_refresh_idmap(void);
 extern int smb_config_getip(smb_cfg_id_t, smb_inaddr_t *);
+extern void smb_config_get_version(smb_version_t *);
 
 extern void smb_load_kconfig(smb_kmod_cfg_t *kcfg);
 extern uint32_t smb_crc_gen(uint8_t *, size_t);
@@ -210,9 +214,9 @@ typedef struct smb_joininfo {
 } smb_joininfo_t;
 
 /* APIs to communicate with SMB daemon via door calls */
-extern uint32_t smb_join(smb_joininfo_t *info);
-extern bool_t xdr_smb_dr_joininfo_t(XDR *, smb_joininfo_t *);
-extern boolean_t smb_find_ads_server(char *, char *, int);
+uint32_t smb_join(smb_joininfo_t *info);
+bool_t smb_joininfo_xdr(XDR *, smb_joininfo_t *);
+boolean_t smb_find_ads_server(char *, char *, int);
 
 extern void smb_config_getdomaininfo(char *, char *, char *, char *, char *);
 extern void smb_config_setdomaininfo(char *, char *, char *, char *, char *);
@@ -237,10 +241,7 @@ extern int smb_ctxbuf_init(smb_ctxbuf_t *ctx, unsigned char *buf,
 extern int smb_ctxbuf_len(smb_ctxbuf_t *ctx);
 extern int smb_ctxbuf_printf(smb_ctxbuf_t *ctx, const char *fmt, ...);
 
-/* Functions to handle SMB daemon communications with idmap service */
-extern int smb_idmap_start(void);
-extern void smb_idmap_stop(void);
-extern int smb_idmap_restart(void);
+void smb_idmap_check(const char *, idmap_stat);
 
 /* Miscellaneous functions */
 extern void hexdump(unsigned char *, int);
@@ -254,7 +255,14 @@ extern void rand_hash(unsigned char *, size_t, unsigned char *, size_t);
 
 extern int smb_getdomainname(char *, size_t);
 extern int smb_getfqdomainname(char *, size_t);
-extern int smb_gethostname(char *, size_t, int);
+
+typedef enum smb_caseconv {
+	SMB_CASE_PRESERVE = 0,
+	SMB_CASE_UPPER,
+	SMB_CASE_LOWER
+} smb_caseconv_t;
+
+extern int smb_gethostname(char *, size_t, smb_caseconv_t);
 extern int smb_getfqhostname(char *, size_t);
 extern int smb_getnetbiosname(char *, size_t);
 extern struct hostent *smb_gethostbyname(const char *, int *);
@@ -651,11 +659,6 @@ void smb_domain_set_dns_info(char *, char *, char *, char *, char *,
 void smb_domain_set_trust_info(char *, char *, char *,
     uint32_t, uint32_t, uint32_t, smb_domain_t *);
 
-typedef enum {
-	SMB_LGRP_BUILTIN = 1,
-	SMB_LGRP_LOCAL
-} smb_gdomain_t;
-
 typedef struct smb_gsid {
 	smb_sid_t *gs_sid;
 	uint16_t gs_type;
@@ -664,6 +667,7 @@ typedef struct smb_gsid {
 typedef struct smb_giter {
 	sqlite_vm	*sgi_vm;
 	sqlite		*sgi_db;
+	uint32_t	sgi_nerr;
 } smb_giter_t;
 
 typedef struct smb_group {
@@ -672,7 +676,7 @@ typedef struct smb_group {
 	uint32_t		sg_attr;
 	uint32_t		sg_rid;
 	smb_gsid_t		sg_id;
-	smb_gdomain_t		sg_domain;
+	smb_domain_type_t	sg_domain;
 	smb_privset_t		*sg_privs;
 	uint32_t		sg_nmembers;
 	smb_gsid_t		*sg_members;
@@ -690,12 +694,13 @@ int smb_lgrp_setpriv(char *, uint8_t, boolean_t);
 int smb_lgrp_add_member(char *, smb_sid_t *, uint16_t);
 int smb_lgrp_del_member(char *, smb_sid_t *, uint16_t);
 int smb_lgrp_getbyname(char *, smb_group_t *);
-int smb_lgrp_getbyrid(uint32_t, smb_gdomain_t, smb_group_t *);
+int smb_lgrp_getbyrid(uint32_t, smb_domain_type_t, smb_group_t *);
 void smb_lgrp_free(smb_group_t *);
 boolean_t smb_lgrp_is_member(smb_group_t *, smb_sid_t *);
 char *smb_lgrp_strerror(int);
 int smb_lgrp_iteropen(smb_giter_t *);
 void smb_lgrp_iterclose(smb_giter_t *);
+boolean_t smb_lgrp_itererror(smb_giter_t *);
 int smb_lgrp_iterate(smb_giter_t *, smb_group_t *);
 
 int smb_lookup_sid(const char *, lsa_account_t *);
@@ -733,6 +738,7 @@ int smb_lookup_name(const char *, sid_type_t, lsa_account_t *);
 #define	SMB_LGRP_UPDATE_FAILED		29
 #define	SMB_LGRP_LOOKUP_FAILED		30
 #define	SMB_LGRP_NOT_SUPPORTED		31
+#define	SMB_LGRP_OFFLINE		32
 
 #define	SMB_LGRP_COMMENT_MAX	256
 
@@ -776,6 +782,24 @@ int smb_nic_getnext(smb_niciter_t *);
 boolean_t smb_nic_is_local(smb_inaddr_t *);
 boolean_t smb_nic_is_same_subnet(smb_inaddr_t *);
 
+#define	SMB_NIC_SUCCESS			0
+#define	SMB_NIC_INVALID_ARG		1
+#define	SMB_NIC_NOT_FOUND		2
+#define	SMB_NIC_NO_HOST			3
+#define	SMB_NIC_NO_MEMORY		4
+#define	SMB_NIC_DB_ERROR		5
+#define	SMB_NIC_DBINIT_ERROR		6
+#define	SMB_NIC_BAD_DATA		7
+#define	SMB_NIC_NO_MORE			8
+#define	SMB_NIC_DBOPEN_FAILED		9
+#define	SMB_NIC_DBEXEC_FAILED		10
+#define	SMB_NIC_DBINIT_FAILED		11
+#define	SMB_NIC_INSERT_FAILED		12
+#define	SMB_NIC_DELETE_FAILED		13
+#define	SMB_NIC_SOCK			14
+#define	SMB_NIC_IOCTL			15
+#define	SMB_NIC_CHANGED			16
+
 /* NIC Monitoring functions */
 int smb_nicmon_start(const char *);
 void smb_nicmon_stop(void);
@@ -813,8 +837,6 @@ typedef struct smb_wka {
 /*
  * Well-known account interfaces
  */
-int smb_wka_init(void);
-void smb_wka_fini(void);
 smb_wka_t *smb_wka_lookup_builtin(const char *);
 smb_wka_t *smb_wka_lookup_name(const char *);
 smb_wka_t *smb_wka_lookup_sid(smb_sid_t *);
@@ -854,6 +876,8 @@ int smb_kmod_bind(void);
 int smb_kmod_setcfg(smb_kmod_cfg_t *);
 int smb_kmod_setgmtoff(int32_t);
 int smb_kmod_start(int, int, int);
+void smb_kmod_stop(void);
+int smb_kmod_event_notify(uint32_t);
 int smb_kmod_tcplisten(int);
 int smb_kmod_nbtlisten(int);
 int smb_kmod_tcpreceive(void);
@@ -874,6 +898,7 @@ uint32_t smb_name_validate_account(const char *);
 uint32_t smb_name_validate_domain(const char *);
 uint32_t smb_name_validate_nbdomain(const char *);
 uint32_t smb_name_validate_workgroup(const char *);
+uint32_t smb_name_validate_rpath(const char *);
 
 /*
  * Interposer library validation
@@ -886,6 +911,71 @@ typedef struct smbex_version {
 } smbex_version_t;
 void *smb_dlopen(void);
 void smb_dlclose(void *);
+
+/*
+ * General purpose multi-thread safe cache based on
+ * AVL tree
+ */
+typedef struct smb_cache {
+	avl_tree_t	ch_cache;
+	rwlock_t	ch_cache_lck;
+	uint32_t	ch_state;
+	uint32_t	ch_nops;
+	uint32_t	ch_wait;
+	uint32_t	ch_sequence;
+	size_t		ch_datasz;
+	mutex_t		ch_mtx;
+	cond_t		ch_cv;
+	void		(*ch_free)(void *);
+	void		(*ch_copy)(const void *, void *, size_t);
+} smb_cache_t;
+
+typedef struct smb_cache_node {
+	avl_node_t	cn_link;
+	void		*cn_data;
+} smb_cache_node_t;
+
+typedef struct smb_cache_cursor {
+	void		*cc_next;
+	uint32_t	cc_sequence;
+} smb_cache_cursor_t;
+
+/*
+ * flags used with smb_cache_add()
+ *
+ * SMB_CACHE_ADD	If object doesn't exist add, otherwise fail
+ * SMB_CACHE_REPLACE	If object doesn't exist add, otherwise replace
+ */
+#define	SMB_CACHE_ADD		1
+#define	SMB_CACHE_REPLACE	2
+
+void smb_cache_create(smb_cache_t *, uint32_t,
+    int (*cmpfn) (const void *, const void *), void (*freefn)(void *),
+    void (*copyfn)(const void *, void *, size_t), size_t);
+void smb_cache_destroy(smb_cache_t *);
+void smb_cache_flush(smb_cache_t *);
+uint32_t smb_cache_num(smb_cache_t *);
+int smb_cache_refreshing(smb_cache_t *);
+void smb_cache_ready(smb_cache_t *);
+int smb_cache_add(smb_cache_t *, const void *, int);
+void smb_cache_remove(smb_cache_t *, const void *);
+void smb_cache_iterinit(smb_cache_t *, smb_cache_cursor_t *);
+boolean_t smb_cache_iterate(smb_cache_t *, smb_cache_cursor_t *, void *);
+
+/*
+ * Values returned by smb_reparse_stat()
+ */
+#define	SMB_REPARSE_NOTFOUND	1	/* object does not exist */
+#define	SMB_REPARSE_NOTREPARSE	2	/* object is NOT a reparse point */
+#define	SMB_REPARSE_ISREPARSE	3	/* object is a reparse point */
+
+/*
+ * Reparse Point API
+ */
+int smb_reparse_stat(const char *, uint32_t *);
+int smb_reparse_svcadd(const char *, const char *, const char *);
+int smb_reparse_svcdel(const char *, const char *);
+int smb_reparse_svcget(const char *, const char *, char **);
 
 #ifdef	__cplusplus
 }

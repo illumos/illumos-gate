@@ -1226,7 +1226,7 @@ mbc_marshal_get_ascii_string(
 	int		length = 0;
 
 	max = MALLOC_QUANTUM;
-	rcvbuf = smb_srm_alloc(sr, max);
+	rcvbuf = smb_srm_zalloc(sr, max);
 
 	if (max_ascii == 0)
 		max_ascii = 0xffff;
@@ -1247,7 +1247,7 @@ mbc_marshal_get_ascii_string(
 			length++;
 		}
 		max += MALLOC_QUANTUM;
-		rcvbuf = smb_srm_realloc(sr, rcvbuf, max);
+		rcvbuf = smb_srm_rezalloc(sr, rcvbuf, max);
 		ch = rcvbuf + length;
 	}
 
@@ -1256,7 +1256,7 @@ multibyte_encode:
 	 * UTF-8 encode the string for internal system use.
 	 */
 	length = strlen(rcvbuf) + 1;
-	*ascii = smb_srm_alloc(sr, length * MTS_MB_CHAR_MAX);
+	*ascii = smb_srm_zalloc(sr, length * MTS_MB_CHAR_MAX);
 	return (mbc_marshal_cstou8("CP850", (char *)*ascii,
 	    (size_t)length * MTS_MB_CHAR_MAX, rcvbuf, (size_t)length));
 }
@@ -1275,7 +1275,7 @@ mbc_marshal_get_unicode_string(smb_request_t *sr,
 		max_unicode = 0xffff;
 
 	max = MALLOC_QUANTUM;
-	*ascii = smb_srm_alloc(sr, max);
+	*ascii = smb_srm_zalloc(sr, max);
 
 	ch = (char *)*ascii;
 	for (;;) {
@@ -1294,7 +1294,7 @@ mbc_marshal_get_unicode_string(smb_request_t *sr,
 			ch += emitted;
 		}
 		max += MALLOC_QUANTUM;
-		*ascii = smb_srm_realloc(sr, *ascii, max);
+		*ascii = smb_srm_rezalloc(sr, *ascii, max);
 		ch = (char *)*ascii + length;
 	}
 done:	*ch = 0;

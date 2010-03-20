@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -332,6 +332,38 @@ ndr_decode_frag_hdr(ndr_stream_t *nds, ndr_common_header_t *hdr)
 		    sizeof (WORD));
 		nds_bswap(&tmp->call_id, &hdr->call_id, sizeof (DWORD));
 	}
+}
+
+/*
+ * Remove an RPC fragment header from the received data stream.
+ *
+ * NDR stream on entry:
+ *
+ *                |<--- frag --->|
+ * +-----+--------+-----+--------+-----+---------+-----+
+ * | hdr |  data  | hdr |  data  | hdr |  data   | ... |
+ * +-----+--------+-----+--------+-----+---------+-----+
+ *                 <----
+ *
+ * NDR stream on return:
+ *
+ * +-----+----------------+-----+---------+-----+
+ * | hdr |       data     | hdr |  data   | ... |
+ * +-----+----------------+-----+---------+-----+
+ */
+void
+ndr_remove_frag_hdr(ndr_stream_t *nds)
+{
+	char	*hdr;
+	char	*data;
+	int	nbytes;
+
+	hdr = (char *)nds->pdu_base_offset + nds->pdu_scan_offset;
+	data = hdr + NDR_RSP_HDR_SIZE;
+	nbytes = nds->pdu_size - nds->pdu_scan_offset - NDR_RSP_HDR_SIZE;
+
+	bcopy(data, hdr, nbytes);
+	nds->pdu_size -= NDR_RSP_HDR_SIZE;
 }
 
 void

@@ -31,10 +31,15 @@
 static char *smb_pathname_catia_v5tov4(smb_request_t *, char *, char *, int);
 static char *smb_pathname_catia_v4tov5(smb_request_t *, char *, char *, int);
 static int smb_pathname_lookup(pathname_t *, pathname_t *, int,
-    vnode_t **, vnode_t *, vnode_t *, cred_t *);
+    vnode_t **, vnode_t *, vnode_t *, smb_attr_t *attr, cred_t *);
 static char *smb_pathname_strdup(smb_request_t *, const char *);
 static char *smb_pathname_strcat(smb_request_t *, char *, const char *);
 static void smb_pathname_preprocess(smb_request_t *, smb_pathname_t *);
+static void smb_pathname_preprocess_quota(smb_request_t *, smb_pathname_t *);
+static int smb_pathname_dfs_preprocess(smb_request_t *, char *, size_t);
+static void smb_pathname_preprocess_adminshare(smb_request_t *,
+    smb_pathname_t *);
+
 
 uint32_t
 smb_is_executable(char *path)
@@ -199,6 +204,15 @@ smb_pathname_reduce(
 	local_cur_node = cur_node;
 	local_root_node = root_node;
 
+	if (sr && (sr->smb_flg2 & SMB_FLAGS2_DFS)) {
+		err = smb_pathname_dfs_preprocess(sr, usepath, MAXPATHLEN);
+		if (err != 0) {
+			kmem_free(usepath, MAXPATHLEN);
+			return (err);
+		}
+		len = strlen(usepath);
+	}
+
 	if (sr && (sr->smb_flg2 & SMB_FLAGS2_REPARSE_PATH)) {
 		err = smb_vss_lookup_nodes(sr, root_node, cur_node,
 		    usepath, &vss_cur_node, &vss_root_node);
@@ -323,6 +337,7 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 	char		*component, *real_name, *namep;
 	pathname_t	pn, rpn, upn, link_pn;
 	smb_node_t	*dnode, *fnode;
+	smb_attr_t	attr;
 	vnode_t		*rootvp, *vp;
 	size_t		pathleft;
 	int		err = 0;
@@ -385,7 +400,7 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 
 		local_flags = flags & FIGNORECASE;
 		err = smb_pathname_lookup(&pn, &rpn, local_flags,
-		    &vp, rootvp, dnode->vp, cred);
+		    &vp, rootvp, dnode->vp, &attr, cred);
 
 		if (err) {
 			if (smb_maybe_mangled_name(component) == 0)
@@ -406,9 +421,20 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 
 			local_flags = 0;
 			err = smb_pathname_lookup(&pn, &rpn, local_flags,
-			    &vp, rootvp, dnode->vp, cred);
+			    &vp, rootvp, dnode->vp, &attr, cred);
 			if (err)
 				break;
+		}
+
+		/*
+		 * This check MUST be done before symlink check
+		 * since a reparse point is of type VLNK but should
+		 * not be handled like a regular symlink.
+		 */
+		if (attr.sa_dosattr & FILE_ATTRIBUTE_REPARSE_POINT) {
+			err = EREMOTE;
+			VN_RELE(vp);
+			break;
 		}
 
 		if ((vp->v_type == VLNK) &&
@@ -509,7 +535,7 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
  */
 static int
 smb_pathname_lookup(pathname_t *pn, pathname_t *rpn, int flags,
-    vnode_t **vp, vnode_t *rootvp, vnode_t *dvp, cred_t *cred)
+    vnode_t **vp, vnode_t *rootvp, vnode_t *dvp, smb_attr_t *attr, cred_t *cred)
 {
 	int err;
 
@@ -519,6 +545,9 @@ smb_pathname_lookup(pathname_t *pn, pathname_t *rpn, int flags,
 		VN_HOLD(rootvp);
 
 	err = lookuppnvp(pn, rpn, flags, NULL, vp, rootvp, dvp, cred);
+	if ((err == 0) && (attr != NULL))
+		(void) smb_vop_getattr(*vp, NULL, attr, 0, kcred);
+
 	return (err);
 }
 
@@ -612,7 +641,7 @@ smb_lookuppathvptovp(smb_request_t *sr, char *path, vnode_t *startvp,
  * including the stream type and preceding colon: :sname:%DATA
  * pn_stype will point to the stream type within pn_sname.
  *
- * If the pname element is missing pn_pname will be set to "\\".
+ * If the pname element is missing pn_pname will be set to NULL.
  * If any other element is missing the pointer in pn will be NULL.
  */
 void
@@ -632,7 +661,7 @@ smb_pathname_init(smb_request_t *sr, smb_pathname_t *pn, char *path)
 
 	if (fname) {
 		if (fname == pname) {
-			pn->pn_pname = smb_pathname_strdup(sr, "\\");
+			pn->pn_pname = NULL;
 		} else {
 			*fname = '\0';
 			pn->pn_pname =
@@ -642,7 +671,7 @@ smb_pathname_init(smb_request_t *sr, smb_pathname_t *pn, char *path)
 		++fname;
 	} else {
 		fname = pname;
-		pn->pn_pname = smb_pathname_strdup(sr, "\\");
+		pn->pn_pname = NULL;
 	}
 
 	if (fname[0] == '\0') {
@@ -690,6 +719,7 @@ smb_pathname_init(smb_request_t *sr, smb_pathname_t *pn, char *path)
  * - convert any '/' to '\\'
  * - eliminate duplicate slashes
  * - remove trailing slashes
+ * - quota directory specific pre-processing
  */
 static void
 smb_pathname_preprocess(smb_request_t *sr, smb_pathname_t *pn)
@@ -714,6 +744,58 @@ smb_pathname_preprocess(smb_request_t *sr, smb_pathname_t *pn)
 	p = pn->pn_path + strlen(pn->pn_path) - 1;
 	if ((p != pn->pn_path) && (*p == '\\'))
 		*p = '\0';
+
+	smb_pathname_preprocess_quota(sr, pn);
+	smb_pathname_preprocess_adminshare(sr, pn);
+}
+
+/*
+ * smb_pathname_preprocess_quota
+ *
+ * There is a special file required by windows so that the quota
+ * tab will be displayed by windows clients. This is created in
+ * a special directory, $EXTEND, at the root of the shared file
+ * system. To hide this directory prepend a '.' (dot).
+ */
+static void
+smb_pathname_preprocess_quota(smb_request_t *sr, smb_pathname_t *pn)
+{
+	char *name = "$EXTEND";
+	char *new_name = ".$EXTEND";
+	char *p, *slash;
+	int len;
+
+	if (!smb_node_is_vfsroot(sr->tid_tree->t_snode))
+		return;
+
+	p = pn->pn_path;
+
+	/* ignore any initial "\\" */
+	p += strspn(p, "\\");
+	if (smb_strcasecmp(p, name, strlen(name)) != 0)
+		return;
+
+	p += strlen(name);
+	if ((*p != ':') && (*p != '\\') && (*p != '\0'))
+		return;
+
+	slash = (pn->pn_path[0] == '\\') ? "\\" : "";
+	len = strlen(pn->pn_path) + 2;
+	pn->pn_path = smb_srm_alloc(sr, len);
+	(void) snprintf(pn->pn_path, len, "%s%s%s", slash, new_name, p);
+	(void) smb_strupr(pn->pn_path);
+}
+
+/*
+ * smb_pathname_preprocess_adminshare
+ *
+ * Convert any path with share name "C$" or "c$" (Admin share) in to lower case.
+ */
+static void
+smb_pathname_preprocess_adminshare(smb_request_t *sr, smb_pathname_t *pn)
+{
+	if (strcasecmp(sr->tid_tree->t_sharename, "c$") == 0)
+		(void) smb_strlwr(pn->pn_path);
 }
 
 /*
@@ -731,7 +813,7 @@ smb_pathname_strdup(smb_request_t *sr, const char *s)
 	size_t n;
 
 	n = strlen(s) + 1;
-	s2 = smb_srm_alloc(sr, n);
+	s2 = smb_srm_zalloc(sr, n);
 	(void) strlcpy(s2, s, n);
 	return (s2);
 }
@@ -752,7 +834,7 @@ smb_pathname_strcat(smb_request_t *sr, char *s1, const char *s2)
 	size_t n;
 
 	n = strlen(s1) + strlen(s2) + 1;
-	s1 = smb_srm_realloc(sr, s1, n);
+	s1 = smb_srm_rezalloc(sr, s1, n);
 	(void) strlcat(s1, s2, n);
 	return (s1);
 }
@@ -981,4 +1063,38 @@ smb_validate_stream_name(smb_request_t *sr, smb_pathname_t *pn)
 	}
 
 	return (B_TRUE);
+}
+
+/*
+ * valid DFS I/O path:
+ *
+ * \server-or-domain\share
+ * \server-or-domain\share\path
+ *
+ * All the returned errors by this function needs to be
+ * checked against Windows.
+ */
+static int
+smb_pathname_dfs_preprocess(smb_request_t *sr, char *path, size_t pathsz)
+{
+	smb_unc_t unc;
+	char *linkpath;
+	int rc;
+
+	if (sr->tid_tree == NULL)
+		return (0);
+
+	if ((rc = smb_unc_init(path, &unc)) != 0)
+		return (rc);
+
+	if (smb_strcasecmp(unc.unc_share, sr->tid_tree->t_sharename, 0)) {
+		smb_unc_free(&unc);
+		return (EINVAL);
+	}
+
+	linkpath = unc.unc_path;
+	(void) snprintf(path, pathsz, "/%s", (linkpath) ? linkpath : "");
+
+	smb_unc_free(&unc);
+	return (0);
 }

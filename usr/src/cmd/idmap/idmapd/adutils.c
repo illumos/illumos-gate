@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -323,7 +323,7 @@ idmap_setqresults(
 		san = NULL;
 	}
 
-	if (q->pid != NULL && pid != SENTINEL_PID) {
+	if (q->pid != NULL && pid != IDMAP_SENTINEL_PID) {
 		*q->pid = pid;
 	}
 
@@ -396,7 +396,7 @@ idmap_extract_object(idmap_query_state_t *state, idmap_q_t *q,
 	rid_t			rid = 0;
 	int			sid_type;
 	int			ok;
-	posix_id_t		pid = SENTINEL_PID;
+	posix_id_t		pid = IDMAP_SENTINEL_PID;
 
 	assert(q->rc != NULL);
 	assert(q->domain == NULL || *q->domain == NULL);

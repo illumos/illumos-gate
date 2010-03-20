@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -28,6 +28,7 @@ LIBRARY =	libmlsvc.a
 VERS =		.1
 
 OBJS_COMMON =		\
+	dfs.o		\
 	dssetup_clnt.o	\
 	dssetup_svc.o	\
 	eventlog_svc.o	\
@@ -40,7 +41,6 @@ OBJS_COMMON =		\
 	mlsvc_init.o	\
 	mlsvc_netr.o	\
 	mlsvc_util.o	\
-	mlsvc_wkssvc.o	\
 	msgsvc_svc.o	\
 	netdfs.o	\
 	netr_auth.o	\
@@ -51,13 +51,15 @@ OBJS_COMMON =		\
 	smb_autohome.o	\
 	smb_logon.o	\
 	smb_share.o	\
+	smb_quota.o	\
 	spoolss_svc.o	\
 	srvsvc_clnt.o	\
 	srvsvc_sd.o	\
 	srvsvc_svc.o	\
 	svcctl_scm.o	\
 	svcctl_svc.o	\
-	winreg_svc.o
+	winreg_svc.o	\
+	wkssvc_svc.o
 
 # Automatically generated from .ndl files
 NDLLIST =		\
@@ -82,7 +84,7 @@ INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS += -lmlrpc -lsmbrdr -lsmb -lsmbns -lshare -lresolv -lnsl -lpkcs11 -lscf	\
-	-lnvpair -lsec -luutil -lzfs -lc
+	-lavl -lnvpair -lsec -luutil -luuid -lgen -lzfs -lc
 
 CPPFLAGS += $(INCS) -D_REENTRANT
 

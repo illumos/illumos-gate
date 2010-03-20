@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,8 +78,8 @@ smbrdr_netuse_free(struct sdb_netuse *netuse)
  * netuse is cleared and a null pointer is returned.
  */
 DWORD
-smbrdr_tree_connect(char *hostname, char *username, char *sharename,
-    unsigned short *tid)
+smbrdr_tree_connect(char *hostname, char *domain, char *username,
+    char *sharename, unsigned short *tid)
 {
 	struct sdb_session *session;
 	struct sdb_netuse *netuse;
@@ -89,10 +89,10 @@ smbrdr_tree_connect(char *hostname, char *username, char *sharename,
 
 	*tid = 0;
 
-	/*
-	 * Make sure there is a session & logon for given info
-	 */
-	session = smbrdr_session_lock(hostname, username, SDB_SLCK_READ);
+	if (smbrdr_logon(hostname, domain, username) != 0)
+		return (NT_STATUS_LOGON_FAILURE);
+
+	session = smbrdr_session_lock(hostname, SDB_SLCK_READ);
 	if (session == NULL) {
 		syslog(LOG_DEBUG, "smbrdr_tree_connect: no session for %s@%s",
 		    username, hostname);

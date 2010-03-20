@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -413,7 +413,7 @@ init_idmapd()
 		idmapdlog(LOG_ERR, "unable to register door");
 		goto errout;
 	}
-	if ((error = idmap_reg(dfd)) != 0) {
+	if ((error = __idmap_reg(dfd)) != 0) {
 		idmapdlog(LOG_ERR, "unable to register door (%s)",
 		    strerror(errno));
 		goto errout;
@@ -424,8 +424,10 @@ init_idmapd()
 	    8192, &_idmapdstate.next_gid)) != 0) {
 		idmapdlog(LOG_ERR, "unable to allocate ephemeral IDs (%s)",
 		    strerror(errno));
-		_idmapdstate.next_uid = _idmapdstate.limit_uid = SENTINEL_PID;
-		_idmapdstate.next_gid = _idmapdstate.limit_gid = SENTINEL_PID;
+		_idmapdstate.next_uid = IDMAP_SENTINEL_PID;
+		_idmapdstate.limit_uid = IDMAP_SENTINEL_PID;
+		_idmapdstate.next_gid = IDMAP_SENTINEL_PID;
+		_idmapdstate.limit_gid = IDMAP_SENTINEL_PID;
 	} else {
 		_idmapdstate.limit_uid = _idmapdstate.next_uid + 8192;
 		_idmapdstate.limit_gid = _idmapdstate.next_gid + 8192;
@@ -443,7 +445,7 @@ errout:
 static void
 fini_idmapd()
 {
-	idmap_unreg(dfd);
+	__idmap_unreg(dfd);
 	fini_mapping_system();
 	if (xprt != NULL)
 		svc_destroy(xprt);

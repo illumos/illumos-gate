@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -271,6 +271,11 @@ struct idmap_prop_res {
 };
 #endif
 
+enum idmap_flush_op {
+	IDMAP_FLUSH_EXPIRE = 0,
+	IDMAP_FLUSH_DELETE = 1
+};
+
 /*
  * Represents an error from the directory lookup service.
  *
@@ -395,5 +400,7 @@ program IDMAP_PROG {
 			idmap_utf8str types,
 			idmap_utf8str_list attrs) = 7;
 
+		idmap_retcode
+		IDMAP_FLUSH(idmap_flush_op) = 8;
 	} = 1;
 } = 100172;

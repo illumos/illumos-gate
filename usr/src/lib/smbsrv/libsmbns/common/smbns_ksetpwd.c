@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,6 +168,8 @@ smb_krb5_ctx_init(krb5_context *ctx)
  * smb_krb5_get_principals
  *
  * Setup the krb5_principal array given the principals in string format.
+ * Parameters:
+ *   domain - fully-qualified domain name in lower case.
  * Return 0 on success. Otherwise, return -1.
  */
 int
@@ -178,9 +180,13 @@ smb_krb5_get_principals(char *domain, krb5_context ctx,
 	int i;
 	char *spn, *upn;
 
-	if (smb_gethostname(fqhn, MAXHOSTNAMELEN, 0) != 0)
+	if (smb_gethostname(fqhn, MAXHOSTNAMELEN, SMB_CASE_LOWER) != 0)
 			return (-1);
 
+	/*
+	 * To comply with RFC 4120 section 6.2.1, the fully-qualified hostname
+	 * must be set to lower case.
+	 */
 	(void) snprintf(fqhn, MAXHOSTNAMELEN, "%s.%s", fqhn,
 	    domain);
 

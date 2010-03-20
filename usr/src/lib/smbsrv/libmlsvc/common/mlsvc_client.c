@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,16 +29,20 @@
 
 #include <sys/types.h>
 #include <sys/errno.h>
+#include <sys/tzfile.h>
 #include <time.h>
 #include <strings.h>
 #include <assert.h>
 #include <thread.h>
+#include <unistd.h>
+#include <syslog.h>
 #include <synch.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/srvsvc.ndl>
+#include <mlsvc.h>
 
 /*
  * Server info cache entry expiration in seconds.
@@ -579,10 +583,12 @@ ndr_xa_release(ndr_client_t *clnt)
 static int
 ndr_svinfo_lookup(char *server, char *domain, srvsvc_server_info_t *svinfo)
 {
+	static boolean_t	timechecked = B_FALSE;
 	ndr_svinfo_t *svi;
 
 	(void) mutex_lock(&ndr_svlist.svl_mtx);
-	assert(ndr_svlist.svl_init == B_TRUE);
+	if (!ndr_svlist.svl_init)
+		return (-1);
 
 	svi = list_head(&ndr_svlist.svl_list);
 	while (svi != NULL) {
@@ -621,6 +627,12 @@ ndr_svinfo_lookup(char *server, char *domain, srvsvc_server_info_t *svinfo)
 	bcopy(&svi->svi_svinfo, svinfo, sizeof (srvsvc_server_info_t));
 	svinfo->sv_name = NULL;
 	svinfo->sv_comment = NULL;
+
+	if (!timechecked) {
+		timechecked = B_TRUE;
+		ndr_srvsvc_timecheck(server, domain);
+	}
+
 	(void) mutex_unlock(&ndr_svlist.svl_mtx);
 	return (0);
 }
@@ -660,4 +672,46 @@ ndr_svinfo_expired(ndr_svinfo_t *svi)
 	}
 
 	return (B_FALSE);
+}
+
+/*
+ * Compare the time here with the remote time on the server
+ * and report clock skew.
+ */
+void
+ndr_srvsvc_timecheck(char *server, char *domain)
+{
+	char			hostname[MAXHOSTNAMELEN];
+	struct timeval		dc_tv;
+	struct tm		dc_tm;
+	struct tm		*tm;
+	time_t			tnow;
+	time_t			tdiff;
+	int			priority;
+
+	if (srvsvc_net_remote_tod(server, domain, &dc_tv, &dc_tm) < 0) {
+		syslog(LOG_DEBUG, "srvsvc_net_remote_tod failed");
+		return;
+	}
+
+	tnow = time(NULL);
+
+	if (tnow > dc_tv.tv_sec)
+		tdiff = (tnow - dc_tv.tv_sec) / SECSPERMIN;
+	else
+		tdiff = (dc_tv.tv_sec - tnow) / SECSPERMIN;
+
+	if (tdiff != 0) {
+		(void) strlcpy(hostname, "localhost", MAXHOSTNAMELEN);
+		(void) gethostname(hostname, MAXHOSTNAMELEN);
+
+		priority = (tdiff > 2) ? LOG_NOTICE : LOG_DEBUG;
+		syslog(priority, "DC [%s] clock skew detected: %u minutes",
+		    server, tdiff);
+
+		tm = gmtime(&dc_tv.tv_sec);
+		syslog(priority, "%-8s  UTC: %s", server, asctime(tm));
+		tm = gmtime(&tnow);
+		syslog(priority, "%-8s  UTC: %s", hostname, asctime(tm));
+	}
 }

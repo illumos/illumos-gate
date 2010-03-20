@@ -56,6 +56,7 @@
  * SMB_FILE_ALT_NAME_INFORMATION - not valid for pipes
  * SMB_FILE_STREAM_INFORMATION - not valid for pipes
  * SMB_FILE_COMPRESSION_INFORMATION - not valid for pipes
+ * SMB_FILE_NETWORK_OPEN_INFORMATION - not valid for pipes
  * SMB_FILE_ATTR_TAG_INFORMATION - not valid for pipes
  *
  * Internal levels representing non trans2 requests
@@ -78,8 +79,7 @@ typedef struct smb_queryinfo {
 #define	qi_crtime	qi_attr.sa_crtime
 
 static int smb_query_by_fid(smb_request_t *, smb_xa_t *, uint16_t);
-static int smb_query_by_path(smb_request_t *, smb_xa_t *,
-    uint16_t, char *);
+static int smb_query_by_path(smb_request_t *, smb_xa_t *, uint16_t);
 
 static int smb_query_fileinfo(smb_request_t *, smb_node_t *,
     uint16_t, smb_queryinfo_t *);
@@ -93,8 +93,8 @@ static void smb_encode_stream_info(smb_request_t *, smb_xa_t *,
     smb_queryinfo_t *);
 static int smb_query_pathname(smb_tree_t *, smb_node_t *, boolean_t,
     char *, size_t);
-uint32_t smb_pad_align(uint32_t offset, uint32_t align);
 
+int smb_query_passthru;
 
 /*
  * smb_com_trans2_query_file_information
@@ -120,8 +120,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 smb_sdrc_t
 smb_com_trans2_query_path_information(smb_request_t *sr, smb_xa_t *xa)
 {
-	uint16_t infolev;
-	char *path;
+	uint16_t	infolev;
+	smb_fqi_t	*fqi = &sr->arg.dirop.fqi;
 
 	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_INVALID_DEVICE_REQUEST,
@@ -130,10 +130,10 @@ smb_com_trans2_query_path_information(smb_request_t *sr, smb_xa_t *xa)
 	}
 
 	if (smb_mbc_decodef(&xa->req_param_mb, "%w4.u",
-	    sr, &infolev, &path) != 0)
+	    sr, &infolev, &fqi->fq_path.pn_path) != 0)
 		return (SDRC_ERROR);
 
-	if (smb_query_by_path(sr, xa, infolev, path) != 0)
+	if (smb_query_by_path(sr, xa, infolev) != 0)
 		return (SDRC_ERROR);
 
 	return (SDRC_SUCCESS);
@@ -165,7 +165,6 @@ smb_post_query_information(smb_request_t *sr)
 smb_sdrc_t
 smb_com_query_information(smb_request_t *sr)
 {
-	char *path = sr->arg.dirop.fqi.fq_path.pn_path;
 	uint16_t infolev = SMB_QUERY_INFORMATION;
 
 	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
@@ -174,7 +173,7 @@ smb_com_query_information(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if (smb_query_by_path(sr, NULL, infolev, path) != 0)
+	if (smb_query_by_path(sr, NULL, infolev) != 0)
 		return (SDRC_ERROR);
 
 	return (SDRC_SUCCESS);
@@ -277,17 +276,20 @@ smb_query_by_fid(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
  * Use the file name to identify the node object and request the
  * smb_queryinfo_t data for that node.
  *
+ * Path should be set in sr->arg.dirop.fqi.fq_path prior to
+ * calling smb_query_by_path.
+ *
  * Querying attributes on a named pipe by name is an error and
  * is handled in the calling functions so that they can return
  * the appropriate error status code (which differs by caller).
  */
 static int
-smb_query_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev, char *path)
+smb_query_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 {
 	smb_queryinfo_t	*qinfo;
 	smb_node_t	*node, *dnode;
+	smb_pathname_t	*pn;
 	int		rc;
-	int		len;
 
 	/* VALID, but not yet supported */
 	if (infolev == SMB_FILE_ACCESS_INFORMATION) {
@@ -295,22 +297,17 @@ smb_query_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev, char *path)
 		return (-1);
 	}
 
-	/*
-	 * Some MS clients pass NULL file names. NT interprets this as "\".
-	 * Otherwise, if path is not "\\", remove the terminating slash.
-	 */
-	if ((len = strlen(path)) == 0)
-		path = "\\";
-	else {
-		if ((len > 1) && (path[len - 1] == '\\')) {
-			path[len - 1] = 0;
-		}
-	}
+	pn = &sr->arg.dirop.fqi.fq_path;
+	smb_pathname_init(sr, pn, pn->pn_path);
+	if (!smb_pathname_validate(sr, pn))
+		return (-1);
 
 	qinfo = kmem_alloc(sizeof (smb_queryinfo_t), KM_SLEEP);
 
-	rc = smb_pathname_reduce(sr, sr->user_cr, path, sr->tid_tree->t_snode,
-	    sr->tid_tree->t_snode, &dnode, qinfo->qi_name);
+	rc = smb_pathname_reduce(sr, sr->user_cr, pn->pn_path,
+	    sr->tid_tree->t_snode, sr->tid_tree->t_snode, &dnode,
+	    qinfo->qi_name);
+
 	if (rc == 0) {
 		rc = smb_fsop_lookup_name(sr, sr->user_cr, SMB_FOLLOW_LINKS,
 		    sr->tid_tree->t_snode, dnode, qinfo->qi_name, &node);
@@ -325,6 +322,13 @@ smb_query_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev, char *path)
 			smbsr_errno(sr, rc);
 
 		kmem_free(qinfo, sizeof (smb_queryinfo_t));
+		return (-1);
+	}
+
+	if ((sr->smb_flg2 & SMB_FLAGS2_DFS) && smb_node_is_dfslink(node)) {
+		smbsr_error(sr, NT_STATUS_PATH_NOT_COVERED, ERRSRV, ERRbadpath);
+		kmem_free(qinfo, sizeof (smb_queryinfo_t));
+		smb_node_release(node);
 		return (-1);
 	}
 
@@ -372,10 +376,12 @@ smb_query_encode_response(smb_request_t *sr, smb_xa_t *xa,
 {
 	uint16_t dattr;
 	u_offset_t datasz, allocsz;
+	uint32_t isdir;
 
 	dattr = qinfo->qi_attr.sa_dosattr & FILE_ATTRIBUTE_MASK;
 	datasz = qinfo->qi_attr.sa_vattr.va_size;
 	allocsz = qinfo->qi_attr.sa_allocsz;
+	isdir = ((dattr & FILE_ATTRIBUTE_DIRECTORY) != 0);
 
 	switch (infolev) {
 	case SMB_QUERY_INFORMATION:
@@ -457,7 +463,7 @@ smb_query_encode_response(smb_request_t *sr, smb_xa_t *xa,
 		    (uint64_t)datasz,
 		    qinfo->qi_attr.sa_vattr.va_nlink,
 		    qinfo->qi_delete_on_close,
-		    (qinfo->qi_attr.sa_vattr.va_type == VDIR));
+		    (uint8_t)isdir);
 		break;
 
 	case SMB_QUERY_FILE_EA_INFO:
@@ -490,7 +496,7 @@ smb_query_encode_response(smb_request_t *sr, smb_xa_t *xa,
 		    (uint64_t)datasz,
 		    qinfo->qi_attr.sa_vattr.va_nlink,
 		    qinfo->qi_delete_on_close,
-		    (qinfo->qi_attr.sa_vattr.va_type == VDIR),
+		    isdir,
 		    0);
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lu",
@@ -524,6 +530,18 @@ smb_query_encode_response(smb_request_t *sr, smb_xa_t *xa,
 		    qinfo->qi_attr.sa_vattr.va_nodeid);
 		break;
 
+	case SMB_FILE_NETWORK_OPEN_INFORMATION:
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "TTTTqql4.",
+		    &qinfo->qi_crtime,
+		    &qinfo->qi_atime,
+		    &qinfo->qi_mtime,
+		    &qinfo->qi_ctime,
+		    (uint64_t)allocsz,
+		    (uint64_t)datasz,
+		    (uint32_t)dattr);
+		break;
+
 	case SMB_FILE_ATTR_TAG_INFORMATION:
 		/*
 		 * If dattr includes FILE_ATTRIBUTE_REPARSE_POINT, the
@@ -538,7 +556,11 @@ smb_query_encode_response(smb_request_t *sr, smb_xa_t *xa,
 		break;
 
 	default:
-		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
+		if ((infolev > 1000) && smb_query_passthru)
+			smbsr_error(sr, NT_STATUS_NOT_SUPPORTED,
+			    ERRDOS, ERROR_NOT_SUPPORTED);
+		else
+			smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
 		return (-1);
 	}
 
@@ -608,7 +630,7 @@ smb_encode_stream_info(smb_request_t *sr, smb_xa_t *xa, smb_queryinfo_t *qinfo)
 
 	sinfo = kmem_alloc(sizeof (smb_streaminfo_t), KM_SLEEP);
 	sinfo_next = kmem_alloc(sizeof (smb_streaminfo_t), KM_SLEEP);
-	is_dir = (attr->sa_vattr.va_type == VDIR);
+	is_dir = ((attr->sa_dosattr & FILE_ATTRIBUTE_DIRECTORY) != 0);
 	datasz = attr->sa_vattr.va_size;
 	allocsz = attr->sa_allocsz;
 
@@ -672,23 +694,6 @@ smb_encode_stream_info(smb_request_t *sr, smb_xa_t *xa, smb_queryinfo_t *qinfo)
 }
 
 /*
- * smb_pad_align
- *
- * Returns the number of bytes required to pad an offset to the
- * specified alignment.
- */
-uint32_t
-smb_pad_align(uint32_t offset, uint32_t align)
-{
-	uint32_t pad = offset % align;
-
-	if (pad != 0)
-		pad = align - pad;
-
-	return (pad);
-}
-
-/*
  * smb_query_pathname
  *
  * Determine the absolute pathname of 'node' within the share.
@@ -699,9 +704,6 @@ smb_pad_align(uint32_t offset, uint32_t align)
  * "dir1" on share "share1"
  * - if include_share is TRUE the pathname would be: \share1\dir1\test1.txt
  * - if include_share is FALSE the pathname would be: \dir1\test1.txt
- *
- * If node represents a named stream, construct the pathname for the
- * associated unnamed stream then append the stream name.
  */
 static int
 smb_query_pathname(smb_tree_t *tree, smb_node_t *node, boolean_t include_share,
@@ -710,7 +712,6 @@ smb_query_pathname(smb_tree_t *tree, smb_node_t *node, boolean_t include_share,
 	char *sharename = tree->t_sharename;
 	int rc;
 	size_t len;
-	vnode_t *vp;
 
 	if (include_share) {
 		len = snprintf(buf, buflen, "\\%s", sharename);
@@ -721,22 +722,7 @@ smb_query_pathname(smb_tree_t *tree, smb_node_t *node, boolean_t include_share,
 		buflen -= len;
 	}
 
-	if (SMB_IS_STREAM(node))
-		vp = node->n_unode->vp;
-	else
-		vp = node->vp;
-
-	if (vp == tree->t_snode->vp)
-		return (0);
-
-	rc = vnodetopath(tree->t_snode->vp, vp, buf, buflen, kcred);
-	if (rc == 0) {
-		(void) strsubst(buf, '/', '\\');
-
-		if (SMB_IS_STREAM(node))
-			(void) strlcat(buf, node->od_name, buflen);
-	}
-
+	rc = smb_node_getshrpath(node, tree, buf, buflen);
 	return (rc);
 }
 
@@ -752,6 +738,7 @@ smb_query_fileinfo(smb_request_t *sr, smb_node_t *node, uint16_t infolev,
 {
 	int rc;
 	boolean_t include_sharename = B_FALSE;
+	char *namep;
 
 	(void) bzero(qinfo, sizeof (smb_queryinfo_t));
 
@@ -803,15 +790,22 @@ smb_query_fileinfo(smb_request_t *sr, smb_node_t *node, uint16_t infolev,
 		qinfo->qi_namelen = 2;
 
 	/*
+	 * If the node is an named stream, use its associated
+	 * unnamed stream name to determine the shortname.
 	 * If the shortname is generated by smb_mangle_name()
 	 * it will be returned as the alternative name.
 	 * Otherwise, convert the original name to upper-case
 	 * and return it as the alternative name.
 	 */
+	if (SMB_IS_STREAM(node))
+		namep = node->n_unode->od_name;
+	else
+		namep = node->od_name;
+
 	(void) smb_mangle_name(qinfo->qi_attr.sa_vattr.va_nodeid,
-	    node->od_name, qinfo->qi_shortname, qinfo->qi_name83, 0);
+	    namep, qinfo->qi_shortname, qinfo->qi_name83, 0);
 	if (*qinfo->qi_shortname == 0) {
-		(void) strlcpy(qinfo->qi_shortname, node->od_name,
+		(void) strlcpy(qinfo->qi_shortname, namep,
 		    SMB_SHORTNAMELEN);
 		(void) smb_strupr(qinfo->qi_shortname);
 	}
@@ -878,6 +872,7 @@ smb_query_pipe_valid_infolev(smb_request_t *sr, uint16_t infolev)
 	case SMB_FILE_STREAM_INFORMATION:
 	case SMB_QUERY_FILE_COMPRESSION_INFO:
 	case SMB_FILE_COMPRESSION_INFORMATION:
+	case SMB_FILE_NETWORK_OPEN_INFORMATION:
 	case SMB_FILE_ATTR_TAG_INFORMATION:
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);

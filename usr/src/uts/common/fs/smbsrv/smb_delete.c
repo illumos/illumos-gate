@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,7 +161,7 @@ smb_com_delete(smb_request_t *sr)
 	    sr->tid_tree->t_snode, sr->tid_tree->t_snode,
 	    &fqi->fq_dnode, fqi->fq_last_comp);
 	if (rc == 0) {
-		if (fqi->fq_dnode->vp->v_type != VDIR) {
+		if (!smb_node_is_dir(fqi->fq_dnode)) {
 			smb_node_release(fqi->fq_dnode);
 			rc = ENOTDIR;
 		}

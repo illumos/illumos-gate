@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -684,10 +684,10 @@ smb_unmangle_name(smb_node_t *dnode, char *name, char *namebuf,
 
 	ASSERT(smb_maybe_mangled_name(name) != 0);
 
-	vp = dnode->vp;
-	if (vp->v_type != VDIR)
+	if (!smb_node_is_dir(dnode))
 		return (ENOTDIR);
 
+	vp = dnode->vp;
 	*namebuf = '\0';
 	is_edp = vfs_has_feature(vp->v_vfsp, VFSFT_DIRENTFLAGS);
 

@@ -241,6 +241,7 @@ smb_com_delete_directory(smb_request_t *sr)
 
 	rc = smb_pathname_reduce(sr, sr->user_cr, fqi->fq_path.pn_path,
 	    tnode, tnode, &fqi->fq_dnode, fqi->fq_last_comp);
+
 	if (rc != 0) {
 		smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
@@ -258,10 +259,21 @@ smb_com_delete_directory(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	/* Do not allow delete of root of share */
-	if (fqi->fq_fnode == tnode) {
+	/*
+	 * Delete should fail if this is the root of a share
+	 * or a DFS link
+	 */
+	if ((fqi->fq_fnode == tnode) || smb_node_is_dfslink(fqi->fq_fnode)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
+		smb_node_release(fqi->fq_dnode);
+		smb_node_release(fqi->fq_fnode);
+		return (SDRC_ERROR);
+	}
+
+	if (!smb_node_is_dir(fqi->fq_fnode)) {
+		smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY,
+		    ERRDOS, ERROR_PATH_NOT_FOUND);
 		smb_node_release(fqi->fq_dnode);
 		smb_node_release(fqi->fq_fnode);
 		return (SDRC_ERROR);
@@ -270,14 +282,6 @@ smb_com_delete_directory(smb_request_t *sr)
 	rc = smb_node_getattr(sr, fqi->fq_fnode, &fqi->fq_fattr);
 	if (rc != 0) {
 		smbsr_errno(sr, rc);
-		smb_node_release(fqi->fq_dnode);
-		smb_node_release(fqi->fq_fnode);
-		return (SDRC_ERROR);
-	}
-
-	if (fqi->fq_fattr.sa_vattr.va_type != VDIR) {
-		smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY,
-		    ERRDOS, ERROR_PATH_NOT_FOUND);
 		smb_node_release(fqi->fq_dnode);
 		smb_node_release(fqi->fq_fnode);
 		return (SDRC_ERROR);
@@ -367,6 +371,7 @@ smb_com_check_directory(smb_request_t *sr)
 	int rc;
 	smb_fqi_t *fqi;
 	smb_node_t *tnode;
+	smb_node_t *node;
 	char *path;
 	smb_pathname_t *pn;
 
@@ -412,23 +417,23 @@ smb_com_check_directory(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	rc = smb_node_getattr(sr, fqi->fq_fnode, &fqi->fq_fattr);
-	if (rc != 0) {
-		smbsr_errno(sr, rc);
-		smb_node_release(fqi->fq_fnode);
-		return (SDRC_ERROR);
-	}
-
-	if (fqi->fq_fattr.sa_vattr.va_type != VDIR) {
+	node = fqi->fq_fnode;
+	if (!smb_node_is_dir(node)) {
 		smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY,
 		    ERRDOS, ERROR_PATH_NOT_FOUND);
-		smb_node_release(fqi->fq_fnode);
+		smb_node_release(node);
 		return (SDRC_ERROR);
 	}
 
-	rc = smb_fsop_access(sr, sr->user_cr, fqi->fq_fnode, FILE_TRAVERSE);
+	if ((sr->smb_flg2 & SMB_FLAGS2_DFS) && smb_node_is_dfslink(node)) {
+		smbsr_error(sr, NT_STATUS_PATH_NOT_COVERED, ERRSRV, ERRbadpath);
+		smb_node_release(node);
+		return (SDRC_ERROR);
+	}
 
-	smb_node_release(fqi->fq_fnode);
+	rc = smb_fsop_access(sr, sr->user_cr, node, FILE_TRAVERSE);
+
+	smb_node_release(node);
 
 	if (rc != 0) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,

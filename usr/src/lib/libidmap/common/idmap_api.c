@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2560,4 +2560,24 @@ idmap_stat
 idmap_getwinnamebygid(gid_t gid, int flag, char **name, char **domain)
 {
 	return (idmap_getwinnamebypid(gid, 0, flag, name, domain));
+}
+
+idmap_stat
+idmap_flush(idmap_handle_t *handle, idmap_flush_op op)
+{
+	CLIENT			*clnt;
+	enum clnt_stat		clntstat;
+	idmap_retcode		res;
+
+	res = IDMAP_SUCCESS;
+	_IDMAP_GET_CLIENT_HANDLE(handle, clnt);
+
+	clntstat = clnt_call(clnt, IDMAP_FLUSH,
+	    (xdrproc_t)xdr_idmap_flush_op, (caddr_t)&op,
+	    (xdrproc_t)xdr_idmap_retcode, (caddr_t)&res, TIMEOUT);
+
+	if (clntstat != RPC_SUCCESS) {
+		return (_idmap_rpc2stat(clnt));
+	}
+	return (res);
 }

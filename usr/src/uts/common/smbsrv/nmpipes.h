@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,6 +107,7 @@ extern "C" {
 #define	PIPE_WINSMGR			"\\PIPE\\winsmgr"
 #define	PIPE_LLSRPC			"\\PIPE\\llsrpc"
 #define	PIPE_REPL			"\\PIPE\\repl"
+#define	PIPE_NETDFS			"\\PIPE\\netdfs"
 
 /*
  * Named pipe function codes (NTDDK).

@@ -525,12 +525,14 @@ smb_common_read(smb_request_t *sr, smb_rw_param_t *param)
 		}
 
 		if ((ofile->f_flags & SMB_OFLAGS_EXECONLY) &&
-		    !(sr->smb_flg2 & SMB_FLAGS2_PAGING_IO)) {
+		    !(sr->smb_flg2 & SMB_FLAGS2_READ_IF_EXECUTE)) {
 			/*
-			 * SMB_FLAGS2_PAGING_IO: permit execute-only reads.
+			 * SMB_FLAGS2_READ_IF_EXECUTE: permit execute-only
+			 * reads.
 			 *
 			 * Reject request if the file has been opened
-			 * execute-only and SMB_FLAGS2_PAGING_IO is not set.
+			 * execute-only and SMB_FLAGS2_READ_IF_EXECUTE is not
+			 * set.
 			 */
 			rc = EACCES;
 			break;

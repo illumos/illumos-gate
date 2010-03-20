@@ -232,6 +232,18 @@ typedef struct smb_sid {
 	uint32_t sid_subauth[ANY_SIZE_ARRAY];
 } smb_sid_t;
 
+#define	SMB_MAX_SID_SIZE	((2 * sizeof (uint8_t)) + \
+	(NT_SID_AUTH_MAX * sizeof (uint8_t)) + \
+	(NT_SID_SUBAUTH_MAX * sizeof (uint32_t)))
+
+/*
+ * Estimated number of sid_subauth is SECURITY_LOGON_IDS_RID_COUNT
+ * plus the DOMAIN_RID and the RID.
+ */
+#define	SMB_EST_SID_SIZE	((2 * sizeof (uint8_t)) + \
+	(NT_SID_AUTH_MAX * sizeof (uint8_t)) + \
+	((2 + SECURITY_LOGON_IDS_RID_COUNT) * sizeof (uint32_t)))
+
 /*
  * Only group attributes are defined. No user attributes defined.
  */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -227,7 +227,7 @@ smb_fem_fcn_create(
 	    ct, vsecp);
 
 	if (error == 0)
-		smb_process_node_notify_change_queue(dnode);
+		smb_node_notify_change(dnode);
 
 	return (error);
 }
@@ -261,7 +261,7 @@ smb_fem_fcn_remove(
 	error = vnext_remove(arg, name, cr, ct, flags);
 
 	if (error == 0)
-		smb_process_node_notify_change_queue(dnode);
+		smb_node_notify_change(dnode);
 
 	return (error);
 }
@@ -286,7 +286,7 @@ smb_fem_fcn_rename(
 	error = vnext_rename(arg, snm, tdvp, tnm, cr, ct, flags);
 
 	if (error == 0)
-		smb_process_node_notify_change_queue(dnode);
+		smb_node_notify_change(dnode);
 
 	return (error);
 }
@@ -312,7 +312,7 @@ smb_fem_fcn_mkdir(
 	error = vnext_mkdir(arg, name, vap, vpp, cr, ct, flags, vsecp);
 
 	if (error == 0)
-		smb_process_node_notify_change_queue(dnode);
+		smb_node_notify_change(dnode);
 
 	return (error);
 }
@@ -336,7 +336,7 @@ smb_fem_fcn_rmdir(
 	error = vnext_rmdir(arg, name, cdir, cr, ct, flags);
 
 	if (error == 0)
-		smb_process_node_notify_change_queue(dnode);
+		smb_node_notify_change(dnode);
 
 	return (error);
 }
@@ -360,7 +360,7 @@ smb_fem_fcn_link(
 	error = vnext_link(arg, svp, tnm, cr, ct, flags);
 
 	if (error == 0)
-		smb_process_node_notify_change_queue(dnode);
+		smb_node_notify_change(dnode);
 
 	return (error);
 }
@@ -385,7 +385,7 @@ smb_fem_fcn_symlink(
 	error = vnext_symlink(arg, linkname, vap, target, cr, ct, flags);
 
 	if (error == 0)
-		smb_process_node_notify_change_queue(dnode);
+		smb_node_notify_change(dnode);
 
 	return (error);
 }

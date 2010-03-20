@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -725,7 +725,7 @@ andx_more:
 	 * override the user credentials.
 	 */
 	if (!(sdd->sdt_flags & SDDF_SUPPRESS_UID) && (sr->uid_user == NULL)) {
-		sr->uid_user = smb_user_lookup_by_uid(session, sr->smb_uid);
+		sr->uid_user = smb_session_lookup_uid(session, sr->smb_uid);
 		if (sr->uid_user == NULL) {
 			smbsr_error(sr, 0, ERRSRV, ERRbaduid);
 			smbsr_cleanup(sr);
@@ -1030,6 +1030,7 @@ static struct {
 	{ ENOMEM,	ERRDOS, ERRnomem, NT_STATUS_NO_MEMORY },
 	{ EIO,		ERRHRD, ERRgeneral, NT_STATUS_IO_DEVICE_ERROR },
 	{ EXDEV, 	ERRSRV, ERRdiffdevice, NT_STATUS_NOT_SAME_DEVICE },
+	{ EREMOTE, 	ERRSRV, ERRbadpath, NT_STATUS_PATH_NOT_COVERED},
 	{ EROFS,	ERRHRD, ERRnowrite, NT_STATUS_ACCESS_DENIED },
 	{ ESTALE,	ERRDOS, ERRbadfid, NT_STATUS_INVALID_HANDLE },
 	{ EBADF,	ERRDOS, ERRbadfid, NT_STATUS_INVALID_HANDLE },

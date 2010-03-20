@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,84 +30,97 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/alloc.h>
 
-#define	MEM_HDR_SIZE	8
-static uint32_t smb_memsize(void *);
+#define	SMB_SMH_MAGIC		0x534D485F	/* 'SMH_' */
+#define	SMB_SMH_VALID(_smh_)	ASSERT((_smh_)->smh_magic == SMB_SMH_MAGIC)
+#define	SMB_MEM2SMH(_mem_)	((smb_mem_header_t *)(_mem_) - 1)
 
+typedef struct smb_mem_header {
+	uint32_t	smh_magic;
+	size_t		smh_size;
+	smb_request_t	*smh_sr;
+	list_node_t	smh_lnd;
+} smb_mem_header_t;
+
+static void *smb_alloc(smb_request_t *, size_t, boolean_t);
+static void smb_free(smb_request_t *, void *, boolean_t);
+static void *smb_realloc(smb_request_t *, void *, size_t, boolean_t);
+
+/*
+ * Allocate memory.
+ */
 void *
-smb_malloc(uint32_t size)
+smb_mem_alloc(size_t size)
 {
-	uint32_t	*hdr;
-	uint8_t		*p;
-
-	size += MEM_HDR_SIZE;
-	hdr = kmem_zalloc(size, KM_SLEEP);
-	*hdr = size;
-
-	p = (uint8_t *)hdr;
-	p += MEM_HDR_SIZE;
-	return (p);
+	return (smb_alloc(NULL, size, B_FALSE));
 }
 
+/*
+ * Allocate memory and zero it out.
+ */
+void *
+smb_mem_zalloc(size_t size)
+{
+	return (smb_alloc(NULL, size, B_TRUE));
+}
+
+/*
+ * Allocate or resize memory previously allocated.
+ *
+ * The address passed in MUST be considered invalid when this function returns.
+ */
+void *
+smb_mem_realloc(void *ptr, size_t size)
+{
+	return (smb_realloc(NULL, ptr, size, B_FALSE));
+}
+
+/*
+ * Allocate or resize memory previously allocated. If the new size is greater
+ * than the current size, the extra space is zeroed out. If the new size is less
+ * then the current size the space truncated is zeroed out.
+ *
+ * The address passed in MUST be considered invalid when this function returns.
+ */
+void *
+smb_mem_rezalloc(void *ptr, size_t size)
+{
+	return (smb_realloc(NULL, ptr, size, B_TRUE));
+}
+
+/*
+ * Free memory previously allocated with smb_malloc(), smb_zalloc(),
+ * smb_remalloc() or smb_rezalloc().
+ */
+void
+smb_mem_free(void *ptr)
+{
+	smb_free(NULL, ptr, B_FALSE);
+}
+
+/*
+ * Free memory previously allocated with smb_mem_malloc(), smb_mem_zalloc(),
+ * smb_mem_remalloc() or smb_mem_rezalloc() or smb_mem_strdup(). The memory will
+ * be zeroed out before being actually freed.
+ */
+void
+smb_mem_zfree(void *ptr)
+{
+	smb_free(NULL, ptr, B_TRUE);
+}
+
+/*
+ * Duplicate a string.
+ */
 char *
-smb_strdup(const char *ptr)
+smb_mem_strdup(const char *ptr)
 {
 	char	*p;
 	size_t	size;
 
 	size = strlen(ptr) + 1;
-	p = smb_malloc(size);
-	(void) memcpy(p, ptr, size);
+	p = smb_alloc(NULL, size, B_FALSE);
+	bcopy(ptr, p, size);
 	return (p);
-}
-
-static uint32_t
-smb_memsize(void *ptr)
-{
-	uint32_t	*p;
-
-	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	p = (uint32_t *)((uint8_t *)ptr - MEM_HDR_SIZE);
-
-	return (*p);
-}
-
-void *
-smb_realloc(void *ptr, uint32_t size)
-{
-	void		*new_ptr;
-	uint32_t	current_size;
-
-
-	if (ptr == NULL)
-		return (smb_malloc(size));
-
-	if (size == 0) {
-		smb_mfree(ptr);
-		return (NULL);
-	}
-
-	current_size = smb_memsize(ptr) - MEM_HDR_SIZE;
-	if (size <= current_size)
-		return (ptr);
-
-	new_ptr = smb_malloc(size);
-	(void) memcpy(new_ptr, ptr, current_size);
-	smb_mfree(ptr);
-
-	return (new_ptr);
-}
-
-void
-smb_mfree(void *ptr)
-{
-	uint8_t	*p;
-
-	if (ptr == NULL)
-		return;
-
-	p = (uint8_t *)ptr - MEM_HDR_SIZE;
-	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	kmem_free(p, *(uint32_t *)p);
 }
 
 /*
@@ -116,76 +129,170 @@ smb_mfree(void *ptr)
 void
 smb_srm_init(smb_request_t *sr)
 {
-	list_create(&sr->sr_storage, sizeof (smb_srm_t),
-	    offsetof(smb_srm_t, srm_lnd));
+	list_create(&sr->sr_storage, sizeof (smb_mem_header_t),
+	    offsetof(smb_mem_header_t, smh_lnd));
 }
 
 /*
- * Free everything on the request-specific temporary storage list
- * and destroy the list.
+ * Free everything on the request-specific temporary storage list and destroy
+ * the list.
  */
 void
 smb_srm_fini(smb_request_t *sr)
 {
-	smb_srm_t	*srm;
+	smb_mem_header_t	*smh;
 
-	while ((srm = list_head(&sr->sr_storage)) != NULL) {
-		list_remove(&sr->sr_storage, srm);
-		smb_mfree(srm);
-	}
-
+	while ((smh = list_head(&sr->sr_storage)) != NULL)
+		smb_free(sr, ++smh, B_FALSE);
 	list_destroy(&sr->sr_storage);
 }
 
 /*
  * Allocate memory and associate it with the specified request.
- * Memory allocated here can only be used for the duration of
- * this request; it will be freed automatically on completion
- * of the request
+ * Memory allocated here can only be used for the duration of this request; it
+ * will be freed automatically on completion of the request.
  */
 void *
 smb_srm_alloc(smb_request_t *sr, size_t size)
 {
-	smb_srm_t	*srm;
-
-	size += sizeof (smb_srm_t);
-	srm = smb_malloc(size);
-	srm->srm_size = size;
-	srm->srm_sr = sr;
-	list_insert_tail(&sr->sr_storage, srm);
-
-	/*
-	 * The memory allocated for use be the caller is
-	 * immediately after our storage context area.
-	 */
-	return (void *)(srm + 1);
+	return (smb_alloc(sr, size, B_FALSE));
 }
 
 /*
- * Allocate or resize memory previously allocated for the specified
- * request.
+ * Allocate memory, zero it out and associate it with the specified request.
+ * Memory allocated here can only be used for the duration of this request; it
+ * will be freed automatically on completion of the request.
+ */
+void *
+smb_srm_zalloc(smb_request_t *sr, size_t size)
+{
+	return (smb_alloc(sr, size, B_TRUE));
+}
+
+/*
+ * Allocate or resize memory previously allocated for the specified request.
+ *
+ * The address passed in MUST be considered invalid when this function returns.
  */
 void *
 smb_srm_realloc(smb_request_t *sr, void *p, size_t size)
 {
-	smb_srm_t 	*old_srm = (smb_srm_t *)p;
-	smb_srm_t 	*new_srm;
+	return (smb_realloc(sr, p, size, B_FALSE));
+}
 
-	if (old_srm == NULL)
-		return (smb_srm_alloc(sr, size));
+/*
+ * Allocate or resize memory previously allocated for the specified request. If
+ * the new size is greater than the current size, the extra space is zeroed out.
+ * If the new size is less then the current size the space truncated is zeroed
+ * out.
+ *
+ * The address passed in MUST be considered invalid when this function returns.
+ */
+void *
+smb_srm_rezalloc(smb_request_t *sr, void *p, size_t size)
+{
+	return (smb_realloc(sr, p, size, B_TRUE));
+}
 
-	old_srm--;
-	list_remove(&sr->sr_storage, old_srm);
+/*
+ * Allocate memory.
+ *
+ * sr	If not NULL, request the memory allocated must be associated with.
+ *
+ * size	Size of the meory to allocate.
+ *
+ * zero	If true the memory allocated will be zeroed out.
+ */
+static void *
+smb_alloc(smb_request_t *sr, size_t size, boolean_t zero)
+{
+	smb_mem_header_t	*smh;
 
-	size += sizeof (smb_srm_t);
-	new_srm = smb_realloc(old_srm, size);
-	new_srm->srm_size = smb_memsize(new_srm);
-	new_srm->srm_sr = sr;
-	list_insert_tail(&sr->sr_storage, new_srm);
+	if (zero) {
+		smh = kmem_zalloc(size + sizeof (smb_mem_header_t), KM_SLEEP);
+	} else {
+		smh = kmem_alloc(size + sizeof (smb_mem_header_t), KM_SLEEP);
+		smh->smh_sr = NULL;
+		bzero(&smh->smh_lnd, sizeof (smh->smh_lnd));
+	}
+	smh->smh_sr = sr;
+	smh->smh_size = size;
+	smh->smh_magic = SMB_SMH_MAGIC;
+	if (sr != NULL) {
+		SMB_REQ_VALID(sr);
+		list_insert_tail(&sr->sr_storage, smh);
+	}
+	return (++smh);
+}
 
-	/*
-	 * The memory allocated for use be the caller is
-	 * immediately after our storage context area.
-	 */
-	return (void *)(new_srm + 1);
+/*
+ * Free memory.
+ *
+ * sr	If not NULL, request the memory to free is associated with.
+ *
+ * ptr	Memory address
+ *
+ * zero	If true the memory is zeroed out before being freed.
+ */
+static void
+smb_free(smb_request_t *sr, void *ptr, boolean_t zero)
+{
+	smb_mem_header_t	*smh;
+
+	if (ptr != NULL) {
+		smh = SMB_MEM2SMH(ptr);
+		SMB_SMH_VALID(smh);
+		ASSERT(sr == smh->smh_sr);
+		if (sr != NULL) {
+			SMB_REQ_VALID(sr);
+			list_remove(&sr->sr_storage, smh);
+		}
+		if (zero)
+			bzero(ptr, smh->smh_size);
+
+		smh->smh_magic = 0;
+		kmem_free(smh, smh->smh_size + sizeof (smb_mem_header_t));
+	}
+}
+
+/*
+ * Allocate or resize memory previously allocated.
+ *
+ * sr	If not NULL, request the memory is associated with.
+ *
+ * ptr	Memory address
+ *
+ * size	New size
+ *
+ * zero	If true zero out the extra space or the truncated space.
+ */
+static void *
+smb_realloc(smb_request_t *sr, void *ptr, size_t size, boolean_t zero)
+{
+	smb_mem_header_t	*smh;
+	void			*new_ptr;
+
+	if (ptr == NULL)
+		return (smb_alloc(sr, size, zero));
+
+	smh = SMB_MEM2SMH(ptr);
+	SMB_SMH_VALID(smh);
+	ASSERT(sr == smh->smh_sr);
+
+	if (size == 0) {
+		smb_free(sr, ptr, zero);
+		return (NULL);
+	}
+	if (smh->smh_size >= size) {
+		if ((zero) & (smh->smh_size > size))
+			bzero((caddr_t)ptr + size, smh->smh_size - size);
+		return (ptr);
+	}
+	new_ptr = smb_alloc(sr, size, B_FALSE);
+	bcopy(ptr, new_ptr, smh->smh_size);
+	if (zero)
+		bzero((caddr_t)new_ptr + smh->smh_size, size - smh->smh_size);
+
+	smb_free(sr, ptr, zero);
+	return (new_ptr);
 }

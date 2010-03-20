@@ -40,8 +40,11 @@
 #include <sys/sid.h>
 #include <sys/priv_names.h>
 
-static boolean_t
-smb_thread_continue_timedwait_locked(smb_thread_t *thread, int ticks);
+static kmem_cache_t	*smb_dtor_cache;
+static boolean_t	smb_llist_initialized = B_FALSE;
+
+static void smb_llist_flush(smb_llist_t *);
+static boolean_t smb_thread_continue_timedwait_locked(smb_thread_t *, int);
 
 time_t tzh_leapcnt = 0;
 
@@ -449,6 +452,34 @@ smb_idpool_free(
 }
 
 /*
+ * Initialize the llist delete queue object cache.
+ */
+void
+smb_llist_init(void)
+{
+	if (smb_llist_initialized)
+		return;
+
+	smb_dtor_cache = kmem_cache_create("smb_dtor_cache",
+	    sizeof (smb_dtor_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
+
+	smb_llist_initialized = B_TRUE;
+}
+
+/*
+ * Destroy the llist delete queue object cache.
+ */
+void
+smb_llist_fini(void)
+{
+	if (!smb_llist_initialized)
+		return;
+
+	kmem_cache_destroy(smb_dtor_cache);
+	smb_llist_initialized = B_FALSE;
+}
+
+/*
  * smb_llist_constructor
  *
  * This function initializes a locked list.
@@ -460,24 +491,97 @@ smb_llist_constructor(
     size_t	offset)
 {
 	rw_init(&ll->ll_lock, NULL, RW_DEFAULT, NULL);
+	mutex_init(&ll->ll_mutex, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&ll->ll_list, size, offset);
+	list_create(&ll->ll_deleteq, sizeof (smb_dtor_t),
+	    offsetof(smb_dtor_t, dt_lnd));
 	ll->ll_count = 0;
 	ll->ll_wrop = 0;
+	ll->ll_deleteq_count = 0;
 }
 
 /*
- * smb_llist_destructor
- *
- * This function destroys a locked list.
+ * Flush the delete queue and destroy a locked list.
  */
 void
 smb_llist_destructor(
     smb_llist_t	*ll)
 {
+	smb_llist_flush(ll);
+
 	ASSERT(ll->ll_count == 0);
+	ASSERT(ll->ll_deleteq_count == 0);
 
 	rw_destroy(&ll->ll_lock);
 	list_destroy(&ll->ll_list);
+	list_destroy(&ll->ll_deleteq);
+	mutex_destroy(&ll->ll_mutex);
+}
+
+/*
+ * Post an object to the delete queue.  The delete queue will be processed
+ * during list exit or list destruction.  Objects are often posted for
+ * deletion during list iteration (while the list is locked) but that is
+ * not required, and an object can be posted at any time.
+ */
+void
+smb_llist_post(smb_llist_t *ll, void *object, smb_dtorproc_t dtorproc)
+{
+	smb_dtor_t	*dtor;
+
+	ASSERT((object != NULL) && (dtorproc != NULL));
+
+	dtor = kmem_cache_alloc(smb_dtor_cache, KM_SLEEP);
+	bzero(dtor, sizeof (smb_dtor_t));
+	dtor->dt_magic = SMB_DTOR_MAGIC;
+	dtor->dt_object = object;
+	dtor->dt_proc = dtorproc;
+
+	mutex_enter(&ll->ll_mutex);
+	list_insert_tail(&ll->ll_deleteq, dtor);
+	++ll->ll_deleteq_count;
+	mutex_exit(&ll->ll_mutex);
+}
+
+/*
+ * Exit the list lock and process the delete queue.
+ */
+void
+smb_llist_exit(smb_llist_t *ll)
+{
+	rw_exit(&ll->ll_lock);
+	smb_llist_flush(ll);
+}
+
+/*
+ * Flush the list delete queue.  The mutex is dropped across the destructor
+ * call in case this leads to additional objects being posted to the delete
+ * queue.
+ */
+static void
+smb_llist_flush(smb_llist_t *ll)
+{
+	smb_dtor_t    *dtor;
+
+	mutex_enter(&ll->ll_mutex);
+
+	dtor = list_head(&ll->ll_deleteq);
+	while (dtor != NULL) {
+		SMB_DTOR_VALID(dtor);
+		ASSERT((dtor->dt_object != NULL) && (dtor->dt_proc != NULL));
+		list_remove(&ll->ll_deleteq, dtor);
+		--ll->ll_deleteq_count;
+		mutex_exit(&ll->ll_mutex);
+
+		dtor->dt_proc(dtor->dt_object);
+
+		dtor->dt_magic = (uint32_t)~SMB_DTOR_MAGIC;
+		kmem_cache_free(smb_dtor_cache, dtor);
+		mutex_enter(&ll->ll_mutex);
+		dtor = list_head(&ll->ll_deleteq);
+	}
+
+	mutex_exit(&ll->ll_mutex);
 }
 
 /*
@@ -738,8 +842,8 @@ smb_slist_exit(smb_slist_t *sl)
 /*
  * smb_thread_entry_point
  *
- * Common entry point for all the threads created through smb_thread_start. The
- * state of teh thread is set to "running" at the beginning and moved to
+ * Common entry point for all the threads created through smb_thread_start.
+ * The state of the thread is set to "running" at the beginning and moved to
  * "exiting" just before calling thread_exit(). The condition variable is
  *  also signaled.
  */
@@ -1313,7 +1417,7 @@ smb_idmap_batch_destroy(smb_idmap_batch_t *sib)
 		for (i = 0; i < sib->sib_nmap; i++) {
 			domsid = sib->sib_maps[i].sim_domsid;
 			if (domsid)
-				smb_mfree(domsid);
+				smb_mem_free(domsid);
 		}
 	}
 
@@ -1347,7 +1451,7 @@ smb_idmap_batch_getid(idmap_get_handle_t *idmaph, smb_idmap_t *sim,
 	smb_sid_tostr(sid, strsid);
 	if (smb_sid_splitstr(strsid, &sim->sim_rid) != 0)
 		return (IDMAP_ERR_SID);
-	sim->sim_domsid = smb_strdup(strsid);
+	sim->sim_domsid = smb_mem_strdup(strsid);
 
 	switch (idtype) {
 	case SMB_IDMAP_USER:
@@ -1803,10 +1907,13 @@ smb_cred_set_sidlist(smb_ids_t *token_grps)
 }
 
 /*
- * smb_cred_create
+ * A Solaris credential (cred_t structure) will be allocated and
+ * initialized based on the given Windows style user access token.
  *
- * The credential of the given SMB user will be allocated and initialized based
- * on the given access token.
+ * cred's gid is set to the primary group of the mapped Solaris user.
+ * When there is no such mapped user (i.e. the mapped UID is ephemeral)
+ * or his/her primary group could not be obtained, cred's gid is set to
+ * the mapped Solaris group of token's primary group.
  */
 cred_t *
 smb_cred_create(smb_token_t *token, uint32_t *privileges)
@@ -1815,17 +1922,25 @@ smb_cred_create(smb_token_t *token, uint32_t *privileges)
 	ksidlist_t		*ksidlist = NULL;
 	smb_posix_grps_t	*posix_grps;
 	cred_t			*cr;
+	gid_t			gid;
 
 	ASSERT(token);
 	ASSERT(token->tkn_posix_grps);
+	posix_grps = token->tkn_posix_grps;
+
 	ASSERT(privileges);
 
 	cr = crget();
 	ASSERT(cr != NULL);
 
-	posix_grps = token->tkn_posix_grps;
-	if (crsetugid(cr, token->tkn_user.i_id,
-	    token->tkn_primary_grp.i_id) != 0) {
+	if (!IDMAP_ID_IS_EPHEMERAL(token->tkn_user.i_id) &&
+	    (posix_grps->pg_ngrps != 0)) {
+		gid = posix_grps->pg_grps[0];
+	} else {
+		gid = token->tkn_primary_grp.i_id;
+	}
+
+	if (crsetugid(cr, token->tkn_user.i_id, gid) != 0) {
 		crfree(cr);
 		return (NULL);
 	}
@@ -1846,22 +1961,20 @@ smb_cred_create(smb_token_t *token, uint32_t *privileges)
 
 	*privileges = 0;
 
-	if (smb_token_query_privilege(token, SE_BACKUP_LUID)) {
+	if (smb_token_query_privilege(token, SE_BACKUP_LUID))
 		*privileges |= SMB_USER_PRIV_BACKUP;
-	}
 
-	if (smb_token_query_privilege(token, SE_RESTORE_LUID)) {
+	if (smb_token_query_privilege(token, SE_RESTORE_LUID))
 		*privileges |= SMB_USER_PRIV_RESTORE;
-	}
 
 	if (smb_token_query_privilege(token, SE_TAKE_OWNERSHIP_LUID)) {
 		*privileges |= SMB_USER_PRIV_TAKE_OWNERSHIP;
 		(void) crsetpriv(cr, PRIV_FILE_CHOWN, NULL);
 	}
 
-	if (smb_token_query_privilege(token, SE_SECURITY_LUID)) {
+	if (smb_token_query_privilege(token, SE_SECURITY_LUID))
 		*privileges |= SMB_USER_PRIV_SECURITY;
-	}
+
 	return (cr);
 }
 
@@ -1958,6 +2071,23 @@ smb_cred_create_privs(cred_t *user_cr, uint32_t privileges)
 	}
 
 	return (cr);
+}
+
+/*
+ * smb_pad_align
+ *
+ * Returns the number of bytes required to pad an offset to the
+ * specified alignment.
+ */
+uint32_t
+smb_pad_align(uint32_t offset, uint32_t align)
+{
+	uint32_t pad = offset % align;
+
+	if (pad != 0)
+		pad = align - pad;
+
+	return (pad);
 }
 
 /*

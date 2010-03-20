@@ -156,7 +156,9 @@ static ndr_hdid_t *
 samr_hdalloc(ndr_xa_t *mxa, samr_key_t key, smb_domain_type_t domain_type,
     DWORD rid)
 {
-	samr_keydata_t *data;
+	ndr_handle_t	*hd;
+	ndr_hdid_t	*id;
+	samr_keydata_t	*data;
 
 	if ((data = malloc(sizeof (samr_keydata_t))) == NULL)
 		return (NULL);
@@ -165,7 +167,15 @@ samr_hdalloc(ndr_xa_t *mxa, samr_key_t key, smb_domain_type_t domain_type,
 	data->kd_type = domain_type;
 	data->kd_rid = rid;
 
-	return (ndr_hdalloc(mxa, data));
+	if ((id = ndr_hdalloc(mxa, data)) == NULL) {
+		free(data);
+		return (NULL);
+	}
+
+	if ((hd = ndr_hdlookup(mxa, id)) != NULL)
+		hd->nh_data_free = free;
+
+	return (id);
 }
 
 /*
@@ -178,6 +188,7 @@ samr_hdfree(ndr_xa_t *mxa, ndr_hdid_t *id)
 
 	if ((hd = ndr_hdlookup(mxa, id)) != NULL) {
 		free(hd->nh_data);
+		hd->nh_data = NULL;
 		ndr_hdfree(mxa, id);
 	}
 }
@@ -740,9 +751,12 @@ samr_s_QueryUserInfo(void *arg, ndr_xa_t *mxa)
 	param->address = 1;
 	param->switch_index = SAMR_QUERY_USER_ALL_INFO;
 	param->status = NT_STATUS_SUCCESS;
+	smb_account_free(&account);
+	smb_sid_free(sid);
 	return (NDR_DRC_OK);
 
 QueryUserInfoError:
+	smb_sid_free(sid);
 	bzero(param, sizeof (struct samr_QueryUserInfo));
 	param->status = NT_SC_ERROR(status);
 	return (NDR_DRC_OK);
@@ -1193,7 +1207,7 @@ samr_s_OpenAlias(void *arg, ndr_xa_t *mxa)
 	ndr_hdid_t	*id = (ndr_hdid_t *)&param->domain_handle;
 	ndr_handle_t	*hd;
 	samr_keydata_t	*data;
-	smb_gdomain_t	gd_type;
+	smb_domain_type_t gd_type;
 	smb_sid_t	*sid;
 	smb_wka_t	*wka;
 	char		sidstr[SMB_SID_STRSZ];
@@ -1212,11 +1226,11 @@ samr_s_OpenAlias(void *arg, ndr_xa_t *mxa)
 	}
 
 	data = (samr_keydata_t *)hd->nh_data;
-	gd_type = (smb_gdomain_t)data->kd_type;
+	gd_type = (smb_domain_type_t)data->kd_type;
 	rid = param->rid;
 
 	switch (gd_type) {
-	case SMB_LGRP_BUILTIN:
+	case SMB_DOMAIN_BUILTIN:
 		(void) snprintf(sidstr, SMB_SID_STRSZ, "%s-%d",
 		    NT_BUILTIN_DOMAIN_SIDSTR, rid);
 		if ((sid = smb_sid_fromstr(sidstr)) == NULL) {
@@ -1233,7 +1247,7 @@ samr_s_OpenAlias(void *arg, ndr_xa_t *mxa)
 		}
 		break;
 
-	case SMB_LGRP_LOCAL:
+	case SMB_DOMAIN_LOCAL:
 		rc = smb_lgrp_getbyrid(rid, gd_type, NULL);
 		if (rc != SMB_LGRP_SUCCESS) {
 			status = NT_STATUS_NO_SUCH_ALIAS;
@@ -1363,7 +1377,7 @@ samr_s_QueryAliasInfo(void *arg, ndr_xa_t *mxa)
 	ndr_handle_t	*hd;
 	samr_keydata_t	*data;
 	smb_group_t	grp;
-	smb_gdomain_t	gd_type;
+	smb_domain_type_t gd_type;
 	smb_sid_t	*sid;
 	smb_wka_t	*wka;
 	char		sidstr[SMB_SID_STRSZ];
@@ -1379,11 +1393,11 @@ samr_s_QueryAliasInfo(void *arg, ndr_xa_t *mxa)
 	}
 
 	data = (samr_keydata_t *)hd->nh_data;
-	gd_type = (smb_gdomain_t)data->kd_type;
+	gd_type = (smb_domain_type_t)data->kd_type;
 	rid = data->kd_rid;
 
 	switch (gd_type) {
-	case SMB_LGRP_BUILTIN:
+	case SMB_DOMAIN_BUILTIN:
 		(void) snprintf(sidstr, SMB_SID_STRSZ, "%s-%d",
 		    NT_BUILTIN_DOMAIN_SIDSTR, rid);
 		if ((sid = smb_sid_fromstr(sidstr)) == NULL) {
@@ -1403,7 +1417,7 @@ samr_s_QueryAliasInfo(void *arg, ndr_xa_t *mxa)
 		desc = (wka->wka_desc != NULL) ? wka->wka_desc : "";
 		break;
 
-	case SMB_LGRP_LOCAL:
+	case SMB_DOMAIN_LOCAL:
 		rc = smb_lgrp_getbyrid(rid, gd_type, &grp);
 		if (rc != SMB_LGRP_SUCCESS) {
 			status = NT_STATUS_NO_SUCH_ALIAS;
@@ -1437,13 +1451,13 @@ samr_s_QueryAliasInfo(void *arg, ndr_xa_t *mxa)
 		break;
 
 	default:
-		if (gd_type == SMB_LGRP_LOCAL)
+		if (gd_type == SMB_DOMAIN_LOCAL)
 			smb_lgrp_free(&grp);
 		status = NT_STATUS_INVALID_INFO_CLASS;
 		goto query_alias_err;
 	};
 
-	if (gd_type == SMB_LGRP_LOCAL)
+	if (gd_type == SMB_DOMAIN_LOCAL)
 		smb_lgrp_free(&grp);
 	param->address = (DWORD)(uintptr_t)&param->ru;
 	param->status = 0;

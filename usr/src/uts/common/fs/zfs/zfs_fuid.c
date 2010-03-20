@@ -503,6 +503,11 @@ zfs_fuid_node_add(zfs_fuid_info_t **fuidpp, const char *domain, uint32_t rid,
 
 /*
  * Create a file system FUID, based on information in the users cred
+ *
+ * If cred contains KSID_OWNER then it should be used to determine
+ * the uid otherwise cred's uid will be used. By default cred's gid
+ * is used unless it's an ephemeral ID in which case KSID_GROUP will
+ * be used if it exists.
  */
 uint64_t
 zfs_fuid_create_cred(zfsvfs_t *zfsvfs, zfs_fuid_type_t type,
@@ -518,22 +523,26 @@ zfs_fuid_create_cred(zfsvfs_t *zfsvfs, zfs_fuid_type_t type,
 	VERIFY(type == ZFS_OWNER || type == ZFS_GROUP);
 
 	ksid = crgetsid(cr, (type == ZFS_OWNER) ? KSID_OWNER : KSID_GROUP);
-	if (ksid) {
-		id = ksid_getid(ksid);
-	} else {
-		if (type == ZFS_OWNER)
-			id = crgetuid(cr);
-		else
-			id = crgetgid(cr);
 
-		if (IS_EPHEMERAL(id)) {
-			return ((uint64_t)(type == ZFS_OWNER ?
-			    UID_NOBODY : GID_NOBODY));
-		}
+	if (!zfsvfs->z_use_fuids || (ksid == NULL)) {
+		id = (type == ZFS_OWNER) ? crgetuid(cr) : crgetgid(cr);
+
+		if (IS_EPHEMERAL(id))
+			return ((type == ZFS_OWNER) ? UID_NOBODY : GID_NOBODY);
+
+		return ((uint64_t)id);
 	}
 
-	if (!zfsvfs->z_use_fuids || (!IS_EPHEMERAL(id)))
+	/*
+	 * ksid is present and FUID is supported
+	 */
+	id = (type == ZFS_OWNER) ? ksid_getid(ksid) : crgetgid(cr);
+
+	if (!IS_EPHEMERAL(id))
 		return ((uint64_t)id);
+
+	if (type == ZFS_GROUP)
+		id = ksid_getid(ksid);
 
 	rid = ksid_getrid(ksid);
 	domain = ksid_getdomain(ksid);

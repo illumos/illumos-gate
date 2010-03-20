@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@ extern "C" {
 
 #define	SIDSYS_IDMAP_REG	1
 #define	SIDSYS_IDMAP_UNREG	2
+#define	SIDSYS_IDMAP_FLUSH_KCACHE 3
 
 #define	SIDSYS_SID2ID	0
 #define	SIDSYS_ID2SID	1
@@ -124,8 +125,9 @@ ksidlist_t *kcrsid_gidstosids(zone_t *, int, gid_t *);
 #else
 
 int allocids(int, int, uid_t *, int, gid_t *);
-int idmap_reg(int);
-int idmap_unreg(int);
+int __idmap_reg(int);
+int __idmap_unreg(int);
+int __idmap_flush_kcache(void);
 
 #endif /* _KERNEL */
 

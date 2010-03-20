@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,8 @@ static struct {
 	{ FSCTL_GET_OBJECT_ID, smb_nt_trans_ioctl_invalid_parm },
 	{ FSCTL_QUERY_ALLOCATED_RANGES, smb_nt_trans_ioctl_invalid_parm },
 	{ FSCTL_SRV_ENUMERATE_SNAPSHOTS, smb_vss_ioctl_enumerate_snaps },
-	{ FSCTL_SET_SPARSE, smb_nt_trans_ioctl_noop }
+	{ FSCTL_SET_SPARSE, smb_nt_trans_ioctl_noop },
+	{ FSCTL_FIND_FILES_BY_SID, smb_nt_trans_ioctl_noop }
 };
 
 /*

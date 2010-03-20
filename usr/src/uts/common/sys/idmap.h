@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,5 +89,9 @@
  * alloca()s).  See libidmap:idmap_init().
  */
 #define	IDMAP_MAX_DOOR_RPC		(256 * 1024)
+
+#define	IDMAP_SENTINEL_PID		UINT32_MAX
+#define	IDMAP_ID_IS_EPHEMERAL(pid)	\
+	(((pid) > INT32_MAX) && ((pid) != IDMAP_SENTINEL_PID))
 
 #endif /* _SYS_IDMAP_H */

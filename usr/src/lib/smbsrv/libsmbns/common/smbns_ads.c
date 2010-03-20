@@ -1164,6 +1164,11 @@ smb_ads_open_main(char *domain, char *user, char *password)
 		return (NULL);
 	}
 
+	/*
+	 * ah->domain is often used for generating service principal name.
+	 * Convert it to lower case for RFC 4120 section 6.2.1 conformance.
+	 */
+	(void) smb_strlwr(ah->domain);
 	ah->domain_dn = smb_ads_convert_domain(domain);
 	if (ah->domain_dn == NULL) {
 		smb_ads_close(ah);
@@ -1393,7 +1398,16 @@ smb_ads_add_share(smb_ads_handle_t *ah, const char *adsShareName,
 	attrs[j]->mod_values = unc_names;
 
 	if ((ret = ldap_add_s(ah->ld, share_dn, attrs)) != LDAP_SUCCESS) {
-		smb_tracef("%s: ldap_add: %s", share_dn, ldap_err2string(ret));
+		if (ret == LDAP_NO_SUCH_OBJECT) {
+			syslog(LOG_ERR, "Failed to publish share %s in" \
+			    " AD.  Container does not exist: %s.\n",
+			    adsShareName, share_dn);
+
+		} else {
+			syslog(LOG_ERR, "Failed to publish share %s in" \
+			    " AD: %s (%s).\n", adsShareName, share_dn,
+			    ldap_err2string(ret));
+		}
 		smb_ads_free_attr(attrs);
 		free(share_dn);
 		return (ret);
@@ -1764,10 +1778,15 @@ smb_ads_get_dc_level(smb_ads_handle_t *ah)
 	return (rc);
 }
 
+/*
+ * The fully-qualified hostname returned by this function is often used for
+ * constructing service principal name.  Return the fully-qualified hostname
+ * in lower case for RFC 4120 section 6.2.1 conformance.
+ */
 static int
 smb_ads_getfqhostname(smb_ads_handle_t *ah, char *fqhost, int len)
 {
-	if (smb_gethostname(fqhost, len, 0) != 0)
+	if (smb_gethostname(fqhost, len, SMB_CASE_LOWER) != 0)
 		return (-1);
 
 	(void) snprintf(fqhost, len, "%s.%s", fqhost,
@@ -2495,7 +2514,7 @@ smb_ads_select_dcfromsubnet(smb_ads_host_list_t *hlist)
 	size_t cnt;
 	int i;
 
-	if (smb_nic_getfirst(&ni) != 0)
+	if (smb_nic_getfirst(&ni) != SMB_NIC_SUCCESS)
 		return (NULL);
 	do {
 		lnic = &ni.ni_nic;
@@ -2513,7 +2532,7 @@ smb_ads_select_dcfromsubnet(smb_ads_host_list_t *hlist)
 						return (hentry);
 			}
 		}
-	} while (smb_nic_getnext(&ni) == 0);
+	} while (smb_nic_getnext(&ni) == SMB_NIC_SUCCESS);
 
 	return (NULL);
 }

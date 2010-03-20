@@ -95,6 +95,9 @@ static sa_group_t smb_get_defaultgrp(sa_handle_t);
 static int interface_validator(int, char *);
 static int smb_update_optionset_props(sa_handle_t, sa_resource_t, nvlist_t *);
 
+static boolean_t smb_saprop_getbool(sa_optionset_t, char *);
+static boolean_t smb_saprop_getstr(sa_optionset_t, char *, char *, size_t);
+
 static struct {
 	char *value;
 	uint32_t flag;
@@ -170,6 +173,7 @@ struct option_defs optdefs[] = {
 	{ SHOPT_CATIA,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_CSC,		OPT_TYPE_CSC },
 	{ SHOPT_GUEST,		OPT_TYPE_BOOLEAN },
+	{ SHOPT_DFSROOT,	OPT_TYPE_BOOLEAN },
 	{ NULL, NULL }
 };
 
@@ -2068,11 +2072,11 @@ smb_rename_resource(sa_handle_t handle, sa_resource_t resource, char *newname)
 static int
 smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 {
-	sa_property_t prop;
 	sa_optionset_t opts;
 	char *path;
 	char *rname;
 	char *val = NULL;
+	char csc_value[SMB_CSC_BUFSZ];
 
 	bzero(si, sizeof (smb_share_t));
 
@@ -2083,9 +2087,6 @@ smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 		sa_free_attr_string(path);
 		return (SA_NO_SUCH_RESOURCE);
 	}
-
-	si->shr_flags = (sa_is_persistent(share))
-	    ? SMB_SHRF_PERM : SMB_SHRF_TRANS;
 
 	(void) strlcpy(si->shr_path, path, sizeof (si->shr_path));
 	(void) strlcpy(si->shr_name, rname, sizeof (si->shr_name));
@@ -2101,94 +2102,42 @@ smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 		sa_free_share_description(val);
 	}
 
+	si->shr_flags = (sa_is_persistent(share))
+	    ? SMB_SHRF_PERM : SMB_SHRF_TRANS;
+
 	opts = sa_get_derived_optionset(resource, SMB_PROTOCOL_NAME, 1);
 	if (opts == NULL)
 		return (SA_OK);
 
-	prop = sa_get_property(opts, SHOPT_AD_CONTAINER);
-	if (prop != NULL) {
-		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
-			(void) strlcpy(si->shr_container, val,
-			    sizeof (si->shr_container));
-			free(val);
-		}
-	}
+	if (smb_saprop_getbool(opts, SHOPT_CATIA))
+		si->shr_flags |= SMB_SHRF_CATIA;
 
-	prop = sa_get_property(opts, SHOPT_CATIA);
-	if (prop != NULL) {
-		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
-			if ((strcasecmp(val, "true") == 0) ||
-			    (strcmp(val, "1") == 0)) {
-				si->shr_flags |= SMB_SHRF_CATIA;
-			} else {
-				si->shr_flags &= ~SMB_SHRF_CATIA;
-			}
-			free(val);
-		}
-	}
+	if (smb_saprop_getbool(opts, SHOPT_ABE))
+		si->shr_flags |= SMB_SHRF_ABE;
 
-	prop = sa_get_property(opts, SHOPT_ABE);
-	if (prop != NULL) {
-		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
-			if ((strcasecmp(val, "true") == 0) ||
-			    (strcmp(val, "1") == 0)) {
-				si->shr_flags |= SMB_SHRF_ABE;
-			} else {
-				si->shr_flags &= ~SMB_SHRF_ABE;
-			}
-			free(val);
-		}
-	}
+	if (smb_saprop_getbool(opts, SHOPT_GUEST))
+		si->shr_flags |= SMB_SHRF_GUEST_OK;
 
-	prop = sa_get_property(opts, SHOPT_CSC);
-	if (prop != NULL) {
-		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
-			smb_csc_option(val, si);
-			free(val);
-		}
-	}
+	if (smb_saprop_getbool(opts, SHOPT_DFSROOT))
+		si->shr_flags |= SMB_SHRF_DFSROOT;
 
-	prop = sa_get_property(opts, SHOPT_GUEST);
-	if (prop != NULL) {
-		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
-			if ((strcasecmp(val, "true") == 0) ||
-			    (strcmp(val, "1") == 0))
-				si->shr_flags |= SMB_SHRF_GUEST_OK;
-			else if (strcasecmp(val, "false") == 0)
-				si->shr_flags &= ~SMB_SHRF_GUEST_OK;
-			free(val);
-		}
-	}
+	(void) smb_saprop_getstr(opts, SHOPT_AD_CONTAINER, si->shr_container,
+	    sizeof (si->shr_container));
 
-	prop = sa_get_property(opts, SHOPT_RO);
-	if (prop != NULL) {
-		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
-			(void) strlcpy(si->shr_access_ro, val,
-			    sizeof (si->shr_access_ro));
-			free(val);
-			si->shr_flags |= SMB_SHRF_ACC_RO;
-		}
-	}
+	if (smb_saprop_getstr(opts, SHOPT_CSC, csc_value, sizeof (csc_value)))
+		smb_csc_option(csc_value, si);
 
-	prop = sa_get_property(opts, SHOPT_RW);
-	if (prop != NULL) {
-		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
-			(void) strlcpy(si->shr_access_rw, val,
-			    sizeof (si->shr_access_rw));
-			free(val);
-			si->shr_flags |= SMB_SHRF_ACC_RW;
-		}
-	}
+	if (smb_saprop_getstr(opts, SHOPT_RO, si->shr_access_ro,
+	    sizeof (si->shr_access_ro)))
+		si->shr_flags |= SMB_SHRF_ACC_RO;
 
-	prop = sa_get_property(opts, SHOPT_NONE);
-	if (prop != NULL) {
-		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
-			(void) strlcpy(si->shr_access_none, val,
-			    sizeof (si->shr_access_none));
-			free(val);
-			si->shr_flags |= SMB_SHRF_ACC_NONE;
-		}
-	}
+	if (smb_saprop_getstr(opts, SHOPT_RW, si->shr_access_rw,
+	    sizeof (si->shr_access_rw)))
+		si->shr_flags |= SMB_SHRF_ACC_RW;
+
+	if (smb_saprop_getstr(opts, SHOPT_NONE, si->shr_access_none,
+	    sizeof (si->shr_access_none)))
+		si->shr_flags |= SMB_SHRF_ACC_NONE;
 
 	sa_free_derived_optionset(opts);
 	return (SA_OK);
@@ -2416,4 +2365,37 @@ smb_update_optionset_props(sa_handle_t handle, sa_resource_t resource,
 		err = sa_commit_properties(opts, 0);
 
 	return (err);
+}
+
+static boolean_t
+smb_saprop_getbool(sa_optionset_t opts, char *propname)
+{
+	sa_property_t prop;
+	char *val;
+	boolean_t propval = B_FALSE;
+
+	prop = sa_get_property(opts, propname);
+	if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+		if ((strcasecmp(val, "true") == 0) || (strcmp(val, "1") == 0))
+			propval = B_TRUE;
+		free(val);
+	}
+
+	return (propval);
+}
+
+static boolean_t
+smb_saprop_getstr(sa_optionset_t opts, char *propname, char *buf, size_t bufsz)
+{
+	sa_property_t prop;
+	char *val;
+
+	prop = sa_get_property(opts, propname);
+	if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+		(void) strlcpy(buf, val, bufsz);
+		free(val);
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
 }

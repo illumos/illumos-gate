@@ -459,7 +459,9 @@ make_dataset_handle_common(zfs_handle_t *zhp, zfs_cmd_t *zc)
 	else
 		abort();	/* we should never see any other types */
 
-	zhp->zpool_hdl = zpool_handle(zhp);
+	if ((zhp->zpool_hdl = zpool_handle(zhp)) == NULL)
+		return (-1);
+
 	return (0);
 }
 

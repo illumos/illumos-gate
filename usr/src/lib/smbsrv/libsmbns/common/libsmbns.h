@@ -37,7 +37,7 @@ extern "C" {
 
 
 typedef struct smb_ads_handle {
-	char *domain;		/* ADS domain */
+	char *domain;		/* ADS domain (in lower case) */
 	char *domain_dn;	/* domain in Distinquish Name format */
 	char *ip_addr;		/* ip addr in string format */
 	char *hostname;		/* fully qualified hostname */

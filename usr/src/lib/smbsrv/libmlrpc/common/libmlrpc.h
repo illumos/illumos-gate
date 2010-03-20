@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -245,6 +245,7 @@ typedef struct ndr_binding {
 
 typedef struct ndr_pipe {
 	int			np_fid;
+	uint32_t		np_txid;
 	smb_netuserinfo_t	np_user;
 	char			*np_buf;
 	struct uio		np_uio;
@@ -509,6 +510,7 @@ int ndr_decode_return(ndr_xa_t *, void *);
 int ndr_decode_pdu_hdr(ndr_xa_t *);
 int ndr_encode_pdu_hdr(ndr_xa_t *);
 void ndr_decode_frag_hdr(ndr_stream_t *, ndr_common_header_t *);
+void ndr_remove_frag_hdr(ndr_stream_t *);
 void ndr_show_hdr(ndr_common_header_t *);
 unsigned ndr_bind_ack_hdr_size(ndr_xa_t *);
 unsigned ndr_alter_context_rsp_hdr_size(void);
@@ -518,6 +520,7 @@ int ndr_pipe_open(int, uint8_t *, uint32_t);
 int ndr_pipe_close(int);
 int ndr_pipe_read(int, uint8_t *, uint32_t *, uint32_t *);
 int ndr_pipe_write(int, uint8_t *, uint32_t);
+void *ndr_pipe_transact(void *);
 
 int ndr_generic_call_stub(ndr_xa_t *);
 

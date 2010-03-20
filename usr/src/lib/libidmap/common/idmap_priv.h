@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,6 +123,8 @@ extern idmap_stat idmap_udt_rm_namerule(idmap_udt_handle_t *, boolean_t,
 /* Flush name-based mapping rules */
 extern idmap_stat idmap_udt_flush_namerules(idmap_udt_handle_t *);
 
+/* Flush caches */
+extern idmap_stat idmap_flush(idmap_handle_t *, idmap_flush_op);
 
 /*
  * Iterator API

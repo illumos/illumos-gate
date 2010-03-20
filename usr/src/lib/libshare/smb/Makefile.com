@@ -30,7 +30,7 @@ SMBBASE_DIR	= $(SRC)/lib/smbsrv/libsmb/common
 SMBCOMMON_DIR	= $(SRC)/common/smbsrv
 
 LIBOBJS =	libshare_smb.o smb_share_doorclnt.o
-SMBCOMMON_OBJ =	smb_share_door_decode.o smb_common_door_decode.o
+SMBCOMMON_OBJ =	smb_door_legacy.o
 SMBBASE_OBJ =	smb_cfg.o smb_scfutil.o
 OBJECTS =	$(LIBOBJS) $(SMBCOMMON_OBJ) $(SMBBASE_OBJ)
 
@@ -62,12 +62,8 @@ pics/smb_door_client.o:       $(SMBBASE_DIR)/smb_door_client.c
 	$(COMPILE.c) -o $@ $(SMBBASE_DIR)/smb_door_client.c
 	$(POST_PROCESS_O)
 
-pics/smb_share_door_decode.o:       $(SMBCOMMON_DIR)/smb_share_door_decode.c
-	$(COMPILE.c) -o $@ $(SMBCOMMON_DIR)/smb_share_door_decode.c
-	$(POST_PROCESS_O)
-
-pics/smb_common_door_decode.o:       $(SMBCOMMON_DIR)/smb_common_door_decode.c
-	$(COMPILE.c) -o $@ $(SMBCOMMON_DIR)/smb_common_door_decode.c
+pics/smb_door_legacy.o:       $(SMBCOMMON_DIR)/smb_door_legacy.c
+	$(COMPILE.c) -o $@ $(SMBCOMMON_DIR)/smb_door_legacy.c
 	$(POST_PROCESS_O)
 
 pics/smb_cfg.o:       $(SMBBASE_DIR)/smb_cfg.c

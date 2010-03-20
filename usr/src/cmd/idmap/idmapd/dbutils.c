@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,9 +70,6 @@ static idmap_retcode lookup_cache_name2sid(sqlite *, const char *,
 
 #define	ALLOW_WK_OR_LOCAL_SIDS_ONLY(req)\
 		(req->flag & IDMAP_REQ_FLG_WK_OR_LOCAL_SIDS_ONLY)
-
-#define	IS_EPHEMERAL(pid)	(pid > INT32_MAX && pid != SENTINEL_PID)
-
 
 typedef enum init_db_option {
 	FAIL_IF_CORRUPT = 0,
@@ -1205,7 +1202,7 @@ idmap_namerule_set(idmap_namerule *rule, const char *windomain,
  * a mapping; UNDEF indicates that we do not.
  *
  * If we find a mapping then we return success, except for the
- * special case of SENTINEL_PID which indicates an inhibited mapping.
+ * special case of IDMAP_SENTINEL_PID which indicates an inhibited mapping.
  *
  * If we find a matching entry, but no mapping, we supply SID, name, and type
  * information and return "not found".  Higher layers will probably
@@ -1296,7 +1293,7 @@ lookup_wksids_sid2pid(idmap_mapping *req, idmap_id_res *res, int *is_wksid)
 	/*
 	 * We have an explicit mapping.
 	 */
-	if (wksid->pid == SENTINEL_PID) {
+	if (wksid->pid == IDMAP_SENTINEL_PID) {
 		/*
 		 * ... which is that mapping is inhibited.
 		 */
@@ -1326,7 +1323,7 @@ lookup_wksids_sid2pid(idmap_mapping *req, idmap_id_res *res, int *is_wksid)
  * Look for an entry mapping a PID to a SID.
  *
  * Note that direction=UNDEF entries do not specify a mapping,
- * and that SENTINEL_PID entries represent either an inhibited
+ * and that IDMAP_SENTINEL_PID entries represent either an inhibited
  * mapping or an ephemeral mapping.  We don't handle either here;
  * they are filtered out by find_wksid_by_pid.
  */
@@ -1604,7 +1601,7 @@ lookup_cache_sid2pid(sqlite *cache, idmap_mapping *req, idmap_id_res *res)
 		 */
 		if (!DO_NOT_ALLOC_NEW_ID_MAPPING(req) &&
 		    !AVOID_NAMESERVICE(req) &&
-		    IS_EPHEMERAL(pid) && values[2] != NULL) {
+		    IDMAP_ID_IS_EPHEMERAL(pid) && values[2] != NULL) {
 			exp = strtoll(values[2], &end, 10);
 			if (exp && exp <= curtime) {
 				/* Store the ephemeral pid */
@@ -1876,10 +1873,11 @@ ad_lookup_batch_int(lookup_state_t *state, idmap_mapping_batch *batch,
 	 * be an option if req->id2.idtype cannot be re-used in
 	 * future.
 	 *
-	 * Similarly, we use req->id2.idmap_id_u.uid to return uidNumber
-	 * or gidNumber supplied by IDMU, and reset it back to SENTINEL_PID
-	 * when we're done.  Note that the query always puts the result in
-	 * req->id2.idmap_id_u.uid, not .gid.
+	 * Similarly, we use req->id2.idmap_id_u.uid to return
+	 * uidNumber or gidNumber supplied by IDMU, and reset it
+	 * back to IDMAP_SENTINEL_PID when we're done.  Note that
+	 * the query always puts the result in req->id2.idmap_id_u.uid,
+	 * not .gid.
 	 */
 retry:
 	retcode = idmap_lookup_batch_start(dir, state->ad_nqueries,
@@ -1916,7 +1914,7 @@ retry:
 
 		retcode = IDMAP_SUCCESS;
 		req->id2.idtype = IDMAP_NONE;
-		req->id2.idmap_id_u.uid = SENTINEL_PID;
+		req->id2.idmap_id_u.uid = IDMAP_SENTINEL_PID;
 
 		/* Skip if no AD lookup required */
 		if (!(req->direction & _IDMAP_F_LOOKUP_AD))
@@ -2069,7 +2067,8 @@ retry:
 			} else if (state->directory_based_mapping ==
 			    DIRECTORY_MAPPING_IDMU &&
 			    (how_local & DOMAIN_IS_LOCAL)) {
-				assert(req->id1.idmap_id_u.uid != SENTINEL_PID);
+				assert(req->id1.idmap_id_u.uid !=
+				    IDMAP_SENTINEL_PID);
 				is_user = IS_REQUEST_UID(*req);
 				if (res->id.idtype == IDMAP_USID)
 					is_wuser = 1;
@@ -2183,7 +2182,7 @@ out:
 		type = req->id2.idtype;
 		req->id2.idtype = IDMAP_NONE;
 		posix_id = req->id2.idmap_id_u.uid;
-		req->id2.idmap_id_u.uid = SENTINEL_PID;
+		req->id2.idmap_id_u.uid = IDMAP_SENTINEL_PID;
 		res = &result->ids.ids_val[i];
 
 		/*
@@ -2235,7 +2234,7 @@ out:
 				 * from IDMU and we were expecting a user,
 				 * copy the id.
 				 */
-				if (posix_id != SENTINEL_PID &&
+				if (posix_id != IDMAP_SENTINEL_PID &&
 				    res->id.idtype == IDMAP_UID) {
 					res->id.idmap_id_u.uid = posix_id;
 					res->direction = IDMAP_DIRECTION_BI;
@@ -2254,7 +2253,7 @@ out:
 				 * from IDMU and we were expecting a group,
 				 * copy the id.
 				 */
-				if (posix_id != SENTINEL_PID &&
+				if (posix_id != IDMAP_SENTINEL_PID &&
 				    res->id.idtype == IDMAP_GID) {
 					res->id.idmap_id_u.gid = posix_id;
 					res->direction = IDMAP_DIRECTION_BI;
@@ -2272,7 +2271,7 @@ out:
 			if (res->retcode == IDMAP_SUCCESS &&
 			    req->id1name != NULL &&
 			    (req->id2name == NULL ||
-			    res->id.idmap_id_u.uid == SENTINEL_PID) &&
+			    res->id.idmap_id_u.uid == IDMAP_SENTINEL_PID) &&
 			    NLDAP_MODE(res->id.idtype, state)) {
 				req->direction |= _IDMAP_F_LOOKUP_NLDAP;
 				state->nldap_nqueries++;
@@ -2484,7 +2483,7 @@ sid2pid_first_pass(lookup_state_t *state, idmap_mapping *req,
 
 	/* Initialize result */
 	res->id.idtype = req->id2.idtype;
-	res->id.idmap_id_u.uid = SENTINEL_PID;
+	res->id.idmap_id_u.uid = IDMAP_SENTINEL_PID;
 	res->direction = IDMAP_DIRECTION_UNDEF;
 	wksid = 0;
 
@@ -2601,7 +2600,7 @@ sid2pid_first_pass(lookup_state_t *state, idmap_mapping *req,
 	if (retcode != IDMAP_SUCCESS ||
 	    (!wksid && req->id2name == NULL &&
 	    AD_OR_MIXED_MODE(res->id.idtype, state)) ||
-	    (!wksid && res->id.idmap_id_u.uid == SENTINEL_PID &&
+	    (!wksid && res->id.idmap_id_u.uid == IDMAP_SENTINEL_PID &&
 	    state->directory_based_mapping == DIRECTORY_MAPPING_IDMU)) {
 		retcode = IDMAP_SUCCESS;
 		req->direction |= _IDMAP_F_LOOKUP_AD;
@@ -2971,7 +2970,7 @@ name_based_mapping_sid2pid(lookup_state_t *state,
 
 			if (EMPTY_NAME(values[0])) {
 				idmap_namerule_set(rule, values[3], values[2],
-				    values[0], is_wuser, is_user,
+				    values[0], is_user, is_wuser,
 				    strtol(values[4], &end, 10),
 				    direction);
 				retcode = IDMAP_ERR_NOMAPPING;
@@ -2995,8 +2994,8 @@ name_based_mapping_sid2pid(lookup_state_t *state,
 				else {
 					/* Case 3 */
 					idmap_namerule_set(rule, values[3],
-					    values[2], values[0], is_wuser,
-					    is_user,
+					    values[2], values[0], is_user,
+					    is_wuser,
 					    strtol(values[4], &end, 10),
 					    direction);
 					retcode = IDMAP_ERR_NOMAPPING;
@@ -3036,7 +3035,7 @@ out:
 
 	if (retcode == IDMAP_SUCCESS) {
 		idmap_namerule_set(rule, values[3], values[2],
-		    values[0], is_wuser, is_user, strtol(values[4], &end, 10),
+		    values[0], is_user, is_wuser, strtol(values[4], &end, 10),
 		    res->direction);
 	}
 
@@ -3186,7 +3185,7 @@ dynamic_ephemeral_mapping(lookup_state_t *state,
 
 	res->direction = IDMAP_DIRECTION_BI;
 
-	if (IS_EPHEMERAL(res->id.idmap_id_u.uid)) {
+	if (IDMAP_ID_IS_EPHEMERAL(res->id.idmap_id_u.uid)) {
 		res->info.how.map_type = IDMAP_MAP_TYPE_EPHEMERAL;
 		res->info.src = IDMAP_MAP_SRC_CACHE;
 		return (IDMAP_SUCCESS);
@@ -3257,8 +3256,8 @@ sid2pid_second_pass(lookup_state_t *state,
 	 * If it's from IDMU, we need to look up the name, for name-based
 	 * requests and the cache.
 	 */
-	if (!IS_EPHEMERAL(res->id.idmap_id_u.uid) &&
-	    res->id.idmap_id_u.uid != SENTINEL_PID) {
+	if (!IDMAP_ID_IS_EPHEMERAL(res->id.idmap_id_u.uid) &&
+	    res->id.idmap_id_u.uid != IDMAP_SENTINEL_PID) {
 		if (req->id2name == NULL) {
 			/*
 			 * If the lookup fails, go ahead anyway.
@@ -3335,10 +3334,10 @@ sid2pid_second_pass(lookup_state_t *state,
 		    res->id.idtype == IDMAP_UID))) {
 			free(req->id2name);
 			req->id2name = NULL;
-			res->id.idmap_id_u.uid = SENTINEL_PID;
+			res->id.idmap_id_u.uid = IDMAP_SENTINEL_PID;
 			/* fallback */
 		} else {
-			if (res->id.idmap_id_u.uid == SENTINEL_PID)
+			if (res->id.idmap_id_u.uid == IDMAP_SENTINEL_PID)
 				retcode = ns_lookup_byname(req->id2name,
 				    NULL, &res->id);
 			/*
@@ -3404,7 +3403,7 @@ update_cache_pid2sid(lookup_state_t *state,
 		return (IDMAP_SUCCESS);
 
 	assert(res->direction != IDMAP_DIRECTION_UNDEF);
-	assert(req->id1.idmap_id_u.uid != SENTINEL_PID);
+	assert(req->id1.idmap_id_u.uid != IDMAP_SENTINEL_PID);
 	assert(res->id.idtype != IDMAP_SID);
 
 	/*
@@ -3557,7 +3556,8 @@ update_cache_sid2pid(lookup_state_t *state,
 	else
 		is_eph_user = -1;
 
-	if (is_eph_user >= 0 && !IS_EPHEMERAL(res->id.idmap_id_u.uid)) {
+	if (is_eph_user >= 0 &&
+	    !IDMAP_ID_IS_EPHEMERAL(res->id.idmap_id_u.uid)) {
 		sql = sqlite_mprintf("UPDATE idmap_cache "
 		    "SET w2u = 0 WHERE "
 		    "sidprefix = %Q AND rid = %u AND w2u = 1 AND "
@@ -3580,7 +3580,7 @@ update_cache_sid2pid(lookup_state_t *state,
 	}
 
 	assert(res->direction != IDMAP_DIRECTION_UNDEF);
-	assert(res->id.idmap_id_u.uid != SENTINEL_PID);
+	assert(res->id.idmap_id_u.uid != IDMAP_SENTINEL_PID);
 
 	switch (res->info.how.map_type) {
 	case IDMAP_MAP_TYPE_DS_AD:
@@ -3702,7 +3702,7 @@ lookup_cache_pid2sid(sqlite *cache, idmap_mapping *req, idmap_id_res *res,
 	}
 
 	/* SQL to lookup the cache by pid or by unixname */
-	if (req->id1.idmap_id_u.uid != SENTINEL_PID) {
+	if (req->id1.idmap_id_u.uid != IDMAP_SENTINEL_PID) {
 		sql = sqlite_mprintf("SELECT sidprefix, rid, "
 		    "canon_winname, windomain, w2u, is_wuser, "
 		    "map_type, map_dn, map_attr, map_value, map_windomain, "
@@ -4060,7 +4060,11 @@ retry:
 	UNLOCK_CONFIG();
 
 	if (retcode != IDMAP_SUCCESS) {
-		idmapdlog(LOG_NOTICE, "AD lookup by winname failed");
+		idmapdlog(LOG_NOTICE,
+		    "AD lookup of winname %s@%s failed, error code %d",
+		    name == NULL ? "(null)" : name,
+		    domain == NULL ? "(null)" : domain,
+		    retcode);
 		return (retcode);
 	}
 	return (rc);
@@ -4441,7 +4445,7 @@ pid2sid_first_pass(lookup_state_t *state, idmap_mapping *req,
 	}
 
 	/* Find pid */
-	if (req->id1.idmap_id_u.uid == SENTINEL_PID) {
+	if (req->id1.idmap_id_u.uid == IDMAP_SENTINEL_PID) {
 		if (req->id1name == NULL) {
 			retcode = IDMAP_ERR_ARG;
 			goto out;
@@ -4465,7 +4469,7 @@ pid2sid_first_pass(lookup_state_t *state, idmap_mapping *req,
 		goto out;
 
 	/* Ephemeral ids cannot be allocated during pid2sid */
-	if (IS_EPHEMERAL(req->id1.idmap_id_u.uid)) {
+	if (IDMAP_ID_IS_EPHEMERAL(req->id1.idmap_id_u.uid)) {
 		retcode = IDMAP_ERR_NOMAPPING;
 		goto out;
 	}
@@ -4587,7 +4591,7 @@ pid2sid_second_pass(lookup_state_t *state, idmap_mapping *req,
 		    &req->id1name);
 		if (retcode != IDMAP_SUCCESS)
 			goto out;
-	} else if (req->id1.idmap_id_u.uid == SENTINEL_PID) {
+	} else if (req->id1.idmap_id_u.uid == IDMAP_SENTINEL_PID) {
 		/* Get pid from name service */
 		retcode = ns_lookup_byname(req->id1name, NULL, &req->id1);
 		if (retcode != IDMAP_SUCCESS) {
@@ -4620,4 +4624,52 @@ out:
 	if (!ARE_WE_DONE(req->direction))
 		state->pid2sid_done = FALSE;
 	return (retcode);
+}
+
+idmap_retcode
+idmap_cache_flush(idmap_flush_op op)
+{
+	idmap_retcode	rc;
+	sqlite *cache = NULL;
+	char *sql1;
+	char *sql2;
+
+	switch (op) {
+	case IDMAP_FLUSH_EXPIRE:
+		sql1 =
+		    "UPDATE idmap_cache SET expiration=1 WHERE expiration>0;";
+		sql2 =
+		    "UPDATE name_cache SET expiration=1 WHERE expiration>0;";
+		break;
+
+	case IDMAP_FLUSH_DELETE:
+		sql1 = "DELETE FROM idmap_cache;";
+		sql2 = "DELETE FROM name_cache;";
+		break;
+
+	default:
+		return (IDMAP_ERR_INTERNAL);
+	}
+
+	rc = get_cache_handle(&cache);
+	if (rc != IDMAP_SUCCESS)
+		return (rc);
+
+	/*
+	 * Note that we flush the idmapd cache first, before the kernel
+	 * cache.  If we did it the other way 'round, a request could come
+	 * in after the kernel cache flush and pull a soon-to-be-flushed
+	 * idmapd cache entry back into the kernel cache.  This way the
+	 * worst that will happen is that a new entry will be added to
+	 * the kernel cache and then immediately flushed.
+	 */
+
+	rc = sql_exec_no_cb(cache, IDMAP_CACHENAME, sql1);
+	if (rc != IDMAP_SUCCESS)
+		return (rc);
+
+	rc = sql_exec_no_cb(cache, IDMAP_CACHENAME, sql2);
+
+	(void) __idmap_flush_kcache();
+	return (rc);
 }

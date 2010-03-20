@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,7 @@
 #include <smbsrv/libsmb.h>
 
 extern int smb_pwd_num(void);
-extern int smb_lgrp_numbydomain(smb_gdomain_t, int *);
+extern int smb_lgrp_numbydomain(smb_domain_type_t, int *);
 
 static uint32_t smb_sam_lookup_user(char *, smb_sid_t **);
 static uint32_t smb_sam_lookup_group(char *, smb_sid_t **);
@@ -262,7 +262,7 @@ smb_sam_lookup_sid(smb_sid_t *sid, smb_account_t *account)
 		case SMB_IDMAP_GROUP:
 			account->a_type = SidTypeAlias;
 			(void) smb_sid_getrid(sid, &rid);
-			rc = smb_lgrp_getbyrid(rid, SMB_LGRP_LOCAL, &grp);
+			rc = smb_lgrp_getbyrid(rid, SMB_DOMAIN_LOCAL, &grp);
 			if (rc != SMB_LGRP_SUCCESS)
 				return (NT_STATUS_NO_SUCH_ALIAS);
 
@@ -369,11 +369,11 @@ smb_sam_grp_cnt(smb_domain_type_t dtype)
 
 	switch (dtype) {
 	case SMB_DOMAIN_BUILTIN:
-		rc = smb_lgrp_numbydomain(SMB_LGRP_BUILTIN, &grpcnt);
+		rc = smb_lgrp_numbydomain(SMB_DOMAIN_BUILTIN, &grpcnt);
 		break;
 
 	case SMB_DOMAIN_LOCAL:
-		rc = smb_lgrp_numbydomain(SMB_LGRP_LOCAL, &grpcnt);
+		rc = smb_lgrp_numbydomain(SMB_DOMAIN_LOCAL, &grpcnt);
 		break;
 
 	default:

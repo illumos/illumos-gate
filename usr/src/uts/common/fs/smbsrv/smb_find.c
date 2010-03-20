@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -219,7 +219,7 @@ smb_com_search(smb_request_t *sr)
 	uint16_t		key_len;
 	uint32_t		client_key;
 	char			name[SMB_SHORTNAMELEN];
-	char			*path;
+	smb_pathname_t		*pn;
 	unsigned char		resume_char;
 	unsigned char		type;
 	boolean_t		find_first, to_upper;
@@ -242,9 +242,18 @@ smb_com_search(smb_request_t *sr)
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
 		return (SDRC_ERROR);
 
-	rc = smbsr_decode_data(sr, "%Abw", sr, &path, &type, &key_len);
+	pn = &sr->arg.dirop.fqi.fq_path;
+	rc = smbsr_decode_data(sr, "%Abw", sr, &pn->pn_path, &type, &key_len);
 	if ((rc != 0) || (type != 0x05))
 		return (SDRC_ERROR);
+
+	smb_pathname_init(sr, pn, pn->pn_path);
+	if (!smb_pathname_validate(sr, pn) ||
+	    smb_is_stream_name(pn->pn_path)) {
+		smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
+		    ERRDOS, ERROR_NO_MORE_FILES);
+		return (SDRC_ERROR);
+	}
 
 	tree = sr->tid_tree;
 
@@ -261,7 +270,7 @@ smb_com_search(smb_request_t *sr)
 		}
 
 		(void) smb_mbc_encodef(&sr->reply, "bwwbwb11c5.lb8.13c",
-		    1, 0, VAR_BCC, 5, 0, 0, path+1,
+		    1, 0, VAR_BCC, 5, 0, 0, pn->pn_path+1,
 		    client_key, sattr, name);
 
 		rc = (sr->reply.chain_offset - sr->cur_reply_offset) - 8;
@@ -279,11 +288,7 @@ smb_com_search(smb_request_t *sr)
 	client_key = 0;
 
 	if (find_first) {
-		/* NT interprets NULL filename as "\" */
-		if (strlen(path) == 0)
-			path = "\\";
-
-		odid = smb_odir_open(sr, path, sattr, 0);
+		odid = smb_odir_open(sr, pn->pn_path, sattr, 0);
 		if (odid == 0) {
 			if (sr->smb_error.status == NT_STATUS_ACCESS_DENIED)
 				smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
@@ -404,7 +409,7 @@ smb_com_find(smb_request_t *sr)
 	smb_fileinfo_t		fileinfo;
 	boolean_t		eos;
 
-	char			*path;
+	smb_pathname_t		*pn;
 	unsigned char		resume_char;
 	unsigned char		type;
 	boolean_t		find_first = B_TRUE;
@@ -413,19 +418,30 @@ smb_com_find(smb_request_t *sr)
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
 		return (SDRC_ERROR);
 
-	rc = smbsr_decode_data(sr, "%Abw", sr, &path, &type, &key_len);
+	pn = &sr->arg.dirop.fqi.fq_path;
+	rc = smbsr_decode_data(sr, "%Abw", sr, &pn->pn_path, &type, &key_len);
 	if ((rc != 0) || (type != 0x05))
 		return (SDRC_ERROR);
 
 	if ((key_len != 0) && (key_len != 21))
 		return (SDRC_ERROR);
 
+	smb_pathname_init(sr, pn, pn->pn_path);
+	if (!smb_pathname_validate(sr, pn))
+		return (SDRC_ERROR);
+
+	if (smb_is_stream_name(pn->pn_path)) {
+		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+		    ERRDOS, ERROR_INVALID_NAME);
+		return (SDRC_ERROR);
+	}
+
 	find_first = (key_len == 0);
 	resume_char = 0;
 	client_key = 0;
 
 	if (find_first) {
-		odid = smb_odir_open(sr, path, sattr, 0);
+		odid = smb_odir_open(sr, pn->pn_path, sattr, 0);
 		if (odid == 0)
 			return (SDRC_ERROR);
 	} else {
@@ -599,7 +615,7 @@ smb_com_find_unique(struct smb_request *sr)
 	int			rc;
 	uint16_t		count, maxcount, index;
 	uint16_t		sattr, odid;
-	char			*path;
+	smb_pathname_t		*pn;
 	unsigned char		resume_char = '\0';
 	uint32_t		client_key = 0;
 	char			name[SMB_SHORTNAMELEN];
@@ -611,17 +627,28 @@ smb_com_find_unique(struct smb_request *sr)
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
 		return (SDRC_ERROR);
 
+	pn = &sr->arg.dirop.fqi.fq_path;
 	vdb = kmem_alloc(sizeof (smb_vdb_t), KM_SLEEP);
-	if ((smbsr_decode_data(sr, "%AV", sr, &path, vdb) != 0) ||
+	if ((smbsr_decode_data(sr, "%AV", sr, &pn->pn_path, vdb) != 0) ||
 	    (vdb->vdb_len != 0)) {
 		kmem_free(vdb, sizeof (smb_vdb_t));
 		return (SDRC_ERROR);
 	}
 	kmem_free(vdb, sizeof (smb_vdb_t));
 
+	smb_pathname_init(sr, pn, pn->pn_path);
+	if (!smb_pathname_validate(sr, pn))
+		return (SDRC_ERROR);
+
+	if (smb_is_stream_name(pn->pn_path)) {
+		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+		    ERRDOS, ERROR_INVALID_NAME);
+		return (SDRC_ERROR);
+	}
+
 	(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
 
-	odid = smb_odir_open(sr, path, sattr, 0);
+	odid = smb_odir_open(sr, pn->pn_path, sattr, 0);
 	if (odid == 0)
 		return (SDRC_ERROR);
 	od = smb_tree_lookup_odir(sr->tid_tree, odid);

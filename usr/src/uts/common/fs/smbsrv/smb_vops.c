@@ -327,6 +327,7 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 		XVA_SET_REQ(&tmp_xvattr, XAT_SYSTEM);
 		XVA_SET_REQ(&tmp_xvattr, XAT_ARCHIVE);
 		XVA_SET_REQ(&tmp_xvattr, XAT_CREATETIME);
+		XVA_SET_REQ(&tmp_xvattr, XAT_REPARSE);
 
 		error = VOP_GETATTR(use_vp, &tmp_xvattr.xva_vattr, flags,
 		    cr, &smb_ct);
@@ -358,6 +359,12 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 			if ((XVA_ISSET_RTN(&tmp_xvattr, XAT_ARCHIVE)) &&
 			    (xoap->xoa_archive)) {
 				ret_attr->sa_dosattr |= FILE_ATTRIBUTE_ARCHIVE;
+			}
+
+			if ((XVA_ISSET_RTN(&tmp_xvattr, XAT_REPARSE)) &&
+			    (xoap->xoa_reparse)) {
+				ret_attr->sa_dosattr |=
+				    FILE_ATTRIBUTE_REPARSE_POINT;
 			}
 
 			ret_attr->sa_crtime = xoap->xoa_createtime;
@@ -534,6 +541,7 @@ smb_vop_lookup(
     int			flags,
     int			*direntflags,
     vnode_t		*rootvp,
+    smb_attr_t		*attr,
     cred_t		*cr)
 {
 	int error = 0;
@@ -587,14 +595,21 @@ smb_vop_lookup(
 	error = VOP_LOOKUP(dvp, np, vpp, NULL, option_flags, NULL, cr,
 	    &smb_ct, direntflags, &rpn);
 
-	if ((error == 0) && od_name) {
-		bzero(od_name, MAXNAMELEN);
-		np = (option_flags == FIGNORECASE) ? rpn.pn_buf : name;
+	if (error == 0) {
+		if (od_name) {
+			bzero(od_name, MAXNAMELEN);
+			np = (option_flags == FIGNORECASE) ? rpn.pn_buf : name;
 
-		if (flags & SMB_CATIA)
-			smb_vop_catia_v4tov5(np, od_name, MAXNAMELEN);
-		else
-			(void) strlcpy(od_name, np, MAXNAMELEN);
+			if (flags & SMB_CATIA)
+				smb_vop_catia_v4tov5(np, od_name, MAXNAMELEN);
+			else
+				(void) strlcpy(od_name, np, MAXNAMELEN);
+		}
+
+		if (attr != NULL) {
+			attr->sa_mask = SMB_AT_ALL;
+			(void) smb_vop_getattr(*vpp, NULL, attr, 0, kcred);
+		}
 	}
 
 	pn_free(&rpn);
@@ -1001,7 +1016,7 @@ smb_vop_stream_lookup(
 	name = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
 
 	if ((error = smb_vop_lookup(*xattrdirvpp, solaris_stream_name, vpp,
-	    name, flags, &tmpflgs, rootvp, cr)) != 0) {
+	    name, flags, &tmpflgs, rootvp, NULL, cr)) != 0) {
 		VN_RELE(*xattrdirvpp);
 	} else {
 		(void) strlcpy(od_name, &(name[SMB_STREAM_PREFIX_LEN]),
@@ -1065,6 +1080,7 @@ smb_vop_stream_remove(vnode_t *vp, char *stream_name, int flags, cred_t *cr)
 	error = smb_vop_remove(xattrdirvp, solaris_stream_name, flags, cr);
 
 	kmem_free(solaris_stream_name, MAXNAMELEN);
+	VN_RELE(xattrdirvp);
 
 	return (error);
 }
@@ -1280,8 +1296,6 @@ smb_vop_eaccess(vnode_t *vp, int *mode, int flags, vnode_t *dir_vp, cred_t *cr)
 }
 
 /*
- * smb_vop_shrlock()
- *
  * See comments for smb_fsop_shrlock()
  */
 int
@@ -1295,13 +1309,21 @@ smb_vop_shrlock(vnode_t *vp, uint32_t uniq_fid, uint32_t desired_access,
 	int flag = 0;
 	int cmd;
 
-	cmd = (nbl_need_check(vp)) ? F_SHARE_NBMAND : F_SHARE;
-
 	/*
-	 * Check if this is a metadata access
+	 * share locking is not supported for non-regular
+	 * objects in NBMAND mode.
 	 */
+	if (nbl_need_check(vp)) {
+		if (vp->v_type != VREG)
+			return (0);
+
+		cmd = F_SHARE_NBMAND;
+	} else {
+		cmd = F_SHARE;
+	}
 
 	if ((desired_access & FILE_DATA_ALL) == 0) {
+		/* metadata access only */
 		new_access |= F_MDACC;
 	} else {
 		if (desired_access & (ACE_READ_DATA | ACE_EXECUTE)) {
@@ -1352,10 +1374,16 @@ smb_vop_unshrlock(vnode_t *vp, uint32_t uniq_fid, cred_t *cr)
 	struct shr_locowner shr_own;
 
 	/*
+	 * share locking is not supported for non-regular
+	 * objects in NBMAND mode.
+	 */
+	if (nbl_need_check(vp) && (vp->v_type != VREG))
+		return (0);
+
+	/*
 	 * For s_access and s_deny, we do not need to pass in the original
 	 * values.
 	 */
-
 	shr.s_access = 0;
 	shr.s_deny = 0;
 	shr.s_sysid = smb_ct.cc_sysid;

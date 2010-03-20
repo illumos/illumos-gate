@@ -931,10 +931,14 @@ smbadm_group_show(int argc, char **argv)
 
 	smb_lgrp_iterclose(&gi);
 
-	if (status != SMB_LGRP_NO_MORE) {
+	if ((status != SMB_LGRP_NO_MORE) || smb_lgrp_itererror(&gi)) {
+		if (status != SMB_LGRP_NO_MORE)
+			syslog(LOG_ERR, "smb_lgrp_iterate: %s",
+			    smb_lgrp_strerror(status));
+
 		(void) fprintf(stderr,
-		    gettext("failed to get all the groups (%s)\n"),
-		    smb_lgrp_strerror(status));
+		    gettext("\nAn error occurred while retrieving group data.\n"
+		    "Check the system log for more information.\n"));
 		return (status);
 	}
 
@@ -1439,17 +1443,10 @@ smbadm_init(void)
 
 	switch (curcmd->flags & SMBADM_CMDF_TYPEMASK) {
 	case SMBADM_CMDF_GROUP:
-		if (smb_idmap_start() != 0) {
-			(void) fprintf(stderr,
-			    gettext("failed to contact idmap service\n"));
-			return (1);
-		}
-
 		if ((rc = smb_lgrp_start()) != SMB_LGRP_SUCCESS) {
 			(void) fprintf(stderr,
 			    gettext("failed to initialize (%s)\n"),
 			    smb_lgrp_strerror(rc));
-			smb_idmap_stop();
 			return (1);
 		}
 		break;
@@ -1471,7 +1468,6 @@ smbadm_fini(void)
 	switch (curcmd->flags & SMBADM_CMDF_TYPEMASK) {
 	case SMBADM_CMDF_GROUP:
 		smb_lgrp_stop();
-		smb_idmap_stop();
 		break;
 
 	case SMBADM_CMDF_USER:

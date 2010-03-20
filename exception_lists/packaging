@@ -761,8 +761,15 @@ usr/lib/smbsrv/dtrace
 #
 # Private/Internal 64-bit libraries of smbsrv. Do not ship.
 #
-usr/lib/smbsrv/amd64			i386
-usr/lib/smbsrv/sparcv9			sparc
+usr/lib/smbsrv/amd64				i386
+usr/lib/smbsrv/sparcv9				sparc
+
+usr/lib/reparse/amd64/libreparse_smb.so		i386
+usr/lib/reparse/amd64/libreparse_smb.so.1	i386
+usr/lib/reparse/amd64/llib-lreparse_smb.ln	i386
+usr/lib/reparse/sparcv9/libreparse_smb.so	sparc
+usr/lib/reparse/sparcv9/libreparse_smb.so.1	sparc
+usr/lib/reparse/sparcv9/llib-lreparse_smb.ln	sparc
 #
 # Private dirent, extended to include flags, for use by SMB server
 #

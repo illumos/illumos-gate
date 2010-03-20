@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@ static int smb_session_message(smb_session_t *);
 static int smb_session_xprt_puthdr(smb_session_t *, smb_xprt_t *,
     uint8_t *, size_t);
 static smb_user_t *smb_session_lookup_user(smb_session_t *, char *, char *);
+static void smb_session_logoff(smb_session_t *);
 static void smb_request_init_command_mbuf(smb_request_t *sr);
 void dump_smb_inaddr(smb_inaddr_t *ipaddr);
 
@@ -619,7 +620,8 @@ smb_session_message(smb_session_t *session)
 		 */
 		if (SMB_IS_WRITERAW(sr)) {
 			rc = smb_handle_write_raw(session, sr);
-			/* XXX smb_request_free(sr); ??? */
+			if (rc == 0)
+				continue;
 			return (rc);
 		}
 
@@ -773,7 +775,8 @@ smb_session_cancel(smb_session_t *session)
 		smb_xa_close(xa);
 		xa = nextxa;
 	}
-	smb_user_logoff_all(session);
+
+	smb_session_logoff(session);
 }
 
 /*
@@ -835,48 +838,6 @@ smb_session_worker(void	*arg)
 		smb_request_free(sr);
 		break;
 	}
-}
-
-/*
- * smb_session_disconnect_share
- *
- * Disconnects the specified share. This function should be called after the
- * share passed in has been made unavailable by the "share manager".
- */
-void
-smb_session_disconnect_share(smb_session_list_t *se, char *sharename)
-{
-	smb_session_t	*session;
-
-	rw_enter(&se->se_lock, RW_READER);
-	session = list_head(&se->se_act.lst);
-	while (session) {
-		ASSERT(session->s_magic == SMB_SESSION_MAGIC);
-		smb_rwx_rwenter(&session->s_lock, RW_READER);
-		switch (session->s_state) {
-		case SMB_SESSION_STATE_NEGOTIATED:
-		case SMB_SESSION_STATE_OPLOCK_BREAKING:
-		case SMB_SESSION_STATE_WRITE_RAW_ACTIVE: {
-			smb_user_t	*user;
-			smb_user_t	*next;
-
-			user = smb_user_lookup_by_state(session, NULL);
-			while (user) {
-				smb_user_disconnect_share(user, sharename);
-				next = smb_user_lookup_by_state(session, user);
-				smb_user_release(user);
-				user = next;
-			}
-			break;
-
-		}
-		default:
-			break;
-		}
-		smb_rwx_rwexit(&session->s_lock);
-		session = list_next(&se->se_act.lst, session);
-	}
-	rw_exit(&se->se_lock);
 }
 
 void
@@ -1078,6 +1039,109 @@ smb_session_dup_user(smb_session_t *session, char *domain, char *account_name)
 	}
 
 	return (user);
+}
+
+/*
+ * Find a user on the specified session by SMB UID.
+ */
+smb_user_t *
+smb_session_lookup_uid(smb_session_t *session, uint16_t uid)
+{
+	smb_user_t	*user;
+	smb_llist_t	*user_list;
+
+	SMB_SESSION_VALID(session);
+
+	user_list = &session->s_user_list;
+	smb_llist_enter(user_list, RW_READER);
+
+	user = smb_llist_head(user_list);
+	while (user) {
+		SMB_USER_VALID(user);
+		ASSERT(user->u_session == session);
+
+		if (user->u_uid == uid) {
+			if (!smb_user_hold(user))
+				break;
+
+			smb_llist_exit(user_list);
+			return (user);
+		}
+
+		user = smb_llist_next(user_list, user);
+	}
+
+	smb_llist_exit(user_list);
+	return (NULL);
+}
+
+void
+smb_session_post_user(smb_session_t *session, smb_user_t *user)
+{
+	SMB_USER_VALID(user);
+	ASSERT(user->u_refcnt == 0);
+	ASSERT(user->u_state == SMB_USER_STATE_LOGGED_OFF);
+	ASSERT(user->u_session == session);
+
+	smb_llist_post(&session->s_user_list, user, smb_user_delete);
+}
+
+/*
+ * Logoff all users associated with the specified session.
+ */
+static void
+smb_session_logoff(smb_session_t *session)
+{
+	smb_user_t	*user;
+
+	SMB_SESSION_VALID(session);
+
+	smb_llist_enter(&session->s_user_list, RW_READER);
+
+	user = smb_llist_head(&session->s_user_list);
+	while (user) {
+		SMB_USER_VALID(user);
+		ASSERT(user->u_session == session);
+
+		if (smb_user_hold(user)) {
+			smb_user_logoff(user);
+			smb_user_release(user);
+		}
+
+		user = smb_llist_next(&session->s_user_list, user);
+	}
+
+	smb_llist_exit(&session->s_user_list);
+}
+
+/*
+ * Disconnect any trees associated with the specified share.
+ * Iterate through the users on this session and tell each user
+ * to disconnect from the share.
+ */
+void
+smb_session_disconnect_share(smb_session_t *session, const char *sharename)
+{
+	smb_user_t	*user;
+
+	SMB_SESSION_VALID(session);
+
+	smb_llist_enter(&session->s_user_list, RW_READER);
+
+	user = smb_llist_head(&session->s_user_list);
+	while (user) {
+		SMB_USER_VALID(user);
+		ASSERT(user->u_session == session);
+
+		if (smb_user_hold(user)) {
+			smb_user_disconnect_share(user, sharename);
+			smb_user_release(user);
+		}
+
+		user = smb_llist_next(&session->s_user_list, user);
+	}
+
+	smb_llist_exit(&session->s_user_list);
 }
 
 /*

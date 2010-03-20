@@ -26,21 +26,14 @@
 #ifndef _SMBSRV_NETRAUTH_H
 #define	_SMBSRV_NETRAUTH_H
 
-
 /*
- * Interface definitions for the NETR remote authentication and logon
- * services.
+ * NETR remote authentication and logon services.
  */
 
 #include <sys/types.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/netbios.h>
-#include <smbsrv/smb_xdr.h>
 #include <smbsrv/smbinfo.h>
-
-#ifndef _KERNEL
-#include <syslog.h>
-#endif /* _KERNEL */
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,19 +57,16 @@ extern "C" {
 #define	NETR_CRED_DATA_SZ			8
 #define	NETR_OWF_PASSWORD_SZ			16
 
-
 /*
  * SAM logon levels: interactive and network.
  */
 #define	NETR_INTERACTIVE_LOGON			0x01
 #define	NETR_NETWORK_LOGON			0x02
 
-
 /*
  * SAM logon validation levels.
  */
 #define	NETR_VALIDATION_LEVEL3			0x03
-
 
 /*
  * This is a duplicate of the netr_credential
@@ -112,34 +102,6 @@ typedef struct netr_info {
 	BYTE password[NETR_MACHINE_ACCT_PASSWD_MAX];
 	time_t timestamp;
 } netr_info_t;
-
-typedef struct netr_client {
-	uint16_t logon_level;
-	char *username;		/* request username */
-	char *domain;		/* request domain */
-	char *e_username;	/* effective username */
-	char *e_domain;		/* effective domain */
-	char *workstation;
-	smb_inaddr_t ipaddr;
-	struct {
-		uint32_t challenge_key_len;
-		uint8_t *challenge_key_val;
-	} challenge_key;
-	struct {
-		uint32_t nt_password_len;
-		uint8_t *nt_password_val;
-	} nt_password;
-	struct {
-		uint32_t lm_password_len;
-		uint8_t *lm_password_val;
-	} lm_password;
-	uint32_t logon_id;
-	int native_os;
-	int native_lm;
-	smb_inaddr_t local_ipaddr;
-	uint16_t local_port;
-} netr_client_t;
-
 
 /*
  * NETLOGON private interface.

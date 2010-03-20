@@ -19,49 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SMBSRV_LMDFS_H
-#define	_SMBSRV_LMDFS_H
+/*LINTLIBRARY*/
+/*PROTOLIB1*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * LAN Manager DFS interface definition.
- */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/*
- * DFS Volume state
- */
-#define	DFS_VOLUME_STATE_OK		1
-#define	DFS_VOLUME_STATE_INCONSISTENT	2
-#define	DFS_VOLUME_STATE_OFFLINE	3
-#define	DFS_VOLUME_STATE_ONLINE		4
-
-/*
- * DFS Storage state
- */
-#define	DFS_STORAGE_STATE_OFFLINE	1
-#define	DFS_STORAGE_STATE_ONLINE	2
-
-/*
- * Flags:
- * DFS_ADD_VOLUME:	Add a new volume to the DFS if not already there.
- * DFS_RESTORE_VOLUME:	Volume/Replica is being restored - do not verify
- * 			share etc.
- */
-#define	DFS_ADD_VOLUME		1
-#define	DFS_RESTORE_VOLUME	2
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* _SMBSRV_LMDFS_H */
+#include <smbsrv/smb_dfs.h>

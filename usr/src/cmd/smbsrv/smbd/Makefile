@@ -19,14 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 
 PROG=	smbd
 SRCS=				\
-	smbd_door_ops.c		\
 	smbd_doorsvc.c		\
 	smbd_join.c		\
 	smbd_logon.c		\
@@ -39,11 +38,15 @@ include ../../Makefile.cmd
 
 MANIFEST=	server.xml
 SVCMETHOD=	svc-smbd
+LOGDLL=		eventlog.dll
 
 ROOTMANIFESTDIR	= $(ROOTSVCSMB)
-$(ROOTMANIFEST):= FILEMODE = 0444
+ROOTVARSMBDLLDIR = $(ROOTVARSMB)/cvol/windows/system32
+ROOTVARSMBDLL= $(LOGDLL:%=$(ROOTVARSMBDLLDIR)/%)
 
+$(ROOTMANIFEST):= FILEMODE = 0444
 $(ROOTSVCMETHOD):= FILEMODE = 0555
+$(ROOTVARSMBDLL):= FILEMODE = 0755
 
 include ../Makefile.smbsrv.defs
 
@@ -58,6 +61,9 @@ FILEMODE = 0444
 $(ROOTSMBDFILE):= FILEMODE = 0555
 
 $(ROOTSMBDDIR)/%: %
+	$(INS.file)
+
+$(ROOTVARSMBDLLDIR)/%: %
 	$(INS.file)
 
 all:		$(PROG)
@@ -78,4 +84,4 @@ _msg:
 include ../../Makefile.targ
 
 install: all .WAIT $(ROOTETCDEFAULTFILES) $(ROOTMANIFEST) \
-		$(ROOTSMBDFILE) ${ROOTSVCMETHOD}
+		$(ROOTSMBDFILE) ${ROOTSVCMETHOD} $(ROOTVARSMBDLL)

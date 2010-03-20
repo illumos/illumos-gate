@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,10 +66,14 @@ static void smb_autohome_parse_options(smb_share_t *);
  * If share directory contains backslash path separators, they will
  * be converted to forward slash to support NT/DOS path style for
  * autohome shares.
+ *
+ * We need to serialize calls to smb_autohome_lookup because it
+ * operates on the global smb_ai structure.
  */
 void
 smb_autohome_add(const smb_token_t *token)
 {
+	static mutex_t	autohome_mutex;
 	smb_share_t	si;
 	smb_autohome_t	*ai;
 	char		*username = token->tkn_account_name;
@@ -90,8 +94,12 @@ smb_autohome_add(const smb_token_t *token)
 		return;
 	}
 
-	if ((ai = smb_autohome_lookup(username)) == NULL)
+	(void) mutex_lock(&autohome_mutex);
+
+	if ((ai = smb_autohome_lookup(username)) == NULL) {
+		(void) mutex_unlock(&autohome_mutex);
 		return;
+	}
 
 	bzero(&si, sizeof (smb_share_t));
 	(void) strlcpy(si.shr_path, ai->ah_path, MAXPATHLEN);
@@ -104,6 +112,8 @@ smb_autohome_add(const smb_token_t *token)
 	si.shr_flags |= SMB_SHRF_TRANS | SMB_SHRF_AUTOHOME;
 	si.shr_uid = token->tkn_user.i_id;
 	si.shr_gid = token->tkn_primary_grp.i_id;
+
+	(void) mutex_unlock(&autohome_mutex);
 
 	(void) smb_shr_add(&si);
 }
@@ -447,7 +457,7 @@ smb_autohome_parse_options(smb_share_t *si)
 		value = *ap;
 
 		if (strncasecmp(value, "catia=", 6) == 0) {
-			smb_shr_sa_catia_option((value + 6), si);
+			smb_shr_sa_setflag((value + 6), si, SMB_SHRF_CATIA);
 			continue;
 		}
 
@@ -457,7 +467,7 @@ smb_autohome_parse_options(smb_share_t *si)
 		}
 
 		if (strncasecmp(value, "abe=", 4) == 0) {
-			smb_shr_sa_abe_option((value + 4), si);
+			smb_shr_sa_setflag((value + 4), si, SMB_SHRF_ABE);
 			continue;
 		}
 

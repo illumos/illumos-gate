@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,15 +36,15 @@
 #include <smbsrv/smb_xdr.h>
 
 #define	SMB_OPIPE_ISOPEN(OPIPE)	\
-	(((OPIPE)->p_hdr.oh_magic == SMB_OPIPE_HDR_MAGIC) && \
-	((OPIPE)->p_hdr.oh_fid))
+	(((OPIPE)->p_hdr.dh_magic == SMB_OPIPE_HDR_MAGIC) && \
+	((OPIPE)->p_hdr.dh_fid))
 
 extern volatile uint32_t smb_fids;
 
 static int smb_opipe_do_open(smb_request_t *, smb_opipe_t *);
-static char *smb_opipe_lookup(const char *path);
-static uint32_t smb_opipe_fid(void);
-static int smb_opipe_set_hdr(smb_opipe_t *opipe, uint32_t, uint32_t);
+static char *smb_opipe_lookup(const char *);
+static int smb_opipe_sethdr(smb_opipe_t *, uint32_t, uint32_t);
+static int smb_opipe_exec(smb_opipe_t *);
 static void smb_opipe_enter(smb_opipe_t *);
 static void smb_opipe_exit(smb_opipe_t *);
 
@@ -56,6 +56,47 @@ static kcondvar_t smb_opipe_door_cv;
 
 static int smb_opipe_door_call(smb_opipe_t *);
 static int smb_opipe_door_upcall(smb_opipe_t *);
+
+smb_opipe_t *
+smb_opipe_alloc(smb_server_t *sv)
+{
+	smb_opipe_t	*opipe;
+
+	opipe = kmem_cache_alloc(sv->si_cache_opipe, KM_SLEEP);
+
+	bzero(opipe, sizeof (smb_opipe_t));
+	mutex_init(&opipe->p_mutex, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&opipe->p_cv, NULL, CV_DEFAULT, NULL);
+	opipe->p_magic = SMB_OPIPE_MAGIC;
+	opipe->p_server = sv;
+
+	smb_llist_enter(&sv->sv_opipe_list, RW_WRITER);
+	smb_llist_insert_tail(&sv->sv_opipe_list, opipe);
+	smb_llist_exit(&sv->sv_opipe_list);
+
+	return (opipe);
+}
+
+void
+smb_opipe_dealloc(smb_opipe_t *opipe)
+{
+	smb_server_t *sv;
+
+	SMB_OPIPE_VALID(opipe);
+	sv = opipe->p_server;
+	SMB_SERVER_VALID(sv);
+
+	smb_llist_enter(&sv->sv_opipe_list, RW_WRITER);
+	smb_llist_remove(&sv->sv_opipe_list, opipe);
+	smb_llist_exit(&sv->sv_opipe_list);
+
+	opipe->p_magic = (uint32_t)~SMB_OPIPE_MAGIC;
+	smb_event_destroy(opipe->p_event);
+	cv_destroy(&opipe->p_cv);
+	mutex_destroy(&opipe->p_mutex);
+
+	kmem_cache_free(sv->si_cache_opipe, opipe);
+}
 
 /*
  * smb_opipe_open
@@ -73,7 +114,7 @@ smb_opipe_open(smb_request_t *sr)
 	open_param_t *op = &sr->arg.open;
 	smb_ofile_t *of;
 	smb_opipe_t *opipe;
-	smb_opipe_hdr_t hdr;
+	smb_doorhdr_t hdr;
 	smb_error_t err;
 	char *pipe_name;
 
@@ -107,10 +148,9 @@ smb_opipe_open(smb_request_t *sr)
 	sr->fid_ofile = of;
 
 	opipe = of->f_pipe;
-	mutex_init(&opipe->p_mutex, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&opipe->p_cv, NULL, CV_DEFAULT, NULL);
 	smb_opipe_enter(opipe);
 
+	opipe->p_server = of->f_server;
 	opipe->p_name = pipe_name;
 	opipe->p_doorbuf = kmem_zalloc(SMB_OPIPE_DOOR_BUFSIZE, KM_SLEEP);
 
@@ -118,7 +158,7 @@ smb_opipe_open(smb_request_t *sr)
 	 * p_data points to the offset within p_doorbuf at which
 	 * data will be written or read.
 	 */
-	opipe->p_data = opipe->p_doorbuf + xdr_sizeof(smb_opipe_hdr_xdr, &hdr);
+	opipe->p_data = opipe->p_doorbuf + xdr_sizeof(smb_doorhdr_xdr, &hdr);
 
 	if (smb_opipe_do_open(sr, opipe) != 0) {
 		/*
@@ -126,7 +166,7 @@ smb_opipe_open(smb_request_t *sr)
 		 * which avoids confusion when smb_opipe_close() is
 		 * called by smb_ofile_close().
 		 */
-		bzero(&opipe->p_hdr, sizeof (smb_opipe_hdr_t));
+		bzero(&opipe->p_hdr, sizeof (smb_doorhdr_t));
 		kmem_free(opipe->p_doorbuf, SMB_OPIPE_DOOR_BUFSIZE);
 		smb_opipe_exit(opipe);
 		smb_ofile_close(of, 0);
@@ -159,7 +199,8 @@ smb_opipe_lookup(const char *path)
 		"SVCCTL",
 		"WINREG",
 		"WKSSVC",
-		"EVENTLOG"
+		"EVENTLOG",
+		"NETDFS"
 	};
 
 	const char *name;
@@ -195,17 +236,21 @@ smb_opipe_do_open(smb_request_t *sr, smb_opipe_t *opipe)
 	uint32_t buflen = SMB_OPIPE_DOOR_BUFSIZE;
 	uint32_t len;
 
+	if ((opipe->p_event = smb_event_create()) == NULL)
+		return (-1);
+
 	smb_user_netinfo_init(user, userinfo);
 	len = xdr_sizeof(smb_netuserinfo_xdr, userinfo);
 
-	bzero(&opipe->p_hdr, sizeof (smb_opipe_hdr_t));
-	opipe->p_hdr.oh_magic = SMB_OPIPE_HDR_MAGIC;
-	opipe->p_hdr.oh_fid = smb_opipe_fid();
+	bzero(&opipe->p_hdr, sizeof (smb_doorhdr_t));
+	opipe->p_hdr.dh_magic = SMB_OPIPE_HDR_MAGIC;
+	opipe->p_hdr.dh_flags = SMB_DF_SYSSPACE;
+	opipe->p_hdr.dh_fid = smb_event_txid(opipe->p_event);
 
-	if (smb_opipe_set_hdr(opipe, SMB_OPIPE_OPEN, len) == -1)
+	if (smb_opipe_sethdr(opipe, SMB_OPIPE_OPEN, len) == -1)
 		return (-1);
 
-	len = xdr_sizeof(smb_opipe_hdr_xdr, &opipe->p_hdr);
+	len = xdr_sizeof(smb_doorhdr_xdr, &opipe->p_hdr);
 	buf += len;
 	buflen -= len;
 
@@ -213,34 +258,6 @@ smb_opipe_do_open(smb_request_t *sr, smb_opipe_t *opipe)
 		return (-1);
 
 	return (smb_opipe_door_call(opipe));
-}
-
-/*
- * smb_opipe_fid
- *
- * The opipe_fid is an arbitrary id used to associate RPC requests
- * with a binding handle.  A new fid is returned on each call.
- * 0 or -1 are not assigned: 0 is used to indicate an invalid fid
- * and SMB sometimes uses -1 to indicate all open fid's.
- */
-static uint32_t
-smb_opipe_fid(void)
-{
-	static uint32_t opipe_fid;
-	static kmutex_t smb_opipe_fid_mutex;
-
-	mutex_enter(&smb_opipe_fid_mutex);
-
-	if (opipe_fid == 0)
-		opipe_fid = ddi_get_lbolt() << 11;
-
-	do {
-		++opipe_fid;
-	} while (opipe_fid == 0 || opipe_fid == (uint32_t)-1);
-
-	mutex_exit(&smb_opipe_fid_mutex);
-
-	return (opipe_fid);
 }
 
 /*
@@ -255,33 +272,34 @@ smb_opipe_close(smb_ofile_t *of)
 
 	ASSERT(of);
 	ASSERT(of->f_ftype == SMB_FTYPE_MESG_PIPE);
-	ASSERT(of->f_pipe != NULL);
 
 	opipe = of->f_pipe;
+	SMB_OPIPE_VALID(opipe);
+
+	(void) smb_server_cancel_event(opipe->p_hdr.dh_fid);
 	smb_opipe_enter(opipe);
 
 	if (SMB_OPIPE_ISOPEN(opipe)) {
-		(void) smb_opipe_set_hdr(opipe, SMB_OPIPE_CLOSE, 0);
+		(void) smb_opipe_sethdr(opipe, SMB_OPIPE_CLOSE, 0);
 		(void) smb_opipe_door_call(opipe);
-		bzero(&opipe->p_hdr, sizeof (smb_opipe_hdr_t));
+		bzero(&opipe->p_hdr, sizeof (smb_doorhdr_t));
 		kmem_free(opipe->p_doorbuf, SMB_OPIPE_DOOR_BUFSIZE);
 	}
 
 	smb_user_netinfo_fini(&opipe->p_user);
 	smb_opipe_exit(opipe);
-	cv_destroy(&opipe->p_cv);
-	mutex_destroy(&opipe->p_mutex);
 }
 
 static int
-smb_opipe_set_hdr(smb_opipe_t *opipe, uint32_t cmd, uint32_t datalen)
+smb_opipe_sethdr(smb_opipe_t *opipe, uint32_t cmd, uint32_t datalen)
 {
-	opipe->p_hdr.oh_op = cmd;
-	opipe->p_hdr.oh_datalen = datalen;
-	opipe->p_hdr.oh_resid = 0;
-	opipe->p_hdr.oh_status = 0;
+	opipe->p_hdr.dh_op = cmd;
+	opipe->p_hdr.dh_txid = opipe->p_hdr.dh_fid;
+	opipe->p_hdr.dh_datalen = datalen;
+	opipe->p_hdr.dh_resid = 0;
+	opipe->p_hdr.dh_door_rc = EINVAL;
 
-	return (smb_opipe_hdr_encode(&opipe->p_hdr, opipe->p_doorbuf,
+	return (smb_doorhdr_encode(&opipe->p_hdr, opipe->p_doorbuf,
 	    SMB_OPIPE_DOOR_BUFSIZE));
 }
 
@@ -318,12 +336,19 @@ smb_opipe_transact(smb_request_t *sr, struct uio *uio)
 		return (SDRC_ERROR);
 	}
 
+	opipe = sr->fid_ofile->f_pipe;
+
+	if ((rc = smb_opipe_exec(opipe)) != 0) {
+		smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
+		    ERRDOS, ERROR_INTERNAL_ERROR);
+		return (SDRC_ERROR);
+	}
+
 	xa = sr->r_xa;
 	mdrcnt = xa->smb_mdrcnt;
-	opipe = sr->fid_ofile->f_pipe;
 	smb_opipe_enter(opipe);
 
-	if (smb_opipe_set_hdr(opipe, SMB_OPIPE_READ, mdrcnt) == -1) {
+	if (smb_opipe_sethdr(opipe, SMB_OPIPE_READ, mdrcnt) == -1) {
 		smb_opipe_exit(opipe);
 		smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
 		    ERRDOS, ERROR_INTERNAL_ERROR);
@@ -331,7 +356,7 @@ smb_opipe_transact(smb_request_t *sr, struct uio *uio)
 	}
 
 	rc = smb_opipe_door_call(opipe);
-	nbytes = opipe->p_hdr.oh_datalen;
+	nbytes = opipe->p_hdr.dh_datalen;
 
 	if (rc != 0) {
 		smb_opipe_exit(opipe);
@@ -346,7 +371,7 @@ smb_opipe_transact(smb_request_t *sr, struct uio *uio)
 		MBC_ATTACH_MBUF(&xa->rep_data_mb, mhead);
 	}
 
-	if (opipe->p_hdr.oh_resid) {
+	if (opipe->p_hdr.dh_resid) {
 		/*
 		 * The pipe contains more data than mdrcnt, warn the
 		 * client that there is more data in the pipe.
@@ -379,9 +404,9 @@ smb_opipe_write(smb_request_t *sr, struct uio *uio)
 
 	ASSERT(sr->fid_ofile);
 	ASSERT(sr->fid_ofile->f_ftype == SMB_FTYPE_MESG_PIPE);
-	ASSERT(sr->fid_ofile->f_pipe != NULL);
 
 	opipe = sr->fid_ofile->f_pipe;
+	SMB_OPIPE_VALID(opipe);
 	smb_opipe_enter(opipe);
 
 	if (!SMB_OPIPE_ISOPEN(opipe)) {
@@ -389,8 +414,8 @@ smb_opipe_write(smb_request_t *sr, struct uio *uio)
 		return (EBADF);
 	}
 
-	rc = smb_opipe_set_hdr(opipe, SMB_OPIPE_WRITE, uio->uio_resid);
-	len = xdr_sizeof(smb_opipe_hdr_xdr, &opipe->p_hdr);
+	rc = smb_opipe_sethdr(opipe, SMB_OPIPE_WRITE, uio->uio_resid);
+	len = xdr_sizeof(smb_doorhdr_xdr, &opipe->p_hdr);
 	if (rc == -1 || len == 0) {
 		smb_opipe_exit(opipe);
 		return (ENOMEM);
@@ -426,9 +451,13 @@ smb_opipe_read(smb_request_t *sr, struct uio *uio)
 
 	ASSERT(sr->fid_ofile);
 	ASSERT(sr->fid_ofile->f_ftype == SMB_FTYPE_MESG_PIPE);
-	ASSERT(sr->fid_ofile->f_pipe != NULL);
 
 	opipe = sr->fid_ofile->f_pipe;
+	SMB_OPIPE_VALID(opipe);
+
+	if ((rc = smb_opipe_exec(opipe)) != 0)
+		return (EIO);
+
 	smb_opipe_enter(opipe);
 
 	if (!SMB_OPIPE_ISOPEN(opipe)) {
@@ -436,13 +465,13 @@ smb_opipe_read(smb_request_t *sr, struct uio *uio)
 		return (EBADF);
 	}
 
-	if (smb_opipe_set_hdr(opipe, SMB_OPIPE_READ, uio->uio_resid) == -1) {
+	if (smb_opipe_sethdr(opipe, SMB_OPIPE_READ, uio->uio_resid) == -1) {
 		smb_opipe_exit(opipe);
 		return (ENOMEM);
 	}
 
 	rc = smb_opipe_door_call(opipe);
-	nbytes = opipe->p_hdr.oh_datalen;
+	nbytes = opipe->p_hdr.dh_datalen;
 
 	if (rc != 0 || nbytes > uio->uio_resid) {
 		smb_opipe_exit(opipe);
@@ -455,6 +484,28 @@ smb_opipe_read(smb_request_t *sr, struct uio *uio)
 		MBC_ATTACH_MBUF(&sr->raw_data, mhead);
 		uio->uio_resid -= nbytes;
 	}
+
+	smb_opipe_exit(opipe);
+	return (rc);
+}
+
+static int
+smb_opipe_exec(smb_opipe_t *opipe)
+{
+	uint32_t	len;
+	int		rc;
+
+	smb_opipe_enter(opipe);
+
+	rc = smb_opipe_sethdr(opipe, SMB_OPIPE_EXEC, 0);
+	len = xdr_sizeof(smb_doorhdr_xdr, &opipe->p_hdr);
+	if (rc == -1 || len == 0) {
+		smb_opipe_exit(opipe);
+		return (ENOMEM);
+	}
+
+	if ((rc = smb_opipe_door_call(opipe)) == 0)
+		rc = smb_event_wait(opipe->p_event);
 
 	smb_opipe_exit(opipe);
 	return (rc);
@@ -476,6 +527,10 @@ smb_opipe_enter(smb_opipe_t *opipe)
 	mutex_exit(&opipe->p_mutex);
 }
 
+/*
+ * Exit busy state.  If we have exec'd an RPC, we may have
+ * to wait for notification that processing has completed.
+ */
 static void
 smb_opipe_exit(smb_opipe_t *opipe)
 {
@@ -569,8 +624,8 @@ smb_opipe_door_call(smb_opipe_t *opipe)
 	rc = smb_opipe_door_upcall(opipe);
 
 	mutex_enter(&smb_opipe_door_mutex);
-	--smb_opipe_door_ncall;
-	cv_signal(&smb_opipe_door_cv);
+	if ((--smb_opipe_door_ncall) == 0)
+		cv_signal(&smb_opipe_door_cv);
 	mutex_exit(&smb_opipe_door_mutex);
 	return (rc);
 }
@@ -583,7 +638,7 @@ static int
 smb_opipe_door_upcall(smb_opipe_t *opipe)
 {
 	door_arg_t da;
-	smb_opipe_hdr_t hdr;
+	smb_doorhdr_t hdr;
 	int i;
 	int rc;
 
@@ -595,6 +650,9 @@ smb_opipe_door_upcall(smb_opipe_t *opipe)
 	da.rsize = SMB_OPIPE_DOOR_BUFSIZE;
 
 	for (i = 0; i < 3; ++i) {
+		if (smb_server_is_stopping())
+			return (-1);
+
 		if ((rc = door_ki_upcall_limited(smb_opipe_door_hd, &da,
 		    NULL, SIZE_MAX, 0)) == 0)
 			break;
@@ -603,21 +661,22 @@ smb_opipe_door_upcall(smb_opipe_t *opipe)
 			return (-1);
 	}
 
-	if (rc != 0)
+	/* Check for door_return(NULL, 0, NULL, 0) */
+	if (rc != 0 || da.data_size == 0 || da.rsize == 0)
 		return (-1);
 
-	if (smb_opipe_hdr_decode(&hdr, (uint8_t *)da.rbuf, da.rsize) == -1)
+	if (smb_doorhdr_decode(&hdr, (uint8_t *)da.data_ptr, da.rsize) == -1)
 		return (-1);
 
-	if ((hdr.oh_magic != SMB_OPIPE_HDR_MAGIC) ||
-	    (hdr.oh_fid != opipe->p_hdr.oh_fid) ||
-	    (hdr.oh_op != opipe->p_hdr.oh_op) ||
-	    (hdr.oh_status != 0) ||
-	    (hdr.oh_datalen > SMB_OPIPE_DOOR_BUFSIZE)) {
+	if ((hdr.dh_magic != SMB_OPIPE_HDR_MAGIC) ||
+	    (hdr.dh_fid != opipe->p_hdr.dh_fid) ||
+	    (hdr.dh_op != opipe->p_hdr.dh_op) ||
+	    (hdr.dh_door_rc != 0) ||
+	    (hdr.dh_datalen > SMB_OPIPE_DOOR_BUFSIZE)) {
 		return (-1);
 	}
 
-	opipe->p_hdr.oh_datalen = hdr.oh_datalen;
-	opipe->p_hdr.oh_resid = hdr.oh_resid;
+	opipe->p_hdr.dh_datalen = hdr.dh_datalen;
+	opipe->p_hdr.dh_resid = hdr.dh_resid;
 	return (0);
 }

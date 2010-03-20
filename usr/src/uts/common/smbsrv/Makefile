@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 include ../../../Makefile.master
@@ -29,7 +29,6 @@ HDRS=	alloc.h			\
 	cp_usascii.h		\
 	doserror.h		\
 	hash_table.h		\
-	lmdfs.h			\
 	lmerr.h			\
 	mac_cifs.h		\
 	mailslot.h		\
@@ -46,8 +45,8 @@ HDRS=	alloc.h			\
 	smb_sid.h		\
 	ntstatus.h		\
 	smb.h			\
-	smb_common_door.h	\
-	smb_door_svc.h		\
+	smb_door.h		\
+	smb_dfs.h		\
 	smb_fsops.h		\
 	smb_idmap.h		\
 	smb_inet.h		\

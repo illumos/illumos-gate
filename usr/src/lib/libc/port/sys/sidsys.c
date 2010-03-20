@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * UID/SID mapping system call entries.
@@ -57,13 +55,19 @@ allocids(int flag, int nuids, uid_t *suid, int ngids, gid_t *sgid)
 }
 
 int
-idmap_reg(int fd)
+__idmap_reg(int fd)
 {
 	return (syscall(SYS_sidsys, SIDSYS_IDMAP_REG, fd));
 }
 
 int
-idmap_unreg(int fd)
+__idmap_unreg(int fd)
 {
 	return (syscall(SYS_sidsys, SIDSYS_IDMAP_UNREG, fd));
+}
+
+int
+__idmap_flush_kcache(void)
+{
+	return (syscall(SYS_sidsys, SIDSYS_IDMAP_FLUSH_KCACHE));
 }

@@ -19,31 +19,29 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_common_door_decode.c	1.2	08/08/07 SMI"
-
 /*
- * Provides encode/decode routines for all door servers/clients.
+ * Legacy encode/decode routines for door clients and servers.
  */
 
-#ifdef _KERNEL
-#include <sys/types.h>
-#include <sys/sunddi.h>
-#else
-#include <string.h>
-#endif
-#include <sys/errno.h>
 #ifndef _KERNEL
 #include <errno.h>
+#include <string.h>
+#include <strings.h>
+#else
+#include <sys/types.h>
+#include <sys/sunddi.h>
+#include <sys/errno.h>
 #endif
 
-#include <smbsrv/alloc.h>
-#include <smbsrv/smb_common_door.h>
 #include <smbsrv/wintypes.h>
-
+#include <smbsrv/smb_share.h>
+#include <smbsrv/smb_door.h>
+#include <smbsrv/alloc.h>
+#include <smbsrv/smbinfo.h>
 
 smb_dr_ctx_t *
 smb_dr_decode_start(char *ptr, int size)
@@ -61,9 +59,9 @@ int
 smb_dr_decode_finish(smb_dr_ctx_t *ctx)
 {
 	int status = ctx->status;
-	if (status == 0 && ctx->ptr != ctx->end_ptr) {
+	if (status == 0 && ctx->ptr != ctx->end_ptr)
 		status = ENOTEMPTY;
-	}
+
 	MEM_FREE("CommonDoor", ctx);
 	return (status);
 }
@@ -88,9 +86,9 @@ smb_dr_encode_finish(smb_dr_ctx_t *ctx, unsigned int *used)
 		if (ctx->ptr < ctx->end_ptr) {
 			/*LINTED E_PTRDIFF_OVERFLOW*/
 			*used = ctx->ptr - ctx->start_ptr;
-		}
-		else
+		} else {
 			status = ENOSPC;
+		}
 	}
 
 	MEM_FREE("CommonDoor", ctx);
@@ -105,9 +103,9 @@ smb_dr_get_dword(smb_dr_ctx_t *ctx)
 		if (ctx->ptr + sizeof (DWORD) <= ctx->end_ptr) {
 			(void) memcpy(&num, ctx->ptr, sizeof (DWORD));
 			ctx->ptr += sizeof (DWORD);
-		}
-		else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 	return (num);
 }
@@ -120,9 +118,9 @@ smb_dr_get_int32(smb_dr_ctx_t *ctx)
 		if (ctx->ptr + sizeof (int32_t) <= ctx->end_ptr) {
 			(void) memcpy(&num, ctx->ptr, sizeof (int32_t));
 			ctx->ptr += sizeof (int32_t);
-		}
-		else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 	return (num);
 }
@@ -146,23 +144,23 @@ smb_dr_get_string(smb_dr_ctx_t *ctx)
 		if (ctx->ptr + len <= ctx->end_ptr) {
 			buf = MEM_MALLOC("CommonDoor", len +1);
 			if (buf) {
-				if (len == 0)
+				if (len == 0) {
 					(void) strcpy(buf, "");
-				else {
+				} else {
 					(void) memcpy(buf, ctx->ptr, len);
 					ctx->ptr += len;
 					*(buf + len) = '\0';
 				}
-			}
-			else
+			} else {
 #ifndef _KERNEL
 				ctx->status = errno;
 #else
 				ctx->status = ENOMEM;
 #endif
-		}
-		else
+			}
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 	return (buf);
 }
@@ -174,8 +172,9 @@ smb_dr_put_dword(smb_dr_ctx_t *ctx, DWORD num)
 		if (ctx->ptr + sizeof (DWORD) <= ctx->end_ptr) {
 			(void) memcpy(ctx->ptr, &num, sizeof (DWORD));
 			ctx->ptr += sizeof (DWORD);
-		} else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 }
 
@@ -186,8 +185,9 @@ smb_dr_put_int32(smb_dr_ctx_t *ctx, int32_t num)
 		if (ctx->ptr + sizeof (int32_t) <= ctx->end_ptr) {
 			(void) memcpy(ctx->ptr, &num, sizeof (int32_t));
 			ctx->ptr += sizeof (int32_t);
-		} else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 }
 
@@ -215,9 +215,9 @@ smb_dr_put_string(smb_dr_ctx_t *ctx, const char *buf)
 		if (ctx->ptr + len <= ctx->end_ptr) {
 			(void) memcpy(ctx->ptr, buf, len);
 			ctx->ptr += len;
-		}
-		else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 }
 
@@ -236,9 +236,9 @@ smb_dr_get_int64(smb_dr_ctx_t *ctx)
 		if (ctx->ptr + sizeof (int64_t) <= ctx->end_ptr) {
 			(void) memcpy(&num, ctx->ptr, sizeof (int64_t));
 			ctx->ptr += sizeof (int64_t);
-		}
-		else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 	return (num);
 }
@@ -257,8 +257,9 @@ smb_dr_put_int64(smb_dr_ctx_t *ctx, int64_t num)
 		if (ctx->ptr + sizeof (int64_t) <= ctx->end_ptr) {
 			(void) memcpy(ctx->ptr, &num, sizeof (int64_t));
 			ctx->ptr += sizeof (int64_t);
-		} else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 }
 
@@ -275,8 +276,9 @@ smb_dr_put_short(smb_dr_ctx_t *ctx, short num)
 		if (ctx->ptr + sizeof (short) <= ctx->end_ptr) {
 			(void) memcpy(ctx->ptr, &num, sizeof (short));
 			ctx->ptr += sizeof (short);
-		} else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 }
 
@@ -288,9 +290,9 @@ smb_dr_get_short(smb_dr_ctx_t *ctx)
 		if (ctx->ptr + sizeof (short) <= ctx->end_ptr) {
 			(void) memcpy(&num, ctx->ptr, sizeof (short));
 			ctx->ptr += sizeof (short);
-		}
-		else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 	return (num);
 }
@@ -326,8 +328,9 @@ smb_dr_put_BYTE(smb_dr_ctx_t *ctx, BYTE byte)
 		if (ctx->ptr + sizeof (BYTE) <= ctx->end_ptr) {
 			(void) memcpy(ctx->ptr, &byte, sizeof (BYTE));
 			ctx->ptr += sizeof (BYTE);
-		} else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 }
 
@@ -339,9 +342,9 @@ smb_dr_get_BYTE(smb_dr_ctx_t *ctx)
 		if (ctx->ptr + sizeof (BYTE) <= ctx->end_ptr) {
 			(void) memcpy(&byte, ctx->ptr, sizeof (BYTE));
 			ctx->ptr += sizeof (BYTE);
-		}
-		else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 	return (byte);
 }
@@ -354,8 +357,9 @@ smb_dr_put_buf(smb_dr_ctx_t *ctx, unsigned char *start, int len)
 		if (ctx->ptr + len <= ctx->end_ptr) {
 			(void) memcpy(ctx->ptr, start, len);
 			ctx->ptr += len;
-		} else
+		} else {
 			ctx->status = ENOSPC;
+		}
 	}
 }
 
@@ -384,4 +388,35 @@ smb_dr_get_buf(smb_dr_ctx_t *ctx, unsigned char *buf, int bufsize)
 	}
 
 	return (len);
+}
+
+void
+smb_dr_get_share(smb_dr_ctx_t *ctx, smb_share_t *si)
+{
+	if (ctx->status == 0) {
+		if (smb_dr_get_int32(ctx)) {
+			(void) memcpy(si, ctx->ptr, sizeof (smb_share_t));
+			ctx->ptr += sizeof (smb_share_t);
+		} else {
+			bzero(si, sizeof (smb_share_t));
+		}
+	} else {
+		bzero(si, sizeof (smb_share_t));
+	}
+}
+
+void
+smb_dr_put_share(smb_dr_ctx_t *ctx, smb_share_t *si)
+{
+	if (si) {
+		smb_dr_put_int32(ctx, 1);
+		if (ctx->ptr + sizeof (smb_share_t) <= ctx->end_ptr) {
+			(void) memcpy(ctx->ptr, si, sizeof (smb_share_t));
+			ctx->ptr += sizeof (smb_share_t);
+		} else {
+			ctx->status = ENOSPC;
+		}
+	} else {
+		smb_dr_put_int32(ctx, 0);
+	}
 }

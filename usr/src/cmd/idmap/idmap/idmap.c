@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,8 @@
 #include <errno.h>
 #include <limits.h>
 #include <syslog.h>
-#include <sys/varargs.h>
+#include <stdarg.h>
+#include <note.h>
 #include "idmap_engine.h"
 #include "idmap_priv.h"
 
@@ -240,6 +241,7 @@ static int do_add_name_mapping(flag_t *f, int argc, char **argv,
     cmd_pos_t *pos);
 static int do_remove_name_mapping(flag_t *f, int argc, char **argv,
     cmd_pos_t *pos);
+static int do_flush(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_exit(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_export(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_help(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
@@ -248,7 +250,7 @@ static int do_unset_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_get_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 
 
-/* Command names and their hanlers to be passed to idmap_engine */
+/* Command names and their handlers to be passed to idmap_engine */
 
 static cmd_ops_t commands[] = {
 	{
@@ -285,6 +287,11 @@ static cmd_ops_t commands[] = {
 		"remove",
 		"a(all)t(to)f(from)d(directional)",
 		do_remove_name_mapping
+	},
+	{
+		"flush",
+		"a(all)",
+		do_flush
 	},
 	{
 		"exit",
@@ -439,6 +446,7 @@ help()
 	    "idmap add [-d] name1 name2\n"
 	    "idmap dump [-n] [-v]\n"
 	    "idmap export [-f file] format\n"
+	    "idmap flush [-a]\n"
 	    "idmap get-namemap name\n"
 	    "idmap help\n"
 	    "idmap import [-F] [-f file] format\n"
@@ -2810,6 +2818,40 @@ cleanup:
 	name_mapping_fini(nm);
 	if (fini_udt_command(1, pos))
 		rc = -1;
+	return (rc);
+}
+
+/* flush command handler */
+static int
+do_flush(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
+{
+	NOTE(ARGUNUSED(argv))
+	idmap_flush_op op;
+	idmap_stat stat;
+	int rc = 0;
+
+	if (argc > 0) {
+		print_error(pos,
+		    gettext("Too many arguments.\n"));
+		return (-1);
+	}
+	if (f[a_FLAG] != NULL)
+		op = IDMAP_FLUSH_DELETE;
+	else
+		op = IDMAP_FLUSH_EXPIRE;
+
+	if (init_command())
+		return (-1);
+
+	stat = idmap_flush(handle, op);
+	if (stat != IDMAP_SUCCESS) {
+		print_error(pos,
+		    gettext("%s\n"),
+		    idmap_stat2string(handle, stat));
+		rc = -1;
+	}
+
+	fini_command();
 	return (rc);
 }
 

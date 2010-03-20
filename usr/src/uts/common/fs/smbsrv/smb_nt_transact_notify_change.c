@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,6 @@
 #include <sys/sdt.h>
 
 static void smb_notify_change_daemon(smb_thread_t *, void *);
-static boolean_t smb_notify_change_required(smb_request_t *, smb_node_t *);
 
 static boolean_t	smb_notify_initialized = B_FALSE;
 static smb_slist_t	smb_ncr_list;
@@ -538,6 +537,7 @@ smb_process_node_notify_change_queue(smb_node_t *node)
 {
 	smb_request_t	*sr;
 	smb_request_t	*tmp;
+	smb_node_t	*nc_node;
 	boolean_t	sig = B_FALSE;
 
 	ASSERT(node->n_magic == SMB_NODE_MAGIC);
@@ -554,7 +554,8 @@ smb_process_node_notify_change_queue(smb_node_t *node)
 		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 		tmp = smb_slist_next(&smb_ncr_list, sr);
 
-		if (smb_notify_change_required(sr, node)) {
+		nc_node = sr->sr_ncr.nc_node;
+		if (nc_node == node) {
 			mutex_enter(&sr->sr_mutex);
 			switch (sr->sr_state) {
 			case SMB_REQ_STATE_WAITING_EVENT:
@@ -575,29 +576,6 @@ smb_process_node_notify_change_queue(smb_node_t *node)
 	smb_slist_exit(&smb_ncr_list);
 	if (sig)
 		smb_thread_signal(&smb_thread_notify_daemon);
-}
-
-/*
- * Change notification is required if:
- *	- the request node matches the specified node
- * or
- *	- the request is from a Mac client, the watch-tree flag
- *	is set and it is monitoring a tree on the same volume.
- */
-static boolean_t
-smb_notify_change_required(smb_request_t *sr, smb_node_t *node)
-{
-	smb_node_t *nc_node = sr->sr_ncr.nc_node;
-
-	if (nc_node == node)
-		return (B_TRUE);
-
-	if ((sr->sr_ncr.nc_flags & NODE_FLAGS_WATCH_TREE) &&
-	    (sr->session->native_os == NATIVE_OS_MACOS) &&
-	    smb_vfs_cmp(SMB_NODE_VFS(nc_node), SMB_NODE_VFS(node)))
-		return (B_TRUE);
-
-	return (B_FALSE);
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
 static void smb_encode_sd(struct smb_xa *, smb_sd_t *, uint32_t);
 static void smb_encode_sacl(struct smb_xa *, smb_acl_t *);
 static void smb_encode_dacl(struct smb_xa *, smb_acl_t *);
-
-static smb_sid_t *smb_decode_sid(struct smb_xa *, uint32_t);
 static smb_acl_t *smb_decode_acl(struct smb_xa *, uint32_t);
 
 /*
@@ -208,7 +206,9 @@ smb_nt_transact_set_security_info(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	status = smb_sd_write(sr, &sd, secinfo);
+	if (!smb_node_is_system(sr->fid_ofile->f_node))
+		status = smb_sd_write(sr, &sd, secinfo);
+
 	smb_sd_term(&sd);
 	if (status != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, status, 0, 0);
@@ -442,7 +442,7 @@ decode_error:
  * Upon successful return, caller must free the allocated memory
  * by calling smb_sid_free()
  */
-static smb_sid_t *
+smb_sid_t *
 smb_decode_sid(struct smb_xa *xa, uint32_t offset)
 {
 	uint8_t revision;

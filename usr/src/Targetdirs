@@ -348,6 +348,10 @@ DIRS= \
 	/var/sadm/pkg \
 	/var/sadm/security \
 	/var/smb \
+	/var/smb/cvol \
+	/var/smb/cvol/windows \
+	/var/smb/cvol/windows/system32 \
+	/var/smb/cvol/windows/system32/vss \
 	/var/spool \
 	/var/spool/cron \
 	/var/spool/cron/atjobs \

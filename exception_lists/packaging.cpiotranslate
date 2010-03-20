@@ -304,7 +304,6 @@ usr/include/smbsrv/libmlsvc.h
 usr/include/smbsrv/libsmb.h
 usr/include/smbsrv/libsmbns.h
 usr/include/smbsrv/libsmbrdr.h
-usr/include/smbsrv/lmdfs.h
 usr/include/smbsrv/lmerr.h
 usr/include/smbsrv/mac_cifs.h
 usr/include/smbsrv/mailslot.h
@@ -334,8 +333,8 @@ usr/include/smbsrv/nterror.h
 usr/include/smbsrv/ntifs.h
 usr/include/smbsrv/ntlocale.h
 usr/include/smbsrv/ntstatus.h
-usr/include/smbsrv/smb_common_door.h
-usr/include/smbsrv/smb_door_svc.h
+usr/include/smbsrv/smb_door.h
+usr/include/smbsrv/smb_dfs.h
 usr/include/smbsrv/smb_fsops.h
 usr/include/smbsrv/smb.h
 usr/include/smbsrv/smb_idmap.h
@@ -465,3 +464,9 @@ usr/lib/smbsrv/sparcv9/llib-lmlsvc.ln
 usr/lib/smbsrv/sparcv9/llib-lsmb.ln
 usr/lib/smbsrv/sparcv9/llib-lsmbns.ln
 usr/lib/smbsrv/sparcv9/llib-lsmbrdr.ln
+usr/lib/reparse/amd64/libreparse_smb.so
+usr/lib/reparse/amd64/libreparse_smb.so.1
+usr/lib/reparse/amd64/llib-lreparse_smb.ln
+usr/lib/reparse/sparcv9/libreparse_smb.so
+usr/lib/reparse/sparcv9/libreparse_smb.so.1
+usr/lib/reparse/sparcv9/llib-lreparse_smb.ln

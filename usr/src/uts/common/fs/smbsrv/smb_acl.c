@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 
+#include <sys/sid.h>
 #include <sys/acl.h>
 #include <acl/acl_common.h>
 #include <smbsrv/smb_sid.h>
@@ -89,7 +90,7 @@ static idmap_stat smb_fsacl_getsids(smb_idmap_batch_t *, acl_t *);
 static acl_t *smb_fsacl_null_empty(boolean_t);
 static int smb_fsacl_inheritable(acl_t *, int);
 
-static void smb_ace_inherit(ace_t *, ace_t *, int);
+static void smb_ace_inherit(ace_t *, ace_t *, int, uid_t, gid_t);
 static boolean_t smb_ace_isvalid(smb_ace_t *, int);
 static uint16_t smb_ace_len(smb_ace_t *);
 static uint32_t smb_ace_mask_g2s(uint32_t);
@@ -713,7 +714,7 @@ smb_fsacl_split(acl_t *zacl, acl_t **dacl, acl_t **sacl, int which_acl)
  * Note that the in/out ACLs are ZFS ACLs not Windows ACLs
  */
 acl_t *
-smb_fsacl_inherit(acl_t *dir_zacl, int is_dir, int which_acl, uid_t owner_uid)
+smb_fsacl_inherit(acl_t *dir_zacl, int is_dir, int which_acl, cred_t *cr)
 {
 	boolean_t use_default = B_FALSE;
 	int num_inheritable = 0;
@@ -721,6 +722,17 @@ smb_fsacl_inherit(acl_t *dir_zacl, int is_dir, int which_acl, uid_t owner_uid)
 	ace_t *dir_zace;
 	acl_t *new_zacl;
 	ace_t *new_zace;
+	ksid_t *owner_sid;
+	ksid_t *group_sid;
+	uid_t uid;
+	gid_t gid;
+
+	owner_sid = crgetsid(cr, KSID_OWNER);
+	group_sid = crgetsid(cr, KSID_GROUP);
+	ASSERT(owner_sid);
+	ASSERT(group_sid);
+	uid = owner_sid->ks_id;
+	gid = group_sid->ks_id;
 
 	num_inheritable = smb_fsacl_inheritable(dir_zacl, is_dir);
 
@@ -739,7 +751,7 @@ smb_fsacl_inherit(acl_t *dir_zacl, int is_dir, int which_acl, uid_t owner_uid)
 
 	if (use_default) {
 		bcopy(default_dacl, new_zacl->acl_aclp, sizeof (default_dacl));
-		new_zace->a_who = owner_uid;
+		new_zace->a_who = uid;
 		return (new_zacl);
 	}
 
@@ -755,7 +767,7 @@ smb_fsacl_inherit(acl_t *dir_zacl, int is_dir, int which_acl, uid_t owner_uid)
 			 * The inherited ACE is inheritable unless the
 			 * ACE_NO_PROPAGATE_INHERIT_ACE bit flag is also set
 			 */
-			smb_ace_inherit(dir_zace, new_zace, is_dir);
+			smb_ace_inherit(dir_zace, new_zace, is_dir, uid, gid);
 			new_zace++;
 
 			if (is_dir && ZACE_IS_CREATOR(dir_zace) &&
@@ -776,7 +788,8 @@ smb_fsacl_inherit(acl_t *dir_zacl, int is_dir, int which_acl, uid_t owner_uid)
 			 * flag is also set.
 			 */
 			if (is_dir == 0) {
-				smb_ace_inherit(dir_zace, new_zace, is_dir);
+				smb_ace_inherit(dir_zace, new_zace, is_dir,
+				    uid, gid);
 				new_zace++;
 			} else if (ZACE_IS_PROPAGATE(dir_zace)) {
 				*new_zace = *dir_zace;
@@ -797,7 +810,7 @@ smb_fsacl_inherit(acl_t *dir_zacl, int is_dir, int which_acl, uid_t owner_uid)
 			if (is_dir == 0)
 				break;
 
-			smb_ace_inherit(dir_zace, new_zace, is_dir);
+			smb_ace_inherit(dir_zace, new_zace, is_dir, uid, gid);
 			new_zace++;
 
 			if (ZACE_IS_CREATOR(dir_zace) &&
@@ -1163,7 +1176,7 @@ smb_ace_len(smb_ace_t *ace)
 }
 
 static void
-smb_ace_inherit(ace_t *dir_zace, ace_t *zace, int is_dir)
+smb_ace_inherit(ace_t *dir_zace, ace_t *zace, int is_dir, uid_t uid, gid_t gid)
 {
 	*zace = *dir_zace;
 
@@ -1181,15 +1194,14 @@ smb_ace_inherit(ace_t *dir_zace, ace_t *zace, int is_dir)
 
 	/*
 	 * Replace creator owner/group ACEs with actual owner/group ACEs.
-	 * This would be an effictive ACE which is not inheritable.
+	 * This is a non-inheritable effective ACE.
 	 */
 	if (ZACE_IS_CREATOR_OWNER(dir_zace)) {
-		zace->a_who = (uid_t)-1;
-		zace->a_flags |= ACE_OWNER;
+		zace->a_who = uid;
 		zace->a_flags &= ~ACE_INHERIT_FLAGS;
 	} else if (ZACE_IS_CREATOR_GROUP(dir_zace)) {
-		zace->a_who = (uid_t)-1;
-		zace->a_flags |= ACE_GROUP;
+		zace->a_who = gid;
+		zace->a_flags |= ACE_IDENTIFIER_GROUP;
 		zace->a_flags &= ~ACE_INHERIT_FLAGS;
 	}
 }

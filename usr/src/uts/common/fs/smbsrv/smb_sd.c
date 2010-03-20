@@ -132,7 +132,7 @@ smb_sd_read(smb_request_t *sr, smb_sd_t *sd, uint32_t secinfo)
 	int error;
 
 	node = sr->fid_ofile->f_node;
-	sd_flags = (node->vp->v_type == VDIR) ? SMB_FSSD_FLAGS_DIR : 0;
+	sd_flags = smb_node_is_dir(node) ? SMB_FSSD_FLAGS_DIR : 0;
 	smb_fssd_init(&fs_sd, secinfo, sd_flags);
 
 	error = smb_fsop_sdread(sr, sr->user_cr, node, &fs_sd);
@@ -165,7 +165,7 @@ smb_sd_write(smb_request_t *sr, smb_sd_t *sd, uint32_t secinfo)
 	int error;
 
 	node = sr->fid_ofile->f_node;
-	sd_flags = (node->vp->v_type == VDIR) ? SMB_FSSD_FLAGS_DIR : 0;
+	sd_flags = smb_node_is_dir(node) ? SMB_FSSD_FLAGS_DIR : 0;
 	smb_fssd_init(&fs_sd, secinfo, sd_flags);
 
 	status = smb_sd_tofs(sd, &fs_sd);

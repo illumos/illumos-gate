@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,6 @@
 #include <sys/policy.h>
 #include <sys/cmn_err.h>
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_ioctl.h>
 
 static int smb_drv_open(dev_t *, int, int, cred_t *);
@@ -222,6 +221,12 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 		break;
 	case SMB_IOC_START:
 		rc = smb_server_start(&ioc->ioc_start);
+		break;
+	case SMB_IOC_STOP:
+		rc = smb_server_stop();
+		break;
+	case SMB_IOC_EVENT:
+		rc = smb_server_notify_event(&ioc->ioc_event);
 		break;
 	case SMB_IOC_NBT_LISTEN:
 		rc = smb_server_nbt_listen(&ioc->ioc_listen);

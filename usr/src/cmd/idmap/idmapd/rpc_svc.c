@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,6 +171,15 @@ _directory_get_common_1(
 	    result, rqstp));
 }
 
+int
+_idmap_flush_1(
+    idmap_flush_op  *argp,
+    idmap_retcode *result,
+    struct svc_req *rqstp)
+{
+	return (idmap_flush_1_svc(*argp, result, rqstp));
+}
+
 void
 idmap_prog_1(struct svc_req *rqstp, register SVCXPRT *transp)
 {
@@ -182,6 +191,7 @@ idmap_prog_1(struct svc_req *rqstp, register SVCXPRT *transp)
 		idmap_mapping idmap_get_mapped_id_by_name_1_arg;
 		idmap_prop_type idmap_get_prop_1_arg;
 		directory_get_common_1_argument directory_get_common_1_arg;
+		idmap_flush_op idmap_flush_1_arg;
 	} argument;
 	union {
 		idmap_ids_res idmap_get_mapped_ids_1_res;
@@ -191,6 +201,7 @@ idmap_prog_1(struct svc_req *rqstp, register SVCXPRT *transp)
 		idmap_mappings_res idmap_get_mapped_id_by_name_1_res;
 		idmap_prop_res idmap_get_prop_1_res;
 		directory_results_rpc directory_get_common_1_res;
+		idmap_retcode idmap_flush_1_res;
 	} result;
 	bool_t retval;
 	xdrproc_t _xdr_argument, _xdr_result;
@@ -270,6 +281,15 @@ idmap_prog_1(struct svc_req *rqstp, register SVCXPRT *transp)
 		    xdr_directory_results_rpc;
 		local = (bool_t (*) (char *,  void *,  struct svc_req *))
 		    _directory_get_common_1;
+		break;
+
+	case IDMAP_FLUSH:
+		_xdr_argument = (xdrproc_t)
+		    xdr_idmap_flush_op;
+		_xdr_result = (xdrproc_t)
+		    xdr_idmap_retcode;
+		local = (bool_t (*) (char *,  void *,  struct svc_req *))
+		    _idmap_flush_1;
 		break;
 
 	default:

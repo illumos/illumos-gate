@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,10 +32,14 @@ extern "C" {
 
 #include <rpc/xdr.h>
 #include <sys/param.h>
+#include <sys/avl.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/smb_sid.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_ioctl.h>
+#include <smbsrv/smb_sid.h>
+#include <smbsrv/wintypes.h>
+#include <smbsrv/smb_dfs.h>
 
 typedef struct smb_dr_kshare {
 	int32_t k_op;
@@ -54,16 +58,16 @@ smb_dr_kshare_t *smb_share_mkabsolute(uint8_t *buf, uint32_t len);
 uint8_t *smb_kshare_mkselfrel(smb_dr_kshare_t *kshare, uint32_t *len);
 #endif /* _KERNEL */
 
-/* null-terminated string buffer */
-typedef struct smb_dr_string {
+/* null-terminated string */
+typedef struct smb_string {
 	char *buf;
-} smb_dr_string_t;
+} smb_string_t;
 
-/* byte buffer (non-null terminated) */
-typedef struct smb_dr_bytes {
-	uint32_t bytes_len;
-	uint8_t *bytes_val;
-} smb_dr_bytes_t;
+/* 32-bit opaque buffer (non-null terminated strings) */
+typedef struct smb_buf32 {
+	uint32_t	len;
+	uint8_t		*val;
+} smb_buf32_t;
 
 #define	SMB_OPIPE_HDR_MAGIC	0x4F484452	/* OHDR */
 #define	SMB_OPIPE_DOOR_BUFSIZE	(30 * 1024)
@@ -78,17 +82,41 @@ typedef enum {
 	SMB_OPIPE_CLOSE,
 	SMB_OPIPE_READ,
 	SMB_OPIPE_WRITE,
-	SMB_OPIPE_STAT
+	SMB_OPIPE_EXEC
 } smb_opipe_op_t;
 
-typedef struct smb_opipe_hdr {
-	uint32_t oh_magic;
-	uint32_t oh_fid;
-	uint32_t oh_op;
-	uint32_t oh_datalen;
-	uint32_t oh_resid;
-	uint32_t oh_status;
-} smb_opipe_hdr_t;
+#define	SMB_DOOR_HDR_MAGIC	0x444F4F52	/* DOOR */
+
+/*
+ * Door header flags.
+ */
+#define	SMB_DF_ASYNC		0x00000001	/* Asynchronous call */
+#define	SMB_DF_SYSSPACE		0x00000002	/* Called from the kernel */
+#define	SMB_DF_USERSPACE	0x00000004	/* Called from user space */
+
+/*
+ * Header for door calls.  The op codes and return codes are defined
+ * in smb_door.h.  The header is here to make it available to XDR.
+ *
+ * fid		For opipe: the pipe identifier.
+ * op		The door operation being invoked.
+ * txid		Unique transaction id for the current door call.
+ * datalen	Bytes of data following the header (excludes the header).
+ * resid	For opipe: the number of bytes remaining in the server.
+ * door_rc	Return code provided by the door server.
+ * status	A pass-through status provided by the door operation.
+ */
+typedef struct smb_doorhdr {
+	uint32_t dh_magic;
+	uint32_t dh_flags;
+	uint32_t dh_fid;
+	uint32_t dh_op;
+	uint32_t dh_txid;
+	uint32_t dh_datalen;
+	uint32_t dh_resid;
+	uint32_t dh_door_rc;
+	uint32_t dh_status;
+} smb_doorhdr_t;
 
 typedef struct smb_netuserinfo {
 	uint64_t	ui_session_id;
@@ -153,15 +181,16 @@ typedef struct smb_netsvc {
 	uint32_t		ns_ioclen;
 } smb_netsvc_t;
 
-/* xdr routines for common door arguments/results */
-extern bool_t xdr_smb_dr_string_t(XDR *, smb_dr_string_t *);
-extern bool_t xdr_smb_dr_bytes_t(XDR *, smb_dr_bytes_t *);
-extern bool_t xdr_smb_dr_kshare_t(XDR *, smb_dr_kshare_t *);
-extern bool_t xdr_smb_inaddr_t(XDR *, smb_inaddr_t *);
 
-int smb_opipe_hdr_encode(smb_opipe_hdr_t *, uint8_t *, uint32_t);
-int smb_opipe_hdr_decode(smb_opipe_hdr_t *, uint8_t *, uint32_t);
-bool_t smb_opipe_hdr_xdr(XDR *xdrs, smb_opipe_hdr_t *objp);
+bool_t smb_buf32_xdr(XDR *, smb_buf32_t *);
+bool_t smb_string_xdr(XDR *, smb_string_t *);
+bool_t smb_dr_kshare_xdr(XDR *, smb_dr_kshare_t *);
+bool_t smb_inaddr_xdr(XDR *, smb_inaddr_t *);
+
+const char *smb_doorhdr_opname(uint32_t);
+int smb_doorhdr_encode(smb_doorhdr_t *, uint8_t *, uint32_t);
+int smb_doorhdr_decode(smb_doorhdr_t *, uint8_t *, uint32_t);
+bool_t smb_doorhdr_xdr(XDR *xdrs, smb_doorhdr_t *objp);
 int smb_netuserinfo_encode(smb_netuserinfo_t *, uint8_t *, uint32_t, uint_t *);
 int smb_netuserinfo_decode(smb_netuserinfo_t *, uint8_t *, uint32_t, uint_t *);
 bool_t smb_netuserinfo_xdr(XDR *, smb_netuserinfo_t *);
@@ -193,31 +222,95 @@ bool_t lsa_account_xdr(XDR *, lsa_account_t *);
  */
 #define	SMB_VSS_GMT_SIZE sizeof ("@GMT-yyyy.mm.dd-hh.mm.ss")
 
-typedef struct smb_dr_get_gmttokens {
-	uint32_t gg_count;
-	char *gg_path;
-} smb_dr_get_gmttokens_t;
+typedef struct smb_gmttoken_query {
+	uint32_t	gtq_count;
+	char		*gtq_path;
+} smb_gmttoken_query_t;
 
-typedef char *gmttoken;
+typedef char *smb_gmttoken_t;
 
-typedef struct smb_dr_return_gmttokens {
-	uint32_t rg_count;
+typedef struct smb_gmttoken_response {
+	uint32_t gtr_count;
 	struct {
-		uint_t rg_gmttokens_len;
-		gmttoken *rg_gmttokens_val;
-	} rg_gmttokens;
-} smb_dr_return_gmttokens_t;
+		uint_t		gtr_gmttokens_len;
+		smb_gmttoken_t	*gtr_gmttokens_val;
+	} gtr_gmttokens;
+} smb_gmttoken_response_t;
 
-typedef struct smb_dr_map_gmttoken {
-	char *mg_path;
-	char *mg_gmttoken;
-} smb_dr_map_gmttoken_t;
+typedef struct smb_gmttoken_snapname {
+	char	*gts_path;
+	char	*gts_gmttoken;
+} smb_gmttoken_snapname_t;
 
-extern bool_t xdr_smb_dr_get_gmttokens_t(XDR *, smb_dr_get_gmttokens_t *);
-extern bool_t xdr_gmttoken(XDR *, gmttoken *);
-extern bool_t xdr_smb_dr_return_gmttokens_t(XDR *xdrs,
-    smb_dr_return_gmttokens_t *);
-extern bool_t xdr_smb_dr_map_gmttoken_t(XDR *, smb_dr_map_gmttoken_t *);
+bool_t smb_gmttoken_query_xdr(XDR *, smb_gmttoken_query_t *);
+bool_t smb_gmttoken_response_xdr(XDR *, smb_gmttoken_response_t *);
+bool_t smb_gmttoken_snapname_xdr(XDR *, smb_gmttoken_snapname_t *);
+
+/*
+ * User and Group Quotas
+ *
+ * SMB User and Group quota values of SMB_QUOTA_UNLIMITED mean
+ * No Limit. This maps to 0 (none) on ZFS.
+ */
+#define	SMB_QUOTA_UNLIMITED		0xFFFFFFFFFFFFFFFF
+
+typedef struct smb_quota {
+	list_node_t q_list_node;
+	char q_sidstr[SMB_SID_STRSZ];
+	uint32_t q_sidtype;
+	uint64_t q_used;
+	uint64_t q_thresh;
+	uint64_t q_limit;
+	avl_node_t q_avl_node;
+} smb_quota_t;
+
+typedef struct smb_quota_sid {
+	list_node_t qs_list_node;
+	char qs_sidstr[SMB_SID_STRSZ];
+} smb_quota_sid_t;
+
+typedef enum {
+	SMB_QUOTA_QUERY_INVALID_OP,
+	SMB_QUOTA_QUERY_SIDLIST,
+	SMB_QUOTA_QUERY_STARTSID,
+	SMB_QUOTA_QUERY_ALL
+} smb_quota_query_op_t;
+
+typedef struct smb_quota_query {
+	char *qq_root_path;
+	uint32_t qq_query_op;	/* smb_quota_query_op_t */
+	bool_t qq_single;
+	bool_t qq_restart;
+	uint32_t qq_max_quota;
+	list_t qq_sid_list;	/* list of smb_quota_sid_t */
+} smb_quota_query_t;
+
+typedef struct smb_quota_response {
+	uint32_t qr_status;
+	list_t qr_quota_list;	/* list of smb_quota_t */
+} smb_quota_response_t;
+
+typedef struct smb_quota_set {
+	char *qs_root_path;
+	list_t qs_quota_list;	/* list of smb_quota_t */
+} smb_quota_set_t;
+
+bool_t smb_quota_query_xdr(XDR *, smb_quota_query_t *);
+bool_t smb_quota_response_xdr(XDR *, smb_quota_response_t *);
+bool_t smb_quota_set_xdr(XDR *, smb_quota_set_t *);
+
+typedef struct dfs_referral_query {
+	dfs_reftype_t	rq_type;
+	char 		*rq_path;
+} dfs_referral_query_t;
+
+typedef struct dfs_referral_response {
+	dfs_info_t	rp_referrals;
+	uint32_t	rp_status;
+} dfs_referral_response_t;
+
+bool_t dfs_referral_query_xdr(XDR *, dfs_referral_query_t *);
+bool_t dfs_referral_response_xdr(XDR *, dfs_referral_response_t *);
 
 #ifdef	__cplusplus
 }

@@ -19,11 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <sys/errno.h>
+#include <sys/tzfile.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <strings.h>
@@ -31,16 +32,13 @@
 #include <rpc/xdr.h>
 #include <synch.h>
 #include <pthread.h>
-#include <smbsrv/smb_door_svc.h>
-#include <smbsrv/smb_common_door.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
 #include <mlsvc.h>
 
-static void *mlsvc_keepalive(void *);
+static void *mlsvc_timecheck(void *);
 
-static pthread_t mlsvc_keepalive_thr;
-#define	MLSVC_KEEPALIVE_INTERVAL	(10 * 60)	/* 10 minutes */
+#define	MLSVC_TIMECHECK_INTERVAL	(10 * SECSPERMIN) /* 10 minutes */
 
 /*
  * All NDR RPC service initialization is invoked from here.
@@ -49,6 +47,7 @@ static pthread_t mlsvc_keepalive_thr;
 int
 mlsvc_init(void)
 {
+	pthread_t tid;
 	pthread_attr_t tattr;
 	int rc;
 
@@ -60,6 +59,7 @@ mlsvc_init(void)
 	if ((rc = smb_dclocator_init()) != 0)
 		return (rc);
 
+	smb_quota_init();
 	ndr_rpc_init();
 	srvsvc_initialize();
 	wkssvc_initialize();
@@ -72,11 +72,11 @@ mlsvc_init(void)
 	logr_initialize();
 	msgsvcsend_initialize();
 	spoolss_initialize();
+	netdfs_initialize();
 
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&mlsvc_keepalive_thr, &tattr,
-	    mlsvc_keepalive, 0);
+	rc = pthread_create(&tid, &tattr, mlsvc_timecheck, 0);
 	(void) pthread_attr_destroy(&tattr);
 	return (rc);
 }
@@ -87,20 +87,26 @@ mlsvc_fini(void)
 	smb_logon_fini();
 	svcctl_finalize();
 	logr_finalize();
+	netdfs_finalize();
 	ndr_rpc_fini();
+	smb_quota_fini();
 }
 
 /*ARGSUSED*/
 static void *
-mlsvc_keepalive(void *arg)
+mlsvc_timecheck(void *arg)
 {
-	unsigned long t;
+	smb_domainex_t di;
 
 	for (;;) {
-		(void) sleep(MLSVC_KEEPALIVE_INTERVAL);
+		(void) sleep(MLSVC_TIMECHECK_INTERVAL);
 
-		if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN)
-			(void) srvsvc_gettime(&t);
+		if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN) {
+			if (!smb_domain_getinfo(&di))
+				continue;
+
+			ndr_srvsvc_timecheck(di.d_dc, di.d_primary.di_nbname);
+		}
 	}
 
 	/*NOTREACHED*/

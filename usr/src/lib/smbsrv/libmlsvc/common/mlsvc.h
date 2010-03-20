@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,9 +46,11 @@ void winreg_initialize(void);
 int srvsvc_gettime(unsigned long *);
 void msgsvcsend_initialize(void);
 void spoolss_initialize(void);
+void netdfs_initialize(void);
 
 void logr_finalize(void);
 void svcctl_finalize(void);
+void netdfs_finalize(void);
 
 int netr_open(char *, char *, mlsvc_handle_t *);
 int netr_close(mlsvc_handle_t *);
@@ -56,6 +58,8 @@ DWORD netlogon_auth(char *, mlsvc_handle_t *, DWORD);
 int netr_setup_authenticator(netr_info_t *, struct netr_authenticator *,
     struct netr_authenticator *);
 DWORD netr_validate_chain(netr_info_t *, struct netr_authenticator *);
+
+void ndr_srvsvc_timecheck(char *, char *);
 
 /* Generic functions to get/set windows Security Descriptors */
 uint32_t srvsvc_sd_get(smb_share_t *, uint8_t *, uint32_t *);
@@ -68,6 +72,12 @@ void smb_logon_fini(void);
 void smb_proc_initsem(void);	/* init (or re-init in child) */
 int  smb_proc_takesem(void);	/* parent before */
 void smb_proc_givesem(void);	/* parent after */
+
+/* Quota */
+void smb_quota_init(void);
+void smb_quota_fini(void);
+void smb_quota_add_fs(const char *);
+void smb_quota_remove_fs(const char *);
 
 #ifdef __cplusplus
 }

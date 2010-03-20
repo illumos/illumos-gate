@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -70,6 +70,7 @@ SUNWprivate {
 	ndr_pipe_open;
 	ndr_pipe_close;
 	ndr_pipe_read;
+	ndr_pipe_transact;
 	ndr_pipe_write;
         ndr_svc_binding_pool_init;
 	ndr_svc_lookup_name;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,6 +108,23 @@ smb_kmod_start(int opipe, int lmshr, int udoor)
 	ioc.lmshrd = lmshr;
 	ioc.udoor = udoor;
 	return (smb_kmod_ioctl(SMB_IOC_START, &ioc.hdr, sizeof (ioc)));
+}
+
+void
+smb_kmod_stop(void)
+{
+	smb_ioc_header_t ioc;
+
+	(void) smb_kmod_ioctl(SMB_IOC_STOP, &ioc, sizeof (ioc));
+}
+
+int
+smb_kmod_event_notify(uint32_t txid)
+{
+	smb_ioc_event_t ioc;
+
+	ioc.txid = txid;
+	return (smb_kmod_ioctl(SMB_IOC_EVENT, &ioc.hdr, sizeof (ioc)));
 }
 
 int

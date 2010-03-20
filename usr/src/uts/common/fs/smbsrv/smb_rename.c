@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,13 +101,22 @@ smb_post_rename(smb_request_t *sr)
 smb_sdrc_t
 smb_com_rename(smb_request_t *sr)
 {
-	smb_fqi_t *src_fqi = &sr->arg.dirop.fqi;
-	smb_fqi_t *dst_fqi = &sr->arg.dirop.dst_fqi;
-	int rc;
+	int		rc;
+	smb_fqi_t	*src_fqi = &sr->arg.dirop.fqi;
+	smb_fqi_t	*dst_fqi = &sr->arg.dirop.dst_fqi;
+	smb_pathname_t	*src_pn = &src_fqi->fq_path;
+	smb_pathname_t	*dst_pn = &dst_fqi->fq_path;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
+		return (SDRC_ERROR);
+	}
+
+	smb_pathname_init(sr, src_pn, src_pn->pn_path);
+	smb_pathname_init(sr, dst_pn, dst_pn->pn_path);
+	if (!smb_pathname_validate(sr, src_pn) ||
+	    !smb_pathname_validate(sr, dst_pn)) {
 		return (SDRC_ERROR);
 	}
 
@@ -167,9 +176,11 @@ smb_post_nt_rename(smb_request_t *sr)
 smb_sdrc_t
 smb_com_nt_rename(smb_request_t *sr)
 {
-	smb_fqi_t *src_fqi = &sr->arg.dirop.fqi;
-	smb_fqi_t *dst_fqi = &sr->arg.dirop.dst_fqi;
-	int rc;
+	int		rc;
+	smb_fqi_t	*src_fqi = &sr->arg.dirop.fqi;
+	smb_fqi_t	*dst_fqi = &sr->arg.dirop.dst_fqi;
+	smb_pathname_t	*src_pn = &src_fqi->fq_path;
+	smb_pathname_t	*dst_pn = &dst_fqi->fq_path;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
@@ -177,8 +188,14 @@ smb_com_nt_rename(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	smb_convert_wildcards(src_fqi->fq_path.pn_path);
-	if (smb_contains_wildcards(src_fqi->fq_path.pn_path)) {
+	smb_pathname_init(sr, src_pn, src_pn->pn_path);
+	smb_pathname_init(sr, dst_pn, dst_pn->pn_path);
+	if (!smb_pathname_validate(sr, src_pn) ||
+	    !smb_pathname_validate(sr, dst_pn)) {
+		return (SDRC_ERROR);
+	}
+
+	if (smb_contains_wildcards(src_pn->pn_path)) {
 		smbsr_error(sr, NT_STATUS_OBJECT_PATH_SYNTAX_BAD,
 		    ERRDOS, ERROR_BAD_PATHNAME);
 		return (SDRC_ERROR);
@@ -242,9 +259,12 @@ smb_nt_transact_rename(smb_request_t *sr, smb_xa_t *xa)
 int
 smb_trans2_rename(smb_request_t *sr, smb_node_t *node, char *fname, int flags)
 {
-	int rc;
-	smb_fqi_t *src_fqi = &sr->arg.dirop.fqi;
-	smb_fqi_t *dst_fqi = &sr->arg.dirop.dst_fqi;
+	int		rc = 0;
+	smb_fqi_t	*src_fqi = &sr->arg.dirop.fqi;
+	smb_fqi_t	*dst_fqi = &sr->arg.dirop.dst_fqi;
+	smb_pathname_t	*dst_pn = &dst_fqi->fq_path;
+	char		*path;
+	int		len;
 
 	sr->arg.dirop.flags = flags ? SMB_RENAME_FLAG_OVERWRITE : 0;
 	sr->arg.dirop.info_level = SMB_NT_RENAME_RENAME_FILE;
@@ -253,9 +273,28 @@ smb_trans2_rename(smb_request_t *sr, smb_node_t *node, char *fname, int flags)
 	src_fqi->fq_fnode = node;
 	src_fqi->fq_dnode = node->n_dnode;
 
-	dst_fqi->fq_path.pn_path = fname;
+	/* costruct and validate the dst pathname */
+	path = smb_srm_zalloc(sr, MAXPATHLEN);
+	if (src_fqi->fq_path.pn_pname) {
+		(void) snprintf(path, MAXPATHLEN, "%s\\%s",
+		    src_fqi->fq_path.pn_pname, fname);
+	} else {
+		rc = smb_node_getshrpath(node->n_dnode, sr->tid_tree,
+		    path, MAXPATHLEN);
+		if (rc != 0) {
+			smb_rename_set_error(sr, rc);
+			return (-1);
+		}
+		len = strlen(path);
+		(void) snprintf(path + len, MAXPATHLEN - len, "\\%s", fname);
+	}
+
+	smb_pathname_init(sr, dst_pn, path);
+	if (!smb_pathname_validate(sr, dst_pn))
+		return (-1);
+
 	dst_fqi->fq_dnode = node->n_dnode;
-	(void) strlcpy(dst_fqi->fq_last_comp, fname, MAXNAMELEN);
+	(void) strlcpy(dst_fqi->fq_last_comp, dst_pn->pn_fname, MAXNAMELEN);
 
 	rc = smb_common_rename(sr, src_fqi, dst_fqi);
 	if (rc != 0) {

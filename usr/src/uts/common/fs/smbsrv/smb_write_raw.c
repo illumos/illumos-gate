@@ -188,25 +188,24 @@
 
 extern uint32_t smb_keep_alive;
 
-static int smb_transfer_write_raw_data(smb_request_t *, uint16_t);
+static int smb_transfer_write_raw_data(smb_request_t *, smb_rw_param_t *);
 
 smb_sdrc_t
 smb_pre_write_raw(smb_request_t *sr)
 {
 	smb_rw_param_t *param;
 	uint32_t off_low;
-	uint32_t off_high;
 	uint32_t timeout;
+	uint32_t off_high;
 	uint16_t datalen;
 	uint16_t total;
 	int rc;
 
-	param = kmem_zalloc(sizeof (smb_rw_param_t), KM_SLEEP);
+	param = smb_srm_zalloc(sr, sizeof (smb_rw_param_t));
 	sr->arg.rw = param;
 	param->rw_magic = SMB_RW_MAGIC;
 
 	if (sr->smb_wct == 12) {
-		off_high = 0;
 		rc = smbsr_decode_vwv(sr, "ww2.llw4.ww", &sr->smb_fid, &total,
 		    &off_low, &timeout, &param->rw_mode, &datalen,
 		    &param->rw_dsoff);
@@ -224,6 +223,7 @@ smb_pre_write_raw(smb_request_t *sr)
 
 	param->rw_count = (uint32_t)datalen;
 	param->rw_total = (uint32_t)total;
+	param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
 
 	DTRACE_SMB_2(op__WriteRaw__start, smb_request_t *, sr,
 	    smb_rw_param_t *, sr->arg.rw);
@@ -240,7 +240,6 @@ smb_post_write_raw(smb_request_t *sr)
 	    smb_rw_param_t *, sr->arg.rw);
 
 	smb_rwx_rwexit(&sr->session->s_lock);
-	kmem_free(sr->arg.rw, sizeof (smb_rw_param_t));
 }
 
 smb_sdrc_t
@@ -253,13 +252,9 @@ smb_com_write_raw(struct smb_request *sr)
 	offset_t		addl_xfer_offset;
 	struct mbuf_chain	reply;
 	smb_error_t		err;
-	int32_t			chain_offset;
 
 	if (sr->session->s_state != SMB_SESSION_STATE_WRITE_RAW_ACTIVE)
 		return (SDRC_DROP_VC);
-
-	addl_xfer_count = param->rw_total - param->rw_count;
-	addl_xfer_offset = param->rw_count;
 
 	smbsr_lookup_file(sr);
 	if (sr->fid_ofile == NULL) {
@@ -270,26 +265,12 @@ smb_com_write_raw(struct smb_request *sr)
 	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	/*
-	 * Make sure any raw write data that is supposed to be
-	 * contained in this SMB is actually present.
-	 */
-	chain_offset = sr->smb_data.chain_offset + param->rw_dsoff
-	    + param->rw_count;
-	if (chain_offset > sr->smb_data.max_bytes) {
-		/* Error handling code will wake up the session daemon */
-		return (SDRC_ERROR);
-	}
-
-	param->rw_vdb.vdb_uio.uio_iov = &param->rw_vdb.vdb_iovec[0];
-	param->rw_vdb.vdb_uio.uio_iovcnt = 1;
-	param->rw_vdb.vdb_uio.uio_segflg = UIO_SYSSPACE;
-	param->rw_vdb.vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
-	param->rw_vdb.vdb_uio.uio_loffset = (offset_t)param->rw_offset;
-
-	/*
 	 * Send response if there is additional data to transfer.
 	 * This will prompt the client to send the remaining data.
 	 */
+	addl_xfer_count = param->rw_total - param->rw_count;
+	addl_xfer_offset = param->rw_count;
+
 	if (addl_xfer_count != 0) {
 		MBC_INIT(&reply, MLEN);
 		(void) smb_mbc_encodef(&reply, SMB_HEADER_ED_FMT "bww",
@@ -323,12 +304,12 @@ smb_com_write_raw(struct smb_request *sr)
 	 * While the response is in flight (and the data begins to arrive)
 	 * write out the first data segment.
 	 */
-	param->rw_vdb.vdb_iovec[0].iov_base = sr->smb_data.chain->m_data +
-	    sr->smb_data.chain_offset + param->rw_dsoff;
-	param->rw_vdb.vdb_iovec[0].iov_len = param->rw_count;
-	param->rw_vdb.vdb_uio.uio_resid = param->rw_count;
+	if (smbsr_decode_data(sr, "#.#B", param->rw_dsoff, param->rw_count,
+	    &param->rw_vdb) != 0)
+		return (SDRC_ERROR);
 
-	rc = smb_common_write(sr, param);
+	if (param->rw_count > 0)
+		rc = smb_common_write(sr, param);
 
 	if (session_send_rc != 0) {
 		sr->smb_rcls = ERRSRV;
@@ -339,7 +320,7 @@ smb_com_write_raw(struct smb_request *sr)
 	/*
 	 * If we have more data to read then go get it
 	 */
-	if (addl_xfer_count) {
+	if (addl_xfer_count > 0) {
 		/*
 		 * This is the only place where a worker thread should
 		 * directly read from the session socket.  If the data
@@ -347,13 +328,11 @@ smb_com_write_raw(struct smb_request *sr)
 		 * will need to be freed after the data is written.
 		 */
 		param->rw_offset += addl_xfer_offset;
-
-		if (smb_transfer_write_raw_data(sr, addl_xfer_count) != 0)
-			goto write_raw_transfer_failed;
-
-		param->rw_vdb.vdb_iovec[0].iov_base = sr->sr_raw_data_buf;
+		param->rw_vdb.vdb_uio.uio_loffset = param->rw_offset;
 		param->rw_vdb.vdb_iovec[0].iov_len = addl_xfer_count;
 		param->rw_vdb.vdb_uio.uio_resid = addl_xfer_count;
+		if (smb_transfer_write_raw_data(sr, param) != 0)
+			goto write_raw_transfer_failed;
 	}
 
 	/*
@@ -376,8 +355,10 @@ smb_com_write_raw(struct smb_request *sr)
 	/*
 	 * Write any additional data
 	 */
-	if (addl_xfer_count)
+	if (addl_xfer_count > 0) {
 		rc = smb_common_write(sr, param);
+		addl_xfer_offset += param->rw_count;
+	}
 
 	/*
 	 * If we were called in "Write-behind" mode and the transfer was
@@ -388,11 +369,6 @@ smb_com_write_raw(struct smb_request *sr)
 	 */
 	if ((rc != 0) || SMB_WRMODE_IS_STABLE(param->rw_mode))
 		goto notify_write_raw_complete;
-
-	/*
-	 * Free raw write buffer (allocated in smb_transfer_write_raw_data)
-	 */
-	kmem_free(sr->sr_raw_data_buf, sr->sr_raw_data_length);
 
 	(void) smb_session_send(sr->session, SESSION_KEEP_ALIVE, NULL);
 	return (SDRC_NO_REPLY);
@@ -413,15 +389,8 @@ notify_write_raw_complete:
 		smbsr_set_error(sr, &err);
 	}
 
-	/*
-	 * Free raw write buffer if present (from smb_transfer_write_raw_data)
-	 */
-	if (sr->sr_raw_data_buf != NULL)
-		kmem_free(sr->sr_raw_data_buf, sr->sr_raw_data_length);
-
 	sr->first_smb_com = SMB_COM_WRITE_COMPLETE;
-	rc = smbsr_encode_result(sr, 1, 0, "bww", 1,
-	    param->rw_total - param->rw_count, 0);
+	rc = smbsr_encode_result(sr, 1, 0, "bww", 1, addl_xfer_offset, 0);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
@@ -484,11 +453,11 @@ smb_handle_write_raw(smb_session_t *session, smb_request_t *sr)
  * Returns 0 for success, non-zero for failure
  */
 int
-smb_transfer_write_raw_data(smb_request_t *sr, uint16_t addl_xfer_count)
+smb_transfer_write_raw_data(smb_request_t *sr, smb_rw_param_t *param)
 {
 	smb_session_t *session = sr->session;
 	smb_xprt_t hdr;
-	uint8_t *data_buf;
+	void *pbuf;
 
 	do {
 		if (smb_session_xprt_gethdr(session, &hdr) != 0)
@@ -502,23 +471,16 @@ smb_transfer_write_raw_data(smb_request_t *sr, uint16_t addl_xfer_count)
 		}
 	} while (hdr.xh_type == SESSION_KEEP_ALIVE);
 
-	if (hdr.xh_length < addl_xfer_count) {
-		/*
-		 * Less data than we were expecting.
-		 */
+	if (hdr.xh_length < param->rw_vdb.vdb_uio.uio_resid)
+		return (-1); /* Less data than we were expecting. */
+
+	pbuf = smb_srm_alloc(sr, hdr.xh_length);
+	if (smb_sorecv(session->sock, pbuf, hdr.xh_length) != 0)
 		return (-1);
-	}
 
-	data_buf = kmem_alloc(hdr.xh_length, KM_SLEEP);
-
-	if (smb_sorecv(session->sock, data_buf, hdr.xh_length) != 0) {
-		kmem_free(data_buf, hdr.xh_length);
-		sr->sr_raw_data_buf = NULL;
-		sr->sr_raw_data_length = 0;
-		return (-1);
-	}
-
-	sr->sr_raw_data_buf = data_buf;
-	sr->sr_raw_data_length = hdr.xh_length;
+	param->rw_vdb.vdb_iovec[0].iov_base = pbuf;
+	param->rw_vdb.vdb_uio.uio_iovcnt = 1;
+	param->rw_vdb.vdb_uio.uio_segflg = UIO_SYSSPACE;
+	param->rw_vdb.vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
 	return (0);
 }

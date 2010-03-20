@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -768,7 +768,7 @@ nldap_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 
 			/* Skip if we already have pid and unixname */
 			if (req->id2name != NULL &&
-			    res->id.idmap_id_u.uid != SENTINEL_PID) {
+			    res->id.idmap_id_u.uid != IDMAP_SENTINEL_PID) {
 				res->retcode = IDMAP_SUCCESS;
 				continue;
 			}
@@ -813,7 +813,7 @@ nldap_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 			how->map_type = IDMAP_MAP_TYPE_DS_NLDAP;
 
 			/* Lookup nldap by pid or unixname to get winname */
-			if (req->id1.idmap_id_u.uid != SENTINEL_PID) {
+			if (req->id1.idmap_id_u.uid != IDMAP_SENTINEL_PID) {
 				add = 1;
 				retcode = idmap_nldap_bypid_batch_add(
 				    qs, req->id1.idmap_id_u.uid,

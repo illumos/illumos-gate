@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -250,10 +250,8 @@ smb_pre_tree_connect_andx(smb_request_t *sr)
 	rc = smbsr_decode_vwv(sr, "b.www", &sr->andx_com, &sr->andx_off,
 	    &sr->arg.tcon.flags, &pwlen);
 	if (rc == 0) {
-		if (pwlen != 0) {
-			pwbuf = smb_srm_alloc(sr, pwlen);
-			bzero(pwbuf, pwlen);
-		}
+		if (pwlen != 0)
+			pwbuf = smb_srm_zalloc(sr, pwlen);
 
 		rc = smbsr_decode_data(sr, "%#cus", sr, pwlen, pwbuf,
 		    &sr->arg.tcon.path, &sr->arg.tcon.service);
@@ -378,7 +376,7 @@ smb_post_tree_disconnect(smb_request_t *sr)
 smb_sdrc_t
 smb_com_tree_disconnect(smb_request_t *sr)
 {
-	sr->uid_user = smb_user_lookup_by_uid(sr->session, sr->smb_uid);
+	sr->uid_user = smb_session_lookup_uid(sr->session, sr->smb_uid);
 	if (sr->uid_user != NULL)
 		sr->tid_tree = smb_user_lookup_tree(sr->uid_user,
 		    sr->smb_tid);

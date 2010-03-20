@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1073,7 +1073,8 @@ struct mslm_NetSessionDel {
 #define SV_TYPE_DOMAIN_ENUM         0x80000000
 #define SV_TYPE_ALL                 0xFFFFFFFF  /* handy for NetServerEnum2 */
 
-#define	SV_TYPE_DEFAULT	(SV_TYPE_WORKSTATION | SV_TYPE_SERVER | SV_TYPE_NT)
+#define SV_TYPE_DEFAULT (SV_TYPE_WORKSTATION | SV_TYPE_SERVER | SV_TYPE_NT | \
+    SV_TYPE_SERVER_NT)
 
 /* Special value for sv102_disc that specifies infinite disconnect time */
 #define SV_NODISC           (-1L)  /* No autodisconnect timeout enforced */

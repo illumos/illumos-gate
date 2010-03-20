@@ -21,7 +21,7 @@ information: Portions Copyright [yyyy] [name of copyright owner]
 
 CDDL HEADER END
 
-Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
 NOTE:  This service manifest is not editable; its contents will
@@ -65,7 +65,7 @@ file.
 	<!-- Must have idmap service started -->
 	<dependency name='idmap'
 	    grouping='require_all'
-	    restart_on='error'
+	    restart_on='restart'
 	    type='service'>
 		<service_fmri value='svc:/system/idmap:default'/>
 	</dependency>
@@ -205,6 +205,8 @@ file.
 			value='0' override='true'/>
 		<propval name='ipv6_enable' type='boolean'
 			value='false' override='true'/>
+		<propval name='sv_version' type='astring'
+			value='5.0' override='true'/>
 	</property_group>
 
 	<!-- SMB service-specific shares exec configuration defaults -->

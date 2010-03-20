@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,20 +46,28 @@
  */
 #define	NDR_FRAG_SZ		5680
 
-#define	NDR_PIPE_BUFSZ		65536
+#define	NDR_GROW_SIZE		(8 * 1024)
+#define	NDR_GROW_MASK		(NDR_GROW_SIZE - 1)
+#define	NDR_ALIGN_BUF(S)	(((S) + NDR_GROW_SIZE) & ~NDR_GROW_MASK)
+
+#define	NDR_PIPE_BUFSZ		(64 * 1024)
+#define	NDR_PIPE_BUFMAX		(64 * 1024 * 1024)
 #define	NDR_PIPE_MAX		128
+
 static ndr_pipe_t ndr_pipe_table[NDR_PIPE_MAX];
 static mutex_t ndr_pipe_lock;
 
-static int ndr_pipe_transact(ndr_pipe_t *);
+static int ndr_pipe_process(ndr_pipe_t *);
 static ndr_pipe_t *ndr_pipe_lookup(int);
 static void ndr_pipe_release(ndr_pipe_t *);
 static ndr_pipe_t *ndr_pipe_allocate(int);
+static int ndr_pipe_grow(ndr_pipe_t *, size_t);
 static void ndr_pipe_deallocate(ndr_pipe_t *);
 static void ndr_pipe_rewind(ndr_pipe_t *);
 static void ndr_pipe_flush(ndr_pipe_t *);
 
 static int ndr_svc_process(ndr_xa_t *);
+static int ndr_svc_defrag(ndr_xa_t *);
 static int ndr_svc_bind(ndr_xa_t *);
 static int ndr_svc_request(ndr_xa_t *);
 static void ndr_reply_prepare_hdr(ndr_xa_t *);
@@ -134,8 +142,9 @@ ndr_pipe_close(int fid)
 int
 ndr_pipe_write(int fid, uint8_t *buf, uint32_t len)
 {
-	ndr_pipe_t *np;
-	ssize_t nbytes;
+	ndr_pipe_t	*np;
+	ssize_t		nbytes;
+	int		rc;
 
 	if (len == 0)
 		return (0);
@@ -147,6 +156,11 @@ ndr_pipe_write(int fid, uint8_t *buf, uint32_t len)
 		return (ENOENT);
 	}
 
+	if ((rc = ndr_pipe_grow(np, len)) != 0) {
+		(void) mutex_unlock(&ndr_pipe_lock);
+		return (rc);
+	}
+
 	nbytes = ndr_uiomove((caddr_t)buf, len, UIO_READ, &np->np_uio);
 
 	ndr_pipe_release(np);
@@ -155,17 +169,13 @@ ndr_pipe_write(int fid, uint8_t *buf, uint32_t len)
 }
 
 /*
- * Read RPC response data.  If the input stream contains an RPC request,
- * we need to process the RPC transaction, which will place the RPC
- * response in the output (frags) stream.  Otherwise, read data from
- * the output stream.
+ * Read RPC response data.
  */
 int
 ndr_pipe_read(int fid, uint8_t *buf, uint32_t *len, uint32_t *resid)
 {
 	ndr_pipe_t *np;
 	ssize_t nbytes = *len;
-	int rc;
 
 	if (nbytes == 0) {
 		*resid = 0;
@@ -178,17 +188,6 @@ ndr_pipe_read(int fid, uint8_t *buf, uint32_t *len, uint32_t *resid)
 		return (ENOENT);
 	}
 	(void) mutex_unlock(&ndr_pipe_lock);
-
-	if (np->np_uio.uio_offset) {
-		if ((rc = ndr_pipe_transact(np)) != 0) {
-			ndr_pipe_flush(np);
-			(void) mutex_lock(&ndr_pipe_lock);
-			ndr_pipe_release(np);
-			(void) mutex_unlock(&ndr_pipe_lock);
-			return (rc);
-		}
-
-	}
 
 	*len = ndr_uiomove((caddr_t)buf, nbytes, UIO_WRITE, &np->np_frags.uio);
 	*resid = np->np_frags.uio.uio_resid;
@@ -207,10 +206,48 @@ ndr_pipe_read(int fid, uint8_t *buf, uint32_t *len, uint32_t *resid)
 }
 
 /*
+ * If the input stream contains an RPC request, process the RPC transaction,
+ * which will place the RPC response in the output (frags) stream.
+ *
+ * arg is freed here; it must have been allocated by malloc().
+ */
+void *
+ndr_pipe_transact(void *arg)
+{
+	uint32_t	*tmp = (uint32_t *)arg;
+	uint32_t	fid;
+	ndr_pipe_t	*np;
+
+	if (arg == NULL)
+		return (NULL);
+
+	fid = *tmp;
+
+	(void) mutex_lock(&ndr_pipe_lock);
+	if ((np = ndr_pipe_lookup(fid)) == NULL) {
+		(void) mutex_unlock(&ndr_pipe_lock);
+		(void) smb_kmod_event_notify(fid);
+		free(arg);
+		return (NULL);
+	}
+	(void) mutex_unlock(&ndr_pipe_lock);
+
+	if (ndr_pipe_process(np) != 0)
+		ndr_pipe_flush(np);
+
+	(void) mutex_lock(&ndr_pipe_lock);
+	ndr_pipe_release(np);
+	(void) mutex_unlock(&ndr_pipe_lock);
+	(void) smb_kmod_event_notify(fid);
+	free(arg);
+	return (NULL);
+}
+
+/*
  * Process a server-side RPC request.
  */
 static int
-ndr_pipe_transact(ndr_pipe_t *np)
+ndr_pipe_process(ndr_pipe_t *np)
 {
 	ndr_xa_t	*mxa;
 	ndr_stream_t	*recv_nds;
@@ -221,6 +258,9 @@ ndr_pipe_transact(ndr_pipe_t *np)
 
 	data = np->np_buf;
 	datalen = np->np_uio.uio_offset;
+
+	if (datalen == 0)
+		return (0);
 
 	if ((mxa = (ndr_xa_t *)malloc(sizeof (ndr_xa_t))) == NULL)
 		return (ENOMEM);
@@ -331,6 +371,47 @@ ndr_pipe_allocate(int fid)
 }
 
 /*
+ * If the desired space exceeds the current pipe size, try to expand
+ * the pipe.  Leave the current pipe intact if the realloc fails.
+ *
+ * Must be called with ndr_pipe_lock held.
+ */
+static int
+ndr_pipe_grow(ndr_pipe_t *np, size_t desired)
+{
+	char	*newbuf;
+	size_t	current;
+	size_t	required;
+
+	required = np->np_uio.uio_offset + desired;
+	current = np->np_uio.uio_offset + np->np_uio.uio_resid;
+
+	if (required <= current)
+		return (0);
+
+	if (required > NDR_PIPE_BUFMAX) {
+		smb_tracef("ndr_pipe_grow: required=%d, max=%d (ENOSPC)",
+		    required, NDR_PIPE_BUFMAX);
+		return (ENOSPC);
+	}
+
+	required = NDR_ALIGN_BUF(required);
+	if (required > NDR_PIPE_BUFMAX)
+		required = NDR_PIPE_BUFMAX;
+
+	if ((newbuf = realloc(np->np_buf, required)) == NULL) {
+		smb_tracef("ndr_pipe_grow: realloc failed (ENOMEM)");
+		return (ENOMEM);
+	}
+
+	np->np_buf = newbuf;
+	np->np_uio.uio_resid += desired;
+	np->np_iov.iov_len += desired;
+	smb_tracef("ndr_pipe_grow: %d bytes", required);
+	return (0);
+}
+
+/*
  * Must be called with ndr_pipe_lock held.
  */
 static void
@@ -428,7 +509,11 @@ ndr_native_os(ndr_xa_t *xa)
 static int
 ndr_svc_process(ndr_xa_t *mxa)
 {
-	int rc;
+	ndr_common_header_t	*hdr = &mxa->recv_hdr.common_hdr;
+	ndr_stream_t		*nds = &mxa->recv_nds;
+	unsigned long		saved_offset;
+	unsigned long		saved_size;
+	int			rc;
 
 	rc = ndr_decode_pdu_hdr(mxa);
 	if (!NDR_DRC_IS_OK(rc))
@@ -442,6 +527,35 @@ ndr_svc_process(ndr_xa_t *mxa)
 		break;
 
 	case NDR_PTYPE_REQUEST:
+		if (!NDR_IS_FIRST_FRAG(hdr->pfc_flags)) {
+			ndr_show_hdr(hdr);
+			rc = NDR_DRC_FAULT_DECODE_FAILED;
+			goto ndr_svc_process_fault;
+		}
+
+		if (!NDR_IS_LAST_FRAG(hdr->pfc_flags)) {
+			/*
+			 * Multi-fragment request.  Preserve the PDU scan
+			 * offset and size during defrag so that we can
+			 * continue as if we had received contiguous data.
+			 */
+			saved_offset = nds->pdu_scan_offset;
+			saved_size = nds->pdu_size;
+
+			nds->pdu_scan_offset = hdr->frag_length;
+			nds->pdu_size = nds->pdu_max_size;
+
+			rc = ndr_svc_defrag(mxa);
+			if (NDR_DRC_IS_FAULT(rc)) {
+				ndr_show_hdr(hdr);
+				nds_show_state(nds);
+				goto ndr_svc_process_fault;
+			}
+
+			nds->pdu_scan_offset = saved_offset;
+			nds->pdu_size = saved_size;
+		}
+
 		rc = ndr_svc_request(mxa);
 		break;
 
@@ -454,11 +568,58 @@ ndr_svc_process(ndr_xa_t *mxa)
 		break;
 	}
 
+ndr_svc_process_fault:
 	if (NDR_DRC_IS_FAULT(rc))
 		ndr_reply_fault(mxa, rc);
 
 	(void) ndr_build_reply(mxa);
 	return (rc);
+}
+
+/*
+ * Remove RPC fragment headers from the received data stream.
+ * The first fragment has already been accounted for before this call.
+ *
+ * NDR stream on entry:
+ *
+ * |<-- frag 2 -->|<-- frag 3 -->| ... |<- last frag ->|
+ *
+ * +-----+--------+-----+--------+-----+-----+---------+
+ * | hdr |  data  | hdr |  data  | ... | hdr |  data   |
+ * +-----+--------+-----+--------+-----+-----+---------+
+ *
+ * NDR stream on return:
+ *
+ * +----------------------------------+
+ * |               data               |
+ * +----------------------------------+
+ */
+static int
+ndr_svc_defrag(ndr_xa_t *mxa)
+{
+	ndr_stream_t		*nds = &mxa->recv_nds;
+	ndr_common_header_t	frag_hdr;
+	int			frag_size;
+	int			last_frag;
+
+	do {
+		ndr_decode_frag_hdr(nds, &frag_hdr);
+		ndr_show_hdr(&frag_hdr);
+
+		if (NDR_IS_FIRST_FRAG(frag_hdr.pfc_flags))
+			return (NDR_DRC_FAULT_DECODE_FAILED);
+
+		last_frag = NDR_IS_LAST_FRAG(frag_hdr.pfc_flags);
+		frag_size = frag_hdr.frag_length;
+
+		if (frag_size > (nds->pdu_size - nds->pdu_scan_offset))
+			return (NDR_DRC_FAULT_DECODE_FAILED);
+
+		ndr_remove_frag_hdr(nds);
+		nds->pdu_scan_offset += frag_size - NDR_RSP_HDR_SIZE;
+	} while (!last_frag);
+
+	return (NDR_DRC_OK);
 }
 
 /*

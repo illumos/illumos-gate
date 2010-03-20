@@ -134,9 +134,9 @@
 #include <sys/pathname.h>
 #include <sys/sdt.h>
 #include <sys/nbmlock.h>
+#include <fs/fs_reparse.h>
 
 uint32_t smb_is_executable(char *);
-static void smb_node_notify_parent(smb_node_t *);
 static void smb_node_delete_on_close(smb_node_t *);
 static void smb_node_create_audit_buf(smb_node_t *, int);
 static void smb_node_destroy_audit_buf(smb_node_t *);
@@ -159,6 +159,8 @@ static void smb_node_init_cached_allocsz(smb_node_t *, smb_attr_t *);
 static void smb_node_clear_cached_allocsz(smb_node_t *);
 static void smb_node_get_cached_allocsz(smb_node_t *, smb_attr_t *);
 static void smb_node_set_cached_allocsz(smb_node_t *, smb_attr_t *);
+static void smb_node_init_reparse(smb_node_t *, smb_attr_t *);
+static void smb_node_init_system(smb_node_t *);
 
 #define	VALIDATE_DIR_NODE(_dir_, _node_) \
     ASSERT((_dir_)->n_magic == SMB_NODE_MAGIC); \
@@ -379,7 +381,7 @@ smb_node_lookup(
 		break;
 	}
 	node = smb_node_alloc(od_name, vp, node_hdr, hashkey);
-	node->n_orig_uid = crgetuid(sr->user_cr);
+	smb_node_init_reparse(node, &attr);
 
 	if (op)
 		node->flags |= smb_is_executable(op->fqi.fq_last_comp);
@@ -396,6 +398,8 @@ smb_node_lookup(
 		smb_node_ref(unode);
 		node->n_unode = unode;
 	}
+
+	smb_node_init_system(node);
 
 	DTRACE_PROBE1(smb_node_lookup_miss, smb_node_t *, node);
 	smb_node_audit(node);
@@ -548,7 +552,7 @@ smb_node_delete_on_close(smb_node_t *node)
 		flags = node->n_delete_on_close_flags;
 		ASSERT(node->od_name != NULL);
 
-		if (node->vp->v_type == VDIR)
+		if (smb_node_is_dir(node))
 			rc = smb_fsop_rmdir(0, node->delete_on_close_cred,
 			    d_snode, node->od_name, flags);
 		else
@@ -693,11 +697,8 @@ smb_node_reset_delete_on_close(smb_node_t *node)
  * sharing conflict, otherwise returns NT_STATUS_SUCCESS.
  */
 uint32_t
-smb_node_open_check(
-    smb_node_t	*node,
-    cred_t	*cr,
-    uint32_t	desired_access,
-    uint32_t	share_access)
+smb_node_open_check(smb_node_t *node, uint32_t desired_access,
+    uint32_t share_access)
 {
 	smb_ofile_t *of;
 	uint32_t status;
@@ -707,8 +708,7 @@ smb_node_open_check(
 	smb_llist_enter(&node->n_ofile_list, RW_READER);
 	of = smb_llist_head(&node->n_ofile_list);
 	while (of) {
-		status = smb_ofile_open_check(of, cr, desired_access,
-		    share_access);
+		status = smb_ofile_open_check(of, desired_access, share_access);
 
 		switch (status) {
 		case NT_STATUS_INVALID_HANDLE:
@@ -772,8 +772,11 @@ smb_node_delete_check(smb_node_t *node)
 
 	SMB_NODE_VALID(node);
 
-	if (node->vp->v_type == VDIR)
+	if (smb_node_is_dir(node))
 		return (NT_STATUS_SUCCESS);
+
+	if (smb_node_is_reparse(node))
+		return (NT_STATUS_ACCESS_DENIED);
 
 	/*
 	 * intra-CIFS check
@@ -814,15 +817,33 @@ smb_node_notify_change(smb_node_t *node)
 		node->flags |= NODE_FLAGS_CHANGED;
 		smb_process_node_notify_change_queue(node);
 	}
+
+	smb_node_notify_parents(node);
 }
 
-static void
-smb_node_notify_parent(smb_node_t *node)
+/*
+ * smb_node_notify_parents
+ *
+ * Iterate up the directory tree notifying any parent
+ * directories that are being watched for changes in
+ * their sub directories.
+ * Stop at the root node, which has a NULL parent node.
+ */
+void
+smb_node_notify_parents(smb_node_t *dnode)
 {
-	SMB_NODE_VALID(node);
+	smb_node_t *pnode = dnode;
 
-	if (node->n_dnode != NULL)
-		smb_node_notify_change(node->n_dnode);
+	SMB_NODE_VALID(dnode);
+
+	while ((pnode = pnode->n_dnode) != NULL) {
+		SMB_NODE_VALID(pnode);
+		if ((pnode->flags & NODE_FLAGS_NOTIFY_CHANGE) &&
+		    (pnode->flags & NODE_FLAGS_WATCH_TREE)) {
+			pnode->flags |= NODE_FLAGS_CHANGED;
+			smb_process_node_notify_change_queue(pnode);
+		}
+	}
 }
 
 /*
@@ -831,7 +852,6 @@ smb_node_notify_parent(smb_node_t *node)
  * Enter critical region for share reservations.
  * See comments above smb_fsop_shrlock().
  */
-
 void
 smb_node_start_crit(smb_node_t *node, krw_t mode)
 {
@@ -844,7 +864,6 @@ smb_node_start_crit(smb_node_t *node, krw_t mode)
  *
  * Exit critical region for share reservations.
  */
-
 void
 smb_node_end_crit(smb_node_t *node)
 {
@@ -953,6 +972,74 @@ smb_node_get_open_ofiles(smb_node_t *node)
 }
 
 /*
+ * smb_node_getmntpath
+ */
+int
+smb_node_getmntpath(smb_node_t *node, char *buf, uint32_t buflen)
+{
+	vnode_t *vp, *root_vp;
+	vfs_t *vfsp;
+	int err;
+
+	ASSERT(node);
+	ASSERT(node->vp);
+	ASSERT(node->vp->v_vfsp);
+
+	vp = node->vp;
+	vfsp = vp->v_vfsp;
+
+	if (VFS_ROOT(vfsp, &root_vp))
+		return (ENOENT);
+
+	VN_HOLD(vp);
+
+	/* NULL is passed in as we want to start at "/" */
+	err = vnodetopath(NULL, root_vp, buf, buflen, kcred);
+
+	VN_RELE(vp);
+	VN_RELE(root_vp);
+	return (err);
+}
+
+/*
+ * smb_node_getshrpath
+ *
+ * Determine the absolute pathname of 'node' within the share (tree).
+ * For example if the node represents file "test1.txt" in directory
+ * "dir1" the pathname would be: \dir1\test1.txt
+ *
+ * If node represents a named stream, construct the pathname for the
+ * associated unnamed stream then append the stream name.
+ */
+int
+smb_node_getshrpath(smb_node_t *node, smb_tree_t *tree,
+    char *buf, uint32_t buflen)
+{
+	int rc;
+	vnode_t *vp;
+
+	(void) bzero(buf, buflen);
+
+	if (SMB_IS_STREAM(node))
+		vp = node->n_unode->vp;
+	else
+		vp = node->vp;
+
+	if (vp == tree->t_snode->vp)
+		return (0);
+
+	rc = vnodetopath(tree->t_snode->vp, vp, buf, buflen, kcred);
+	if (rc == 0) {
+		(void) strsubst(buf, '/', '\\');
+
+		if (SMB_IS_STREAM(node))
+			(void) strlcat(buf, node->od_name, buflen);
+	}
+
+	return (rc);
+}
+
+/*
  * smb_node_alloc
  */
 static smb_node_t *
@@ -963,6 +1050,7 @@ smb_node_alloc(
     uint32_t	hashkey)
 {
 	smb_node_t	*node;
+	vnode_t		*root_vp;
 
 	node = kmem_cache_alloc(smb_node_cache, KM_SLEEP);
 
@@ -975,7 +1063,6 @@ smb_node_alloc(
 	node->n_refcnt = 1;
 	node->n_hash_bucket = bucket;
 	node->n_hashkey = hashkey;
-	node->n_orig_uid = 0;
 	node->readonly_creator = NULL;
 	node->waiting_event = 0;
 	node->n_open_count = 0;
@@ -988,8 +1075,15 @@ smb_node_alloc(
 	if (strcmp(od_name, XATTR_DIR) == 0)
 		node->flags |= NODE_XATTR_DIR;
 
+	if (VFS_ROOT(vp->v_vfsp, &root_vp) == 0) {
+		if (vp == root_vp)
+			node->flags |= NODE_FLAGS_VFSROOT;
+		VN_RELE(root_vp);
+	}
+
 	node->n_state = SMB_NODE_STATE_AVAILABLE;
 	node->n_magic = SMB_NODE_MAGIC;
+
 	return (node);
 }
 
@@ -1116,17 +1210,56 @@ smb_node_get_hash(fsid_t *fsid, smb_attr_t *attr, uint32_t *phashkey)
 }
 
 boolean_t
-smb_node_is_dir(smb_node_t *node)
+smb_node_is_file(smb_node_t *node)
 {
 	SMB_NODE_VALID(node);
-	return (node->vp->v_type == VDIR);
+	return (node->vp->v_type == VREG);
 }
 
 boolean_t
-smb_node_is_link(smb_node_t *node)
+smb_node_is_dir(smb_node_t *node)
 {
 	SMB_NODE_VALID(node);
-	return (node->vp->v_type == VLNK);
+	return ((node->vp->v_type == VDIR) ||
+	    (node->flags & NODE_FLAGS_DFSLINK));
+}
+
+boolean_t
+smb_node_is_symlink(smb_node_t *node)
+{
+	SMB_NODE_VALID(node);
+	return ((node->vp->v_type == VLNK) &&
+	    ((node->flags & NODE_FLAGS_REPARSE) == 0));
+}
+
+boolean_t
+smb_node_is_dfslink(smb_node_t *node)
+{
+	SMB_NODE_VALID(node);
+	return ((node->vp->v_type == VLNK) &&
+	    (node->flags & NODE_FLAGS_DFSLINK));
+}
+
+boolean_t
+smb_node_is_reparse(smb_node_t *node)
+{
+	SMB_NODE_VALID(node);
+	return ((node->vp->v_type == VLNK) &&
+	    (node->flags & NODE_FLAGS_REPARSE));
+}
+
+boolean_t
+smb_node_is_vfsroot(smb_node_t *node)
+{
+	SMB_NODE_VALID(node);
+	return ((node->flags & NODE_FLAGS_VFSROOT) == NODE_FLAGS_VFSROOT);
+}
+
+boolean_t
+smb_node_is_system(smb_node_t *node)
+{
+	SMB_NODE_VALID(node);
+	return ((node->flags & NODE_FLAGS_SYSTEM) == NODE_FLAGS_SYSTEM);
 }
 
 /*
@@ -1260,8 +1393,10 @@ smb_node_setattr(smb_request_t *sr, smb_node_t *node,
 	if (tmp_attr.sa_mask)
 		smb_node_set_cached_timestamps(node, &tmp_attr);
 
-	if (tmp_attr.sa_mask & SMB_AT_MTIME || explicit_times & SMB_AT_MTIME)
-		smb_node_notify_parent(node);
+	if (tmp_attr.sa_mask & SMB_AT_MTIME || explicit_times & SMB_AT_MTIME) {
+		if (node->n_dnode != NULL)
+			smb_node_notify_change(node->n_dnode);
+	}
 
 	return (0);
 }
@@ -1294,7 +1429,7 @@ smb_node_getattr(smb_request_t *sr, smb_node_t *node, smb_attr_t *attr)
 
 	mutex_enter(&node->n_mutex);
 
-	if (node->vp->v_type == VDIR) {
+	if (smb_node_is_dir(node)) {
 		attr->sa_vattr.va_size = 0;
 		attr->sa_allocsz = 0;
 		attr->sa_vattr.va_nlink = 1;
@@ -1392,7 +1527,7 @@ smb_node_clear_cached_allocsz(smb_node_t *node)
 static void
 smb_node_get_cached_allocsz(smb_node_t *node, smb_attr_t *attr)
 {
-	if (node->vp->v_type == VDIR)
+	if (smb_node_is_dir(node))
 		return;
 
 	mutex_enter(&node->n_mutex);
@@ -1543,4 +1678,74 @@ smb_node_set_cached_timestamps(smb_node_t *node, smb_attr_t *attr)
 			node->n_timestamps.t_crtime = attr->sa_crtime;
 	}
 	mutex_exit(&node->n_mutex);
+}
+
+/*
+ * Check to see if the node represents a reparse point.
+ * If yes, whether the reparse point contains a DFS link.
+ */
+static void
+smb_node_init_reparse(smb_node_t *node, smb_attr_t *attr)
+{
+	nvlist_t *nvl;
+	nvpair_t *rec;
+	char *rec_type;
+
+	if ((attr->sa_dosattr & FILE_ATTRIBUTE_REPARSE_POINT) == 0)
+		return;
+
+	if ((nvl = reparse_init()) == NULL)
+		return;
+
+	if (reparse_vnode_parse(node->vp, nvl) != 0) {
+		reparse_free(nvl);
+		return;
+	}
+
+	node->flags |= NODE_FLAGS_REPARSE;
+
+	rec = nvlist_next_nvpair(nvl, NULL);
+	while (rec != NULL) {
+		rec_type = nvpair_name(rec);
+		if ((rec_type != NULL) &&
+		    (strcasecmp(rec_type, DFS_REPARSE_SVCTYPE) == 0)) {
+			node->flags |= NODE_FLAGS_DFSLINK;
+			break;
+		}
+		rec = nvlist_next_nvpair(nvl, rec);
+	}
+
+	reparse_free(nvl);
+}
+
+/*
+ * smb_node_init_system
+ *
+ * If the node represents a special system file set NODE_FLAG_SYSTEM.
+ * System files:
+ * - any node whose parent dnode has NODE_FLAG_SYSTEM set
+ * - any node whose associated unnamed stream node (unode) has
+ *   NODE_FLAG_SYSTEM set
+ * - .$EXTEND at root of share (quota management)
+ */
+static void
+smb_node_init_system(smb_node_t *node)
+{
+	smb_node_t *dnode = node->n_dnode;
+	smb_node_t *unode = node->n_unode;
+
+	if ((dnode) && (dnode->flags & NODE_FLAGS_SYSTEM)) {
+		node->flags |= NODE_FLAGS_SYSTEM;
+		return;
+	}
+
+	if ((unode) && (unode->flags & NODE_FLAGS_SYSTEM)) {
+		node->flags |= NODE_FLAGS_SYSTEM;
+		return;
+	}
+
+	if ((dnode) && (smb_node_is_vfsroot(node->n_dnode) &&
+	    (strcasecmp(node->od_name, ".$EXTEND") == 0))) {
+		node->flags |= NODE_FLAGS_SYSTEM;
+	}
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1361,6 +1361,9 @@ sa_check_path(sa_group_t group, char *path, int strictness)
 	sa_handle_t handle;
 
 	handle = sa_find_group_handle(group);
+	if (handle == NULL)
+		return (SA_BAD_PATH);
+
 	return (validpath(handle, path, strictness));
 }
 

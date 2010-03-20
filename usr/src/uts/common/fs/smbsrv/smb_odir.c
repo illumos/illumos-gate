@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -251,7 +251,6 @@
 /* static functions */
 static smb_odir_t *smb_odir_create(smb_request_t *, smb_node_t *,
     char *, uint16_t, cred_t *);
-static void smb_odir_delete(smb_odir_t *);
 static int smb_odir_single_fileinfo(smb_request_t *, smb_odir_t *,
     smb_fileinfo_t *);
 static int smb_odir_wildcard_fileinfo(smb_request_t *, smb_odir_t *,
@@ -296,7 +295,7 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 		return (0);
 	}
 
-	if (dnode->vp->v_type != VDIR) {
+	if (!smb_node_is_dir(dnode)) {
 		smbsr_error(sr, NT_STATUS_OBJECT_PATH_NOT_FOUND,
 		    ERRDOS, ERROR_PATH_NOT_FOUND);
 		smb_node_release(dnode);
@@ -415,19 +414,15 @@ smb_odir_hold(smb_odir_t *od)
 }
 
 /*
- * smb_odir_release
- *
- * If the odir is in SMB_ODIR_STATE_CLOSING and this release
- * results in a refcnt of 0, the odir may be removed from
- * the tree's list of odirs and deleted.  The odir's state is
- * set to SMB_ODIR_STATE_CLOSED prior to exiting the mutex and
- * deleting the odir.
+ * If the odir is in SMB_ODIR_STATE_CLOSING and this release results in
+ * a refcnt of 0, change the state to SMB_ODIR_STATE_CLOSED and post the
+ * object for deletion.  Object deletion is deferred to avoid modifying
+ * a list while an iteration may be in progress.
  */
 void
 smb_odir_release(smb_odir_t *od)
 {
-	ASSERT(od);
-	ASSERT(od->d_magic == SMB_ODIR_MAGIC);
+	SMB_ODIR_VALID(od);
 
 	mutex_enter(&od->d_mutex);
 	ASSERT(od->d_refcnt > 0);
@@ -444,9 +439,7 @@ smb_odir_release(smb_odir_t *od)
 		od->d_refcnt--;
 		if (od->d_refcnt == 0) {
 			od->d_state = SMB_ODIR_STATE_CLOSED;
-			mutex_exit(&od->d_mutex);
-			smb_odir_delete(od);
-			return;
+			smb_tree_post_odir(od->d_tree, od);
 		}
 		break;
 	case SMB_ODIR_STATE_CLOSED:
@@ -887,27 +880,33 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 }
 
 /*
- * smb_odir_delete
+ * Delete an odir.
  *
- * Removal of the odir from the tree's list of odirs must be
- * done before any resources associated with the odir are
- * released.
+ * Remove the odir from the tree list before freeing resources
+ * associated with the odir.
  */
-static void
-smb_odir_delete(smb_odir_t *od)
+void
+smb_odir_delete(void *arg)
 {
-	ASSERT(od);
-	ASSERT(od->d_magic == SMB_ODIR_MAGIC);
+	smb_tree_t	*tree;
+	smb_odir_t	*od = (smb_odir_t *)arg;
+
+	SMB_ODIR_VALID(od);
+	ASSERT(od->d_refcnt == 0);
 	ASSERT(od->d_state == SMB_ODIR_STATE_CLOSED);
 
-	smb_llist_enter(&od->d_tree->t_odir_list, RW_WRITER);
-	smb_llist_remove(&od->d_tree->t_odir_list, od);
-	smb_llist_exit(&od->d_tree->t_odir_list);
+	tree = od->d_tree;
+	smb_llist_enter(&tree->t_odir_list, RW_WRITER);
+	smb_llist_remove(&tree->t_odir_list, od);
+	smb_idpool_free(&tree->t_odid_pool, od->d_odid);
+	atomic_dec_32(&tree->t_session->s_dir_cnt);
+	smb_llist_exit(&tree->t_odir_list);
+
+	mutex_enter(&od->d_mutex);
+	mutex_exit(&od->d_mutex);
 
 	od->d_magic = 0;
-	atomic_dec_32(&od->d_tree->t_session->s_dir_cnt);
 	smb_node_release(od->d_dnode);
-	smb_idpool_free(&od->d_tree->t_odid_pool, od->d_odid);
 	mutex_destroy(&od->d_mutex);
 	kmem_cache_free(od->d_tree->t_server->si_cache_odir, od);
 }
@@ -1077,7 +1076,7 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 
 		rc = smb_vop_lookup(od->d_dnode->vp, fnode->od_name, &vp,
 		    NULL, lookup_flags, &flags, od->d_tree->t_snode->vp,
-		    od->d_cred);
+		    NULL, od->d_cred);
 		if (rc != 0)
 			return (rc);
 		VN_RELE(vp);
@@ -1098,8 +1097,8 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
 
 	/* follow link to get target node & attr */
-	if ((fnode->vp->v_type == VLNK) &&
-	    (smb_odir_lookup_link(sr, od, fnode->od_name, &tgt_node))) {
+	if (smb_node_is_symlink(fnode) &&
+	    smb_odir_lookup_link(sr, od, fnode->od_name, &tgt_node)) {
 		smb_node_release(fnode);
 		fnode = tgt_node;
 		if ((rc = smb_node_getattr(sr, fnode, &attr)) != 0) {
@@ -1187,10 +1186,16 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		return (rc);
 
 	/* follow link to get target node & attr */
-	if ((fnode->vp->v_type == VLNK) &&
-	    (smb_odir_lookup_link(sr, od, name, &tgt_node))) {
+	if (smb_node_is_symlink(fnode) &&
+	    smb_odir_lookup_link(sr, od, name, &tgt_node)) {
 		smb_node_release(fnode);
 		fnode = tgt_node;
+	}
+
+	/* skip system files */
+	if (smb_node_is_system(fnode)) {
+		smb_node_release(fnode);
+		return (ENOENT);
 	}
 
 	if ((rc = smb_node_getattr(sr, fnode, &attr)) != 0) {

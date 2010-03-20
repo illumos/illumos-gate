@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/ksynch.h>
+#include <time.h>
 #include <stdio.h>
 #include <string.h>
 #include <netdb.h>
@@ -41,6 +42,7 @@
 #include <smbsrv/smb_privilege.h>
 #include <smbsrv/smb_share.h>
 #include <smbsrv/smb_xdr.h>
+#include <smbsrv/smb_dfs.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/ndl/lsarpc.ndl>
@@ -93,6 +95,10 @@ int mlsvc_encrypt_nt_password(char *password, char *key, int keylen, char *out,
 
 #define	SMB_AUTOHOME_FILE	"smbautohome"
 #define	SMB_AUTOHOME_PATH	"/etc"
+#define	SMB_CVOL		"/var/smb/cvol"
+#define	SMB_SYSROOT		"/var/smb/cvol/windows"
+#define	SMB_SYSTEM32		"/var/smb/cvol/windows/system32"
+#define	SMB_VSS			"/var/smb/cvol/windows/system32/vss"
 
 typedef struct smb_autohome {
 	struct smb_autohome *ah_next;
@@ -132,6 +138,8 @@ typedef struct srvsvc_server_info {
 } srvsvc_server_info_t;
 
 int srvsvc_net_server_getinfo(char *, char *, srvsvc_server_info_t *);
+int srvsvc_net_remote_tod(char *, char *, struct timeval *, struct tm *);
+
 
 /*
  * A client_t is created while binding a client connection to hold the
@@ -265,6 +273,14 @@ void logr_init(void);
 void logr_fini(void);
 boolean_t logr_is_supported(char *);
 int logr_get_snapshot(logr_context_t *);
+
+/* User and Group quotas */
+uint32_t smb_quota_query(smb_quota_query_t *, smb_quota_response_t *);
+uint32_t smb_quota_set(smb_quota_set_t *);
+void smb_quota_free(smb_quota_response_t *);
+
+uint32_t dfs_get_referrals(const char *, dfs_reftype_t, dfs_info_t *);
+void dfs_info_free(dfs_info_t *);
 
 #ifdef	__cplusplus
 }

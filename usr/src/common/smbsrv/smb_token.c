@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,35 +69,57 @@ smb_token_query_privilege(smb_token_t *token, int priv_id)
 	return (0);
 }
 
+/*
+ * Basic sanity check on a token.
+ */
+boolean_t
+smb_token_valid(smb_token_t *token)
+{
+	if (token == NULL)
+		return (B_FALSE);
+
+	if ((token->tkn_user.i_sid == NULL) ||
+	    (token->tkn_owner.i_sid == NULL) ||
+	    (token->tkn_primary_grp.i_sid == NULL) ||
+	    (token->tkn_account_name == NULL) ||
+	    (token->tkn_domain_name == NULL) ||
+	    (token->tkn_posix_grps == NULL))
+		return (B_FALSE);
+
+	if ((token->tkn_win_grps.i_cnt != 0) &&
+	    (token->tkn_win_grps.i_ids == NULL))
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
 #ifndef _KERNEL
 /*
- * smb_token_mkselfrel
- *
- * encode: structure -> flat buffer (buffer size)
+ * Encode: structure -> flat buffer (buffer size)
  * Pre-condition: obj is non-null.
  */
 uint8_t *
-smb_token_mkselfrel(smb_token_t *obj, uint32_t *len)
+smb_token_encode(smb_token_t *obj, uint32_t *len)
 {
 	uint8_t *buf;
 	XDR xdrs;
 
 	if (!obj) {
-		syslog(LOG_ERR, "smb_token_mkselfrel: invalid parameter");
+		syslog(LOG_ERR, "smb_token_encode: invalid parameter");
 		return (NULL);
 	}
 
-	*len = xdr_sizeof(xdr_smb_token_t, obj);
+	*len = xdr_sizeof(smb_token_xdr, obj);
 	buf = (uint8_t *)malloc(*len);
 	if (!buf) {
-		syslog(LOG_ERR, "smb_token_mkselfrel: resource shortage");
+		syslog(LOG_ERR, "smb_token_encode: %m");
 		return (NULL);
 	}
 
 	xdrmem_create(&xdrs, (const caddr_t)buf, *len, XDR_ENCODE);
 
-	if (!xdr_smb_token_t(&xdrs, obj)) {
-		syslog(LOG_ERR, "smb_token_mkselfrel: XDR encode error");
+	if (!smb_token_xdr(&xdrs, obj)) {
+		syslog(LOG_ERR, "smb_token_encode: XDR encode error");
 		*len = 0;
 		free(buf);
 		buf = NULL;
@@ -108,27 +130,25 @@ smb_token_mkselfrel(smb_token_t *obj, uint32_t *len)
 }
 
 /*
- * netr_client_mkabsolute
- *
- * decode: flat buffer -> structure
+ * Decode: flat buffer -> structure
  */
-netr_client_t *
-netr_client_mkabsolute(uint8_t *buf, uint32_t len)
+smb_logon_t *
+smb_logon_decode(uint8_t *buf, uint32_t len)
 {
-	netr_client_t *obj;
-	XDR xdrs;
+	smb_logon_t	*obj;
+	XDR		xdrs;
 
 	xdrmem_create(&xdrs, (const caddr_t)buf, len, XDR_DECODE);
-	obj = (netr_client_t *)malloc(sizeof (netr_client_t));
-	if (!obj) {
-		syslog(LOG_ERR, "netr_client_mkabsolute: resource shortage");
+
+	if ((obj = malloc(sizeof (smb_logon_t))) == NULL) {
+		syslog(LOG_ERR, "smb_logon_decode: %m");
 		xdr_destroy(&xdrs);
 		return (NULL);
 	}
 
-	bzero(obj, sizeof (netr_client_t));
-	if (!xdr_netr_client_t(&xdrs, obj)) {
-		syslog(LOG_ERR, "netr_client_mkabsolute: XDR decode error");
+	bzero(obj, sizeof (smb_logon_t));
+	if (!smb_logon_xdr(&xdrs, obj)) {
+		syslog(LOG_ERR, "smb_logon_decode: XDR decode error");
 		free(obj);
 		obj = NULL;
 	}
@@ -138,76 +158,22 @@ netr_client_mkabsolute(uint8_t *buf, uint32_t len)
 }
 
 void
-netr_client_xfree(netr_client_t *clnt)
+smb_logon_free(smb_logon_t *obj)
 {
-	xdr_free(xdr_netr_client_t, (char *)clnt);
-	free(clnt);
+	xdr_free(smb_logon_xdr, (char *)obj);
+	free(obj);
 }
 #else /* _KERNEL */
 /*
- * smb_token_mkabsolute
- *
- * decode: flat buffer -> structure
+ * Tokens are allocated in the kernel via XDR.
+ * Call xdr_free before freeing the token structure.
  */
-smb_token_t *
-smb_token_mkabsolute(uint8_t *buf, uint32_t len)
-{
-	smb_token_t *obj;
-	XDR xdrs;
-
-	xdrmem_create(&xdrs, (const caddr_t)buf, len, XDR_DECODE);
-	obj = kmem_zalloc(sizeof (smb_token_t), KM_SLEEP);
-
-	if (!xdr_smb_token_t(&xdrs, obj)) {
-		cmn_err(CE_NOTE, "smb_token_mkabsolute: XDR decode error");
-		kmem_free(obj, sizeof (smb_token_t));
-		obj = NULL;
-	}
-
-	xdr_destroy(&xdrs);
-	return (obj);
-}
-
-/*
- * netr_client_mkselfrel
- *
- * encode: structure -> flat buffer (buffer size)
- * Pre-condition: obj is non-null.
- */
-uint8_t *
-netr_client_mkselfrel(netr_client_t *obj, uint32_t *len)
-{
-	uint8_t *buf;
-	XDR xdrs;
-
-	*len = xdr_sizeof(xdr_netr_client_t, obj);
-	buf = kmem_alloc(*len, KM_SLEEP);
-
-	xdrmem_create(&xdrs, (const caddr_t)buf, *len, XDR_ENCODE);
-
-	if (!xdr_netr_client_t(&xdrs, obj)) {
-		cmn_err(CE_NOTE, "netr_client_mkselfrel: XDR encode error");
-		kmem_free(buf, *len);
-		*len = 0;
-		buf = NULL;
-	}
-
-	xdr_destroy(&xdrs);
-	return (buf);
-}
-
 void
 smb_token_free(smb_token_t *token)
 {
-	if (!token)
-		return;
-
-	/*
-	 * deallocate any pointer field of an access token object
-	 * using xdr_free since they are created by the XDR decode
-	 * operation.
-	 */
-	xdr_free(xdr_smb_token_t, (char *)token);
-	kmem_free(token, sizeof (smb_token_t));
+	if (token != NULL) {
+		xdr_free(smb_token_xdr, (char *)token);
+		kmem_free(token, sizeof (smb_token_t));
+	}
 }
 #endif /* _KERNEL */

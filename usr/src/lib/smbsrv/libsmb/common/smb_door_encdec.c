@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,24 +27,62 @@
 #include <strings.h>
 #include <rpc/xdr.h>
 #include <errno.h>
+#include <syslog.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/smb_xdr.h>
-#include <smbsrv/smb_common_door.h>
-#include <smbsrv/smb_door_svc.h>
+#include <smbsrv/smb_door.h>
+
 
 /*
- * smb_dr_decode_common
+ * Generic XDR encoder.
  *
- * This function can be used to decode both door request and result buffer.
- * pre-condition: data is non-null pointer, and is bzero'd.
+ * Returns a malloc'd, encoded buffer upon success.
+ * Otherwise, returns NULL.
+ */
+char *
+smb_common_encode(void *data, xdrproc_t proc, size_t *rsize)
+{
+	XDR	xdrs;
+	char	*buf;
+	size_t	len;
+
+	if (proc == NULL || data == NULL || rsize == NULL) {
+		syslog(LOG_ERR, "smb_common_encode: invalid parameter");
+		return (NULL);
+	}
+
+	len = xdr_sizeof(proc, data);
+
+	if ((buf = malloc(len)) == NULL) {
+		syslog(LOG_ERR, "smb_common_encode: %m");
+		*rsize = 0;
+		return (NULL);
+	}
+
+	xdrmem_create(&xdrs, buf, len, XDR_ENCODE);
+	*rsize = len;
+
+	if (!proc(&xdrs, data)) {
+		syslog(LOG_DEBUG, "smb_common_encode: encode error");
+		free(buf);
+		buf = NULL;
+		*rsize = 0;
+	}
+
+	xdr_destroy(&xdrs);
+	return (buf);
+}
+
+/*
+ * Generic XDR decoder.  Ensure that data is non-null and bzero'd.
  */
 int
-smb_dr_decode_common(char *buf, size_t len, xdrproc_t proc, void *data)
+smb_common_decode(char *buf, size_t len, xdrproc_t proc, void *data)
 {
 	XDR xdrs;
 	int rc = 0;
 
-	if (!data)
+	if (data == NULL)
 		return (-1);
 
 	xdrmem_create(&xdrs, buf, len, XDR_DECODE);
@@ -56,142 +94,11 @@ smb_dr_decode_common(char *buf, size_t len, xdrproc_t proc, void *data)
 }
 
 /*
- * smb_dr_encode_common
- *
- * This function can be used to encode both request and result door buffer.
- * The 'opcode' paramater is set to the 'opcode' of the operation to be invoked
- * on the server, by the client. The server sets the same 'opcode' paramater
- * to indicate the 'status' of the door call.
- *
- * This function will first encode integer value 'opcode' (opcode/status),
- * followed by the data (which will be encoded via the specified XDR routine).
- *
- * Returns encoded buffer upon success. Otherwise, returns NULL.
- */
-char *
-smb_dr_encode_common(uint_t opcode, void *data, xdrproc_t proc, size_t *len)
-{
-	XDR xdrs;
-	char *buf;
-
-	if (proc && !data) {
-		syslog(LOG_ERR, "smb_dr_encode_common: invalid param");
-		*len = 0;
-		return (NULL);
-	}
-
-	*len = xdr_sizeof(xdr_uint32_t, &opcode);
-	if (proc)
-		*len += xdr_sizeof(proc, data);
-	buf = (char *)malloc(*len);
-	if (!buf) {
-		syslog(LOG_ERR, "smb_dr_encode_common: resource shortage");
-		*len = 0;
-		return (NULL);
-	}
-	xdrmem_create(&xdrs, buf, *len, XDR_ENCODE);
-	if (!xdr_uint32_t(&xdrs, &opcode)) {
-		syslog(LOG_DEBUG, "smb_dr_encode_common: encode error 1");
-		free(buf);
-		*len = 0;
-		xdr_destroy(&xdrs);
-		return (NULL);
-	}
-
-	if (proc && !proc(&xdrs, data)) {
-		syslog(LOG_DEBUG, "smb_dr_encode_common: encode error 2");
-		free(buf);
-		buf = NULL;
-		*len = 0;
-	}
-
-	xdr_destroy(&xdrs);
-	return (buf);
-}
-
-/*
- * Get the opcode of the door argument buffer.
- */
-int
-smb_dr_get_opcode(char *argp, size_t arg_size)
-{
-	int opcode;
-
-	if (smb_dr_decode_common(argp, arg_size, xdr_uint32_t, &opcode) != 0)
-		opcode = -1;
-	return (opcode);
-}
-
-/*
- * Set the opcode of the door argument buffer.
- */
-char *
-smb_dr_set_opcode(uint32_t opcode, size_t *len)
-{
-	char *buf;
-
-	buf = smb_dr_encode_common(opcode, NULL, NULL, len);
-	return (buf);
-}
-
-/*
- * Get the status of the door result buffer.
- */
-int
-smb_dr_get_res_stat(char *rbufp, size_t rbuf_size)
-{
-	int status;
-
-	if (smb_dr_decode_common(rbufp, rbuf_size, xdr_uint32_t, &status) != 0)
-		status = -1;
-
-	return (status);
-}
-
-/*
- * Set the status of the door result buffer.
- */
-char *
-smb_dr_set_res_stat(uint32_t stat, size_t *len)
-{
-	char *buf;
-
-	buf = smb_dr_encode_common(stat, NULL, NULL, len);
-	return (buf);
-}
-
-char *
-smb_dr_encode_res_token(smb_token_t *token, size_t *len)
-{
-	smb_dr_bytes_t res;
-	char *buf = NULL;
-
-	res.bytes_val = smb_token_mkselfrel(token, &res.bytes_len);
-	if (!res.bytes_val) {
-		syslog(LOG_ERR, "smb_dr_encode_res_token: mkselfrel error");
-		*len = 0;
-		return (NULL);
-	}
-
-	if ((buf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &res,
-	    xdr_smb_dr_bytes_t, len)) == NULL) {
-		syslog(LOG_ERR, "smb_dr_encode_res_token: failed");
-		*len = 0;
-		free(res.bytes_val);
-		return (NULL);
-
-	}
-	free(res.bytes_val);
-	return (buf);
-}
-
-/*
  * smb_kshare_mkselfrel
  *
  * encode: structure -> flat buffer (buffer size)
  * Pre-condition: kshare is non-null.
  */
-
 uint8_t *
 smb_kshare_mkselfrel(smb_dr_kshare_t *kshare, uint32_t *len)
 {
@@ -201,14 +108,14 @@ smb_kshare_mkselfrel(smb_dr_kshare_t *kshare, uint32_t *len)
 	if (!kshare)
 		return (NULL);
 
-	*len = xdr_sizeof(xdr_smb_dr_kshare_t, kshare);
+	*len = xdr_sizeof(smb_dr_kshare_xdr, kshare);
 	buf = (uint8_t *)malloc(*len);
 	if (!buf)
 		return (NULL);
 
 	xdrmem_create(&xdrs, (const caddr_t)buf, *len, XDR_ENCODE);
 
-	if (!xdr_smb_dr_kshare_t(&xdrs, kshare)) {
+	if (!smb_dr_kshare_xdr(&xdrs, kshare)) {
 		*len = 0;
 		free(buf);
 		buf = NULL;
@@ -219,52 +126,58 @@ smb_kshare_mkselfrel(smb_dr_kshare_t *kshare, uint32_t *len)
 }
 
 char *
-smb_dr_encode_string(uint32_t opcode, char *str, size_t *len)
+smb_string_encode(char *s, size_t *rsize)
 {
-	char *buf;
-	smb_dr_string_t res;
+	smb_string_t	obj;
+	XDR		xdrs;
+	char		*buf = NULL;
+	size_t		len;
 
-	res.buf = str;
+	if ((obj.buf = s) == NULL) {
+		syslog(LOG_DEBUG, "smb_string_encode: invalid param");
+		goto smb_string_encode_failed;
+	}
 
-	if ((buf = smb_dr_encode_common(opcode, &res,
-	    xdr_smb_dr_string_t, len)) == NULL)
-		syslog(LOG_ERR, "smb_dr_encode_string: failed");
+	len = xdr_sizeof(smb_string_xdr, &obj);
+	if ((buf = calloc(len, 1)) == NULL) {
+		syslog(LOG_DEBUG, "smb_string_encode: %m");
+		goto smb_string_encode_failed;
+	}
+
+	xdrmem_create(&xdrs, buf, len, XDR_ENCODE);
+
+	if (!smb_string_xdr(&xdrs, &obj)) {
+		syslog(LOG_DEBUG, "smb_string_encode: encode failed");
+		xdr_destroy(&xdrs);
+		free(buf);
+		goto smb_string_encode_failed;
+	}
+
+	xdr_destroy(&xdrs);
+	if (rsize)
+		*rsize = len;
 	return (buf);
+
+smb_string_encode_failed:
+	if (rsize)
+		*rsize = 0;
+	return (NULL);
 }
 
-char *
-smb_dr_decode_string(char *buf, size_t len)
+int
+smb_string_decode(smb_string_t *obj, char *buf, size_t buflen)
 {
-	smb_dr_string_t res;
-	char *str = NULL;
+	XDR xdrs;
+	int rc = 0;
 
-	bzero(&res, sizeof (smb_dr_string_t));
-	if (smb_dr_decode_common(buf, len, xdr_smb_dr_string_t,
-	    &res) == 0) {
-		str = res.buf;
-	} else {
-		syslog(LOG_ERR, "smb_dr_decode_string: failed");
-	}
-	return (str);
-}
+	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_DECODE);
 
-netr_client_t *
-smb_dr_decode_arg_get_token(char *buf, size_t len)
-{
-	smb_dr_bytes_t arg;
-	netr_client_t *clnt_info;
+	bzero(obj, sizeof (smb_string_t));
+	if (!smb_string_xdr(&xdrs, obj))
+		rc = -1;
 
-	bzero(&arg, sizeof (smb_dr_bytes_t));
-	if (smb_dr_decode_common(buf, len, xdr_smb_dr_bytes_t, &arg)
-	    != 0) {
-		syslog(LOG_ERR, "smb_dr_decode_arg_get_token: failed");
-		xdr_free(xdr_smb_dr_bytes_t, (char *)&arg);
-		return (NULL);
-	}
-	clnt_info = netr_client_mkabsolute(arg.bytes_val,
-	    arg.bytes_len);
-	xdr_free(xdr_smb_dr_bytes_t, (char *)&arg);
-	return (clnt_info);
+	xdr_destroy(&xdrs);
+	return (rc);
 }
 
 /*

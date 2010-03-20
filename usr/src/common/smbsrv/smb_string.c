@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #endif
 #include <sys/u8_textprep.h>
 #include <smbsrv/alloc.h>
+#include <sys/errno.h>
 #include <smbsrv/string.h>
 #include <smbsrv/cp_usascii.h>
 #include <smbsrv/cp_unicode.h>
@@ -409,4 +410,92 @@ smb_unicode_init(void)
 	};
 
 	return (unicode);
+}
+
+/*
+ * Parse a UNC path (\\server\share\path) into its components.
+ * Although a standard UNC path starts with two '\', in DFS
+ * all UNC paths start with one '\'. So, this function only
+ * checks for one.
+ *
+ * A valid UNC must at least contain two components i.e. server
+ * and share. The path is parsed to:
+ *
+ * unc_server	server or domain name with no leading/trailing '\'
+ * unc_share	share name with no leading/trailing '\'
+ * unc_path	relative path to the share with no leading/trailing '\'
+ * 		it is valid for unc_path to be NULL.
+ *
+ * Upon successful return of this function, smb_unc_free()
+ * MUST be called when returned 'unc' is no longer needed.
+ *
+ * Returns 0 on success, otherwise returns an errno code.
+ */
+int
+smb_unc_init(const char *path, smb_unc_t *unc)
+{
+	char *p;
+
+	if (path == NULL || unc == NULL || (*path != '\\' && *path != '/'))
+		return (EINVAL);
+
+	bzero(unc, sizeof (smb_unc_t));
+
+#ifdef _KERNEL
+	unc->unc_buf = smb_mem_strdup(path);
+#else
+	if ((unc->unc_buf = strdup(path)) == NULL)
+		return (ENOMEM);
+#endif
+
+	(void) strsubst(unc->unc_buf, '\\', '/');
+	(void) strcanon(unc->unc_buf, "/");
+
+	unc->unc_server = unc->unc_buf + 1;
+	if (*unc->unc_server == '\0') {
+		smb_unc_free(unc);
+		return (EINVAL);
+	}
+
+	if ((p = strchr(unc->unc_server, '/')) == NULL) {
+		smb_unc_free(unc);
+		return (EINVAL);
+	}
+
+	*p++ = '\0';
+	unc->unc_share = p;
+
+	if (*unc->unc_share == '\0') {
+		smb_unc_free(unc);
+		return (EINVAL);
+	}
+
+	unc->unc_path = strchr(unc->unc_share, '/');
+	if ((p = unc->unc_path) == NULL)
+		return (0);
+
+	unc->unc_path++;
+	*p = '\0';
+
+	/* remove the last '/' if any */
+	if ((p = strchr(unc->unc_path, '\0')) != NULL) {
+		if (*(--p) == '/')
+			*p = '\0';
+	}
+
+	return (0);
+}
+
+void
+smb_unc_free(smb_unc_t *unc)
+{
+	if (unc == NULL)
+		return;
+
+#ifdef _KERNEL
+	smb_mem_free(unc->unc_buf);
+#else
+	free(unc->unc_buf);
+#endif
+	unc->unc_buf = NULL;
 }

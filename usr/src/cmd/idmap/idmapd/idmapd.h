@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,6 @@
 extern "C" {
 #endif
 
-#define	SENTINEL_PID	UINT32_MAX
 #define	CHECK_NULL(s)	(s != NULL ? s : "null")
 
 extern mutex_t _svcstate_lock;	/* lock for _rpcsvcstate, _rpcsvccount */
@@ -300,7 +299,7 @@ extern idmap_retcode	lookup_name2sid(sqlite *, const char *, const char *,
 extern idmap_retcode	lookup_wksids_name2sid(const char *, const char *,
 				char **, char **, char **, idmap_rid_t *,
 				int *);
-
+extern idmap_retcode	idmap_cache_flush(idmap_flush_op);
 
 extern void 	idmap_log_stderr(int);
 extern void	idmap_log_syslog(boolean_t);

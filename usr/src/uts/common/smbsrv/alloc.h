@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,16 +66,14 @@ extern "C" {
 
 #else /* _KERNEL */
 
-void *smb_malloc(uint32_t);
-char *smb_strdup(const char *);
-void *smb_realloc(void *, uint32_t);
-void smb_mfree(void *);
+void *smb_mem_alloc(size_t);
+void *smb_mem_zalloc(size_t);
+void smb_mem_free(void *);
+char *smb_mem_strdup(const char *);
 
-#define	MEM_MALLOC(AREA, SIZE) smb_malloc(SIZE)
-#define	MEM_ZALLOC(AREA, SIZE) smb_malloc(SIZE)
-#define	MEM_STRDUP(AREA, PTR) smb_strdup(PTR)
-#define	MEM_REALLOC(AREA, PTR, SIZE) smb_realloc((PTR), (SIZE))
-#define	MEM_FREE(AREA, PTR) smb_mfree(PTR)
+#define	MEM_MALLOC(AREA, SIZE)	smb_mem_alloc(SIZE)
+#define	MEM_ZALLOC(AREA, SIZE)	smb_mem_zalloc(SIZE)
+#define	MEM_FREE(AREA, PTR)	smb_mem_free(PTR)
 
 #endif /* _KERNEL */
 

@@ -256,6 +256,21 @@ typedef enum _FILE_INFORMATION_CLASS {
 } FILE_INFORMATION_CLASS;
 
 /*
+ * Define the file system information class values.
+ */
+typedef enum _FILE_FS_INFORMATION_CLASS {
+	FileFsVolumeInformation		= 1,
+	FileFsLabelInformation,		/* 2 */
+	FileFsSizeInformation,		/* 3 */
+	FileFsDeviceInformation,	/* 4 */
+	FileFsAttributeInformation,	/* 5 */
+	FileFsControlInformation,	/* 6 */
+	FileFsFullSizeInformation,	/* 7 */
+	FileFsObjectIdInformation,	/* 8 */
+	FileFsDriverPathInformation	/* 9 */
+} FILE_FS_INFORMATION_CLASS;
+
+/*
  * Discretionary Access Control List (DACL)
  *
  * A Discretionary Access Control List (DACL), often abbreviated to

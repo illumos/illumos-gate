@@ -72,6 +72,8 @@ static char *b64_data =
 
 static smb_cfg_param_t smb_cfg_table[] =
 {
+	{SMB_CI_VERSION, "sv_version", SCF_TYPE_ASTRING, 0},
+
 	/* Oplock configuration, Kernel Only */
 	{SMB_CI_OPLOCK_ENABLE, "oplock_enable", SCF_TYPE_BOOLEAN, 0},
 
@@ -814,19 +816,6 @@ smb_config_set_secmode(int secmode)
 	return (smb_config_setstr(SMB_CI_SECURITY, p));
 }
 
-static smb_cfg_param_t *
-smb_config_getent(smb_cfg_id_t id)
-{
-	int i;
-
-	for (i = 0; i < SMB_CI_MAX; i++)
-		if (smb_cfg_table[i].sc_id == id)
-			return (&smb_cfg_table[id]);
-
-	assert(0);
-	return (NULL);
-}
-
 void
 smb_config_getdomaininfo(char *domain, char *fqdn, char *sid, char *forest,
     char *guid)
@@ -866,4 +855,66 @@ smb_config_setdomaininfo(char *domain, char *fqdn, char *sid, char *forest,
 		(void) smb_config_setstr(SMB_CI_DOMAIN_FOREST, forest);
 	if (guid)
 		(void) smb_config_setstr(SMB_CI_DOMAIN_GUID, guid);
+}
+
+/*
+ * The version stored in SMF in string format as N.N where
+ * N is a number defined by Microsoft. The first number represents
+ * the major version and the second number is the minor version.
+ * Current defined values can be found here in 'ver_table'.
+ *
+ * This function reads the SMF string value and converts it to
+ * two numbers returned in the given 'version' structure.
+ * Current default version number is 5.0 which is for Windows 2000.
+ */
+void
+smb_config_get_version(smb_version_t *version)
+{
+	smb_version_t tmpver;
+	char verstr[SMB_VERSTR_LEN];
+	char *p;
+	int rc, i;
+	static smb_version_t ver_table [] = {
+		{ SMB_MAJOR_NT,		SMB_MINOR_NT	},
+		{ SMB_MAJOR_2000,	SMB_MINOR_2000	},
+		{ SMB_MAJOR_XP,		SMB_MINOR_XP	},
+		{ SMB_MAJOR_2003,	SMB_MINOR_2003	},
+		{ SMB_MAJOR_VISTA,	SMB_MINOR_VISTA	},
+		{ SMB_MAJOR_2008,	SMB_MINOR_2008	},
+		{ SMB_MAJOR_2008R2,	SMB_MINOR_2008R2}
+	};
+
+	*version = ver_table[1];
+
+	rc = smb_config_getstr(SMB_CI_VERSION, verstr, sizeof (verstr));
+	if (rc != SMBD_SMF_OK)
+		return;
+
+	if ((p = strchr(verstr, '.')) == NULL)
+		return;
+
+	*p = '\0';
+	tmpver.sv_major = (uint8_t)atoi(verstr);
+	tmpver.sv_minor = (uint8_t)atoi(p + 1);
+
+	for (i = 0; i < sizeof (ver_table)/sizeof (ver_table[0]); ++i) {
+		if ((tmpver.sv_major == ver_table[i].sv_major) &&
+		    (tmpver.sv_minor == ver_table[i].sv_minor)) {
+			*version = ver_table[i];
+			break;
+		}
+	}
+}
+
+static smb_cfg_param_t *
+smb_config_getent(smb_cfg_id_t id)
+{
+	int i;
+
+	for (i = 0; i < SMB_CI_MAX; i++)
+		if (smb_cfg_table[i].sc_id == id)
+			return (&smb_cfg_table[id]);
+
+	assert(0);
+	return (NULL);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@ smb_com_echo(struct smb_request *sr)
 		return (SDRC_ERROR);
 
 	nbytes = sr->smb_bcc;
-	data = smb_srm_alloc(sr, nbytes);
+	data = smb_srm_zalloc(sr, nbytes);
 
 	if (smb_mbc_decodef(&sr->smb_data, "#c", nbytes, data))
 		return (SDRC_ERROR);

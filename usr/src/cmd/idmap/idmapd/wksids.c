@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,116 +81,125 @@
  */
 static wksids_table_t wksids[] = {
 	/* S-1-0	Null Authority */
-	{"S-1-0", 0, "", "Nobody", 1, SENTINEL_PID, -1, 1},
+	{"S-1-0", 0, "", "Nobody", 1, IDMAP_SENTINEL_PID, -1, 1},
 
 	/* S-1-1	World Authority */
-	{"S-1-1", 0, "", "Everyone", 0, SENTINEL_PID, -1, -1},
+	{"S-1-1", 0, "", "Everyone", 0, IDMAP_SENTINEL_PID, -1, -1},
 
 	/* S-1-2	Local Authority */
-	{"S-1-2", 0, "", "Local", 0, SENTINEL_PID, -1, -1},
-	{"S-1-2", 1, "", "Console Logon", 0, SENTINEL_PID, -1, -1},
+	{"S-1-2", 0, "", "Local", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-2", 1, "", "Console Logon", 0, IDMAP_SENTINEL_PID, -1, -1},
 
 	/* S-1-3	Creator Authority */
 	{"S-1-3", 0, "", "Creator Owner", 1, IDMAP_WK_CREATOR_OWNER_UID, 1, 0},
 	{"S-1-3", 1, "", "Creator Group", 0, IDMAP_WK_CREATOR_GROUP_GID, 0, 0},
-	{"S-1-3", 2, "", "Creator Owner Server", 1, SENTINEL_PID, -1, -1},
-	{"S-1-3", 3, "", "Creator Group Server", 0, SENTINEL_PID, -1, 1},
-	{"S-1-3", 4, "", "Owner Rights", 0, SENTINEL_PID, -1, -1},
+	{"S-1-3", 2, "", "Creator Owner Server", 1, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-3", 3, "", "Creator Group Server", 0, IDMAP_SENTINEL_PID, -1, 1},
+	{"S-1-3", 4, "", "Owner Rights", 0, IDMAP_SENTINEL_PID, -1, -1},
 
 	/* S-1-4	Non-unique Authority */
 
 	/* S-1-5	NT Authority */
-	{"S-1-5", 1, "", "Dialup", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5", 2, "", "Network", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5", 3, "", "Batch", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5", 4, "", "Interactive", 0, SENTINEL_PID, -1, -1},
+	{"S-1-5", 1, "", "Dialup", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5", 2, "", "Network", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5", 3, "", "Batch", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5", 4, "", "Interactive", 0, IDMAP_SENTINEL_PID, -1, -1},
 	/* S-1-5-5-X-Y	Logon Session */
-	{"S-1-5", 6, "", "Service", 0, SENTINEL_PID, -1, -1},
+	{"S-1-5", 6, "", "Service", 0, IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5", 7, "", "Anonymous Logon", 0, GID_NOBODY, 0, 0},
 	{"S-1-5", 7, "", "Anonymous Logon", 0, UID_NOBODY, 1, 0},
-	{"S-1-5", 8, "", "Proxy", 0, SENTINEL_PID, -1, -1},
+	{"S-1-5", 8, "", "Proxy", 0, IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5", 9, "", "Enterprise Domain Controllers", 0,
-	    SENTINEL_PID, -1, -1},
-	{"S-1-5", 10, "", "Self", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5", 11, "", "Authenticated Users", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5", 12, "", "Restricted", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5", 13, "", "Terminal Server Users", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5", 14, "", "Remote Interactive Logon", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5", 15, "", "This Organization", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5", 17, "", "IUSR", 0, SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5", 10, "", "Self", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5", 11, "", "Authenticated Users", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5", 12, "", "Restricted", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5", 13, "", "Terminal Server Users", 0,
+	    IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5", 14, "", "Remote Interactive Logon", 0,
+	    IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5", 15, "", "This Organization", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5", 17, "", "IUSR", 0, IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5", 18, "", "Local System", 0, IDMAP_WK_LOCAL_SYSTEM_GID, 0, 0},
-	{"S-1-5", 19, "", "Local Service", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5", 20, "", "Network Service", 0, SENTINEL_PID, -1, -1},
+	{"S-1-5", 19, "", "Local Service", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5", 20, "", "Network Service", 0, IDMAP_SENTINEL_PID, -1, -1},
 
 	/* S-1-5-21-<domain>	Machine-local definitions */
 	{NULL, 498, NULL, "Enterprise Read-only Domain Controllers", 0,
-	    SENTINEL_PID, -1, -1},
-	{NULL, 500, NULL, "Administrator", 1, SENTINEL_PID, 1, -1},
-	{NULL, 501, NULL, "Guest", 1, SENTINEL_PID, 1, -1},
-	{NULL, 502, NULL, "KRBTGT", 1, SENTINEL_PID, 1, -1},
-	{NULL, 512, NULL, "Domain Admins", 0, SENTINEL_PID, -1, -1},
-	{NULL, 513, NULL, "Domain Users", 0, SENTINEL_PID, -1, -1},
-	{NULL, 514, NULL, "Domain Guests", 0, SENTINEL_PID, -1, -1},
-	{NULL, 515, NULL, "Domain Computers", 0, SENTINEL_PID, -1, -1},
-	{NULL, 516, NULL, "Domain Controllers", 0, SENTINEL_PID, -1, -1},
-	{NULL, 517, NULL, "Cert Publishers", 0, SENTINEL_PID, -1, -1},
-	{NULL, 518, NULL, "Schema Admins", 0, SENTINEL_PID, -1, -1},
-	{NULL, 519, NULL, "Enterprise Admins", 0, SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
+	{NULL, 500, NULL, "Administrator", 1, IDMAP_SENTINEL_PID, 1, -1},
+	{NULL, 501, NULL, "Guest", 1, IDMAP_SENTINEL_PID, 1, -1},
+	{NULL, 502, NULL, "KRBTGT", 1, IDMAP_SENTINEL_PID, 1, -1},
+	{NULL, 512, NULL, "Domain Admins", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{NULL, 513, NULL, "Domain Users", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{NULL, 514, NULL, "Domain Guests", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{NULL, 515, NULL, "Domain Computers", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{NULL, 516, NULL, "Domain Controllers", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{NULL, 517, NULL, "Cert Publishers", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{NULL, 518, NULL, "Schema Admins", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{NULL, 519, NULL, "Enterprise Admins", 0, IDMAP_SENTINEL_PID, -1, -1},
 	{NULL, 520, NULL, "Global Policy Creator Owners", 0,
-	    SENTINEL_PID, -1, -1},
-	{NULL, 533, NULL, "RAS and IAS Servers", 0, SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
+	{NULL, 533, NULL, "RAS and IAS Servers", 0, IDMAP_SENTINEL_PID, -1, -1},
 
 	/* S-1-5-32	BUILTIN */
-	{"S-1-5-32", 544, "BUILTIN", "Administrators", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5-32", 545, "BUILTIN", "Users", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5-32", 546, "BUILTIN", "Guests", 0, SENTINEL_PID, -1, -1},
-	{"S-1-5-32", 547, "BUILTIN", "Power Users", 0, SENTINEL_PID, -1, -1},
+	{"S-1-5-32", 544, "BUILTIN", "Administrators", 0,
+	    IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5-32", 545, "BUILTIN", "Users", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5-32", 546, "BUILTIN", "Guests", 0, IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5-32", 547, "BUILTIN", "Power Users", 0,
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 548, "BUILTIN", "Account Operators", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 549, "BUILTIN", "Server Operators", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 550, "BUILTIN", "Print Operators", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 551, "BUILTIN", "Backup Operators", 0,
-	    SENTINEL_PID, -1, -1},
-	{"S-1-5-32", 552, "BUILTIN", "Replicator", 0, SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5-32", 552, "BUILTIN", "Replicator", 0,
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 554, "BUILTIN", "Pre-Windows 2000 Compatible Access", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 555, "BUILTIN", "Remote Desktop Users", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 556, "BUILTIN", "Network Configuration Operators", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 557, "BUILTIN", "Incoming Forest Trust Builders", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 558, "BUILTIN", "Performance Monitor Users", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 559, "BUILTIN", "Performance Log Users", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 560, "BUILTIN", "Windows Authorization Access Group", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 561, "BUILTIN", "Terminal Server License Servers", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 562, "BUILTIN", "Distributed COM Users", 0,
-	    SENTINEL_PID, -1, -1},
-	{"S-1-5-32", 568, "BUILTIN", "IIS_IUSRS", 0, SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5-32", 568, "BUILTIN", "IIS_IUSRS", 0,
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 569, "BUILTIN", "Cryptographic Operators", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 573, "BUILTIN", "Event Log Readers", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-32", 574, "BUILTIN", "Certificate Service DCOM Access", 0,
-	    SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
 
-	{"S-1-5", 33, "", "Write Restricted", 0, SENTINEL_PID, -1, -1},
+	{"S-1-5", 33, "", "Write Restricted", 0, IDMAP_SENTINEL_PID, -1, -1},
 
 	/* S-1-5-64	NT Authority */
-	{"S-1-5-64", 10, "", "NTLM Authentication", 0, SENTINEL_PID, -1, -1},
+	{"S-1-5-64", 10, "", "NTLM Authentication", 0,
+	    IDMAP_SENTINEL_PID, -1, -1},
 	{"S-1-5-64", 14, "", "SChannel Authentication", 0,
-	    SENTINEL_PID, -1, -1},
-	{"S-1-5-64", 21, "", "Digest Authentication", 0, SENTINEL_PID, -1, -1},
+	    IDMAP_SENTINEL_PID, -1, -1},
+	{"S-1-5-64", 21, "", "Digest Authentication", 0,
+	    IDMAP_SENTINEL_PID, -1, -1},
 
 	/* S-1-5-80-a-b-c-d NT Service */
 
-	{"S-1-5", 1000, "", "Other Organization", 0, SENTINEL_PID, -1, -1},
+	{"S-1-5", 1000, "", "Other Organization", 0,
+	    IDMAP_SENTINEL_PID, -1, -1},
 
 	/* S-1-7 Internet$ */
 
@@ -341,7 +350,7 @@ find_wksid_by_pid(uid_t pid, int is_user)
 {
 	int i;
 
-	if (pid == SENTINEL_PID)
+	if (pid == IDMAP_SENTINEL_PID)
 		return (NULL);
 
 	for (i = 0; i < NELEM(wksids); i++) {

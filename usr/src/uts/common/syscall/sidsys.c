@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SID system call.
@@ -124,6 +122,34 @@ idmap_unreg(int did)
 	return (0);
 }
 
+static uint64_t
+idmap_flush_kcache(void)
+{
+	struct door_info di;
+	door_handle_t dh;
+	int err;
+	zone_t *zone = crgetzone(CRED());
+
+	dh = idmap_get_door(zone);
+
+	if (dh == NULL)
+		return (set_errno(EPERM));
+
+	if ((err = door_ki_info(dh, &di)) != 0) {
+		door_ki_rele(dh);
+		return (set_errno(err));
+	}
+
+	door_ki_rele(dh);
+
+	if (curproc->p_pid != di.di_target)
+		return (set_errno(EPERM));
+
+	idmap_purge_cache(zone);
+
+	return (0);
+}
+
 uint64_t
 sidsys(int op, int flag, int nuids, int ngids)
 {
@@ -134,6 +160,8 @@ sidsys(int op, int flag, int nuids, int ngids)
 		return (idmap_reg(flag));
 	case SIDSYS_IDMAP_UNREG:
 		return (idmap_unreg(flag));
+	case SIDSYS_IDMAP_FLUSH_KCACHE:
+		return (idmap_flush_kcache());
 	default:
 		return (set_errno(EINVAL));
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -273,7 +273,7 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 {
 	int		count;
 	uint16_t	sattr, odid;
-	char		*path;
+	smb_pathname_t	*pn;
 	smb_odir_t	*od;
 	smb_find_args_t	args;
 	boolean_t	eos;
@@ -287,12 +287,19 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 		return (SDRC_ERROR);
 	}
 
+	pn = &sr->arg.dirop.fqi.fq_path;
+
 	if (smb_mbc_decodef(&xa->req_param_mb, "%wwww4.u", sr, &sattr,
-	    &args.fa_maxcount, &args.fa_fflag, &args.fa_infolev, &path) != 0) {
+	    &args.fa_maxcount, &args.fa_fflag, &args.fa_infolev,
+	    &pn->pn_path) != 0) {
 		return (SDRC_ERROR);
 	}
 
-	if (smb_is_stream_name(path)) {
+	smb_pathname_init(sr, pn, pn->pn_path);
+	if (!smb_pathname_validate(sr, pn))
+		return (-1);
+
+	if (smb_is_stream_name(pn->pn_path)) {
 		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 		    ERRDOS, ERROR_INVALID_NAME);
 		return (SDRC_ERROR);
@@ -308,12 +315,14 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	if (args.fa_maxdata == 0)
 		return (SDRC_ERROR);
 
-	if (sr->smb_flg2 & SMB_FLAGS2_UNICODE)
-		smb_convert_wildcards(path);
-
-	odid = smb_odir_open(sr, path, sattr, odir_flags);
-	if (odid == 0)
+	odid = smb_odir_open(sr, pn->pn_path, sattr, odir_flags);
+	if (odid == 0) {
+		if (sr->smb_error.status == NT_STATUS_OBJECT_PATH_NOT_FOUND) {
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
+		}
 		return (SDRC_ERROR);
+	}
 
 	od = smb_tree_lookup_odir(sr->tid_tree, odid);
 	if (od == NULL)

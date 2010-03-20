@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -453,6 +453,10 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
 	if (*ret_snode == NULL)
 		rc = ENOMEM;
 
+	/* notify change to the unnamed stream */
+	if (rc == 0)
+		smb_node_notify_change(dnode);
+
 	return (rc);
 }
 
@@ -520,6 +524,10 @@ smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
 		}
 
 	}
+
+	if (rc == 0)
+		smb_node_notify_parents(dnode);
+
 	return (rc);
 }
 
@@ -648,6 +656,9 @@ smb_fsop_mkdir(
 		}
 	}
 
+	if (rc == 0)
+		smb_node_notify_parents(dnode);
+
 	return (rc);
 }
 
@@ -697,8 +708,13 @@ smb_fsop_remove(
 	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 	if (dnode->flags & NODE_XATTR_DIR) {
-		rc = smb_vop_stream_remove(dnode->n_dnode->vp,
-		    name, flags, cr);
+		fnode = dnode->n_dnode;
+		rc = smb_vop_stream_remove(fnode->vp, name, flags, cr);
+
+		/* notify change to the unnamed stream */
+		if ((rc == 0) && fnode->n_dnode)
+			smb_node_notify_change(fnode->n_dnode);
+
 	} else if (smb_is_stream_name(name)) {
 		smb_stream_parse_name(name, fname, sname);
 
@@ -725,6 +741,10 @@ smb_fsop_remove(
 		rc = smb_vop_stream_remove(fnode->vp, sname, flags, cr);
 
 		smb_node_release(fnode);
+
+		/* notify change to the unnamed stream */
+		if (rc == 0)
+			smb_node_notify_change(dnode);
 	} else {
 		rc = smb_vop_remove(dnode->vp, name, flags, cr);
 
@@ -755,12 +775,16 @@ smb_fsop_remove(
 				    flags, cr);
 			}
 
+			if (rc == 0)
+				smb_node_notify_parents(dnode);
+
 			kmem_free(longname, MAXNAMELEN);
 		}
 	}
 
 	kmem_free(fname, MAXNAMELEN);
 	kmem_free(sname, MAXNAMELEN);
+
 	return (rc);
 }
 
@@ -893,6 +917,9 @@ smb_fsop_rmdir(
 		kmem_free(longname, MAXNAMELEN);
 	}
 
+	if (rc == 0)
+		smb_node_notify_parents(dnode);
+
 	return (rc);
 }
 
@@ -954,6 +981,12 @@ smb_fsop_getattr(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	}
 
 	rc = smb_vop_getattr(snode->vp, unnamed_vp, attr, flags, cr);
+
+	if ((rc == 0) && smb_node_is_dfslink(snode)) {
+		/* a DFS link should be treated as a directory */
+		attr->sa_dosattr |= FILE_ATTRIBUTE_DIRECTORY;
+	}
+
 	return (rc);
 }
 
@@ -1015,6 +1048,10 @@ smb_fsop_link(smb_request_t *sr, cred_t *cr, smb_node_t *from_fnode,
 	}
 
 	rc = smb_vop_link(to_dnode->vp, from_fnode->vp, to_name, flags, cr);
+
+	if ((rc == 0) && from_fnode->n_dnode)
+		smb_node_notify_parents(from_fnode->n_dnode);
+
 	return (rc);
 }
 
@@ -1039,6 +1076,7 @@ smb_fsop_rename(
     char *to_name)
 {
 	smb_node_t *from_snode;
+	smb_attr_t from_attr;
 	vnode_t *from_vp;
 	int flags = 0, ret_flags;
 	int rc;
@@ -1085,19 +1123,26 @@ smb_fsop_rename(
 	 */
 
 	rc = smb_vop_lookup(from_dnode->vp, from_name, &from_vp, NULL,
-	    flags, &ret_flags, NULL, cr);
+	    flags, &ret_flags, NULL, &from_attr, cr);
 
 	if (rc != 0)
 		return (rc);
 
-	isdir = from_vp->v_type == VDIR;
+	if (from_attr.sa_dosattr & FILE_ATTRIBUTE_REPARSE_POINT) {
+		VN_RELE(from_vp);
+		return (EACCES);
+	}
+
+	isdir = ((from_attr.sa_dosattr & FILE_ATTRIBUTE_DIRECTORY) != 0);
 
 	if ((isdir && SMB_TREE_HAS_ACCESS(sr,
 	    ACE_DELETE_CHILD | ACE_ADD_SUBDIRECTORY) !=
 	    (ACE_DELETE_CHILD | ACE_ADD_SUBDIRECTORY)) ||
 	    (!isdir && SMB_TREE_HAS_ACCESS(sr, ACE_DELETE | ACE_ADD_FILE) !=
-	    (ACE_DELETE | ACE_ADD_FILE)))
+	    (ACE_DELETE | ACE_ADD_FILE))) {
+		VN_RELE(from_vp);
 		return (EACCES);
+	}
 
 	/*
 	 * SMB checks access on open and retains an access granted
@@ -1113,8 +1158,10 @@ smb_fsop_rename(
 	 */
 	if (sr && sr->fid_ofile) {
 		rc = smb_ofile_access(sr->fid_ofile, cr, DELETE);
-		if (rc != NT_STATUS_SUCCESS)
+		if (rc != NT_STATUS_SUCCESS) {
+			VN_RELE(from_vp);
 			return (EACCES);
+		}
 
 		if (smb_tree_has_feature(sr->tid_tree,
 		    SMB_TREE_ACEMASKONACCESS))
@@ -1137,6 +1184,9 @@ smb_fsop_rename(
 		}
 	}
 	VN_RELE(from_vp);
+
+	if (rc == 0)
+		smb_node_notify_parents(from_dnode);
 
 	/* XXX: unlock */
 
@@ -1283,11 +1333,12 @@ smb_fsop_read(smb_request_t *sr, cred_t *cr, smb_node_t *snode, uio_t *uio)
 		return (EACCES);
 
 	rc = smb_ofile_access(sr->fid_ofile, cr, FILE_READ_DATA);
-	if (rc != NT_STATUS_SUCCESS) {
+	if ((rc != NT_STATUS_SUCCESS) &&
+	    (sr->smb_flg2 & SMB_FLAGS2_READ_IF_EXECUTE))
 		rc = smb_ofile_access(sr->fid_ofile, cr, FILE_EXECUTE);
-		if (rc != NT_STATUS_SUCCESS)
-			return (EACCES);
-	}
+
+	if (rc != NT_STATUS_SUCCESS)
+		return (EACCES);
 
 	/*
 	 * Streams permission are checked against the unnamed stream,
@@ -1456,6 +1507,9 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		}
 	}
 
+	if (smb_node_is_reparse(snode) && (faccess & DELETE))
+		return (NT_STATUS_ACCESS_DENIED);
+
 	unnamed_node = SMB_IS_STREAM(snode);
 	if (unnamed_node) {
 		ASSERT(unnamed_node->n_magic == SMB_NODE_MAGIC);
@@ -1497,7 +1551,7 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 
 	/* Links don't have ACL */
 	if ((!smb_tree_has_feature(sr->tid_tree, SMB_TREE_ACEMASKONACCESS)) ||
-	    smb_node_is_link(snode))
+	    smb_node_is_symlink(snode))
 		acl_check = B_FALSE;
 
 	/*
@@ -1692,6 +1746,7 @@ smb_fsop_lookup(
 	vnode_t *vp;
 	int rc;
 	int ret_flags;
+	smb_attr_t attr;
 
 	ASSERT(cr);
 	ASSERT(dnode);
@@ -1716,7 +1771,7 @@ smb_fsop_lookup(
 	od_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 	rc = smb_vop_lookup(dnode->vp, name, &vp, od_name, flags,
-	    &ret_flags, root_node ? root_node->vp : NULL, cr);
+	    &ret_flags, root_node ? root_node->vp : NULL, &attr, cr);
 
 	if (rc != 0) {
 		if (smb_maybe_mangled_name(name) == 0) {
@@ -1745,7 +1800,8 @@ smb_fsop_lookup(
 			flags &= ~SMB_IGNORE_CASE;
 
 		rc = smb_vop_lookup(dnode->vp, longname, &vp, od_name,
-		    flags, &ret_flags, root_node ? root_node->vp : NULL, cr);
+		    flags, &ret_flags, root_node ? root_node->vp : NULL, &attr,
+		    cr);
 
 		kmem_free(longname, MAXNAMELEN);
 
@@ -1755,8 +1811,8 @@ smb_fsop_lookup(
 		}
 	}
 
-	if ((flags & SMB_FOLLOW_LINKS) && (vp->v_type == VLNK)) {
-
+	if ((flags & SMB_FOLLOW_LINKS) && (vp->v_type == VLNK) &&
+	    ((attr.sa_dosattr & FILE_ATTRIBUTE_REPARSE_POINT) == 0)) {
 		rc = smb_pathname(sr, od_name, FOLLOW, root_node, dnode,
 		    &lnk_dnode, &lnk_target_node, cr);
 
@@ -1908,7 +1964,7 @@ smb_fsop_aclread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	}
 
 	error = acl_translate(acl, _ACL_ACE_ENABLED,
-	    (snode->vp->v_type == VDIR), fs_sd->sd_uid, fs_sd->sd_gid);
+	    smb_node_is_dir(snode), fs_sd->sd_uid, fs_sd->sd_gid);
 
 	if (error == 0) {
 		smb_fsacl_split(acl, &fs_sd->sd_zdacl, &fs_sd->sd_zsacl,
@@ -1994,7 +2050,7 @@ smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	else
 		acl = sacl;
 
-	error = acl_translate(acl, target_flavor, (snode->vp->v_type == VDIR),
+	error = acl_translate(acl, target_flavor, smb_node_is_dir(snode),
 	    fs_sd->sd_uid, fs_sd->sd_gid);
 	if (error == 0) {
 		if (smb_tree_has_feature(sr->tid_tree,
@@ -2289,10 +2345,9 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 static int
 smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode, smb_fssd_t *fs_sd)
 {
-	int is_dir;
 	acl_t *dacl = NULL;
 	acl_t *sacl = NULL;
-	ksid_t *owner_sid;
+	int is_dir;
 	int error;
 
 	ASSERT(fs_sd);
@@ -2313,12 +2368,10 @@ smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode, smb_fssd_t *fs_sd)
 	}
 
 	is_dir = (fs_sd->sd_flags & SMB_FSSD_FLAGS_DIR);
-	owner_sid = crgetsid(sr->user_cr, KSID_OWNER);
-	ASSERT(owner_sid);
 	dacl = smb_fsacl_inherit(fs_sd->sd_zdacl, is_dir, SMB_DACL_SECINFO,
-	    owner_sid->ks_id);
+	    sr->user_cr);
 	sacl = smb_fsacl_inherit(fs_sd->sd_zsacl, is_dir, SMB_SACL_SECINFO,
-	    (uid_t)-1);
+	    sr->user_cr);
 
 	if (sacl == NULL)
 		fs_sd->sd_secinfo &= ~SMB_SACL_SECINFO;
@@ -2417,21 +2470,17 @@ smb_fsop_eaccess(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
  * checking is done in the open, delete, and rename paths using a CIFS
  * critical region (node->n_share_lock).
  */
-
 uint32_t
 smb_fsop_shrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid,
     uint32_t desired_access, uint32_t share_access)
 {
 	int rc;
 
-	if (smb_node_is_dir(node))
-		return (NT_STATUS_SUCCESS);
-
 	/* Allow access if the request is just for meta data */
 	if ((desired_access & FILE_DATA_ALL) == 0)
 		return (NT_STATUS_SUCCESS);
 
-	rc = smb_node_open_check(node, cr, desired_access, share_access);
+	rc = smb_node_open_check(node, desired_access, share_access);
 	if (rc)
 		return (NT_STATUS_SHARING_VIOLATION);
 
@@ -2446,9 +2495,6 @@ smb_fsop_shrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid,
 void
 smb_fsop_unshrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid)
 {
-	if (smb_node_is_dir(node))
-		return;
-
 	(void) smb_vop_unshrlock(node->vp, uniq_fid, cr);
 }
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -274,7 +274,7 @@ int nb_session_request(int, char *, char *, char *, char *);
  * smbrdr_session.c
  */
 int smbrdr_negotiate(char *, char *);
-struct sdb_session *smbrdr_session_lock(const char *, const char *, int);
+struct sdb_session *smbrdr_session_lock(const char *, int);
 void smbrdr_session_unlock(struct sdb_session *);
 
 /*
@@ -285,7 +285,7 @@ int smbrdr_logoffx(struct sdb_logon *);
 /* smbrdr_netuse.c */
 void smbrdr_netuse_logoff(unsigned short);
 struct sdb_netuse *smbrdr_netuse_get(int);
-DWORD smbrdr_tree_connect(char *, char *, char *, unsigned short *);
+DWORD smbrdr_tree_connect(char *, char *, char *, char *, unsigned short *);
 int smbrdr_tree_disconnect(unsigned short);
 void smbrdr_netuse_put(struct sdb_netuse *);
 int smbrdr_tdcon(struct sdb_netuse *);

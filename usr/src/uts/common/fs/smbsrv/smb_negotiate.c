@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -218,6 +218,8 @@ static uint32_t	smb_nt_tcp_rcvbuf = 1048560;	/* scale factor of 4 */
 static void smb_get_security_info(smb_request_t *, unsigned short *,
     unsigned char *, unsigned char *, uint32_t *);
 
+int smb_cap_passthru = 1;
+
 /*
  * Function: int smb_com_negotiate(struct smb_request *)
  */
@@ -371,7 +373,15 @@ smb_com_negotiate(smb_request_t *sr)
 		    | CAP_LOCK_AND_READ
 		    | CAP_RPC_REMOTE_APIS
 		    | CAP_LARGE_READX
-		    | CAP_LARGE_WRITEX;
+		    | CAP_LARGE_WRITEX
+		    | CAP_DFS;
+
+		if (smb_cap_passthru)
+			capabilities |= CAP_INFOLEVEL_PASSTHRU;
+		else
+			cmn_err(CE_NOTE, "smbsrv: cap passthru is %s",
+			    (capabilities & CAP_INFOLEVEL_PASSTHRU) ?
+			    "enabled" : "disabled");
 
 		/*
 		 * Turn off Extended Security Negotiation

@@ -37,17 +37,16 @@
 #define	SMB_SHR_ACE_READ_PERMS	(ACE_READ_PERMS | ACE_EXECUTE | ACE_SYNCHRONIZE)
 #define	SMB_SHR_ACE_CONTROL_PERMS	(ACE_MODIFY_PERMS & (~ACE_DELETE_CHILD))
 
-#define	SMB_SHR_ACE_MODIFY_PERMS	(ACE_MODIFY_PERMS &		\
-	(~(ACE_READ_DATA | ACE_READ_ATTRIBUTES | ACE_READ_NAMED_ATTRS |	\
-	ACE_EXECUTE | ACE_DELETE_CHILD)))
-
+/*
+ * This mapping table is provided to map permissions set by chmod
+ * using 'read_set' and 'modify_set' to what Windows share ACL GUI
+ * expects as Read and Control, respectively.
+ */
 static struct {
 	int am_ace_perms;
 	int am_share_perms;
 } smb_ace_map[] = {
-	{ ACE_ALL_PERMS,	ACE_ALL_PERMS },
 	{ ACE_MODIFY_PERMS,	SMB_SHR_ACE_CONTROL_PERMS },
-	{ ACE_MODIFY_PERMS,	SMB_SHR_ACE_MODIFY_PERMS },
 	{ ACE_READ_PERMS,	SMB_SHR_ACE_READ_PERMS }
 };
 
@@ -145,7 +144,7 @@ smb_sd_adjust_read_mask(int mask)
 			return (smb_ace_map[i].am_share_perms);
 	}
 
-	return (-1);
+	return (mask);
 }
 
 /*
@@ -156,7 +155,6 @@ smb_sd_read_acl(char *path, smb_fssd_t *fs_sd)
 {
 	acl_t *z_acl;
 	ace_t *z_ace;
-	int mask;
 
 	fs_sd->sd_gid = fs_sd->sd_uid = 0;
 	if (acl_trivial(path) != 1)
@@ -168,12 +166,9 @@ smb_sd_read_acl(char *path, smb_fssd_t *fs_sd)
 	if ((z_ace = (ace_t *)z_acl->acl_aclp) == NULL)
 		return (NT_STATUS_INVALID_ACL);
 
-	for (int i = 0; i < z_acl->acl_cnt; i++, z_ace++) {
-		mask = smb_sd_adjust_read_mask(z_ace->a_access_mask);
-		if (mask == -1)
-			return (NT_STATUS_INVALID_ACL);
-		z_ace->a_access_mask = mask;
-	}
+	for (int i = 0; i < z_acl->acl_cnt; i++, z_ace++)
+		z_ace->a_access_mask =
+		    smb_sd_adjust_read_mask(z_ace->a_access_mask);
 
 	fs_sd->sd_zdacl = z_acl;
 	fs_sd->sd_zsacl = NULL;
@@ -213,44 +208,24 @@ smb_sd_read(char *path, smb_sd_t *sd, uint32_t secinfo)
 }
 
 /*
- * Adjust the Access Mask so that ZFS ACE mask and Windows ACE write mask match.
- */
-static int
-smb_sd_adjust_write_mask(int mask)
-{
-	int i;
-
-	for (i = 0; i < SMB_ACE_MASK_MAP_SIZE; ++i) {
-		if (smb_ace_map[i].am_share_perms == mask)
-			return (smb_ace_map[i].am_ace_perms);
-	}
-
-	return (-1);
-}
-
-/*
  * Apply ZFS acl to the share path via acl_set() method.
+ * A NULL ACL pointer here represents an error.
+ * Null or empty ACLs are handled in smb_sd_tofs().
  */
 static uint32_t
 smb_sd_write_acl(char *path, smb_fssd_t *fs_sd)
 {
 	acl_t *z_acl;
 	ace_t *z_ace;
-	int mask;
 	uint32_t status = NT_STATUS_SUCCESS;
 
-	if ((z_acl = fs_sd->sd_zdacl) == NULL)
+	z_acl = fs_sd->sd_zdacl;
+	if (z_acl == NULL)
 		return (NT_STATUS_INVALID_ACL);
 
-	if ((z_ace = (ace_t *)z_acl->acl_aclp) == NULL)
+	z_ace = (ace_t *)z_acl->acl_aclp;
+	if (z_ace == NULL)
 		return (NT_STATUS_INVALID_ACL);
-
-	for (int i = 0; i < z_acl->acl_cnt; i++, z_ace++) {
-		mask = smb_sd_adjust_write_mask(z_ace->a_access_mask);
-		if (mask == -1)
-			return (NT_STATUS_INVALID_ACL);
-		z_ace->a_access_mask = mask;
-	}
 
 	fs_sd->sd_gid = fs_sd->sd_uid = 0;
 	if (acl_set(path, z_acl) != 0)

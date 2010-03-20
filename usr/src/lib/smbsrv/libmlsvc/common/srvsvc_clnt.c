@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <strings.h>
-#include <time.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
@@ -48,8 +47,6 @@
  * Information level for NetShareGetInfo.
  */
 DWORD srvsvc_info_level = 1;
-
-static int srvsvc_net_remote_tod(char *, char *, struct timeval *, struct tm *);
 
 /*
  * Bind to the the SRVSVC.
@@ -491,14 +488,13 @@ int
 srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
     struct tm *tm)
 {
-	char timebuf[64];
-	struct mslm_NetRemoteTOD arg;
-	struct mslm_TIME_OF_DAY_INFO *tod;
-	mlsvc_handle_t handle;
-	int rc;
-	int opnum;
-	int len;
-	char user[SMB_USERNAME_MAXLEN];
+	struct mslm_NetRemoteTOD	arg;
+	struct mslm_TIME_OF_DAY_INFO	*tod;
+	mlsvc_handle_t			handle;
+	int				rc;
+	int				opnum;
+	int				len;
+	char				user[SMB_USERNAME_MAXLEN];
 
 	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
@@ -533,8 +529,6 @@ srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
 	if (tv) {
 		tv->tv_sec = tod->tod_elapsedt;
 		tv->tv_usec = tod->tod_msecs;
-		smb_tracef("RemoteTime from %s: %s", server,
-		    ctime(&tv->tv_sec));
 	}
 
 	if (tm) {
@@ -545,10 +539,6 @@ srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
 		tm->tm_mon = tod->tod_month - 1;
 		tm->tm_year = tod->tod_year - 1900;
 		tm->tm_wday = tod->tod_weekday;
-
-		(void) strftime(timebuf, sizeof (timebuf),
-		    "NetRemoteTOD: %D %T", tm);
-		smb_tracef("NetRemoteTOD from %s: %s", server, timebuf);
 	}
 
 	srvsvc_close(&handle);

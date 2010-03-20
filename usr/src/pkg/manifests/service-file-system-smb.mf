@@ -54,9 +54,14 @@ dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/lib/security
 dir path=usr/lib/smbsrv
+dir path=usr/lib/reparse
 dir path=usr/sbin
 dir path=var group=sys
 dir path=var/smb group=sys
+dir path=var/smb/cvol group=sys
+dir path=var/smb/cvol/windows group=sys
+dir path=var/smb/cvol/windows/system32 group=sys
+dir path=var/smb/cvol/windows/system32/vss group=sys
 dir path=var/svc group=sys
 dir path=var/svc/manifest group=sys
 dir path=var/svc/manifest/network group=sys
@@ -72,18 +77,22 @@ file path=kernel/kmdb/$(ARCH64)/smbsrv group=sys mode=0555 \
     opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
 $(i386_ONLY)file path=kernel/kmdb/smbsrv group=sys mode=0555 \
     opensolaris.zone=global reboot-needed=true variant.opensolaris.zone=global
+file path=var/smb/cvol/windows/system32/eventlog.dll mode=0755
 file path=lib/svc/method/svc-smbd mode=0555
 file path=usr/lib/fs/smb/$(ARCH64)/libshare_smb.so.1
 file path=usr/lib/fs/smb/libshare_smb.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/smbsrv.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/smbsrv.so group=sys mode=0555
 file path=usr/lib/security/pam_smb_passwd.so.1
+file path=usr/lib/reparse/libreparse_smb.so.1
 file path=usr/lib/smbsrv/libmlrpc.so.1
 file path=usr/lib/smbsrv/libmlsvc.so.1
 file path=usr/lib/smbsrv/libsmb.so.1
 file path=usr/lib/smbsrv/libsmbns.so.1
 file path=usr/lib/smbsrv/libsmbrdr.so.1
 file path=usr/lib/smbsrv/libsqlite.so.1
+file path=usr/lib/reparse/llib-lreparse_smb
+file path=usr/lib/reparse/llib-lreparse_smb.ln
 file path=usr/lib/smbsrv/llib-lmlrpc
 file path=usr/lib/smbsrv/llib-lmlrpc.ln
 file path=usr/lib/smbsrv/llib-lmlsvc
@@ -118,6 +127,7 @@ legacy pkg=SUNWsmbsu arch=$(ARCH) category=system \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/security/pam_smb_passwd.so target=pam_smb_passwd.so.1
+link path=usr/lib/reparse/libreparse_smb.so target=libreparse_smb.so.1
 link path=usr/lib/smbsrv/libmlrpc.so target=libmlrpc.so.1
 link path=usr/lib/smbsrv/libmlsvc.so target=libmlsvc.so.1
 link path=usr/lib/smbsrv/libsmb.so target=libsmb.so.1

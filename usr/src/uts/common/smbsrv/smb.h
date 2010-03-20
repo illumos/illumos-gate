@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -374,6 +374,8 @@ typedef uint32_t smb_utime_t;
 
 /*
  * Flags2 field of the SMB header.
+ *
+ * SMB_FLAGS2_READ_IF_EXECUTE is also known as SMB_FLAGS2_PAGING_IO
  */
 #define	SMB_FLAGS2_KNOWS_LONG_NAMES		0x0001
 #define	SMB_FLAGS2_KNOWS_EAS			0x0002
@@ -382,7 +384,7 @@ typedef uint32_t smb_utime_t;
 #define	SMB_FLAGS2_REPARSE_PATH			0x0400
 #define	SMB_FLAGS2_EXT_SEC			0x0800
 #define	SMB_FLAGS2_DFS				0x1000
-#define	SMB_FLAGS2_PAGING_IO			0x2000
+#define	SMB_FLAGS2_READ_IF_EXECUTE		0x2000
 #define	SMB_FLAGS2_NT_STATUS			0x4000
 #define	SMB_FLAGS2_UNICODE			0x8000
 
@@ -467,7 +469,7 @@ typedef uint32_t smb_utime_t;
 #define	TRANS2_FIND_FIRST2	0x01	/* Begin search for files */
 #define	TRANS2_FIND_NEXT2	0x02	/* Resume search for files */
 #define	TRANS2_QUERY_FS_INFORMATION 0x03 /* Get file system information */
-#define	_TRANS2_RESV_0x04	0x04	/* Reserved */
+#define	TRANS2_SET_FS_INFORMATION	0x04	/* Set file system info. */
 #define	TRANS2_QUERY_PATH_INFORMATION 0x05 /* Get info, named file or dir */
 #define	TRANS2_SET_PATH_INFORMATION 0x06 /* Set info, named file or dir */
 #define	TRANS2_QUERY_FILE_INFORMATION 0x07 /* Get info, handle */
@@ -674,6 +676,11 @@ typedef uint32_t smb_utime_t;
 
 /*
  * TRANS2_QUERY_FS_INFORMATION
+ *
+ * SMB_QUERY_FS_QUOTA_INFO, SMB_QUERY_FS_CONTROL_INFO are not used in Windows
+ * NT, and are not used in any post NT Windows operating systems. If a server
+ * receives these information levels from a client, it should handle them as
+ * invalid information levels.
  */
 #define	SMB_INFO_ALLOCATION		1
 #define	SMB_INFO_VOLUME			2
@@ -682,10 +689,10 @@ typedef uint32_t smb_utime_t;
 #define	SMB_QUERY_FS_SIZE_INFO		0x103
 #define	SMB_QUERY_FS_DEVICE_INFO	0x104
 #define	SMB_QUERY_FS_ATTRIBUTE_INFO	0x105
-#define	SMB_QUERY_FS_QUOTA_INFO		0x106	/* unused? */
+#define	SMB_QUERY_FS_QUOTA_INFO		0x106
 #define	SMB_QUERY_FS_CONTROL_INFO	0x107
-#define	SMB_MAC_QUERY_FS_INFO		MAC_QUERY_FS_INFO
 
+#define	SMB_MAC_QUERY_FS_INFO		MAC_QUERY_FS_INFO
 
 /*
  * Internal use only.
@@ -750,7 +757,19 @@ typedef uint32_t smb_utime_t;
 #define	SMB_FILE_ALT_NAME_INFORMATION		1021
 #define	SMB_FILE_STREAM_INFORMATION		1022
 #define	SMB_FILE_COMPRESSION_INFORMATION	1028
+#define	SMB_FILE_NETWORK_OPEN_INFORMATION	1034
 #define	SMB_FILE_ATTR_TAG_INFORMATION		1035
+
+/* NT passthrough levels - see ntifs.h FILE_FS_INFORMATION_CLASS */
+#define	SMB_FILE_FS_VOLUME_INFORMATION		1001
+#define	SMB_FILE_FS_LABEL_INFORMATION		1002
+#define	SMB_FILE_FS_SIZE_INFORMATION		1003
+#define	SMB_FILE_FS_DEVICE_INFORMATION		1004
+#define	SMB_FILE_FS_ATTRIBUTE_INFORMATION	1005
+#define	SMB_FILE_FS_CONTROL_INFORMATION		1006
+#define	SMB_FILE_FS_FULLSIZE_INFORMATION	1007
+#define	SMB_FILE_FS_OBJECTID_INFORMATION	1008
+#define	SMB_FILE_FS_DRIVERPATH_INFORMATION	1009
 
 /*
  * The following bits may be set in the SecurityMode field of the
@@ -802,6 +821,8 @@ typedef uint32_t smb_utime_t;
  * CAP_BULK_TRANSFER	 0x0400
  * CAP_COMPRESSED_BULK	 0x0800
  * CAP_DFS		 0x1000	    The server is DFS aware
+ * CAP_INFOLEVEL_PASSTHRU 0x2000    The server supports passthru information
+ *				    level processing capability.
  * CAP_LARGE_READX	 0x4000	    The server supports large
  *				    SMB_COM_READ_ANDX
  * CAP_LARGE_WRITEX	 0x8000	    The server supports large
@@ -822,21 +843,22 @@ typedef uint32_t smb_utime_t;
  */
 #define	CAP_RAW_MODE			0x0001
 #define	CAP_MPX_MODE			0x0002
-#define	CAP_UNICODE				0x0004
+#define	CAP_UNICODE			0x0004
 #define	CAP_LARGE_FILES			0x0008
-#define	CAP_NT_SMBS				0x0010
+#define	CAP_NT_SMBS			0x0010
 #define	CAP_RPC_REMOTE_APIS		0x0020
 #define	CAP_STATUS32			0x0040
-#define	CAP_LEVEL_II_OPLOCKS	0x0080
+#define	CAP_LEVEL_II_OPLOCKS		0x0080
 #define	CAP_LOCK_AND_READ		0x0100
-#define	CAP_NT_FIND				0x0200
+#define	CAP_NT_FIND			0x0200
 #define	CAP_BULK_TRANSFER		0x0400
 #define	CAP_COMPRESSED_BULK		0x0800
-#define	CAP_DFS					0x1000
+#define	CAP_DFS				0x1000
+#define	CAP_INFOLEVEL_PASSTHRU		0x2000
 #define	CAP_LARGE_READX			0x4000
 #define	CAP_LARGE_WRITEX		0x8000
 #define	CAP_RESERVED			0x02000000
-#define	CAP_EXTENDED_SECURITY	0x80000000
+#define	CAP_EXTENDED_SECURITY		0x80000000
 
 
 /*

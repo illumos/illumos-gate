@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,6 @@
 #define	NDR_MULTI_FRAGSZ	(60 * 1024)
 
 static void ndr_clnt_init_hdr(ndr_client_t *, ndr_xa_t *);
-static void ndr_clnt_remove_hdr(ndr_stream_t *);
 static int ndr_clnt_get_frags(ndr_client_t *, ndr_xa_t *);
 static int ndr_clnt_get_frag(ndr_client_t *, ndr_xa_t *, ndr_common_header_t *);
 
@@ -262,50 +261,6 @@ ndr_clnt_init_hdr(ndr_client_t *clnt, ndr_xa_t *mxa)
 }
 
 /*
- * ndr_clnt_remove_hdr
- *
- * Remove an RPC fragment header from the received data stream.
- *
- * Original RPC receive buffer:
- * |-      frag1                   -|    |-frag M(partial)-|
- * +==================+=============+----+=================+
- * | SmbTransact Rsp1 | SmbTransact |    | SmbReadX RspN   |
- * | (with RPC hdr)   | Rsp2        | .. | (with RPC hdr)  |
- * +-----+------------+-------------+    +-----+-----------+
- * | hdr | data       | data        | .. | hdr | data      |
- * +=====+============+=============+----+=====+===========+
- *                                       <------
- * ^                                     ^     ^
- * |                                     |     |
- * base_offset                          hdr   data
- *
- * |-------------------------------------|-----------------|
- *            scan_offset                         len
- *
- * RPC receive buffer (after this call):
- * +==================+=============+----+===========+
- * | SmbTransact Rsp1 | SmbTransact |    | SmbReadX  |
- * | (with RPC hdr)   | Rsp2        | .. | RspN      |
- * +-----+------------+-------------+    +-----------+
- * | hdr | data       | data        | .. | data      |
- * +=====+============+=============+----+===========+
- */
-static void
-ndr_clnt_remove_hdr(ndr_stream_t *nds)
-{
-	char *hdr;
-	char *data;
-	int nbytes;
-
-	hdr = (char *)nds->pdu_base_offset + nds->pdu_scan_offset;
-	data = hdr + NDR_RSP_HDR_SIZE;
-	nbytes = nds->pdu_size - nds->pdu_scan_offset - NDR_RSP_HDR_SIZE;
-
-	bcopy(data, hdr, nbytes);
-	nds->pdu_size -= NDR_RSP_HDR_SIZE;
-}
-
-/*
  * ndr_clnt_get_frags
  *
  * A DCE RPC message that is larger than a single fragment is transmitted
@@ -338,7 +293,7 @@ ndr_clnt_get_frags(ndr_client_t *clnt, ndr_xa_t *mxa)
 			return (-1);
 		}
 
-		ndr_clnt_remove_hdr(nds);
+		ndr_remove_frag_hdr(nds);
 		nds->pdu_scan_offset += frag_size - NDR_RSP_HDR_SIZE;
 	} while (!last_frag);
 

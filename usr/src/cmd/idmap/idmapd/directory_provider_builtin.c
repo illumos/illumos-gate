@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -186,11 +186,13 @@ directory_provider_builtin_populate(
 		if (strcaseeq(a, "uid")) {
 			de = str_list_dav(val, &wksid->winname, 1);
 		} else if (strcaseeq(a, "uidNumber")) {
-			if (wksid->pid != SENTINEL_PID && wksid->is_user) {
+			if (wksid->pid != IDMAP_SENTINEL_PID &&
+			    wksid->is_user) {
 				de = uint_list_dav(val, &wksid->pid, 1);
 			}
 		} else if (strcaseeq(a, "gidNumber")) {
-			if (wksid->pid != SENTINEL_PID && !wksid->is_user) {
+			if (wksid->pid != IDMAP_SENTINEL_PID &&
+			    !wksid->is_user) {
 				de = uint_list_dav(val, &wksid->pid, 1);
 			}
 		} else if (strcaseeq(a, "displayName") || strcaseeq(a, "cn")) {

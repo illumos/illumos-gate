@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,7 @@ static char *smb_nicmon_caller_fmri = NULL;
 int
 smb_nicmon_start(const char *svc_fmri)
 {
-	if (smb_nic_init() != 0)
+	if (smb_nic_init() != SMB_NIC_SUCCESS)
 		return (-1);
 
 	if (pthread_create(&smb_nicmon_thread, NULL, smb_nicmon_daemon, 0) != 0)

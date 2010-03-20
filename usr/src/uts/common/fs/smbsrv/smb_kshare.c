@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@
 #include <sys/door.h>
 #include <smbsrv/lmerr.h>
 #include <smbsrv/smb_share.h>
-#include <smbsrv/smb_common_door.h>
+#include <smbsrv/smb_door.h>
 #include <smbsrv/smbinfo.h>
 
 static int smb_kshare_chk_dsrv_status(int, smb_dr_ctx_t *);

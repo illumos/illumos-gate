@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,9 +131,15 @@ nds_initialize(ndr_stream_t *nds, unsigned pdu_size_hint,
 	assert(heap);
 
 	bzero(nds, sizeof (*nds));
+	nds->ndo = &nds_ops;
+	nds->heap = (struct ndr_heap *)heap;
 
-	if (pdu_size_hint > NDR_PDU_MAX_SIZE)
-		return (0);
+	if (pdu_size_hint > NDR_PDU_MAX_SIZE) {
+		nds->error = NDR_ERR_BOUNDS_CHECK;
+		nds->error_ref = __LINE__;
+		NDS_TATTLE_ERROR(nds, NULL, NULL);
+		return (NDR_DRC_FAULT_RESOURCE_1);
+	}
 
 	size = (pdu_size_hint == 0) ? NDR_PDU_BLOCK_SIZE : pdu_size_hint;
 
@@ -147,9 +153,6 @@ nds_initialize(ndr_stream_t *nds, unsigned pdu_size_hint,
 	nds->pdu_max_size = size;
 	nds->pdu_size = 0;
 	nds->pdu_base_offset = (unsigned long)nds->pdu_base_addr;
-
-	nds->ndo = &nds_ops;
-	nds->heap = (struct ndr_heap *)heap;
 
 	nds->m_op = NDR_MODE_TO_M_OP(composite_op);
 	nds->dir  = NDR_MODE_TO_DIR(composite_op);
@@ -375,13 +378,17 @@ ndo_tattle_error(ndr_stream_t *nds, ndr_ref_t *ref)
 	unsigned char *data;
 	char hexbuf[NDOBUFSZ];
 
-	data = (unsigned char *)nds->pdu_base_offset;
-	if (ref)
-		data += ref->pdu_offset;
-	else
-		data += nds->pdu_scan_offset;
+	if (nds->pdu_base_addr != NULL) {
+		data = (unsigned char *)nds->pdu_base_offset;
+		if (ref)
+			data += ref->pdu_offset;
+		else
+			data += nds->pdu_scan_offset;
 
-	ndo_hexfmt(data, 16, 0, hexbuf, NDOBUFSZ);
+		ndo_hexfmt(data, 16, 0, hexbuf, NDOBUFSZ);
+	} else {
+		bzero(hexbuf, NDOBUFSZ);
+	}
 
 	ndo_printf(nds, ref, "ERROR=%d REF=%d OFFSET=%d SIZE=%d/%d",
 	    nds->error, nds->error_ref, nds->pdu_scan_offset,

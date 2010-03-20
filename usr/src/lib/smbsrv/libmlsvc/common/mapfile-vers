@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -40,18 +40,24 @@
 
 SUNWprivate {
     global:
+	dfs_get_referrals;
+	dfs_info_free;
 	dssetup_clear_domain_info;
 	lsa_lookup_name;
 	lsa_lookup_sid;
 	mlsvc_disconnect;
 	mlsvc_fini;
 	mlsvc_init;
-	mlsvc_join;
+	mlsvc_join;	
 	mlsvc_netlogon;
 	smb_autohome_add;
 	smb_autohome_remove;
 	smb_locate_dc;
 	smb_logon;
+	smb_logon_abort;
+	smb_quota_free;
+	smb_quota_query;
+	smb_quota_set;
 	smb_shr_add;
 	smb_shr_count;
 	smb_shr_exec;

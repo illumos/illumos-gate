@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -216,4 +216,58 @@ smbnative_pdc_value(const char *native_lm)
 	}
 
 	return (PDC_WIN2000);
+}
+
+/*
+ * Returns the native OS string for the given OS version.
+ * If no match is found the string for Windows 2000 is returned.
+ */
+const char *
+smbnative_os_str(smb_version_t *version)
+{
+	int i;
+
+	static smb_native_t osstr_table[] = {
+		{ SMB_MAJOR_NT,		"Windows NT"		},
+		{ SMB_MAJOR_2000,	"Windows 2000"		},
+		{ SMB_MAJOR_XP,		"Windows XP"		},
+		{ SMB_MAJOR_2003,	"Windows Server 2003"	},
+		{ SMB_MAJOR_VISTA,	""			},
+		{ SMB_MAJOR_2008,	""			},
+		{ SMB_MAJOR_2008R2,	""			}
+	};
+
+	for (i = 0; i < sizeof (osstr_table)/sizeof (osstr_table[0]); ++i) {
+		if (version->sv_major == osstr_table[i].sn_value)
+			return (osstr_table[i].sn_name);
+	}
+
+	return (osstr_table[1].sn_name);
+}
+
+/*
+ * Returns the native Lanman string for the given OS version.
+ * If no match is found the string for Windows 2000 is returned.
+ */
+const char *
+smbnative_lm_str(smb_version_t *version)
+{
+	int i;
+
+	static smb_native_t lmstr_table[] = {
+		{ SMB_MAJOR_NT,		"NT LAN Manager 4.0"		},
+		{ SMB_MAJOR_2000,	"Windows 2000 LAN Manager"	},
+		{ SMB_MAJOR_XP,		"Windows 2002 5.1"		},
+		{ SMB_MAJOR_2003,	"Windows Server 2003 5.2"	},
+		{ SMB_MAJOR_VISTA,	""				},
+		{ SMB_MAJOR_2008,	""				},
+		{ SMB_MAJOR_2008R2,	""				}
+	};
+
+	for (i = 0; i < sizeof (lmstr_table)/sizeof (lmstr_table[0]); ++i) {
+		if (version->sv_major == lmstr_table[i].sn_value)
+			return (lmstr_table[i].sn_name);
+	}
+
+	return (lmstr_table[1].sn_name);
 }

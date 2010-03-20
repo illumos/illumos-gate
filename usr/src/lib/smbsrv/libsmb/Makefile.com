@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -27,25 +27,24 @@ LIBRARY= libsmb.a
 VERS= .1
 
 OBJS_SHARED = 			\
-	smb_common_door_decode.o 	\
+	smb_door_legacy.o 	\
 	smb_inet.o		\
 	smb_match.o 		\
 	smb_msgbuf.o		\
 	smb_native.o		\
 	smb_oem.o		\
-	smb_share_door_decode.o	\
 	smb_sid.o		\
 	smb_status_xlat.o	\
 	smb_string.o 		\
 	smb_token.o		\
 	smb_token_xdr.o		\
 	smb_utf8.o		\
-	smb_xdr_utils.o
+	smb_xdr.o
 
 OBJS_COMMON = 			\
 	smb_acl.o		\
-	smb_api_door_calls.o	\
 	smb_auth.o 		\
+	smb_cache.o		\
 	smb_cfg.o		\
 	smb_crypt.o		\
 	smb_ctxbuf.o		\
@@ -63,6 +62,7 @@ OBJS_COMMON = 			\
 	smb_nicmon.o		\
 	smb_pwdutil.o		\
 	smb_privilege.o		\
+	smb_reparse.o		\
 	smb_sam.o		\
 	smb_scfutil.o		\
 	smb_sd.o		\
@@ -78,7 +78,7 @@ INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS +=	-lscf -lmd -luuid -lnsl -lpkcs11 -lsec -lsocket -lresolv
-LDLIBS +=	-lidmap -lavl -lc
+LDLIBS +=	-lidmap -lreparse -lnvpair -lavl -lc
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\

@@ -126,8 +126,8 @@ mlsvc_join(smb_domainex_t *dxi, char *user, char *plain_text)
 			erc = smb_setdomainprops(NULL, dxi->d_dc,
 			    machine_passwd);
 			if (erc != 0) {
-				syslog(LOG_NOTICE, "Failed to update CIFS "
-				    "configuration");
+				syslog(LOG_NOTICE,
+				    "Failed to update configuration");
 				bzero(machine_passwd, sizeof (machine_passwd));
 				return (NT_STATUS_UNSUCCESSFUL);
 			}

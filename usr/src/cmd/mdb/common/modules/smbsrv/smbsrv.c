@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -548,6 +548,7 @@ static const char *smb_server_state[SMB_SERVER_STATE_SENTINEL] =
 	"CREATED",
 	"CONFIGURED",
 	"RUNNING",
+	"STOPPING",
 	"DELETING"
 };
 
@@ -717,6 +718,7 @@ static const char *smb_session_state[SMB_SESSION_STATE_SENTINEL] =
 	"NEGOTIATED",
 	"OPLOCK_BREAKING",
 	"WRITE_RAW_ACTIVE",
+	"READ_RAW_ACTIVE",
 	"TERMINATED"
 };
 
@@ -1131,6 +1133,7 @@ smb_dcmd_tree(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static const char *smb_odir_state[SMB_ODIR_STATE_SENTINEL] =
 {
 	"OPEN",
+	"IN_USE",
 	"CLOSING",
 	"CLOSED"
 };

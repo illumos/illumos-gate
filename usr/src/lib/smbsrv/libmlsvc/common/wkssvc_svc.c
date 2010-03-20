@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,7 @@ wkssvc_s_NetWkstaGetInfo(void *arg, ndr_xa_t *mxa)
 	mslm_NetWkstaGetInfo_rb *rb;
 	char hostname[MAXHOSTNAMELEN];
 	char resource_domain[SMB_PI_MAX_DOMAIN];
+	smb_version_t version;
 	char *name;
 	char *domain;
 	DWORD status;
@@ -95,14 +96,16 @@ wkssvc_s_NetWkstaGetInfo(void *arg, ndr_xa_t *mxa)
 		return (NDR_DRC_OK);
 	}
 
+	smb_config_get_version(&version);
+
 	param->result.level = param->level;
 	param->result.bufptr.nullptr = (void *)rb;
 
 	switch (param->level) {
 	case 100:
 		rb->buf100.wki100_platform_id = SV_PLATFORM_ID_NT;
-		rb->buf100.wki100_ver_major = 4;
-		rb->buf100.wki100_ver_minor = 0;
+		rb->buf100.wki100_ver_major = version.sv_major;
+		rb->buf100.wki100_ver_minor = version.sv_minor;
 		rb->buf100.wki100_computername = (unsigned char *)name;
 		rb->buf100.wki100_langroup = (unsigned char *)domain;
 		status = ERROR_SUCCESS;
@@ -110,8 +113,8 @@ wkssvc_s_NetWkstaGetInfo(void *arg, ndr_xa_t *mxa)
 
 	case 101:
 		rb->buf101.wki101_platform_id = SV_PLATFORM_ID_NT;
-		rb->buf101.wki101_ver_major = 4;
-		rb->buf101.wki101_ver_minor = 0;
+		rb->buf101.wki101_ver_major = version.sv_major;
+		rb->buf101.wki101_ver_minor = version.sv_minor;
 		rb->buf101.wki101_computername = (unsigned char *)name;
 		rb->buf101.wki101_langroup = (unsigned char *)domain;
 		rb->buf101.wki101_lanroot = (unsigned char *)"";
@@ -120,8 +123,8 @@ wkssvc_s_NetWkstaGetInfo(void *arg, ndr_xa_t *mxa)
 
 	case 102:
 		rb->buf102.wki102_platform_id = SV_PLATFORM_ID_NT;
-		rb->buf102.wki102_ver_major = 4;
-		rb->buf102.wki102_ver_minor = 0;
+		rb->buf102.wki102_ver_major = version.sv_major;
+		rb->buf102.wki102_ver_minor = version.sv_minor;
 		rb->buf102.wki102_computername = (unsigned char *)name;
 		rb->buf102.wki102_langroup = (unsigned char *)domain;
 		rb->buf102.wki102_lanroot = (unsigned char *)"";

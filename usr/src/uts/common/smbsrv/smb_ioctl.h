@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,8 @@ extern "C" {
 #define	SMB_IOC_SVCENUM		_IOW(SMB_IOC_BASE, 11, int)
 #define	SMB_IOC_FILE_CLOSE	_IOW(SMB_IOC_BASE, 12, int)
 #define	SMB_IOC_SESSION_CLOSE	_IOW(SMB_IOC_BASE, 13, int)
+#define	SMB_IOC_STOP		_IOW(SMB_IOC_BASE, 14, int)
+#define	SMB_IOC_EVENT		_IOW(SMB_IOC_BASE, 15, int)
 
 typedef struct smb_ioc_header {
 	uint32_t	version;
@@ -81,6 +83,11 @@ typedef	struct smb_ioc_start {
 	int		lmshrd;
 	int		udoor;
 } smb_ioc_start_t;
+
+typedef	struct smb_ioc_event {
+	smb_ioc_header_t hdr;
+	uint32_t	txid;
+} smb_ioc_event_t;
 
 typedef	struct smb_ioc_opennum {
 	smb_ioc_header_t hdr;
@@ -155,6 +162,7 @@ typedef union smb_ioc {
 	smb_ioc_gmt_t		ioc_gmt;
 	smb_ioc_cfg_t		ioc_cfg;
 	smb_ioc_start_t		ioc_start;
+	smb_ioc_event_t		ioc_event;
 	smb_ioc_listen_t	ioc_listen;
 	smb_ioc_opennum_t	ioc_opennum;
 	smb_ioc_svcenum_t	ioc_svcenum;

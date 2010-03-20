@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,10 +28,11 @@
 
 #include <sys/param.h>
 #include <smbsrv/string.h>
+#include <smbsrv/smb_inet.h>
 #include <smbsrv/hash_table.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/lmerr.h>
-#include <smbsrv/smb_common_door.h>
+#include <smbsrv/smb_door.h>
 
 #ifndef _KERNEL
 #include <libshare.h>
@@ -81,6 +82,7 @@ extern "C" {
 #define	SHOPT_RO		"ro"
 #define	SHOPT_RW		"rw"
 #define	SHOPT_NONE		"none"
+#define	SHOPT_DFSROOT		"dfsroot"
 
 #define	SMB_DEFAULT_SHARE_GROUP	"smb"
 #define	SMB_PROTOCOL_NAME	"smb"
@@ -112,10 +114,13 @@ extern "C" {
 /*
  * Share flags:
  *
- * SMB_SHRF_TRANS	Transient share
- * SMB_SHRF_PERM	Permanent share
- * SMB_SHRF_AUTOHOME	Autohome share.
- * SMB_SHRF_LONGNAME	Share name in OEM is longer than 13 chars
+ * There are two types of flags:
+ *
+ *   - flags that represent a share property
+ *   - other flags set at runtime
+ *
+ * Property flags:
+ *
  * SMB_SHRF_CSC_DISABLED	Client-side caching is disabled for this share
  * SMB_SHRF_CSC_MANUAL	Manual client-side caching is allowed
  * SMB_SHRF_CSC_AUTO	Automatic client-side caching (CSC) is allowed
@@ -125,10 +130,18 @@ extern "C" {
  * SMB_SHRF_ACC_RO	"ro" (readonly) property set
  * SMB_SHRF_ACC_RW	"rw" (read/write) property set
  * SMB_SHRF_ACC_ALL	All of the access bits
- * SMB_SHRF_ADMIN	Admin share
  * SMB_SHRF_CATIA	CATIA character translation on/off
  * SMB_SHRF_GUEST_OK	Guest access on/off
  * SMB_SHRF_ABE		Access Based Enumeration on/off
+ * SMB_SHRF_DFSROOT	Share is a standalone DFS root
+ *
+ * Runtime flags:
+ *
+ * SMB_SHRF_TRANS	Transient share
+ * SMB_SHRF_PERM	Permanent share
+ * SMB_SHRF_AUTOHOME	Autohome share.
+ * SMB_SHRF_LONGNAME	Share name in OEM is longer than 13 chars
+ * SMB_SHRF_ADMIN	Admin share
  * SMB_SHRF_MAP		Map command is specified
  * SMB_SHRF_UNMAP	Unmap command is specified
  * SMB_SHRF_DISP_TERM	Disposition is set to terminate
@@ -138,34 +151,40 @@ extern "C" {
  * IPC$ and drive letter shares (e.g. d$, e$, etc) are transient but
  * not autohome.
  */
-#define	SMB_SHRF_TRANS		0x0001
-#define	SMB_SHRF_PERM		0x0002
-#define	SMB_SHRF_AUTOHOME	0x0004
-#define	SMB_SHRF_LONGNAME	0x0008
 
-#define	SMB_SHRF_CSC_MASK	0x00F0
+/*
+ * Property flags
+ */
+#define	SMB_SHRF_DFSROOT	0x0001
+#define	SMB_SHRF_CATIA		0x0002
+#define	SMB_SHRF_GUEST_OK	0x0004
+#define	SMB_SHRF_ABE		0x0008
+
 #define	SMB_SHRF_CSC_DISABLED	0x0010
 #define	SMB_SHRF_CSC_MANUAL	0x0020
 #define	SMB_SHRF_CSC_AUTO	0x0040
 #define	SMB_SHRF_CSC_VDO	0x0080
+#define	SMB_SHRF_CSC_MASK	0x00F0
 
-/* Access Flags */
 #define	SMB_SHRF_ACC_OPEN	0x0000
 #define	SMB_SHRF_ACC_NONE	0x0100
 #define	SMB_SHRF_ACC_RO		0x0200
 #define	SMB_SHRF_ACC_RW		0x0400
 #define	SMB_SHRF_ACC_ALL	0x0F00
 
-#define	SMB_SHRF_ADMIN		0x1000
-#define	SMB_SHRF_CATIA		0x2000
-#define	SMB_SHRF_GUEST_OK	0x4000
-#define	SMB_SHRF_ABE		0x8000
+/*
+ * Runtime flags
+ */
+#define	SMB_SHRF_MAP		0x00010000
+#define	SMB_SHRF_UNMAP		0x00020000
+#define	SMB_SHRF_DISP_TERM	0x00040000
+#define	SMB_SHRF_EXEC_MASK	0x00070000
 
-/* Exec Flags */
-#define	SMB_SHRF_MAP		0x10000
-#define	SMB_SHRF_UNMAP		0x20000
-#define	SMB_SHRF_DISP_TERM	0x40000
-#define	SMB_SHRF_EXEC_MASK	0x70000
+#define	SMB_SHRF_ADMIN		0x01000000
+#define	SMB_SHRF_TRANS		0x10000000
+#define	SMB_SHRF_PERM		0x20000000
+#define	SMB_SHRF_AUTOHOME	0x40000000
+#define	SMB_SHRF_LONGNAME	0x80000000
 
 /*
  * refcnt is currently only used for autohome.  autohome needs a refcnt
@@ -272,8 +291,7 @@ sa_handle_t smb_shr_sa_enter(void);
 void smb_shr_sa_exit(void);
 void smb_shr_sa_csc_option(const char *, smb_share_t *);
 char *smb_shr_sa_csc_name(const smb_share_t *);
-void smb_shr_sa_catia_option(const char *, smb_share_t *);
-void smb_shr_sa_abe_option(const char *, smb_share_t *);
+void smb_shr_sa_setflag(const char *, smb_share_t *, uint32_t);
 
 /*
  * CIFS share management API exported for other processes

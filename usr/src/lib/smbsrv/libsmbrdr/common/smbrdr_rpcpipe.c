@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,23 +83,18 @@ smbrdr_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 	struct timespec st;
 	int i;
 
-	if (smbrdr_logon(hostname, domain, username) != 0)
-		return (-1);
-
 	/*
 	 * If a stale session is detected, we will attempt to establish a new
 	 * session.
 	 */
 	for (i = 0; i < 2; i++) {
-		status = smbrdr_tree_connect(hostname, username, "IPC$", &tid);
-		if (i == 0 && status == NT_STATUS_UNEXPECTED_NETWORK_ERROR) {
-			if (smbrdr_logon(hostname, domain, username) != 0)
-				return (-1);
+		status = smbrdr_tree_connect(hostname, domain, username, "IPC$",
+		    &tid);
+		if (i == 0 && status == NT_STATUS_UNEXPECTED_NETWORK_ERROR)
 			continue;
-		}
 
 		if (status != NT_STATUS_SUCCESS) {
-			syslog(LOG_DEBUG, "smbrdr: (open) %s %s %s %s %s",
+			syslog(LOG_DEBUG, "smbrdr_open: %s %s %s %s %s",
 			    hostname, domain, username, pipename,
 			    xlate_nt_status(status));
 			return (-1);
@@ -111,14 +106,14 @@ smbrdr_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 
 	netuse = smbrdr_netuse_get(tid);
 	if (netuse == NULL) {
-		syslog(LOG_DEBUG, "smbrdr: (open) %s %s %s %s %s",
+		syslog(LOG_DEBUG, "smbrdr_open: %s %s %s %s %s",
 		    hostname, domain, username, pipename,
 		    xlate_nt_status(NT_STATUS_CONNECTION_INVALID));
 		return (-1);
 	}
 
 	if ((ofile = smbrdr_ofile_alloc(netuse, pipename)) == 0) {
-		syslog(LOG_DEBUG, "smbrdr: (open) %s %s %s %s %s",
+		syslog(LOG_DEBUG, "smbrdr_open: %s %s %s %s %s",
 		    hostname, domain, username, pipename,
 		    xlate_nt_status(NT_STATUS_INSUFFICIENT_RESOURCES));
 		(void) smbrdr_tdcon(netuse);
@@ -159,7 +154,7 @@ smbrdr_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 		}
 	}
 
-	syslog(LOG_DEBUG, "smbrdr: (open) %s %s %s %s %s",
+	syslog(LOG_DEBUG, "smbrdr_open: %s %s %s %s %s",
 	    hostname, domain, username, pipename,
 	    xlate_nt_status(status));
 	smbrdr_ofile_free(ofile);
@@ -461,13 +456,11 @@ smbrdr_ntcreatex(struct sdb_ofile *ofile)
 		null_size = sizeof (char);
 	}
 
-	syslog(LOG_DEBUG, "smbrdr_ntcreatex: %d %s", path_len, path);
-
 	status = smbrdr_request_init(&srh, SMB_COM_NT_CREATE_ANDX,
 	    sess, logon, netuse);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "smbrdr_ntcreatex: %s",
+		syslog(LOG_DEBUG, "smbrdr_ntcreatex: %s %s", path,
 		    xlate_nt_status(status));
 		return (NT_STATUS_INVALID_PARAMETER_1);
 	}
@@ -499,24 +492,27 @@ smbrdr_ntcreatex(struct sdb_ofile *ofile)
 
 	if (rc <= 0) {
 		smbrdr_handle_free(&srh);
+		syslog(LOG_DEBUG, "smbrdr_ntcreatex: %s encode failed", path);
 		return (NT_STATUS_INVALID_PARAMETER_1);
 	}
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
 	if (status != NT_STATUS_SUCCESS) {
 		smbrdr_handle_free(&srh);
+		syslog(LOG_DEBUG, "smbrdr_ntcreatex: %s exchange failed", path);
 		return (NT_SC_VALUE(status));
 	}
 
 	rc = smb_msgbuf_decode(mb, "(wct). (andx)4. (opl)1. (fid)w", &fid);
 	if (rc <= 0) {
 		smbrdr_handle_free(&srh);
+		syslog(LOG_DEBUG, "smbrdr_ntcreatex: %s decode failed", path);
 		return (NT_STATUS_INVALID_PARAMETER_2);
 	}
 
 	ofile->fid = fid;
 	ofile->state = SDB_FSTATE_OPEN;
-	syslog(LOG_DEBUG, "SmbRdrNtCreate: fid=%d", ofile->fid);
+	syslog(LOG_DEBUG, "smbrdr_ntcreatex: %s fid=%d", path, ofile->fid);
 	smbrdr_handle_free(&srh);
 	return (NT_STATUS_SUCCESS);
 }

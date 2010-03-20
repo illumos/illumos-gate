@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2313,7 +2313,7 @@ smb_netbios_name_config(void)
 	bzero(smb_bcast_list, sizeof (addr_entry_t) * SMB_PI_MAX_NETWORKS);
 
 	rc = smb_nic_getfirst(&ni);
-	while (rc == 0) {
+	while (rc == SMB_NIC_SUCCESS) {
 		if ((ni.ni_nic.nic_smbflags & SMB_NICF_NBEXCL) ||
 		    (ni.ni_nic.nic_smbflags & SMB_NICF_ALIAS)) {
 			rc = smb_nic_getnext(&ni);

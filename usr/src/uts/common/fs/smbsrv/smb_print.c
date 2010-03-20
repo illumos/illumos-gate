@@ -66,7 +66,7 @@ smb_pre_open_print_file(smb_request_t *sr)
 
 	atomic_inc_32(&tmp_id);
 
-	path = smb_srm_alloc(sr, MAXPATHLEN);
+	path = smb_srm_zalloc(sr, MAXPATHLEN);
 	(void) snprintf(path, MAXPATHLEN, "%s%05u", identifier, tmp_id);
 	op->fqi.fq_path.pn_path = path;
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,31 +32,30 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <thread.h>
+#include <synch.h>
 #include <smbsrv/smb_ioctl.h>
 #include <smbsrv/smb_token.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
 
-extern int smbd_opipe_dsrv_start(void);
-extern void smbd_opipe_dsrv_stop(void);
+int smbd_opipe_start(void);
+void smbd_opipe_stop(void);
+int smbd_share_start(void);
+void smbd_share_stop(void);
+boolean_t smbd_set_netlogon_cred(void);
+int smbd_locate_dc_start(void);
+smb_token_t *smbd_user_auth_logon(smb_logon_t *);
+void smbd_user_nonauth_logon(uint32_t);
+void smbd_user_auth_logoff(uint32_t);
+uint32_t smbd_join(smb_joininfo_t *);
+void smbd_set_secmode(int);
+boolean_t smbd_online(void);
 
-extern int smb_share_dsrv_start(void);
-extern void smb_share_dsrv_stop(void);
-
-extern boolean_t smbd_set_netlogon_cred(void);
-extern int smbd_locate_dc_start(void);
-
-extern smb_token_t *smbd_user_auth_logon(netr_client_t *);
-extern void smbd_user_nonauth_logon(uint32_t);
-extern void smbd_user_auth_logoff(uint32_t);
-extern uint32_t smbd_join(smb_joininfo_t *);
-
-extern void smbd_set_secmode(int);
-
-extern int smbd_vss_get_count(const char *, uint32_t *);
-extern void smbd_vss_get_snapshots(const char *, uint32_t, uint32_t *,
+int smbd_vss_get_count(const char *, uint32_t *);
+void smbd_vss_get_snapshots(const char *, uint32_t, uint32_t *,
     uint32_t *, char **);
-extern int smbd_vss_map_gmttoken(const char *, char *, char *);
+int smbd_vss_map_gmttoken(const char *, char *, char *);
 
 typedef struct smbd {
 	const char	*s_version;	/* smbd version string */
@@ -65,6 +64,7 @@ typedef struct smbd {
 	uid_t		s_uid;		/* UID of current daemon */
 	gid_t		s_gid;		/* GID of current daemon */
 	int		s_fg;		/* Run in foreground */
+	boolean_t	s_initialized;
 	boolean_t	s_shutting_down; /* shutdown control */
 	volatile uint_t	s_sigval;
 	volatile uint_t	s_refreshes;
@@ -79,6 +79,22 @@ typedef struct smbd {
 	pthread_t	s_tcp_listener_id;
 	boolean_t	s_fatal_error;
 } smbd_t;
+
+#define	SMBD_DOOR_NAMESZ	16
+
+typedef struct smbd_door {
+	mutex_t		sd_mutex;
+	cond_t		sd_cv;
+	uint32_t	sd_ncalls;
+	char		sd_name[SMBD_DOOR_NAMESZ];
+} smbd_door_t;
+
+int smbd_door_start(void);
+void smbd_door_stop(void);
+void smbd_door_init(smbd_door_t *, const char *);
+void smbd_door_fini(smbd_door_t *);
+void smbd_door_enter(smbd_door_t *);
+void smbd_door_return(smbd_door_t *, char *, size_t, door_desc_t *, uint_t);
 
 #ifdef __cplusplus
 }

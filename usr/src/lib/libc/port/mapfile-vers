@@ -1516,8 +1516,9 @@ SUNWprivate_1.1 {
 	__getwchar_xpg5;
 	__getwc_xpg5;
 	gtty;
-	idmap_reg;
-	idmap_unreg;
+	__idmap_flush_kcache;
+	__idmap_reg;
+	__idmap_unreg;
 	__init_daemon_priv;
 	__init_suid_priv;
 	_insert;

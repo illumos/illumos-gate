@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,7 +81,7 @@ smbrdr_disconnect(const char *server)
 {
 	struct sdb_session *session;
 
-	session = smbrdr_session_lock(server, 0, SDB_SLCK_WRITE);
+	session = smbrdr_session_lock(server, SDB_SLCK_WRITE);
 	if (session) {
 		smbrdr_session_disconnect(session, 0);
 		smbrdr_session_unlock(session);
@@ -116,7 +116,7 @@ smbrdr_negotiate(char *domain_controller, char *domain)
 	 * server.
 	 */
 	(void) mutex_lock(&smbrdr_screate_mtx);
-	session = smbrdr_session_lock(domain_controller, 0, SDB_SLCK_WRITE);
+	session = smbrdr_session_lock(domain_controller, SDB_SLCK_WRITE);
 	if (session != 0) {
 		if (nb_keep_alive(session->sock, session->port) == 0) {
 			/* session is good, use it */
@@ -126,7 +126,7 @@ smbrdr_negotiate(char *domain_controller, char *domain)
 
 		} else {
 			/* stale session */
-			session->state = SDB_SSTATE_STALE;
+			smbrdr_session_clear(session);
 			smbrdr_session_unlock(session);
 		}
 	}
@@ -168,16 +168,9 @@ smbrdr_session_connect(char *domain_controller, char *domain)
 	}
 
 	for (port = 0; port < smbrdr_nports; ++port) {
-		syslog(LOG_DEBUG, "smbrdr: trying port %d",
-		    smbrdr_ports[port]);
-
 		rc = smbrdr_trnsprt_connect(session, smbrdr_ports[port]);
-
-		if (rc == 0) {
-			syslog(LOG_DEBUG, "smbrdr: connected port %d",
-			    smbrdr_ports[port]);
+		if (rc == 0)
 			break;
-		}
 	}
 
 	if (rc < 0) {
@@ -517,7 +510,7 @@ smbrdr_session_unlock(struct sdb_session *session)
  *            the pointer.
  */
 struct sdb_session *
-smbrdr_session_lock(const char *server, const char *username, int lmode)
+smbrdr_session_lock(const char *server, int lmode)
 {
 	struct sdb_session *session;
 	int i;
@@ -531,16 +524,14 @@ smbrdr_session_lock(const char *server, const char *username, int lmode)
 		(lmode == SDB_SLCK_READ) ? (void) rw_rdlock(&session->rwl) :
 		    (void) rw_wrlock(&session->rwl);
 
-		if ((session->state == SDB_SSTATE_NEGOTIATED) &&
-		    (strcasecmp(session->srv_name, server) == 0)) {
-			if (username) {
-				if (strcasecmp(username,
-				    session->logon.username) == 0)
-					return (session);
+		if (session->state == SDB_SSTATE_STALE) {
+			smbrdr_session_clear(session);
+			(void) rw_unlock(&session->rwl);
+			continue;
+		}
 
-				(void) rw_unlock(&session->rwl);
-				return (NULL);
-			}
+		if ((session->state == SDB_SSTATE_NEGOTIATED) &&
+		    (smb_strcasecmp(session->srv_name, server, 0) == 0)) {
 			return (session);
 		}
 
@@ -593,15 +584,11 @@ smbrdr_echo(const char *server)
 	struct sdb_session *session;
 	int res = 0;
 
-	if ((session = smbrdr_session_lock(server, 0, SDB_SLCK_WRITE)) == 0)
-		return (1);
-
-	if (smbrdr_smb_echo(session) != 0) {
-		session->state = SDB_SSTATE_STALE;
-		res = -1;
+	if ((session = smbrdr_session_lock(server, SDB_SLCK_WRITE)) != NULL) {
+		res = smbrdr_smb_echo(session);
+		smbrdr_session_unlock(session);
 	}
 
-	smbrdr_session_unlock(session);
 	return (res);
 }
 

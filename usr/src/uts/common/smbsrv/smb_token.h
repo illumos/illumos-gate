@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,25 +93,48 @@ typedef struct smb_token {
 	smb_posix_grps_t *tkn_posix_grps;
 } smb_token_t;
 
-/* XDR routines */
-extern bool_t xdr_netr_client_t();
-extern bool_t xdr_smb_token_t();
+/*
+ * Details required to authenticate a user.
+ */
+typedef struct smb_logon {
+	uint16_t	lg_level;
+	char		*lg_username;	/* requested username */
+	char		*lg_domain;	/* requested domain */
+	char		*lg_e_username;	/* effective username */
+	char		*lg_e_domain;	/* effective domain */
+	char		*lg_workstation;
+	smb_inaddr_t	lg_clnt_ipaddr;
+	smb_inaddr_t	lg_local_ipaddr;
+	uint16_t	lg_local_port;
+	smb_buf32_t	lg_challenge_key;
+	smb_buf32_t	lg_nt_password;
+	smb_buf32_t	lg_lm_password;
+	int		lg_native_os;
+	int		lg_native_lm;
+	uint32_t	lg_flags;
+	uint32_t	lg_logon_id;	/* filled in user space */
+	uint32_t	lg_domain_type;	/* filled in user space */
+	uint32_t	lg_secmode;	/* filled in user space */
+	uint32_t	lg_status;	/* filled in user space */
+} smb_logon_t;
 
+bool_t smb_logon_xdr();
+bool_t smb_token_xdr();
 
 #ifndef _KERNEL
-smb_token_t *smb_logon(netr_client_t *clnt);
-void smb_token_destroy(smb_token_t *token);
-uint8_t *smb_token_mkselfrel(smb_token_t *obj, uint32_t *len);
-netr_client_t *netr_client_mkabsolute(uint8_t *buf, uint32_t len);
-void netr_client_xfree(netr_client_t *);
-void smb_token_log(smb_token_t *token);
+smb_token_t *smb_logon(smb_logon_t *);
+void smb_logon_abort(void);
+void smb_token_destroy(smb_token_t *);
+uint8_t *smb_token_encode(smb_token_t *, uint32_t *);
+void smb_token_log(smb_token_t *);
+smb_logon_t *smb_logon_decode(uint8_t *, uint32_t);
+void smb_logon_free(smb_logon_t *);
 #else /* _KERNEL */
-smb_token_t *smb_token_mkabsolute(uint8_t *buf, uint32_t len);
-void smb_token_free(smb_token_t *token);
-uint8_t *netr_client_mkselfrel(netr_client_t *obj, uint32_t *len);
+void smb_token_free(smb_token_t *);
 #endif /* _KERNEL */
 
 int smb_token_query_privilege(smb_token_t *token, int priv_id);
+boolean_t smb_token_valid(smb_token_t *);
 
 #ifdef __cplusplus
 }
