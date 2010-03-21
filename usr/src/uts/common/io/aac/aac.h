@@ -55,7 +55,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	2
-#define	AAC_DRIVER_BUGFIX_LEVEL		9
+#define	AAC_DRIVER_BUGFIX_LEVEL		10
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -113,6 +113,13 @@ extern "C" {
 #define	AAC_HI32(p64)			((uint32_t *)(p64) + 1)
 
 /*
+ * Internal events that will be handled serially by aac_event_thread()
+ */
+#define	AAC_EVENT_AIF			(1 << 0)
+#define	AAC_EVENT_TIMEOUT		(1 << 1)
+#define	AAC_EVENT_SYNCTICK		(1 << 2)
+
+/*
  * AAC_CMDQ_SYNC should be 0 and AAC_CMDQ_ASYNC be 1 for Sync FIB io
  * to be served before async FIB io, see aac_start_waiting_io().
  * So that io requests sent by interactive userland commands get
@@ -154,16 +161,22 @@ struct aac_card_type {
 #define	AAC_DEV_LD		0	/* logical device */
 #define	AAC_DEV_PD		1	/* physical device */
 
-/* DR events */
-#define	AAC_EVT_NONE		0
-#define	AAC_EVT_ONLINE		1
-#define	AAC_EVT_OFFLINE		2
-
 /* Device flags */
 #define	AAC_DFLAG_VALID		(1 << 0)
 #define	AAC_DFLAG_CONFIGURING	(1 << 1)
 
 #define	AAC_DEV_IS_VALID(dvp)	((dvp)->flags & AAC_DFLAG_VALID)
+
+/*
+ * Device config change events
+ */
+enum aac_cfg_event {
+	AAC_CFG_NULL_NOEXIST = 0,	/* No change with no device */
+	AAC_CFG_NULL_EXIST,		/* No change but have device */
+	AAC_CFG_ADD,			/* Device added */
+	AAC_CFG_DELETE,			/* Device deleted */
+	AAC_CFG_CHANGE			/* Device changed */
+};
 
 struct aac_device {
 	int flags;
@@ -333,10 +346,15 @@ struct aac_interface {
 	    uint32_t, uint32_t, uint32_t, uint32_t);
 };
 
+#define	AAC_CTXFLAG_FILLED	0x01	/* aifq's full for this ctx */
+#define	AAC_CTXFLAG_RESETED	0x02
+
 struct aac_fib_context {
 	uint32_t unique;
 	int ctx_idx;
 	int ctx_filled;		/* aifq is full for this fib context */
+	int ctx_flags;
+	int ctx_overrun;
 	struct aac_fib_context *next, *prev;
 };
 
@@ -428,8 +446,6 @@ struct aac_softstate {
 	struct aac_slot *io_slot;	/* static list for allocated slots */
 	struct aac_slot *free_io_slot_head;
 
-	timeout_id_t timeout_id;	/* for timeout daemon */
-
 	kcondvar_t event;		/* for ioctl_send_fib() and sync IO */
 	kcondvar_t sync_fib_cv;		/* for sync_fib_slot_bind/release */
 
@@ -439,17 +455,32 @@ struct aac_softstate {
 	timeout_id_t drain_timeid;	/* for outstanding cmd drain */
 	kcondvar_t drain_cv;		/* for quiesce drain */
 
+	/* Internal timer */
+	kmutex_t time_mutex;
+	timeout_id_t timeout_id;	/* for timeout daemon */
+	uint32_t timebase;		/* internal timer in seconds */
+	uint32_t time_sync;		/* next time to sync with firmware */
+	uint32_t time_out;		/* next time to check timeout */
+	uint32_t time_throttle;		/* next time to restore throttle */
+
+	/* Internal events handling */
+	kmutex_t ev_lock;
+	int events;
+	kthread_t *event_thread;	/* for AIF & timeout */
+	kcondvar_t event_wait_cv;
+	kcondvar_t event_disp_cv;
+
 	/* AIF */
 	kmutex_t aifq_mutex;		/* for AIF queue aifq */
-	kcondvar_t aifv;
+	kcondvar_t aifq_cv;
 	union aac_fib_align aifq[AAC_AIFQ_LENGTH];
 	int aifq_idx;			/* slot for next new AIF */
 	int aifq_wrap;			/* AIF queue has ever been wrapped */
-	struct aac_fib_context *fibctx;
+	struct aac_fib_context aifctx;	/* sys aif ctx */
+	struct aac_fib_context *fibctx_p;
 	int devcfg_wait_on;		/* AIF event waited for rescan */
 
 	int fm_capabilities;
-	ddi_taskq_t *taskq;
 
 	/* MSI specific fields */
 	ddi_intr_handle_t *htable;	/* For array of interrupts */

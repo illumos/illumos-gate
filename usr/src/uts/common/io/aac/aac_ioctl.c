@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,10 @@ extern void aac_free_dmamap(struct aac_cmd *);
 extern int aac_do_io(struct aac_softstate *, struct aac_cmd *);
 extern void aac_cmd_fib_copy(struct aac_softstate *, struct aac_cmd *);
 extern void aac_ioctl_complete(struct aac_softstate *, struct aac_cmd *);
+extern int aac_return_aif_wait(struct aac_softstate *, struct aac_fib_context *,
+    struct aac_fib **);
+extern int aac_return_aif(struct aac_softstate *, struct aac_fib_context *,
+    struct aac_fib **);
 
 extern ddi_device_acc_attr_t aac_acc_attr;
 extern int aac_check_dma_handle(ddi_dma_handle_t);
@@ -305,66 +309,47 @@ finish:
 static int
 aac_open_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 {
-	struct aac_fib_context *fibctx, *ctx;
+	struct aac_fib_context *fibctx_p, *ctx_p;
 
 	DBCALLED(softs, 2);
 
-	fibctx = kmem_zalloc(sizeof (struct aac_fib_context), KM_NOSLEEP);
-	if (fibctx == NULL)
+	fibctx_p = kmem_zalloc(sizeof (struct aac_fib_context), KM_NOSLEEP);
+	if (fibctx_p == NULL)
 		return (ENOMEM);
 
 	mutex_enter(&softs->aifq_mutex);
 	/* All elements are already 0, add to queue */
-	if (softs->fibctx == NULL) {
-		softs->fibctx = fibctx;
+	if (softs->fibctx_p == NULL) {
+		softs->fibctx_p = fibctx_p;
 	} else {
-		for (ctx = softs->fibctx; ctx->next; ctx = ctx->next)
+		for (ctx_p = softs->fibctx_p; ctx_p->next; ctx_p = ctx_p->next)
 			;
-		ctx->next = fibctx;
-		fibctx->prev = ctx;
+		ctx_p->next = fibctx_p;
+		fibctx_p->prev = ctx_p;
 	}
 
 	/* Evaluate unique value */
-	fibctx->unique = (unsigned long)fibctx & 0xfffffffful;
-	ctx = softs->fibctx;
-	while (ctx != fibctx) {
-		if (ctx->unique == fibctx->unique) {
-			fibctx->unique++;
-			ctx = softs->fibctx;
+	fibctx_p->unique = (unsigned long)fibctx_p & 0xfffffffful;
+	ctx_p = softs->fibctx_p;
+	while (ctx_p != fibctx_p) {
+		if (ctx_p->unique == fibctx_p->unique) {
+			fibctx_p->unique++;
+			ctx_p = softs->fibctx_p;
 		} else {
-			ctx = ctx->next;
+			ctx_p = ctx_p->next;
 		}
 	}
 
 	/* Set ctx_idx to the oldest AIF */
 	if (softs->aifq_wrap) {
-		fibctx->ctx_idx = softs->aifq_idx;
-		fibctx->ctx_filled = 1;
+		fibctx_p->ctx_idx = softs->aifq_idx;
+		fibctx_p->ctx_filled = 1;
 	}
 	mutex_exit(&softs->aifq_mutex);
 
-	if (ddi_copyout(&fibctx->unique, (void *)arg,
+	if (ddi_copyout(&fibctx_p->unique, (void *)arg,
 	    sizeof (uint32_t), mode) != 0)
 		return (EFAULT);
-
-	return (0);
-}
-
-static int
-aac_return_aif(struct aac_softstate *softs,
-    struct aac_fib_context *ctx, caddr_t uptr, int mode)
-{
-	int current;
-
-	current = ctx->ctx_idx;
-	if (current == softs->aifq_idx && !ctx->ctx_filled)
-		return (EAGAIN); /* Empty */
-	if (ddi_copyout(&softs->aifq[current].d, (void *)uptr,
-	    sizeof (struct aac_fib), mode) != 0)
-		return (EFAULT);
-
-	ctx->ctx_filled = 0;
-	ctx->ctx_idx = (current + 1) % AAC_AIFQ_LENGTH;
 
 	return (0);
 }
@@ -374,7 +359,8 @@ aac_next_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 {
 	union aac_get_adapter_fib_align un;
 	struct aac_get_adapter_fib *af = &un.d;
-	struct aac_fib_context *ctx;
+	struct aac_fib_context *ctx_p;
+	struct aac_fib *fibp;
 	int rval;
 
 	DBCALLED(softs, 2);
@@ -383,65 +369,58 @@ aac_next_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 		return (EFAULT);
 
 	mutex_enter(&softs->aifq_mutex);
-	for (ctx = softs->fibctx; ctx; ctx = ctx->next) {
-		if (af->context == ctx->unique)
+	for (ctx_p = softs->fibctx_p; ctx_p; ctx_p = ctx_p->next) {
+		if (af->context == ctx_p->unique)
 			break;
-	}
-	if (ctx) {
-#ifdef	_LP64
-		rval = aac_return_aif(softs, ctx,
-		    (caddr_t)(uint64_t)af->aif_fib, mode);
-#else
-		rval = aac_return_aif(softs, ctx,
-		    (caddr_t)af->aif_fib, mode);
-#endif
-		if (rval == EAGAIN && af->wait) {
-			AACDB_PRINT(softs, CE_NOTE,
-			    "aac_next_getadapter_fib(): waiting for AIF");
-			rval = cv_wait_sig(&softs->aifv, &softs->aifq_mutex);
-			if (rval > 0) {
-#ifdef	_LP64
-				rval = aac_return_aif(softs, ctx,
-				    (caddr_t)(uint64_t)af->aif_fib, mode);
-#else
-				rval = aac_return_aif(softs, ctx,
-				    (caddr_t)af->aif_fib, mode);
-#endif
-			} else {
-				rval = EINTR;
-			}
-		}
-	} else {
-		rval = EFAULT;
 	}
 	mutex_exit(&softs->aifq_mutex);
 
+	if (ctx_p) {
+		if (af->wait)
+			rval = aac_return_aif_wait(softs, ctx_p, &fibp);
+		else
+			rval = aac_return_aif(softs, ctx_p, &fibp);
+	}
+	else
+		rval = EFAULT;
+
+finish:
+	if (rval == 0) {
+		if (ddi_copyout(fibp,
+#ifdef _LP64
+		    (void *)(uint64_t)af->aif_fib,
+#else
+		    (void *)af->aif_fib,
+#endif
+		    sizeof (struct aac_fib), mode) != 0)
+			rval = EFAULT;
+	}
 	return (rval);
 }
 
 static int
 aac_close_getadapter_fib(struct aac_softstate *softs, intptr_t arg)
 {
-	struct aac_fib_context *ctx;
+	struct aac_fib_context *ctx_p;
 
 	DBCALLED(softs, 2);
 
 	mutex_enter(&softs->aifq_mutex);
-	for (ctx = softs->fibctx; ctx; ctx = ctx->next) {
-		if (ctx->unique != (uint32_t)arg)
+	for (ctx_p = softs->fibctx_p; ctx_p; ctx_p = ctx_p->next) {
+		if (ctx_p->unique != (uint32_t)arg)
 			continue;
 
-		if (ctx == softs->fibctx)
-			softs->fibctx = ctx->next;
+		if (ctx_p == softs->fibctx_p)
+			softs->fibctx_p = ctx_p->next;
 		else
-			ctx->prev->next = ctx->next;
-		if (ctx->next)
-			ctx->next->prev = ctx->prev;
+			ctx_p->prev->next = ctx_p->next;
+		if (ctx_p->next)
+			ctx_p->next->prev = ctx_p->prev;
 		break;
 	}
 	mutex_exit(&softs->aifq_mutex);
-	if (ctx)
-		kmem_free(ctx, sizeof (struct aac_fib_context));
+	if (ctx_p)
+		kmem_free(ctx_p, sizeof (struct aac_fib_context));
 
 	return (0);
 }

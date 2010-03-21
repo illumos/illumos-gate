@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 one aac_softstate
@@ -45,7 +45,7 @@ add aac_softstate::aac_cmd_fib_scsi target \
 	aac_cmd_fib_scsi32 \
 	aac_cmd_fib_scsi64
 
-root aac_intr_old aac_intr_new aac_fm_error_cb aac_handle_dr aac_name_node aac_quiesce
+root aac_intr_old aac_intr_new aac_fm_error_cb aac_name_node aac_quiesce
 
 add scsi_pkt::pkt_comp target \
 	aac_tran_destroy_pkt \

@@ -339,12 +339,16 @@ static void aac_set_throttle(struct aac_softstate *, struct aac_device *,
 /*
  * Adapter Initiated FIB handling function
  */
-static int aac_handle_aif(struct aac_softstate *, struct aac_fib *);
+static void aac_save_aif(struct aac_softstate *, ddi_acc_handle_t,
+    struct aac_fib *, int);
+static int aac_handle_aif(struct aac_softstate *, struct aac_aif_command *);
 
 /*
- * Timeout handling thread function
+ * Event handling related functions
  */
-static void aac_daemon(void *);
+static void aac_timer(void *);
+static void aac_event_thread(struct aac_softstate *);
+static void aac_event_disp(struct aac_softstate *, int);
 
 /*
  * IOCTL interface related functions
@@ -370,7 +374,9 @@ void aac_fm_ereport(struct aac_softstate *, char *);
 static dev_info_t *aac_find_child(struct aac_softstate *, uint16_t, uint8_t);
 static int aac_tran_bus_config(dev_info_t *, uint_t, ddi_bus_config_op_t,
     void *, dev_info_t **);
-static int aac_dr_event(struct aac_softstate *, int, int, int);
+static int aac_handle_dr(struct aac_softstate *, int, int, int);
+
+extern pri_t minclsyspri;
 
 #ifdef DEBUG
 /*
@@ -659,16 +665,8 @@ static ddi_dma_attr_t aac_dma_attr = {
 	0		/* DMA transfer flags */
 };
 
-struct aac_drinfo {
-	struct aac_softstate *softs;
-	int tgt;
-	int lun;
-	int event;
-};
-
 static int aac_tick = AAC_DEFAULT_TICK;	/* tick for the internal timer */
 static uint32_t aac_timebase = 0;	/* internal timer in seconds */
-static uint32_t aac_sync_time = 0;	/* next time to sync. with firmware */
 
 /*
  * Warlock directives
@@ -690,7 +688,6 @@ _NOTE(SCHEME_PROTECTS_DATA("unique per aac_fib", aac_blockread aac_blockwrite \
     aac_sg_table aac_srb))
 _NOTE(SCHEME_PROTECTS_DATA("unique to sync fib and cdb", scsi_inquiry))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", scsi_device scsi_address))
-_NOTE(SCHEME_PROTECTS_DATA("unique to dr event", aac_drinfo))
 _NOTE(SCHEME_PROTECTS_DATA("unique to scsi_transport", buf))
 
 int
@@ -825,16 +822,22 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	AAC_DISABLE_INTR(softs);
 
 	/* Init mutexes and condvars */
-	mutex_init(&softs->q_comp_mutex, NULL,
+	mutex_init(&softs->io_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(softs->intr_pri));
+	mutex_init(&softs->q_comp_mutex, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(softs->intr_pri));
+	mutex_init(&softs->time_mutex, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(softs->intr_pri));
+	mutex_init(&softs->ev_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(softs->intr_pri));
+	mutex_init(&softs->aifq_mutex, NULL,
 	    MUTEX_DRIVER, DDI_INTR_PRI(softs->intr_pri));
 	cv_init(&softs->event, NULL, CV_DRIVER, NULL);
 	cv_init(&softs->sync_fib_cv, NULL, CV_DRIVER, NULL);
-	mutex_init(&softs->aifq_mutex, NULL,
-	    MUTEX_DRIVER, DDI_INTR_PRI(softs->intr_pri));
-	cv_init(&softs->aifv, NULL, CV_DRIVER, NULL);
 	cv_init(&softs->drain_cv, NULL, CV_DRIVER, NULL);
-	mutex_init(&softs->io_lock, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(softs->intr_pri));
+	cv_init(&softs->event_wait_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&softs->event_disp_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&softs->aifq_cv, NULL, CV_DRIVER, NULL);
 	attach_state |= AAC_ATTACH_KMUTEX_INITED;
 
 	/* Init the cmd queues */
@@ -907,19 +910,23 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto error;
 	}
 
-	/* Create a taskq for dealing with dr events */
-	if ((softs->taskq = ddi_taskq_create(dip, "aac_dr_taskq", 1,
-	    TASKQ_DEFAULTPRI, 0)) == NULL) {
-		AACDB_PRINT(softs, CE_WARN, "ddi_taskq_create failed");
+	/* Common attach is OK, so we are attached! */
+	softs->state |= AAC_STATE_RUN;
+
+	/* Create event thread */
+	softs->fibctx_p = &softs->aifctx;
+	if ((softs->event_thread = thread_create(NULL, 0, aac_event_thread,
+	    softs, 0, &p0, TS_RUN, minclsyspri)) == NULL) {
+		AACDB_PRINT(softs, CE_WARN, "aif thread create failed");
+		softs->state &= ~AAC_STATE_RUN;
 		goto error;
 	}
 
 	aac_unhold_bus(softs, AAC_IOCMD_SYNC | AAC_IOCMD_ASYNC);
-	softs->state |= AAC_STATE_RUN;
 
 	/* Create a thread for command timeout */
-	softs->timeout_id = timeout(aac_daemon, (void *)softs,
-	    (60 * drv_usectohz(1000000)));
+	softs->timeout_id = timeout(aac_timer, (void *)softs,
+	    (aac_tick * drv_usectohz(1000000)));
 
 	/* Common attach is OK, so we are attached! */
 	ddi_report_dev(dip);
@@ -927,8 +934,6 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 error:
-	if (softs && softs->taskq)
-		ddi_taskq_destroy(softs->taskq);
 	if (attach_state & AAC_ATTACH_CREATE_SCSI)
 		ddi_remove_minor_node(dip, "scsi");
 	if (attach_state & AAC_ATTACH_CREATE_DEVCTL)
@@ -940,13 +945,17 @@ error:
 		scsi_hba_tran_free(AAC_DIP2TRAN(dip));
 	}
 	if (attach_state & AAC_ATTACH_KMUTEX_INITED) {
+		mutex_destroy(&softs->io_lock);
 		mutex_destroy(&softs->q_comp_mutex);
+		mutex_destroy(&softs->time_mutex);
+		mutex_destroy(&softs->ev_lock);
+		mutex_destroy(&softs->aifq_mutex);
 		cv_destroy(&softs->event);
 		cv_destroy(&softs->sync_fib_cv);
-		mutex_destroy(&softs->aifq_mutex);
-		cv_destroy(&softs->aifv);
 		cv_destroy(&softs->drain_cv);
-		mutex_destroy(&softs->io_lock);
+		cv_destroy(&softs->event_wait_cv);
+		cv_destroy(&softs->event_disp_cv);
+		cv_destroy(&softs->aifq_cv);
 	}
 	if (attach_state & AAC_ATTACH_PCI_MEM_MAPPED)
 		ddi_regs_map_free(&softs->pci_mem_handle);
@@ -979,17 +988,9 @@ aac_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	AAC_DISABLE_INTR(softs);
 	softs->state = AAC_STATE_STOPPED;
 
-	mutex_exit(&softs->io_lock);
-	(void) untimeout(softs->timeout_id);
-	mutex_enter(&softs->io_lock);
-	softs->timeout_id = 0;
-
-	ddi_taskq_destroy(softs->taskq);
-
 	ddi_remove_minor_node(dip, "aac");
 	ddi_remove_minor_node(dip, "scsi");
 	ddi_remove_minor_node(dip, "devctl");
-
 	mutex_exit(&softs->io_lock);
 
 	aac_common_detach(softs);
@@ -999,12 +1000,34 @@ aac_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	scsi_hba_tran_free(tran);
 	mutex_exit(&softs->io_lock);
 
-	mutex_destroy(&softs->q_comp_mutex);
-	cv_destroy(&softs->event);
-	cv_destroy(&softs->sync_fib_cv);
-	mutex_destroy(&softs->aifq_mutex);
-	cv_destroy(&softs->aifv);
+	/* Stop timer */
+	mutex_enter(&softs->time_mutex);
+	if (softs->timeout_id) {
+		timeout_id_t tid = softs->timeout_id;
+		softs->timeout_id = 0;
+
+		mutex_exit(&softs->time_mutex);
+		(void) untimeout(tid);
+		mutex_enter(&softs->time_mutex);
+	}
+	mutex_exit(&softs->time_mutex);
+
+	/* Destroy event thread */
+	mutex_enter(&softs->ev_lock);
+	cv_signal(&softs->event_disp_cv);
+	cv_wait(&softs->event_wait_cv, &softs->ev_lock);
+	mutex_exit(&softs->ev_lock);
+
+	cv_destroy(&softs->aifq_cv);
+	cv_destroy(&softs->event_disp_cv);
+	cv_destroy(&softs->event_wait_cv);
 	cv_destroy(&softs->drain_cv);
+	cv_destroy(&softs->sync_fib_cv);
+	cv_destroy(&softs->event);
+	mutex_destroy(&softs->aifq_mutex);
+	mutex_destroy(&softs->ev_lock);
+	mutex_destroy(&softs->time_mutex);
+	mutex_destroy(&softs->q_comp_mutex);
 	mutex_destroy(&softs->io_lock);
 
 	ddi_regs_map_free(&softs->pci_mem_handle);
@@ -1050,6 +1073,7 @@ aac_quiesce(dev_info_t *dip)
 	if (softs == NULL)
 		return (DDI_FAILURE);
 
+	_NOTE(ASSUMING_PROTECTED(softs->state))
 	AAC_DISABLE_INTR(softs);
 
 	return (DDI_SUCCESS);
@@ -1352,7 +1376,7 @@ aac_process_intr_new(struct aac_softstate *softs)
 				aac_handle_io(softs, index);
 			} else if (index != 0xfffffffeul) {
 				struct aac_fib *fibp;	/* FIB in AIF queue */
-				uint16_t fib_size, fib_size0;
+				uint16_t fib_size;
 
 				/*
 				 * 0xfffffffe means that the controller wants
@@ -1361,25 +1385,13 @@ aac_process_intr_new(struct aac_softstate *softs)
 				 */
 				index &= ~2;
 
-				mutex_enter(&softs->aifq_mutex);
-				/*
-				 * Copy AIF from adapter to the empty AIF slot
-				 */
-				fibp = &softs->aifq[softs->aifq_idx].d;
-				fib_size0 = PCI_MEM_GET16(softs, index + \
+				fibp = (struct aac_fib *)(softs-> \
+				    pci_mem_base_vaddr + index);
+				fib_size = PCI_MEM_GET16(softs, index + \
 				    offsetof(struct aac_fib, Header.Size));
-				fib_size = (fib_size0 > AAC_FIB_SIZE) ?
-				    AAC_FIB_SIZE : fib_size0;
-				PCI_MEM_REP_GET8(softs, index, fibp,
-				    fib_size);
 
-				if (aac_check_acc_handle(softs-> \
-				    pci_mem_handle) == DDI_SUCCESS)
-					(void) aac_handle_aif(softs, fibp);
-				else
-					ddi_fm_service_impact(softs->devinfo_p,
-					    DDI_SERVICE_UNAFFECTED);
-				mutex_exit(&softs->aifq_mutex);
+				aac_save_aif(softs, softs->pci_mem_handle,
+				    fibp, fib_size);
 
 				/*
 				 * AIF memory is owned by the adapter, so let it
@@ -1460,9 +1472,8 @@ aac_process_intr_old(struct aac_softstate *softs)
 		if (aac_fib_dequeue(softs, AAC_HOST_NORM_CMD_Q, &aif_idx) ==
 		    AACOK) {
 			ddi_acc_handle_t acc = softs->comm_space_acc_handle;
-			struct aac_fib *fibp;	/* FIB in AIF queue */
-			struct aac_fib *fibp0;	/* FIB in communication space */
-			uint16_t fib_size, fib_size0;
+			struct aac_fib *fibp;	/* FIB in communication space */
+			uint16_t fib_size;
 			uint32_t fib_xfer_state;
 			uint32_t addr, size;
 
@@ -1474,28 +1485,21 @@ aac_process_intr_old(struct aac_softstate *softs)
 	    adapter_fibs[(aif_idx)]), AAC_FIB_SIZE, \
 	    (type)); }
 
-			mutex_enter(&softs->aifq_mutex);
 			/* Copy AIF from adapter to the empty AIF slot */
-			fibp = &softs->aifq[softs->aifq_idx].d;
 			AAC_SYNC_AIF(softs, aif_idx, DDI_DMA_SYNC_FORCPU);
-			fibp0 = &softs->comm_space->adapter_fibs[aif_idx];
-			fib_size0 = ddi_get16(acc, &fibp0->Header.Size);
-			fib_size = (fib_size0 > AAC_FIB_SIZE) ?
-			    AAC_FIB_SIZE : fib_size0;
-			ddi_rep_get8(acc, (uint8_t *)fibp, (uint8_t *)fibp0,
-			    fib_size, DDI_DEV_AUTOINCR);
+			fibp = &softs->comm_space->adapter_fibs[aif_idx];
+			fib_size = ddi_get16(acc, &fibp->Header.Size);
 
-			(void) aac_handle_aif(softs, fibp);
-			mutex_exit(&softs->aifq_mutex);
+			aac_save_aif(softs, acc, fibp, fib_size);
 
 			/* Complete AIF back to adapter with good status */
 			fib_xfer_state = LE_32(fibp->Header.XferState);
 			if (fib_xfer_state & AAC_FIBSTATE_FROMADAP) {
-				ddi_put32(acc, &fibp0->Header.XferState,
+				ddi_put32(acc, &fibp->Header.XferState,
 				    fib_xfer_state | AAC_FIBSTATE_DONEHOST);
-				ddi_put32(acc, (void *)&fibp0->data[0], ST_OK);
-				if (fib_size0 > AAC_FIB_SIZE)
-					ddi_put16(acc, &fibp0->Header.Size,
+				ddi_put32(acc, (void *)&fibp->data[0], ST_OK);
+				if (fib_size > AAC_FIB_SIZE)
+					ddi_put16(acc, &fibp->Header.Size,
 					    AAC_FIB_SIZE);
 				AAC_SYNC_AIF(softs, aif_idx,
 				    DDI_DMA_SYNC_FORDEV);
@@ -2773,6 +2777,7 @@ aac_common_attach(struct aac_softstate *softs)
 {
 	uint32_t status;
 	int i;
+	struct aac_supplement_adapter_info sinf;
 
 	DBCALLED(softs, 1);
 
@@ -2852,13 +2857,10 @@ aac_common_attach(struct aac_softstate *softs)
 	AAC_STATUS_CLR(softs, ~0); /* Clear out all interrupts */
 	AAC_ENABLE_INTR(softs); /* Enable the interrupts we can handle */
 
-	/* Get adapter names */
-	if (CARD_IS_UNKNOWN(softs->card)) {
-		struct aac_supplement_adapter_info sinf;
+	if (aac_get_adapter_info(softs, NULL, &sinf) == AACOK) {
+		/* Get adapter names */
+		if (CARD_IS_UNKNOWN(softs->card)) {
 
-		if (aac_get_adapter_info(softs, NULL, &sinf) != AACOK) {
-			cmn_err(CE_CONT, "?Query adapter information failed");
-		} else {
 			softs->feature_bits = sinf.FeatureBits;
 			softs->support_opt2 = sinf.SupportedOptions2;
 
@@ -2900,7 +2902,10 @@ aac_common_attach(struct aac_softstate *softs)
 					    p0, AAC_PRODUCT_LEN);
 			}
 		}
+	} else {
+		cmn_err(CE_CONT, "?Query adapter information failed");
 	}
+
 
 	cmn_err(CE_NOTE,
 	    "!aac driver %d.%02d.%02d-%d, found card: " \
@@ -3428,22 +3433,20 @@ aac_get_container_info(struct aac_softstate *softs, int cid)
 	return (mir);
 }
 
-static int
+static enum aac_cfg_event
 aac_probe_container(struct aac_softstate *softs, uint32_t cid)
 {
+	enum aac_cfg_event event = AAC_CFG_NULL_NOEXIST;
 	struct aac_container *dvp = &softs->containers[cid];
-	ddi_acc_handle_t acc;
 	struct aac_mntinforesp *mir;
-	uint64_t size;
-	uint32_t uid;
-	int rval;
+	ddi_acc_handle_t acc;
 
 	(void) aac_sync_fib_slot_bind(softs, &softs->sync_ac);
 	acc = softs->sync_ac.slotp->fib_acc_handle;
 
 	/* Get container basic info */
 	if ((mir = aac_get_container_info(softs, cid)) == NULL) {
-		rval = AACERR;
+		/* AAC_CFG_NULL_NOEXIST */
 		goto finish;
 	}
 
@@ -3452,10 +3455,15 @@ aac_probe_container(struct aac_softstate *softs, uint32_t cid)
 			AACDB_PRINT(softs, CE_NOTE,
 			    ">>> Container %d deleted", cid);
 			dvp->dev.flags &= ~AAC_DFLAG_VALID;
-			(void) aac_dr_event(softs, dvp->cid, -1,
-			    AAC_EVT_OFFLINE);
+			event = AAC_CFG_DELETE;
 		}
+		/* AAC_CFG_NULL_NOEXIST */
 	} else {
+		uint64_t size;
+		uint32_t uid;
+
+		event = AAC_CFG_NULL_EXIST;
+
 		size = AAC_MIR_SIZE(softs, acc, mir);
 		uid = ddi_get32(acc, &mir->Status);
 		if (AAC_DEV_IS_VALID(&dvp->dev)) {
@@ -3464,12 +3472,14 @@ aac_probe_container(struct aac_softstate *softs, uint32_t cid)
 				    ">>> Container %u uid changed to %d",
 				    cid, uid);
 				dvp->uid = uid;
+				event = AAC_CFG_CHANGE;
 			}
 			if (dvp->size != size) {
 				AACDB_PRINT(softs, CE_NOTE,
 				    ">>> Container %u size changed to %"PRIu64,
 				    cid, size);
 				dvp->size = size;
+				event = AAC_CFG_CHANGE;
 			}
 		} else { /* Init new container */
 			AACDB_PRINT(softs, CE_NOTE,
@@ -3488,15 +3498,14 @@ aac_probe_container(struct aac_softstate *softs, uint32_t cid)
 			dvp->size = size;
 			dvp->locked = 0;
 			dvp->deleted = 0;
-			(void) aac_dr_event(softs, dvp->cid, -1,
-			    AAC_EVT_ONLINE);
+
+			event = AAC_CFG_ADD;
 		}
 	}
-	rval = AACOK;
 
 finish:
 	aac_sync_fib_slot_release(softs, &softs->sync_ac);
-	return (rval);
+	return (event);
 }
 
 /*
@@ -3512,10 +3521,16 @@ aac_probe_containers(struct aac_softstate *softs)
 	count = softs->container_count;
 	if (aac_get_container_count(softs, &count) == AACERR)
 		return (AACERR);
+
 	for (i = total = 0; i < count; i++) {
-		if (aac_probe_container(softs, i) == AACOK)
+		enum aac_cfg_event event = aac_probe_container(softs, i);
+		if ((event != AAC_CFG_NULL_NOEXIST) &&
+		    (event != AAC_CFG_NULL_EXIST)) {
+			(void) aac_handle_dr(softs, i, -1, event);
 			total++;
+		}
 	}
+
 	if (count < softs->container_count) {
 		struct aac_container *dvp;
 
@@ -3526,10 +3541,11 @@ aac_probe_containers(struct aac_softstate *softs)
 			AACDB_PRINT(softs, CE_NOTE, ">>> Container %d deleted",
 			    dvp->cid);
 			dvp->dev.flags &= ~AAC_DFLAG_VALID;
-			(void) aac_dr_event(softs, dvp->cid, -1,
-			    AAC_EVT_OFFLINE);
+			(void) aac_handle_dr(softs, dvp->cid, -1,
+			    AAC_CFG_DELETE);
 		}
 	}
+
 	softs->container_count = count;
 	AACDB_PRINT(softs, CE_CONT, "?Total %d container(s) found", total);
 	return (AACOK);
@@ -5494,15 +5510,13 @@ aac_cmd_fib_header(struct aac_softstate *softs, struct aac_cmd *acp,
 	    AAC_FIBSTATE_HOSTOWNED |
 	    AAC_FIBSTATE_INITIALISED |
 	    AAC_FIBSTATE_EMPTY |
+	    AAC_FIBSTATE_FAST_RESPONSE | /* enable fast io */
 	    AAC_FIBSTATE_FROMHOST |
 	    AAC_FIBSTATE_REXPECTED |
 	    AAC_FIBSTATE_NORM;
 
-	if (!(acp->flags & AAC_CMD_SYNC)) {
-		xfer_state |=
-		    AAC_FIBSTATE_ASYNC |
-		    AAC_FIBSTATE_FAST_RESPONSE; /* enable fast io */
-	}
+	if (!(acp->flags & AAC_CMD_SYNC))
+		xfer_state |= AAC_FIBSTATE_ASYNC;
 
 	ddi_put32(acc, &fibp->Header.XferState, xfer_state);
 	ddi_put16(acc, &fibp->Header.Command, cmd);
@@ -6265,6 +6279,115 @@ aac_dma_sync_ac(struct aac_cmd *acp)
 }
 
 /*
+ * Copy AIF from adapter to the empty AIF slot and inform AIF threads
+ */
+static void
+aac_save_aif(struct aac_softstate *softs, ddi_acc_handle_t acc,
+    struct aac_fib *fibp0, int fib_size0)
+{
+	struct aac_fib *fibp;	/* FIB in AIF queue */
+	int fib_size;
+	uint16_t fib_command;
+	int current, next;
+
+	/* Ignore non AIF messages */
+	fib_command = ddi_get16(acc, &fibp0->Header.Command);
+	if (fib_command != AifRequest) {
+		cmn_err(CE_WARN, "!Unknown command from controller");
+		return;
+	}
+
+	mutex_enter(&softs->aifq_mutex);
+
+	/* Save AIF */
+	fibp = &softs->aifq[softs->aifq_idx].d;
+	fib_size = (fib_size0 > AAC_FIB_SIZE) ? AAC_FIB_SIZE : fib_size0;
+	ddi_rep_get8(acc, (uint8_t *)fibp, (uint8_t *)fibp0, fib_size,
+	    DDI_DEV_AUTOINCR);
+
+	if (aac_check_acc_handle(softs->pci_mem_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(softs->devinfo_p,
+		    DDI_SERVICE_UNAFFECTED);
+		mutex_exit(&softs->aifq_mutex);
+		return;
+	}
+
+	AACDB_PRINT_AIF(softs, (struct aac_aif_command *)&fibp->data[0]);
+
+	/* Modify AIF contexts */
+	current = softs->aifq_idx;
+	next = (current + 1) % AAC_AIFQ_LENGTH;
+	if (next == 0) {
+		struct aac_fib_context *ctx_p;
+
+		softs->aifq_wrap = 1;
+		for (ctx_p = softs->fibctx_p; ctx_p; ctx_p = ctx_p->next) {
+			if (next == ctx_p->ctx_idx) {
+				ctx_p->ctx_flags |= AAC_CTXFLAG_FILLED;
+			} else if (current == ctx_p->ctx_idx &&
+			    (ctx_p->ctx_flags & AAC_CTXFLAG_FILLED)) {
+				ctx_p->ctx_idx = next;
+				ctx_p->ctx_overrun++;
+			}
+		}
+	}
+	softs->aifq_idx = next;
+
+	/* Wakeup AIF threads */
+	cv_broadcast(&softs->aifq_cv);
+	mutex_exit(&softs->aifq_mutex);
+
+	/* Wakeup event thread to handle aif */
+	aac_event_disp(softs, AAC_EVENT_AIF);
+}
+
+static int
+aac_return_aif_common(struct aac_softstate *softs, struct aac_fib_context *ctx,
+    struct aac_fib **fibpp)
+{
+	int current;
+
+	current = ctx->ctx_idx;
+	if (current == softs->aifq_idx &&
+	    !(ctx->ctx_flags & AAC_CTXFLAG_FILLED))
+		return (EAGAIN); /* Empty */
+
+	*fibpp = &softs->aifq[current].d;
+
+	ctx->ctx_flags &= ~AAC_CTXFLAG_FILLED;
+	ctx->ctx_idx = (current + 1) % AAC_AIFQ_LENGTH;
+	return (0);
+}
+
+int
+aac_return_aif(struct aac_softstate *softs, struct aac_fib_context *ctx,
+    struct aac_fib **fibpp)
+{
+	int rval;
+
+	mutex_enter(&softs->aifq_mutex);
+	rval = aac_return_aif_common(softs, ctx, fibpp);
+	mutex_exit(&softs->aifq_mutex);
+	return (rval);
+}
+
+int
+aac_return_aif_wait(struct aac_softstate *softs, struct aac_fib_context *ctx,
+    struct aac_fib **fibpp)
+{
+	int rval;
+
+	mutex_enter(&softs->aifq_mutex);
+	rval = aac_return_aif_common(softs, ctx, fibpp);
+	if (rval == EAGAIN) {
+		AACDB_PRINT(softs, CE_NOTE, "Waiting for AIF");
+		rval = cv_wait_sig(&softs->aifq_cv, &softs->aifq_mutex);
+	}
+	mutex_exit(&softs->aifq_mutex);
+	return ((rval > 0) ? 0 : EINTR);
+}
+
+/*
  * The following function comes from Adaptec:
  *
  * When driver sees a particular event that means containers are changed, it
@@ -6275,26 +6398,12 @@ aac_dma_sync_ac(struct aac_cmd *acp)
  * another particular event. When sees that events come in, it will do rescan.
  */
 static int
-aac_handle_aif(struct aac_softstate *softs, struct aac_fib *fibp)
+aac_handle_aif(struct aac_softstate *softs, struct aac_aif_command *aif)
 {
 	ddi_acc_handle_t acc = softs->comm_space_acc_handle;
-	uint16_t fib_command;
-	struct aac_aif_command *aif;
 	int en_type;
 	int devcfg_needed;
-	int current, next;
 
-	fib_command = LE_16(fibp->Header.Command);
-	if (fib_command != AifRequest) {
-		cmn_err(CE_NOTE, "!Unknown command from controller: 0x%x",
-		    fib_command);
-		return (AACERR);
-	}
-
-	/* Update internal container state */
-	aif = (struct aac_aif_command *)&fibp->data[0];
-
-	AACDB_PRINT_AIF(softs, aif);
 	devcfg_needed = 0;
 	en_type = LE_32((uint32_t)aif->data.EN.type);
 
@@ -6353,35 +6462,43 @@ aac_handle_aif(struct aac_softstate *softs, struct aac_fib *fibp)
 		break;
 	}
 
-	mutex_exit(&softs->aifq_mutex);
 	if (devcfg_needed) {
 		softs->devcfg_wait_on = 0;
 		(void) aac_probe_containers(softs);
 	}
-	mutex_enter(&softs->aifq_mutex);
 
-	/* Modify AIF contexts */
-	current = softs->aifq_idx;
-	next = (current + 1) % AAC_AIFQ_LENGTH;
-	if (next == 0) {
-		struct aac_fib_context *ctx;
-
-		softs->aifq_wrap = 1;
-		for (ctx = softs->fibctx; ctx; ctx = ctx->next) {
-			if (next == ctx->ctx_idx) {
-				ctx->ctx_filled = 1;
-			} else if (current == ctx->ctx_idx && ctx->ctx_filled) {
-				ctx->ctx_idx = next;
-				AACDB_PRINT(softs, CE_NOTE,
-				    "-- AIF queue(%x) overrun", ctx->unique);
-			}
-		}
-	}
-	softs->aifq_idx = next;
-
-	/* Wakeup applications */
-	cv_broadcast(&softs->aifv);
 	return (AACOK);
+}
+
+
+/*
+ * Check and handle AIF events
+ */
+static void
+aac_aif_event(struct aac_softstate *softs)
+{
+	struct aac_fib *fibp;
+
+	/*CONSTCOND*/
+	while (1) {
+		if (aac_return_aif(softs, &softs->aifctx, &fibp) != 0)
+			break; /* No more AIFs to handle, end loop */
+
+		/* AIF overrun, array create/delete may missed. */
+		if (softs->aifctx.ctx_overrun) {
+			softs->aifctx.ctx_overrun = 0;
+		}
+
+		/* AIF received, handle it */
+		struct aac_aif_command *aifp =
+		    (struct aac_aif_command *)&fibp->data[0];
+		uint32_t aif_command = LE_32((uint32_t)aifp->command);
+
+		if (aif_command == AifCmdDriverNotify ||
+		    aif_command == AifCmdEventNotify ||
+		    aif_command == AifCmdJobProgress)
+			(void) aac_handle_aif(softs, aifp);
+	}
 }
 
 /*
@@ -6426,11 +6543,16 @@ aac_cmd_timeout(struct aac_softstate *softs, struct aac_cmd *acp)
  * Time sync. command added to synchronize time with firmware every 30
  * minutes (required for correct AIF timestamps etc.)
  */
-static int
+static void
 aac_sync_tick(struct aac_softstate *softs)
 {
 	ddi_acc_handle_t acc;
 	int rval;
+
+	mutex_enter(&softs->time_mutex);
+	ASSERT(softs->time_sync <= softs->timebase);
+	softs->time_sync = 0;
+	mutex_exit(&softs->time_mutex);
 
 	/* Time sync. with firmware every AAC_SYNC_TICK */
 	(void) aac_sync_fib_slot_bind(softs, &softs->sync_ac);
@@ -6440,43 +6562,158 @@ aac_sync_tick(struct aac_softstate *softs)
 	    ddi_get_time());
 	rval = aac_sync_fib(softs, SendHostTime, AAC_FIB_SIZEOF(uint32_t));
 	aac_sync_fib_slot_release(softs, &softs->sync_ac);
-	return (rval);
+
+	mutex_enter(&softs->time_mutex);
+	softs->time_sync = softs->timebase;
+	if (rval != AACOK)
+		/* retry shortly */
+		softs->time_sync += aac_tick << 1;
+	else
+		softs->time_sync += AAC_SYNC_TICK;
+	mutex_exit(&softs->time_mutex);
 }
 
+/*
+ * Timeout checking and handling
+ */
 static void
-aac_daemon(void *arg)
+aac_daemon(struct aac_softstate *softs)
 {
-	struct aac_softstate *softs = (struct aac_softstate *)arg;
-	struct aac_cmd *acp;
+	int time_out; /* set if timeout happened */
+	int time_adjust;
+	uint32_t softs_timebase;
 
-	DBCALLED(softs, 2);
+	mutex_enter(&softs->time_mutex);
+	ASSERT(softs->time_out <= softs->timebase);
+	softs->time_out = 0;
+	softs_timebase = softs->timebase;
+	mutex_exit(&softs->time_mutex);
 
-	mutex_enter(&softs->io_lock);
-	/* Check slot for timeout pkts */
-	aac_timebase += aac_tick;
-	for (acp = softs->q_busy.q_head; acp; acp = acp->next) {
-		if (acp->timeout) {
-			if (acp->timeout <= aac_timebase) {
-				aac_cmd_timeout(softs, acp);
-				ddi_trigger_softintr(softs->softint_id);
+	/* Check slots for timeout pkts */
+	time_adjust = 0;
+	do {
+		struct aac_cmd *acp;
+
+		time_out = 0;
+		for (acp = softs->q_busy.q_head; acp; acp = acp->next) {
+			if (acp->timeout == 0)
+				continue;
+
+			/*
+			 * If timeout happened, update outstanding cmds
+			 * to be checked later again.
+			 */
+			if (time_adjust) {
+				acp->timeout += time_adjust;
+				continue;
 			}
-			break;
+
+			if (acp->timeout <= softs_timebase) {
+				aac_cmd_timeout(softs, acp);
+				time_out = 1;
+				time_adjust = aac_tick * drv_usectohz(1000000);
+				break; /* timeout happened */
+			} else {
+				break; /* no timeout */
+			}
 		}
+	} while (time_out);
+
+	mutex_enter(&softs->time_mutex);
+	softs->time_out = softs->timebase + aac_tick;
+	mutex_exit(&softs->time_mutex);
+}
+
+/*
+ * The event thread handles various tasks serially for the other parts of
+ * the driver, so that they can run fast.
+ */
+static void
+aac_event_thread(struct aac_softstate *softs)
+{
+	int run = 1;
+
+	DBCALLED(softs, 1);
+
+	mutex_enter(&softs->ev_lock);
+	while (run) {
+		int events;
+
+		if ((events = softs->events) == 0) {
+			cv_wait(&softs->event_disp_cv, &softs->ev_lock);
+			events = softs->events;
+		}
+		softs->events = 0;
+		mutex_exit(&softs->ev_lock);
+
+		mutex_enter(&softs->io_lock);
+		if ((softs->state & AAC_STATE_RUN) &&
+		    (softs->state & AAC_STATE_DEAD) == 0) {
+			if (events & AAC_EVENT_TIMEOUT)
+				aac_daemon(softs);
+			if (events & AAC_EVENT_SYNCTICK)
+				aac_sync_tick(softs);
+			if (events & AAC_EVENT_AIF)
+				aac_aif_event(softs);
+		} else {
+			run = 0;
+		}
+		mutex_exit(&softs->io_lock);
+
+		mutex_enter(&softs->ev_lock);
 	}
 
-	/* Time sync. with firmware every AAC_SYNC_TICK */
-	if (aac_sync_time <= aac_timebase) {
-		aac_sync_time = aac_timebase;
-		if (aac_sync_tick(softs) != AACOK)
-			aac_sync_time += aac_tick << 1; /* retry shortly */
-		else
-			aac_sync_time += AAC_SYNC_TICK;
-	}
+	cv_signal(&softs->event_wait_cv);
+	mutex_exit(&softs->ev_lock);
+}
 
-	if ((softs->state & AAC_STATE_RUN) && (softs->timeout_id != 0))
-		softs->timeout_id = timeout(aac_daemon, (void *)softs,
+/*
+ * Internal timer. It is only responsbile for time counting and report time
+ * related events. Events handling is done by aac_event_thread(), so that
+ * the timer itself could be as precise as possible.
+ */
+static void
+aac_timer(void *arg)
+{
+	struct aac_softstate *softs = arg;
+	int events = 0;
+
+	mutex_enter(&softs->time_mutex);
+
+	/* If timer is being stopped, exit */
+	if (softs->timeout_id) {
+		softs->timeout_id = timeout(aac_timer, (void *)softs,
 		    (aac_tick * drv_usectohz(1000000)));
-	mutex_exit(&softs->io_lock);
+	} else {
+		mutex_exit(&softs->time_mutex);
+		return;
+	}
+
+	/* Time counting */
+	softs->timebase += aac_tick;
+
+	/* Check time related events */
+	if (softs->time_out && softs->time_out <= softs->timebase)
+		events |= AAC_EVENT_TIMEOUT;
+	if (softs->time_sync && softs->time_sync <= softs->timebase)
+		events |= AAC_EVENT_SYNCTICK;
+
+	mutex_exit(&softs->time_mutex);
+
+	if (events)
+		aac_event_disp(softs, events);
+}
+
+/*
+ * Dispatch events to daemon thread for handling
+ */
+static void
+aac_event_disp(struct aac_softstate *softs, int events)
+{
+	mutex_enter(&softs->ev_lock);
+	softs->events |= events;
+	cv_broadcast(&softs->event_disp_cv);
+	mutex_exit(&softs->ev_lock);
 }
 
 /*
@@ -6898,13 +7135,14 @@ aac_probe_lun(struct aac_softstate *softs, struct scsi_device *sd)
 	DBCALLED(softs, 2);
 
 	if (tgt < AAC_MAX_LD) {
-		int rval;
+		enum aac_cfg_event event;
 
 		if (lun == 0) {
 			mutex_enter(&softs->io_lock);
-			rval = aac_probe_container(softs, tgt);
+			event = aac_probe_container(softs, tgt);
 			mutex_exit(&softs->io_lock);
-			if (rval == AACOK) {
+			if ((event != AAC_CFG_NULL_NOEXIST) &&
+			    (event != AAC_CFG_DELETE)) {
 				if (scsi_hba_probe(sd, NULL) ==
 				    SCSIPROBE_EXISTS)
 					return (NDI_SUCCESS);
@@ -7162,10 +7400,10 @@ aac_tran_bus_config(dev_info_t *parent, uint_t flags, ddi_bus_config_op_t op,
 	return (rval);
 }
 
-static void
-aac_handle_dr(struct aac_drinfo *drp)
+/*ARGSUSED*/
+static int
+aac_handle_dr(struct aac_softstate *softs, int tgt, int lun, int event)
 {
-	struct aac_softstate *softs = drp->softs;
 	struct aac_device *dvp;
 	dev_info_t *dip;
 	int valid;
@@ -7174,21 +7412,22 @@ aac_handle_dr(struct aac_drinfo *drp)
 	DBCALLED(softs, 1);
 
 	/* Hold the nexus across the bus_config */
-	mutex_enter(&softs->io_lock);
-	dvp = AAC_DEV(softs, drp->tgt);
+	dvp = AAC_DEV(softs, tgt);
 	valid = AAC_DEV_IS_VALID(dvp);
 	dip = dvp->dip;
+	if (!(softs->state & AAC_STATE_RUN))
+		return (AACERR);
 	mutex_exit(&softs->io_lock);
 
-	switch (drp->event) {
-	case AAC_EVT_ONLINE:
-	case AAC_EVT_OFFLINE:
+	switch (event) {
+	case AAC_CFG_ADD:
+	case AAC_CFG_DELETE:
 		/* Device onlined */
 		if (dip == NULL && valid) {
 			ndi_devi_enter(softs->devinfo_p, &circ1);
-			(void) aac_config_lun(softs, drp->tgt, 0, NULL);
+			(void) aac_config_lun(softs, tgt, 0, NULL);
 			AACDB_PRINT(softs, CE_NOTE, "c%dt%dL%d onlined",
-			    softs->instance, drp->tgt, drp->lun);
+			    softs->instance, tgt, lun);
 			ndi_devi_exit(softs->devinfo_p, circ1);
 		}
 		/* Device offlined */
@@ -7199,34 +7438,12 @@ aac_handle_dr(struct aac_drinfo *drp)
 
 			(void) ndi_devi_offline(dip, NDI_DEVI_REMOVE);
 			AACDB_PRINT(softs, CE_NOTE, "c%dt%dL%d offlined",
-			    softs->instance, drp->tgt, drp->lun);
+			    softs->instance, tgt, lun);
 		}
 		break;
 	}
-	kmem_free(drp, sizeof (struct aac_drinfo));
-}
 
-static int
-aac_dr_event(struct aac_softstate *softs, int tgt, int lun, int event)
-{
-	struct aac_drinfo *drp;
-
-	DBCALLED(softs, 1);
-
-	if (softs->taskq == NULL ||
-	    (drp = kmem_zalloc(sizeof (struct aac_drinfo), KM_NOSLEEP)) == NULL)
-		return (AACERR);
-
-	drp->softs = softs;
-	drp->tgt = tgt;
-	drp->lun = lun;
-	drp->event = event;
-	if ((ddi_taskq_dispatch(softs->taskq, (void (*)(void *))aac_handle_dr,
-	    drp, DDI_NOSLEEP)) != DDI_SUCCESS) {
-		AACDB_PRINT(softs, CE_WARN, "DR task start failed");
-		kmem_free(drp, sizeof (struct aac_drinfo));
-		return (AACERR);
-	}
+	mutex_enter(&softs->io_lock);
 	return (AACOK);
 }
 
