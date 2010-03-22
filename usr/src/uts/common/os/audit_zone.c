@@ -141,7 +141,7 @@ au_zone_destroy(zoneid_t zone, void *arg)
 	cv_destroy(&(kctx->auk_queue.write_cv));
 	cv_destroy(&(kctx->auk_queue.read_cv));
 
-	kmem_free(kctx->auk_dbuffer, AU_DBUF_HEADER + kctx->auk_queue.bufsz);
+	kmem_free(kctx->auk_dbuffer, AU_DBUF_HEADER + kctx->auk_queue.buflen);
 
 	kmem_free(kctx, sizeof (au_kcontext_t));
 }

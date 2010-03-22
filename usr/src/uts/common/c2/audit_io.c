@@ -642,14 +642,16 @@ au_doorio(au_kcontext_t *kctx) {
 	 * Initial allocation is from audit_start.c/audit_init()
 	 */
 	if (kctx->auk_queue.bufsz != kctx->auk_queue.buflen) {
+		size_t new_sz = kctx->auk_queue.bufsz;
+
 		kmem_free(kctx->auk_dbuffer, AU_DBUF_HEADER +
 		    kctx->auk_queue.buflen);
 
-		kctx->auk_dbuffer = kmem_alloc(AU_DBUF_HEADER +
-		    kctx->auk_queue.bufsz, KM_SLEEP);
+		kctx->auk_dbuffer = kmem_alloc(AU_DBUF_HEADER + new_sz,
+		    KM_SLEEP);
 
 		/* omit the 64 bit header */
-		kctx->auk_queue.buflen = kctx->auk_queue.bufsz;
+		kctx->auk_queue.buflen = new_sz;
 	}
 	if (!kctx->auk_queue.head)
 		goto nodata;
