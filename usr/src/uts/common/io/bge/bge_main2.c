@@ -3188,6 +3188,13 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	err = pci_config_setup(devinfo, &bgep->cfg_handle);
 #ifdef BGE_IPMI_ASF
 #ifdef __sparc
+	/*
+	 * We need to determine the type of chipset for accessing some configure
+	 * registers. (This information will be used by bge_ind_put32,
+	 * bge_ind_get32 and bge_nic_read32)
+	 */
+	bgep->chipid.device = pci_config_get16(bgep->cfg_handle,
+	    PCI_CONF_DEVID);
 	value16 = pci_config_get16(bgep->cfg_handle, PCI_CONF_COMM);
 	value16 = value16 | (PCI_COMM_MAE | PCI_COMM_ME);
 	pci_config_put16(bgep->cfg_handle, PCI_CONF_COMM, value16);
@@ -3198,6 +3205,13 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    MHCR_CLEAR_INTERRUPT_INTA |
 	    MHCR_ENABLE_ENDIAN_WORD_SWAP |
 	    MHCR_ENABLE_ENDIAN_BYTE_SWAP;
+	/*
+	 * For some chipsets (e.g., BCM5718), if MHCR_ENABLE_ENDIAN_BYTE_SWAP
+	 * has been set in PCI_CONF_COMM already, we need to write the
+	 * byte-swapped value to it. So we just write zero first for simplicity.
+	 */
+	if (DEVICE_5717_SERIES_CHIPSETS(bgep))
+		pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR, 0);
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR, mhcrValue);
 	bge_ind_put32(bgep, MEMORY_ARBITER_MODE_REG,
 	    bge_ind_get32(bgep, MEMORY_ARBITER_MODE_REG) |

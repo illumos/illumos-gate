@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1503,6 +1503,15 @@ bge_phys_init(bge_t *bgep)
 	 * BCM800x PHY.
 	 */
 	bgep->phy_mii_addr = 1;
+	if (DEVICE_5717_SERIES_CHIPSETS(bgep)) {
+		int regval = bge_reg_get32(bgep, CPMU_STATUS_REG);
+		if (regval & CPMU_STATUS_FUN_NUM)
+			bgep->phy_mii_addr += 1;
+		regval = bge_reg_get32(bgep, SGMII_STATUS_REG);
+		if (regval & MEDIA_SELECTION_MODE)
+			bgep->phy_mii_addr += 7;
+	}
+
 	if (bge_phy_probe(bgep)) {
 		bgep->chipid.flags &= ~CHIP_FLAG_SERDES;
 		bgep->physops = &copper_ops;

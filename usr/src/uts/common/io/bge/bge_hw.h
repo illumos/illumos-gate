@@ -64,6 +64,7 @@ extern "C" {
 #define	DEVICE_ID_5704			0x1649
 #define	DEVICE_ID_5705C			0x1653
 #define	DEVICE_ID_5705_2		0x1654
+#define	DEVICE_ID_5718			0x1656
 #define	DEVICE_ID_5705M			0x165d
 #define	DEVICE_ID_5705MA3		0x165e
 #define	DEVICE_ID_5705F			0x166e
@@ -182,6 +183,9 @@ extern "C" {
 		(bgep->chipid.device == DEVICE_ID_5752) ||\
 		(bgep->chipid.device == DEVICE_ID_5752M) ||\
 		(bgep->chipid.device == DEVICE_ID_5789))
+
+#define	DEVICE_5717_SERIES_CHIPSETS(bgep) \
+		(bgep->chipid.device == DEVICE_ID_5718)
 
 #define	DEVICE_5723_SERIES_CHIPSETS(bgep) \
 		((bgep->chipid.device == DEVICE_ID_5723) ||\
@@ -356,6 +360,7 @@ extern "C" {
 #define	PDRWCR_VAR_5721			0x76180000
 #define	PDRWCR_VAR_5714			0x76148000	/* OR of above	*/
 #define	PDRWCR_VAR_5715			0x76144000	/* OR of above	*/
+#define	PDRWCR_VAR_5717			0x00380000
 
 /*
  * PCI State Register, in PCI config space
@@ -487,6 +492,7 @@ extern "C" {
 #define	NIC_MEM_SHADOW_SEND_7_8		0x7000		/* bogus	*/
 #define	NIC_MEM_SHADOW_SEND_9_16	0x8000		/* bogus	*/
 #define	NIC_MEM_SHADOW_BUFF_STD		0x6000
+#define	NIC_MEM_SHADOW_BUFF_STD_5717		0x40000
 #define	NIC_MEM_SHADOW_BUFF_JUMBO	0x7000
 #define	NIC_MEM_SHADOW_BUFF_MINI	0x8000		/* bogus	*/
 #define	NIC_MEM_SHADOW_SEND_RING(ring, nslots)	(0x4000 + 4*(ring)*(nslots))
@@ -960,6 +966,12 @@ extern "C" {
 #define	SERDES_STATUS_RXSTAT		0x000000ff
 
 /*
+ * SGMII Status Register (5717/5718 only)
+ */
+#define	SGMII_STATUS_REG	0x5B4
+#define	MEDIA_SELECTION_MODE	0x00000100
+
+/*
  * Statistic Registers (5705/5788/5721/5751/5752/5714/5715 only)
  */
 #define	STAT_IFHCOUT_OCTETS_REG		0x0800
@@ -1052,6 +1064,12 @@ extern "C" {
 #define	JUMBO_RCV_BD_REPLENISH_DEFAULT	0x00000020	/* 32	*/
 
 /*
+ * CPMU registers (5717/5718 only)
+ */
+#define	CPMU_STATUS_REG	0x362c
+#define	CPMU_STATUS_FUN_NUM	0x20000000
+
+/*
  * Host Coalescing Engine Control Registers
  */
 #define	RCV_COALESCE_TICKS_REG		0x3c08
@@ -1112,12 +1130,14 @@ extern "C" {
 #define	MAC_RX_MBUF_LOWAT_DEFAULT	0x00000020
 #define	MAC_RX_MBUF_LOWAT_5705		0x00000010
 #define	MAC_RX_MBUF_LOWAT_5906		0x00000004
+#define	MAC_RX_MBUF_LOWAT_5717		0x0000002a
 #define	MAC_RX_MBUF_LOWAT_JUMBO		0x00000098
 #define	MAC_RX_MBUF_LOWAT_5714_JUMBO	0x0000004b
 #define	MBUF_HIWAT_REG			0x4418
 #define	MBUF_HIWAT_DEFAULT		0x00000060
 #define	MBUF_HIWAT_5705			0x00000060
 #define	MBUF_HIWAT_5906			0x00000010
+#define	MBUF_HIWAT_5717			0x000000a0
 #define	MBUF_HIWAT_JUMBO		0x0000017c
 #define	MBUF_HIWAT_5714_JUMBO		0x00000096
 
@@ -1269,6 +1289,7 @@ extern "C" {
  */
 #define	MLCR_DEFAULT			0x0101c000
 #define	MLCR_DEFAULT_5714		0x1901c000
+#define	MLCR_DEFAULT_5717		0x01000000
 
 /*
  * Serial EEPROM Data/Address Registers (auto-access mode)

@@ -638,6 +638,7 @@ typedef struct {
 	uint32_t		rx_count_norm;
 	uint32_t		tx_ticks_norm;
 	uint32_t		tx_count_norm;
+	uint32_t		mask_pci_int;
 } chip_id_t;
 
 #define	CHIP_FLAG_SUPPORTED	0x80
