@@ -1855,11 +1855,11 @@ zfs_acl_inherit(zfsvfs_t *zfsvfs, vtype_t vtype, zfs_acl_t *paclp,
 		    OWNING_GROUP)) && (vreg || (vdir && (iflags &
 		    ACE_DIRECTORY_INHERIT_ACE)))) {
 			*need_chmod = B_FALSE;
+		}
 
-			if (!vdir && passthrough_x &&
-			    ((mode & (S_IXUSR | S_IXGRP | S_IXOTH)) == 0)) {
-				access_mask &= ~ACE_EXECUTE;
-			}
+		if (!vdir && passthrough_x &&
+		    ((mode & (S_IXUSR | S_IXGRP | S_IXOTH)) == 0)) {
+			access_mask &= ~ACE_EXECUTE;
 		}
 
 		aclnode = zfs_acl_node_alloc(ace_size);
