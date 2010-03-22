@@ -703,11 +703,18 @@ gexec(
 	    setidfl, exec_file, cred, brand_action);
 	rw_exit(eswp->exec_lock);
 	if (error != 0) {
-		if (newcred != NULL)
-			crfree(newcred);
 		if (execvp)
 			VN_RELE(execvp);
-		goto bad;
+		/*
+		 * If this process's p_exec has been set to the vp of
+		 * the executable by exec_func, we will return without
+		 * calling VOP_CLOSE because proc_exit will close it
+		 * on exit.
+		 */
+		if (pp->p_exec == vp)
+			goto bad_noclose;
+		else
+			goto bad;
 	}
 
 	if (level == 0) {
@@ -797,6 +804,8 @@ bad:
 	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, cred, NULL);
 
 bad_noclose:
+	if (newcred != NULL)
+		crfree(newcred);
 	if (error == 0)
 		error = ENOEXEC;
 
