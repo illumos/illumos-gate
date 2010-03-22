@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -256,8 +256,6 @@ struct tavor_sw_mr_s {
 	uint32_t		mr_rkey;
 	uint32_t		mr_logmttpgsz;
 	tavor_rsrc_t		*mr_rsrcp;
-	uint_t			mr_is_fmr;
-	tavor_fmr_list_t	*mr_fmr;
 	uint_t			mr_is_umem;
 	ddi_umem_cookie_t	mr_umemcookie;
 	void 			(*mr_umem_cbfunc)(void *, void *);
@@ -266,9 +264,7 @@ struct tavor_sw_mr_s {
 };
 _NOTE(DATA_READABLE_WITHOUT_LOCK(tavor_sw_mr_s::mr_bindinfo
     tavor_sw_mr_s::mr_lkey
-    tavor_sw_mr_s::mr_is_umem
-    tavor_sw_mr_s::mr_is_fmr
-    tavor_sw_mr_s::mr_fmr))
+    tavor_sw_mr_s::mr_is_umem))
 _NOTE(MUTEX_PROTECTS_DATA(tavor_sw_mr_s::mr_lock,
     tavor_sw_mr_s::mr_mptrsrcp
     tavor_sw_mr_s::mr_mttrsrcp
@@ -338,14 +334,6 @@ int tavor_mw_alloc(tavor_state_t *state, tavor_pdhdl_t pdhdl,
     ibt_mw_flags_t flags, tavor_mwhdl_t *mwhdl);
 int tavor_mw_free(tavor_state_t *state, tavor_mwhdl_t *mwhdl, uint_t sleep);
 void tavor_mr_keycalc(tavor_state_t *state, uint32_t indx, uint32_t *key);
-int tavor_mr_alloc_fmr(tavor_state_t *state, tavor_pdhdl_t pd,
-    tavor_fmrhdl_t fmr_pool, tavor_mrhdl_t *mrhdl);
-int tavor_mr_dealloc_fmr(tavor_state_t *state, tavor_mrhdl_t *mrhdl);
-int tavor_mr_register_physical_fmr(tavor_state_t *state,
-    ibt_pmr_attr_t *mem_pattr_p, tavor_mrhdl_t mr, ibt_pmr_desc_t *mem_desc_p);
-int tavor_mr_invalidate_fmr(tavor_state_t *state, tavor_mrhdl_t mr);
-int tavor_mr_deregister_fmr(tavor_state_t *state, tavor_mrhdl_t mr);
-
 
 #ifdef __cplusplus
 }

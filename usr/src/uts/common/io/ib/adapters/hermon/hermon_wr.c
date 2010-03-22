@@ -63,6 +63,15 @@ static void hermon_cq_workq_remove(hermon_cqhdl_t cq,
 
 static	ibt_wr_ds_t	null_sgl = { 0, 0x00000100, 0 };
 
+/*
+ * Add ability to try to debug RDMA_READ/RDMA_WRITE failures.
+ *
+ *      0x1 - print rkey used during post_send
+ *      0x2 - print sgls used during post_send
+ *	0x4 - print FMR comings and goings
+ */
+int hermon_rdma_debug = 0x0;
+
 static int
 hermon_post_send_ud(hermon_state_t *state, hermon_qphdl_t qp,
     ibt_send_wr_t *wr, uint_t num_wr, uint_t *num_posted)
@@ -310,15 +319,16 @@ hermon_post_send_rc(hermon_state_t *state, hermon_qphdl_t qp,
 	uint32_t			*wqe_start;
 	int				sectperwqe;
 	uint_t				posted_cnt = 0;
+	int				print_rdma;
+	int				rlen;
+	uint32_t			rkey;
+	uint64_t			raddr;
 
 	/* initialize the FMA retry loop */
 	hermon_pio_init(fm_loop_cnt, fm_status, fm_test_num);
 
 	ASSERT(MUTEX_HELD(&qp->qp_sq_lock));
 	_NOTE(LOCK_RELEASED_AS_SIDE_EFFECT(&qp->qp_sq_lock))
-
-	/* make sure we see any update of wq_head */
-	membar_consumer();
 
 	/* Save away some initial QP state */
 	wq = qp->qp_sq_wqhdr;
@@ -331,6 +341,9 @@ hermon_post_send_rc(hermon_state_t *state, hermon_qphdl_t qp,
 	status	  = DDI_SUCCESS;
 
 post_next:
+	print_rdma = 0;
+	rlen = 0;
+
 	/*
 	 * Check for "queue full" condition.  If the queue
 	 * is already full, then no more WQEs can be posted.
@@ -396,6 +409,12 @@ post_next:
 		 * the information from the RC work request.
 		 */
 		HERMON_WQE_BUILD_REMADDR(qp, rc, &wr->wr.rc.rcwr.rdma);
+
+		if (hermon_rdma_debug) {
+			print_rdma = hermon_rdma_debug;
+			rkey = wr->wr.rc.rcwr.rdma.rdma_rkey;
+			raddr = wr->wr.rc.rcwr.rdma.rdma_raddr;
+		}
 
 		/* Update "ds" for filling in Data Segments (below) */
 		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)rc +
@@ -490,6 +509,10 @@ post_next:
 		if (sgl[i].ds_len == 0) {
 			continue;
 		}
+		rlen += sgl[i].ds_len;
+		if (print_rdma & 0x2)
+			IBTF_DPRINTF_L2("rdma", "post: [%d]: laddr %llx  "
+			    "llen %x", i, sgl[i].ds_va, sgl[i].ds_len);
 
 		/*
 		 * Fill in the Data Segment(s) for the current WQE, using the
@@ -498,6 +521,11 @@ post_next:
 		 */
 		last_ds--;
 		HERMON_WQE_BUILD_DATA_SEG_SEND(&ds[last_ds], &sgl[i]);
+	}
+
+	if (print_rdma & 0x1) {
+		IBTF_DPRINTF_L2("rdma", "post: indx %x  rkey %x  raddr %llx  "
+		    "total len %x", tail, rkey, raddr, rlen);
 	}
 
 	fence = (wr->wr_flags & IBT_WR_SEND_FENCE) ? 1 : 0;
@@ -634,11 +662,21 @@ hermon_post_send(hermon_state_t *state, hermon_qphdl_t qp,
 		goto post_many;
 
 	/* Use these optimized functions most of the time */
-	if (qp->qp_serv_type == HERMON_QP_UD)
+	if (qp->qp_serv_type == HERMON_QP_UD) {
+		if (wr->wr_trans != IBT_UD_SRV) {
+			mutex_exit(&qp->qp_sq_lock);
+			return (IBT_QP_SRV_TYPE_INVALID);
+		}
 		return (hermon_post_send_ud(state, qp, wr, num_wr, num_posted));
+	}
 
-	if (qp->qp_serv_type == HERMON_QP_RC)
+	if (qp->qp_serv_type == HERMON_QP_RC) {
+		if (wr->wr_trans != IBT_RC_SRV) {
+			mutex_exit(&qp->qp_sq_lock);
+			return (IBT_QP_SRV_TYPE_INVALID);
+		}
 		return (hermon_post_send_rc(state, qp, wr, num_wr, num_posted));
+	}
 
 	if (qp->qp_serv_type == HERMON_QP_UC)
 		goto post_many;
@@ -648,9 +686,6 @@ hermon_post_send(hermon_state_t *state, hermon_qphdl_t qp,
 
 post_many:
 	/* general loop for non-optimized posting */
-
-	/* Grab the lock for the WRID list */
-	membar_consumer();
 
 	/* Save away some initial QP state */
 	wq = qp->qp_sq_wqhdr;

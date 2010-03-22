@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,9 +58,6 @@ uint32_t tavor_log_max_cq_sz		= TAVOR_CQ_SZ_SHIFT;
 /* Select to enable SRQ or not; NOTE: 0 for disabled, 1 for enabled */
 uint32_t tavor_srq_enable		= 1;
 
-/* Select to enable FMR or not; NOTE: 0 for disabled, 1 for enabled */
-uint32_t tavor_fmr_enable		= 1;
-
 /* Number of supported SRQs and their maximum size */
 uint32_t tavor_log_num_srq		= TAVOR_NUM_SRQ_SHIFT_128;
 uint32_t tavor_log_max_srq_sz		= TAVOR_SRQ_SZ_SHIFT;
@@ -89,14 +86,6 @@ uint32_t tavor_log_num_mcg_hash		= TAVOR_NUM_MCG_HASH_SHIFT;
 uint32_t tavor_log_num_mpt		= TAVOR_NUM_MPT_SHIFT_128;
 uint32_t tavor_log_max_mrw_sz		= TAVOR_MAX_MEM_MPT_SHIFT_128;
 uint32_t tavor_log_num_mttseg		= TAVOR_NUM_MTTSEG_SHIFT;
-
-/*
- * Number of remaps allowed for FMR before a sync is required.  This value
- * determines how many times we can fmr_deregister() before the underlying fmr
- * framework places the region to wait for an MTT_SYNC operation, cleaning up
- * the old mappings.
- */
-uint32_t tavor_fmr_num_remaps		= TAVOR_FMR_MAX_REMAPS;
 
 /*
  * Number of supported Tavor mailboxes ("In" and "Out") and their maximum
@@ -295,8 +284,8 @@ tavor_cfg_profile_init_phase1(tavor_state_t *state)
 	cp->cp_max_out_splt_trans	= tavor_max_out_splt_trans;
 	cp->cp_max_mem_rd_byte_cnt	= tavor_max_mem_rd_byte_cnt;
 	cp->cp_srq_enable		= tavor_srq_enable;
-	cp->cp_fmr_enable		= tavor_fmr_enable;
-	cp->cp_fmr_max_remaps		= tavor_fmr_num_remaps;
+	cp->cp_fmr_enable		= 0;
+	cp->cp_fmr_max_remaps		= 0;
 
 	/*
 	 * Although most of the configuration is enabled in "phase2" of the

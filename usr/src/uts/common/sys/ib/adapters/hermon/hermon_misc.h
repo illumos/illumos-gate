@@ -615,7 +615,7 @@ _NOTE(MUTEX_PROTECTS_DATA(hermon_sw_fmr_s::fmr_lock,
 _NOTE(MUTEX_PROTECTS_DATA(hermon_sw_fmr_s::fmr_cachelock,
     hermon_sw_fmr_s::fmr_cache_avl))
 
-#define	HERMON_FMR_MAX_REMAPS		32
+#define	HERMON_FMR_MAX_REMAPS		128
 
 /* Hermon doorbell record routines */
 
@@ -680,17 +680,6 @@ int hermon_pkeyindex_is_valid(hermon_state_t *state, uint_t pkeyindx);
 int hermon_queue_alloc(hermon_state_t *state, hermon_qalloc_info_t *qa_info,
     uint_t sleepflag);
 void hermon_queue_free(hermon_qalloc_info_t *qa_info);
-int hermon_get_dma_cookies(hermon_state_t *state, ibt_phys_buf_t *paddr_list_p,
-    ibt_va_attr_t *va_attrs, uint_t list_len, uint_t *cookiecnt,
-    ibc_ma_hdl_t *ibc_ma_hdl_p);
-int hermon_split_dma_cookies(hermon_state_t *state,
-    ibt_phys_buf_t *paddr_list_p, ib_memlen_t *paddr_offset_p,
-    uint_t list_len, uint_t *cookiecnt, uint_t pagesize);
-int hermon_dma_cookie_shift(ibt_phys_buf_t *paddr_list, int start, int end,
-    int cookiecnt, int num_shift);
-int hermon_free_dma_cookies(ibc_ma_hdl_t ibc_ma_hdl);
-int hermon_log2(long x);
-
 
 #ifdef __cplusplus
 }

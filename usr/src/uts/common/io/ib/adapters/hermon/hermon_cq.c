@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1473,6 +1473,11 @@ hermon_cq_errcqe_consume(hermon_state_t *state, hermon_cqhdl_t cq,
 	 */
 	imm_eth_pkey_cred = HERMON_CQE_ERROR_SYNDROME_GET(cq, cqe);
 	status = imm_eth_pkey_cred;
+	if (status != HERMON_CQE_WR_FLUSHED_ERR)
+		IBTF_DPRINTF_L2("errcqe", "cqe %p  indx %x  status 0x%x  "
+		    "vendor syndrome %x", cqe, HERMON_CQE_WQECNTR_GET(cq, cqe),
+		    status, ((uint8_t *)cqe)[26]);
+
 	switch (status) {
 	case HERMON_CQE_LOC_LEN_ERR:
 		HERMON_FMANOTE(state, HERMON_FMA_LOCLEN);

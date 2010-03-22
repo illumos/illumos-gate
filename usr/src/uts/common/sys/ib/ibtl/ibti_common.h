@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1312,8 +1312,7 @@ ibt_status_t ibt_reregister_phys_mr(ibt_hca_hdl_t hca_hdl, ibt_mr_hdl_t mr_hdl,
  *	is returned.
  */
 ibt_status_t ibt_map_mem_area(ibt_hca_hdl_t hca_hdl, ibt_va_attr_t *va_attrs,
-    uint_t paddr_list_len, ibt_phys_buf_t *paddr_list_p, uint_t *num_paddr_p,
-    size_t *paddr_bufsz_p, ib_memlen_t *paddr_offset_p, ibt_ma_hdl_t *ma_hdl_p);
+    uint_t paddr_list_len, ibt_reg_req_t *reg_req, ibt_ma_hdl_t *ma_hdl_p);
 
 /*
  * ibt_unmap_mem_area()

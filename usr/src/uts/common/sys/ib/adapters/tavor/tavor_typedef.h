@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,7 +87,6 @@ typedef struct tavor_sw_pd_s		*tavor_pdhdl_t;
 typedef struct tavor_sw_eq_s		*tavor_eqhdl_t;
 typedef struct tavor_sw_cq_s		*tavor_cqhdl_t;
 typedef struct tavor_sw_srq_s		*tavor_srqhdl_t;
-typedef struct tavor_sw_fmr_s		*tavor_fmrhdl_t;
 typedef struct tavor_sw_ah_s		*tavor_ahhdl_t;
 typedef struct tavor_sw_qp_s		*tavor_qphdl_t;
 typedef struct tavor_sw_mcg_list_s	*tavor_mcghdl_t;

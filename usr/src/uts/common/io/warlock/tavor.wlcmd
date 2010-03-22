@@ -1,5 +1,5 @@
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -132,11 +132,6 @@ add	tavor_umap_db_handle_onclose_cb/callback targets \
 
 ### Tavor QP number AVL tree compare function
 root	tavor_qpn_avl_compare
-
-### Tavor FMR processing
-root	tavor_fmr_avl_compare
-root	tavor_fmr_processing
-add	tavor_sw_fmr_s::fmr_flush_function targets warlock_dummy
 
 add	bus_ops::bus_add_eventcall	targets warlock_dummy
 add	bus_ops::bus_get_eventcookie	targets warlock_dummy

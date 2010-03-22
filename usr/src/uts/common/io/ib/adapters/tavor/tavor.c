@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1851,9 +1851,6 @@ tavor_soft_state_init(tavor_state_t *state)
 	}
 	if (state->ts_cfg_profile->cp_srq_enable) {
 		caps |= IBT_HCA_SRQ | IBT_HCA_RESIZE_SRQ;
-	}
-	if (state->ts_cfg_profile->cp_fmr_enable) {
-		caps |= IBT_HCA_FMR;
 	}
 	caps |= (IBT_HCA_AH_PORT_CHECK | IBT_HCA_SQD_SQD_PORT |
 	    IBT_HCA_SI_GUID | IBT_HCA_RNR_NAK | IBT_HCA_CURRENT_QP_STATE |

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -377,6 +377,23 @@ typedef struct ibt_eec_query_attr_s {
 #define	IBT_AH_NO_FLAGS		IBT_UD_DEST_NO_FLAGS
 #define	IBT_AH_USER_MAP		IBT_UD_DEST_USER_MAP
 #define	IBT_AH_DEFER_ALLOC	IBT_UD_DEST_DEFER_ALLOC
+
+
+/*
+ * ibt_hca_attr_t
+ */
+#define	hca_max_rdd		hca_opaque2	/* Max RDDs in HCA */
+#define	hca_max_eec		hca_opaque3	/* Max EEContexts in HCA */
+#define	hca_max_rd_sgl		hca_opaque4	/* Max SGL entries per RD WR */
+#define	hca_max_rdma_in_ee	hca_opaque5	/* Max RDMA Reads/Atomics in */
+						/* per EEC with HCA as target */
+#define	hca_max_rdma_out_ee	hca_opaque6	/* Max RDMA Reads/Atomics out */
+						/* per EE by this HCA */
+#define	hca_max_ipv6_qp		hca_max_ipv6_chan
+#define	hca_max_ether_qp	hca_max_ether_chan
+#define	hca_eec_max_ci_priv_sz	hca_opaque7
+#define	hca_rdd_max_ci_priv_sz	hca_opaque8
+#define	hca_max_map_per_fmr	hca_opaque9
 
 #ifdef __cplusplus
 }

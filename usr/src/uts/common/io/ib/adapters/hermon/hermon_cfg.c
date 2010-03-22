@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,6 +242,20 @@ hermon_cfg_profile_init_phase1(hermon_state_t *state)
 		return (DDI_FAILURE);
 	}
 
+	/*
+	 * Set IOMMU bypass or not.  Ensure consistency of flags with
+	 * architecture type.
+	 */
+#ifdef __sparc
+	if (hermon_iommu_bypass == 1) {
+		hermon_check_iommu_bypass(state, cp);
+	} else {
+		cp->cp_iommu_bypass = HERMON_BINDMEM_NORMAL;
+	}
+#else
+	cp->cp_iommu_bypass = HERMON_BINDMEM_NORMAL;
+#endif
+
 	/* Attach the configuration profile to Hermon softstate */
 	state->hs_cfg_profile = cp;
 
@@ -351,20 +365,6 @@ hermon_cfg_profile_init_phase2(hermon_state_t *state)
 
 	/* Determine WQE sizes from requested max SGLs */
 	hermon_cfg_wqe_sizes(state, cp);
-
-	/*
-	 * Set IOMMU bypass or not.  Ensure consistency of flags with
-	 * architecture type.
-	 */
-#ifdef __sparc
-	if (hermon_iommu_bypass == 1) {
-		hermon_check_iommu_bypass(state, cp);
-	} else {
-		cp->cp_iommu_bypass = HERMON_BINDMEM_NORMAL;
-	}
-#else
-	cp->cp_iommu_bypass = HERMON_BINDMEM_NORMAL;
-#endif
 
 	/* Set whether to use MSIs or not */
 	cp->cp_use_msi_if_avail = hermon_use_msi_if_avail;

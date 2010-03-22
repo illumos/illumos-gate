@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,27 +59,10 @@ extern "C" {
  * Native page size of the adapter
  */
 #define	HERMON_PAGESIZE		0x1000	/* 4Kb */
-#define	HERMON_PAGEMASK		(HERMON_PAGESIZE - 1)
+#define	HERMON_PAGEOFFSET	(HERMON_PAGESIZE - 1)
+#define	HERMON_PAGEMASK		(~HERMON_PAGEOFFSET)
 #define	HERMON_PAGESHIFT	0xC		/* 12  */
 
-/*
- * MACROS to make some page stuff easier
- */
-
-/* given a value, return a value that's the next higher power of 2 */
-#define	HERMON_POW2(x)		(1 << highbit(x))
-/*
- * given a size in bytes, return the minimum number of
- * *HCA PAGES* needed to hold it
- */
-#define	HERMON_HCA_PAGES(x)	\
-	(((x + HERMON_PAGESIZE) & HERMON_PAGEMASK) >> HERMON_PAGESHIFT)
-
-/*
- * given a size in bytes, return the power of two number of
- * *HCA PAGES* needed to hold it
- */
-#define	HERMON_HCA_POW2_PAGES(x)	(HERMON_POW2(HERMON_HCA_PAGES(x)))
 /*
  * Offsets into the CMD BAR (BAR 0) for many of the more interesting hardware
  * registers.  These registers include the HCR (more below), and the software
@@ -1380,7 +1363,7 @@ struct hermon_hw_dmpt_s {
 	uint32_t	fast_reg_en	:1;
 	uint32_t	net_cache	:1;
 	uint32_t	en_inval	:1;
-	uint32_t	ren_inavl	:1;
+	uint32_t	ren_inval	:1;
 	uint32_t	pd		:24;	/* dw 3, byte 0xc-f */
 
 	uint64_t	start_addr;		/* dw 4-5, byte 0x10-17 */
@@ -1542,7 +1525,7 @@ struct hermon_hw_cmpt_s {
 	uint32_t	fast_reg_en	:1;
 	uint32_t	net_cache	:1;
 	uint32_t	en_inval	:1;
-	uint32_t	ren_inavl	:1;
+	uint32_t	ren_inval	:1;
 	uint32_t	pd		:24;	/* dw 3, byte 0xc-f */
 
 	uint64_t	start_addr;		/* dw 4-5, byte 0x10-17 */

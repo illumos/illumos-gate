@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,23 +133,6 @@ typedef struct ibtl_hca_devinfo_s *ibc_clnt_hdl_t;	/* ibc_attach() */
  */
 #define	IBT_HDL_EEC	IBT_HDL_OPAQUE1
 #define	IBT_HDL_RDD	IBT_HDL_OPAQUE2
-
-
-/*
- * ibt_hca_attr_t
- */
-#define	hca_max_rdd		hca_opaque2	/* Max RDDs in HCA */
-#define	hca_max_eec		hca_opaque3	/* Max EEContexts in HCA */
-#define	hca_max_rd_sgl		hca_opaque4	/* Max SGL entries per RD WR */
-#define	hca_max_rdma_in_ee	hca_opaque5	/* Max RDMA Reads/Atomics in */
-						/* per EEC with HCA as target */
-#define	hca_max_rdma_out_ee	hca_opaque6	/* Max RDMA Reads/Atomics out */
-						/* per EE by this HCA */
-#define	hca_max_ipv6_qp		hca_max_ipv6_chan
-#define	hca_max_ether_qp	hca_max_ether_chan
-#define	hca_eec_max_ci_priv_sz	hca_opaque7
-#define	hca_rdd_max_ci_priv_sz	hca_opaque8
-#define	hca_max_map_per_fmr	hca_opaque9
 
 
 /*
@@ -371,9 +354,8 @@ typedef struct ibc_operations_s {
 	/* Address translation */
 	ibt_status_t (*ibc_map_mem_area)(ibc_hca_hdl_t hca_hdl,
 	    ibt_va_attr_t *va_attrs, void *ibtl_reserved,
-	    uint_t paddr_list_len, ibt_phys_buf_t *paddr_list_p,
-	    uint_t *num_paddr_p, size_t *paddr_bufsz_p,
-	    ib_memlen_t *paddr_offset_p, ibc_ma_hdl_t *ma_hdl_p);
+	    uint_t paddr_list_len, ibt_reg_req_t *reg_req,
+	    ibc_ma_hdl_t *ma_hdl_p);
 	ibt_status_t (*ibc_unmap_mem_area)(ibc_hca_hdl_t hca_hdl,
 	    ibc_ma_hdl_t ma_hdl);
 	ibt_status_t (*ibc_map_mem_iov)(ibc_hca_hdl_t hca_hdl,

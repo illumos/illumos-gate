@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -499,72 +499,6 @@ typedef struct tavor_loopback_state_s {
 	int			tls_timeout;
 } tavor_loopback_state_t;
 
-/*
- * Mellanox FMR
- */
-typedef struct tavor_fmr_list_s {
-	avl_node_t			fmr_avlnode;
-	struct tavor_fmr_list_s		*fmr_next;
-
-	tavor_mrhdl_t			fmr;
-	ibt_pmr_desc_t			fmr_desc;
-	tavor_fmrhdl_t			fmr_pool;
-	uint_t				fmr_refcnt;
-	uint_t				fmr_remaps;
-	uint_t				fmr_in_cache;
-} tavor_fmr_list_t;
-
-struct tavor_sw_fmr_s {
-	tavor_state_t			*fmr_state;
-
-	kmutex_t			fmr_lock;
-	ddi_taskq_t			*fmr_taskq;
-
-	ibt_fmr_flush_handler_t		fmr_flush_function;
-	void				*fmr_flush_arg;
-
-	int				fmr_pool_size;
-	int				fmr_max_pages;
-	int				fmr_page_sz;
-	int				fmr_dirty_watermark;
-	int				fmr_dirty_len;
-	int				fmr_flags;
-
-	tavor_fmr_list_t		*fmr_free_list;
-	tavor_fmr_list_t		*fmr_dirty_list;
-
-	int				fmr_cache;
-	avl_tree_t			fmr_cache_avl;
-	kmutex_t			fmr_cachelock;
-};
-_NOTE(MUTEX_PROTECTS_DATA(tavor_sw_fmr_s::fmr_lock,
-    tavor_sw_fmr_s::fmr_state
-    tavor_sw_fmr_s::fmr_pool_size
-    tavor_sw_fmr_s::fmr_max_pages
-    tavor_sw_fmr_s::fmr_page_sz
-    tavor_sw_fmr_s::fmr_dirty_watermark
-    tavor_sw_fmr_s::fmr_dirty_len
-    tavor_sw_fmr_s::fmr_flags
-    tavor_sw_fmr_s::fmr_free_list
-    tavor_sw_fmr_s::fmr_dirty_list
-    tavor_sw_fmr_s::fmr_cache))
-
-_NOTE(MUTEX_PROTECTS_DATA(tavor_sw_fmr_s::fmr_cachelock,
-    tavor_sw_fmr_s::fmr_cache_avl))
-
-#define	TAVOR_FMR_MAX_REMAPS		32
-
-/* Tavor Fast Memory Registration Routines */
-int tavor_create_fmr_pool(tavor_state_t *state, tavor_pdhdl_t pdhdl,
-    ibt_fmr_pool_attr_t *params, tavor_fmrhdl_t *fmrhdl);
-int tavor_destroy_fmr_pool(tavor_state_t *state, tavor_fmrhdl_t fmrhdl);
-int tavor_flush_fmr_pool(tavor_state_t *state, tavor_fmrhdl_t fmrhdl);
-int tavor_register_physical_fmr(tavor_state_t *state, tavor_fmrhdl_t fmrhdl,
-    ibt_pmr_attr_t *mem_pattr_p, tavor_mrhdl_t *mrhdl,
-    ibt_pmr_desc_t *mem_desc_p);
-int tavor_deregister_fmr(tavor_state_t *state, tavor_mrhdl_t mr);
-
-
 /* Tavor Address Handle routines */
 int tavor_ah_alloc(tavor_state_t *state, tavor_pdhdl_t pd,
     ibt_adds_vect_t *attr_p, tavor_ahhdl_t *ahhdl, uint_t sleepflag);
@@ -609,15 +543,6 @@ int tavor_queue_alloc(tavor_state_t *state, tavor_qalloc_info_t *qa_info,
     uint_t sleepflag);
 void tavor_queue_free(tavor_state_t *state, tavor_qalloc_info_t *qa_info);
 void tavor_dma_attr_init(ddi_dma_attr_t *dma_attr);
-int tavor_get_dma_cookies(tavor_state_t *state, ibt_phys_buf_t *paddr_list_p,
-    ibt_va_attr_t *va_attrs, uint_t list_len, uint_t *cookiecnt,
-    ibc_ma_hdl_t *ibc_ma_hdl_p);
-int tavor_split_dma_cookies(tavor_state_t *state, ibt_phys_buf_t *paddr_list_p,
-    ib_memlen_t *paddr_offset_p, uint_t list_len, uint_t *cookiecnt,
-    uint_t pagesize);
-int tavor_dma_cookie_shift(ibt_phys_buf_t *paddr_list, int start, int end,
-    int cookiecnt, int num_shift);
-int tavor_free_dma_cookies(ibc_ma_hdl_t ibc_ma_hdl);
 
 #ifdef __cplusplus
 }

@@ -47,14 +47,18 @@
 
 extern uint32_t hermon_kernel_data_ro;
 extern uint32_t hermon_user_data_ro;
+extern int hermon_rdma_debug;
 
 /*
  * Used by hermon_mr_keycalc() below to fill in the "unconstrained" portion
  * of Hermon memory keys (LKeys and RKeys)
  */
 static	uint_t hermon_memkey_cnt = 0x00;
-#define	HERMON_MEMKEY_SHIFT	 24
-#define	HERMON_MPT_SW_OWNERSHIP	 0xF
+#define	HERMON_MEMKEY_SHIFT	24
+
+/* initial state of an MPT */
+#define	HERMON_MPT_SW_OWNERSHIP	0xF	/* memory regions */
+#define	HERMON_MPT_FREE		0x3	/* allocate lkey */
 
 static int hermon_mr_common_reg(hermon_state_t *state, hermon_pdhdl_t pd,
     hermon_bind_info_t *bind, hermon_mrhdl_t *mrhdl, hermon_mr_options_t *op,
@@ -73,8 +77,8 @@ static void hermon_mr_mem_unbind(hermon_state_t *state,
     hermon_bind_info_t *bind);
 static int hermon_mr_fast_mtt_write(hermon_state_t *state, hermon_rsrc_t *mtt,
     hermon_bind_info_t *bind, uint32_t mtt_pgsize_bits);
-static int hermon_mr_fast_mtt_write_fmr(hermon_rsrc_t *mtt,
-    ibt_pmr_attr_t *mem_pattr, uint32_t mtt_pgsize_bits);
+static int hermon_mr_fast_mtt_write_fmr(hermon_state_t *state,
+    hermon_rsrc_t *mtt, ibt_pmr_attr_t *mem_pattr, uint32_t mtt_pgsize_bits);
 static uint_t hermon_mtt_refcnt_inc(hermon_rsrc_t *rsrc);
 static uint_t hermon_mtt_refcnt_dec(hermon_rsrc_t *rsrc);
 
@@ -252,12 +256,7 @@ hermon_mr_register_shared(hermon_state_t *state, hermon_mrhdl_t mrhdl,
 	 * if no remote access is required, then the RKey value is not filled
 	 * in.  Otherwise both Rkey and LKey are given the same value.
 	 */
-	mr->mr_lkey = hermon_mr_keycalc(mpt->hr_indx);
-	if ((mr->mr_accflag & IBT_MR_REMOTE_READ) ||
-	    (mr->mr_accflag & IBT_MR_REMOTE_WRITE) ||
-	    (mr->mr_accflag & IBT_MR_REMOTE_ATOMIC)) {
-		mr->mr_rkey = mr->mr_lkey;
-	}
+	mr->mr_rkey = mr->mr_lkey = hermon_mr_keycalc(mpt->hr_indx);
 
 	/* Grab the MR lock for the current memory region */
 	mutex_enter(&mrhdl->mr_lock);
@@ -446,13 +445,17 @@ hermon_mr_alloc_fmr(hermon_state_t *state, hermon_pdhdl_t pd,
     hermon_fmrhdl_t fmr_pool, hermon_mrhdl_t *mrhdl)
 {
 	hermon_rsrc_t		*mpt, *mtt, *rsrc;
-	hermon_hw_dmpt_t		mpt_entry;
+	hermon_hw_dmpt_t	mpt_entry;
 	hermon_mrhdl_t		mr;
 	hermon_bind_info_t	bind;
 	uint64_t		mtt_addr;
 	uint64_t		nummtt;
 	uint_t			sleep, mtt_pgsize_bits;
 	int			status;
+	offset_t		i;
+	hermon_icm_table_t	*icm_table;
+	hermon_dma_info_t	*dma_info;
+	uint32_t		index1, index2, rindx;
 
 	/*
 	 * Check the sleep flag.  Ensure that it is consistent with the
@@ -521,12 +524,8 @@ hermon_mr_alloc_fmr(hermon_state_t *state, hermon_pdhdl_t pd,
 	 * if no remote access is required, then the RKey value is not filled
 	 * in.  Otherwise both Rkey and LKey are given the same value.
 	 */
-	mr->mr_lkey = hermon_mr_keycalc(mpt->hr_indx);
-	if ((mr->mr_accflag & IBT_MR_REMOTE_READ) ||
-	    (mr->mr_accflag & IBT_MR_REMOTE_WRITE) ||
-	    (mr->mr_accflag & IBT_MR_REMOTE_ATOMIC)) {
-		mr->mr_rkey = mr->mr_lkey;
-	}
+	mr->mr_fmr_key = 1;	/* ready for the next reload */
+	mr->mr_rkey = mr->mr_lkey = mpt->hr_indx;
 
 	/*
 	 * Determine number of pages spanned.  This routine uses the
@@ -571,6 +570,8 @@ hermon_mr_alloc_fmr(hermon_state_t *state, hermon_pdhdl_t pd,
 
 	mpt_entry.entity_sz	= mr->mr_logmttpgsz;
 	mtt_addr = (mtt->hr_indx << HERMON_MTT_SIZE_SHIFT);
+	mpt_entry.fast_reg_en = 1;
+	mpt_entry.mtt_size = (uint_t)nummtt;
 	mpt_entry.mtt_addr_h = mtt_addr >> 32;
 	mpt_entry.mtt_addr_l = mtt_addr >> 3;
 	mpt_entry.mem_key = mr->mr_lkey;
@@ -608,13 +609,23 @@ hermon_mr_alloc_fmr(hermon_state_t *state, hermon_pdhdl_t pd,
 	 */
 	mr->mr_mptrsrcp	  = mpt;
 	mr->mr_mttrsrcp	  = mtt;
+
 	mr->mr_mpt_type   = HERMON_MPT_DMPT;
 	mr->mr_pdhdl	  = pd;
 	mr->mr_rsrcp	  = rsrc;
 	mr->mr_is_fmr	  = 1;
 	mr->mr_lkey	   = hermon_mr_key_swap(mr->mr_lkey);
 	mr->mr_rkey	   = hermon_mr_key_swap(mr->mr_rkey);
+	mr->mr_mttaddr	   = mtt_addr;
 	(void) memcpy(&mr->mr_bindinfo, &bind, sizeof (hermon_bind_info_t));
+
+	/* initialize hr_addr for use during register/deregister/invalidate */
+	icm_table = &state->hs_icm[HERMON_DMPT];
+	rindx = mpt->hr_indx;
+	hermon_index(index1, index2, rindx, icm_table, i);
+	dma_info = icm_table->icm_dma[index1] + index2;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mpt))
+	mpt->hr_addr = (void *)((uintptr_t)(dma_info->vaddr + i * mpt->hr_len));
 
 	*mrhdl = mr;
 
@@ -635,6 +646,7 @@ fmralloc_fail:
 	return (status);
 }
 
+
 /*
  * hermon_mr_register_physical_fmr()
  *    Context: Can be called from interrupt or base context.
@@ -647,21 +659,24 @@ hermon_mr_register_physical_fmr(hermon_state_t *state,
 	hermon_rsrc_t		*mpt;
 	uint64_t		*mpt_table;
 	int			status;
+	uint32_t		key;
 
 	mutex_enter(&mr->mr_lock);
 	mpt = mr->mr_mptrsrcp;
 	mpt_table = (uint64_t *)mpt->hr_addr;
 
 	/* Write MPT status to SW bit */
-	ddi_put8(mpt->hr_acchdl, (uint8_t *)&mpt_table[0], 0xF);
+	*(uint8_t *)mpt_table = 0xF0;
+
+	membar_producer();
 
 	/*
 	 * Write the mapped addresses into the MTT entries.  FMR needs to do
 	 * this a little differently, so we call the fmr specific fast mtt
 	 * write here.
 	 */
-	status = hermon_mr_fast_mtt_write_fmr(mr->mr_mttrsrcp, mem_pattr_p,
-	    mr->mr_logmttpgsz);
+	status = hermon_mr_fast_mtt_write_fmr(state, mr->mr_mttrsrcp,
+	    mem_pattr_p, mr->mr_logmttpgsz);
 	if (status != DDI_SUCCESS) {
 		mutex_exit(&mr->mr_lock);
 		status = ibc_get_ci_failure(0);
@@ -677,27 +692,25 @@ hermon_mr_register_physical_fmr(hermon_state_t *state,
 	 * if no remote access is required, then the RKey value is not filled
 	 * in.  Otherwise both Rkey and LKey are given the same value.
 	 */
-	mr->mr_lkey = hermon_mr_keycalc(mpt->hr_indx);
-	if ((mr->mr_accflag & IBT_MR_REMOTE_READ) ||
-	    (mr->mr_accflag & IBT_MR_REMOTE_WRITE) ||
-	    (mr->mr_accflag & IBT_MR_REMOTE_ATOMIC)) {
-		mr->mr_rkey = mr->mr_lkey;
-	}
+	key = mpt->hr_indx | (mr->mr_fmr_key++ << HERMON_MEMKEY_SHIFT);
+	mr->mr_lkey = mr->mr_rkey = hermon_mr_key_swap(key);
 
 	/* write mem key value */
-	ddi_put32(mpt->hr_acchdl, (uint32_t *)&mpt_table[1], mr->mr_lkey);
+	*(uint32_t *)&mpt_table[1] = htonl(key);
 
 	/* write length value */
-	ddi_put64(mpt->hr_acchdl, &mpt_table[3], mem_pattr_p->pmr_len);
+	mpt_table[3] = htonll(mem_pattr_p->pmr_len);
 
 	/* write start addr value */
-	ddi_put64(mpt->hr_acchdl, &mpt_table[2], mem_pattr_p->pmr_iova);
+	mpt_table[2] = htonll(mem_pattr_p->pmr_iova);
 
 	/* write lkey value */
-	ddi_put32(mpt->hr_acchdl, (uint32_t *)&mpt_table[4], mr->mr_lkey);
+	*(uint32_t *)&mpt_table[4] = htonl(key);
+
+	membar_producer();
 
 	/* Write MPT status to HW bit */
-	ddi_put8(mpt->hr_acchdl, (uint8_t *)&mpt_table[0], 0x0);
+	*(uint8_t *)mpt_table = 0x00;
 
 	/* Fill in return parameters */
 	mem_desc_p->pmd_lkey = mr->mr_lkey;
@@ -719,7 +732,7 @@ fmr_reg_fail1:
 	 * software.  The memory tables may be corrupt, so we leave the region
 	 * unregistered.
 	 */
-	return (DDI_FAILURE);
+	return (status);
 }
 
 
@@ -784,6 +797,9 @@ hermon_mr_deregister(hermon_state_t *state, hermon_mrhdl_t *mrhdl, uint_t level,
 	if ((mr->mr_is_umem) && (mr->mr_umemcookie == NULL)) {
 		goto mrdereg_finish_cleanup;
 	}
+	if (hermon_rdma_debug & 0x4)
+		IBTF_DPRINTF_L2("mr", "dereg: mr %p  key %x",
+		    mr, mr->mr_rkey);
 
 	/*
 	 * We must drop the "mr_lock" here to ensure that both SLEEP and
@@ -972,16 +988,20 @@ hermon_mr_invalidate_fmr(hermon_state_t *state, hermon_mrhdl_t mr)
 	mpt_table = (uint64_t *)mpt->hr_addr;
 
 	/* Write MPT status to SW bit */
-	ddi_put8(mpt->hr_acchdl, (uint8_t *)&mpt_table[0], 0xF);
+	*(uint8_t *)&mpt_table[0] = 0xF0;
+
+	membar_producer();
 
 	/* invalidate mem key value */
-	ddi_put32(mpt->hr_acchdl, (uint32_t *)&mpt_table[1], 0);
+	*(uint32_t *)&mpt_table[1] = 0;
 
 	/* invalidate lkey value */
-	ddi_put32(mpt->hr_acchdl, (uint32_t *)&mpt_table[4], 0);
+	*(uint32_t *)&mpt_table[4] = 0;
+
+	membar_producer();
 
 	/* Write MPT status to HW bit */
-	ddi_put8(mpt->hr_acchdl, (uint8_t *)&mpt_table[0], 0x0);
+	*(uint8_t *)&mpt_table[0] = 0x00;
 
 	mutex_exit(&mr->mr_lock);
 
@@ -1004,7 +1024,8 @@ hermon_mr_deregister_fmr(hermon_state_t *state, hermon_mrhdl_t mr)
 	mpt_table = (uint64_t *)mpt->hr_addr;
 
 	/* Write MPT status to SW bit */
-	ddi_put8(mpt->hr_acchdl, (uint8_t *)&mpt_table[0], 0xF);
+	*(uint8_t *)&mpt_table[0] = 0xF0;
+
 	mutex_exit(&mr->mr_lock);
 
 	return (DDI_SUCCESS);
@@ -1020,6 +1041,10 @@ int
 hermon_mr_query(hermon_state_t *state, hermon_mrhdl_t mr,
     ibt_mr_query_attr_t *attr)
 {
+	int			status;
+	hermon_hw_dmpt_t	mpt_entry;
+	uint32_t		lkey;
+
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*attr))
 
 	mutex_enter(&mr->mr_lock);
@@ -1034,9 +1059,38 @@ hermon_mr_query(hermon_state_t *state, hermon_mrhdl_t mr,
 		return (IBT_MR_HDL_INVALID);
 	}
 
+	status = hermon_cmn_query_cmd_post(state, QUERY_MPT, 0,
+	    mr->mr_lkey >> 8, &mpt_entry, sizeof (hermon_hw_dmpt_t),
+	    HERMON_NOSLEEP);
+	if (status != HERMON_CMD_SUCCESS) {
+		cmn_err(CE_CONT, "Hermon: QUERY_MPT failed: status %x", status);
+		mutex_exit(&mr->mr_lock);
+		return (ibc_get_ci_failure(0));
+	}
+
+	/* Update the mr sw struct from the hw struct. */
+	lkey = mpt_entry.mem_key;
+	mr->mr_lkey = mr->mr_rkey = (lkey >> 8) | (lkey << 24);
+	mr->mr_bindinfo.bi_addr = mpt_entry.start_addr;
+	mr->mr_bindinfo.bi_len = mpt_entry.reg_win_len;
+	mr->mr_accflag = (mr->mr_accflag & IBT_MR_RO_DISABLED) |
+	    (mpt_entry.lw ? IBT_MR_LOCAL_WRITE : 0) |
+	    (mpt_entry.rr ? IBT_MR_REMOTE_READ : 0) |
+	    (mpt_entry.rw ? IBT_MR_REMOTE_WRITE : 0) |
+	    (mpt_entry.atomic ? IBT_MR_REMOTE_ATOMIC : 0) |
+	    (mpt_entry.en_bind ? IBT_MR_WINDOW_BIND : 0);
+	mr->mr_mttaddr = ((uint64_t)mpt_entry.mtt_addr_h << 32) |
+	    (mpt_entry.mtt_addr_l << 3);
+	mr->mr_logmttpgsz = mpt_entry.entity_sz;
+
 	/* Fill in the queried attributes */
+	attr->mr_lkey_state =
+	    (mpt_entry.status == HERMON_MPT_FREE) ? IBT_KEY_FREE :
+	    (mpt_entry.status == HERMON_MPT_SW_OWNERSHIP) ? IBT_KEY_INVALID :
+	    IBT_KEY_VALID;
+	attr->mr_phys_buf_list_sz = mpt_entry.mtt_size;
 	attr->mr_attr_flags = mr->mr_accflag;
-	attr->mr_pd	= (ibt_pd_hdl_t)mr->mr_pdhdl;
+	attr->mr_pd = (ibt_pd_hdl_t)mr->mr_pdhdl;
 
 	/* Fill in the "local" attributes */
 	attr->mr_lkey = (ibt_lkey_t)mr->mr_lkey;
@@ -1591,13 +1645,7 @@ hermon_mr_common_reg(hermon_state_t *state, hermon_pdhdl_t pd,
 	 * in.  Otherwise both Rkey and LKey are given the same value.
 	 */
 	if (mpt)
-		mr->mr_lkey = hermon_mr_keycalc(mpt->hr_indx);
-
-	if ((mr->mr_accflag & IBT_MR_REMOTE_READ) ||
-	    (mr->mr_accflag & IBT_MR_REMOTE_WRITE) ||
-	    (mr->mr_accflag & IBT_MR_REMOTE_ATOMIC)) {
-		mr->mr_rkey = mr->mr_lkey;
-	}
+		mr->mr_rkey = mr->mr_lkey = hermon_mr_keycalc(mpt->hr_indx);
 
 	/*
 	 * Determine if the memory is from userland and pin the pages
@@ -1750,6 +1798,9 @@ hermon_mr_common_reg(hermon_state_t *state, hermon_pdhdl_t pd,
 		status = ibc_get_ci_failure(0);
 		goto mrcommon_fail7;
 	}
+	if (hermon_rdma_debug & 0x4)
+		IBTF_DPRINTF_L2("mr", "  reg: mr %p  key %x",
+		    mr, hermon_mr_key_swap(mr->mr_rkey));
 no_passown:
 
 	/*
@@ -2919,64 +2970,36 @@ hermon_mr_fast_mtt_write(hermon_state_t *state, hermon_rsrc_t *mtt,
  * hermon_mr_fast_mtt_write_fmr()
  *    Context: Can be called from interrupt or base context.
  */
+/* ARGSUSED */
 static int
-hermon_mr_fast_mtt_write_fmr(hermon_rsrc_t *mtt, ibt_pmr_attr_t *mem_pattr,
-    uint32_t mtt_pgsize_bits)
+hermon_mr_fast_mtt_write_fmr(hermon_state_t *state, hermon_rsrc_t *mtt,
+    ibt_pmr_attr_t *mem_pattr, uint32_t mtt_pgsize_bits)
 {
+	hermon_icm_table_t	*icm_table;
+	hermon_dma_info_t	*dma_info;
+	uint32_t		index1, index2, rindx;
 	uint64_t		*mtt_table;
-	ibt_phys_addr_t		*buf;
-	uint64_t		mtt_entry;
-	uint64_t		addr, first_addr, endaddr;
-	uint64_t		pagesize;
-	int			i;
+	offset_t		i, j;
+	uint_t			per_span;
 
-	/* Calculate page size from the suggested value passed in */
-	pagesize = ((uint64_t)1 << mtt_pgsize_bits);
+	icm_table = &state->hs_icm[HERMON_MTT];
+	rindx = mtt->hr_indx;
+	hermon_index(index1, index2, rindx, icm_table, i);
+	per_span   = icm_table->span;
+	dma_info   = icm_table->icm_dma[index1] + index2;
+	mtt_table  = (uint64_t *)(uintptr_t)dma_info->vaddr;
 
 	/*
-	 * Walk the "addr list" and fill in the MTT table entries
+	 * Fill in the MTT table entries
 	 */
-	mtt_table  = (uint64_t *)mtt->hr_addr;
-	for (i = 0; i < mem_pattr->pmr_num_buf; i++) {
-		buf = &mem_pattr->pmr_addr_list[i];
-
-		/*
-		 * For first cookie, use the offset field to determine where
-		 * the buffer starts.  The end addr is then calculated with the
-		 * offset in mind.
-		 */
-		if (i == 0) {
-			first_addr = addr = buf->p_laddr +
-			    mem_pattr->pmr_offset;
-			endaddr = addr + (mem_pattr->pmr_buf_sz - 1) -
-			    mem_pattr->pmr_offset;
-		/*
-		 * For last cookie, determine end addr based on starting
-		 * address and size of the total buffer
-		 */
-		} else if (i == mem_pattr->pmr_num_buf - 1) {
-			addr = buf->p_laddr;
-			endaddr = addr + (first_addr + mem_pattr->pmr_len &
-			    (mem_pattr->pmr_buf_sz - 1));
-		/*
-		 * For the middle cookies case, start and end addr are
-		 * straightforward.  Just use the laddr, and the size, as all
-		 * middle cookies are a set size.
-		 */
-		} else {
-			addr = buf->p_laddr;
-			endaddr = addr + (mem_pattr->pmr_buf_sz - 1);
-		}
-
-		addr	= addr & ~((uint64_t)pagesize - 1);
-		while (addr <= endaddr) {
-			/*
-			 * Fill in the mapped addresses (calculated above) and
-			 * set HERMON_MTT_ENTRY_PRESENT flag for each MTT entry.
-			 */
-			mtt_entry = addr | HERMON_MTT_ENTRY_PRESENT;
-			mtt_table[i] = htonll(mtt_entry);
-			addr += pagesize;
+	for (j = 0; j < mem_pattr->pmr_num_buf; j++) {
+		mtt_table[i] = mem_pattr->pmr_addr_list[j].p_laddr;
+		i++;
+		rindx++;
+		if (i == per_span) {
+			hermon_index(index1, index2, rindx, icm_table, i);
+			dma_info = icm_table->icm_dma[index1] + index2;
+			mtt_table = (uint64_t *)(uintptr_t)dma_info->vaddr;
 		}
 	}
 

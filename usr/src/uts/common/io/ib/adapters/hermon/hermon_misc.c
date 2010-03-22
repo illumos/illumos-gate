@@ -47,6 +47,7 @@
 #include <sys/ib/adapters/hermon/hermon.h>
 
 extern uint32_t hermon_kernel_data_ro;
+extern int hermon_rdma_debug;
 
 /* used for helping uniquify fmr pool taskq name */
 static uint_t hermon_debug_fmrpool_cnt = 0x00000000;
@@ -102,6 +103,10 @@ hermon_dbr_new_user_page(hermon_state_t *state, uint_t index,
 	    PAGESIZE, B_WRITE, 0, 0, NULL, DDI_UMEM_SLEEP);
 
 	hermon_dma_attr_init(state, &dma_attr);
+#ifdef	__sparc
+	if (state->hs_cfg_profile->cp_iommu_bypass == HERMON_BINDMEM_BYPASS)
+		dma_attr.dma_attr_flags = DDI_DMA_FORCE_PHYSICAL;
+#endif
 	status = ddi_dma_alloc_handle(state->hs_dip, &dma_attr,
 	    DDI_DMA_SLEEP, NULL, &pagep->upg_dmahdl);
 	if (status != DDI_SUCCESS) {
@@ -287,6 +292,10 @@ hermon_dbr_page_alloc(hermon_state_t *state, hermon_dbr_info_t **dinfo)
 	hermon_dma_attr_init(state, &dma_attr);
 	dma_attr.dma_attr_align = PAGESIZE;
 	dma_attr.dma_attr_sgllen = 1;	/* make sure only one cookie */
+#ifdef	__sparc
+	if (state->hs_cfg_profile->cp_iommu_bypass == HERMON_BINDMEM_BYPASS)
+		dma_attr.dma_attr_flags = DDI_DMA_FORCE_PHYSICAL;
+#endif
 
 	status = ddi_dma_alloc_handle(state->hs_dip, &dma_attr,
 	    DDI_DMA_SLEEP, NULL, &dma_hdl);
@@ -2395,7 +2404,6 @@ hermon_queue_alloc(hermon_state_t *state, hermon_qalloc_info_t *qa_info,
 	ddi_dma_attr_t		dma_attr;
 	int			(*callback)(caddr_t);
 	uint64_t		realsize, alloc_mask;
-	uint_t			type;
 	int			flag, status;
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*qa_info))
@@ -2411,10 +2419,11 @@ hermon_queue_alloc(hermon_state_t *state, hermon_qalloc_info_t *qa_info,
 	 */
 	hermon_dma_attr_init(state, &dma_attr);
 	dma_attr.dma_attr_align = qa_info->qa_bind_align;
-	type = state->hs_cfg_profile->cp_iommu_bypass;
-	if (type == HERMON_BINDMEM_BYPASS) {
+#ifdef	__sparc
+	if (state->hs_cfg_profile->cp_iommu_bypass == HERMON_BINDMEM_BYPASS) {
 		dma_attr.dma_attr_flags = DDI_DMA_FORCE_PHYSICAL;
 	}
+#endif
 
 	/* Allocate a DMA handle */
 	status = ddi_dma_alloc_handle(state->hs_dip, &dma_attr, callback, NULL,
@@ -2504,7 +2513,7 @@ hermon_queue_alloc(hermon_state_t *state, hermon_qalloc_info_t *qa_info,
 	 * passed to the HW
 	 */
 	qa_info->qa_pgoffs = (uint_t)((uintptr_t)
-	    qa_info->qa_buf_aligned & HERMON_PAGEMASK);
+	    qa_info->qa_buf_aligned & HERMON_PAGEOFFSET);
 
 	return (DDI_SUCCESS);
 }
@@ -2539,7 +2548,7 @@ hermon_queue_free(hermon_qalloc_info_t *qa_info)
 }
 
 /*
- * hermon_destroy_fmr_pool()
+ * hermon_create_fmr_pool()
  * Create a pool of FMRs.
  *     Context: Can be called from kernel context only.
  */
@@ -2746,6 +2755,16 @@ hermon_register_physical_fmr(hermon_state_t *state, hermon_fmrhdl_t fmrpool,
 			(void) memcpy(mem_desc_p, &fmr->fmr_desc,
 			    sizeof (ibt_pmr_desc_t));
 			*mr = (hermon_mrhdl_t)fmr->fmr;
+			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
+			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(
+			    *(fmr->fmr->mr_mptrsrcp)))
+			if (hermon_rdma_debug & 0x4)
+				IBTF_DPRINTF_L2("fmr", "  reg cache: mr %p "
+				    "index %x", fmr->fmr,
+				    fmr->fmr->mr_mptrsrcp->hr_indx);
+			_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(
+			    *(fmr->fmr->mr_mptrsrcp)))
+			_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
 			mutex_exit(&fmrpool->fmr_cachelock);
 			mutex_exit(&fmrpool->fmr_lock);
 			return (DDI_SUCCESS);
@@ -2757,6 +2776,7 @@ hermon_register_physical_fmr(hermon_state_t *state, hermon_fmrhdl_t fmrpool,
 	/* grab next free entry */
 	fmr = fmrpool->fmr_free_list;
 	if (fmr == NULL) {
+		IBTF_DPRINTF_L2("fmr", "WARNING: no free fmr resource");
 		mutex_exit(&fmrpool->fmr_cachelock);
 		mutex_exit(&fmrpool->fmr_lock);
 		return (IBT_INSUFF_RESOURCE);
@@ -2772,6 +2792,11 @@ hermon_register_physical_fmr(hermon_state_t *state, hermon_fmrhdl_t fmrpool,
 		mutex_exit(&fmrpool->fmr_lock);
 		return (status);
 	}
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*fmr->fmr))
+	if (hermon_rdma_debug & 0x4)
+		IBTF_DPRINTF_L2("fmr", "  reg: mr %p  key %x",
+		    fmr->fmr, fmr->fmr->mr_rkey);
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*fmr->fmr))
 
 	fmr->fmr_refcnt = 1;
 	fmr->fmr_remaps++;
@@ -2828,10 +2853,20 @@ hermon_deregister_fmr(hermon_state_t *state, hermon_mrhdl_t mr)
 		if (fmr->fmr_remaps <
 		    state->hs_cfg_profile->cp_fmr_max_remaps) {
 			/* add to free list */
+			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
+			if (hermon_rdma_debug & 0x4)
+				IBTF_DPRINTF_L2("fmr", "dereg: mr %p  key %x",
+				    fmr->fmr, fmr->fmr->mr_rkey);
+			_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
 			fmr->fmr_next = fmrpool->fmr_free_list;
 			fmrpool->fmr_free_list = fmr;
 		} else {
 			/* add to dirty list */
+			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
+			if (hermon_rdma_debug & 0x4)
+				IBTF_DPRINTF_L2("fmr", "dirty: mr %p  key %x",
+				    fmr->fmr, fmr->fmr->mr_rkey);
+			_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*(fmr->fmr)))
 			fmr->fmr_next = fmrpool->fmr_dirty_list;
 			fmrpool->fmr_dirty_list = fmr;
 			fmrpool->fmr_dirty_len++;
@@ -3005,310 +3040,4 @@ hermon_fmr_cache_fini(hermon_fmrhdl_t fmr)
 
 	/* Destroy the lock used for FMR cache */
 	mutex_destroy(&fmr->fmr_cachelock);
-}
-
-/*
- * hermon_get_dma_cookies()
- * Return DMA cookies in the pre-allocated paddr_list_p based on the length
- * needed.
- *    Context: Can be called from interrupt or base context.
- */
-int
-hermon_get_dma_cookies(hermon_state_t *state, ibt_phys_buf_t *paddr_list_p,
-    ibt_va_attr_t *va_attrs, uint_t list_len, uint_t *cookiecnt,
-    ibc_ma_hdl_t *ibc_ma_hdl_p)
-{
-	ddi_dma_handle_t	dma_hdl;
-	ddi_dma_attr_t		dma_attr;
-	ddi_dma_cookie_t	dmacookie;
-	int			(*callback)(caddr_t);
-	int			status;
-	int			i;
-
-	/* Set the callback flag appropriately */
-	callback = (va_attrs->va_flags & IBT_VA_NOSLEEP) ? DDI_DMA_DONTWAIT :
-	    DDI_DMA_SLEEP;
-	if ((callback == DDI_DMA_SLEEP) &&
-	    (HERMON_SLEEP != HERMON_SLEEPFLAG_FOR_CONTEXT())) {
-		return (IBT_INVALID_PARAM);
-	}
-
-	/*
-	 * Initialize many of the default DMA attributes and allocate the DMA
-	 * handle.  Then, if we're bypassing the IOMMU, set the
-	 * DDI_DMA_FORCE_PHYSICAL flag.
-	 */
-	hermon_dma_attr_init(state, &dma_attr);
-
-#ifdef __x86
-	/*
-	 * On x86 we can specify a maximum segment length for our returned
-	 * cookies.
-	 */
-	if (va_attrs->va_flags & IBT_VA_FMR) {
-		dma_attr.dma_attr_seg = PAGESIZE - 1;
-	}
-#endif
-
-	/*
-	 * Check to see if the RO flag is set, and if so,
-	 * set that bit in the attr structure as well.
-	 *
-	 * NOTE 1:  This function is ONLY called by consumers, and only for
-	 *	    data buffers
-	 */
-	if (hermon_kernel_data_ro == HERMON_RO_ENABLED) {
-		dma_attr.dma_attr_flags |= DDI_DMA_RELAXED_ORDERING;
-	}
-
-	status = ddi_dma_alloc_handle(state->hs_dip, &dma_attr,
-	    callback, NULL, &dma_hdl);
-	if (status != DDI_SUCCESS) {
-		switch (status) {
-		case DDI_DMA_NORESOURCES:
-			return (IBT_INSUFF_RESOURCE);
-		case DDI_DMA_BADATTR:
-		default:
-			return (ibc_get_ci_failure(0));
-		}
-	}
-
-	/*
-	 * Now bind the handle with the correct DMA attributes.
-	 */
-	if (va_attrs->va_flags & IBT_VA_BUF) {
-		status = ddi_dma_buf_bind_handle(dma_hdl, va_attrs->va_buf,
-		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT,
-		    NULL, &dmacookie, cookiecnt);
-	} else {
-		status = ddi_dma_addr_bind_handle(dma_hdl, NULL,
-		    (caddr_t)(uintptr_t)va_attrs->va_vaddr, va_attrs->va_len,
-		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT,
-		    NULL, &dmacookie, cookiecnt);
-	}
-	if (status != DDI_SUCCESS) {
-		ddi_dma_free_handle(&dma_hdl);
-
-		switch (status) {
-		case DDI_DMA_NORESOURCES:
-			return (IBT_INSUFF_RESOURCE);
-		case DDI_DMA_TOOBIG:
-			return (IBT_INVALID_PARAM);
-		case DDI_DMA_PARTIAL_MAP:
-		case DDI_DMA_INUSE:
-		case DDI_DMA_NOMAPPING:
-		default:
-			return (ibc_get_ci_failure(0));
-		}
-	}
-
-	/*
-	 * Verify our physical buffer list (PBL) is large enough to handle the
-	 * number of cookies that were returned.
-	 */
-	if (*cookiecnt > list_len) {
-		(void) ddi_dma_unbind_handle(dma_hdl);
-		ddi_dma_free_handle(&dma_hdl);
-		return (IBT_PBL_TOO_SMALL);
-	}
-
-	/*
-	 * We store the cookies returned by the DDI into our own PBL.  This
-	 * sets the cookies up for later processing (for example, if we want to
-	 * split up the cookies into smaller chunks).  We use the laddr and
-	 * size fields in each cookie to create each individual entry (PBE).
-	 */
-
-	/*
-	 * Store first cookie info first
-	 */
-	paddr_list_p[0].p_laddr = dmacookie.dmac_laddress;
-	paddr_list_p[0].p_size = dmacookie.dmac_size;
-
-	/*
-	 * Loop through each cookie, storing each cookie into our physical
-	 * buffer list.
-	 */
-	for (i = 1; i < *cookiecnt; i++) {
-		ddi_dma_nextcookie(dma_hdl, &dmacookie);
-
-		paddr_list_p[i].p_laddr = dmacookie.dmac_laddress;
-		paddr_list_p[i].p_size  = dmacookie.dmac_size;
-	}
-
-	/* return handle */
-	*ibc_ma_hdl_p = (ibc_ma_hdl_t)dma_hdl;
-	return (DDI_SUCCESS);
-}
-
-/*
- * hermon_split_dma_cookies()
- * Split up cookies passed in from paddr_list_p, returning the new list in the
- * same buffers, based on the pagesize to split the cookies into.
- *    Context: Can be called from interrupt or base context.
- */
-/* ARGSUSED */
-int
-hermon_split_dma_cookies(hermon_state_t *state, ibt_phys_buf_t *paddr_list,
-    ib_memlen_t *paddr_offset, uint_t list_len, uint_t *cookiecnt,
-    uint_t pagesize)
-{
-	uint64_t	pageoffset;
-	uint64_t	pagemask;
-	uint_t		pageshift;
-	uint_t		current_cookiecnt;
-	uint_t		cookies_needed;
-	uint64_t	last_size, extra_cookie;
-	int		i_increment;
-	int		i, k;
-	int		status;
-
-	/* Setup pagesize calculations */
-	pageoffset = pagesize - 1;
-	pagemask = (~pageoffset);
-	pageshift = highbit(pagesize) - 1;
-
-	/*
-	 * Setup first cookie offset based on pagesize requested.
-	 */
-	*paddr_offset = paddr_list[0].p_laddr & pageoffset;
-	paddr_list[0].p_laddr &= pagemask;
-
-	/* Save away the current number of cookies that are passed in */
-	current_cookiecnt = *cookiecnt;
-
-	/* Perform splitting up of current cookies into pagesize blocks */
-	for (i = 0; i < current_cookiecnt; i += i_increment) {
-		/*
-		 * If the cookie is smaller than pagesize, or already is
-		 * pagesize, then we are already within our limits, so we skip
-		 * it.
-		 */
-		if (paddr_list[i].p_size <= pagesize) {
-			i_increment = 1;
-			continue;
-		}
-
-		/*
-		 * If this is our first cookie, then we have to deal with the
-		 * offset that may be present in the first address.  So add
-		 * that to our size, to calculate potential change to the last
-		 * cookie's size.
-		 *
-		 * Also, calculate the number of cookies that we'll need to
-		 * split up this block into.
-		 */
-		if (i == 0) {
-			last_size = (paddr_list[i].p_size + *paddr_offset) &
-			    pageoffset;
-			cookies_needed = (paddr_list[i].p_size +
-			    *paddr_offset) >> pageshift;
-		} else {
-			last_size = 0;
-			cookies_needed = paddr_list[i].p_size >> pageshift;
-		}
-
-		/*
-		 * If our size is not a multiple of pagesize, we need one more
-		 * cookie.
-		 */
-		if (last_size) {
-			extra_cookie = 1;
-		} else {
-			extra_cookie = 0;
-		}
-
-		/*
-		 * Split cookie into pagesize chunks, shifting list of cookies
-		 * down, using more cookie slots in the PBL if necessary.
-		 */
-		status = hermon_dma_cookie_shift(paddr_list, i, list_len,
-		    current_cookiecnt - i, cookies_needed + extra_cookie);
-		if (status != 0) {
-			return (status);
-		}
-
-		/*
-		 * If the very first cookie, we must take possible offset into
-		 * account.
-		 */
-		if (i == 0) {
-			paddr_list[i].p_size = pagesize - *paddr_offset;
-		} else {
-			paddr_list[i].p_size = pagesize;
-		}
-
-		/*
-		 * We have shifted the existing cookies down the PBL, now fill
-		 * in the blank entries by splitting up our current block.
-		 */
-		for (k = 1; k < cookies_needed; k++) {
-			paddr_list[i + k].p_laddr =
-			    paddr_list[i + k - 1].p_laddr + pagesize;
-			paddr_list[i + k].p_size = pagesize;
-		}
-
-		/* If we have one extra cookie (of less than pagesize...) */
-		if (extra_cookie) {
-			paddr_list[i + k].p_laddr =
-			    paddr_list[i + k - 1].p_laddr + pagesize;
-			paddr_list[i + k].p_size = (size_t)last_size;
-		}
-
-		/* Increment cookiecnt appropriately based on cookies used */
-		i_increment = cookies_needed + extra_cookie;
-		current_cookiecnt += i_increment - 1;
-	}
-
-	/* Update to new cookie count */
-	*cookiecnt = current_cookiecnt;
-	return (DDI_SUCCESS);
-}
-
-/*
- * hermon_dma_cookie_shift()
- *    Context: Can be called from interrupt or base context.
- */
-int
-hermon_dma_cookie_shift(ibt_phys_buf_t *paddr_list, int start, int end,
-    int cookiecnt, int num_shift)
-{
-	int shift_start;
-	int i;
-
-	/* Calculating starting point in the PBL list */
-	shift_start = start + cookiecnt - 1;
-
-	/* Check if we're at the end of our PBL list */
-	if ((shift_start + num_shift - 1) >= end) {
-		return (IBT_PBL_TOO_SMALL);
-	}
-
-	for (i = shift_start; i > start; i--) {
-		paddr_list[i + num_shift - 1] = paddr_list[i];
-	}
-
-	return (DDI_SUCCESS);
-}
-
-
-/*
- * hermon_free_dma_cookies()
- *    Context: Can be called from interrupt or base context.
- */
-int
-hermon_free_dma_cookies(ibc_ma_hdl_t ma_hdl)
-{
-	ddi_dma_handle_t	dma_hdl;
-	int			status;
-
-	dma_hdl = (ddi_dma_handle_t)ma_hdl;
-
-	status = ddi_dma_unbind_handle(dma_hdl);
-	if (status != DDI_SUCCESS) {
-		return (ibc_get_ci_failure(0));
-	}
-	ddi_dma_free_handle(&dma_hdl);
-
-	return (DDI_SUCCESS);
 }

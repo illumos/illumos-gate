@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -514,10 +514,9 @@ ibt_free_mw(ibt_hca_hdl_t hca_hdl, ibt_mw_hdl_t mw_hdl)
  */
 ibt_status_t
 ibt_map_mem_area(ibt_hca_hdl_t hca_hdl, ibt_va_attr_t *va_attrs,
-    uint_t paddr_list_len, ibt_phys_buf_t *paddr_list_p, uint_t *num_paddr_p,
-    size_t *paddr_bufsz_p, ib_memlen_t *paddr_offset_p, ibt_ma_hdl_t *ma_hdl_p)
+    uint_t paddr_list_len, ibt_reg_req_t *reg_req, ibt_ma_hdl_t *ma_hdl_p)
 {
-	ibt_status_t 	status;
+	ibt_status_t	status;
 
 	IBTF_DPRINTF_L3(ibtl_mem, "ibt_map_mem_area(%p, %p, %d)",
 	    hca_hdl, va_attrs, paddr_list_len);
@@ -525,14 +524,12 @@ ibt_map_mem_area(ibt_hca_hdl_t hca_hdl, ibt_va_attr_t *va_attrs,
 	status = IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_map_mem_area(
 	    IBTL_HCA2CIHCA(hca_hdl), va_attrs,
 	    NULL, /* IBTL_HCA2MODI_P(hca_hdl)->mi_reserved */
-	    paddr_list_len, paddr_list_p, num_paddr_p,  paddr_bufsz_p,
-	    paddr_offset_p, ma_hdl_p);
+	    paddr_list_len, reg_req, ma_hdl_p);
 	if (status == IBT_SUCCESS) {
 		mutex_enter(&hca_hdl->ha_mutex);
 		hca_hdl->ha_ma_cnt++;
 		mutex_exit(&hca_hdl->ha_mutex);
 	}
-
 	return (status);
 }
 

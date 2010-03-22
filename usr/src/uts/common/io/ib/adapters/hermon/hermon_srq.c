@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -718,7 +718,7 @@ hermon_srq_modify(hermon_state_t *state, hermon_srqhdl_t srq, uint_t size,
 	srq_desc_off = (uint64_t)(uintptr_t)new_srqinfo.qa_buf_aligned -
 	    (uint64_t)bind.bi_addr;
 	srq_pgoffs   = (uint_t)
-	    ((uintptr_t)new_srqinfo.qa_buf_aligned & HERMON_PAGEMASK);
+	    ((uintptr_t)new_srqinfo.qa_buf_aligned & HERMON_PAGEOFFSET);
 
 	/*
 	 * Fill in the MPT entry.  This is the final step before passing

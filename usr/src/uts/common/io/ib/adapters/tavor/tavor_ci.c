@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,8 +173,7 @@ static ibt_status_t tavor_ci_post_srq(ibc_hca_hdl_t, ibc_srq_hdl_t,
 
 /* Address translation */
 static ibt_status_t tavor_ci_map_mem_area(ibc_hca_hdl_t, ibt_va_attr_t *,
-    void *, uint_t, ibt_phys_buf_t *, uint_t *, size_t *, ib_memlen_t *,
-    ibc_ma_hdl_t *);
+    void *, uint_t, ibt_reg_req_t *, ibc_ma_hdl_t *);
 static ibt_status_t tavor_ci_unmap_mem_area(ibc_hca_hdl_t, ibc_ma_hdl_t);
 static ibt_status_t tavor_ci_map_mem_iov(ibc_hca_hdl_t, ibt_iov_attr_t *,
     ibt_all_wr_t *, ibc_mi_hdl_t *);
@@ -2971,68 +2970,10 @@ tavor_ci_post_srq(ibc_hca_hdl_t hca, ibc_srq_hdl_t srq,
 /* ARGSUSED */
 static ibt_status_t
 tavor_ci_map_mem_area(ibc_hca_hdl_t hca, ibt_va_attr_t *va_attrs,
-    void *ibtl_reserved, uint_t list_len, ibt_phys_buf_t *paddr_list_p,
-    uint_t *ret_num_paddr_p, size_t *paddr_buf_sz_p,
-    ib_memlen_t *paddr_offset_p, ibc_ma_hdl_t *ibc_ma_hdl_p)
+    void *ibtl_reserved, uint_t list_len, ibt_reg_req_t *reg_req,
+    ibc_ma_hdl_t *ibc_ma_hdl_p)
 {
-	tavor_state_t		*state;
-	uint_t			cookiecnt;
-	int			status;
-
-	TAVOR_TNF_ENTER(tavor_ci_map_mem_area);
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*paddr_list_p))
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		TNF_PROBE_0(tavor_ci_map_mem_area_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_map_mem_area);
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	if ((va_attrs->va_flags & IBT_VA_BUF) && (va_attrs->va_buf == NULL)) {
-		TNF_PROBE_0(tavor_ci_map_mem_area_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_map_mem_area);
-		return (IBT_INVALID_PARAM);
-	}
-
-	state = (tavor_state_t *)hca;
-
-	/*
-	 * Based on the length of the buffer and the paddr_list passed in,
-	 * retrieve DMA cookies for the virtual to physical address
-	 * translation.
-	 */
-	status = tavor_get_dma_cookies(state, paddr_list_p, va_attrs,
-	    list_len, &cookiecnt, ibc_ma_hdl_p);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_1(tavor_ci_map_mem_area, TAVOR_TNF_ERROR, "",
-		    tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_ci_map_mem_area);
-		return (status);
-	}
-
-	/*
-	 * Split the cookies returned from 'tavor_get_dma_cookies() above.  We
-	 * also pass in the size of the cookies we would like.
-	 * Note: for now, we only support PAGESIZE cookies.
-	 */
-	status = tavor_split_dma_cookies(state, paddr_list_p, paddr_offset_p,
-	    list_len, &cookiecnt, PAGESIZE);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_1(tavor_ci_map_mem_area, TAVOR_TNF_ERROR, "",
-		    tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_ci_map_mem_area);
-		return (status);
-	}
-
-	/*  Setup return values */
-	*ret_num_paddr_p = cookiecnt;
-	*paddr_buf_sz_p = PAGESIZE;
-
-	TAVOR_TNF_EXIT(tavor_ci_map_mem_area);
-	return (IBT_SUCCESS);
+	return (IBT_NOT_SUPPORTED);
 }
 
 /*
@@ -3044,27 +2985,7 @@ tavor_ci_map_mem_area(ibc_hca_hdl_t hca, ibt_va_attr_t *va_attrs,
 static ibt_status_t
 tavor_ci_unmap_mem_area(ibc_hca_hdl_t hca, ibc_ma_hdl_t ma_hdl)
 {
-	int			status;
-
-	TAVOR_TNF_ENTER(tavor_ci_unmap_mem_area);
-
-	if (ma_hdl == NULL) {
-		TNF_PROBE_0(tavor_ci_unmap_mem_area_invalid_mahdl_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_unmap_mem_area);
-		return (IBT_MA_HDL_INVALID);
-	}
-
-	status = tavor_free_dma_cookies(ma_hdl);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(tavor_ci_unmap_mem_area_free_dma_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_unmap_mem_area);
-		return (ibc_get_ci_failure(0));
-	}
-
-	TAVOR_TNF_EXIT(tavor_ci_unmap_mem_area);
-	return (IBT_SUCCESS);
+	return (IBT_NOT_SUPPORTED);
 }
 
 /* ARGSUSED */
@@ -3132,72 +3053,12 @@ tavor_ci_reregister_physical_mr(ibc_hca_hdl_t hca, ibc_mr_hdl_t mr,
  * Creates a pool of memory regions suitable for FMR registration
  *    Context: Can be called from base context only
  */
+/* ARGSUSED */
 static ibt_status_t
 tavor_ci_create_fmr_pool(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd,
     ibt_fmr_pool_attr_t *params, ibc_fmr_pool_hdl_t *fmr_pool_p)
 {
-	tavor_state_t	*state;
-	tavor_pdhdl_t	pdhdl;
-	tavor_fmrhdl_t	fmrpoolhdl;
-	int		status;
-
-	TAVOR_TNF_ENTER(tavor_ci_create_fmr_pool);
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		TNF_PROBE_0(tavor_ci_create_fmr_pool_invhca_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_create_fmr_pool);
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	state = (tavor_state_t *)hca;
-
-	/* Check if FMR is even supported */
-	if (state->ts_cfg_profile->cp_fmr_enable == 0) {
-		TNF_PROBE_0(tavor_ci_create_fmr_pool_not_supported_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_create_fmr_pool);
-		return (IBT_HCA_FMR_NOT_SUPPORTED);
-	}
-
-	/* Check for valid PD handle pointer */
-	if (pd == NULL) {
-		TNF_PROBE_0(tavor_ci_create_fmr_invpdhdl_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_create_fmr_pool);
-		return (IBT_PD_HDL_INVALID);
-	}
-
-	pdhdl = (tavor_pdhdl_t)pd;
-
-	/*
-	 * Validate the access flags.  Both Remote Write and Remote Atomic
-	 * require the Local Write flag to be set
-	 */
-	if (((params->fmr_flags & IBT_MR_ENABLE_REMOTE_WRITE) ||
-	    (params->fmr_flags & IBT_MR_ENABLE_REMOTE_ATOMIC)) &&
-	    !(params->fmr_flags & IBT_MR_ENABLE_LOCAL_WRITE)) {
-		TNF_PROBE_0(tavor_ci_create_fmr_pool_inv_accflags_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_create_fmr_pool);
-		return (IBT_MR_ACCESS_REQ_INVALID);
-	}
-
-	status = tavor_create_fmr_pool(state, pdhdl, params, &fmrpoolhdl);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_1(tavor_ci_create_fmr_pool, TAVOR_TNF_ERROR, "",
-		    tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_ci_create_fmr_pool);
-		return (status);
-	}
-
-	/* Set fmr_pool from tavor handle */
-	*fmr_pool_p = (ibc_fmr_pool_hdl_t)fmrpoolhdl;
-
-	TAVOR_TNF_EXIT(tavor_ci_create_fmr_pool);
-
-	return (IBT_SUCCESS);
+	return (IBT_NOT_SUPPORTED);
 }
 
 /*
@@ -3205,45 +3066,11 @@ tavor_ci_create_fmr_pool(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd,
  * Free all resources associated with an FMR pool.
  *    Context: Can be called from base context only.
  */
+/* ARGSUSED */
 static ibt_status_t
 tavor_ci_destroy_fmr_pool(ibc_hca_hdl_t hca, ibc_fmr_pool_hdl_t fmr_pool)
 {
-	tavor_state_t	*state;
-	tavor_fmrhdl_t	fmrpoolhdl;
-	int		status;
-
-	TAVOR_TNF_ENTER(tavor_ci_destroy_fmr_pool);
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		TNF_PROBE_0(tavor_ci_destroy_fmr_pool_invhca_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_create_fmr_pool);
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	state = (tavor_state_t *)hca;
-
-	/* Check for valid FMR Pool handle */
-	if (fmr_pool == NULL) {
-		TNF_PROBE_0(tavor_ci_destroy_fmr_pool_invfmr_pool_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_destroy_fmr_pool);
-		return (IBT_FMR_POOL_HDL_INVALID);
-	}
-
-	fmrpoolhdl = (tavor_fmrhdl_t)fmr_pool;
-
-	status = tavor_destroy_fmr_pool(state, fmrpoolhdl);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_1(tavor_ci_destroy_fmr_pool, TAVOR_TNF_ERROR, "",
-		    tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_ci_destroy_fmr_pool);
-		return (status);
-	}
-
-	TAVOR_TNF_EXIT(tavor_ci_destroy_fmr_pool);
-	return (IBT_SUCCESS);
+	return (IBT_NOT_SUPPORTED);
 }
 
 /*
@@ -3251,45 +3078,11 @@ tavor_ci_destroy_fmr_pool(ibc_hca_hdl_t hca, ibc_fmr_pool_hdl_t fmr_pool)
  * Force a flush of the memory tables, cleaning up used FMR resources.
  *    Context: Can be called from interrupt or base context.
  */
+/* ARGSUSED */
 static ibt_status_t
 tavor_ci_flush_fmr_pool(ibc_hca_hdl_t hca, ibc_fmr_pool_hdl_t fmr_pool)
 {
-	tavor_state_t	*state;
-	tavor_fmrhdl_t	fmrpoolhdl;
-	int		status;
-
-	TAVOR_TNF_ENTER(tavor_ci_flush_fmr_pool);
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		TNF_PROBE_0(tavor_ci_flush_fmr_pool_invhca_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_flush_fmr_pool);
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	state = (tavor_state_t *)hca;
-
-	/* Check for valid FMR Pool handle */
-	if (fmr_pool == NULL) {
-		TNF_PROBE_0(tavor_ci_flush_fmr_pool_invhca_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_flush_fmr_pool);
-		return (IBT_FMR_POOL_HDL_INVALID);
-	}
-
-	fmrpoolhdl = (tavor_fmrhdl_t)fmr_pool;
-
-	status = tavor_flush_fmr_pool(state, fmrpoolhdl);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_1(tavor_ci_flush_fmr_pool, TAVOR_TNF_ERROR, "",
-		    tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_ci_flush_fmr_pool);
-		return (status);
-	}
-
-	TAVOR_TNF_EXIT(tavor_ci_flush_fmr_pool);
-	return (IBT_SUCCESS);
+	return (IBT_NOT_SUPPORTED);
 }
 
 /*
@@ -3304,66 +3097,7 @@ tavor_ci_register_physical_fmr(ibc_hca_hdl_t hca,
     ibc_fmr_pool_hdl_t fmr_pool, ibt_pmr_attr_t *mem_pattr,
     void *ibtl_reserved, ibc_mr_hdl_t *mr_p, ibt_pmr_desc_t *mem_desc_p)
 {
-	tavor_state_t		*state;
-	tavor_mrhdl_t		mrhdl;
-	tavor_fmrhdl_t		fmrpoolhdl;
-	int			status;
-
-	TAVOR_TNF_ENTER(tavor_ci_register_physical_fmr);
-
-	ASSERT(mem_pattr != NULL);
-	ASSERT(mr_p != NULL);
-	ASSERT(mem_desc_p != NULL);
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		TNF_PROBE_0(tavor_ci_register_physical_fmr_invhca_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_register_physical_fmr);
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Grab the Tavor softstate pointer */
-	state = (tavor_state_t *)hca;
-
-	/* Check for valid FMR Pool handle */
-	if (fmr_pool == NULL) {
-		TNF_PROBE_0(tavor_ci_register_physical_fmr_invhca_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_register_physical_fmr);
-		return (IBT_FMR_POOL_HDL_INVALID);
-	}
-
-	fmrpoolhdl = (tavor_fmrhdl_t)fmr_pool;
-
-	status = tavor_register_physical_fmr(state, fmrpoolhdl, mem_pattr,
-	    &mrhdl, mem_desc_p);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_1(tavor_ci_register_physical_fmr_reg_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_ci_register_physical_fmr);
-		return (status);
-	}
-
-	/*
-	 * If region is mapped for streaming (i.e. noncoherent), then set
-	 * sync is required
-	 */
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mem_desc_p))
-	mem_desc_p->pmd_sync_required = (mrhdl->mr_bindinfo.bi_flags &
-	    IBT_MR_NONCOHERENT) ? B_TRUE : B_FALSE;
-	if (mem_desc_p->pmd_sync_required == B_TRUE) {
-		/* Fill in DMA handle for future sync operations */
-		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(mrhdl->mr_bindinfo))
-		mrhdl->mr_bindinfo.bi_dmahdl =
-		    (ddi_dma_handle_t)mem_pattr->pmr_ma;
-	}
-
-	/* Return the Tavor MR handle */
-	*mr_p = (ibc_mr_hdl_t)mrhdl;
-
-	TAVOR_TNF_EXIT(tavor_ci_register_physical_fmr);
-	return (IBT_SUCCESS);
+	return (IBT_NOT_SUPPORTED);
 }
 
 /*
@@ -3371,49 +3105,11 @@ tavor_ci_register_physical_fmr(ibc_hca_hdl_t hca,
  * Moves an FMR (specified by 'mr') to the deregistered state.
  *    Context: Can be called from base context only.
  */
+/* ARGSUSED */
 static ibt_status_t
 tavor_ci_deregister_fmr(ibc_hca_hdl_t hca, ibc_mr_hdl_t mr)
 {
-	tavor_state_t		*state;
-	tavor_mrhdl_t		mrhdl;
-	int			status;
-
-	TAVOR_TNF_ENTER(tavor_ci_deregister_fmr);
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		TNF_PROBE_0(tavor_ci_deregister_fmr_invhca_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_deregister_fmr);
-		return (IBT_HCA_HDL_INVALID);
-	}
-
-	/* Check for valid memory region handle */
-	if (mr == NULL) {
-		TNF_PROBE_0(tavor_ci_deregister_fmr_invmrhdl_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ci_deregister_fmr);
-		return (IBT_MR_HDL_INVALID);
-	}
-
-	/* Grab the Tavor softstate pointer */
-	state = (tavor_state_t *)hca;
-	mrhdl = (tavor_mrhdl_t)mr;
-
-	/*
-	 * Deregister the memory region, either "unmap" the FMR or deregister
-	 * the normal memory region.
-	 */
-	status = tavor_deregister_fmr(state, mrhdl);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_1(tavor_ci_deregister_mr_fmr_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_ci_deregister_fmr);
-		return (status);
-	}
-
-	TAVOR_TNF_EXIT(tavor_ci_deregister_fmr);
-	return (IBT_SUCCESS);
+	return (IBT_NOT_SUPPORTED);
 }
 
 /*

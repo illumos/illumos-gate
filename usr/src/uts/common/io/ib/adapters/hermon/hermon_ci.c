@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,9 @@
 #include <sys/sunddi.h>
 
 #include <sys/ib/adapters/hermon/hermon.h>
+
+extern uint32_t hermon_kernel_data_ro;
+extern uint32_t hermon_user_data_ro;
 
 /* HCA and port related operations */
 static ibt_status_t hermon_ci_query_hca_ports(ibc_hca_hdl_t, uint8_t,
@@ -173,8 +176,7 @@ static ibt_status_t hermon_ci_post_srq(ibc_hca_hdl_t, ibc_srq_hdl_t,
 
 /* Address translation */
 static ibt_status_t hermon_ci_map_mem_area(ibc_hca_hdl_t, ibt_va_attr_t *,
-    void *, uint_t, ibt_phys_buf_t *, uint_t *, size_t *, ib_memlen_t *,
-    ibc_ma_hdl_t *);
+    void *, uint_t, ibt_reg_req_t *, ibc_ma_hdl_t *);
 static ibt_status_t hermon_ci_unmap_mem_area(ibc_hca_hdl_t, ibc_ma_hdl_t);
 static ibt_status_t hermon_ci_map_mem_iov(ibc_hca_hdl_t, ibt_iov_attr_t *,
     ibt_all_wr_t *, ibc_mi_hdl_t *);
@@ -2300,61 +2302,339 @@ hermon_ci_post_srq(ibc_hca_hdl_t hca, ibc_srq_hdl_t srq,
 }
 
 /* Address translation */
+
+struct ibc_ma_s {
+	int			h_ma_addr_list_len;
+	void			*h_ma_addr_list;
+	ddi_dma_handle_t	h_ma_dmahdl;
+	ddi_dma_handle_t	h_ma_list_hdl;
+	ddi_acc_handle_t	h_ma_list_acc_hdl;
+	size_t			h_ma_real_len;
+	caddr_t			h_ma_kaddr;
+	ibt_phys_addr_t		h_ma_list_cookie;
+};
+
+static ibt_status_t
+hermon_map_mem_area_fmr(ibc_hca_hdl_t hca, ibt_va_attr_t *va_attrs,
+    uint_t list_len, ibt_pmr_attr_t *pmr, ibc_ma_hdl_t *ma_hdl_p)
+{
+	int			status;
+	ibt_status_t		ibt_status;
+	ibc_ma_hdl_t		ma_hdl;
+	ib_memlen_t		len;
+	ddi_dma_attr_t		dma_attr;
+	uint_t			cookie_cnt;
+	ddi_dma_cookie_t	dmacookie;
+	hermon_state_t		*state;
+	uint64_t		*kaddr;
+	uint64_t		addr, endaddr, pagesize;
+	int			i, kmflag;
+	int			(*callback)(caddr_t);
+
+	if ((va_attrs->va_flags & IBT_VA_BUF) == 0) {
+		return (IBT_NOT_SUPPORTED);	/* XXX - not yet implemented */
+	}
+
+	state = (hermon_state_t *)hca;
+	hermon_dma_attr_init(state, &dma_attr);
+	if (va_attrs->va_flags & IBT_VA_NOSLEEP) {
+		kmflag = KM_NOSLEEP;
+		callback = DDI_DMA_DONTWAIT;
+	} else {
+		kmflag = KM_SLEEP;
+		callback = DDI_DMA_SLEEP;
+	}
+
+	ma_hdl = kmem_zalloc(sizeof (*ma_hdl), kmflag);
+	if (ma_hdl == NULL) {
+		return (IBT_INSUFF_RESOURCE);
+	}
+#ifdef	__sparc
+	if (state->hs_cfg_profile->cp_iommu_bypass == HERMON_BINDMEM_BYPASS)
+		dma_attr.dma_attr_flags = DDI_DMA_FORCE_PHYSICAL;
+
+	if (hermon_kernel_data_ro == HERMON_RO_ENABLED)
+		dma_attr.dma_attr_flags |= DDI_DMA_RELAXED_ORDERING;
+#endif
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*ma_hdl))
+	status = ddi_dma_alloc_handle(state->hs_dip, &dma_attr,
+	    callback, NULL, &ma_hdl->h_ma_dmahdl);
+	if (status != DDI_SUCCESS) {
+		kmem_free(ma_hdl, sizeof (*ma_hdl));
+		return (IBT_INSUFF_RESOURCE);
+	}
+	status = ddi_dma_buf_bind_handle(ma_hdl->h_ma_dmahdl,
+	    va_attrs->va_buf, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    callback, NULL, &dmacookie, &cookie_cnt);
+	if (status != DDI_DMA_MAPPED) {
+		status = ibc_get_ci_failure(0);
+		goto marea_fail3;
+	}
+
+	ma_hdl->h_ma_real_len = list_len * sizeof (ibt_phys_addr_t);
+	ma_hdl->h_ma_kaddr = kmem_zalloc(ma_hdl->h_ma_real_len, kmflag);
+	if (ma_hdl->h_ma_kaddr == NULL) {
+		ibt_status = IBT_INSUFF_RESOURCE;
+		goto marea_fail4;
+	}
+
+	i = 0;
+	len = 0;
+	pagesize = PAGESIZE;
+	kaddr = (uint64_t *)(void *)ma_hdl->h_ma_kaddr;
+	while (cookie_cnt-- > 0) {
+		addr	= dmacookie.dmac_laddress;
+		len	+= dmacookie.dmac_size;
+		endaddr	= addr + (dmacookie.dmac_size - 1);
+		addr	= addr & ~(pagesize - 1);
+		while (addr <= endaddr) {
+			if (i >= list_len) {
+				status = IBT_PBL_TOO_SMALL;
+				goto marea_fail5;
+			}
+			kaddr[i] = htonll(addr | HERMON_MTT_ENTRY_PRESENT);
+			i++;
+			addr += pagesize;
+			if (addr == 0) {
+				static int do_once = 1;
+				_NOTE(SCHEME_PROTECTS_DATA("safe sharing",
+				    do_once))
+				if (do_once) {
+					do_once = 0;
+					cmn_err(CE_NOTE, "probable error in "
+					    "dma_cookie address: map_mem_area");
+				}
+				break;
+			}
+		}
+		if (cookie_cnt != 0)
+			ddi_dma_nextcookie(ma_hdl->h_ma_dmahdl, &dmacookie);
+	}
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*pmr))
+	pmr->pmr_addr_list = (ibt_phys_addr_t *)(void *)ma_hdl->h_ma_kaddr;
+	pmr->pmr_iova = va_attrs->va_vaddr;
+	pmr->pmr_len = len;
+	pmr->pmr_offset = va_attrs->va_vaddr & PAGEOFFSET;
+	pmr->pmr_buf_sz = PAGESHIFT;	/* PRM says "Page Sice", but... */
+	pmr->pmr_num_buf = i;
+	pmr->pmr_ma = ma_hdl;
+
+	*ma_hdl_p = ma_hdl;
+	return (IBT_SUCCESS);
+
+marea_fail5:
+	kmem_free(ma_hdl->h_ma_kaddr, ma_hdl->h_ma_real_len);
+marea_fail4:
+	status = ddi_dma_unbind_handle(ma_hdl->h_ma_dmahdl);
+marea_fail3:
+	ddi_dma_free_handle(&ma_hdl->h_ma_dmahdl);
+	kmem_free(ma_hdl, sizeof (*ma_hdl));
+	*ma_hdl_p = NULL;
+	return (ibt_status);
+}
+
 /*
  * hermon_ci_map_mem_area()
  *    Context: Can be called from interrupt or base context.
+ *
+ *	Creates the memory mapping suitable for a subsequent posting of an
+ *	FRWR work request.  All the info about the memory area for the
+ *	FRWR work request (wr member of "union ibt_reg_req_u") is filled
+ *	such that the client only needs to point wr.rc.rcwr.reg_pmr to it,
+ *	and then fill in the additional information only it knows.
+ *
+ *	Alternatively, creates the memory mapping for FMR.
  */
 /* ARGSUSED */
 static ibt_status_t
 hermon_ci_map_mem_area(ibc_hca_hdl_t hca, ibt_va_attr_t *va_attrs,
-    void *ibtl_reserved, uint_t list_len, ibt_phys_buf_t *paddr_list_p,
-    uint_t *ret_num_paddr_p, size_t *paddr_buf_sz_p,
-    ib_memlen_t *paddr_offset_p, ibc_ma_hdl_t *ibc_ma_hdl_p)
+    void *ibtl_reserved, uint_t list_len, ibt_reg_req_t *reg_req,
+    ibc_ma_hdl_t *ma_hdl_p)
 {
-	hermon_state_t		*state;
-	uint_t			cookiecnt;
+	ibt_status_t		ibt_status;
 	int			status;
+	ibc_ma_hdl_t		ma_hdl;
+	ibt_wr_reg_pmr_t	*pmr;
+	ib_memlen_t		len;
+	ddi_dma_attr_t		dma_attr;
+	ddi_dma_handle_t	khdl;
+	uint_t			cookie_cnt;
+	ddi_dma_cookie_t	dmacookie, kcookie;
+	hermon_state_t		*state;
+	uint64_t		*kaddr;
+	uint64_t		addr, endaddr, pagesize, kcookie_paddr;
+	int			i, j, kmflag;
+	int			(*callback)(caddr_t);
 
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*paddr_list_p))
-
-	/* Check for valid HCA handle */
-	if (hca == NULL) {
-		return (IBT_HCA_HDL_INVALID);
+	if (va_attrs->va_flags & (IBT_VA_FMR | IBT_VA_REG_FN)) {
+		/* delegate FMR and Physical Register to other function */
+		return (hermon_map_mem_area_fmr(hca, va_attrs, list_len,
+		    &reg_req->fn_arg, ma_hdl_p));
 	}
 
-	if ((va_attrs->va_flags & IBT_VA_BUF) && (va_attrs->va_buf == NULL)) {
-		return (IBT_INVALID_PARAM);
-	}
+	/* FRWR */
 
 	state = (hermon_state_t *)hca;
+	hermon_dma_attr_init(state, &dma_attr);
+#ifdef	__sparc
+	if (state->hs_cfg_profile->cp_iommu_bypass == HERMON_BINDMEM_BYPASS)
+		dma_attr.dma_attr_flags = DDI_DMA_FORCE_PHYSICAL;
 
-	/*
-	 * Based on the length of the buffer and the paddr_list passed in,
-	 * retrieve DMA cookies for the virtual to physical address
-	 * translation.
-	 */
-	status = hermon_get_dma_cookies(state, paddr_list_p, va_attrs,
-	    list_len, &cookiecnt, ibc_ma_hdl_p);
-	if (status != DDI_SUCCESS) {
-		return (status);
+	if (hermon_kernel_data_ro == HERMON_RO_ENABLED)
+		dma_attr.dma_attr_flags |= DDI_DMA_RELAXED_ORDERING;
+#endif
+	if (va_attrs->va_flags & IBT_VA_NOSLEEP) {
+		kmflag = KM_NOSLEEP;
+		callback = DDI_DMA_DONTWAIT;
+	} else {
+		kmflag = KM_SLEEP;
+		callback = DDI_DMA_SLEEP;
 	}
 
-	/*
-	 * Split the cookies returned from 'hermon_get_dma_cookies() above.  We
-	 * also pass in the size of the cookies we would like.
-	 * Note: for now, we only support PAGESIZE cookies.
-	 */
-	status = hermon_split_dma_cookies(state, paddr_list_p, paddr_offset_p,
-	    list_len, &cookiecnt, PAGESIZE);
+	ma_hdl = kmem_zalloc(sizeof (*ma_hdl), kmflag);
+	if (ma_hdl == NULL) {
+		return (IBT_INSUFF_RESOURCE);
+	}
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*ma_hdl))
+
+	status = ddi_dma_alloc_handle(state->hs_dip, &dma_attr,
+	    callback, NULL, &ma_hdl->h_ma_dmahdl);
 	if (status != DDI_SUCCESS) {
-		return (status);
+		kmem_free(ma_hdl, sizeof (*ma_hdl));
+		ibt_status = IBT_INSUFF_RESOURCE;
+		goto marea_fail0;
+	}
+	dma_attr.dma_attr_align = 64;	/* as per PRM */
+	status = ddi_dma_alloc_handle(state->hs_dip, &dma_attr,
+	    callback, NULL, &ma_hdl->h_ma_list_hdl);
+	if (status != DDI_SUCCESS) {
+		ibt_status = IBT_INSUFF_RESOURCE;
+		goto marea_fail1;
+	}
+	/*
+	 * Entries in the list in the last slot on each page cannot be used,
+	 * so 1 extra ibt_phys_addr_t is allocated per page.  We add 1 more
+	 * to deal with the possibility of a less than 1 page allocation
+	 * across a page boundary.
+	 */
+	status = ddi_dma_mem_alloc(ma_hdl->h_ma_list_hdl, (list_len + 1 +
+	    list_len / (HERMON_PAGESIZE / sizeof (ibt_phys_addr_t))) *
+	    sizeof (ibt_phys_addr_t),
+	    &state->hs_reg_accattr, DDI_DMA_CONSISTENT, callback, NULL,
+	    &ma_hdl->h_ma_kaddr, &ma_hdl->h_ma_real_len,
+	    &ma_hdl->h_ma_list_acc_hdl);
+	if (status != DDI_SUCCESS) {
+		ibt_status = IBT_INSUFF_RESOURCE;
+		goto marea_fail2;
+	}
+	status = ddi_dma_addr_bind_handle(ma_hdl->h_ma_list_hdl, NULL,
+	    ma_hdl->h_ma_kaddr, ma_hdl->h_ma_real_len, DDI_DMA_RDWR |
+	    DDI_DMA_CONSISTENT, callback, NULL,
+	    &kcookie, &cookie_cnt);
+	if (status != DDI_SUCCESS) {
+		ibt_status = IBT_INSUFF_RESOURCE;
+		goto marea_fail3;
+	}
+	if ((kcookie.dmac_laddress & 0x3f) != 0) {
+		cmn_err(CE_NOTE, "64-byte alignment assumption wrong");
+		ibt_status = ibc_get_ci_failure(0);
+		goto marea_fail4;
+	}
+	ma_hdl->h_ma_list_cookie.p_laddr = kcookie.dmac_laddress;
+
+	if (va_attrs->va_flags & IBT_VA_BUF) {
+		status = ddi_dma_buf_bind_handle(ma_hdl->h_ma_dmahdl,
+		    va_attrs->va_buf, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+		    callback, NULL, &dmacookie, &cookie_cnt);
+	} else {
+		status = ddi_dma_addr_bind_handle(ma_hdl->h_ma_dmahdl,
+		    va_attrs->va_as, (caddr_t)(uintptr_t)va_attrs->va_vaddr,
+		    va_attrs->va_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+		    callback, NULL, &dmacookie, &cookie_cnt);
+	}
+	if (status != DDI_DMA_MAPPED) {
+		ibt_status = ibc_get_ci_failure(0);
+		goto marea_fail4;
+	}
+	i = 0;	/* count the number of pbl entries */
+	j = 0;	/* count the number of links to next HERMON_PAGE */
+	len = 0;
+	pagesize = PAGESIZE;
+	kaddr = (uint64_t *)(void *)ma_hdl->h_ma_kaddr;
+	kcookie_paddr = kcookie.dmac_laddress + HERMON_PAGEMASK;
+	khdl = ma_hdl->h_ma_list_hdl;
+	while (cookie_cnt-- > 0) {
+		addr	= dmacookie.dmac_laddress;
+		len	+= dmacookie.dmac_size;
+		endaddr	= addr + (dmacookie.dmac_size - 1);
+		addr	= addr & ~(pagesize - 1);
+		while (addr <= endaddr) {
+			if (i >= list_len) {
+				ibt_status = IBT_PBL_TOO_SMALL;
+				goto marea_fail5;
+			}
+			/* Deal with last entry on page. */
+			if (!((uintptr_t)&kaddr[i+j+1] & HERMON_PAGEOFFSET)) {
+				if (kcookie.dmac_size > HERMON_PAGESIZE) {
+					kcookie_paddr += HERMON_PAGESIZE;
+					kcookie.dmac_size -= HERMON_PAGESIZE;
+				} else {
+					ddi_dma_nextcookie(khdl, &kcookie);
+					kcookie_paddr = kcookie.dmac_laddress;
+				}
+				kaddr[i+j] = htonll(kcookie_paddr);
+				j++;
+			}
+			kaddr[i+j] = htonll(addr | HERMON_MTT_ENTRY_PRESENT);
+			i++;
+			addr += pagesize;
+			if (addr == 0) {
+				static int do_once = 1;
+				_NOTE(SCHEME_PROTECTS_DATA("safe sharing",
+				    do_once))
+				if (do_once) {
+					do_once = 0;
+					cmn_err(CE_NOTE, "probable error in "
+					    "dma_cookie address: map_mem_area");
+				}
+				break;
+			}
+		}
+		if (cookie_cnt != 0)
+			ddi_dma_nextcookie(ma_hdl->h_ma_dmahdl, &dmacookie);
 	}
 
-	/*  Setup return values */
-	*ret_num_paddr_p = cookiecnt;
-	*paddr_buf_sz_p = PAGESIZE;
+	pmr = &reg_req->wr;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*pmr))
+	pmr->pmr_len = len;
+	pmr->pmr_offset = va_attrs->va_vaddr & PAGEOFFSET;
+	pmr->pmr_buf_sz = PAGESHIFT;	/* PRM says "Page Size", but... */
+	pmr->pmr_num_buf = i;
+	pmr->pmr_addr_list = &ma_hdl->h_ma_list_cookie;
 
+	*ma_hdl_p = ma_hdl;
 	return (IBT_SUCCESS);
+
+marea_fail5:
+	status = ddi_dma_unbind_handle(ma_hdl->h_ma_dmahdl);
+	if (status != DDI_SUCCESS)
+		HERMON_WARNING(state, "failed to unbind DMA mapping");
+marea_fail4:
+	status = ddi_dma_unbind_handle(ma_hdl->h_ma_list_hdl);
+	if (status != DDI_SUCCESS)
+		HERMON_WARNING(state, "failed to unbind DMA mapping");
+marea_fail3:
+	ddi_dma_mem_free(&ma_hdl->h_ma_list_acc_hdl);
+marea_fail2:
+	ddi_dma_free_handle(&ma_hdl->h_ma_list_hdl);
+marea_fail1:
+	ddi_dma_free_handle(&ma_hdl->h_ma_dmahdl);
+marea_fail0:
+	kmem_free(ma_hdl, sizeof (*ma_hdl));
+	*ma_hdl_p = NULL;
+	return (ibt_status);
 }
 
 /*
@@ -2366,16 +2646,27 @@ hermon_ci_map_mem_area(ibc_hca_hdl_t hca, ibt_va_attr_t *va_attrs,
 static ibt_status_t
 hermon_ci_unmap_mem_area(ibc_hca_hdl_t hca, ibc_ma_hdl_t ma_hdl)
 {
-	int			status = DDI_SUCCESS;
+	int			status;
+	hermon_state_t		*state;
 
 	if (ma_hdl == NULL) {
-		return (IBT_MI_HDL_INVALID);
+		return (IBT_MA_HDL_INVALID);
 	}
-
-	status = hermon_free_dma_cookies(ma_hdl);
-	if (status != DDI_SUCCESS) {
-		return (ibc_get_ci_failure(0));
+	state = (hermon_state_t *)hca;
+	if (ma_hdl->h_ma_list_hdl != NULL) {
+		status = ddi_dma_unbind_handle(ma_hdl->h_ma_list_hdl);
+		if (status != DDI_SUCCESS)
+			HERMON_WARNING(state, "failed to unbind DMA mapping");
+		ddi_dma_mem_free(&ma_hdl->h_ma_list_acc_hdl);
+		ddi_dma_free_handle(&ma_hdl->h_ma_list_hdl);
+	} else {
+		kmem_free(ma_hdl->h_ma_kaddr, ma_hdl->h_ma_real_len);
 	}
+	status = ddi_dma_unbind_handle(ma_hdl->h_ma_dmahdl);
+	if (status != DDI_SUCCESS)
+		HERMON_WARNING(state, "failed to unbind DMA mapping");
+	ddi_dma_free_handle(&ma_hdl->h_ma_dmahdl);
+	kmem_free(ma_hdl, sizeof (*ma_hdl));
 	return (IBT_SUCCESS);
 }
 
@@ -2424,6 +2715,13 @@ hermon_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov_attr,
 
 	state = (hermon_state_t *)hca;
 	hermon_dma_attr_init(state, &dma_attr);
+#ifdef	__sparc
+	if (state->hs_cfg_profile->cp_iommu_bypass == HERMON_BINDMEM_BYPASS)
+		dma_attr.dma_attr_flags = DDI_DMA_FORCE_PHYSICAL;
+
+	if (hermon_kernel_data_ro == HERMON_RO_ENABLED)
+		dma_attr.dma_attr_flags |= DDI_DMA_RELAXED_ORDERING;
+#endif
 
 	nds = 0;
 	max_nds = iov_attr->iov_wr_nds;
@@ -2461,7 +2759,7 @@ hermon_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov_attr,
 			return (ibc_get_ci_failure(0));
 		}
 		while (cookie_cnt-- > 0) {
-			if (nds >= max_nds) {
+			if (nds > max_nds) {
 				status = ddi_dma_unbind_handle(dmahdl);
 				if (status != DDI_SUCCESS)
 					HERMON_WARNING(state, "failed to "
@@ -2517,7 +2815,7 @@ hermon_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov_attr,
 			ibt_status = ibc_get_ci_failure(0);
 			goto fail1;
 		}
-		if (nds + cookie_cnt >= max_nds) {
+		if (nds + cookie_cnt > max_nds) {
 			ibt_status = IBT_SGL_TOO_SMALL;
 			goto fail2;
 		}
@@ -2594,7 +2892,7 @@ hermon_ci_unmap_mem_iov(ibc_hca_hdl_t hca, ibc_mi_hdl_t mi_hdl)
 /* ARGSUSED */
 static ibt_status_t
 hermon_ci_alloc_lkey(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd,
-    ibt_lkey_flags_t flags, uint_t phys_buf_list_sz, ibc_mr_hdl_t *mr_p,
+    ibt_lkey_flags_t flags, uint_t list_sz, ibc_mr_hdl_t *mr_p,
     ibt_pmr_desc_t *mem_desc_p)
 {
 	return (IBT_NOT_SUPPORTED);

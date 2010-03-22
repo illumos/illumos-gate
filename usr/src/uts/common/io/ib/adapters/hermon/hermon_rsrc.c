@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,6 +212,11 @@ hermon_rsrc_alloc(hermon_state_t *state, hermon_rsrc_type_t rsrc, uint_t num,
 		break;
 
 	case HERMON_QPC:
+		/* Allocate "num" contiguous/aligned QPCs for RSS */
+		status = hermon_rsrc_hw_entry_alloc(rsrc_pool, num, num,
+		    0, sleepflag, tmp_rsrc_hdl);
+		break;
+
 	case HERMON_CQC:
 	case HERMON_SRQC:
 	case HERMON_EQC:
@@ -942,8 +947,6 @@ hermon_rsrc_init_phase2(hermon_state_t *state)
 		case HERMON_SRQHDL:
 			state->hs_srqhdl = hdl_info.swi_table_ptr;
 			break;
-		case HERMON_MRHDL:
-			break;
 		default:
 			break;
 		}
@@ -1386,8 +1389,9 @@ hermon_rsrc_hw_entries_init(hermon_state_t *state,
 
 	/* Set this pool's rsrc_start from the initial ICM allocation */
 	if (rsrc_pool->rsrc_start == 0) {
-		rsrc_pool->rsrc_start = (void *)(uintptr_t)
-		    state->hs_icm[rsrc_pool->rsrc_type].icm_dma[0][0].vaddr;
+
+		/* use a ROUND value that works on both 32 and 64-bit kernels */
+		rsrc_pool->rsrc_start = (void *)(uintptr_t)0x10000000;
 
 		if (hermon_rsrc_verbose) {
 			IBTF_DPRINTF_L2("hermon", "hermon_rsrc_hw_entries_init:"
@@ -1749,6 +1753,7 @@ hermon_rsrc_hw_entry_alloc(hermon_rsrc_pool_info_t *pool_info, uint_t num,
 		if (status != DDI_SUCCESS) {
 			return (DDI_FAILURE);
 		}
+		hdl->hr_addr = NULL;
 	}
 
 	return (DDI_SUCCESS);

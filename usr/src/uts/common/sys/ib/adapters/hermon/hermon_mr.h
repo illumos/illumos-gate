@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -211,6 +211,7 @@ struct hermon_sw_mr_s {
 				/* entity_size (in bytes), for cMPTS */
 	hermon_rsrc_t		*mr_rsrcp;
 	uint_t			mr_is_fmr;
+	uint8_t			mr_fmr_key;	/* per FMR 8-bit key */
 	hermon_fmr_list_t	*mr_fmr;
 	uint_t			mr_is_umem;
 	ddi_umem_cookie_t	mr_umemcookie;
@@ -220,6 +221,7 @@ struct hermon_sw_mr_s {
 };
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hermon_sw_mr_s::mr_bindinfo
     hermon_sw_mr_s::mr_lkey
+    hermon_sw_mr_s::mr_mttaddr
     hermon_sw_mr_s::mr_is_umem
     hermon_sw_mr_s::mr_is_fmr
     hermon_sw_mr_s::mr_fmr))

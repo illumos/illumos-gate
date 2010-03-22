@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -267,8 +267,9 @@ typedef enum ibt_srq_flags_e {
  * ibt_alloc_lkey() alloc flags
  */
 typedef enum ibt_lkey_flags_e {
-	IBT_KEY_NO_FLAGS	= 0,
-	IBT_KEY_REMOTE		= (1 << 0)
+	IBT_KEY_SLEEP		= 0,
+	IBT_KEY_NOSLEEP		= (1 << 0),
+	IBT_KEY_REMOTE		= (1 << 1)
 } ibt_lkey_flags_t;
 
 /*
@@ -1088,7 +1089,8 @@ typedef enum ibt_va_flags_e {
 	IBT_VA_NONCOHERENT	= (1 << 1),
 	IBT_VA_FMR		= (1 << 2),
 	IBT_VA_BLOCK_MODE	= (1 << 3),
-	IBT_VA_BUF		= (1 << 4)
+	IBT_VA_BUF		= (1 << 4),
+	IBT_VA_REG_FN		= (1 << 5)
 } ibt_va_flags_t;
 
 
@@ -1309,16 +1311,16 @@ typedef struct ibt_wr_reg_pmr_s {
 					/* client for the first byte of the */
 					/* region */
 	ib_memlen_t	pmr_len;	/* Length of region to register */
-	ib_memlen_t	pmr_offset;	/* Offset of the regions starting */
+	ib_memlen_t	pmr_offset;	/* Offset of the region's starting */
 					/* IOVA within the 1st physical */
 					/* buffer */
 	ibt_mr_hdl_t	pmr_mr_hdl;
 	ibt_phys_addr_t	*pmr_addr_list; /* List of physical buffers accessed */
 					/* as an array */
 	size_t		pmr_buf_sz;	/* size of uniform size PBEs */
-	uint_t		pmr_num_buf;	/* Num of entries in the pmr_buf_list */
-	ibt_lkey_t	pmr_lkey;
-	ibt_rkey_t	pmr_rkey;
+	uint_t		pmr_num_buf;	/* #entries in the pmr_addr_list */
+	ibt_lkey_t	pmr_lkey;	/* new lkey upon return */
+	ibt_rkey_t	pmr_rkey;	/* new rkey upon return */
 	ibt_mr_flags_t	pmr_flags;
 	uint8_t		pmr_key;	/* Key to use on new Lkey & Rkey */
 } ibt_wr_reg_pmr_t;

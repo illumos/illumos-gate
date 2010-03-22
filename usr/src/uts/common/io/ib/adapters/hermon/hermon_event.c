@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1123,6 +1123,7 @@ hermon_eq_demux(hermon_state_t *state, hermon_eqhdl_t eq,
 
 	case HERMON_EVT_LOCAL_ACC_VIO_WQ_ERROR:
 		HERMON_FMANOTE(state, HERMON_FMA_LOCACEQ);
+		IBTF_DPRINTF_L2("async", HERMON_FMA_LOCACEQ);
 		status = hermon_local_acc_vio_wq_err_handler(state, eq, eqe);
 		break;
 	case HERMON_EVT_SEND_QUEUE_DRAINED:
