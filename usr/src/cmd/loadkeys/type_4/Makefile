@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,24 +19,23 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 1991, by Sun Microsystems, Inc.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/loadkeys/type_4/Makefile
 
 KEYTABLES = \
 	us belgium_france germany swiss_german swiss_french uk \
 	canada denmark italy netherlands norway portugal spain_latin_america \
-	sweden_finland japan korea taiwan us101a_pc \
+	sweden_finland japan korea traditional_chinese us101a_pc \
 	reset germany_5 norway_5 sweden_5 uk_5 italy_5 \
 	portugal_5 swiss_french_5 us_5 denmark_5 netherlands_5 spain_5 \
-	swiss_german_5 france_5 japan_5 korea_5 taiwan_5 canadian_french_5 \
+	swiss_german_5 france_5 japan_5 korea_5 traditional_chinese_5 canadian_french_5 \
 	hungary_5 poland_5 czech_5 russia_5 canadian_french_5_tbits5 \
 	germany_hobo norway_hobo sweden_hobo uk_hobo italy_hobo \
 	portugal_hobo swiss_french_hobo us_hobo denmark_hobo netherlands_hobo \
 	spain_hobo swiss_german_hobo france_hobo japan_hobo korea_hobo \
-	taiwan_hobo canadian_french_hobo
+	traditional_chinese_hobo canadian_french_hobo
 
 include ../../Makefile.cmd
 
@@ -138,8 +136,8 @@ $(ROOTKEYDIR)/layout_0e: $(ROOTKEYDIR)/uk
 $(ROOTKEYDIR)/layout_10: $(ROOTKEYDIR)/korea
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/korea $@
 
-$(ROOTKEYDIR)/layout_11: $(ROOTKEYDIR)/taiwan
-	$(RM) $@; $(LN) $(ROOTKEYDIR)/taiwan $@
+$(ROOTKEYDIR)/layout_11: $(ROOTKEYDIR)/traditional_chinese
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/traditional_chinese $@
 
 $(ROOTKEYDIR)/layout_13: $(ROOTKEYDIR)/us101a_pc
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/us101a_pc $@
@@ -192,8 +190,8 @@ $(ROOTKEYDIR)/layout_2e: $(ROOTKEYDIR)/uk_5
 $(ROOTKEYDIR)/layout_2f: $(ROOTKEYDIR)/korea_5
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/korea_5 $@
 
-$(ROOTKEYDIR)/layout_30: $(ROOTKEYDIR)/taiwan_5
-	$(RM) $@; $(LN) $(ROOTKEYDIR)/taiwan_5 $@
+$(ROOTKEYDIR)/layout_30: $(ROOTKEYDIR)/traditional_chinese_5
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/traditional_chinese_5 $@
 
 $(ROOTKEYDIR)/layout_31: $(ROOTKEYDIR)/japan_5
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/japan_5 $@
@@ -261,8 +259,8 @@ $(ROOTKEYDIR)/layout_5d: $(ROOTKEYDIR)/uk_hobo
 $(ROOTKEYDIR)/layout_5e: $(ROOTKEYDIR)/korea_hobo
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/korea_hobo $@
 
-$(ROOTKEYDIR)/layout_5f: $(ROOTKEYDIR)/taiwan_hobo
-	$(RM) $@; $(LN) $(ROOTKEYDIR)/taiwan_hobo $@
+$(ROOTKEYDIR)/layout_5f: $(ROOTKEYDIR)/traditional_chinese_hobo
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/traditional_chinese_hobo $@
 
 $(ROOTKEYDIR)/layout_60: $(ROOTKEYDIR)/japan_hobo
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/japan_hobo $@

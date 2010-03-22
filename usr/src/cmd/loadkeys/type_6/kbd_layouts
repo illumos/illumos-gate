@@ -18,9 +18,8 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -37,6 +36,7 @@
 
 
 Albanian=264
+Arabic=1
 Belarusian=261
 Belgian=2
 Brazilian=272

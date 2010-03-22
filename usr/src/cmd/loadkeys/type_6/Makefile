@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#
-#
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/loadkeys/type_6/Makefile
@@ -30,11 +28,12 @@ KEYTABLES = \
         us belgium czech denmark finnish france canadian_french \
  	germany greece hungary italy japan korea \
         netherlands norway portugal poland reset spain sweden \
-        swiss_french swiss_german taiwan uk \
+        swiss_french swiss_german traditional_chinese uk \
         slovakia slovenia serbiaandmontenegro \
         iceland croatia bulgaria belarus maltaus \
         maltauk albania turkeyq turkeyf latvia lithuania macedonia russia \
-        latinamerica canadian_bilingual brazil dvorak estonia romania
+        latinamerica canadian_bilingual brazil dvorak estonia romania \
+	arabia
 
 KEYTABLESCONFIG = kbd_layouts
 
@@ -55,7 +54,7 @@ LAYOUTS= \
 	layout_20 layout_21 layout_100 layout_18 layout_101 layout_102 \
 	layout_103 layout_104 layout_105 layout_106 layout_107 layout_108 \
 	layout_10f layout_1f layout_23 layout_15 layout_05 layout_11 \
-	layout_03 layout_110 layout_111 layout_112 layout_113
+	layout_03 layout_110 layout_111 layout_112 layout_113 layout_01
 
 ROOTLINKS= $(LAYOUTS:%=$(ROOTKEYDIR)/%)
 
@@ -85,6 +84,9 @@ $(ROOTKEYDIR): $(ROOTKEYTABLESDIR)
 #
 $(ROOTKEYDIR)/layout_00: $(ROOTKEYDIR)/us
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/us $@
+
+$(ROOTKEYDIR)/layout_01: $(ROOTKEYDIR)/arabia
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/arabia $@
 
 $(ROOTKEYDIR)/layout_02: $(ROOTKEYDIR)/belgium
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/belgium $@
@@ -155,8 +157,8 @@ $(ROOTKEYDIR)/layout_1b: $(ROOTKEYDIR)/swiss_french
 $(ROOTKEYDIR)/layout_1c: $(ROOTKEYDIR)/swiss_german
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/swiss_german $@
 
-$(ROOTKEYDIR)/layout_1e: $(ROOTKEYDIR)/taiwan
-	$(RM) $@; $(LN) $(ROOTKEYDIR)/taiwan $@
+$(ROOTKEYDIR)/layout_1e: $(ROOTKEYDIR)/traditional_chinese
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/traditional_chinese $@
 
 $(ROOTKEYDIR)/layout_20: $(ROOTKEYDIR)/uk
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/uk $@

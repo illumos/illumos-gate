@@ -19,52 +19,41 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Belgian Type 6 (USB) key layout
 #
-key  49  base '\\' shift | caps '\\' ctrl ^\ altg nop
-key  50 all hole
-key 103  all hole
-key  30  base 1 shift ! caps 1 ctrl 1 altg nop
-key  31  base 2 shift @ caps 2 ctrl ^@ altg nop
-key  32  base 3 shift # caps 3 ctrl 3 altg nop
-key  33  base 4 shift $ caps 4 ctrl 4 altg nop
-key  34  base 5 shift % caps 5 ctrl 5 altg nop
-key  35  base 6 shift ^ caps 6 ctrl ^^ altg nop
-key  36  base 7 shift & caps 7 ctrl 7 altg nop
-key  37  base 8 shift * caps 8 ctrl 8 altg nop
-key  38  base 9 shift ( caps 9 ctrl 9 altg nop
-key  39  base 0 shift ) caps 0 ctrl 0 altg nop
-key  45  base - shift _ caps - ctrl ^_ altg nop
-key  46  base = shift + caps = ctrl = altg nop
-key  20  base q shift Q caps Q ctrl ^Q altg nop
-key  26  base w shift W caps W ctrl ^W altg nop
-key  28  base y shift Y caps Y ctrl ^Y altg nop
-key  18  base o shift O caps O ctrl ^O altg nop
-key  19  base p shift P caps P ctrl ^P altg nop
-key  47  base [ shift { caps [ ctrl ^[ altg nop
-key  48  base ] shift } caps ] ctrl ^] altg nop
-key 224  all shiftkeys+leftctrl up shiftkeys+leftctrl
-key   4  base a shift A caps A ctrl ^A altg nop
-key  22  base s shift S caps S ctrl ^S altg nop
-key  51  base ; shift : caps ; ctrl ; altg nop
-key  52  base '\'' shift '"' caps '\'' ctrl '\'' altg nop
-key  53  base ` shift ~ caps ` ctrl ^^ altg nop
-key 100  all hole
-key  29  base z shift Z caps Z ctrl ^Z altg nop
-key  27  base x shift X caps X ctrl ^X altg nop
-key   6  base c shift C caps C ctrl ^C altg nop
-key  25  base v shift V caps V ctrl ^V altg nop
-key   5  base b shift B caps B ctrl ^B altg nop
-key  17  base n shift N caps N ctrl ^N altg nop
-key  16  base m shift M caps M ctrl '\r' altg nop
-key  54  base , shift < caps , ctrl , altg nop
-key  55  base . shift > caps . ctrl . altg nop
-key  56  base / shift ? caps / ctrl ^_ altg nop
+#
+key  53  base ² shift ³ caps ² ctrl ² altg nop
+key  30  base & shift 1 caps & ctrl & altg |
+key  31  base é shift 2 caps é ctrl é altg @
+key  32  base '"' shift 3 caps '"' ctrl '"' altg #
+key  33  base '\'' shift 4 caps '\'' ctrl '\'' altg nop
+key  34  base ( shift 5 caps ( ctrl ^[ altg nop
+key  35  base § shift 6 caps § ctrl ^_ altg ^
+key  36  base è shift 7 caps è ctrl è altg nop
+key  37  base ! shift 8 caps ! ctrl ^\ altg nop
+key  38  base ç shift 9 caps ç ctrl ^^ altg {
+key  39  base à shift 0 caps à ctrl ^@ altg }
+key  45  base ) shift ° caps ) ctrl ^] altg nop
+key  46  base - shift _ caps - ctrl ^_ altg nop
+key  20  base a shift A caps A ctrl ^A altg nop
+key  26  base z shift Z caps Z ctrl ^Z altg nop
+key  47  base fa_cflex shift fa_umlaut caps fa_cflex ctrl fa_cflex altg [
+key  48  base $ shift * caps $ ctrl $ altg ]
+key   4  base q shift Q caps Q ctrl ^Q altg nop
+key  51  base m shift M caps M ctrl ^M altg nop
+key  52  base ù shift % caps ù ctrl ù altg fa_grave
+key  50  base µ shift £ caps µ ctrl µ altg fa_acute numl nonl up nop
+key  49  all hole
+key 100  base < shift > caps < ctrl < altg '\\' numl nonl up nop
+key  29  base w shift W caps W ctrl ^W altg nop
+key  16  base , shift ? caps , ctrl , altg nop
+key  54  base ; shift . caps ; ctrl ; altg nop
+key  55  base : shift / caps : ctrl : altg nop
+key  56  base = shift + caps = ctrl = altg fa_tilde
 key  57  all shiftkeys+capslock
 key 226  all shiftkeys+alt up shiftkeys+alt
 key 101  all compose
@@ -74,12 +63,12 @@ key 230  all shiftkeys+altgraph up shiftkeys+altgraph
 #
 # New function keys assigned old codes
 #
-key  73  all bf(8)
-key  74  all rf(7)
-key  75  all rf(9)
-key  77  all rf(13)
-key  78  all rf(15)
-key  82  all string+uparrow
-key  80  all string+leftarrow
-key  81  all string+downarrow
-key  79  all string+rightarrow
+key  73  all bf(8)        
+key  74  all rf(7)        
+key  75  all rf(9)        
+key  77  all rf(13)        
+key  78  all rf(15)        
+key  82  all string+uparrow        
+key  80  all string+leftarrow        
+key  81  all string+downarrow        
+key  79  all string+rightarrow        

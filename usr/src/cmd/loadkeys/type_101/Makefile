@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# Copyright (c) 1999 by Sun Microsystems, Inc.
-# All rights reserved.
 #
 # cmd/loadkeys/type_101/Makefile
 
@@ -51,7 +49,7 @@ KEYTABLES = \
 	sweden \
 	swiss_french \
 	swiss_german \
-	taiwan \
+	traditional_chinese \
 	turkey \
 	uk \
 	us
@@ -175,8 +173,8 @@ $(ROOTKEYDIR)/layout_2e:	$(ROOTKEYDIR)/uk
 $(ROOTKEYDIR)/layout_2f:	$(ROOTKEYDIR)/korea
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/korea $@
 
-$(ROOTKEYDIR)/layout_30:	$(ROOTKEYDIR)/taiwan
-	$(RM) $@; $(LN) $(ROOTKEYDIR)/taiwan $@
+$(ROOTKEYDIR)/layout_30:	$(ROOTKEYDIR)/traditional_chinese
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/traditional_chinese $@
 
 $(ROOTKEYDIR)/layout_31:	$(ROOTKEYDIR)/japan
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/japan $@
