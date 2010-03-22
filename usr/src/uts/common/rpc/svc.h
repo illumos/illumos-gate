@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -187,6 +187,8 @@ struct svc_ops {
 		/* destroy a clone xprt */
 	void	(*xp_start)(SVCMASTERXPRT *);
 		/* `ready-to-receive' */
+	void	(*xp_clone_xprt)(SVCXPRT *, SVCXPRT *);
+		/* transport specific clone function */
 };
 #else	/* _KERNEL */
 /*
@@ -510,6 +512,12 @@ struct __svcxprt {
  */
 
 #ifdef	_KERNEL
+
+#define	SVC_CLONE_XPRT(src_xprt, dst_xprt) \
+	if ((src_xprt)->xp_ops->xp_clone_xprt) \
+		(*(src_xprt)->xp_ops->xp_clone_xprt) \
+		    (src_xprt, dst_xprt)
+
 #define	SVC_RECV(clone_xprt, mp, msg) \
 	(*(clone_xprt)->xp_ops->xp_recv)((clone_xprt), (mp), (msg))
 
@@ -1103,7 +1111,7 @@ extern int	__svc_vc_dupdone();
  */
 extern SVCXPRT *svc_clone_init(void);
 extern void svc_clone_free(SVCXPRT *);
-extern void svc_clone_link(SVCMASTERXPRT *, SVCXPRT *);
+extern void svc_clone_link(SVCMASTERXPRT *, SVCXPRT *, SVCXPRT *);
 extern void svc_clone_unlink(SVCXPRT *);
 #endif	/* _KERNEL */
 

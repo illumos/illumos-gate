@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -79,6 +79,7 @@ static int32_t		*svc_clts_kgetres(SVCXPRT *, int);
 static void		svc_clts_kclone_destroy(SVCXPRT *);
 static void		svc_clts_kfreeres(SVCXPRT *);
 static void		svc_clts_kstart(SVCMASTERXPRT *);
+static void		svc_clts_kclone_xprt(SVCXPRT *, SVCXPRT *);
 
 /*
  * Server transport operations vector.
@@ -94,7 +95,8 @@ struct svc_ops svc_clts_op = {
 	svc_clts_kgetres,	/* Get pointer to response buffer */
 	svc_clts_kfreeres,	/* Destroy pre-serialized response header */
 	svc_clts_kclone_destroy, /* Destroy a clone xprt */
-	svc_clts_kstart		/* Tell `ready-to-receive' to rpcmod */
+	svc_clts_kstart,	/* Tell `ready-to-receive' to rpcmod */
+	svc_clts_kclone_xprt	/* transport specific clone xprt function */
 };
 
 /*
@@ -229,6 +231,20 @@ static void
 svc_clts_kstart(SVCMASTERXPRT *xprt)
 {
 }
+
+static void
+svc_clts_kclone_xprt(SVCXPRT *src_xprt, SVCXPRT *dst_xprt)
+{
+	struct udp_data *ud_src =
+	    (struct udp_data *)src_xprt->xp_p2buf;
+	struct udp_data *ud_dst =
+	    (struct udp_data *)dst_xprt->xp_p2buf;
+
+	if (ud_src->ud_resp)
+		ud_dst->ud_resp = dupb(ud_src->ud_resp);
+
+}
+
 
 /*
  * Receive rpc requests.

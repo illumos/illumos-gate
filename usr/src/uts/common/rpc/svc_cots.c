@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *  Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -99,7 +99,8 @@ struct svc_ops svc_cots_op = {
 	svc_cots_kgetres,	/* Get pointer to response buffer */
 	svc_cots_kfreeres,	/* Destroy pre-serialized response header */
 	svc_cots_kclone_destroy, /* Destroy a clone xprt */
-	svc_cots_kstart		/* Tell `ready-to-receive' to rpcmod */
+	svc_cots_kstart,	/* Tell `ready-to-receive' to rpcmod */
+	NULL			/* Transport specific clone xprt */
 };
 
 /*

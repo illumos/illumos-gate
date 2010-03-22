@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -90,11 +90,13 @@ struct rdma_data {
  * Plugin connection specific data stashed away in clone SVCXPRT
  */
 struct clone_rdma_data {
+	bool_t		cloned;		/* xprt cloned for thread processing */
 	CONN		*conn;		/* RDMA connection */
 	rdma_buf_t	rpcbuf;		/* RPC req/resp buffer */
 	struct clist	*cl_reply;	/* reply chunk buffer info */
 	struct clist	*cl_wlist;		/* write list clist */
 };
+
 
 #define	MAXADDRLEN	128	/* max length for address mask */
 
@@ -115,6 +117,7 @@ static void		svc_rdma_kfreeres(SVCXPRT *);
 static void		svc_rdma_kclone_destroy(SVCXPRT *);
 static void		svc_rdma_kstart(SVCMASTERXPRT *);
 void			svc_rdma_kstop(SVCMASTERXPRT *);
+static void		svc_rdma_kclone_xprt(SVCXPRT *, SVCXPRT *);
 
 static int	svc_process_long_reply(SVCXPRT *, xdrproc_t,
 			caddr_t, struct rpc_msg *, bool_t, int *,
@@ -141,7 +144,8 @@ struct svc_ops rdma_svc_ops = {
 	svc_rdma_kgetres,	/* Get pointer to response buffer */
 	svc_rdma_kfreeres,	/* Destroy pre-serialized response header */
 	svc_rdma_kclone_destroy,	/* Destroy a clone xprt */
-	svc_rdma_kstart		/* Tell `ready-to-receive' to rpcmod */
+	svc_rdma_kstart,	/* Tell `ready-to-receive' to rpcmod */
+	svc_rdma_kclone_xprt	/* Transport specific clone xprt */
 };
 
 /*
@@ -384,7 +388,45 @@ svc_rdma_kstop(SVCMASTERXPRT *xprt)
 static void
 svc_rdma_kclone_destroy(SVCXPRT *clone_xprt)
 {
+
+	struct clone_rdma_data *cdrp;
+	cdrp = (struct clone_rdma_data *)clone_xprt->xp_p2buf;
+
+	/*
+	 * Only free buffers and release connection when cloned is set.
+	 */
+	if (cdrp->cloned != TRUE)
+		return;
+
+	rdma_buf_free(cdrp->conn, &cdrp->rpcbuf);
+	if (cdrp->cl_reply) {
+		clist_free(cdrp->cl_reply);
+		cdrp->cl_reply = NULL;
+	}
+	RDMA_REL_CONN(cdrp->conn);
+
+	cdrp->cloned = 0;
 }
+
+/*
+ * Clone the xprt specific information.  It will be freed by
+ * SVC_CLONE_DESTROY.
+ */
+static void
+svc_rdma_kclone_xprt(SVCXPRT *src_xprt, SVCXPRT *dst_xprt)
+{
+	struct clone_rdma_data *srcp2;
+	struct clone_rdma_data *dstp2;
+
+	srcp2 = (struct clone_rdma_data *)src_xprt->xp_p2buf;
+	dstp2 = (struct clone_rdma_data *)dst_xprt->xp_p2buf;
+
+	if (srcp2->conn != NULL) {
+		srcp2->cloned = TRUE;
+		*dstp2 = *srcp2;
+	}
+}
+
 
 static bool_t
 svc_rdma_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
@@ -1029,7 +1071,18 @@ svc_rdma_kfreeargs(SVCXPRT *clone_xprt, xdrproc_t xdr_args,
 	struct clone_rdma_data *crdp;
 	bool_t retval;
 
+	/*
+	 * If the cloned bit is true, then this transport specific
+	 * rmda data has been duplicated into another cloned xprt. Do
+	 * not free, or release the connection, it is still in use.  The
+	 * buffers will be freed and the connection released later by
+	 * SVC_CLONE_DESTROY().
+	 */
 	crdp = (struct clone_rdma_data *)clone_xprt->xp_p2buf;
+	if (crdp->cloned == TRUE) {
+		crdp->cloned = 0;
+		return (TRUE);
+	}
 
 	/*
 	 * Free the args if needed then XDR_DESTROY

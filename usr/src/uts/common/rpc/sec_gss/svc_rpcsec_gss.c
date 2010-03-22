@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -970,20 +970,9 @@ rpcsec_gss_init(
 
 	/* get a xprt clone for taskq thread, taskq func must free it */
 	arg->rq_xprt = svc_clone_init();
-	svc_clone_link(rqst->rq_xprt->xp_master, arg->rq_xprt);
+	svc_clone_link(rqst->rq_xprt->xp_master, arg->rq_xprt, rqst->rq_xprt);
 	arg->rq_xprt->xp_xid = rqst->rq_xprt->xp_xid;
 
-	/* UDP uses the incoming mblk for the response, so dup it. */
-	/* Note this probably should be done by svc_clone_link().  */
-	if (rqst->rq_xprt->xp_type == T_CLTS) {
-		struct udp_data *ud_src =
-		    (struct udp_data *)rqst->rq_xprt->xp_p2buf;
-		struct udp_data *ud_dst =
-		    (struct udp_data *)arg->rq_xprt->xp_p2buf;
-		if (ud_src->ud_resp) {
-			ud_dst->ud_resp = dupb(ud_src->ud_resp);
-		}
-	}
 
 	/* set the appropriate wrap/unwrap routine for RPCSEC_GSS */
 	arg->rq_xprt->xp_auth.svc_ah_ops = svc_rpc_gss_ops;

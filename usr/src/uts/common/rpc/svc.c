@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1469,7 +1469,7 @@ svc_clone_free(SVCXPRT *clone_xprt)
  * - call a transport specific clone routine.
  */
 void
-svc_clone_link(SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
+svc_clone_link(SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt, SVCXPRT *clone_xprt2)
 {
 	cred_t *cred = clone_xprt->xp_cred;
 
@@ -1496,14 +1496,8 @@ svc_clone_link(SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 	/* Restore per-thread fields (xp_cred) */
 	clone_xprt->xp_cred = cred;
 
-
-	/*
-	 * NOTICE: There is no transport-type specific code now.
-	 *	   If you want to add a transport-type specific cloning code
-	 *	   add one more operation (e.g. xp_clone()) to svc_ops,
-	 *	   implement it for each transport type, and call it here
-	 *	   through an appropriate macro (e.g. SVC_CLONE()).
-	 */
+	if (clone_xprt2)
+		SVC_CLONE_XPRT(clone_xprt2, clone_xprt);
 }
 
 /*
@@ -2192,7 +2186,7 @@ svc_run(SVCPOOL *pool)
 		if (next != xprt) {
 			if (xprt)
 				svc_clone_unlink(clone_xprt);
-			svc_clone_link(next, clone_xprt);
+			svc_clone_link(next, clone_xprt, NULL);
 			xprt = next;
 		}
 
