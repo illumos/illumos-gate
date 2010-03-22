@@ -1431,7 +1431,7 @@ update_default_path()
 	 */
 	current = (default_path == NULL) ? kobj_module_path : default_path;
 
-	newlen = strlen(HVM_MOD_DIR) + strlen(current) + 1;
+	newlen = strlen(HVM_MOD_DIR) + strlen(current) + 2;
 	newpath = kmem_alloc(newlen, KM_SLEEP);
 	(void) strcpy(newpath, HVM_MOD_DIR);
 	(void) strcat(newpath, " ");
