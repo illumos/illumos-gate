@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,11 +84,22 @@ extern "C" {
 #define	VDC_SEQ_NUM_TODO		1	/* Request needs processing */
 
 /*
+ * DRing reserved entries. Entry 0 is reserved and only used for error
+ * checking. This is done so that error checking can be done even if the
+ * DRing is full. All other entries are available for regular I/Os.
+ */
+#define	VDC_DRING_NUM_RESV		1	/* #reserved entries */
+#define	VDC_DRING_FIRST_RESV		0	/* 1st reserved entry */
+#define	VDC_DRING_FIRST_ENTRY		\
+	    (VDC_DRING_FIRST_RESV + VDC_DRING_NUM_RESV)	/* 1st non-resv entry */
+
+/*
  * Flags for virtual disk operations.
  */
 #define	VDC_OP_STATE_RUNNING	0x01	/* do operation in running state */
 #define	VDC_OP_ERRCHK_BACKEND	0x02	/* check backend on error */
 #define	VDC_OP_ERRCHK_CONFLICT	0x04	/* check resv conflict on error */
+#define	VDC_OP_DRING_RESERVED	0x08	/* use dring reserved entry */
 
 #define	VDC_OP_ERRCHK	(VDC_OP_ERRCHK_BACKEND | VDC_OP_ERRCHK_CONFLICT)
 #define	VDC_OP_NORMAL	(VDC_OP_STATE_RUNNING | VDC_OP_ERRCHK)

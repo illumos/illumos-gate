@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2717,7 +2717,7 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 	}
 
 	/* Initialize the starting index */
-	vdc->dring_curr_idx = 0;
+	vdc->dring_curr_idx = VDC_DRING_FIRST_ENTRY;
 
 	return (status);
 }
@@ -3037,26 +3037,32 @@ vdc_populate_descriptor(vdc_t *vdcp, int operation, caddr_t addr,
 loop:
 	DMSG(vdcp, 2, ": dring_curr_idx = %d\n", vdcp->dring_curr_idx);
 
-	/* Get next available D-Ring entry */
-	idx = vdcp->dring_curr_idx;
-	local_dep = &(vdcp->local_dring[idx]);
+	if (flags & VDC_OP_DRING_RESERVED) {
+		/* use D-Ring reserved entry */
+		idx = VDC_DRING_FIRST_RESV;
+		local_dep = &(vdcp->local_dring[idx]);
+	} else {
+		/* Get next available D-Ring entry */
+		idx = vdcp->dring_curr_idx;
+		local_dep = &(vdcp->local_dring[idx]);
 
-	if (!local_dep->is_free) {
-		DMSG(vdcp, 2, "[%d]: dring full - waiting for space\n",
-		    vdcp->instance);
-		cv_wait(&vdcp->dring_free_cv, &vdcp->lock);
-		if (vdcp->state == VDC_STATE_RUNNING ||
-		    vdcp->state == VDC_STATE_HANDLE_PENDING) {
-			goto loop;
+		if (!local_dep->is_free) {
+			DMSG(vdcp, 2, "[%d]: dring full - waiting for space\n",
+			    vdcp->instance);
+			cv_wait(&vdcp->dring_free_cv, &vdcp->lock);
+			if (vdcp->state == VDC_STATE_RUNNING ||
+			    vdcp->state == VDC_STATE_HANDLE_PENDING) {
+				goto loop;
+			}
+			vdcp->threads_pending--;
+			return (ECONNRESET);
 		}
-		vdcp->threads_pending--;
-		return (ECONNRESET);
-	}
 
-	next_idx = idx + 1;
-	if (next_idx >= vdcp->dring_len)
-		next_idx = 0;
-	vdcp->dring_curr_idx = next_idx;
+		next_idx = idx + 1;
+		if (next_idx >= vdcp->dring_len)
+			next_idx = VDC_DRING_FIRST_ENTRY;
+		vdcp->dring_curr_idx = next_idx;
+	}
 
 	ASSERT(local_dep->is_free);
 
@@ -3073,6 +3079,17 @@ loop:
 
 	rv = vdc_map_to_shared_dring(vdcp, idx);
 	if (rv) {
+		if (flags & VDC_OP_DRING_RESERVED) {
+			DMSG(vdcp, 0, "[%d]: cannot bind memory - error\n",
+			    vdcp->instance);
+			/*
+			 * We can't wait if we are using reserved slot.
+			 * Free the descriptor and return.
+			 */
+			local_dep->is_free = B_TRUE;
+			vdcp->threads_pending--;
+			return (rv);
+		}
 		DMSG(vdcp, 0, "[%d]: cannot bind memory - waiting ..\n",
 		    vdcp->instance);
 		/* free the descriptor */
@@ -3126,15 +3143,13 @@ loop:
 		break;
 
 	default:
-		goto cleanup_and_exit;
+		DMSG(vdcp, 0, "unexpected error, rv=%d\n", rv);
+		rv = ENXIO;
+		break;
 	}
 
 	vdcp->threads_pending--;
 	return (rv);
-
-cleanup_and_exit:
-	DMSG(vdcp, 0, "unexpected error, rv=%d\n", rv);
-	return (ENXIO);
 }
 
 /*
@@ -4844,8 +4859,8 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 		 * is effectively available (if multiple server) or that there
 		 * is no reservation conflict (if failfast).
 		 */
-		if ((status != 0 &&
-		    (vdcp->num_servers > 1 &&
+		if (status != 0 &&
+		    ((vdcp->num_servers > 1 &&
 		    (ldep->flags & VDC_OP_ERRCHK_BACKEND)) ||
 		    (vdcp->failfast_interval != 0 &&
 		    (ldep->flags & VDC_OP_ERRCHK_CONFLICT)))) {
@@ -6476,6 +6491,8 @@ vdc_eio_check(vdc_t *vdc, int flags)
 
 	ASSERT((flags & VDC_OP_ERRCHK) == 0);
 
+	flags |= VDC_OP_DRING_RESERVED;
+
 	if (VD_OP_SUPPORTED(vdc->operations, VD_OP_SCSICMD))
 		return (vdc_eio_scsi_check(vdc, flags));
 
@@ -6700,6 +6717,14 @@ vdc_eio_thread(void *arg)
 			vdc->read_state = VDC_READ_RESET;
 			cv_signal(&vdc->read_cv);
 			mutex_exit(&vdc->read_lock);
+		} else {
+			/*
+			 * There is only one path and the backend is not
+			 * accessible, so I/Os are actually failing because
+			 * of that. So we can complete I/O queued before the
+			 * last check.
+			 */
+			vdc_eio_unqueue(vdc, starttime, B_TRUE);
 		}
 	}
 
