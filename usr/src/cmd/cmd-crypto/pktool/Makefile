@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -37,7 +37,8 @@ OBJS =	pktool.o \
 	gencsr.o \
 	download.o \
 	genkey.o \
-	signcsr.o
+	signcsr.o \
+	genkeypair.o
 
 include ../../Makefile.cmd
 
@@ -47,10 +48,11 @@ POFILES = $(OBJS:%.o=%.po)
 POFILE = $(PROG)_msg.po
 MSGFILES=$(SRCS:%.c=%.i)
 
-CPPFLAGS += -I. -I$(KMFDIR)/include -I/usr/include/libxml2
+CPPFLAGS += -I. -I$(KMFDIR)/include -I/usr/include/libxml2 \
+	-I$(KMFDIR)/ber_der/inc
+
 CFLAGS += $(CCVERBOSE) -DDEBUG
 
-#LDFLAGS += -L$(SRC)/lib/libkmf/libkmf/$(MACH)
 LDLIBS +=  -lkmf -lpkcs11 -lcryptoutil 
 
 .KEEP_STATE:

@@ -1,16 +1,15 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
  * Copyright (c) 1995-1999 Intel Corporation. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <strings.h>
 #include <kmftypes.h>
 #include <ber_der.h>
+#include <kmfber_int.h>
 #include <kmfapi.h>
 #include <kmfapiP.h>
 
@@ -23,14 +22,18 @@ const KMF_OID extension_request_oid = {OID_PKCS_9_LENGTH + 1,
 	OID_ExtensionRequest};
 
 static KMF_RETURN
-encode_algoid(BerElement *asn1, KMF_X509_ALGORITHM_IDENTIFIER *algoid)
+encode_algoid(BerElement *asn1, KMF_X509_ALGORITHM_IDENTIFIER *algoid,
+    boolean_t encode_params)
 {
 	KMF_RETURN ret = KMF_OK;
 
 	if (kmfber_printf(asn1, "{D", &algoid->algorithm) == -1) {
 		ret = KMF_ERR_BAD_CERT_FORMAT;
 	}
-	if (algoid->parameters.Data == NULL ||
+	if (!encode_params) {
+		if (kmfber_printf(asn1, "}") == -1)
+			return (KMF_ERR_BAD_CERT_FORMAT);
+	} else if (algoid->parameters.Data == NULL ||
 	    algoid->parameters.Length == 0) {
 		if (kmfber_printf(asn1, "n}") == -1)
 			return (KMF_ERR_BAD_CERT_FORMAT);
@@ -196,31 +199,98 @@ free_decoded_cert(KMF_X509_CERTIFICATE *certptr)
 }
 
 static KMF_RETURN
-get_algoid(BerElement *asn1, KMF_X509_ALGORITHM_IDENTIFIER *algoid)
+get_sequence_data(BerElement *asn1, BerValue *seqdata)
 {
-	KMF_RETURN ret = KMF_OK;
-	ber_tag_t tag, newtag;
+	ber_tag_t tag;
 	ber_len_t size;
-	BerValue AlgOID = {NULL, 0};
 
 	tag = kmfber_next_element(asn1, &size, NULL);
-	if (tag != BER_CONSTRUCTED_SEQUENCE)
+	if (tag == BER_OBJECT_IDENTIFIER) {
+		/* The whole block is the OID. */
+		size += kmfber_calc_taglen(tag) + kmfber_calc_lenlen(size);
+		seqdata->bv_val = malloc(size);
+		if (seqdata->bv_val == NULL) {
+			return (KMF_ERR_MEMORY);
+		}
+		/* read the raw data into the Algoritm params area. */
+		if (kmfber_read(asn1, seqdata->bv_val, size) ==
+		    -1) {
+			return (KMF_ERR_BAD_CERT_FORMAT);
+		}
+		seqdata->bv_len = size;
+		return (KMF_OK);
+	} else if (tag != BER_CONSTRUCTED_SEQUENCE)
 		return (KMF_ERR_BAD_CERT_FORMAT);
 
-	if ((tag = kmfber_scanf(asn1, "{Dt", &AlgOID, &newtag)) == -1) {
+	if ((kmfber_scanf(asn1, "tl", &tag, &size)) == -1) {
+		return (KMF_ERR_BAD_CERT_FORMAT);
+	}
+	/*
+	 * We need to read the tag and the length bytes too,
+	 * so adjust the size.
+	 */
+	size += kmfber_calc_taglen(tag) + kmfber_calc_lenlen(size);
+	seqdata->bv_val = malloc(size);
+	if (seqdata->bv_val == NULL) {
+		return (KMF_ERR_MEMORY);
+	}
+	/* read the raw data into the Algoritm params area. */
+	if (kmfber_read(asn1, seqdata->bv_val, size) ==
+	    -1) {
+		return (KMF_ERR_BAD_CERT_FORMAT);
+	}
+	seqdata->bv_len = size;
+	return (KMF_OK);
+}
+
+static KMF_RETURN
+get_algoid(BerElement *asn1, KMF_X509_ALGORITHM_IDENTIFIER *algoid)
+{
+	KMF_RETURN rv = KMF_OK;
+	ber_tag_t tag;
+	ber_len_t size;
+	BerValue algoid_data;
+	BerValue AlgOID;
+	BerElement *oidasn1 = NULL;
+
+	/* Read the entire OID seq into it's own data block */
+	rv = get_sequence_data(asn1, &algoid_data);
+	if (rv != KMF_OK)
+		return (rv);
+
+	/* Now parse just this block so we don't overrun */
+	if ((oidasn1 = kmfder_init(&algoid_data)) == NULL)
+		return (KMF_ERR_MEMORY);
+	tag = kmfber_next_element(oidasn1, &size, NULL);
+	if (tag == BER_OBJECT_IDENTIFIER) {
+		algoid->algorithm.Data = (uchar_t *)algoid_data.bv_val;
+		algoid->algorithm.Length = algoid_data.bv_len;
+		algoid->parameters.Data = NULL;
+		algoid->parameters.Length = 0;
+		kmfber_free(oidasn1, 1);
+		return (KMF_OK);
+	}
+
+	if ((tag = kmfber_scanf(oidasn1, "{D", &AlgOID)) == -1) {
+		kmfber_free(oidasn1, 1);
 		return (KMF_ERR_BAD_CERT_FORMAT);
 	}
 	algoid->algorithm.Data = (uchar_t *)AlgOID.bv_val;
 	algoid->algorithm.Length = AlgOID.bv_len;
 
-	if (newtag == BER_NULL) {
-		(void) kmfber_scanf(asn1, "n}");
+	tag = kmfber_next_element(oidasn1, &size, NULL);
+	if (tag == BER_NULL) {
+		(void) kmfber_scanf(oidasn1, "n}");
+		algoid->parameters.Data = NULL;
+		algoid->parameters.Length = 0;
+	} else if (tag == KMFBER_END_OF_SEQORSET || tag == KMFBER_DEFAULT) {
+		/* close sequence, we are done with Algoid */
 		algoid->parameters.Data = NULL;
 		algoid->parameters.Length = 0;
 	} else {
-		/* Peek at the tag and length bytes */
-		if ((kmfber_scanf(asn1, "tl", &tag, &size)) == -1) {
-			ret = KMF_ERR_BAD_CERT_FORMAT;
+		/* The rest of the data is the algorithm parameters */
+		if ((kmfber_scanf(oidasn1, "tl", &tag, &size)) == -1) {
+			rv = KMF_ERR_BAD_CERT_FORMAT;
 			goto cleanup;
 		}
 
@@ -231,26 +301,24 @@ get_algoid(BerElement *asn1, KMF_X509_ALGORITHM_IDENTIFIER *algoid)
 		size += kmfber_calc_taglen(tag) + kmfber_calc_lenlen(size);
 		algoid->parameters.Data = malloc(size);
 		if (algoid->parameters.Data == NULL) {
-			ret = KMF_ERR_MEMORY;
+			rv = KMF_ERR_MEMORY;
 			goto cleanup;
 		}
 		/* read the raw data into the Algoritm params area. */
-		if (kmfber_read(asn1, (char *)algoid->parameters.Data,
+		if (kmfber_read(oidasn1, (char *)algoid->parameters.Data,
 		    size) == -1) {
-			ret = KMF_ERR_BAD_CERT_FORMAT;
+			rv = KMF_ERR_BAD_CERT_FORMAT;
 			goto cleanup;
 		}
 		algoid->parameters.Length = size;
-		if ((tag = kmfber_scanf(asn1, "}")) == -1) {
-			ret = KMF_ERR_BAD_CERT_FORMAT;
-		}
 	}
 cleanup:
-	if (ret != KMF_OK) {
+	if (rv != KMF_OK) {
 		free_algoid(algoid);
 	}
+	kmfber_free(oidasn1, 1);
 
-	return (ret);
+	return (rv);
 }
 
 static KMF_RETURN
@@ -274,7 +342,11 @@ encode_spki(BerElement *asn1, KMF_X509_SPKI *spki)
 	if (kmfber_printf(asn1, "{") == -1)
 		return (KMF_ERR_BAD_CERT_FORMAT);
 
-	if ((ret = encode_algoid(asn1, &spki->algorithm)) != KMF_OK)
+	/*
+	 * The SPKI is the only place where algorithm parameters
+	 * should be encoded.
+	 */
+	if ((ret = encode_algoid(asn1, &spki->algorithm, TRUE)) != KMF_OK)
 		return (ret);
 
 	if (kmfber_printf(asn1, "B}", spki->subjectPublicKey.Data,
@@ -346,6 +418,7 @@ cleanup:
 	return (ret);
 }
 
+
 KMF_RETURN
 DerEncodeDSASignature(KMF_DATA *rawdata, KMF_DATA *signature)
 {
@@ -356,7 +429,7 @@ DerEncodeDSASignature(KMF_DATA *rawdata, KMF_DATA *signature)
 	if (rawdata == NULL || signature == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	if (rawdata->Data == NULL || rawdata->Length != DSA_RAW_SIG_LEN)
+	if (rawdata->Data == NULL || rawdata->Length == 0)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	asn1 = kmfder_alloc();
@@ -364,10 +437,10 @@ DerEncodeDSASignature(KMF_DATA *rawdata, KMF_DATA *signature)
 		return (KMF_ERR_MEMORY);
 
 	/*
-	 * The DSA signature is the concatenation of 2 SHA-1 hashed
+	 * The [EC]DSA signature is the concatenation of 2
 	 * bignum values.
 	 */
-	n = DSA_RAW_SIG_LEN/2;
+	n = rawdata->Length/2;
 	if (kmfber_printf(asn1, "{II}",
 	    rawdata->Data, n, &rawdata->Data[n], n) == -1) {
 		kmfber_free(asn1, 1);
@@ -388,12 +461,60 @@ DerEncodeDSASignature(KMF_DATA *rawdata, KMF_DATA *signature)
 	return (KMF_OK);
 }
 
+/*
+ * ECDSA and DSA encode signatures the same way.
+ */
+KMF_RETURN
+DerEncodeECDSASignature(KMF_DATA *rawdata, KMF_DATA *signature)
+{
+	return (DerEncodeDSASignature(rawdata, signature));
+}
+
+/*
+ * Convert a signed DSA sig to a fixed-length unsigned one.
+ * This is necessary because DER encoding seeks to use the
+ * minimal amount of bytes but we need a full 20 byte DSA
+ * value with leading 0x00 bytes.
+ */
+static KMF_RETURN
+convert_signed_to_fixed(BerValue *src, BerValue *dst)
+{
+	int cnt;
+	char *p;
+	if (dst->bv_len > src->bv_len) {
+		cnt = dst->bv_len - src->bv_len;
+		/* prepend with leading 0s */
+		(void) memset(dst->bv_val, 0x00, cnt);
+		(void) memcpy(dst->bv_val + cnt, src->bv_val,
+		    src->bv_len);
+		return (KMF_OK);
+	}
+	if (dst->bv_len == src->bv_len) {
+		(void) memcpy(dst->bv_val, src->bv_val,
+		    dst->bv_len);
+		return (KMF_OK);
+	}
+	/*
+	 * src is larger than dest, strip leading 0s.
+	 * This should not be necessary, but do it just in case.
+	 */
+	cnt = src->bv_len - dst->bv_len;
+	p = src->bv_val;
+	while (cnt-- > 0) {
+		if (*p++ != 0x00)
+			return (KMF_ERR_ENCODING);
+	}
+	(void) memcpy(dst->bv_val, p, dst->bv_len);
+	return (KMF_OK);
+}
+
 KMF_RETURN
 DerDecodeDSASignature(KMF_DATA *encoded, KMF_DATA *signature)
 {
 	KMF_RETURN ret = KMF_OK;
 	BerElement *asn1 = NULL;
 	BerValue buf, *R = NULL, *S = NULL;
+	BerValue fixedR, fixedS;
 
 	buf.bv_val = (char *)encoded->Data;
 	buf.bv_len = encoded->Length;
@@ -413,14 +534,50 @@ DerDecodeDSASignature(KMF_DATA *encoded, KMF_DATA *signature)
 		goto cleanup;
 	}
 	signature->Length = R->bv_len + S->bv_len;
+	/*
+	 * If either of the values had a leading 0 lopped off
+	 * they will be 1 byte short and need to be adjusted below.
+	 * The stripping is correct as per ASN.1 rules.
+	 *
+	 * We don't know the exact length that the R and S values
+	 * must be, it depends on the signature algorithm and,
+	 * in the case of EC, the curve used. So instead of
+	 * checking for a specific length, we just check to see
+	 * if the value came out to be an odd number.  If so,
+	 * then we know it needs a leading 0x00 byte which
+	 * will be added below when we convert it to a fixed
+	 * length.
+	 */
+	if ((R->bv_len % 2) != 0)
+		signature->Length++;
+	if ((S->bv_len % 2) != 0)
+		signature->Length++;
+
 	signature->Data = malloc(signature->Length);
 	if (signature->Data == NULL)  {
 		ret = KMF_ERR_MEMORY;
 		goto cleanup;
 	}
-	(void) memcpy(signature->Data, R->bv_val, R->bv_len);
-	(void) memcpy(&signature->Data[R->bv_len], S->bv_val, S->bv_len);
+	fixedR.bv_val = (char *)signature->Data;
+	/* adjust length if it needs a leading 0x00 byte */
+	fixedR.bv_len = R->bv_len + (R->bv_len % 2);
 
+	fixedS.bv_val = (char *)(signature->Data + fixedR.bv_len);
+	/* adjust length if it needs a leading 0x00 byte */
+	fixedS.bv_len = S->bv_len + (S->bv_len % 2);
+
+	/*
+	 * This will add back any missing leading 0's
+	 * that were stripped off earlier when the signature
+	 * was parsed.  This ensures that the 2 parts of the
+	 * signature are the right length and have the proper
+	 * leading 0's prepended.
+	 */
+	ret = convert_signed_to_fixed(R, &fixedR);
+	if (ret)
+		goto cleanup;
+
+	ret = convert_signed_to_fixed(S, &fixedS);
 cleanup:
 	if (R && R->bv_val)
 		free(R->bv_val);
@@ -433,6 +590,13 @@ cleanup:
 	if (asn1) kmfber_free(asn1, 1);
 
 	return (ret);
+}
+
+KMF_RETURN
+DerDecodeECDSASignature(KMF_DATA *encoded, KMF_DATA *signature)
+{
+	/* ECDSA can be decoded using same code as standard DSA */
+	return (DerDecodeDSASignature(encoded, signature));
 }
 
 KMF_RETURN
@@ -1472,7 +1636,8 @@ encode_tbs_cert(BerElement *asn1, KMF_X509_TBS_CERT *tbscert)
 		goto cleanup;
 	}
 
-	if ((ret = encode_algoid(asn1, &tbscert->signature)) != KMF_OK)
+	/* Don't encode alg parameters in signature algid area */
+	if ((ret = encode_algoid(asn1, &tbscert->signature, FALSE)) != KMF_OK)
 		goto cleanup;
 
 	/* Encode the Issuer RDN */
@@ -1601,9 +1766,9 @@ DerEncodeSignedCertificate(KMF_X509_CERTIFICATE *signed_cert_ptr,
 		goto cleanup;
 	}
 
-	/* Add the Algorithm & Signature Sequence */
+	/* Add the Algorithm & Signature Sequence (no parameters) */
 	if ((ret = encode_algoid(asn1,
-	    &signature->algorithmIdentifier)) != KMF_OK)
+	    &signature->algorithmIdentifier, FALSE)) != KMF_OK)
 		goto cleanup;
 
 	if (signature->encrypted.Length > 0) {
@@ -1718,90 +1883,6 @@ cleanup:
 	if (ret != KMF_OK)
 		free_data(tbscert);
 
-	return (ret);
-}
-
-/*
- * Name: GetKeyFromSpki
- *
- * Description:
- * This function parses the KMF_X509_SPKI into its
- * key and parameter components based on the key generation algorithm.
- * NOTE:  Currently, it only checks for the RSA and DSA algorithms.
- *	The RSA algorithm is equivalent to the default behavior.
- *	All other algorithms will default to the parameters = NULL and the
- *	key data equal to whatever is in the CSSM_KEY structure for the key
- *
- * Parameters:
- * AlgId (input) : Algorithm identifier
- * SpkiPtr (input): SPKI structure that contains the key
- * key_ptr(output): The output key
- *
- */
-KMF_RETURN
-GetKeyFromSpki(KMF_ALGORITHM_INDEX AlgId,
-	KMF_X509_SPKI *SpkiPtr,
-	KMF_DATA **key_ptr)
-{
-	KMF_RETURN ret = KMF_OK;
-	BerElement *asn1;
-	BerValue *encodedkey = NULL;
-
-	if (!key_ptr || !SpkiPtr) {
-		return (KMF_ERR_BAD_PARAMETER);
-	}
-	*key_ptr = NULL;
-
-	switch (AlgId) {
-		case KMF_ALGID_DSA:
-			asn1 = kmfder_alloc();
-			if (asn1 == NULL) {
-				return (KMF_ERR_MEMORY);
-			}
-
-			if ((ret = encode_spki(asn1, SpkiPtr)) != KMF_OK) {
-				ret = KMF_ERR_MEMORY;
-				goto cleanup;
-			}
-
-			if (kmfber_flatten(asn1, &encodedkey) == -1) {
-				ret = KMF_ERR_MEMORY;
-				goto cleanup;
-			}
-
-			*key_ptr = malloc(sizeof (KMF_DATA));
-
-			if (!*key_ptr) {
-				ret = KMF_ERR_MEMORY;
-				goto cleanup;
-			}
-
-			(*key_ptr)->Length = encodedkey->bv_len;
-			(*key_ptr)->Data = (uchar_t *)encodedkey->bv_val;
-cleanup:
-			kmfber_free(asn1, 1);
-			if (encodedkey)
-				free(encodedkey);
-		break;
-		default: /* RSA */
-			*key_ptr = malloc(sizeof (KMF_DATA));
-
-			if (!*key_ptr) {
-				return (KMF_ERR_MEMORY);
-			}
-			(*key_ptr)->Length = SpkiPtr->subjectPublicKey.Length;
-			(*key_ptr)->Data = malloc((*key_ptr)->Length);
-
-			if (!(*key_ptr)->Data) {
-				free(*key_ptr);
-				*key_ptr = NULL;
-				return (KMF_ERR_MEMORY);
-			}
-			(void) memcpy((*key_ptr)->Data,
-			    SpkiPtr->subjectPublicKey.Data,
-			    (*key_ptr)->Length);
-			return (ret);
-	}
 	return (ret);
 }
 
@@ -2133,7 +2214,6 @@ encode_tbs_csr(BerElement *asn1, KMF_TBS_CSR *tbscsr)
 	if ((ret = encode_spki(asn1, &tbscsr->subjectPublicKeyInfo)) != KMF_OK)
 		goto cleanup;
 
-
 	if ((ret = encode_csr_extensions(asn1, tbscsr)) != KMF_OK)
 		goto cleanup;
 
@@ -2216,6 +2296,56 @@ cleanup:
 	return (rv);
 }
 
+KMF_RETURN
+DerEncodeECPrivateKey(KMF_DATA *encodedkey, KMF_RAW_EC_KEY *eckey)
+{
+	KMF_RETURN rv = KMF_OK;
+	BerElement *asn1 = NULL;
+	uchar_t ver = 1;
+	BerValue  *data = NULL;
+
+	asn1 = kmfder_alloc();
+	if (asn1 == NULL)
+		return (KMF_ERR_MEMORY);
+
+	if (kmfber_printf(asn1, "{io",
+	    ver, eckey->value.val, eckey->value.len) == -1) {
+		rv = KMF_ERR_ENCODING;
+		goto cleanup;
+	}
+	/*
+	 * Indicate that we are using the named curve option
+	 * for the parameters.
+	 */
+	if (kmfber_printf(asn1, "T", 0xA0) == -1) {
+		rv = KMF_ERR_ENCODING;
+		goto cleanup;
+	}
+	if (kmfber_printf(asn1, "l", eckey->params.Length) == -1) {
+		rv = KMF_ERR_ENCODING;
+		goto cleanup;
+	}
+	if (kmfber_write(asn1, (char *)eckey->params.Data,
+	    eckey->params.Length, 0) == -1) {
+		rv = KMF_ERR_ENCODING;
+		goto cleanup;
+	}
+	if (kmfber_printf(asn1, "}") == -1) {
+		rv = KMF_ERR_ENCODING;
+		goto cleanup;
+	}
+	if (kmfber_flatten(asn1, &data) == -1) {
+		rv = KMF_ERR_MEMORY;
+		goto cleanup;
+	}
+	encodedkey->Data = (uchar_t *)data->bv_val;
+	encodedkey->Length = data->bv_len;
+
+cleanup:
+	kmfber_free(asn1, 1);
+	return (rv);
+}
+
 
 KMF_RETURN
 DerEncodeTbsCsr(KMF_TBS_CSR *tbs_csr_ptr,
@@ -2288,7 +2418,7 @@ DerEncodeSignedCsr(KMF_CSR_DATA *signed_csr_ptr,
 
 	/* Add the Algorithm & Signature Sequence */
 	if ((ret = encode_algoid(asn1,
-	    &signature->algorithmIdentifier)) != KMF_OK)
+	    &signature->algorithmIdentifier, FALSE)) != KMF_OK)
 		goto cleanup;
 
 	if (signature->encrypted.Length > 0) {
@@ -2322,6 +2452,24 @@ cleanup:
 
 	if (asn1)
 		kmfber_free(asn1, 1);
+	return (ret);
+}
+
+static KMF_RETURN
+ber_copy_data(KMF_DATA *dst, KMF_DATA *src)
+{
+	KMF_RETURN ret = KMF_OK;
+
+	if (dst == NULL || src == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	dst->Data = malloc(src->Length);
+	if (dst->Data == NULL)
+		return (KMF_ERR_MEMORY);
+
+	dst->Length = src->Length;
+	(void) memcpy(dst->Data, src->Data, src->Length);
+
 	return (ret);
 }
 
@@ -2387,6 +2535,16 @@ ExtractSPKIData(
 			free(PubKey);
 
 			*uNumKeyParts = KMF_NUMBER_DSA_PUBLIC_KEY_PARTS;
+			break;
+		case KMF_ALGID_SHA1WithECDSA:
+		case KMF_ALGID_ECDSA:
+			(void) ber_copy_data(&pKeyParts[KMF_ECDSA_PARAMS],
+			    (KMF_DATA *)&pKey->algorithm.parameters);
+
+			(void) ber_copy_data(&pKeyParts[KMF_ECDSA_POINT],
+			    (KMF_DATA *)&pKey->subjectPublicKey);
+
+			*uNumKeyParts = 2;
 			break;
 
 		case KMF_ALGID_RSA:

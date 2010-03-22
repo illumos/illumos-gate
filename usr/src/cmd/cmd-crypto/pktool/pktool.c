@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,7 @@ extern int	pk_download(int argc, char *argv[]);
 extern int	pk_genkey(int argc, char *argv[]);
 extern int	pk_signcsr(int argc, char *argv[]);
 extern int	pk_inittoken(int argc, char *argv[]);
+extern int	pk_genkeypair(int argc, char *argv[]);
 
 /* Forward declarations for "built-in" verb actions. */
 static int	pk_help(int argc, char *argv[]);
@@ -296,16 +297,20 @@ static int	pk_help(int argc, char *argv[]);
 #define	GENCERT_VERB "gencert"
 #define	GENCERT_SUMM gettext("creates a self-signed X.509v3 certificate")
 #define	GENCERT_SYN \
+	"gencert listcurves\n\t" \
+\
 	"gencert keystore=nss\n\t\t" \
 	"label=cert-nickname\n\t\t" \
-	"serial=serial number hex string]\n\t\t" \
+	"serial=serial number hex string\n\t\t" \
 	"[ -i ] | [subject=subject-DN]\n\t\t" \
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
 	"[ token=token[:manuf[:serial]]]\n\t\t" \
 	"[ dir=directory-path ]\n\t\t" \
 	"[ prefix=DBprefix ]\n\t\t" \
-	"[ keytype=rsa|dsa ]\n\t\t" \
+	"[ keytype=rsa | ec [curve=ECC Curve Name] " \
+	"[hash=md5 | sha1 | sha256 | sha384 | sha512]]\n\t\t" \
+	"[ keytype=dsa [hash=sha1]]\n\t\t" \
 	"[ keylen=key-size ]\n\t\t" \
 	"[ trust=trust-value ]\n\t\t" \
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
@@ -318,7 +323,9 @@ static int	pk_help(int argc, char *argv[]);
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
 	"[ token=token[:manuf[:serial]]]\n\t\t" \
-	"[ keytype=rsa|dsa ]\n\t\t" \
+	"[ keytype=rsa | ec [curve=ECC Curve Name] " \
+	"[hash=md5 | sha1 | sha256 | sha384 | sha512]]\n\t\t" \
+	"[ keytype=dsa [hash=sha1 | sha256 ]]\n\t\t" \
 	"[ keylen=key-size ]\n\t\t" \
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
 	"[ lifetime=number-hour|number-day|number-year ]\n\t" \
@@ -331,8 +338,8 @@ static int	pk_help(int argc, char *argv[]);
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
 	"[ format=der|pem ]\n\t\t" \
-	"[ prefix=DBprefix ]\n\t\t" \
-	"[ keytype=rsa|dsa ]\n\t\t" \
+	"[ keytype=rsa [hash=md5 | sha1 | sha256 | sha384 | sha512]]\n\t\t" \
+	"[ keytype=dsa [hash=sha1 | sha256 ]]\n\t\t" \
 	"[ keylen=key-size ]\n\t\t" \
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
 	"[ lifetime=number-hour|number-day|number-year ]\n\t"
@@ -343,6 +350,8 @@ static int	pk_help(int argc, char *argv[]);
 	"request file")
 
 #define	GENCSR_SYN \
+	"gencsr listcurves\n\t" \
+\
 	"gencsr keystore=nss \n\t\t" \
 	"nickname=cert-nickname\n\t\t" \
 	"outcsr=csr-fn\n\t\t" \
@@ -352,7 +361,9 @@ static int	pk_help(int argc, char *argv[]);
 	"[ token=token[:manuf[:serial]]]\n\t\t" \
 	"[ dir=directory-path ]\n\t\t" \
 	"[ prefix=DBprefix ]\n\t\t" \
-	"[ keytype=rsa|dsa ]\n\t\t" \
+	"[ keytype=rsa | ec [curve=ECC Curve Name] " \
+	"[hash=md5 | sha1 | sha256 | sha384 | sha512]]\n\t\t" \
+	"[ keytype=dsa [hash=sha1]]\n\t\t" \
 	"[ keylen=key-size ]\n\t\t" \
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
 	"[ format=pem|der ]\n\t" \
@@ -364,7 +375,9 @@ static int	pk_help(int argc, char *argv[]);
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
 	"[ token=token[:manuf[:serial]]]\n\t\t" \
-	"[ keytype=rsa|dsa ]\n\t\t" \
+	"[ keytype=rsa | ec [curve=ECC Curve Name] " \
+	"[hash=md5 | sha1 | sha256 | sha384 | sha512]]\n\t\t" \
+	"[ keytype=dsa [hash=sha1 | sha256 ]]\n\t\t" \
 	"[ keylen=key-size ]\n\t\t" \
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
 	"[ format=pem|der ]]\n\t" \
@@ -375,7 +388,8 @@ static int	pk_help(int argc, char *argv[]);
 	"[ -i ] | [subject=subject-DN]\n\t\t" \
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
-	"[ keytype=rsa|dsa ]\n\t\t" \
+	"[ keytype=rsa [hash=md5 | sha1 | sha256 | sha384 | sha512]]\n\t\t" \
+	"[ keytype=dsa [hash=sha1 | sha256 ]]\n\t\t" \
 	"[ keylen=key-size ]\n\t\t" \
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
 	"[ format=pem|der ]\n\t"
@@ -476,7 +490,33 @@ static int	pk_help(int argc, char *argv[]);
 	"[ currlabel=token[:manuf[:serial]]]\n\t\t" \
 	"[ newlabel=new token label ]\n\t"
 
-#define	HELP_IDX 12
+#define	GENKEYPAIR_IDX 12
+#define	GENKEYPAIR_VERB "genkeypair"
+#define	GENKEYPAIR_SUMM gettext("creates an asymmetric keypair")
+#define	GENKEYPAIR_SYN \
+	"genkeypair listcurves\n\t" \
+\
+	"genkeypair keystore=nss\n\t\t" \
+	"label=key-nickname\n\t\t" \
+	"[ token=token[:manuf[:serial]]]\n\t\t" \
+	"[ dir=directory-path ]\n\t\t" \
+	"[ prefix=DBprefix ]\n\t\t" \
+	"[ keytype=rsa | dsa | ec [curve=ECC Curve Name]]\n\t\t" \
+	"[ keylen=key-size ]\n\t" \
+ \
+	"genkeypair [ keystore=pkcs11 ]\n\t\t" \
+	"label=key-label\n\t\t" \
+	"[ token=token[:manuf[:serial]]]\n\t\t" \
+	"[ keytype=rsa | dsa | ec [curve=ECC Curve Name]]\n\t\t" \
+	"[ keylen=key-size ]\n\t" \
+ \
+	"genkeypair keystore=file\n\t\t" \
+	"outkey=key_filename\n\t\t" \
+	"[ format=der|pem ]\n\t\t" \
+	"[ keytype=rsa|dsa ]\n\t\t" \
+	"[ keylen=key-size ]\n\t"
+
+#define	HELP_IDX 13
 #define	HELP_VERB "help"
 #define	HELP_SUMM gettext("displays help message")
 #define	HELP_SYN "help\t(help and usage)"
@@ -495,6 +535,7 @@ static verbcmd	cmds[] = {
 	{ NULL,	pk_genkey, 0, NULL, NULL},
 	{ NULL, pk_signcsr, 0, NULL, NULL},
 	{ NULL, pk_inittoken, 0, NULL, NULL},
+	{ NULL, pk_genkeypair, 0, NULL, NULL},
 	{ NULL,	pk_help, 0, NULL, NULL}
 };
 
@@ -553,6 +594,10 @@ init_command_list()
 	cmds[INITTOKEN_IDX].verb = INITTOKEN_VERB;
 	cmds[INITTOKEN_IDX].summary = INITTOKEN_SUMM;
 	cmds[INITTOKEN_IDX].synopsis = INITTOKEN_SYN;
+
+	cmds[GENKEYPAIR_IDX].verb = GENKEYPAIR_VERB;
+	cmds[GENKEYPAIR_IDX].summary = GENKEYPAIR_SUMM;
+	cmds[GENKEYPAIR_IDX].synopsis = GENKEYPAIR_SYN;
 
 	cmds[HELP_IDX].verb = HELP_VERB;
 	cmds[HELP_IDX].summary = HELP_SUMM;

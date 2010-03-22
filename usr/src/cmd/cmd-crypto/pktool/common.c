@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,72 @@ char			*optarg_av = NULL;
 
 static void close_sess(CK_SESSION_HANDLE);
 static void logout_token(CK_SESSION_HANDLE);
+
+struct oid_table_entry {
+	const KMF_OID *oid;
+	char *name;
+};
+
+struct oid_table_entry oid_table[] = {
+	{ &KMFOID_ECC_secp112r1, "secp112r1"},
+	{ &KMFOID_ECC_secp112r2, "secp112r2"},
+	{ &KMFOID_ECC_secp128r1, "secp128r1"},
+	{ &KMFOID_ECC_secp128r2, "secp128r2"},
+	{ &KMFOID_ECC_secp160k1, "secp160k1"},
+	{ &KMFOID_ECC_secp160r1, "secp160r1"},
+	{ &KMFOID_ECC_secp160r2, "secp160r2"},
+	{ &KMFOID_ECC_secp192k1, "secp192k1"},
+	{ &KMFOID_ECC_secp192r1, "secp192r1"},
+	{ &KMFOID_ECC_secp224k1, "secp224k1"},
+	{ &KMFOID_ECC_secp224r1, "secp224r1"},
+	{ &KMFOID_ECC_secp256k1, "secp256k1"},
+	{ &KMFOID_ECC_secp256r1, "secp256r1"},
+	{ &KMFOID_ECC_secp384r1, "secp384r1"},
+	{ &KMFOID_ECC_secp521r1, "secp521r1"},
+	{ &KMFOID_ECC_sect113r1, "sect113r1"},
+	{ &KMFOID_ECC_sect113r2, "sect113r2"},
+	{ &KMFOID_ECC_sect131r1, "sect131r1"},
+	{ &KMFOID_ECC_sect131r2, "sect131r2"},
+	{ &KMFOID_ECC_sect163k1, "sect163k1"},
+	{ &KMFOID_ECC_sect163r1, "sect163r1"},
+	{ &KMFOID_ECC_sect163r2, "sect163r2"},
+	{ &KMFOID_ECC_sect193r1, "sect193r1"},
+	{ &KMFOID_ECC_sect193r2, "sect193r2"},
+	{ &KMFOID_ECC_sect233k1, "sect233k1"},
+	{ &KMFOID_ECC_sect233r1, "sect233r1"},
+	{ &KMFOID_ECC_sect239k1, "sect239k1"},
+	{ &KMFOID_ECC_sect283k1, "sect283k1"},
+	{ &KMFOID_ECC_sect283r1, "sect283r1"},
+	{ &KMFOID_ECC_sect409k1, "sect409k1"},
+	{ &KMFOID_ECC_sect409r1, "sect409r1"},
+	{ &KMFOID_ECC_sect571k1, "sect571k1"},
+	{ &KMFOID_ECC_sect571r1, "sect571r1"},
+	{ &KMFOID_ECC_c2pnb163v1, "c2pnb163v1"},
+	{ &KMFOID_ECC_c2pnb163v2, "c2pnb163v2"},
+	{ &KMFOID_ECC_c2pnb163v3, "c2pnb163v3"},
+	{ &KMFOID_ECC_c2pnb176v1, "c2pnb176v1"},
+	{ &KMFOID_ECC_c2tnb191v1, "c2tnb191v1"},
+	{ &KMFOID_ECC_c2tnb191v2, "c2tnb191v2"},
+	{ &KMFOID_ECC_c2tnb191v3, "c2tnb191v3"},
+	{ &KMFOID_ECC_c2pnb208w1, "c2pnb208w1"},
+	{ &KMFOID_ECC_c2tnb239v1, "c2tnb239v1"},
+	{ &KMFOID_ECC_c2tnb239v2, "c2tnb239v2"},
+	{ &KMFOID_ECC_c2tnb239v3, "c2tnb239v3"},
+	{ &KMFOID_ECC_c2pnb272w1, "c2pnb272w1"},
+	{ &KMFOID_ECC_c2pnb304w1, "c2pnb304w1"},
+	{ &KMFOID_ECC_c2tnb359v1, "c2tnb359v1"},
+	{ &KMFOID_ECC_c2pnb368w1, "c2pnb368w1"},
+	{ &KMFOID_ECC_c2tnb431r1, "c2tnb431r1"},
+	{ &KMFOID_ECC_prime192v2, "prime192v2"},
+	{ &KMFOID_ECC_prime192v3, "prime192v3"},
+	{ &KMFOID_MD5, "md5"},
+	{ &KMFOID_SHA1, "sha1"},
+	{ &KMFOID_SHA256, "sha256"},
+	{ &KMFOID_SHA384, "sha384"},
+	{ &KMFOID_SHA512, "sha512"}
+};
+int number_of_oids = sizeof (oid_table) / sizeof (struct oid_table_entry);
+#define	number_of_curves (number_of_oids - 5)
 
 /*
  * Perform PKCS#11 setup here.  Currently only C_Initialize is required,
@@ -457,19 +523,64 @@ KS2Int(char *keystore_str)
 		return (0);
 }
 
+/*
+ * compare_oids
+ * return 1 if equal
+ */
+boolean_t
+compare_oids(KMF_OID *oid1, const KMF_OID *oid2)
+{
+	return ((oid1->Length == oid2->Length) &&
+	    !memcmp(oid1->Data, oid2->Data, oid1->Length));
+}
 
 int
-Str2KeyType(char *algm, KMF_KEY_ALG *ktype, KMF_ALGORITHM_INDEX *sigAlg)
+Str2KeyType(char *algm, KMF_OID *hashoid, KMF_KEY_ALG *ktype,
+    KMF_ALGORITHM_INDEX *sigAlg)
 {
 	if (algm == NULL) {
+		/* Default to SHA1+RSA */
 		*sigAlg = KMF_ALGID_SHA1WithRSA;
 		*ktype = KMF_RSA;
 	} else if (strcasecmp(algm, "DSA") == 0) {
-		*sigAlg = KMF_ALGID_SHA1WithDSA;
+		if (hashoid == NULL ||
+		    compare_oids(hashoid, &KMFOID_SHA1))
+			*sigAlg = KMF_ALGID_SHA1WithDSA;
+		else if (compare_oids(hashoid, &KMFOID_SHA256))
+			*sigAlg = KMF_ALGID_SHA256WithDSA;
+		else
+			return (-1); /* unsupported hash/key combo */
 		*ktype = KMF_DSA;
 	} else if (strcasecmp(algm, "RSA") == 0) {
-		*sigAlg = KMF_ALGID_SHA1WithRSA;
+		if (hashoid == NULL ||
+		    compare_oids(hashoid, &KMFOID_SHA1))
+			*sigAlg = KMF_ALGID_SHA1WithRSA;
+		else if (compare_oids(hashoid, &KMFOID_SHA256))
+			*sigAlg = KMF_ALGID_SHA256WithRSA;
+		else if (compare_oids(hashoid, &KMFOID_SHA384))
+			*sigAlg = KMF_ALGID_SHA384WithRSA;
+		else if (compare_oids(hashoid, &KMFOID_SHA512))
+			*sigAlg = KMF_ALGID_SHA512WithRSA;
+		else if (compare_oids(hashoid, &KMFOID_MD5))
+			*sigAlg = KMF_ALGID_MD5WithRSA;
+		else
+			return (-1); /* unsupported hash/key combo */
 		*ktype = KMF_RSA;
+	} else if (strcasecmp(algm, "EC") == 0) {
+		/* EC keys may be used with some SHA2 hashes */
+		if (hashoid == NULL ||
+		    compare_oids(hashoid, &KMFOID_SHA1))
+			*sigAlg = KMF_ALGID_SHA1WithECDSA;
+		else if (compare_oids(hashoid, &KMFOID_SHA256))
+			*sigAlg = KMF_ALGID_SHA256WithECDSA;
+		else if (compare_oids(hashoid, &KMFOID_SHA384))
+			*sigAlg = KMF_ALGID_SHA384WithECDSA;
+		else if (compare_oids(hashoid, &KMFOID_SHA512))
+			*sigAlg = KMF_ALGID_SHA512WithECDSA;
+		else
+			return (-1); /* unsupported hash/key combo */
+
+		*ktype = KMF_ECDSA;
 	} else {
 		return (-1);
 	}
@@ -1217,4 +1328,31 @@ token_auth_needed(KMF_HANDLE_T handle, char *tokenlabel, int *auth)
 	*auth = (info.flags & CKF_LOGIN_REQUIRED);
 
 	return (KMF_OK);
+}
+
+void
+show_ecc_curves()
+{
+	int i;
+
+	(void) printf(gettext("Supported ECC curve names:\n"));
+	for (i = 0; i < number_of_curves; i++) {
+		(void) printf("%s", oid_table[i].name);
+		if (i > 0 && ((i+1) % 5) == 0)
+			(void) printf("\n");
+		else if (i+1 < number_of_curves)
+			(void) printf(", ");
+	}
+	(void) printf("\n");
+}
+
+KMF_OID *
+ecc_name_to_oid(char *name)
+{
+	int i;
+	for (i = 0; i < number_of_oids; i++) {
+		if (strcasecmp(name, oid_table[i].name) == 0)
+			return ((KMF_OID *)oid_table[i].oid);
+	}
+	return (NULL);
 }

@@ -21,7 +21,7 @@
 /*
  * PKCS11 token KMF Plugin
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,6 @@
 
 #include <kmfapiP.h>
 #include <ber_der.h>
-#include <algorithm.h>
 #include <fcntl.h>
 #include <sha1.h>
 #include <bignum.h>
@@ -127,10 +126,6 @@ KMF_RETURN
 KMFPK11_SetTokenPin(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
-KMFPK11_VerifyDataWithCert(KMF_HANDLE_T, KMF_ALGORITHM_INDEX, KMF_DATA *,
-	KMF_DATA *, KMF_DATA *);
-
-KMF_RETURN
 KMFPK11_ExportPK12(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 
@@ -161,7 +156,6 @@ KMF_PLUGIN_FUNCLIST pk11token_plugin_table =
 	KMFPK11_CreateSymKey,
 	KMFPK11_GetSymKeyValue,
 	KMFPK11_SetTokenPin,
-	KMFPK11_VerifyDataWithCert,
 	KMFPK11_StoreKey,
 	NULL			/* Finalize */
 };
@@ -777,7 +771,7 @@ KMFPK11_FreeKMFCert(KMF_HANDLE_T handle, KMF_X509_DER_CERT *kmf_cert)
 
 KMF_RETURN
 KMFPK11_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *pKey,
-		KMF_DATA *eData)
+	KMF_DATA *eData)
 {
 	KMF_RETURN ret = KMF_OK;
 	CK_RV rv;
@@ -789,9 +783,11 @@ KMFPK11_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *pKey,
 	BerElement *asn1 = NULL;
 	BerValue *PubKeyParams = NULL, *EncodedKey = NULL;
 	KMF_X509_SPKI spki;
+	CK_BYTE ec_params[256], ec_point[256];
 
 	CK_ATTRIBUTE rsaTemplate[4];
 	CK_ATTRIBUTE dsaTemplate[6];
+	CK_ATTRIBUTE ecdsaTemplate[6];
 
 	if (kmfh == NULL)
 		return (KMF_ERR_UNINITIALIZED); /* Plugin Not Initialized */
@@ -809,21 +805,16 @@ KMFPK11_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *pKey,
 	(void) memset(&Base, 0, sizeof (Base));
 	(void) memset(&Value, 0, sizeof (Value));
 
-	SETATTR(rsaTemplate, 0, CKA_CLASS, &ckObjClass, sizeof (ckObjClass));
-	SETATTR(rsaTemplate, 1, CKA_KEY_TYPE, &ckKeyType, sizeof (ckKeyType));
-	SETATTR(rsaTemplate, 2, CKA_MODULUS, Modulus.Data, Modulus.Length);
-	SETATTR(rsaTemplate, 3, CKA_PUBLIC_EXPONENT, Exponent.Data,
-	    Exponent.Length);
-
-	SETATTR(dsaTemplate, 0, CKA_CLASS, &ckObjClass, sizeof (ckObjClass));
-	SETATTR(dsaTemplate, 1, CKA_KEY_TYPE, &ckKeyType, sizeof (ckKeyType));
-	SETATTR(dsaTemplate, 2, CKA_PRIME, Prime.Data, Prime.Length);
-	SETATTR(dsaTemplate, 3, CKA_SUBPRIME, Subprime.Data, Subprime.Length);
-	SETATTR(dsaTemplate, 4, CKA_BASE, Base.Data, Base.Length);
-	SETATTR(dsaTemplate, 5, CKA_VALUE, Value.Data, Value.Length);
-
 	switch (pKey->keyalg) {
 		case KMF_RSA:
+			SETATTR(rsaTemplate, 0, CKA_CLASS, &ckObjClass,
+			    sizeof (ckObjClass));
+			SETATTR(rsaTemplate, 1, CKA_KEY_TYPE, &ckKeyType,
+			    sizeof (ckKeyType));
+			SETATTR(rsaTemplate, 2, CKA_MODULUS, Modulus.Data,
+			    Modulus.Length);
+			SETATTR(rsaTemplate, 3, CKA_PUBLIC_EXPONENT,
+			    Exponent.Data, Exponent.Length);
 			/* Get the length of the fields */
 			rv = C_GetAttributeValue(kmfh->pk11handle,
 			    (CK_OBJECT_HANDLE)pKey->keyp, rsaTemplate, 4);
@@ -893,6 +884,19 @@ KMFPK11_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *pKey,
 
 			break;
 		case KMF_DSA:
+			SETATTR(dsaTemplate, 0, CKA_CLASS, &ckObjClass,
+			    sizeof (ckObjClass));
+			SETATTR(dsaTemplate, 1, CKA_KEY_TYPE, &ckKeyType,
+			    sizeof (ckKeyType));
+			SETATTR(dsaTemplate, 2, CKA_PRIME, Prime.Data,
+			    Prime.Length);
+			SETATTR(dsaTemplate, 3, CKA_SUBPRIME, Subprime.Data,
+			    Subprime.Length);
+			SETATTR(dsaTemplate, 4, CKA_BASE, Base.Data,
+			    Base.Length);
+			SETATTR(dsaTemplate, 5, CKA_VALUE, Value.Data,
+			    Value.Length);
+
 			/* Get the length of the fields */
 			rv = C_GetAttributeValue(kmfh->pk11handle,
 			    (CK_OBJECT_HANDLE)pKey->keyp, dsaTemplate, 6);
@@ -1008,6 +1012,41 @@ KMFPK11_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *pKey,
 			kmfber_free(asn1, 1);
 			free(Value.Data);
 			break;
+		case KMF_ECDSA:
+			/* The EC_PARAMS are the PubKey algorithm parameters */
+			PubKeyParams = calloc(1, sizeof (BerValue));
+			if (PubKeyParams == NULL)
+				return (KMF_ERR_MEMORY);
+			EncodedKey = calloc(1, sizeof (BerValue));
+			if (EncodedKey == NULL) {
+				free(PubKeyParams);
+				return (KMF_ERR_MEMORY);
+			}
+			SETATTR(ecdsaTemplate, 0, CKA_EC_PARAMS,
+			    &ec_params, sizeof (ec_params));
+			SETATTR(ecdsaTemplate, 1, CKA_EC_POINT,
+			    &ec_point, sizeof (ec_point));
+
+			/* Get the length of the fields */
+			rv = C_GetAttributeValue(kmfh->pk11handle,
+			    (CK_OBJECT_HANDLE)pKey->keyp,
+			    ecdsaTemplate, 2);
+			if (rv != CKR_OK) {
+				SET_ERROR(kmfh, rv);
+				return (KMF_ERR_BAD_PARAMETER);
+			}
+			/* The params are to be used as algorithm parameters */
+			PubKeyParams->bv_val = (char *)ec_params;
+			PubKeyParams->bv_len = ecdsaTemplate[0].ulValueLen;
+			/*
+			 * The EC_POINT is to be used as the subject pub key.
+			 */
+			EncodedKey->bv_val = (char *)ec_point;
+			EncodedKey->bv_len = ecdsaTemplate[1].ulValueLen;
+
+			/* Use the EC_PUBLIC_KEY OID */
+			Algorithm = (KMF_OID *)&KMFOID_EC_PUBLIC_KEY;
+			break;
 		default:
 			return (KMF_ERR_BAD_PARAMETER);
 	}
@@ -1036,12 +1075,14 @@ KMFPK11_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *pKey,
 
 cleanup:
 	if (EncodedKey) {
-		free(EncodedKey->bv_val);
+		if (pKey->keyalg != KMF_ECDSA)
+			free(EncodedKey->bv_val);
 		free(EncodedKey);
 	}
 
 	if (PubKeyParams) {
-		free(PubKeyParams->bv_val);
+		if (pKey->keyalg != KMF_ECDSA)
+			free(PubKeyParams->bv_val);
 		free(PubKeyParams);
 	}
 
@@ -1363,32 +1404,18 @@ out:
 	return (rv);
 }
 
-KMF_RETURN
-KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
-	int numattr,
-	KMF_ATTRIBUTE *attlist)
+static CK_RV
+gendsa_keypair(KMF_HANDLE *kmfh, boolean_t storekey,
+	CK_OBJECT_HANDLE *pubKey,
+	CK_OBJECT_HANDLE *priKey)
 {
-	KMF_RETURN rv = KMF_OK;
-	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
-
-	CK_RV			ckrv = 0;
-	CK_OBJECT_HANDLE	pubKey = CK_INVALID_HANDLE;
-	CK_OBJECT_HANDLE	priKey = CK_INVALID_HANDLE;
-	CK_SESSION_HANDLE	hSession = kmfh->pk11handle;
-
+	CK_RV ckrv = CKR_OK;
+	CK_SESSION_HANDLE hSession = kmfh->pk11handle;
+	static CK_ULONG	dsaKeyType = CKK_DSA;
+	static CK_BBOOL	true = TRUE;
+	static CK_BBOOL	false = FALSE;
 	static CK_OBJECT_CLASS	priClass = CKO_PRIVATE_KEY;
 	static CK_OBJECT_CLASS	pubClass = CKO_PUBLIC_KEY;
-
-	static CK_ULONG	modulusBits = 1024;
-	uint32_t	modulusBits_size = sizeof (CK_ULONG);
-	static CK_BYTE	PubExpo[3] = {0x01, 0x00, 0x01};
-	static CK_BBOOL	true = TRUE;
-	static CK_BBOOL	ontoken = TRUE;
-	static CK_BBOOL	false = FALSE;
-	static CK_ULONG	dsaKeyType = CKK_DSA;
-
-	CK_ATTRIBUTE rsaPubKeyTemplate[16];
-	CK_ATTRIBUTE rsaPriKeyTemplate[16];
 
 	static CK_BYTE ckDsaPrime[128] = {
 	0xb2, 0x6b, 0xc3, 0xfb, 0xe3, 0x26, 0xf4, 0xc2,
@@ -1434,7 +1461,7 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 	static CK_ATTRIBUTE ckDsaPubKeyTemplate[] = {
 	{ CKA_CLASS, &pubClass, sizeof (pubClass) },
 	{ CKA_KEY_TYPE, &dsaKeyType, sizeof (dsaKeyType) },
-	{ CKA_TOKEN, &ontoken, sizeof (ontoken)},
+	{ CKA_TOKEN, &true, sizeof (true)},
 	{ CKA_PRIVATE, &false, sizeof (false)},
 	{ CKA_PRIME, &ckDsaPrime, sizeof (ckDsaPrime) },
 	{ CKA_SUBPRIME, &ckDsaSubPrime, sizeof (ckDsaSubPrime)},
@@ -1450,26 +1477,201 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 	static CK_ATTRIBUTE ckDsaPriKeyTemplate[] = {
 	{CKA_CLASS, &priClass, sizeof (priClass)},
 	{CKA_KEY_TYPE, &dsaKeyType, sizeof (dsaKeyType)},
-	{CKA_TOKEN, &ontoken, sizeof (ontoken)},
+	{CKA_TOKEN, &true, sizeof (true)},
 	{CKA_PRIVATE, &true, sizeof (true)},
 	{CKA_SIGN, &true, sizeof (true)},
 	};
-
-	CK_ATTRIBUTE labelattr[1];
-	CK_ATTRIBUTE idattr[1];
-	char IDHashData[SHA1_HASH_LENGTH];
-	KMF_DATA IDInput, IDOutput;
-	SHA1_CTX ctx;
-	KMF_CREDENTIAL *cred;
-	KMF_KEY_ALG keytype = KMF_RSA;
-	boolean_t storekey = TRUE;
-	char *keylabel = NULL;
-	KMF_KEY_HANDLE *pubkey, *privkey;
 
 #define	NUMBER_DSA_PRI_TEMPLATES (sizeof (ckDsaPriKeyTemplate) / \
 					sizeof (CK_ATTRIBUTE))
 #define	MAX_DSA_PRI_TEMPLATES (sizeof (ckDsaPriKeyTemplate) / \
 				sizeof (CK_ATTRIBUTE))
+	CK_MECHANISM keyGenMech = {CKM_DSA_KEY_PAIR_GEN, NULL, 0};
+
+	SETATTR(ckDsaPriKeyTemplate, 2, CKA_TOKEN,
+	    (storekey ? &true : &false), sizeof (CK_BBOOL));
+
+	ckrv = C_GenerateKeyPair(hSession, &keyGenMech,
+	    ckDsaPubKeyTemplate,
+	    (sizeof (ckDsaPubKeyTemplate)/sizeof (CK_ATTRIBUTE)),
+	    ckDsaPriKeyTemplate,
+	    (sizeof (ckDsaPriKeyTemplate)/sizeof (CK_ATTRIBUTE)),
+	    pubKey, priKey);
+	if (ckrv != CKR_OK) {
+		SET_ERROR(kmfh, ckrv);
+		return (KMF_ERR_KEYGEN_FAILED);
+	}
+
+	return (ckrv);
+}
+
+static CK_RV
+genrsa_keypair(KMF_HANDLE *kmfh, CK_ULONG modulusBits,
+	boolean_t storekey, KMF_BIGINT *rsaexp,
+	CK_OBJECT_HANDLE *pubKey,
+	CK_OBJECT_HANDLE *priKey)
+{
+	CK_RV ckrv = CKR_OK;
+	CK_SESSION_HANDLE hSession = kmfh->pk11handle;
+	CK_ATTRIBUTE rsaPubKeyTemplate[16];
+	CK_ATTRIBUTE rsaPriKeyTemplate[16];
+	CK_MECHANISM keyGenMech = {CKM_RSA_PKCS_KEY_PAIR_GEN, NULL, 0};
+	int numpubattr = 0, numpriattr = 0;
+	static CK_BYTE	PubExpo[3] = {0x01, 0x00, 0x01};
+	static CK_BBOOL	true = TRUE;
+	static CK_BBOOL	false = FALSE;
+
+	SETATTR(rsaPubKeyTemplate, numpubattr, CKA_TOKEN,
+	    (storekey ? &true : &false), sizeof (CK_BBOOL));
+	numpubattr++;
+
+	SETATTR(rsaPubKeyTemplate, numpubattr, CKA_MODULUS_BITS,
+	    &modulusBits, sizeof (modulusBits));
+	numpubattr++;
+
+	if (rsaexp != NULL && (rsaexp->len > 0 && rsaexp->val != NULL)) {
+		SETATTR(rsaPubKeyTemplate, numpubattr,
+		    CKA_PUBLIC_EXPONENT,
+		    rsaexp->val, rsaexp->len);
+		numpubattr++;
+	} else {
+		SETATTR(rsaPubKeyTemplate, numpubattr,
+		    CKA_PUBLIC_EXPONENT, &PubExpo, sizeof (PubExpo));
+		numpubattr++;
+	}
+	SETATTR(rsaPubKeyTemplate, numpubattr, CKA_ENCRYPT,
+	    &true, sizeof (true));
+	numpubattr++;
+	SETATTR(rsaPubKeyTemplate, numpubattr, CKA_VERIFY,
+	    &true, sizeof (true));
+	numpubattr++;
+	SETATTR(rsaPubKeyTemplate, numpubattr, CKA_WRAP,
+	    &true, sizeof (true));
+	numpubattr++;
+
+	SETATTR(rsaPriKeyTemplate, numpriattr, CKA_TOKEN,
+	    (storekey ? &true : &false), sizeof (CK_BBOOL));
+	numpriattr++;
+	SETATTR(rsaPriKeyTemplate, numpriattr, CKA_PRIVATE, &true,
+	    sizeof (true));
+	numpriattr++;
+	SETATTR(rsaPriKeyTemplate, numpriattr, CKA_DECRYPT, &true,
+	    sizeof (true));
+	numpriattr++;
+	SETATTR(rsaPriKeyTemplate, numpriattr, CKA_SIGN, &true,
+	    sizeof (true));
+	numpriattr++;
+	SETATTR(rsaPriKeyTemplate, numpriattr, CKA_UNWRAP, &true,
+	    sizeof (true));
+	numpriattr++;
+
+	ckrv = C_GenerateKeyPair(hSession, &keyGenMech,
+	    rsaPubKeyTemplate, numpubattr,
+	    rsaPriKeyTemplate, numpriattr,
+	    pubKey, priKey);
+	if (ckrv != CKR_OK) {
+		SET_ERROR(kmfh, ckrv);
+		return (ckrv);
+	}
+
+	return (ckrv);
+}
+
+static CK_RV
+genecc_keypair(KMF_HANDLE *kmfh,
+	boolean_t ontoken,
+	KMF_OID *curveoid,
+	CK_OBJECT_HANDLE *pubKey,
+	CK_OBJECT_HANDLE *priKey)
+{
+	CK_RV ckrv;
+	CK_SESSION_HANDLE hSession = kmfh->pk11handle;
+	CK_MECHANISM keyGenMech = {CKM_EC_KEY_PAIR_GEN, NULL, 0};
+	const ulong_t publicKey = CKO_PUBLIC_KEY;
+	const ulong_t privateKey = CKO_PRIVATE_KEY;
+	const ulong_t keytype = CKK_EC;
+	static CK_BBOOL	true = TRUE;
+	static CK_BBOOL	false = FALSE;
+	CK_ATTRIBUTE public_template[6];
+	CK_ATTRIBUTE private_template[6];
+	int numpubattr, numpriattr;
+
+	numpubattr = 0;
+	SETATTR(public_template, numpubattr, CKA_CLASS,
+	    &publicKey, sizeof (publicKey));
+	numpubattr++;
+	SETATTR(public_template, numpubattr, CKA_KEY_TYPE,
+	    &keytype, sizeof (keytype));
+	numpubattr++;
+	SETATTR(public_template, numpubattr, CKA_EC_PARAMS,
+	    curveoid->Data, curveoid->Length);
+	numpubattr++;
+	SETATTR(public_template, numpubattr, CKA_TOKEN,
+	    ontoken ? &true : &false, sizeof (true));
+	numpubattr++;
+	SETATTR(public_template, numpubattr, CKA_VERIFY,
+	    &true, sizeof (true));
+	numpubattr++;
+	SETATTR(public_template, numpubattr, CKA_PRIVATE,
+	    &false, sizeof (false));
+	numpubattr++;
+
+	numpriattr = 0;
+	SETATTR(private_template, numpriattr, CKA_CLASS,
+	    &privateKey, sizeof (privateKey));
+	numpriattr++;
+	SETATTR(private_template, numpriattr, CKA_KEY_TYPE,
+	    &keytype, sizeof (keytype));
+	numpriattr++;
+	SETATTR(private_template, numpriattr, CKA_TOKEN,
+	    ontoken ? &true : &false, sizeof (true));
+	numpriattr++;
+	SETATTR(private_template, numpriattr, CKA_PRIVATE,
+	    &true, sizeof (true));
+	numpriattr++;
+	SETATTR(private_template, numpriattr, CKA_SIGN,
+	    &true, sizeof (true));
+	numpriattr++;
+	SETATTR(private_template, numpriattr, CKA_DERIVE,
+	    &true, sizeof (true));
+	numpriattr++;
+
+	ckrv = C_GenerateKeyPair(hSession, &keyGenMech,
+	    public_template, numpubattr,
+	    private_template, numpriattr,
+	    pubKey, priKey);
+	if (ckrv != CKR_OK) {
+		SET_ERROR(kmfh, ckrv);
+		return (ckrv);
+	}
+
+	return (ckrv);
+}
+
+KMF_RETURN
+KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
+	int numattr,
+	KMF_ATTRIBUTE *attlist)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
+	KMF_DATA IDInput, IDOutput;
+	KMF_CREDENTIAL *cred;
+	KMF_KEY_ALG keytype = KMF_RSA;
+	KMF_KEY_HANDLE *pubkey, *privkey;
+
+	CK_RV			ckrv = 0;
+	CK_SESSION_HANDLE	hSession = kmfh->pk11handle;
+	CK_ATTRIBUTE labelattr[1];
+	CK_ATTRIBUTE idattr[1];
+	CK_OBJECT_HANDLE pubKey, priKey;
+
+	char IDHashData[SHA1_HASH_LENGTH];
+	static CK_ULONG	modulusBits = 1024;
+	uint32_t	modulusBits_size = sizeof (CK_ULONG);
+	SHA1_CTX ctx;
+	boolean_t storekey = TRUE;
+	char *keylabel = NULL;
 
 	if (kmfh == NULL)
 		return (KMF_ERR_UNINITIALIZED); /* Plugin Not Initialized */
@@ -1504,12 +1706,10 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 	(void) memset(pubkey, 0, sizeof (KMF_KEY_HANDLE));
 	(void) memset(privkey, 0, sizeof (KMF_KEY_HANDLE));
 	if (keytype == KMF_RSA) {
-		CK_MECHANISM keyGenMech = {CKM_RSA_PKCS_KEY_PAIR_GEN, NULL, 0};
-		CK_BYTE *modulus;
+		CK_BYTE *modulus = NULL;
 		CK_ULONG modulusLength = 0;
-		CK_ATTRIBUTE modattr[1];
 		KMF_BIGINT *rsaexp = NULL;
-		int numpubattr = 0, numpriattr = 0;
+		CK_ATTRIBUTE modattr[1];
 
 		rv = kmf_get_attr(KMF_KEYLENGTH_ATTR, attlist, numattr,
 		    &modulusBits, &modulusBits_size);
@@ -1519,64 +1719,14 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 		if (rv != KMF_OK)
 			return (KMF_ERR_BAD_PARAMETER);
 
-		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_TOKEN,
-		    (storekey ? &true : &false), sizeof (CK_BBOOL));
-		numpubattr++;
+		rsaexp = kmf_get_attr_ptr(KMF_RSAEXP_ATTR, attlist, numattr);
 
-		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_MODULUS_BITS,
-		    &modulusBits, sizeof (modulusBits));
-		numpubattr++;
+		/* Generate the RSA keypair */
+		ckrv = genrsa_keypair(kmfh, modulusBits, storekey,
+		    rsaexp, &pubKey, &priKey);
 
-		if ((rsaexp = kmf_get_attr_ptr(KMF_RSAEXP_ATTR, attlist,
-		    numattr)) != NULL &&
-		    (rsaexp->len > 0 && rsaexp->val != NULL)) {
-				SETATTR(rsaPubKeyTemplate, numpubattr,
-				    CKA_PUBLIC_EXPONENT,
-				    rsaexp->val, rsaexp->len);
-				numpubattr++;
-		} else {
-			rv = KMF_OK;
-			SETATTR(rsaPubKeyTemplate, numpubattr,
-			    CKA_PUBLIC_EXPONENT, &PubExpo, sizeof (PubExpo));
-			numpubattr++;
-		}
-		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_ENCRYPT,
-		    &true, sizeof (true));
-		numpubattr++;
-		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_VERIFY,
-		    &true, sizeof (true));
-		numpubattr++;
-		SETATTR(rsaPubKeyTemplate, numpubattr, CKA_WRAP,
-		    &true, sizeof (true));
-		numpubattr++;
-
-		SETATTR(rsaPriKeyTemplate, numpriattr, CKA_TOKEN,
-		    (storekey ? &true : &false), sizeof (CK_BBOOL));
-		numpriattr++;
-		SETATTR(rsaPriKeyTemplate, numpriattr, CKA_PRIVATE, &true,
-		    sizeof (true));
-		numpriattr++;
-		SETATTR(rsaPriKeyTemplate, numpriattr, CKA_DECRYPT, &true,
-		    sizeof (true));
-		numpriattr++;
-		SETATTR(rsaPriKeyTemplate, numpriattr, CKA_SIGN, &true,
-		    sizeof (true));
-		numpriattr++;
-		SETATTR(rsaPriKeyTemplate, numpriattr, CKA_UNWRAP, &true,
-		    sizeof (true));
-		numpriattr++;
-
-
-		pubKey = CK_INVALID_HANDLE;
-		priKey = CK_INVALID_HANDLE;
-		ckrv = C_GenerateKeyPair(hSession, &keyGenMech,
-		    rsaPubKeyTemplate, numpubattr,
-		    rsaPriKeyTemplate, numpriattr,
-		    &pubKey, &priKey);
-		if (ckrv != CKR_OK) {
-			SET_ERROR(kmfh, ckrv);
-			return (KMF_ERR_KEYGEN_FAILED);
-		}
+		if (ckrv != CKR_OK)
+			return (KMF_ERR_BAD_PARAMETER);
 
 		privkey->kstype = KMF_KEYSTORE_PK11TOKEN;
 		privkey->keyalg = KMF_RSA;
@@ -1615,25 +1765,14 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 		IDInput.Length = modulusLength;
 
 	} else if (keytype == KMF_DSA) {
-		CK_MECHANISM keyGenMech = {CKM_DSA_KEY_PAIR_GEN, NULL, 0};
 		CK_BYTE *keyvalue;
 		CK_ULONG valueLen;
 		CK_ATTRIBUTE valattr[1];
 
-		SETATTR(ckDsaPriKeyTemplate, 2, CKA_TOKEN,
-		    (storekey ? &true : &false), sizeof (CK_BBOOL));
-		SETATTR(valattr, 0, CKA_VALUE, NULL, &valueLen);
-
-		ckrv = C_GenerateKeyPair(hSession, &keyGenMech,
-		    ckDsaPubKeyTemplate,
-		    (sizeof (ckDsaPubKeyTemplate)/sizeof (CK_ATTRIBUTE)),
-		    ckDsaPriKeyTemplate,
-		    (sizeof (ckDsaPriKeyTemplate)/sizeof (CK_ATTRIBUTE)),
-		    &pubKey, &priKey);
-		if (ckrv != CKR_OK) {
-			SET_ERROR(kmfh, ckrv);
-			return (KMF_ERR_KEYGEN_FAILED);
-		}
+		/* Generate the DSA keypair */
+		ckrv = gendsa_keypair(kmfh, storekey, &pubKey, &priKey);
+		if (ckrv != CKR_OK)
+			return (KMF_ERR_BAD_PARAMETER);
 
 		privkey->kstype = KMF_KEYSTORE_PK11TOKEN;
 		privkey->keyalg = KMF_DSA;
@@ -1646,6 +1785,59 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle,
 		pubkey->keyp = (void *)pubKey;
 
 		/* Get the Public Value to use as input for creating the ID */
+		SETATTR(valattr, 0, CKA_VALUE, NULL, &valueLen);
+
+		ckrv = C_GetAttributeValue(hSession,
+		    (CK_OBJECT_HANDLE)pubKey, valattr, 1);
+		if (ckrv != CKR_OK) {
+			SET_ERROR(kmfh, ckrv);
+			return (KMF_ERR_BAD_PARAMETER);
+		}
+
+		valueLen = valattr[0].ulValueLen;
+		keyvalue = malloc(valueLen);
+		if (keyvalue == NULL)
+			return (KMF_ERR_MEMORY);
+
+		valattr[0].pValue = keyvalue;
+		ckrv = C_GetAttributeValue(hSession,
+		    (CK_OBJECT_HANDLE)pubKey, valattr, 1);
+		if (ckrv != CKR_OK) {
+			SET_ERROR(kmfh, ckrv);
+			free(keyvalue);
+			return (KMF_ERR_BAD_PARAMETER);
+		}
+
+		IDInput.Data = keyvalue;
+		IDInput.Length = valueLen;
+	} else if (keytype == KMF_ECDSA) {
+		CK_BYTE *keyvalue;
+		CK_ULONG valueLen;
+		CK_ATTRIBUTE valattr[1];
+		KMF_OID *eccoid = kmf_get_attr_ptr(KMF_ECC_CURVE_OID_ATTR,
+		    attlist, numattr);
+
+		if (eccoid == NULL)
+			return (KMF_ERR_BAD_PARAMETER);
+
+		ckrv = genecc_keypair(kmfh, storekey, eccoid,
+		    &pubKey, &priKey);
+		if (ckrv != CKR_OK)
+			return (KMF_ERR_BAD_PARAMETER);
+
+		privkey->kstype = KMF_KEYSTORE_PK11TOKEN;
+		privkey->keyalg = KMF_ECDSA;
+		privkey->keyclass = KMF_ASYM_PRI;
+		privkey->keyp = (void *)priKey;
+
+		pubkey->kstype = KMF_KEYSTORE_PK11TOKEN;
+		pubkey->keyalg = KMF_ECDSA;
+		pubkey->keyclass = KMF_ASYM_PUB;
+		pubkey->keyp = (void *)pubKey;
+
+		/* Get the EC_POINT to use as input for creating the ID */
+		SETATTR(valattr, 0, CKA_EC_POINT, NULL, &valueLen);
+
 		ckrv = C_GetAttributeValue(hSession,
 		    (CK_OBJECT_HANDLE)pubKey, valattr, 1);
 		if (ckrv != CKR_OK) {
@@ -1812,12 +2004,17 @@ KMFPK11_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *keyp,
 	KMF_DATA *tobesigned,
 	KMF_DATA *output)
 {
+	KMF_RETURN		rv = KMF_OK;
 	CK_RV			ckrv;
 	KMF_HANDLE		*kmfh = (KMF_HANDLE *)handle;
 	CK_SESSION_HANDLE	hSession = kmfh->pk11handle;
 	CK_MECHANISM		mechanism;
-	PKCS_ALGORITHM_MAP 	*pAlgMap;
+	CK_MECHANISM_TYPE	mechtype, hashmech;
+	CK_KEY_TYPE		keytype;
 	KMF_ALGORITHM_INDEX	AlgId;
+	KMF_DATA		hashData = {NULL, 0};
+	uchar_t			digest[1024];
+	CK_ATTRIBUTE		subprime = { CKA_SUBPRIME, NULL, 0 };
 
 	if (kmfh == NULL)
 		return (KMF_ERR_UNINITIALIZED); /* Plugin Not Initialized */
@@ -1834,14 +2031,36 @@ KMFPK11_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *keyp,
 	if (AlgId == KMF_ALGID_NONE)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	/* Map the Algorithm OID to a PKCS#11 mechanism */
-	pAlgMap = pkcs_get_alg_map(KMF_ALGCLASS_SIGNATURE,
-	    AlgId, PKCS_GetDefaultSignatureMode(AlgId));
-
-	if (pAlgMap == NULL)
+	/* Get the PKCS11 signing key type and mechtype */
+	if (get_pk11_data(AlgId, &keytype, &mechtype, &hashmech, 0))
 		return (KMF_ERR_BAD_PARAMETER);
 
-	mechanism.mechanism = pAlgMap->pkcs_mechanism;
+	(void) memset(digest, 0, sizeof (digest));
+	hashData.Data = digest;
+	hashData.Length = sizeof (digest);
+	rv = PKCS_DigestData(handle, hSession, hashmech, tobesigned, &hashData,
+	    (mechtype == CKM_RSA_PKCS));
+	if (rv)
+		return (rv);
+
+	if (mechtype == CKM_DSA && hashmech == CKM_SHA256) {
+		/*
+		 * FIPS 186-3 says that when signing with DSA
+		 * the hash must be truncated to the size of the
+		 * subprime.
+		 */
+		ckrv = C_GetAttributeValue(hSession,
+		    (CK_OBJECT_HANDLE)keyp->keyp,
+		    &subprime, 1);
+		if (ckrv != CKR_OK)  {
+			SET_ERROR(kmfh, ckrv);
+			return (KMF_ERR_INTERNAL);
+		}
+		hashData.Length = subprime.ulValueLen;
+	}
+
+	/* the mechtype from the 'get_pk11_info' refers to the signing */
+	mechanism.mechanism = mechtype;
 	mechanism.pParameter = NULL;
 	mechanism.ulParameterLen = 0;
 
@@ -1851,7 +2070,7 @@ KMFPK11_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *keyp,
 		return (KMF_ERR_INTERNAL);
 	}
 
-	ckrv = C_Sign(hSession,	tobesigned->Data, tobesigned->Length,
+	ckrv = C_Sign(hSession,	hashData.Data, hashData.Length,
 	    output->Data, (CK_ULONG *)&output->Length);
 
 	if (ckrv != CKR_OK) {
@@ -2069,6 +2288,8 @@ KMFPK11_FindPrikeyByCert(KMF_HANDLE_T handle, int numattr,
 		key->keyalg = KMF_RSA;
 	else if (keytype == CKK_DSA)
 		key->keyalg = KMF_DSA;
+	else if (keytype == CKK_EC)
+		key->keyalg = KMF_ECDSA;
 	else {
 		/* For asymmetric keys, we only support RSA and DSA */
 		rv = KMF_ERR_KEY_NOT_FOUND;
@@ -2104,7 +2325,8 @@ KMFPK11_DecryptData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 	KMF_HANDLE		*kmfh = (KMF_HANDLE *)handle;
 	CK_SESSION_HANDLE	hSession = kmfh->pk11handle;
 	CK_MECHANISM		mechanism;
-	PKCS_ALGORITHM_MAP 	*pAlgMap;
+	CK_MECHANISM_TYPE	mechtype;
+	CK_KEY_TYPE		keytype;
 	KMF_ALGORITHM_INDEX	AlgId;
 	CK_ULONG out_len = 0, block_len = 0, total_decrypted = 0;
 	uint8_t *in_data, *out_data;
@@ -2126,13 +2348,10 @@ KMFPK11_DecryptData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 		return (KMF_ERR_BAD_PARAMETER);
 
 	/* Map the Algorithm ID to a PKCS#11 mechanism */
-	pAlgMap = pkcs_get_alg_map(KMF_ALGCLASS_SIGNATURE,
-	    AlgId, PKCS_GetDefaultSignatureMode(AlgId));
-
-	if (pAlgMap == NULL)
+	if (get_pk11_data(AlgId, &keytype, &mechtype, NULL, 0))
 		return (KMF_ERR_BAD_PARAMETER);
 
-	mechanism.mechanism = pAlgMap->pkcs_mechanism;
+	mechanism.mechanism = mechtype;
 	mechanism.pParameter = NULL;
 	mechanism.ulParameterLen = 0;
 
@@ -2390,6 +2609,64 @@ ret1:
 	return (rv);
 }
 
+static KMF_RETURN
+get_raw_ec(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE obj, KMF_RAW_EC_KEY *rawec)
+{
+	KMF_RETURN rv = KMF_OK;
+	CK_RV ckrv;
+	CK_SESSION_HANDLE sess = kmfh->pk11handle;
+	CK_ATTRIBUTE	ec_attrs[2] = {
+		{ CKA_EC_PARAMS, NULL, 0},
+		{ CKA_VALUE, NULL, 0}
+	};
+	CK_ULONG	count = sizeof (ec_attrs) / sizeof (CK_ATTRIBUTE);
+	int		i;
+
+	if ((ckrv = C_GetAttributeValue(sess, obj,
+	    ec_attrs, 2)) != CKR_OK) {
+		SET_ERROR(kmfh, ckrv);
+
+		/* Tell the caller know why the key data cannot be retrieved. */
+		if (ckrv == CKR_ATTRIBUTE_SENSITIVE)
+			return (KMF_ERR_SENSITIVE_KEY);
+		else if (ckrv == CKR_KEY_UNEXTRACTABLE)
+			return (KMF_ERR_UNEXTRACTABLE_KEY);
+		return (KMF_ERR_INTERNAL);
+	}
+	for (i = 0; i < count; i++) {
+		if (ec_attrs[i].ulValueLen == (CK_ULONG)-1 ||
+		    ec_attrs[i].ulValueLen == 0) {
+			ec_attrs[i].ulValueLen = 0;
+			continue;
+		}
+		if ((ec_attrs[i].pValue =
+		    malloc(ec_attrs[i].ulValueLen)) == NULL) {
+			rv = KMF_ERR_MEMORY;
+			goto end;
+		}
+	}
+	if ((ckrv = C_GetAttributeValue(sess, obj,
+	    ec_attrs, count)) != CKR_OK) {
+		SET_ERROR(kmfh, ckrv);
+		rv = KMF_ERR_INTERNAL;
+		goto end;
+	}
+
+	rawec->params.Data = ec_attrs[0].pValue;
+	rawec->params.Length = ec_attrs[0].ulValueLen;
+	rawec->value.val = ec_attrs[1].pValue;
+	rawec->value.len = ec_attrs[1].ulValueLen;
+
+end:
+	if (rv != KMF_OK) {
+		for (i = 0; i < count; i++) {
+			if (ec_attrs[i].pValue != NULL)
+				free(ec_attrs[i].pValue);
+		}
+		(void) memset(rawec, 0, sizeof (KMF_RAW_EC_KEY));
+	}
+	return (rv);
+}
 
 static KMF_RETURN
 get_raw_dsa(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE obj, KMF_RAW_DSA_KEY *rawdsa)
@@ -2544,6 +2821,9 @@ keyObj2RawKey(KMF_HANDLE_T handle, KMF_KEY_HANDLE *inkey,
 			rkey->not_extractable = B_TRUE;
 			rv = KMF_OK;
 		}
+	} else if (inkey->keyalg == KMF_ECDSA) {
+		rv = get_raw_ec(kmfh, (CK_OBJECT_HANDLE)inkey->keyp,
+		    &rkey->rawdata.ec);
 	} else {
 		rv = KMF_ERR_BAD_PARAMETER;
 	}
@@ -2568,6 +2848,9 @@ kmf2pk11keytype(KMF_KEY_ALG keyalg, CK_KEY_TYPE *type)
 		break;
 	case KMF_DSA:
 		*type = CKK_DSA;
+		break;
+	case KMF_ECDSA:
+		*type = CKK_EC;
 		break;
 	case KMF_AES:
 		*type = CKK_AES;
@@ -2802,6 +3085,8 @@ KMFPK11_FindKey(KMF_HANDLE_T handle,
 						keys[n].keyalg = KMF_RSA;
 					} else if (keytype == CKK_DSA) {
 						keys[n].keyalg = KMF_DSA;
+					} else if (keytype == CKK_EC) {
+						keys[n].keyalg = KMF_ECDSA;
 					} else if (keytype == CKK_AES) {
 						keys[n].keyalg = KMF_AES;
 						keys[n].keyclass =
@@ -2936,6 +3221,8 @@ store_raw_key(KMF_HANDLE_T handle,
 		keytype = CKK_RSA;
 	else if (rawkey->keytype == KMF_DSA)
 		keytype = CKK_DSA;
+	else if (rawkey->keytype == KMF_ECDSA)
+		keytype = CKK_EC;
 	else
 		return (KMF_ERR_BAD_PARAMETER);
 
@@ -2960,7 +3247,8 @@ store_raw_key(KMF_HANDLE_T handle,
 	SETATTR(templ, i, CKA_KEY_TYPE, &keytype, sizeof (keytype)); i++;
 	SETATTR(templ, i, CKA_TOKEN, &cktrue, sizeof (cktrue)); i++;
 	SETATTR(templ, i, CKA_PRIVATE, &cktrue, sizeof (cktrue)); i++;
-	SETATTR(templ, i, CKA_DECRYPT, &cktrue, sizeof (cktrue)); i++;
+	if (keytype != CKK_EC)
+		SETATTR(templ, i, CKA_DECRYPT, &cktrue, sizeof (cktrue)); i++;
 
 	cert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist, numattr);
 	if (cert != NULL) {
@@ -3107,7 +3395,7 @@ store_raw_key(KMF_HANDLE_T handle,
 			    rawkey->rawdata.rsa.coef.len);
 			i++;
 		}
-	} else {
+	} else if (keytype == CKK_DSA) {
 		SETATTR(templ, i, CKA_PRIME,
 		    rawkey->rawdata.dsa.prime.val,
 		    rawkey->rawdata.dsa.prime.len);
@@ -3123,6 +3411,19 @@ store_raw_key(KMF_HANDLE_T handle,
 		SETATTR(templ, i, CKA_VALUE,
 		    rawkey->rawdata.dsa.value.val,
 		    rawkey->rawdata.dsa.value.len);
+		i++;
+	} else if (keytype == CKK_EC) {
+		SETATTR(templ, i, CKA_SIGN, &cktrue, sizeof (cktrue));
+		i++;
+		SETATTR(templ, i, CKA_DERIVE, &cktrue, sizeof (cktrue));
+		i++;
+		SETATTR(templ, i, CKA_VALUE,
+		    rawkey->rawdata.ec.value.val,
+		    rawkey->rawdata.ec.value.len);
+		i++;
+		SETATTR(templ, i, CKA_EC_PARAMS,
+		    rawkey->rawdata.ec.params.Data,
+		    rawkey->rawdata.ec.params.Length);
 		i++;
 	}
 
@@ -3521,176 +3822,6 @@ KMFPK11_SetTokenPin(KMF_HANDLE_T handle,
 end:
 	if (session != NULL)
 		(void) C_CloseSession(session);
-	return (ret);
-}
-
-static KMF_RETURN
-create_pk11_session(CK_SESSION_HANDLE *sessionp, CK_MECHANISM_TYPE wanted_mech,
-	CK_FLAGS wanted_flags)
-{
-	CK_RV rv;
-	KMF_RETURN kmf_rv = KMF_OK;
-	CK_SLOT_ID_PTR pSlotList;
-	CK_ULONG pulCount;
-	CK_MECHANISM_INFO info;
-	int i;
-
-	rv = C_Initialize(NULL);
-	if ((rv != CKR_OK) && (rv != CKR_CRYPTOKI_ALREADY_INITIALIZED)) {
-		kmf_rv = KMF_ERR_UNINITIALIZED;
-		goto out;
-	}
-
-	rv = C_GetSlotList(0, NULL, &pulCount);
-	if (rv != CKR_OK) {
-		kmf_rv = KMF_ERR_UNINITIALIZED;
-		goto out;
-	}
-
-	pSlotList = (CK_SLOT_ID_PTR) malloc(pulCount * sizeof (CK_SLOT_ID));
-	if (pSlotList == NULL) {
-		kmf_rv = KMF_ERR_MEMORY;
-		goto out;
-	}
-
-	rv = C_GetSlotList(0, pSlotList, &pulCount);
-	if (rv != CKR_OK) {
-		kmf_rv = KMF_ERR_UNINITIALIZED;
-		goto out;
-	}
-
-	for (i = 0; i < pulCount; i++) {
-		rv = C_GetMechanismInfo(pSlotList[i], wanted_mech, &info);
-		if (rv == CKR_OK && (info.flags & wanted_flags))
-			break;
-	}
-	if (i < pulCount) {
-		rv = C_OpenSession(pSlotList[i], CKF_SERIAL_SESSION,
-		    NULL, NULL, sessionp);
-
-		if (rv != CKR_OK) {
-			kmf_rv = KMF_ERR_UNINITIALIZED;
-		}
-	} else {
-		kmf_rv = KMF_ERR_UNINITIALIZED;
-	}
-
-out:
-	if (pSlotList != NULL)
-		free(pSlotList);
-	return (kmf_rv);
-
-}
-static KMF_RETURN
-verify_data(KMF_HANDLE_T handle,
-	KMF_ALGORITHM_INDEX AlgorithmId,
-	KMF_X509_SPKI *keyp,
-	KMF_DATA *data,
-	KMF_DATA *signed_data)
-{
-	KMF_RETURN ret;
-	PKCS_ALGORITHM_MAP *pAlgMap = NULL;
-	CK_RV ckRv;
-	CK_MECHANISM ckMechanism;
-	CK_OBJECT_HANDLE ckKeyHandle;
-	KMF_BOOL	bTempKey;
-	KMF_HANDLE	*kmfh = (KMF_HANDLE *)handle;
-	CK_SESSION_HANDLE	ckSession = NULL;
-
-	if (AlgorithmId == KMF_ALGID_NONE)
-		return (KMF_ERR_BAD_ALGORITHM);
-
-	pAlgMap = pkcs_get_alg_map(KMF_ALGCLASS_SIGNATURE,
-	    AlgorithmId, PKCS_GetDefaultSignatureMode(AlgorithmId));
-
-	if (!pAlgMap)
-		return (KMF_ERR_BAD_ALGORITHM);
-
-	ret = create_pk11_session(&ckSession, pAlgMap->pkcs_mechanism,
-	    CKF_VERIFY);
-	if (ret != KMF_OK)
-		return (ret);
-
-	/* Fetch the verifying key */
-	ret = PKCS_AcquirePublicKeyHandle(ckSession, keyp,
-	    pAlgMap->key_type, &ckKeyHandle, &bTempKey);
-
-	if (ret != KMF_OK) {
-		return (ret);
-	}
-
-	ckMechanism.mechanism = pAlgMap->pkcs_mechanism;
-	ckMechanism.pParameter = NULL;
-	ckMechanism.ulParameterLen = 0;
-
-	ckRv = C_VerifyInit(ckSession, &ckMechanism, ckKeyHandle);
-	if (ckRv != CKR_OK) {
-		if (bTempKey)
-			(void) C_DestroyObject(ckSession, ckKeyHandle);
-		SET_ERROR(kmfh, ckRv);
-		ret = KMF_ERR_INTERNAL;
-		goto cleanup;
-	}
-
-	ckRv = C_Verify(ckSession, (CK_BYTE *)data->Data,
-	    (CK_ULONG)data->Length, (CK_BYTE *)signed_data->Data,
-	    (CK_ULONG)signed_data->Length);
-
-	if (ckRv != CKR_OK) {
-		SET_ERROR(kmfh, ckRv);
-		ret = KMF_ERR_INTERNAL;
-	}
-
-cleanup:
-	if (bTempKey)
-		(void) C_DestroyObject(ckSession, ckKeyHandle);
-
-	(void) C_CloseSession(ckSession);
-
-	return (ret);
-}
-
-KMF_RETURN
-KMFPK11_VerifyDataWithCert(KMF_HANDLE_T handle,
-	KMF_ALGORITHM_INDEX algid, KMF_DATA *indata,
-	KMF_DATA *insig, KMF_DATA *SignerCertData)
-{
-	KMF_RETURN ret = KMF_OK;
-	KMF_X509_CERTIFICATE *SignerCert = NULL;
-	KMF_X509_SPKI *pubkey;
-
-	if (handle == NULL || indata == NULL ||
-	    indata->Data == NULL || indata->Length == 0 ||
-	    insig == NULL|| insig->Data == NULL || insig->Length == 0 ||
-	    SignerCertData == NULL || SignerCertData->Data == NULL ||
-	    SignerCertData->Length == 0)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	/* Decode the signer cert so we can get the SPKI data */
-	ret = DerDecodeSignedCertificate(SignerCertData, &SignerCert);
-	if (ret != KMF_OK)
-		goto cleanup;
-
-	/* Get the public key info from the signer certificate */
-	pubkey = &SignerCert->certificate.subjectPublicKeyInfo;
-
-	/* If no algorithm specified, use the certs signature algorithm */
-	if (algid == KMF_ALGID_NONE) {
-		algid = x509_algoid_to_algid(CERT_ALG_OID(SignerCert));
-	}
-
-	if (algid == KMF_ALGID_NONE) {
-		ret = KMF_ERR_BAD_ALGORITHM;
-	} else {
-		ret = verify_data(handle, algid, pubkey, indata, insig);
-	}
-
-cleanup:
-	if (SignerCert) {
-		kmf_free_signed_cert(SignerCert);
-		free(SignerCert);
-	}
-
 	return (ret);
 }
 

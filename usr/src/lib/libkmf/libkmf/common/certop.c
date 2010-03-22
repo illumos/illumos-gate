@@ -71,12 +71,22 @@ get_keyalg_from_cert(KMF_DATA *cert, KMF_KEY_ALG *keyalg)
 
 	switch (AlgorithmId) {
 		case KMF_ALGID_MD5WithRSA:
-		case KMF_ALGID_MD2WithRSA:
 		case KMF_ALGID_SHA1WithRSA:
+		case KMF_ALGID_SHA256WithRSA:
+		case KMF_ALGID_SHA384WithRSA:
+		case KMF_ALGID_SHA512WithRSA:
 			*keyalg = KMF_RSA;
 			break;
 		case KMF_ALGID_SHA1WithDSA:
+		case KMF_ALGID_SHA256WithDSA:
 			*keyalg = KMF_DSA;
+			break;
+		case KMF_ALGID_SHA1WithECDSA:
+		case KMF_ALGID_SHA256WithECDSA:
+		case KMF_ALGID_SHA384WithECDSA:
+		case KMF_ALGID_SHA512WithECDSA:
+		case KMF_ALGID_ECDSA:
+			*keyalg = KMF_ECDSA;
 			break;
 		default:
 			rv = KMF_ERR_BAD_ALGORITHM;
@@ -410,8 +420,8 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	int freethekey = 0;
 	KMF_POLICY_RECORD *policy;
 	KMF_OID *oid = NULL;
-	KMF_ALGORITHM_INDEX AlgId;
 	KMF_X509_CERTIFICATE *x509cert;
+	KMF_X509_TBS_CERT *decodedTbsCert = NULL;
 	KMF_ATTRIBUTE_TESTER required_attrs[] = {
 	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
 	    {KMF_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA), sizeof (KMF_DATA)}
@@ -466,18 +476,6 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 		}
 		sign_key_ptr = &sign_key;
 		freethekey = 1;
-
-		ret = get_sigalg_from_cert(signer_cert, &AlgId);
-		if (ret != KMF_OK)
-			goto out;
-		else
-			oid = x509_algid_to_algoid(AlgId);
-	} else if (sign_key_ptr != NULL) {
-		if (sign_key_ptr->keyalg == KMF_RSA) {
-			oid = (KMF_OID *)&KMFOID_SHA1WithRSA;
-		} else if (sign_key_ptr->keyalg == KMF_DSA) {
-			oid = (KMF_OID *)&KMFOID_SHA1WithDSA;
-		}
 	}
 
 	/* Now we are ready to sign */
@@ -490,11 +488,22 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 			ret = KMF_ERR_BAD_PARAMETER;
 			goto out;
 		}
+
+		/* determine signature OID from cert request */
+		oid = CERT_ALG_OID(x509cert);
+
 		ret = kmf_encode_cert_record(x509cert, &unsignedCert);
-		if (ret == KMF_OK)
-			tbs_cert = &unsignedCert;
-		else
+		if (ret != KMF_OK)
 			goto out;
+
+		tbs_cert = &unsignedCert;
+	}
+	/* If OID still not found, decode the TBS Cert and pull it out */
+	if (oid == NULL) {
+		ret = DerDecodeTbsCertificate(tbs_cert, &decodedTbsCert);
+		if (ret != KMF_OK)
+			goto out;
+		oid = &decodedTbsCert->signature.algorithm;
 	}
 
 	signed_cert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist,
@@ -515,6 +524,10 @@ out:
 		kmf_free_kmf_key(handle, &sign_key);
 
 	kmf_free_data(&unsignedCert);
+	if (decodedTbsCert != NULL) {
+		kmf_free_tbs_cert(decodedTbsCert);
+		free(decodedTbsCert);
+	}
 	return (ret);
 }
 
@@ -564,7 +577,7 @@ kmf_sign_data(KMF_HANDLE_T handle, int numattr,
 	KMF_DATA *tbs_data = NULL;  /* to be signed data */
 	KMF_DATA *output = NULL;
 	KMF_KEY_HANDLE sign_key, *sign_key_ptr;
-	KMF_ALGORITHM_INDEX AlgId;
+	KMF_ALGORITHM_INDEX AlgId = KMF_ALGID_NONE;
 	KMF_DATA	signature = {0, NULL};
 	KMF_OID *oid;
 	KMF_POLICY_RECORD *policy;
@@ -665,9 +678,7 @@ kmf_sign_data(KMF_HANDLE_T handle, int numattr,
 		ret = get_sigalg_from_cert(signer_cert, &AlgId);
 		if (ret != KMF_OK)
 			goto cleanup;
-		else
-			oid = x509_algid_to_algoid(AlgId);
-
+		oid = x509_algid_to_algoid(AlgId);
 	} else if (oid == NULL && ret == KMF_OK) {
 		/* AlgID was given by caller, convert it to OID */
 		oid = x509_algid_to_algoid(AlgId);
@@ -691,13 +702,15 @@ kmf_sign_data(KMF_HANDLE_T handle, int numattr,
 
 	/*
 	 * For DSA, NSS returns an encoded signature. Decode the
-	 * signature as DSA signature should be 40-byte long.
+	 * signature and expect a 40-byte DSA signature.
 	 */
 	if (plugin->type == KMF_KEYSTORE_NSS &&
-	    AlgId == KMF_ALGID_SHA1WithDSA) {
+	    (AlgId == KMF_ALGID_SHA1WithDSA ||
+	    AlgId == KMF_ALGID_SHA256WithDSA)) {
 		ret = DerDecodeDSASignature(output, &signature);
 		if (ret != KMF_OK)
 			goto cleanup;
+
 		output->Length = signature.Length;
 		(void) memcpy(output->Data, signature.Data, signature.Length);
 	}
@@ -711,7 +724,6 @@ cleanup:
 
 	if (signer_cert != NULL && sign_key_ptr != NULL)
 		kmf_free_kmf_key(handle, sign_key_ptr);
-
 
 	return (ret);
 }
@@ -806,6 +818,8 @@ kmf_verify_data(KMF_HANDLE_T handle,
 
 	/* If the caller passed a signer cert instead of a key use it. */
 	if (signer_cert != NULL) {
+		KMF_X509_CERTIFICATE *SignerCert = NULL;
+
 		policy = handle->policy;
 		ret = check_key_usage(handle, signer_cert, KMF_KU_SIGN_DATA);
 		if (ret == KMF_ERR_EXTENSION_NOT_FOUND && policy->ku_bits == 0)
@@ -813,17 +827,35 @@ kmf_verify_data(KMF_HANDLE_T handle,
 		if (ret != KMF_OK)
 			return (ret);
 
-		if (kstype == KMF_KEYSTORE_NSS)
-			kstype = KMF_KEYSTORE_PK11TOKEN;
-		plugin = FindPlugin(handle, kstype);
-		if (plugin == NULL)
-			return (KMF_ERR_PLUGIN_NOTFOUND);
-		if (plugin->funclist->VerifyDataWithCert == NULL)
-			return (KMF_ERR_FUNCTION_NOT_FOUND);
+		/* Decode the signer cert so we can get the SPKI data */
+		ret = DerDecodeSignedCertificate(signer_cert, &SignerCert);
+		if (ret != KMF_OK)
+			return (ret);
 
-		CLEAR_ERROR(handle, ret);
-		ret = plugin->funclist->VerifyDataWithCert(handle,
-		    sigAlg, indata, insig, signer_cert);
+		/* If no algorithm specified, use the certs signature alg */
+		if (sigAlg == KMF_ALGID_NONE)
+			sigAlg = x509_algoid_to_algid(CERT_ALG_OID(SignerCert));
+
+		if (sigAlg == KMF_ALGID_NONE) {
+			kmf_free_signed_cert(SignerCert);
+			free(SignerCert);
+			return (KMF_ERR_BAD_ALGORITHM);
+		}
+
+		/*
+		 * Verify the data locally (i.e. using PKCS#11).
+		 * The verify operation uses a public key and does not
+		 * require access to a specific keystore. Save time
+		 * (and code) by just using the frameworks implementation
+		 * of the verify operation using crypto framework
+		 * APIs.
+		 */
+		ret = PKCS_VerifyData(handle, sigAlg,
+		    &SignerCert->certificate.subjectPublicKeyInfo,
+		    indata, insig);
+
+		kmf_free_signed_cert(SignerCert);
+		free(SignerCert);
 	} else {
 		/* Retrieve public key data from keystore */
 		plugin = FindPlugin(handle, kstype);
@@ -836,10 +868,9 @@ kmf_verify_data(KMF_HANDLE_T handle,
 		}
 
 		ret = DerDecodeSPKI(&derkey, &spki);
-		if (ret == KMF_OK) {
+		if (ret == KMF_OK)
 			ret = PKCS_VerifyData(handle, sigAlg, &spki,
 			    indata, insig);
-		}
 
 		if (derkey.Data != NULL)
 			free(derkey.Data);
@@ -946,54 +977,6 @@ kmf_verify_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 }
 
 /*
- * Utility routine for verifying generic data using a
- * certificate to derive the public key.  This is
- * done in a specific plugin because there are situations
- * where we want to force this operation to happen in
- * a specific keystore.
- * For example:
- *    libelfsign.so.1 verifies signatures on crypto libraries.
- *    We must use pkcs11 functions to verify the pkcs11
- *    plugins in order to keep the validation within the
- *    Cryptographic Framework's FIPS-140 boundary. To avoid
- *    a circular dependency, pksc11_softtoken.so.1 is
- *    interposed by libkcfd.so.1 via kcfd, which prevents
- *    libpkcs11.so.1's interfaces from being used when libkmf.so.1
- *    is called from kcfd.
- */
-static KMF_RETURN
-plugin_verify_data_with_cert(KMF_HANDLE_T handle,
-	KMF_KEYSTORE_TYPE kstype,
-	KMF_ALGORITHM_INDEX algid,
-	KMF_DATA *indata,
-	KMF_DATA *insig,
-	const KMF_DATA *SignerCert)
-{
-	KMF_PLUGIN *plugin;
-	KMF_RETURN ret = KMF_OK;
-
-	/*
-	 * If NSS, use PKCS#11, we are not accessing the database(s),
-	 * we just prefer the "verify" operation from the crypto framework.
-	 */
-	if (kstype == KMF_KEYSTORE_NSS)
-		kstype = KMF_KEYSTORE_PK11TOKEN;
-
-	plugin = FindPlugin(handle, kstype);
-	if (plugin == NULL)
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-
-	if (plugin->funclist->VerifyDataWithCert == NULL)
-		return (KMF_ERR_FUNCTION_NOT_FOUND);
-
-	CLEAR_ERROR(handle, ret);
-	ret = (plugin->funclist->VerifyDataWithCert(handle,
-	    algid, indata, insig, (KMF_DATA *)SignerCert));
-
-	return (ret);
-}
-
-/*
  * Name: kmf_encrypt
  *
  * Description:
@@ -1078,8 +1061,15 @@ kmf_encrypt(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 
 	algid = x509_algoid_to_algid(alg);
 
-	/* DSA does not support encrypt */
-	if (algid == KMF_ALGID_DSA || algid == KMF_ALGID_NONE) {
+	/* [EC]DSA does not support encrypt */
+	if (algid == KMF_ALGID_DSA ||
+	    algid == KMF_ALGID_SHA1WithDSA ||
+	    algid == KMF_ALGID_SHA256WithDSA ||
+	    algid == KMF_ALGID_SHA1WithECDSA ||
+	    algid == KMF_ALGID_SHA256WithECDSA ||
+	    algid == KMF_ALGID_SHA384WithECDSA ||
+	    algid == KMF_ALGID_SHA512WithECDSA ||
+	    algid == KMF_ALGID_NONE) {
 		kmf_free_signed_cert(x509cert);
 		free(x509cert);
 		return (KMF_ERR_BAD_ALGORITHM);
@@ -1186,8 +1176,9 @@ kmf_decrypt(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	AlgorithmId = x509_algoid_to_algid((KMF_OID *)
 	    &spki_ptr->algorithm.algorithm);
 
-	/* DSA does not support decrypt */
-	if (AlgorithmId == KMF_ALGID_DSA) {
+	/* [EC]DSA does not support decrypt */
+	if (AlgorithmId == KMF_ALGID_DSA ||
+	    AlgorithmId == KMF_ALGID_ECDSA) {
 		ret = KMF_ERR_BAD_ALGORITHM;
 		goto cleanup;
 	}
@@ -2991,12 +2982,26 @@ sign_cert(KMF_HANDLE_T handle,
 
 	algid = x509_algoid_to_algid(signature_oid);
 
-	/*
-	 * For DSA, KMF_SignDataWithKey() returns a 40-bytes decoded
-	 * signature. So we must encode the signature correctly.
-	 */
-	if (algid == KMF_ALGID_SHA1WithDSA) {
+	if (algid == KMF_ALGID_SHA1WithECDSA ||
+	    algid == KMF_ALGID_SHA256WithECDSA ||
+	    algid == KMF_ALGID_SHA384WithECDSA ||
+	    algid == KMF_ALGID_SHA512WithECDSA) {
+		/* ASN.1 encode ECDSA signature */
+		KMF_DATA signature;
 
+		ret = DerEncodeECDSASignature(&signed_data, &signature);
+		kmf_free_data(&signed_data);
+
+		if (ret != KMF_OK)
+			goto cleanup;
+
+		subj_cert->signature.encrypted = signature;
+	} else if (algid == KMF_ALGID_SHA1WithDSA ||
+	    algid == KMF_ALGID_SHA256WithDSA) {
+		/*
+		 * For DSA, kmf_sign_data() returns a 40-byte
+		 * signature. We must encode the signature correctly.
+		 */
 		KMF_DATA signature;
 
 		ret = DerEncodeDSASignature(&signed_data, &signature);
@@ -3068,8 +3073,16 @@ verify_cert_with_key(KMF_HANDLE_T handle,
 	if (algid == KMF_ALGID_NONE)
 		return (KMF_ERR_BAD_ALGORITHM);
 
-	if (algid == KMF_ALGID_SHA1WithDSA) {
+	if (algid == KMF_ALGID_SHA1WithDSA ||
+	    algid == KMF_ALGID_SHA256WithDSA) {
 		ret = DerDecodeDSASignature(&signed_data, &signature);
+		if (ret != KMF_OK)
+			goto cleanup;
+	} else if (algid == KMF_ALGID_SHA1WithECDSA ||
+	    algid == KMF_ALGID_SHA256WithECDSA ||
+	    algid == KMF_ALGID_SHA384WithECDSA ||
+	    algid == KMF_ALGID_SHA512WithECDSA) {
+		ret = DerDecodeECDSASignature(&signed_data, &signature);
 		if (ret != KMF_OK)
 			goto cleanup;
 	} else {
@@ -3091,7 +3104,12 @@ cleanup:
 		kmf_free_signed_cert(signed_cert);
 		free(signed_cert);
 	}
-	if (algid == KMF_ALGID_SHA1WithDSA) {
+	if (algid == KMF_ALGID_SHA1WithDSA ||
+	    algid == KMF_ALGID_SHA256WithDSA ||
+	    algid == KMF_ALGID_SHA1WithECDSA ||
+	    algid == KMF_ALGID_SHA256WithECDSA ||
+	    algid == KMF_ALGID_SHA384WithECDSA ||
+	    algid == KMF_ALGID_SHA512WithECDSA) {
 		free(signature.Data);
 	}
 
@@ -3149,14 +3167,21 @@ verify_cert_with_cert(KMF_HANDLE_T handle,
 	/* Decode the to-be-verified cert so we know what algorithm to use */
 	ret = DerDecodeSignedCertificate(CertToBeVerifiedData,
 	    &ToBeVerifiedCert);
-
 	if (ret != KMF_OK)
 		goto cleanup;
 
 	algid = x509_algoid_to_algid(CERT_SIG_OID(ToBeVerifiedCert));
 
-	if (algid == KMF_ALGID_SHA1WithDSA) {
+	if (algid == KMF_ALGID_SHA1WithDSA ||
+	    algid == KMF_ALGID_SHA256WithDSA) {
 		ret = DerDecodeDSASignature(&signed_data, &signature);
+		if (ret != KMF_OK)
+			goto cleanup;
+	} else if (algid == KMF_ALGID_SHA1WithECDSA ||
+	    algid == KMF_ALGID_SHA256WithECDSA ||
+	    algid == KMF_ALGID_SHA384WithECDSA ||
+	    algid == KMF_ALGID_SHA512WithECDSA) {
+		ret = DerDecodeECDSASignature(&signed_data, &signature);
 		if (ret != KMF_OK)
 			goto cleanup;
 	} else {
@@ -3164,12 +3189,17 @@ verify_cert_with_cert(KMF_HANDLE_T handle,
 		signature.Length = signed_data.Length;
 	}
 
+	ret = DerDecodeSignedCertificate(SignerCertData, &SignerCert);
+	if (ret != KMF_OK)
+		goto cleanup;
+
 	/*
 	 * Force use of PKCS11 API for kcfd/libelfsign.  This is
 	 * required for the Cryptographic Framework's FIPS-140 boundary.
 	 */
-	ret = plugin_verify_data_with_cert(handle, KMF_KEYSTORE_PK11TOKEN,
-	    algid, &data_to_verify, &signature,	SignerCertData);
+	ret = PKCS_VerifyData(handle, algid,
+	    &SignerCert->certificate.subjectPublicKeyInfo,
+	    &data_to_verify, &signature);
 
 cleanup:
 	kmf_free_data(&data_to_verify);
@@ -3185,7 +3215,12 @@ cleanup:
 		free(ToBeVerifiedCert);
 	}
 
-	if (algid == KMF_ALGID_SHA1WithDSA) {
+	if (algid == KMF_ALGID_SHA1WithDSA ||
+	    algid == KMF_ALGID_SHA256WithDSA ||
+	    algid == KMF_ALGID_SHA1WithECDSA ||
+	    algid == KMF_ALGID_SHA256WithECDSA ||
+	    algid == KMF_ALGID_SHA384WithECDSA ||
+	    algid == KMF_ALGID_SHA512WithECDSA) {
 		free(signature.Data);
 	}
 

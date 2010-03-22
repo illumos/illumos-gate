@@ -1,26 +1,91 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
  * Copyright (c) 1995-2000 Intel Corporation. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <kmfapiP.h>
 #include <sha1.h>
 #include <security/cryptoki.h>
 
-#include <algorithm.h>
 #include <ber_der.h>
 
 #define	MAX_PUBLIC_KEY_TEMPLATES    (20)
 #define	MAX_PRIVATE_KEY_TEMPLATES   (24)
 #define	MAX_SECRET_KEY_TEMPLATES    (24)
 
-static KMF_RETURN
-create_pk11_session(CK_SESSION_HANDLE *sessionp, CK_MECHANISM_TYPE wanted_mech,
+typedef struct
+{
+	KMF_ALGORITHM_INDEX kmfAlgorithmId;
+	CK_KEY_TYPE ckKeyType;
+	CK_MECHANISM_TYPE signmech;
+	CK_MECHANISM_TYPE vfymech;
+	CK_MECHANISM_TYPE hashmech;
+} ALG_INFO;
+
+static const ALG_INFO alg_info_map[] = {
+	{ KMF_ALGID_RSA, CKK_RSA, CKM_RSA_PKCS, CKM_RSA_PKCS, NULL},
+	{ KMF_ALGID_DSA, CKK_DSA, CKM_DSA, CKM_DSA, CKM_SHA_1 },
+	{ KMF_ALGID_ECDSA, CKK_EC, CKM_ECDSA, CKM_ECDSA, CKM_SHA_1 },
+	{ KMF_ALGID_SHA1WithDSA, CKK_DSA, CKM_DSA, CKM_DSA, CKM_SHA_1 },
+	{ KMF_ALGID_SHA256WithDSA, CKK_DSA, CKM_DSA, CKM_DSA, CKM_SHA256 },
+
+	/*
+	 * For RSA, the verify can be done using a single mechanism,
+	 * but signing must be done separately because not all hardware
+	 * tokens support the combined hash+key operations.
+	 */
+	{ KMF_ALGID_MD5WithRSA, CKK_RSA, CKM_RSA_PKCS,
+	    CKM_MD5_RSA_PKCS, CKM_MD5},
+	{ KMF_ALGID_SHA1WithRSA, CKK_RSA, CKM_RSA_PKCS,
+	    CKM_SHA1_RSA_PKCS, CKM_SHA_1},
+	{ KMF_ALGID_SHA256WithRSA, CKK_RSA, CKM_RSA_PKCS,
+	    CKM_SHA256_RSA_PKCS, CKM_SHA256},
+	{ KMF_ALGID_SHA384WithRSA, CKK_RSA, CKM_RSA_PKCS,
+	    CKM_SHA384_RSA_PKCS, CKM_SHA384},
+	{ KMF_ALGID_SHA512WithRSA, CKK_RSA, CKM_RSA_PKCS,
+	    CKM_SHA512_RSA_PKCS, CKM_SHA512},
+	{ KMF_ALGID_SHA1WithECDSA, CKK_EC, CKM_ECDSA,
+	    CKM_ECDSA, CKM_SHA_1},
+	{ KMF_ALGID_SHA256WithECDSA, CKK_EC, CKM_ECDSA,
+	    CKM_ECDSA, CKM_SHA256},
+	{ KMF_ALGID_SHA384WithECDSA, CKK_EC, CKM_ECDSA,
+	    CKM_ECDSA, CKM_SHA384},
+	{ KMF_ALGID_SHA512WithECDSA, CKK_EC, CKM_ECDSA,
+	    CKM_ECDSA, CKM_SHA512}
+};
+
+KMF_RETURN
+get_pk11_data(KMF_ALGORITHM_INDEX AlgId,
+	CK_KEY_TYPE *keytype, CK_MECHANISM_TYPE *signmech,
+	CK_MECHANISM_TYPE *hashmech, boolean_t vfy)
+{
+	uint32_t uIndex;
+	uint32_t uMapSize =
+	    sizeof (alg_info_map) / sizeof (ALG_INFO);
+
+	for (uIndex = 0; uIndex < uMapSize; uIndex++) {
+		if (alg_info_map[uIndex].kmfAlgorithmId == AlgId) {
+			if (keytype)
+				*keytype = alg_info_map[uIndex].ckKeyType;
+			if (hashmech)
+				*hashmech = alg_info_map[uIndex].hashmech;
+			if (signmech)
+				*signmech =
+				    (vfy ? alg_info_map[uIndex].vfymech :
+				    alg_info_map[uIndex].signmech);
+			return (KMF_OK);
+		}
+	}
+	/* no match */
+	return (KMF_ERR_BAD_ALGORITHM);
+}
+
+KMF_RETURN
+kmf_create_pk11_session(CK_SESSION_HANDLE *sessionp,
+	CK_MECHANISM_TYPE wanted_mech,
 	CK_FLAGS wanted_flags)
 {
 	CK_RV rv;
@@ -56,7 +121,8 @@ create_pk11_session(CK_SESSION_HANDLE *sessionp, CK_MECHANISM_TYPE wanted_mech,
 
 	for (i = 0; i < pulCount; i++) {
 		rv = C_GetMechanismInfo(pSlotList[i], wanted_mech, &info);
-		if (rv == CKR_OK && (info.flags & wanted_flags))
+		if (rv == CKR_OK &&
+		    (info.flags & wanted_flags) == wanted_flags)
 			break;
 	}
 	if (i < pulCount) {
@@ -173,7 +239,7 @@ PKCS_CreatePublicKey(
 	}
 
 	/* Fill in the common key attributes */
-	if (!pkcs_algid_to_keytype(AlgorithmId,	&ckKeyType)) {
+	if (get_pk11_data(AlgorithmId, &ckKeyType, NULL, NULL, 0)) {
 		goto cleanup;
 	}
 	if (!PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
@@ -210,6 +276,7 @@ PKCS_CreatePublicKey(
 		    MAX_PUBLIC_KEY_TEMPLATES, CKA_MODULUS,
 		    (CK_BYTE *)KeyParts[KMF_RSA_MODULUS].Data,
 		    (CK_ULONG)KeyParts[KMF_RSA_MODULUS].Length) ||
+
 		    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
 		    MAX_PUBLIC_KEY_TEMPLATES, CKA_PUBLIC_EXPONENT,
 		    (CK_BYTE *)KeyParts[KMF_RSA_PUBLIC_EXPONENT].Data,
@@ -237,6 +304,20 @@ PKCS_CreatePublicKey(
 		    (CK_ULONG)KeyParts[KMF_DSA_PUBLIC_VALUE].Length)) {
 		mrReturn = KMF_ERR_INTERNAL;
 		goto cleanup;
+		}
+		break;
+	case CKK_EC:
+		if (!PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+		    MAX_PUBLIC_KEY_TEMPLATES, CKA_EC_POINT,
+		    (CK_BYTE *)KeyParts[KMF_ECDSA_POINT].Data,
+		    (CK_ULONG)KeyParts[KMF_ECDSA_POINT].Length) ||
+
+		    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+		    MAX_PUBLIC_KEY_TEMPLATES, CKA_EC_PARAMS,
+		    (CK_BYTE *)KeyParts[KMF_ECDSA_PARAMS].Data,
+		    (CK_ULONG)KeyParts[KMF_ECDSA_PARAMS].Length)) {
+			mrReturn = KMF_ERR_INTERNAL;
+			goto cleanup;
 		}
 		break;
 	default:
@@ -274,18 +355,16 @@ cleanup:
  *  - Public Key with label:
  *    Attempts to find a public key with the corresponding label.
  */
-KMF_RETURN
+static KMF_RETURN
 PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
 	const KMF_X509_SPKI *pKey,
 	CK_KEY_TYPE ckRequestedKeyType,
-	CK_OBJECT_HANDLE *pckKeyHandle,
-	KMF_BOOL *pbTemporary)
+	CK_OBJECT_HANDLE *pckKeyHandle)
 {
 	KMF_RETURN mrReturn = KMF_OK;
 
-
 	/* Key searching variables */
-	CK_OBJECT_HANDLE ckKeyHandle;
+	CK_OBJECT_HANDLE ckKeyHandle = 0;
 	CK_OBJECT_CLASS ckObjClass;
 	CK_KEY_TYPE ckKeyType;
 	CK_ATTRIBUTE ckTemplate[3];
@@ -299,8 +378,6 @@ PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
 	if (mrReturn != KMF_OK)
 		return (mrReturn);
 
-	*pbTemporary = KMF_TRUE;
-
 	/* Fetch the key class and algorithm from the object */
 	ckNumTemplates = 0;
 	if (!PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
@@ -309,21 +386,20 @@ PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
 	    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
 	    ckMaxTemplates, CKA_KEY_TYPE, (CK_BYTE *)&ckKeyType,
 	    sizeof (ckKeyType))) {
+		(void) C_DestroyObject(ckSession, ckKeyHandle);
 		return (KMF_ERR_INTERNAL);
 	}
 	ckRv = C_GetAttributeValue(ckSession, ckKeyHandle,
 	    ckTemplate,	ckNumTemplates);
 	if (ckRv != CKR_OK) {
+		(void) C_DestroyObject(ckSession, ckKeyHandle);
 		return (ckRv);
 	}
 
 	/* Make sure the results match the expected values */
 	if ((ckKeyType != ckRequestedKeyType) ||
 	    (ckObjClass != CKO_PUBLIC_KEY)) {
-		if (*pbTemporary == KMF_TRUE) {
-			(void) C_DestroyObject(ckSession, ckKeyHandle);
-		}
-
+		(void) C_DestroyObject(ckSession, ckKeyHandle);
 		return (KMF_ERR_BAD_KEY_FORMAT);
 	}
 
@@ -333,95 +409,136 @@ PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
 	return (KMF_OK);
 }
 
-KMF_SIGNATURE_MODE
-PKCS_GetDefaultSignatureMode(KMF_ALGORITHM_INDEX AlgId)
-{
-	KMF_SIGNATURE_MODE AlgMode;
-
-	switch (AlgId) {
-		case KMF_ALGID_RSA:
-		case KMF_ALGID_MD5WithRSA:
-		case KMF_ALGID_MD2WithRSA:
-		case KMF_ALGID_SHA1WithRSA:
-			AlgMode = KMF_ALGMODE_PKCS1_EMSA_V15;
-			break;
-		default:
-			AlgMode = KMF_ALGMODE_NONE;
-			break;
-	}
-
-	return (AlgMode);
-}
-
+/*
+ * Utility routine for verifying generic data using
+ * the cryptographic framework (PKCS#11).
+ * There are situations where we want to force this
+ * operation to happen in a specific keystore.
+ * For example:
+ * libelfsign.so.1 verifies signatures on crypto libraries.
+ * We must use pkcs11 functions to verify the pkcs11
+ * plugins in order to keep the validation within the
+ * Cryptographic Framework's FIPS-140 boundary. To avoid
+ * a circular dependency, pksc11_softtoken.so.1 is
+ * interposed by libkcfd.so.1 via kcfd, which prevents
+ * libpkcs11.so.1's interfaces from being used when libkmf.so.1
+ * is called from kcfd.
+ *
+ * This also saves code and time because verify operations
+ * only use public keys and do not need acccess to any
+ * keystore specific functions.
+ */
 KMF_RETURN
-PKCS_VerifyData(KMF_HANDLE_T kmfh,
+PKCS_VerifyData(KMF_HANDLE_T handle,
 		KMF_ALGORITHM_INDEX AlgorithmId,
 		KMF_X509_SPKI *keyp,
 		KMF_DATA *data,
-		KMF_DATA *signed_data)
+		KMF_DATA *signature)
 {
-	KMF_RETURN rv = KMF_OK;
-	PKCS_ALGORITHM_MAP *pAlgMap = NULL;
-	CK_RV ckRv;
-	CK_MECHANISM ckMechanism;
-	CK_OBJECT_HANDLE ckKeyHandle;
-	KMF_BOOL	bTempKey;
+	KMF_RETURN	rv = KMF_OK;
+	CK_RV		ckRv;
+	KMF_HANDLE	*kmfh = (KMF_HANDLE *)handle;
+	CK_MECHANISM	ckMechanism;
+	CK_MECHANISM_TYPE mechtype, hashmech;
+	CK_OBJECT_HANDLE ckKeyHandle = 0;
+	CK_KEY_TYPE	pk11keytype;
 	CK_SESSION_HANDLE ckSession = 0;
+	CK_ATTRIBUTE	subprime = { CKA_SUBPRIME, NULL, 0 };
+	CK_BYTE		*dataptr;
+	CK_ULONG	datalen;
+	KMF_DATA	hashData = {NULL, 0};
+	uchar_t		digest[1024];
 
 	if (AlgorithmId == KMF_ALGID_NONE)
 		return (KMF_ERR_BAD_ALGORITHM);
 
-	pAlgMap = pkcs_get_alg_map(KMF_ALGCLASS_SIGNATURE,
-	    AlgorithmId, PKCS_GetDefaultSignatureMode(AlgorithmId));
-
-	if (!pAlgMap)
+	if (get_pk11_data(AlgorithmId, &pk11keytype, &mechtype, &hashmech, 1))
 		return (KMF_ERR_BAD_ALGORITHM);
 
-	rv = create_pk11_session(&ckSession, pAlgMap->pkcs_mechanism,
-	    CKF_VERIFY);
-
+	/*
+	 * Verify in metaslot/softtoken since only the public key is needed
+	 * and not all hardware tokens support the combined [hash]-RSA/DSA/EC
+	 * mechanisms.
+	 */
+	rv = kmf_create_pk11_session(&ckSession, mechtype, 0);
 	if (rv != KMF_OK)
 		return (rv);
 
 	/* Fetch the verifying key */
 	rv = PKCS_AcquirePublicKeyHandle(ckSession, keyp,
-	    pAlgMap->key_type, &ckKeyHandle, &bTempKey);
+	    pk11keytype, &ckKeyHandle);
 
 	if (rv != KMF_OK) {
 		(void) C_CloseSession(ckSession);
 		return (rv);
 	}
+	dataptr = data->Data;
+	datalen = data->Length;
+	/*
+	 * For some mechanisms, we must compute the hash separately
+	 * and then do the verify.
+	 */
+	if (hashmech != 0 &&
+	    (mechtype == CKM_ECDSA ||
+	    mechtype == CKM_DSA ||
+	    mechtype == CKM_RSA_PKCS)) {
+		hashData.Data = digest;
+		hashData.Length = sizeof (digest);
 
-	ckMechanism.mechanism = pAlgMap->pkcs_mechanism;
+		rv = PKCS_DigestData(handle, ckSession,
+		    hashmech, data, &hashData,
+		    (mechtype == CKM_RSA_PKCS));
+		if (rv)
+			goto cleanup;
+
+		dataptr = hashData.Data;
+		datalen = hashData.Length;
+	}
+	if (mechtype == CKM_DSA &&
+	    hashmech == CKM_SHA256) {
+		/*
+		 * FIPS 186-3 says that when using DSA
+		 * the hash must be truncated to the size of the
+		 * subprime.
+		 */
+		ckRv = C_GetAttributeValue(ckSession,
+		    ckKeyHandle, &subprime, 1);
+		if (ckRv != CKR_OK)  {
+			kmfh->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
+			kmfh->lasterr.errcode = ckRv;
+			rv = KMF_ERR_INTERNAL;
+			goto cleanup;
+		}
+		datalen = subprime.ulValueLen;
+	}
+
+	ckMechanism.mechanism = mechtype;
 	ckMechanism.pParameter = NULL;
 	ckMechanism.ulParameterLen = 0;
 
 	ckRv = C_VerifyInit(ckSession, &ckMechanism, ckKeyHandle);
 	if (ckRv != CKR_OK) {
-		if (bTempKey)
-			(void) C_DestroyObject(ckSession, ckKeyHandle);
 		kmfh->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
 		kmfh->lasterr.errcode = ckRv;
-		(void) C_CloseSession(ckSession);
-		return (KMF_ERR_INTERNAL);
+		rv = KMF_ERR_INTERNAL;
+		goto cleanup;
 	}
-
-	ckRv = C_Verify(ckSession, (CK_BYTE *)data->Data,
-	    (CK_ULONG)data->Length,
-	    (CK_BYTE *)signed_data->Data,
-	    (CK_ULONG)signed_data->Length);
+	ckRv = C_Verify(ckSession,
+	    dataptr, datalen,
+	    (CK_BYTE *)signature->Data,
+	    (CK_ULONG)signature->Length);
 
 	if (ckRv != CKR_OK) {
 		kmfh->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
 		kmfh->lasterr.errcode = ckRv;
 		rv = KMF_ERR_INTERNAL;
 	}
-	if (bTempKey)
-		(void) C_DestroyObject(ckSession, ckKeyHandle);
 
+cleanup:
+	if (ckKeyHandle != 0)
+		(void) C_DestroyObject(ckSession, ckKeyHandle);
 	(void) C_CloseSession(ckSession);
 	return (rv);
-
 }
 
 KMF_RETURN
@@ -432,11 +549,11 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 		KMF_DATA *ciphertext)
 {
 	KMF_RETURN rv = KMF_OK;
-	PKCS_ALGORITHM_MAP *pAlgMap = NULL;
 	CK_RV ckRv;
 	CK_MECHANISM ckMechanism;
-	CK_OBJECT_HANDLE ckKeyHandle;
-	KMF_BOOL bTempKey;
+	CK_MECHANISM_TYPE mechtype;
+	CK_KEY_TYPE keytype;
+	CK_OBJECT_HANDLE ckKeyHandle = 0;
 	CK_SESSION_HANDLE ckSession = NULL;
 	CK_ULONG out_len = 0, in_len = 0, total_encrypted = 0;
 	uint8_t *in_data, *out_data;
@@ -446,21 +563,16 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 	CK_ULONG ckMaxTemplates = (sizeof (ckTemplate) /
 	    sizeof (CK_ATTRIBUTE));
 
-	pAlgMap = pkcs_get_alg_map(KMF_ALGCLASS_SIGNATURE,
-	    AlgorithmId, PKCS_GetDefaultSignatureMode(AlgorithmId));
-
-	if (!pAlgMap)
+	if (get_pk11_data(AlgorithmId, &keytype, &mechtype, NULL, 0))
 		return (KMF_ERR_BAD_ALGORITHM);
 
-	rv = create_pk11_session(&ckSession, pAlgMap->pkcs_mechanism,
-	    CKF_ENCRYPT);
-
+	rv = kmf_create_pk11_session(&ckSession, mechtype, CKF_ENCRYPT);
 	if (rv != KMF_OK)
 		return (rv);
 
 	/* Get the public key used in encryption */
 	rv = PKCS_AcquirePublicKeyHandle(ckSession, keyp,
-	    pAlgMap->key_type, &ckKeyHandle, &bTempKey);
+	    keytype, &ckKeyHandle);
 
 	if (rv != KMF_OK) {
 		(void) C_CloseSession(ckSession);
@@ -471,7 +583,7 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 	ckNumTemplates = 0;
 	if (!PKCS_AddTemplate(ckTemplate, &ckNumTemplates, ckMaxTemplates,
 	    CKA_MODULUS, (CK_BYTE *)NULL, sizeof (CK_ULONG))) {
-		if (bTempKey)
+		if (ckKeyHandle != 0)
 			(void) C_DestroyObject(ckSession, ckKeyHandle);
 		(void) C_CloseSession(ckSession);
 		return (KMF_ERR_INTERNAL);
@@ -481,7 +593,7 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 	    ckTemplate, ckNumTemplates);
 
 	if (ckRv != CKR_OK) {
-		if (bTempKey)
+		if (ckKeyHandle != 0)
 			(void) C_DestroyObject(ckSession, ckKeyHandle);
 		kmfh->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
 		kmfh->lasterr.errcode = ckRv;
@@ -491,13 +603,13 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 	out_len = ckTemplate[0].ulValueLen;
 
 	if (out_len > ciphertext->Length) {
-		if (bTempKey)
+		if (ckKeyHandle != 0)
 			(void) C_DestroyObject(ckSession, ckKeyHandle);
 		(void) C_CloseSession(ckSession);
 		return (KMF_ERR_BUFFER_SIZE);
 	}
 
-	ckMechanism.mechanism = pAlgMap->pkcs_mechanism;
+	ckMechanism.mechanism = mechtype;
 	ckMechanism.pParameter = NULL_PTR;
 	ckMechanism.ulParameterLen = 0;
 
@@ -512,7 +624,7 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 	for (i = 0; i < blocks; i++) {
 		ckRv = C_EncryptInit(ckSession, &ckMechanism, ckKeyHandle);
 		if (ckRv != CKR_OK) {
-			if (bTempKey)
+			if (ckKeyHandle != 0)
 				(void) C_DestroyObject(ckSession, ckKeyHandle);
 			kmfh->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
 			kmfh->lasterr.errcode = ckRv;
@@ -523,7 +635,7 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 		    (CK_BYTE_PTR)out_data, &out_len);
 
 		if (ckRv != CKR_OK) {
-			if (bTempKey)
+			if (ckKeyHandle != 0)
 				(void) C_DestroyObject(ckSession, ckKeyHandle);
 			kmfh->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
 			kmfh->lasterr.errcode = ckRv;
@@ -540,7 +652,7 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 		/* Encrypt the remaining data */
 		ckRv = C_EncryptInit(ckSession, &ckMechanism, ckKeyHandle);
 		if (ckRv != CKR_OK) {
-			if (bTempKey)
+			if (ckKeyHandle != 0)
 				(void) C_DestroyObject(ckSession, ckKeyHandle);
 			kmfh->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
 			kmfh->lasterr.errcode = ckRv;
@@ -553,7 +665,7 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 		    (CK_BYTE_PTR)out_data, &out_len);
 
 		if (ckRv != CKR_OK) {
-			if (bTempKey)
+			if (ckKeyHandle != 0)
 				(void) C_DestroyObject(ckSession, ckKeyHandle);
 			kmfh->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
 			kmfh->lasterr.errcode = ckRv;
@@ -568,7 +680,7 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 
 	ciphertext->Length = total_encrypted;
 
-	if (bTempKey)
+	if (ckKeyHandle != 0)
 		(void) C_DestroyObject(ckSession, ckKeyHandle);
 
 	(void) C_CloseSession(ckSession);
@@ -577,7 +689,7 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 }
 
 static void
-DigestData(KMF_DATA *IDInput, KMF_DATA *IDOutput)
+create_id_hash(KMF_DATA *IDInput, KMF_DATA *IDOutput)
 {
 	SHA1_CTX ctx;
 
@@ -616,9 +728,12 @@ GetIDFromSPKI(KMF_X509_SPKI *spki, KMF_DATA *ID)
 
 	/* Check the KEY algorithm */
 	if (algId == KMF_ALGID_RSA) {
-		DigestData(&KeyParts[KMF_RSA_MODULUS], ID);
+		create_id_hash(&KeyParts[KMF_RSA_MODULUS], ID);
 	} else if (algId == KMF_ALGID_DSA) {
-		DigestData(&KeyParts[KMF_DSA_PUBLIC_VALUE], ID);
+		create_id_hash(&KeyParts[KMF_DSA_PUBLIC_VALUE], ID);
+	} else if (algId == KMF_ALGID_SHA1WithECDSA ||
+	    algId == KMF_ALGID_ECDSA) {
+		create_id_hash(&KeyParts[KMF_ECDSA_POINT], ID);
 	} else {
 		/* We only support RSA and DSA keys for now */
 		rv = KMF_ERR_BAD_ALGORITHM;
@@ -635,5 +750,114 @@ GetIDFromSPKI(KMF_X509_SPKI *spki, KMF_DATA *ID)
 		ID->Length = 0;
 	}
 
+	return (rv);
+}
+
+/*
+ * For PKCS1 encoding (necessary for RSA signatures), we
+ * must prepend the following prefixes before computing
+ * the digest.
+ */
+static uchar_t SHA1_DER_PREFIX[] = {
+	0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e,
+	0x03, 0x02, 0x1a, 0x05, 0x00, 0x04, 0x14
+};
+static uchar_t MD5_DER_PREFIX[] = {
+	0x30, 0x20, 0x30, 0x0c, 0x06, 0x08, 0x2a, 0x86,
+	0x48, 0x86, 0xf7, 0x0d, 0x02, 0x05, 0x05, 0x00,
+	0x04, 0x10
+};
+static uchar_t SHA256_DER_PREFIX[] = {0x30, 0x31, 0x30, 0x0d,
+    0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05,
+    0x00, 0x04, 0x20};
+
+static uchar_t SHA384_DER_PREFIX[] = {0x30, 0x41, 0x30, 0x0d,
+    0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02, 0x05,
+    0x00, 0x04, 0x30};
+
+static uchar_t SHA512_DER_PREFIX[] = {0x30, 0x51, 0x30, 0x0d,
+    0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05,
+    0x00, 0x04, 0x40};
+
+#define	MAX_SHA2_DIGEST_LENGTH 64
+/*
+ * Compute hashes using metaslot (or softtoken).
+ * Not all hardware tokens support the combined HASH + RSA/EC
+ * Signing operations so it is safer to separate the hashing
+ * from the signing.  This function generates a hash using a
+ * separate session.  The resulting digest can be signed later.
+ */
+KMF_RETURN
+PKCS_DigestData(KMF_HANDLE_T handle,
+    CK_SESSION_HANDLE hSession,
+    CK_MECHANISM_TYPE mechtype,
+    KMF_DATA *tobesigned, KMF_DATA *output,
+    boolean_t pkcs1_encoding)
+{
+	KMF_RETURN	rv = KMF_OK;
+	CK_RV		ckrv;
+	CK_MECHANISM	mechanism;
+	KMF_HANDLE	*kmfh = (KMF_HANDLE *)handle;
+	CK_BYTE		outbuf[MAX_SHA2_DIGEST_LENGTH +
+	    sizeof (SHA512_DER_PREFIX)];
+	CK_ULONG	outlen = sizeof (outbuf);
+
+	mechanism.mechanism = mechtype;
+	mechanism.pParameter = NULL;
+	mechanism.ulParameterLen = 0;
+
+	ckrv = C_DigestInit(hSession, &mechanism);
+	if (ckrv != CKR_OK) {
+		kmfh->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
+		kmfh->lasterr.errcode = ckrv;
+		rv = KMF_ERR_INTERNAL;
+		goto end;
+	}
+
+	ckrv = C_Digest(hSession, tobesigned->Data,
+	    tobesigned->Length, outbuf, &outlen);
+	if (ckrv != CKR_OK) {
+		kmfh->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
+		kmfh->lasterr.errcode = ckrv;
+		rv = KMF_ERR_INTERNAL;
+	}
+
+	if (pkcs1_encoding) {
+		uchar_t *pfx;
+		int pfxlen;
+		switch (mechtype) {
+			case CKM_MD5:
+				pfx = MD5_DER_PREFIX;
+				pfxlen = sizeof (MD5_DER_PREFIX);
+				break;
+			case CKM_SHA_1:
+				pfx = SHA1_DER_PREFIX;
+				pfxlen = sizeof (SHA1_DER_PREFIX);
+				break;
+			case CKM_SHA256:
+				pfx = SHA256_DER_PREFIX;
+				pfxlen = sizeof (SHA256_DER_PREFIX);
+				break;
+			case CKM_SHA384:
+				pfx = SHA384_DER_PREFIX;
+				pfxlen = sizeof (SHA384_DER_PREFIX);
+				break;
+			case CKM_SHA512:
+				pfx = SHA512_DER_PREFIX;
+				pfxlen = sizeof (SHA512_DER_PREFIX);
+				break;
+			default:
+				rv = KMF_ERR_BAD_ALGORITHM;
+				goto end;
+		}
+		(void) memcpy(output->Data, pfx, pfxlen);
+		(void) memcpy(output->Data + pfxlen, outbuf, outlen);
+		output->Length = outlen + pfxlen;
+	} else {
+		(void) memcpy(output->Data, outbuf, outlen);
+		output->Length = outlen;
+	}
+
+end:
 	return (rv);
 }

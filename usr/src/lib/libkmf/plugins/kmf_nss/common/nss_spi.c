@@ -22,7 +22,7 @@
 /*
  * NSS keystore wrapper
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,7 +154,6 @@ KMF_PLUGIN_FUNCLIST nss_plugin_table =
 	NSS_CreateSymKey,
 	NSS_GetSymKeyValue,
 	NSS_SetTokenPin,
-	NULL, /* VerifyData */
 	NSS_StoreKey,
 	NULL /* Finalize */
 };
@@ -683,7 +682,6 @@ NSS_FreeKMFCert(KMF_HANDLE_T handle,
 	}
 }
 
-
 KMF_RETURN
 NSS_DeleteCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
@@ -817,6 +815,7 @@ NSS_CreateKeypair(KMF_HANDLE_T handle,
 	PK11SlotInfo *nss_slot = NULL;
 	SECKEYPrivateKey *NSSprivkey = NULL;
 	SECKEYPublicKey *NSSpubkey = NULL;
+	SECKEYECParams *ecparams = NULL;
 	PQGParams *pqgParams = NULL;
 	KMF_CREDENTIAL cred;
 	boolean_t storekey = TRUE;
@@ -936,6 +935,20 @@ NSS_CreateKeypair(KMF_HANDLE_T handle,
 		}
 
 		nssparams = pqgParams;
+	} else if (keytype == KMF_ECDSA) {
+		KMF_OID *eccoid = kmf_get_attr_ptr(KMF_ECC_CURVE_OID_ATTR,
+		    attrlist, numattr);
+		if (eccoid == NULL)
+			return (KMF_ERR_BAD_PARAMETER);
+
+		ecparams = SECITEM_AllocItem(NULL, NULL, (eccoid->Length));
+		if (!ecparams)
+			return (KMF_ERR_MEMORY);
+
+		(void) memcpy(ecparams->data, eccoid->Data, eccoid->Length);
+
+		mechanism = CKM_EC_KEY_PAIR_GEN;
+		nssparams = ecparams;
 	} else {
 		rv = KMF_ERR_BAD_PARAMETER;
 		goto cleanup;
@@ -988,6 +1001,9 @@ cleanup:
 	if (pqgParams != NULL)
 		PK11_PQG_DestroyParams(pqgParams);
 
+	if (ecparams != NULL)
+		SECITEM_FreeItem(ecparams, PR_TRUE);
+
 	if (nss_slot != NULL)
 		PK11_FreeSlot(nss_slot);
 
@@ -1027,9 +1043,23 @@ NSS_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 		signAlgTag = SEC_OID_PKCS1_MD2_WITH_RSA_ENCRYPTION;
 	else if (AlgId == KMF_ALGID_SHA1WithRSA)
 		signAlgTag = SEC_OID_PKCS1_SHA1_WITH_RSA_ENCRYPTION;
+	else if (AlgId == KMF_ALGID_SHA256WithRSA)
+		signAlgTag = SEC_OID_PKCS1_SHA256_WITH_RSA_ENCRYPTION;
+	else if (AlgId == KMF_ALGID_SHA384WithRSA)
+		signAlgTag = SEC_OID_PKCS1_SHA384_WITH_RSA_ENCRYPTION;
+	else if (AlgId == KMF_ALGID_SHA512WithRSA)
+		signAlgTag = SEC_OID_PKCS1_SHA512_WITH_RSA_ENCRYPTION;
 	else if (AlgId == KMF_ALGID_SHA1WithDSA)
 		signAlgTag = SEC_OID_ANSIX9_DSA_SIGNATURE_WITH_SHA1_DIGEST;
-	else
+	else if (AlgId == KMF_ALGID_SHA1WithECDSA || AlgId == KMF_ALGID_ECDSA)
+		signAlgTag = SEC_OID_ANSIX962_ECDSA_SIGNATURE_WITH_SHA1_DIGEST;
+	else if (AlgId == KMF_ALGID_SHA256WithECDSA)
+		signAlgTag = SEC_OID_ANSIX962_ECDSA_SHA256_SIGNATURE;
+	else if (AlgId == KMF_ALGID_SHA384WithECDSA)
+		signAlgTag = SEC_OID_ANSIX962_ECDSA_SHA384_SIGNATURE;
+	else if (AlgId == KMF_ALGID_SHA512WithECDSA)
+		signAlgTag = SEC_OID_ANSIX962_ECDSA_SHA512_SIGNATURE;
+	else	/* NSS does not support DSA with SHA2 hashes (FIPS 186-3) */
 		return (KMF_ERR_BAD_PARAMETER);
 
 	rv = SEC_SignData(&signed_data, tobesigned->Data,
@@ -1321,6 +1351,8 @@ pk11keytype2kmf(CK_KEY_TYPE type)
 		return (KMF_DES);
 	case CKK_DES3:
 		return (KMF_DES3);
+	case CKK_EC:
+		return (KMF_ECDSA);
 	default:
 		/* not supported */
 		return (KMF_KEYALG_NONE);
@@ -1437,6 +1469,8 @@ NSS_FindKey(KMF_HANDLE_T handle,
 					keys[count].keyalg = KMF_RSA;
 				else if (pubnode->key->keyType == dsaKey)
 					keys[count].keyalg = KMF_DSA;
+				else if (pubnode->key->keyType == ecKey)
+					keys[count].keyalg = KMF_ECDSA;
 			}
 			if (match)
 				count++;
@@ -1469,6 +1503,8 @@ NSS_FindKey(KMF_HANDLE_T handle,
 					keys[count].keyalg = KMF_RSA;
 				else if (prinode->key->keyType == dsaKey)
 					keys[count].keyalg = KMF_DSA;
+				else if (prinode->key->keyType == ecKey)
+					keys[count].keyalg = KMF_ECDSA;
 			}
 			if (match)
 				count++;
@@ -2188,10 +2224,14 @@ NSS_StoreKey(KMF_HANDLE_T handle,
 			    &rawkey->rawdata.rsa);
 			if (rv != KMF_OK)
 				goto cleanup;
-
 		} else if (rawkey->keytype == KMF_DSA) {
 			rv = DerEncodeDSAPrivateKey(&derkey,
 			    &rawkey->rawdata.dsa);
+			if (rv != KMF_OK)
+				goto cleanup;
+		} else if (rawkey->keytype == KMF_ECDSA) {
+			rv = DerEncodeECPrivateKey(&derkey,
+			    &rawkey->rawdata.ec);
 			if (rv != KMF_OK)
 				goto cleanup;
 		}

@@ -1,11 +1,9 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4
- *
  * The contents of this file are subject to the Netscape Public License
  * Version 1.0(the "NPL"); you may not use this file except in
  * compliance with the NPL.  You may obtain a copy of the NPL at
@@ -143,8 +141,6 @@ extern KMF_RETURN DerDecodeTbsCsr(const KMF_DATA *, KMF_TBS_CSR **);
 extern KMF_RETURN DerEncodeTbsCsr(KMF_TBS_CSR *, KMF_DATA *);
 
 KMF_RETURN ExtractX509CertParts(KMF_DATA *, KMF_DATA *, KMF_DATA *);
-KMF_RETURN GetKeyFromSpki(KMF_ALGORITHM_INDEX, KMF_X509_SPKI *,
-	KMF_DATA **);
 extern KMF_RETURN DerEncodeName(KMF_X509_NAME *, KMF_DATA *);
 KMF_RETURN DerDecodeName(KMF_DATA *, KMF_X509_NAME *);
 KMF_RETURN DerDecodeExtension(KMF_DATA *, KMF_X509_EXTENSION **);
@@ -154,6 +150,8 @@ KMF_RETURN CopySPKI(KMF_X509_SPKI *,
 extern KMF_RETURN DerDecodeSPKI(KMF_DATA *, KMF_X509_SPKI *);
 extern KMF_RETURN DerDecodeDSASignature(KMF_DATA *, KMF_DATA *);
 extern KMF_RETURN DerEncodeDSASignature(KMF_DATA *, KMF_DATA *);
+extern KMF_RETURN DerEncodeECDSASignature(KMF_DATA *, KMF_DATA *);
+extern KMF_RETURN DerDecodeECDSASignature(KMF_DATA *, KMF_DATA *);
 KMF_RETURN DerEncodeAlgoid(KMF_DATA *, KMF_DATA *);
 KMF_RETURN DerDecodeSPKI(KMF_DATA *, KMF_X509_SPKI *);
 KMF_RETURN DerEncodeSPKI(KMF_X509_SPKI *, KMF_DATA *);
@@ -162,5 +160,6 @@ extern KMF_RETURN ExtractSPKIData(const KMF_X509_SPKI *,
 extern KMF_RETURN AddRDN(KMF_X509_NAME *, KMF_X509_RDN *);
 KMF_RETURN DerEncodeRSAPrivateKey(KMF_DATA *, KMF_RAW_RSA_KEY *);
 KMF_RETURN DerEncodeDSAPrivateKey(KMF_DATA *, KMF_RAW_DSA_KEY *);
+KMF_RETURN DerEncodeECPrivateKey(KMF_DATA *, KMF_RAW_EC_KEY *);
 
 #endif /* BER_DER_H */

@@ -2,11 +2,9 @@
  * Copyright (c) 1995-2000 Intel Corporation. All rights reserved.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <string.h>
@@ -28,9 +26,17 @@ static KMF_OID_ID ALGOID_ID_Table[] = {
 	{(KMF_OID *)&KMFOID_RSA, KMF_ALGID_RSA},
 	{(KMF_OID *)&KMFOID_DSA, KMF_ALGID_DSA},
 	{(KMF_OID *)&KMFOID_MD5WithRSA, KMF_ALGID_MD5WithRSA},
-	{(KMF_OID *)&KMFOID_MD2WithRSA, KMF_ALGID_MD2WithRSA},
 	{(KMF_OID *)&KMFOID_SHA1WithRSA, KMF_ALGID_SHA1WithRSA},
-	{(KMF_OID *)&KMFOID_SHA1WithDSA, KMF_ALGID_SHA1WithDSA}
+	{(KMF_OID *)&KMFOID_SHA1WithDSA, KMF_ALGID_SHA1WithDSA},
+	{(KMF_OID *)&KMFOID_SHA256WithDSA, KMF_ALGID_SHA256WithDSA},
+	{(KMF_OID *)&KMFOID_SHA1WithECDSA, KMF_ALGID_SHA1WithECDSA},
+	{(KMF_OID *)&KMFOID_SHA256WithECDSA, KMF_ALGID_SHA256WithECDSA},
+	{(KMF_OID *)&KMFOID_SHA256WithRSA, KMF_ALGID_SHA256WithRSA},
+	{(KMF_OID *)&KMFOID_SHA384WithECDSA, KMF_ALGID_SHA384WithECDSA},
+	{(KMF_OID *)&KMFOID_SHA384WithRSA, KMF_ALGID_SHA384WithRSA},
+	{(KMF_OID *)&KMFOID_SHA512WithECDSA, KMF_ALGID_SHA512WithECDSA},
+	{(KMF_OID *)&KMFOID_SHA512WithRSA, KMF_ALGID_SHA512WithRSA},
+	{(KMF_OID *)&KMFOID_EC_PUBLIC_KEY, KMF_ALGID_ECDSA}
 };
 
 #define	NUM_ALGOIDS ((sizeof (ALGOID_ID_Table))/(sizeof (ALGOID_ID_Table[0])))

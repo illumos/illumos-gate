@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file implements the token object list operation for this tool.
@@ -126,12 +124,16 @@ describeKey(KMF_KEY_HANDLE *key)
 			return (gettext("RSA public key"));
 		if (key->keyalg == KMF_DSA)
 			return (gettext("DSA public key"));
+		if (key->keyalg == KMF_ECDSA)
+			return (gettext("ECDSA public key"));
 	}
 	if (key->keyclass == KMF_ASYM_PRI) {
 		if (key->keyalg == KMF_RSA)
-			return ("RSA private key");
+			return (gettext("RSA private key"));
 		if (key->keyalg == KMF_DSA)
-			return ("DSA private key");
+			return (gettext("DSA private key"));
+		if (key->keyalg == KMF_ECDSA)
+			return (gettext("ECDSA private key"));
 	}
 	if (key->keyclass == KMF_SYMMETRIC) {
 		switch (key->keyalg) {
@@ -320,7 +322,7 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 	KMF_CREDENTIAL cred = {NULL, 0};
 
 	/*
-	 * Symmetric keys and RSA/DSA private keys are always
+	 * Symmetric keys and RSA/DSA/ECDSA private keys are always
 	 * created with the "CKA_PRIVATE" field == TRUE, so
 	 * make sure we search for them with it also set.
 	 */

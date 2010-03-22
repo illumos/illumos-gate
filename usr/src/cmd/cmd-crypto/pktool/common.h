@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _PKTOOL_COMMON_H
 #define	_PKTOOL_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains data and functions shared between all the
@@ -70,7 +68,7 @@ extern "C" {
 				PK_CERT_OBJ| PK_CRL_OBJ | PK_KEY_OBJ)
 
 #define	PK_DEFAULT_KEYTYPE	"rsa"
-#define	PK_DEFAULT_KEYLENGTH	1024
+#define	PK_DEFAULT_KEYLENGTH	2048
 #define	PK_DEFAULT_DIRECTORY	"."
 #define	PK_DEFAULT_SERIALNUM	1
 #define	PK_DEFAULT_PK11TOKEN	SOFT_TOKEN_LABEL
@@ -114,7 +112,7 @@ extern int	optind_av;
 int OT2Int(char *);
 int PK2Int(char *);
 KMF_KEYSTORE_TYPE KS2Int(char *);
-int Str2KeyType(char *, KMF_KEY_ALG *, KMF_ALGORITHM_INDEX *);
+int Str2KeyType(char *, KMF_OID *, KMF_KEY_ALG *, KMF_ALGORITHM_INDEX *);
 int Str2SymKeyType(char *, KMF_KEY_ALG *);
 int Str2Lifetime(char *, uint32_t *);
 KMF_RETURN select_token(void *, char *, int);
@@ -128,6 +126,20 @@ KMF_RETURN verify_keyusage(char *arg, uint16_t *, int *);
 KMF_RETURN verify_file(char *);
 KMF_RETURN verify_ekunames(char *, EKU_LIST **);
 KMF_RETURN token_auth_needed(KMF_HANDLE_T, char *, int *);
+KMF_OID *ecc_name_to_oid(char *);
+void show_ecc_curves();
+KMF_RETURN genkeypair_pkcs11(KMF_HANDLE_T, char *, char *, KMF_KEY_ALG,
+	int, KMF_CREDENTIAL *, KMF_OID *,
+	KMF_KEY_HANDLE *, KMF_KEY_HANDLE *);
+
+KMF_RETURN genkeypair_file(KMF_HANDLE_T,
+	KMF_KEY_ALG, int, KMF_ENCODE_FORMAT,
+	char *, KMF_KEY_HANDLE *, KMF_KEY_HANDLE *);
+
+KMF_RETURN genkeypair_nss(KMF_HANDLE_T,
+	char *, char *, char *, char *,
+	KMF_KEY_ALG, int, KMF_CREDENTIAL *,
+	KMF_OID *, KMF_KEY_HANDLE *, KMF_KEY_HANDLE *);
 
 void free_eku_list(EKU_LIST *);
 

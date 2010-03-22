@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _KMFAPIP_H
@@ -143,13 +143,6 @@ typedef struct {
 			KMF_HANDLE_T,
 			int, KMF_ATTRIBUTE *);
 
-	KMF_RETURN	(*VerifyDataWithCert) (
-			KMF_HANDLE_T,
-			KMF_ALGORITHM_INDEX,
-			KMF_DATA *,
-			KMF_DATA *,
-			KMF_DATA *);
-
 	KMF_RETURN	(*StoreKey) (
 			KMF_HANDLE_T,
 			int,
@@ -224,6 +217,10 @@ VerifyDataWithKey(KMF_HANDLE_T, KMF_DATA *, KMF_ALGORITHM_INDEX,
 extern KMF_BOOL pkcs_algid_to_keytype(
     KMF_ALGORITHM_INDEX, CK_KEY_TYPE *);
 
+extern KMF_RETURN PKCS_DigestData(KMF_HANDLE_T,
+    CK_SESSION_HANDLE, CK_MECHANISM_TYPE,
+    KMF_DATA *, KMF_DATA *, boolean_t);
+
 extern KMF_RETURN PKCS_VerifyData(
     KMF_HANDLE *,
     KMF_ALGORITHM_INDEX,
@@ -246,10 +243,6 @@ extern KMF_RETURN copy_algoid(KMF_X509_ALGORITHM_IDENTIFIER *destid,
 
 extern KMF_OID *x509_algid_to_algoid(KMF_ALGORITHM_INDEX);
 extern KMF_ALGORITHM_INDEX x509_algoid_to_algid(KMF_OID *);
-
-extern KMF_RETURN PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
-    const KMF_X509_SPKI *, CK_KEY_TYPE, CK_OBJECT_HANDLE *,
-    KMF_BOOL *);
 
 extern KMF_RETURN GetIDFromSPKI(KMF_X509_SPKI *, KMF_DATA *);
 extern KMF_RETURN kmf_select_token(KMF_HANDLE_T, char *, int);
@@ -294,6 +287,9 @@ extern KMF_RETURN test_attributes(int, KMF_ATTRIBUTE_TESTER *,
 #define	KMF_DSA_SUB_PRIME	(1)
 #define	KMF_DSA_BASE		(2)
 #define	KMF_DSA_PUBLIC_VALUE	(3)
+
+#define	KMF_ECDSA_PARAMS	(0)
+#define	KMF_ECDSA_POINT		(1)
 
 #ifndef max
 #define	max(a, b) ((a) < (b) ? (b) : (a))
@@ -341,7 +337,10 @@ typedef struct conf_entrylist {
 	struct conf_entrylist 	*next;
 } conf_entrylist_t;
 
-
+extern KMF_RETURN get_pk11_data(KMF_ALGORITHM_INDEX,
+	CK_KEY_TYPE *, CK_MECHANISM_TYPE *, CK_MECHANISM_TYPE *, boolean_t);
+extern KMF_RETURN kmf_create_pk11_session(CK_SESSION_HANDLE *,
+	CK_MECHANISM_TYPE, CK_FLAGS);
 extern KMF_RETURN get_entrylist(conf_entrylist_t **);
 extern void free_entrylist(conf_entrylist_t *);
 extern void free_entry(conf_entry_t *);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -345,10 +345,10 @@ ber_get_bigint(BerElement *ber, struct berval **bv)
 
 	(*bv)->bv_len = len;
 
-	/* If DER encoding, strip leading 0's */
+	/* If DER encoding, strip leading 0's if high-order bit is set */
 	if (ber->ber_options & KMFBER_OPT_USE_DER) {
 		char *p = (*bv)->bv_val;
-		while ((*p == 0x00) && ((*bv)->bv_len > 0)) {
+		while ((*p == 0x00) && ((*bv)->bv_len > 0) && (p[1] & 0x80)) {
 			p++;
 			(*bv)->bv_len--;
 		}

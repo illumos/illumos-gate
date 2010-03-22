@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -268,6 +268,9 @@ pk_signcsr_files(KMF_HANDLE_T handle,
 	KMF_DATA certdata = {NULL, 0};
 	int numattr, count;
 
+	(void) memset(&cakey, 0, sizeof (cakey));
+	(void) memset(&signedCert, 0, sizeof (signedCert));
+
 	rv = read_csrdata(handle, csrfile, &csrdata);
 	if (rv != KMF_OK) {
 		cryptoerror(LOG_STDERR,
@@ -370,6 +373,7 @@ pk_signcsr_pk11_nss(KMF_HANDLE_T handle,
 	boolean_t private_bool = B_TRUE;
 
 	(void) memset(&casignkey, 0, sizeof (KMF_KEY_HANDLE));
+	(void) memset(&signedCert, 0, sizeof (signedCert));
 
 	rv = read_csrdata(handle, csrfile, &csrdata);
 	if (rv != KMF_OK) {

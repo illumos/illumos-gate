@@ -369,6 +369,7 @@ sign_csr(KMF_HANDLE_T handle,
 	KMF_DATA	signed_data = {0, NULL};
 	KMF_RETURN	ret = KMF_OK;
 	KMF_ATTRIBUTE	attlist[5];
+	KMF_ALGORITHM_INDEX algid;
 	int i = 0;
 
 	if (!SignedCsr)
@@ -425,7 +426,29 @@ sign_csr(KMF_HANDLE_T handle,
 	if (ret)
 		goto cleanup;
 
-	subj_csr.signature.encrypted = signed_data;
+	algid = x509_algoid_to_algid(&algo->algorithm);
+	if (algid == KMF_ALGID_SHA1WithDSA ||
+	    algid == KMF_ALGID_SHA256WithDSA ||
+	    algid == KMF_ALGID_SHA1WithECDSA ||
+	    algid == KMF_ALGID_SHA256WithECDSA ||
+	    algid == KMF_ALGID_SHA384WithECDSA ||
+	    algid == KMF_ALGID_SHA512WithECDSA) {
+		/*
+		 * For DSA and ECDSA, we must encode the
+		 * signature correctly.
+		 */
+		KMF_DATA signature;
+
+		ret = DerEncodeDSASignature(&signed_data, &signature);
+		kmf_free_data(&signed_data);
+
+		if (ret != KMF_OK)
+			goto cleanup;
+
+		subj_csr.signature.encrypted = signature;
+	} else {
+		subj_csr.signature.encrypted = signed_data;
+	}
 
 	/* Now, re-encode the CSR with the new signature */
 	ret = DerEncodeSignedCsr(&subj_csr, SignedCsr);
@@ -573,12 +596,43 @@ kmf_verify_csr(KMF_HANDLE_T handle, int numattr,
 
 	x509alg = &csrdata->signature.algorithmIdentifier;
 	algid = x509_algoid_to_algid(&x509alg->algorithm);
+	if (algid == KMF_ALGID_SHA1WithDSA ||
+	    algid == KMF_ALGID_SHA256WithDSA) {
+		/* Decode the DSA signature before verifying it */
+		KMF_DATA signature;
+		rv = DerDecodeDSASignature(&csrdata->signature.encrypted,
+		    &signature);
+		if (rv != KMF_OK)
+			goto end;
 
-	rv = PKCS_VerifyData(handle, algid,
-	    &csrdata->csr.subjectPublicKeyInfo,
-	    &rawcsr,
-	    &csrdata->signature.encrypted);
+		rv = PKCS_VerifyData(handle, algid,
+		    &csrdata->csr.subjectPublicKeyInfo,
+		    &rawcsr, &signature);
 
+		kmf_free_data(&signature);
+	} else if (algid == KMF_ALGID_SHA1WithECDSA ||
+	    algid == KMF_ALGID_SHA256WithECDSA ||
+	    algid == KMF_ALGID_SHA384WithECDSA ||
+	    algid == KMF_ALGID_SHA512WithECDSA) {
+		KMF_DATA signature;
+		rv = DerDecodeECDSASignature(&csrdata->signature.encrypted,
+		    &signature);
+		if (rv != KMF_OK)
+			goto end;
+
+		rv = PKCS_VerifyData(handle, algid,
+		    &csrdata->csr.subjectPublicKeyInfo,
+		    &rawcsr, &signature);
+
+		kmf_free_data(&signature);
+	} else {
+		rv = PKCS_VerifyData(handle, algid,
+		    &csrdata->csr.subjectPublicKeyInfo,
+		    &rawcsr,
+		    &csrdata->signature.encrypted);
+	}
+
+end:
 	kmf_free_data(&rawcsr);
 	return (rv);
 }
@@ -841,51 +895,4 @@ kmf_is_crl_file(KMF_HANDLE_T handle, char *filename, KMF_ENCODE_FORMAT *pformat)
 	}
 
 	return (IsCRLFileFn(handle, filename, pformat));
-}
-
-/*
- * Phase 1 APIs still needed to maintain compat with elfsign.
- */
-KMF_RETURN
-KMF_CreateCSRFile(KMF_DATA *csrdata, KMF_ENCODE_FORMAT format,
-	char *csrfile)
-{
-	return (kmf_create_csr_file(csrdata, format, csrfile));
-}
-
-KMF_RETURN
-KMF_SetCSRPubKey(KMF_HANDLE_T handle,
-	KMF_KEY_HANDLE *KMFKey,
-	KMF_CSR_DATA *Csr)
-{
-	return (kmf_set_csr_pubkey(handle, KMFKey, Csr));
-}
-
-KMF_RETURN
-KMF_SetCSRVersion(KMF_CSR_DATA *CsrData, uint32_t version)
-{
-	return (kmf_set_csr_version(CsrData, version));
-}
-
-KMF_RETURN
-KMF_SetCSRSignatureAlgorithm(KMF_CSR_DATA *CsrData,
-	KMF_ALGORITHM_INDEX sigAlg)
-{
-	return (kmf_set_csr_sig_alg(CsrData, sigAlg));
-}
-
-KMF_RETURN
-KMF_SignCSR(KMF_HANDLE_T handle,
-	const KMF_CSR_DATA *tbsCsr,
-	KMF_KEY_HANDLE	*Signkey,
-	KMF_DATA	*SignedCsr)
-{
-	return (kmf_sign_csr(handle, tbsCsr, Signkey, SignedCsr));
-}
-
-KMF_RETURN
-KMF_SetCSRSubjectName(KMF_CSR_DATA *CsrData,
-	KMF_X509_NAME *subject_name_ptr)
-{
-	return (kmf_set_csr_subject(CsrData, subject_name_ptr));
 }

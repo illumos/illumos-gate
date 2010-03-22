@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@ gencert_pkcs11(KMF_HANDLE_T kmfhandle,
 	KMF_ALGORITHM_INDEX sigAlg,
 	int keylen, uint32_t ltime, KMF_BIGINT *serial,
 	uint16_t kubits, int kucrit, KMF_CREDENTIAL *tokencred,
-	EKU_LIST *ekulist)
+	EKU_LIST *ekulist, KMF_OID *curveoid)
 {
 	KMF_RETURN kmfrv = KMF_OK;
 	KMF_KEY_HANDLE pubk, prik;
@@ -90,54 +90,17 @@ gencert_pkcs11(KMF_HANDLE_T kmfhandle,
 
 	/* Select a PKCS11 token */
 	kmfrv = select_token(kmfhandle, token, FALSE);
-
 	if (kmfrv != KMF_OK) {
 		return (kmfrv);
 	}
 
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_KEYSTORE_TYPE_ATTR, &kstype,
-	    sizeof (kstype));
-	numattr++;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_KEYALG_ATTR, &keytype,
-	    sizeof (keytype));
-	numattr++;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_KEYLENGTH_ATTR, &keylength,
-	    sizeof (keylength));
-	numattr++;
-
-	if (certlabel != NULL) {
-		kmf_set_attr_at_index(attrlist, numattr,
-		    KMF_KEYLABEL_ATTR, certlabel,
-		    strlen(certlabel));
-		numattr++;
-	}
-
-	if (tokencred != NULL && tokencred->cred != NULL) {
-		kmf_set_attr_at_index(attrlist, numattr,
-		    KMF_CREDENTIAL_ATTR, tokencred,
-		    sizeof (KMF_CREDENTIAL));
-		numattr++;
-	}
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_PRIVKEY_HANDLE_ATTR, &prik,
-	    sizeof (KMF_KEY_HANDLE));
-	numattr++;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_PUBKEY_HANDLE_ATTR, &pubk,
-	    sizeof (KMF_KEY_HANDLE));
-	numattr++;
-
-	kmfrv = kmf_create_keypair(kmfhandle, numattr, attrlist);
-	if (kmfrv != KMF_OK) {
+	/*
+	 * Share the "genkeypair" routine for creating the keypair.
+	 */
+	kmfrv = genkeypair_pkcs11(kmfhandle, token, certlabel,
+	    keytype, keylength, tokencred, curveoid, &prik, &pubk);
+	if (kmfrv != KMF_OK)
 		return (kmfrv);
-	}
 
 	SET_VALUE(kmf_set_cert_pubkey(kmfhandle, &pubk, &signedCert),
 	    "keypair");
@@ -297,9 +260,6 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
 	KMF_ATTRIBUTE attrlist[10];
 	int numattr = 0;
-	KMF_KEY_ALG keytype;
-	uint32_t keylength;
-	KMF_ENCODE_FORMAT format;
 
 	(void) memset(&signedCert, 0, sizeof (signedCert));
 	(void) memset(&certSubject, 0, sizeof (certSubject));
@@ -321,16 +281,6 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 		return (PK_ERR_USAGE);
 	}
 
-	fullkeypath = strdup(outkey);
-	if (verify_file(fullkeypath)) {
-		cryptoerror(LOG_STDERR,
-		    gettext("Cannot write the indicated output "
-		    "key file (%s).\n"), fullkeypath);
-		free(fullkeypath);
-		free(fullcertpath);
-		return (PK_ERR_USAGE);
-	}
-
 	/* If the subject name cannot be parsed, flag it now and exit */
 	if (kmf_dn_parser(subject, &certSubject) != KMF_OK) {
 		cryptoerror(LOG_STDERR,
@@ -346,51 +296,13 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 		return (PK_ERR_USAGE);
 	}
 
-	keylength = keylen; /* bits */
-	keytype = keyAlg;
-	format = fmt;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_KEYSTORE_TYPE_ATTR, &kstype,
-	    sizeof (kstype));
-	numattr++;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_KEYALG_ATTR, &keytype,
-	    sizeof (keytype));
-	numattr++;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_KEYLENGTH_ATTR, &keylength,
-	    sizeof (keylength));
-	numattr++;
-
-	if (fullkeypath != NULL) {
-		kmf_set_attr_at_index(attrlist, numattr,
-		    KMF_KEY_FILENAME_ATTR, fullkeypath,
-		    strlen(fullkeypath));
-		numattr++;
-	}
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_ENCODE_FORMAT_ATTR, &format,
-	    sizeof (format));
-	numattr++;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_PRIVKEY_HANDLE_ATTR, &prik,
-	    sizeof (KMF_KEY_HANDLE));
-	numattr++;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_PUBKEY_HANDLE_ATTR, &pubk,
-	    sizeof (KMF_KEY_HANDLE));
-	numattr++;
-
-	kmfrv = kmf_create_keypair(kmfhandle, numattr, attrlist);
-	if (kmfrv != KMF_OK) {
-		goto cleanup;
-	}
+	/*
+	 * Share the "genkeypair" routine for creating the keypair.
+	 */
+	kmfrv = genkeypair_file(kmfhandle, keyAlg, keylen,
+	    fmt, outkey, &prik, &pubk);
+	if (kmfrv != KMF_OK)
+		return (kmfrv);
 
 	SET_VALUE(kmf_set_cert_pubkey(kmfhandle, &pubk, &signedCert),
 	    "keypair");
@@ -496,7 +408,7 @@ gencert_nss(KMF_HANDLE_T kmfhandle,
 	int keylen, char *trust,
 	uint32_t ltime, KMF_BIGINT *serial, uint16_t kubits,
 	int kucrit, KMF_CREDENTIAL *tokencred,
-	EKU_LIST *ekulist)
+	EKU_LIST *ekulist, KMF_OID *curveoid)
 {
 	KMF_RETURN kmfrv;
 	KMF_KEY_HANDLE pubk, prik;
@@ -507,8 +419,6 @@ gencert_nss(KMF_HANDLE_T kmfhandle,
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
 	KMF_ATTRIBUTE attrlist[16];
 	int numattr = 0;
-	KMF_KEY_ALG keytype;
-	uint32_t keylength;
 
 	if (token == NULL)
 		token = DEFAULT_NSS_TOKEN;
@@ -536,59 +446,11 @@ gencert_nss(KMF_HANDLE_T kmfhandle,
 		return (PK_ERR_USAGE);
 	}
 
-	keylength = keylen; /* bits */
-	keytype = keyAlg;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_KEYSTORE_TYPE_ATTR, &kstype,
-	    sizeof (kstype));
-	numattr++;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_KEYALG_ATTR, &keytype,
-	    sizeof (keytype));
-	numattr++;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_KEYLENGTH_ATTR, &keylength,
-	    sizeof (keylength));
-	numattr++;
-
-	if (nickname != NULL) {
-		kmf_set_attr_at_index(attrlist, numattr,
-		    KMF_KEYLABEL_ATTR, nickname,
-		    strlen(nickname));
-		numattr++;
-	}
-
-	if (tokencred != NULL && tokencred->cred != NULL) {
-		kmf_set_attr_at_index(attrlist, numattr,
-		    KMF_CREDENTIAL_ATTR, tokencred,
-		    sizeof (KMF_CREDENTIAL));
-		numattr++;
-	}
-
-	if (token != NULL) {
-		kmf_set_attr_at_index(attrlist, numattr,
-		    KMF_TOKEN_LABEL_ATTR, token,
-		    strlen(token));
-		numattr++;
-	}
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_PRIVKEY_HANDLE_ATTR, &prik,
-	    sizeof (KMF_KEY_HANDLE));
-	numattr++;
-
-	kmf_set_attr_at_index(attrlist, numattr,
-	    KMF_PUBKEY_HANDLE_ATTR, &pubk,
-	    sizeof (KMF_KEY_HANDLE));
-	numattr++;
-
-	kmfrv = kmf_create_keypair(kmfhandle, numattr, attrlist);
-	if (kmfrv != KMF_OK) {
+	kmfrv = genkeypair_nss(kmfhandle, token, nickname, dir,
+	    prefix, keyAlg, keylen, tokencred, curveoid,
+	    &prik, &pubk);
+	if (kmfrv != KMF_OK)
 		return (kmfrv);
-	}
 
 	SET_VALUE(kmf_set_cert_pubkey(kmfhandle, &pubk, &signedCert),
 	    "keypair");
@@ -716,6 +578,7 @@ pk_gencert(int argc, char *argv[])
 	char *altname = NULL;
 	char *keyusagestr = NULL;
 	char *ekustr = NULL;
+	char *hashname = NULL;
 	KMF_GENERALNAMECHOICES alttype = 0;
 	KMF_BIGINT serial = { NULL, 0 };
 	uint32_t ltime;
@@ -729,14 +592,18 @@ pk_gencert(int argc, char *argv[])
 	uint16_t kubits = 0;
 	int altcrit = 0, kucrit = 0;
 	EKU_LIST *ekulist = NULL;
+	KMF_OID *curveoid = NULL; /* ECC */
+	KMF_OID *hashoid = NULL;
+	int y_flag = 0;
 
 	while ((opt = getopt_av(argc, argv,
 	    "ik:(keystore)s:(subject)n:(nickname)A:(altname)"
 	    "T:(token)d:(dir)p:(prefix)t:(keytype)y:(keylen)"
 	    "r:(trust)L:(lifetime)l:(label)c:(outcert)e:(eku)"
-	    "K:(outkey)S:(serial)F:(format)u:(keyusage)")) != EOF) {
+	    "K:(outkey)S:(serial)F:(format)u:(keyusage)C:(curve)"
+	    "E(listcurves)h:(hash)")) != EOF) {
 
-		if (opt != 'i' && EMPTYSTRING(optarg_av))
+		if (opt != 'i' && opt != 'E' && EMPTYSTRING(optarg_av))
 			return (PK_ERR_USAGE);
 
 		switch (opt) {
@@ -796,6 +663,7 @@ pk_gencert(int argc, char *argv[])
 					    optarg_av);
 					return (PK_ERR_USAGE);
 				}
+				y_flag++;
 				break;
 			case 'r':
 				if (trust)
@@ -827,6 +695,38 @@ pk_gencert(int argc, char *argv[])
 				break;
 			case 'e':
 				ekustr = optarg_av;
+				break;
+			case 'C':
+				curveoid = ecc_name_to_oid(optarg_av);
+				if (curveoid == NULL) {
+					cryptoerror(LOG_STDERR,
+					    gettext("Unrecognized ECC "
+					    "curve.\n"));
+					return (PK_ERR_USAGE);
+				}
+				break;
+			case 'E':
+				/*
+				 * This argument is only to be used
+				 * by itself, no other options should
+				 * be present.
+				 */
+				if (argc != 2) {
+					cryptoerror(LOG_STDERR,
+					    gettext("listcurves has no other "
+					    "options.\n"));
+					return (PK_ERR_USAGE);
+				}
+				show_ecc_curves();
+				return (0);
+			case 'h':
+				hashname = optarg_av;
+				hashoid = ecc_name_to_oid(optarg_av);
+				if (hashoid == NULL) {
+					cryptoerror(LOG_STDERR,
+					    gettext("Unrecognized hash.\n"));
+					return (PK_ERR_USAGE);
+				}
 				break;
 			default:
 				return (PK_ERR_USAGE);
@@ -881,11 +781,25 @@ pk_gencert(int argc, char *argv[])
 		return (PK_ERR_USAGE);
 	}
 
-	if (Str2KeyType(keytype, &keyAlg, &sigAlg) != 0) {
-		cryptoerror(LOG_STDERR, gettext("Unrecognized keytype (%s).\n"),
-		    keytype);
+	if (Str2KeyType(keytype, hashoid, &keyAlg, &sigAlg) != 0) {
+		cryptoerror(LOG_STDERR,
+		    gettext("Unsupported key/hash combination (%s/%s).\n"),
+		    keytype, (hashname ? hashname : "none"));
 		return (PK_ERR_USAGE);
 	}
+	if (curveoid != NULL && keyAlg != KMF_ECDSA) {
+		cryptoerror(LOG_STDERR, gettext("EC curves are only "
+		    "valid for EC keytypes.\n"));
+		return (PK_ERR_USAGE);
+	}
+	if (keyAlg == KMF_ECDSA && curveoid == NULL) {
+		cryptoerror(LOG_STDERR, gettext("A curve must be "
+		    "specifed when using EC keys.\n"));
+		return (PK_ERR_USAGE);
+	}
+	/* Adjust default keylength for NSS and DSA */
+	if (keyAlg == KMF_DSA && !y_flag && kstype == KMF_KEYSTORE_NSS)
+		keylen = 1024;
 
 	/*
 	 * Check the subject name.
@@ -976,6 +890,12 @@ pk_gencert(int argc, char *argv[])
 			goto end;
 		}
 	}
+	if (keyAlg == KMF_ECDSA && kstype == KMF_KEYSTORE_OPENSSL) {
+		(void) fprintf(stderr, gettext("ECC certificates are"
+		    "only supported with the pkcs11 and nss keystores\n"));
+		rv = PK_ERR_USAGE;
+		goto end;
+	}
 
 	if (kstype == KMF_KEYSTORE_NSS || kstype == KMF_KEYSTORE_PK11TOKEN) {
 		if (tokenname == NULL || !strlen(tokenname)) {
@@ -997,13 +917,14 @@ pk_gencert(int argc, char *argv[])
 		    tokenname, subname, altname, alttype, altcrit,
 		    certlabel, dir, prefix, keyAlg, sigAlg, keylen,
 		    trust, ltime, &serial, kubits, kucrit, &tokencred,
-		    ekulist);
+		    ekulist, curveoid);
 
 	} else if (kstype == KMF_KEYSTORE_PK11TOKEN) {
 		rv = gencert_pkcs11(kmfhandle,
 		    tokenname, subname, altname, alttype, altcrit,
 		    certlabel, keyAlg, sigAlg, keylen, ltime,
-		    &serial, kubits, kucrit, &tokencred, ekulist);
+		    &serial, kubits, kucrit, &tokencred, ekulist,
+		    curveoid);
 
 	} else if (kstype == KMF_KEYSTORE_OPENSSL) {
 		rv = gencert_file(kmfhandle,

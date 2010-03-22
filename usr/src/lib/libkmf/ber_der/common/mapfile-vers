@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -43,6 +43,7 @@ SUNWprivate_1.1 {
 	CopyRDN;
 	CopySPKI;
 	DerDecodeDSASignature;
+	DerDecodeECDSASignature;
 	DerDecodeExtension;
 	DerDecodeName;
 	DerDecodeSPKI;
@@ -52,6 +53,8 @@ SUNWprivate_1.1 {
 	DerDecodeTbsCsr;
 	DerEncodeDSAPrivateKey;
 	DerEncodeDSASignature;
+	DerEncodeECDSASignature;
+	DerEncodeECPrivateKey;
 	DerEncodeName;
 	DerEncodeRSAPrivateKey;
 	DerEncodeSPKI;
@@ -61,7 +64,6 @@ SUNWprivate_1.1 {
 	DerEncodeTbsCsr;
 	ExtractSPKIData;
 	ExtractX509CertParts;
-	GetKeyFromSpki;
 	kmfber_alloc;
 	kmfber_bvfree;
 	kmfber_first_element;

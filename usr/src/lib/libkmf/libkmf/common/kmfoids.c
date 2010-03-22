@@ -1,12 +1,10 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
  * Copyright(c) 1995-2000 Intel Corporation. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <kmfapi.h>
 
@@ -363,6 +361,9 @@ OID_RSAEncryption[] = { OID_PKCS_1, 1 },
 OID_MD2WithRSA[]   = { OID_PKCS_1, 2 },
 OID_MD5WithRSA[]   = { OID_PKCS_1, 4 },
 OID_SHA1WithRSA[]  = { OID_PKCS_1, 5 },
+OID_SHA256WithRSA[]  = { OID_PKCS_1, 11 },
+OID_SHA384WithRSA[]  = { OID_PKCS_1, 12 },
+OID_SHA512WithRSA[]  = { OID_PKCS_1, 13 },
 OID_X9CM_DSA[] = { OID_X9CM_X9ALGORITHM, 1 },
 OID_X9CM_DSAWithSHA1[] = { OID_X9CM_X9ALGORITHM, 3};
 
@@ -373,9 +374,10 @@ KMFOID_DSA = {OID_OIW_ALGORITHM_LENGTH+1, OID_OIW_DSA},
 KMFOID_MD5WithRSA = {OID_PKCS_1_LENGTH+1, OID_MD5WithRSA},
 KMFOID_MD2WithRSA = {OID_PKCS_1_LENGTH+1, OID_MD2WithRSA},
 KMFOID_SHA1WithRSA = {OID_PKCS_1_LENGTH+1, OID_SHA1WithRSA},
-KMFOID_SHA1WithDSA = {OID_OIW_ALGORITHM_LENGTH+1, OID_OIW_DSAWithSHA1},
-KMFOID_OIW_DSAWithSHA1  = {OID_OIW_ALGORITHM_LENGTH+1,
-	OID_OIW_DSAWithSHA1},
+KMFOID_SHA256WithRSA = {OID_PKCS_1_LENGTH+1, OID_SHA256WithRSA},
+KMFOID_SHA384WithRSA = {OID_PKCS_1_LENGTH+1, OID_SHA384WithRSA},
+KMFOID_SHA512WithRSA = {OID_PKCS_1_LENGTH+1, OID_SHA512WithRSA},
+KMFOID_SHA1WithDSA  = {OID_OIW_ALGORITHM_LENGTH+1, OID_OIW_DSAWithSHA1},
 KMFOID_X9CM_DSA = {OID_X9CM_X9ALGORITHM_LENGTH+1, OID_X9CM_DSA},
 KMFOID_X9CM_DSAWithSHA1 = {OID_X9CM_X9ALGORITHM_LENGTH+1,
 		OID_X9CM_DSAWithSHA1};
@@ -400,3 +402,179 @@ KMFOID_MS_KP_SCLogon = {OID_MS_KP_SC_LOGON_LENGTH,
     OID_pkinit_kp_sc_logon},
 KMFOID_MS_KP_SCLogon_UPN = {OID_MS_KP_SC_LOGON_UPN_LENGTH,
     OID_pkinit_san_upn};
+
+/*
+ * MD5
+ * iso(1) member-body(2) us(840) rsadsi(113549)
+ * digestAlgorithm(2) 5
+ */
+#define	RSADSI 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d
+#define	OID_id_md5	RSADSI, 0x02, 0x05
+
+/*
+ * SHA2 OIDs
+ */
+#define	NIST_ALG 96, 134, 72, 1, 101, 3, 4
+#define	NIST_HASH NIST_ALG, 2
+#define	OID_id_sha256 NIST_HASH, 1
+#define	OID_id_sha384 NIST_HASH, 2
+#define	OID_id_sha512 NIST_HASH, 3
+#define	OID_id_sha224 NIST_HASH, 4
+
+#define	OID_id_dsa_with_sha224	NIST_ALG, 3, 1
+#define	OID_id_dsa_with_sha256	NIST_ALG, 3, 2
+
+/*
+ * For ECC support.
+ */
+#define	CERTICOM_OID	0x2b, 0x81, 0x04
+#define	SECG_OID	CERTICOM_OID, 0x00
+
+#define	ANSI_X962_OID		0x2a, 0x86, 0x48, 0xce, 0x3d
+#define	ANSI_X962_CURVE_OID	ANSI_X962_OID, 0x03
+#define	ANSI_X962_GF2m_OID	ANSI_X962_CURVE_OID, 0x00
+#define	ANSI_X962_GFp_OID	ANSI_X962_CURVE_OID, 0x01
+
+#define	ANSI_X962_SIG_OID	ANSI_X962_OID, 0x04
+#define	OID_ecdsa_with_sha224	ANSI_X962_SIG_OID, 3, 1
+#define	OID_ecdsa_with_sha256	ANSI_X962_SIG_OID, 3, 2
+#define	OID_ecdsa_with_sha384	ANSI_X962_SIG_OID, 3, 3
+#define	OID_ecdsa_with_sha512	ANSI_X962_SIG_OID, 3, 4
+
+static uint8_t
+OID_secp112r1[] = { 0x6, 0x5, SECG_OID, 0x06 },
+OID_secp112r2[] = { 0x6, 0x5, SECG_OID, 0x07 },
+OID_secp128r1[] = { 0x6, 0x5, SECG_OID, 0x1c },
+OID_secp128r2[] = { 0x6, 0x5, SECG_OID, 0x1d },
+OID_secp160k1[] = { 0x6, 0x5, SECG_OID, 0x09 },
+OID_secp160r1[] = { 0x6, 0x5, SECG_OID, 0x08 },
+OID_secp160r2[] = { 0x6, 0x5, SECG_OID, 0x1e },
+OID_secp192k1[] = { 0x6, 0x5, SECG_OID, 0x1f },
+OID_secp224k1[] = { 0x6, 0x5, SECG_OID, 0x20 },
+OID_secp224r1[] = { 0x6, 0x5, SECG_OID, 0x21 },
+OID_secp256k1[] = { 0x6, 0x5, SECG_OID, 0x0a },
+OID_secp384r1[] = { 0x6, 0x5, SECG_OID, 0x22 },
+OID_secp521r1[] = { 0x6, 0x5, SECG_OID, 0x23 },
+OID_sect113r1[] = { 0x6, 0x5, SECG_OID, 0x04 },
+OID_sect113r2[] = { 0x6, 0x5, SECG_OID, 0x05 },
+OID_sect131r1[] = { 0x6, 0x5, SECG_OID, 0x16 },
+OID_sect131r2[] = { 0x6, 0x5, SECG_OID, 0x17 },
+OID_sect163k1[] = { 0x6, 0x5, SECG_OID, 0x01 },
+OID_sect163r1[] = { 0x6, 0x5, SECG_OID, 0x02 },
+OID_sect163r2[] = { 0x6, 0x5, SECG_OID, 0x0f },
+OID_sect193r1[] = { 0x6, 0x5, SECG_OID, 0x18 },
+OID_sect193r2[] = { 0x6, 0x5, SECG_OID, 0x19 },
+OID_sect233k1[] = { 0x6, 0x5, SECG_OID, 0x1a },
+OID_sect233r1[] = { 0x6, 0x5, SECG_OID, 0x1b },
+OID_sect239k1[] = { 0x6, 0x5, SECG_OID, 0x03 },
+OID_sect283k1[] = { 0x6, 0x5, SECG_OID, 0x10 },
+OID_sect283r1[] = { 0x6, 0x5, SECG_OID, 0x11 },
+OID_sect409k1[] = { 0x6, 0x5, SECG_OID, 0x24 },
+OID_sect409r1[] = { 0x6, 0x5, SECG_OID, 0x25 },
+OID_sect571k1[] = { 0x6, 0x5, SECG_OID, 0x26 },
+OID_sect571r1[] = { 0x6, 0x5, SECG_OID, 0x27 },
+OID_c2pnb163v1[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x01 },
+OID_c2pnb163v2[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x02 },
+OID_c2pnb163v3[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x03 },
+OID_c2pnb176v1[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x04 },
+OID_c2tnb191v1[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x05 },
+OID_c2tnb191v2[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x06 },
+OID_c2tnb191v3[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x07 },
+OID_c2pnb208w1[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x0a },
+OID_c2tnb239v1[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x0b },
+OID_c2tnb239v2[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x0c },
+OID_c2tnb239v3[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x0d },
+OID_c2pnb272w1[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x10 },
+OID_c2pnb304w1[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x11 },
+OID_c2tnb359v1[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x12 },
+OID_c2pnb368w1[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x13 },
+OID_c2tnb431r1[] = { 0x6, 0x8, ANSI_X962_GF2m_OID, 0x14 },
+
+OID_prime192v2[] = { 0x6, 0x8, ANSI_X962_GFp_OID, 0x02 },
+OID_prime192v3[] = { 0x6, 0x8, ANSI_X962_GFp_OID, 0x03 },
+
+OID_secp192r1[] = { 0x6, 0x8, ANSI_X962_GFp_OID, 0x01 },
+OID_secp256r1[] = { 0x6, 0x8, ANSI_X962_GFp_OID, 0x07 };
+
+const KMF_OID
+KMFOID_ECC_secp112r1 = {sizeof (OID_secp112r1), OID_secp112r1},
+KMFOID_ECC_secp112r2 = {sizeof (OID_secp112r2), OID_secp112r2},
+KMFOID_ECC_secp128r1 = {sizeof (OID_secp128r1), OID_secp128r1},
+KMFOID_ECC_secp128r2 = {sizeof (OID_secp128r2), OID_secp128r2},
+KMFOID_ECC_secp160k1 = {sizeof (OID_secp160k1), OID_secp160k1},
+KMFOID_ECC_secp160r1 = {sizeof (OID_secp160r1), OID_secp160r1},
+KMFOID_ECC_secp160r2 = {sizeof (OID_secp160r2), OID_secp160r2},
+KMFOID_ECC_secp192k1 = {sizeof (OID_secp192k1), OID_secp192k1},
+KMFOID_ECC_secp224k1 = {sizeof (OID_secp224k1), OID_secp224k1},
+KMFOID_ECC_secp224r1 = {sizeof (OID_secp224r1), OID_secp224r1},
+KMFOID_ECC_secp256k1 = {sizeof (OID_secp256k1), OID_secp256k1},
+KMFOID_ECC_secp384r1 = {sizeof (OID_secp384r1), OID_secp384r1},
+KMFOID_ECC_secp521r1 = {sizeof (OID_secp521r1), OID_secp521r1},
+KMFOID_ECC_sect113r1 = {sizeof (OID_sect113r1), OID_sect113r1},
+KMFOID_ECC_sect113r2 = {sizeof (OID_sect113r2), OID_sect113r2},
+KMFOID_ECC_sect131r1 = {sizeof (OID_sect131r1), OID_sect131r1},
+KMFOID_ECC_sect131r2 = {sizeof (OID_sect131r2), OID_sect131r2},
+KMFOID_ECC_sect163k1 = {sizeof (OID_sect163k1), OID_sect163k1},
+KMFOID_ECC_sect163r1 = {sizeof (OID_sect163r1), OID_sect163r1},
+KMFOID_ECC_sect163r2 = {sizeof (OID_sect163r2), OID_sect163r2},
+KMFOID_ECC_sect193r1 = {sizeof (OID_sect193r1), OID_sect193r1},
+KMFOID_ECC_sect193r2 = {sizeof (OID_sect193r2), OID_sect193r2},
+KMFOID_ECC_sect233k1 = {sizeof (OID_sect233k1), OID_sect233k1},
+KMFOID_ECC_sect233r1 = {sizeof (OID_sect233r1), OID_sect233r1},
+KMFOID_ECC_sect239k1 = {sizeof (OID_sect239k1), OID_sect239k1},
+KMFOID_ECC_sect283k1 = {sizeof (OID_sect283k1), OID_sect283k1},
+KMFOID_ECC_sect283r1 = {sizeof (OID_sect283r1), OID_sect283r1},
+KMFOID_ECC_sect409k1 = {sizeof (OID_sect409k1), OID_sect409k1},
+KMFOID_ECC_sect409r1 = {sizeof (OID_sect409r1), OID_sect409r1},
+KMFOID_ECC_sect571k1 = {sizeof (OID_sect571k1), OID_sect571k1},
+KMFOID_ECC_sect571r1 = {sizeof (OID_sect571r1), OID_sect571r1},
+KMFOID_ECC_c2pnb163v1 = {sizeof (OID_c2pnb163v1), OID_c2pnb163v1},
+KMFOID_ECC_c2pnb163v2 = {sizeof (OID_c2pnb163v2), OID_c2pnb163v2},
+KMFOID_ECC_c2pnb163v3 = {sizeof (OID_c2pnb163v3), OID_c2pnb163v3},
+KMFOID_ECC_c2pnb176v1 = {sizeof (OID_c2pnb176v1), OID_c2pnb176v1},
+KMFOID_ECC_c2tnb191v1 = {sizeof (OID_c2tnb191v1), OID_c2tnb191v1},
+KMFOID_ECC_c2tnb191v2 = {sizeof (OID_c2tnb191v2), OID_c2tnb191v2},
+KMFOID_ECC_c2tnb191v3 = {sizeof (OID_c2tnb191v3), OID_c2tnb191v3},
+KMFOID_ECC_c2pnb208w1 = {sizeof (OID_c2pnb208w1), OID_c2pnb208w1},
+KMFOID_ECC_c2tnb239v1 = {sizeof (OID_c2tnb239v1), OID_c2tnb239v1},
+KMFOID_ECC_c2tnb239v2 = {sizeof (OID_c2tnb239v2), OID_c2tnb239v2},
+KMFOID_ECC_c2tnb239v3 = {sizeof (OID_c2tnb239v3), OID_c2tnb239v3},
+KMFOID_ECC_c2pnb272w1 = {sizeof (OID_c2pnb272w1), OID_c2pnb272w1},
+KMFOID_ECC_c2pnb304w1 = {sizeof (OID_c2pnb304w1), OID_c2pnb304w1},
+KMFOID_ECC_c2tnb359v1 = {sizeof (OID_c2tnb359v1), OID_c2tnb359v1},
+KMFOID_ECC_c2pnb368w1 = {sizeof (OID_c2pnb368w1), OID_c2pnb368w1},
+KMFOID_ECC_c2tnb431r1 = {sizeof (OID_c2tnb431r1), OID_c2tnb431r1},
+KMFOID_ECC_prime192v2 = {sizeof (OID_prime192v2), OID_prime192v2},
+KMFOID_ECC_prime192v3 = {sizeof (OID_prime192v3), OID_prime192v3},
+KMFOID_ECC_secp192r1 = {sizeof (OID_secp192r1), OID_secp192r1},
+KMFOID_ECC_secp256r1 = {sizeof (OID_secp256r1), OID_secp256r1};
+
+static uint8_t
+OID_EC_PUBLIC_KEY[] = {ANSI_X962_OID, 0x02, 0x01},
+OID_ECDSA_SHA1[] = {ANSI_X962_OID, 0x04, 0x01},
+OID_ECDSA_SHA224[] = {ANSI_X962_OID, 0x04, 0x03, 0x01},
+OID_ECDSA_SHA256[] = {ANSI_X962_OID, 0x04, 0x03, 0x02},
+OID_ECDSA_SHA384[] = {ANSI_X962_OID, 0x04, 0x03, 0x03},
+OID_ECDSA_SHA512[] = {ANSI_X962_OID, 0x04, 0x03, 0x04},
+OID_DSA_SHA224[] = {OID_id_dsa_with_sha224},
+OID_DSA_SHA256[] = {OID_id_dsa_with_sha256},
+OID_SHA224[] = {OID_id_sha224},
+OID_SHA256[] = {OID_id_sha256},
+OID_SHA384[] = {OID_id_sha384},
+OID_SHA512[] = {OID_id_sha512},
+OID_MD5[] = {OID_id_md5};
+
+const KMF_OID
+KMFOID_EC_PUBLIC_KEY = { sizeof (OID_EC_PUBLIC_KEY), OID_EC_PUBLIC_KEY},
+KMFOID_SHA1WithECDSA = { sizeof (OID_ECDSA_SHA1), OID_ECDSA_SHA1},
+KMFOID_SHA224WithECDSA = { sizeof (OID_ECDSA_SHA224), OID_ECDSA_SHA224},
+KMFOID_SHA256WithECDSA = { sizeof (OID_ECDSA_SHA256), OID_ECDSA_SHA256},
+KMFOID_SHA384WithECDSA = { sizeof (OID_ECDSA_SHA384), OID_ECDSA_SHA384},
+KMFOID_SHA512WithECDSA = { sizeof (OID_ECDSA_SHA512), OID_ECDSA_SHA512},
+KMFOID_SHA224WithDSA = { sizeof (OID_DSA_SHA224), OID_DSA_SHA224},
+KMFOID_SHA256WithDSA = { sizeof (OID_DSA_SHA256), OID_DSA_SHA256},
+KMFOID_SHA224 = { sizeof (OID_SHA224), OID_SHA224},
+KMFOID_SHA256 = { sizeof (OID_SHA256), OID_SHA256},
+KMFOID_SHA384 = { sizeof (OID_SHA384), OID_SHA384},
+KMFOID_SHA512 = { sizeof (OID_SHA512), OID_SHA512},
+KMFOID_MD5 = { sizeof (OID_MD5), OID_MD5};
