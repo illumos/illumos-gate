@@ -105,7 +105,9 @@ struct brand_ops lx_brops = {
 	lx_freelwp,
 	lx_exitlwp,
 	lx_elfexec,
-	NSIG
+	NULL,
+	NULL,
+	NSIG,
 };
 
 struct brand_mach_ops lx_mops = {

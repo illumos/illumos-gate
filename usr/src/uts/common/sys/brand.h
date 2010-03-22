@@ -96,6 +96,8 @@ struct brand_ops {
 	    struct uarg *args, struct intpdata *idata, int level,
 	    long *execsz, int setid, caddr_t exec_file,
 	    struct cred *cred, int brand_action);
+	void	(*b_sigset_native_to_brand)(sigset_t *);
+	void	(*b_sigset_brand_to_native)(sigset_t *);
 	int	b_nsig;
 };
 
@@ -121,6 +123,14 @@ extern brand_t native_brand;
 #define	BROP(p)			((p)->p_brand->b_ops)
 #define	ZBROP(z)		((z)->zone_brand->b_ops)
 #define	BRMOP(p)		((p)->p_brand->b_machops)
+#define	SIGSET_NATIVE_TO_BRAND(sigset)				\
+	if (PROC_IS_BRANDED(curproc) &&				\
+	    BROP(curproc)->b_sigset_native_to_brand)		\
+		BROP(curproc)->b_sigset_native_to_brand(sigset)
+#define	SIGSET_BRAND_TO_NATIVE(sigset)				\
+	if (PROC_IS_BRANDED(curproc) &&				\
+	    BROP(curproc)->b_sigset_brand_to_native)		\
+		BROP(curproc)->b_sigset_brand_to_native(sigset)
 
 extern void	brand_init();
 extern int	brand_register(brand_t *);

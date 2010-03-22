@@ -37,6 +37,7 @@
 #include <sys/privregs.h>
 #include <sys/frame.h>
 #include <sys/proc.h>
+#include <sys/brand.h>
 #include <sys/psw.h>
 #include <sys/ucontext.h>
 #include <sys/asm_linkage.h>
@@ -199,6 +200,8 @@ getsetcontext(int flag, void *arg)
 	case GETCONTEXT:
 		schedctl_finish_sigblock(curthread);
 		savecontext(&uc, &curthread->t_hold);
+		if (uc.uc_flags & UC_SIGMASK)
+			SIGSET_NATIVE_TO_BRAND(&uc.uc_sigmask);
 		if (copyout(&uc, arg, sizeof (uc)))
 			return (set_errno(EFAULT));
 		return (0);
@@ -216,6 +219,8 @@ getsetcontext(int flag, void *arg)
 		    sizeof (uc.uc_mcontext.fpregs))) {
 			return (set_errno(EFAULT));
 		}
+		if (uc.uc_flags & UC_SIGMASK)
+			SIGSET_BRAND_TO_NATIVE(&uc.uc_sigmask);
 
 		if ((uc.uc_flags & UC_FPU) &&
 		    copyin(&ucp->uc_mcontext.fpregs, &uc.uc_mcontext.fpregs,
@@ -326,6 +331,8 @@ getsetcontext32(int flag, void *arg)
 	case GETCONTEXT:
 		schedctl_finish_sigblock(curthread);
 		savecontext32(&uc, &curthread->t_hold);
+		if (uc.uc_flags & UC_SIGMASK)
+			SIGSET_NATIVE_TO_BRAND(&uc.uc_sigmask);
 		if (copyout(&uc, arg, sizeof (uc)))
 			return (set_errno(EFAULT));
 		return (0);
@@ -339,6 +346,8 @@ getsetcontext32(int flag, void *arg)
 		    sizeof (uc.uc_mcontext.fpregs))) {
 			return (set_errno(EFAULT));
 		}
+		if (uc.uc_flags & UC_SIGMASK)
+			SIGSET_BRAND_TO_NATIVE(&uc.uc_sigmask);
 		if ((uc.uc_flags & UC_FPU) &&
 		    copyin(&ucp->uc_mcontext.fpregs, &uc.uc_mcontext.fpregs,
 		    sizeof (uc.uc_mcontext.fpregs))) {

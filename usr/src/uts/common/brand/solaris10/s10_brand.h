@@ -58,8 +58,11 @@ extern "C" {
 #endif /* !_LP64 */
 
 /*
- * Solaris 10 value of NSIG
+ * Solaris 10 value of _SIGRTMIN, _SIGRTMAX, MAXSIG, NSIG
  */
+#define	S10_SIGRTMIN	41
+#define	S10_SIGRTMAX	48
+#define	S10_MAXSIG	48
 #define	S10_NSIG	49
 
 /*

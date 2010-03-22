@@ -61,6 +61,8 @@ void	s10_freelwp(klwp_t *);
 void	s10_lwpexit(klwp_t *);
 int	s10_elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
 	long *, int, caddr_t, cred_t *, int);
+void	s10_sigset_native_to_s10(sigset_t *);
+void	s10_sigset_s10_to_native(sigset_t *);
 
 /* s10 brand */
 struct brand_ops s10_brops = {
@@ -79,7 +81,9 @@ struct brand_ops s10_brops = {
 	s10_freelwp,
 	s10_lwpexit,
 	s10_elfexec,
-	S10_NSIG
+	s10_sigset_native_to_s10,
+	s10_sigset_s10_to_native,
+	S10_NSIG,
 };
 
 #ifdef	sparc
@@ -937,6 +941,77 @@ s10_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	return (0);
 }
 
+void
+s10_sigset_native_to_s10(sigset_t *set)
+{
+	int nativesig;
+	int s10sig;
+	sigset_t s10set;
+
+	/*
+	 * Shortcut: we know the first 32 signals are the same in both
+	 * s10 and native Solaris.  Just assign the first word.
+	 */
+	s10set.__sigbits[0] = set->__sigbits[0];
+	s10set.__sigbits[1] = 0;
+	s10set.__sigbits[2] = 0;
+	s10set.__sigbits[3] = 0;
+
+	/*
+	 * Copy the remainder of the initial set of common signals.
+	 */
+	for (nativesig = 33; nativesig < S10_SIGRTMIN; nativesig++)
+		if (sigismember(set, nativesig))
+			sigaddset(&s10set, nativesig);
+
+	/*
+	 * Convert any native RT signals to their S10 values.
+	 */
+	for (nativesig = _SIGRTMIN, s10sig = S10_SIGRTMIN;
+	    nativesig <= _SIGRTMAX && s10sig <= S10_SIGRTMAX;
+	    nativesig++, s10sig++) {
+		if (sigismember(set, nativesig))
+			sigaddset(&s10set, s10sig);
+	}
+
+	*set = s10set;
+}
+
+void
+s10_sigset_s10_to_native(sigset_t *set)
+{
+	int s10sig;
+	int nativesig;
+	sigset_t nativeset;
+
+	/*
+	 * Shortcut: we know the first 32 signals are the same in both
+	 * s10 and native Solaris.  Just assign the first word.
+	 */
+	nativeset.__sigbits[0] = set->__sigbits[0];
+	nativeset.__sigbits[1] = 0;
+	nativeset.__sigbits[2] = 0;
+	nativeset.__sigbits[3] = 0;
+
+	/*
+	 * Copy the remainder of the initial set of common signals.
+	 */
+	for (s10sig = 33; s10sig < S10_SIGRTMIN; s10sig++)
+		if (sigismember(set, s10sig))
+			sigaddset(&nativeset, s10sig);
+
+	/*
+	 * Convert any S10 RT signals to their native values.
+	 */
+	for (s10sig = S10_SIGRTMIN, nativesig = _SIGRTMIN;
+	    s10sig <= S10_SIGRTMAX && nativesig <= _SIGRTMAX;
+	    s10sig++, nativesig++) {
+		if (sigismember(set, s10sig))
+			sigaddset(&nativeset, nativesig);
+	}
+
+	*set = nativeset;
+}
 
 int
 _init(void)
@@ -978,7 +1053,6 @@ _init(void)
 	s10_emulation_table[SYS_sigsuspend] = 1;		/*  96 */
 	s10_emulation_table[SYS_sigaction] = 1;			/*  98 */
 	s10_emulation_table[SYS_sigpending] = 1;		/*  99 */
-	s10_emulation_table[SYS_context] = 1;			/* 100 */
 	s10_emulation_table[SYS_waitid] = 1;			/* 107 */
 	s10_emulation_table[SYS_sigsendsys] = 1;		/* 108 */
 #if defined(__x86)

@@ -76,7 +76,9 @@ struct brand_ops sn1_brops = {
 	sn1_freelwp,
 	sn1_lwpexit,
 	sn1_elfexec,
-	NSIG
+	NULL,
+	NULL,
+	NSIG,
 };
 
 #ifdef	sparc

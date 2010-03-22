@@ -56,6 +56,14 @@ s10_sighandler_t s10_handlers[S10_NSIG - 1];
  * refer to a potentially different range and to intercenpt any "illegal"
  * signals that might otherwise be sent to an S10 process.
  *
+ * Important exception:
+ * We cannot interpose on the SYS_context system call in order to deal with the
+ * sigset_t contained within the ucontext_t structure because the getcontext()
+ * part of this system call trap would then return an incorrect set of machine
+ * registers.  See the getcontext() functions in libc to get the gory details.
+ * The kernel code for getcontext() and setcontext() has been made brand-aware
+ * in order to deal with this.
+ *
  * Simple translation is all that is required to handle most system calls,
  * but signal handlers also must be interposed upon so that a user signal
  * handler sees proper signal numbers in its arguments, any passed siginfo_t
@@ -64,14 +72,16 @@ s10_sighandler_t s10_handlers[S10_NSIG - 1];
  * libc adds its own signal handler to handled signals such that the
  * signal delivery mechanism looks like:
  *
- *    signal -> libc sigacthandler() -> user signal handler
+ * signal ->
+ *     libc sigacthandler() ->
+ *         user signal handler()
  *
  * With interposition, this will instead look like:
  *
  * signal ->
- *   s10_sigacthandler() ->
- *     libc sigacthandler() ->
- *       user signal handler()
+ *     s10_sigacthandler() ->
+ *         libc sigacthandler() ->
+ *             user signal handler()
  */
 
 /*
@@ -518,39 +528,6 @@ s10_sigpending(sysret_t *rval, int flag, sigset_t *set)
 
 	if ((err = nativesigset_to_s10(&sigset_set, set)) != 0)
 		return (err);
-
-	return (0);
-}
-
-/*
- * Interposition upon SYS_context
- */
-int
-s10_context(sysret_t *rval, int flag, ucontext_t *ucp)
-{
-	ucontext_t uc;
-	int err;
-
-	if (flag == SETCONTEXT) {
-		if (s10_uucopy(ucp, &uc, sizeof (ucontext_t)) != 0)
-			return (EFAULT);
-		if (uc.uc_flags & UC_SIGMASK) {
-			if ((err = s10sigset_to_native(&uc.uc_sigmask,
-			    &uc.uc_sigmask)) != 0) {
-				(void) S10_TRUSS_POINT_2(rval, SYS_context, err,
-				    flag, ucp);
-				return (err);
-			}
-		}
-		ucp = &uc;
-	}
-
-	err = __systemcall(rval, SYS_context + 1024, flag, ucp);
-	if (err != 0)
-		return (err);
-
-	if (flag == GETCONTEXT && (ucp->uc_flags & UC_SIGMASK))
-		(void) nativesigset_to_s10(&ucp->uc_sigmask, &ucp->uc_sigmask);
 
 	return (0);
 }

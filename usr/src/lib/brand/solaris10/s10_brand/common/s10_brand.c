@@ -2105,7 +2105,7 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/*  97 */
 	EMULATE(s10_sigaction, 3 | RV_DEFAULT),	/*  98 */
 	EMULATE(s10_sigpending, 2 | RV_DEFAULT), /*  99 */
-	EMULATE(s10_context, 2 | RV_DEFAULT),	/* 100 */
+	NOSYS,					/* 100 */
 	NOSYS,					/* 101 */
 	NOSYS,					/* 102 */
 	NOSYS,					/* 103 */

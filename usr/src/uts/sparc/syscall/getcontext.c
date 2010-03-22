@@ -35,6 +35,7 @@
 #include <sys/stack.h>
 #include <sys/frame.h>
 #include <sys/proc.h>
+#include <sys/brand.h>
 #include <sys/ucontext.h>
 #include <sys/asm_linkage.h>
 #include <sys/kmem.h>
@@ -200,6 +201,8 @@ getsetcontext(int flag, void *arg)
 	case GETCONTEXT:
 		schedctl_finish_sigblock(curthread);
 		savecontext(&uc, &curthread->t_hold);
+		if (uc.uc_flags & UC_SIGMASK)
+			SIGSET_NATIVE_TO_BRAND(&uc.uc_sigmask);
 		/*
 		 * When using floating point it should not be possible to
 		 * get here with a fpu_qcnt other than zero since we go
@@ -233,6 +236,8 @@ getsetcontext(int flag, void *arg)
 		    sizeof (uc.uc_mcontext.filler))) {
 			return (set_errno(EFAULT));
 		}
+		if (uc.uc_flags & UC_SIGMASK)
+			SIGSET_BRAND_TO_NATIVE(&uc.uc_sigmask);
 		if (copyin(&ucp->uc_mcontext.xrs, &uc.uc_mcontext.xrs,
 		    sizeof (uc.uc_mcontext.xrs))) {
 			return (set_errno(EFAULT));
@@ -446,6 +451,8 @@ getsetcontext32(int flag, void *arg)
 	case GETCONTEXT:
 		schedctl_finish_sigblock(curthread);
 		savecontext32(&uc, &curthread->t_hold, NULL);
+		if (uc.uc_flags & UC_SIGMASK)
+			SIGSET_NATIVE_TO_BRAND(&uc.uc_sigmask);
 		/*
 		 * When using floating point it should not be possible to
 		 * get here with a fpu_qcnt other than zero since we go
@@ -477,6 +484,8 @@ getsetcontext32(int flag, void *arg)
 		    sizeof (uc.uc_mcontext.filler))) {
 			return (set_errno(EFAULT));
 		}
+		if (uc.uc_flags & UC_SIGMASK)
+			SIGSET_BRAND_TO_NATIVE(&uc.uc_sigmask);
 		if (copyin(&ucp->uc_mcontext.xrs, &uc.uc_mcontext.xrs,
 		    sizeof (uc.uc_mcontext.xrs))) {
 			return (set_errno(EFAULT));

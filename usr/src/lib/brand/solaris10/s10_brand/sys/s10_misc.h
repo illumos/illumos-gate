@@ -233,7 +233,6 @@ extern int s10_umount();
  */
 extern int s10sigset_to_native(const sigset_t *, sigset_t *);
 
-extern int s10_context();
 extern int s10_kill();
 extern int s10_lwp_create();
 extern int s10_lwp_kill();
