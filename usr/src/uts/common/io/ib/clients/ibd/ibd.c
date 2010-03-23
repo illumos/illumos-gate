@@ -2086,9 +2086,27 @@ update_link_state:
 	}
 
 	/*
-	 * If the old state is the same as the new state, nothing to do
+	 * If we're reporting a link up, check InitTypeReply to see if
+	 * the SM has ensured that the port's presence in mcg, traps,
+	 * etc. is intact.
 	 */
-	if (state->id_link_state == new_link_state) {
+	if (new_link_state == LINK_STATE_DOWN) {
+		opcode = IBD_LINK_DOWN;
+	} else {
+		if ((itreply & SM_INIT_TYPE_PRESERVE_PRESENCE_REPLY) ==
+		    SM_INIT_TYPE_PRESERVE_PRESENCE_REPLY) {
+			opcode = IBD_LINK_UP;
+		} else {
+			opcode = IBD_LINK_UP_ABSENT;
+		}
+	}
+
+	/*
+	 * If the old state is the same as the new state, and the SM indicated
+	 * no change in the port parameters, nothing to do.
+	 */
+	if ((state->id_link_state == new_link_state) && (opcode !=
+	    IBD_LINK_UP_ABSENT)) {
 		mutex_exit(&state->id_link_mutex);
 		goto link_mod_return;
 	}
@@ -2104,22 +2122,6 @@ update_link_state:
 	}
 
 	mutex_exit(&state->id_link_mutex);
-
-	/*
-	 * If we're reporting a link up, check InitTypeReply to see if
-	 * the SM has ensured that the port's presence in mcg, traps,
-	 * etc. is intact.
-	 */
-	if (new_link_state == LINK_STATE_DOWN) {
-		opcode = IBD_LINK_DOWN;
-	} else {
-		if ((itreply & SM_INIT_TYPE_PRESERVE_PRESENCE_REPLY) ==
-		    SM_INIT_TYPE_PRESERVE_PRESENCE_REPLY) {
-			opcode = IBD_LINK_UP;
-		} else {
-			opcode = IBD_LINK_UP_ABSENT;
-		}
-	}
 
 	/*
 	 * Queue up a request for ibd_async_link() to handle this link
@@ -3036,6 +3038,9 @@ ibd_reacquire_group(ibd_state_t *state, ibd_mce_t *mce)
 	DPRINT(2, "ibd_reacquire_group : %016llx:%016llx\n", mgid.gid_prefix,
 	    mgid.gid_guid);
 
+	/* While reacquiring, leave and then join the MCG */
+	(void) ibt_leave_mcg(state->id_sgid, mgid, state->id_sgid,
+	    mce->mc_jstate);
 	if (ibd_iba_join(state, mgid, mce) != IBT_SUCCESS)
 		ibd_print_warn(state, "Failure on port up to rejoin "
 		    "multicast gid %016llx:%016llx",
