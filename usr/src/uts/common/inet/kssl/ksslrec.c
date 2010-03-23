@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -453,6 +453,11 @@ kssl_compute_handshake_hashes(
  */
 #define	KSSL_SSL3_CH_MIN_MSGLEN	(39)
 
+/*
+ * Process SSL/TLS Client Hello message. Return 0 on success, errno value
+ * or SSL_MISS if no cipher suite of the server matches the list received
+ * in the message.
+ */
 static int
 kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 {
@@ -471,6 +476,8 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 	ASSERT(ssl->resumed == B_FALSE);
 
 	if (msglen < ch_msglen) {
+		DTRACE_PROBE2(kssl_err__msglen_less_than_minimum,
+		    int, msglen, int, ch_msglen);
 		goto falert;
 	}
 
@@ -487,13 +494,17 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 	}
 	mp->b_rptr += 2; /* skip the version bytes */
 
+	/* read client random field */
 	bcopy(mp->b_rptr, ssl->client_random, SSL3_RANDOM_LENGTH);
 	mp->b_rptr += SSL3_RANDOM_LENGTH;
 
+	/* read session ID length */
 	ASSERT(ssl->sid.cached == B_FALSE);
 	sidlen = *mp->b_rptr++;
 	ch_msglen += sidlen;
 	if (msglen < ch_msglen) {
+		DTRACE_PROBE2(kssl_err__invalid_message_length_after_ver,
+		    int, msglen, int, ch_msglen);
 		goto falert;
 	}
 	if (sidlen != SSL3_SESSIONID_BYTES) {
@@ -504,6 +515,7 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 		mp->b_rptr += SSL3_SESSIONID_BYTES;
 	}
 
+	/* read cipher suite length */
 	cslen = ((uint_t)mp->b_rptr[0] << 8) + (uint_t)mp->b_rptr[1];
 	mp->b_rptr += 2;
 	ch_msglen += cslen;
@@ -516,11 +528,15 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 	 * extensions and hence ignore them.
 	 */
 	if (msglen < ch_msglen) {
+		DTRACE_PROBE2(kssl_err__invalid_message_length_after_cslen,
+		    int, msglen, int, ch_msglen);
 		goto falert;
 	}
 
 	/* The length has to be even since a cipher suite is 2-byte long */
 	if (cslen & 0x1) {
+		DTRACE_PROBE1(kssl_err__uneven_cipher_suite_length,
+		    uint_t, cslen);
 		goto falert;
 	}
 	suitesp = mp->b_rptr;
@@ -553,8 +569,20 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 	}
 	if (i == ssl->kssl_entry->kssl_cipherSuites_nentries) {
 		if (ssl->sslcnt == 1) {
+			DTRACE_PROBE(kssl_no_cipher_suite_found);
 			KSSL_COUNTER(no_suite_found, 1);
-			return (SSL_MISS);
+			/*
+			 * If there is no fallback point terminate the
+			 * handshake with SSL alert otherwise return with
+			 * SSL_MISS.
+			 */
+			if (ssl->kssl_entry->ke_fallback_head == NULL) {
+				DTRACE_PROBE(kssl_no_fallback);
+				desc = handshake_failure;
+				goto falert;
+			} else {
+				return (SSL_MISS);
+			}
 		}
 		desc = handshake_failure;
 		DTRACE_PROBE(kssl_err__no_cipher_suites_found);
@@ -571,9 +599,15 @@ suite_found:
 	cmlen = *mp->b_rptr++;
 	ch_msglen += cmlen - 1;	/* -1 accounts for the null method */
 	if (msglen < ch_msglen) {
+		DTRACE_PROBE2(kssl_err__invalid_message_length_after_complen,
+		    int, msglen, int, ch_msglen);
 		goto falert;
 	}
 
+	/*
+	 * Search for null compression method (encoded as 0 byte) in the
+	 * compression methods field.
+	 */
 	while (cmlen >= 1) {
 		if (*mp->b_rptr++ == 0)
 			break;
@@ -582,7 +616,7 @@ suite_found:
 
 	if (cmlen == 0) {
 		desc = handshake_failure;
-		DTRACE_PROBE(kssl_err__no_null_method_failure);
+		DTRACE_PROBE(kssl_err__no_null_compression_method);
 		goto falert;
 	}
 
@@ -1856,6 +1890,8 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 	ASSERT(ssl->resumed == B_FALSE);
 
 	if (recsz < ch_recsz) {
+		DTRACE_PROBE2(kssl_err__reclen_less_than_minimum,
+		    int, recsz, int, ch_recsz);
 		goto falert;
 	}
 
@@ -1867,6 +1903,7 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 	recend = mp->b_rptr + recsz;
 
 	if (*mp->b_rptr != 1) {
+		DTRACE_PROBE1(kssl_err__invalid_version, uint_t, *mp->b_rptr);
 		goto falert;
 	}
 	mp->b_rptr += 3;
@@ -1887,6 +1924,8 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 	mp->b_rptr += 6;
 	ch_recsz += cslen + sidlen + randlen;
 	if (recsz != ch_recsz) {
+		DTRACE_PROBE2(kssl_err__invalid_message_len_sum,
+		    int, recsz, int, ch_recsz);
 		goto falert;
 	}
 	suitesp = mp->b_rptr;
@@ -1916,7 +1955,17 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 	if (i == ssl->kssl_entry->kssl_cipherSuites_nentries) {
 		DTRACE_PROBE(kssl_err__no_SSLv2_cipher_suite);
 		ssl->activeinput = B_FALSE;
-		return (SSL_MISS);
+		/*
+		 * If there is no fallback point terminate the handshake with
+		 * SSL alert otherwise return with SSL_MISS.
+		 */
+		if (ssl->kssl_entry->ke_fallback_head == NULL) {
+			DTRACE_PROBE(kssl_no_fallback);
+			desc = handshake_failure;
+			goto falert;
+		} else {
+			return (SSL_MISS);
+		}
 	}
 
 	mp->b_rptr = recend;

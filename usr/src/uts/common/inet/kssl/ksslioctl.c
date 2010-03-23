@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@
 kssl_entry_t **kssl_entry_tab;
 int kssl_entry_tab_size;
 int kssl_entry_tab_nentries;
+uint_t null_cipher_suite;	/* setable in /etc/system */
 kmutex_t kssl_tab_mutex;
 
 static void
@@ -498,8 +499,13 @@ create_kssl_entry(kssl_params_t *kssl_params, Certificate_t *cert,
 		crypto_free_mech_list(mechs, mech_count);
 	}
 
-	/* Add the no encryption suite to the end */
-	kssl_entry->kssl_cipherSuites[cnt++] = SSL_RSA_WITH_NULL_SHA;
+	/*
+	 * Add the no encryption suite to the end if requested by the
+	 * kssl:null_cipher_suite /etc/system tunable since we do not want
+	 * to be running with it by default.
+	 */
+	if (null_cipher_suite && got_rsa && got_sha1)
+		kssl_entry->kssl_cipherSuites[cnt++] = SSL_RSA_WITH_NULL_SHA;
 	kssl_entry->kssl_cipherSuites_nentries = cnt;
 	for (i = 0; i < cnt; i++)
 		kssl_entry->kssl_saved_Suites[i] =
