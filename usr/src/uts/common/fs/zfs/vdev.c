@@ -2078,12 +2078,10 @@ vdev_fault(spa_t *spa, uint64_t guid, vdev_aux_t aux)
 	vdev_set_state(vd, B_FALSE, VDEV_STATE_FAULTED, aux);
 
 	/*
-	 * If marking the vdev as faulted cause the top-level vdev to become
-	 * unavailable, then back off and simply mark the vdev as degraded
-	 * instead.
+	 * If this device has the only valid copy of the data, then
+	 * back off and simply mark the vdev as degraded instead.
 	 */
-	if (vdev_is_dead(vd->vdev_top) && !vd->vdev_islog &&
-	    vd->vdev_aux == NULL) {
+	if (!vd->vdev_islog && vd->vdev_aux == NULL && vdev_dtl_required(vd)) {
 		vd->vdev_degraded = 1ULL;
 		vd->vdev_faulted = 0ULL;
 
