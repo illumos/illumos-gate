@@ -1267,13 +1267,19 @@ iscsid_del(iscsi_hba_t *ihp, char *target_name,
 				if (ISCSI_SUCCESS(status)) {
 					iscsid_remove_target_param(name);
 					isp = ihp->hba_sess_list;
-				} else {
+				} else if (status == ISCSI_STATUS_BUSY) {
 					/*
 					 * The most likely destroy failure
 					 * is that ndi/mdi offline failed.
 					 * This means that the resource is
 					 * in_use/busy.
 					 */
+					cmn_err(CE_NOTE, "iscsi session(%d) - "
+					    "resource is in use\n",
+					    isp->sess_oid);
+					isp = isp->sess_next;
+					rtn = B_FALSE;
+				} else {
 					cmn_err(CE_NOTE, "iscsi session(%d) - "
 					    "session logout failed (%d)\n",
 					    isp->sess_oid, status);

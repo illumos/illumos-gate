@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI logical unit interfaces
@@ -724,7 +724,7 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 			}
 			offline = B_TRUE;
 		} else {
-			status = ISCSI_STATUS_INTERNAL_ERROR;
+			status = ISCSI_STATUS_BUSY;
 			if (lun_free == B_FALSE) {
 				ilp->lun_state |= ISCSI_LUN_STATE_INVALID;
 				offline = B_TRUE;
@@ -745,7 +745,7 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 			    ilp->lun_dip, 0);
 		}
 		if (rval != NDI_SUCCESS) {
-			status = ISCSI_STATUS_INTERNAL_ERROR;
+			status = ISCSI_STATUS_BUSY;
 			if (lun_free == B_FALSE) {
 				ilp->lun_state |= ISCSI_LUN_STATE_INVALID;
 				offline = B_TRUE;
