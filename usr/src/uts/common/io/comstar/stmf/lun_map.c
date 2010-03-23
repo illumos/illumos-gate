@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,11 +191,8 @@ stmf_session_create_lun_map(stmf_i_local_port_t *ilport,
 	stmf_ver_hg_t	*verhg;
 	stmf_lun_map_t	*ve_map;
 
-	if (iss->iss_sm != NULL)
-		cmn_err(CE_PANIC, "create lun map called with non NULL map");
-	iss->iss_sm = (stmf_lun_map_t *)kmem_zalloc(sizeof (stmf_lun_map_t),
-	    KM_SLEEP);
-	mutex_enter(&stmf_state.stmf_lock);
+	ASSERT(mutex_owned(&stmf_state.stmf_lock));
+
 	tg = ilport->ilport_tg;
 	hg = stmf_lookup_group_for_host(iss->iss_ss->ss_rport_id->ident,
 	    iss->iss_ss->ss_rport_id->ident_length);
@@ -233,7 +230,6 @@ stmf_session_create_lun_map(stmf_i_local_port_t *ilport,
 	}
 	/* not configured, cannot access any luns for now */
 
-	mutex_exit(&stmf_state.stmf_lock);
 	stmf_destroy_ve_map(ve_map);
 
 	return (STMF_SUCCESS);
@@ -252,15 +248,14 @@ stmf_session_destroy_lun_map(stmf_i_local_port_t *ilport,
 	uint16_t n;
 	stmf_lun_map_ent_t *ent;
 
+	ASSERT(mutex_owned(&stmf_state.stmf_lock));
 	/*
 	 * to avoid conflict with updating session's map,
 	 * which only grab stmf_lock
 	 */
-	mutex_enter(&stmf_state.stmf_lock);
 	sm = iss->iss_sm;
 	iss->iss_sm = NULL;
 	iss->iss_hg = NULL;
-	mutex_exit(&stmf_state.stmf_lock);
 	if (sm->lm_nentries) {
 		for (n = 0; n < sm->lm_nentries; n++) {
 			if ((ent = (stmf_lun_map_ent_t *)sm->lm_plus[n])

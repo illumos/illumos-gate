@@ -49,6 +49,11 @@
 #include <pppt_ic_if.h>
 #include <stmf_stats.h>
 
+/*
+ * Lock order:
+ * stmf_state_lock --> ilport_lock/iss_lockp --> ilu_task_lock
+ */
+
 static uint64_t stmf_session_counter = 0;
 static uint16_t stmf_rtpid_counter = 0;
 /* start messages at 1 */
@@ -3494,13 +3499,20 @@ stmf_register_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 
 	/* sessions use the ilport_lock. No separate lock is required */
 	iss->iss_lockp = &ilport->ilport_lock;
-	(void) stmf_session_create_lun_map(ilport, iss);
 
+	if (iss->iss_sm != NULL)
+		cmn_err(CE_PANIC, "create lun map called with non NULL map");
+	iss->iss_sm = (stmf_lun_map_t *)kmem_zalloc(sizeof (stmf_lun_map_t),
+	    KM_SLEEP);
+
+	mutex_enter(&stmf_state.stmf_lock);
 	rw_enter(&ilport->ilport_lock, RW_WRITER);
+	(void) stmf_session_create_lun_map(ilport, iss);
 	ilport->ilport_nsessions++;
 	iss->iss_next = ilport->ilport_ss_list;
 	ilport->ilport_ss_list = iss;
 	rw_exit(&ilport->ilport_lock);
+	mutex_exit(&stmf_state.stmf_lock);
 
 	iss->iss_creation_time = ddi_get_time();
 	ss->ss_session_id = atomic_add_64_nv(&stmf_session_counter, 1);
@@ -3554,8 +3566,6 @@ try_dereg_ss_again:
 		}
 	}
 
-	mutex_exit(&stmf_state.stmf_lock);
-
 	rw_enter(&ilport->ilport_lock, RW_WRITER);
 	for (ppss = &ilport->ilport_ss_list; *ppss != NULL;
 	    ppss = &((*ppss)->iss_next)) {
@@ -3570,10 +3580,11 @@ try_dereg_ss_again:
 		    " session");
 	}
 	ilport->ilport_nsessions--;
-	rw_exit(&ilport->ilport_lock);
 
 	stmf_irport_deregister(iss->iss_irport);
 	(void) stmf_session_destroy_lun_map(ilport, iss);
+	rw_exit(&ilport->ilport_lock);
+	mutex_exit(&stmf_state.stmf_lock);
 }
 
 stmf_i_scsi_session_t *
@@ -6228,8 +6239,6 @@ stmf_handle_target_reset(scsi_task_t *task)
 		ilu = (stmf_i_lu_t *)(lm_ent->ent_lu->lu_stmf_private);
 		atomic_or_32(&ilu->ilu_flags, ILU_RESET_ACTIVE);
 	}
-	rw_exit(iss->iss_lockp);
-	mutex_exit(&stmf_state.stmf_lock);
 
 	for (i = 0; i < lm->lm_nentries; i++) {
 		if (lm->lm_plus[i] == NULL)
@@ -6238,6 +6247,9 @@ stmf_handle_target_reset(scsi_task_t *task)
 		stmf_abort(STMF_QUEUE_ABORT_LU, task, STMF_ABORTED,
 		    lm_ent->ent_lu);
 	}
+
+	rw_exit(iss->iss_lockp);
+	mutex_exit(&stmf_state.stmf_lock);
 
 	/* Start polling on this task */
 	if (stmf_task_poll_lu(task, ITASK_DEFAULT_POLL_TIMEOUT)
