@@ -1509,6 +1509,7 @@ ip_ni_queue_func_impl(injection_t *inject,  boolean_t out)
 		} else {
 			ixas.ixa_flags = IXAF_BASIC_SIMPLE_V4;
 		}
+		ixas.ixa_flags &= ~IXAF_VERIFY_SOURCE;
 		(void) ip_output_simple(packet->ni_packet, &ixas);
 		ixa_cleanup(&ixas);
 	}

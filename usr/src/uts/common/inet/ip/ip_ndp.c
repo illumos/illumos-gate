@@ -2192,7 +2192,7 @@ ndp_xmit(ill_t *ill, uint32_t operation, uint8_t *hw_addr, uint_t hw_addr_len,
 	mp->b_wptr = mp->b_rptr + len;
 
 	bzero(&ixas, sizeof (ixas));
-	ixas.ixa_flags = IXAF_BASIC_SIMPLE_V6 | IXAF_NO_HW_CKSUM;
+	ixas.ixa_flags = IXAF_SET_ULP_CKSUM | IXAF_NO_HW_CKSUM;
 
 	ixas.ixa_ifindex = ill->ill_phyint->phyint_ifindex;
 	ixas.ixa_ipst = ipst;

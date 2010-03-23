@@ -971,6 +971,7 @@ ipsq_xopq_mp_cleanup(ill_t *ill, conn_t *connp)
 		tmp_list = curr->b_next;
 		curr->b_next = NULL;
 		curr->b_prev = NULL;
+		wq = curr->b_queue;
 		curr->b_queue = NULL;
 		if (DB_TYPE(curr) == M_IOCTL || DB_TYPE(curr) == M_IOCDATA) {
 			DTRACE_PROBE4(ipif__ioctl,
@@ -12951,7 +12952,7 @@ ill_mcast_send_queued(ill_t *ill)
 			ixas.ixa_flags = IXAF_BASIC_SIMPLE_V4;
 			ixas.ixa_flags &= ~IXAF_SET_ULP_CKSUM;
 		}
-
+		ixas.ixa_flags &= ~IXAF_VERIFY_SOURCE;
 		ixas.ixa_flags |= IXAF_MULTICAST_LOOP | IXAF_SET_SOURCE;
 		(void) ip_output_simple(mp, &ixas);
 		ixa_cleanup(&ixas);
@@ -13566,7 +13567,6 @@ ipif_mask_reply(ipif_t *ipif)
 
 	bzero(&ixas, sizeof (ixas));
 	ixas.ixa_flags = IXAF_BASIC_SIMPLE_V4;
-	ixas.ixa_flags |= IXAF_SET_SOURCE;
 	ixas.ixa_zoneid = ALL_ZONES;
 	ixas.ixa_ifindex = 0;
 	ixas.ixa_ipst = ipst;

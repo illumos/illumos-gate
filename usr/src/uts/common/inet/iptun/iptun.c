@@ -2115,8 +2115,10 @@ iptun_sendicmp_v4(iptun_t *iptun, icmph_t *icmp, ipha_t *orig_ipha, mblk_t *mp,
 
 	bzero(&ixas, sizeof (ixas));
 	ixas.ixa_flags = IXAF_BASIC_SIMPLE_V4;
-	if (new_ipha->ipha_src == INADDR_ANY)
+	if (new_ipha->ipha_src == INADDR_ANY) {
+		ixas.ixa_flags &= ~IXAF_VERIFY_SOURCE;
 		ixas.ixa_flags |= IXAF_SET_SOURCE;
+	}
 
 	ixas.ixa_zoneid = IPCL_ZONEID(connp);
 	ixas.ixa_ipst = connp->conn_netstack->netstack_ip;
@@ -2166,8 +2168,10 @@ iptun_sendicmp_v6(iptun_t *iptun, icmp6_t *icmp6, ip6_t *orig_ip6h, mblk_t *mp,
 
 	bzero(&ixas, sizeof (ixas));
 	ixas.ixa_flags = IXAF_BASIC_SIMPLE_V6;
-	if (IN6_IS_ADDR_UNSPECIFIED(&new_ip6h->ip6_src))
+	if (IN6_IS_ADDR_UNSPECIFIED(&new_ip6h->ip6_src)) {
+		ixas.ixa_flags &= ~IXAF_VERIFY_SOURCE;
 		ixas.ixa_flags |= IXAF_SET_SOURCE;
+	}
 
 	ixas.ixa_zoneid = IPCL_ZONEID(connp);
 	ixas.ixa_ipst = connp->conn_netstack->netstack_ip;
