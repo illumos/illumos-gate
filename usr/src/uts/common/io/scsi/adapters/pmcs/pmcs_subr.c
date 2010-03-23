@@ -71,6 +71,7 @@ static void pmcs_tgtmap_activate_cb(void *, char *, scsi_tgtmap_tgt_type_t,
 static boolean_t pmcs_tgtmap_deactivate_cb(void *, char *,
     scsi_tgtmap_tgt_type_t, void *, scsi_tgtmap_deact_rsn_t);
 static void pmcs_add_dead_phys(pmcs_hw_t *, pmcs_phy_t *);
+static void pmcs_get_fw_version(pmcs_hw_t *);
 
 /*
  * Often used strings
@@ -168,7 +169,7 @@ pmcs_setup(pmcs_hw_t *pwp)
 	pwp->mpi_oqc_offset =
 	    pwp->mpi_offset + pmcs_rd_mpi_tbl(pwp, PMCS_MPI_OQCTO);
 
-	pwp->fw = pmcs_rd_mpi_tbl(pwp, PMCS_MPI_FW);
+	pmcs_get_fw_version(pwp);
 
 	pwp->max_cmd = pmcs_rd_mpi_tbl(pwp, PMCS_MPI_MOIO);
 	pwp->max_dev = pmcs_rd_mpi_tbl(pwp, PMCS_MPI_INFO0) >> 16;
@@ -1492,7 +1493,7 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 	/*
 	 * Step 3
 	 */
-	gsm = pmcs_rd_gsm_reg(pwp, GSM_CFG_AND_RESET);
+	gsm = pmcs_rd_gsm_reg(pwp, 0, GSM_CFG_AND_RESET);
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "GSM %08x -> %08x", gsm,
 	    gsm & ~PMCS_SOFT_RESET_BITS);
 	pmcs_wr_gsm_reg(pwp, GSM_CFG_AND_RESET, gsm & ~PMCS_SOFT_RESET_BITS);
@@ -1500,15 +1501,15 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 	/*
 	 * Step 4
 	 */
-	rapchk = pmcs_rd_gsm_reg(pwp, READ_ADR_PARITY_CHK_EN);
+	rapchk = pmcs_rd_gsm_reg(pwp, 0, READ_ADR_PARITY_CHK_EN);
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "READ_ADR_PARITY_CHK_EN "
 	    "%08x -> %08x", rapchk, 0);
 	pmcs_wr_gsm_reg(pwp, READ_ADR_PARITY_CHK_EN, 0);
-	wapchk = pmcs_rd_gsm_reg(pwp, WRITE_ADR_PARITY_CHK_EN);
+	wapchk = pmcs_rd_gsm_reg(pwp, 0, WRITE_ADR_PARITY_CHK_EN);
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "WRITE_ADR_PARITY_CHK_EN "
 	    "%08x -> %08x", wapchk, 0);
 	pmcs_wr_gsm_reg(pwp, WRITE_ADR_PARITY_CHK_EN, 0);
-	wdpchk = pmcs_rd_gsm_reg(pwp, WRITE_DATA_PARITY_CHK_EN);
+	wdpchk = pmcs_rd_gsm_reg(pwp, 0, WRITE_DATA_PARITY_CHK_EN);
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "WRITE_DATA_PARITY_CHK_EN "
 	    "%08x -> %08x", wdpchk, 0);
 	pmcs_wr_gsm_reg(pwp, WRITE_DATA_PARITY_CHK_EN, 0);
@@ -1521,7 +1522,7 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 	/*
 	 * Step 5.5 (Temporary workaround for 1.07.xx Beta)
 	 */
-	tsmode = pmcs_rd_gsm_reg(pwp, PMCS_GPIO_TRISTATE_MODE_ADDR);
+	tsmode = pmcs_rd_gsm_reg(pwp, 0, PMCS_GPIO_TRISTATE_MODE_ADDR);
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "GPIO TSMODE %08x -> %08x",
 	    tsmode, tsmode & ~(PMCS_GPIO_TSMODE_BIT0|PMCS_GPIO_TSMODE_BIT1));
 	pmcs_wr_gsm_reg(pwp, PMCS_GPIO_TRISTATE_MODE_ADDR,
@@ -1567,7 +1568,7 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 	/*
 	 * Step 11
 	 */
-	gsm = pmcs_rd_gsm_reg(pwp, GSM_CFG_AND_RESET);
+	gsm = pmcs_rd_gsm_reg(pwp, 0, GSM_CFG_AND_RESET);
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "GSM %08x -> %08x", gsm,
 	    gsm | PMCS_SOFT_RESET_BITS);
 	pmcs_wr_gsm_reg(pwp, GSM_CFG_AND_RESET, gsm | PMCS_SOFT_RESET_BITS);
@@ -1577,17 +1578,17 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 	 * Step 12
 	 */
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "READ_ADR_PARITY_CHK_EN "
-	    "%08x -> %08x", pmcs_rd_gsm_reg(pwp, READ_ADR_PARITY_CHK_EN),
+	    "%08x -> %08x", pmcs_rd_gsm_reg(pwp, 0, READ_ADR_PARITY_CHK_EN),
 	    rapchk);
 	pmcs_wr_gsm_reg(pwp, READ_ADR_PARITY_CHK_EN, rapchk);
 	drv_usecwait(10);
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "WRITE_ADR_PARITY_CHK_EN "
-	    "%08x -> %08x", pmcs_rd_gsm_reg(pwp, WRITE_ADR_PARITY_CHK_EN),
+	    "%08x -> %08x", pmcs_rd_gsm_reg(pwp, 0, WRITE_ADR_PARITY_CHK_EN),
 	    wapchk);
 	pmcs_wr_gsm_reg(pwp, WRITE_ADR_PARITY_CHK_EN, wapchk);
 	drv_usecwait(10);
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "WRITE_DATA_PARITY_CHK_EN "
-	    "%08x -> %08x", pmcs_rd_gsm_reg(pwp, WRITE_DATA_PARITY_CHK_EN),
+	    "%08x -> %08x", pmcs_rd_gsm_reg(pwp, 0, WRITE_DATA_PARITY_CHK_EN),
 	    wapchk);
 	pmcs_wr_gsm_reg(pwp, WRITE_DATA_PARITY_CHK_EN, wdpchk);
 	drv_usecwait(10);
@@ -5590,9 +5591,9 @@ pmcs_report_fwversion(pmcs_hw_t *pwp)
 		break;
 	}
 	pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
-	    "Chip Revision: %c; F/W Revision %x.%x.%x %s", 'A' + pwp->chiprev,
-	    PMCS_FW_MAJOR(pwp), PMCS_FW_MINOR(pwp), PMCS_FW_MICRO(pwp),
-	    fwsupport);
+	    "Chip Revision: %c; F/W Revision %x.%x.%x %s (ILA rev %08x)",
+	    'A' + pwp->chiprev, PMCS_FW_MAJOR(pwp), PMCS_FW_MINOR(pwp),
+	    PMCS_FW_MICRO(pwp), fwsupport, pwp->ila_ver);
 }
 
 void
@@ -6490,9 +6491,9 @@ pmcs_rd_oqpi(pmcs_hw_t *pwp, uint32_t qnum)
 }
 
 uint32_t
-pmcs_rd_gsm_reg(pmcs_hw_t *pwp, uint32_t off)
+pmcs_rd_gsm_reg(pmcs_hw_t *pwp, uint8_t hi, uint32_t off)
 {
-	uint32_t rv, newaxil, oldaxil;
+	uint32_t rv, newaxil, oldaxil, oldaxih;
 
 	newaxil = off & ~GSM_BASE_MASK;
 	off &= GSM_BASE_MASK;
@@ -6507,7 +6508,29 @@ pmcs_rd_gsm_reg(pmcs_hw_t *pwp, uint32_t off)
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "AXIL register update failed");
 	}
+	if (hi) {
+		oldaxih = ddi_get32(pwp->top_acc_handle,
+		    &pwp->top_regs[PMCS_AXI_TRANS_UPPER >> 2]);
+		ddi_put32(pwp->top_acc_handle,
+		    &pwp->top_regs[PMCS_AXI_TRANS_UPPER >> 2], hi);
+		drv_usecwait(10);
+		if (ddi_get32(pwp->top_acc_handle,
+		    &pwp->top_regs[PMCS_AXI_TRANS_UPPER >> 2]) != hi) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "AXIH register update failed");
+		}
+	}
 	rv = ddi_get32(pwp->gsm_acc_handle, &pwp->gsm_regs[off >> 2]);
+	if (hi) {
+		ddi_put32(pwp->top_acc_handle,
+		    &pwp->top_regs[PMCS_AXI_TRANS_UPPER >> 2], oldaxih);
+		drv_usecwait(10);
+		if (ddi_get32(pwp->top_acc_handle,
+		    &pwp->top_regs[PMCS_AXI_TRANS_UPPER >> 2]) != oldaxih) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "AXIH register restore failed");
+		}
+	}
 	ddi_put32(pwp->top_acc_handle,
 	    &pwp->top_regs[PMCS_AXI_TRANS >> 2], oldaxil);
 	drv_usecwait(10);
@@ -6558,7 +6581,7 @@ pmcs_rd_topunit(pmcs_hw_t *pwp, uint32_t off)
 	case PMCS_SPC_BOOT_STRAP:
 	case PMCS_SPC_DEVICE_ID:
 	case PMCS_DEVICE_REVISION:
-		off = pmcs_rd_gsm_reg(pwp, off);
+		off = pmcs_rd_gsm_reg(pwp, 0, off);
 		break;
 	default:
 		off = ddi_get32(pwp->top_acc_handle,
@@ -8264,4 +8287,53 @@ pmcs_add_dead_phys(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		phyp = nxt;
 	}
 	mutex_exit(&pwp->dead_phylist_lock);
+}
+
+static void
+pmcs_get_fw_version(pmcs_hw_t *pwp)
+{
+	uint32_t ila_len, ver_hi, ver_lo;
+	uint8_t ila_ver_string[9], img_flag;
+	char uc, *ucp = &uc;
+	unsigned long ila_ver;
+	uint64_t ver_hilo;
+
+	/* Firmware version is easy. */
+	pwp->fw = pmcs_rd_mpi_tbl(pwp, PMCS_MPI_FW);
+
+	/*
+	 * Get the image size (2nd to last dword)
+	 * NOTE: The GSM registers are mapped little-endian, but the data
+	 * on the flash is actually big-endian, so we need to swap these values
+	 * regardless of which platform we're on.
+	 */
+	ila_len = BSWAP_32(pmcs_rd_gsm_reg(pwp, GSM_FLASH_BASE_UPPER,
+	    GSM_FLASH_BASE + GSM_SM_BLKSZ - (2 << 2)));
+	if (ila_len > 65535) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: Invalid ILA image size (0x%x)?", __func__, ila_len);
+		return;
+	}
+
+	/*
+	 * The numeric version is at ila_len - PMCS_ILA_VER_OFFSET
+	 */
+	ver_hi = BSWAP_32(pmcs_rd_gsm_reg(pwp, GSM_FLASH_BASE_UPPER,
+	    GSM_FLASH_BASE + ila_len - PMCS_ILA_VER_OFFSET));
+	ver_lo = BSWAP_32(pmcs_rd_gsm_reg(pwp, GSM_FLASH_BASE_UPPER,
+	    GSM_FLASH_BASE + ila_len - PMCS_ILA_VER_OFFSET + 4));
+	ver_hilo = BE_64(((uint64_t)ver_hi << 32) | ver_lo);
+	bcopy((const void *)&ver_hilo, &ila_ver_string[0], 8);
+	ila_ver_string[8] = '\0';
+
+	(void) ddi_strtoul((const char *)ila_ver_string, &ucp, 16, &ila_ver);
+	pwp->ila_ver = (int)(ila_ver & 0xffffffff);
+
+	img_flag = (BSWAP_32(pmcs_rd_gsm_reg(pwp, GSM_FLASH_BASE_UPPER,
+	    GSM_FLASH_IMG_FLAGS)) & 0xff000000) >> 24;
+	if (img_flag & PMCS_IMG_FLAG_A) {
+		pwp->fw_active_img = 1;
+	} else {
+		pwp->fw_active_img = 0;
+	}
 }

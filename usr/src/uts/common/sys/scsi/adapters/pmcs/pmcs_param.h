@@ -143,6 +143,12 @@ extern "C" {
 #define	PMCS_FIRMWARE_FILENAME		"misc/pmcs/pmcs8001fw"
 #define	PMCS_FIRMWARE_VERSION_NAME	"pmcs8001_fwversion"
 
+/*
+ * These are offsets from the end of the image
+ */
+#define	PMCS_FW_VER_OFFSET		528
+#define	PMCS_ILA_VER_OFFSET		528
+
 #ifdef	__cplusplus
 }
 #endif

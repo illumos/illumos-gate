@@ -328,7 +328,8 @@ struct pmcs_hw {
 		configuring		: 1,
 		ds_err_recovering	: 1,
 		quiesced		: 1,
-		fwlog_file		: 1;
+		fwlog_file		: 1,
+		fw_active_img		: 1;	/* 1='A', 0='B' */
 
 	/*
 	 * This HBA instance's iportmap and list of iport states.
@@ -522,6 +523,7 @@ struct pmcs_hw {
 	 * Card information, some determined during MPI setup
 	 */
 	uint32_t	fw;		/* firmware version */
+	uint32_t	ila_ver;	/* ILA version */
 	uint8_t		max_iq;		/* maximum inbound queues this card */
 	uint8_t 	max_oq;		/* "" outbound "" */
 	uint8_t		nphy;		/* number of phys this card */

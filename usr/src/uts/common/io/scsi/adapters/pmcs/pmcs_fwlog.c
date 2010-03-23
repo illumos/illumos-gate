@@ -684,30 +684,31 @@ pmcs_dump_gsm_conf(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 	n += snprintf(&buf[n], (size_left - n), "\nDump GSM configuration "
 	    "registers: \n -----------------\n");
 	n += snprintf(&buf[n], (size_left - n), "RB6 Access Register = "
-	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, RB6_ACCESS));
+	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, RB6_ACCESS));
 	n += snprintf(&buf[n], (size_left - n), "CFG and RST = 0x%08x\n",
-	    pmcs_rd_gsm_reg(pwp, GSM_CFG_AND_RESET));
+	    pmcs_rd_gsm_reg(pwp, 0, GSM_CFG_AND_RESET));
 	n += snprintf(&buf[n], (size_left - n), "RAM ECC ERR INDICATOR= "
-	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, RAM_ECC_DOUBLE_ERROR_INDICATOR));
+	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, 0,
+	    RAM_ECC_DOUBLE_ERROR_INDICATOR));
 	n += snprintf(&buf[n], (size_left - n), "READ ADR PARITY CHK EN = "
-	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, READ_ADR_PARITY_CHK_EN));
+	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, READ_ADR_PARITY_CHK_EN));
 	n += snprintf(&buf[n], (size_left - n), "WRITE ADR PARITY CHK EN = "
-	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, WRITE_ADR_PARITY_CHK_EN));
+	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, WRITE_ADR_PARITY_CHK_EN));
 	n += snprintf(&buf[n], (size_left - n), "WRITE DATA PARITY CHK EN= "
-	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, WRITE_DATA_PARITY_CHK_EN));
+	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, WRITE_DATA_PARITY_CHK_EN));
 	n += snprintf(&buf[n], (size_left - n),
 	    "READ ADR PARITY ERROR INDICATOR = 0x%08x\n",
-	    pmcs_rd_gsm_reg(pwp, READ_ADR_PARITY_ERROR_INDICATOR));
+	    pmcs_rd_gsm_reg(pwp, 0, READ_ADR_PARITY_ERROR_INDICATOR));
 	n += snprintf(&buf[n], (size_left - n),
 	    "WRITE ADR PARITY ERROR INDICATOR = 0x%08x\n",
-	    pmcs_rd_gsm_reg(pwp, WRITE_ADR_PARITY_ERROR_INDICATOR));
+	    pmcs_rd_gsm_reg(pwp, 0, WRITE_ADR_PARITY_ERROR_INDICATOR));
 	n += snprintf(&buf[n], (size_left - n),
 	    "WRITE DATA PARITY ERROR INDICATOR = 0x%08x\n",
-	    pmcs_rd_gsm_reg(pwp, WRITE_DATA_PARITY_ERROR_INDICATOR));
+	    pmcs_rd_gsm_reg(pwp, 0, WRITE_DATA_PARITY_ERROR_INDICATOR));
 	n += snprintf(&buf[n], (size_left - n), "NMI Enable VPE0 IOP Register"
-	    " = 0x%08x\n", pmcs_rd_gsm_reg(pwp, NMI_EN_VPE0_IOP));
+	    " = 0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, NMI_EN_VPE0_IOP));
 	n += snprintf(&buf[n], (size_left - n), "NMI Enable VPE0 AAP1 Register"
-	    " = 0x%08x\n", pmcs_rd_gsm_reg(pwp, NMI_EN_VPE0_AAP1));
+	    " = 0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, NMI_EN_VPE0_AAP1));
 	n += snprintf(&buf[n], (size_left - n), "-----------------\n"
 	    "Dump GSM configuration registers end \n");
 	return (n);
@@ -889,7 +890,7 @@ pmcs_dump_gsm_addiregs(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 		if (nums == 0) {
 			n += snprintf(&buf[n], (size_left - n),
 			    "[%04X]: %08X\n", gsm_spregs[i].offset_start,
-			    pmcs_rd_gsm_reg(pwp, gsm_addr));
+			    pmcs_rd_gsm_reg(pwp, 0, gsm_addr));
 		} else if (nums > 0) {
 			n += snprintf(&buf[n], (size_left - n),
 			    "\n[%04X] - [%04X]: \n", gsm_spregs[i].offset_start,
@@ -900,7 +901,7 @@ pmcs_dump_gsm_addiregs(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 				addr = gsm_addr + j * 4;
 				n += snprintf(&buf[n], (size_left - n),
 				    "[%04X]: %08X\n", addr & GSM_BASE_MASK,
-				    pmcs_rd_gsm_reg(pwp, addr));
+				    pmcs_rd_gsm_reg(pwp, 0, addr));
 				j++;
 				nums -= 4;
 			}
@@ -1089,11 +1090,13 @@ pmcs_dump_hsst_sregs(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 			addr = hsst_state[i+8].offset_start +
 			    hsst_state[i+8].shift_addr;
 			n += snprintf(&buf[n], (size_left - n),
-			    "[%08X]: %08X\t", addr, pmcs_rd_gsm_reg(pwp, addr));
+			    "[%08X]: %08X\t", addr, pmcs_rd_gsm_reg(pwp, 0,
+			    addr));
 			addr = hsst_state[i+16].offset_start +
 			    hsst_state[i+16].shift_addr;
 			n += snprintf(&buf[n], (size_left - n),
-			    "[%08X]: %08X\n", addr, pmcs_rd_gsm_reg(pwp, addr));
+			    "[%08X]: %08X\n", addr, pmcs_rd_gsm_reg(pwp, 0,
+			    addr));
 		}
 
 	}
@@ -1118,11 +1121,11 @@ pmcs_dump_sspa_sregs(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 			    sspa_state[i].desc ? sspa_state[i].desc : "NULL");
 		}
 		addr = sspa_state[i].offset_start + sspa_state[i].shift_addr;
-		rv = pmcs_rd_gsm_reg(pwp, addr);
+		rv = pmcs_rd_gsm_reg(pwp, 0, addr);
 		rv |= PMCS_SSPA_CONTROL_REGISTER_BIT27;
 		pmcs_wr_gsm_reg(pwp, addr, rv);
 		n += snprintf(&buf[n], (size_left - n), "[%08X]: %08X \n",
-		    addr, pmcs_rd_gsm_reg(pwp, addr));
+		    addr, pmcs_rd_gsm_reg(pwp, 0, addr));
 
 	}
 	return (n);

@@ -533,6 +533,8 @@ display_hwinfo(struct pmcs_hw m, int verbose)
 	mdb_printf("Firmware version: %x.%x.%x (%s)\n",
 	    PMCS_FW_MAJOR(mp), PMCS_FW_MINOR(mp), PMCS_FW_MICRO(mp),
 	    fwsupport);
+	mdb_printf("ILA version:      %08x\n", m.ila_ver);
+	mdb_printf("Active f/w img:   %c\n", (m.fw_active_img) ? 'A' : 'B');
 
 	mdb_printf("Number of PHYs:   %d\n", m.nphy);
 	mdb_printf("Maximum commands: %d\n", m.max_cmd);
@@ -542,6 +544,15 @@ display_hwinfo(struct pmcs_hw m, int verbose)
 		mdb_printf("Firmware logging: Disabled\n");
 	} else {
 		mdb_printf("Firmware logging: Enabled (%d)\n", m.fwlog);
+	}
+	if (m.fwlog_file == 0) {
+		mdb_printf("Firmware logfile: Not configured\n");
+	} else {
+		mdb_printf("Firmware logfile: Configured\n");
+		mdb_inc_indent(2);
+		mdb_printf("AAP1 log file:  %s\n", m.fwlogfile_aap1);
+		mdb_printf("IOP logfile:    %s\n", m.fwlogfile_iop);
+		mdb_dec_indent(2);
 	}
 }
 

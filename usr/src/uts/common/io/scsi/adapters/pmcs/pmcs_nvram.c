@@ -47,13 +47,15 @@ int
 pmcs_firmware_update(pmcs_hw_t *pwp)
 {
 	ddi_modhandle_t modhp;
-	char buf[64];
+	char buf[64], *bufp;
 	int errno;
 	uint8_t *cstart, *cend;		/* Firmware image file */
 	uint8_t *istart, *iend; 	/* ila */
 	uint8_t *sstart, *send;		/* SPCBoot */
 	uint32_t *fwvp;
 	int defret = 0;
+	long fw_version, ila_version;
+	uint8_t *fw_verp, *ila_verp;
 
 	/*
 	 * If updating is disabled, we're done.
@@ -74,10 +76,6 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "Firmware version matches, but still forcing update");
-	} else {
-		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
-		    "Upgrading firmware on card from 0x%x to 0x%x",
-		    pwp->fw, PMCS_FIRMWARE_VERSION);
 	}
 
 	modhp = ddi_modopen(PMCS_FIRMWARE_FILENAME, KRTLD_MODE_FIRST, &errno);
@@ -174,6 +172,32 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 		(void) ddi_modclose(modhp);
 		return (defret);
 	}
+
+	/*
+	 * Get the ILA and firmware versions from the modules themselves
+	 */
+	ila_verp = iend - PMCS_ILA_VER_OFFSET;
+	(void) ddi_strtol((const char *)ila_verp, &bufp, 16, &ila_version);
+	fw_verp = cend - PMCS_FW_VER_OFFSET;
+	(void) ddi_strtol((const char *)fw_verp, &bufp, 16, &fw_version);
+
+	/*
+	 * If force update is not set, verify that what we're loading is
+	 * what we expect.
+	 */
+	if (pwp->fw_force_update == 0) {
+		if (fw_version != PMCS_FIRMWARE_VERSION) {
+			pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+			    "Expected fw version 0x%x, not 0x%lx: not "
+			    "updating", PMCS_FIRMWARE_VERSION, fw_version);
+			(void) ddi_modclose(modhp);
+			return (defret);
+		}
+	}
+
+	pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+	    "Upgrading firmware on card from 0x%x to 0x%lx (ILA version 0x%lx)",
+	    pwp->fw, fw_version, ila_version);
 
 	/*
 	 * The SPCBoot image must be updated first, and this is written to

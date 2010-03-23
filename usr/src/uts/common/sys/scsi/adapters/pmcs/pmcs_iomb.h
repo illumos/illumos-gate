@@ -196,7 +196,7 @@ extern "C" {
 #define	PMCS_PHYID_SHIFT		4	/* level 0 registration only */
 #define	PMCS_DEVREG_TLR			0x1	/* Transport Layer Retry */
 
-#define	PMCS_DEVREG_IT_NEXUS_TIMEOUT	200U
+#define	PMCS_DEVREG_IT_NEXUS_TIMEOUT	2000U
 
 #define	PMCS_DEVREG_HA			0x2	/* Host Assigned upper 16 */
 						/* bits for device ID. */
