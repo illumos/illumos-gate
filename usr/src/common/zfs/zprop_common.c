@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,7 @@ zprop_get_numprops(zfs_type_t type)
 }
 
 void
-register_impl(int prop, const char *name, zprop_type_t type,
+zprop_register_impl(int prop, const char *name, zprop_type_t type,
     uint64_t numdefault, const char *strdefault, zprop_attr_t attr,
     int objset_types, const char *values, const char *colname,
     boolean_t rightalign, boolean_t visible, const zprop_index_t *idx_tbl)
@@ -97,37 +97,38 @@ register_impl(int prop, const char *name, zprop_type_t type,
 }
 
 void
-register_string(int prop, const char *name, const char *def,
+zprop_register_string(int prop, const char *name, const char *def,
     zprop_attr_t attr, int objset_types, const char *values,
     const char *colname)
 {
-	register_impl(prop, name, PROP_TYPE_STRING, 0, def, attr,
+	zprop_register_impl(prop, name, PROP_TYPE_STRING, 0, def, attr,
 	    objset_types, values, colname, B_FALSE, B_TRUE, NULL);
 
 }
 
 void
-register_number(int prop, const char *name, uint64_t def, zprop_attr_t attr,
-    int objset_types, const char *values, const char *colname)
+zprop_register_number(int prop, const char *name, uint64_t def,
+    zprop_attr_t attr, int objset_types, const char *values,
+    const char *colname)
 {
-	register_impl(prop, name, PROP_TYPE_NUMBER, def, NULL, attr,
+	zprop_register_impl(prop, name, PROP_TYPE_NUMBER, def, NULL, attr,
 	    objset_types, values, colname, B_TRUE, B_TRUE, NULL);
 }
 
 void
-register_index(int prop, const char *name, uint64_t def, zprop_attr_t attr,
-    int objset_types, const char *values, const char *colname,
-    const zprop_index_t *idx_tbl)
+zprop_register_index(int prop, const char *name, uint64_t def,
+    zprop_attr_t attr, int objset_types, const char *values,
+    const char *colname, const zprop_index_t *idx_tbl)
 {
-	register_impl(prop, name, PROP_TYPE_INDEX, def, NULL, attr,
+	zprop_register_impl(prop, name, PROP_TYPE_INDEX, def, NULL, attr,
 	    objset_types, values, colname, B_TRUE, B_TRUE, idx_tbl);
 }
 
 void
-register_hidden(int prop, const char *name, zprop_type_t type,
+zprop_register_hidden(int prop, const char *name, zprop_type_t type,
     zprop_attr_t attr, int objset_types, const char *colname)
 {
-	register_impl(prop, name, type, 0, NULL, attr,
+	zprop_register_impl(prop, name, type, 0, NULL, attr,
 	    objset_types, NULL, colname, B_FALSE, B_FALSE, NULL);
 }
 

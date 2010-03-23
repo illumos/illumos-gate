@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,52 +64,55 @@ zpool_prop_init(void)
 	};
 
 	/* string properties */
-	register_string(ZPOOL_PROP_ALTROOT, "altroot", NULL, PROP_DEFAULT,
+	zprop_register_string(ZPOOL_PROP_ALTROOT, "altroot", NULL, PROP_DEFAULT,
 	    ZFS_TYPE_POOL, "<path>", "ALTROOT");
-	register_string(ZPOOL_PROP_BOOTFS, "bootfs", NULL, PROP_DEFAULT,
+	zprop_register_string(ZPOOL_PROP_BOOTFS, "bootfs", NULL, PROP_DEFAULT,
 	    ZFS_TYPE_POOL, "<filesystem>", "BOOTFS");
-	register_string(ZPOOL_PROP_CACHEFILE, "cachefile", NULL, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "<file> | none", "CACHEFILE");
+	zprop_register_string(ZPOOL_PROP_CACHEFILE, "cachefile", NULL,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "<file> | none", "CACHEFILE");
 
 	/* readonly number properties */
-	register_number(ZPOOL_PROP_SIZE, "size", 0, PROP_READONLY,
+	zprop_register_number(ZPOOL_PROP_SIZE, "size", 0, PROP_READONLY,
 	    ZFS_TYPE_POOL, "<size>", "SIZE");
-	register_number(ZPOOL_PROP_FREE, "free", 0, PROP_READONLY,
+	zprop_register_number(ZPOOL_PROP_FREE, "free", 0, PROP_READONLY,
 	    ZFS_TYPE_POOL, "<size>", "FREE");
-	register_number(ZPOOL_PROP_ALLOCATED, "allocated", 0, PROP_READONLY,
-	    ZFS_TYPE_POOL, "<size>", "ALLOC");
-	register_number(ZPOOL_PROP_CAPACITY, "capacity", 0, PROP_READONLY,
+	zprop_register_number(ZPOOL_PROP_ALLOCATED, "allocated", 0,
+	    PROP_READONLY, ZFS_TYPE_POOL, "<size>", "ALLOC");
+	zprop_register_number(ZPOOL_PROP_CAPACITY, "capacity", 0, PROP_READONLY,
 	    ZFS_TYPE_POOL, "<size>", "CAP");
-	register_number(ZPOOL_PROP_GUID, "guid", 0, PROP_READONLY,
+	zprop_register_number(ZPOOL_PROP_GUID, "guid", 0, PROP_READONLY,
 	    ZFS_TYPE_POOL, "<guid>", "GUID");
-	register_number(ZPOOL_PROP_HEALTH, "health", 0, PROP_READONLY,
+	zprop_register_number(ZPOOL_PROP_HEALTH, "health", 0, PROP_READONLY,
 	    ZFS_TYPE_POOL, "<state>", "HEALTH");
-	register_number(ZPOOL_PROP_DEDUPRATIO, "dedupratio", 0, PROP_READONLY,
-	    ZFS_TYPE_POOL, "<1.00x or higher if deduped>", "DEDUP");
+	zprop_register_number(ZPOOL_PROP_DEDUPRATIO, "dedupratio", 0,
+	    PROP_READONLY, ZFS_TYPE_POOL, "<1.00x or higher if deduped>",
+	    "DEDUP");
 
 	/* default number properties */
-	register_number(ZPOOL_PROP_VERSION, "version", SPA_VERSION,
+	zprop_register_number(ZPOOL_PROP_VERSION, "version", SPA_VERSION,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "<version>", "VERSION");
-	register_number(ZPOOL_PROP_DEDUPDITTO, "dedupditto", 0,
+	zprop_register_number(ZPOOL_PROP_DEDUPDITTO, "dedupditto", 0,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "<threshold (min 100)>", "DEDUPDITTO");
 
 	/* default index (boolean) properties */
-	register_index(ZPOOL_PROP_DELEGATION, "delegation", 1, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "on | off", "DELEGATION", boolean_table);
-	register_index(ZPOOL_PROP_AUTOREPLACE, "autoreplace", 0, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "on | off", "REPLACE", boolean_table);
-	register_index(ZPOOL_PROP_LISTSNAPS, "listsnapshots", 0, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "on | off", "LISTSNAPS", boolean_table);
-	register_index(ZPOOL_PROP_AUTOEXPAND, "autoexpand", 0, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "on | off", "EXPAND", boolean_table);
+	zprop_register_index(ZPOOL_PROP_DELEGATION, "delegation", 1,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "DELEGATION",
+	    boolean_table);
+	zprop_register_index(ZPOOL_PROP_AUTOREPLACE, "autoreplace", 0,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "REPLACE", boolean_table);
+	zprop_register_index(ZPOOL_PROP_LISTSNAPS, "listsnapshots", 0,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "LISTSNAPS",
+	    boolean_table);
+	zprop_register_index(ZPOOL_PROP_AUTOEXPAND, "autoexpand", 0,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "EXPAND", boolean_table);
 
 	/* default index properties */
-	register_index(ZPOOL_PROP_FAILUREMODE, "failmode",
+	zprop_register_index(ZPOOL_PROP_FAILUREMODE, "failmode",
 	    ZIO_FAILURE_MODE_WAIT, PROP_DEFAULT, ZFS_TYPE_POOL,
 	    "wait | continue | panic", "FAILMODE", failuremode_table);
 
 	/* hidden properties */
-	register_hidden(ZPOOL_PROP_NAME, "name", PROP_TYPE_STRING,
+	zprop_register_hidden(ZPOOL_PROP_NAME, "name", PROP_TYPE_STRING,
 	    PROP_READONLY, ZFS_TYPE_POOL, "NAME");
 }
 

@@ -2426,7 +2426,14 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		(void) strcpy(zc.zc_name, zc.zc_value);
 		*strchr(zc.zc_name, '@') = '\0';
 
-		if (!zfs_dataset_exists(hdl, zc.zc_name, ZFS_TYPE_DATASET)) {
+		/*
+		 * If the exact receive path was specified and this is the
+		 * topmost path in the stream, then if the fs does not exist we
+		 * should look no further.
+		 */
+		if ((flags.isprefix || (*(chopprefix = drrb->drr_toname +
+		    strlen(sendfs)) != '\0' && *chopprefix != '@')) &&
+		    !zfs_dataset_exists(hdl, zc.zc_name, ZFS_TYPE_DATASET)) {
 			char snap[ZFS_MAXNAMELEN];
 			(void) strcpy(snap, strchr(zc.zc_value, '@'));
 			if (guid_to_name(hdl, tosnap, drrb->drr_fromguid,
@@ -2844,7 +2851,7 @@ zfs_receive_impl(libzfs_handle_t *hdl, const char *tosnap, recvflags_t flags,
 		return (zfs_receive_one(hdl, infd, tosnap, flags,
 		    &drr, &drr_noswap, sendfs, stream_nv, stream_avl,
 		    top_zfs));
-	} else {  /* must be DMU_COMPOUNDSTREAM */
+	} else {
 		assert(DMU_GET_STREAM_HDRTYPE(drrb->drr_versioninfo) ==
 		    DMU_COMPOUNDSTREAM);
 		return (zfs_receive_package(hdl, infd, tosnap, flags,
