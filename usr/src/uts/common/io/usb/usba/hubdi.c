@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,6 +151,7 @@ uint_t			hubdi_errlevel = USB_LOG_L4;
 uint_t			hubdi_errmask = (uint_t)-1;
 uint8_t			hubdi_min_pm_threshold = 5; /* seconds */
 uint8_t			hubdi_reset_delay = 20; /* seconds */
+extern int modrootloaded;
 
 /*
  * initialize private data
@@ -3650,9 +3651,12 @@ hubd_hotplug_thread(void *arg)
 	 * Before console is init'd, we temporarily block the hotplug
 	 * threads so that BUS_CONFIG_ONE through hubd_bus_config() can be
 	 * processed quickly. This reduces the time needed for vfs_mountroot()
-	 * to mount the root FS from a USB disk.
+	 * to mount the root FS from a USB disk. And on SPARC platform,
+	 * in order to load 'consconfig' successfully after OBP is gone,
+	 * we need to check 'modrootloaded' to make sure root filesystem is
+	 * available.
 	 */
-	while (!consconfig_console_is_ready()) {
+	while (!modrootloaded || !consconfig_console_is_ready()) {
 		delay(drv_usectohz(10000));
 	}
 
