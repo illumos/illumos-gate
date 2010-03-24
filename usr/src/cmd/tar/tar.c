@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -548,6 +548,16 @@ static int retry_open_attr(int pdirfd, int cwd, char *dirp, char *pattr,
     char *name, int oflag, mode_t mode);
 static char *skipslashes(char *string, char *start);
 static void chop_endslashes(char *path);
+static pid_t compress_file(void);
+static void compress_back(void);
+static void decompress_file(void);
+static pid_t uncompress_file(void);
+static void *compress_malloc(size_t);
+static void check_compression();
+static char *bz_suffix();
+static char *gz_suffix();
+static char *add_suffix();
+static void wait_pid(pid_t);
 
 static	struct stat stbuf;
 
@@ -558,7 +568,7 @@ static	int	Fileflag;
 char    *sysv3_env;
 #endif
 static	int	Xflag, Fflag, iflag, hflag, Bflag, Iflag;
-static	int	rflag, xflag, vflag, tflag, mt, cflag, mflag, pflag;
+static	int	rflag, xflag, vflag, tflag, mt, svmt, cflag, mflag, pflag;
 static	int	uflag;
 static	int	eflag, errflag, qflag;
 static	int	oflag;
@@ -568,6 +578,10 @@ static	int	Eflag;			/* Allow files greater than 8GB */
 static	int	atflag;			/* traverse extended attributes */
 static	int	saflag;			/* traverse extended sys attributes */
 static	int	Dflag;			/* Data change flag */
+static	int	jflag;			/* flag to use 'bzip2' */
+static	int	zflag;			/* flag to use 'gzip' */
+static	int	Zflag;			/* flag to use 'compress' */
+
 /* Trusted Extensions */
 static	int	Tflag;			/* Trusted Extensions attr flags */
 static	int	dir_flag;		/* for attribute extract */
@@ -607,6 +621,7 @@ static	char	tname[] = "/tmp/tarXXXXXX";
 static	char	archive[] = "archive0=";
 static	char	*Xfile;
 static	char	*usefile;
+static	char	tfname[1024];
 static	char	*Filefile;
 
 static	int	mulvol;		/* multi-volume option selected */
@@ -669,8 +684,8 @@ static	char	local_uname[UTF_8_FACTOR * _POSIX_NAME_MAX + 1];
 /*
  * The following mechanism is provided to allow us to debug tar in complicated
  * situations, like when it is part of a pipe.  The idea is that you compile
- * with -DWAITAROUND defined, and then add the 'z' function modifier to the
- * target tar invocation, eg. "tar czf tarfile file".  If stderr is available,
+ * with -DWAITAROUND defined, and then add the 'D' function modifier to the
+ * target tar invocation, eg. "tar cDf tarfile file".  If stderr is available,
  * it will tell you to which pid to attach the debugger; otherwise, use ps to
  * find it.  Attach to the process from the debugger, and, *PRESTO*, you are
  * there!
@@ -683,6 +698,22 @@ static	char	local_uname[UTF_8_FACTOR * _POSIX_NAME_MAX + 1];
 int waitaround = 0;		/* wait for rendezvous with the debugger */
 #endif
 
+#define	BZIP		"/usr/bin/bzip2"
+#define	GZIP		"/usr/bin/gzip"
+#define	COMPRESS	"/usr/bin/compress"
+#define	BZCAT		"/usr/bin/bzcat"
+#define	GZCAT		"/usr/bin/gzcat"
+#define	ZCAT		"/usr/bin/zcat"
+#define	GS		8		/* number of valid 'gzip' sufixes */
+#define	BS		4		/* number of valid 'bzip2' sufixes */
+
+static	char		*compress_opt; 	/* compression type */
+
+static	char		*gsuffix[] = {".gz", "-gz", ".z", "-z", "_z", ".Z",
+			".tgz", ".taz"};
+static	char		*bsuffix[] = {".bz2", ".bz", ".tbz2", ".tbz"};
+static	char		*suffix;
+
 
 int
 main(int argc, char *argv[])
@@ -690,6 +721,8 @@ main(int argc, char *argv[])
 	char		*cp;
 	char		*tmpdirp;
 	pid_t		thispid;
+	pid_t		pid;
+	int		wstat;
 
 #ifdef	_iBCS2
 	int	tbl_cnt = 0;
@@ -758,7 +791,7 @@ main(int argc, char *argv[])
 	for (cp = *argv++; *cp; cp++)
 		switch (*cp) {
 #ifdef WAITAROUND
-		case 'z':
+		case 'D':
 			/* rendezvous with the debugger */
 			waitaround = 1;
 			break;
@@ -899,6 +932,15 @@ main(int argc, char *argv[])
 			Tflag++;	/* Handle Trusted Extensions attrs */
 			pflag++;	/* also set flag for ACL */
 			break;
+		case 'j':		/* compession "bzip2" */
+			jflag++;
+			break;
+		case 'z':		/* compression "gzip" */
+			zflag++;
+			break;
+		case 'Z':		/* compression "compress" */
+			Zflag++;
+			break;
 		default:
 			(void) fprintf(stderr, gettext(
 			"tar: %c: unknown function modifier\n"), *cp);
@@ -919,6 +961,15 @@ main(int argc, char *argv[])
 		(void) fprintf(stderr, gettext(
 		"tar: specify only one of [ctxru].\n"));
 		usage();
+	}
+	if (cflag) {
+		if ((zflag && jflag) || (zflag && Zflag) ||
+		    (jflag && Zflag)) {
+			(void) fprintf(stderr, gettext(
+			    "tar: specify only one of [jzZ] to "
+			    "create a compressed file.\n"));
+			usage();
+		}
 	}
 	/* Trusted Extensions attribute handling */
 	if (Tflag && ((getzoneid() != GLOBAL_ZONEID) ||
@@ -983,6 +1034,34 @@ main(int argc, char *argv[])
 	(void) strcat(xhdr_dirname, pidchars);
 
 	if (rflag) {
+		if (cflag && usefile != NULL)  {
+			/* Set the compression type */
+			if (jflag) {
+				compress_opt = compress_malloc(strlen(BZIP)
+				    + 1);
+				(void) strcpy(compress_opt, BZIP);
+			} else if (zflag) {
+				compress_opt = compress_malloc(strlen(GZIP)
+				    + 1);
+				(void) strcpy(compress_opt, GZIP);
+			} else if (Zflag) {
+				compress_opt =
+				    compress_malloc(strlen(COMPRESS) + 1);
+				(void) strcpy(compress_opt, COMPRESS);
+			}
+		} else {
+			/*
+			 * Decompress if the file is compressed for
+			 * an update or replace.
+			 */
+			if (strcmp(usefile, "-") != 0) {
+				check_compression();
+				if (compress_opt != NULL) {
+					decompress_file();
+				}
+			}
+		}
+
 		if (cflag && tfile != NULL)
 			usage();
 		if (signal(SIGINT, SIG_IGN) != SIG_IGN)
@@ -1031,7 +1110,13 @@ main(int argc, char *argv[])
 		if (Aflag && vflag)
 			(void) printf(
 			gettext("Suppressing absolute pathnames\n"));
+		if (cflag && compress_opt != NULL) {
+			pid = compress_file();
+			wait_pid(pid);
+		}
 		dorep(argv);
+		if (rflag && !cflag && (compress_opt != NULL))
+			compress_back();
 	} else if (xflag || tflag) {
 		/*
 		 * for each argument, check to see if there is a "-I file" pair.
@@ -1069,6 +1154,15 @@ main(int argc, char *argv[])
 		} else if ((mt = open(usefile, 0)) < 0)
 			vperror(1, "%s", usefile);
 
+		/* Decompress if the file is compressed */
+
+		if (strcmp(usefile, "-") != 0) {
+			check_compression();
+			if (compress_opt != NULL) {
+				pid = uncompress_file();
+				wait_pid(pid);
+			}
+		}
 		if (xflag) {
 			if (Aflag && vflag)
 				(void) printf(gettext(
@@ -1112,6 +1206,7 @@ usage(void)
 #else
 		"Usage: tar {c|r|t|u|x}[BDeEhilmnopPqTvw[0-7]][bfFk][X...] "
 #endif	/* O_XATTR */
+		"[j|z|Z] "
 		"[blocksize] [tarfile] [filename] [size] [exclude-file...] "
 		"{file | -I include-file | -C directory file}...\n"));
 	} else
@@ -1127,6 +1222,7 @@ usage(void)
 #else
 		"Usage: tar {c|r|t|u|x}[BDeEFhilmnopPqTvw[0-7]][bfk][X...] "
 #endif	/* O_XATTR */
+		"[j|z|Z] "
 		"[blocksize] [tarfile] [size] [exclude-file...] "
 		"{file | -I include-file | -C directory file}...\n"));
 	}
@@ -4816,6 +4912,8 @@ static void
 done(int n)
 {
 	(void) unlink(tname);
+	if (compress_opt != NULL)
+		(void) free(compress_opt);
 	if (mt > 0) {
 		if ((close(mt) != 0) || (fclose(stdout) != 0)) {
 			perror(gettext("tar: close error"));
@@ -9045,3 +9143,249 @@ check_ext_attr(char *filename)
 	return (1);
 
 }	/* end check_ext_attr */
+
+/* Compressing a tar file using compression method provided in 'opt' */
+
+static void
+compress_back()
+{
+	pid_t	pid;
+	int status;
+	int wret;
+	struct	stat statb;
+
+	if (vflag) {
+		(void) fprintf(vfile,
+		    gettext("Compressing '%s' with '%s'...\n"),
+		    usefile, compress_opt);
+	}
+	if ((pid = fork()) == 0) {
+		(void) execlp(compress_opt, compress_opt,
+		    usefile, NULL);
+	} else if (pid == -1) {
+		vperror(1, "%s", gettext("Could not fork"));
+	}
+	wait_pid(pid);
+	if (suffix == 0) {
+		(void) rename(tfname, usefile);
+	}
+}
+
+/* The magic numbers from /etc/magic */
+
+#define	GZIP_MAGIC	"\037\213"
+#define	BZIP_MAGIC	"BZh"
+#define	COMP_MAGIC	"\037\235"
+
+void
+check_compression()
+{
+	char 	magic[2];
+	char	buf[16];
+	FILE	*fp;
+
+	if ((fp = fopen(usefile, "r")) != NULL) {
+		(void) fread(buf, sizeof (char), 6, fp);
+		magic[0] = buf[0];
+		magic[1] = buf[1];
+		(void) fclose(fp);
+	}
+
+	if (memcmp(magic, GZIP_MAGIC, 2) == 0) {
+		if (xflag || tflag) {
+			compress_opt = compress_malloc(strlen(GZCAT) + 1);
+			(void) strcpy(compress_opt, GZCAT);
+		} else if (uflag || rflag) {
+			compress_opt = compress_malloc(strlen(GZIP) + 1);
+			(void) strcpy(compress_opt, GZIP);
+		}
+	} else if (memcmp(magic, BZIP_MAGIC, 2) == 0) {
+		if (xflag || tflag) {
+			compress_opt = compress_malloc(strlen(BZCAT) + 1);
+			(void) strcpy(compress_opt, BZCAT);
+		} else if (uflag || rflag) {
+			compress_opt = compress_malloc(strlen(BZIP) + 1);
+			(void) strcpy(compress_opt, BZIP);
+		}
+	} else if (memcmp(magic, COMP_MAGIC, 2) == 0) {
+		if (xflag || tflag) {
+			compress_opt = compress_malloc(strlen(ZCAT) + 1);
+			(void) strcpy(compress_opt, ZCAT);
+		} else if (uflag || rflag) {
+			compress_opt = compress_malloc(strlen(COMPRESS) + 1);
+			(void) strcpy(compress_opt, COMPRESS);
+		}
+	}
+}
+
+char *
+add_suffix()
+{
+	(void) strcpy(tfname, usefile);
+	if (strcmp(compress_opt, GZIP) == 0) {
+		if ((suffix = gz_suffix()) == NULL) {
+			strlcat(tfname, gsuffix[0], sizeof (tfname));
+			return (gsuffix[0]);
+		}
+	} else if (strcmp(compress_opt, COMPRESS) == 0) {
+		if ((suffix = gz_suffix()) == NULL) {
+			strlcat(tfname, gsuffix[6], sizeof (tfname));
+			return (gsuffix[6]);
+		}
+	} else if (strcmp(compress_opt, BZIP) == 0) {
+		if ((suffix = bz_suffix()) == NULL) {
+			strlcat(tfname, bsuffix[0], sizeof (tfname));
+			return (bsuffix[0]);
+		}
+	}
+	return (NULL);
+}
+
+/* Decompressing a tar file using compression method from the file type */
+void
+decompress_file(void)
+{
+	pid_t 	pid;
+	int	status;
+	char	cmdstr[PATH_MAX];
+	char	fname[PATH_MAX];
+	char	*added_suffix;
+
+
+	added_suffix = add_suffix();
+	if (added_suffix != NULL)  {
+		(void) rename(usefile, tfname);
+	}
+	if ((pid = fork()) == 0) {
+		if (vflag) {
+			(void) fprintf(vfile,
+			    gettext("Decompressing '%s' with "
+			    "'%s'...\n"), usefile, compress_opt);
+		}
+		(void) execlp(compress_opt, compress_opt, "-df",
+		    tfname, NULL);
+		(void) fprintf(vfile, gettext("Could not exec %s: %s\n"),
+		    compress_opt, usefile, strerror(errno));
+	} else if (pid == -1) {
+		vperror(1, "Could not fork");
+	}
+	wait_pid(pid);
+	if (suffix != NULL) {
+		/* restore the file name - original file was without suffix */
+		*(usefile + strlen(usefile) - strlen(suffix)) = '\0';
+	}
+}
+
+/* Set the archive for writing and then compress the archive */
+pid_t
+compress_file(void)
+{
+	int fd[2];
+	pid_t pid;
+
+	if (vflag) {
+		(void) fprintf(vfile, gettext("Compressing '%s' with "
+		    "'%s'...\n"), usefile, compress_opt);
+	}
+
+	if (pipe(fd) < 0) {
+		vperror(1, gettext("Could not create pipe"));
+	}
+	if (pid = fork() > 0) {
+		mt = fd[1];
+		(void) close(fd[0]);
+		return (pid);
+	}
+	/* child */
+	(void) dup2(fd[0], STDIN_FILENO);
+	(void) close(fd[1]);
+	(void) dup2(mt, STDOUT_FILENO);
+	(void) execlp(compress_opt, compress_opt, NULL);
+	vperror(1, "%s", gettext("Could not exec %s"), compress_opt);
+	return (0);	/*NOTREACHED*/
+}
+
+pid_t
+uncompress_file(void)
+{
+	int fd[2];
+	pid_t pid;
+
+	if (vflag) {
+		(void) fprintf(vfile, gettext("Decompressing '%s' with "
+		    "'%s'...\n"), usefile, compress_opt);
+	}
+
+	if (pipe(fd) < 0) {
+		vperror(1, gettext("Could not create pipe"));
+	}
+	if (pid = fork() > 0) {
+		mt = fd[0];
+		(void) close(fd[1]);
+		return (pid);
+	}
+	/* child */
+	(void) dup2(fd[1], STDOUT_FILENO);
+	(void) close(fd[0]);
+	(void) dup2(mt, STDIN_FILENO);
+	(void) execlp(compress_opt, compress_opt, NULL);
+	vperror(1, "%s", gettext("Could not exec %s"), compress_opt);
+	return (0);	/*NOTREACHED*/
+}
+
+/* Checking valid 'bzip2' suffix */
+char *
+bz_suffix()
+{
+	int 	i;
+	int	slen;
+	int	nlen = strlen(usefile);
+
+	for (i = 0; i < BS; i++) {
+		slen = strlen(bsuffix[i]);
+		if (nlen < slen)
+			return (NULL);
+		if (strcmp(usefile + nlen - slen, bsuffix[i]) == 0)
+			return (bsuffix[i]);
+	}
+	return (NULL);
+}
+
+/* Checking valid 'gzip' suffix */
+char *
+gz_suffix()
+{
+	int 	i;
+	int	slen;
+	int	nlen = strlen(usefile);
+
+	for (i = 0; i < GS; i++) {
+		slen = strlen(gsuffix[i]);
+		if (nlen < slen)
+			return (NULL);
+		if (strcmp(usefile + nlen - slen, gsuffix[i]) == 0)
+			return (gsuffix[i]);
+	}
+	return (NULL);
+}
+
+void *
+compress_malloc(size_t size)
+{
+	void *opt;
+
+	if ((opt = malloc(size)) == NULL) {
+		vperror(1, "%s",
+		    gettext("Could not allocate compress buffer\n"));
+	}
+	return (opt);
+}
+
+void
+wait_pid(pid_t pid)
+{
+	int status;
+
+	while (waitpid(pid, &status, 0) == -1 && errno == EINTR)
+		;
+}
