@@ -20,9 +20,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # inityp2l -- Utility to generate YP (NIS) to LDAP
@@ -249,7 +247,7 @@ EOF
     ;;
     TLSCertificateDBPath_help) cat <<EOF
 
-HELP - The absolute path name of the file containing the certificate
+HELP - The absolute path name of the directory containing the certificate
        database. The default value is "$DEF_TLSCertificateDBPath"
 
 EOF
@@ -1257,7 +1255,7 @@ DEF_TTL_MAPLIST="audit_user
 configDN_flag=0
 DEF_nisLDAPconfigDN=""
 DEF_TLS=none
-DEF_TLSCertificateDBPath=/var/yp/cert7.db
+DEF_TLSCertificateDBPath=/var/yp/
 DEF_nisLDAPbindTimeout=15
 DEF_nisLDAPsearchTimeout=180
 DEF_nisLDAPmodifyTimeout=15
@@ -1616,7 +1614,7 @@ get_nisLDAPconfigTLSCertificateDBPath()
 while :
 do
 
-get_ans "TLS Certificate DB for configuration server (h=help):"\
+get_ans "Path with TLS Certificate DB for configuration server (h=help):"\
             "${DEF_TLSCertificateDBPath}"
 
 # If help continue, otherwise break.
@@ -1716,7 +1714,7 @@ get_nisLDAPTLSCertificateDBPath()
 while :
 do
 
-get_ans "TLS Certificate DB for LDAP data server (h=help):"\
+get_ans "Path with TLS Certificate DB for LDAP data server (h=help):"\
         "${DEF_nisLDAPTLSCertificateDBPath}"
 
 # If help continue, otherwise break.
