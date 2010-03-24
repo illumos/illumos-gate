@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -312,6 +312,12 @@ NA, MTC0, MTC1, M2, MTC2, M2, M2, MT0, MTC3, M2, M2,  MT1, M2, MT2, M2, M2
 #define	BSYND_TBL_SIZE	16
 
 #endif /* !(JALAPENO || SERRANO) */
+
+/*
+ * Virtual Address bit flag in the data cache. This is actually bit 2 in the
+ * dcache data tag.
+ */
+#define	VA13	INT64_C(0x0000000000000002)
 
 /*
  * Types returned from cpu_error_to_resource_type()
@@ -2082,6 +2088,12 @@ cpu_parity_error(struct regs *rp, uint_t flags, caddr_t tpc)
 	uchar_t iparity = ((flags & CH_ERR_IPE) != 0);
 	uchar_t panic = ((flags & CH_ERR_PANIC) != 0);
 	char *error_class;
+	int index, way, word;
+	ch_dc_data_t tmp_dcp;
+	int dc_set_size = dcache_size / CH_DCACHE_NWAY;
+	uint64_t parity_bits, pbits;
+	/* The parity bit array corresponds to the result of summing two bits */
+	static int parity_bits_popc[] = { 0, 1, 1, 0 };
 
 	/*
 	 * Log the error.
@@ -2116,9 +2128,55 @@ cpu_parity_error(struct regs *rp, uint_t flags, caddr_t tpc)
 		aflt->flt_payload = FM_EREPORT_PAYLOAD_ICACHE_PE;
 	} else {
 		cpu_dcache_parity_info(&ch_flt);
-		if (ch_flt.parity_data.dpe.cpl_off != -1)
+		if (ch_flt.parity_data.dpe.cpl_off != -1) {
+			/*
+			 * If not at TL 0 and running on a Jalapeno processor,
+			 * then process as a true ddspe.  A true
+			 * ddspe error can only occur if the way == 0
+			 */
+			way = ch_flt.parity_data.dpe.cpl_way;
+			if ((tl == 0) && (way != 0) &&
+			    IS_JALAPENO(cpunodes[CPU->cpu_id].implementation)) {
+				for (index = 0; index < dc_set_size;
+				    index += dcache_linesize) {
+					get_dcache_dtag(index + way *
+					    dc_set_size,
+					    (uint64_t *)&tmp_dcp);
+					/*
+					 * Check data array for even parity.
+					 * The 8 parity bits are grouped into
+					 * 4 pairs each of which covers a 64-bit
+					 * word.  The endianness is reversed
+					 * -- the low-order parity bits cover
+					 *  the high-order data words.
+					 */
+					parity_bits = tmp_dcp.dc_utag >> 8;
+					for (word = 0; word < 4; word++) {
+						pbits = (parity_bits >>
+						    (6 - word * 2)) & 3;
+						if (((popc64(
+						    tmp_dcp.dc_data[word]) +
+						    parity_bits_popc[pbits]) &
+						    1) && (tmp_dcp.dc_tag &
+						    VA13)) {
+							/* cleanup */
+							correct_dcache_parity(
+							    dcache_size,
+							    dcache_linesize);
+							if (cache_boot_state &
+							    DCU_DC) {
+								flush_dcache();
+							}
+
+							set_dcu(get_dcu() |
+							    cache_boot_state);
+							return;
+						}
+					}
+				}
+			} /* (tl == 0) && (way != 0) && IS JALAPENO */
 			error_class = FM_EREPORT_CPU_USIII_DDSPE;
-		else if (ch_flt.parity_data.dpe.cpl_way != -1)
+		} else if (ch_flt.parity_data.dpe.cpl_way != -1)
 			error_class = FM_EREPORT_CPU_USIII_DTSPE;
 		else
 			error_class = FM_EREPORT_CPU_USIII_DPE;
