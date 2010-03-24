@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -152,9 +152,9 @@ case $SMF_FMRI in
 		fi
 
 		if [ -f /etc/resolv.conf ]; then
-			$YPDIR/ypserv -d
+			/usr/bin/env NSS_STRICT_NOFORK=DISABLED $YPDIR/ypserv -d
 		else
-			$YPDIR/ypserv
+			/usr/bin/env NSS_STRICT_NOFORK=DISABLED $YPDIR/ypserv
 		fi
 
 		rc=$?
