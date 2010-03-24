@@ -798,8 +798,6 @@ struct audiohd_state {
 	kmutex_t	hda_mutex;
 	uint32_t	hda_flags;
 
-	boolean_t	soft_volume;
-
 	caddr_t			hda_reg_base;
 	ddi_acc_handle_t	hda_pci_handle;
 	ddi_acc_handle_t	hda_reg_handle;

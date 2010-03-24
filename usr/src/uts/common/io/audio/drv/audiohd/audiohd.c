@@ -1185,47 +1185,6 @@ audiohd_get_control(void *arg, uint64_t *val)
 }
 
 static void
-audiohd_set_output_gain(audiohd_state_t *statep)
-{
-	int			i;
-	audiohd_path_t		*path;
-	uint_t			verb;
-	wid_t			wid;
-	audiohd_widget_t	*w;
-	uint8_t			gain;
-	uint32_t		maxgain;
-
-	if (statep->soft_volume)
-		return;
-	gain = (uint8_t)statep->ctrls[CTL_VOLUME].val;
-	for (i = 0; i < statep->pathnum; i++) {
-		path = statep->path[i];
-		if (!path || path->path_type != PLAY)
-			continue;
-		/* use the DACs to adjust the volume */
-		wid = path->adda_wid;
-		w = path->codec->widget[wid];
-		maxgain = w->outamp_cap &
-		    AUDIOHDC_AMP_CAP_STEP_NUMS;
-		maxgain >>= AUDIOHD_GAIN_OFF;
-
-		verb = AUDIOHDC_AMP_SET_OUTPUT | AUDIOHDC_AMP_SET_INPUT
-		    | (gain * maxgain / 100);
-		if (gain == 0) {
-			/* set mute bit in amplifier */
-			verb |= AUDIOHDC_AMP_SET_MUTE;
-		}
-
-		(void) audioha_codec_4bit_verb_get(statep,
-		    path->codec->index, wid, AUDIOHDC_VERB_SET_AMP_MUTE,
-		    AUDIOHDC_AMP_SET_LEFT | verb);
-		(void) audioha_codec_4bit_verb_get(statep,
-		    path->codec->index, wid, AUDIOHDC_VERB_SET_AMP_MUTE,
-		    AUDIOHDC_AMP_SET_RIGHT | verb);
-	}
-}
-
-static void
 audiohd_do_set_pin_volume(audiohd_state_t *statep, audiohd_path_t *path,
     uint64_t val)
 {
@@ -1247,7 +1206,6 @@ audiohd_do_set_pin_volume(audiohd_state_t *statep, audiohd_path_t *path,
 
 	l = (val & 0xff00) >> 8;
 	r = (val & 0xff);
-
 	tmp = l * path->gain_bits / 100;
 	(void) audioha_codec_4bit_verb_get(statep,
 	    path->codec->index,
@@ -1299,26 +1257,38 @@ audiohd_set_pin_volume(audiohd_state_t *statep, audiohda_device_type_t type)
 	switch (type) {
 		case DTYPE_SPEAKER:
 			control = statep->ctrls[CTL_SPEAKER];
+			if (control.ctrl == NULL)
+				return;
 			val = control.val;
 			break;
 		case DTYPE_HP_OUT:
 			control = statep->ctrls[CTL_HEADPHONE];
+			if (control.ctrl == NULL)
+				return;
 			val = control.val;
 			break;
 		case DTYPE_LINEOUT:
 			control = statep->ctrls[CTL_FRONT];
+			if (control.ctrl == NULL)
+				return;
 			val = control.val;
 			break;
 		case DTYPE_CD:
 			control = statep->ctrls[CTL_CD];
+			if (control.ctrl == NULL)
+				return;
 			val = control.val;
 			break;
 		case DTYPE_LINE_IN:
 			control = statep->ctrls[CTL_LINEIN];
+			if (control.ctrl == NULL)
+				return;
 			val = control.val;
 			break;
 		case DTYPE_MIC_IN:
 			control = statep->ctrls[CTL_MIC];
+			if (control.ctrl == NULL)
+				return;
 			val = control.val;
 			break;
 	}
@@ -1358,21 +1328,31 @@ audiohd_set_pin_volume_by_color(audiohd_state_t *statep,
 	switch (color) {
 		case AUDIOHD_PIN_GREEN:
 			control = statep->ctrls[CTL_FRONT];
+			if (control.ctrl == NULL)
+				return;
 			val = control.val;
 			break;
 		case AUDIOHD_PIN_BLACK:
 			control = statep->ctrls[CTL_REAR];
+			if (control.ctrl == NULL)
+				return;
 			val = control.val;
 			break;
 		case AUDIOHD_PIN_ORANGE:
 			control = statep->ctrls[CTL_CENTER];
+			if (control.ctrl == NULL)
+				return;
 			l = control.val;
 			control = statep->ctrls[CTL_LFE];
+			if (control.ctrl == NULL)
+				return;
 			r = control.val;
 			val = (l << 8) | r;
 			break;
 		case AUDIOHD_PIN_GREY:
 			control = statep->ctrls[CTL_SURROUND];
+			if (control.ctrl == NULL)
+				return;
 			val = control.val;
 			break;
 	}
@@ -1675,8 +1655,6 @@ audiohd_configure_output(audiohd_state_t *statep)
 	audiohd_set_pin_volume_by_color(statep, AUDIOHD_PIN_BLACK);
 	audiohd_set_pin_volume_by_color(statep, AUDIOHD_PIN_GREY);
 	audiohd_set_pin_volume_by_color(statep, AUDIOHD_PIN_ORANGE);
-
-	audiohd_set_output_gain(statep);
 }
 
 static void
@@ -1687,22 +1665,6 @@ audiohd_configure_input(audiohd_state_t *statep)
 	audiohd_set_pin_volume(statep, DTYPE_LINE_IN);
 	audiohd_set_pin_volume(statep, DTYPE_CD);
 	audiohd_set_pin_volume(statep, DTYPE_MIC_IN);
-}
-
-static int
-audiohd_set_volume(void *arg, uint64_t val)
-{
-	audiohd_ctrl_t	*pc = arg;
-	audiohd_state_t	*statep = pc->statep;
-
-	AUDIOHD_CHECK_CHANNEL_VOLUME(val);
-
-	mutex_enter(&statep->hda_mutex);
-	pc->val = val;
-	audiohd_set_output_gain(statep);
-	mutex_exit(&statep->hda_mutex);
-
-	return (0);
 }
 
 static int
@@ -2004,33 +1966,10 @@ audiohd_create_controls(audiohd_state_t *statep)
 	audiohd_pin_color_t	color;
 	int			i, j;
 
-	for (i = 0; i < statep->pathnum; i++) {
-		path = statep->path[i];
-		if (path == NULL || path->path_type != PLAY)
-			continue;
-		/*
-		 * Firstly we check if all the DACs on the play paths
-		 * have amplifiers.
-		 */
-		wid = path->adda_wid;
-		widget = path->codec->widget[wid];
-		if (!widget->outamp_cap) {
-			statep->soft_volume = B_TRUE;
-			break;
-		}
-	}
-
 	/*
-	 * If all the DACs on the play paths have the amplifiers, we use DACs'
-	 * amplifiers to adjust volume, otherwise use soft volume control to
-	 * to adjust PCM volume.
+	 * We always use soft volume control to adjust PCM volume.
 	 */
-	if (!statep->soft_volume) {
-		audiohd_create_mono(statep, CTL_VOLUME,
-		    AUDIO_CTRL_ID_VOLUME, PCMVOL, 75, audiohd_set_volume);
-	} else {
-		(void) audio_dev_add_soft_volume(statep->adev);
-	}
+	(void) audio_dev_add_soft_volume(statep->adev);
 
 	/* Allocate other controls */
 	for (i = 0; i < statep->pathnum; i++) {
