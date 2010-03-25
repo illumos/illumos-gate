@@ -68,6 +68,8 @@ typedef struct xc_msg {
 #if defined(_KERNEL)
 
 extern void	xc_init_cpu(struct cpu *);
+extern void	xc_fini_cpu(struct cpu *);
+extern int	xc_flush_cpu(struct cpu *);
 extern uint_t	xc_serv(caddr_t, caddr_t);
 
 #define	CPUSET2BV(set)	((ulong_t *)(void *)&(set))

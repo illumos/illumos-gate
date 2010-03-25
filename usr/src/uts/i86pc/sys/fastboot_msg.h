@@ -45,6 +45,7 @@
 fastboot_nosup_msg(FBNS_DEFAULT, "")
 fastboot_nosup_msg(FBNS_SUSPEND, " after suspend/resume")
 fastboot_nosup_msg(FBNS_FMAHWERR, " due to FMA recovery from hardware error")
+fastboot_nosup_msg(FBNS_HOTPLUG, " after DR operations")
 
 /*
  * Should ALWAYS be the last one.

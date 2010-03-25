@@ -79,7 +79,39 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpi/acpinex/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+SBD_IOCTL	= $(UTSBASE)/i86pc/sys/sbd_ioctl.h
+DRMACH_IO	= $(UTSBASE)/i86pc/io/acpi/drmach_acpi
+DRMACH_GENERR	= $(DRMACH_IO)/sbdgenerr
+DR_IO		= $(UTSBASE)/i86pc/io/dr
+DR_GENERR	= $(DR_IO)/sbdgenerr
+
+$(DRMACH_GENERR):	$(DR_IO)/sbdgenerr.pl
+	$(RM) $@
+	$(CAT) $(DR_IO)/sbdgenerr.pl > $@
+	$(CHMOD) +x $@
+
+$(DRMACH_IO)/drmach_err.c:	$(DRMACH_GENERR) $(SBD_IOCTL)
+	$(RM) $@
+	$(DRMACH_GENERR) EX86 < $(SBD_IOCTL) > $(DRMACH_IO)/drmach_err.c
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpi/drmach_acpi/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/amd_iommu/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(DR_GENERR):			$(DR_IO)/sbdgenerr.pl
+	$(RM) $@
+	$(CAT) $(DR_IO)/sbdgenerr.pl > $@
+	$(CHMOD) +x $@
+
+$(DR_IO)/dr_err.c:		$(DR_GENERR) $(SBD_IOCTL)
+	$(RM) $@
+	$(DR_GENERR) ESBD < $(SBD_IOCTL) > $(DR_IO)/dr_err.c
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/dr/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -307,7 +339,13 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpi/acpidev/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpi/acpinex/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpi/drmach_acpi/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:              $(UTSBASE)/i86pc/io/amd_iommu/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/dr/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/ioat/%.c

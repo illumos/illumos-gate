@@ -189,6 +189,7 @@ struct gcpu_chipshared {
 	kmutex_t gcpus_cfglock;		/* serial MCA config from chip cores */
 	kmutex_t gcpus_poll_lock;	/* serialize pollers on the same chip */
 	uint32_t gcpus_actv_banks;	/* MCA bank numbers active on chip */
+	volatile uint32_t gcpus_actv_cnt; /* active cpu count in this chip */
 };
 
 struct gcpu_data {
@@ -205,11 +206,13 @@ struct regs;
  * CMI implementation
  */
 extern int gcpu_init(cmi_hdl_t, void **);
+extern void gcpu_fini(cmi_hdl_t);
 extern void gcpu_post_startup(cmi_hdl_t);
 extern void gcpu_post_mpstartup(cmi_hdl_t);
 extern void gcpu_faulted_enter(cmi_hdl_t);
 extern void gcpu_faulted_exit(cmi_hdl_t);
 extern void gcpu_mca_init(cmi_hdl_t);
+extern void gcpu_mca_fini(cmi_hdl_t hdl);
 extern cmi_errno_t gcpu_msrinject(cmi_hdl_t, cmi_mca_regs_t *, uint_t, int);
 #ifndef __xpv
 extern uint64_t gcpu_mca_trap(cmi_hdl_t, struct regs *);
@@ -228,6 +231,7 @@ extern int cmi_enable_cmci;
  * Local functions
  */
 extern void gcpu_mca_poll_init(cmi_hdl_t);
+extern void gcpu_mca_poll_fini(cmi_hdl_t);
 extern void gcpu_mca_poll_start(cmi_hdl_t);
 extern void gcpu_poll_trace_init(gcpu_poll_trace_ctl_t *);
 extern void gcpu_poll_trace(gcpu_poll_trace_ctl_t *, uint8_t, uint8_t);

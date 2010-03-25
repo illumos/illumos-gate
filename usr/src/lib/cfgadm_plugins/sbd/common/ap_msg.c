@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -63,8 +61,7 @@ debugging(void)
 		if ((debug_fp = fopen(ep, "a")) == NULL)
 			return (0);
 	}
-	(void) fprintf(debug_fp,
-		"\nDebug started, pid=%d\n", (int)getpid());
+	(void) fprintf(debug_fp, "\nDebug started, pid=%d\n", (int)getpid());
 	return (1);
 }
 
@@ -110,7 +107,7 @@ ap_err_fmts[] = {
 	NULL
 };
 
-#define	ap_err_fmt(i)		ap_err_fmts[min((i), ERR_NONE)]
+#define	ap_err_fmt(i)		ap_err_fmts[min((uint_t)(i), ERR_NONE)]
 
 static char *
 ap_msg_fmts[] = {
@@ -125,7 +122,7 @@ ap_msg_fmts[] = {
 	NULL
 };
 
-#define	ap_msg_fmt(i)		ap_msg_fmts[min((i), MSG_NONE)]
+#define	ap_msg_fmt(i)		ap_msg_fmts[min((uint_t)(i), MSG_NONE)]
 
 #define	STR_BD			"board"
 #define	STR_SEP			": "
@@ -366,7 +363,7 @@ ap_err(apd_t *a, ...)
 	switch (err) {
 	case ERR_CMD_FAIL:
 		(void) snprintf(p, len, fmt, cmd, target,
-			syserr, rsep, sysrsrc);
+		    syserr, rsep, sysrsrc);
 		break;
 	case ERR_CMD_ABORT:
 	case ERR_CMD_NACK:

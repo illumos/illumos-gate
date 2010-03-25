@@ -476,6 +476,7 @@ ODE	$(CLOSED)/cmd/tail	\
 	$(CLOSED)/cmd/tr_xpg4
 
 i386_SUBDIRS=		\
+	acpihpd		\
 	addbadsec	\
 	biosdev		\
 	diskscan	\

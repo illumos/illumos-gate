@@ -59,9 +59,6 @@
 
 extern struct memlist *phys_avail;
 
-extern void mem_node_add(pfn_t, pfn_t);
-extern void mem_node_del(pfn_t, pfn_t);
-
 extern uint_t page_ctrs_adjust(int);
 void page_ctrs_cleanup(void);
 static void kphysm_setup_post_add(pgcnt_t);
@@ -107,6 +104,13 @@ static void memseg_cpu_vm_flush(void);
 
 int meta_alloc_enable;
 
+#ifdef	DEBUG
+static int memseg_debug;
+#define	MEMSEG_DEBUG(args...) if (memseg_debug) printf(args)
+#else
+#define	MEMSEG_DEBUG(...)
+#endif
+
 /*
  * Add a chunk of memory to the system.
  * base: starting PAGESIZE page of new memory.
@@ -117,13 +121,6 @@ int meta_alloc_enable;
  * dynamically most likely means more hash misses, since the tables will
  * be smaller than they otherwise would be.
  */
-#ifdef	DEBUG
-static int memseg_debug;
-#define	MEMSEG_DEBUG(args...) if (memseg_debug) printf(args)
-#else
-#define	MEMSEG_DEBUG(...)
-#endif
-
 int
 kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 {
@@ -341,6 +338,9 @@ mapalloc:
 	 * this may change with COD or in larger SSM systems with
 	 * nested latency groups, so we must not assume that the
 	 * node does not yet exist.
+	 *
+	 * Note that there may be multiple memory nodes associated with
+	 * a single lgrp node on x86 systems.
 	 */
 	pnum = pt_base + tpgs - 1;
 	mem_node_add_range(pt_base, pnum);
@@ -569,8 +569,8 @@ mapalloc:
 	    (uint64_t)(tpgs) << PAGESHIFT);
 
 	delspan_unreserve(pt_base, tpgs);
-	return (KPHYSM_OK);		/* Successfully added system memory */
 
+	return (KPHYSM_OK);		/* Successfully added system memory */
 }
 
 /*
@@ -2566,7 +2566,7 @@ remap_to_dummy(caddr_t va, pgcnt_t metapgs)
 {
 	int phase;
 
-	ASSERT(IS_P2ALIGNED((uint64_t)va, PAGESIZE));
+	ASSERT(IS_P2ALIGNED((uint64_t)(uintptr_t)va, PAGESIZE));
 
 	/*
 	 * We may start remapping at a non-zero page offset
@@ -2574,7 +2574,8 @@ remap_to_dummy(caddr_t va, pgcnt_t metapgs)
 	 * of the outgoing pp's could be shared by other
 	 * memsegs (see memseg_remap_meta).
 	 */
-	phase = btop((uint64_t)va) % pp_dummy_npages;
+	phase = btop((uint64_t)(uintptr_t)va) % pp_dummy_npages;
+	/*CONSTCOND*/
 	ASSERT(PAGESIZE % sizeof (page_t) || phase == 0);
 
 	while (metapgs != 0) {

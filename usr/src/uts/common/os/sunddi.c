@@ -85,6 +85,10 @@
 #include <sys/zone.h>
 #include <sys/clock_impl.h>
 #include <sys/ddi.h>
+#include <sys/modhash.h>
+#include <sys/sunldi_impl.h>
+#include <sys/fs/dv_node.h>
+#include <sys/fs/snode.h>
 
 extern	pri_t	minclsyspri;
 
@@ -9368,4 +9372,939 @@ ddi_cb_unregister(ddi_cb_handle_t hdl)
 	DEVI(dip)->devi_cb_p = NULL;
 
 	return (DDI_SUCCESS);
+}
+
+/*
+ * Platform independent DR routines
+ */
+
+static int
+ndi2errno(int n)
+{
+	int err = 0;
+
+	switch (n) {
+		case NDI_NOMEM:
+			err = ENOMEM;
+			break;
+		case NDI_BUSY:
+			err = EBUSY;
+			break;
+		case NDI_FAULT:
+			err = EFAULT;
+			break;
+		case NDI_FAILURE:
+			err = EIO;
+			break;
+		case NDI_SUCCESS:
+			break;
+		case NDI_BADHANDLE:
+		default:
+			err = EINVAL;
+			break;
+	}
+	return (err);
+}
+
+/*
+ * Prom tree node list
+ */
+struct ptnode {
+	pnode_t		nodeid;
+	struct ptnode	*next;
+};
+
+/*
+ * Prom tree walk arg
+ */
+struct pta {
+	dev_info_t	*pdip;
+	devi_branch_t	*bp;
+	uint_t		flags;
+	dev_info_t	*fdip;
+	struct ptnode	*head;
+};
+
+static void
+visit_node(pnode_t nodeid, struct pta *ap)
+{
+	struct ptnode	**nextp;
+	int		(*select)(pnode_t, void *, uint_t);
+
+	ASSERT(nodeid != OBP_NONODE && nodeid != OBP_BADNODE);
+
+	select = ap->bp->create.prom_branch_select;
+
+	ASSERT(select);
+
+	if (select(nodeid, ap->bp->arg, 0) == DDI_SUCCESS) {
+
+		for (nextp = &ap->head; *nextp; nextp = &(*nextp)->next)
+			;
+
+		*nextp = kmem_zalloc(sizeof (struct ptnode), KM_SLEEP);
+
+		(*nextp)->nodeid = nodeid;
+	}
+
+	if ((ap->flags & DEVI_BRANCH_CHILD) == DEVI_BRANCH_CHILD)
+		return;
+
+	nodeid = prom_childnode(nodeid);
+	while (nodeid != OBP_NONODE && nodeid != OBP_BADNODE) {
+		visit_node(nodeid, ap);
+		nodeid = prom_nextnode(nodeid);
+	}
+}
+
+/*
+ * NOTE: The caller of this function must check for device contracts
+ * or LDI callbacks against this dip before setting the dip offline.
+ */
+static int
+set_infant_dip_offline(dev_info_t *dip, void *arg)
+{
+	char	*path = (char *)arg;
+
+	ASSERT(dip);
+	ASSERT(arg);
+
+	if (i_ddi_node_state(dip) >= DS_ATTACHED) {
+		(void) ddi_pathname(dip, path);
+		cmn_err(CE_WARN, "Attempt to set offline flag on attached "
+		    "node: %s", path);
+		return (DDI_FAILURE);
+	}
+
+	mutex_enter(&(DEVI(dip)->devi_lock));
+	if (!DEVI_IS_DEVICE_OFFLINE(dip))
+		DEVI_SET_DEVICE_OFFLINE(dip);
+	mutex_exit(&(DEVI(dip)->devi_lock));
+
+	return (DDI_SUCCESS);
+}
+
+typedef struct result {
+	char	*path;
+	int	result;
+} result_t;
+
+static int
+dip_set_offline(dev_info_t *dip, void *arg)
+{
+	int end;
+	result_t *resp = (result_t *)arg;
+
+	ASSERT(dip);
+	ASSERT(resp);
+
+	/*
+	 * We stop the walk if e_ddi_offline_notify() returns
+	 * failure, because this implies that one or more consumers
+	 * (either LDI or contract based) has blocked the offline.
+	 * So there is no point in conitnuing the walk
+	 */
+	if (e_ddi_offline_notify(dip) == DDI_FAILURE) {
+		resp->result = DDI_FAILURE;
+		return (DDI_WALK_TERMINATE);
+	}
+
+	/*
+	 * If set_infant_dip_offline() returns failure, it implies
+	 * that we failed to set a particular dip offline. This
+	 * does not imply that the offline as a whole should fail.
+	 * We want to do the best we can, so we continue the walk.
+	 */
+	if (set_infant_dip_offline(dip, resp->path) == DDI_SUCCESS)
+		end = DDI_SUCCESS;
+	else
+		end = DDI_FAILURE;
+
+	e_ddi_offline_finalize(dip, end);
+
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * The call to e_ddi_offline_notify() exists for the
+ * unlikely error case that a branch we are trying to
+ * create already exists and has device contracts or LDI
+ * event callbacks against it.
+ *
+ * We allow create to succeed for such branches only if
+ * no constraints block the offline.
+ */
+static int
+branch_set_offline(dev_info_t *dip, char *path)
+{
+	int		circ;
+	int		end;
+	result_t	res;
+
+
+	if (e_ddi_offline_notify(dip) == DDI_FAILURE) {
+		return (DDI_FAILURE);
+	}
+
+	if (set_infant_dip_offline(dip, path) == DDI_SUCCESS)
+		end = DDI_SUCCESS;
+	else
+		end = DDI_FAILURE;
+
+	e_ddi_offline_finalize(dip, end);
+
+	if (end == DDI_FAILURE)
+		return (DDI_FAILURE);
+
+	res.result = DDI_SUCCESS;
+	res.path = path;
+
+	ndi_devi_enter(dip, &circ);
+	ddi_walk_devs(ddi_get_child(dip), dip_set_offline, &res);
+	ndi_devi_exit(dip, circ);
+
+	return (res.result);
+}
+
+/*ARGSUSED*/
+static int
+create_prom_branch(void *arg, int has_changed)
+{
+	int		circ;
+	int		exists, rv;
+	pnode_t		nodeid;
+	struct ptnode	*tnp;
+	dev_info_t	*dip;
+	struct pta	*ap = arg;
+	devi_branch_t	*bp;
+	char		*path;
+
+	ASSERT(ap);
+	ASSERT(ap->fdip == NULL);
+	ASSERT(ap->pdip && ndi_dev_is_prom_node(ap->pdip));
+
+	bp = ap->bp;
+
+	nodeid = ddi_get_nodeid(ap->pdip);
+	if (nodeid == OBP_NONODE || nodeid == OBP_BADNODE) {
+		cmn_err(CE_WARN, "create_prom_branch: invalid "
+		    "nodeid: 0x%x", nodeid);
+		return (EINVAL);
+	}
+
+	ap->head = NULL;
+
+	nodeid = prom_childnode(nodeid);
+	while (nodeid != OBP_NONODE && nodeid != OBP_BADNODE) {
+		visit_node(nodeid, ap);
+		nodeid = prom_nextnode(nodeid);
+	}
+
+	if (ap->head == NULL)
+		return (ENODEV);
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	rv = 0;
+	while ((tnp = ap->head) != NULL) {
+		ap->head = tnp->next;
+
+		ndi_devi_enter(ap->pdip, &circ);
+
+		/*
+		 * Check if the branch already exists.
+		 */
+		exists = 0;
+		dip = e_ddi_nodeid_to_dip(tnp->nodeid);
+		if (dip != NULL) {
+			exists = 1;
+
+			/* Parent is held busy, so release hold */
+			ndi_rele_devi(dip);
+#ifdef	DEBUG
+			cmn_err(CE_WARN, "create_prom_branch: dip(%p) exists"
+			    " for nodeid 0x%x", (void *)dip, tnp->nodeid);
+#endif
+		} else {
+			dip = i_ddi_create_branch(ap->pdip, tnp->nodeid);
+		}
+
+		kmem_free(tnp, sizeof (struct ptnode));
+
+		/*
+		 * Hold the branch if it is not already held
+		 */
+		if (dip && !exists) {
+			e_ddi_branch_hold(dip);
+		}
+
+		ASSERT(dip == NULL || e_ddi_branch_held(dip));
+
+		/*
+		 * Set all dips in the newly created branch offline so that
+		 * only a "configure" operation can attach
+		 * the branch
+		 */
+		if (dip == NULL || branch_set_offline(dip, path)
+		    == DDI_FAILURE) {
+			ndi_devi_exit(ap->pdip, circ);
+			rv = EIO;
+			continue;
+		}
+
+		ASSERT(ddi_get_parent(dip) == ap->pdip);
+
+		ndi_devi_exit(ap->pdip, circ);
+
+		if (ap->flags & DEVI_BRANCH_CONFIGURE) {
+			int error = e_ddi_branch_configure(dip, &ap->fdip, 0);
+			if (error && rv == 0)
+				rv = error;
+		}
+
+		/*
+		 * Invoke devi_branch_callback() (if it exists) only for
+		 * newly created branches
+		 */
+		if (bp->devi_branch_callback && !exists)
+			bp->devi_branch_callback(dip, bp->arg, 0);
+	}
+
+	kmem_free(path, MAXPATHLEN);
+
+	return (rv);
+}
+
+static int
+sid_node_create(dev_info_t *pdip, devi_branch_t *bp, dev_info_t **rdipp)
+{
+	int			rv, circ, len;
+	int			i, flags, ret;
+	dev_info_t		*dip;
+	char			*nbuf;
+	char			*path;
+	static const char	*noname = "<none>";
+
+	ASSERT(pdip);
+	ASSERT(DEVI_BUSY_OWNED(pdip));
+
+	flags = 0;
+
+	/*
+	 * Creating the root of a branch ?
+	 */
+	if (rdipp) {
+		*rdipp = NULL;
+		flags = DEVI_BRANCH_ROOT;
+	}
+
+	ndi_devi_alloc_sleep(pdip, (char *)noname, DEVI_SID_NODEID, &dip);
+	rv = bp->create.sid_branch_create(dip, bp->arg, flags);
+
+	nbuf = kmem_alloc(OBP_MAXDRVNAME, KM_SLEEP);
+
+	if (rv == DDI_WALK_ERROR) {
+		cmn_err(CE_WARN, "e_ddi_branch_create: Error setting"
+		    " properties on devinfo node %p",  (void *)dip);
+		goto fail;
+	}
+
+	len = OBP_MAXDRVNAME;
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "name", nbuf, &len)
+	    != DDI_PROP_SUCCESS) {
+		cmn_err(CE_WARN, "e_ddi_branch_create: devinfo node %p has"
+		    "no name property", (void *)dip);
+		goto fail;
+	}
+
+	ASSERT(i_ddi_node_state(dip) == DS_PROTO);
+	if (ndi_devi_set_nodename(dip, nbuf, 0) != NDI_SUCCESS) {
+		cmn_err(CE_WARN, "e_ddi_branch_create: cannot set name (%s)"
+		    " for devinfo node %p", nbuf, (void *)dip);
+		goto fail;
+	}
+
+	kmem_free(nbuf, OBP_MAXDRVNAME);
+
+	/*
+	 * Ignore bind failures just like boot does
+	 */
+	(void) ndi_devi_bind_driver(dip, 0);
+
+	switch (rv) {
+	case DDI_WALK_CONTINUE:
+	case DDI_WALK_PRUNESIB:
+		ndi_devi_enter(dip, &circ);
+
+		i = DDI_WALK_CONTINUE;
+		for (; i == DDI_WALK_CONTINUE; ) {
+			i = sid_node_create(dip, bp, NULL);
+		}
+
+		ASSERT(i == DDI_WALK_ERROR || i == DDI_WALK_PRUNESIB);
+		if (i == DDI_WALK_ERROR)
+			rv = i;
+		/*
+		 * If PRUNESIB stop creating siblings
+		 * of dip's child. Subsequent walk behavior
+		 * is determined by rv returned by dip.
+		 */
+
+		ndi_devi_exit(dip, circ);
+		break;
+	case DDI_WALK_TERMINATE:
+		/*
+		 * Don't create children and ask our parent
+		 * to not create siblings either.
+		 */
+		rv = DDI_WALK_PRUNESIB;
+		break;
+	case DDI_WALK_PRUNECHILD:
+		/*
+		 * Don't create children, but ask parent to continue
+		 * with siblings.
+		 */
+		rv = DDI_WALK_CONTINUE;
+		break;
+	default:
+		ASSERT(0);
+		break;
+	}
+
+	if (rdipp)
+		*rdipp = dip;
+
+	/*
+	 * Set device offline - only the "configure" op should cause an attach.
+	 * Note that it is safe to set the dip offline without checking
+	 * for either device contract or layered driver (LDI) based constraints
+	 * since there cannot be any contracts or LDI opens of this device.
+	 * This is because this node is a newly created dip with the parent busy
+	 * held, so no other thread can come in and attach this dip. A dip that
+	 * has never been attached cannot have contracts since by definition
+	 * a device contract (an agreement between a process and a device minor
+	 * node) can only be created against a device that has minor nodes
+	 * i.e is attached. Similarly an LDI open will only succeed if the
+	 * dip is attached. We assert below that the dip is not attached.
+	 */
+	ASSERT(i_ddi_node_state(dip) < DS_ATTACHED);
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	ret = set_infant_dip_offline(dip, path);
+	ASSERT(ret == DDI_SUCCESS);
+	kmem_free(path, MAXPATHLEN);
+
+	return (rv);
+fail:
+	(void) ndi_devi_free(dip);
+	kmem_free(nbuf, OBP_MAXDRVNAME);
+	return (DDI_WALK_ERROR);
+}
+
+static int
+create_sid_branch(
+	dev_info_t	*pdip,
+	devi_branch_t	*bp,
+	dev_info_t	**dipp,
+	uint_t		flags)
+{
+	int		rv = 0, state = DDI_WALK_CONTINUE;
+	dev_info_t	*rdip;
+
+	while (state == DDI_WALK_CONTINUE) {
+		int	circ;
+
+		ndi_devi_enter(pdip, &circ);
+
+		state = sid_node_create(pdip, bp, &rdip);
+		if (rdip == NULL) {
+			ndi_devi_exit(pdip, circ);
+			ASSERT(state == DDI_WALK_ERROR);
+			break;
+		}
+
+		e_ddi_branch_hold(rdip);
+
+		ndi_devi_exit(pdip, circ);
+
+		if (flags & DEVI_BRANCH_CONFIGURE) {
+			int error = e_ddi_branch_configure(rdip, dipp, 0);
+			if (error && rv == 0)
+				rv = error;
+		}
+
+		/*
+		 * devi_branch_callback() is optional
+		 */
+		if (bp->devi_branch_callback)
+			bp->devi_branch_callback(rdip, bp->arg, 0);
+	}
+
+	ASSERT(state == DDI_WALK_ERROR || state == DDI_WALK_PRUNESIB);
+
+	return (state == DDI_WALK_ERROR ? EIO : rv);
+}
+
+int
+e_ddi_branch_create(
+	dev_info_t	*pdip,
+	devi_branch_t	*bp,
+	dev_info_t	**dipp,
+	uint_t		flags)
+{
+	int prom_devi, sid_devi, error;
+
+	if (pdip == NULL || bp == NULL || bp->type == 0)
+		return (EINVAL);
+
+	prom_devi = (bp->type == DEVI_BRANCH_PROM) ? 1 : 0;
+	sid_devi = (bp->type == DEVI_BRANCH_SID) ? 1 : 0;
+
+	if (prom_devi && bp->create.prom_branch_select == NULL)
+		return (EINVAL);
+	else if (sid_devi && bp->create.sid_branch_create == NULL)
+		return (EINVAL);
+	else if (!prom_devi && !sid_devi)
+		return (EINVAL);
+
+	if (flags & DEVI_BRANCH_EVENT)
+		return (EINVAL);
+
+	if (prom_devi) {
+		struct pta pta = {0};
+
+		pta.pdip = pdip;
+		pta.bp = bp;
+		pta.flags = flags;
+
+		error = prom_tree_access(create_prom_branch, &pta, NULL);
+
+		if (dipp)
+			*dipp = pta.fdip;
+		else if (pta.fdip)
+			ndi_rele_devi(pta.fdip);
+	} else {
+		error = create_sid_branch(pdip, bp, dipp, flags);
+	}
+
+	return (error);
+}
+
+int
+e_ddi_branch_configure(dev_info_t *rdip, dev_info_t **dipp, uint_t flags)
+{
+	int		rv;
+	char		*devnm;
+	dev_info_t	*pdip;
+
+	if (dipp)
+		*dipp = NULL;
+
+	if (rdip == NULL || flags != 0 || (flags & DEVI_BRANCH_EVENT))
+		return (EINVAL);
+
+	pdip = ddi_get_parent(rdip);
+
+	ndi_hold_devi(pdip);
+
+	if (!e_ddi_branch_held(rdip)) {
+		ndi_rele_devi(pdip);
+		cmn_err(CE_WARN, "e_ddi_branch_configure: "
+		    "dip(%p) not held", (void *)rdip);
+		return (EINVAL);
+	}
+
+	if (i_ddi_node_state(rdip) < DS_INITIALIZED) {
+		/*
+		 * First attempt to bind a driver. If we fail, return
+		 * success (On some platforms, dips for some device
+		 * types (CPUs) may not have a driver)
+		 */
+		if (ndi_devi_bind_driver(rdip, 0) != NDI_SUCCESS) {
+			ndi_rele_devi(pdip);
+			return (0);
+		}
+
+		if (ddi_initchild(pdip, rdip) != DDI_SUCCESS) {
+			rv = NDI_FAILURE;
+			goto out;
+		}
+	}
+
+	ASSERT(i_ddi_node_state(rdip) >= DS_INITIALIZED);
+
+	devnm = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
+
+	(void) ddi_deviname(rdip, devnm);
+
+	if ((rv = ndi_devi_config_one(pdip, devnm+1, &rdip,
+	    NDI_DEVI_ONLINE | NDI_CONFIG)) == NDI_SUCCESS) {
+		/* release hold from ndi_devi_config_one() */
+		ndi_rele_devi(rdip);
+	}
+
+	kmem_free(devnm, MAXNAMELEN + 1);
+out:
+	if (rv != NDI_SUCCESS && dipp && rdip) {
+		ndi_hold_devi(rdip);
+		*dipp = rdip;
+	}
+	ndi_rele_devi(pdip);
+	return (ndi2errno(rv));
+}
+
+void
+e_ddi_branch_hold(dev_info_t *rdip)
+{
+	if (e_ddi_branch_held(rdip)) {
+		cmn_err(CE_WARN, "e_ddi_branch_hold: branch already held");
+		return;
+	}
+
+	mutex_enter(&DEVI(rdip)->devi_lock);
+	if ((DEVI(rdip)->devi_flags & DEVI_BRANCH_HELD) == 0) {
+		DEVI(rdip)->devi_flags |= DEVI_BRANCH_HELD;
+		DEVI(rdip)->devi_ref++;
+	}
+	ASSERT(DEVI(rdip)->devi_ref > 0);
+	mutex_exit(&DEVI(rdip)->devi_lock);
+}
+
+int
+e_ddi_branch_held(dev_info_t *rdip)
+{
+	int rv = 0;
+
+	mutex_enter(&DEVI(rdip)->devi_lock);
+	if ((DEVI(rdip)->devi_flags & DEVI_BRANCH_HELD) &&
+	    DEVI(rdip)->devi_ref > 0) {
+		rv = 1;
+	}
+	mutex_exit(&DEVI(rdip)->devi_lock);
+
+	return (rv);
+}
+
+void
+e_ddi_branch_rele(dev_info_t *rdip)
+{
+	mutex_enter(&DEVI(rdip)->devi_lock);
+	DEVI(rdip)->devi_flags &= ~DEVI_BRANCH_HELD;
+	DEVI(rdip)->devi_ref--;
+	mutex_exit(&DEVI(rdip)->devi_lock);
+}
+
+int
+e_ddi_branch_unconfigure(
+	dev_info_t *rdip,
+	dev_info_t **dipp,
+	uint_t flags)
+{
+	int	circ, rv;
+	int	destroy;
+	char	*devnm;
+	uint_t	nflags;
+	dev_info_t *pdip;
+
+	if (dipp)
+		*dipp = NULL;
+
+	if (rdip == NULL)
+		return (EINVAL);
+
+	pdip = ddi_get_parent(rdip);
+
+	ASSERT(pdip);
+
+	/*
+	 * Check if caller holds pdip busy - can cause deadlocks during
+	 * devfs_clean()
+	 */
+	if (DEVI_BUSY_OWNED(pdip)) {
+		cmn_err(CE_WARN, "e_ddi_branch_unconfigure: failed: parent"
+		    " devinfo node(%p) is busy held", (void *)pdip);
+		return (EINVAL);
+	}
+
+	destroy = (flags & DEVI_BRANCH_DESTROY) ? 1 : 0;
+
+	devnm = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
+
+	ndi_devi_enter(pdip, &circ);
+	(void) ddi_deviname(rdip, devnm);
+	ndi_devi_exit(pdip, circ);
+
+	/*
+	 * ddi_deviname() returns a component name with / prepended.
+	 */
+	(void) devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
+
+	ndi_devi_enter(pdip, &circ);
+
+	/*
+	 * Recreate device name as it may have changed state (init/uninit)
+	 * when parent busy lock was dropped for devfs_clean()
+	 */
+	(void) ddi_deviname(rdip, devnm);
+
+	if (!e_ddi_branch_held(rdip)) {
+		kmem_free(devnm, MAXNAMELEN + 1);
+		ndi_devi_exit(pdip, circ);
+		cmn_err(CE_WARN, "e_ddi_%s_branch: dip(%p) not held",
+		    destroy ? "destroy" : "unconfigure", (void *)rdip);
+		return (EINVAL);
+	}
+
+	/*
+	 * Release hold on the branch. This is ok since we are holding the
+	 * parent busy. If rdip is not removed, we must do a hold on the
+	 * branch before returning.
+	 */
+	e_ddi_branch_rele(rdip);
+
+	nflags = NDI_DEVI_OFFLINE;
+	if (destroy || (flags & DEVI_BRANCH_DESTROY)) {
+		nflags |= NDI_DEVI_REMOVE;
+		destroy = 1;
+	} else {
+		nflags |= NDI_UNCONFIG;		/* uninit but don't remove */
+	}
+
+	if (flags & DEVI_BRANCH_EVENT)
+		nflags |= NDI_POST_EVENT;
+
+	if (i_ddi_devi_attached(pdip) &&
+	    (i_ddi_node_state(rdip) >= DS_INITIALIZED)) {
+		rv = ndi_devi_unconfig_one(pdip, devnm+1, dipp, nflags);
+	} else {
+		rv = e_ddi_devi_unconfig(rdip, dipp, nflags);
+		if (rv == NDI_SUCCESS) {
+			ASSERT(!destroy || ddi_get_child(rdip) == NULL);
+			rv = ndi_devi_offline(rdip, nflags);
+		}
+	}
+
+	if (!destroy || rv != NDI_SUCCESS) {
+		/* The dip still exists, so do a hold */
+		e_ddi_branch_hold(rdip);
+	}
+out:
+	kmem_free(devnm, MAXNAMELEN + 1);
+	ndi_devi_exit(pdip, circ);
+	return (ndi2errno(rv));
+}
+
+int
+e_ddi_branch_destroy(dev_info_t *rdip, dev_info_t **dipp, uint_t flag)
+{
+	return (e_ddi_branch_unconfigure(rdip, dipp,
+	    flag|DEVI_BRANCH_DESTROY));
+}
+
+/*
+ * Number of chains for hash table
+ */
+#define	NUMCHAINS	17
+
+/*
+ * Devinfo busy arg
+ */
+struct devi_busy {
+	int dv_total;
+	int s_total;
+	mod_hash_t *dv_hash;
+	mod_hash_t *s_hash;
+	int (*callback)(dev_info_t *, void *, uint_t);
+	void *arg;
+};
+
+static int
+visit_dip(dev_info_t *dip, void *arg)
+{
+	uintptr_t sbusy, dvbusy, ref;
+	struct devi_busy *bsp = arg;
+
+	ASSERT(bsp->callback);
+
+	/*
+	 * A dip cannot be busy if its reference count is 0
+	 */
+	if ((ref = e_ddi_devi_holdcnt(dip)) == 0) {
+		return (bsp->callback(dip, bsp->arg, 0));
+	}
+
+	if (mod_hash_find(bsp->dv_hash, dip, (mod_hash_val_t *)&dvbusy))
+		dvbusy = 0;
+
+	/*
+	 * To catch device opens currently maintained on specfs common snodes.
+	 */
+	if (mod_hash_find(bsp->s_hash, dip, (mod_hash_val_t *)&sbusy))
+		sbusy = 0;
+
+#ifdef	DEBUG
+	if (ref < sbusy || ref < dvbusy) {
+		cmn_err(CE_WARN, "dip(%p): sopen = %lu, dvopen = %lu "
+		    "dip ref = %lu\n", (void *)dip, sbusy, dvbusy, ref);
+	}
+#endif
+
+	dvbusy = (sbusy > dvbusy) ? sbusy : dvbusy;
+
+	return (bsp->callback(dip, bsp->arg, dvbusy));
+}
+
+static int
+visit_snode(struct snode *sp, void *arg)
+{
+	uintptr_t sbusy;
+	dev_info_t *dip;
+	int count;
+	struct devi_busy *bsp = arg;
+
+	ASSERT(sp);
+
+	/*
+	 * The stable lock is held. This prevents
+	 * the snode and its associated dip from
+	 * going away.
+	 */
+	dip = NULL;
+	count = spec_devi_open_count(sp, &dip);
+
+	if (count <= 0)
+		return (DDI_WALK_CONTINUE);
+
+	ASSERT(dip);
+
+	if (mod_hash_remove(bsp->s_hash, dip, (mod_hash_val_t *)&sbusy))
+		sbusy = count;
+	else
+		sbusy += count;
+
+	if (mod_hash_insert(bsp->s_hash, dip, (mod_hash_val_t)sbusy)) {
+		cmn_err(CE_WARN, "%s: s_hash insert failed: dip=0x%p, "
+		    "sbusy = %lu", "e_ddi_branch_referenced",
+		    (void *)dip, sbusy);
+	}
+
+	bsp->s_total += count;
+
+	return (DDI_WALK_CONTINUE);
+}
+
+static void
+visit_dvnode(struct dv_node *dv, void *arg)
+{
+	uintptr_t dvbusy;
+	uint_t count;
+	struct vnode *vp;
+	struct devi_busy *bsp = arg;
+
+	ASSERT(dv && dv->dv_devi);
+
+	vp = DVTOV(dv);
+
+	mutex_enter(&vp->v_lock);
+	count = vp->v_count;
+	mutex_exit(&vp->v_lock);
+
+	if (!count)
+		return;
+
+	if (mod_hash_remove(bsp->dv_hash, dv->dv_devi,
+	    (mod_hash_val_t *)&dvbusy))
+		dvbusy = count;
+	else
+		dvbusy += count;
+
+	if (mod_hash_insert(bsp->dv_hash, dv->dv_devi,
+	    (mod_hash_val_t)dvbusy)) {
+		cmn_err(CE_WARN, "%s: dv_hash insert failed: dip=0x%p, "
+		    "dvbusy=%lu", "e_ddi_branch_referenced",
+		    (void *)dv->dv_devi, dvbusy);
+	}
+
+	bsp->dv_total += count;
+}
+
+/*
+ * Returns reference count on success or -1 on failure.
+ */
+int
+e_ddi_branch_referenced(
+	dev_info_t *rdip,
+	int (*callback)(dev_info_t *dip, void *arg, uint_t ref),
+	void *arg)
+{
+	int circ;
+	char *path;
+	dev_info_t *pdip;
+	struct devi_busy bsa = {0};
+
+	ASSERT(rdip);
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+	ndi_hold_devi(rdip);
+
+	pdip = ddi_get_parent(rdip);
+
+	ASSERT(pdip);
+
+	/*
+	 * Check if caller holds pdip busy - can cause deadlocks during
+	 * devfs_walk()
+	 */
+	if (!e_ddi_branch_held(rdip) || DEVI_BUSY_OWNED(pdip)) {
+		cmn_err(CE_WARN, "e_ddi_branch_referenced: failed: "
+		    "devinfo branch(%p) not held or parent busy held",
+		    (void *)rdip);
+		ndi_rele_devi(rdip);
+		kmem_free(path, MAXPATHLEN);
+		return (-1);
+	}
+
+	ndi_devi_enter(pdip, &circ);
+	(void) ddi_pathname(rdip, path);
+	ndi_devi_exit(pdip, circ);
+
+	bsa.dv_hash = mod_hash_create_ptrhash("dv_node busy hash", NUMCHAINS,
+	    mod_hash_null_valdtor, sizeof (struct dev_info));
+
+	bsa.s_hash = mod_hash_create_ptrhash("snode busy hash", NUMCHAINS,
+	    mod_hash_null_valdtor, sizeof (struct snode));
+
+	if (devfs_walk(path, visit_dvnode, &bsa)) {
+		cmn_err(CE_WARN, "e_ddi_branch_referenced: "
+		    "devfs walk failed for: %s", path);
+		kmem_free(path, MAXPATHLEN);
+		bsa.s_total = bsa.dv_total = -1;
+		goto out;
+	}
+
+	kmem_free(path, MAXPATHLEN);
+
+	/*
+	 * Walk the snode table to detect device opens, which are currently
+	 * maintained on specfs common snodes.
+	 */
+	spec_snode_walk(visit_snode, &bsa);
+
+	if (callback == NULL)
+		goto out;
+
+	bsa.callback = callback;
+	bsa.arg = arg;
+
+	if (visit_dip(rdip, &bsa) == DDI_WALK_CONTINUE) {
+		ndi_devi_enter(rdip, &circ);
+		ddi_walk_devs(ddi_get_child(rdip), visit_dip, &bsa);
+		ndi_devi_exit(rdip, circ);
+	}
+
+out:
+	ndi_rele_devi(rdip);
+	mod_hash_destroy_ptrhash(bsa.s_hash);
+	mod_hash_destroy_ptrhash(bsa.dv_hash);
+	return (bsa.s_total > bsa.dv_total ? bsa.s_total : bsa.dv_total);
 }

@@ -337,7 +337,7 @@ i_cpr_pre_resume_cpus()
 	CPUSET_ONLY(cpu_ready_set, boot_cpuid);
 	CPUSET_ONLY(procset, boot_cpuid);
 
-	for (who = 0; who < ncpus; who++) {
+	for (who = 0; who < max_ncpus; who++) {
 
 		wc_cpu_t	*cpup = wc_other_cpus + who;
 		wc_desctbr_t	gdt;
@@ -363,7 +363,10 @@ i_cpr_pre_resume_cpus()
 
 		init_real_mode_platter(who, code_length, cpup->wc_cr4, gdt);
 
-		if ((err = mach_cpuid_start(who, rm_platter_va)) != 0) {
+		mutex_enter(&cpu_lock);
+		err = mach_cpuid_start(who, rm_platter_va);
+		mutex_exit(&cpu_lock);
+		if (err != 0) {
 			cmn_err(CE_WARN, "cpu%d: failed to start during "
 			    "suspend/resume error %d", who, err);
 			continue;
@@ -481,9 +484,12 @@ prt_other_cpus()
 		return;
 	}
 
-	for (who = 0; who < ncpus; who++) {
+	for (who = 0; who < max_ncpus; who++) {
 
 		wc_cpu_t	*cpup = wc_other_cpus + who;
+
+		if (!CPU_IN_SET(mp_cpus, who))
+			continue;
 
 		PMD(PMD_SX, ("prt_other_cpus() who = %d, gdt=%p:%x, "
 		    "idt=%p:%x, ldt=%lx, tr=%lx, kgsbase="
@@ -1009,7 +1015,7 @@ i_cpr_alloc_cpus(void)
 	 */
 
 	if (wc_other_cpus == NULL) {
-		wc_other_cpus = kmem_zalloc(ncpus * sizeof (wc_cpu_t),
+		wc_other_cpus = kmem_zalloc(max_ncpus * sizeof (wc_cpu_t),
 		    KM_SLEEP);
 	}
 
@@ -1022,7 +1028,7 @@ i_cpr_free_cpus(void)
 	wc_cpu_t *wc_cpu;
 
 	if (wc_other_cpus != NULL) {
-		for (index = 0; index < ncpus; index++) {
+		for (index = 0; index < max_ncpus; index++) {
 			wc_cpu = wc_other_cpus + index;
 			if (wc_cpu->wc_saved_stack != NULL) {
 				kmem_free(wc_cpu->wc_saved_stack,
@@ -1030,7 +1036,8 @@ i_cpr_free_cpus(void)
 			}
 		}
 
-		kmem_free((void *) wc_other_cpus, ncpus * sizeof (wc_cpu_t));
+		kmem_free((void *) wc_other_cpus,
+		    max_ncpus * sizeof (wc_cpu_t));
 		wc_other_cpus = NULL;
 	}
 }

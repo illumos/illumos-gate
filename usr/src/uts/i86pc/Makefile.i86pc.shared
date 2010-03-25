@@ -61,6 +61,9 @@ LINTS_DIR	 = $(OBJS_DIR)
 LINT_LIB_DIR	 = $(UTSBASE)/$(PLATFORM)/lint-libs/$(OBJS_DIR)
 GEN_LINT_LIB_DIR = $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)
 
+LINT32_DIRS	 = $(LINT32_BUILDS:%=$(UTSBASE)/$(PLATFORM)/lint-libs/%)
+LINT32_FILES	 = $(LINT32_DIRS:%=%/llib-l$(MODULE).ln)
+
 DTRACESTUBS_O	 = $(OBJS_DIR)/dtracestubs.o
 DTRACESTUBS	 = $(OBJS_DIR)/libdtracestubs.so
 
@@ -256,6 +259,7 @@ DRV_KMODS	+= tzmon
 DRV_KMODS	+= acpi_drv 
 DRV_KMODS	+= acpinex
 DRV_KMODS	+= amd_iommu
+DRV_KMODS	+= dr
 DRV_KMODS	+= ioat
 DRV_KMODS	+= fipe
 
@@ -311,6 +315,7 @@ SYS_KMODS	+=
 #
 MISC_KMODS	+= gfx_private pcie
 MISC_KMODS	+= acpidev
+MISC_KMODS	+= drmach_acpi
 
 #
 #	'Dacf' modules (/kernel/dacf)

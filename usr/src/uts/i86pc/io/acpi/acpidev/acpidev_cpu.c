@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
@@ -43,6 +43,7 @@
 #include <sys/bootconf.h>
 #include <sys/cpuvar.h>
 #include <sys/machsystm.h>
+#include <sys/note.h>
 #include <sys/psm_types.h>
 #include <sys/x86_archext.h>
 #include <sys/sunddi.h>
@@ -70,11 +71,14 @@ static ACPI_STATUS acpidev_cpu_probe(acpidev_walk_info_t *infop);
 static acpidev_filter_result_t acpidev_cpu_filter(acpidev_walk_info_t *infop,
     char *devname, int maxlen);
 static ACPI_STATUS acpidev_cpu_init(acpidev_walk_info_t *infop);
+static void acpidev_cpu_fini(ACPI_HANDLE hdl, acpidev_data_handle_t dhdl,
+    acpidev_class_t *clsp);
 
 static acpidev_filter_result_t acpidev_cpu_filter_func(
     acpidev_walk_info_t *infop, ACPI_HANDLE hdl, acpidev_filter_rule_t *afrp,
     char *devname, int len);
-static int acpidev_cpu_query_dip(cpu_t *, dev_info_t **);
+static int acpidev_cpu_create_dip(cpu_t *, dev_info_t **);
+static int acpidev_cpu_get_dip(cpu_t *, dev_info_t **);
 
 /*
  * Default class driver for ACPI processor/CPU objects.
@@ -91,7 +95,7 @@ acpidev_class_t acpidev_class_cpu = {
 	acpidev_cpu_probe,		/* adc_probe */
 	acpidev_cpu_filter,		/* adc_filter */
 	acpidev_cpu_init,		/* adc_init */
-	NULL,				/* adc_fini */
+	acpidev_cpu_fini,		/* adc_fini */
 };
 
 /*
@@ -133,12 +137,14 @@ static char *acpidev_cpu_uid_formats[] = {
 	"SCK%x-CPU%x",
 };
 
-static ACPI_HANDLE acpidev_cpu_map_hdl = NULL;
-static uint32_t acpidev_cpu_map_count = 0;
-static struct acpidev_cpu_map_item *acpidev_cpu_map = NULL;
+static ACPI_HANDLE acpidev_cpu_map_hdl;
+static uint32_t acpidev_cpu_map_count;
+static struct acpidev_cpu_map_item *acpidev_cpu_map;
 
 extern int (*psm_cpu_create_devinfo)(cpu_t *, dev_info_t **);
-static int (*psm_cpu_create_devinfo_old)(cpu_t *, dev_info_t **) = NULL;
+static int (*psm_cpu_create_devinfo_old)(cpu_t *, dev_info_t **);
+extern int (*psm_cpu_get_devinfo)(cpu_t *, dev_info_t **);
+static int (*psm_cpu_get_devinfo_old)(cpu_t *, dev_info_t **);
 
 /* Count how many enabled CPUs are in the MADT table. */
 static ACPI_STATUS
@@ -200,7 +206,7 @@ acpidev_cpu_parse_MADT(ACPI_SUBTABLE_HEADER *ap, void *context)
 		/* See comment at beginning about 255 limitation. */
 		if (mpx2a->LocalApicId < 255) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: encountered CPU with X2APIC Id < 255.");
+			    "!acpidev: encountered CPU with X2APIC Id < 255.");
 		} else if (mpx2a->LapicFlags & ACPI_MADT_ENABLED) {
 			ASSERT(*cntp < acpidev_cpu_map_count);
 			acpidev_cpu_map[*cntp].proc_id = mpx2a->Uid;
@@ -270,7 +276,7 @@ acpidev_cpu_query_MAT(ACPI_SUBTABLE_HEADER *ap, void *context)
 			}
 			return (AE_CTRL_TERMINATE);
 		} else {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: encountered CPU "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: encountered CPU "
 			    "with X2APIC Id < 255 in _MAT.");
 		}
 		break;
@@ -292,7 +298,7 @@ acpidev_cpu_query_MAT(ACPI_SUBTABLE_HEADER *ap, void *context)
 		 * x2APIC and x2APIC NMI Structure.
 		 */
 		ACPIDEV_DEBUG(CE_NOTE,
-		    "acpidev: unknown APIC entry type %u in _MAT.", ap->Type);
+		    "!acpidev: unknown APIC entry type %u in _MAT.", ap->Type);
 		break;
 	}
 
@@ -313,7 +319,7 @@ acpidev_cpu_get_procid(acpidev_walk_info_t *infop, uint32_t *idp)
 	if (infop->awi_info->Type != ACPI_TYPE_PROCESSOR &&
 	    infop->awi_info->Type != ACPI_TYPE_DEVICE) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: object %s is not PROCESSOR or DEVICE.",
+		    "!acpidev: object %s is not PROCESSOR or DEVICE.",
 		    infop->awi_name);
 		return (AE_BAD_PARAMETER);
 	}
@@ -345,7 +351,7 @@ acpidev_cpu_get_procid(acpidev_walk_info_t *infop, uint32_t *idp)
 			return (AE_OK);
 		} else {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: failed to evaluate ACPI object %s.",
+			    "!acpidev: failed to evaluate ACPI object %s.",
 			    infop->awi_name);
 		}
 	}
@@ -365,6 +371,59 @@ acpidev_cpu_get_procid(acpidev_walk_info_t *infop, uint32_t *idp)
 }
 
 static ACPI_STATUS
+acpidev_cpu_get_proximity_id(ACPI_HANDLE hdl, uint32_t apicid, uint32_t *pxmidp)
+{
+	int len, off;
+	ACPI_SUBTABLE_HEADER *sp;
+	ACPI_SRAT_CPU_AFFINITY *xp;
+	ACPI_SRAT_X2APIC_CPU_AFFINITY *x2p;
+
+	ASSERT(hdl != NULL);
+	ASSERT(pxmidp != NULL);
+	*pxmidp = UINT32_MAX;
+
+	if (ACPI_SUCCESS(acpidev_eval_pxm(hdl, pxmidp))) {
+		return (AE_OK);
+	}
+	if (acpidev_srat_tbl_ptr == NULL) {
+		return (AE_NOT_FOUND);
+	}
+
+	/* Search the static ACPI SRAT table for proximity domain id. */
+	sp = (ACPI_SUBTABLE_HEADER *)(acpidev_srat_tbl_ptr + 1);
+	len = acpidev_srat_tbl_ptr->Header.Length;
+	off = sizeof (*acpidev_srat_tbl_ptr);
+	while (off < len) {
+		switch (sp->Type) {
+		case ACPI_SRAT_TYPE_CPU_AFFINITY:
+			xp = (ACPI_SRAT_CPU_AFFINITY *)sp;
+			if ((xp->Flags & ACPI_SRAT_CPU_ENABLED) &&
+			    xp->ApicId == apicid) {
+				*pxmidp = xp->ProximityDomainLo;
+				*pxmidp |= xp->ProximityDomainHi[0] << 8;
+				*pxmidp |= xp->ProximityDomainHi[1] << 16;
+				*pxmidp |= xp->ProximityDomainHi[2] << 24;
+				return (AE_OK);
+			}
+			break;
+
+		case ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY:
+			x2p = (ACPI_SRAT_X2APIC_CPU_AFFINITY *)sp;
+			if ((x2p->Flags & ACPI_SRAT_CPU_ENABLED) &&
+			    x2p->ApicId == apicid) {
+				*pxmidp = x2p->ProximityDomain;
+				return (AE_OK);
+			}
+			break;
+		}
+		off += sp->Length;
+		sp = (ACPI_SUBTABLE_HEADER *)(((char *)sp) + sp->Length);
+	}
+
+	return (AE_NOT_FOUND);
+}
+
+static ACPI_STATUS
 acpidev_cpu_pre_probe(acpidev_walk_info_t *infop)
 {
 	uint32_t count = 0;
@@ -373,6 +432,7 @@ acpidev_cpu_pre_probe(acpidev_walk_info_t *infop)
 	ASSERT(infop != NULL);
 	if (infop->awi_op_type == ACPIDEV_OP_BOOT_PROBE &&
 	    acpidev_cpu_map_hdl == NULL) {
+		/* Parse CPU relative information in the ACPI MADT table. */
 		(void) acpidev_walk_apic(NULL, NULL, NULL,
 		    acpidev_cpu_count_MADT, &acpidev_cpu_map_count);
 		acpidev_cpu_map = kmem_zalloc(sizeof (acpidev_cpu_map[0])
@@ -381,6 +441,12 @@ acpidev_cpu_pre_probe(acpidev_walk_info_t *infop)
 		    acpidev_cpu_parse_MADT, &count);
 		ASSERT(count == acpidev_cpu_map_count);
 		acpidev_cpu_map_hdl = infop->awi_hdl;
+
+		/* Cache pointer to the ACPI SRAT table. */
+		if (ACPI_FAILURE(AcpiGetTable(ACPI_SIG_SRAT, 1,
+		    (ACPI_TABLE_HEADER **)&acpidev_srat_tbl_ptr))) {
+			acpidev_srat_tbl_ptr = NULL;
+		}
 	}
 
 	return (AE_OK);
@@ -404,7 +470,9 @@ acpidev_cpu_post_probe(acpidev_walk_info_t *infop)
 
 		/* replace psm_cpu_create_devinfo with local implementation. */
 		psm_cpu_create_devinfo_old = psm_cpu_create_devinfo;
-		psm_cpu_create_devinfo = acpidev_cpu_query_dip;
+		psm_cpu_create_devinfo = acpidev_cpu_create_dip;
+		psm_cpu_get_devinfo_old = psm_cpu_get_devinfo;
+		psm_cpu_get_devinfo = acpidev_cpu_get_dip;
 	}
 
 	return (AE_OK);
@@ -427,27 +495,40 @@ acpidev_cpu_probe(acpidev_walk_info_t *infop)
 		return (AE_OK);
 	}
 
-	/*
-	 * Mark device as offline. It will be changed to online state
-	 * when the corresponding CPU starts up.
-	 */
-	if (infop->awi_op_type == ACPIDEV_OP_BOOT_PROBE) {
-		flags = ACPIDEV_PROCESS_FLAG_SCAN |
-		    ACPIDEV_PROCESS_FLAG_CREATE |
-		    ACPIDEV_PROCESS_FLAG_OFFLINE;
-		rc = acpidev_process_object(infop, flags);
-	} else if (infop->awi_op_type == ACPIDEV_OP_BOOT_REPROBE) {
-		flags = ACPIDEV_PROCESS_FLAG_SCAN;
-		rc = acpidev_process_object(infop, flags);
-	} else if (infop->awi_op_type == ACPIDEV_OP_HOTPLUG_PROBE) {
-		flags = ACPIDEV_PROCESS_FLAG_SCAN |
-		    ACPIDEV_PROCESS_FLAG_CREATE |
-		    ACPIDEV_PROCESS_FLAG_OFFLINE;
-		rc = acpidev_process_object(infop, flags);
-	} else {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: unknown operation type %u in "
+	flags = ACPIDEV_PROCESS_FLAG_SCAN;
+	switch (infop->awi_op_type) {
+	case  ACPIDEV_OP_BOOT_PROBE:
+		/*
+		 * Mark device as offline. It will be changed to online state
+		 * when the corresponding CPU starts up.
+		 */
+		if (acpica_get_devcfg_feature(ACPI_DEVCFG_CPU)) {
+			flags |= ACPIDEV_PROCESS_FLAG_CREATE |
+			    ACPIDEV_PROCESS_FLAG_OFFLINE;
+		}
+		break;
+
+	case ACPIDEV_OP_BOOT_REPROBE:
+		break;
+
+	case ACPIDEV_OP_HOTPLUG_PROBE:
+		if (acpica_get_devcfg_feature(ACPI_DEVCFG_CPU)) {
+			flags |= ACPIDEV_PROCESS_FLAG_CREATE |
+			    ACPIDEV_PROCESS_FLAG_OFFLINE |
+			    ACPIDEV_PROCESS_FLAG_SYNCSTATUS |
+			    ACPIDEV_PROCESS_FLAG_HOLDBRANCH;
+		}
+		break;
+
+	default:
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: unknown operation type %u in "
 		    "acpidev_cpu_probe().", infop->awi_op_type);
 		rc = AE_BAD_PARAMETER;
+		break;
+	}
+
+	if (rc == AE_OK) {
+		rc = acpidev_process_object(infop, flags);
 	}
 	if (ACPI_FAILURE(rc) && rc != AE_NOT_EXIST && rc != AE_ALREADY_EXISTS) {
 		cmn_err(CE_WARN,
@@ -474,12 +555,12 @@ acpidev_cpu_filter_func(acpidev_walk_info_t *infop, ACPI_HANDLE hdl,
 
 		if (acpidev_cpu_get_procid(infop, &procid) != 0) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: failed to query processor id for %s.",
+			    "!acpidev: failed to query processor id for %s.",
 			    infop->awi_name);
 			return (ACPIDEV_FILTER_SKIP);
 		} else if (acpidev_cpu_get_apicid(procid, &apicid) != 0) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: failed to query apic id for %s.",
+			    "!acpidev: failed to query apic id for %s.",
 			    infop->awi_name);
 			return (ACPIDEV_FILTER_SKIP);
 		}
@@ -499,7 +580,7 @@ acpidev_cpu_filter_func(acpidev_walk_info_t *infop, ACPI_HANDLE hdl,
 			return (ACPIDEV_FILTER_SKIP);
 		} else if (!mat.enabled) {
 			ACPIDEV_DEBUG(CE_NOTE,
-			    "acpidev: CPU %s has been disabled.",
+			    "!acpidev: CPU %s has been disabled.",
 			    infop->awi_name);
 			return (ACPIDEV_FILTER_SKIP);
 		}
@@ -536,6 +617,7 @@ static ACPI_STATUS
 acpidev_cpu_init(acpidev_walk_info_t *infop)
 {
 	int count;
+	uint32_t pxmid;
 	dev_info_t *dip;
 	ACPI_HANDLE hdl;
 	char unitaddr[64];
@@ -550,7 +632,7 @@ acpidev_cpu_init(acpidev_walk_info_t *infop)
 	dip = infop->awi_dip;
 	hdl = infop->awi_hdl;
 
-	/* Create "apic_id" and "processor_id" properties. */
+	/* Create "apic_id", "processor_id" and "proximity_id" properties. */
 	if (ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 	    ACPIDEV_PROP_NAME_PROCESSOR_ID, infop->awi_scratchpad[0]) !=
 	    NDI_SUCCESS) {
@@ -566,6 +648,15 @@ acpidev_cpu_init(acpidev_walk_info_t *infop)
 		    "!acpidev: failed to set apic_id property for %s.",
 		    infop->awi_name);
 		return (AE_ERROR);
+	}
+	if (ACPI_SUCCESS(acpidev_cpu_get_proximity_id(infop->awi_hdl,
+	    infop->awi_scratchpad[1], &pxmid))) {
+		if (ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+		    ACPIDEV_PROP_NAME_PROXIMITY_ID, pxmid) != NDI_SUCCESS) {
+			cmn_err(CE_WARN, "!acpidev: failed to set proximity id "
+			    "property for %s.", infop->awi_name);
+			return (AE_ERROR);
+		}
 	}
 
 	/* Set "compatible" property for CPU dip */
@@ -616,7 +707,7 @@ acpidev_cpu_init(acpidev_walk_info_t *infop)
 		}
 	} else {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: unknown operation type %u in acpidev_cpu_init.",
+		    "!acpidev: unknown operation type %u in acpidev_cpu_init.",
 		    infop->awi_op_type);
 		return (AE_BAD_PARAMETER);
 	}
@@ -624,18 +715,38 @@ acpidev_cpu_init(acpidev_walk_info_t *infop)
 	return (AE_OK);
 }
 
+static void
+acpidev_cpu_fini(ACPI_HANDLE hdl, acpidev_data_handle_t dhdl,
+    acpidev_class_t *clsp)
+{
+	_NOTE(ARGUNUSED(clsp, dhdl));
+
+	int rc;
+	uint32_t procid;
+
+	rc = acpica_get_procid_by_object(hdl, &procid);
+	ASSERT(ACPI_SUCCESS(rc));
+	if (ACPI_SUCCESS(rc)) {
+		rc = acpica_remove_processor_from_map(procid);
+		ASSERT(ACPI_SUCCESS(rc));
+		if (ACPI_FAILURE(rc)) {
+			cmn_err(CE_WARN, "!acpidev: failed to remove "
+			    "processor from ACPICA.");
+		}
+	}
+}
+
+/*
+ * Lookup the dip for a CPU if ACPI CPU autoconfig is enabled.
+ */
 static int
-acpidev_cpu_query_dip(cpu_t *cp, dev_info_t **dipp)
+acpidev_cpu_lookup_dip(cpu_t *cp, dev_info_t **dipp)
 {
 	uint32_t apicid;
 	ACPI_HANDLE hdl;
 	dev_info_t *dip = NULL;
 
 	*dipp = NULL;
-	/*
-	 * Try to get the dip associated with the CPU if ACPI_DEVCFG_CPU is
-	 * enabled.
-	 */
 	if (acpica_get_devcfg_feature(ACPI_DEVCFG_CPU)) {
 		apicid = cpuid_get_apicid(cp);
 		if (acpica_get_cpu_object_by_cpuid(cp->cpu_id, &hdl) == 0 ||
@@ -644,17 +755,40 @@ acpidev_cpu_query_dip(cpu_t *cp, dev_info_t **dipp)
 			ASSERT(hdl != NULL);
 			if (ACPI_SUCCESS(acpica_get_devinfo(hdl, &dip))) {
 				ASSERT(dip != NULL);
-				ndi_hold_devi(dip);
 				*dipp = dip;
 				return (PSM_SUCCESS);
 			}
 		}
+		ACPIDEV_DEBUG(CE_WARN,
+		    "!acpidev: failed to lookup dip for cpu %d(%p).",
+		    cp->cpu_id, (void *)cp);
 	}
 
-	ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to get dip for cpu %d(%p).",
-	    cp->cpu_id, (void *)cp);
+	return (PSM_FAILURE);
+}
+
+static int
+acpidev_cpu_create_dip(cpu_t *cp, dev_info_t **dipp)
+{
+	if (acpidev_cpu_lookup_dip(cp, dipp) == PSM_SUCCESS) {
+		ndi_hold_devi(*dipp);
+		return (PSM_SUCCESS);
+	}
 	if (psm_cpu_create_devinfo_old != NULL) {
 		return (psm_cpu_create_devinfo_old(cp, dipp));
+	} else {
+		return (PSM_FAILURE);
+	}
+}
+
+static int
+acpidev_cpu_get_dip(cpu_t *cp, dev_info_t **dipp)
+{
+	if (acpidev_cpu_lookup_dip(cp, dipp) == PSM_SUCCESS) {
+		return (PSM_SUCCESS);
+	}
+	if (psm_cpu_get_devinfo_old != NULL) {
+		return (psm_cpu_get_devinfo_old(cp, dipp));
 	} else {
 		return (PSM_FAILURE);
 	}

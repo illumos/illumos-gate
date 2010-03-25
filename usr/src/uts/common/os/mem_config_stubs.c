@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cmn_err.h>
@@ -44,6 +42,7 @@ pgcnt_t kcage_desfree;
 pgcnt_t kcage_needfree;
 pgcnt_t	kcage_lotsfree = 1;
 
+#if !defined(__x86) || defined(__xpv)
 /*ARGSUSED*/
 int
 kphysm_setup_func_register(kphysm_setup_vector_t *vec, void *arg)
@@ -56,6 +55,7 @@ void
 kphysm_setup_func_unregister(kphysm_setup_vector_t *vec, void *arg)
 {
 }
+#endif
 
 /*ARGSUSED*/
 int

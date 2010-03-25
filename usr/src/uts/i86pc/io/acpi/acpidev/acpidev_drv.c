@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
@@ -60,19 +60,23 @@
 #include <sys/errno.h>
 #include <sys/modctl.h>
 #include <sys/mutex.h>
+#include <sys/note.h>
 #include <sys/obpdefs.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
 #include <sys/acpidev.h>
+#include <sys/acpidev_dr.h>
 #include <sys/acpidev_impl.h>
 
 /* Patchable through /etc/system */
 int acpidev_options = 0;
 int acpidev_debug = 0;
 
+krwlock_t acpidev_class_lock;
 acpidev_class_list_t *acpidev_class_list_root = NULL;
+ulong_t acpidev_object_type_mask[BT_BITOUL(ACPI_TYPE_NS_NODE_MAX + 1)];
 
 /* ACPI device autoconfig global status */
 typedef enum acpidev_status {
@@ -86,9 +90,7 @@ typedef enum acpidev_status {
 
 static acpidev_status_t acpidev_status = ACPIDEV_STATUS_UNKNOWN;
 static kmutex_t	acpidev_drv_lock;
-static krwlock_t acpidev_class_lock;
 static dev_info_t *acpidev_root_dip = NULL;
-static ulong_t acpidev_object_type_mask[BT_BITOUL(ACPI_TYPE_NS_NODE_MAX + 1)];
 
 /* Boot time ACPI device enumerator. */
 static void acpidev_boot_probe(int type);
@@ -117,6 +119,7 @@ _init(void)
 		    sizeof (acpidev_object_type_mask));
 		mutex_init(&acpidev_drv_lock, NULL, MUTEX_DRIVER, NULL);
 		rw_init(&acpidev_class_lock, NULL, RW_DEFAULT, NULL);
+		acpidev_dr_init();
 		impl_bus_add_probe(acpidev_boot_probe);
 	} else {
 		cmn_err(CE_WARN, "!acpidev: failed to install driver.");
@@ -156,6 +159,13 @@ static void
 acpidev_class_list_fini(void)
 {
 	acpidev_unload_plat_modules();
+
+	if ((acpidev_options & ACPIDEV_OUSER_NO_PCI) == 0) {
+		(void) acpidev_unregister_class(&acpidev_class_list_scope,
+		    &acpidev_class_pci);
+		(void) acpidev_unregister_class(&acpidev_class_list_device,
+		    &acpidev_class_pci);
+	}
 
 	if ((acpidev_options & ACPIDEV_OUSER_NO_MEM) == 0) {
 		(void) acpidev_unregister_class(&acpidev_class_list_device,
@@ -252,7 +262,7 @@ acpidev_class_list_init(uint64_t *fp)
 		*fp |= ACPI_DEVCFG_CPU;
 	}
 
-	/* Check support for ACPI memory device. */
+	/* Check support of ACPI memory devices. */
 	if ((acpidev_options & ACPIDEV_OUSER_NO_MEM) == 0) {
 		/*
 		 * Register the ACPI memory class driver onto the
@@ -267,10 +277,36 @@ acpidev_class_list_init(uint64_t *fp)
 		*fp |= ACPI_DEVCFG_MEMORY;
 	}
 
+	/* Check support of PCI/PCIex Host Bridge devices. */
+	if ((acpidev_options & ACPIDEV_OUSER_NO_PCI) == 0) {
+		/*
+		 * Register pci/pciex class drivers onto
+		 * the acpidev_class_list_device class list because ACPI
+		 * module class driver uses that list.
+		 */
+		if (ACPI_FAILURE(acpidev_register_class(
+		    &acpidev_class_list_device, &acpidev_class_pci,
+		    B_FALSE))) {
+			goto error_device_pci;
+		}
+
+		/*
+		 * Register pci/pciex class drivers onto the
+		 * acpidev_class_list_scope class list.
+		 */
+		if (ACPI_FAILURE(acpidev_register_class(
+		    &acpidev_class_list_scope, &acpidev_class_pci,
+		    B_FALSE))) {
+			goto error_scope_pci;
+		}
+
+		*fp |= ACPI_DEVCFG_PCI;
+	}
+
 	/* Check blacklist and load platform specific modules. */
 	rc = acpidev_load_plat_modules();
 	if (ACPI_FAILURE(rc)) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to check blacklist "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to check blacklist "
 		    "or load pratform modules.");
 		goto error_plat;
 	}
@@ -278,6 +314,16 @@ acpidev_class_list_init(uint64_t *fp)
 	return (AE_OK);
 
 error_plat:
+	if ((acpidev_options & ACPIDEV_OUSER_NO_PCI) == 0) {
+		(void) acpidev_unregister_class(&acpidev_class_list_scope,
+		    &acpidev_class_pci);
+	}
+error_scope_pci:
+	if ((acpidev_options & ACPIDEV_OUSER_NO_PCI) == 0) {
+		(void) acpidev_unregister_class(&acpidev_class_list_device,
+		    &acpidev_class_pci);
+	}
+error_device_pci:
 	if ((acpidev_options & ACPIDEV_OUSER_NO_MEM) == 0) {
 		(void) acpidev_unregister_class(&acpidev_class_list_device,
 		    &acpidev_class_memory);
@@ -313,7 +359,7 @@ error_root_device:
 	    &acpidev_class_scope);
 error_out:
 	ACPIDEV_DEBUG(CE_WARN,
-	    "acpidev: failed to register built-in class drivers.");
+	    "!acpidev: failed to register built-in class drivers.");
 	*fp = 0;
 
 	return (AE_ERROR);
@@ -353,7 +399,7 @@ acpidev_create_root_node(void)
 	    (pnode_t)DEVI_SID_NODEID, &dip);
 	if (rv != NDI_SUCCESS) {
 		ndi_devi_exit(ddi_root_node(), circ);
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to create device node "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to create device node "
 		    "for ACPI root with errcode %d.", rv);
 		return (AE_ERROR);
 	}
@@ -362,7 +408,7 @@ acpidev_create_root_node(void)
 	if (ACPI_FAILURE(acpica_tag_devinfo(dip, ACPI_ROOT_OBJECT))) {
 		(void) ddi_remove_child(dip, 0);
 		ndi_devi_exit(ddi_root_node(), circ);
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to tag object %s.",
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to tag object %s.",
 		    ACPIDEV_OBJECT_NAME_SB);
 		return (AE_ERROR);
 	}
@@ -376,7 +422,7 @@ acpidev_create_root_node(void)
 	}
 	if (rv != DDI_SUCCESS) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: failed to set device property for /devices/%s.",
+		    "!acpidev: failed to set device property for /devices/%s.",
 		    ACPIDEV_NODE_NAME_ROOT);
 		goto error_out;
 	}
@@ -384,7 +430,7 @@ acpidev_create_root_node(void)
 	/* Manually create an object handle for the root node */
 	objhdl = acpidev_data_create_handle(ACPI_ROOT_OBJECT);
 	if (objhdl == NULL) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to create object "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to create object "
 		    "handle for the root node.");
 		goto error_out;
 	}
@@ -425,7 +471,7 @@ acpidev_initialize(void)
 		return;
 	} else if (acpidev_status != ACPIDEV_STATUS_UNKNOWN) {
 		ACPIDEV_DEBUG(CE_NOTE,
-		    "acpidev: initialization called more than once.");
+		    "!acpidev: initialization called more than once.");
 		return;
 	}
 
@@ -476,6 +522,18 @@ acpidev_initialize(void)
 	acpidev_options = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(),
 	    DDI_PROP_DONTPASS, "acpidev-options", acpidev_options);
 
+	/* Check whether ACPI based DR has been disabled by user. */
+	rc = ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, "acpidev-dr", &str);
+	if (rc == DDI_SUCCESS) {
+		if (strcasecmp(str, "off") == 0 || strcasecmp(str, "no") == 0) {
+			cmn_err(CE_CONT, "?acpidev: ACPI based DR has been "
+			    "disabled by user.\n");
+			acpidev_dr_enable = 0;
+		}
+		ddi_prop_free(str);
+	}
+
 	/* Register all device class drivers. */
 	if (ACPI_FAILURE(acpidev_class_list_init(&features))) {
 		cmn_err(CE_WARN,
@@ -518,7 +576,7 @@ acpidev_boot_probe_device(acpidev_op_type_t op_type)
 	infop = acpidev_alloc_walk_info(op_type, 0, ACPI_ROOT_OBJECT,
 	    &acpidev_class_list_root, NULL);
 	if (infop == NULL) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to allocate walk info "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to allocate walk info "
 		    "object in acpi_boot_probe_device().");
 		return (AE_ERROR);
 	}
@@ -558,9 +616,18 @@ acpidev_boot_probe(int type)
 	if (type == 0 && acpidev_status == ACPIDEV_STATUS_INITIALIZED) {
 		rc = acpidev_boot_probe_device(ACPIDEV_OP_BOOT_PROBE);
 		if (ACPI_SUCCESS(rc)) {
+			/*
+			 * Support of DR operations will be disabled
+			 * if failed to initialize DR subsystem.
+			 */
+			rc = acpidev_dr_initialize(acpidev_root_dip);
+			if (ACPI_FAILURE(rc) && rc != AE_SUPPORT) {
+				cmn_err(CE_CONT, "?acpidev: failed to "
+				    "initialize DR subsystem.");
+			}
 			acpidev_status = ACPIDEV_STATUS_FIRST_PASS;
 		} else {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to probe ACPI "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to probe ACPI "
 			    "devices during boot.");
 			acpidev_status = ACPIDEV_STATUS_FAILED;
 		}
@@ -569,7 +636,7 @@ acpidev_boot_probe(int type)
 		if (ACPI_SUCCESS(rc)) {
 			acpidev_status = ACPIDEV_STATUS_READY;
 		} else {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to reprobe "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to reprobe "
 			    "ACPI devices during boot.");
 			acpidev_status = ACPIDEV_STATUS_FAILED;
 		}
@@ -598,12 +665,12 @@ acpidev_probe_child(acpidev_walk_info_t *infop)
 	ASSERT(infop != NULL);
 	if (infop == NULL) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: infop is NULL in acpidev_probe_child().");
+		    "!acpidev: infop is NULL in acpidev_probe_child().");
 		return (AE_BAD_PARAMETER);
 	}
 	ASSERT(infop->awi_level < ACPIDEV_MAX_ENUM_LEVELS - 1);
 	if (infop->awi_level >= ACPIDEV_MAX_ENUM_LEVELS - 1) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: recursive level is too deep "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: recursive level is too deep "
 		    "in acpidev_probe_child().");
 		return (AE_BAD_PARAMETER);
 	}
@@ -615,14 +682,14 @@ acpidev_probe_child(acpidev_walk_info_t *infop)
 	if (infop->awi_class_list == NULL || infop->awi_hdl == NULL ||
 	    infop->awi_info == NULL || infop->awi_name == NULL ||
 	    infop->awi_data == NULL) {
-		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: infop has NULL fields in acpidev_probe_child().");
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: infop has NULL fields in "
+		    "acpidev_probe_child().");
 		return (AE_BAD_PARAMETER);
 	}
 	pdip = acpidev_walk_info_get_pdip(infop);
 	if (pdip == NULL) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: pdip is NULL in acpidev_probe_child().");
+		    "!acpidev: pdip is NULL in acpidev_probe_child().");
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -636,7 +703,7 @@ acpidev_probe_child(acpidev_walk_info_t *infop)
 		}
 		infop->awi_class_curr = it->acl_class;
 		if (ACPI_FAILURE(it->acl_class->adc_pre_probe(infop))) {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to pre-probe "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to pre-probe "
 			    "device of type %s under %s.",
 			    it->acl_class->adc_class_name, infop->awi_name);
 		}
@@ -653,11 +720,17 @@ acpidev_probe_child(acpidev_walk_info_t *infop)
 			continue;
 		}
 
+		/* It's another hotplug-capable board, skip it. */
+		if (infop->awi_op_type == ACPIDEV_OP_HOTPLUG_PROBE &&
+		    acpidev_dr_device_is_board(child)) {
+			continue;
+		}
+
 		/* Allocate the walk info structure. */
 		cinfop = acpidev_alloc_walk_info(infop->awi_op_type,
 		    infop->awi_level + 1, child, NULL, infop);
 		if (cinfop == NULL) {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to allocate "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to allocate "
 			    "walk info child object of %s.",
 			    infop->awi_name);
 			/* Mark error and continue to handle next child. */
@@ -673,12 +746,6 @@ acpidev_probe_child(acpidev_walk_info_t *infop)
 		datap = cinfop->awi_data;
 		if (cinfop->awi_op_type == ACPIDEV_OP_BOOT_PROBE) {
 			datap->aod_class_list = infop->awi_class_list;
-		} else if (datap->aod_class_list != infop->awi_class_list) {
-			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: class list for %s has been changed",
-			    infop->awi_name);
-			acpidev_free_walk_info(cinfop);
-			continue;
 		}
 
 		/* Call registered process callbacks. */
@@ -691,7 +758,7 @@ acpidev_probe_child(acpidev_walk_info_t *infop)
 			res = it->acl_class->adc_probe(cinfop);
 			if (ACPI_FAILURE(res)) {
 				rc = res;
-				ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to "
+				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
 				    "process object of type %s under %s.",
 				    it->acl_class->adc_class_name,
 				    infop->awi_name);
@@ -709,7 +776,7 @@ acpidev_probe_child(acpidev_walk_info_t *infop)
 		}
 		infop->awi_class_curr = it->acl_class;
 		if (ACPI_FAILURE(it->acl_class->adc_post_probe(infop))) {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to post-probe "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to post-probe "
 			    "device of type %s under %s.",
 			    it->acl_class->adc_class_name, infop->awi_name);
 		}
@@ -737,7 +804,7 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 	ASSERT(infop != NULL);
 	if (infop == NULL) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: infop is NULL in acpidev_process_object().");
+		    "!acpidev: infop is NULL in acpidev_process_object().");
 		return (AE_BAD_PARAMETER);
 	}
 	ASSERT(infop->awi_hdl != NULL);
@@ -751,13 +818,13 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 	clsp = infop->awi_class_curr;
 	if (hdl == NULL || datap == NULL || adip == NULL || clsp == NULL ||
 	    clsp->adc_filter == NULL) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: infop has NULL pointer in "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: infop has NULL pointer in "
 		    "acpidev_process_object().");
 		return (AE_BAD_PARAMETER);
 	}
 	pdip = acpidev_walk_info_get_pdip(infop);
 	if (pdip == NULL) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to get pdip for %s "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to get pdip for %s "
 		    "in acpidev_process_object().", infop->awi_name);
 		return (AE_BAD_PARAMETER);
 	}
@@ -782,7 +849,7 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 	    (infop->awi_flags & ACPIDEV_WI_DEVICE_CREATED)) {
 		ASSERT(infop->awi_dip != NULL);
 		ACPIDEV_DEBUG(CE_NOTE,
-		    "acpidev: device has already been created for object %s.",
+		    "!acpidev: device has already been created for object %s.",
 		    infop->awi_name);
 		return (AE_ALREADY_EXISTS);
 	}
@@ -793,9 +860,9 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 	 * 6.3.1 and 6.5.1.
 	 * present functioning enabled	Action
 	 *	0	0	x	Do nothing
-	 *	1	x	0	Create node in OFFLINE and scan child
+	 *	1	x	0	Do nothing
 	 *	1	x	1	Create node and scan child
-	 *	x	1	0	Create node in OFFLINE and scan child
+	 *	x	1	0	Do nothing
 	 *	x	1	1	Create node and scan child
 	 */
 	if ((datap->aod_iflag & ACPIDEV_ODF_STATUS_VALID) == 0 ||
@@ -807,31 +874,34 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 		}
 		datap->aod_iflag |= ACPIDEV_ODF_STATUS_VALID;
 	}
-	if (!acpidev_check_device_present(datap->aod_status)) {
-		ACPIDEV_DEBUG(CE_NOTE, "acpidev: object %s doesn't exist.",
+	if (!acpidev_check_device_enabled(datap->aod_status)) {
+		ACPIDEV_DEBUG(CE_NOTE, "!acpidev: object %s doesn't exist.",
 		    infop->awi_name);
-		return (AE_NOT_EXIST);
+		/*
+		 * Need to scan for hotplug-capable boards even if object
+		 * doesn't exist or has been disabled during the first pass.
+		 * So just disable creating device node and keep on scanning.
+		 */
+		if (infop->awi_op_type == ACPIDEV_OP_BOOT_PROBE) {
+			flags &= ~ACPIDEV_PROCESS_FLAG_CREATE;
+		} else {
+			return (AE_NOT_EXIST);
+		}
 	}
 
 	ASSERT(infop->awi_data != NULL);
 	ASSERT(infop->awi_parent != NULL);
 	ASSERT(infop->awi_parent->awi_data != NULL);
-	/* Put device into offline state if parent is in offline state. */
-	if (infop->awi_parent->awi_data->aod_iflag &
-	    ACPIDEV_ODF_DEVINFO_OFFLINE) {
-		flags |= ACPIDEV_PROCESS_FLAG_OFFLINE;
-	/* Put device into offline state if it's disabled. */
-	} else if (!acpidev_check_device_enabled(datap->aod_status)) {
-		flags |= ACPIDEV_PROCESS_FLAG_OFFLINE;
-	}
-	/*
-	 * Mark current node status as OFFLINE even if a device node will not
-	 * be created for it. This is needed to handle the case when the current
-	 * node is SKIPPED (no device node will be created for it), so that all
-	 * descedants of current nodes could be correctly marked as OFFLINE.
-	 */
-	if (flags & ACPIDEV_PROCESS_FLAG_OFFLINE) {
-		infop->awi_data->aod_iflag |= ACPIDEV_ODF_DEVINFO_OFFLINE;
+	if (flags & ACPIDEV_PROCESS_FLAG_CREATE) {
+		mutex_enter(&(DEVI(pdip)->devi_lock));
+		/*
+		 * Put the device into offline state if its parent is in
+		 * offline state.
+		 */
+		if (DEVI_IS_DEVICE_OFFLINE(pdip)) {
+			flags |= ACPIDEV_PROCESS_FLAG_OFFLINE;
+		}
+		mutex_exit(&(DEVI(pdip)->devi_lock));
 	}
 
 	/* Evaluate filtering rules and generate device name. */
@@ -862,7 +932,7 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 		    OBP_DEVICETYPE, clsp->adc_dev_type);
 		if (ret != NDI_SUCCESS) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: failed to set device property for %s.",
+			    "!acpidev: failed to set device property for %s.",
 			    infop->awi_name);
 			(void) ddi_remove_child(dip, 0);
 			infop->awi_dip = NULL;
@@ -886,7 +956,7 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 		if (clsp->adc_init != NULL &&
 		    ACPI_FAILURE(clsp->adc_init(infop))) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: failed to initialize device %s.",
+			    "!acpidev: failed to initialize device %s.",
 			    infop->awi_name);
 			if ((flags & ACPIDEV_PROCESS_FLAG_NOTAG) == 0) {
 				(void) acpica_untag_devinfo(dip, hdl);
@@ -923,6 +993,11 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 		} else {
 			(void) ndi_devi_bind_driver(dip, 0);
 		}
+
+		/* Hold reference on branch when hot-adding devices. */
+		if (flags & ACPIDEV_PROCESS_FLAG_HOLDBRANCH) {
+			e_ddi_branch_hold(dip);
+		}
 	}
 
 	/* Free resources */
@@ -942,7 +1017,7 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 			rc = acpidev_probe_child(infop);
 			if (ACPI_FAILURE(rc)) {
 				ACPIDEV_DEBUG(CE_WARN,
-				    "acpidev: failed to probe subtree of %s.",
+				    "!acpidev: failed to probe subtree of %s.",
 				    infop->awi_name);
 				rc = AE_ERROR;
 			}
@@ -960,7 +1035,7 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 
 	case ACPIDEV_FILTER_FAILED:
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: failed to probe device for %s.",
+		    "!acpidev: failed to probe device for %s.",
 		    infop->awi_name);
 		rc = AE_ERROR;
 		break;
@@ -975,11 +1050,12 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 	return (rc);
 }
 
-/*ARGSUSED*/
 acpidev_filter_result_t
 acpidev_filter_default(acpidev_walk_info_t *infop, ACPI_HANDLE hdl,
     acpidev_filter_rule_t *afrp, char *devname, int len)
 {
+	_NOTE(ARGUNUSED(hdl));
+
 	ASSERT(afrp != NULL);
 	ASSERT(devname == NULL || len >= ACPIDEV_MAX_NAMELEN);
 	if (infop->awi_level < afrp->adf_minlvl ||
@@ -992,8 +1068,7 @@ acpidev_filter_default(acpidev_walk_info_t *infop, ACPI_HANDLE hdl,
 		return (ACPIDEV_FILTER_CONTINUE);
 	}
 	if (afrp->adf_replace != NULL && devname != NULL) {
-		(void) strncpy(devname, afrp->adf_replace, len - 1);
-		devname[len - 1] = 0;
+		(void) strlcpy(devname, afrp->adf_replace, len);
 	}
 
 	return (afrp->adf_retcode);
@@ -1042,7 +1117,7 @@ acpidev_register_class(acpidev_class_list_t **listpp, acpidev_class_t *clsp,
 	ASSERT(listpp != NULL);
 	if (listpp == NULL || clsp == NULL) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: invalid parameter in acpidev_register_class().");
+		    "!acpidev: invalid parameter in acpidev_register_class().");
 		return (AE_BAD_PARAMETER);
 	} else if (clsp->adc_version != ACPIDEV_CLASS_REV) {
 		cmn_err(CE_WARN,
@@ -1092,7 +1167,7 @@ acpidev_unregister_class(acpidev_class_list_t **listpp,
 	ASSERT(clsp != NULL);
 	ASSERT(listpp != NULL);
 	if (listpp == NULL || clsp == NULL) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: invalid parameter "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: invalid parameter "
 		    "in acpidev_unregister_class().");
 		return (AE_BAD_PARAMETER);
 	}
@@ -1106,12 +1181,12 @@ acpidev_unregister_class(acpidev_class_list_t **listpp,
 		}
 	}
 	if (temp == NULL) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: class %p(%s) doesn't exist "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: class %p(%s) doesn't exist "
 		    "in acpidev_unregister_class().",
 		    (void *)clsp, clsp->adc_class_name);
 		rc = AE_NOT_FOUND;
 	} else if (temp->acl_class->adc_refcnt != 0) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: class %p(%s) is still in use "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: class %p(%s) is still in use "
 		    "in acpidev_unregister_class()..",
 		    (void *)clsp, clsp->adc_class_name);
 		rc = AE_ERROR;

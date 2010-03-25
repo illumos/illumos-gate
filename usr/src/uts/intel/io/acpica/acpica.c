@@ -36,6 +36,7 @@
 #include <sys/modctl.h>
 #include <sys/open.h>
 #include <sys/stat.h>
+#include <sys/spl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/esunddi.h>
@@ -121,8 +122,11 @@ _init(void)
 	int error = EBUSY;
 	int	status;
 	extern int (*acpi_fp_setwake)();
+	extern kmutex_t cpu_map_lock;
 
 	mutex_init(&acpica_module_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&cpu_map_lock, NULL, MUTEX_SPIN,
+	    (ddi_iblock_cookie_t)ipltospl(DISP_LEVEL));
 
 	if ((error = mod_install(&modlinkage)) != 0) {
 		mutex_destroy(&acpica_module_lock);

@@ -23,10 +23,15 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/thread.h>
 #include <sys/cpuvar.h>
+#include <sys/cpu.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -34,6 +39,7 @@
 #include <sys/class.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
+#include <sys/note.h>
 #include <sys/asm_linkage.h>
 #include <sys/x_call.h>
 #include <sys/systm.h>
@@ -60,6 +66,7 @@
 #include <sys/reboot.h>
 #include <sys/kdi_machimpl.h>
 #include <vm/hat_i86.h>
+#include <vm/vm_dep.h>
 #include <sys/memnode.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/mach_mmu.h>
@@ -71,7 +78,10 @@
 
 struct cpu	cpus[1];			/* CPU data */
 struct cpu	*cpu[NCPU] = {&cpus[0]};	/* pointers to all CPUs */
+struct cpu	*cpu_free_list;			/* list for released CPUs */
 cpu_core_t	cpu_core[NCPU];			/* cpu_core structures */
+
+#define	cpu_next_free	cpu_prev
 
 /*
  * Useful for disabling MP bring-up on a MP capable system.
@@ -94,7 +104,8 @@ int flushes_require_xcalls;
 
 cpuset_t cpu_ready_set;		/* initialized in startup() */
 
-static 	void	mp_startup(void);
+static void mp_startup_boot(void);
+static void mp_startup_hotplug(void);
 
 static void cpu_sep_enable(void);
 static void cpu_sep_disable(void);
@@ -108,7 +119,6 @@ void
 init_cpu_info(struct cpu *cp)
 {
 	processor_info_t *pi = &cp->cpu_type_info;
-	char buf[CPU_IDSTRLEN];
 
 	/*
 	 * Get clock-frequency property for the CPU.
@@ -131,14 +141,18 @@ init_cpu_info(struct cpu *cp)
 	if (fpu_exists)
 		(void) strcpy(pi->pi_fputypes, "i387 compatible");
 
-	(void) cpuid_getidstr(cp, buf, sizeof (buf));
+	cp->cpu_idstr = kmem_zalloc(CPU_IDSTRLEN, KM_SLEEP);
+	cp->cpu_brandstr = kmem_zalloc(CPU_IDSTRLEN, KM_SLEEP);
 
-	cp->cpu_idstr = kmem_alloc(strlen(buf) + 1, KM_SLEEP);
-	(void) strcpy(cp->cpu_idstr, buf);
-
-	(void) cpuid_getbrandstr(cp, buf, sizeof (buf));
-	cp->cpu_brandstr = kmem_alloc(strlen(buf) + 1, KM_SLEEP);
-	(void) strcpy(cp->cpu_brandstr, buf);
+	/*
+	 * If called for the BSP, cp is equal to current CPU.
+	 * For non-BSPs, cpuid info of cp is not ready yet, so use cpuid info
+	 * of current CPU as default values for cpu_idstr and cpu_brandstr.
+	 * They will be corrected in mp_startup_common() after cpuid_pass1()
+	 * has been invoked on target CPU.
+	 */
+	(void) cpuid_getidstr(CPU, cp->cpu_idstr, CPU_IDSTRLEN);
+	(void) cpuid_getbrandstr(CPU, cp->cpu_brandstr, CPU_IDSTRLEN);
 }
 
 /*
@@ -228,9 +242,11 @@ init_cpu_syscall(struct cpu *cp)
  *
  * Allocate and initialize the cpu structure, TRAPTRACE buffer, and the
  * startup and idle threads for the specified CPU.
+ * Parameter boot is true for boot time operations and is false for CPU
+ * DR operations.
  */
-struct cpu *
-mp_startup_init(int cpun)
+static struct cpu *
+mp_cpu_configure_common(int cpun, boolean_t boot)
 {
 	struct cpu *cp;
 	kthread_id_t tp;
@@ -247,27 +263,25 @@ mp_startup_init(int cpun)
 	trap_trace_ctl_t *ttc = &trap_trace_ctl[cpun];
 #endif
 
+	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(cpun < NCPU && cpu[cpun] == NULL);
 
-	cp = kmem_zalloc(sizeof (*cp), KM_SLEEP);
-#if !defined(__xpv)
-	if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait) {
-		cp->cpu_m.mcpu_mwait = cpuid_mwait_alloc(CPU);
-		cp->cpu_m.mcpu_idle_cpu = cpu_idle_mwait;
-	} else
-#endif
-		cp->cpu_m.mcpu_idle_cpu = cpu_idle;
+	if (cpu_free_list == NULL) {
+		cp = kmem_zalloc(sizeof (*cp), KM_SLEEP);
+	} else {
+		cp = cpu_free_list;
+		cpu_free_list = cp->cpu_next_free;
+	}
 
 	cp->cpu_m.mcpu_istamp = cpun << 16;
 
-	procp = curthread->t_procp;
+	/* Create per CPU specific threads in the process p0. */
+	procp = &p0;
 
-	mutex_enter(&cpu_lock);
 	/*
 	 * Initialize the dispatcher first.
 	 */
 	disp_cpu_init(cp);
-	mutex_exit(&cpu_lock);
 
 	cpu_vm_data_init(cp);
 
@@ -294,14 +308,21 @@ mp_startup_init(int cpun)
 	tp->t_disp_queue = cp->cpu_disp;
 
 	/*
-	 * Setup thread to start in mp_startup.
+	 * Setup thread to start in mp_startup_common.
 	 */
 	sp = tp->t_stk;
-	tp->t_pc = (uintptr_t)mp_startup;
 	tp->t_sp = (uintptr_t)(sp - MINFRAME);
 #if defined(__amd64)
 	tp->t_sp -= STACK_ENTRY_ALIGN;		/* fake a call */
 #endif
+	/*
+	 * Setup thread start entry point for boot or hotplug.
+	 */
+	if (boot) {
+		tp->t_pc = (uintptr_t)mp_startup_boot;
+	} else {
+		tp->t_pc = (uintptr_t)mp_startup_hotplug;
+	}
 
 	cp->cpu_id = cpun;
 	cp->cpu_self = cp;
@@ -312,12 +333,13 @@ mp_startup_init(int cpun)
 
 	/*
 	 * cpu_base_spl must be set explicitly here to prevent any blocking
-	 * operations in mp_startup from causing the spl of the cpu to drop
-	 * to 0 (allowing device interrupts before we're ready) in resume().
+	 * operations in mp_startup_common from causing the spl of the cpu
+	 * to drop to 0 (allowing device interrupts before we're ready) in
+	 * resume().
 	 * cpu_base_spl MUST remain at LOCK_LEVEL until the cpu is CPU_READY.
 	 * As an extra bit of security on DEBUG kernels, this is enforced with
-	 * an assertion in mp_startup() -- before cpu_base_spl is set to its
-	 * proper value.
+	 * an assertion in mp_startup_common() -- before cpu_base_spl is set
+	 * to its proper value.
 	 */
 	cp->cpu_base_spl = ipltospl(LOCK_LEVEL);
 
@@ -392,6 +414,15 @@ mp_startup_init(int cpun)
 	 * alloc space for cpuid info
 	 */
 	cpuid_alloc_space(cp);
+#if !defined(__xpv)
+	if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait) {
+		cp->cpu_m.mcpu_mwait = cpuid_mwait_alloc(cp);
+		cp->cpu_m.mcpu_idle_cpu = cpu_idle_mwait;
+	} else
+#endif
+		cp->cpu_m.mcpu_idle_cpu = cpu_idle;
+
+	init_cpu_info(cp);
 
 	/*
 	 * alloc space for ucode_info
@@ -408,31 +439,34 @@ mp_startup_init(int cpun)
 	ttc->ttc_next = ttc->ttc_first;
 	ttc->ttc_limit = ttc->ttc_first + trap_trace_bufsize;
 #endif
+
 	/*
 	 * Record that we have another CPU.
 	 */
-	mutex_enter(&cpu_lock);
 	/*
 	 * Initialize the interrupt threads for this CPU
 	 */
 	cpu_intr_alloc(cp, NINTR_THREADS);
+
+	cp->cpu_flags = CPU_OFFLINE | CPU_QUIESCED | CPU_POWEROFF;
+	cpu_set_state(cp);
+
 	/*
 	 * Add CPU to list of available CPUs.  It'll be on the active list
-	 * after mp_startup().
+	 * after mp_startup_common().
 	 */
 	cpu_add_unit(cp);
-	mutex_exit(&cpu_lock);
 
 	return (cp);
 }
 
 /*
- * Undo what was done in mp_startup_init
+ * Undo what was done in mp_cpu_configure_common
  */
 static void
-mp_startup_fini(struct cpu *cp, int error)
+mp_cpu_unconfigure_common(struct cpu *cp, int error)
 {
-	mutex_enter(&cpu_lock);
+	ASSERT(MUTEX_HELD(&cpu_lock));
 
 	/*
 	 * Remove the CPU from the list of available CPUs.
@@ -451,7 +485,6 @@ mp_startup_fini(struct cpu *cp, int error)
 		 * leave the fundamental data structures intact.
 		 */
 		cp->cpu_flags = 0;
-		mutex_exit(&cpu_lock);
 		return;
 	}
 
@@ -468,8 +501,7 @@ mp_startup_fini(struct cpu *cp, int error)
 	 */
 	segkp_release(segkp,
 	    cp->cpu_intr_stack - (INTR_STACK_SIZE - SA(MINFRAME)));
-
-	mutex_exit(&cpu_lock);
+	cp->cpu_intr_stack = NULL;
 
 #ifdef TRAPTRACE
 	/*
@@ -485,9 +517,25 @@ mp_startup_fini(struct cpu *cp, int error)
 
 	hat_cpu_offline(cp);
 
-	cpuid_free_space(cp);
-
 	ucode_free_space(cp);
+
+	/* Free CPU ID string and brand string. */
+	if (cp->cpu_idstr) {
+		kmem_free(cp->cpu_idstr, CPU_IDSTRLEN);
+		cp->cpu_idstr = NULL;
+	}
+	if (cp->cpu_brandstr) {
+		kmem_free(cp->cpu_brandstr, CPU_IDSTRLEN);
+		cp->cpu_brandstr = NULL;
+	}
+
+#if !defined(__xpv)
+	if (cp->cpu_m.mcpu_mwait != NULL) {
+		cpuid_mwait_free(cp);
+		cp->cpu_m.mcpu_mwait = NULL;
+	}
+#endif
+	cpuid_free_space(cp);
 
 	if (cp->cpu_idt != CPU->cpu_idt)
 		kmem_free(cp->cpu_idt, PAGESIZE);
@@ -495,6 +543,12 @@ mp_startup_fini(struct cpu *cp, int error)
 
 	kmem_free(cp->cpu_gdt, PAGESIZE);
 	cp->cpu_gdt = NULL;
+
+	if (cp->cpu_supp_freqs != NULL) {
+		size_t len = strlen(cp->cpu_supp_freqs) + 1;
+		kmem_free(cp->cpu_supp_freqs, len);
+		cp->cpu_supp_freqs = NULL;
+	}
 
 	teardown_vaddr_for_ppcopy(cp);
 
@@ -505,15 +559,13 @@ mp_startup_fini(struct cpu *cp, int error)
 
 	cpu_vm_data_destroy(cp);
 
-	mutex_enter(&cpu_lock);
+	xc_fini_cpu(cp);
 	disp_cpu_fini(cp);
-	mutex_exit(&cpu_lock);
 
-#if !defined(__xpv)
-	if (cp->cpu_m.mcpu_mwait != NULL)
-		cpuid_mwait_free(cp);
-#endif
-	kmem_free(cp, sizeof (*cp));
+	ASSERT(cp != CPU0);
+	bzero(cp, sizeof (*cp));
+	cp->cpu_next_free = cpu_free_list;
+	cpu_free_list = cp;
 }
 
 /*
@@ -529,8 +581,8 @@ mp_startup_fini(struct cpu *cp, int error)
  * system.
  *
  * workaround_errata is invoked early in mlsetup() for CPU 0, and in
- * mp_startup() for all slave CPUs. Slaves process workaround_errata prior
- * to acknowledging their readiness to the master, so this routine will
+ * mp_startup_common() for all slave CPUs. Slaves process workaround_errata
+ * prior to acknowledging their readiness to the master, so this routine will
  * never be executed by multiple CPUs in parallel, thus making updates to
  * global data safe.
  *
@@ -1214,7 +1266,126 @@ workaround_errata_end()
 #endif
 }
 
-static cpuset_t procset;
+/*
+ * The procset_slave and procset_master are used to synchronize
+ * between the control CPU and the target CPU when starting CPUs.
+ */
+static cpuset_t procset_slave, procset_master;
+
+static void
+mp_startup_wait(cpuset_t *sp, processorid_t cpuid)
+{
+	cpuset_t tempset;
+
+	for (tempset = *sp; !CPU_IN_SET(tempset, cpuid);
+	    tempset = *(volatile cpuset_t *)sp) {
+		SMT_PAUSE();
+	}
+	CPUSET_ATOMIC_DEL(*(cpuset_t *)sp, cpuid);
+}
+
+static void
+mp_startup_signal(cpuset_t *sp, processorid_t cpuid)
+{
+	cpuset_t tempset;
+
+	CPUSET_ATOMIC_ADD(*(cpuset_t *)sp, cpuid);
+	for (tempset = *sp; CPU_IN_SET(tempset, cpuid);
+	    tempset = *(volatile cpuset_t *)sp) {
+		SMT_PAUSE();
+	}
+}
+
+int
+mp_start_cpu_common(cpu_t *cp, boolean_t boot)
+{
+	_NOTE(ARGUNUSED(boot));
+
+	void *ctx;
+	int delays;
+	int error = 0;
+	cpuset_t tempset;
+	processorid_t cpuid;
+#ifndef __xpv
+	extern void cpupm_init(cpu_t *);
+#endif
+
+	ASSERT(cp != NULL);
+	cpuid = cp->cpu_id;
+	ctx = mach_cpucontext_alloc(cp);
+	if (ctx == NULL) {
+		cmn_err(CE_WARN,
+		    "cpu%d: failed to allocate context", cp->cpu_id);
+		return (EAGAIN);
+	}
+	error = mach_cpu_start(cp, ctx);
+	if (error != 0) {
+		cmn_err(CE_WARN,
+		    "cpu%d: failed to start, error %d", cp->cpu_id, error);
+		mach_cpucontext_free(cp, ctx, error);
+		return (error);
+	}
+
+	for (delays = 0, tempset = procset_slave; !CPU_IN_SET(tempset, cpuid);
+	    delays++) {
+		if (delays == 500) {
+			/*
+			 * After five seconds, things are probably looking
+			 * a bit bleak - explain the hang.
+			 */
+			cmn_err(CE_NOTE, "cpu%d: started, "
+			    "but not running in the kernel yet", cpuid);
+		} else if (delays > 2000) {
+			/*
+			 * We waited at least 20 seconds, bail ..
+			 */
+			error = ETIMEDOUT;
+			cmn_err(CE_WARN, "cpu%d: timed out", cpuid);
+			mach_cpucontext_free(cp, ctx, error);
+			return (error);
+		}
+
+		/*
+		 * wait at least 10ms, then check again..
+		 */
+		delay(USEC_TO_TICK_ROUNDUP(10000));
+		tempset = *((volatile cpuset_t *)&procset_slave);
+	}
+	CPUSET_ATOMIC_DEL(procset_slave, cpuid);
+
+	mach_cpucontext_free(cp, ctx, 0);
+
+#ifndef __xpv
+	if (tsc_gethrtime_enable)
+		tsc_sync_master(cpuid);
+#endif
+
+	if (dtrace_cpu_init != NULL) {
+		(*dtrace_cpu_init)(cpuid);
+	}
+
+	/*
+	 * During CPU DR operations, the cpu_lock is held by current
+	 * (the control) thread. We can't release the cpu_lock here
+	 * because that will break the CPU DR logic.
+	 * On the other hand, CPUPM and processor group initialization
+	 * routines need to access the cpu_lock. So we invoke those
+	 * routines here on behalf of mp_startup_common().
+	 *
+	 * CPUPM and processor group initialization routines depend
+	 * on the cpuid probing results. Wait for mp_startup_common()
+	 * to signal that cpuid probing is done.
+	 */
+	mp_startup_wait(&procset_slave, cpuid);
+#ifndef __xpv
+	cpupm_init(cp);
+#endif
+	(void) pg_cpu_init(cp, B_FALSE);
+	cpu_set_state(cp);
+	mp_startup_signal(&procset_master, cpuid);
+
+	return (0);
+}
 
 /*
  * Start a single cpu, assuming that the kernel context is available
@@ -1226,10 +1397,9 @@ static cpuset_t procset;
 int
 start_cpu(processorid_t who)
 {
-	void *ctx;
 	cpu_t *cp;
-	int delays;
 	int error = 0;
+	cpuset_t tempset;
 
 	ASSERT(who != 0);
 
@@ -1246,83 +1416,38 @@ start_cpu(processorid_t who)
 		return (ENOMEM);
 	}
 
-	cp = mp_startup_init(who);
-	if ((ctx = mach_cpucontext_alloc(cp)) == NULL ||
-	    (error = mach_cpu_start(cp, ctx)) != 0) {
+	/*
+	 * First configure cpu.
+	 */
+	cp = mp_cpu_configure_common(who, B_TRUE);
+	ASSERT(cp != NULL);
 
-		/*
-		 * Something went wrong before we even started it
-		 */
-		if (ctx)
-			cmn_err(CE_WARN,
-			    "cpu%d: failed to start error %d",
-			    cp->cpu_id, error);
-		else
-			cmn_err(CE_WARN,
-			    "cpu%d: failed to allocate context", cp->cpu_id);
-
-		if (ctx)
-			mach_cpucontext_free(cp, ctx, error);
-		else
-			error = EAGAIN;		/* hmm. */
-		mp_startup_fini(cp, error);
+	/*
+	 * Then start cpu.
+	 */
+	error = mp_start_cpu_common(cp, B_TRUE);
+	if (error != 0) {
+		mp_cpu_unconfigure_common(cp, error);
 		return (error);
 	}
 
-	for (delays = 0; !CPU_IN_SET(procset, who); delays++) {
-		if (delays == 500) {
-			/*
-			 * After five seconds, things are probably looking
-			 * a bit bleak - explain the hang.
-			 */
-			cmn_err(CE_NOTE, "cpu%d: started, "
-			    "but not running in the kernel yet", who);
-		} else if (delays > 2000) {
-			/*
-			 * We waited at least 20 seconds, bail ..
-			 */
-			error = ETIMEDOUT;
-			cmn_err(CE_WARN, "cpu%d: timed out", who);
-			mach_cpucontext_free(cp, ctx, error);
-			mp_startup_fini(cp, error);
-			return (error);
-		}
-
-		/*
-		 * wait at least 10ms, then check again..
-		 */
-		delay(USEC_TO_TICK_ROUNDUP(10000));
+	mutex_exit(&cpu_lock);
+	tempset = cpu_ready_set;
+	while (!CPU_IN_SET(tempset, who)) {
+		drv_usecwait(1);
+		tempset = *((volatile cpuset_t *)&cpu_ready_set);
 	}
-
-	mach_cpucontext_free(cp, ctx, 0);
-
-#ifndef __xpv
-	if (tsc_gethrtime_enable)
-		tsc_sync_master(who);
-#endif
-
-	if (dtrace_cpu_init != NULL) {
-		/*
-		 * DTrace CPU initialization expects cpu_lock to be held.
-		 */
-		mutex_enter(&cpu_lock);
-		(*dtrace_cpu_init)(who);
-		mutex_exit(&cpu_lock);
-	}
-
-	while (!CPU_IN_SET(cpu_ready_set, who))
-		delay(1);
+	mutex_enter(&cpu_lock);
 
 	return (0);
 }
 
-
-/*ARGSUSED*/
 void
 start_other_cpus(int cprboot)
 {
+	_NOTE(ARGUNUSED(cprboot));
+
 	uint_t who;
-	uint_t skipped = 0;
 	uint_t bootcpuid = 0;
 
 	/*
@@ -1347,9 +1472,12 @@ start_other_cpus(int cprboot)
 	CPUSET_ADD(cpu_ready_set, bootcpuid);
 
 	/*
-	 * if only 1 cpu or not using MP, skip the rest of this
+	 * skip the rest of this if
+	 * . only 1 cpu dectected and system isn't hotplug-capable
+	 * . not using MP
 	 */
-	if (CPUSET_ISNULL(mp_cpus) || use_mp == 0) {
+	if ((CPUSET_ISNULL(mp_cpus) && plat_dr_support_cpu() == 0) ||
+	    use_mp == 0) {
 		if (use_mp == 0)
 			cmn_err(CE_CONT, "?***** Not in MP mode\n");
 		goto done;
@@ -1375,18 +1503,13 @@ start_other_cpus(int cprboot)
 	affinity_set(CPU_CURRENT);
 
 	for (who = 0; who < NCPU; who++) {
-
 		if (!CPU_IN_SET(mp_cpus, who))
 			continue;
 		ASSERT(who != bootcpuid);
-		if (ncpus >= max_ncpus) {
-			skipped = who;
-			continue;
-		}
-		if (start_cpu(who) != 0)
-			CPUSET_DEL(mp_cpus, who);
 
 		mutex_enter(&cpu_lock);
+		if (start_cpu(who) != 0)
+			CPUSET_DEL(mp_cpus, who);
 		cpu_state_change_notify(who, CPU_SETUP);
 		mutex_exit(&cpu_lock);
 	}
@@ -1396,59 +1519,92 @@ start_other_cpus(int cprboot)
 
 	affinity_clear();
 
-	if (skipped) {
-		cmn_err(CE_NOTE,
-		    "System detected %d cpus, but "
-		    "only %d cpu(s) were enabled during boot.",
-		    skipped + 1, ncpus);
-		cmn_err(CE_NOTE,
-		    "Use \"boot-ncpus\" parameter to enable more CPU(s). "
-		    "See eeprom(1M).");
-	}
+	mach_cpucontext_fini();
 
 done:
 	if (get_hwenv() == HW_NATIVE)
 		workaround_errata_end();
-	mach_cpucontext_fini();
-
 	cmi_post_mpstartup();
+
+	if (use_mp && ncpus != boot_max_ncpus) {
+		cmn_err(CE_NOTE,
+		    "System detected %d cpus, but "
+		    "only %d cpu(s) were enabled during boot.",
+		    boot_max_ncpus, ncpus);
+		cmn_err(CE_NOTE,
+		    "Use \"boot-ncpus\" parameter to enable more CPU(s). "
+		    "See eeprom(1M).");
+	}
 }
 
-/*
- * Dummy functions - no i86pc platforms support dynamic cpu allocation.
- */
-/*ARGSUSED*/
 int
 mp_cpu_configure(int cpuid)
 {
-	return (ENOTSUP);		/* not supported */
+	cpu_t *cp;
+
+	if (use_mp == 0 || plat_dr_support_cpu() == 0) {
+		return (ENOTSUP);
+	}
+
+	cp = cpu_get(cpuid);
+	if (cp != NULL) {
+		return (EALREADY);
+	}
+
+	/*
+	 * Check if there's at least a Mbyte of kmem available
+	 * before attempting to start the cpu.
+	 */
+	if (kmem_avail() < 1024 * 1024) {
+		/*
+		 * Kick off a reap in case that helps us with
+		 * later attempts ..
+		 */
+		kmem_reap();
+		return (ENOMEM);
+	}
+
+	cp = mp_cpu_configure_common(cpuid, B_FALSE);
+	ASSERT(cp != NULL && cpu_get(cpuid) == cp);
+
+	return (cp != NULL ? 0 : EAGAIN);
 }
 
-/*ARGSUSED*/
 int
 mp_cpu_unconfigure(int cpuid)
 {
-	return (ENOTSUP);		/* not supported */
+	cpu_t *cp;
+
+	if (use_mp == 0 || plat_dr_support_cpu() == 0) {
+		return (ENOTSUP);
+	} else if (cpuid < 0 || cpuid >= max_ncpus) {
+		return (EINVAL);
+	}
+
+	cp = cpu_get(cpuid);
+	if (cp == NULL) {
+		return (ENODEV);
+	}
+	mp_cpu_unconfigure_common(cp, 0);
+
+	return (0);
 }
 
 /*
  * Startup function for 'other' CPUs (besides boot cpu).
  * Called from real_mode_start.
  *
- * WARNING: until CPU_READY is set, mp_startup and routines called by
- * mp_startup should not call routines (e.g. kmem_free) that could call
+ * WARNING: until CPU_READY is set, mp_startup_common and routines called by
+ * mp_startup_common should not call routines (e.g. kmem_free) that could call
  * hat_unload which requires CPU_READY to be set.
  */
-void
-mp_startup(void)
+static void
+mp_startup_common(boolean_t boot)
 {
-	struct cpu *cp = CPU;
+	cpu_t *cp = CPU;
 	uint_t new_x86_feature;
-	extern void cpu_event_init_cpu(cpu_t *);
-#ifndef __xpv
-	extern void cpupm_init(cpu_t *);
-#endif
 	const char *fmt = "?cpu%d: %b\n";
+	extern void cpu_event_init_cpu(cpu_t *);
 
 	/*
 	 * We need to get TSC on this proc synced (i.e., any delta
@@ -1457,8 +1613,8 @@ mp_startup(void)
 	 * interrupts, cmn_err, etc.
 	 */
 
-	/* Let cpu0 continue into tsc_sync_master() */
-	CPUSET_ATOMIC_ADD(procset, cp->cpu_id);
+	/* Let the control CPU continue into tsc_sync_master() */
+	mp_startup_signal(&procset_slave, cp->cpu_id);
 
 #ifndef __xpv
 	if (tsc_gethrtime_enable)
@@ -1537,39 +1693,42 @@ mp_startup(void)
 	if (workaround_errata(cp) != 0)
 		panic("critical workaround(s) missing for cpu%d", cp->cpu_id);
 
+	/*
+	 * We can touch cpu_flags here without acquiring the cpu_lock here
+	 * because the cpu_lock is held by the control CPU which is running
+	 * mp_start_cpu_common().
+	 * Need to clear CPU_QUIESCED flag before calling any function which
+	 * may cause thread context switching, such as kmem_alloc() etc.
+	 * The idle thread checks for CPU_QUIESCED flag and loops for ever if
+	 * it's set. So the startup thread may have no chance to switch back
+	 * again if it's switched away with CPU_QUIESCED set.
+	 */
+	cp->cpu_flags &= ~(CPU_POWEROFF | CPU_QUIESCED);
+
 	cpuid_pass2(cp);
 	cpuid_pass3(cp);
 	(void) cpuid_pass4(cp);
 
-	init_cpu_info(cp);
-
-	mutex_enter(&cpu_lock);
+	/*
+	 * Correct cpu_idstr and cpu_brandstr on target CPU after
+	 * cpuid_pass1() is done.
+	 */
+	(void) cpuid_getidstr(cp, cp->cpu_idstr, CPU_IDSTRLEN);
+	(void) cpuid_getbrandstr(cp, cp->cpu_brandstr, CPU_IDSTRLEN);
 
 	cp->cpu_flags |= CPU_RUNNING | CPU_READY | CPU_EXISTS;
 
-	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_idstr);
-	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_brandstr);
-
-	if (dtrace_cpu_init != NULL) {
-		(*dtrace_cpu_init)(cp->cpu_id);
-	}
-
-	/*
-	 * Fill out cpu_ucode_info.  Update microcode if necessary.
-	 */
-	ucode_check(cp);
-
-	mutex_exit(&cpu_lock);
-
 	post_startup_cpu_fixups();
+
+	cpu_event_init_cpu(cp);
 
 	/*
 	 * Enable preemption here so that contention for any locks acquired
-	 * later in mp_startup may be preempted if the thread owning those
-	 * locks is continuously executing on other CPUs (for example, this
-	 * CPU must be preemptible to allow other CPUs to pause it during their
-	 * startup phases).  It's safe to enable preemption here because the
-	 * CPU state is pretty-much fully constructed.
+	 * later in mp_startup_common may be preempted if the thread owning
+	 * those locks is continuously executing on other CPUs (for example,
+	 * this CPU must be preemptible to allow other CPUs to pause it during
+	 * their startup phases).  It's safe to enable preemption here because
+	 * the CPU state is pretty-much fully constructed.
 	 */
 	curthread->t_preempt = 0;
 
@@ -1577,29 +1736,31 @@ mp_startup(void)
 	ASSERT(cp->cpu_base_spl == ipltospl(LOCK_LEVEL));
 	set_base_spl();		/* Restore the spl to its proper value */
 
-	cpu_event_init_cpu(cp);
-#ifndef __xpv
-	cpupm_init(cp);
-#endif
-
-	/*
-	 * Processor group initialization for this CPU is dependent on the
-	 * cpuid probing, which must be done in the context of the current
-	 * CPU, as well as the CPU's device node initialization (for ACPI).
-	 */
-	mutex_enter(&cpu_lock);
 	pghw_physid_create(cp);
-	(void) pg_cpu_init(cp, B_FALSE);
+	/*
+	 * Delegate initialization tasks, which need to access the cpu_lock,
+	 * to mp_start_cpu_common() because we can't acquire the cpu_lock here
+	 * during CPU DR operations.
+	 */
+	mp_startup_signal(&procset_slave, cp->cpu_id);
+	mp_startup_wait(&procset_master, cp->cpu_id);
 	pg_cmt_cpu_startup(cp);
-	mutex_exit(&cpu_lock);
+
+	if (boot) {
+		mutex_enter(&cpu_lock);
+		cp->cpu_flags &= ~CPU_OFFLINE;
+		cpu_enable_intr(cp);
+		cpu_add_active(cp);
+		mutex_exit(&cpu_lock);
+	}
 
 	/* Enable interrupts */
 	(void) spl0();
 
-	mutex_enter(&cpu_lock);
-	cpu_enable_intr(cp);
-	cpu_add_active(cp);
-	mutex_exit(&cpu_lock);
+	/*
+	 * Fill out cpu_ucode_info.  Update microcode if necessary.
+	 */
+	ucode_check(cp);
 
 #ifndef __xpv
 	{
@@ -1616,6 +1777,7 @@ mp_startup(void)
 		    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL) {
 			if (x86_feature & X86_MCA)
 				cmi_mca_init(hdl);
+			cp->cpu_m.mcpu_cmi_hdl = hdl;
 		}
 	}
 #endif /* __xpv */
@@ -1630,15 +1792,12 @@ mp_startup(void)
 	 */
 	CPUSET_ATOMIC_ADD(cpu_ready_set, cp->cpu_id);
 
-	/*
-	 * Because mp_startup() gets fired off after init() starts, we
-	 * can't use the '?' trick to do 'boot -v' printing - so we
-	 * always direct the 'cpu .. online' messages to the log.
-	 */
-	cmn_err(CE_CONT, "!cpu%d initialization complete - online\n",
-	    cp->cpu_id);
-
 	(void) mach_cpu_create_device_node(cp, NULL);
+
+	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_idstr);
+	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_brandstr);
+	cmn_err(CE_CONT, "?cpu%d initialization complete - online\n",
+	    cp->cpu_id);
 
 	/*
 	 * Now we are done with the startup thread, so free it up.
@@ -1648,6 +1807,23 @@ mp_startup(void)
 	/*NOTREACHED*/
 }
 
+/*
+ * Startup function for 'other' CPUs at boot time (besides boot cpu).
+ */
+static void
+mp_startup_boot(void)
+{
+	mp_startup_common(B_TRUE);
+}
+
+/*
+ * Startup function for hotplug CPUs at runtime.
+ */
+void
+mp_startup_hotplug(void)
+{
+	mp_startup_common(B_FALSE);
+}
 
 /*
  * Start CPU on user request.
@@ -1663,7 +1839,6 @@ mp_cpu_start(struct cpu *cp)
 /*
  * Stop CPU on user request.
  */
-/* ARGSUSED */
 int
 mp_cpu_stop(struct cpu *cp)
 {
@@ -1713,15 +1888,20 @@ cpu_enable_intr(struct cpu *cp)
 	psm_enable_intr(cp->cpu_id);
 }
 
-
-/*ARGSUSED*/
 void
 mp_cpu_faulted_enter(struct cpu *cp)
 {
-#ifndef __xpv
-	cmi_hdl_t hdl = cmi_hdl_lookup(CMI_HDL_NATIVE, cmi_ntv_hwchipid(cp),
-	    cmi_ntv_hwcoreid(cp), cmi_ntv_hwstrandid(cp));
+#ifdef __xpv
+	_NOTE(ARGUNUSED(cp));
+#else
+	cmi_hdl_t hdl = cp->cpu_m.mcpu_cmi_hdl;
 
+	if (hdl != NULL) {
+		cmi_hdl_hold(hdl);
+	} else {
+		hdl = cmi_hdl_lookup(CMI_HDL_NATIVE, cmi_ntv_hwchipid(cp),
+		    cmi_ntv_hwcoreid(cp), cmi_ntv_hwstrandid(cp));
+	}
 	if (hdl != NULL) {
 		cmi_faulted_enter(hdl);
 		cmi_hdl_rele(hdl);
@@ -1729,14 +1909,20 @@ mp_cpu_faulted_enter(struct cpu *cp)
 #endif
 }
 
-/*ARGSUSED*/
 void
 mp_cpu_faulted_exit(struct cpu *cp)
 {
-#ifndef __xpv
-	cmi_hdl_t hdl = cmi_hdl_lookup(CMI_HDL_NATIVE, cmi_ntv_hwchipid(cp),
-	    cmi_ntv_hwcoreid(cp), cmi_ntv_hwstrandid(cp));
+#ifdef __xpv
+	_NOTE(ARGUNUSED(cp));
+#else
+	cmi_hdl_t hdl = cp->cpu_m.mcpu_cmi_hdl;
 
+	if (hdl != NULL) {
+		cmi_hdl_hold(hdl);
+	} else {
+		hdl = cmi_hdl_lookup(CMI_HDL_NATIVE, cmi_ntv_hwchipid(cp),
+		    cmi_ntv_hwcoreid(cp), cmi_ntv_hwstrandid(cp));
+	}
 	if (hdl != NULL) {
 		cmi_faulted_exit(hdl);
 		cmi_hdl_rele(hdl);

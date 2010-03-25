@@ -919,7 +919,7 @@ acpi_drv_obj_copy(ACPI_OBJECT *op, char *bp, struct obj_desc *dp)
 		    ep->Type == dp->type) {
 			ACPI_DRV_DBG(CE_NOTE, NULL, "\t%s: \"%s\"",
 			    dp->name, ep->String.Pointer);
-			(void) strncpy(fp, ep->String.Pointer, dp->size);
+			(void) strlcpy(fp, ep->String.Pointer, dp->size);
 		} else if (dp->type == ACPI_TYPE_STRING &&
 		    ep->Type == ACPI_TYPE_BUFFER) {
 #ifdef DEBUG
@@ -1559,9 +1559,9 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 	if ((info->Valid & ACPI_VALID_HID) == 0) {
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "AcpiGetObjectInfo(): _HID not available");
-		(void) strncpy(p->hid, "\0", ID_LEN);
+		p->hid[0] = 0;
 	} else {
-		(void) strncpy(p->hid, info->HardwareId.String, ID_LEN);
+		(void) strlcpy(p->hid, info->HardwareId.String, ID_LEN);
 	}
 
 	/*
@@ -1572,9 +1572,9 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "AcpiGetObjectInfo(): _UID not available");
 		/* Use 0 as the default _UID */
-		(void) strncpy(p->uid, "\0", ID_LEN);
+		p->uid[0] = 0;
 	} else {
-		(void) strncpy(p->uid, info->UniqueId.String, ID_LEN);
+		(void) strlcpy(p->uid, info->UniqueId.String, ID_LEN);
 	}
 
 	AcpiOsFree(info);
@@ -2064,9 +2064,9 @@ acpi_drv_dev_init(struct acpi_drv_dev *p)
 	if ((info->Valid & ACPI_VALID_HID) == 0) {
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "!AcpiGetObjectInfo(): _HID not available");
-		(void) strncpy(p->hid, "\0", ID_LEN);
+		p->hid[0] = 0;
 	} else {
-		(void) strncpy(p->hid, info->HardwareId.String, ID_LEN);
+		(void) strlcpy(p->hid, info->HardwareId.String, ID_LEN);
 	}
 
 	/*
@@ -2077,9 +2077,9 @@ acpi_drv_dev_init(struct acpi_drv_dev *p)
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "!AcpiGetObjectInfo(): _UID not available");
 		/* Use 0 as the default _UID */
-		(void) strncpy(p->uid, "\0", ID_LEN);
+		p->uid[0] = 0;
 	} else {
-		(void) strncpy(p->uid, info->UniqueId.String, ID_LEN);
+		(void) strlcpy(p->uid, info->UniqueId.String, ID_LEN);
 	}
 
 	if (info->Valid & ACPI_VALID_ADR) {

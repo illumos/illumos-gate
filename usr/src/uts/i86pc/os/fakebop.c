@@ -23,6 +23,10 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 /*
  * This file contains the functionality that mimics the boot operations
@@ -40,6 +44,7 @@
 #include <sys/varargs.h>
 #include <sys/param.h>
 #include <sys/machparam.h>
+#include <sys/machsystm.h>
 #include <sys/archsystm.h>
 #include <sys/boot_console.h>
 #include <sys/cmn_err.h>
@@ -151,12 +156,13 @@ char fastreboot_onpanic_cmdline[FASTBOOT_SAVED_CMDLINE_LEN];
 static const char fastreboot_onpanic_args[] = " -B fastreboot_onpanic=0";
 
 /*
- * Pointers to where System Resource Affinity Table (SRAT) and
- * System Locality Information Table (SLIT) are mapped into virtual memory
+ * Pointers to where System Resource Affinity Table (SRAT), System Locality
+ * Information Table (SLIT) and Maximum System Capability Table (MSCT)
+ * are mapped into virtual memory
  */
 struct srat	*srat_ptr = NULL;
 struct slit	*slit_ptr = NULL;
-
+struct msct	*msct_ptr = NULL;
 
 /*
  * Allocate aligned physical memory at boot time. This allocator allocates
@@ -2077,6 +2083,7 @@ process_madt(struct madt *tp)
 {
 	struct madt_processor *cpu, *end;
 	uint32_t cpu_count = 0;
+	uint32_t cpu_possible_count = 0;
 	uint8_t cpu_apicid_array[UINT8_MAX + 1];
 
 	if (tp != NULL) {
@@ -2094,6 +2101,7 @@ process_madt(struct madt *tp)
 						    cpu->apic_id;
 					cpu_count++;
 				}
+				cpu_possible_count++;
 			}
 
 			cpu = (struct madt_processor *)
@@ -2109,17 +2117,44 @@ process_madt(struct madt *tp)
 	}
 
 	/*
+	 * Check whehter property plat-max-ncpus is already set.
+	 */
+	if (do_bsys_getproplen(NULL, PLAT_MAX_NCPUS_NAME) < 0) {
+		/*
+		 * Set plat-max-ncpus to number of maximum possible CPUs given
+		 * in MADT if it hasn't been set.
+		 * There's no formal way to detect max possible CPUs supported
+		 * by platform according to ACPI spec3.0b. So current CPU
+		 * hotplug implementation expects that all possible CPUs will
+		 * have an entry in MADT table and set plat-max-ncpus to number
+		 * of entries in MADT.
+		 * With introducing of ACPI4.0, Maximum System Capability Table
+		 * (MSCT) provides maximum number of CPUs supported by platform.
+		 * If MSCT is unavailable, fall back to old way.
+		 */
+		if (tp != NULL)
+			bsetpropsi(PLAT_MAX_NCPUS_NAME, cpu_possible_count);
+	}
+
+	/*
+	 * Set boot property boot-max-ncpus to number of CPUs existing at
+	 * boot time. boot-max-ncpus is mainly used for optimization.
+	 */
+	if (tp != NULL)
+		bsetpropsi(BOOT_MAX_NCPUS_NAME, cpu_count);
+
+	/*
 	 * User-set boot-ncpus overrides firmware count
 	 */
-	if (do_bsys_getproplen(NULL, "boot-ncpus") >= 0)
+	if (do_bsys_getproplen(NULL, BOOT_NCPUS_NAME) >= 0)
 		return;
 
 	/*
-	 * Set boot property for boot-ncpus to number of CPUs given in MADT
-	 * if user hasn't set the property already
+	 * Set boot property boot-ncpus to number of active CPUs given in MADT
+	 * if it hasn't been set yet.
 	 */
 	if (tp != NULL)
-		bsetpropsi("boot-ncpus", cpu_count);
+		bsetpropsi(BOOT_NCPUS_NAME, cpu_count);
 }
 
 static void
@@ -2146,6 +2181,7 @@ process_srat(struct srat *tp)
 	} memory;
 #pragma pack()
 	char prop_name[30];
+	uint64_t maxmem = 0;
 
 	if (tp == NULL)
 		return;
@@ -2181,6 +2217,10 @@ process_srat(struct srat *tp)
 			    mem_num);
 			bsetprop(prop_name, strlen(prop_name), &memory,
 			    sizeof (memory));
+			if ((item->i.m.flags & SRAT_HOT_PLUG) &&
+			    (memory.addr + memory.length > maxmem)) {
+				maxmem = memory.addr + memory.length;
+			}
 			mem_num++;
 			break;
 		case SRAT_X2APIC:
@@ -2198,6 +2238,14 @@ process_srat(struct srat *tp)
 
 		item = (struct srat_item *)
 		    (item->len + (caddr_t)item);
+	}
+
+	/*
+	 * The maximum physical address calculated from the SRAT table is more
+	 * accurate than that calculated from the MSCT table.
+	 */
+	if (maxmem != 0) {
+		plat_dr_physmax = btop(maxmem);
 	}
 }
 
@@ -2224,6 +2272,99 @@ process_slit(struct slit *tp)
 	    tp->number * tp->number);
 }
 
+static struct msct *
+process_msct(struct msct *tp)
+{
+	int last_seen = 0;
+	int proc_num = 0;
+	struct msct_proximity_domain *item, *end;
+	extern uint64_t plat_dr_options;
+
+	ASSERT(tp != NULL);
+
+	end = (void *)(tp->hdr.len + (uintptr_t)tp);
+	for (item = (void *)((uintptr_t)tp + tp->proximity_domain_offset);
+	    item < end;
+	    item = (void *)(item->length + (uintptr_t)item)) {
+		/*
+		 * Sanity check according to section 5.2.19.1 of ACPI 4.0.
+		 * Revision 	1
+		 * Length	22
+		 */
+		if (item->revision != 1 || item->length != 22) {
+			cmn_err(CE_CONT,
+			    "?boot: unknown proximity domain structure in MSCT "
+			    "with rev(%d), len(%d).\n",
+			    (int)item->revision, (int)item->length);
+			return (NULL);
+		} else if (item->domain_min > item->domain_max) {
+			cmn_err(CE_CONT,
+			    "?boot: invalid proximity domain structure in MSCT "
+			    "with domain_min(%u), domain_max(%u).\n",
+			    item->domain_min, item->domain_max);
+			return (NULL);
+		} else if (item->domain_min != last_seen) {
+			/*
+			 * Items must be organized in ascending order of the
+			 * proximity domain enumerations.
+			 */
+			cmn_err(CE_CONT,
+			    "?boot: invalid proximity domain structure in MSCT,"
+			    " items are not orginized in ascending order.\n");
+			return (NULL);
+		}
+
+		/*
+		 * If processor_max is 0 then there would be no CPUs in this
+		 * domain.
+		 */
+		if (item->processor_max != 0) {
+			proc_num += (item->domain_max - item->domain_min + 1) *
+			    item->processor_max;
+		}
+
+		last_seen = item->domain_max - item->domain_min + 1;
+		/*
+		 * Break out if all proximity domains have been processed.
+		 * Some BIOSes may have unused items at the end of MSCT table.
+		 */
+		if (last_seen > tp->maximum_proximity_domains) {
+			break;
+		}
+	}
+	if (last_seen != tp->maximum_proximity_domains + 1) {
+		cmn_err(CE_CONT,
+		    "?boot: invalid proximity domain structure in MSCT, "
+		    "proximity domain count doesn't match.\n");
+		return (NULL);
+	}
+
+	/*
+	 * Set plat-max-ncpus property if it hasn't been set yet.
+	 */
+	if (do_bsys_getproplen(NULL, PLAT_MAX_NCPUS_NAME) < 0) {
+		if (proc_num != 0) {
+			bsetpropsi(PLAT_MAX_NCPUS_NAME, proc_num);
+		}
+	}
+
+	/*
+	 * Use Maximum Physical Address from the MSCT table as upper limit for
+	 * memory hot-adding by default. It may be overridden by value from
+	 * the SRAT table or the "plat-dr-physmax" boot option.
+	 */
+	plat_dr_physmax = btop(tp->maximum_physical_address + 1);
+
+	/*
+	 * Existence of MSCT implies CPU/memory hotplug-capability for the
+	 * platform.
+	 */
+	plat_dr_options |= PLAT_DR_FEATURE_CPU;
+	plat_dr_options |= PLAT_DR_FEATURE_MEMORY;
+
+	return (tp);
+}
+
 #else /* __xpv */
 static void
 enumerate_xen_cpus()
@@ -2233,7 +2374,7 @@ enumerate_xen_cpus()
 	/*
 	 * User-set boot-ncpus overrides enumeration
 	 */
-	if (do_bsys_getproplen(NULL, "boot-ncpus") >= 0)
+	if (do_bsys_getproplen(NULL, BOOT_NCPUS_NAME) >= 0)
 		return;
 
 	/*
@@ -2246,7 +2387,7 @@ enumerate_xen_cpus()
 		if (HYPERVISOR_vcpu_op(VCPUOP_is_up, id, NULL) == 0)
 			max_id = id;
 
-	bsetpropsi("boot-ncpus", max_id+1);
+	bsetpropsi(BOOT_NCPUS_NAME, max_id+1);
 
 }
 #endif /* __xpv */
@@ -2257,6 +2398,9 @@ build_firmware_properties(void)
 	struct table_header *tp = NULL;
 
 #ifndef __xpv
+	if ((msct_ptr = (struct msct *)find_fw_table("MSCT")) != NULL)
+		msct_ptr = process_msct(msct_ptr);
+
 	if ((tp = find_fw_table("APIC")) != NULL)
 		process_madt((struct madt *)tp);
 

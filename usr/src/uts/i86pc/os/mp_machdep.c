@@ -24,11 +24,11 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
-#define	PSMI_1_6
+#define	PSMI_1_7
 #include <sys/smp_impldefs.h>
 #include <sys/psm.h>
 #include <sys/psm_modctl.h>
@@ -157,6 +157,7 @@ void (*notify_error)(int, char *) = (void (*)(int, char *))return_instr;
 void (*hrtime_tick)(void)	= return_instr;
 
 int (*psm_cpu_create_devinfo)(cpu_t *, dev_info_t **) = mach_cpu_create_devinfo;
+int (*psm_cpu_get_devinfo)(cpu_t *, dev_info_t **) = NULL;
 
 /*
  * True if the generic TSC code is our source of hrtime, rather than whatever
@@ -864,8 +865,16 @@ mach_get_platform(int owner)
 		total_ops = OFFSETOF(struct psm_ops, psm_preshutdown) /
 		    sizeof (void (*)(void));
 	else if (mach_ver[owner] == (ushort_t)PSM_INFO_VER01_4)
-		/* no psm_preshutdown function */
+		/* no psm_intr_ops function */
 		total_ops = OFFSETOF(struct psm_ops, psm_intr_ops) /
+		    sizeof (void (*)(void));
+	else if (mach_ver[owner] == (ushort_t)PSM_INFO_VER01_5)
+		/* no psm_state function */
+		total_ops = OFFSETOF(struct psm_ops, psm_state) /
+		    sizeof (void (*)(void));
+	else if (mach_ver[owner] == (ushort_t)PSM_INFO_VER01_6)
+		/* no psm_cpu_ops function */
+		total_ops = OFFSETOF(struct psm_ops, psm_cpu_ops) /
 		    sizeof (void (*)(void));
 	else
 		total_ops = sizeof (struct psm_ops) / sizeof (void (*)(void));
@@ -1042,7 +1051,11 @@ mach_smpinit(void)
 
 	cpu_id = -1;
 	cpu_id = (*pops->psm_get_next_processorid)(cpu_id);
-	for (cnt = 0; cpu_id != -1; cnt++) {
+	/*
+	 * Only add boot_ncpus CPUs to mp_cpus. Other CPUs will be handled
+	 * by CPU DR driver at runtime.
+	 */
+	for (cnt = 0; cpu_id != -1 && cnt < boot_ncpus; cnt++) {
 		CPUSET_ADD(cpumask, cpu_id);
 		cpu_id = (*pops->psm_get_next_processorid)(cpu_id);
 	}
@@ -1092,7 +1105,7 @@ mach_smpinit(void)
 		psm_enable_intr  = pops->psm_enable_intr;
 
 	/* check for multiple CPUs */
-	if (cnt < 2)
+	if (cnt < 2 && plat_dr_support_cpu() == B_FALSE)
 		return;
 
 	/* check for MP platforms */
@@ -1480,6 +1493,63 @@ mach_cpuid_start(processorid_t id, void *ctx)
 	return ((*pops->psm_cpu_start)(id, ctx));
 }
 
+int
+mach_cpu_stop(cpu_t *cp, void *ctx)
+{
+	struct psm_ops *pops = mach_set[0];
+	psm_cpu_request_t request;
+
+	if (pops->psm_cpu_ops == NULL) {
+		return (ENOTSUP);
+	}
+
+	ASSERT(cp->cpu_id != -1);
+	request.pcr_cmd = PSM_CPU_STOP;
+	request.req.cpu_stop.cpuid = cp->cpu_id;
+	request.req.cpu_stop.ctx = ctx;
+
+	return ((*pops->psm_cpu_ops)(&request));
+}
+
+int
+mach_cpu_add(mach_cpu_add_arg_t *argp, processorid_t *cpuidp)
+{
+	int rc;
+	struct psm_ops *pops = mach_set[0];
+	psm_cpu_request_t request;
+
+	if (pops->psm_cpu_ops == NULL) {
+		return (ENOTSUP);
+	}
+
+	request.pcr_cmd = PSM_CPU_ADD;
+	request.req.cpu_add.argp = argp;
+	request.req.cpu_add.cpuid = -1;
+	rc = (*pops->psm_cpu_ops)(&request);
+	if (rc == 0) {
+		ASSERT(request.req.cpu_add.cpuid != -1);
+		*cpuidp = request.req.cpu_add.cpuid;
+	}
+
+	return (rc);
+}
+
+int
+mach_cpu_remove(processorid_t cpuid)
+{
+	struct psm_ops *pops = mach_set[0];
+	psm_cpu_request_t request;
+
+	if (pops->psm_cpu_ops == NULL) {
+		return (ENOTSUP);
+	}
+
+	request.pcr_cmd = PSM_CPU_REMOVE;
+	request.req.cpu_remove.cpuid = cpuid;
+
+	return ((*pops->psm_cpu_ops)(&request));
+}
+
 /*
  * Default handler to create device node for CPU.
  * One reference count will be held on created device node.
@@ -1567,6 +1637,24 @@ mach_cpu_create_device_node(struct cpu *cp, dev_info_t **dipp)
 	}
 
 	return (rv);
+}
+
+/*
+ * The dipp contains one of following values on return:
+ * - NULL if no device node found
+ * - pointer to device node if found
+ */
+int
+mach_cpu_get_device_node(struct cpu *cp, dev_info_t **dipp)
+{
+	*dipp = NULL;
+	if (psm_cpu_get_devinfo != NULL) {
+		if (psm_cpu_get_devinfo(cp, dipp) == PSM_SUCCESS) {
+			return (PSM_SUCCESS);
+		}
+	}
+
+	return (PSM_FAILURE);
 }
 
 /*ARGSUSED*/

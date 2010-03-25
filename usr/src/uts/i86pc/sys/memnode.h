@@ -41,8 +41,9 @@ extern "C" {
  * memory slice ID and the high-order bits are the SSM nodeid.
  */
 
+#define	MAX_MEM_NODES_PER_LGROUP	3
 #ifndef	MAX_MEM_NODES
-#define	MAX_MEM_NODES	(8)
+#define	MAX_MEM_NODES			(8 * MAX_MEM_NODES_PER_LGROUP)
 #endif	/* MAX_MEM_NODES */
 
 #define	PFN_2_MEM_NODE(pfn)			\
@@ -57,14 +58,12 @@ extern "C" {
  */
 
 extern int plat_pfn_to_mem_node(pfn_t);
-extern int plat_lgrphand_to_mem_node(lgrp_handle_t);
 extern void plat_assign_lgrphand_to_mem_node(lgrp_handle_t, int);
 extern lgrp_handle_t plat_mem_node_to_lgrphand(int);
 extern void plat_slice_add(pfn_t, pfn_t);
 extern void plat_slice_del(pfn_t, pfn_t);
 
 #pragma	weak plat_pfn_to_mem_node
-#pragma	weak plat_lgrphand_to_mem_node
 #pragma	weak plat_mem_node_to_lgrphand
 #pragma	weak plat_slice_add
 #pragma	weak plat_slice_del

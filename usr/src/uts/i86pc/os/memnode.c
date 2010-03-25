@@ -84,7 +84,7 @@ mem_node_add_slice(pfn_t start, pfn_t end)
 	}
 
 	mnode = PFN_2_MEM_NODE(start);
-	ASSERT(mnode < max_mem_nodes);
+	ASSERT(mnode >= 0 && mnode < max_mem_nodes);
 
 	if (cas32((uint32_t *)&mem_node_config[mnode].exists, 0, 1)) {
 		/*
@@ -130,7 +130,7 @@ mem_node_del_slice(pfn_t start, pfn_t end)
 	}
 	mnode = PFN_2_MEM_NODE(start);
 
-	ASSERT(mnode < max_mem_nodes);
+	ASSERT(mnode >= 0 && mnode < max_mem_nodes);
 	ASSERT(mem_node_config[mnode].exists == 1);
 
 	delta_pgcnt = end - start;

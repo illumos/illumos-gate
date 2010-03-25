@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 #ifndef _ACPI_FW_H
 #define	_ACPI_FW_H
@@ -160,6 +164,28 @@ struct slit {
  * Pointer to System Locality Information Table (SLIT)
  */
 extern struct slit	*slit_ptr;
+
+struct msct_proximity_domain {
+	uint8_t revision;
+	uint8_t length;
+	uint32_t domain_min;
+	uint32_t domain_max;
+	uint32_t processor_max;
+	uint64_t memory_max;
+};
+
+struct msct {
+	struct table_header hdr;
+	uint32_t proximity_domain_offset;
+	uint32_t maximum_proximity_domains;
+	uint32_t maximum_power_domains;
+	uint64_t maximum_physical_address;
+};
+
+/*
+ * Pointer to Maximum System Capability Table (MSCT)
+ */
+extern struct msct	*msct_ptr;
 
 struct cfg_base_addr_alloc {
 	uint64_t	base_addr;

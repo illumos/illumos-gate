@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -39,6 +36,12 @@
 #define	CFGA_PLUGIN_LIB
 #include <config_admin.h>
 #include "ap.h"
+
+#ifdef	__x86
+#include <libscf_priv.h>
+
+static int fastreboot_disabled;
+#endif	/* __x86 */
 
 static cfga_err_t
 ap_suspend_check(apd_t *a, int cmd, int first, int last, int *suspend)
@@ -202,7 +205,7 @@ ap_seq_get(apd_t *a, int cmd, int *first, int *last)
 	*last = l;
 
 	DBG("ap_seq(%d, %d, %d, %p, %p) = (%d, %d)\n",
-		rs, os, cmd, (void *)first, (void *)last, f, l);
+	    rs, os, cmd, (void *)first, (void *)last, f, l);
 
 	return (AP_SEQ_OK);
 }
@@ -268,7 +271,7 @@ ap_seq_exec(apd_t *a, int cmd, int first, int last)
 			 * interpose on the suspend operation.
 			 */
 			rc = ap_suspend_check(a, cmd,
-				first + 1, last, &suspend);
+			    first + 1, last, &suspend);
 			break;
 		case CMD_RCM_SUSPEND:
 			if (suspend && ((rc = ap_rcm_ctl(a, c)) == CFGA_OK)) {
@@ -297,6 +300,41 @@ ap_seq_exec(apd_t *a, int cmd, int first, int last)
 		case CMD_RCM_CAP_NOTIFY:
 			(void) ap_rcm_ctl(a, c);
 			break;
+
+#ifdef	__x86
+		/*
+		 * Disable fast reboot if a CPU/MEM/IOH hotplug event happens.
+		 * Note: this is a temporary solution and will be revised when
+		 * fast reboot can support CPU/MEM/IOH DR operations in the
+		 * future.
+		 *
+		 * ACPI BIOS generates some static ACPI tables, such as MADT,
+		 * SRAT and SLIT, to describe the system hardware configuration
+		 * on power-on. When a CPU/MEM/IOH hotplug event happens, those
+		 * static tables won't be updated and will become stale.
+		 *
+		 * If we reset the system by fast reboot, BIOS will have no
+		 * chance to regenerate those staled static tables. Fast reboot
+		 * can't tolerate such inconsistency between staled ACPI tables
+		 * and real hardware configuration yet.
+		 *
+		 * A temporary solution is introduced to disable fast reboot if
+		 * CPU/MEM/IOH hotplug event happens. This solution should be
+		 * revised when fast reboot is enhanced to support CPU/MEM/IOH
+		 * DR operations.
+		 */
+		case CMD_ASSIGN:
+		case CMD_POWERON:
+		case CMD_POWEROFF:
+		case CMD_UNASSIGN:
+			if (!fastreboot_disabled &&
+			    scf_fastreboot_default_set_transient(B_FALSE) ==
+			    SCF_SUCCESS) {
+				fastreboot_disabled = 1;
+			}
+			/* FALLTHROUGH */
+#endif	/* __x86 */
+
 		default:
 			rc = ap_ioctl(a, c);
 			break;

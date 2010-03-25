@@ -50,6 +50,7 @@ extern "C" {
 #define	BP_CPU_APICID_ARRAY	"cpu_apicid_array"
 #define	BP_LGRP_SLIT_ENABLE	"lgrp_slit_enable"
 #define	BP_LGRP_SRAT_ENABLE	"lgrp_srat_enable"
+#define	BP_LGRP_MSCT_ENABLE	"lgrp_msct_enable"
 #define	BP_LGRP_TOPO_LEVELS	"lgrp_topo_levels"
 
 /*
@@ -212,18 +213,6 @@ extern void param_check(void);
 extern int octet_to_hexascii(const void *, uint_t, char *, uint_t *);
 
 extern int dhcpinit(void);
-
-/*
- * XXX	The memlist stuff belongs in a header of its own
- */
-extern int check_boot_version(int);
-extern void size_physavail(struct memlist *, pgcnt_t *, int *, pfn_t);
-extern int copy_physavail(struct memlist *, struct memlist **,
-    uint_t, uint_t);
-extern void installed_top_size(struct memlist *, pfn_t *, pgcnt_t *, int *);
-extern int check_memexp(struct memlist *, uint_t);
-extern void copy_memlist_filter(struct memlist *, struct memlist **,
-    void (*filter)(uint64_t *, uint64_t *));
 
 extern struct bootops *bootops;
 extern int netboot;

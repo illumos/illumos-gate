@@ -1085,8 +1085,8 @@ struct memseg {
 	page_t *pages, *epages;		/* [from, to] in page array */
 	pfn_t pages_base, pages_end;	/* [from, to] in page numbers */
 	struct memseg *next;		/* next segment in list */
-#if defined(__sparc)
 	struct memseg *lnext;		/* next segment in deleted list */
+#if defined(__sparc)
 	uint64_t pagespa, epagespa;	/* [from, to] page array physical */
 	uint64_t nextpa;		/* physical next pointer */
 	pfn_t	kpm_pbase;		/* start of kpm range */
@@ -1096,8 +1096,8 @@ struct memseg {
 		kpm_spage_t *kpm_spgs;	/* ptr to kpm_spage array */
 	} mseg_un;
 	uint64_t kpm_pagespa;		/* physical ptr to kpm (s)pages array */
-	uint_t msegflags;		/* memseg flags */
 #endif /* __sparc */
+	uint_t msegflags;		/* memseg flags */
 };
 
 /* memseg union aliases */

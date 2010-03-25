@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -26,8 +25,6 @@
 
 #ifndef	_VM_SEG_KPM_H
 #define	_VM_SEG_KPM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -85,8 +82,13 @@ extern int	segmap_kpm;
 #define	IS_KPM_ADDR(addr) \
 	((addr) >= segkpm->s_base && (addr) < (segkpm->s_base + segkpm->s_size))
 
+#ifdef	__x86
+/* x86 systems use neither kpm_page_t nor kpm_spage_t when supporting kpm. */
+#define	KPMPAGE_T_SZ	(0)
+#else	/* __x86 */
 #define	KPMPAGE_T_SZ \
 	((kpm_smallpages == 0) ? sizeof (kpm_page_t) : sizeof (kpm_spage_t))
+#endif	/* __x86 */
 
 #else	/* SEGKPM_SUPPORT */
 

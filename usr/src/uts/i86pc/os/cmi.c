@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,6 +100,8 @@ typedef struct cmi {
 } cmi_t;
 
 static cmi_t *cmi_list;
+static const cmi_mc_ops_t *cmi_mc_global_ops;
+static void *cmi_mc_global_data;
 static kmutex_t cmi_load_lock;
 
 /*
@@ -107,6 +109,7 @@ static kmutex_t cmi_load_lock;
  * interface.
  */
 extern cmi_hdl_t cmi_hdl_create(enum cmi_hdl_class, uint_t, uint_t, uint_t);
+extern void cmi_hdl_destroy(cmi_hdl_t ophdl);
 extern void cmi_hdl_setcmi(cmi_hdl_t, void *, void *);
 extern void *cmi_hdl_getcmi(cmi_hdl_t);
 extern void cmi_hdl_setmc(cmi_hdl_t, const struct cmi_mc_ops *, void *);
@@ -484,9 +487,8 @@ cmi_init(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 }
 
 /*
- * cmi_fini is not called at the moment.  It is intended to be called
- * on DR deconfigure of a cpu resource.  It should not be called at
- * simple offline of a cpu.
+ * cmi_fini is called on DR deconfigure of a cpu resource.
+ * It should not be called at simple offline of a cpu.
  */
 void
 cmi_fini(cmi_hdl_t hdl)
@@ -499,7 +501,7 @@ cmi_fini(cmi_hdl_t hdl)
 	if (CMI_OP_PRESENT(cmi, cmi_fini))
 		CMI_OPS(cmi)->cmi_fini(hdl);
 
-	cmi_hdl_rele(hdl);	/* release hold obtained in cmi_hdl_create */
+	cmi_hdl_destroy(hdl);
 }
 
 /*
@@ -806,6 +808,21 @@ cmi_mc_register(cmi_hdl_t hdl, const cmi_mc_ops_t *mcops, void *mcdata)
 		cmi_hdl_setmc(hdl, mcops, mcdata);
 }
 
+cmi_errno_t
+cmi_mc_register_global(const cmi_mc_ops_t *mcops, void *mcdata)
+{
+	if (!cmi_no_mca_init) {
+		if (cmi_mc_global_ops != NULL || cmi_mc_global_data != NULL ||
+		    mcops == NULL || mcops->cmi_mc_patounum == NULL ||
+		    mcops->cmi_mc_unumtopa == NULL) {
+			return (CMIERR_UNKNOWN);
+		}
+		cmi_mc_global_data = mcdata;
+		cmi_mc_global_ops = mcops;
+	}
+	return (CMI_SUCCESS);
+}
+
 void
 cmi_mc_sw_memscrub_disable(void)
 {
@@ -820,8 +837,17 @@ cmi_mc_patounum(uint64_t pa, uint8_t valid_hi, uint8_t valid_lo, uint32_t synd,
 	cmi_hdl_t hdl;
 	cmi_errno_t rv;
 
-	if (cmi_no_mca_init ||
-	    (hdl = cmi_hdl_any()) == NULL)	/* short-term hold */
+	if (cmi_no_mca_init)
+		return (CMIERR_MC_ABSENT);
+
+	if (cmi_mc_global_ops != NULL) {
+		if (cmi_mc_global_ops->cmi_mc_patounum == NULL)
+			return (CMIERR_MC_NOTSUP);
+		return (cmi_mc_global_ops->cmi_mc_patounum(cmi_mc_global_data,
+		    pa, valid_hi, valid_lo, synd, syndtype, up));
+	}
+
+	if ((hdl = cmi_hdl_any()) == NULL)	/* short-term hold */
 		return (CMIERR_MC_ABSENT);
 
 	if ((mcops = cmi_hdl_getmcops(hdl)) == NULL ||
@@ -849,8 +875,17 @@ cmi_mc_unumtopa(mc_unum_t *up, nvlist_t *nvl, uint64_t *pap)
 	if (up != NULL && nvl != NULL)
 		return (CMIERR_API);	/* convert from just one form */
 
-	if (cmi_no_mca_init ||
-	    (hdl = cmi_hdl_any()) == NULL)	/* short-term hold */
+	if (cmi_no_mca_init)
+		return (CMIERR_MC_ABSENT);
+
+	if (cmi_mc_global_ops != NULL) {
+		if (cmi_mc_global_ops->cmi_mc_unumtopa == NULL)
+			return (CMIERR_MC_NOTSUP);
+		return (cmi_mc_global_ops->cmi_mc_unumtopa(cmi_mc_global_data,
+		    up, nvl, pap));
+	}
+
+	if ((hdl = cmi_hdl_any()) == NULL)	/* short-term hold */
 		return (CMIERR_MC_ABSENT);
 
 	if ((mcops = cmi_hdl_getmcops(hdl)) == NULL ||
@@ -865,7 +900,7 @@ cmi_mc_unumtopa(mc_unum_t *up, nvlist_t *nvl, uint64_t *pap)
 		    pap) == 0)) {
 			return (CMIERR_MC_PARTIALUNUMTOPA);
 		} else {
-			return (mcops && mcops->cmi_mc_unumtopa ?
+			return (mcops && mcops->cmi_mc_unumtopa == NULL ?
 			    CMIERR_MC_NOTSUP : CMIERR_MC_ABSENT);
 		}
 	}
@@ -882,10 +917,15 @@ cmi_mc_logout(cmi_hdl_t hdl, boolean_t ismc, boolean_t sync)
 {
 	const struct cmi_mc_ops *mcops;
 
-	if (cmi_no_mca_init || (mcops = cmi_hdl_getmcops(hdl)) == NULL)
+	if (cmi_no_mca_init)
 		return;
 
-	if (mcops->cmi_mc_logout != NULL)
+	if (cmi_mc_global_ops != NULL)
+		mcops = cmi_mc_global_ops;
+	else
+		mcops = cmi_hdl_getmcops(hdl);
+
+	if (mcops != NULL && mcops->cmi_mc_logout != NULL)
 		mcops->cmi_mc_logout(hdl, ismc, sync);
 }
 

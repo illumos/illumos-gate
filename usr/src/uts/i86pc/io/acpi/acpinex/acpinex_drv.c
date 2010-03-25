@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 /*
@@ -40,6 +40,7 @@
 #include <sys/ddi.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/ddifm.h>
+#include <sys/note.h>
 #include <sys/ndifm.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
@@ -175,6 +176,9 @@ _init(void)
 		return (error);
 	}
 
+	/* Initialize event subsystem. */
+	acpinex_event_init();
+
 	/* Install the module. */
 	if ((error = mod_install(&modlinkage)) != 0) {
 		cmn_err(CE_WARN, "acpinex: failed to install module.");
@@ -197,6 +201,9 @@ _fini(void)
 		return (error);
 	}
 
+	/* Shut down event subsystem. */
+	acpinex_event_fini();
+
 	/* Free the soft state info. */
 	ddi_soft_state_fini(&acpinex_softstates);
 
@@ -211,10 +218,11 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-/* ARGSUSED */
 static int
 acpinex_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {
+	_NOTE(ARGUNUSED(dip));
+
 	dev_t	dev;
 	int	instance;
 
@@ -268,16 +276,24 @@ acpinex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	(void) ddi_pathname(devi, softsp->ans_path);
 	if (ACPI_FAILURE(acpica_get_handle(devi, &softsp->ans_hdl))) {
 		ACPINEX_DEBUG(CE_WARN,
-		    "acpinex: failed to get ACPI handle for %s.",
+		    "!acpinex: failed to get ACPI handle for %s.",
 		    softsp->ans_path);
 		ddi_soft_state_free(acpinex_softstates, instance);
 		return (DDI_FAILURE);
 	}
 	mutex_init(&softsp->ans_lock, NULL, MUTEX_DRIVER, NULL);
 
+	/* Install event handler for child/descendant objects. */
+	if (acpinex_event_scan(softsp, B_TRUE) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "!acpinex: failed to install event handler "
+		    "for children of %s.", softsp->ans_path);
+	}
+
 	/* nothing to suspend/resume here */
 	(void) ddi_prop_update_string(DDI_DEV_T_NONE, devi,
 	    "pm-hardware-state", "no-suspend-resume");
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, devi,
+	    DDI_NO_AUTODETACH, 1);
 
 	acpinex_fm_init(softsp);
 	ddi_report_dev(devi);
@@ -301,17 +317,24 @@ acpinex_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	softsp = ddi_get_soft_state(acpinex_softstates, instance);
 	if (softsp == NULL) {
-		ACPINEX_DEBUG(CE_WARN, "acpinex: failed to get soft state "
+		ACPINEX_DEBUG(CE_WARN, "!acpinex: failed to get soft state "
 		    "object for instance %d in acpinex_detach()", instance);
 		return (DDI_FAILURE);
 	}
 
 	switch (cmd) {
 	case DDI_DETACH:
+		if (acpinex_event_scan(softsp, B_FALSE) != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "!acpinex: failed to uninstall event "
+			    "handler for children of %s.", softsp->ans_path);
+			return (DDI_FAILURE);
+		}
 		ddi_remove_minor_node(devi, NULL);
 		acpinex_fm_fini(softsp);
 		mutex_destroy(&softsp->ans_lock);
 		ddi_soft_state_free(acpinex_softstates, instance);
+		(void) ddi_prop_update_int(DDI_DEV_T_NONE, devi,
+		    DDI_NO_AUTODETACH, 0);
 		return (DDI_SUCCESS);
 
 	case DDI_SUSPEND:
@@ -332,13 +355,11 @@ name_child(dev_info_t *child, char *name, int namelen)
 	name[0] = '\0';
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
 	    ACPIDEV_PROP_NAME_UNIT_ADDR, &unitaddr) == DDI_SUCCESS) {
-		(void) strncpy(name, unitaddr, namelen - 1);
-		name[namelen - 1] = '\0';
+		(void) strlcpy(name, unitaddr, namelen);
 		ddi_prop_free(unitaddr);
 	} else {
-		ACPINEX_DEBUG(CE_NOTE,
-		    "acpinex: failed to lookup child unit-address prop for %p.",
-		    (void *)child);
+		ACPINEX_DEBUG(CE_NOTE, "!acpinex: failed to lookup child "
+		    "unit-address prop for %p.", (void *)child);
 	}
 
 	return (DDI_SUCCESS);
@@ -406,21 +427,22 @@ acpinex_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
     off_t offset, off_t len, caddr_t *vaddrp)
 {
 	ACPINEX_DEBUG(CE_WARN,
-	    "acpinex: acpinex_bus_map called and it's unimplemented.");
+	    "!acpinex: acpinex_bus_map called and it's unimplemented.");
 	return (DDI_ME_UNIMPLEMENTED);
 }
 
-/* ARGSUSED */
 static int
 acpinex_open(dev_t *devi, int flags, int otyp, cred_t *credp)
 {
+	_NOTE(ARGUNUSED(flags, otyp, credp));
+
 	minor_t minor, instance;
 	acpinex_softstate_t *softsp;
 
 	minor = getminor(*devi);
 	instance = ACPINEX_GET_INSTANCE(minor);
 	if (instance >= ACPINEX_INSTANCE_MAX) {
-		ACPINEX_DEBUG(CE_WARN, "acpinex: instance number %d out of "
+		ACPINEX_DEBUG(CE_WARN, "!acpinex: instance number %d out of "
 		    "range in acpinex_open, max %d.",
 		    instance, ACPINEX_INSTANCE_MAX - 1);
 		return (EINVAL);
@@ -428,7 +450,7 @@ acpinex_open(dev_t *devi, int flags, int otyp, cred_t *credp)
 
 	softsp = ddi_get_soft_state(acpinex_softstates, instance);
 	if (softsp == NULL) {
-		ACPINEX_DEBUG(CE_WARN, "acpinex: failed to get soft state "
+		ACPINEX_DEBUG(CE_WARN, "!acpinex: failed to get soft state "
 		    "object for instance %d in acpinex_open().", instance);
 		return (EINVAL);
 	}
@@ -437,23 +459,24 @@ acpinex_open(dev_t *devi, int flags, int otyp, cred_t *credp)
 		return (0);
 	} else {
 		ACPINEX_DEBUG(CE_WARN,
-		    "acpinex: invalid minor number %d in acpinex_open().",
+		    "!acpinex: invalid minor number %d in acpinex_open().",
 		    minor);
 		return (EINVAL);
 	}
 }
 
-/* ARGSUSED */
 static int
 acpinex_close(dev_t dev, int flags, int otyp, cred_t *credp)
 {
+	_NOTE(ARGUNUSED(flags, otyp, credp));
+
 	minor_t minor, instance;
 	acpinex_softstate_t *softsp;
 
 	minor = getminor(dev);
 	instance = ACPINEX_GET_INSTANCE(minor);
 	if (instance >= ACPINEX_INSTANCE_MAX) {
-		ACPINEX_DEBUG(CE_WARN, "acpinex: instance number %d out of "
+		ACPINEX_DEBUG(CE_WARN, "!acpinex: instance number %d out of "
 		    "range in acpinex_close(), max %d.",
 		    instance, ACPINEX_INSTANCE_MAX - 1);
 		return (EINVAL);
@@ -461,7 +484,7 @@ acpinex_close(dev_t dev, int flags, int otyp, cred_t *credp)
 
 	softsp = ddi_get_soft_state(acpinex_softstates, instance);
 	if (softsp == NULL) {
-		ACPINEX_DEBUG(CE_WARN, "acpinex: failed to get soft state "
+		ACPINEX_DEBUG(CE_WARN, "!acpinex: failed to get soft state "
 		    "object for instance %d in acpinex_close().", instance);
 		return (EINVAL);
 	}
@@ -470,17 +493,18 @@ acpinex_close(dev_t dev, int flags, int otyp, cred_t *credp)
 		return (0);
 	} else {
 		ACPINEX_DEBUG(CE_WARN,
-		    "acpinex: invalid minor number %d in acpinex_close().",
+		    "!acpinex: invalid minor number %d in acpinex_close().",
 		    minor);
 		return (EINVAL);
 	}
 }
 
-/* ARGSUSED */
 static int
 acpinex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
     int *rvalp)
 {
+	_NOTE(ARGUNUSED(cmd, arg, mode, credp, rvalp));
+
 	int rv = 0;
 	minor_t minor, instance;
 	acpinex_softstate_t *softsp;
@@ -488,21 +512,21 @@ acpinex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	minor = getminor(dev);
 	instance = ACPINEX_GET_INSTANCE(minor);
 	if (instance >= ACPINEX_INSTANCE_MAX) {
-		ACPINEX_DEBUG(CE_NOTE, "acpinex: instance number %d out of "
+		ACPINEX_DEBUG(CE_NOTE, "!acpinex: instance number %d out of "
 		    "range in acpinex_ioctl(), max %d.",
 		    instance, ACPINEX_INSTANCE_MAX - 1);
 		return (EINVAL);
 	}
 	softsp = ddi_get_soft_state(acpinex_softstates, instance);
 	if (softsp == NULL) {
-		ACPINEX_DEBUG(CE_WARN, "acpinex: failed to get soft state "
+		ACPINEX_DEBUG(CE_WARN, "!acpinex: failed to get soft state "
 		    "object for instance %d in acpinex_ioctl().", instance);
 		return (EINVAL);
 	}
 
 	rv = ENOTSUP;
 	ACPINEX_DEBUG(CE_WARN,
-	    "acpinex: invalid minor number %d in acpinex_ioctl().", minor);
+	    "!acpinex: invalid minor number %d in acpinex_ioctl().", minor);
 
 	return (rv);
 }
@@ -512,11 +536,12 @@ acpinex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
  * Register error handling callback with our parent. We will just call
  * our children's error callbacks and return their status.
  */
-/*ARGSUSED*/
 static int
 acpinex_err_callback(dev_info_t *dip, ddi_fm_error_t *derr,
     const void *impl_data)
 {
+	_NOTE(ARGUNUSED(impl_data));
+
 	/* Call our childrens error handlers */
 	return (ndi_fm_handler_dispatch(dip, NULL, derr));
 }
@@ -560,11 +585,12 @@ acpinex_fm_fini(acpinex_softstate_t *softsp)
  * Initialize FMA resources for child devices.
  * Called when child calls ddi_fm_init().
  */
-/*ARGSUSED*/
 static int
 acpinex_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
     ddi_iblock_cookie_t *ibc)
 {
+	_NOTE(ARGUNUSED(tdip, cap));
+
 	acpinex_softstate_t *softsp = ddi_get_soft_state(acpinex_softstates,
 	    ddi_get_instance(dip));
 

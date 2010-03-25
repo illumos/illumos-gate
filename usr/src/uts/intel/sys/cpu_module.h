@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -143,7 +143,6 @@ extern cmi_errno_t cmi_hdl_rdmsr(cmi_hdl_t, uint_t, uint64_t *);
 extern cmi_errno_t cmi_hdl_wrmsr(cmi_hdl_t, uint_t, uint64_t);
 
 extern void cmi_hdl_enable_mce(cmi_hdl_t);
-
 extern uint_t cmi_hdl_vendor(cmi_hdl_t);
 extern const char *cmi_hdl_vendorstr(cmi_hdl_t);
 extern uint_t cmi_hdl_family(cmi_hdl_t);
@@ -172,6 +171,7 @@ extern uint_t cmi_ntv_hwchipid(cpu_t *);
 extern uint_t cmi_ntv_hwprocnodeid(cpu_t *);
 extern uint_t cmi_ntv_hwcoreid(cpu_t *);
 extern uint_t cmi_ntv_hwstrandid(cpu_t *);
+extern void cmi_ntv_hwdisable_mce(cmi_hdl_t);
 #endif	/* __xpv */
 
 typedef struct cmi_mca_regs {
@@ -210,6 +210,7 @@ extern void cmi_mca_trap(struct regs *);
 extern boolean_t cmi_panic_on_ue(void);
 
 extern void cmi_mc_register(cmi_hdl_t, const struct cmi_mc_ops *, void *);
+extern cmi_errno_t cmi_mc_register_global(const struct cmi_mc_ops *, void *);
 extern void cmi_mc_sw_memscrub_disable(void);
 extern cmi_errno_t cmi_mc_patounum(uint64_t, uint8_t, uint8_t, uint32_t, int,
     mc_unum_t *);

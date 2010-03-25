@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 
 /*
@@ -187,6 +191,10 @@ int pt_kern;
  */
 extern void atomic_orb(uchar_t *addr, uchar_t val);
 extern void atomic_andb(uchar_t *addr, uchar_t val);
+
+#ifndef __xpv
+extern pfn_t memseg_get_start(struct memseg *);
+#endif
 
 #define	PP_GETRM(pp, rmmask)    (pp->p_nrm & rmmask)
 #define	PP_ISMOD(pp)		PP_GETRM(pp, P_MOD)
@@ -4050,8 +4058,8 @@ hat_cpu_offline(struct cpu *cpup)
 	ASSERT(cpup != CPU);
 
 	CPUSET_ATOMIC_DEL(khat_cpuset, cpup->cpu_id);
-	x86pte_cpu_fini(cpup);
 	hat_vlp_teardown(cpup);
+	x86pte_cpu_fini(cpup);
 }
 
 /*
@@ -4363,7 +4371,96 @@ void
 hat_kpm_mseghash_update(pgcnt_t inx, struct memseg *msp)
 {}
 
-#ifdef __xpv
+#ifndef	__xpv
+void
+hat_kpm_addmem_mseg_update(struct memseg *msp, pgcnt_t nkpmpgs,
+	offset_t kpm_pages_off)
+{
+	_NOTE(ARGUNUSED(nkpmpgs, kpm_pages_off));
+	pfn_t base, end;
+
+	/*
+	 * kphysm_add_memory_dynamic() does not set nkpmpgs
+	 * when page_t memory is externally allocated.  That
+	 * code must properly calculate nkpmpgs in all cases
+	 * if nkpmpgs needs to be used at some point.
+	 */
+
+	/*
+	 * The meta (page_t) pages for dynamically added memory are allocated
+	 * either from the incoming memory itself or from existing memory.
+	 * In the former case the base of the incoming pages will be different
+	 * than the base of the dynamic segment so call memseg_get_start() to
+	 * get the actual base of the incoming memory for each case.
+	 */
+
+	base = memseg_get_start(msp);
+	end = msp->pages_end;
+
+	hat_devload(kas.a_hat, kpm_vbase + mmu_ptob(base),
+	    mmu_ptob(end - base), base, PROT_READ | PROT_WRITE,
+	    HAT_LOAD | HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST);
+}
+
+void
+hat_kpm_addmem_mseg_insert(struct memseg *msp)
+{
+	_NOTE(ARGUNUSED(msp));
+}
+
+void
+hat_kpm_addmem_memsegs_update(struct memseg *msp)
+{
+	_NOTE(ARGUNUSED(msp));
+}
+
+/*
+ * Return end of metadata for an already setup memseg.
+ * X86 platforms don't need per-page meta data to support kpm.
+ */
+caddr_t
+hat_kpm_mseg_reuse(struct memseg *msp)
+{
+	return ((caddr_t)msp->epages);
+}
+
+void
+hat_kpm_delmem_mseg_update(struct memseg *msp, struct memseg **mspp)
+{
+	_NOTE(ARGUNUSED(msp, mspp));
+	ASSERT(0);
+}
+
+void
+hat_kpm_split_mseg_update(struct memseg *msp, struct memseg **mspp,
+	struct memseg *lo, struct memseg *mid, struct memseg *hi)
+{
+	_NOTE(ARGUNUSED(msp, mspp, lo, mid, hi));
+	ASSERT(0);
+}
+
+/*
+ * Walk the memsegs chain, applying func to each memseg span.
+ */
+void
+hat_kpm_walk(void (*func)(void *, void *, size_t), void *arg)
+{
+	pfn_t	pbase, pend;
+	void	*base;
+	size_t	size;
+	struct memseg *msp;
+
+	for (msp = memsegs; msp; msp = msp->next) {
+		pbase = msp->pages_base;
+		pend = msp->pages_end;
+		base = ptob(pbase) + kpm_vbase;
+		size = ptob(pend - pbase);
+		func(arg, base, size);
+	}
+}
+
+#else	/* __xpv */
+
 /*
  * There are specific Hypervisor calls to establish and remove mappings
  * to grant table references and the privcmd driver. We have to ensure
@@ -4406,5 +4503,5 @@ hat_release_mapping(hat_t *hat, caddr_t addr)
 	htable_release(ht);
 	htable_release(ht);
 	XPV_ALLOW_MIGRATE();
-									}
-#endif
+}
+#endif	/* __xpv */

@@ -40,6 +40,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_intr.h>
 #include <sys/avintr.h>
+#include <sys/note.h>
 
 static int cbe_vector;
 static int cbe_ticks = 0;
@@ -207,6 +208,13 @@ cbe_configure(cpu_t *cpu)
 	return (cpu);
 }
 
+void
+cbe_unconfigure(void *arg)
+{
+	_NOTE(ARGUNUSED(arg));
+	ASSERT(!CPU_IN_SET(cbe_enabled, ((cpu_t *)arg)->cpu_id));
+}
+
 #ifndef __xpv
 /*
  * declarations needed for time adjustment
@@ -318,7 +326,7 @@ cbe_init(void)
 {
 	cyc_backend_t cbe = {
 		cbe_configure,		/* cyb_configure */
-		NULL,			/* cyb_unconfigure */
+		cbe_unconfigure,	/* cyb_unconfigure */
 		cbe_enable,		/* cyb_enable */
 		cbe_disable,		/* cyb_disable */
 		cbe_reprogram,		/* cyb_reprogram */

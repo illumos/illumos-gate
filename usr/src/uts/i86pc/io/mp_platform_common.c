@@ -22,6 +22,10 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 /*
  * PSMI 1.1 extensions are supported only in 2.6 and later versions.
@@ -29,8 +33,9 @@
  * PSMI 1.3 and 1.4 extensions are supported in Solaris 10.
  * PSMI 1.5 extensions are supported in Solaris Nevada.
  * PSMI 1.6 extensions are supported in Solaris Nevada.
+ * PSMI 1.7 extensions are supported in Solaris Nevada.
  */
-#define	PSMI_1_6
+#define	PSMI_1_7
 
 #include <sys/processor.h>
 #include <sys/time.h>
@@ -93,6 +98,7 @@ static int apic_setup_irq_table(dev_info_t *dip, int irqno,
     struct apic_io_intr *intrp, struct intrspec *ispec, iflag_t *intr_flagp,
     int type);
 static void apic_set_pwroff_method_from_mpcnfhdr(struct apic_mp_cnf_hdr *hdrp);
+static void apic_free_apic_cpus(void);
 static void apic_try_deferred_reprogram(int ipl, int vect);
 static void delete_defer_repro_ent(int which_irq);
 static void apic_ioapic_wait_pending_clear(int ioapicindex,
@@ -194,6 +200,11 @@ int	apic_redist_cpu_skip = 0;
 int	apic_num_imbalance = 0;
 int	apic_num_rebind = 0;
 
+/*
+ * Maximum number of APIC CPUs in the system, -1 indicates that dynamic
+ * allocation of CPU ids is disabled.
+ */
+int 	apic_max_nproc = -1;
 int	apic_nproc = 0;
 size_t	apic_cpus_size = 0;
 int	apic_defconf = 0;
@@ -597,6 +608,16 @@ apic_set_pwroff_method_from_mpcnfhdr(struct apic_mp_cnf_hdr *hdrp)
 	}
 }
 
+static void
+apic_free_apic_cpus(void)
+{
+	if (apic_cpus != NULL) {
+		kmem_free(apic_cpus, apic_cpus_size);
+		apic_cpus = NULL;
+		apic_cpus_size = 0;
+	}
+}
+
 static int
 acpi_probe(char *modname)
 {
@@ -639,7 +660,6 @@ acpi_probe(char *modname)
 	id = apic_reg_ops->apic_read(APIC_LID_REG);
 	local_ids[0] = (uchar_t)(id >> 24);
 	apic_nproc = index = 1;
-	CPUSET_ONLY(apic_cpumask, 0);
 	apic_io_max = 0;
 
 	ap = (ACPI_SUBTABLE_HEADER *) (acpi_mapic_dtp + 1);
@@ -652,16 +672,12 @@ acpi_probe(char *modname)
 			mpa = (ACPI_MADT_LOCAL_APIC *) ap;
 			if (mpa->LapicFlags & ACPI_MADT_ENABLED) {
 				if (mpa->Id == local_ids[0]) {
+					ASSERT(index == 1);
 					proc_ids[0] = mpa->ProcessorId;
-					(void) acpica_map_cpu(0,
-					    mpa->ProcessorId);
 				} else if (apic_nproc < NCPU && use_mp &&
 				    apic_nproc < boot_ncpus) {
 					local_ids[index] = mpa->Id;
 					proc_ids[index] = mpa->ProcessorId;
-					CPUSET_ADD(apic_cpumask, index);
-					(void) acpica_map_cpu(index,
-					    mpa->ProcessorId);
 					index++;
 					apic_nproc++;
 				} else if (apic_nproc == NCPU && !warned) {
@@ -770,9 +786,7 @@ acpi_probe(char *modname)
 				if (apic_nproc < NCPU && use_mp &&
 				    apic_nproc < boot_ncpus) {
 					local_ids[index] = mpx2a->LocalApicId;
-					CPUSET_ADD(apic_cpumask, index);
-					(void) acpica_map_cpu(index,
-					    mpx2a->Uid);
+					proc_ids[index] = mpa->ProcessorId;
 					index++;
 					apic_nproc++;
 				} else if (apic_nproc == NCPU && !warned) {
@@ -813,7 +827,14 @@ acpi_probe(char *modname)
 		ap = (ACPI_SUBTABLE_HEADER *)(((char *)ap) + ap->Length);
 	}
 
-	apic_cpus_size = apic_nproc * sizeof (*apic_cpus);
+	/*
+	 * allocate enough space for possible hot-adding of CPUs.
+	 * max_ncpus may be less than apic_nproc if it's set by user.
+	 */
+	if (plat_dr_support_cpu()) {
+		apic_max_nproc = max_ncpus;
+	}
+	apic_cpus_size = max(apic_nproc, max_ncpus) * sizeof (*apic_cpus);
 	if ((apic_cpus = kmem_zalloc(apic_cpus_size, KM_NOSLEEP)) == NULL)
 		goto cleanup;
 
@@ -825,6 +846,47 @@ acpi_probe(char *modname)
 	for (i = 0; i < apic_nproc; i++) {
 		apic_cpus[i].aci_local_id = local_ids[i];
 		apic_cpus[i].aci_local_ver = (uchar_t)(ver & 0xFF);
+		apic_cpus[i].aci_processor_id = proc_ids[i];
+		/* Only build mapping info for CPUs present at boot. */
+		if (i < boot_ncpus)
+			(void) acpica_map_cpu(i, proc_ids[i]);
+	}
+
+	/*
+	 * To support CPU dynamic reconfiguration, the apic CPU info structure
+	 * for each possible CPU will be pre-allocated at boot time.
+	 * The state for each apic CPU info structure will be assigned according
+	 * to the following rules:
+	 * Rule 1:
+	 * 	Slot index range: [0, min(apic_nproc, boot_ncpus))
+	 *	State flags: 0
+	 *	Note: cpu exists and will be configured/enabled at boot time
+	 * Rule 2:
+	 * 	Slot index range: [boot_ncpus, apic_nproc)
+	 *	State flags: APIC_CPU_FREE | APIC_CPU_DIRTY
+	 *	Note: cpu exists but won't be configured/enabled at boot time
+	 * Rule 3:
+	 * 	Slot index range: [apic_nproc, boot_ncpus)
+	 *	State flags: APIC_CPU_FREE
+	 *	Note: cpu doesn't exist at boot time
+	 * Rule 4:
+	 * 	Slot index range: [max(apic_nproc, boot_ncpus), max_ncpus)
+	 *	State flags: APIC_CPU_FREE
+	 *	Note: cpu doesn't exist at boot time
+	 */
+	CPUSET_ZERO(apic_cpumask);
+	for (i = 0; i < min(boot_ncpus, apic_nproc); i++) {
+		CPUSET_ADD(apic_cpumask, i);
+		apic_cpus[i].aci_status = 0;
+	}
+	for (i = boot_ncpus; i < apic_nproc; i++) {
+		apic_cpus[i].aci_status = APIC_CPU_FREE | APIC_CPU_DIRTY;
+	}
+	for (i = apic_nproc; i < boot_ncpus; i++) {
+		apic_cpus[i].aci_status = APIC_CPU_FREE;
+	}
+	for (i = max(boot_ncpus, apic_nproc); i < max_ncpus; i++) {
+		apic_cpus[i].aci_status = APIC_CPU_FREE;
 	}
 
 	for (i = 0; i < apic_io_max; i++) {
@@ -926,10 +988,12 @@ acpi_probe(char *modname)
 	/* if setting APIC mode failed above, we fall through to cleanup */
 
 cleanup:
+	apic_free_apic_cpus();
 	if (apicadr != NULL) {
 		mapout_apic((caddr_t)apicadr, APIC_LOCAL_MEMLEN);
 		apicadr = NULL;
 	}
+	apic_max_nproc = -1;
 	apic_nproc = 0;
 	for (i = 0; i < apic_io_max; i++) {
 		mapout_ioapic((caddr_t)apicioadr[i], APIC_IO_MEMLEN);
@@ -953,6 +1017,11 @@ static int
 apic_handle_defconf()
 {
 	uint_t	lid;
+
+	/* Failed to probe ACPI MADT tables, disable CPU DR. */
+	apic_max_nproc = -1;
+	apic_free_apic_cpus();
+	plat_dr_disable_cpu();
 
 	/*LINTED: pointer cast may result in improper alignment */
 	apicioadr[0] = mapin_ioapic(APIC_IO_ADDR,
@@ -998,8 +1067,7 @@ apic_handle_defconf()
 	return (PSM_SUCCESS);
 
 apic_handle_defconf_fail:
-	if (apic_cpus)
-		kmem_free(apic_cpus, apic_cpus_size);
+	apic_free_apic_cpus();
 	if (apicadr)
 		mapout_apic((caddr_t)apicadr, APIC_LOCAL_MEMLEN);
 	if (apicioadr[0])
@@ -1187,7 +1255,51 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 boolean_t
 apic_cpu_in_range(int cpu)
 {
-	return ((cpu & ~IRQ_USER_BOUND) < apic_nproc);
+	cpu &= ~IRQ_USER_BOUND;
+	/* Check whether cpu id is in valid range. */
+	if (cpu < 0 || cpu >= apic_nproc) {
+		return (B_FALSE);
+	} else if (apic_max_nproc != -1 && cpu >= apic_max_nproc) {
+		/*
+		 * Check whether cpuid is in valid range if CPU DR is enabled.
+		 */
+		return (B_FALSE);
+	} else if (!CPU_IN_SET(apic_cpumask, cpu)) {
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * Must be called with interrupts disabled and the apic_ioapic_lock held.
+ */
+processorid_t
+apic_find_next_cpu_intr(void)
+{
+	int i, count;
+	processorid_t cpuid = 0;
+
+	ASSERT(LOCK_HELD(&apic_ioapic_lock));
+
+	/*
+	 * Find next CPU with INTR_ENABLE flag set.
+	 * Assume that there is at least one CPU with interrupts enabled.
+	 */
+	for (count = 0; count < apic_nproc; count++) {
+		if (apic_next_bind_cpu >= apic_nproc) {
+			apic_next_bind_cpu = 0;
+		}
+		i = apic_next_bind_cpu++;
+		if (apic_cpu_in_range(i) &&
+		    (apic_cpus[i].aci_status & APIC_CPU_INTR_ENABLE)) {
+			cpuid = i;
+			break;
+		}
+	}
+	ASSERT((apic_cpus[cpuid].aci_status & APIC_CPU_INTR_ENABLE) != 0);
+
+	return (cpuid);
 }
 
 uint16_t
@@ -1770,7 +1882,7 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 		bind_cpu = irqptr->airq_temp_cpu;
 		if (((uint32_t)bind_cpu != IRQ_UNBOUND) &&
 		    ((uint32_t)bind_cpu != IRQ_UNINIT)) {
-			ASSERT((bind_cpu & ~IRQ_USER_BOUND) < apic_nproc);
+			ASSERT(apic_cpu_in_range(bind_cpu));
 			if (bind_cpu & IRQ_USER_BOUND) {
 				/* If hardbound, temp_cpu == cpu */
 				bind_cpu &= ~IRQ_USER_BOUND;
@@ -2392,6 +2504,7 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 	major_t	major;
 	char	*name, *drv_name, *prop_val, *cptr;
 	char	prop_name[32];
+	ulong_t	iflag;
 
 
 	if (apic_intr_policy == INTR_LOWEST_PRIORITY)
@@ -2475,26 +2588,28 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 				i++;
 		bind_cpu = stoi(&cptr);
 		kmem_free(prop_val, prop_len);
-		/* if specific cpu is bogus, then default to cpu 0 */
-		if (bind_cpu >= apic_nproc) {
+		/* if specific CPU is bogus, then default to next cpu */
+		if (!apic_cpu_in_range(bind_cpu)) {
 			cmn_err(CE_WARN, "%s: %s=%s: CPU %d not present",
 			    psm_name, prop_name, prop_val, bind_cpu);
-			bind_cpu = 0;
+			rc = DDI_PROP_NOT_FOUND;
 		} else {
 			/* indicate that we are bound at user request */
 			bind_cpu |= IRQ_USER_BOUND;
 		}
 		/*
-		 * no need to check apic_cpus[].aci_status, if specific cpu is
+		 * no need to check apic_cpus[].aci_status, if specific CPU is
 		 * not up, then post_cpu_start will handle it.
 		 */
-	} else {
-		bind_cpu = apic_next_bind_cpu++;
-		if (bind_cpu >= apic_nproc) {
-			apic_next_bind_cpu = 1;
-			bind_cpu = 0;
-		}
 	}
+	if (rc != DDI_PROP_SUCCESS) {
+		iflag = intr_clear();
+		lock_set(&apic_ioapic_lock);
+		bind_cpu = apic_find_next_cpu_intr();
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
+	}
+
 	if (drv_name != NULL)
 		cmn_err(CE_CONT, "!%s: %s (%s) instance %d irq 0x%x "
 		    "vector 0x%x ioapic 0x%x intin 0x%x is bound to cpu %d\n",
@@ -2925,7 +3040,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 			/* Mask off high bit so it can be used as array index */
 			airq_temp_cpu &= ~IRQ_USER_BOUND;
 
-		ASSERT(airq_temp_cpu < apic_nproc);
+		ASSERT(apic_cpu_in_range(airq_temp_cpu));
 	}
 
 	/*
@@ -2999,7 +3114,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 	} else {
 		cpu_infop->aci_temp_bound++;
 	}
-	ASSERT((bind_cpu & ~IRQ_USER_BOUND) < apic_nproc);
+	ASSERT(apic_cpu_in_range(bind_cpu));
 
 	if ((airq_temp_cpu != IRQ_UNBOUND) && (airq_temp_cpu != IRQ_UNINIT)) {
 		apic_cpus[airq_temp_cpu].aci_temp_bound--;
@@ -3477,7 +3592,8 @@ apic_intr_redistribute()
 	 * we are consistent.
 	 */
 	for (i = 0; i < apic_nproc; i++) {
-		if (!(apic_redist_cpu_skip & (1 << i)) &&
+		if (apic_cpu_in_range(i) &&
+		    !(apic_redist_cpu_skip & (1 << i)) &&
 		    (apic_cpus[i].aci_status & APIC_CPU_INTR_ENABLE)) {
 
 			cpu_infop = &apic_cpus[i];
@@ -3639,7 +3755,9 @@ apic_intr_redistribute()
 			apic_redist_cpu_skip = 0;
 	}
 	for (i = 0; i < apic_nproc; i++) {
-		apic_cpus[i].aci_busy = 0;
+		if (apic_cpu_in_range(i)) {
+			apic_cpus[i].aci_busy = 0;
+		}
 	}
 }
 
@@ -3650,7 +3768,9 @@ apic_cleanup_busy()
 	apic_irq_t *irq_ptr;
 
 	for (i = 0; i < apic_nproc; i++) {
-		apic_cpus[i].aci_busy = 0;
+		if (apic_cpu_in_range(i)) {
+			apic_cpus[i].aci_busy = 0;
+		}
 	}
 
 	for (i = apic_min_device_irq; i <= apic_max_device_irq; i++) {

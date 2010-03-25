@@ -60,6 +60,7 @@ HDRS=  \
 	psm_types.h	\
 	rm_platter.h	\
 	smp_impldefs.h	\
+	sbd_ioctl.h	\
 	vm_machparam.h	\
 	x_call.h	\
 	xc_levels.h	\

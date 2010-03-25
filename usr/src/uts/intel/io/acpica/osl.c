@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 /*
@@ -98,7 +98,7 @@ static int scanning_d2a_map = 0;
 static int d2a_done = 0;
 
 /* features supported by ACPICA and ACPI device configuration. */
-uint64_t acpica_core_features = 0;
+uint64_t acpica_core_features = ACPI_FEATURE_OSI_MODULE;
 static uint64_t acpica_devcfg_features = 0;
 
 /* set by acpi_poweroff() in PSMs and appm_ioctl() in acpippm for S3 */
@@ -112,7 +112,7 @@ struct cpu_map_item {
 	ACPI_HANDLE	obj;
 };
 
-static kmutex_t cpu_map_lock;
+kmutex_t cpu_map_lock;
 static struct cpu_map_item **cpu_map = NULL;
 static int cpu_map_count_max = 0;
 static int cpu_map_count = 0;
@@ -1552,7 +1552,7 @@ acpica_get_handle_cpu(int cpu_id, ACPI_HANDLE *rh)
 		}
 	}
 	if (i < cpu_map_count && (cpu_map[i]->obj != NULL)) {
-		*rh = cpu_map[cpu_id]->obj;
+		*rh = cpu_map[i]->obj;
 		mutex_exit(&cpu_map_lock);
 		return (AE_OK);
 	}
@@ -1567,7 +1567,7 @@ acpica_get_handle_cpu(int cpu_id, ACPI_HANDLE *rh)
 				}
 			}
 			if (i < cpu_map_count && (cpu_map[i]->obj != NULL)) {
-				*rh = cpu_map[cpu_id]->obj;
+				*rh = cpu_map[i]->obj;
 				mutex_exit(&cpu_map_lock);
 				return (AE_OK);
 			}
@@ -2200,6 +2200,82 @@ acpica_get_cpu_object_by_apicid(UINT32 apicid, ACPI_HANDLE *hdlp)
 	for (i = 0; i < cpu_map_count; i++) {
 		if (cpu_map[i]->apic_id == apicid && cpu_map[i]->obj != NULL) {
 			*hdlp = cpu_map[i]->obj;
+			rc = AE_OK;
+			break;
+		}
+	}
+	mutex_exit(&cpu_map_lock);
+
+	return (rc);
+}
+
+ACPI_STATUS
+acpica_get_cpu_id_by_object(ACPI_HANDLE hdl, processorid_t *cpuidp)
+{
+	int i;
+	ACPI_STATUS rc = AE_NOT_EXIST;
+
+	ASSERT(cpuidp != NULL);
+	if (hdl == NULL || cpuidp == NULL) {
+		return (rc);
+	}
+
+	*cpuidp = -1;
+	mutex_enter(&cpu_map_lock);
+	for (i = 0; i < cpu_map_count; i++) {
+		if (cpu_map[i]->obj == hdl && cpu_map[i]->cpu_id != -1) {
+			*cpuidp = cpu_map[i]->cpu_id;
+			rc = AE_OK;
+			break;
+		}
+	}
+	mutex_exit(&cpu_map_lock);
+
+	return (rc);
+}
+
+ACPI_STATUS
+acpica_get_apicid_by_object(ACPI_HANDLE hdl, UINT32 *rp)
+{
+	int i;
+	ACPI_STATUS rc = AE_NOT_EXIST;
+
+	ASSERT(rp != NULL);
+	if (hdl == NULL || rp == NULL) {
+		return (rc);
+	}
+
+	*rp = UINT32_MAX;
+	mutex_enter(&cpu_map_lock);
+	for (i = 0; i < cpu_map_count; i++) {
+		if (cpu_map[i]->obj == hdl &&
+		    cpu_map[i]->apic_id != UINT32_MAX) {
+			*rp = cpu_map[i]->apic_id;
+			rc = AE_OK;
+			break;
+		}
+	}
+	mutex_exit(&cpu_map_lock);
+
+	return (rc);
+}
+
+ACPI_STATUS
+acpica_get_procid_by_object(ACPI_HANDLE hdl, UINT32 *rp)
+{
+	int i;
+	ACPI_STATUS rc = AE_NOT_EXIST;
+
+	ASSERT(rp != NULL);
+	if (hdl == NULL || rp == NULL) {
+		return (rc);
+	}
+
+	*rp = UINT32_MAX;
+	mutex_enter(&cpu_map_lock);
+	for (i = 0; i < cpu_map_count; i++) {
+		if (cpu_map[i]->obj == hdl) {
+			*rp = cpu_map[i]->proc_id;
 			rc = AE_OK;
 			break;
 		}

@@ -1660,6 +1660,7 @@ $(i386_ONLY)file path=usr/platform/i86pc/include/sys/psm_defs.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/psm_modctl.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/psm_types.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/rm_platter.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/sbd_ioctl.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/smp_impldefs.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/vm_machparam.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/x_call.h

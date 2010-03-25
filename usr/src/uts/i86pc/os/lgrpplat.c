@@ -23,6 +23,10 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 /*
  * LOCALITY GROUP (LGROUP) PLATFORM SUPPORT FOR X86/AMD64 PLATFORMS
@@ -88,14 +92,18 @@
  * - lgrp_plat_lat_stats.latencies[][]	Table of latencies between same and
  *					different nodes indexed by node ID
  *
- * - lgrp_plat_node_cnt			Number of NUMA nodes in system
+ * - lgrp_plat_node_cnt			Number of NUMA nodes in system for
+ *					non-DR-capable systems,
+ *					maximum possible number of NUMA nodes
+ *					in system for DR capable systems.
  *
  * - lgrp_plat_node_domain[]		Node ID to proximity domain ID mapping
  *					table indexed by node ID (only used
  *					for SRAT)
  *
- * - lgrp_plat_node_memory[]		Table with physical address range for
- *					each node indexed by node ID
+ * - lgrp_plat_memnode_info[]		Table with physical address range for
+ *					each memory node indexed by memory node
+ *					ID
  *
  * The code is implemented to make the following always be true:
  *
@@ -113,26 +121,41 @@
  * equivalent node ID since we want to keep the node IDs numbered from 0 to
  * <number of nodes - 1> to minimize cost of searching and potentially space.
  *
- * The code below really tries to do the above.  However, the virtual memory
- * system expects the memnodes which describe the physical address range for
- * each NUMA node to be arranged in ascending order by physical address.  (:-(
- * Otherwise, the kernel will panic in different semi-random places in the VM
- * system.
+ * With the introduction of support of memory DR operations on x86 platforms,
+ * things get a little complicated. The addresses of hot-added memory may not
+ * be continuous with other memory connected to the same lgrp node. In other
+ * words, memory addresses may get interleaved among lgrp nodes after memory
+ * DR operations. To work around this limitation, we have extended the
+ * relationship between lgrp node and memory node from 1:1 map to 1:N map,
+ * that means there may be multiple memory nodes associated with a lgrp node
+ * after memory DR operations.
  *
- * Consequently, this module has to try to sort the nodes in ascending order by
- * each node's starting physical address to try to meet this "constraint" in
- * the VM system (see lgrp_plat_node_sort()).  Also, the lowest numbered
- * proximity domain ID in the system is deteremined and used to make the lowest
- * numbered proximity domain map to node 0 in hopes that the proximity domains
- * are sorted in ascending order by physical address already even if their IDs
- * don't start at 0 (see NODE_DOMAIN_HASH() and lgrp_plat_srat_domains()).
- * Finally, it is important to note that these workarounds may not be
- * sufficient if/when memory hotplugging is supported and the VM system may
- * ultimately need to be fixed to handle this....
+ * To minimize the code changes to support memory DR operations, the
+ * following policies have been adopted.
+ * 1) On non-DR-capable systems, the relationship among lgroup platform handle,
+ *    node ID and memnode ID is still kept as:
+ *	lgroup platform handle == node ID == memnode ID
+ * 2) For memory present at boot time on DR capable platforms, the relationship
+ *    is still kept as is.
+ *	lgroup platform handle == node ID == memnode ID
+ * 3) For hot-added memory, the relationship between lgrp ID and memnode ID have
+ *    been changed from 1:1 map to 1:N map. Memnode IDs [0 - lgrp_plat_node_cnt)
+ *    are reserved for memory present at boot time, and memnode IDs
+ *    [lgrp_plat_node_cnt, max_mem_nodes) are used to dynamically allocate
+ *    memnode ID for hot-added memory.
+ * 4) All boot code having the assumption "node ID == memnode ID" can live as
+ *    is, that's because node ID is always equal to memnode ID at boot time.
+ * 5) The lgrp_plat_memnode_info_update(), plat_pfn_to_mem_node() and
+ *    lgrp_plat_mem_size() related logics have been enhanced to deal with
+ *    the 1:N map relationship.
+ * 6) The latency probing related logics, which have the assumption
+ *    "node ID == memnode ID" and may be called at run time, is disabled if
+ *    memory DR operation is enabled.
  */
 
 
 #include <sys/archsystm.h>	/* for {in,out}{b,w,l}() */
+#include <sys/atomic.h>
 #include <sys/bootconf.h>
 #include <sys/cmn_err.h>
 #include <sys/controlregs.h>
@@ -143,6 +166,7 @@
 #include <sys/memlist.h>
 #include <sys/memnode.h>
 #include <sys/mman.h>
+#include <sys/note.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_impl.h>
 #include <sys/param.h>
@@ -158,7 +182,8 @@
 #include <vm/seg_kmem.h>
 #include <vm/vm_dep.h>
 
-#include "acpi_fw.h"		/* for SRAT and SLIT */
+#include <sys/acpidev.h>
+#include "acpi_fw.h"		/* for SRAT, SLIT and MSCT */
 
 
 #define	MAX_NODES		8
@@ -186,7 +211,6 @@
 #define	NODE_DOMAIN_HASH(domain, node_cnt) \
 	((lgrp_plat_prox_domain_min == UINT32_MAX) ? (domain) % node_cnt : \
 	    ((domain) - lgrp_plat_prox_domain_min) % node_cnt)
-
 
 /*
  * CPU to node ID mapping structure (only used with SRAT)
@@ -239,14 +263,16 @@ typedef	struct node_domain_map {
 } node_domain_map_t;
 
 /*
- * Node ID and starting and ending page for physical memory in node
+ * Node ID and starting and ending page for physical memory in memory node
  */
-typedef	struct node_phys_addr_map {
+typedef	struct memnode_phys_addr_map {
 	pfn_t		start;
 	pfn_t		end;
 	int		exists;
 	uint32_t	prox_domain;
-} node_phys_addr_map_t;
+	uint32_t	device_id;
+	uint_t		lgrphand;
+} memnode_phys_addr_map_t;
 
 /*
  * Number of CPUs for which we got APIC IDs
@@ -278,7 +304,7 @@ static node_domain_map_t		lgrp_plat_node_domain[MAX_NODES];
 /*
  * Physical address range for memory in each node
  */
-static node_phys_addr_map_t		lgrp_plat_node_memory[MAX_NODES];
+static memnode_phys_addr_map_t		lgrp_plat_memnode_info[MAX_MEM_NODES];
 
 /*
  * Statistics gotten from probing
@@ -306,6 +332,17 @@ static int				lgrp_plat_srat_error = 0;
 static int				lgrp_plat_slit_error = 0;
 
 /*
+ * Whether lgrp topology has been flattened to 2 levels.
+ */
+static int				lgrp_plat_topo_flatten = 0;
+
+
+/*
+ * Maximum memory node ID in use.
+ */
+static uint_t				lgrp_plat_max_mem_node;
+
+/*
  * Allocate lgroup array statically
  */
 static lgrp_t				lgrp_space[NLGRP];
@@ -318,7 +355,7 @@ static int				nlgrps_alloc;
 int			lgrp_plat_domain_min_enable = 1;
 
 /*
- * Number of nodes in system
+ * Maximum possible number of nodes in system
  */
 uint_t			lgrp_plat_node_cnt = 1;
 
@@ -343,11 +380,12 @@ int			lgrp_plat_probe_nsamples = LGRP_PLAT_PROBE_NSAMPLES;
 int			lgrp_plat_probe_nreads = LGRP_PLAT_PROBE_NREADS;
 
 /*
- * Enable use of ACPI System Resource Affinity Table (SRAT) and System
- * Locality Information Table (SLIT)
+ * Enable use of ACPI System Resource Affinity Table (SRAT), System
+ * Locality Information Table (SLIT) and Maximum System Capability Table (MSCT)
  */
 int			lgrp_plat_srat_enable = 1;
 int			lgrp_plat_slit_enable = 1;
+int			lgrp_plat_msct_enable = 1;
 
 /*
  * mnode_xwa: set to non-zero value to initiate workaround if large pages are
@@ -370,11 +408,9 @@ struct lgrp_stats	lgrp_stats[NLGRP];
  */
 void		plat_build_mem_nodes(struct memlist *list);
 
-int		plat_lgrphand_to_mem_node(lgrp_handle_t hand);
+int		plat_mnode_xcheck(pfn_t pfncnt);
 
 lgrp_handle_t	plat_mem_node_to_lgrphand(int mnode);
-
-int		plat_mnode_xcheck(pfn_t pfncnt);
 
 int		plat_pfn_to_mem_node(pfn_t pfn);
 
@@ -420,11 +456,11 @@ static int	lgrp_plat_domain_to_node(node_domain_map_t *node_domain,
 
 static void	lgrp_plat_get_numa_config(void);
 
-static void	lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
+static void	lgrp_plat_latency_adjust(memnode_phys_addr_map_t *memnode_info,
     lgrp_plat_latency_stats_t *lat_stats,
     lgrp_plat_probe_stats_t *probe_stats);
 
-static int	lgrp_plat_latency_verify(node_phys_addr_map_t *node_memory,
+static int	lgrp_plat_latency_verify(memnode_phys_addr_map_t *memnode_info,
     lgrp_plat_latency_stats_t *lat_stats);
 
 static void	lgrp_plat_main_init(void);
@@ -434,13 +470,13 @@ static pgcnt_t	lgrp_plat_mem_size_default(lgrp_handle_t, lgrp_mem_query_t);
 static int	lgrp_plat_node_domain_update(node_domain_map_t *node_domain,
     int node_cnt, uint32_t domain);
 
-static int	lgrp_plat_node_memory_update(node_domain_map_t *node_domain,
-    int node_cnt, node_phys_addr_map_t *node_memory, uint64_t start,
-    uint64_t end, uint32_t domain);
+static int	lgrp_plat_memnode_info_update(node_domain_map_t *node_domain,
+    int node_cnt, memnode_phys_addr_map_t *memnode_info, int memnode_cnt,
+    uint64_t start, uint64_t end, uint32_t domain, uint32_t device_id);
 
 static void	lgrp_plat_node_sort(node_domain_map_t *node_domain,
     int node_cnt, cpu_node_map_t *cpu_node, int cpu_count,
-    node_phys_addr_map_t *node_memory);
+    memnode_phys_addr_map_t *memnode_info);
 
 static hrtime_t	lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
     int cpu_node_nentries, lgrp_plat_probe_mem_config_t *probe_mem_config,
@@ -448,24 +484,32 @@ static hrtime_t	lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
 
 static int	lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node);
 
-static int	lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
-    node_phys_addr_map_t *node_memory, lgrp_plat_latency_stats_t *lat_stats);
+static int	lgrp_plat_process_slit(struct slit *tp,
+    node_domain_map_t *node_domain, uint_t node_cnt,
+    memnode_phys_addr_map_t *memnode_info,
+    lgrp_plat_latency_stats_t *lat_stats);
 
-static int	lgrp_plat_process_srat(struct srat *tp,
+static int	lgrp_plat_process_sli(uint32_t domain, uchar_t *sli_info,
+    uint32_t sli_cnt, node_domain_map_t *node_domain, uint_t node_cnt,
+    lgrp_plat_latency_stats_t *lat_stats);
+
+static int	lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
     uint32_t *prox_domain_min, node_domain_map_t *node_domain,
     cpu_node_map_t *cpu_node, int cpu_count,
-    node_phys_addr_map_t *node_memory);
+    memnode_phys_addr_map_t *memnode_info);
 
 static void	lgrp_plat_release_bootstrap(void);
 
 static int	lgrp_plat_srat_domains(struct srat *tp,
     uint32_t *prox_domain_min);
 
-static void	lgrp_plat_2level_setup(node_phys_addr_map_t *node_memory,
-    lgrp_plat_latency_stats_t *lat_stats);
+static int	lgrp_plat_msct_domains(struct msct *tp,
+    uint32_t *prox_domain_min);
+
+static void	lgrp_plat_2level_setup(lgrp_plat_latency_stats_t *lat_stats);
 
 static void	opt_get_numa_config(uint_t *node_cnt, int *mem_intrlv,
-    node_phys_addr_map_t *node_memory);
+    memnode_phys_addr_map_t *memnode_info);
 
 static hrtime_t	opt_probe_vendor(int dest_node, int nreads);
 
@@ -529,10 +573,10 @@ plat_build_mem_nodes(struct memlist *list)
 			 * This shouldn't happen and rest of code can't deal
 			 * with this if it does.
 			 */
-			if (node < 0 || node >= lgrp_plat_node_cnt ||
-			    !lgrp_plat_node_memory[node].exists ||
-			    cur_start < lgrp_plat_node_memory[node].start ||
-			    cur_start > lgrp_plat_node_memory[node].end) {
+			if (node < 0 || node >= lgrp_plat_max_mem_node ||
+			    !lgrp_plat_memnode_info[node].exists ||
+			    cur_start < lgrp_plat_memnode_info[node].start ||
+			    cur_start > lgrp_plat_memnode_info[node].end) {
 				cmn_err(CE_PANIC, "Don't know which memnode "
 				    "to add installed memory address 0x%lx\n",
 				    cur_start);
@@ -543,9 +587,9 @@ plat_build_mem_nodes(struct memlist *list)
 			 */
 			cur_end = end;
 			endcnt = 0;
-			if (lgrp_plat_node_memory[node].exists &&
-			    cur_end > lgrp_plat_node_memory[node].end) {
-				cur_end = lgrp_plat_node_memory[node].end;
+			if (lgrp_plat_memnode_info[node].exists &&
+			    cur_end > lgrp_plat_memnode_info[node].end) {
+				cur_end = lgrp_plat_memnode_info[node].end;
 				if (mnode_xwa > 1) {
 					/*
 					 * sacrifice the last page in each
@@ -572,16 +616,6 @@ plat_build_mem_nodes(struct memlist *list)
 }
 
 
-int
-plat_lgrphand_to_mem_node(lgrp_handle_t hand)
-{
-	if (max_mem_nodes == 1)
-		return (0);
-
-	return ((int)hand);
-}
-
-
 /*
  * plat_mnode_xcheck: checks the node memory ranges to see if there is a pfncnt
  * range of pages aligned on pfncnt that crosses an node boundary. Returns 1 if
@@ -593,9 +627,9 @@ plat_mnode_xcheck(pfn_t pfncnt)
 	int	node, prevnode = -1, basenode;
 	pfn_t	ea, sa;
 
-	for (node = 0; node < lgrp_plat_node_cnt; node++) {
+	for (node = 0; node < lgrp_plat_max_mem_node; node++) {
 
-		if (lgrp_plat_node_memory[node].exists == 0)
+		if (lgrp_plat_memnode_info[node].exists == 0)
 			continue;
 
 		if (prevnode == -1) {
@@ -605,23 +639,23 @@ plat_mnode_xcheck(pfn_t pfncnt)
 		}
 
 		/* assume x86 node pfn ranges are in increasing order */
-		ASSERT(lgrp_plat_node_memory[node].start >
-		    lgrp_plat_node_memory[prevnode].end);
+		ASSERT(lgrp_plat_memnode_info[node].start >
+		    lgrp_plat_memnode_info[prevnode].end);
 
 		/*
 		 * continue if the starting address of node is not contiguous
 		 * with the previous node.
 		 */
 
-		if (lgrp_plat_node_memory[node].start !=
-		    (lgrp_plat_node_memory[prevnode].end + 1)) {
+		if (lgrp_plat_memnode_info[node].start !=
+		    (lgrp_plat_memnode_info[prevnode].end + 1)) {
 			basenode = node;
 			prevnode = node;
 			continue;
 		}
 
 		/* check if the starting address of node is pfncnt aligned */
-		if ((lgrp_plat_node_memory[node].start & (pfncnt - 1)) != 0) {
+		if ((lgrp_plat_memnode_info[node].start & (pfncnt - 1)) != 0) {
 
 			/*
 			 * at this point, node starts at an unaligned boundary
@@ -630,14 +664,14 @@ plat_mnode_xcheck(pfn_t pfncnt)
 			 * range of length pfncnt that crosses this boundary.
 			 */
 
-			sa = P2ALIGN(lgrp_plat_node_memory[prevnode].end,
+			sa = P2ALIGN(lgrp_plat_memnode_info[prevnode].end,
 			    pfncnt);
-			ea = P2ROUNDUP((lgrp_plat_node_memory[node].start),
+			ea = P2ROUNDUP((lgrp_plat_memnode_info[node].start),
 			    pfncnt);
 
 			ASSERT((ea - sa) == pfncnt);
-			if (sa >= lgrp_plat_node_memory[basenode].start &&
-			    ea <= (lgrp_plat_node_memory[node].end + 1)) {
+			if (sa >= lgrp_plat_memnode_info[basenode].start &&
+			    ea <= (lgrp_plat_memnode_info[node].end + 1)) {
 				/*
 				 * large page found to cross mnode boundary.
 				 * Return Failure if workaround not enabled.
@@ -659,9 +693,10 @@ plat_mem_node_to_lgrphand(int mnode)
 	if (max_mem_nodes == 1)
 		return (LGRP_DEFAULT_HANDLE);
 
-	return ((lgrp_handle_t)mnode);
-}
+	ASSERT(0 <= mnode && mnode < lgrp_plat_max_mem_node);
 
+	return ((lgrp_handle_t)(lgrp_plat_memnode_info[mnode].lgrphand));
+}
 
 int
 plat_pfn_to_mem_node(pfn_t pfn)
@@ -671,22 +706,23 @@ plat_pfn_to_mem_node(pfn_t pfn)
 	if (max_mem_nodes == 1)
 		return (0);
 
-	for (node = 0; node < lgrp_plat_node_cnt; node++) {
+	for (node = 0; node < lgrp_plat_max_mem_node; node++) {
 		/*
 		 * Skip nodes with no memory
 		 */
-		if (!lgrp_plat_node_memory[node].exists)
+		if (!lgrp_plat_memnode_info[node].exists)
 			continue;
 
-		if (pfn >= lgrp_plat_node_memory[node].start &&
-		    pfn <= lgrp_plat_node_memory[node].end)
+		membar_consumer();
+		if (pfn >= lgrp_plat_memnode_info[node].start &&
+		    pfn <= lgrp_plat_memnode_info[node].end)
 			return (node);
 	}
 
 	/*
 	 * Didn't find memnode where this PFN lives which should never happen
 	 */
-	ASSERT(node < lgrp_plat_node_cnt);
+	ASSERT(node < lgrp_plat_max_mem_node);
 	return (-1);
 }
 
@@ -698,7 +734,6 @@ plat_pfn_to_mem_node(pfn_t pfn)
 /*
  * Allocate additional space for an lgroup.
  */
-/* ARGSUSED */
 lgrp_t *
 lgrp_plat_alloc(lgrp_id_t lgrpid)
 {
@@ -713,22 +748,197 @@ lgrp_plat_alloc(lgrp_id_t lgrpid)
 
 /*
  * Platform handling for (re)configuration changes
+ *
+ * Mechanism to protect lgrp_plat_cpu_node[] at CPU hotplug:
+ * 1) Use cpu_lock to synchronize between lgrp_plat_config() and
+ *    lgrp_plat_cpu_to_hand().
+ * 2) Disable latency probing logic by making sure that the flag
+ *    LGRP_PLAT_PROBE_ENABLE is cleared.
+ *
+ * Mechanism to protect lgrp_plat_memnode_info[] at memory hotplug:
+ * 1) Only inserts into lgrp_plat_memnode_info at memory hotplug, no removal.
+ * 2) Only expansion to existing entries, no shrinking.
+ * 3) On writing side, DR framework ensures that lgrp_plat_config() is called
+ *    in single-threaded context. And membar_producer() is used to ensure that
+ *    all changes are visible to other CPUs before setting the "exists" flag.
+ * 4) On reading side, membar_consumer() after checking the "exists" flag
+ *    ensures that right values are retrieved.
+ *
+ * Mechanism to protect lgrp_plat_node_domain[] at hotplug:
+ * 1) Only insertion into lgrp_plat_node_domain at hotplug, no removal.
+ * 2) On writing side, it's single-threaded and membar_producer() is used to
+ *    ensure all changes are visible to other CPUs before setting the "exists"
+ *    flag.
+ * 3) On reading side, membar_consumer() after checking the "exists" flag
+ *    ensures that right values are retrieved.
  */
-/* ARGSUSED */
 void
 lgrp_plat_config(lgrp_config_flag_t flag, uintptr_t arg)
 {
+#ifdef	__xpv
+	_NOTE(ARGUNUSED(flag, arg));
+#else
+	int	rc, node;
+	cpu_t	*cp;
+	void	*hdl = NULL;
+	uchar_t	*sliptr = NULL;
+	uint32_t domain, apicid, slicnt = 0;
+	update_membounds_t *mp;
+
+	extern int acpidev_dr_get_cpu_numa_info(cpu_t *, void **, uint32_t *,
+	    uint32_t *, uint32_t *, uchar_t **);
+	extern void acpidev_dr_free_cpu_numa_info(void *);
+
+	/*
+	 * This interface is used to support CPU/memory DR operations.
+	 * Don't bother here if it's still during boot or only one lgrp node
+	 * is supported.
+	 */
+	if (!lgrp_topo_initialized || lgrp_plat_node_cnt == 1)
+		return;
+
+	switch (flag) {
+	case LGRP_CONFIG_CPU_ADD:
+		cp = (cpu_t *)arg;
+		ASSERT(cp != NULL);
+		ASSERT(MUTEX_HELD(&cpu_lock));
+
+		/* Check whether CPU already exists. */
+		ASSERT(!lgrp_plat_cpu_node[cp->cpu_id].exists);
+		if (lgrp_plat_cpu_node[cp->cpu_id].exists) {
+			cmn_err(CE_WARN,
+			    "!lgrp: CPU(%d) already exists in cpu_node map.",
+			    cp->cpu_id);
+			break;
+		}
+
+		/* Query CPU lgrp information. */
+		rc = acpidev_dr_get_cpu_numa_info(cp, &hdl, &apicid, &domain,
+		    &slicnt, &sliptr);
+		ASSERT(rc == 0);
+		if (rc != 0) {
+			cmn_err(CE_WARN,
+			    "!lgrp: failed to query lgrp info for CPU(%d).",
+			    cp->cpu_id);
+			break;
+		}
+
+		/* Update node to proximity domain mapping */
+		node = lgrp_plat_domain_to_node(lgrp_plat_node_domain,
+		    lgrp_plat_node_cnt, domain);
+		if (node == -1) {
+			node = lgrp_plat_node_domain_update(
+			    lgrp_plat_node_domain, lgrp_plat_node_cnt, domain);
+			ASSERT(node != -1);
+			if (node == -1) {
+				acpidev_dr_free_cpu_numa_info(hdl);
+				cmn_err(CE_WARN, "!lgrp: failed to update "
+				    "node_domain map for domain(%u).", domain);
+				break;
+			}
+		}
+
+		/* Update latency information among lgrps. */
+		if (slicnt != 0 && sliptr != NULL) {
+			if (lgrp_plat_process_sli(domain, sliptr, slicnt,
+			    lgrp_plat_node_domain, lgrp_plat_node_cnt,
+			    &lgrp_plat_lat_stats) != 0) {
+				cmn_err(CE_WARN, "!lgrp: failed to update "
+				    "latency information for domain (%u).",
+				    domain);
+			}
+		}
+
+		/* Update CPU to node mapping. */
+		lgrp_plat_cpu_node[cp->cpu_id].prox_domain = domain;
+		lgrp_plat_cpu_node[cp->cpu_id].node = node;
+		lgrp_plat_cpu_node[cp->cpu_id].apicid = apicid;
+		lgrp_plat_cpu_node[cp->cpu_id].exists = 1;
+		lgrp_plat_apic_ncpus++;
+
+		acpidev_dr_free_cpu_numa_info(hdl);
+		break;
+
+	case LGRP_CONFIG_CPU_DEL:
+		cp = (cpu_t *)arg;
+		ASSERT(cp != NULL);
+		ASSERT(MUTEX_HELD(&cpu_lock));
+
+		/* Check whether CPU exists. */
+		ASSERT(lgrp_plat_cpu_node[cp->cpu_id].exists);
+		if (!lgrp_plat_cpu_node[cp->cpu_id].exists) {
+			cmn_err(CE_WARN,
+			    "!lgrp: CPU(%d) doesn't exist in cpu_node map.",
+			    cp->cpu_id);
+			break;
+		}
+
+		/* Query CPU lgrp information. */
+		rc = acpidev_dr_get_cpu_numa_info(cp, &hdl, &apicid, &domain,
+		    NULL, NULL);
+		ASSERT(rc == 0);
+		if (rc != 0) {
+			cmn_err(CE_WARN,
+			    "!lgrp: failed to query lgrp info for CPU(%d).",
+			    cp->cpu_id);
+			break;
+		}
+
+		/* Update map. */
+		ASSERT(lgrp_plat_cpu_node[cp->cpu_id].apicid == apicid);
+		ASSERT(lgrp_plat_cpu_node[cp->cpu_id].prox_domain == domain);
+		lgrp_plat_cpu_node[cp->cpu_id].exists = 0;
+		lgrp_plat_cpu_node[cp->cpu_id].apicid = UINT32_MAX;
+		lgrp_plat_cpu_node[cp->cpu_id].prox_domain = UINT32_MAX;
+		lgrp_plat_cpu_node[cp->cpu_id].node = UINT_MAX;
+		lgrp_plat_apic_ncpus--;
+
+		acpidev_dr_free_cpu_numa_info(hdl);
+		break;
+
+	case LGRP_CONFIG_MEM_ADD:
+		mp = (update_membounds_t *)arg;
+		ASSERT(mp != NULL);
+
+		/* Update latency information among lgrps. */
+		if (mp->u_sli_cnt != 0 && mp->u_sli_ptr != NULL) {
+			if (lgrp_plat_process_sli(mp->u_domain,
+			    mp->u_sli_ptr, mp->u_sli_cnt,
+			    lgrp_plat_node_domain, lgrp_plat_node_cnt,
+			    &lgrp_plat_lat_stats) != 0) {
+				cmn_err(CE_WARN, "!lgrp: failed to update "
+				    "latency information for domain (%u).",
+				    domain);
+			}
+		}
+
+		if (lgrp_plat_memnode_info_update(lgrp_plat_node_domain,
+		    lgrp_plat_node_cnt, lgrp_plat_memnode_info, max_mem_nodes,
+		    mp->u_base, mp->u_base + mp->u_length,
+		    mp->u_domain, mp->u_device_id) < 0) {
+			cmn_err(CE_WARN,
+			    "!lgrp: failed to update latency  information for "
+			    "memory (0x%" PRIx64 " - 0x%" PRIx64 ").",
+			    mp->u_base, mp->u_base + mp->u_length);
+		}
+		break;
+
+	default:
+		break;
+	}
+#endif	/* __xpv */
 }
 
 
 /*
  * Return the platform handle for the lgroup containing the given CPU
  */
-/* ARGSUSED */
 lgrp_handle_t
 lgrp_plat_cpu_to_hand(processorid_t id)
 {
 	lgrp_handle_t	hand;
+
+	ASSERT(!lgrp_initialized || MUTEX_HELD(&cpu_lock));
 
 	if (lgrp_plat_node_cnt == 1)
 		return (LGRP_DEFAULT_HANDLE);
@@ -763,6 +973,7 @@ lgrp_plat_init(lgrp_init_stages_t stage)
 		 */
 		lgrp_plat_node_cnt = max_mem_nodes = 1;
 #else	/* __xpv */
+
 		/*
 		 * Get boot property for lgroup topology height limit
 		 */
@@ -782,14 +993,32 @@ lgrp_plat_init(lgrp_init_stages_t stage)
 			lgrp_plat_slit_enable = (int)value;
 
 		/*
+		 * Get boot property for enabling/disabling MSCT
+		 */
+		if (bootprop_getval(BP_LGRP_MSCT_ENABLE, &value) == 0)
+			lgrp_plat_msct_enable = (int)value;
+
+		/*
 		 * Initialize as a UMA machine
 		 */
 		if (lgrp_topo_ht_limit() == 1) {
 			lgrp_plat_node_cnt = max_mem_nodes = 1;
+			lgrp_plat_max_mem_node = 1;
 			return;
 		}
 
 		lgrp_plat_get_numa_config();
+
+		/*
+		 * Each lgrp node needs MAX_MEM_NODES_PER_LGROUP memnodes
+		 * to support memory DR operations if memory DR is enabled.
+		 */
+		lgrp_plat_max_mem_node = lgrp_plat_node_cnt;
+		if (plat_dr_support_memory() && lgrp_plat_node_cnt != 1) {
+			max_mem_nodes = MAX_MEM_NODES_PER_LGROUP *
+			    lgrp_plat_node_cnt;
+			ASSERT(max_mem_nodes <= MAX_MEM_NODES);
+		}
 #endif	/* __xpv */
 		break;
 
@@ -817,7 +1046,6 @@ lgrp_plat_init(lgrp_init_stages_t stage)
  * specific, so platform gets to decide its value.  It would be nice if the
  * number was at least proportional to make comparisons more meaningful though.
  */
-/* ARGSUSED */
 int
 lgrp_plat_latency(lgrp_handle_t from, lgrp_handle_t to)
 {
@@ -844,13 +1072,29 @@ lgrp_plat_latency(lgrp_handle_t from, lgrp_handle_t to)
 
 	/*
 	 * Probe from current CPU if its lgroup latencies haven't been set yet
-	 * and we are trying to get latency from current CPU to some node
+	 * and we are trying to get latency from current CPU to some node.
+	 * Avoid probing if CPU/memory DR is enabled.
 	 */
-	node = lgrp_plat_cpu_to_node(CPU, lgrp_plat_cpu_node,
-	    lgrp_plat_cpu_node_nentries);
-	ASSERT(node >= 0 && node < lgrp_plat_node_cnt);
-	if (lgrp_plat_lat_stats.latencies[src][src] == 0 && node == src)
-		lgrp_plat_probe();
+	if (lgrp_plat_lat_stats.latencies[src][src] == 0) {
+		/*
+		 * Latency information should be updated by lgrp_plat_config()
+		 * for DR operations. Something is wrong if reaches here.
+		 * For safety, flatten lgrp topology to two levels.
+		 */
+		if (plat_dr_support_cpu() || plat_dr_support_memory()) {
+			ASSERT(lgrp_plat_lat_stats.latencies[src][src]);
+			cmn_err(CE_WARN,
+			    "lgrp: failed to get latency information, "
+			    "fall back to two-level topology.");
+			lgrp_plat_2level_setup(&lgrp_plat_lat_stats);
+		} else {
+			node = lgrp_plat_cpu_to_node(CPU, lgrp_plat_cpu_node,
+			    lgrp_plat_cpu_node_nentries);
+			ASSERT(node >= 0 && node < lgrp_plat_node_cnt);
+			if (node == src)
+				lgrp_plat_probe();
+		}
+	}
 
 	return (lgrp_plat_lat_stats.latencies[src][dest]);
 }
@@ -859,19 +1103,43 @@ lgrp_plat_latency(lgrp_handle_t from, lgrp_handle_t to)
 /*
  * Return the maximum number of lgrps supported by the platform.
  * Before lgrp topology is known it returns an estimate based on the number of
- * nodes. Once topology is known it returns the actual maximim number of lgrps
- * created. Since x86/x64 doesn't support Dynamic Reconfiguration (DR) and
- * dynamic addition of new nodes, this number may not grow during system
- * lifetime (yet).
+ * nodes. Once topology is known it returns:
+ * 1) the actual maximim number of lgrps created if CPU/memory DR operations
+ *    are not suppported.
+ * 2) the maximum possible number of lgrps if CPU/memory DR operations are
+ *    supported.
  */
 int
 lgrp_plat_max_lgrps(void)
 {
-	return (lgrp_topo_initialized ?
-	    lgrp_alloc_max + 1 :
-	    lgrp_plat_node_cnt * (lgrp_plat_node_cnt - 1) + 1);
+	if (!lgrp_topo_initialized || plat_dr_support_cpu() ||
+	    plat_dr_support_memory()) {
+		return (lgrp_plat_node_cnt * (lgrp_plat_node_cnt - 1) + 1);
+	} else {
+		return (lgrp_alloc_max + 1);
+	}
 }
 
+
+/*
+ * Count number of memory pages (_t) based on mnode id (_n) and query type (_t).
+ */
+#define	_LGRP_PLAT_MEM_SIZE(_n, _q, _t)					\
+	if (mem_node_config[_n].exists) {				\
+		switch (_q) {						\
+		case LGRP_MEM_SIZE_FREE:				\
+			_t += MNODE_PGCNT(_n);				\
+			break;						\
+		case LGRP_MEM_SIZE_AVAIL:				\
+			_t += mem_node_memlist_pages(_n, phys_avail);	\
+				break;					\
+		case LGRP_MEM_SIZE_INSTALL:				\
+			_t += mem_node_memlist_pages(_n, phys_install);	\
+			break;						\
+		default:						\
+			break;						\
+		}							\
+	}
 
 /*
  * Return the number of free pages in an lgroup.
@@ -896,25 +1164,19 @@ lgrp_plat_mem_size(lgrp_handle_t plathand, lgrp_mem_query_t query)
 		return (lgrp_plat_mem_size_default(plathand, query));
 
 	if (plathand != LGRP_NULL_HANDLE) {
-		mnode = plat_lgrphand_to_mem_node(plathand);
-		if (mnode >= 0 && mem_node_config[mnode].exists) {
-			switch (query) {
-			case LGRP_MEM_SIZE_FREE:
-				npgs = MNODE_PGCNT(mnode);
-				break;
-			case LGRP_MEM_SIZE_AVAIL:
-				npgs = mem_node_memlist_pages(mnode,
-				    phys_avail);
-				break;
-			case LGRP_MEM_SIZE_INSTALL:
-				npgs = mem_node_memlist_pages(mnode,
-				    phys_install);
-				break;
-			default:
-				break;
-			}
+		/* Count memory node present at boot. */
+		mnode = (int)plathand;
+		ASSERT(mnode < lgrp_plat_node_cnt);
+		_LGRP_PLAT_MEM_SIZE(mnode, query, npgs);
+
+		/* Count possible hot-added memory nodes. */
+		for (mnode = lgrp_plat_node_cnt;
+		    mnode < lgrp_plat_max_mem_node; mnode++) {
+			if (lgrp_plat_memnode_info[mnode].lgrphand == plathand)
+				_LGRP_PLAT_MEM_SIZE(mnode, query, npgs);
 		}
 	}
+
 	return (npgs);
 }
 
@@ -923,7 +1185,6 @@ lgrp_plat_mem_size(lgrp_handle_t plathand, lgrp_mem_query_t query)
  * Return the platform handle of the lgroup that contains the physical memory
  * corresponding to the given page frame number
  */
-/* ARGSUSED */
 lgrp_handle_t
 lgrp_plat_pfn_to_hand(pfn_t pfn)
 {
@@ -977,6 +1238,10 @@ lgrp_plat_probe(void)
 
 	if (!(lgrp_plat_probe_flags & LGRP_PLAT_PROBE_ENABLE) ||
 	    max_mem_nodes == 1 || lgrp_topo_ht_limit() <= 2)
+		return;
+
+	/* SRAT and SLIT should be enabled if DR operations are enabled. */
+	if (plat_dr_support_cpu() || plat_dr_support_memory())
 		return;
 
 	/*
@@ -1051,14 +1316,13 @@ lgrp_plat_probe(void)
 	 * - Fallback to just optimizing for local and remote if
 	 *   latencies didn't look right
 	 */
-	lgrp_plat_latency_adjust(lgrp_plat_node_memory, &lgrp_plat_lat_stats,
+	lgrp_plat_latency_adjust(lgrp_plat_memnode_info, &lgrp_plat_lat_stats,
 	    &lgrp_plat_probe_stats);
 	lgrp_plat_probe_stats.probe_error_code =
-	    lgrp_plat_latency_verify(lgrp_plat_node_memory,
+	    lgrp_plat_latency_verify(lgrp_plat_memnode_info,
 	    &lgrp_plat_lat_stats);
 	if (lgrp_plat_probe_stats.probe_error_code)
-		lgrp_plat_2level_setup(lgrp_plat_node_memory,
-		    &lgrp_plat_lat_stats);
+		lgrp_plat_2level_setup(&lgrp_plat_lat_stats);
 }
 
 
@@ -1078,8 +1342,11 @@ lgrp_plat_root_hand(void)
 
 
 /*
- * Update CPU to node mapping for given CPU and proximity domain (and returns
- * negative numbers for errors and positive ones for success)
+ * Update CPU to node mapping for given CPU and proximity domain.
+ * Return values:
+ * 	- zero for success
+ *	- positive numbers for warnings
+ *	- negative numbers for errors
  */
 static int
 lgrp_plat_cpu_node_update(node_domain_map_t *node_domain, int node_cnt,
@@ -1119,6 +1386,13 @@ lgrp_plat_cpu_node_update(node_domain_map_t *node_domain, int node_cnt,
 			return (1);
 
 		/*
+		 * It's invalid to have more than one entry with the same
+		 * local APIC ID in SRAT table.
+		 */
+		if (cpu_node[i].node != UINT_MAX)
+			return (-2);
+
+		/*
 		 * Fill in node and proximity domain IDs
 		 */
 		cpu_node[i].prox_domain = domain;
@@ -1128,9 +1402,11 @@ lgrp_plat_cpu_node_update(node_domain_map_t *node_domain, int node_cnt,
 	}
 
 	/*
-	 * Return error when entry for APIC ID wasn't found in table
+	 * It's possible that an apicid doesn't exist in the cpu_node map due
+	 * to user limits number of CPUs powered on at boot by specifying the
+	 * boot_ncpus kernel option.
 	 */
-	return (-2);
+	return (2);
 }
 
 
@@ -1189,9 +1465,11 @@ lgrp_plat_domain_to_node(node_domain_map_t *node_domain, int node_cnt,
 	 */
 	node = start = NODE_DOMAIN_HASH(domain, node_cnt);
 	do {
-		if (node_domain[node].prox_domain == domain &&
-		    node_domain[node].exists)
-			return (node);
+		if (node_domain[node].exists) {
+			membar_consumer();
+			if (node_domain[node].prox_domain == domain)
+				return (node);
+		}
 		node = (node + 1) % node_cnt;
 	} while (node != start);
 	return (-1);
@@ -1219,19 +1497,26 @@ lgrp_plat_get_numa_config(void)
 	if (lgrp_plat_apic_ncpus > 0) {
 		int	retval;
 
+		/* Reserve enough resources if CPU DR is enabled. */
+		if (plat_dr_support_cpu() && max_ncpus > lgrp_plat_apic_ncpus)
+			lgrp_plat_cpu_node_nentries = max_ncpus;
+		else
+			lgrp_plat_cpu_node_nentries = lgrp_plat_apic_ncpus;
+
 		/*
 		 * Temporarily allocate boot memory to use for CPU to node
 		 * mapping since kernel memory allocator isn't alive yet
 		 */
 		lgrp_plat_cpu_node = (cpu_node_map_t *)BOP_ALLOC(bootops,
-		    NULL, lgrp_plat_apic_ncpus * sizeof (cpu_node_map_t),
+		    NULL, lgrp_plat_cpu_node_nentries * sizeof (cpu_node_map_t),
 		    sizeof (int));
 
 		ASSERT(lgrp_plat_cpu_node != NULL);
 		if (lgrp_plat_cpu_node) {
-			lgrp_plat_cpu_node_nentries = lgrp_plat_apic_ncpus;
 			bzero(lgrp_plat_cpu_node, lgrp_plat_cpu_node_nentries *
 			    sizeof (cpu_node_map_t));
+		} else {
+			lgrp_plat_cpu_node_nentries = 0;
 		}
 
 		/*
@@ -1240,10 +1525,10 @@ lgrp_plat_get_numa_config(void)
 		 */
 		(void) lgrp_plat_process_cpu_apicids(lgrp_plat_cpu_node);
 
-		retval = lgrp_plat_process_srat(srat_ptr,
+		retval = lgrp_plat_process_srat(srat_ptr, msct_ptr,
 		    &lgrp_plat_prox_domain_min,
 		    lgrp_plat_node_domain, lgrp_plat_cpu_node,
-		    lgrp_plat_apic_ncpus, lgrp_plat_node_memory);
+		    lgrp_plat_apic_ncpus, lgrp_plat_memnode_info);
 		if (retval <= 0) {
 			lgrp_plat_srat_error = retval;
 			lgrp_plat_node_cnt = 1;
@@ -1260,15 +1545,12 @@ lgrp_plat_get_numa_config(void)
 	if ((lgrp_plat_apic_ncpus <= 0 || lgrp_plat_srat_error != 0) &&
 	    is_opteron())
 		opt_get_numa_config(&lgrp_plat_node_cnt, &lgrp_plat_mem_intrlv,
-		    lgrp_plat_node_memory);
+		    lgrp_plat_memnode_info);
 
 	/*
 	 * Don't bother to setup system for multiple lgroups and only use one
 	 * memory node when memory is interleaved between any nodes or there is
 	 * only one NUMA node
-	 *
-	 * NOTE: May need to change this for Dynamic Reconfiguration (DR)
-	 *	 when and if it happens for x86/x64
 	 */
 	if (lgrp_plat_mem_intrlv || lgrp_plat_node_cnt == 1) {
 		lgrp_plat_node_cnt = max_mem_nodes = 1;
@@ -1287,7 +1569,7 @@ lgrp_plat_get_numa_config(void)
 
 	/*
 	 * There should be one memnode (physical page free list(s)) for
-	 * each node
+	 * each node if memory DR is disabled.
 	 */
 	max_mem_nodes = lgrp_plat_node_cnt;
 
@@ -1303,8 +1585,35 @@ lgrp_plat_get_numa_config(void)
 	 * exists
 	 */
 	lgrp_plat_slit_error = lgrp_plat_process_slit(slit_ptr,
-	    lgrp_plat_node_cnt, lgrp_plat_node_memory,
+	    lgrp_plat_node_domain, lgrp_plat_node_cnt, lgrp_plat_memnode_info,
 	    &lgrp_plat_lat_stats);
+
+	/*
+	 * Disable support of CPU/memory DR operations if multiple locality
+	 * domains exist in system and either of following is true.
+	 * 1) Failed to process SLIT table.
+	 * 2) Latency probing is enabled by user.
+	 */
+	if (lgrp_plat_node_cnt > 1 &&
+	    (plat_dr_support_cpu() || plat_dr_support_memory())) {
+		if (!lgrp_plat_slit_enable || lgrp_plat_slit_error != 0 ||
+		    !lgrp_plat_srat_enable || lgrp_plat_srat_error != 0 ||
+		    lgrp_plat_apic_ncpus <= 0) {
+			cmn_err(CE_CONT,
+			    "?lgrp: failed to process ACPI SRAT/SLIT table, "
+			    "disable support of CPU/memory DR operations.");
+			plat_dr_disable_cpu();
+			plat_dr_disable_memory();
+		} else if (lgrp_plat_probe_flags & LGRP_PLAT_PROBE_ENABLE) {
+			cmn_err(CE_CONT,
+			    "?lgrp: latency probing enabled by user, "
+			    "disable support of CPU/memory DR operations.");
+			plat_dr_disable_cpu();
+			plat_dr_disable_memory();
+		}
+	}
+
+	/* Done if succeeded to process SLIT table. */
 	if (lgrp_plat_slit_error == 0)
 		return;
 
@@ -1366,7 +1675,7 @@ int	lgrp_plat_probe_lt_shift = LGRP_LAT_TOLERANCE_SHIFT;
  * latencies be same
  */
 static void
-lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
+lgrp_plat_latency_adjust(memnode_phys_addr_map_t *memnode_info,
     lgrp_plat_latency_stats_t *lat_stats, lgrp_plat_probe_stats_t *probe_stats)
 {
 	int				i;
@@ -1387,7 +1696,7 @@ lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
 	if (max_mem_nodes == 1)
 		return;
 
-	ASSERT(node_memory != NULL && lat_stats != NULL &&
+	ASSERT(memnode_info != NULL && lat_stats != NULL &&
 	    probe_stats != NULL);
 
 	/*
@@ -1395,11 +1704,11 @@ lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
 	 * (ie. latency(node0, node1) == latency(node1, node0))
 	 */
 	for (i = 0; i < lgrp_plat_node_cnt; i++) {
-		if (!node_memory[i].exists)
+		if (!memnode_info[i].exists)
 			continue;
 
 		for (j = 0; j < lgrp_plat_node_cnt; j++) {
-			if (!node_memory[j].exists)
+			if (!memnode_info[j].exists)
 				continue;
 
 			t1 = lat_stats->latencies[i][j];
@@ -1452,7 +1761,7 @@ lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
 	 */
 	for (i = 0; i < lgrp_plat_node_cnt; i++) {
 		for (j = 0; j < lgrp_plat_node_cnt; j++) {
-			if (!node_memory[j].exists)
+			if (!memnode_info[j].exists)
 				continue;
 			/*
 			 * Pick one pair of nodes (i, j)
@@ -1469,7 +1778,7 @@ lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
 
 			for (k = 0; k < lgrp_plat_node_cnt; k++) {
 				for (l = 0; l < lgrp_plat_node_cnt; l++) {
-					if (!node_memory[l].exists)
+					if (!memnode_info[l].exists)
 						continue;
 					/*
 					 * Pick another pair of nodes (k, l)
@@ -1545,7 +1854,7 @@ lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
 	min = -1;
 	max = 0;
 	for (i = 0; i < lgrp_plat_node_cnt; i++) {
-		if (!node_memory[i].exists)
+		if (!memnode_info[i].exists)
 			continue;
 		t = lat_stats->latencies[i][i];
 		if (t == 0)
@@ -1559,7 +1868,7 @@ lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
 		for (i = 0; i < lgrp_plat_node_cnt; i++) {
 			int	local;
 
-			if (!node_memory[i].exists)
+			if (!memnode_info[i].exists)
 				continue;
 
 			local = lat_stats->latencies[i][i];
@@ -1590,7 +1899,7 @@ lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
 	lat_stats->latency_max = 0;
 	for (i = 0; i < lgrp_plat_node_cnt; i++) {
 		for (j = 0; j < lgrp_plat_node_cnt; j++) {
-			if (!node_memory[j].exists)
+			if (!memnode_info[j].exists)
 				continue;
 			t = lat_stats->latencies[i][j];
 			if (t > lat_stats->latency_max)
@@ -1616,7 +1925,7 @@ lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
  *	-3	Local >= remote
  */
 static int
-lgrp_plat_latency_verify(node_phys_addr_map_t *node_memory,
+lgrp_plat_latency_verify(memnode_phys_addr_map_t *memnode_info,
     lgrp_plat_latency_stats_t *lat_stats)
 {
 	int				i;
@@ -1624,7 +1933,7 @@ lgrp_plat_latency_verify(node_phys_addr_map_t *node_memory,
 	u_longlong_t			t1;
 	u_longlong_t			t2;
 
-	ASSERT(node_memory != NULL && lat_stats != NULL);
+	ASSERT(memnode_info != NULL && lat_stats != NULL);
 
 	/*
 	 * Nothing to do when this is an UMA machine, lgroup topology is
@@ -1639,10 +1948,10 @@ lgrp_plat_latency_verify(node_phys_addr_map_t *node_memory,
 	 * (ie. latency(node0, node1) == latency(node1, node0))
 	 */
 	for (i = 0; i < lgrp_plat_node_cnt; i++) {
-		if (!node_memory[i].exists)
+		if (!memnode_info[i].exists)
 			continue;
 		for (j = 0; j < lgrp_plat_node_cnt; j++) {
-			if (!node_memory[j].exists)
+			if (!memnode_info[j].exists)
 				continue;
 			t1 = lat_stats->latencies[i][j];
 			t2 = lat_stats->latencies[j][i];
@@ -1659,7 +1968,7 @@ lgrp_plat_latency_verify(node_phys_addr_map_t *node_memory,
 	 */
 	t1 = lat_stats->latencies[0][0];
 	for (i = 1; i < lgrp_plat_node_cnt; i++) {
-		if (!node_memory[i].exists)
+		if (!memnode_info[i].exists)
 			continue;
 
 		t2 = lat_stats->latencies[i][i];
@@ -1681,7 +1990,7 @@ lgrp_plat_latency_verify(node_phys_addr_map_t *node_memory,
 	if (t1) {
 		for (i = 0; i < lgrp_plat_node_cnt; i++) {
 			for (j = 0; j < lgrp_plat_node_cnt; j++) {
-				if (!node_memory[j].exists)
+				if (!memnode_info[j].exists)
 					continue;
 				t2 = lat_stats->latencies[i][j];
 				if (i == j || t2 == 0)
@@ -1729,8 +2038,7 @@ lgrp_plat_main_init(void)
 		 */
 		if (ht_limit == 2 && lgrp_plat_lat_stats.latency_min == -1 &&
 		    lgrp_plat_lat_stats.latency_max == 0)
-			lgrp_plat_2level_setup(lgrp_plat_node_memory,
-			    &lgrp_plat_lat_stats);
+			lgrp_plat_2level_setup(&lgrp_plat_lat_stats);
 		return;
 	}
 
@@ -1769,7 +2077,7 @@ lgrp_plat_main_init(void)
 		 * Skip this node and leave its probe page NULL
 		 * if it doesn't have any memory
 		 */
-		mnode = plat_lgrphand_to_mem_node((lgrp_handle_t)i);
+		mnode = i;
 		if (!mem_node_config[mnode].exists) {
 			lgrp_plat_probe_mem_config.probe_va[i] = NULL;
 			continue;
@@ -1815,10 +2123,11 @@ lgrp_plat_main_init(void)
  * This is a copy of the MAX_MEM_NODES == 1 version of the routine
  * used when MPO is disabled (i.e. single lgroup) or this is the root lgroup
  */
-/* ARGSUSED */
 static pgcnt_t
 lgrp_plat_mem_size_default(lgrp_handle_t lgrphand, lgrp_mem_query_t query)
 {
+	_NOTE(ARGUNUSED(lgrphand));
+
 	struct memlist *mlist;
 	pgcnt_t npgs = 0;
 	extern struct memlist *phys_avail;
@@ -1866,8 +2175,9 @@ lgrp_plat_node_domain_update(node_domain_map_t *node_domain, int node_cnt,
 		 * domain and return node ID which is index into mapping table.
 		 */
 		if (!node_domain[node].exists) {
-			node_domain[node].exists = 1;
 			node_domain[node].prox_domain = domain;
+			membar_producer();
+			node_domain[node].exists = 1;
 			return (node);
 		}
 
@@ -1887,18 +2197,17 @@ lgrp_plat_node_domain_update(node_domain_map_t *node_domain, int node_cnt,
 	return (-1);
 }
 
-
 /*
  * Update node memory information for given proximity domain with specified
  * starting and ending physical address range (and return positive numbers for
  * success and negative ones for errors)
  */
 static int
-lgrp_plat_node_memory_update(node_domain_map_t *node_domain, int node_cnt,
-    node_phys_addr_map_t *node_memory, uint64_t start, uint64_t end,
-    uint32_t domain)
+lgrp_plat_memnode_info_update(node_domain_map_t *node_domain, int node_cnt,
+    memnode_phys_addr_map_t *memnode_info, int memnode_cnt, uint64_t start,
+    uint64_t end, uint32_t domain, uint32_t device_id)
 {
-	int	node;
+	int	node, mnode;
 
 	/*
 	 * Get node number for proximity domain
@@ -1912,13 +2221,53 @@ lgrp_plat_node_memory_update(node_domain_map_t *node_domain, int node_cnt,
 	}
 
 	/*
+	 * This function is called during boot if device_id is
+	 * ACPI_MEMNODE_DEVID_BOOT, otherwise it's called at runtime for
+	 * memory DR operations.
+	 */
+	if (device_id != ACPI_MEMNODE_DEVID_BOOT) {
+		ASSERT(lgrp_plat_max_mem_node <= memnode_cnt);
+
+		for (mnode = lgrp_plat_node_cnt;
+		    mnode < lgrp_plat_max_mem_node; mnode++) {
+			if (memnode_info[mnode].exists &&
+			    memnode_info[mnode].prox_domain == domain &&
+			    memnode_info[mnode].device_id == device_id) {
+				if (btop(start) < memnode_info[mnode].start)
+					memnode_info[mnode].start = btop(start);
+				if (btop(end) > memnode_info[mnode].end)
+					memnode_info[mnode].end = btop(end);
+				return (1);
+			}
+		}
+
+		if (lgrp_plat_max_mem_node >= memnode_cnt) {
+			return (-3);
+		} else {
+			lgrp_plat_max_mem_node++;
+			memnode_info[mnode].start = btop(start);
+			memnode_info[mnode].end = btop(end);
+			memnode_info[mnode].prox_domain = domain;
+			memnode_info[mnode].device_id = device_id;
+			memnode_info[mnode].lgrphand = node;
+			membar_producer();
+			memnode_info[mnode].exists = 1;
+			return (0);
+		}
+	}
+
+	/*
 	 * Create entry in table for node if it doesn't exist
 	 */
-	if (!node_memory[node].exists) {
-		node_memory[node].exists = 1;
-		node_memory[node].start = btop(start);
-		node_memory[node].end = btop(end);
-		node_memory[node].prox_domain = domain;
+	ASSERT(node < memnode_cnt);
+	if (!memnode_info[node].exists) {
+		memnode_info[node].start = btop(start);
+		memnode_info[node].end = btop(end);
+		memnode_info[node].prox_domain = domain;
+		memnode_info[node].device_id = device_id;
+		memnode_info[node].lgrphand = node;
+		membar_producer();
+		memnode_info[node].exists = 1;
 		return (0);
 	}
 
@@ -1928,11 +2277,11 @@ lgrp_plat_node_memory_update(node_domain_map_t *node_domain, int node_cnt,
 	 * There may be more than one SRAT memory entry for a domain, so we may
 	 * need to update existing start or end address for the node.
 	 */
-	if (node_memory[node].prox_domain == domain) {
-		if (btop(start) < node_memory[node].start)
-			node_memory[node].start = btop(start);
-		if (btop(end) > node_memory[node].end)
-			node_memory[node].end = btop(end);
+	if (memnode_info[node].prox_domain == domain) {
+		if (btop(start) < memnode_info[node].start)
+			memnode_info[node].start = btop(start);
+		if (btop(end) > memnode_info[node].end)
+			memnode_info[node].end = btop(end);
 		return (1);
 	}
 	return (-2);
@@ -1940,16 +2289,14 @@ lgrp_plat_node_memory_update(node_domain_map_t *node_domain, int node_cnt,
 
 
 /*
- * Have to sort node by starting physical address because VM system (physical
- * page free list management) assumes and expects memnodes to be sorted in
- * ascending order by physical address.  If not, the kernel will panic in
- * potentially a number of different places.  (:-(
- * NOTE: This workaround will not be sufficient if/when hotplugging memory is
- *	 supported on x86/x64.
+ * Have to sort nodes by starting physical address because plat_mnode_xcheck()
+ * assumes and expects memnodes to be sorted in ascending order by physical
+ * address.
  */
 static void
 lgrp_plat_node_sort(node_domain_map_t *node_domain, int node_cnt,
-    cpu_node_map_t *cpu_node, int cpu_count, node_phys_addr_map_t *node_memory)
+    cpu_node_map_t *cpu_node, int cpu_count,
+    memnode_phys_addr_map_t *memnode_info)
 {
 	boolean_t	found;
 	int		i;
@@ -1959,7 +2306,7 @@ lgrp_plat_node_sort(node_domain_map_t *node_domain, int node_cnt,
 	boolean_t	swapped;
 
 	if (!lgrp_plat_node_sort_enable || node_cnt <= 1 ||
-	    node_domain == NULL || node_memory == NULL)
+	    node_domain == NULL || memnode_info == NULL)
 		return;
 
 	/*
@@ -1970,7 +2317,7 @@ lgrp_plat_node_sort(node_domain_map_t *node_domain, int node_cnt,
 		/*
 		 * Skip entries that don't exist
 		 */
-		if (!node_memory[i].exists)
+		if (!memnode_info[i].exists)
 			continue;
 
 		/*
@@ -1978,7 +2325,7 @@ lgrp_plat_node_sort(node_domain_map_t *node_domain, int node_cnt,
 		 */
 		found = B_FALSE;
 		for (j = i + 1; j < node_cnt; j++) {
-			if (node_memory[j].exists) {
+			if (memnode_info[j].exists) {
 				found = B_TRUE;
 				break;
 			}
@@ -1994,7 +2341,7 @@ lgrp_plat_node_sort(node_domain_map_t *node_domain, int node_cnt,
 		 * Not sorted if starting address of current entry is bigger
 		 * than starting address of next existing entry
 		 */
-		if (node_memory[i].start > node_memory[j].start) {
+		if (memnode_info[i].start > memnode_info[j].start) {
 			sorted = B_FALSE;
 			break;
 		}
@@ -2017,7 +2364,7 @@ lgrp_plat_node_sort(node_domain_map_t *node_domain, int node_cnt,
 			/*
 			 * Skip entries that don't exist
 			 */
-			if (!node_memory[i].exists)
+			if (!memnode_info[i].exists)
 				continue;
 
 			/*
@@ -2025,7 +2372,7 @@ lgrp_plat_node_sort(node_domain_map_t *node_domain, int node_cnt,
 			 */
 			found = B_FALSE;
 			for (j = i + 1; j <= n; j++) {
-				if (node_memory[j].exists) {
+				if (memnode_info[j].exists) {
 					found = B_TRUE;
 					break;
 				}
@@ -2037,8 +2384,8 @@ lgrp_plat_node_sort(node_domain_map_t *node_domain, int node_cnt,
 			if (found == B_FALSE)
 				break;
 
-			if (node_memory[i].start > node_memory[j].start) {
-				node_phys_addr_map_t	save_addr;
+			if (memnode_info[i].start > memnode_info[j].start) {
+				memnode_phys_addr_map_t	save_addr;
 				node_domain_map_t	save_node;
 
 				/*
@@ -2054,12 +2401,12 @@ lgrp_plat_node_sort(node_domain_map_t *node_domain, int node_cnt,
 				/*
 				 * Swap node to physical memory assignments
 				 */
-				bcopy(&node_memory[i], &save_addr,
-				    sizeof (node_phys_addr_map_t));
-				bcopy(&node_memory[j], &node_memory[i],
-				    sizeof (node_phys_addr_map_t));
-				bcopy(&save_addr, &node_memory[j],
-				    sizeof (node_phys_addr_map_t));
+				bcopy(&memnode_info[i], &save_addr,
+				    sizeof (memnode_phys_addr_map_t));
+				bcopy(&memnode_info[j], &memnode_info[i],
+				    sizeof (memnode_phys_addr_map_t));
+				bcopy(&save_addr, &memnode_info[j],
+				    sizeof (memnode_phys_addr_map_t));
 				swapped = B_TRUE;
 			}
 		}
@@ -2226,11 +2573,12 @@ lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node)
 		return (-1);
 
 	/*
-	 * Calculate number of entries in array and return when there's just
-	 * one CPU since that's not very interesting for NUMA
+	 * Calculate number of entries in array and return when the system is
+	 * not very interesting for NUMA. It's not interesting for NUMA if
+	 * system has only one CPU and doesn't support CPU hotplug.
 	 */
 	n = boot_prop_len / sizeof (uint8_t);
-	if (n == 1)
+	if (n == 1 && !plat_dr_support_cpu())
 		return (-2);
 
 	/*
@@ -2243,21 +2591,31 @@ lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node)
 	 * Just return number of CPU APIC IDs if CPU to node mapping table is
 	 * NULL
 	 */
-	if (cpu_node == NULL)
-		return (n);
+	if (cpu_node == NULL) {
+		if (plat_dr_support_cpu() && n >= boot_ncpus) {
+			return (boot_ncpus);
+		} else {
+			return (n);
+		}
+	}
 
 	/*
 	 * Fill in CPU to node ID mapping table with APIC ID for each CPU
 	 */
 	for (i = 0; i < n; i++) {
+		/* Only add boot CPUs into the map if CPU DR is enabled. */
+		if (plat_dr_support_cpu() && i >= boot_ncpus)
+			break;
 		cpu_node[i].exists = 1;
 		cpu_node[i].apicid = cpu_apicid_array[i];
+		cpu_node[i].prox_domain = UINT32_MAX;
+		cpu_node[i].node = UINT_MAX;
 	}
 
 	/*
 	 * Return number of CPUs based on number of APIC IDs
 	 */
-	return (n);
+	return (i);
 }
 
 
@@ -2266,11 +2624,14 @@ lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node)
  * NUMA node is from each other
  */
 static int
-lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
-    node_phys_addr_map_t *node_memory, lgrp_plat_latency_stats_t *lat_stats)
+lgrp_plat_process_slit(struct slit *tp,
+    node_domain_map_t *node_domain, uint_t node_cnt,
+    memnode_phys_addr_map_t *memnode_info, lgrp_plat_latency_stats_t *lat_stats)
 {
 	int		i;
 	int		j;
+	int		src;
+	int		dst;
 	int		localities;
 	hrtime_t	max;
 	hrtime_t	min;
@@ -2284,8 +2645,6 @@ lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
 		return (2);
 
 	localities = tp->number;
-	if (localities != node_cnt)
-		return (3);
 
 	min = lat_stats->latency_min;
 	max = lat_stats->latency_max;
@@ -2295,11 +2654,21 @@ lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
 	 */
 	slit_entries = tp->entry;
 	for (i = 0; i < localities; i++) {
+		src = lgrp_plat_domain_to_node(node_domain,
+		    node_cnt, i);
+		if (src == -1)
+			continue;
+
 		for (j = 0; j < localities; j++) {
 			uint8_t	latency;
 
+			dst = lgrp_plat_domain_to_node(node_domain,
+			    node_cnt, j);
+			if (dst == -1)
+				continue;
+
 			latency = slit_entries[(i * localities) + j];
-			lat_stats->latencies[i][j] = latency;
+			lat_stats->latencies[src][dst] = latency;
 			if (latency < min || min == -1)
 				min = latency;
 			if (latency > max)
@@ -2310,7 +2679,7 @@ lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
 	/*
 	 * Verify that latencies/distances given in SLIT look reasonable
 	 */
-	retval = lgrp_plat_latency_verify(node_memory, lat_stats);
+	retval = lgrp_plat_latency_verify(memnode_info, lat_stats);
 
 	if (retval) {
 		/*
@@ -2334,20 +2703,110 @@ lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
 
 
 /*
+ * Update lgrp latencies according to information returned by ACPI _SLI method.
+ */
+static int
+lgrp_plat_process_sli(uint32_t domain_id, uchar_t *sli_info,
+    uint32_t sli_cnt, node_domain_map_t *node_domain, uint_t node_cnt,
+    lgrp_plat_latency_stats_t *lat_stats)
+{
+	int		i;
+	int		src, dst;
+	uint8_t		latency;
+	hrtime_t	max, min;
+
+	if (lat_stats == NULL || sli_info == NULL ||
+	    sli_cnt == 0 || domain_id >= sli_cnt)
+		return (-1);
+
+	src = lgrp_plat_domain_to_node(node_domain, node_cnt, domain_id);
+	if (src == -1) {
+		src = lgrp_plat_node_domain_update(node_domain, node_cnt,
+		    domain_id);
+		if (src == -1)
+			return (-1);
+	}
+
+	/*
+	 * Don't update latency info if topology has been flattened to 2 levels.
+	 */
+	if (lgrp_plat_topo_flatten != 0) {
+		return (0);
+	}
+
+	/*
+	 * Latency information for proximity domain is ready.
+	 * TODO: support adjusting latency information at runtime.
+	 */
+	if (lat_stats->latencies[src][src] != 0) {
+		return (0);
+	}
+
+	/* Validate latency information. */
+	for (i = 0; i < sli_cnt; i++) {
+		if (i == domain_id) {
+			if (sli_info[i] != ACPI_SLIT_SELF_LATENCY ||
+			    sli_info[sli_cnt + i] != ACPI_SLIT_SELF_LATENCY) {
+				return (-1);
+			}
+		} else {
+			if (sli_info[i] <= ACPI_SLIT_SELF_LATENCY ||
+			    sli_info[sli_cnt + i] <= ACPI_SLIT_SELF_LATENCY ||
+			    sli_info[i] != sli_info[sli_cnt + i]) {
+				return (-1);
+			}
+		}
+	}
+
+	min = lat_stats->latency_min;
+	max = lat_stats->latency_max;
+	for (i = 0; i < sli_cnt; i++) {
+		dst = lgrp_plat_domain_to_node(node_domain, node_cnt, i);
+		if (dst == -1)
+			continue;
+
+		ASSERT(sli_info[i] == sli_info[sli_cnt + i]);
+
+		/* Update row in latencies matrix. */
+		latency = sli_info[i];
+		lat_stats->latencies[src][dst] = latency;
+		if (latency < min || min == -1)
+			min = latency;
+		if (latency > max)
+			max = latency;
+
+		/* Update column in latencies matrix. */
+		latency = sli_info[sli_cnt + i];
+		lat_stats->latencies[dst][src] = latency;
+		if (latency < min || min == -1)
+			min = latency;
+		if (latency > max)
+			max = latency;
+	}
+	lat_stats->latency_min = min;
+	lat_stats->latency_max = max;
+
+	return (0);
+}
+
+
+/*
  * Read ACPI System Resource Affinity Table (SRAT) to determine which CPUs
  * and memory are local to each other in the same NUMA node and return number
  * of nodes
  */
 static int
-lgrp_plat_process_srat(struct srat *tp, uint32_t *prox_domain_min,
-    node_domain_map_t *node_domain, cpu_node_map_t *cpu_node, int cpu_count,
-    node_phys_addr_map_t *node_memory)
+lgrp_plat_process_srat(struct srat *tp, struct msct *mp,
+    uint32_t *prox_domain_min, node_domain_map_t *node_domain,
+    cpu_node_map_t *cpu_node, int cpu_count,
+    memnode_phys_addr_map_t *memnode_info)
 {
 	struct srat_item	*srat_end;
 	int			i;
 	struct srat_item	*item;
 	int			node_cnt;
 	int			proc_entry_count;
+	int			rc;
 
 	/*
 	 * Nothing to do when no SRAT or disabled
@@ -2356,11 +2815,21 @@ lgrp_plat_process_srat(struct srat *tp, uint32_t *prox_domain_min,
 		return (-1);
 
 	/*
-	 * Determine number of nodes by counting number of proximity domains in
-	 * SRAT and return if number of nodes is 1 or less since don't need to
-	 * read SRAT then
+	 * Try to get domain information from MSCT table.
+	 * ACPI4.0: OSPM will use information provided by the MSCT only
+	 * when the System Resource Affinity Table (SRAT) exists.
 	 */
-	node_cnt = lgrp_plat_srat_domains(tp, prox_domain_min);
+	node_cnt = lgrp_plat_msct_domains(mp, prox_domain_min);
+	if (node_cnt <= 0) {
+		/*
+		 * Determine number of nodes by counting number of proximity
+		 * domains in SRAT.
+		 */
+		node_cnt = lgrp_plat_srat_domains(tp, prox_domain_min);
+	}
+	/*
+	 * Return if number of nodes is 1 or less since don't need to read SRAT.
+	 */
 	if (node_cnt == 1)
 		return (1);
 	else if (node_cnt <= 0)
@@ -2397,16 +2866,17 @@ lgrp_plat_process_srat(struct srat *tp, uint32_t *prox_domain_min,
 			}
 			apic_id = item->i.p.apic_id;
 
-			if (lgrp_plat_cpu_node_update(node_domain, node_cnt,
-			    cpu_node, cpu_count, apic_id, domain) < 0)
+			rc = lgrp_plat_cpu_node_update(node_domain, node_cnt,
+			    cpu_node, cpu_count, apic_id, domain);
+			if (rc < 0)
 				return (-3);
-
-			proc_entry_count++;
+			else if (rc == 0)
+				proc_entry_count++;
 			break;
 
 		case SRAT_MEMORY:	/* memory entry */
 			if (!(item->i.m.flags & SRAT_ENABLED) ||
-			    node_memory == NULL)
+			    memnode_info == NULL)
 				break;
 
 			/*
@@ -2418,10 +2888,52 @@ lgrp_plat_process_srat(struct srat *tp, uint32_t *prox_domain_min,
 			length = item->i.m.len;
 			end = start + length - 1;
 
-			if (lgrp_plat_node_memory_update(node_domain, node_cnt,
-			    node_memory, start, end, domain) < 0)
+			/*
+			 * According to ACPI 4.0, both ENABLE and HOTPLUG flags
+			 * may be set for memory address range entries in SRAT
+			 * table which are reserved for memory hot plug.
+			 * We intersect memory address ranges in SRAT table
+			 * with memory ranges in physinstalled to filter out
+			 * memory address ranges reserved for hot plug.
+			 */
+			if (item->i.m.flags & SRAT_HOT_PLUG) {
+				uint64_t	rstart = UINT64_MAX;
+				uint64_t	rend = 0;
+				struct memlist	*ml;
+				extern struct bootops	*bootops;
+
+				memlist_read_lock();
+				for (ml = bootops->boot_mem->physinstalled;
+				    ml; ml = ml->ml_next) {
+					uint64_t tstart = ml->ml_address;
+					uint64_t tend;
+
+					tend = ml->ml_address + ml->ml_size;
+					if (tstart > end || tend < start)
+						continue;
+					if (start > tstart)
+						tstart = start;
+					if (rstart > tstart)
+						rstart = tstart;
+					if (end < tend)
+						tend = end;
+					if (rend < tend)
+						rend = tend;
+				}
+				memlist_read_unlock();
+				start = rstart;
+				end = rend;
+				/* Skip this entry if no memory installed. */
+				if (start > end)
+					break;
+			}
+
+			if (lgrp_plat_memnode_info_update(node_domain,
+			    node_cnt, memnode_info, node_cnt,
+			    start, end, domain, ACPI_MEMNODE_DEVID_BOOT) < 0)
 				return (-4);
 			break;
+
 		case SRAT_X2APIC:	/* x2apic CPU entry */
 			if (!(item->i.xp.flags & SRAT_ENABLED) ||
 			    cpu_node == NULL)
@@ -2434,11 +2946,12 @@ lgrp_plat_process_srat(struct srat *tp, uint32_t *prox_domain_min,
 			domain = item->i.xp.domain;
 			apic_id = item->i.xp.x2apic_id;
 
-			if (lgrp_plat_cpu_node_update(node_domain, node_cnt,
-			    cpu_node, cpu_count, apic_id, domain) < 0)
+			rc = lgrp_plat_cpu_node_update(node_domain, node_cnt,
+			    cpu_node, cpu_count, apic_id, domain);
+			if (rc < 0)
 				return (-3);
-
-			proc_entry_count++;
+			else if (rc == 0)
+				proc_entry_count++;
 			break;
 
 		default:
@@ -2460,7 +2973,7 @@ lgrp_plat_process_srat(struct srat *tp, uint32_t *prox_domain_min,
 	 * physical address
 	 */
 	lgrp_plat_node_sort(node_domain, node_cnt, cpu_node, cpu_count,
-	    node_memory);
+	    memnode_info);
 
 	return (node_cnt);
 }
@@ -2665,27 +3178,70 @@ lgrp_plat_srat_domains(struct srat *tp, uint32_t *prox_domain_min)
 
 
 /*
+ * Parse domain information in ACPI Maximum System Capability Table (MSCT).
+ * MSCT table has been verified in function process_msct() in fakebop.c.
+ */
+static int
+lgrp_plat_msct_domains(struct msct *tp, uint32_t *prox_domain_min)
+{
+	int last_seen = 0;
+	uint32_t proxmin = UINT32_MAX;
+	struct msct_proximity_domain *item, *end;
+
+	if (tp == NULL || lgrp_plat_msct_enable == 0)
+		return (-1);
+
+	if (tp->maximum_proximity_domains >= MAX_NODES) {
+		cmn_err(CE_CONT,
+		    "?lgrp: too many proximity domains (%d), max %d supported, "
+		    "disable support of CPU/memory DR operations.",
+		    tp->maximum_proximity_domains + 1, MAX_NODES);
+		plat_dr_disable_cpu();
+		plat_dr_disable_memory();
+		return (-1);
+	}
+
+	if (prox_domain_min != NULL) {
+		end = (void *)(tp->hdr.len + (uintptr_t)tp);
+		for (item = (void *)((uintptr_t)tp +
+		    tp->proximity_domain_offset); item < end;
+		    item = (void *)(item->length + (uintptr_t)item)) {
+			if (item->domain_min < proxmin) {
+				proxmin = item->domain_min;
+			}
+
+			last_seen = item->domain_max - item->domain_min + 1;
+			/*
+			 * Break out if all proximity domains have been
+			 * processed. Some BIOSes may have unused items
+			 * at the end of MSCT table.
+			 */
+			if (last_seen > tp->maximum_proximity_domains) {
+				break;
+			}
+		}
+		*prox_domain_min = proxmin;
+	}
+
+	return (tp->maximum_proximity_domains + 1);
+}
+
+
+/*
  * Set lgroup latencies for 2 level lgroup topology
  */
 static void
-lgrp_plat_2level_setup(node_phys_addr_map_t *node_memory,
-    lgrp_plat_latency_stats_t *lat_stats)
+lgrp_plat_2level_setup(lgrp_plat_latency_stats_t *lat_stats)
 {
-	int	i;
+	int	i, j;
 
-	ASSERT(node_memory != NULL && lat_stats != NULL);
+	ASSERT(lat_stats != NULL);
 
 	if (lgrp_plat_node_cnt >= 4)
 		cmn_err(CE_NOTE,
 		    "MPO only optimizing for local and remote\n");
 	for (i = 0; i < lgrp_plat_node_cnt; i++) {
-		int	j;
-
-		if (!node_memory[i].exists)
-			continue;
 		for (j = 0; j < lgrp_plat_node_cnt; j++) {
-			if (!node_memory[j].exists)
-				continue;
 			if (i == j)
 				lat_stats->latencies[i][j] = 2;
 			else
@@ -2694,7 +3250,9 @@ lgrp_plat_2level_setup(node_phys_addr_map_t *node_memory,
 	}
 	lat_stats->latency_min = 2;
 	lat_stats->latency_max = 3;
+	/* TODO: check it. */
 	lgrp_config(LGRP_CONFIG_FLATTEN, 2, 0);
+	lgrp_plat_topo_flatten = 1;
 }
 
 
@@ -2884,7 +3442,7 @@ is_opteron(void)
  */
 static void
 opt_get_numa_config(uint_t *node_cnt, int *mem_intrlv,
-    node_phys_addr_map_t *node_memory)
+    memnode_phys_addr_map_t *memnode_info)
 {
 	uint_t				bus;
 	uint_t				dev;
@@ -2999,10 +3557,10 @@ opt_get_numa_config(uint_t *node_cnt, int *mem_intrlv,
 		    (base_lo & OPT_DRAMBASE_LO_MASK_WE) == 0) {
 			/*
 			 * Mark node memory as non-existent and set start and
-			 * end addresses to be same in node_memory[]
+			 * end addresses to be same in memnode_info[]
 			 */
-			node_memory[node].exists = 0;
-			node_memory[node].start = node_memory[node].end =
+			memnode_info[node].exists = 0;
+			memnode_info[node].start = memnode_info[node].end =
 			    (pfn_t)-1;
 			continue;
 		}
@@ -3011,11 +3569,11 @@ opt_get_numa_config(uint_t *node_cnt, int *mem_intrlv,
 		 * Mark node memory as existing and remember physical address
 		 * range of each node for use later
 		 */
-		node_memory[node].exists = 1;
+		memnode_info[node].exists = 1;
 
-		node_memory[node].start = btop(OPT_DRAMADDR(base_hi, base_lo));
+		memnode_info[node].start = btop(OPT_DRAMADDR(base_hi, base_lo));
 
-		node_memory[node].end = btop(OPT_DRAMADDR(limit_hi, limit_lo) |
+		memnode_info[node].end = btop(OPT_DRAMADDR(limit_hi, limit_lo) |
 		    OPT_DRAMADDR_LO_MASK_OFF);
 	}
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
@@ -152,8 +152,13 @@ typedef struct cpu_idle_cb_item {
 /* Per-CPU state aligned to CPU_CACHE_COHERENCE_SIZE to avoid false sharing. */
 typedef union cpu_idle_cb_state {
 	struct {
+		/* Index of already invoked callbacks. */
 		int			index;
+		/* Invoke registered callbacks if true. */
+		boolean_t		enabled;
+		/* Property values are valid if true. */
 		boolean_t		ready;
+		/* Pointers to per-CPU properties. */
 		cpu_idle_prop_value_t	*idle_state;
 		cpu_idle_prop_value_t	*enter_ts;
 		cpu_idle_prop_value_t	*exit_ts;
@@ -181,6 +186,17 @@ static int				cpu_idle_cb_curr = 0;
 static int				cpu_idle_cb_max = 0;
 
 static cpu_idle_cb_state_t		*cpu_idle_cb_state;
+
+#ifdef	__x86
+/*
+ * cpuset used to intercept CPUs before powering them off.
+ * The control CPU sets the bit corresponding to the target CPU and waits
+ * until the bit is cleared.
+ * The target CPU disables interrupts before clearing corresponding bit and
+ * then loops for ever.
+ */
+static cpuset_t				cpu_idle_intercept_set;
+#endif
 
 static int cpu_idle_prop_update_intr_cnt(void *arg, uint64_t seqnum,
     cpu_idle_prop_value_t *valp);
@@ -326,17 +342,26 @@ cpu_event_init(void)
 #endif
 }
 
+/*
+ * This function is called to initialize per CPU state when starting CPUs.
+ */
 void
 cpu_event_init_cpu(cpu_t *cp)
 {
 	ASSERT(cp->cpu_seqid < max_ncpus);
+	cpu_idle_cb_state[cp->cpu_seqid].v.index = 0;
 	cpu_idle_cb_state[cp->cpu_seqid].v.ready = B_FALSE;
+	cpu_idle_cb_state[cp->cpu_seqid].v.enabled = B_TRUE;
 }
 
+/*
+ * This function is called to clean up per CPU state when stopping CPUs.
+ */
 void
 cpu_event_fini_cpu(cpu_t *cp)
 {
 	ASSERT(cp->cpu_seqid < max_ncpus);
+	cpu_idle_cb_state[cp->cpu_seqid].v.enabled = B_FALSE;
 	cpu_idle_cb_state[cp->cpu_seqid].v.ready = B_FALSE;
 }
 
@@ -618,6 +643,21 @@ cpu_idle_enter(int state, int flag,
 	ASSERT(CPU->cpu_seqid < max_ncpus);
 	sp = &cpu_idle_cb_state[CPU->cpu_seqid];
 	ASSERT(sp->v.index == 0);
+	if (sp->v.enabled == B_FALSE) {
+#if defined(__x86)
+		/* Intercept CPU at a safe point before powering off it. */
+		if (CPU_IN_SET(cpu_idle_intercept_set, CPU->cpu_id)) {
+			iflags = intr_clear();
+			CPUSET_ATOMIC_DEL(cpu_idle_intercept_set, CPU->cpu_id);
+			/*CONSTCOND*/
+			while (1) {
+				SMT_PAUSE();
+			}
+		}
+#endif
+
+		return (0);
+	}
 
 	/*
 	 * On x86, cpu_idle_enter can be called from idle thread with either
@@ -1091,3 +1131,26 @@ cpu_idle_get_cpu_state(cpu_t *cp)
 	    cpu_idle_prop_array[CPU_IDLE_PROP_IDX_IDLE_STATE].handle,
 	    CPU_IDLE_GET_CTX(cp)));
 }
+
+#if defined(__x86)
+/*
+ * Intercept CPU at a safe point in idle() before powering it off.
+ */
+void
+cpu_idle_intercept_cpu(cpu_t *cp)
+{
+	ASSERT(cp->cpu_seqid < max_ncpus);
+	ASSERT(cpu_idle_cb_state[cp->cpu_seqid].v.enabled == B_FALSE);
+
+	/* Set flag to intercept CPU. */
+	CPUSET_ATOMIC_ADD(cpu_idle_intercept_set, cp->cpu_id);
+	/* Wake up CPU from possible sleep state. */
+	poke_cpu(cp->cpu_id);
+	while (CPU_IN_SET(cpu_idle_intercept_set, cp->cpu_id)) {
+		DELAY(1);
+	}
+	/*
+	 * Now target CPU is spinning in a pause loop with interrupts disabled.
+	 */
+}
+#endif

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
@@ -27,10 +27,13 @@
 #define	_SYS_ACPIDEV_IMPL_H
 #include <sys/types.h>
 #include <sys/cmn_err.h>
+#include <sys/bitmap.h>
+#include <sys/synch.h>
 #include <sys/sunddi.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
 #include <sys/acpidev.h>
+#include <sys/acpidev_dr.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,12 +57,52 @@ struct acpidev_data_impl {
 	dev_info_t			*aod_dip;
 	acpidev_class_t			*aod_class;
 	acpidev_class_list_t		**aod_class_list;
+	acpidev_board_type_t		aod_bdtype;	/* Type of board. */
+	uint32_t			aod_bdnum;	/* Board # for DR. */
+	uint32_t			aod_portid;	/* Port id for DR. */
+	uint32_t			aod_bdidx;	/* Index # of AP */
+	volatile uint32_t		aod_chidx;	/* Index # of child */
+	uint32_t			aod_memidx;	/* Index # of memory */
+	acpidev_class_id_t		aod_class_id;	/* Dev type for DR. */
 };
 
 #define	ACPIDEV_ODF_STATUS_VALID	0x1
 #define	ACPIDEV_ODF_DEVINFO_CREATED	0x2
 #define	ACPIDEV_ODF_DEVINFO_TAGGED	0x4
-#define	ACPIDEV_ODF_DEVINFO_OFFLINE	0x8
+#define	ACPIDEV_ODF_HOTPLUG_CAPABLE	0x100
+#define	ACPIDEV_ODF_HOTPLUG_READY	0x200
+#define	ACPIDEV_ODF_HOTPLUG_FAILED	0x400
+
+#define	ACPIDEV_DR_IS_BOARD(hdl)	\
+	((hdl)->aod_iflag & ACPIDEV_ODF_HOTPLUG_CAPABLE)
+
+#define	ACPIDEV_DR_SET_BOARD(hdl)	\
+	(hdl)->aod_iflag |= ACPIDEV_ODF_HOTPLUG_CAPABLE
+
+#define	ACPIDEV_DR_IS_READY(hdl)	\
+	((hdl)->aod_iflag & ACPIDEV_ODF_HOTPLUG_READY)
+
+#define	ACPIDEV_DR_SET_READY(hdl)	\
+	(hdl)->aod_iflag |= ACPIDEV_ODF_HOTPLUG_READY
+
+#define	ACPIDEV_DR_IS_FAILED(hdl)	\
+	((hdl)->aod_iflag & ACPIDEV_ODF_HOTPLUG_FAILED)
+
+#define	ACPIDEV_DR_SET_FAILED(hdl)	\
+	(hdl)->aod_iflag |= ACPIDEV_ODF_HOTPLUG_FAILED
+
+#define	ACPIDEV_DR_IS_WORKING(hdl)	\
+	(((hdl)->aod_iflag & (ACPIDEV_ODF_HOTPLUG_READY | \
+	ACPIDEV_ODF_HOTPLUG_FAILED)) == ACPIDEV_ODF_HOTPLUG_READY)
+
+#define	ACPIDEV_DR_IS_PROCESSED(hdl)	\
+	((hdl)->aod_iflag & (ACPIDEV_ODF_HOTPLUG_READY | \
+	ACPIDEV_ODF_HOTPLUG_FAILED | ACPIDEV_ODF_HOTPLUG_CAPABLE))
+
+#define	ACPIDEV_DR_BOARD_READY(hdl)	\
+	(((hdl)->aod_iflag & \
+	(ACPIDEV_ODF_HOTPLUG_READY | ACPIDEV_ODF_HOTPLUG_CAPABLE)) == \
+	(ACPIDEV_ODF_HOTPLUG_READY | ACPIDEV_ODF_HOTPLUG_CAPABLE))
 
 /*
  * List of registered device class drivers.
@@ -82,6 +125,23 @@ typedef struct acpidev_pseudo_uid_head {
 	uint32_t			apuh_id;
 	acpidev_pseudo_uid_t		*apuh_first;
 } acpidev_pseudo_uid_head_t;
+
+typedef struct acpidev_dr_capacity {
+	uint_t				cpu_vendor;
+	uint_t				cpu_family;
+	uint_t				cpu_model_min;
+	uint_t				cpu_model_max;
+	uint_t				cpu_step_min;
+	uint_t				cpu_step_max;
+	boolean_t			hotplug_supported;
+	uint64_t			memory_alignment;
+} acpidev_dr_capacity_t;
+
+extern int acpidev_dr_enable;
+extern krwlock_t acpidev_class_lock;
+extern ulong_t acpidev_object_type_mask[BT_BITOUL(ACPI_TYPE_NS_NODE_MAX + 1)];
+extern ACPI_TABLE_SRAT *acpidev_srat_tbl_ptr;
+extern ACPI_TABLE_SLIT *acpidev_slit_tbl_ptr;
 
 #endif	/* _KERNEL */
 

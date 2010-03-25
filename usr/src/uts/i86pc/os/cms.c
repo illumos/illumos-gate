@@ -23,6 +23,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/cpu_module_ms_impl.h>
@@ -421,9 +425,19 @@ void
 cms_fini(cmi_hdl_t hdl)
 {
 	cms_t *cms = HDL2CMS(hdl);
+	struct cms_ctl *cdp;
 
 	if (CMS_OP_PRESENT(cms, cms_fini))
 		CMS_OPS(cms)->cms_fini(hdl);
+
+	mutex_enter(&cms_load_lock);
+	cdp = (struct cms_ctl *)cmi_hdl_getspecific(hdl);
+	if (cdp != NULL) {
+		if (cdp->cs_cms != NULL)
+			cms_rele(cdp->cs_cms);
+		kmem_free(cdp, sizeof (*cdp));
+	}
+	mutex_exit(&cms_load_lock);
 }
 
 boolean_t

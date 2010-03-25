@@ -23,7 +23,6 @@
 # Use is subject to license terms.
 #
 
-PLATFORM=	sun4u
 LIBRARY= sbd.a
 VERS= .1
 
@@ -33,7 +32,7 @@ OBJECTS= ap.o ap_msg.o ap_rcm.o ap_sbd.o ap_seq.o cfga.o ap_err.o
 include ../../../Makefile.lib
 
 USR_PLAT_DIR		= $(ROOT)/usr/platform
-USR_PSM_DIR		= $(USR_PLAT_DIR)/sun4u
+USR_PSM_DIR		= $(USR_PLAT_DIR)/$(PLATFORM)
 USR_PSM_LIB_DIR		= $(USR_PSM_DIR)/lib
 USR_PSM_LIB_CFG_DIR	= $(USR_PSM_LIB_DIR)/cfgadm
 USR_PSM_LIB_CFG_DIR_64	= $(USR_PSM_LIB_CFG_DIR)/$(MACH64)
@@ -54,7 +53,7 @@ CPPFLAGS +=	-I$(ROOT)/usr/platform/$(PLATFORM)/include -DSBD_DEBUG
 #
 GENERRDIR=	$(SRC)/lib/cfgadm_plugins/sbd
 GENERR=		$(GENERRDIR)/sbdgenerr
-ERRSRC=		$(ROOT)/usr/platform/sun4u/include/sys/sbd_ioctl.h
+ERRSRC=		$(ROOT)/usr/platform/$(PLATFORM)/include/sys/sbd_ioctl.h
 
 .KEEP_STATE:
 

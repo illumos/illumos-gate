@@ -22,6 +22,10 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	All Rights Reserved   */
@@ -127,7 +131,6 @@ int largepagesupport = 0;
 extern uint_t page_create_new;
 extern uint_t page_create_exists;
 extern uint_t page_create_putbacks;
-extern uint_t page_create_putbacks;
 /*
  * Allow users to disable the kernel's use of SSE.
  */
@@ -142,6 +145,8 @@ typedef struct {
 	pfn_t	mnr_pfnhi;
 	int	mnr_mnode;
 	int	mnr_memrange;		/* index into memranges[] */
+	int	mnr_next;		/* next lower PA mnoderange */
+	int	mnr_exists;
 	/* maintain page list stats */
 	pgcnt_t	mnr_mt_clpgcnt;		/* cache list cnt */
 	pgcnt_t	mnr_mt_flpgcnt[MMU_PAGE_SIZES];	/* free list cnt per szc */
@@ -175,6 +180,11 @@ typedef struct {
  */
 #define	PFN_4GIG	0x100000
 #define	PFN_16MEG	0x1000
+/* Indices into the memory range (arch_memranges) array. */
+#define	MRI_4G		0
+#define	MRI_2G		1
+#define	MRI_16M		2
+#define	MRI_0		3
 static pfn_t arch_memranges[NUM_MEM_RANGES] = {
     PFN_4GIG,	/* pfn range for 4G and above */
     0x80000,	/* pfn range for 2G-4G */
@@ -191,6 +201,8 @@ int nranges = NUM_MEM_RANGES;
 mnoderange_t	*mnoderanges;
 int		mnoderangecnt;
 int		mtype4g;
+int		mtype16m;
+int		mtypetop;	/* index of highest pfn'ed mnoderange */
 
 /*
  * 4g memory management variables for systems with more than 4g of memory:
@@ -220,7 +232,6 @@ int		mtype4g;
  * for requests that don't specifically require it.
  */
 
-#define	LOTSFREE4G	(maxmem4g >> lotsfree4gshift)
 #define	DESFREE4G	(maxmem4g >> desfree4gshift)
 
 #define	RESTRICT4G_ALLOC					\
@@ -230,7 +241,6 @@ static pgcnt_t	maxmem4g;
 static pgcnt_t	freemem4g;
 static int	physmax4g;
 static int	desfree4gshift = 4;	/* maxmem4g shift to derive DESFREE4G */
-static int	lotsfree4gshift = 3;
 
 /*
  * 16m memory management:
@@ -246,7 +256,7 @@ static int	lotsfree4gshift = 3;
  * are not restricted.
  */
 
-#define	FREEMEM16M	MTYPE_FREEMEM(0)
+#define	FREEMEM16M	MTYPE_FREEMEM(mtype16m)
 #define	DESFREE16M	desfree16m
 #define	RESTRICT16M_ALLOC(freemem, pgcnt, flags)		\
 	((freemem != 0) && ((flags & PG_PANIC) == 0) &&		\
@@ -336,6 +346,9 @@ hw_pagesize_t hw_page_array[MAX_NUM_LEVEL + 1];
 
 kmutex_t	*fpc_mutex[NPC_MUTEX];
 kmutex_t	*cpc_mutex[NPC_MUTEX];
+
+/* Lock to protect mnoderanges array for memory DR operations. */
+static kmutex_t mnoderange_lock;
 
 /*
  * Only let one thread at a time try to coalesce large pages, to
@@ -951,7 +964,8 @@ pfn_2_mtype(pfn_t pfn)
 #else
 	int	n;
 
-	for (n = mnoderangecnt - 1; n >= 0; n--) {
+	/* Always start from highest pfn and work our way down */
+	for (n = mtypetop; n != -1; n = mnoderanges[n].mnr_next) {
 		if (pfn >= mnoderanges[n].mnr_pfnlo) {
 			break;
 		}
@@ -1063,7 +1077,7 @@ retry:
  * verify that pages being returned from allocator have correct DMA attribute
  */
 #ifndef DEBUG
-#define	check_dma(a, b, c) (0)
+#define	check_dma(a, b, c) (void)(0)
 #else
 static void
 check_dma(ddi_dma_attr_t *dma_attr, page_t *pp, int cnt)
@@ -1253,7 +1267,12 @@ mnode_range_cnt(int mnode)
 void
 mnode_range_setup(mnoderange_t *mnoderanges)
 {
+	mnoderange_t *mp = mnoderanges;
 	int	mnode, mri;
+	int	mindex = 0;	/* current index into mnoderanges array */
+	int	i, j;
+	pfn_t	hipfn;
+	int	last, hi;
 
 	for (mnode = 0; mnode < max_mem_nodes; mnode++) {
 		if (mem_node_config[mnode].exists == 0)
@@ -1272,26 +1291,168 @@ mnode_range_setup(mnoderange_t *mnoderanges)
 			    mem_node_config[mnode].physmax);
 			mnoderanges->mnr_mnode = mnode;
 			mnoderanges->mnr_memrange = mri;
+			mnoderanges->mnr_exists = 1;
 			mnoderanges++;
+			mindex++;
 			if (mem_node_config[mnode].physmax > MEMRANGEHI(mri))
 				mri--;
 			else
 				break;
 		}
 	}
+
+	/*
+	 * For now do a simple sort of the mnoderanges array to fill in
+	 * the mnr_next fields.  Since mindex is expected to be relatively
+	 * small, using a simple O(N^2) algorithm.
+	 */
+	for (i = 0; i < mindex; i++) {
+		if (mp[i].mnr_pfnlo == 0)	/* find lowest */
+			break;
+	}
+	ASSERT(i < mindex);
+	last = i;
+	mtype16m = last;
+	mp[last].mnr_next = -1;
+	for (i = 0; i < mindex - 1; i++) {
+		hipfn = (pfn_t)(-1);
+		hi = -1;
+		/* find next highest mnode range */
+		for (j = 0; j < mindex; j++) {
+			if (mp[j].mnr_pfnlo > mp[last].mnr_pfnlo &&
+			    mp[j].mnr_pfnlo < hipfn) {
+				hipfn = mp[j].mnr_pfnlo;
+				hi = j;
+			}
+		}
+		mp[hi].mnr_next = last;
+		last = hi;
+	}
+	mtypetop = last;
 }
+
+#ifndef	__xpv
+/*
+ * Update mnoderanges for memory hot-add DR operations.
+ */
+static void
+mnode_range_add(int mnode)
+{
+	int	*prev;
+	int	n, mri;
+	pfn_t	start, end;
+	extern	void membar_sync(void);
+
+	ASSERT(0 <= mnode && mnode < max_mem_nodes);
+	ASSERT(mem_node_config[mnode].exists);
+	start = mem_node_config[mnode].physbase;
+	end = mem_node_config[mnode].physmax;
+	ASSERT(start <= end);
+	mutex_enter(&mnoderange_lock);
+
+#ifdef	DEBUG
+	/* Check whether it interleaves with other memory nodes. */
+	for (n = mtypetop; n != -1; n = mnoderanges[n].mnr_next) {
+		ASSERT(mnoderanges[n].mnr_exists);
+		if (mnoderanges[n].mnr_mnode == mnode)
+			continue;
+		ASSERT(start > mnoderanges[n].mnr_pfnhi ||
+		    end < mnoderanges[n].mnr_pfnlo);
+	}
+#endif	/* DEBUG */
+
+	mri = nranges - 1;
+	while (MEMRANGEHI(mri) < mem_node_config[mnode].physbase)
+		mri--;
+	while (mri >= 0 && mem_node_config[mnode].physmax >= MEMRANGELO(mri)) {
+		/* Check whether mtype already exists. */
+		for (n = mtypetop; n != -1; n = mnoderanges[n].mnr_next) {
+			if (mnoderanges[n].mnr_mnode == mnode &&
+			    mnoderanges[n].mnr_memrange == mri) {
+				mnoderanges[n].mnr_pfnlo = MAX(MEMRANGELO(mri),
+				    start);
+				mnoderanges[n].mnr_pfnhi = MIN(MEMRANGEHI(mri),
+				    end);
+				break;
+			}
+		}
+
+		/* Add a new entry if it doesn't exist yet. */
+		if (n == -1) {
+			/* Try to find an unused entry in mnoderanges array. */
+			for (n = 0; n < mnoderangecnt; n++) {
+				if (mnoderanges[n].mnr_exists == 0)
+					break;
+			}
+			ASSERT(n < mnoderangecnt);
+			mnoderanges[n].mnr_pfnlo = MAX(MEMRANGELO(mri), start);
+			mnoderanges[n].mnr_pfnhi = MIN(MEMRANGEHI(mri), end);
+			mnoderanges[n].mnr_mnode = mnode;
+			mnoderanges[n].mnr_memrange = mri;
+			mnoderanges[n].mnr_exists = 1;
+			/* Page 0 should always be present. */
+			for (prev = &mtypetop;
+			    mnoderanges[*prev].mnr_pfnlo > start;
+			    prev = &mnoderanges[*prev].mnr_next) {
+				ASSERT(mnoderanges[*prev].mnr_next >= 0);
+				ASSERT(mnoderanges[*prev].mnr_pfnlo > end);
+			}
+			mnoderanges[n].mnr_next = *prev;
+			membar_sync();
+			*prev = n;
+		}
+
+		if (mem_node_config[mnode].physmax > MEMRANGEHI(mri))
+			mri--;
+		else
+			break;
+	}
+
+	mutex_exit(&mnoderange_lock);
+}
+
+/*
+ * Update mnoderanges for memory hot-removal DR operations.
+ */
+static void
+mnode_range_del(int mnode)
+{
+	_NOTE(ARGUNUSED(mnode));
+	ASSERT(0 <= mnode && mnode < max_mem_nodes);
+	/* TODO: support deletion operation. */
+	ASSERT(0);
+}
+
+void
+plat_slice_add(pfn_t start, pfn_t end)
+{
+	mem_node_add_slice(start, end);
+	if (plat_dr_enabled()) {
+		mnode_range_add(PFN_2_MEM_NODE(start));
+	}
+}
+
+void
+plat_slice_del(pfn_t start, pfn_t end)
+{
+	ASSERT(PFN_2_MEM_NODE(start) == PFN_2_MEM_NODE(end));
+	ASSERT(plat_dr_enabled());
+	mnode_range_del(PFN_2_MEM_NODE(start));
+	mem_node_del_slice(start, end);
+}
+#endif	/* __xpv */
 
 /*ARGSUSED*/
 int
 mtype_init(vnode_t *vp, caddr_t vaddr, uint_t *flags, size_t pgsz)
 {
-	int mtype = mnoderangecnt - 1;
+	int mtype = mtypetop;
 
 #if !defined(__xpv)
 #if defined(__i386)
 	/*
 	 * set the mtype range
-	 * - kmem requests needs to be below 4g if restricted_kmemalloc is set.
+	 * - kmem requests need to be below 4g if restricted_kmemalloc is set.
 	 * - for non kmem requests, set range to above 4g if memory below 4g
 	 * runs low.
 	 */
@@ -1334,8 +1495,8 @@ mtype_init(vnode_t *vp, caddr_t vaddr, uint_t *flags, size_t pgsz)
 int
 mtype_pgr_init(int *flags, page_t *pp, int mnode, pgcnt_t pgcnt)
 {
-	int mtype = mnoderangecnt - 1;
-#if !defined(__ixpv)
+	int mtype = mtypetop;
+#if !defined(__xpv)
 	if (RESTRICT16M_ALLOC(freemem, pgcnt, *flags)) {
 		*flags |= PGI_MT_RANGE16M;
 	} else {
@@ -1349,7 +1510,7 @@ mtype_pgr_init(int *flags, page_t *pp, int mnode, pgcnt_t pgcnt)
 /*
  * Determine if the mnode range specified in mtype contains memory belonging
  * to memory node mnode.  If flags & PGI_MT_RANGE is set then mtype contains
- * the range of indices from high pfn to 0, 16m or 4g.
+ * the range from high pfn to 0, 16m or 4g.
  *
  * Return first mnode range type index found otherwise return -1 if none found.
  */
@@ -1357,18 +1518,20 @@ int
 mtype_func(int mnode, int mtype, uint_t flags)
 {
 	if (flags & PGI_MT_RANGE) {
-		int	mtlim = 0;
+		int	mnr_lim = MRI_0;
 
-		if (flags & PGI_MT_NEXT)
-			mtype--;
+		if (flags & PGI_MT_NEXT) {
+			mtype = mnoderanges[mtype].mnr_next;
+		}
 		if (flags & PGI_MT_RANGE4G)
-			mtlim = mtype4g + 1;	/* exclude 0-4g range */
+			mnr_lim = MRI_4G;	/* exclude 0-4g range */
 		else if (flags & PGI_MT_RANGE16M)
-			mtlim = 1;		/* exclude 0-16m range */
-		while (mtype >= mtlim) {
+			mnr_lim = MRI_16M;	/* exclude 0-16m range */
+		while (mtype != -1 &&
+		    mnoderanges[mtype].mnr_memrange <= mnr_lim) {
 			if (mnoderanges[mtype].mnr_mnode == mnode)
 				return (mtype);
-			mtype--;
+			mtype = mnoderanges[mtype].mnr_next;
 		}
 	} else if (mnoderanges[mtype].mnr_mnode == mnode) {
 		return (mtype);
@@ -1378,34 +1541,40 @@ mtype_func(int mnode, int mtype, uint_t flags)
 
 /*
  * Update the page list max counts with the pfn range specified by the
- * input parameters.  Called from add_physmem() when physical memory with
- * page_t's are initially added to the page lists.
+ * input parameters.
  */
 void
 mtype_modify_max(pfn_t startpfn, long cnt)
 {
-	int	mtype = 0;
-	pfn_t	endpfn = startpfn + cnt, pfn;
-	pgcnt_t	inc;
-
-	ASSERT(cnt > 0);
+	int		mtype;
+	pgcnt_t		inc;
+	spgcnt_t	scnt = (spgcnt_t)(cnt);
+	pgcnt_t		acnt = ABS(scnt);
+	pfn_t		endpfn = startpfn + acnt;
+	pfn_t		pfn, lo;
 
 	if (!physmax4g)
 		return;
 
-	for (pfn = startpfn; pfn < endpfn; ) {
-		if (pfn <= mnoderanges[mtype].mnr_pfnhi) {
-			if (endpfn < mnoderanges[mtype].mnr_pfnhi) {
-				inc = endpfn - pfn;
+	mtype = mtypetop;
+	for (pfn = endpfn; pfn > startpfn; ) {
+		ASSERT(mtype != -1);
+		lo = mnoderanges[mtype].mnr_pfnlo;
+		if (pfn > lo) {
+			if (startpfn >= lo) {
+				inc = pfn - startpfn;
 			} else {
-				inc = mnoderanges[mtype].mnr_pfnhi - pfn + 1;
+				inc = pfn - lo;
 			}
-			if (mtype <= mtype4g)
-				maxmem4g += inc;
-			pfn += inc;
+			if (mnoderanges[mtype].mnr_memrange != MRI_4G) {
+				if (scnt > 0)
+					maxmem4g += inc;
+				else
+					maxmem4g -= inc;
+			}
+			pfn -= inc;
 		}
-		mtype++;
-		ASSERT(mtype < mnoderangecnt || pfn >= endpfn);
+		mtype = mnoderanges[mtype].mnr_next;
 	}
 }
 
@@ -1418,6 +1587,7 @@ mtype_2_mrange(int mtype)
 void
 mnodetype_2_pfn(int mnode, int mtype, pfn_t *pfnlo, pfn_t *pfnhi)
 {
+	_NOTE(ARGUNUSED(mnode));
 	ASSERT(mnoderanges[mtype].mnr_mnode == mnode);
 	*pfnlo = mnoderanges[mtype].mnr_pfnlo;
 	*pfnhi = mnoderanges[mtype].mnr_pfnhi;
@@ -1462,6 +1632,7 @@ plcnt_init(caddr_t addr)
 void
 plcnt_inc_dec(page_t *pp, int mtype, int szc, long cnt, int flags)
 {
+	_NOTE(ARGUNUSED(pp));
 #ifdef DEBUG
 	int	bin = PP_2_BIN(pp);
 
@@ -1470,7 +1641,7 @@ plcnt_inc_dec(page_t *pp, int mtype, int szc, long cnt, int flags)
 	    cnt);
 #endif
 	ASSERT(mtype == PP_2_MTYPE(pp));
-	if (physmax4g && mtype <= mtype4g)
+	if (physmax4g && mnoderanges[mtype].mnr_memrange != MRI_4G)
 		atomic_add_long(&freemem4g, cnt);
 	if (flags & PG_CACHE_LIST)
 		atomic_add_long(&mnoderanges[mtype].mnr_mt_clpgcnt, cnt);
@@ -1485,7 +1656,7 @@ plcnt_inc_dec(page_t *pp, int mtype, int szc, long cnt, int flags)
 int
 mnode_pgcnt(int mnode)
 {
-	int	mtype = mnoderangecnt - 1;
+	int	mtype = mtypetop;
 	int	flags = PGI_MT_RANGE0;
 	pgcnt_t	pgcnt = 0;
 
@@ -1505,6 +1676,7 @@ mnode_pgcnt(int mnode)
 size_t
 page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 {
+	_NOTE(ARGUNUSED(l2_linesz));
 	size_t	colorsz = 0;
 	int	i;
 	int	colors;
@@ -1519,14 +1691,19 @@ page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 	/*
 	 * Reduce the memory ranges lists if we don't have large amounts
 	 * of memory. This avoids searching known empty free lists.
+	 * To support memory DR operations, we need to keep memory ranges
+	 * for possible memory hot-add operations.
 	 */
-	i = memrange_num(physmax);
+	if (plat_dr_physmax > physmax)
+		i = memrange_num(plat_dr_physmax);
+	else
+		i = memrange_num(physmax);
 #if defined(__i386)
-	if (i > 0)
+	if (i > MRI_4G)
 		restricted_kmemalloc = 0;
 #endif
 	/* physmax greater than 4g */
-	if (i == 0)
+	if (i == MRI_4G)
 		physmax4g = 1;
 #endif /* !__xpv */
 	memranges += i;
@@ -1619,6 +1796,16 @@ page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 	/* size for mnoderanges */
 	for (mnoderangecnt = 0, i = 0; i < max_mem_nodes; i++)
 		mnoderangecnt += mnode_range_cnt(i);
+	if (plat_dr_support_memory()) {
+		/*
+		 * Reserve enough space for memory DR operations.
+		 * Two extra mnoderanges for possbile fragmentations,
+		 * one for the 2G boundary and the other for the 4G boundary.
+		 * We don't expect a memory board crossing the 16M boundary
+		 * for memory hot-add operations on x86 platforms.
+		 */
+		mnoderangecnt += 2 + max_mem_nodes - lgrp_plat_node_cnt;
+	}
 	colorsz = mnoderangecnt * sizeof (mnoderange_t);
 
 	/* size for fpc_mutex and cpc_mutex */
@@ -3122,8 +3309,8 @@ page_get_anylist(struct vnode *vp, u_offset_t off, struct as *as, caddr_t vaddr,
 	 * ordering.
 	 */
 	if (dma_attr == NULL) {
-		n = 0;
-		m = mnoderangecnt - 1;
+		n = mtype16m;
+		m = mtypetop;
 		fullrange = 1;
 		VM_STAT_ADD(pga_vmstats.pga_nulldmaattr);
 	} else {
@@ -3136,6 +3323,10 @@ page_get_anylist(struct vnode *vp, u_offset_t off, struct as *as, caddr_t vaddr,
 		if (dma_attr->dma_attr_align > MMU_PAGESIZE)
 			return (NULL);
 
+		/* Sanity check the dma_attr */
+		if (pfnlo > pfnhi)
+			return (NULL);
+
 		n = pfn_2_mtype(pfnlo);
 		m = pfn_2_mtype(pfnhi);
 
@@ -3144,13 +3335,10 @@ page_get_anylist(struct vnode *vp, u_offset_t off, struct as *as, caddr_t vaddr,
 	}
 	VM_STAT_COND_ADD(fullrange == 0, pga_vmstats.pga_notfullrange);
 
-	if (n > m)
-		return (NULL);
-
 	szc = 0;
 
-	/* cylcing thru mtype handled by RANGE0 if n == 0 */
-	if (n == 0) {
+	/* cylcing thru mtype handled by RANGE0 if n == mtype16m */
+	if (n == mtype16m) {
 		flags |= PGI_MT_RANGE0;
 		n = m;
 	}
@@ -3164,7 +3352,8 @@ page_get_anylist(struct vnode *vp, u_offset_t off, struct as *as, caddr_t vaddr,
 		/*
 		 * allocate pages from high pfn to low.
 		 */
-		for (mtype = m; mtype >= n; mtype--) {
+		mtype = m;
+		do {
 			if (fullrange != 0) {
 				pp = page_get_mnode_freelist(mnode,
 				    bin, mtype, szc, flags);
@@ -3181,7 +3370,8 @@ page_get_anylist(struct vnode *vp, u_offset_t off, struct as *as, caddr_t vaddr,
 				check_dma(dma_attr, pp, 1);
 				return (pp);
 			}
-		}
+		} while (mtype != n &&
+		    (mtype = mnoderanges[mtype].mnr_next) != -1);
 		if (!local_failed_stat) {
 			lgrp_stat_add(lgrp->lgrp_id, LGRP_NUM_ALLOC_FAIL, 1);
 			local_failed_stat = 1;

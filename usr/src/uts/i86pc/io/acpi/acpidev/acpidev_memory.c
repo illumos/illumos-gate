@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/acpica.h>
 #include <sys/acpidev.h>
 #include <sys/acpidev_rsc.h>
+#include <sys/acpidev_dr.h>
 #include <sys/acpidev_impl.h>
 
 static ACPI_STATUS acpidev_memory_probe(acpidev_walk_info_t *infop);
@@ -97,7 +98,7 @@ static acpidev_filter_rule_t acpidev_memory_filters[] = {
 static ACPI_STATUS
 acpidev_memory_probe(acpidev_walk_info_t *infop)
 {
-	ACPI_STATUS rc;
+	ACPI_STATUS rc = AE_OK;
 	int flags;
 
 	ASSERT(infop != NULL);
@@ -109,19 +110,35 @@ acpidev_memory_probe(acpidev_walk_info_t *infop)
 		return (AE_OK);
 	}
 
-	if (infop->awi_op_type == ACPIDEV_OP_BOOT_PROBE) {
-		flags = ACPIDEV_PROCESS_FLAG_SCAN | ACPIDEV_PROCESS_FLAG_CREATE;
-		rc = acpidev_process_object(infop, flags);
-	} else if (infop->awi_op_type == ACPIDEV_OP_BOOT_REPROBE) {
-		flags = ACPIDEV_PROCESS_FLAG_SCAN;
-		rc = acpidev_process_object(infop, flags);
-	} else if (infop->awi_op_type == ACPIDEV_OP_HOTPLUG_PROBE) {
-		flags = ACPIDEV_PROCESS_FLAG_SCAN | ACPIDEV_PROCESS_FLAG_CREATE;
-		rc = acpidev_process_object(infop, flags);
-	} else {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: unknown operation type %u "
+	flags = ACPIDEV_PROCESS_FLAG_SCAN;
+	switch (infop->awi_op_type) {
+	case ACPIDEV_OP_BOOT_PROBE:
+		if (acpica_get_devcfg_feature(ACPI_DEVCFG_MEMORY)) {
+			flags |= ACPIDEV_PROCESS_FLAG_CREATE;
+			acpidev_dr_check(infop);
+		}
+		break;
+
+	case ACPIDEV_OP_BOOT_REPROBE:
+		break;
+
+	case ACPIDEV_OP_HOTPLUG_PROBE:
+		if (acpica_get_devcfg_feature(ACPI_DEVCFG_MEMORY)) {
+			flags |= ACPIDEV_PROCESS_FLAG_CREATE |
+			    ACPIDEV_PROCESS_FLAG_SYNCSTATUS |
+			    ACPIDEV_PROCESS_FLAG_HOLDBRANCH;
+		}
+		break;
+
+	default:
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: unknown operation type %u "
 		    "in acpidev_memory_probe.", infop->awi_op_type);
 		rc = AE_BAD_PARAMETER;
+		break;
+	}
+
+	if (rc == AE_OK) {
+		rc = acpidev_process_object(infop, flags);
 	}
 	if (ACPI_FAILURE(rc) && rc != AE_NOT_EXIST && rc != AE_ALREADY_EXISTS) {
 		cmn_err(CE_WARN,
@@ -153,7 +170,6 @@ acpidev_memory_filter(acpidev_walk_info_t *infop, char *devname, int maxlen)
 	return (res);
 }
 
-/*ARGSUSED*/
 static ACPI_STATUS
 acpidev_memory_init(acpidev_walk_info_t *infop)
 {

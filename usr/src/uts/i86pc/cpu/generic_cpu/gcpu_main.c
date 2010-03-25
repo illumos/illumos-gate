@@ -23,6 +23,10 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 /*
  * Generic x86 CPU Module
@@ -78,20 +82,50 @@ gcpu_init(cmi_hdl_t hdl, void **datap)
 	 */
 	if ((sp = gcpu_shared[chipid]) == NULL) {
 		sp = kmem_zalloc(sizeof (struct gcpu_chipshared), KM_SLEEP);
+		mutex_init(&sp->gcpus_poll_lock, NULL, MUTEX_DRIVER, NULL);
+		mutex_init(&sp->gcpus_cfglock, NULL, MUTEX_DRIVER, NULL);
 		osp = atomic_cas_ptr(&gcpu_shared[chipid], NULL, sp);
-		if (osp == NULL) {
-			mutex_init(&sp->gcpus_poll_lock, NULL, MUTEX_DRIVER,
-			    NULL);
-			mutex_init(&sp->gcpus_cfglock, NULL, MUTEX_DRIVER,
-			    NULL);
-		} else {
+		if (osp != NULL) {
+			mutex_destroy(&sp->gcpus_cfglock);
+			mutex_destroy(&sp->gcpus_poll_lock);
 			kmem_free(sp, sizeof (struct gcpu_chipshared));
 			sp = osp;
 		}
 	}
+
+	atomic_inc_32(&sp->gcpus_actv_cnt);
 	gcpu->gcpu_shared = sp;
 
 	return (0);
+}
+
+/*
+ * deconfigure gcpu_init()
+ */
+void
+gcpu_fini(cmi_hdl_t hdl)
+{
+	uint_t chipid = cmi_hdl_chipid(hdl);
+	gcpu_data_t *gcpu = cmi_hdl_getcmidata(hdl);
+	struct gcpu_chipshared *sp;
+
+	if (gcpu_disable || chipid >= GCPU_MAX_CHIPID)
+		return;
+
+	gcpu_mca_fini(hdl);
+
+	/*
+	 * Keep shared data in cache for reuse.
+	 */
+	sp = gcpu_shared[chipid];
+	ASSERT(sp != NULL);
+	atomic_dec_32(&sp->gcpus_actv_cnt);
+
+	if (gcpu != NULL)
+		kmem_free(gcpu, sizeof (gcpu_data_t));
+
+	/* Release reference count held in gcpu_init(). */
+	cmi_hdl_rele(hdl);
 }
 
 void
@@ -150,7 +184,7 @@ const cmi_ops_t _cmi_ops = {
 	GCPU_OP(gcpu_cmci_trap, NULL),		/* cmi_cmci_trap */
 	gcpu_msrinject,				/* cmi_msrinject */
 	GCPU_OP(gcpu_hdl_poke, NULL),		/* cmi_hdl_poke */
-	NULL,					/* cmi_fini */
+	gcpu_fini,				/* cmi_fini */
 	GCPU_OP(NULL, gcpu_xpv_panic_callback),	/* cmi_panic_callback */
 };
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
@@ -28,8 +28,10 @@
 #include <sys/types.h>
 #include <sys/obpdefs.h>
 #include <sys/sunddi.h>
+#ifdef	_KERNEL
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -55,23 +57,19 @@ extern "C" {
 #define	ACPIDEV_HID_CPU			"ACPI0007"
 #define	ACPIDEV_HID_PCI_HOSTBRIDGE	"PNP0A03"
 #define	ACPIDEV_HID_PCIE_HOSTBRIDGE	"PNP0A08"
+#define	ACPIDEV_HID_PCIEX_HOSTBRIDGE	"PNP0A08"
 #define	ACPIDEV_HID_MEMORY		"PNP0C80"
-
-/* Common ACPI object names. */
-#define	ACPIDEV_OBJECT_NAME_SB		ACPI_NS_SYSTEM_BUS
-#define	ACPIDEV_OBJECT_NAME_PR		"_PR_"
-
-/* Common ACPI method names. */
-#define	ACPIDEV_METHOD_NAME_MAT		"_MAT"
 
 /* Device names for ACPI objects. */
 #define	ACPIDEV_NODE_NAME_ROOT		"fw"
+#define	ACPIDEV_NODE_NAME_ACPIDR	"acpidr"
 #define	ACPIDEV_NODE_NAME_CONTAINER	"container"
 #define	ACPIDEV_NODE_NAME_MODULE_SBD	"sb"
 #define	ACPIDEV_NODE_NAME_MODULE_CPU	"socket"
 #define	ACPIDEV_NODE_NAME_CPU		"cpu"
 #define	ACPIDEV_NODE_NAME_PROCESSOR	"cpus"
 #define	ACPIDEV_NODE_NAME_MEMORY	"mem"
+#define	ACPIDEV_NODE_NAME_PCI		"pci"
 
 /* Device types for ACPI objects. */
 #define	ACPIDEV_TYPE_ROOTNEX		"acpirootnex"
@@ -81,14 +79,30 @@ extern "C" {
 #define	ACPIDEV_TYPE_CONTAINER		"acpicontainer"
 #define	ACPIDEV_TYPE_CPU		"acpicpu"
 #define	ACPIDEV_TYPE_MEMORY		"acpimemory"
+#define	ACPIDEV_TYPE_PCI		"pci"
+#define	ACPIDEV_TYPE_PCIEX		"pciex"
 
 /* Device property names for ACPI objects. */
 #define	ACPIDEV_PROP_NAME_UNIT_ADDR	"unit-address"
 #define	ACPIDEV_PROP_NAME_ACPI_UID	"acpi-uid"
 #define	ACPIDEV_PROP_NAME_PROCESSOR_ID	"acpi-processor-id"
 #define	ACPIDEV_PROP_NAME_LOCALAPIC_ID	"apic-id"
+#define	ACPIDEV_PROP_NAME_PROXIMITY_ID	"proximity-id"
 
 #define	ACPIDEV_PROP_NAME_UID_FORMAT	"acpidev-uid-format"
+
+/* Miscellaneous strings. */
+#define	ACPIDEV_CMD_OST_PREFIX		"acpi-update-status"
+#define	ACPIDEV_CMD_OST_INPROGRESS	"acpi-update-status=inprogress"
+#define	ACPIDEV_CMD_OST_SUCCESS		"acpi-update-status=success"
+#define	ACPIDEV_CMD_OST_FAILURE		"acpi-update-status=failure"
+#define	ACPIDEV_CMD_OST_NOOP		"acpi-update-status=noop"
+
+#define	ACPIDEV_EVENT_TYPE_ATTR_NAME	"acpi-event-type"
+#define	ACPIDEV_EVENT_TYPE_BUS_CHECK	"bus_check"
+#define	ACPIDEV_EVENT_TYPE_DEVICE_CHECK	"device_check"
+#define	ACPIDEV_EVENT_TYPE_DEVICE_CHECK_LIGHT	"device_check_light"
+#define	ACPIDEV_EVENT_TYPE_EJECT_REQUEST	"eject_request"
 
 /* ACPI device class Id. */
 typedef enum acpidev_class_id {
@@ -99,6 +113,8 @@ typedef enum acpidev_class_id {
 	ACPIDEV_CLASS_ID_CONTAINER = 4,
 	ACPIDEV_CLASS_ID_CPU = 5,
 	ACPIDEV_CLASS_ID_MEMORY = 6,
+	ACPIDEV_CLASS_ID_PCI = 7,
+	ACPIDEV_CLASS_ID_PCIEX = 8,
 	ACPIDEV_CLASS_ID_MAX
 } acpidev_class_id_t;
 
@@ -106,8 +122,87 @@ typedef enum acpidev_class_id {
 #define	ACPIDEV_OUSER_NO_CPU		0x1
 #define	ACPIDEV_OUSER_NO_MEM		0x2
 #define	ACPIDEV_OUSER_NO_CONTAINER	0x4
+#define	ACPIDEV_OUSER_NO_PCI		0x8
+#define	ACPIDEV_OUSER_NO_CACHE		0x10000
 
 #ifdef	_KERNEL
+
+/* Common ACPI object names. */
+#define	ACPIDEV_OBJECT_NAME_SB		ACPI_NS_SYSTEM_BUS
+#define	ACPIDEV_OBJECT_NAME_PR		"_PR_"
+
+/* Common ACPI method names. */
+#define	ACPIDEV_METHOD_NAME_MAT		"_MAT"
+#define	ACPIDEV_METHOD_NAME_EJ0		"_EJ0"
+#define	ACPIDEV_METHOD_NAME_EDL		"_EDL"
+#define	ACPIDEV_METHOD_NAME_EJD		"_EJD"
+#define	ACPIDEV_METHOD_NAME_OST		"_OST"
+#define	ACPIDEV_METHOD_NAME_PXM		"_PXM"
+#define	ACPIDEV_METHOD_NAME_SLI		"_SLI"
+
+/* Source event code for _OST. */
+#define	ACPI_OST_EVENT_EJECTING		0x103
+#define	ACPI_OST_EVENT_INSERTING	0x200
+
+/* Status code for _OST. */
+#define	ACPI_OST_STA_SUCCESS		0x0
+
+/* Non-specific failure. */
+#define	ACPI_OST_STA_FAILURE		0x1
+
+/* Unrecognized Notify Code. */
+#define	ACPI_OST_STA_NOT_SUPPORT	0x2
+
+/* Device ejection not supported by OSPM. */
+#define	ACPI_OST_STA_EJECT_NOT_SUPPORT	0x80
+
+/* Device in use by application. */
+#define	ACPI_OST_STA_EJECT_IN_USE	0x81
+
+/* Device Busy. */
+#define	ACPI_OST_STA_EJECT_BUSY		0x82
+
+/* Ejection dependency is busy or not supported for ejection by OSPM. */
+#define	ACPI_OST_STA_EJECT_DEPENDENCY	0x83
+
+/* Ejection is in progress (pending). */
+#define	ACPI_OST_STA_EJECT_IN_PROGRESS	0x84
+
+/* Device insertion in progress (pending). */
+#define	ACPI_OST_STA_INSERT_IN_PROGRESS	0x80
+
+/* Device driver load failure. */
+#define	ACPI_OST_STA_INSERT_DRIVER	0x81
+
+/* Device insertion not supported by OSPM. */
+#define	ACPI_OST_STA_INSERT_NOT_SUPPORT	0x82
+
+/*
+ * Insertion failure
+ * Resources Unavailable as described by the following bit encodings:
+ * Bit[3] Bus Numbers
+ * Bit[2] Interrupts
+ * Bit[1] I/O
+ * Bit[0] Memory
+ */
+#define	ACPI_OST_STA_INSERT_NO_RESOURCE	0x90
+#define	ACPI_OST_STA_INSERT_NO_BUS	0x8
+#define	ACPI_OST_STA_INSERT_NO_INTR	0x4
+#define	ACPI_OST_STA_INSERT_NO_IO	0x2
+#define	ACPI_OST_STA_INSERT_NO_MEM	0x1
+
+/*
+ * According to the ACPI specification, self latency (entry[n][n]) in the
+ * SLIT table should be 10.
+ */
+#define	ACPI_SLIT_SELF_LATENCY		10
+
+/*
+ * The DR driver assigns a unique device id for each hot-added memory device.
+ * ACPI_MEMNODE_DEVID_BOOT is assigned to memory devices present at boot,
+ * which is distinguished from device ids assigned by the DR driver.
+ */
+#define	ACPI_MEMNODE_DEVID_BOOT		UINT32_MAX
 
 /* Forward declaration */
 typedef	struct acpidev_data_impl	*acpidev_data_handle_t;
@@ -197,7 +292,7 @@ typedef ACPI_STATUS (* acpidev_probe_t)(acpidev_walk_info_t *);
 typedef acpidev_filter_result_t (* acpidev_filter_t)(acpidev_walk_info_t *,
     char *, int);
 typedef ACPI_STATUS (* acpidev_init_t)(acpidev_walk_info_t *);
-typedef ACPI_STATUS (* acpidev_fini_t)(ACPI_HANDLE, dev_info_t *,
+typedef void (* acpidev_fini_t)(ACPI_HANDLE, acpidev_data_handle_t,
     acpidev_class_t *);
 
 /* Device class driver interface. */
@@ -237,6 +332,7 @@ extern acpidev_class_t			acpidev_class_device;
 extern acpidev_class_t			acpidev_class_container;
 extern acpidev_class_t			acpidev_class_cpu;
 extern acpidev_class_t			acpidev_class_memory;
+extern acpidev_class_t			acpidev_class_pci;
 
 /*
  * Class driver lists.
@@ -309,6 +405,7 @@ extern ACPI_STATUS acpidev_process_object(acpidev_walk_info_t *infop,
 #define	ACPIDEV_PROCESS_FLAG_OFFLINE	0x400	/* Put device into offline. */
 #define	ACPIDEV_PROCESS_FLAG_NOTAG	0x800	/* Skip tag dip with object. */
 #define	ACPIDEV_PROCESS_FLAG_SYNCSTATUS	0x1000	/* Sync object status. */
+#define	ACPIDEV_PROCESS_FLAG_HOLDBRANCH	0x10000	/* Hold device branch. */
 
 /*
  * Filter ACPI objects according to filter rules, generate devname if needed.
@@ -346,9 +443,15 @@ extern void acpidev_data_destroy_handle(ACPI_HANDLE hdl);
 extern ACPI_HANDLE acpidev_data_get_object(acpidev_data_handle_t hdl);
 extern dev_info_t *acpidev_data_get_devinfo(acpidev_data_handle_t hdl);
 extern int acpidev_data_get_status(acpidev_data_handle_t hdl);
+extern boolean_t acpidev_data_dr_capable(acpidev_data_handle_t hdl);
+extern boolean_t acpidev_data_dr_ready(acpidev_data_handle_t hdl);
+extern boolean_t acpidev_data_dr_failed(acpidev_data_handle_t hdl);
 extern void acpidev_data_set_flag(acpidev_data_handle_t hdl, uint32_t flag);
 extern void acpidev_data_clear_flag(acpidev_data_handle_t hdl, uint32_t flag);
 extern uint32_t acpidev_data_get_flag(acpidev_data_handle_t hdl, uint32_t flag);
+
+/* ACPI system event handler has been registered. */
+#define	ACPIDEV_DATA_HANDLER_READY	0x1
 
 /*
  * Try to generate meaningful device unit address from uid.
@@ -429,6 +532,26 @@ typedef ACPI_STATUS (* acpidev_apic_walker_t)(ACPI_SUBTABLE_HEADER *, void *);
  */
 extern ACPI_STATUS acpidev_walk_apic(ACPI_BUFFER *bufp, ACPI_HANDLE hdl,
     char *method, acpidev_apic_walker_t func, void *context);
+
+/*
+ * Evaluate _OST method under object, which is used to support hotplug event.
+ * hdl: object handle
+ * code: _OST source event code
+ * stauts: _OST result status code
+ * bufp and len: optional third parameter for _OST.
+ */
+extern ACPI_STATUS acpidev_eval_ost(ACPI_HANDLE hdl, uint32_t code,
+    uint32_t status, char *bufp, size_t len);
+
+/*
+ * Evaluate _EJ0 method under object.
+ */
+extern ACPI_STATUS acpidev_eval_ej0(ACPI_HANDLE hdl);
+
+/*
+ * Evaluate _PXM method under object.
+ */
+extern ACPI_STATUS acpidev_eval_pxm(ACPI_HANDLE hdl, uint32_t *idp);
 
 #endif	/* _KERNEL */
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -175,11 +172,11 @@ ap_stat(apd_t *a, int all)
 		 */
 		ctl->ic_type = SBD_COMP_UNKNOWN;
 		ctl->ic_unit = a->cnum;
-		strcpy(ctl->ic_name, a->cname);
+		(void) strcpy(ctl->ic_name, a->cname);
 	}
 
 	DBG("ioctl(%d SBD_CMD_STATUS, sc=0x%p sz=%d flags=%d",
-		fd, (void *)sc->s_statp, sc->s_nbytes, ctl->i_flags);
+	    fd, (void *)sc->s_statp, sc->s_nbytes, ctl->i_flags);
 	if (select)
 		DBG(" cname=<%s> cnum=%d", a->cname, a->cnum);
 	DBG(")\n");
@@ -282,7 +279,7 @@ apd_init(apd_t *a, int all)
 	for (dst = st->s_stat, i = 0; i < st->s_nstat; i++, dst++) {
 
 		DBG("ds_name,ds_unit,ds_type=<%s,%d,%d> ",
-			dst->ds_name, dst->ds_unit, dst->ds_type);
+		    dst->ds_name, dst->ds_unit, dst->ds_type);
 
 		if (dst->ds_unit != a->cnum)
 			continue;
@@ -331,7 +328,7 @@ apd_free(apd_t *a)
 	ap_rcm_fini(a);
 
 	if (a->fd != -1)
-		close(a->fd);
+		(void) close(a->fd);
 
 	s_free(a->options);
 	s_free(a->path);
@@ -405,7 +402,7 @@ ap_init(apd_t *a, cfga_list_data_t *ap)
 	st = (sbd_stat_t *)a->stat;
 
 	DBG("ap_init bd=%d rs=%d os=%d type=<%s>\n",
-		a->bnum, st->s_rstate, st->s_ostate, st->s_type);
+	    a->bnum, st->s_rstate, st->s_ostate, st->s_type);
 
 	parsable_strncpy(ap->ap_type, st->s_type, sizeof (ap->ap_type));
 	ap->ap_r_state = (cfga_stat_t)st->s_rstate;
@@ -555,7 +552,7 @@ ap_ioctl(apd_t *a, int cmd)
 	else {
 		ctl->ic_type = SBD_COMP_UNKNOWN;
 		ctl->ic_unit = a->cnum;
-		strcpy(ctl->ic_name, a->cname);
+		(void) strcpy(ctl->ic_name, a->cname);
 	}
 
 	if (!(ioc = ap_ioc(cmd))) {
@@ -638,7 +635,7 @@ mod_estr(int code)
 	if (i == sbd_etab_len) {
 		char buf[32];
 
-		snprintf(buf, sizeof (buf), "error %d", code);
+		(void) snprintf(buf, sizeof (buf), "error %d", code);
 		s = strdup(buf);
 	}
 
@@ -760,7 +757,7 @@ ap_help(struct cfga_msg *msgp, const char *options, cfga_flags_t flags)
 			continue;
 		if ((q = (char *)calloc(len + 1, 1)) == NULL)
 			continue;
-		strcpy(q, *p);
+		(void) strcpy(q, *p);
 		(*msgp->message_routine)(msgp->appdata_ptr, q);
 		free(q);
 	}
@@ -823,7 +820,7 @@ ap_cm_devpath(apd_t *a, int seq)
 	 * Assume an io component so that we can get
 	 * the path if the component is indeed of type io.
 	 */
-	if (seq == -1)
+	if (seq == CM_DFLT)
 		dst = (sbd_io_stat_t *)a->cmstat;
 	else {
 		sbd_stat_t *st;
@@ -1002,7 +999,7 @@ ap_cm_init(apd_t *a, cfga_list_data_t *ap, int seq)
 	a->cmstat = (void *)dst;
 
 	DBG("ap_cm_init bd=%d rs=%d os=%d type=<%s> seq=%d\n",
-		a->bnum, st->s_rstate, dst->ds_ostate, type, seq);
+	    a->bnum, st->s_rstate, dst->ds_ostate, type, seq);
 
 	(void) strncpy(ap->ap_type, type, sizeof (ap->ap_type));
 	ap->ap_r_state = (cfga_stat_t)st->s_rstate;

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
@@ -46,6 +46,8 @@
 
 #define	CSTATE_USING_HPET		1
 #define	CSTATE_USING_LAT		2
+
+#define	CPU_IDLE_STOP_TIMEOUT		1000
 
 extern void cpu_idle_adaptive(void);
 extern uint32_t cpupm_next_cstate(cma_c_state_t *cs_data,
@@ -677,7 +679,7 @@ cpu_idle_init(cpu_t *cp)
 		/*
 		 * Allocate, initialize and install cstate kstat
 		 */
-		cstate->cs_ksp = kstat_create("cstate", CPU->cpu_id,
+		cstate->cs_ksp = kstat_create("cstate", cp->cpu_id,
 		    name, "misc",
 		    KSTAT_TYPE_NAMED,
 		    sizeof (cpu_idle_kstat) / sizeof (kstat_named_t),
@@ -692,8 +694,8 @@ cpu_idle_init(cpu_t *cp)
 			cstate->cs_ksp->ks_data_size += MAXNAMELEN;
 			cstate->cs_ksp->ks_private = cstate;
 			kstat_install(cstate->cs_ksp);
-			cstate++;
 		}
+		cstate++;
 	}
 
 	cpupm_alloc_domains(cp, CPUPM_C_STATES);
@@ -771,6 +773,19 @@ cpu_idle_fini(cpu_t *cp)
 	mutex_exit(&cpu_idle_callb_mutex);
 }
 
+/*
+ * This function is introduced here to solve a race condition
+ * between the master and the slave to touch c-state data structure.
+ * After the slave calls this idle function to switch to the non
+ * deep idle function, the master can go on to reclaim the resource.
+ */
+static void
+cpu_idle_stop_sync(void)
+{
+	/* switch to the non deep idle function */
+	CPU->cpu_m.mcpu_idle_cpu = non_deep_idle_cpu;
+}
+
 static void
 cpu_idle_stop(cpu_t *cp)
 {
@@ -778,15 +793,28 @@ cpu_idle_stop(cpu_t *cp)
 	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
 	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_cstate_t *cstate;
-	uint_t cpu_max_cstates, i;
+	uint_t cpu_max_cstates, i = 0;
 
-	/*
-	 * place the CPUs in a safe place so that we can disable
-	 * deep c-state on them.
-	 */
-	pause_cpus(NULL);
-	cp->cpu_m.mcpu_idle_cpu = non_deep_idle_cpu;
-	start_cpus();
+	mutex_enter(&cpu_idle_callb_mutex);
+	if (idle_cpu == cpu_idle_adaptive) {
+		/*
+		 * invoke the slave to call synchronous idle function.
+		 */
+		cp->cpu_m.mcpu_idle_cpu = cpu_idle_stop_sync;
+		poke_cpu(cp->cpu_id);
+
+		/*
+		 * wait until the slave switchs to non deep idle function,
+		 * so that the master is safe to go on to reclaim the resource.
+		 */
+		while (cp->cpu_m.mcpu_idle_cpu != non_deep_idle_cpu) {
+			drv_usecwait(10);
+			if ((++i % CPU_IDLE_STOP_TIMEOUT) == 0)
+				cmn_err(CE_NOTE, "!cpu_idle_stop: the slave"
+				    " idle stop timeout");
+		}
+	}
+	mutex_exit(&cpu_idle_callb_mutex);
 
 	cstate = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
 	if (cstate) {
@@ -937,7 +965,6 @@ cpuidle_cstate_instance(cpu_t *cp)
 			cmn_err(CE_WARN, "Cannot re-evaluate the cpu c-state"
 			    " object Instance: %d", cpu_id);
 		}
-		mutex_enter(&cpu_lock);
 		mcpu = &(cp->cpu_m);
 		mcpu->max_cstates = cpu_acpi_get_max_cstates(handle);
 		if (mcpu->max_cstates > CPU_ACPI_C1) {
@@ -950,7 +977,6 @@ cpuidle_cstate_instance(cpu_t *cp)
 			cp->cpu_m.mcpu_idle_cpu = non_deep_idle_cpu;
 			(void) cstate_timer_callback(CST_EVENT_ONE_CSTATE);
 		}
-		mutex_exit(&cpu_lock);
 
 		CPUSET_ATOMIC_XDEL(dom_cpu_set, cpu_id, result);
 	} while (result < 0);

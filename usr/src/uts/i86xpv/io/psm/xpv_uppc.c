@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#define	PSMI_1_6
+#define	PSMI_1_7
 
 #include <sys/mutex.h>
 #include <sys/types.h>
@@ -891,7 +891,8 @@ static struct psm_ops xen_uppc_ops = {
 
 	(int (*)(dev_info_t *, ddi_intr_handle_impl_t *,
 	    psm_intr_op_t, int *))NULL,		/* psm_intr_ops		*/
-	(int (*)(psm_state_request_t *))NULL	/* psm_state		*/
+	(int (*)(psm_state_request_t *))NULL,	/* psm_state		*/
+	(int (*)(psm_cpu_request_t *))NULL	/* psm_cpu_ops		*/
 };
 
 static struct psm_info xen_uppc_info = {

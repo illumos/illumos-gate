@@ -23,6 +23,10 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 /*
  * PSMI 1.1 extensions are supported only in 2.6 and later versions.
@@ -30,8 +34,9 @@
  * PSMI 1.3 and 1.4 extensions are supported in Solaris 10.
  * PSMI 1.5 extensions are supported in Solaris Nevada.
  * PSMI 1.6 extensions are supported in Solaris Nevada.
+ * PSMI 1.7 extensions are supported in Solaris Nevada.
  */
-#define	PSMI_1_6
+#define	PSMI_1_7
 
 #include <sys/processor.h>
 #include <sys/time.h>
@@ -88,7 +93,11 @@ static hrtime_t apic_gettime();
 static hrtime_t apic_gethrtime();
 static void	apic_init();
 static void	apic_picinit(void);
-static int	apic_cpu_start(processorid_t, caddr_t);
+static int	apic_cpu_start(processorid_t cpuid, caddr_t ctx);
+static int	apic_cpu_stop(processorid_t cpuid, caddr_t ctx);
+static int	apic_cpu_add(psm_cpu_request_t *reqp);
+static int	apic_cpu_remove(psm_cpu_request_t *reqp);
+static int	apic_cpu_ops(psm_cpu_request_t *reqp);
 static int	apic_post_cpu_start(void);
 static void	apic_send_ipi(int cpun, int ipl);
 static void	apic_set_idlecpu(processorid_t cpun);
@@ -96,6 +105,7 @@ static void	apic_unset_idlecpu(processorid_t cpun);
 static int	apic_intr_enter(int ipl, int *vect);
 static void	apic_setspl(int ipl);
 static void	x2apic_setspl(int ipl);
+static void	apic_switch_ipi_callback(boolean_t enter);
 static int	apic_addspl(int ipl, int vector, int min_ipl, int max_ipl);
 static int	apic_delspl(int ipl, int vector, int min_ipl, int max_ipl);
 static void	apic_shutdown(int cmd, int fcn);
@@ -137,6 +147,9 @@ int apic_error_display_delay = 100;
 int apic_cpcovf_vect;
 int apic_enable_cpcovf_intr = 1;
 
+/* maximum loop count when sending Start IPIs. */
+int apic_sipi_max_loop_count = 0x1000;
+
 /* vector at which CMCI interrupts come in */
 int apic_cmci_vect;
 extern int cmi_enable_cmci;
@@ -144,6 +157,10 @@ extern void cmi_cmci_trap(void);
 
 static kmutex_t cmci_cpu_setup_lock;	/* protects cmci_cpu_setup_registered */
 static int cmci_cpu_setup_registered;
+
+/* number of CPUs in power-on transition state */
+static int apic_poweron_cnt = 0;
+static lock_t apic_mode_switch_lock;
 
 /*
  * The following vector assignments influence the value of ipltopri and
@@ -209,6 +226,7 @@ int	apic_verbose = 0;
 
 /* minimum number of timer ticks to program to */
 int apic_min_timer_ticks = 1;
+
 /*
  *	Local static data
  */
@@ -252,11 +270,12 @@ static struct	psm_ops apic_ops = {
 	apic_preshutdown,
 	apic_intr_ops,			/* Advanced DDI Interrupt framework */
 	apic_state,			/* save, restore apic state for S3 */
+	apic_cpu_ops,			/* CPU control interface. */
 };
 
 
 static struct	psm_info apic_psm_info = {
-	PSM_INFO_VER01_6,			/* version */
+	PSM_INFO_VER01_7,			/* version */
 	PSM_OWN_EXCLUSIVE,			/* ownership */
 	(struct psm_ops *)&apic_ops,		/* operation */
 	APIC_PCPLUSMP_NAME,			/* machine name */
@@ -786,6 +805,7 @@ apic_picinit(void)
 	LOCK_INIT_CLEAR(&apic_gethrtime_lock);
 	LOCK_INIT_CLEAR(&apic_ioapic_lock);
 	LOCK_INIT_CLEAR(&apic_error_lock);
+	LOCK_INIT_CLEAR(&apic_mode_switch_lock);
 
 	picsetup();	 /* initialise the 8259 */
 
@@ -814,29 +834,27 @@ apic_picinit(void)
 	ioapic_init_intr(IOAPIC_MASK);
 }
 
-
-/*ARGSUSED1*/
-static int
-apic_cpu_start(processorid_t cpun, caddr_t arg)
+static void
+apic_cpu_send_SIPI(processorid_t cpun, boolean_t start)
 {
 	int		loop_count;
 	uint32_t	vector;
-	uint_t		cpu_id;
+	uint_t		apicid;
 	ulong_t		iflag;
 
-	cpu_id =  apic_cpus[cpun].aci_local_id;
-
-	apic_cmos_ssb_set = 1;
+	apicid =  apic_cpus[cpun].aci_local_id;
 
 	/*
-	 * Interrupts on BSP cpu will be disabled during these startup
+	 * Interrupts on current CPU will be disabled during the
 	 * steps in order to avoid unwanted side effects from
 	 * executing interrupt handlers on a problematic BIOS.
 	 */
-
 	iflag = intr_clear();
-	outb(CMOS_ADDR, SSB);
-	outb(CMOS_DATA, BIOS_SHUTDOWN);
+
+	if (start) {
+		outb(CMOS_ADDR, SSB);
+		outb(CMOS_DATA, BIOS_SHUTDOWN);
+	}
 
 	/*
 	 * According to X2APIC specification in section '2.3.5.1' of
@@ -860,10 +878,10 @@ apic_cpu_start(processorid_t cpun, caddr_t arg)
 
 	/* for integrated - make sure there is one INIT IPI in buffer */
 	/* for external - it will wake up the cpu */
-	apic_reg_ops->apic_write_int_cmd(cpu_id, AV_ASSERT | AV_RESET);
+	apic_reg_ops->apic_write_int_cmd(apicid, AV_ASSERT | AV_RESET);
 
 	/* If only 1 CPU is installed, PENDING bit will not go low */
-	for (loop_count = 0x1000; loop_count; loop_count--) {
+	for (loop_count = apic_sipi_max_loop_count; loop_count; loop_count--) {
 		if (apic_mode == LOCAL_APIC &&
 		    apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING)
 			apic_ret();
@@ -871,8 +889,7 @@ apic_cpu_start(processorid_t cpun, caddr_t arg)
 			break;
 	}
 
-	apic_reg_ops->apic_write_int_cmd(cpu_id, AV_DEASSERT | AV_RESET);
-
+	apic_reg_ops->apic_write_int_cmd(apicid, AV_DEASSERT | AV_RESET);
 	drv_usecwait(20000);		/* 20 milli sec */
 
 	if (apic_cpus[cpun].aci_local_ver >= APIC_INTEGRATED_VERS) {
@@ -882,18 +899,111 @@ apic_cpu_start(processorid_t cpun, caddr_t arg)
 		    (APIC_VECTOR_MASK | APIC_IPL_MASK);
 
 		/* to offset the INIT IPI queue up in the buffer */
-		apic_reg_ops->apic_write_int_cmd(cpu_id, vector | AV_STARTUP);
-
+		apic_reg_ops->apic_write_int_cmd(apicid, vector | AV_STARTUP);
 		drv_usecwait(200);		/* 20 micro sec */
 
-		apic_reg_ops->apic_write_int_cmd(cpu_id, vector | AV_STARTUP);
-
-		drv_usecwait(200);		/* 20 micro sec */
+		/*
+		 * send the second SIPI (Startup IPI) as recommended by Intel
+		 * software development manual.
+		 */
+		apic_reg_ops->apic_write_int_cmd(apicid, vector | AV_STARTUP);
+		drv_usecwait(200);	/* 20 micro sec */
 	}
+
 	intr_restore(iflag);
+}
+
+/*ARGSUSED1*/
+static int
+apic_cpu_start(processorid_t cpun, caddr_t arg)
+{
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	if (!apic_cpu_in_range(cpun)) {
+		return (EINVAL);
+	}
+
+	/*
+	 * Switch to apic_common_send_ipi for safety during starting other CPUs.
+	 */
+	if (apic_mode == LOCAL_X2APIC) {
+		apic_switch_ipi_callback(B_TRUE);
+	}
+
+	apic_cmos_ssb_set = 1;
+	apic_cpu_send_SIPI(cpun, B_TRUE);
+
 	return (0);
 }
 
+/*
+ * Put CPU into halted state with interrupts disabled.
+ */
+/*ARGSUSED1*/
+static int
+apic_cpu_stop(processorid_t cpun, caddr_t arg)
+{
+	int		rc;
+	cpu_t 		*cp;
+	extern cpuset_t cpu_ready_set;
+	extern void cpu_idle_intercept_cpu(cpu_t *cp);
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	if (!apic_cpu_in_range(cpun)) {
+		return (EINVAL);
+	}
+	if (apic_cpus[cpun].aci_local_ver < APIC_INTEGRATED_VERS) {
+		return (ENOTSUP);
+	}
+
+	cp = cpu_get(cpun);
+	ASSERT(cp != NULL);
+	ASSERT((cp->cpu_flags & CPU_OFFLINE) != 0);
+	ASSERT((cp->cpu_flags & CPU_QUIESCED) != 0);
+	ASSERT((cp->cpu_flags & CPU_ENABLE) == 0);
+
+	/* Clear CPU_READY flag to disable cross calls. */
+	cp->cpu_flags &= ~CPU_READY;
+	CPUSET_ATOMIC_DEL(cpu_ready_set, cpun);
+	rc = xc_flush_cpu(cp);
+	if (rc != 0) {
+		CPUSET_ATOMIC_ADD(cpu_ready_set, cpun);
+		cp->cpu_flags |= CPU_READY;
+		return (rc);
+	}
+
+	/* Intercept target CPU at a safe point before powering it off. */
+	cpu_idle_intercept_cpu(cp);
+
+	apic_cpu_send_SIPI(cpun, B_FALSE);
+	cp->cpu_flags &= ~CPU_RUNNING;
+
+	return (0);
+}
+
+static int
+apic_cpu_ops(psm_cpu_request_t *reqp)
+{
+	if (reqp == NULL) {
+		return (EINVAL);
+	}
+
+	switch (reqp->pcr_cmd) {
+	case PSM_CPU_ADD:
+		return (apic_cpu_add(reqp));
+
+	case PSM_CPU_REMOVE:
+		return (apic_cpu_remove(reqp));
+
+	case PSM_CPU_STOP:
+		return (apic_cpu_stop(reqp->req.cpu_stop.cpuid,
+		    reqp->req.cpu_stop.ctx));
+
+	default:
+		return (ENOTSUP);
+	}
+}
 
 #ifdef	DEBUG
 int	apic_break_on_cpu = 9;
@@ -1377,7 +1487,6 @@ apic_post_cpu_start()
 {
 	int cpun;
 	static int cpus_started = 1;
-	struct psm_ops *pops = &apic_ops;
 
 	/* We know this CPU + BSP  started successfully. */
 	cpus_started++;
@@ -1395,23 +1504,11 @@ apic_post_cpu_start()
 	}
 
 	/*
-	 * We change psm_send_ipi and send_dirintf only if Solaris
-	 * is booted in kmdb & the current CPU is the last CPU being
-	 * brought up. We don't need to do anything if Solaris is running
-	 * in MMIO mode (xAPIC).
+	 * Switch back to x2apic IPI sending method for performance when target
+	 * CPU has entered x2apic mode.
 	 */
-	if ((boothowto & RB_DEBUG) &&
-	    (cpus_started == boot_ncpus || cpus_started == apic_nproc) &&
-	    apic_mode == LOCAL_X2APIC) {
-		/*
-		 * We no longer need help from apic_common_send_ipi()
-		 * since we will not start any more CPUs.
-		 *
-		 * We will need to revisit this if we start supporting
-		 * hot-plugging of CPUs.
-		 */
-		pops->psm_send_ipi = x2apic_send_ipi;
-		send_dirintf = pops->psm_send_ipi;
+	if (apic_mode == LOCAL_X2APIC) {
+		apic_switch_ipi_callback(B_FALSE);
 	}
 
 	splx(ipltospl(LOCK_LEVEL));
@@ -1452,13 +1549,230 @@ apic_get_next_processorid(processorid_t cpu_id)
 		return ((processorid_t)0);
 
 	for (i = cpu_id + 1; i < NCPU; i++) {
-		if (CPU_IN_SET(apic_cpumask, i))
+		if (apic_cpu_in_range(i))
 			return (i);
 	}
 
 	return ((processorid_t)-1);
 }
 
+static int
+apic_cpu_add(psm_cpu_request_t *reqp)
+{
+	int i, rv = 0;
+	ulong_t iflag;
+	boolean_t first = B_TRUE;
+	uchar_t localver;
+	uint32_t localid, procid;
+	processorid_t cpuid = (processorid_t)-1;
+	mach_cpu_add_arg_t *ap;
+
+	ASSERT(reqp != NULL);
+	reqp->req.cpu_add.cpuid = (processorid_t)-1;
+
+	/* Check whether CPU hotplug is supported. */
+	if (!plat_dr_support_cpu() || apic_max_nproc == -1) {
+		return (ENOTSUP);
+	}
+
+	ap = (mach_cpu_add_arg_t *)reqp->req.cpu_add.argp;
+	switch (ap->type) {
+	case MACH_CPU_ARG_LOCAL_APIC:
+		localid = ap->arg.apic.apic_id;
+		procid = ap->arg.apic.proc_id;
+		if (localid >= 255 || procid > 255) {
+			cmn_err(CE_WARN,
+			    "!apic: apicid(%u) or procid(%u) is invalid.",
+			    localid, procid);
+			return (EINVAL);
+		}
+		break;
+
+	case MACH_CPU_ARG_LOCAL_X2APIC:
+		localid = ap->arg.apic.apic_id;
+		procid = ap->arg.apic.proc_id;
+		if (localid >= UINT32_MAX) {
+			cmn_err(CE_WARN,
+			    "!apic: x2apicid(%u) is invalid.", localid);
+			return (EINVAL);
+		} else if (localid >= 255 && apic_mode == LOCAL_APIC) {
+			cmn_err(CE_WARN, "!apic: system is in APIC mode, "
+			    "can't support x2APIC processor.");
+			return (ENOTSUP);
+		}
+		break;
+
+	default:
+		cmn_err(CE_WARN,
+		    "!apic: unknown argument type %d to apic_cpu_add().",
+		    ap->type);
+		return (EINVAL);
+	}
+
+	/* Use apic_ioapic_lock to sync with apic_find_next_cpu_intr. */
+	iflag = intr_clear();
+	lock_set(&apic_ioapic_lock);
+
+	/* Check whether local APIC id already exists. */
+	for (i = 0; i < apic_nproc; i++) {
+		if (!CPU_IN_SET(apic_cpumask, i))
+			continue;
+		if (apic_cpus[i].aci_local_id == localid) {
+			lock_clear(&apic_ioapic_lock);
+			intr_restore(iflag);
+			cmn_err(CE_WARN,
+			    "!apic: local apic id %u already exists.",
+			    localid);
+			return (EEXIST);
+		} else if (apic_cpus[i].aci_processor_id == procid) {
+			lock_clear(&apic_ioapic_lock);
+			intr_restore(iflag);
+			cmn_err(CE_WARN,
+			    "!apic: processor id %u already exists.",
+			    (int)procid);
+			return (EEXIST);
+		}
+
+		/*
+		 * There's no local APIC version number available in MADT table,
+		 * so assume that all CPUs are homogeneous and use local APIC
+		 * version number of the first existing CPU.
+		 */
+		if (first) {
+			first = B_FALSE;
+			localver = apic_cpus[i].aci_local_ver;
+		}
+	}
+	ASSERT(first == B_FALSE);
+
+	/*
+	 * Try to assign the same cpuid if APIC id exists in the dirty cache.
+	 */
+	for (i = 0; i < apic_max_nproc; i++) {
+		if (CPU_IN_SET(apic_cpumask, i)) {
+			ASSERT((apic_cpus[i].aci_status & APIC_CPU_FREE) == 0);
+			continue;
+		}
+		ASSERT(apic_cpus[i].aci_status & APIC_CPU_FREE);
+		if ((apic_cpus[i].aci_status & APIC_CPU_DIRTY) &&
+		    apic_cpus[i].aci_local_id == localid &&
+		    apic_cpus[i].aci_processor_id == procid) {
+			cpuid = i;
+			break;
+		}
+	}
+
+	/* Avoid the dirty cache and allocate fresh slot if possible. */
+	if (cpuid == (processorid_t)-1) {
+		for (i = 0; i < apic_max_nproc; i++) {
+			if ((apic_cpus[i].aci_status & APIC_CPU_FREE) &&
+			    (apic_cpus[i].aci_status & APIC_CPU_DIRTY) == 0) {
+				cpuid = i;
+				break;
+			}
+		}
+	}
+
+	/* Try to find any free slot as last resort. */
+	if (cpuid == (processorid_t)-1) {
+		for (i = 0; i < apic_max_nproc; i++) {
+			if (apic_cpus[i].aci_status & APIC_CPU_FREE) {
+				cpuid = i;
+				break;
+			}
+		}
+	}
+
+	if (cpuid == (processorid_t)-1) {
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
+		cmn_err(CE_NOTE,
+		    "!apic: failed to allocate cpu id for processor %u.",
+		    procid);
+		rv = EAGAIN;
+	} else if (ACPI_FAILURE(acpica_map_cpu(cpuid, procid))) {
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
+		cmn_err(CE_NOTE,
+		    "!apic: failed to build mapping for processor %u.",
+		    procid);
+		rv = EBUSY;
+	} else {
+		ASSERT(cpuid >= 0 && cpuid < NCPU);
+		ASSERT(cpuid < apic_max_nproc && cpuid < max_ncpus);
+		bzero(&apic_cpus[cpuid], sizeof (apic_cpus[0]));
+		apic_cpus[cpuid].aci_processor_id = procid;
+		apic_cpus[cpuid].aci_local_id = localid;
+		apic_cpus[cpuid].aci_local_ver = localver;
+		CPUSET_ATOMIC_ADD(apic_cpumask, cpuid);
+		if (cpuid >= apic_nproc) {
+			apic_nproc = cpuid + 1;
+		}
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
+		reqp->req.cpu_add.cpuid = cpuid;
+	}
+
+	return (rv);
+}
+
+static int
+apic_cpu_remove(psm_cpu_request_t *reqp)
+{
+	int i;
+	ulong_t iflag;
+	processorid_t cpuid;
+
+	/* Check whether CPU hotplug is supported. */
+	if (!plat_dr_support_cpu() || apic_max_nproc == -1) {
+		return (ENOTSUP);
+	}
+
+	cpuid = reqp->req.cpu_remove.cpuid;
+
+	/* Use apic_ioapic_lock to sync with apic_find_next_cpu_intr. */
+	iflag = intr_clear();
+	lock_set(&apic_ioapic_lock);
+
+	if (!apic_cpu_in_range(cpuid)) {
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
+		cmn_err(CE_WARN,
+		    "!apic: cpuid %d doesn't exist in apic_cpus array.",
+		    cpuid);
+		return (ENODEV);
+	}
+	ASSERT((apic_cpus[cpuid].aci_status & APIC_CPU_FREE) == 0);
+
+	if (ACPI_FAILURE(acpica_unmap_cpu(cpuid))) {
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
+		return (ENOENT);
+	}
+
+	if (cpuid == apic_nproc - 1) {
+		/*
+		 * We are removing the highest numbered cpuid so we need to
+		 * find the next highest cpuid as the new value for apic_nproc.
+		 */
+		for (i = apic_nproc; i > 0; i--) {
+			if (CPU_IN_SET(apic_cpumask, i - 1)) {
+				apic_nproc = i;
+				break;
+			}
+		}
+		/* at least one CPU left */
+		ASSERT(i > 0);
+	}
+	CPUSET_ATOMIC_DEL(apic_cpumask, cpuid);
+	/* mark slot as free and keep it in the dirty cache */
+	apic_cpus[cpuid].aci_status = APIC_CPU_FREE | APIC_CPU_DIRTY;
+
+	lock_clear(&apic_ioapic_lock);
+	intr_restore(iflag);
+
+	return (0);
+}
 
 /*
  * type == -1 indicates it is an internal request. Do not change
@@ -1898,8 +2212,7 @@ apic_disable_intr(processorid_t cpun)
 		if ((irq_ptr = apic_irq_table[i]) != NULL) {
 			ASSERT((irq_ptr->airq_temp_cpu == IRQ_UNBOUND) ||
 			    (irq_ptr->airq_temp_cpu == IRQ_UNINIT) ||
-			    ((irq_ptr->airq_temp_cpu & ~IRQ_USER_BOUND) <
-			    apic_nproc));
+			    (apic_cpu_in_range(irq_ptr->airq_temp_cpu)));
 
 			if (irq_ptr->airq_temp_cpu == (cpun | IRQ_USER_BOUND)) {
 				hardbound = 1;
@@ -1908,12 +2221,7 @@ apic_disable_intr(processorid_t cpun)
 
 			if (irq_ptr->airq_temp_cpu == cpun) {
 				do {
-					bind_cpu = apic_next_bind_cpu++;
-					if (bind_cpu >= apic_nproc) {
-						apic_next_bind_cpu = 1;
-						bind_cpu = 0;
-
-					}
+					bind_cpu = apic_find_next_cpu_intr();
 				} while (apic_rebind_all(irq_ptr, bind_cpu));
 			}
 		}
@@ -2141,6 +2449,8 @@ apic_redistribute_compute(void)
 		}
 		max_busy = 0;
 		for (i = 0; i < apic_nproc; i++) {
+			if (!apic_cpu_in_range(i))
+				continue;
 
 			/*
 			 * Check if curipl is non zero & if ISR is in
@@ -2481,24 +2791,6 @@ ioapic_write_eoi(int ioapic_ix, uint32_t value)
 	ioapic[APIC_IO_EOI] = value;
 }
 
-static processorid_t
-apic_find_cpu(int flag)
-{
-	processorid_t acid = 0;
-	int i;
-
-	/* Find the first CPU with the passed-in flag set */
-	for (i = 0; i < apic_nproc; i++) {
-		if (apic_cpus[i].aci_status & flag) {
-			acid = i;
-			break;
-		}
-	}
-
-	ASSERT((apic_cpus[acid].aci_status & flag) != 0);
-	return (acid);
-}
-
 /*
  * Call rebind to do the actual programming.
  * Must be called with interrupts disabled and apic_ioapic_lock held
@@ -2508,8 +2800,8 @@ apic_find_cpu(int flag)
  * p is of the type 'apic_irq_t *'.
  *
  * apic_ioapic_lock must be held across this call, as it protects apic_rebind
- * and it protects apic_find_cpu() from a race in which a CPU can be taken
- * offline after a cpu is selected, but before apic_rebind is called to
+ * and it protects apic_find_next_cpu_intr() from a race in which a CPU can be
+ * taken offline after a cpu is selected, but before apic_rebind is called to
  * bind interrupts to it.
  */
 int
@@ -2534,8 +2826,7 @@ apic_setup_io_intr(void *p, int irq, boolean_t deferred)
 		 * CPU is not up or interrupts are disabled. Fall back to
 		 * the first available CPU
 		 */
-		rv = apic_rebind(irqptr, apic_find_cpu(APIC_CPU_INTR_ENABLE),
-		    drep);
+		rv = apic_rebind(irqptr, apic_find_next_cpu_intr(), drep);
 	}
 
 	return (rv);
@@ -2555,6 +2846,45 @@ apic_get_apic_type()
 	return (apic_psm_info.p_mach_idstring);
 }
 
+/*
+ * Switch between safe and x2APIC IPI sending method.
+ * CPU may power on in xapic mode or x2apic mode. If CPU needs to send IPI to
+ * other CPUs before entering x2APIC mode, it still needs to xAPIC method.
+ * Before sending StartIPI to target CPU, psm_send_ipi will be changed to
+ * apic_common_send_ipi, which detects current local APIC mode and use right
+ * method to send IPI. If some CPUs fail to start up, apic_poweron_cnt
+ * won't return to zero, so apic_common_send_ipi will always be used.
+ * psm_send_ipi can't be simply changed back to x2apic_send_ipi if some CPUs
+ * failed to start up because those failed CPUs may recover itself later at
+ * unpredictable time.
+ */
+static void
+apic_switch_ipi_callback(boolean_t enter)
+{
+	ulong_t iflag;
+	struct psm_ops *pops = &apic_ops;
+
+	iflag = intr_clear();
+	lock_set(&apic_mode_switch_lock);
+	if (enter) {
+		ASSERT(apic_poweron_cnt >= 0);
+		if (apic_poweron_cnt == 0) {
+			pops->psm_send_ipi = apic_common_send_ipi;
+			send_dirintf = pops->psm_send_ipi;
+		}
+		apic_poweron_cnt++;
+	} else {
+		ASSERT(apic_poweron_cnt > 0);
+		apic_poweron_cnt--;
+		if (apic_poweron_cnt == 0) {
+			pops->psm_send_ipi = x2apic_send_ipi;
+			send_dirintf = pops->psm_send_ipi;
+		}
+	}
+	lock_clear(&apic_mode_switch_lock);
+	intr_restore(iflag);
+}
+
 void
 x2apic_update_psm()
 {
@@ -2562,28 +2892,9 @@ x2apic_update_psm()
 
 	ASSERT(pops != NULL);
 
-	/*
-	 * We don't need to do any magic if one of the following
-	 * conditions is true :
-	 * - Not being run under kernel debugger.
-	 * - MP is not set.
-	 * - Booted with one CPU only.
-	 * - One CPU configured.
-	 *
-	 * We set apic_common_send_ipi() since kernel debuggers
-	 * attempt to send IPIs to other slave CPUs during
-	 * entry (exit) from (to) debugger.
-	 */
-	if (!(boothowto & RB_DEBUG) || use_mp == 0 ||
-	    apic_nproc == 1 || boot_ncpus == 1) {
-		pops->psm_send_ipi =  x2apic_send_ipi;
-	} else {
-		pops->psm_send_ipi =  apic_common_send_ipi;
-	}
-
 	pops->psm_intr_exit = x2apic_intr_exit;
 	pops->psm_setspl = x2apic_setspl;
-
+	pops->psm_send_ipi =  x2apic_send_ipi;
 	send_dirintf = pops->psm_send_ipi;
 
 	apic_mode = LOCAL_X2APIC;

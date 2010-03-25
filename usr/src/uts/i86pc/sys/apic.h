@@ -502,7 +502,7 @@ typedef struct	apic_irq {
  * adjust APIC_PADSZ as we add/modify any member of apic_cpus_info. We also
  * don't want the compiler to optimize apic_cpus_info.
  */
-#define	APIC_PADSZ	19
+#define	APIC_PADSZ	15
 
 #pragma	pack(1)
 typedef struct apic_cpus_info {
@@ -517,6 +517,7 @@ typedef struct apic_cpus_info {
 	uchar_t	aci_current[MAXIPL];	/* Current IRQ at each IPL */
 	uint32_t aci_bound;		/* # of user requested binds ? */
 	uint32_t aci_temp_bound;	/* # of non user IRQ binds */
+	uint32_t aci_processor_id;	/* Only used in ACPI mode. */
 	uchar_t	aci_idle;		/* The CPU is idle */
 	/*
 	 * Fill to make sure each struct is in separate 64-byte cache line.
@@ -527,6 +528,8 @@ typedef struct apic_cpus_info {
 
 #define	APIC_CPU_ONLINE		1
 #define	APIC_CPU_INTR_ENABLE	2
+#define	APIC_CPU_FREE		4	/* APIC CPU slot is free */
+#define	APIC_CPU_DIRTY		8	/* Slot was once used */
 
 /*
  * APIC ops to support various flavors of APIC like APIC and x2APIC.
@@ -784,6 +787,7 @@ extern int apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
     psm_intr_op_t intr_op, int *result);
 extern int apic_state(psm_state_request_t *);
 extern boolean_t apic_cpu_in_range(int cpu);
+extern processorid_t apic_find_next_cpu_intr(void);
 extern int apic_check_msi_support();
 extern apic_irq_t *apic_find_irq(dev_info_t *dip, struct intrspec *ispec,
     int type);
@@ -849,6 +853,7 @@ extern int apic_diff_for_redistribution;
 extern int apic_poweroff_method;
 extern int apic_enable_acpi;
 extern int apic_nproc;
+extern int apic_max_nproc;
 extern int apic_next_bind_cpu;
 extern int apic_redistribute_sample_interval;
 extern int apic_multi_msi_enable;

@@ -23,6 +23,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 #ifndef _SYS_MACHSYSTM_H
 #define	_SYS_MACHSYSTM_H
@@ -51,11 +55,30 @@ extern "C" {
 
 #ifdef _KERNEL
 
+typedef enum mach_cpu_add_arg_type {
+	MACH_CPU_ARG_LOCAL_APIC,
+	MACH_CPU_ARG_LOCAL_X2APIC,
+} mach_cpu_add_arg_type_t;
+
+typedef struct mach_cpu_add_arg {
+	mach_cpu_add_arg_type_t		type;
+	union {
+		struct {
+			uint32_t	apic_id;
+			uint32_t	proc_id;
+		} apic;
+	} arg;
+} mach_cpu_add_arg_t;
+
 extern void mach_cpu_idle(void);
 extern void mach_cpu_halt(char *);
 extern int mach_cpu_start(cpu_t *, void *);
 extern int mach_cpuid_start(processorid_t, void *);
+extern int mach_cpu_stop(cpu_t *, void *);
+extern int mach_cpu_add(mach_cpu_add_arg_t *, processorid_t *);
+extern int mach_cpu_remove(processorid_t);
 extern int mach_cpu_create_device_node(cpu_t *, dev_info_t **);
+extern int mach_cpu_get_device_node(cpu_t *, dev_info_t **);
 
 extern int Cpudelay;
 extern void setcpudelay(void);
@@ -120,10 +143,16 @@ extern int use_mp;
 extern struct cpu	cpus[];		/* pointer to other cpus */
 extern struct cpu	*cpu[];		/* pointer to all cpus */
 
+/* Operation types for extended mach_cpucontext interfaces */
+#define	MACH_CPUCONTEXT_OP_START	0
+#define	MACH_CPUCONTEXT_OP_STOP		1
+
 extern int mach_cpucontext_init(void);
 extern void mach_cpucontext_fini(void);
 extern void *mach_cpucontext_alloc(struct cpu *);
 extern void mach_cpucontext_free(struct cpu *, void *, int);
+extern void *mach_cpucontext_xalloc(struct cpu *, int);
+extern void mach_cpucontext_xfree(struct cpu *, void *, int, int);
 extern void rmp_gdt_init(rm_platter_t *);
 
 extern uintptr_t hole_start, hole_end;
@@ -144,6 +173,52 @@ extern int linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp);
 extern int dtrace_linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp);
 
 extern int force_shutdown_method;
+
+/* Dynamic Reconfiguration capability interface. */
+#define	PLAT_DR_OPTIONS_NAME		"plat-dr-options"
+#define	PLAT_DR_PHYSMAX_NAME		"plat-dr-physmax"
+#define	PLAT_MAX_NCPUS_NAME		"plat-max-ncpus"
+#define	BOOT_MAX_NCPUS_NAME		"boot-max-ncpus"
+#define	BOOT_NCPUS_NAME			"boot-ncpus"
+
+#define	PLAT_DR_FEATURE_CPU		0x1
+#define	PLAT_DR_FEATURE_MEMORY		0x2
+#define	PLAT_DR_FEATURE_ENABLED		0x1000000
+
+#define	plat_dr_enabled()		\
+	plat_dr_check_capability(PLAT_DR_FEATURE_ENABLED)
+
+#define	plat_dr_enable()		\
+	plat_dr_enable_capability(PLAT_DR_FEATURE_ENABLED)
+
+#define	plat_dr_disable_cpu()		\
+	plat_dr_disable_capability(PLAT_DR_FEATURE_CPU)
+#define	plat_dr_disable_memory()	\
+	plat_dr_disable_capability(PLAT_DR_FEATURE_MEMORY)
+
+extern boolean_t plat_dr_support_cpu(void);
+extern boolean_t plat_dr_support_memory(void);
+extern boolean_t plat_dr_check_capability(uint64_t features);
+extern void plat_dr_enable_capability(uint64_t features);
+extern void plat_dr_disable_capability(uint64_t features);
+
+#pragma	weak plat_dr_support_cpu
+#pragma	weak plat_dr_support_memory
+
+/*
+ * Used to communicate DR updates to platform lgroup framework
+ */
+typedef struct {
+	uint64_t	u_base;
+	uint64_t	u_length;
+	uint32_t	u_domain;
+	uint32_t	u_device_id;
+	uint32_t	u_sli_cnt;
+	uchar_t		*u_sli_ptr;
+} update_membounds_t;
+
+/* Maximum physical page number (PFN) for memory DR operations. */
+extern uint64_t plat_dr_physmax;
 
 #ifdef __xpv
 #include <sys/xen_mmu.h>

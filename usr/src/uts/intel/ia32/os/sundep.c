@@ -115,9 +115,10 @@ check_boot_version(int boots_version)
  * 1) the pfn of the highest installed physical page,
  * 2) the number of pages installed
  * 3) the number of distinct contiguous regions these pages fall into.
+ * 4) the number of contiguous memory ranges
  */
 void
-installed_top_size(
+installed_top_size_ex(
 	struct memlist *list,	/* pointer to start of installed list */
 	pfn_t *high_pfn,	/* return ptr for top value */
 	pgcnt_t *pgcnt,		/* return ptr for sum of installed pages */
@@ -140,6 +141,21 @@ installed_top_size(
 	*pgcnt = sumpages;
 	*ranges = cnt;
 }
+
+void
+installed_top_size(
+	struct memlist *list,	/* pointer to start of installed list */
+	pfn_t *high_pfn,	/* return ptr for top value */
+	pgcnt_t *pgcnt)		/* return ptr for sum of installed pages */
+{
+	int ranges;
+
+	installed_top_size_ex(list, high_pfn, pgcnt, &ranges);
+}
+
+void
+phys_install_has_changed(void)
+{}
 
 /*
  * Copy in a memory list from boot to kernel, with a filter function

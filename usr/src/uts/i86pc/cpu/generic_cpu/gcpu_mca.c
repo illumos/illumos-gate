@@ -23,6 +23,10 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 #include <sys/mca_x86.h>
 #include <sys/cpu_module_impl.h>
@@ -1064,7 +1068,7 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	/*
 	 * CPU startup code only calls cmi_mca_init if x86_feature indicates
 	 * both MCA and MCE support (i.e., X86_MCA).  P5, K6, and earlier
-	 * processors, which have their own * more primitive way of doing
+	 * processors, which have their own more primitive way of doing
 	 * machine checks, will not have cmi_mca_init called since their
 	 * CPUID information will not indicate both MCA and MCE features.
 	 */
@@ -2001,4 +2005,51 @@ gcpu_msrinject(cmi_hdl_t hdl, cmi_mca_regs_t *regs, uint_t nregs,
 	}
 
 	return (errs == 0 ? CMI_SUCCESS : CMIERR_UNKNOWN);
+}
+
+/* deconfigure gcpu_mca_init() */
+void
+gcpu_mca_fini(cmi_hdl_t hdl)
+{
+	gcpu_data_t *gcpu = cmi_hdl_getcmidata(hdl);
+	gcpu_mca_t *mca = &gcpu->gcpu_mca;
+	int i;
+
+	/*
+	 * CPU startup code only calls cmi_mca_init if x86_feature indicates
+	 * both MCA and MCE support (i.e., X86_MCA).  P5, K6, and earlier
+	 * processors, which have their own more primitive way of doing
+	 * machine checks, will not have cmi_mca_init called since their
+	 * CPUID information will not indicate both MCA and MCE features.
+	 */
+	if ((x86_feature & X86_MCA) == 0)
+		return;
+#ifndef __xpv
+	/*
+	 * disable machine check in CR4
+	 */
+	cmi_ntv_hwdisable_mce(hdl);
+#endif
+	mutex_enter(&gcpu->gcpu_shared->gcpus_cfglock);
+	gcpu_mca_poll_fini(hdl);
+	mutex_exit(&gcpu->gcpu_shared->gcpus_cfglock);
+
+	/*
+	 * free resources allocated during init
+	 */
+	if (mca->gcpu_bank_cmci != NULL) {
+		kmem_free(mca->gcpu_bank_cmci, sizeof (gcpu_mca_cmci_t) *
+		    mca->gcpu_mca_nbanks);
+	}
+
+	for (i = 0; i < GCPU_MCA_LOGOUT_NUM; i++) {
+		if (mca->gcpu_mca_logout[i] != NULL) {
+			kmem_free(mca->gcpu_mca_logout[i], mca->gcpu_mca_lgsz);
+		}
+	}
+
+	if (mca->gcpu_mca_bioscfg.bios_bankcfg != NULL) {
+		kmem_free(mca->gcpu_mca_bioscfg.bios_bankcfg,
+		    sizeof (struct gcpu_bios_bankcfg) * mca->gcpu_mca_nbanks);
+	}
 }

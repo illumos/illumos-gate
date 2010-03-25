@@ -116,6 +116,9 @@ extern struct pci_bus_resource *pci_bus_res;
 /*
  * For now, x86-only to avoid conflicts with <sys/memlist_impl.h>
  */
+#define	memlist_find		memlist_find_pci
+#define	memlist_insert		memlist_insert_pci
+
 extern struct memlist *memlist_alloc(void);
 extern void memlist_free(struct memlist *);
 extern void memlist_free_all(struct memlist **);

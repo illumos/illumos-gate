@@ -677,9 +677,13 @@ cpupm_redefine_max_activepwr_state(struct cpu *cp, int max_perf_level)
 	cpupm_state_t	*new_state = NULL;
 
 	did = cpupm_domain_id(cp, type);
-	mutex_enter(&cpu_lock);
-	dom = cpupm_domain_find(did, type);
-	mutex_exit(&cpu_lock);
+	if (MUTEX_HELD(&cpu_lock)) {
+		dom = cpupm_domain_find(did, type);
+	} else {
+		mutex_enter(&cpu_lock);
+		dom = cpupm_domain_find(did, type);
+		mutex_exit(&cpu_lock);
+	}
 
 	/*
 	 * Can use a lock to avoid changing the power state of the cpu when

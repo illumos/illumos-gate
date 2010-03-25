@@ -22,6 +22,10 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 /*
  * UNIX machine dependent virtual memory support.
@@ -71,7 +75,14 @@ extern void plcnt_inc_dec(page_t *, int, int, long, int);
  */
 #define	PLCNT_XFER_NORELOC(pp)
 
-#define	PLCNT_MODIFY_MAX(pfn, cnt)	mtype_modify_max(pfn, (pgcnt_t)cnt)
+/*
+ * macro to modify the page list max counts when memory is added to
+ * the page lists during startup (add_physmem) or during a DR operation
+ * when memory is added (kphysm_add_memory_dynamic) or deleted
+ * (kphysm_del_cleanup).
+ */
+#define	PLCNT_MODIFY_MAX(pfn, cnt)	mtype_modify_max(pfn, cnt)
+
 extern int memrange_num(pfn_t);
 extern int pfn_2_mtype(pfn_t);
 extern int mtype_func(int, int, uint_t);
@@ -82,7 +93,7 @@ extern int mnode_range_cnt(int);
 /*
  * candidate counters in vm_pagelist.c are indexed by color and range
  */
-#define	NUM_MEM_RANGES	4		/* memory range types */
+#define	NUM_MEM_RANGES		4		/* memory range types */
 #define	MAX_MNODE_MRANGES	NUM_MEM_RANGES
 #define	MNODE_RANGE_CNT(mnode)	mnode_range_cnt(mnode)
 #define	MNODE_MAX_MRANGE(mnode)	memrange_num(mem_node_config[mnode].physbase)
@@ -160,6 +171,25 @@ extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 		page_freelist_unlock(mnode);			\
 		rw_exit(&page_ctrs_rwlock[(mnode)]);		\
 	}
+
+/*
+ * macro to call page_ctrs_adjust() when memory is added
+ * during a DR operation.
+ */
+#define	PAGE_CTRS_ADJUST(pfn, cnt, rv) {				       \
+	spgcnt_t _cnt = (spgcnt_t)(cnt);				       \
+	int _mn;							       \
+	pgcnt_t _np;							       \
+	pfn_t _pfn = (pfn);						       \
+	pfn_t _endpfn = _pfn + _cnt;					       \
+	while (_pfn < _endpfn) {					       \
+		_mn = PFN_2_MEM_NODE(_pfn);				       \
+		_np = MIN(_endpfn, mem_node_config[_mn].physmax + 1) - _pfn;   \
+		_pfn += _np;						       \
+		if ((rv = page_ctrs_adjust(_mn)) != 0)			       \
+			break;						       \
+	}								       \
+}
 
 #define	PAGE_GET_COLOR_SHIFT(szc, nszc)				\
 	    (hw_page_array[(nszc)].hp_shift - hw_page_array[(szc)].hp_shift)
@@ -524,6 +554,7 @@ extern page_t *page_freelist_split(uchar_t,
     uint_t, int, int, pfn_t, pfn_t, page_list_walker_t *);
 extern page_t *page_freelist_coalesce(int, uchar_t, uint_t, uint_t, int,
     pfn_t);
+extern void page_freelist_coalesce_all(int);
 extern uint_t page_get_pagecolors(uint_t);
 extern void pfnzero(pfn_t, uint_t, uint_t);
 

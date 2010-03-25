@@ -477,11 +477,13 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/lib/libc_i18n
 
 i386_SUBDIRS= \
+	cmd/acpihpd \
 	cmd/biosdev \
 	cmd/rtc \
 	cmd/ucodeadm \
 	lib/brand/lx \
 	lib/cfgadm_plugins/sata \
+	lib/cfgadm_plugins/sbd \
 	lib/libfdisk
 
 sparc_SUBDIRS= \

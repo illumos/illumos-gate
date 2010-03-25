@@ -22,6 +22,10 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -63,6 +67,7 @@
 
 #include <sys/dumphdr.h>
 #include <sys/bootconf.h>
+#include <sys/memlist_plat.h>
 #include <sys/varargs.h>
 #include <sys/promif.h>
 #include <sys/modctl.h>
@@ -116,7 +121,7 @@
 #include <sys/systeminfo.h>
 #include <sys/multiboot.h>
 
-#ifdef __xpv
+#ifdef	__xpv
 
 #include <sys/hypervisor.h>
 #include <sys/xen_mmu.h>
@@ -130,6 +135,10 @@ extern void xen_late_startup(void);
 
 struct xen_evt_data cpu0_evt_data;
 
+#else	/* __xpv */
+#include <sys/memlist_impl.h>
+
+extern void mem_config_init(void);
 #endif /* __xpv */
 
 extern void progressbar_init(void);
@@ -313,6 +322,17 @@ pgcnt_t segkpsize = btop(SEGKPDEFSIZE);	/* size of segkp segment in pages */
 pgcnt_t segkpsize = 0;
 #endif
 pgcnt_t segziosize = 0;		/* size of zio segment in pages */
+
+/*
+ * A static DR page_t VA map is reserved that can map the page structures
+ * for a domain's entire RA space. The pages that back this space are
+ * dynamically allocated and need not be physically contiguous.  The DR
+ * map size is derived from KPM size.
+ * This mechanism isn't used by x86 yet, so just stubs here.
+ */
+int ppvm_enable = 0;		/* Static virtual map for page structs */
+page_t *ppvm_base = NULL;	/* Base of page struct map */
+pgcnt_t ppvm_size = 0;		/* Size of page struct map */
 
 /*
  * VA range available to the debugger
@@ -965,11 +985,29 @@ startup_memlist(void)
 	if (prom_debug)
 		print_memlist("boot physinstalled",
 		    bootops->boot_mem->physinstalled);
-	installed_top_size(bootops->boot_mem->physinstalled, &physmax,
+	installed_top_size_ex(bootops->boot_mem->physinstalled, &physmax,
 	    &physinstalled, &memblocks);
 	PRM_DEBUG(physmax);
 	PRM_DEBUG(physinstalled);
 	PRM_DEBUG(memblocks);
+
+	/*
+	 * Compute maximum physical address for memory DR operations.
+	 * Memory DR operations are unsupported on xpv or 32bit OSes.
+	 */
+#ifdef	__amd64
+	if (plat_dr_support_memory()) {
+		if (plat_dr_physmax == 0) {
+			uint_t pabits = UINT_MAX;
+
+			cpuid_get_addrsize(CPU, &pabits, NULL);
+			plat_dr_physmax = btop(1ULL << pabits);
+		}
+		if (plat_dr_physmax > PHYSMEM_MAX64)
+			plat_dr_physmax = PHYSMEM_MAX64;
+	} else
+#endif
+		plat_dr_physmax = 0;
 
 	/*
 	 * Examine the bios reserved memory to find out:
@@ -978,7 +1016,7 @@ startup_memlist(void)
 	if (prom_debug)
 		print_memlist("boot reserved mem",
 		    bootops->boot_mem->rsvdmem);
-	installed_top_size(bootops->boot_mem->rsvdmem, &rsvd_high_pfn,
+	installed_top_size_ex(bootops->boot_mem->rsvdmem, &rsvd_high_pfn,
 	    &rsvd_pgcnt, &rsvdmemblocks);
 	PRM_DEBUG(rsvd_high_pfn);
 	PRM_DEBUG(rsvd_pgcnt);
@@ -1137,8 +1175,13 @@ startup_memlist(void)
 	 * memory is at addresses above 1 TB. When adjusted, segkpm_base must
 	 * be aligned on KERNEL_REDZONE_SIZE boundary (span of top level pte).
 	 */
-	if (physmax + 1 > mmu_btop(TERABYTE)) {
+	if (physmax + 1 > mmu_btop(TERABYTE) ||
+	    plat_dr_physmax > mmu_btop(TERABYTE)) {
 		uint64_t kpm_resv_amount = mmu_ptob(physmax + 1);
+
+		if (kpm_resv_amount < mmu_ptob(plat_dr_physmax)) {
+			kpm_resv_amount = mmu_ptob(plat_dr_physmax);
+		}
 
 		segkpm_base = -(P2ROUNDUP((2 * kpm_resv_amount),
 		    KERNEL_REDZONE_SIZE));	/* down from top VA */
@@ -1186,6 +1229,16 @@ startup_memlist(void)
 		panic("physavail was too big!");
 	if (prom_debug)
 		print_memlist("phys_avail", phys_avail);
+#ifndef	__xpv
+	/*
+	 * Free unused memlist items, which may be used by memory DR driver
+	 * at runtime.
+	 */
+	if ((caddr_t)current < (caddr_t)memlist + memlist_sz) {
+		memlist_free_block((caddr_t)current,
+		    (caddr_t)memlist + memlist_sz - (caddr_t)current);
+	}
+#endif
 
 	/*
 	 * Build bios reserved memspace
@@ -1196,6 +1249,16 @@ startup_memlist(void)
 		panic("bios_rsvd was too big!");
 	if (prom_debug)
 		print_memlist("bios_rsvd", bios_rsvd);
+#ifndef	__xpv
+	/*
+	 * Free unused memlist items, which may be used by memory DR driver
+	 * at runtime.
+	 */
+	if ((caddr_t)current < (caddr_t)bios_rsvd + rsvdmemlist_sz) {
+		memlist_free_block((caddr_t)current,
+		    (caddr_t)bios_rsvd + rsvdmemlist_sz - (caddr_t)current);
+	}
+#endif
 
 	/*
 	 * setup page coloring
@@ -1391,7 +1454,11 @@ startup_kmem(void)
 	}
 #endif
 
-#ifdef __xpv
+#ifndef __xpv
+	if (plat_dr_support_memory()) {
+		mem_config_init();
+	}
+#else	/* __xpv */
 	/*
 	 * Some of the xen start information has to be relocated up
 	 * into the kernel's permanent address space.
@@ -1406,7 +1473,7 @@ startup_kmem(void)
 	 */
 	CPU->cpu_m.mcpu_vcpu_info =
 	    &HYPERVISOR_shared_info->vcpu_info[CPU->cpu_id];
-#endif
+#endif	/* __xpv */
 
 	PRM_POINT("startup_kmem() done");
 }
@@ -1591,8 +1658,10 @@ startup_modules(void)
 	if ((get_hwenv() != HW_XEN_HVM) &&
 	    (hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
 	    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL &&
-	    (x86_feature & X86_MCA))
+	    (x86_feature & X86_MCA)) {
 			cmi_mca_init(hdl);
+			CPU->cpu_m.mcpu_cmi_hdl = hdl;
+	}
 #endif	/* __xpv */
 
 	/*
@@ -1701,7 +1770,11 @@ layout_kernel_va(void)
 #if defined(__amd64)
 
 	kpm_vbase = (caddr_t)segkpm_base;
-	kpm_size = ROUND_UP_LPAGE(mmu_ptob(physmax + 1));
+	if (physmax + 1 < plat_dr_physmax) {
+		kpm_size = ROUND_UP_LPAGE(mmu_ptob(plat_dr_physmax));
+	} else {
+		kpm_size = ROUND_UP_LPAGE(mmu_ptob(physmax + 1));
+	}
 	if ((uintptr_t)kpm_vbase + kpm_size > (uintptr_t)valloc_base)
 		panic("not enough room for kpm!");
 	PRM_DEBUG(kpm_size);
@@ -2342,10 +2415,6 @@ release_bootstrap(void)
 		rm_platter_va = i86devmap(pfn, 1,
 		    PROT_READ | PROT_WRITE | PROT_EXEC);
 		rm_platter_pa = ptob(pfn);
-		hat_devload(kas.a_hat,
-		    (caddr_t)(uintptr_t)rm_platter_pa, MMU_PAGESIZE,
-		    pfn, PROT_READ | PROT_WRITE | PROT_EXEC,
-		    HAT_LOAD_NOCONSIST);
 		break;
 	}
 	if (pfn == btop(1*1024*1024) && use_mp)

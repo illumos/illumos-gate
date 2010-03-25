@@ -26,8 +26,6 @@
 #ifndef _SYS_MACHSYSTM_H
 #define	_SYS_MACHSYSTM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Numerous platform-dependent interfaces that don't seem to belong
  * in any other header file.
@@ -355,46 +353,6 @@ extern char *flt_to_error_type(struct async_flt *);
  */
 extern uint64_t cpu_pa[];
 extern void ptl1_init_cpu(struct cpu *);
-
-/*
- * Defines for DR interfaces
- */
-#define	DEVI_BRANCH_CHILD	0x01	/* Walk immediate children of root  */
-#define	DEVI_BRANCH_CONFIGURE	0x02	/* Configure branch after create    */
-#define	DEVI_BRANCH_DESTROY	0x04	/* Destroy branch after unconfigure */
-#define	DEVI_BRANCH_EVENT	0x08	/* Post NDI event		    */
-#define	DEVI_BRANCH_PROM	0x10	/* Branches derived from PROM nodes */
-#define	DEVI_BRANCH_SID		0x20	/* SID node branches		    */
-#define	DEVI_BRANCH_ROOT	0x40	/* Node is the root of a branch	    */
-
-typedef struct devi_branch {
-	void		*arg;
-	void		(*devi_branch_callback)(dev_info_t *, void *, uint_t);
-	int		type;
-	union {
-		int	(*prom_branch_select)(pnode_t, void *, uint_t);
-		int	(*sid_branch_create)(dev_info_t *, void *, uint_t);
-	} create;
-} devi_branch_t;
-
-
-/*
- * Prototypes which really belongs to sunddi.c, and should be moved to
- * sunddi.c if there is another platform using these calls.
- */
-extern int e_ddi_branch_create(dev_info_t *pdip, devi_branch_t *bp,
-    dev_info_t **dipp, uint_t flags);
-extern int e_ddi_branch_configure(dev_info_t *rdip, dev_info_t **dipp,
-    uint_t flags);
-extern int e_ddi_branch_unconfigure(dev_info_t *rdip, dev_info_t **dipp,
-    uint_t flags);
-extern int e_ddi_branch_destroy(dev_info_t *rdip, dev_info_t **dipp,
-    uint_t flags);
-extern void e_ddi_branch_hold(dev_info_t *rdip);
-extern void e_ddi_branch_rele(dev_info_t *rdip);
-extern int e_ddi_branch_held(dev_info_t *rdip);
-extern int e_ddi_branch_referenced(dev_info_t *rdip,
-    int (*cb)(dev_info_t *dip, void *, uint_t), void *arg);
 
 /*
  * Constants which define the "hole" in the 64-bit sfmmu address space.

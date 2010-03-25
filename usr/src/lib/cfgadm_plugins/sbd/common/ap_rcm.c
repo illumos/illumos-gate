@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -145,6 +143,8 @@ ap_rcm_ops[] = {
 
 #ifdef	__sparcv9
 #define	RCMLIB	"/lib/sparcv9/librcm.so";
+#elif defined(__amd64)
+#define	RCMLIB	"/lib/amd64/librcm.so";
 #else
 #define	RCMLIB	"/lib/librcm.so";
 #endif
@@ -323,22 +323,21 @@ ap_rcm_init(apd_t *a)
 		switch (i) {
 		case ALLOC_HANDLE:
 			rcm->alloc_handle = (int(*)
-				(char *, uint_t, void *, rcm_handle_t **))sym;
+			    (char *, uint_t, void *, rcm_handle_t **))sym;
 			break;
 		case FREE_HANDLE:
 			rcm->free_handle = (void (*)(rcm_handle_t *))sym;
 			break;
 		case GET_INFO:
 			rcm->get_info = (int (*)
-				(rcm_handle_t *, char *, uint_t,
-				rcm_info_t **))sym;
+			    (rcm_handle_t *, char *, uint_t, rcm_info_t **))sym;
 			break;
 		case FREE_INFO:
 			rcm->free_info = (void (*)(rcm_info_t *))sym;
 			break;
 		case INFO_TUPLE_NEXT:
 			rcm->info_next = (rcm_info_tuple_t *(*)
-				(rcm_info_t *, rcm_info_tuple_t *))sym;
+			    (rcm_info_t *, rcm_info_tuple_t *))sym;
 			break;
 		case INFO_TUPLE_STATE:
 			rcm->info_state = (int (*)(rcm_info_tuple_t *))sym;
@@ -348,50 +347,50 @@ ap_rcm_init(apd_t *a)
 			break;
 		case INFO_TUPLE_ERROR:
 			rcm->info_error = (const char *(*)
-				(rcm_info_tuple_t *))sym;
+			    (rcm_info_tuple_t *))sym;
 			break;
 		case INFO_TUPLE_INFO:
 			rcm->info_info = (const char *(*)
-				(rcm_info_tuple_t *))sym;
+			    (rcm_info_tuple_t *))sym;
 			break;
 		case INFO_TUPLE_RSRC:
 			rcm->info_rsrc = (const char *(*)
-				(rcm_info_tuple_t *))sym;
+			    (rcm_info_tuple_t *))sym;
 			break;
 		case REQUEST_OFFLINE:
 			rcm->request_offline_list = (int (*)
-				(rcm_handle_t *, char **, uint_t,
-				rcm_info_t **))sym;
+			    (rcm_handle_t *, char **, uint_t,
+			    rcm_info_t **))sym;
 			break;
 		case NOTIFY_ONLINE:
 			rcm->notify_online_list = (int (*)
-				(rcm_handle_t *, char **, uint_t,
-				rcm_info_t **))sym;
+			    (rcm_handle_t *, char **, uint_t,
+			    rcm_info_t **))sym;
 			break;
 		case REQUEST_SUSPEND:
 			rcm->request_suspend = (int (*)
-				(rcm_handle_t *, char *, uint_t,
-				timespec_t *, rcm_info_t **))sym;
+			    (rcm_handle_t *, char *, uint_t,
+			    timespec_t *, rcm_info_t **))sym;
 			break;
 		case NOTIFY_RESUME:
 			rcm->notify_resume = (int (*)
-				(rcm_handle_t *, char *, uint_t,
-				rcm_info_t **))sym;
+			    (rcm_handle_t *, char *, uint_t,
+			    rcm_info_t **))sym;
 			break;
 		case NOTIFY_REMOVE:
 			rcm->notify_remove_list = (int (*)
-				(rcm_handle_t *, char **, uint_t,
-				rcm_info_t **))sym;
+			    (rcm_handle_t *, char **, uint_t,
+			    rcm_info_t **))sym;
 			break;
 		case REQUEST_CAP_CHANGE:
 			rcm->request_capacity_change = (int (*)
-				(rcm_handle_t *, char *, uint_t,
-				nvlist_t *, rcm_info_t **))sym;
+			    (rcm_handle_t *, char *, uint_t,
+			    nvlist_t *, rcm_info_t **))sym;
 			break;
 		case NOTIFY_CAP_CHANGE:
 			rcm->notify_capacity_change = (int (*)
-				(rcm_handle_t *, char *, uint_t,
-				nvlist_t *, rcm_info_t **))sym;
+			    (rcm_handle_t *, char *, uint_t,
+			    nvlist_t *, rcm_info_t **))sym;
 			break;
 		default:
 			break;
@@ -400,7 +399,7 @@ ap_rcm_init(apd_t *a)
 
 	if (rcm->alloc_handle == NULL ||
 	    (*rcm->alloc_handle)(NULL, RCM_NOPID, NULL, &rcm->hd)
-		!= RCM_SUCCESS) {
+	    != RCM_SUCCESS) {
 		ap_err(a, ERR_RCM_HANDLE);
 		return (CFGA_LIB_ERROR);
 	}
@@ -441,7 +440,7 @@ ap_rcm_init(apd_t *a)
 
 		rcm->ncpus = ncpu;
 		if ((rcm->cpuids = (cpuid_t *)calloc(ncpu, sizeof (cpuid_t)))
-			== NULL) {
+		    == NULL) {
 			ap_err(a, ERR_NOMEM);
 			return (CFGA_LIB_ERROR);
 		}
@@ -781,20 +780,21 @@ ap_rcm_cap_cpu(apd_t *a, rcmd_t *rcm, rcm_handle_t *hd, uint_t flags,
 	    nvlist_add_int32(nvl, "old_total", oldncpuids) != 0 ||
 	    nvlist_add_int32(nvl, "new_total", newncpuids) != 0 ||
 	    nvlist_add_int32_array(nvl, "old_cpu_list", oldcpuids,
-		oldncpuids) != 0 ||
+	    oldncpuids) != 0 ||
 	    nvlist_add_int32_array(nvl, "new_cpu_list", newcpuids,
-		newncpuids) != 0)
+	    newncpuids) != 0)
 		goto done;
 
-	snprintf(buf, sizeof (buf), fmt, change);
+	(void) snprintf(buf, sizeof (buf), fmt, change);
 	ap_msg(a, MSG_ISSUE, cmd, buf);
 
-	if (cmd == CMD_RCM_CAP_DEL)
+	if (cmd == CMD_RCM_CAP_DEL) {
 		rv = (*rcm->request_capacity_change)(hd, "SUNW_cpu",
-			flags, nvl, rinfo);
-	else
+		    flags, nvl, rinfo);
+	} else {
 		rv = (*rcm->notify_capacity_change)(hd, "SUNW_cpu",
-			flags & ~RCM_FORCE, nvl, rinfo);
+		    flags & ~RCM_FORCE, nvl, rinfo);
+	}
 
 done:
 	if (nvl)
@@ -865,12 +865,13 @@ ap_rcm_cap_mem(apd_t *a, rcmd_t *rcm, rcm_handle_t *hd, uint_t flags,
 	(void) snprintf(buf, sizeof (buf), "(%ld pages)", change);
 	ap_msg(a, MSG_ISSUE, cmd, buf);
 
-	if (cmd == CMD_RCM_CAP_DEL)
+	if (cmd == CMD_RCM_CAP_DEL) {
 		rv = (*rcm->request_capacity_change)(hd, "SUNW_memory",
-			flags, nvl, rinfo);
-	else
+		    flags, nvl, rinfo);
+	} else {
 		rv = (*rcm->notify_capacity_change)(hd, "SUNW_memory",
-			flags & ~RCM_FORCE, nvl, rinfo);
+		    flags & ~RCM_FORCE, nvl, rinfo);
+	}
 
 	nvlist_free(nvl);
 
@@ -923,11 +924,13 @@ ap_rcm_request_cap(apd_t *a, rcmd_t *rcm, rcm_handle_t *hd,
 	}
 
 	if (ncpus && ((*rv = ap_rcm_cap_cpu(a, rcm, hd, flags, rinfo,
-		CMD_RCM_CAP_DEL, ncpus)) != RCM_SUCCESS))
+	    CMD_RCM_CAP_DEL, ncpus)) != RCM_SUCCESS)) {
 		return (CFGA_LIB_ERROR);
+	}
 	if (npages && ((*rv = ap_rcm_cap_mem(a, rcm, hd, flags, rinfo,
-		CMD_RCM_CAP_DEL, npages)) != RCM_SUCCESS))
+	    CMD_RCM_CAP_DEL, npages)) != RCM_SUCCESS)) {
 		return (CFGA_LIB_ERROR);
+	}
 
 	return (CFGA_OK);
 }
@@ -945,8 +948,8 @@ ap_rcm_add_cap(apd_t *a, rcmd_t *rcm, rcm_handle_t *hd,
 	DBG("ap_rcm_add_cap(%p)\n", (void *)a);
 
 	/* Get the new capacity info to figure out what has changed */
-	if ((rc = ap_capinfo(a, rcm->firstcm, rcm->lastcm, &capinfo))
-		!= CFGA_OK)
+	if ((rc = ap_capinfo(a, rcm->firstcm, rcm->lastcm, &capinfo)) !=
+	    CFGA_OK)
 		return (rc);
 
 	if (capinfo == NULL) {
@@ -981,7 +984,7 @@ ap_rcm_add_cap(apd_t *a, rcmd_t *rcm, rcm_handle_t *hd,
 		type = ap_cm_type(a, cm);
 
 		DBG("cm=%d valid=%d type=%d, prevos=%d os=%d\n",
-			cm, prevvalidity, type, prevos, os);
+		    cm, prevvalidity, type, prevos, os);
 
 		/*
 		 * We are interested only in those components
@@ -1008,11 +1011,13 @@ ap_rcm_add_cap(apd_t *a, rcmd_t *rcm, rcm_handle_t *hd,
 	free(capinfo);
 
 	if (ncpus && ((*rv = ap_rcm_cap_cpu(a, rcm, hd, flags, rinfo,
-		CMD_RCM_CAP_ADD, ncpus)) != RCM_SUCCESS))
+	    CMD_RCM_CAP_ADD, ncpus)) != RCM_SUCCESS)) {
 		return (CFGA_LIB_ERROR);
+	}
 	if (npages && ((*rv = ap_rcm_cap_mem(a, rcm, hd, flags, rinfo,
-		CMD_RCM_CAP_ADD, npages)) != RCM_SUCCESS))
+	    CMD_RCM_CAP_ADD, npages)) != RCM_SUCCESS)) {
 		return (CFGA_LIB_ERROR);
+	}
 
 	return (CFGA_OK);
 }
@@ -1045,8 +1050,8 @@ ap_rcm_notify_cap(apd_t *a, rcmd_t *rcm, rcm_handle_t *hd,
 	DBG("ap_rcm_notify_cap(%p)\n", (void *)a);
 
 	/* Get the new capacity info to figure out what has changed */
-	if ((rc = ap_capinfo(a, rcm->firstcm, rcm->lastcm, &capinfo))
-		!= CFGA_OK)
+	if ((rc = ap_capinfo(a, rcm->firstcm, rcm->lastcm, &capinfo)) !=
+	    CFGA_OK)
 		return (rc);
 
 	if (capinfo == NULL) {
@@ -1183,8 +1188,7 @@ ap_rcm_ctl(apd_t *a, int cmd)
 		if (rcm->capinfo == NULL)
 			noop++;
 		else
-			rc = ap_rcm_request_cap(a, rcm, hd, &rv,
-				flags, &rinfo);
+			rc = ap_rcm_request_cap(a, rcm, hd, &rv, flags, &rinfo);
 		break;
 	case CMD_RCM_CAP_ADD:
 		rc = ap_rcm_add_cap(a, rcm, hd, &rv, flags, &rinfo);
@@ -1266,13 +1270,13 @@ ap_rcm_ctl(apd_t *a, int cmd)
 			ap_msg(a, MSG_ISSUE, cmd, rlist[nrsrc]);
 		if (cmd == CMD_RCM_OFFLINE)
 			rv = (*rcm->request_offline_list)(hd, rlist, flags,
-				&rinfo);
+			    &rinfo);
 		else if (cmd == CMD_RCM_ONLINE)
 			rv = (*rcm->notify_online_list)(hd, rlist,
-				flags & ~RCM_FORCE, &rinfo);
+			    flags & ~RCM_FORCE, &rinfo);
 		else
 			rv = (*rcm->notify_remove_list)(hd, rlist,
-				flags & ~RCM_FORCE, &rinfo);
+			    flags & ~RCM_FORCE, &rinfo);
 		break;
 	}
 	case CMD_RCM_SUSPEND: {
@@ -1440,7 +1444,7 @@ ap_rcm_info(apd_t *a, char **msg)
 		if ((infostr = (*rcm->info_info)(tuple)) != NULL) {
 			(void) strcat(*msg, "\n");
 			(void) sprintf(&((*msg)[strlen(*msg)]), format,
-			(*rcm->info_rsrc)(tuple), infostr);
+			    (*rcm->info_rsrc)(tuple), infostr);
 		}
 	}
 

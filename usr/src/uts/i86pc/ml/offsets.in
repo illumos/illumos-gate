@@ -295,6 +295,8 @@ rm_platter
 	rm_cpu			CPUNOFF
 	rm_cr4			CR4OFF
 	rm_x86feature		X86FEATURE
+	rm_cpu_halt_code	CPUHALTCODEOFF
+	rm_cpu_halted		CPUHALTEDOFF
 
 ddi_acc_impl
 	ahi_acc_attr	ACC_ATTR

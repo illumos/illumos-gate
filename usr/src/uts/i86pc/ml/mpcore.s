@@ -22,9 +22,11 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 	
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
 #include <sys/regset.h>
@@ -44,6 +46,7 @@
  *		- The GDT, IDT, ktss and page directory has been built for us
  *
  *	Our actions:
+ *	Start CPU:
  *		- We start using our GDT by loading correct values in the
  *		  selector registers (cs=KCS_SEL, ds=es=ss=KDS_SEL, fs=KFS_SEL,
  *		  gs=KGS_SEL).
@@ -51,20 +54,30 @@
  *		- We load the default LDT into the hardware LDT register.
  *		- We load the default TSS into the hardware task register.
  *		- call mp_startup(void) indirectly through the T_PC
+ *	Stop CPU:
+ *		- Put CPU into halted state with interrupts disabled
  *
  */
 
 #if defined(__lint)
 
 void
-real_mode_start(void)
+real_mode_start_cpu(void)
+{}
+
+void
+real_mode_stop_cpu_stage1(void)
+{}
+
+void
+real_mode_stop_cpu_stage2(void)
 {}
 
 #else	/* __lint */
 
 #if defined(__amd64)
 
-	ENTRY_NP(real_mode_start)
+	ENTRY_NP(real_mode_start_cpu)
 
 #if !defined(__GNUC_AS__)
 
@@ -229,8 +242,8 @@ long_mode_64:
 	pushq	$KCS_SEL
 	pushq	$kernel_cs_code
 	lretq
-	.globl real_mode_end
-real_mode_end:
+	.globl real_mode_start_cpu_end
+real_mode_start_cpu_end:
 	nop
 
 kernel_cs_code:
@@ -484,8 +497,8 @@ long_mode_64:
 	pushq	$KCS_SEL
 	pushq	$kernel_cs_code
 	lretq
-	.globl real_mode_end
-real_mode_end:
+	.globl real_mode_start_cpu_end
+real_mode_start_cpu_end:
 	nop
 
 kernel_cs_code:
@@ -575,11 +588,11 @@ kernel_cs_code:
 	int	$20			/* whoops, returned somehow! */
 #endif	/* !__GNUC_AS__ */
 
-	SET_SIZE(real_mode_start)
+	SET_SIZE(real_mode_start_cpu)
 
 #elif defined(__i386)
 
-	ENTRY_NP(real_mode_start)
+	ENTRY_NP(real_mode_start_cpu)
 
 #if !defined(__GNUC_AS__)
 
@@ -621,8 +634,8 @@ pestart:
 	D16 pushl	$KCS_SEL
 	D16 pushl	$kernel_cs_code
 	D16 lret
-	.globl real_mode_end
-real_mode_end:
+	.globl real_mode_start_cpu_end
+real_mode_start_cpu_end:
 	nop
 
 	.globl	kernel_cs_code
@@ -714,8 +727,8 @@ pestart:
 	D16 pushl	$KCS_SEL
 	D16 pushl	$kernel_cs_code
 	D16 lret
-	.globl real_mode_end
-real_mode_end:
+	.globl real_mode_start_cpu_end
+real_mode_start_cpu_end:
 	nop
 	.globl	kernel_cs_code
 kernel_cs_code:
@@ -767,7 +780,120 @@ kernel_cs_code:
 	int	$20			/* whoops, returned somehow! */
 #endif
 
-	SET_SIZE(real_mode_start)
+	SET_SIZE(real_mode_start_cpu)
 
 #endif	/* __amd64 */
+
+#if defined(__amd64)
+
+	ENTRY_NP(real_mode_stop_cpu_stage1)
+
+#if !defined(__GNUC_AS__)
+
+	/*
+	 * For vulcan as we need to do a .code32 and mentally invert the
+	 * meaning of the addr16 and data16 prefixes to get 32-bit access when
+	 * generating code to be executed in 16-bit mode (sigh...)
+	 */
+	.code32
+	cli
+	movw		%cs, %ax
+	movw		%ax, %ds	/* load cs into ds */
+	movw		%ax, %ss	/* and into ss */
+
+	/*
+	 * Jump to the stage 2 code in the rm_platter_va->rm_cpu_halt_code
+	 */
+	movw		$CPUHALTCODEOFF, %ax
+	.byte		0xff, 0xe0	/* jmp *%ax */
+
+#else	/* __GNUC_AS__ */
+
+	/*
+	 * NOTE:  The GNU assembler automatically does the right thing to
+	 *	  generate data size operand prefixes based on the code size
+	 *	  generation mode (e.g. .code16, .code32, .code64) and as such
+	 *	  prefixes need not be used on instructions EXCEPT in the case
+	 *	  of address prefixes for code for which the reference is not
+	 *	  automatically of the default operand size.
+	 */      
+	.code16
+	cli
+	movw		%cs, %ax
+	movw		%ax, %ds	/* load cs into ds */
+	movw		%ax, %ss	/* and into ss */
+
+	/*
+	 * Jump to the stage 2 code in the rm_platter_va->rm_cpu_halt_code
+	 */
+	movw		$CPUHALTCODEOFF, %ax
+	jmp		*%ax
+
+#endif	/* !__GNUC_AS__ */
+
+	.globl real_mode_stop_cpu_stage1_end
+real_mode_stop_cpu_stage1_end:
+	nop
+
+	SET_SIZE(real_mode_stop_cpu_stage1)
+
+#elif defined(__i386)
+
+	ENTRY_NP(real_mode_stop_cpu_stage1)
+
+#if !defined(__GNUC_AS__)
+
+	cli
+	D16 movw	%cs, %eax
+	movw		%eax, %ds	/* load cs into ds */
+	movw		%eax, %ss	/* and into ss */
+
+	/*
+	 * Jump to the stage 2 code in the rm_platter_va->rm_cpu_halt_code
+	 */
+	movw		$CPUHALTCODEOFF, %ax
+	.byte		0xff, 0xe0	/* jmp *%ax */
+
+#else	/* __GNUC_AS__ */
+
+	cli
+	mov		%cs, %ax
+	mov		%eax, %ds	/* load cs into ds */
+	mov		%eax, %ss	/* and into ss */
+
+	/*
+	 * Jump to the stage 2 code in the rm_platter_va->rm_cpu_halt_code
+	 */
+	movw		$CPUHALTCODEOFF, %ax
+	jmp		*%ax
+
+#endif	/* !__GNUC_AS__ */
+
+	.globl real_mode_stop_cpu_stage1_end
+real_mode_stop_cpu_stage1_end:
+	nop
+
+	SET_SIZE(real_mode_stop_cpu_stage1)
+
+#endif	/* __amd64 */
+
+	ENTRY_NP(real_mode_stop_cpu_stage2)
+
+	movw		$0xdead, %ax
+	movw		%ax, CPUHALTEDOFF
+
+real_mode_stop_cpu_loop:
+	/*
+	 * Put CPU into halted state.
+	 * Only INIT, SMI, NMI could break the loop.
+	 */
+	hlt
+	jmp		real_mode_stop_cpu_loop
+
+	.globl real_mode_stop_cpu_stage2_end
+real_mode_stop_cpu_stage2_end:
+	nop
+
+	SET_SIZE(real_mode_stop_cpu_stage2)
+
 #endif	/* __lint */

@@ -93,8 +93,8 @@ cpupm_intel_init(cpu_t *cp)
 	if (x86_vendor != X86_VENDOR_Intel)
 		return (B_FALSE);
 
-	family = cpuid_getfamily(CPU);
-	model = cpuid_getmodel(CPU);
+	family = cpuid_getfamily(cp);
+	model = cpuid_getmodel(cp);
 
 	cpupm_intel_pdccap = CPUPM_INTEL_PDC_MP;
 

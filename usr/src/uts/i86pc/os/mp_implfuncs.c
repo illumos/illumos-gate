@@ -22,12 +22,12 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+#define	PSMI_1_7
 
 #include <sys/vmem.h>
 #include <vm/hat.h>
 #include <sys/modctl.h>
 #include <vm/seg_kmem.h>
-#define	PSMI_1_6
 #include <sys/psm.h>
 #include <sys/psm_modctl.h>
 #include <sys/smp_impldefs.h>

@@ -23,6 +23,10 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 /*
  * Native MCA polling.  We establish an ommipresent cyclic to fire on all
@@ -31,6 +35,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/atomic.h>
 #include <sys/cyclic.h>
 #include <sys/x86_archext.h>
 #include <sys/mca_x86.h>
@@ -39,7 +44,9 @@
 
 hrtime_t gcpu_mca_poll_interval = NANOSEC * 10ULL;	/* tuneable */
 static cyclic_id_t gcpu_mca_poll_cycid;
-static int gcpu_mca_poll_inits;
+static volatile uint_t gcpu_mca_poll_inits;
+extern int gcpu_poll_trace_always;
+extern uint_t gcpu_poll_trace_nent;
 
 /*
  * Return nonzero of the given handle should poll the MCH.  We stick with
@@ -280,7 +287,24 @@ gcpu_mca_poll_init(cmi_hdl_t hdl)
 
 	gcpu_poll_trace_init(ptc);
 
-	gcpu_mca_poll_inits++;
+	atomic_inc_uint(&gcpu_mca_poll_inits);
+}
+
+/* deconfigure gcpu_mca_poll_init() */
+void
+gcpu_mca_poll_fini(cmi_hdl_t hdl)
+{
+	gcpu_data_t *gcpu = cmi_hdl_getcmidata(hdl);
+	gcpu_poll_trace_ctl_t *ptc = &gcpu->gcpu_mca.gcpu_polltrace;
+
+	ASSERT(cmi_hdl_class(hdl) == CMI_HDL_NATIVE);
+
+	if (gcpu_poll_trace_always && (ptc->mptc_tbufs != NULL)) {
+		kmem_free(ptc->mptc_tbufs, sizeof (gcpu_poll_trace_t) *
+		    gcpu_poll_trace_nent);
+	}
+
+	atomic_dec_uint(&gcpu_mca_poll_inits);
 }
 
 void

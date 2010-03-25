@@ -23,6 +23,10 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 /*
  * CPU Module Interface - hardware abstraction.
@@ -94,6 +98,7 @@ typedef struct cmi_hdl_impl {
 #define	HDLOPS(hdl)	((hdl)->cmih_ops)
 
 #define	CMIH_F_INJACTV		0x1ULL
+#define	CMIH_F_DEAD		0x2ULL
 
 /*
  * Ops structure for handle operations.
@@ -847,9 +852,18 @@ ntv_int(cmi_hdl_impl_t *hdl, int int_no)
 static int
 ntv_online(cmi_hdl_impl_t *hdl, int new_status, int *old_status)
 {
+	int rc;
 	processorid_t cpuid = HDLPRIV(hdl)->cpu_id;
 
-	return (p_online_internal(cpuid, new_status, old_status));
+	while (mutex_tryenter(&cpu_lock) == 0) {
+		if (hdl->cmih_flags & CMIH_F_DEAD)
+			return (EBUSY);
+		delay(1);
+	}
+	rc = p_online_internal_locked(cpuid, new_status, old_status);
+	mutex_exit(&cpu_lock);
+
+	return (rc);
 }
 
 #else	/* __xpv */
@@ -1387,15 +1401,32 @@ void
 cmi_hdl_rele(cmi_hdl_t ophdl)
 {
 	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);
-	cmi_hdl_ent_t *ent;
 
 	ASSERT(*hdl->cmih_refcntp > 0);
+	(void) atomic_dec_32_nv(hdl->cmih_refcntp);
+}
 
-	if (atomic_dec_32_nv(hdl->cmih_refcntp) > 0)
-		return;
+void
+cmi_hdl_destroy(cmi_hdl_t ophdl)
+{
+	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);
+	cmi_hdl_ent_t *ent;
+
+	/* Release the reference count held by cmi_hdl_create(). */
+	ASSERT(*hdl->cmih_refcntp > 0);
+	(void) atomic_dec_32_nv(hdl->cmih_refcntp);
+	hdl->cmih_flags |= CMIH_F_DEAD;
 
 	ent = cmi_hdl_ent_lookup(hdl->cmih_chipid, hdl->cmih_coreid,
 	    hdl->cmih_strandid);
+	/*
+	 * Use busy polling instead of condition variable here because
+	 * cmi_hdl_rele() may be called from #MC handler.
+	 */
+	while (cmi_hdl_canref(ent)) {
+		cmi_hdl_rele(ophdl);
+		delay(1);
+	}
 	ent->cmae_hdlp = NULL;
 
 	kmem_free(hdl, sizeof (*hdl));
@@ -1628,6 +1659,33 @@ cmi_ntv_hwstrandid(cpu_t *cp)
 
 	return (cpuid_get_clogid(cp) % strands_per_core);
 }
+
+static void
+cmi_ntv_hwdisable_mce_xc(void)
+{
+	ulong_t cr4;
+
+	cr4 = getcr4();
+	cr4 = cr4 & (~CR4_MCE);
+	setcr4(cr4);
+}
+
+void
+cmi_ntv_hwdisable_mce(cmi_hdl_t hdl)
+{
+	cpuset_t	set;
+	cmi_hdl_impl_t *thdl = IMPLHDL(hdl);
+	cpu_t *cp = HDLPRIV(thdl);
+
+	if (CPU->cpu_id == cp->cpu_id) {
+		cmi_ntv_hwdisable_mce_xc();
+	} else {
+		CPUSET_ONLY(set, cp->cpu_id);
+		xc_call(NULL, NULL, NULL, CPUSET2BV(set),
+		    (xc_func_t)cmi_ntv_hwdisable_mce_xc);
+	}
+}
+
 #endif	/* __xpv */
 
 void

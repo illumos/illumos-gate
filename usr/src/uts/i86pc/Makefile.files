@@ -80,7 +80,10 @@ CORE_OBJS +=			\
 	mach_kdi.o		\
 	mach_sysconfig.o	\
 	machdep.o		\
+	mem_config.o		\
 	mem_config_stubs.o	\
+	mem_config_arch.o	\
+	memlist_new.o		\
 	memnode.o		\
 	microcode.o		\
 	microfind.o		\
@@ -187,7 +190,7 @@ PCPLUSMP_OBJS += apic.o apic_regops.o psm_common.o apic_introp.o	\
 			mp_platform_common.o hpet_acpi.o
 
 ACPI_DRV_OBJS	+= acpi_drv.o acpi_video.o
-ACPINEX_OBJS	+= acpinex_drv.o
+ACPINEX_OBJS	+= acpinex_drv.o acpinex_event.o
 
 CPUDRV_OBJS	+= \
 	cpudrv.o \
@@ -200,9 +203,15 @@ ACPIDEV_OBJS += acpidev_drv.o \
 	acpidev_scope.o acpidev_device.o \
 	acpidev_container.o \
 	acpidev_cpu.o \
+	acpidev_dr.o \
 	acpidev_memory.o \
+	acpidev_pci.o \
 	acpidev_resource.o \
 	acpidev_util.o
+
+DRMACH_ACPI_OBJS += drmach_acpi.o dr_util.o drmach_err.o
+
+DR_OBJS	+= dr.o dr_cpu.o dr_err.o dr_io.o dr_mem_acpi.o dr_quiesce.o dr_util.o
 
 ROOTNEX_OBJS += rootnex.o immu.o immu_dmar.o immu_dvma.o \
 		immu_intrmap.o immu_qinv.o immu_regs.o

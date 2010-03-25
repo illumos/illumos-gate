@@ -430,6 +430,9 @@ uint32_t cpuid_feature_ecx_exclude;
 uint32_t cpuid_feature_edx_include;
 uint32_t cpuid_feature_edx_exclude;
 
+/*
+ * Allocate space for mcpu_cpi in the machcpu structure for all non-boot CPUs.
+ */
 void
 cpuid_alloc_space(cpu_t *cpu)
 {
@@ -439,6 +442,7 @@ cpuid_alloc_space(cpu_t *cpu)
 	 * their cpuid_info struct allocated here.
 	 */
 	ASSERT(cpu->cpu_id != 0);
+	ASSERT(cpu->cpu_m.mcpu_cpi == NULL);
 	cpu->cpu_m.mcpu_cpi =
 	    kmem_zalloc(sizeof (*cpu->cpu_m.mcpu_cpi), KM_SLEEP);
 }
@@ -449,7 +453,8 @@ cpuid_free_space(cpu_t *cpu)
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
 	int i;
 
-	ASSERT(cpu->cpu_id != 0);
+	ASSERT(cpi != NULL);
+	ASSERT(cpi != &cpuid_info0);
 
 	/*
 	 * Free up any function 4 related dynamic storage
@@ -460,7 +465,8 @@ cpuid_free_space(cpu_t *cpu)
 		kmem_free(cpi->cpi_std_4,
 		    cpi->cpi_std_4_size * sizeof (struct cpuid_regs *));
 
-	kmem_free(cpu->cpu_m.mcpu_cpi, sizeof (*cpu->cpu_m.mcpu_cpi));
+	kmem_free(cpi, sizeof (*cpi));
+	cpu->cpu_m.mcpu_cpi = NULL;
 }
 
 #if !defined(__xpv)
@@ -721,9 +727,9 @@ cpuid_pass1(cpu_t *cpu)
 	determine_platform();
 #endif
 	/*
-	 * Space statically allocated for cpu0, ensure pointer is set
+	 * Space statically allocated for BSP, ensure pointer is set
 	 */
-	if (cpu->cpu_id == 0)
+	if (cpu->cpu_id == 0 && cpu->cpu_m.mcpu_cpi == NULL)
 		cpu->cpu_m.mcpu_cpi = &cpuid_info0;
 	cpi = cpu->cpu_m.mcpu_cpi;
 	ASSERT(cpi != NULL);
@@ -3977,9 +3983,9 @@ cpuid_mwait_alloc(cpu_t *cpu)
 	uint32_t	*ret;
 	size_t		mwait_size;
 
-	ASSERT(cpuid_checkpass(cpu, 2));
+	ASSERT(cpuid_checkpass(CPU, 2));
 
-	mwait_size = cpu->cpu_m.mcpu_cpi->cpi_mwait.mon_max;
+	mwait_size = CPU->cpu_m.mcpu_cpi->cpi_mwait.mon_max;
 	if (mwait_size == 0)
 		return (NULL);
 
@@ -4016,7 +4022,9 @@ cpuid_mwait_alloc(cpu_t *cpu)
 void
 cpuid_mwait_free(cpu_t *cpu)
 {
-	ASSERT(cpuid_checkpass(cpu, 2));
+	if (cpu->cpu_m.mcpu_cpi == NULL) {
+		return;
+	}
 
 	if (cpu->cpu_m.mcpu_cpi->cpi_mwait.buf_actual != NULL &&
 	    cpu->cpu_m.mcpu_cpi->cpi_mwait.size_actual > 0) {

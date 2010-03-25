@@ -161,6 +161,12 @@ gcpu_mca_poll_init(cmi_hdl_t hdl)
 	}
 }
 
+/* deconfigure gcpu_mca_poll_init() */
+void
+gcpu_mca_poll_fini(cmi_hdl_t hdl)
+{
+}
+
 void
 gcpu_mca_poll_start(cmi_hdl_t hdl)
 {

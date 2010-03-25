@@ -63,6 +63,7 @@ typedef void *cpu_pri_lev_t;
 
 struct cpuid_info;
 struct cpu_ucode_info;
+struct cmi_hdl;
 
 /*
  * A note about the hypervisor affinity bits: a one bit in the affinity mask
@@ -135,7 +136,9 @@ struct	machcpu {
 
 	struct cpu_ucode_info	*mcpu_ucode_info;
 
-	void		*mcpu_pm_mach_state;
+	void			*mcpu_pm_mach_state;
+	struct cmi_hdl		*mcpu_cmi_hdl;
+	void			*mcpu_mach_ctx_ptr;
 
 	/*
 	 * A stamp that is unique per processor and changes

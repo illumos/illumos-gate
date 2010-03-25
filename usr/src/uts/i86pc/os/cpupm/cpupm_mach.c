@@ -240,7 +240,7 @@ cpupm_init(cpu_t *cp)
 			if (mcpu->max_cstates > CPU_ACPI_C1) {
 				(void) cstate_timer_callback(
 				    CST_EVENT_MULTIPLE_CSTATES);
-				CPU->cpu_m.mcpu_idle_cpu = cpu_acpi_idle;
+				cp->cpu_m.mcpu_idle_cpu = cpu_acpi_idle;
 				mcpu->mcpu_idle_type = CPU_ACPI_C1;
 				disp_enq_thread = cstate_wakeup;
 			} else {
@@ -439,9 +439,13 @@ cpupm_alloc_domains(cpu_t *cp, int state)
 			domain = CPU_ACPI_PSD(handle).sd_domain;
 			type = CPU_ACPI_PSD(handle).sd_type;
 		} else {
-			mutex_enter(&cpu_lock);
-			domain = cpuid_get_chipid(cp);
-			mutex_exit(&cpu_lock);
+			if (MUTEX_HELD(&cpu_lock)) {
+				domain = cpuid_get_chipid(cp);
+			} else {
+				mutex_enter(&cpu_lock);
+				domain = cpuid_get_chipid(cp);
+				mutex_exit(&cpu_lock);
+			}
 			type = CPU_ACPI_HW_ALL;
 		}
 		dom_ptr = &cpupm_pstate_domains;
@@ -452,9 +456,13 @@ cpupm_alloc_domains(cpu_t *cp, int state)
 			domain = CPU_ACPI_TSD(handle).sd_domain;
 			type = CPU_ACPI_TSD(handle).sd_type;
 		} else {
-			mutex_enter(&cpu_lock);
-			domain = cpuid_get_chipid(cp);
-			mutex_exit(&cpu_lock);
+			if (MUTEX_HELD(&cpu_lock)) {
+				domain = cpuid_get_chipid(cp);
+			} else {
+				mutex_enter(&cpu_lock);
+				domain = cpuid_get_chipid(cp);
+				mutex_exit(&cpu_lock);
+			}
 			type = CPU_ACPI_HW_ALL;
 		}
 		dom_ptr = &cpupm_tstate_domains;
@@ -465,9 +473,13 @@ cpupm_alloc_domains(cpu_t *cp, int state)
 			domain = CPU_ACPI_CSD(handle).sd_domain;
 			type = CPU_ACPI_CSD(handle).sd_type;
 		} else {
-			mutex_enter(&cpu_lock);
-			domain = cpuid_get_coreid(cp);
-			mutex_exit(&cpu_lock);
+			if (MUTEX_HELD(&cpu_lock)) {
+				domain = cpuid_get_coreid(cp);
+			} else {
+				mutex_enter(&cpu_lock);
+				domain = cpuid_get_coreid(cp);
+				mutex_exit(&cpu_lock);
+			}
 			type = CPU_ACPI_HW_ALL;
 		}
 		dom_ptr = &cpupm_cstate_domains;

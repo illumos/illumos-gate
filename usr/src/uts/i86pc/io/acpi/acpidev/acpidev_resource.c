@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
@@ -331,7 +331,7 @@ acpidev_resource_insert_dma(acpidev_resource_handle_t rhdl, int dma)
 	ASSERT(rhdl != NULL);
 	if (rhdl->acpidev_dma_count >= ACPIDEV_RES_DMA_MAX) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: too many DMA resources, max %u.",
+		    "!acpidev: too many DMA resources, max %u.",
 		    ACPIDEV_RES_DMA_MAX);
 		return (AE_LIMIT);
 	}
@@ -380,7 +380,7 @@ acpidev_resource_insert_irq(acpidev_resource_handle_t rhdl, int irq)
 	ASSERT(rhdl != NULL);
 	if (rhdl->acpidev_irq_count >= ACPIDEV_RES_IRQ_MAX) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: too many IRQ resources, max %u.",
+		    "!acpidev: too many IRQ resources, max %u.",
 		    ACPIDEV_RES_IRQ_MAX);
 		return (AE_LIMIT);
 	}
@@ -456,7 +456,7 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			high |= ACPIDEV_REG_MEM_COHERENT_PF;
 		} else {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: unknown memory caching type %u.",
+			    "!acpidev: unknown memory caching type %u.",
 			    addrp->Info.Mem.Caching);
 			rc = AE_ERROR;
 			break;
@@ -477,7 +477,7 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			reg.size_low = addrp->AddressLength & 0xFFFFFFFF;
 			rc = acpidev_resource_insert_reg(rhdl, &reg);
 			if (ACPI_FAILURE(rc)) {
-				ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to "
+				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
 				    "insert regspec into resource handle.");
 			}
 		/* Generate 'ranges' for producer. */
@@ -502,7 +502,7 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			range.size_low = addrp->AddressLength & 0xFFFFFFFF;
 			rc = acpidev_resource_insert_range(rhdl, &range);
 			if (ACPI_FAILURE(rc)) {
-				ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to "
+				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
 				    "insert range into resource handle.");
 			}
 		}
@@ -524,7 +524,7 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			high |= ACPIDEV_REG_IO_RANGE_FULL;
 		} else {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: unknown IO range type %u.",
+			    "!acpidev: unknown IO range type %u.",
 			    addrp->Info.Io.RangeType);
 			rc = AE_ERROR;
 			break;
@@ -545,7 +545,7 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			reg.size_low = addrp->AddressLength & 0xFFFFFFFF;
 			rc = acpidev_resource_insert_reg(rhdl, &reg);
 			if (ACPI_FAILURE(rc)) {
-				ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to "
+				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
 				    "insert regspec into resource handle.");
 			}
 		/* Generate 'ranges' for producer. */
@@ -570,7 +570,7 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			range.size_low = addrp->AddressLength & 0xFFFFFFFF;
 			rc = acpidev_resource_insert_range(rhdl, &range);
 			if (ACPI_FAILURE(rc)) {
-				ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to "
+				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
 				    "insert range into resource handle.");
 			}
 		}
@@ -585,7 +585,7 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 
 			end = addrp->Minimum + addrp->AddressLength;
 			if (end < addrp->Minimum || end > UINT_MAX) {
-				ACPIDEV_DEBUG(CE_WARN, "acpidev: bus range "
+				ACPIDEV_DEBUG(CE_WARN, "!acpidev: bus range "
 				    "in ADDRESS64 is invalid.");
 				rc = AE_ERROR;
 				break;
@@ -595,7 +595,7 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 			ASSERT(bus.bus_start <= bus.bus_end);
 			rc = acpidev_resource_insert_bus(rhdl, &bus);
 			if (ACPI_FAILURE(rc)) {
-				ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to "
+				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
 				    "insert bus range into resource handle.");
 			}
 		}
@@ -603,7 +603,7 @@ acpidev_resource_address64(acpidev_resource_handle_t rhdl,
 
 	default:
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: unknown resource type %u in ADDRESS64.",
+		    "!acpidev: unknown resource type %u in ADDRESS64.",
 		    addrp->ResourceType);
 		rc = AE_BAD_PARAMETER;
 	}
@@ -632,7 +632,7 @@ acpidev_resource_walk_producer(ACPI_RESOURCE *rscp, void *ctxp)
 	case ACPI_RESOURCE_TYPE_GENERIC_REGISTER:
 	case ACPI_RESOURCE_TYPE_VENDOR:
 		ACPIDEV_DEBUG(CE_NOTE,
-		    "acpidev: unsupported producer resource type %u, ignored.",
+		    "!acpidev: unsupported producer resource type %u, ignored.",
 		    rscp->Type);
 		break;
 
@@ -651,13 +651,13 @@ acpidev_resource_walk_producer(ACPI_RESOURCE *rscp, void *ctxp)
 		range.size_hi = 0;
 		range.size_low = rscp->Data.Io.AddressLength;
 		if ((uint64_t)range.child_low + range.size_low > UINT16_MAX) {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: invalid IO record, "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: invalid IO record, "
 			    "IO max is out of range.");
 			rc = AE_ERROR;
 		} else if (range.size_low != 0) {
 			rc = acpidev_resource_insert_range(rhdl, &range);
 			if (ACPI_FAILURE(rc)) {
-				ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to "
+				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
 				    "insert range into resource handle.");
 			}
 		}
@@ -671,16 +671,16 @@ acpidev_resource_walk_producer(ACPI_RESOURCE *rscp, void *ctxp)
 		ACPI_RESOURCE_ADDRESS64 addr64;
 
 		if (rscp->Data.Address.ProducerConsumer != ACPI_PRODUCER) {
-			ACPIDEV_DEBUG(CE_NOTE, "acpidev: producer encountered "
+			ACPIDEV_DEBUG(CE_NOTE, "!acpidev: producer encountered "
 			    "a CONSUMER resource, ignored.");
 		} else if (ACPI_FAILURE(AcpiResourceToAddress64(rscp,
 		    &addr64))) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: failed to convert resource to ADDR64.");
+			    "!acpidev: failed to convert resource to ADDR64.");
 		} else if (ACPI_FAILURE(rc = acpidev_resource_address64(rhdl,
 		    &addr64))) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: failed to handle ADDRESS resource.");
+			    "!acpidev: failed to handle ADDRESS resource.");
 		}
 		break;
 	}
@@ -690,7 +690,7 @@ acpidev_resource_walk_producer(ACPI_RESOURCE *rscp, void *ctxp)
 		ACPI_RESOURCE_ADDRESS64 addr64;
 
 		if (rscp->Data.ExtAddress64.ProducerConsumer != ACPI_PRODUCER) {
-			ACPIDEV_DEBUG(CE_NOTE, "acpidev: producer encountered "
+			ACPIDEV_DEBUG(CE_NOTE, "!acpidev: producer encountered "
 			    "a CONSUMER resource, ignored.");
 			break;
 		}
@@ -705,14 +705,14 @@ acpidev_resource_walk_producer(ACPI_RESOURCE *rscp, void *ctxp)
 		if (ACPI_FAILURE(rc = acpidev_resource_address64(rhdl,
 		    &addr64))) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: failed to handle EXTADDRESS resource.");
+			    "!acpidev: failed to handle EXTADDRESS resource.");
 		}
 		break;
 	}
 
 	case ACPI_RESOURCE_TYPE_START_DEPENDENT:
 	case ACPI_RESOURCE_TYPE_END_DEPENDENT:
-		ACPIDEV_DEBUG(CE_NOTE, "acpidev: producer encountered "
+		ACPIDEV_DEBUG(CE_NOTE, "!acpidev: producer encountered "
 		    "START_DEPENDENT or END_DEPENDENT tag, ignored.");
 		break;
 
@@ -723,7 +723,7 @@ acpidev_resource_walk_producer(ACPI_RESOURCE *rscp, void *ctxp)
 
 	default:
 		ACPIDEV_DEBUG(CE_NOTE,
-		    "acpidev: unknown ACPI resource type %u, ignored.",
+		    "!acpidev: unknown ACPI resource type %u, ignored.",
 		    rscp->Type);
 		break;
 	}
@@ -746,7 +746,7 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 	case ACPI_RESOURCE_TYPE_GENERIC_REGISTER:
 	case ACPI_RESOURCE_TYPE_VENDOR:
 		ACPIDEV_DEBUG(CE_NOTE,
-		    "acpidev: unsupported consumer resource type %u, ignored.",
+		    "!acpidev: unsupported consumer resource type %u, ignored.",
 		    rscp->Type);
 		break;
 
@@ -755,7 +755,7 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 		int i;
 
 		if (rscp->Data.ExtendedIrq.ProducerConsumer != ACPI_CONSUMER) {
-			ACPIDEV_DEBUG(CE_NOTE, "acpidev: consumer encountered "
+			ACPIDEV_DEBUG(CE_NOTE, "!acpidev: consumer encountered "
 			    "a PRODUCER resource, ignored.");
 			break;
 		}
@@ -764,7 +764,7 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 			    rscp->Data.ExtendedIrq.Interrupts[i]))) {
 				continue;
 			}
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to insert"
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to insert"
 			    "Extended IRQ into resource handle.");
 			rc = AE_ERROR;
 			break;
@@ -781,7 +781,7 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 			    rscp->Data.Irq.Interrupts[i]))) {
 				continue;
 			}
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to insert"
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to insert"
 			    "IRQ into resource handle.");
 			rc = AE_ERROR;
 			break;
@@ -798,7 +798,7 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 			    rscp->Data.Dma.Channels[i]))) {
 				continue;
 			}
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to insert"
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to insert"
 			    "dma into resource handle.");
 			rc = AE_ERROR;
 			break;
@@ -827,13 +827,13 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 		reg.phys_mid = 0;
 		reg.size_hi = 0;
 		if ((uint64_t)reg.phys_low + reg.size_low > UINT16_MAX) {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: invalid IO/FIXEDIO "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: invalid IO/FIXEDIO "
 			    "record, IO max is out of range.");
 			rc = AE_ERROR;
 		} else if (reg.size_low != 0) {
 			rc = acpidev_resource_insert_reg(rhdl, &reg);
 			if (ACPI_FAILURE(rc)) {
-				ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to "
+				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
 				    "insert reg into resource handle.");
 			}
 		}
@@ -866,13 +866,13 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 		reg.size_hi = 0;
 		if ((uint64_t)reg.phys_low + reg.size_low > UINT32_MAX) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: invalid MEMORY32/FIXEDMEMORY32 record, "
+			    "!acpidev: invalid MEMORY32/FIXEDMEMORY32 record, "
 			    "memory max is out of range.");
 			rc = AE_ERROR;
 		} else if (reg.size_low != 0) {
 			rc = acpidev_resource_insert_reg(rhdl, &reg);
 			if (ACPI_FAILURE(rc)) {
-				ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to "
+				ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to "
 				    "insert reg into resource handle.");
 			}
 		}
@@ -886,16 +886,16 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 		ACPI_RESOURCE_ADDRESS64 addr64;
 
 		if (rscp->Data.Address.ProducerConsumer != ACPI_CONSUMER) {
-			ACPIDEV_DEBUG(CE_NOTE, "acpidev: consumer encountered "
+			ACPIDEV_DEBUG(CE_NOTE, "!acpidev: consumer encountered "
 			    "a PRODUCER resource, ignored.");
 		} else if (ACPI_FAILURE(AcpiResourceToAddress64(rscp,
 		    &addr64))) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: failed to convert resource to ADDR64.");
+			    "!acpidev: failed to convert resource to ADDR64.");
 		} else if (ACPI_FAILURE(rc = acpidev_resource_address64(rhdl,
 		    &addr64))) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: failed to handle ADDRESS resource.");
+			    "!acpidev: failed to handle ADDRESS resource.");
 		}
 		break;
 	}
@@ -905,7 +905,7 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 		ACPI_RESOURCE_ADDRESS64 addr64;
 
 		if (rscp->Data.ExtAddress64.ProducerConsumer != ACPI_CONSUMER) {
-			ACPIDEV_DEBUG(CE_NOTE, "acpidev: consumer encountered "
+			ACPIDEV_DEBUG(CE_NOTE, "!acpidev: consumer encountered "
 			    "a PRODUCER resource, ignored.");
 			break;
 		}
@@ -920,14 +920,14 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 		if (ACPI_FAILURE(rc = acpidev_resource_address64(rhdl,
 		    &addr64))) {
 			ACPIDEV_DEBUG(CE_WARN,
-			    "acpidev: failed to handle EXTADDRESS resource.");
+			    "!acpidev: failed to handle EXTADDRESS resource.");
 		}
 		break;
 	}
 
 	case ACPI_RESOURCE_TYPE_START_DEPENDENT:
 	case ACPI_RESOURCE_TYPE_END_DEPENDENT:
-		ACPIDEV_DEBUG(CE_NOTE, "acpidev: consumer encountered "
+		ACPIDEV_DEBUG(CE_NOTE, "!acpidev: consumer encountered "
 		    "START_DEPENDENT or END_DEPENDENT tag, ignored.");
 		break;
 
@@ -938,7 +938,7 @@ acpidev_resource_walk_consumer(ACPI_RESOURCE *rscp, void *ctxp)
 
 	default:
 		ACPIDEV_DEBUG(CE_NOTE,
-		    "acpidev: unknown ACPI resource type %u, ignored.",
+		    "!acpidev: unknown ACPI resource type %u, ignored.",
 		    rscp->Type);
 		break;
 	}
@@ -959,14 +959,14 @@ acpidev_resource_walk(ACPI_HANDLE hdl, char *method,
 	ASSERT(rhdlp != NULL);
 	if (hdl == NULL) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: hdl is NULL in acpidev_resource_walk().");
+		    "!acpidev: hdl is NULL in acpidev_resource_walk().");
 		return (AE_BAD_PARAMETER);
 	} else if (method == NULL) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: method is NULL in acpidev_resource_walk().");
+		    "!acpidev: method is NULL in acpidev_resource_walk().");
 		return (AE_BAD_PARAMETER);
 	} else if (rhdlp == NULL) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: resource handle ptr is NULL "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: resource handle ptr is NULL "
 		    "in acpidev_resource_walk().");
 		return (AE_BAD_PARAMETER);
 	}
@@ -975,7 +975,7 @@ acpidev_resource_walk(ACPI_HANDLE hdl, char *method,
 	if (ACPI_FAILURE(AcpiGetHandle(hdl, method, &mhdl))) {
 		char *objname = acpidev_get_object_name(hdl);
 		ACPIDEV_DEBUG(CE_NOTE,
-		    "acpidev: method %s doesn't exist under %s",
+		    "!acpidev: method %s doesn't exist under %s",
 		    method, objname);
 		acpidev_free_object_name(objname);
 		return (AE_NOT_FOUND);
@@ -997,11 +997,9 @@ acpidev_resource_walk(ACPI_HANDLE hdl, char *method,
 	}
 	if (ACPI_FAILURE(rc)) {
 		char *objname = acpidev_get_object_name(hdl);
-		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: failed to walk resource from method %s under %s.",
-		    method, objname);
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to walk resource from "
+		    "method %s under %s.", method, objname);
 		acpidev_free_object_name(objname);
-
 	}
 
 	return (rc);
@@ -1016,7 +1014,7 @@ acpidev_resource_process(acpidev_walk_info_t *infop, boolean_t consumer)
 
 	ASSERT(infop != NULL);
 	if (infop == NULL) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: invalid parameter "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: invalid parameter "
 		    "in acpidev_resource_process().");
 		return (AE_BAD_PARAMETER);
 	}
@@ -1027,7 +1025,7 @@ acpidev_resource_process(acpidev_walk_info_t *infop, boolean_t consumer)
 	    consumer, &rhdl);
 	if (ACPI_FAILURE(rc)) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: failed to walk ACPI resources of %s(%s).",
+		    "!acpidev: failed to walk ACPI resources of %s(%s).",
 		    path, infop->awi_name);
 		return (rc);
 	}
@@ -1041,7 +1039,7 @@ acpidev_resource_process(acpidev_walk_info_t *infop, boolean_t consumer)
 		    "reg", (int *)rhdl->acpidev_regp,
 		    rhdl->acpidev_reg_count * sizeof (acpidev_regspec_t) /
 		    sizeof (int)) != NDI_SUCCESS) {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to set "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to set "
 			    "'reg' property for %s.", path);
 			rc = AE_ERROR;
 			goto out;
@@ -1051,7 +1049,7 @@ acpidev_resource_process(acpidev_walk_info_t *infop, boolean_t consumer)
 		    "assigned-addresses", (int *)rhdl->acpidev_regp,
 		    rhdl->acpidev_reg_count * sizeof (acpidev_regspec_t) /
 		    sizeof (int)) != NDI_SUCCESS) {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to set "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to set "
 			    "'assigned-addresses' property for %s.", path);
 			rc = AE_ERROR;
 			goto out;
@@ -1062,7 +1060,7 @@ acpidev_resource_process(acpidev_walk_info_t *infop, boolean_t consumer)
 		    ndi_prop_update_int_array(DDI_DEV_T_NONE, infop->awi_dip,
 		    "interrupts", (int *)rhdl->acpidev_irqp,
 		    rhdl->acpidev_irq_count) != NDI_SUCCESS) {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to set "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to set "
 			    "'interrupts' property for %s.", path);
 			rc = AE_ERROR;
 			goto out;
@@ -1073,7 +1071,7 @@ acpidev_resource_process(acpidev_walk_info_t *infop, boolean_t consumer)
 		    ndi_prop_update_int_array(DDI_DEV_T_NONE, infop->awi_dip,
 		    "dma-channels", (int *)rhdl->acpidev_dmap,
 		    rhdl->acpidev_dma_count) != NDI_SUCCESS) {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to set "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to set "
 			    "'dma-channels' property for %s.", path);
 			rc = AE_ERROR;
 			goto out;
@@ -1088,7 +1086,7 @@ acpidev_resource_process(acpidev_walk_info_t *infop, boolean_t consumer)
 		    "ranges", (int *)rhdl->acpidev_rangep,
 		    rhdl->acpidev_range_count * sizeof (acpidev_ranges_t) /
 		    sizeof (int)) != NDI_SUCCESS) {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to set "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to set "
 			    "'ranges' property for %s.", path);
 			rc = AE_ERROR;
 			goto out;
@@ -1100,7 +1098,7 @@ acpidev_resource_process(acpidev_walk_info_t *infop, boolean_t consumer)
 		    "bus-range", (int *)rhdl->acpidev_busp,
 		    rhdl->acpidev_bus_count * sizeof (acpidev_bus_range_t) /
 		    sizeof (int)) != NDI_SUCCESS) {
-			ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to set "
+			ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to set "
 			    "'bus-range' property for %s.", path);
 			rc = AE_ERROR;
 			goto out;

@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -186,11 +190,11 @@ xc_extract(xc_msg_t **queue)
 	return (old_head);
 }
 
-
 /*
  * Initialize the machcpu fields used for cross calls
  */
 static uint_t xc_initialized = 0;
+
 void
 xc_init_cpu(struct cpu *cpup)
 {
@@ -198,34 +202,100 @@ xc_init_cpu(struct cpu *cpup)
 	int c;
 
 	/*
-	 * add a new msg to each existing CPU's free list, as well as one for
-	 * my list for each of them. ncpus has an inconsistent value when this
-	 * function is called, so use cpup->cpu_id.
+	 * Allocate message buffers for the new CPU.
 	 */
-	for (c = 0; c < cpup->cpu_id; ++c) {
-		if (cpu[c] == NULL)
-			continue;
-		msg = kmem_zalloc(sizeof (*msg), KM_SLEEP);
-		msg->xc_command = XC_MSG_FREE;
-		msg->xc_master = c;
-		xc_insert(&cpu[c]->cpu_m.xc_free, msg);
+	for (c = 0; c < max_ncpus; ++c) {
+		if (plat_dr_support_cpu()) {
+			/*
+			 * Allocate a message buffer for every CPU possible
+			 * in system, including our own, and add them to our xc
+			 * message queue.
+			 */
+			msg = kmem_zalloc(sizeof (*msg), KM_SLEEP);
+			msg->xc_command = XC_MSG_FREE;
+			msg->xc_master = cpup->cpu_id;
+			xc_insert(&cpup->cpu_m.xc_free, msg);
+		} else if (cpu[c] != NULL && cpu[c] != cpup) {
+			/*
+			 * Add a new message buffer to each existing CPU's free
+			 * list, as well as one for my list for each of them.
+			 * Note: cpu0 is statically inserted into cpu[] array,
+			 * so need to check cpu[c] isn't cpup itself to avoid
+			 * allocating extra message buffers for cpu0.
+			 */
+			msg = kmem_zalloc(sizeof (*msg), KM_SLEEP);
+			msg->xc_command = XC_MSG_FREE;
+			msg->xc_master = c;
+			xc_insert(&cpu[c]->cpu_m.xc_free, msg);
 
+			msg = kmem_zalloc(sizeof (*msg), KM_SLEEP);
+			msg->xc_command = XC_MSG_FREE;
+			msg->xc_master = cpup->cpu_id;
+			xc_insert(&cpup->cpu_m.xc_free, msg);
+		}
+	}
+
+	if (!plat_dr_support_cpu()) {
+		/*
+		 * Add one for self messages if CPU hotplug is disabled.
+		 */
 		msg = kmem_zalloc(sizeof (*msg), KM_SLEEP);
 		msg->xc_command = XC_MSG_FREE;
 		msg->xc_master = cpup->cpu_id;
 		xc_insert(&cpup->cpu_m.xc_free, msg);
 	}
 
-	/*
-	 * Add one for self messages
-	 */
-	msg = kmem_zalloc(sizeof (*msg), KM_SLEEP);
-	msg->xc_command = XC_MSG_FREE;
-	msg->xc_master = cpup->cpu_id;
-	xc_insert(&cpup->cpu_m.xc_free, msg);
-
 	if (!xc_initialized)
 		xc_initialized = 1;
+}
+
+void
+xc_fini_cpu(struct cpu *cpup)
+{
+	xc_msg_t *msg;
+
+	ASSERT((cpup->cpu_flags & CPU_READY) == 0);
+	ASSERT(cpup->cpu_m.xc_msgbox == NULL);
+	ASSERT(cpup->cpu_m.xc_work_cnt == 0);
+
+	while ((msg = xc_extract(&cpup->cpu_m.xc_free)) != NULL) {
+		kmem_free(msg, sizeof (*msg));
+	}
+}
+
+#define	XC_FLUSH_MAX_WAITS		1000
+
+/* Flush inflight message buffers. */
+int
+xc_flush_cpu(struct cpu *cpup)
+{
+	int i;
+
+	ASSERT((cpup->cpu_flags & CPU_READY) == 0);
+
+	/*
+	 * Pause all working CPUs, which ensures that there's no CPU in
+	 * function xc_common().
+	 * This is used to work around a race condition window in xc_common()
+	 * between checking CPU_READY flag and increasing working item count.
+	 */
+	pause_cpus(cpup);
+	start_cpus();
+
+	for (i = 0; i < XC_FLUSH_MAX_WAITS; i++) {
+		if (cpup->cpu_m.xc_work_cnt == 0) {
+			break;
+		}
+		DELAY(1);
+	}
+	for (; i < XC_FLUSH_MAX_WAITS; i++) {
+		if (!BT_TEST(xc_priority_set, cpup->cpu_id)) {
+			break;
+		}
+		DELAY(1);
+	}
+
+	return (i >= XC_FLUSH_MAX_WAITS ? ETIME : 0);
 }
 
 /*
@@ -416,7 +486,7 @@ xc_common(
 	 * Post messages to all CPUs involved that are CPU_READY
 	 */
 	CPU->cpu_m.xc_wait_cnt = 0;
-	for (c = 0; c < ncpus; ++c) {
+	for (c = 0; c < max_ncpus; ++c) {
 		if (!BT_TEST(set, c))
 			continue;
 		cpup = cpu[c];
@@ -487,7 +557,7 @@ xc_priority_common(
 	/*
 	 * Wait briefly for any previous xc_priority to have finished.
 	 */
-	for (c = 0; c < ncpus; ++c) {
+	for (c = 0; c < max_ncpus; ++c) {
 		cpup = cpu[c];
 		if (cpup == NULL || !(cpup->cpu_flags & CPU_READY))
 			continue;
@@ -527,7 +597,7 @@ xc_priority_common(
 	 * Post messages to all CPUs involved that are CPU_READY
 	 * We'll always IPI, plus bang on the xc_msgbox for i86_mwait()
 	 */
-	for (c = 0; c < ncpus; ++c) {
+	for (c = 0; c < max_ncpus; ++c) {
 		if (!BT_TEST(set, c))
 			continue;
 		cpup = cpu[c];

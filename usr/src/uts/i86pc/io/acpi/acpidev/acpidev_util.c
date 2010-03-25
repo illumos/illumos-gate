@@ -24,12 +24,13 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
 #include <sys/types.h>
 #include <sys/cmn_err.h>
+#include <sys/note.h>
 #include <sys/sysmacros.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
@@ -55,7 +56,7 @@ acpidev_query_device_status(ACPI_HANDLE hdl)
 	ASSERT(hdl != NULL);
 	if (hdl == NULL) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: hdl is NULL in acpidev_query_device_status().");
+		    "!acpidev: hdl is NULL in acpidev_query_device_status().");
 		return (0);
 	}
 
@@ -114,7 +115,7 @@ acpidev_match_device_id(ACPI_DEVICE_INFO *infop, char **ids, int count)
 	if (count == 0) {
 		return (B_TRUE);
 	} else if (infop == NULL || ids == NULL) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: invalid parameters in "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: invalid parameters in "
 		    "acpidev_match_device_id().");
 		return (B_FALSE);
 	}
@@ -206,7 +207,7 @@ acpidev_get_device_by_id(ACPI_HANDLE hdl, char **ids, int count,
 
 	ASSERT(userfunc != NULL);
 	if (hdl == NULL || userfunc == NULL || (ids == NULL && count != 0)) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: invalid parameters "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: invalid parameters "
 		    "in acpidev_get_device_by_id().");
 		return (AE_BAD_PARAMETER);
 	}
@@ -237,7 +238,7 @@ acpidev_walk_apic(ACPI_BUFFER *bufp, ACPI_HANDLE hdl, char *method,
 	ASSERT(func != NULL);
 	if (func == NULL) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: invalid parameters for acpidev_walk_apic().");
+		    "!acpidev: invalid parameters for acpidev_walk_apic().");
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -361,7 +362,7 @@ acpidev_alloc_walk_info(acpidev_op_type_t op_type, int lvl, ACPI_HANDLE hdl,
 		datap->aod_level = lvl;
 		datap->aod_hdl = hdl;
 	} else {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: failed to create object "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to create object "
 		    "handle for %s in acpidev_alloc_walk_info().",
 		    infop->awi_name);
 		AcpiOsFree(infop->awi_info);
@@ -416,12 +417,17 @@ acpidev_walk_info_get_pdip(acpidev_walk_info_t *infop)
  * Called to release resources when the corresponding object is going
  * to be destroyed.
  */
-/*ARGSUSED*/
 static void
-acpidev_get_object_handler(ACPI_HANDLE hdl, void *data)
+acpidev_free_object_handler(ACPI_HANDLE hdl, void *data)
 {
+	_NOTE(ARGUNUSED(hdl));
+
 	acpidev_data_handle_t objhdl = data;
 
+	if (objhdl->aod_class != NULL) {
+		atomic_dec_32(&objhdl->aod_class->adc_refcnt);
+		objhdl->aod_class = NULL;
+	}
 	kmem_free(objhdl, sizeof (acpidev_data_handle_t));
 }
 
@@ -431,7 +437,7 @@ acpidev_data_get_handle(ACPI_HANDLE hdl)
 	void *ptr;
 	acpidev_data_handle_t objhdl = NULL;
 
-	if (ACPI_SUCCESS(AcpiGetData(hdl, acpidev_get_object_handler, &ptr))) {
+	if (ACPI_SUCCESS(AcpiGetData(hdl, acpidev_free_object_handler, &ptr))) {
 		objhdl = (acpidev_data_handle_t)ptr;
 	}
 
@@ -444,7 +450,12 @@ acpidev_data_create_handle(ACPI_HANDLE hdl)
 	acpidev_data_handle_t objhdl;
 
 	objhdl = kmem_zalloc(sizeof (*objhdl), KM_SLEEP);
-	if (ACPI_FAILURE(AcpiAttachData(hdl, acpidev_get_object_handler,
+	objhdl->aod_bdtype = ACPIDEV_INVALID_BOARD;
+	objhdl->aod_bdnum = UINT32_MAX;
+	objhdl->aod_portid = UINT32_MAX;
+	objhdl->aod_class_id = ACPIDEV_CLASS_ID_INVALID;
+
+	if (ACPI_FAILURE(AcpiAttachData(hdl, acpidev_free_object_handler,
 	    (void *)objhdl))) {
 		cmn_err(CE_WARN,
 		    "!acpidev: failed to attach handle data to object.");
@@ -459,9 +470,15 @@ void
 acpidev_data_destroy_handle(ACPI_HANDLE hdl)
 {
 	void *ptr;
+	acpidev_data_handle_t objhdl = NULL;
 
-	if (ACPI_SUCCESS(AcpiGetData(hdl, acpidev_get_object_handler, &ptr)) &&
-	    ACPI_SUCCESS(AcpiDetachData(hdl, acpidev_get_object_handler))) {
+	if (ACPI_SUCCESS(AcpiGetData(hdl, acpidev_free_object_handler, &ptr)) &&
+	    ACPI_SUCCESS(AcpiDetachData(hdl, acpidev_free_object_handler))) {
+		objhdl = ptr;
+		if (objhdl->aod_class != NULL) {
+			atomic_dec_32(&objhdl->aod_class->adc_refcnt);
+			objhdl->aod_class = NULL;
+		}
 		kmem_free(ptr, sizeof (acpidev_data_handle_t));
 	}
 }
@@ -502,14 +519,14 @@ void
 acpidev_data_set_flag(acpidev_data_handle_t hdl, uint32_t flag)
 {
 	ASSERT(hdl != NULL);
-	hdl->aod_eflag |= flag;
+	atomic_or_32(&hdl->aod_eflag, flag);
 }
 
 void
 acpidev_data_clear_flag(acpidev_data_handle_t hdl, uint32_t flag)
 {
 	ASSERT(hdl != NULL);
-	hdl->aod_eflag &= ~flag;
+	atomic_and_32(&hdl->aod_eflag, ~flag);
 }
 
 uint32_t
@@ -517,6 +534,27 @@ acpidev_data_get_flag(acpidev_data_handle_t hdl, uint32_t flag)
 {
 	ASSERT(hdl != NULL);
 	return (hdl->aod_eflag & flag);
+}
+
+boolean_t
+acpidev_data_dr_capable(acpidev_data_handle_t hdl)
+{
+	ASSERT(hdl != NULL);
+	return (hdl->aod_iflag & ACPIDEV_ODF_HOTPLUG_CAPABLE);
+}
+
+boolean_t
+acpidev_data_dr_ready(acpidev_data_handle_t hdl)
+{
+	ASSERT(hdl != NULL);
+	return (hdl->aod_iflag & ACPIDEV_ODF_HOTPLUG_READY);
+}
+
+boolean_t
+acpidev_data_dr_failed(acpidev_data_handle_t hdl)
+{
+	ASSERT(hdl != NULL);
+	return (hdl->aod_iflag & ACPIDEV_ODF_HOTPLUG_FAILED);
 }
 
 static char *
@@ -591,7 +629,7 @@ acpidev_gen_unitaddr(char *uid, char *fmt, char *buf, size_t len)
 	}
 	if (cnt != 1 && cnt != 2) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: invalid uid format string '%s'.", fmt);
+		    "!acpidev: invalid uid format string '%s'.", fmt);
 		return (NULL);
 	}
 
@@ -605,11 +643,11 @@ acpidev_gen_unitaddr(char *uid, char *fmt, char *buf, size_t len)
 	 */
 	if (cnt == 2 && snprintf(buf, len, "%u,%u", id2, id1) >= len) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: generated unitaddr is too long.");
+		    "!acpidev: generated unitaddr is too long.");
 		return (NULL);
 	} else if (cnt == 1 && snprintf(buf, len, "%u", id1) >= len) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: generated unitaddr is too long.");
+		    "!acpidev: generated unitaddr is too long.");
 		return (NULL);
 	}
 
@@ -681,7 +719,7 @@ acpidev_set_unitaddr(acpidev_walk_info_t *infop, char **fmts, size_t nfmt,
 	if (infop == NULL || infop->awi_dip == NULL ||
 	    infop->awi_info == NULL) {
 		ACPIDEV_DEBUG(CE_WARN,
-		    "acpidev: invalid parameters in acpidev_set_unitaddr().");
+		    "!acpidev: invalid parameters in acpidev_set_unitaddr().");
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -758,7 +796,7 @@ acpidev_set_compatible(acpidev_walk_info_t *infop, char **compat, int acount)
 	ASSERT(compat != NULL || acount == 0);
 	if (infop == NULL || infop->awi_dip == NULL ||
 	    infop->awi_info == NULL || (compat == NULL && acount != 0)) {
-		ACPIDEV_DEBUG(CE_WARN, "acpidev: invalid parameters "
+		ACPIDEV_DEBUG(CE_WARN, "!acpidev: invalid parameters "
 		    "in acpidev_set_compatible().");
 		return (AE_BAD_PARAMETER);
 	}
@@ -801,4 +839,91 @@ acpidev_set_compatible(acpidev_walk_info_t *infop, char **compat, int acount)
 	kmem_free(compatible, count * sizeof (char *));
 
 	return (AE_OK);
+}
+
+/* Evaluate _OST method under object, which is used to support hotplug event. */
+ACPI_STATUS
+acpidev_eval_ost(ACPI_HANDLE hdl, uint32_t code, uint32_t status,
+    char *bufp, size_t len)
+{
+	ACPI_STATUS rc;
+	ACPI_OBJECT args[3];
+	ACPI_OBJECT_LIST arglist;
+
+	args[0].Type = ACPI_TYPE_INTEGER;
+	args[0].Integer.Value = code;
+	args[1].Type = ACPI_TYPE_INTEGER;
+	args[1].Integer.Value = status;
+	args[2].Type = ACPI_TYPE_BUFFER;
+	args[2].Buffer.Pointer = (UINT8 *)bufp;
+	args[2].Buffer.Length = (UINT32)len;
+	if (bufp == NULL || len == 0) {
+		arglist.Count = 2;
+	} else {
+		arglist.Count = 3;
+	}
+	arglist.Pointer = args;
+	rc = AcpiEvaluateObject(hdl, ACPIDEV_METHOD_NAME_OST, &arglist, NULL);
+	if (rc != AE_OK && rc != AE_NOT_FOUND) {
+		ACPIDEV_DEBUG(CE_WARN,
+		    "!acpidev: failed to evaluate _OST method, code 0x%x.", rc);
+	}
+
+	return (rc);
+}
+
+ACPI_STATUS
+acpidev_eval_ej0(ACPI_HANDLE hdl)
+{
+	ACPI_STATUS rc;
+	ACPI_OBJECT args[1];
+	ACPI_OBJECT_LIST arglist;
+
+	/*
+	 * Quotation from ACPI spec 4.0 section 6.3.3.
+	 * Arg0 An Integer containing a device ejection control
+	 * 	0  Cancel a mark for ejection request (EJ0 will never be called
+	 *	   with this value)
+	 * 	1  Hot eject or mark for ejection
+	 */
+	args[0].Type = ACPI_TYPE_INTEGER;
+	args[0].Integer.Value = 1;
+	arglist.Count = 1;
+	arglist.Pointer = args;
+	rc = AcpiEvaluateObject(hdl, ACPIDEV_METHOD_NAME_EJ0, &arglist, NULL);
+	if (rc != AE_OK) {
+		ACPIDEV_DEBUG(CE_WARN,
+		    "!acpidev: failed to evaluate _EJ0 method, code 0x%x.", rc);
+	}
+
+	return (rc);
+}
+
+ACPI_STATUS
+acpidev_eval_pxm(ACPI_HANDLE hdl, uint32_t *idp)
+{
+	int pxmid;
+
+	ASSERT(idp != NULL);
+
+	/*
+	 * Try to evaluate ACPI _PXM method to get proximity doamin id.
+	 * Quotation from ACPI4.0:
+	 * If the Local APIC ID / Local SAPIC ID / Local x2APIC ID of a
+	 * dynamically added processor is not present in the System Resource
+	 * Affinity Table (SRAT), a _PXM object must exist for the processor's
+	 * device or one of its ancestors in the ACPI Namespace.
+	 */
+	while (hdl != NULL) {
+		if (ACPI_SUCCESS(acpica_eval_int(hdl,
+		    ACPIDEV_METHOD_NAME_PXM, &pxmid))) {
+			*idp = (uint32_t)pxmid;
+			return (AE_OK);
+		}
+		if (ACPI_FAILURE(AcpiGetParent(hdl, &hdl))) {
+			break;
+		}
+	}
+
+	return (AE_NOT_FOUND);
 }

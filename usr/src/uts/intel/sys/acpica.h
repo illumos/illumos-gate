@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
@@ -133,6 +133,7 @@ typedef struct iflag {
 #define	ACPI_DEVCFG_CPU		0x1
 #define	ACPI_DEVCFG_MEMORY	0x2
 #define	ACPI_DEVCFG_CONTAINER	0x4
+#define	ACPI_DEVCFG_PCI		0x8
 
 /*
  * master_ops.c
@@ -187,6 +188,9 @@ extern ACPI_STATUS acpica_unmap_cpu(processorid_t);
 extern ACPI_STATUS acpica_get_cpu_object_by_cpuid(processorid_t, ACPI_HANDLE *);
 extern ACPI_STATUS acpica_get_cpu_object_by_procid(UINT32, ACPI_HANDLE *);
 extern ACPI_STATUS acpica_get_cpu_object_by_apicid(UINT32, ACPI_HANDLE *);
+extern ACPI_STATUS acpica_get_cpu_id_by_object(ACPI_HANDLE, processorid_t *);
+extern ACPI_STATUS acpica_get_apicid_by_object(ACPI_HANDLE, UINT32 *);
+extern ACPI_STATUS acpica_get_procid_by_object(ACPI_HANDLE, UINT32 *);
 
 extern uint64_t acpica_get_core_feature(uint64_t);
 extern void acpica_set_core_feature(uint64_t);

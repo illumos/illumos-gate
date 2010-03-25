@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2009, Intel Corporation.
+ * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
 
@@ -61,6 +61,10 @@ typedef struct {
 	kmutex_t			ans_lock;
 	char				ans_path[MAXPATHLEN];
 } acpinex_softstate_t;
+
+extern void acpinex_event_init(void);
+extern void acpinex_event_fini(void);
+extern int acpinex_event_scan(acpinex_softstate_t *, boolean_t);
 
 #endif	/* _KERNEL */
 

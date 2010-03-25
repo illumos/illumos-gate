@@ -22,11 +22,13 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 #ifndef	_SYS_RM_PLATTER_H
 #define	_SYS_RM_PLATTER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/tss.h>
@@ -36,8 +38,12 @@
 extern "C" {
 #endif
 
+#define	RM_PLATTER_CODE_SIZE		0x400
+#define	RM_PLATTER_CPU_HALT_CODE_SIZE	0x100
+
 typedef	struct rm_platter {
-	char		rm_code[1024];
+	char		rm_code[RM_PLATTER_CODE_SIZE];
+	char		rm_cpu_halt_code[RM_PLATTER_CPU_HALT_CODE_SIZE];
 #if defined(__amd64)
 	/*
 	 * The compiler will want to 64-bit align the 64-bit rm_gdt_base
@@ -59,7 +65,7 @@ typedef	struct rm_platter {
 	 */
 	uint32_t	rm_idt_pad;
 #endif	/* __amd64 */
-	ushort_t	rm_filler2;	/* till I am sure that pragma works */
+	ushort_t	rm_cpu_halted;	/* non-zero if CPU has been halted */
 	ushort_t	rm_idt_lim;	/* stuff for lidt */
 	gate_desc_t	*rm_idt_base;
 	uint_t		rm_pdbr;	/* cr3 value */

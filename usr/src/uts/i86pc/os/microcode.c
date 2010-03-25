@@ -141,6 +141,7 @@ void
 ucode_alloc_space(cpu_t *cp)
 {
 	ASSERT(cp->cpu_id != 0);
+	ASSERT(cp->cpu_m.mcpu_ucode_info == NULL);
 	cp->cpu_m.mcpu_ucode_info =
 	    kmem_zalloc(sizeof (*cp->cpu_m.mcpu_ucode_info), KM_SLEEP);
 }
@@ -148,9 +149,11 @@ ucode_alloc_space(cpu_t *cp)
 void
 ucode_free_space(cpu_t *cp)
 {
-	ASSERT(cp->cpu_id != 0);
+	ASSERT(cp->cpu_m.mcpu_ucode_info != NULL);
+	ASSERT(cp->cpu_m.mcpu_ucode_info != &cpu_ucode_info0);
 	kmem_free(cp->cpu_m.mcpu_ucode_info,
 	    sizeof (*cp->cpu_m.mcpu_ucode_info));
+	cp->cpu_m.mcpu_ucode_info = NULL;
 }
 
 /*
@@ -1126,7 +1129,10 @@ ucode_check(cpu_t *cp)
 	uint32_t new_rev = 0;
 
 	ASSERT(cp);
-	if (cp->cpu_id == 0)
+	/*
+	 * Space statically allocated for BSP, ensure pointer is set
+	 */
+	if (cp->cpu_id == 0 && cp->cpu_m.mcpu_ucode_info == NULL)
 		cp->cpu_m.mcpu_ucode_info = &cpu_ucode_info0;
 
 	uinfop = cp->cpu_m.mcpu_ucode_info;

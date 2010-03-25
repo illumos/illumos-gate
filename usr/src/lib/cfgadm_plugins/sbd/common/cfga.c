@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,8 +22,6 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -243,14 +240,14 @@ cfga_list_ext(
 			ap_cm_id(a, i, dyn, sizeof (dyn));
 
 			(void) snprintf(ap->ap_log_id, szl, "%s::%s",
-				a->target, dyn);
+			    a->target, dyn);
 			(void) snprintf(ap->ap_phys_id, szp, "%s::%s",
-				a->path, dyn);
+			    a->path, dyn);
 
 			ap_cm_init(a, ap, i);
 
 			DBG("ap_phys_id=%s ap_log_id=%s\n",
-				ap->ap_phys_id, ap->ap_log_id);
+			    ap->ap_phys_id, ap->ap_log_id);
 		}
 
 	} else

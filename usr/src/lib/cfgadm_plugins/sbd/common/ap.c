@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <ctype.h>
@@ -40,6 +37,7 @@
 #include <config_admin.h>
 #include "ap.h"
 
+/*ARGSUSED0*/
 int
 ap_symid(apd_t *a, char *apid, char *symid, size_t bufsize)
 {
@@ -78,13 +76,13 @@ ap_symid(apd_t *a, char *apid, char *symid, size_t bufsize)
 			cp--;	/* Get the '/' */
 
 		if (strcmp(cp, apid) == 0) {
-			snprintf(symid, bufsize, "%s", dp->d_name);
+			(void) snprintf(symid, bufsize, "%s", dp->d_name);
 			rc = 0;
 			break;
 		}
 	}
 
-	closedir(dirp);
+	(void) closedir(dirp);
 	return (rc);
 }
 
@@ -293,7 +291,7 @@ done:
 
 	DBG("path=<%s> ", a->path ? a->path : "");
 	DBG("drv=<%s> inst=%d minor=<%s> ",
-		a->drv ? a->drv : "", a->inst, a->minor ? a->minor : "");
+	    a->drv ? a->drv : "", a->inst, a->minor ? a->minor : "");
 	DBG("target=<%s>\n", a->target ? a->target : "");
 	DBG("cid=<%s> ", a->cid ? a->cid : "");
 	DBG("cname=<%s> ", a->cname ? a->cname : "");
@@ -612,7 +610,7 @@ ap_opt_parse(apd_t *a, ap_cmd_t *acp, const char *options)
 			 * during sequencing.
 			 */
 			for (p = strtok(value, ":"); p != NULL;
-				p = strtok(NULL, ":")) {
+			    p = strtok(NULL, ":")) {
 				if ((i = ap_cmd(p)) == CMD_NONE) {
 					ap_err(a, ERR_CMD_INVAL, p);
 					return (-1);
@@ -711,8 +709,7 @@ ap_cmd_parse(apd_t *a, const char *f, const char *options, int *cmd)
 	target = mask(tgt);
 
 	DBG("cmd=%s(%d) tmask=0x%x cmask=0x%x omask=0x%x\n",
-		ap_cmd_name(c), c, target,
-		acp->cmask, acp->omask[tgt]);
+	    ap_cmd_name(c), c, target, acp->cmask, acp->omask[tgt]);
 
 	if ((acp->cmask & target) == 0)
 		ap_err(a, ERR_CMD_NOTSUPP, c);

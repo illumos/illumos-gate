@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -107,6 +111,7 @@ mlsetup(struct regs *rp)
 	extern char t0stack[];
 	extern int post_fastreboot;
 	extern int console;
+	extern uint64_t plat_dr_options;
 
 	ASSERT_STACK_ALIGNED();
 
@@ -354,15 +359,70 @@ mlsetup(struct regs *rp)
 
 	prom_init("kernel", (void *)NULL);
 
-	if (bootprop_getval("boot-ncpus", &prop_value) != 0)
+	/* User-set option overrides firmware value. */
+	if (bootprop_getval(PLAT_DR_OPTIONS_NAME, &prop_value) == 0) {
+		plat_dr_options = (uint64_t)prop_value;
+	}
+#if defined(__xpv)
+	/* No support of DR operations on xpv */
+	plat_dr_options = 0;
+#else	/* __xpv */
+	/* Flag PLAT_DR_FEATURE_ENABLED should only be set by DR driver. */
+	plat_dr_options &= ~PLAT_DR_FEATURE_ENABLED;
+#ifndef	__amd64
+	/* Only enable CPU/memory DR on 64 bits kernel. */
+	plat_dr_options &= ~PLAT_DR_FEATURE_MEMORY;
+	plat_dr_options &= ~PLAT_DR_FEATURE_CPU;
+#endif	/* __amd64 */
+#endif	/* __xpv */
+
+	/*
+	 * Get value of "plat_dr_physmax" boot option.
+	 * It overrides values calculated from MSCT or SRAT table.
+	 */
+	if (bootprop_getval(PLAT_DR_PHYSMAX_NAME, &prop_value) == 0) {
+		plat_dr_physmax = ((uint64_t)prop_value) >> PAGESHIFT;
+	}
+
+	/* Get value of boot_ncpus. */
+	if (bootprop_getval(BOOT_NCPUS_NAME, &prop_value) != 0) {
 		boot_ncpus = NCPU;
-	else {
+	} else {
 		boot_ncpus = (int)prop_value;
 		if (boot_ncpus <= 0 || boot_ncpus > NCPU)
 			boot_ncpus = NCPU;
 	}
 
-	max_ncpus = boot_max_ncpus = boot_ncpus;
+	/*
+	 * Set max_ncpus and boot_max_ncpus to boot_ncpus if platform doesn't
+	 * support CPU DR operations.
+	 */
+	if (plat_dr_support_cpu() == 0) {
+		max_ncpus = boot_max_ncpus = boot_ncpus;
+	} else {
+		if (bootprop_getval(PLAT_MAX_NCPUS_NAME, &prop_value) != 0) {
+			max_ncpus = NCPU;
+		} else {
+			max_ncpus = (int)prop_value;
+			if (max_ncpus <= 0 || max_ncpus > NCPU) {
+				max_ncpus = NCPU;
+			}
+			if (boot_ncpus > max_ncpus) {
+				boot_ncpus = max_ncpus;
+			}
+		}
+
+		if (bootprop_getval(BOOT_MAX_NCPUS_NAME, &prop_value) != 0) {
+			boot_max_ncpus = boot_ncpus;
+		} else {
+			boot_max_ncpus = (int)prop_value;
+			if (boot_max_ncpus <= 0 || boot_max_ncpus > NCPU) {
+				boot_max_ncpus = boot_ncpus;
+			} else if (boot_max_ncpus > max_ncpus) {
+				boot_max_ncpus = max_ncpus;
+			}
+		}
+	}
 
 	/*
 	 * Initialize the lgrp framework

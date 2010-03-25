@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -26,9 +25,6 @@
 
 #ifndef	_SYS_ESUNDDI_H
 #define	_SYS_ESUNDDI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 */
-
 #include <sys/sunddi.h>
 #include <sys/proc.h>
 #include <sys/autoconf.h>
@@ -212,6 +208,41 @@ e_ddi_walk_driver(char *, int (*f)(dev_info_t *, void *), void *);
  */
 dev_info_t *
 e_ddi_nodeid_to_dip(pnode_t nodeid);
+
+/*
+ * Defines for DR interfaces
+ */
+#define	DEVI_BRANCH_CHILD	0x01	/* Walk immediate children of root  */
+#define	DEVI_BRANCH_CONFIGURE	0x02	/* Configure branch after create    */
+#define	DEVI_BRANCH_DESTROY	0x04	/* Destroy branch after unconfigure */
+#define	DEVI_BRANCH_EVENT	0x08	/* Post NDI event		    */
+#define	DEVI_BRANCH_PROM	0x10	/* Branches derived from PROM nodes */
+#define	DEVI_BRANCH_SID		0x20	/* SID node branches		    */
+#define	DEVI_BRANCH_ROOT	0x40	/* Node is the root of a branch	    */
+
+typedef struct devi_branch {
+	void		*arg;
+	void		(*devi_branch_callback)(dev_info_t *, void *, uint_t);
+	int		type;
+	union {
+		int	(*prom_branch_select)(pnode_t, void *, uint_t);
+		int	(*sid_branch_create)(dev_info_t *, void *, uint_t);
+	} create;
+} devi_branch_t;
+
+extern int e_ddi_branch_create(dev_info_t *pdip, devi_branch_t *bp,
+    dev_info_t **dipp, uint_t flags);
+extern int e_ddi_branch_configure(dev_info_t *rdip, dev_info_t **dipp,
+    uint_t flags);
+extern int e_ddi_branch_unconfigure(dev_info_t *rdip, dev_info_t **dipp,
+    uint_t flags);
+extern int e_ddi_branch_destroy(dev_info_t *rdip, dev_info_t **dipp,
+    uint_t flags);
+extern void e_ddi_branch_hold(dev_info_t *rdip);
+extern void e_ddi_branch_rele(dev_info_t *rdip);
+extern int e_ddi_branch_held(dev_info_t *rdip);
+extern int e_ddi_branch_referenced(dev_info_t *rdip,
+    int (*cb)(dev_info_t *dip, void *, uint_t), void *arg);
 
 /*
  * Obsolete interfaces, no longer used, to be removed.

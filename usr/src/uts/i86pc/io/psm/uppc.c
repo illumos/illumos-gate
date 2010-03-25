@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#define	PSMI_1_6
+#define	PSMI_1_7
 
 #include <sys/mutex.h>
 #include <sys/types.h>
@@ -173,12 +173,13 @@ static struct	psm_ops uppc_ops = {
 	(int (*)(dev_info_t *, ddi_intr_handle_impl_t *,
 	    psm_intr_op_t, int *))NULL,		/* psm_intr_ops		*/
 
-	uppc_state				/* psm_state		*/
+	uppc_state,				/* psm_state		*/
+	(int (*)(psm_cpu_request_t *))NULL	/* psm_cpu_ops		*/
 };
 
 
 static struct	psm_info uppc_info = {
-	PSM_INFO_VER01_6,	/* version				*/
+	PSM_INFO_VER01_7,	/* version				*/
 	PSM_OWN_SYS_DEFAULT,	/* ownership				*/
 	(struct psm_ops *)&uppc_ops, /* operation			*/
 	"uppc",			/* machine name				*/
