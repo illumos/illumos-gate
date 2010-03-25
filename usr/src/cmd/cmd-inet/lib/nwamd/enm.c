@@ -151,7 +151,8 @@ nwamd_enm_activate_deactivate_thread(void *arg)
 	nwam_value_t scriptval = NULL;
 	nwam_state_t state;
 	nwam_aux_state_t aux_state;
-	char *script;
+	char *script, *copy = NULL;
+	const char **argv = NULL;
 	boolean_t going_online, disable_succeeded = B_FALSE;
 	int ret;
 
@@ -159,12 +160,8 @@ nwamd_enm_activate_deactivate_thread(void *arg)
 	if (object == NULL) {
 		nlog(LOG_ERR, "nwamd_enm_activate_deactivate_thread: "
 		    "could not find ENM %s", object_name);
-		free(object_name);
-		return (NULL);
+		goto done;
 	}
-	/* object_name was malloc() before this thread was created, free() it */
-	free(object_name);
-
 	enmh = object->nwamd_object_handle;
 
 	going_online =
@@ -182,8 +179,7 @@ nwamd_enm_activate_deactivate_thread(void *arg)
 		 */
 		nlog(going_online ? LOG_ERR : LOG_DEBUG,
 		    "nwamd_enm_activate_deactivate_thread: "
-		    "no script specified for enm %s",
-		    object->nwamd_object_name);
+		    "no script specified for enm %s", object_name);
 		if (going_online) {
 			state = NWAM_STATE_MAINTENANCE;
 			aux_state = NWAM_AUX_STATE_METHOD_MISSING;
@@ -191,13 +187,13 @@ nwamd_enm_activate_deactivate_thread(void *arg)
 			disable_succeeded = B_TRUE;
 		}
 	} else {
-		char *copy = NULL, *lasts;
-		const char **newargv, **argv = NULL;
+		char *lasts;
+		const char **newargv;
 		int i = 0;
+		struct timeval now;
 
 		nlog(LOG_DEBUG, "nwamd_enm_activate_deactivate_thread: "
-		    "running script %s for ENM %s", script,
-		    object->nwamd_object_name);
+		    "running script %s for ENM %s", script, object_name);
 
 		/*
 		 * The script may take a number of arguments. We need to
@@ -225,7 +221,40 @@ nwamd_enm_activate_deactivate_thread(void *arg)
 		newargv = realloc(argv, (i + 1) * sizeof (char *));
 		argv = newargv;
 
+		/* Store the current time as the time the script began */
+		(void) gettimeofday(&now, NULL);
+		object->nwamd_script_time = now;
+
+		/*
+		 * Release the object so that it is not blocked while the
+		 * script is running.
+		 */
+		nwamd_object_release(object);
+
 		ret = nwamd_start_childv(CTRUN, argv);
+
+		/*
+		 * Find the object again, now that the script has finished
+		 * running.  Check if this ENM was re-read during that time by
+		 * comparing the object's script time with the one from above.
+		 */
+		object = nwamd_object_find(NWAM_OBJECT_TYPE_ENM, object_name);
+		if (object == NULL) {
+			nlog(LOG_ERR, "nwamd_enm_activate_deactivate_thread: "
+			    "could not find ENM %s after running script",
+			    object_name);
+			goto done;
+		}
+
+		if (object->nwamd_script_time.tv_sec != now.tv_sec ||
+		    object->nwamd_script_time.tv_usec != now.tv_usec) {
+			nlog(LOG_INFO, "nwamd_enm_activate_deactivate_thread: "
+			    "ENM %s has been refreshed, nothing to do",
+			    object_name);
+			nwamd_object_release(object);
+			goto done;
+		}
+		(void) gettimeofday(&object->nwamd_script_time, NULL);
 
 err:
 		/*
@@ -235,7 +264,7 @@ err:
 		if (ret != 0) {
 			nlog(LOG_ERR, "nwamd_enm_activate_deactivate_thread: "
 			    "execution of '%s' failed for ENM %s",
-			    script, object->nwamd_object_name);
+			    script, object_name);
 			if (object->nwamd_object_aux_state !=
 			    NWAM_AUX_STATE_UNINITIALIZED) {
 				state = NWAM_STATE_MAINTENANCE;
@@ -252,10 +281,7 @@ err:
 				disable_succeeded = B_TRUE;
 			}
 		}
-		free(argv);
-		free(copy);
 	}
-	nwam_value_free(scriptval);
 
 	if (disable_succeeded) {
 		/*
@@ -292,6 +318,12 @@ err:
 		(void) nwamd_object_release_after_preserve(object);
 	}
 
+done:
+	/* object_name was malloc() before this thread was created, free() it */
+	free(object_name);
+	free(argv);
+	free(copy);
+	nwam_value_free(scriptval);
 	return (NULL);
 }
 
@@ -737,6 +769,9 @@ nwamd_enm_handle_init_event(nwamd_event_t event)
 		object->nwamd_object_aux_state =
 		    NWAM_AUX_STATE_CONDITIONS_NOT_MET;
 	}
+	/* (Re)set script time to now as the object has just been (re)read */
+	(void) gettimeofday(&object->nwamd_script_time, NULL);
+
 	manual_disabled = (enm_get_activation_mode(enmh) ==
 	    NWAM_ACTIVATION_MODE_MANUAL && !enm_is_enabled(enmh));
 

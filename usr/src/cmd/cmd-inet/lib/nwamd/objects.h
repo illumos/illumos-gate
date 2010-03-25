@@ -54,6 +54,7 @@ struct nwamd_object {
 
 	void *nwamd_object_handle; /* can point at ENMs, locations, etc. */
 	nwamd_ncu_t *nwamd_object_data;
+	struct timeval nwamd_script_time;
 	nwam_state_t nwamd_object_state;
 	nwam_aux_state_t nwamd_object_aux_state;
 	uu_list_node_t nwamd_object_node;
