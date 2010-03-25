@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -582,8 +582,8 @@ gvers_need(Cache *cache, Cache *need, const Gver_sym_data *vsdata,
 	    vnd = (GElf_Verneed *)((uintptr_t)vnd + vnd->vn_next)) {
 		GElf_Vernaux	*vnap;
 		Word		ndx;
-		const char	*needobj, *dep, *fmt;
-		int		started = 0;
+		const char	*needobj, *dep;
+		int		started = 0, listcnt = 0;
 
 		vnap = (GElf_Vernaux *) ((uintptr_t)vnd + vnd->vn_aux);
 
@@ -616,11 +616,7 @@ gvers_need(Cache *cache, Cache *need, const Gver_sym_data *vsdata,
 					(void) printf(
 					    MSG_ORIG(MSG_FMT_LIST_BEGIN),
 					    needobj);
-
-					fmt = MSG_ORIG(MSG_FMT_LIST_FIRST);
 					started = 1;
-				} else {
-					fmt = MSG_ORIG(MSG_FMT_LIST_NEXT);
 				}
 
 				/*
@@ -633,6 +629,12 @@ gvers_need(Cache *cache, Cache *need, const Gver_sym_data *vsdata,
 				if (vflag || (vsdata != NULL) ||
 				    (alist_nitems(match_list) != 0) ||
 				    !(vnap->vna_flags & VER_FLG_INFO)) {
+					const char *fmt = (listcnt == 0) ?
+					    MSG_ORIG(MSG_FMT_LIST_FIRST) :
+					    MSG_ORIG(MSG_FMT_LIST_NEXT);
+
+					if (vsdata == NULL)
+						listcnt++;
 					(void) printf(fmt, dep);
 
 					/* Show non-zero flags */

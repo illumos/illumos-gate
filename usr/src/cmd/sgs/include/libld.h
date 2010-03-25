@@ -453,6 +453,7 @@ struct ofl_desc {
 					/*	symbol capabilities */
 #define	FLG_OF_PTCAP	0x080000000000	/* PT_SUNWCAP required */
 #define	FLG_OF_CAPSTRS	0x100000000000	/* capability strings are required */
+#define	FLG_OF_EHFRAME	0x200000000000	/* output contains .eh_frame section */
 
 /*
  * In the flags1 arena, establish any options that are applicable to archive
@@ -823,6 +824,7 @@ struct os_desc {			/* Output section descriptor */
 #define	FLG_OS_KEY		0x01	/* section requires sort keys */
 #define	FLG_OS_OUTREL		0x02	/* output rel against this section */
 #define	FLG_OS_SECTREF		0x04	/* isps are not affected by -zignore */
+#define	FLG_OS_EHFRAME		0x08	/* section is .eh_frame */
 
 /*
  * The sg_id field of the segment descriptor is used to establish the default

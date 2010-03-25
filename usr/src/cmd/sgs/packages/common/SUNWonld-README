@@ -1572,3 +1572,5 @@ Bugid   Risk Synopsis
 6478684 isainfo/cpuid reports pause instruction not supported on amd64
 	PSARC/2010/089 Removal of AV_386_PAUSE and AV_386_MON
 6934123 elfdump -d coredumps on PA-RISC elf
+6931044 ld should not allow SHT_PROGBITS .eh_frame sections on amd64 (D)
+6931056 pvs -r output can include empty versions in output

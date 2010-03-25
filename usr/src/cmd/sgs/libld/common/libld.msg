@@ -409,6 +409,8 @@
 
 @ MSG_FIL_BADORDREF	"file %s: section [%u]%s: contains illegal reference \
 			 to discarded section: [%u]%s"
+@ MSG_FIL_EXEHFRMTYP	"file %s: section [%u]%s: section type is %s: \
+			 expected %s"
 
 
 # Recording name conflicts
@@ -572,6 +574,9 @@
 
 @ MSG_UPD_NOBITS	"NOBITS section found before end of initialized data"
 @ MSG_SEG_FIRNOTLOAD	"First segment has type %s, PT_LOAD required: %s"
+@ MSG_UPD_MULEHFRAME	"file %s; section [%u]%s and file %s; section [%u]%s \
+			 have incompatibile attributes and cannot \
+			 be merged into a single output section"
 
 
 # Version processing messages

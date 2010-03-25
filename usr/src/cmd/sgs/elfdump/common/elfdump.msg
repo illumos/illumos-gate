@@ -157,6 +157,10 @@
 @ MSG_ERR_BADEHFRMPTR	"%s: section[%d: %s] FramePtr (%#llx) does not match \
 			 shdr[%d: %s].sh_addr (%#llx)\n"
 @ MSG_ERR_BADSORT	"%s: %s: index[%d]: invalid sort order\n"
+@ MSG_ERR_BADSIDYNNDX	"%s: [%d: %s][%d]: dynamic section index out of \
+			 range (0 - %d): %d\n";
+@ MSG_ERR_BADSIDYNTAG	"%s: [%d: %s][%d]: dynamic element \
+			 [%d: %s][%d] should have type %s: %s\n";
 
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"

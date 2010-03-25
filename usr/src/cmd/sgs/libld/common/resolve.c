@@ -64,6 +64,10 @@ sym_visibility_diag(Error err, Sym_desc *sdp, Sym *osym, Sym *nsym,
 {
 	Conv_inv_buf_t	inv_obuf, inv_nbuf;
 
+	/* Warnings are only issued when -z verbose is specified */
+	if (!(ofl->ofl_flags & FLG_OF_VERBOSE) && (err != ERR_FATAL))
+		return;
+
 	eprintf(ofl->ofl_lml, err, MSG_INTL(MSG_SYM_CONFVIS),
 	    demangle(sdp->sd_name));
 	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_VISTYPES),

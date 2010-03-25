@@ -1772,14 +1772,15 @@ interp(const char *file, Cache *cache, Word shnum, Word phnum, Elf *elf)
  * Print the syminfo section.
  */
 static void
-syminfo(Cache *cache, Word shnum, const char *file)
+syminfo(Cache *cache, Word shnum, Ehdr *ehdr, uchar_t osabi, const char *file)
 {
 	Shdr		*infoshdr;
 	Syminfo		*info;
 	Sym		*syms;
 	Dyn		*dyns;
-	Word		infonum, cnt, ndx, symnum;
-	Cache		*infocache = NULL, *symsec, *strsec;
+	Word		infonum, cnt, ndx, symnum, dynnum;
+	Cache		*infocache = NULL, *dyncache = NULL, *symsec, *strsec;
+	Boolean		*dynerr;
 
 	for (cnt = 1; cnt < shnum; cnt++) {
 		if (cache[cnt].c_shdr->sh_type == SHT_SUNW_syminfo) {
@@ -1803,21 +1804,54 @@ syminfo(Cache *cache, Word shnum, const char *file)
 	info = (Syminfo *)infocache->c_data->d_buf;
 
 	/*
-	 * Get the data buffer of the associated dynamic section.
+	 * If there is no associated dynamic section, determine if one
+	 * is needed, and if so issue a warning. If there is an
+	 * associated dynamic section, validate it and get the data buffer
+	 * for it.
 	 */
-	if ((infoshdr->sh_info == 0) || (infoshdr->sh_info >= shnum)) {
+	dyns = NULL;
+	dynnum = 0;
+	if (infoshdr->sh_info == 0) {
+		Syminfo	*_info = info + 1;
+
+		for (ndx = 1; ndx < infonum; ndx++, _info++) {
+			if ((_info->si_flags == 0) && (_info->si_boundto == 0))
+				continue;
+
+			if (_info->si_boundto < SYMINFO_BT_LOWRESERVE)
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_BADSHINFO), file,
+				    infocache->c_name,
+				    EC_WORD(infoshdr->sh_info));
+		}
+	} else if ((infoshdr->sh_info >= shnum) ||
+	    (cache[infoshdr->sh_info].c_shdr->sh_type != SHT_DYNAMIC)) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHINFO),
 		    file, infocache->c_name, EC_WORD(infoshdr->sh_info));
-		return;
-	}
-	if (cache[infoshdr->sh_info].c_data == NULL)
-		return;
+	} else {
+		dyncache = &cache[infoshdr->sh_info];
+		if ((dyncache->c_data == NULL) ||
+		    ((dyns = dyncache->c_data->d_buf) == NULL)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+			    file, dyncache->c_name);
+		}
+		if (dyns != NULL) {
+			dynnum = dyncache->c_shdr->sh_size /
+			    dyncache->c_shdr->sh_entsize;
 
-	dyns = cache[infoshdr->sh_info].c_data->d_buf;
-	if (dyns == NULL) {
-		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
-		    file, cache[infoshdr->sh_info].c_name);
-		return;
+			/*
+			 * We validate the type of dynamic elements referenced
+			 * from the syminfo. This array is used report any
+			 * bad dynamic entries.
+			 */
+			if ((dynerr = calloc(dynnum, sizeof (*dynerr))) ==
+			    NULL) {
+				int err = errno;
+				(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALLOC),
+				    file, strerror(err));
+				return;
+			}
+		}
 	}
 
 	/*
@@ -1838,22 +1872,105 @@ syminfo(Cache *cache, Word shnum, const char *file)
 
 	for (ndx = 1, info++; ndx < infonum; ndx++, info++) {
 		Sym 		*sym;
-		const char	*needed = NULL, *name;
+		const char	*needed, *name;
+		Word		expect_dt;
+		Word		boundto = info->si_boundto;
 
-		if ((info->si_flags == 0) && (info->si_boundto == 0))
+		if ((info->si_flags == 0) && (boundto == 0))
 			continue;
 
 		sym = &syms[ndx];
 		name = string(infocache, ndx, strsec, file, sym->st_name);
 
-		if (info->si_boundto < SYMINFO_BT_LOWRESERVE) {
-			Dyn	*dyn = &dyns[info->si_boundto];
+		/* Is si_boundto set to one of the reserved values? */
+		if (boundto >= SYMINFO_BT_LOWRESERVE) {
+			Elf_syminfo_entry(0, ndx, info, name, NULL);
+			continue;
+		}
 
-			needed = string(infocache, info->si_boundto,
-			    strsec, file, dyn->d_un.d_val);
+		/*
+		 * si_boundto is referencing a dynamic section. If we don't
+		 * have one, an error was already issued above, so it suffices
+		 * to display an empty string. If we are out of bounds, then
+		 * report that and then display an empty string.
+		 */
+		if ((dyns == NULL) || (boundto >= dynnum)) {
+			if (dyns != NULL)
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_BADSIDYNNDX), file,
+				    infocache->c_ndx, infocache->c_name,
+				    EC_WORD(ndx), EC_WORD(dynnum - 1),
+				    EC_WORD(boundto));
+			Elf_syminfo_entry(0, ndx, info, name,
+			    MSG_ORIG(MSG_STR_EMPTY));
+			continue;
+		}
+
+		/*
+		 * The si_boundto reference expects a specific dynamic element
+		 * type at the given index. The dynamic element is always a
+		 * string that gives an object name. The specific type depends
+		 * on the si_flags present. Ensure that we've got the right
+		 * type.
+		 */
+		if (info->si_flags & SYMINFO_FLG_FILTER)
+			expect_dt = DT_SUNW_FILTER;
+		else if (info->si_flags & SYMINFO_FLG_AUXILIARY)
+			expect_dt = DT_SUNW_AUXILIARY;
+		else if (info->si_flags & (SYMINFO_FLG_DIRECT |
+		    SYMINFO_FLG_LAZYLOAD | SYMINFO_FLG_DIRECTBIND))
+			expect_dt = DT_NEEDED;
+		else
+			expect_dt = DT_NULL;   /* means we ignore the type */
+
+		if ((dyns[boundto].d_tag != expect_dt) &&
+		    (expect_dt != DT_NULL)) {
+			Conv_inv_buf_t	buf1, buf2;
+
+			/* Only complain about each dynamic element once */
+			if (!dynerr[boundto]) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_BADSIDYNTAG),
+				    file, infocache->c_ndx, infocache->c_name,
+				    EC_WORD(ndx), dyncache->c_ndx,
+				    dyncache->c_name, EC_WORD(boundto),
+				    conv_dyn_tag(expect_dt, osabi,
+				    ehdr->e_machine, CONV_FMT_ALT_CF, &buf1),
+				    conv_dyn_tag(dyns[boundto].d_tag, osabi,
+				    ehdr->e_machine, CONV_FMT_ALT_CF, &buf2));
+				dynerr[boundto] = TRUE;
+			}
+		}
+
+		/*
+		 * Whether or not the DT item we're pointing at is
+		 * of the right type, if it's a type we recognize as
+		 * providing a string, go ahead and show it. Otherwise
+		 * an empty string.
+		 */
+		switch (dyns[boundto].d_tag) {
+		case DT_NEEDED:
+		case DT_SONAME:
+		case DT_RPATH:
+		case DT_RUNPATH:
+		case DT_CONFIG:
+		case DT_DEPAUDIT:
+		case DT_USED:
+		case DT_AUDIT:
+		case DT_SUNW_AUXILIARY:
+		case DT_SUNW_FILTER:
+		case DT_FILTER:
+		case DT_AUXILIARY:
+			needed = string(infocache, boundto,
+			    strsec, file, dyns[boundto].d_un.d_val);
+			break;
+		default:
+			needed = MSG_ORIG(MSG_STR_EMPTY);
 		}
 		Elf_syminfo_entry(0, ndx, info, name, needed);
 	}
+	if (dyns != NULL)
+		free(dynerr);
 }
 
 /*
@@ -4966,7 +5083,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 		group(cache, shnum, file, flags);
 
 	if (flags & FLG_SHOW_SYMINFO)
-		syminfo(cache, shnum, file);
+		syminfo(cache, shnum, ehdr, osabi, file);
 
 	if (flags & FLG_SHOW_RELOC)
 		reloc(cache, shnum, ehdr, file);

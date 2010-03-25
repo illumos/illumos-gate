@@ -1424,13 +1424,109 @@ is_name_cmp(const char *is_name, const char *match_name, size_t match_len)
 }
 
 /*
+ * Helper routine for process_progbits() to process allocable sections.
+ *
+ * entry:
+ *	name, ifl, shdr, ndx, ident, ofl - As passed to process_progbits().
+ *	is_stab_index - TRUE if section is .index.
+ *	is_flags - Additional flags to be added to the input section.
+ *
+ * exit:
+ *	The allocable section has been processed. *ident and *is_flags
+ *	are updated as necessary to reflect the changes. Returns TRUE
+ *	for success, FALSE for failure.
+ */
+inline static Boolean
+process_progbits_alloc(const char *name, Ifl_desc *ifl, Shdr *shdr,
+    Word ndx, int *ident, Ofl_desc *ofl, Boolean is_stab_index,
+    Word *is_flags)
+{
+	Boolean done = FALSE;
+
+	if (name[0] == '.') {
+		Conv_inv_buf_t inv_buf1, inv_buf2;
+
+		switch (name[1]) {
+		case 'e':
+			if (!is_name_cmp(name, MSG_ORIG(MSG_SCN_EHFRAME),
+			    MSG_SCN_EHFRAME_SIZE))
+				break;
+
+			*ident = ld_targ.t_id.id_unwind;
+			*is_flags |= FLG_IS_EHFRAME;
+			done = TRUE;
+
+			/*
+			 * Only accept a progbits .eh_frame on a platform
+			 * for which this is the expected type.
+			 */
+			if (ld_targ.t_m.m_sht_unwind == SHT_PROGBITS)
+				break;
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_FIL_EXEHFRMTYP), ifl->ifl_name,
+			    EC_WORD(ndx), name,
+			    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
+			    ifl->ifl_ehdr->e_machine, shdr->sh_type,
+			    CONV_FMT_ALT_CF, &inv_buf1),
+			    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
+			    ifl->ifl_ehdr->e_machine, ld_targ.t_m.m_sht_unwind,
+			    CONV_FMT_ALT_CF, &inv_buf2));
+			ofl->ofl_flags |= FLG_OF_FATAL;
+			return (FALSE);
+		case 'g':
+			if (is_name_cmp(name, MSG_ORIG(MSG_SCN_GOT),
+			    MSG_SCN_GOT_SIZE)) {
+				*ident = ld_targ.t_id.id_null;
+				done = TRUE;
+				break;
+			}
+			if ((ld_targ.t_m.m_sht_unwind == SHT_PROGBITS) &&
+			    is_name_cmp(name, MSG_ORIG(MSG_SCN_GCC_X_TBL),
+			    MSG_SCN_GCC_X_TBL_SIZE)) {
+				*ident = ld_targ.t_id.id_unwind;
+				done = TRUE;
+				break;
+			}
+			break;
+		case 'p':
+			if (is_name_cmp(name, MSG_ORIG(MSG_SCN_PLT),
+			    MSG_SCN_PLT_SIZE)) {
+				*ident = ld_targ.t_id.id_null;
+				done = TRUE;
+			}
+			break;
+		}
+	}
+	if (!done) {
+		if (is_stab_index) {
+			/*
+			 * This is a work-around for x86 compilers that have
+			 * set SHF_ALLOC for the .stab.index section.
+			 *
+			 * Because of this, make sure that the .stab.index
+			 * does not end up as the last section in the text
+			 * segment. Older linkers can produce segmentation
+			 * violations when they strip (ld -s) against a
+			 * shared object whose last section in the text
+			 * segment is a .stab.
+			 */
+			*ident = ld_targ.t_id.id_interp;
+		} else {
+			*ident = ld_targ.t_id.id_data;
+		}
+	}
+
+	return (TRUE);
+}
+
+/*
  * Process a progbits section.
  */
 static uintptr_t
 process_progbits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
-	int		stab_index = 0;
+	Boolean		is_stab_index = FALSE;
 	Word		is_flags = 0;
 	uintptr_t	r;
 
@@ -1447,7 +1543,7 @@ process_progbits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 
 		if (strcmp((name + MSG_SCN_STAB_SIZE),
 		    MSG_ORIG(MSG_SCN_INDEX)) == 0)
-			stab_index = 1;
+			is_stab_index = TRUE;
 	}
 
 	if ((ofl->ofl_flags & FLG_OF_STRIP) && ident) {
@@ -1476,72 +1572,12 @@ process_progbits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 		    (SHF_ALLOC | SHF_EXECINSTR)) {
 			ident = ld_targ.t_id.id_text;
 		} else if (shdr->sh_flags & SHF_ALLOC) {
-			int done = 0;
-
-			if (name[0] == '.') {
-				switch (name[1]) {
-				case 'e':
-					if ((ld_targ.t_m.m_sht_unwind ==
-					    SHT_PROGBITS) &&
-					    is_name_cmp(name,
-					    MSG_ORIG(MSG_SCN_EHFRAME),
-					    MSG_SCN_EHFRAME_SIZE)) {
-						ident = ld_targ.t_id.id_unwind;
-						is_flags = FLG_IS_EHFRAME;
-						done = 1;
-					}
-					break;
-				case 'g':
-					if (is_name_cmp(name,
-					    MSG_ORIG(MSG_SCN_GOT),
-					    MSG_SCN_GOT_SIZE)) {
-						ident = ld_targ.t_id.id_null;
-						done = 1;
-						break;
-					}
-					if ((ld_targ.t_m.m_sht_unwind ==
-					    SHT_PROGBITS) &&
-					    is_name_cmp(name,
-					    MSG_ORIG(MSG_SCN_GCC_X_TBL),
-					    MSG_SCN_GCC_X_TBL_SIZE)) {
-						ident = ld_targ.t_id.id_unwind;
-						done = 1;
-						break;
-					}
-					break;
-				case 'p':
-					if (is_name_cmp(name,
-					    MSG_ORIG(MSG_SCN_PLT),
-					    MSG_SCN_PLT_SIZE)) {
-						ident = ld_targ.t_id.id_null;
-						done = 1;
-					}
-					break;
-				}
-			}
-			if (!done) {
-				if (stab_index) {
-					/*
-					 * This is a work-around for x86
-					 * compilers that have set SHF_ALLOC
-					 * for the .stab.index section.
-					 *
-					 * Because of this, make sure that the
-					 * .stab.index does not end up as the
-					 * last section in the text segment.
-					 * Older linkers can produce
-					 * segmentation violations when they
-					 * strip (ld -s) against a shared
-					 * object whose last section in the
-					 * text segment is a .stab.
-					 */
-					ident = ld_targ.t_id.id_interp;
-				} else {
-					ident = ld_targ.t_id.id_data;
-				}
-			}
-		} else
+			if (process_progbits_alloc(name, ifl, shdr, ndx,
+			    &ident, ofl, is_stab_index, &is_flags) == FALSE)
+				return (S_ERROR);
+		} else {
 			ident = ld_targ.t_id.id_note;
+		}
 	}
 
 	r = process_section(name, ifl, shdr, scn, ndx, ident, ofl);

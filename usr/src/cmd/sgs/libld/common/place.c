@@ -563,6 +563,74 @@ eval_ec_files(Place_path_info *path_info, Ent_desc *enp)
 }
 
 /*
+ * Replace the section header for the given input section with a new section
+ * header of the specified type. All values in the replacement header other
+ * than the type retain their previous values.
+ *
+ * entry:
+ *	isp - Input section to replace
+ *	sh_type - New section type to apply
+ *
+ * exit:
+ *	Returns the pointer to the new section header on success, and
+ *	NULL for failure.
+ */
+static Shdr *
+isp_convert_type(Is_desc *isp, Word sh_type)
+{
+	Shdr	*shdr;
+
+	if ((shdr = libld_malloc(sizeof (Shdr))) == NULL)
+		return (NULL);
+	*shdr = *isp->is_shdr;
+	isp->is_shdr = shdr;
+	shdr->sh_type = sh_type;
+	return (shdr);
+}
+
+/*
+ * Issue a fatal warning for the given .eh_frame section, which
+ * cannot be merged with the existing .eh_frame output section.
+ */
+static void
+eh_frame_muldef(Ofl_desc *ofl, Is_desc *isp)
+{
+	Sg_desc	*sgp;
+	Is_desc *isp1;
+	Os_desc	*osp;
+	Aliste	idx1, idx2, idx3;
+
+	/*
+	 * Locate the .eh_frame output section, and use the first section
+	 * assigned to it in the error message. The user can then compare
+	 * the two sections to determine what attribute prevented the merge.
+	 */
+	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
+			if ((osp->os_flags & FLG_OS_EHFRAME) == 0)
+				continue;
+
+			for (idx3 = 0; idx3 < OS_ISD_NUM; idx3++) {
+				APlist *lst = osp->os_isdescs[idx3];
+
+				if (aplist_nitems(lst) == 0)
+					continue;
+
+				isp1 = lst->apl_data[0];
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_UPD_MULEHFRAME),
+				    isp1->is_file->ifl_name,
+				    EC_WORD(isp1->is_scnndx), isp1->is_name,
+				    isp->is_file->ifl_name,
+				    EC_WORD(isp->is_scnndx), isp->is_name);
+				ofl->ofl_flags |= FLG_OF_FATAL;
+				return;
+			}
+		}
+	}
+}
+
+/*
  * Place a section into the appropriate segment and output section.
  *
  * entry:
@@ -592,6 +660,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	Ifl_desc	*ifl = isp->is_file;
 	char		*oname, *sname;
 	uint_t		onamehash;
+	Boolean		is_ehframe = (isp->is_flags & FLG_IS_EHFRAME) != 0;
 
 	/*
 	 * Define any sections that must be thought of as referenced.  These
@@ -896,18 +965,34 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	 */
 	iidx = 0;
 	for (APLIST_TRAVERSE(sgp->sg_osdescs, idx1, osp)) {
-		Shdr	*_shdr = osp->os_shdr;
+		Shdr	*os_shdr = osp->os_shdr;
 
+		/*
+		 * An input section matches an output section if:
+		 * -	The ident values match
+		 * -	The names match
+		 * -	Not a GROUP section
+		 * - 	Not a DTrace dof section
+		 * -	Section types match
+		 * -	Matching section flags, after screening out the
+		 *	shflagmask flags.
+		 *
+		 * Section types are considered to match if any one of
+		 * the following are true:
+		 * -	The type codes are the same
+		 * -	The input section is COMDAT, and the output section
+		 *	is SHT_PROGBITS.
+		 */
 		if ((ident == osp->os_identndx) &&
 		    (ident != ld_targ.t_id.id_rel) &&
 		    (onamehash == osp->os_namehash) &&
 		    (shdr->sh_type != SHT_GROUP) &&
 		    (shdr->sh_type != SHT_SUNW_dof) &&
-		    ((shdr->sh_type == _shdr->sh_type) ||
+		    ((shdr->sh_type == os_shdr->sh_type) ||
 		    ((shdr->sh_type == SHT_SUNW_COMDAT) &&
-		    (_shdr->sh_type == SHT_PROGBITS))) &&
+		    (os_shdr->sh_type == SHT_PROGBITS))) &&
 		    ((shflags & ~shflagmask) ==
-		    (_shdr->sh_flags & ~shflagmask)) &&
+		    (os_shdr->sh_flags & ~shflagmask)) &&
 		    (strcmp(oname, osp->os_name) == 0)) {
 			uintptr_t	err;
 
@@ -1029,18 +1114,27 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	 * output section.  Save any COMDAT section for later processing, as
 	 * additional COMDAT sections that match this section need discarding.
 	 */
-	if (shdr->sh_type == SHT_SUNW_COMDAT) {
-		Shdr	*tshdr;
-
-		if ((tshdr = libld_malloc(sizeof (Shdr))) == NULL)
-			return ((Os_desc *)S_ERROR);
-		*tshdr = *shdr;
-		isp->is_shdr = shdr = tshdr;
-		shdr->sh_type = SHT_PROGBITS;
-	}
+	if ((shdr->sh_type == SHT_SUNW_COMDAT) &&
+	    ((shdr = isp_convert_type(isp, SHT_PROGBITS)) == NULL))
+		return ((Os_desc *)S_ERROR);
 	if ((isp->is_flags & FLG_IS_COMDAT) &&
 	    (add_comdat(ofl, osp, isp) == S_ERROR))
 		return ((Os_desc *)S_ERROR);
+
+	if (is_ehframe) {
+		/*
+		 * Executable or sharable objects can have at most a single
+		 * .eh_frame section. Detect attempts to create more than
+		 * one. This occurs if the input sections have incompatible
+		 * attributes.
+		 */
+		if ((ofl->ofl_flags & FLG_OF_EHFRAME) &&
+		    !(ofl->ofl_flags & FLG_OF_RELOBJ)) {
+			eh_frame_muldef(ofl, isp);
+			return ((Os_desc *)S_ERROR);
+		}
+		ofl->ofl_flags |= FLG_OF_EHFRAME;
+	}
 
 	osp->os_shdr->sh_type = shdr->sh_type;
 	osp->os_shdr->sh_flags = shdr->sh_flags;
@@ -1049,6 +1143,8 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	osp->os_namehash = onamehash;
 	osp->os_ordndx = os_ndx;
 	osp->os_sgdesc = sgp;
+	if (is_ehframe)
+		osp->os_flags |= FLG_OS_EHFRAME;
 
 	if (ifl && (shdr->sh_type == SHT_PROGBITS)) {
 		/*

@@ -19,11 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 #	This file makes the atheros driver for an intel system
@@ -95,6 +93,13 @@ include $(UTSBASE)/intel/Makefile.targ
 #	Makefile rules don't serve for you, just do
 #	it yourself.
 #
+#	The amd64 version of this object has the .eh_frame section tagged
+#	as SHT_PROGBITS, while the ABI requires SHT_AMD64_UNWIND. The Solaris
+#	ld enforces this, so use elfedit to bring the object in line with
+#	this requirement.
+#
 ATHEROS_HAL=$(UTSBASE)/common/io/ath/hal_x86_$(CLASS).o.uu
 $(OBJS_DIR)/hal.o:     $(ATHEROS_HAL)
 	uudecode -o $@ $(ATHEROS_HAL)
+	if [ `elfedit -r -e 'ehdr:e_machine' $@` = EM_AMD64 ]; \
+		then elfedit -e 'shdr:sh_type .eh_frame SHT_AMD64_UNWIND' $@; fi
