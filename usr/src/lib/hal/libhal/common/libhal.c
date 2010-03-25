@@ -1655,7 +1655,7 @@ libhal_device_set_property_helper (LibHalContext *ctx,
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -1848,7 +1848,7 @@ libhal_device_property_strlist_append (LibHalContext *ctx,
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -1901,7 +1901,7 @@ libhal_device_property_strlist_prepend (LibHalContext *ctx,
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -1954,7 +1954,7 @@ libhal_device_property_strlist_remove_index (LibHalContext *ctx,
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -2006,7 +2006,7 @@ libhal_device_property_strlist_remove (LibHalContext *ctx,
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -2065,7 +2065,7 @@ libhal_device_lock (LibHalContext *ctx,
 							   message, -1,
 							   error);
 
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		if (strcmp (error->name,
 			    "org.freedesktop.Hal.DeviceAlreadyLocked") == 0) {
 			if (reason_why_locked != NULL) {
@@ -2126,7 +2126,7 @@ libhal_device_unlock (LibHalContext *ctx,
 							   message, -1,
 							   error);
 
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -2181,7 +2181,7 @@ libhal_new_device (LibHalContext *ctx, DBusError *error)
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return NULL;
 	}
@@ -2264,7 +2264,7 @@ libhal_device_commit_to_gdl (LibHalContext *ctx,
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -2320,7 +2320,7 @@ libhal_remove_device (LibHalContext *ctx, const char *udi, DBusError *error)
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -2512,7 +2512,7 @@ libhal_merge_properties (LibHalContext *ctx,
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -2802,7 +2802,7 @@ libhal_device_add_capability (LibHalContext *ctx,
 	reply = dbus_connection_send_with_reply_and_block (ctx->connection,
 							   message, -1,
 							   error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -2942,7 +2942,7 @@ libhal_device_property_watch_all (LibHalContext *ctx, DBusError *error)
 			    "type='signal',"
 			    "interface='org.freedesktop.Hal.Device',"
 			    "sender='org.freedesktop.Hal'", error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		return FALSE;
 	}
 	return TRUE;
@@ -2976,7 +2976,7 @@ libhal_device_add_property_watch (LibHalContext *ctx, const char *udi, DBusError
 		  "sender='org.freedesktop.Hal'," "path=%s", udi);
 
 	dbus_bus_add_match (ctx->connection, buf, error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		return FALSE;
 	}
 	return TRUE;
@@ -3006,7 +3006,7 @@ libhal_device_remove_property_watch (LibHalContext *ctx, const char *udi, DBusEr
 		  "sender='org.freedesktop.Hal'," "path=%s", udi);
 
 	dbus_bus_remove_match (ctx->connection, buf, error);
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		return FALSE;
 	}
 	return TRUE;
@@ -3421,7 +3421,7 @@ libhal_device_rescan (LibHalContext *ctx, const char *udi, DBusError *error)
 							   message, -1,
 							   error);
 
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -3481,7 +3481,7 @@ libhal_device_reprobe (LibHalContext *ctx, const char *udi, DBusError *error)
 							   message, -1,
 							   error);
 
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -3552,7 +3552,7 @@ dbus_bool_t libhal_device_emit_condition (LibHalContext *ctx,
 							   message, -1,
 							   error);
 
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -3618,7 +3618,7 @@ libhal_device_addon_is_ready (LibHalContext *ctx, const char *udi, DBusError *er
 							   message, -1,
 							   error);
 
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
@@ -3689,7 +3689,7 @@ libhal_device_claim_interface (LibHalContext *ctx,
 							   message, -1,
 							   error);
 
-	if (dbus_error_is_set (error)) {
+	if (error != NULL && dbus_error_is_set (error)) {
 		dbus_message_unref (message);
 		return FALSE;
 	}
