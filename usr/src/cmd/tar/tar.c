@@ -1543,10 +1543,11 @@ top:
 			break;
 		}
 
-	if (dblock.dbuf.typeflag == 'X')
+	if ((dblock.dbuf.typeflag == 'X') || (dblock.dbuf.typeflag == 'L')) {
 		Xhdrflag = 1;	/* Currently processing extended header */
-	else
+	} else {
 		Xhdrflag = 0;
+	}
 
 	sp->st_uid = Gen.g_uid;
 	sp->st_gid = Gen.g_gid;
@@ -2722,6 +2723,7 @@ convtoreg(off_t size)
 	    (dblock.dbuf.typeflag != '2') && (dblock.dbuf.typeflag != '3') &&
 	    (dblock.dbuf.typeflag != '4') && (dblock.dbuf.typeflag != '5') &&
 	    (dblock.dbuf.typeflag != '6') && (dblock.dbuf.typeflag != 'A') &&
+	    (dblock.dbuf.typeflag != 'L') &&
 	    (dblock.dbuf.typeflag != _XATTR_HDRTYPE) &&
 	    (dblock.dbuf.typeflag != 'X')) {
 		return (1);
@@ -6753,7 +6755,7 @@ write_ancillary(union hblock *dblockp, char *secinfo, int len, char hdrtype)
 /*
  * Read the data record for extended headers and then the regular header.
  * The data are read into the buffer and then null-terminated.  Entries
- * are of the format:
+ * for typeflag 'X' extended headers are of the format:
  * 	"%d %s=%s\n"
  *
  * When an extended header record is found, the extended header must
@@ -6810,11 +6812,17 @@ get_xdata(void)
 	lineloc = xrec_ptr;
 	xrec_ptr[stbuf.st_size] = '\0';
 	while (lineloc < xrec_ptr + stbuf.st_size) {
-		length = atoi(lineloc);
-		*(lineloc + length - 1) = '\0';
-		keyword = strchr(lineloc, ' ') + 1;
-		value = strchr(keyword, '=') + 1;
-		*(value - 1) = '\0';
+		if (dblock.dbuf.typeflag == 'L') {
+			length = xrec_size;
+			keyword = "path";
+			value = lineloc;
+		} else {
+			length = atoi(lineloc);
+			*(lineloc + length - 1) = '\0';
+			keyword = strchr(lineloc, ' ') + 1;
+			value = strchr(keyword, '=') + 1;
+			*(value - 1) = '\0';
+		}
 		i = 0;
 		lineloc += length;
 		while (keylist_pair[i].keynum != (int)_X_LAST) {
