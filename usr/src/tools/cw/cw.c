@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@
  */
 
 /* If you modify this file, you must increment CW_VERSION */
-#define	CW_VERSION	"1.28"
+#define	CW_VERSION	"1.29"
 
 /*
  * -#		Verbose mode
@@ -320,9 +320,9 @@ static const char *cmds[] = {
 	"gcc", "g++"
 };
 
-static const char *dirs[] = {
-	DEFAULT_CC_DIR, DEFAULT_CPLUSPLUS_DIR,
-	DEFAULT_GCC_DIR, DEFAULT_GPLUSPLUS_DIR
+static char default_dir[2][MAXPATHLEN] = {
+	DEFAULT_CC_DIR,
+	DEFAULT_GCC_DIR,
 };
 
 #define	CC(ctx) \
@@ -1593,16 +1593,38 @@ do_cc(cw_ictx_t *ctx)
 static void
 prepctx(cw_ictx_t *ctx)
 {
-	const char *dir, *cmd;
-	char *program;
+	const char *dir = NULL, *cmd;
+	char *program = NULL;
 	size_t len;
 
-	dir = dirs[CIDX(CC(ctx), ctx->i_flags)];
-	cmd = cmds[CIDX(CC(ctx), ctx->i_flags)];
-	len = strlen(dir) + strlen(cmd) + 2;
-	if ((program = malloc(len)) == NULL)
-		nomem();
-	(void) snprintf(program, len, "%s/%s", dir, cmd);
+	switch (CIDX(CC(ctx), ctx->i_flags)) {
+		case CIDX(CW_C_CC, 0):
+			program = getenv("CW_CC");
+			dir = getenv("CW_CC_DIR");
+			break;
+		case CIDX(CW_C_CC, CW_F_CXX):
+			program = getenv("CW_CPLUSPLUS");
+			dir = getenv("CW_CPLUSPLUS_DIR");
+			break;
+		case CIDX(CW_C_GCC, 0):
+			program = getenv("CW_GCC");
+			dir = getenv("CW_GCC_DIR");
+			break;
+		case CIDX(CW_C_GCC, CW_F_CXX):
+			program = getenv("CW_GPLUSPLUS");
+			dir = getenv("CW_GPLUSPLUS_DIR");
+			break;
+	}
+
+	if (program == NULL) {
+		if (dir == NULL)
+			dir = default_dir[CC(ctx)];
+		cmd = cmds[CIDX(CC(ctx), ctx->i_flags)];
+		len = strlen(dir) + strlen(cmd) + 2;
+		if ((program = malloc(len)) == NULL)
+			nomem();
+		(void) snprintf(program, len, "%s/%s", dir, cmd);
+	}
 
 	newae(ctx->i_ae, program);
 
@@ -1792,7 +1814,6 @@ main(int argc, char **argv)
 	cw_ictx_t *ctx = newictx();
 	cw_ictx_t *ctx_shadow = newictx();
 	const char *dir;
-	char cc_buf[MAXPATHLEN], gcc_buf[MAXPATHLEN];
 	int do_serial, do_shadow;
 	int ret = 0;
 
@@ -1811,32 +1832,20 @@ main(int argc, char **argv)
 	 * the environment variables set at run time.
 	 */
 	if ((dir = getenv("SPRO_VROOT")) != NULL) {
-		(void) snprintf(cc_buf, MAXPATHLEN, "%s/bin", dir);
+		(void) snprintf(default_dir[CW_C_CC], MAXPATHLEN,
+		    "%s/bin", dir);
 	} else if ((dir = getenv("SPRO_ROOT")) != NULL) {
-		(void) snprintf(cc_buf, MAXPATHLEN, "%s/SS12/bin", dir);
+		(void) snprintf(default_dir[CW_C_CC], MAXPATHLEN,
+		    "%s/SS12/bin", dir);
 	} else if ((dir = getenv("BUILD_TOOLS")) != NULL) {
-		(void) snprintf(cc_buf, MAXPATHLEN,
+		(void) snprintf(default_dir[CW_C_CC], MAXPATHLEN,
 		    "%s/SUNWspro/SS12/bin", dir);
-	}
-	if (dir != NULL) {
-		dirs[CIDX(CW_C_CC, 0)] = (const char *)cc_buf;
-		dirs[CIDX(CW_C_CC, CW_F_CXX)] = (const char *)cc_buf;
 	}
 
 	if ((dir = getenv("GNU_ROOT")) != NULL) {
-		(void) snprintf(gcc_buf, MAXPATHLEN, "%s/bin", dir);
-		dirs[CIDX(CW_C_GCC, 0)] = (const char *)gcc_buf;
-		dirs[CIDX(CW_C_GCC, CW_F_CXX)] = (const char *)gcc_buf;
+		(void) snprintf(default_dir[CW_C_GCC], MAXPATHLEN,
+		    "%s/bin", dir);
 	}
-
-	if ((dir = getenv("CW_CC_DIR")) != NULL)
-		dirs[CIDX(CW_C_CC, 0)] = dir;
-	if ((dir = getenv("CW_CPLUSPLUS_DIR")) != NULL)
-		dirs[CIDX(CW_C_CC, CW_F_CXX)] = dir;
-	if ((dir = getenv("CW_GCC_DIR")) != NULL)
-		dirs[CIDX(CW_C_GCC, 0)] = dir;
-	if ((dir = getenv("CW_GPLUSPLUS_DIR")) != NULL)
-		dirs[CIDX(CW_C_GCC, CW_F_CXX)] = dir;
 
 	do_shadow = (getenv("CW_NO_SHADOW") ? 0 : 1);
 	do_serial = (getenv("CW_SHADOW_SERIAL") ? 1 : 0);

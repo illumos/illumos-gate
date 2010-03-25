@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -486,9 +486,12 @@ main(int argc, char *argv[])
 	char **asargv;
 	char *outfile = NULL;
 	char *srcfile = NULL;
-	const char *as_dir, *as64_dir, *m4_dir, *m4_lib_dir, *cpp_dir;
-	char *as_pgm, *as64_pgm, *m4_pgm, *m4_cmdefs, *cpp_pgm;
-	size_t bufsize;
+	const char *dir, *cmd;
+	static char as_pgm[MAXPATHLEN];
+	static char as64_pgm[MAXPATHLEN];
+	static char m4_pgm[MAXPATHLEN];
+	static char m4_cmdefs[MAXPATHLEN];
+	static char cpp_pgm[MAXPATHLEN];
 	int as64 = 0;
 	int code;
 
@@ -500,35 +503,46 @@ main(int argc, char *argv[])
 	/*
 	 * Helpful when debugging, or when changing tool versions..
 	 */
-	if ((as_dir = getenv("AW_AS_DIR")) == NULL)
-		as_dir = DEFAULT_AS_DIR;	/* /usr/sfw/bin */
-	bufsize = strlen(as_dir) + strlen("/gas") + 1;
-	as_pgm = malloc(bufsize);
-	(void) snprintf(as_pgm, bufsize, "%s/gas", as_dir);
+	if ((cmd = getenv("AW_AS")) != NULL)
+		strlcpy(as_pgm, cmd, sizeof (as_pgm));
+	else {
+		if ((dir = getenv("AW_AS_DIR")) == NULL)
+			dir = DEFAULT_AS_DIR;	/* /usr/sfw/bin */
+		(void) snprintf(as_pgm, sizeof (as_pgm), "%s/gas", dir);
+	}
 
-	if ((as64_dir = getenv("AW_AS64_DIR")) == NULL)
-		as64_dir = DEFAULT_AS64_DIR;	/* /usr/sfw/bin */
-	bufsize = strlen(as64_dir) + strlen("/gas") + 1;
-	as64_pgm = malloc(bufsize);
-	(void) snprintf(as64_pgm, bufsize, "%s/gas", as64_dir);
+	if ((cmd = getenv("AW_AS64")) != NULL)
+		strlcpy(as64_pgm, cmd, sizeof (as64_pgm));
+	else {
+		if ((dir = getenv("AW_AS64_DIR")) == NULL)
+			dir = DEFAULT_AS64_DIR;	/* /usr/sfw/bin */
+		(void) snprintf(as64_pgm, sizeof (as_pgm), "%s/gas", dir);
+	}
 
-	if ((m4_dir = getenv("AW_M4_DIR")) == NULL)
-		m4_dir = DEFAULT_M4_DIR;	/* /usr/ccs/bin */
-	bufsize = strlen(m4_dir) + strlen("/m4") + 1;
-	m4_pgm = malloc(bufsize);
-	(void) snprintf(m4_pgm, bufsize, "%s/m4", m4_dir);
+	if ((cmd = getenv("AW_M4")) != NULL)
+		strlcpy(m4_pgm, cmd, sizeof (m4_pgm));
+	else {
+		if ((dir = getenv("AW_M4_DIR")) == NULL)
+			dir = DEFAULT_M4_DIR;	/* /usr/ccs/bin */
+		(void) snprintf(m4_pgm, sizeof (m4_pgm), "%s/m4", dir);
+	}
 
-	if ((m4_lib_dir = getenv("AW_M4LIB_DIR")) == NULL)
-		m4_lib_dir = DEFAULT_M4LIB_DIR;	/* /usr/ccs/lib */
-	bufsize = strlen(m4_lib_dir) + strlen("/cmdefs") + 1;
-	m4_cmdefs = malloc(bufsize);
-	(void) snprintf(m4_cmdefs, bufsize, "%s/cmdefs", m4_lib_dir);
+	if ((cmd = getenv("AW_M4LIB")) != NULL)
+		strlcpy(m4_cmdefs, cmd, sizeof (m4_cmdefs));
+	else {
+		if ((dir = getenv("AW_M4LIB_DIR")) == NULL)
+			dir = DEFAULT_M4LIB_DIR;	/* /usr/ccs/lib */
+		(void) snprintf(m4_cmdefs, sizeof (m4_cmdefs),
+		    "%s/cm4defs", dir);
+	}
 
-	if ((cpp_dir = getenv("AW_CPP_DIR")) == NULL)
-		cpp_dir = DEFAULT_CPP_DIR;	/* /usr/ccs/lib */
-	bufsize = strlen(cpp_dir) + strlen("/cpp") + 1;
-	cpp_pgm = malloc(bufsize);
-	(void) snprintf(cpp_pgm, bufsize, "%s/cpp", cpp_dir);
+	if ((cmd = getenv("AW_CPP")) != NULL)
+		strlcpy(cpp_pgm, cmd, sizeof (cpp_pgm));
+	else {
+		if ((dir = getenv("AW_CPP_DIR")) == NULL)
+			dir = DEFAULT_CPP_DIR;	/* /usr/ccs/lib */
+		(void) snprintf(cpp_pgm, sizeof (cpp_pgm), "%s/cpp", dir);
+	}
 
 	newae(as, as_pgm);
 	newae(as, "--warn");

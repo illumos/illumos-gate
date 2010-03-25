@@ -18,10 +18,10 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
-.TH cw 1 "18 September 2009"
+.TH cw 1 "22 March 2010"
 .SH NAME
 .I cw
 \- invoke one or more compilers with argument translation
@@ -194,8 +194,14 @@ standard error but do not actually invoke any compiler.  This is
 useful for debugging the translation engine.
 .LP
 .TP 4
+.B CW_CC, CW_CPLUSPLUS
+If these variables are set in the environment, they specify the full
+pathname for the Studio C and C++ compilers, respectively.
+.LP
+.TP 4
 .B CW_CC_DIR, CW_CPLUSPLUS_DIR, SPRO_VROOT, SPRO_ROOT, BUILD_TOOLS
-These variables define the search path for Studio compilers as
+If CW_CC or CW_CPLUSPLUS are not set,
+these variables define the search path for Studio compilers as
 follows:
 .B
 If CW_CC_DIR is set, the Studio C compiler in \fI$CW_CC_DIR\fP
@@ -211,9 +217,15 @@ Otherwise, the Studio compilers in a predefined default location
 will be used.
 .LP
 .TP 4
+.B CW_GCC, CW_GPLUSPLUS
+If these variables are set in the environment, they specify the full
+pathname for the GNU C and C++ compilers, respectively.
+.LP
+.TP 4
 .B CW_GCC_DIR, CW_GPLUSPLUS_DIR, GNU_ROOT
-These variables alter the search path for GNU compilers in a manner
-similar to those described above.  Specifically:
+If CW_GCC or CW_GPLUSPLUS are not set,
+these variables alter the search path for GNU compilers in a manner
+similar to that described above for the Studio compilers.  Specifically:
 .B
 If CW_GCC_DIR is set, the GNU C compiler in \fI$CW_GCC_DIR\fP
 will be used.  Likewise, if CW_GPLUSPLUS_DIR is set, the GNU C++
