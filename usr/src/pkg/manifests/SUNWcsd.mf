@@ -60,10 +60,8 @@ dir path=etc/security group=sys
 dir path=lib
 dir path=lib/svc
 dir path=lib/svc/method
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/system group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 file path=etc/dacf.conf group=sys
 file path=etc/devlink.tab group=sys preserve=true
 file path=etc/driver_aliases group=sys preserve=true
@@ -77,7 +75,7 @@ file path=etc/path_to_inst group=root mode=0444 preserve=true
 file path=etc/security/device_policy group=sys preserve=true
 file path=etc/security/extra_privs group=sys preserve=true
 file path=lib/svc/method/svc-syseventd mode=0555
-file path=var/svc/manifest/system/sysevent.xml group=sys mode=0444
+file path=lib/svc/manifest/system/sysevent.xml group=sys mode=0444
 legacy pkg=SUNWcsd arch=$(ARCH) category=system \
     desc="core entries for /dev and /devices needed for the initial boot of Solaris" \
     hotline="Please contact your local service provider" \

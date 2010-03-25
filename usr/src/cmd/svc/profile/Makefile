@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -28,7 +28,7 @@ include ../../Makefile.cmd
 
 FILEMODE = 0444
 
-ROOTPROFILE = $(ROOT)/var/svc/profile
+ROOTPROFILE = $(ROOT)/etc/svc/profile
 
 PROFILESRCS = \
 	generic_open.xml \

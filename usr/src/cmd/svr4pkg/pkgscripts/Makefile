@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -39,7 +39,7 @@ CLASS_ACTION_SCRIPTS =  i.awk		\
 			r.sed
 ADMINFILE =		default
 
-ROOTPKGMNFSTDIR=$(ROOT)/var/svc/manifest/system
+ROOTPKGMNFSTDIR=$(ROOT)/lib/svc/manifest/system
 ROOTPKGMNFST=   $(ROOTPKGMNFSTDIR)/pkgserv.xml
 
 $(ROOTPKGMNFST) := FILEMODE = 0444

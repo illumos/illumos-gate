@@ -71,10 +71,9 @@ dir path=var/spool/lp/admins group=lp mode=0775 owner=lp
 dir path=var/spool/lp/requests group=lp mode=0775 owner=lp
 dir path=var/spool/lp/system group=lp mode=0775 owner=lp
 dir path=var/spool/print group=lp
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/application group=sys
-dir path=var/svc/manifest/application/print group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/application group=sys
+dir path=lib/svc/manifest/application/print group=sys
 file path=etc/lp/fd/catv.fd group=lp
 file path=etc/lp/fd/download.fd group=lp
 file path=etc/lp/fd/dpost.fd group=lp
@@ -217,8 +216,8 @@ file path=usr/share/lib/terminfo/a/att477+basic2
 file path=usr/share/lib/terminfo/a/att583+basic
 file path=var/spool/cron/crontabs/lp group=root mode=0400 \
     original_name=SUNWps:var/spool/cron/crontabs/lp preserve=true
-file path=var/svc/manifest/application/print/rfc1179.xml group=sys mode=0444
-file path=var/svc/manifest/application/print/server.xml group=sys mode=0444
+file path=lib/svc/manifest/application/print/rfc1179.xml group=sys mode=0444
+file path=lib/svc/manifest/application/print/server.xml group=sys mode=0444
 hardlink path=usr/share/lib/terminfo/4/458 \
     target=../../../../../usr/share/lib/terminfo/4/457
 hardlink path=usr/share/lib/terminfo/4/477qume \

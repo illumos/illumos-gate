@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -58,7 +58,7 @@ LDLIBS +=	-lipp-listener -lipp-core -lpapi -lc
 
 #	SMF manifest
 MANIFEST=       ipp-listener.xml
-ROOTMANIFESTDIR=        $(ROOT)/var/svc/manifest/application/print
+ROOTMANIFESTDIR=        $(ROOT)/lib/svc/manifest/application/print
 ROOTMANIFEST=		$(MANIFEST:%=$(ROOTMANIFESTDIR)/%)
 $(ROOTMANIFEST)         := FILEMODE= 444
 

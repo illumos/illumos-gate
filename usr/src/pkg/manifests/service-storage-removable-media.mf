@@ -36,11 +36,11 @@ dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/smedia
 dir path=usr/lib/smedia/$(ARCH64)
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
-dir path=var/svc/manifest/network/rpc group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/rpc group=sys
 file path=usr/lib/$(ARCH64)/libsmedia.so.1
 file path=usr/lib/$(ARCH64)/llib-lsmedia.ln
 file path=usr/lib/libsmedia.so.1
@@ -53,7 +53,7 @@ file path=usr/lib/smedia/rpc.smserverd mode=0555
 file path=usr/lib/smedia/sm_fd.so.1 mode=0555
 file path=usr/lib/smedia/sm_pcata.so.1 mode=0555
 file path=usr/lib/smedia/sm_scsi.so.1 mode=0555
-file path=var/svc/manifest/network/rpc/smserver.xml group=sys mode=0444
+file path=lib/svc/manifest/network/rpc/smserver.xml group=sys mode=0444
 legacy pkg=SUNWsmedia arch=$(ARCH) category=system \
     desc="Storage media management library" \
     hotline="Please contact your local service provider" \

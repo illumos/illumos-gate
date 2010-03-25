@@ -54,9 +54,8 @@ dir path=var/adm/sa group=sys mode=0775 owner=adm
 dir path=var/spool
 dir path=var/spool/cron group=sys
 dir path=var/spool/cron/crontabs group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/system group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 file path=etc/acct/holidays original_name=SUNWacc:etc/acct/holidays \
     preserve=true
 file path=etc/init.d/acct group=sys mode=0744 \
@@ -102,7 +101,7 @@ file path=usr/lib/sa/sadc mode=0555
 file path=usr/sbin/sar mode=0555
 file path=var/spool/cron/crontabs/sys group=sys mode=0600 \
     original_name=SUNWacc:var/spool/cron/crontabs/sys preserve=true
-file path=var/svc/manifest/system/sar.xml group=sys mode=0444
+file path=lib/svc/manifest/system/sar.xml group=sys mode=0444
 legacy pkg=SUNWaccr arch=$(ARCH) category=system \
     desc="utilities for accounting and reporting of system activity" \
     hotline="Please contact your local service provider" \

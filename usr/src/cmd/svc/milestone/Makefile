@@ -72,6 +72,7 @@ SYSDEVMANIFESTS= $(SYSDEVSVCS:%=$(ROOTSVCSYSTEMDEVICE)/%)
 SYSTEMSVCS= \
 	boot-archive.xml \
 	console-login.xml \
+	early-manifest-import.xml \
 	identity.xml \
 	manifest-import.xml \
 	rmtmpfiles.xml	\

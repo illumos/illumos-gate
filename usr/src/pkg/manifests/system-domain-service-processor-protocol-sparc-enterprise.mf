@@ -51,11 +51,9 @@ dir path=usr/platform group=sys
 dir path=usr/platform/SUNW,SPARC-Enterprise group=sys
 dir path=usr/platform/SUNW,SPARC-Enterprise/lib
 dir path=usr/platform/SUNW,SPARC-Enterprise/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/platform group=sys
-dir path=var/svc/manifest/platform/sun4u group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/platform group=sys
+dir path=lib/svc/manifest/platform/sun4u group=sys
 driver name=dm2s
 driver name=oplkmdrv
 file path=lib/svc/method/svc-dscp mode=0555
@@ -70,7 +68,7 @@ file path=usr/platform/SUNW,SPARC-Enterprise/lib/dscp.ppp.options group=sys \
 file path=usr/platform/SUNW,SPARC-Enterprise/lib/libdscp.so.1
 file path=usr/platform/SUNW,SPARC-Enterprise/lib/llib-ldscp.ln group=sys
 file path=usr/platform/SUNW,SPARC-Enterprise/sbin/prtdscp mode=0755
-file path=var/svc/manifest/platform/sun4u/dscp.xml group=sys mode=0444
+file path=lib/svc/manifest/platform/sun4u/dscp.xml group=sys mode=0444
 legacy pkg=SUNWdscpr.u arch=$(ARCH).sun4u category=system \
     desc="Domain to Service Processor Communications Protocol (Root)" \
     hotline="Please contact your local service provider" \

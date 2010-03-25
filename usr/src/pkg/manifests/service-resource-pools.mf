@@ -53,11 +53,9 @@ dir path=var/adm/pool group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 dir path=var/log/pool group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 driver name=pool perms="pool 0666 root sys" perms="poolctl 0666 root sys"
 file path=lib/svc/method/svc-poold mode=0555 opensolaris.zone=global \
@@ -79,9 +77,9 @@ file path=usr/sbin/pooladm mode=0555
 file path=usr/sbin/poolbind mode=0555
 file path=usr/sbin/poolcfg mode=0555
 file path=usr/share/lib/xml/dtd/rm_pool.dtd.1
-file path=var/svc/manifest/system/poold.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/poold.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/system/pools.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/pools.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWpool arch=$(ARCH) category=system \
     desc="core software for resource pools" \

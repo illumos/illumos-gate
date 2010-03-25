@@ -46,14 +46,11 @@ dir path=usr/include/sys/iscsit
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/sbin
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/network group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/network group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/network/iscsi group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/network/iscsi group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 driver name=iscsit perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/iscsit group=sys opensolaris.zone=global \
@@ -72,7 +69,7 @@ file path=usr/lib/libiscsit.so.1
 file path=usr/lib/llib-liscsit
 file path=usr/lib/llib-liscsit.ln
 file path=usr/sbin/itadm mode=0555
-file path=var/svc/manifest/network/iscsi/iscsi-target.xml group=sys mode=0444 \
+file path=lib/svc/manifest/network/iscsi/iscsi-target.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWiscsitr arch=$(ARCH) category=system \
     desc="Sun iSCSI COMSTAR Port Provider" \

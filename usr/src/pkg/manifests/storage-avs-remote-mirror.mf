@@ -63,10 +63,8 @@ dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/system group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 driver name=rdc devlink=type=ddi_pseudo;name=rdc\t\D perms="* 0666 root sys" \
     privs=sys_config privs=sys_devices
 file path=etc/init.d/rdc mode=0744
@@ -90,8 +88,8 @@ $(i386_ONLY)file path=usr/kernel/drv/rdcstub group=sys
 file path=usr/lib/librdc.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/rdc.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/rdc.so group=sys mode=0555
-file path=var/svc/manifest/system/nws_rdc.xml group=sys mode=0444
-file path=var/svc/manifest/system/nws_rdcsyncd.xml group=sys mode=0444
+file path=lib/svc/manifest/system/nws_rdc.xml group=sys mode=0444
+file path=lib/svc/manifest/system/nws_rdcsyncd.xml group=sys mode=0444
 hardlink path=lib/svc/method/svc-rdc target=../../../etc/init.d/rdc
 hardlink path=lib/svc/method/svc-rdcsyncd target=../../../etc/init.d/rdcfinish
 hardlink path=usr/kernel/misc/$(ARCH64)/rdcsrv target=../../drv/$(ARCH64)/rdcsrv

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -29,7 +29,7 @@ include		../../Makefile.master
 include		../Makefile.lib
 
 MANIFEST=	client.xml
-MANIFESTDIR=	$(ROOT)/var/svc/manifest/network/dns
+MANIFESTDIR=	$(ROOT)/lib/svc/manifest/network/dns
 ROOTMANIFEST=	$(MANIFEST:%=$(MANIFESTDIR)/%)
 
 $(ROOTMANIFEST) :=	FILEMODE = 444

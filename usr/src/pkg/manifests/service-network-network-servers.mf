@@ -31,6 +31,8 @@ set name=pkg.summary value="Remote Network Server Commands"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib
+dir path=lib/svc
 dir path=etc group=sys
 dir path=usr group=sys
 dir path=usr/bin
@@ -41,11 +43,9 @@ dir path=usr/lib/netsvc/rusers group=sys
 dir path=usr/lib/netsvc/rwall group=sys
 dir path=usr/lib/netsvc/spray group=sys
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
-dir path=var/svc/manifest/network/rpc group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/rpc group=sys
 file path=usr/bin/finger mode=0555
 file path=usr/bin/rwho mode=0555
 file path=usr/bin/talk mode=0555
@@ -60,16 +60,16 @@ file path=usr/sbin/in.rlogind mode=0555
 file path=usr/sbin/in.rshd mode=0555
 file path=usr/sbin/in.rwhod mode=0555
 file path=usr/sbin/in.talkd mode=0555
-file path=var/svc/manifest/network/comsat.xml group=sys mode=0444
-file path=var/svc/manifest/network/finger.xml group=sys mode=0444
-file path=var/svc/manifest/network/login.xml group=sys mode=0444
-file path=var/svc/manifest/network/rexec.xml group=sys mode=0444
-file path=var/svc/manifest/network/rpc/rstat.xml group=sys mode=0444
-file path=var/svc/manifest/network/rpc/rusers.xml group=sys mode=0444
-file path=var/svc/manifest/network/rpc/spray.xml group=sys mode=0444
-file path=var/svc/manifest/network/rpc/wall.xml group=sys mode=0444
-file path=var/svc/manifest/network/shell.xml group=sys mode=0444
-file path=var/svc/manifest/network/talk.xml group=sys mode=0444
+file path=lib/svc/manifest/network/comsat.xml group=sys mode=0444
+file path=lib/svc/manifest/network/finger.xml group=sys mode=0444
+file path=lib/svc/manifest/network/login.xml group=sys mode=0444
+file path=lib/svc/manifest/network/rexec.xml group=sys mode=0444
+file path=lib/svc/manifest/network/rpc/rstat.xml group=sys mode=0444
+file path=lib/svc/manifest/network/rpc/rusers.xml group=sys mode=0444
+file path=lib/svc/manifest/network/rpc/spray.xml group=sys mode=0444
+file path=lib/svc/manifest/network/rpc/wall.xml group=sys mode=0444
+file path=lib/svc/manifest/network/shell.xml group=sys mode=0444
+file path=lib/svc/manifest/network/talk.xml group=sys mode=0444
 legacy pkg=SUNWrcmdr arch=$(ARCH) category=system \
     desc="Remote Network Server Commands (Root)" \
     hotline="Please contact your local service provider" \

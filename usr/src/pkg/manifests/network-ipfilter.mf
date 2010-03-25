@@ -53,9 +53,8 @@ dir path=usr/share/ipfilter/examples
 dir path=var group=sys
 dir path=var/db group=sys
 dir path=var/db/ipf group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 driver name=ipf perms="* 0666 root sys" \
     policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
 file path=etc/ipf/ipf.conf group=sys original_name=SUNWipf:etc/ipf/ipf.conf \
@@ -107,7 +106,7 @@ file path=usr/share/ipfilter/examples/nat.eg
 file path=usr/share/ipfilter/examples/pool.conf
 file path=usr/share/ipfilter/examples/server
 file path=usr/share/ipfilter/examples/tcpstate
-file path=var/svc/manifest/network/ipfilter.xml group=sys mode=0444
+file path=lib/svc/manifest/network/ipfilter.xml group=sys mode=0444
 hardlink path=usr/lib/ipf/ipftest target=../../../usr/lib/isaexec
 hardlink path=usr/sbin/ipf target=../../usr/lib/isaexec
 hardlink path=usr/sbin/ipfs target=../../usr/lib/isaexec

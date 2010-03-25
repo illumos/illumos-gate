@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <libxml/tree.h>
 
 #include <libscf.h>
+#include <libscf_priv.h>
 #include <libtecla.h>
 #include <libuutil.h>
 
@@ -56,6 +57,14 @@ extern "C" {
 #define	SCI_KEEP	0x40		/* Don't delete when SCI_FORCEing */
 #define	SCI_NOSNAP	0x80		/* Don't take last-import snapshot */
 #define	SCI_DELAYENABLE	0x100		/* Delay the general/enable property */
+
+#define	HASH_SVC		"smf/manifest"
+
+/*
+ * If the filesystem/minimal service is not online, do not consider
+ * manifests in the /var file system.
+ */
+#define	IGNORE_VAR	(!est->sc_fs_minimal)
 
 /* Flags for lscf_service_export() */
 #define	SCE_ALL_VALUES	0x01		/* Include all property values */
@@ -282,6 +291,8 @@ typedef struct engine_state {
 	size_t		sc_cmd_bufsz;
 	off_t		sc_cmd_bufoff;
 	GetLine		*sc_gl;
+	boolean_t	sc_fs_minimal;	/* SCF_INSTANCE_FS_MINIMAL is online. */
+	boolean_t	sc_in_emi;	/* During early import */
 
 	pid_t		sc_repo_pid;
 	const char	*sc_repo_filename;
@@ -405,6 +416,8 @@ void lscf_refresh();
 char *filename_to_propname(const char *);
 int lscf_retrieve_hash(const char *, unsigned char *);
 int lscf_store_hash(const char *, unsigned char *);
+int lscf_service_cleanup(void *, scf_walkinfo_t *);
+int lscf_hash_cleanup();
 CPL_MATCH_FN(complete_select);
 CPL_MATCH_FN(complete_command);
 
@@ -418,6 +431,7 @@ int add_cmd_matches(WordCompletion *, const char *, int, uint32_t);
 int engine_interp(void);
 int engine_source(const char *, boolean_t);
 int engine_import(uu_list_t *);
+int engine_cleanup(int);
 void help(int);
 
 int engine_cmd_getc(engine_state_t *);

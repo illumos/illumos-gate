@@ -131,12 +131,11 @@ $(sparc_ONLY)dir path=usr/platform/sun4v/lib
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/picl group=sys
 $(sparc_ONLY)dir path=usr/platform/sun4v/lib/picl/plugins group=sys
 dir path=usr/sbin
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=usr/lib/$(ARCH64)/libpicl.so.1
 file path=usr/lib/$(ARCH64)/llib-lpicl.ln
@@ -616,7 +615,7 @@ $(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libpriplugin.so.1 \
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libsnmpplugin.so.1 \
     group=sys
 file path=usr/sbin/prtpicl mode=0755
-file path=var/svc/manifest/system/picl.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/picl.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWpiclr arch=$(ARCH) category=system \
     desc="PICL Framework init scripts" \

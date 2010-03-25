@@ -60,16 +60,15 @@ dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/efcode
 dir path=usr/lib/efcode/$(ARCH64)
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/platform group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/platform group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/platform/sun4u group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/platform/sun4u group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/platform/sun4v group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/platform/sun4v group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 driver name=fcode
 file path=etc/flash/postdeployment/efcode.cleanup group=sys mode=0744 \
@@ -99,9 +98,9 @@ file path=usr/lib/efcode/$(ARCH64)/lfc_jupiter.so
 file path=usr/lib/efcode/$(ARCH64)/lfc_upa.so
 file path=usr/lib/efcode/$(ARCH64)/lfc_upa_pci.so
 file path=usr/lib/efcode/efcode.sh mode=0555
-file path=var/svc/manifest/platform/sun4u/efdaemon.xml group=sys mode=0444 \
+file path=lib/svc/manifest/platform/sun4u/efdaemon.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/platform/sun4v/efdaemon.xml group=sys mode=0444 \
+file path=lib/svc/manifest/platform/sun4v/efdaemon.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWefc.u arch=$(ARCH).sun4u category=system \
     desc="Embedded FCode Interpreter Drivers" \

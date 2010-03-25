@@ -56,10 +56,8 @@ dir path=usr/lib/lp/model group=lp
 dir path=usr/lib/lp/postscript group=lp
 dir path=usr/lib/zones
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/system group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 file path=lib/svc/method/svc-tsol-zones mode=0555
 file path=sbin/tnctl group=sys mode=0555
 file path=usr/bin/getlabel mode=0555
@@ -121,7 +119,7 @@ file path=usr/sbin/tnchkdb group=sys mode=0555
 file path=usr/sbin/tnd group=sys mode=0555
 file path=usr/sbin/tninfo group=sys mode=0555
 file path=usr/sbin/txzonemgr group=sys mode=0555
-file path=var/svc/manifest/system/tsol-zones.xml group=sys mode=0444
+file path=lib/svc/manifest/system/tsol-zones.xml group=sys mode=0444
 hardlink path=usr/sbin/remove_allocatable target=add_allocatable
 legacy pkg=SUNWtsr arch=$(ARCH) category=system \
     desc="Solaris Trusted Extensions, (Root)" \

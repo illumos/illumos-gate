@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,7 @@
 #include <utmpx.h>
 #include <spawn.h>
 
+#include "manifest_hash.h"
 #include "configd_exit.h"
 #include "protocol.h"
 #include "startd.h"
@@ -125,8 +126,8 @@ fork_mount(char *path, char *opts)
 
 /*
  * pid_t fork_common(...)
- *   Common routine used by fork_sulogin and fork_configd to fork a
- *   process in a contract with the provided terms.  Invokes
+ *   Common routine used by fork_sulogin, fork_emi, and fork_configd to
+ *   fork a process in a contract with the provided terms.  Invokes
  *   fork_sulogin (with its no-fork argument set) on errors.
  */
 static pid_t
@@ -680,6 +681,393 @@ fork_rc_script(char rl, const char *arg, boolean_t wait)
 
 	perror("exec");
 	exit(0);
+}
+
+#define	SVCCFG_PATH	"/usr/sbin/svccfg"
+#define	EMI_MFST	"/lib/svc/manifest/system/early-manifest-import.xml"
+#define	EMI_PATH	"/lib/svc/method/manifest-import"
+
+/*
+ * Set Early Manifest Import service's state and log file.
+ */
+static int
+emi_set_state(restarter_instance_state_t state, boolean_t setlog)
+{
+	int r, ret = 1;
+	instance_data_t idata;
+	scf_handle_t *hndl = NULL;
+	scf_instance_t *inst = NULL;
+
+retry:
+	if (hndl == NULL)
+		hndl = libscf_handle_create_bound(SCF_VERSION);
+
+	if (hndl == NULL) {
+		/*
+		 * In the case that we can't bind to the repository
+		 * (which should have been started), we need to allow
+		 * the user into maintenance mode to determine what's
+		 * failed.
+		 */
+		fork_sulogin(B_FALSE, "Unable to bind a new repository"
+		    " handle: %s\n", scf_strerror(scf_error()));
+		goto retry;
+	}
+
+	if (inst == NULL)
+		inst = safe_scf_instance_create(hndl);
+
+	if (scf_handle_decode_fmri(hndl, SCF_INSTANCE_EMI, NULL, NULL,
+	    inst, NULL, NULL, SCF_DECODE_FMRI_EXACT) == -1) {
+		switch (scf_error()) {
+		case SCF_ERROR_NOT_FOUND:
+			goto out;
+
+		case SCF_ERROR_CONNECTION_BROKEN:
+		case SCF_ERROR_NOT_BOUND:
+			libscf_handle_rebind(hndl);
+			goto retry;
+
+		default:
+			fork_sulogin(B_FALSE, "Couldn't fetch %s service: "
+			    "%s\n", SCF_INSTANCE_EMI,
+			    scf_strerror(scf_error()));
+			goto retry;
+		}
+	}
+
+	if (setlog) {
+		(void) libscf_note_method_log(inst, st->st_log_prefix, EMI_LOG);
+		log_framework(LOG_DEBUG,
+		    "Set logfile property for %s\n", SCF_INSTANCE_EMI);
+	}
+
+	idata.i_fmri = SCF_INSTANCE_EMI;
+	idata.i_state =  RESTARTER_STATE_NONE;
+	idata.i_next_state = RESTARTER_STATE_NONE;
+	switch (r = _restarter_commit_states(hndl, &idata, state,
+	    RESTARTER_STATE_NONE, NULL)) {
+	case 0:
+		break;
+
+	case ECONNABORTED:
+		libscf_handle_rebind(hndl);
+		goto retry;
+
+	case ENOMEM:
+	case ENOENT:
+	case EPERM:
+	case EACCES:
+	case EROFS:
+		fork_sulogin(B_FALSE, "Could not set state of "
+		    "%s: %s\n", SCF_INSTANCE_EMI, strerror(r));
+		goto retry;
+		break;
+
+	case EINVAL:
+	default:
+		bad_error("_restarter_commit_states", r);
+	}
+	ret = 0;
+
+out:
+	scf_instance_destroy(inst);
+	scf_handle_destroy(hndl);
+	return (ret);
+}
+
+/*
+ * It is possible that the early-manifest-import service is disabled.  This
+ * would not be the normal case for Solaris, but it may happen on dedicated
+ * systems.  So this function checks the state of the general/enabled
+ * property for Early Manifest Import.
+ *
+ * It is also possible that the early-manifest-import service does not yet
+ * have a repository representation when this function runs.  This happens
+ * if non-Early Manifest Import system is upgraded to an Early Manifest
+ * Import based system.  Thus, the non-existence of general/enabled is not
+ * an error.
+ *
+ * Returns 1 if Early Manifest Import is disabled and 0 otherwise.
+ */
+static int
+emi_is_disabled()
+{
+	int disabled = 0;
+	int disconnected = 1;
+	int enabled;
+	scf_handle_t *hndl = NULL;
+	scf_instance_t *inst = NULL;
+	uchar_t stored_hash[MHASH_SIZE];
+	char *pname;
+	int hashash, r;
+
+	while (hndl == NULL) {
+		hndl = libscf_handle_create_bound(SCF_VERSION);
+
+		if (hndl == NULL) {
+			/*
+			 * In the case that we can't bind to the repository
+			 * (which should have been started), we need to
+			 * allow the user into maintenance mode to
+			 * determine what's failed.
+			 */
+			fork_sulogin(B_FALSE, "Unable to bind a new repository "
+			    "handle: %s\n", scf_strerror(scf_error()));
+		}
+	}
+
+	while (disconnected) {
+		r = libscf_fmri_get_instance(hndl, SCF_INSTANCE_EMI, &inst);
+		if (r != 0) {
+			switch (r) {
+			case ECONNABORTED:
+				libscf_handle_rebind(hndl);
+				continue;
+
+			case ENOENT:
+				/*
+				 * Early Manifest Import service is not in
+				 * the repository. Check the manifest file
+				 * and service's hash in smf/manifest to
+				 * figure out whether Early Manifest Import
+				 * service was deleted. If Early Manifest Import
+				 * service was deleted, treat that as a disable
+				 * and don't run early import.
+				 */
+
+				if (access(EMI_MFST, F_OK)) {
+					/*
+					 * Manifest isn't found, so service is
+					 * properly removed.
+					 */
+					disabled = 1;
+				} else {
+					/*
+					 * If manifest exists and we have the
+					 * hash, the service was improperly
+					 * deleted, generate a warning and treat
+					 * this as a disable.
+					 */
+
+					if ((pname = mhash_filename_to_propname(
+					    EMI_MFST, B_TRUE)) == NULL) {
+						/*
+						 * Treat failure to get propname
+						 * as a disable.
+						 */
+						disabled = 1;
+						uu_warn("Failed to get propname"
+						    " for %s.\n",
+						    SCF_INSTANCE_EMI);
+					} else {
+						hashash = mhash_retrieve_entry(
+						    hndl, pname,
+						    stored_hash,
+						    NULL) == 0;
+						uu_free(pname);
+
+						if (hashash) {
+							disabled = 1;
+							uu_warn("%s service is "
+							    "deleted \n",
+							    SCF_INSTANCE_EMI);
+						}
+					}
+
+				}
+
+				disconnected = 0;
+				continue;
+
+			default:
+				bad_error("libscf_fmri_get_instance",
+				    scf_error());
+			}
+		}
+		r = libscf_get_basic_instance_data(hndl, inst, SCF_INSTANCE_EMI,
+		    &enabled, NULL, NULL);
+		if (r == 0) {
+			/*
+			 * enabled can be returned as -1, which indicates
+			 * that the enabled property was not found.  To us
+			 * that means that the service was not disabled.
+			 */
+			if (enabled == 0)
+				disabled = 1;
+		} else {
+			switch (r) {
+			case ECONNABORTED:
+				libscf_handle_rebind(hndl);
+				continue;
+
+			case ECANCELED:
+			case ENOENT:
+				break;
+			default:
+				bad_error("libscf_get_basic_instance_data", r);
+			}
+		}
+		disconnected = 0;
+	}
+
+out:
+	if (inst != NULL)
+		scf_instance_destroy(inst);
+	scf_handle_destroy(hndl);
+	return (disabled);
+}
+
+void
+fork_emi()
+{
+	pid_t pid;
+	ctid_t ctid = -1;
+	char **envp, **np;
+	char *emipath;
+	char corepath[PATH_MAX];
+	char *svc_state;
+	int setemilog;
+	int sz;
+
+	if (emi_is_disabled()) {
+		log_framework(LOG_NOTICE, "%s is  disabled and will "
+		    "not be run.\n", SCF_INSTANCE_EMI);
+		return;
+	}
+
+	/*
+	 * Early Manifest Import should run only once, at boot. If svc.startd
+	 * is some how restarted, Early Manifest Import  should not run again.
+	 * Use the Early Manifest Import service's state to figure out whether
+	 * Early Manifest Import has successfully completed earlier and bail
+	 * out if it did.
+	 */
+	if (svc_state = smf_get_state(SCF_INSTANCE_EMI)) {
+		if (strcmp(svc_state, SCF_STATE_STRING_ONLINE) == 0) {
+			free(svc_state);
+			return;
+		}
+		free(svc_state);
+	}
+
+	/*
+	 * Attempt to set Early Manifest Import service's state and log file.
+	 * If emi_set_state fails, set log file again in the next call to
+	 * emi_set_state.
+	 */
+	setemilog = emi_set_state(RESTARTER_STATE_OFFLINE, B_TRUE);
+
+	/* Don't go further if /usr isn't available */
+	if (access(SVCCFG_PATH, F_OK)) {
+		log_framework(LOG_NOTICE, "Early Manifest Import is not "
+		    "supported on systems with a separate /usr filesystem.\n");
+		return;
+	}
+
+fork_retry:
+	log_framework(LOG_DEBUG, "Starting Early Manifest Import\n");
+
+	/*
+	 * If we're retrying, we will have an old contract lying around
+	 * from the failure.  Since we're going to be creating a new
+	 * contract shortly, we abandon the old one now.
+	 */
+	if (ctid != -1)
+		contract_abandon(ctid);
+	ctid = -1;
+
+	pid = fork_common(SCF_INSTANCE_EMI, SCF_INSTANCE_EMI,
+	    MAX_EMI_RETRIES, &ctid, 0, 0, 0, 0, EMI_COOKIE);
+
+	if (pid != 0) {
+		int exitstatus;
+
+		if (waitpid(pid, &exitstatus, 0) == -1) {
+			fork_sulogin(B_FALSE, "waitpid on %s failed: "
+			    "%s\n", SCF_INSTANCE_EMI, strerror(errno));
+		} else if (WIFEXITED(exitstatus)) {
+			if (WEXITSTATUS(exitstatus)) {
+				fork_sulogin(B_FALSE, "%s exited with status "
+				    "%d \n", SCF_INSTANCE_EMI,
+				    WEXITSTATUS(exitstatus));
+				goto fork_retry;
+			}
+		} else if (WIFSIGNALED(exitstatus)) {
+			char signame[SIG2STR_MAX];
+
+			if (sig2str(WTERMSIG(exitstatus), signame))
+				(void) snprintf(signame, SIG2STR_MAX,
+				    "signum %d", WTERMSIG(exitstatus));
+
+			fork_sulogin(B_FALSE, "%s signalled: %s\n",
+			    SCF_INSTANCE_EMI, signame);
+			goto fork_retry;
+		} else {
+			fork_sulogin(B_FALSE, "%s non-exit condition: 0x%x\n",
+			    SCF_INSTANCE_EMI, exitstatus);
+			goto fork_retry;
+		}
+
+		log_framework(LOG_DEBUG, "%s completed successfully\n",
+		    SCF_INSTANCE_EMI);
+
+		/*
+		 * Once Early Manifest Import completed, the Early Manifest
+		 * Import service must have been imported so set log file and
+		 * state properties. Since this information is required for
+		 * late manifest import and common admin operations, failing to
+		 * set these properties should result in su login so admin can
+		 * correct the problem.
+		 */
+		(void) emi_set_state(RESTARTER_STATE_ONLINE,
+		    setemilog ? B_TRUE : B_FALSE);
+
+		return;
+	}
+
+	/* child */
+
+	/*
+	 * Set our per-process core file path to leave core files in
+	 * /etc/svc/volatile directory, named after the PID to aid in debugging.
+	 */
+	(void) snprintf(corepath, sizeof (corepath),
+	    "/etc/svc/volatile/core.emi.%%p");
+	(void) core_set_process_path(corepath, strlen(corepath) + 1, getpid());
+
+	/*
+	 * Similar to running legacy services, we need to manually set
+	 * log files here and environment variables.
+	 */
+	setlog(EMI_LOG);
+
+	envp = startd_zalloc(sizeof (char *) * 3);
+	np = envp;
+
+	sz = sizeof ("SMF_FMRI=") + strlen(SCF_INSTANCE_EMI);
+	*np = startd_zalloc(sz);
+	(void) strlcpy(*np, "SMF_FMRI=", sz);
+	(void) strncat(*np, SCF_INSTANCE_EMI, sz);
+	np++;
+
+	emipath = getenv("PATH");
+	if (emipath == NULL)
+		emipath = strdup("/usr/sbin:/usr/bin");
+
+	sz = sizeof ("PATH=") + strlen(emipath);
+	*np = startd_zalloc(sz);
+	(void) strlcpy(*np, "PATH=", sz);
+	(void) strncat(*np, emipath, sz);
+
+	log_framework(LOG_DEBUG, "executing Early Manifest Import\n");
+	(void) execle(EMI_PATH, EMI_PATH, NULL, envp);
+
+	/*
+	 * Status code is used above to identify Early Manifest Import
+	 * exec failure.
+	 */
+	exit(1);
 }
 
 extern char **environ;

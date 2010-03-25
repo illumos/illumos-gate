@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -211,6 +211,12 @@ typedef struct scf_tmpl_error scf_tmpl_error_t;
 				    "svc:/system/svc/global")
 #define	SCF_SERVICE_STARTD	((const char *) \
 				    "svc:/system/svc/restarter:default")
+#define	SCF_INSTANCE_EMI	((const char *) \
+				    "svc:/system/early-manifest-import:default")
+#define	SCF_INSTANCE_FS_MINIMAL	((const char *) \
+				    "svc:/system/filesystem/minimal:default")
+#define	SCF_INSTANCE_MI		((const char *) \
+				    "svc:/system/manifest-import:default")
 
 /*
  * Major milestones

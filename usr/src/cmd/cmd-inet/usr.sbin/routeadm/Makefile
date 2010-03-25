@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -34,17 +34,17 @@ include ../../../Makefile.cmd
 
 #
 # We cannot use the usual manifest rules here since we deliver
-# manifests to two different locations, /var/svc/manifest/network/forwarding.xml
-# and /var/svc/manifest/network/routing/legacy-routing.xml
+# manifests to two different locations, /lib/svc/manifest/network/forwarding.xml
+# and /lib/svc/manifest/network/routing/legacy-routing.xml
 #
 
 ROOTSVCMANIFESTDIR=	$(ROOTSVCNETWORK) $(ROOTSVCNETWORKROUTING)
-ROOTSVCMANIFEST=	$(ROOTSVCNETWORKROUTING)/legacy-routing.xml \
+ROOTSVCMANIFESTS=	$(ROOTSVCNETWORKROUTING)/legacy-routing.xml \
 			$(ROOTSVCNETWORK)/forwarding.xml
 
 include ../../Makefile.cmd-inet
 
-$(ROOTSVCMANIFEST)	:=	FILEMODE= 444
+$(ROOTSVCMANIFESTS)	:=	FILEMODE= 444
 
 ROOTUSRSBINLINKS=	$(PROG:%=$(ROOTUSRSBIN)/%)
 
@@ -59,7 +59,7 @@ ROOTSBINPROG=		$(ROOTFS_PROG:%=$(ROOTSBIN)/%)
 
 all: $(PROG)
 
-install: all $(ROOTSBINPROG) $(ROOTUSRSBINLINKS) $(ROOTSVCMANIFEST) \
+install: all $(ROOTSBINPROG) $(ROOTUSRSBINLINKS) $(ROOTSVCMANIFESTS) \
 	$(ROOTSVCMETHOD)
 
 $(ROOTUSRSBINLINKS):
@@ -71,7 +71,7 @@ clean:
 
 lint: lint_PROG
 
-$(ROOTSVCMANIFEST): $(ROOTSVCMANIFESTDIR)
+$(ROOTSVCMANIFESTS): $(ROOTSVCMANIFESTDIR)
 
 $(ROOTSVCMANIFESTDIR):
 	$(INS.dir)

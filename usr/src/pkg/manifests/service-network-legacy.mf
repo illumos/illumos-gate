@@ -32,23 +32,23 @@ set name=pkg.summary \
 set name=info.classification value=org.opensolaris.category.2008:System/Services
 set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib
+dir path=lib/svc
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/inet
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 file path=usr/lib/inet/in.chargend mode=0555
 file path=usr/lib/inet/in.daytimed mode=0555
 file path=usr/lib/inet/in.discardd mode=0555
 file path=usr/lib/inet/in.echod mode=0555
 file path=usr/lib/inet/in.timed mode=0555
-file path=var/svc/manifest/network/chargen.xml group=sys mode=0444
-file path=var/svc/manifest/network/daytime.xml group=sys mode=0444
-file path=var/svc/manifest/network/discard.xml group=sys mode=0444
-file path=var/svc/manifest/network/echo.xml group=sys mode=0444
-file path=var/svc/manifest/network/time.xml group=sys mode=0444
+file path=lib/svc/manifest/network/chargen.xml group=sys mode=0444
+file path=lib/svc/manifest/network/daytime.xml group=sys mode=0444
+file path=lib/svc/manifest/network/discard.xml group=sys mode=0444
+file path=lib/svc/manifest/network/echo.xml group=sys mode=0444
+file path=lib/svc/manifest/network/time.xml group=sys mode=0444
 legacy pkg=SUNWcnsr arch=$(ARCH) category=system \
     desc="Common Network Services (Root): time, daytime, echo, discard, chargen" \
     hotline="Please contact your local service provider" \

@@ -76,14 +76,11 @@ dir path=usr/share group=sys
 dir path=usr/share/lib group=sys
 dir path=usr/share/lib/xml group=sys
 dir path=usr/share/lib/xml/dtd group=sys
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/network group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/network group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=etc/dbus-1/system.d/hal.conf opensolaris.zone=global \
     variant.opensolaris.zone=global
@@ -183,9 +180,9 @@ file path=usr/sbin/hal-get-property mode=0555
 file path=usr/sbin/hal-set-property mode=0555
 file path=usr/sbin/lshal mode=0555
 file path=usr/share/lib/xml/dtd/fdi.dtd.1
-file path=var/svc/manifest/network/network-discovery.xml group=sys mode=0444 \
+file path=lib/svc/manifest/network/network-discovery.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/system/hal.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/hal.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWhal arch=$(ARCH) category=system \
     desc="Hardware Abstraction Layer, HAL (freedesktop.org)" \

@@ -36,6 +36,7 @@ dir path=etc/inet group=sys
 dir path=etc/init.d group=sys
 dir path=lib
 dir path=lib/svc
+dir path=lib/svc/manifest group=sys
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/include
@@ -45,10 +46,7 @@ dir path=usr/lib/inet
 dir path=usr/share group=sys
 dir path=usr/share/lib group=sys
 dir path=usr/share/lib/slp
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network group=sys
 file path=etc/inet/slp.conf.example group=sys
 file path=etc/init.d/slpd group=sys mode=0744
 file path=lib/svc/method/slp mode=0555
@@ -61,7 +59,7 @@ file path=usr/lib/llib-lslp
 file path=usr/lib/llib-lslp.ln
 file path=usr/share/lib/slp/slp.jar group=sys
 file path=usr/share/lib/slp/slpd.jar group=sys mode=0600
-file path=var/svc/manifest/network/slp.xml group=sys mode=0444
+file path=lib/svc/manifest/network/slp.xml group=sys mode=0444
 legacy pkg=SUNWslpr arch=$(ARCH) category=system \
     desc="Root filesystem portion of the Service Location Protocol (SLP) framework. Includes the SLP configuration file and start scripts for the SLP daemon." \
     hotline="Please contact your local service provider" name="SLP, (Root)" \

@@ -44,6 +44,7 @@ dir path=etc/mail/cf/ostype group=mail
 dir path=etc/mail/cf/sh group=mail
 dir path=lib
 dir path=lib/svc
+dir path=lib/svc/manifest group=sys
 dir path=lib/svc/method
 dir path=lib/svc/share
 dir path=usr group=sys
@@ -62,9 +63,7 @@ dir path=var/adm/sm.bin group=sys
 dir path=var/spool
 dir path=var/spool/clientmqueue group=smmsp mode=0770 owner=smmsp
 dir path=var/spool/mqueue mode=0750
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network group=sys
 file path=etc/init.d/sendmail group=sys mode=0744 \
     original_name=SUNWsndm:etc/init.d/sendmail preserve=true
 file path=etc/mail/aliases original_name=SUNWsndm:etc/mail/aliases preserve=true
@@ -181,8 +180,8 @@ file path=usr/sbin/check-permissions group=mail mode=0555
 file path=usr/sbin/editmap mode=0555
 file path=usr/sbin/etrn mode=0555
 file path=usr/sbin/makemap mode=0555
-file path=var/svc/manifest/network/sendmail-client.xml group=sys mode=0444
-file path=var/svc/manifest/network/smtp-sendmail.xml group=sys mode=0444
+file path=lib/svc/manifest/network/sendmail-client.xml group=sys mode=0444
+file path=lib/svc/manifest/network/smtp-sendmail.xml group=sys mode=0444
 legacy pkg=SUNWsndmr arch=$(ARCH) category=system \
     desc="Sendmail Configuration Files" \
     hotline="Please contact your local service provider" name="Sendmail (root)" \

@@ -63,10 +63,8 @@ dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/system group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 driver name=ncall devlink=type=ddi_pseudo;name=ncall\t\D perms="* 0666 root sys" \
     privs=sys_config privs=sys_devices
 driver name=nsctl devlink=type=ddi_pseudo;name=nsctl\t\D perms="* 0666 root sys" \
@@ -112,7 +110,7 @@ file path=usr/lib/mdb/kvm/$(ARCH64)/nsctl.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/sdbc.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/nsctl.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/sdbc.so group=sys mode=0555
-file path=var/svc/manifest/system/nws_scm.xml group=sys mode=0444
+file path=lib/svc/manifest/system/nws_scm.xml group=sys mode=0444
 hardlink path=lib/svc/method/svc-scm target=../../../etc/init.d/scm
 hardlink path=usr/cluster/sbin/dscfg_reconfigure \
     target=../../bin/dscfg_reconfigure.cluster

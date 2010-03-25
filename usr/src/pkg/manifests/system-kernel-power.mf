@@ -45,12 +45,9 @@ dir path=usr/kernel/drv/$(ARCH64) group=sys
 dir path=usr/lib
 dir path=usr/lib/power group=sys
 dir path=usr/sbin
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 driver name=pm perms="* 0666 root sys"
 file path=etc/default/power group=sys opensolaris.zone=global \
@@ -67,7 +64,7 @@ file path=usr/kernel/drv/pm.conf group=sys
 file path=usr/lib/power/powerd mode=0555
 file path=usr/sbin/pmconfig mode=4555
 file path=usr/sbin/sysidpm group=sys mode=0755
-file path=var/svc/manifest/system/power.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/power.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWpmr arch=$(ARCH) category=system \
     desc="Power Management config file and rc script" \

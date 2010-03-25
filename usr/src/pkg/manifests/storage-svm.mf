@@ -60,16 +60,13 @@ dir path=usr/lib/lvm
 dir path=usr/sbin
 dir path=usr/snadm
 dir path=usr/snadm/lib
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/network group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/network group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/network/rpc group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/network/rpc group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 driver name=md policy="admin write_priv_set=sys_config" perms="* 0640 root sys" \
     perms="admin 0644 root sys"
@@ -175,19 +172,19 @@ file path=usr/sbin/rpc.metad mode=0555
 file path=usr/sbin/rpc.metamedd mode=0555
 file path=usr/sbin/rpc.metamhd mode=0555
 file path=usr/snadm/lib/libsvm.so.1
-file path=var/svc/manifest/network/rpc/mdcomm.xml group=sys mode=0444 \
+file path=lib/svc/manifest/network/rpc/mdcomm.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/network/rpc/meta.xml group=sys mode=0444 \
+file path=lib/svc/manifest/network/rpc/meta.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/network/rpc/metamed.xml group=sys mode=0444 \
+file path=lib/svc/manifest/network/rpc/metamed.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/network/rpc/metamh.xml group=sys mode=0444 \
+file path=lib/svc/manifest/network/rpc/metamh.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/system/mdmonitor.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/mdmonitor.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/system/metainit.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/metainit.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/system/metasync.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/metasync.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWmdr arch=$(ARCH) category=system \
     desc="Solaris Volume Manager driver" \

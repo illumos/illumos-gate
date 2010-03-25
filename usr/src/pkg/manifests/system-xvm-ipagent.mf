@@ -44,13 +44,11 @@ dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/xen
 dir path=usr/lib/xen/bin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/system group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 file path=lib/svc/method/svc-ipagent mode=0555
 file path=usr/lib/xen/bin/ipagent mode=0555
-file path=var/svc/manifest/system/ipagent.xml group=sys mode=0444
+file path=lib/svc/manifest/system/ipagent.xml group=sys mode=0444
 legacy pkg=SUNWxvmipar arch=$(ARCH) category=system \
     desc="xVM PV IP address agent" \
     hotline="Please contact your local service provider" \

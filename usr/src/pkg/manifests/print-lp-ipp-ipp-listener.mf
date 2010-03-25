@@ -33,21 +33,22 @@ set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/apache
+dir path=lib
+dir path=lib/svc
 dir path=usr group=sys
 dir path=usr/apache
 dir path=usr/apache/libexec
 dir path=var group=sys
 dir path=var/lp group=lp mode=0775 owner=lp
 dir path=var/lp/ipp-listener
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/application group=sys
-dir path=var/svc/manifest/application/print group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/application group=sys
+dir path=lib/svc/manifest/application/print group=sys
 file path=etc/apache/httpd-standalone-ipp.conf \
     original_name=SUNWippl:etc/apache/httpd-standalone-ipp.conf preserve=true
 file path=usr/apache/libexec/mod_ipp.so mode=0555
 file path=var/lp/ipp-listener/index.html mode=0444
-file path=var/svc/manifest/application/print/ipp-listener.xml group=sys \
+file path=lib/svc/manifest/application/print/ipp-listener.xml group=sys \
     mode=0444
 legacy pkg=SUNWipplr arch=$(ARCH) category=system \
     desc="Internet Printing Protocol(IPP) Apache configuration for service module" \

@@ -48,14 +48,11 @@ dir path=usr group=sys
 dir path=usr/platform group=sys
 dir path=usr/platform/sun4u group=sys
 dir path=usr/platform/sun4u/lib
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/platform group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/platform group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/platform/sun4u group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/platform/sun4u group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 driver name=sckmdrv perms="* 0600 root sys"
 file path=lib/svc/method/svc-sckmd mode=0555 opensolaris.zone=global \
@@ -65,7 +62,7 @@ file path=platform/SUNW,Sun-Fire-15000/kernel/drv/$(ARCH64)/sckmdrv group=sys \
 file path=platform/SUNW,Sun-Fire-15000/kernel/drv/sckmdrv.conf group=sys \
     opensolaris.zone=global reboot-needed=false variant.opensolaris.zone=global
 file path=usr/platform/sun4u/lib/sckmd group=sys mode=0755
-file path=var/svc/manifest/platform/sun4u/sckmd.xml group=sys mode=0444 \
+file path=lib/svc/manifest/platform/sun4u/sckmd.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWsckm.u arch=$(ARCH).sun4u category=system \
     desc="Key Management Modules for Sun Fire 15000" \

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -292,6 +292,7 @@ int scf_set_count_property(scf_transaction_t *, char *, uint64_t, boolean_t);
 #define	REPOSITORY_DB		"/etc/svc/repository.db"
 #define	NONPERSIST_DB		"/etc/svc/volatile/svc_nonpersist.db"
 #define	FAST_REPOSITORY_DB	"/etc/svc/volatile/fast_repository.db"
+#define	REPOSITORY_CHECKPOINT	"/etc/svc/volatile/checkpoint_repository.db"
 
 
 typedef struct scf_walkinfo {

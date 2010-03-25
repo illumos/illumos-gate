@@ -25,5 +25,6 @@
 #
 
 <transform file path=var/svc/manifest/.*\.xml -> add restart_fmri svc:/system/manifest-import:default>
+<transform file path=lib/svc/manifest/.*\.xml -> add restart_fmri svc:/system/manifest-import:default>
 <transform file path=etc/security/[^/]+_attr.d/.+ -> add restart_fmri svc:/system/rbac:default>
 <transform file path=etc/user_attr.d/.+ -> add restart_fmri svc:/system/rbac:default>

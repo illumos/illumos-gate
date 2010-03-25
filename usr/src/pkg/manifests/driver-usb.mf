@@ -51,10 +51,8 @@ dir path=lib
 dir path=lib/svc
 dir path=lib/svc/method
 dir path=sbin group=sys
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/system group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 driver name=ehci alias=pciclass,0c0320 perms="* 0644 root sys"
 driver name=hid alias=usbif,class3 perms="* 0600 root sys"
 driver name=hubd alias=usbif,class9 perms="* 0644 root sys"
@@ -137,7 +135,7 @@ $(i386_ONLY)file path=kernel/strmod/usbwcm group=sys mode=0755 \
     reboot-needed=true
 file path=lib/svc/method/svc-wusb mode=0555
 file path=sbin/wusbadm mode=0555
-file path=var/svc/manifest/system/wusb.xml group=sys mode=0444
+file path=lib/svc/manifest/system/wusb.xml group=sys mode=0444
 legacy pkg=SUNWusb arch=$(ARCH) category=system \
     desc="USBA (USB framework) and USB Device Drivers" \
     hotline="Please contact your local service provider" \

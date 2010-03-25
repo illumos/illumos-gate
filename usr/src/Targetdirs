@@ -150,6 +150,7 @@ DIRS= \
 	/etc/sasl	\
 	/etc/sfw \
 	/etc/svc \
+	/etc/svc/profile \
 	/etc/svc/volatile \
 	/etc/tm  \
 	/etc/usb   \
@@ -165,6 +166,32 @@ DIRS= \
 	/lib/svc \
 	/lib/svc/bin \
 	/lib/svc/capture \
+	/lib/svc/manifest \
+	/lib/svc/manifest/milestone \
+	/lib/svc/manifest/device \
+	/lib/svc/manifest/system \
+	/lib/svc/manifest/system/device \
+	/lib/svc/manifest/system/filesystem \
+	/lib/svc/manifest/system/security \
+	/lib/svc/manifest/system/svc \
+	/lib/svc/manifest/network \
+	/lib/svc/manifest/network/dns \
+  	/lib/svc/manifest/network/ipsec \
+	/lib/svc/manifest/network/ldap \
+	/lib/svc/manifest/network/nfs \
+	/lib/svc/manifest/network/nis \
+	/lib/svc/manifest/network/rpc \
+	/lib/svc/manifest/network/security \
+	/lib/svc/manifest/network/shares \
+	/lib/svc/manifest/network/ssl \
+	/lib/svc/manifest/application \
+	/lib/svc/manifest/application/management \
+	/lib/svc/manifest/application/security \
+	/lib/svc/manifest/application/print \
+	/lib/svc/manifest/platform \
+	/lib/svc/manifest/platform/sun4u \
+	/lib/svc/manifest/platform/sun4v \
+	/lib/svc/manifest/site \
 	/lib/svc/method \
 	/lib/svc/monitor \
 	/lib/svc/seed \
@@ -372,18 +399,19 @@ DIRS= \
 	/var/svc/manifest/system/svc \
 	/var/svc/manifest/network \
 	/var/svc/manifest/network/dns \
-	/var/svc/manifest/network/ipsec \
+  	/var/svc/manifest/network/ipsec \
 	/var/svc/manifest/network/ldap \
 	/var/svc/manifest/network/nfs \
 	/var/svc/manifest/network/nis \
 	/var/svc/manifest/network/rpc \
+	/var/svc/manifest/network/routing \
 	/var/svc/manifest/network/security \
 	/var/svc/manifest/network/shares \
 	/var/svc/manifest/network/ssl \
 	/var/svc/manifest/application \
 	/var/svc/manifest/application/management \
-	/var/svc/manifest/application/security \
 	/var/svc/manifest/application/print \
+	/var/svc/manifest/application/security \
 	/var/svc/manifest/platform \
 	/var/svc/manifest/platform/sun4u \
 	/var/svc/manifest/platform/sun4v \

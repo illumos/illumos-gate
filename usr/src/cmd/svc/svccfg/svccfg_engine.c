@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <libintl.h>
 #include <libtecla.h>
 #include <md5.h>
@@ -41,6 +42,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "manifest_find.h"
 #include "manifest_hash.h"
 #include "svccfg.h"
 
@@ -196,6 +198,7 @@ static struct cmd_info {
 } cmds[] = {
 	{ "validate", CS_GLOBAL, complete_single_xml_file_arg },
 	{ "import", CS_GLOBAL, complete_single_xml_file_arg },
+	{ "cleanup", CS_GLOBAL, NULL},
 	{ "export", CS_GLOBAL, NULL },
 	{ "archive", CS_GLOBAL, NULL },
 	{ "apply", CS_GLOBAL, complete_single_xml_file_arg },
@@ -501,87 +504,30 @@ engine_init()
 
 	cp = getenv("SVCCFG_CONFIGD_PATH");
 	est->sc_repo_server = cp ? cp : "/lib/svc/bin/svc.configd";
+
+	est->sc_in_emi = 0;
+	cp = getenv("SMF_FMRI");
+	if ((cp != NULL) && (strcmp(cp, SCF_INSTANCE_EMI) == 0))
+		est->sc_in_emi = 1;
+
+	cp = smf_get_state(SCF_INSTANCE_FS_MINIMAL);
+	if (cp && (strcmp(cp, SCF_STATE_STRING_ONLINE) == 0))
+		est->sc_fs_minimal = B_TRUE;
+	free((void *) cp);
 }
 
-int
-engine_import(uu_list_t *args)
+static int
+import_manifest_file(manifest_info_t *info, boolean_t validate, FILE *pout,
+    uint_t flags)
 {
-	int ret, argc, i, o;
 	bundle_t *b;
-	char *file, *pname;
-	uchar_t hash[MHASH_SIZE];
-	char **argv;
-	string_list_t *slp;
-	boolean_t validate = B_FALSE;
-	tmpl_validate_status_t vr;
-	uint_t flags = SCI_GENERALLAST;
 	tmpl_errors_t *errs;
+	const char *file;
+	tmpl_validate_status_t vr;
 
-	argc = uu_list_numnodes(args);
-	if (argc < 1)
-		return (-2);
+	file = info->mi_path;
 
-	argv = calloc(argc + 1, sizeof (char *));
-	if (argv == NULL)
-		uu_die(gettext("Out of memory.\n"));
-
-	for (slp = uu_list_first(args), i = 0;
-	    slp != NULL;
-	    slp = uu_list_next(args, slp), ++i)
-		argv[i] = slp->str;
-
-	argv[i] = NULL;
-
-	opterr = 0;
-	optind = 0;				/* Remember, no argv[0]. */
-	for (;;) {
-		o = getopt(argc, argv, "nV");
-		if (o == -1)
-			break;
-
-		switch (o) {
-		case 'n':
-			flags |= SCI_NOREFRESH;
-			break;
-
-		case 'V':
-			validate = B_TRUE;
-			break;
-
-		case '?':
-			free(argv);
-			return (-2);
-
-		default:
-			bad_error("getopt", o);
-		}
-	}
-
-	argc -= optind;
-	if (argc != 1) {
-		free(argv);
-		return (-2);
-	}
-
-	file = argv[optind];
-	free(argv);
-
-	/* If we're in interactive mode, force strict validation. */
-	if (est->sc_cmd_flags & SC_CMD_IACTIVE)
-		validate = B_TRUE;
-
-	lscf_prep_hndl();
-
-	ret = mhash_test_file(g_hndl, file, 0, &pname, hash);
-	if (ret != MHASH_NEWFILE) {
-		if (ret == MHASH_FAILURE)
-			semerr(gettext("Could not hash file %s\n"), file);
-		else if (g_verbose && ret == MHASH_RECONCILED)
-			warn(gettext("No changes were necessary.\n"));
-		return (ret);
-	}
-
-	/* Load */
+	/* Load the manifest */
 	b = internal_bundle_new();
 
 	if (lxml_get_bundle_file(b, file, SVCCFG_OP_IMPORT) != 0) {
@@ -601,7 +547,13 @@ engine_import(uu_list_t *args)
 		tmpl_errors_print(stderr, errs, prefix);
 		if (validate && (vr != TVS_WARN)) {
 			tmpl_errors_destroy(errs);
-			semerr(gettext("Import failed.\n"));
+			semerr(gettext("Import of %s failed.\n"),
+			    info->mi_path);
+			if (pout != NULL) {
+				(void) fprintf(pout, gettext("WARNING: svccfg "
+				    "import of %s failed.\n"), info->mi_path);
+			}
+
 			return (-1);
 		}
 	}
@@ -610,30 +562,294 @@ engine_import(uu_list_t *args)
 	/* Import */
 	if (lscf_bundle_import(b, file, flags) != 0) {
 		internal_bundle_free(b);
-		semerr(gettext("Import failed.\n"));
+		semerr(gettext("Import of %s failed.\n"), info->mi_path);
+		if (pout != NULL) {
+			(void) fprintf(pout, gettext("WARNING: svccfg import "
+			    "of %s failed.\n"), info->mi_path);
+		}
 		return (-1);
 	}
 
 	internal_bundle_free(b);
 
-	if (g_verbose)
-		warn(gettext("Successful import.\n"));
-
-	if (pname) {
+	if (info->mi_prop) {
 		char *errstr;
 
-		if (mhash_store_entry(g_hndl, pname, file, hash, &errstr)) {
+		if (mhash_store_entry(g_hndl, info->mi_prop, file,
+		    info->mi_hash, APPLY_NONE, &errstr)) {
 			if (errstr)
-				semerr(errstr);
+				semerr(gettext("Could not store hash for %s. "
+				    "%s\n"), info->mi_path, errstr);
 			else
 				semerr(gettext("Unknown error from "
-				    "mhash_store_entry()\n"));
+				    "mhash_store_entry() for %s\n"),
+				    info->mi_path);
 		}
 
-		free(pname);
 	}
 
 	return (0);
+}
+
+/*
+ * Return values:
+ *	1	No manifests need to be imported.
+ *	0	Success
+ *	-1	Error
+ *	-2	Syntax error
+ */
+int
+engine_import(uu_list_t *args)
+{
+	int argc, i, o;
+	int dont_exit;
+	int failed_manifests;
+	int total_manifests;
+	char *file;
+	char **argv = NULL;
+	string_list_t *slp;
+	boolean_t validate = B_FALSE;
+	uint_t flags = SCI_GENERALLAST;
+	int dirarg = 0;
+	int isdir;
+	int rc = -1;
+	struct stat sb;
+	char **paths;
+	manifest_info_t ***manifest_sets = NULL;
+	manifest_info_t **manifests;
+	char *progress_file = NULL;
+	FILE *progress_out = NULL;
+	int progress_count;
+	int back_count;
+	int count;
+	int fm_flags;
+
+	argc = uu_list_numnodes(args);
+	if (argc < 1)
+		return (-2);
+
+	argv = calloc(argc + 1, sizeof (char *));
+	if (argv == NULL)
+		uu_die(gettext("Out of memory.\n"));
+
+	for (slp = uu_list_first(args), i = 0;
+	    slp != NULL;
+	    slp = uu_list_next(args, slp), ++i)
+		argv[i] = slp->str;
+
+	argv[i] = NULL;
+
+	opterr = 0;
+	optind = 0;				/* Remember, no argv[0]. */
+	for (;;) {
+		o = getopt(argc, argv, "np:V");
+		if (o == -1)
+			break;
+
+		switch (o) {
+		case 'n':
+			flags |= SCI_NOREFRESH;
+			break;
+
+		case 'p':
+			progress_file = optarg;
+			break;
+
+		case 'V':
+			validate = B_TRUE;
+			break;
+
+		case '?':
+			free(argv);
+			return (-2);
+
+		default:
+			bad_error("getopt", o);
+		}
+	}
+
+	argc -= optind;
+	if (argc < 1) {
+		free(argv);
+		return (-2);
+	}
+
+	/* Open device for progress messages */
+	if (progress_file != NULL) {
+		if (strcmp(progress_file, "-") == 0) {
+			progress_out = stdout;
+		} else {
+			progress_out = fopen(progress_file, "w");
+			if (progress_out == NULL) {
+				semerr(gettext("Unable to open %s for "
+				    "progress reporting.  %s\n"),
+				    progress_file, strerror(errno));
+				goto out;
+			}
+			setbuf(progress_out, NULL);
+		}
+	}
+
+	paths = argv+optind;
+	manifest_sets = safe_malloc(argc * sizeof (*manifest_sets));
+
+	/* If we're in interactive mode, force strict validation. */
+	if (est->sc_cmd_flags & SC_CMD_IACTIVE)
+		validate = B_TRUE;
+
+	lscf_prep_hndl();
+
+	/* Determine which manifests must be imported. */
+
+	total_manifests = 0;
+	for (i = 0; i < argc; i++) {
+		file = *(paths + i);
+		fm_flags = CHECKHASH;
+
+		/* Determine if argument is a directory or file. */
+		if (stat(file, &sb) == -1) {
+			semerr(gettext("Unable to stat file %s.  %s\n"), file,
+			    strerror(errno));
+			goto out;
+		}
+		if (sb.st_mode & S_IFDIR) {
+			fm_flags |= CHECKEXT;
+			dirarg = 1;
+			isdir = 1;
+		} else if (sb.st_mode & S_IFREG) {
+			isdir = 0;
+		} else {
+			semerr(gettext("%s is not a directory or regular "
+			    "file\n"), file);
+			goto out;
+		}
+
+		/* Get list of manifests that we should import for this path. */
+		if ((count = find_manifests(file, &manifests, fm_flags)) < 0) {
+			if (isdir) {
+				semerr(gettext("Could not hash directory %s\n"),
+				    file);
+			} else {
+				semerr(gettext("Could not hash file %s\n"),
+				    file);
+			}
+			free_manifest_array(manifests);
+			goto out;
+		}
+		total_manifests += count;
+		manifest_sets[i] = manifests;
+	}
+
+	if (total_manifests == 0) {
+		/* No manifests to process. */
+		if (g_verbose) {
+			warn(gettext("No changes were necessary\n"));
+		}
+		rc = 1;
+		goto out;
+	}
+
+	/*
+	 * If we're processing more than one file, we don't want to exit if
+	 * we encounter an error.  We should go ahead and process all of
+	 * the manifests.
+	 */
+	dont_exit = est->sc_cmd_flags & SC_CMD_DONT_EXIT;
+	if (total_manifests > 1)
+		est->sc_cmd_flags |= SC_CMD_DONT_EXIT;
+
+	if (progress_out != NULL)
+		(void) fprintf(progress_out,
+		    "Loading smf(5) service descriptions: ");
+
+	failed_manifests = 0;
+	progress_count = 0;
+	for (i = 0; i < argc; i++) {
+		manifests = manifest_sets[i];
+		if (manifests == NULL)
+			continue;
+		for (; *manifests != NULL; manifests++) {
+			progress_count++;
+			if (progress_out != NULL) {
+				back_count = fprintf(progress_out, "%d/%d",
+				    progress_count, total_manifests);
+				while (back_count-- > 0) {
+					(void) fputc('\b', progress_out);
+				}
+			}
+			if (import_manifest_file(*manifests, validate,
+			    progress_out, flags) != 0) {
+				failed_manifests++;
+			}
+		}
+	}
+	if (progress_out != NULL)
+		(void) fputc('\n', progress_out);
+
+	if ((total_manifests > 1) && (dont_exit == 0))
+		est->sc_cmd_flags &= ~SC_CMD_DONT_EXIT;
+
+	if (dirarg && total_manifests > 0) {
+		char *msg;
+
+		msg = "Loaded %d smf(5) service descriptions\n";
+		warn(gettext(msg), progress_count);
+
+		if (failed_manifests) {
+			msg = "%d smf(5) service descriptions failed to load\n";
+			warn(gettext(msg), failed_manifests);
+		}
+	}
+
+	if (failed_manifests > 0)
+		goto out;
+
+	if (g_verbose)
+		warn(gettext("Successful import.\n"));
+	rc = 0;
+
+out:
+	if ((progress_out != NULL) && (progress_out != stdout))
+		(void) fclose(progress_out);
+	free(argv);
+	if (manifest_sets != NULL) {
+		for (i = 0; i < argc; i++) {
+			free_manifest_array(manifest_sets[i]);
+		}
+		free(manifest_sets);
+	}
+	return (rc);
+}
+
+/*
+ * Walk each service and get its manifest file.
+ *
+ * If the file exists check instance support, and cleanup any
+ * stale instances.
+ *
+ * If the file doesn't exist tear down the service and/or instances
+ * that are no longer supported by files.
+ */
+int
+engine_cleanup(int flags)
+{
+	boolean_t		activity = B_TRUE;
+	int			r = -1;
+
+	lscf_prep_hndl();
+
+	if (flags == 1) {
+		activity = B_FALSE;
+	}
+
+	if (scf_walk_fmri(g_hndl, 0, NULL, SCF_WALK_SERVICE|SCF_WALK_NOINSTANCE,
+	    lscf_service_cleanup, (void *)activity, NULL,
+	    uu_warn) == SCF_SUCCESS)
+		r = 0;
+
+	(void) lscf_hash_cleanup();
+
+	return (r);
 }
 
 int
@@ -670,9 +886,14 @@ engine_apply(const char *file, int apply_changes)
 	internal_bundle_free(b);
 
 	if (pname) {
+		apply_action_t apply;
 		char *errstr;
-		if (mhash_store_entry(g_hndl, pname, file, hash, &errstr))
+
+		apply = (est->sc_in_emi == 1) ? APPLY_LATE : APPLY_NONE;
+		if (mhash_store_entry(g_hndl, pname, file, hash, apply,
+		    &errstr)) {
 			semerr(errstr);
+		}
 
 		free(pname);
 	}

@@ -237,8 +237,7 @@ static const char * const up_svcs[] = {
 static graph_vertex_t *up_svcs_p[] = { NULL, NULL, NULL, NULL };
 
 /* These are for seed repository magic.  See can_come_up(). */
-static const char * const manifest_import =
-	"svc:/system/manifest-import:default";
+static const char * const manifest_import = SCF_INSTANCE_MI;
 static graph_vertex_t *manifest_import_p = NULL;
 
 

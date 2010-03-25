@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,9 +33,12 @@ struct help_message help_messages[] = {
 "Validate a manifest file without changing the repository.\n"
 "Validate an instance FMRI against the template specifications."
 	},
-	{ SCC_IMPORT, "import [-V] file\n\n"
-"Import a manifest into the repository.  With -V force strict adherence\n"
-"to the template specifications."
+	{ SCC_IMPORT, "import [-p outfile] [-V] paths...\n\n"
+"Import manifests into the repository.  paths can be one or more\n"
+"manifest files or directories.  If directories are specified, they\n"
+"will be searched for files with a .xml extension.  If -p is specified,\n"
+"a progress message will be written to outfile as each manifest is\n"
+"imported.  With -V force strict adherence to the template specifications."
 	},
 	{ SCC_EXPORT, "export [-a] {service | pattern} [> file]\n\n"
 "Print a manifest for service to file, or standard output if not specified."
@@ -86,6 +89,10 @@ struct help_message help_messages[] = {
 	{ SCC_DELHASH, "delhash [-d] manifest\n\n"
 "Delete the named manifest hash entry (from smf/manifest).\n"
 "With -d, manifest file doesn't need to exist."
+	},
+	{ SCC_CLEANUP, "cleanup\n\n"
+"Cleanup any service or instances that no longer have manifest files that\n"
+"support the services or instances in /lib/svc/manifest or /var/svc/manifest."
 	},
 	{ SCC_LISTPROP, "listprop [glob_pattern]\n\n"
 "List property groups and properties of the currently selected entity."

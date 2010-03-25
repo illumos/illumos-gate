@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -100,7 +100,7 @@ DSCFGLOCKDCF="/etc/dscfg_lockdb"
 DSCFG_DEPEND_NOCHK="/tmp/.dscfgadm_pid"
 
 # SMF defines
-MANIFEST_PATH=/var/svc/manifest/system
+MANIFEST_PATH=/lib/svc/manifest/system
 
 # SMF services (enable and disable)
 SMF_ENABLE="nws_scm nws_sv nws_ii nws_rdc nws_rdcsyncd"

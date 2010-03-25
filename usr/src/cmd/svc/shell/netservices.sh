@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -261,8 +261,8 @@ case $1 in
 		;;
 esac
 
-if [ ! -f /var/svc/profile/$profile ]; then
-	echo "/var/svc/profile/$profile nonexistent. Exiting."
+if [ ! -f /etc/svc/profile/$profile ]; then
+	echo "/etc/svc/profile/$profile nonexistent. Exiting."
 	exit 1
 fi
 
@@ -283,18 +283,19 @@ set_printing $keyword
 #
 # put the new profile into place, and apply it
 #
-ln -sf ./$profile /var/svc/profile/generic.xml
-svccfg apply /var/svc/profile/generic.xml
-
-#
 # Create a hash entry so that manifest_import is aware of the
 # profile being applied and does not reapply the profile on reboot.
 #
-SVCCFG_CHECKHASH="TRUE" /lib/svc/bin/prophist hash /var/svc/profile/generic.xml
+ln -sf ./$profile /etc/svc/profile/generic.xml
+svccfg delhash /etc/svc/profile/generic.xml > /dev/null 2>&1
+SVCCFG_CHECKHASH="TRUE" svccfg apply /etc/svc/profile/generic.xml
+
+#
+# generic_open may not start inetd services on upgraded systems
+#
 if [ $profile = "generic_open.xml" ]
 then
-	# generic_open may not start inetd services on upgraded systems
-	svccfg apply /var/svc/profile/inetd_generic.xml
+	svccfg apply /etc/svc/profile/inetd_generic.xml
 fi
 
 #

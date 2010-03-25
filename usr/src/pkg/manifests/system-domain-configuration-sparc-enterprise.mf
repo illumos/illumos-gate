@@ -40,14 +40,11 @@ dir path=usr/platform group=sys
 dir path=usr/platform/SUNW,SPARC-Enterprise group=sys
 dir path=usr/platform/SUNW,SPARC-Enterprise/lib
 dir path=usr/platform/SUNW,SPARC-Enterprise/lib/$(ARCH64)
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/platform group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/platform group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/platform/sun4u group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/platform/sun4u group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=lib/svc/method/svc-dcs mode=0555 opensolaris.zone=global \
     variant.opensolaris.zone=global
@@ -55,9 +52,9 @@ file path=lib/svc/method/svc-oplhpd mode=0555 opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=usr/lib/dcs mode=0755
 file path=usr/platform/SUNW,SPARC-Enterprise/lib/$(ARCH64)/oplhpd mode=0755
-file path=var/svc/manifest/platform/sun4u/dcs.xml group=sys mode=0444 \
+file path=lib/svc/manifest/platform/sun4u/dcs.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/platform/sun4u/oplhpd.xml group=sys mode=0444 \
+file path=lib/svc/manifest/platform/sun4u/oplhpd.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWdcsr arch=$(ARCH) category=system \
     desc="Domain Configuration Server, (Root)" \

@@ -54,12 +54,9 @@ dir path=usr/share group=sys
 dir path=usr/share/lib group=sys
 dir path=usr/share/lib/xml group=sys
 dir path=usr/share/lib/xml/dtd group=sys
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 driver name=zcons
 file path=etc/zones/SUNWblank.xml mode=0444
@@ -89,9 +86,9 @@ file path=usr/sbin/zonecfg mode=0555
 file path=usr/share/lib/xml/dtd/brand.dtd.1 mode=0644
 file path=usr/share/lib/xml/dtd/zone_platform.dtd.1 mode=0644
 file path=usr/share/lib/xml/dtd/zonecfg.dtd.1
-file path=var/svc/manifest/system/resource-mgmt.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/resource-mgmt.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/system/zones.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/zones.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWzoner arch=$(ARCH) category=system \
     desc="Solaris Zones Configuration Files" \

@@ -101,6 +101,7 @@ extern "C" {
 #define	FAULT_THRESHOLD		3
 
 #define	MAX_CONFIGD_RETRIES	5
+#define	MAX_EMI_RETRIES		5
 #define	MAX_MOUNT_RETRIES	5
 #define	MAX_SULOGIN_RETRIES	5
 
@@ -127,6 +128,7 @@ extern "C" {
 #define	METHOD_START_COOKIE	0x20
 #define	METHOD_OTHER_COOKIE	0x21
 #define	MONITOR_COOKIE		0x30
+#define	EMI_COOKIE		0x31
 
 
 #define	ALLOC_RETRY		3
@@ -198,6 +200,7 @@ extern mode_t dmask;
 #define	LOG_SUFFIX		".log"
 
 #define	STARTD_DEFAULT_LOG	"svc.startd.log"
+#define	EMI_LOG ((const char *) "system-early-manifest-import:default.log")
 
 extern const char *log_directory;	/* Current log directory path */
 
@@ -595,6 +598,7 @@ void *fork_configd_thread(void *);
 
 pid_t startd_fork1(int *);
 void fork_with_timeout(const char *, uint_t, uint_t);
+void fork_emi();
 
 /* graph.c */
 void graph_init(void);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2945,6 +2945,64 @@ lxml_get_single_instance(entity_t *entity, xmlNodePtr si)
 }
 
 /*
+ * Check to see if the service should allow the upgrade
+ * process to handle adding of the manifestfiles linkage.
+ *
+ * If the service exists and does not have a manifestfiles
+ * property group then the upgrade process should handle
+ * the service.
+ *
+ * If the service doesn't exist or the service exists
+ * and has a manifestfiles property group then the import
+ * process can handle the manifestfiles property group
+ * work.
+ *
+ * This prevents potential cleanup of unaccounted for instances
+ * in early manifest import due to upgrade process needing
+ * information that has not yet been supplied by manifests
+ * that are still located in the /var/svc manifests directory.
+ */
+static int
+lxml_check_upgrade(const char *service) {
+	scf_handle_t	*h = NULL;
+	scf_scope_t	*sc = NULL;
+	scf_service_t	*svc = NULL;
+	scf_propertygroup_t	*pg = NULL;
+	int rc = SCF_FAILED;
+
+	if ((h = scf_handle_create(SCF_VERSION)) == NULL ||
+	    (sc = scf_scope_create(h)) == NULL ||
+	    (svc = scf_service_create(h)) == NULL ||
+	    (pg = scf_pg_create(h)) == NULL)
+		goto out;
+
+	if (scf_handle_bind(h) != 0)
+		goto out;
+
+	if (scf_handle_get_scope(h, SCF_FMRI_LOCAL_SCOPE, sc) == -1)
+		goto out;
+
+	if (scf_scope_get_service(sc, service, svc) != SCF_SUCCESS) {
+		if (scf_error() == SCF_ERROR_NOT_FOUND)
+			rc = SCF_SUCCESS;
+
+		goto out;
+	}
+
+	if (scf_service_get_pg(svc, SCF_PG_MANIFESTFILES, pg) != SCF_SUCCESS)
+		goto out;
+
+	rc = SCF_SUCCESS;
+out:
+	scf_pg_destroy(pg);
+	scf_service_destroy(svc);
+	scf_scope_destroy(sc);
+	scf_handle_destroy(h);
+
+	return (rc);
+}
+
+/*
  * Translate a service element into an internal instance/property tree, added
  * to bundle.  If op is SVCCFG_OP_APPLY, allow only instance subelements.
  */
@@ -2977,7 +3035,8 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 	 * Now that the service is created create the manifest
 	 * property group and add the property value of the service.
 	 */
-	if (svc->doc->name != NULL &&
+	if (lxml_check_upgrade(s->sc_name) == SCF_SUCCESS &&
+	    svc->doc->name != NULL &&
 	    bundle->sc_bundle_type == SVCCFG_MANIFEST) {
 		char *buf, *base, *fname;
 

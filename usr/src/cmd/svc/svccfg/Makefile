@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -36,17 +36,20 @@ SRCS  =		svccfg_main.c \
 		svccfg_help.c
 
 LNTS =		$(SRCS:%.c=%.ln) \
+		manifest_find.ln \
 		manifest_hash.ln
 
 MYOBJS =	$(SRCS:%.c=%.o) \
 		svccfg_grammar.o \
 		svccfg_lex.o \
-		manifest_hash.o
+		manifest_find.o \
+		manifest_hash.o 
 OBJS =		$(MYOBJS)
 
 POFILES = 	$(SRCS:%.c=%.po) \
 		svccfg_grammar.po \
 		svccfg_lex.po \
+		../common/manifest_find.po \
 		../common/manifest_hash.po
 
 include ../../Makefile.cmd

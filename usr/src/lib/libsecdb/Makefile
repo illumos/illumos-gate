@@ -55,7 +55,7 @@ ETCSECURITYDFILES =	$(ESDFILES:%=$(ROOTETCSECURITY)/%.d/SUNWcs)
 
 
 MFSTFILES =	rbac.xml
-MANIFESTDIR =	$(ROOT)/var/svc/manifest/system
+MANIFESTDIR =	$(ROOT)/lib/svc/manifest/system
 MANIFEST =	$(MFSTFILES:%=$(MANIFESTDIR)/%)
 $(MANIFEST) :=	FILEMODE = 0444
 

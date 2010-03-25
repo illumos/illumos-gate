@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@ uu_list_pool_t *string_pool;
 %start commands
 
 %token SCC_VALIDATE SCC_IMPORT SCC_EXPORT SCC_ARCHIVE SCC_APPLY SCC_EXTRACT
+%token SCC_CLEANUP
 %token SCC_REPOSITORY SCC_INVENTORY SCC_SET SCC_END SCC_HELP SCC_RESTORE
 %token SCC_LIST SCC_ADD SCC_DELETE SCC_SELECT SCC_UNSELECT
 %token SCC_LISTPG SCC_ADDPG SCC_DELPG SCC_DELHASH
@@ -74,6 +75,7 @@ commands : command
 command : terminator
 	| validate_cmd
 	| import_cmd
+	| cleanup_cmd
 	| export_cmd
 	| archive_cmd
 	| restore_cmd
@@ -156,6 +158,24 @@ import_cmd : SCC_IMPORT string_list terminator
 		uu_list_destroy($2);
 	}
 	| SCC_IMPORT error terminator	{ synerr(SCC_IMPORT); return(0); }
+
+cleanup_cmd : SCC_CLEANUP terminator	
+	{ 
+		engine_cleanup(0);
+	}
+	| SCC_CLEANUP SCV_WORD terminator
+	{
+		if (strcmp($2, "-a") == 0) {
+			engine_cleanup(1);
+			free($2);
+		} else {
+			synerr(SCC_CLEANUP);
+			free($2);
+			return (0);
+		}
+	}
+	| SCC_CLEANUP error terminator { synerr(SCC_CLEANUP); return(0); }
+
 
 export_cmd : SCC_EXPORT SCV_WORD terminator
 	{
@@ -566,6 +586,7 @@ opt_word :		{ $$ = NULL; }
 
 command_token : SCC_VALIDATE	{ $$ = SCC_VALIDATE; }
 	| SCC_IMPORT		{ $$ = SCC_IMPORT; }
+	| SCC_CLEANUP		{ $$ = SCC_CLEANUP; }
 	| SCC_EXPORT		{ $$ = SCC_EXPORT; }
 	| SCC_APPLY		{ $$ = SCC_APPLY; }
 	| SCC_EXTRACT		{ $$ = SCC_EXTRACT; }

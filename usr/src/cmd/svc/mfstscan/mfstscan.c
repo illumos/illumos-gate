@@ -19,29 +19,28 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 #include <sys/types.h>
 
-#include <ftw.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <libintl.h>
-#include <libscf.h>
 #include <libuutil.h>
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
+#include "manifest_find.h"
 #include "manifest_hash.h"
 
 #define	MAX_DEPTH	24
-
-static scf_handle_t *hndl;
-static int tflag;
 
 /*
  * mfstscan - service manifest change detection utility
@@ -59,32 +58,16 @@ usage()
 	exit(UU_EXIT_USAGE);
 }
 
-/*ARGSUSED*/
-static int
-process(const char *fn, const struct stat *sp, int ftw_type,
-    struct FTW *ftws)
-{
-	char *suffix_match;
-
-	if (ftw_type != FTW_F)
-		return (0);
-
-	suffix_match = strstr(fn, ".xml");
-	if (suffix_match == NULL || strcmp(suffix_match, ".xml") != 0)
-		return (0);
-
-	if (mhash_test_file(hndl, fn, 0, NULL, NULL) == MHASH_NEWFILE)
-		(void) printf("%s\n", fn);
-
-	return (0);
-}
-
 int
 main(int argc, char *argv[])
 {
+	manifest_info_t **entry;
+	manifest_info_t **manifests;
 	int i;
 	int paths_walked = 0;
 	struct stat sb;
+	int status;
+	int tflag = 0;
 
 	(void) uu_setpname(argv[0]);
 
@@ -103,12 +86,6 @@ main(int argc, char *argv[])
 
 	if (optind >= argc)
 		usage();
-
-	hndl = scf_handle_create(SCF_VERSION);
-
-	if (scf_handle_bind(hndl) != SCF_SUCCESS)
-		uu_die(gettext("cannot bind to repository: %s\n"),
-		    scf_strerror(scf_error()));
 
 	for (i = optind; i < argc; i++) {
 		if (tflag) {
@@ -129,15 +106,25 @@ main(int argc, char *argv[])
 			continue;
 		}
 
-		if (nftw(argv[i], process, MAX_DEPTH, FTW_MOUNT) == -1)
+		status = find_manifests(argv[i], &manifests,
+		    CHECKHASH|CHECKEXT);
+		if (status < 0) {
 			uu_warn(gettext("file tree walk of %s encountered "
-			    "error"), argv[i]);
-		else
+			    "error.  %s\n"), argv[i], strerror(errno));
+		} else {
 			paths_walked++;
-	}
+			if (manifests != NULL) {
+				for (entry = manifests;
+				    *entry != NULL;
+				    entry++) {
+					(void) printf("%s\n",
+					    (*entry)->mi_path);
+				}
+				free_manifest_array(manifests);
+			}
+		}
 
-	(void) scf_handle_unbind(hndl);
-	(void) scf_handle_destroy(hndl);
+	}
 
 	if (!paths_walked)
 		uu_die(gettext("no paths walked\n"));

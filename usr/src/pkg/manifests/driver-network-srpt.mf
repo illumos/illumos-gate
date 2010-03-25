@@ -48,14 +48,11 @@ dir path=usr/lib
 dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/system/ibsrp group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system/ibsrp group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 driver name=srpt perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/srpt group=sys opensolaris.zone=global \
@@ -72,7 +69,7 @@ file path=lib/svc/method/svc-srpt mode=0555 opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=usr/lib/mdb/kvm/$(ARCH64)/srpt.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/srpt.so group=sys mode=0555
-file path=var/svc/manifest/system/ibsrp/target.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/ibsrp/target.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWsrptr arch=$(ARCH) category=system \
     desc="Sun SRP COMSTAR Port Provider (Root)" \

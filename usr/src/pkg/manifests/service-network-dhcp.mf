@@ -34,6 +34,8 @@ set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/inet group=sys
 dir path=etc/init.d group=sys
+dir path=lib
+dir path=lib/svc
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib
@@ -43,10 +45,8 @@ dir path=usr/lib/inet/dhcp/nsu
 dir path=usr/lib/inet/dhcp/svc
 dir path=usr/lib/inet/dhcp/svcadm
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 file path=etc/init.d/dhcp group=sys mode=0744
 file path=usr/include/dhcp_svc_public.h
 file path=usr/lib/inet/dhcp/nsu/rfc2136.so.1
@@ -64,7 +64,7 @@ file path=usr/lib/libdhcpsvc.so.1
 file path=usr/sbin/dhcpconfig mode=0555
 file path=usr/sbin/dhtadm mode=0555
 file path=usr/sbin/pntadm mode=0555
-file path=var/svc/manifest/network/dhcp-server.xml group=sys mode=0444
+file path=lib/svc/manifest/network/dhcp-server.xml group=sys mode=0444
 legacy pkg=SUNWdhcsr arch=$(ARCH) category=system \
     desc="Root filesystem portion of the SunOS BOOTP/DHCP service, which uses the BOOT Protocol and/or Dynamic Host Configuration Protocol to provide network configuration parameters to BOOTP/DHCP clients. Administration utilities for the service are included." \
     hotline="Please contact your local service provider" \

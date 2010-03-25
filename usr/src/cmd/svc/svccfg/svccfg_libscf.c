@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,13 +45,18 @@
 #include <strings.h>
 #include <unistd.h>
 #include <wait.h>
+#include <poll.h>
 
 #include <libxml/tree.h>
 
 #include <sys/param.h>
 
+#include <sys/stat.h>
+#include <sys/mman.h>
+
 #include "svccfg.h"
 #include "manifest_hash.h"
+#include "manifest_find.h"
 
 /* The colon namespaces in each entity (each followed by a newline). */
 #define	COLON_NAMESPACES	":properties\n"
@@ -62,7 +67,6 @@
 #define	CHARS_TO_QUOTE		" \t\n\\>=\"()"
 
 #define	HASH_SIZE		16
-#define	HASH_SVC		"smf/manifest"
 #define	HASH_PG_TYPE		"framework"
 #define	HASH_PG_FLAGS		0
 #define	HASH_PROP		"md5sum"
@@ -74,6 +78,21 @@
 #define	TMPL_INDENT		"    "
 #define	TMPL_INDENT_2X		"        "
 #define	TMPL_CHOICE_INDENT	"      "
+
+/*
+ * Directory locations for manifests
+ */
+#define	VARSVC_DIR		"/var/svc/manifest"
+#define	LIBSVC_DIR		"/lib/svc/manifest"
+#define	VARSVC_PR		"var_svc_manifest"
+#define	LIBSVC_PR		"lib_svc_manifest"
+#define	MFSTFILEPR		"manifestfile"
+
+#define	SUPPORTPROP		"support"
+
+#define	MFSTHISTFILE		"/lib/svc/share/mfsthistory"
+
+#define	MFSTFILE_MAX		16
 
 /*
  * These are the classes of elements which may appear as children of service
@@ -129,6 +148,31 @@ struct export_args {
 	int 		flags;
 };
 
+/*
+ * The service_manifest structure is used by the upgrade process
+ * to create a list of service to manifest linkages from the manifests
+ * in a set of given directories.
+ */
+typedef struct service_manifest {
+	const char 	*servicename;
+	uu_list_t	*mfstlist;
+	size_t	mfstlist_sz;
+
+	uu_avl_node_t	svcmfst_node;
+} service_manifest_t;
+
+/*
+ * Structure to track the manifest file property group
+ * and the manifest file associated with that property
+ * group.  Also, a flag to keep the access once it has
+ * been checked.
+ */
+struct mpg_mfile {
+	char	*mpg;
+	char	*mfile;
+	int	access;
+};
+
 const char * const scf_pg_general = SCF_PG_GENERAL;
 const char * const scf_group_framework = SCF_GROUP_FRAMEWORK;
 const char * const scf_property_enabled = SCF_PROPERTY_ENABLED;
@@ -182,7 +226,7 @@ static const char *emsg_snap_perm;
 static const char *emsg_dpt_dangling;
 static const char *emsg_dpt_no_dep;
 
-static int li_only;
+static int li_only = 0;
 static int no_refresh = 0;
 
 /* import globals, to minimize allocations */
@@ -229,6 +273,10 @@ static scf_value_t *exp_val;
 static scf_iter_t *exp_inst_iter, *exp_pg_iter, *exp_prop_iter, *exp_val_iter;
 static char *exp_str;
 static size_t exp_str_sz;
+
+/* cleanup globals */
+static uu_avl_pool_t *service_manifest_pool = NULL;
+static uu_avl_t *service_manifest_tree = NULL;
 
 static void scfdie_lineno(int lineno) __NORETURN;
 
@@ -637,7 +685,6 @@ entity_get_running_pg(void *ent, int issvc, const char *name,
 	}
 }
 
-
 /*
  * To be registered with atexit().
  */
@@ -648,7 +695,7 @@ remove_tempfile(void)
 
 	if (tempfile != NULL) {
 		if (fclose(tempfile) == EOF)
-			warn(gettext("Could not close temporary file"));
+			(void) warn(gettext("Could not close temporary file"));
 		tempfile = NULL;
 	}
 
@@ -1494,8 +1541,14 @@ refresh_entity(int isservice, void *entity, const char *fmri,
 	int r;
 
 	if (!isservice) {
+		/*
+		 * Let restarter handles refreshing and making new running
+		 * snapshot only if operating on a live repository and not
+		 * running in early import.
+		 */
 		if (est->sc_repo_filename == NULL &&
-		    est->sc_repo_doorname == NULL) {
+		    est->sc_repo_doorname == NULL &&
+		    est->sc_in_emi == 0) {
 			if (_smf_refresh_instance_i(entity) == 0) {
 				if (g_verbose)
 					warn(gettext("Refreshed %s.\n"), fmri);
@@ -1571,8 +1624,13 @@ refresh_entity(int isservice, void *entity, const char *fmri,
 			}
 		}
 
+		/*
+		 * Similarly, just take a new running snapshot if operating on
+		 * a non-live repository or running during early import.
+		 */
 		if (est->sc_repo_filename != NULL ||
-		    est->sc_repo_doorname != NULL) {
+		    est->sc_repo_doorname != NULL ||
+		    est->sc_in_emi == 1) {
 			r = refresh_running_snapshot(inst);
 			switch (r) {
 			case 0:
@@ -3291,7 +3349,7 @@ commit:
 
 /*
  * Used to add the manifests to the list of currently supported manifests.
- * We could modify the existing manifest list removing entries if the files
+ * We can modify the existing manifest list removing entries if the files
  * don't exist.
  *
  * Get the old list and the new file name
@@ -3315,7 +3373,7 @@ upgrade_manifestfiles(pgroup_t *pg, const entity_t *ient,
 	property_t *mfst_prop;
 	property_t *old_prop;
 	char *pname = malloc(MAXPATHLEN);
-	char *fval;
+	char *fval = NULL;
 	char *old_pname;
 	char *old_fval;
 	int no_upgrade_pg;
@@ -3404,7 +3462,8 @@ upgrade_manifestfiles(pgroup_t *pg, const entity_t *ient,
 		 * property list to get proccessed into the repo.
 		 */
 		if (mfst_seen == 0) {
-			fval = malloc(MAXPATHLEN);
+			if (fval == NULL)
+				fval = malloc(MAXPATHLEN);
 
 			/*
 			 * If we cannot get the value then there is no
@@ -3416,11 +3475,19 @@ upgrade_manifestfiles(pgroup_t *pg, const entity_t *ient,
 			    scf_value_get_astring(fname_value, fval,
 			    MAXPATHLEN) != -1)  {
 				/*
-				 * First check to see if the manifest is there
-				 * if not then there is no need to add it.
+				 * If the filesystem/minimal service is
+				 * online check to see if the manifest is
+				 * there.  If not then there is no need to
+				 * add it.
+				 *
+				 * If filesystem/minimal service is not
+				 * online, we go ahead and record the
+				 * manifest file name.  We don't check for
+				 * its existence because it may be on a
+				 * file system that is not yet mounted.
 				 */
-				if (access(fval, F_OK) == -1) {
-					free(fval);
+				if ((est->sc_fs_minimal) &&
+				    (access(fval, F_OK) == -1)) {
 					continue;
 				}
 
@@ -3438,6 +3505,7 @@ upgrade_manifestfiles(pgroup_t *pg, const entity_t *ient,
 			}
 		}
 	}
+	free(fval);
 
 	cbdata.sc_handle = g_hndl;
 	cbdata.sc_parent = ent;
@@ -6231,7 +6299,7 @@ lscf_service_import(void *v, void *pvt)
 	int r;
 	int fresh = 0;
 	scf_snaplevel_t *running;
-	int have_ge;
+	int have_ge = 0;
 
 	const char * const ts_deleted = gettext("Temporary service svc:/%s "
 	    "was deleted unexpectedly.\n");
@@ -6244,6 +6312,7 @@ lscf_service_import(void *v, void *pvt)
 	const char * const badsnap = gettext("\"%s\" snapshot of svc:/%s:%s "
 	    "is corrupt (missing service snaplevel).\n");
 
+	li_only = 0;
 	/* Validate the service name */
 	if (scf_scope_get_service(scope, s->sc_name, imp_svc) != 0) {
 		switch (scf_error()) {
@@ -6708,9 +6777,6 @@ lscf_service_import(void *v, void *pvt)
 			bad_error("scf_iter_service_instances", scf_error());
 		}
 	}
-
-	have_ge = 0;
-	li_only = 0;
 
 	for (;;) {
 		r = scf_iter_next_instance(imp_iter, imp_inst);
@@ -7340,6 +7406,7 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 		/* Success.  Refresh everything. */
 
 		if (flags & SCI_NOREFRESH || no_refresh) {
+			no_refresh = 0;
 			result = 0;
 			goto out;
 		}
@@ -7618,6 +7685,7 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 	scf_scope_t *rscope;
 	scf_service_t *rsvc;
 	scf_instance_t *rinst;
+	scf_snapshot_t *rsnap;
 	scf_iter_t *iter;
 	int annotation_set = 0;
 	int r;
@@ -7627,8 +7695,10 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 	if ((rscope = scf_scope_create(g_hndl)) == NULL ||
 	    (rsvc = scf_service_create(g_hndl)) == NULL ||
 	    (rinst = scf_instance_create(g_hndl)) == NULL ||
+	    (rsnap = scf_snapshot_create(g_hndl)) == NULL ||
 	    (iter = scf_iter_create(g_hndl)) == NULL ||
 	    (imp_pg = scf_pg_create(g_hndl)) == NULL ||
+	    (imp_prop = scf_property_create(g_hndl)) == NULL ||
 	    (imp_tx = scf_transaction_create(g_hndl)) == NULL)
 		scfdie();
 
@@ -7726,6 +7796,30 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 				}
 			}
 
+			/*
+			 * If the instance does not have a general/enabled
+			 * property and no last-import snapshot then the
+			 * instance is not a fully installed instance and
+			 * should not have a profile applied to it.
+			 *
+			 * This could happen if a service/instance declares
+			 * a dependent on behalf of another service/instance.
+			 */
+			if (scf_instance_get_snapshot(rinst, snap_lastimport,
+			    rsnap) != 0) {
+				if (scf_instance_get_pg(rinst, SCF_PG_GENERAL,
+				    imp_pg) != 0 || scf_pg_get_property(imp_pg,
+				    SCF_PROPERTY_ENABLED, imp_prop) != 0) {
+					if (g_verbose)
+						warn(gettext("Ignoreing "
+						    "partial instance "
+						    "%s:%s.\n"),
+						    inst->sc_parent->sc_name,
+						    inst->sc_name);
+					continue;
+				}
+			}
+
 			r = lscf_import_instance_pgs(rinst, inst->sc_fmri, inst,
 			    SCI_FORCE | SCI_KEEP);
 			switch (_lscf_import_err(r, inst->sc_fmri)) {
@@ -7765,7 +7859,10 @@ out:
 	imp_tx = NULL;
 	scf_pg_destroy(imp_pg);
 	imp_pg = NULL;
+	scf_property_destroy(imp_prop);
+	imp_prop = NULL;
 
+	scf_snapshot_destroy(rsnap);
 	scf_iter_destroy(iter);
 	scf_instance_destroy(rinst);
 	scf_service_destroy(rsvc);
@@ -12413,7 +12510,7 @@ lscf_delhash(char *manifest, int deathrow)
 	}
 
 	/* select smf/manifest */
-	lscf_select("smf/manifest");
+	lscf_select(HASH_SVC);
 	/*
 	 * Translate the manifest file name to property name. In the deathrow
 	 * case, the manifest file does not need to exist.
@@ -13072,6 +13169,39 @@ add_string(uu_list_t *strlist, const char *str)
 	if (uu_list_append(strlist, elem) != 0)
 		uu_die(gettext("libuutil error: %s\n"),
 		    uu_strerror(uu_error()));
+}
+
+static int
+remove_string(uu_list_t *strlist, const char *str)
+{
+	uu_list_walk_t	*elems;
+	string_list_t	*sp;
+
+	/*
+	 * Find the element that needs to be removed.
+	 */
+	elems = uu_list_walk_start(strlist, UU_DEFAULT);
+	while ((sp = uu_list_walk_next(elems)) != NULL) {
+		if (strcmp(sp->str, str) == 0)
+			break;
+	}
+	uu_list_walk_end(elems);
+
+	/*
+	 * Returning 1 here as the value was not found, this
+	 * might not be an error.  Leave it to the caller to
+	 * decide.
+	 */
+	if (sp == NULL) {
+		return (1);
+	}
+
+	uu_list_remove(strlist, sp);
+
+	free(sp->str);
+	free(sp);
+
+	return (0);
 }
 
 /*
@@ -14291,6 +14421,1272 @@ out:
 usage:
 	ret = -2;
 	goto out;
+}
+
+/*
+ * Creates a list of instance name strings associated with a service. If
+ * wohandcrafted flag is set, get only instances that have a last-import
+ * snapshot, instances that were imported via svccfg.
+ */
+static uu_list_t *
+create_instance_list(scf_service_t *svc, int wohandcrafted)
+{
+	scf_snapshot_t  *snap = NULL;
+	scf_instance_t  *inst;
+	scf_iter_t	*inst_iter;
+	uu_list_t	*instances;
+	char		*instname;
+	int		r;
+
+	inst_iter = scf_iter_create(g_hndl);
+	inst = scf_instance_create(g_hndl);
+	if (inst_iter == NULL || inst == NULL) {
+		uu_warn(gettext("Could not create instance or iterator\n"));
+		scfdie();
+	}
+
+	if ((instances = uu_list_create(string_pool, NULL, 0)) == NULL)
+		return (instances);
+
+	if (scf_iter_service_instances(inst_iter, svc) != 0) {
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+		case SCF_ERROR_DELETED:
+			uu_list_destroy(instances);
+			instances = NULL;
+			goto out;
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_NOT_BOUND:
+		case SCF_ERROR_NOT_SET:
+		default:
+			bad_error("scf_iter_service_instances", scf_error());
+		}
+	}
+
+	instname = safe_malloc(max_scf_name_len + 1);
+	while ((r = scf_iter_next_instance(inst_iter, inst)) != 0) {
+		if (r == -1) {
+			(void) uu_warn(gettext("Unable to iterate through "
+			    "instances to create instance list : %s\n"),
+			    scf_strerror(scf_error()));
+
+			uu_list_destroy(instances);
+			instances = NULL;
+			goto out;
+		}
+
+		/*
+		 * If the instance does not have a last-import snapshot
+		 * then do not add it to the list as it is a hand-crafted
+		 * instance that should not be managed.
+		 */
+		if (wohandcrafted) {
+			if (snap == NULL &&
+			    (snap = scf_snapshot_create(g_hndl)) == NULL) {
+				uu_warn(gettext("Unable to create snapshot "
+				    "entity\n"));
+				scfdie();
+			}
+
+			if (scf_instance_get_snapshot(inst,
+			    snap_lastimport, snap) != 0) {
+				switch (scf_error()) {
+				case SCF_ERROR_NOT_FOUND :
+				case SCF_ERROR_DELETED:
+					continue;
+
+				case SCF_ERROR_CONNECTION_BROKEN:
+					uu_list_destroy(instances);
+					instances = NULL;
+					goto out;
+
+				case SCF_ERROR_HANDLE_MISMATCH:
+				case SCF_ERROR_NOT_BOUND:
+				case SCF_ERROR_NOT_SET:
+				default:
+					bad_error("scf_iter_service_instances",
+					    scf_error());
+				}
+			}
+		}
+
+		if (scf_instance_get_name(inst, instname,
+		    max_scf_name_len + 1) < 0) {
+			switch (scf_error()) {
+			case SCF_ERROR_NOT_FOUND :
+				continue;
+
+			case SCF_ERROR_CONNECTION_BROKEN:
+			case SCF_ERROR_DELETED:
+				uu_list_destroy(instances);
+				instances = NULL;
+				goto out;
+
+			case SCF_ERROR_HANDLE_MISMATCH:
+			case SCF_ERROR_NOT_BOUND:
+			case SCF_ERROR_NOT_SET:
+			default:
+				bad_error("scf_iter_service_instances",
+				    scf_error());
+			}
+		}
+
+		add_string(instances, instname);
+	}
+
+out:
+	if (snap)
+		scf_snapshot_destroy(snap);
+
+	scf_instance_destroy(inst);
+	scf_iter_destroy(inst_iter);
+	free(instname);
+	return (instances);
+}
+
+/*
+ * disable an instance but wait for the instance to
+ * move out of the running state.
+ *
+ * Returns 0 : if the instance did not disable
+ * Returns non-zero : if the instance disabled.
+ *
+ */
+static int
+disable_instance(scf_instance_t *instance)
+{
+	char	*fmribuf;
+	int	enabled = 10000;
+
+	if (inst_is_running(instance)) {
+		fmribuf = safe_malloc(max_scf_name_len + 1);
+		if (scf_instance_to_fmri(instance, fmribuf,
+		    max_scf_name_len + 1) < 0) {
+			free(fmribuf);
+			return (0);
+		}
+
+		/*
+		 * If the instance cannot be disabled then return
+		 * failure to disable and let the caller decide
+		 * if that is of importance.
+		 */
+		if (smf_disable_instance(fmribuf, 0) != 0) {
+			free(fmribuf);
+			return (0);
+		}
+
+		while (enabled) {
+			if (!inst_is_running(instance))
+				break;
+
+			(void) poll(NULL, 0, 5);
+			enabled = enabled - 5;
+		}
+
+		free(fmribuf);
+	}
+
+	return (enabled);
+}
+
+/*
+ * Function to compare two service_manifest structures.
+ */
+/* ARGSUSED2 */
+static int
+service_manifest_compare(const void *left, const void *right, void *unused)
+{
+	service_manifest_t *l = (service_manifest_t *)left;
+	service_manifest_t *r = (service_manifest_t *)right;
+	int rc;
+
+	rc = strcmp(l->servicename, r->servicename);
+
+	return (rc);
+}
+
+/*
+ * Look for the provided service in the service to manifest
+ * tree.  If the service exists, and a manifest was provided
+ * then add the manifest to that service.  If the service
+ * does not exist, then add the service and manifest to the
+ * list.
+ *
+ * If the manifest is NULL, return the element if found.  If
+ * the service is not found return NULL.
+ */
+service_manifest_t *
+find_add_svc_mfst(const char *svnbuf, const char *mfst)
+{
+	service_manifest_t	elem;
+	service_manifest_t	*fnelem;
+	uu_avl_index_t		marker;
+
+	elem.servicename = svnbuf;
+	fnelem = uu_avl_find(service_manifest_tree, &elem, NULL, &marker);
+
+	if (mfst) {
+		if (fnelem) {
+			add_string(fnelem->mfstlist, strdup(mfst));
+		} else {
+			fnelem = safe_malloc(sizeof (*fnelem));
+			fnelem->servicename = safe_strdup(svnbuf);
+			if ((fnelem->mfstlist =
+			    uu_list_create(string_pool, NULL, 0)) == NULL)
+				uu_die(gettext("Could not create property "
+				    "list: %s\n"), uu_strerror(uu_error()));
+
+			add_string(fnelem->mfstlist, safe_strdup(mfst));
+
+			uu_avl_insert(service_manifest_tree, fnelem, marker);
+		}
+	}
+
+	return (fnelem);
+}
+
+/*
+ * Create the service to manifest avl tree.
+ *
+ * Walk each of the manifests currently installed in the supported
+ * directories, /lib/svc/manifests and /var/svc/manifests.  For
+ * each of the manifests, inventory the services and add them to
+ * the tree.
+ *
+ * Code that calls this function should make sure fileystem/minimal is online,
+ * /var is available, since this function walks the /var/svc/manifest directory.
+ */
+static void
+create_manifest_tree(void)
+{
+	manifest_info_t **entry;
+	manifest_info_t **manifests;
+	uu_list_walk_t	*svcs;
+	bundle_t	*b;
+	entity_t	*mfsvc;
+	char		*dirs[] = {LIBSVC_DIR, VARSVC_DIR, NULL};
+	int		c, status;
+
+	if (service_manifest_pool)
+		return;
+
+	/*
+	 * Create the list pool for the service manifest list
+	 */
+	service_manifest_pool = uu_avl_pool_create("service_manifest",
+	    sizeof (service_manifest_t),
+	    offsetof(service_manifest_t, svcmfst_node),
+	    service_manifest_compare, UU_DEFAULT);
+	if (service_manifest_pool == NULL)
+		uu_die(gettext("service_manifest pool creation failed: %s\n"),
+		    uu_strerror(uu_error()));
+
+	/*
+	 * Create the list
+	 */
+	service_manifest_tree = uu_avl_create(service_manifest_pool, NULL,
+	    UU_DEFAULT);
+	if (service_manifest_tree == NULL)
+		uu_die(gettext("service_manifest tree creation failed: %s\n"),
+		    uu_strerror(uu_error()));
+
+	/*
+	 * Walk the manifests adding the service(s) from each manifest.
+	 *
+	 * If a service already exists add the manifest to the manifest
+	 * list for that service.  This covers the case of a service that
+	 * is supported by multiple manifest files.
+	 */
+	for (c = 0; dirs[c]; c++) {
+		status = find_manifests(dirs[c], &manifests, CHECKEXT);
+		if (status < 0) {
+			uu_warn(gettext("file tree walk of %s encountered "
+			    "error %s\n"), dirs[c], strerror(errno));
+
+			uu_avl_destroy(service_manifest_tree);
+			service_manifest_tree = NULL;
+			return;
+		}
+
+		/*
+		 * If a manifest that was in the list is not found
+		 * then skip and go to the next manifest file.
+		 */
+		if (manifests != NULL) {
+			for (entry = manifests; *entry != NULL; entry++) {
+				b = internal_bundle_new();
+				if (lxml_get_bundle_file(b, (*entry)->mi_path,
+				    SVCCFG_OP_IMPORT) != 0) {
+					internal_bundle_free(b);
+					continue;
+				}
+
+				svcs = uu_list_walk_start(b->sc_bundle_services,
+				    0);
+				if (svcs == NULL) {
+					internal_bundle_free(b);
+					continue;
+				}
+
+				while ((mfsvc = uu_list_walk_next(svcs)) !=
+				    NULL) {
+					/* Add manifest to service */
+					(void) find_add_svc_mfst(mfsvc->sc_name,
+					    (*entry)->mi_path);
+				}
+
+				uu_list_walk_end(svcs);
+				internal_bundle_free(b);
+			}
+
+			free_manifest_array(manifests);
+		}
+	}
+}
+
+/*
+ * Check the manifest history file to see
+ * if the service was ever installed from
+ * one of the supported directories.
+ *
+ * Return Values :
+ * 	-1 - if there's error reading manifest history file
+ *	 1 - if the service is not found
+ *	 0 - if the service is found
+ */
+static int
+check_mfst_history(const char *svcname)
+{
+	struct stat	st;
+	caddr_t		mfsthist_start;
+	char		*svnbuf;
+	int		fd;
+	int		r = 1;
+
+	fd = open(MFSTHISTFILE, O_RDONLY);
+	if (fd == -1) {
+		uu_warn(gettext("Unable to open the history file\n"));
+		return (-1);
+	}
+
+	if (fstat(fd, &st) == -1) {
+		uu_warn(gettext("Unable to stat the history file\n"));
+		return (-1);
+	}
+
+	mfsthist_start = mmap(0, st.st_size, PROT_READ,
+	    MAP_PRIVATE, fd, 0);
+
+	(void) close(fd);
+	if (mfsthist_start == MAP_FAILED ||
+	    *(mfsthist_start + st.st_size) != '\0') {
+		(void) munmap(mfsthist_start, st.st_size);
+		return (-1);
+	}
+
+	/*
+	 * The manifest history file is a space delimited list
+	 * of service and instance to manifest linkage.  Adding
+	 * a space to the end of the service name so to get only
+	 * the service that is being searched for.
+	 */
+	svnbuf = uu_msprintf("%s ", svcname);
+	if (svnbuf == NULL)
+		uu_die(gettext("Out of memory"));
+
+	if (strstr(mfsthist_start, svnbuf) != NULL)
+		r = 0;
+
+	(void) munmap(mfsthist_start, st.st_size);
+	uu_free(svnbuf);
+	return (r);
+}
+
+/*
+ * Take down each of the instances in the service
+ * and remove them, then delete the service.
+ */
+static void
+teardown_service(scf_service_t *svc, const char *svnbuf)
+{
+	scf_instance_t	*instance;
+	scf_iter_t	*iter;
+	int		r;
+
+	safe_printf(gettext("Delete service %s as there are no "
+	    "supporting manifests\n"), svnbuf);
+
+	instance = scf_instance_create(g_hndl);
+	iter = scf_iter_create(g_hndl);
+	if (iter == NULL || instance == NULL) {
+		uu_warn(gettext("Unable to create supporting entities to "
+		    "teardown the service\n"));
+		uu_warn(gettext("scf error is : %s\n"),
+		    scf_strerror(scf_error()));
+		scfdie();
+	}
+
+	if (scf_iter_service_instances(iter, svc) != 0) {
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+		case SCF_ERROR_DELETED:
+			goto out;
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_NOT_BOUND:
+		case SCF_ERROR_NOT_SET:
+		default:
+			bad_error("scf_iter_service_instances",
+			    scf_error());
+		}
+	}
+
+	while ((r = scf_iter_next_instance(iter, instance)) != 0) {
+		if (r == -1) {
+			uu_warn(gettext("Error - %s\n"),
+			    scf_strerror(scf_error()));
+			goto out;
+		}
+
+		(void) disable_instance(instance);
+	}
+
+	/*
+	 * Delete the service... forcing the deletion in case
+	 * any of the instances did not disable.
+	 */
+	(void) lscf_service_delete(svc, 1);
+out:
+	scf_instance_destroy(instance);
+	scf_iter_destroy(iter);
+}
+
+/*
+ * Get the list of instances supported by the manifest
+ * file.
+ *
+ * Return 0 if there are no instances.
+ *
+ * Return -1 if there are errors attempting to collect instances.
+ *
+ * Return the count of instances found if there are no errors.
+ *
+ */
+static int
+check_instance_support(char *mfstfile, const char *svcname,
+    uu_list_t *instances)
+{
+	uu_list_walk_t	*svcs, *insts;
+	uu_list_t	*ilist;
+	bundle_t	*b;
+	entity_t	*mfsvc, *mfinst;
+	const char	*svcn;
+	int		rminstcnt = 0;
+
+
+	b = internal_bundle_new();
+
+	if (lxml_get_bundle_file(b, mfstfile, SVCCFG_OP_IMPORT) != 0) {
+		/*
+		 * Unable to process the manifest file for
+		 * instance support, so just return as
+		 * don't want to remove instances that could
+		 * not be accounted for that might exist here.
+		 */
+		internal_bundle_free(b);
+		return (0);
+	}
+
+	svcs = uu_list_walk_start(b->sc_bundle_services, 0);
+	if (svcs == NULL) {
+		internal_bundle_free(b);
+		return (0);
+	}
+
+	svcn = svcname + (sizeof (SCF_FMRI_SVC_PREFIX) - 1) +
+	    (sizeof (SCF_FMRI_SERVICE_PREFIX) - 1);
+
+	while ((mfsvc = uu_list_walk_next(svcs)) != NULL) {
+		if (strcmp(mfsvc->sc_name, svcn) == 0)
+			break;
+	}
+	uu_list_walk_end(svcs);
+
+	if (mfsvc == NULL) {
+		internal_bundle_free(b);
+		return (-1);
+	}
+
+	ilist = mfsvc->sc_u.sc_service.sc_service_instances;
+	if ((insts = uu_list_walk_start(ilist, 0)) == NULL) {
+		internal_bundle_free(b);
+		return (0);
+	}
+
+	while ((mfinst = uu_list_walk_next(insts)) != NULL) {
+		/*
+		 * Remove the instance from the instances list.
+		 * The unaccounted for instances will be removed
+		 * from the service once all manifests are
+		 * processed.
+		 */
+		(void) remove_string(instances,
+		    mfinst->sc_name);
+		rminstcnt++;
+	}
+
+	uu_list_walk_end(insts);
+	internal_bundle_free(b);
+
+	return (rminstcnt);
+}
+
+/*
+ * For the given service, set its SCF_PG_MANIFESTFILES/SUPPORT property to
+ * 'false' to indicate there's no manifest file(s) found for the service.
+ */
+static void
+svc_add_no_support(scf_service_t *svc)
+{
+	char	*pname;
+
+	/* Add no support */
+	cur_svc = svc;
+	if (addpg(SCF_PG_MANIFESTFILES, SCF_GROUP_FRAMEWORK))
+		return;
+
+	pname = uu_msprintf("%s/%s", SCF_PG_MANIFESTFILES, SUPPORTPROP);
+	if (pname == NULL)
+		uu_die(gettext("Out of memory.\n"));
+
+	(void) lscf_addpropvalue(pname, "boolean:", "0");
+
+	uu_free(pname);
+	cur_svc = NULL;
+}
+
+/*
+ * This function handles all upgrade scenarios for a service that doesn't have
+ * SCF_PG_MANIFESTFILES pg. The function creates and populates
+ * SCF_PG_MANIFESTFILES pg for the given service to keep track of service to
+ * manifest(s) mapping. Manifests under supported directories are inventoried
+ * and a property is added for each file that delivers configuration to the
+ * service.  A service that has no corresponding manifest files (deleted) are
+ * removed from repository.
+ *
+ * Unsupported services:
+ *
+ * A service is considered unsupported if there is no corresponding manifest
+ * in the supported directories for that service and the service isn't in the
+ * history file list.  The history file, MFSTHISTFILE, contains a list of all
+ * services and instances that were delivered by Solaris before the introduction
+ * of the SCF_PG_MANIFESTFILES property group.  The history file also contains
+ * the path to the manifest file that defined the service or instance.
+ *
+ * Another type of unsupported services is 'handcrafted' services,
+ * programmatically created services or services created by dependent entries
+ * in other manifests. A handcrafted service is identified by its lack of any
+ * instance containing last-import snapshot which is created during svccfg
+ * import.
+ *
+ * This function sets a flag for unsupported services by setting services'
+ * SCF_PG_MANIFESTFILES/support property to false.
+ */
+static void
+upgrade_svc_mfst_connection(scf_service_t *svc, const char *svcname)
+{
+	service_manifest_t	*elem;
+	uu_list_walk_t		*mfwalk;
+	string_list_t		*mfile;
+	uu_list_t		*instances;
+	const char		*sname;
+	char			*pname;
+	int			r;
+
+	/*
+	 * Since there's no guarantee manifests under /var are available during
+	 * early import, don't perform any upgrade during early import.
+	 */
+	if (IGNORE_VAR)
+		return;
+
+	if (service_manifest_tree == NULL) {
+		create_manifest_tree();
+	}
+
+	/*
+	 * Find service's supporting manifest(s) after
+	 * stripping off the svc:/ prefix that is part
+	 * of the fmri that is not used in the service
+	 * manifest bundle list.
+	 */
+	sname = svcname + strlen(SCF_FMRI_SVC_PREFIX) +
+	    strlen(SCF_FMRI_SERVICE_PREFIX);
+	elem = find_add_svc_mfst(sname, NULL);
+	if (elem == NULL) {
+
+		/*
+		 * A handcrafted service, one that has no instance containing
+		 * last-import snapshot, should get unsupported flag.
+		 */
+		instances = create_instance_list(svc, 1);
+		if (instances == NULL) {
+			uu_warn(gettext("Unable to create instance list %s\n"),
+			    svcname);
+			return;
+		}
+
+		if (uu_list_numnodes(instances) == 0) {
+			svc_add_no_support(svc);
+			return;
+		}
+
+		/*
+		 * If the service is in the history file, and its supporting
+		 * manifests are not found, we can safely delete the service
+		 * because its manifests are removed from the system.
+		 *
+		 * Services not found in the history file are not delivered by
+		 * Solaris and/or delivered outside supported directories, set
+		 * unsupported flag for these services.
+		 */
+		r = check_mfst_history(svcname);
+		if (r == -1)
+			return;
+
+		if (r) {
+			/* Set unsupported flag for service  */
+			svc_add_no_support(svc);
+		} else {
+			/* Delete the service */
+			teardown_service(svc, svcname);
+		}
+
+		return;
+	}
+
+	/*
+	 * Walk through the list of manifests and add them
+	 * to the service.
+	 *
+	 * Create a manifestfiles pg and add the property.
+	 */
+	mfwalk = uu_list_walk_start(elem->mfstlist, 0);
+	if (mfwalk == NULL)
+		return;
+
+	cur_svc = svc;
+	r = addpg(SCF_PG_MANIFESTFILES, SCF_GROUP_FRAMEWORK);
+	if (r != 0) {
+		cur_svc = NULL;
+		return;
+	}
+
+	while ((mfile = uu_list_walk_next(mfwalk)) != NULL) {
+		pname = uu_msprintf("%s/%s", SCF_PG_MANIFESTFILES,
+		    mhash_filename_to_propname(mfile->str, 0));
+		if (pname == NULL)
+			uu_die(gettext("Out of memory.\n"));
+
+		(void) lscf_addpropvalue(pname, "astring:", mfile->str);
+		uu_free(pname);
+	}
+	uu_list_walk_end(mfwalk);
+
+	cur_svc = NULL;
+}
+
+/*
+ * Take a service and process the manifest file entires to see if
+ * there is continued support for the service and instances.  If
+ * not cleanup as appropriate.
+ *
+ * If a service does not have a manifest files entry flag it for
+ * upgrade and return.
+ *
+ * For each manifestfiles property check if the manifest file is
+ * under the supported /lib/svc/manifest or /var/svc/manifest path
+ * and if not then return immediately as this service is not supported
+ * by the cleanup mechanism and should be ignored.
+ *
+ * For each manifest file that is supported, check to see if the
+ * file exists.  If not then remove the manifest file property
+ * from the service and the smf/manifest hash table.  If the manifest
+ * file exists then verify that it supports the instances that are
+ * part of the service.
+ *
+ * Once all manifest files have been accounted for remove any instances
+ * that are no longer supported in the service.
+ *
+ * Return values :
+ * 0 - Successfully processed the service
+ * non-zero - failed to process the service
+ *
+ * On most errors, will just return to wait and get the next service,
+ * unless in case of unable to create the needed structures which is
+ * most likely a fatal error that is not going to be recoverable.
+ */
+int
+lscf_service_cleanup(void *act, scf_walkinfo_t *wip)
+{
+	struct mpg_mfile	*mpntov;
+	struct mpg_mfile	**mpvarry = NULL;
+	scf_service_t		*svc;
+	scf_propertygroup_t	*mpg;
+	scf_property_t		*mp;
+	scf_value_t		*mv;
+	scf_iter_t		*mi;
+	scf_instance_t		*instance;
+	uu_list_walk_t		*insts;
+	uu_list_t		*instances = NULL;
+	boolean_t		activity = (boolean_t)act;
+	char			*mpnbuf;
+	char			*mpvbuf;
+	char			*pgpropbuf;
+	int			mfstcnt, rminstct, instct, mfstmax;
+	int			index;
+	int			r = 0;
+
+	assert(g_hndl != NULL);
+	assert(wip->svc != NULL);
+	assert(wip->fmri != NULL);
+
+	svc = wip->svc;
+
+	mpg = scf_pg_create(g_hndl);
+	mp = scf_property_create(g_hndl);
+	mi = scf_iter_create(g_hndl);
+	mv = scf_value_create(g_hndl);
+	instance = scf_instance_create(g_hndl);
+
+	if (mpg == NULL || mp == NULL || mi == NULL || mv == NULL ||
+	    instance == NULL) {
+		uu_warn(gettext("Unable to create the supporting entities\n"));
+		uu_warn(gettext("scf error is : %s\n"),
+		    scf_strerror(scf_error()));
+		scfdie();
+	}
+
+	/*
+	 * Get the manifestfiles property group to be parsed for
+	 * files existence.
+	 */
+	if (scf_service_get_pg(svc, SCF_PG_MANIFESTFILES, mpg) != SCF_SUCCESS) {
+		switch (scf_error()) {
+		case SCF_ERROR_NOT_FOUND:
+			upgrade_svc_mfst_connection(svc, wip->fmri);
+			break;
+		case SCF_ERROR_DELETED:
+		case SCF_ERROR_CONNECTION_BROKEN:
+			goto out;
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_NOT_BOUND:
+		case SCF_ERROR_NOT_SET:
+		default:
+			bad_error("scf_iter_pg_properties",
+			    scf_error());
+		}
+
+		goto out;
+	}
+
+	/*
+	 * Iterate through each of the manifestfiles properties
+	 * to determine what manifestfiles are available.
+	 *
+	 * If a manifest file is supported then increment the
+	 * count and therefore the service is safe.
+	 */
+	if (scf_iter_pg_properties(mi, mpg) != 0) {
+		switch (scf_error()) {
+		case SCF_ERROR_DELETED:
+		case SCF_ERROR_CONNECTION_BROKEN:
+			goto out;
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_NOT_BOUND:
+		case SCF_ERROR_NOT_SET:
+		default:
+			bad_error("scf_iter_pg_properties",
+			    scf_error());
+		}
+	}
+
+	mfstcnt = 0;
+	mfstmax = MFSTFILE_MAX;
+	mpvarry = safe_malloc(sizeof (struct mpg_file *) * MFSTFILE_MAX);
+	while ((r = scf_iter_next_property(mi, mp)) != 0) {
+		if (r == -1)
+			bad_error(gettext("Unable to iterate through "
+			    "manifestfiles properties : %s"),
+			    scf_error());
+
+		mpntov = safe_malloc(sizeof (struct mpg_mfile));
+		mpnbuf = safe_malloc(max_scf_name_len + 1);
+		mpvbuf = safe_malloc(max_scf_value_len + 1);
+		mpntov->mpg = mpnbuf;
+		mpntov->mfile = mpvbuf;
+		mpntov->access = 1;
+		if (scf_property_get_name(mp, mpnbuf,
+		    max_scf_name_len + 1) < 0) {
+			uu_warn(gettext("Unable to get manifest file "
+			    "property : %s\n"),
+			    scf_strerror(scf_error()));
+
+			switch (scf_error()) {
+			case SCF_ERROR_DELETED:
+			case SCF_ERROR_CONNECTION_BROKEN:
+				r = scferror2errno(scf_error());
+				goto out_free;
+
+			case SCF_ERROR_HANDLE_MISMATCH:
+			case SCF_ERROR_NOT_BOUND:
+			case SCF_ERROR_NOT_SET:
+			default:
+				bad_error("scf_iter_pg_properties",
+				    scf_error());
+			}
+		}
+
+		/*
+		 * The support property is a boolean value that indicates
+		 * if the service is supported for manifest file deletion.
+		 * Currently at this time there is no code that sets this
+		 * value to true.  So while we could just let this be caught
+		 * by the support check below, in the future this by be set
+		 * to true and require processing.  So for that, go ahead
+		 * and check here, and just return if false.  Otherwise,
+		 * fall through expecting that other support checks will
+		 * handle the entries.
+		 */
+		if (strcmp(mpnbuf, SUPPORTPROP) == 0) {
+			uint8_t	support;
+
+			if (scf_property_get_value(mp, mv) != 0 ||
+			    scf_value_get_boolean(mv, &support) != 0) {
+				uu_warn(gettext("Unable to get the manifest "
+				    "support value: %s\n"),
+				    scf_strerror(scf_error()));
+
+				switch (scf_error()) {
+				case SCF_ERROR_DELETED:
+				case SCF_ERROR_CONNECTION_BROKEN:
+					r = scferror2errno(scf_error());
+					goto out_free;
+
+				case SCF_ERROR_HANDLE_MISMATCH:
+				case SCF_ERROR_NOT_BOUND:
+				case SCF_ERROR_NOT_SET:
+				default:
+					bad_error("scf_iter_pg_properties",
+					    scf_error());
+				}
+			}
+
+			if (support == B_FALSE)
+				goto out_free;
+		}
+
+		/*
+		 * Anything with a manifest outside of the supported
+		 * directories, immediately bail out because that makes
+		 * this service non-supported.  We don't even want
+		 * to do instance processing in this case because the
+		 * instances could be part of the non-supported manifest.
+		 */
+		if (strncmp(mpnbuf, LIBSVC_PR, strlen(LIBSVC_PR)) != 0) {
+			/*
+			 * Manifest is not in /lib/svc, so we need to
+			 * consider the /var/svc case.
+			 */
+			if (strncmp(mpnbuf, VARSVC_PR,
+			    strlen(VARSVC_PR)) != 0 || IGNORE_VAR) {
+				/*
+				 * Either the manifest is not in /var/svc or
+				 * /var is not yet mounted.  We ignore the
+				 * manifest either because it is not in a
+				 * standard location or because we cannot
+				 * currently access the manifest.
+				 */
+				goto out_free;
+			}
+		}
+
+		/*
+		 * Get the value to of the manifest file for this entry
+		 * for access verification and instance support
+		 * verification if it still exists.
+		 *
+		 * During Early Manifest Import if the manifest is in
+		 * /var/svc then it may not yet be available for checking
+		 * so we must determine if /var/svc is available.  If not
+		 * then defer until Late Manifest Import to cleanup.
+		 */
+		if (scf_property_get_value(mp, mv) != 0) {
+			uu_warn(gettext("Unable to get the manifest file "
+			    "value: %s\n"),
+			    scf_strerror(scf_error()));
+
+			switch (scf_error()) {
+			case SCF_ERROR_DELETED:
+			case SCF_ERROR_CONNECTION_BROKEN:
+				r = scferror2errno(scf_error());
+				goto out_free;
+
+			case SCF_ERROR_HANDLE_MISMATCH:
+			case SCF_ERROR_NOT_BOUND:
+			case SCF_ERROR_NOT_SET:
+			default:
+				bad_error("scf_property_get_value",
+				    scf_error());
+			}
+		}
+
+		if (scf_value_get_astring(mv, mpvbuf,
+		    max_scf_value_len + 1) < 0) {
+			uu_warn(gettext("Unable to get the manifest "
+			    "file : %s\n"),
+			    scf_strerror(scf_error()));
+
+			switch (scf_error()) {
+			case SCF_ERROR_DELETED:
+			case SCF_ERROR_CONNECTION_BROKEN:
+				r = scferror2errno(scf_error());
+				goto out_free;
+
+			case SCF_ERROR_HANDLE_MISMATCH:
+			case SCF_ERROR_NOT_BOUND:
+			case SCF_ERROR_NOT_SET:
+			default:
+				bad_error("scf_value_get_astring",
+				    scf_error());
+			}
+		}
+
+		mpvarry[mfstcnt] = mpntov;
+		mfstcnt++;
+
+		/*
+		 * Check for the need to reallocate array
+		 */
+		if (mfstcnt >= (mfstmax - 1)) {
+			struct mpg_mfile **newmpvarry;
+
+			mfstmax = mfstmax * 2;
+			newmpvarry = realloc(mpvarry,
+			    sizeof (struct mpg_mfile *) * mfstmax);
+
+			if (newmpvarry == NULL)
+				goto out_free;
+
+			mpvarry = newmpvarry;
+		}
+
+		mpvarry[mfstcnt] = NULL;
+	}
+
+	for (index = 0; mpvarry[index]; index++) {
+		mpntov = mpvarry[index];
+
+		/*
+		 * Check to see if the manifestfile is accessable, if so hand
+		 * this service and manifestfile off to be processed for
+		 * instance support.
+		 */
+		mpnbuf = mpntov->mpg;
+		mpvbuf = mpntov->mfile;
+		if (access(mpvbuf, F_OK) != 0) {
+			mpntov->access = 0;
+			activity++;
+			mfstcnt--;
+			/* Remove the entry from the service */
+			cur_svc = svc;
+			pgpropbuf = uu_msprintf("%s/%s", SCF_PG_MANIFESTFILES,
+			    mpnbuf);
+			if (pgpropbuf == NULL)
+				uu_die(gettext("Out of memory.\n"));
+
+			lscf_delprop(pgpropbuf);
+			cur_svc = NULL;
+
+			uu_free(pgpropbuf);
+		}
+	}
+
+	/*
+	 * If mfstcnt is 0, none of the manifests that supported the service
+	 * existed so remove the service.
+	 */
+	if (mfstcnt == 0) {
+		teardown_service(svc, wip->fmri);
+
+		goto out_free;
+	}
+
+	if (activity) {
+		int	nosvcsupport = 0;
+
+		/*
+		 * If the list of service instances is NULL then
+		 * create the list.
+		 */
+		instances = create_instance_list(svc, 1);
+		if (instances == NULL) {
+			uu_warn(gettext("Unable to create instance list %s\n"),
+			    wip->fmri);
+			goto out_free;
+		}
+
+		rminstct = uu_list_numnodes(instances);
+		instct = rminstct;
+
+		for (index = 0; mpvarry[index]; index++) {
+			mpntov = mpvarry[index];
+			if (mpntov->access == 0)
+				continue;
+
+			mpnbuf = mpntov->mpg;
+			mpvbuf = mpntov->mfile;
+			r = check_instance_support(mpvbuf, wip->fmri,
+			    instances);
+			if (r == -1) {
+				nosvcsupport++;
+			} else {
+				rminstct -= r;
+			}
+		}
+
+		if (instct && instct == rminstct && nosvcsupport == mfstcnt) {
+			teardown_service(svc, wip->fmri);
+
+			goto out_free;
+		}
+	}
+
+	/*
+	 * If there are instances left on the instance list, then
+	 * we must remove them.
+	 */
+	if (instances != NULL && uu_list_numnodes(instances)) {
+		string_list_t *sp;
+
+		insts = uu_list_walk_start(instances, 0);
+		while ((sp = uu_list_walk_next(insts)) != NULL) {
+			/*
+			 * Remove the instance from the instances list.
+			 */
+			safe_printf(gettext("Delete instance %s from "
+			    "service %s\n"), sp->str, wip->fmri);
+			if (scf_service_get_instance(svc, sp->str,
+			    instance) != SCF_SUCCESS) {
+				(void) uu_warn("scf_error - %s\n",
+				    scf_strerror(scf_error()));
+
+				continue;
+			}
+
+			(void) disable_instance(instance);
+
+			(void) lscf_instance_delete(instance, 1);
+		}
+		scf_instance_destroy(instance);
+		uu_list_walk_end(insts);
+	}
+
+out_free:
+	if (mpvarry) {
+		struct mpg_mfile *fmpntov;
+
+		for (index = 0; mpvarry[index]; index++) {
+			fmpntov  = mpvarry[index];
+			if (fmpntov->mpg == mpnbuf)
+				mpnbuf = NULL;
+			free(fmpntov->mpg);
+
+			if (fmpntov->mfile == mpvbuf)
+				mpvbuf = NULL;
+			free(fmpntov->mfile);
+
+			if (fmpntov == mpntov)
+				mpntov = NULL;
+			free(fmpntov);
+		}
+		if (mpnbuf)
+			free(mpnbuf);
+		if (mpvbuf)
+			free(mpvbuf);
+		if (mpntov)
+			free(mpntov);
+
+		free(mpvarry);
+	}
+out:
+	scf_pg_destroy(mpg);
+	scf_property_destroy(mp);
+	scf_iter_destroy(mi);
+	scf_value_destroy(mv);
+
+	return (0);
+}
+
+/*
+ * Take the service and search for the manifestfiles property
+ * in each of the property groups.  If the manifest file
+ * associated with the property does not exist then remove
+ * the property group.
+ */
+int
+lscf_hash_cleanup()
+{
+	scf_service_t		*svc;
+	scf_scope_t		*scope;
+	scf_propertygroup_t	*pg;
+	scf_property_t		*prop;
+	scf_value_t		*val;
+	scf_iter_t		*iter;
+	char			*pgname;
+	char			*mfile;
+	int			r;
+
+	svc = scf_service_create(g_hndl);
+	scope = scf_scope_create(g_hndl);
+	pg = scf_pg_create(g_hndl);
+	prop = scf_property_create(g_hndl);
+	val = scf_value_create(g_hndl);
+	iter = scf_iter_create(g_hndl);
+	if (pg == NULL || prop == NULL || val == NULL || iter == NULL ||
+	    svc == NULL || scope == NULL) {
+		uu_warn(gettext("Unable to create a property group, or "
+		    "property\n"));
+		uu_warn("%s\n", pg == NULL ? "pg is NULL" :
+		    "pg is not NULL");
+		uu_warn("%s\n", prop == NULL ? "prop is NULL" :
+		    "prop is not NULL");
+		uu_warn("%s\n", val == NULL ? "val is NULL" :
+		    "val is not NULL");
+		uu_warn("%s\n", iter == NULL ? "iter is NULL" :
+		    "iter is not NULL");
+		uu_warn("%s\n", svc == NULL ? "svc is NULL" :
+		    "svc is not NULL");
+		uu_warn("%s\n", scope == NULL ? "scope is NULL" :
+		    "scope is not NULL");
+		uu_warn(gettext("scf error is : %s\n"),
+		    scf_strerror(scf_error()));
+		scfdie();
+	}
+
+	if (scf_handle_get_scope(g_hndl, SCF_SCOPE_LOCAL, scope) != 0) {
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+		case SCF_ERROR_NOT_FOUND:
+			goto out;
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_NOT_BOUND:
+		case SCF_ERROR_INVALID_ARGUMENT:
+		default:
+			bad_error("scf_handle_get_scope", scf_error());
+		}
+	}
+
+	if (scf_scope_get_service(scope, HASH_SVC, svc) != 0) {
+		uu_warn(gettext("Unable to process the hash service, %s\n"),
+		    HASH_SVC);
+		goto out;
+	}
+
+	pgname = safe_malloc(max_scf_name_len + 1);
+	mfile = safe_malloc(max_scf_value_len + 1);
+
+	if (scf_iter_service_pgs(iter, svc) != SCF_SUCCESS) {
+		uu_warn(gettext("Unable to cleanup smf hash table : %s\n"),
+		    scf_strerror(scf_error()));
+		goto out;
+	}
+
+	while ((r = scf_iter_next_pg(iter, pg)) != 0) {
+		if (r == -1)
+			goto out;
+
+		if (scf_pg_get_name(pg, pgname, max_scf_name_len + 1) < 0) {
+			switch (scf_error()) {
+			case SCF_ERROR_DELETED:
+				return (ENODEV);
+
+			case SCF_ERROR_CONNECTION_BROKEN:
+				return (ECONNABORTED);
+
+			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_NOT_BOUND:
+			default:
+				bad_error("scf_pg_get_name", scf_error());
+			}
+		}
+		if (IGNORE_VAR) {
+			if (strncmp(pgname, VARSVC_PR, strlen(VARSVC_PR)) == 0)
+				continue;
+		}
+
+		/*
+		 * If unable to get the property continue as this is an
+		 * entry that has no location to check against.
+		 */
+		if (scf_pg_get_property(pg, MFSTFILEPR, prop) != SCF_SUCCESS) {
+			continue;
+		}
+
+		if (scf_property_get_value(prop, val) != SCF_SUCCESS) {
+			uu_warn(gettext("Unable to get value from %s\n"),
+			    pgname);
+			goto error_handle;
+		}
+
+		if (scf_value_get_astring(val, mfile, max_scf_value_len + 1) ==
+		    -1) {
+			uu_warn(gettext("Unable to get astring from %s : %s\n"),
+			    pgname, scf_strerror(scf_error()));
+			goto error_handle;
+		}
+
+		if (access(mfile, F_OK) == 0)
+			continue;
+
+		(void) scf_pg_delete(pg);
+
+error_handle:
+		switch (scf_error()) {
+		case SCF_ERROR_DELETED:
+		case SCF_ERROR_CONSTRAINT_VIOLATED:
+		case SCF_ERROR_NOT_FOUND:
+		case SCF_ERROR_NOT_SET:
+			continue;
+
+		case SCF_ERROR_CONNECTION_BROKEN:
+			r = scferror2errno(scf_error());
+			goto out;
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_NOT_BOUND:
+		default:
+			bad_error("scf_value_get_astring",
+			    scf_error());
+		}
+	}
+
+out:
+	scf_scope_destroy(scope);
+	scf_service_destroy(svc);
+	scf_pg_destroy(pg);
+	scf_property_destroy(prop);
+	scf_value_destroy(val);
+	scf_iter_destroy(iter);
+	free(pgname);
+	free(mfile);
+
+	return (0);
 }
 
 #ifndef NATIVE_BUILD

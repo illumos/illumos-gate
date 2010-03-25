@@ -49,10 +49,9 @@ dir path=var group=sys
 dir path=var/lp group=lp mode=0775 owner=lp
 dir path=var/lp/ppd group=lp
 dir path=var/lp/ppd/caches group=lp
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/application group=sys
-dir path=var/svc/manifest/application/print group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/application group=sys
+dir path=lib/svc/manifest/application/print group=sys
 file path=lib/svc/method/ppd-cache-update mode=0555
 file path=usr/lib/lp/bin/getmakes group=lp mode=0555
 file path=usr/lib/lp/bin/getmodels group=lp mode=0555
@@ -66,7 +65,7 @@ file path=usr/sadm/admin/printmgr/classes/pmserver.jar group=lp
 file path=usr/sadm/admin/printmgr/lib/libpmgr.so.1 group=lp
 file path=usr/sbin/ppdmgr group=lp mode=0555
 file path=var/lp/ppd/manufaliases group=lp mode=0444
-file path=var/svc/manifest/application/print/ppd-cache-update.xml group=sys \
+file path=lib/svc/manifest/application/print/ppd-cache-update.xml group=sys \
     mode=0444
 legacy pkg=SUNWppm arch=$(ARCH) category=system \
     desc="Graphical tool for managing printers under Solaris." \

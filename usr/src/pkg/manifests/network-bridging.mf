@@ -30,18 +30,18 @@ set name=pkg.summary value="IEEE 802 Bridging Support"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib
+dir path=lib/svc
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/rcm
 dir path=usr/lib/rcm/modules
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 file path=usr/lib/bridged mode=0555
 file path=usr/lib/librstp.so.1
 file path=usr/lib/rcm/modules/SUNW_bridge_rcm.so mode=0555
-file path=var/svc/manifest/network/bridge.xml group=sys mode=0444
+file path=lib/svc/manifest/network/bridge.xml group=sys mode=0444
 legacy pkg=SUNWbridger arch=$(ARCH) category=system \
     desc="Datalink layer bridging support" \
     hotline="Please contact your local service provider" \

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -45,11 +45,17 @@ OBJS = \
 	wait.o \
 	utmpx.o
 
-ALLOBJS = $(OBJS) proc.o
+ALLOBJS = $(OBJS) \
+	proc.o \
+	manifest_hash.o
 
-SRCS = $(OBJS:%.o=%.c)
+SRCS = $(OBJS:%.o=%.c) \
+	proc.c \
+	../common/manifest_hash.c
 
-POFILES = $(ALLOBJS:%.o=%.po)
+POFILES = $(OBJS:%.o=%.po) \
+	proc.po \
+	../common/manifest_hash.po
 
 include ../../Makefile.cmd
 include ../../Makefile.ctf
@@ -57,17 +63,23 @@ include ../../Makefile.ctf
 ROOTCMDDIR=	$(ROOT)/lib/svc/bin
 
 CFLAGS += -v
+CPPFLAGS += -I. -I../common
 
-$(OBJS) := CPPFLAGS += \
-	-I. -I../common -D_REENTRANT -D_FILE_OFFSET_BITS=64
+$(OBJS) := CPPFLAGS += -D_FILE_OFFSET_BITS=64 -D_REENTRANT
 
-$(POFILE) := CPPFLAGS += -I. -I../common
+proc.o := CPPFLAGS += -D_REENTRANT
 
-proc.o := CPPFLAGS += -I. -I../common -D_REENTRANT
+%.o:	../common/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)
+
+%.ln:	../common/%.c
+	$(LINT.c) $(OUTPUT_OPTION) -c $<
 
 LDLIBS += \
 	-lcontract \
 	-lkstat \
+	-lmd5 \
 	-lnvpair \
 	-lrestart \
 	-lscf \

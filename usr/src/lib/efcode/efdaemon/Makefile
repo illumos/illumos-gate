@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/efcode/efdaemon/Makefile
 
@@ -39,8 +37,8 @@ PROG	= efdaemon
 EFTARGETS += $(EFCODEDIR64)/$(PROG)
 EFTARGETS += $(EFCODEDIR)/efcode.sh
 
-MFSTDIR = $(ROOT)/var/svc/manifest/platform/sun4u
-MFSTDIR_SUN4V = $(ROOT)/var/svc/manifest/platform/sun4v
+MFSTDIR = $(ROOT)/lib/svc/manifest/platform/sun4u
+MFSTDIR_SUN4V = $(ROOT)/lib/svc/manifest/platform/sun4v
 MANIFEST = efdaemon.xml
 MANIFEST_SUN4V = efdaemon_sun4v.xml
 EFTARGETS += $(MFSTDIR)/$(MANIFEST)

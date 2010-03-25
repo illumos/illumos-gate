@@ -32,16 +32,16 @@
     NOTE:  Service profiles delivered by this package are not editable,
     and their contents will be overwritten by package or patch
     operations, including operating system upgrade.  Make customizations
-    in a distinct file.  The path, /var/svc/profile/site.xml, is a
-    distinguished location for a site-specific service profile, treated
-    otherwise equivalently to this file.
+    in a distinct file.  The paths, /etc/svc/profile/site.xml and
+    /var/svc/profile/site.xml, are distinguished locations for site-specific
+    service profile, treated otherwise equivalently to this file.
 -->
 <service_bundle type='profile' name='generic_limited_net'
 	 xmlns:xi='http://www.w3.org/2003/XInclude' >
   <!--
       Include name service profile, as set by system id tools.
   -->
-  <xi:include href='file:/var/svc/profile/name_service.xml' />
+  <xi:include href='file:/etc/svc/profile/name_service.xml' />
 
   <!--
       svc.startd(1M) services

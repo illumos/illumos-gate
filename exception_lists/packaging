@@ -402,18 +402,20 @@ usr/include/librestart_priv.h
 usr/include/librestart.h
 usr/lib/librestart.so
 usr/lib/sparcv9/librestart.so					sparc
+lib/svc/manifest/platform/sun4u					i386
+lib/svc/manifest/platform/sun4v					i386
 var/svc/manifest/platform/sun4u					i386
 var/svc/manifest/platform/sun4v					i386
-var/svc/profile/platform_sun4v.xml				i386
-var/svc/profile/platform_SUNW,SPARC-Enterprise.xml		i386
-var/svc/profile/platform_SUNW,Sun-Fire-15000.xml		i386
-var/svc/profile/platform_SUNW,Sun-Fire-880.xml			i386
-var/svc/profile/platform_SUNW,Sun-Fire-V890.xml			i386
-var/svc/profile/platform_SUNW,Sun-Fire.xml			i386
-var/svc/profile/platform_SUNW,Ultra-Enterprise-10000.xml	i386
-var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml	i386
-var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml	i386
-var/svc/profile/platform_SUNW,UltraSPARC-IIi-Netract.xml	i386
+etc/svc/profile/platform_sun4v.xml				i386
+etc/svc/profile/platform_SUNW,SPARC-Enterprise.xml		i386
+etc/svc/profile/platform_SUNW,Sun-Fire-15000.xml		i386
+etc/svc/profile/platform_SUNW,Sun-Fire-880.xml			i386
+etc/svc/profile/platform_SUNW,Sun-Fire-V890.xml			i386
+etc/svc/profile/platform_SUNW,Sun-Fire.xml			i386
+etc/svc/profile/platform_SUNW,Ultra-Enterprise-10000.xml	i386
+etc/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml	i386
+etc/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml	i386
+etc/svc/profile/platform_SUNW,UltraSPARC-IIi-Netract.xml	i386
 #
 # Private libuutil files
 #

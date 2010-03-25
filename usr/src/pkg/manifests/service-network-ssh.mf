@@ -34,20 +34,18 @@ dir path=etc group=sys
 dir path=etc/ssh group=sys
 dir path=lib
 dir path=lib/svc
+dir path=lib/svc/manifest group=sys
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/ssh
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network group=sys
 file path=etc/ssh/sshd_config group=sys \
     original_name=SUNWsshd:etc/ssh/sshd_config preserve=true
 file path=lib/svc/method/sshd mode=0555
 file path=usr/lib/ssh/sftp-server mode=0555
 file path=usr/lib/ssh/sshd mode=0555
-file path=var/svc/manifest/network/ssh.xml group=sys mode=0444
+file path=lib/svc/manifest/network/ssh.xml group=sys mode=0444
 legacy pkg=SUNWsshdr arch=$(ARCH) category=system \
     desc="Secure Shell protocol Server" \
     hotline="Please contact your local service provider" \

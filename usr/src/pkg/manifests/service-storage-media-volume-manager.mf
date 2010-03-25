@@ -37,14 +37,11 @@ dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
 dir path=usr/sbin
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/system/filesystem group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system/filesystem group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=lib/svc/method/svc-rmvolmgr mode=0555 opensolaris.zone=global \
     variant.opensolaris.zone=global
@@ -53,7 +50,7 @@ file path=usr/bin/rmmount mode=0555
 file path=usr/bin/volcheck mode=0555
 file path=usr/bin/volrmmount mode=0555
 file path=usr/lib/rmvolmgr mode=0555
-file path=var/svc/manifest/system/filesystem/rmvolmgr.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/filesystem/rmvolmgr.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWrmvolmgr arch=$(ARCH) category=system \
     desc="Non-graphical removable volume manager" \

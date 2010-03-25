@@ -31,6 +31,8 @@ set name=pkg.summary value="Multicast DNS and Service Discovery"
 set name=info.classification value=org.opensolaris.category.2008:System/Services
 set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib
+dir path=lib/svc
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/include
@@ -48,11 +50,9 @@ dir path=usr/share/lib/java/javadoc/dnssd/api/com/apple group=other
 dir path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd group=other
 dir path=usr/share/lib/java/javadoc/dnssd/api/resources group=other
 dir path=usr/share/lib/java/javadoc/dnssd/examples group=other
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
-dir path=var/svc/manifest/network/dns group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/dns group=sys
 file path=usr/bin/dns-sd mode=0555
 file path=usr/include/dns_sd.h
 file path=usr/lib/$(ARCH64)/libdns_sd.so.1
@@ -126,7 +126,7 @@ file path=usr/share/lib/java/javadoc/dnssd/api/serialized-form.html group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/stylesheet.css group=other
 file path=usr/share/lib/java/javadoc/dnssd/examples/BrowserApp.jar group=sys
 file path=usr/share/lib/java/javadoc/dnssd/examples/SimpleChat.jar group=sys
-file path=var/svc/manifest/network/dns/multicast.xml group=sys mode=0444
+file path=lib/svc/manifest/network/dns/multicast.xml group=sys mode=0444
 legacy pkg=SUNWdsdr arch=$(ARCH) category=system \
     desc="Root components for Multicast DNS daemon and service discovery support" \
     hotline="Please contact your local service provider" \

@@ -34,12 +34,12 @@ set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/inet
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 file path=usr/lib/inet/wpad mode=0555
-file path=var/svc/manifest/network/wpa.xml group=sys mode=0444
+file path=lib/svc/manifest/network/wpa.xml group=sys mode=0444
 legacy pkg=SUNWwpar arch=$(ARCH) category=system \
     desc="The service implements the IEEE802.11i (WPA/WPA2) specification." \
     hotline="Please contact your local service provider" \

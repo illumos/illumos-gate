@@ -37,10 +37,8 @@ dir path=lib/svc
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 file path=etc/ftpd/ftpaccess group=sys original_name=SUNWftp:etc/ftpd/ftpaccess \
     preserve=true
 file path=etc/ftpd/ftpconversions group=sys \
@@ -59,7 +57,7 @@ file path=usr/sbin/ftprestart mode=0555
 file path=usr/sbin/ftpshut mode=0555
 file path=usr/sbin/in.ftpd mode=0555
 file path=usr/sbin/privatepw mode=0555
-file path=var/svc/manifest/network/ftp.xml group=sys mode=0444
+file path=lib/svc/manifest/network/ftp.xml group=sys mode=0444
 hardlink path=usr/sbin/ftpwho target=../../usr/sbin/ftpcount
 legacy pkg=SUNWftpr arch=$(ARCH) category=system \
     desc="FTP Server Configuration Files" \

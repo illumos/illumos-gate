@@ -19,13 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 include ../Makefile.cmd
 
-SUBDIR_CMD=	lsvcrun mfstscan prophist servinfo svcadm svccfg svcprop svcs
+SUBDIR_CMD=	lsvcrun mfstscan servinfo svcadm svccfg svcprop svcs
 SUBDIR_DAEMON=	configd startd
 SUBDIR_REPO=	milestone profile seed
 SUBDIR_MISC=	shell

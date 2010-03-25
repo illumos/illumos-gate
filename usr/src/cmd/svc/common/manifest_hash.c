@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,15 +110,20 @@ mhash_filename_to_propname(const char *in, boolean_t deathrow)
 }
 
 int
-mhash_retrieve_entry(scf_handle_t *hndl, const char *name, uchar_t *hash)
+mhash_retrieve_entry(scf_handle_t *hndl, const char *name, uchar_t *hash,
+    apply_action_t *action)
 {
 	scf_scope_t *scope;
 	scf_service_t *svc;
 	scf_propertygroup_t *pg;
 	scf_property_t *prop;
 	scf_value_t *val;
+	scf_error_t err;
 	ssize_t szret;
 	int result = 0;
+
+	if (action)
+		*action = APPLY_NONE;
 
 	/*
 	 * In this implementation the hash for name is the opaque value of
@@ -178,6 +183,38 @@ mhash_retrieve_entry(scf_handle_t *hndl, const char *name, uchar_t *hash)
 		goto out;
 	}
 
+	/*
+	 * If caller has requested the apply_last property, read the
+	 * property if it exists.
+	 */
+	if (action != NULL) {
+		uint8_t apply_value;
+
+		if (scf_pg_get_property(pg, MHASH_APPLY_PROP, prop) !=
+		    SCF_SUCCESS) {
+			err = scf_error();
+			if ((err != SCF_ERROR_DELETED) &&
+			    (err != SCF_ERROR_NOT_FOUND)) {
+				result = -1;
+			}
+			goto out;
+		}
+		if (scf_property_get_value(prop, val) != SCF_SUCCESS) {
+			err = scf_error();
+			if ((err != SCF_ERROR_DELETED) &&
+			    (err != SCF_ERROR_NOT_FOUND)) {
+				result = -1;
+			}
+			goto out;
+		}
+		if (scf_value_get_boolean(val, &apply_value) != SCF_SUCCESS) {
+			result = -1;
+			goto out;
+		}
+		if (apply_value)
+			*action = APPLY_LATE;
+	}
+
 out:
 	(void) scf_value_destroy(val);
 	scf_property_destroy(prop);
@@ -190,17 +227,20 @@ out:
 
 int
 mhash_store_entry(scf_handle_t *hndl, const char *name, const char *fname,
-    uchar_t *hash, char **errstr)
+    uchar_t *hash, apply_action_t apply_late, char **errstr)
 {
 	scf_scope_t *scope = NULL;
 	scf_service_t *svc = NULL;
 	scf_propertygroup_t *pg = NULL;
 	scf_property_t *prop = NULL;
+	scf_value_t *aval = NULL;
 	scf_value_t *val = NULL;
 	scf_value_t *fval = NULL;
 	scf_transaction_t *tx = NULL;
+	scf_transaction_entry_t *ae = NULL;
 	scf_transaction_entry_t *e = NULL;
 	scf_transaction_entry_t *fe = NULL;
+	scf_error_t err;
 	int ret, result = 0;
 
 	int i;
@@ -223,7 +263,6 @@ mhash_store_entry(scf_handle_t *hndl, const char *name, const char *fname,
 	}
 
 	for (i = 0; i < 5; ++i) {
-		scf_error_t err;
 
 		if (scf_scope_get_service(scope, MHASH_SVC, svc) ==
 		    SCF_SUCCESS)
@@ -270,8 +309,6 @@ mhash_store_entry(scf_handle_t *hndl, const char *name, const char *fname,
 	}
 
 	for (i = 0; i < 5; ++i) {
-		scf_error_t err;
-
 		if (scf_service_get_pg(svc, name, pg) == SCF_SUCCESS)
 			break;
 
@@ -316,7 +353,9 @@ mhash_store_entry(scf_handle_t *hndl, const char *name, const char *fname,
 	if ((e = scf_entry_create(hndl)) == NULL ||
 	    (val = scf_value_create(hndl)) == NULL ||
 	    (fe = scf_entry_create(hndl)) == NULL ||
-	    (fval = scf_value_create(hndl)) == NULL) {
+	    (fval = scf_value_create(hndl)) == NULL ||
+	    (ae = scf_entry_create(hndl)) == NULL ||
+	    (aval = scf_value_create(hndl)) == NULL) {
 		if (errstr != NULL)
 			*errstr = gettext("Could not store file hash: "
 			    "permission denied.\n");
@@ -328,6 +367,9 @@ mhash_store_entry(scf_handle_t *hndl, const char *name, const char *fname,
 	assert(ret == SCF_SUCCESS);
 	ret = scf_value_set_astring(fval, fname);
 	assert(ret == SCF_SUCCESS);
+	if (apply_late == APPLY_LATE) {
+		scf_value_set_boolean(aval, 1);
+	}
 
 	tx = scf_transaction_create(hndl);
 	if (tx == NULL) {
@@ -378,10 +420,10 @@ mhash_store_entry(scf_handle_t *hndl, const char *name, const char *fname,
 		ret = scf_entry_add_value(e, val);
 		assert(ret == SCF_SUCCESS);
 
-		if (scf_transaction_property_new(tx, fe, MFILE_PROP,
+		if (scf_transaction_property_new(tx, fe, MHASH_FILE_PROP,
 		    SCF_TYPE_ASTRING) != SCF_SUCCESS &&
-		    scf_transaction_property_change_type(tx, fe, MFILE_PROP,
-		    SCF_TYPE_ASTRING) != SCF_SUCCESS) {
+		    scf_transaction_property_change_type(tx, fe,
+		    MHASH_FILE_PROP, SCF_TYPE_ASTRING) != SCF_SUCCESS) {
 			if (errstr != NULL)
 				*errstr = gettext("Could not modify file "
 				    "entry");
@@ -391,6 +433,45 @@ mhash_store_entry(scf_handle_t *hndl, const char *name, const char *fname,
 
 		ret = scf_entry_add_value(fe, fval);
 		assert(ret == SCF_SUCCESS);
+
+		switch (apply_late) {
+		case APPLY_NONE:
+			if (scf_transaction_property_delete(tx, ae,
+			    MHASH_APPLY_PROP) != 0) {
+				err = scf_error();
+				if ((err != SCF_ERROR_DELETED) &&
+				    (err != SCF_ERROR_NOT_FOUND)) {
+					if (errstr != NULL) {
+						*errstr = gettext("Could not "
+						    "delete apply_late "
+						    "property");
+					}
+					result = -1;
+					goto out;
+				}
+			}
+			break;
+		case APPLY_LATE:
+			if ((scf_transaction_property_new(tx, ae,
+			    MHASH_APPLY_PROP,
+			    SCF_TYPE_BOOLEAN) != SCF_SUCCESS) &&
+			    (scf_transaction_property_change_type(tx, ae,
+			    MHASH_APPLY_PROP, SCF_TYPE_BOOLEAN) !=
+			    SCF_SUCCESS)) {
+				if (errstr != NULL) {
+					*errstr = gettext("Could not modify "
+					    "apply_late property");
+				}
+				result = -1;
+				goto out;
+			}
+
+			ret = scf_entry_add_value(ae, aval);
+			assert(ret == SCF_SUCCESS);
+			break;
+		default:
+			abort();
+		};
 
 		ret = scf_transaction_commit(tx);
 
@@ -415,10 +496,12 @@ mhash_store_entry(scf_handle_t *hndl, const char *name, const char *fname,
 	scf_transaction_destroy(tx);
 	(void) scf_entry_destroy(e);
 	(void) scf_entry_destroy(fe);
+	(void) scf_entry_destroy(ae);
 
 out:
 	(void) scf_value_destroy(val);
 	(void) scf_value_destroy(fval);
+	(void) scf_value_destroy(aval);
 	scf_property_destroy(prop);
 	scf_pg_destroy(pg);
 	scf_service_destroy(svc);
@@ -495,6 +578,7 @@ int
 mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
     char **pnamep, uchar_t *hashbuf)
 {
+	apply_action_t action;
 	boolean_t do_hash;
 	struct stat64 st;
 	char *cp;
@@ -505,6 +589,9 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 	int ret;
 	int hashash;
 	int metahashok = 0;
+
+	if (pnamep)
+		*pnamep = NULL;
 
 	/*
 	 * In the case where we are doing automated imports, we reduce the UID,
@@ -542,8 +629,6 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 	cp = getenv("SVCCFG_CHECKHASH");
 	do_hash = (cp != NULL && *cp != '\0');
 	if (!do_hash) {
-		if (pnamep != NULL)
-			*pnamep = NULL;
 		return (MHASH_NEWFILE);
 	}
 
@@ -551,12 +636,25 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 	if (pname == NULL)
 		return (MHASH_FAILURE);
 
-	hashash = mhash_retrieve_entry(hndl, pname, stored_hash) == 0;
+	hashash = mhash_retrieve_entry(hndl, pname, stored_hash, &action) == 0;
+	if (is_profile == 0) {
+		/* Actions other than APPLY_NONE are restricted to profiles. */
+		assert(action == APPLY_NONE);
+	}
 
-	/* Never reread a profile. */
+	/*
+	 * As a general rule, we do not reread a profile.  The exception to
+	 * this rule is when we are running as part of the manifest import
+	 * service and the apply_late property is set to true.
+	 */
 	if (hashash && is_profile) {
-		uu_free(pname);
-		return (MHASH_RECONCILED);
+		cp = getenv("SMF_FMRI");
+		if ((cp == NULL) ||
+		    (strcmp(cp, SCF_INSTANCE_MI) != 0) ||
+		    (action != APPLY_LATE)) {
+			uu_free(pname);
+			return (MHASH_RECONCILED);
+		}
 	}
 
 	/*
@@ -604,8 +702,15 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 		 */
 		for (i = 0; i < MD5_DIGEST_LENGTH; i++) {
 			if (stored_hash[MD5_DIGEST_LENGTH+i] != 0) {
-				uu_free(pname);
-				return (MHASH_RECONCILED);
+				if (action == APPLY_LATE) {
+					if (pnamep != NULL)
+						*pnamep = pname;
+					ret = MHASH_NEWFILE;
+				} else {
+					uu_free(pname);
+					ret = MHASH_RECONCILED;
+				}
+				return (ret);
 			}
 		}
 	}
@@ -631,9 +736,17 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 			 * we then update the database with the complete
 			 * new hash so we can be a bit quicker next time.
 			 */
-			(void) mhash_store_entry(hndl, pname, file, hash, NULL);
-			uu_free(pname);
-			return (MHASH_RECONCILED);
+			(void) mhash_store_entry(hndl, pname, file, hash,
+			    APPLY_NONE, NULL);
+			if (action == APPLY_LATE) {
+				if (pnamep != NULL)
+					*pnamep = pname;
+				ret = MHASH_NEWFILE;
+			} else {
+				uu_free(pname);
+				ret = MHASH_RECONCILED;
+			}
+			return (ret);
 		}
 
 		/*
@@ -655,7 +768,8 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 			 * Update the new entry so we don't have to go through
 			 * all this trouble next time.
 			 */
-			(void) mhash_store_entry(hndl, pname, file, hash, NULL);
+			(void) mhash_store_entry(hndl, pname, file, hash,
+			    APPLY_NONE, NULL);
 			uu_free(pname);
 			return (MHASH_RECONCILED);
 		}

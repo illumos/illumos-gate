@@ -508,8 +508,8 @@ fi
 # now import the new service, if necessary
 $SVCPROP -q $STMSINSTANCE < /dev/null > /dev/null 2>&1
 if [ $? -ne 0 ]; then
-	if [ -f /var/svc/manifest/system/device/mpxio-upgrade.xml ]; then
-		$SVCCFG import /var/svc/manifest/system/device/mpxio-upgrade.xml
+	if [ -f /lib/svc/manifest/system/device/mpxio-upgrade.xml ]; then
+		$SVCCFG import /lib/svc/manifest/system/device/mpxio-upgrade.xml
 		if [ $? -ne 0 ]; then
 
 			fmt=`gettext "Unable to import the %s service"`

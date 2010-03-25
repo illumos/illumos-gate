@@ -34,14 +34,14 @@ dir path=etc group=sys
 dir path=etc/default group=sys
 dir path=usr group=sys
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 file path=etc/default/telnetd group=sys \
     original_name=SUNWtnetd:etc/default/telnetd preserve=true
 file path=usr/sbin/in.telnetd mode=0555
-file path=var/svc/manifest/network/telnet.xml group=sys mode=0444
+file path=lib/svc/manifest/network/telnet.xml group=sys mode=0444
 legacy pkg=SUNWtnetd arch=$(ARCH) category=system \
     desc="Telnet Server Daemon (Usr)" \
     hotline="Please contact your local service provider" \

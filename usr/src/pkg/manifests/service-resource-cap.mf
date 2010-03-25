@@ -37,15 +37,15 @@ dir path=usr/lib/rcap
 dir path=usr/lib/rcap/$(ARCH32)
 dir path=usr/lib/rcap/$(ARCH64)
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/system group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 file path=usr/bin/rcapstat mode=0555
 file path=usr/lib/rcap/$(ARCH32)/rcapd mode=0555
 file path=usr/lib/rcap/$(ARCH64)/rcapd mode=0555
 file path=usr/sbin/rcapadm mode=0555
-file path=var/svc/manifest/system/rcap.xml group=sys mode=0444
+file path=lib/svc/manifest/system/rcap.xml group=sys mode=0444
 hardlink path=usr/lib/rcap/rcapd target=../isaexec
 legacy pkg=SUNWrcapr arch=$(ARCH) category=system \
     desc="Solaris Resource Capping Daemon (Root)" \

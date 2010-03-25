@@ -46,9 +46,10 @@ dir path=var/spool/uucp/.Corrupt group=uucp owner=uucp
 dir path=var/spool/uucp/.Workspace group=uucp owner=uucp
 dir path=var/spool/uucp/.Xqtdir group=uucp owner=uucp
 dir path=var/spool/uucppublic group=uucp mode=1777 owner=uucp
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 dir path=var/uucp group=uucp owner=uucp
 dir path=var/uucp/.Admin group=uucp owner=uucp
 dir path=var/uucp/.Log group=uucp owner=uucp
@@ -107,7 +108,7 @@ file path=usr/lib/uucp/uudemon.poll group=uucp mode=0555
 file path=usr/lib/uucp/uusched group=uucp mode=4511 owner=uucp
 file path=usr/lib/uucp/uuxqt group=uucp mode=4511 owner=uucp
 file path=usr/sbin/in.uucpd group=uucp mode=0555
-file path=var/svc/manifest/network/uucp.xml group=sys mode=0444
+file path=lib/svc/manifest/network/uucp.xml group=sys mode=0444
 hardlink path=etc/rc2.d/S70uucp target=../../etc/init.d/uucp
 legacy pkg=SUNWbnur arch=$(ARCH) category=system \
     desc="configuration and start-up files for UUCP utilities" \

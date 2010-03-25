@@ -41,19 +41,16 @@ dir path=usr/platform/SUNW,Sun-Fire-880 group=sys
 dir path=usr/platform/SUNW,Sun-Fire-880/lib
 dir path=usr/platform/SUNW,Sun-Fire-V890 group=sys
 dir path=usr/platform/SUNW,Sun-Fire-V890/lib
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/platform group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/platform group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/platform/sun4u group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/platform/sun4u group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=lib/svc/method/sf880dr mode=0555 opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=usr/platform/SUNW,Sun-Fire-880/lib/sf880drd group=sys mode=0755
-file path=var/svc/manifest/platform/sun4u/sf880drd.xml group=sys mode=0444 \
+file path=lib/svc/manifest/platform/sun4u/sf880drd.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWsfdr.u arch=$(ARCH).sun4u category=system \
     desc="Sun Fire 880 DR Daemon" \

@@ -357,46 +357,46 @@ superfluous_nonglobal_zone_files="
 	usr/platform/SUNW,SPARC-Enterprise/sbin/prtdscp
 	var/adm/pool
 	var/log/pool
-	var/svc/manifest/network/iscsi/iscsi-initiator.xml
-	var/svc/manifest/network/npiv_config.xml
-	var/svc/manifest/network/rpc/mdcomm.xml
-	var/svc/manifest/network/rpc/meta.xml
-	var/svc/manifest/network/rpc/metamed.xml
-	var/svc/manifest/network/rpc/metamh.xml
-	var/svc/manifest/network/tnctl.xml
-	var/svc/manifest/network/tnd.xml
-	var/svc/manifest/platform/i86pc/eeprom.xml
-	var/svc/manifest/platform/sun4u/dcs.xml
-	var/svc/manifest/platform/sun4u/dscp.xml
-	var/svc/manifest/platform/sun4u/efdaemon.xml
-	var/svc/manifest/platform/sun4u/oplhpd.xml
-	var/svc/manifest/platform/sun4u/sckmd.xml
-	var/svc/manifest/platform/sun4u/sf880drd.xml
-	var/svc/manifest/platform/sun4v
-	var/svc/manifest/system/cvc.xml
-	var/svc/manifest/system/device/devices-audio.xml
-	var/svc/manifest/system/device/devices-fc-fabric.xml
-	var/svc/manifest/system/dumpadm.xml
-	var/svc/manifest/system/fcoe_initiator.xml
-	var/svc/manifest/system/fcoe_target.xml
-	var/svc/manifest/system/filesystem/rmvolmgr.xml
-	var/svc/manifest/system/fmd.xml
-	var/svc/manifest/system/hal.xml
-	var/svc/manifest/system/intrd.xml
-	var/svc/manifest/system/labeld.xml
-	var/svc/manifest/system/mdmonitor.xml
-	var/svc/manifest/system/metainit.xml
-	var/svc/manifest/system/metasync.xml
-	var/svc/manifest/system/picl.xml
-	var/svc/manifest/system/poold.xml
-	var/svc/manifest/system/pools.xml
-	var/svc/manifest/system/power.xml
-	var/svc/manifest/system/resource-mgmt.xml
-	var/svc/manifest/system/scheduler.xml
-	var/svc/manifest/system/stmf.xml
-	var/svc/manifest/system/sysevent.xml
-	var/svc/manifest/system/vtdaemon.xml
-	var/svc/manifest/system/zones.xml
+	lib/svc/manifest/network/iscsi/iscsi-initiator.xml
+	lib/svc/manifest/network/npiv_config.xml
+	lib/svc/manifest/network/rpc/mdcomm.xml
+	lib/svc/manifest/network/rpc/meta.xml
+	lib/svc/manifest/network/rpc/metamed.xml
+	lib/svc/manifest/network/rpc/metamh.xml
+	lib/svc/manifest/network/tnctl.xml
+	lib/svc/manifest/network/tnd.xml
+	lib/svc/manifest/platform/i86pc/eeprom.xml
+	lib/svc/manifest/platform/sun4u/dcs.xml
+	lib/svc/manifest/platform/sun4u/dscp.xml
+	lib/svc/manifest/platform/sun4u/efdaemon.xml
+	lib/svc/manifest/platform/sun4u/oplhpd.xml
+	lib/svc/manifest/platform/sun4u/sckmd.xml
+	lib/svc/manifest/platform/sun4u/sf880drd.xml
+	lib/svc/manifest/platform/sun4v
+	lib/svc/manifest/system/cvc.xml
+	lib/svc/manifest/system/device/devices-audio.xml
+	lib/svc/manifest/system/device/devices-fc-fabric.xml
+	lib/svc/manifest/system/dumpadm.xml
+	lib/svc/manifest/system/fcoe_initiator.xml
+	lib/svc/manifest/system/fcoe_target.xml
+	lib/svc/manifest/system/filesystem/rmvolmgr.xml
+	lib/svc/manifest/system/fmd.xml
+	lib/svc/manifest/system/hal.xml
+	lib/svc/manifest/system/intrd.xml
+	lib/svc/manifest/system/labeld.xml
+	lib/svc/manifest/system/mdmonitor.xml
+	lib/svc/manifest/system/metainit.xml
+	lib/svc/manifest/system/metasync.xml
+	lib/svc/manifest/system/picl.xml
+	lib/svc/manifest/system/poold.xml
+	lib/svc/manifest/system/pools.xml
+	lib/svc/manifest/system/power.xml
+	lib/svc/manifest/system/resource-mgmt.xml
+	lib/svc/manifest/system/scheduler.xml
+	lib/svc/manifest/system/stmf.xml
+	lib/svc/manifest/system/sysevent.xml
+	lib/svc/manifest/system/vtdaemon.xml
+	lib/svc/manifest/system/zones.xml
 "
 
 #
@@ -1018,7 +1018,16 @@ check_boomer_sys() {
 }
 
 check_boomer_bfu() {
+	# It's necessary to check in both the root and lib archives.
+	# The Early Manifest Import project moved the manifest from the
+	# root archive to the lib archive.
+	#
 	$ZCAT $cpiodir/generic.root$ZFIX | cpio -it 2>/dev/null |
+	    grep devices-audio.xml > /dev/null 2>&1
+	if [ $? -eq 0 ] ; then
+		return 0
+	fi
+	$ZCAT $cpiodir/generic.lib$ZFIX | cpio -it 2>/dev/null |
 	    grep devices-audio.xml > /dev/null 2>&1
 }
 
@@ -1577,9 +1586,8 @@ smf_new_profiles () {
 
 	# platform_SUNW,Sun-Fire.xml (and other new and
 	# corrected platforms) were delivered in Build 68.
-	if [ ! -f \
-		$rootprefix/var/svc/profile/platform_SUNW,Sun-Fire.xml \
-		]; then
+	if [ ! -f $rootprefix/var/svc/profile/platform_SUNW,Sun-Fire.xml -a \
+	     ! -f $rootprefix/etc/svc/profile/platform_SUNW,Sun-Fire.xml ]; then
 		for pfx in " " "v"; do
 			for plname in \
 			    none \
@@ -1603,7 +1611,7 @@ smf_handle_new_services () {
 	# default-enabled-in-profile services.  If so, add a command
 	# such that they are enabled.
 	#
-	if [ ! -f $rootprefix/var/svc/profile/system/sac.xml ]; then
+	if [ ! -f $rootprefix/lib/svc/manifest/system/sac.xml ]; then
 		echo /usr/sbin/svcadm enable system/sac >> \
 		    $rootprefix/var/svc/profile/upgrade
 	fi
@@ -1758,7 +1766,10 @@ smf_cleanup_vt() {
 
 smf_cleanup_boomer() {
 	(
-		smf_delete_manifest var/src/manifest/system/devices-audio.xml
+		for boomer_dir in lib/svc/manifest var/svc/manifest ; do
+			boomer_mfst=$boomer_dir/system/devices-audio.xml
+			smf_delete_manifest $boomer_mfst
+		done
 		cd $root
 		rm -f lib/svc/method/devices-audio
 
@@ -1768,6 +1779,11 @@ smf_cleanup_boomer() {
 
 old_mfst_dir="var/svc/manifest.orig"
 new_mfst_dir="var/svc/manifest"
+moved_mfst_dir="lib/svc/manifest"
+
+old_profile_dir="var/svc/profile.orig"
+new_profile_dir="var/svc/profile"
+moved_profile_dir="etc/svc/profile"
 
 smf_enable() {
 	echo "svcadm enable $*" >> $rootprefix/var/svc/profile/upgrade
@@ -2023,14 +2039,22 @@ smf_bkbfu_templates() {
 
 smf_apply_conf () {
 	#
-	# Go thru the original manifests and move any that were unchanged
-	# (or are not system-provided) back to their proper location.  This
-	# will avoid superfluous re-import on reboot, as the inode and mtime
-	# are both part of the hash.
+	# Go thru the original manifests and move any that are not
+	# system-provided) back to their proper location.
 	#
 	if [ -d $rootprefix/$old_mfst_dir ]; then
 		for f in `cd $rootprefix/$old_mfst_dir ; find . -type f`
 		do
+			#
+			# Don't restore if manifest is moved to
+			# /lib/svc/manifest 
+			#
+			moved=$rootprefix/$moved_mfst_dir/$f
+			[ -f "$moved" ] && continue
+
+			[ "$zone" != "global" -a \
+			    -f "/$moved_mfst_dir/$f" ] && continue
+
 			old=$rootprefix/$old_mfst_dir/$f
 			new=$rootprefix/$new_mfst_dir/$f
 			if [ ! -f $new ]; then
@@ -2038,9 +2062,44 @@ smf_apply_conf () {
 				mv $old $new
 				continue
 			fi
-			cmp -s $old $new && mv $old $new
 		done
 		rm -rf $rootprefix/$old_mfst_dir
+	fi
+
+	#
+	# Do the same for profiles
+	#
+	if [ -d $rootprefix/$old_profile_dir ]; then
+		for f in `cd $rootprefix/$old_profile_dir ; find . -type f`
+		do
+			#
+			# Don't restore if profile is moved to
+			# /etc/svc/profile
+			#
+			moved=$rootprefix/$moved_profile_dir/$f
+			[ -f "$moved" ] && continue
+
+			old=$rootprefix/$old_profile_dir/$f
+			new=$rootprefix/$new_profile_dir/$f
+			if [ ! -f $new ]; then
+				mkdir -m 0755 -p `dirname $new`
+				mv $old $new
+				continue
+			fi
+		done
+
+		#
+		# Handle generic profile here before removing the old dir. This
+		# is only done during the first time we move generic profiles
+		# to /etc/svc/profiles
+		#
+		if [ -f $rootprefix/$old_profile_dir/generic.xml ]; then
+			rm -f $rootprefix/etc/svc/profile/generic.xml
+			mv $rootprefix/$old_profile_dir/generic.xml \
+			    $rootprefix/etc/svc/profile/
+		fi
+
+		rm -rf $rootprefix/$old_profile_dir
 	fi
 
 	if [ -f $rootprefix/etc/init.d/inetd ]; then
@@ -2116,7 +2175,7 @@ smf_apply_conf () {
 
 	print "Connecting platform and name service profiles ..."
 
-	rm -f $rootprefix/var/svc/profile/name_service.xml
+	rm -f $rootprefix/etc/svc/profile/name_service.xml
 
 	grep ldap $rootprefix/etc/nsswitch.conf >/dev/null 2>&1
 	is_ldap=$?
@@ -2131,10 +2190,10 @@ smf_apply_conf () {
 		ns_profile=ns_files.xml
 	fi
 
-	ln -s $ns_profile $rootprefix/var/svc/profile/name_service.xml
+	ln -s $ns_profile $rootprefix/etc/svc/profile/name_service.xml
 
-	rm -f $rootprefix/var/svc/profile/inetd_services.xml
-	ln -s inetd_upgrade.xml $rootprefix/var/svc/profile/inetd_services.xml
+	rm -f $rootprefix/etc/svc/profile/inetd_services.xml
+	ln -s inetd_upgrade.xml $rootprefix/etc/svc/profile/inetd_services.xml
 
 	print "Marking converted services as enabled ..."
 
@@ -2442,8 +2501,6 @@ EOF
 		smf_enable network/rarp
 		smf_enable network/rpc/bootparams
 	fi
-
-	touch $rootprefix/var/svc/profile/.upgrade_prophist
 
 	cat >> $rootprefix/var/svc/profile/upgrade <<EOF
 	# We are deleting and reimporting dcs's manifest, because we
@@ -8054,6 +8111,13 @@ mondo_loop() {
 	#
 	rm -rf $root/$old_mfst_dir
 	[ -d $root/$new_mfst_dir ] && mv $root/$new_mfst_dir $root/$old_mfst_dir
+
+	#
+	# Do the same for profiles in old location
+	rm -rf $root/$old_profile_dir
+	if [ -d $root/$new_profile_dir ]; then
+	    mv $root/$new_profile_dir $root/$old_profile_dir
+	fi
 
 	#
 	# Remove obsolete sum.h

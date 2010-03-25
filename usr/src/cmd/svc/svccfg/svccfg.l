@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,7 @@ extern int yyerror(const char *);
 
 <INITIAL>validate	{ BEGIN WORD; return (SCC_VALIDATE); }
 <INITIAL>import		{ BEGIN WORD; return (SCC_IMPORT); }
+<INITIAL>cleanup	{ BEGIN WORD; return (SCC_CLEANUP); }
 <INITIAL>export		{ BEGIN WORD; return (SCC_EXPORT); }
 <INITIAL>archive	{ BEGIN WORD; return (SCC_ARCHIVE); }
 <INITIAL>restore	{ BEGIN WORD; return (SCC_RESTORE); }

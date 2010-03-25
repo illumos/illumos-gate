@@ -50,10 +50,8 @@ dir path=platform/SUNW,Ultra-Enterprise-10000/kernel group=sys
 dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv group=sys
 dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/$(ARCH64) group=sys
 dir path=platform/SUNW,Ultra-Enterprise-10000/lib
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/system group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 driver name=cvc perms="* 0600 root sys"
 driver name=cvcredir perms="* 0600 root sys"
 file path=lib/svc/method/svc-cvcd mode=0555
@@ -75,7 +73,7 @@ file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/cvcredir.conf \
     group=sys reboot-needed=false
 file path=platform/SUNW,Ultra-Enterprise-10000/lib/cvcd group=sys mode=0700 \
     reboot-needed=true
-file path=var/svc/manifest/system/cvc.xml group=sys mode=0444
+file path=lib/svc/manifest/system/cvc.xml group=sys mode=0444
 legacy pkg=SUNWcvc.u arch=$(ARCH).sun4u category=system desc="Network Console" \
     hotline="Please contact your local service provider" name="Network Console" \
     vendor="Sun Microsystems, Inc." version=11.11,REV=2009.11.11

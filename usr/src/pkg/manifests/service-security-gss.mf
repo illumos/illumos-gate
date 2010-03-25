@@ -33,17 +33,17 @@ set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=etc group=sys
 dir path=etc/gss group=sys
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
-dir path=var/svc/manifest/network/rpc group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/rpc group=sys
 file path=etc/gss/gsscred.conf group=sys \
     original_name=SUNWgssc:etc/gss/gsscred.conf preserve=true
 file path=etc/gss/mech group=sys original_name=SUNWgssc:etc/gss/mech \
     preserve=true
 file path=etc/gss/qop group=sys original_name=SUNWgssc:etc/gss/qop preserve=true
-file path=var/svc/manifest/network/rpc/gss.xml group=sys mode=0444
+file path=lib/svc/manifest/network/rpc/gss.xml group=sys mode=0444
 legacy pkg=SUNWgssc arch=$(ARCH) category=system \
     desc="Generic Security Service Application Program Interface, Version 2 - config" \
     hotline="Please contact your local service provider" \

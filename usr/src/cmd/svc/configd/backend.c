@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sqlite is not compatible with _FILE_OFFSET_BITS=64, but we need to
@@ -35,6 +33,7 @@
 #define	_LARGEFILE64_SOURCE
 
 #include <assert.h>
+#include <atomic.h>
 #include <door.h>
 #include <dirent.h>
 #include <errno.h>
@@ -45,8 +44,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <time.h>
 #include <unistd.h>
 #include <zone.h>
 #include <libscf_priv.h>
@@ -67,6 +68,15 @@
  *    synchronizes MT access to the database.
  */
 
+#define	IS_VOLATILE(be)		((be)->be_ppath != NULL)
+#define	MAX_FLIGHT_RECORDER_EVENTS	100
+
+typedef enum backend_switch_results {
+	BACKEND_SWITCH_FATAL =	-1,
+	BACKEND_SWITCH_OK =	0,
+	BACKEND_SWITCH_RO
+} backend_switch_results_t;
+
 typedef struct backend_spent {
 	uint64_t bs_count;
 	hrtime_t bs_time;
@@ -78,11 +88,23 @@ typedef struct backend_totals {
 	backend_spent_t	bt_exec;	/* time spent executing SQL */
 } backend_totals_t;
 
+/*
+ * There are times when svcadm asks configd to move the BACKEND_TYPE_NORMAL
+ * repository to volatile storage.  See backend_switch().  When the
+ * repository is on volatile storage, we save the location of the permanent
+ * repository in be_ppath.  We use the saved path when the time comes to
+ * move the repository back.  When the repository is on permanent storage,
+ * be_ppath is set to NULL.  Also see the definition of IS_VOLATILE() above
+ * for testing if the repository is on volatile storage.
+ */
 typedef struct sqlite_backend {
 	pthread_mutex_t	be_lock;
 	pthread_t	be_thread;	/* thread holding lock */
 	struct sqlite	*be_db;
 	const char	*be_path;	/* path to db */
+	const char	*be_ppath;	/* saved path to persistent db when */
+					/* backend is volatile */
+	const char	*be_checkpoint;	/* path to repository checkpoint */
 	int		be_readonly;	/* readonly at start, and still is */
 	int		be_writing;	/* held for writing */
 	backend_type_t	be_type;	/* type of db */
@@ -123,6 +145,52 @@ struct backend_idx_info {
 	const char *bxi_cols;
 };
 
+/* Definitions for the flight recorder: */
+
+typedef enum be_flight_type {
+	BE_FLIGHT_EV_NOEVENT = 0,	/* No event yet recorded. */
+	BE_FLIGHT_EV_BACKUP,		/* Information about repo. backup */
+	BE_FLIGHT_EV_BACKUP_ENTER,	/* Enter */
+					/* backend_create_backup_locked() */
+	BE_FLIGHT_EV_CHECKPOINT,	/* Request to checkpoint repository */
+					/* for boot time backup */
+	BE_FLIGHT_EV_CHECKPOINT_EXISTS,	/* Existing checkpoint detected on */
+					/* restart */
+	BE_FLIGHT_EV_LINGERING_FAST,	/* Use lingering fast repository */
+	BE_FLIGHT_EV_NO_BACKUP,		/* Requested backup not made */
+	BE_FLIGHT_EV_REPO_CREATE,	/* Main repository created */
+	BE_FLIGHT_EV_RESTART,		/* This is a restart of configd */
+	BE_FLIGHT_EV_SWITCH,		/* Switch repositories */
+	BE_FLIGHT_EV_TRANS_RW		/* Root transitioned to read/write */
+} be_flight_type_t;
+
+typedef enum be_flight_status {
+	BE_FLIGHT_ST_INFO = 0,		/* No status.  Event is informative */
+	BE_FLIGHT_ST_BOOT_BACKUP,	/* Boot time backup */
+	BE_FLIGHT_ST_CHECKPOINT_BACKUP,	/* Backup from checkpoint */
+	BE_FLIGHT_ST_CLIENT,		/* Request form client as opposed to */
+					/* internal call */
+	BE_FLIGHT_ST_DUPLICATE,		/* Backup duplicates existing one */
+	BE_FLIGHT_ST_FAIL,		/* Operation failed. */
+	BE_FLIGHT_ST_FAST,		/* Fast repository (tmpfs) */
+	BE_FLIGHT_ST_MI_BACKUP,		/* Manifest-import backup */
+	BE_FLIGHT_ST_NO_SWITCH,		/* Don't switch repositories */
+	BE_FLIGHT_ST_OTHER_BACKUP,	/* Other type of backup */
+	BE_FLIGHT_ST_PERMANENT,		/* Repository on permanet storage */
+	BE_FLIGHT_ST_REPO_BACKUP,	/* Backup from repository */
+	BE_FLIGHT_ST_RO,		/* Main repository is read-only */
+	BE_FLIGHT_ST_RW,		/* Main repository is read/write */
+	BE_FLIGHT_ST_SUCCESS,		/* Operation was successful */
+	BE_FLIGHT_ST_SWITCH		/* Switch repository */
+} be_flight_status_t;
+
+typedef struct be_flight_event {
+	be_flight_type_t	bfe_type;	/* Type of event. */
+	be_flight_status_t	bfe_status;	/* Result of the event. */
+	time_t			bfe_time;	/* Time of the event. */
+	uint_t			bfe_sequence;	/* Sequence number. */
+} be_flight_event_t;
+
 static pthread_mutex_t backend_panic_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t backend_panic_cv = PTHREAD_COND_INITIALIZER;
 pthread_t backend_panic_thread = 0;
@@ -130,6 +198,14 @@ pthread_t backend_panic_thread = 0;
 int backend_do_trace = 0;		/* invoke tracing callback */
 int backend_print_trace = 0;		/* tracing callback prints SQL */
 int backend_panic_abort = 0;		/* abort when panicking */
+
+/* Data for the flight_recorder. */
+
+static pthread_mutex_t backend_flight_recorder_lock = PTHREAD_MUTEX_INITIALIZER;
+static be_flight_event_t flight_recorder[MAX_FLIGHT_RECORDER_EVENTS];
+static uint_t flight_recorder_next = 0;
+static uint_t flight_recorder_missed = 0;
+static uint_t flight_recorder_sequence = 0;
 
 /* interval between read-only checks while starting up */
 #define	BACKEND_READONLY_CHECK_INTERVAL	(2 * (hrtime_t)NANOSEC)
@@ -312,6 +388,51 @@ struct run_single_int_info {
 	uint32_t	*rs_out;
 	int		rs_result;
 };
+
+static rep_protocol_responseid_t backend_copy_repository(const char *,
+    const char *, int);
+static rep_protocol_responseid_t backend_do_copy(const char *, int,
+    const char *, int, size_t *);
+
+/*
+ * The flight recorder keeps track of events that happen primarily while
+ * the system is booting.  Once the system is up an running, one can take a
+ * gcore(1) of configd and examine the events with mdb.  Since we're most
+ * interested in early boot events, we stop recording events when the
+ * recorder is full.
+ */
+static void
+flight_recorder_event(be_flight_type_t type, be_flight_status_t res)
+{
+	be_flight_event_t *data;
+	uint_t item;
+	uint_t sequence;
+
+	if (pthread_mutex_lock(&backend_flight_recorder_lock) != 0) {
+		atomic_inc_uint(&flight_recorder_missed);
+		return;
+	}
+	if (flight_recorder_next >= MAX_FLIGHT_RECORDER_EVENTS) {
+		/* Hit end of the array.  No more event recording. */
+		item = flight_recorder_next;
+	} else {
+		item = flight_recorder_next++;
+		sequence = flight_recorder_sequence++;
+	}
+	(void) pthread_mutex_unlock(&backend_flight_recorder_lock);
+
+	if (item >= MAX_FLIGHT_RECORDER_EVENTS) {
+		/* Array is filled.  Stop recording events */
+		atomic_inc_uint(&flight_recorder_missed);
+		return;
+	}
+	data = &flight_recorder[item];
+	(void) memset(data, 0, sizeof (*data));
+	data->bfe_type = type;
+	data->bfe_status = res;
+	data->bfe_sequence = sequence;
+	data->bfe_time = time(NULL);
+}
 
 /*ARGSUSED*/
 static int
@@ -680,7 +801,8 @@ backend_backup_base(sqlite_backend_t *be, const char *name,
 	 * for paths of the form /path/to/foo.db, we truncate at the final
 	 * '.'.
 	 */
-	(void) strlcpy(out, be->be_path, out_len);
+	(void) strlcpy(out, IS_VOLATILE(be) ? be->be_ppath : be->be_path,
+	    out_len);
 
 	p = strrchr(out, '/');
 	q = strrchr(out, '.');
@@ -710,6 +832,34 @@ backend_backup_base(sqlite_backend_t *be, const char *name,
 	}
 
 	return (REP_PROTOCOL_SUCCESS);
+}
+
+/*
+ * Make a checkpoint of the repository, so that we can use it for a backup
+ * when the root file system becomes read/write.  We'll first copy the
+ * repository into a temporary file and then rename it to
+ * REPOSITORY_CHECKPOINT.  This is protection against configd crashing in
+ * the middle of the copy and leaving a partial copy at
+ * REPOSITORY_CHECKPOINT.  Renames are atomic.
+ */
+static rep_protocol_responseid_t
+backend_checkpoint_repository(sqlite_backend_t *be)
+{
+	rep_protocol_responseid_t r;
+
+	assert(be->be_readonly);	/* Only need a checkpoint if / is ro */
+	assert(be->be_type == BACKEND_TYPE_NORMAL);
+	assert(be->be_checkpoint == NULL); /* Only 1 checkpoint */
+
+	r = backend_copy_repository(be->be_path, REPOSITORY_CHECKPOINT, 0);
+	if (r == REP_PROTOCOL_SUCCESS)
+		be->be_checkpoint = REPOSITORY_CHECKPOINT;
+
+	flight_recorder_event(BE_FLIGHT_EV_CHECKPOINT,
+	    r == REP_PROTOCOL_SUCCESS ? BE_FLIGHT_ST_SUCCESS :
+	    BE_FLIGHT_ST_FAIL);
+
+	return (r);
 }
 
 /*
@@ -857,7 +1007,19 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 	size_t len;
 	time_t now;
 	struct tm now_tm;
+	be_flight_status_t backup_type;
 	rep_protocol_responseid_t result;
+	const char *src;
+	int use_checkpoint;
+
+	if (strcmp(name, REPOSITORY_BOOT_BACKUP) == 0) {
+		backup_type = BE_FLIGHT_ST_BOOT_BACKUP;
+	} else if (strcmp(name, "manifest_import") ==  0) {
+		backup_type = BE_FLIGHT_ST_MI_BACKUP;
+	} else {
+		backup_type = BE_FLIGHT_ST_OTHER_BACKUP;
+	}
+	flight_recorder_event(BE_FLIGHT_EV_BACKUP_ENTER, backup_type);
 
 	if ((finalpath = malloc(PATH_MAX)) == NULL)
 		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
@@ -868,6 +1030,7 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 	}
 
 	if (be->be_readonly) {
+		flight_recorder_event(BE_FLIGHT_EV_NO_BACKUP, BE_FLIGHT_ST_RO);
 		result = REP_PROTOCOL_FAIL_BACKEND_READONLY;
 		goto out;
 	}
@@ -876,7 +1039,29 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 	if (result != REP_PROTOCOL_SUCCESS)
 		goto out;
 
-	if (!backend_check_backup_needed(be->be_path, finalpath)) {
+	/*
+	 * If this is a boot backup and if we made a checkpoint before the
+	 * root file system became read/write, then we should use the
+	 * checkpoint as the source.  Otherwise, we'll use the actual
+	 * repository as the source.
+	 */
+	if (be->be_checkpoint && name &&
+	    strcmp(REPOSITORY_BOOT_BACKUP, name) == 0) {
+		backup_type = BE_FLIGHT_ST_CHECKPOINT_BACKUP;
+		use_checkpoint = 1;
+		src = be->be_checkpoint;
+	} else {
+		backup_type = BE_FLIGHT_ST_REPO_BACKUP;
+		use_checkpoint = 0;
+		src = be->be_path;
+	}
+	flight_recorder_event(BE_FLIGHT_EV_BACKUP, backup_type);
+	if (!backend_check_backup_needed(src, finalpath)) {
+		/*
+		 * No changes, so there is no need for a backup.
+		 */
+		flight_recorder_event(BE_FLIGHT_EV_NO_BACKUP,
+		    BE_FLIGHT_ST_DUPLICATE);
 		result = REP_PROTOCOL_SUCCESS;
 		goto out;
 	}
@@ -901,7 +1086,7 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 	if (localtime_r(&now, &now_tm) == NULL) {
 		configd_critical(
 		    "\"%s\" backup failed: localtime(3C) failed: %s\n", name,
-		    be->be_path, strerror(errno));
+		    strerror(errno));
 		result = REP_PROTOCOL_FAIL_UNKNOWN;
 		goto out;
 	}
@@ -912,10 +1097,10 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 		goto out;
 	}
 
-	infd = open(be->be_path, O_RDONLY);
+	infd = open(src, O_RDONLY);
 	if (infd < 0) {
 		configd_critical("\"%s\" backup failed: opening %s: %s\n", name,
-		    be->be_path, strerror(errno));
+		    src, strerror(errno));
 		result = REP_PROTOCOL_FAIL_UNKNOWN;
 		goto out;
 	}
@@ -929,8 +1114,8 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 		goto out;
 	}
 
-	if ((result = backend_do_copy((const char *)be->be_path, infd,
-	    (const char *)tmppath, outfd, NULL)) != REP_PROTOCOL_SUCCESS)
+	if ((result = backend_do_copy(src, infd, (const char *)tmppath,
+	    outfd, NULL)) != REP_PROTOCOL_SUCCESS)
 		goto fail;
 
 	/*
@@ -973,14 +1158,22 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 	}
 
 	result = REP_PROTOCOL_SUCCESS;
+	flight_recorder_event(BE_FLIGHT_EV_BACKUP, BE_FLIGHT_ST_SUCCESS);
 
 fail:
 	(void) close(infd);
 	(void) close(outfd);
-	if (result != REP_PROTOCOL_SUCCESS)
+	if (result != REP_PROTOCOL_SUCCESS) {
+		flight_recorder_event(BE_FLIGHT_EV_BACKUP, BE_FLIGHT_ST_FAIL);
 		(void) unlink(tmppath);
+	}
 
 out:
+	/* Get rid of the checkpoint file now that we've used it. */
+	if (use_checkpoint && (result == REP_PROTOCOL_SUCCESS)) {
+		(void) unlink(be->be_checkpoint);
+		be->be_checkpoint = NULL;
+	}
 	free(finalpath);
 	free(tmppath);
 
@@ -1059,6 +1252,7 @@ backend_check_upgrade(sqlite_backend_t *be, boolean_t do_upgrade)
 static int
 backend_check_readonly(sqlite_backend_t *be, int writing, hrtime_t t)
 {
+	const char *check_path;
 	char *errp;
 	struct sqlite *new;
 	int r;
@@ -1077,27 +1271,62 @@ backend_check_readonly(sqlite_backend_t *be, int writing, hrtime_t t)
 		be->be_lastcheck = t;
 	}
 
-	new = sqlite_open(be->be_path, 0600, &errp);
+	/*
+	 * It could be that the repository has been moved to non-persistent
+	 * storage for performance reasons.  In this case we need to check
+	 * the persistent path to see if it is writable.  The
+	 * non-persistent path will always be writable.
+	 */
+	check_path = IS_VOLATILE(be) ? be->be_ppath : be->be_path;
+
+	new = sqlite_open(check_path, 0600, &errp);
 	if (new == NULL) {
-		backend_panic("reopening %s: %s\n", be->be_path, errp);
+		backend_panic("reopening %s: %s\n", check_path, errp);
 		/*NOTREACHED*/
 	}
-	r = backend_is_readonly(new, be->be_path);
+	r = backend_is_readonly(new, check_path);
 
 	if (r != SQLITE_OK) {
+		/*
+		 * The underlying storage for the permanent repository is
+		 * still read-only, so we don't want to change the state or
+		 * move the checkpointed backup if it exists.  On the other
+		 * hand if the repository has been copied to volatile
+		 * storage, we'll let our caller go ahead and write to the
+		 * database.
+		 */
 		sqlite_close(new);
-		if (writing)
+		if (writing && (IS_VOLATILE(be) == 0))
 			return (REP_PROTOCOL_FAIL_BACKEND_READONLY);
 		return (REP_PROTOCOL_SUCCESS);
 	}
 
 	/*
-	 * We can write!  Swap the db handles, mark ourself writable,
-	 * upgrade if necessary,  and make a backup.
+	 * We can write!  If the repository is not on volatile storage,
+	 * swap the db handles.  Mark ourself as writable, upgrade the
+	 * repository if necessary and make a backup.
 	 */
-	sqlite_close(be->be_db);
-	be->be_db = new;
 	be->be_readonly = 0;
+	flight_recorder_event(BE_FLIGHT_EV_TRANS_RW, BE_FLIGHT_ST_RW);
+	if (IS_VOLATILE(be)) {
+		/*
+		 * If the repository is on volatile storage, don't switch
+		 * the handles.  We'll continue to use the repository that
+		 * is on tmpfs until we're told to move it back by one of
+		 * our clients.  Clients, specifically manifest_import,
+		 * move the repository to tmpfs for performance reasons,
+		 * and that is the reason to not switch it back until we're
+		 * told to do so.
+		 */
+		flight_recorder_event(BE_FLIGHT_EV_TRANS_RW,
+		    BE_FLIGHT_ST_NO_SWITCH);
+		sqlite_close(new);
+	} else {
+		flight_recorder_event(BE_FLIGHT_EV_TRANS_RW,
+		    BE_FLIGHT_ST_SWITCH);
+		sqlite_close(be->be_db);
+		be->be_db = new;
+	}
 
 	if (be->be_type == BACKEND_TYPE_NORMAL)
 		backend_check_upgrade(be, B_TRUE);
@@ -1234,6 +1463,7 @@ backend_create_backup(const char *name)
 	rep_protocol_responseid_t result;
 	sqlite_backend_t *be;
 
+	flight_recorder_event(BE_FLIGHT_EV_BACKUP, BE_FLIGHT_ST_CLIENT);
 	result = backend_lock(BACKEND_TYPE_NORMAL, 0, &be);
 	assert(result == REP_PROTOCOL_SUCCESS);
 
@@ -1244,11 +1474,11 @@ backend_create_backup(const char *name)
 }
 
 /*
- * Copy the repository.  If the sw_back flag is not set, we are
- * copying the repository from the default location under /etc/svc to
- * the tmpfs /etc/svc/volatile location.  If the flag is set, we are
- * copying back to the /etc/svc location from the volatile location
- * after manifest-import is completed.
+ * This function makes a copy of the repository at src, placing the copy at
+ * dst.  It is used to copy a repository on permanent storage to volatile
+ * storage or vice versa.  If the source file is on volatile storage, it is
+ * often times desirable to delete it after the copy has been made and
+ * verified.  To remove the source repository, set remove_src to 1.
  *
  * Can return:
  *
@@ -1257,7 +1487,7 @@ backend_create_backup(const char *name)
  *	REP_PROTOCOL_FAIL_NO_RESOURCES	out of memory
  */
 static rep_protocol_responseid_t
-backend_switch_copy(const char *src, const char *dst, int sw_back)
+backend_copy_repository(const char *src, const char *dst, int remove_src)
 {
 	int srcfd, dstfd;
 	char *tmppath = malloc(PATH_MAX);
@@ -1337,7 +1567,7 @@ errexit:
 
 out:
 	free(tmppath);
-	if (sw_back) {
+	if (remove_src) {
 		if (unlink(src) < 0)
 			configd_critical(
 			    "Backend copy failed: remove %s: %s\n",
@@ -1374,10 +1604,15 @@ backend_switch_check(struct sqlite *be_db, char **errp)
 }
 
 /*
- * Backend switch entry point.  It is called to perform the backend copy and
- * switch from src to dst.  First, it blocks all other clients from accessing
- * the repository by calling backend_lock to lock the repository.  Upon
- * successful lock, copying and switching of the repository are performed.
+ * backend_switch() implements the REP_PROTOCOL_SWITCH request from
+ * clients.  First, it blocks all other clients from accessing the
+ * repository by calling backend_lock to lock the repository.  It either
+ * copies the repository from it's permanent storage location
+ * (REPOSITORY_DB) to its fast volatile location (FAST_REPOSITORY_DB), or
+ * vice versa.  dir determines the direction of the copy.
+ *
+ *	dir = 0	Copy from permanent location to volatile location.
+ *	dir = 1	Copy from volatile location to permanent location.
  *
  * Can return:
  *	REP_PROTOCOL_SUCCESS			successful switch
@@ -1387,7 +1622,7 @@ backend_switch_check(struct sqlite *be_db, char **errp)
  *	REP_PROTOCOL_FAIL_NO_RESOURCES		out of memory
  */
 rep_protocol_responseid_t
-backend_switch(int sw_back)
+backend_switch(int dir)
 {
 	rep_protocol_responseid_t result;
 	sqlite_backend_t *be;
@@ -1395,20 +1630,38 @@ backend_switch(int sw_back)
 	char *errp;
 	const char *dst;
 
-	result = backend_lock(BACKEND_TYPE_NORMAL, 1, &be);
+	flight_recorder_event(BE_FLIGHT_EV_SWITCH, BE_FLIGHT_ST_CLIENT);
+
+	/*
+	 * If switching back to the main repository, lock for writing.
+	 * Otherwise, lock for reading.
+	 */
+	result = backend_lock(BACKEND_TYPE_NORMAL, dir ? 1 : 0,
+	    &be);
 	if (result != REP_PROTOCOL_SUCCESS)
 		return (result);
 
-	if (sw_back) {
+	if (dir) {
+		flight_recorder_event(BE_FLIGHT_EV_SWITCH,
+		    BE_FLIGHT_ST_PERMANENT);
 		dst = REPOSITORY_DB;
 	} else {
+		flight_recorder_event(BE_FLIGHT_EV_SWITCH,
+		    BE_FLIGHT_ST_FAST);
 		dst = FAST_REPOSITORY_DB;
 	}
 
 	/*
 	 * Do the actual copy and rename
 	 */
-	result = backend_switch_copy(be->be_path, dst, sw_back);
+	if (strcmp(be->be_path, dst) == 0) {
+		flight_recorder_event(BE_FLIGHT_EV_SWITCH,
+		    BE_FLIGHT_ST_DUPLICATE);
+		result = REP_PROTOCOL_SUCCESS;
+		goto errout;
+	}
+
+	result = backend_copy_repository(be->be_path, dst, dir);
 	if (result != REP_PROTOCOL_SUCCESS) {
 		goto errout;
 	}
@@ -1433,6 +1686,17 @@ backend_switch(int sw_back)
 			} else {
 				sqlite_close(be->be_db);
 				be->be_db = new;
+				if (dir) {
+					/* We're back on permanent storage. */
+					be->be_ppath = NULL;
+				} else {
+					/*
+					 * Repository is now on volatile
+					 * storage.  Save the location of
+					 * the persistent repository.
+					 */
+					be->be_ppath = REPOSITORY_DB;
+				}
 			}
 		} else {
 			configd_critical(
@@ -1447,6 +1711,12 @@ backend_switch(int sw_back)
 	}
 
 errout:
+	if (result == REP_PROTOCOL_SUCCESS) {
+		flight_recorder_event(BE_FLIGHT_EV_SWITCH,
+		    BE_FLIGHT_ST_SUCCESS);
+	} else {
+		flight_recorder_event(BE_FLIGHT_EV_SWITCH, BE_FLIGHT_ST_FAIL);
+	}
 	backend_unlock(be);
 	return (result);
 }
@@ -1459,23 +1729,41 @@ errout:
  * referenced here are indicators of successful switch
  * operations.
  */
-static void
+static backend_switch_results_t
 backend_switch_recovery(void)
 {
 	const char *fast_db = FAST_REPOSITORY_DB;
-	char *errp;
+	char *errp = NULL;
 	struct stat s_buf;
 	struct sqlite *be_db;
-
+	int r;
+	backend_switch_results_t res = BACKEND_SWITCH_OK;
 
 	/*
 	 * A good transient db containing most recent data can
-	 * exist if system or svc.configd crashes during the
+	 * exist if svc.configd crashes during the
 	 * switch operation.  If that is the case, check its
 	 * integrity and use it.
 	 */
 	if (stat(fast_db, &s_buf) < 0) {
-		return;
+		return (BACKEND_SWITCH_OK);
+	}
+
+	/* Determine if persistent repository is read-only */
+	be_db = sqlite_open(REPOSITORY_DB, 0600, &errp);
+	if (be_db == NULL) {
+		configd_critical("Unable to open \"%s\".  %s\n",
+		    REPOSITORY_DB, errp == NULL ? "" : errp);
+		free(errp);
+		return (BACKEND_SWITCH_FATAL);
+	}
+	r = backend_is_readonly(be_db, REPOSITORY_DB);
+	sqlite_close(be_db);
+	if (r != SQLITE_OK) {
+		if (r == SQLITE_READONLY) {
+			return (BACKEND_SWITCH_RO);
+		}
+		return (BACKEND_SWITCH_FATAL);
 	}
 
 	/*
@@ -1484,11 +1772,23 @@ backend_switch_recovery(void)
 	be_db = sqlite_open(fast_db, 0600, &errp);
 
 	if (be_db != NULL) {
-		if (backend_switch_check(be_db, &errp) == 0)
-			(void) backend_switch_copy(fast_db, REPOSITORY_DB, 1);
+		if (backend_switch_check(be_db, &errp) == 0) {
+			if (backend_copy_repository(fast_db,
+			    REPOSITORY_DB, 1) != REP_PROTOCOL_SUCCESS) {
+				res = BACKEND_SWITCH_FATAL;
+			}
+		}
+		sqlite_close(be_db);
 	}
+	free(errp);
 
+	/*
+	 * If we get to this point, the fast_db has either been copied or
+	 * it is useless.  Either way, get rid of it.
+	 */
 	(void) unlink(fast_db);
+
+	return (res);
 }
 
 /*ARGSUSED*/
@@ -2289,7 +2589,10 @@ int
 backend_init(const char *db_file, const char *npdb_file, int have_np)
 {
 	sqlite_backend_t *be;
+	char *errp;
+	struct sqlite *fast_db;
 	int r;
+	backend_switch_results_t switch_result = BACKEND_SWITCH_OK;
 	int writable_persist = 1;
 
 	/* set up our temporary directory */
@@ -2301,18 +2604,36 @@ backend_init(const char *db_file, const char *npdb_file, int have_np)
 		return (CONFIGD_EXIT_DATABASE_INIT_FAILED);
 	}
 
-	/*
-	 * If the system crashed during a backend switch, there might
-	 * be a leftover transient database which contains useful
-	 * information which can be used for recovery.
-	 */
-	backend_switch_recovery();
-
 	if (db_file == NULL)
 		db_file = REPOSITORY_DB;
 	if (strcmp(db_file, REPOSITORY_DB) != 0) {
 		is_main_repository = 0;
 	}
+
+	/*
+	 * If the svc.configd crashed, there might be a leftover transient
+	 * database at FAST_REPOSITORY_DB,which contains useful
+	 * information.  Both early manifest import and late manifest
+	 * import use svcadm to copy the repository to FAST_REPOSITORY_DB.
+	 * One reason for doing this is that it improves the performance of
+	 * manifest import.  The other reason is that the repository may be
+	 * on read-only root in the case of early manifest import.
+	 *
+	 * If FAST_REPOSITORY_DB exists, it is an indication that
+	 * svc.configd has been restarted for some reason.  Since we have
+	 * no way of knowing where we are in the boot process, the safe
+	 * thing to do is to move the repository back to it's non-transient
+	 * location, REPOSITORY_DB.  This may slow manifest import
+	 * performance, but it avoids the problem of missing the command to
+	 * move the repository to permanent storage.
+	 *
+	 * There is a caveat, though.  If root is read-only, we'll need to
+	 * leave the repository at FAST_REPOSITORY_DB.  If root is
+	 * read-only, late manifest import has not yet run, so it will move
+	 * the repository back to permanent storage when it runs.
+	 */
+	if (is_main_repository)
+		switch_result = backend_switch_recovery();
 
 	r = backend_create(BACKEND_TYPE_NORMAL, db_file, &be);
 	switch (r) {
@@ -2336,6 +2657,40 @@ backend_init(const char *db_file, const char *npdb_file, int have_np)
 		/*NOTREACHED*/
 	}
 	backend_create_finish(BACKEND_TYPE_NORMAL, be);
+	flight_recorder_event(BE_FLIGHT_EV_REPO_CREATE,
+	    writable_persist == 1 ? BE_FLIGHT_ST_RW : BE_FLIGHT_ST_RO);
+	/*
+	 * If there was a transient repository that could not be copied
+	 * back because the root file system was read-only, switch over to
+	 * using the transient repository.
+	 */
+	if (switch_result == BACKEND_SWITCH_RO) {
+		char *db_name_copy = NULL;
+
+		fast_db = sqlite_open(FAST_REPOSITORY_DB, 0600, &errp);
+		if (fast_db == NULL) {
+			/* Can't open fast repository.  Stick with permanent. */
+			configd_critical("Cannot open \"%s\".  %s\n",
+			    FAST_REPOSITORY_DB, errp == NULL ? "" : errp);
+			free(errp);
+		} else {
+			db_name_copy = strdup(FAST_REPOSITORY_DB);
+			if (db_name_copy == NULL) {
+				configd_critical("backend_init: out of "
+				    "memory.\n");
+				sqlite_close(fast_db);
+				return (CONFIGD_EXIT_INIT_FAILED);
+			} else {
+				flight_recorder_event(
+				    BE_FLIGHT_EV_LINGERING_FAST,
+				    BE_FLIGHT_ST_RO);
+				sqlite_close(be->be_db);
+				be->be_db = fast_db;
+				be->be_ppath = be->be_path;
+				be->be_path = db_name_copy;
+			}
+		}
+	}
 
 	if (have_np) {
 		if (npdb_file == NULL)
@@ -2365,10 +2720,19 @@ backend_init(const char *db_file, const char *npdb_file, int have_np)
 		}
 		backend_create_finish(BACKEND_TYPE_NONPERSIST, be);
 
+		if (r != BACKEND_CREATE_NEED_INIT) {
+			flight_recorder_event(BE_FLIGHT_EV_RESTART,
+			    BE_FLIGHT_ST_INFO);
+		}
+
 		/*
 		 * If we started up with a writable filesystem, but the
-		 * non-persistent database needed initialization, we
-		 * are booting a non-global zone, so do a backup.
+		 * non-persistent database needed initialization, we are
+		 * booting a non-global zone or a system with a writable
+		 * root (ZFS), so do a backup.  Checking to see if the
+		 * non-persistent database needed initialization also keeps
+		 * us from making additional backups if configd gets
+		 * restarted.
 		 */
 		if (r == BACKEND_CREATE_NEED_INIT && writable_persist &&
 		    backend_lock(BACKEND_TYPE_NORMAL, 0, &be) ==
@@ -2379,6 +2743,65 @@ backend_init(const char *db_file, const char *npdb_file, int have_np)
 				    "unable to create \"%s\" backup of "
 				    "\"%s\"\n", REPOSITORY_BOOT_BACKUP,
 				    be->be_path);
+			}
+			backend_unlock(be);
+		}
+
+		/*
+		 * On the other hand if we started with a read-only file
+		 * system and the non-persistent database needed
+		 * initialization, then we need to take a checkpoint of the
+		 * repository.  We grab the checkpoint now before Early
+		 * Manifest Import starts modifying the repository.  Then
+		 * when the file system becomes writable, the checkpoint
+		 * can be used to create the boot time backup of the
+		 * repository.  Checking that the non-persistent database
+		 * needed initialization, keeps us from making additional
+		 * checkpoints if configd gets restarted.
+		 */
+		if (r == BACKEND_CREATE_NEED_INIT && writable_persist == 0 &&
+		    backend_lock(BACKEND_TYPE_NORMAL, 0, &be) ==
+		    REP_PROTOCOL_SUCCESS) {
+			r = backend_checkpoint_repository(be);
+			if (r != REP_PROTOCOL_SUCCESS) {
+				configd_critical("unable to create checkpoint "
+				    "of \"%s\"\n", be->be_path);
+			}
+			backend_unlock(be);
+		}
+
+		/*
+		 * If the non-persistent database did not need
+		 * initialization, svc.configd has been restarted.  See if
+		 * the boot time checkpoint exists.  If it does, use it to
+		 * make a backup if root is writable.
+		 */
+		if (r != BACKEND_CREATE_NEED_INIT &&
+		    backend_lock(BACKEND_TYPE_NORMAL, 0, &be) ==
+		    REP_PROTOCOL_SUCCESS) {
+			struct stat sb;
+
+			if ((stat(REPOSITORY_CHECKPOINT, &sb) == 0) &&
+			    (sb.st_size > 0) && (sb.st_mode & S_IFREG)) {
+				be->be_checkpoint = REPOSITORY_CHECKPOINT;
+				flight_recorder_event(
+				    BE_FLIGHT_EV_CHECKPOINT_EXISTS,
+				    BE_FLIGHT_ST_INFO);
+			}
+
+			/*
+			 * If we have a checkpoint and root is writable,
+			 * make the backup now.
+			 */
+			if (be->be_checkpoint && writable_persist) {
+				if (backend_create_backup_locked(be,
+				    REPOSITORY_BOOT_BACKUP) !=
+				    REP_PROTOCOL_SUCCESS) {
+					configd_critical(
+					    "unable to create \"%s\" backup of "
+					    "\"%s\"\n", REPOSITORY_BOOT_BACKUP,
+					    be->be_path);
+				}
 			}
 			backend_unlock(be);
 		}

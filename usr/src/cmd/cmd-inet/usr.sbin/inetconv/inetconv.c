@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * inetconv - convert inetd.conf entries into smf(5) service manifests,
@@ -64,7 +62,7 @@
 #define	MAIN_CONFIG		"/etc/inet/inetd.conf"
 #define	ALT_CONFIG		"/etc/inetd.conf"
 
-#define	MANIFEST_DIR		"/var/svc/manifest/network"
+#define	MANIFEST_DIR		"/lib/svc/manifest/network"
 #define	MANIFEST_RPC_DIR	MANIFEST_DIR  "/rpc"
 #define	SVCCFG_PATH		"/usr/sbin/svccfg"
 

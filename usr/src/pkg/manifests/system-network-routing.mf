@@ -37,11 +37,9 @@ dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/inet
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
-dir path=var/svc/manifest/network/routing group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/routing group=sys
 file path=lib/svc/method/svc-ndp mode=0555
 file path=lib/svc/method/svc-rdisc mode=0555
 file path=lib/svc/method/svc-ripng mode=0555
@@ -51,10 +49,10 @@ file path=usr/lib/inet/in.ripngd mode=0555
 file path=usr/sbin/in.rdisc mode=0555
 file path=usr/sbin/in.routed mode=0555
 file path=usr/sbin/rtquery mode=0555
-file path=var/svc/manifest/network/routing/ndp.xml group=sys mode=0444
-file path=var/svc/manifest/network/routing/rdisc.xml group=sys mode=0444
-file path=var/svc/manifest/network/routing/ripng.xml group=sys mode=0444
-file path=var/svc/manifest/network/routing/route.xml group=sys mode=0444
+file path=lib/svc/manifest/network/routing/ndp.xml group=sys mode=0444
+file path=lib/svc/manifest/network/routing/rdisc.xml group=sys mode=0444
+file path=lib/svc/manifest/network/routing/ripng.xml group=sys mode=0444
+file path=lib/svc/manifest/network/routing/route.xml group=sys mode=0444
 legacy pkg=SUNWroute arch=$(ARCH) category=system \
     desc="Network Routing daemons/commands (Usr)" \
     hotline="Please contact your local service provider" \

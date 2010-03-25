@@ -41,17 +41,15 @@ dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/inet
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 file path=etc/inet/vrrp.conf group=sys
 file path=lib/svc/method/svc-vrrp mode=0555
 file path=usr/lib/$(ARCH64)/libvrrpadm.so.1
 file path=usr/lib/inet/vrrpd mode=0555
 file path=usr/lib/libvrrpadm.so.1
 file path=usr/sbin/vrrpadm mode=0555
-file path=var/svc/manifest/network/vrrp.xml group=sys mode=0444
+file path=lib/svc/manifest/network/vrrp.xml group=sys mode=0444
 legacy pkg=SUNWvrrpr arch=$(ARCH) category=system \
     desc="Solaris VRRP Administration" \
     hotline="Please contact your local service provider" \

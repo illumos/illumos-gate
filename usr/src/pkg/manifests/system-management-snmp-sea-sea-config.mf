@@ -43,10 +43,9 @@ dir path=lib/svc/method
 dir path=var group=sys
 dir path=var/snmp group=sys
 dir path=var/snmp/mib group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/application group=sys
-dir path=var/svc/manifest/application/management group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/application group=sys
+dir path=lib/svc/manifest/application/management group=sys
 file path=etc/init.d/init.snmpdx group=sys mode=0744
 file path=etc/snmp/conf/enterprises.oid group=sys
 file path=etc/snmp/conf/mibiisa.reg group=sys \
@@ -64,7 +63,7 @@ file path=etc/snmp/conf/snmpdx.rsrc group=sys \
 file path=lib/svc/method/svc-snmpdx mode=0555
 file path=var/snmp/mib/snmpdx.mib group=sys
 file path=var/snmp/mib/sun.mib group=sys
-file path=var/svc/manifest/application/management/snmpdx.xml group=sys mode=0444
+file path=lib/svc/manifest/application/management/snmpdx.xml group=sys mode=0444
 legacy pkg=SUNWsacom arch=$(ARCH) category=system \
     desc="Solstice Enterprise Agents 1.0.3 files for root file system" \
     hotline="Please contact your local service provider" \

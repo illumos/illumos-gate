@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * startd.c - the master restarter
@@ -781,6 +779,15 @@ startup(void)
 	timeout_init();
 	restarter_protocol_init();
 	restarter_init();
+
+	/*
+	 * svc.configd is started by fork_configd_thread so repository access is
+	 * available, run early manifest import before continuing with starting
+	 * graph engine and the rest of startd.
+	 */
+	log_framework(LOG_DEBUG, "Calling fork_emi...\n");
+	fork_emi();
+
 	graph_protocol_init();
 	graph_init();
 

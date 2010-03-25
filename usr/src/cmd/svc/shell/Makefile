@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 include ../../Makefile.cmd
@@ -32,8 +32,7 @@ SRCS = \
 	routing_include.sh \
 	sendmail_include.sh \
 	smf_include.sh \
-	mfsthistory \
-	manifest_cleanup.ksh
+	mfsthistory
 
 SCRIPTS = $(SRCS:%=$(ROOT)/lib/svc/share/%)
 

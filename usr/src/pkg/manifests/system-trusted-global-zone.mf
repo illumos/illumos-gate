@@ -45,15 +45,13 @@ dir path=etc/zones group=sys opensolaris.zone=global \
 dir path=lib opensolaris.zone=global variant.opensolaris.zone=global
 dir path=lib/svc opensolaris.zone=global variant.opensolaris.zone=global
 dir path=lib/svc/method opensolaris.zone=global variant.opensolaris.zone=global
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=lib/svc/manifest/network group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
+    variant.opensolaris.zone=global
 dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/network group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
 dir path=var/tsol group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 dir path=var/tsol/doors group=sys opensolaris.zone=global \
@@ -100,11 +98,11 @@ file path=lib/svc/method/svc-tnctl mode=0555 opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=lib/svc/method/svc-tnd mode=0555 opensolaris.zone=global \
     variant.opensolaris.zone=global
-file path=var/svc/manifest/network/tnctl.xml group=sys mode=0444 \
+file path=lib/svc/manifest/network/tnctl.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/network/tnd.xml group=sys mode=0444 \
+file path=lib/svc/manifest/network/tnd.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
-file path=var/svc/manifest/system/labeld.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/labeld.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWtsg arch=$(ARCH) category=system \
     desc="Solaris Trusted Extensions, globalzone-only files" \

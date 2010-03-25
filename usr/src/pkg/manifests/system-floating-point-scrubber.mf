@@ -46,13 +46,13 @@ dir path=usr/lib/fps/sun4u/UltraSPARC-III+
 dir path=usr/lib/fps/sun4u/UltraSPARC-IIIi
 dir path=usr/lib/fps/sun4u/UltraSPARC-IV
 dir path=usr/lib/fps/sun4u/UltraSPARC-IV+
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/system group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
 file path=usr/lib/fps/fpsd mode=0555
 file path=usr/lib/fps/sun4u/UltraSPARC-III/fptest mode=0555
-file path=var/svc/manifest/system/fpsd.xml group=sys mode=0444
+file path=lib/svc/manifest/system/fpsd.xml group=sys mode=0444
 legacy pkg=SUNWfsr arch=$(ARCH) category=system \
     desc="FP Scrubber configuration files (ROOT)" \
     hotline="Please contact your local service provider" \

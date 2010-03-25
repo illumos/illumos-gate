@@ -44,10 +44,11 @@ dir path=usr/share/lib group=sys
 dir path=usr/share/lib/ldif group=sys
 dir path=var group=sys
 dir path=var/krb5 group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
-dir path=var/svc/manifest/network/security group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/security group=sys
 file path=etc/krb5/kadm5.acl group=sys original_name=SUNWkdc:etc/krb5/kadm5.acl \
     preserve=true
 file path=etc/krb5/kdc.conf group=sys original_name=SUNWkdc:etc/krb5/kdc.conf \
@@ -90,7 +91,7 @@ file path=usr/sbin/kdb5_util mode=0555
 file path=usr/sbin/kdcmgr mode=0555
 file path=usr/sbin/kproplog mode=0555
 file path=usr/share/lib/ldif/kerberos.ldif
-file path=var/svc/manifest/network/security/krb5_prop.xml group=sys mode=0444
+file path=lib/svc/manifest/network/security/krb5_prop.xml group=sys mode=0444
 legacy pkg=SUNWkdcr arch=$(ARCH) category=system desc="Kerberos V5 KDC (root)" \
     hotline="Please contact your local service provider" \
     name="Kerberos V5 KDC (root)" vendor="Sun Microsystems, Inc." \

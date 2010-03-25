@@ -63,9 +63,9 @@ dir path=var/smb/cvol/windows group=sys
 dir path=var/smb/cvol/windows/system32 group=sys
 dir path=var/smb/cvol/windows/system32/vss group=sys
 dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
-dir path=var/svc/manifest/network/smb group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/smb group=sys
 driver name=smbsrv perms="* 0640 root sys"
 file path=kernel/drv/$(ARCH64)/smbsrv group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
@@ -108,7 +108,7 @@ file path=usr/sbin/smbadm mode=0555
 file path=usr/sbin/smbstat mode=0555
 file path=var/smb/smbpasswd group=sys mode=0400 \
     original_name=SUNWsmbs:var/smb/smbpasswd preserve=true
-file path=var/svc/manifest/network/smb/server.xml group=sys mode=0444
+file path=lib/svc/manifest/network/smb/server.xml group=sys mode=0444
 legacy pkg=SUNWsmbskr arch=$(ARCH) category=system \
     desc="SMB Server kernel root components" \
     hotline="Please contact your local service provider" \

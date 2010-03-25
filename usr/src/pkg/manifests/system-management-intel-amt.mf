@@ -40,10 +40,8 @@ dir path=lib/svc
 dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/lib
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 driver name=heci perms="* 0644 root sys" \
     alias=pci8086,2974 \
     alias=pci8086,2984 \
@@ -57,7 +55,7 @@ file path=kernel/drv/$(ARCH64)/heci group=sys
 file path=kernel/drv/heci group=sys
 file path=lib/svc/method/svc-lms mode=0555
 file path=usr/lib/lms mode=0555
-file path=var/svc/manifest/network/lms.xml group=sys mode=0444
+file path=lib/svc/manifest/network/lms.xml group=sys mode=0444
 legacy pkg=SUNWamt arch=$(ARCH) category=system \
     desc="Solaris support for Intel Active Management Technology" \
     hotline="Please contact your local service provider" \

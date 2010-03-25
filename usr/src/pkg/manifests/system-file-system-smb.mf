@@ -54,11 +54,9 @@ dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/lib/security
 dir path=usr/lib/security/$(ARCH64)
 dir path=usr/lib/smbfs
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
-dir path=var/svc/manifest/network/smb group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/smb group=sys
 driver name=nsmb devlink=type=ddi_pseudo;name=nsmb\t\D perms="* 0666 root sys"
 file path=lib/svc/method/smb-client mode=0555
 file path=usr/bin/smbutil mode=0555
@@ -84,7 +82,7 @@ $(i386_ONLY)file path=usr/lib/mdb/kvm/smbfs.so mode=0555
 file path=usr/lib/security/$(ARCH64)/pam_smbfs_login.so.1
 file path=usr/lib/security/pam_smbfs_login.so.1
 file path=usr/lib/smbfs/smbiod mode=0555
-file path=var/svc/manifest/network/smb/client.xml group=sys mode=0444
+file path=lib/svc/manifest/network/smb/client.xml group=sys mode=0444
 legacy pkg=SUNWsmbfskr arch=$(ARCH) category=system \
     desc="SMB/CIFS File System client support (Kernel)" \
     hotline="Please contact your local service provider" \

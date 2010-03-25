@@ -86,13 +86,11 @@ dir path=var/mms/ssl/ca group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 dir path=var/mms/ssl/pub group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/application group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/application group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/application/management group=sys \
+dir path=lib/svc/manifest/application/management group=sys \
     opensolaris.zone=global variant.opensolaris.zone=global
 driver name=dda devlink=type=ddi_pseudo;name=dda\tdda/\N0\M0
 driver name=dmd
@@ -192,7 +190,7 @@ file path=var/log/mms/mms_logadm.conf group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=var/mms/ssl/ca/mms_openssl.cnf group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-file path=var/svc/manifest/application/management/mms.xml group=sys mode=0444 \
+file path=lib/svc/manifest/application/management/mms.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWmmsr arch=$(ARCH) category=system desc="Media Management System" \
     hotline="Please contact your local service provider" \

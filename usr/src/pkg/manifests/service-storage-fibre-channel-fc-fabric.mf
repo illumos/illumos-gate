@@ -38,20 +38,17 @@ dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/cfgadm
 dir path=usr/lib/cfgadm/$(ARCH64)
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/system/device group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system/device group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=lib/svc/method/fc-fabric mode=0555 opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=usr/lib/cfgadm/$(ARCH64)/fp.so.1
 file path=usr/lib/cfgadm/fp.so.1
-file path=var/svc/manifest/system/device/devices-fc-fabric.xml group=sys \
+file path=lib/svc/manifest/system/device/devices-fc-fabric.xml group=sys \
     mode=0444 opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWcfpl arch=$(ARCH) category=system \
     desc="Provides the fp plug-in library of libcfgadm." \

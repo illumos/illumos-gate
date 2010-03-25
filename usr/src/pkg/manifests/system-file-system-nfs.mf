@@ -63,10 +63,9 @@ dir path=var group=sys
 dir path=var/nfs
 dir path=var/nfs/v4_oldstate group=daemon owner=daemon
 dir path=var/nfs/v4_state group=daemon owner=daemon
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
-dir path=var/svc/manifest/network/nfs group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/nfs group=sys
 file path=etc/default/nfs group=sys original_name=SUNWnfsc:etc/default/nfs \
     preserve=true
 file path=etc/fs/nfs/mount mode=0555
@@ -104,11 +103,11 @@ file path=usr/lib/nfs/lockd mode=0555
 file path=usr/lib/nfs/nfs4cbd mode=0555
 file path=usr/lib/nfs/nfsmapid mode=0555
 file path=usr/lib/nfs/statd mode=0555
-file path=var/svc/manifest/network/nfs/cbd.xml group=sys mode=0444
-file path=var/svc/manifest/network/nfs/client.xml group=sys mode=0444
-file path=var/svc/manifest/network/nfs/mapid.xml group=sys mode=0444
-file path=var/svc/manifest/network/nfs/nlockmgr.xml group=sys mode=0444
-file path=var/svc/manifest/network/nfs/status.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nfs/cbd.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nfs/client.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nfs/mapid.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nfs/nlockmgr.xml group=sys mode=0444
+file path=lib/svc/manifest/network/nfs/status.xml group=sys mode=0444
 group groupname=unknown gid=96
 hardlink path=kernel/sys/$(ARCH64)/nfs opensolaris.zone=global \
     target=../../../kernel/fs/$(ARCH64)/nfs variant.opensolaris.zone=global

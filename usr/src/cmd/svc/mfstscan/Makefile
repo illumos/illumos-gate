@@ -19,17 +19,18 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG =		mfstscan
 
 OBJS =		mfstscan.o \
+		manifest_find.o \
 		manifest_hash.o
 
 SRCS =		mfstscan.c \
+		../common/manifest_find.c \
 		../common/manifest_hash.c
 
 POFILES = 	$(SRCS:.c=.po)

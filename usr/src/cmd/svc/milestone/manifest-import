@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -29,12 +29,15 @@
 [ -f /lib/svc/share/smf_include.sh ] || exit 1
 
 . /lib/svc/share/smf_include.sh
-. /lib/svc/share/manifest_cleanup.ksh
 
 activity=false
 
+EMI_SERVICE="svc:/system/early-manifest-import:default"
+
 X=
-while getopts n opt; do
+early=false
+[ "$SMF_FMRI" == "$EMI_SERVICE" ] && early=true
+while getopts "n" opt; do
 	case $opt in
 		n)	X=echo;;
 		?)	echo "Usage: /lib/svc/method/manifest-import [-n]\n"
@@ -49,243 +52,66 @@ function svccfg_apply {
 	fi
 }
 
-function svccfg_import {
-	$X /usr/sbin/svccfg import $1 2>>/tmp/manifest_import.$$
-	if [ $? -ne 0 ]; then
-		echo > /dev/msglog
-		echo "WARNING: svccfg import $1 failed" | tee /dev/msglog
-	fi
-}
-
-function prophist_upgrade {
-	#
-	# A property has changed in the manifest that we wish to propagate into
-	# the repository during manifest import.  We don't want to pollute
-	# manifests with overrides, so handle explicitly here.
-	#
-	fmri=$1
-	pgrp=$2
-	prop=$3
-	nval=$4
-	shift 4
-
-	/lib/svc/bin/prophist upgrade -e $fmri -g $pgrp -p $prop -n "$nval" \
-	    "$@"
-	[ $? = 0 ] && instance_refresh $fmri
-}
-
-function prophist_override {
-	#
-	# A property has changed in the manifest that we wish to propagate
-	# into the repository during manifest import.
-	#
-	fmri=$1
-	pgrp=$2
-	prop=$3
-	nval=$4
-
-	/lib/svc/bin/prophist overwrite -e $fmri -g $pgrp -p $prop -n "$nval"
-	[ $? = 0 ] && instance_refresh $fmri
-}
-
-function prophist_delete_svc_pg {
-	#
-	# Certain property groups have migrated from the service level to the
-	# instance level.  We don't care if they are at both, as the instance
-	# level will trump.  But having neither could be bad.  So check and if
-	# the given pg exists at both levels, delete the service-level one only.
-	#
-	service=$1
-	instance=$2
-	property_group=$3
-
-	/usr/bin/svcprop -q -p $property_group $service
-	res1=$?
-	/usr/bin/svcprop -q -c -p $property_group $service:$instance
-	res2=$?
-	if [ $res1 -eq 0 -a $res2 -eq 0 ]; then
-		/lib/svc/bin/prophist delete -e $service -g $property_group
-		instance_refresh $service:$instance
-	fi
-}
-
-function prophist_delete_dependency {
-	#
-	# Some services have stale dependencies that need to be removed.
-	# This is done by removing the dependency property group.
-	#
-	fmri=$1
-	property_group=$2
-
-	/usr/bin/svcprop -q -c -p $property_group $fmri
-	if [ $? -eq 0 ]; then
-		/lib/svc/bin/prophist delete -e $fmri -g $property_group
+#
+# If the smf/manifest table has file entries that are missing
+# then there is work to be done by the cleanup process.
+#
+function cleanup_needwork {
+	if [ "$early" == true ]; then
+		smfmfiles=`/usr/bin/svcprop smf/manifest | \
+		    awk '(/^lib_) && (/\/manifestfile /) {print $3}'`
 	else
-		[ -n "$_MFST_DEBUG" ] && \
-		    echo "Dependency $property_group not defined on $fmri"
-	fi
-}
-
-function prophist_delete_pg {
-	# Delete obsolete property groups from old manifests.  Instances
-	# should be refreshed for changes to take effect.
-	fmri=$1
-	pg=$2
-
-	/usr/bin/svcprop -Cqp $pg $fmri &&
-	    /lib/svc/bin/prophist delete -e $fmri -g $pg
-}
-
-function prophist_addprop {
-	#
-	# If a property doesn't exist, create it.  Instances should be
-	# refreshed for changes to take effect.
-	#
-	if [ $# -lt 6 ]; then
-		echo "prophist_addprop(): Insufficient arguments ($*)."
-		exit 1
+		smfmfiles=`/usr/bin/svcprop smf/manifest | \
+		    awk '/\/manifestfile / {print $3}'`
 	fi
 
-	fmri=$1
-	/usr/bin/svcprop -q $fmri || return
+	nw=`/lib/svc/bin/mfstscan $smfmfiles 2>&1 1>/dev/null`
+	[ "$nw" ] && return 1
 
-	pg=$2
-	pgtype=$3
-	prop=$4
-
-	/usr/bin/svcprop -Cqp $pg/$prop $fmri && return
-
-	shift 4
-
-	/usr/bin/svcprop -Cqp $pg $fmri || \
-	    /usr/sbin/svccfg -s $fmri addpg $pg $pgtype
-	/usr/sbin/svccfg -s $fmri setprop $pg/$prop = $*
+	return 0
 }
 
-function prophist_addmeth {
+#
+# Upon upgrading to early manifest import code, preserve hashes of system
+# profiles which lived under /var/svc/profile so that svccfg apply would
+# not re-apply the profiles and overwrite user customizations. Simply 
+# migrate manifestfile and hash values to new property groups named after
+# profiles under /etc/svc/profile. If the profiles don't really exist,
+# svccfg cleanup will remove the property groups in a later step.
+# 
+# Existing generic.xml, inetd_services.xml, and name_service.xml symlinks
+# need to be preserved.
+#
+# Don't process site.xml profile since it is still supported under
+# /var/svc/profile directory.
+#
+function preserve_system_profiles {
+
 	#
-	# If a method doesn't exist, create it.  Instances should be refreshed
-	# for changes to take effect.
+	# If /var is a separate fs, return and let Late Import
+	# preserves the hashes.
+	#	
+	[ -d "/var/svc/profile" ] || return 1
+
 	#
-	if [ $# -ne 4 ]; then
-		echo "prophist_addmeth(): Insufficient arguments ($*)"
-		exit 1
-	fi
-
-	fmri=$1
-	/usr/bin/svcprop -q $fmri || return
-
-	name=$2
-	/usr/bin/svcprop -Cqp $name $fmri && return
-
-	exec=$3
-	to=$4
-
-	/usr/sbin/svccfg -s $fmri <<END
-	    addpg $name method
-	    setprop $name/type = astring: method
-	    setprop $name/exec = astring: "$exec"
-	    setprop $name/timeout_seconds = count: $to
-END
-}
-
-function prophist_adddep {
+	# Preserve hashes for the following profiles: generic (two
+	# cases) and platform (uname -i, uname -m outputs).
 	#
-	# If a dependency doesn't exist, create it.  Instances should be
-	# refreshed for changes to take effect.
-	#
-	if [ $# -lt 6 ]; then
-		echo "prophist_adddep(): Insufficient arguments ($*)"
-		exit 1
-	fi
-
-	fmri=$1
-	/usr/bin/svcprop -q $fmri || return
-
-	name=$2
-	/usr/bin/svcprop -Cqp $name $fmri && return
-
-	type=$3
-	group=$4
-	ro=$5
-	shift 5
-
-	/usr/sbin/svccfg -s $fmri <<END
-	    addpg $name dependency
-	    setprop $name/type = astring: $type
-	    setprop $name/grouping = astring: $group
-	    setprop $name/restart_on = astring: $ro
-	    setprop $name/entities = fmri: $*
-END
-}
-
-function prophist_adddpt {
-	#
-	# If a dependent doesn't exist, create it.  Instances should be
-	# refresh for changes to take effect.
-	#
-	if [ $# -ne 5 ]; then
-		echo "prophist_adddpt(): Incorrect arguments ($*).\n"
-		exit 1
-	fi
-
-	fmri=$1
-	/usr/bin/svcprop -q $fmri || return
-
-	name=$2
-	/usr/bin/svcprop -Cqp dependents/$name $fmri && return
-
-	group=$3
-	ro=$4
-	target=$5
-
-	prophist_addprop $fmri dependents framework $name fmri: $target
-	prophist_adddep $target $name service $group $ro $fmri
-}
-
-function instance_refresh {
-	echo $1 >> /etc/svc/volatile/refreshes
-}
-
-function refresh_instances {
-	[ -r /etc/svc/volatile/refreshes ] && {
-		sort -u /etc/svc/volatile/refreshes | xargs -l svcadm refresh
-	}
-}
-
-function instance_clear {
-	echo $1 >> /etc/svc/volatile/clears
-}
-
-function clear_conditionally {
-	[ "`/usr/bin/svcprop -p restarter/state $1`" = "maintenance" ] && \
-	    /usr/sbin/svcadm clear $1
-}
-
-function clear_instances {
-	[ -r /etc/svc/volatile/clears ] && {
-		for inst in `/usr/bin/sort -u /etc/svc/volatile/clears`; do
-			clear_conditionally $inst
-		done
-	}
-}
-
-function prepare_last_import {
-	# Preserve the five hashes for the profiles: generic (two
-	# cases), platform (uname -i, uname -m outputs), and site.
-
 	gn="var_svc_profile_generic_open_xml"
 	gh=`/usr/bin/svcprop -p ${gn}/md5sum smf/manifest 2>/dev/null`
 	[ $? = 0 ] || gh=""
+	gn="etc_svc_profile_generic_open_xml"
 
 	gln="var_svc_profile_generic_limited_net_xml"
 	glh=`/usr/bin/svcprop -p ${gln}/md5sum smf/manifest 2>/dev/null`
 	[ $? = 0 ] || glh=""
+	gln="etc_svc_profile_generic_limited_net_xml"
 
 	LC_ALL=C pl=`/usr/bin/uname -i | /usr/bin/tr , _`
 	pln="var_svc_profile_platform_${pl}_xml"
 	plh=`/usr/bin/svcprop -p ${pln}/md5sum smf/manifest 2>/dev/null`
 	[ $? = 0 ] || plh=""
+	pln="etc_svc_profile_platform_${pl}_xml"
 
 	LC_ALL=C plm=`/usr/bin/uname -m | /usr/bin/tr , _`
 	if [ $plm != $pl ]; then
@@ -293,177 +119,80 @@ function prepare_last_import {
 		plmh=`/usr/bin/svcprop -p ${plmn}/md5sum smf/manifest \
 		    2>/dev/null`
 		[ $? = 0 ] || plmh=""
+		plmn="etc_svc_profile_platform_${plm}_xml"
 	else
 		plmh=""
 	fi
 
-	sn="var_svc_profile_site_xml"
-	sh=`/usr/bin/svcprop -p $sn/md5sum smf/manifest 2>/dev/null`
-	[ $? = 0 ] || sh=""
-
-	# Remove all manifest hashes.
-	/usr/sbin/svccfg delete smf/manifest
-
-	# Restore smf/manifest and hash values.
-	/usr/sbin/svccfg add smf/manifest
 	[ -n "$gh" ] && {
 		echo "Preserving generic hash ($gh)."
 		/usr/sbin/svccfg -s smf/manifest addpg ${gn} framework
 		/usr/sbin/svccfg -s smf/manifest setprop ${gn}/md5sum = \
 		    opaque: $gh
+		/usr/sbin/svccfg -s smf/manifest setprop ${gn}/manifestfile = \
+		    astring: "/etc/svc/profile/generic.xml"
 	}
 	[ -n "$glh" ] && {
 		echo "Preserving generic_limited hash ($glh)."
 		/usr/sbin/svccfg -s smf/manifest addpg ${gln} framework
 		/usr/sbin/svccfg -s smf/manifest setprop ${gln}/md5sum = \
 		    opaque: $glh
+		/usr/sbin/svccfg -s smf/manifest setprop ${gln}/manifestfile = \
+		    astring: "/etc/svc/profile/generic.xml"
 	}
 	[ -n "$plh" ] && {
 		echo "Preserving platform hash ($plh)."
 		/usr/sbin/svccfg -s smf/manifest addpg $pln framework
 		/usr/sbin/svccfg -s smf/manifest setprop $pln/md5sum = \
 		    opaque: $plh
+		/usr/sbin/svccfg -s smf/manifest setprop ${pln}/manifestfile = \
+		    astring: "/etc/svc/profile/platform_${pl}_xml"
 	}
 	[ -n "$plmh" ] && {
 		echo "Preserving platform hash ($plmh)."
 		/usr/sbin/svccfg -s smf/manifest addpg $plmn framework
 		/usr/sbin/svccfg -s smf/manifest setprop $plmn/md5sum = \
 		    opaque: $plmh
+		/usr/sbin/svccfg -s smf/manifest setprop \
+		    ${plmn}/manifestfile = \
+		    astring: "/etc/svc/profile/platform_${plm}_xml"
 	}
-	[ -n "$sh" ] && {
-		echo "Preserving site hash ($sh)."
-		/usr/sbin/svccfg -s smf/manifest addpg $sn framework
-		/usr/sbin/svccfg -s smf/manifest setprop $sn/md5sum = \
-		    opaque: $sh
-	}
+
+	#
+	# Move symlinks from /var/svc/profile to /etc/svc/profile
+	#
+	generic_prof="/var/svc/profile/generic.xml"
+	ns_prof="/var/svc/profile/name_service.xml"
+	inetd_prof="/var/svc/profile/inetd_services.xml"
+	[ -L "$generic_prof" ] && mv $generic_prof /etc/svc/profile/
+	[ -L "$ns_prof" ] && mv $ns_prof /etc/svc/profile/
+	[ -L "$inetd_prof" ] && mv $inetd_prof /etc/svc/profile/
+
+	return 0
 }
-
-#
-# 0b Cleanup deathrow
-#
-deathrow=/etc/svc/deathrow
-if [ -s $deathrow ];then
-	#
-	# svc.startd has unconfigured the services found in deathrow,
-	# clean them now.
-	#
-	while read fmri mfst pkgname; do
-		# Delete services and instances from the deathrow file.
-		/usr/sbin/svccfg delete -f $fmri >/dev/null 2>&1
-		# Remove deathrow manifest hash.
-		/usr/sbin/svccfg delhash -d $mfst >/dev/null 2>&1
-	done < $deathrow
-	/usr/bin/mv $deathrow $deathrow.old
-fi
-SVCCFG_CHECKHASH=1 export SVCCFG_CHECKHASH
-
-#
-# 0c Clean up repository
-#
-if [ -z "$X" ] && /usr/bin/svcprop smf/manifest 2>/dev/null |
-    /usr/bin/grep '^ar_svc_[^/]*/md5sum opaque ' >/dev/null
-then
-	set -- `
-		/usr/bin/svcprop smf/manifest 2>/dev/null |
-		    /usr/bin/grep '^ar_svc[^/]*/md5sum opaque ' |
-		    /usr/bin/tr '/' ' ' |
-		    while read pg prop type value; do
-			echo "$pg/$value"
-		done
-	`
-	backup=`echo "$#/$#" | sed 's/.//g'`
-	fwidth=`echo "$#\c" | wc -c`
-
-	echo "Converting obsolete repository entries: \c" > /dev/msglog
-	i=1; n=$#
-	while [ $# -gt 0 ]; do
-		printf "%${fwidth}s/%${fwidth}s" $i $n > /dev/msglog
-		echo $1 | sed 's:/: :' | (
-			read pg value
-
-			(echo "select /smf/manifest"; echo "delpg v$pg") |
-			    /usr/sbin/svccfg 2>/dev/null >/dev/null
-			(echo "select /smf/manifest"; echo "delpg $pg") |
-			    /usr/sbin/svccfg 2>/dev/null >/dev/null
-			(echo "select /smf/manifest";
-			    echo "addpg v$pg framework") |
-			    /usr/sbin/svccfg 2>/dev/null >/dev/null
-			(echo "select /smf/manifest";
-			    echo "setprop v$pg/md5sum = opaque: $value") |
-			    /usr/sbin/svccfg 2>/dev/null >/dev/null
-		)
-		i=`expr $i + 1`
-		shift
-		echo "$backup\c" > /dev/msglog
-	done
-	echo > /dev/msglog
-	echo "Converted $n obsolete repository entries"
-	activity=true
-fi
-
-#
-# If no last-import snapshots are present on critical services, then we are
-# creating the last-import snapshots for the first time post upgrade.
-#
-create_last_import=1
-for svc in single-user multi-user multi-user-server; do
-	if /usr/bin/svcprop -s last-import svc:/milestone/$svc:default \
-	    >/dev/null 2>&1
-	then
-		create_last_import=
-		break
-	fi
-done
-
-if [ $create_last_import ]; then
-	echo "Last import snapshots absent; preparing for re-import"
-	prepare_last_import
-
-	#
-	# Apply property history files.
-	#
-	echo "Upgrade detected; applying property history"
-	for phist in /var/svc/profile/prophist.*; do
-		/lib/svc/bin/prophist hash $phist
-		if [ $? = 3 ]; then
-			echo "Sourcing $phist"
-			. $phist
-		fi
-	done
-
-	/usr/bin/rm -f /var/svc/profile/.upgrade_prophist
-fi
 
 #
 # 2.  Manifest import.  Application directories first, then
 # site-specific manifests.
 #
-nonsite_dirs=`/usr/bin/find /var/svc/manifest/* -name site -prune -o -type d \
-	-print -prune`
+function import_manifests {
+	typeset basedir=$1
+	typeset logf="/etc/svc/volatile/manifest_import.$$"
 
-nonsite_manifests=`/lib/svc/bin/mfstscan $nonsite_dirs`
-site_manifests=`/lib/svc/bin/mfstscan /var/svc/manifest/site`
+	rm -f $logf
 
-manifests="$nonsite_manifests $site_manifests"
+	nonsite_dirs=`/usr/bin/find $basedir/svc/manifest/* -name site \
+	    -prune -o -type d -print -prune`
 
-[ -n "$_MFST_DEBUG" ] && {
-	echo "Changed manifests to import:"
-	for m in $manifests; do echo "  $m"; done
-}
+	if [ -n "$_MFST_DEBUG" ]; then
+		nonsite_manifests=`/lib/svc/bin/mfstscan $nonsite_dirs`
+		site_manifests=`/lib/svc/bin/mfstscan $basedir/svc/manifest/site`
 
-#
-# 2b.  Import the manifests while giving a running display of imports on
-# console, and a final count in the logfile.
-#
-if [ -n "$nonsite_manifests" -o -n "$site_manifests" ]; then
-	rm -f /tmp/manifest_import.$$
+		manifests="$nonsite_manifests $site_manifests"
 
-	set -- $manifests
-	cleanup=""
-	backup=`echo "$#/$#" | sed 's/.//g'`
-	fwidth=`echo "$#\c" | wc -c`
-
-	echo "Loading smf(5) service descriptions: \c" > /dev/msglog
+		echo "Changed manifests to import:"
+		for m in $manifests; do echo "  $m"; done
+	fi
 
 	#
 	# Attempt of moving the repository to tmpfs.  If that doesn't
@@ -472,120 +201,262 @@ if [ -n "$nonsite_manifests" -o -n "$site_manifests" ]; then
 	/usr/sbin/svcadm _smf_repository_switch fast
 	doswitch=$?
 
-	i=1; n=$#
-	svcprop smf/manifest > /etc/svc/volatile/smf_manifest_svcprop 2>&1
-	while [ $# -gt 0 ]; do
-		printf "%${fwidth}s/%${fwidth}s" $i $n > /dev/msglog
-		grep $1 /etc/svc/volatile/smf_manifest_svcprop > /dev/null 2>&1
-		if [ $? -eq 0 ]; then
-			cleanup="$cleanup $1"
-		fi	
-		svccfg_import $1
-		i=`expr $i + 1`
-		shift
-		echo "$backup\c" > /dev/msglog
-	done
-	rm -f /etc/svc/volatile/smf_manifest_svcprop
+	#
+	# Import the manifests while giving a running display of imports on
+	# console, and a final count in the logfile.
+	#
+	dirs="$nonsite_dirs $basedir/svc/manifest/site"
+	$X /usr/sbin/svccfg import -p /dev/msglog $dirs > $logf 2>&1
 
-	#
-	# If switch back fails, exit with the fatal error code.
-	# Normally the failure indicates that there is a serious
-	# problem on the root file system such as file operation
-	# failure or repository access failure.
-	#
-	if [ $doswitch -eq 0 ]; then
-		/usr/sbin/svcadm _smf_repository_switch perm || { \
-		    echo "Repository switch back operation failed, \c"
-		    echo "please check the system log for the"
-		    echo "possible fatal error messages."
-		    exit $SMF_EXIT_ERR_FATAL
-                    }
+	grep "Loaded .*. smf(5) service descriptions" $logf > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		activity=true
 	fi
 
-	echo > /dev/msglog
-	echo "Loaded $n smf(5) service descriptions"
-	activity=true
+	if [ -s $logf ]; then
+		grep "smf(5) service descriptions failed to load" $logf > /dev/null 2>&1
+		failures=$?
+		if [ $failures -eq 0 ]; then
+			echo "svccfg warnings:"
+		fi
+		cat $logf
 
-	if [ -s /tmp/manifest_import.$$ ]; then
-		echo "svccfg warnings:"
-		cat /tmp/manifest_import.$$
-
-		msg="svccfg import warnings.  See"
-		msg="$msg /var/svc/log/system-manifest-import:default.log ."
-		echo $msg > /dev/msglog
+		if [ $failures -eq 0 ]; then
+			msg="svccfg import warnings.  See"
+			msg="$msg /var/svc/log/system-manifest-import:default.log ."
+			echo $msg > /dev/msglog
+		fi
 	fi
-	rm -f /tmp/manifest_import.$$
-fi
+	rm -f $logf
+}
 
 #
 # 3.  Profile application.  We must create the platform profile upon
 # first boot, as we may be a diskless client of a platform or
 # architecture distinct from our NFS server.
 #
-svccfg_apply /var/svc/profile/generic.xml
+# Generic and platform profiles are only supported in /etc.
+#
+function apply_profile {
+	#
+	# If smf/manifest doesn't have any profile under /etc/var/profile,
+	# this is very likely an import after upgrade so call
+	# preserve_system_profiles in that case.
+	#
+	LC_ALL=C pl=`/usr/bin/uname -i | /usr/bin/tr , _`
+	pln="etc_svc_profile_platform_${pl}_xml"
 
-if [ ! -f /var/svc/profile/platform.xml ]; then
-	this_karch=`uname -m`
-	this_plat=`uname -i`
+	LC_ALL=C plm=`/usr/bin/uname -m | /usr/bin/tr , _`
+	[ $plm != $pl ] && plmn="etc_svc_profile_platform_${plm}_xml"
 
-	if [ -f /var/svc/profile/platform_$this_plat.xml ]; then
-		platform_profile=platform_$this_plat.xml
-	elif [ -f /var/svc/profile/platform_$this_karch.xml ]; then
-		platform_profile=platform_$this_karch.xml
-	else
-		platform_profile=platform_none.xml
+	preserve_profiles=1
+	for prof in $pln $plmn etc_svc_profile_platform_none_xml \
+	    etc_svc_profile_generic_limited_net_xml \
+	    etc_svc_profile_generic_open_xml; do
+		if /usr/bin/svcprop -p $prof smf/manifest >/dev/null 2>&1
+		then
+			preserve_profiles=0
+			break
+		fi
+	done
+
+	if [ $preserve_profiles -eq 1 ]; then
+		echo "/etc/svc system profiles not found: upgrade system profiles"
+		preserve_system_profiles || return
 	fi
 
-	ln -s $platform_profile /var/svc/profile/platform.xml
-fi
+	typeset prefix="/etc/svc/profile"
+	svccfg_apply $prefix/generic.xml
+	if [ ! -f $prefix/platform.xml ]; then
+		this_karch=`uname -m`
+		this_plat=`uname -i`
 
-svccfg_apply /var/svc/profile/platform.xml
+		if [ -f $prefix/platform_$this_plat.xml ]; then
+			platform_profile=platform_$this_plat.xml
+		elif [ -f $prefix/platform_$this_karch.xml ]; then
+			platform_profile=platform_$this_karch.xml
+		else
+			platform_profile=platform_none.xml
+		fi
+
+		ln -s $platform_profile $prefix/platform.xml
+	fi
+
+	svccfg_apply $prefix/platform.xml
+}
 
 #
 # 4.  Upgrade handling.  The upgrade file generally consists of a series
 # of svcadm(1M) and svccfg(1M) commands.
 #
-(
-	unset SVCCFG_CHECKHASH
+function handle_upgrade {
 
-	if [ -f /var/svc/profile/upgrade ]; then
-		. /var/svc/profile/upgrade
+	[ -f /var/svc/profile/upgrade ] && activity=true
 
-		/usr/bin/mv /var/svc/profile/upgrade \
-		    /var/svc/profile/upgrade.app.`date +\%Y\%m\%d\%H\%M\%S`
-		activity=true
-	fi
+	(
+		unset SVCCFG_CHECKHASH
 
-	#
-	# Rename the datalink upgrade script file. This script is used in the
-	# network/physical service to upgrade datalink configuration, but
-	# the file cannot be renamed until now (when the file system becomes
-	# read-write).
-	#
-	datalink_script=/var/svc/profile/upgrade_datalink
-	if [ -f "${datalink_script}" ]; then
-		/usr/bin/mv "${datalink_script}" \
-		    "${datalink_script}".app.`date +\%Y\%m\%d\%H\%M\%S`
-	fi
-)
+		if [ -f /var/svc/profile/upgrade ]; then
+			. /var/svc/profile/upgrade
+
+			/usr/bin/mv /var/svc/profile/upgrade \
+			    /var/svc/profile/upgrade.app.`date +\%Y\%m\%d\%H\%M\%S`
+		fi
+
+		#
+		# Rename the datalink upgrade script file. This script is used in the
+		# network/physical service to upgrade datalink configuration, but
+		# the file cannot be renamed until now (when the file system becomes
+		# read-write).
+		#
+		datalink_script=/var/svc/profile/upgrade_datalink
+		if [ -f "${datalink_script}" ]; then
+			/usr/bin/mv "${datalink_script}" \
+			    "${datalink_script}".app.`date +\%Y\%m\%d\%H\%M\%S`
+		fi
+	)
+}
 
 #
 # 5.  Site profile is applied last to give administrator the final say.
 #
-if [ -f /var/svc/profile/site.xml ]; then
-	svccfg_apply /var/svc/profile/site.xml
+function apply_site_profile {
+        typeset prefix="$1/svc/profile"
+	[ -f $prefix/site.xml ] && svccfg_apply $prefix/site.xml
+}
+
+#
+# 0b Cleanup deathrow
+#
+if [ "$early" = "false" ];then
+	deathrow=/etc/svc/deathrow
+	if [ -s $deathrow ];then
+		#
+		# svc.startd has unconfigured the services found in deathrow,
+		# clean them now.
+		#
+		while read fmri mfst pkgname; do
+			# Delete services and instances from the deathrow file.
+			/usr/sbin/svccfg delete -f $fmri >/dev/null 2>&1
+			# Remove deathrow manifest hash.
+			/usr/sbin/svccfg delhash -d $mfst >/dev/null 2>&1
+		done < $deathrow
+		/usr/bin/mv $deathrow $deathrow.old
+	fi
 fi
+
+SVCCFG_CHECKHASH=1 export SVCCFG_CHECKHASH
+
+#
+# 0c Clean up repository
+#
+if [ "$early" = "false" ]; then
+	if [ -z "$X" ] && /usr/bin/svcprop smf/manifest 2>/dev/null |
+	    /usr/bin/grep '^ar_svc_[^/]*/md5sum opaque ' >/dev/null
+	then
+		set -- `
+			/usr/bin/svcprop smf/manifest 2>/dev/null |
+			    /usr/bin/grep '^ar_svc[^/]*/md5sum opaque ' |
+			    /usr/bin/tr '/' ' ' |
+			    while read pg prop type value; do
+				echo "$pg/$value"
+			done
+		`
+		backup=`echo "$#/$#" | sed 's/.//g'`
+		fwidth=`echo "$#\c" | wc -c`
+
+		echo "Converting obsolete repository entries: \c" > /dev/msglog
+		i=1; n=$#
+		while [ $# -gt 0 ]; do
+			printf "%${fwidth}s/%${fwidth}s" $i $n > /dev/msglog
+			echo $1 | sed 's:/: :' | (
+				read pg value
+
+				(echo "select /smf/manifest"; echo "delpg v$pg") |
+				    /usr/sbin/svccfg 2>/dev/null >/dev/null
+				(echo "select /smf/manifest"; echo "delpg $pg") |
+				    /usr/sbin/svccfg 2>/dev/null >/dev/null
+				(echo "select /smf/manifest";
+				    echo "addpg v$pg framework") |
+				    /usr/sbin/svccfg 2>/dev/null >/dev/null
+				(echo "select /smf/manifest";
+				    echo "setprop v$pg/md5sum = opaque: $value") |
+				    /usr/sbin/svccfg 2>/dev/null >/dev/null
+			)
+			i=`expr $i + 1`
+			shift
+			echo "$backup\c" > /dev/msglog
+		done
+		echo > /dev/msglog
+		echo "Converted $n obsolete repository entries"
+		activity=true
+	fi
+
+fi
+
+#
+# Call import and apply profiles here
+#
+if [ "$early" = "true" ]; then
+	import_manifests "/lib"
+	apply_profile
+	apply_site_profile "/etc"
+else
+	#
+	# Process both /lib/svc and /var/svc
+	# during late manifest-import
+	#
+	# First import the manifests
+	#
+	import_manifests "/lib"
+	import_manifests "/var"
+
+	#
+	# Apply profiles
+	#
+	apply_profile
+	apply_site_profile "/etc"
+
+	#
+	# Run the upgrade script
+	#
+	handle_upgrade
+	apply_site_profile "/var"
+fi
+
 
 #
 # 6.  Final actions.
 #
-refresh_instances
-clear_instances
 
 if $activity; then
-	svcadm _smf_backup "manifest_import" || true
+	/usr/sbin/svcadm _smf_backup "manifest_import" || true
 fi
 
-manifest_cleanup $activity $cleanup
+#
+# If the filesystem is NOT read only then move the repo back to perm
+# There is no care wether the switch was made or not, but just want
+# to move it.  If it is already perm this does not affect anything
+# at least on the surface.  REALLY want to improve on this...
+#
+touch /etc/svc/smf_rwtest.$$ > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+	rm -f /etc/svc/smf_rwtest.$$
+	/usr/sbin/svcadm _smf_repository_switch perm || { \
+	    echo "Repository switch back operation failed, \c"
+	    echo "please check the system log for the"
+	    echo "possible fatal error messages."
+	    exit $SMF_EXIT_ERR_FATAL
+	    }
+fi
+
+if $activity; then
+	/usr/sbin/svccfg cleanup | /usr/bin/tee /dev/msglog
+else
+	cleanup_needwork
+	if [ $? -ne 0 ]; then
+		/usr/sbin/svccfg cleanup -a | /usr/bin/tee /dev/msglog
+	fi
+fi
 
 exit 0

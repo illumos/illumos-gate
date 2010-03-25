@@ -33,13 +33,13 @@ set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=usr group=sys
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
 file path=usr/sbin/isns mode=0555
 file path=usr/sbin/isnsadm mode=0555
-file path=var/svc/manifest/network/isns_server.xml group=sys mode=0444
+file path=lib/svc/manifest/network/isns_server.xml group=sys mode=0444
 legacy pkg=SUNWisns arch=$(ARCH) category=system \
     desc="Solaris internet Storage Name Service(iSNS) Server" \
     hotline="Please contact your local service provider" \

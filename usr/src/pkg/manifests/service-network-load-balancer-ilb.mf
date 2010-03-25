@@ -32,6 +32,8 @@ set name=info.classification \
     value="org.opensolaris.category.2008:System/Administration and Configuration"
 set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=lib
+dir path=lib/svc
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib
@@ -39,11 +41,9 @@ dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/inet
 dir path=usr/lib/inet/ilb
 dir path=usr/sbin
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
-dir path=var/svc/manifest/network/loadbalancer group=sys
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/loadbalancer group=sys
 file path=usr/include/libilb.h
 file path=usr/lib/$(ARCH64)/libilb.so.1
 file path=usr/lib/$(ARCH64)/llib-lilb.ln
@@ -53,7 +53,7 @@ file path=usr/lib/libilb.so.1
 file path=usr/lib/llib-lilb
 file path=usr/lib/llib-lilb.ln
 file path=usr/sbin/ilbadm mode=0555
-file path=var/svc/manifest/network/loadbalancer/ilbd.xml group=sys mode=0444
+file path=lib/svc/manifest/network/loadbalancer/ilbd.xml group=sys mode=0444
 legacy pkg=SUNWilb arch=$(ARCH) category=system \
     desc="Integrated IP layer 3/4 load balancer for Solaris (usr)" \
     hotline="Please contact your local service provider" \

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -58,7 +58,7 @@ LDLIBS +=	-lc -ldevice -ldevinfo -lrcm
 LDLIBS +=	-lHBAAPI -lgen
 
 MANIFEST=	devices-fc-fabric.xml
-ROOTMANIFESTDIR=	$(ROOT)/var/svc/manifest/system/device
+ROOTMANIFESTDIR=	$(ROOT)/lib/svc/manifest/system/device
 ROOTMANIFEST=	$(MANIFEST:%=$(ROOTMANIFESTDIR)/%)
 $(ROOTMANIFEST)	:= FILEMODE= 444
 

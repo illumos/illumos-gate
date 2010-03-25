@@ -48,10 +48,11 @@ dir path=var group=sys
 dir path=var/krb5 group=sys
 dir path=var/krb5/rcache group=sys mode=1777
 dir path=var/krb5/rcache/root group=sys mode=0700
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/network group=sys
-dir path=var/svc/manifest/network/security group=sys
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+dir path=lib/svc/manifest/network/security group=sys
 file path=etc/krb5/krb5.conf group=sys original_name=SUNWkrb:etc/krb5/krb5.conf \
     preserve=true
 file path=etc/krb5/warn.conf group=sys original_name=SUNWkrb:etc/krb5/warn.conf \
@@ -75,9 +76,9 @@ file path=usr/lib/security/$(ARCH64)/pam_krb5.so.1
 file path=usr/lib/security/$(ARCH64)/pam_krb5_migrate.so.1
 file path=usr/lib/security/pam_krb5.so.1
 file path=usr/lib/security/pam_krb5_migrate.so.1
-file path=var/svc/manifest/network/security/kadmin.xml group=sys mode=0444
-file path=var/svc/manifest/network/security/krb5kdc.xml group=sys mode=0444
-file path=var/svc/manifest/network/security/ktkt_warn.xml group=sys mode=0444
+file path=lib/svc/manifest/network/security/kadmin.xml group=sys mode=0444
+file path=lib/svc/manifest/network/security/krb5kdc.xml group=sys mode=0444
+file path=lib/svc/manifest/network/security/ktkt_warn.xml group=sys mode=0444
 legacy pkg=SUNWkrbr arch=$(ARCH) category=system \
     desc="Kerberos version 5 support (Root)" \
     hotline="Please contact your local service provider" \

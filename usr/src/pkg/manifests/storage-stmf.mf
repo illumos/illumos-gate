@@ -56,12 +56,9 @@ dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/sbin
-dir path=var group=sys opensolaris.zone=global variant.opensolaris.zone=global
-dir path=var/svc group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
-dir path=var/svc/manifest group=sys opensolaris.zone=global \
-    variant.opensolaris.zone=global
-dir path=var/svc/manifest/system group=sys opensolaris.zone=global \
+dir path=lib/svc/manifest/system group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 driver name=fct perms="* 0666 root sys"
 driver name=pppt perms="* 0666 root sys"
@@ -128,7 +125,7 @@ file path=usr/lib/mdb/kvm/$(ARCH64)/stmf.so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/kvm/stmf.so group=sys mode=0555
 file path=usr/sbin/sbdadm mode=0555
 file path=usr/sbin/stmfadm mode=0555
-file path=var/svc/manifest/system/stmf.xml group=sys mode=0444 \
+file path=lib/svc/manifest/system/stmf.xml group=sys mode=0444 \
     opensolaris.zone=global variant.opensolaris.zone=global
 legacy pkg=SUNWstmf arch=$(ARCH) category=system \
     desc="Sun Common Multiprotocol SCSI Target device drivers" \
