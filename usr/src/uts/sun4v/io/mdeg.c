@@ -553,6 +553,10 @@ mdeg_notify_clients(void)
 		    (void *)clnt, TQ_SLEEP);
 	}
 
+	/*
+	 * Wait for all mdeg_notify_client notifications to
+	 * finish while we are still holding mdeg.rwlock.
+	 */
 	taskq_wait(mdeg.taskq);
 
 done:
@@ -569,7 +573,21 @@ mdeg_notify_client(void *arg)
 	mde_cookie_t		md_prev_start;
 	mde_cookie_t		md_curr_start;
 
-	rw_enter(&mdeg.rwlock, RW_READER);
+	/*
+	 * mdeg.rwlock must be held as a reader while this function
+	 * executes. However, we do not need to acquire the lock as a
+	 * reader here because it is held as a reader by the thread
+	 * executing mdeg_notify_clients which triggers the execution
+	 * of this function from a taskq. Since mdeg_notify_clients
+	 * holds the lock as a reader until the taskq callbacks have
+	 * completed, it will be held for the life of this function call.
+	 * Furthermore, we must not attempt to acquire the lock as a
+	 * reader with rw_enter because if there is a pending writer,
+	 * we will block, creating a circular deadlock with this function,
+	 * the writer, and mdeg_notify_clients. Since we do not need
+	 * to acquire the lock, just assert that it is held.
+	 */
+	ASSERT(RW_READ_HELD(&mdeg.rwlock));
 
 	if (!mdeg.enabled) {
 		/* trying to shutdown */
@@ -621,8 +639,6 @@ mdeg_notify_client(void *arg)
 	MDEG_DBG("MDEG client callback done\n");
 
 cleanup:
-	rw_exit(&mdeg.rwlock);
-
 	if (mdd != MD_INVAL_DIFF_COOKIE)
 		(void) md_diff_fini(mdd);
 }
