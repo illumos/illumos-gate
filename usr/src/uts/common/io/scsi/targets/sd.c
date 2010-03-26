@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -20190,11 +20190,11 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
 		}
 
 		/*
-		 * Read capacity and block size from the READ CAPACITY 10 data.
+		 * Read capacity and block size from the READ CAPACITY 16 data.
 		 * This data may be adjusted later due to device specific
 		 * issues.
 		 *
-		 * According to the SCSI spec, the READ CAPACITY 10
+		 * According to the SCSI spec, the READ CAPACITY 16
 		 * command returns the following:
 		 *
 		 *  bytes 0-7: Maximum logical block address available.
@@ -20207,7 +20207,7 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
 		 */
 		capacity = BE_64(capacity16_buf[0]);
 		lbasize = BE_32(*(uint32_t *)&capacity16_buf[1]);
-		lbpb_exp = (BE_64(capacity16_buf[1]) >> 40) & 0x0f;
+		lbpb_exp = (BE_64(capacity16_buf[1]) >> 16) & 0x0f;
 
 		pbsize = lbasize << lbpb_exp;
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -543,6 +543,8 @@ struct sata_apt_sense_data {
  * in sys/scsi/targets/sddefs.h as MODEPAGE_ERR_RECOV
  */
 #define	MODEPAGE_RW_ERRRECOV			0x01 /* read/write recovery */
+/* Missing from sys/scsi/impl/commands.h */
+#define	SCSI_READ_CAPACITY16_MAX_LBA		0xfffffffffffffffe
 
 /*
  * medium access command

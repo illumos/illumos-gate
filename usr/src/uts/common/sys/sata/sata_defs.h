@@ -314,6 +314,12 @@ typedef struct sata_id {
 /* IDLE IMMEDIATE with UNLOAD FEATURE supported */
 #define	SATA_IDLE_UNLOAD_SUPPORTED	0x2000
 
+/* Identify Device: physical sector size - word 106 */
+#define	SATA_L2PS_CHECK_BIT	0x4000	/* Set when this word valid */
+#define	SATA_L2PS_HAS_MULT	0x2000	/* Multiple logical sectors per phys */
+#define	SATA_L2PS_BIG_SECTORS	0x1000	/* Logical sector size > 512 */
+#define	SATA_L2PS_EXP_MASK	0x000f	/* Logical sectors per phys exponent */
+
 /* Identify (Packet) Device word 63,  ATA/ATAPI-6 & 7 */
 #define	SATA_MDMA_SEL_MASK	0x0700	/* Multiword DMA selected */
 #define	SATA_MDMA_2_SEL		0x0400	/* Multiword DMA mode 2 selected */
@@ -612,7 +618,7 @@ struct read_log_ext_directory {
 
 /*
  * SMART specific data
- * These eventually need to go to a generic scsi hearder file
+ * These eventually need to go to a generic scsi header file
  * for now they will reside here
  */
 #define	PC_CUMULATIVE_VALUES			0x01
