@@ -158,7 +158,7 @@ if [ -f "${UPDATEFILE}" ]; then
 	if [ $? != 0 ]; then
 		cecho ""
 		cecho "WARNING: Automatic update of the boot archive failed."
-		cecho "Try update the archives using 'bootadm update-archive'"
+		cecho "Update the archives using 'bootadm update-archive'"
 		cecho "command and then reboot the system from the same device that"
 		cecho "was previously booted." 
 		cecho ""
