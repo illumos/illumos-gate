@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -207,7 +207,7 @@ mp_cpu_configure(int cpuid)
 
 	kmem_free(listp, listsz);
 
-	mpo_cpu_add(cpuid);
+	mpo_cpu_add(mdp, cpuid);
 
 	/*
 	 * Note: uses cpu_lock to protect cpunodes

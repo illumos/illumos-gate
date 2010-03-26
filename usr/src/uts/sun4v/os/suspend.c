@@ -44,6 +44,7 @@
 #include <sys/sunddi.h>
 #include <sys/cpupart.h>
 #include <sys/hsvc.h>
+#include <sys/mpo.h>
 #include <vm/hat_sfmmu.h>
 
 /*
@@ -295,6 +296,7 @@ update_cpu_mappings(void)
 		if ((cp = cpu_get(id)) == NULL)
 			continue;
 		pg_cpu_fini(cp, pgps[id]);
+		mpo_cpu_remove(id);
 	}
 
 	/*
@@ -305,6 +307,7 @@ update_cpu_mappings(void)
 	for (id = 0; id < NCPU; id++) {
 		if ((cp = cpu_get(id)) == NULL)
 			continue;
+		mpo_cpu_add(mdp, id);
 		pgps[id] = pg_cpu_init(cp, B_TRUE);
 	}
 

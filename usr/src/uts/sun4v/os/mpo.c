@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -382,17 +382,14 @@ to_lgrp_done:
 
 /* Called when DR'ing in a CPU */
 void
-mpo_cpu_add(int cpuid)
+mpo_cpu_add(md_t *md, int cpuid)
 {
-	md_t *md;
 	mde_cookie_t cpunode;
 
 	int i;
 
 	if (n_lgrpnodes <= 0)
 		return;
-
-	md = md_get_handle();
 
 	if (md == NULL)
 		goto add_fail;
@@ -409,7 +406,6 @@ mpo_cpu_add(int cpuid)
 	mpo_cpu[cpuid].home = mpo_lgroup[i].addr_match >> home_mask_shift;
 	mpo_lgroup[i].ncpu++;
 	mpo_update_tunables();
-	(void) md_fini_handle(md);
 	return;
 add_fail:
 	panic("mpo_cpu_add: Cannot read MD");
