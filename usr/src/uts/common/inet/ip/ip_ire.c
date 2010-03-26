@@ -59,6 +59,7 @@
 #include <inet/ip_ftable.h>
 #include <inet/ip_rts.h>
 #include <inet/nd.h>
+#include <inet/tunables.h>
 
 #include <inet/tcp.h>
 #include <inet/ipclassifier.h>

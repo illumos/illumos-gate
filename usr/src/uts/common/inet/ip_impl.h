@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@ extern "C" {
 
 #include <sys/sdt.h>
 #include <sys/dld.h>
+#include <inet/tunables.h>
 
 #define	IP_MOD_ID		5701
 
@@ -179,6 +180,9 @@ extern zoneid_t	ip_get_zoneid_v4(ipaddr_t, mblk_t *, ip_recv_attr_t *,
     zoneid_t);
 extern zoneid_t	ip_get_zoneid_v6(in6_addr_t *, mblk_t *, const ill_t *,
     ip_recv_attr_t *, zoneid_t);
+extern void conn_ire_revalidate(conn_t *, void *);
+extern void ip_ire_unbind_walker(ire_t *, void *);
+extern void ip_ire_rebind_walker(ire_t *, void *);
 
 /*
  * flag passed in by IP based protocols to get a private ip stream with

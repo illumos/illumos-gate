@@ -54,6 +54,7 @@
 #include <inet/ip_ire.h>
 #include <inet/ipclassifier.h>
 #include <inet/nd.h>
+#include <inet/tunables.h>
 #include <sys/kmem.h>
 #include <sys/zone.h>
 

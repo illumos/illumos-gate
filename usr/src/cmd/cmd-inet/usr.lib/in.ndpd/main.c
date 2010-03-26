@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,7 +91,22 @@ int	rtsock = -1;			/* Routing socket */
 struct	rt_msghdr	*rt_msg;	/* Routing socket message */
 struct	sockaddr_in6	*rta_gateway;	/* RTA_GATEWAY sockaddr */
 struct	sockaddr_dl	*rta_ifp;	/* RTA_IFP sockaddr */
-int	mibsock = -1;			/* mib request socket */
+
+/*
+ * These sockets are used internally in this file.
+ */
+static int	mibsock = -1;			/* mib request socket */
+static int	cmdsock = -1;			/* command socket */
+
+static	int	ndpd_setup_cmd_listener(void);
+static	void	ndpd_cmd_handler(int);
+static	int	ndpd_process_cmd(int, ipadm_ndpd_msg_t *);
+static	int	ndpd_send_error(int, int);
+static	int	ndpd_set_autoconf(const char *, boolean_t);
+static	int	ndpd_create_addrs(const char *, struct sockaddr_in6, int,
+    boolean_t, boolean_t, char *);
+static	int	ndpd_delete_addrs(const char *);
+static	int	phyint_check_ipadm_intfid(struct phyint *);
 
 /*
  * Return the current time in milliseconds truncated to
@@ -361,7 +376,7 @@ poll_add(int fd)
 	new_num = pollfd_num + 32;
 	newfds = realloc(pollfds, new_num * sizeof (struct pollfd));
 	if (newfds == NULL) {
-		logperror("poll_add: realloc");
+		logperror("realloc");
 		return (-1);
 	}
 
@@ -449,20 +464,27 @@ if_process(int s, char *ifname, boolean_t first)
 
 	pi = phyint_lookup(phyintname);
 	if (pi == NULL) {
-		/*
-		 * Do not add anything for new interfaces until they are UP.
-		 * For existing interfaces we track the up flag.
-		 */
-		if (!(lifr.lifr_flags & IFF_UP))
-			return;
-
 		pi = phyint_create(phyintname);
 		if (pi == NULL) {
 			logmsg(LOG_ERR, "if_process: out of memory\n");
 			return;
 		}
+		/*
+		 * if in.ndpd is restarted, check with ipmgmtd if there is any
+		 * interface id to be configured for this interface.
+		 */
+		if (first) {
+			if (phyint_check_ipadm_intfid(pi) == -1)
+				logmsg(LOG_ERR, "Could not get ipadm info\n");
+		}
+	} else {
+		/*
+		 * if the phyint already exists, synchronize it with
+		 * the kernel state. For a newly created phyint, phyint_create
+		 * calls phyint_init_from_k().
+		 */
+		(void) phyint_init_from_k(pi);
 	}
-	(void) phyint_init_from_k(pi);
 	if (pi->pi_sock == -1 && !(pi->pi_kernel_state & PI_PRESENT)) {
 		/* Interface is not yet present */
 		if (debug & D_PHYINT) {
@@ -1088,7 +1110,7 @@ solicit_event(struct phyint *pi, enum solicit_events event, uint_t elapsed)
 				    "found on %s; assuming default flags\n",
 				    pi->pi_name);
 			}
-			if (pi->pi_StatefulAddrConf) {
+			if (pi->pi_autoconf && pi->pi_StatefulAddrConf) {
 				pi->pi_ra_flags |= ND_RA_FLAG_MANAGED |
 				    ND_RA_FLAG_OTHER;
 				start_dhcp(pi);
@@ -1376,6 +1398,12 @@ in_signal(int fd)
 			if (pi->pi_AdvSendAdvertisements)
 				check_to_advertise(pi, START_FINAL_ADV);
 
+			/*
+			 * Remove all the configured addresses.
+			 * Remove the addrobj names created with ipmgmtd.
+			 * Release the dhcpv6 addresses if any.
+			 * Cleanup the phyints.
+			 */
 			phyint_delete(pi);
 		}
 
@@ -1411,7 +1439,7 @@ in_signal(int fd)
 		/* NOTREACHED */
 	case 255:
 		/*
-		 * Special "signal" from looback_ra_enqueue.
+		 * Special "signal" from loopback_ra_enqueue.
 		 * Handle any queued loopback router advertisements.
 		 */
 		loopback_ra_dequeue();
@@ -1838,6 +1866,8 @@ check_if_removed(struct phyint *pi)
 		if (!pr->pr_in_use) {
 			/* Clear everything except PR_STATIC */
 			pr->pr_kernel_state &= PR_STATIC;
+			if (pr->pr_state & PR_STATIC)
+				prefix_update_ipadm_addrobj(pr, _B_FALSE);
 			pr->pr_name[0] = '\0';
 			if (pr->pr_state & PR_STATIC) {
 				prefix_delete(pr);
@@ -1870,6 +1900,7 @@ check_if_removed(struct phyint *pi)
 		for (pr = pi->pi_prefix_list; pr != NULL; pr = next_pr) {
 			next_pr = pr->pr_next;
 			if (pr->pr_state & PR_AUTO)
+				prefix_update_ipadm_addrobj(pr, _B_FALSE);
 				prefix_delete(pr);
 		}
 
@@ -2033,10 +2064,10 @@ main(int argc, char *argv[])
 	if (show_ifs)
 		phyint_print_all();
 
-	if (debug == 0) {
+	if (debug == 0)
 		initlog();
-	}
 
+	cmdsock = ndpd_setup_cmd_listener();
 	setup_eventpipe();
 	rtsock = setup_rtsock();
 	mibsock = setup_mibsock();
@@ -2065,6 +2096,10 @@ main(int argc, char *argv[])
 			}
 			if (pollfds[i].fd == mibsock) {
 				process_mibsock(mibsock);
+				break;
+			}
+			if (pollfds[i].fd == cmdsock) {
+				ndpd_cmd_handler(cmdsock);
 				break;
 			}
 			/*
@@ -2166,4 +2201,418 @@ logperror_pr(const struct prefix *pr, const char *str)
 		    str, pr->pr_name, pr->pr_physical->pi_name,
 		    strerror(errno));
 	}
+}
+
+static int
+ndpd_setup_cmd_listener(void)
+{
+	int sock;
+	int ret;
+	struct sockaddr_un servaddr;
+
+	sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sock < 0) {
+		logperror("socket");
+		exit(1);
+	}
+
+	bzero(&servaddr, sizeof (servaddr));
+	servaddr.sun_family = AF_UNIX;
+	(void) strlcpy(servaddr.sun_path, IPADM_UDS_PATH,
+	    sizeof (servaddr.sun_path));
+	(void) unlink(servaddr.sun_path);
+	ret = bind(sock, (struct sockaddr *)&servaddr, sizeof (servaddr));
+	if (ret < 0) {
+		logperror("bind");
+		exit(1);
+	}
+	if (listen(sock, 30) < 0) {
+		logperror("listen");
+		exit(1);
+	}
+	if (poll_add(sock) == -1) {
+		logmsg(LOG_ERR, "command socket could not be added to the "
+		    "polling set\n");
+		exit(1);
+	}
+
+	return (sock);
+}
+
+/*
+ * Commands received over the command socket come here
+ */
+static void
+ndpd_cmd_handler(int sock)
+{
+	int			newfd;
+	struct sockaddr_storage	peer;
+	socklen_t		peerlen;
+	ipadm_ndpd_msg_t	ndpd_msg;
+	int			retval;
+
+	peerlen = sizeof (peer);
+	newfd = accept(sock, (struct sockaddr *)&peer, &peerlen);
+	if (newfd < 0) {
+		logperror("accept");
+		return;
+	}
+
+	retval = ipadm_ndpd_read(newfd, &ndpd_msg, sizeof (ndpd_msg));
+	if (retval != 0)
+		logperror("Could not read ndpd command");
+
+	retval = ndpd_process_cmd(newfd, &ndpd_msg);
+	if (retval != 0) {
+		logmsg(LOG_ERR, "ndpd command on interface %s failed with "
+		    "error %s\n", ndpd_msg.inm_ifname, strerror(retval));
+	}
+	(void) close(newfd);
+}
+
+/*
+ * Process the commands received from the cmd listener socket.
+ */
+static int
+ndpd_process_cmd(int newfd, ipadm_ndpd_msg_t *msg)
+{
+	int err;
+
+	if (!ipadm_check_auth()) {
+		logmsg(LOG_ERR, "User not authorized to send the command\n");
+		(void) ndpd_send_error(newfd, EPERM);
+		return (EPERM);
+	}
+	switch (msg->inm_cmd) {
+	case IPADM_DISABLE_AUTOCONF:
+		err = ndpd_set_autoconf(msg->inm_ifname, _B_FALSE);
+		break;
+
+	case IPADM_ENABLE_AUTOCONF:
+		err = ndpd_set_autoconf(msg->inm_ifname, _B_TRUE);
+		break;
+
+	case IPADM_CREATE_ADDRS:
+		err = ndpd_create_addrs(msg->inm_ifname, msg->inm_intfid,
+		    msg->inm_intfidlen, msg->inm_stateless,
+		    msg->inm_stateful, msg->inm_aobjname);
+		break;
+
+	case IPADM_DELETE_ADDRS:
+		err = ndpd_delete_addrs(msg->inm_ifname);
+		break;
+
+	default:
+		err = EINVAL;
+		break;
+	}
+
+	(void) ndpd_send_error(newfd, err);
+
+	return (err);
+}
+
+static int
+ndpd_send_error(int fd, int error)
+{
+	return (ipadm_ndpd_write(fd, &error, sizeof (error)));
+}
+
+/*
+ * Disables/Enables autoconfiguration of addresses on the
+ * given physical interface.
+ * This is provided to support the legacy method of configuring IPv6
+ * addresses. i.e. `ifconfig bge0 inet6 plumb` will plumb the interface
+ * and start stateless and stateful autoconfiguration. If this function is
+ * not called with enable=_B_FALSE, no autoconfiguration will be done until
+ * ndpd_create_addrs() is called with an Interface ID.
+ */
+static int
+ndpd_set_autoconf(const char *ifname, boolean_t enable)
+{
+	struct phyint *pi;
+
+	pi = phyint_lookup((char *)ifname);
+	if (pi == NULL) {
+		/*
+		 * If the physical interface was plumbed but no
+		 * addresses were configured yet, phyint will not exist.
+		 */
+		pi = phyint_create((char *)ifname);
+		if (pi == NULL) {
+			logmsg(LOG_ERR, "could not create phyint for "
+			    "interface %s", ifname);
+			return (ENOMEM);
+		}
+	}
+	pi->pi_autoconf = enable;
+
+	if (debug & D_PHYINT) {
+		logmsg(LOG_DEBUG, "ndpd_set_autoconf: %s autoconf for "
+		    "interface %s\n", (enable ? "enabled" : "disabled"),
+		    pi->pi_name);
+	}
+	return (0);
+}
+
+/*
+ * Create auto-configured addresses on the given interface using
+ * the given token as the interface id during the next Router Advertisement.
+ * Currently, only one token per interface is supported.
+ */
+static int
+ndpd_create_addrs(const char *ifname, struct sockaddr_in6 intfid, int intfidlen,
+    boolean_t stateless, boolean_t stateful, char *addrobj)
+{
+	struct phyint *pi;
+	struct lifreq lifr;
+	struct sockaddr_in6 *sin6;
+	int err;
+
+	pi = phyint_lookup((char *)ifname);
+	if (pi == NULL) {
+		/*
+		 * If the physical interface was plumbed but no
+		 * addresses were configured yet, phyint will not exist.
+		 */
+		pi = phyint_create((char *)ifname);
+		if (pi == NULL) {
+			if (debug & D_PHYINT)
+				logmsg(LOG_ERR, "could not create phyint "
+				    "for interface %s", ifname);
+			return (ENOMEM);
+		}
+	} else if (pi->pi_autoconf) {
+		logmsg(LOG_ERR, "autoconfiguration already in progress\n");
+		return (EEXIST);
+	}
+	check_autoconf_var_consistency(pi, stateless, stateful);
+
+	if (intfidlen == 0) {
+		pi->pi_default_token = _B_TRUE;
+		if (ifsock < 0) {
+			ifsock = socket(AF_INET6, SOCK_DGRAM, 0);
+			if (ifsock < 0) {
+				err = errno;
+				logperror("ndpd_create_addrs: socket");
+				return (err);
+			}
+		}
+		(void) strncpy(lifr.lifr_name, ifname, sizeof (lifr.lifr_name));
+		sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
+		if (ioctl(ifsock, SIOCGLIFTOKEN, (char *)&lifr) < 0) {
+			err = errno;
+			logperror("SIOCGLIFTOKEN");
+			return (err);
+		}
+		pi->pi_token = sin6->sin6_addr;
+		pi->pi_token_length = lifr.lifr_addrlen;
+	} else {
+		pi->pi_default_token = _B_FALSE;
+		pi->pi_token = intfid.sin6_addr;
+		pi->pi_token_length = intfidlen;
+	}
+	pi->pi_stateless = stateless;
+	pi->pi_stateful = stateful;
+	(void) strlcpy(pi->pi_ipadm_aobjname, addrobj,
+	    sizeof (pi->pi_ipadm_aobjname));
+
+	/* We can allow autoconfiguration now. */
+	pi->pi_autoconf = _B_TRUE;
+
+	/* Restart the solicitations. */
+	if (pi->pi_sol_state == DONE_SOLICIT)
+		pi->pi_sol_state = NO_SOLICIT;
+	if (pi->pi_sol_state == NO_SOLICIT)
+		check_to_solicit(pi, START_INIT_SOLICIT);
+	if (debug & D_PHYINT)
+		logmsg(LOG_DEBUG, "ndpd_create_addrs: "
+		    "added token to interface %s\n", pi->pi_name);
+	return (0);
+}
+
+/*
+ * This function deletes all addresses on the given interface
+ * with the given Interface ID.
+ */
+static int
+ndpd_delete_addrs(const char *ifname)
+{
+	struct phyint *pi;
+	struct prefix *pr, *next_pr;
+	struct lifreq lifr;
+	int err;
+
+	pi = phyint_lookup((char *)ifname);
+	if (pi == NULL) {
+		logmsg(LOG_ERR, "no phyint found for %s", ifname);
+		return (ENXIO);
+	}
+	if (IN6_IS_ADDR_UNSPECIFIED(&pi->pi_token)) {
+		logmsg(LOG_ERR, "token does not exist for %s", ifname);
+		return (EINVAL);
+	}
+
+	if (ifsock < 0) {
+		ifsock = socket(AF_INET6, SOCK_DGRAM, 0);
+		if (ifsock < 0) {
+			err = errno;
+			logperror("ndpd_create_addrs: socket");
+			return (err);
+		}
+	}
+	/* Remove the prefixes for this phyint if they exist */
+	for (pr = pi->pi_prefix_list; pr != NULL; pr = next_pr) {
+		next_pr = pr->pr_next;
+		if (pr->pr_name[0] == '\0') {
+			prefix_delete(pr);
+			continue;
+		}
+		/*
+		 * Delete all the prefixes for the auto-configured
+		 * addresses as well as the DHCPv6 addresses.
+		 */
+		(void) strncpy(lifr.lifr_name, pr->pr_name,
+		    sizeof (lifr.lifr_name));
+		if (ioctl(ifsock, SIOCGLIFFLAGS, (char *)&lifr) < 0) {
+			err = errno;
+			logperror("SIOCGLIFFLAGS");
+			return (err);
+		}
+		if ((lifr.lifr_flags & IFF_ADDRCONF) ||
+		    (lifr.lifr_flags & IFF_DHCPRUNNING)) {
+			prefix_update_ipadm_addrobj(pr, _B_FALSE);
+		}
+		prefix_delete(pr);
+	}
+
+	/*
+	 * If we had started dhcpagent, we need to release the leases
+	 * if any are required.
+	 */
+	if (pi->pi_stateful) {
+		(void) strncpy(lifr.lifr_name, pi->pi_name,
+		    sizeof (lifr.lifr_name));
+		if (ioctl(ifsock, SIOCGLIFFLAGS, (char *)&lifr) < 0) {
+			err = errno;
+			logperror("SIOCGLIFFLAGS");
+			return (err);
+		}
+		if (lifr.lifr_flags & IFF_DHCPRUNNING)
+			release_dhcp(pi);
+	}
+
+	/*
+	 * Reset the Interface ID on this phyint and stop autoconfigurations
+	 * until a new interface ID is provided.
+	 */
+	pi->pi_token = in6addr_any;
+	pi->pi_token_length = 0;
+	pi->pi_autoconf = _B_FALSE;
+	pi->pi_ipadm_aobjname[0] = '\0';
+
+	/* Reset the stateless and stateful settings to default. */
+	pi->pi_stateless = pi->pi_StatelessAddrConf;
+	pi->pi_stateful = pi->pi_StatefulAddrConf;
+
+	if (debug & D_PHYINT) {
+		logmsg(LOG_DEBUG, "ndpd_delete_addrs: "
+		    "removed token from interface %s\n", pi->pi_name);
+	}
+	return (0);
+}
+
+void
+check_autoconf_var_consistency(struct phyint *pi, boolean_t stateless,
+    boolean_t stateful)
+{
+	/*
+	 * If StatelessAddrConf and StatelessAddrConf are set in
+	 * /etc/inet/ndpd.conf, check if the new values override those
+	 * settings. If so, log a warning.
+	 */
+	if ((pi->pi_StatelessAddrConf !=
+	    ifdefaults[I_StatelessAddrConf].cf_value &&
+	    stateless != pi->pi_StatelessAddrConf) ||
+	    (pi->pi_StatefulAddrConf !=
+	    ifdefaults[I_StatefulAddrConf].cf_value &&
+	    stateful != pi->pi_StatefulAddrConf)) {
+		logmsg(LOG_ERR, "check_autoconf_var_consistency: "
+		    "Overriding the StatelessAddrConf or StatefulAddrConf "
+		    "settings in ndpd.conf with the new values for "
+		    "interface %s\n", pi->pi_name);
+	}
+}
+
+/*
+ * If ipadm was used to start autoconfiguration and in.ndpd was restarted
+ * for some reason, in.ndpd has to resume autoconfiguration when it comes up.
+ * In this function, it scans the ipadm_addr_info() output to find a link-local
+ * on this interface with address type "addrconf" and extracts the interface id.
+ * It also stores the addrobj name to be used later when new addresses are
+ * created for the prefixes advertised by the router.
+ * If autoconfiguration was never started on this interface before in.ndpd
+ * was killed, then in.ndpd should refrain from configuring prefixes, even if
+ * there is a valid link-local on this interface, created by ipadm (identified
+ * if there is a valid addrobj name).
+ */
+static int
+phyint_check_ipadm_intfid(struct phyint *pi)
+{
+	ipadm_status_t		status;
+	ipadm_addr_info_t	*addrinfo;
+	struct ifaddrs		*ifap;
+	ipadm_addr_info_t	*ainfop;
+	struct sockaddr_in6	*sin6;
+	ipadm_handle_t		iph;
+
+	if (ipadm_open(&iph, 0) != IPADM_SUCCESS) {
+		logmsg(LOG_ERR, "could not open handle to libipadm\n");
+		return (-1);
+	}
+
+	status = ipadm_addr_info(iph, pi->pi_name, &addrinfo,
+	    IPADM_OPT_ZEROADDR, LIFC_NOXMIT|LIFC_TEMPORARY);
+	if (status != IPADM_SUCCESS) {
+		ipadm_close(iph);
+		return (-1);
+	}
+	pi->pi_autoconf = _B_TRUE;
+	for (ainfop = addrinfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
+		ifap = &ainfop->ia_ifa;
+		if (ifap->ifa_addr->ss_family != AF_INET6 ||
+		    ainfop->ia_state == IFA_DISABLED)
+			continue;
+		sin6 = (struct sockaddr_in6 *)ifap->ifa_addr;
+		if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+			if (ainfop->ia_atype == IPADM_ADDR_IPV6_ADDRCONF) {
+				pi->pi_token = sin6->sin6_addr;
+				pi->pi_token._S6_un._S6_u32[0] = 0;
+				pi->pi_token._S6_un._S6_u32[1] = 0;
+				pi->pi_autoconf = _B_TRUE;
+				(void) strlcpy(pi->pi_ipadm_aobjname,
+				    ainfop->ia_aobjname,
+				    sizeof (pi->pi_ipadm_aobjname));
+				break;
+			}
+			/*
+			 * If IFF_NOLINKLOCAL is set, then the link-local
+			 * was created using ipadm. Do not autoconfigure until
+			 * ipadm is explicitly used for autoconfiguration.
+			 */
+			if (ifap->ifa_flags & IFF_NOLINKLOCAL)
+				pi->pi_autoconf = _B_FALSE;
+		} else if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr) &&
+		    strrchr(ifap->ifa_name, ':') == NULL) {
+			/* The interface was created using ipadm. */
+			pi->pi_autoconf = _B_FALSE;
+		}
+	}
+	ipadm_free_addr_info(addrinfo);
+	if (!pi->pi_autoconf) {
+		pi->pi_token = in6addr_any;
+		pi->pi_token_length = 0;
+	}
+	ipadm_close(iph);
+	return (0);
 }

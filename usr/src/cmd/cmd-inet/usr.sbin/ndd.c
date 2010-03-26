@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,11 +36,14 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stropts.h>
+#include <inet/tunables.h>
 #include <inet/nd.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <libdllink.h>
 #include <libintl.h>
+#include <libipadm.h>
 
 static boolean_t do_getset(int fd, int cmd, char *buf, int buf_len);
 static int	get_value(char *msg, char *buf, int buf_len);
@@ -51,9 +54,257 @@ static char	*errmsg(int err);
 static void	fatal(char *fmt, ...);
 static void	printe(boolean_t print_errno, char *fmt, ...);
 
-static char	gbuf[65536];	/* Need 20k for 160 IREs ... */
+static char	modpath[128];	/* path to module */
+static char	gbuf[65536];	/* need large buffer to retrieve all names */
 static char	usage_str[] =	"usage: ndd -set device_name name value\n"
 				"       ndd [-get] device_name name [name ...]";
+
+/*
+ * Maps old ndd_name to the new ipadm_name. Any ndd property that is moved to
+ * libipadm should have an entry here to ensure backward compatibility
+ */
+typedef struct ndd2ipadm_map {
+	char	*ndd_name;
+	char	*ipadm_name;
+	uint_t	ipadm_proto;
+	uint_t	ipadm_flags;
+	uint_t	ndd_perm;
+} ndd2ipadm_map_t;
+
+static ndd2ipadm_map_t map[] = {
+	{ "ip_def_ttl",			"ttl",		MOD_PROTO_IPV4, 0, 0 },
+	{ "ip6_def_hops",		"hoplimit",	MOD_PROTO_IPV6, 0, 0 },
+	{ "ip_forwarding",		"forwarding",	MOD_PROTO_IPV4, 0, 0 },
+	{ "ip6_forwarding",		"forwarding",	MOD_PROTO_IPV6, 0, 0 },
+	{ "icmp_recv_hiwat",		"recv_maxbuf",	MOD_PROTO_RAWIP, 0, 0 },
+	{ "icmp_xmit_hiwat",		"send_maxbuf",	MOD_PROTO_RAWIP, 0, 0 },
+	{ "tcp_ecn_permitted",		"ecn",		MOD_PROTO_TCP, 0, 0 },
+	{ "tcp_extra_priv_ports_add",	"extra_priv_ports",	MOD_PROTO_TCP,
+	    IPADM_OPT_APPEND, MOD_PROP_PERM_WRITE },
+	{ "tcp_extra_priv_ports_del",	"extra_priv_ports",	MOD_PROTO_TCP,
+	    IPADM_OPT_REMOVE, MOD_PROP_PERM_WRITE },
+	{ "tcp_extra_priv_ports",	"extra_priv_ports",	MOD_PROTO_TCP,
+	    0, MOD_PROP_PERM_READ },
+	{ "tcp_largest_anon_port",	"largest_anon_port",	MOD_PROTO_TCP,
+	    0, 0 },
+	{ "tcp_recv_hiwat",		"recv_maxbuf",	MOD_PROTO_TCP, 0, 0 },
+	{ "tcp_sack_permitted",		"sack",		MOD_PROTO_TCP, 0, 0 },
+	{ "tcp_xmit_hiwat",		"send_maxbuf",	MOD_PROTO_TCP, 0, 0 },
+	{ "tcp_smallest_anon_port",	"smallest_anon_port",	MOD_PROTO_TCP,
+	    0, 0 },
+	{ "tcp_smallest_nonpriv_port",	"smallest_nonpriv_port", MOD_PROTO_TCP,
+	    0, 0 },
+	{ "udp_extra_priv_ports_add",	"extra_priv_ports",	MOD_PROTO_UDP,
+	    IPADM_OPT_APPEND, MOD_PROP_PERM_WRITE },
+	{ "udp_extra_priv_ports_del",	"extra_priv_ports",	MOD_PROTO_UDP,
+	    IPADM_OPT_REMOVE, MOD_PROP_PERM_WRITE },
+	{ "udp_extra_priv_ports",	"extra_priv_ports",	MOD_PROTO_UDP,
+	    0, MOD_PROP_PERM_READ },
+	{ "udp_largest_anon_port",	"largest_anon_port",    MOD_PROTO_UDP,
+	    0, 0 },
+	{ "udp_recv_hiwat",		"recv_maxbuf",	MOD_PROTO_UDP, 0, 0 },
+	{ "udp_xmit_hiwat",		"send_maxbuf",	MOD_PROTO_UDP, 0, 0 },
+	{ "udp_smallest_anon_port",	"smallest_anon_port",	MOD_PROTO_UDP,
+	    0, 0 },
+	{ "udp_smallest_nonpriv_port",	"smallest_nonpriv_port", MOD_PROTO_UDP,
+	    0, 0 },
+	{ "sctp_extra_priv_ports_add",	"extra_priv_ports",	MOD_PROTO_SCTP,
+	    IPADM_OPT_APPEND, MOD_PROP_PERM_WRITE },
+	{ "sctp_extra_priv_ports_del",	"extra_priv_ports",	MOD_PROTO_SCTP,
+	    IPADM_OPT_REMOVE, MOD_PROP_PERM_WRITE },
+	{ "sctp_extra_priv_ports",	"extra_priv_ports",	MOD_PROTO_SCTP,
+	    0, MOD_PROP_PERM_READ },
+	{ "sctp_largest_anon_port",	"largest_anon_port",	MOD_PROTO_SCTP,
+	    0, 0 },
+	{ "sctp_recv_hiwat",		"recv_maxbuf",	MOD_PROTO_SCTP, 0, 0 },
+	{ "sctp_xmit_hiwat",		"send_maxbuf",	MOD_PROTO_SCTP, 0, 0 },
+	{ "sctp_smallest_anon_port",	"smallest_anon_port",	MOD_PROTO_SCTP,
+	    0, 0 },
+	{ "sctp_smallest_nonpriv_port",	"smallest_nonpriv_port", MOD_PROTO_SCTP,
+	    0, 0 },
+	{ NULL, NULL, 0, 0, 0 }
+};
+
+static uint_t
+ndd_str2proto(const char *protostr)
+{
+	if (strcmp(protostr, "tcp") == 0 ||
+	    strcmp(protostr, "tcp6") == 0) {
+		return (MOD_PROTO_TCP);
+	} else if (strcmp(protostr, "udp") == 0 ||
+	    strcmp(protostr, "udp6") == 0) {
+		return (MOD_PROTO_UDP);
+	} else if (strcmp(protostr, "ip") == 0 ||
+	    strcmp(protostr, "ip6") == 0 ||
+	    strcmp(protostr, "arp") == 0) {
+		return (MOD_PROTO_IP);
+	} else if (strcmp(protostr, "icmp") == 0 ||
+	    strcmp(protostr, "icmp6") == 0) {
+		return (MOD_PROTO_RAWIP);
+	} else if (strcmp(protostr, "sctp") == 0 ||
+	    strcmp(protostr, "sctp6") == 0) {
+		return (MOD_PROTO_SCTP);
+	}
+	return (MOD_PROTO_NONE);
+}
+
+static char *
+ndd_perm2str(uint_t perm)
+{
+	switch (perm) {
+	case MOD_PROP_PERM_READ:
+		return ("read only");
+	case MOD_PROP_PERM_WRITE:
+		return ("write only");
+	case MOD_PROP_PERM_RW:
+		return ("read and write");
+	}
+
+	return (NULL);
+}
+
+/*
+ * This function converts any new property names to old ndd name by consulting
+ * ndd2ipadm_map_t. This is done to preserve backward compatibility.
+ */
+static void
+print_ipadm2ndd(char *oldbuf, uint_t obufsize)
+{
+	ndd2ipadm_map_t	*nimap;
+	char		*pname, *rwtag, *protostr;
+	uint_t		proto, perm;
+	boolean_t	matched;
+
+	pname = oldbuf;
+	while (pname[0] && pname < (oldbuf + obufsize - 1)) {
+		for (protostr = pname; !isspace(*protostr); protostr++)
+			;
+		*protostr++ = '\0';
+		/* protostr now points to protocol */
+
+		for (rwtag = protostr; !isspace(*rwtag); rwtag++)
+			;
+		*rwtag++ = '\0';
+		/* rwtag now points to permissions */
+
+		proto = atoi(protostr);
+		perm = atoi(rwtag);
+		matched = B_FALSE;
+		for (nimap = map; nimap->ndd_name != NULL; nimap++) {
+			if (strcmp(pname, nimap->ipadm_name) != 0 ||
+			    !(nimap->ipadm_proto & proto))
+				continue;
+
+			matched = B_TRUE;
+			if (nimap->ndd_perm != 0)
+				perm = nimap->ndd_perm;
+			(void) printf("%-30s (%s)\n", nimap->ndd_name,
+			    ndd_perm2str(perm));
+		}
+		if (!matched)
+			(void) printf("%-30s (%s)\n", pname,
+			    ndd_perm2str(perm));
+		for (pname = rwtag; *pname++; )
+			;
+	}
+}
+
+/*
+ * get/set the value for a given property by calling into libipadm. The
+ * IPH_LEGACY flag is used by libipadm for special handling. For some
+ * properties, libipadm.so displays strings (for e.g., on/off,
+ * never/passive/active, et al) instead of numerals. However ndd(1M) always
+ * printed numberals. This flag will help in avoiding printing strings.
+ */
+static boolean_t
+do_ipadm_getset(int cmd, char *buf, int buflen)
+{
+	ndd2ipadm_map_t	*nimap;
+	ipadm_handle_t	iph = NULL;
+	ipadm_status_t	status;
+	char		*mod;
+	uint_t		proto, perm = 0, flags = 0;
+	char		*pname, *pvalp;
+	int		i;
+
+	if ((mod = strrchr(modpath, '/')) == NULL)
+		mod = modpath;
+	else
+		++mod;
+	if ((proto = ndd_str2proto(mod)) == MOD_PROTO_NONE)
+		return (B_FALSE);
+
+	if ((status = ipadm_open(&iph, IPH_LEGACY)) != IPADM_SUCCESS)
+		goto fail;
+
+	pname = buf;
+	for (nimap = map; nimap->ndd_name != NULL; nimap++) {
+		if (strcmp(pname, nimap->ndd_name) == 0)
+			break;
+	}
+	if (nimap->ndd_name != NULL) {
+		pname = nimap->ipadm_name;
+		proto = nimap->ipadm_proto;
+		flags = nimap->ipadm_flags;
+		perm = nimap->ndd_perm;
+	}
+	if (cmd == ND_GET) {
+		char		propval[MAXPROPVALLEN], allprop[64536];
+		uint_t		pvalsz;
+		sa_family_t	af = AF_UNSPEC;
+		int		err;
+
+		if (perm == MOD_PROP_PERM_WRITE)
+			fatal("operation failed: Permission denied");
+
+		if (strcmp(pname, "?") == 0) {
+			pvalp = allprop;
+			pvalsz = sizeof (allprop);
+		} else {
+			pvalp = propval;
+			pvalsz = sizeof (propval);
+		}
+
+		status = ipadm_get_prop(iph, pname, pvalp, &pvalsz, proto,
+		    IPADM_OPT_ACTIVE);
+		if (status != IPADM_SUCCESS)
+			goto fail;
+
+		if (strcmp(pname, "?") == 0) {
+			(void) print_ipadm2ndd(pvalp, pvalsz);
+		} else {
+			char *tmp = pvalp;
+
+			/*
+			 * For backward compatibility if there are multiple
+			 * values print each value in it's own line.
+			 */
+			while (*tmp != '\0') {
+				if (*tmp == ',')
+					*tmp = '\n';
+				tmp++;
+			}
+			(void) printf("%s\n", pvalp);
+		}
+		(void) fflush(stdout);
+	} else {
+		if (perm == MOD_PROP_PERM_READ)
+			fatal("operation failed: Permission denied");
+
+		/* walk past the property name to find the property value */
+		for (i = 0; buf[i] != '\0'; i++)
+			;
+
+		pvalp = &buf[++i];
+		status = ipadm_set_prop(iph, pname, pvalp, proto,
+		    flags|IPADM_OPT_ACTIVE);
+	}
+fail:
+	ipadm_close(iph);
+	if (status != IPADM_SUCCESS)
+		fatal("operation failed: %s", ipadm_status2str(status));
+	return (B_TRUE);
+}
 
 /*
  * gldv3_warning() catches the case of /sbin/ndd abuse to administer
@@ -98,10 +349,9 @@ gldv3_warning(char *module)
 int
 main(int argc, char **argv)
 {
-	char	*cp, *value;
+	char	*cp, *value, *mod;
 	int	cmd;
-	int	fd;
-
+	int	fd = 0;
 
 	if (!(cp = *++argv)) {
 		while ((fd = open_device()) != -1) {
@@ -120,14 +370,23 @@ main(int argc, char **argv)
 		if (!(cp = *++argv))
 			fatal(usage_str);
 	}
+
 	gldv3_warning(cp);
 
-	if ((fd = open(cp, O_RDWR)) == -1)
-		fatal("open of %s failed: %s", cp, errmsg(errno));
+	mod = strrchr(cp, '/');
+	if (mod != NULL)
+		mod++;
+	else
+		mod = cp;
 
-	if (!isastream(fd))
-		fatal("%s is not a streams device", cp);
+	if (ndd_str2proto(mod) == MOD_PROTO_NONE) {
+		if ((fd = open(cp, O_RDWR)) == -1)
+			fatal("open of %s failed: %s", cp, errmsg(errno));
+		if (!isastream(fd))
+			fatal("%s is not a streams device", cp);
+	}
 
+	(void) strlcpy(modpath, cp, sizeof (modpath));
 	if (!(cp = *++argv)) {
 		getset_interactive(fd);
 		(void) close(fd);
@@ -197,6 +456,13 @@ do_getset(int fd, int cmd, char *buf, int buf_len)
 	boolean_t	is_name_get;
 
 	if (is_obsolete(buf))
+		return (B_TRUE);
+
+	/*
+	 * See if libipadm can handle this request, i.e., properties on
+	 * following modules arp, ip, ipv4, ipv6, tcp, udp and sctp
+	 */
+	if (do_ipadm_getset(cmd, buf, buf_len))
 		return (B_TRUE);
 
 	stri.ic_cmd = cmd;
@@ -293,31 +559,40 @@ printe(boolean_t print_errno, char *fmt, ...)
 		(void) printf("\n");
 }
 
-
 static int
 open_device()
 {
-	char	name[80];
 	int	fd, len;
+	char	*mod;
 
 	for (;;) {
-		len = get_value("module to query ? ", name, sizeof (name));
+		len = get_value("module to query ? ", modpath,
+		    sizeof (modpath));
 		if (len <= 1 ||
-		    (len == 2 && (name[0] == 'q' || name[0] == 'Q')))
+		    (len == 2 && (modpath[0] == 'q' || modpath[0] == 'Q')))
 			return (-1);
 
-		if ((fd = open(name, O_RDWR)) == -1) {
-			printe(B_TRUE, "open of %s failed", name);
-			continue;
+		mod = strrchr(modpath, '/');
+		if (mod != NULL)
+			mod++;
+		else
+			mod = modpath;
+		if (ndd_str2proto(mod) == MOD_PROTO_NONE) {
+			if ((fd = open(modpath, O_RDWR)) == -1) {
+				printe(B_TRUE, "open of %s failed", modpath);
+				continue;
+			}
+		} else {
+			return (0);
 		}
 
-		gldv3_warning(name);
+		gldv3_warning(modpath);
 
 		if (isastream(fd))
 			return (fd);
 
 		(void) close(fd);
-		printe(B_FALSE, "%s is not a streams device", name);
+		printe(B_FALSE, "%s is not a streams device", modpath);
 	}
 }
 

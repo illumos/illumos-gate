@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,8 +123,6 @@ _info(struct modinfo *modinfop)
 #define	TCP6		"tcp6"
 #define	UDP		"udp"
 #define	UDP6		"udp6"
-#define	SCTP		"sctp"
-#define	SCTP6		"sctp6"
 #define	ICMP		"icmp"
 #define	ICMP6		"icmp6"
 #define	IP		"ip"
@@ -134,7 +132,6 @@ _info(struct modinfo *modinfop)
 #define	UDPDEV		"/devices/pseudo/udp@0:udp"
 #define	TCP6DEV		"/devices/pseudo/tcp6@0:tcp6"
 #define	UDP6DEV		"/devices/pseudo/udp6@0:udp6"
-#define	SCTP6DEV	"/devices/pseudo/sctp6@0:sctp6"
 #define	IP6DEV		"/devices/pseudo/ip6@0:ip6"
 
 typedef struct strplumb_modspec {
@@ -150,8 +147,6 @@ static strplumb_modspec_t	strplumb_modlist[] = {
 	{ "drv", TCP6 },
 	{ "drv", UDP },
 	{ "drv", UDP6 },
-	{ "drv", SCTP },
-	{ "drv", SCTP6 },
 	{ "drv", ICMP },
 	{ "drv", ICMP6 },
 	{ "drv", ARP },

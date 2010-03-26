@@ -118,6 +118,7 @@ DIRS= \
 	/etc/hal/fdi/preprobe/10osvendor \
 	/etc/hal/fdi/preprobe/20thirdparty \
 	/etc/hal/fdi/preprobe/30user \
+	/etc/ipadm \
 	/etc/iscsi \
 	/etc/rpcsec	\
 	/etc/security	\

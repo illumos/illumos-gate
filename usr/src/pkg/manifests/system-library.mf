@@ -181,6 +181,7 @@ file path=lib/libgen.so.1
 file path=lib/libinetcfg.so.1
 file path=lib/libinetutil.so.1
 file path=lib/libintl.so.1
+file path=lib/libipadm.so.1
 file path=lib/libipmp.so.1
 file path=lib/libkcfd.so.1
 file path=lib/libkmf.so.1

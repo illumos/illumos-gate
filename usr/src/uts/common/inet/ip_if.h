@@ -80,7 +80,7 @@ extern "C" {
 
 #define	IFF_PHYINTINST_FLAGS	(IFF_DEBUG|IFF_NOTRAILERS|IFF_NOARP| \
     IFF_MULTICAST|IFF_ROUTER|IFF_NONUD|IFF_NORTEXCH|IFF_IPV4|IFF_IPV6| \
-    IFF_COS_ENABLED|IFF_FIXEDMTU|IFF_VRRP|IFF_NOACCEPT)
+    IFF_COS_ENABLED|IFF_FIXEDMTU|IFF_VRRP|IFF_NOACCEPT|IFF_NOLINKLOCAL)
 
 #define	IFF_LOGINT_FLAGS	(IFF_UP|IFF_BROADCAST|IFF_POINTOPOINT| \
     IFF_UNNUMBERED|IFF_DHCPRUNNING|IFF_PRIVATE|IFF_NOXMIT|IFF_NOLOCAL| \
@@ -113,6 +113,7 @@ extern "C" {
 #define	ILLF_FIXEDMTU		IFF_FIXEDMTU	/* set with SIOCSLIFMTU */
 #define	ILLF_VRRP		IFF_VRRP	/* managed by VRRP */
 #define	ILLF_NOACCEPT		IFF_NOACCEPT	/* accept only ND messagees */
+#define	ILLF_NOLINKLOCAL	IFF_NOLINKLOCAL	/* No default linklocal */
 
 #define	IPIF_UP			IFF_UP		/* interface is up */
 #define	IPIF_BROADCAST		IFF_BROADCAST	/* broadcast address valid */
@@ -338,6 +339,11 @@ extern int ip_siocaddrt(ipif_t *, sin_t *, queue_t *, mblk_t *,
 extern int ip_siocdelrt(ipif_t *, sin_t *, queue_t *, mblk_t *,
     ip_ioctl_cmd_t *, void *);
 
+extern int ip_sioctl_prefix(ipif_t *, sin_t *, queue_t *, mblk_t *,
+    ip_ioctl_cmd_t *, void *);
+extern int ip_sioctl_prefix_restart(ipif_t *, sin_t *, queue_t *, mblk_t *,
+    ip_ioctl_cmd_t *, void *);
+
 extern int ip_sioctl_addr(ipif_t *, sin_t *, queue_t *, mblk_t *,
     ip_ioctl_cmd_t *, void *);
 extern int ip_sioctl_addr_restart(ipif_t *, sin_t *, queue_t *, mblk_t *,
@@ -469,6 +475,9 @@ extern int ip_sioctl_slifusesrc(ipif_t *, sin_t *, queue_t *,
     mblk_t *, ip_ioctl_cmd_t *, void *);
 extern int ip_sioctl_get_lifsrcof(ipif_t *, sin_t *, queue_t *,
     mblk_t *, ip_ioctl_cmd_t *, void *);
+
+extern int ip_sioctl_get_dadstate(ipif_t *, sin_t *, queue_t *, mblk_t *,
+    ip_ioctl_cmd_t *, void *);
 
 extern	void	ip_sioctl_copyin_resume(ipsq_t *, queue_t *, mblk_t *, void *);
 extern	void	ip_sioctl_copyin_setup(queue_t *, mblk_t *);

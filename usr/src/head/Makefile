@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # head/Makefile
@@ -79,6 +79,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	grp.h		\
 	iconv.h		\
 	ieeefp.h	\
+	ifaddrs.h	\
 	inttypes.h	\
 	iso646.h	\
 	klpd.h		\

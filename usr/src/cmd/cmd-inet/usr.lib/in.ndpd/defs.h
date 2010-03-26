@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_NDPD_DEFS_H
 #define	_NDPD_DEFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,6 +60,8 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <net/route.h>
+#include <libipadm.h>
+#include <ipadm_ndpd.h>
 
 #include "tables.h"
 

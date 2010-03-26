@@ -128,10 +128,6 @@ int		icmp_opt_get(conn_t *connp, int level, int name,
 		    uchar_t *ptr);
 static int	icmp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin,
 		    sin6_t *sin6, cred_t *cr, pid_t pid, ip_xmit_attr_t *ixa);
-static int	icmp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
-static boolean_t icmp_param_register(IDP *ndp, icmpparam_t *icmppa, int cnt);
-static int	icmp_param_set(queue_t *q, mblk_t *mp, char *value,
-		    caddr_t cp, cred_t *cr);
 static mblk_t	*icmp_prepend_hdr(conn_t *, ip_xmit_attr_t *, const ip_pkt_t *,
     const in6_addr_t *, const in6_addr_t *, uint32_t, mblk_t *, int *);
 static mblk_t	*icmp_prepend_header_template(conn_t *, ip_xmit_attr_t *,
@@ -219,33 +215,69 @@ static struct T_info_ack icmp_g_t_info_ack = {
 };
 
 /*
- * Table of ND variables supported by icmp.  These are loaded into is_nd
- * when the stack instance is created.
  * All of these are alterable, within the min/max values given, at run time.
+ *
+ * Note: All those tunables which do not start with "icmp_" are Committed and
+ * therefore are public. See PSARC 2009/306.
  */
-static icmpparam_t	icmp_param_arr[] = {
-	/* min	max	value	name */
-	{ 0,	128,	32,	"icmp_wroff_extra" },
-	{ 1,	255,	255,	"icmp_ipv4_ttl" },
-	{ 0, IPV6_MAX_HOPS, IPV6_DEFAULT_HOPS,	"icmp_ipv6_hoplimit"},
-	{ 0,	1,	1,	"icmp_bsd_compat" },
-	{ 4096,	65536,	8192,	"icmp_xmit_hiwat"},
-	{ 0,	65536,	1024,	"icmp_xmit_lowat"},
-	{ 4096,	65536,	8192,	"icmp_recv_hiwat"},
-	{ 65536, 1024*1024*1024, 256*1024,	"icmp_max_buf"},
-	{ 0,	1,	0,	"icmp_pmtu_discovery" },
-	{ 0,	1,	0,	"icmp_sendto_ignerr" },
+static mod_prop_info_t icmp_propinfo_tbl[] = {
+	/* tunable - 0 */
+	{ "icmp_wroff_extra", MOD_PROTO_RAWIP,
+	    mod_set_uint32, mod_get_uint32,
+	    {0, 128, 32}, {32} },
+
+	{ "icmp_ipv4_ttl", MOD_PROTO_RAWIP,
+	    mod_set_uint32, mod_get_uint32,
+	    {1, 255, 255}, {255} },
+
+	{ "icmp_ipv6_hoplimit", MOD_PROTO_RAWIP,
+	    mod_set_uint32, mod_get_uint32,
+	    {0, IPV6_MAX_HOPS, IPV6_DEFAULT_HOPS},
+	    {IPV6_DEFAULT_HOPS} },
+
+	{ "icmp_bsd_compat", MOD_PROTO_RAWIP,
+	    mod_set_boolean, mod_get_boolean,
+	    {B_TRUE}, {B_TRUE} },
+
+	{ "send_maxbuf", MOD_PROTO_RAWIP,
+	    mod_set_uint32, mod_get_uint32,
+	    {4096, 65536, 8192}, {8192} },
+
+	{ "icmp_xmit_lowat", MOD_PROTO_RAWIP,
+	    mod_set_uint32, mod_get_uint32,
+	    {0, 65536, 1024}, {1024} },
+
+	{ "recv_maxbuf", MOD_PROTO_RAWIP,
+	    mod_set_uint32, mod_get_uint32,
+	    {4096, 65536, 8192}, {8192} },
+
+	{ "icmp_max_buf", MOD_PROTO_RAWIP,
+	    mod_set_uint32, mod_get_uint32,
+	    {65536, 1024*1024*1024, 256*1024}, {256 * 1024} },
+
+	{ "icmp_pmtu_discovery", MOD_PROTO_RAWIP,
+	    mod_set_boolean, mod_get_boolean,
+	    {B_FALSE}, {B_FALSE} },
+
+	{ "icmp_sendto_ignerr", MOD_PROTO_RAWIP,
+	    mod_set_boolean, mod_get_boolean,
+	    {B_FALSE}, {B_FALSE} },
+
+	{ "?", MOD_PROTO_RAWIP, NULL, mod_get_allprop, {0}, {0} },
+
+	{ NULL, 0, NULL, NULL, {0}, {0} }
 };
-#define	is_wroff_extra			is_param_arr[0].icmp_param_value
-#define	is_ipv4_ttl			is_param_arr[1].icmp_param_value
-#define	is_ipv6_hoplimit		is_param_arr[2].icmp_param_value
-#define	is_bsd_compat			is_param_arr[3].icmp_param_value
-#define	is_xmit_hiwat			is_param_arr[4].icmp_param_value
-#define	is_xmit_lowat			is_param_arr[5].icmp_param_value
-#define	is_recv_hiwat			is_param_arr[6].icmp_param_value
-#define	is_max_buf			is_param_arr[7].icmp_param_value
-#define	is_pmtu_discovery		is_param_arr[8].icmp_param_value
-#define	is_sendto_ignerr		is_param_arr[9].icmp_param_value
+
+#define	is_wroff_extra			is_propinfo_tbl[0].prop_cur_uval
+#define	is_ipv4_ttl			is_propinfo_tbl[1].prop_cur_uval
+#define	is_ipv6_hoplimit		is_propinfo_tbl[2].prop_cur_uval
+#define	is_bsd_compat			is_propinfo_tbl[3].prop_cur_bval
+#define	is_xmit_hiwat			is_propinfo_tbl[4].prop_cur_uval
+#define	is_xmit_lowat			is_propinfo_tbl[5].prop_cur_uval
+#define	is_recv_hiwat			is_propinfo_tbl[6].prop_cur_uval
+#define	is_max_buf			is_propinfo_tbl[7].prop_cur_uval
+#define	is_pmtu_discovery		is_propinfo_tbl[8].prop_cur_bval
+#define	is_sendto_ignerr		is_propinfo_tbl[9].prop_cur_bval
 
 typedef union T_primitives *t_primp_t;
 
@@ -2420,63 +2452,6 @@ icmp_build_hdr_template(conn_t *connp, const in6_addr_t *v6src,
 	 * Any routing header/option has been massaged. The checksum difference
 	 * is stored in conn_sum.
 	 */
-	return (0);
-}
-
-/*
- * This routine retrieves the value of an ND variable in a icmpparam_t
- * structure.  It is called through nd_getset when a user reads the
- * variable.
- */
-/* ARGSUSED */
-static int
-icmp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	icmpparam_t	*icmppa = (icmpparam_t *)cp;
-
-	(void) mi_mpprintf(mp, "%d", icmppa->icmp_param_value);
-	return (0);
-}
-
-/*
- * Walk through the param array specified registering each element with the
- * named dispatch (ND) handler.
- */
-static boolean_t
-icmp_param_register(IDP *ndp, icmpparam_t *icmppa, int cnt)
-{
-	for (; cnt-- > 0; icmppa++) {
-		if (icmppa->icmp_param_name && icmppa->icmp_param_name[0]) {
-			if (!nd_load(ndp, icmppa->icmp_param_name,
-			    icmp_param_get, icmp_param_set,
-			    (caddr_t)icmppa)) {
-				nd_free(ndp);
-				return (B_FALSE);
-			}
-		}
-	}
-	return (B_TRUE);
-}
-
-/* This routine sets an ND variable in a icmpparam_t structure. */
-/* ARGSUSED */
-static int
-icmp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
-{
-	long		new_value;
-	icmpparam_t	*icmppa = (icmpparam_t *)cp;
-
-	/*
-	 * Fail the request if the new value does not lie within the
-	 * required bounds.
-	 */
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
-	    new_value < icmppa->icmp_param_min ||
-	    new_value > icmppa->icmp_param_max) {
-		return (EINVAL);
-	}
-	/* Set the new value */
-	icmppa->icmp_param_value = new_value;
 	return (0);
 }
 
@@ -4706,7 +4681,6 @@ icmp_wput_other(queue_t *q, mblk_t *mp)
 	struct iocblk *iocp;
 	conn_t	*connp = Q_TO_CONN(q);
 	icmp_t	*icmp = connp->conn_icmp;
-	icmp_stack_t *is = icmp->icmp_is;
 	cred_t *cr;
 
 	switch (mp->b_datap->db_type) {
@@ -4837,14 +4811,6 @@ icmp_wput_other(queue_t *q, mblk_t *mp)
 			mi_copyin(q, mp, NULL,
 			    SIZEOF_STRUCT(strbuf, iocp->ioc_flag));
 			return;
-		case ND_SET:
-			/* nd_getset performs the necessary checking */
-		case ND_GET:
-			if (nd_getset(q, is->is_nd, mp)) {
-				qreply(q, mp);
-				return;
-			}
-			break;
 		default:
 			break;
 		}
@@ -4990,19 +4956,17 @@ static void *
 rawip_stack_init(netstackid_t stackid, netstack_t *ns)
 {
 	icmp_stack_t	*is;
-	icmpparam_t	*pa;
 	int		error = 0;
+	size_t		arrsz;
 	major_t		major;
 
 	is = (icmp_stack_t *)kmem_zalloc(sizeof (*is), KM_SLEEP);
 	is->is_netstack = ns;
 
-	pa = (icmpparam_t *)kmem_alloc(sizeof (icmp_param_arr), KM_SLEEP);
-	is->is_param_arr = pa;
-	bcopy(icmp_param_arr, is->is_param_arr, sizeof (icmp_param_arr));
+	arrsz = sizeof (icmp_propinfo_tbl);
+	is->is_propinfo_tbl = (mod_prop_info_t *)kmem_alloc(arrsz, KM_SLEEP);
+	bcopy(icmp_propinfo_tbl, is->is_propinfo_tbl, arrsz);
 
-	(void) icmp_param_register(&is->is_nd,
-	    is->is_param_arr, A_CNT(icmp_param_arr));
 	is->is_ksp = rawip_kstat_init(stackid);
 
 	major = mod_name_to_major(INET_NAME);
@@ -5019,9 +4983,8 @@ rawip_stack_fini(netstackid_t stackid, void *arg)
 {
 	icmp_stack_t *is = (icmp_stack_t *)arg;
 
-	nd_free(&is->is_nd);
-	kmem_free(is->is_param_arr, sizeof (icmp_param_arr));
-	is->is_param_arr = NULL;
+	kmem_free(is->is_propinfo_tbl, sizeof (icmp_propinfo_tbl));
+	is->is_propinfo_tbl = NULL;
 
 	rawip_kstat_fini(stackid, is->is_ksp);
 	is->is_ksp = NULL;
@@ -5599,8 +5562,6 @@ rawip_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 	}
 
 	switch (cmd) {
-	case ND_SET:
-	case ND_GET:
 	case _SIOCSOCKFALLBACK:
 	case TI_GETPEERNAME:
 	case TI_GETMYNAME:

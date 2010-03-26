@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -43,14 +43,7 @@ extern "C" {
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/optcom.h>
-
-/* Named Dispatch Parameter Management Structure */
-typedef struct icmpparam_s {
-	uint_t	icmp_param_min;
-	uint_t	icmp_param_max;
-	uint_t	icmp_param_value;
-	char	*icmp_param_name;
-} icmpparam_t;
+#include <inet/tunables.h>
 
 /*
  * ICMP stack instances
@@ -58,8 +51,7 @@ typedef struct icmpparam_s {
 struct icmp_stack {
 	netstack_t	*is_netstack;	/* Common netstack */
 	void		*is_head;	/* Head for list of open icmps */
-	IDP		is_nd;	/* Points to table of ICMP ND variables. */
-	icmpparam_t	*is_param_arr; 	/* ndd variable table */
+	mod_prop_info_t	*is_propinfo_tbl; /* holds the icmp tunables */
 	kstat_t		*is_ksp;	/* kstats */
 	mib2_rawip_t	is_rawip_mib;	/* SNMP fixed size info */
 	ldi_ident_t	is_ldi_ident;

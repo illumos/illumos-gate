@@ -97,6 +97,7 @@ solaris.network.autoconf.wlan:::Create Network Auto-Magic Config for Known WLANs
 solaris.network.autoconf.write:::Create Network Auto-Magic Config::help=NetworkAutoconfWrite.html
 solaris.network.ilb.config:::Network ILB Configuration::help=NetworkILBconf.html
 solaris.network.ilb.enable:::Network ILB Enable Configuration::help=NetworkILBenable.html
+solaris.network.interface.config:::Network Interface Configuration::help=NetworkInterfaceConfig.html
 solaris.network.link.security:::Link Security::help=LinkSecurity.html
 solaris.network.wifi.config:::Wifi Config::help=WifiConfig.html
 solaris.network.wifi.wep:::Wifi Wep::help=WifiWep.html

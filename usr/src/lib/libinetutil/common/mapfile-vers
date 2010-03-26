@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -62,12 +62,15 @@ SUNWprivate_1.1 {
 	iu_tq_destroy;
 	iu_unregister_event;
 	octet_to_hexascii;
-	sockaddrcmp;
 	ofmt_open;
 	ofmt_close;
 	ofmt_print;
 	ofmt_update_winsize;
 	ofmt_strerror;
+	mask2plen;
+	plen2mask;
+	sockaddrcmp;
+	sockaddrunspec;
     local:
 	*;
 };

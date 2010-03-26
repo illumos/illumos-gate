@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,8 +148,7 @@ struct ip_stack {
 
 	uint_t			ips_src_generation;	/* Both IPv4 and IPv6 */
 
-	struct ipparam_s	*ips_param_arr; 	/* ndd variable table */
-	struct ipndp_s		*ips_ndp_arr;
+	struct mod_prop_info_s	*ips_propinfo_tbl; 	/* ip tunables table */
 
 	mib2_ipIfStatsEntry_t	ips_ip_mib;	/* SNMP fixed size info */
 	mib2_icmp_t	ips_icmp_mib;
@@ -170,7 +169,6 @@ struct ip_stack {
 	ip6_stat_t	ips_ip6_statistics;
 
 /* ip.c */
-	krwlock_t	ips_ip_g_nd_lock;
 	kmutex_t	ips_igmp_timer_lock;
 	kmutex_t	ips_mld_timer_lock;
 	kmutex_t	ips_ip_mi_lock;
@@ -287,14 +285,6 @@ struct ip_stack {
 	/* The number of policy entries in the table */
 	uint_t		ips_ip6_asp_table_count;
 
-	int		ips_ip_g_forward;
-	int		ips_ipv6_forward;
-
-	time_t		ips_ip_g_frag_timeout;
-	clock_t		ips_ip_g_frag_timo_ms;
-	time_t		ips_ipv6_frag_timeout;
-	clock_t		ips_ipv6_frag_timo_ms;
-
 	struct conn_s	*ips_ip_g_mrouter;
 
 	/* Time since last icmp_pkt_err */
@@ -306,16 +296,17 @@ struct ip_stack {
 	void		*ips_ip_g_head;	/* IP Instance Data List Head */
 	void		*ips_arp_g_head; /* ARP Instance Data List Head */
 
-	caddr_t		ips_ip_g_nd;	/* Named Dispatch List Head */
-
 	/* Multirouting stuff */
 	/* Interval (in ms) between consecutive 'bad MTU' warnings */
 	hrtime_t	ips_ip_multirt_log_interval;
 	/* Time since last warning issued. */
 	hrtime_t	ips_multirt_bad_mtu_last_time;
 
-	struct cgtp_filter_ops *ips_ip_cgtp_filter_ops;	/* CGTP hooks */
-	boolean_t	ips_ip_cgtp_filter;	/* Enable/disable CGTP hooks */
+	/*
+	 * CGTP hooks. Enabling and disabling of hooks is controlled by an
+	 * IP tunable 'ips_ip_cgtp_filter'.
+	 */
+	struct cgtp_filter_ops *ips_ip_cgtp_filter_ops;
 
 	struct ipsq_s	*ips_ipsq_g_head;
 	uint_t		ips_ill_index;	/* Used to assign interface indicies */
@@ -332,7 +323,7 @@ struct ip_stack {
 	kmutex_t	ips_ip_g_mrouter_mutex;
 
 	struct mrtstat	*ips_mrtstat;	/* Stats for netstat */
-	int		ips_saved_ip_g_forward;
+	int		ips_saved_ip_forwarding;
 
 	/* numvifs is only a hint about the max interface being used. */
 	ushort_t	ips_numvifs;

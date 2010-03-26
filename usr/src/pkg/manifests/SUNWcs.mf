@@ -486,6 +486,7 @@ file path=etc/user_attr.d/SUNWcs group=sys
 file path=etc/vfstab group=sys preserve=true
 file path=lib/crypto/kcfd mode=0555
 file path=lib/inet/in.mpathd mode=0555
+file path=lib/inet/ipmgmtd mode=0555
 file path=lib/inet/netcfgd mode=0555
 file path=lib/inet/nwamd mode=0555
 file path=lib/svc/bin/lsvcrun group=sys mode=0555
@@ -512,6 +513,7 @@ file path=lib/svc/method/ldap-client mode=0555
 file path=lib/svc/method/manifest-import mode=0555
 file path=lib/svc/method/mpxio-upgrade mode=0555
 file path=lib/svc/method/net-init mode=0555
+file path=lib/svc/method/net-ipmgmt mode=0555
 file path=lib/svc/method/net-ipqos mode=0555
 file path=lib/svc/method/net-iptun mode=0555
 file path=lib/svc/method/net-loc mode=0555
@@ -968,6 +970,7 @@ file path=usr/lib/help/auths/locale/C/NetworkAutoconfWrite.html
 file path=usr/lib/help/auths/locale/C/NetworkHeader.html
 file path=usr/lib/help/auths/locale/C/NetworkILBconf.html
 file path=usr/lib/help/auths/locale/C/NetworkILBenable.html
+file path=usr/lib/help/auths/locale/C/NetworkInterfaceConfig.html
 file path=usr/lib/help/auths/locale/C/NetworkVRRP.html
 file path=usr/lib/help/auths/locale/C/PriAdmin.html
 file path=usr/lib/help/auths/locale/C/ProfmgrHeader.html
@@ -1930,6 +1933,7 @@ file path=lib/svc/manifest/network/ipsec/manual-key.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ipsec/policy.xml group=sys mode=0444
 file path=lib/svc/manifest/network/ldap/client.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-initial.xml group=sys mode=0444
+file path=lib/svc/manifest/network/network-ipmgmt.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-ipqos.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-iptun.xml group=sys mode=0444
 file path=lib/svc/manifest/network/network-location.xml group=sys mode=0444
@@ -2689,6 +2693,7 @@ link path=usr/sbin/ifconfig target=../../sbin/ifconfig
 link path=usr/sbin/inetd target=../lib/inet/inetd
 link path=usr/sbin/init target=../../sbin/init
 $(i386_ONLY)link path=usr/sbin/installgrub target=../../sbin/installgrub
+link path=usr/sbin/ipadm target=../../sbin/ipadm
 link path=usr/sbin/ipmpstat target=../../sbin/ipmpstat
 link path=usr/sbin/labelit target=./clri
 link path=usr/sbin/lockfs target=../lib/fs/ufs/lockfs

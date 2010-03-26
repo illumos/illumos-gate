@@ -19,12 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -97,25 +95,8 @@ nd_getset(queue_t *q, caddr_t nd_param, MBLKP mp)
 		valp = NULL;
 	switch (iocp->ioc_cmd) {
 	case ND_GET:
-		/*
-		 * (temporary) hack: "*valp" is size of user buffer for
-		 * copyout. If result of action routine is too big, free
-		 * excess and return ioc_rval as buffer size needed.  Return
-		 * as many mblocks as will fit, free the rest.  For backward
-		 * compatibility, assume size of original ioctl buffer if
-		 * "*valp" bad or not given.
-		 */
-		if (valp)
-			(void) ddi_strtol(valp, NULL, 10, &avail);
 		/* We overwrite the name/value with the reply data */
-		{
-			mblk_t *mp2 = mp1;
-
-			while (mp2) {
-				mp2->b_wptr = mp2->b_rptr;
-				mp2 = mp2->b_cont;
-			}
-		}
+		mp1->b_wptr = mp1->b_rptr;
 		err = (*nde->nde_get_pfi)(q, mp1, nde->nde_data, iocp->ioc_cr);
 		if (!err) {
 			int	size_out;
@@ -141,7 +122,7 @@ nd_getset(queue_t *q, caddr_t nd_param, MBLKP mp)
 		if (valp) {
 			if ((iocp->ioc_cr != NULL) &&
 			    ((err = secpolicy_ip_config(iocp->ioc_cr, B_FALSE))
-				    == 0)) {
+			    == 0)) {
 				err = (*nde->nde_set_pfi)(q, mp1, valp,
 				    nde->nde_data, iocp->ioc_cr);
 			}

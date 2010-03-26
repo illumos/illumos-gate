@@ -19,44 +19,17 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*LINTLIBRARY*/
+/*PROTOLIB1*/
 
-#include <sys/types.h>
-#include <sys/conf.h>
-#include <sys/modctl.h>
-#include <inet/common.h>
-#include <inet/ip.h>
-
-#define	INET_NAME	"sctp"
-#define	INET_DEVDESC	"SCTP device"
-#define	INET_DEVSTRTAB	sctpinfo
-#define	INET_DEVMINOR	0
-#define	INET_DEVMTFLAGS	D_MP
-
-#include "../inetddi.c"
-
-int
-_init(void)
-{
-	/*
-	 * device initialization happens when the actual code containing
-	 * module (/kernel/drv/ip) is loaded, and driven from ip_ddi_init()
-	 */
-	return (mod_install(&modlinkage));
-}
-
-int
-_fini(void)
-{
-	return (mod_remove(&modlinkage));
-}
-
-int
-_info(struct modinfo *modinfop)
-{
-	return (mod_info(&modlinkage, modinfop));
-}
+#include <libipadm.h>
+/*
+ * functions private to libipadm and ipmgmtd/in.ndpd are prototyped
+ * in the files below
+ */
+#include <ipadm_ipmgmt.h>
+#include <ipadm_ndpd.h>

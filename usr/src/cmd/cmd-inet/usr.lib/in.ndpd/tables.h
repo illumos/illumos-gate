@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 #include <ndpd.h>
+#include <libipadm.h>
 
 enum adv_states { NO_ADV = 0, REG_ADV, INIT_ADV, SOLICIT_ADV, FINAL_ADV };
 enum adv_events { ADV_OFF, START_INIT_ADV, START_FINAL_ADV, RECEIVED_SOLICIT,
@@ -60,6 +61,8 @@ struct phyint {
 	uint_t		pi_mtu;			/* From SIOCGLIFMTU */
 	struct in6_addr pi_token;
 	uint_t		pi_token_length;
+	boolean_t	pi_stateless;
+	boolean_t	pi_stateful;
 	struct in6_addr	pi_tmp_token;		/* For RFC3041 addrs */
 	struct in6_addr	pi_dst_token;		/* For POINTOPOINT */
 
@@ -119,9 +122,12 @@ struct phyint {
 	 * even if no Router Advertisements are received.
 	 * Tracked using pi_each_time_since_random.
 	 */
-	uint_t		pi_RetransTimer;		/* In milliseconds */
+	uint_t		pi_RetransTimer;	/* In milliseconds */
 
-	uint_t		pi_ra_flags;		/* Detect when to start DHCP */
+	uint_t		pi_ra_flags;	/* Detect when to start DHCP */
+	boolean_t	pi_autoconf;	/* Enable/Disable autoconfiguration */
+	boolean_t	pi_default_token;	/* Use default token */
+	char		pi_ipadm_aobjname[IPADM_AOBJSIZ];
 };
 
 /*
@@ -311,6 +317,7 @@ extern void	print_prefixlist(struct confvar *confvar);
 extern void	in_data(struct phyint *pi);
 
 extern void	start_dhcp(struct phyint *pi);
+extern void	release_dhcp(struct phyint *pi);
 
 extern void	incoming_ra(struct phyint *pi, struct nd_router_advert *ra,
 		    int len, struct sockaddr_in6 *from, boolean_t loopback);
@@ -323,6 +330,9 @@ extern boolean_t incoming_prefix_addrconf_process(struct phyint *pi,
 extern void	incoming_prefix_onlink_process(struct prefix *pr,
 		    uchar_t *opt);
 
+extern void	check_autoconf_var_consistency(struct phyint *, boolean_t,
+    boolean_t);
+extern void	prefix_update_ipadm_addrobj(struct prefix *pr, boolean_t add);
 #ifdef	__cplusplus
 }
 #endif

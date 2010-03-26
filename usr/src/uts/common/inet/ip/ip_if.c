@@ -71,6 +71,7 @@
 #include <inet/common.h>   /* for various inet/mi.h and inet/nd.h needs */
 #include <inet/mi.h>
 #include <inet/nd.h>
+#include <inet/tunables.h>
 #include <inet/arp.h>
 #include <inet/ip_arp.h>
 #include <inet/mib2.h>
@@ -100,6 +101,9 @@
 
 #include <sys/tsol/tndb.h>
 #include <sys/tsol/tnet.h>
+
+#include <inet/rawip_impl.h> /* needed for icmp_stack_t */
+#include <inet/udp_impl.h> /* needed for udp_stack_t */
 
 /* The character which tells where the ill_name ends */
 #define	IPIF_SEPARATOR_CHAR	':'
@@ -275,8 +279,6 @@ static ip_m_t   ip_m_tbl[] = {
 
 static ill_t	ill_null;		/* Empty ILL for init. */
 char	ipif_loopback_name[] = "lo0";
-static char *ipv4_forward_suffix = ":ip_forwarding";
-static char *ipv6_forward_suffix = ":ip6_forwarding";
 
 /* These are used by all IP network modules. */
 sin6_t	sin6_null;	/* Zero address for quick clears */
@@ -483,7 +485,7 @@ ill_delete_tail(ill_t *ill)
 {
 	mblk_t	**mpp;
 	ipif_t	*ipif;
-	ip_stack_t	*ipst = ill->ill_ipst;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
 		ipif_non_duplicate(ipif);
@@ -572,11 +574,6 @@ ill_delete_tail(ill_t *ill)
 	 * point.
 	 */
 	(void) ill_glist_delete(ill);
-
-	rw_enter(&ipst->ips_ip_g_nd_lock, RW_WRITER);
-	if (ill->ill_ndd_name != NULL)
-		nd_unload(&ipst->ips_ip_g_nd, ill->ill_ndd_name);
-	rw_exit(&ipst->ips_ip_g_nd_lock);
 
 	if (ill->ill_frag_ptr != NULL) {
 		uint_t count;
@@ -2644,52 +2641,6 @@ ill_frag_free_pkts(ill_t *ill, ipfb_t *ipfb, ipf_t *ipf, int free_cnt)
 	ipfp[0] = ipf;
 }
 
-#define	ND_FORWARD_WARNING	"The <if>:ip*_forwarding ndd variables are " \
-	"obsolete and may be removed in a future release of Solaris.  Use " \
-	"ifconfig(1M) to manipulate the forwarding status of an interface."
-
-/*
- * For obsolete per-interface forwarding configuration;
- * called in response to ND_GET.
- */
-/* ARGSUSED */
-static int
-nd_ill_forward_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *ioc_cr)
-{
-	ill_t *ill = (ill_t *)cp;
-
-	cmn_err(CE_WARN, ND_FORWARD_WARNING);
-
-	(void) mi_mpprintf(mp, "%d", (ill->ill_flags & ILLF_ROUTER) != 0);
-	return (0);
-}
-
-/*
- * For obsolete per-interface forwarding configuration;
- * called in response to ND_SET.
- */
-/* ARGSUSED */
-static int
-nd_ill_forward_set(queue_t *q, mblk_t *mp, char *valuestr, caddr_t cp,
-    cred_t *ioc_cr)
-{
-	long value;
-	int retval;
-	ip_stack_t *ipst = CONNQ_TO_IPST(q);
-
-	cmn_err(CE_WARN, ND_FORWARD_WARNING);
-
-	if (ddi_strtol(valuestr, NULL, 10, &value) != 0 ||
-	    value < 0 || value > 1) {
-		return (EINVAL);
-	}
-
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-	retval = ill_forward_set((ill_t *)cp, (value != 0));
-	rw_exit(&ipst->ips_ill_g_lock);
-	return (retval);
-}
-
 /*
  * Helper function for ill_forward_set().
  */
@@ -2785,58 +2736,6 @@ ill_set_nce_router_flags(ill_t *ill, boolean_t enable)
 			nce_refrele(nce);
 		}
 	}
-}
-
-/*
- * Given an ill with a _valid_ name, add the ip_forwarding ndd variable
- * for this ill.  Make sure the v6/v4 question has been answered about this
- * ill.  The creation of this ndd variable is only for backwards compatibility.
- * The preferred way to control per-interface IP forwarding is through the
- * ILLF_ROUTER interface flag.
- */
-static int
-ill_set_ndd_name(ill_t *ill)
-{
-	char *suffix;
-	ip_stack_t	*ipst = ill->ill_ipst;
-
-	ASSERT(IAM_WRITER_ILL(ill));
-
-	if (ill->ill_isv6)
-		suffix = ipv6_forward_suffix;
-	else
-		suffix = ipv4_forward_suffix;
-
-	ill->ill_ndd_name = ill->ill_name + ill->ill_name_length;
-	bcopy(ill->ill_name, ill->ill_ndd_name, ill->ill_name_length - 1);
-	/*
-	 * Copies over the '\0'.
-	 * Note that strlen(suffix) is always bounded.
-	 */
-	bcopy(suffix, ill->ill_ndd_name + ill->ill_name_length - 1,
-	    strlen(suffix) + 1);
-
-	/*
-	 * Use of the nd table requires holding the reader lock.
-	 * Modifying the nd table thru nd_load/nd_unload requires
-	 * the writer lock.
-	 */
-	rw_enter(&ipst->ips_ip_g_nd_lock, RW_WRITER);
-	if (!nd_load(&ipst->ips_ip_g_nd, ill->ill_ndd_name, nd_ill_forward_get,
-	    nd_ill_forward_set, (caddr_t)ill)) {
-		/*
-		 * If the nd_load failed, it only meant that it could not
-		 * allocate a new bunch of room for further NDD expansion.
-		 * Because of that, the ill_ndd_name will be set to 0, and
-		 * this interface is at the mercy of the global ip_forwarding
-		 * variable.
-		 */
-		rw_exit(&ipst->ips_ip_g_nd_lock);
-		ill->ill_ndd_name = NULL;
-		return (ENOMEM);
-	}
-	rw_exit(&ipst->ips_ip_g_nd_lock);
-	return (0);
 }
 
 /*
@@ -3448,8 +3347,7 @@ ill_init(queue_t *q, ill_t *ill)
 	 * Allocate sufficient space to contain our fragment hash table and
 	 * the device name.
 	 */
-	frag_ptr = (uchar_t *)mi_zalloc(ILL_FRAG_HASH_TBL_SIZE +
-	    2 * LIFNAMSIZ + strlen(ipv6_forward_suffix));
+	frag_ptr = (uchar_t *)mi_zalloc(ILL_FRAG_HASH_TBL_SIZE + 2 * LIFNAMSIZ);
 	if (frag_ptr == NULL) {
 		freemsg(info_mp);
 		return (ENOMEM);
@@ -5439,6 +5337,27 @@ ip_mcast_mapping(ill_t *ill, uchar_t *addr, uchar_t *hwaddr)
 }
 
 /*
+ * Returns B_FALSE if the IPv4 netmask pointed by `mask' is non-contiguous.
+ * Otherwise returns B_TRUE.
+ *
+ * The netmask can be verified to be contiguous with 32 shifts and or
+ * operations. Take the contiguous mask (in host byte order) and compute
+ * 	mask | mask << 1 | mask << 2 | ... | mask << 31
+ * the result will be the same as the 'mask' for contiguous mask.
+ */
+static boolean_t
+ip_contiguous_mask(uint32_t mask)
+{
+	uint32_t	m = mask;
+	int		i;
+
+	for (i = 1; i < 32; i++)
+		m |= (mask << i);
+
+	return (m == mask);
+}
+
+/*
  * ip_rt_add is called to add an IPv4 route to the forwarding table.
  * ill is passed in to associate it with the correct interface.
  * If ire_arg is set, then we return the held IRE in that location.
@@ -5463,6 +5382,10 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 
 	if (ire_arg != NULL)
 		*ire_arg = NULL;
+
+	/* disallow non-contiguous netmasks */
+	if (!ip_contiguous_mask(ntohl(mask)))
+		return (ENOTSUP);
 
 	/*
 	 * If this is the case of RTF_HOST being set, then we set the netmask
@@ -8840,6 +8763,248 @@ ip_sioctl_lookup(int ioc_cmd)
 }
 
 /*
+ * helper function for ip_sioctl_getsetprop(), which does some sanity checks
+ */
+static boolean_t
+getset_ioctl_checks(mblk_t *mp)
+{
+	struct iocblk	*iocp = (struct iocblk *)mp->b_rptr;
+	mblk_t		*mp1 = mp->b_cont;
+	mod_ioc_prop_t	*pioc;
+	uint_t		flags;
+	uint_t		pioc_size;
+
+	/* do sanity checks on various arguments */
+	if (mp1 == NULL || iocp->ioc_count == 0 ||
+	    iocp->ioc_count == TRANSPARENT) {
+		return (B_FALSE);
+	}
+	if (msgdsize(mp1) < iocp->ioc_count) {
+		if (!pullupmsg(mp1, iocp->ioc_count))
+			return (B_FALSE);
+	}
+
+	pioc = (mod_ioc_prop_t *)mp1->b_rptr;
+
+	/* sanity checks on mpr_valsize */
+	pioc_size = sizeof (mod_ioc_prop_t);
+	if (pioc->mpr_valsize != 0)
+		pioc_size += pioc->mpr_valsize - 1;
+
+	if (iocp->ioc_count != pioc_size)
+		return (B_FALSE);
+
+	flags = pioc->mpr_flags;
+	if (iocp->ioc_cmd == SIOCSETPROP) {
+		/*
+		 * One can either reset the value to it's default value or
+		 * change the current value or append/remove the value from
+		 * a multi-valued properties.
+		 */
+		if ((flags & MOD_PROP_DEFAULT) != MOD_PROP_DEFAULT &&
+		    flags != MOD_PROP_ACTIVE &&
+		    flags != (MOD_PROP_ACTIVE|MOD_PROP_APPEND) &&
+		    flags != (MOD_PROP_ACTIVE|MOD_PROP_REMOVE))
+			return (B_FALSE);
+	} else {
+		ASSERT(iocp->ioc_cmd == SIOCGETPROP);
+
+		/*
+		 * One can retrieve only one kind of property information
+		 * at a time.
+		 */
+		if ((flags & MOD_PROP_ACTIVE) != MOD_PROP_ACTIVE &&
+		    (flags & MOD_PROP_DEFAULT) != MOD_PROP_DEFAULT &&
+		    (flags & MOD_PROP_POSSIBLE) != MOD_PROP_POSSIBLE &&
+		    (flags & MOD_PROP_PERM) != MOD_PROP_PERM)
+			return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * process the SIOC{SET|GET}PROP ioctl's
+ */
+/* ARGSUSED */
+static void
+ip_sioctl_getsetprop(queue_t *q, mblk_t *mp)
+{
+	struct iocblk	*iocp = (struct iocblk *)mp->b_rptr;
+	mblk_t		*mp1 = mp->b_cont;
+	mod_ioc_prop_t	*pioc;
+	mod_prop_info_t *ptbl = NULL, *pinfo = NULL;
+	ip_stack_t	*ipst;
+	icmp_stack_t	*is;
+	tcp_stack_t	*tcps;
+	sctp_stack_t	*sctps;
+	udp_stack_t	*us;
+	netstack_t	*stack;
+	void		*cbarg;
+	cred_t		*cr;
+	boolean_t 	set;
+	int		err;
+
+	ASSERT(q->q_next == NULL);
+	ASSERT(CONN_Q(q));
+
+	if (!getset_ioctl_checks(mp)) {
+		miocnak(q, mp, 0, EINVAL);
+		return;
+	}
+	ipst = CONNQ_TO_IPST(q);
+	stack = ipst->ips_netstack;
+	pioc = (mod_ioc_prop_t *)mp1->b_rptr;
+
+	switch (pioc->mpr_proto) {
+	case MOD_PROTO_IP:
+	case MOD_PROTO_IPV4:
+	case MOD_PROTO_IPV6:
+		ptbl = ipst->ips_propinfo_tbl;
+		cbarg = ipst;
+		break;
+	case MOD_PROTO_RAWIP:
+		is = stack->netstack_icmp;
+		ptbl = is->is_propinfo_tbl;
+		cbarg = is;
+		break;
+	case MOD_PROTO_TCP:
+		tcps = stack->netstack_tcp;
+		ptbl = tcps->tcps_propinfo_tbl;
+		cbarg = tcps;
+		break;
+	case MOD_PROTO_UDP:
+		us = stack->netstack_udp;
+		ptbl = us->us_propinfo_tbl;
+		cbarg = us;
+		break;
+	case MOD_PROTO_SCTP:
+		sctps = stack->netstack_sctp;
+		ptbl = sctps->sctps_propinfo_tbl;
+		cbarg = sctps;
+		break;
+	default:
+		miocnak(q, mp, 0, EINVAL);
+		return;
+	}
+
+	/* search for given property in respective protocol propinfo table */
+	for (pinfo = ptbl; pinfo->mpi_name != NULL; pinfo++) {
+		if (strcmp(pinfo->mpi_name, pioc->mpr_name) == 0 &&
+		    pinfo->mpi_proto == pioc->mpr_proto)
+			break;
+	}
+	if (pinfo->mpi_name == NULL) {
+		miocnak(q, mp, 0, ENOENT);
+		return;
+	}
+
+	set = (iocp->ioc_cmd == SIOCSETPROP) ? B_TRUE : B_FALSE;
+	if (set && pinfo->mpi_setf != NULL) {
+		cr = msg_getcred(mp, NULL);
+		if (cr == NULL)
+			cr = iocp->ioc_cr;
+		err = pinfo->mpi_setf(cbarg, cr, pinfo, pioc->mpr_ifname,
+		    pioc->mpr_val, pioc->mpr_flags);
+	} else if (!set && pinfo->mpi_getf != NULL) {
+		err = pinfo->mpi_getf(cbarg, pinfo, pioc->mpr_ifname,
+		    pioc->mpr_val, pioc->mpr_valsize, pioc->mpr_flags);
+	} else {
+		err = EPERM;
+	}
+
+	if (err != 0) {
+		miocnak(q, mp, 0, err);
+	} else {
+		if (set)
+			miocack(q, mp, 0, 0);
+		else    /* For get, we need to return back the data */
+			miocack(q, mp, iocp->ioc_count, 0);
+	}
+}
+
+/*
+ * process the legacy ND_GET, ND_SET ioctl just for {ip|ip6}_forwarding
+ * as several routing daemons have unfortunately used this 'unpublished'
+ * but well-known ioctls.
+ */
+/* ARGSUSED */
+static void
+ip_process_legacy_nddprop(queue_t *q, mblk_t *mp)
+{
+	struct iocblk	*iocp = (struct iocblk *)mp->b_rptr;
+	mblk_t		*mp1 = mp->b_cont;
+	char		*pname, *pval, *buf;
+	uint_t		bufsize, proto;
+	mod_prop_info_t *ptbl = NULL, *pinfo = NULL;
+	ip_stack_t	*ipst;
+	int		err = 0;
+
+	ASSERT(CONN_Q(q));
+	ipst = CONNQ_TO_IPST(q);
+
+	if (iocp->ioc_count == 0 || mp1 == NULL) {
+		miocnak(q, mp, 0, EINVAL);
+		return;
+	}
+
+	mp1->b_datap->db_lim[-1] = '\0';	/* Force null termination */
+	pval = buf = pname = (char *)mp1->b_rptr;
+	bufsize = MBLKL(mp1);
+
+	if (strcmp(pname, "ip_forwarding") == 0) {
+		pname = "forwarding";
+		proto = MOD_PROTO_IPV4;
+	} else if (strcmp(pname, "ip6_forwarding") == 0) {
+		pname = "forwarding";
+		proto = MOD_PROTO_IPV6;
+	} else {
+		miocnak(q, mp, 0, EINVAL);
+		return;
+	}
+
+	ptbl = ipst->ips_propinfo_tbl;
+	for (pinfo = ptbl; pinfo->mpi_name != NULL; pinfo++) {
+		if (strcmp(pinfo->mpi_name, pname) == 0 &&
+		    pinfo->mpi_proto == proto)
+			break;
+	}
+
+	ASSERT(pinfo->mpi_name != NULL);
+
+	switch (iocp->ioc_cmd) {
+	case ND_GET:
+		if ((err = pinfo->mpi_getf(ipst, pinfo, NULL, buf, bufsize,
+		    0)) == 0) {
+			miocack(q, mp, iocp->ioc_count, 0);
+			return;
+		}
+		break;
+	case ND_SET:
+		/*
+		 * buffer will have property name and value in the following
+		 * format,
+		 * <property name>'\0'<property value>'\0', extract them;
+		 */
+		while (*pval++)
+			noop;
+
+		if (!*pval || pval >= (char *)mp1->b_wptr) {
+			err = EINVAL;
+		} else if ((err = pinfo->mpi_setf(ipst, NULL, pinfo, NULL,
+		    pval, 0)) == 0) {
+			miocack(q, mp, 0, 0);
+			return;
+		}
+		break;
+	default:
+		err = EINVAL;
+		break;
+	}
+	miocnak(q, mp, 0, err);
+}
+
+/*
  * Wrapper function for resuming deferred ioctl processing
  * Used for SIOCGDSTINFO, SIOCGIP6ADDRPOLICY, SIOCGMSFILTER,
  * SIOCSMSFILTER, SIOCGIPMSFILTER, and SIOCSIPMSFILTER currently.
@@ -8972,6 +9137,7 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 		copyin_size = SIZEOF_STRUCT(lifsrcof, iocp->ioc_flag);
 		mi_copyin(q, mp, NULL, copyin_size);
 		return;
+
 	case SIOCGIP6ADDRPOLICY:
 		ip_sioctl_ip6addrpolicy(q, mp);
 		ip6_asp_table_refrele(ipst);
@@ -8984,6 +9150,16 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 	case SIOCGDSTINFO:
 		ip_sioctl_dstinfo(q, mp);
 		ip6_asp_table_refrele(ipst);
+		return;
+
+	case ND_SET:
+	case ND_GET:
+		ip_process_legacy_nddprop(q, mp);
+		return;
+
+	case SIOCSETPROP:
+	case SIOCGETPROP:
+		ip_sioctl_getsetprop(q, mp);
 		return;
 
 	case I_PLINK:
@@ -9002,38 +9178,6 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 		if (CONN_Q(q))
 			CONN_INC_REF(Q_TO_CONN(q));
 		ip_sioctl_plink(NULL, q, mp, NULL);
-		return;
-
-	case ND_GET:
-	case ND_SET:
-		/*
-		 * Use of the nd table requires holding the reader lock.
-		 * Modifying the nd table thru nd_load/nd_unload requires
-		 * the writer lock.
-		 */
-		rw_enter(&ipst->ips_ip_g_nd_lock, RW_READER);
-		if (nd_getset(q, ipst->ips_ip_g_nd, mp)) {
-			rw_exit(&ipst->ips_ip_g_nd_lock);
-
-			if (iocp->ioc_error)
-				iocp->ioc_count = 0;
-			mp->b_datap->db_type = M_IOCACK;
-			qreply(q, mp);
-			return;
-		}
-		rw_exit(&ipst->ips_ip_g_nd_lock);
-		/*
-		 * We don't understand this subioctl of ND_GET / ND_SET.
-		 * Maybe intended for some driver / module below us
-		 */
-		if (q->q_next) {
-			putnext(q, mp);
-		} else {
-			iocp->ioc_error = ENOENT;
-			mp->b_datap->db_type = M_IOCNAK;
-			iocp->ioc_count = 0;
-			qreply(q, mp);
-		}
 		return;
 
 	case IP_IOCTL:
@@ -9468,6 +9612,61 @@ ip_sioctl_removeif_restart(ipif_t *ipif, sin_t *dummy_sin, queue_t *q,
 }
 
 /*
+ * Set the local interface address using the given prefix and ill_token.
+ */
+/* ARGSUSED */
+int
+ip_sioctl_prefix(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
+    ip_ioctl_cmd_t *dummy_ipip, void *dummy_ifreq)
+{
+	int err;
+	in6_addr_t v6addr;
+	sin6_t *sin6;
+	ill_t *ill;
+	int i;
+
+	ip1dbg(("ip_sioctl_prefix(%s:%u %p)\n",
+	    ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
+
+	ASSERT(IAM_WRITER_IPIF(ipif));
+
+	if (!ipif->ipif_isv6)
+		return (EINVAL);
+
+	if (sin->sin_family != AF_INET6)
+		return (EAFNOSUPPORT);
+
+	sin6 = (sin6_t *)sin;
+	v6addr = sin6->sin6_addr;
+	ill = ipif->ipif_ill;
+
+	if (IN6_IS_ADDR_UNSPECIFIED(&v6addr) ||
+	    IN6_IS_ADDR_UNSPECIFIED(&ill->ill_token))
+		return (EADDRNOTAVAIL);
+
+	for (i = 0; i < 4; i++)
+		sin6->sin6_addr.s6_addr32[i] |= ill->ill_token.s6_addr32[i];
+
+	err = ip_sioctl_addr(ipif, sin, q, mp,
+	    &ip_ndx_ioctl_table[SIOCLIFADDR_NDX], dummy_ifreq);
+	return (err);
+}
+
+/*
+ * Restart entry point to restart the address set operation after the
+ * refcounts have dropped to zero.
+ */
+/* ARGSUSED */
+int
+ip_sioctl_prefix_restart(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
+    ip_ioctl_cmd_t *ipip, void *ifreq)
+{
+	ip1dbg(("ip_sioctl_prefix_restart(%s:%u %p)\n",
+	    ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
+	return (ip_sioctl_addr_restart(ipif, sin, q, mp, ipip, ifreq));
+}
+
+/*
  * Set the local interface address.
  * Allow an address of all zero when the interface is down.
  */
@@ -9501,13 +9700,28 @@ ip_sioctl_addr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		/*
 		 * Enforce that true multicast interfaces have a link-local
 		 * address for logical unit 0.
+		 *
+		 * However for those ipif's for which link-local address was
+		 * not created by default, also allow setting :: as the address.
+		 * This scenario would arise, when we delete an address on ipif
+		 * with logical unit 0, we would want to set :: as the address.
 		 */
 		if (ipif->ipif_id == 0 &&
 		    (ill->ill_flags & ILLF_MULTICAST) &&
 		    !(ipif->ipif_flags & (IPIF_POINTOPOINT)) &&
 		    !(phyi->phyint_flags & (PHYI_LOOPBACK)) &&
 		    !IN6_IS_ADDR_LINKLOCAL(&v6addr)) {
-			return (EADDRNOTAVAIL);
+
+			/*
+			 * if default link-local was not created by kernel for
+			 * this ill, allow setting :: as the address on ipif:0.
+			 */
+			if (ill->ill_flags & ILLF_NOLINKLOCAL) {
+				if (!IN6_IS_ADDR_UNSPECIFIED(&v6addr))
+					return (EADDRNOTAVAIL);
+			} else {
+				return (EADDRNOTAVAIL);
+			}
 		}
 
 		/*
@@ -9532,8 +9746,9 @@ ip_sioctl_addr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 		addr = sin->sin_addr.s_addr;
 
-		/* Allow 0 as the local address. */
-		if (addr != 0 && !ip_addr_ok_v4(addr, ipif->ipif_net_mask))
+		/* Allow INADDR_ANY as the local address. */
+		if (addr != INADDR_ANY &&
+		    !ip_addr_ok_v4(addr, ipif->ipif_net_mask))
 			return (EADDRNOTAVAIL);
 
 		IN6_IPADDR_TO_V4MAPPED(addr, &v6addr);
@@ -9636,8 +9851,11 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 * in this address getting automatically reconfigured from under the
 	 * administrator.
 	 */
-	if (ipif->ipif_isv6 && ipif->ipif_id == 0)
-		ill->ill_manual_linklocal = 1;
+	if (ipif->ipif_isv6 && ipif->ipif_id == 0) {
+		if (iocp == NULL || (iocp->ioc_cmd == SIOCSLIFADDR &&
+		    !IN6_IS_ADDR_UNSPECIFIED(&v6addr)))
+			ill->ill_manual_linklocal = 1;
+	}
 
 	/*
 	 * When publishing an interface address change event, we only notify
@@ -9767,8 +9985,10 @@ ip_sioctl_dstaddr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 			return (EAFNOSUPPORT);
 
 		addr = sin->sin_addr.s_addr;
-		if (!ip_addr_ok_v4(addr, ipif->ipif_net_mask))
+		if (addr != INADDR_ANY &&
+		    !ip_addr_ok_v4(addr, ipif->ipif_net_mask)) {
 			return (EADDRNOTAVAIL);
+		}
 
 		IN6_IPADDR_TO_V4MAPPED(addr, &v6addr);
 	}
@@ -10628,6 +10848,7 @@ ip_sioctl_brdaddr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		return (EAFNOSUPPORT);
 
 	addr = sin->sin_addr.s_addr;
+
 	if (ipif->ipif_flags & IPIF_UP) {
 		/*
 		 * If we are already up, make sure the new
@@ -10704,6 +10925,8 @@ ip_sioctl_netmask(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 			return (EAFNOSUPPORT);
 
 		mask = sin->sin_addr.s_addr;
+		if (!ip_contiguous_mask(ntohl(mask)))
+			return (ENOTSUP);
 		V4MASK_TO_V6(mask, v6mask);
 	}
 
@@ -10846,12 +11069,12 @@ ip_sioctl_metric(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		struct ifreq    *ifr;
 
 		ifr = (struct ifreq *)if_req;
-		ipif->ipif_metric = ifr->ifr_metric;
+		ipif->ipif_ill->ill_metric = ifr->ifr_metric;
 	} else {
 		struct lifreq   *lifr;
 
 		lifr = (struct lifreq *)if_req;
-		ipif->ipif_metric = lifr->lifr_metric;
+		ipif->ipif_ill->ill_metric = lifr->lifr_metric;
 	}
 	return (0);
 }
@@ -10869,12 +11092,12 @@ ip_sioctl_get_metric(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		struct ifreq    *ifr;
 
 		ifr = (struct ifreq *)if_req;
-		ifr->ifr_metric = ipif->ipif_metric;
+		ifr->ifr_metric = ipif->ipif_ill->ill_metric;
 	} else {
 		struct lifreq   *lifr;
 
 		lifr = (struct lifreq *)if_req;
-		lifr->lifr_metric = ipif->ipif_metric;
+		lifr->lifr_metric = ipif->ipif_ill->ill_metric;
 	}
 
 	return (0);
@@ -11542,7 +11765,6 @@ ipif_clone(const ipif_t *sipif, ipif_t *dipif)
 	ASSERT(sipif->ipif_ire_type == dipif->ipif_ire_type);
 
 	dipif->ipif_flags = sipif->ipif_flags;
-	dipif->ipif_metric = sipif->ipif_metric;
 	dipif->ipif_zoneid = sipif->ipif_zoneid;
 	dipif->ipif_v6subnet = sipif->ipif_v6subnet;
 	dipif->ipif_v6lcl_addr = sipif->ipif_v6lcl_addr;
@@ -15447,6 +15669,9 @@ ip_sioctl_slifname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	if ((new_flags & IFF_IPV6) != 0) {
 		ill->ill_flags |= ILLF_IPV6;
 		ill->ill_flags &= ~ILLF_IPV4;
+
+		if (lifr->lifr_flags & IFF_NOLINKLOCAL)
+			ill->ill_flags |= ILLF_NOLINKLOCAL;
 	}
 
 	if ((new_flags & IFF_BROADCAST) != 0)
@@ -15971,8 +16196,11 @@ ip_sioctl_slifusesrc(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	}
 
 	usesrc_ill = ill_lookup_on_ifindex(ifindex, isv6, ipst);
-	if (usesrc_ill == NULL) {
+	if (usesrc_ill == NULL)
 		return (ENXIO);
+	if (usesrc_ill == ipif->ipif_ill) {
+		ill_refrele(usesrc_ill);
+		return (EINVAL);
 	}
 
 	ipsq = ipsq_try_enter(NULL, usesrc_ill, q, mp, ip_process_ioctl,
@@ -16074,6 +16302,27 @@ done:
 	ip_update_source_selection(ipst);
 
 	return (err);
+}
+
+/* ARGSUSED */
+int
+ip_sioctl_get_dadstate(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
+    ip_ioctl_cmd_t *ipip, void *if_req)
+{
+	struct lifreq	*lifr = (struct lifreq *)if_req;
+	ill_t		*ill = ipif->ipif_ill;
+
+	/*
+	 * Need a lock since IFF_UP can be set even when there are
+	 * references to the ipif.
+	 */
+	mutex_enter(&ill->ill_lock);
+	if ((ipif->ipif_flags & IPIF_UP) && ipif->ipif_addr_ready == 0)
+		lifr->lifr_dadstate = DAD_IN_PROGRESS;
+	else
+		lifr->lifr_dadstate = DAD_DONE;
+	mutex_exit(&ill->ill_lock);
+	return (0);
 }
 
 /*
@@ -16355,13 +16604,6 @@ ipif_set_values_tail(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	ip_stack_t	*ipst = ill->ill_ipst;
 	phyint_t	*phyi = ill->ill_phyint;
 
-	/* Set the obsolete NDD per-interface forwarding name. */
-	err = ill_set_ndd_name(ill);
-	if (err != 0) {
-		cmn_err(CE_WARN, "ipif_set_values: ill_set_ndd_name (%d)\n",
-		    err);
-	}
-
 	/*
 	 * Now that ill_name is set, the configuration for the IPMP
 	 * meta-interface can be performed.
@@ -16494,7 +16736,6 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 	 * which makes the ill globally visible and also merges it with the
 	 * other protocol instance of this phyint. The remaining work is
 	 * done after entering the ipsq which may happen sometime later.
-	 * ill_set_ndd_name occurs after the ill has been made globally visible.
 	 */
 	ipif = ill->ill_ipif;
 
@@ -16546,7 +16787,7 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 		 * Set the ILLF_ROUTER flag according to the global
 		 * IPv6 forwarding policy.
 		 */
-		if (ipst->ips_ipv6_forward != 0)
+		if (ipst->ips_ipv6_forwarding != 0)
 			ill->ill_flags |= ILLF_ROUTER;
 	} else if (ill->ill_flags & ILLF_IPV4) {
 		ill->ill_isv6 = B_FALSE;
@@ -16561,7 +16802,7 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 		 * Set the ILLF_ROUTER flag according to the global
 		 * IPv4 forwarding policy.
 		 */
-		if (ipst->ips_ip_g_forward != 0)
+		if (ipst->ips_ip_forwarding != 0)
 			ill->ill_flags |= ILLF_ROUTER;
 	}
 

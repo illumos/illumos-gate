@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/cmd-inet/usr.lib/in.ndpd/Makefile
 #
@@ -41,12 +39,12 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKROUTING)
 # be accessed by -lxnet. In addition -lsocket and -lnsl are used to
 # capture new not-yet-standard interfaces. Someday -lxnet alone should be enough
 # when IPv6 inspired new interfaces are part of standards.
-LDLIBS +=	-ldhcpagent -lxnet -lsocket -lnsl
+LDLIBS +=	-ldhcpagent -lxnet -lsocket -lnsl -lipadm
 
 # these #defines are required to use UNIX 98 interfaces
 _D_UNIX98_EXTN= -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
 
-$(OBJS)		:= CPPFLAGS +=	$(_D_UNIX98_EXTN)
+$(OBJS)		:= CPPFLAGS +=  $(_D_UNIX98_EXTN)
 
 LINTFLAGS +=	$(_D_UNIX98_EXTN)
 
@@ -58,6 +56,10 @@ LINTFLAGS +=	-erroff=E_INCONS_ARG_DECL2 -erroff=E_INCONS_VAL_TYPE_DECL2
 # perfect would require a bigger rewrite.
 LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 
+CTFCONVERT_HOOK = && $(CTFCONVERT_O)
+CTFMERGE_HOOK = && $(CTFMERGE) -L VERSION -o $@ $(OBJS)
+$(OBJS) := CFLAGS += $(CTF_FLAGS)
+
 .KEEP_STATE:
 
 .PARALLEL:  $(OBJS)
@@ -65,7 +67,7 @@ LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS) $(CTFMERGE_HOOK)
 	$(POST_PROCESS)
 
 include		../Makefile.lib

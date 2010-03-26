@@ -56,6 +56,7 @@
 
 #include <inet/common.h>
 #include <inet/nd.h>
+#include <inet/tunables.h>
 #include <inet/mib2.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
@@ -1152,6 +1153,14 @@ ipif_setlinklocal(ipif_t *ipif)
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
+	/*
+	 * If the interface was created with no link-local address
+	 * on it and the flag ILLF_NOLINKLOCAL was set, then we
+	 * dont want to update the link-local.
+	 */
+	if ((ill->ill_flags & ILLF_NOLINKLOCAL) &&
+	    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr))
+		return;
 	/*
 	 * ill_manual_linklocal is set when the link-local address was
 	 * manually configured.

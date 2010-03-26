@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,6 @@
 #include <inet/mi.h>
 #include <inet/mib2.h>
 #include <inet/kstatcom.h>
-#include <inet/nd.h>
 #include <inet/optcom.h>
 #include <inet/ipclassifier.h>
 #include <inet/ipsec_impl.h>
@@ -118,6 +117,12 @@ int		sctp_recvq_tq_thr_max = 16;
 int		sctp_recvq_tq_task_min = 5;
 /* The maxiimum number of tasks for each taskq. */
 int		sctp_recvq_tq_task_max = 50;
+
+/*
+ * SCTP tunables related declarations. Definitions are in sctp_tunables.c
+ */
+extern mod_prop_info_t sctp_propinfo_tbl[];
+extern int sctp_propinfo_count;
 
 /*  sctp_t/conn_t kmem cache */
 struct kmem_cache	*sctp_conn_cache;
@@ -1565,6 +1570,7 @@ static void *
 sctp_stack_init(netstackid_t stackid, netstack_t *ns)
 {
 	sctp_stack_t	*sctps;
+	size_t		arrsz;
 
 	sctps = kmem_zalloc(sizeof (*sctps), KM_SLEEP);
 	sctps->sctps_netstack = ns;
@@ -1573,15 +1579,16 @@ sctp_stack_init(netstackid_t stackid, netstack_t *ns)
 	mutex_init(&sctps->sctps_g_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&sctps->sctps_epriv_port_lock, NULL, MUTEX_DEFAULT, NULL);
 	sctps->sctps_g_num_epriv_ports = SCTP_NUM_EPRIV_PORTS;
-	sctps->sctps_g_epriv_ports[0] = 2049;
-	sctps->sctps_g_epriv_ports[1] = 4045;
+	sctps->sctps_g_epriv_ports[0] = ULP_DEF_EPRIV_PORT1;
+	sctps->sctps_g_epriv_ports[1] = ULP_DEF_EPRIV_PORT2;
 
 	/* Initialize SCTP hash arrays. */
 	sctp_hash_init(sctps);
 
-	if (!sctp_nd_init(sctps)) {
-		sctp_nd_free(sctps);
-	}
+	arrsz = sctp_propinfo_count * sizeof (mod_prop_info_t);
+	sctps->sctps_propinfo_tbl = (mod_prop_info_t *)kmem_alloc(arrsz,
+	    KM_SLEEP);
+	bcopy(sctp_propinfo_tbl, sctps->sctps_propinfo_tbl, arrsz);
 
 	/* Initialize the recvq taskq. */
 	sctp_rq_tq_init(sctps);
@@ -1630,7 +1637,9 @@ sctp_stack_fini(netstackid_t stackid, void *arg)
 {
 	sctp_stack_t *sctps = (sctp_stack_t *)arg;
 
-	sctp_nd_free(sctps);
+	kmem_free(sctps->sctps_propinfo_tbl,
+	    sctp_propinfo_count * sizeof (mod_prop_info_t));
+	sctps->sctps_propinfo_tbl = NULL;
 
 	/* Destroy the recvq taskqs. */
 	sctp_rq_tq_fini(sctps);

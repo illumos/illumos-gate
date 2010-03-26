@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,7 @@ struct sctp_stack {
 
 #define	SCTP_NUM_EPRIV_PORTS	64
 	int		sctps_g_num_epriv_ports;
-	uint16_t	sctps_g_epriv_ports[SCTP_NUM_EPRIV_PORTS];
+	in_port_t	sctps_g_epriv_ports[SCTP_NUM_EPRIV_PORTS];
 	kmutex_t	sctps_epriv_port_lock;
 	uint_t		sctps_next_port_to_try;
 
@@ -91,10 +91,8 @@ struct sctp_stack {
 	struct sctp_tf_s	*sctps_conn_fanout;
 	uint_t			sctps_conn_hash_size;
 
-	/* Only modified during _init and _fini thus no locking is needed. */
-	caddr_t			sctps_g_nd;
-	struct sctpparam_s	*sctps_params;
-	struct sctpparam_s	*sctps_wroff_xtra_param;
+	/* holds sctp tunables */
+	struct mod_prop_info_s	*sctps_propinfo_tbl;
 
 /* This lock protects the SCTP recvq_tq_list array and recvq_tq_list_cur_sz. */
 	kmutex_t		sctps_rq_tq_lock;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@ extern "C" {
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/optcom.h>
+#include <inet/tunables.h>
 
 #define	UDP_MOD_ID		5607
 
@@ -89,15 +90,13 @@ typedef struct udp_stat {			/* Class "net" kstats */
 
 } udp_stat_t;
 
-/* Named Dispatch Parameter Management Structure */
-typedef struct udpparam_s {
-	uint32_t udp_param_min;
-	uint32_t udp_param_max;
-	uint32_t udp_param_value;
-	char	*udp_param_name;
-} udpparam_t;
-
 #define	UDP_NUM_EPRIV_PORTS	64
+
+/* Default buffer size and flow control wake up threshold. */
+#define	UDP_RECV_HIWATER	(56 * 1024)
+#define	UDP_RECV_LOWATER	128
+#define	UDP_XMIT_HIWATER	(56 * 1024)
+#define	UDP_XMIT_LOWATER	1024
 
 /*
  * UDP stack instances
@@ -110,12 +109,13 @@ struct udp_stack {
 
 	int		us_num_epriv_ports;
 	in_port_t	us_epriv_ports[UDP_NUM_EPRIV_PORTS];
+	kmutex_t	us_epriv_port_lock;
 
 	/* Hint not protected by any lock */
 	in_port_t	us_next_port_to_try;
 
-	IDP		us_nd;	/* Points to table of UDP ND variables. */
-	udpparam_t	*us_param_arr; 	/* ndd variable table */
+	/* UDP tunables table */
+	struct mod_prop_info_s	*us_propinfo_tbl;
 
 	kstat_t		*us_mibkp;	/* kstats exporting mib data */
 	kstat_t		*us_kstat;
@@ -181,20 +181,19 @@ typedef	struct udpahdr_s {
 	uint16_t	uha_checksum;		/* UDP checksum */
 } udpha_t;
 
-#define	us_wroff_extra			us_param_arr[0].udp_param_value
-#define	us_ipv4_ttl			us_param_arr[1].udp_param_value
-#define	us_ipv6_hoplimit		us_param_arr[2].udp_param_value
-#define	us_smallest_nonpriv_port	us_param_arr[3].udp_param_value
-#define	us_do_checksum			us_param_arr[4].udp_param_value
-#define	us_smallest_anon_port		us_param_arr[5].udp_param_value
-#define	us_largest_anon_port		us_param_arr[6].udp_param_value
-#define	us_xmit_hiwat			us_param_arr[7].udp_param_value
-#define	us_xmit_lowat			us_param_arr[8].udp_param_value
-#define	us_recv_hiwat			us_param_arr[9].udp_param_value
-#define	us_max_buf			us_param_arr[10].udp_param_value
-#define	us_pmtu_discovery		us_param_arr[11].udp_param_value
-#define	us_sendto_ignerr		us_param_arr[12].udp_param_value
-
+#define	us_wroff_extra			us_propinfo_tbl[0].prop_cur_uval
+#define	us_ipv4_ttl			us_propinfo_tbl[1].prop_cur_uval
+#define	us_ipv6_hoplimit		us_propinfo_tbl[2].prop_cur_uval
+#define	us_smallest_nonpriv_port	us_propinfo_tbl[3].prop_cur_uval
+#define	us_do_checksum			us_propinfo_tbl[4].prop_cur_bval
+#define	us_smallest_anon_port		us_propinfo_tbl[5].prop_cur_uval
+#define	us_largest_anon_port		us_propinfo_tbl[6].prop_cur_uval
+#define	us_xmit_hiwat			us_propinfo_tbl[7].prop_cur_uval
+#define	us_xmit_lowat			us_propinfo_tbl[8].prop_cur_uval
+#define	us_recv_hiwat			us_propinfo_tbl[9].prop_cur_uval
+#define	us_max_buf			us_propinfo_tbl[10].prop_cur_uval
+#define	us_pmtu_discovery		us_propinfo_tbl[11].prop_cur_bval
+#define	us_sendto_ignerr		us_propinfo_tbl[12].prop_cur_bval
 
 #define	UDP_STAT(us, x)		((us)->us_statistics.x.value.ui64++)
 #define	UDP_STAT_UPDATE(us, x, n)	\

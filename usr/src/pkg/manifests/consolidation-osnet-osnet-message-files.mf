@@ -137,6 +137,7 @@ file path=usr/lib/help/auths/locale/NetworkAutoconfWrite.html
 file path=usr/lib/help/auths/locale/NetworkHeader.html
 file path=usr/lib/help/auths/locale/NetworkILBconf.html
 file path=usr/lib/help/auths/locale/NetworkILBenable.html
+file path=usr/lib/help/auths/locale/NetworkInterfaceConfig.html
 file path=usr/lib/help/auths/locale/NetworkVRRP.html
 file path=usr/lib/help/auths/locale/PriAdmin.html
 file path=usr/lib/help/auths/locale/PrintAdmin.html

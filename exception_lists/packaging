@@ -113,6 +113,19 @@ usr/include/libdlwlan.h
 usr/include/sys/vnic.h
 usr/include/sys/vnic_impl.h
 #
+# Private libipadm lint library and header files
+#
+usr/include/ipadm_ipmgmt.h
+usr/include/ipadm_ndpd.h
+usr/include/libipadm.h
+lib/llib-lipadm
+lib/llib-lipadm.ln
+lib/libipadm.so
+#
+# Private libsocket header file
+#
+usr/include/libsocket_priv.h
+#
 # IKE and IPsec support library exceptions.  The IKE support
 # library contains exclusively private interfaces, as does
 # libipsecutil.  My apologies for the glut of header files here.

@@ -1,5 +1,5 @@
 /*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -11,8 +11,6 @@
 
 #ifndef _net_if_h
 #define	_net_if_h
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Structures defining a network interface, providing a packet
@@ -94,7 +92,7 @@ struct ifnet {
 #define	IFF_NOARP	0x80		/* no address resolution protocol */
 #define	IFF_PROMISC	0x100		/* receive all packets */
 #define	IFF_ALLMULTI	0x200		/* receive all multicast packets */
-#define IFF_PRIVATE	0x8000		/* do not advertise */
+#define	IFF_PRIVATE	0x8000		/* do not advertise */
 
 /* flags set internally only: */
 #define	IFF_CANTCHANGE \
@@ -131,8 +129,8 @@ struct ifnet {
  * IF_ADJ should be used otherwise to adjust for its presence.
  */
 #define	IF_ADJ(m) { \
-	(m)->m_off += sizeof(struct ifnet *); \
-	(m)->m_len -= sizeof(struct ifnet *); \
+	(m)->m_off += sizeof (struct ifnet *); \
+	(m)->m_len -= sizeof (struct ifnet *); \
 	if ((m)->m_len == 0) { \
 		struct mbuf *n; \
 		MFREE((m), n); \
@@ -175,8 +173,12 @@ struct ifaddr {
 		struct	sockaddr ifu_broadaddr;
 		struct	sockaddr ifu_dstaddr;
 	} ifa_ifu;
+#ifndef ifa_broadaddr
 #define	ifa_broadaddr	ifa_ifu.ifu_broadaddr	/* broadcast address */
+#endif
+#ifndef ifa_dstaddr
 #define	ifa_dstaddr	ifa_ifu.ifu_dstaddr	/* other end of p-to-p link */
+#endif
 	struct	ifnet *ifa_ifp;		/* back-pointer to interface */
 	struct	ifaddr *ifa_next;	/* next address for interface */
 };
@@ -223,7 +225,7 @@ struct	ifreq {
 
 		struct ifr_fddi_gen_struct {
 			int	ifru_fddi_gioctl; /* field for gen ioctl */
-			caddr_t ifru_fddi_gaddr ; /* Generic ptr to a field */
+			caddr_t ifru_fddi_gaddr; /* Generic ptr to a field */
 		} ifru_fddi_gstruct;
 
 	} ifr_ifru;
@@ -237,10 +239,10 @@ struct	ifreq {
 #define	ifr_data	ifr_ifru.ifru_data	/* for use by interface */
 
 /* FDDI specific */
-#define ifr_dnld_req	ifr_ifru.ifru_dnld_req
-#define ifr_fddi_stat	ifr_ifru.ifru_fddi_stat
-#define ifr_fddi_netmap	ifr_ifru.ifru_netmapent	/* FDDI network map entries */
-#define ifr_fddi_gstruct ifr_ifru.ifru_fddi_gstruct   
+#define	ifr_dnld_req	ifr_ifru.ifru_dnld_req
+#define	ifr_fddi_stat	ifr_ifru.ifru_fddi_stat
+#define	ifr_fddi_netmap	ifr_ifru.ifru_netmapent	/* FDDI network map entries */
+#define	ifr_fddi_gstruct ifr_ifru.ifru_fddi_gstruct
 
 };
 

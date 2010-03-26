@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -36,6 +36,12 @@
 #
 # MAPFILE HEADER END
 #
+
+SUNW_1.7 {
+    global:
+	freeifaddrs;
+	getifaddrs;
+} SUNW_1.6;
 
 SUNW_1.6 {
     global:
@@ -157,6 +163,8 @@ SUNWprivate_1.3 {
 	_nss_initf_netmasks;
 	_nss_initf_proto;
 	_nss_initf_services;
+	getallifaddrs;
+	getallifs;
 	str2ether;
 	str2addr;
 	str2netent;

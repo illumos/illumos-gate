@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,6 @@ extern conn_t *sctp_fanout(in6_addr_t *, in6_addr_t *, uint32_t,
     ip_recv_attr_t *, mblk_t *, sctp_stack_t *);
 
 extern void sctp_input(conn_t *, ipha_t *, ip6_t *, mblk_t *, ip_recv_attr_t *);
-extern void sctp_wput(queue_t *, mblk_t *);
 extern void sctp_ootb_input(mblk_t *, ip_recv_attr_t *, ip_stack_t *);
 extern void sctp_hash_init(sctp_stack_t *);
 extern void sctp_hash_destroy(sctp_stack_t *);

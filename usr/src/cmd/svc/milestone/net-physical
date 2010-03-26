@@ -38,6 +38,7 @@
 #
 smf_configure_ip || exit $SMF_EXIT_OK
 
+
 # Make sure that the libraries essential to this stage of booting can be found.
 LD_LIBRARY_PATH=/lib; export LD_LIBRARY_PATH
 
@@ -137,6 +138,8 @@ is_iptun ()
 # outputs.
 #
 
+#
+# First deal with /etc/hostname
 #
 # Get the list of IPv4 interfaces to configure by breaking
 # /etc/hostname.* into separate args by using "." as a shell separator
@@ -287,6 +290,28 @@ if [ -n "$ipmp6_list" ]; then
 	[ -n "$ipmp6_failed" ] && warn_failed_ifs "create IPv6 IPMP" \
 	    "$ipmp6_failed"
 fi
+
+#
+# Finally configure interfaces set up with ipadm.
+#
+for showif_output in `/sbin/ipadm show-if -p -o ifname,state`; do
+	intf=`echo $showif_output | /usr/bin/cut -f1 -d:`
+	state=`echo $showif_output | /usr/bin/cut -f2 -d:`
+	if  [ "$state" != "disabled" ]; then
+		# skip if not a persistent interface
+		continue;
+	elif is_iptun $intf; then
+		# skip IP tunnel interfaces plumbed by net-iptun
+		continue;
+	elif [ -f /etc/hostname.$intf ] || [ -f /etc/hostname6.$intf ]; then
+		echo "found /etc/hostname.$intf or /etc/hostname6.$intf, "\
+		    "ignoring ipadm configuration" > /dev/msglog
+		continue;
+	fi
+
+	# Enable the interface managed by ipadm
+	/sbin/ipadm enable-if -t $intf
+done
 
 #
 # Process the /etc/hostname[6].* files for IPMP interfaces.  Processing these

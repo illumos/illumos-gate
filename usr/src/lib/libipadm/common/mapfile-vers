@@ -1,0 +1,93 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+SUNWprivate_1.1 {
+    global:
+	ipadm_add_aobjname;
+	ipadm_addr_info;
+	ipadm_check_auth;
+	ipadm_close;
+	ipadm_create_addr;
+	ipadm_create_addrobj;
+	ipadm_create_if;
+	ipadm_delete_addr;
+	ipadm_delete_aobjname;
+	ipadm_delete_if;
+	ipadm_destroy_addrobj;
+	ipadm_disable_addr;
+	ipadm_disable_if;
+	ipadm_down_addr;
+	ipadm_enable_addr;
+	ipadm_enable_if;
+	ipadm_free_addr_info;
+	ipadm_free_if_info;
+	ipadm_get_addrprop;
+	ipadm_get_ifprop;
+	ipadm_get_prop;
+	ipadm_if_enabled;
+	ipadm_if_info;
+	ipadm_init_prop;
+	ipadm_ndpd_read;
+	ipadm_ndpd_write;
+	ipadm_nvlist2str;
+	ipadm_open;
+	ipadm_open_arp_on_udp;
+	ipadm_proto2str;
+	ipadm_refresh_addr;
+	ipadm_rw_db;
+	ipadm_set_addr;
+	ipadm_set_addrprop;
+	ipadm_set_dst_addr;
+	ipadm_set_ifprop;
+	ipadm_set_interface_id;
+	ipadm_set_primary;
+	ipadm_set_prop;
+	ipadm_set_stateful;
+	ipadm_set_stateless;
+	ipadm_set_wait_time;
+	ipadm_status2str;
+	ipadm_str2nvlist;
+	ipadm_str2proto;
+	ipadm_up_addr;
+	ipadm_walk_prop;
+	ipadm_walk_proptbl;
+    local:
+	*;
+};

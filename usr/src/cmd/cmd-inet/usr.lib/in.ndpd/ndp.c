@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -307,57 +307,99 @@ incoming_rs(struct phyint *pi, struct nd_router_solicit *rs, int len,
 }
 
 /*
- * Start up DHCPv6 on a given physical interface.  Does not wait for a message
- * to be returned from the daemon.
+ * Function that sends commands to dhcpagent daemon.
  */
-void
-start_dhcp(struct phyint *pi)
+int
+dhcp_op(struct phyint *pi, int type)
 {
 	dhcp_ipc_request_t	*request;
 	dhcp_ipc_reply_t	*reply	= NULL;
 	int			error;
-	int			type;
-
-	if (dhcp_start_agent(DHCP_IPC_MAX_WAIT) == -1) {
-		logmsg(LOG_ERR, "start_dhcp: unable to start %s\n",
-		    DHCP_AGENT_PATH);
-		/* make sure we try again next time there's a chance */
-		pi->pi_ra_flags &= ~ND_RA_FLAG_MANAGED & ~ND_RA_FLAG_OTHER;
-		return;
-	}
-
-	type = (pi->pi_ra_flags & ND_RA_FLAG_MANAGED) ? DHCP_START :
-	    DHCP_INFORM;
 
 	request = dhcp_ipc_alloc_request(type | DHCP_V6, pi->pi_name, NULL, 0,
 	    DHCP_TYPE_NONE);
 	if (request == NULL) {
-		logmsg(LOG_ERR, "start_dhcp: out of memory\n");
+		logmsg(LOG_ERR, "dhcp_op: out of memory\n");
 		/* make sure we try again next time there's a chance */
-		pi->pi_ra_flags &= ~ND_RA_FLAG_MANAGED & ~ND_RA_FLAG_OTHER;
-		return;
+		if (type != DHCP_RELEASE) {
+			pi->pi_ra_flags &=
+			    ~ND_RA_FLAG_MANAGED & ~ND_RA_FLAG_OTHER;
+		}
+		return (DHCP_IPC_E_MEMORY);
 	}
 
 	error = dhcp_ipc_make_request(request, &reply, 0);
 	free(request);
 	if (error != 0) {
-		logmsg(LOG_ERR, "start_dhcp: err: %s: %s\n", pi->pi_name,
-		    dhcp_ipc_strerror(error));
-		return;
+		logmsg(LOG_ERR, "could not send request to dhcpagent: "
+		    "%s: %s\n", pi->pi_name, dhcp_ipc_strerror(error));
+		return (error);
 	}
 
 	error = reply->return_code;
 	free(reply);
 
+	return (error);
+}
+
+/*
+ * Start up DHCPv6 on a given physical interface. Does not wait for
+ * a message to be returned from the daemon.
+ */
+void
+start_dhcp(struct phyint *pi)
+{
+	int	error;
+	int	type;
+
+	if (dhcp_start_agent(DHCP_IPC_MAX_WAIT) == -1) {
+		logmsg(LOG_ERR, "unable to start %s\n", DHCP_AGENT_PATH);
+		/* make sure we try again next time there's a chance */
+		pi->pi_ra_flags &= ~ND_RA_FLAG_MANAGED & ~ND_RA_FLAG_OTHER;
+		return;
+	}
+
+	else if (pi->pi_ra_flags & ND_RA_FLAG_MANAGED)
+		type = DHCP_START;
+	else
+		type = DHCP_INFORM;
+
+	error = dhcp_op(pi, type);
 	/*
 	 * Timeout is considered to be "success" because we don't wait for DHCP
 	 * to do its exchange.
 	 */
 	if (error != DHCP_IPC_SUCCESS && error != DHCP_IPC_E_RUNNING &&
 	    error != DHCP_IPC_E_TIMEOUT) {
-		logmsg(LOG_ERR, "start_dhcp: ret: %s: %s\n", pi->pi_name,
-		    dhcp_ipc_strerror(error));
-		return;
+		logmsg(LOG_ERR, "Error in dhcpagent: %s: %s\n",
+		    pi->pi_name, dhcp_ipc_strerror(error));
+	}
+}
+
+/*
+ * Release the acquired DHCPv6 lease on a given physical interface.
+ * Does not wait for a message to be returned from the daemon.
+ */
+void
+release_dhcp(struct phyint *pi)
+{
+	int	error;
+	int	type;
+
+	type = DHCP_RELEASE;
+retry:
+	error = dhcp_op(pi, type);
+	if (error != DHCP_IPC_SUCCESS && error != DHCP_IPC_E_RUNNING &&
+	    error != DHCP_IPC_E_TIMEOUT) {
+		if (type == DHCP_RELEASE && error == DHCP_IPC_E_OUTSTATE) {
+			/*
+			 * Drop the dhcp control if we cannot release it.
+			 */
+			type = DHCP_DROP;
+			goto retry;
+		}
+		logmsg(LOG_ERR, "Error in dhcpagent: %s: %s\n",
+		    pi->pi_name, dhcp_ipc_strerror(error));
 	}
 }
 
@@ -436,7 +478,7 @@ incoming_ra(struct phyint *pi, struct nd_router_advert *ra, int len,
 	 * get addresses via DHCP; only "other" data.  If "managed" is set,
 	 * then we must always get both addresses and "other" data.
 	 */
-	if (pi->pi_StatefulAddrConf &&
+	if (pi->pi_autoconf && pi->pi_stateful &&
 	    (ra->nd_ra_flags_reserved & ~pi->pi_ra_flags &
 	    (ND_RA_FLAG_MANAGED | ND_RA_FLAG_OTHER))) {
 		if (debug & D_DHCP) {
@@ -540,14 +582,14 @@ incoming_prefix_opt(struct phyint *pi, uchar_t *opt,
 		return;
 	}
 	if ((po->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_AUTO) &&
-	    pi->pi_StatelessAddrConf) {
+	    pi->pi_stateless && pi->pi_autoconf) {
 		good_prefix = incoming_prefix_addrconf(pi, opt, from, loopback);
 	}
 	if ((po->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ONLINK) &&
 	    good_prefix) {
 		incoming_prefix_onlink(pi, opt);
 	}
-	if (pi->pi_StatefulAddrConf)
+	if (pi->pi_stateful && pi->pi_autoconf)
 		incoming_prefix_stateful(pi, opt);
 }
 
@@ -924,8 +966,10 @@ incoming_prefix_addrconf_process(struct phyint *pi, struct prefix *pr,
 			    "preferred lifetime(%d) <= TmpRegenAdvance(%d)\n",
 			    pbuf, plen, abuf, pi->pi_name, preftime,
 			    pi->pi_TmpRegenAdvance);
-			if (new_prefix)
+			if (new_prefix) {
+				prefix_update_ipadm_addrobj(pr, _B_FALSE);
 				prefix_delete(pr);
+			}
 			return (_B_TRUE);
 		}
 	}
@@ -939,7 +983,7 @@ incoming_prefix_addrconf_process(struct phyint *pi, struct prefix *pr,
 		/*
 		 * Form a new local address if the lengths match.
 		 */
-		if (pr->pr_flags && IFF_TEMPORARY) {
+		if (pr->pr_flags & IFF_TEMPORARY) {
 			if (IN6_IS_ADDR_UNSPECIFIED(&pi->pi_tmp_token)) {
 				if (!tmptoken_create(pi)) {
 					prefix_delete(pr);
@@ -990,6 +1034,7 @@ incoming_prefix_addrconf_process(struct phyint *pi, struct prefix *pr,
 			    "Prefix already exists in interface %s\n",
 			    other_pr->pr_physical->pi_name);
 			if (new_prefix) {
+				prefix_update_ipadm_addrobj(pr, _B_FALSE);
 				prefix_delete(pr);
 				return (_B_FALSE);
 			}

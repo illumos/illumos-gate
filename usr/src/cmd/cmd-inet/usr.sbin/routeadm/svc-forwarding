@@ -20,30 +20,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 # This script is the shared method script for the ipv4-routing, ipv6-routing,
 # ipv4-forwarding and ipv6-forwarding services.
 
 . /lib/svc/share/smf_include.sh
-
-set_forwarding_flag() {
-	proto="$1"
-	value="$2"
-	ndd_flag="0"
-	if [ "$value" = "enabled" ]; then
-		ndd_flag="1"
-	fi
-	if [ "$proto" = "ipv4" ]; then
-		/usr/sbin/ndd -set /dev/ip ip_forwarding $ndd_flag
-	else
-		/usr/sbin/ndd -set /dev/ip ip6_forwarding $ndd_flag
-		/usr/sbin/ndd -set /dev/ip ip6_send_redirects $ndd_flag
-	fi
-}
 
 usage() {
 	echo "Usage: $0 { start | stop | refresh } { ipv4 | ipv6 }"
@@ -65,18 +49,19 @@ case "$1" in
 	#
 	# Start ip forwarding.
 	#
-	if [ -z "$proto" ]; then
-		usage
-		exit $SMF_ERROR_FATAL
-	fi
 	if [ "$proto" = "ipv6" -a "$numv6ifs" = 0 ]; then
 		echo "Error: no IPv6 interface configured"
 		exit $SMF_EXIT_ERR_CONFIG
 	fi
-	set_forwarding_flag $proto enabled
+
+	/usr/sbin/ipadm set-prop -p forwarding=on $proto
+	[ "$proto" = "ipv6" ] && /usr/sbin/ipadm set-prop \
+				    -p ip6_send_redirects=1 ip
         ;;
 'stop')
-	set_forwarding_flag $proto disabled
+	/usr/sbin/ipadm set-prop -p forwarding=off $proto
+	[ "$proto" = "ipv6" ] && /usr/sbin/ipadm set-prop \
+				    -p ip6_send_redirects=0 ip
 	;;
 *)
 	usage

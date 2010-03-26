@@ -43,6 +43,7 @@ extern "C" {
 #include <sys/clock_impl.h>	/* For LBOLT_FASTPATH{,64} */
 #include <inet/optcom.h>
 #include <inet/tcp.h>
+#include <inet/tunables.h>
 
 #define	TCP_MOD_ID	5105
 
@@ -64,13 +65,6 @@ extern sock_downcalls_t sock_tcp_downcalls;
  * incompatible changes in protocols like telnet and rlogin.
  */
 #define	TCP_OLD_URP_INTERPRETATION	1
-
-/* Handy time related macros. */
-#define	MS	1L
-#define	SECONDS	(1000 * MS)
-#define	MINUTES	(60 * SECONDS)
-#define	HOURS	(60 * MINUTES)
-#define	DAYS	(24 * HOURS)
 
 /* TCP option length */
 #define	TCPOPT_NOP_LEN		1
@@ -407,80 +401,73 @@ extern uint32_t tcp_early_abort;
 #define	TCP_REASS_SET_END(mp, u)	((mp)->b_prev = \
 					(mblk_t *)(uintptr_t)(u))
 
-/* Named Dispatch Parameter Management Structure */
-typedef struct tcpparam_s {
-	uint32_t	tcp_param_min;
-	uint32_t	tcp_param_max;
-	uint32_t	tcp_param_val;
-	char		*tcp_param_name;
-} tcpparam_t;
-
-
-#define	tcps_time_wait_interval		tcps_params[0].tcp_param_val
-#define	tcps_conn_req_max_q		tcps_params[1].tcp_param_val
-#define	tcps_conn_req_max_q0		tcps_params[2].tcp_param_val
-#define	tcps_conn_req_min		tcps_params[3].tcp_param_val
-#define	tcps_conn_grace_period		tcps_params[4].tcp_param_val
-#define	tcps_cwnd_max_			tcps_params[5].tcp_param_val
-#define	tcps_dbg			tcps_params[6].tcp_param_val
-#define	tcps_smallest_nonpriv_port	tcps_params[7].tcp_param_val
-#define	tcps_ip_abort_cinterval		tcps_params[8].tcp_param_val
-#define	tcps_ip_abort_linterval		tcps_params[9].tcp_param_val
-#define	tcps_ip_abort_interval		tcps_params[10].tcp_param_val
-#define	tcps_ip_notify_cinterval	tcps_params[11].tcp_param_val
-#define	tcps_ip_notify_interval		tcps_params[12].tcp_param_val
-#define	tcps_ipv4_ttl			tcps_params[13].tcp_param_val
-#define	tcps_keepalive_interval_high	tcps_params[14].tcp_param_max
-#define	tcps_keepalive_interval		tcps_params[14].tcp_param_val
-#define	tcps_keepalive_interval_low	tcps_params[14].tcp_param_min
-#define	tcps_maxpsz_multiplier		tcps_params[15].tcp_param_val
-#define	tcps_mss_def_ipv4		tcps_params[16].tcp_param_val
-#define	tcps_mss_max_ipv4		tcps_params[17].tcp_param_val
-#define	tcps_mss_min			tcps_params[18].tcp_param_val
-#define	tcps_naglim_def			tcps_params[19].tcp_param_val
-#define	tcps_rexmit_interval_initial	tcps_params[20].tcp_param_val
-#define	tcps_rexmit_interval_max	tcps_params[21].tcp_param_val
-#define	tcps_rexmit_interval_min	tcps_params[22].tcp_param_val
-#define	tcps_deferred_ack_interval	tcps_params[23].tcp_param_val
-#define	tcps_snd_lowat_fraction		tcps_params[24].tcp_param_val
-#define	tcps_dupack_fast_retransmit	tcps_params[25].tcp_param_val
-#define	tcps_ignore_path_mtu		tcps_params[26].tcp_param_val
-#define	tcps_smallest_anon_port		tcps_params[27].tcp_param_val
-#define	tcps_largest_anon_port		tcps_params[28].tcp_param_val
-#define	tcps_xmit_hiwat			tcps_params[29].tcp_param_val
-#define	tcps_xmit_lowat			tcps_params[30].tcp_param_val
-#define	tcps_recv_hiwat			tcps_params[31].tcp_param_val
-#define	tcps_recv_hiwat_minmss		tcps_params[32].tcp_param_val
-#define	tcps_fin_wait_2_flush_interval	tcps_params[33].tcp_param_val
-#define	tcps_max_buf			tcps_params[34].tcp_param_val
-#define	tcps_strong_iss			tcps_params[35].tcp_param_val
-#define	tcps_rtt_updates		tcps_params[36].tcp_param_val
-#define	tcps_wscale_always		tcps_params[37].tcp_param_val
-#define	tcps_tstamp_always		tcps_params[38].tcp_param_val
-#define	tcps_tstamp_if_wscale		tcps_params[39].tcp_param_val
-#define	tcps_rexmit_interval_extra	tcps_params[40].tcp_param_val
-#define	tcps_deferred_acks_max		tcps_params[41].tcp_param_val
-#define	tcps_slow_start_after_idle	tcps_params[42].tcp_param_val
-#define	tcps_slow_start_initial		tcps_params[43].tcp_param_val
-#define	tcps_sack_permitted		tcps_params[44].tcp_param_val
-#define	tcps_ipv6_hoplimit		tcps_params[45].tcp_param_val
-#define	tcps_mss_def_ipv6		tcps_params[46].tcp_param_val
-#define	tcps_mss_max_ipv6		tcps_params[47].tcp_param_val
-#define	tcps_rev_src_routes		tcps_params[48].tcp_param_val
-#define	tcps_local_dack_interval	tcps_params[49].tcp_param_val
-#define	tcps_local_dacks_max		tcps_params[50].tcp_param_val
-#define	tcps_ecn_permitted		tcps_params[51].tcp_param_val
-#define	tcps_rst_sent_rate_enabled	tcps_params[52].tcp_param_val
-#define	tcps_rst_sent_rate		tcps_params[53].tcp_param_val
-#define	tcps_push_timer_interval	tcps_params[54].tcp_param_val
-#define	tcps_use_smss_as_mss_opt	tcps_params[55].tcp_param_val
-#define	tcps_keepalive_abort_interval_high	tcps_params[56].tcp_param_max
-#define	tcps_keepalive_abort_interval		tcps_params[56].tcp_param_val
-#define	tcps_keepalive_abort_interval_low	tcps_params[56].tcp_param_min
-#define	tcps_dev_flow_ctl		tcps_params[57].tcp_param_val
-#define	tcps_reass_timeout		tcps_params[58].tcp_param_val
-
-#define	tcps_wroff_xtra	tcps_wroff_xtra_param->tcp_param_val
+#define	tcps_time_wait_interval		tcps_propinfo_tbl[0].prop_cur_uval
+#define	tcps_conn_req_max_q		tcps_propinfo_tbl[1].prop_cur_uval
+#define	tcps_conn_req_max_q0		tcps_propinfo_tbl[2].prop_cur_uval
+#define	tcps_conn_req_min		tcps_propinfo_tbl[3].prop_cur_uval
+#define	tcps_conn_grace_period		tcps_propinfo_tbl[4].prop_cur_uval
+#define	tcps_cwnd_max_			tcps_propinfo_tbl[5].prop_cur_uval
+#define	tcps_dbg			tcps_propinfo_tbl[6].prop_cur_uval
+#define	tcps_smallest_nonpriv_port	tcps_propinfo_tbl[7].prop_cur_uval
+#define	tcps_ip_abort_cinterval		tcps_propinfo_tbl[8].prop_cur_uval
+#define	tcps_ip_abort_linterval		tcps_propinfo_tbl[9].prop_cur_uval
+#define	tcps_ip_abort_interval		tcps_propinfo_tbl[10].prop_cur_uval
+#define	tcps_ip_notify_cinterval	tcps_propinfo_tbl[11].prop_cur_uval
+#define	tcps_ip_notify_interval		tcps_propinfo_tbl[12].prop_cur_uval
+#define	tcps_ipv4_ttl			tcps_propinfo_tbl[13].prop_cur_uval
+#define	tcps_keepalive_interval_high	tcps_propinfo_tbl[14].prop_max_uval
+#define	tcps_keepalive_interval		tcps_propinfo_tbl[14].prop_cur_uval
+#define	tcps_keepalive_interval_low	tcps_propinfo_tbl[14].prop_min_uval
+#define	tcps_maxpsz_multiplier		tcps_propinfo_tbl[15].prop_cur_uval
+#define	tcps_mss_def_ipv4		tcps_propinfo_tbl[16].prop_cur_uval
+#define	tcps_mss_max_ipv4		tcps_propinfo_tbl[17].prop_cur_uval
+#define	tcps_mss_min			tcps_propinfo_tbl[18].prop_cur_uval
+#define	tcps_naglim_def			tcps_propinfo_tbl[19].prop_cur_uval
+#define	tcps_rexmit_interval_initial	tcps_propinfo_tbl[20].prop_cur_uval
+#define	tcps_rexmit_interval_max	tcps_propinfo_tbl[21].prop_cur_uval
+#define	tcps_rexmit_interval_min	tcps_propinfo_tbl[22].prop_cur_uval
+#define	tcps_deferred_ack_interval	tcps_propinfo_tbl[23].prop_cur_uval
+#define	tcps_snd_lowat_fraction		tcps_propinfo_tbl[24].prop_cur_uval
+#define	tcps_dupack_fast_retransmit	tcps_propinfo_tbl[25].prop_cur_uval
+#define	tcps_ignore_path_mtu		tcps_propinfo_tbl[26].prop_cur_bval
+#define	tcps_smallest_anon_port		tcps_propinfo_tbl[27].prop_cur_uval
+#define	tcps_largest_anon_port		tcps_propinfo_tbl[28].prop_cur_uval
+#define	tcps_xmit_hiwat			tcps_propinfo_tbl[29].prop_cur_uval
+#define	tcps_xmit_lowat			tcps_propinfo_tbl[30].prop_cur_uval
+#define	tcps_recv_hiwat			tcps_propinfo_tbl[31].prop_cur_uval
+#define	tcps_recv_hiwat_minmss		tcps_propinfo_tbl[32].prop_cur_uval
+#define	tcps_fin_wait_2_flush_interval	tcps_propinfo_tbl[33].prop_cur_uval
+#define	tcps_max_buf			tcps_propinfo_tbl[34].prop_cur_uval
+#define	tcps_strong_iss			tcps_propinfo_tbl[35].prop_cur_uval
+#define	tcps_rtt_updates		tcps_propinfo_tbl[36].prop_cur_uval
+#define	tcps_wscale_always		tcps_propinfo_tbl[37].prop_cur_bval
+#define	tcps_tstamp_always		tcps_propinfo_tbl[38].prop_cur_bval
+#define	tcps_tstamp_if_wscale		tcps_propinfo_tbl[39].prop_cur_bval
+#define	tcps_rexmit_interval_extra	tcps_propinfo_tbl[40].prop_cur_uval
+#define	tcps_deferred_acks_max		tcps_propinfo_tbl[41].prop_cur_uval
+#define	tcps_slow_start_after_idle	tcps_propinfo_tbl[42].prop_cur_uval
+#define	tcps_slow_start_initial		tcps_propinfo_tbl[43].prop_cur_uval
+#define	tcps_sack_permitted		tcps_propinfo_tbl[44].prop_cur_uval
+#define	tcps_ipv6_hoplimit		tcps_propinfo_tbl[45].prop_cur_uval
+#define	tcps_mss_def_ipv6		tcps_propinfo_tbl[46].prop_cur_uval
+#define	tcps_mss_max_ipv6		tcps_propinfo_tbl[47].prop_cur_uval
+#define	tcps_rev_src_routes		tcps_propinfo_tbl[48].prop_cur_bval
+#define	tcps_local_dack_interval	tcps_propinfo_tbl[49].prop_cur_uval
+#define	tcps_local_dacks_max		tcps_propinfo_tbl[50].prop_cur_uval
+#define	tcps_ecn_permitted		tcps_propinfo_tbl[51].prop_cur_uval
+#define	tcps_rst_sent_rate_enabled	tcps_propinfo_tbl[52].prop_cur_bval
+#define	tcps_rst_sent_rate		tcps_propinfo_tbl[53].prop_cur_uval
+#define	tcps_push_timer_interval	tcps_propinfo_tbl[54].prop_cur_uval
+#define	tcps_use_smss_as_mss_opt	tcps_propinfo_tbl[55].prop_cur_bval
+#define	tcps_keepalive_abort_interval_high \
+					tcps_propinfo_tbl[56].prop_max_uval
+#define	tcps_keepalive_abort_interval \
+					tcps_propinfo_tbl[56].prop_cur_uval
+#define	tcps_keepalive_abort_interval_low \
+					tcps_propinfo_tbl[56].prop_min_uval
+#define	tcps_wroff_xtra			tcps_propinfo_tbl[57].prop_cur_uval
+#define	tcps_dev_flow_ctl		tcps_propinfo_tbl[58].prop_cur_bval
+#define	tcps_reass_timeout		tcps_propinfo_tbl[59].prop_cur_uval
 
 extern struct qinit tcp_rinitv4, tcp_rinitv6;
 extern boolean_t do_tcp_fusion;
@@ -574,6 +561,7 @@ extern boolean_t tcp_fuse_rcv_drain(queue_t *, tcp_t *, mblk_t **);
 extern size_t	tcp_fuse_set_rcv_hiwat(tcp_t *, size_t);
 extern int	tcp_fuse_maxpsz(tcp_t *);
 extern void	tcp_fuse_backenable(tcp_t *);
+extern void	tcp_iss_key_init(uint8_t *, int, tcp_stack_t *);
 
 /*
  * Output related functions in tcp_output.c.
@@ -682,11 +670,6 @@ extern void		tcp_time_wait_processing(tcp_t *, mblk_t *, uint32_t,
 extern int	tcp_cpu_update(cpu_setup_t, int, void *);
 extern void	tcp_ioctl_abort_conn(queue_t *, mblk_t *);
 extern uint32_t	tcp_find_listener_conf(tcp_stack_t *, in_port_t);
-extern int	tcp_listener_conf_get(queue_t *, mblk_t *, caddr_t, cred_t *);
-extern int	tcp_listener_conf_add(queue_t *, mblk_t *, char *, caddr_t,
-		    cred_t *);
-extern int	tcp_listener_conf_del(queue_t *, mblk_t *, char *, caddr_t,
-		    cred_t *);
 extern void	tcp_listener_conf_cleanup(tcp_stack_t *);
 
 #endif	/* _KERNEL */

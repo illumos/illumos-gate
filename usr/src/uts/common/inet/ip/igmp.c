@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -61,6 +61,7 @@
 #include <inet/common.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
+#include <inet/tunables.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/ip_multi.h>

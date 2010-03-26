@@ -174,11 +174,11 @@ typedef struct ipoptp_s
 #define	IPOPTP_ERROR	0x00000001
 #endif	/* _KERNEL */
 
-/* Controls forwarding of IP packets, set via ndd */
+/* Controls forwarding of IP packets, set via ipadm(1M)/ndd(1M) */
 #define	IP_FORWARD_NEVER	0
 #define	IP_FORWARD_ALWAYS	1
 
-#define	WE_ARE_FORWARDING(ipst)	((ipst)->ips_ip_g_forward == IP_FORWARD_ALWAYS)
+#define	WE_ARE_FORWARDING(ipst)	((ipst)->ips_ip_forwarding == IP_FORWARD_ALWAYS)
 
 #define	IPH_HDR_LENGTH(ipha)						\
 	((int)(((ipha_t *)ipha)->ipha_version_and_hdr_length & 0xF) << 2)
@@ -945,7 +945,6 @@ typedef struct ipif_s {
 	in6_addr_t ipif_v6brd_addr;	/* Broadcast addr for this interface. */
 	in6_addr_t ipif_v6pp_dst_addr;	/* Point-to-point dest address. */
 	uint64_t ipif_flags;		/* Interface flags. */
-	uint_t	ipif_metric;		/* BSD if metric, for compatibility. */
 	uint_t	ipif_ire_type;		/* IRE_LOCAL or IRE_LOOPBACK */
 
 	/*
@@ -1018,7 +1017,6 @@ typedef struct ipif_s {
  * ipif_v6brd_addr
  * ipif_v6pp_dst_addr
  * ipif_flags		ill_lock		ill_lock
- * ipif_metric
  * ipif_ire_type	ipsq + down ill		up ill
  *
  * ipif_ib_pkt_count	Approx
@@ -1608,10 +1606,10 @@ typedef struct ill_s {
 	uint_t	ill_max_frag;		/* Max IDU from DLPI. */
 	uint_t	ill_current_frag;	/* Current IDU from DLPI. */
 	uint_t	ill_mtu;		/* User-specified MTU; SIOCSLIFMTU */
+	uint_t	ill_metric;		/* BSD if metric, for compatibility. */
 	char	*ill_name;		/* Our name. */
 	uint_t	ill_ipif_dup_count;	/* Number of duplicate addresses. */
 	uint_t	ill_name_length;	/* Name length, incl. terminator. */
-	char	*ill_ndd_name;		/* Name + ":ip?_forwarding" for NDD. */
 	uint_t	ill_net_type;		/* IRE_IF_RESOLVER/IRE_IF_NORESOLVER. */
 	/*
 	 * Physical Point of Attachment num.  If DLPI style 1 provider
@@ -1691,7 +1689,11 @@ typedef struct ill_s {
 		ill_fragtimer_executing : 1,
 		ill_fragtimer_needrestart : 1,
 		ill_manual_token : 1,	/* system won't override ill_token */
-		ill_manual_linklocal : 1, /* system won't auto-conf linklocal */
+		/*
+		 * ill_manual_linklocal : system will not change the
+		 * linklocal whenever ill_token changes.
+		 */
+		ill_manual_linklocal : 1,
 
 		ill_manual_dst_linklocal : 1, /* same for pt-pt dst linklocal */
 
@@ -2024,14 +2026,6 @@ enum {
 	IDCS_RENEG,
 	IDCS_FAILED
 };
-
-/* Named Dispatch Parameter Management Structure */
-typedef struct ipparam_s {
-	uint_t	ip_param_min;
-	uint_t	ip_param_max;
-	uint_t	ip_param_value;
-	char	*ip_param_name;
-} ipparam_t;
 
 /* Extended NDP Management Structure */
 typedef struct ipndp_s {
@@ -2932,88 +2926,94 @@ extern vmem_t *ip_minor_arena_la;
  * /etc/rc2.d/S69inet script.
  */
 
-#define	ips_ip_respond_to_address_mask_broadcast ips_param_arr[0].ip_param_value
-#define	ips_ip_g_resp_to_echo_bcast	ips_param_arr[1].ip_param_value
-#define	ips_ip_g_resp_to_echo_mcast	ips_param_arr[2].ip_param_value
-#define	ips_ip_g_resp_to_timestamp	ips_param_arr[3].ip_param_value
-#define	ips_ip_g_resp_to_timestamp_bcast ips_param_arr[4].ip_param_value
-#define	ips_ip_g_send_redirects		ips_param_arr[5].ip_param_value
-#define	ips_ip_g_forward_directed_bcast	ips_param_arr[6].ip_param_value
-#define	ips_ip_mrtdebug			ips_param_arr[7].ip_param_value
-#define	ips_ip_ire_reclaim_fraction	ips_param_arr[8].ip_param_value
-#define	ips_ip_nce_reclaim_fraction	ips_param_arr[9].ip_param_value
-#define	ips_ip_dce_reclaim_fraction	ips_param_arr[10].ip_param_value
-#define	ips_ip_def_ttl			ips_param_arr[11].ip_param_value
-#define	ips_ip_forward_src_routed	ips_param_arr[12].ip_param_value
-#define	ips_ip_wroff_extra		ips_param_arr[13].ip_param_value
-#define	ips_ip_pathmtu_interval		ips_param_arr[14].ip_param_value
-#define	ips_ip_icmp_return		ips_param_arr[15].ip_param_value
-#define	ips_ip_path_mtu_discovery	ips_param_arr[16].ip_param_value
-#define	ips_ip_pmtu_min			ips_param_arr[17].ip_param_value
-#define	ips_ip_ignore_redirect		ips_param_arr[18].ip_param_value
-#define	ips_ip_arp_icmp_error		ips_param_arr[19].ip_param_value
-#define	ips_ip_broadcast_ttl		ips_param_arr[20].ip_param_value
-#define	ips_ip_icmp_err_interval	ips_param_arr[21].ip_param_value
-#define	ips_ip_icmp_err_burst		ips_param_arr[22].ip_param_value
-#define	ips_ip_reass_queue_bytes	ips_param_arr[23].ip_param_value
-#define	ips_ip_strict_dst_multihoming	ips_param_arr[24].ip_param_value
-#define	ips_ip_addrs_per_if		ips_param_arr[25].ip_param_value
-#define	ips_ipsec_override_persocket_policy ips_param_arr[26].ip_param_value
-#define	ips_icmp_accept_clear_messages	ips_param_arr[27].ip_param_value
-#define	ips_igmp_accept_clear_messages	ips_param_arr[28].ip_param_value
+#define	ips_ip_respond_to_address_mask_broadcast \
+					ips_propinfo_tbl[0].prop_cur_bval
+#define	ips_ip_g_resp_to_echo_bcast	ips_propinfo_tbl[1].prop_cur_bval
+#define	ips_ip_g_resp_to_echo_mcast	ips_propinfo_tbl[2].prop_cur_bval
+#define	ips_ip_g_resp_to_timestamp	ips_propinfo_tbl[3].prop_cur_bval
+#define	ips_ip_g_resp_to_timestamp_bcast ips_propinfo_tbl[4].prop_cur_bval
+#define	ips_ip_g_send_redirects		ips_propinfo_tbl[5].prop_cur_bval
+#define	ips_ip_g_forward_directed_bcast	ips_propinfo_tbl[6].prop_cur_bval
+#define	ips_ip_mrtdebug			ips_propinfo_tbl[7].prop_cur_uval
+#define	ips_ip_ire_reclaim_fraction	ips_propinfo_tbl[8].prop_cur_uval
+#define	ips_ip_nce_reclaim_fraction	ips_propinfo_tbl[9].prop_cur_uval
+#define	ips_ip_dce_reclaim_fraction	ips_propinfo_tbl[10].prop_cur_uval
+#define	ips_ip_def_ttl			ips_propinfo_tbl[11].prop_cur_uval
+#define	ips_ip_forward_src_routed	ips_propinfo_tbl[12].prop_cur_bval
+#define	ips_ip_wroff_extra		ips_propinfo_tbl[13].prop_cur_uval
+#define	ips_ip_pathmtu_interval		ips_propinfo_tbl[14].prop_cur_uval
+#define	ips_ip_icmp_return		ips_propinfo_tbl[15].prop_cur_uval
+#define	ips_ip_path_mtu_discovery	ips_propinfo_tbl[16].prop_cur_bval
+#define	ips_ip_pmtu_min			ips_propinfo_tbl[17].prop_cur_uval
+#define	ips_ip_ignore_redirect		ips_propinfo_tbl[18].prop_cur_bval
+#define	ips_ip_arp_icmp_error		ips_propinfo_tbl[19].prop_cur_bval
+#define	ips_ip_broadcast_ttl		ips_propinfo_tbl[20].prop_cur_uval
+#define	ips_ip_icmp_err_interval	ips_propinfo_tbl[21].prop_cur_uval
+#define	ips_ip_icmp_err_burst		ips_propinfo_tbl[22].prop_cur_uval
+#define	ips_ip_reass_queue_bytes	ips_propinfo_tbl[23].prop_cur_uval
+#define	ips_ip_strict_dst_multihoming	ips_propinfo_tbl[24].prop_cur_uval
+#define	ips_ip_addrs_per_if		ips_propinfo_tbl[25].prop_cur_uval
+#define	ips_ipsec_override_persocket_policy ips_propinfo_tbl[26].prop_cur_bval
+#define	ips_icmp_accept_clear_messages	ips_propinfo_tbl[27].prop_cur_bval
+#define	ips_igmp_accept_clear_messages	ips_propinfo_tbl[28].prop_cur_bval
 
 /* IPv6 configuration knobs */
-#define	ips_delay_first_probe_time	ips_param_arr[29].ip_param_value
-#define	ips_max_unicast_solicit		ips_param_arr[30].ip_param_value
-#define	ips_ipv6_def_hops		ips_param_arr[31].ip_param_value
-#define	ips_ipv6_icmp_return		ips_param_arr[32].ip_param_value
-#define	ips_ipv6_forward_src_routed	ips_param_arr[33].ip_param_value
-#define	ips_ipv6_resp_echo_mcast	ips_param_arr[34].ip_param_value
-#define	ips_ipv6_send_redirects		ips_param_arr[35].ip_param_value
-#define	ips_ipv6_ignore_redirect	ips_param_arr[36].ip_param_value
-#define	ips_ipv6_strict_dst_multihoming	ips_param_arr[37].ip_param_value
-#define	ips_src_check			ips_param_arr[38].ip_param_value
-#define	ips_ipsec_policy_log_interval	ips_param_arr[39].ip_param_value
-#define	ips_pim_accept_clear_messages	ips_param_arr[40].ip_param_value
-#define	ips_ip_ndp_unsolicit_interval	ips_param_arr[41].ip_param_value
-#define	ips_ip_ndp_unsolicit_count	ips_param_arr[42].ip_param_value
-#define	ips_ipv6_ignore_home_address_opt ips_param_arr[43].ip_param_value
+#define	ips_delay_first_probe_time	ips_propinfo_tbl[29].prop_cur_uval
+#define	ips_max_unicast_solicit		ips_propinfo_tbl[30].prop_cur_uval
+#define	ips_ipv6_def_hops		ips_propinfo_tbl[31].prop_cur_uval
+#define	ips_ipv6_icmp_return		ips_propinfo_tbl[32].prop_cur_uval
+#define	ips_ipv6_forward_src_routed	ips_propinfo_tbl[33].prop_cur_bval
+#define	ips_ipv6_resp_echo_mcast	ips_propinfo_tbl[34].prop_cur_bval
+#define	ips_ipv6_send_redirects		ips_propinfo_tbl[35].prop_cur_bval
+#define	ips_ipv6_ignore_redirect	ips_propinfo_tbl[36].prop_cur_bval
+#define	ips_ipv6_strict_dst_multihoming	ips_propinfo_tbl[37].prop_cur_uval
+#define	ips_src_check			ips_propinfo_tbl[38].prop_cur_uval
+#define	ips_ipsec_policy_log_interval	ips_propinfo_tbl[39].prop_cur_uval
+#define	ips_pim_accept_clear_messages	ips_propinfo_tbl[40].prop_cur_bval
+#define	ips_ip_ndp_unsolicit_interval	ips_propinfo_tbl[41].prop_cur_uval
+#define	ips_ip_ndp_unsolicit_count	ips_propinfo_tbl[42].prop_cur_uval
+#define	ips_ipv6_ignore_home_address_opt ips_propinfo_tbl[43].prop_cur_bval
 
 /* Misc IP configuration knobs */
-#define	ips_ip_policy_mask		ips_param_arr[44].ip_param_value
-#define	ips_ip_ecmp_behavior		ips_param_arr[45].ip_param_value
-#define	ips_ip_multirt_ttl  		ips_param_arr[46].ip_param_value
-#define	ips_ip_ire_badcnt_lifetime	ips_param_arr[47].ip_param_value
-#define	ips_ip_max_temp_idle		ips_param_arr[48].ip_param_value
-#define	ips_ip_max_temp_defend		ips_param_arr[49].ip_param_value
-#define	ips_ip_max_defend		ips_param_arr[50].ip_param_value
-#define	ips_ip_defend_interval		ips_param_arr[51].ip_param_value
-#define	ips_ip_dup_recovery		ips_param_arr[52].ip_param_value
-#define	ips_ip_restrict_interzone_loopback ips_param_arr[53].ip_param_value
-#define	ips_ip_lso_outbound		ips_param_arr[54].ip_param_value
-#define	ips_igmp_max_version		ips_param_arr[55].ip_param_value
-#define	ips_mld_max_version		ips_param_arr[56].ip_param_value
-#define	ips_ipv6_drop_inbound_icmpv6	ips_param_arr[57].ip_param_value
-#define	ips_arp_probe_delay		ips_param_arr[58].ip_param_value
-#define	ips_arp_fastprobe_delay		ips_param_arr[59].ip_param_value
-#define	ips_arp_probe_interval		ips_param_arr[60].ip_param_value
-#define	ips_arp_fastprobe_interval	ips_param_arr[61].ip_param_value
-#define	ips_arp_probe_count		ips_param_arr[62].ip_param_value
-#define	ips_arp_fastprobe_count		ips_param_arr[63].ip_param_value
-#define	ips_ipv4_dad_announce_interval	ips_param_arr[64].ip_param_value
-#define	ips_ipv6_dad_announce_interval	ips_param_arr[65].ip_param_value
-#define	ips_arp_defend_interval		ips_param_arr[66].ip_param_value
-#define	ips_arp_defend_rate		ips_param_arr[67].ip_param_value
-#define	ips_ndp_defend_interval		ips_param_arr[68].ip_param_value
-#define	ips_ndp_defend_rate		ips_param_arr[69].ip_param_value
-#define	ips_arp_defend_period		ips_param_arr[70].ip_param_value
-#define	ips_ndp_defend_period		ips_param_arr[71].ip_param_value
-#define	ips_ipv4_icmp_return_pmtu	ips_param_arr[72].ip_param_value
-#define	ips_ipv6_icmp_return_pmtu	ips_param_arr[73].ip_param_value
-#define	ips_ip_arp_publish_count	ips_param_arr[74].ip_param_value
-#define	ips_ip_arp_publish_interval	ips_param_arr[75].ip_param_value
-#define	ips_ip_strict_src_multihoming	ips_param_arr[76].ip_param_value
-#define	ips_ipv6_strict_src_multihoming	ips_param_arr[77].ip_param_value
+#define	ips_ip_policy_mask		ips_propinfo_tbl[44].prop_cur_uval
+#define	ips_ip_ecmp_behavior		ips_propinfo_tbl[45].prop_cur_uval
+#define	ips_ip_multirt_ttl  		ips_propinfo_tbl[46].prop_cur_uval
+#define	ips_ip_ire_badcnt_lifetime	ips_propinfo_tbl[47].prop_cur_uval
+#define	ips_ip_max_temp_idle		ips_propinfo_tbl[48].prop_cur_uval
+#define	ips_ip_max_temp_defend		ips_propinfo_tbl[49].prop_cur_uval
+#define	ips_ip_max_defend		ips_propinfo_tbl[50].prop_cur_uval
+#define	ips_ip_defend_interval		ips_propinfo_tbl[51].prop_cur_uval
+#define	ips_ip_dup_recovery		ips_propinfo_tbl[52].prop_cur_uval
+#define	ips_ip_restrict_interzone_loopback ips_propinfo_tbl[53].prop_cur_bval
+#define	ips_ip_lso_outbound		ips_propinfo_tbl[54].prop_cur_bval
+#define	ips_igmp_max_version		ips_propinfo_tbl[55].prop_cur_uval
+#define	ips_mld_max_version		ips_propinfo_tbl[56].prop_cur_uval
+#define	ips_ip_forwarding		ips_propinfo_tbl[57].prop_cur_bval
+#define	ips_ipv6_forwarding		ips_propinfo_tbl[58].prop_cur_bval
+#define	ips_ip_reassembly_timeout	ips_propinfo_tbl[59].prop_cur_uval
+#define	ips_ipv6_reassembly_timeout	ips_propinfo_tbl[60].prop_cur_uval
+#define	ips_ip_cgtp_filter		ips_propinfo_tbl[61].prop_cur_bval
+#define	ips_arp_probe_delay		ips_propinfo_tbl[62].prop_cur_uval
+#define	ips_arp_fastprobe_delay		ips_propinfo_tbl[63].prop_cur_uval
+#define	ips_arp_probe_interval		ips_propinfo_tbl[64].prop_cur_uval
+#define	ips_arp_fastprobe_interval	ips_propinfo_tbl[65].prop_cur_uval
+#define	ips_arp_probe_count		ips_propinfo_tbl[66].prop_cur_uval
+#define	ips_arp_fastprobe_count		ips_propinfo_tbl[67].prop_cur_uval
+#define	ips_ipv4_dad_announce_interval	ips_propinfo_tbl[68].prop_cur_uval
+#define	ips_ipv6_dad_announce_interval	ips_propinfo_tbl[69].prop_cur_uval
+#define	ips_arp_defend_interval		ips_propinfo_tbl[70].prop_cur_uval
+#define	ips_arp_defend_rate		ips_propinfo_tbl[71].prop_cur_uval
+#define	ips_ndp_defend_interval		ips_propinfo_tbl[72].prop_cur_uval
+#define	ips_ndp_defend_rate		ips_propinfo_tbl[73].prop_cur_uval
+#define	ips_arp_defend_period		ips_propinfo_tbl[74].prop_cur_uval
+#define	ips_ndp_defend_period		ips_propinfo_tbl[75].prop_cur_uval
+#define	ips_ipv4_icmp_return_pmtu	ips_propinfo_tbl[76].prop_cur_bval
+#define	ips_ipv6_icmp_return_pmtu	ips_propinfo_tbl[77].prop_cur_bval
+#define	ips_ip_arp_publish_count	ips_propinfo_tbl[78].prop_cur_uval
+#define	ips_ip_arp_publish_interval	ips_propinfo_tbl[79].prop_cur_uval
+#define	ips_ip_strict_src_multihoming	ips_propinfo_tbl[80].prop_cur_uval
+#define	ips_ipv6_strict_src_multihoming	ips_propinfo_tbl[81].prop_cur_uval
+#define	ips_ipv6_drop_inbound_icmpv6	ips_propinfo_tbl[82].prop_cur_bval
 
 extern int	dohwcksum;	/* use h/w cksum if supported by the h/w */
 #ifdef ZC_TEST

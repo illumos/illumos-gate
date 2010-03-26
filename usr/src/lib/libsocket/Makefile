@@ -18,15 +18,14 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.lib
 
+HDRS = libsocket_priv.h
+HDRDIR = common
 SUBDIRS = $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
@@ -45,6 +44,10 @@ TEXT_DOMAIN =	SUNW_OST_NETRPC
 
 all clean clobber install lint: $(SUBDIRS)
 
+install_h: $(ROOTHDRS)
+
+check: $(CHECKHDRS)
+
 _msg: $(MSGDOMAINPOFILE)
 
 $(POFILE): pofile_MSGFILES
@@ -54,4 +57,5 @@ $(SUBDIRS): FRC
 
 FRC:
 
+include $(SRC)/lib/Makefile.targ
 include $(SRC)/Makefile.msg.targ

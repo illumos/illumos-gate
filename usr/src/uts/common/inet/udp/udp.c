@@ -68,7 +68,6 @@
 #include <inet/ip_ndp.h>
 #include <inet/proto_set.h>
 #include <inet/mib2.h>
-#include <inet/nd.h>
 #include <inet/optcom.h>
 #include <inet/snmpcom.h>
 #include <inet/kstatcom.h>
@@ -165,10 +164,6 @@ static int	udp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr,
 static int	udp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin,
 		    sin6_t *sin6, ushort_t ipversion, cred_t *cr, pid_t,
 		    ip_xmit_attr_t *ixa);
-static int	udp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
-static boolean_t udp_param_register(IDP *ndp, udpparam_t *udppa, int cnt);
-static int	udp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
-		    cred_t *cr);
 static mblk_t	*udp_prepend_hdr(conn_t *, ip_xmit_attr_t *, const ip_pkt_t *,
     const in6_addr_t *, const in6_addr_t *, in_port_t, uint32_t, mblk_t *,
     int *);
@@ -210,11 +205,6 @@ int		udp_getpeername(sock_lower_handle_t,
     struct sockaddr *, socklen_t *, cred_t *);
 static int	udp_do_connect(conn_t *, const struct sockaddr *, socklen_t,
     cred_t *, pid_t);
-
-#define	UDP_RECV_HIWATER	(56 * 1024)
-#define	UDP_RECV_LOWATER	128
-#define	UDP_XMIT_HIWATER	(56 * 1024)
-#define	UDP_XMIT_LOWATER	1024
 
 #pragma inline(udp_output_connected, udp_output_newdst, udp_output_lastdst)
 
@@ -336,32 +326,11 @@ static	struct T_info_ack udp_g_t_info_ack_ipv6 = {
 	(XPG4_1|SENDZERO) /* PROVIDER_flag */
 };
 
-/* largest UDP port number */
-#define	UDP_MAX_PORT	65535
-
 /*
- * Table of ND variables supported by udp.  These are loaded into us_nd
- * in udp_open.
- * All of these are alterable, within the min/max values given, at run time.
+ * UDP tunables related declarations. Definitions are in udp_tunables.c
  */
-/* BEGIN CSTYLED */
-udpparam_t udp_param_arr[] = {
- /*min		max		value		name */
- { 0L,		256,		32,		"udp_wroff_extra" },
- { 1L,		255,		255,		"udp_ipv4_ttl" },
- { 0,		IPV6_MAX_HOPS,	IPV6_DEFAULT_HOPS, "udp_ipv6_hoplimit"},
- { 1024,	(32 * 1024),	1024,		"udp_smallest_nonpriv_port" },
- { 0,		1,		1,		"udp_do_checksum" },
- { 1024,	UDP_MAX_PORT,	(32 * 1024),	"udp_smallest_anon_port" },
- { 1024,	UDP_MAX_PORT,	UDP_MAX_PORT,	"udp_largest_anon_port" },
- { UDP_XMIT_LOWATER, (1<<30), UDP_XMIT_HIWATER,	"udp_xmit_hiwat"},
- { 0,		     (1<<30), UDP_XMIT_LOWATER, "udp_xmit_lowat"},
- { UDP_RECV_LOWATER, (1<<30), UDP_RECV_HIWATER,	"udp_recv_hiwat"},
- { 65536,	(1<<30),	2*1024*1024,	"udp_max_buf"},
- { 0,		1,		0,		"udp_pmtu_discovery" },
- { 0,		1,		0,		"udp_sendto_ignerr" },
-};
-/* END CSTYLED */
+extern mod_prop_info_t udp_propinfo_tbl[];
+extern int udp_propinfo_count;
 
 /* Setable in /etc/system */
 /* If set to 0, pick ephemeral port sequentially; otherwise randomly. */
@@ -910,93 +879,6 @@ udp_err_ack_prim(queue_t *q, mblk_t *mp, t_scalar_t primitive,
 		teackp->UNIX_error = sys_error;
 		qreply(q, mp);
 	}
-}
-
-/*ARGSUSED2*/
-static int
-udp_extra_priv_ports_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	int i;
-	udp_t		*udp = Q_TO_UDP(q);
-	udp_stack_t *us = udp->udp_us;
-
-	for (i = 0; i < us->us_num_epriv_ports; i++) {
-		if (us->us_epriv_ports[i] != 0)
-			(void) mi_mpprintf(mp, "%d ", us->us_epriv_ports[i]);
-	}
-	return (0);
-}
-
-/* ARGSUSED1 */
-static int
-udp_extra_priv_ports_add(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
-    cred_t *cr)
-{
-	long	new_value;
-	int	i;
-	udp_t		*udp = Q_TO_UDP(q);
-	udp_stack_t *us = udp->udp_us;
-
-	/*
-	 * Fail the request if the new value does not lie within the
-	 * port number limits.
-	 */
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
-	    new_value <= 0 || new_value >= 65536) {
-		return (EINVAL);
-	}
-
-	/* Check if the value is already in the list */
-	for (i = 0; i < us->us_num_epriv_ports; i++) {
-		if (new_value == us->us_epriv_ports[i]) {
-			return (EEXIST);
-		}
-	}
-	/* Find an empty slot */
-	for (i = 0; i < us->us_num_epriv_ports; i++) {
-		if (us->us_epriv_ports[i] == 0)
-			break;
-	}
-	if (i == us->us_num_epriv_ports) {
-		return (EOVERFLOW);
-	}
-
-	/* Set the new value */
-	us->us_epriv_ports[i] = (in_port_t)new_value;
-	return (0);
-}
-
-/* ARGSUSED1 */
-static int
-udp_extra_priv_ports_del(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
-    cred_t *cr)
-{
-	long	new_value;
-	int	i;
-	udp_t		*udp = Q_TO_UDP(q);
-	udp_stack_t *us = udp->udp_us;
-
-	/*
-	 * Fail the request if the new value does not lie within the
-	 * port number limits.
-	 */
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
-	    new_value <= 0 || new_value >= 65536) {
-		return (EINVAL);
-	}
-
-	/* Check that the value is already in the list */
-	for (i = 0; i < us->us_num_epriv_ports; i++) {
-		if (us->us_epriv_ports[i] == new_value)
-			break;
-	}
-	if (i == us->us_num_epriv_ports) {
-		return (ESRCH);
-	}
-
-	/* Clear the value */
-	us->us_epriv_ports[i] = 0;
-	return (0);
 }
 
 /* At minimum we need 4 bytes of UDP header */
@@ -2222,79 +2104,6 @@ udp_build_hdr_template(conn_t *connp, const in6_addr_t *v6src,
 	udpha->uha_dst_port = dstport;
 	udpha->uha_checksum = 0;
 	udpha->uha_length = htons(UDPH_SIZE);	/* Filled in later */
-	return (0);
-}
-
-/*
- * This routine retrieves the value of an ND variable in a udpparam_t
- * structure.  It is called through nd_getset when a user reads the
- * variable.
- */
-/* ARGSUSED */
-static int
-udp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	udpparam_t *udppa = (udpparam_t *)cp;
-
-	(void) mi_mpprintf(mp, "%d", udppa->udp_param_value);
-	return (0);
-}
-
-/*
- * Walk through the param array specified registering each element with the
- * named dispatch (ND) handler.
- */
-static boolean_t
-udp_param_register(IDP *ndp, udpparam_t *udppa, int cnt)
-{
-	for (; cnt-- > 0; udppa++) {
-		if (udppa->udp_param_name && udppa->udp_param_name[0]) {
-			if (!nd_load(ndp, udppa->udp_param_name,
-			    udp_param_get, udp_param_set,
-			    (caddr_t)udppa)) {
-				nd_free(ndp);
-				return (B_FALSE);
-			}
-		}
-	}
-	if (!nd_load(ndp, "udp_extra_priv_ports",
-	    udp_extra_priv_ports_get, NULL, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "udp_extra_priv_ports_add",
-	    NULL, udp_extra_priv_ports_add, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "udp_extra_priv_ports_del",
-	    NULL, udp_extra_priv_ports_del, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	return (B_TRUE);
-}
-
-/* This routine sets an ND variable in a udpparam_t structure. */
-/* ARGSUSED */
-static int
-udp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
-{
-	long		new_value;
-	udpparam_t	*udppa = (udpparam_t *)cp;
-
-	/*
-	 * Fail the request if the new value does not lie within the
-	 * required bounds.
-	 */
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
-	    new_value < udppa->udp_param_min ||
-	    new_value > udppa->udp_param_max) {
-		return (EINVAL);
-	}
-
-	/* Set the new value */
-	udppa->udp_param_value = new_value;
 	return (0);
 }
 
@@ -4521,7 +4330,6 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 	struct iocblk *iocp;
 	conn_t	*connp = Q_TO_CONN(q);
 	udp_t	*udp = connp->conn_udp;
-	udp_stack_t *us = udp->udp_us;
 	cred_t	*cr;
 
 	switch (mp->b_datap->db_type) {
@@ -4655,14 +4463,6 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 			mi_copyin(q, mp, NULL,
 			    SIZEOF_STRUCT(strbuf, iocp->ioc_flag));
 			return;
-		case ND_SET:
-			/* nd_getset performs the necessary checking */
-		case ND_GET:
-			if (nd_getset(q, us->us_nd, mp)) {
-				qreply(q, mp);
-				return;
-			}
-			break;
 		case _SIOCSOCKFALLBACK:
 			/*
 			 * Either sockmod is about to be popped and the
@@ -4826,17 +4626,18 @@ static void *
 udp_stack_init(netstackid_t stackid, netstack_t *ns)
 {
 	udp_stack_t	*us;
-	udpparam_t	*pa;
 	int		i;
 	int		error = 0;
 	major_t		major;
+	size_t		arrsz;
 
 	us = (udp_stack_t *)kmem_zalloc(sizeof (*us), KM_SLEEP);
 	us->us_netstack = ns;
 
+	mutex_init(&us->us_epriv_port_lock, NULL, MUTEX_DEFAULT, NULL);
 	us->us_num_epriv_ports = UDP_NUM_EPRIV_PORTS;
-	us->us_epriv_ports[0] = 2049;
-	us->us_epriv_ports[1] = 4045;
+	us->us_epriv_ports[0] = ULP_DEF_EPRIV_PORT1;
+	us->us_epriv_ports[1] = ULP_DEF_EPRIV_PORT2;
 
 	/*
 	 * The smallest anonymous port in the priviledged port range which UDP
@@ -4862,13 +4663,10 @@ udp_stack_init(netstackid_t stackid, netstack_t *ns)
 		    NULL);
 	}
 
-	pa = (udpparam_t *)kmem_alloc(sizeof (udp_param_arr), KM_SLEEP);
-
-	us->us_param_arr = pa;
-	bcopy(udp_param_arr, us->us_param_arr, sizeof (udp_param_arr));
-
-	(void) udp_param_register(&us->us_nd,
-	    us->us_param_arr, A_CNT(udp_param_arr));
+	arrsz = udp_propinfo_count * sizeof (mod_prop_info_t);
+	us->us_propinfo_tbl = (mod_prop_info_t *)kmem_alloc(arrsz,
+	    KM_SLEEP);
+	bcopy(udp_propinfo_tbl, us->us_propinfo_tbl, arrsz);
 
 	us->us_kstat = udp_kstat2_init(stackid, &us->us_statistics);
 	us->us_mibkp = udp_kstat_init(stackid);
@@ -4897,9 +4695,9 @@ udp_stack_fini(netstackid_t stackid, void *arg)
 
 	us->us_bind_fanout = NULL;
 
-	nd_free(&us->us_nd);
-	kmem_free(us->us_param_arr, sizeof (udp_param_arr));
-	us->us_param_arr = NULL;
+	kmem_free(us->us_propinfo_tbl,
+	    udp_propinfo_count * sizeof (mod_prop_info_t));
+	us->us_propinfo_tbl = NULL;
 
 	udp_kstat_fini(stackid, us->us_mibkp);
 	us->us_mibkp = NULL;
@@ -4908,6 +4706,7 @@ udp_stack_fini(netstackid_t stackid, void *arg)
 	us->us_kstat = NULL;
 	bzero(&us->us_statistics, sizeof (us->us_statistics));
 
+	mutex_destroy(&us->us_epriv_port_lock);
 	ldi_ident_release(us->us_ldi_ident);
 	kmem_free(us, sizeof (*us));
 }
@@ -6944,8 +6743,6 @@ udp_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 	}
 
 	switch (cmd) {
-		case ND_SET:
-		case ND_GET:
 		case _SIOCSOCKFALLBACK:
 		case TI_GETPEERNAME:
 		case TI_GETMYNAME:

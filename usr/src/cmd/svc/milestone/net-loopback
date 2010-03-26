@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -34,26 +34,40 @@
 #
 smf_configure_ip || exit $SMF_EXIT_OK
 
-#
-# Before any interfaces are configured, we need to set the system
-# default IP forwarding behavior.  This will be the setting for
-# interfaces that don't modify the per-interface setting with the
-# router or -router ifconfig command in their /etc/hostname.<intf>
-# files.  Due to their dependency on this service, the IP forwarding services
-# will run at this point (though routing daemons will not run until later
-# in the boot process) and set forwarding flags.
-#
+if [ -f /etc/hostname.lo0 ] || [ -f /etc/hostname6.lo0 ]; then
+	echo "found /etc/hostname.lo0 or /etc/hostname6.lo0; "\
+		    "using ifconfig to create lo0" > /dev/msglog
+	# IPv4 loopback
+	/sbin/ifconfig lo0 plumb 127.0.0.1 up
 
-# IPv4 loopback
-/sbin/ifconfig lo0 plumb 127.0.0.1 up
+	# IPv6 loopback
+	/sbin/ifconfig lo0 inet6 plumb ::1 up
 
-# IPv6 loopback
-/sbin/ifconfig lo0 inet6 plumb ::1 up
+	# Trusted Extensions shares the loopback interface with all zones
+	if (smf_is_system_labeled); then
+		if smf_is_globalzone; then
+			/sbin/ifconfig lo0 all-zones
+			/sbin/ifconfig lo0 inet6 all-zones
+		fi
+	fi
+else
+	state=`/sbin/ipadm show-if -p -o state lo0 2>/dev/null`
+	if [ $? -eq 0 -a "$state" = "disabled" ]; then
+		/sbin/ipadm enable-if -t lo0
+	else
+		# IPv4 loopback
+		/sbin/ipadm create-addr -t -T static -a 127.0.0.1/8 lo0/v4
 
-# Trusted Extensions shares the loopback interface with all zones
-if (smf_is_system_labeled); then
-	if smf_is_globalzone; then
-		 /sbin/ifconfig lo0 all-zones
-		 /sbin/ifconfig lo0 inet6 all-zones
+		# IPv6 loopback
+		/sbin/ipadm create-addr -t -T static -a ::1/128 lo0/v6
+	fi
+
+	# Trusted Extensions shares the loopback interface with all zones
+	if (smf_is_system_labeled); then
+		if smf_is_globalzone; then
+			/sbin/ipadm set-addrprop -t -p zone=all-zones lo0/v4
+			/sbin/ipadm set-addrprop -t -p zone=all-zones lo0/v6
+		fi
 	fi
 fi
+

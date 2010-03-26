@@ -52,7 +52,7 @@ struct tcp_stack {
 	 */
 #define	TCP_NUM_EPRIV_PORTS	64
 	int		tcps_g_num_epriv_ports;
-	uint16_t	tcps_g_epriv_ports[TCP_NUM_EPRIV_PORTS];
+	in_port_t	tcps_g_epriv_ports[TCP_NUM_EPRIV_PORTS];
 	kmutex_t	tcps_epriv_port_lock;
 
 	/*
@@ -61,10 +61,8 @@ struct tcp_stack {
 	 */
 	in_port_t	tcps_min_anonpriv_port;
 
-	/* Only modified during _init and _fini thus no locking is needed. */
-	caddr_t		tcps_g_nd;
-	struct tcpparam_s *tcps_params;	/* ndd parameters */
-	struct tcpparam_s *tcps_wroff_xtra_param;
+	/* holds the tcp tunables */
+	struct mod_prop_info_s *tcps_propinfo_tbl;
 
 	/* Hint not protected by any lock */
 	uint_t		tcps_next_port_to_try;

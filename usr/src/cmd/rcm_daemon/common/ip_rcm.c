@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@
 #include <libdllink.h>
 #include <libgen.h>
 #include <ipmp_admin.h>
+#include <libipadm.h>
 
 #include "rcm_module.h"
 
@@ -157,6 +158,7 @@ static mutex_t		cache_lock;
 static int		events_registered = 0;
 
 static dladm_handle_t	dld_handle = NULL;
+static ipadm_handle_t	ip_handle = NULL;
 
 /*
  * RCM module interface prototypes
@@ -186,7 +188,7 @@ static ip_cache_t *cache_lookup(rcm_handle_t *, char *, char);
 static void 	free_node(ip_cache_t *);
 static void 	cache_insert(ip_cache_t *);
 static char 	*ip_usage(ip_cache_t *);
-static int 	update_pif(rcm_handle_t *, int, int, struct lifreq *);
+static int 	update_pif(rcm_handle_t *, int, int, struct ifaddrs *);
 static int 	ip_ipmp_offline(ip_cache_t *);
 static int	ip_ipmp_undo_offline(ip_cache_t *);
 static int	if_cfginfo(ip_cache_t *, uint_t);
@@ -209,7 +211,9 @@ static void	ip_consumer_notify(rcm_handle_t *, datalink_id_t, char **,
 			uint_t, rcm_info_t **);
 static boolean_t ip_addrstr(ip_lif_t *, char *, size_t);
 
-static int if_configure(datalink_id_t);
+static int if_configure_hostname(datalink_id_t);
+static int if_configure_ipadm(datalink_id_t);
+static boolean_t if_hostname_exists(char *, sa_family_t);
 static boolean_t isgrouped(const char *);
 static int if_config_inst(const char *, FILE *, int, boolean_t);
 static uint_t ntok(const char *cp);
@@ -240,6 +244,7 @@ rcm_mod_init(void)
 {
 	char errmsg[DLADM_STRSIZE];
 	dladm_status_t status;
+	ipadm_status_t iph_status;
 
 	rcm_log_message(RCM_TRACE1, "IP: mod_init\n");
 
@@ -253,6 +258,15 @@ rcm_mod_init(void)
 		rcm_log_message(RCM_WARNING,
 		    "IP: mod_init failed: cannot get datalink handle: %s\n",
 		    dladm_status2str(status, errmsg));
+		return (NULL);
+	}
+
+	if ((iph_status = ipadm_open(&ip_handle, 0)) != IPADM_SUCCESS) {
+		rcm_log_message(RCM_ERROR,
+		    "IP: mod_init failed: cannot get IP handle: %s\n",
+		    ipadm_status2str(iph_status));
+		dladm_close(dld_handle);
+		dld_handle = NULL;
 		return (NULL);
 	}
 
@@ -283,6 +297,7 @@ rcm_mod_fini(void)
 	(void) mutex_destroy(&cache_lock);
 
 	dladm_close(dld_handle);
+	ipadm_close(ip_handle);
 	return (RCM_SUCCESS);
 }
 
@@ -758,7 +773,25 @@ ip_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 				return (RCM_FAILURE);
 			}
 			linkid = (datalink_id_t)id64;
-			if (if_configure(linkid) != 0) {
+			/*
+			 * Grovel through /etc/hostname* files and configure
+			 * interface in the same way that they would be handled
+			 * by network/physical.
+			 */
+			if (if_configure_hostname(linkid) != 0) {
+				rcm_log_message(RCM_ERROR,
+				    _("IP: Configuration failed (%u)\n"),
+				    linkid);
+				ip_log_err(NULL, errorp,
+				    "Failed configuring one or more IP "
+				    "addresses");
+			}
+
+			/*
+			 * Query libipadm for persistent configuration info
+			 * and resurrect that persistent configuration.
+			 */
+			if (if_configure_ipadm(linkid) != 0) {
 				rcm_log_message(RCM_ERROR,
 				    _("IP: Configuration failed (%u)\n"),
 				    linkid);
@@ -1018,9 +1051,8 @@ cache_remove(ip_cache_t *node)
  * update_pif() - Update physical interface properties
  *		Call with cache_lock held
  */
-/*ARGSUSED*/
-static int
-update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
+int
+update_pif(rcm_handle_t *hd, int af, int sock, struct ifaddrs *ifa)
 {
 	char *rsrc;
 	ifspec_t ifspec;
@@ -1034,11 +1066,11 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 	uint64_t ifflags;
 	int lif_listed = 0;
 
-	rcm_log_message(RCM_TRACE1, "IP: update_pif(%s)\n", lifr->lifr_name);
+	rcm_log_message(RCM_TRACE1, "IP: update_pif(%s)\n", ifa->ifa_name);
 
-	if (!ifparse_ifspec(lifr->lifr_name, &ifspec)) {
+	if (!ifparse_ifspec(ifa->ifa_name, &ifspec)) {
 		rcm_log_message(RCM_ERROR, _("IP: bad network interface: %s\n"),
-		    lifr->lifr_name);
+		    ifa->ifa_name);
 		return (-1);
 	}
 
@@ -1048,16 +1080,7 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 		ifnumber = ifspec.ifsp_lun;
 
 	/* Get the interface flags */
-	(void) strlcpy(lifreq.lifr_name, lifr->lifr_name, LIFNAMSIZ);
-	if (ioctl(sock, SIOCGLIFFLAGS, (char *)&lifreq) < 0) {
-		if (errno != ENXIO) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: SIOCGLIFFLAGS(%s): %s\n"),
-			    lifreq.lifr_name, strerror(errno));
-		}
-		return (-1);
-	}
-	(void) memcpy(&ifflags, &lifreq.lifr_flags, sizeof (ifflags));
+	ifflags = ifa->ifa_flags;
 
 	/*
 	 * Ignore interfaces that are always incapable of DR:
@@ -1077,6 +1100,9 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 	}
 
 	/* Get the interface group name for this interface */
+	bzero(&lifreq, sizeof (lifreq));
+	(void) strncpy(lifreq.lifr_name, ifa->ifa_name, LIFNAMSIZ);
+
 	if (ioctl(sock, SIOCGLIFGROUPNAME, (char *)&lifreq) < 0) {
 		if (errno != ENXIO) {
 			rcm_log_message(RCM_ERROR,
@@ -1091,15 +1117,7 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 	    sizeof (pif.pi_grname));
 
 	/* Get the interface address for this interface */
-	if (ioctl(sock, SIOCGLIFADDR, (char *)&lifreq) < 0) {
-		if (errno != ENXIO) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: SIOCGLIFADDR(%s): %s\n"),
-			    lifreq.lifr_name, strerror(errno));
-			return (-1);
-		}
-	}
-	(void) memcpy(&ifaddr, &lifreq.lifr_addr, sizeof (ifaddr));
+	ifaddr = *(ifa->ifa_addr);
 
 	rsrc = get_link_resource(pif.pi_ifname);
 	if (rsrc == NULL) {
@@ -1220,14 +1238,12 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 static int
 update_ipifs(rcm_handle_t *hd, int af)
 {
-	int sock;
-	char *buf;
-	struct lifnum lifn;
-	struct lifconf lifc;
-	struct lifreq *lifrp;
-	int i;
 
-	rcm_log_message(RCM_TRACE2, "IP: update_ipifs\n");
+	struct ifaddrs *ifa;
+	ipadm_addr_info_t *ainfo;
+	ipadm_addr_info_t *ptr;
+	ipadm_status_t status;
+	int sock;
 
 	if ((sock = socket(af, SOCK_DGRAM, 0)) == -1) {
 		rcm_log_message(RCM_ERROR,
@@ -1236,46 +1252,20 @@ update_ipifs(rcm_handle_t *hd, int af)
 		return (-1);
 	}
 
-	lifn.lifn_family = af;
-	lifn.lifn_flags = LIFC_UNDER_IPMP;
-	if (ioctl(sock, SIOCGLIFNUM, (char *)&lifn) < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: SIOCLGIFNUM failed: %s\n"),
-		    strerror(errno));
+	status = ipadm_addr_info(ip_handle, NULL, &ainfo, IPADM_OPT_ZEROADDR,
+	    LIFC_UNDER_IPMP);
+	if (status != IPADM_SUCCESS) {
 		(void) close(sock);
 		return (-1);
 	}
-
-	if ((buf = calloc(lifn.lifn_count, sizeof (struct lifreq))) == NULL) {
-		rcm_log_message(RCM_ERROR, _("IP: calloc: %s\n"),
-		    strerror(errno));
-		(void) close(sock);
-		return (-1);
+	for (ptr = ainfo; ptr; ptr = IA_NEXT(ptr)) {
+		ifa = &ptr->ia_ifa;
+		if (ptr->ia_state != IFA_DISABLED &&
+		    af == ifa->ifa_addr->ss_family)
+			(void) update_pif(hd, af, sock, ifa);
 	}
-
-	lifc.lifc_family = af;
-	lifc.lifc_flags = LIFC_UNDER_IPMP;
-	lifc.lifc_len = sizeof (struct lifreq) * lifn.lifn_count;
-	lifc.lifc_buf = buf;
-
-	if (ioctl(sock, SIOCGLIFCONF, (char *)&lifc) < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: SIOCGLIFCONF failed: %s\n"),
-		    strerror(errno));
-		free(buf);
-		(void) close(sock);
-		return (-1);
-	}
-
-	/* now we need to search for active interfaces */
-	lifrp = lifc.lifc_req;
-	for (i = 0; i < lifn.lifn_count; i++) {
-		(void) update_pif(hd, af, sock, lifrp);
-		lifrp++;
-	}
-
-	free(buf);
 	(void) close(sock);
+	ipadm_free_addr_info(ainfo);
 	return (0);
 }
 
@@ -2270,20 +2260,15 @@ ip_consumer_notify(rcm_handle_t *hd, datalink_id_t linkid, char **errorp,
 }
 
 /*
- * if_configure() - Configure a physical interface after attach
+ * Gets the interface name for the given linkid. Returns -1 if there is
+ * any error. It fills in the interface name in `ifinst' if the interface
+ * is not already configured. Otherwise, it puts a null string in `ifinst'.
  */
 static int
-if_configure(datalink_id_t linkid)
+if_configure_get_linkid(datalink_id_t linkid, char *ifinst, size_t len)
 {
-	char ifinst[MAXLINKNAMELEN];
-	char cfgfile[MAXPATHLEN];
 	char cached_name[RCM_LINK_RESOURCE_MAX];
-	FILE *hostfp, *host6fp;
 	ip_cache_t *node;
-	boolean_t ipmp = B_FALSE;
-
-	assert(linkid != DATALINK_INVALID_LINKID);
-	rcm_log_message(RCM_TRACE1, _("IP: if_configure(%u)\n"), linkid);
 
 	/* Check for the interface in the cache */
 	(void) snprintf(cached_name, sizeof (cached_name), "%s/%u",
@@ -2296,16 +2281,42 @@ if_configure(datalink_id_t linkid)
 		rcm_log_message(RCM_TRACE1,
 		    _("IP: Skipping configured interface(%u)\n"), linkid);
 		(void) mutex_unlock(&cache_lock);
+		*ifinst = '\0';
 		return (0);
 	}
 	(void) mutex_unlock(&cache_lock);
 
 	if (dladm_datalink_id2info(dld_handle, linkid, NULL, NULL, NULL, ifinst,
-	    sizeof (ifinst)) != DLADM_STATUS_OK) {
+	    len) != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: get %u link name failed\n"), linkid);
 		return (-1);
 	}
+	return (0);
+}
+
+/*
+ * if_configure_hostname() - Configure a physical interface after attach
+ * based on the information in /etc/hostname.*
+ */
+static int
+if_configure_hostname(datalink_id_t linkid)
+{
+	FILE *hostfp, *host6fp;
+	boolean_t ipmp = B_FALSE;
+	char ifinst[MAXLINKNAMELEN];
+	char cfgfile[MAXPATHLEN];
+
+	assert(linkid != DATALINK_INVALID_LINKID);
+	rcm_log_message(RCM_TRACE1, _("IP: if_configure_hostname(%u)\n"),
+	    linkid);
+
+	if (if_configure_get_linkid(linkid, ifinst, sizeof (ifinst)) != 0)
+		return (-1);
+
+	/* Check if the interface is already configured. */
+	if (ifinst[0] == '\0')
+		return (0);
 
 	/*
 	 * Scan the IPv4 and IPv6 hostname files to see if (a) they exist
@@ -2344,11 +2355,82 @@ if_configure(datalink_id_t linkid)
 
 	(void) fclose(hostfp);
 	(void) fclose(host6fp);
-	rcm_log_message(RCM_TRACE1, "IP: if_configure(%s) success\n", ifinst);
+	rcm_log_message(RCM_TRACE1, "IP: if_configure_hostname(%s) success\n",
+	    ifinst);
 	return (0);
 fail:
 	(void) fclose(hostfp);
 	(void) fclose(host6fp);
+	return (-1);
+}
+
+/*
+ * if_configure_ipadm() - Configure a physical interface after attach
+ * Queries libipadm for persistent configuration information and then
+ * resurrects that persistent configuration.
+ */
+static int
+if_configure_ipadm(datalink_id_t linkid)
+{
+	char ifinst[MAXLINKNAMELEN];
+	boolean_t found;
+	ipadm_if_info_t *ifinfo, *ptr;
+	ipadm_status_t status;
+
+	assert(linkid != DATALINK_INVALID_LINKID);
+	rcm_log_message(RCM_TRACE1, _("IP: if_configure_ipadm(%u)\n"),
+	    linkid);
+
+	if (if_configure_get_linkid(linkid, ifinst, sizeof (ifinst)) != 0)
+		return (-1);
+
+	/* Check if the interface is already configured. */
+	if (ifinst[0] == '\0')
+		return (0);
+
+	status = ipadm_if_info(ip_handle, ifinst, &ifinfo, 0, LIFC_UNDER_IPMP);
+	if (status == IPADM_ENXIO)
+		goto done;
+	if (status != IPADM_SUCCESS) {
+		rcm_log_message(RCM_ERROR,
+		    _("IP: IPv4 Post-attach failed (%s) Error %s\n"),
+		    ifinst, ipadm_status2str(status));
+		goto fail;
+	}
+	if (ifinfo != NULL) {
+		found = B_FALSE;
+		for (ptr = ifinfo; ptr; ptr = ptr->ifi_next) {
+			if (strncmp(ptr->ifi_name, ifinst,
+			    sizeof (ifinst)) == 0) {
+				found = B_TRUE;
+				break;
+			}
+		}
+		free(ifinfo);
+		if (!found) {
+			return (0);
+		}
+		if (if_hostname_exists(ifinst, AF_INET) ||
+		    if_hostname_exists(ifinst, AF_INET6)) {
+			rcm_log_message(RCM_WARNING,
+			    _("IP: IPv4 Post-attach (%s) found both "
+			    "/etc/hostname and ipadm persistent configuration. "
+			    "Ignoring ipadm config\n"), ifinst);
+			return (0);
+		}
+		status = ipadm_enable_if(ip_handle, ifinst, IPADM_OPT_ACTIVE);
+		if (status != IPADM_SUCCESS) {
+			rcm_log_message(RCM_ERROR,
+			    _("IP: Post-attach failed (%s) Error %s\n"),
+			    ifinst, ipadm_status2str(status));
+			goto fail;
+		}
+	}
+done:
+	rcm_log_message(RCM_TRACE1, "IP: if_configure_ipadm(%s) success\n",
+	    ifinst);
+	return (0);
+fail:
 	return (-1);
 }
 
@@ -2661,4 +2743,24 @@ ifconfig(const char *ifinst, const char *fstr, const char *buf, boolean_t stdif)
 		return (B_FALSE);
 	}
 	return (B_TRUE);
+}
+
+/*
+ * Return TRUE if a writeable /etc/hostname[6].ifname file exists.
+ */
+static boolean_t
+if_hostname_exists(char *ifname, sa_family_t af)
+{
+	char cfgfile[MAXPATHLEN];
+
+	if (af == AF_INET) {
+		(void) snprintf(cfgfile, MAXPATHLEN, CFGFILE_FMT_IPV4, ifname);
+		if (access(cfgfile, W_OK|F_OK) == 0)
+			return (B_TRUE);
+	} else if (af == AF_INET6) {
+		(void) snprintf(cfgfile, MAXPATHLEN, CFGFILE_FMT_IPV6, ifname);
+		if (access(cfgfile, W_OK|F_OK) == 0)
+			return (B_TRUE);
+	}
+	return (B_FALSE);
 }

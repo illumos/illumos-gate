@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -317,6 +317,25 @@ extern "C" {
  * Private ioctl for Integrated Load Balancer.  The ioctl length varies.
  */
 #define	SIOCILB		_IOWR('i', 187, 0)
+
+/*
+ * IOCTL's to get/set module specific or interface specific properties.
+ * Argument is a struct mod_ioc_prop_s. These ioctls are Consolidation Private.
+ */
+#define	SIOCGETPROP	_IOWRN('p', 188, 0)
+#define	SIOCSETPROP	_IOW('p', 189, 0)
+
+/*
+ * IOCTL used to check for the given ipif, whether DAD is in progress or
+ * DAD has completed. This ioctl is Consolidation Private.
+ */
+#define	SIOCGLIFDADSTATE	_IOWR('i', 190, struct lifreq)
+
+/*
+ * IOCTL used to generate an IPv6 address using the given prefix and the
+ * default token for the interface.
+ */
+#define	SIOCSLIFPREFIX		_IOWR('i', 191, struct lifreq)
 
 #ifdef	__cplusplus
 }

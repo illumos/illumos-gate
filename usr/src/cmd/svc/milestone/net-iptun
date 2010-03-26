@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This service configures IP tunnel links and IP interfaces over IP
@@ -97,6 +97,26 @@ start)
 		if [ -f /etc/hostname6.$intf_name ]; then
 			plumb_tunnel $intf_name inet6 /etc/hostname6.$intf_name
 		fi
+		#
+		# Configure IP tunnel interfaces set up using ipadm
+		#
+		state=`/sbin/ipadm show-if -p -o state $intf_name`
+		if [ $? -ne 0 ] || [ "$state" != "disabled" ]; then
+			#
+			# skip if not managed my ipadm or if not a persistent
+			# interface
+			#
+			continue;
+		elif [ -f /etc/hostname.$intf_name ] ||\
+			[ -f /etc/hostname6.$intf_name ]; then
+			echo "found /etc/hostname.$intf_name or "\
+			    "/etc/hostname6.$intfi_name, ignoring ipadm "\
+			    "configuration" > /dev/msglog
+			continue;
+		else
+			# Enable the interface managed by ipadm
+			/sbin/ipadm enable-if -t $intf_name
+		fi
 	done
 
 	#
@@ -124,6 +144,7 @@ stop)
 	for tun in $tunnel_links; do
 		/sbin/ifconfig $tun unplumb > /dev/null 2>&1
 		/sbin/ifconfig $tun inet6 unplumb > /dev/null 2>&1
+		/sbin/ipadm disable-if -t $tun > /dev/null 2>&1
 	done
 
 	# Take down the IP tunnel links

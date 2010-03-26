@@ -34,6 +34,7 @@
 #include <sys/zone.h>
 #include <netinet/ip6.h>
 #include <inet/optcom.h>
+#include <inet/tunables.h>
 #include <netinet/sctp.h>
 #include <inet/sctp_itf.h>
 #include "sctp_stack.h"
@@ -74,80 +75,66 @@ typedef struct sctpt_s {
 	IN6_IS_ADDR_UNSPECIFIED(&(addr)))
 
 /*
- * SCTP parameters
+ * SCTP properties/tunables
  */
-/* Named Dispatch Parameter Management Structure */
-typedef struct sctpparam_s {
-	uint32_t	sctp_param_min;
-	uint32_t	sctp_param_max;
-	uint32_t	sctp_param_val;
-	char		*sctp_param_name;
-} sctpparam_t;
-
-#define	sctps_max_init_retr		sctps_params[0].sctp_param_val
-#define	sctps_max_init_retr_high	sctps_params[0].sctp_param_max
-#define	sctps_max_init_retr_low		sctps_params[0].sctp_param_min
-#define	sctps_pa_max_retr		sctps_params[1].sctp_param_val
-#define	sctps_pa_max_retr_high		sctps_params[1].sctp_param_max
-#define	sctps_pa_max_retr_low		sctps_params[1].sctp_param_min
-#define	sctps_pp_max_retr		sctps_params[2].sctp_param_val
-#define	sctps_pp_max_retr_high		sctps_params[2].sctp_param_max
-#define	sctps_pp_max_retr_low		sctps_params[2].sctp_param_min
-#define	sctps_cwnd_max_			sctps_params[3].sctp_param_val
-#define	__sctps_not_used1		sctps_params[4].sctp_param_val
-#define	sctps_smallest_nonpriv_port	sctps_params[5].sctp_param_val
-#define	sctps_ipv4_ttl			sctps_params[6].sctp_param_val
-#define	sctps_heartbeat_interval	sctps_params[7].sctp_param_val
-#define	sctps_heartbeat_interval_high	sctps_params[7].sctp_param_max
-#define	sctps_heartbeat_interval_low	sctps_params[7].sctp_param_min
-#define	sctps_initial_mtu		sctps_params[8].sctp_param_val
-#define	sctps_mtu_probe_interval	sctps_params[9].sctp_param_val
-#define	sctps_new_secret_interval	sctps_params[10].sctp_param_val
-#define	sctps_deferred_ack_interval	sctps_params[11].sctp_param_val
-#define	sctps_snd_lowat_fraction	sctps_params[12].sctp_param_val
-#define	sctps_ignore_path_mtu		sctps_params[13].sctp_param_val
-#define	sctps_initial_ssthresh		sctps_params[14].sctp_param_val
-#define	sctps_smallest_anon_port	sctps_params[15].sctp_param_val
-#define	sctps_largest_anon_port		sctps_params[16].sctp_param_val
-#define	sctps_xmit_hiwat		sctps_params[17].sctp_param_val
-#define	sctps_xmit_lowat		sctps_params[18].sctp_param_val
-#define	sctps_recv_hiwat		sctps_params[19].sctp_param_val
-#define	sctps_max_buf			sctps_params[20].sctp_param_val
-#define	sctps_rtt_updates		sctps_params[21].sctp_param_val
-#define	sctps_ipv6_hoplimit		sctps_params[22].sctp_param_val
-#define	sctps_rto_ming			sctps_params[23].sctp_param_val
-#define	sctps_rto_ming_high		sctps_params[23].sctp_param_max
-#define	sctps_rto_ming_low		sctps_params[23].sctp_param_min
-#define	sctps_rto_maxg			sctps_params[24].sctp_param_val
-#define	sctps_rto_maxg_high		sctps_params[24].sctp_param_max
-#define	sctps_rto_maxg_low		sctps_params[24].sctp_param_min
-#define	sctps_rto_initialg		sctps_params[25].sctp_param_val
-#define	sctps_rto_initialg_high		sctps_params[25].sctp_param_max
-#define	sctps_rto_initialg_low		sctps_params[25].sctp_param_min
-#define	sctps_cookie_life		sctps_params[26].sctp_param_val
-#define	sctps_cookie_life_high		sctps_params[26].sctp_param_max
-#define	sctps_cookie_life_low		sctps_params[26].sctp_param_min
-#define	sctps_max_in_streams		sctps_params[27].sctp_param_val
-#define	sctps_max_in_streams_high	sctps_params[27].sctp_param_max
-#define	sctps_max_in_streams_low	sctps_params[27].sctp_param_min
-#define	sctps_initial_out_streams	sctps_params[28].sctp_param_val
-#define	sctps_initial_out_streams_high	sctps_params[28].sctp_param_max
-#define	sctps_initial_out_streams_low	sctps_params[28].sctp_param_min
-#define	sctps_shutack_wait_bound	sctps_params[29].sctp_param_val
-#define	sctps_maxburst			sctps_params[30].sctp_param_val
-#define	sctps_addip_enabled		sctps_params[31].sctp_param_val
-#define	sctps_recv_hiwat_minmss		sctps_params[32].sctp_param_val
-#define	sctps_slow_start_initial	sctps_params[33].sctp_param_val
-#define	sctps_slow_start_after_idle	sctps_params[34].sctp_param_val
-#define	sctps_prsctp_enabled		sctps_params[35].sctp_param_val
-#define	sctps_fast_rxt_thresh		sctps_params[36].sctp_param_val
-#define	sctps_deferred_acks_max		sctps_params[37].sctp_param_val
-
-/*
- * sctp_wroff_xtra is the extra space in front of SCTP/IP header for link
- * layer header.  It has to be a multiple of 4.
- */
-#define	sctps_wroff_xtra	sctps_wroff_xtra_param->sctp_param_val
+#define	sctps_max_init_retr		sctps_propinfo_tbl[0].prop_cur_uval
+#define	sctps_max_init_retr_high	sctps_propinfo_tbl[0].prop_max_uval
+#define	sctps_max_init_retr_low		sctps_propinfo_tbl[0].prop_min_uval
+#define	sctps_pa_max_retr		sctps_propinfo_tbl[1].prop_cur_uval
+#define	sctps_pa_max_retr_high		sctps_propinfo_tbl[1].prop_max_uval
+#define	sctps_pa_max_retr_low		sctps_propinfo_tbl[1].prop_min_uval
+#define	sctps_pp_max_retr		sctps_propinfo_tbl[2].prop_cur_uval
+#define	sctps_pp_max_retr_high		sctps_propinfo_tbl[2].prop_max_uval
+#define	sctps_pp_max_retr_low		sctps_propinfo_tbl[2].prop_min_uval
+#define	sctps_cwnd_max_			sctps_propinfo_tbl[3].prop_cur_uval
+#define	sctps_smallest_nonpriv_port	sctps_propinfo_tbl[4].prop_cur_uval
+#define	sctps_ipv4_ttl			sctps_propinfo_tbl[5].prop_cur_uval
+#define	sctps_heartbeat_interval	sctps_propinfo_tbl[6].prop_cur_uval
+#define	sctps_heartbeat_interval_high	sctps_propinfo_tbl[6].prop_max_uval
+#define	sctps_heartbeat_interval_low	sctps_propinfo_tbl[6].prop_min_uval
+#define	sctps_initial_mtu		sctps_propinfo_tbl[7].prop_cur_uval
+#define	sctps_mtu_probe_interval	sctps_propinfo_tbl[8].prop_cur_uval
+#define	sctps_new_secret_interval	sctps_propinfo_tbl[9].prop_cur_uval
+#define	sctps_deferred_ack_interval	sctps_propinfo_tbl[10].prop_cur_uval
+#define	sctps_snd_lowat_fraction	sctps_propinfo_tbl[11].prop_cur_uval
+#define	sctps_ignore_path_mtu		sctps_propinfo_tbl[12].prop_cur_bval
+#define	sctps_initial_ssthresh		sctps_propinfo_tbl[13].prop_cur_uval
+#define	sctps_smallest_anon_port	sctps_propinfo_tbl[14].prop_cur_uval
+#define	sctps_largest_anon_port		sctps_propinfo_tbl[15].prop_cur_uval
+#define	sctps_xmit_hiwat		sctps_propinfo_tbl[16].prop_cur_uval
+#define	sctps_xmit_lowat		sctps_propinfo_tbl[17].prop_cur_uval
+#define	sctps_recv_hiwat		sctps_propinfo_tbl[18].prop_cur_uval
+#define	sctps_max_buf			sctps_propinfo_tbl[19].prop_cur_uval
+#define	sctps_rtt_updates		sctps_propinfo_tbl[20].prop_cur_uval
+#define	sctps_ipv6_hoplimit		sctps_propinfo_tbl[21].prop_cur_uval
+#define	sctps_rto_ming			sctps_propinfo_tbl[22].prop_cur_uval
+#define	sctps_rto_ming_high		sctps_propinfo_tbl[22].prop_max_uval
+#define	sctps_rto_ming_low		sctps_propinfo_tbl[22].prop_min_uval
+#define	sctps_rto_maxg			sctps_propinfo_tbl[23].prop_cur_uval
+#define	sctps_rto_maxg_high		sctps_propinfo_tbl[23].prop_max_uval
+#define	sctps_rto_maxg_low		sctps_propinfo_tbl[23].prop_min_uval
+#define	sctps_rto_initialg		sctps_propinfo_tbl[24].prop_cur_uval
+#define	sctps_rto_initialg_high		sctps_propinfo_tbl[24].prop_max_uval
+#define	sctps_rto_initialg_low		sctps_propinfo_tbl[24].prop_min_uval
+#define	sctps_cookie_life		sctps_propinfo_tbl[25].prop_cur_uval
+#define	sctps_cookie_life_high		sctps_propinfo_tbl[25].prop_max_uval
+#define	sctps_cookie_life_low		sctps_propinfo_tbl[25].prop_min_uval
+#define	sctps_max_in_streams		sctps_propinfo_tbl[26].prop_cur_uval
+#define	sctps_max_in_streams_high	sctps_propinfo_tbl[26].prop_max_uval
+#define	sctps_max_in_streams_low	sctps_propinfo_tbl[26].prop_min_uval
+#define	sctps_initial_out_streams	sctps_propinfo_tbl[27].prop_cur_uval
+#define	sctps_initial_out_streams_high	sctps_propinfo_tbl[27].prop_max_uval
+#define	sctps_initial_out_streams_low	sctps_propinfo_tbl[27].prop_min_uval
+#define	sctps_shutack_wait_bound	sctps_propinfo_tbl[28].prop_cur_uval
+#define	sctps_maxburst			sctps_propinfo_tbl[29].prop_cur_uval
+#define	sctps_addip_enabled		sctps_propinfo_tbl[30].prop_cur_bval
+#define	sctps_recv_hiwat_minmss		sctps_propinfo_tbl[31].prop_cur_uval
+#define	sctps_slow_start_initial	sctps_propinfo_tbl[32].prop_cur_uval
+#define	sctps_slow_start_after_idle	sctps_propinfo_tbl[33].prop_cur_uval
+#define	sctps_prsctp_enabled		sctps_propinfo_tbl[34].prop_cur_bval
+#define	sctps_fast_rxt_thresh		sctps_propinfo_tbl[35].prop_cur_uval
+#define	sctps_deferred_acks_max		sctps_propinfo_tbl[36].prop_cur_uval
+#define	sctps_wroff_xtra		sctps_propinfo_tbl[37].prop_cur_uval
 
 /*
  * Retransmission timer start and stop macro for a given faddr.
@@ -1005,9 +992,6 @@ extern mblk_t	*sctp_make_sack(sctp_t *, sctp_faddr_t *, mblk_t *);
 extern void	sctp_maxpsz_set(sctp_t *);
 extern void	sctp_move_faddr_timers(queue_t *, sctp_t *);
 
-extern void	sctp_nd_free(sctp_stack_t *);
-extern int	sctp_nd_getset(queue_t *, MBLKP);
-extern boolean_t sctp_nd_init(sctp_stack_t *);
 extern sctp_parm_hdr_t *sctp_next_parm(sctp_parm_hdr_t *, ssize_t *);
 
 extern void	sctp_ootb_shutdown_ack(mblk_t *, uint_t, ip_recv_attr_t *,
@@ -1016,7 +1000,6 @@ extern size_t	sctp_options_param(const sctp_t *, void *, int);
 extern size_t	sctp_options_param_len(const sctp_t *, int);
 extern void	sctp_output(sctp_t *, uint_t);
 
-extern boolean_t sctp_param_register(IDP *, sctpparam_t *, int, sctp_stack_t *);
 extern void	sctp_partial_delivery_event(sctp_t *);
 extern int	sctp_process_cookie(sctp_t *, sctp_chunk_hdr_t *, mblk_t *,
 		    sctp_init_chunk_t **, sctp_hdr_t *, int *, in6_addr_t *,
@@ -1080,8 +1063,6 @@ extern void	sctp_update_rtt(sctp_t *, sctp_faddr_t *, clock_t);
 extern void	sctp_user_abort(sctp_t *, mblk_t *);
 
 extern void	sctp_validate_peer(sctp_t *);
-
-extern void	sctp_wput_ioctl(queue_t *, mblk_t *);
 
 extern int	sctp_xmit_list_clean(sctp_t *, ssize_t);
 

@@ -67,7 +67,8 @@ COMMON_DESCRIPTIONS = \
 	../milestone/single-user.xml \
 	../milestone/usr-fs.xml \
 	../../dlmgmtd/dlmgmt.xml \
-	../../rpcbind/bind.xml \
+	../../cmd-inet/lib/ipmgmtd/network-ipmgmt.xml \
+	../../rpcbind/bind.xml
 
 #
 # Additional manifests for standalone Solaris

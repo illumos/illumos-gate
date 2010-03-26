@@ -1,0 +1,62 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# This daemon stores address object to logical interface number mappings
+# (among other things) and reads/writes from/to ipmgmtd data store.
+#
+
+. /lib/svc/share/smf_include.sh
+
+if [ -z "$SMF_FMRI" ]; then
+        echo "this script can only be invoked by smf(5)"        
+        exit $SMF_EXIT_ERR_NOSMF
+fi
+
+#
+# network/ip-interface-management:default service is always enabled by default.
+# When the non-global shared-IP stack zone boots, it tries to bring up this
+# service as well. If we don't start a background process and simply exit the
+# service, the service will go into maintenance mode and so will all it's
+# dependents.
+#
+if smf_is_nonglobalzone; then
+	if [ `/sbin/zonename -t` = shared ]; then
+		(while true ; do sleep 3600 ; done) & 
+		exit $SMF_EXIT_OK
+	fi
+fi
+
+# Apply any persistent protocol (IP/TCP/SCTP/UDP/ICMP) properties
+/sbin/ipadm init-prop
+
+#
+# We must be now in a global zone or non-global zone with exclusive-IP stack.
+# Start the ipmgmtd daemon.
+#
+if /lib/inet/ipmgmtd ; then
+	exit $SMF_EXIT_OK
+else
+        exit $SMF_EXIT_ERR_FATAL
+fi

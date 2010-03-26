@@ -23,12 +23,12 @@
 # Use is subject to license terms.
 #
 
-SUBDIRS=	nwamd netcfgd
-MSGSUBDIRS=	nwamd
+SUBDIRS=	ipmgmtd nwamd netcfgd
+MSGSUBDIRS=	ipmgmtd nwamd
 
-include 	../../Makefile.cmd
+include         ../../Makefile.cmd
 
-POFILES=	$(MSGSUBDIRS:%=%/%.po)
+POFILES=        $(MSGSUBDIRS:%=%/%.po)
 POFILE=		lib.po
 
 all:=		TARGET= all
@@ -46,4 +46,4 @@ $(SUBDIRS): FRC
 
 FRC:
 
-include		../Makefile.msg
+include         ../Makefile.msg

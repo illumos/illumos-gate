@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # s10 boot script.
@@ -142,6 +142,13 @@ safe_dir /sbin
 # Replace various network-related programs with native wrappers.
 #
 replace_with_native /sbin/ifconfig 0555 root:bin
+
+#
+# PSARC 2009/306 removed the ND_SET/ND_GET ioctl's for modifying
+# IP/TCP/UDP/SCTP/ICMP tunables. If S10 ndd(1M) is used within an
+# S10 container, the kernel will return EINVAL. So we need this.
+#
+replace_with_native /usr/sbin/ndd 0555 root:bin
 
 #
 # Replace automount and automountd with native wrappers.

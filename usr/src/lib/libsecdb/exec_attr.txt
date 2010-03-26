@@ -175,6 +175,8 @@ Network Management:solaris:cmd:::/sbin/dlstat:euid=dladm;egid=sys;
 Network Management:solaris:cmd:::/sbin/flowadm:euid=dladm;egid=sys;\
 	privs=sys_dl_config,net_rawaccess,proc_audit
 Network Management:solaris:cmd:::/sbin/flowstat:euid=dladm;egid=sys;
+Network Management:solaris:cmd:::/sbin/ipadm:euid=netadm;egid=netadm;\
+	privs=sys_ip_config,net_rawaccess
 Network Management:suser:cmd:::/usr/bin/netstat:uid=0
 Network Management:suser:cmd:::/usr/bin/rup:euid=0
 Network Management:suser:cmd:::/usr/bin/ruptime:euid=0

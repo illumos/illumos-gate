@@ -54,7 +54,7 @@ NSLPROG=	6to4relay arp gettable hostconfig in.comsat in.rarpd \
 CMDPROG=	in.telnetd
 K5PROGS=	in.telnetd in.rlogind in.rshd
 TSNETPROG=	route
-DLADMPROG=	6to4relay ndd
+DLADMPROG=	6to4relay
 DEFAULTFILES=	telnetd.dfl
 
 PROGSRCS=	$(PROG:%=%.c)
@@ -66,12 +66,12 @@ K5TELNETOBJS=	in.telnetd.o
 SRCS=		$(PROGSRCS) $(OTHERSRC)
 
 SUBDIRS=	bootconfchk htable ifconfig ilbadm in.ftpd in.rdisc in.routed \
-		in.talkd inetadm inetconv ipmpstat ipqosconf ipsecutils \
+		in.talkd inetadm inetconv ipadm ipmpstat ipqosconf ipsecutils \
 		kssl/kssladm kssl/ksslcfg nwamadm nwamcfg ping routeadm \
 		snoop sppptun traceroute wificonfig
 
 MSGSUBDIRS=	bootconfchk htable ifconfig ilbadm in.ftpd in.routed in.talkd \
-		inetadm inetconv ipmpstat ipqosconf ipsecutils kssl/ksslcfg \
+		inetadm inetconv ipadm ipmpstat ipqosconf ipsecutils kssl/ksslcfg \
 		nwamadm nwamcfg routeadm sppptun snoop wificonfig
 
 # As programs get lint-clean, add them here and to the 'lint' target.
@@ -151,6 +151,7 @@ in.rarpd		:=	LDLIBS += -linetutil -ldlpi
 if_mpadm		:=	LDLIBS += -linetutil -lipmp
 if_mpadm.po		:=	XGETFLAGS += -a
 route			:=	CPPFLAGS += -DNDEBUG
+ndd			:=	LDLIBS += -ldladm -lipadm
 gettable in.comsat	:=	LDFLAGS += $(MAPFILE.NGB:%=-M%)
 
 .KEEP_STATE:

@@ -112,6 +112,7 @@ SUBDIRS += \
 	libcryptoutil	\
 	libinetcfg	\
 	libinetutil	\
+	libipadm	\
 	libipmp		\
 	libiscsit	\
 	libkmf		\
@@ -334,6 +335,7 @@ MSGSUBDIRS=		\
 	libilb		\
 	libinetutil	\
 	libinstzones	\
+	libipadm	\
 	libnsl		\
 	libnwam		\
 	libpam		\
@@ -386,6 +388,7 @@ HDRSUBDIRS=		\
 	libc		\
 	libcmd		\
 	libcmdutils	\
+	libcommputil	\
 	libcontract	\
 	libcpc		\
 	libctf		\
@@ -411,8 +414,7 @@ HDRSUBDIRS=		\
 	libfru		\
 	libfstyp	\
 	libgen		\
-	libwanboot	\
-	libwanbootutil	\
+	libipadm	\
 	libipsecutil	\
 	libinetcfg	\
 	libinetsvc	\
@@ -445,7 +447,6 @@ HDRSUBDIRS=		\
 	librdc		\
 	libscf		\
 	libsip		\
-	libcommputil	\
 	libsmbios	\
 	librestart	\
 	librpcsvc	\
@@ -456,6 +457,7 @@ HDRSUBDIRS=		\
 	libshell	\
 	libslp		\
 	libsmedia	\
+	libsocket	\
 	libsqlite	\
 	libfcoe		\
 	libstmf		\
@@ -473,6 +475,8 @@ HDRSUBDIRS=		\
 	libumem		\
 	libunistat	\
 	libuutil	\
+	libwanboot	\
+	libwanbootutil	\
 	libwrap		\
 	libxcurses2	\
 	libzfs		\
@@ -592,7 +596,9 @@ libefi:		libuuid
 libfstyp:	libnvpair
 libelfsign:	libcryptoutil libkmf
 libidmap:	libadutils libldap5 libavl libsldap
-libinetcfg:	libnsl libsocket libdlpi
+libinetcfg:	libnsl libsocket libdlpi libinetutil
+libipadm:	libnsl libinetutil libsocket libdlpi libnvpair libdhcpagent \
+		libdladm libsecdb
 libiscsit:	libc libnvpair libstmf libuuid libnsl
 libkmf:		libcryptoutil pkcs11
 libnsl:		libmd5 libscf

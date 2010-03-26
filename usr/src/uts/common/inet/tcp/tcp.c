@@ -77,7 +77,6 @@
 #include <inet/ip_ndp.h>
 #include <inet/proto_set.h>
 #include <inet/mib2.h>
-#include <inet/nd.h>
 #include <inet/optcom.h>
 #include <inet/snmpcom.h>
 #include <inet/kstatcom.h>
@@ -285,23 +284,7 @@ static int	tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp,
 static int	tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp,
 		    in_port_t dstport, uint32_t flowinfo,
 		    uint_t srcid, uint32_t scope_id);
-static int	tcp_extra_priv_ports_get(queue_t *q, mblk_t *mp, caddr_t cp,
-		    cred_t *cr);
-static int	tcp_extra_priv_ports_add(queue_t *q, mblk_t *mp,
-		    char *value, caddr_t cp, cred_t *cr);
-static int	tcp_extra_priv_ports_del(queue_t *q, mblk_t *mp,
-		    char *value, caddr_t cp, cred_t *cr);
 static void	tcp_iss_init(tcp_t *tcp);
-static int	tcp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
-static boolean_t tcp_param_register(IDP *ndp, tcpparam_t *tcppa, int cnt,
-    tcp_stack_t *);
-static int	tcp_param_set(queue_t *q, mblk_t *mp, char *value,
-		    caddr_t cp, cred_t *cr);
-static int	tcp_param_set_aligned(queue_t *q, mblk_t *mp, char *value,
-		    caddr_t cp, cred_t *cr);
-static void	tcp_iss_key_init(uint8_t *phrase, int len, tcp_stack_t *);
-static int	tcp_1948_phrase_set(queue_t *q, mblk_t *mp, char *value,
-		    caddr_t cp, cred_t *cr);
 static void	tcp_reinit(tcp_t *tcp);
 static void	tcp_reinit_values(tcp_t *tcp);
 
@@ -415,97 +398,13 @@ struct T_info_ack tcp_g_t_info_ack_v6 = {
 	(XPG4_1|EXPINLINE)	/* PROVIDER_flag */
 };
 
-#define	PARAM_MAX (~(uint32_t)0)
-
-/* Max size IP datagram is 64k - 1 */
-#define	TCP_MSS_MAX_IPV4 (IP_MAXPACKET - (sizeof (ipha_t) + sizeof (tcpha_t)))
-#define	TCP_MSS_MAX_IPV6 (IP_MAXPACKET - (sizeof (ip6_t) + sizeof (tcpha_t)))
-/* Max of the above */
-#define	TCP_MSS_MAX	TCP_MSS_MAX_IPV4
-
-/* Largest TCP port number */
-#define	TCP_MAX_PORT	(64 * 1024 - 1)
-
 /*
- * tcp_wroff_xtra is the extra space in front of TCP/IP header for link
- * layer header.  It has to be a multiple of 4.
+ * TCP tunables related declarations. Definitions are in tcp_tunables.c
  */
-static tcpparam_t lcl_tcp_wroff_xtra_param = { 0, 256, 32, "tcp_wroff_xtra" };
+extern mod_prop_info_t tcp_propinfo_tbl[];
+extern int tcp_propinfo_count;
 
 #define	MB	(1024 * 1024)
-
-/*
- * All of these are alterable, within the min/max values given, at run time.
- * Note that the default value of "tcp_time_wait_interval" is four minutes,
- * per the TCP spec.
- */
-/* BEGIN CSTYLED */
-static tcpparam_t	lcl_tcp_param_arr[] = {
- /*min		max		value		name */
- { 1*SECONDS,	10*MINUTES,	1*MINUTES,	"tcp_time_wait_interval"},
- { 1,		PARAM_MAX,	128,		"tcp_conn_req_max_q" },
- { 0,		PARAM_MAX,	1024,		"tcp_conn_req_max_q0" },
- { 1,		1024,		1,		"tcp_conn_req_min" },
- { 0*MS,	20*SECONDS,	0*MS,		"tcp_conn_grace_period" },
- { 128,		(1<<30),	1*MB,		"tcp_cwnd_max" },
- { 0,		10,		0,		"tcp_debug" },
- { 1024,	(32*1024),	1024,		"tcp_smallest_nonpriv_port"},
- { 1*SECONDS,	PARAM_MAX,	3*MINUTES,	"tcp_ip_abort_cinterval"},
- { 1*SECONDS,	PARAM_MAX,	3*MINUTES,	"tcp_ip_abort_linterval"},
- { 500*MS,	PARAM_MAX,	5*MINUTES,	"tcp_ip_abort_interval"},
- { 1*SECONDS,	PARAM_MAX,	10*SECONDS,	"tcp_ip_notify_cinterval"},
- { 500*MS,	PARAM_MAX,	10*SECONDS,	"tcp_ip_notify_interval"},
- { 1,		255,		64,		"tcp_ipv4_ttl"},
- { 10*SECONDS,	10*DAYS,	2*HOURS,	"tcp_keepalive_interval"},
- { 0,		100,		10,		"tcp_maxpsz_multiplier" },
- { 1,		TCP_MSS_MAX_IPV4, 536,		"tcp_mss_def_ipv4"},
- { 1,		TCP_MSS_MAX_IPV4, TCP_MSS_MAX_IPV4, "tcp_mss_max_ipv4"},
- { 1,		TCP_MSS_MAX,	108,		"tcp_mss_min"},
- { 1,		(64*1024)-1,	(4*1024)-1,	"tcp_naglim_def"},
- { 1*MS,	20*SECONDS,	1*SECONDS,	"tcp_rexmit_interval_initial"},
- { 1*MS,	2*HOURS,	60*SECONDS,	"tcp_rexmit_interval_max"},
- { 1*MS,	2*HOURS,	400*MS,		"tcp_rexmit_interval_min"},
- { 1*MS,	1*MINUTES,	100*MS,		"tcp_deferred_ack_interval" },
- { 0,		16,		0,		"tcp_snd_lowat_fraction" },
- { 1,		10000,		3,		"tcp_dupack_fast_retransmit" },
- { 0,		1,		0,		"tcp_ignore_path_mtu" },
- { 1024,	TCP_MAX_PORT,	32*1024,	"tcp_smallest_anon_port"},
- { 1024,	TCP_MAX_PORT,	TCP_MAX_PORT,	"tcp_largest_anon_port"},
- { TCP_XMIT_LOWATER, (1<<30), TCP_XMIT_HIWATER,"tcp_xmit_hiwat"},
- { TCP_XMIT_LOWATER, (1<<30), TCP_XMIT_LOWATER,"tcp_xmit_lowat"},
- { TCP_RECV_LOWATER, (1<<30), TCP_RECV_HIWATER,"tcp_recv_hiwat"},
- { 1,		65536,		4,		"tcp_recv_hiwat_minmss"},
- { 1*SECONDS,	PARAM_MAX,	675*SECONDS,	"tcp_fin_wait_2_flush_interval"},
- { 8192,	(1<<30),	1*MB,		"tcp_max_buf"},
-/*
- * Question:  What default value should I set for tcp_strong_iss?
- */
- { 0,		2,		1,		"tcp_strong_iss"},
- { 0,		65536,		20,		"tcp_rtt_updates"},
- { 0,		1,		1,		"tcp_wscale_always"},
- { 0,		1,		0,		"tcp_tstamp_always"},
- { 0,		1,		1,		"tcp_tstamp_if_wscale"},
- { 0*MS,	2*HOURS,	0*MS,		"tcp_rexmit_interval_extra"},
- { 0,		16,		2,		"tcp_deferred_acks_max"},
- { 1,		16384,		4,		"tcp_slow_start_after_idle"},
- { 1,		4,		4,		"tcp_slow_start_initial"},
- { 0,		2,		2,		"tcp_sack_permitted"},
- { 0,		IPV6_MAX_HOPS,	IPV6_DEFAULT_HOPS,	"tcp_ipv6_hoplimit"},
- { 1,		TCP_MSS_MAX_IPV6, 1220,		"tcp_mss_def_ipv6"},
- { 1,		TCP_MSS_MAX_IPV6, TCP_MSS_MAX_IPV6, "tcp_mss_max_ipv6"},
- { 0,		1,		0,		"tcp_rev_src_routes"},
- { 10*MS,	500*MS,		50*MS,		"tcp_local_dack_interval"},
- { 0,		16,		8,		"tcp_local_dacks_max"},
- { 0,		2,		1,		"tcp_ecn_permitted"},
- { 0,		1,		1,		"tcp_rst_sent_rate_enabled"},
- { 0,		PARAM_MAX,	40,		"tcp_rst_sent_rate"},
- { 0,		100*MS,		50*MS,		"tcp_push_timer_interval"},
- { 0,		1,		0,		"tcp_use_smss_as_mss_opt"},
- { 0,		PARAM_MAX,	8*MINUTES,	"tcp_keepalive_abort_interval"},
- { 0,		1,		0,		"tcp_dev_flow_ctl"},
- { 0,		PARAM_MAX,	100*SECONDS,	"tcp_reass_timeout"}
-};
-/* END CSTYLED */
 
 #define	IS_VMLOANED_MBLK(mp) \
 	(((mp)->b_datap->db_struioflag & STRUIO_ZC) != 0)
@@ -1957,110 +1856,6 @@ tcp_disconnect(tcp_t *tcp, mblk_t *mp)
 }
 
 /*
- * Note: No locks are held when inspecting tcp_g_*epriv_ports
- * but instead the code relies on:
- * - the fact that the address of the array and its size never changes
- * - the atomic assignment of the elements of the array
- */
-/* ARGSUSED */
-static int
-tcp_extra_priv_ports_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	int i;
-	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
-
-	for (i = 0; i < tcps->tcps_g_num_epriv_ports; i++) {
-		if (tcps->tcps_g_epriv_ports[i] != 0)
-			(void) mi_mpprintf(mp, "%d ",
-			    tcps->tcps_g_epriv_ports[i]);
-	}
-	return (0);
-}
-
-/*
- * Hold a lock while changing tcp_g_epriv_ports to prevent multiple
- * threads from changing it at the same time.
- */
-/* ARGSUSED */
-static int
-tcp_extra_priv_ports_add(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
-    cred_t *cr)
-{
-	long	new_value;
-	int	i;
-	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
-
-	/*
-	 * Fail the request if the new value does not lie within the
-	 * port number limits.
-	 */
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
-	    new_value <= 0 || new_value >= 65536) {
-		return (EINVAL);
-	}
-
-	mutex_enter(&tcps->tcps_epriv_port_lock);
-	/* Check if the value is already in the list */
-	for (i = 0; i < tcps->tcps_g_num_epriv_ports; i++) {
-		if (new_value == tcps->tcps_g_epriv_ports[i]) {
-			mutex_exit(&tcps->tcps_epriv_port_lock);
-			return (EEXIST);
-		}
-	}
-	/* Find an empty slot */
-	for (i = 0; i < tcps->tcps_g_num_epriv_ports; i++) {
-		if (tcps->tcps_g_epriv_ports[i] == 0)
-			break;
-	}
-	if (i == tcps->tcps_g_num_epriv_ports) {
-		mutex_exit(&tcps->tcps_epriv_port_lock);
-		return (EOVERFLOW);
-	}
-	/* Set the new value */
-	tcps->tcps_g_epriv_ports[i] = (uint16_t)new_value;
-	mutex_exit(&tcps->tcps_epriv_port_lock);
-	return (0);
-}
-
-/*
- * Hold a lock while changing tcp_g_epriv_ports to prevent multiple
- * threads from changing it at the same time.
- */
-/* ARGSUSED */
-static int
-tcp_extra_priv_ports_del(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
-    cred_t *cr)
-{
-	long	new_value;
-	int	i;
-	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
-
-	/*
-	 * Fail the request if the new value does not lie within the
-	 * port number limits.
-	 */
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0 || new_value <= 0 ||
-	    new_value >= 65536) {
-		return (EINVAL);
-	}
-
-	mutex_enter(&tcps->tcps_epriv_port_lock);
-	/* Check that the value is already in the list */
-	for (i = 0; i < tcps->tcps_g_num_epriv_ports; i++) {
-		if (tcps->tcps_g_epriv_ports[i] == new_value)
-			break;
-	}
-	if (i == tcps->tcps_g_num_epriv_ports) {
-		mutex_exit(&tcps->tcps_epriv_port_lock);
-		return (ESRCH);
-	}
-	/* Clear the value */
-	tcps->tcps_g_epriv_ports[i] = 0;
-	mutex_exit(&tcps->tcps_epriv_port_lock);
-	return (0);
-}
-
-/*
  * Handle reinitialization of a tcp structure.
  * Maintain "binding state" resetting the state to BOUND, LISTEN, or IDLE.
  */
@@ -3065,139 +2860,6 @@ tcp_build_hdrs(tcp_t *tcp)
 		(void) proto_set_tx_wroff(connp->conn_rq, connp,
 		    connp->conn_wroff);
 	}
-	return (0);
-}
-
-/* Get callback routine passed to nd_load by tcp_param_register */
-/* ARGSUSED */
-static int
-tcp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	tcpparam_t	*tcppa = (tcpparam_t *)cp;
-
-	(void) mi_mpprintf(mp, "%u", tcppa->tcp_param_val);
-	return (0);
-}
-
-/*
- * Walk through the param array specified registering each element with the
- * named dispatch handler.
- */
-static boolean_t
-tcp_param_register(IDP *ndp, tcpparam_t *tcppa, int cnt, tcp_stack_t *tcps)
-{
-	for (; cnt-- > 0; tcppa++) {
-		if (tcppa->tcp_param_name && tcppa->tcp_param_name[0]) {
-			if (!nd_load(ndp, tcppa->tcp_param_name,
-			    tcp_param_get, tcp_param_set,
-			    (caddr_t)tcppa)) {
-				nd_free(ndp);
-				return (B_FALSE);
-			}
-		}
-	}
-	tcps->tcps_wroff_xtra_param = kmem_zalloc(sizeof (tcpparam_t),
-	    KM_SLEEP);
-	bcopy(&lcl_tcp_wroff_xtra_param, tcps->tcps_wroff_xtra_param,
-	    sizeof (tcpparam_t));
-	if (!nd_load(ndp, tcps->tcps_wroff_xtra_param->tcp_param_name,
-	    tcp_param_get, tcp_param_set_aligned,
-	    (caddr_t)tcps->tcps_wroff_xtra_param)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_extra_priv_ports",
-	    tcp_extra_priv_ports_get, NULL, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_extra_priv_ports_add",
-	    NULL, tcp_extra_priv_ports_add, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_extra_priv_ports_del",
-	    NULL, tcp_extra_priv_ports_del, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_1948_phrase", NULL,
-	    tcp_1948_phrase_set, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-
-
-	if (!nd_load(ndp, "tcp_listener_limit_conf",
-	    tcp_listener_conf_get, NULL, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_listener_limit_conf_add",
-	    NULL, tcp_listener_conf_add, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_listener_limit_conf_del",
-	    NULL, tcp_listener_conf_del, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-
-	/*
-	 * Dummy ndd variables - only to convey obsolescence information
-	 * through printing of their name (no get or set routines)
-	 * XXX Remove in future releases ?
-	 */
-	if (!nd_load(ndp,
-	    "tcp_close_wait_interval(obsoleted - "
-	    "use tcp_time_wait_interval)", NULL, NULL, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	return (B_TRUE);
-}
-
-/* ndd set routine for tcp_wroff_xtra. */
-/* ARGSUSED */
-static int
-tcp_param_set_aligned(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
-    cred_t *cr)
-{
-	long new_value;
-	tcpparam_t *tcppa = (tcpparam_t *)cp;
-
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
-	    new_value < tcppa->tcp_param_min ||
-	    new_value > tcppa->tcp_param_max) {
-		return (EINVAL);
-	}
-	/*
-	 * Need to make sure new_value is a multiple of 4.  If it is not,
-	 * round it up.  For future 64 bit requirement, we actually make it
-	 * a multiple of 8.
-	 */
-	if (new_value & 0x7) {
-		new_value = (new_value & ~0x7) + 0x8;
-	}
-	tcppa->tcp_param_val = new_value;
-	return (0);
-}
-
-/* Set callback routine passed to nd_load by tcp_param_register */
-/* ARGSUSED */
-static int
-tcp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
-{
-	long	new_value;
-	tcpparam_t	*tcppa = (tcpparam_t *)cp;
-
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
-	    new_value < tcppa->tcp_param_min ||
-	    new_value > tcppa->tcp_param_max) {
-		return (EINVAL);
-	}
-	tcppa->tcp_param_val = new_value;
 	return (0);
 }
 
@@ -4292,7 +3954,7 @@ tcp_random(void)
 
 #define	PASSWD_SIZE 16  /* MUST be multiple of 4 */
 
-static void
+void
 tcp_iss_key_init(uint8_t *phrase, int len, tcp_stack_t *tcps)
 {
 	struct {
@@ -4344,23 +4006,6 @@ tcp_iss_key_init(uint8_t *phrase, int len, tcp_stack_t *tcps)
 	MD5Update(&tcps->tcps_iss_key, (uchar_t *)&tcp_iss_cookie,
 	    sizeof (tcp_iss_cookie));
 	mutex_exit(&tcps->tcps_iss_key_lock);
-}
-
-/*
- * Set the RFC 1948 pass phrase
- */
-/* ARGSUSED */
-static int
-tcp_1948_phrase_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
-    cred_t *cr)
-{
-	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
-
-	/*
-	 * Basically, value contains a new pass phrase.  Pass it along!
-	 */
-	tcp_iss_key_init((uint8_t *)value, strlen(value), tcps);
-	return (0);
 }
 
 /* ARGSUSED */
@@ -4419,10 +4064,10 @@ static void *
 tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 {
 	tcp_stack_t	*tcps;
-	tcpparam_t	*pa;
 	int		i;
 	int		error = 0;
 	major_t		major;
+	size_t		arrsz;
 
 	tcps = (tcp_stack_t *)kmem_zalloc(sizeof (*tcps), KM_SLEEP);
 	tcps->tcps_netstack = ns;
@@ -4432,8 +4077,8 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	mutex_init(&tcps->tcps_epriv_port_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	tcps->tcps_g_num_epriv_ports = TCP_NUM_EPRIV_PORTS;
-	tcps->tcps_g_epriv_ports[0] = 2049;
-	tcps->tcps_g_epriv_ports[1] = 4045;
+	tcps->tcps_g_epriv_ports[0] = ULP_DEF_EPRIV_PORT1;
+	tcps->tcps_g_epriv_ports[1] = ULP_DEF_EPRIV_PORT2;
 	tcps->tcps_min_anonpriv_port = 512;
 
 	tcps->tcps_bind_fanout = kmem_zalloc(sizeof (tf_t) *
@@ -4454,12 +4099,10 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	/* TCP's IPsec code calls the packet dropper. */
 	ip_drop_register(&tcps->tcps_dropper, "TCP IPsec policy enforcement");
 
-	pa = (tcpparam_t *)kmem_alloc(sizeof (lcl_tcp_param_arr), KM_SLEEP);
-	tcps->tcps_params = pa;
-	bcopy(lcl_tcp_param_arr, tcps->tcps_params, sizeof (lcl_tcp_param_arr));
-
-	(void) tcp_param_register(&tcps->tcps_g_nd, tcps->tcps_params,
-	    A_CNT(lcl_tcp_param_arr), tcps);
+	arrsz = tcp_propinfo_count * sizeof (mod_prop_info_t);
+	tcps->tcps_propinfo_tbl = (mod_prop_info_t *)kmem_alloc(arrsz,
+	    KM_SLEEP);
+	bcopy(tcp_propinfo_tbl, tcps->tcps_propinfo_tbl, arrsz);
 
 	/*
 	 * Note: To really walk the device tree you need the devinfo
@@ -4577,11 +4220,9 @@ tcp_stack_fini(netstackid_t stackid, void *arg)
 		kmem_free(tcps->tcps_sc[i], sizeof (tcp_stats_cpu_t));
 	kmem_free(tcps->tcps_sc, max_ncpus * sizeof (tcp_stats_cpu_t *));
 
-	nd_free(&tcps->tcps_g_nd);
-	kmem_free(tcps->tcps_params, sizeof (lcl_tcp_param_arr));
-	tcps->tcps_params = NULL;
-	kmem_free(tcps->tcps_wroff_xtra_param, sizeof (tcpparam_t));
-	tcps->tcps_wroff_xtra_param = NULL;
+	kmem_free(tcps->tcps_propinfo_tbl,
+	    tcp_propinfo_count * sizeof (mod_prop_info_t));
+	tcps->tcps_propinfo_tbl = NULL;
 
 	for (i = 0; i < TCP_BIND_FANOUT_SIZE; i++) {
 		ASSERT(tcps->tcps_bind_fanout[i].tf_tcp == NULL);

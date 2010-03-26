@@ -90,7 +90,6 @@ tcp_wput(queue_t *q, mblk_t *mp)
 	uchar_t *rptr;
 	struct iocblk	*iocp;
 	size_t size;
-	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	ASSERT(connp->conn_ref >= 2);
 
@@ -181,17 +180,6 @@ tcp_wput(queue_t *q, mblk_t *mp)
 		case TI_GETMYNAME:
 			mi_copyin(q, mp, NULL,
 			    SIZEOF_STRUCT(strbuf, iocp->ioc_flag));
-			return;
-		case ND_SET:
-			/* nd_getset does the necessary checks */
-		case ND_GET:
-			if (nd_getset(q, tcps->tcps_g_nd, mp)) {
-				qreply(q, mp);
-				return;
-			}
-			CONN_INC_IOCTLREF(connp);
-			ip_wput_nondata(q, mp);
-			CONN_DEC_IOCTLREF(connp);
 			return;
 
 		default:

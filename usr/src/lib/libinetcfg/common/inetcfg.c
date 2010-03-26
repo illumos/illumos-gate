@@ -128,32 +128,6 @@ dlpi_error_to_icfg_error(int err)
 }
 
 /*
- * Convert a prefix length to a netmask. Note that the mask array
- * should zero'ed by the caller.
- *
- * Returns: ICFG_SUCCESS or ICFG_FAILURE.
- */
-static int
-prefixlen_to_mask(int prefixlen, int maxlen, uchar_t *mask)
-{
-	if ((prefixlen < 0) || (prefixlen > maxlen)) {
-		errno = EINVAL;
-		return (ICFG_FAILURE);
-	}
-
-	while (prefixlen > 0) {
-		if (prefixlen >= 8) {
-			*mask++ = 0xFF;
-			prefixlen -= 8;
-			continue;
-		}
-		*mask |= 1 << (8 - prefixlen);
-		prefixlen--;
-	}
-	return (ICFG_SUCCESS);
-}
-
-/*
  * Copies an an IPv4 or IPv6 address from a sockaddr_storage
  * structure into the appropriate sockaddr structure for the
  * address family (sockaddr_in for AF_INET or sockaddr_in6 for
@@ -573,34 +547,16 @@ icfg_set_prefixlen(icfg_handle_t handle, int prefixlen)
 {
 	struct lifreq lifr;
 
-	(void) memset(&lifr.lifr_addr, 0, sizeof (lifr.lifr_addr));
 	(void) strlcpy(lifr.lifr_name, icfg_if_name(handle),
 	    sizeof (lifr.lifr_name));
-	lifr.lifr_addr.ss_family = icfg_if_protocol(handle);
 
-	if (icfg_if_protocol(handle) == AF_INET6) {
-		struct sockaddr_in6 *sin6;
-		int ret;
-
-		sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
-		if ((ret = prefixlen_to_mask(prefixlen, IPV6_ABITS,
-		    (uchar_t *)&sin6->sin6_addr)) != ICFG_SUCCESS) {
-			return (ret);
-		}
-	} else {
-		struct sockaddr_in *sin;
-		int ret;
-
-		sin = (struct sockaddr_in *)&lifr.lifr_addr;
-		if ((ret = prefixlen_to_mask(prefixlen, IP_ABITS,
-		    (uchar_t *)&sin->sin_addr)) != ICFG_SUCCESS) {
-			return (ret);
-		}
-	}
-
-	if (ioctl(handle->ifh_sock, SIOCSLIFNETMASK, (caddr_t)&lifr) < 0) {
+	if (plen2mask(prefixlen, icfg_if_protocol(handle),
+	    &lifr.lifr_addr) != 0) {
 		return (ICFG_FAILURE);
 	}
+
+	if (ioctl(handle->ifh_sock, SIOCSLIFNETMASK, (caddr_t)&lifr) < 0)
+		return (ICFG_FAILURE);
 
 	return (ICFG_SUCCESS);
 }

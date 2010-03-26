@@ -93,6 +93,7 @@ all_zones_files="
 	etc/inet/*
 	etc/init.d/*
 	etc/inittab
+	etc/ipadm/ipadm.conf
 	etc/ipf/ipf.conf
 	etc/iu.ap
 	etc/krb5/kadm5.acl
@@ -2451,6 +2452,12 @@ EOFA
 	fi
 
 	#
+	# Import the ip-interface-management service.
+	#
+	smf_import_service network/network-ipmgmt.xml \
+	    svc:/network/ip-interface-management:default
+
+	#
 	# Import the ldap/client service. This is to get the service
 	# (with correct dependencies) in the repository before reboot.
 	#
@@ -3145,6 +3152,7 @@ bfucmd="
 	/usr/sbin/chroot
 	/usr/sbin/fstyp
 	/usr/sbin/halt
+	/usr/sbin/ifconfig
 	/usr/sbin/lockfs
 	/usr/sbin/lofiadm
 	/usr/sbin/logadm
@@ -3152,6 +3160,7 @@ bfucmd="
 	/usr/sbin/mkfs
 	/usr/sbin/mknod
 	/usr/sbin/mount
+	/usr/sbin/ndd
 	/usr/sbin/newfs
 	/usr/sbin/pkgrm
 	/usr/sbin/prtconf
@@ -7962,6 +7971,16 @@ mondo_loop() {
 	rm -f $root/kernel/drv/mscsi
 	rm -f $root/kernel/drv/mscsi.conf
 	rm -f $root/platform/i86pc/kernel/drv/amd64/mscsi
+
+	# Remove sctp, sctp6
+	rm -f $root/kernel/drv/sctp
+	rm -f $root/kernel/drv/sctp.conf
+	rm -f $root/kernel/drv/sctp6
+	rm -f $root/kernel/drv/sctp6.conf
+	rm -f $root/kernel/drv/amd64/sctp
+	rm -f $root/kernel/drv/amd64/sctp6
+	rm -f $root/kernel/drv/sparcv9/sctp
+	rm -f $root/kernel/drv/sparcv9/sctp6
 
 	# Remove obsolete pfil modules, binaries, and configuration files
 	rm -f $root/kernel/drv/pfil

@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -22,9 +22,6 @@ extern "C" {
  */
 #define	BAD_ADDR	-1	/* prefix is invalid */
 #define	NO_PREFIX	-2	/* no prefix was found */
-
-/* No suitable header file defines this, though it's in libsocket */
-extern int	getnetmaskbyaddr(struct in_addr, struct in_addr *);
 
 extern int	debug;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -18,11 +18,15 @@
 #include <libdllink.h>
 #include <inet/ip.h>
 #include <inet/ipsec_impl.h>
+#include <libipadm.h>
+#include <ifaddrs.h>
+#include <libsocket_priv.h>
 
 #define	LOOPBACK_IF	"lo0"
 #define	NONE_STR	"none"
 #define	ARP_MOD_NAME	"arp"
-#define	IPMPSTUB	(void *)-1
+#define	LIFC_DEFAULT	(LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES |\
+			LIFC_UNDER_IPMP)
 
 typedef struct if_flags {
 	uint64_t iff_value;
@@ -93,8 +97,11 @@ static char		name[LIFNAMSIZ];
 /* foreach interface saved name */
 static char		origname[LIFNAMSIZ];
 static int		setaddr;
+static boolean_t	setaddr_done = _B_FALSE;
 static boolean_t	ipsec_policy_set;
 static boolean_t	ipsec_auth_covered;
+static ipadm_handle_t	iph;
+static ipadm_addrobj_t	ipaddr;
 
 /*
  * Make sure the algorithm variables hold more than the sizeof an algorithm
@@ -149,7 +156,7 @@ static int	setifgroupname(char *arg, int64_t param);
 static int	configinfo(char *arg, int64_t param);
 static void	print_config_flags(int af, uint64_t flags);
 static void	print_flags(uint64_t flags);
-static void	print_ifether(char *ifname);
+static void	print_ifether(const char *ifname);
 static int	set_tun_encap_limit(char *arg, int64_t param);
 static int	clr_tun_encap_limit(char *arg, int64_t param);
 static int	set_tun_hop_limit(char *arg, int64_t param);
@@ -157,6 +164,7 @@ static int	setzone(char *arg, int64_t param);
 static int	setallzones(char *arg, int64_t param);
 static int	setifsrc(char *arg, int64_t param);
 static int	lifnum(const char *ifname);
+static void	plumball(int, char **, int64_t, int64_t, int64_t);
 
 /*
  * Address family specific function prototypes.
@@ -172,36 +180,37 @@ static void	in6_configinfo(int force, uint64_t flags);
  * Misc support functions
  */
 static boolean_t	ni_entry(const char *, void *);
-static void	foreachinterface(void (*func)(), int argc, char *argv[],
-		    int af, int64_t onflags, int64_t offflags,
-		    int64_t lifc_flags);
-static void	ifconfig(int argc, char *argv[], int af, struct lifreq *lifrp);
+static void		foreachinterface(int argc, char *argv[],
+			    int af, int64_t onflags, int64_t offflags,
+			    int64_t lifc_flags);
+static void		ifconfig(int argc, char *argv[], int af,
+			    struct ifaddrs *ifa);
 static boolean_t	in_getmask(struct sockaddr_in *saddr,
 			    boolean_t addr_set);
-static int	in_getprefixlen(char *addr, boolean_t slash, int plen);
+static int		in_getprefixlen(char *addr, boolean_t slash, int plen);
 static boolean_t	in_prefixlentomask(int prefixlen, int maxlen,
 			    uchar_t *mask);
-static void	status(void);
-static void	ifstatus(const char *);
-static void	tun_status(datalink_id_t);
-static void	usage(void);
-static int	strioctl(int s, int cmd, void *buf, int buflen);
-static int	setifdhcp(const char *caller, const char *ifname,
-		    int argc, char *argv[]);
-static int	ip_domux2fd(int *, int *, int *, int *, int *);
-static int	ip_plink(int, int, int, int, int);
-static int	modop(char *arg, char op);
-static int	find_all_interfaces(struct lifconf *lifcp, char **buf,
-		    int64_t lifc_flags);
-static int	create_ipmp(const char *grname, int af, const char *ifname,
-		    boolean_t implicit);
-static int	create_ipmp_peer(int af, const char *ifname);
-static void	start_ipmp_daemon(void);
-static boolean_t ifaddr_up(ifaddrlistx_t *ifaddrp);
-static boolean_t ifaddr_down(ifaddrlistx_t *ifaddrp);
+static void		status(void);
+static void		ifstatus(const char *ifname);
+static void		tun_status(datalink_id_t);
+static void		usage(void);
+static int		setifdhcp(const char *caller, const char *ifname,
+			    int argc, char *argv[]);
+static int		ip_domux2fd(int *, int *, int *, int *, int *);
+static int		ip_plink(int, int, int, int, int);
+static int		modop(char *arg, char op);
+static int		find_all_interfaces(struct lifconf *lifcp, char **buf,
+			    int64_t lifc_flags);
+static int		create_ipmp(const char *grname, int af,
+			    const char *ifname, boolean_t implicit);
+static void		start_ipmp_daemon(void);
+static boolean_t 	ifaddr_up(ifaddrlistx_t *ifaddrp);
+static boolean_t 	ifaddr_down(ifaddrlistx_t *ifaddrp);
 static dladm_status_t	ifconfig_dladm_open(const char *, datalink_class_t,
-		    datalink_id_t *);
-static void	dladmerr_exit(dladm_status_t status, const char *str);
+			    datalink_id_t *);
+static void		dladmerr_exit(dladm_status_t status, const char *str);
+static void		ipadmerr_exit(ipadm_status_t status, const char *str);
+static boolean_t	ifconfig_use_libipadm(int, const char *);
 
 #define	max(a, b)	((a) < (b) ? (b) : (a))
 
@@ -366,8 +375,9 @@ main(int argc, char *argv[])
 {
 	int64_t		lifc_flags;
 	char		*default_ip_str;
+	ipadm_status_t	istatus;
 
-	lifc_flags = LIFC_NOXMIT|LIFC_TEMPORARY|LIFC_ALLZONES|LIFC_UNDER_IPMP;
+	lifc_flags = LIFC_DEFAULT;
 
 	if (argc < 2) {
 		usage();
@@ -412,6 +422,13 @@ main(int argc, char *argv[])
 	s6 = socket(AF_INET6, SOCK_DGRAM, 0);
 	if (s == -1 || s4 == -1 || s6 == -1)
 		Perror0_exit("socket");
+	/*
+	 * Open the global libipadm handle. The flag IPH_LEGACY has to
+	 * be specified to indicate that logical interface names will
+	 * be used during interface creation and address creation.
+	 */
+	if ((istatus = ipadm_open(&iph, IPH_LEGACY)) != IPADM_SUCCESS)
+		ipadmerr_exit(istatus, "unable to open handle to libipadm");
 
 	/*
 	 * Special interface names is any combination of these flags.
@@ -484,157 +501,89 @@ main(int argc, char *argv[])
 			    "ifconfig: %s: no such interface\n", name);
 			exit(1);
 		}
-		foreachinterface(ifconfig, argc, argv, af, onflags, offflags,
+		foreachinterface(argc, argv, af, onflags, offflags,
 		    lifc_flags);
 	} else {
-		ifconfig(argc, argv, af, (struct lifreq *)NULL);
+		ifconfig(argc, argv, af, NULL);
 	}
+	ipadm_close(iph);
 	return (0);
 }
 
 /*
- * For each interface, call (*func)(argc, argv, af, lifrp).
+ * For each interface, call ifconfig(argc, argv, af, ifa).
  * Only call function if onflags and offflags are set or clear, respectively,
  * in the interfaces flags field.
  */
 static void
-foreachinterface(void (*func)(), int argc, char *argv[], int af,
+foreachinterface(int argc, char *argv[], int af,
     int64_t onflags, int64_t offflags, int64_t lifc_flags)
 {
-	int n;
-	char *buf;
-	struct lifnum lifn;
-	struct lifconf lifc;
-	struct lifreq *lifrp;
-	struct lifreq lifrl;	/* Local lifreq struct */
-	int numifs;
-	unsigned bufsize;
-	int plumball = 0;
-	int save_af = af;
+	ipadm_addr_info_t *ainfo, *ainfop;
+	struct ifaddrs *ifa;
+	ipadm_status_t istatus;
 
-	buf = NULL;
 	/*
 	 * Special case:
 	 * ifconfig -a plumb should find all network interfaces in the current
 	 * zone.
 	 */
 	if (argc > 0 && (strcmp(*argv, "plumb") == 0)) {
-		if (find_all_interfaces(&lifc, &buf, lifc_flags) != 0 ||
-		    lifc.lifc_len == 0)
-			return;
-		plumball = 1;
-	} else {
-		lifn.lifn_family = AF_UNSPEC;
-		lifn.lifn_flags = lifc_flags;
-		if (ioctl(s, SIOCGLIFNUM, (char *)&lifn) < 0) {
-			Perror0_exit("Could not determine number"
-			    " of interfaces");
-		}
-		numifs = lifn.lifn_count;
-		if (debug)
-			(void) printf("ifconfig: %d interfaces\n",  numifs);
-
-		bufsize = numifs * sizeof (struct lifreq);
-		if ((buf = malloc(bufsize)) == NULL) {
-			Perror0("out of memory\n");
-			(void) close(s);
-			return;
-		}
-
-		lifc.lifc_family = AF_UNSPEC;
-		lifc.lifc_flags = lifc_flags;
-		lifc.lifc_len = bufsize;
-		lifc.lifc_buf = buf;
-
-		if (ioctl(s, SIOCGLIFCONF, (char *)&lifc) < 0) {
-			Perror0("SIOCGLIFCONF");
-			(void) close(s);
-			free(buf);
-			return;
-		}
+		plumball(argc, argv, onflags, offflags, lifc_flags);
+		return;
 	}
+	/* Get all addresses in kernel including addresses that are zero. */
+	istatus = ipadm_addr_info(iph, NULL, &ainfo, IPADM_OPT_ZEROADDR,
+	    lifc_flags);
+	if (istatus != IPADM_SUCCESS)
+		ipadmerr_exit(istatus, "could not get addresses from kernel");
+
+	/*
+	 * For each logical interface, call ifconfig() with the
+	 * given arguments.
+	 */
+	for (ainfop = ainfo; ainfop != NULL; ainfop = IA_NEXT(ainfop)) {
+		if (ainfop->ia_state == IFA_DISABLED)
+			continue;
+		ifa = &ainfop->ia_ifa;
+		if (onflags || offflags) {
+			if ((ifa->ifa_flags & onflags) != onflags)
+				continue;
+			if ((~ifa->ifa_flags & offflags) != offflags)
+				continue;
+		}
+		s = (ifa->ifa_addr->ss_family == AF_INET ? s4 : s6);
+		(void) strncpy(name, ifa->ifa_name, sizeof (name));
+		(void) strncpy(origname, name, sizeof (origname));
+		ifconfig(argc, argv, af, ifa);
+	}
+	ipadm_free_addr_info(ainfo);
+}
+
+/*
+ * Used for `ifconfig -a plumb'. Finds all datalinks and plumbs the interface.
+ */
+static void
+plumball(int argc, char *argv[], int64_t onflags, int64_t offflags,
+    int64_t lifc_flags)
+{
+	int n;
+	struct lifreq *lifrp;
+	struct lifconf lifc;
+	char *buf;
+
+	if (onflags != 0 || offflags != 0) {
+		(void) fprintf(stderr, "ifconfig: invalid syntax used to "
+		    "plumb all interfaces.\n");
+		exit(1);
+	}
+
+	if (find_all_interfaces(&lifc, &buf, lifc_flags) != 0 ||
+	    lifc.lifc_len == 0)
+		return;
 
 	lifrp = lifc.lifc_req;
 	for (n = lifc.lifc_len / sizeof (struct lifreq); n > 0; n--, lifrp++) {
-
-		if (!plumball) {
-			/*
-			 * We must close and recreate the socket each time
-			 * since we don't know what type of socket it is now
-			 * (each status function may change it).
-			 */
-
-			(void) close(s);
-
-			af = lifrp->lifr_addr.ss_family;
-			s = socket(SOCKET_AF(af), SOCK_DGRAM, 0);
-			if (s == -1) {
-				/*
-				 * Perror0() assumes the name to be in the
-				 * globally defined lifreq structure.
-				 */
-				(void) strncpy(lifr.lifr_name,
-				    lifrp->lifr_name, sizeof (lifr.lifr_name));
-				Perror0_exit("socket");
-			}
-		}
-
-		/*
-		 * Only service interfaces that match the on and off
-		 * flags masks.
-		 */
-		if (onflags || offflags) {
-			(void) memset(&lifrl, 0, sizeof (lifrl));
-			(void) strncpy(lifrl.lifr_name, lifrp->lifr_name,
-			    sizeof (lifrl.lifr_name));
-			if (ioctl(s, SIOCGLIFFLAGS, (caddr_t)&lifrl) < 0) {
-				/*
-				 * Perror0() assumes the name to be in the
-				 * globally defined lifreq structure.
-				 */
-				(void) strncpy(lifr.lifr_name,
-				    lifrp->lifr_name, sizeof (lifr.lifr_name));
-				Perror0_exit("foreachinterface: SIOCGLIFFLAGS");
-			}
-			if ((lifrl.lifr_flags & onflags) != onflags)
-				continue;
-			if ((~lifrl.lifr_flags & offflags) != offflags)
-				continue;
-		}
-
-		if (!plumball) {
-			(void) strncpy(lifrl.lifr_name, lifrp->lifr_name,
-			    sizeof (lifrl.lifr_name));
-			if (ioctl(s, SIOCGLIFADDR, (caddr_t)&lifrl) < 0) {
-				/*
-				 * Perror0() assumes the name to be in the
-				 * globally defined lifreq structure.
-				 */
-				(void) strncpy(lifr.lifr_name,
-				    lifrp->lifr_name, sizeof (lifr.lifr_name));
-				Perror0("foreachinterface: SIOCGLIFADDR");
-				continue;
-			}
-			if (lifrl.lifr_addr.ss_family != af) {
-				/* Switch address family */
-				af = lifrl.lifr_addr.ss_family;
-				(void) close(s);
-
-				s = socket(SOCKET_AF(af), SOCK_DGRAM, 0);
-				if (s == -1) {
-					/*
-					 * Perror0() assumes the name to be in
-					 * the globally defined lifreq
-					 * structure.
-					 */
-					(void) strncpy(lifr.lifr_name,
-					    lifrp->lifr_name,
-					    sizeof (lifr.lifr_name));
-					Perror0_exit("socket");
-				}
-			}
-		}
-
 		/*
 		 * Reset global state
 		 * setaddr: Used by parser to tear apart source and dest
@@ -644,24 +593,23 @@ foreachinterface(void (*func)(), int argc, char *argv[], int af,
 		setaddr = 0;
 		(void) strncpy(name, lifrp->lifr_name, sizeof (name));
 		(void) strncpy(origname, name, sizeof (origname));
-
-		(*func)(argc, argv, save_af, lifrp);
-		/* the func could have overwritten origname, so restore */
-		(void) strncpy(name, origname, sizeof (name));
+		ifconfig(argc, argv, af, NULL);
 	}
-	if (buf != NULL)
-		free(buf);
 }
 
 /*
- * for the specified interface call (*func)(argc, argv, af, lifrp).
+ * Parses the interface name and the command in argv[]. Calls the
+ * appropriate callback function for the given command from `cmds[]'
+ * table.
+ * If there is no command specified, it prints all addresses.
  */
-
 static void
-ifconfig(int argc, char *argv[], int af, struct lifreq *lifrp)
+ifconfig(int argc, char *argv[], int af, struct ifaddrs *ifa)
 {
 	static boolean_t scan_netmask = _B_FALSE;
 	int ret;
+	ipadm_status_t istatus;
+	struct lifreq lifr;
 
 	if (argc == 0) {
 		status();
@@ -782,8 +730,52 @@ ifconfig(int argc, char *argv[], int af, struct lifreq *lifrp)
 		 * else (no keyword found), we assume it's an address
 		 * of some sort
 		 */
-		if (p->c_name == 0 && setaddr)
-			p++;	/* got src, do dst */
+		if (setaddr && ipaddr != NULL) {
+			/*
+			 * We must have already filled in a source address in
+			 * `ipaddr' and we now got a destination address.
+			 * Fill it in `ipaddr' and call libipadm to create
+			 * the static address.
+			 */
+			if (p->c_name == 0) {
+				istatus = ipadm_set_dst_addr(ipaddr, *argv,
+				    (p->c_af == AF_ANY ? AF_UNSPEC : af));
+				if (istatus != IPADM_SUCCESS) {
+					ipadmerr_exit(istatus, "could not "
+					    "set destination address");
+				}
+				/*
+				 * finished processing dstaddr, so reset setaddr
+				 */
+				setaddr = 0;
+			}
+			/*
+			 * Both source and destination address are in `ipaddr'.
+			 * Add the address by calling libipadm.
+			 */
+			istatus = ipadm_create_addr(iph, ipaddr,
+			    IPADM_OPT_ACTIVE);
+			if (istatus != IPADM_SUCCESS)
+				goto createfailed;
+			ipadm_destroy_addrobj(ipaddr);
+			ipaddr = NULL;
+			setaddr_done = _B_TRUE;
+			if (p->c_name == 0) {
+				/* move parser along */
+				argc--, argv++;
+				continue;
+			}
+		}
+		if (p->c_name == 0 && setaddr_done) {
+			/*
+			 * catch odd commands like
+			 * "ifconfig <intf> addr1 addr2 addr3 addr4 up"
+			 */
+			(void) fprintf(stderr, "%s",
+			    "ifconfig: cannot configure more than two "
+			    "addresses in one command\n");
+			exit(1);
+		}
 		if (p->c_func) {
 			if (p->c_af == AF_INET6) {
 				v4compat = 0;
@@ -812,8 +804,8 @@ ifconfig(int argc, char *argv[], int af, struct lifreq *lifrp)
 			 *		the address families match
 			 */
 			if ((p->c_af == AF_ANY)	||
-			    (lifrp == (struct lifreq *)NULL) ||
-			    (lifrp->lifr_addr.ss_family == p->c_af)) {
+			    (ifa == NULL) ||
+			    (ifa->ifa_addr->ss_family == p->c_af)) {
 				ret = (*p->c_func)(*argv, p->c_parameter);
 				/*
 				 *	If c_func failed and we should
@@ -830,11 +822,36 @@ ifconfig(int argc, char *argv[], int af, struct lifreq *lifrp)
 		argc--, argv++;
 	}
 
+	if (setaddr && ipaddr != NULL) {
+		/*
+		 * Only the source address was provided, which was already
+		 * set in `ipaddr'. Add the address by calling libipadm.
+		 */
+		istatus = ipadm_create_addr(iph, ipaddr, IPADM_OPT_ACTIVE);
+		if (istatus != IPADM_SUCCESS)
+			goto createfailed;
+		ipadm_destroy_addrobj(ipaddr);
+		ipaddr = NULL;
+		setaddr_done = _B_TRUE;
+	}
+
 	/* Check to see if there's a security hole in the tunnel setup. */
 	if (ipsec_policy_set && !ipsec_auth_covered) {
 		(void) fprintf(stderr, "ifconfig: WARNING: tunnel with only "
 		    "ESP and no authentication.\n");
 	}
+	return;
+
+createfailed:
+	(void) fprintf(stderr, "ifconfig: could not create address:% s\n",
+	    ipadm_status2str(istatus));
+	/* Remove the newly created logical interface. */
+	if (strcmp(name, origname) != 0) {
+		assert(strchr(name, ':') != NULL);
+		(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
+		(void) ioctl(s, SIOCLIFREMOVEIF, (caddr_t)&lifr);
+	}
+	exit(1);
 }
 
 /* ARGSUSED */
@@ -902,12 +919,15 @@ set_mask_lifreq(struct lifreq *lifr, struct sockaddr_storage *addr,
 static int
 setifaddr(char *addr, int64_t param)
 {
+	ipadm_status_t istatus;
 	int prefixlen = 0;
+	struct  lifreq lifr1;
 	struct	sockaddr_storage laddr;
 	struct	sockaddr_storage netmask;
 	struct	sockaddr_in6 *sin6;
 	struct	sockaddr_in *sin;
 	struct	sockaddr_storage sav_netmask;
+	char cidraddr[BUFSIZ];
 
 	if (addr[0] == '/')
 		return (setifprefixlen(addr, 0));
@@ -951,13 +971,53 @@ setifaddr(char *addr, int64_t param)
 		g_netmask_set = G_NETMASK_NIL;
 		break;
 	}
+
+	/*
+	 * Check and see if any "netmask" command is used and perform the
+	 * necessary operation.
+	 */
+	set_mask_lifreq(&lifr, &laddr, &netmask);
+
+	/* This check is temporary until libipadm supports IPMP interfaces. */
+	if (ifconfig_use_libipadm(s, name)) {
+		istatus = ipadm_create_addrobj(IPADM_ADDR_STATIC, name,
+		    &ipaddr);
+		if (istatus != IPADM_SUCCESS)
+			ipadmerr_exit(istatus, "setifaddr");
+
+		if (strchr(addr, '/') == NULL) {
+			/*
+			 * lifr.lifr_addr, which is updated by set_mask_lifreq()
+			 * will contain the right mask to use.
+			 */
+			prefixlen = mask2plen(&lifr.lifr_addr);
+			(void) snprintf(cidraddr, sizeof (cidraddr), "%s/%d",
+			    addr, prefixlen);
+			addr = cidraddr;
+		}
+		istatus = ipadm_set_addr(ipaddr, addr, af);
+		if (istatus != IPADM_SUCCESS)
+			ipadmerr_exit(istatus, "could not set address");
+		/*
+		 * let parser know we got a source.
+		 * Next address, if given, should be dest
+		 */
+		setaddr++;
+
+		/*
+		 * address will be set by the parser after nextarg has
+		 * been scanned
+		 */
+		return (0);
+	}
+
 	/* Tell parser that an address was set */
 	setaddr++;
 	/* save copy of netmask to restore in case of error */
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-	if (ioctl(s, SIOCGLIFNETMASK, (caddr_t)&lifr) < 0)
+	(void) strncpy(lifr1.lifr_name, name, sizeof (lifr1.lifr_name));
+	if (ioctl(s, SIOCGLIFNETMASK, (caddr_t)&lifr1) < 0)
 		Perror0_exit("SIOCGLIFNETMASK");
-	sav_netmask = lifr.lifr_addr;
+	sav_netmask = lifr1.lifr_addr;
 
 	/*
 	 * If setting the address and not the mask, clear any existing mask
@@ -966,7 +1026,8 @@ setifaddr(char *addr, int64_t param)
 	 * using the netmask command), set the mask first, so the address will
 	 * be interpreted correctly.
 	 */
-	set_mask_lifreq(&lifr, &laddr, &netmask);
+	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
+	/* lifr.lifr_addr already contains netmask from set_mask_lifreq() */
 	if (ioctl(s, SIOCSLIFNETMASK, (caddr_t)&lifr) < 0)
 		Perror0_exit("SIOCSLIFNETMASK");
 
@@ -1567,7 +1628,7 @@ setifether(char *addr, int64_t param)
 	if ((hwaddr = _link_aton(addr, &hwaddrlen)) == NULL) {
 		if (hwaddrlen == -1)
 			(void) fprintf(stderr,
-			    "ifconfig: %s: bad address\n", hwaddr);
+			    "ifconfig: bad ethernet address\n");
 		else
 			(void) fprintf(stderr, "ifconfig: malloc() failed\n");
 		exit(1);
@@ -1631,7 +1692,7 @@ setifether(char *addr, int64_t param)
  * Print an interface's Ethernet address, if it has one.
  */
 static void
-print_ifether(char *ifname)
+print_ifether(const char *ifname)
 {
 	int fd;
 
@@ -1739,6 +1800,8 @@ addif(char *str, int64_t param)
 	int prefixlen = 0;
 	struct sockaddr_storage laddr;
 	struct sockaddr_storage mask;
+	ipadm_status_t istatus;
+	char cidraddr[BUFSIZ];
 
 	(void) strncpy(name, origname, sizeof (name));
 
@@ -1818,11 +1881,54 @@ addif(char *str, int64_t param)
 	 * necessary operation.
 	 */
 	set_mask_lifreq(&lifr, &laddr, &mask);
+
+	/* This check is temporary until libipadm supports IPMP interfaces. */
+	if (ifconfig_use_libipadm(s, name)) {
+		/*
+		 * We added the logical interface above before calling
+		 * ipadm_create_addr(), because, with IPH_LEGACY, we need
+		 * to do an addif for `ifconfig ce0 addif <addr>' but not for
+		 * `ifconfig ce0 <addr>'. libipadm does not have a flag to
+		 * to differentiate between these two cases. To keep it simple,
+		 * we always create the logical interface and pass it to
+		 * libipadm instead of requiring libipadm to addif for some
+		 * cases and not do addif for other cases.
+		 */
+		istatus = ipadm_create_addrobj(IPADM_ADDR_STATIC, name,
+		    &ipaddr);
+		if (istatus != IPADM_SUCCESS)
+			ipadmerr_exit(istatus, "addif");
+
+		if (strchr(str, '/') == NULL) {
+			/*
+			 * lifr.lifr_addr, which is updated by set_mask_lifreq()
+			 * will contain the right mask to use.
+			 */
+			prefixlen = mask2plen(&lifr.lifr_addr);
+			(void) snprintf(cidraddr, sizeof (cidraddr), "%s/%d",
+			    str, prefixlen);
+			str = cidraddr;
+		}
+		istatus = ipadm_set_addr(ipaddr, str, af);
+		if (istatus != IPADM_SUCCESS)
+			ipadmerr_exit(istatus, "could not set address");
+		setaddr++;
+		/*
+		 * address will be set by the parser after nextarg
+		 * has been scanned
+		 */
+		return (0);
+	}
+
 	/*
 	 * Only set the netmask if "netmask" command is used or a prefix is
 	 * provided.
 	 */
 	if (g_netmask_set == G_NETMASK_SET || prefixlen >= 0) {
+		/*
+		 * lifr.lifr_addr already contains netmask from
+		 * set_mask_lifreq().
+		 */
 		if (ioctl(s, SIOCSLIFNETMASK, (caddr_t)&lifr) < 0)
 			Perror0_exit("addif: SIOCSLIFNETMASK");
 	}
@@ -1850,6 +1956,8 @@ static int
 removeif(char *str, int64_t param)
 {
 	struct sockaddr_storage laddr;
+	ipadm_status_t istatus;
+	ipadm_addr_info_t *ainfo, *ainfop;
 
 	if (strchr(name, ':') != NULL) {
 		(void) fprintf(stderr,
@@ -1859,8 +1967,43 @@ removeif(char *str, int64_t param)
 	}
 
 	(*afp->af_getaddr)(str, &laddr, NULL);
-	lifr.lifr_addr = laddr;
 
+	/*
+	 * Following check is temporary until libipadm supports
+	 * IPMP interfaces.
+	 */
+	if (!ifconfig_use_libipadm(s, name))
+		goto delete;
+
+	/*
+	 * Get all addresses and search this address among the active
+	 * addresses. If an address object was found, delete using
+	 * ipadm_delete_addr().
+	 */
+	istatus = ipadm_addr_info(iph, name, &ainfo, 0, LIFC_DEFAULT);
+	if (istatus != IPADM_SUCCESS)
+		ipadmerr_exit(istatus, "removeif");
+
+	for (ainfop = ainfo; ainfop != NULL; ainfop = IA_NEXT(ainfop))
+		if (sockaddrcmp(ainfop->ia_ifa.ifa_addr, &laddr))
+			break;
+
+	if (ainfop != NULL && ainfop->ia_aobjname[0] != '\0') {
+		istatus = ipadm_delete_addr(iph, ainfop->ia_aobjname,
+		    IPADM_OPT_ACTIVE);
+		if (istatus != IPADM_SUCCESS)
+			ipadmerr_exit(istatus, "could not delete address");
+		ipadm_free_addr_info(ainfo);
+		return (0);
+	}
+	ipadm_free_addr_info(ainfo);
+
+delete:
+	/*
+	 * An address object for this address was not found in ipadm.
+	 * Delete with SIOCLIFREMOVEIF.
+	 */
+	lifr.lifr_addr = laddr;
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
 	if (ioctl(s, SIOCLIFREMOVEIF, (caddr_t)&lifr) < 0) {
 		if (errno == EBUSY) {
@@ -2202,37 +2345,6 @@ modremove(char *arg, int64_t param)
 }
 
 /*
- * Open a stream on /dev/udp{,6}, pop off all undesired modules (note that
- * the user may have configured autopush to add modules above
- * udp), and push the arp module onto the resulting stream.
- * This is used to make IP+ARP be able to atomically track the muxid
- * for the I_PLINKed STREAMS, thus it isn't related to ARP running the ARP
- * protocol.
- */
-static int
-open_arp_on_udp(char *udp_dev_name)
-{
-	int fd;
-
-	if ((fd = open(udp_dev_name, O_RDWR)) == -1) {
-		Perror2("open", udp_dev_name);
-		return (-1);
-	}
-	errno = 0;
-	while (ioctl(fd, I_POP, 0) != -1)
-		;
-	if (errno != EINVAL) {
-		Perror2("pop", udp_dev_name);
-	} else if (ioctl(fd, I_PUSH, ARP_MOD_NAME) == -1) {
-		Perror2("arp PUSH", udp_dev_name);
-	} else {
-		return (fd);
-	}
-	(void) close(fd);
-	return (-1);
-}
-
-/*
  * Helper function for mod*() functions.  It gets a fd to the lower IP
  * stream and I_PUNLINK's the lower stream.  It also initializes the
  * global variable lifr.
@@ -2286,7 +2398,7 @@ ip_domux2fd(int *muxfd, int *muxid_fd, int *ipfd_lowstr, int *arpfd_lowstr,
 	/*
 	 * Use /dev/udp{,6} as the mux to avoid linkcycles.
 	 */
-	if ((*muxfd = open_arp_on_udp(udp_dev_name)) == -1)
+	if (ipadm_open_arp_on_udp(udp_dev_name, muxfd) != IPADM_SUCCESS)
 		return (-1);
 
 	if (lifr.lifr_arp_muxid != 0) {
@@ -2636,11 +2748,9 @@ setifsrc(char *arg, int64_t param)
 	 * that any previous selection is cleared.
 	 */
 
-	rval = strcmp(arg, name);
-	if (rval == 0) {
+	if (strchr(arg, ':') != NULL) {
 		(void) fprintf(stderr,
-		    "ifconfig: Cannot specify same interface for usesrc"
-		    " group\n");
+		    "ifconfig: Cannot specify logical interface for usesrc \n");
 		exit(1);
 	}
 
@@ -2805,7 +2915,6 @@ ifstatus(const char *ifname)
 	(void) putchar('\n');
 }
 
-
 /*
  * Print the status of the interface.  If an address family was
  * specified, show it and it only; otherwise, show them all.
@@ -2850,13 +2959,8 @@ status(void)
 		(*p->af_status)(1, flags);
 	} else {
 		for (p = afs; p->af_name; p++) {
-			(void) close(s);
-			s = socket(SOCKET_AF(p->af_af), SOCK_DGRAM, 0);
 			/* set global af for use in p->af_status */
 			af = p->af_af;
-			if (s == -1) {
-				Perror0_exit("socket");
-			}
 			(*p->af_status)(0, flags);
 		}
 
@@ -3471,277 +3575,6 @@ in6_configinfo(int force, uint64_t flags)
 }
 
 /*
- * We need to plink both the arp-device stream and the arp-ip-device stream.
- * However the muxid is stored only in IP. Plumbing 2 streams individually
- * is not atomic, and if ifconfig is killed, the resulting plumbing can
- * be inconsistent. For eg. if only the arp stream is plumbed, we have lost
- * the muxid, and the half-baked plumbing can neither be unplumbed nor
- * replumbed, thus requiring a reboot. To avoid the above the following
- * scheme is used.
- *
- * Ifconfig asks IP to enforce atomicity of plumbing the arp and IP streams.
- * This is done by pushing arp on to the mux (/dev/udp). ARP adds some
- * extra information in the I_PLINK and I_PUNLINK ioctls to let IP know
- * that the plumbing/unplumbing has to be done atomically. Ifconfig plumbs
- * the IP stream first, and unplumbs it last. The kernel (IP) does not
- * allow IP stream to be unplumbed without unplumbing arp stream. Similarly
- * it does not allow arp stream to be plumbed before IP stream is plumbed.
- * There is no need to use SIOCSLIFMUXID, since the whole operation is atomic,
- * and IP uses the info in the I_PLINK message to get the muxid.
- *
- * a. STREAMS does not allow us to use /dev/ip itself as the mux. So we use
- *    /dev/udp{,6}.
- * b. SIOCGLIFMUXID returns the muxid corresponding to the V4 or V6 stream
- *    depending on the open i.e. V4 vs V6 open. So we need to use /dev/udp
- *    or /dev/udp6 for SIOCGLIFMUXID and SIOCSLIFMUXID.
- * c. We need to push ARP in order to get the required kernel support for
- *    atomic plumbings. The actual work done by ARP is explained in arp.c
- *    Without pushing ARP, we will still be able to plumb/unplumb. But
- *    it is not atomic, and is supported by the kernel for backward
- *    compatibility for other utilities like atmifconfig etc. In this case
- *    the utility must use SIOCSLIFMUXID.
- */
-static int
-ifplumb(const char *linkname, const char *ifname, boolean_t genppa, int af)
-{
-	int	arp_muxid = -1, ip_muxid;
-	int	mux_fd, ip_fd, arp_fd;
-	int 	retval;
-	char	*udp_dev_name;
-	uint64_t flags;
-	uint_t	dlpi_flags;
-	dlpi_handle_t	dh_arp, dh_ip;
-
-	/*
-	 * Always dlpi_open() with DLPI_NOATTACH because the IP and ARP module
-	 * will do the attach themselves for DLPI style-2 links.
-	 */
-	dlpi_flags = DLPI_NOATTACH;
-
-	/*
-	 * If `linkname' is the special token IPMPSTUB, then this is a request
-	 * to create an IPMP interface atop /dev/ipmpstub0.  (We can't simply
-	 * pass "ipmpstub0" as `linkname' since an admin *could* have a normal
-	 * vanity-named link named "ipmpstub0" that they'd like to plumb.)
-	 */
-	if (linkname == IPMPSTUB) {
-		linkname = "ipmpstub0";
-		dlpi_flags |= DLPI_DEVONLY;
-	}
-
-	retval = dlpi_open(linkname, &dh_ip, dlpi_flags);
-	if (retval != DLPI_SUCCESS)
-		Perrdlpi_exit("cannot open link", linkname, retval);
-
-	if (debug) {
-		(void) printf("ifconfig: ifplumb: link %s, ifname %s, "
-		    "genppa %u\n", linkname, ifname, genppa);
-	}
-
-	ip_fd = dlpi_fd(dh_ip);
-	if (ioctl(ip_fd, I_PUSH, IP_MOD_NAME) == -1)
-		Perror2_exit("I_PUSH", IP_MOD_NAME);
-
-	/*
-	 * Prepare to set IFF_IPV4/IFF_IPV6 flags as part of SIOCSLIFNAME.
-	 * (At this point in time the kernel also allows an override of the
-	 * IFF_CANTCHANGE flags.)
-	 */
-	lifr.lifr_name[0] = '\0';
-	if (ioctl(ip_fd, SIOCGLIFFLAGS, (char *)&lifr) == -1)
-		Perror0_exit("ifplumb: SIOCGLIFFLAGS");
-
-	if (af == AF_INET6) {
-		flags = lifr.lifr_flags | IFF_IPV6;
-		flags &= ~(IFF_BROADCAST | IFF_IPV4);
-	} else {
-		flags = lifr.lifr_flags | IFF_IPV4;
-		flags &= ~IFF_IPV6;
-	}
-
-	/*
-	 * Set the interface name.  If we've been asked to generate the PPA,
-	 * then find the lowest available PPA (only currently used for IPMP
-	 * interfaces).  Otherwise, use the interface name as-is.
-	 */
-	if (genppa) {
-		int ppa;
-
-		/*
-		 * We'd like to just set lifr_ppa to UINT_MAX and have the
-		 * kernel pick a PPA.  Unfortunately, that would mishandle
-		 * two cases:
-		 *
-		 *	1. If the PPA is available but the groupname is taken
-		 *	   (e.g., the "ipmp2" IP interface name is available
-		 *	   but the "ipmp2" groupname is taken) then the
-		 *	   auto-assignment by the kernel will fail.
-		 *
-		 *	2. If we're creating (e.g.) an IPv6-only IPMP
-		 *	   interface, and there's already an IPv4-only IPMP
-		 *	   interface, the kernel will allow us to accidentally
-		 *	   reuse the IPv6 IPMP interface name (since
-		 *	   SIOCSLIFNAME uniqueness is per-interface-type).
-		 *	   This will cause administrative confusion.
-		 *
-		 * Thus, we instead take a brute-force approach of checking
-		 * whether the IPv4 or IPv6 name is already in-use before
-		 * attempting the SIOCSLIFNAME.  As per (1) above, the
-		 * SIOCSLIFNAME may still fail, in which case we just proceed
-		 * to the next one.  If this approach becomes too slow, we
-		 * can add a new SIOC* to handle this case in the kernel.
-		 */
-		for (ppa = 0; ppa < UINT_MAX; ppa++) {
-			(void) snprintf(lifr.lifr_name, LIFNAMSIZ, "%s%d",
-			    ifname, ppa);
-
-			if (ioctl(s4, SIOCGLIFFLAGS, &lifr) != -1 ||
-			    errno != ENXIO)
-				continue;
-
-			if (ioctl(s6, SIOCGLIFFLAGS, &lifr) != -1 ||
-			    errno != ENXIO)
-				continue;
-
-			lifr.lifr_ppa = ppa;
-			lifr.lifr_flags = flags;
-			retval = ioctl(ip_fd, SIOCSLIFNAME, &lifr);
-			if (retval != -1 || errno != EEXIST)
-				break;
-		}
-	} else {
-		ifspec_t ifsp;
-
-		/*
-		 * The interface name could have come from the command-line;
-		 * check it.
-		 */
-		if (!ifparse_ifspec(ifname, &ifsp) || ifsp.ifsp_lunvalid)
-			Perror2_exit("invalid IP interface name", ifname);
-
-		/*
-		 * Before we call SIOCSLIFNAME, ensure that the IPMP group
-		 * interface for this address family exists.  Otherwise, the
-		 * kernel will kick the interface out of the group when we do
-		 * the SIOCSLIFNAME.
-		 *
-		 * Example: suppose bge0 is plumbed for IPv4 and in group "a".
-		 * If we're now plumbing bge0 for IPv6, but the IPMP group
-		 * interface for "a" is not plumbed for IPv6, the SIOCSLIFNAME
-		 * will kick bge0 out of group "a", which is undesired.
-		 */
-		if (create_ipmp_peer(af, ifname) == -1) {
-			(void) fprintf(stderr, "ifconfig: warning: cannot "
-			    "create %s IPMP group; %s will be removed from "
-			    "group\n", af == AF_INET ? "IPv4" : "IPv6", ifname);
-		}
-
-		lifr.lifr_ppa = ifsp.ifsp_ppa;
-		lifr.lifr_flags = flags;
-		(void) strlcpy(lifr.lifr_name, ifname, LIFNAMSIZ);
-		retval = ioctl(ip_fd, SIOCSLIFNAME, &lifr);
-	}
-
-	if (retval == -1) {
-		if (errno != EEXIST)
-			Perror0_exit("SIOCSLIFNAME for ip");
-		/*
-		 * This difference between the way we behave for EEXIST
-		 * and that with other errors exists to preserve legacy
-		 * behaviour. Earlier when foreachinterface() and matchif()
-		 * were doing the duplicate interface name checks, for
-		 * already existing interfaces, inetplumb() returned "0".
-		 * To preserve this behaviour, Perror0() and return are
-		 * called for EEXIST.
-		 */
-		Perror0("SIOCSLIFNAME for ip");
-		return (-1);
-	}
-
-	/* Get the full set of existing flags for this stream */
-	if (ioctl(ip_fd, SIOCGLIFFLAGS, (char *)&lifr) == -1)
-		Perror0_exit("ifplumb: SIOCGLIFFLAGS");
-
-	if (debug) {
-		(void) printf("ifconfig: ifplumb: %s got flags:\n",
-		    lifr.lifr_name);
-		print_flags(lifr.lifr_flags);
-		(void) putchar('\n');
-	}
-
-	/*
-	 * Open "/dev/udp" for use as a multiplexor to PLINK the
-	 * interface stream under. We use "/dev/udp" instead of "/dev/ip"
-	 * since STREAMS will not let you PLINK a driver under itself,
-	 * and "/dev/ip" is typically the driver at the bottom of
-	 * the stream for tunneling interfaces.
-	 */
-	if (af == AF_INET6)
-		udp_dev_name = UDP6_DEV_NAME;
-	else
-		udp_dev_name = UDP_DEV_NAME;
-	if ((mux_fd = open_arp_on_udp(udp_dev_name)) == -1)
-		exit(EXIT_FAILURE);
-
-	/* Check if arp is not needed */
-	if (lifr.lifr_flags & (IFF_NOARP|IFF_IPV6)) {
-		/*
-		 * PLINK the interface stream so that ifconfig can exit
-		 * without tearing down the stream.
-		 */
-		if ((ip_muxid = ioctl(mux_fd, I_PLINK, ip_fd)) == -1)
-			Perror0_exit("I_PLINK for ip");
-		(void) close(mux_fd);
-		return (lifr.lifr_ppa);
-	}
-
-	/*
-	 * This interface does use ARP, so set up a separate stream
-	 * from the interface to ARP.
-	 */
-	if (debug)
-		(void) printf("ifconfig: ifplumb: interface %s", ifname);
-
-	retval = dlpi_open(linkname, &dh_arp, dlpi_flags);
-	if (retval != DLPI_SUCCESS)
-		Perrdlpi_exit("cannot open link", linkname, retval);
-
-	arp_fd = dlpi_fd(dh_arp);
-	if (ioctl(arp_fd, I_PUSH, ARP_MOD_NAME) == -1)
-		Perror2_exit("I_PUSH", ARP_MOD_NAME);
-
-	/*
-	 * Tell ARP the name and unit number for this interface.
-	 * Note that arp has no support for transparent ioctls.
-	 */
-	if (strioctl(arp_fd, SIOCSLIFNAME, &lifr, sizeof (lifr)) == -1) {
-		if (errno != EEXIST)
-			Perror0_exit("SIOCSLIFNAME for arp");
-		Perror0("SIOCSLIFNAME for arp");
-		goto out;
-	}
-
-	/*
-	 * PLINK the IP and ARP streams so that ifconfig can exit
-	 * without tearing down the stream.
-	 */
-	if ((ip_muxid = ioctl(mux_fd, I_PLINK, ip_fd)) == -1)
-		Perror0_exit("I_PLINK for ip");
-	if ((arp_muxid = ioctl(mux_fd, I_PLINK, arp_fd)) == -1) {
-		(void) ioctl(mux_fd, I_PUNLINK, ip_muxid);
-		Perror0_exit("I_PLINK for arp");
-	}
-
-	if (debug)
-		(void) printf("arp muxid = %d\n", arp_muxid);
-out:
-	dlpi_close(dh_ip);
-	dlpi_close(dh_arp);
-	(void) close(mux_fd);
-	return (lifr.lifr_ppa);
-}
-
-/*
  * If this is a physical interface then remove it.
  * If it is a logical interface name use SIOCLIFREMOVEIF to
  * remove it. In both cases fail if it doesn't exist.
@@ -3750,245 +3583,36 @@ out:
 static int
 inetunplumb(char *arg, int64_t param)
 {
-	int ip_muxid, arp_muxid;
-	int mux_fd;
-	int muxid_fd;
-	char *udp_dev_name;
-	char *strptr;
-	uint64_t flags;
-	boolean_t changed_arp_muxid = _B_FALSE;
-	int save_errno;
-	boolean_t v6 = (afp->af_af == AF_INET6);
+	ipadm_status_t	istatus;
 
-	strptr = strchr(name, ':');
-	if (strptr != NULL || strcmp(name, LOOPBACK_IF) == 0) {
-		/* Can't unplumb logical interface zero */
-		if (strptr != NULL && strcmp(strptr, ":0") == 0) {
-			(void) fprintf(stderr, "ifconfig: unplumb:"
-			    " Cannot unplumb %s: Invalid interface\n", name);
-			exit(1);
-		}
-		(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-		(void) memset(&lifr.lifr_addr, 0, sizeof (lifr.lifr_addr));
-
-		if (ioctl(s, SIOCLIFREMOVEIF, (caddr_t)&lifr) < 0)
-			Perror0_exit("unplumb: SIOCLIFREMOVEIF");
-		return (0);
+	istatus = ipadm_delete_if(iph, name, afp->af_af, IPADM_OPT_ACTIVE);
+	if (istatus != IPADM_SUCCESS) {
+		(void) fprintf(stderr, "ifconfig: cannot unplumb %s: %s\n",
+		    name, ipadm_status2str(istatus));
+		exit(1);
 	}
 
-	/*
-	 * We used /dev/udp or udp6 to set up the mux. So we have to use
-	 * the same now for PUNLINK also.
-	 */
-	if (v6)
-		udp_dev_name = UDP6_DEV_NAME;
-	else
-		udp_dev_name = UDP_DEV_NAME;
-
-	if ((muxid_fd = open(udp_dev_name, O_RDWR)) == -1)
-		exit(EXIT_FAILURE);
-
-	if ((mux_fd = open_arp_on_udp(udp_dev_name)) == -1)
-		exit(EXIT_FAILURE);
-
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-	if (ioctl(muxid_fd, SIOCGLIFFLAGS, (caddr_t)&lifr) < 0) {
-		Perror0_exit("unplumb: SIOCGLIFFLAGS");
-	}
-	flags = lifr.lifr_flags;
-again:
-	if (flags & IFF_IPMP) {
-		lifgroupinfo_t lifgr;
-		ifaddrlistx_t *ifaddrs, *ifaddrp;
-
-		/*
-		 * There are two reasons the I_PUNLINK can fail with EBUSY:
-		 * (1) if IP interfaces are in the group, or (2) if IPMP data
-		 * addresses are administratively up.  For case (1), we fail
-		 * here with a specific error message.  For case (2), we bring
-		 * down the addresses prior to doing the I_PUNLINK.  If the
-		 * I_PUNLINK still fails with EBUSY then the configuration
-		 * must have changed after our checks, in which case we branch
-		 * back up to `again' and rerun this logic.  The net effect is
-		 * that unplumbing an IPMP interface will only fail with EBUSY
-		 * if IP interfaces are in the group.
-		 */
-		if (ioctl(s, SIOCGLIFGROUPNAME, &lifr) == -1)
-			Perror0_exit("unplumb: SIOCGLIFGROUPNAME");
-
-		(void) strlcpy(lifgr.gi_grname, lifr.lifr_groupname,
-		    LIFGRNAMSIZ);
-		if (ioctl(s, SIOCGLIFGROUPINFO, &lifgr) == -1)
-			Perror0_exit("unplumb: SIOCGLIFGROUPINFO");
-
-		if ((v6 && lifgr.gi_nv6 != 0) || (!v6 && lifgr.gi_nv4 != 0)) {
-			(void) fprintf(stderr, "ifconfig: %s: cannot unplumb:"
-			    " IPMP group is not empty\n", name);
-			exit(1);
-		}
-
-		/*
-		 * The kernel will fail the I_PUNLINK if the IPMP interface
-		 * has administratively up addresses; bring 'em down.
-		 */
-		if (ifaddrlistx(name, IFF_UP|IFF_DUPLICATE, 0, &ifaddrs) == -1)
-			Perror2_exit(name, "cannot get address list");
-
-		ifaddrp = ifaddrs;
-		for (; ifaddrp != NULL; ifaddrp = ifaddrp->ia_next) {
-			if (((ifaddrp->ia_flags & IFF_IPV6) && !v6) ||
-			    (!(ifaddrp->ia_flags & IFF_IPV6) && v6))
-				continue;
-
-			if (!ifaddr_down(ifaddrp)) {
-				Perror2_exit(ifaddrp->ia_name,
-				    "cannot bring down");
-			}
-		}
-		ifaddrlistx_free(ifaddrs);
-	}
-
-	if (ioctl(muxid_fd, SIOCGLIFMUXID, (caddr_t)&lifr) < 0) {
-		Perror0_exit("unplumb: SIOCGLIFMUXID");
-	}
-	arp_muxid = lifr.lifr_arp_muxid;
-	ip_muxid = lifr.lifr_ip_muxid;
-	/*
-	 * We don't have a good way of knowing whether the arp stream is
-	 * plumbed. We can't rely on IFF_NOARP because someone could
-	 * have turned it off later using "ifconfig xxx -arp".
-	 */
-	if (arp_muxid != 0) {
-		if (debug)
-			(void) printf("arp_muxid %d\n", arp_muxid);
-		if (ioctl(mux_fd, I_PUNLINK, arp_muxid) < 0) {
-			/*
-			 * See the comment before the SIOCGLIFGROUPNAME call.
-			 */
-			if (errno == EBUSY && (flags & IFF_IPMP))
-				goto again;
-
-			if ((errno == EINVAL) &&
-			    (flags & (IFF_NOARP | IFF_IPV6))) {
-				/*
-				 * Some plumbing utilities set the muxid to
-				 * -1 or some invalid value to signify that
-				 * there is no arp stream. Set the muxid to 0
-				 * before trying to unplumb the IP stream.
-				 * IP does not allow the IP stream to be
-				 * unplumbed if it sees a non-null arp muxid,
-				 * for consistency of IP-ARP streams.
-				 */
-				lifr.lifr_arp_muxid = 0;
-				(void) ioctl(muxid_fd, SIOCSLIFMUXID,
-				    (caddr_t)&lifr);
-				changed_arp_muxid = _B_TRUE;
-			} else {
-				Perror0("I_PUNLINK for arp");
-			}
-		}
-	}
-	if (debug)
-		(void) printf("ip_muxid %d\n", ip_muxid);
-
-	if (ioctl(mux_fd, I_PUNLINK, ip_muxid) < 0) {
-		if (changed_arp_muxid) {
-			/*
-			 * Some error occurred, and we need to restore
-			 * everything back to what it was.
-			 */
-			save_errno = errno;
-			lifr.lifr_arp_muxid = arp_muxid;
-			lifr.lifr_ip_muxid = ip_muxid;
-			(void) ioctl(muxid_fd, SIOCSLIFMUXID, (caddr_t)&lifr);
-			errno = save_errno;
-		}
-
-		/*
-		 * See the comment before the SIOCGLIFGROUPNAME call.
-		 */
-		if (errno == EBUSY && (flags & IFF_IPMP))
-			goto again;
-
-		Perror0_exit("I_PUNLINK for ip");
-	}
-	(void) close(mux_fd);
-	(void) close(muxid_fd);
 	return (0);
 }
 
 /*
- * If this is a physical interface then create it unless it is already
- * present. If it is a logical interface name use SIOCLIFADDIF to
- * create and (and fail it if already exists.)
- * As a special case send SIOCLIFADDIF for the loopback interface. This
- * is needed since there is no other notion of plumbing the loopback
- * interface.
+ * Create the interface in `name', using ipadm_create_if(). If `name' is a
+ * logical interface or loopback interface, ipadm_create_if() uses
+ * SIOCLIFADDIF to create it.
  */
 /* ARGSUSED */
 static int
 inetplumb(char *arg, int64_t param)
 {
-	char		*strptr;
-	boolean_t	islo;
-	zoneid_t	zoneid;
-	datalink_id_t	linkid;
+	ipadm_status_t	istatus;
 
-	strptr = strchr(name, ':');
-	islo = (strcmp(name, LOOPBACK_IF) == 0);
-
-	if (strptr != NULL || islo) {
-		(void) memset(&lifr, 0, sizeof (lifr));
-		(void) strlcpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-		if (islo && ioctl(s, SIOCGLIFADDR, (caddr_t)&lifr) >= 0) {
-			if (debug) {
-				(void) fprintf(stderr,
-				    "ifconfig: %s already exists\n", name);
-			}
-			return (0);
-		}
-		if (ioctl(s, SIOCLIFADDIF, (caddr_t)&lifr) < 0) {
-			if (errno == EEXIST) {
-				if (debug) {
-					(void) fprintf(stderr,
-					    "ifconfig: %s already exists\n",
-					    name);
-				}
-			} else {
-				Perror2_exit("plumb: SIOCLIFADDIF", name);
-			}
-		}
-		return (0);
+	istatus = ipadm_create_if(iph, name, afp->af_af, IPADM_OPT_ACTIVE);
+	if (istatus != IPADM_SUCCESS) {
+		(void) fprintf(stderr, "ifconfig: cannot plumb %s: %s\n",
+		    name, ipadm_status2str(istatus));
+		if (istatus != IPADM_IF_EXISTS)
+			exit(1);
 	}
-
-	/*
-	 * If we're in the global zone and we're plumbing a datalink, make
-	 * sure that the datalink is not assigned to a non-global zone.  Note
-	 * that the non-global zones don't need this check, because zoneadm
-	 * has taken care of this when the zones boot.
-	 */
-	zoneid = getzoneid();
-	if (zoneid == GLOBAL_ZONEID &&
-	    ifconfig_dladm_open(name, DATALINK_CLASS_ALL, &linkid) ==
-	    DLADM_STATUS_OK) {
-		int ret;
-
-		zoneid = ALL_ZONES;
-		ret = zone_check_datalink(&zoneid, linkid);
-		if (ret == 0) {
-			char zonename[ZONENAME_MAX];
-
-			(void) getzonenamebyid(zoneid, zonename, ZONENAME_MAX);
-			(void) fprintf(stderr, "%s is used by non-global"
-			    "zone: %s\n", name, zonename);
-			return (1);
-		}
-	}
-
-	if (debug)
-		(void) printf("inetplumb: %s af %d\n", name, afp->af_af);
-
-	(void) ifplumb(name, name, _B_FALSE, afp->af_af);
 	return (0);
 }
 
@@ -4026,28 +3650,29 @@ inetipmp(char *arg, int64_t param)
 static int
 create_ipmp(const char *grname, int af, const char *ifname, boolean_t implicit)
 {
-	int ppa;
 	static int ipmp_daemon_started;
+	uint32_t flags = IPADM_OPT_IPMP|IPADM_OPT_ACTIVE;
+	ipadm_status_t istatus;
 
 	if (debug) {
 		(void) printf("create_ipmp: ifname %s grname %s af %d\n",
 		    ifname != NULL ? ifname : "NULL", grname, af);
 	}
 
-	if (ifname != NULL)
-		ppa = ifplumb(IPMPSTUB, ifname, _B_FALSE, af);
-	else
-		ppa = ifplumb(IPMPSTUB, "ipmp", _B_TRUE, af);
-
-	if (ppa == -1) {
-		Perror2(grname, "cannot create IPMP interface");
+	/*
+	 * ipadm_create_if() creates the IPMP interface and fills in the
+	 * ppa in lifr.lifr_name, if `ifname'="ipmp".
+	 */
+	(void) strlcpy(lifr.lifr_name, (ifname ? ifname : "ipmp"),
+	    sizeof (lifr.lifr_name));
+	if (ifname == NULL)
+		flags |= IPADM_OPT_GENPPA;
+	istatus = ipadm_create_if(iph, lifr.lifr_name, af, flags);
+	if (istatus != IPADM_SUCCESS) {
+		(void) fprintf(stderr, "ifconfig: cannot create IPMP interface "
+		    "%s: %s\n", grname, ipadm_status2str(istatus));
 		return (-1);
 	}
-
-	if (ifname != NULL)
-		(void) strlcpy(lifr.lifr_name, ifname, LIFNAMSIZ);
-	else
-		(void) snprintf(lifr.lifr_name, LIFNAMSIZ, "ipmp%d", ppa);
 
 	/*
 	 * To preserve backward-compatibility, always bring up the link-local
@@ -4079,42 +3704,6 @@ create_ipmp(const char *grname, int af, const char *ifname, boolean_t implicit)
 		start_ipmp_daemon();
 
 	return (0);
-}
-
-/*
- * Check if `ifname' is plumbed and in an IPMP group on its "other" address
- * family.  If so, create a matching IPMP group for address family `af'.
- */
-static int
-create_ipmp_peer(int af, const char *ifname)
-{
-	int		fd;
-	lifgroupinfo_t	lifgr;
-
-	assert(af == AF_INET || af == AF_INET6);
-
-	/*
-	 * Get the socket for the "other" address family.
-	 */
-	fd = (af == AF_INET) ? s6 : s4;
-
-	(void) strlcpy(lifr.lifr_name, ifname, LIFNAMSIZ);
-	if (ioctl(fd, SIOCGLIFGROUPNAME, &lifr) != 0)
-		return (0);
-
-	(void) strlcpy(lifgr.gi_grname, lifr.lifr_groupname, LIFGRNAMSIZ);
-	if (ioctl(fd, SIOCGLIFGROUPINFO, &lifgr) != 0)
-		return (0);
-
-	/*
-	 * If `ifname' *is* the IPMP group interface, or if the relevant
-	 * address family is already configured, then there's nothing to do.
-	 */
-	if (strcmp(lifgr.gi_grifname, ifname) == 0 ||
-	    (af == AF_INET && lifgr.gi_v4) || (af == AF_INET6 && lifgr.gi_v6))
-		return (0);
-
-	return (create_ipmp(lifgr.gi_grname, af, lifgr.gi_grifname, _B_TRUE));
 }
 
 /*
@@ -4244,7 +3833,35 @@ ifconfig_dladm_open(const char *name, datalink_class_t reqclass,
 	return (status);
 }
 
-void
+/*
+ * This function checks if we can use libipadm API's. We will only
+ * call libipadm functions for non-IPMP interfaces. This check is
+ * temporary until libipadm supports IPMP interfaces.
+ */
+static boolean_t
+ifconfig_use_libipadm(int s, const char *lifname)
+{
+	struct lifreq lifr1;
+
+	(void) strlcpy(lifr1.lifr_name, lifname, sizeof (lifr1.lifr_name));
+	if (ioctl(s, SIOCGLIFGROUPNAME, (caddr_t)&lifr1) < 0) {
+		(void) strncpy(lifr.lifr_name, lifname,
+		    sizeof (lifr.lifr_name));
+		Perror0_exit("error");
+	}
+
+	return (lifr1.lifr_groupname[0] == '\0');
+}
+
+static void
+ipadmerr_exit(ipadm_status_t status, const char *str)
+{
+	(void) fprintf(stderr, "ifconfig: %s: %s\n", str,
+	    ipadm_status2str(status));
+	exit(1);
+}
+
+static void
 dladmerr_exit(dladm_status_t status, const char *str)
 {
 	char errstr[DLADM_STRSIZE];
@@ -4587,19 +4204,6 @@ lifnum(const char *ifname)
 		return (0);
 	else
 		return (atoi(cp + 1));
-}
-
-static int
-strioctl(int s, int cmd, void *buf, int buflen)
-{
-	struct strioctl ioc;
-
-	(void) memset(&ioc, 0, sizeof (ioc));
-	ioc.ic_cmd = cmd;
-	ioc.ic_timout = 0;
-	ioc.ic_len = buflen;
-	ioc.ic_dp = buf;
-	return (ioctl(s, I_STR, (char *)&ioc));
 }
 
 static void

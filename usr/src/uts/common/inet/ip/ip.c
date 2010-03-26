@@ -299,11 +299,6 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * - phyint_lock: This is a per phyint mutex lock. Protects just the
  *   phyint_flags
  *
- * - ip_g_nd_lock: This is a global reader/writer lock.
- *   Any call to nd_load to load a new parameter to the ND table must hold the
- *   lock as writer. ND_GET/ND_SET routines that read the ND table hold the lock
- *   as reader.
- *
  * - ip_addr_avail_lock: This is used to ensure the uniqueness of IP addresses.
  *   This lock is held in ipif_up_done and the ipif is marked IPIF_UP and the
  *   uniqueness check also done atomically.
@@ -662,9 +657,6 @@ boolean_t	ip_squeue_fanout = 0;
  */
 uint_t ip_max_frag_dups = 10;
 
-/* RFC 1122 Conformance */
-#define	IP_FORWARD_DEFAULT	IP_FORWARD_NEVER
-
 static int	ip_open(queue_t *q, dev_t *devp, int flag, int sflag,
 		    cred_t *credp, boolean_t isv6);
 static mblk_t	*ip_xmit_attach_llhdr(mblk_t *, nce_t *);
@@ -691,11 +683,6 @@ static char	*ip_dot_saddr(uchar_t *, char *);
 static void	ip_lrput(queue_t *, mblk_t *);
 ipaddr_t	ip_net_mask(ipaddr_t);
 char		*ip_nv_lookup(nv_t *, int);
-static int	ip_param_get(queue_t *, mblk_t *, caddr_t, cred_t *);
-static int	ip_param_generic_get(queue_t *, mblk_t *, caddr_t, cred_t *);
-static boolean_t	ip_param_register(IDP *ndp, ipparam_t *, size_t,
-    ipndp_t *, size_t);
-static int	ip_param_set(queue_t *, mblk_t *, char *, caddr_t, cred_t *);
 void	ip_rput(queue_t *, mblk_t *);
 static void	ip_rput_dlpi_writer(ipsq_t *dummy_sq, queue_t *q, mblk_t *mp,
 		    void *dummy_arg);
@@ -749,20 +736,11 @@ static void	*ip_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ip_stack_shutdown(netstackid_t stackid, void *arg);
 static void	ip_stack_fini(netstackid_t stackid, void *arg);
 
-static int	ip_forward_set(queue_t *, mblk_t *, char *, caddr_t, cred_t *);
-
 static int	ip_multirt_apply_membership(int (*fn)(conn_t *, boolean_t,
     const in6_addr_t *, ipaddr_t, uint_t, mcast_record_t, const in6_addr_t *),
     ire_t *, conn_t *, boolean_t, const in6_addr_t *,  mcast_record_t,
     const in6_addr_t *);
 
-static int	ip_cgtp_filter_get(queue_t *, mblk_t *, caddr_t, cred_t *);
-static int	ip_cgtp_filter_set(queue_t *, mblk_t *, char *,
-    caddr_t, cred_t *);
-static int	ip_input_proc_set(queue_t *q, mblk_t *mp, char *value,
-    caddr_t cp, cred_t *cr);
-static int	ip_int_set(queue_t *, mblk_t *, char *, caddr_t,
-    cred_t *);
 static int	ip_squeue_switch(int);
 
 static void	*ip_kstat_init(netstackid_t, ip_stack_t *);
@@ -779,10 +757,6 @@ static void	ipobs_fini(ip_stack_t *);
 
 ipaddr_t	ip_g_all_ones = IP_HOST_MASK;
 
-/* How long, in seconds, we allow frags to hang around. */
-#define	IP_FRAG_TIMEOUT		15
-#define	IPV6_FRAG_TIMEOUT	60
-
 static long ip_rput_pullups;
 int	dohwcksum = 1;	/* use h/w cksum if supported by the hardware */
 
@@ -797,191 +771,10 @@ int	ip_debug;
 int	ip_cgtp_filter_rev = CGTP_FILTER_REV;	/* CGTP hooks version */
 
 /*
- * Named Dispatch Parameter Table.
- * All of these are alterable, within the min/max values given, at run time.
+ * IP tunables related declarations. Definitions are in ip_tunables.c
  */
-static ipparam_t	lcl_param_arr[] = {
-	/* min	max	value	name */
-	{  0,	1,	0,	"ip_respond_to_address_mask_broadcast"},
-	{  0,	1,	1,	"ip_respond_to_echo_broadcast"},
-	{  0,	1,	1,	"ip_respond_to_echo_multicast"},
-	{  0,	1,	0,	"ip_respond_to_timestamp"},
-	{  0,	1,	0,	"ip_respond_to_timestamp_broadcast"},
-	{  0,	1,	1,	"ip_send_redirects"},
-	{  0,	1,	0,	"ip_forward_directed_broadcasts"},
-	{  0,	10,	0,	"ip_mrtdebug"},
-	{  1,	8,	3,	"ip_ire_reclaim_fraction" },
-	{  1,	8,	3,	"ip_nce_reclaim_fraction" },
-	{  1,	8,	3,	"ip_dce_reclaim_fraction" },
-	{  1,	255,	255,	"ip_def_ttl" },
-	{  0,	1,	0,	"ip_forward_src_routed"},
-	{  0,	256,	32,	"ip_wroff_extra" },
-	{  2, 999999999, 60*20, "ip_pathmtu_interval" },	/* In seconds */
-	{  8,	65536,  64,	"ip_icmp_return_data_bytes" },
-	{  0,	1,	1,	"ip_path_mtu_discovery" },
-	{ 68,	65535,	576,	"ip_pmtu_min" },
-	{  0,	1,	0,	"ip_ignore_redirect" },
-	{  0,	1,	0,	"ip_arp_icmp_error" },
-	{  1,	254,	1,	"ip_broadcast_ttl" },
-	{  0,	99999,	100,	"ip_icmp_err_interval" },
-	{  1,	99999,	10,	"ip_icmp_err_burst" },
-	{  0,	999999999,	1000000, "ip_reass_queue_bytes" },
-	/*
-	 * See comments for ip_strict_src_multihoming for an explanation
-	 * of the semantics of ip_strict_dst_multihoming
-	 */
-	{  0,	1,	0,	"ip_strict_dst_multihoming" },
-	{  1,	MAX_ADDRS_PER_IF,	256,	"ip_addrs_per_if"},
-	{  0,	1,	0,	"ipsec_override_persocket_policy" },
-	{  0,	1,	1,	"icmp_accept_clear_messages" },
-	{  0,	1,	1,	"igmp_accept_clear_messages" },
-	{  2,	999999999, ND_DELAY_FIRST_PROBE_TIME,
-				"ip_ndp_delay_first_probe_time"},
-	{  1,	999999999, ND_MAX_UNICAST_SOLICIT,
-				"ip_ndp_max_unicast_solicit"},
-	{  1,	255,	IPV6_MAX_HOPS,	"ip6_def_hops" },
-	{  8,	IPV6_MIN_MTU,	IPV6_MIN_MTU, "ip6_icmp_return_data_bytes" },
-	{  0,	1,	0,	"ip6_forward_src_routed"},
-	{  0,	1,	1,	"ip6_respond_to_echo_multicast"},
-	{  0,	1,	1,	"ip6_send_redirects"},
-	{  0,	1,	0,	"ip6_ignore_redirect" },
-	/*
-	 * See comments for ip6_strict_src_multihoming for an explanation
-	 * of the semantics of ip6_strict_dst_multihoming
-	 */
-	{  0,	1,	0,	"ip6_strict_dst_multihoming" },
-
-	{  0,	2,	2,	"ip_src_check" },
-
-	{  0,	999999,	1000,	"ipsec_policy_log_interval" },
-
-	{  0,	1,	1,	"pim_accept_clear_messages" },
-	{  1000, 20000,	2000,	"ip_ndp_unsolicit_interval" },
-	{  1,	20,	3,	"ip_ndp_unsolicit_count" },
-	{  0,	1,	1,	"ip6_ignore_home_address_opt" },
-	{  0,	15,	0,	"ip_policy_mask" },
-	{  0,	2,	2,	"ip_ecmp_behavior" },
-	{  0,	255,	1,	"ip_multirt_ttl" },
-	{  0,	3600,	60,	"ip_ire_badcnt_lifetime" },	/* In seconds */
-	{  0,	999999,	60*60*24, "ip_max_temp_idle" },
-	{  0,	1000,	1,	"ip_max_temp_defend" },
-	/*
-	 * when a conflict of an active address is detected,
-	 * defend up to ip_max_defend times, within any
-	 * ip_defend_interval span.
-	 */
-	{  0,	1000,	3,	"ip_max_defend" },
-	{  0,	999999,	30,	"ip_defend_interval" },
-	{  0,	3600000, 300000, "ip_dup_recovery" },
-	{  0,	1,	1,	"ip_restrict_interzone_loopback" },
-	{  0,	1,	1,	"ip_lso_outbound" },
-	{  IGMP_V1_ROUTER, IGMP_V3_ROUTER, IGMP_V3_ROUTER, "igmp_max_version" },
-	{  MLD_V1_ROUTER, MLD_V2_ROUTER, MLD_V2_ROUTER, "mld_max_version" },
-#ifdef DEBUG
-	{  0,	1,	0,	"ip6_drop_inbound_icmpv6" },
-#else
-	{  0,	0,	0,	"" },
-#endif
-	/* delay before sending first probe: */
-	{  0,	20000,	1000,	"arp_probe_delay" },
-	{  0,	20000,	100,	"arp_fastprobe_delay" },
-	/* interval at which DAD probes are sent: */
-	{ 10,	20000,	1500,	"arp_probe_interval" },
-	{ 10,	20000,	150,	"arp_fastprobe_interval" },
-	/* setting probe count to 0 will disable ARP probing for DAD. */
-	{  0,	20,	3,	"arp_probe_count" },
-	{  0,	20,	3,	"arp_fastprobe_count" },
-
-	{  0,	3600000, 15000,	"ipv4_dad_announce_interval"},
-	{  0,	3600000, 15000,	"ipv6_dad_announce_interval"},
-	/*
-	 * Rate limiting parameters for DAD defense used in
-	 * ill_defend_rate_limit():
-	 * defend_rate : pkts/hour permitted
-	 * defend_interval : time that can elapse before we send out a
-	 *			DAD defense.
-	 * defend_period: denominator for defend_rate (in seconds).
-	 */
-	{  0,	3600000, 300000,	"arp_defend_interval"},
-	{  0,	20000, 100,		"arp_defend_rate"},
-	{  0,	3600000, 300000,	"ndp_defend_interval"},
-	{  0,	20000, 100,		"ndp_defend_rate"},
-	{  5,	86400,	3600,		"arp_defend_period"},
-	{  5,	86400,	3600,		"ndp_defend_period"},
-	{  0,	1,	1,		"ipv4_icmp_return_pmtu" },
-	{  0,	1,	1,		"ipv6_icmp_return_pmtu" },
-	/*
-	 * publish count/interval values used to announce local addresses
-	 * for IPv4, IPv6.
-	 */
-	{  1,	20,	5,	"ip_arp_publish_count" },
-	{  1000, 20000, 2000,   "ip_arp_publish_interval" },
-	/*
-	 * The ip*strict_src_multihoming and ip*strict_dst_multihoming provide
-	 * a range of choices for setting strong/weak/preferred end-system
-	 * behavior. The semantics for setting these are:
-	 *
-	 * ip*_strict_dst_multihoming = 0
-	 *    weak end system model for managing ip destination addresses.
-	 *    A packet with IP dst D1 that's received on interface I1 will be
-	 *    accepted as long as D1 is one of the local addresses on
-	 *    the machine, even if D1 is not configured on I1.
-	 * ip*strict_dst_multihioming = 1
-	 *    strong end system model for managing ip destination addresses.
-	 *    A packet with IP dst D1 that's received on interface I1 will be
-	 *    accepted if, and only if, D1 is configured on I1.
-	 *
-	 * ip*strict_src_multihoming = 0
-	 *    Source agnostic route selection for outgoing packets: the
-	 *    outgoing interface for a packet will be computed using
-	 *    default algorithms for route selection, where the route
-	 *    with the longest matching prefix is chosen for the output
-	 *    unless other route selection constraints are explicitly
-	 *    specified during routing table lookup.  This may result
-	 *    in packet being sent out on interface I2 with source
-	 *    address S1, even though S1 is not a configured address on I2.
-	 * ip*strict_src_multihoming = 1
-	 *    Preferred source aware route selection for outgoing packets: for
-	 *    a packet with source S2, destination D2, the route selection
-	 *    algorithm will first attempt to find a route for the destination
-	 *    that goes out through an interface where S2 is
-	 *    configured. If such a route cannot be found, then the
-	 *    best-matching route for D2 will be selected.
-	 * ip*strict_src_multihoming = 2
-	 *    Source aware route selection for outgoing packets: a packet will
-	 *    be sent out on an interface I2 only if the src address S2 of the
-	 *    packet is a configured address on I2. In conjunction with
-	 *    the setting 'ip_strict_dst_multihoming == 1', this will result in
-	 *    the implementation of Strong ES as defined in Section 3.3.4.2 of
-	 *    RFC 1122
-	 */
-	{  0,	2,	0,	"ip_strict_src_multihoming" },
-	{  0,	2,	0,	"ip6_strict_src_multihoming" }
-};
-
-/*
- * Extended NDP table
- * The addresses for the first two are filled in to be ips_ip_g_forward
- * and ips_ipv6_forward at init time.
- */
-static ipndp_t	lcl_ndp_arr[] = {
-	/* getf			setf		data			name */
-#define	IPNDP_IP_FORWARDING_OFFSET	0
-	{  ip_param_generic_get,	ip_forward_set,	NULL,
-	    "ip_forwarding" },
-#define	IPNDP_IP6_FORWARDING_OFFSET	1
-	{  ip_param_generic_get,	ip_forward_set,	NULL,
-	    "ip6_forwarding" },
-	{ ip_param_generic_get, ip_input_proc_set,
-	    (caddr_t)&ip_squeue_enter, "ip_squeue_enter" },
-	{ ip_param_generic_get, ip_int_set,
-	    (caddr_t)&ip_squeue_fanout, "ip_squeue_fanout" },
-#define	IPNDP_CGTP_FILTER_OFFSET	4
-	{  ip_cgtp_filter_get,	ip_cgtp_filter_set, NULL,
-	    "ip_cgtp_filter" },
-	{  ip_param_generic_get, ip_int_set, (caddr_t)&ip_debug,
-	    "ip_debug" },
-};
+extern mod_prop_info_t ip_propinfo_tbl[];
+extern int ip_propinfo_count;
 
 /*
  * Table of IP ioctls encoding the various properties of the ioctl and
@@ -1324,6 +1117,12 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* 186 */ { IPI_DONTCARE /* SIOCGSTAMP */, 0, 0, 0, NULL, NULL },
 	/* 187 */ { SIOCILB, 0, IPI_PRIV | IPI_GET_CMD, MISC_CMD,
 			ip_sioctl_ilb_cmd, NULL },
+	/* 188 */ { SIOCGETPROP, 0, IPI_GET_CMD, 0, NULL, NULL },
+	/* 189 */ { SIOCSETPROP, 0, IPI_PRIV | IPI_WR, 0, NULL, NULL},
+	/* 190 */ { SIOCGLIFDADSTATE, sizeof (struct lifreq),
+			IPI_GET_CMD, LIF_CMD, ip_sioctl_get_dadstate, NULL },
+	/* 191 */ { SIOCSLIFPREFIX, sizeof (struct lifreq), IPI_PRIV | IPI_WR,
+			LIF_CMD, ip_sioctl_prefix, ip_sioctl_prefix_restart }
 };
 
 int ip_ndx_ioctl_count = sizeof (ip_ndx_ioctl_table) / sizeof (ip_ioctl_cmd_t);
@@ -4584,18 +4383,15 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	ipst->ips_ip6_kstat = NULL;
 	bzero(&ipst->ips_ip6_statistics, sizeof (ipst->ips_ip6_statistics));
 
-	nd_free(&ipst->ips_ip_g_nd);
-	kmem_free(ipst->ips_param_arr, sizeof (lcl_param_arr));
-	ipst->ips_param_arr = NULL;
-	kmem_free(ipst->ips_ndp_arr, sizeof (lcl_ndp_arr));
-	ipst->ips_ndp_arr = NULL;
+	kmem_free(ipst->ips_propinfo_tbl,
+	    ip_propinfo_count * sizeof (mod_prop_info_t));
+	ipst->ips_propinfo_tbl = NULL;
 
 	dce_stack_destroy(ipst);
 	ip_mrouter_stack_destroy(ipst);
 
 	mutex_destroy(&ipst->ips_ip_mi_lock);
 	rw_destroy(&ipst->ips_ill_g_usesrc_lock);
-	rw_destroy(&ipst->ips_ip_g_nd_lock);
 
 	ret = untimeout(ipst->ips_igmp_timeout_id);
 	if (ret == -1) {
@@ -4753,8 +4549,7 @@ static void *
 ip_stack_init(netstackid_t stackid, netstack_t *ns)
 {
 	ip_stack_t	*ipst;
-	ipparam_t	*pa;
-	ipndp_t		*na;
+	size_t		arrsz;
 	major_t		major;
 
 #ifdef NS_DEBUG
@@ -4773,7 +4568,6 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	mutex_init(&ipst->ips_ndp4->ndp_g_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&ipst->ips_ndp6->ndp_g_lock, NULL, MUTEX_DEFAULT, NULL);
 
-	rw_init(&ipst->ips_ip_g_nd_lock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&ipst->ips_igmp_timer_lock, NULL, MUTEX_DEFAULT, NULL);
 	ipst->ips_igmp_deferred_next = INFINITY;
 	mutex_init(&ipst->ips_mld_timer_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -4793,39 +4587,16 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	ip_mrouter_stack_init(ipst);
 	dce_stack_init(ipst);
 
-	ipst->ips_ip_g_frag_timeout = IP_FRAG_TIMEOUT;
-	ipst->ips_ip_g_frag_timo_ms = IP_FRAG_TIMEOUT * 1000;
-	ipst->ips_ipv6_frag_timeout = IPV6_FRAG_TIMEOUT;
-	ipst->ips_ipv6_frag_timo_ms = IPV6_FRAG_TIMEOUT * 1000;
-
 	ipst->ips_ip_multirt_log_interval = 1000;
 
-	ipst->ips_ip_g_forward = IP_FORWARD_DEFAULT;
-	ipst->ips_ipv6_forward = IP_FORWARD_DEFAULT;
 	ipst->ips_ill_index = 1;
 
-	ipst->ips_saved_ip_g_forward = -1;
+	ipst->ips_saved_ip_forwarding = -1;
 	ipst->ips_reg_vif_num = ALL_VIFS; 	/* Index to Register vif */
 
-	pa = (ipparam_t *)kmem_alloc(sizeof (lcl_param_arr), KM_SLEEP);
-	ipst->ips_param_arr = pa;
-	bcopy(lcl_param_arr, ipst->ips_param_arr, sizeof (lcl_param_arr));
-
-	na = (ipndp_t *)kmem_alloc(sizeof (lcl_ndp_arr), KM_SLEEP);
-	ipst->ips_ndp_arr = na;
-	bcopy(lcl_ndp_arr, ipst->ips_ndp_arr, sizeof (lcl_ndp_arr));
-	ipst->ips_ndp_arr[IPNDP_IP_FORWARDING_OFFSET].ip_ndp_data =
-	    (caddr_t)&ipst->ips_ip_g_forward;
-	ipst->ips_ndp_arr[IPNDP_IP6_FORWARDING_OFFSET].ip_ndp_data =
-	    (caddr_t)&ipst->ips_ipv6_forward;
-	ASSERT(strcmp(ipst->ips_ndp_arr[IPNDP_CGTP_FILTER_OFFSET].ip_ndp_name,
-	    "ip_cgtp_filter") == 0);
-	ipst->ips_ndp_arr[IPNDP_CGTP_FILTER_OFFSET].ip_ndp_data =
-	    (caddr_t)&ipst->ips_ip_cgtp_filter;
-
-	(void) ip_param_register(&ipst->ips_ip_g_nd,
-	    ipst->ips_param_arr, A_CNT(lcl_param_arr),
-	    ipst->ips_ndp_arr, A_CNT(lcl_ndp_arr));
+	arrsz = ip_propinfo_count * sizeof (mod_prop_info_t);
+	ipst->ips_propinfo_tbl = (mod_prop_info_t *)kmem_alloc(arrsz, KM_SLEEP);
+	bcopy(ip_propinfo_tbl, ipst->ips_propinfo_tbl, arrsz);
 
 	ipst->ips_ip_mibkp = ip_kstat_init(stackid, ipst);
 	ipst->ips_icmp_mibkp = icmp_kstat_init(stackid);
@@ -6726,103 +6497,6 @@ ip_fill_mtuinfo(conn_t *connp, ip_xmit_attr_t *ixa, struct ip6_mtuinfo *mtuinfo)
 	return (sizeof (struct ip6_mtuinfo));
 }
 
-/* Named Dispatch routine to get a current value out of our parameter table. */
-/* ARGSUSED */
-static int
-ip_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *ioc_cr)
-{
-	ipparam_t *ippa = (ipparam_t *)cp;
-
-	(void) mi_mpprintf(mp, "%d", ippa->ip_param_value);
-	return (0);
-}
-
-/* ARGSUSED */
-static int
-ip_param_generic_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *ioc_cr)
-{
-
-	(void) mi_mpprintf(mp, "%d", *(int *)cp);
-	return (0);
-}
-
-/*
- * Set ip{,6}_forwarding values.  This means walking through all of the
- * ill's and toggling their forwarding values.
- */
-/* ARGSUSED */
-static int
-ip_forward_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *ioc_cr)
-{
-	long new_value;
-	int *forwarding_value = (int *)cp;
-	ill_t *ill;
-	boolean_t isv6;
-	ill_walk_context_t ctx;
-	ip_stack_t *ipst = CONNQ_TO_IPST(q);
-
-	isv6 = (forwarding_value == &ipst->ips_ipv6_forward);
-
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
-	    new_value < 0 || new_value > 1) {
-		return (EINVAL);
-	}
-
-	*forwarding_value = new_value;
-
-	/*
-	 * Regardless of the current value of ip_forwarding, set all per-ill
-	 * values of ip_forwarding to the value being set.
-	 *
-	 * Bring all the ill's up to date with the new global value.
-	 */
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-
-	if (isv6)
-		ill = ILL_START_WALK_V6(&ctx, ipst);
-	else
-		ill = ILL_START_WALK_V4(&ctx, ipst);
-
-	for (; ill != NULL; ill = ill_next(&ctx, ill))
-		(void) ill_forward_set(ill, new_value != 0);
-
-	rw_exit(&ipst->ips_ill_g_lock);
-	return (0);
-}
-
-/*
- * Walk through the param array specified registering each element with the
- * Named Dispatch handler. This is called only during init. So it is ok
- * not to acquire any locks
- */
-static boolean_t
-ip_param_register(IDP *ndp, ipparam_t *ippa, size_t ippa_cnt,
-    ipndp_t *ipnd, size_t ipnd_cnt)
-{
-	for (; ippa_cnt-- > 0; ippa++) {
-		if (ippa->ip_param_name && ippa->ip_param_name[0]) {
-			if (!nd_load(ndp, ippa->ip_param_name,
-			    ip_param_get, ip_param_set, (caddr_t)ippa)) {
-				nd_free(ndp);
-				return (B_FALSE);
-			}
-		}
-	}
-
-	for (; ipnd_cnt-- > 0; ipnd++) {
-		if (ipnd->ip_ndp_name && ipnd->ip_ndp_name[0]) {
-			if (!nd_load(ndp, ipnd->ip_ndp_name,
-			    ipnd->ip_ndp_getf, ipnd->ip_ndp_setf,
-			    ipnd->ip_ndp_data)) {
-				nd_free(ndp);
-				return (B_FALSE);
-			}
-		}
-	}
-
-	return (B_TRUE);
-}
-
 /*
  * When the src multihoming is changed from weak to [strong, preferred]
  * ip_ire_rebind_walker is called to walk the list of all ire_t entries
@@ -6832,7 +6506,7 @@ ip_param_register(IDP *ndp, ipparam_t *ippa, size_t ippa_cnt,
  * is selected by finding an interface route for the gateway.
  */
 /* ARGSUSED */
-static void
+void
 ip_ire_rebind_walker(ire_t *ire, void *notused)
 {
 	if (!ire->ire_unbound || ire->ire_ill != NULL)
@@ -6848,7 +6522,7 @@ ip_ire_rebind_walker(ire_t *ire, void *notused)
  * (i.e., without RTA_IFP) back to having a NULL ire_ill.
  */
 /* ARGSUSED */
-static void
+void
 ip_ire_unbind_walker(ire_t *ire, void *notused)
 {
 	ire_t *new_ire;
@@ -6891,7 +6565,7 @@ ip_ire_unbind_walker(ire_t *ire, void *notused)
  * The cached ixa_ire entires for all conn_t entries are marked as
  * "verify" so that they will be recomputed for the next packet.
  */
-static void
+void
 conn_ire_revalidate(conn_t *connp, void *arg)
 {
 	boolean_t isv6 = (boolean_t)arg;
@@ -6900,45 +6574,6 @@ conn_ire_revalidate(conn_t *connp, void *arg)
 	    (!isv6 && connp->conn_ipversion != IPV4_VERSION))
 		return;
 	connp->conn_ixa->ixa_ire_generation = IRE_GENERATION_VERIFY;
-}
-
-/* Named Dispatch routine to negotiate a new value for one of our parameters. */
-/* ARGSUSED */
-static int
-ip_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *ioc_cr)
-{
-	long		new_value;
-	ipparam_t	*ippa = (ipparam_t *)cp;
-	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
-	int		strict_src4, strict_src6;
-
-	strict_src4 = ipst->ips_ip_strict_src_multihoming;
-	strict_src6 = ipst->ips_ipv6_strict_src_multihoming;
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
-	    new_value < ippa->ip_param_min || new_value > ippa->ip_param_max) {
-		return (EINVAL);
-	}
-	ippa->ip_param_value = new_value;
-	if (ipst->ips_ip_strict_src_multihoming != strict_src4) {
-		if (strict_src4 == 0) {
-			ire_walk_v4(ip_ire_rebind_walker, NULL, ALL_ZONES,
-			    ipst);
-		} else {
-			ire_walk_v4(ip_ire_unbind_walker, NULL, ALL_ZONES,
-			    ipst);
-		}
-		ipcl_walk(conn_ire_revalidate, (void *)B_FALSE, ipst);
-	} else if (ipst->ips_ipv6_strict_src_multihoming != strict_src6) {
-		if (strict_src6 == 0) {
-			ire_walk_v6(ip_ire_rebind_walker, NULL, ALL_ZONES,
-			    ipst);
-		} else {
-			ire_walk_v4(ip_ire_unbind_walker, NULL, ALL_ZONES,
-			    ipst);
-		}
-		ipcl_walk(conn_ire_revalidate, (void *)B_TRUE, ipst);
-	}
-	return (0);
 }
 
 /*
@@ -9413,7 +9048,7 @@ ill_frag_timer(void *arg)
 {
 	ill_t	*ill = (ill_t *)arg;
 	boolean_t frag_pending;
-	ip_stack_t	*ipst = ill->ill_ipst;
+	ip_stack_t *ipst = ill->ill_ipst;
 	time_t	timeout;
 
 	mutex_enter(&ill->ill_lock);
@@ -9426,10 +9061,8 @@ ill_frag_timer(void *arg)
 	ill->ill_fragtimer_executing = 1;
 	mutex_exit(&ill->ill_lock);
 
-	if (ill->ill_isv6)
-		timeout = ipst->ips_ipv6_frag_timeout;
-	else
-		timeout = ipst->ips_ip_g_frag_timeout;
+	timeout = (ill->ill_isv6 ? ipst->ips_ipv6_reassembly_timeout :
+	    ipst->ips_ip_reassembly_timeout);
 
 	frag_pending = ill_frag_timeout(ill, timeout);
 
@@ -9448,7 +9081,7 @@ ill_frag_timer(void *arg)
 void
 ill_frag_timer_start(ill_t *ill)
 {
-	ip_stack_t	*ipst = ill->ill_ipst;
+	ip_stack_t *ipst = ill->ill_ipst;
 	clock_t	timeo_ms;
 
 	ASSERT(MUTEX_HELD(&ill->ill_lock));
@@ -9469,10 +9102,9 @@ ill_frag_timer_start(ill_t *ill)
 	}
 
 	if (ill->ill_frag_timer_id == 0) {
-		if (ill->ill_isv6)
-			timeo_ms = ipst->ips_ipv6_frag_timo_ms;
-		else
-			timeo_ms = ipst->ips_ip_g_frag_timo_ms;
+		timeo_ms = (ill->ill_isv6 ? ipst->ips_ipv6_reassembly_timeout :
+		    ipst->ips_ip_reassembly_timeout) * SECONDS;
+
 		/*
 		 * The timer is neither running nor is the timeout handler
 		 * executing. Post a timeout so that ill_frag_timer will be
@@ -10000,7 +9632,7 @@ ip_snmp_get_mib2_ip(queue_t *q, mblk_t *mpctl, mib2_ipIfStatsEntry_t *ipmib,
 	SET_MIB(old_ip_mib.ipDefaultTTL,
 	    (uint32_t)ipst->ips_ip_def_ttl);
 	SET_MIB(old_ip_mib.ipReasmTimeout,
-	    ipst->ips_ip_g_frag_timeout);
+	    ipst->ips_ip_reassembly_timeout);
 	SET_MIB(old_ip_mib.ipAddrEntrySize,
 	    sizeof (mib2_ipAddrEntry_t));
 	SET_MIB(old_ip_mib.ipRouteEntrySize,
@@ -10097,7 +9729,7 @@ ip_snmp_get_mib2_ip_traffic_stats(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	ipst->ips_ip_mib.ipIfStatsIfIndex =
 	    MIB2_UNKNOWN_INTERFACE; /* Flag to netstat */
 	SET_MIB(ipst->ips_ip_mib.ipIfStatsForwarding,
-	    (ipst->ips_ip_g_forward ? 1 : 2));
+	    (ipst->ips_ip_forwarding ? 1 : 2));
 	SET_MIB(ipst->ips_ip_mib.ipIfStatsDefaultTTL,
 	    (uint32_t)ipst->ips_ip_def_ttl);
 	SET_MIB(ipst->ips_ip_mib.ipIfStatsEntrySize,
@@ -10128,7 +9760,7 @@ ip_snmp_get_mib2_ip_traffic_stats(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 		ill->ill_ip_mib->ipIfStatsIfIndex =
 		    ill->ill_phyint->phyint_ifindex;
 		SET_MIB(ill->ill_ip_mib->ipIfStatsForwarding,
-		    (ipst->ips_ip_g_forward ? 1 : 2));
+		    (ipst->ips_ip_forwarding ? 1 : 2));
 		SET_MIB(ill->ill_ip_mib->ipIfStatsDefaultTTL,
 		    (uint32_t)ipst->ips_ip_def_ttl);
 
@@ -10295,7 +9927,7 @@ ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			mae.ipAdEntBcastAddr = bitval;
 			mae.ipAdEntReasmMaxSize = IP_MAXPACKET;
 			mae.ipAdEntInfo.ae_mtu = ipif->ipif_ill->ill_mtu;
-			mae.ipAdEntInfo.ae_metric  = ipif->ipif_metric;
+			mae.ipAdEntInfo.ae_metric  = ipif->ipif_ill->ill_metric;
 			mae.ipAdEntInfo.ae_broadcast_addr =
 			    ipif->ipif_brd_addr;
 			mae.ipAdEntInfo.ae_pp_dst_addr =
@@ -10398,7 +10030,8 @@ ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			else
 				mae6.ipv6AddrStatus = 1;
 			mae6.ipv6AddrInfo.ae_mtu = ipif->ipif_ill->ill_mtu;
-			mae6.ipv6AddrInfo.ae_metric  = ipif->ipif_metric;
+			mae6.ipv6AddrInfo.ae_metric  =
+			    ipif->ipif_ill->ill_metric;
 			mae6.ipv6AddrInfo.ae_pp_dst_addr =
 			    ipif->ipif_v6pp_dst_addr;
 			mae6.ipv6AddrInfo.ae_flags = ipif->ipif_flags |
@@ -10980,7 +10613,7 @@ ip_snmp_get_mib2_ip6(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	ipst->ips_ip6_mib.ipIfStatsIfIndex =
 	    MIB2_UNKNOWN_INTERFACE; /* Flag to netstat */
 	SET_MIB(ipst->ips_ip6_mib.ipIfStatsForwarding,
-	    ipst->ips_ipv6_forward ? 1 : 2);
+	    ipst->ips_ipv6_forwarding ? 1 : 2);
 	SET_MIB(ipst->ips_ip6_mib.ipIfStatsDefaultHopLimit,
 	    ipst->ips_ipv6_def_hops);
 	SET_MIB(ipst->ips_ip6_mib.ipIfStatsEntrySize,
@@ -11024,7 +10657,7 @@ ip_snmp_get_mib2_ip6(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 		ill->ill_ip_mib->ipIfStatsIfIndex =
 		    ill->ill_phyint->phyint_ifindex;
 		SET_MIB(ill->ill_ip_mib->ipIfStatsForwarding,
-		    ipst->ips_ipv6_forward ? 1 : 2);
+		    ipst->ips_ipv6_forwarding ? 1 : 2);
 		SET_MIB(ill->ill_ip_mib->ipIfStatsDefaultHopLimit,
 		    ill->ill_max_hops);
 
@@ -14014,71 +13647,6 @@ ip_multirt_apply_membership(int (*fn)(conn_t *, boolean_t,
 }
 
 /*
- * Get the CGTP (multirouting) filtering status.
- * If 0, the CGTP hooks are transparent.
- */
-/* ARGSUSED */
-static int
-ip_cgtp_filter_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *ioc_cr)
-{
-	boolean_t	*ip_cgtp_filter_value = (boolean_t *)cp;
-
-	(void) mi_mpprintf(mp, "%d", (int)*ip_cgtp_filter_value);
-	return (0);
-}
-
-/*
- * Set the CGTP (multirouting) filtering status.
- * If the status is changed from active to transparent
- * or from transparent to active, forward the new status
- * to the filtering module (if loaded).
- */
-/* ARGSUSED */
-static int
-ip_cgtp_filter_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
-    cred_t *ioc_cr)
-{
-	long		new_value;
-	boolean_t	*ip_cgtp_filter_value = (boolean_t *)cp;
-	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
-
-	if (secpolicy_ip_config(ioc_cr, B_FALSE) != 0)
-		return (EPERM);
-
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
-	    new_value < 0 || new_value > 1) {
-		return (EINVAL);
-	}
-
-	if ((!*ip_cgtp_filter_value) && new_value) {
-		cmn_err(CE_NOTE, "IP: enabling CGTP filtering%s",
-		    ipst->ips_ip_cgtp_filter_ops == NULL ?
-		    " (module not loaded)" : "");
-	}
-	if (*ip_cgtp_filter_value && (!new_value)) {
-		cmn_err(CE_NOTE, "IP: disabling CGTP filtering%s",
-		    ipst->ips_ip_cgtp_filter_ops == NULL ?
-		    " (module not loaded)" : "");
-	}
-
-	if (ipst->ips_ip_cgtp_filter_ops != NULL) {
-		int	res;
-		netstackid_t stackid;
-
-		stackid = ipst->ips_netstack->netstack_stackid;
-		res = ipst->ips_ip_cgtp_filter_ops->cfo_change_state(stackid,
-		    new_value);
-		if (res)
-			return (res);
-	}
-
-	*ip_cgtp_filter_value = (boolean_t)new_value;
-
-	ill_set_inputfn_all(ipst);
-	return (0);
-}
-
-/*
  * Return the expected CGTP hooks version number.
  */
 int
@@ -14198,47 +13766,6 @@ ip_squeue_switch(int val)
 		break;
 	}
 	return (rval);
-}
-
-/* ARGSUSED */
-static int
-ip_input_proc_set(queue_t *q, mblk_t *mp, char *value,
-    caddr_t addr, cred_t *cr)
-{
-	int *v = (int *)addr;
-	long new_value;
-
-	if (secpolicy_net_config(cr, B_FALSE) != 0)
-		return (EPERM);
-
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0)
-		return (EINVAL);
-
-	ip_squeue_flag = ip_squeue_switch(new_value);
-	*v = new_value;
-	return (0);
-}
-
-/*
- * Handle ndd set of variables which require PRIV_SYS_NET_CONFIG such as
- * ip_debug.
- */
-/* ARGSUSED */
-static int
-ip_int_set(queue_t *q, mblk_t *mp, char *value,
-    caddr_t addr, cred_t *cr)
-{
-	int *v = (int *)addr;
-	long new_value;
-
-	if (secpolicy_net_config(cr, B_FALSE) != 0)
-		return (EPERM);
-
-	if (ddi_strtol(value, NULL, 10, &new_value) != 0)
-		return (EINVAL);
-
-	*v = new_value;
-	return (0);
 }
 
 static void *
@@ -14365,7 +13892,7 @@ ip_kstat_init(netstackid_t stackid, ip_stack_t *ipst)
 
 	template.forwarding.value.ui32 = WE_ARE_FORWARDING(ipst) ? 1:2;
 	template.defaultTTL.value.ui32 = (uint32_t)ipst->ips_ip_def_ttl;
-	template.reasmTimeout.value.ui32 = ipst->ips_ip_g_frag_timeout;
+	template.reasmTimeout.value.ui32 = ipst->ips_ip_reassembly_timeout;
 	template.addrEntrySize.value.i32 = sizeof (mib2_ipAddrEntry_t);
 	template.routeEntrySize.value.i32 = sizeof (mib2_ipRouteEntry_t);
 
@@ -14437,7 +13964,7 @@ ip_kstat_update(kstat_t *kp, int rw)
 	ipkp->outRequests.value.ui64 =		ipmib.ipIfStatsHCOutRequests;
 	ipkp->outDiscards.value.ui32 =		ipmib.ipIfStatsOutDiscards;
 	ipkp->outNoRoutes.value.ui32 =		ipmib.ipIfStatsOutNoRoutes;
-	ipkp->reasmTimeout.value.ui32 =		ipst->ips_ip_g_frag_timeout;
+	ipkp->reasmTimeout.value.ui32 =		ipst->ips_ip_reassembly_timeout;
 	ipkp->reasmReqds.value.ui32 =		ipmib.ipIfStatsReasmReqds;
 	ipkp->reasmOKs.value.ui32 =		ipmib.ipIfStatsReasmOKs;
 	ipkp->reasmFails.value.ui32 =		ipmib.ipIfStatsReasmFails;

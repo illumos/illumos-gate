@@ -1351,7 +1351,8 @@ rts_getifdata(if_data_t *if_data, const ipif_t *ipif)
 	if_data->ifi_addrlen = 0;		/* media address length */
 	if_data->ifi_hdrlen = 0;		/* media header length */
 	if_data->ifi_mtu = ipif->ipif_ill->ill_mtu;	/* mtu */
-	if_data->ifi_metric = ipif->ipif_metric; /* metric (external only) */
+						/* metric (external only) */
+	if_data->ifi_metric = ipif->ipif_ill->ill_metric;
 	if_data->ifi_baudrate = 0;		/* linespeed */
 
 	if_data->ifi_ipackets = 0;		/* packets received on if */
@@ -2027,7 +2028,7 @@ rts_new_rtsmsg(int cmd, int error, const ipif_t *ipif, uint_t flags)
 		ifam = (ifa_msghdr_t *)mp->b_rptr;
 		ifam->ifam_index =
 		    ipif->ipif_ill->ill_phyint->phyint_ifindex;
-		ifam->ifam_metric = ipif->ipif_metric;
+		ifam->ifam_metric = ipif->ipif_ill->ill_metric;
 		ifam->ifam_flags = ((cmd == RTM_NEWADDR) ? RTF_UP : 0);
 		ifam->ifam_addrs = rtm_addrs;
 	} else {

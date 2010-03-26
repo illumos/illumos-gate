@@ -1,5 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,13 +170,15 @@ struct ifnet {
 #define	IFF_IPMP	0x8000000000ll	/* IPMP IP interface */
 #define	IFF_VRRP	0x10000000000ll	/* Managed by VRRP */
 
+#define	IFF_NOLINKLOCAL	0x20000000000ll	/* No default linklocal */
+
 /* flags that cannot be changed by userland on any interface */
 #define	IFF_CANTCHANGE \
 	(IFF_BROADCAST | IFF_POINTOPOINT | IFF_RUNNING | IFF_PROMISC | \
 	IFF_MULTICAST | IFF_MULTI_BCAST | IFF_UNNUMBERED | IFF_IPV4 | \
 	IFF_IPV6 | IFF_IPMP | IFF_FIXEDMTU | IFF_VIRTUAL | \
 	IFF_LOOPBACK | IFF_ALLMULTI | IFF_DUPLICATE | IFF_COS_ENABLED | \
-	IFF_VRRP)
+	IFF_VRRP | IFF_NOLINKLOCAL)
 
 /* flags that cannot be changed by userland on an IPMP interface */
 #define	IFF_IPMP_CANTCHANGE 	IFF_FAILED
@@ -378,6 +380,7 @@ struct	lifreq {
 		char	lifru_groupname[LIFGRNAMSIZ]; /* SIOC[GS]LIFGROUPNAME */
 		char	lifru_binding[LIFNAMSIZ]; /* SIOCGLIFBINDING */
 		zoneid_t lifru_zoneid;		/* SIOC[GS]LIFZONE */
+		uint_t	lifru_dadstate;		/* SIOCGLIFDADSTATE */
 	} lifr_lifru;
 
 #define	lifr_addr	lifr_lifru.lifru_addr	/* address */
@@ -396,6 +399,7 @@ struct	lifreq {
 #define	lifr_groupname	lifr_lifru.lifru_groupname
 #define	lifr_binding	lifr_lifru.lifru_binding
 #define	lifr_zoneid	lifr_lifru.lifru_zoneid
+#define	lifr_dadstate	lifr_lifru.lifru_dadstate
 };
 #endif /* defined(_INT64_TYPE) */
 
@@ -420,6 +424,12 @@ struct sioc_lsg_req {
 	uint_t			slr_wrong_if;
 	uint_t			slr_pad;
 };
+
+/* Argument structure for SIOCGLIFDADSTATE ioctl */
+typedef enum {
+	DAD_IN_PROGRESS	= 0x1,
+	DAD_DONE	= 0x2
+} glif_dad_state_t;
 
 /*
  * OBSOLETE: Replaced by struct lifreq. Supported for compatibility.
@@ -561,6 +571,7 @@ struct lifsrcof {
 #define	LIFC_ALLZONES	0x08		/* Include all zones */
 					/* (must be issued from global zone) */
 #define	LIFC_UNDER_IPMP	0x10		/* Include underlying IPMP interfaces */
+#define	LIFC_ENABLED	0x20		/* Include only IFF_UP interfaces */
 
 #if defined(_SYSCALL32)
 

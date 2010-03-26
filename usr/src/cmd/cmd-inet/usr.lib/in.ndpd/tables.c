@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,6 +131,10 @@ phyint_create(char *name)
 	pi->pi_TmpRegenCountdown = TIMER_INFINITY;
 
 	pi->pi_sock = -1;
+	pi->pi_stateless = pi->pi_StatelessAddrConf;
+	pi->pi_stateful = pi->pi_StatefulAddrConf;
+	pi->pi_autoconf = _B_TRUE;
+	pi->pi_default_token = _B_TRUE;
 	if (phyint_init_from_k(pi) == -1) {
 		free(pi);
 		return (NULL);
@@ -237,6 +241,7 @@ start_over:
 			(void) close(pi->pi_sock);
 			pi->pi_sock = -1;
 		}
+
 		if (debug & D_PHYINT) {
 			logmsg(LOG_DEBUG, "phyint_init_from_k(%s): "
 			    "IFF_NOLOCAL or not IFF_UP\n", pi->pi_name);
@@ -258,19 +263,21 @@ start_over:
 	sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
 	pi->pi_ifaddr = sin6->sin6_addr;
 
-	if (ioctl(fd, SIOCGLIFTOKEN, (char *)&lifr) < 0) {
-		logperror_pi(pi, "phyint_init_from_k: SIOCGLIFTOKEN");
-		goto error;
+	if (pi->pi_autoconf && pi->pi_default_token) {
+		if (ioctl(fd, SIOCGLIFTOKEN, (char *)&lifr) < 0) {
+			logperror_pi(pi, "phyint_init_from_k: SIOCGLIFTOKEN");
+			goto error;
+		}
+		/* Ignore interface if the token is all zeros */
+		sin6 = (struct sockaddr_in6 *)&lifr.lifr_token;
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+			logmsg(LOG_ERR, "ignoring interface %s: zero token\n",
+			    pi->pi_name);
+			goto error;
+		}
+		pi->pi_token = sin6->sin6_addr;
+		pi->pi_token_length = lifr.lifr_addrlen;
 	}
-	/* Ignore interface if the token is all zeros */
-	sin6 = (struct sockaddr_in6 *)&lifr.lifr_token;
-	if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
-		logmsg(LOG_ERR, "ignoring interface %s: zero token\n",
-		    pi->pi_name);
-		goto error;
-	}
-	pi->pi_token = sin6->sin6_addr;
-	pi->pi_token_length = lifr.lifr_addrlen;
 
 	/*
 	 * Guess a remote token for POINTOPOINT by looking at
@@ -472,8 +479,10 @@ phyint_delete(struct phyint *pi)
 
 	while (pi->pi_router_list)
 		router_delete(pi->pi_router_list);
-	while (pi->pi_prefix_list)
+	while (pi->pi_prefix_list) {
+		prefix_update_ipadm_addrobj(pi->pi_prefix_list, _B_FALSE);
 		prefix_delete(pi->pi_prefix_list);
+	}
 	while (pi->pi_adv_prefix_list)
 		adv_prefix_delete(pi->pi_adv_prefix_list);
 
@@ -1262,6 +1271,12 @@ prefix_init_from_k(struct prefix *pr)
 				    pr2->pr_name, pr->pr_name);
 			prefix_update_dhcp(pr);
 		}
+		/*
+		 * If this interface was created using ipadm, store the
+		 * addrobj for the DHCPv6 interface in ipmgmtd daemon's
+		 * in-memory aobjmap.
+		 */
+		prefix_update_ipadm_addrobj(pr, _B_TRUE);
 	} else {
 		if (ioctl(sock, SIOCGLIFSUBNET, (char *)&lifr) < 0) {
 			logperror_pr(pr,
@@ -1344,6 +1359,7 @@ error:
  * was added by in.ndpd (i.e. PR_STATIC is not set).
  * Handles delete of things that have not yet been inserted in the list
  * i.e. pr_physical is NULL.
+ * Removes the ipadm addrobj created for the prefix.
  */
 void
 prefix_delete(struct prefix *pr)
@@ -1357,9 +1373,10 @@ prefix_delete(struct prefix *pr)
 		    inet_ntop(AF_INET6, (void *)&pr->pr_prefix,
 		    abuf, sizeof (abuf)), pr->pr_prefix_len);
 	}
+	pi = pr->pr_physical;
+
 	/* Remove non-static prefixes from the kernel. */
 	pr->pr_state &= PR_STATIC;
-	pi = pr->pr_physical;
 	if (pr->pr_kernel_state != pr->pr_state)
 		prefix_update_k(pr);
 
@@ -1372,6 +1389,7 @@ prefix_delete(struct prefix *pr)
 	if (pr->pr_next != NULL)
 		pr->pr_next->pr_prev = pr->pr_prev;
 	pr->pr_next = pr->pr_prev = NULL;
+
 	free(pr);
 }
 
@@ -1595,6 +1613,11 @@ prefix_update_k(struct prefix *pr)
 			logperror_pr(pr, "prefix_update_k: SIOCSLIFADDR");
 			return;
 		}
+		/*
+		 * If this interface was created using ipadm, store the
+		 * addrobj for the prefix in ipmgmtd daemon's aobjmap.
+		 */
+		prefix_update_ipadm_addrobj(pr, _B_TRUE);
 		if (pr->pr_state & PR_ONLINK) {
 			sin6->sin6_addr = pr->pr_prefix;
 			lifr.lifr_addrlen = pr->pr_prefix_len;
@@ -2315,4 +2338,55 @@ phyint_cleanup(struct phyint *pi)
 	(void) poll_remove(pi->pi_sock);
 	(void) close(pi->pi_sock);
 	pi->pi_sock = -1;
+	pi->pi_stateless = pi->pi_StatelessAddrConf;
+	pi->pi_stateful = pi->pi_StatefulAddrConf;
+	pi->pi_ipadm_aobjname[0] = '\0';
+}
+
+/*
+ * Sets/removes the ipadm address object name for the given prefix.
+ */
+void
+prefix_update_ipadm_addrobj(struct prefix *pr, boolean_t add)
+{
+	struct phyint *pi = pr->pr_physical;
+	int lnum = 0;
+	char *cp;
+	ipadm_handle_t iph;
+	ipadm_status_t status;
+
+	/*
+	 * If ipadm was used to autoconfigure this interface,
+	 * pi_ipadm_aobjname will contain the address object name
+	 * that is used to identify the addresses. Use the same
+	 * address object name for this prefix.
+	 */
+	if (pi->pi_ipadm_aobjname[0] == '\0' ||
+	    pr->pr_name[0] == '\0' || IN6_IS_ADDR_LINKLOCAL(&pr->pr_address) ||
+	    (!(pr->pr_flags & IFF_ADDRCONF) &&
+	    !(pr->pr_flags & IFF_DHCPRUNNING))) {
+		return;
+	}
+	if ((status = ipadm_open(&iph, 0)) != IPADM_SUCCESS) {
+		logmsg(LOG_ERR, "Could not open handle to libipadm: %s\n",
+		    ipadm_status2str(status));
+		return;
+	}
+	cp = strrchr(pr->pr_name, ':');
+	if (cp != NULL)
+		lnum = atoi(++cp);
+	if (add) {
+		status = ipadm_add_aobjname(iph, pi->pi_name, AF_INET6,
+		    pi->pi_ipadm_aobjname, IPADM_ADDR_IPV6_ADDRCONF, lnum);
+	} else {
+		status = ipadm_delete_aobjname(iph, pi->pi_name, AF_INET6,
+		    pi->pi_ipadm_aobjname, IPADM_ADDR_IPV6_ADDRCONF, lnum);
+	}
+	/* Ignore the error if the ipmgmtd daemon is not running */
+	if (status != IPADM_SUCCESS && status != IPADM_IPC_ERROR) {
+		logmsg(LOG_ERR, "ipadm error in %s '%s' : %s\n",
+		    (add ? "adding" : "deleting"), pi->pi_ipadm_aobjname,
+		    ipadm_status2str(status));
+	}
+	ipadm_close(iph);
 }

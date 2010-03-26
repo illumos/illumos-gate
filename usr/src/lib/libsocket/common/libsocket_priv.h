@@ -19,44 +19,25 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+#ifndef _LIBSOCKET_PRIV_H
+#define	_LIBSOCKET_PRIV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <net/if.h>
+#include <ifaddrs.h>
 
-#include <sys/types.h>
-#include <sys/conf.h>
-#include <sys/modctl.h>
-#include <inet/common.h>
-#include <inet/ip.h>
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
-#define	INET_NAME	"sctp6"
-#define	INET_DEVDESC	"SCTP6 device"
-#define	INET_DEVSTRTAB	sctpinfo
-#define	INET_DEVMINOR	0
-#define	INET_DEVMTFLAGS	D_MP
+extern int	getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
+extern int	getallifs(int, sa_family_t, struct lifreq **, int *, int64_t);
+extern int	getnetmaskbyaddr(const struct in_addr, struct in_addr *);
 
-#include "../inetddi.c"
-
-int
-_init(void)
-{
-	/*
-	 * device initialization happens when the actual code containing
-	 * module (/kernel/drv/ip) is loaded, and driven from ip_ddi_init()
-	 */
-	return (mod_install(&modlinkage));
+#ifdef	__cplusplus
 }
+#endif
 
-int
-_fini(void)
-{
-	return (mod_remove(&modlinkage));
-}
-
-int
-_info(struct modinfo *modinfop)
-{
-	return (mod_info(&modlinkage, modinfop));
-}
+#endif	/* _LIBSOCKET_PRIV_H */

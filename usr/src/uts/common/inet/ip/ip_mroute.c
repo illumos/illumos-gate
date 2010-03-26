@@ -65,6 +65,7 @@
 #include <inet/common.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
+#include <inet/tunables.h>
 #include <inet/mib2.h>
 #include <netinet/ip6.h>
 #include <inet/ip.h>
@@ -565,8 +566,8 @@ ip_mrouter_init(conn_t *connp, uchar_t *data, int datalen, ip_stack_t *ipst)
 			(void) mi_strlog(connp->conn_rq, 1, SL_TRACE,
 			    "ip_mrouter_init: turning on forwarding");
 		}
-		ipst->ips_saved_ip_g_forward = ipst->ips_ip_g_forward;
-		ipst->ips_ip_g_forward = IP_FORWARD_ALWAYS;
+		ipst->ips_saved_ip_forwarding = ipst->ips_ip_forwarding;
+		ipst->ips_ip_forwarding = IP_FORWARD_ALWAYS;
 	}
 
 	mutex_exit(&ipst->ips_ip_g_mrouter_mutex);
@@ -620,13 +621,13 @@ ip_mrouter_done(ip_stack_t *ipst)
 
 	mrouter = ipst->ips_ip_g_mrouter;
 
-	if (ipst->ips_saved_ip_g_forward != -1) {
+	if (ipst->ips_saved_ip_forwarding != -1) {
 		if (ipst->ips_ip_mrtdebug > 1) {
 			(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 			    "ip_mrouter_done: turning off forwarding");
 		}
-		ipst->ips_ip_g_forward = ipst->ips_saved_ip_g_forward;
-		ipst->ips_saved_ip_g_forward = -1;
+		ipst->ips_ip_forwarding = ipst->ips_saved_ip_forwarding;
+		ipst->ips_saved_ip_forwarding = -1;
 	}
 
 	/*

@@ -214,8 +214,6 @@ driver name=rts perms="rts 0666 root sys"
 driver name=sad perms="admin 0666 root sys" perms="user 0666 root sys"
 driver name=scsi_vhci class=scsi-self-identifying perms="* 0666 root sys" \
     policy="devctl write_priv_set=sys_devices"
-driver name=sctp perms="* 0666 root sys"
-driver name=sctp6 perms="* 0666 root sys"
 $(sparc_ONLY)driver name=sd perms="* 0640 root sys" \
     alias=ide-cdrom \
     alias=scsiclass,00 \
@@ -365,8 +363,6 @@ file path=kernel/drv/$(ARCH64)/random group=sys
 file path=kernel/drv/$(ARCH64)/rts group=sys
 file path=kernel/drv/$(ARCH64)/sad group=sys
 file path=kernel/drv/$(ARCH64)/scsi_vhci group=sys
-file path=kernel/drv/$(ARCH64)/sctp group=sys
-file path=kernel/drv/$(ARCH64)/sctp6 group=sys
 file path=kernel/drv/$(ARCH64)/sd group=sys
 file path=kernel/drv/$(ARCH64)/sgen group=sys
 file path=kernel/drv/$(ARCH64)/simnet group=sys
@@ -507,10 +503,6 @@ $(i386_ONLY)file path=kernel/drv/scsi_vhci group=sys
 file path=kernel/drv/scsi_vhci.conf group=sys \
     original_name=SUNWckr:kernel/drv/scsi_vhci.conf preserve=true \
     reboot-needed=false
-$(i386_ONLY)file path=kernel/drv/sctp group=sys
-file path=kernel/drv/sctp.conf group=sys reboot-needed=false
-$(i386_ONLY)file path=kernel/drv/sctp6 group=sys
-file path=kernel/drv/sctp6.conf group=sys reboot-needed=false
 $(sparc_ONLY)file path=kernel/drv/sd.conf group=sys \
     original_name=SUNWckr:kernel/drv/sd.conf preserve=true reboot-needed=false
 $(i386_ONLY)file path=kernel/drv/sgen group=sys
