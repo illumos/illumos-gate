@@ -434,6 +434,46 @@ damap_addr_del(damap_t *damapp, char *address)
 	return (DAM_SUCCESS);
 }
 
+static int
+damap_addrset_flush_locked(damap_t *damapp)
+{
+	dam_t   *mapp = (dam_t *)damapp;
+	int	idx;
+
+	ASSERT(mapp);
+	ASSERT(mutex_owned(&mapp->dam_lock));
+	if (mapp->dam_rptmode != DAMAP_REPORT_FULLSET) {
+		return (DAM_EINVAL);
+	}
+
+	DTRACE_PROBE2(damap__addrset__flush__locked__enter, char *,
+	    mapp->dam_name, dam_t *, mapp);
+	if (mapp->dam_flags & DAM_SETADD) {
+		DTRACE_PROBE2(damap__addrset__flush__locked__reset, char *,
+		    mapp->dam_name, dam_t *, mapp);
+
+		/*
+		 * cancel stabilization timeout
+		 */
+		dam_sched_tmo(mapp, 0, NULL);
+		DAM_INCR_STAT(mapp, dam_jitter);
+
+		/*
+		 * clear pending reports
+		 */
+		for (idx = 1; idx < mapp->dam_high; idx++) {
+			if (DAM_IN_REPORT(mapp, idx)) {
+				dam_addr_report_release(mapp, idx);
+			}
+		}
+
+		bitset_zero(&mapp->dam_report_set);
+		mapp->dam_flags &= ~DAM_SETADD;
+	}
+
+	return (DAM_SUCCESS);
+}
+
 /*
  * Initiate full-set report
  *
@@ -445,40 +485,58 @@ damap_addr_del(damap_t *damapp, char *address)
 int
 damap_addrset_begin(damap_t *damapp)
 {
-	dam_t *mapp = (dam_t *)damapp;
-	int i;
+	dam_t	*mapp = (dam_t *)damapp;
+	int	rv;
 
-	if (!mapp || (mapp->dam_rptmode != DAMAP_REPORT_FULLSET))
+	if (mapp == NULL) {
 		return (DAM_EINVAL);
+	}
 
 	DTRACE_PROBE2(damap__addrset__begin, char *, mapp->dam_name, dam_t *,
 	    mapp);
+
 	mutex_enter(&mapp->dam_lock);
 	if (dam_map_alloc(mapp) != DAM_SUCCESS) {
 		mutex_exit(&mapp->dam_lock);
+
 		return (DAM_MAPFULL);
 	}
-	if (mapp->dam_flags & DAM_SETADD) {
-		DTRACE_PROBE2(damap__addrset__begin__reset, char *,
-		    mapp->dam_name, dam_t *, mapp);
-		/*
-		 * cancel stabilization timeout
-		 */
-		dam_sched_tmo(mapp, 0, NULL);
-		DAM_INCR_STAT(mapp, dam_jitter);
 
-		/*
-		 * clear pending reports
-		 */
-		for (i = 1; i < mapp->dam_high; i++) {
-			if (DAM_IN_REPORT(mapp, i))
-				dam_addr_report_release(mapp, i);
-		}
+	rv = damap_addrset_flush_locked(damapp);
+	if (rv == DAM_SUCCESS) {
+		mapp->dam_flags |= DAM_SETADD;
 	}
-	bitset_zero(&mapp->dam_report_set);
-	mapp->dam_flags |= DAM_SETADD;
 	mutex_exit(&mapp->dam_lock);
-	return (DAM_SUCCESS);
+
+	return (rv);
+}
+
+/*
+ * Cancel full-set report
+ *
+ * damapp:      address map
+ *
+ * Returns:     DAM_SUCCESS
+ *	      DAM_EINVAL      Invalid argument(s)
+ */
+int
+damap_addrset_flush(damap_t *damapp)
+{
+	int	rv;
+	dam_t	*mapp = (dam_t *)damapp;
+
+	if (mapp == NULL) {
+		return (DAM_EINVAL);
+	}
+
+	DTRACE_PROBE2(damap__addrset__flush, char *, mapp->dam_name,
+	    dam_t *, mapp);
+
+	mutex_enter(&mapp->dam_lock);
+	rv = damap_addrset_flush_locked(damapp);
+	mutex_exit(&mapp->dam_lock);
+
+	return (rv);
 }
 
 /*

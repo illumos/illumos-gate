@@ -5162,7 +5162,7 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 		 * kernels.
 		 */
 		SCSI_HBA_LOG((_LOG(1), NULL, self,
-		    "no node_name for device @%s:\n         compatible: %s",
+		    "no node_name for device @%s:\n	 compatible: %s",
 		    addr, *compat));
 		goto out;
 	}
@@ -8413,52 +8413,71 @@ scsi_tgtmap_sync(scsi_hba_tgtmap_t *handle)
 	return (empty);
 }
 
-int
-scsi_hba_tgtmap_set_begin(scsi_hba_tgtmap_t *handle)
+static int
+scsi_tgtmap_begin_or_flush(scsi_hba_tgtmap_t *handle, boolean_t do_begin)
 {
 	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)handle;
 	dev_info_t		*self = tgtmap->tgtmap_tran->tran_iport_dip;
 	char			*context;
-	int			rv = DDI_SUCCESS;
+	int			rv = DAM_SUCCESS;
 	int			i;
 
 	for (i = 0; i < SCSI_TGT_NTYPES; i++) {
-		if (tgtmap->tgtmap_dam[i] == NULL)
+		if (tgtmap->tgtmap_dam[i] == NULL) {
 			continue;
+		}
 
 		context = damap_name(tgtmap->tgtmap_dam[i]);
-
-		if (i == SCSI_TGT_SCSI_DEVICE) {
-			/*
-			 * In scsi_device context, so we have the 'context'
-			 * string, diagnose the case where the tgtmap caller
-			 * is failing to make forward progress, i.e. the caller
-			 * is never completing an observation, and calling
-			 * scsi_hbg_tgtmap_set_end. If this occurs, the solaris
-			 * target/lun state may be out of sync with hardware.
-			 */
-			if (tgtmap->tgtmap_reports++ >=
-			    scsi_hba_tgtmap_reports_max) {
-				tgtmap->tgtmap_noisy++;
-				if (tgtmap->tgtmap_noisy == 1)
-					SCSI_HBA_LOG((_LOG(WARN), self, NULL,
-					    "%s: failing to complete a tgtmap "
-					    "observation", context));
+		if (do_begin == B_TRUE) {
+			if (i == SCSI_TGT_SCSI_DEVICE) {
+				/*
+				 * In scsi_device context, so we have the
+				 * 'context' string, diagnose the case where
+				 * the tgtmap caller is failing to make
+				 * forward progress, i.e. the caller is never
+				 * completing an observation, and calling
+				 * scsi_hbg_tgtmap_set_end. If this occurs,
+				 * the solaris target/lun state may be out
+				 * of sync with hardware.
+				 */
+				if (tgtmap->tgtmap_reports++ >=
+				    scsi_hba_tgtmap_reports_max) {
+					tgtmap->tgtmap_noisy++;
+					if (tgtmap->tgtmap_noisy == 1) {
+						SCSI_HBA_LOG((_LOG(WARN), self,
+						    NULL, "%s: failing a tgtmap"
+						    " observation", context));
+					}
+				}
 			}
+
+			rv = damap_addrset_begin(tgtmap->tgtmap_dam[i]);
+		} else {
+			rv = damap_addrset_flush(tgtmap->tgtmap_dam[i]);
 		}
 
-		if (damap_addrset_begin(
-		    tgtmap->tgtmap_dam[i]) != DAM_SUCCESS) {
+		if (rv != DAM_SUCCESS) {
 			SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s FAIL", context));
-			rv = DDI_FAILURE;
-			continue;
+		} else {
+			SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s", context));
 		}
-
-		SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s", context));
 	}
-	return (rv);
+
+	return ((rv == DAM_SUCCESS) ? DDI_SUCCESS : DDI_FAILURE);
 }
 
+
+int
+scsi_hba_tgtmap_set_begin(scsi_hba_tgtmap_t *handle)
+{
+	return (scsi_tgtmap_begin_or_flush(handle, B_TRUE));
+}
+
+int
+scsi_hba_tgtmap_set_flush(scsi_hba_tgtmap_t *handle)
+{
+	return (scsi_tgtmap_begin_or_flush(handle, B_FALSE));
+}
 
 int
 scsi_hba_tgtmap_set_add(scsi_hba_tgtmap_t *handle,

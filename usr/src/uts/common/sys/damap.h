@@ -152,6 +152,7 @@ int		damap_addrset_begin(damap_t *);
 int		damap_addrset_add(damap_t *, char *, damap_id_t *,
 		    nvlist_t *, void *);
 int		damap_addrset_end(damap_t *, int);
+int		damap_addrset_flush(damap_t *);
 int		damap_addrset_reset(damap_t *, int);
 damap_id_t	damap_id_next(damap_t *, damap_id_list_t, damap_id_t);
 char		*damap_id2addr(damap_t *, damap_id_t);

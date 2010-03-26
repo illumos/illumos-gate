@@ -53,6 +53,7 @@ static boolean_t pmcs_validate_devid(pmcs_phy_t *, pmcs_phy_t *, uint32_t);
 static void pmcs_clear_phys(pmcs_hw_t *, pmcs_phy_t *);
 static int pmcs_configure_new_devices(pmcs_hw_t *, pmcs_phy_t *);
 static void pmcs_begin_observations(pmcs_hw_t *);
+static void pmcs_flush_observations(pmcs_hw_t *);
 static boolean_t pmcs_report_observations(pmcs_hw_t *);
 static boolean_t pmcs_report_iport_observations(pmcs_hw_t *, pmcs_iport_t *,
     pmcs_phy_t *);
@@ -2371,7 +2372,6 @@ pmcs_discover(pmcs_hw_t *pwp)
 {
 	pmcs_phy_t		*pptr;
 	pmcs_phy_t		*root_phy;
-	int			phymap_active;
 
 	DTRACE_PROBE2(pmcs__discover__entry, ulong_t, pwp->work_flags,
 	    boolean_t, pwp->config_changed);
@@ -2391,7 +2391,6 @@ pmcs_discover(pmcs_hw_t *pwp)
 		return;
 	}
 
-	phymap_active = pwp->phymap_active;
 	mutex_exit(&pwp->lock);
 
 	/*
@@ -2403,14 +2402,6 @@ pmcs_discover(pmcs_hw_t *pwp)
 		rw_exit(&pwp->iports_lock);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 		    "%s: no iports attached, retry discovery", __func__);
-		SCHEDULE_WORK(pwp, PMCS_WORK_DISCOVER);
-		return;
-	}
-	if (pwp->num_iports != phymap_active) {
-		rw_exit(&pwp->iports_lock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
-		    "%s: phymaps or iport maps not stable; retry discovery",
-		    __func__);
 		SCHEDULE_WORK(pwp, PMCS_WORK_DISCOVER);
 		return;
 	}
@@ -2580,6 +2571,7 @@ out:
 restart:
 	/* Clean up and restart discovery */
 	pmcs_release_scratch(pwp);
+	pmcs_flush_observations(pwp);
 	mutex_enter(&pwp->config_lock);
 	pwp->configuring = 0;
 	RESTART_DISCOVERY_LOCKED(pwp);
@@ -2659,6 +2651,41 @@ pmcs_begin_observations(pmcs_hw_t *pwp)
 		}
 		pmcs_prt(pwp, PMCS_PRT_DEBUG_MAP, NULL, NULL,
 		    "%s: set begin on tgtmap [0x%p]", __func__, (void *)tgtmap);
+	}
+	rw_exit(&pwp->iports_lock);
+}
+
+/*
+ * Tell SCSA to flush the observations we've already sent (if any), as they
+ * are no longer valid.
+ */
+static void
+pmcs_flush_observations(pmcs_hw_t *pwp)
+{
+	pmcs_iport_t		*iport;
+	scsi_hba_tgtmap_t	*tgtmap;
+
+	rw_enter(&pwp->iports_lock, RW_READER);
+	for (iport = list_head(&pwp->iports); iport != NULL;
+	    iport = list_next(&pwp->iports, iport)) {
+		/*
+		 * Skip this iport if it has no PHYs up.
+		 */
+		if (!sas_phymap_uahasphys(pwp->hss_phymap, iport->ua)) {
+			continue;
+		}
+
+		tgtmap = iport->iss_tgtmap;
+		ASSERT(tgtmap);
+		if (scsi_hba_tgtmap_set_flush(tgtmap) != DDI_SUCCESS) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_MAP, NULL, NULL,
+			    "%s: Failed set_flush on tgtmap 0x%p", __func__,
+			    (void *)tgtmap);
+		} else {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_MAP, NULL, NULL,
+			    "%s: set flush on tgtmap 0x%p", __func__,
+			    (void *)tgtmap);
+		}
 	}
 	rw_exit(&pwp->iports_lock);
 }

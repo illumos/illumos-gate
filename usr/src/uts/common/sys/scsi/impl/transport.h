@@ -643,6 +643,8 @@ int	scsi_hba_tgtmap_set_end(
 				scsi_hba_tgtmap_t	*tgtmap,
 				uint_t			flags);
 
+int	scsi_hba_tgtmap_set_flush(scsi_hba_tgtmap_t	*tgtmap);
+
 int	scsi_hba_tgtmap_tgt_add(
 				scsi_hba_tgtmap_t	*tgtmap,
 				scsi_tgtmap_tgt_type_t	tgt_type,
