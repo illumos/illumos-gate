@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,14 +130,15 @@ tickcmpr_disable(void)
 #if defined(lint)
 
 /*
- * tick_write_delta() increments %tick by the specified delta.  This should
- * only be called after a CPR event to assure that gethrtime() continues to
- * increase monotonically.  Obviously, writing %tick needs to de done very
- * carefully to avoid introducing unnecessary %tick skew across CPUs.  For
- * this reason, we make sure we're i-cache hot before actually writing to
- * %tick.
- *
- * NOTE: No provision for this on sun4v right now.
+ * tick_write_delta() is intended to increment %stick by the specified delta,
+ * but %stick is only writeable in hyperprivileged mode and at present there
+ * is no provision for this. tick_write_delta is called by the cylic subsystem
+ * if a negative %stick delta is observed after cyclic processing is resumed
+ * after an event such as an OS suspend/resume. On sun4v, the suspend/resume
+ * routines should adjust the %stick offset preventing the cyclic subsystem
+ * from detecting a negative delta. If a negative delta is detected, panic the
+ * system. The negative delta could be caused by improper %stick
+ * synchronization after a suspend/resume.
  */
 
 /*ARGSUSED*/
@@ -149,11 +150,12 @@ tick_write_delta(uint64_t delta)
 
 	.seg	".text"
 tick_write_delta_panic:
-	.asciz	"tick_write_delta: not supported"
+	.asciz	"tick_write_delta: not supported, delta: 0x%lx"
 
 	ENTRY_NP(tick_write_delta)
 	sethi	%hi(tick_write_delta_panic), %o1
         save    %sp, -SA(MINFRAME), %sp ! get a new window to preserve caller
+	mov	%i0, %o1
 	call	panic
 	  or	%i1, %lo(tick_write_delta_panic), %o0
 	/*NOTREACHED*/

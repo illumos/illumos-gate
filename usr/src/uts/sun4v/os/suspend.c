@@ -46,6 +46,8 @@
 #include <sys/hsvc.h>
 #include <sys/mpo.h>
 #include <vm/hat_sfmmu.h>
+#include <sys/time.h>
+#include <sys/clock.h>
 
 /*
  * Sun4v OS Suspend
@@ -86,6 +88,7 @@ extern int mach_descrip_update(void);
 extern cpuset_t cpu_ready_set;
 extern uint64_t native_tick_offset;
 extern uint64_t native_stick_offset;
+extern uint64_t sys_tick_freq;
 
 /*
  * Global Sun Cluster pre/post callbacks.
@@ -132,6 +135,26 @@ boolean_t tick_stick_emulation_active = B_FALSE;
  * information from the updated MD.
  */
 static int suspend_update_cpu_mappings = 1;
+
+/*
+ * The maximum number of microseconds by which the %tick or %stick register
+ * can vary between any two CPUs in the system. To calculate the
+ * native_stick_offset and native_tick_offset, we measure the change in these
+ * registers on one CPU over a suspend/resume. Other CPUs may experience
+ * slightly larger or smaller changes. %tick and %stick should be synchronized
+ * between CPUs, but there may be some variation. So we add an additional value
+ * derived from this variable to ensure that these registers always increase
+ * over a suspend/resume operation, assuming all %tick and %stick registers
+ * are synchronized (within a certain limit) across CPUs in the system. The
+ * delta between %sticks on different CPUs should be a small number of cycles,
+ * not perceptible to readers of %stick that migrate between CPUs. We set this
+ * value to 1 millisecond which means that over a suspend/resume operation,
+ * all CPU's %tick and %stick will advance forwards as long as, across all
+ * CPUs, the %tick and %stick are synchronized to within 1 ms. This applies to
+ * CPUs before the suspend and CPUs after the resume. 1 ms is conservative,
+ * but small enough to not trigger TOD faults.
+ */
+static uint64_t suspend_tick_stick_max_delta = 1000; /* microseconds */
 
 /*
  * DBG and DBG_PROM() macro.
@@ -188,23 +211,96 @@ suspend_supported(void)
 }
 
 /*
- * Given a source tick and stick value, set the tick and stick offsets such
- * that the (current physical register value + offset == source value).
+ * Given a source tick, stick, and tod value, set the tick and stick offsets
+ * such that the (current physical register value) + offset == (source value)
+ * and in addition account for some variation between the %tick/%stick on
+ * different CPUs. We account for this variation by adding in double the value
+ * of suspend_tick_stick_max_delta. The following is an explanation of why
+ * suspend_tick_stick_max_delta must be multplied by two and added to
+ * native_stick_offset.
+ *
+ * Consider a guest instance that is yet to be suspended with CPUs p0 and p1
+ * with physical "source" %stick values s0 and s1 respectively. When the guest
+ * is first resumed, the physical "target" %stick values are t0 and t1
+ * respectively. The virtual %stick values after the resume are v0 and v1
+ * respectively. Let x be the maximum difference between any two CPU's %stick
+ * register at a given point in time and let the %stick values be assigned
+ * such that
+ *
+ *     s1 = s0 + x and
+ *     t1 = t0 - x
+ *
+ * Let us assume that p0 is driving the suspend and resume. Then, we will
+ * calculate the stick offset f and the virtual %stick on p0 after the
+ * resume as follows.
+ *
+ *      f = s0 - t0 and
+ *     v0 = t0 + f
+ *
+ * We calculate the virtual %stick v1 on p1 after the resume as
+ *
+ *     v1 = t1 + f
+ *
+ * Substitution yields
+ *
+ *     v1 = t1 + (s0 - t0)
+ *     v1 = (t0 - x) + (s0 - t0)
+ *     v1 = -x + s0
+ *     v1 = s0 - x
+ *     v1 = (s1 - x) - x
+ *     v1 = s1 - 2x
+ *
+ * Therefore, in this scenario, without accounting for %stick variation in
+ * the calculation of the native_stick_offset f, the virtual %stick on p1
+ * is less than the value of the %stick on p1 before the suspend which is
+ * unacceptable. By adding 2x to v1, we guarantee it will be equal to s1
+ * which means the %stick on p1 after the resume will always be greater
+ * than or equal to the %stick on p1 before the suspend. Since v1 = t1 + f
+ * at any point in time, we can accomplish this by adding 2x to f. This
+ * guarantees any processes bound to CPU P0 or P1 will not see a %stick
+ * decrease across a suspend/resume. Hence, in the code below, we multiply
+ * suspend_tick_stick_max_delta by two in the calculation for
+ * native_stick_offset, native_tick_offset, and target_hrtime.
  */
 static void
-set_tick_offsets(uint64_t source_tick, uint64_t source_stick)
+set_tick_offsets(uint64_t source_tick, uint64_t source_stick, timestruc_t *tsp)
 {
 	uint64_t target_tick;
 	uint64_t target_stick;
+	hrtime_t source_hrtime;
+	hrtime_t target_hrtime;
 
+	/*
+	 * Temporarily set the offsets to zero so that the following reads
+	 * of the registers will yield physical unadjusted counter values.
+	 */
 	native_tick_offset = 0;
 	native_stick_offset = 0;
 
 	target_tick = gettick_counter();	/* returns %tick */
 	target_stick = gettick();		/* returns %stick */
 
-	native_tick_offset = source_tick - target_tick;
-	native_stick_offset = source_stick - target_stick;
+	/*
+	 * Calculate the new offsets. In addition to the delta observed on
+	 * this CPU, add an additional value. Multiply the %tick/%stick
+	 * frequency by suspend_tick_stick_max_delta (us). Then, multiply by 2
+	 * to account for a delta between CPUs before the suspend and a
+	 * delta between CPUs after the resume.
+	 */
+	native_tick_offset = (source_tick - target_tick) +
+	    (CPU->cpu_curr_clock * suspend_tick_stick_max_delta * 2 / MICROSEC);
+	native_stick_offset = (source_stick - target_stick) +
+	    (sys_tick_freq * suspend_tick_stick_max_delta * 2 / MICROSEC);
+
+	/*
+	 * We've effectively increased %stick and %tick by twice the value
+	 * of suspend_tick_stick_max_delta to account for variation across
+	 * CPUs. Now adjust the preserved TOD by the same amount.
+	 */
+	source_hrtime = ts2hrt(tsp);
+	target_hrtime = source_hrtime +
+	    (suspend_tick_stick_max_delta * 2 * (NANOSEC/MICROSEC));
+	hrt2ts(target_hrtime, tsp);
 }
 
 /*
@@ -503,10 +599,13 @@ suspend_start(char *error_reason, size_t max_reason_len)
 	pause_cpus(NULL);
 	DBG_PROM("suspend: CPUs paused\n");
 
-	/* Suspend cyclics and disable interrupts */
+	/* Suspend cyclics */
 	cyclic_suspend();
 	DBG_PROM("suspend: cyclics suspended\n");
+
+	/* Disable interrupts */
 	spl = spl8();
+	DBG_PROM("suspend: spl8()\n");
 
 	source_tick = gettick_counter();
 	source_stick = gettick();
@@ -514,16 +613,16 @@ suspend_start(char *error_reason, size_t max_reason_len)
 	DBG_PROM("suspend: source_stick: 0x%lx\n", source_stick);
 
 	/*
-	 * Call into the HV to initiate the suspend.
-	 * hv_guest_suspend() returns after the guest has been
-	 * resumed or if the suspend operation failed or was
-	 * cancelled. After a successful suspend, the %tick and
-	 * %stick registers may have changed by an amount that is
-	 * not proportional to the amount of time that has passed.
-	 * They may have jumped forwards or backwards. This jump
-	 * must be uniform across all CPUs and we operate under
-	 * the assumption that it is (maintaining two global offset
-	 * variables--one for %tick and one for %stick.)
+	 * Call into the HV to initiate the suspend. hv_guest_suspend()
+	 * returns after the guest has been resumed or if the suspend
+	 * operation failed or was cancelled. After a successful suspend,
+	 * the %tick and %stick registers may have changed by an amount
+	 * that is not proportional to the amount of time that has passed.
+	 * They may have jumped forwards or backwards. Some variation is
+	 * allowed and accounted for using suspend_tick_stick_max_delta,
+	 * but otherwise this jump must be uniform across all CPUs and we
+	 * operate under the assumption that it is (maintaining two global
+	 * offset variables--one for %tick and one for %stick.)
 	 */
 	DBG_PROM("suspend: suspending... \n");
 	rv = hv_guest_suspend();
@@ -538,8 +637,8 @@ suspend_start(char *error_reason, size_t max_reason_len)
 		return (rv);
 	}
 
-	/* Update the global tick and stick offsets */
-	set_tick_offsets(source_tick, source_stick);
+	/* Update the global tick and stick offsets and the preserved TOD */
+	set_tick_offsets(source_tick, source_stick, &source_tod);
 
 	/* Ensure new offsets are globally visible before resuming CPUs */
 	membar_sync();
