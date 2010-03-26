@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,7 +106,7 @@ static const fmd_prop_t fmd_props[] = {
 	{ ETM_PROP_NM_CONSOLE,			FMD_TYPE_BOOL, "false" },
 	{ ETM_PROP_NM_SYSLOGD,			FMD_TYPE_BOOL, "true" },
 	{ ETM_PROP_NM_FACILITY,			FMD_TYPE_STRING, "LOG_DAEMON" },
-	{ ETM_PROP_NM_MAX_RESP_Q_LEN,		FMD_TYPE_UINT32, "512" },
+	{ ETM_PROP_NM_MAX_RESP_Q_LEN,		FMD_TYPE_UINT32, "32" },
 	{ ETM_PROP_NM_BAD_ACC_TO_SEC,		FMD_TYPE_UINT32, "1" },
 	{ ETM_PROP_NM_FMA_RESP_WAIT_TIME,	FMD_TYPE_INT32, "240" },
 	{ NULL, 0, NULL }
@@ -2094,6 +2094,10 @@ etm_maybe_enq_response(fmd_hdl_t *hdl, etm_xport_conn_t conn,
 	rqe.rqe_resp_code = resp_code;
 
 	(void) pthread_mutex_lock(&etm_resp_q_lock);
+
+	if (etm_resp_q_cur_len == etm_resp_q_max_len)
+		(void) pthread_cond_wait(&etm_resp_q_cv, &etm_resp_q_lock);
+
 	rv = etm_resp_q_enq(hdl, &rqe);
 	if (etm_resp_q_cur_len == 1)
 		(void) pthread_cond_signal(&etm_resp_q_cv);
@@ -2724,6 +2728,10 @@ etm_responder(void *arg)
 		while (etm_resp_q_cur_len > 0) {
 
 			(void) etm_resp_q_deq(hdl, &rqe);
+
+			if ((etm_resp_q_cur_len + 1) == etm_resp_q_max_len)
+				(void) pthread_cond_signal(&etm_resp_q_cv);
+
 			(void) pthread_mutex_unlock(&etm_resp_q_lock);
 
 			if ((n = etm_send_response(hdl, rqe.rqe_conn,
