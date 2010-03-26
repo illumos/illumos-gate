@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,8 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright 1994-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +58,26 @@ extern int    validstr(char *str, size_t size);
 extern int yplckpwdf();
 extern int ypulckpwdf();
 
+static char *
+cryptoldpasswd(char *oldpass, char *salt, char *acctname)
+{
+	char *oldpass_crypt = NULL;
+
+	if ((oldpass_crypt = crypt(oldpass, salt)) == NULL) {
+		if (errno == EINVAL) {
+			syslog(LOG_ERR,
+			    "yppasswdd: password not changed for \"%s\" - "
+			    "crypt module not supported on the master\n",
+			    acctname);
+		} else {
+			syslog(LOG_ERR,
+			    "yppasswdd: password not changed for \"%s\" - "
+			    "%s\n", acctname, strerror(errno));
+		}
+	}
+	return (oldpass_crypt);
+}
+
 void
 changepasswd(SVCXPRT *transp)
 {
@@ -78,6 +95,7 @@ changepasswd(SVCXPRT *transp)
 	struct spwd ospwd;
 	struct sigaction sa, osa1, osa2, osa3;
 	struct stat pwstat, spstat, adjstat;
+	char *oldpass_crypt = NULL;
 
 	char newpasswdfile[FILENAME_MAX];
 	char newshadowfile[FILENAME_MAX];
@@ -97,7 +115,7 @@ changepasswd(SVCXPRT *transp)
 	char *p;
 
 	FILE *opwfp = NULL, *ospfp = NULL, *oadjfp = NULL,
-		*npwfp = NULL, *nspfp = NULL, *nadjfp = NULL;
+	    *npwfp = NULL, *nspfp = NULL, *nadjfp = NULL;
 	int npwfd = -1, nspfd = -1, nadjfd = -1;
 
 	int i, ans, chsh, chpw, chgecos, namelen;
@@ -127,10 +145,10 @@ changepasswd(SVCXPRT *transp)
 
 	/* Perform basic validation */
 	if (/* (!validstr(yppwd.oldpass, PWSIZE)) || */ /* see PR:nis/38 */
-		(!validstr(yppwd.newpw.pw_passwd, cryptpwsize)) ||
-		(!validstr(yppwd.newpw.pw_name, UTUSERLEN)) ||
-		(!validstr(yppwd.newpw.pw_gecos, fingersize)) ||
-		(!validstr(yppwd.newpw.pw_shell, shellsize))) {
+	    (!validstr(yppwd.newpw.pw_passwd, cryptpwsize)) ||
+	    (!validstr(yppwd.newpw.pw_name, UTUSERLEN)) ||
+	    (!validstr(yppwd.newpw.pw_gecos, fingersize)) ||
+	    (!validstr(yppwd.newpw.pw_shell, shellsize))) {
 		svcerr_decode(transp);
 		return;
 	}
@@ -144,7 +162,7 @@ changepasswd(SVCXPRT *transp)
 		svc_local_cred_t cred;
 		if (!svc_get_local_cred(transp, &cred)) {
 			syslog(LOG_ERR, "yppasswdd: Couldn't get "
-				"local user credentials.\n");
+			    "local user credentials.\n");
 		} else if (cred.ruid == 0)
 			root_on_master = 1;
 	}
@@ -175,8 +193,8 @@ changepasswd(SVCXPRT *transp)
 
 	if (yplckpwdf() < 0) {
 		syslog(LOG_ERR,
-			"yppasswdd: Password file(s) busy. "
-			"Try again later.\n");
+		    "yppasswdd: Password file(s) busy. "
+		    "Try again later.\n");
 		ans = 8;
 		goto cleanup;
 	}
@@ -190,9 +208,9 @@ changepasswd(SVCXPRT *transp)
 
 	if (useshadow) {
 		if ((ospfp = fopen(shadow_file, "r")) == NULL) {
-		    syslog(LOG_ERR,
-				"yppasswdd: Could not open %s\n", shadow_file);
-		    goto cleanup;
+			syslog(LOG_ERR,
+			    "yppasswdd: Could not open %s\n", shadow_file);
+			goto cleanup;
 		}
 
 		fstat(fileno(ospfp), &spstat);
@@ -200,10 +218,10 @@ changepasswd(SVCXPRT *transp)
 
 	if (useadjunct) {
 		if ((oadjfp = fopen(adjunct_file, "r")) == NULL) {
-		    syslog(LOG_ERR,
-				"yppasswdd: Could not open %s\n",
-				adjunct_file);
-		    goto cleanup;
+			syslog(LOG_ERR,
+			    "yppasswdd: Could not open %s\n",
+			    adjunct_file);
+			goto cleanup;
 		}
 
 		fstat(fileno(oadjfp), &adjstat);
@@ -214,14 +232,14 @@ changepasswd(SVCXPRT *transp)
 	 * first with open and then create a FILE * with fdopen()
 	 */
 	if ((npwfd = open(newpasswdfile, O_WRONLY | O_CREAT | O_EXCL,
-				pwstat.st_mode)) < 0) {
+	    pwstat.st_mode)) < 0) {
 		if (errno == EEXIST) {
 			syslog(LOG_WARNING,
-				"yppasswdd: passwd file busy - try again\n");
+			    "yppasswdd: passwd file busy - try again\n");
 			ans = 8;
 		} else {
 			syslog(LOG_ERR, "yppasswdd: %s: %m",
-					newpasswdfile);
+			    newpasswdfile);
 			ans = 9;
 		}
 		goto cleanup;
@@ -231,20 +249,21 @@ changepasswd(SVCXPRT *transp)
 
 	if ((npwfp = fdopen(npwfd, "w")) == NULL) {
 		syslog(LOG_ERR,
-			"yppasswdd: fdopen() on %s failed\n", newpasswdfile);
+		    "yppasswdd: fdopen() on %s failed\n", newpasswdfile);
 		goto cleanup;
 	}
 
 	if (useshadow) {
 		if ((nspfd = open(newshadowfile, O_WRONLY | O_CREAT | O_EXCL,
-					spstat.st_mode)) < 0) {
+		    spstat.st_mode)) < 0) {
 			if (errno == EEXIST) {
 				syslog(LOG_WARNING,
-				"yppasswdd: shadow file busy - try again\n");
+				    "yppasswdd: shadow file busy - try "
+				    "again\n");
 				ans = 8;
 			} else {
 				syslog(LOG_ERR, "yppasswdd: %s: %m",
-					newshadowfile);
+				    newshadowfile);
 				ans = 9;
 			}
 			goto cleanup;
@@ -254,22 +273,23 @@ changepasswd(SVCXPRT *transp)
 
 		if ((nspfp = fdopen(nspfd, "w")) == NULL) {
 			syslog(LOG_ERR,
-				"yppasswdd: fdopen() on %s failed\n",
-				newshadowfile);
+			    "yppasswdd: fdopen() on %s failed\n",
+			    newshadowfile);
 			goto cleanup;
 		}
 	}
 
 	if (useadjunct) {
 		if ((nadjfd = open(newadjunctfile, O_WRONLY | O_CREAT | O_EXCL,
-					adjstat.st_mode)) < 0) {
+		    adjstat.st_mode)) < 0) {
 			if (errno == EEXIST) {
 				syslog(LOG_WARNING,
-				"yppasswdd: adjunct file busy - try again\n");
+				    "yppasswdd: adjunct file busy - try "
+				    "again\n");
 				ans = 8;
 			} else {
 				syslog(LOG_ERR, "yppasswdd: %s: %m",
-				newadjunctfile);
+				    newadjunctfile);
 				ans = 9;
 			}
 			goto cleanup;
@@ -279,8 +299,8 @@ changepasswd(SVCXPRT *transp)
 
 		if ((nadjfp = fdopen(nadjfd, "w")) == NULL) {
 			syslog(LOG_ERR,
-				"yppasswdd: fdopen() on %s failed\n",
-				newadjunctfile);
+			    "yppasswdd: fdopen() on %s failed\n",
+			    newadjunctfile);
 			goto cleanup;
 		}
 	}
@@ -309,7 +329,7 @@ changepasswd(SVCXPRT *transp)
 	 *    section that installs the new files.
 	 */
 
-	loop_in_files:
+loop_in_files:
 	/* While we find things in the passwd file */
 	while (fgets(pwbuf, NSS_LINELEN_PASSWD, opwfp)) {
 
@@ -321,7 +341,8 @@ changepasswd(SVCXPRT *transp)
 		if (doneflag || strncmp(name, pwbuf, namelen)) {
 			if (fputs(pwbuf, npwfp) == EOF) {
 				syslog(LOG_ERR,
-				"yppasswdd: write to passwd file failed.\n");
+				    "yppasswdd: write to passwd file "
+				    "failed.\n");
 				goto cleanup;
 			}
 			pwpos = ftell(opwfp);
@@ -348,7 +369,8 @@ changepasswd(SVCXPRT *transp)
 		if (doneflag || strncmp(name, spbuf, namelen)) {
 			if (fputs(spbuf, nspfp) == EOF) {
 				syslog(LOG_ERR,
-				"yppasswdd: write to shadow file failed.\n");
+				    "yppasswdd: write to shadow file "
+				    "failed.\n");
 				goto cleanup;
 			}
 			sppos = ftell(ospfp);
@@ -369,7 +391,8 @@ changepasswd(SVCXPRT *transp)
 		if (doneflag || strncmp(name, adjbuf, namelen)) {
 			if (fputs(adjbuf, nadjfp) == EOF) {
 				syslog(LOG_ERR,
-				"yppasswdd: write to adjunct file failed.\n");
+				    "yppasswdd: write to adjunct file "
+				    "failed.\n");
 				goto cleanup;
 			}
 			continue;
@@ -383,13 +406,13 @@ changepasswd(SVCXPRT *transp)
 
 	if (useshadow && !gotshadow) {
 		syslog(LOG_ERR, "yppasswdd: no passwd in shadow for %s\n",
-		newpw.pw_name);
+		    newpw.pw_name);
 		ans = 4;
 		goto cleanup;
 	}
 	if (useadjunct && !gotadjunct) {
 		syslog(LOG_ERR, "yppasswdd: no passwd in adjunct for %s\n",
-			newpw.pw_name);
+		    newpw.pw_name);
 		ans = 4;
 		goto cleanup;
 	}
@@ -410,14 +433,20 @@ changepasswd(SVCXPRT *transp)
 		ospwd = *fgetspent(ospfp);
 	}
 
+	oldpass_crypt = cryptoldpasswd(yppwd.oldpass, newpw.pw_passwd,
+	    newpw.pw_name);
+	if (oldpass_crypt == NULL) {
+		ans = 3;
+		goto cleanup;
+	}
 	p = newpw.pw_passwd;
 	if ((!nopw) &&
-		p && *p &&
-		!(*p++ == '#' && *p++ == '#' &&
-				(strcmp(p, opwd.pw_name) == 0)) &&
-		(strcmp(crypt(yppwd.oldpass, newpw.pw_passwd),
-				newpw.pw_passwd) != 0))
+	    p && *p &&
+	    !((*p++ == '#') && (*p++ == '#') &&
+	    (strcmp(p, opwd.pw_name) == 0)) &&
+	    (strcmp(oldpass_crypt, newpw.pw_passwd) != 0))
 		chpw = 1;
+	oldpass_crypt = NULL;
 
 	if ((!noshell) && (strcmp(opwd.pw_shell, newpw.pw_shell) != 0)) {
 		if (single)
@@ -435,18 +464,21 @@ changepasswd(SVCXPRT *transp)
 
 	if (!(chpw + chsh + chgecos)) {
 		syslog(LOG_NOTICE, "yppasswdd: no change for %s\n",
-			newpw.pw_name);
+		    newpw.pw_name);
 		ans = 3;
 		goto cleanup;
 	}
 
 	if (useshadow && !root_on_master) {
+		oldpass_crypt = cryptoldpasswd(yppwd.oldpass, ospwd.sp_pwdp,
+		    newpw.pw_name);
+		if (oldpass_crypt == NULL)
+			goto cleanup;
 		if (ospwd.sp_pwdp && *ospwd.sp_pwdp &&
-			(strcmp(crypt(yppwd.oldpass, ospwd.sp_pwdp),
-			ospwd.sp_pwdp) != 0)) {
+		    (strcmp(oldpass_crypt, ospwd.sp_pwdp) != 0)) {
 
 			syslog(LOG_NOTICE, "yppasswdd: passwd incorrect\n",
-				newpw.pw_name);
+			    newpw.pw_name);
 			ans = 7;
 			goto cleanup;
 		}
@@ -465,23 +497,29 @@ changepasswd(SVCXPRT *transp)
 		adj_crypt_begin = adjbuf + namelen;
 		adj_crypt_end = strchr(adj_crypt_begin, ':');
 		strncpy(adj_encrypt, adj_crypt_begin,
-			adj_crypt_end - adj_crypt_begin);
+		    adj_crypt_end - adj_crypt_begin);
+		oldpass_crypt = cryptoldpasswd(yppwd.oldpass, adj_encrypt,
+		    newpw.pw_name);
+		if (oldpass_crypt == NULL)
+			goto cleanup;
 		if (!root_on_master && *adj_encrypt &&
-				(strcmp(crypt(yppwd.oldpass, adj_encrypt),
-				adj_encrypt) != 0)) {
+		    (strcmp(oldpass_crypt, adj_encrypt) != 0)) {
 
 			syslog(LOG_NOTICE, "yppasswdd: passwd incorrect\n",
-			newpw.pw_name);
+			    newpw.pw_name);
 			ans = 7;
 			goto cleanup;
 		}
 	} else {
+		oldpass_crypt = cryptoldpasswd(yppwd.oldpass, opwd.pw_passwd,
+		    newpw.pw_name);
+		if (oldpass_crypt == NULL)
+			goto cleanup;
 		if (!root_on_master && opwd.pw_passwd && *opwd.pw_passwd &&
-			(strcmp(crypt(yppwd.oldpass, opwd.pw_passwd),
-				opwd.pw_passwd) != 0)) {
+		    (strcmp(oldpass_crypt, opwd.pw_passwd) != 0)) {
 
 			syslog(LOG_NOTICE, "yppasswdd: passwd incorrect\n",
-			newpw.pw_name);
+			    newpw.pw_name);
 			ans = 7;
 			goto cleanup;
 		}
@@ -491,18 +529,18 @@ changepasswd(SVCXPRT *transp)
 	printf("%d %d %d\n", chsh, chgecos, chpw);
 
 	printf("%s %s %s\n",
-		yppwd.newpw.pw_shell,
-		yppwd.newpw.pw_gecos,
-		yppwd.newpw.pw_passwd);
+	    yppwd.newpw.pw_shell,
+	    yppwd.newpw.pw_gecos,
+	    yppwd.newpw.pw_passwd);
 
 	printf("%s %s %s\n",
-		opwd.pw_shell,
-		opwd.pw_gecos,
-		ospwd.sp_pwdp);
+	    opwd.pw_shell,
+	    opwd.pw_gecos,
+	    ospwd.sp_pwdp);
 #endif
 
-	if (chsh && !validloginshell(opwd.pw_shell, newpw.pw_shell,
-						root_on_master)) {
+	if (chsh &&
+	    !validloginshell(opwd.pw_shell, newpw.pw_shell, root_on_master)) {
 		goto cleanup;
 	}
 
@@ -528,10 +566,10 @@ changepasswd(SVCXPRT *transp)
 	 * or adjunct file is handled later.
 	 */
 	if ((chsh || chgecos) && (useshadow || useadjunct || !chpw) &&
-		putpwent(&opwd, npwfp)) {
+	    putpwent(&opwd, npwfp)) {
 
 		syslog(LOG_ERR, "yppasswdd: putpwent failed: %s\n",
-			passwd_file);
+		    passwd_file);
 		goto cleanup;
 	}
 
@@ -543,35 +581,35 @@ changepasswd(SVCXPRT *transp)
 			if (ospwd.sp_max != -1) {
 				if (now < ospwd.sp_lstchg + ospwd.sp_min) {
 					syslog(LOG_ERR,
-					"yppasswdd: Sorry: < %ld days since "
-					"the last change.\n", ospwd.sp_min);
+					    "yppasswdd: Sorry: < %ld days "
+					    "since the last change.\n",
+					    ospwd.sp_min);
 					goto cleanup;
 				}
 			}
 			ospwd.sp_lstchg = now;
 			if (putspent(&ospwd, nspfp)) {
 				syslog(LOG_ERR,
-					"yppasswdd: putspent failed: %s\n",
-					shadow_file);
+				    "yppasswdd: putspent failed: %s\n",
+				    shadow_file);
 				goto cleanup;
 			}
 		} else if (useadjunct) {
 			sprintf(adjbuf_new,
-				"%s%s%s", name, newpw.pw_passwd,
-				adj_crypt_end);
+			    "%s%s%s", name, newpw.pw_passwd, adj_crypt_end);
 			if (fputs(adjbuf_new, nadjfp) == EOF) {
 				syslog(LOG_ERR,
-				"yppasswdd: write to adjunct failed: %s\n",
-					adjunct_file);
+				    "yppasswdd: write to adjunct failed: %s\n",
+				    adjunct_file);
 				goto cleanup;
 			}
 		} else {
 			opwd.pw_passwd = newpw.pw_passwd;
 			if (putpwent(&opwd, npwfp)) {
 				syslog(LOG_ERR,
-					"yppasswdd: putpwent failed: %s\n",
-					passwd_file);
-			goto cleanup;
+				    "yppasswdd: putpwent failed: %s\n",
+				    passwd_file);
+				goto cleanup;
 			}
 		}
 	}
@@ -581,7 +619,7 @@ changepasswd(SVCXPRT *transp)
 		goto loop_in_files;
 	}
 
-	install_files:
+install_files:
 	/*
 	 * Critical section, nothing special needs to be done since we
 	 * hold exclusive access to the *.ptmp files
@@ -606,16 +644,16 @@ changepasswd(SVCXPRT *transp)
 	if ((!useshadow && !useadjunct) || (chsh || chgecos)) {
 		if (rename(passwd_file, tmppasswdfile) < 0) {
 			syslog(LOG_CRIT, "yppasswdd: failed to backup "
-					"passwd file: %m");
+			    "passwd file: %m");
 			goto cleanup;
 		} else {
 			if (rename(newpasswdfile, passwd_file) < 0) {
 				syslog(LOG_CRIT,
-					"yppasswdd: failed to mv passwd: %m");
+				    "yppasswdd: failed to mv passwd: %m");
 				if (rename(tmppasswdfile, passwd_file) < 0) {
 					syslog(LOG_CRIT,
-						"yppasswdd: failed to restore "
-						"backup of passwd file: %m");
+					    "yppasswdd: failed to restore "
+					    "backup of passwd file: %m");
 				}
 				goto cleanup;
 			}
@@ -625,26 +663,26 @@ changepasswd(SVCXPRT *transp)
 	if (useshadow && chpw) {
 		if (rename(shadow_file, tmpshadowfile) < 0) {
 			syslog(LOG_CRIT, "yppasswdd: failed to back up "
-				"shadow file: %m");
+			    "shadow file: %m");
 			if (rename(tmppasswdfile, passwd_file) < 0) {
 				syslog(LOG_CRIT,
-					"yppasswdd: failed to restore "
-					"backup of passwd file: %m");
+				    "yppasswdd: failed to restore "
+				    "backup of passwd file: %m");
 			}
 			goto cleanup;
 		} else {
 			if (rename(newshadowfile, shadow_file) < 0) {
 				syslog(LOG_CRIT,
-					"yppasswdd: failed to mv shadow: %m");
+				    "yppasswdd: failed to mv shadow: %m");
 				if (rename(tmpshadowfile, shadow_file) < 0) {
 					syslog(LOG_CRIT,
-						"yppasswdd: failed to restore "
-						"backup of shadow file: %m");
+					    "yppasswdd: failed to restore "
+					    "backup of shadow file: %m");
 				}
 				if (rename(tmppasswdfile, passwd_file) < 0) {
 					syslog(LOG_CRIT,
-						"yppasswdd: failed to restore "
-						"backup of passwd file: %m");
+					    "yppasswdd: failed to restore "
+					    "backup of passwd file: %m");
 				}
 				goto cleanup;
 			}
@@ -652,26 +690,26 @@ changepasswd(SVCXPRT *transp)
 	} else if (useadjunct && chpw) {
 		if (rename(adjunct_file, tmpadjunctfile) < 0) {
 			syslog(LOG_CRIT, "yppasswdd: failed to back up "
-				"adjunct file: %m");
+			    "adjunct file: %m");
 			if (rename(tmppasswdfile, passwd_file) < 0) {
 				syslog(LOG_CRIT,
-					"yppasswdd: failed to restore backup "
-					"of passwd: %m");
+				    "yppasswdd: failed to restore backup "
+				    "of passwd: %m");
 			}
 			goto cleanup;
 		} else {
 			if (rename(newadjunctfile, adjunct_file) < 0) {
 				syslog(LOG_CRIT,
-					"yppassdd: failed to mv adjunct: %m");
+				    "yppassdd: failed to mv adjunct: %m");
 				if (rename(tmppasswdfile, passwd_file) < 0) {
 					syslog(LOG_CRIT,
-						"yppasswdd: failed to restore "
-						"backup of passwd file: %m");
+					    "yppasswdd: failed to restore "
+					    "backup of passwd file: %m");
 				}
 				if (rename(tmpadjunctfile, adjunct_file) < 0) {
 					syslog(LOG_CRIT,
-					"yppasswdd: failed to restore "
-					"backup of adjunct file: %m");
+					    "yppasswdd: failed to restore "
+					    "backup of adjunct file: %m");
 				}
 				goto cleanup;
 			}
@@ -693,7 +731,7 @@ changepasswd(SVCXPRT *transp)
 	if (useadjunct)
 		unlink(tmpadjunctfile);
 
-	cleanup:
+cleanup:
 
 	/* If we don't have opwfp, then we didn't do anything */
 	if (opwfp) {
@@ -741,11 +779,11 @@ changepasswd(SVCXPRT *transp)
 
 #ifdef DEBUG
 			syslog(LOG_ERR, "yppasswdd: about to "
-					"execute %s\n", cmdbuf);
+			    "execute %s\n", cmdbuf);
 #else
 			if (yplckpwdf() < 0) {
-				syslog(LOG_ERR, "yppasswdd: Couldn't get the"
-						"lock to update the maps");
+				syslog(LOG_ERR, "yppasswdd: Couldn't get the "
+				    "lock to update the maps");
 			} else {
 				setpgrp();
 				system(cmdbuf);
@@ -762,5 +800,5 @@ changepasswd(SVCXPRT *transp)
 
 	if (!svc_sendreply(transp, xdr_int, (char *)&ans))
 		syslog(LOG_WARNING,
-			"yppasswdd: couldn\'t reply to RPC call\n");
+		    "yppasswdd: couldn\'t reply to RPC call\n");
 }
