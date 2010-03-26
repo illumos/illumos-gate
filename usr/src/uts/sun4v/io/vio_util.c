@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,8 @@ static int vio_pool_cleanup_delay = 10000;	/* 10ms */
  *	ENOSPC if the pool could not be created due to alloc failures.
  */
 int
-vio_create_mblks(uint64_t num_mblks, size_t mblk_size, vio_mblk_pool_t **poolp)
+vio_create_mblks(uint64_t num_mblks, size_t mblk_size, uint8_t *mblk_datap,
+    vio_mblk_pool_t **poolp)
 {
 	vio_mblk_pool_t		*vmplp;
 	vio_mblk_t		*vmp;
@@ -73,7 +74,12 @@ vio_create_mblks(uint64_t num_mblks, size_t mblk_size, vio_mblk_pool_t **poolp)
 	    DDI_INTR_PRI(DDI_INTR_SOFTPRI_DEFAULT));
 
 	vmplp->basep = kmem_zalloc(num_mblks * sizeof (vio_mblk_t), KM_SLEEP);
-	vmplp->datap = kmem_zalloc(num_mblks * mblk_size, KM_SLEEP);
+	if (mblk_datap == NULL) {
+		vmplp->datap = kmem_zalloc(num_mblks * mblk_size, KM_SLEEP);
+	} else {
+		vmplp->datap = mblk_datap;
+		vmplp->flag |= VMPL_FLAG_CLIENT_DATA;
+	}
 	vmplp->nextp = NULL;
 
 	/* create a queue of pointers to free vio_mblk_t's */
@@ -105,6 +111,11 @@ vio_create_mblks(uint64_t num_mblks, size_t mblk_size, vio_mblk_pool_t **poolp)
 
 			*poolp = NULL;
 			return (ENOSPC);
+		}
+
+		if ((vmplp->flag & VMPL_FLAG_CLIENT_DATA) != 0) {
+			vmp->index = i;
+			vmp->state = VIO_MBLK_FREE;
 		}
 
 		/* put this vmp on the free stack */
@@ -182,7 +193,9 @@ vio_destroy_mblks(vio_mblk_pool_t *vmplp)
 	vmplp->flag &= ~(VMPL_FLAG_DESTROYING);
 
 	kmem_free(vmplp->basep, num_mblks * sizeof (vio_mblk_t));
-	kmem_free(vmplp->datap, num_mblks * vmplp->mblk_size);
+	if ((vmplp->flag & VMPL_FLAG_CLIENT_DATA) == 0) {
+		kmem_free(vmplp->datap, num_mblks * vmplp->mblk_size);
+	}
 	kmem_free(vmplp->quep, num_mblks * sizeof (vio_mblk_t *));
 
 	mutex_destroy(&vmplp->hlock);
@@ -194,14 +207,13 @@ vio_destroy_mblks(vio_mblk_pool_t *vmplp)
 }
 
 /*
- * Allocate a mblk from the free pool if one is available.
+ * Allocate a vio_mblk from the free pool if one is available.
  * Otherwise returns NULL.
  */
-mblk_t *
+vio_mblk_t *
 vio_allocb(vio_mblk_pool_t *vmplp)
 {
 	vio_mblk_t	*vmp = NULL;
-	mblk_t		*mp = NULL;
 	uint32_t	head;
 
 	mutex_enter(&vmplp->hlock);
@@ -209,12 +221,13 @@ vio_allocb(vio_mblk_pool_t *vmplp)
 	if (head != vmplp->tail) {
 		/* we have free mblks */
 		vmp = vmplp->quep[vmplp->head];
-		mp = vmp->mp;
 		vmplp->head = head;
+		ASSERT(vmp->state == VIO_MBLK_FREE);
+		vmp->state = VIO_MBLK_BOUND;
 	}
 	mutex_exit(&vmplp->hlock);
 
-	return (mp);
+	return (vmp);
 }
 
 /*
@@ -240,11 +253,44 @@ vio_freeb(void *arg)
 
 	vmp->mp = desballoc(vmp->datap, vmplp->mblk_size,
 	    BPRI_MED, &vmp->reclaim);
+	vmp->state = VIO_MBLK_FREE;
 
 	mutex_enter(&vmplp->tlock);
 	vmplp->quep[vmplp->tail] = vmp;
 	vmplp->tail = (vmplp->tail + 1) & vmplp->quemask;
 	mutex_exit(&vmplp->tlock);
+}
+
+
+/*
+ * This function searches the given mblk pool for mblks that are in the
+ * BOUND state and moves them to the FREE state. Note that only clients that
+ * are operating in RxDringData mode use this function. This allows such
+ * clients to reclaim buffers that are provided to the peer as shared memory,
+ * before calling vio_destroy_mblks(). We don't need this in other cases
+ * as the buffer is locally managed.
+ */
+void
+vio_clobber_pool(vio_mblk_pool_t *vmplp)
+{
+	uint64_t	num_mblks = vmplp->quelen;
+	uint64_t	i;
+	vio_mblk_t	*vmp;
+
+	mutex_enter(&vmplp->hlock);
+	mutex_enter(&vmplp->tlock);
+	for (i = 0; i < num_mblks; i++) {
+		vmp = &(vmplp->basep[i]);
+		if ((vmp->state & VIO_MBLK_BOUND) != 0) {
+			/* put this vmp on the free stack */
+			vmp->state = VIO_MBLK_FREE;
+			ASSERT(vmplp->tail != vmplp->head);
+			vmplp->quep[vmplp->tail] = vmp;
+			vmplp->tail = (vmplp->tail + 1) & vmplp->quemask;
+		}
+	}
+	mutex_exit(&vmplp->tlock);
+	mutex_exit(&vmplp->hlock);
 }
 
 /*
@@ -299,7 +345,7 @@ vio_init_multipools(vio_multi_pool_t *vmultip, int num_pools, ...)
 
 	for (i = 0; i < vmultip->num_pools; i++) {
 		status = vio_create_mblks(vmultip->nbuf_tbl[i],
-		    vmultip->bufsz_tbl[i], &vmultip->vmpp[i]);
+		    vmultip->bufsz_tbl[i], NULL, &vmultip->vmpp[i]);
 		if (status != 0) {
 			vio_destroy_multipools(vmultip, &fvmp);
 			/* We expect to free the pools without failure here */
@@ -354,26 +400,26 @@ vio_destroy_multipools(vio_multi_pool_t *vmultip, vio_mblk_pool_t **fvmp)
 
 
 /*
- * Allocate an mblk from one of the free pools, but tries the pool that
+ * Allocate an vio_mblk from one of the free pools, but tries the pool that
  * best fits size requested first.
  */
-mblk_t *
+vio_mblk_t *
 vio_multipool_allocb(vio_multi_pool_t *vmultip, size_t size)
 {
 	int i;
-	mblk_t *mp = NULL;
+	vio_mblk_t *vmp = NULL;
 
 	/* Try allocating any size that fits */
 	for (i = 0; i < vmultip->num_pools; i++) {
 		if (size > vmultip->bufsz_tbl[i]) {
 			continue;
 		}
-		mp = vio_allocb(vmultip->vmpp[i]);
-		if (mp != NULL) {
+		vmp = vio_allocb(vmultip->vmpp[i]);
+		if (vmp != NULL) {
 			break;
 		}
 	}
-	return (mp);
+	return (vmp);
 }
 
 /*

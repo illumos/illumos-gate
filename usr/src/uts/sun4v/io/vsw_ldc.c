@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,12 +74,10 @@
 /* Port add/deletion/etc routines */
 static	void vsw_port_delete(vsw_port_t *port);
 static	int vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id);
-static	void vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id);
-static	int vsw_init_ldcs(vsw_port_t *port);
-static	void vsw_uninit_ldcs(vsw_port_t *port);
+static	void vsw_ldc_detach(vsw_ldc_t *ldcp);
 static	int vsw_ldc_init(vsw_ldc_t *ldcp);
 static	void vsw_ldc_uninit(vsw_ldc_t *ldcp);
-static	void vsw_drain_ldcs(vsw_port_t *port);
+static	void vsw_ldc_drain(vsw_ldc_t *ldcp);
 static	void vsw_drain_port_taskq(vsw_port_t *port);
 static	void vsw_marker_task(void *);
 static	int vsw_plist_del_node(vsw_t *, vsw_port_t *port);
@@ -91,7 +89,6 @@ int vsw_portsend(vsw_port_t *port, mblk_t *mp);
 int vsw_port_attach(vsw_port_t *portp);
 vsw_port_t *vsw_lookup_port(vsw_t *vswp, int p_instance);
 void vsw_vlan_unaware_port_reset(vsw_port_t *portp);
-int vsw_send_msg(vsw_ldc_t *, void *, int, boolean_t);
 void vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate);
 void vsw_reset_ports(vsw_t *vswp);
 void vsw_port_reset(vsw_port_t *portp);
@@ -103,17 +100,17 @@ static	uint_t vsw_ldc_cb(uint64_t cb, caddr_t arg);
 
 /* Handshake routines */
 static	void vsw_ldc_reinit(vsw_ldc_t *);
-static	void vsw_process_conn_evt(vsw_ldc_t *, uint16_t);
 static	void vsw_conn_task(void *);
 static	int vsw_check_flag(vsw_ldc_t *, int, uint64_t);
 static	void vsw_next_milestone(vsw_ldc_t *);
 static	int vsw_supported_version(vio_ver_msg_t *);
 static	void vsw_set_vnet_proto_ops(vsw_ldc_t *ldcp);
 static	void vsw_reset_vnet_proto_ops(vsw_ldc_t *ldcp);
+void vsw_process_conn_evt(vsw_ldc_t *, uint16_t);
 
 /* Data processing routines */
-static void vsw_process_pkt(void *);
-static void vsw_dispatch_ctrl_task(vsw_ldc_t *, void *, vio_msg_tag_t *);
+void vsw_process_pkt(void *);
+static void vsw_dispatch_ctrl_task(vsw_ldc_t *, void *, vio_msg_tag_t *, int);
 static void vsw_process_ctrl_pkt(void *);
 static void vsw_process_ctrl_ver_pkt(vsw_ldc_t *, void *);
 static void vsw_process_ctrl_attr_pkt(vsw_ldc_t *, void *);
@@ -124,14 +121,14 @@ static void vsw_process_ctrl_rdx_pkt(vsw_ldc_t *, void *);
 static void vsw_process_physlink_msg(vsw_ldc_t *, void *);
 static void vsw_process_data_pkt(vsw_ldc_t *, void *, vio_msg_tag_t *,
 	uint32_t);
-static void vsw_process_data_dring_pkt(vsw_ldc_t *, void *);
 static void vsw_process_pkt_data_nop(void *, void *, uint32_t);
 static void vsw_process_pkt_data(void *, void *, uint32_t);
 static void vsw_process_data_ibnd_pkt(vsw_ldc_t *, void *);
 static void vsw_process_err_pkt(vsw_ldc_t *, void *, vio_msg_tag_t *);
+static void vsw_process_evt_read(vsw_ldc_t *ldcp);
+static void vsw_ldc_rcv(vsw_ldc_t *ldcp);
 
 /* Switching/data transmit routines */
-static	int vsw_dringsend(vsw_ldc_t *, mblk_t *);
 static	int vsw_descrsend(vsw_ldc_t *, mblk_t *);
 static void vsw_ldcsend_pkt(vsw_ldc_t *ldcp, mblk_t *mp);
 static int vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, uint32_t retries);
@@ -141,35 +138,26 @@ static int vsw_ldctx(void *arg, mblk_t *mp, mblk_t *mpt, uint32_t count);
 /* Packet creation routines */
 static void vsw_send_ver(void *);
 static void vsw_send_attr(vsw_ldc_t *);
-static vio_dring_reg_msg_t *vsw_create_dring_info_pkt(vsw_ldc_t *);
 static void vsw_send_dring_info(vsw_ldc_t *);
 static void vsw_send_rdx(vsw_ldc_t *);
 static void vsw_send_physlink_msg(vsw_ldc_t *ldcp, link_state_t plink_state);
 
 /* Dring routines */
-static dring_info_t *vsw_create_dring(vsw_ldc_t *);
 static void vsw_create_privring(vsw_ldc_t *);
-static int vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp);
-static int vsw_dring_find_free_desc(dring_info_t *, vsw_private_desc_t **,
-    int *);
-static dring_info_t *vsw_ident2dring(lane_t *, uint64_t);
-static int vsw_reclaim_dring(dring_info_t *dp, int start);
-
+static dring_info_t *vsw_map_dring(vsw_ldc_t *ldcp, void *pkt);
+static void vsw_unmap_dring(vsw_ldc_t *ldcp);
+static void vsw_destroy_dring(vsw_ldc_t *ldcp);
+static void vsw_free_lane_resources(vsw_ldc_t *, uint64_t);
+static int vsw_map_data(vsw_ldc_t *ldcp, dring_info_t *dp, void *pkt);
 static void vsw_set_lane_attr(vsw_t *, lane_t *);
-static int vsw_check_attr(vnet_attr_msg_t *, vsw_ldc_t *);
-static int vsw_dring_match(dring_info_t *dp, vio_dring_reg_msg_t *msg);
-static int vsw_mem_cookie_match(ldc_mem_cookie_t *, ldc_mem_cookie_t *);
-static int vsw_check_dring_info(vio_dring_reg_msg_t *);
+dring_info_t *vsw_map_dring_cmn(vsw_ldc_t *ldcp,
+    vio_dring_reg_msg_t *dring_pkt);
 
-/* Rcv/Tx thread routines */
+/* tx/msg/rcv thread routines */
 static void vsw_stop_tx_thread(vsw_ldc_t *ldcp);
 static void vsw_ldc_tx_worker(void *arg);
-static void vsw_stop_rx_thread(vsw_ldc_t *ldcp);
-static void vsw_ldc_rx_worker(void *arg);
 
 /* Misc support routines */
-static void vsw_free_lane_resources(vsw_ldc_t *, uint64_t);
-static void vsw_free_ring(dring_info_t *);
 static void vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr);
 static int vsw_get_same_dest_list(struct ether_header *ehp,
     mblk_t **rhead, mblk_t **rtail, mblk_t **mpp);
@@ -210,36 +198,43 @@ extern void vsw_publish_macaddr(vsw_t *vswp, vsw_port_t *portp);
 extern int vsw_mac_client_init(vsw_t *vswp, vsw_port_t *port, int type);
 extern void vsw_mac_client_cleanup(vsw_t *vswp, vsw_port_t *port, int type);
 extern void vsw_destroy_rxpools(void *arg);
-
-#define	VSW_NUM_VMPOOLS		3	/* number of vio mblk pools */
+extern void vsw_stop_msg_thread(vsw_ldc_t *ldcp);
+extern int vsw_send_msg(vsw_ldc_t *, void *, int, boolean_t);
+extern int vsw_dringsend(vsw_ldc_t *, mblk_t *);
+extern int vsw_reclaim_dring(dring_info_t *dp, int start);
+extern int vsw_dring_find_free_desc(dring_info_t *, vsw_private_desc_t **,
+    int *);
+extern vio_dring_reg_msg_t *vsw_create_tx_dring_info(vsw_ldc_t *);
+extern int vsw_setup_tx_dring(vsw_ldc_t *ldcp, dring_info_t *dp);
+extern void vsw_destroy_tx_dring(vsw_ldc_t *ldcp);
+extern dring_info_t *vsw_map_rx_dring(vsw_ldc_t *ldcp, void *pkt);
+extern void vsw_unmap_rx_dring(vsw_ldc_t *ldcp);
+extern void vsw_ldc_msg_worker(void *arg);
+extern void vsw_process_dringdata(void *, void *);
+extern vio_dring_reg_msg_t *vsw_create_rx_dring_info(vsw_ldc_t *);
+extern void vsw_destroy_rx_dring(vsw_ldc_t *ldcp);
+extern dring_info_t *vsw_map_tx_dring(vsw_ldc_t *ldcp, void *pkt);
+extern void vsw_unmap_tx_dring(vsw_ldc_t *ldcp);
+extern void vsw_ldc_rcv_worker(void *arg);
+extern void vsw_stop_rcv_thread(vsw_ldc_t *ldcp);
+extern int vsw_dringsend_shm(vsw_ldc_t *, mblk_t *);
+extern void vsw_process_dringdata_shm(void *, void *);
 
 /*
  * Tunables used in this file.
  */
 extern int vsw_num_handshakes;
-extern int vsw_wretries;
-extern int vsw_desc_delay;
-extern int vsw_read_attempts;
 extern int vsw_ldc_tx_delay;
 extern int vsw_ldc_tx_retries;
 extern int vsw_ldc_retries;
 extern int vsw_ldc_delay;
 extern boolean_t vsw_ldc_rxthr_enabled;
 extern boolean_t vsw_ldc_txthr_enabled;
-extern uint32_t vsw_ntxds;
+extern uint32_t vsw_num_descriptors;
+extern uint8_t  vsw_dring_mode;
 extern uint32_t vsw_max_tx_qcount;
-extern uint32_t vsw_chain_len;
-extern uint32_t vsw_mblk_size1;
-extern uint32_t vsw_mblk_size2;
-extern uint32_t vsw_mblk_size3;
-extern uint32_t vsw_mblk_size4;
-extern uint32_t vsw_num_mblks1;
-extern uint32_t vsw_num_mblks2;
-extern uint32_t vsw_num_mblks3;
-extern uint32_t vsw_num_mblks4;
 extern boolean_t vsw_obp_ver_proto_workaround;
 extern uint32_t vsw_publish_macaddr_count;
-extern boolean_t vsw_jumbo_rxpools;
 
 #define	LDC_ENTER_LOCK(ldcp)	\
 				mutex_enter(&((ldcp)->ldc_cblock));\
@@ -264,6 +259,11 @@ extern boolean_t vsw_jumbo_rxpools;
 	    ((ldcp)->lane_out.ver_major == (major) &&	\
 	    (ldcp)->lane_out.ver_minor >= (minor)))
 
+#define	VSW_VER_LTEQ(ldcp, major, minor)	\
+	(((ldcp)->lane_out.ver_major < (major)) ||	\
+	    ((ldcp)->lane_out.ver_major == (major) &&	\
+	    (ldcp)->lane_out.ver_minor <= (minor)))
+
 /*
  * VIO Protocol Version Info:
  *
@@ -279,8 +279,9 @@ extern boolean_t vsw_jumbo_rxpools;
  * 1.4			Jumbo Frame support.
  * 1.5			Link State Notification support with optional support
  * 			for Physical Link information.
+ * 1.6			Support for RxDringData mode.
  */
-static	ver_sup_t	vsw_versions[] = { {1, 5} };
+static	ver_sup_t	vsw_versions[] = { {1, 6} };
 
 /*
  * For the moment the state dump routines have their own
@@ -327,7 +328,6 @@ vsw_port_attach(vsw_port_t *port)
 	vsw_t			*vswp = port->p_vswp;
 	vsw_port_list_t		*plist = &vswp->plist;
 	vsw_port_t		*p, **pp;
-	int			i;
 	int			nids = port->num_ldcs;
 	uint64_t		*ldcids;
 	int			rv;
@@ -346,8 +346,6 @@ vsw_port_attach(vsw_port_t *port)
 	}
 	RW_EXIT(&plist->lockrw);
 
-	rw_init(&port->p_ldclist.lockrw, NULL, RW_DRIVER, NULL);
-
 	mutex_init(&port->tx_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&port->mca_lock, NULL, MUTEX_DRIVER, NULL);
 	rw_init(&port->maccl_rwlock, NULL, RW_DRIVER, NULL);
@@ -358,12 +356,10 @@ vsw_port_attach(vsw_port_t *port)
 
 	D2(vswp, "%s: %d nids", __func__, nids);
 	ldcids = port->ldc_ids;
-	for (i = 0; i < nids; i++) {
-		D2(vswp, "%s: ldcid (%llx)", __func__, (uint64_t)ldcids[i]);
-		if (vsw_ldc_attach(port, (uint64_t)ldcids[i]) != 0) {
-			DERR(vswp, "%s: ldc_attach failed", __func__);
-			goto exit_error;
-		}
+	D2(vswp, "%s: ldcid (%llx)", __func__, (uint64_t)ldcids[0]);
+	if (vsw_ldc_attach(port, (uint64_t)ldcids[0]) != 0) {
+		DERR(vswp, "%s: ldc_attach failed", __func__);
+		goto exit_error;
 	}
 
 	if (vswp->switching_setup_done == B_TRUE) {
@@ -396,7 +392,7 @@ vsw_port_attach(vsw_port_t *port)
 	/*
 	 * Initialise the port and any ldc's under it.
 	 */
-	(void) vsw_init_ldcs(port);
+	(void) vsw_ldc_init(port->ldcp);
 
 	/* announce macaddr of vnet to the physical switch */
 	if (vsw_publish_macaddr_count != 0) {	/* enabled */
@@ -407,7 +403,6 @@ vsw_port_attach(vsw_port_t *port)
 	return (0);
 
 exit_error:
-	rw_destroy(&port->p_ldclist.lockrw);
 
 	cv_destroy(&port->state_cv);
 	mutex_destroy(&port->state_lock);
@@ -518,13 +513,11 @@ vsw_detach_ports(vsw_t *vswp)
 static void
 vsw_port_delete(vsw_port_t *port)
 {
-	vsw_ldc_list_t 		*ldcl;
 	vsw_t			*vswp = port->p_vswp;
-	int			num_ldcs;
 
 	D1(vswp, "%s: enter : port id %d", __func__, port->p_instance);
 
-	vsw_uninit_ldcs(port);
+	vsw_ldc_uninit(port->ldcp);
 
 	/*
 	 * Wait for any pending ctrl msg tasks which reference this
@@ -535,18 +528,9 @@ vsw_port_delete(vsw_port_t *port)
 	/*
 	 * Wait for any active callbacks to finish
 	 */
-	vsw_drain_ldcs(port);
+	vsw_ldc_drain(port->ldcp);
 
-	ldcl = &port->p_ldclist;
-	num_ldcs = port->num_ldcs;
-	WRITE_ENTER(&ldcl->lockrw);
-	while (num_ldcs > 0) {
-		vsw_ldc_detach(port, ldcl->head->ldc_id);
-		num_ldcs--;
-	}
-	RW_EXIT(&ldcl->lockrw);
-
-	rw_destroy(&port->p_ldclist.lockrw);
+	vsw_ldc_detach(port->ldcp);
 
 	rw_destroy(&port->maccl_rwlock);
 	mutex_destroy(&port->mca_lock);
@@ -569,109 +553,6 @@ vsw_port_delete(vsw_port_t *port)
 	D1(vswp, "%s: exit", __func__);
 }
 
-static int
-vsw_init_multipools(vsw_ldc_t *ldcp, vsw_t *vswp)
-{
-	size_t		data_sz;
-	int		rv;
-	uint32_t	sz1 = 0;
-	uint32_t	sz2 = 0;
-	uint32_t	sz3 = 0;
-	uint32_t	sz4 = 0;
-
-	/*
-	 * We round up the mtu specified to be a multiple of 2K to limit the
-	 * number of rx buffer pools created for a given mtu.
-	 */
-	data_sz = vswp->max_frame_size + VNET_IPALIGN + VNET_LDCALIGN;
-	data_sz = VNET_ROUNDUP_2K(data_sz);
-
-	/*
-	 * If pool sizes are specified, use them. Note that the presence of
-	 * the first tunable will be used as a hint.
-	 */
-	if (vsw_mblk_size1 != 0) {
-		sz1 = vsw_mblk_size1;
-		sz2 = vsw_mblk_size2;
-		sz3 = vsw_mblk_size3;
-		sz4 = vsw_mblk_size4;
-
-		if (sz4 == 0) { /* need 3 pools */
-
-			ldcp->max_rxpool_size = sz3;
-			rv = vio_init_multipools(&ldcp->vmp,
-			    VSW_NUM_VMPOOLS, sz1, sz2, sz3,
-			    vsw_num_mblks1, vsw_num_mblks2, vsw_num_mblks3);
-
-		} else {
-
-			ldcp->max_rxpool_size = sz4;
-			rv = vio_init_multipools(&ldcp->vmp,
-			    VSW_NUM_VMPOOLS + 1, sz1, sz2, sz3, sz4,
-			    vsw_num_mblks1, vsw_num_mblks2, vsw_num_mblks3,
-			    vsw_num_mblks4);
-
-		}
-
-		return (rv);
-	}
-
-	/*
-	 * Pool sizes are not specified. We select the pool sizes based on the
-	 * mtu if vnet_jumbo_rxpools is enabled.
-	 */
-	if (vsw_jumbo_rxpools == B_FALSE || data_sz == VNET_2K) {
-		/*
-		 * Receive buffer pool allocation based on mtu is disabled.
-		 * Use the default mechanism of standard size pool allocation.
-		 */
-		sz1 = VSW_MBLK_SZ_128;
-		sz2 = VSW_MBLK_SZ_256;
-		sz3 = VSW_MBLK_SZ_2048;
-		ldcp->max_rxpool_size = sz3;
-
-		rv = vio_init_multipools(&ldcp->vmp, VSW_NUM_VMPOOLS,
-		    sz1, sz2, sz3,
-		    vsw_num_mblks1, vsw_num_mblks2, vsw_num_mblks3);
-
-		return (rv);
-	}
-
-	switch (data_sz) {
-
-	case VNET_4K:
-
-		sz1 = VSW_MBLK_SZ_128;
-		sz2 = VSW_MBLK_SZ_256;
-		sz3 = VSW_MBLK_SZ_2048;
-		sz4 = sz3 << 1;			/* 4K */
-		ldcp->max_rxpool_size = sz4;
-
-		rv = vio_init_multipools(&ldcp->vmp, VSW_NUM_VMPOOLS + 1,
-		    sz1, sz2, sz3, sz4,
-		    vsw_num_mblks1, vsw_num_mblks2, vsw_num_mblks3,
-		    vsw_num_mblks4);
-		break;
-
-	default:	/* data_sz:  4K+ to 16K */
-
-		sz1 = VSW_MBLK_SZ_256;
-		sz2 = VSW_MBLK_SZ_2048;
-		sz3 = data_sz >> 1;	/* Jumbo-size/2 */
-		sz4 = data_sz;	/* Jumbo-size */
-		ldcp->max_rxpool_size = sz4;
-
-		rv = vio_init_multipools(&ldcp->vmp, VSW_NUM_VMPOOLS + 1,
-		    sz1, sz2, sz3, sz4,
-		    vsw_num_mblks1, vsw_num_mblks2, vsw_num_mblks3,
-		    vsw_num_mblks4);
-		break;
-	}
-
-	return (rv);
-
-}
-
 /*
  * Attach a logical domain channel (ldc) under a specified port.
  *
@@ -681,15 +562,14 @@ static int
 vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 {
 	vsw_t 		*vswp = port->p_vswp;
-	vsw_ldc_list_t *ldcl = &port->p_ldclist;
 	vsw_ldc_t 	*ldcp = NULL;
 	ldc_attr_t 	attr;
 	ldc_status_t	istatus;
 	int 		status = DDI_FAILURE;
 	char		kname[MAXNAMELEN];
 	enum		{ PROG_init = 0x0,
-			    PROG_callback = 0x1, PROG_rx_thread = 0x2,
-			    PROG_tx_thread = 0x4}
+			    PROG_callback = 0x1,
+			    PROG_tx_thread = 0x2}
 			progress;
 
 	progress = PROG_init;
@@ -706,16 +586,21 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 	mutex_init(&ldcp->ldc_txlock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&ldcp->ldc_rxlock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&ldcp->ldc_cblock, NULL, MUTEX_DRIVER, NULL);
+	ldcp->msg_thr_flags = 0;
+	mutex_init(&ldcp->msg_thr_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&ldcp->msg_thr_cv, NULL, CV_DRIVER, NULL);
+	ldcp->rcv_thr_flags = 0;
+	mutex_init(&ldcp->rcv_thr_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&ldcp->rcv_thr_cv, NULL, CV_DRIVER, NULL);
 	mutex_init(&ldcp->drain_cv_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&ldcp->drain_cv, NULL, CV_DRIVER, NULL);
-	rw_init(&ldcp->lane_in.dlistrw, NULL, RW_DRIVER, NULL);
-	rw_init(&ldcp->lane_out.dlistrw, NULL, RW_DRIVER, NULL);
 
 	/* required for handshake with peer */
 	ldcp->local_session = (uint64_t)ddi_get_lbolt();
 	ldcp->peer_session = 0;
 	ldcp->session_status = 0;
 	ldcp->hss_id = 1;	/* Initial handshake session id */
+	ldcp->hphase = VSW_MILESTONE0;
 
 	(void) atomic_swap_32(&port->p_hio_capable, B_FALSE);
 
@@ -731,22 +616,6 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 		DERR(vswp, "%s(%lld): ldc_init failed, rv (%d)",
 		    __func__, ldc_id, status);
 		goto ldc_attach_fail;
-	}
-
-	if (vsw_ldc_rxthr_enabled) {
-		ldcp->rx_thr_flags = 0;
-
-		mutex_init(&ldcp->rx_thr_lock, NULL, MUTEX_DRIVER, NULL);
-		cv_init(&ldcp->rx_thr_cv, NULL, CV_DRIVER, NULL);
-		ldcp->rx_thread = thread_create(NULL, 2 * DEFAULTSTKSZ,
-		    vsw_ldc_rx_worker, ldcp, 0, &p0, TS_RUN, maxclsyspri);
-
-		progress |= PROG_rx_thread;
-		if (ldcp->rx_thread == NULL) {
-			DWARN(vswp, "%s(%lld): Failed to create worker thread",
-			    __func__, ldc_id);
-			goto ldc_attach_fail;
-		}
 	}
 
 	if (vsw_ldc_txthr_enabled) {
@@ -804,11 +673,8 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 		goto ldc_attach_fail;
 	}
 
-	/* link it into the list of channels for this port */
-	WRITE_ENTER(&ldcl->lockrw);
-	ldcp->ldc_next = ldcl->head;
-	ldcl->head = ldcp;
-	RW_EXIT(&ldcl->lockrw);
+	/* link it into this port */
+	port->ldcp = ldcp;
 
 	D1(vswp, "%s: exit", __func__);
 	return (0);
@@ -818,14 +684,6 @@ ldc_attach_fail:
 	if (progress & PROG_callback) {
 		(void) ldc_unreg_callback(ldcp->ldc_handle);
 		kmem_free(ldcp->ldcmsg, ldcp->msglen);
-	}
-
-	if (progress & PROG_rx_thread) {
-		if (ldcp->rx_thread != NULL) {
-			vsw_stop_rx_thread(ldcp);
-		}
-		mutex_destroy(&ldcp->rx_thr_lock);
-		cv_destroy(&ldcp->rx_thr_cv);
 	}
 
 	if (progress & PROG_tx_thread) {
@@ -838,15 +696,15 @@ ldc_attach_fail:
 	if (ldcp->ksp != NULL) {
 		vgen_destroy_kstats(ldcp->ksp);
 	}
+	mutex_destroy(&ldcp->msg_thr_lock);
+	mutex_destroy(&ldcp->rcv_thr_lock);
 	mutex_destroy(&ldcp->ldc_txlock);
 	mutex_destroy(&ldcp->ldc_rxlock);
 	mutex_destroy(&ldcp->ldc_cblock);
 	mutex_destroy(&ldcp->drain_cv_lock);
-
+	cv_destroy(&ldcp->msg_thr_cv);
+	cv_destroy(&ldcp->rcv_thr_cv);
 	cv_destroy(&ldcp->drain_cv);
-
-	rw_destroy(&ldcp->lane_in.dlistrw);
-	rw_destroy(&ldcp->lane_out.dlistrw);
 
 	kmem_free(ldcp, sizeof (vsw_ldc_t));
 
@@ -858,32 +716,19 @@ ldc_attach_fail:
  * particular port.
  */
 static void
-vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
+vsw_ldc_detach(vsw_ldc_t *ldcp)
 {
-	vsw_t 		*vswp = port->p_vswp;
-	vsw_ldc_t 	*ldcp, *prev_ldcp;
-	vsw_ldc_list_t	*ldcl = &port->p_ldclist;
 	int 		rv;
+	vsw_t 		*vswp = ldcp->ldc_port->p_vswp;
 	int		retries = 0;
-	vio_mblk_pool_t *fvmp = NULL;
-
-	prev_ldcp = ldcl->head;
-	for (; (ldcp = prev_ldcp) != NULL; prev_ldcp = ldcp->ldc_next) {
-		if (ldcp->ldc_id == ldc_id) {
-			break;
-		}
-	}
-
-	/* specified ldc id not found */
-	ASSERT(ldcp != NULL);
 
 	D2(vswp, "%s: detaching channel %lld", __func__, ldcp->ldc_id);
 
-	/* Stop the receive thread */
-	if (ldcp->rx_thread != NULL) {
-		vsw_stop_rx_thread(ldcp);
-		mutex_destroy(&ldcp->rx_thr_lock);
-		cv_destroy(&ldcp->rx_thr_cv);
+	/* Stop msg/rcv thread */
+	if (ldcp->rcv_thread != NULL) {
+		vsw_stop_rcv_thread(ldcp);
+	} else if (ldcp->msg_thread != NULL) {
+		vsw_stop_msg_thread(ldcp);
 	}
 	kmem_free(ldcp->ldcmsg, ldcp->msglen);
 
@@ -930,31 +775,16 @@ vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 	ldcp->ldc_handle = NULL;
 	ldcp->ldc_vswp = NULL;
 
-
-	/*
-	 * If we can't destroy all the rx pools for this channel, dispatch
-	 * a task to retry and clean up those rx pools. Note that we don't
-	 * need to wait for the task to complete. If the vsw device itself
-	 * gets detached (vsw_detach()), it will wait for the task to complete
-	 * implicitly in ddi_taskq_destroy().
-	 */
-	vio_destroy_multipools(&ldcp->vmp, &fvmp);
-	if (fvmp != NULL) {
-		(void) ddi_taskq_dispatch(vswp->rxp_taskq,
-		    vsw_destroy_rxpools, fvmp, DDI_SLEEP);
-	}
-
-	/* unlink it from the list */
-	prev_ldcp = ldcp->ldc_next;
-
+	mutex_destroy(&ldcp->msg_thr_lock);
+	mutex_destroy(&ldcp->rcv_thr_lock);
 	mutex_destroy(&ldcp->ldc_txlock);
 	mutex_destroy(&ldcp->ldc_rxlock);
 	mutex_destroy(&ldcp->ldc_cblock);
-	cv_destroy(&ldcp->drain_cv);
 	mutex_destroy(&ldcp->drain_cv_lock);
 	mutex_destroy(&ldcp->status_lock);
-	rw_destroy(&ldcp->lane_in.dlistrw);
-	rw_destroy(&ldcp->lane_out.dlistrw);
+	cv_destroy(&ldcp->msg_thr_cv);
+	cv_destroy(&ldcp->rcv_thr_cv);
+	cv_destroy(&ldcp->drain_cv);
 
 	kmem_free(ldcp, sizeof (vsw_ldc_t));
 }
@@ -1073,40 +903,6 @@ vsw_ldc_uninit(vsw_ldc_t *ldcp)
 	D1(vswp, "vsw_ldc_uninit: exit: id(%lx)", ldcp->ldc_id);
 }
 
-static int
-vsw_init_ldcs(vsw_port_t *port)
-{
-	vsw_ldc_list_t	*ldcl = &port->p_ldclist;
-	vsw_ldc_t	*ldcp;
-
-	READ_ENTER(&ldcl->lockrw);
-	ldcp =  ldcl->head;
-	for (; ldcp  != NULL; ldcp = ldcp->ldc_next) {
-		(void) vsw_ldc_init(ldcp);
-	}
-	RW_EXIT(&ldcl->lockrw);
-
-	return (0);
-}
-
-static void
-vsw_uninit_ldcs(vsw_port_t *port)
-{
-	vsw_ldc_list_t	*ldcl = &port->p_ldclist;
-	vsw_ldc_t	*ldcp;
-
-	D1(NULL, "vsw_uninit_ldcs: enter\n");
-
-	READ_ENTER(&ldcl->lockrw);
-	ldcp =  ldcl->head;
-	for (; ldcp  != NULL; ldcp = ldcp->ldc_next) {
-		vsw_ldc_uninit(ldcp);
-	}
-	RW_EXIT(&ldcl->lockrw);
-
-	D1(NULL, "vsw_uninit_ldcs: exit\n");
-}
-
 /*
  * Wait until the callback(s) associated with the ldcs under the specified
  * port have completed.
@@ -1143,58 +939,48 @@ vsw_uninit_ldcs(vsw_port_t *port)
  * cleared the active flag. In this case we would never get a cv_signal.
  */
 static void
-vsw_drain_ldcs(vsw_port_t *port)
+vsw_ldc_drain(vsw_ldc_t *ldcp)
 {
-	vsw_ldc_list_t	*ldcl = &port->p_ldclist;
-	vsw_ldc_t	*ldcp;
-	vsw_t		*vswp = port->p_vswp;
+	vsw_t	*vswp = ldcp->ldc_port->p_vswp;
 
 	D1(vswp, "%s: enter", __func__);
 
-	READ_ENTER(&ldcl->lockrw);
+	/*
+	 * If we can unregister the channel callback then we
+	 * know that there is no callback either running or
+	 * scheduled to run for this channel so move on to next
+	 * channel in the list.
+	 */
+	mutex_enter(&ldcp->drain_cv_lock);
 
-	ldcp = ldcl->head;
+	/* prompt active callbacks to quit */
+	ldcp->drain_state = VSW_LDC_DRAINING;
 
-	for (; ldcp  != NULL; ldcp = ldcp->ldc_next) {
+	if ((ldc_unreg_callback(ldcp->ldc_handle)) == 0) {
+		D2(vswp, "%s: unreg callback for chan %ld", __func__,
+		    ldcp->ldc_id);
+		mutex_exit(&ldcp->drain_cv_lock);
+	} else {
 		/*
-		 * If we can unregister the channel callback then we
-		 * know that there is no callback either running or
-		 * scheduled to run for this channel so move on to next
-		 * channel in the list.
+		 * If we end up here we know that either 1) a callback
+		 * is currently executing, 2) is about to start (i.e.
+		 * the ldc framework has set the active flag but
+		 * has not actually invoked the callback yet, or 3)
+		 * has finished and has returned to the ldc framework
+		 * but the ldc framework has not yet cleared the
+		 * active bit.
+		 *
+		 * Wait for it to finish.
 		 */
-		mutex_enter(&ldcp->drain_cv_lock);
-
-		/* prompt active callbacks to quit */
-		ldcp->drain_state = VSW_LDC_DRAINING;
-
-		if ((ldc_unreg_callback(ldcp->ldc_handle)) == 0) {
-			D2(vswp, "%s: unreg callback for chan %ld", __func__,
-			    ldcp->ldc_id);
-			mutex_exit(&ldcp->drain_cv_lock);
-			continue;
-		} else {
-			/*
-			 * If we end up here we know that either 1) a callback
-			 * is currently executing, 2) is about to start (i.e.
-			 * the ldc framework has set the active flag but
-			 * has not actually invoked the callback yet, or 3)
-			 * has finished and has returned to the ldc framework
-			 * but the ldc framework has not yet cleared the
-			 * active bit.
-			 *
-			 * Wait for it to finish.
-			 */
-			while (ldc_unreg_callback(ldcp->ldc_handle)
-			    == EWOULDBLOCK)
-				(void) cv_reltimedwait(&ldcp->drain_cv,
-				    &ldcp->drain_cv_lock, hz, TR_CLOCK_TICK);
-
-			mutex_exit(&ldcp->drain_cv_lock);
-			D2(vswp, "%s: unreg callback for chan %ld after "
-			    "timeout", __func__, ldcp->ldc_id);
+		while (ldc_unreg_callback(ldcp->ldc_handle) == EWOULDBLOCK) {
+			(void) cv_timedwait(&ldcp->drain_cv,
+			    &ldcp->drain_cv_lock, ddi_get_lbolt() + hz);
 		}
+
+		mutex_exit(&ldcp->drain_cv_lock);
+		D2(vswp, "%s: unreg callback for chan %ld after "
+		    "timeout", __func__, ldcp->ldc_id);
 	}
-	RW_EXIT(&ldcl->lockrw);
 
 	D1(vswp, "%s: exit", __func__);
 }
@@ -1282,21 +1068,7 @@ vsw_lookup_port(vsw_t *vswp, int p_instance)
 void
 vsw_vlan_unaware_port_reset(vsw_port_t *portp)
 {
-	vsw_ldc_list_t 	*ldclp;
-	vsw_ldc_t	*ldcp;
-
-	ldclp = &portp->p_ldclist;
-
-	READ_ENTER(&ldclp->lockrw);
-
-	/*
-	 * NOTE: for now, we will assume we have a single channel.
-	 */
-	if (ldclp->head == NULL) {
-		RW_EXIT(&ldclp->lockrw);
-		return;
-	}
-	ldcp = ldclp->head;
+	vsw_ldc_t	*ldcp = portp->ldcp;
 
 	mutex_enter(&ldcp->ldc_cblock);
 
@@ -1310,28 +1082,12 @@ vsw_vlan_unaware_port_reset(vsw_port_t *portp)
 	}
 
 	mutex_exit(&ldcp->ldc_cblock);
-
-	RW_EXIT(&ldclp->lockrw);
 }
 
 void
 vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate)
 {
-	vsw_ldc_list_t	*ldclp;
-	vsw_ldc_t	*ldcp;
-
-	ldclp = &portp->p_ldclist;
-
-	READ_ENTER(&ldclp->lockrw);
-
-	/*
-	 * NOTE: for now, we will assume we have a single channel.
-	 */
-	if (ldclp->head == NULL) {
-		RW_EXIT(&ldclp->lockrw);
-		return;
-	}
-	ldcp = ldclp->head;
+	vsw_ldc_t	*ldcp = portp->ldcp;
 
 	mutex_enter(&ldcp->ldc_cblock);
 
@@ -1350,28 +1106,12 @@ vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate)
 	}
 
 	mutex_exit(&ldcp->ldc_cblock);
-
-	RW_EXIT(&ldclp->lockrw);
 }
 
 void
 vsw_port_reset(vsw_port_t *portp)
 {
-	vsw_ldc_list_t 	*ldclp;
-	vsw_ldc_t	*ldcp;
-
-	ldclp = &portp->p_ldclist;
-
-	READ_ENTER(&ldclp->lockrw);
-
-	/*
-	 * NOTE: for now, we will assume we have a single channel.
-	 */
-	if (ldclp->head == NULL) {
-		RW_EXIT(&ldclp->lockrw);
-		return;
-	}
-	ldcp = ldclp->head;
+	vsw_ldc_t	*ldcp = portp->ldcp;
 
 	mutex_enter(&ldcp->ldc_cblock);
 
@@ -1381,8 +1121,6 @@ vsw_port_reset(vsw_port_t *portp)
 	vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 
 	mutex_exit(&ldcp->ldc_cblock);
-
-	RW_EXIT(&ldclp->lockrw);
 }
 
 void
@@ -1426,23 +1164,11 @@ vsw_send_physlink_msg(vsw_ldc_t *ldcp, link_state_t plink_state)
 static void
 vsw_port_physlink_update(vsw_port_t *portp)
 {
-	vsw_ldc_list_t 	*ldclp;
 	vsw_ldc_t	*ldcp;
 	vsw_t		*vswp;
 
 	vswp = portp->p_vswp;
-	ldclp = &portp->p_ldclist;
-
-	READ_ENTER(&ldclp->lockrw);
-
-	/*
-	 * NOTE: for now, we will assume we have a single channel.
-	 */
-	if (ldclp->head == NULL) {
-		RW_EXIT(&ldclp->lockrw);
-		return;
-	}
-	ldcp = ldclp->head;
+	ldcp = portp->ldcp;
 
 	mutex_enter(&ldcp->ldc_cblock);
 
@@ -1456,8 +1182,6 @@ vsw_port_physlink_update(vsw_port_t *portp)
 	}
 
 	mutex_exit(&ldcp->ldc_cblock);
-
-	RW_EXIT(&ldclp->lockrw);
 }
 
 void
@@ -1547,23 +1271,7 @@ vsw_ldc_cb(uint64_t event, caddr_t arg)
 		D2(vswp, "%s: id(ld) event(%llx) data READ",
 		    __func__, ldcp->ldc_id, event);
 
-		if (ldcp->rx_thread != NULL) {
-			/*
-			 * If the receive thread is enabled, then
-			 * wakeup the receive thread to process the
-			 * LDC messages.
-			 */
-			mutex_exit(&ldcp->ldc_cblock);
-			mutex_enter(&ldcp->rx_thr_lock);
-			if (!(ldcp->rx_thr_flags & VSW_WTHR_DATARCVD)) {
-				ldcp->rx_thr_flags |= VSW_WTHR_DATARCVD;
-				cv_signal(&ldcp->rx_thr_cv);
-			}
-			mutex_exit(&ldcp->rx_thr_lock);
-			mutex_enter(&ldcp->ldc_cblock);
-		} else {
-			vsw_process_pkt(ldcp);
-		}
+		vsw_process_evt_read(ldcp);
 
 		ASSERT((event & (LDC_EVT_RESET | LDC_EVT_DOWN)) == 0);
 
@@ -1610,35 +1318,16 @@ vsw_ldc_reinit(vsw_ldc_t *ldcp)
 {
 	vsw_t		*vswp = ldcp->ldc_vswp;
 	vsw_port_t	*port;
-	vsw_ldc_list_t	*ldcl;
-	vio_mblk_pool_t *fvmp = NULL;
 
 	D1(vswp, "%s: enter", __func__);
 
-	/*
-	 * If we can't destroy all the rx pools for this channel, dispatch
-	 * a task to retry and clean up those rx pools. Note that we don't
-	 * need to wait for the task to complete. If the vsw device itself
-	 * gets detached (vsw_detach()), it will wait for the task to complete
-	 * implicitly in ddi_taskq_destroy().
-	 */
-	vio_destroy_multipools(&ldcp->vmp, &fvmp);
-	if (fvmp != NULL) {
-		(void) ddi_taskq_dispatch(vswp->rxp_taskq,
-		    vsw_destroy_rxpools, fvmp, DDI_SLEEP);
-	}
-
 	port = ldcp->ldc_port;
-	ldcl = &port->p_ldclist;
-
-	READ_ENTER(&ldcl->lockrw);
 
 	D2(vswp, "%s: in 0x%llx : out 0x%llx", __func__,
 	    ldcp->lane_in.lstate, ldcp->lane_out.lstate);
 
 	vsw_free_lane_resources(ldcp, INBOUND);
 	vsw_free_lane_resources(ldcp, OUTBOUND);
-	RW_EXIT(&ldcl->lockrw);
 
 	ldcp->lane_in.lstate = 0;
 	ldcp->lane_out.lstate = 0;
@@ -1668,11 +1357,8 @@ vsw_ldc_reinit(vsw_ldc_t *ldcp)
 
 /*
  * Process a connection event.
- *
- * Note - care must be taken to ensure that this function is
- * not called with the dlistrw lock held.
  */
-static void
+void
 vsw_process_conn_evt(vsw_ldc_t *ldcp, uint16_t evt)
 {
 	vsw_t		*vswp = ldcp->ldc_vswp;
@@ -1786,6 +1472,12 @@ vsw_conn_task(void *arg)
 
 	/* can safely free now have copied out data */
 	kmem_free(conn, sizeof (vsw_conn_evt_t));
+
+	if (ldcp->rcv_thread != NULL) {
+		vsw_stop_rcv_thread(ldcp);
+	} else if (ldcp->msg_thread != NULL) {
+		vsw_stop_msg_thread(ldcp);
+	}
 
 	mutex_enter(&ldcp->status_lock);
 	if (ldc_status(ldcp->ldc_handle, &curr_status) != 0) {
@@ -2004,12 +1696,14 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 {
 	vsw_t		*vswp = ldcp->ldc_vswp;
 	vsw_port_t	*portp = ldcp->ldc_port;
+	lane_t		*lane_out = &ldcp->lane_out;
+	lane_t		*lane_in = &ldcp->lane_in;
 
 	D1(vswp, "%s (chan %lld): enter (phase %ld)", __func__,
 	    ldcp->ldc_id, ldcp->hphase);
 
-	DUMP_FLAGS(ldcp->lane_in.lstate);
-	DUMP_FLAGS(ldcp->lane_out.lstate);
+	DUMP_FLAGS(lane_in->lstate);
+	DUMP_FLAGS(lane_out->lstate);
 
 	switch (ldcp->hphase) {
 
@@ -2018,7 +1712,7 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		 * If we haven't started to handshake with our peer,
 		 * start to do so now.
 		 */
-		if (ldcp->lane_out.lstate == 0) {
+		if (lane_out->lstate == 0) {
 			D2(vswp, "%s: (chan %lld) starting handshake "
 			    "with peer", __func__, ldcp->ldc_id);
 			vsw_process_conn_evt(ldcp, VSW_CONN_UP);
@@ -2028,8 +1722,8 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		 * Only way to pass this milestone is to have successfully
 		 * negotiated version info.
 		 */
-		if ((ldcp->lane_in.lstate & VSW_VER_ACK_SENT) &&
-		    (ldcp->lane_out.lstate & VSW_VER_ACK_RECV)) {
+		if ((lane_in->lstate & VSW_VER_ACK_SENT) &&
+		    (lane_out->lstate & VSW_VER_ACK_RECV)) {
 
 			D2(vswp, "%s: (chan %lld) leaving milestone 0",
 			    __func__, ldcp->ldc_id);
@@ -2049,27 +1743,35 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 	case VSW_MILESTONE1:
 		/*
 		 * Only way to pass this milestone is to have successfully
-		 * negotiated attribute information.
+		 * negotiated attribute information, in both directions.
 		 */
-		if (ldcp->lane_in.lstate & VSW_ATTR_ACK_SENT) {
-
-			ldcp->hphase = VSW_MILESTONE2;
-
-			/*
-			 * If the peer device has said it wishes to
-			 * use descriptor rings then we send it our ring
-			 * info, otherwise we just set up a private ring
-			 * which we use an internal buffer
-			 */
-			if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
-			    (ldcp->lane_in.xfer_mode & VIO_DRING_MODE_V1_2)) ||
-			    (VSW_VER_LT(ldcp, 1, 2) &&
-			    (ldcp->lane_in.xfer_mode ==
-			    VIO_DRING_MODE_V1_0))) {
-				vsw_send_dring_info(ldcp);
-			}
+		if (!((lane_in->lstate & VSW_ATTR_ACK_SENT) &&
+		    (lane_out->lstate & VSW_ATTR_ACK_RECV))) {
+			break;
 		}
-		break;
+
+		ldcp->hphase = VSW_MILESTONE2;
+
+		/*
+		 * If the peer device has said it wishes to
+		 * use descriptor rings then we send it our ring
+		 * info, otherwise we just set up a private ring
+		 * which we use an internal buffer
+		 */
+		if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
+		    (lane_in->xfer_mode & VIO_DRING_MODE_V1_2)) ||
+		    (VSW_VER_LT(ldcp, 1, 2) &&
+		    (lane_in->xfer_mode == VIO_DRING_MODE_V1_0))) {
+			vsw_send_dring_info(ldcp);
+			break;
+		}
+
+		/*
+		 * The peer doesn't operate in dring mode; we
+		 * can simply fallthru to the RDX phase from
+		 * here.
+		 */
+		/*FALLTHRU*/
 
 	case VSW_MILESTONE2:
 		/*
@@ -2082,11 +1784,11 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		 * through.
 		 */
 		if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
-		    (ldcp->lane_in.xfer_mode & VIO_DRING_MODE_V1_2)) ||
+		    (lane_in->xfer_mode & VIO_DRING_MODE_V1_2)) ||
 		    (VSW_VER_LT(ldcp, 1, 2) &&
-		    (ldcp->lane_in.xfer_mode ==
+		    (lane_in->xfer_mode ==
 		    VIO_DRING_MODE_V1_0))) {
-			if (!(ldcp->lane_in.lstate & VSW_DRING_ACK_SENT))
+			if (!(lane_in->lstate & VSW_DRING_ACK_SENT))
 				break;
 		}
 
@@ -2102,17 +1804,24 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		 * Pass this milestone when all paramaters have been
 		 * successfully exchanged and RDX sent in both directions.
 		 *
-		 * Mark outbound lane as available to transmit data.
+		 * Mark the relevant lane as available to transmit data. In
+		 * RxDringData mode, lane_in is associated with transmit and
+		 * lane_out is associated with receive. It is the reverse in
+		 * TxDring mode.
 		 */
-		if ((ldcp->lane_out.lstate & VSW_RDX_ACK_SENT) &&
-		    (ldcp->lane_in.lstate & VSW_RDX_ACK_RECV)) {
+		if ((lane_out->lstate & VSW_RDX_ACK_SENT) &&
+		    (lane_in->lstate & VSW_RDX_ACK_RECV)) {
 
 			D2(vswp, "%s: (chan %lld) leaving milestone 3",
 			    __func__, ldcp->ldc_id);
 			D2(vswp, "%s: ** handshake complete (0x%llx : "
-			    "0x%llx) **", __func__, ldcp->lane_in.lstate,
-			    ldcp->lane_out.lstate);
-			ldcp->lane_out.lstate |= VSW_LANE_ACTIVE;
+			    "0x%llx) **", __func__, lane_in->lstate,
+			    lane_out->lstate);
+			if (lane_out->dring_mode == VIO_RX_DRING_DATA) {
+				lane_in->lstate |= VSW_LANE_ACTIVE;
+			} else {
+				lane_out->lstate |= VSW_LANE_ACTIVE;
+			}
 			ldcp->hphase = VSW_MILESTONE4;
 			ldcp->hcnt = 0;
 			DISPLAY_STATE();
@@ -2135,8 +1844,8 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 
 		} else {
 			D2(vswp, "%s: still in milestone 3 (0x%llx : 0x%llx)",
-			    __func__, ldcp->lane_in.lstate,
-			    ldcp->lane_out.lstate);
+			    __func__, lane_in->lstate,
+			    lane_out->lstate);
 		}
 		break;
 
@@ -2221,6 +1930,44 @@ vsw_set_vnet_proto_ops(vsw_ldc_t *ldcp)
 	vsw_t	*vswp = ldcp->ldc_vswp;
 	lane_t	*lp = &ldcp->lane_out;
 
+	/*
+	 * Setup the appropriate dring data processing routine and any
+	 * associated thread based on the version.
+	 *
+	 * In versions < 1.6, we support only TxDring mode. In this mode, the
+	 * msg worker thread processes all types of VIO msgs (ctrl and data).
+	 *
+	 * In versions >= 1.6, we also support RxDringData mode. In this mode,
+	 * the rcv worker thread processes dring data messages (msgtype:
+	 * VIO_TYPE_DATA, subtype: VIO_SUBTYPE_INFO, env: VIO_DRING_DATA). The
+	 * rest of the data messages (including acks) and ctrl messages are
+	 * handled directly by the callback (intr) thread.
+	 *
+	 * However, for versions >= 1.6, we could still fallback to TxDring
+	 * mode. This could happen if RxDringData mode has been disabled (see
+	 * vsw_dring_mode) on this guest or on the peer guest. This info is
+	 * determined as part of attr exchange phase of handshake. Hence, we
+	 * setup these pointers for v1.6 after attr msg phase completes during
+	 * handshake.
+	 */
+	if (VSW_VER_GTEQ(ldcp, 1, 6)) {
+		/*
+		 * Set data dring mode for vsw_send_attr(). We setup msg worker
+		 * thread in TxDring mode or rcv worker thread in RxDringData
+		 * mode when attr phase of handshake completes.
+		 */
+		if (vsw_dring_mode == VIO_RX_DRING_DATA) {
+			lp->dring_mode = (VIO_RX_DRING_DATA | VIO_TX_DRING);
+		} else {
+			lp->dring_mode = VIO_TX_DRING;
+		}
+	} else {
+		lp->dring_mode = VIO_TX_DRING;
+	}
+
+	/*
+	 * Setup the MTU for attribute negotiation based on the version.
+	 */
 	if (VSW_VER_GTEQ(ldcp, 1, 4)) {
 		/*
 		 * If the version negotiated with peer is >= 1.4(Jumbo Frame
@@ -2249,6 +1996,9 @@ vsw_set_vnet_proto_ops(vsw_ldc_t *ldcp)
 		}
 	}
 
+	/*
+	 * Setup version dependent data processing functions.
+	 */
 	if (VSW_VER_GTEQ(ldcp, 1, 2)) {
 		/* Versions >= 1.2 */
 
@@ -2294,10 +2044,40 @@ vsw_reset_vnet_proto_ops(vsw_ldc_t *ldcp)
 	lp->xfer_mode = VIO_DRING_MODE_V1_0;
 }
 
+static void
+vsw_process_evt_read(vsw_ldc_t *ldcp)
+{
+	if (ldcp->msg_thread != NULL) {
+		/*
+		 * TxDring mode; wakeup message worker
+		 * thread to process the VIO messages.
+		 */
+		mutex_exit(&ldcp->ldc_cblock);
+		mutex_enter(&ldcp->msg_thr_lock);
+		if (!(ldcp->msg_thr_flags & VSW_WTHR_DATARCVD)) {
+			ldcp->msg_thr_flags |= VSW_WTHR_DATARCVD;
+			cv_signal(&ldcp->msg_thr_cv);
+		}
+		mutex_exit(&ldcp->msg_thr_lock);
+		mutex_enter(&ldcp->ldc_cblock);
+	} else {
+		/*
+		 * We invoke vsw_process_pkt() in the context of the LDC
+		 * callback (vsw_ldc_cb()) during handshake, until the dring
+		 * mode is negotiated. After the dring mode is negotiated, the
+		 * msgs are processed by the msg worker thread (above case) if
+		 * the dring mode is TxDring. Otherwise (in RxDringData mode)
+		 * we continue to process the msgs directly in the callback
+		 * context.
+		 */
+		vsw_process_pkt(ldcp);
+	}
+}
+
 /*
  * Main routine for processing messages received over LDC.
  */
-static void
+void
 vsw_process_pkt(void *arg)
 {
 	vsw_ldc_t	*ldcp = (vsw_ldc_t  *)arg;
@@ -2348,7 +2128,7 @@ vsw_process_pkt(void *arg)
 
 		switch (tagp->vio_msgtype) {
 		case VIO_TYPE_CTRL:
-			vsw_dispatch_ctrl_task(ldcp, ldcmsg, tagp);
+			vsw_dispatch_ctrl_task(ldcp, ldcmsg, tagp, msglen);
 			break;
 		case VIO_TYPE_DATA:
 			vsw_process_data_pkt(ldcp, ldcmsg, tagp, msglen);
@@ -2370,7 +2150,8 @@ vsw_process_pkt(void *arg)
  * Dispatch a task to process a VIO control message.
  */
 static void
-vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t *tagp)
+vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t *tagp,
+	int msglen)
 {
 	vsw_ctrl_task_t		*ctaskp = NULL;
 	vsw_port_t		*port = ldcp->ldc_port;
@@ -2406,7 +2187,7 @@ vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t *tagp)
 	}
 
 	ctaskp->ldcp = ldcp;
-	bcopy((def_msg_t *)cpkt, &ctaskp->pktp, sizeof (def_msg_t));
+	bcopy((def_msg_t *)cpkt, &ctaskp->pktp, msglen);
 	ctaskp->hss_id = ldcp->hss_id;
 
 	/*
@@ -2728,6 +2509,369 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 	D1(vswp, "%s(%lld): exit\n", __func__, ldcp->ldc_id);
 }
 
+static int
+vsw_process_attr_info(vsw_ldc_t *ldcp, vnet_attr_msg_t *msg)
+{
+	vsw_t			*vswp = ldcp->ldc_vswp;
+	vsw_port_t		*port = ldcp->ldc_port;
+	struct ether_addr	ea;
+	uint64_t		macaddr = 0;
+	lane_t			*lane_out = &ldcp->lane_out;
+	lane_t			*lane_in = &ldcp->lane_in;
+	uint32_t		mtu;
+	int			i;
+	uint8_t			dring_mode;
+
+	D2(vswp, "%s: VIO_SUBTYPE_INFO", __func__);
+
+	if (vsw_check_flag(ldcp, INBOUND, VSW_ATTR_INFO_RECV)) {
+		return (1);
+	}
+
+	if ((msg->xfer_mode != VIO_DESC_MODE) &&
+	    (msg->xfer_mode != lane_out->xfer_mode)) {
+		D2(NULL, "%s: unknown mode %x\n", __func__, msg->xfer_mode);
+		return (1);
+	}
+
+	/* Only support MAC addresses at moment. */
+	if ((msg->addr_type != ADDR_TYPE_MAC) || (msg->addr == 0)) {
+		D2(NULL, "%s: invalid addr_type %x, or address 0x%llx\n",
+		    __func__, msg->addr_type, msg->addr);
+		return (1);
+	}
+
+	/*
+	 * MAC address supplied by device should match that stored
+	 * in the vsw-port OBP node. Need to decide what to do if they
+	 * don't match, for the moment just warn but don't fail.
+	 */
+	vnet_macaddr_ultostr(msg->addr, ea.ether_addr_octet);
+	if (ether_cmp(&ea, &port->p_macaddr) != 0) {
+		DERR(NULL, "%s: device supplied address "
+		    "0x%llx doesn't match node address 0x%llx\n",
+		    __func__, msg->addr, port->p_macaddr);
+	}
+
+	/*
+	 * Ack freq only makes sense in pkt mode, in shared
+	 * mode the ring descriptors say whether or not to
+	 * send back an ACK.
+	 */
+	if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
+	    (msg->xfer_mode & VIO_DRING_MODE_V1_2)) ||
+	    (VSW_VER_LT(ldcp, 1, 2) &&
+	    (msg->xfer_mode == VIO_DRING_MODE_V1_0))) {
+		if (msg->ack_freq > 0) {
+			D2(NULL, "%s: non zero ack freq in SHM mode\n",
+			    __func__);
+			return (1);
+		}
+	}
+
+	/*
+	 * Process dring mode attribute.
+	 */
+	if (VSW_VER_GTEQ(ldcp, 1, 6)) {
+		/*
+		 * Versions >= 1.6:
+		 * Though we are operating in v1.6 mode, it is possible that
+		 * RxDringData mode has been disabled either on this guest or
+		 * on the peer guest. If so, we revert to pre v1.6 behavior of
+		 * TxDring mode. But this must be agreed upon in both
+		 * directions of attr exchange. We first determine the mode
+		 * that can be negotiated.
+		 */
+		if ((msg->options & VIO_RX_DRING_DATA) != 0 &&
+		    vsw_dring_mode == VIO_RX_DRING_DATA) {
+			/*
+			 * The peer is capable of handling RxDringData AND we
+			 * are also capable of it; we enable RxDringData mode
+			 * on this channel.
+			 */
+			dring_mode = VIO_RX_DRING_DATA;
+		} else if ((msg->options & VIO_TX_DRING) != 0) {
+			/*
+			 * If the peer is capable of TxDring mode, we
+			 * negotiate TxDring mode on this channel.
+			 */
+			dring_mode = VIO_TX_DRING;
+		} else {
+			/*
+			 * We support only VIO_TX_DRING and VIO_RX_DRING_DATA
+			 * modes. We don't support VIO_RX_DRING mode.
+			 */
+			return (1);
+		}
+
+		/*
+		 * If we have received an ack for the attr info that we sent,
+		 * then check if the dring mode matches what the peer had ack'd
+		 * (saved in lane_out). If they don't match, we fail the
+		 * handshake.
+		 */
+		if (lane_out->lstate & VSW_ATTR_ACK_RECV) {
+			if (msg->options != lane_out->dring_mode) {
+				/* send NACK */
+				return (1);
+			}
+		} else {
+			/*
+			 * Save the negotiated dring mode in our attr
+			 * parameters, so it gets sent in the attr info from us
+			 * to the peer.
+			 */
+			lane_out->dring_mode = dring_mode;
+		}
+
+		/* save the negotiated dring mode in the msg to be replied */
+		msg->options = dring_mode;
+	}
+
+	/*
+	 * Process MTU attribute.
+	 */
+	if (VSW_VER_GTEQ(ldcp, 1, 4)) {
+		/*
+		 * Versions >= 1.4:
+		 * Validate mtu of the peer is at least ETHERMAX. Then, the mtu
+		 * is negotiated down to the minimum of our mtu and peer's mtu.
+		 */
+		if (msg->mtu < ETHERMAX) {
+			return (1);
+		}
+
+		mtu = MIN(msg->mtu, vswp->max_frame_size);
+
+		/*
+		 * If we have received an ack for the attr info
+		 * that we sent, then check if the mtu computed
+		 * above matches the mtu that the peer had ack'd
+		 * (saved in local hparams). If they don't
+		 * match, we fail the handshake.
+		 */
+		if (lane_out->lstate & VSW_ATTR_ACK_RECV) {
+			if (mtu != lane_out->mtu) {
+				/* send NACK */
+				return (1);
+			}
+		} else {
+			/*
+			 * Save the mtu computed above in our
+			 * attr parameters, so it gets sent in
+			 * the attr info from us to the peer.
+			 */
+			lane_out->mtu = mtu;
+		}
+
+		/* save the MIN mtu in the msg to be replied */
+		msg->mtu = mtu;
+	} else {
+		/* Versions < 1.4, mtu must match */
+		if (msg->mtu != lane_out->mtu) {
+			D2(NULL, "%s: invalid MTU (0x%llx)\n",
+			    __func__, msg->mtu);
+			return (1);
+		}
+	}
+
+	/*
+	 * Otherwise store attributes for this lane and update
+	 * lane state.
+	 */
+	lane_in->mtu = msg->mtu;
+	lane_in->addr = msg->addr;
+	lane_in->addr_type = msg->addr_type;
+	lane_in->xfer_mode = msg->xfer_mode;
+	lane_in->ack_freq = msg->ack_freq;
+	lane_in->physlink_update = msg->physlink_update;
+	lane_in->dring_mode = msg->options;
+
+	/*
+	 * Check if the client has requested physlink state updates.
+	 * If there is a physical device bound to this vswitch (L2
+	 * mode), set the ack bits to indicate it is supported.
+	 * Otherwise, set the nack bits.
+	 */
+	if (VSW_VER_GTEQ(ldcp, 1, 5)) {	/* Protocol ver >= 1.5 */
+
+		/* Does the vnet need phys link state updates ? */
+		if ((lane_in->physlink_update &
+		    PHYSLINK_UPDATE_STATE_MASK) ==
+		    PHYSLINK_UPDATE_STATE) {
+
+			if (vswp->smode & VSW_LAYER2) {
+				/* is a net-dev assigned to us ? */
+				msg->physlink_update =
+				    PHYSLINK_UPDATE_STATE_ACK;
+				ldcp->pls_negotiated = B_TRUE;
+			} else {
+				/* not in L2 mode */
+				msg->physlink_update =
+				    PHYSLINK_UPDATE_STATE_NACK;
+				ldcp->pls_negotiated = B_FALSE;
+			}
+
+		} else {
+			msg->physlink_update =
+			    PHYSLINK_UPDATE_NONE;
+			ldcp->pls_negotiated = B_FALSE;
+		}
+
+	} else {
+		/*
+		 * physlink_update bits are ignored
+		 * if set by clients < v1.5 protocol.
+		 */
+		msg->physlink_update = PHYSLINK_UPDATE_NONE;
+		ldcp->pls_negotiated = B_FALSE;
+	}
+
+	macaddr = lane_in->addr;
+	for (i = ETHERADDRL - 1; i >= 0; i--) {
+		port->p_macaddr.ether_addr_octet[i] = macaddr & 0xFF;
+		macaddr >>= 8;
+	}
+
+	/* create the fdb entry for this port/mac address */
+	vsw_fdbe_add(vswp, port);
+
+	/* add the port to the specified vlans */
+	vsw_vlan_add_ids(port, VSW_VNETPORT);
+
+	/*
+	 * Setup device specific xmit routines. Note this could be changed
+	 * further in vsw_send_dring_info() for versions >= 1.6 if operating in
+	 * RxDringData mode.
+	 */
+	mutex_enter(&port->tx_lock);
+
+	if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
+	    (lane_in->xfer_mode & VIO_DRING_MODE_V1_2)) ||
+	    (VSW_VER_LT(ldcp, 1, 2) &&
+	    (lane_in->xfer_mode == VIO_DRING_MODE_V1_0))) {
+		D2(vswp, "%s: mode = VIO_DRING_MODE", __func__);
+		port->transmit = vsw_dringsend;
+	} else if (lane_in->xfer_mode == VIO_DESC_MODE) {
+		D2(vswp, "%s: mode = VIO_DESC_MODE", __func__);
+		vsw_create_privring(ldcp);
+		port->transmit = vsw_descrsend;
+		lane_out->xfer_mode = VIO_DESC_MODE;
+	}
+
+	/*
+	 * HybridIO is supported only vnet, not by OBP.
+	 * So, set hio_capable to true only when in DRING mode.
+	 */
+	if (VSW_VER_GTEQ(ldcp, 1, 3) &&
+	    (lane_in->xfer_mode != VIO_DESC_MODE)) {
+		(void) atomic_swap_32(&port->p_hio_capable, B_TRUE);
+	} else {
+		(void) atomic_swap_32(&port->p_hio_capable, B_FALSE);
+	}
+
+	mutex_exit(&port->tx_lock);
+
+	return (0);
+}
+
+static int
+vsw_process_attr_ack(vsw_ldc_t *ldcp, vnet_attr_msg_t *msg)
+{
+	vsw_t	*vswp = ldcp->ldc_vswp;
+	lane_t	*lane_out = &ldcp->lane_out;
+	lane_t	*lane_in = &ldcp->lane_in;
+
+	D2(vswp, "%s: VIO_SUBTYPE_ACK", __func__);
+
+	if (vsw_check_flag(ldcp, OUTBOUND, VSW_ATTR_ACK_RECV)) {
+		return (1);
+	}
+
+	/*
+	 * Process dring mode attribute.
+	 */
+	if (VSW_VER_GTEQ(ldcp, 1, 6)) {
+		/*
+		 * Versions >= 1.6:
+		 * The ack msg sent by the peer contains the negotiated dring
+		 * mode between our capability (that we had sent in our attr
+		 * info) and the peer's capability.
+		 */
+		if (lane_in->lstate & VSW_ATTR_ACK_SENT) {
+			/*
+			 * If we have sent an ack for the attr info msg from
+			 * the peer, check if the dring mode that was
+			 * negotiated then (saved in lane_out) matches the
+			 * mode that the peer has ack'd. If they don't match,
+			 * we fail the handshake.
+			 */
+			if (lane_out->dring_mode != msg->options) {
+				return (1);
+			}
+		} else {
+			if ((msg->options & lane_out->dring_mode) == 0) {
+				/*
+				 * Peer ack'd with a mode that we don't
+				 * support; we fail the handshake.
+				 */
+				return (1);
+			}
+			if ((msg->options & (VIO_TX_DRING|VIO_RX_DRING_DATA))
+			    == (VIO_TX_DRING|VIO_RX_DRING_DATA)) {
+				/*
+				 * Peer must ack with only one negotiated mode.
+				 * Otherwise fail handshake.
+				 */
+				return (1);
+			}
+
+			/*
+			 * Save the negotiated mode, so we can validate it when
+			 * we receive attr info from the peer.
+			 */
+			lane_out->dring_mode = msg->options;
+		}
+	}
+
+	/*
+	 * Process MTU attribute.
+	 */
+	if (VSW_VER_GTEQ(ldcp, 1, 4)) {
+		/*
+		 * Versions >= 1.4:
+		 * The ack msg sent by the peer contains the minimum of
+		 * our mtu (that we had sent in our attr info) and the
+		 * peer's mtu.
+		 *
+		 * If we have sent an ack for the attr info msg from
+		 * the peer, check if the mtu that was computed then
+		 * (saved in lane_out params) matches the mtu that the
+		 * peer has ack'd. If they don't match, we fail the
+		 * handshake.
+		 */
+		if (lane_in->lstate & VSW_ATTR_ACK_SENT) {
+			if (lane_out->mtu != msg->mtu) {
+				return (1);
+			}
+		} else {
+			/*
+			 * If the mtu ack'd by the peer is > our mtu
+			 * fail handshake. Otherwise, save the mtu, so
+			 * we can validate it when we receive attr info
+			 * from our peer.
+			 */
+			if (msg->mtu <= lane_out->mtu) {
+				lane_out->mtu = msg->mtu;
+			} else {
+				return (1);
+			}
+		}
+	}
+
+	return (0);
+}
+
 /*
  * Process an attribute packet. We can end up here either because our peer
  * has ACK/NACK'ed back to an earlier ATTR msg we had sent it, or our
@@ -2748,15 +2892,11 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 void
 vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 {
-	vnet_attr_msg_t		*attr_pkt;
-	vsw_t			*vswp = ldcp->ldc_vswp;
-	vsw_port_t		*port = ldcp->ldc_port;
-	uint64_t		macaddr = 0;
-	lane_t			*lane_out = &ldcp->lane_out;
-	lane_t			*lane_in = &ldcp->lane_in;
-	uint32_t		mtu;
-	boolean_t		ack = B_TRUE;
-	int			i;
+	vnet_attr_msg_t	*attr_pkt;
+	vsw_t		*vswp = ldcp->ldc_vswp;
+	lane_t		*lane_out = &ldcp->lane_out;
+	lane_t		*lane_in = &ldcp->lane_in;
+	int		rv;
 
 	D1(vswp, "%s(%lld) enter", __func__, ldcp->ldc_id);
 
@@ -2768,218 +2908,29 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 	switch (attr_pkt->tag.vio_subtype) {
 	case VIO_SUBTYPE_INFO:
-		D2(vswp, "%s: VIO_SUBTYPE_INFO", __func__);
 
-		if (vsw_check_flag(ldcp, INBOUND, VSW_ATTR_INFO_RECV))
-			return;
-
-		/*
-		 * If the attributes are unacceptable then we NACK back.
-		 */
-		if (vsw_check_attr(attr_pkt, ldcp)) {
-			ack = B_FALSE;
-
-			DERR(vswp, "%s (chan %d): invalid attributes",
-			    __func__, ldcp->ldc_id);
-
-		} else {
-
-			if (VSW_VER_GTEQ(ldcp, 1, 4)) {
-				/*
-				 * Versions >= 1.4:
-				 * The mtu is negotiated down to the
-				 * minimum of our mtu and peer's mtu.
-				 */
-				mtu = MIN(attr_pkt->mtu, vswp->max_frame_size);
-
-				/*
-				 * If we have received an ack for the attr info
-				 * that we sent, then check if the mtu computed
-				 * above matches the mtu that the peer had ack'd
-				 * (saved in local hparams). If they don't
-				 * match, we fail the handshake.
-				 */
-				if (lane_out->lstate & VSW_ATTR_ACK_RECV) {
-					if (mtu != lane_out->mtu) {
-						/* send NACK */
-						ack = B_FALSE;
-					}
-				} else {
-					/*
-					 * Save the mtu computed above in our
-					 * attr parameters, so it gets sent in
-					 * the attr info from us to the peer.
-					 */
-					lane_out->mtu = mtu;
-				}
-			}
-
-		}
-
-		if (ack == B_FALSE) {
-
+		rv = vsw_process_attr_info(ldcp, attr_pkt);
+		if (rv != 0) {
 			vsw_free_lane_resources(ldcp, INBOUND);
-
-			attr_pkt->tag.vio_sid = ldcp->local_session;
 			attr_pkt->tag.vio_subtype = VIO_SUBTYPE_NACK;
-
-			DUMP_TAG_PTR((vio_msg_tag_t *)attr_pkt);
 			ldcp->lane_in.lstate |= VSW_ATTR_NACK_SENT;
-			(void) vsw_send_msg(ldcp, (void *)attr_pkt,
-			    sizeof (vnet_attr_msg_t), B_TRUE);
-
-			vsw_next_milestone(ldcp);
-			return;
-		}
-
-		/*
-		 * Otherwise store attributes for this lane and update
-		 * lane state.
-		 */
-		lane_in->mtu = attr_pkt->mtu;
-		lane_in->addr = attr_pkt->addr;
-		lane_in->addr_type = attr_pkt->addr_type;
-		lane_in->xfer_mode = attr_pkt->xfer_mode;
-		lane_in->ack_freq = attr_pkt->ack_freq;
-		lane_in->physlink_update = attr_pkt->physlink_update;
-
-		/*
-		 * Check if the client has requested physlink state updates.
-		 * If there is a physical device bound to this vswitch (L2
-		 * mode), set the ack bits to indicate it is supported.
-		 * Otherwise, set the nack bits.
-		 */
-		if (VSW_VER_GTEQ(ldcp, 1, 5)) {	/* Protocol ver >= 1.5 */
-
-			/* Does the vnet need phys link state updates ? */
-			if ((lane_in->physlink_update &
-			    PHYSLINK_UPDATE_STATE_MASK) ==
-			    PHYSLINK_UPDATE_STATE) {
-
-				if (vswp->smode & VSW_LAYER2) {
-					/* is a net-dev assigned to us ? */
-					attr_pkt->physlink_update =
-					    PHYSLINK_UPDATE_STATE_ACK;
-					ldcp->pls_negotiated = B_TRUE;
-				} else {
-					/* not in L2 mode */
-					attr_pkt->physlink_update =
-					    PHYSLINK_UPDATE_STATE_NACK;
-					ldcp->pls_negotiated = B_FALSE;
-				}
-
-			} else {
-				attr_pkt->physlink_update =
-				    PHYSLINK_UPDATE_NONE;
-				ldcp->pls_negotiated = B_FALSE;
-			}
-
 		} else {
-			/*
-			 * physlink_update bits are ignored
-			 * if set by clients < v1.5 protocol.
-			 */
-			attr_pkt->physlink_update = PHYSLINK_UPDATE_NONE;
-			ldcp->pls_negotiated = B_FALSE;
+			attr_pkt->tag.vio_subtype = VIO_SUBTYPE_ACK;
+			lane_in->lstate |= VSW_ATTR_ACK_SENT;
 		}
-
-		if (VSW_VER_GTEQ(ldcp, 1, 4)) {
-			/* save the MIN mtu in the msg to be replied */
-			attr_pkt->mtu = mtu;
-		}
-
-		macaddr = lane_in->addr;
-		for (i = ETHERADDRL - 1; i >= 0; i--) {
-			port->p_macaddr.ether_addr_octet[i] = macaddr & 0xFF;
-			macaddr >>= 8;
-		}
-
-		/* create the fdb entry for this port/mac address */
-		vsw_fdbe_add(vswp, port);
-
-		/* add the port to the specified vlans */
-		vsw_vlan_add_ids(port, VSW_VNETPORT);
-
-		/* setup device specifc xmit routines */
-		mutex_enter(&port->tx_lock);
-		if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
-		    (lane_in->xfer_mode & VIO_DRING_MODE_V1_2)) ||
-		    (VSW_VER_LT(ldcp, 1, 2) &&
-		    (lane_in->xfer_mode == VIO_DRING_MODE_V1_0))) {
-			D2(vswp, "%s: mode = VIO_DRING_MODE", __func__);
-			port->transmit = vsw_dringsend;
-		} else if (lane_in->xfer_mode == VIO_DESC_MODE) {
-			D2(vswp, "%s: mode = VIO_DESC_MODE", __func__);
-			vsw_create_privring(ldcp);
-			port->transmit = vsw_descrsend;
-			lane_out->xfer_mode = VIO_DESC_MODE;
-		}
-
-		/*
-		 * HybridIO is supported only vnet, not by OBP.
-		 * So, set hio_capable to true only when in DRING mode.
-		 */
-		if (VSW_VER_GTEQ(ldcp, 1, 3) &&
-		    (lane_in->xfer_mode != VIO_DESC_MODE)) {
-			(void) atomic_swap_32(&port->p_hio_capable, B_TRUE);
-		} else {
-			(void) atomic_swap_32(&port->p_hio_capable, B_FALSE);
-		}
-
-		mutex_exit(&port->tx_lock);
-
 		attr_pkt->tag.vio_sid = ldcp->local_session;
-		attr_pkt->tag.vio_subtype = VIO_SUBTYPE_ACK;
-
 		DUMP_TAG_PTR((vio_msg_tag_t *)attr_pkt);
-
-		lane_in->lstate |= VSW_ATTR_ACK_SENT;
-
 		(void) vsw_send_msg(ldcp, (void *)attr_pkt,
 		    sizeof (vnet_attr_msg_t), B_TRUE);
-
 		vsw_next_milestone(ldcp);
 		break;
 
 	case VIO_SUBTYPE_ACK:
-		D2(vswp, "%s: VIO_SUBTYPE_ACK", __func__);
 
-		if (vsw_check_flag(ldcp, OUTBOUND, VSW_ATTR_ACK_RECV))
+		rv = vsw_process_attr_ack(ldcp, attr_pkt);
+		if (rv != 0) {
 			return;
-
-		if (VSW_VER_GTEQ(ldcp, 1, 4)) {
-			/*
-			 * Versions >= 1.4:
-			 * The ack msg sent by the peer contains the minimum of
-			 * our mtu (that we had sent in our attr info) and the
-			 * peer's mtu.
-			 *
-			 * If we have sent an ack for the attr info msg from
-			 * the peer, check if the mtu that was computed then
-			 * (saved in lane_out params) matches the mtu that the
-			 * peer has ack'd. If they don't match, we fail the
-			 * handshake.
-			 */
-			if (lane_in->lstate & VSW_ATTR_ACK_SENT) {
-				if (lane_out->mtu != attr_pkt->mtu) {
-					return;
-				}
-			} else {
-				/*
-				 * If the mtu ack'd by the peer is > our mtu
-				 * fail handshake. Otherwise, save the mtu, so
-				 * we can validate it when we receive attr info
-				 * from our peer.
-				 */
-				if (attr_pkt->mtu > lane_out->mtu) {
-					return;
-				}
-				if (attr_pkt->mtu <= lane_out->mtu) {
-					lane_out->mtu = attr_pkt->mtu;
-				}
-			}
 		}
-
 		lane_out->lstate |= VSW_ATTR_ACK_RECV;
 		vsw_next_milestone(ldcp);
 		break;
@@ -3002,6 +2953,77 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 	D1(vswp, "%s(%lld) exit", __func__, ldcp->ldc_id);
 }
 
+static int
+vsw_process_dring_reg_info(vsw_ldc_t *ldcp, vio_msg_tag_t *tagp)
+{
+	int		rv;
+	vsw_t		*vswp = ldcp->ldc_vswp;
+	lane_t		*lp = &ldcp->lane_out;
+	dring_info_t	*dp = NULL;
+
+	D2(vswp, "%s: VIO_SUBTYPE_INFO", __func__);
+
+	rv = vsw_check_flag(ldcp, INBOUND, VSW_DRING_INFO_RECV);
+	if (rv != 0) {
+		return (1);
+	}
+
+	if (VSW_VER_GTEQ(ldcp, 1, 6) &&
+	    (lp->dring_mode != ((vio_dring_reg_msg_t *)tagp)->options)) {
+		/*
+		 * The earlier version of Solaris vnet driver doesn't set the
+		 * option (VIO_TX_DRING in its case) correctly in its dring reg
+		 * message. We workaround that here by doing the check only
+		 * for versions >= v1.6.
+		 */
+		DWARN(vswp, "%s(%lld): Rcvd dring reg option (%d), "
+		    "negotiated mode (%d)\n", __func__, ldcp->ldc_id,
+		    ((vio_dring_reg_msg_t *)tagp)->options, lp->dring_mode);
+		return (1);
+	}
+
+	/*
+	 * Map dring exported by the peer.
+	 */
+	dp = vsw_map_dring(ldcp, (void *)tagp);
+	if (dp == NULL) {
+		return (1);
+	}
+
+	/*
+	 * Map data buffers exported by the peer if we are in RxDringData mode.
+	 */
+	if (lp->dring_mode == VIO_RX_DRING_DATA) {
+		rv = vsw_map_data(ldcp, dp, (void *)tagp);
+		if (rv != 0) {
+			vsw_unmap_dring(ldcp);
+			return (1);
+		}
+	}
+
+	return (0);
+}
+
+static int
+vsw_process_dring_reg_ack(vsw_ldc_t *ldcp, vio_msg_tag_t *tagp)
+{
+	vsw_t		*vswp = ldcp->ldc_vswp;
+	dring_info_t	*dp;
+
+	D2(vswp, "%s: VIO_SUBTYPE_ACK", __func__);
+
+	if (vsw_check_flag(ldcp, OUTBOUND, VSW_DRING_ACK_RECV)) {
+		return (1);
+	}
+
+	dp = ldcp->lane_out.dringp;
+
+	/* save dring_ident acked by peer */
+	dp->ident = ((vio_dring_reg_msg_t *)tagp)->dring_ident;
+
+	return (0);
+}
+
 /*
  * Process a dring info packet. We can end up here either because our peer
  * has ACK/NACK'ed back to an earlier DRING msg we had sent it, or our
@@ -3017,210 +3039,46 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 void
 vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 {
-	vio_dring_reg_msg_t	*dring_pkt;
-	vsw_t			*vswp = ldcp->ldc_vswp;
-	ldc_mem_info_t		minfo;
-	dring_info_t		*dp, *dbp;
-	int			dring_found = 0;
-
-	/*
-	 * We know this is a ctrl/dring packet so
-	 * cast it into the correct structure.
-	 */
-	dring_pkt = (vio_dring_reg_msg_t *)pkt;
+	int		rv;
+	int		msgsize;
+	dring_info_t	*dp;
+	vio_msg_tag_t	*tagp = (vio_msg_tag_t *)pkt;
+	vsw_t		*vswp = ldcp->ldc_vswp;
+	lane_t		*lane_out = &ldcp->lane_out;
+	lane_t		*lane_in = &ldcp->lane_in;
 
 	D1(vswp, "%s(%lld) enter", __func__, ldcp->ldc_id);
 
-	switch (dring_pkt->tag.vio_subtype) {
+	switch (tagp->vio_subtype) {
 	case VIO_SUBTYPE_INFO:
-		D2(vswp, "%s: VIO_SUBTYPE_INFO", __func__);
-
-		if (vsw_check_flag(ldcp, INBOUND, VSW_DRING_INFO_RECV))
-			return;
-
-		/*
-		 * If the dring params are unacceptable then we NACK back.
-		 */
-		if (vsw_check_dring_info(dring_pkt)) {
-
-			DERR(vswp, "%s (%lld): invalid dring info",
-			    __func__, ldcp->ldc_id);
-
+		rv = vsw_process_dring_reg_info(ldcp, tagp);
+		if (rv != 0) {
 			vsw_free_lane_resources(ldcp, INBOUND);
-
-			dring_pkt->tag.vio_sid = ldcp->local_session;
-			dring_pkt->tag.vio_subtype = VIO_SUBTYPE_NACK;
-
-			DUMP_TAG_PTR((vio_msg_tag_t *)dring_pkt);
-
-			ldcp->lane_in.lstate |= VSW_DRING_NACK_SENT;
-
-			(void) vsw_send_msg(ldcp, (void *)dring_pkt,
-			    sizeof (vio_dring_reg_msg_t), B_TRUE);
-
-			vsw_next_milestone(ldcp);
-			return;
-		}
-
-		/*
-		 * Otherwise, attempt to map in the dring using the
-		 * cookie. If that succeeds we send back a unique dring
-		 * identifier that the sending side will use in future
-		 * to refer to this descriptor ring.
-		 */
-		dp = kmem_zalloc(sizeof (dring_info_t), KM_SLEEP);
-
-		dp->num_descriptors = dring_pkt->num_descriptors;
-		dp->descriptor_size = dring_pkt->descriptor_size;
-		dp->options = dring_pkt->options;
-		dp->ncookies = dring_pkt->ncookies;
-
-		/*
-		 * Note: should only get one cookie. Enforced in
-		 * the ldc layer.
-		 */
-		bcopy(&dring_pkt->cookie[0], &dp->cookie[0],
-		    sizeof (ldc_mem_cookie_t));
-
-		D2(vswp, "%s: num_desc %ld : desc_size %ld", __func__,
-		    dp->num_descriptors, dp->descriptor_size);
-		D2(vswp, "%s: options 0x%lx: ncookies %ld", __func__,
-		    dp->options, dp->ncookies);
-
-		if ((ldc_mem_dring_map(ldcp->ldc_handle, &dp->cookie[0],
-		    dp->ncookies, dp->num_descriptors, dp->descriptor_size,
-		    LDC_DIRECT_MAP, &(dp->handle))) != 0) {
-
-			DERR(vswp, "%s: dring_map failed\n", __func__);
-
-			kmem_free(dp, sizeof (dring_info_t));
-			vsw_free_lane_resources(ldcp, INBOUND);
-
-			dring_pkt->tag.vio_sid = ldcp->local_session;
-			dring_pkt->tag.vio_subtype = VIO_SUBTYPE_NACK;
-
-			DUMP_TAG_PTR((vio_msg_tag_t *)dring_pkt);
-
-			ldcp->lane_in.lstate |= VSW_DRING_NACK_SENT;
-			(void) vsw_send_msg(ldcp, (void *)dring_pkt,
-			    sizeof (vio_dring_reg_msg_t), B_TRUE);
-
-			vsw_next_milestone(ldcp);
-			return;
-		}
-
-		if ((ldc_mem_dring_info(dp->handle, &minfo)) != 0) {
-
-			DERR(vswp, "%s: dring_addr failed\n", __func__);
-
-			kmem_free(dp, sizeof (dring_info_t));
-			vsw_free_lane_resources(ldcp, INBOUND);
-
-			dring_pkt->tag.vio_sid = ldcp->local_session;
-			dring_pkt->tag.vio_subtype = VIO_SUBTYPE_NACK;
-
-			DUMP_TAG_PTR((vio_msg_tag_t *)dring_pkt);
-
-			ldcp->lane_in.lstate |= VSW_DRING_NACK_SENT;
-			(void) vsw_send_msg(ldcp, (void *)dring_pkt,
-			    sizeof (vio_dring_reg_msg_t), B_TRUE);
-
-			vsw_next_milestone(ldcp);
-			return;
+			tagp->vio_subtype = VIO_SUBTYPE_NACK;
+			lane_in->lstate |= VSW_DRING_NACK_SENT;
 		} else {
-			/* store the address of the pub part of ring */
-			dp->pub_addr = minfo.vaddr;
-
-			/* cache the dring mtype */
-			dp->dring_mtype = minfo.mtype;
+			tagp->vio_subtype = VIO_SUBTYPE_ACK;
+			lane_in->lstate |= VSW_DRING_ACK_SENT;
 		}
-
-		/* no private section as we are importing */
-		dp->priv_addr = NULL;
-
-		/*
-		 * Using simple mono increasing int for ident at
-		 * the moment.
-		 */
-		dp->ident = ldcp->next_ident;
-		ldcp->next_ident++;
-
-		dp->end_idx = 0;
-		dp->next = NULL;
-
-		/*
-		 * Link it onto the end of the list of drings
-		 * for this lane.
-		 */
-		if (ldcp->lane_in.dringp == NULL) {
-			D2(vswp, "%s: adding first INBOUND dring", __func__);
-			ldcp->lane_in.dringp = dp;
+		tagp->vio_sid = ldcp->local_session;
+		DUMP_TAG_PTR(tagp);
+		if (lane_out->dring_mode == VIO_RX_DRING_DATA) {
+			dp = lane_in->dringp;
+			msgsize =
+			    VNET_DRING_REG_EXT_MSG_SIZE(dp->data_ncookies);
 		} else {
-			dbp = ldcp->lane_in.dringp;
-
-			while (dbp->next != NULL)
-				dbp = dbp->next;
-
-			dbp->next = dp;
+			msgsize = sizeof (vio_dring_reg_msg_t);
 		}
-
-		/* acknowledge it */
-		dring_pkt->tag.vio_sid = ldcp->local_session;
-		dring_pkt->tag.vio_subtype = VIO_SUBTYPE_ACK;
-		dring_pkt->dring_ident = dp->ident;
-
-		(void) vsw_send_msg(ldcp, (void *)dring_pkt,
-		    sizeof (vio_dring_reg_msg_t), B_TRUE);
-
-		ldcp->lane_in.lstate |= VSW_DRING_ACK_SENT;
+		(void) vsw_send_msg(ldcp, (void *)tagp, msgsize, B_TRUE);
 		vsw_next_milestone(ldcp);
 		break;
 
 	case VIO_SUBTYPE_ACK:
-		D2(vswp, "%s: VIO_SUBTYPE_ACK", __func__);
-
-		if (vsw_check_flag(ldcp, OUTBOUND, VSW_DRING_ACK_RECV))
-			return;
-
-		/*
-		 * Peer is acknowledging our dring info and will have
-		 * sent us a dring identifier which we will use to
-		 * refer to this ring w.r.t. our peer.
-		 */
-		dp = ldcp->lane_out.dringp;
-		if (dp != NULL) {
-			/*
-			 * Find the ring this ident should be associated
-			 * with.
-			 */
-			if (vsw_dring_match(dp, dring_pkt)) {
-				dring_found = 1;
-
-			} else while (dp != NULL) {
-				if (vsw_dring_match(dp, dring_pkt)) {
-					dring_found = 1;
-					break;
-				}
-				dp = dp->next;
-			}
-
-			if (dring_found == 0) {
-				DERR(NULL, "%s: unrecognised ring cookie",
-				    __func__);
-				vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
-				return;
-			}
-
-		} else {
-			DERR(vswp, "%s: DRING ACK received but no drings "
-			    "allocated", __func__);
-			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
+		rv = vsw_process_dring_reg_ack(ldcp, tagp);
+		if (rv != 0) {
 			return;
 		}
-
-		/* store ident */
-		dp->ident = dring_pkt->dring_ident;
-		ldcp->lane_out.lstate |= VSW_DRING_ACK_RECV;
+		lane_out->lstate |= VSW_DRING_ACK_RECV;
 		vsw_next_milestone(ldcp);
 		break;
 
@@ -3230,13 +3088,13 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 		if (vsw_check_flag(ldcp, OUTBOUND, VSW_DRING_NACK_RECV))
 			return;
 
-		ldcp->lane_out.lstate |= VSW_DRING_NACK_RECV;
+		lane_out->lstate |= VSW_DRING_NACK_RECV;
 		vsw_next_milestone(ldcp);
 		break;
 
 	default:
 		DERR(vswp, "%s: Unknown vio_subtype %x\n", __func__,
-		    dring_pkt->tag.vio_subtype);
+		    tagp->vio_subtype);
 	}
 
 	D1(vswp, "%s(%lld) exit", __func__, ldcp->ldc_id);
@@ -3520,6 +3378,8 @@ vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t *tagp,
 {
 	uint16_t	env = tagp->vio_subtype_env;
 	vsw_t		*vswp = ldcp->ldc_vswp;
+	lane_t		*lp = &ldcp->lane_out;
+	uint8_t		dring_mode = lp->dring_mode;
 
 	D1(vswp, "%s(%lld): enter", __func__, ldcp->ldc_id);
 
@@ -3546,519 +3406,41 @@ vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t *tagp,
 		vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 		return;
 	}
-
-	/*
-	 * To reduce the locking contention, release the
-	 * ldc_cblock here and re-acquire it once we are done
-	 * receiving packets.
-	 */
-	mutex_exit(&ldcp->ldc_cblock);
-	mutex_enter(&ldcp->ldc_rxlock);
+	if (dring_mode == VIO_TX_DRING) {
+		/*
+		 * To reduce the locking contention, release the ldc_cblock
+		 * here and re-acquire it once we are done receiving packets.
+		 * We do this only in TxDring mode to allow further callbaks to
+		 * continue while the msg worker thread processes the messages.
+		 * In RxDringData mode, we process the messages in the callback
+		 * itself and wake up rcv worker thread to process only data
+		 * info messages.
+		 */
+		mutex_exit(&ldcp->ldc_cblock);
+		mutex_enter(&ldcp->ldc_rxlock);
+	}
 
 	/*
 	 * Switch on vio_subtype envelope, then let lower routines
 	 * decide if its an INFO, ACK or NACK packet.
 	 */
 	if (env == VIO_DRING_DATA) {
-		vsw_process_data_dring_pkt(ldcp, dpkt);
+		ldcp->rx_dringdata(ldcp, dpkt);
 	} else if (env == VIO_PKT_DATA) {
 		ldcp->rx_pktdata(ldcp, dpkt, msglen);
 	} else if (env == VIO_DESC_DATA) {
 		vsw_process_data_ibnd_pkt(ldcp, dpkt);
 	} else {
-		DERR(vswp, "%s: unknown vio_subtype_env (%x)\n", __func__, env);
+		DERR(vswp, "%s: unknown vio_subtype_env (%x)\n",
+		    __func__, env);
 	}
 
-	mutex_exit(&ldcp->ldc_rxlock);
-	mutex_enter(&ldcp->ldc_cblock);
+	if (dring_mode == VIO_TX_DRING) {
+		mutex_exit(&ldcp->ldc_rxlock);
+		mutex_enter(&ldcp->ldc_cblock);
+	}
 
 	D1(vswp, "%s(%lld): exit", __func__, ldcp->ldc_id);
-}
-
-#define	SND_DRING_NACK(ldcp, pkt) \
-	pkt->tag.vio_subtype = VIO_SUBTYPE_NACK; \
-	pkt->tag.vio_sid = ldcp->local_session; \
-	(void) vsw_send_msg(ldcp, (void *)pkt, \
-			sizeof (vio_dring_msg_t), B_TRUE);
-
-static void
-vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
-{
-	vio_dring_msg_t		*dring_pkt;
-	vnet_public_desc_t	desc, *pub_addr = NULL;
-	vsw_private_desc_t	*priv_addr = NULL;
-	dring_info_t		*dp = NULL;
-	vsw_t			*vswp = ldcp->ldc_vswp;
-	mblk_t			*mp = NULL;
-	mblk_t			*bp = NULL;
-	mblk_t			*bpt = NULL;
-	size_t			nbytes = 0;
-	uint64_t		chain = 0;
-	uint64_t		len;
-	uint32_t		pos, start;
-	uint32_t		range_start, range_end;
-	int32_t			end, num, cnt = 0;
-	int			i, rv, rng_rv = 0, msg_rv = 0;
-	boolean_t		prev_desc_ack = B_FALSE;
-	int			read_attempts = 0;
-	struct ether_header	*ehp;
-	lane_t			*lp = &ldcp->lane_out;
-
-	D1(vswp, "%s(%lld): enter", __func__, ldcp->ldc_id);
-
-	/*
-	 * We know this is a data/dring packet so
-	 * cast it into the correct structure.
-	 */
-	dring_pkt = (vio_dring_msg_t *)dpkt;
-
-	/*
-	 * Switch on the vio_subtype. If its INFO then we need to
-	 * process the data. If its an ACK we need to make sure
-	 * it makes sense (i.e did we send an earlier data/info),
-	 * and if its a NACK then we maybe attempt a retry.
-	 */
-	switch (dring_pkt->tag.vio_subtype) {
-	case VIO_SUBTYPE_INFO:
-		D2(vswp, "%s(%lld): VIO_SUBTYPE_INFO", __func__, ldcp->ldc_id);
-
-		READ_ENTER(&ldcp->lane_in.dlistrw);
-		if ((dp = vsw_ident2dring(&ldcp->lane_in,
-		    dring_pkt->dring_ident)) == NULL) {
-			RW_EXIT(&ldcp->lane_in.dlistrw);
-
-			DERR(vswp, "%s(%lld): unable to find dring from "
-			    "ident 0x%llx", __func__, ldcp->ldc_id,
-			    dring_pkt->dring_ident);
-
-			SND_DRING_NACK(ldcp, dring_pkt);
-			return;
-		}
-
-		start = pos = dring_pkt->start_idx;
-		end = dring_pkt->end_idx;
-		len = dp->num_descriptors;
-
-		range_start = range_end = pos;
-
-		D2(vswp, "%s(%lld): start index %ld : end %ld\n",
-		    __func__, ldcp->ldc_id, start, end);
-
-		if (end == -1) {
-			num = -1;
-		} else if (end >= 0) {
-			num = end >= pos ? end - pos + 1: (len - pos + 1) + end;
-
-			/* basic sanity check */
-			if (end > len) {
-				RW_EXIT(&ldcp->lane_in.dlistrw);
-				DERR(vswp, "%s(%lld): endpoint %lld outside "
-				    "ring length %lld", __func__,
-				    ldcp->ldc_id, end, len);
-
-				SND_DRING_NACK(ldcp, dring_pkt);
-				return;
-			}
-		} else {
-			RW_EXIT(&ldcp->lane_in.dlistrw);
-			DERR(vswp, "%s(%lld): invalid endpoint %lld",
-			    __func__, ldcp->ldc_id, end);
-			SND_DRING_NACK(ldcp, dring_pkt);
-			return;
-		}
-
-		while (cnt != num) {
-vsw_recheck_desc:
-			pub_addr = (vnet_public_desc_t *)dp->pub_addr + pos;
-
-			if ((rng_rv = vnet_dring_entry_copy(pub_addr,
-			    &desc, dp->dring_mtype, dp->handle,
-			    pos, pos)) != 0) {
-				DERR(vswp, "%s(%lld): unable to copy "
-				    "descriptor at pos %d: err %d",
-				    __func__, pos, ldcp->ldc_id, rng_rv);
-				ldcp->ldc_stats.ierrors++;
-				break;
-			}
-
-			/*
-			 * When given a bounded range of descriptors
-			 * to process, its an error to hit a descriptor
-			 * which is not ready. In the non-bounded case
-			 * (end_idx == -1) this simply indicates we have
-			 * reached the end of the current active range.
-			 */
-			if (desc.hdr.dstate != VIO_DESC_READY) {
-				/* unbound - no error */
-				if (end == -1) {
-					if (read_attempts == vsw_read_attempts)
-						break;
-
-					delay(drv_usectohz(vsw_desc_delay));
-					read_attempts++;
-					goto vsw_recheck_desc;
-				}
-
-				/* bounded - error - so NACK back */
-				RW_EXIT(&ldcp->lane_in.dlistrw);
-				DERR(vswp, "%s(%lld): descriptor not READY "
-				    "(%d)", __func__, ldcp->ldc_id,
-				    desc.hdr.dstate);
-				SND_DRING_NACK(ldcp, dring_pkt);
-				return;
-			}
-
-			DTRACE_PROBE1(read_attempts, int, read_attempts);
-
-			range_end = pos;
-
-			/*
-			 * If we ACK'd the previous descriptor then now
-			 * record the new range start position for later
-			 * ACK's.
-			 */
-			if (prev_desc_ack) {
-				range_start = pos;
-
-				D2(vswp, "%s(%lld): updating range start to be "
-				    "%d", __func__, ldcp->ldc_id, range_start);
-
-				prev_desc_ack = B_FALSE;
-			}
-
-			D2(vswp, "%s(%lld): processing desc %lld at pos"
-			    " 0x%llx : dstate 0x%lx : datalen 0x%lx",
-			    __func__, ldcp->ldc_id, pos, &desc,
-			    desc.hdr.dstate, desc.nbytes);
-
-			if ((desc.nbytes < ETHERMIN) ||
-			    (desc.nbytes > lp->mtu)) {
-				/* invalid size; drop the packet */
-				ldcp->ldc_stats.ierrors++;
-				goto vsw_process_desc_done;
-			}
-
-			/*
-			 * Ensure that we ask ldc for an aligned
-			 * number of bytes. Data is padded to align on 8
-			 * byte boundary, desc.nbytes is actual data length,
-			 * i.e. minus that padding.
-			 */
-			nbytes = (desc.nbytes + VNET_IPALIGN + 7) & ~7;
-			if (nbytes > ldcp->max_rxpool_size) {
-				mp = allocb(desc.nbytes + VNET_IPALIGN + 8,
-				    BPRI_MED);
-			} else {
-				mp = vio_multipool_allocb(&ldcp->vmp, nbytes);
-				if (mp == NULL) {
-					ldcp->ldc_stats.rx_vio_allocb_fail++;
-					/*
-					 * No free receive buffers available,
-					 * so fallback onto allocb(9F). Make
-					 * sure that we get a data buffer which
-					 * is a multiple of 8 as this is
-					 * required by ldc_mem_copy.
-					 */
-					DTRACE_PROBE(allocb);
-					mp = allocb(desc.nbytes +
-					    VNET_IPALIGN + 8, BPRI_MED);
-				}
-			}
-			if (mp == NULL) {
-				DERR(vswp, "%s(%ld): allocb failed",
-				    __func__, ldcp->ldc_id);
-				rng_rv = vnet_dring_entry_set_dstate(pub_addr,
-				    dp->dring_mtype, dp->handle, pos, pos,
-				    VIO_DESC_DONE);
-				ldcp->ldc_stats.ierrors++;
-				ldcp->ldc_stats.rx_allocb_fail++;
-				break;
-			}
-
-			rv = ldc_mem_copy(ldcp->ldc_handle,
-			    (caddr_t)mp->b_rptr, 0, &nbytes,
-			    desc.memcookie, desc.ncookies, LDC_COPY_IN);
-			if (rv != 0) {
-				DERR(vswp, "%s(%d): unable to copy in data "
-				    "from %d cookies in desc %d (rv %d)",
-				    __func__, ldcp->ldc_id, desc.ncookies,
-				    pos, rv);
-				freemsg(mp);
-
-				rng_rv = vnet_dring_entry_set_dstate(pub_addr,
-				    dp->dring_mtype, dp->handle, pos, pos,
-				    VIO_DESC_DONE);
-				ldcp->ldc_stats.ierrors++;
-				break;
-			} else {
-				D2(vswp, "%s(%d): copied in %ld bytes"
-				    " using %d cookies", __func__,
-				    ldcp->ldc_id, nbytes, desc.ncookies);
-			}
-
-			/* adjust the read pointer to skip over the padding */
-			mp->b_rptr += VNET_IPALIGN;
-
-			/* point to the actual end of data */
-			mp->b_wptr = mp->b_rptr + desc.nbytes;
-
-			/* update statistics */
-			ehp = (struct ether_header *)mp->b_rptr;
-			if (IS_BROADCAST(ehp))
-				ldcp->ldc_stats.brdcstrcv++;
-			else if (IS_MULTICAST(ehp))
-				ldcp->ldc_stats.multircv++;
-
-			ldcp->ldc_stats.ipackets++;
-			ldcp->ldc_stats.rbytes += desc.nbytes;
-
-			/*
-			 * IPALIGN space can be used for VLAN_TAG
-			 */
-			(void) vsw_vlan_frame_pretag(ldcp->ldc_port,
-			    VSW_VNETPORT, mp);
-
-			/* build a chain of received packets */
-			if (bp == NULL) {
-				/* first pkt */
-				bp = mp;
-				bp->b_next = bp->b_prev = NULL;
-				bpt = bp;
-				chain = 1;
-			} else {
-				mp->b_next = mp->b_prev = NULL;
-				bpt->b_next = mp;
-				bpt = mp;
-				chain++;
-			}
-
-vsw_process_desc_done:
-			/* mark we are finished with this descriptor */
-			if ((rng_rv = vnet_dring_entry_set_dstate(pub_addr,
-			    dp->dring_mtype, dp->handle, pos, pos,
-			    VIO_DESC_DONE)) != 0) {
-				DERR(vswp, "%s(%lld): unable to update "
-				    "dstate at pos %d: err %d",
-				    __func__, pos, ldcp->ldc_id, rng_rv);
-				ldcp->ldc_stats.ierrors++;
-				break;
-			}
-
-			/*
-			 * Send an ACK back to peer if requested.
-			 */
-			if (desc.hdr.ack) {
-				dring_pkt->start_idx = range_start;
-				dring_pkt->end_idx = range_end;
-
-				DERR(vswp, "%s(%lld): processed %d %d, ACK"
-				    " requested", __func__, ldcp->ldc_id,
-				    dring_pkt->start_idx, dring_pkt->end_idx);
-
-				dring_pkt->dring_process_state = VIO_DP_ACTIVE;
-				dring_pkt->tag.vio_subtype = VIO_SUBTYPE_ACK;
-				dring_pkt->tag.vio_sid = ldcp->local_session;
-
-				msg_rv = vsw_send_msg(ldcp, (void *)dring_pkt,
-				    sizeof (vio_dring_msg_t), B_FALSE);
-
-				/*
-				 * Check if ACK was successfully sent. If not
-				 * we break and deal with that below.
-				 */
-				if (msg_rv != 0)
-					break;
-
-				prev_desc_ack = B_TRUE;
-				range_start = pos;
-			}
-
-			/* next descriptor */
-			pos = (pos + 1) % len;
-			cnt++;
-
-			/*
-			 * Break out of loop here and stop processing to
-			 * allow some other network device (or disk) to
-			 * get access to the cpu.
-			 */
-			if (chain > vsw_chain_len) {
-				D3(vswp, "%s(%lld): switching chain of %d "
-				    "msgs", __func__, ldcp->ldc_id, chain);
-				break;
-			}
-		}
-		RW_EXIT(&ldcp->lane_in.dlistrw);
-
-		/* send the chain of packets to be switched */
-		if (bp != NULL) {
-			DTRACE_PROBE1(vsw_rcv_msgs, int, chain);
-			D3(vswp, "%s(%lld): switching chain of %d msgs",
-			    __func__, ldcp->ldc_id, chain);
-			vswp->vsw_switch_frame(vswp, bp, VSW_VNETPORT,
-			    ldcp->ldc_port, NULL);
-		}
-
-		/*
-		 * If when we encountered an error when attempting to
-		 * access an imported dring, initiate a connection reset.
-		 */
-		if (rng_rv != 0) {
-			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
-			break;
-		}
-
-		/*
-		 * If when we attempted to send the ACK we found that the
-		 * channel had been reset then now handle this. We deal with
-		 * it here as we cannot reset the channel while holding the
-		 * dlistrw lock, and we don't want to acquire/release it
-		 * continuously in the above loop, as a channel reset should
-		 * be a rare event.
-		 */
-		if (msg_rv == ECONNRESET) {
-			vsw_process_conn_evt(ldcp, VSW_CONN_RESET);
-			break;
-		}
-
-		DTRACE_PROBE1(msg_cnt, int, cnt);
-
-		/*
-		 * We are now finished so ACK back with the state
-		 * set to STOPPING so our peer knows we are finished
-		 */
-		dring_pkt->tag.vio_subtype = VIO_SUBTYPE_ACK;
-		dring_pkt->tag.vio_sid = ldcp->local_session;
-
-		dring_pkt->dring_process_state = VIO_DP_STOPPED;
-
-		DTRACE_PROBE(stop_process_sent);
-
-		/*
-		 * We have not processed any more descriptors beyond
-		 * the last one we ACK'd.
-		 */
-		if (prev_desc_ack)
-			range_start = range_end;
-
-		dring_pkt->start_idx = range_start;
-		dring_pkt->end_idx = range_end;
-
-		D2(vswp, "%s(%lld) processed : %d : %d, now stopping",
-		    __func__, ldcp->ldc_id, dring_pkt->start_idx,
-		    dring_pkt->end_idx);
-
-		(void) vsw_send_msg(ldcp, (void *)dring_pkt,
-		    sizeof (vio_dring_msg_t), B_TRUE);
-		break;
-
-	case VIO_SUBTYPE_ACK:
-		D2(vswp, "%s(%lld): VIO_SUBTYPE_ACK", __func__, ldcp->ldc_id);
-		/*
-		 * Verify that the relevant descriptors are all
-		 * marked as DONE
-		 */
-		READ_ENTER(&ldcp->lane_out.dlistrw);
-		if ((dp = vsw_ident2dring(&ldcp->lane_out,
-		    dring_pkt->dring_ident)) == NULL) {
-			RW_EXIT(&ldcp->lane_out.dlistrw);
-			DERR(vswp, "%s: unknown ident in ACK", __func__);
-			return;
-		}
-
-		start = end = 0;
-		start = dring_pkt->start_idx;
-		end = dring_pkt->end_idx;
-		len = dp->num_descriptors;
-
-
-		mutex_enter(&dp->dlock);
-		dp->last_ack_recv = end;
-		ldcp->ldc_stats.dring_data_acks++;
-		mutex_exit(&dp->dlock);
-
-		(void) vsw_reclaim_dring(dp, start);
-
-		/*
-		 * If our peer is stopping processing descriptors then
-		 * we check to make sure it has processed all the descriptors
-		 * we have updated. If not then we send it a new message
-		 * to prompt it to restart.
-		 */
-		if (dring_pkt->dring_process_state == VIO_DP_STOPPED) {
-			DTRACE_PROBE(stop_process_recv);
-			D2(vswp, "%s(%lld): got stopping msg : %d : %d",
-			    __func__, ldcp->ldc_id, dring_pkt->start_idx,
-			    dring_pkt->end_idx);
-
-			/*
-			 * Check next descriptor in public section of ring.
-			 * If its marked as READY then we need to prompt our
-			 * peer to start processing the ring again.
-			 */
-			i = (end + 1) % len;
-			pub_addr = (vnet_public_desc_t *)dp->pub_addr + i;
-			priv_addr = (vsw_private_desc_t *)dp->priv_addr + i;
-
-			/*
-			 * Hold the restart lock across all of this to
-			 * make sure that its not possible for us to
-			 * decide that a msg needs to be sent in the future
-			 * but the sending code having already checked is
-			 * about to exit.
-			 */
-			mutex_enter(&dp->restart_lock);
-			ldcp->ldc_stats.dring_stopped_acks++;
-			mutex_enter(&priv_addr->dstate_lock);
-			if (pub_addr->hdr.dstate == VIO_DESC_READY) {
-
-				mutex_exit(&priv_addr->dstate_lock);
-
-				dring_pkt->tag.vio_subtype = VIO_SUBTYPE_INFO;
-				dring_pkt->tag.vio_sid = ldcp->local_session;
-
-				dring_pkt->start_idx = (end + 1) % len;
-				dring_pkt->end_idx = -1;
-
-				D2(vswp, "%s(%lld) : sending restart msg:"
-				    " %d : %d", __func__, ldcp->ldc_id,
-				    dring_pkt->start_idx, dring_pkt->end_idx);
-
-				msg_rv = vsw_send_msg(ldcp, (void *)dring_pkt,
-				    sizeof (vio_dring_msg_t), B_FALSE);
-				ldcp->ldc_stats.dring_data_msgs++;
-
-			} else {
-				mutex_exit(&priv_addr->dstate_lock);
-				dp->restart_reqd = B_TRUE;
-			}
-			mutex_exit(&dp->restart_lock);
-		}
-		RW_EXIT(&ldcp->lane_out.dlistrw);
-
-		/* only do channel reset after dropping dlistrw lock */
-		if (msg_rv == ECONNRESET)
-			vsw_process_conn_evt(ldcp, VSW_CONN_RESET);
-
-		break;
-
-	case VIO_SUBTYPE_NACK:
-		DWARN(vswp, "%s(%lld): VIO_SUBTYPE_NACK",
-		    __func__, ldcp->ldc_id);
-		/*
-		 * Something is badly wrong if we are getting NACK's
-		 * for our data pkts. So reset the channel.
-		 */
-		vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
-
-		break;
-
-	default:
-		DERR(vswp, "%s(%lld): Unknown vio_subtype %x\n", __func__,
-		    ldcp->ldc_id, dring_pkt->tag.vio_subtype);
-	}
-
-	D1(vswp, "%s(%lld) exit", __func__, ldcp->ldc_id);
 }
 
 /*
@@ -4083,6 +3465,7 @@ vsw_process_pkt_data(void *arg1, void *arg2, uint32_t msglen)
 	vio_raw_data_msg_t	*dpkt = (vio_raw_data_msg_t *)arg2;
 	uint32_t		size;
 	mblk_t			*mp;
+	vio_mblk_t		*vmp;
 	vsw_t			*vswp = ldcp->ldc_vswp;
 	vgen_stats_t		*statsp = &ldcp->ldc_stats;
 	lane_t			*lp = &ldcp->lane_out;
@@ -4095,8 +3478,8 @@ vsw_process_pkt_data(void *arg1, void *arg2, uint32_t msglen)
 		return;
 	}
 
-	mp = vio_multipool_allocb(&ldcp->vmp, size + VLAN_TAGSZ);
-	if (mp == NULL) {
+	vmp = vio_multipool_allocb(&ldcp->vmp, size + VLAN_TAGSZ);
+	if (vmp == NULL) {
 		mp = allocb(size + VLAN_TAGSZ, BPRI_MED);
 		if (mp == NULL) {
 			(void) atomic_inc_32(&statsp->rx_pri_fail);
@@ -4105,6 +3488,8 @@ vsw_process_pkt_data(void *arg1, void *arg2, uint32_t msglen)
 			    ldcp->ldc_id);
 			return;
 		}
+	} else {
+		mp = vmp->mp;
 	}
 
 	/* skip over the extra space for vlan tag */
@@ -4113,6 +3498,10 @@ vsw_process_pkt_data(void *arg1, void *arg2, uint32_t msglen)
 	/* copy the frame from the payload of raw data msg into the mblk */
 	bcopy(dpkt->data, mp->b_rptr, size);
 	mp->b_wptr = mp->b_rptr + size;
+
+	if (vmp != NULL) {
+		vmp->state = VIO_MBLK_HAS_DATA;
+	}
 
 	/* update stats */
 	(void) atomic_inc_64(&statsp->rx_pri_packets);
@@ -4238,7 +3627,7 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		/* Verify the ACK is valid */
 		idx = ibnd_desc->hdr.desc_handle;
 
-		if (idx >= vsw_ntxds) {
+		if (idx >= vsw_num_descriptors) {
 			cmn_err(CE_WARN, "!vsw%d: corrupted ACK received "
 			    "(idx %ld)", vswp->instance, idx);
 			return;
@@ -4313,7 +3702,7 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		/* limit check */
 		idx = ibnd_desc->hdr.desc_handle;
 
-		if (idx >= vsw_ntxds) {
+		if (idx >= vsw_num_descriptors) {
 			DERR(vswp, "%s: corrupted NACK received (idx %lld)",
 			    __func__, idx);
 			return;
@@ -4368,31 +3757,15 @@ vsw_process_err_pkt(vsw_ldc_t *ldcp, void *epkt, vio_msg_tag_t *tagp)
 int
 vsw_portsend(vsw_port_t *port, mblk_t *mp)
 {
-	vsw_ldc_list_t 	*ldcl = &port->p_ldclist;
-	vsw_ldc_t 	*ldcp;
 	mblk_t		*mpt;
 	int		count;
+	vsw_ldc_t 	*ldcp = port->ldcp;
 	int		status = 0;
 
-	READ_ENTER(&ldcl->lockrw);
-	/*
-	 * Note for now, we have a single channel.
-	 */
-	ldcp = ldcl->head;
-	if (ldcp == NULL) {
-		DERR(port->p_vswp, "vsw_portsend: no ldc: dropping packet\n");
-		freemsgchain(mp);
-		RW_EXIT(&ldcl->lockrw);
-		return (1);
-	}
-
 	count = vsw_vlan_frame_untag(port, VSW_VNETPORT, &mp, &mpt);
-
 	if (count != 0) {
 		status = ldcp->tx(ldcp, mp, mpt, count);
 	}
-
-	RW_EXIT(&ldcl->lockrw);
 	return (status);
 }
 
@@ -4581,6 +3954,7 @@ vsw_ldcsend_pkt(vsw_ldc_t *ldcp, mblk_t *mp)
 	vio_raw_data_msg_t	*pkt;
 	mblk_t			*bp;
 	mblk_t			*nmp = NULL;
+	vio_mblk_t		*vmp;
 	caddr_t			dst;
 	uint32_t		mblksz;
 	uint32_t		size;
@@ -4612,11 +3986,13 @@ vsw_ldcsend_pkt(vsw_ldc_t *ldcp, mblk_t *mp)
 		size = ETHERMIN;
 
 	/* alloc space for a raw data message */
-	nmp = vio_allocb(vswp->pri_tx_vmp);
-	if (nmp == NULL) {
+	vmp = vio_allocb(vswp->pri_tx_vmp);
+	if (vmp == NULL) {
 		(void) atomic_inc_32(&statsp->tx_pri_fail);
 		DWARN(vswp, "vio_allocb failed\n");
 		goto send_pkt_exit;
+	} else {
+		nmp = vmp->mp;
 	}
 	pkt = (vio_raw_data_msg_t *)nmp->b_rptr;
 
@@ -4627,6 +4003,8 @@ vsw_ldcsend_pkt(vsw_ldc_t *ldcp, mblk_t *mp)
 		bcopy(bp->b_rptr, dst, mblksz);
 		dst += mblksz;
 	}
+
+	vmp->state = VIO_MBLK_HAS_DATA;
 
 	/* setup the raw data msg */
 	pkt->tag.vio_msgtype = VIO_TYPE_DATA;
@@ -4665,12 +4043,12 @@ send_pkt_exit:
 static int
 vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, uint32_t retries)
 {
-	int i;
-	int rc;
-	int status = 0;
-	vsw_port_t *port = ldcp->ldc_port;
-	dring_info_t *dp = NULL;
-
+	int		i;
+	int		rc;
+	int		status = 0;
+	vsw_port_t	*port = ldcp->ldc_port;
+	dring_info_t	*dp = NULL;
+	lane_t		*lp = &ldcp->lane_out;
 
 	for (i = 0; i < retries; ) {
 		/*
@@ -4701,22 +4079,24 @@ vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, uint32_t retries)
 			 */
 			break;
 		}
-		READ_ENTER(&ldcp->lane_out.dlistrw);
 		if (((dp = ldcp->lane_out.dringp) != NULL) &&
 		    ((VSW_VER_GTEQ(ldcp, 1, 2) &&
 		    (ldcp->lane_out.xfer_mode & VIO_DRING_MODE_V1_2)) ||
 		    ((VSW_VER_LT(ldcp, 1, 2) &&
 		    (ldcp->lane_out.xfer_mode == VIO_DRING_MODE_V1_0))))) {
-			rc = vsw_reclaim_dring(dp, dp->end_idx);
+
+			/* Need to reclaim in TxDring mode. */
+			if (lp->dring_mode == VIO_TX_DRING) {
+				rc = vsw_reclaim_dring(dp, dp->end_idx);
+			}
+
 		} else {
 			/*
 			 * If there is no dring or the xfer_mode is
 			 * set to DESC_MODE(ie., OBP), then simply break here.
 			 */
-			RW_EXIT(&ldcp->lane_out.dlistrw);
 			break;
 		}
-		RW_EXIT(&ldcp->lane_out.dlistrw);
 
 		/*
 		 * Delay only if none were reclaimed
@@ -4727,169 +4107,6 @@ vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, uint32_t retries)
 		}
 	}
 	freemsg(mp);
-	return (status);
-}
-
-/*
- * Send packet out via descriptor ring to a logical device.
- */
-static int
-vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
-{
-	vio_dring_msg_t		dring_pkt;
-	dring_info_t		*dp = NULL;
-	vsw_private_desc_t	*priv_desc = NULL;
-	vnet_public_desc_t	*pub = NULL;
-	vsw_t			*vswp = ldcp->ldc_vswp;
-	mblk_t			*bp;
-	size_t			n, size;
-	caddr_t			bufp;
-	int			idx;
-	int			status = LDC_TX_SUCCESS;
-	struct ether_header	*ehp = (struct ether_header *)mp->b_rptr;
-	lane_t			*lp = &ldcp->lane_out;
-
-	D1(vswp, "%s(%lld): enter\n", __func__, ldcp->ldc_id);
-
-	/* TODO: make test a macro */
-	if ((!(ldcp->lane_out.lstate & VSW_LANE_ACTIVE)) ||
-	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == NULL)) {
-		DWARN(vswp, "%s(%lld) status(%d) lstate(0x%llx), dropping "
-		    "packet\n", __func__, ldcp->ldc_id, ldcp->ldc_status,
-		    ldcp->lane_out.lstate);
-		ldcp->ldc_stats.oerrors++;
-		return (LDC_TX_FAILURE);
-	}
-
-	/*
-	 * Note - using first ring only, this may change
-	 * in the future.
-	 */
-	READ_ENTER(&ldcp->lane_out.dlistrw);
-	if ((dp = ldcp->lane_out.dringp) == NULL) {
-		RW_EXIT(&ldcp->lane_out.dlistrw);
-		DERR(vswp, "%s(%lld): no dring for outbound lane on"
-		    " channel %d", __func__, ldcp->ldc_id, ldcp->ldc_id);
-		ldcp->ldc_stats.oerrors++;
-		return (LDC_TX_FAILURE);
-	}
-
-	size = msgsize(mp);
-	if (size > (size_t)lp->mtu) {
-		RW_EXIT(&ldcp->lane_out.dlistrw);
-		DERR(vswp, "%s(%lld) invalid size (%ld)\n", __func__,
-		    ldcp->ldc_id, size);
-		ldcp->ldc_stats.oerrors++;
-		return (LDC_TX_FAILURE);
-	}
-
-	/*
-	 * Find a free descriptor
-	 *
-	 * Note: for the moment we are assuming that we will only
-	 * have one dring going from the switch to each of its
-	 * peers. This may change in the future.
-	 */
-	if (vsw_dring_find_free_desc(dp, &priv_desc, &idx) != 0) {
-		D2(vswp, "%s(%lld): no descriptor available for ring "
-		    "at 0x%llx", __func__, ldcp->ldc_id, dp);
-
-		/* nothing more we can do */
-		status = LDC_TX_NORESOURCES;
-		ldcp->ldc_stats.tx_no_desc++;
-		goto vsw_dringsend_free_exit;
-	} else {
-		D2(vswp, "%s(%lld): free private descriptor found at pos %ld "
-		    "addr 0x%llx\n", __func__, ldcp->ldc_id, idx, priv_desc);
-	}
-
-	/* copy data into the descriptor */
-	bufp = priv_desc->datap;
-	bufp += VNET_IPALIGN;
-	for (bp = mp, n = 0; bp != NULL; bp = bp->b_cont) {
-		n = MBLKL(bp);
-		bcopy(bp->b_rptr, bufp, n);
-		bufp += n;
-	}
-
-	priv_desc->datalen = (size < (size_t)ETHERMIN) ? ETHERMIN : size;
-
-	pub = priv_desc->descp;
-	pub->nbytes = priv_desc->datalen;
-
-	/* update statistics */
-	if (IS_BROADCAST(ehp))
-		ldcp->ldc_stats.brdcstxmt++;
-	else if (IS_MULTICAST(ehp))
-		ldcp->ldc_stats.multixmt++;
-	ldcp->ldc_stats.opackets++;
-	ldcp->ldc_stats.obytes += priv_desc->datalen;
-
-	mutex_enter(&priv_desc->dstate_lock);
-	pub->hdr.dstate = VIO_DESC_READY;
-	mutex_exit(&priv_desc->dstate_lock);
-
-	/*
-	 * Determine whether or not we need to send a message to our
-	 * peer prompting them to read our newly updated descriptor(s).
-	 */
-	mutex_enter(&dp->restart_lock);
-	if (dp->restart_reqd) {
-		dp->restart_reqd = B_FALSE;
-		ldcp->ldc_stats.dring_data_msgs++;
-		mutex_exit(&dp->restart_lock);
-
-		/*
-		 * Send a vio_dring_msg to peer to prompt them to read
-		 * the updated descriptor ring.
-		 */
-		dring_pkt.tag.vio_msgtype = VIO_TYPE_DATA;
-		dring_pkt.tag.vio_subtype = VIO_SUBTYPE_INFO;
-		dring_pkt.tag.vio_subtype_env = VIO_DRING_DATA;
-		dring_pkt.tag.vio_sid = ldcp->local_session;
-
-		/* Note - for now using first ring */
-		dring_pkt.dring_ident = dp->ident;
-
-		/*
-		 * If last_ack_recv is -1 then we know we've not
-		 * received any ack's yet, so this must be the first
-		 * msg sent, so set the start to the begining of the ring.
-		 */
-		mutex_enter(&dp->dlock);
-		if (dp->last_ack_recv == -1) {
-			dring_pkt.start_idx = 0;
-		} else {
-			dring_pkt.start_idx =
-			    (dp->last_ack_recv + 1) % dp->num_descriptors;
-		}
-		dring_pkt.end_idx = -1;
-		mutex_exit(&dp->dlock);
-
-		D3(vswp, "%s(%lld): dring 0x%llx : ident 0x%llx\n", __func__,
-		    ldcp->ldc_id, dp, dring_pkt.dring_ident);
-		D3(vswp, "%s(%lld): start %lld : end %lld :\n",
-		    __func__, ldcp->ldc_id, dring_pkt.start_idx,
-		    dring_pkt.end_idx);
-
-		RW_EXIT(&ldcp->lane_out.dlistrw);
-
-		(void) vsw_send_msg(ldcp, (void *)&dring_pkt,
-		    sizeof (vio_dring_msg_t), B_TRUE);
-
-		return (status);
-
-	} else {
-		mutex_exit(&dp->restart_lock);
-		D2(vswp, "%s(%lld): updating descp %d", __func__,
-		    ldcp->ldc_id, idx);
-	}
-
-vsw_dringsend_free_exit:
-
-	RW_EXIT(&ldcp->lane_out.dlistrw);
-
-	D1(vswp, "%s(%lld): exit\n", __func__, ldcp->ldc_id);
 	return (status);
 }
 
@@ -4925,23 +4142,20 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	}
 
 	/*
-	 * only expect single dring to exist, which we use
-	 * as an internal buffer, rather than a transfer channel.
+	 * The dring here is as an internal buffer,
+	 * rather than a transfer channel.
 	 */
-	READ_ENTER(&ldcp->lane_out.dlistrw);
 	if ((dp = ldcp->lane_out.dringp) == NULL) {
 		DERR(vswp, "%s(%lld): no dring for outbound lane",
 		    __func__, ldcp->ldc_id);
 		DERR(vswp, "%s(%lld) status(%d) state (0x%llx)", __func__,
 		    ldcp->ldc_id, ldcp->ldc_status, ldcp->lane_out.lstate);
-		RW_EXIT(&ldcp->lane_out.dlistrw);
 		ldcp->ldc_stats.oerrors++;
 		return (LDC_TX_FAILURE);
 	}
 
 	size = msgsize(mp);
 	if (size > (size_t)lp->mtu) {
-		RW_EXIT(&ldcp->lane_out.dlistrw);
 		DERR(vswp, "%s(%lld) invalid size (%ld)\n", __func__,
 		    ldcp->ldc_id, size);
 		ldcp->ldc_stats.oerrors++;
@@ -4952,7 +4166,6 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	 * Find a free descriptor in our buffer ring
 	 */
 	if (vsw_dring_find_free_desc(dp, &priv_desc, &idx) != 0) {
-		RW_EXIT(&ldcp->lane_out.dlistrw);
 		if (warn_msg) {
 			DERR(vswp, "%s(%lld): no descriptor available for ring "
 			    "at 0x%llx", __func__, ldcp->ldc_id, dp);
@@ -5000,8 +4213,6 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 
 	ldcp->ldc_stats.opackets++;
 	ldcp->ldc_stats.obytes += size;
-
-	RW_EXIT(&ldcp->lane_out.dlistrw);
 
 	(void) vsw_send_msg(ldcp, (void *)&ibnd_msg,
 	    sizeof (vnet_ibnd_desc_t), B_TRUE);
@@ -5071,6 +4282,7 @@ vsw_send_attr(vsw_ldc_t *ldcp)
 	attr_msg.addr_type = lp->addr_type;
 	attr_msg.xfer_mode = lp->xfer_mode;
 	attr_msg.ack_freq = lp->xfer_mode;
+	attr_msg.options = lp->dring_mode;
 
 	READ_ENTER(&vswp->if_lockrw);
 	attr_msg.addr = vnet_macaddr_strtoul((vswp->if_addr).ether_addr_octet);
@@ -5085,83 +4297,50 @@ vsw_send_attr(vsw_ldc_t *ldcp)
 	D1(vswp, "%s (%ld) exit", __func__, ldcp->ldc_id);
 }
 
-/*
- * Create dring info msg (which also results in the creation of
- * a dring).
- */
-static vio_dring_reg_msg_t *
-vsw_create_dring_info_pkt(vsw_ldc_t *ldcp)
-{
-	vio_dring_reg_msg_t	*mp;
-	dring_info_t		*dp;
-	vsw_t			*vswp = ldcp->ldc_vswp;
-	int			rv;
-
-	D1(vswp, "vsw_create_dring_info_pkt enter\n");
-
-	/*
-	 * If we can't create a dring, obviously no point sending
-	 * a message.
-	 */
-	if ((dp = vsw_create_dring(ldcp)) == NULL)
-		return (NULL);
-
-	/* Allocate pools of receive mblks */
-	rv = vsw_init_multipools(ldcp, vswp);
-	if (rv) {
-		/*
-		 * We do not return failure if receive mblk pools can't be
-		 * allocated, instead allocb(9F) will be used to dynamically
-		 * allocate buffers during receive.
-		 */
-		DWARN(vswp, "%s: unable to create free mblk pools for"
-		    " channel %ld (rv %d)", __func__, ldcp->ldc_id, rv);
-	}
-
-	mp = kmem_zalloc(sizeof (vio_dring_reg_msg_t), KM_SLEEP);
-
-	mp->tag.vio_msgtype = VIO_TYPE_CTRL;
-	mp->tag.vio_subtype = VIO_SUBTYPE_INFO;
-	mp->tag.vio_subtype_env = VIO_DRING_REG;
-	mp->tag.vio_sid = ldcp->local_session;
-
-	/* payload */
-	mp->num_descriptors = dp->num_descriptors;
-	mp->descriptor_size = dp->descriptor_size;
-	mp->options = dp->options;
-	mp->ncookies = dp->ncookies;
-	bcopy(&dp->cookie[0], &mp->cookie[0], sizeof (ldc_mem_cookie_t));
-
-	mp->dring_ident = 0;
-
-	D1(vswp, "vsw_create_dring_info_pkt exit\n");
-
-	return (mp);
-}
-
 static void
 vsw_send_dring_info(vsw_ldc_t *ldcp)
 {
-	vio_dring_reg_msg_t	*dring_msg;
-	vsw_t			*vswp = ldcp->ldc_vswp;
+	int		msgsize;
+	void		*msg;
+	vsw_t		*vswp = ldcp->ldc_vswp;
+	vsw_port_t	*port = ldcp->ldc_port;
+	lane_t		*lp = &ldcp->lane_out;
+	vgen_stats_t	*statsp = &ldcp->ldc_stats;
 
 	D1(vswp, "%s: (%ld) enter", __func__, ldcp->ldc_id);
 
-	dring_msg = vsw_create_dring_info_pkt(ldcp);
-	if (dring_msg == NULL) {
-		cmn_err(CE_WARN, "!vsw%d: %s: error creating msg",
-		    vswp->instance, __func__);
-		return;
+	/* dring mode has been negotiated in attr phase; save in stats */
+	statsp->dring_mode = lp->dring_mode;
+
+	if (lp->dring_mode == VIO_RX_DRING_DATA) {
+		/*
+		 * Change the transmit routine for RxDringData mode.
+		 */
+		port->transmit = vsw_dringsend_shm;
+		msg = (void *) vsw_create_rx_dring_info(ldcp);
+		if (msg == NULL) {
+			return;
+		}
+		msgsize =
+		    VNET_DRING_REG_EXT_MSG_SIZE(lp->dringp->data_ncookies);
+		ldcp->rcv_thread = thread_create(NULL, 2 * DEFAULTSTKSZ,
+		    vsw_ldc_rcv_worker, ldcp, 0, &p0, TS_RUN, maxclsyspri);
+		ldcp->rx_dringdata = vsw_process_dringdata_shm;
+	} else {
+		msg = (void *) vsw_create_tx_dring_info(ldcp);
+		if (msg == NULL) {
+			return;
+		}
+		msgsize = sizeof (vio_dring_reg_msg_t);
+		ldcp->msg_thread = thread_create(NULL, 2 * DEFAULTSTKSZ,
+		    vsw_ldc_msg_worker, ldcp, 0, &p0, TS_RUN, maxclsyspri);
+		ldcp->rx_dringdata = vsw_process_dringdata;
 	}
 
-	ldcp->lane_out.lstate |= VSW_DRING_INFO_SENT;
-
-	DUMP_TAG_PTR((vio_msg_tag_t *)dring_msg);
-
-	(void) vsw_send_msg(ldcp, dring_msg,
-	    sizeof (vio_dring_reg_msg_t), B_TRUE);
-
-	kmem_free(dring_msg, sizeof (vio_dring_reg_msg_t));
+	lp->lstate |= VSW_DRING_INFO_SENT;
+	DUMP_TAG_PTR((vio_msg_tag_t *)msg);
+	(void) vsw_send_msg(ldcp, msg, msgsize, B_TRUE);
+	kmem_free(msg, msgsize);
 
 	D1(vswp, "%s: (%ld) exit", __func__, ldcp->ldc_id);
 }
@@ -5186,88 +4365,6 @@ vsw_send_rdx(vsw_ldc_t *ldcp)
 	(void) vsw_send_msg(ldcp, &rdx_msg, sizeof (vio_rdx_msg_t), B_TRUE);
 
 	D1(vswp, "%s (%ld) exit", __func__, ldcp->ldc_id);
-}
-
-/*
- * Generic routine to send message out over ldc channel.
- *
- * It is possible that when we attempt to write over the ldc channel
- * that we get notified that it has been reset. Depending on the value
- * of the handle_reset flag we either handle that event here or simply
- * notify the caller that the channel was reset.
- */
-int
-vsw_send_msg(vsw_ldc_t *ldcp, void *msgp, int size, boolean_t handle_reset)
-{
-	int			rv;
-	size_t			msglen = size;
-	vio_msg_tag_t		*tag = (vio_msg_tag_t *)msgp;
-	vsw_t			*vswp = ldcp->ldc_vswp;
-	vio_dring_msg_t		*dmsg;
-	vio_raw_data_msg_t	*rmsg;
-	vnet_ibnd_desc_t	*imsg;
-	boolean_t		data_msg = B_FALSE;
-
-	D1(vswp, "vsw_send_msg (%lld) enter : sending %d bytes",
-	    ldcp->ldc_id, size);
-
-	D2(vswp, "send_msg: type 0x%llx", tag->vio_msgtype);
-	D2(vswp, "send_msg: stype 0x%llx", tag->vio_subtype);
-	D2(vswp, "send_msg: senv 0x%llx", tag->vio_subtype_env);
-
-	mutex_enter(&ldcp->ldc_txlock);
-
-	if (tag->vio_subtype == VIO_SUBTYPE_INFO) {
-		if (tag->vio_subtype_env == VIO_DRING_DATA) {
-			dmsg = (vio_dring_msg_t *)tag;
-			dmsg->seq_num = ldcp->lane_out.seq_num;
-			data_msg = B_TRUE;
-		} else if (tag->vio_subtype_env == VIO_PKT_DATA) {
-			rmsg = (vio_raw_data_msg_t *)tag;
-			rmsg->seq_num = ldcp->lane_out.seq_num;
-			data_msg = B_TRUE;
-		} else if (tag->vio_subtype_env == VIO_DESC_DATA) {
-			imsg = (vnet_ibnd_desc_t *)tag;
-			imsg->hdr.seq_num = ldcp->lane_out.seq_num;
-			data_msg = B_TRUE;
-		}
-	}
-
-	do {
-		msglen = size;
-		rv = ldc_write(ldcp->ldc_handle, (caddr_t)msgp, &msglen);
-	} while (rv == EWOULDBLOCK && --vsw_wretries > 0);
-
-	if (rv == 0 && data_msg == B_TRUE) {
-		ldcp->lane_out.seq_num++;
-	}
-
-	if ((rv != 0) || (msglen != size)) {
-		DERR(vswp, "vsw_send_msg:ldc_write failed: chan(%lld) rv(%d) "
-		    "size (%d) msglen(%d)\n", ldcp->ldc_id, rv, size, msglen);
-		ldcp->ldc_stats.oerrors++;
-	}
-
-	mutex_exit(&ldcp->ldc_txlock);
-
-	/*
-	 * If channel has been reset we either handle it here or
-	 * simply report back that it has been reset and let caller
-	 * decide what to do.
-	 */
-	if (rv == ECONNRESET) {
-		DWARN(vswp, "%s (%lld) channel reset", __func__, ldcp->ldc_id);
-
-		/*
-		 * N.B - must never be holding the dlistrw lock when
-		 * we do a reset of the channel.
-		 */
-		if (handle_reset) {
-			vsw_process_conn_evt(ldcp, VSW_CONN_RESET);
-		}
-	}
-
-	return (rv);
 }
 
 /*
@@ -5326,120 +4423,6 @@ vsw_del_addr(uint8_t devtype, void *arg, uint64_t addr)
 }
 
 /*
- * Creates a descriptor ring (dring) and links it into the
- * link of outbound drings for this channel.
- *
- * Returns NULL if creation failed.
- */
-static dring_info_t *
-vsw_create_dring(vsw_ldc_t *ldcp)
-{
-	vsw_private_desc_t	*priv_addr = NULL;
-	vsw_t			*vswp = ldcp->ldc_vswp;
-	ldc_mem_info_t		minfo;
-	dring_info_t		*dp, *tp;
-	int			i;
-
-	dp = (dring_info_t *)kmem_zalloc(sizeof (dring_info_t), KM_SLEEP);
-
-	mutex_init(&dp->dlock, NULL, MUTEX_DRIVER, NULL);
-
-	/* create public section of ring */
-	if ((ldc_mem_dring_create(vsw_ntxds,
-	    VSW_PUB_SIZE, &dp->handle)) != 0) {
-
-		DERR(vswp, "vsw_create_dring(%lld): ldc dring create "
-		    "failed", ldcp->ldc_id);
-		goto create_fail_exit;
-	}
-
-	ASSERT(dp->handle != NULL);
-
-	/*
-	 * Get the base address of the public section of the ring.
-	 */
-	if ((ldc_mem_dring_info(dp->handle, &minfo)) != 0) {
-		DERR(vswp, "vsw_create_dring(%lld): dring info failed\n",
-		    ldcp->ldc_id);
-		goto dring_fail_exit;
-	} else {
-		ASSERT(minfo.vaddr != 0);
-		dp->pub_addr = minfo.vaddr;
-	}
-
-	dp->num_descriptors = vsw_ntxds;
-	dp->descriptor_size = VSW_PUB_SIZE;
-	dp->options = VIO_TX_DRING;
-	dp->ncookies = 1;	/* guaranteed by ldc */
-
-	/*
-	 * create private portion of ring
-	 */
-	dp->priv_addr = (vsw_private_desc_t *)kmem_zalloc(
-	    (sizeof (vsw_private_desc_t) * vsw_ntxds), KM_SLEEP);
-
-	if (vsw_setup_ring(ldcp, dp)) {
-		DERR(vswp, "%s: unable to setup ring", __func__);
-		goto dring_fail_exit;
-	}
-
-	/* haven't used any descriptors yet */
-	dp->end_idx = 0;
-	dp->last_ack_recv = -1;
-
-	/* bind dring to the channel */
-	if ((ldc_mem_dring_bind(ldcp->ldc_handle, dp->handle,
-	    LDC_DIRECT_MAP | LDC_SHADOW_MAP, LDC_MEM_RW,
-	    &dp->cookie[0], &dp->ncookies)) != 0) {
-		DERR(vswp, "vsw_create_dring: unable to bind to channel "
-		    "%lld", ldcp->ldc_id);
-		goto dring_fail_exit;
-	}
-
-	mutex_init(&dp->restart_lock, NULL, MUTEX_DRIVER, NULL);
-	dp->restart_reqd = B_TRUE;
-
-	/*
-	 * Only ever create rings for outgoing lane. Link it onto
-	 * end of list.
-	 */
-	WRITE_ENTER(&ldcp->lane_out.dlistrw);
-	if (ldcp->lane_out.dringp == NULL) {
-		D2(vswp, "vsw_create_dring: adding first outbound ring");
-		ldcp->lane_out.dringp = dp;
-	} else {
-		tp = ldcp->lane_out.dringp;
-		while (tp->next != NULL)
-			tp = tp->next;
-
-		tp->next = dp;
-	}
-	RW_EXIT(&ldcp->lane_out.dlistrw);
-
-	return (dp);
-
-dring_fail_exit:
-	(void) ldc_mem_dring_destroy(dp->handle);
-
-create_fail_exit:
-	if (dp->priv_addr != NULL) {
-		priv_addr = dp->priv_addr;
-		for (i = 0; i < vsw_ntxds; i++) {
-			if (priv_addr->memhandle != NULL)
-				(void) ldc_mem_free_handle(
-				    priv_addr->memhandle);
-			priv_addr++;
-		}
-		kmem_free(dp->priv_addr,
-		    (sizeof (vsw_private_desc_t) * vsw_ntxds));
-	}
-	mutex_destroy(&dp->dlock);
-
-	kmem_free(dp, sizeof (dring_info_t));
-	return (NULL);
-}
-
-/*
  * Create a ring consisting of just a private portion and link
  * it into the list of rings for the outbound lane.
  *
@@ -5449,297 +4432,33 @@ create_fail_exit:
 void
 vsw_create_privring(vsw_ldc_t *ldcp)
 {
-	dring_info_t		*dp, *tp;
+	dring_info_t		*dp;
 	vsw_t			*vswp = ldcp->ldc_vswp;
 
 	D1(vswp, "%s(%lld): enter", __func__, ldcp->ldc_id);
 
 	dp = kmem_zalloc(sizeof (dring_info_t), KM_SLEEP);
-
 	mutex_init(&dp->dlock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&dp->restart_lock, NULL, MUTEX_DRIVER, NULL);
+	ldcp->lane_out.dringp = dp;
 
 	/* no public section */
 	dp->pub_addr = NULL;
-
 	dp->priv_addr = kmem_zalloc(
-	    (sizeof (vsw_private_desc_t) * vsw_ntxds), KM_SLEEP);
+	    (sizeof (vsw_private_desc_t) * vsw_num_descriptors), KM_SLEEP);
+	dp->num_descriptors = vsw_num_descriptors;
 
-	dp->num_descriptors = vsw_ntxds;
-
-	if (vsw_setup_ring(ldcp, dp)) {
+	if (vsw_setup_tx_dring(ldcp, dp)) {
 		DERR(vswp, "%s: setup of ring failed", __func__);
-		kmem_free(dp->priv_addr,
-		    (sizeof (vsw_private_desc_t) * vsw_ntxds));
-		mutex_destroy(&dp->dlock);
-		kmem_free(dp, sizeof (dring_info_t));
+		vsw_destroy_tx_dring(ldcp);
 		return;
 	}
 
 	/* haven't used any descriptors yet */
 	dp->end_idx = 0;
-
-	mutex_init(&dp->restart_lock, NULL, MUTEX_DRIVER, NULL);
 	dp->restart_reqd = B_TRUE;
 
-	/*
-	 * Only ever create rings for outgoing lane. Link it onto
-	 * end of list.
-	 */
-	WRITE_ENTER(&ldcp->lane_out.dlistrw);
-	if (ldcp->lane_out.dringp == NULL) {
-		D2(vswp, "%s: adding first outbound privring", __func__);
-		ldcp->lane_out.dringp = dp;
-	} else {
-		tp = ldcp->lane_out.dringp;
-		while (tp->next != NULL)
-			tp = tp->next;
-
-		tp->next = dp;
-	}
-	RW_EXIT(&ldcp->lane_out.dlistrw);
-
 	D1(vswp, "%s(%lld): exit", __func__, ldcp->ldc_id);
-}
-
-/*
- * Setup the descriptors in the dring. Returns 0 on success, 1 on
- * failure.
- */
-int
-vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
-{
-	vnet_public_desc_t	*pub_addr = NULL;
-	vsw_private_desc_t	*priv_addr = NULL;
-	vsw_t			*vswp = ldcp->ldc_vswp;
-	uint64_t		*tmpp;
-	uint64_t		offset = 0;
-	uint32_t		ncookies = 0;
-	static char		*name = "vsw_setup_ring";
-	int			i, j, nc, rv;
-	size_t			data_sz;
-	void			*data_addr;
-
-	priv_addr = dp->priv_addr;
-	pub_addr = dp->pub_addr;
-
-	/* public section may be null but private should never be */
-	ASSERT(priv_addr != NULL);
-
-	/*
-	 * Allocate the region of memory which will be used to hold
-	 * the data the descriptors will refer to.
-	 */
-	data_sz = vswp->max_frame_size + VNET_IPALIGN + VNET_LDCALIGN;
-
-	/*
-	 * In order to ensure that the number of ldc cookies per descriptor is
-	 * limited to be within the default MAX_COOKIES (2), we take the steps
-	 * outlined below:
-	 *
-	 * Align the entire data buffer area to 8K and carve out per descriptor
-	 * data buffers starting from this 8K aligned base address.
-	 *
-	 * We round up the mtu specified to be a multiple of 2K or 4K.
-	 * For sizes up to 12K we round up the size to the next 2K.
-	 * For sizes > 12K we round up to the next 4K (otherwise sizes such as
-	 * 14K could end up needing 3 cookies, with the buffer spread across
-	 * 3 8K pages:  8K+6K, 2K+8K+2K, 6K+8K, ...).
-	 */
-	if (data_sz <= VNET_12K) {
-		data_sz = VNET_ROUNDUP_2K(data_sz);
-	} else {
-		data_sz = VNET_ROUNDUP_4K(data_sz);
-	}
-
-	dp->desc_data_sz = data_sz;
-
-	/* allocate extra 8K bytes for alignment */
-	dp->data_sz = (vsw_ntxds * data_sz) + VNET_8K;
-	data_addr = kmem_alloc(dp->data_sz, KM_SLEEP);
-	dp->data_addr = data_addr;
-
-	D2(vswp, "%s: allocated %lld bytes at 0x%llx\n", name,
-	    dp->data_sz, dp->data_addr);
-
-	/* align the starting address of the data area to 8K */
-	data_addr = (void *)VNET_ROUNDUP_8K((uintptr_t)data_addr);
-
-	tmpp = (uint64_t *)data_addr;
-	offset = dp->desc_data_sz/sizeof (tmpp);
-
-	/*
-	 * Initialise some of the private and public (if they exist)
-	 * descriptor fields.
-	 */
-	for (i = 0; i < vsw_ntxds; i++) {
-		mutex_init(&priv_addr->dstate_lock, NULL, MUTEX_DRIVER, NULL);
-
-		if ((ldc_mem_alloc_handle(ldcp->ldc_handle,
-		    &priv_addr->memhandle)) != 0) {
-			DERR(vswp, "%s: alloc mem handle failed", name);
-			goto setup_ring_cleanup;
-		}
-
-		priv_addr->datap = (void *)tmpp;
-
-		rv = ldc_mem_bind_handle(priv_addr->memhandle,
-		    (caddr_t)priv_addr->datap, dp->desc_data_sz,
-		    LDC_SHADOW_MAP, LDC_MEM_R|LDC_MEM_W,
-		    &(priv_addr->memcookie[0]), &ncookies);
-		if (rv != 0) {
-			DERR(vswp, "%s(%lld): ldc_mem_bind_handle failed "
-			    "(rv %d)", name, ldcp->ldc_id, rv);
-			goto setup_ring_cleanup;
-		}
-		priv_addr->bound = 1;
-
-		D2(vswp, "%s: %d: memcookie 0 : addr 0x%llx : size 0x%llx",
-		    name, i, priv_addr->memcookie[0].addr,
-		    priv_addr->memcookie[0].size);
-
-		if (ncookies >= (uint32_t)(VSW_MAX_COOKIES + 1)) {
-			DERR(vswp, "%s(%lld) ldc_mem_bind_handle returned "
-			    "invalid num of cookies (%d) for size 0x%llx",
-			    name, ldcp->ldc_id, ncookies, VSW_RING_EL_DATA_SZ);
-
-			goto setup_ring_cleanup;
-		} else {
-			for (j = 1; j < ncookies; j++) {
-				rv = ldc_mem_nextcookie(priv_addr->memhandle,
-				    &(priv_addr->memcookie[j]));
-				if (rv != 0) {
-					DERR(vswp, "%s: ldc_mem_nextcookie "
-					    "failed rv (%d)", name, rv);
-					goto setup_ring_cleanup;
-				}
-				D3(vswp, "%s: memcookie %d : addr 0x%llx : "
-				    "size 0x%llx", name, j,
-				    priv_addr->memcookie[j].addr,
-				    priv_addr->memcookie[j].size);
-			}
-
-		}
-		priv_addr->ncookies = ncookies;
-		priv_addr->dstate = VIO_DESC_FREE;
-
-		if (pub_addr != NULL) {
-
-			/* link pub and private sides */
-			priv_addr->descp = pub_addr;
-
-			pub_addr->ncookies = priv_addr->ncookies;
-
-			for (nc = 0; nc < pub_addr->ncookies; nc++) {
-				bcopy(&priv_addr->memcookie[nc],
-				    &pub_addr->memcookie[nc],
-				    sizeof (ldc_mem_cookie_t));
-			}
-
-			pub_addr->hdr.dstate = VIO_DESC_FREE;
-			pub_addr++;
-		}
-
-		/*
-		 * move to next element in the dring and the next
-		 * position in the data buffer.
-		 */
-		priv_addr++;
-		tmpp += offset;
-	}
-
-	return (0);
-
-setup_ring_cleanup:
-	priv_addr = dp->priv_addr;
-
-	for (j = 0; j < i; j++) {
-		(void) ldc_mem_unbind_handle(priv_addr->memhandle);
-		(void) ldc_mem_free_handle(priv_addr->memhandle);
-
-		mutex_destroy(&priv_addr->dstate_lock);
-
-		priv_addr++;
-	}
-	kmem_free(dp->data_addr, dp->data_sz);
-
-	return (1);
-}
-
-/*
- * Searches the private section of a ring for a free descriptor,
- * starting at the location of the last free descriptor found
- * previously.
- *
- * Returns 0 if free descriptor is available, and updates state
- * of private descriptor to VIO_DESC_READY,  otherwise returns 1.
- *
- * FUTURE: might need to return contiguous range of descriptors
- * as dring info msg assumes all will be contiguous.
- */
-static int
-vsw_dring_find_free_desc(dring_info_t *dringp,
-		vsw_private_desc_t **priv_p, int *idx)
-{
-	vsw_private_desc_t	*addr = NULL;
-	int			num = vsw_ntxds;
-	int			ret = 1;
-
-	D1(NULL, "%s enter\n", __func__);
-
-	ASSERT(dringp->priv_addr != NULL);
-
-	D2(NULL, "%s: searching ring, dringp 0x%llx : start pos %lld",
-	    __func__, dringp, dringp->end_idx);
-
-	addr = (vsw_private_desc_t *)dringp->priv_addr + dringp->end_idx;
-
-	mutex_enter(&addr->dstate_lock);
-	if (addr->dstate == VIO_DESC_FREE) {
-		addr->dstate = VIO_DESC_READY;
-		*priv_p = addr;
-		*idx = dringp->end_idx;
-		dringp->end_idx = (dringp->end_idx + 1) % num;
-		ret = 0;
-
-	}
-	mutex_exit(&addr->dstate_lock);
-
-	/* ring full */
-	if (ret == 1) {
-		D2(NULL, "%s: no desp free: started at %d", __func__,
-		    dringp->end_idx);
-	}
-
-	D1(NULL, "%s: exit\n", __func__);
-
-	return (ret);
-}
-
-/*
- * Map from a dring identifier to the ring itself. Returns
- * pointer to ring or NULL if no match found.
- *
- * Should be called with dlistrw rwlock held as reader.
- */
-static dring_info_t *
-vsw_ident2dring(lane_t *lane, uint64_t ident)
-{
-	dring_info_t	*dp = NULL;
-
-	if ((dp = lane->dringp) == NULL) {
-		return (NULL);
-	} else {
-		if (dp->ident == ident)
-			return (dp);
-
-		while (dp != NULL) {
-			if (dp->ident == ident)
-				break;
-			dp = dp->next;
-		}
-	}
-
-	return (dp);
 }
 
 /*
@@ -5764,148 +4483,189 @@ vsw_set_lane_attr(vsw_t *vswp, lane_t *lp)
 }
 
 /*
- * Verify that the attributes are acceptable.
- *
- * FUTURE: If some attributes are not acceptable, change them
- * our desired values.
+ * Map the descriptor ring exported by the peer.
  */
-static int
-vsw_check_attr(vnet_attr_msg_t *pkt, vsw_ldc_t *ldcp)
+static dring_info_t *
+vsw_map_dring(vsw_ldc_t *ldcp, void *pkt)
 {
-	int			ret = 0;
-	struct ether_addr	ea;
-	vsw_port_t		*port = ldcp->ldc_port;
-	lane_t			*lp = &ldcp->lane_out;
+	dring_info_t	*dp = NULL;
+	lane_t		*lp = &ldcp->lane_out;
 
-	D1(NULL, "vsw_check_attr enter\n");
-
-	if ((pkt->xfer_mode != VIO_DESC_MODE) &&
-	    (pkt->xfer_mode != lp->xfer_mode)) {
-		D2(NULL, "vsw_check_attr: unknown mode %x\n", pkt->xfer_mode);
-		ret = 1;
+	if (lp->dring_mode == VIO_RX_DRING_DATA) {
+		/*
+		 * In RxDringData mode, dring that we map in
+		 * becomes our transmit descriptor ring.
+		 */
+		dp =  vsw_map_tx_dring(ldcp, pkt);
+	} else {
+		/*
+		 * In TxDring mode, dring that we map in
+		 * becomes our receive descriptor ring.
+		 */
+		dp =  vsw_map_rx_dring(ldcp, pkt);
 	}
+	return (dp);
+}
 
-	/* Only support MAC addresses at moment. */
-	if ((pkt->addr_type != ADDR_TYPE_MAC) || (pkt->addr == 0)) {
-		D2(NULL, "vsw_check_attr: invalid addr_type %x, "
-		    "or address 0x%llx\n", pkt->addr_type, pkt->addr);
-		ret = 1;
-	}
+/*
+ * Common dring mapping function used in both TxDring and RxDringData modes.
+ */
+dring_info_t *
+vsw_map_dring_cmn(vsw_ldc_t *ldcp, vio_dring_reg_msg_t *dring_pkt)
+{
+	int		rv;
+	dring_info_t	*dp;
+	ldc_mem_info_t	minfo;
+	vsw_t		*vswp = ldcp->ldc_vswp;
 
 	/*
-	 * MAC address supplied by device should match that stored
-	 * in the vsw-port OBP node. Need to decide what to do if they
-	 * don't match, for the moment just warn but don't fail.
+	 * If the dring params are unacceptable then we NACK back.
 	 */
-	vnet_macaddr_ultostr(pkt->addr, ea.ether_addr_octet);
-	if (ether_cmp(&ea, &port->p_macaddr) != 0) {
-		DERR(NULL, "vsw_check_attr: device supplied address "
-		    "0x%llx doesn't match node address 0x%llx\n",
-		    pkt->addr, port->p_macaddr);
+	if ((dring_pkt->num_descriptors == 0) ||
+	    (dring_pkt->descriptor_size == 0) ||
+	    (dring_pkt->ncookies != 1)) {
+		DERR(vswp, "%s (%lld): invalid dring info",
+		    __func__, ldcp->ldc_id);
+		return (NULL);
 	}
+
+	dp = kmem_zalloc(sizeof (dring_info_t), KM_SLEEP);
+
+	dp->num_descriptors = dring_pkt->num_descriptors;
+	dp->descriptor_size = dring_pkt->descriptor_size;
+	dp->options = dring_pkt->options;
+	dp->dring_ncookies = dring_pkt->ncookies;
 
 	/*
-	 * Ack freq only makes sense in pkt mode, in shared
-	 * mode the ring descriptors say whether or not to
-	 * send back an ACK.
+	 * Note: should only get one cookie. Enforced in
+	 * the ldc layer.
 	 */
-	if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
-	    (pkt->xfer_mode & VIO_DRING_MODE_V1_2)) ||
-	    (VSW_VER_LT(ldcp, 1, 2) &&
-	    (pkt->xfer_mode == VIO_DRING_MODE_V1_0))) {
-		if (pkt->ack_freq > 0) {
-			D2(NULL, "vsw_check_attr: non zero ack freq "
-			    " in SHM mode\n");
-			ret = 1;
-		}
+	bcopy(&dring_pkt->cookie[0], &dp->dring_cookie[0],
+	    sizeof (ldc_mem_cookie_t));
+
+	rv = ldc_mem_dring_map(ldcp->ldc_handle, &dp->dring_cookie[0],
+	    dp->dring_ncookies, dp->num_descriptors, dp->descriptor_size,
+	    LDC_DIRECT_MAP, &(dp->dring_handle));
+	if (rv != 0) {
+		goto fail;
 	}
 
-	if (VSW_VER_LT(ldcp, 1, 4)) {
-		/* versions < 1.4, mtu must match */
-		if (pkt->mtu != lp->mtu) {
-			D2(NULL, "vsw_check_attr: invalid MTU (0x%llx)\n",
-			    pkt->mtu);
-			ret = 1;
-		}
-	} else {
-		/* Ver >= 1.4, validate mtu of the peer is at least ETHERMAX */
-		if (pkt->mtu < ETHERMAX) {
-			ret = 1;
-		}
+	rv = ldc_mem_dring_info(dp->dring_handle, &minfo);
+	if (rv != 0) {
+		goto fail;
 	}
+	/* store the address of the ring */
+	dp->pub_addr = minfo.vaddr;
 
-	D1(NULL, "vsw_check_attr exit\n");
+	/* cache the dring mtype */
+	dp->dring_mtype = minfo.mtype;
 
-	return (ret);
+	/* no private section as we are importing */
+	dp->priv_addr = NULL;
+
+	/*
+	 * Using simple mono increasing int for ident at the moment.
+	 */
+	dp->ident = ldcp->next_ident;
+	ldcp->next_ident++;
+
+	/*
+	 * Acknowledge it; we send back a unique dring identifier that
+	 * the sending side will use in future to refer to this
+	 * descriptor ring.
+	 */
+	dring_pkt->dring_ident = dp->ident;
+
+	return (dp);
+fail:
+	if (dp->dring_handle != NULL) {
+		(void) ldc_mem_dring_unmap(dp->dring_handle);
+	}
+	kmem_free(dp, sizeof (*dp));
+	return (NULL);
 }
 
 /*
- * Returns 1 if there is a problem, 0 otherwise.
+ * Unmap the descriptor ring exported by the peer.
  */
-static int
-vsw_check_dring_info(vio_dring_reg_msg_t *pkt)
+static void
+vsw_unmap_dring(vsw_ldc_t *ldcp)
 {
-	_NOTE(ARGUNUSED(pkt))
+	lane_t	*lane_out = &ldcp->lane_out;
 
-	int	ret = 0;
-
-	D1(NULL, "vsw_check_dring_info enter\n");
-
-	if ((pkt->num_descriptors == 0) ||
-	    (pkt->descriptor_size == 0) ||
-	    (pkt->ncookies != 1)) {
-		DERR(NULL, "vsw_check_dring_info: invalid dring msg");
-		ret = 1;
+	if (lane_out->dring_mode == VIO_RX_DRING_DATA) {
+		vsw_unmap_tx_dring(ldcp);
+	} else {
+		vsw_unmap_rx_dring(ldcp);
 	}
-
-	D1(NULL, "vsw_check_dring_info exit\n");
-
-	return (ret);
 }
 
 /*
- * Returns 1 if two memory cookies match. Otherwise returns 0.
+ * Map the shared memory data buffer area exported by the peer.
+ * Used in RxDringData mode only.
  */
 static int
-vsw_mem_cookie_match(ldc_mem_cookie_t *m1, ldc_mem_cookie_t *m2)
+vsw_map_data(vsw_ldc_t *ldcp, dring_info_t *dp, void *pkt)
 {
-	if ((m1->addr != m2->addr) ||
-	    (m2->size != m2->size)) {
-		return (0);
-	} else {
+	int			rv;
+	vio_dring_reg_ext_msg_t	*emsg;
+	vio_dring_reg_msg_t	*msg = pkt;
+	uint8_t			*buf = (uint8_t *)msg->cookie;
+	vsw_t			*vswp = ldcp->ldc_vswp;
+
+	/* skip over dring cookies */
+	ASSERT(msg->ncookies == 1);
+	buf += (msg->ncookies * sizeof (ldc_mem_cookie_t));
+
+	emsg = (vio_dring_reg_ext_msg_t *)buf;
+	if (emsg->data_ncookies > VNET_DATA_AREA_COOKIES) {
 		return (1);
 	}
-}
 
-/*
- * Returns 1 if ring described in reg message matches that
- * described by dring_info structure. Otherwise returns 0.
- */
-static int
-vsw_dring_match(dring_info_t *dp, vio_dring_reg_msg_t *msg)
-{
-	if ((msg->descriptor_size != dp->descriptor_size) ||
-	    (msg->num_descriptors != dp->num_descriptors) ||
-	    (msg->ncookies != dp->ncookies) ||
-	    !(vsw_mem_cookie_match(&msg->cookie[0], &dp->cookie[0]))) {
-		return (0);
-	} else {
+	/* save # of data area cookies */
+	dp->data_ncookies = emsg->data_ncookies;
+
+	/* save data area size */
+	dp->data_sz = emsg->data_area_size;
+
+	/* allocate ldc mem handle for data area */
+	rv = ldc_mem_alloc_handle(ldcp->ldc_handle, &dp->data_handle);
+	if (rv != 0) {
+		cmn_err(CE_WARN, "ldc_mem_alloc_handle failed\n");
+		DWARN(vswp, "%s (%lld) ldc_mem_alloc_handle() failed: %d\n",
+		    __func__, ldcp->ldc_id, rv);
 		return (1);
 	}
 
+	/* map the data area */
+	rv = ldc_mem_map(dp->data_handle, emsg->data_cookie,
+	    emsg->data_ncookies, LDC_DIRECT_MAP, LDC_MEM_R,
+	    (caddr_t *)&dp->data_addr, NULL);
+	if (rv != 0) {
+		cmn_err(CE_WARN, "ldc_mem_map failed\n");
+		DWARN(vswp, "%s (%lld) ldc_mem_map() failed: %d\n",
+		    __func__, ldcp->ldc_id, rv);
+		return (1);
+	}
+
+	/* allocate memory for data area cookies */
+	dp->data_cookie = kmem_zalloc(emsg->data_ncookies *
+	    sizeof (ldc_mem_cookie_t), KM_SLEEP);
+
+	/* save data area cookies */
+	bcopy(emsg->data_cookie, dp->data_cookie,
+	    emsg->data_ncookies * sizeof (ldc_mem_cookie_t));
+
+	return (0);
 }
 
 /*
- * Reset and free all the resources associated with
- * the channel.
+ * Reset and free all the resources associated with the channel.
  */
 static void
 vsw_free_lane_resources(vsw_ldc_t *ldcp, uint64_t dir)
 {
-	dring_info_t		*dp, *dpp;
-	lane_t			*lp = NULL;
-
-	ASSERT(ldcp != NULL);
+	lane_t	*lp;
 
 	D1(ldcp->ldc_vswp, "%s (%lld): enter", __func__, ldcp->ldc_id);
 
@@ -5922,187 +4682,30 @@ vsw_free_lane_resources(vsw_ldc_t *ldcp, uint64_t dir)
 	lp->lstate = VSW_LANE_INACTIV;
 	lp->seq_num = VNET_ISS;
 
-	if (lp->dringp) {
-		if (dir == INBOUND) {
-			WRITE_ENTER(&lp->dlistrw);
-			dp = lp->dringp;
-			while (dp != NULL) {
-				dpp = dp->next;
-				if (dp->handle != NULL)
-					(void) ldc_mem_dring_unmap(dp->handle);
-				kmem_free(dp, sizeof (dring_info_t));
-				dp = dpp;
-			}
-			RW_EXIT(&lp->dlistrw);
-		} else {
-			/*
-			 * unbind, destroy exported dring, free dring struct
-			 */
-			WRITE_ENTER(&lp->dlistrw);
-			dp = lp->dringp;
-			vsw_free_ring(dp);
-			RW_EXIT(&lp->dlistrw);
-		}
-		lp->dringp = NULL;
+	if (dir == INBOUND) {
+		/* Unmap the remote dring which is imported from the peer */
+		vsw_unmap_dring(ldcp);
+	} else {
+		/* Destroy the local dring which is exported to the peer */
+		vsw_destroy_dring(ldcp);
 	}
 
 	D1(ldcp->ldc_vswp, "%s (%lld): exit", __func__, ldcp->ldc_id);
 }
 
 /*
- * Free ring and all associated resources.
- *
- * Should be called with dlistrw rwlock held as writer.
+ * Destroy the descriptor ring.
  */
 static void
-vsw_free_ring(dring_info_t *dp)
+vsw_destroy_dring(vsw_ldc_t *ldcp)
 {
-	vsw_private_desc_t	*paddr = NULL;
-	dring_info_t		*dpp;
-	int			i;
+	lane_t	*lp = &ldcp->lane_out;
 
-	while (dp != NULL) {
-		mutex_enter(&dp->dlock);
-		dpp = dp->next;
-		if (dp->priv_addr != NULL) {
-			/*
-			 * First unbind and free the memory handles
-			 * stored in each descriptor within the ring.
-			 */
-			for (i = 0; i < vsw_ntxds; i++) {
-				paddr = (vsw_private_desc_t *)
-				    dp->priv_addr + i;
-				if (paddr->memhandle != NULL) {
-					if (paddr->bound == 1) {
-						if (ldc_mem_unbind_handle(
-						    paddr->memhandle) != 0) {
-							DERR(NULL, "error "
-							"unbinding handle for "
-							"ring 0x%llx at pos %d",
-							    dp, i);
-							continue;
-						}
-						paddr->bound = 0;
-					}
-
-					if (ldc_mem_free_handle(
-					    paddr->memhandle) != 0) {
-						DERR(NULL, "error freeing "
-						    "handle for ring 0x%llx "
-						    "at pos %d", dp, i);
-						continue;
-					}
-					paddr->memhandle = NULL;
-				}
-				mutex_destroy(&paddr->dstate_lock);
-			}
-			kmem_free(dp->priv_addr,
-			    (sizeof (vsw_private_desc_t) * vsw_ntxds));
-		}
-
-		/*
-		 * Now unbind and destroy the ring itself.
-		 */
-		if (dp->handle != NULL) {
-			(void) ldc_mem_dring_unbind(dp->handle);
-			(void) ldc_mem_dring_destroy(dp->handle);
-		}
-
-		if (dp->data_addr != NULL) {
-			kmem_free(dp->data_addr, dp->data_sz);
-		}
-
-		mutex_exit(&dp->dlock);
-		mutex_destroy(&dp->dlock);
-		mutex_destroy(&dp->restart_lock);
-		kmem_free(dp, sizeof (dring_info_t));
-
-		dp = dpp;
+	if (lp->dring_mode == VIO_RX_DRING_DATA) {
+		vsw_destroy_rx_dring(ldcp);
+	} else {
+		vsw_destroy_tx_dring(ldcp);
 	}
-}
-
-/*
- * vsw_ldc_rx_worker -- A per LDC worker thread to receive data.
- * This thread is woken up by the LDC interrupt handler to process
- * LDC packets and receive data.
- */
-static void
-vsw_ldc_rx_worker(void *arg)
-{
-	callb_cpr_t	cprinfo;
-	vsw_ldc_t *ldcp = (vsw_ldc_t *)arg;
-	vsw_t *vswp = ldcp->ldc_vswp;
-
-	D1(vswp, "%s(%lld):enter\n", __func__, ldcp->ldc_id);
-	CALLB_CPR_INIT(&cprinfo, &ldcp->rx_thr_lock, callb_generic_cpr,
-	    "vsw_rx_thread");
-	mutex_enter(&ldcp->rx_thr_lock);
-	while (!(ldcp->rx_thr_flags & VSW_WTHR_STOP)) {
-
-		CALLB_CPR_SAFE_BEGIN(&cprinfo);
-		/*
-		 * Wait until the data is received or a stop
-		 * request is received.
-		 */
-		while (!(ldcp->rx_thr_flags &
-		    (VSW_WTHR_DATARCVD | VSW_WTHR_STOP))) {
-			cv_wait(&ldcp->rx_thr_cv, &ldcp->rx_thr_lock);
-		}
-		CALLB_CPR_SAFE_END(&cprinfo, &ldcp->rx_thr_lock)
-
-		/*
-		 * First process the stop request.
-		 */
-		if (ldcp->rx_thr_flags & VSW_WTHR_STOP) {
-			D2(vswp, "%s(%lld):Rx thread stopped\n",
-			    __func__, ldcp->ldc_id);
-			break;
-		}
-		ldcp->rx_thr_flags &= ~VSW_WTHR_DATARCVD;
-		mutex_exit(&ldcp->rx_thr_lock);
-		D1(vswp, "%s(%lld):calling vsw_process_pkt\n",
-		    __func__, ldcp->ldc_id);
-		mutex_enter(&ldcp->ldc_cblock);
-		vsw_process_pkt(ldcp);
-		mutex_exit(&ldcp->ldc_cblock);
-		mutex_enter(&ldcp->rx_thr_lock);
-	}
-
-	/*
-	 * Update the run status and wakeup the thread that
-	 * has sent the stop request.
-	 */
-	ldcp->rx_thr_flags &= ~VSW_WTHR_STOP;
-	ldcp->rx_thread = NULL;
-	CALLB_CPR_EXIT(&cprinfo);
-	D1(vswp, "%s(%lld):exit\n", __func__, ldcp->ldc_id);
-	thread_exit();
-}
-
-/* vsw_stop_rx_thread -- Co-ordinate with receive thread to stop it */
-static void
-vsw_stop_rx_thread(vsw_ldc_t *ldcp)
-{
-	kt_did_t	tid = 0;
-	vsw_t		*vswp = ldcp->ldc_vswp;
-
-	D1(vswp, "%s(%lld):enter\n", __func__, ldcp->ldc_id);
-	/*
-	 * Send a stop request by setting the stop flag and
-	 * wait until the receive thread stops.
-	 */
-	mutex_enter(&ldcp->rx_thr_lock);
-	if (ldcp->rx_thread != NULL) {
-		tid = ldcp->rx_thread->t_did;
-		ldcp->rx_thr_flags |= VSW_WTHR_STOP;
-		cv_signal(&ldcp->rx_thr_cv);
-	}
-	mutex_exit(&ldcp->rx_thr_lock);
-
-	if (tid != 0) {
-		thread_join(tid);
-	}
-	D1(vswp, "%s(%lld):exit\n", __func__, ldcp->ldc_id);
 }
 
 /*
@@ -6197,43 +4800,6 @@ vsw_stop_tx_thread(vsw_ldc_t *ldcp)
 	D1(vswp, "%s(%lld):exit\n", __func__, ldcp->ldc_id);
 }
 
-/* vsw_reclaim_dring -- reclaim descriptors */
-static int
-vsw_reclaim_dring(dring_info_t *dp, int start)
-{
-	int i, j, len;
-	vsw_private_desc_t *priv_addr;
-	vnet_public_desc_t *pub_addr;
-
-	pub_addr = (vnet_public_desc_t *)dp->pub_addr;
-	priv_addr = (vsw_private_desc_t *)dp->priv_addr;
-	len = dp->num_descriptors;
-
-	D2(NULL, "%s: start index %ld\n", __func__, start);
-
-	j = 0;
-	for (i = start; j < len; i = (i + 1) % len, j++) {
-		pub_addr = (vnet_public_desc_t *)dp->pub_addr + i;
-		priv_addr = (vsw_private_desc_t *)dp->priv_addr + i;
-
-		mutex_enter(&priv_addr->dstate_lock);
-		if (pub_addr->hdr.dstate != VIO_DESC_DONE) {
-			mutex_exit(&priv_addr->dstate_lock);
-			break;
-		}
-		pub_addr->hdr.dstate = VIO_DESC_FREE;
-		priv_addr->dstate = VIO_DESC_FREE;
-		/* clear all the fields */
-		priv_addr->datalen = 0;
-		pub_addr->hdr.ack = 0;
-		mutex_exit(&priv_addr->dstate_lock);
-
-		D3(NULL, "claiming descp:%d pub state:0x%llx priv state 0x%llx",
-		    i, pub_addr->hdr.dstate, priv_addr->dstate);
-	}
-	return (j);
-}
-
 /*
  * Debugging routines
  */
@@ -6243,7 +4809,6 @@ display_state(void)
 	vsw_t		*vswp;
 	vsw_port_list_t	*plist;
 	vsw_port_t 	*port;
-	vsw_ldc_list_t	*ldcl;
 	vsw_ldc_t 	*ldcp;
 	extern vsw_t 	*vsw_head;
 
@@ -6256,26 +4821,21 @@ display_state(void)
 		    vswp->instance, plist->num_ports);
 
 		for (port = plist->head; port != NULL; port = port->p_next) {
-			ldcl = &port->p_ldclist;
 			cmn_err(CE_CONT, "port %d : %d ldcs attached\n",
 			    port->p_instance, port->num_ldcs);
-			READ_ENTER(&ldcl->lockrw);
-			ldcp = ldcl->head;
-			for (; ldcp != NULL; ldcp = ldcp->ldc_next) {
-				cmn_err(CE_CONT, "chan %lu : dev %d : "
-				    "status %d : phase %u\n",
-				    ldcp->ldc_id, ldcp->dev_class,
-				    ldcp->ldc_status, ldcp->hphase);
-				cmn_err(CE_CONT, "chan %lu : lsession %lu : "
-				    "psession %lu\n", ldcp->ldc_id,
-				    ldcp->local_session, ldcp->peer_session);
+			ldcp = port->ldcp;
+			cmn_err(CE_CONT, "chan %lu : dev %d : "
+			    "status %d : phase %u\n",
+			    ldcp->ldc_id, ldcp->dev_class,
+			    ldcp->ldc_status, ldcp->hphase);
+			cmn_err(CE_CONT, "chan %lu : lsession %lu : "
+			    "psession %lu\n", ldcp->ldc_id,
+			    ldcp->local_session, ldcp->peer_session);
 
-				cmn_err(CE_CONT, "Inbound lane:\n");
-				display_lane(&ldcp->lane_in);
-				cmn_err(CE_CONT, "Outbound lane:\n");
-				display_lane(&ldcp->lane_out);
-			}
-			RW_EXIT(&ldcl->lockrw);
+			cmn_err(CE_CONT, "Inbound lane:\n");
+			display_lane(&ldcp->lane_in);
+			cmn_err(CE_CONT, "Outbound lane:\n");
+			display_lane(&ldcp->lane_out);
 		}
 		RW_EXIT(&plist->lockrw);
 	}
@@ -6285,7 +4845,7 @@ display_state(void)
 static void
 display_lane(lane_t *lp)
 {
-	dring_info_t	*drp;
+	dring_info_t	*drp = lp->dringp;
 
 	cmn_err(CE_CONT, "ver 0x%x:0x%x : state %lx : mtu 0x%lx\n",
 	    lp->ver_major, lp->ver_minor, lp->lstate, lp->mtu);
@@ -6294,16 +4854,14 @@ display_lane(lane_t *lp)
 	cmn_err(CE_CONT, "dringp 0x%lx\n", (uint64_t)lp->dringp);
 
 	cmn_err(CE_CONT, "Dring info:\n");
-	for (drp = lp->dringp; drp != NULL; drp = drp->next) {
-		cmn_err(CE_CONT, "\tnum_desc %u : dsize %u\n",
-		    drp->num_descriptors, drp->descriptor_size);
-		cmn_err(CE_CONT, "\thandle 0x%lx\n", drp->handle);
-		cmn_err(CE_CONT, "\tpub_addr 0x%lx : priv_addr 0x%lx\n",
-		    (uint64_t)drp->pub_addr, (uint64_t)drp->priv_addr);
-		cmn_err(CE_CONT, "\tident 0x%lx : end_idx %lu\n",
-		    drp->ident, drp->end_idx);
-		display_ring(drp);
-	}
+	cmn_err(CE_CONT, "\tnum_desc %u : dsize %u\n",
+	    drp->num_descriptors, drp->descriptor_size);
+	cmn_err(CE_CONT, "\thandle 0x%lx\n", drp->dring_handle);
+	cmn_err(CE_CONT, "\tpub_addr 0x%lx : priv_addr 0x%lx\n",
+	    (uint64_t)drp->pub_addr, (uint64_t)drp->priv_addr);
+	cmn_err(CE_CONT, "\tident 0x%lx : end_idx %lu\n",
+	    drp->ident, drp->end_idx);
+	display_ring(drp);
 }
 
 static void
@@ -6315,7 +4873,7 @@ display_ring(dring_info_t *dringp)
 	vnet_public_desc_t	*pub_addr = NULL;
 	vsw_private_desc_t	*priv_addr = NULL;
 
-	for (i = 0; i < vsw_ntxds; i++) {
+	for (i = 0; i < vsw_num_descriptors; i++) {
 		if (dringp->pub_addr != NULL) {
 			pub_addr = (vnet_public_desc_t *)dringp->pub_addr + i;
 

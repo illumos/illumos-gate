@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -584,7 +584,6 @@ vsw_hio_send_delshare_msg(vsw_share_t *vsharep)
 {
 	vsw_t *vswp = vsharep->vs_vswp;
 	vsw_port_t *portp;
-	vsw_ldc_list_t	*ldcl;
 	vsw_ldc_t	*ldcp;
 	uint32_t	req_id;
 	uint64_t	cookie = vsharep->vs_cookie;
@@ -600,11 +599,8 @@ vsw_hio_send_delshare_msg(vsw_share_t *vsharep)
 		return (0);
 	}
 
-	ldcl = &portp->p_ldclist;
-	READ_ENTER(&ldcl->lockrw);
-	ldcp = ldcl->head;
+	ldcp = portp->ldcp;
 	if ((ldcp == NULL) || (ldcp->ldc_id != vsharep->vs_ldcid)) {
-		RW_EXIT(&ldcl->lockrw);
 		mutex_enter(&vswp->mac_lock);
 		return (0);
 	}
@@ -612,7 +608,6 @@ vsw_hio_send_delshare_msg(vsw_share_t *vsharep)
 	rv = vsw_send_dds_msg(ldcp, DDS_VNET_DEL_SHARE,
 	    cookie, macaddr, req_id);
 
-	RW_EXIT(&ldcl->lockrw);
 	mutex_enter(&vswp->mac_lock);
 	if (rv == 0) {
 		vsharep->vs_state &= ~VSW_SHARE_DDS_ACKD;

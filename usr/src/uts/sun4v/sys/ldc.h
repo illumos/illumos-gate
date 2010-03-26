@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _LDC_H
 #define	_LDC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -213,32 +211,30 @@ int ldc_mem_dring_release(ldc_dring_handle_t dhandle, uint64_t start,
 /*
  * Shared Memory (Direct Map) Acquire and Release API
  *
- * LDC_MEM_BARRIER_OPEN and LDC_MEM_BARRIER_CLOSE provide on_trap
- * protection for clients accessing imported LDC_DIRECT_MAP'd shared
- * memory segments. Use of these macros is analogous to the
- * ldc_mem_acquire/release and ldc_mem_dring_acquire/release interfaces
- * for LDC_SHADOW_MAP'd segments. After LDC_MEM_BARRIER_OPEN is called,
- * unless an error is returned, LDC_MEM_BARRIER_CLOSE must be called.
+ * LDC_ON_TRAP and LDC_NO_TRAP provide on_trap protection for clients accessing
+ * imported LDC_DIRECT_MAP'd shared memory segments. Use of these macros is
+ * analogous to the ldc_mem_acquire/release and ldc_mem_dring_acquire/release
+ * interfaces for LDC_SHADOW_MAP'd segments. After LDC_ON_TRAP is called,
+ * unless an error is returned, LDC_NO_TRAP must be called.
  *
- * LDC_MEM_BARRIER_OPEN returns zero on success and EACCES if a data
- * access exception occurs after the OPEN call, but before the CLOSE
- * call. If EACCES is returned, the caller must not call
- * LDC_MEM_BARRIER_CLOSE. In order to handle the EACCES error return,
- * callers should take the same precautions that apply when calling
- * on_trap() when calling LDC_MEM_BARRIER_OPEN.
+ * LDC_ON_TRAP returns zero on success and EACCES if a data access exception
+ * occurs after enabling protection, but before it is disabled. If EACCES is
+ * returned, the caller must not call LDC_NO_TRAP. In order to handle the
+ * EACCES error return, callers should take the same precautions that apply
+ * when calling on_trap() when calling LDC_ON_TRAP.
  *
- * LDC_MEM_BARRIER_OPEN is implemented as a macro so that on_trap
- * protection can be enabled without first executing a save instruction
- * and obtaining a new register window. Aside from LDC clients calling
- * on_trap() directly, one alternative approach is to implement the
- * OPEN function in assembly language without a save instruction and to
- * then call on_trap() as a tail call.
+ * LDC_ON_TRAP is implemented as a macro so that on_trap protection can be
+ * enabled without first executing a save instruction and obtaining a new
+ * register window. Aside from LDC clients calling on_trap() directly, one
+ * alternative approach is to implement the LDC_ON_TRAP function in assembly
+ * language without a save instruction and to then call on_trap() as a tail
+ * call.
  */
-#define	LDC_MEM_BARRIER_OPEN(otd)					\
-	(on_trap((otd), OT_DATA_ACCESS) != 0 ?				\
+#define	LDC_ON_TRAP(otd)					\
+	(on_trap((otd), OT_DATA_ACCESS) != 0 ?			\
 	(no_trap(), EACCES) : 0)
 
-#define	LDC_MEM_BARRIER_CLOSE()						\
+#define	LDC_NO_TRAP()						\
 	(no_trap(), 0)
 
 #ifdef __cplusplus

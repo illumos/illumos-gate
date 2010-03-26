@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +35,10 @@
  *
  * Each port in turn contains a number of logical domain channels
  * (ldc's) which are inter domain communications channels which
- * are used for passing small messages between the domains. Their
- * may be an unlimited number of channels associated with each port,
- * though most devices only use a single channel.
+ * are used for passing small messages between the domains. There
+ * may be any number of channels associated with each port, though
+ * currently most devices only have a single channel. The current
+ * implementation provides support for only one channel per port.
  *
  * The ldc is a bi-directional channel, which is divided up into
  * two directional 'lanes', one outbound from the switch to the
@@ -57,15 +58,15 @@
  *     |
  *     +----->port_t----->port_t----->port_t----->
  *		|
- *		+--->ldc_t--->ldc_t--->ldc_t--->
+ *		+--->ldc_t
  *		       |
  *		       +--->lane_t (inbound)
  *		       |       |
- *		       |       +--->dring--->dring--->
+ *		       |       +--->dring
  *		       |
  *		       +--->lane_t (outbound)
  *			       |
- *			       +--->dring--->dring--->
+ *			       +--->dring
  *
  */
 
@@ -77,10 +78,18 @@ extern "C" {
 #endif
 
 /*
+ * LDC pkt tranfer MTU - largest msg size used
+ */
+#define	VSW_LDC_MTU		64
+
+#define	VSW_DEF_MSG_WORDS	\
+	(VNET_DRING_REG_EXT_MSG_SIZE_MAX / sizeof (uint64_t))
+
+/*
  * Default message type.
  */
 typedef struct def_msg {
-	uint64_t	data[8];
+	uint64_t	data[VSW_DEF_MSG_WORDS];
 } def_msg_t;
 
 /*
@@ -181,14 +190,8 @@ typedef struct ver_sup {
  */
 #define	VSW_RING_EL_DATA_SZ	2048	/* Size of data section (bytes) */
 #define	VSW_PRIV_SIZE	sizeof (vnet_private_desc_t)
-#define	VSW_PUB_SIZE	sizeof (vnet_public_desc_t)
 
 #define	VSW_MAX_COOKIES		((ETHERMTU >> MMU_PAGESHIFT) + 2)
-
-/*
- * LDC pkt tranfer MTU
- */
-#define	VSW_LDC_MTU	sizeof (def_msg_t)
 
 /*
  * Size of the mblk in each mblk pool.
@@ -201,6 +204,26 @@ typedef struct ver_sup {
  * Number of mblks in each mblk pool.
  */
 #define	VSW_NUM_MBLKS	1024
+
+/* increment recv index */
+#define	INCR_DESC_INDEX(dp, i)	\
+		((i) = (((i) + 1) & ((dp)->num_descriptors - 1)))
+
+/* decrement recv index */
+#define	DECR_DESC_INDEX(dp, i)	\
+		((i) = (((i) - 1) & ((dp)->num_descriptors - 1)))
+
+#define	INCR_TXI	INCR_DESC_INDEX
+#define	DECR_TXI	DECR_DESC_INDEX
+#define	INCR_RXI	INCR_DESC_INDEX
+#define	DECR_RXI	DECR_DESC_INDEX
+
+/* bounds check rx index */
+#define	CHECK_DESC_INDEX(dp, i)	\
+		(((i) >= 0) && ((i) < (dp)->num_descriptors))
+
+#define	CHECK_RXI	CHECK_DESC_INDEX
+#define	CHECK_TXI	CHECK_DESC_INDEX
 
 /*
  * Private descriptor
@@ -226,32 +249,33 @@ typedef struct vsw_private_desc {
  * Descriptor ring structure
  */
 typedef struct dring_info {
-	struct	dring_info	*next;	/* next ring in chain */
-	kmutex_t		dlock;
-	uint32_t		num_descriptors;
-	uint32_t		descriptor_size;
-	uint32_t		options;
-	uint32_t		ncookies;
-	ldc_mem_cookie_t	cookie[1];
-
-	ldc_dring_handle_t	handle;
-	uint64_t		ident;	/* identifier sent to peer */
+	kmutex_t		dlock;		/* sync access */
+	uint32_t		num_descriptors; /* # of descriptors */
+	uint32_t		descriptor_size; /* size of descriptor */
+	uint32_t		options;	/* dring options (mode) */
+	ldc_dring_handle_t	dring_handle;	/* dring LDC handle */
+	uint32_t		dring_ncookies;	/* # of dring cookies */
+	ldc_mem_cookie_t	dring_cookie[1]; /* LDC cookie of dring */
+	ldc_mem_handle_t	data_handle;	/* data area  LDC handle */
+	uint32_t		data_ncookies;	/* # of data area cookies */
+	ldc_mem_cookie_t	*data_cookie;	/* data area LDC cookies */
+	uint64_t		ident;		/* identifier sent to peer */
 	uint64_t		end_idx;	/* last idx processed */
-	int64_t			last_ack_recv;
-
-	kmutex_t		restart_lock;
+	int64_t			last_ack_recv;	/* last ack received */
+	kmutex_t		txlock;		/* protect tx desc alloc */
+	uint32_t		next_txi;	/* next tx descriptor index */
+	uint32_t		next_rxi;	/* next expected recv index */
+	kmutex_t		restart_lock;	/* protect restart_reqd */
 	boolean_t		restart_reqd;	/* send restart msg */
-
-	/*
-	 * base address of private and public portions of the
-	 * ring (where appropriate), and data block.
-	 */
 	void			*pub_addr;	/* base of public section */
 	void			*priv_addr;	/* base of private section */
 	void			*data_addr;	/* base of data section */
 	size_t			data_sz;	/* size of data section */
 	size_t			desc_data_sz;	/* size of descr data blk */
 	uint8_t			dring_mtype;	/* dring mem map type */
+	uint32_t		num_bufs;	/* # of buffers */
+	vio_mblk_pool_t		*rx_vmp;	/* rx mblk pool */
+	vio_mblk_t		**rxdp_to_vmp;	/* descr to buf map tbl */
 } dring_info_t;
 
 /*
@@ -271,7 +295,7 @@ typedef struct lane {
 	uint8_t		xfer_mode;	/* Dring or Pkt based */
 	uint8_t		ack_freq;	/* Only non zero for Pkt based xfer */
 	uint32_t	physlink_update;	/* physlink updates */
-	krwlock_t	dlistrw;	/* Lock for dring list */
+	uint8_t		dring_mode;	/* Descriptor ring mode */
 	dring_info_t	*dringp;	/* List of drings for this lane */
 } lane_t;
 
@@ -284,6 +308,7 @@ typedef struct lane {
  */
 typedef int	(*vsw_ldctx_t) (void *, mblk_t *, mblk_t *, uint32_t);
 typedef void	(*vsw_ldcrx_pktdata_t) (void *, void *, uint32_t);
+typedef void	(*vsw_ldcrx_dringdata_t) (void *, void *);
 
 /* ldc information associated with a vsw-port */
 typedef struct vsw_ldc {
@@ -316,6 +341,7 @@ typedef struct vsw_ldc {
 	uint32_t		max_rxpool_size; /* max size of rxpool in use */
 	uint64_t		*ldcmsg;	/* msg buffer for ldc_read() */
 	uint64_t		msglen;		/* size of ldcmsg */
+	uint32_t		dringdata_msgid; /* msgid in RxDringData mode */
 
 	/* tx thread fields */
 	kthread_t		*tx_thread;	/* tx thread */
@@ -326,14 +352,21 @@ typedef struct vsw_ldc {
 	mblk_t			*tx_mtail;	/* tx mblks tail */
 	uint32_t		tx_cnt;		/* # of pkts queued for tx */
 
+	/* message thread fields */
+	kthread_t		*msg_thread;	/* message thread */
+	uint32_t		msg_thr_flags;	/* message thread flags */
+	kmutex_t		msg_thr_lock;	/* lock for message thread */
+	kcondvar_t		msg_thr_cv;	/* cond.var for msg thread */
+
 	/* receive thread fields */
-	kthread_t		*rx_thread;	/* receive thread */
-	uint32_t		rx_thr_flags;	/* receive thread flags */
-	kmutex_t		rx_thr_lock;	/* lock for receive thread */
-	kcondvar_t		rx_thr_cv;	/* cond.var for recv thread */
+	kthread_t		*rcv_thread;	/* receive thread */
+	uint32_t		rcv_thr_flags;	/* receive thread flags */
+	kmutex_t		rcv_thr_lock;	/* lock for receive thread */
+	kcondvar_t		rcv_thr_cv;	/* cond.var for recv thread */
 
 	vsw_ldctx_t		tx;		/* transmit function */
-	vsw_ldcrx_pktdata_t	rx_pktdata;	/* process rx raw data msg */
+	vsw_ldcrx_pktdata_t	rx_pktdata;	/* process raw data msg */
+	vsw_ldcrx_dringdata_t	rx_dringdata;	/* process dring data msg */
 
 	/* channel statistics */
 	vgen_stats_t		ldc_stats;	/* channel statistics */
@@ -343,12 +376,6 @@ typedef struct vsw_ldc {
 /* worker thread flags */
 #define	VSW_WTHR_DATARCVD 	0x01	/* data received */
 #define	VSW_WTHR_STOP 		0x02	/* stop worker thread request */
-
-/* list of ldcs per port */
-typedef struct vsw_ldc_list {
-	vsw_ldc_t	*head;		/* head of the list */
-	krwlock_t	lockrw;		/* sync access(rw) to the list */
-} vsw_ldc_list_t;
 
 /* multicast addresses port is interested in */
 typedef struct mcst_addr {
@@ -370,7 +397,7 @@ typedef struct vsw_port {
 	struct vsw		*p_vswp;	/* associated vsw */
 	int			num_ldcs;	/* # of ldcs in the port */
 	uint64_t		*ldc_ids;	/* ldc ids */
-	vsw_ldc_list_t		p_ldclist;	/* list of ldcs for this port */
+	vsw_ldc_t		*ldcp;		/* ldc for this port */
 
 	kmutex_t		tx_lock;	/* transmit lock */
 	int			(*transmit)(vsw_ldc_t *, mblk_t *);

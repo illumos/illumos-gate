@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +86,7 @@ typedef struct vnet_attr_msg {
 	uint8_t			addr_type;	/* device address type */
 	uint16_t		ack_freq;	/* ack after rcving # of pkts */
 	uint8_t			physlink_update; /* physlink updates(s)? */
-	uint8_t			resv1;		/* reserved */
+	uint8_t			options;	/* options - dring mode */
 	uint16_t		resv2;		/* reserved */
 
 	uint64_t		addr;		/* device address */

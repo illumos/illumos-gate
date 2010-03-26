@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,6 +128,8 @@ extern uint64_t vdds_hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vch_idx,
 
 
 #ifdef DEBUG
+
+#define	DEBUG_PRINTF	debug_printf
 
 extern int vnet_dbglevel;
 

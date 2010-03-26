@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,14 +98,24 @@ extern "C" {
 
 /* mblk pool flags */
 #define	VMPL_FLAG_DESTROYING	0x1	/* pool is being destroyed */
+#define	VMPL_FLAG_CLIENT_DATA	0x2	/* pool data area provided by client */
 
 struct vio_mblk_pool;
+
+/* VIO mblk states */
+typedef enum vio_mblk_state {
+	VIO_MBLK_FREE = 0x1,		/* free to use */
+	VIO_MBLK_BOUND = 0x2,		/* allocated/bound to a descriptor */
+	VIO_MBLK_HAS_DATA = 0x4		/* contains valid data */
+} vio_mblk_state_t;
 
 typedef struct vio_mblk {
 	uint8_t			*datap;		/* data buffer */
 	mblk_t			*mp;		/* mblk using datap */
 	frtn_t			reclaim;	/* mblk reclaim routine */
 	struct vio_mblk_pool 	*vmplp;		/* pointer to parent pool */
+	uint_t			index;		/* index in the pool */
+	vio_mblk_state_t	state;		/* state flags */
 } vio_mblk_t;
 
 typedef struct vio_mblk_pool {
@@ -131,15 +141,19 @@ typedef struct vio_multi_pool {
 	vio_mblk_pool_t		**vmpp;		/* vio mblk pools */
 } vio_multi_pool_t;
 
+#define	VIO_MBLK_DATA_OFF(vmp)	((vmp)->datap - ((vmp)->vmplp)->datap)
+
 int vio_create_mblks(uint64_t num_mblks,
-			size_t mblk_size, vio_mblk_pool_t **);
+			size_t mblk_size, uint8_t *mblk_datap,
+			vio_mblk_pool_t **poolp);
 int vio_destroy_mblks(vio_mblk_pool_t *);
-mblk_t *vio_allocb(vio_mblk_pool_t *);
+vio_mblk_t *vio_allocb(vio_mblk_pool_t *);
 void vio_freeb(void *arg);
 int vio_init_multipools(vio_multi_pool_t *vmultip, int num_pools, ...);
 void vio_destroy_multipools(vio_multi_pool_t *vmultip, vio_mblk_pool_t **fvmp);
-mblk_t *vio_multipool_allocb(vio_multi_pool_t *vmultip, size_t size);
+vio_mblk_t *vio_multipool_allocb(vio_multi_pool_t *vmultip, size_t size);
 int vio_check_pending_pools(vio_multi_pool_t *vmultip);
+void vio_clobber_pool(vio_mblk_pool_t *vmplp);
 
 /* VIO versioning helpers */
 #define	VIO_VER_IS_NEGOTIATED(ver, maj, min)		\

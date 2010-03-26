@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2008,7 +2008,7 @@ vd_start_bio(vd_task_t *task)
 		return (0);
 	}
 
-	mtype = (&vd->inband_task == task) ? LDC_SHADOW_MAP : LDC_DIRECT_MAP;
+	mtype = LDC_SHADOW_MAP;
 
 	/* Map memory exported by client */
 	status = ldc_mem_map(task->mhdl, request->cookie, request->ncookies,

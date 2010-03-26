@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_VIO_MAILBOX_H
 #define	_SYS_VIO_MAILBOX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -108,8 +106,9 @@ extern "C" {
  * VIO Descriptor Ring registration options
  * (intended use for Descriptor Ring)
  */
-#define	VIO_TX_DRING	0x1
-#define	VIO_RX_DRING	0x2
+#define	VIO_TX_DRING		0x1
+#define	VIO_RX_DRING		0x2
+#define	VIO_RX_DRING_DATA	0x4
 
 /*
  * Size of message payload
@@ -190,16 +189,36 @@ typedef struct vio_dring_reg_msg {
 	uint64_t		dring_ident;	/* =0 for SUBTYPE_INFO msg */
 	uint32_t		num_descriptors; /* # of desc in the ring */
 	uint32_t		descriptor_size; /* size of each entry */
-	uint16_t		options;	/* intended use */
+	uint16_t		options;	/* dring mode */
 	uint16_t		resv;		/* padding */
 	uint32_t		ncookies;	/* # cookies exporting ring */
 
 	/*
-	 * cookie is a variable sized array.  If the number of cookies is 1,
-	 * the message can be sent by LDC without fragmentation.
+	 * The rest of the structure is variable in size. The first member that
+	 * follows is the descriptor ring cookie(s), that is used in all dring
+	 * modes. Following that are the members that are needed only in
+	 * RxDringData mode. If the dring mode is not RxDringData and the # of
+	 * dring cookies is 1, the message can be sent by LDC without
+	 * fragmentation. As dring cookie array is variable in size depending
+	 * on ncookies, the subsequent members are defined in a separate
+	 * structure vio_dring_reg_msg_ext_t as shown below.
 	 */
+
 	ldc_mem_cookie_t	cookie[1];
 } vio_dring_reg_msg_t;
+
+/*
+ * VIO Descriptor Ring Register Extended message; used in RxDringData mode.
+ */
+typedef struct vio_dring_reg_extended_msg {
+	uint32_t		data_ncookies;	/* # of data area cookies */
+	uint32_t		data_area_size;	/* size of data area */
+
+	/*
+	 * The data_cookie[] array is variable in size based on data_ncookies.
+	 */
+	ldc_mem_cookie_t	data_cookie[1]; /* data cookies */
+} vio_dring_reg_ext_msg_t;
 
 /*
  * VIO Descriptor Ring Unregister message.
@@ -216,7 +235,6 @@ typedef struct vio_dring_unreg_msg {
 	uint64_t	dring_ident;
 	uint64_t	resv[VIO_PAYLOAD_ELEMS - 1];
 } vio_dring_unreg_msg_t;
-
 
 /*
  * Definition of a generic VIO message (with no payload) which can be cast

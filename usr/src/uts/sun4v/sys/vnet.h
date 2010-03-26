@@ -42,11 +42,7 @@ extern "C" {
 
 #define	KMEM_FREE(_p)		kmem_free((_p), sizeof (*(_p)))
 
-#define	VNET_NTXDS		512		/* power of 2 tx descriptors */
-#define	VNET_LDCWD_INTERVAL	1000		/* watchdog freq in msec */
-#define	VNET_LDCWD_TXTIMEOUT	1000		/* tx timeout in msec */
-#define	VNET_LDC_MTU		64		/* ldc mtu */
-
+#define	VNET_NUM_DESCRIPTORS	512		/* power of 2 descriptors */
 
 #define	IS_BROADCAST(ehp) \
 		(ether_cmp(&ehp->ether_dhost, &etherbroadcastaddr) == 0)
@@ -328,25 +324,25 @@ enum	{ DBG_LEVEL1 = 0x01, DBG_LEVEL2 = 0x02, DBG_WARN = 0x04,
 
 #define	DBG1(...)	do {						\
 			    if ((vnet_dbglevel & DBG_LEVEL1) != 0) {	\
-				debug_printf(__func__, __VA_ARGS__);	\
+				DEBUG_PRINTF(__func__, __VA_ARGS__);	\
 			    }						\
 			_NOTE(CONSTCOND) } while (0)
 
 #define	DBG2(...)	do {						\
 			    if ((vnet_dbglevel & DBG_LEVEL2) != 0) {	\
-				debug_printf(__func__, __VA_ARGS__);	\
+				DEBUG_PRINTF(__func__, __VA_ARGS__);	\
 			    }						\
 			_NOTE(CONSTCOND) } while (0)
 
 #define	DWARN(...)	do {						\
 			    if ((vnet_dbglevel & DBG_WARN) != 0) {	\
-				debug_printf(__func__, __VA_ARGS__);	\
+				DEBUG_PRINTF(__func__, __VA_ARGS__);	\
 			    }						\
 			_NOTE(CONSTCOND) } while (0)
 
 #define	DERR(...)	do {						\
 			    if ((vnet_dbglevel & DBG_ERR) != 0) {	\
-				debug_printf(__func__, __VA_ARGS__);	\
+				DEBUG_PRINTF(__func__, __VA_ARGS__);	\
 			    }						\
 			_NOTE(CONSTCOND) } while (0)
 

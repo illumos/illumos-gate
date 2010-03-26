@@ -180,8 +180,6 @@ extern void vsw_update_bandwidth(vsw_t *vswp, vsw_port_t *port, int type,
  */
 int	vsw_num_handshakes = VNET_NUM_HANDSHAKES; /* # of handshake attempts */
 int	vsw_wretries = 100;		/* # of write attempts */
-int	vsw_desc_delay = 0;		/* delay in us */
-int	vsw_read_attempts = 5;		/* # of reads of descriptor */
 int	vsw_setup_switching_delay = 3;	/* setup sw timeout interval in sec */
 int	vsw_mac_open_retries = 300;	/* max # of mac_open() retries */
 					/* 300*3 = 900sec(15min) of max tmout */
@@ -241,12 +239,87 @@ uint32_t vsw_pri_tx_nmblks = 64;
  */
 uint32_t vsw_publish_macaddr_count = 3;
 
-boolean_t vsw_hio_enabled = B_TRUE;	/* Enable/disable HybridIO */
-int vsw_hio_max_cleanup_retries = 10;	/* Max retries for HybridIO cleanp */
-int vsw_hio_cleanup_delay = 10000;	/* 10ms */
+/*
+ * Enable/disable HybridIO
+ */
+boolean_t vsw_hio_enabled = B_TRUE;
 
-/* Number of transmit descriptors -  must be power of 2 */
-uint32_t vsw_ntxds = VSW_RING_NUM_EL;
+/*
+ * Max retries for HybridIO cleanup
+ */
+int vsw_hio_max_cleanup_retries = 10;
+
+/*
+ * 10ms delay for HybridIO cleanup
+ */
+int vsw_hio_cleanup_delay = 10000;
+
+/*
+ * Descriptor ring modes of LDC data transfer:
+ *
+ * 1) TxDring mode:
+ * In versions < v1.6 of VIO Protocol, we support only TxDring mode. In this
+ * mode, we create a transmit descriptor ring and export it to the peer through
+ * dring registration process of handshake. The descriptor ring is exported
+ * using LDC shared memory. Each descriptor is associated with a data buffer.
+ * The data buffer is also exported over LDC and the cookies for this data
+ * buffer are provided in the descriptor. The peer maps this ring as its
+ * receive ring. Similarly, the peer exports a transmit descriptor ring which
+ * is mapped by this device as its receive ring. In this mode, in a given data
+ * transfer direction, the transmitter copies the data to the exported data
+ * buffer (owned by itself), bound to the descriptor. The receiver uses the LDC
+ * cookies specified in the descriptor to copy the data into the receiving
+ * guest through the hypervisor (ldc_mem_copy()).
+ *
+ * 2) RxDringData mode:
+ * In versions >= v1.6 of VIO Protocol, we also support RxDringData mode. In
+ * this mode, we create a receive descriptor ring and export it to the peer
+ * through dring registration process of handshake. In addition, we export a
+ * receive buffer area and provide that information also in the dring
+ * registration message. The descriptor ring and the data buffer area are
+ * exported using LDC shared memory. Each descriptor is associated with a data
+ * buffer in the data buffer area and the offset of the specific data buffer
+ * within this area is specified in the descriptor. The peer maps this ring
+ * along with the data buffer area as its transmit ring. Similarly, the peer
+ * exports a receive ring which is mapped by this device as its transmit ring,
+ * along with its buffer area. In this mode, in a given data transfer
+ * direction, the transmitter copies the data to the data buffer offset
+ * specified in the descriptor. The receiver simply picks up the data buffer
+ * (owned by itself) without any copy operation into the receiving guest.
+ *
+ * We provide a tunable to enable RxDringData mode for versions >= v1.6 of VIO
+ * Protocol. By default, this tunable is set to 1 (VIO_TX_DRING). To enable
+ * RxDringData mode set this tunable to 4 (VIO_RX_DRING_DATA). This enables us
+ * to negotiate RxDringData mode with peers that support versions >= v1.6. For
+ * peers that support version < v1.6, we continue to operate in TxDring mode
+ * with them though the tunable is enabled.
+ */
+uint8_t  vsw_dring_mode = VIO_TX_DRING;
+
+/*
+ * Number of descriptors;  must be power of 2.
+ */
+uint32_t vsw_num_descriptors = VSW_NUM_DESCRIPTORS;
+
+/*
+ * In RxDringData mode, # of buffers is determined by multiplying the # of
+ * descriptors with the factor below. Note that the factor must be > 1; i.e,
+ * the # of buffers must always be > # of descriptors. This is needed because,
+ * while the shared memory buffers are sent up the stack on the receiver, the
+ * sender needs additional buffers that can be used for further transmits.
+ * See vsw_setup_rx_dring() for details.
+ */
+uint32_t vsw_nrbufs_factor = 2;
+
+/*
+ * Delay when rx descr not ready; used in both dring modes.
+ */
+int	vsw_recv_delay = 0;
+
+/*
+ * Retry when rx descr not ready; used in both dring modes.
+ */
+int	vsw_recv_retries = 5;
 
 /*
  * Max number of mblks received in one receive operation.
@@ -258,7 +331,7 @@ uint32_t vsw_chain_len = (VSW_NUM_MBLKS * 0.6);
  * mblks for each pool. At least 3 sizes must be specified if these are used.
  * The sizes must be specified in increasing order. Non-zero value of the first
  * size will be used as a hint to use these values instead of the algorithm
- * that determines the sizes based on MTU.
+ * that determines the sizes based on MTU. Used in TxDring mode only.
  */
 uint32_t vsw_mblk_size1 = 0;
 uint32_t vsw_mblk_size2 = 0;
@@ -282,7 +355,7 @@ boolean_t vsw_jumbo_rxpools = B_FALSE;
  * before the tx worker thread begins processing the queue. Its value
  * is chosen to be 4x the default length of tx descriptor ring.
  */
-uint32_t vsw_max_tx_qcount = 4 * VSW_RING_NUM_EL;
+uint32_t vsw_max_tx_qcount = 4 * VSW_NUM_DESCRIPTORS;
 
 /*
  * MAC callbacks
@@ -585,7 +658,7 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Create the taskq which will process all the VIO
 	 * control messages.
 	 */
-	(void) snprintf(qname, TASKQ_NAMELEN, "vsw_taskq%d", vswp->instance);
+	(void) snprintf(qname, TASKQ_NAMELEN, "taskq%d", vswp->instance);
 	if ((vswp->taskq_p = ddi_taskq_create(vswp->dip, qname, 1,
 	    TASKQ_DEFAULTPRI, 0)) == NULL) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to create task queue",
@@ -595,7 +668,7 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	progress |= PROG_taskq;
 
-	(void) snprintf(qname, TASKQ_NAMELEN, "vsw_rxp_taskq%d",
+	(void) snprintf(qname, TASKQ_NAMELEN, "rxpool_taskq%d",
 	    vswp->instance);
 	if ((vswp->rxp_taskq = ddi_taskq_create(vswp->dip, qname, 1,
 	    TASKQ_DEFAULTPRI, 0)) == NULL) {
@@ -1910,7 +1983,8 @@ vsw_read_pri_eth_types(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		types[i] = data[i] & 0xFFFF;
 	}
 	mblk_sz = (VIO_PKT_DATA_HDRSIZE + ETHERMAX + 7) & ~7;
-	(void) vio_create_mblks(vsw_pri_tx_nmblks, mblk_sz, &vswp->pri_tx_vmp);
+	(void) vio_create_mblks(vsw_pri_tx_nmblks, mblk_sz, NULL,
+	    &vswp->pri_tx_vmp);
 }
 
 static void

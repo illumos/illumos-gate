@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,11 +40,37 @@ extern "C" {
  * server (vsw) and client (vnet).
  */
 
-/* max # of cookies per frame size */
+/* max # of cookies per frame size in TxDring mode */
 #define	MAX_COOKIES	 ((ETHERMAX >> MMU_PAGESHIFT) + 2ULL)
+
+/*
+ * Max # of data area cookies that we support in RxDringData mode. This is
+ * pre-defined to avoid allocating and importing a large # of cookies for the
+ * data area. We know that the export map table on the exporting end point is
+ * per LDC. We also know that a single cookie can be obtained if we manage
+ * to get consecutive entries in the export map table. We use this knowledge to
+ * limit the # of cookies to a pre-defined maximum value.
+ */
+#define	VNET_DATA_AREA_COOKIES	32
+
+/*
+ * Size of dring reg msg in RxDringData mode, given # of data area cookies.
+ * This assumes that the # of dring cookies in vio_dring_reg_msg_t is 1.
+ * The given # of data area cookies is reduced by 1, as vio_dring_reg_msg_ext_t
+ * itself contains 1 data cookie.
+ */
+#define	VNET_DRING_REG_EXT_MSG_SIZE(data_ncookies)		\
+	(sizeof (vio_dring_reg_msg_t) + sizeof (vio_dring_reg_ext_msg_t) + \
+	(((data_ncookies) - 1) * sizeof (ldc_mem_cookie_t)))
+
+/* Max supported size of dring reg msg in RxDringData mode */
+#define	VNET_DRING_REG_EXT_MSG_SIZE_MAX				\
+	VNET_DRING_REG_EXT_MSG_SIZE(VNET_DATA_AREA_COOKIES)
 
 /* initial send sequence number */
 #define	VNET_ISS		0x1
+
+#define	VNET_START_IDX_UNSPEC	0xFFFFFFFF /* ignore st_idx in dringdata ack */
 
 #define	VNET_2K			(1 << 11)
 #define	VNET_4K			(1 << 12)
@@ -55,6 +81,9 @@ extern "C" {
 #define	VNET_ROUNDUP_2K(n)	(((n) + (VNET_2K - 1)) & ~(VNET_2K - 1))
 #define	VNET_ROUNDUP_4K(n)	(((n) + (VNET_4K - 1)) & ~(VNET_4K - 1))
 #define	VNET_ROUNDUP_8K(n)	(((n) + (VNET_8K - 1)) & ~(VNET_8K - 1))
+
+#define	MEMBAR_CONSUMER		membar_consumer
+#define	MEMBAR_PRODUCER		membar_producer
 
 /*
  * Maximum MTU value currently supported. MAX_COOKIES for data has been defined
@@ -87,6 +116,16 @@ typedef struct vnet_ibnd_desc {
 	uint32_t			ncookies;
 	ldc_mem_cookie_t		memcookie[MAX_COOKIES];
 } vnet_ibnd_desc_t;
+
+/*
+ * Descriptor format in RxDringData mode.
+ */
+typedef struct vnet_rxdring_data_desc {
+	uint8_t		dstate;			/* Descriptor state */
+	uint8_t		resv1[3];		/* Reserved */
+	uint32_t	nbytes;			/* Num bytes in data buffer */
+	uint64_t	data_buf_offset;	/* Offset of data buffer */
+} vnet_rx_dringdata_desc_t;
 
 /* exported functions */
 uint64_t vnet_macaddr_strtoul(const uint8_t *macaddr);

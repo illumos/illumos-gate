@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4276,15 +4276,7 @@ ldc_write(ldc_handle_t handle, caddr_t buf, size_t *sizep)
 	}
 	ldcp = (ldc_chan_t *)handle;
 
-	/* check if writes can occur */
-	if (!mutex_tryenter(&ldcp->tx_lock)) {
-		/*
-		 * Could not get the lock - channel could
-		 * be in the process of being unconfigured
-		 * or reader has encountered an error
-		 */
-		return (EAGAIN);
-	}
+	mutex_enter(&ldcp->tx_lock);
 
 	/* check if non-zero data to write */
 	if (buf == NULL || sizep == NULL) {

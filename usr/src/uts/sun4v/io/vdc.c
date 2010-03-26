@@ -3648,7 +3648,7 @@ vdc_populate_mem_hdl(vdc_t *vdcp, vdc_local_desc_t *ldep)
 		vaddr = ldep->align_addr;
 	}
 
-	maptype = LDC_IO_MAP|LDC_SHADOW_MAP|LDC_DIRECT_MAP;
+	maptype = LDC_IO_MAP|LDC_SHADOW_MAP;
 	rv = ldc_mem_bind_handle(mhdl, vaddr, P2ROUNDUP(nbytes, 8),
 	    maptype, perm, &dep->payload.cookie[0], &dep->payload.ncookies);
 	DMSG(vdcp, 2, "[%d] bound mem handle; ncookies=%d\n",

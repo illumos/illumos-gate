@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _VGEN_STATS_H
 #define	_VGEN_STATS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,9 +66,13 @@ typedef struct vgen_stats {
 
 	/* Callback statistics */
 	uint32_t	callbacks;		/* # callbacks */
-	uint32_t	dring_data_acks;	/* # dring data acks recvd  */
-	uint32_t	dring_stopped_acks;	/* # dring stopped acks recvd */
-	uint32_t	dring_data_msgs;	/* # dring data msgs sent */
+	uint32_t	dring_data_msgs_sent;	/* # dring data msgs sent */
+	uint32_t	dring_data_acks_rcvd;	/* # dring data acks recvd  */
+	uint32_t	dring_stopped_acks_rcvd; /* # dring stopped acks rcvd */
+	uint32_t	dring_data_msgs_rcvd;	/* # dring data msgs rcvd */
+	uint32_t	dring_data_acks_sent;	/* # dring data acks sent  */
+	uint32_t	dring_stopped_acks_sent; /* # dring stopped acks sent */
+	uint32_t	dring_mode;		/* dring mode */
 
 } vgen_stats_t;
 
@@ -116,9 +118,13 @@ typedef struct vgen_kstats {
 
 	/* Callback statistics */
 	kstat_named_t	callbacks;		/* # callbacks */
-	kstat_named_t	dring_data_acks;	/* # dring data acks recvd  */
-	kstat_named_t	dring_stopped_acks;	/* # dring stopped acks recvd */
-	kstat_named_t	dring_data_msgs;	/* # dring data msgs sent */
+	kstat_named_t	dring_data_msgs_sent;	/* # dring data msgs sent */
+	kstat_named_t	dring_data_acks_rcvd;	/* # dring data acks recvd  */
+	kstat_named_t	dring_stopped_acks_rcvd; /* # dring stopped acks rcvd */
+	kstat_named_t	dring_data_msgs_rcvd;	/* # dring data msgs rcvd */
+	kstat_named_t	dring_data_acks_sent;	/* # dring data acks sent  */
+	kstat_named_t	dring_stopped_acks_sent; /* # dring stopped acks sent */
+	kstat_named_t	dring_mode;		/* dring mode */
 
 } vgen_kstats_t;
 

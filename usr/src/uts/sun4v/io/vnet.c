@@ -157,12 +157,9 @@ extern int vgen_init(void *vnetp, uint64_t regprop, dev_info_t *vnetdip,
 extern int vgen_init_mdeg(void *arg);
 extern void vgen_uninit(void *arg);
 extern int vgen_dds_tx(void *arg, void *dmsg);
-extern void vgen_mod_init(void);
-extern int vgen_mod_cleanup(void);
-extern void vgen_mod_fini(void);
 extern int vgen_enable_intr(void *arg);
 extern int vgen_disable_intr(void *arg);
-extern mblk_t *vgen_poll(void *arg, int bytes_to_pickup);
+extern mblk_t *vgen_rx_poll(void *arg, int bytes_to_pickup);
 
 /* Externs that are imported from vnet_dds */
 extern void vdds_mod_init(void);
@@ -230,13 +227,15 @@ static vnet_t	*vnet_headp = NULL;
 static krwlock_t vnet_rw;
 
 /* Tunables */
-uint32_t vnet_ntxds = VNET_NTXDS;	/* power of 2 transmit descriptors */
-uint32_t vnet_ldcwd_interval = VNET_LDCWD_INTERVAL; /* watchdog freq in msec */
-uint32_t vnet_ldcwd_txtimeout = VNET_LDCWD_TXTIMEOUT;  /* tx timeout in msec */
-uint32_t vnet_ldc_mtu = VNET_LDC_MTU;		/* ldc mtu */
+uint32_t vnet_num_descriptors = VNET_NUM_DESCRIPTORS;
 
-/* Configure tx serialization in mac layer for the vnet device */
-boolean_t vnet_mac_tx_serialize = B_TRUE;
+/*
+ * Configure tx serialization in mac layer for the vnet device. This tunable
+ * should be enabled to improve performance only if HybridIO is configured for
+ * the vnet device.
+ */
+boolean_t vnet_mac_tx_serialize = B_FALSE;
+
 /* Configure enqueing at Rx soft rings in mac layer for the vnet device */
 boolean_t vnet_mac_rx_queuing = B_TRUE;
 
@@ -331,6 +330,8 @@ static struct modlinkage modlinkage = {
 
 #ifdef DEBUG
 
+#define	DEBUG_PRINTF	debug_printf
+
 /*
  * Print debug messages - set to 0xf to enable all msgs
  */
@@ -373,7 +374,6 @@ _init(void)
 		mac_fini_ops(&vnetops);
 	}
 	vdds_mod_init();
-	vgen_mod_init();
 	DBG1(NULL, "exit(%d)\n", status);
 	return (status);
 }
@@ -386,15 +386,10 @@ _fini(void)
 
 	DBG1(NULL, "enter\n");
 
-	status = vgen_mod_cleanup();
-	if (status != 0)
-		return (status);
-
 	status = mod_remove(&modlinkage);
 	if (status != 0)
 		return (status);
 	mac_fini_ops(&vnetops);
-	vgen_mod_fini();
 	vdds_mod_fini();
 
 	DBG1(NULL, "exit(%d)\n", status);
@@ -473,7 +468,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vnet_fdb_create(vnetp);
 	attach_progress |= AST_fdbh_alloc;
 
-	(void) snprintf(qname, TASKQ_NAMELEN, "vnet_taskq%d", instance);
+	(void) snprintf(qname, TASKQ_NAMELEN, "vres_taskq%d", instance);
 	if ((vnetp->taskqp = ddi_taskq_create(dip, qname, 1,
 	    TASKQ_DEFAULTPRI, 0)) == NULL) {
 		cmn_err(CE_WARN, "!vnet%d: Unable to create task queue",
@@ -2627,7 +2622,7 @@ vnet_rx_poll(void *arg, int bytes_to_pickup)
 		}
 	} else {
 		vresp = (vnet_res_t *)rx_ringp->hw_rh;
-		mp = vgen_poll(vresp->macreg.m_driver, bytes_to_pickup);
+		mp = vgen_rx_poll(vresp->macreg.m_driver, bytes_to_pickup);
 	}
 	return (mp);
 }

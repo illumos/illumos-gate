@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -128,12 +126,19 @@ vgen_setup_kstats(char *ks_mod, int instance,
 	/* Interrupt stats */
 	kstat_named_init(&ldckp->callbacks,		"callbacks",
 	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->dring_data_acks,	"dring_data_acks",
+	kstat_named_init(&ldckp->dring_data_msgs_sent,	"dring_data_msgs_sent",
 	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->dring_stopped_acks,	"dring_stopped_acks",
+	kstat_named_init(&ldckp->dring_data_acks_rcvd,	"dring_data_acks_rcvd",
 	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->dring_data_msgs,	"dring_data_msgs",
+	kstat_named_init(&ldckp->dring_stopped_acks_rcvd,
+	    "dring_stopped_acks_rcvd", KSTAT_DATA_ULONG);
+	kstat_named_init(&ldckp->dring_data_msgs_rcvd,	"dring_data_msgs_rcvd",
 	    KSTAT_DATA_ULONG);
+	kstat_named_init(&ldckp->dring_data_acks_sent,	"dring_data_acks_sent",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&ldckp->dring_stopped_acks_sent,
+	    "dring_stopped_acks_sent", KSTAT_DATA_ULONG);
+	kstat_named_init(&ldckp->dring_mode, "dring_mode", KSTAT_DATA_ULONG);
 
 	ksp->ks_update = vgen_kstat_update;
 	ksp->ks_private = (void *)statsp;
@@ -207,9 +212,20 @@ vgen_kstat_update(kstat_t *ksp, int rw)
 		ldckp->rx_pri_bytes.value.ull	= statsp->rx_pri_bytes;
 
 		ldckp->callbacks.value.ul	= statsp->callbacks;
-		ldckp->dring_data_acks.value.ul	= statsp->dring_data_acks;
-		ldckp->dring_stopped_acks.value.ul = statsp->dring_stopped_acks;
-		ldckp->dring_data_msgs.value.ul	= statsp->dring_data_msgs;
+
+		ldckp->dring_data_msgs_sent.value.ul =
+		    statsp->dring_data_msgs_sent;
+		ldckp->dring_data_acks_rcvd.value.ul =
+		    statsp->dring_data_acks_rcvd;
+		ldckp->dring_stopped_acks_rcvd.value.ul =
+		    statsp->dring_stopped_acks_rcvd;
+		ldckp->dring_data_msgs_rcvd.value.ul =
+		    statsp->dring_data_msgs_rcvd;
+		ldckp->dring_data_acks_sent.value.ul =
+		    statsp->dring_data_acks_sent;
+		ldckp->dring_stopped_acks_sent.value.ul =
+		    statsp->dring_stopped_acks_sent;
+		ldckp->dring_mode.value.ul = statsp->dring_mode;
 	} else {
 		statsp->ipackets	= ldckp->ipackets64.value.ull;
 		statsp->ierrors		= ldckp->ierrors.value.ul;
@@ -242,9 +258,19 @@ vgen_kstat_update(kstat_t *ksp, int rw)
 		statsp->rx_pri_bytes	= ldckp->rx_pri_bytes.value.ull;
 
 		statsp->callbacks	= ldckp->callbacks.value.ul;
-		statsp->dring_data_acks	= ldckp->dring_data_acks.value.ul;
-		statsp->dring_stopped_acks = ldckp->dring_stopped_acks.value.ul;
-		statsp->dring_data_msgs	= ldckp->dring_data_msgs.value.ul;
+		statsp->dring_data_msgs_sent =
+		    ldckp->dring_data_msgs_sent.value.ul;
+		statsp->dring_data_acks_rcvd =
+		    ldckp->dring_data_acks_rcvd.value.ul;
+		statsp->dring_stopped_acks_rcvd =
+		    ldckp->dring_stopped_acks_rcvd.value.ul;
+		statsp->dring_data_msgs_rcvd =
+		    ldckp->dring_data_msgs_rcvd.value.ul;
+		statsp->dring_data_acks_sent =
+		    ldckp->dring_data_acks_sent.value.ul;
+		statsp->dring_stopped_acks_sent =
+		    ldckp->dring_stopped_acks_sent.value.ul;
+		statsp->dring_mode = ldckp->dring_mode.value.ul;
 	}
 
 	return (0);

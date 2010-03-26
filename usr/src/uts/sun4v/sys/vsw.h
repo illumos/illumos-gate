@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,8 +64,8 @@ extern "C" {
  */
 #define		VSW_NCHAINS	8
 
-/* Number of transmit descriptors -  must be power of 2 */
-#define		VSW_RING_NUM_EL	512
+/* Number of descriptors -  must be power of 2 */
+#define		VSW_NUM_DESCRIPTORS	512
 
 /*
  * State of interface if switch plumbed as network device.

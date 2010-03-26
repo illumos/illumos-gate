@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_VIO_COMMON_H
 #define	_SYS_VIO_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,21 +51,21 @@ typedef struct vio_dring_entry_hdr {
  */
 #define	VIO_DRING_ACQUIRE(otd, mtype, handle, start, stop)		\
 	((mtype) == LDC_DIRECT_MAP ?					\
-	LDC_MEM_BARRIER_OPEN((otd)) :					\
+	LDC_ON_TRAP((otd)) :						\
 	ldc_mem_dring_acquire((handle), (start), (stop)))
 
 #define	VIO_DRING_ACQUIRE_NOCOPYIN(otd, mtype)				\
 	((mtype) == LDC_DIRECT_MAP ?					\
-	LDC_MEM_BARRIER_OPEN((otd)) : 0)
+	LDC_ON_TRAP((otd)) : 0)
 
 #define	VIO_DRING_RELEASE(mtype, handle, start, stop)			\
 	((mtype) == LDC_DIRECT_MAP ?					\
-	LDC_MEM_BARRIER_CLOSE() :					\
+	LDC_NO_TRAP() :							\
 	ldc_mem_dring_release((handle), (start), (stop)))
 
 #define	VIO_DRING_RELEASE_NOCOPYOUT(mtype)				\
 	((mtype) == LDC_DIRECT_MAP ?					\
-	LDC_MEM_BARRIER_CLOSE() : 0)
+	LDC_NO_TRAP() : 0)
 
 #ifdef __cplusplus
 }
