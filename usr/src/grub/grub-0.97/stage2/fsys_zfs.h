@@ -25,6 +25,7 @@
 
 #ifdef	FSYS_ZFS
 
+#ifndef	FSIMAGE
 typedef unsigned long long uint64_t;
 typedef unsigned int uint32_t;
 typedef unsigned short uint16_t;
@@ -36,6 +37,9 @@ typedef	unsigned long size_t;
 #else
 typedef	unsigned int size_t;
 #endif
+#else
+#include "fsi_zfs.h"
+#endif	/* !FSIMAGE */
 
 #include <zfs-include/zfs.h>
 #include <zfs-include/dmu.h>
