@@ -105,6 +105,9 @@ extern uint64_t ultra_getpic(void);
 extern uint64_t ultra_gettick(void);
 extern char cpu_module_name[];
 
+#define	L2_dmiss_ld_event	0x320
+int pcbe_l2dmiss_ovtrap_enable = 0;
+
 pcbe_ops_t ni2_pcbe_ops = {
 	PCBE_VER_1,
 	CPC_CAP_OVERFLOW_INTERRUPT | CPC_CAP_OVERFLOW_PRECISE,
@@ -669,6 +672,19 @@ ni2_pcbe_program(void *token)
 	if (pic0->pcbe_flags & CPC_COUNT_SAMPLE_MODE)
 		pcr |= (1ull << CPC_PCR_SAMPLE_MODE_SHIFT);
 #endif
+
+	if (pcbe_l2dmiss_ovtrap_enable == 0) {
+		/*
+		 * SW workaround for HW Erratum 108.
+		 * Disable overflow interrupts when L2_dmiss_ld event is
+		 * selected.
+		 */
+		if ((pic0->pcbe_evsel & L2_dmiss_ld_event) == L2_dmiss_ld_event)
+			toe &= ~CPC_PCR_TOE0;
+
+		if ((pic1->pcbe_evsel & L2_dmiss_ld_event) == L2_dmiss_ld_event)
+			toe &= ~CPC_PCR_TOE1;
+	}
 	pcr |= toe;
 
 	DTRACE_PROBE1(niagara2__setpcr, uint64_t, pcr);
