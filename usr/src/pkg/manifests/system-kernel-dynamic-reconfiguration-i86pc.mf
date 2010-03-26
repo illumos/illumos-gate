@@ -55,20 +55,18 @@ dir path=usr group=sys
 dir path=usr/platform group=sys
 dir path=usr/platform/i86pc group=sys
 dir path=usr/platform/i86pc/lib group=sys
-dir path=var group=sys
-dir path=var/svc group=sys
-dir path=var/svc/manifest group=sys
-dir path=var/svc/manifest/platform group=sys
-dir path=var/svc/manifest/platform/i86pc group=sys
 file path=platform/i86pc/kernel/drv/$(ARCH64)/dr group=sys
 driver name=dr alias=acpidr_sbd
 file path=platform/i86pc/kernel/drv/dr.conf group=sys mode=0644
 file path=usr/platform/i86pc/lib/acpihpd group=sys mode=0755
-file path=var/svc/manifest/platform/i86pc/acpihpd.xml group=sys mode=0444
-dir path=lib group=sys
-dir path=lib/svc group=sys
-dir path=lib/svc/method group=sys
-file path=lib/svc/method/svc-acpihpd group=sys mode=0555
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/platform group=sys
+dir path=lib/svc/manifest/platform/i86pc group=sys
+file path=lib/svc/manifest/platform/i86pc/acpihpd.xml group=sys mode=0444
+dir path=lib/svc/method
+file path=lib/svc/method/svc-acpihpd mode=0555
 dir path=usr/platform/i86pc/lib/cfgadm
 dir path=usr/platform/i86pc/lib/cfgadm/$(ARCH64)
 file path=usr/platform/i86pc/lib/cfgadm/sbd.so.1
