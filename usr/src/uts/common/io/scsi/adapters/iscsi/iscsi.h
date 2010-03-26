@@ -191,7 +191,9 @@ typedef enum iscsi_status {
 	/* logical unit in use */
 	ISCSI_STATUS_BUSY,
 	/* Login on connection failed, retries exceeded */
-	ISCSI_STATUS_LOGIN_TIMED_OUT
+	ISCSI_STATUS_LOGIN_TIMED_OUT,
+	/* iSCSI login tpgt negotiation failed */
+	ISCSI_STATUS_LOGIN_TPGT_NEGO_FAIL
 } iscsi_status_t;
 #define	ISCSI_SUCCESS(status) (status == ISCSI_STATUS_SUCCESS)
 

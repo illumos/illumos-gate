@@ -99,6 +99,7 @@ login_start:
 	    (icp->conn_state == ISCSI_CONN_STATE_POLLING));
 
 	icp->conn_state_ffp = B_FALSE;
+	icp->conn_login_status = ISCSI_INITIAL_LOGIN_STAGE;
 
 	/* reset connection statsn */
 	icp->conn_expstatsn = 0;
@@ -175,6 +176,7 @@ login_start:
 		case ISCSI_STATUS_INTERNAL_ERROR:
 		case ISCSI_STATUS_VERSION_MISMATCH:
 		case ISCSI_STATUS_NEGO_FAIL:
+		case ISCSI_STATUS_LOGIN_TPGT_NEGO_FAIL:
 			/* we don't want to retry this failure */
 			iscsi_login_end(icp, ISCSI_STATUS_LOGIN_FAILED, itp);
 			return (ISCSI_STATUS_LOGIN_FAILED);
@@ -410,6 +412,7 @@ iscsi_login(iscsi_conn_t *icp, uint8_t *status_class, uint8_t *status_detail)
 			cmn_err(CE_WARN, "iscsi connection(%u) login failed - "
 			    "unable to initialize authentication",
 			    icp->conn_oid);
+			icp->conn_login_status = ISCSI_STATUS_INTERNAL_ERROR;
 			iscsi_login_disconnect(icp);
 			iscsi_login_update_state(icp, LOGIN_DONE);
 			return (ISCSI_STATUS_INTERNAL_ERROR);
@@ -627,6 +630,7 @@ iscsi_login_done:
 		}
 	}
 
+	icp->conn_login_status = rval;
 	if (ISCSI_SUCCESS(rval) &&
 	    (*status_class == ISCSI_STATUS_CLASS_SUCCESS)) {
 		mutex_enter(&icp->conn_state_mutex);
@@ -1201,7 +1205,7 @@ more_text:
 	cmn_err(CE_WARN, "iscsi connection(%u) login failed - target "
 	    "protocol group tag mismatch, expected %d, received %lu",
 	    icp->conn_oid, isp->sess_tpgt_conf, tmp);
-	return (ISCSI_STATUS_PROTOCOL_ERROR);
+	return (ISCSI_STATUS_LOGIN_TPGT_NEGO_FAIL);
 
 					}
 				}
@@ -1292,7 +1296,7 @@ more_text:
 	cmn_err(CE_WARN, "iscsi connection(%u) login failed - target portal "
 	    "tag mismatch, expected:%d received:%lu", icp->conn_oid,
 	    isp->sess_tpgt_conf, tmp);
-	return (ISCSI_STATUS_PROTOCOL_ERROR);
+	return (ISCSI_STATUS_LOGIN_TPGT_NEGO_FAIL);
 
 					}
 				}

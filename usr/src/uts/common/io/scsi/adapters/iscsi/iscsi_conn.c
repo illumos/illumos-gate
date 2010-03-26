@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI connection interfaces
@@ -41,6 +41,10 @@ static void iscsi_conn_flush_active_cmds(iscsi_conn_t *icp);
 extern int modrootloaded;
 
 boolean_t iscsi_conn_logging = B_FALSE;
+
+#define	ISCSI_LOGIN_TPGT_NEGO_ERROR(icp) \
+	(((icp)->conn_login_state == LOGIN_ERROR) && \
+	((icp)->conn_login_status == ISCSI_STATUS_LOGIN_TPGT_NEGO_FAIL))
 
 /*
  * +--------------------------------------------------------------------+
@@ -610,7 +614,8 @@ iscsi_client_notify_task(void *cn_task_void)
 			 * If session type is NORMAL, try to reestablish the
 			 * connection.
 			 */
-			if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+			if ((isp->sess_type == ISCSI_SESS_TYPE_NORMAL) &&
+			    !(ISCSI_LOGIN_TPGT_NEGO_ERROR(icp))) {
 				iscsi_conn_retry(isp, icp);
 			} else {
 
