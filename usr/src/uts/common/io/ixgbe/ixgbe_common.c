@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.218 scm_100309_002210 */
+/* IntelVersion: 1.227 sol_ixgbe_shared_339b */
 
 #include "ixgbe_common.h"
 #include "ixgbe_api.h"
@@ -41,7 +41,6 @@ static u16 ixgbe_shift_in_eeprom_bits(struct ixgbe_hw *hw, u16 count);
 static void ixgbe_raise_eeprom_clk(struct ixgbe_hw *hw, u32 *eec);
 static void ixgbe_lower_eeprom_clk(struct ixgbe_hw *hw, u32 *eec);
 static void ixgbe_release_eeprom(struct ixgbe_hw *hw);
-static u16 ixgbe_calc_eeprom_checksum(struct ixgbe_hw *hw);
 
 static s32 ixgbe_mta_vector(struct ixgbe_hw *hw, u8 *mc_addr);
 static s32 ixgbe_get_san_mac_addr_offset(struct ixgbe_hw *hw,
@@ -74,6 +73,7 @@ ixgbe_init_ops_generic(struct ixgbe_hw *hw)
 	eeprom->ops.validate_checksum =
 	    &ixgbe_validate_eeprom_checksum_generic;
 	eeprom->ops.update_checksum = &ixgbe_update_eeprom_checksum_generic;
+	eeprom->ops.calc_checksum = &ixgbe_calc_eeprom_checksum_generic;
 
 	/* MAC */
 	mac->ops.init_hw = &ixgbe_init_hw_generic;
@@ -484,9 +484,7 @@ ixgbe_stop_adapter_generic(struct ixgbe_hw *hw)
 	 * Prevent the PCI-E bus from from hanging by disabling PCI-E master
 	 * access and verify no pending requests
 	 */
-	if (ixgbe_disable_pcie_master(hw) != IXGBE_SUCCESS) {
-		DEBUGOUT("PCI-E Master disable polling has failed.\n");
-	}
+	(void) ixgbe_disable_pcie_master(hw);
 
 	return (IXGBE_SUCCESS);
 }
@@ -1170,11 +1168,11 @@ ixgbe_release_eeprom(struct ixgbe_hw *hw)
 }
 
 /*
- * ixgbe_calc_eeprom_checksum - Calculates and returns the checksum
+ * ixgbe_calc_eeprom_checksum_generic - Calculates and returns the checksum
  * @hw: pointer to hardware structure
  */
-static u16
-ixgbe_calc_eeprom_checksum(struct ixgbe_hw *hw)
+u16
+ixgbe_calc_eeprom_checksum_generic(struct ixgbe_hw *hw)
 {
 	u16 i;
 	u16 j;
@@ -1183,7 +1181,7 @@ ixgbe_calc_eeprom_checksum(struct ixgbe_hw *hw)
 	u16 pointer = 0;
 	u16 word = 0;
 
-	DEBUGFUNC("ixgbe_calc_eeprom_checksum");
+	DEBUGFUNC("ixgbe_calc_eeprom_checksum_generic");
 
 	/* Include 0x0-0x3F in the checksum */
 	for (i = 0; i < IXGBE_EEPROM_CHECKSUM; i++) {
@@ -1242,7 +1240,7 @@ ixgbe_validate_eeprom_checksum_generic(struct ixgbe_hw *hw,
 	status = hw->eeprom.ops.read(hw, 0, &checksum);
 
 	if (status == IXGBE_SUCCESS) {
-		checksum = ixgbe_calc_eeprom_checksum(hw);
+		checksum = hw->eeprom.ops.calc_checksum(hw);
 
 		hw->eeprom.ops.read(hw, IXGBE_EEPROM_CHECKSUM, &read_checksum);
 
@@ -1283,7 +1281,7 @@ ixgbe_update_eeprom_checksum_generic(struct ixgbe_hw *hw)
 	status = hw->eeprom.ops.read(hw, 0, &checksum);
 
 	if (status == IXGBE_SUCCESS) {
-		checksum = ixgbe_calc_eeprom_checksum(hw);
+		checksum = hw->eeprom.ops.calc_checksum(hw);
 		status = hw->eeprom.ops.write(hw, IXGBE_EEPROM_CHECKSUM,
 		    checksum);
 	} else {
@@ -1550,10 +1548,10 @@ ixgbe_update_uc_addr_list_generic(struct ixgbe_hw *hw, u8 *addr_list,
 	hw->addr_ctrl.overflow_promisc = 0;
 
 	/* Zero out the other receive addresses */
-	DEBUGOUT1("Clearing RAR[1-%d]\n", uc_addr_in_use);
-	for (i = 1; i <= uc_addr_in_use; i++) {
-		IXGBE_WRITE_REG(hw, IXGBE_RAL(i), 0);
-		IXGBE_WRITE_REG(hw, IXGBE_RAH(i), 0);
+	DEBUGOUT1("Clearing RAR[1-%d]\n", uc_addr_in_use + 1);
+	for (i = 0; i < uc_addr_in_use; i++) {
+		IXGBE_WRITE_REG(hw, IXGBE_RAL(i + 1), 0);
+		IXGBE_WRITE_REG(hw, IXGBE_RAH(i + 1), 0);
 	}
 
 	/* Add the new addresses */
@@ -1919,16 +1917,23 @@ ixgbe_fc_autoneg(struct ixgbe_hw *hw)
 	/*
 	 * On backplane, bail out if
 	 * - backplane autoneg was not completed, or if
-	 * - link partner is not AN enabled
+	 * - we are 82599 and link partner is not AN enabled
 	 */
 	if (hw->phy.media_type == ixgbe_media_type_backplane) {
 		links = IXGBE_READ_REG(hw, IXGBE_LINKS);
-		links2 = IXGBE_READ_REG(hw, IXGBE_LINKS2);
-		if (((links & IXGBE_LINKS_KX_AN_COMP) == 0) ||
-		    ((links2 & IXGBE_LINKS2_AN_SUPPORTED) == 0)) {
+		if ((links & IXGBE_LINKS_KX_AN_COMP) == 0) {
 			hw->fc.fc_was_autonegged = false;
 			hw->fc.current_mode = hw->fc.requested_mode;
 			goto out;
+		}
+
+		if (hw->mac.type == ixgbe_mac_82599EB) {
+			links2 = IXGBE_READ_REG(hw, IXGBE_LINKS2);
+			if ((links2 & IXGBE_LINKS2_AN_SUPPORTED) == 0) {
+				hw->fc.fc_was_autonegged = false;
+				hw->fc.current_mode = hw->fc.requested_mode;
+				goto out;
+			}
 		}
 	}
 
@@ -2238,9 +2243,13 @@ ixgbe_disable_pcie_master(struct ixgbe_hw *hw)
 	u32 i;
 	u32 reg_val;
 	u32 number_of_queues;
-	s32 status = IXGBE_ERR_MASTER_REQUESTS_PENDING;
+	s32 status = IXGBE_SUCCESS;
 
 	DEBUGFUNC("ixgbe_disable_pcie_master");
+
+	/* Just jump out if bus mastering is already disabled */
+	if (!(IXGBE_READ_REG(hw, IXGBE_STATUS) & IXGBE_STATUS_GIO))
+		goto out;
 
 	/* Disable the receive unit by stopping each queue */
 	number_of_queues = hw->mac.max_rx_queues;
@@ -2257,13 +2266,42 @@ ixgbe_disable_pcie_master(struct ixgbe_hw *hw)
 	IXGBE_WRITE_REG(hw, IXGBE_CTRL, reg_val);
 
 	for (i = 0; i < IXGBE_PCI_MASTER_DISABLE_TIMEOUT; i++) {
-		if (!(IXGBE_READ_REG(hw, IXGBE_STATUS) & IXGBE_STATUS_GIO)) {
-			status = IXGBE_SUCCESS;
-			break;
-		}
+		if (!(IXGBE_READ_REG(hw, IXGBE_STATUS) & IXGBE_STATUS_GIO))
+			goto out;
 		usec_delay(100);
 	}
 
+	DEBUGOUT("GIO Master Disable bit didn't clear - requesting resets\n");
+	status = IXGBE_ERR_MASTER_REQUESTS_PENDING;
+
+	/*
+	 * The GIO Master Disable bit didn't clear.  There are multiple reasons
+	 * for this listed in the datasheet 5.2.5.3.2 Master Disable, and they
+	 * all require a double reset to recover from.  Before proceeding, we
+	 * first wait a little more to try to ensure that, at a minimum, the
+	 * PCIe block has no transactions pending.
+	 */
+	for (i = 0; i < IXGBE_PCI_MASTER_DISABLE_TIMEOUT; i++) {
+		if (!(IXGBE_READ_PCIE_WORD(hw, IXGBE_PCI_DEVICE_STATUS) &
+		    IXGBE_PCI_DEVICE_STATUS_TRANSACTION_PENDING))
+			break;
+		usec_delay(100);
+	}
+
+	if (i == IXGBE_PCI_MASTER_DISABLE_TIMEOUT)
+		DEBUGOUT("PCIe transaction pending bit also did not clear.\n");
+
+	/*
+	 * Two consecutive resets are required via CTRL.RST per datasheet
+	 * 5.2.5.3.2 Master Disable.  We set a flag to inform the reset routine
+	 * of this need.  The first reset prevents new master requests from
+	 * being issued by our device.  We then must wait 1usec for any
+	 * remaining completions from the PCIe bus to trickle in, and then reset
+	 * again to clear out any effects they may have had on our device.
+	 */
+	hw->mac.flags |= IXGBE_FLAGS_DOUBLE_RESET_REQUIRED;
+
+out:
 	return (status);
 }
 
@@ -2747,6 +2785,10 @@ ixgbe_find_vlvf_slot(struct ixgbe_hw *hw, u32 vlan)
 	u32 first_empty_slot = 0;
 	s32 regindex;
 
+	/* short cut the special case */
+	if (vlan == 0)
+		return (0);
+
 	/*
 	 * Search for the vlan id in the VLVF entries. Save off the first empty
 	 * slot found along the way
@@ -2769,7 +2811,7 @@ ixgbe_find_vlvf_slot(struct ixgbe_hw *hw, u32 vlan)
 			regindex = first_empty_slot;
 		else {
 			DEBUGOUT("No space in VLVF.\n");
-			regindex = -1;
+			regindex = IXGBE_ERR_NO_SPACE;
 		}
 	}
 
@@ -2790,8 +2832,11 @@ ixgbe_set_vfta_generic(struct ixgbe_hw *hw, u32 vlan, u32 vind, bool vlan_on)
 {
 	s32 regindex;
 	u32 bitindex;
+	u32 vfta;
 	u32 bits;
 	u32 vt;
+	u32 targetbit;
+	bool vfta_changed = false;
 
 	DEBUGFUNC("ixgbe_set_vfta_generic");
 
@@ -2801,6 +2846,7 @@ ixgbe_set_vfta_generic(struct ixgbe_hw *hw, u32 vlan, u32 vind, bool vlan_on)
 	/*
 	 * this is a 2 part operation - first the VFTA, then the
 	 * VLVF and VLVFB if VT Mode is set
+	 * We don't write the VFTA until we know the VLVF part succeeded.
 	 */
 
 	/*
@@ -2812,12 +2858,20 @@ ixgbe_set_vfta_generic(struct ixgbe_hw *hw, u32 vlan, u32 vind, bool vlan_on)
 	 */
 	regindex = (vlan >> 5) & 0x7F;
 	bitindex = vlan & 0x1F;
-	bits = IXGBE_READ_REG(hw, IXGBE_VFTA(regindex));
-	if (vlan_on)
-		bits |= (1 << bitindex);
-	else
-		bits &= ~(1 << bitindex);
-	IXGBE_WRITE_REG(hw, IXGBE_VFTA(regindex), bits);
+	targetbit = (1 << bitindex);
+	vfta = IXGBE_READ_REG(hw, IXGBE_VFTA(regindex));
+
+	if (vlan_on) {
+		if (!(vfta & targetbit)) {
+			vfta |= targetbit;
+			vfta_changed = true;
+		}
+	} else {
+		if ((vfta & targetbit)) {
+			vfta &= ~targetbit;
+			vfta_changed = true;
+		}
+	}
 
 
 	/*
@@ -2831,61 +2885,86 @@ ixgbe_set_vfta_generic(struct ixgbe_hw *hw, u32 vlan, u32 vind, bool vlan_on)
 	 */
 	vt = IXGBE_READ_REG(hw, IXGBE_VT_CTL);
 	if (vt & IXGBE_VT_CTL_VT_ENABLE) {
-		if (vlan == 0) {
-			regindex = 0;
-		} else {
-			regindex = ixgbe_find_vlvf_slot(hw, vlan);
-			if (regindex < 0)
-				goto out;
-		}
+		s32 vlvf_index;
+
+		vlvf_index = ixgbe_find_vlvf_slot(hw, vlan);
+		if (vlvf_index < 0)
+			return (vlvf_index);
 
 		if (vlan_on) {
 			/* set the pool bit */
 			if (vind < 32) {
 				bits = IXGBE_READ_REG(hw,
-				    IXGBE_VLVFB(regindex*2));
+				    IXGBE_VLVFB(vlvf_index * 2));
 				bits |= (1 << vind);
 				IXGBE_WRITE_REG(hw,
-				    IXGBE_VLVFB(regindex*2),
+				    IXGBE_VLVFB(vlvf_index * 2),
 				    bits);
 			} else {
 				bits = IXGBE_READ_REG(hw,
-				    IXGBE_VLVFB((regindex*2)+1));
-				bits |= (1 << vind);
+				    IXGBE_VLVFB((vlvf_index * 2) + 1));
+				bits |= (1 << (vind - 32));
 				IXGBE_WRITE_REG(hw,
-				    IXGBE_VLVFB((regindex*2)+1),
+				    IXGBE_VLVFB((vlvf_index * 2) + 1),
 				    bits);
 			}
 		} else {
 			/* clear the pool bit */
 			if (vind < 32) {
 				bits = IXGBE_READ_REG(hw,
-				    IXGBE_VLVFB(regindex*2));
+				    IXGBE_VLVFB(vlvf_index * 2));
 				bits &= ~(1 << vind);
 				IXGBE_WRITE_REG(hw,
-				    IXGBE_VLVFB(regindex*2),
+				    IXGBE_VLVFB(vlvf_index * 2),
 				    bits);
 				bits |= IXGBE_READ_REG(hw,
-				    IXGBE_VLVFB((regindex*2)+1));
+				    IXGBE_VLVFB((vlvf_index * 2) + 1));
 			} else {
 				bits = IXGBE_READ_REG(hw,
-				    IXGBE_VLVFB((regindex*2)+1));
-				bits &= ~(1 << vind);
+				    IXGBE_VLVFB((vlvf_index * 2) + 1));
+				bits &= ~(1 << (vind - 32));
 				IXGBE_WRITE_REG(hw,
-				    IXGBE_VLVFB((regindex*2)+1),
+				    IXGBE_VLVFB((vlvf_index * 2) + 1),
 				    bits);
 				bits |= IXGBE_READ_REG(hw,
-				    IXGBE_VLVFB(regindex*2));
+				    IXGBE_VLVFB(vlvf_index * 2));
 			}
 		}
 
-		if (bits)
-			IXGBE_WRITE_REG(hw, IXGBE_VLVF(regindex),
+		/*
+		 * If there are still bits set in the VLVFB registers
+		 * for the VLAN ID indicated we need to see if the
+		 * caller is requesting that we clear the VFTA entry bit.
+		 * If the caller has requested that we clear the VFTA
+		 * entry bit but there are still pools/VFs using this VLAN
+		 * ID entry then ignore the request.  We're not worried
+		 * about the case where we're turning the VFTA VLAN ID
+		 * entry bit on, only when requested to turn it off as
+		 * there may be multiple pools and/or VFs using the
+		 * VLAN ID entry.  In that case we cannot clear the
+		 * VFTA bit until all pools/VFs using that VLAN ID have also
+		 * been cleared.  This will be indicated by "bits" being
+		 * zero.
+		 */
+		if (bits) {
+			IXGBE_WRITE_REG(hw, IXGBE_VLVF(vlvf_index),
 			    (IXGBE_VLVF_VIEN | vlan));
-		else
-			IXGBE_WRITE_REG(hw, IXGBE_VLVF(regindex), 0);
+			if (!vlan_on) {
+				/*
+				 * someone wants to clear the vfta entry
+				 * but some pools/VFs are still using it.
+				 * Ignore it.
+				 */
+				vfta_changed = false;
+			}
+		} else {
+			IXGBE_WRITE_REG(hw, IXGBE_VLVF(vlvf_index), 0);
+		}
 	}
-out:
+
+	if (vfta_changed)
+		IXGBE_WRITE_REG(hw, IXGBE_VFTA(regindex), vfta);
+
 	return (IXGBE_SUCCESS);
 }
 

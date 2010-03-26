@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +22,11 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.77 scm_100309_002210 */
+/* IntelVersion: 1.78 sol_ixgbe_shared_339b */
 
 #ifndef _IXGBE_API_H
 #define	_IXGBE_API_H
@@ -39,6 +39,7 @@ s32 ixgbe_set_mac_type(struct ixgbe_hw *hw);
 s32 ixgbe_init_hw(struct ixgbe_hw *hw);
 s32 ixgbe_reset_hw(struct ixgbe_hw *hw);
 s32 ixgbe_start_hw(struct ixgbe_hw *hw);
+void ixgbe_enable_relaxed_ordering(struct ixgbe_hw *hw);
 s32 ixgbe_clear_hw_cntrs(struct ixgbe_hw *hw);
 enum ixgbe_media_type ixgbe_get_media_type(struct ixgbe_hw *hw);
 s32 ixgbe_get_mac_addr(struct ixgbe_hw *hw, u8 *mac_addr);

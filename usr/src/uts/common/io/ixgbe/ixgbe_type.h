@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.360 scm_100309_002210 */
+/* IntelVersion: 1.375.4.1 sol_ixgbe_shared_339b */
 
 #ifndef _IXGBE_TYPE_H
 #define	_IXGBE_TYPE_H
@@ -51,11 +51,13 @@
 #define	IXGBE_DEV_ID_82598EB_XF_LR		0x10F4
 #define	IXGBE_DEV_ID_82599_KX4			0x10F7
 #define	IXGBE_DEV_ID_82599_KX4_MEZZ		0x1514
+#define	IXGBE_DEV_ID_82599_KR			0x1517
 #define	IXGBE_DEV_ID_82599_COMBO_BACKPLANE	0x10F8
 #define	IXGBE_DEV_ID_82599_CX4			0x10F9
 #define	IXGBE_DEV_ID_82599_SFP			0x10FB
 #define	IXGBE_DEV_ID_82599_SFP_EM		0x1507
 #define	IXGBE_DEV_ID_82599_XAUI_LOM		0x10FC
+#define	IXGBE_DEV_ID_82599_T			0x10FA
 
 /* General Registers */
 #define	IXGBE_CTRL	0x00000
@@ -329,7 +331,6 @@
 /* Wake Up Control */
 #define	IXGBE_WUC_PME_EN	0x00000002 /* PME Enable */
 #define	IXGBE_WUC_PME_STATUS	0x00000004 /* PME Status */
-#define	IXGBE_WUC_ADVD3WUC	0x00000010 /* D3Cold wake up cap. enable */
 
 /* Wake Up Filter Control */
 #define	IXGBE_WUFC_LNKC	0x00000001 /* Link Status Change Wakeup Enable */
@@ -351,7 +352,7 @@
 #define	IXGBE_WUFC_FLX5		0x00200000 /* Flexible Filter 5 Enable */
 #define	IXGBE_WUFC_FLX_FILTERS	0x000F0000 /* Mask for 4 flex filters */
 #define	IXGBE_WUFC_EXT_FLX_FILTERS 0x00300000 /* Mask for Ext. flex filters */
-#define	IXGBE_WUFC_ALL_FILTERS	0x003F00FF /* Mask for all 6 wakeup filters */
+#define	IXGBE_WUFC_ALL_FILTERS	0x003F00FF /* Mask for all wakeup filters */
 #define	IXGBE_WUFC_FLX_OFFSET	16 /* Offset to the Flexible Filters bits */
 
 /* Wake Up Status */
@@ -717,6 +718,12 @@
 #define	IXGBE_GCR_CMPL_TMOUT_RESEND	0x00010000
 #define	IXGBE_GCR_CAP_VER2		0x00040000
 
+#define	IXGBE_GCR_EXT_MSIX_EN		0x80000000
+#define	IXGBE_GCR_EXT_VT_MODE_16	0x00000001
+#define	IXGBE_GCR_EXT_VT_MODE_32	0x00000002
+#define	IXGBE_GCR_EXT_VT_MODE_64	0x00000003
+#define	IXGBE_GCR_EXT_SRIOV		(IXGBE_GCR_EXT_MSIX_EN | \
+					IXGBE_GCR_EXT_VT_MODE_64)
 /* Time Sync Registers */
 #define	IXGBE_TSYNCRXCTL	0x05188 /* Rx Time Sync Control register - RW */
 #define	IXGBE_TSYNCTXCTL	0x08C00 /* Tx Time Sync Control register - RW */
@@ -840,6 +847,9 @@
 #define	IXGBE_MPVC		0x04318
 #define	IXGBE_SGMIIC		0x04314
 
+/* Copper Pond 2 link timeout */
+#define	IXGBE_VALIDATE_LINK_READY_TIMEOUT	50
+
 /* Omer CORECTL */
 #define	IXGBE_CORECTL		0x014F00
 /* BARCTRL */
@@ -867,7 +877,8 @@
 #define	IXGBE_RDRXCTL_AGGDIS	0x00010000 /* Aggregation disable */
 #define	IXGBE_RDRXCTL_RSCFRSTSIZE	0x003E0000 /* RSC First packet size */
 #define	IXGBE_RDRXCTL_RSCLLIDIS	0x00800000 /* Disable RSC compl on LLI */
-#define	IXGBE_RDRXCTL_RSCACKC	0x02000000 /* RSCACKC bit */
+#define	IXGBE_RDRXCTL_RSCACKC	0x02000000 /* must set 1 when RSC enabled */
+#define	IXGBE_RDRXCTL_FCOE_WRFIX 0x04000000 /* must set 1 when RSC enabled */
 
 /* RQTC Bit Masks and Shifts */
 #define	IXGBE_RQTC_SHIFT_TC(_i)	((_i) * 4)
@@ -1004,7 +1015,9 @@
 #define	IXGBE_MDIO_PHY_10GBASET_ABILITY	0x0004 /* 10GBaseT capable */
 #define	IXGBE_MDIO_PHY_1000BASET_ABILITY	0x0020 /* 1000BaseT capable */
 #define	IXGBE_MDIO_PHY_100BASETX_ABILITY	0x0080 /* 100BaseTX capable */
+#define	IXGBE_MDIO_PHY_SET_LOW_POWER_MODE	0x0800 /* Set low power mode */
 
+#define	IXGBE_MDIO_PMA_PMD_CONTROL_ADDR	0x0000 /* PMA/PMD Control Reg */
 
 #define	IXGBE_MDIO_PMA_PMD_SDA_SCL_ADDR	0xC30A	/* PHY_XS SDA/SCL Addr Reg */
 #define	IXGBE_MDIO_PMA_PMD_SDA_SCL_DATA	0xC30B	/* PHY_XS SDA/SCL Data Reg */
@@ -1553,7 +1566,9 @@
 #define	IXGBE_EEPROM_SUM	0xBABA
 #define	IXGBE_PCIE_ANALOG_PTR	0x03
 #define	IXGBE_ATLAS0_CONFIG_PTR 0x04
+#define	IXGBE_PHY_PTR		0x04
 #define	IXGBE_ATLAS1_CONFIG_PTR 0x05
+#define	IXGBE_OPTION_ROM_PTR	0x05
 #define	IXGBE_PCIE_GENERAL_PTR  0x06
 #define	IXGBE_PCIE_CONFIG0_PTR  0x07
 #define	IXGBE_PCIE_CONFIG1_PTR  0x08
@@ -1643,6 +1658,8 @@
 #define	IXGBE_ALT_SAN_MAC_ADDR_CAPS_ALTWWN  0x1 /* Alt. WWN base exists */
 
 /* PCI Bus Info */
+#define	IXGBE_PCI_DEVICE_STATUS		0xAA
+#define	IXGBE_PCI_DEVICE_STATUS_TRANSACTION_PENDING	0x0020
 #define	IXGBE_PCI_LINK_STATUS		0xB2
 #define	IXGBE_PCI_DEVICE_CONTROL2	0xC8
 #define	IXGBE_PCI_LINK_WIDTH		0x3F0
@@ -1938,7 +1955,6 @@
 #define	IXGBE_VFLRE(_i)			(((_i & 1) ? 0x001C0 : 0x00600))
 #define	IXGBE_VFLREC(_i)		(0x00700 + (_i * 4))
 
-/* Translated register #defines */
 #ifndef	__le16
 /* Little Endian defines */
 #define	__le16	u16
@@ -2478,6 +2494,7 @@ struct ixgbe_eeprom_operations {
 	s32 (*write)(struct ixgbe_hw *, u16, u16);
 	s32 (*validate_checksum)(struct ixgbe_hw *, u16 *);
 	s32 (*update_checksum)(struct ixgbe_hw *);
+	u16 (*calc_checksum)(struct ixgbe_hw *);
 };
 
 struct ixgbe_mac_operations {
@@ -2485,6 +2502,7 @@ struct ixgbe_mac_operations {
 	s32 (*reset_hw)(struct ixgbe_hw *);
 	s32 (*start_hw)(struct ixgbe_hw *);
 	s32 (*clear_hw_cntrs)(struct ixgbe_hw *);
+	void (*enable_relaxed_ordering)(struct ixgbe_hw *);
 	enum ixgbe_media_type (*get_media_type)(struct ixgbe_hw *);
 	u32 (*get_supported_physical_layer)(struct ixgbe_hw *);
 	s32 (*get_mac_addr)(struct ixgbe_hw *, u8 *);
@@ -2562,6 +2580,7 @@ struct ixgbe_eeprom_info {
 	u16				address_bits;
 };
 
+#define	IXGBE_FLAGS_DOUBLE_RESET_REQUIRED	0x01
 struct ixgbe_mac_info {
 	struct ixgbe_mac_operations	ops;
 	enum ixgbe_mac_type		type;
@@ -2585,6 +2604,7 @@ struct ixgbe_mac_info {
 	u32				orig_autoc2;
 	bool				orig_link_settings_stored;
 	bool				autotry_restart;
+	u8				flags;
 };
 
 struct ixgbe_phy_info {
@@ -2649,6 +2669,8 @@ struct ixgbe_hw {
 #define	IXGBE_ERR_NO_SAN_ADDR_PTR		-22
 #define	IXGBE_ERR_FDIR_REINIT_FAILED		-23
 #define	IXGBE_ERR_EEPROM_VERSION		-24
+#define	IXGBE_ERR_NO_SPACE			-25
+#define	IXGBE_ERR_INVALID_INTERRUPT		-26
 #define	IXGBE_NOT_IMPLEMENTED			0x7FFFFFFF
 
 #ifndef UNREFERENCED_PARAMETER

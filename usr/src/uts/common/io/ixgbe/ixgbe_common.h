@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,16 +22,23 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.93 scm_100309_002210 */
+/* IntelVersion: 1.94 sol_ixgbe_shared_339b */
 
 #ifndef _IXGBE_COMMON_H
 #define	_IXGBE_COMMON_H
 
 #include "ixgbe_type.h"
+#ifndef IXGBE_WRITE_REG64
+#define	IXGBE_WRITE_REG64(hw, reg, value) \
+	do { \
+		IXGBE_WRITE_REG(hw, reg, (u32) value); \
+		IXGBE_WRITE_REG(hw, reg + 4, (u32) (value >> 32)); \
+	} while (0)
+#endif /* IXGBE_WRITE_REG64 */
 
 u32 ixgbe_get_pcie_msix_count_generic(struct ixgbe_hw *hw);
 
@@ -53,6 +60,7 @@ s32 ixgbe_write_eeprom_generic(struct ixgbe_hw *hw, u16 offset, u16 data);
 s32 ixgbe_read_eerd_generic(struct ixgbe_hw *hw, u16 offset, u16 *data);
 s32 ixgbe_read_eeprom_bit_bang_generic(struct ixgbe_hw *hw, u16 offset,
     u16 *data);
+u16 ixgbe_calc_eeprom_checksum_generic(struct ixgbe_hw *hw);
 s32 ixgbe_validate_eeprom_checksum_generic(struct ixgbe_hw *hw,
     u16 *checksum_val);
 s32 ixgbe_update_eeprom_checksum_generic(struct ixgbe_hw *hw);

@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +22,11 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.155 scm_100309_002210 */
+/* IntelVersion: 1.162 sol_ixgbe_shared_339b */
 
 #include "ixgbe_type.h"
 #include "ixgbe_api.h"
@@ -50,6 +50,7 @@ static s32 ixgbe_setup_copper_link_82598(struct ixgbe_hw *hw,
     ixgbe_link_speed speed, bool autoneg, bool autoneg_wait_to_complete);
 static s32 ixgbe_reset_hw_82598(struct ixgbe_hw *hw);
 s32 ixgbe_start_hw_82598(struct ixgbe_hw *hw);
+void ixgbe_enable_relaxed_ordering_82598(struct ixgbe_hw *hw);
 s32 ixgbe_set_vmdq_82598(struct ixgbe_hw *hw, u32 rar, u32 vmdq);
 static s32 ixgbe_clear_vmdq_82598(struct ixgbe_hw *hw, u32 rar, u32 vmdq);
 s32 ixgbe_set_vfta_82598(struct ixgbe_hw *hw, u32 vlan,
@@ -63,6 +64,7 @@ u32 ixgbe_get_supported_physical_layer_82598(struct ixgbe_hw *hw);
 s32 ixgbe_init_phy_ops_82598(struct ixgbe_hw *hw);
 void ixgbe_set_lan_id_multi_port_pcie_82598(struct ixgbe_hw *hw);
 void ixgbe_set_pcie_completion_timeout(struct ixgbe_hw *hw);
+static s32 ixgbe_validate_link_ready(struct ixgbe_hw *hw);
 
 /*
  * ixgbe_set_pcie_completion_timeout - set pci-e completion timeout
@@ -159,6 +161,7 @@ ixgbe_init_ops_82598(struct ixgbe_hw *hw)
 
 	/* MAC */
 	mac->ops.start_hw = &ixgbe_start_hw_82598;
+	mac->ops.enable_relaxed_ordering = &ixgbe_enable_relaxed_ordering_82598;
 	mac->ops.reset_hw = &ixgbe_reset_hw_82598;
 	mac->ops.get_media_type = &ixgbe_get_media_type_82598;
 	mac->ops.get_supported_physical_layer =
@@ -267,16 +270,36 @@ out:
  * @hw: pointer to hardware structure
  *
  * Starts the hardware using the generic start_hw function.
- * Then set pcie completion timeout
+ * Disables relaxed ordering Then set pcie completion timeout
  */
 s32
 ixgbe_start_hw_82598(struct ixgbe_hw *hw)
 {
+	u32 regval;
+	u32 i;
 	s32 ret_val = IXGBE_SUCCESS;
 
 	DEBUGFUNC("ixgbe_start_hw_82598");
 
 	ret_val = ixgbe_start_hw_generic(hw);
+
+	/*
+	 * Disable relaxed ordering
+	 */
+	for (i = 0; ((i < hw->mac.max_tx_queues) &&
+	    (i < IXGBE_DCA_MAX_QUEUES_82598)); i++) {
+		regval = IXGBE_READ_REG(hw, IXGBE_DCA_TXCTRL(i));
+		regval &= ~IXGBE_DCA_TXCTRL_TX_WB_RO_EN;
+		IXGBE_WRITE_REG(hw, IXGBE_DCA_TXCTRL(i), regval);
+	}
+
+	for (i = 0; ((i < hw->mac.max_rx_queues) &&
+	    (i < IXGBE_DCA_MAX_QUEUES_82598)); i++) {
+		regval = IXGBE_READ_REG(hw, IXGBE_DCA_RXCTRL(i));
+		regval &= ~(IXGBE_DCA_RXCTRL_DESC_WRO_EN |
+		    IXGBE_DCA_RXCTRL_DESC_HSRO_EN);
+		IXGBE_WRITE_REG(hw, IXGBE_DCA_RXCTRL(i), regval);
+	}
 
 	/* set the completion timeout for interface */
 	if (ret_val == IXGBE_SUCCESS)
@@ -412,8 +435,22 @@ ixgbe_fc_enable_82598(struct ixgbe_hw *hw, s32 packetbuf_num)
 	u32 fctrl_reg;
 	u32 rmcs_reg;
 	u32 reg;
+	u32 link_speed = 0;
+	bool link_up;
 
 	DEBUGFUNC("ixgbe_fc_enable_82598");
+
+	/*
+	 * On 82598 backplane having FC on causes resets while doing
+	 * KX, so turn off here.
+	 */
+	hw->mac.ops.check_link(hw, &link_speed, &link_up, false);
+	if (link_up &&
+	    link_speed == IXGBE_LINK_SPEED_1GB_FULL &&
+	    hw->mac.ops.get_media_type(hw) == ixgbe_media_type_backplane) {
+		hw->fc.disable_fc_autoneg = true;
+		hw->fc.requested_mode = ixgbe_fc_none;
+	}
 
 	/* Negotiate the fc mode to use */
 	ret_val = ixgbe_fc_autoneg(hw);
@@ -635,11 +672,16 @@ ixgbe_check_mac_link_82598(struct ixgbe_hw *hw, ixgbe_link_speed *speed,
 	else
 		*speed = IXGBE_LINK_SPEED_1GB_FULL;
 
+	if ((hw->device_id == IXGBE_DEV_ID_82598AT2) && (*link_up == true) &&
+	    (ixgbe_validate_link_ready(hw) != IXGBE_SUCCESS))
+		*link_up = false;
+
 	/* if link is down, zero out the current_mode */
 	if (*link_up == false) {
 		hw->fc.current_mode = ixgbe_fc_none;
 		hw->fc.fc_was_autonegged = false;
 	}
+
 out:
 	return (IXGBE_SUCCESS);
 }
@@ -802,11 +844,9 @@ no_phy_reset:
 	 * Prevent the PCI-E bus from from hanging by disabling PCI-E master
 	 * access and verify no pending requests before reset
 	 */
-	status = ixgbe_disable_pcie_master(hw);
-	if (status != IXGBE_SUCCESS) {
-		status = IXGBE_ERR_MASTER_REQUESTS_PENDING;
-		DEBUGOUT("PCI-E Master disable polling has failed.\n");
-	}
+	(void) ixgbe_disable_pcie_master(hw);
+
+mac_reset_top:
 
 	/*
 	 * Issue global reset to the MAC.  This needs to be a SW reset.
@@ -828,6 +868,18 @@ no_phy_reset:
 		DEBUGOUT("Reset polling failed to complete.\n");
 	}
 
+	/*
+	 * Double resets are required for recovery from certain error
+	 * conditions.  Between resets, it is necessary to stall to allow time
+	 * for any pending HW events to complete.  We use 1usec since that is
+	 * what is needed for ixgbe_disable_pcie_master().  The second reset
+	 * then clears out any effects of those events.
+	 */
+	if (hw->mac.flags & IXGBE_FLAGS_DOUBLE_RESET_REQUIRED) {
+		hw->mac.flags &= ~IXGBE_FLAGS_DOUBLE_RESET_REQUIRED;
+		usec_delay(1);
+		goto mac_reset_top;
+	}
 	msec_delay(50);
 
 	gheccr = IXGBE_READ_REG(hw, IXGBE_GHECCR);
@@ -1226,5 +1278,70 @@ ixgbe_set_lan_id_multi_port_pcie_82598(struct ixgbe_hw *hw)
 		    !(pci_ctrl2 & IXGBE_PCIE_CTRL2_DUMMY_ENABLE)) {
 			bus->func = 0;
 		}
+	}
+}
+
+/*
+ * ixgbe_validate_link_ready - Function looks for phy link
+ * @hw: pointer to hardware structure
+ *
+ * Function indicates success when phy link is available. If phy is not ready
+ * within 5 seconds of MAC indicating link, the function returns error.
+ */
+static s32
+ixgbe_validate_link_ready(struct ixgbe_hw *hw)
+{
+	u32 timeout;
+	u16 an_reg;
+
+	if (hw->device_id != IXGBE_DEV_ID_82598AT2)
+		return (IXGBE_SUCCESS);
+
+	for (timeout = 0;
+	    timeout < IXGBE_VALIDATE_LINK_READY_TIMEOUT; timeout++) {
+		hw->phy.ops.read_reg(hw, IXGBE_MDIO_AUTO_NEG_STATUS,
+		    IXGBE_MDIO_AUTO_NEG_DEV_TYPE, &an_reg);
+
+		if ((an_reg & IXGBE_MII_AUTONEG_COMPLETE) &&
+		    (an_reg & IXGBE_MII_AUTONEG_LINK_UP))
+			break;
+
+		msec_delay(100);
+	}
+
+	if (timeout == IXGBE_VALIDATE_LINK_READY_TIMEOUT) {
+		DEBUGOUT("Link was indicated but link is down\n");
+		return (IXGBE_ERR_LINK_SETUP);
+	}
+
+	return (IXGBE_SUCCESS);
+}
+
+/*
+ * ixgbe_enable_relaxed_ordering_82598 - enable relaxed ordering
+ * @hw: pointer to hardware structure
+ */
+void
+ixgbe_enable_relaxed_ordering_82598(struct ixgbe_hw *hw)
+{
+	u32 regval;
+	u32 i;
+
+	DEBUGFUNC("ixgbe_enable_relaxed_ordering_82598");
+
+	/* Enable relaxed ordering */
+	for (i = 0; ((i < hw->mac.max_tx_queues) &&
+	    (i < IXGBE_DCA_MAX_QUEUES_82598)); i++) {
+		regval = IXGBE_READ_REG(hw, IXGBE_DCA_TXCTRL(i));
+		regval |= IXGBE_DCA_TXCTRL_TX_WB_RO_EN;
+		IXGBE_WRITE_REG(hw, IXGBE_DCA_TXCTRL(i), regval);
+	}
+
+	for (i = 0; ((i < hw->mac.max_rx_queues) &&
+	    (i < IXGBE_DCA_MAX_QUEUES_82598)); i++) {
+		regval = IXGBE_READ_REG(hw, IXGBE_DCA_RXCTRL(i));
+		regval |= (IXGBE_DCA_RXCTRL_DESC_WRO_EN |
+		    IXGBE_DCA_RXCTRL_DESC_HSRO_EN);
+		IXGBE_WRITE_REG(hw, IXGBE_DCA_RXCTRL(i), regval);
 	}
 }

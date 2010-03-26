@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,8 +90,17 @@ void ixgbe_dump_addr(void *, char *, const uint8_t *);
 #define	DEBUGOUT6(S, A, B, C, D, E, F)	\
 	IXGBE_DEBUGLOG_6(NULL, S, A, B, C, D, E, F)
 
-#define	DEBUGFUNC(F)	\
-	IXGBE_DEBUGLOG_0(NULL, F)
+/*
+ * DEBUGFUNC() is used to print the function call information, however since
+ * Dtrace in Solaris can be used to trace function calls, this function is
+ * not useful in Solaris, and DEBUGFUNC() can spam a large number of
+ * function call system logs (see CR6918426). We sould eliminate
+ * DEBUGFUNC(), but since DEBUGFUNC() is used by the shared code
+ * (maintained by Intel) which is used and shared by ixgbe drivers in
+ * different OSes, we can not remove it, so in Solaris just simply define
+ * it as blank.
+ */
+#define	DEBUGFUNC(F)
 
 #else
 

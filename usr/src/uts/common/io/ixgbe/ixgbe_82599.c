@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +22,11 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.197 scm_100309_002210 */
+/* IntelVersion: 1.202 sol_ixgbe_shared_339b */
 
 #include "ixgbe_type.h"
 #include "ixgbe_api.h"
@@ -55,6 +55,7 @@ s32 ixgbe_reset_hw_82599(struct ixgbe_hw *hw);
 s32 ixgbe_read_analog_reg8_82599(struct ixgbe_hw *hw, u32 reg, u8 *val);
 s32 ixgbe_write_analog_reg8_82599(struct ixgbe_hw *hw, u32 reg, u8 val);
 s32 ixgbe_start_hw_rev_1_82599(struct ixgbe_hw *hw);
+void ixgbe_enable_relaxed_ordering_82599(struct ixgbe_hw *hw);
 s32 ixgbe_identify_phy_82599(struct ixgbe_hw *hw);
 s32 ixgbe_init_phy_ops_82599(struct ixgbe_hw *hw);
 u32 ixgbe_get_supported_physical_layer_82599(struct ixgbe_hw *hw);
@@ -120,6 +121,7 @@ ixgbe_init_phy_ops_82599(struct ixgbe_hw *hw)
 	/* Set necessary function pointers based on phy type */
 	switch (hw->phy.type) {
 	case ixgbe_phy_tn:
+		phy->ops.setup_link = &ixgbe_setup_phy_link_tnx;
 		phy->ops.check_link = &ixgbe_check_phy_link_tnx;
 		phy->ops.get_firmware_version =
 		    &ixgbe_get_phy_firmware_version_tnx;
@@ -215,6 +217,7 @@ ixgbe_init_ops_82599(struct ixgbe_hw *hw)
 	mac->ops.read_analog_reg8 = &ixgbe_read_analog_reg8_82599;
 	mac->ops.write_analog_reg8 = &ixgbe_write_analog_reg8_82599;
 	mac->ops.start_hw = &ixgbe_start_hw_rev_1_82599;
+	mac->ops.enable_relaxed_ordering = &ixgbe_enable_relaxed_ordering_82599;
 	mac->ops.get_san_mac_addr = &ixgbe_get_san_mac_addr_generic;
 	mac->ops.set_san_mac_addr = &ixgbe_set_san_mac_addr_generic;
 	mac->ops.get_device_caps = &ixgbe_get_device_caps_82599;
@@ -361,6 +364,7 @@ ixgbe_get_media_type_82599(struct ixgbe_hw *hw)
 	case IXGBE_DEV_ID_82599_KX4:
 	case IXGBE_DEV_ID_82599_KX4_MEZZ:
 	case IXGBE_DEV_ID_82599_COMBO_BACKPLANE:
+	case IXGBE_DEV_ID_82599_KR:
 	case IXGBE_DEV_ID_82599_XAUI_LOM:
 		/* Default device ID is mezzanine card KX/KX4 */
 		media_type = ixgbe_media_type_backplane;
@@ -371,6 +375,9 @@ ixgbe_get_media_type_82599(struct ixgbe_hw *hw)
 		break;
 	case IXGBE_DEV_ID_82599_CX4:
 		media_type = ixgbe_media_type_cx4;
+		break;
+	case IXGBE_DEV_ID_82599_T:
+		media_type = ixgbe_media_type_copper;
 		break;
 	default:
 		media_type = ixgbe_media_type_unknown;
@@ -909,12 +916,9 @@ ixgbe_reset_hw_82599(struct ixgbe_hw *hw)
 	 * Prevent the PCI-E bus from from hanging by disabling PCI-E master
 	 * access and verify no pending requests before reset
 	 */
-	status = ixgbe_disable_pcie_master(hw);
-	if (status != IXGBE_SUCCESS) {
-		status = IXGBE_ERR_MASTER_REQUESTS_PENDING;
-		DEBUGOUT("PCI-E Master disable polling has failed.\n");
-	}
+	(void) ixgbe_disable_pcie_master(hw);
 
+mac_reset_top:
 	/*
 	 * Issue global reset to the MAC.  This needs to be a SW reset.
 	 * If link reset is used, it might reset the MAC when mng is using it
@@ -940,6 +944,19 @@ ixgbe_reset_hw_82599(struct ixgbe_hw *hw)
 	ctrl_ext = IXGBE_READ_REG(hw, IXGBE_CTRL_EXT);
 	ctrl_ext |= IXGBE_CTRL_EXT_PFRSTD;
 	IXGBE_WRITE_REG(hw, IXGBE_CTRL_EXT, ctrl_ext);
+
+	/*
+	 * Double resets are required for recovery from certain error
+	 * conditions.  Between resets, it is necessary to stall to allow time
+	 * for any pending HW events to complete.  We use 1usec since that is
+	 * what is needed for ixgbe_disable_pcie_master().  The second reset
+	 * then clears out any effects of those events.
+	 */
+	if (hw->mac.flags & IXGBE_FLAGS_DOUBLE_RESET_REQUIRED) {
+		hw->mac.flags &= ~IXGBE_FLAGS_DOUBLE_RESET_REQUIRED;
+		usec_delay(1);
+		goto mac_reset_top;
+	}
 
 	msec_delay(50);
 
@@ -2059,6 +2076,7 @@ s32
 ixgbe_start_hw_rev_1_82599(struct ixgbe_hw *hw)
 {
 	u32 i;
+	u32 regval;
 	s32 ret_val = IXGBE_SUCCESS;
 
 	DEBUGFUNC("ixgbe_start_hw_rev_1__82599");
@@ -2071,6 +2089,20 @@ ixgbe_start_hw_rev_1_82599(struct ixgbe_hw *hw)
 		IXGBE_WRITE_REG(hw, IXGBE_RTTBCNRC, 0);
 	}
 	IXGBE_WRITE_FLUSH(hw);
+
+	/* Disable relaxed ordering */
+	for (i = 0; i < hw->mac.max_tx_queues; i++) {
+		regval = IXGBE_READ_REG(hw, IXGBE_DCA_TXCTRL_82599(i));
+		regval &= ~IXGBE_DCA_TXCTRL_TX_WB_RO_EN;
+		IXGBE_WRITE_REG(hw, IXGBE_DCA_TXCTRL_82599(i), regval);
+	}
+
+	for (i = 0; i < hw->mac.max_rx_queues; i++) {
+		regval = IXGBE_READ_REG(hw, IXGBE_DCA_RXCTRL(i));
+		regval &= ~(IXGBE_DCA_RXCTRL_DESC_WRO_EN |
+		    IXGBE_DCA_RXCTRL_DESC_HSRO_EN);
+		IXGBE_WRITE_REG(hw, IXGBE_DCA_RXCTRL(i), regval);
+	}
 
 	/* We need to run link autotry after the driver loads */
 	hw->mac.autotry_restart = true;
@@ -2335,4 +2367,31 @@ ixgbe_verify_fw_version_82599(struct ixgbe_hw *hw)
 
 fw_version_out:
 	return (status);
+}
+
+/*
+ * ixgbe_enable_relaxed_ordering_82599 - Enable relaxed ordering
+ * @hw: pointer to hardware structure
+ */
+void
+ixgbe_enable_relaxed_ordering_82599(struct ixgbe_hw *hw)
+{
+	u32 regval;
+	u32 i;
+
+	DEBUGFUNC("ixgbe_enable_relaxed_ordering_82599");
+
+	/* Enable relaxed ordering */
+	for (i = 0; i < hw->mac.max_tx_queues; i++) {
+		regval = IXGBE_READ_REG(hw, IXGBE_DCA_TXCTRL_82599(i));
+		regval |= IXGBE_DCA_TXCTRL_TX_WB_RO_EN;
+		IXGBE_WRITE_REG(hw, IXGBE_DCA_TXCTRL_82599(i), regval);
+	}
+
+	for (i = 0; i < hw->mac.max_rx_queues; i++) {
+		regval = IXGBE_READ_REG(hw, IXGBE_DCA_RXCTRL(i));
+		regval |= (IXGBE_DCA_RXCTRL_DESC_WRO_EN |
+		    IXGBE_DCA_RXCTRL_DESC_HSRO_EN);
+		IXGBE_WRITE_REG(hw, IXGBE_DCA_RXCTRL(i), regval);
+	}
 }

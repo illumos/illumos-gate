@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +22,11 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.131 scm_100309_002210 */
+/* IntelVersion: 1.134 sol_ixgbe_shared_339b */
 
 #include "ixgbe_api.h"
 #include "ixgbe_common.h"
@@ -107,9 +107,11 @@ ixgbe_set_mac_type(struct ixgbe_hw *hw)
 		case IXGBE_DEV_ID_82599_KX4_MEZZ:
 		case IXGBE_DEV_ID_82599_XAUI_LOM:
 		case IXGBE_DEV_ID_82599_COMBO_BACKPLANE:
+		case IXGBE_DEV_ID_82599_KR:
 		case IXGBE_DEV_ID_82599_SFP:
 		case IXGBE_DEV_ID_82599_SFP_EM:
 		case IXGBE_DEV_ID_82599_CX4:
+		case IXGBE_DEV_ID_82599_T:
 			hw->mac.type = ixgbe_mac_82599EB;
 			break;
 		default:
@@ -168,6 +170,21 @@ ixgbe_start_hw(struct ixgbe_hw *hw)
 {
 	return ixgbe_call_func(hw, hw->mac.ops.start_hw, (hw),
 	    IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_enable_relaxed_ordering - Enables tx relaxed ordering,
+ * which is disabled by default in ixgbe_start_hw();
+ *
+ * @hw: pointer to hardware structure
+ *
+ * Enable relaxed ordering;
+ */
+void
+ixgbe_enable_relaxed_ordering(struct ixgbe_hw *hw)
+{
+	if (hw->mac.ops.enable_relaxed_ordering)
+		hw->mac.ops.enable_relaxed_ordering(hw);
 }
 
 /*

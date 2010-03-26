@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -1219,6 +1219,7 @@ ixgbe_tx_recycle_legacy(ixgbe_tx_ring_t *tx_ring)
 	DMA_SYNC(&tx_ring->tbd_area, DDI_DMA_SYNC_FORKERNEL);
 
 	if (ixgbe_check_dma_handle(tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
+		mutex_exit(&tx_ring->recycle_lock);
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
 		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
 		return (0);
@@ -1390,6 +1391,7 @@ ixgbe_tx_recycle_head_wb(ixgbe_tx_ring_t *tx_ring)
 	    DDI_DMA_SYNC_FORKERNEL);
 
 	if (ixgbe_check_dma_handle(tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
+		mutex_exit(&tx_ring->recycle_lock);
 		ddi_fm_service_impact(ixgbe->dip,
 		    DDI_SERVICE_DEGRADED);
 		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);

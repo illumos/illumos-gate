@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@
 #include "ixgbe_sw.h"
 
 static char ixgbe_ident[] = "Intel 10Gb Ethernet";
-static char ixgbe_version[] = "ixgbe 1.1.4";
+static char ixgbe_version[] = "ixgbe 1.1.5";
 
 /*
  * Local function protoypes
@@ -817,7 +817,7 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 	 */
 	switch (hw->mac.type) {
 	case ixgbe_mac_82598EB:
-		ixgbe_log(ixgbe, "identify 82598 adapter\n");
+		IXGBE_DEBUGLOG_0(ixgbe, "identify 82598 adapter\n");
 		ixgbe->capab = &ixgbe_82598eb_cap;
 
 		if (ixgbe_get_media_type(hw) == ixgbe_media_type_copper) {
@@ -828,7 +828,7 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 
 		break;
 	case ixgbe_mac_82599EB:
-		ixgbe_log(ixgbe, "identify 82599 adapter\n");
+		IXGBE_DEBUGLOG_0(ixgbe, "identify 82599 adapter\n");
 		ixgbe->capab = &ixgbe_82599eb_cap;
 
 		ixgbe->capab->other_intr = (IXGBE_EICR_GPI_SDP1 |
@@ -836,7 +836,7 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 
 		break;
 	default:
-		ixgbe_log(ixgbe,
+		IXGBE_DEBUGLOG_1(ixgbe,
 		    "adapter not supported in ixgbe_identify_hardware(): %d\n",
 		    hw->mac.type);
 		return (IXGBE_FAILURE);
@@ -1248,6 +1248,12 @@ ixgbe_chip_start(ixgbe_t *ixgbe)
 			return (IXGBE_FAILURE);
 		}
 	}
+
+	/*
+	 * Re-enable relaxed ordering for performance.  It is disabled
+	 * by default in the hardware init.
+	 */
+	ixgbe_enable_relaxed_ordering(hw);
 
 	/*
 	 * Setup adapter interrupt vectors
@@ -2226,6 +2232,7 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 
 		reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
 		reg_val |= IXGBE_RDRXCTL_RSCACKC;
+		reg_val |= IXGBE_RDRXCTL_FCOE_WRFIX;
 		reg_val &= ~IXGBE_RDRXCTL_RSCFRSTSIZE;
 
 		IXGBE_WRITE_REG(hw, IXGBE_RDRXCTL, reg_val);
@@ -2857,7 +2864,7 @@ ixgbe_setup_vmdq_rss_conf(ixgbe_t *ixgbe)
 		ixgbe->classify_mode = IXGBE_CLASSIFY_RSS;
 	}
 
-	ixgbe_log(ixgbe, "rx group number:%d, rx ring number:%d",
+	IXGBE_DEBUGLOG_2(ixgbe, "rx group number:%d, rx ring number:%d",
 	    ixgbe->num_rx_groups, ixgbe->num_rx_rings);
 }
 
@@ -3941,6 +3948,7 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 	eicr = IXGBE_READ_REG(hw, IXGBE_EICR);
 
 	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
+		mutex_exit(&ixgbe->gen_lock);
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
 		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
 		return (DDI_INTR_CLAIMED);
@@ -4425,7 +4433,7 @@ ixgbe_add_intr_handlers(ixgbe_t *ixgbe)
 
 			if (rc != DDI_SUCCESS) {
 				ixgbe_log(ixgbe,
-				    "Add rx interrupt handler failed. "
+				    "Add interrupt handler failed. "
 				    "return: %d, vector: %d", rc, vector);
 				for (vector--; vector >= 0; vector--) {
 					(void) ddi_intr_remove_handler(
@@ -5360,7 +5368,7 @@ ixgbe_rx_ring_intr_enable(mac_intr_handle_t intrh)
 	BT_SET(ixgbe->vect_map[v_idx].rx_map, r_idx);
 
 	/*
-	 * To trigger a Rx interrupt to on this ring
+	 * Trigger a Rx interrupt on this ring
 	 */
 	IXGBE_WRITE_REG(&ixgbe->hw, IXGBE_EICS, (1 << v_idx));
 	IXGBE_WRITE_FLUSH(&ixgbe->hw);
