@@ -34,7 +34,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -192,17 +192,17 @@ typedef struct drm_driver_info drm_driver_t;
 	ddi_copyout((arg2), arg1, arg3, 0)
 
 #define	DRM_READ8(map, offset) \
-	*(uint8_t *)((uintptr_t)((map)->dev_addr) + (offset))
+	*(volatile uint8_t *)((uintptr_t)((map)->dev_addr) + (offset))
 #define	DRM_READ16(map, offset) \
-	*(uint16_t *)((uintptr_t)((map)->dev_addr) + (offset))
+	*(volatile uint16_t *)((uintptr_t)((map)->dev_addr) + (offset))
 #define	DRM_READ32(map, offset) \
-	*(uint32_t *)((uintptr_t)((map)->dev_addr) + (offset))
+	*(volatile uint32_t *)((uintptr_t)((map)->dev_addr) + (offset))
 #define	DRM_WRITE8(map, offset, val) \
-	*(uint8_t *)((uintptr_t)((map)->dev_addr) + (offset)) = (val)
+	*(volatile uint8_t *)((uintptr_t)((map)->dev_addr) + (offset)) = (val)
 #define	DRM_WRITE16(map, offset, val) \
-	*(uint16_t *)((uintptr_t)((map)->dev_addr) + (offset)) = (val)
+	*(volatile uint16_t *)((uintptr_t)((map)->dev_addr) + (offset)) = (val)
 #define	DRM_WRITE32(map, offset, val) \
-	*(uint32_t *)((uintptr_t)((map)->dev_addr) + (offset)) = (val)
+	*(volatile uint32_t *)((uintptr_t)((map)->dev_addr) + (offset)) = (val)
 
 typedef struct drm_wait_queue {
 	kcondvar_t	cv;
