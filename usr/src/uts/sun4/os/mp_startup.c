@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,6 +137,17 @@ common_startup_init(cpu_t *cp, int cpuid)
 	cp->cpu_dispthread = tp;
 	cp->cpu_dispatch_pri = DISP_PRIO(tp);
 	cp->cpu_startup_thread = tp;
+
+	/*
+	 * The dispatcher may discover the CPU before it is in cpu_ready_set
+	 * and attempt to poke it. Before the CPU is in cpu_ready_set, any
+	 * cross calls to it will be dropped. We initialize
+	 * poke_cpu_outstanding to true so that poke_cpu will ignore any poke
+	 * requests for this CPU. Pokes that come in before the CPU is in
+	 * cpu_ready_set can be ignored because the CPU is about to come
+	 * online.
+	 */
+	cp->cpu_m.poke_cpu_outstanding = B_TRUE;
 }
 
 /*
@@ -586,7 +597,6 @@ slave_startup(void)
 	mach_htraptrace_configure(cp->cpu_id);
 	cpu_intrq_register(CPU);
 	cp->cpu_m.mutex_ready = 1;
-	cp->cpu_m.poke_cpu_outstanding = B_FALSE;
 
 	/* acknowledge that we are done with initialization */
 	CPUSET_ADD(proxy_ready_set, cp->cpu_id);
@@ -607,6 +617,11 @@ slave_startup(void)
 	 */
 	while (!CPU_IN_SET(cpu_ready_set, cp->cpu_id))
 		DELAY(1);
+
+	/*
+	 * The CPU is now in cpu_ready_set, safely able to take pokes.
+	 */
+	cp->cpu_m.poke_cpu_outstanding = B_FALSE;
 
 	/* enable interrupts */
 	(void) spl0();
