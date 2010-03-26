@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -33,4 +33,4 @@ include $(UTSBASE)/intel/Makefile.intel.shared
 # for the lint builds so as not to cause lint errors during the
 # global cross check.
 #
-LINTFLAGS	+= -D_MACHDEP -I../../i86pc
+LINTFLAGS	+= -D_MACHDEP -I$(UTSBASE)/i86pc
