@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2960,7 +2960,7 @@ ldap_list(
 
 	/* get the service descriptor - or create a default one */
 	rc = __s_api_get_SSD_from_SSDtoUse_service(service,
-	    &sdlist, errorp);
+	    &sdlist, &error);
 	if (rc != NS_LDAP_SUCCESS) {
 		delete_search_cookie(cookie);
 		*errorp = error;
@@ -3563,7 +3563,7 @@ firstEntry(
 
 	/* get the service descriptor - or create a default one */
 	rc = __s_api_get_SSD_from_SSDtoUse_service(service,
-	    &sdlist, errorp);
+	    &sdlist, &error);
 	if (rc != NS_LDAP_SUCCESS) {
 		*errorp = error;
 		return (rc);
