@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@ extern int _sasl_server_new(void *ctx, const char *service,
 	unsigned flags, sasl_conn_t **pconn);
 
 static int nsldapi_sasl_close( LDAP *ld, Sockbuf *sb );
+static void destroy_sasliobuf(Sockbuf *sb);
 
 /*
  * SASL Dependent routines
@@ -263,37 +264,50 @@ nsldapi_sasl_write( int s, const void *buf, int  len,
 	struct lextiof_socket_private *arg)
 {
 	Sockbuf		*sb = (Sockbuf *)arg;
-	int		ret;
-	const char	*obuf, *optr;
-	unsigned	olen;
+	int		ret = 0;
+	const char	*obuf, *optr, *cbuf = (const char *)buf;
+	unsigned	olen, clen, tlen = 0;
+	unsigned	*maxbuf;
 
 	if (sb == NULL) {
 		return( -1 );
 	}
 
-	/* encode the next packet. */
-	ret = sasl_encode( sb->sb_sasl_ctx, buf, (unsigned)len, &obuf, &olen);
+	ret = sasl_getprop(sb->sb_sasl_ctx, SASL_MAXOUTBUF,
+					     (const void **)&maxbuf);
 	if ( ret != SASL_OK ) {
-		/* XXX Log error? "sb_sasl_write: failed to encode packet..." */
+		/* just a sanity check, should never happen */
 		return( -1 );
 	}
 
-	/* Write everything now, buffer is only good until next sasl_encode */
-	optr = obuf;
-	while (olen > 0) {
-		if (sb->sb_sasl_fns.lbextiofn_write != NULL) {
-			ret = sb->sb_sasl_fns.lbextiofn_write(
-				s, optr, olen,
-				sb->sb_sasl_fns.lbextiofn_socket_arg);
-		} else {
-			ret = write( sb->sb_sd, optr, olen);
+	while (len > 0) {
+		clen = (len > *maxbuf) ? *maxbuf : len;
+		/* encode the next packet. */
+		ret = sasl_encode( sb->sb_sasl_ctx, cbuf, clen, &obuf, &olen);
+		if ( ret != SASL_OK ) {
+			/* XXX Log error? "sb_sasl_write: failed to encode packet..." */
+			return( -1 );
 		}
-		if ( ret < 0 )
-			return( ret );
-		optr += ret;
-		olen -= ret;
+		/* Write everything now, buffer is only good until next sasl_encode */
+		optr = obuf;
+		while (olen > 0) {
+			if (sb->sb_sasl_fns.lbextiofn_write != NULL) {
+				ret = sb->sb_sasl_fns.lbextiofn_write(
+					s, optr, olen,
+					sb->sb_sasl_fns.lbextiofn_socket_arg);
+			} else {
+				ret = write( sb->sb_sd, optr, olen);
+			}
+			if ( ret < 0 )
+				return( ret );
+			optr += ret;
+			olen -= ret;
+		}
+		len -= clen;
+		cbuf += clen;
+		tlen += clen;
 	}
-	return( len );
+	return( tlen );
 }
 
 static int
@@ -401,6 +415,9 @@ nsldapi_sasl_install( LDAP *ld, Sockbuf *sb, void *ctx_arg, sasl_ssf_t *ssf)
 	if (ssf && *ssf) {
 		encrypt = 1;
 	}
+	if ( sb == NULL ) {
+		return( LDAP_LOCAL_ERROR );
+	}
 	rc = ber_sockbuf_get_option( sb,
 			LBER_SOCKBUF_OPT_TO_FILE_ONLY,
 			(void *) &value);
@@ -433,12 +450,18 @@ nsldapi_sasl_install( LDAP *ld, Sockbuf *sb, void *ctx_arg, sasl_ssf_t *ssf)
 	rc = ber_sockbuf_get_option( sb,
 			LBER_SOCKBUF_OPT_EXT_IO_FNS,
 			(void *)&sb->sb_sasl_fns);
+	if (rc != 0) {
+		destroy_sasliobuf(sb);
+		return( LDAP_LOCAL_ERROR );
+	}
 	memset( &ld->ld_sasl_io_fns, 0, sizeof(iofns));
 	ld->ld_sasl_io_fns.lextiof_size = LDAP_X_EXTIO_FNS_SIZE;
 	rc = ldap_get_option( ld, LDAP_X_OPT_EXTIO_FN_PTRS,
 			      &ld->ld_sasl_io_fns );
-	if (rc != 0 )
+	if (rc != 0 ) {
+		destroy_sasliobuf(sb);
 		return( LDAP_LOCAL_ERROR );
+	}
 
 	/* Set new values */
 	if (  ld->ld_sasl_io_fns.lextiof_read != NULL ||
@@ -467,8 +490,10 @@ nsldapi_sasl_install( LDAP *ld, Sockbuf *sb, void *ctx_arg, sasl_ssf_t *ssf)
 				/* ld->ld_sasl_io_fns.lextiof_session_arg; */
 		rc = ldap_set_option( ld, LDAP_X_OPT_EXTIO_FN_PTRS,
 			      &iofns );
-		if (rc != 0 )
+		if (rc != 0 ) {
+			destroy_sasliobuf(sb);
 			return( LDAP_LOCAL_ERROR );
+		}
 		sb->sb_sasl_prld = (void *)ld;
 	}
 
@@ -483,15 +508,17 @@ nsldapi_sasl_install( LDAP *ld, Sockbuf *sb, void *ctx_arg, sasl_ssf_t *ssf)
 		rc = ber_sockbuf_set_option( sb,
 				LBER_SOCKBUF_OPT_EXT_IO_FNS,
 				(void *)&fns);
-		if (rc != 0)
+		if (rc != 0) {
+			destroy_sasliobuf(sb);
 			return( LDAP_LOCAL_ERROR );
+		}
 	}
 
 	return( LDAP_SUCCESS );
 }
 
 static int
-nsldapi_sasl_cvterrno( LDAP *ld, int err )
+nsldapi_sasl_cvterrno( LDAP *ld, int err, char *msg )
 {
 	int rc = LDAP_LOCAL_ERROR;
 
@@ -534,7 +561,7 @@ nsldapi_sasl_cvterrno( LDAP *ld, int err )
 		break;
 	}
 
-	LDAP_SET_LDERRNO( ld, rc, NULL, NULL );
+	LDAP_SET_LDERRNO( ld, rc, NULL, msg );
 	return( rc );
 }
 
@@ -544,7 +571,7 @@ nsldapi_sasl_open(LDAP *ld)
 	Sockbuf *sb;
 	char * host;
 	int saslrc;
-	sasl_conn_t *ctx;
+	sasl_conn_t *ctx = NULL;
 
 	if (ld == NULL) {
 		return( LDAP_LOCAL_ERROR );
@@ -562,6 +589,11 @@ nsldapi_sasl_open(LDAP *ld)
 		return( LDAP_LOCAL_ERROR );
 	}
 
+	if (sb->sb_sasl_ctx) {
+	    sasl_dispose(&sb->sb_sasl_ctx);
+	    sb->sb_sasl_ctx = NULL;
+	}
+
 	/* SASL is not properly initialized */
 	mutex_lock(&sasl_mutex);
 	if (gctx == NULL) {
@@ -576,7 +608,8 @@ nsldapi_sasl_open(LDAP *ld)
 
 	if ( saslrc != SASL_OK ) {
 		mutex_unlock(&sasl_mutex);
-		return( nsldapi_sasl_cvterrno( ld, saslrc ) );
+		sasl_dispose(&ctx);
+		return( nsldapi_sasl_cvterrno( ld, saslrc, NULL ) );
 	}
 
 	sb->sb_sasl_ctx = (void *)ctx;
@@ -591,6 +624,9 @@ destroy_sasliobuf(Sockbuf *sb)
 	if (sb != NULL && sb->sb_sasl_ibuf != NULL) {
 		NSLDAPI_FREE(sb->sb_sasl_ibuf);
 		sb->sb_sasl_ibuf = NULL;
+		sb->sb_sasl_iptr = NULL;
+		sb->sb_sasl_bfsz = 0;
+		sb->sb_sasl_ilen = 0;
 	}
 }
 
@@ -621,6 +657,8 @@ nsldapi_sasl_do_bind( LDAP *ld, const char *dn,
 	int		saslrc, rc;
 	struct berval	ccred;
 	unsigned	credlen;
+	int		stepnum = 1;
+	char *sasl_username = NULL;
 
 	if (NSLDAPI_LDAP_VERSION( ld ) < LDAP_VERSION3) {
 		LDAP_SET_LDERRNO( ld, LDAP_NOT_SUPPORTED, NULL, NULL );
@@ -660,6 +698,9 @@ nsldapi_sasl_do_bind( LDAP *ld, const char *dn,
 	ccred.bv_val = NULL;
 	ccred.bv_len = 0;
 
+	LDAPDebug(LDAP_DEBUG_TRACE, "Starting SASL/%s authentication\n",
+		  (mech ? mech : ""), 0, 0 );
+
 	do {
 		saslrc = sasl_client_start( ctx,
 			mechs,
@@ -668,8 +709,9 @@ nsldapi_sasl_do_bind( LDAP *ld, const char *dn,
 			&credlen,
 			&mech );
 
-		LDAPDebug(LDAP_DEBUG_TRACE, "Starting SASL/%s authentication\n",
-			  (mech ? mech : ""), 0, 0 );
+		LDAPDebug(LDAP_DEBUG_TRACE, "Doing step %d of client start for SASL/%s authentication\n",
+			  stepnum, (mech ? mech : ""), 0 );
+		stepnum++;
 
 		if( saslrc == SASL_INTERACT &&
 		    (callback)(ld, flags, defaults, prompts) != LDAP_SUCCESS ) {
@@ -680,13 +722,20 @@ nsldapi_sasl_do_bind( LDAP *ld, const char *dn,
 	ccred.bv_len = credlen;
 
 	if ( (saslrc != SASL_OK) && (saslrc != SASL_CONTINUE) ) {
-		return( nsldapi_sasl_cvterrno( ld, saslrc ) );
+		return( nsldapi_sasl_cvterrno( ld, saslrc, nsldapi_strdup( sasl_errdetail( ctx ) ) ) );
 	}
+
+	stepnum = 1;
 
 	do {
 		struct berval *scred;
+		int clientstepnum = 1;
 
 		scred = NULL;
+
+		LDAPDebug(LDAP_DEBUG_TRACE, "Doing step %d of bind for SASL/%s authentication\n",
+                          stepnum, (mech ? mech : ""), 0 );
+                stepnum++;
 
 		/* notify server of a sasl bind step */
 		rc = ldap_sasl_bind_s(ld, dn, mech, &ccred,
@@ -697,27 +746,39 @@ nsldapi_sasl_do_bind( LDAP *ld, const char *dn,
 		}
 
 		if ( rc != LDAP_SUCCESS && rc != LDAP_SASL_BIND_IN_PROGRESS ) {
-			if( scred && scred->bv_len ) {
-				/* and server provided us with data? */
-				ber_bvfree( scred );
-			}
+			ber_bvfree( scred );
 			return( rc );
 		}
 
 		if( rc == LDAP_SUCCESS && saslrc == SASL_OK ) {
 			/* we're done, no need to step */
-			if( scred && scred->bv_len ) {
+			if( scred ) {
+			    if (scred->bv_len  == 0 ) { /* MS AD sends back empty screds */
+				LDAPDebug(LDAP_DEBUG_ANY,
+					  "SASL BIND complete - ignoring empty credential response\n",
+					  0, 0, 0);
+				ber_bvfree( scred );
+			    } else {
 				/* but server provided us with data! */
+				LDAPDebug(LDAP_DEBUG_TRACE,
+					  "SASL BIND complete but invalid because server responded with credentials - length [%u]\n",
+					  scred->bv_len, 0, 0);
 				ber_bvfree( scred );
 				LDAP_SET_LDERRNO( ld, LDAP_LOCAL_ERROR,
-						  NULL, NULL );
+				    NULL, nsldapi_strdup( dgettext(TEXT_DOMAIN,
+				    "Error during SASL handshake - "
+				    "invalid server credential response") ));
 				return( LDAP_LOCAL_ERROR );
+			    }
 			}
 			break;
 		}
 
 		/* perform the next step of the sasl bind */
 		do {
+			LDAPDebug(LDAP_DEBUG_TRACE, "Doing client step %d of bind step %d for SASL/%s authentication\n",
+				  clientstepnum, stepnum, (mech ? mech : "") );
+			clientstepnum++;
 			saslrc = sasl_client_step( ctx,
 				(scred == NULL) ? NULL : scred->bv_val,
 				(scred == NULL) ? 0 : scred->bv_len,
@@ -736,7 +797,7 @@ nsldapi_sasl_do_bind( LDAP *ld, const char *dn,
 		ber_bvfree( scred );
 
 		if ( (saslrc != SASL_OK) && (saslrc != SASL_CONTINUE) ) {
-			return( nsldapi_sasl_cvterrno( ld, saslrc ) );
+			return( nsldapi_sasl_cvterrno( ld, saslrc, nsldapi_strdup( sasl_errdetail( ctx ) ) ) );
 		}
 	} while ( rc == LDAP_SASL_BIND_IN_PROGRESS );
 
@@ -745,11 +806,21 @@ nsldapi_sasl_do_bind( LDAP *ld, const char *dn,
 	}
 
 	if ( saslrc != SASL_OK ) {
-		return( nsldapi_sasl_cvterrno( ld, saslrc ) );
+		return( nsldapi_sasl_cvterrno( ld, saslrc, nsldapi_strdup( sasl_errdetail( ctx ) ) ) );
+	}
+
+	saslrc = sasl_getprop( ctx, SASL_USERNAME, (const void **) &sasl_username );
+	if ( (saslrc == SASL_OK) && sasl_username ) {
+		LDAPDebug(LDAP_DEBUG_TRACE, "SASL identity: %s\n", sasl_username, 0, 0);
 	}
 
 	saslrc = sasl_getprop( ctx, SASL_SSF, (const void **) &ssf );
 	if( saslrc == SASL_OK ) {
+		if( ssf && *ssf ) {
+			LDAPDebug(LDAP_DEBUG_TRACE,
+				"SASL install encryption, for SSF: %lu\n",
+				(unsigned long) *ssf, 0, 0 );
+		}
 		rc = nsldapi_sasl_install(ld, ld->ld_conns->lconn_sb, ctx, ssf);
 	}
 

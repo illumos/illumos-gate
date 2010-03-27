@@ -1,10 +1,28 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
@@ -705,6 +723,13 @@ LDAP_CALL
 ber_sockbuf_free(Sockbuf *p)
 {
 	if ( p != NULL ) {
+#ifdef LDAP_SASLIO_HOOKS
+		if ( p->sb_sasl_ctx != NULL)
+        		sasl_dispose(&p->sb_sasl_ctx);
+		if ( p->sb_sasl_ibuf != NULL) {
+			NSLBERI_FREE( p->sb_sasl_ibuf );
+		}
+#endif
 		if ( p->sb_ber.ber_buf != NULL &&
 		    !(p->sb_ber.ber_flags & LBER_FLAG_NO_FREE_BUFFER) ) {
 			NSLBERI_FREE( p->sb_ber.ber_buf );
