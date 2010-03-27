@@ -828,15 +828,11 @@ typedef struct iulp_s {
 } iulp_t;
 
 /*
- * The conn drain list structure (idl_t).
- * The list is protected by idl_lock. Each conn_t inserted in the list
- * points back at this idl_t using conn_idl. IP primes the draining of the
- * conns queued in these lists, by qenabling the 1st conn of each list. This
- * occurs when STREAMS backenables ip_wsrv on the IP module. Each conn instance
- * of ip_wsrv successively qenables the next conn in the list.
- * idl_lock protects all other members of idl_t and conn_drain_next
- * and conn_drain_prev of conn_t. The conn_lock protects IPCF_DRAIN_DISABLED
- * flag of the conn_t and conn_idl.
+ * The conn drain list structure (idl_t), protected by idl_lock.  Each conn_t
+ * inserted in the list points back at this idl_t using conn_idl, and is
+ * chained by conn_drain_next and conn_drain_prev, which are also protected by
+ * idl_lock.  When flow control is relieved, either ip_wsrv() (STREAMS) or
+ * ill_flow_enable() (non-STREAMS) will call conn_drain().
  *
  * The conn drain list, idl_t, itself is part of tx cookie list structure.
  * A tx cookie list points to a blocked Tx ring and contains the list of
@@ -860,10 +856,6 @@ struct idl_tx_list_s {
 struct idl_s {
 	conn_t		*idl_conn;		/* Head of drain list */
 	kmutex_t	idl_lock;		/* Lock for this list */
-	uint32_t
-		idl_repeat : 1,			/* Last conn must re-enable */
-						/* drain list again */
-		idl_unused : 31;
 	idl_tx_list_t	*idl_itl;
 };
 

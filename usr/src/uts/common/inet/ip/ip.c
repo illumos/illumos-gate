@@ -503,50 +503,36 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * |idl_tx_list[n]|-> ...
  * ----------------
  *
- * When mac_tx() returns a cookie, the cookie is used to hash into a
- * idl_tx_list in ips_idl_tx_list[] array. Then conn_drain_insert() is
- * called passing idl_tx_list. The connp gets inserted in a drain list
- * pointed to by idl_tx_list. conn_drain_list() asserts flow control for
- * the sockets (non stream based) and sets QFULL condition on the conn_wq
- * of streams sockets, or the su_txqfull for non-streams sockets.
- * connp->conn_direct_blocked will be set to indicate the blocked
- * condition.
+ * When mac_tx() returns a cookie, the cookie is hashed into an index into
+ * ips_idl_tx_list[], and conn_drain_insert() is called with the idl_tx_list
+ * to insert the conn onto.  conn_drain_insert() asserts flow control for the
+ * sockets via su_txq_full() (non-STREAMS) or QFULL on conn_wq (STREAMS).
+ * Further, conn_blocked is set to indicate that the conn is blocked.
  *
- * GLDv3 mac layer calls ill_flow_enable() when flow control is relieved.
- * A cookie is passed in the call to ill_flow_enable() that identifies the
- * blocked Tx ring. This cookie is used to get to the idl_tx_list that
- * contains the blocked connp's. conn_walk_drain() uses the idl_tx_list_t
- * and goes through each conn in the drain list and calls conn_idl_remove
- * for the conn to clear the qfull condition for the conn, as well as to
- * remove the conn from the idl list. In addition, streams based sockets
- * will have the conn_wq enabled, causing ip_wsrv to run for the
- * conn. ip_wsrv drains the queued messages, and removes the conn from the
- * drain list, if all messages were drained. It also notifies the
- * conn_upcalls for the conn to signal that flow-control has opened up.
+ * GLDv3 calls ill_flow_enable() when flow control is relieved.  The cookie
+ * passed in the call to ill_flow_enable() identifies the blocked Tx ring and
+ * is again hashed to locate the appropriate idl_tx_list, which is then
+ * drained via conn_walk_drain().  conn_walk_drain() goes through each conn in
+ * the drain list and calls conn_drain_remove() to clear flow control (via
+ * calling su_txq_full() or clearing QFULL), and remove the conn from the
+ * drain list.
  *
- * In reality the drain list is not a single list, but a configurable number
- * of lists. conn_walk_drain() in the IP module, notifies the conn_upcalls for
- * each conn in the list. conn_drain_insert and conn_drain_tail are the only
- * functions that manipulate this drain list. conn_drain_insert is called in
- * from the protocol layer when conn_ip_output returns EWOULDBLOCK.
- * (as opposed to from ip_wsrv context for STREAMS
- * case -- see below). The synchronization between drain insertion and flow
- * control wakeup is handled by using idl_txl->txl_lock.
+ * Note that the drain list is not a single list but a (configurable) array of
+ * lists (8 elements by default).  Synchronization between drain insertion and
+ * flow control wakeup is handled by using idl_txl->txl_lock, and only
+ * conn_drain_insert() and conn_drain_remove() manipulate the drain list.
  *
- * Flow control using STREAMS:
- * When ILL_DIRECT_CAPABLE() is not TRUE, STREAMS flow control mechanism
- * is used. On the send side, if the packet cannot be sent down to the
- * driver by IP, because of a canput failure, ip_xmit drops the packet
- * and returns EWOULDBLOCK to the caller, who may then invoke
- * ixa_check_drain_insert to insert the conn on the 0'th drain list.
- * When ip_wsrv runs on the ill_wq because flow control has been relieved, the
- * blocked conns in the * 0'th drain list is drained as with the
- * non-STREAMS case.
+ * Flow control via STREAMS is used when ILL_DIRECT_CAPABLE() returns FALSE.
+ * On the send side, if the packet cannot be sent down to the driver by IP
+ * (canput() fails), ip_xmit() drops the packet and returns EWOULDBLOCK to the
+ * caller, who may then invoke ixa_check_drain_insert() to insert the conn on
+ * the 0'th drain list.  When ip_wsrv() runs on the ill_wq because flow
+ * control has been relieved, the blocked conns in the 0'th drain list are
+ * drained as in the non-STREAMS case.
  *
- * In both the STREAMS and non-STREAMS case, the sockfs upcall to set
- * qfull is done when the conn is inserted into the drain list
- * (conn_drain_insert()) and cleared when the conn is removed from the drain
- * list (conn_idl_remove()).
+ * In both the STREAMS and non-STREAMS cases, the sockfs upcall to set QFULL
+ * is done when the conn is inserted into the drain list (conn_drain_insert())
+ * and cleared when the conn is removed from the it (conn_drain_remove()).
  *
  * IPQOS notes:
  *
@@ -727,7 +713,7 @@ static mblk_t	*ip_fragment_copyhdr(uchar_t *, int, int, ip_stack_t *,
 
 static void	conn_drain_init(ip_stack_t *);
 static void	conn_drain_fini(ip_stack_t *);
-static void	conn_drain_tail(conn_t *connp, boolean_t closing);
+static void	conn_drain(conn_t *connp, boolean_t closing);
 
 static void	conn_walk_drain(ip_stack_t *, idl_tx_list_t *);
 static void	conn_walk_sctp(pfv_t, void *, zoneid_t, netstack_t *);
@@ -4192,7 +4178,7 @@ ip_quiesce_conn(conn_t *connp)
 	 */
 	if (drain_cleanup_reqd && connp->conn_idl != NULL) {
 		mutex_enter(&connp->conn_idl->idl_lock);
-		conn_drain_tail(connp, B_TRUE);
+		conn_drain(connp, B_TRUE);
 		mutex_exit(&connp->conn_idl->idl_lock);
 	}
 
@@ -13010,15 +12996,11 @@ conn_drain_fini(ip_stack_t *ipst)
 }
 
 /*
- * Note: For an overview of how flowcontrol is handled in IP please see the
- * IP Flowcontrol notes at the top of this file.
- *
- * Flow control has blocked us from proceeding. Insert the given conn in one
- * of the conn drain lists. These conn wq's will be qenabled later on when
- * STREAMS flow control does a backenable. conn_walk_drain will enable
- * the first conn in each of these drain lists. Each of these qenabled conns
- * in turn enables the next in the list, after it runs, or when it closes,
- * thus sustaining the drain process.
+ * Flow control has blocked us from proceeding.  Insert the given conn in one
+ * of the conn drain lists.  When flow control is unblocked, either ip_wsrv()
+ * (STREAMS) or ill_flow_enable() (direct) will be called back, which in turn
+ * will call conn_walk_drain().  See the flow control notes at the top of this
+ * file for more details.
  */
 void
 conn_drain_insert(conn_t *connp, idl_tx_list_t *tx_list)
@@ -13049,6 +13031,8 @@ conn_drain_insert(conn_t *connp, idl_tx_list_t *tx_list)
 		if (index == ipst->ips_conn_drain_list_cnt)
 			index = 0;
 		tx_list->txl_drain_index = index;
+	} else {
+		ASSERT(connp->conn_idl->idl_itl == tx_list);
 	}
 	mutex_exit(&connp->conn_lock);
 
@@ -13094,18 +13078,13 @@ conn_drain_insert(conn_t *connp, idl_tx_list_t *tx_list)
 }
 
 static void
-conn_idl_remove(conn_t *connp)
+conn_drain_remove(conn_t *connp)
 {
 	idl_t *idl = connp->conn_idl;
 
 	if (idl != NULL) {
 		/*
-		 * Remove ourself from the drain list, if we did not do
-		 * a putq, or if the conn is closing.
-		 * Note: It is possible that q->q_first is non-null. It means
-		 * that these messages landed after we did a enableok() in
-		 * ip_wsrv. Thus STREAMS will call ip_wsrv once again to
-		 * service them.
+		 * Remove ourself from the drain list.
 		 */
 		if (connp->conn_drain_next == connp) {
 			/* Singleton in the list */
@@ -13119,6 +13098,16 @@ conn_idl_remove(conn_t *connp)
 			if (idl->idl_conn == connp)
 				idl->idl_conn = connp->conn_drain_next;
 		}
+
+		/*
+		 * NOTE: because conn_idl is associated with a specific drain
+		 * list which in turn is tied to the index the TX ring
+		 * (txl_cookie) hashes to, and because the TX ring can change
+		 * over the lifetime of the conn_t, we must clear conn_idl so
+		 * a subsequent conn_drain_insert() will set conn_idl again
+		 * based on the latest txl_cookie.
+		 */
+		connp->conn_idl = NULL;
 	}
 	connp->conn_drain_next = NULL;
 	connp->conn_drain_prev = NULL;
@@ -13139,7 +13128,7 @@ conn_idl_remove(conn_t *connp)
  * inform the sockfs upcalls about the change in flow-control.
  */
 static void
-conn_drain_tail(conn_t *connp, boolean_t closing)
+conn_drain(conn_t *connp, boolean_t closing)
 {
 	idl_t *idl;
 	conn_t *next_connp;
@@ -13157,42 +13146,31 @@ conn_drain_tail(conn_t *connp, boolean_t closing)
 	ASSERT(!closing || connp == NULL || connp->conn_idl != NULL);
 
 	/*
-	 * If connp->conn_idl is null, the conn has not been inserted into any
-	 * drain list even once since creation of the conn. Just return.
+	 * If the conn doesn't exist or is not on a drain list, bail.
 	 */
-	if (connp == NULL || connp->conn_idl == NULL)
-		return;
-
-	if (connp->conn_drain_prev == NULL) {
-		/* This conn is currently not in the drain list.  */
+	if (connp == NULL || connp->conn_idl == NULL ||
+	    connp->conn_drain_prev == NULL) {
 		return;
 	}
+
 	idl = connp->conn_idl;
 	if (!closing) {
-		/*
-		 * This conn is the current drainer. If this is the last conn
-		 * in the drain list, we need to do more checks, in the 'if'
-		 * below. Otherwwise we need to just qenable the next conn,
-		 * to sustain the draining, and is handled in the 'else'
-		 * below.
-		 */
 		next_connp = connp->conn_drain_next;
 		while (next_connp != connp) {
 			conn_t *delconnp = next_connp;
 
 			next_connp = next_connp->conn_drain_next;
-			conn_idl_remove(delconnp);
+			conn_drain_remove(delconnp);
 		}
 		ASSERT(connp->conn_drain_next == idl->idl_conn);
 	}
-	conn_idl_remove(connp);
-
+	conn_drain_remove(connp);
 }
 
 /*
  * Write service routine. Shared perimeter entry point.
  * The device queue's messages has fallen below the low water mark and STREAMS
- * has backenabled the ill_wq. Send sockfs notification about flow-control onx
+ * has backenabled the ill_wq. Send sockfs notification about flow-control on
  * each waiting conn.
  */
 void
@@ -13244,13 +13222,8 @@ ill_flow_enable(void *arg, ip_mac_tx_cookie_t cookie)
 }
 
 /*
- * Flowcontrol has relieved, and STREAMS has backenabled us. For each list
- * of conns that need to be drained, check if drain is already in progress.
- * If so set the idl_repeat bit, indicating that the last conn in the list
- * needs to reinitiate the drain once again, for the list. If drain is not
- * in progress for the list, initiate the draining, by qenabling the 1st
- * conn in the list. The drain is self-sustaining, each qenabled conn will
- * in turn qenable the next conn, when it is done/blocked/closing.
+ * Flow control has been relieved and STREAMS has backenabled us; drain
+ * all the conn lists on `tx_list'.
  */
 static void
 conn_walk_drain(ip_stack_t *ipst, idl_tx_list_t *tx_list)
@@ -13263,7 +13236,7 @@ conn_walk_drain(ip_stack_t *ipst, idl_tx_list_t *tx_list)
 	for (i = 0; i < ipst->ips_conn_drain_list_cnt; i++) {
 		idl = &tx_list->txl_drain_list[i];
 		mutex_enter(&idl->idl_lock);
-		conn_drain_tail(idl->idl_conn, B_FALSE);
+		conn_drain(idl->idl_conn, B_FALSE);
 		mutex_exit(&idl->idl_lock);
 	}
 }
@@ -13376,7 +13349,10 @@ conn_clrqfull(conn_t *connp, boolean_t *flow_stopped)
 			}
 		}
 	}
-	connp->conn_direct_blocked = B_FALSE;
+
+	mutex_enter(&connp->conn_lock);
+	connp->conn_blocked = B_FALSE;
+	mutex_exit(&connp->conn_lock);
 }
 
 /*

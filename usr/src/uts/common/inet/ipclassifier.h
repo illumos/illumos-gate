@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -276,28 +276,26 @@ struct conn_s {
 		conn_reuseaddr : 1,		/* SO_REUSEADDR state */
 		conn_keepalive : 1,		/* SO_KEEPALIVE state */
 		conn_multi_router : 1,		/* Wants all multicast pkts */
-		conn_did_putbq : 1,		/* ip_wput did a putbq */
-
 		conn_unspec_src : 1,		/* IP_UNSPEC_SRC */
+
 		conn_policy_cached : 1,		/* Is policy cached/latched ? */
 		conn_in_enforce_policy : 1,	/* Enforce Policy on inbound */
 		conn_out_enforce_policy : 1,	/* Enforce Policy on outbound */
-
 		conn_debug : 1,			/* SO_DEBUG */
+
 		conn_ipv6_v6only : 1,		/* IPV6_V6ONLY */
 		conn_oobinline : 1, 		/* SO_OOBINLINE state */
 		conn_dgram_errind : 1,		/* SO_DGRAM_ERRIND state */
-
 		conn_exclbind : 1,		/* SO_EXCLBIND state */
+
 		conn_mdt_ok : 1,		/* MDT is permitted */
 		conn_allzones : 1,		/* SO_ALLZONES */
 		conn_ipv6_recvpathmtu : 1,	/* IPV6_RECVPATHMTU */
-
 		conn_mcbc_bind : 1,		/* Bound to multi/broadcast */
 
-		conn_pad_to_bit_31 : 11;
+		conn_pad_to_bit_31 : 12;
 
-	boolean_t conn_direct_blocked;		/* conn is flow-controlled */
+	boolean_t	conn_blocked;		/* conn is flow-controlled */
 
 	squeue_t	*conn_initial_sqp;	/* Squeue at open time */
 	squeue_t	*conn_final_sqp;	/* Squeue after connect */

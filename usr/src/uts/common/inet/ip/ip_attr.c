@@ -1307,35 +1307,49 @@ ixa_check_drain_insert(conn_t *connp, ip_xmit_attr_t *ixa)
 
 	idd = &(ill)->ill_dld_capab->idc_direct;
 	idl_txl = &ixa->ixa_ipst->ips_idl_tx_list[IDLHASHINDEX(cookie)];
-	if (cookie == 0) {
-		/*
-		 * ip_xmit failed the canputnext check
-		 */
-		connp->conn_did_putbq = 1;
-		ASSERT(cookie == 0);
-		conn_drain_insert(connp, idl_txl);
-		if (!IPCL_IS_NONSTR(connp))
-			noenable(connp->conn_wq);
-		return (B_TRUE);
-	}
-	ASSERT(ILL_DIRECT_CAPABLE(ill));
 	mutex_enter(&idl_txl->txl_lock);
-	if (connp->conn_direct_blocked ||
-	    (idd->idd_tx_fctl_df(idd->idd_tx_fctl_dh, cookie) == 0)) {
-		DTRACE_PROBE1(ill__tx__not__blocked, boolean,
-		    connp->conn_direct_blocked);
+
+	/*
+	 * If `cookie' is zero, ip_xmit() -> canputnext() failed -- i.e., flow
+	 * control is asserted on an ill that does not support direct calls.
+	 * Jump to insert.
+	 */
+	if (cookie == 0)
+		goto tryinsert;
+
+	ASSERT(ILL_DIRECT_CAPABLE(ill));
+
+	if (idd->idd_tx_fctl_df(idd->idd_tx_fctl_dh, cookie) == 0) {
+		DTRACE_PROBE1(ill__tx__not__blocked, uintptr_t, cookie);
 	} else if (idl_txl->txl_cookie != NULL &&
 	    idl_txl->txl_cookie != ixa->ixa_cookie) {
-		DTRACE_PROBE2(ill__send__tx__collision, uintptr_t, cookie,
+		DTRACE_PROBE2(ill__tx__cookie__collision, uintptr_t, cookie,
 		    uintptr_t, idl_txl->txl_cookie);
-		/* bump kstat for cookie collision */
+		/* TODO: bump kstat for cookie collision */
 	} else {
-		connp->conn_direct_blocked = B_TRUE;
-		idl_txl->txl_cookie = cookie;
-		conn_drain_insert(connp, idl_txl);
-		if (!IPCL_IS_NONSTR(connp))
-			noenable(connp->conn_wq);
-		inserted = B_TRUE;
+		/*
+		 * Check/set conn_blocked under conn_lock.  Note that txl_lock
+		 * will not suffice since two separate UDP threads may be
+		 * racing to send to different destinations that are
+		 * associated with different cookies and thus may not be
+		 * holding the same txl_lock.  Further, since a given conn_t
+		 * can only be on a single drain list, the conn_t will be
+		 * enqueued on whichever thread wins this race.
+		 */
+tryinsert:	mutex_enter(&connp->conn_lock);
+		if (connp->conn_blocked) {
+			DTRACE_PROBE1(ill__tx__conn__already__blocked,
+			    conn_t *, connp);
+			mutex_exit(&connp->conn_lock);
+		} else {
+			connp->conn_blocked = B_TRUE;
+			mutex_exit(&connp->conn_lock);
+			idl_txl->txl_cookie = cookie;
+			conn_drain_insert(connp, idl_txl);
+			if (!IPCL_IS_NONSTR(connp))
+				noenable(connp->conn_wq);
+			inserted = B_TRUE;
+		}
 	}
 	mutex_exit(&idl_txl->txl_lock);
 	return (inserted);
