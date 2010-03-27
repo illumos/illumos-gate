@@ -117,12 +117,10 @@ static ctid_t startdct = -1;
 #define	FMRI_STARTD_CONTRACT \
 	"svc:/system/svc/restarter:default/:properties/restarter/contract"
 
-#define	ZONEADM_PROG "/usr/sbin/zoneadm"
-
-#define	LUUMOUNT_PROG	"/usr/sbin/luumount"
-#define	LUMOUNT_PROG	"/usr/sbin/lumount"
-
+#define	BEADM_PROG	"/usr/sbin/beadm"
 #define	BOOTADM_PROG	"/sbin/bootadm"
+#define	ZONEADM_PROG	"/usr/sbin/zoneadm"
+
 /*
  * The length of FASTBOOT_MOUNTPOINT must be less than MAXPATHLEN.
  */
@@ -946,21 +944,26 @@ halt_exec(const char *path, ...)
 }
 
 /*
- * Invokes lumount for bename.
- * At successfull completion returns zero and copies contents of bename
- * into mountpoint[]
+ * Mount the specified BE.
+ *
+ * Upon success returns zero and copies bename string to mountpoint[]
  */
 static int
 fastboot_bename(const char *bename, char *mountpoint, size_t mpsz)
 {
 	int rc;
 
-	(void) halt_exec(LUUMOUNT_PROG, "-n", bename, NULL);
+	/*
+	 * Attempt to unmount the BE first in case it's already mounted
+	 * elsewhere.
+	 */
+	(void) halt_exec(BEADM_PROG, "umount", bename, NULL);
 
-	if ((rc = halt_exec(LUMOUNT_PROG, "-n", bename, FASTBOOT_MOUNTPOINT,
+	if ((rc = halt_exec(BEADM_PROG, "mount", bename, FASTBOOT_MOUNTPOINT,
 	    NULL)) != 0)
-		(void) fprintf(stderr, gettext("%s: Cannot mount BE %s\n"),
-		    cmdname, bename);
+		(void) fprintf(stderr,
+		    gettext("%s: Unable to mount BE \"%s\" at %s\n"),
+		    cmdname, bename, FASTBOOT_MOUNTPOINT);
 	else
 		(void) strlcpy(mountpoint, FASTBOOT_MOUNTPOINT, mpsz);
 
@@ -1660,7 +1663,7 @@ fail:
 
 	if (fast_reboot == 1) {
 		if (bename) {
-			(void) halt_exec(LUUMOUNT_PROG, "-n", bename, NULL);
+			(void) halt_exec(BEADM_PROG, "umount", bename, NULL);
 
 		} else if (strlen(fastboot_mounted) != 0) {
 			(void) umount(fastboot_mounted);
