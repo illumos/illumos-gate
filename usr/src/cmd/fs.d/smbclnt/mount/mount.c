@@ -50,6 +50,7 @@
 #include <libintl.h>
 #include <locale.h>
 #include <libscf.h>
+#include <priv_utils.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -175,6 +176,21 @@ main(int argc, char *argv[])
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
+
+	/*
+	 * Normal users are allowed to run "mount -F smbfs ..."
+	 * to mount on a directory they own.  To allow that, this
+	 * program is installed setuid root, and it adds SYS_MOUNT
+	 * privilege here (if needed), and then restores the user's
+	 * normal privileges.  When root runs this, it's a no-op.
+	 */
+	if (__init_suid_priv(0, PRIV_SYS_MOUNT, (char *)NULL) < 0) {
+		(void) fprintf(stderr,
+		    gettext("Insufficient privileges, "
+		    "%s must be set-uid root\n"), argv[0]);
+		exit(RET_ERR);
+	}
+
 	if (argc == 2) {
 		if (strcmp(argv[1], "-h") == 0) {
 			usage();
@@ -363,9 +379,14 @@ again:
 	 */
 	mdata.devfd = ctx->ct_dev_fd;
 
-	if (mount(mnt.mnt_special, mnt.mnt_mountp,
+	/* Need sys_mount privilege for the mount call. */
+	(void) __priv_bracket(PRIV_ON);
+	err2 = mount(mnt.mnt_special, mnt.mnt_mountp,
 	    mntflags, fstype, &mdata, sizeof (mdata),
-	    mnt.mnt_mntopts, MAX_MNTOPT_STR) < 0) {
+	    mnt.mnt_mntopts, MAX_MNTOPT_STR);
+	(void) __priv_bracket(PRIV_OFF);
+
+	if (err2 < 0) {
 		if (errno != ENOENT) {
 			err(EX_MNT, gettext("mount_smbfs: %s"),
 			    mnt.mnt_mountp);

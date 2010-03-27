@@ -222,14 +222,14 @@ smbfs_attrcache_fa(vnode_t *vp, struct smbfattr *fap)
 
 	/*
 	 * We allow v_type to change, so set that here
-	 * (and the mode, which is derived from it).
+	 * (and the mode, which depends on the type).
 	 */
 	if (fap->fa_attr & SMB_FA_DIR) {
 		vtype = VDIR;
-		mode = S_IFDIR | smi->smi_dmode;
+		mode = smi->smi_dmode;
 	} else {
 		vtype = VREG;
-		mode = S_IFREG | smi->smi_fmode;
+		mode = smi->smi_fmode;
 	}
 
 	mutex_enter(&np->r_statelock);

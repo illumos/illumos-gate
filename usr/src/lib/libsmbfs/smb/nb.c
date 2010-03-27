@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,7 +114,6 @@ nb_ctx_create(struct nb_ctx **ctxpp)
 	if (ctx == NULL)
 		return (ENOMEM);
 	bzero(ctx, sizeof (struct nb_ctx));
-	ctx->nb_flags = NBCF_NS_ENABLE | NBCF_BC_ENABLE;
 	*ctxpp = ctx;
 	return (0);
 }
@@ -135,9 +134,9 @@ nb_ctx_setnbflags(struct nb_ctx *nb, int ns_ena, int bc_ena)
 {
 	nb->nb_flags &= ~(NBCF_NS_ENABLE | NBCF_BC_ENABLE);
 	if (ns_ena) {
-		nb->nb_flags = NBCF_NS_ENABLE;
+		nb->nb_flags |= NBCF_NS_ENABLE;
 		if (bc_ena)
-			nb->nb_flags = NBCF_BC_ENABLE;
+			nb->nb_flags |= NBCF_BC_ENABLE;
 	}
 }
 
@@ -284,16 +283,11 @@ nb_ctx_readrcsection(struct rcfile *rcfile, struct nb_ctx *ctx,
 	 * have to get both boolean values first,
 	 * either from settings or defaults.
 	 */
-	nbns_enable = nbns_broadcast = -1; /* not set */
+	nbns_enable = nbns_broadcast = 1; /* defaults */
 	rc_getbool(rcfile, sname, "nbns_enable", &nbns_enable);
 	rc_getbool(rcfile, sname, "nbns_broadcast", &nbns_broadcast);
-	if (nbns_enable >= 0 || nbns_broadcast >= 0) {
-		if (nbns_enable < 0)
-			nbns_enable = 1; /* default */
-		if (nbns_broadcast < 0)
-			nbns_broadcast = 1; /* default */
-		nb_ctx_setnbflags(ctx, nbns_enable, nbns_broadcast);
-	}
+	nb_ctx_setnbflags(ctx, nbns_enable, nbns_broadcast);
+
 	return (0);
 }
 

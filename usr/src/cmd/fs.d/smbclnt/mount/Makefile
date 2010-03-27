@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -34,9 +34,11 @@ ROOTFS_PROG=	$(LIBPROG)
 include		../../Makefile.fstype
 
 OBJS=	$(LIBPROG).o
-SRCS=	$(LIBPROG).c $(FSLIBSRC)
+SRCS=	$(LIBPROG).c
 POFILE=	$(LIBPROG).po
 CLOBBERFILES	+= $(LIBPROG)
+
+$(ROOTLIBFSTYPE)/mount := FILEMODE= 04555
 
 CFLAGS += $(CCVERBOSE)
 C99MODE= $(C99_ENABLE)

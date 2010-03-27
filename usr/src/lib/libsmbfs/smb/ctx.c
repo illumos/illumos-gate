@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1252,6 +1252,14 @@ smb_ctx_get_tree(struct smb_ctx *ctx)
 	/* The share name */
 	strlcpy(tcon->tc_sh.sh_name, ctx->ct_origshare,
 	    sizeof (tcon->tc_sh.sh_name));
+
+	/*
+	 * Share password (unused - no share-level security)
+	 * MS-SMB 2.2.6 says this should be null terminated,
+	 * and the length includes the null.  Did bzero above,
+	 * so just set length for the null.
+	 */
+	tcon->tc_sh.sh_pwlen = 1;
 
 	/* The share "use" type. */
 	stype = smb_use_type_str(ctx->ct_shtype_req);

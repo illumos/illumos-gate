@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -810,13 +810,6 @@ doexec(char *fstype, char *newargv[])
 	char	*vfs_path = VFS_PATH;
 	char	*alt_path = ALT_PATH;
 	int	i;
-	int	smbfs;
-
-	/*
-	 * Special case smbfs file system.
-	 * Execute command in profile if possible.
-	 */
-	smbfs = strcmp(fstype, "smbfs") == 0;
 
 	/* build the full pathname of the fstype dependent command. */
 	sprintf(full_path, "%s/%s/%s", vfs_path, fstype, myname);
@@ -839,18 +832,6 @@ doexec(char *fstype, char *newargv[])
 	 * '..mount: not found' message when '/usr' is mounted
 	 */
 	if (access(full_path, 0) == 0) {
-		if (smbfs) {
-			/*
-			 * Run mount_smbfs(1m) with pfexec so that we can
-			 * add sys_mount privilege, (via exec_attr, etc.)
-			 * allowing normal users to mount on any directory
-			 * they own.
-			 */
-			newargv[0] = "pfexec";
-			newargv[1] = full_path;
-			execv("/usr/bin/pfexec", &newargv[0]);
-			newargv[1] = myname;
-		}
 		execv(full_path, &newargv[1]);
 		if (errno == EACCES) {
 			fprintf(stderr,
@@ -862,12 +843,6 @@ doexec(char *fstype, char *newargv[])
 			newargv[1] = full_path;
 			execv("/sbin/sh", &newargv[0]);
 		}
-	}
-	if (smbfs) {
-		newargv[0] = "pfexec";
-		newargv[1] = alter_path;
-		execv("/usr/bin/pfexec", &newargv[0]);
-		newargv[1] = myname;
 	}
 	execv(alter_path, &newargv[1]);
 	if (errno == EACCES) {

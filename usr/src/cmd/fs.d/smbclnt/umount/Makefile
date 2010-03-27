@@ -19,10 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # cmd/fs.d/smbclnt/umount/Makefile
 #
@@ -37,11 +37,12 @@ COMMON=		$(FSLIB)
 OBJS=		$(LIBPROG).o $(COMMON)
 SRCS=		$(LIBPROG).c $(FSLIBSRC)
 POFILE=		$(LIBPROG).po
+CLOBBERFILES	+= $(LIBPROG)
+
+$(ROOTLIBFSTYPE)/umount := FILEMODE= 04555
 
 CPPFLAGS += -I../.. -I../lib
 CFLAGS += $(CCVERBOSE)
-
-CLOBBERFILES	+= $(LIBPROG)
 
 .KEEP_STATE:
 

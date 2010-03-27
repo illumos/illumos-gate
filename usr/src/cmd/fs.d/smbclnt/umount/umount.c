@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * smbfs umount
@@ -43,7 +41,7 @@
 #include <errno.h>
 #include <locale.h>
 #include <fslib.h>
-#include <priv.h>
+#include <priv_utils.h>
 
 #define	RET_OK	0
 #define	RET_ERR	32
@@ -69,6 +67,19 @@ main(int argc, char *argv[])
 #define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
+
+	/*
+	 * Normal users are allowed to umount smbfs mounts they own.
+	 * To allow that, this program is installed setuid root, and
+	 * it adds SYS_MOUNT privilege here (if needed), and then
+	 * restores the user's normal privileges.
+	 */
+	if (__init_suid_priv(0, PRIV_SYS_MOUNT, (char *)NULL) < 0) {
+		(void) fprintf(stderr,
+		    gettext("Insufficient privileges, "
+		    "%s must be set-uid root\n"), argv[0]);
+		exit(RET_ERR);
+	}
 
 	myname = strrchr(argv[0], '/');
 	myname = myname ? myname+1 : argv[0];
@@ -120,13 +131,19 @@ static int
 smbfs_unmount(char *pathname, int umnt_flag)
 {
 	struct extmnttab *mntp;
+	int rc;
 
 	mntp = mnttab_find(pathname);
 	if (mntp) {
 		pathname = mntp->mnt_mountp;
 	}
 
-	if (umount2(pathname, umnt_flag) < 0) {
+	/* Need sys_mount privilege for the umount call. */
+	(void) __priv_bracket(PRIV_ON);
+	rc = umount2(pathname, umnt_flag);
+	(void) __priv_bracket(PRIV_OFF);
+
+	if (rc < 0) {
 		pr_err(gettext("%s: %s\n"), pathname, strerror(errno));
 		return (RET_ERR);
 	}

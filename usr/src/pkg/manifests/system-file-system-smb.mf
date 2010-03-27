@@ -72,8 +72,8 @@ $(i386_ONLY)file path=usr/kernel/kmdb/smbfs group=sys mode=0555
 file path=usr/lib/$(ARCH64)/libsmbfs.so.1
 file path=usr/lib/fs/smbfs/$(ARCH64)/libshare_smbfs.so.1
 file path=usr/lib/fs/smbfs/libshare_smbfs.so.1
-file path=usr/lib/fs/smbfs/mount mode=0555
-file path=usr/lib/fs/smbfs/umount mode=0555
+file path=usr/lib/fs/smbfs/mount mode=4555
+file path=usr/lib/fs/smbfs/umount mode=4555
 file path=usr/lib/libsmbfs.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/nsmb.so mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/smbfs.so mode=0555

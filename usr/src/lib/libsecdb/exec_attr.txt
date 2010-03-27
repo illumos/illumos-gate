@@ -36,8 +36,6 @@ Audit Control:suser:cmd:::/usr/sbin/auditd:uid=0
 Audit Review:suser:cmd:::/usr/sbin/auditreduce:euid=0
 Audit Review:suser:cmd:::/usr/sbin/auditstat:euid=0
 Audit Review:suser:cmd:::/usr/sbin/praudit:euid=0
-Basic Solaris User:solaris:cmd:::/usr/lib/fs/smbfs/mount:privs=sys_mount
-Basic Solaris User:solaris:cmd:::/usr/lib/fs/smbfs/umount:privs=sys_mount
 Contract Observer:solaris:cmd:::/usr/bin/ctwatch:\
 	privs=contract_event,contract_observer
 Cron Management:suser:cmd:::/usr/bin/crontab:euid=0

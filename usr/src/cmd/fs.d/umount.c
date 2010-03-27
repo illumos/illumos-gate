@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<stdio_ext.h>
@@ -355,7 +353,6 @@ doexec(struct mnttab *ment)
 		char	alter_path[FULLPATH_MAX];
 		char	*newargv[ARGV_MAX];
 		int 	ii;
-		int	smbfs;
 
 		if (strlen(ment->mnt_fstype) > (size_t)FSTYPE_MAX) {
 			fprintf(stderr, gettext(
@@ -363,12 +360,6 @@ doexec(struct mnttab *ment)
 			    myname, ment->mnt_fstype, FSTYPE_MAX);
 			exit(1);
 		}
-
-		/*
-		 * Special case smbfs file system.
-		 * Execute command in profile if possible.
-		 */
-		smbfs = strcmp(ment->mnt_fstype, "smbfs") == 0;
 
 		/* build the full pathname of the fstype dependent command. */
 		sprintf(full_path, "%s/%s/%s", fs_path, ment->mnt_fstype,
@@ -408,28 +399,11 @@ doexec(struct mnttab *ment)
 		}
 
 		/* Try to exec the fstype dependent umount. */
-		if (smbfs) {
-			/*
-			 * Run umount_smbfs(1m) with pfexec so that we can
-			 * add sys_mount privilege, (via exec_attr, etc.)
-			 * allowing normal users to unmount any directory
-			 * they own.
-			 */
-			newargv[0] = "pfexec";
-			newargv[1] = full_path;
-			execv("/usr/bin/pfexec", &newargv[0]);
-			newargv[1] = myname;
-		}
 		execv(full_path, &newargv[1]);
 		if (errno == ENOEXEC) {
 			newargv[0] = "sh";
 			newargv[1] = full_path;
 			execv("/sbin/sh", &newargv[0]);
-		}
-		if (smbfs) {
-			newargv[0] = "pfexec";
-			newargv[1] = alter_path;
-			execv("/usr/bin/pfexec", &newargv[0]);
 		}
 		newargv[1] = myname;
 		execv(alter_path, &newargv[1]);

@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <sys/list.h>
 #include <sys/t_lock.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/fs/smbfs_mount.h>
 
 /*

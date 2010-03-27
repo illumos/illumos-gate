@@ -114,6 +114,8 @@ static int	smbfssetattr(vnode_t *, struct vattr *, int, cred_t *);
 static int	smbfs_accessx(void *, int, cred_t *);
 static int	smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 			caller_context_t *);
+static void	smbfs_rele_fid(smbnode_t *, struct smb_cred *);
+
 /*
  * These are the vnode ops routines which implement the vnode interface to
  * the networked file system.  These routines just take their parameters,
@@ -418,14 +420,10 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 {
 	smbnode_t	*np;
 	smbmntinfo_t	*smi;
-	smb_share_t	*ssp;
-	cred_t		*oldcr;
-	int		error = 0;
 	struct smb_cred scred;
 
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
-	ssp = smi->smi_share;
 
 	/*
 	 * Don't "bail out" for VFS_UNMOUNTED here,
@@ -437,7 +435,7 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	 * open; if we happen to get here from the wrong zone we can't do
 	 * anything over the wire.
 	 */
-	if (VTOSMI(vp)->smi_zone != curproc->p_zone) {
+	if (smi->smi_zone != curproc->p_zone) {
 		/*
 		 * We could attempt to clean up locks, except we're sure
 		 * that the current process didn't acquire any locks on
@@ -465,7 +463,7 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	 * process on this file are released no matter what the
 	 * incoming reference count is.
 	 */
-	if (VTOSMI(vp)->smi_flags & SMI_LLOCK) {
+	if (smi->smi_flags & SMI_LLOCK) {
 		pid_t pid = ddi_get_pid();
 		cleanlocks(vp, pid, 0);
 		cleanshares(vp, pid);
@@ -480,18 +478,43 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 		return (0);
 
 	/*
-	 * Do the CIFS close.
-	 * Darwin code
-	 */
-
-	/*
+	 * Decrement the reference count for the FID
+	 * and possibly do the OtW close.
+	 *
 	 * Exclusive lock for modifying n_fid stuff.
 	 * Don't want this one ever interruptible.
 	 */
 	(void) smbfs_rw_enter_sig(&np->r_lkserlock, RW_WRITER, 0);
 	smb_credinit(&scred, cr);
 
+	smbfs_rele_fid(np, &scred);
+
+	smb_credrele(&scred);
+	smbfs_rw_exit(&np->r_lkserlock);
+
+	return (0);
+}
+
+/*
+ * Helper for smbfs_close.  Decrement the reference count
+ * for an SMB-level file or directory ID, and when the last
+ * reference for the fid goes away, do the OtW close.
+ * Also called in smbfs_inactive (defensive cleanup).
+ */
+static void
+smbfs_rele_fid(smbnode_t *np, struct smb_cred *scred)
+{
+	smb_share_t	*ssp;
+	cred_t		*oldcr;
+	struct smbfs_fctx *fctx;
+	int		error;
+	uint16_t ofid;
+
+	ssp = np->n_mount->smi_share;
 	error = 0;
+
+	/* Make sure we serialize for n_dirseq use. */
+	ASSERT(smbfs_rw_lock_held(&np->r_lkserlock, RW_WRITER));
 
 	/*
 	 * Note that vp->v_type may change if a remote node
@@ -500,29 +523,35 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	 * Now use n_ovtype to keep track of the v_type
 	 * we had during open (see comments above).
 	 */
-	if (np->n_ovtype == VDIR) {
-		struct smbfs_fctx *fctx;
+	switch (np->n_ovtype) {
+	case VDIR:
 		ASSERT(np->n_dirrefs > 0);
 		if (--np->n_dirrefs)
-			goto out;
+			return;
 		if ((fctx = np->n_dirseq) != NULL) {
 			np->n_dirseq = NULL;
 			np->n_dirofs = 0;
-			error = smbfs_smb_findclose(fctx, &scred);
+			error = smbfs_smb_findclose(fctx, scred);
 		}
-	} else {
-		uint16_t ofid;
+		break;
+
+	case VREG:
 		ASSERT(np->n_fidrefs > 0);
 		if (--np->n_fidrefs)
-			goto out;
+			return;
 		if ((ofid = np->n_fid) != SMB_FID_UNUSED) {
 			np->n_fid = SMB_FID_UNUSED;
 			/* After reconnect, n_fid is invalid */
 			if (np->n_vcgenid == ssp->ss_vcgenid) {
 				error = smbfs_smb_close(
-				    ssp, ofid, NULL, &scred);
+				    ssp, ofid, NULL, scred);
 			}
 		}
+		break;
+
+	default:
+		SMBVDEBUG("bad n_ovtype %d\n", np->n_ovtype);
+		break;
 	}
 	if (error) {
 		SMBVDEBUG("error %d closing %s\n",
@@ -543,13 +572,6 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	mutex_exit(&np->r_statelock);
 	if (oldcr != NULL)
 		crfree(oldcr);
-
-out:
-	smb_credrele(&scred);
-	smbfs_rw_exit(&np->r_lkserlock);
-
-	/* don't return any errors */
-	return (0);
 }
 
 /* ARGSUSED */
@@ -1294,6 +1316,7 @@ static void
 smbfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	smbnode_t	*np;
+	struct smb_cred scred;
 
 	/*
 	 * Don't "bail out" for VFS_UNMOUNTED here,
@@ -1312,23 +1335,51 @@ smbfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 	 */
 
 	/*
-	 * Some paranoia from the Darwin code:
-	 * Make sure the FID was closed.
-	 * If we see this, it's a bug!
+	 * Defend against the possibility that higher-level callers
+	 * might not correctly balance open and close calls.  If we
+	 * get here with open references remaining, it means there
+	 * was a missing VOP_CLOSE somewhere.  If that happens, do
+	 * the close here so we don't "leak" FIDs on the server.
 	 *
-	 * No rw_enter here, as this should be the
-	 * last ref, and we're just looking...
+	 * Exclusive lock for modifying n_fid stuff.
+	 * Don't want this one ever interruptible.
 	 */
-	if (np->n_fidrefs > 0) {
-		SMBVDEBUG("opencount %d fid %d file %s\n",
+	(void) smbfs_rw_enter_sig(&np->r_lkserlock, RW_WRITER, 0);
+	smb_credinit(&scred, cr);
+
+	switch (np->n_ovtype) {
+	case VNON:
+		/* not open (OK) */
+		break;
+
+	case VDIR:
+		if (np->n_dirrefs == 0)
+			break;
+		SMBVDEBUG("open dir: refs %d path %s\n",
+		    np->n_dirrefs, np->n_rpath);
+		/* Force last close. */
+		np->n_dirrefs = 1;
+		smbfs_rele_fid(np, &scred);
+		break;
+
+	case VREG:
+		if (np->n_fidrefs == 0)
+			break;
+		SMBVDEBUG("open file: refs %d id 0x%x path %s\n",
 		    np->n_fidrefs, np->n_fid, np->n_rpath);
+		/* Force last close. */
+		np->n_fidrefs = 1;
+		smbfs_rele_fid(np, &scred);
+		break;
+
+	default:
+		SMBVDEBUG("bad n_ovtype %d\n", np->n_ovtype);
+		np->n_ovtype = VNON;
+		break;
 	}
-	if (np->n_dirrefs > 0) {
-		uint_t fid = (np->n_dirseq) ?
-		    np->n_dirseq->f_Sid : 0;
-		SMBVDEBUG("opencount %d fid %d dir %s\n",
-		    np->n_dirrefs, fid, np->n_rpath);
-	}
+
+	smb_credrele(&scred);
+	smbfs_rw_exit(&np->r_lkserlock);
 
 	smbfs_addfree(np);
 }
