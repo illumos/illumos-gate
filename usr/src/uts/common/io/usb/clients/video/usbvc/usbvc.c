@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2815,21 +2815,46 @@ static int
 usbvc_read_buf(usbvc_state_t *usbvcp, struct buf *bp)
 {
 	usbvc_buf_t	*buf;
+	int		buf_residue;
+	int		len_to_copy;
 
 	ASSERT(mutex_owned(&usbvcp->usbvc_mutex));
 
+	if (list_is_empty(&usbvcp->usbvc_curr_strm->buf_read.uv_buf_done)) {
+		USB_DPRINTF_L2(PRINT_MASK_OPEN, usbvcp->usbvc_log_handle,
+		    "usbvc_read_buf: empty list(uv_buf_done)!");
+
+		return (USB_FAILURE);
+	}
+
 	/* read a buf from full list and then put it to free list */
 	buf = list_head(&usbvcp->usbvc_curr_strm->buf_read.uv_buf_done);
-	USB_DPRINTF_L4(PRINT_MASK_OPEN, usbvcp->usbvc_log_handle,
-	    "usbvc_read_buf: buf=%p, buf->filled=%d, bfu->len=%d,"
-	    " bp->b_bcount=%ld, bp->b_resid=%lu",
-	    (void *)buf, buf->filled, buf->len, bp->b_bcount, bp->b_resid);
 
-	list_remove(&usbvcp->usbvc_curr_strm->buf_read.uv_buf_done, buf);
-	bcopy(buf->data, bp->b_un.b_addr, buf->filled);
+	USB_DPRINTF_L2(PRINT_MASK_OPEN, usbvcp->usbvc_log_handle,
+	    "usbvc_read_buf: buf=%p, buf->filled=%d, buf->len=%d,"
+	    " buf->len_read=%d bp->b_bcount=%ld, bp->b_resid=%lu",
+	    (void *)buf, buf->filled, buf->len, buf->len_read,
+	    bp->b_bcount, bp->b_resid);
+
+	ASSERT(buf->len_read <= buf->filled);
+
+	buf_residue = buf->filled - buf->len_read;
+	len_to_copy = min(bp->b_bcount, buf_residue);
+
+	if (len_to_copy == buf_residue) {
+		/*
+		 * the bp can accommodate all the remaining bytes of
+		 * the buf. Then we can reuse this buf.
+		 */
+		list_remove(&usbvcp->usbvc_curr_strm->buf_read.uv_buf_done,
+		    buf);
+		list_insert_tail(&usbvcp->usbvc_curr_strm->buf_read.uv_buf_free,
+		    buf);
+	}
+	bcopy(buf->data + buf->len_read, bp->b_un.b_addr, len_to_copy);
 	bp->b_private = NULL;
-	bp->b_resid = bp->b_bcount - buf->filled;
-	list_insert_tail(&usbvcp->usbvc_curr_strm->buf_read.uv_buf_free, buf);
+	buf->len_read += len_to_copy;
+	bp->b_resid = bp->b_bcount - len_to_copy;
 
 	return (USB_SUCCESS);
 }

@@ -587,6 +587,7 @@ file path=sbin/uadmin group=sys mode=0555
 file path=sbin/umount mode=0555
 file path=sbin/umountall group=sys mode=0555
 file path=sbin/uname mode=0555
+file path=sbin/wusbadm mode=0555
 file path=sbin/zonename mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/amt mode=0555
 file path=usr/bin/$(ARCH32)/decrypt mode=0555

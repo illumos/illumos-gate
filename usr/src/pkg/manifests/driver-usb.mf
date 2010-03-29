@@ -134,7 +134,6 @@ $(i386_ONLY)file path=kernel/strmod/usbms group=sys mode=0755 reboot-needed=true
 $(i386_ONLY)file path=kernel/strmod/usbwcm group=sys mode=0755 \
     reboot-needed=true
 file path=lib/svc/method/svc-wusb mode=0555
-file path=sbin/wusbadm mode=0555
 file path=lib/svc/manifest/system/wusb.xml group=sys mode=0444
 legacy pkg=SUNWusb arch=$(ARCH) category=system \
     desc="USBA (USB framework) and USB Device Drivers" \

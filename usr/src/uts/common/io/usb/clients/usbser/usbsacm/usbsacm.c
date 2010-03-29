@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1454,14 +1454,12 @@ usbsacm_get_bulk_pipe_number(usbsacm_state_t *acmp, uint_t dir)
 	usb_if_data_t	*cur_if;
 	int		ep_num;
 	int		if_num;
-	int		if_no;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, acmp->acm_lh,
 	    "usbsacm_get_bulk_pipe_number: ");
 
 	cur_if = acmp->acm_dev_data->dev_curr_cfg->cfg_if;
 	if_num = acmp->acm_dev_data->dev_curr_cfg->cfg_n_if;
-	if_no = acmp->acm_dev_data->dev_curr_if;
 
 	/* search each interface which have bulk endpoint */
 	for (i = 0; i < if_num; i++) {
@@ -1473,7 +1471,7 @@ usbsacm_get_bulk_pipe_number(usbsacm_state_t *acmp, uint_t dir)
 		 */
 		for (skip = 0; skip < ep_num; skip++) {
 			if (usb_lookup_ep_data(acmp->acm_dip,
-			    acmp->acm_dev_data, if_no + i, 0, skip,
+			    acmp->acm_dev_data, i, 0, skip,
 			    USB_EP_ATTR_BULK, dir) == NULL) {
 
 				/*
@@ -3195,6 +3193,8 @@ usbsacm_parse_intr_data(usbsacm_port_t *acm_port, mblk_t *data)
 		USB_DPRINTF_L2(PRINT_MASK_CB, acmp->acm_lh,
 		    "usbsacm_parse_intr_data: unknown request type - 0x%x",
 		    bmRequestType);
+
+		freemsg(data);
 
 		return;
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,7 @@ typedef struct usbvc_buf
 	uchar_t *data;
 	uint_t len;	/* the length of the allocated memory of data */
 	uint_t filled;	/* number of bytes filled */
+	uint_t len_read; /* bytes read */
 	uchar_t status; /* empty, filling done, read done */
 
 	/* cookie used for memory mapping */
