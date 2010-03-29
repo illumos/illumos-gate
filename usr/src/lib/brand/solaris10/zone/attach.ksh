@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -173,28 +173,27 @@ fi
 get_zonepath_ds $zonepath
 
 /usr/sbin/zfs list -H -o name $ZONEPATH_DS/ROOT >/dev/null 2>&1
-if (( $? != 0 )); then
-	fail_fatal "$f_no_active_ds"
-else
-       	/usr/sbin/zfs set mountpoint=legacy $ZONEPATH_DS/ROOT \
-	    >/dev/null 2>&1
-       	/usr/sbin/zfs set zoned=on $ZONEPATH_DS/ROOT \
-	    >/dev/null 2>&1
+(( $? != 0 )) && fail_fatal "$f_no_active_ds"
+
+zfs set mountpoint=legacy $ZONEPATH_DS/ROOT >/dev/null 2>&1
+zfs set zoned=on $ZONEPATH_DS/ROOT >/dev/null 2>&1
+
+get_active_ds $ZONEPATH_DS
+zfs list -H -o name $ACTIVE_DS >/dev/null 2>&1
+(( $? != 0 )) && fail_fatal "$f_zfs_create"
+
+zfs set canmount=noauto $ACTIVE_DS >/dev/null 2>&1
+zfs inherit mountpoint $ACTIVE_DS >/dev/null 2>&1
+zfs inherit zoned $ACTIVE_DS >/dev/null 2>&1
+
+if [ ! -d $ZONEROOT ]; then
+	mkdir -p $ZONEROOT || fail_fatal "$f_mkdir" "$ZONEROOT"
+	chmod 700 $ZONEPATH || fail_fatal "$f_chmod" "$ZONEPATH"
 fi
 
-BENAME=zbe-0
-/usr/sbin/zfs list -H -o name $ZONEPATH_DS/ROOT/$BENAME >/dev/null 2>&1
-if (( $? != 0 )); then
-	fail_fatal "$f_zfs_create"
-else
-       	/usr/sbin/zfs set $PROP_ACTIVE=on $ZONEPATH_DS/ROOT/$BENAME \
-	    >/dev/null 2>&1
-       	/usr/sbin/zfs set canmount=noauto $ZONEPATH_DS/ROOT/$BENAME \
-	    >/dev/null 2>&1
-       	/usr/sbin/zfs inherit mountpoint $ZONEPATH_DS/ROOT/$BENAME \
-	    >/dev/null 2>&1
-       	/usr/sbin/zfs inherit zoned $ZONEPATH_DS/ROOT/$BENAME \
-	    >/dev/null 2>&1
+mnted=`zfs get -H mounted $ACTIVE_DS | cut -f3`
+if [[ $mnted = "no" ]]; then
+	mount -F zfs $ACTIVE_DS $ZONEROOT || fail_fatal "$f_zfs_mount"
 fi
 
 LOGFILE=$(/usr/bin/mktemp -t -p /var/tmp $zonename.attach_log.XXXXXX)

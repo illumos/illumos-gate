@@ -30,10 +30,6 @@ m_usage=$(gettext "solaris10 brand usage: clone {sourcezone}.")
 f_nosource=$(gettext "Error: unable to determine source zone dataset.")
 f_sysunconfig=$(gettext "Error: sys-unconfig failed.")
 
-# Set up ZFS dataset hierarchy for the zone.
-
-ROOT="rpool/ROOT"
-
 # Other brand clone options are invalid for this brand.
 while getopts "R:z:" opt; do
 	case $opt in
@@ -49,6 +45,7 @@ if [ $# -ne 1 ]; then
 	fail_usage "$0 {sourcezone}";
 fi
 
+ZONEROOT="$ZONEPATH/root"
 sourcezone=$1
 
 # Find the active source zone dataset to clone.
@@ -60,6 +57,7 @@ fi
 
 get_zonepath_ds $sourcezonepath
 get_active_ds $ZONEPATH_DS
+ACTIVE_SRC=$ACTIVE_DS
 
 #
 # Now set up the zone's datasets
@@ -90,7 +88,7 @@ fi
 SNAPNAME=${ZONENAME}_snap
 SNAPNUM=0
 while [ $SNAPNUM -lt 100 ]; do
-	/usr/sbin/zfs snapshot $ACTIVE_DS@$SNAPNAME
+	zfs snapshot $ACTIVE_SRC@$SNAPNAME
         if [ $? = 0 ]; then
                 break
 	fi
@@ -103,19 +101,16 @@ if [ $SNAPNUM -ge 100 ]; then
 fi
 
 # do clone
-BENAME=zbe-0
-/usr/sbin/zfs clone -o $PROP_ACTIVE=on -o canmount=noauto \
-     $ACTIVE_DS@$SNAPNAME $zpds/$zpname/ROOT/$BENAME
-if (( $? != 0 )); then
-	fail_fatal "$f_zfs_create"
+get_active_ds $zpds/$zpname
+zfs clone -o canmount=noauto $ACTIVE_SRC@$SNAPNAME $ACTIVE_DS
+(( $? != 0 )) && fail_fatal "$f_zfs_create"
+
+if [ ! -d $ZONEROOT ]; then
+	mkdir -p $ZONEROOT || fail_fatal "$f_mkdir" "$ZONEROOT"
+	chmod 700 $ZONEPATH || fail_fatal "$f_chmod" "$ZONEPATH"
 fi
 
-if [ ! -d $ZONEPATH/root ]; then
-	/usr/bin/mkdir -p $ZONEPATH/root || \
-	    fail_fatal "$f_mkdir" "$ZONEPATH/root"
-	/usr/bin/chmod 700 $ZONEPATH || \
-	    fail_fatal "$f_chmod" "$ZONEPATH"
-fi
+mount -F zfs $ACTIVE_DS $ZONEROOT || fail_fatal "$f_zfs_mount"
 
 # Don't re-sysunconfig if we've already done so
 if [[ ! -f $ZONEROOT/etc/.UNCONFIGURED ]]; then

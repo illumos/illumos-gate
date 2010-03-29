@@ -29,9 +29,6 @@ export PATH
 
 . /usr/lib/brand/shared/common.ksh
 
-# Use the ipkg-brand ZFS property for denoting the zone root's active dataset.
-PROP_ACTIVE="org.opensolaris.libbe:active"
-
 # Values for service tags.
 STCLIENT=/usr/bin/stclient
 ST_PRODUCT_NAME="Solaris 10 Containers"
@@ -190,58 +187,21 @@ sanity_check()
 # Find the active dataset under the zonepath dataset to mount on zonepath/root.
 # $1 ZONEPATH_DS
 get_active_ds() {
-	ACTIVE_DS=`/usr/sbin/zfs list -H -r -t filesystem \
-	    -o name,$PROP_ACTIVE $1/ROOT | \
-	    /usr/bin/nawk ' {
-		if ($1 ~ /ROOT\/[^\/]+$/ && $2 == "on") {
-			print $1
-			if (found == 1)
-				exit 1
-			found = 1
-		}
-	    }'`
-
-	if [ $? -ne 0 ]; then
-		fail_fatal "$f_multiple_ds"
-	fi
-
-	if [ -z "$ACTIVE_DS" ]; then
-		fail_fatal "$f_no_active_ds"
-	fi
+	ACTIVE_DS=$1/ROOT/zbe-0
 }
 
 #
-# Make sure the active dataset is mounted for the zone.  There are several
-# cases to consider:
-# 1) First boot of the zone, nothing is mounted
-# 2) Zone is halting, active dataset remains the same.
-# 3) Zone is halting, there is a new active dataset to mount.
+# Make sure the active dataset is mounted for the zone.
 #
 mount_active_ds() {
-	mount -p | cut -d' ' -f3 | egrep -s "^$zonepath/root$"
-	if (( $? == 0 )); then
-		# Umount current dataset on the root (it might be an old BE).
-		/usr/sbin/umount $zonepath/root
-		if (( $? != 0 )); then
-			# The umount failed, leave the old BE mounted.  If
-			# there are zone processes (i.e. zsched) in the fs,
-			# then we're umounting because we failed validation
-			# during boot, otherwise, warn about gz process
-			# preventing umount.
-			nproc=`pgrep -z $zonename | wc -l`
-			if (( $nproc == 0 )); then
-                       		printf "$f_zfs_unmount" "$zonepath/root"
-			fi
-			return
-		fi
-	fi
-
-	# Mount active dataset on the root.
 	get_zonepath_ds $zonepath
 	get_active_ds $ZONEPATH_DS
 
-	/usr/sbin/mount -F zfs $ACTIVE_DS $zonepath/root || \
-	    fail_fatal "$f_zfs_mount"
+	# If already mounted then we're done.
+	mnted=`zfs get -H mounted $ACTIVE_DS | cut -f3`
+	[[ $mnted = "yes" ]] && return
+
+	mount -F zfs $ACTIVE_DS $zonepath/root || fail_fatal "$f_zfs_mount"
 }
 
 #
@@ -271,23 +231,15 @@ create_active_ds() {
 		    >/dev/null 2>&1
 	fi
 
-	BENAME=zbe-0
-	/usr/sbin/zfs list -H -o name $ZONEPATH_DS/ROOT/$BENAME >/dev/null 2>&1
+	get_active_ds $ZONEPATH_DS
+	zfs list -H -o name $ACTIVE_DS >/dev/null 2>&1
 	if (( $? != 0 )); then
-	       	/usr/sbin/zfs create -o $PROP_ACTIVE=on -o canmount=noauto \
-		    $ZONEPATH_DS/ROOT/$BENAME >/dev/null 2>&1
-		if (( $? != 0 )); then
-			fail_fatal "$f_zfs_create"
-		fi
+	       	zfs create -o canmount=noauto $ACTIVE_DS
+		(( $? != 0 )) && fail_fatal "$f_zfs_create"
 	else
-	       	/usr/sbin/zfs set $PROP_ACTIVE=on $ZONEPATH_DS/ROOT/$BENAME \
-		    >/dev/null 2>&1
-	       	/usr/sbin/zfs set canmount=noauto $ZONEPATH_DS/ROOT/$BENAME \
-		    >/dev/null 2>&1
-	       	/usr/sbin/zfs inherit mountpoint $ZONEPATH_DS/ROOT/$BENAME \
-		    >/dev/null 2>&1
-	       	/usr/sbin/zfs inherit zoned $ZONEPATH_DS/ROOT/$BENAME \
-		    >/dev/null 2>&1
+	       	zfs set canmount=noauto $ACTIVE_DS >/dev/null 2>&1
+	       	zfs inherit mountpoint $ACTIVE_DS >/dev/null 2>&1
+	       	zfs inherit zoned $ACTIVE_DS >/dev/null 2>&1
 	fi
 
 	if [ ! -d $ZONEROOT ]; then
@@ -296,8 +248,7 @@ create_active_ds() {
 	fi
 	/usr/bin/chmod 700 $ZONEPATH || fail_fatal "$f_chmod" "$ZONEPATH"
 
-	/usr/sbin/mount -F zfs $ZONEPATH_DS/ROOT/$BENAME $ZONEROOT || \
-		fail_fatal "$f_zfs_mount"
+	mount -F zfs $ACTIVE_DS $ZONEROOT || fail_fatal "$f_zfs_mount"
 }
 
 #

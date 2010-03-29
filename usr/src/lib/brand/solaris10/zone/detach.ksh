@@ -60,6 +60,12 @@ if [[ $noexecute == 1 ]]; then
 	exit $ZONE_SUBPROC_OK
 fi
 
+get_zonepath_ds $ZONEPATH
+get_active_ds $ZONEPATH_DS
+zfs set zoned=off $ACTIVE_DS >/dev/null 2>&1
+zfs set canmount=on $ACTIVE_DS >/dev/null 2>&1
+zfs set mountpoint=$ZONEPATH/root $ACTIVE_DS >/dev/null 2>&1
+
 cp /etc/zones/$ZONENAME.xml $ZONEPATH/SUNWdetached.xml
 
 # Remove the service tag for this zone.

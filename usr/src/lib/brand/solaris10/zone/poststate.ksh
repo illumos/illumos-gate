@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -51,10 +51,6 @@ cmd=$4
 # the global zone.
 if (( $cmd == 0 )); then
 	echo "global:installed:/" > $zonepath/root/etc/zones/index
-elif (( $cmd == 4 )); then
-	# Leave the active dataset mounted after halting (this might be
-	# a different dataset than what was mounted).
-	mount_active_ds
 fi
 
 exit 0
