@@ -280,6 +280,8 @@ tar_getdir(tlm_commands_t *commands,
 	cstack_t *stp;
 	char 	*bkpath;
 	char 	*parentlnk;
+	int dir_dar = 0;
+
 	/*
 	 * The directory where temporary files may be created during a partial
 	 * non-DAR restore of hardlinks.  It is intended to be initialized by
@@ -825,6 +827,7 @@ tar_getdir(tlm_commands_t *commands,
 			    longname;
 			if (is_file_wanted(file_name, sels, exls, flags,
 			    &mchtype, &pos)) {
+				dir_dar = DAR;
 				nmp = rs_new_name(rnp, name, pos, file_name);
 				if (nmp && mchtype != PM_PARENT) {
 					(void) strlcpy(parentlnk, nmp,
@@ -849,6 +852,8 @@ tar_getdir(tlm_commands_t *commands,
 					(void) dtree_push(stp, nmp, acls);
 					name[0] = 0;
 				}
+			} else {
+				dir_dar = 0;
 			}
 			nm_end = 0;
 			longname[0] = 0;
@@ -922,7 +927,7 @@ tar_getdir(tlm_commands_t *commands,
 		 */
 		if (DAR && tar_hdr->th_linkflag != LF_ACL &&
 		    tar_hdr->th_linkflag != LF_XATTR &&
-		    !huge_size && !is_long_name)
+		    !huge_size && !is_long_name && !dir_dar)
 			dar_recovered = 1;
 	}
 

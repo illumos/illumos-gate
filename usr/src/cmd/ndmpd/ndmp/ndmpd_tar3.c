@@ -2731,19 +2731,27 @@ fix_nlist_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		 * the last component of the original path, if any
 		 * (except in V4).
 		 */
-		if (session->ns_protocol_version == NDMPV4) {
+		if (ISDEFINED(ep->nm3_newnm)) {
 			nm = ep->nm3_newnm;
 		} else {
-			if (ISDEFINED(ep->nm3_newnm)) {
-				nm = ep->nm3_newnm;
-			} else {
-				/*
-				 * Find the last component of nm3_opath.
-				 * nm3_opath has no trailing '/'.
-				 */
-				char *p = strrchr(ep->nm3_opath, '/');
-				nm = p? p : ep->nm3_opath;
-			}
+			char *p, *q;
+
+			/*
+			 * Find the last component of nm3_opath.
+			 * nm3_opath has no trailing '/'.
+			 */
+			p = strrchr(ep->nm3_opath, '/');
+			nm = p ? p + 1 : ep->nm3_opath;
+
+			/*
+			 * In DDAR the last component could
+			 * be repeated in nm3_dpath
+			 */
+			q = strrchr(ep->nm3_dpath, '/');
+			q = q ? q + 1 : ep->nm3_dpath;
+			if (strcmp(nm, q) == 0)
+				nm = NULL;
+
 		}
 
 		bp = joinpath(buf, dp, nm);
