@@ -34,7 +34,9 @@
 #include "tildexpand.h"
 
 /* Number of bits in the RSA/DSA key.  This value can be set on the command line. */
-u_int32_t bits = 1024;
+#define	DEFAULT_BITS_RSA	2048
+#define	DEFAULT_BITS_DSA	1024
+u_int32_t bits = 0;
 
 /*
  * Flag indicating that we just want to change the passphrase.  This can be
@@ -1081,6 +1083,9 @@ main(int argc, char **argv)
 		    key_type_name);
 		exit(1);
 	}
+	if (bits == 0)
+		bits = (type == KEY_DSA) ? DEFAULT_BITS_DSA : DEFAULT_BITS_RSA;
+
 	if (!quiet)
 		printf(gettext("Generating public/private %s key pair.\n"),
 		    key_type_name);
