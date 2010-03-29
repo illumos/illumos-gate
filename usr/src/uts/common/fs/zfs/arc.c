@@ -1722,7 +1722,6 @@ arc_evict_ghost(arc_state_t *state, uint64_t spa, int64_t bytes)
 	kmutex_t *hash_lock;
 	uint64_t bytes_deleted = 0;
 	uint64_t bufs_skipped = 0;
-	boolean_t have_lock;
 
 	ASSERT(GHOST_STATE(state));
 top:
@@ -1732,8 +1731,10 @@ top:
 		if (spa && ab->b_spa != spa)
 			continue;
 		hash_lock = HDR_LOCK(ab);
-		have_lock = MUTEX_HELD(hash_lock);
-		if (have_lock || mutex_tryenter(hash_lock)) {
+		/* caller may be trying to modify this buffer, skip it */
+		if (MUTEX_HELD(hash_lock))
+			continue;
+		if (mutex_tryenter(hash_lock)) {
 			ASSERT(!HDR_IO_IN_PROGRESS(ab));
 			ASSERT(ab->b_buf == NULL);
 			ARCSTAT_BUMP(arcstat_deleted);
@@ -1745,12 +1746,10 @@ top:
 				 * don't destroy the header.
 				 */
 				arc_change_state(arc_l2c_only, ab, hash_lock);
-				if (!have_lock)
-					mutex_exit(hash_lock);
+				mutex_exit(hash_lock);
 			} else {
 				arc_change_state(arc_anon, ab, hash_lock);
-				if (!have_lock)
-					mutex_exit(hash_lock);
+				mutex_exit(hash_lock);
 				arc_hdr_destroy(ab);
 			}
 
@@ -2761,8 +2760,8 @@ top:
 			hdr->b_buf = buf;
 			ASSERT(hdr->b_datacnt == 0);
 			hdr->b_datacnt = 1;
-			arc_access(hdr, hash_lock);
 			arc_get_data_buf(buf);
+			arc_access(hdr, hash_lock);
 		}
 
 		ASSERT(!GHOST_STATE(hdr->b_state));
