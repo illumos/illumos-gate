@@ -482,9 +482,8 @@
 @ MSG_USE_R8_B	"        bindings         symbol binding; detail flag shows"
 @ MSG_USE_R8_B2	"                           absolute:relative addresses"
 
-# TRANSLATION_NOTE -- do not translate the first token "init".
-@ MSG_USE_R8_C	"        callback         user supplied code executed by ld.so.1"
-@ MSG_USE_R8_C2	"                           (i.e. dl_iterate_phdr)"
+# TRANSLATION_NOTE -- do not translate the first token "dl".
+@ MSG_USE_R8_C	"        dl               user calls to the dl*() family"
 
 # TRANSLATION_NOTE -- do not translate the first token "init".
 @ MSG_USE_R8_D	"        init             init and fini processing"
@@ -655,10 +654,7 @@
 @ MSG_FIL_REUSE		"file=%s;  reusing: originally processed as %s"
 @ MSG_FIL_PROT		"file=%s;  modifying memory protections (%c PROT_WRITE)"
 @ MSG_FIL_DELETE	"file=%s;  deleting"
-@ MSG_FIL_DLOPEN	"file=%s;  dlopen() called from file=%s %s %s"
-@ MSG_FIL_DLCLOSE	"file=%s;  dlclose()  %s"
 @ MSG_FIL_CLEANUP	"file=%s;  loading failed: cleaning up lmco 0x%llx"
-@ MSG_FIL_DLDUMP	"file=%s;  dldump() to file=%s  %s"
 @ MSG_FIL_LAZYLOAD	"file=%s;  lazy loading from file=%s: symbol=%s"
 @ MSG_FIL_PRELOAD	"file=%s;  preloading"
 @ MSG_FIL_NEEDED	"file=%s;  needed by %s"
@@ -982,8 +978,9 @@
 
 @ MSG_SYM_AOUT		"symbol=%s;  (original AOUT name)"
 @ MSG_SYM_LOOKUP	"symbol=%s;  lookup in file=%s  [ %s ]"
-@ MSG_SYM_DLSYM_1 	"symbol=%s;  dlsym() called from file=%s %s %s"
-@ MSG_SYM_DLSYM_2	"symbol=%s;  dlsym() called from file=%s; starting \
+
+@ MSG_DLSYM_1		"symbol=%s;  dlsym() called from file=%s %s %s"
+@ MSG_DLSYM_2		"symbol=%s;  dlsym() called from file=%s; starting \
 			 at file=%s %s %s"
 
 @ MSG_CAP_SYM_DEFAULT	"  symbol=%s[%u]:  capability family default"
@@ -1434,20 +1431,30 @@
 @ MSG_REL_LDLV_TITLE_64	"         type                               \
 			 offset              value  section / symbol"
 
-# Callback messages
+# dl*() family messages
 
-@ MSG_CB_IPHDR_ENTER	"dl_iterate_phdr enter:"
-@ MSG_CB_IPHDR_MAPCNG	"dl_iterate_phdr object map/unmap in callback:"
-@ MSG_CB_IPHDR_UNMAP	"dl_iterate_phdr early return due to object unmap"
-@ MSG_CB_IPHDR_CALLBACK	"dl_iterate_phdr callback:"
-@ MSG_CB_IPHDR_NAME	"    dlpi_name:    %s"
-@ MSG_CB_IPHDR_MAPCNT	"    dlpi_adds:    %-18llu   dlpi_subs:   %-18llu"
+@ MSG_DL_IPHDR_ENTER	"dl_iterate_phdr() called from file=%s"
+@ MSG_DL_IPHDR_MAPCNG	"dl_iterate_phdr() object map/unmap in callback"
+@ MSG_DL_IPHDR_UNMAP	"dl_iterate_phdr() early return due to object unmap"
+@ MSG_DL_IPHDR_CALLBACK	"dl_iterate_phdr() callback"
+@ MSG_DL_IPHDR_NAME	"    dlpi_name:    %s"
+@ MSG_DL_IPHDR_MAPCNT	"    dlpi_adds:    %-18llu   dlpi_subs:   %-18llu"
 
-@ MSG_CB_IPHDR_ADDR_32	"    dlpi_addr:    %#-10llx"
-@ MSG_CB_IPHDR_PHDR_32	"    dlpi_phdr:    %#-10llx  dlpi_phnum:  %u"
+@ MSG_DL_IPHDR_ADDR_32	"    dlpi_addr:    %#-10llx"
+@ MSG_DL_IPHDR_PHDR_32	"    dlpi_phdr:    %#-10llx  dlpi_phnum:  %u"
 
-@ MSG_CB_IPHDR_ADDR_64	"    dlpi_addr:    %#-18llx"
-@ MSG_CB_IPHDR_PHDR_64	"    dlpi_phdr:    %#-18llx   dlpi_phnum:  %u"
+@ MSG_DL_IPHDR_ADDR_64	"    dlpi_addr:    %#-18llx"
+@ MSG_DL_IPHDR_PHDR_64	"    dlpi_phdr:    %#-18llx   dlpi_phnum:  %u"
+
+@ MSG_DL_DLCLOSE	"file=%s;  dlclose() called from file=%s  %s"
+@ MSG_DL_DLDUMP		"file=%s;  dldump() called from file=%s: dumping to \
+			 file=%s  %s"
+@ MSG_DL_DLOPEN		"file=%s;  dlopen() called from file=%s %s %s"
+
+@ MSG_DL_DLADDR		"dladdr() called from file=%s: %#llx"
+@ MSG_DL_DLERROR	"dlerror() called from file=%s: %s"
+@ MSG_DL_DLINFO		"dlinfo() called from file=%s: handle=%s, request=%s, \
+			 user data=%#llx"
 
 @ _END_
 
@@ -1456,7 +1463,7 @@
 @ MSG_TOK_ALL		"all"
 @ MSG_TOK_ARGS		"args"
 @ MSG_TOK_BINDINGS	"bindings"
-@ MSG_TOK_CALLBACK	"callback"
+@ MSG_TOK_DL		"dl"
 @ MSG_TOK_CAP		"cap"
 @ MSG_TOK_BASIC		"basic"
 @ MSG_TOK_ENTRY		"entry"
@@ -1579,11 +1586,12 @@
 @ MSG_SYM_GLOBAL	"global"
 @ MSG_SYM_LOCAL		"local"
 @ MSG_SYM_COPY		"copy rel"
-@ MSG_SYM_NEXT		"[ RTLD_NEXT ]"
-@ MSG_SYM_DEFAULT	"[ RTLD_DEFAULT ]"
-@ MSG_SYM_SELF		"[ RTLD_SELF ]"
-@ MSG_SYM_PROBE		"[ RTLD_PROBE ]"
-@ MSG_SYM_SINGLETON	"( singleton reference )"
+
+@ MSG_DLSYM_NEXT	"[ RTLD_NEXT ]"
+@ MSG_DLSYM_DEFAULT	"[ RTLD_DEFAULT ]"
+@ MSG_DLSYM_SELF	"[ RTLD_SELF ]"
+@ MSG_DLSYM_PROBE	"[ RTLD_PROBE ]"
+@ MSG_DLSYM_SINGLETON	"( singleton reference )"
 
 # Link-map mode strings
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -519,7 +519,7 @@ prepend_ldoptions(int *argcp, char ***argvp)
 	 */
 	while (isspace(*ld_options))
 		ld_options++;
-	if (*ld_options == '\0')
+	if (ld_options[0] == '\0')
 		return (0);
 
 	/*

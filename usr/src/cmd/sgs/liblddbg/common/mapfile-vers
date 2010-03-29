@@ -41,7 +41,7 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.77 {
+SUNWprivate_4.78 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -102,14 +102,28 @@ SUNWprivate_4.77 {
 		Dbg32_cap_val_entry;
 		Dbg64_cap_val_entry;
 
-		Dbg32_cb_iphdr_callback;
-		Dbg64_cb_iphdr_callback;
-		Dbg32_cb_iphdr_enter;
-		Dbg64_cb_iphdr_enter;
-		Dbg32_cb_iphdr_mapchange;
-		Dbg64_cb_iphdr_mapchange;
-		Dbg32_cb_iphdr_unmap_ret;
-		Dbg64_cb_iphdr_unmap_ret;
+		Dbg32_dl_dladdr;
+		Dbg64_dl_dladdr;
+		Dbg32_dl_dlclose;
+		Dbg64_dl_dlclose;
+		Dbg32_dl_dldump;
+		Dbg64_dl_dldump;
+		Dbg32_dl_dlerror;
+		Dbg64_dl_dlerror;
+		Dbg32_dl_dlinfo;
+		Dbg64_dl_dlinfo;
+		Dbg32_dl_dlopen;
+		Dbg64_dl_dlopen;
+		Dbg32_dl_dlsym;
+		Dbg64_dl_dlsym;
+		Dbg32_dl_iphdr_callback;
+		Dbg64_dl_iphdr_callback;
+		Dbg32_dl_iphdr_enter;
+		Dbg64_dl_iphdr_enter;
+		Dbg32_dl_iphdr_mapchange;
+		Dbg64_dl_iphdr_mapchange;
+		Dbg32_dl_iphdr_unmap_ret;
+		Dbg64_dl_iphdr_unmap_ret;
 
 		Dbg32_demangle_name;
 		Dbg64_demangle_name;
@@ -141,12 +155,6 @@ SUNWprivate_4.77 {
 		Dbg64_file_del_rescan;
 		Dbg32_file_delete;
 		Dbg64_file_delete;
-		Dbg32_file_dlclose;
-		Dbg64_file_dlclose;
-		Dbg32_file_dldump;
-		Dbg64_file_dldump;
-		Dbg32_file_dlopen;
-		Dbg64_file_dlopen;
 		Dbg32_file_elf;
 		Dbg64_file_elf;
 		Dbg32_file_cleanup;
@@ -393,8 +401,6 @@ SUNWprivate_4.77 {
 		Dbg64_syms_discarded;
 		Dbg32_syms_dup_discarded;
 		Dbg64_syms_dup_discarded;
-		Dbg32_syms_dlsym;
-		Dbg64_syms_dlsym;
 		Dbg32_syms_dup_sort_addr;
 		Dbg64_syms_dup_sort_addr;
 		Dbg32_syms_entered;

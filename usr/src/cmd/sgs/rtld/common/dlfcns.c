@@ -40,6 +40,7 @@
 #include	<synch.h>
 #include	<limits.h>
 #include	<debug.h>
+#include	<conv.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
@@ -108,6 +109,8 @@ dlerror()
 	entry = enter(0);
 
 	clmp = _caller(caller(), CL_EXECDEF);
+
+	DBG_CALL(Dbg_dl_dlerror(clmp, lasterr));
 
 	error = lasterr;
 	lasterr = NULL;
@@ -468,10 +471,10 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp, Lm_list *lml)
 	 * Diagnose what we're up to.
 	 */
 	if (ghp->gh_flags & GPH_ZERO) {
-		DBG_CALL(Dbg_file_dlclose(LIST(clmp), MSG_ORIG(MSG_STR_ZERO),
+		DBG_CALL(Dbg_dl_dlclose(clmp, MSG_ORIG(MSG_STR_ZERO),
 		    DBG_DLCLOSE_IGNORE));
 	} else {
-		DBG_CALL(Dbg_file_dlclose(LIST(clmp), NAME(ghp->gh_ownlmp),
+		DBG_CALL(Dbg_dl_dlclose(clmp, NAME(ghp->gh_ownlmp),
 		    DBG_DLCLOSE_NULL));
 	}
 
@@ -552,6 +555,11 @@ dlclose_check(void *handle, Rt_map *clmp)
 	Grp_hdl	*ghp = (Grp_hdl *)handle;
 
 	if (hdl_validate(ghp) == 0) {
+		Conv_inv_buf_t	inv_buf;
+
+		(void) conv_invalid_val(&inv_buf, EC_NATPTR(ghp), 0);
+		DBG_CALL(Dbg_dl_dlclose(clmp, inv_buf.buf, DBG_DLCLOSE_NULL));
+
 		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL),
 		    EC_NATPTR(handle));
 		return (1);
@@ -621,7 +629,7 @@ dlmopen_core(Lm_list *lml, Lm_list *olml, const char *path, int mode,
 	Grp_hdl		*ghp;
 	Aliste		olmco, nlmco;
 
-	DBG_CALL(Dbg_file_dlopen(clmp,
+	DBG_CALL(Dbg_dl_dlopen(clmp,
 	    (path ? path : MSG_ORIG(MSG_STR_ZERO)), in_nfavl, mode));
 
 	/*
@@ -1226,7 +1234,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		 * that the symbol is a singleton, then the search for the
 		 * symbol must follow the default search path.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl, 0,
+		DBG_CALL(Dbg_dl_dlsym(clmp, name, in_nfavl, 0,
 		    DBG_DLSYM_SINGLETON));
 
 		sl.sl_imap = hlmp;
@@ -1272,7 +1280,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		 */
 		sl.sl_imap = nlmp = NEXT_RT_MAP(clmp);
 
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl,
+		DBG_CALL(Dbg_dl_dlsym(clmp, name, in_nfavl,
 		    (nlmp ? NAME(nlmp) : MSG_INTL(MSG_STR_NULL)),
 		    DBG_DLSYM_NEXT));
 
@@ -1286,7 +1294,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		/*
 		 * If the handle is RTLD_SELF start searching from the caller.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl, NAME(clmp),
+		DBG_CALL(Dbg_dl_dlsym(clmp, name, in_nfavl, NAME(clmp),
 		    DBG_DLSYM_SELF));
 
 		sl.sl_imap = clmp;
@@ -1300,7 +1308,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		 * If the handle is RTLD_DEFAULT mimic the standard symbol
 		 * lookup as would be triggered by a relocation.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl, 0,
+		DBG_CALL(Dbg_dl_dlsym(clmp, name, in_nfavl, 0,
 		    DBG_DLSYM_DEFAULT));
 
 		sl.sl_imap = hlmp;
@@ -1319,7 +1327,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		 * loaded to satisfy this request, but no exhaustive lazy load
 		 * rescan is carried out.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl, 0,
+		DBG_CALL(Dbg_dl_dlsym(clmp, name, in_nfavl, 0,
 		    DBG_DLSYM_PROBE));
 
 		sl.sl_imap = hlmp;
@@ -1333,7 +1341,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		 * Look in the shared object specified by the handle and in all
 		 * of its dependencies.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl,
+		DBG_CALL(Dbg_dl_dlsym(clmp, name, in_nfavl,
 		    NAME(ghp->gh_ownlmp), DBG_DLSYM_DEF));
 
 		ret = LM_DLSYM(clmp)(ghp, &sl, &sr, &binfo, in_nfavl);
@@ -1499,21 +1507,21 @@ dlsym(void *handle, const char *name)
  * Core dladdr activity.
  */
 static void
-dladdr_core(Rt_map *clmp, void *addr, Dl_info_t *dlip, void **info, int flags)
+dladdr_core(Rt_map *almp, void *addr, Dl_info_t *dlip, void **info, int flags)
 {
 	/*
 	 * Set up generic information and any defaults.
 	 */
-	dlip->dli_fname = PATHNAME(clmp);
+	dlip->dli_fname = PATHNAME(almp);
 
-	dlip->dli_fbase = (void *)ADDR(clmp);
+	dlip->dli_fbase = (void *)ADDR(almp);
 	dlip->dli_sname = NULL;
 	dlip->dli_saddr = NULL;
 
 	/*
 	 * Determine the nearest symbol to this address.
 	 */
-	LM_DLADDR(clmp)((ulong_t)addr, clmp, dlip, info, flags);
+	LM_DLADDR(almp)((ulong_t)addr, almp, dlip, info, flags);
 }
 
 #pragma weak _dladdr = dladdr
@@ -1526,21 +1534,25 @@ int
 dladdr(void *addr, Dl_info_t *dlip)
 {
 	int	entry, error;
-	Rt_map	*clmp;
+	Rt_map	*clmp, *almp;
 
 	entry = enter(0);
+
+	clmp = _caller(caller(), CL_EXECDEF);
+
+	DBG_CALL(Dbg_dl_dladdr(clmp, addr));
 
 	/*
 	 * Use our calling technique to determine what object is associated
 	 * with the supplied address.  If a caller can't be determined,
 	 * indicate the failure.
 	 */
-	if ((clmp = _caller(addr, CL_NONE)) == NULL) {
-		eprintf(0, ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR),
+	if ((almp = _caller(addr, CL_NONE)) == NULL) {
+		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR),
 		    EC_NATPTR(addr));
 		error = 0;
 	} else {
-		dladdr_core(clmp, addr, dlip, 0, 0);
+		dladdr_core(almp, addr, dlip, 0, 0);
 		error = 1;
 	}
 
@@ -1554,8 +1566,16 @@ dladdr(void *addr, Dl_info_t *dlip)
 int
 dladdr1(void *addr, Dl_info_t *dlip, void **info, int flags)
 {
-	int	entry, error = 0;
-	Rt_map	*clmp;
+	int	entry, ret = 1;
+	Rt_map	*clmp, *almp;
+	Lm_list	*clml;
+
+	entry = enter(0);
+
+	clmp = _caller(caller(), CL_EXECDEF);
+	clml = LIST(clmp);
+
+	DBG_CALL(Dbg_dl_dladdr(clmp, addr));
 
 	/*
 	 * Validate any flags.
@@ -1565,50 +1585,51 @@ dladdr1(void *addr, Dl_info_t *dlip, void **info, int flags)
 
 		if (((request = (flags & RTLD_DL_MASK)) != RTLD_DL_SYMENT) &&
 		    (request != RTLD_DL_LINKMAP)) {
-			eprintf(0, ERR_FATAL, MSG_INTL(MSG_ARG_ILLFLAGS),
+			eprintf(clml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLFLAGS),
 			    flags);
-			return (0);
-		}
-		if (info == NULL) {
-			eprintf(0, ERR_FATAL, MSG_INTL(MSG_ARG_ILLINFO), flags);
-			return (0);
+			ret = 0;
+
+		} else if (info == NULL) {
+			eprintf(clml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLINFO),
+			    flags);
+			ret = 0;
 		}
 	}
-
-	entry = enter(0);
 
 	/*
 	 * Use our calling technique to determine what object is associated
 	 * with the supplied address.  If a caller can't be determined,
 	 * indicate the failure.
 	 */
-	if ((clmp = _caller(addr, CL_NONE)) == NULL) {
-		eprintf(0, ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR),
-		    EC_NATPTR(addr));
-		error = 0;
-	} else {
-		dladdr_core(clmp, addr, dlip, info, flags);
-		error = 1;
+	if (ret) {
+		if ((almp = _caller(addr, CL_NONE)) == NULL) {
+			eprintf(clml, ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR),
+			    EC_NATPTR(addr));
+			ret = 0;
+		} else
+			dladdr_core(almp, addr, dlip, info, flags);
 	}
 
 	if (entry)
-		leave(0, 0);
-	return (error);
+		leave(clml, 0);
+	return (ret);
 }
 
 /*
  * Core dldump activity.
  */
 static int
-dldump_core(Lm_list *lml, const char *ipath, const char *opath, int flags)
+dldump_core(Rt_map *clmp, Rt_map *lmp, const char *ipath, const char *opath,
+    int flags)
 {
+	Lm_list	*lml = LIST(clmp);
 	Addr	addr = 0;
-	Rt_map	*lmp;
 
 	/*
 	 * Verify any arguments first.
 	 */
-	if ((!opath || (*opath == '\0')) || (ipath && (*ipath == '\0'))) {
+	if ((opath == NULL) || (opath[0] == '\0') ||
+	    ((lmp == NULL) && (ipath[0] == '\0'))) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLPATH));
 		return (1);
 	}
@@ -1621,7 +1642,7 @@ dldump_core(Lm_list *lml, const char *ipath, const char *opath, int flags)
 	 * dump objects from alternative link-maps, this model is going to
 	 * have to be revisited.
 	 */
-	if (ipath) {
+	if (lmp == NULL) {
 		if ((lmp = is_so_loaded(&lml_main, ipath, NULL)) == NULL) {
 			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_NOFILE),
 			    ipath);
@@ -1636,11 +1657,7 @@ dldump_core(Lm_list *lml, const char *ipath, const char *opath, int flags)
 			    ipath);
 			return (1);
 		}
-	} else
-		lmp = lml_main.lm_head;
-
-
-	DBG_CALL(Dbg_file_dldump(lmp, opath, flags));
+	}
 
 	/*
 	 * If the object being dump'ed isn't fixed identify its mapping.
@@ -1670,13 +1687,22 @@ int
 dldump(const char *ipath, const char *opath, int flags)
 {
 	int	error, entry;
-	Rt_map	*clmp;
+	Rt_map	*clmp, *lmp;
 
 	entry = enter(0);
 
 	clmp = _caller(caller(), CL_EXECDEF);
 
-	error = dldump_core(LIST(clmp), ipath, opath, flags);
+	if (ipath) {
+		lmp = NULL;
+	} else {
+		lmp = lml_main.lm_head;
+		ipath = NAME(lmp);
+	}
+
+	DBG_CALL(Dbg_dl_dldump(clmp, ipath, opath, flags));
+
+	error = dldump_core(clmp, lmp, ipath, opath, flags);
 
 	if (entry)
 		leave(LIST(clmp), 0);
@@ -1710,9 +1736,35 @@ get_linkmap_id(Lm_list *lml)
 static int
 dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 {
-	Lm_list	*lml = LIST(clmp);
-	Rt_map	*lmp;
+	Conv_inv_buf_t	inv_buf;
+	char		*handlename;
+	Lm_list		*lml = LIST(clmp);
+	Rt_map		*lmp = NULL;
 
+	/*
+	 * Determine whether a handle is provided.  A handle isn't needed for
+	 * all operations, but it is validated here for the initial diagnostic.
+	 */
+	if (handle == RTLD_SELF) {
+		lmp = clmp;
+	} else {
+		Grp_hdl	*ghp = (Grp_hdl *)handle;
+
+		if (hdl_validate(ghp))
+			lmp = ghp->gh_ownlmp;
+	}
+	if (lmp) {
+		handlename = NAME(lmp);
+	} else {
+		(void) conv_invalid_val(&inv_buf, EC_NATPTR(handle), 0);
+		handlename = inv_buf.buf;
+	}
+
+	DBG_CALL(Dbg_dl_dlinfo(clmp, handlename, request, p));
+
+	/*
+	 * Validate the request and return buffer.
+	 */
 	if ((request > RTLD_DI_MAX) || (p == NULL)) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLVAL));
 		return (-1);
@@ -1786,17 +1838,10 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 	/*
 	 * For any other request a link-map is required.  Verify the handle.
 	 */
-	if (handle == RTLD_SELF)
-		lmp = clmp;
-	else {
-		Grp_hdl	*ghp = (Grp_hdl *)handle;
-
-		if (!hdl_validate(ghp)) {
-			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL),
-			    EC_NATPTR(handle));
-			return (-1);
-		}
-		lmp = ghp->gh_ownlmp;
+	if (lmp == NULL) {
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL),
+		    EC_NATPTR(handle));
+		return (-1);
 	}
 
 	/*
@@ -2079,7 +2124,7 @@ dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *),
 	struct dl_phdr_info	info;
 	u_longlong_t		l_cnt_map = cnt_map;
 	u_longlong_t		l_cnt_unmap = cnt_unmap;
-	Lm_list			*lml;
+	Lm_list			*lml, *clml;
 	Lm_cntl			*lmc;
 	Rt_map			*lmp, *clmp;
 	Aliste			idx1, idx2;
@@ -2087,10 +2132,11 @@ dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *),
 	int			ret = 0;
 	int			entry;
 
-
 	entry = enter(0);
-	clmp =  _caller(caller(), CL_EXECDEF);
-	DBG_CALL(Dbg_cb_iphdr_enter(LIST(clmp), cnt_map, cnt_unmap));
+	clmp = _caller(caller(), CL_EXECDEF);
+	clml = LIST(clmp);
+
+	DBG_CALL(Dbg_dl_iphdr_enter(clmp, cnt_map, cnt_unmap));
 
 	/* Issue a callback for each ELF object in the process */
 	for (APLIST_TRAVERSE(dynlm_list, idx1, lml)) {
@@ -2104,7 +2150,6 @@ dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *),
 				if (THIS_IS_NOT_ELF(lmp))
 					continue;
 #endif
-
 				/* Prepare the object information structure */
 				ehdr = (Ehdr *) ADDR(lmp);
 				info.dlpi_addr = (ehdr->e_type == ET_EXEC) ?
@@ -2117,9 +2162,8 @@ dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *),
 				info.dlpi_subs = cnt_unmap;
 
 				/* Issue the callback */
-				DBG_CALL(Dbg_cb_iphdr_callback(LIST(clmp),
-				    &info));
-				leave(LIST(clmp), thr_flg_reenter);
+				DBG_CALL(Dbg_dl_iphdr_callback(clml, &info));
+				leave(clml, thr_flg_reenter);
 				ret = (* callback)(&info, sizeof (info), data);
 				(void) enter(thr_flg_reenter);
 
@@ -2128,21 +2172,22 @@ dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *),
 					goto done;
 
 				/* Adapt to object mapping changes */
-				if ((cnt_map != l_cnt_map) ||
-				    (cnt_unmap != l_cnt_unmap)) {
-					DBG_CALL(Dbg_cb_iphdr_mapchange(
-					    LIST(clmp), cnt_map, cnt_unmap));
+				if ((cnt_map == l_cnt_map) &&
+				    (cnt_unmap == l_cnt_unmap))
+					continue;
 
-					/* Stop if an object was unmapped */
-					if (cnt_unmap != l_cnt_unmap) {
-						ret = -1;
-						DBG_CALL(Dbg_cb_iphdr_unmap_ret(
-						    LIST(clmp)));
-						goto done;
-					}
+				DBG_CALL(Dbg_dl_iphdr_mapchange(clml, cnt_map,
+				    cnt_unmap));
 
+				/* Stop if an object was unmapped */
+				if (cnt_unmap == l_cnt_unmap) {
 					l_cnt_map = cnt_map;
+					continue;
 				}
+
+				ret = -1;
+				DBG_CALL(Dbg_dl_iphdr_unmap_ret(clml));
+				goto done;
 			}
 		}
 	}

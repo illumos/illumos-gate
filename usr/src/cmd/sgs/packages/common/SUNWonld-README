@@ -1502,6 +1502,7 @@ Bugid   Risk Synopsis
 	pfinstall does it again.
 6807050 GNU linkonce sections can create duplicate and incompatible
 	eh_frame FDE entries
+6826513 ldd gets confused by a crle(1) LD_PRELOAD setting
 --------------------------------------------------------------------------------
 
 --------------
@@ -1522,7 +1523,6 @@ Bugid   Risk Synopsis
 6715578 AOUT (BCP) symbol lookup can be compromised with lazy loading.
 6752883 ld.so.1 error message should be buffered (not sent to stderr).
 6577982 ld.so.1 calls getpid() before it should when any LD_* are set
-6826513 ldd gets confused by a crle(1) LD_PRELOAD setting
 6831285 linker LD_DEBUG support needs improvements (D)
 6806791 filter builds could be optimized (link-editor components only)
 6823371 calloc() uses suboptimal memset() causing 15% regression in SpecCPU2006
@@ -1574,3 +1574,4 @@ Bugid   Risk Synopsis
 6934123 elfdump -d coredumps on PA-RISC elf
 6931044 ld should not allow SHT_PROGBITS .eh_frame sections on amd64 (D)
 6931056 pvs -r output can include empty versions in output
+6938628 ld.so.1 should produce diagnostics for all dl*() entry points

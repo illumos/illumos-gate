@@ -25,7 +25,6 @@
  */
 
 #include	<stdio.h>
-#include	<dlfcn.h>
 #include	"msg.h"
 #include	"_debug.h"
 #include	"libld.h"
@@ -114,57 +113,6 @@ Dbg_syms_ignore_gnuver(Rt_map *lmp, const char *name, Word symndx,
 
 	dbg_print(lml, MSG_INTL(MSG_SYM_IGNGNUVER), Dbg_demangle_name(name),
 	    EC_WORD(symndx), EC_HALF(verndx), NAME(lmp));
-}
-
-void
-Dbg_syms_dlsym(Rt_map *clmp, const char *sym, int *in_nfavl, const char *next,
-    int flag)
-{
-	const char	*str, *retry, *from = NAME(clmp);
-	Lm_list		*lml = LIST(clmp);
-
-	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
-		return;
-
-	/*
-	 * The core functionality of dlsym() can be called twice.  The first
-	 * attempt can be affected by path names that exist in the "not-found"
-	 * AVL tree.  Should a "not-found" path name be found, a second attempt
-	 * is made to locate the required file (in_nfavl is NULL).  This fall-
-	 * back provides for file system changes while a process executes.
-	 */
-	if (in_nfavl)
-		retry = MSG_ORIG(MSG_STR_EMPTY);
-	else
-		retry = MSG_INTL(MSG_STR_RETRY);
-
-	switch (flag) {
-	case DBG_DLSYM_NEXT:
-		str = MSG_ORIG(MSG_SYM_NEXT);
-		break;
-	case DBG_DLSYM_DEFAULT:
-		str = MSG_ORIG(MSG_SYM_DEFAULT);
-		break;
-	case DBG_DLSYM_SELF:
-		str = MSG_ORIG(MSG_SYM_SELF);
-		break;
-	case DBG_DLSYM_PROBE:
-		str = MSG_ORIG(MSG_SYM_PROBE);
-		break;
-	case DBG_DLSYM_SINGLETON:
-		str = MSG_ORIG(MSG_SYM_SINGLETON);
-		break;
-	default:
-		str = MSG_ORIG(MSG_STR_EMPTY);
-	}
-
-	Dbg_util_nl(lml, DBG_NL_STD);
-	if (next == 0)
-		dbg_print(lml, MSG_INTL(MSG_SYM_DLSYM_1),
-		    Dbg_demangle_name(sym), from, retry, str);
-	else
-		dbg_print(lml, MSG_INTL(MSG_SYM_DLSYM_2),
-		    Dbg_demangle_name(sym), from, next, retry, str);
 }
 
 void

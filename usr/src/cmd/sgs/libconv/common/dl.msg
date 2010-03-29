@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -20,8 +20,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Message file for cmd/sgs/libconv/common/dl.c
 
@@ -49,6 +47,20 @@
 @ MSG_RTLD_STRIP	"RTLD_STRIP"
 @ MSG_RTLD_NOHEAP	"RTLD_NOHEAP"
 @ MSG_RTLD_CONFSET	"RTLD_CONFSET"
+
+@ MSG_RTLD_DI_LMID            "RTLD_DI_LMID"
+@ MSG_RTLD_DI_LINKMAP         "RTLD_DI_LINKMAP"
+@ MSG_RTLD_DI_CONFIGADDR      "RTLD_DI_CONFIGADDR"
+@ MSG_RTLD_DI_SERINFO         "RTLD_DI_SERINFO"
+@ MSG_RTLD_DI_SERINFOSIZE     "RTLD_DI_SERINFOSIZE"
+@ MSG_RTLD_DI_ORIGIN          "RTLD_DI_ORIGIN"
+@ MSG_RTLD_DI_PROFILENAME     "RTLD_DI_PROFILENAME"
+@ MSG_RTLD_DI_PROFILEOUT      "RTLD_DI_PROFILEOUT"
+@ MSG_RTLD_DI_GETSIGNAL       "RTLD_DI_GETSIGNAL"
+@ MSG_RTLD_DI_SETSIGNAL       "RTLD_DI_SETSIGNAL"
+@ MSG_RTLD_DI_ARGSINFO        "RTLD_DI_ARGSINFO"
+@ MSG_RTLD_DI_MMAPS           "RTLD_DI_MMAPS"
+@ MSG_RTLD_DI_MMAPCNT         "RTLD_DI_MMAPCNT"
 
 @ MSG_GBL_SEP		" | "
 @ MSG_GBL_QUOTE		"\""

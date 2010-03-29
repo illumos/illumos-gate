@@ -85,6 +85,7 @@ extern "C" {
 #define	DBG_DLSYM_SELF		3
 #define	DBG_DLSYM_PROBE		4
 #define	DBG_DLSYM_SINGLETON	5
+#define	DBG_DLSYM_NUM		DBG_DLSYM_SINGLETON + 1
 
 #define	DBG_DLCLOSE_NULL	0
 #define	DBG_DLCLOSE_IGNORE	1
@@ -302,10 +303,17 @@ extern	void		Dbg_help(void);
 #define	Dbg_cap_ptr_entry	Dbg64_cap_ptr_entry
 #define	Dbg_cap_val_entry	Dbg64_cap_val_entry
 
-#define	Dbg_cb_iphdr_enter	Dbg64_cb_iphdr_enter
-#define	Dbg_cb_iphdr_callback	Dbg64_cb_iphdr_callback
-#define	Dbg_cb_iphdr_mapchange	Dbg64_cb_iphdr_mapchange
-#define	Dbg_cb_iphdr_unmap_ret	Dbg64_cb_iphdr_unmap_ret
+#define	Dbg_dl_dladdr		Dbg64_dl_dladdr
+#define	Dbg_dl_dlclose		Dbg64_dl_dlclose
+#define	Dbg_dl_dldump		Dbg64_dl_dldump
+#define	Dbg_dl_dlerror		Dbg64_dl_dlerror
+#define	Dbg_dl_dlinfo		Dbg64_dl_dlinfo
+#define	Dbg_dl_dlopen		Dbg64_dl_dlopen
+#define	Dbg_dl_dlsym		Dbg64_dl_dlsym
+#define	Dbg_dl_iphdr_enter	Dbg64_dl_iphdr_enter
+#define	Dbg_dl_iphdr_callback	Dbg64_dl_iphdr_callback
+#define	Dbg_dl_iphdr_mapchange	Dbg64_dl_iphdr_mapchange
+#define	Dbg_dl_iphdr_unmap_ret	Dbg64_dl_iphdr_unmap_ret
 
 #define	Dbg_ent_entry		Dbg64_ent_entry
 #define	Dbg_ent_print		Dbg64_ent_print
@@ -323,9 +331,6 @@ extern	void		Dbg_help(void);
 #define	Dbg_file_config_obj	Dbg64_file_config_obj
 #define	Dbg_file_del_rescan	Dbg64_file_del_rescan
 #define	Dbg_file_delete		Dbg64_file_delete
-#define	Dbg_file_dlclose	Dbg64_file_dlclose
-#define	Dbg_file_dldump		Dbg64_file_dldump
-#define	Dbg_file_dlopen		Dbg64_file_dlopen
 #define	Dbg_file_elf		Dbg64_file_elf
 #define	Dbg_file_filtee		Dbg64_file_filtee
 #define	Dbg_file_filter		Dbg64_file_filter
@@ -454,7 +459,6 @@ extern	void		Dbg_help(void);
 #define	Dbg_syms_cap_title	Dbg64_syms_cap_title
 #define	Dbg_syms_created	Dbg64_syms_created
 #define	Dbg_syms_discarded	Dbg64_syms_discarded
-#define	Dbg_syms_dlsym		Dbg64_syms_dlsym
 #define	Dbg_syms_dup_discarded	Dbg64_syms_dup_discarded
 #define	Dbg_syms_dup_sort_addr	Dbg64_syms_dup_sort_addr
 #define	Dbg_syms_entered	Dbg64_syms_entered
@@ -529,10 +533,17 @@ extern	void		Dbg_help(void);
 #define	Dbg_cap_ptr_entry	Dbg32_cap_ptr_entry
 #define	Dbg_cap_val_entry	Dbg32_cap_val_entry
 
-#define	Dbg_cb_iphdr_enter	Dbg32_cb_iphdr_enter
-#define	Dbg_cb_iphdr_callback	Dbg32_cb_iphdr_callback
-#define	Dbg_cb_iphdr_mapchange	Dbg32_cb_iphdr_mapchange
-#define	Dbg_cb_iphdr_unmap_ret	Dbg32_cb_iphdr_unmap_ret
+#define	Dbg_dl_dladdr		Dbg32_dl_dladdr
+#define	Dbg_dl_dlclose		Dbg32_dl_dlclose
+#define	Dbg_dl_dldump		Dbg32_dl_dldump
+#define	Dbg_dl_dlerror		Dbg32_dl_dlerror
+#define	Dbg_dl_dlinfo		Dbg32_dl_dlinfo
+#define	Dbg_dl_dlopen		Dbg32_dl_dlopen
+#define	Dbg_dl_dlsym		Dbg32_dl_dlsym
+#define	Dbg_dl_iphdr_enter	Dbg32_dl_iphdr_enter
+#define	Dbg_dl_iphdr_callback	Dbg32_dl_iphdr_callback
+#define	Dbg_dl_iphdr_mapchange	Dbg32_dl_iphdr_mapchange
+#define	Dbg_dl_iphdr_unmap_ret	Dbg32_dl_iphdr_unmap_ret
 
 #define	Dbg_ent_entry		Dbg32_ent_entry
 #define	Dbg_ent_print		Dbg32_ent_print
@@ -550,9 +561,6 @@ extern	void		Dbg_help(void);
 #define	Dbg_file_config_obj	Dbg32_file_config_obj
 #define	Dbg_file_del_rescan	Dbg32_file_del_rescan
 #define	Dbg_file_delete		Dbg32_file_delete
-#define	Dbg_file_dlclose	Dbg32_file_dlclose
-#define	Dbg_file_dldump		Dbg32_file_dldump
-#define	Dbg_file_dlopen		Dbg32_file_dlopen
 #define	Dbg_file_elf		Dbg32_file_elf
 #define	Dbg_file_filtee		Dbg32_file_filtee
 #define	Dbg_file_filter		Dbg32_file_filter
@@ -681,7 +689,6 @@ extern	void		Dbg_help(void);
 #define	Dbg_syms_cap_title	Dbg32_syms_cap_title
 #define	Dbg_syms_created	Dbg32_syms_created
 #define	Dbg_syms_discarded	Dbg32_syms_discarded
-#define	Dbg_syms_dlsym		Dbg32_syms_dlsym
 #define	Dbg_syms_dup_discarded	Dbg32_syms_dup_discarded
 #define	Dbg_syms_dup_sort_addr	Dbg32_syms_dup_sort_addr
 #define	Dbg_syms_entered	Dbg32_syms_entered
@@ -786,10 +793,17 @@ extern	void	Dbg_cap_val(Lm_list *, Syscapset *, Syscapset *, Half);
 extern	void	Dbg_cap_ptr_entry(Lm_list *, dbg_state_t, Xword, const char *);
 extern	void	Dbg_cap_val_entry(Lm_list *, dbg_state_t, Xword, Xword, Half);
 
-extern	void	Dbg_cb_iphdr_enter(Lm_list *, u_longlong_t, u_longlong_t);
-extern	void	Dbg_cb_iphdr_callback(Lm_list *, struct dl_phdr_info *);
-extern	void	Dbg_cb_iphdr_mapchange(Lm_list *, u_longlong_t, u_longlong_t);
-extern	void	Dbg_cb_iphdr_unmap_ret(Lm_list *);
+extern	void	Dbg_dl_dladdr(Rt_map *, void *);
+extern	void	Dbg_dl_dlclose(Rt_map *, const char *, int);
+extern	void	Dbg_dl_dldump(Rt_map *, const char *, const char *, int);
+extern	void	Dbg_dl_dlerror(Rt_map *, const char *);
+extern	void	Dbg_dl_dlinfo(Rt_map *, const char *, int, void *);
+extern	void	Dbg_dl_dlopen(Rt_map *, const char *, int *, int);
+extern	void	Dbg_dl_dlsym(Rt_map *, const char *, int *, const char *, int);
+extern	void	Dbg_dl_iphdr_enter(Rt_map *, u_longlong_t, u_longlong_t);
+extern	void	Dbg_dl_iphdr_callback(Lm_list *, struct dl_phdr_info *);
+extern	void	Dbg_dl_iphdr_mapchange(Lm_list *, u_longlong_t, u_longlong_t);
+extern	void	Dbg_dl_iphdr_unmap_ret(Lm_list *);
 
 extern	const char *
 		Dbg_demangle_name(const char *);
@@ -812,9 +826,6 @@ extern	void	Dbg_file_config_obj(Lm_list *, const char *, const char *,
 		    const char *);
 extern	void	Dbg_file_del_rescan(Lm_list *);
 extern	void	Dbg_file_delete(Rt_map *);
-extern	void	Dbg_file_dlclose(Lm_list *, const char *, int);
-extern	void	Dbg_file_dldump(Rt_map *, const char *, int);
-extern	void	Dbg_file_dlopen(Rt_map *, const char *, int *, int);
 extern	void	Dbg_file_elf(Lm_list *, const char *, Addr, size_t,
 		    const char *, Aliste);
 extern	void	Dbg_file_filtee(Lm_list *, const char *, const char *, int);
@@ -966,8 +977,6 @@ extern	void	Dbg_syms_cap_lookup(Rt_map *, uint_t, const char *, uint_t,
 extern	void	Dbg_syms_cap_title(Ofl_desc *);
 extern	void	Dbg_syms_created(Lm_list *, const char *);
 extern	void	Dbg_syms_discarded(Lm_list *, Sym_desc *);
-extern	void	Dbg_syms_dlsym(Rt_map *, const char *, int *, const char *,
-		    int);
 extern	void	Dbg_syms_dup_discarded(Lm_list *, Word ndx, Sym_desc *);
 extern	void	Dbg_syms_dup_sort_addr(Lm_list *, const char *, const char *,
 		    const char *, Addr);

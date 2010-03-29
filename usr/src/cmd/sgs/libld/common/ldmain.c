@@ -181,7 +181,7 @@ ld_main(int argc, char **argv, Half mach)
 #endif
 		sgs_support = getenv(MSG_ORIG(MSG_SGS_SUPPORT));
 
-	if (sgs_support && (*sgs_support != '\0')) {
+	if (sgs_support && sgs_support[0]) {
 		const char	*sep = MSG_ORIG(MSG_STR_COLON);
 		char		*lib;
 		char		*lasts;
@@ -240,9 +240,10 @@ ld_main(int argc, char **argv, Half mach)
 		Plibpath = def_Plibpath;
 
 	if (ofl->ofl_rpath == NULL) {
-		char *rpath;
+		char	*rpath;
+
 		if (((rpath = getenv(MSG_ORIG(MSG_LD_RUN_PATH))) != NULL) &&
-		    (strcmp((const char *)rpath, MSG_ORIG(MSG_STR_EMPTY))))
+		    rpath[0])
 			ofl->ofl_rpath = rpath;
 	}
 

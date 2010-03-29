@@ -384,9 +384,11 @@ print_cap(CAP_CMD_T cmd, int autoprint, ARGSTATE *argstate,
     PRINT_CAP_T print_type, Word arg)
 {
 	elfedit_outstyle_t	outstyle;
-	Word	cnt, ndx, printed = 0;
-	Cap	*cap;
-	Boolean	header_done = FALSE, null_seen = FALSE;
+	Word		cnt, ndx, printed = 0;
+	Cap		*cap;
+	Boolean		header_done = FALSE, null_seen = FALSE;
+	const char	*str;
+	size_t		str_size;
 
 	if (autoprint && ((elfedit_flags() & ELFEDIT_F_AUTOPRINT) == 0))
 		return;
@@ -411,6 +413,13 @@ print_cap(CAP_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 
 	/* Load string table if there is one */
 	argstate_add_str(argstate, FALSE);
+	if (argstate->str.sec == NULL) {
+		str = NULL;
+		str_size = 0;
+	} else {
+		str = (const char *)argstate->str.sec->sec_data->d_buf;
+		str_size = argstate->str.sec->sec_data->d_size;
+	}
 
 	cap = &argstate->cap.data[ndx];
 	for (; cnt--; cap++, ndx++) {
@@ -452,9 +461,7 @@ print_cap(CAP_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 				group_title(argstate, ndx);
 				Elf_cap_title(0);
 			}
-			Elf_cap_entry(NULL, cap, ndx,
-			    (const char *)argstate->str.sec->sec_data->d_buf,
-			    argstate->str.sec->sec_data->d_size,
+			Elf_cap_entry(NULL, cap, ndx, str, str_size,
 			    argstate->obj_state->os_ehdr->e_machine);
 		} else {
 			/*

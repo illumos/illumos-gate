@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,4 +185,34 @@ conv_dl_flag(int flags, Conv_fmt_flags_t fmt_flags,
 	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
 
 	return ((const char *)dl_flag_buf->buf);
+}
+
+const char *
+conv_dl_info(int request)
+{
+	static const Msg	requests[RTLD_DI_MAX] = {
+		MSG_RTLD_DI_LMID,	/* MSG_ORIG(MSG_RTLD_DI_LMID) */
+		MSG_RTLD_DI_LINKMAP,	/* MSG_ORIG(MSG_RTLD_DI_LINKMAP) */
+		MSG_RTLD_DI_CONFIGADDR,	/* MSG_ORIG(MSG_RTLD_DI_CONFIGADDR) */
+		MSG_RTLD_DI_SERINFO,	/* MSG_ORIG(MSG_RTLD_DI_SERINFO) */
+		MSG_RTLD_DI_SERINFOSIZE, /* MSG_ORIG(MSG_RTLD_DI_SERINFOSIZE) */
+		MSG_RTLD_DI_ORIGIN,	/* MSG_ORIG(MSG_RTLD_DI_ORIGIN) */
+		MSG_RTLD_DI_PROFILENAME, /* MSG_ORIG(MSG_RTLD_DI_PROFILENAME) */
+		MSG_RTLD_DI_PROFILEOUT,	/* MSG_ORIG(MSG_RTLD_DI_PROFILEOUT) */
+		MSG_RTLD_DI_GETSIGNAL,	/* MSG_ORIG(MSG_RTLD_DI_GETSIGNAL) */
+		MSG_RTLD_DI_SETSIGNAL,	/* MSG_ORIG(MSG_RTLD_DI_SETSIGNAL) */
+		MSG_RTLD_DI_ARGSINFO,	/* MSG_ORIG(MSG_RTLD_DI_ARGSINFO) */
+		MSG_RTLD_DI_MMAPS,	/* MSG_ORIG(MSG_RTLD_DI_MMAPS) */
+		MSG_RTLD_DI_MMAPCNT	/* MSG_ORIG(MSG_RTLD_DI_MMAPCNT) */
+	};
+	static Conv_inv_buf_t	inv_buf;
+
+#if	(RTLD_DI_MAX != RTLD_DI_MMAPCNT)
+#error	"RTLD_DI_MAX has grown"
+#endif
+	if (request && (request <= RTLD_DI_MAX))
+		return (MSG_ORIG(requests[request - 1]));
+
+	(void) conv_invalid_val(&inv_buf, EC_NATPTR(request), 0);
+	return (inv_buf.buf);
 }

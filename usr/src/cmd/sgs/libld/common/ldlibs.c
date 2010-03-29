@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -358,7 +358,7 @@ ld_lib_setup(Ofl_desc *ofl)
 			cp  = getenv(MSG_ORIG(MSG_LD_LIBPATH));
 	}
 
-	if ((cp != NULL) && (*cp != '\0')) {
+	if (cp && cp[0]) {
 		if ((path = libld_malloc(strlen(cp) + 1)) == NULL)
 			return (S_ERROR);
 		(void) strcpy(path, cp);

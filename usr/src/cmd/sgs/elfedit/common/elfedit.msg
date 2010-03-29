@@ -635,7 +635,7 @@
 @ MSG_STR_ARG		"arg"
 @ MSG_STR_SP_BAR_SP	" | "
 @ MSG_STR_ELIPSES	"..."
-@ MSG_STR_OPTIONS	"ade:L:o:rw"
+@ MSG_STR_OPTIONS	"ade:L:o:r"
 @ MSG_STR_ELFEDIT	"elfedit: "
 @ MSG_STR_PROMPT	"> "
 @ MSG_STR_NL		"\n"

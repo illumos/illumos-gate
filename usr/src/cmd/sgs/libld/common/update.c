@@ -2944,20 +2944,37 @@ update_oehdr(Ofl_desc * ofl)
 		ehdr->e_entry =
 		    ((Sym_desc *)(ofl->ofl_entry))->sd_sym->st_value;
 
-	/*
-	 * Note. it may be necessary to update the `e_flags' field in the
-	 * machine dependent section.
-	 */
 	ehdr->e_ident[EI_DATA] = ld_targ.t_m.m_data;
-	ehdr->e_machine = ofl->ofl_dehdr->e_machine;
-	ehdr->e_flags = ofl->ofl_dehdr->e_flags;
 	ehdr->e_version = ofl->ofl_dehdr->e_version;
 
-	if (ehdr->e_machine != ld_targ.t_m.m_mach) {
-		if (ehdr->e_machine != ld_targ.t_m.m_machplus)
-			return (S_ERROR);
-		if ((ehdr->e_flags & ld_targ.t_m.m_flagsplus) == 0)
-			return (S_ERROR);
+	/*
+	 * When generating a relocatable object under -z symbolcap, set the
+	 * e_machine to be generic, and remove any e_flags.  Input relocatable
+	 * objects may identify alternative e_machine (m.machplus) and e_flags
+	 * values.  However, the functions within the created output object
+	 * are selected at runtime using the capabilities mechanism, which
+	 * supersedes the e-machine and e_flags information.  Therefore,
+	 * e_machine and e_flag values are not propagated to the output object,
+	 * as these values might prevent the kernel from loading the object
+	 * before the runtime linker gets control.
+	 */
+	if (ofl->ofl_flags & FLG_OF_OTOSCAP) {
+		ehdr->e_machine = ld_targ.t_m.m_mach;
+		ehdr->e_flags = 0;
+	} else {
+		/*
+		 * Note. it may be necessary to update the e_flags field in the
+		 * machine dependent section.
+		 */
+		ehdr->e_machine = ofl->ofl_dehdr->e_machine;
+		ehdr->e_flags = ofl->ofl_dehdr->e_flags;
+
+		if (ehdr->e_machine != ld_targ.t_m.m_mach) {
+			if (ehdr->e_machine != ld_targ.t_m.m_machplus)
+				return (S_ERROR);
+			if ((ehdr->e_flags & ld_targ.t_m.m_flagsplus) == 0)
+				return (S_ERROR);
+		}
 	}
 
 	if (ofl->ofl_flags & FLG_OF_SHAROBJ)

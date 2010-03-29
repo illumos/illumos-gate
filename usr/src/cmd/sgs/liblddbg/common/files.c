@@ -391,64 +391,6 @@ Dbg_file_bindings_done(Lm_list *lml)
 }
 
 void
-Dbg_file_dlopen(Rt_map *clmp, const char *name, int *in_nfavl, int mode)
-{
-	Conv_dl_mode_buf_t	dl_mode_buf;
-	Lm_list			*lml = LIST(clmp);
-	const char		*retry;
-
-	if (DBG_NOTCLASS(DBG_C_FILES))
-		return;
-
-	/*
-	 * The core functionality of dlopen() can be called twice.  The first
-	 * attempt can be affected by path names that exist in the "not-found"
-	 * AVL tree.  Should a "not-found" path name be found, a second attempt
-	 * is made to locate the required file (in_nfavl is NULL).  This fall-
-	 * back provides for file system changes while a process executes.
-	 */
-	if (in_nfavl)
-		retry = MSG_ORIG(MSG_STR_EMPTY);
-	else
-		retry = MSG_INTL(MSG_STR_RETRY);
-
-	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_FIL_DLOPEN), name, NAME(clmp), retry,
-	    conv_dl_mode(mode, 0, &dl_mode_buf));
-}
-
-void
-Dbg_file_dlclose(Lm_list *lml, const char *name, int flag)
-{
-	const char	*str;
-
-	if (DBG_NOTCLASS(DBG_C_FILES))
-		return;
-
-	if (flag == DBG_DLCLOSE_IGNORE)
-		str = MSG_INTL(MSG_STR_IGNORE);
-	else
-		str = MSG_ORIG(MSG_STR_EMPTY);
-
-	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_FIL_DLCLOSE), name, str);
-}
-
-void
-Dbg_file_dldump(Rt_map *lmp, const char *path, int flags)
-{
-	Conv_dl_flag_buf_t	dl_flag_buf;
-	Lm_list			*lml = LIST(lmp);
-
-	if (DBG_NOTCLASS(DBG_C_FILES))
-		return;
-
-	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_FIL_DLDUMP), NAME(lmp), path,
-	    conv_dl_flag(flags, 0, &dl_flag_buf));
-}
-
-void
 Dbg_file_lazyload(Rt_map *clmp, const char *fname, const char *sname)
 {
 	Lm_list	*lml = LIST(clmp);

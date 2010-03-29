@@ -817,6 +817,7 @@ extern	const char	*conv_def_tag(Symref, Conv_inv_buf_t *);
 extern	const char	*conv_demangle_name(const char *);
 extern	const char	*conv_dl_flag(int, Conv_fmt_flags_t,
 			    Conv_dl_flag_buf_t *);
+extern	const char	*conv_dl_info(int);
 extern	const char	*conv_dl_mode(int, int, Conv_dl_mode_buf_t *);
 extern	const char	*conv_dwarf_cfa(uchar_t, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);

@@ -30,14 +30,14 @@ VERS =		.4
 COMOBJS =	args.o		audit.o		basic.o		debug.o \
 		syminfo.o	tls.o
 
-COMOBJS32 =	bindings32.o	cap32.o		callback32.o	dynamic32.o \
+COMOBJS32 =	bindings32.o	cap32.o		dlfcns32.o	dynamic32.o \
 		elf32.o		entry32.o	files32.o	got32.o \
  		libs32.o	map32.o		move32.o	phdr32.o \
 		relocate32.o	sections32.o	segments32.o	shdr32.o \
 		statistics32.o	support32.o	syms32.o	unused32.o \
 		util32.o	version32.o
 
-COMOBJS64 =	bindings64.o	cap64.o		callback64.o	dynamic64.o \
+COMOBJS64 =	bindings64.o	cap64.o		dlfcns64.o	dynamic64.o \
 		elf64.o		entry64.o	files64.o	got64.o \
 		libs64.o	map64.o		move64.o	phdr64.o \
 		relocate64.o	sections64.o	segments64.o	shdr64.o \

@@ -92,7 +92,7 @@ static DBG_options _Dbg_options_ld[] = {	/* ld only options */
 static DBG_options _Dbg_options_rtld[] = {	/* ld.so.1 only options */
 	{MSG_ORIG(MSG_TOK_AUDIT),	DBG_C_AUDITING,	0},
 	{MSG_ORIG(MSG_TOK_BINDINGS),	DBG_C_BINDINGS,	0},
-	{MSG_ORIG(MSG_TOK_CALLBACK),    DBG_C_CALLBACK,	0},
+	{MSG_ORIG(MSG_TOK_DL),   	DBG_C_DL,	0},
 	{MSG_ORIG(MSG_TOK_INIT),	DBG_C_INIT,	0},
 	{NULL,				0,		0},
 };
@@ -261,7 +261,6 @@ Dbg_help(void)
 	dbg_print(0, MSG_INTL(MSG_USE_R8_B));
 	dbg_print(0, MSG_INTL(MSG_USE_R8_B2));
 	dbg_print(0, MSG_INTL(MSG_USE_R8_C));
-	dbg_print(0, MSG_INTL(MSG_USE_R8_C2));
 	dbg_print(0, MSG_INTL(MSG_USE_R8_D));
 
 	Dbg_util_nl(0, DBG_NL_FRC);

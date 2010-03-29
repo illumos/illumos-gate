@@ -1023,7 +1023,7 @@ ld_vers_verify(Ofl_desc *ofl)
 #endif
 		nv = getenv(MSG_ORIG(MSG_LD_NOVERSION));
 
-	if (nv && (*nv != '\0'))
+	if (nv && nv[0])
 		return (1);
 
 	for (APLIST_TRAVERSE(ofl->ofl_soneed, idx1, sdf)) {
