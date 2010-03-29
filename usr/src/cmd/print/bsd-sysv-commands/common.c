@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -185,7 +185,10 @@ printer_state_line(FILE *fp, papi_printer_t p, int num_jobs, char *name)
 
 	if ((state != 0x03) || (num_jobs != 0)) {
 		fprintf(fp, "%s: %s", name, state_string(state));
-		if (state == 0x05) /* stopped */
+		if ((state == 0x05) ||
+		    (state == 0x06) ||
+		    (state == 0x07) ||
+		    (state == 0x08)) /* stopped */
 			fprintf(fp, ": %s\n", reason);
 		else
 			fprintf(fp, "\n");

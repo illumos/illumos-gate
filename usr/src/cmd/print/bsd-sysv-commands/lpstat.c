@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -406,6 +406,7 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 		printf(gettext("is idle. enabled"));
 		break;
 	case 0x04: /* processing */
+	case 0x06: /* faulted printing */
 		status = papiPrinterListJobs(svc, name, NULL,
 		    0, 0, &j);
 
@@ -445,10 +446,16 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 					if ((jstate == 0x0008) ||
 					    (jstate == 0x05) ||
 					    (jstate == 0)) {
-						printf(gettext
-						    ("now printing"\
-						    " %s-%d. enabled"),
-						    name, jobid);
+						if (pstat == 0x04)
+							printf(gettext
+							    ("now printing"\
+							    " %s-%d. enabled"),
+							    name, jobid);
+						if (pstat == 0x06)
+							printf(gettext
+							    ("faulted printing"\
+							    " %s-%d. enabled"),
+							    name, jobid);
 						break;
 					}
 				}
@@ -459,21 +466,34 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 	case 0x05:	/* stopped */
 		printf(gettext("disabled"));
 		break;
+	case 0x07:	/* faulted printer */
+		printf(gettext("faulted. enabled"));
+		break;
+	case 0x08:	/* waiting for auto retry */
+		printf(gettext("waiting for auto-retry."));
+		break;
 	default:
 		printf(gettext("unknown state(0x%x)."), pstat);
 		break;
 	}
 
-	(void) time(&curr);
-	(void) papiAttributeListGetDatetime(attrs, NULL,
-	    "printer-up-time", &curr);
-	(void) papiAttributeListGetDatetime(attrs, NULL,
-	    "printer-state-time", &curr);
-	(void) papiAttributeListGetDatetime(attrs, NULL,
-	    "lpsched-disable-date", &curr);
-	printf(gettext(" since %s. available.\n"), nctime(&curr));
+	if (pstat == 0x08)
+		printf(gettext(" available.\n"));
+	else {
+		(void) time(&curr);
+		(void) papiAttributeListGetDatetime(attrs, NULL,
+		    "printer-up-time", &curr);
+		(void) papiAttributeListGetDatetime(attrs, NULL,
+		    "printer-state-time", &curr);
+		(void) papiAttributeListGetDatetime(attrs, NULL,
+		    "lpsched-disable-date", &curr);
+		printf(gettext(" since %s. available.\n"), nctime(&curr));
+	}
 
-	if (pstat == 0x05) {
+	if ((pstat == 0x05) ||
+	    (pstat == 0x06) ||
+	    (pstat == 0x07) ||
+	    (pstat == 0x08)) {
 		char *reason = "unknown reason";
 
 		(void) papiAttributeListGetString(attrs, NULL,
