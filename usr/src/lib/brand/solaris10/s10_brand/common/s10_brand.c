@@ -810,10 +810,35 @@ ctfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 	return (0);
 }
 
-typedef struct s10_zfs_cmd {
+/*
+ * This is S10u8's zinject_record_t structure.
+ */
+typedef struct s10_zinject_record_u8 {
+	uint64_t	zi_objset;
+	uint64_t	zi_object;
+	uint64_t	zi_start;
+	uint64_t	zi_end;
+	uint64_t	zi_guid;
+	uint32_t	zi_level;
+	uint32_t	zi_error;
+	uint64_t	zi_type;
+	uint32_t	zi_freq;
+	/* Solaris Next added zi_failfast here */
+	/* Solaris Next added zi_func here */
+	/* Solaris Next added zi_iotype here */
+	uint32_t	zi_pad;		/* 64-bit alignment; renamed to */
+					/* zi_duration in Solaris Next */
+	/* Solaris Next added zi_timer here */
+} s10_zinject_record_u8_t;
+
+/*
+ * This is S10u8's zfs_cmd_t structure, which is used by ZFS ioctls.
+ */
+typedef struct s10_zfs_cmd_u8 {
 	char		zc_name[MAXPATHLEN];
 	char		zc_value[MAXPATHLEN * 2];
 	char		zc_string[MAXNAMELEN];
+	/* Solaris Next added zc_top_ds here */
 	uint64_t	zc_guid;
 	uint64_t	zc_nvlist_conf;		/* really (char *) */
 	uint64_t	zc_nvlist_conf_size;
@@ -832,44 +857,100 @@ typedef struct s10_zfs_cmd {
 	zfs_share_t	zc_share;
 	dmu_objset_stats_t zc_objset_stats;
 	struct drr_begin zc_begin_record;
-	zinject_record_t zc_inject_record;
-} s10_zfs_cmd_t;
+	s10_zinject_record_u8_t zc_inject_record;
+	/* Solaris Next added zc_defer_destroy here */
+	/* Solaris Next added zc_temphold here */
+} s10_zfs_cmd_u8_t;
 
 /*
- * There is a difference in the zfs_cmd_t ioctl parameter between S10 and
- * Solaris Next so we need to translate between the two structures when
- * making ZFS ioctls.
+ * Solaris Next removed these ZFS ioctls.
+ */
+#define	S10_ZFS_IOC_CREATE_MINOR	ZFS_IOC_CREATE
+#define	S10_ZFS_IOC_REMOVE_MINOR	ZFS_IOC_DESTROY
+#define	S10_ZFS_IOC_ISCSI_PERM_CHECK	ZFS_IOC_SMB_ACL
+
+/*
+ * ZFS ioctls changed between Solaris 10 (S10) and Solaris Next (S.Next).
+ * This emulation function translates S10 ZFS ioctls into their S.Next
+ * counterparts (and vice versa).
  */
 static int
 zfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 {
 	int				err;
-	s10_zfs_cmd_t			s10_param;
+	s10_zfs_cmd_u8_t		s10_param;
 	zfs_cmd_t			native_param;
 	static dev_t			zfs_dev = (dev_t)-1;
 	struct stat			sbuf;
 
+	/*
+	 * Ensure that the ioctl is targeting the ZFS device, /dev/zfs.
+	 * If it isn't, then s10_ioctl() mistook the ioctl for a ZFS ioctl.
+	 * In that case, it doesn't need to be emulated, so we pass it to the
+	 * kernel.
+	 */
 	if (zfs_dev == (dev_t)-1) {
 		if ((err = __systemcall(rval, SYS_fstatat + 1024,
-		    AT_FDCWD, "/dev/zfs", &sbuf, 0) != 0) != 0)
-			goto nonemuioctl;
+		    AT_FDCWD, ZFS_DEV, &sbuf, 0) != 0) != 0)
+			goto passthruioctl;
 		zfs_dev = major(sbuf.st_rdev);
 	}
 	if ((err = __systemcall(rval, SYS_fstatat + 1024,
 	    fdes, NULL, &sbuf, 0)) != 0)
 		return (err);
 	if (major(sbuf.st_rdev) != zfs_dev)
-		goto nonemuioctl;
+		goto passthruioctl;
 
+	/*
+	 * S.Next removed the ZFS_IOC_CREATE_MINOR, ZFS_IOC_REMOVE_MINOR, and
+	 * ZFS_IOC_ISCSI_PERM_CHECK ioctl commands, which were defined in the
+	 * middle of zfs_ioc_t.  This means that all ZFS ioctls numbers greater
+	 * than ZFS_IOC_REMOVE_MINOR must be decremented by two and those
+	 * greater than ZFS_IOC_ISCSI_PERM_CHECK must be decremented by three.
+	 * We'll return EPERM when the ioctl is ZFS_IOC_CREATE_MINOR or
+	 * ZFS_IOC_REMOVE_MINOR because that's what ZFS does inside native S10
+	 * zones.  We'll also return EPERM when the ioctl is
+	 * ZFS_IOC_ISCSI_PERM_CHECK.
+	 */
+	if (cmd == S10_ZFS_IOC_CREATE_MINOR ||
+	    cmd == S10_ZFS_IOC_REMOVE_MINOR ||
+	    cmd == S10_ZFS_IOC_ISCSI_PERM_CHECK)
+		return (EPERM);
+	if (cmd > S10_ZFS_IOC_ISCSI_PERM_CHECK)
+		cmd -= 3;
+	else if (cmd > S10_ZFS_IOC_REMOVE_MINOR)
+		cmd -= 2;
+
+	/*
+	 * S10u9's ZFS ioctls are compatible with their S.Next
+	 * counterparts (modulo some removed ioctl command numbers;
+	 * see above); consequently, we can pass the ioctl's
+	 * zfs_cmd_t structure to the S.Next kernel without modifying
+	 * it if the process is running in an S10u9 environment.
+	 * (S10_FEATURE_U9_ZFS_IOCTL indicates an S10u9 environment.)
+	 */
+	if (S10_FEATURE_IS_PRESENT(S10_FEATURE_U9_ZFS_IOCTL))
+		goto passthruioctl;
+
+	/*
+	 * The process is running in an S10u8 environment.
+	 * Copy the S10 process' ioctl structure to the stack.  We'll
+	 * copy the individual fields to a Solaris Next ZFS ioctl
+	 * structure.
+	 */
 	if (s10_uucopy((const void *)arg, &s10_param, sizeof (s10_param)) != 0)
 		return (EFAULT);
 
-	bcopy((const void *)s10_param.zc_name, (void *)native_param.zc_name,
-	    sizeof (s10_param.zc_name));
-	bcopy((const void *)s10_param.zc_value, (void *)native_param.zc_value,
-	    sizeof (s10_param.zc_value));
-	bcopy((const void *)s10_param.zc_string, (void *)native_param.zc_string,
-	    sizeof (s10_param.zc_string));
+	/*
+	 * Copy fields from the S10 ioctl structure on the stack to the
+	 * Solaris Next ioctl structure.
+	 */
+	bcopy(s10_param.zc_name, native_param.zc_name,
+	    sizeof (native_param.zc_name));
+	bcopy(s10_param.zc_value, native_param.zc_value,
+	    sizeof (native_param.zc_value));
+	bcopy(s10_param.zc_string, native_param.zc_string,
+	    sizeof (native_param.zc_string));
 	struct_assign(native_param, s10_param, zc_guid);
 	struct_assign(native_param, s10_param, zc_nvlist_conf);
 	struct_assign(native_param, s10_param, zc_nvlist_conf_size);
@@ -884,19 +965,46 @@ zfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 	struct_assign(native_param, s10_param, zc_history_len);
 	struct_assign(native_param, s10_param, zc_history_offset);
 	struct_assign(native_param, s10_param, zc_obj);
-	native_param.zc_iflags = 0;
 	struct_assign(native_param, s10_param, zc_share);
 	struct_assign(native_param, s10_param, zc_objset_stats);
 	struct_assign(native_param, s10_param, zc_begin_record);
-	struct_assign(native_param, s10_param, zc_inject_record);
+	struct_assign(native_param, s10_param, zc_inject_record.zi_objset);
+	struct_assign(native_param, s10_param, zc_inject_record.zi_object);
+	struct_assign(native_param, s10_param, zc_inject_record.zi_start);
+	struct_assign(native_param, s10_param, zc_inject_record.zi_end);
+	struct_assign(native_param, s10_param, zc_inject_record.zi_guid);
+	struct_assign(native_param, s10_param, zc_inject_record.zi_level);
+	struct_assign(native_param, s10_param, zc_inject_record.zi_error);
+	struct_assign(native_param, s10_param, zc_inject_record.zi_type);
+	struct_assign(native_param, s10_param, zc_inject_record.zi_freq);
 
+	/*
+	 * Fill Solaris Next fields that aren't in S10u8 with sensible values.
+	 */
+	native_param.zc_top_ds[0] = '\0';
+	native_param.zc_iflags = 0;
+	native_param.zc_inject_record.zi_failfast = B_FALSE;
+	native_param.zc_inject_record.zi_func[0] = '\0';
+	native_param.zc_inject_record.zi_iotype = ZIO_TYPES;
+	native_param.zc_inject_record.zi_duration = 0;
+	native_param.zc_inject_record.zi_timer = 0;
+	native_param.zc_defer_destroy = B_FALSE;
+	native_param.zc_temphold = B_FALSE;
+
+	/*
+	 * Issue a native ZFS ioctl using the Solaris Next ioctl structure.
+	 */
 	err = __systemcall(rval, SYS_ioctl + 1024, fdes, cmd, &native_param);
 
-	bcopy((const void *)native_param.zc_name, (void *)s10_param.zc_name,
+	/*
+	 * Copy fields shared by both S10 and Solaris Next ioctl structures
+	 * from the Solaris Next structure to the S10 structure.
+	 */
+	bcopy(native_param.zc_name, s10_param.zc_name,
 	    sizeof (s10_param.zc_name));
-	bcopy((const void *)native_param.zc_value, (void *)s10_param.zc_value,
+	bcopy(native_param.zc_value, s10_param.zc_value,
 	    sizeof (s10_param.zc_value));
-	bcopy((const void *)native_param.zc_string, (void *)s10_param.zc_string,
+	bcopy(native_param.zc_string, s10_param.zc_string,
 	    sizeof (s10_param.zc_string));
 	struct_assign(s10_param, native_param, zc_guid);
 	struct_assign(s10_param, native_param, zc_nvlist_conf);
@@ -915,12 +1023,24 @@ zfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 	struct_assign(s10_param, native_param, zc_share);
 	struct_assign(s10_param, native_param, zc_objset_stats);
 	struct_assign(s10_param, native_param, zc_begin_record);
-	struct_assign(s10_param, native_param, zc_inject_record);
+	struct_assign(s10_param, native_param, zc_inject_record.zi_objset);
+	struct_assign(s10_param, native_param, zc_inject_record.zi_object);
+	struct_assign(s10_param, native_param, zc_inject_record.zi_start);
+	struct_assign(s10_param, native_param, zc_inject_record.zi_end);
+	struct_assign(s10_param, native_param, zc_inject_record.zi_guid);
+	struct_assign(s10_param, native_param, zc_inject_record.zi_level);
+	struct_assign(s10_param, native_param, zc_inject_record.zi_error);
+	struct_assign(s10_param, native_param, zc_inject_record.zi_type);
+	struct_assign(s10_param, native_param, zc_inject_record.zi_freq);
 
+	/*
+	 * Copy the S10 structure from the stack to the location
+	 * specified by the S10 process.
+	 */
 	(void) s10_uucopy(&s10_param, (void *)arg, sizeof (s10_param));
 	return (err);
 
-nonemuioctl:
+passthruioctl:
 	return (__systemcall(rval, SYS_ioctl + 1024, fdes, cmd, arg));
 }
 

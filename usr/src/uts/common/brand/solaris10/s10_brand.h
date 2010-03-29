@@ -86,6 +86,7 @@ extern "C" {
  */
 enum s10_emulated_features {
 	S10_FEATURE_ALTERED_MNTFS_IOCTL,
+	S10_FEATURE_U9_ZFS_IOCTL,	/* S10u9 ZFS ioctl changes */
 	S10_NUM_EMUL_FEATURES		/* This must be the last entry! */
 };
 
