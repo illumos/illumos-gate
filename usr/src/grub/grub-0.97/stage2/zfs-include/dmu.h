@@ -56,7 +56,7 @@ typedef enum dmu_object_type {
 	DMU_OT_DSL_DATASET,		/* UINT64 */
 	/* zpl: */
 	DMU_OT_ZNODE,			/* ZNODE */
-	DMU_OT_ACL,			/* ACL */
+	DMU_OT_OLDACL,			/* OLD ACL */
 	DMU_OT_PLAIN_FILE_CONTENTS,	/* UINT8 */
 	DMU_OT_DIRECTORY_CONTENTS,	/* ZAP */
 	DMU_OT_MASTER_NODE,		/* ZAP */

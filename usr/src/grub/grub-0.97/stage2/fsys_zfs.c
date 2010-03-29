@@ -1436,7 +1436,6 @@ zfs_open(char *filename)
 		sa_hdr_phys_t *sahdrp;
 		int hdrsize;
 
-		sahdrp = (sa_hdr_phys_t *)DN_BONUS(DNODE);
 		if (DNODE->dn_bonuslen != 0) {
 			sahdrp = (sa_hdr_phys_t *)DN_BONUS(DNODE);
 		} else {
