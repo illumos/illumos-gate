@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -746,10 +746,8 @@ mapped:
 	    cookiep->dmac_size);
 	dump_dma_handle(DBG_DMA_MAP, dip, mp);
 
-	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR) {
-		(void) ndi_fmc_insert(rdip, DMA_HANDLE, mp, NULL);
+	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR)
 		mp->dmai_error.err_cf = impl_dma_check;
-	}
 
 	mp->dmai_flags |= DMAI_FLAGS_MAPPED;
 	return (mp->dmai_nwin == 1 ? DDI_DMA_MAPPED : DDI_DMA_PARTIAL_MAP);
@@ -808,12 +806,7 @@ pci_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 	mp->dmai_flags &= DMAI_FLAGS_PRESERVE;
 	SYNC_BUF_PA(mp) = 0;
 
-	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR) {
-		if (DEVI(rdip)->devi_fmhdl != NULL &&
-		    DDI_FM_DMA_ERR_CAP(DEVI(rdip)->devi_fmhdl->fh_cap)) {
-			(void) ndi_fmc_remove(rdip, DMA_HANDLE, mp);
-		}
-	}
+	mp->dmai_error.err_cf = NULL;
 
 	return (DDI_SUCCESS);
 }

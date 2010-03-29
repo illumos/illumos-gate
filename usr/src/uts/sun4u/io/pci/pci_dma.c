@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PCI nexus DVMA and DMA core routines:
@@ -60,8 +58,8 @@ pci_sc_pg_inv(dev_info_t *dip, sc_t *sc_p, ddi_dma_impl_t *mp, off_t off,
 	pg_off = MIN(off + len, pg_off);		/* hi */
 	if (dvma_addr >= pg_off) {			/* lo >= hi ? */
 		DEBUG4(DBG_SC, dip, "%x+%x out of window [%x,%x)\n",
-			off, len, mp->dmai_offset,
-			mp->dmai_offset + mp->dmai_size);
+		    off, len, mp->dmai_offset,
+		    mp->dmai_offset + mp->dmai_size);
 		return;
 	}
 
@@ -120,7 +118,7 @@ start:
 		stack_buf[0] |= PCI_SYNC_FLAG_FAILED;
 done:
 	DEBUG3(DBG_SC|DBG_CONT, 0, "flag wait loops=%lu ticks=%lu status=%x\n",
-		loops, gethrtime() - start_time, stack_buf[0]);
+	    loops, gethrtime() - start_time, stack_buf[0]);
 
 	if (stack_buf[0] & PCI_SYNC_FLAG_LOCKED)
 		mutex_exit(&sc_p->sc_sync_mutex);
@@ -155,9 +153,9 @@ pci_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	sc_t *sc_p;
 
 	DEBUG4(DBG_DMA_SYNC, dip, "%s%d flags=%x,%x\n", ddi_driver_name(rdip),
-		ddi_get_instance(rdip), dev_flag, sync_flag);
+	    ddi_get_instance(rdip), dev_flag, sync_flag);
 	DEBUG4(DBG_SC, dip, "dmai_mapping=%x, dmai_sz=%x off=%x len=%x\n",
-		mp->dmai_mapping, mp->dmai_size, off, len);
+	    mp->dmai_mapping, mp->dmai_size, off, len);
 	DEBUG2(DBG_SC, dip, "mp=%p, ctx=%x\n", mp, MP2CTX(mp));
 
 	if (!(mp->dmai_flags & DMAI_FLAGS_INUSE)) {
@@ -210,7 +208,7 @@ ext:
 	if (sync_flag & PCI_DMA_SYNC_BAR)
 		goto wait_check;
 	if (sync_flag & PCI_DMA_SYNC_AFTER &&
-		mp->dmai_flags & DMAI_FLAGS_CONTEXT && pci_sc_use_contexts)
+	    mp->dmai_flags & DMAI_FLAGS_CONTEXT && pci_sc_use_contexts)
 		ret = pci_sc_ctx_inv(dip, sc_p, mp);
 	if (ret)
 		pci_sc_pg_inv(dip, sc_p, mp, off, len);
@@ -301,6 +299,7 @@ pci_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 	mp->dmai_error.err_ontrap = NULL;
 	mp->dmai_error.err_fep = NULL;
 	mp->dmai_error.err_cf = NULL;
+	ndi_fmc_insert(rdip, DMA_HANDLE, mp, NULL);
 
 	SYNC_BUF_PA(mp) = 0ull;
 	return (mp);
@@ -309,6 +308,7 @@ pci_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 void
 pci_dma_freemp(ddi_dma_impl_t *mp)
 {
+	ndi_fmc_remove(mp->dmai_rdip, DMA_HANDLE, mp);
 	if (mp->dmai_ndvmapages > 1)
 		pci_dma_freepfn(mp);
 	if (mp->dmai_winlst)
@@ -371,7 +371,7 @@ pci_dma_lmts2hdl(dev_info_t *dip, dev_info_t *rdip, iommu_t *iommu_p,
 		count_max--;
 
 	if (!(mp = pci_dma_allocmp(dip, rdip, dmareq->dmar_fp,
-		dmareq->dmar_arg)))
+	    dmareq->dmar_arg)))
 		return (NULL);
 
 	/* store original dev input at the 2nd ddi_dma_attr */
@@ -387,7 +387,7 @@ pci_dma_lmts2hdl(dev_info_t *dip, dev_info_t *rdip, iommu_t *iommu_p,
 
 	if (DEV_NOSYSLIMIT(lo, hi, syslo, fasthi, 1))
 		mp->dmai_flags |= DMAI_FLAGS_NOFASTLIMIT |
-			DMAI_FLAGS_NOSYSLIMIT;
+		    DMAI_FLAGS_NOSYSLIMIT;
 	else {
 		if (DEV_NOFASTLIMIT(lo, hi, syslo, syshi, 1))
 			mp->dmai_flags |= DMAI_FLAGS_NOFASTLIMIT;
@@ -431,11 +431,11 @@ pci_dma_attr2hdl(pci_t *pci_p, ddi_dma_impl_t *mp)
 	uint64_t count_max	= attrp->dma_attr_count_max;
 
 	DEBUG3(DBG_DMA_ALLOCH, pci_p->pci_dip, "attrp=%p cntr_max=%x.%08x\n",
-		attrp, HI32(count_max), LO32(count_max));
+	    attrp, HI32(count_max), LO32(count_max));
 	DEBUG4(DBG_DMA_ALLOCH, pci_p->pci_dip, "hi=%x.%08x lo=%x.%08x\n",
-		HI32(hi), LO32(hi), HI32(lo), LO32(lo));
+	    HI32(hi), LO32(hi), HI32(lo), LO32(lo));
 	DEBUG4(DBG_DMA_ALLOCH, pci_p->pci_dip, "seg=%x.%08x align=%x.%08x\n",
-		HI32(nocross), LO32(nocross), HI32(align), LO32(align));
+	    HI32(nocross), LO32(nocross), HI32(align), LO32(align));
 
 	if (!nocross)
 		nocross--;
@@ -460,7 +460,7 @@ pci_dma_attr2hdl(pci_t *pci_p, ddi_dma_impl_t *mp)
 		if ((align & nocross) != align) {
 			dev_info_t *rdip = mp->dmai_rdip;
 			cmn_err(CE_WARN, "%s%d dma_attr_seg not aligned",
-				NAMEINST(rdip));
+			    NAMEINST(rdip));
 			return (DDI_DMA_BADATTR);
 		}
 		align = IOMMU_BTOP(align + 1);
@@ -478,13 +478,13 @@ pci_dma_attr2hdl(pci_t *pci_p, ddi_dma_impl_t *mp)
 		count_max--;
 
 	DEBUG4(DBG_DMA_ALLOCH, pci_p->pci_dip, "hi=%x.%08x, lo=%x.%08x\n",
-		HI32(hi), LO32(hi), HI32(lo), LO32(lo));
+	    HI32(hi), LO32(hi), HI32(lo), LO32(lo));
 	if (hi <= lo) { /* peer transfers cannot have alignment & nocross */
 		dev_info_t *rdip = mp->dmai_rdip;
 		cmn_err(CE_WARN, "%s%d peer only dev %p", NAMEINST(rdip), mp);
 		if ((nocross < UINT32_MAX) || (align > 1)) {
 			cmn_err(CE_WARN, "%s%d peer only device bad attr",
-				NAMEINST(rdip));
+			    NAMEINST(rdip));
 			return (DDI_DMA_BADATTR);
 		}
 		mp->dmai_flags |= DMAI_FLAGS_PEER_ONLY;
@@ -493,7 +493,7 @@ pci_dma_attr2hdl(pci_t *pci_p, ddi_dma_impl_t *mp)
 
 	if (DEV_NOSYSLIMIT(lo, hi, syslo, syshi, align))
 		mp->dmai_flags |= DMAI_FLAGS_NOSYSLIMIT |
-			DMAI_FLAGS_NOFASTLIMIT;
+		    DMAI_FLAGS_NOFASTLIMIT;
 	else {
 		syshi = iommu_p->iommu_dvma_fast_end;
 		if (DEV_NOFASTLIMIT(lo, hi, syslo, syshi, align))
@@ -575,10 +575,10 @@ pci_dma_type(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 			ASSERT(PAGE_LOCKED(*pplist));
 			pfn0 = page_pptonum(*pplist);
 		} else if (pci_dvma_remap_enabled && as_p == &kas &&
-			dobj_p->dmao_type != DMA_OTYP_BUFVADDR) {
+		    dobj_p->dmao_type != DMA_OTYP_BUFVADDR) {
 			int (*waitfp)(caddr_t) = dmareq->dmar_fp;
 			uint_t flags = ((waitfp == DDI_DMA_SLEEP)?
-				    HAC_SLEEP : HAC_NOSLEEP) | HAC_PAGELOCK;
+			    HAC_SLEEP : HAC_NOSLEEP) | HAC_PAGELOCK;
 			int ret;
 
 			ret = hat_add_callback(pci_dvma_cbid, vaddr,
@@ -610,12 +610,12 @@ pci_dma_type(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	case DMA_OTYP_PADDR:
 	default:
 		cmn_err(CE_WARN, "%s%d requested unsupported dma type %x",
-			NAMEINST(mp->dmai_rdip), dobj_p->dmao_type);
+		    NAMEINST(mp->dmai_rdip), dobj_p->dmao_type);
 		return (DDI_DMA_NOMAPPING);
 	}
 	if (pfn0 == PFN_INVALID) {
 		cmn_err(CE_WARN, "%s%d: invalid pfn0 for DMA object %p",
-			NAMEINST(dip), dobj_p);
+		    NAMEINST(dip), dobj_p);
 		return (DDI_DMA_NOMAPPING);
 	}
 	if (TGT_PFN_INBETWEEN(pfn0, pbm_p->pbm_base_pfn, pbm_p->pbm_last_pfn)) {
@@ -628,7 +628,7 @@ pci_dma_type(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		return (DDI_DMA_NOMAPPING);
 	}
 	mp->dmai_flags |= (mp->dmai_flags & DMAI_FLAGS_BYPASSREQ) ?
-		DMAI_FLAGS_BYPASS : DMAI_FLAGS_DVMA;
+	    DMAI_FLAGS_BYPASS : DMAI_FLAGS_DVMA;
 done:
 	mp->dmai_object	 = *dobj_p;			/* whole object    */
 	mp->dmai_pfn0	 = (void *)pfn0;		/* cache pfn0	   */
@@ -655,7 +655,7 @@ pci_dma_pgpfn(pci_t *pci_p, ddi_dma_impl_t *mp, uint_t npages)
 	case DMA_OTYP_VADDR: {
 		page_t **pplist = mp->dmai_object.dmao_obj.virt_obj.v_priv;
 		DEBUG2(DBG_DMA_MAP, dip, "shadow pplist=%p, %x pages, pfns=",
-			pplist, npages);
+		    pplist, npages);
 		for (i = 1; i < npages; i++) {
 			iopfn_t pfn = page_pptonum(pplist[i]);
 			ASSERT(PAGE_LOCKED(pplist[i]));
@@ -707,7 +707,7 @@ pci_dma_vapfn(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp,
 	    IOMMU_PAGE_SIZE) & IOMMU_PAGE_MASK);
 
 	if (pci_dvma_remap_enabled && hat_p == kas.a_hat &&
-		mp->dmai_object.dmao_type != DMA_OTYP_BUFVADDR)
+	    mp->dmai_object.dmao_type != DMA_OTYP_BUFVADDR)
 		needcb = 1;
 
 	for (vaddr = sva, i = 1; i < npages; i++, vaddr += IOMMU_PAGE_SIZE) {
@@ -736,7 +736,7 @@ pci_dma_vapfn(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp,
 			goto err_badpfn;
 		PCI_SET_MP_PFN1(mp, i, (iopfn_t)pfn);
 		DEBUG3(DBG_DMA_MAP, dip, "pci_dma_vapfn: mp=%p pfnlst[%x]=%x\n",
-			mp, i, (iopfn_t)pfn);
+		    mp, i, (iopfn_t)pfn);
 	}
 	return (DDI_SUCCESS);
 err_badpfn:
@@ -767,7 +767,7 @@ pci_dma_pfn(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	iopfn_t pfn_adj = peer ? pfn_base : 0;
 
 	DEBUG2(DBG_DMA_MAP, pci_p->pci_dip, "pci_dma_pfn: mp=%p pfn0=%x\n",
-		mp, MP_PFN0(mp) - pfn_adj);
+	    mp, MP_PFN0(mp) - pfn_adj);
 	/* 1 page: no array alloc/fill, no mixed mode check */
 	if (npages == 1) {
 		PCI_SET_MP_PFN(mp, 0, MP_PFN0(mp) - pfn_adj);
@@ -775,16 +775,16 @@ pci_dma_pfn(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	}
 	/* allocate pfn array */
 	if (!(mp->dmai_pfnlst = kmem_alloc(npages * sizeof (iopfn_t),
-		waitfp == DDI_DMA_SLEEP ? KM_SLEEP : KM_NOSLEEP))) {
+	    waitfp == DDI_DMA_SLEEP ? KM_SLEEP : KM_NOSLEEP))) {
 		if (waitfp != DDI_DMA_DONTWAIT)
 			ddi_set_callback(waitfp, dmareq->dmar_arg,
-				&pci_kmem_clid);
+			    &pci_kmem_clid);
 		return (DDI_DMA_NORESOURCES);
 	}
 	/* fill pfn array */
 	PCI_SET_MP_PFN(mp, 0, MP_PFN0(mp) - pfn_adj);	/* pfnlst[0] */
 	if ((ret = PCI_DMA_ISPGPFN(mp) ? pci_dma_pgpfn(pci_p, mp, npages) :
-		pci_dma_vapfn(pci_p, dmareq, mp, npages)) != DDI_SUCCESS)
+	    pci_dma_vapfn(pci_p, dmareq, mp, npages)) != DDI_SUCCESS)
 		goto err;
 
 	/* skip pfn0, check mixed mode and adjust peer to peer pfn */
@@ -792,12 +792,12 @@ pci_dma_pfn(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		iopfn_t pfn = PCI_GET_MP_PFN1(mp, i);
 		if (peer ^ TGT_PFN_INBETWEEN(pfn, pfn_base, pfn_last)) {
 			cmn_err(CE_WARN, "%s%d mixed mode DMA %lx %lx",
-				NAMEINST(mp->dmai_rdip), MP_PFN0(mp), pfn);
+			    NAMEINST(mp->dmai_rdip), MP_PFN0(mp), pfn);
 			ret = DDI_DMA_NOMAPPING;	/* mixed mode */
 			goto err;
 		}
 		DEBUG3(DBG_DMA_MAP, pci_p->pci_dip,
-			"pci_dma_pfn: pfnlst[%x]=%x-%x\n", i, pfn, pfn_adj);
+		    "pci_dma_pfn: pfnlst[%x]=%x-%x\n", i, pfn, pfn_adj);
 		if (pfn_adj)
 			PCI_SET_MP_PFN1(mp, i, pfn - pfn_adj);
 	}
@@ -850,7 +850,8 @@ pci_dvma_win(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	pg_off	= mp->dmai_roffset;
 	xfer_sz	= obj_sz + redzone_sz;
 
-	/* include redzone in nocross check */ {
+	/* include redzone in nocross check */
+	{
 		uint64_t nocross = mp->dmai_attr.dma_attr_seg;
 		if (xfer_sz + pg_off - 1 > nocross)
 			xfer_sz = nocross - pg_off + 1;
@@ -861,8 +862,9 @@ pci_dvma_win(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 			return (DDI_DMA_TOOBIG);
 		}
 	}
-	xfer_sz -= redzone_sz;		/* restore transfer size  */
-	/* check counter max */ {
+	xfer_sz -= redzone_sz;	/* restore transfer size  */
+	/* check counter max */
+	{
 		uint32_t count_max = mp->dmai_attr.dma_attr_count_max;
 		if (xfer_sz - 1 > count_max)
 			xfer_sz = count_max + 1;
@@ -919,11 +921,13 @@ pci_dvma_map_fast(iommu_t *iommu_p, ddi_dma_impl_t *mp)
 	ASSERT(IOMMU_PTOB(npages) == mp->dmai_winsize);
 	ASSERT(npages + HAS_REDZONE(mp) <= clustsz);
 
-	for (; i < entries && ldstub(lock_addr); i++, lock_addr++);
+	for (; i < entries && ldstub(lock_addr); i++, lock_addr++)
+		;
 	if (i >= entries) {
 		lock_addr = iommu_p->iommu_dvma_cache_locks;
 		i = 0;
-		for (; i < entries && ldstub(lock_addr); i++, lock_addr++);
+		for (; i < entries && ldstub(lock_addr); i++, lock_addr++)
+			;
 		if (i >= entries) {
 #ifdef PCI_DMA_PROF
 			pci_dvmaft_exhaust++;
@@ -947,14 +951,14 @@ pci_dvma_map_fast(iommu_t *iommu_p, ddi_dma_impl_t *mp)
 #endif
 	*tte_addr = tte | IOMMU_PTOB(MP_PFN0(mp)); /* map page 0 */
 	DEBUG5(DBG_DMA_MAP, dip, "fast %p:dvma_pg=%x tte0(%p)=%08x.%08x\n", mp,
-		dvma_pg, tte_addr, HI32(*tte_addr), LO32(*tte_addr));
+	    dvma_pg, tte_addr, HI32(*tte_addr), LO32(*tte_addr));
 	if (npages == 1)
 		goto tte_done;
 	pfn_addr = PCI_GET_MP_PFN1_ADDR(mp); /* short iommu_map_pages() */
 	for (tte_addr++, i = 1; i < npages; i++, tte_addr++, pfn_addr++) {
 		*tte_addr = tte | IOMMU_PTOB(*pfn_addr);
 		DEBUG5(DBG_DMA_MAP, dip, "fast %p:tte(%p, %p)=%08x.%08x\n", mp,
-			tte_addr, pfn_addr, HI32(*tte_addr), LO32(*tte_addr));
+		    tte_addr, pfn_addr, HI32(*tte_addr), LO32(*tte_addr));
 	}
 tte_done:
 #ifdef PCI_DMA_PROF
@@ -966,7 +970,7 @@ tte_done:
 	PCI_SAVE_MP_TTE(mp, tte);	/* save TTE template for unmapping */
 	if (DVMA_DBG_ON(iommu_p))
 		pci_dvma_alloc_debug(iommu_p, (char *)mp->dmai_mapping,
-			mp->dmai_size, mp);
+		    mp->dmai_size, mp);
 	return (DDI_SUCCESS);
 }
 
@@ -993,20 +997,20 @@ pci_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, iommu_t *iommu_p)
 	 */
 	if ((npages == 1) && !HAS_REDZONE(mp) && HAS_NOSYSLIMIT(mp)) {
 		dvma_addr = vmem_alloc(iommu_p->iommu_dvma_map,
-			IOMMU_PAGE_SIZE, sleep);
+		    IOMMU_PAGE_SIZE, sleep);
 		mp->dmai_flags |= DMAI_FLAGS_VMEMCACHE;
 #ifdef PCI_DMA_PROF
 		pci_dvma_vmem_alloc++;
 #endif
 	} else {
 		dvma_addr = vmem_xalloc(iommu_p->iommu_dvma_map,
-			IOMMU_PTOB(npages + HAS_REDZONE(mp)),
-			MAX(mp->dmai_attr.dma_attr_align, IOMMU_PAGE_SIZE),
-			0,
-			mp->dmai_attr.dma_attr_seg + 1,
-			(void *)mp->dmai_attr.dma_attr_addr_lo,
-			(void *)(mp->dmai_attr.dma_attr_addr_hi + 1),
-			sleep);
+		    IOMMU_PTOB(npages + HAS_REDZONE(mp)),
+		    MAX(mp->dmai_attr.dma_attr_align, IOMMU_PAGE_SIZE),
+		    0,
+		    mp->dmai_attr.dma_attr_seg + 1,
+		    (void *)mp->dmai_attr.dma_attr_addr_lo,
+		    (void *)(mp->dmai_attr.dma_attr_addr_hi + 1),
+		    sleep);
 #ifdef PCI_DMA_PROF
 		pci_dvma_vmem_xalloc++;
 #endif
@@ -1014,7 +1018,7 @@ pci_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, iommu_t *iommu_p)
 	dvma_pg = IOMMU_BTOP((ulong_t)dvma_addr);
 	dvma_pg_index = dvma_pg - iommu_p->dvma_base_pg;
 	DEBUG2(DBG_DMA_MAP, dip, "fallback dvma_pages: dvma_pg=%x index=%x\n",
-		dvma_pg, dvma_pg_index);
+	    dvma_pg, dvma_pg_index);
 	if (dvma_pg == 0)
 		goto noresource;
 
@@ -1035,7 +1039,7 @@ noresource:
 	if (dmareq->dmar_fp != DDI_DMA_DONTWAIT) {
 		DEBUG0(DBG_DMA_MAP, dip, "dvma_pg 0 - set callback\n");
 		ddi_set_callback(dmareq->dmar_fp, dmareq->dmar_arg,
-			&iommu_p->iommu_dvma_clid);
+		    &iommu_p->iommu_dvma_clid);
 	}
 	DEBUG0(DBG_DMA_MAP, dip, "vmem_xalloc - DDI_DMA_NORESOURCES\n");
 	return (DDI_DMA_NORESOURCES);
@@ -1118,7 +1122,7 @@ pci_dvma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 
 		if (off >= mp->dmai_object.dmao_size) {
 			cmn_err(CE_WARN, "%s%d invalid dma_htoc offset %lx",
-				NAMEINST(mp->dmai_rdip), off);
+			    NAMEINST(mp->dmai_rdip), off);
 			return (DDI_FAILURE);
 		}
 		off += mp->dmai_roffset;
@@ -1127,18 +1131,18 @@ pci_dvma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 		if (ret)
 			return (ret);
 		DEBUG4(DBG_DMA_CTL, dip, "HTOC:cookie=%x+%lx off=%lx,%lx\n",
-			cp->dmac_address, cp->dmac_size, off, *offp);
+		    cp->dmac_address, cp->dmac_size, off, *offp);
 
 		/* adjust cookie addr/len if we are not on window boundary */
 		ASSERT((off % win_size) == (off -
-			(PCI_DMA_CURWIN(mp) ? mp->dmai_roffset : 0) - wo_off));
+		    (PCI_DMA_CURWIN(mp) ? mp->dmai_roffset : 0) - wo_off));
 		off = PCI_DMA_CURWIN(mp) ? off % win_size : *offp;
 		ASSERT(cp->dmac_size > off);
 		cp->dmac_laddress += off;
 		cp->dmac_size -= off;
 		DEBUG5(DBG_DMA_CTL, dip,
-			"HTOC:mp=%p cookie=%x+%lx off=%lx,%lx\n",
-			mp, cp->dmac_address, cp->dmac_size, off, wo_off);
+		    "HTOC:mp=%p cookie=%x+%lx off=%lx,%lx\n",
+		    mp, cp->dmac_address, cp->dmac_size, off, wo_off);
 		}
 		return (DDI_SUCCESS);
 
@@ -1191,7 +1195,7 @@ pci_dvma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 
 	case DDI_DMA_SEGTOC:
 		MAKE_DMA_COOKIE((ddi_dma_cookie_t *)objp, mp->dmai_mapping,
-			mp->dmai_size);
+		    mp->dmai_size);
 		*offp = mp->dmai_offset;
 		*lenp = mp->dmai_size;
 		return (DDI_SUCCESS);
@@ -1203,7 +1207,7 @@ pci_dvma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 		    (mp->dmai_mapping + mp->dmai_size))
 			return (DDI_FAILURE);
 		*objp = (caddr_t)(cp->dmac_address - mp->dmai_mapping +
-			mp->dmai_offset);
+		    mp->dmai_offset);
 		}
 		return (DDI_SUCCESS);
 
@@ -1214,7 +1218,7 @@ pci_dvma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 
 	default:
 		DEBUG3(DBG_DMA_CTL, dip, "unknown command (%x): rdip=%s%d\n",
-			cmd, ddi_driver_name(rdip), ddi_get_instance(rdip));
+		    cmd, ddi_driver_name(rdip), ddi_get_instance(rdip));
 		break;
 	}
 	return (DDI_FAILURE);
@@ -1227,7 +1231,7 @@ pci_dma_freewin(ddi_dma_impl_t *mp)
 	for (win2_p = win_p; win_p; win2_p = win_p) {
 		win_p = win2_p->win_next;
 		kmem_free(win2_p, sizeof (pci_dma_win_t) +
-			sizeof (ddi_dma_cookie_t) * win2_p->win_ncookies);
+		    sizeof (ddi_dma_cookie_t) * win2_p->win_ncookies);
 	}
 	mp->dmai_nwin = 0;
 	mp->dmai_winlst = NULL;
@@ -1275,7 +1279,7 @@ pci_dma_newwin(ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp, uint32_t cookie_no,
 	uint64_t seg_pfn0 = pfn;
 	size_t sz = cookie_no * sizeof (ddi_dma_cookie_t);
 	pci_dma_win_t *win_p = kmem_alloc(sizeof (pci_dma_win_t) + sz,
-		waitfp == DDI_DMA_SLEEP ? KM_SLEEP : KM_NOSLEEP);
+	    waitfp == DDI_DMA_SLEEP ? KM_SLEEP : KM_NOSLEEP);
 	if (!win_p)
 		goto noresource;
 
@@ -1290,23 +1294,23 @@ pci_dma_newwin(ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp, uint32_t cookie_no,
 	for (; start_idx <= end_idx; start_idx++, prev_pfn = pfn, pfn_no++) {
 		pfn = PCI_GET_MP_PFN1(mp, start_idx);
 		if ((pfn == prev_pfn + 1) &&
-			(IOMMU_PTOB(pfn_no + 1) - 1 <= count_max))
+		    (IOMMU_PTOB(pfn_no + 1) - 1 <= count_max))
 			continue;
 
 		/* close up the cookie up to (including) prev_pfn */
 		MAKE_DMA_COOKIE(cookie_p, IOMMU_PTOB(seg_pfn0) | bypass_prefix,
-			IOMMU_PTOB(pfn_no));
+		    IOMMU_PTOB(pfn_no));
 		DEBUG2(DBG_BYPASS, mp->dmai_rdip, "cookie %p (%x pages)\n",
-			IOMMU_PTOB(seg_pfn0) | bypass_prefix, pfn_no);
+		    IOMMU_PTOB(seg_pfn0) | bypass_prefix, pfn_no);
 
 		cookie_p++;	/* advance to next available cookie cell */
 		pfn_no = 0;
 		seg_pfn0 = pfn;	/* start a new segment from current pfn */
 	}
 	MAKE_DMA_COOKIE(cookie_p, IOMMU_PTOB(seg_pfn0) | bypass_prefix,
-		IOMMU_PTOB(pfn_no));
+	    IOMMU_PTOB(pfn_no));
 	DEBUG3(DBG_BYPASS, mp->dmai_rdip, "cookie %p (%x pages) of total %x\n",
-		IOMMU_PTOB(seg_pfn0) | bypass_prefix, pfn_no, cookie_no);
+	    IOMMU_PTOB(seg_pfn0) | bypass_prefix, pfn_no, cookie_no);
 #ifdef DEBUG
 	cookie_p++;
 	ASSERT((cookie_p - (ddi_dma_cookie_t *)(win_p + 1)) == cookie_no);
@@ -1461,7 +1465,7 @@ pci_dma_physwin(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	    i++, prev_pfn = pfn, pfn_no++) {
 		pfn = bypass_pfn | PCI_GET_MP_PFN1(mp, i);
 		if ((pfn == prev_pfn + 1) &&
-			(IOMMU_PTOB(pfn_no + 1) - 1 <= count_max))
+		    (IOMMU_PTOB(pfn_no + 1) - 1 <= count_max))
 			continue;
 		if ((pfn < pfn_lo) || (prev_pfn > pfn_hi)) {
 			ret = DDI_DMA_NOMAPPING;
@@ -1473,9 +1477,9 @@ pci_dma_physwin(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 			continue;
 
 		DEBUG3(DBG_BYPASS, mp->dmai_rdip, "newwin pfn[%x-%x] %x cks\n",
-			win_pfn0_index, i - 1, cookie_no);
+		    win_pfn0_index, i - 1, cookie_no);
 		if (ret = pci_dma_newwin(dmareq, mp, cookie_no,
-			win_pfn0_index, i - 1, win_pp, count_max, bypass))
+		    win_pfn0_index, i - 1, win_pp, count_max, bypass))
 			goto err;
 
 		win_pp = &(*win_pp)->win_next;	/* win_pp = *(win_pp) */
@@ -1489,9 +1493,9 @@ pci_dma_physwin(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	}
 	cookie_no++;
 	DEBUG3(DBG_BYPASS, mp->dmai_rdip, "newwin pfn[%x-%x] %x cks\n",
-		win_pfn0_index, i - 1, cookie_no);
+	    win_pfn0_index, i - 1, cookie_no);
 	if (ret = pci_dma_newwin(dmareq, mp, cookie_no, win_pfn0_index,
-		i - 1, win_pp, count_max, bypass))
+	    i - 1, win_pp, count_max, bypass))
 		goto err;
 	win_no++;
 	pci_dma_adjust(dmareq, mp, mp->dmai_winlst);
@@ -1549,11 +1553,11 @@ pci_dma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 		win_p->win_curseg = loop_cp - cp;
 		cp = (ddi_dma_cookie_t *)objp;
 		MAKE_DMA_COOKIE(cp, loop_cp->dmac_laddress + off,
-			loop_cp->dmac_size - off);
+		    loop_cp->dmac_size - off);
 
 		DEBUG2(DBG_DMA_CTL, dip,
-			"HTOC: cookie - dmac_laddress=%p dmac_size=%x\n",
-			cp->dmac_laddress, cp->dmac_size);
+		    "HTOC: cookie - dmac_laddress=%p dmac_size=%x\n",
+		    cp->dmac_laddress, cp->dmac_size);
 		}
 		return (DDI_SUCCESS);
 
@@ -1585,8 +1589,8 @@ pci_dma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 		*offp = win_p->win_offset;
 		*lenp = win_p->win_size;
 		DEBUG2(DBG_DMA_CTL, dip,
-			"HTOC: cookie - dmac_laddress=%p dmac_size=%x\n",
-			cp->dmac_laddress, cp->dmac_size);
+		    "HTOC: cookie - dmac_laddress=%p dmac_size=%x\n",
+		    cp->dmac_laddress, cp->dmac_size);
 		}
 		return (DDI_SUCCESS);
 
@@ -1632,7 +1636,8 @@ pci_dma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 		int i;
 
 		/* locate active window */
-		for (; win_p->win_offset != off; win_p = win_p->win_next);
+		for (; win_p->win_offset != off; win_p = win_p->win_next)
+			;
 		cp = (ddi_dma_cookie_t *)(win_p + 1);
 		for (i = 0; i < win_p->win_curseg; i++, cp++)
 			off += cp->dmac_size;
@@ -1672,7 +1677,7 @@ found:
 
 	default:
 		DEBUG3(DBG_DMA_CTL, dip, "unknown command (%x): rdip=%s%d\n",
-			cmd, ddi_driver_name(rdip), ddi_get_instance(rdip));
+		    cmd, ddi_driver_name(rdip), ddi_get_instance(rdip));
 		break;
 	}
 	return (DDI_FAILURE);
@@ -1784,7 +1789,7 @@ pci_dvma_free_debug(iommu_t *iommu_p, char *address, uint_t len,
 	}
 	if (!ptr) {
 		cmn_err(CE_WARN, "bad dvma free addr=%lx len=%x",
-			(long)address, len);
+		    (long)address, len);
 		goto done;
 	}
 	if (ptr == iommu_p->dvma_active_list)
@@ -1802,15 +1807,15 @@ void
 dump_dma_handle(uint64_t flag, dev_info_t *dip, ddi_dma_impl_t *hp)
 {
 	DEBUG4(flag, dip, "mp(%p): flags=%x mapping=%lx xfer_size=%x\n",
-		hp, hp->dmai_inuse, hp->dmai_mapping, hp->dmai_size);
+	    hp, hp->dmai_inuse, hp->dmai_mapping, hp->dmai_size);
 	DEBUG4(flag|DBG_CONT, dip, "\tnpages=%x roffset=%x rflags=%x nwin=%x\n",
-		hp->dmai_ndvmapages, hp->dmai_roffset, hp->dmai_rflags,
-		hp->dmai_nwin);
+	    hp->dmai_ndvmapages, hp->dmai_roffset, hp->dmai_rflags,
+	    hp->dmai_nwin);
 	DEBUG4(flag|DBG_CONT, dip, "\twinsize=%x tte=%p pfnlst=%p pfn0=%p\n",
-		hp->dmai_winsize, hp->dmai_tte, hp->dmai_pfnlst, hp->dmai_pfn0);
+	    hp->dmai_winsize, hp->dmai_tte, hp->dmai_pfnlst, hp->dmai_pfn0);
 	DEBUG4(flag|DBG_CONT, dip, "\twinlst=%x obj=%p attr=%p ckp=%p\n",
-		hp->dmai_winlst, &hp->dmai_object, &hp->dmai_attr,
-		hp->dmai_cookie);
+	    hp->dmai_winlst, &hp->dmai_object, &hp->dmai_attr,
+	    hp->dmai_cookie);
 }
 #endif
 

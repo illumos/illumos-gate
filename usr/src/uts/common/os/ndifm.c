@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,14 +230,11 @@ ndi_fmc_insert(dev_info_t *dip, int flag, void *resource, void *bus_specific)
 
 	fmhdl = devi->devi_fmhdl;
 	if (fmhdl == NULL) {
-		i_ddi_drv_ereport_post(dip, DVR_EFMCAP, NULL, DDI_NOSLEEP);
 		return;
 	}
 
 	if (flag == DMA_HANDLE) {
 		if (!DDI_FM_DMA_ERR_CAP(fmhdl->fh_cap)) {
-			i_ddi_drv_ereport_post(dip, DVR_EFMCAP, NULL,
-			    DDI_NOSLEEP);
 			return;
 		}
 		fcp = fmhdl->fh_dma_cache;
@@ -297,15 +294,12 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 
 	fmhdl = devi->devi_fmhdl;
 	if (fmhdl == NULL) {
-		i_ddi_drv_ereport_post(dip, DVR_EFMCAP, NULL, DDI_NOSLEEP);
 		return;
 	}
 
 	/* Find cache entry pointer for this resource */
 	if (flag == DMA_HANDLE) {
 		if (!DDI_FM_DMA_ERR_CAP(fmhdl->fh_cap)) {
-			i_ddi_drv_ereport_post(dip, DVR_EFMCAP, NULL,
-			    DDI_NOSLEEP);
 			return;
 		}
 		fcp = fmhdl->fh_dma_cache;
@@ -402,6 +396,9 @@ ndi_fmc_entry_error(dev_info_t *dip, int flag, ddi_fm_error_t *derr,
 			    fep->fce_resource) :
 			    i_ddi_fm_dma_err_cf_get((ddi_dma_handle_t)
 			    fep->fce_resource);
+
+			if (compare_func == NULL) /* unbound or not FLAGERR */
+				continue;
 
 			status = compare_func(dip, fep->fce_resource,
 			    bus_err_state, fep->fce_bus_specific);
@@ -544,8 +541,20 @@ ndi_fmc_entry_error_all(dev_info_t *dip, int flag, ddi_fm_error_t *derr)
 		 */
 		mutex_enter(&fcp->fc_lock);
 		for (fep = fcp->fc_head; fep != NULL; fep = fep->fce_next) {
+			ddi_fmcompare_t compare_func;
+
+			compare_func = (flag == ACC_HANDLE) ?
+			    i_ddi_fm_acc_err_cf_get((ddi_acc_handle_t)
+			    fep->fce_resource) :
+			    i_ddi_fm_dma_err_cf_get((ddi_dma_handle_t)
+			    fep->fce_resource);
+
+			if (compare_func == NULL) /* unbound or not FLAGERR */
+				continue;
+
 			/* Set the error for this resource handle */
 			nonfatal++;
+
 			if (flag == ACC_HANDLE) {
 				ddi_acc_handle_t ap = fep->fce_resource;
 

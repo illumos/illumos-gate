@@ -2429,6 +2429,9 @@ pf_hdl_compare(dev_info_t *dip, ddi_fm_error_t *derr, uint32_t flag,
 		    i_ddi_fm_dma_err_cf_get((ddi_dma_handle_t)
 			fep->fce_resource);
 
+		if (compare_func == NULL) /* unbound or not FLAGERR */
+			continue;
+
 		status = compare_func(dip, fep->fce_resource,
 			    (void *)&addr, (void *)&bdf);
 

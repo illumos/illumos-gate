@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,12 +121,14 @@ px_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 	mp->dmai_bdf = ((intptr_t)ddi_get_parent_data(rdip) == 1) ?
 	    PCIE_INVALID_BDF : pcie_get_bdf_for_dma_xfer(dip, rdip);
 
+	ndi_fmc_insert(rdip, DMA_HANDLE, mp, NULL);
 	return (mp);
 }
 
 void
 px_dma_freemp(ddi_dma_impl_t *mp)
 {
+	ndi_fmc_remove(mp->dmai_rdip, DMA_HANDLE, mp);
 	if (mp->dmai_ndvmapages > 1)
 		px_dma_freepfn(mp);
 	if (mp->dmai_winlst)

@@ -984,10 +984,8 @@ mapped:
 	px_dump_dma_handle(DBG_DMA_MAP, dip, mp);
 
 	/* insert dma handle into FMA cache */
-	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR) {
-		(void) ndi_fmc_insert(rdip, DMA_HANDLE, mp, NULL);
+	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR)
 		mp->dmai_error.err_cf = px_err_dma_hdl_check;
-	}
 
 	return (mp->dmai_nwin == 1 ? DDI_DMA_MAPPED : DDI_DMA_PARTIAL_MAP);
 map_err:
@@ -1016,13 +1014,7 @@ px_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 		return (DDI_FAILURE);
 	}
 
-	/* remove dma handle from FMA cache */
-	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR) {
-		if (DEVI(rdip)->devi_fmhdl != NULL &&
-		    DDI_FM_DMA_ERR_CAP(DEVI(rdip)->devi_fmhdl->fh_cap)) {
-			(void) ndi_fmc_remove(rdip, DMA_HANDLE, mp);
-		}
-	}
+	mp->dmai_error.err_cf = NULL;
 
 	/*
 	 * Here if the handle is using the iommu.  Unload all the iommu

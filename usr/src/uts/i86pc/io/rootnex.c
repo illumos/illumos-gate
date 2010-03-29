@@ -1646,6 +1646,8 @@ rootnex_coredma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 
 	/* setup the handle */
 	rootnex_clean_dmahdl(hp);
+	hp->dmai_error.err_fep = NULL;
+	hp->dmai_error.err_cf = NULL;
 	dma->dp_dip = rdip;
 	dma->dp_sglinfo.si_min_addr = attr->dma_attr_addr_lo;
 	dma->dp_sglinfo.si_max_addr = attr->dma_attr_addr_hi;
@@ -1747,9 +1749,9 @@ static int
 rootnex_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
     int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
 {
+	int retval;
 #if defined(__amd64) && !defined(__xpv)
 	uint_t error = ENOTSUP;
-	int retval;
 
 	retval = iommulib_nex_open(rdip, &error);
 
@@ -1764,12 +1766,15 @@ rootnex_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
 	ASSERT(IOMMU_USED(rdip));
 
 	/* has an IOMMU */
-	return (iommulib_nexdma_allochdl(dip, rdip, attr,
-	    waitfp, arg, handlep));
+	retval = iommulib_nexdma_allochdl(dip, rdip, attr,
+	    waitfp, arg, handlep);
 #else
-	return (rootnex_coredma_allochdl(dip, rdip, attr, waitfp, arg,
-	    handlep));
+	retval = rootnex_coredma_allochdl(dip, rdip, attr, waitfp, arg,
+	    handlep);
 #endif
+	if (retval == DDI_SUCCESS)
+		ndi_fmc_insert(rdip, DMA_HANDLE, *handlep, NULL);
+	return (retval);
 }
 
 /*ARGSUSED*/
@@ -1807,6 +1812,7 @@ rootnex_coredma_freehdl(dev_info_t *dip, dev_info_t *rdip,
 static int
 rootnex_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 {
+	ndi_fmc_remove(rdip, DMA_HANDLE, handle);
 #if defined(__amd64) && !defined(__xpv)
 	if (IOMMU_USED(rdip)) {
 		return (iommulib_nexdma_freehdl(dip, rdip, handle));
@@ -1981,10 +1987,8 @@ out:
 		 * If the driver supports FMA, insert the handle in the FMA DMA
 		 * handle cache.
 		 */
-		if (attr->dma_attr_flags & DDI_DMA_FLAGERR) {
+		if (attr->dma_attr_flags & DDI_DMA_FLAGERR)
 			hp->dmai_error.err_cf = rootnex_dma_check;
-			(void) ndi_fmc_insert(rdip, DMA_HANDLE, hp, NULL);
-		}
 
 		/*
 		 * copy out the first cookie and ccountp, set the cookie
@@ -2023,10 +2027,8 @@ out:
 	 * If the driver supports FMA, insert the handle in the FMA DMA handle
 	 * cache.
 	 */
-	if (attr->dma_attr_flags & DDI_DMA_FLAGERR) {
+	if (attr->dma_attr_flags & DDI_DMA_FLAGERR)
 		hp->dmai_error.err_cf = rootnex_dma_check;
-		(void) ndi_fmc_insert(rdip, DMA_HANDLE, hp, NULL);
-	}
 
 	/* if the first window uses the copy buffer, sync it for the device */
 	if ((dma->dp_window[dma->dp_current_win].wd_dosync) &&
@@ -2110,17 +2112,6 @@ rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	}
 
 	/*
-	 * If the driver supports FMA, remove the handle in the FMA DMA handle
-	 * cache.
-	 */
-	if (hp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR) {
-		if ((DEVI(rdip)->devi_fmhdl != NULL) &&
-		    (DDI_FM_DMA_ERR_CAP(DEVI(rdip)->devi_fmhdl->fh_cap))) {
-			(void) ndi_fmc_remove(rdip, DMA_HANDLE, hp);
-		}
-	}
-
-	/*
 	 * cleanup and copy buffer or window state. if we didn't use the copy
 	 * buffer or windows, there won't be much to do :-)
 	 */
@@ -2150,6 +2141,7 @@ rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	 * handle is reused).
 	 */
 	rootnex_clean_dmahdl(hp);
+	hp->dmai_error.err_cf = NULL;
 
 	if (rootnex_state->r_dvma_call_list_id)
 		ddi_run_callback(&rootnex_state->r_dvma_call_list_id);
@@ -2446,8 +2438,6 @@ rootnex_clean_dmahdl(ddi_dma_impl_t *hp)
 	hp->dmai_error.err_status = DDI_FM_OK;
 	hp->dmai_error.err_expected = DDI_FM_ERR_UNEXPECTED;
 	hp->dmai_error.err_ontrap = NULL;
-	hp->dmai_error.err_fep = NULL;
-	hp->dmai_error.err_cf = NULL;
 }
 
 
