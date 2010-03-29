@@ -1482,7 +1482,8 @@ mptsas_sasexpdpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	uint8_t			tmp_sas_wwn[SAS_WWN_BYTE_SIZE];
 	uint16_t		*devhdl;
 	uint64_t		*sas_wwn;
-	uint8_t			physport, *phymask;
+	uint8_t			physport;
+	mptsas_phymask_t	*phymask;
 	uint32_t		page_address;
 
 	if ((iocstatus != MPI2_IOCSTATUS_SUCCESS) &&
@@ -1510,7 +1511,7 @@ mptsas_sasexpdpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	}
 	devhdl = va_arg(ap, uint16_t *);
 	sas_wwn = va_arg(ap, uint64_t *);
-	phymask = va_arg(ap, uint8_t *);
+	phymask = va_arg(ap, mptsas_phymask_t *);
 
 	expddevpage = (pMpi2ExpanderPage0_t)page_memp;
 
@@ -1622,7 +1623,7 @@ mptsas_sasiou_page_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	int rval = DDI_SUCCESS;
 	pMpi2SasIOUnitPage0_t sasioupage0;
 	int i, num_phys;
-	uint32_t cpdi[8], *retrypage0, *readpage1;
+	uint32_t cpdi[MPTSAS_MAX_PHYS], *retrypage0, *readpage1;
 	uint8_t port_flags;
 
 	if (iocstatus != MPI2_IOCSTATUS_SUCCESS) {
@@ -1638,6 +1639,12 @@ mptsas_sasiou_page_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	sasioupage0 = (pMpi2SasIOUnitPage0_t)page_memp;
 
 	num_phys = ddi_get8(accessp, &sasioupage0->NumPhys);
+	/*
+	 * ASSERT that the num_phys value in SAS IO Unit Page 0 is the same as
+	 * was initially set.  This should never change throughout the life of
+	 * the driver.
+	 */
+	ASSERT(num_phys == mpt->m_num_phys);
 	for (i = 0; i < num_phys; i++) {
 		cpdi[i] = ddi_get32(accessp,
 		    &sasioupage0->PhyData[i].
@@ -1685,7 +1692,7 @@ mptsas_sasiou_page_1_cb(mptsas_t *mpt, caddr_t page_memp,
 	int rval = DDI_SUCCESS;
 	pMpi2SasIOUnitPage1_t sasioupage1;
 	int i, num_phys;
-	uint32_t cpdi[8];
+	uint32_t cpdi[MPTSAS_MAX_PHYS];
 	uint8_t port_flags;
 
 	if (iocstatus != MPI2_IOCSTATUS_SUCCESS) {
@@ -1698,6 +1705,12 @@ mptsas_sasiou_page_1_cb(mptsas_t *mpt, caddr_t page_memp,
 
 	sasioupage1 = (pMpi2SasIOUnitPage1_t)page_memp;
 	num_phys = ddi_get8(accessp, &sasioupage1->NumPhys);
+	/*
+	 * ASSERT that the num_phys value in SAS IO Unit Page 1 is the same as
+	 * was initially set.  This should never change throughout the life of
+	 * the driver.
+	 */
+	ASSERT(num_phys == mpt->m_num_phys);
 	for (i = 0; i < num_phys; i++) {
 		cpdi[i] = ddi_get32(accessp, &sasioupage1->PhyData[i].
 		    ControllerPhyDeviceInfo);
@@ -1859,15 +1872,16 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 	caddr_t			recv_memp, page_memp;
 	int			recv_dmastate = 0;
 	int			page_dmastate = 0;
-	int			i, num_phys;
+	int			i, num_phys, start_phy = 0;
 	int			page0_size =
 	    sizeof (MPI2_CONFIG_PAGE_SASIOUNIT_0) +
-	    (sizeof (MPI2_SAS_IO_UNIT0_PHY_DATA) * 7);
+	    (sizeof (MPI2_SAS_IO_UNIT0_PHY_DATA) * (MPTSAS_MAX_PHYS - 1));
 	int			page1_size =
 	    sizeof (MPI2_CONFIG_PAGE_SASIOUNIT_1) +
-	    (sizeof (MPI2_SAS_IO_UNIT1_PHY_DATA) * 7);
+	    (sizeof (MPI2_SAS_IO_UNIT1_PHY_DATA) * (MPTSAS_MAX_PHYS - 1));
 	uint32_t		flags_length;
-	uint32_t		cpdi[8], readpage1 = 0, retrypage0 = 0;
+	uint32_t		cpdi[MPTSAS_MAX_PHYS];
+	uint32_t		readpage1 = 0, retrypage0 = 0;
 	uint16_t		iocstatus;
 	uint8_t			port_flags, page_number, action;
 	uint32_t		reply_size = 256; /* Big enough for any page */
@@ -2057,7 +2071,17 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 
 			num_phys = ddi_get8(page_accessp,
 			    &sasioupage0->NumPhys);
-			for (i = 0; i < num_phys; i++) {
+			ASSERT(num_phys == mpt->m_num_phys);
+			if (num_phys > MPTSAS_MAX_PHYS) {
+				mptsas_log(mpt, CE_WARN, "Number of phys "
+				    "supported by HBA (%d) is more than max "
+				    "supported by driver (%d).  Driver will "
+				    "not attach.", num_phys,
+				    MPTSAS_MAX_PHYS);
+				rval = DDI_FAILURE;
+				goto cleanup;
+			}
+			for (i = start_phy; i < num_phys; i++, start_phy = i) {
 				cpdi[i] = ddi_get32(page_accessp,
 				    &sasioupage0->PhyData[i].
 				    ControllerPhyDeviceInfo);
@@ -2128,7 +2152,16 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 
 			num_phys = ddi_get8(page_accessp,
 			    &sasioupage1->NumPhys);
-
+			ASSERT(num_phys == mpt->m_num_phys);
+			if (num_phys > MPTSAS_MAX_PHYS) {
+				mptsas_log(mpt, CE_WARN, "Number of phys "
+				    "supported by HBA (%d) is more than max "
+				    "supported by driver (%d).  Driver will "
+				    "not attach.", num_phys,
+				    MPTSAS_MAX_PHYS);
+				rval = DDI_FAILURE;
+				goto cleanup;
+			}
 			for (i = 0; i < num_phys; i++) {
 				cpdi[i] = ddi_get32(page_accessp,
 				    &sasioupage1->PhyData[i].
@@ -2179,318 +2212,6 @@ cleanup:
 		mptsas_fm_ereport(mpt, DDI_FM_DEVICE_NO_RESPONSE);
 		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_LOST);
 	}
-	return (rval);
-}
-
-/*
- * Check if the PHYs are currently in target mode. If they are not, we don't
- * need to change anything.  Otherwise, we need to modify the appropriate bits
- * and write them to IO unit page 1.  Once that is done, an IO unit reset is
- * necessary to begin operating in initiator mode.  Since this function is only
- * called during the initialization process, use handshaking.
- */
-int
-mptsas_set_initiator_mode(mptsas_t *mpt)
-{
-	ddi_dma_attr_t		recv_dma_attrs, page_dma_attrs;
-	uint_t			recv_ncookie, page_ncookie;
-	ddi_dma_cookie_t	recv_cookie, page_cookie;
-	ddi_dma_handle_t	recv_dma_handle, page_dma_handle;
-	ddi_acc_handle_t	recv_accessp, page_accessp;
-	size_t			recv_alloc_len, page_alloc_len;
-	pMpi2ConfigReply_t	configreply;
-	pMpi2SasIOUnitPage1_t	sasioupage1;
-	int			recv_numbytes;
-	caddr_t			recv_memp, page_memp;
-	int			recv_dmastate = 0;
-	int			page_dmastate = 0;
-	int			i;
-	int			page1_size =
-	    sizeof (MPI2_CONFIG_PAGE_SASIOUNIT_1) +
-	    (sizeof (MPI2_SAS_IO_UNIT0_PHY_DATA) * 7);
-	uint32_t		flags_length;
-	uint32_t		cpdi[8], reprogram = 0;
-	uint16_t		iocstatus;
-	uint8_t			port_flags, page_number, action;
-	uint32_t		reply_size = 256; /* Big enough for any page */
-	uint_t			state;
-	int			rval = DDI_FAILURE;
-
-	ASSERT(mutex_owned(&mpt->m_mutex));
-	/*
-	 * get each PHY informations from SAS IO Unit Pages.  Use handshakiing
-	 * to get SAS IO Unit Page information since this is during init.
-	 */
-	rval = mptsas_get_sas_io_unit_page_hndshk(mpt);
-	if (rval != DDI_SUCCESS)
-		return (rval);
-
-	for (i = 0; i < mpt->m_num_phys; i++) {
-		if (mpt->m_phy_info[i].phy_device_type &
-		    MPI2_SAS_DEVICE_INFO_SSP_TARGET) {
-			reprogram = 1;
-			break;
-		}
-	}
-	if (reprogram == 0)
-		return (DDI_SUCCESS);
-
-	/*
-	 * Initialize our "state machine".  This is a bit convoluted,
-	 * but it keeps us from having to do the ddi allocations numerous
-	 * times.
-	 */
-
-	state = IOUC_READ_PAGE1;
-
-	/*
-	 * dynamically create a customized dma attribute structure
-	 * that describes mpt's config reply page request structure.
-	 */
-	recv_dma_attrs = mpt->m_msg_dma_attr;
-	recv_dma_attrs.dma_attr_sgllen = 1;
-	recv_dma_attrs.dma_attr_granular = (sizeof (MPI2_CONFIG_REPLY));
-
-	if (ddi_dma_alloc_handle(mpt->m_dip, &recv_dma_attrs,
-	    DDI_DMA_SLEEP, NULL, &recv_dma_handle) != DDI_SUCCESS) {
-		goto cleanup;
-	}
-
-	recv_dmastate |= MPTSAS_DMA_HANDLE_ALLOCD;
-
-	if (ddi_dma_mem_alloc(recv_dma_handle,
-	    (sizeof (MPI2_CONFIG_REPLY)),
-	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
-	    &recv_memp, &recv_alloc_len, &recv_accessp) != DDI_SUCCESS) {
-		goto cleanup;
-	}
-
-	recv_dmastate |= MPTSAS_DMA_MEMORY_ALLOCD;
-
-	if (ddi_dma_addr_bind_handle(recv_dma_handle, NULL, recv_memp,
-	    recv_alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-	    NULL, &recv_cookie, &recv_ncookie) != DDI_DMA_MAPPED) {
-		goto cleanup;
-	}
-
-	recv_dmastate |= MPTSAS_DMA_HANDLE_BOUND;
-
-	page_dma_attrs = mpt->m_msg_dma_attr;
-	page_dma_attrs.dma_attr_sgllen = 1;
-	page_dma_attrs.dma_attr_granular = reply_size;
-
-	if (ddi_dma_alloc_handle(mpt->m_dip, &page_dma_attrs,
-	    DDI_DMA_SLEEP, NULL, &page_dma_handle) != DDI_SUCCESS) {
-		goto cleanup;
-	}
-
-	page_dmastate |= MPTSAS_DMA_HANDLE_ALLOCD;
-
-	if (ddi_dma_mem_alloc(page_dma_handle, reply_size,
-	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
-	    &page_memp, &page_alloc_len, &page_accessp) != DDI_SUCCESS) {
-		goto cleanup;
-	}
-
-	page_dmastate |= MPTSAS_DMA_MEMORY_ALLOCD;
-
-	if (ddi_dma_addr_bind_handle(page_dma_handle, NULL, page_memp,
-	    page_alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-	    NULL, &page_cookie, &page_ncookie) != DDI_DMA_MAPPED) {
-		goto cleanup;
-	}
-
-	page_dmastate |= MPTSAS_DMA_HANDLE_BOUND;
-
-	/*
-	 * Now we cycle through the state machine.  Here's what happens:
-	 * 1. Read IO unit page 1.
-	 * 2. Change the appropriate bits
-	 * 3. Write the updated settings to IO unit page 1.
-	 * 4. Reset the IO unit.
-	 */
-
-	sasioupage1 = (pMpi2SasIOUnitPage1_t)page_memp;
-
-	while (state != IOUC_DONE) {
-		switch (state) {
-		case IOUC_READ_PAGE1:
-			page_number = 1;
-			action = MPI2_CONFIG_ACTION_PAGE_READ_CURRENT;
-			flags_length = (uint32_t)page1_size;
-			flags_length |= ((uint32_t)(
-			    MPI2_SGE_FLAGS_LAST_ELEMENT |
-			    MPI2_SGE_FLAGS_END_OF_BUFFER |
-			    MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
-			    MPI2_SGE_FLAGS_SYSTEM_ADDRESS |
-			    MPI2_SGE_FLAGS_32_BIT_ADDRESSING |
-			    MPI2_SGE_FLAGS_IOC_TO_HOST |
-			    MPI2_SGE_FLAGS_END_OF_LIST) <<
-			    MPI2_SGE_FLAGS_SHIFT);
-
-			break;
-
-		case IOUC_WRITE_PAGE1:
-			page_number = 1;
-			action = MPI2_CONFIG_ACTION_PAGE_WRITE_NVRAM;
-			flags_length = (uint32_t)page1_size;
-			flags_length |= ((uint32_t)(
-			    MPI2_SGE_FLAGS_LAST_ELEMENT |
-			    MPI2_SGE_FLAGS_END_OF_BUFFER |
-			    MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
-			    MPI2_SGE_FLAGS_SYSTEM_ADDRESS |
-			    MPI2_SGE_FLAGS_32_BIT_ADDRESSING |
-			    MPI2_SGE_FLAGS_HOST_TO_IOC |
-			    MPI2_SGE_FLAGS_END_OF_LIST) <<
-			    MPI2_SGE_FLAGS_SHIFT);
-
-			break;
-		}
-
-		bzero(recv_memp, sizeof (MPI2_CONFIG_REPLY));
-		configreply = (pMpi2ConfigReply_t)recv_memp;
-		recv_numbytes = sizeof (MPI2_CONFIG_REPLY);
-
-		if (mptsas_send_extended_config_request_msg(mpt,
-		    MPI2_CONFIG_ACTION_PAGE_HEADER,
-		    MPI2_CONFIG_EXTPAGETYPE_SAS_IO_UNIT,
-		    0, page_number, 0, 0, 0, 0)) {
-			goto cleanup;
-		}
-
-		if (mptsas_get_handshake_msg(mpt, recv_memp, recv_numbytes,
-		    recv_accessp)) {
-			goto cleanup;
-		}
-
-		iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus);
-		iocstatus = MPTSAS_IOCSTATUS(iocstatus);
-
-		if (iocstatus != MPI2_IOCSTATUS_SUCCESS) {
-			mptsas_log(mpt, CE_WARN,
-			    "mptsas_set_initiator_mode: read page hdr iocstatus"
-			    ": 0x%x", iocstatus);
-			goto cleanup;
-		}
-
-		if (action != MPI2_CONFIG_ACTION_PAGE_WRITE_NVRAM) {
-			bzero(page_memp, reply_size);
-		}
-
-		if (mptsas_send_extended_config_request_msg(mpt, action,
-		    MPI2_CONFIG_EXTPAGETYPE_SAS_IO_UNIT, 0, page_number,
-		    ddi_get8(recv_accessp, &configreply->Header.PageVersion),
-		    ddi_get16(recv_accessp, &configreply->ExtPageLength),
-		    flags_length, page_cookie.dmac_address)) {
-			goto cleanup;
-		}
-
-		if (mptsas_get_handshake_msg(mpt, recv_memp, recv_numbytes,
-		    recv_accessp)) {
-			goto cleanup;
-		}
-
-		iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus);
-		iocstatus = MPTSAS_IOCSTATUS(iocstatus);
-
-		if (iocstatus != MPI2_IOCSTATUS_SUCCESS) {
-			mptsas_log(mpt, CE_WARN,
-			    "mptsas_set_initiator_mode: IO unit config failed "
-			    "for action %d, iocstatus = 0x%x", action,
-			    iocstatus);
-			goto cleanup;
-		}
-
-		switch (state) {
-		case IOUC_READ_PAGE1:
-			if ((ddi_dma_sync(page_dma_handle, 0, 0,
-			    DDI_DMA_SYNC_FORCPU)) != DDI_SUCCESS) {
-				goto cleanup;
-			}
-
-			/*
-			 * All the PHYs should have the same settings, so we
-			 * really only need to read 1 and use its config for
-			 * every PHY.
-			 */
-
-			cpdi[0] = ddi_get32(page_accessp,
-			    &sasioupage1->PhyData[0].ControllerPhyDeviceInfo);
-			port_flags = ddi_get8(page_accessp,
-			    &sasioupage1->PhyData[0].PortFlags);
-			port_flags |=
-			    MPI2_SASIOUNIT1_PORT_FLAGS_AUTO_PORT_CONFIG;
-
-			/*
-			 * Write the configuration to SAS I/O unit page 1
-			 */
-
-			mptsas_log(mpt, CE_NOTE,
-			    "?IO unit in target mode, changing to initiator");
-
-			/*
-			 * Modify the PHY settings for initiator mode
-			 */
-
-			cpdi[0] &= ~MPI2_SAS_DEVICE_INFO_SSP_TARGET;
-			cpdi[0] |= (MPI2_SAS_DEVICE_INFO_SSP_INITIATOR |
-			    MPI2_SAS_DEVICE_INFO_STP_INITIATOR |
-			    MPI2_SAS_DEVICE_INFO_SMP_INITIATOR);
-
-			for (i = 0; i < mpt->m_num_phys; i++) {
-				ddi_put32(page_accessp,
-				    &sasioupage1->PhyData[i].
-				    ControllerPhyDeviceInfo, cpdi[0]);
-				ddi_put8(page_accessp,
-				    &sasioupage1->PhyData[i].
-				    PortFlags, port_flags);
-				/*
-				 * update phy information
-				 */
-				mpt->m_phy_info[i].phy_device_type = cpdi[0];
-				mpt->m_phy_info[i].port_flags = port_flags;
-			}
-
-			if ((ddi_dma_sync(page_dma_handle, 0, 0,
-			    DDI_DMA_SYNC_FORDEV)) != DDI_SUCCESS) {
-				goto cleanup;
-			}
-
-			state = IOUC_WRITE_PAGE1;
-
-			break;
-
-		case IOUC_WRITE_PAGE1:
-			/*
-			 * If we're here, we wrote IO unit page 1 succesfully.
-			 */
-			state = IOUC_DONE;
-
-			rval = DDI_SUCCESS;
-			break;
-		}
-	}
-
-	/*
-	 * We need to do a Message Unit Reset in order to activate the changes.
-	 */
-	mpt->m_softstate |= MPTSAS_SS_MSG_UNIT_RESET;
-	rval = mptsas_init_chip(mpt, FALSE);
-
-cleanup:
-	if (recv_dmastate & MPTSAS_DMA_HANDLE_BOUND)
-		(void) ddi_dma_unbind_handle(recv_dma_handle);
-	if (page_dmastate & MPTSAS_DMA_HANDLE_BOUND)
-		(void) ddi_dma_unbind_handle(page_dma_handle);
-	if (recv_dmastate & MPTSAS_DMA_MEMORY_ALLOCD)
-		(void) ddi_dma_mem_free(&recv_accessp);
-	if (page_dmastate & MPTSAS_DMA_MEMORY_ALLOCD)
-		(void) ddi_dma_mem_free(&page_accessp);
-	if (recv_dmastate & MPTSAS_DMA_HANDLE_ALLOCD)
-		ddi_dma_free_handle(&recv_dma_handle);
-	if (page_dmastate & MPTSAS_DMA_HANDLE_ALLOCD)
-		ddi_dma_free_handle(&page_dma_handle);
-
 	return (rval);
 }
 

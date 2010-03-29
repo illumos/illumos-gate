@@ -40,8 +40,14 @@ dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=mpt_sas class=scsi-self-identifying \
+    alias=pci1000,64 \
+    alias=pciex1000,64 \
+    alias=pci1000,70 \
+    alias=pciex1000,70 \
     alias=pci1000,72 \
-    alias=pciex1000,72
+    alias=pciex1000,72 \
+    alias=pci1000,76 \
+    alias=pciex1000,76
 file path=kernel/drv/$(ARCH64)/mpt_sas group=sys
 $(i386_ONLY)file path=kernel/drv/mpt_sas group=sys
 file path=kernel/drv/mpt_sas.conf group=sys \

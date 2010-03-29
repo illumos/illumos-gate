@@ -75,7 +75,13 @@ extern "C" {
 
 #define	MAX_MPI_PORTS		16
 
-#define	MPTSAS_MAX_PHYS		8
+/*
+ * Note below macro definition and data type definition
+ * are used for phy mask handling, it should be changed
+ * simultaneously.
+ */
+#define	MPTSAS_MAX_PHYS		16
+typedef uint16_t		mptsas_phymask_t;
 
 #define	MPTSAS_INVALID_DEVHDL	0xffff
 
@@ -177,7 +183,7 @@ typedef	struct NcrTableIndirect {	/* Table Indirect entries */
 
 typedef	struct mptsas_target {
 		uint64_t		m_sas_wwn;	/* hash key1 */
-		uint8_t			m_phymask;	/* hash key2 */
+		mptsas_phymask_t	m_phymask;	/* hash key2 */
 		/*
 		 * m_dr_flag is a flag for DR, make sure the member
 		 * take the place of dr_flag of mptsas_hash_data.
@@ -201,7 +207,7 @@ typedef	struct mptsas_target {
 
 typedef struct mptsas_smp {
 	uint64_t	m_sasaddr;	/* hash key1 */
-	uint8_t		m_phymask;	/* hash key2 */
+	mptsas_phymask_t m_phymask;	/* hash key2 */
 	uint8_t		reserved1;
 	uint16_t	m_devhdl;
 	uint32_t	m_deviceinfo;
@@ -209,7 +215,7 @@ typedef struct mptsas_smp {
 
 typedef struct mptsas_hash_data {
 	uint64_t	key1;
-	uint8_t		key2;
+	mptsas_phymask_t key2;
 	uint8_t		dr_flag;
 	uint16_t	devhdl;
 	uint32_t	device_info;
@@ -493,7 +499,7 @@ typedef struct mptsas_topo_change_list {
 	uint_t  event;
 	union {
 		uint8_t physport;
-		uint8_t phymask;
+		mptsas_phymask_t phymask;
 	} un;
 	uint16_t devhdl;
 	void *object;
@@ -588,7 +594,7 @@ typedef struct mptsas_phy_info {
 	uint16_t		ctrl_devhdl;
 	uint32_t		phy_device_type;
 	uint16_t		attached_devhdl;
-	uint8_t			phy_mask;
+	mptsas_phymask_t	phy_mask;
 } mptsas_phy_info_t;
 
 typedef struct mptsas_doneq_thread_arg {
@@ -1213,8 +1219,7 @@ int mptsas_download_firmware();
 int mptsas_can_download_firmware();
 int mptsas_dma_alloc(mptsas_t *mpt, mptsas_dma_alloc_state_t *dma_statep);
 void mptsas_dma_free(mptsas_dma_alloc_state_t *dma_statep);
-uint8_t mptsas_physport_to_phymask(mptsas_t *mpt, uint8_t physport);
-uint8_t mptsas_phymask_to_physport(mptsas_t *mpt, uint8_t phymask);
+mptsas_phymask_t mptsas_physport_to_phymask(mptsas_t *mpt, uint8_t physport);
 void mptsas_fma_check(mptsas_t *mpt, mptsas_cmd_t *cmd);
 int mptsas_check_acc_handle(ddi_acc_handle_t handle);
 int mptsas_check_dma_handle(ddi_dma_handle_t handle);
@@ -1277,7 +1282,6 @@ int mptsas_get_sas_io_unit_page(mptsas_t *mpt);
 int mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt);
 int mptsas_get_sas_expander_page0(mptsas_t *mpt, uint32_t page_address,
     mptsas_smp_t *info);
-int mptsas_set_initiator_mode(mptsas_t *mpt);
 int mptsas_set_ioc_params(mptsas_t *mpt);
 int mptsas_get_manufacture_page5(mptsas_t *mpt);
 int mptsas_get_sas_port_page0(mptsas_t *mpt, uint32_t page_address,

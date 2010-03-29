@@ -380,18 +380,18 @@ static void mptsas_hash_init(mptsas_hash_table_t *hashtab);
 static void mptsas_hash_uninit(mptsas_hash_table_t *hashtab, size_t datalen);
 static void mptsas_hash_add(mptsas_hash_table_t *hashtab, void *data);
 static void * mptsas_hash_rem(mptsas_hash_table_t *hashtab, uint64_t key1,
-    uint8_t key2);
+    mptsas_phymask_t key2);
 static void * mptsas_hash_search(mptsas_hash_table_t *hashtab, uint64_t key1,
-    uint8_t key2);
+    mptsas_phymask_t key2);
 static void * mptsas_hash_traverse(mptsas_hash_table_t *hashtab, int pos);
 
 mptsas_target_t *mptsas_tgt_alloc(mptsas_hash_table_t *, uint16_t, uint64_t,
-    uint32_t, uint8_t, uint8_t);
+    uint32_t, mptsas_phymask_t, uint8_t);
 static mptsas_smp_t *mptsas_smp_alloc(mptsas_hash_table_t *hashtab,
     mptsas_smp_t *data);
 static void mptsas_smp_free(mptsas_hash_table_t *hashtab, uint64_t wwid,
-    uint8_t physport);
-static void mptsas_tgt_free(mptsas_hash_table_t *, uint64_t, uint8_t);
+    mptsas_phymask_t phymask);
+static void mptsas_tgt_free(mptsas_hash_table_t *, uint64_t, mptsas_phymask_t);
 static void * mptsas_search_by_devhdl(mptsas_hash_table_t *, uint16_t);
 static int mptsas_online_smp(dev_info_t *pdip, mptsas_smp_t *smp_node,
     dev_info_t **smp_dip);
@@ -525,7 +525,7 @@ static struct dev_ops mptsas_ops = {
 };
 
 
-#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.22"
+#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.23"
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module. This one is a driver */
@@ -664,8 +664,8 @@ mptsas_iport_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mptsas_t		*mpt;
 	scsi_hba_tran_t		*hba_tran;
 	char			*iport = NULL;
-	char			phymask[8];
-	uint8_t			phy_mask = 0;
+	char			phymask[MPTSAS_MAX_PHYS];
+	mptsas_phymask_t	phy_mask = 0;
 	int			physport = -1;
 	int			dynamic_port = 0;
 	uint32_t		page_address;
@@ -824,7 +824,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	scsi_hba_tran_t		*hba_tran;
 	int			intr_types;
 	uint_t			mem_bar = MEM_SPACE;
-	uint8_t			mask = 0x0;
+	mptsas_phymask_t	mask = 0x0;
 	int			tran_flags = 0;
 	int			rval = DDI_FAILURE;
 
@@ -1220,8 +1220,8 @@ intr_done:
 	 */
 	mutex_enter(&mpt->m_mutex);
 	for (i = 0; i < mpt->m_num_phys; i++) {
-		uint8_t	phy_mask = 0x00;
-		char phy_mask_name[8];
+		mptsas_phymask_t phy_mask = 0x0;
+		char phy_mask_name[MPTSAS_MAX_PHYS];
 		uint8_t current_port;
 
 		if (mpt->m_phy_info[i].attached_devhdl == 0)
@@ -5502,30 +5502,11 @@ mptsas_handle_qfull(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	}
 }
 
-uint8_t
-mptsas_phymask_to_physport(mptsas_t *mpt, uint8_t phymask)
-{
-	int i;
-
-	/*
-	 * RAID doesn't have valid phymask and physport so we use phymask == 0
-	 * and physport == 0xff to indicate that it's RAID.
-	 */
-	if (phymask == 0) {
-		return (0xff);
-	}
-	for (i = 0; i < 8; i++) {
-		if (phymask & (1 << i)) {
-			break;
-		}
-	}
-	return (mpt->m_phy_info[i].port_num);
-}
-uint8_t
+mptsas_phymask_t
 mptsas_physport_to_phymask(mptsas_t *mpt, uint8_t physport)
 {
-	uint8_t		phy_mask = 0;
-	uint8_t		i = 0;
+	mptsas_phymask_t	phy_mask = 0;
+	uint8_t			i = 0;
 
 	NDBG20(("mptsas%d physport_to_phymask enter", mpt->m_instance));
 
@@ -5595,10 +5576,10 @@ mptsas_free_devhdl(mptsas_t *mpt, uint16_t devhdl)
 static void
 mptsas_update_phymask(mptsas_t *mpt)
 {
-	uint8_t	mask = 0, phy_mask;
-	char	*phy_mask_name;
-	uint8_t current_port;
-	int	i, j;
+	mptsas_phymask_t mask = 0, phy_mask;
+	char		*phy_mask_name;
+	uint8_t		current_port;
+	int		i, j;
 
 	NDBG20(("mptsas%d update phymask ", mpt->m_instance));
 
@@ -5606,7 +5587,7 @@ mptsas_update_phymask(mptsas_t *mpt)
 
 	(void) mptsas_get_sas_io_unit_page(mpt);
 
-	phy_mask_name = kmem_zalloc(8, KM_SLEEP);
+	phy_mask_name = kmem_zalloc(MPTSAS_MAX_PHYS, KM_SLEEP);
 
 	for (i = 0; i < mpt->m_num_phys; i++) {
 		phy_mask = 0x00;
@@ -5645,7 +5626,7 @@ mptsas_update_phymask(mptsas_t *mpt)
 		(void) scsi_hba_iport_register(mpt->m_dip, phy_mask_name);
 		mutex_enter(&mpt->m_mutex);
 	}
-	kmem_free(phy_mask_name, 8);
+	kmem_free(phy_mask_name, MPTSAS_MAX_PHYS);
 	NDBG20(("mptsas%d update phymask return", mpt->m_instance));
 }
 
@@ -5665,7 +5646,7 @@ mptsas_handle_dr(void *args) {
 	mptsas_topo_change_list_t	*save_node = NULL;
 	mptsas_t			*mpt;
 	dev_info_t			*parent = NULL;
-	uint8_t				phymask = 0;
+	mptsas_phymask_t		phymask = 0;
 	char				*phy_mask_name;
 	uint8_t				flags = 0, physport = 0xff;
 	uint8_t				port_update = 0;
@@ -5677,7 +5658,7 @@ mptsas_handle_dr(void *args) {
 	event = topo_node->event;
 	flags = topo_node->flags;
 
-	phy_mask_name = kmem_zalloc(8, KM_SLEEP);
+	phy_mask_name = kmem_zalloc(MPTSAS_MAX_PHYS, KM_SLEEP);
 
 	NDBG20(("mptsas%d handle_dr enter", mpt->m_instance));
 
@@ -5774,7 +5755,7 @@ mptsas_handle_dr(void *args) {
 			mutex_exit(&mpt->m_mutex);
 
 find_parent:
-			bzero(phy_mask_name, 8);
+			bzero(phy_mask_name, MPTSAS_MAX_PHYS);
 			/*
 			 * For RAID topology change node, write the iport name
 			 * as v0.
@@ -5836,7 +5817,7 @@ handle_topo_change:
 		}
 	}
 out:
-	kmem_free(phy_mask_name, 8);
+	kmem_free(phy_mask_name, MPTSAS_MAX_PHYS);
 }
 
 static void
@@ -5863,7 +5844,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 	case MPTSAS_DR_EVENT_RECONFIG_TARGET:
 	{
 		char *phy_mask_name;
-		uint8_t phymask = 0;
+		mptsas_phymask_t phymask = 0;
 
 		if (topo_node->flags == MPTSAS_TOPO_FLAG_RAID_ASSOCIATED) {
 			/*
@@ -5921,11 +5902,11 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 
 		if (flags == MPTSAS_TOPO_FLAG_RAID_PHYSDRV_ASSOCIATED) {
 			phymask = ptgt->m_phymask;
-			phy_mask_name = kmem_zalloc(8, KM_SLEEP);
+			phy_mask_name = kmem_zalloc(MPTSAS_MAX_PHYS, KM_SLEEP);
 			(void) sprintf(phy_mask_name, "%x", phymask);
 			parent = scsi_hba_iport_find(mpt->m_dip,
 			    phy_mask_name);
-			kmem_free(phy_mask_name, 8);
+			kmem_free(phy_mask_name, MPTSAS_MAX_PHYS);
 			if (parent == NULL) {
 				mptsas_log(mpt, CE_WARN, "Failed to find a "
 				    "iport for PD, should not happen!");
@@ -11524,20 +11505,19 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	}
 
 	/*
-	 * First, make sure the HBA is set in "initiator" mode.  Once that
-	 * is complete, get the base WWID.
+	 * Fill in the phy_info structure and get the base WWID
 	 */
 
 	if (first_time == TRUE) {
-		if (mptsas_set_initiator_mode(mpt)) {
-			mptsas_log(mpt, CE_WARN, "mptsas_set_initiator_mode "
-			    "failed!");
-			goto fail;
-		}
-
 		if (mptsas_get_manufacture_page5(mpt) == DDI_FAILURE) {
 			mptsas_log(mpt, CE_WARN,
 			    "mptsas_get_manufacture_page5 failed!");
+			goto fail;
+		}
+
+		if (mptsas_get_sas_io_unit_page_hndshk(mpt)) {
+			mptsas_log(mpt, CE_WARN,
+			    "mptsas_get_sas_io_unit_page_hndshk failed!");
 			goto fail;
 		}
 	}
@@ -11950,8 +11930,8 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 	int		rval;
 	uint32_t	dev_info;
 	uint64_t	sas_wwn;
-	uint8_t		physport, phymask;
-	uint8_t		phynum, config, disk;
+	mptsas_phymask_t phymask;
+	uint8_t		physport, phynum, config, disk;
 	mptsas_slots_t	*slots = mpt->m_active;
 	uint64_t		devicename;
 	mptsas_target_t		*tmp_tgt = NULL;
@@ -12226,7 +12206,7 @@ mptsas_parse_address(char *name, uint64_t *wwid, uint8_t *phy, int *lun)
 		goto out;
 
 	if (phyid != -1) {
-		ASSERT(phyid < 8);
+		ASSERT(phyid < MPTSAS_MAX_PHYS);
 		*phy = (uint8_t)phyid;
 	}
 	rc = ddi_strtol(lun_str, NULL, 0x10, &lunnum);
@@ -12910,7 +12890,7 @@ mptsas_config_all(dev_info_t *pdip)
 	dev_info_t	*smpdip = NULL;
 	mptsas_t	*mpt = DIP2MPT(pdip);
 	int		phymask = 0;
-	uint8_t		phy_mask;
+	mptsas_phymask_t phy_mask;
 	mptsas_target_t	*ptgt = NULL;
 	mptsas_smp_t	*psmp;
 
@@ -14262,7 +14242,7 @@ mptsas_search_by_devhdl(mptsas_hash_table_t *hashtab, uint16_t devhdl)
 
 mptsas_target_t *
 mptsas_tgt_alloc(mptsas_hash_table_t *hashtab, uint16_t devhdl, uint64_t wwid,
-    uint32_t devinfo, uint8_t phymask, uint8_t phynum)
+    uint32_t devinfo, mptsas_phymask_t phymask, uint8_t phynum)
 {
 	mptsas_target_t *tmp_tgt = NULL;
 
@@ -14295,7 +14275,8 @@ mptsas_tgt_alloc(mptsas_hash_table_t *hashtab, uint16_t devhdl, uint64_t wwid,
 }
 
 static void
-mptsas_tgt_free(mptsas_hash_table_t *hashtab, uint64_t wwid, uint8_t phymask)
+mptsas_tgt_free(mptsas_hash_table_t *hashtab, uint64_t wwid,
+    mptsas_phymask_t phymask)
 {
 	mptsas_target_t *tmp_tgt;
 	tmp_tgt = mptsas_hash_rem(hashtab, wwid, phymask);
@@ -14313,7 +14294,7 @@ static mptsas_smp_t *
 mptsas_smp_alloc(mptsas_hash_table_t *hashtab, mptsas_smp_t *data)
 {
 	uint64_t key1 = data->m_sasaddr;
-	uint8_t key2 = data->m_phymask;
+	mptsas_phymask_t key2 = data->m_phymask;
 	mptsas_smp_t *ret_data;
 
 	ret_data = mptsas_hash_search(hashtab, key1, key2);
@@ -14329,7 +14310,8 @@ mptsas_smp_alloc(mptsas_hash_table_t *hashtab, mptsas_smp_t *data)
 }
 
 static void
-mptsas_smp_free(mptsas_hash_table_t *hashtab, uint64_t wwid, uint8_t phymask)
+mptsas_smp_free(mptsas_hash_table_t *hashtab, uint64_t wwid,
+    mptsas_phymask_t phymask)
 {
 	mptsas_smp_t *tmp_smp;
 	tmp_smp = mptsas_hash_rem(hashtab, wwid, phymask);
@@ -14384,7 +14366,7 @@ static void
 mptsas_hash_add(mptsas_hash_table_t *hashtab, void *data)
 {
 	uint64_t key1 = ((mptsas_hash_data_t *)data)->key1;
-	uint8_t	key2 = ((mptsas_hash_data_t *)data)->key2;
+	mptsas_phymask_t key2 = ((mptsas_hash_data_t *)data)->key2;
 	mptsas_hash_node_t **head = NULL;
 	mptsas_hash_node_t *node = NULL;
 
@@ -14405,7 +14387,8 @@ mptsas_hash_add(mptsas_hash_table_t *hashtab, void *data)
 }
 
 static void *
-mptsas_hash_rem(mptsas_hash_table_t *hashtab, uint64_t key1, uint8_t key2)
+mptsas_hash_rem(mptsas_hash_table_t *hashtab, uint64_t key1,
+    mptsas_phymask_t key2)
 {
 	mptsas_hash_node_t **head = NULL;
 	mptsas_hash_node_t *last = NULL, *cur = NULL;
@@ -14434,7 +14417,8 @@ mptsas_hash_rem(mptsas_hash_table_t *hashtab, uint64_t key1, uint8_t key2)
 }
 
 static void *
-mptsas_hash_search(mptsas_hash_table_t *hashtab, uint64_t key1, uint8_t key2)
+mptsas_hash_search(mptsas_hash_table_t *hashtab, uint64_t key1,
+    mptsas_phymask_t key2)
 {
 	mptsas_hash_node_t *cur = NULL;
 	mptsas_hash_data_t *data;
