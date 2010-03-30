@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@ extern "C" {
 #define	OCE_MAJOR_VERSION	"1"
 #define	OCE_MINOR_VERSION	"1"
 #define	OCE_RELEASE_NUM		"0"
-#define	OCE_PROTO_LEVEL		"e"
+#define	OCE_PROTO_LEVEL		"f"
 
 #define	OCE_VERSION		OCE_MAJOR_VERSION "." \
 				OCE_MINOR_VERSION \

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,8 @@ typedef struct oce_dma_buf_s {
 #define	DBUF_VA(obj) (((oce_dma_buf_t *)(obj))->base)
 #define	DBUF_DHDL(obj) (((oce_dma_buf_t *)(obj))->dma_handle)
 #define	DBUF_AHDL(obj) (((oce_dma_buf_t *)obj))->acc_handle)
+#define	DBUF_SYNC(obj, flags)	ddi_dma_sync(DBUF_DHDL(obj), 0,\
+			((oce_dma_buf_t *)obj)->len, (flags))
 
 typedef struct oce_ring_buffer_s {
 	uint16_t    cidx; 	/* Get ptr */

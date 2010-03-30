@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -227,11 +227,7 @@ oce_set_dma_fma_flags(int fm_caps)
 		return;
 	}
 
-	if (DDI_FM_ACC_ERR_CAP(fm_caps)) {
-		oce_dma_buf_accattr.devacc_attr_access = DDI_FLAGERR_ACC;
-	} else {
-		oce_dma_buf_accattr.devacc_attr_access = DDI_DEFAULT_ACC;
-	}
+	oce_dma_buf_accattr.devacc_attr_access = DDI_DEFAULT_ACC;
 
 	if (DDI_FM_DMA_ERR_CAP(fm_caps)) {
 		oce_dma_buf_attr.dma_attr_flags |= DDI_DMA_FLAGERR;

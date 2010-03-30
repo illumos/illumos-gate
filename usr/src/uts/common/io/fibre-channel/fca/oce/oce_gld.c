@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,19 +68,19 @@ oce_m_start(void *arg)
 		return (EIO);
 	}
 
-	if (oce_fm_check_acc_handle(dev, dev->db_handle)) {
+	if (oce_fm_check_acc_handle(dev, dev->db_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
 		mutex_exit(&dev->dev_lock);
 		return (EIO);
 	}
 
-	if (oce_fm_check_acc_handle(dev, dev->csr_handle)) {
+	if (oce_fm_check_acc_handle(dev, dev->csr_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
 		mutex_exit(&dev->dev_lock);
 		return (EIO);
 	}
 
-	if (oce_fm_check_acc_handle(dev, dev->cfg_handle)) {
+	if (oce_fm_check_acc_handle(dev, dev->cfg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
 		mutex_exit(&dev->dev_lock);
 		return (EIO);
@@ -556,6 +556,7 @@ oce_m_propinfo(void *arg, const char *name, mac_prop_id_t pr_num,
 
 		(void) snprintf(valstr, sizeof (valstr), "%d", value);
 		mac_prop_info_set_default_str(prh, valstr);
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		break;
 	}
 	}

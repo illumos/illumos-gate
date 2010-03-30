@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,8 +157,14 @@ oce_chip_ei(struct oce_dev *dev)
 	uint32_t reg;
 
 	reg =  OCE_CFG_READ32(dev, PCICFG_INTR_CTRL);
+	if (oce_fm_check_acc_handle(dev, dev->dev_cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+	}
 	reg |= HOSTINTR_MASK;
 	OCE_CFG_WRITE32(dev, PCICFG_INTR_CTRL, reg);
+	if (oce_fm_check_acc_handle(dev, dev->dev_cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+	}
 }
 
 /*
@@ -196,8 +202,14 @@ oce_chip_di(struct oce_dev *dev)
 	uint32_t reg;
 
 	reg =  OCE_CFG_READ32(dev, PCICFG_INTR_CTRL);
+	if (oce_fm_check_acc_handle(dev, dev->dev_cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+	}
 	reg &= ~HOSTINTR_MASK;
 	OCE_CFG_WRITE32(dev, PCICFG_INTR_CTRL, reg);
+	if (oce_fm_check_acc_handle(dev, dev->dev_cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+	}
 }
 
 /*
@@ -412,6 +424,9 @@ oce_isr(caddr_t arg1, caddr_t arg2)
 		return (DDI_INTR_UNCLAIMED);
 	}
 
+	(void) ddi_dma_sync(eq->ring->dbuf->dma_handle, 0, 0,
+	    DDI_DMA_SYNC_FORKERNEL);
+
 	eqe = RING_GET_CONSUMER_ITEM_VA(eq->ring, struct oce_eqe);
 
 	while (eqe->u0.dw0) {
@@ -479,7 +494,10 @@ oce_setup_intx(struct oce_dev *dev)
 	dev->num_vectors = navail;
 
 	/* allocate htable */
-	dev->htable = kmem_zalloc(sizeof (ddi_intr_handle_t), KM_SLEEP);
+	dev->htable = kmem_zalloc(sizeof (ddi_intr_handle_t), KM_NOSLEEP);
+	if (dev->htable == NULL) {
+		return (DDI_FAILURE);
+	}
 
 	/* allocate interrupt handlers */
 	ret = ddi_intr_alloc(dev->dip, dev->htable, DDI_INTR_TYPE_FIXED,

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,6 @@
 /* ---[ globals and externs ]-------------------------------------------- */
 const char oce_ident_string[] = OCE_IDENT_STRING;
 const char oce_mod_name[] = OCE_MOD_NAME;
-static const char oce_desc_string[] = OCE_DESC_STRING;
 
 char oce_version[] = OCE_REVISION;
 
@@ -127,7 +126,7 @@ static mac_callbacks_t oce_mac_cb = {
 	oce_m_multicast,	/* mc_multicast */
 	oce_m_unicast,		/* mc_unicast */
 	oce_m_send,		/* mc_tx */
-	NULL,
+	NULL,			/* mc_reserve */
 	oce_m_ioctl,		/* mc_ioctl */
 	oce_m_getcap,		/* mc_getcapab */
 	NULL,			/* open */
@@ -195,11 +194,12 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_ATTACH:
 		break;
 	}
-	oce_log(dev, CE_CONT, MOD_CONFIG, "!%s, %s",
-	    oce_desc_string, oce_version);
 
 	/* allocate dev */
-	dev = kmem_zalloc(sizeof (struct oce_dev), KM_SLEEP);
+	dev = kmem_zalloc(sizeof (struct oce_dev), KM_NOSLEEP);
+	if (dev == NULL) {
+		return (DDI_FAILURE);
+	}
 
 	/* populate the dev structure */
 	dev->dip = dip;
@@ -316,6 +316,7 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	dev->attach_state |= ATTACH_MAC_REG;
 	dev->state |= STATE_INIT;
+
 	oce_log(dev, CE_NOTE, MOD_CONFIG, "%s",
 	    "ATTACH SUCCESS");
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,7 @@
 #include <oce_ioctl.h>
 
 static ddi_device_acc_attr_t reg_accattr = {
-	DDI_DEVICE_ATTR_V0,
+	DDI_DEVICE_ATTR_V1,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC,
 	DDI_FLAGERR_ACC
@@ -161,7 +161,9 @@ oce_pci_init(struct oce_dev *dev)
 		return (DDI_FAILURE);
 	}
 	dev->fn =  OCE_PCI_FUNC(dev);
-	ret = oce_fm_check_acc_handle(dev, dev->dev_cfg_handle);
+	if (oce_fm_check_acc_handle(dev, dev->dev_cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+	}
 
 	if (ret != DDI_FM_OK) {
 		oce_pci_fini(dev);
@@ -268,11 +270,19 @@ oce_POST(struct oce_dev *dev)
 
 	/* read semaphore CSR */
 	post_status.dw0 = OCE_CSR_READ32(dev, MPU_EP_SEMAPHORE);
-
+	if (oce_fm_check_acc_handle(dev, dev->csr_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+		return (DDI_FAILURE);
+	}
 	/* if host is ready then wait for fw ready else send POST */
 	if (post_status.bits.stage <= POST_STAGE_AWAITING_HOST_RDY) {
 		post_status.bits.stage = POST_STAGE_CHIP_RESET;
 		OCE_CSR_WRITE32(dev, MPU_EP_SEMAPHORE, post_status.dw0);
+		if (oce_fm_check_acc_handle(dev, dev->csr_handle) !=
+		    DDI_FM_OK) {
+			ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+			return (DDI_FAILURE);
+		}
 	}
 
 	/* wait for FW ready */
@@ -284,6 +294,11 @@ oce_POST(struct oce_dev *dev)
 		}
 
 		post_status.dw0 = OCE_CSR_READ32(dev, MPU_EP_SEMAPHORE);
+		if (oce_fm_check_acc_handle(dev, dev->csr_handle) !=
+		    DDI_FM_OK) {
+			ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+			return (DDI_FAILURE);
+		}
 		if (post_status.bits.error) {
 			oce_log(dev, CE_WARN, MOD_CONFIG,
 			    "0x%x POST ERROR!!", post_status.dw0);

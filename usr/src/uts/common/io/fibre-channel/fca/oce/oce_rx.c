@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +69,10 @@ oce_rqb_cache_create(struct oce_rq *rq, size_t buf_size)
 
 	nitems = rq->cfg.nbufs;
 	size = nitems * sizeof (oce_rq_bdesc_t);
-	rq->rq_bdesc_array = kmem_zalloc(size, KM_SLEEP);
+	rq->rq_bdesc_array = kmem_zalloc(size, KM_NOSLEEP);
+	if (rq->rq_bdesc_array == NULL) {
+		return (DDI_FAILURE);
+	}
 
 	/* Create the free buffer list */
 	OCE_LIST_CREATE(&rq->rq_buf_list, DDI_INTR_PRI(dev->intr_pri));
@@ -267,6 +270,11 @@ oce_rq_charge(struct oce_dev *dev,
 			rxdb_reg.bits.num_posted = num_bufs;
 			rxdb_reg.bits.qid = rq->rq_id & DB_RQ_ID_MASK;
 			OCE_DB_WRITE32(dev, PD_RXULP_DB, rxdb_reg.dw0);
+			if (oce_fm_check_acc_handle(dev, dev->db_handle) !=
+			    DDI_FM_OK) {
+				ddi_fm_service_impact(dev->dip,
+				    DDI_SERVICE_DEGRADED);
+			}
 			num_bufs = 0;
 		}
 		num_bufs++;
@@ -279,8 +287,13 @@ oce_rq_charge(struct oce_dev *dev,
 		rxdb_reg.bits.num_posted = num_bufs;
 		rxdb_reg.bits.qid = rq->rq_id & DB_RQ_ID_MASK;
 		OCE_DB_WRITE32(dev, PD_RXULP_DB, rxdb_reg.dw0);
+		if (oce_fm_check_acc_handle(dev, dev->db_handle) !=
+		    DDI_FM_OK) {
+			ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+		}
 	}
 	atomic_add_32(&rq->buf_avail, total_bufs);
+
 	return (total_bufs);
 } /* oce_rq_charge */
 

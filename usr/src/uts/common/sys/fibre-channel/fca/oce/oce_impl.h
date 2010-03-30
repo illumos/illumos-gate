@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,9 +115,9 @@ extern "C" {
 					NTWK_RX_FILTER_STRIP_CRC)
 
 
-#define	OCE_FM_CAPABILITY		DDI_FM_EREPORT_CAPABLE	|	\
+#define	OCE_FM_CAPABILITY		(DDI_FM_EREPORT_CAPABLE	|	\
 					DDI_FM_ACCCHK_CAPABLE	|	\
-					DDI_FM_DMACHK_CAPABLE
+					DDI_FM_DMACHK_CAPABLE)
 
 /* flow control definitions */
 #define	OCE_FC_NONE	0x00000000

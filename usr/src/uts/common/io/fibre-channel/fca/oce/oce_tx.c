@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +104,7 @@ oce_wqm_ctor(oce_wq_mdesc_t *wqmd, struct oce_wq *wq)
 	dev = wq->parent;
 	/* Allocate DMA handle */
 	ret = ddi_dma_alloc_handle(dev->dip, &tx_map_dma_attr,
-	    KM_SLEEP, NULL, &wqmd->dma_handle);
+	    DDI_DMA_DONTWAIT, NULL, &wqmd->dma_handle);
 
 	return (ret);
 } /* oce_wqm_ctor */
@@ -125,7 +125,10 @@ oce_wqm_cache_create(struct oce_wq *wq)
 	int ret;
 
 	size = wq->cfg.nhdl * sizeof (oce_wq_mdesc_t);
-	wq->wq_mdesc_array = kmem_zalloc(size, KM_SLEEP);
+	wq->wq_mdesc_array = kmem_zalloc(size, KM_NOSLEEP);
+	if (wq->wq_mdesc_array == NULL) {
+		return (DDI_FAILURE);
+	}
 
 	/* Create the free buffer list */
 	OCE_LIST_CREATE(&wq->wq_mdesc_list, DDI_INTR_PRI(dev->intr_pri));
@@ -184,7 +187,10 @@ oce_wqb_cache_create(struct oce_wq *wq, size_t buf_size)
 	int ret;
 
 	size = wq->cfg.nbufs * sizeof (oce_wq_bdesc_t);
-	wq->wq_bdesc_array = kmem_zalloc(size, KM_SLEEP);
+	wq->wq_bdesc_array = kmem_zalloc(size, KM_NOSLEEP);
+	if (wq->wq_bdesc_array == NULL) {
+		return (DDI_FAILURE);
+	}
 
 	/* Create the free buffer list */
 	OCE_LIST_CREATE(&wq->wq_buf_list, DDI_INTR_PRI(dev->intr_pri));
@@ -541,6 +547,9 @@ oce_map_wqe(struct oce_wq *wq, oce_wqe_desc_t *wqed, mblk_t *mp)
 
 		wqed->hdesc[wqed->nhdl].hdl = (void *)wqmd;
 		wqed->nhdl++;
+
+		(void) ddi_dma_sync(wqmd->dma_handle,
+		    0, 0, DDI_DMA_SYNC_FORDEV);
 	}
 	wqed->frag_cnt = nfrag;
 	wqed->type = MAPPED_WQE;
@@ -564,6 +573,9 @@ oce_process_tx_compl(struct oce_wq *wq, boolean_t rearm)
 
 	cq  = wq->cq;
 	dev = wq->parent;
+	(void) ddi_dma_sync(cq->ring->dbuf->dma_handle, 0, 0,
+	    DDI_DMA_SYNC_FORKERNEL);
+
 	mutex_enter(&wq->txc_lock);
 	cqe = RING_GET_CONSUMER_ITEM_VA(cq->ring, struct oce_nic_tx_cqe);
 	while (WQ_CQE_VALID(cqe)) {
@@ -835,11 +847,16 @@ oce_send_packet(struct oce_wq *wq, mblk_t *mp)
 
 	/* Add the packet desc to list to be retrieved during cmpl */
 	OCE_LIST_INSERT_TAIL(&wq->wqe_desc_list,  wqed);
+	(void) ddi_dma_sync(wq->ring->dbuf->dma_handle, 0, 0,
+	    DDI_DMA_SYNC_FORDEV);
 
 	/* ring tx doorbell */
 	reg_value = (num_wqes << 16) | wq->wq_id;
 	/* Ring the door bell  */
 	OCE_DB_WRITE32(dev, PD_TXULP_DB, reg_value);
+	if (oce_fm_check_acc_handle(dev, dev->db_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+	}
 	mutex_exit(&wq->tx_lock);
 
 	/* free mp if copied or packet chain collapsed */

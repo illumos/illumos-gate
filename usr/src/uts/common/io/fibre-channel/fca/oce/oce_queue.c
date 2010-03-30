@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -477,6 +477,7 @@ oce_wq_init(struct oce_dev *dev,  uint32_t q_len, int wq_type)
 	if (wq == NULL) {
 		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
 		    "WQ allocation failed");
+		return (NULL);
 	}
 
 	/* Set the wq config */
@@ -912,6 +913,9 @@ oce_arm_eq(struct oce_dev *dev, int16_t qid, int npopped,
 	eq_db.bits.clrint = clearint;
 	eq_db.bits.qid = qid;
 	OCE_DB_WRITE32(dev, PD_EQ_DB, eq_db.dw0);
+	if (oce_fm_check_acc_handle(dev, dev->db_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+	}
 }
 
 /*
@@ -934,6 +938,9 @@ oce_arm_cq(struct oce_dev *dev, int16_t qid, int npopped,
 	cq_db.bits.event = 0;
 	cq_db.bits.qid = qid;
 	OCE_DB_WRITE32(dev, PD_CQ_DB, cq_db.dw0);
+	if (oce_fm_check_acc_handle(dev, dev->db_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+	}
 }
 
 
