@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -695,10 +694,8 @@ main(int argc, char *argv[])
 		    "\n\n%s Release %s Version %s %d-bit\r\n",
 		    un.sysname, un.release, un.version, bits);
 		console(B_FALSE,
-		    "Copyright 1983-2010 Sun Microsystems, Inc. "
+		    "Copyright (c) 1983, 2010, Oracle and/or its affiliates."
 		    " All rights reserved.\r\n");
-		console(B_FALSE,
-		    "Use is subject to license terms.\r\n");
 	}
 
 	/*

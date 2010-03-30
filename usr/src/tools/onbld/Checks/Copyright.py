@@ -21,10 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -50,16 +47,21 @@ oldcopyright = re.compile(r'Copyright \(c\) .* Sun Microsystems, Inc\.')
 # pre-2002 copyright with 'by'
 oldcopyright1 = re.compile(r'Copyright .* by Sun Microsystems, Inc\.')
 
-# Valid, current copyright
-goodcopyright = re.compile(r'Copyright ([\d, -]+) Sun Microsystems, Inc\.' +
-			   r'(\s+)(All rights reserved\.)?')
+# last valid Sun copyright
+suncopyright = re.compile(r'Copyright ([\d, -]+) Sun Microsystems, Inc\.' +
+			  r'(\s+)(All rights reserved\.)?')
 
+# old, check to make sure no longer present
 licterms = 'Use is subject to license terms.'
+
+# initial Oracle copyright
+goodcopyright = re.compile(r'Copyright \(c\) (\d\d\d\d, )?(\d\d\d\d)(,)? ' +
+			   r'Oracle and/or its affiliates\.(\s+)' +
+			   r'All rights reserved\.')
 
 def copyright(fh, filename=None, output=sys.stderr):
 	ret = lineno = rights = 0
-	# Are we expecting the license terms message on this line?
-	expecting_license = False
+	check_license = False
 
 	if not filename:
 		filename = fh.name
@@ -67,63 +69,64 @@ def copyright(fh, filename=None, output=sys.stderr):
 	for line in fh:
 		lineno += 1
 
-		if expecting_license:
-			expecting_license = False
-
-			if licterms not in line:
-				err(output, "'%s' message missing" % licterms,
+		if check_license:
+			check_license = False
+			if licterms in line:
+				err(output, "old '%s' message found" % licterms,
 				    filename, lineno)
 				ret = 1
 				continue
-			elif rights > 0 and ret == 0:
-				return 0
-			continue
 
 		if oldcopyright.search(line):
-			err(output, "old copyright with '(c)'", filename,
+			err(output, "ancient Sun copyright", filename,
 			    lineno)
 			rights += 1
 			ret = 1
+			check_license = True
+			continue
 		elif oldcopyright1.search(line):
-			err(output, "old copyright with 'by'", filename, lineno)
+			err(output, "pre-2002 Sun copyright", filename, lineno)
 			rights += 1
 			ret = 1
+			check_license = True
+			continue
+		elif suncopyright.search(line):
+			err(output, "old Sun copyright", filename, lineno)
+			rights += 1
+			ret = 1
+			check_license = True
+			continue
 
 		#
-		# group 1 = year
-		# group 2 = spacing
-		# group 3 = All rights reserved message.
+		# group 1 = optional initial year
+		# group 2 = current year
+		# group 3 = comma after current year
+		# group 4 = spacing between phrases
 		#
 		match = goodcopyright.search(line)
 		if match:
-			expecting_license = True
+			# only check for the old license message on the line
+			# following a copyright match
+			check_license = True
 			rights += 1
 
 			year = time.strftime('%Y')
-			if match.group(1) != year:
+			if match.group(2) != year:
 				err(output, "wrong copyright year %s, should "
 				    "be %s" %
-				    (match.group(1), year), filename, lineno)
+				    (match.group(2), year), filename, lineno)
 				ret = 1
 
-			if not match.group(3):
-				err(output, "'All rights reserved.' message "
-				    "missing",
+			if match.group(3) != ',':
+				err(output, "need comma after current year",
 				    filename, lineno)
 				ret = 1
-			elif match.group(2) != '  ':
-				err(output, "need two spaces between copyright "
+
+			if match.group(4) != ' ':
+				err(output, "need one space between copyright "
 				    "and all rights reserved phrases",
 				    filename, lineno)
 				ret = 1
-	#
-	# If the last line left us expecting the license message,
-	# we're pretty sure it isn't going to be there.
-	#
-	if expecting_license:
-		err(output, "'Use is subject to license terms.' message "
-		    "missing", filename, lineno)
-		ret = 1
 
 	if rights == 0:
 		err(output, "no copyright message found", filename)
