@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -868,8 +867,11 @@ dumpsys_get_maxmem()
 	int k;
 
 	if (cfg->maxsize == 0 || cfg->clevel < DUMP_CLEVEL_LZJB ||
-	    (dump_conflags & DUMP_ALL) != 0)
+	    (dump_conflags & DUMP_ALL) != 0) {
+		if (cfg->clevel > DUMP_CLEVEL_LZJB)
+			cfg->clevel = DUMP_CLEVEL_LZJB;
 		return;
+	}
 
 	sz = 0;
 	cfg->found4m = 0;
@@ -2624,6 +2626,7 @@ dumpsys(void)
 		for (pidx = 0; pidx < npids; pidx++)
 			(void) dump_process(dumpcfg.pids[pidx]);
 
+		dump_init_memlist_walker(&mlw);
 		for (bitnum = 0; bitnum < dumpcfg.bitmapsize; bitnum++) {
 			dump_timeleft = dump_timeout;
 			pfn = dump_bitnum_to_pfn(bitnum, &mlw);
