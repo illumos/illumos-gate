@@ -2247,6 +2247,7 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t total_size,
 	mblk_t *mp = NULL;
 	int chain_size;
 	int error;
+	clock_t deadlk_wait;
 	short fflag;
 	int ksize;
 	struct vattr va;
@@ -2277,12 +2278,27 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t total_size,
 			snfv = kmem_zalloc(sizeof (snf_vmap_desbinfo),
 			    KM_SLEEP);
 
-			/* Get vpm mappings for maxsize with read access */
-			if (vpm_map_pages(fvp, fileoff, (size_t)maxsize,
-			    (VPM_FETCHPAGE), snfv->snfv_vml, SNF_MAXVMAPS,
-			    NULL, S_READ) != 0) {
+			/*
+			 * Get vpm mappings for maxsize with read access.
+			 * If the pages aren't available yet, we get
+			 * DEADLK, so wait and try again a little later using
+			 * an increasing wait. We might be here a long time.
+			 *
+			 * If delay_sig returns EINTR, be sure to exit and
+			 * pass it up to the caller.
+			 */
+			deadlk_wait = 0;
+			while ((error = vpm_map_pages(fvp, fileoff,
+			    (size_t)maxsize, (VPM_FETCHPAGE), snfv->snfv_vml,
+			    SNF_MAXVMAPS, NULL, S_READ)) == EDEADLK) {
+				deadlk_wait += (deadlk_wait < 5) ? 1 : 4;
+				if ((error = delay_sig(deadlk_wait)) != 0) {
+					break;
+				}
+			}
+			if (error != 0) {
 				kmem_free(snfv, sizeof (snf_vmap_desbinfo));
-				error = EIO;
+				error = (error == EINTR) ? EINTR : EIO;
 				goto out;
 			}
 			snfv->snfv_frtn.free_func = snf_vmap_desbfree;
@@ -2359,14 +2375,28 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t total_size,
 			 * because that's how error gets returned.
 			 * (segmap_getmapflt() never fails but segmap_fault()
 			 * does.)
+			 *
+			 * If the pages aren't available yet, we get
+			 * DEADLK, so wait and try again a little later using
+			 * an increasing wait. We might be here a long time.
+			 *
+			 * If delay_sig returns EINTR, be sure to exit and
+			 * pass it up to the caller.
 			 */
-			if (segmap_fault(kas.a_hat, segkmap,
-			    (caddr_t)(uintptr_t)(((uintptr_t)base + mapoff) &
-			    PAGEMASK), snfi->snfi_len,
-			    F_SOFTLOCK, S_READ) != 0) {
+			deadlk_wait = 0;
+			while ((error = FC_ERRNO(segmap_fault(kas.a_hat,
+			    segkmap, (caddr_t)(uintptr_t)(((uintptr_t)base +
+			    mapoff) & PAGEMASK), snfi->snfi_len, F_SOFTLOCK,
+			    S_READ))) == EDEADLK) {
+				deadlk_wait += (deadlk_wait < 5) ? 1 : 4;
+				if ((error = delay_sig(deadlk_wait)) != 0) {
+					break;
+				}
+			}
+			if (error != 0) {
 				(void) segmap_release(segkmap, base, 0);
 				kmem_free(snfi, sizeof (*snfi));
-				error = EIO;
+				error = (error == EINTR) ? EINTR : EIO;
 				goto out;
 			}
 			snfi->snfi_frtn.free_func = snf_smap_desbfree;
