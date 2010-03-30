@@ -178,7 +178,7 @@ sub openlog {
 
 sub closelog {
     $facility = $ident = '';
-    disconnect_log();
+    disconnect_log() if $connected;
 } 
 
 sub setlogmask {
