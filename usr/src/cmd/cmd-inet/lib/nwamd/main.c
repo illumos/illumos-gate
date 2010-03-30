@@ -134,58 +134,11 @@ daemonize(void)
 static void *
 sighandler(void *arg)
 {
-	uint64_t propval;
 	int sig;
-	uid_t uid = getuid();
 
 	while (!shutting_down) {
 		sig = sigwait(&sigwaitset);
 		nlog(LOG_DEBUG, "signal %s caught", strsignal(sig));
-
-		/*
-		 * Signal handling is different if the Phase 1 manifest
-		 * have not been yet been imported.  The two if-statements
-		 * below highlight this.  Signals must be handled
-		 * differently because there is no event handling thread
-		 * and event queue.
-		 *
-		 * When manifest-import imports the Phase 1 manifest, it
-		 * refreshes NWAM.  The NWAM Phase 1 properties must be
-		 * available.  If not, NWAM receveid a signal too soon.
-		 * "ncu_wait_time" is a Phase 1 SMF property that did not
-		 * exist in Phase 0/0.5.
-		 */
-		if (uid == 0 &&
-		    nwamd_lookup_count_property(OUR_FMRI, OUR_PG,
-		    OUR_NCU_WAIT_TIME_PROP_NAME, &propval) != 0) {
-			nlog(LOG_ERR, "WARN: Phase 1 properties not available. "
-			    "Ignoring signal ...");
-			continue;
-		}
-
-		/*
-		 *  The Phase 1 manifest has been imported.  If the
-		 *  "version" property exists (it is added by nwamd upon
-		 *  upgrade to Phase 1), then it means that we have already
-		 *  successfully run nwam before.  If it doesn't, then we
-		 *  arrived here just after the new manifest was imported.
-		 *  manifest-import refreshes nwam after the import.  Exit
-		 *  nwamd so that svc.startd(1M) can start nwamd correctly
-		 *  as specified in the imported manifest.
-		 */
-		if (uid == 0 &&
-		    nwamd_lookup_count_property(OUR_FMRI, OUR_PG,
-		    OUR_VERSION_PROP_NAME, &propval) != 0) {
-			if (sig == SIGHUP) {
-				pfail("WARN: Phase 1 properties available, "
-				    "but NWAM has not been upgraded.  "
-				    "Exiting to let svc.startd restart NWAM");
-			} else {
-				nlog(LOG_ERR, "WARN: Ignoring signal as NWAM "
-				    "has not been upgraded yet");
-				continue;
-			}
-		}
 
 		switch (sig) {
 		case SIGTHAW:
@@ -375,26 +328,7 @@ main(int argc, char *argv[])
 	 */
 	block_signals();
 
-	/*
-	 * In the first boot after upgrade, manifest-import hasn't run yet.
-	 * Thus, the NWAM Phase 1 SMF properties are not available yet.  In
-	 * Phase 0/0.5, nwamd ran as root.  Thus in this case, just
-	 * daemonize() nwamd.  When manifest-import imports the Phase 1
-	 * manifest, NWAM is refreshed.  Also, setup signal handling to
-	 * catch the refresh signal.  Kill nwamd then and let svc.startd(1M)
-	 * start nwamd again (this time correctly as netadm).
-	 */
-	if (uid == 0) {
-		nlog(LOG_ERR, "Warning: Phase 1 properties not available yet");
-
-		daemonize();
-		init_signalhandling();
-		(void) pause();
-
-		return (EXIT_SUCCESS);
-	}
-
-	if (uid != UID_NETADM) {
+	if (uid != UID_NETADM && uid != 0) {
 		/*
 		 * This shouldn't happen normally.  On upgrade the service might
 		 * need reloading.

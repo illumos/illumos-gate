@@ -393,7 +393,7 @@ done:
 		free(ncpfiles);
 	} else {
 		*ncpfilesp = realloc(ncpfiles, sizeof (char *) * (*num_filesp));
-		if (*ncpfilesp == NULL)
+		if (*num_filesp != 0 && *ncpfilesp == NULL)
 			err = NWAM_NO_MEMORY;
 	}
 	return (err);

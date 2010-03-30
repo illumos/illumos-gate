@@ -97,8 +97,6 @@ nwamd_escalate(void) {
 			priv_freeset(priv_set);
 			pfail("setppriv effective: %s", strerror(errno));
 		}
-		if (setuid(0) == -1)
-			nlog(LOG_ERR, "setuid(0) failed %s", strerror(errno));
 	}
 	(void) pthread_mutex_unlock(&uid_mutex);
 
@@ -112,10 +110,6 @@ nwamd_deescalate(void) {
 	assert(uid_cnt > 0);
 	if (--uid_cnt == 0) {
 		priv_set_t *priv_set, *allpriv_set;
-
-		if (setuid(uid) == -1)
-			nlog(LOG_ERR, "setuid(%d) failed %s", uid,
-			    strerror(errno));
 
 		/* build up our minimal set of privs. */
 		priv_set = priv_str_to_set("basic", ",", NULL);

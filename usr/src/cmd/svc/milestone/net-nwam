@@ -541,17 +541,6 @@ case "$1" in
 	fi
 
 	#
-	# Ensure that the network/netcfg service is running since
-	# manifest-import has not yet run for the first boot after upgrade.
-	# We wouldn't need to do that if manifest-import ran earlier in
-	# boot, since there is an explicit dependency between
-	# network/netcfg and network/physical:nwam.  This is similar to
-	# what network/physical does with network/datalink-management in
-	# net_reconfigure().
-	#
-	$SVCADM enable -ts svc:/network/netcfg:default
-
-	#
 	# We also need to create the Legacy location, which is used
 	# to restore non-NWAM settings that are overwritten when
 	# NWAM is enabled (e.g. resolv.conf, nsswitch.conf, etc.).

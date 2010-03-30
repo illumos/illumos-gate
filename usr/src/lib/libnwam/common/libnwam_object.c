@@ -597,7 +597,7 @@ nwam_prop_read_only(struct nwam_prop_table table, const char *propname,
 	if ((pte = nwam_get_prop_table_entry(table, propname)) == NULL)
 		return (NWAM_INVALID_ARG);
 
-	*readp = (pte->prop_is_readonly && !nwam_uid_is_netadm());
+	*readp = (pte->prop_is_readonly && !nwam_uid_is_special());
 
 	return (NWAM_SUCCESS);
 }

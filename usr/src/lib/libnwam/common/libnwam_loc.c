@@ -461,7 +461,7 @@ nwam_loc_destroy(nwam_loc_handle_t loch, uint64_t flags)
 
 	if (activation == NWAM_ACTIVATION_MODE_SYSTEM) {
 		if (strcmp(loch->nwh_name, NWAM_LOC_NAME_LEGACY) == 0) {
-			if (!nwam_uid_is_netadm())
+			if (!nwam_uid_is_special())
 				return (NWAM_ENTITY_NOT_DESTROYABLE);
 		} else {
 			return (NWAM_ENTITY_NOT_DESTROYABLE);

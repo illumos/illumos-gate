@@ -56,9 +56,8 @@
 #define	NWAM_EVENT_MSG_DIR		"/etc/svc/volatile/nwam/"
 #define	NWAM_EVENT_MSG_FILE		"nwam_event_msgs"
 #define	NWAM_EVENT_MSG_FILE_PREFIX	NWAM_EVENT_MSG_DIR NWAM_EVENT_MSG_FILE
-#define	NWAM_EVENT_MAX_NUM_WLANS	32
 #define	NWAM_EVENT_MAX_SIZE		(sizeof (struct nwam_event) + \
-	(NWAM_EVENT_MAX_NUM_WLANS * sizeof (nwam_wlan_t)))
+	(NWAMD_MAX_NUM_WLANS * sizeof (nwam_wlan_t)))
 #define	NWAM_EVENT_WAIT_TIME		10
 #define	NWAM_EVENT_MAX_NUM_PENDING	25
 

@@ -308,7 +308,7 @@ extern nwam_error_t nwam_valid_fmri(nwam_value_t);
 extern nwam_error_t nwam_valid_mac_addr(nwam_value_t);
 
 /* Misc. util functions */
-extern boolean_t nwam_uid_is_netadm(void);
+extern boolean_t nwam_uid_is_special(void);
 extern nwam_error_t nwam_set_smf_string_property(const char *, const char *,
 	const char *, const char *);
 extern nwam_error_t nwam_get_smf_string_property(const char *, const char *,

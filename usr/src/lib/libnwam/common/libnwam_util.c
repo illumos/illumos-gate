@@ -862,9 +862,10 @@ nwam_valid_mac_addr(nwam_value_t value)
 }
 
 boolean_t
-nwam_uid_is_netadm(void)
+nwam_uid_is_special(void)
 {
-	return (getuid() == UID_NETADM);
+	uid_t uid = getuid();
+	return (uid == UID_NETADM || uid == 0);
 }
 
 nwam_error_t

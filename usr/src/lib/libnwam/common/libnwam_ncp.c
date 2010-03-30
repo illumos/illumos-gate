@@ -545,7 +545,7 @@ nwam_ncp_get_read_only(nwam_ncp_handle_t ncph, boolean_t *readp)
 		return (err);
 
 	if (NWAM_NCP_AUTOMATIC(name))
-		*readp = !nwam_uid_is_netadm();
+		*readp = !nwam_uid_is_special();
 	else
 		*readp = B_FALSE;
 
