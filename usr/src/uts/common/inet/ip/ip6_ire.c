@@ -848,6 +848,8 @@ matchit:
 	V6_MASK_COPY(*addr, *mask, masked_addr);
 	if (V6_MASK_EQ(*addr, *mask, ire->ire_addr_v6) &&
 	    ((!(match_flags & MATCH_IRE_GW)) ||
+	    ((!(match_flags & MATCH_IRE_DIRECT)) ||
+	    !(ire->ire_flags & RTF_INDIRECT)) &&
 	    IN6_ARE_ADDR_EQUAL(&gw_addr_v6, gateway)) &&
 	    ((!(match_flags & MATCH_IRE_TYPE)) || (ire->ire_type & type)) &&
 	    ((!(match_flags & MATCH_IRE_TESTHIDDEN)) || ire->ire_testhidden) &&
@@ -1167,8 +1169,8 @@ ire_route_recursive_impl_v6(ire_t *ire,
 	uint_t		generations[MAX_IRE_RECURSION];
 	boolean_t	need_refrele = B_FALSE;
 	boolean_t	invalidate = B_FALSE;
-	int		prefs[MAX_IRE_RECURSION];
 	ill_t		*ill = NULL;
+	uint_t		maskoff = (IRE_LOCAL|IRE_LOOPBACK);
 
 	if (setsrcp != NULL)
 		ASSERT(IN6_IS_ADDR_UNSPECIFIED(setsrcp));
@@ -1196,8 +1198,15 @@ ire_route_recursive_impl_v6(ire_t *ire,
 				generation = IRE_GENERATION_VERIFY;
 		}
 
-		if (ire == NULL)
-			ire = ire_reject(ipst, B_TRUE);
+		if (ire == NULL) {
+			if (i > 0 && (irr_flags & IRR_INCOMPLETE)) {
+				ire = ires[0];
+				ire_refhold(ire);
+			} else {
+				ire = ire_reject(ipst, B_TRUE);
+			}
+			goto error;
+		}
 
 		/* Need to return the ire with RTF_REJECT|BLACKHOLE */
 		if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))
@@ -1205,25 +1214,24 @@ ire_route_recursive_impl_v6(ire_t *ire,
 
 		ASSERT(!(ire->ire_type & IRE_MULTICAST)); /* Not in ftable */
 
-		if (i != 0) {
-			prefs[i] = ire_pref(ire);
-			/*
-			 * Don't allow anything unusual past the first
-			 * iteration.
-			 */
-			if ((ire->ire_type &
-			    (IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST)) ||
-			    prefs[i] <= prefs[i-1]) {
-				ire_refrele(ire);
-				if (irr_flags & IRR_INCOMPLETE) {
-					ire = ires[0];
-					ire_refhold(ire);
-				} else {
-					ire = ire_reject(ipst, B_TRUE);
-				}
-				goto error;
-			}
+		/*
+		 * Don't allow anything unusual past the first iteration.
+		 * After the first lookup, we should no longer look for
+		 * (IRE_LOCAL|IRE_LOOPBACK) or RTF_INDIRECT routes.
+		 *
+		 * In addition, after we have found a direct IRE_OFFLINK,
+		 * we should only look for interface or clone routes.
+		 */
+		match_args |= MATCH_IRE_DIRECT; /* no more RTF_INDIRECTs */
+		if ((ire->ire_type & IRE_OFFLINK) &&
+		    !(ire->ire_flags & RTF_INDIRECT)) {
+			ire_type = IRE_IF_ALL;
+		} else {
+			if (!(match_args & MATCH_IRE_TYPE))
+				ire_type = (IRE_OFFLINK|IRE_ONLINK);
+			ire_type &= ~maskoff; /* no more LOCAL, LOOPBACK */
 		}
+		match_args |= MATCH_IRE_TYPE;
 		/* We have a usable IRE */
 		ires[i] = ire;
 		generations[i] = generation;
@@ -1335,7 +1343,7 @@ ire_route_recursive_impl_v6(ire_t *ire,
 		 * ire->ire_ill, and we want to find the IRE_INTERFACE for
 		 * ire_ill, so we set ill to the ire_ill
 		 */
-		match_args &= MATCH_IRE_TYPE;
+		match_args &= (MATCH_IRE_TYPE | MATCH_IRE_DIRECT);
 		v6nexthop = ire->ire_gateway_addr_v6;
 		if (ill == NULL && ire->ire_ill != NULL) {
 			ill = ire->ire_ill;
@@ -1343,12 +1351,6 @@ ire_route_recursive_impl_v6(ire_t *ire,
 			ill_refhold(ill);
 			match_args |= MATCH_IRE_ILL;
 		}
-		/*
-		 * We set the prefs[i] value above if i > 0. We've already
-		 * done i++ so i is one in the case of the first time around.
-		 */
-		if (i == 1)
-			prefs[0] = ire_pref(ire);
 		ire = NULL;
 	}
 	ASSERT(ire == NULL);

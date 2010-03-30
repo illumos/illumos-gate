@@ -211,6 +211,14 @@ icmp_inbound_v6(mblk_t *mp, ip_recv_attr_t *ira)
 
 	BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInMsgs);
 
+	/* Check for Martian packets  */
+	if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_src)) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInAddrErrors);
+		ip_drop_input("ipIfStatsInAddrErrors: mcast src", mp, ill);
+		freemsg(mp);
+		return (NULL);
+	}
+
 	/* Make sure ira_l2src is set for ndp_input */
 	if (!(ira->ira_flags & IRAF_L2SRC_SET))
 		ip_setl2src(mp, ira, ira->ira_rill);

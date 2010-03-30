@@ -2006,6 +2006,8 @@ matchit:
 	if ((ire->ire_addr == (addr & mask)) &&
 	    ((!(match_flags & MATCH_IRE_GW)) ||
 	    (ire->ire_gateway_addr == gateway)) &&
+	    ((!(match_flags & MATCH_IRE_DIRECT)) ||
+	    !(ire->ire_flags & RTF_INDIRECT)) &&
 	    ((!(match_flags & MATCH_IRE_TYPE)) || (ire->ire_type & type)) &&
 	    ((!(match_flags & MATCH_IRE_TESTHIDDEN)) || ire->ire_testhidden) &&
 	    ((!(match_flags & MATCH_IRE_MASK)) || (ire->ire_mask == mask)) &&
@@ -3558,30 +3560,6 @@ restart:
 		child = next;
 	}
 	rw_exit(&ipst->ips_ire_dep_lock);
-}
-
-/*
- * ire_pref() is used in recursive route-resolution for a destination to
- * determine the preference of an ire, where "preference" is determined
- * based on the level of indirection to the destination of the ire.
- * A higher preference indicates that fewer lookups are needed to complete
- * recursive route lookup. Thus
- * ire_pref(RTF_INDIRECT) < ire_pref(IRE_IF_RESOLVER) < ire_pref(IRE_PREF_CLONE)
- */
-int
-ire_pref(ire_t *ire)
-{
-	if (ire->ire_flags & RTF_INDIRECT)
-		return (1);
-	if (ire->ire_type & IRE_OFFLINK)
-		return (2);
-	if (ire->ire_type & (IRE_IF_RESOLVER|IRE_IF_NORESOLVER))
-		return (3);
-	if (ire->ire_type & IRE_IF_CLONE)
-		return (4);
-	if (ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST))
-		return (5);
-	return (-1); /* unknown ire_type */
 }
 
 /*

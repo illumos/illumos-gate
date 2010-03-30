@@ -94,6 +94,7 @@ extern "C" {
 #define	MATCH_IRE_SECATTR	0x0040	/* Match gateway security attributes */
 #define	MATCH_IRE_TESTHIDDEN 	0x0080	/* Match ire_testhidden IREs */
 #define	MATCH_IRE_SRC_ILL	0x0100	/* ire_ill uses a src address on ill */
+#define	MATCH_IRE_DIRECT	0x0200	/* Don't match indirect routes */
 
 #define	MAX_IRE_RECURSION	4	/* Max IREs in ire_route_recursive */
 
@@ -162,11 +163,6 @@ extern	ire_t	*ire_create_v6(const in6_addr_t *, const in6_addr_t *,
 extern	void	ire_delete(ire_t *);
 extern	void	ire_delete_v6(ire_t *);
 
-/*
- * ire_pref used to make sure we don't set up routing loops in the ire_dep
- * chain.
- */
-extern	int	ire_pref(ire_t *);
 extern	boolean_t ire_dep_build(ire_t *[], uint_t [], uint_t);
 extern	void	ire_dep_delete_if_clone(ire_t *);
 extern	void	ire_dep_incr_generation(ire_t *);

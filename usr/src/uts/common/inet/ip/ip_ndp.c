@@ -1656,11 +1656,12 @@ ndp_input_solicit(mblk_t *mp, ip_recv_attr_t *ira)
 	src = ip6h->ip6_src;
 	ns = (nd_neighbor_solicit_t *)icmp_nd;
 	target = ns->nd_ns_target;
-	if (IN6_IS_ADDR_MULTICAST(&target)) {
+	if (IN6_IS_ADDR_MULTICAST(&target) || IN6_IS_ADDR_V4MAPPED(&target) ||
+	    IN6_IS_ADDR_LOOPBACK(&target)) {
 		if (ip_debug > 2) {
 			/* ip1dbg */
-			pr_addr_dbg("ndp_input_solicit: Target is"
-			    " multicast! %s\n", AF_INET6, &target);
+			pr_addr_dbg("ndp_input_solicit: Martian Target %s\n",
+			    AF_INET6, &target);
 		}
 		bad_solicit = B_TRUE;
 		goto done;
@@ -1888,8 +1889,13 @@ ndp_input_advert(mblk_t *mp, ip_recv_attr_t *ira)
 		return;
 	}
 	target = na->nd_na_target;
-	if (IN6_IS_ADDR_MULTICAST(&target)) {
-		ip1dbg(("ndp_input_advert: Target is multicast!\n"));
+	if (IN6_IS_ADDR_MULTICAST(&target) || IN6_IS_ADDR_V4MAPPED(&target) ||
+	    IN6_IS_ADDR_LOOPBACK(&target)) {
+		if (ip_debug > 2) {
+			/* ip1dbg */
+			pr_addr_dbg("ndp_input_solicit: Martian Target %s\n",
+			    AF_INET6, &target);
+		}
 		BUMP_MIB(mib, ipv6IfIcmpInBadNeighborAdvertisements);
 		return;
 	}
@@ -2974,6 +2980,8 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 			nce_refrele(nce);
 		return (EINVAL);
 	}
+	if (inflags & NDF_STATIC)
+		new_flags |= NCE_F_STATIC;
 
 	switch (inflags & (NDF_ANYCAST_ON|NDF_ANYCAST_OFF)) {
 	case NDF_ANYCAST_ON:

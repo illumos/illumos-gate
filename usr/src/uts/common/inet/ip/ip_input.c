@@ -575,8 +575,8 @@ ill_input_short_v4(mblk_t *mp, void *iph_arg, void *nexthop_arg,
 	 * operations.
 	 * Note that these addresses are always in network byte order
 	 */
-	if (((*(uchar_t *)&ipha->ipha_dst) == 127) ||
-	    ((*(uchar_t *)&ipha->ipha_src) == 127)) {
+	if (((*(uchar_t *)&ipha->ipha_dst) == IN_LOOPBACKNET) ||
+	    ((*(uchar_t *)&ipha->ipha_src) == IN_LOOPBACKNET)) {
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInAddrErrors);
 		ip_drop_input("ipIfStatsInAddrErrors", mp, ill);
 		freemsg(mp);

@@ -320,6 +320,11 @@ typedef struct lif_nd_req {
 #define	NDF_ANYCAST_OFF		0x8
 #define	NDF_PROXY_ON		0x10
 #define	NDF_PROXY_OFF		0x20
+/*
+ * the NDF_STATIC entry ensures that an NCE will not be deleted, and is
+ * used by non-ON applications like IPv6 test suites.
+ */
+#define	NDF_STATIC		0x40
 
 /* For SIOC[GS]LIFLNKINFO */
 typedef struct lif_ifinfo_req {

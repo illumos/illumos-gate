@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -925,6 +925,19 @@ arp_process_packet(ill_t *ill, mblk_t *mp)
 
 	/* Determine if this is just a probe */
 	is_probe = (src_paddr == INADDR_ANY);
+
+	/*
+	 * The following test for loopback is faster than
+	 * IP_LOOPBACK_ADDR(), because it avoids any bitwise
+	 * operations.
+	 * Note that these addresses are always in network byte order
+	 */
+	if ((*(uint8_t *)&src_paddr) == IN_LOOPBACKNET ||
+	    (*(uint8_t *)&dst_paddr) == IN_LOOPBACKNET ||
+	    IN_MULTICAST(src_paddr) || IN_MULTICAST(dst_paddr)) {
+		arp_drop_packet("Martian IP addr", mp, ill);
+		return;
+	}
 
 	/*
 	 * ira_ill is the only field used down the arp_notify path.

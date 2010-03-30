@@ -1025,20 +1025,33 @@ ire_lookup_v4(ipaddr_t dst_addr, ipaddr_t net_mask, ipaddr_t gw_addr,
 		/* Look for an interface ire recursively based on the gateway */
 		dst_addr = ire->ire_gateway_addr;
 		match_flags &= ~(MATCH_IRE_GW|MATCH_IRE_MASK);
+		/*
+		 * Don't allow anything unusual past the first iteration.
+		 * After the first lookup, we should no longer look for
+		 * (IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST) or RTF_INDIRECT
+		 * routes.
+		 *
+		 * In addition, after we have found a direct IRE_OFFLINK,
+		 * we should only look for interface or clone routes.
+		 */
+		match_flags |= MATCH_IRE_DIRECT; /* no more RTF_INDIRECTs */
+
+		if ((ire->ire_type & IRE_OFFLINK) &&
+		    !(ire->ire_flags & RTF_INDIRECT)) {
+			ire_type = IRE_IF_ALL;
+		} else {
+			/*
+			 * no more local, loopback, broadcast routes
+			 */
+			if (!(match_flags & MATCH_IRE_TYPE))
+				ire_type = (IRE_OFFLINK|IRE_ONLINK);
+			ire_type &= ~(IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST);
+		}
+		match_flags |= MATCH_IRE_TYPE;
+
 		ifire = ire_route_recursive_v4(dst_addr, ire_type, ill, zoneid,
 		    tsl, match_flags, IRR_INCOMPLETE, 0, ipst, v4setsrcp,
 		    gwattrp, NULL);
-		/*
-		 * Don't allow anything unusual past the first
-		 * iteration. Clearing ifire means caller will not see a
-		 * complete response - there will be no RTA_IFP returned.
-		 */
-		if ((ifire->ire_type &
-		    (IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST)) ||
-		    ire_pref(ifire) <= ire_pref(ire)) {
-			ire_refrele(ifire);
-			ifire = NULL;
-		}
 	} else {
 		ire = ire_route_recursive_v4(dst_addr, ire_type, ill, zoneid,
 		    tsl, match_flags, IRR_INCOMPLETE, 0, ipst, v4setsrcp,
@@ -1101,20 +1114,33 @@ ire_lookup_v6(const in6_addr_t *dst_addr_v6,
 		dst = ire->ire_gateway_addr_v6;
 		mutex_exit(&ire->ire_lock);
 		match_flags &= ~(MATCH_IRE_GW|MATCH_IRE_MASK);
+		/*
+		 * Don't allow anything unusual past the first iteration.
+		 * After the first lookup, we should no longer look for
+		 * (IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST) or RTF_INDIRECT
+		 * routes.
+		 *
+		 * In addition, after we have found a direct IRE_OFFLINK,
+		 * we should only look for interface or clone routes.
+		 */
+		match_flags |= MATCH_IRE_DIRECT; /* no more RTF_INDIRECTs */
+
+		if ((ire->ire_type & IRE_OFFLINK) &&
+		    !(ire->ire_flags & RTF_INDIRECT)) {
+			ire_type = IRE_IF_ALL;
+		} else {
+			/*
+			 * no more local, loopback routes
+			 */
+			if (!(match_flags & MATCH_IRE_TYPE))
+				ire_type = (IRE_OFFLINK|IRE_ONLINK);
+			ire_type &= ~(IRE_LOCAL|IRE_LOOPBACK);
+		}
+		match_flags |= MATCH_IRE_TYPE;
+
 		ifire = ire_route_recursive_v6(&dst, ire_type, ill, zoneid, tsl,
 		    match_flags, IRR_INCOMPLETE, 0, ipst, v6setsrcp, gwattrp,
 		    NULL);
-		/*
-		 * Don't allow anything unusual past the first
-		 * iteration. Clearing ifire means caller will not see a
-		 * complete response - there will be no RTA_IFP returned.
-		 */
-		if ((ifire->ire_type &
-		    (IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST)) ||
-		    ire_pref(ifire) <= ire_pref(ire)) {
-			ire_refrele(ifire);
-			ifire = NULL;
-		}
 	} else {
 		ire = ire_route_recursive_v6(dst_addr_v6, ire_type, ill, zoneid,
 		    tsl, match_flags, IRR_INCOMPLETE, 0, ipst, v6setsrcp,
