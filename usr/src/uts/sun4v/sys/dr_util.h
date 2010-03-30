@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +99,8 @@ typedef enum {
 
 extern boolean_t dr_is_disabled(dr_type_t type);
 extern void dr_generate_event(dr_type_t type, int se_hint);
+extern struct memlist *dr_memlist_dup(struct memlist *mlist);
+extern void dr_memlist_delete(struct memlist *mlist);
 
 #ifdef __cplusplus
 }

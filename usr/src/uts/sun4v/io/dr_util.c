@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,7 @@
 #include <sys/sysevent/dr.h>
 #include <sys/sysevent/eventdefs.h>
 #include <sys/ldoms.h>
-
+#include <sys/memlist.h>
 #include <sys/dr_util.h>
 
 extern int ppvm_enable;
@@ -140,6 +140,44 @@ dr_generate_event(dr_type_t type, int se_hint)
 done:
 	if (ev != NULL)
 		sysevent_free(ev);
+}
+
+struct memlist *
+dr_memlist_dup(struct memlist *mlist)
+{
+	struct memlist *hl = NULL, *tl, **mlp;
+
+	if (mlist == NULL)
+		return (NULL);
+
+	mlp = &hl;
+	tl = *mlp;
+	for (; mlist; mlist = mlist->ml_next) {
+		*mlp = 	(struct memlist *)kmem_zalloc(sizeof (struct memlist),\
+		    KM_SLEEP);
+		(*mlp)->ml_address = mlist->ml_address;
+		(*mlp)->ml_size = mlist->ml_size;
+		(*mlp)->ml_prev = tl;
+		tl = *mlp;
+		mlp = &((*mlp)->ml_next);
+	}
+	*mlp = NULL;
+
+	return (hl);
+}
+
+/*
+ * Free a memlist and its elements
+ */
+void
+dr_memlist_delete(struct memlist *mlist)
+{
+	register struct memlist *ml;
+
+	for (ml = mlist; ml; ml = mlist) {
+		mlist = ml->ml_next;
+		kmem_free((void *)ml, sizeof (struct memlist));
+	}
 }
 
 /*

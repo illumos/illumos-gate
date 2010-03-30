@@ -192,7 +192,7 @@ hat_kpm_vaddr2page(caddr_t vaddr)
 
 	return (page_numtopp_nolock(pfn));
 }
-
+/*ARGSUSED*/
 /*
  * hat_kpm_fault is called from segkpm_fault when a kpm tsbmiss occurred.
  * This should never happen on sun4v.
@@ -200,10 +200,12 @@ hat_kpm_vaddr2page(caddr_t vaddr)
 int
 hat_kpm_fault(struct hat *hat, caddr_t vaddr)
 {
-	panic("pagefault in seg_kpm.  hat: 0x%p  vaddr: 0x%p",
-	    (void *)hat, (void *)vaddr);
+	/*
+	 * Return FC_NOMAP for sun4v to allow the t_lofault_handler
+	 * to handle this fault if one is installed
+	 */
 
-	return (0);
+	return (FC_NOMAP);
 }
 
 /*ARGSUSED*/

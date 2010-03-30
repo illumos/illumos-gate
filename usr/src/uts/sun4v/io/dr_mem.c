@@ -708,6 +708,7 @@ dr_mem_list_query(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 	int		rlen;
 	int		nml;
 	struct memlist	*ml;
+	struct memlist	*phys_copy = NULL;
 	dr_mem_blk_t	*req_mblks, mb;
 	dr_mem_hdr_t	*rp;
 	dr_mem_query_t	*stat;
@@ -723,9 +724,13 @@ dr_mem_list_query(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 	if (req_mblks->addr == NULL && req_mblks->size == 0) {
 		/*
 		 * Request is for domain's full view of it's memory.
+		 * place a copy in phys_copy then release the memlist lock.
 		 */
 		memlist_read_lock();
-		for (ml = phys_install; ml; ml = ml->ml_next)
+		phys_copy = dr_memlist_dup(phys_install);
+		memlist_read_unlock();
+
+		for (ml = phys_copy; ml; ml = ml->ml_next)
 			nml++;
 
 		rlen += nml * sizeof (dr_mem_query_t);
@@ -744,12 +749,11 @@ dr_mem_list_query(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 
 	/* get the status for each of the mblocks */
 	if (nml) {
-		for (idx = 0, ml = phys_install; ml; ml = ml->ml_next, idx++) {
+		for (idx = 0, ml = phys_copy; ml; ml = ml->ml_next, idx++) {
 			mb.addr = ml->ml_address;
 			mb.size = ml->ml_size;
 			dr_mem_query(&mb, &stat[idx]);
 		}
-		memlist_read_unlock();
 	} else {
 		for (idx = 0; idx < req->msg_arg; idx++)
 			dr_mem_query(&req_mblks[idx], &stat[idx]);
@@ -757,7 +761,9 @@ dr_mem_list_query(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 
 	*resp = rp;
 	*resp_len = rlen;
-
+	if (phys_copy != NULL) {
+		dr_memlist_delete(phys_copy);
+	}
 	drctl_unblock();
 
 	return (0);
