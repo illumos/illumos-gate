@@ -18,15 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_IMPL_COMMANDS_H
 #define	_SYS_SCSI_IMPL_COMMANDS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -575,6 +573,10 @@ union scsi_cdb {		/* scsi command description block */
 #define	DLD_BFI_FORMAT		0x04	/* bytes-from-index format */
 #define	DLD_PS_FORMAT		0x05	/* physical sector format */
 
+/*
+ * Defines for value of CONTROL byte of cdb.
+ */
+#define	CDB_FLAG_NACA		0x04	/* naca flag */
 
 /*
  * Disk defect list - used by format command.

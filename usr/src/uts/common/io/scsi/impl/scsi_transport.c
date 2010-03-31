@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -49,6 +49,12 @@ extern	kmutex_t	scsi_flag_nointr_mutex;
 extern	kcondvar_t	scsi_flag_nointr_cv;
 
 extern int		do_polled_io;
+
+extern int		scsi_pkt_allow_naca;
+extern uchar_t		scsi_cdb_size[];
+#define	NACA_IS_SET(cdb)						\
+	(((cdb)[scsi_cdb_size[GETGROUP((union scsi_cdb *)(cdb))] - 1]	\
+	& CDB_FLAG_NACA) ? 1 : 0)
 
 /*
  * we used to set the callback_done value to NULL after the callback
@@ -100,6 +106,16 @@ scsi_transport(struct scsi_pkt *pkt)
 	struct scsi_address	*ap = P_TO_ADDR(pkt);
 	int			rval = TRAN_ACCEPT;
 	major_t			major;
+
+	/*
+	 * Add an assertion check for debugging as use of the NACA flag
+	 * can cause problems. If an initiator sets it but does not clear
+	 * it, other initiators would end up waiting indefinitely for the
+	 * first to clear ACA.
+	 */
+	if (!scsi_pkt_allow_naca) {
+		ASSERT(!NACA_IS_SET(pkt->pkt_cdbp));
+	}
 
 	/*
 	 * The DDI does not allow drivers to allocate their own scsi_pkt(9S),

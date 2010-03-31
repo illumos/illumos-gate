@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/scsi/scsi.h>
@@ -34,6 +34,7 @@
  * Polling support routines
  */
 
+int		scsi_pkt_allow_naca = 0;
 extern uintptr_t scsi_callback_id;
 
 extern uchar_t scsi_cdb_size[];
@@ -2475,6 +2476,25 @@ scsi_uscsi_handle_cmd(dev_t dev, enum uio_seg dataspace,
 int
 scsi_uscsi_pktinit(struct uscsi_cmd *uscmd, struct scsi_pkt *pkt)
 {
+
+	/*
+	 * Check if the NACA flag is set. If one initiator sets it
+	 * but does not clear it, other initiators would end up
+	 * waiting indefinitely for the first to clear NACA. If the
+	 * the system allows NACA to be set, then warn the user but
+	 * still pass the command down, otherwise, clear the flag.
+	 */
+	if (uscmd->uscsi_cdb[uscmd->uscsi_cdblen - 1] & CDB_FLAG_NACA) {
+		if (scsi_pkt_allow_naca) {
+			cmn_err(CE_WARN, "scsi_uscsi_pktinit: "
+			    "NACA flag is set");
+		} else {
+			uscmd->uscsi_cdb[uscmd->uscsi_cdblen - 1] &=
+			    ~CDB_FLAG_NACA;
+			cmn_err(CE_WARN, "scsi_uscsi_pktinit: "
+			    "NACA flag is cleared");
+		}
+	}
 
 	/*
 	 * See if path_instance was requested in uscsi_cmd.
