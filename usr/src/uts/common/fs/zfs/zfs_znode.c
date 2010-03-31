@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Portions Copyright 2007 Jeremy Teo */
@@ -987,11 +986,11 @@ zfs_mknode(znode_t *dzp, vattr_t *vap, dmu_tx_t *tx, cred_t *cr,
 		(*zpp)->z_sa_hdl = sa_hdl;
 	}
 
-	if (vap->va_mask & AT_XVATTR)
-		zfs_xvattr_set(*zpp, (xvattr_t *)vap, tx);
-
 	(*zpp)->z_pflags = pflags;
 	(*zpp)->z_mode = mode;
+
+	if (vap->va_mask & AT_XVATTR)
+		zfs_xvattr_set(*zpp, (xvattr_t *)vap, tx);
 
 	if (obj_type == DMU_OT_ZNODE ||
 	    acl_ids->z_aclp->z_version < ZFS_ACL_VERSION_FUID) {

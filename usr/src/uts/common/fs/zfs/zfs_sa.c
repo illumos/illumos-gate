@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -289,8 +288,10 @@ zfs_sa_upgrade(sa_handle_t *hdl, dmu_tx_t *tx)
 		else {
 			dmu_buf_t *dbp;
 			if (dmu_buf_hold(zfsvfs->z_os, zp->z_id, 0,
-			    FTAG, &dbp))
+			    FTAG, &dbp)) {
+				kmem_free(slink, zp->z_size + 1);
 				return;
+			}
 			bcopy(dbp->db_data, slink, zp->z_size);
 			dmu_buf_rele(dbp, FTAG);
 		}

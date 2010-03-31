@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -376,7 +375,7 @@ zfs_fuid_find_by_idx(zfsvfs_t *zfsvfs, uint32_t idx)
 
 	rw_enter(&zfsvfs->z_fuid_lock, RW_READER);
 
-	if (zfsvfs->z_fuid_obj)
+	if (zfsvfs->z_fuid_obj || zfsvfs->z_fuid_dirty)
 		domain = zfs_fuid_idx_domain(&zfsvfs->z_fuid_idx, idx);
 	else
 		domain = nulldomain;
