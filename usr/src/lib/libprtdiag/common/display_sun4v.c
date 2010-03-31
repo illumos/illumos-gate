@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1219,6 +1218,10 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 		if (sensor_status == SENSOR_OK) {
 			return (PICL_WALK_CONTINUE);
 		}
+	} else {
+		if (sensor_status != SENSOR_OK && all_status_ok == 1) {
+			all_status_ok = 0;
+		}
 	}
 
 	/*
@@ -1388,10 +1391,8 @@ sun4v_env_print_indicator_callback(picl_nodehdl_t nodeh, void *args)
 			sensor_status = SENSOR_UNKNOWN;
 		} else {
 			if (picl_get_propval_by_name(nodeh, PICL_PROP_EXPECTED,
-			    &expected_val, sizeof (expected_val)) !=
+			    &expected_val, sizeof (expected_val)) ==
 			    PICL_SUCCESS) {
-				sensor_status = SENSOR_UNKNOWN;
-			} else {
 				if (strncmp(current_val, expected_val,
 				    sizeof (current_val)) == 0) {
 					sensor_status = SENSOR_OK;
@@ -1409,6 +1410,10 @@ sun4v_env_print_indicator_callback(picl_nodehdl_t nodeh, void *args)
 		}
 		if (sensor_status == SENSOR_OK) {
 			return (PICL_WALK_CONTINUE);
+		}
+	} else {
+		if (sensor_status != SENSOR_OK && all_status_ok == 1) {
+			all_status_ok = 0;
 		}
 	}
 
@@ -1780,6 +1785,10 @@ sun4v_print_fru_status_callback(picl_nodehdl_t nodeh, void *args)
 			}
 		} else
 			return (PICL_WALK_CONTINUE);
+	} else {
+		if (all_status_ok && (strcmp(status, "disabled") == 0)) {
+			all_status_ok = 0;
+		}
 	}
 
 	if (is_fru_absent(nodeh))
