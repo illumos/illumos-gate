@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -702,30 +701,35 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		case ELFSIGN_RESTRICTED:
 			break;
 		case ELFSIGN_NOTSIGNED:
-			estatus_str = strdup("not a signed provider.");
+			estatus_str = "not a signed provider.";
 			break;
 		case ELFSIGN_FAILED:
-			estatus_str = strdup("signature verification failed.");
+			estatus_str = "signature verification failed.";
 			break;
 		case ELFSIGN_UNAVAILABLE:
-			estatus_str = strdup("kcfd(1m) is not available for "
+			estatus_str = "kcfd(1m) is not available for "
 			    "signature verification. Cannot continue loading "
-			    "the cryptographic framework.");
+			    "the cryptographic framework.";
 			break;
 		default:
-			estatus_str = strdup("unexpected failure in ELF "
-			    "signature verification.");
+			estatus_str = "unexpected failure in ELF "
+			    "signature verification.";
 		}
 		if (estatus_str != NULL) {
-			cryptoerror(LOG_ERR, "libpkcs11: %s %s %s",
-			    fullpath, estatus_str,
-			    (estatus == ELFSIGN_UNKNOWN ||
-			    estatus == ELFSIGN_UNAVAILABLE) ?
-			    "See cryptoadm (1M). Cannot continue parsing "
-			    _PATH_PKCS11_CONF : conf_err);
+			if (estatus != ELFSIGN_UNAVAILABLE) {
+				cryptoerror(LOG_ERR, "libpkcs11: %s %s %s",
+				    fullpath, estatus_str,
+				    estatus == ELFSIGN_UNKNOWN ?
+				    "See cryptoadm (1M). "
+				    "Cannot continue parsing "
+				    _PATH_PKCS11_CONF : conf_err);
+			} else {
+				cryptoerror(LOG_ERR, "libpkcs11: %s",
+				    estatus_str);
+			}
+
 			(void) prov_funcs->C_Finalize(NULL);
 			(void) dlclose(dldesc);
-			free(estatus_str);
 			estatus_str = NULL;
 			if (estatus == ELFSIGN_UNKNOWN ||
 			    estatus == ELFSIGN_UNAVAILABLE) {
@@ -983,7 +987,8 @@ config_complete:
 conferror:
 	/*
 	 * This cleanup code is only exercised when a major,
-	 * unrecoverable error like "out of memory" occurs.
+	 * unrecoverable error like "out of memory" or
+	 * kcfd is not reachable occurs.
 	 */
 	if (prov_funcs != NULL) {
 		(void) prov_funcs->C_Finalize(NULL);
