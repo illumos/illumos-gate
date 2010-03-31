@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 1983 Regents of the University of California.
@@ -2205,6 +2204,15 @@ again:
 			goto fail;
 		}
 	}
+
+	/*
+	 * If the interface being moved is under the control of `ipmgmtd(1M)'
+	 * dameon then we should inform the daemon about this move, so that
+	 * the daemon can delete the state associated with this interface.
+	 *
+	 * This workaround is needed until the IPMP support in ipadm(1M).
+	 */
+	ipadm_if_move(iph, name);
 
 	/*
 	 * If there were addresses that we had to bring down, it's time to

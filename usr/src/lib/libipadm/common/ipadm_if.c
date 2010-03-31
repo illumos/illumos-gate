@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <errno.h>
@@ -1531,4 +1530,21 @@ ipadm_disable_if(ipadm_handle_t iph, const char *ifname, uint32_t flags)
 	} else {
 		return (IPADM_FAILURE);
 	}
+}
+
+/*
+ * This workaround is until libipadm supports IPMP and is required whenever an
+ * interface is moved into an IPMP group. Since libipadm doesn't support IPMP
+ * yet, we will have to update the daemon's in-memory mapping of
+ * `aobjname' to 'lifnum'.
+ *
+ * For `IPMGMT_ACTIVE' case, i_ipadm_delete_ifobj() would only fail if
+ * door_call(3C) fails. Also, there is no use in returning error because
+ * `ifname' would have been successfuly moved into IPMP group, by this time.
+ */
+void
+ipadm_if_move(ipadm_handle_t iph, const char *ifname)
+{
+	(void) i_ipadm_delete_ifobj(iph, ifname, AF_INET, B_FALSE);
+	(void) i_ipadm_delete_ifobj(iph, ifname, AF_INET6, B_FALSE);
 }

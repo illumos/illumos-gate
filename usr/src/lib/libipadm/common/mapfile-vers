@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-
 
 #
 # MAPFILE HEADER START
@@ -63,6 +61,7 @@ SUNWprivate_1.1 {
 	ipadm_get_prop;
 	ipadm_if_enabled;
 	ipadm_if_info;
+	ipadm_if_move;
 	ipadm_init_prop;
 	ipadm_ndpd_read;
 	ipadm_ndpd_write;

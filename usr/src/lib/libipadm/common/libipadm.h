@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef _LIBIPADM_H
 #define	_LIBIPADM_H
@@ -258,6 +257,7 @@ extern ipadm_status_t	ipadm_if_info(ipadm_handle_t, const char *,
 extern void		ipadm_free_if_info(ipadm_if_info_t *);
 extern ipadm_status_t	ipadm_delete_if(ipadm_handle_t, const char *,
 			    sa_family_t, uint32_t);
+extern void		ipadm_if_move(ipadm_handle_t, const char *);
 
 /*
  * Address management functions
