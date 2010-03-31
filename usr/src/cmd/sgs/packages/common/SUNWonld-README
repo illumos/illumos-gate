@@ -1,6 +1,5 @@
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -1575,3 +1574,4 @@ Bugid   Risk Synopsis
 6931044 ld should not allow SHT_PROGBITS .eh_frame sections on amd64 (D)
 6931056 pvs -r output can include empty versions in output
 6938628 ld.so.1 should produce diagnostics for all dl*() entry points
+6938111 nm `No symbol table data' message goes to stdout

@@ -24,8 +24,7 @@
  * Copyright (c) 1989 AT&T
  * All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -328,8 +327,9 @@ main(int argc, char *argv[], char *envp[])
 					new_fmt_flag = FMT_T_NONE;
 				}
 				if (new_fmt_flag == FMT_T_NONE) {
+					errflag += 1;
 					(void) fprintf(stderr, gettext(
-"nm: illegal format '%s' for -t is specified. -t ignored.\n"), optarg);
+"nm: -t requires radix value (d, o, x): %s\n"), optarg);
 				} else if (COMPAT_FMT_FLAG(new_fmt_flag)) {
 					fmt_flag = new_fmt_flag;
 				} else {
@@ -380,7 +380,7 @@ static void
 usage()
 {
 	(void) fprintf(stderr, gettext(
-"Usage: nm [-APvChlnV] [-efox] [-r | -R]  [-g | -u] [-t format] file ...\n"));
+"Usage: nm [-APvChlnV] [-efox] [-r | -R]  [-g | -u] [-t d|o|x] file ...\n"));
 }
 
 /*
@@ -415,7 +415,7 @@ each_file(char *filename)
 	}
 	if (elf_version(EV_CURRENT) == EV_NONE)	{
 		(void) fprintf(stderr, gettext(
-		    "%s: %s: Libelf is out of date\n"),
+		    "%s: %s: libelf is out of date\n"),
 		    prog_name, filename);
 		exit(BADELF);
 	}
@@ -540,7 +540,7 @@ get_symtab(Elf *elf_file, char *filename)
 
 	if (elf_getshdrstrndx(elf_file, &shstrndx) == -1) {
 		(void) fprintf(stderr, gettext(
-		    "%s: %s: could not get e_shstrndx\n"),
+		    "%s: %s: cannot get e_shstrndx\n"),
 		    prog_name, filename);
 		return;
 	}
@@ -549,7 +549,7 @@ get_symtab(Elf *elf_file, char *filename)
 	scnfd = get_scnfd(elf_file, shstrndx, SHT_STRTAB);
 	if (scnfd == NULL) {
 		(void) fprintf(stderr, gettext(
-		    "%s: %s: could not get string table\n"),
+		    "%s: %s: cannot get string table\n"),
 		    prog_name, filename);
 		return;
 	}
@@ -696,7 +696,8 @@ print_symtab(Elf *elf_file, unsigned int shstrndx,
 	 * get symbol table data
 	 */
 	if (((sd = elf_getdata(p_sd, NULL)) == NULL) || (sd->d_size == 0)) {
-		(void) printf(gettext("%s: %s - No symbol table data\n"),
+		(void) fprintf(stderr,
+		    gettext("%s: %s: no symbol table data\n"),
 		    prog_name, filename);
 		return;
 	}
@@ -789,7 +790,8 @@ readsyms(Elf_Data * data, GElf_Sxword num, Elf *elf,
 	int		i;
 
 	if ((buf = calloc(num, sizeof (SYM))) == NULL) {
-		(void) fprintf(stderr, "%s: cannot calloc space\n", prog_name);
+		(void) fprintf(stderr, gettext("%s: cannot allocate memory\n"),
+		    prog_name);
 		return (NULL);
 	}
 
@@ -1036,43 +1038,15 @@ print_with_uflag(
 	}
 }
 #endif
+
 /*
- * -p flag specified
+ * Print a symbol type representation suitable for the -p or -P formats.
  */
 static void
-print_with_pflag(
-	int ndigits,
-	Elf *elf_file,
-	unsigned int shstrndx,
-	SYM *sym_data,
-	char *filename
-)
+print_brief_sym_type(Elf *elf_file, unsigned int shstrndx, SYM *sym_data)
 {
-	char *sym_key	= NULL;
-	const char * const fmt[] = {
-		"%.*llu ",	/* FMT_T_DEC */
-		"0x%.*llx ",	/* FMT_T_HEX */
-		"0%.*llo "	/* FMT_T_OCT */
-	};
+	const char	*sym_key = NULL;
 
-	if (is_sym_print(sym_data) != 1)
-		return;
-	/*
-	 * -A header
-	 */
-	if (A_flag != 0)
-		(void) printf("%s", A_header);
-
-	/*
-	 * Symbol Value.
-	 *	(hex/octal/decimal)
-	 */
-	(void) printf(fmt[fmt_flag], ndigits, EC_ADDR(sym_data->value));
-
-
-	/*
-	 * Symbol Type.
-	 */
 	if ((sym_data->shndx == SHN_UNDEF) && (strlen(sym_data->name)))
 		sym_key = UNDEFINED;
 	else if (sym_data->type == STT_SPARC_REGISTER) {
@@ -1099,9 +1073,9 @@ print_with_pflag(
 					break;
 		}
 
-	}
-	else
+	} else {
 		sym_key = lookup(sym_data->type, sym_data->bind);
+	}
 
 	if (sym_key != NULL) {
 		if (!l_flag)
@@ -1114,6 +1088,46 @@ print_with_pflag(
 		else
 			(void) printf("%-3d", sym_data->type);
 	}
+}
+
+/*
+ * -p flag specified
+ */
+static void
+print_with_pflag(
+	int ndigits,
+	Elf *elf_file,
+	unsigned int shstrndx,
+	SYM *sym_data,
+	char *filename
+)
+{
+	const char * const fmt[] = {
+		"%.*llu ",	/* FMT_T_DEC */
+		"0x%.*llx ",	/* FMT_T_HEX */
+		"0%.*llo "	/* FMT_T_OCT */
+	};
+
+	if (is_sym_print(sym_data) != 1)
+		return;
+	/*
+	 * -A header
+	 */
+	if (A_flag != 0)
+		(void) printf("%s", A_header);
+
+	/*
+	 * Symbol Value.
+	 *	(hex/octal/decimal)
+	 */
+	(void) printf(fmt[fmt_flag], ndigits, EC_ADDR(sym_data->value));
+
+
+	/*
+	 * Symbol Type.
+	 */
+	print_brief_sym_type(elf_file, shstrndx, sym_data);
+
 	if (!r_flag) {
 		if (R_flag) {
 			if (archive_name != (char *)0)
@@ -1141,7 +1155,6 @@ print_with_Pflag(
 	SYM *sym_data
 )
 {
-	char *sym_key = NULL;
 #define	SYM_LEN 10
 	char sym_name[SYM_LEN+1];
 	size_t len;
@@ -1173,46 +1186,7 @@ print_with_Pflag(
 	/*
 	 * Symbol Type.
 	 */
-	if ((sym_data->shndx == SHN_UNDEF) && (strlen(sym_data->name)))
-		sym_key = UNDEFINED;
-	else if (sym_data->type == STT_SPARC_REGISTER) {
-		switch (sym_data->bind) {
-			case STB_LOCAL  : sym_key = REG_LOCL;
-					break;
-			case STB_GLOBAL : sym_key = REG_GLOB;
-					break;
-			case STB_WEAK   : sym_key = REG_WEAK;
-					break;
-			default	: sym_key = REG_GLOB;
-					break;
-		}
-	} else if (((sym_data->flags & FLG_SYM_SPECSEC) == 0) &&
-	    is_bss_section((int)sym_data->shndx, elf_file, shstrndx)) {
-		switch (sym_data->bind) {
-			case STB_LOCAL  : sym_key = BSS_LOCL;
-					break;
-			case STB_GLOBAL : sym_key = BSS_GLOB;
-					break;
-			case STB_WEAK   : sym_key = BSS_WEAK;
-					break;
-			default	: sym_key = BSS_GLOB;
-					break;
-		}
-
-	} else
-		sym_key = lookup(sym_data->type, sym_data->bind);
-
-	if (sym_key != NULL) {
-		if (!l_flag)
-			(void) printf("%c ", sym_key[0]);
-		else
-			(void) printf("%-3s", sym_key);
-	} else {
-		if (!l_flag)
-			(void) printf("%-2d", sym_data->type);
-		else
-			(void) printf("%-3d", sym_data->type);
-	}
+	print_brief_sym_type(elf_file, shstrndx, sym_data);
 
 	/*
 	 * Symbol Value & size
@@ -1392,7 +1366,7 @@ exotic(const char *in_str)
 
 	if (buff == NULL) {
 		(void) fprintf(stderr, gettext(
-		    "%s: cannot malloc space\n"), prog_name);
+		    "%s: cannot allocate memory\n"), prog_name);
 		exit(NOALLOC);
 	}
 	s = strcpy(buff, in_str);
