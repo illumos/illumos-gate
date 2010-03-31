@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -608,13 +607,16 @@ static space_map_ops_t metaslab_cdf_ops = {
 	metaslab_cdf_fragmented
 };
 
+uint64_t metaslab_ndf_clump_shift = 4;
+
 static uint64_t
 metaslab_ndf_alloc(space_map_t *sm, uint64_t size)
 {
 	avl_tree_t *t = &sm->sm_root;
 	avl_index_t where;
 	space_seg_t *ss, ssearch;
-	uint64_t *cursor = (uint64_t *)sm->sm_ppd;
+	uint64_t hbit = highbit(size);
+	uint64_t *cursor = (uint64_t *)sm->sm_ppd + hbit - 1;
 	uint64_t max_size = metaslab_pp_maxsize(sm);
 
 	ASSERT(MUTEX_HELD(sm->sm_lock));
@@ -630,11 +632,9 @@ metaslab_ndf_alloc(space_map_t *sm, uint64_t size)
 	if (ss == NULL || (ss->ss_start + size > ss->ss_end)) {
 		t = sm->sm_pp_root;
 
-		if (max_size > 2 * SPA_MAXBLOCKSIZE)
-			size = MIN(metaslab_min_alloc_size, max_size);
-
 		ssearch.ss_start = 0;
-		ssearch.ss_end = size;
+		ssearch.ss_end = MIN(max_size,
+		    1ULL << (hbit + metaslab_ndf_clump_shift));
 		ss = avl_find(t, &ssearch, &where);
 		if (ss == NULL)
 			ss = avl_nearest(t, where, AVL_AFTER);
@@ -655,7 +655,7 @@ metaslab_ndf_fragmented(space_map_t *sm)
 {
 	uint64_t max_size = metaslab_pp_maxsize(sm);
 
-	if (max_size > (metaslab_min_alloc_size * 10))
+	if (max_size > (metaslab_min_alloc_size << metaslab_ndf_clump_shift))
 		return (B_FALSE);
 	return (B_TRUE);
 }
@@ -671,7 +671,7 @@ static space_map_ops_t metaslab_ndf_ops = {
 	metaslab_ndf_fragmented
 };
 
-space_map_ops_t *zfs_metaslab_ops = &metaslab_df_ops;
+space_map_ops_t *zfs_metaslab_ops = &metaslab_ndf_ops;
 
 /*
  * ==========================================================================
