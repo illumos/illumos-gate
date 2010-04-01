@@ -20,8 +20,7 @@
 #
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG=		ldmad
@@ -64,7 +63,7 @@ $(ROOTMANIFEST)		:= FILEMODE= 444
 LDLIBS +=	-lds -ldladm -ldevinfo -lpri
 INCS +=		-I$(ROOT)/usr/platform/sun4v/include/sys
 INCS +=		-I$(SRC)/uts/sun4v
-CPPFLAGS += 	$(INCS)
+CPPFLAGS += 	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 $(INCS)
 C99MODE =	$(C99_ENABLE)
 
 LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
