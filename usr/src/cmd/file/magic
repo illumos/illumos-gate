@@ -1,6 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -287,6 +286,8 @@
 >10	string		-1.0		 1.0
 >10	string		-2.0		 2.0
 >10	string		-3.0		 3.0
+# Handle Microsoft PostScript files (CTRL-D%!)
+0	string		\004%!		PostScript document text
 # version ID follows, in the form PS-Adobe-nn
 0	string		Interpress/Xerox	Interpress document
 # version ID follows, in the form /n.n
@@ -590,6 +591,13 @@
 >7	ubyte	x			%u x
 >9	ubyte	x			%u, 
 >11	ubyte	x			%u channel(s)
+
+2048	string		PCD_IPI		Kodak Photo CD image pack file
+>0xe02	byte&0x03	0x00		, landscape mode
+>0xe02	byte&0x03	0x01		, portrait mode
+>0xe02	byte&0x03	0x02		, landscape mode
+>0xe02	byte&0x03	0x03		, portrait mode
+0	string		PCD_OPA		Kodak Photo CD overview pack file
 
 # MS Documents. Not much info available.
 0	string	\320\317\021\340\241\261\032\341	Microsoft
