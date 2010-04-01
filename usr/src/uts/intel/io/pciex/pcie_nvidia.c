@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -47,7 +46,8 @@ extern uint64_t mcfg_mem_base;
 
 boolean_t
 check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
-    uchar_t func, ushort_t *slot_number, ushort_t *is_pci_bridge)
+    uchar_t func, boolean_t *slot_valid, ushort_t *slot_number,
+    ushort_t *is_pci_bridge)
 {
 	boolean_t found_pciex = B_FALSE;
 	ushort_t cap;
@@ -56,7 +56,7 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
 	ushort_t status;
 	uint32_t slot_cap;
 
-	*slot_number = 0;
+	*slot_valid = B_FALSE;
 
 	status = (*pci_getw_func)(bus, dev, func, PCI_CONF_STAT);
 	if (!(status & PCI_STAT_CAP))
@@ -93,6 +93,7 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
 				/* offset 14h is Slot Cap Register */
 				slot_cap = (*pci_getl_func)(bus, dev, func,
 				    capsp + PCIE_SLOTCAP);
+				*slot_valid = B_TRUE;
 				*slot_number =
 				    PCIE_SLOTCAP_PHY_SLOT_NUM(slot_cap);
 
@@ -133,6 +134,7 @@ look_for_any_pciex_device(uchar_t bus)
 	uchar_t dev, func;
 	uchar_t nfunc, header;
 	ushort_t venid, slot_num, is_pci_bridge = 0;
+	boolean_t slot_valid;
 
 	for (dev = 0; dev < 32; dev++) {
 		nfunc = 1;
@@ -164,7 +166,7 @@ look_for_any_pciex_device(uchar_t bus)
 				nfunc = 8;
 
 			if (check_if_device_is_pciex(NULL, bus, dev, func,
-			    &slot_num, &is_pci_bridge) == B_TRUE)
+			    &slot_valid, &slot_num, &is_pci_bridge) == B_TRUE)
 				return (B_TRUE);
 		} /* end of func */
 	} /* end of dev */

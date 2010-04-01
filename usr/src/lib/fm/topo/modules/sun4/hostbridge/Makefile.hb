@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = hostbridge
 CLASS = arch
@@ -35,7 +33,7 @@ MODULESRCS = $(HBSRCS) $($(ARCH)_SRCS)
 
 include ../../Makefile.plugin
 
-LDLIBS += -ldevinfo
+LDLIBS += -ldevinfo -lsmbios
 CPPFLAGS += -I$(SUN4DIR) -I$(UTILDIR) -I$(HBDIR)
 
 %.o: $(SUN4DIR)/%.c

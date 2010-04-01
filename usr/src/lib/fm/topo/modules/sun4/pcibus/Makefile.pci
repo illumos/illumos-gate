@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = pcibus
 CLASS = arch
@@ -37,7 +35,7 @@ MODULESRCS = $(PCISRCS) $(UTILSRCS) pci_$(ARCH).c
 
 include ../../Makefile.plugin
 
-LDLIBS += -ldevinfo
+LDLIBS += -ldevinfo -lsmbios
 CPPFLAGS += -I$(SUN4DIR) -I$(UTILDIR) -I$(HBDIR)
 
 %.o: $(SUN4DIR)/%.c

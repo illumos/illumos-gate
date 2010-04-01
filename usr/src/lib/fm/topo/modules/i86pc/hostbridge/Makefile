@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = hostbridge
 ARCH = i86pc
@@ -35,7 +33,7 @@ MODULESRCS = $(HBSRCS) $(UTILSRCS)
 
 include ../../Makefile.plugin
 
-LDLIBS += -ldevinfo
+LDLIBS += -ldevinfo -lsmbios
 
 CPPFLAGS += -I$(UTILDIR) -I$(HBDIR)
 

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -688,7 +687,6 @@ startup(void)
 {
 #if !defined(__xpv)
 	extern void startup_pci_bios(void);
-	extern int post_fastreboot;
 #endif
 	extern cpuset_t cpu_ready_set;
 
@@ -717,8 +715,11 @@ startup(void)
 	startup_kmem();
 	startup_vm();
 #if !defined(__xpv)
-	if (!post_fastreboot)
-		startup_pci_bios();
+	/*
+	 * Note we need to do this even on fast reboot in order to access
+	 * the irq routing table (used for pci labels).
+	 */
+	startup_pci_bios();
 #endif
 #if defined(__xpv)
 	startup_xen_mca();

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _DID_H
@@ -60,7 +59,6 @@ extern int did_physlot(did_t *);
 extern int did_physlot_exists(did_t *);
 extern char *did_slot_label_get(did_t *);
 extern void did_slot_label_set(did_t *, char *);
-extern int did_inherit(did_t *, did_t *);
 extern int did_excap(did_t *);
 extern void did_excap_set(did_t *, int);
 

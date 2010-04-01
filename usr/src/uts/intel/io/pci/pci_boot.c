@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1876,6 +1875,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	int pciex = 0;
 	ushort_t is_pci_bridge = 0;
 	struct pci_devfunc *devlist = NULL, *entry = NULL;
+	boolean_t slot_valid;
 	gfx_entry_t *gfxp;
 	pcie_req_id_t bdf;
 
@@ -1935,8 +1935,8 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	ndi_devi_alloc_sleep(pci_bus_res[bus].dip, nodename,
 	    DEVI_SID_NODEID, &dip);
 
-	if (check_if_device_is_pciex(dip, bus, dev, func, &slot_num,
-	    &is_pci_bridge) == B_TRUE)
+	if (check_if_device_is_pciex(dip, bus, dev, func, &slot_valid,
+	    &slot_num, &is_pci_bridge) == B_TRUE)
 		pciex = 1;
 
 	bdf = PCI_GETBDF(bus, dev, func);
@@ -2028,7 +2028,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	if (status & PCI_STAT_UDF)
 		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip,
 		    "udf-supported");
-	if (pciex && slot_num) {
+	if (pciex && slot_valid) {
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 		    "physical-slot#", slot_num);
 		if (!is_pci_bridge)
@@ -3041,12 +3041,28 @@ add_bus_slot_names_prop(int bus)
 {
 	char slotprop[256];
 	int len;
+	extern int pci_irq_nroutes;
+	char *slotcap_name;
 
+	/*
+	 * If no irq routing table, then go with the slot-names as set up
+	 * in pciex_slot_names_prop() from slot capability register (if any).
+	 */
+	if (pci_irq_nroutes == 0)
+		return;
+
+	/*
+	 * Otherise delete the slot-names we already have and use the irq
+	 * routing table values as returned by pci_slot_names_prop() instead,
+	 * but keep any property of value "pcie0" as that can't be represented
+	 * in the irq routing table.
+	 */
 	if (pci_bus_res[bus].dip != NULL) {
-		/* simply return if the property is already defined */
-		if (ddi_prop_exists(DDI_DEV_T_ANY, pci_bus_res[bus].dip,
-		    DDI_PROP_DONTPASS, "slot-names"))
-			return;
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pci_bus_res[bus].dip,
+		    DDI_PROP_DONTPASS, "slot-names", &slotcap_name) !=
+		    DDI_SUCCESS || strcmp(slotcap_name, "pcie0") != 0)
+			(void) ndi_prop_remove(DDI_DEV_T_NONE,
+			    pci_bus_res[bus].dip, "slot-names");
 	}
 
 	len = pci_slot_names_prop(bus, slotprop, sizeof (slotprop));

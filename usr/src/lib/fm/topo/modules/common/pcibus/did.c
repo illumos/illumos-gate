@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -81,37 +80,6 @@ slotnm_destroy(slotnm_t *p)
 }
 
 static int
-slotnm_cp(did_t *from, did_t *to, int *nslots)
-{
-	slotnm_t *nxt, *new;
-	slotnm_t *last = NULL;
-
-	*nslots = 0;
-	for (nxt = from->dp_slotnames; nxt != NULL; nxt = nxt->snm_next) {
-		new = slotnm_create(to->dp_mod, nxt->snm_dev, nxt->snm_name);
-		if (new == NULL) {
-			if (to->dp_slotnames != NULL)
-				slotnm_destroy(to->dp_slotnames);
-			to->dp_slotnames = NULL;
-			*nslots = 0;
-			return (-1);
-		}
-		if (last == NULL) {
-			to->dp_slotnames = last = new;
-		} else {
-			last->snm_next = new;
-			last = new;
-		}
-		(*nslots)++;
-	}
-	if (*nslots > 0)
-		topo_mod_dprintf(to->dp_mod,
-		    "%p inherits %d slot label(s) from %p.\n",
-		    to, *nslots, from);
-	return (0);
-}
-
-static int
 di_devtype_get(topo_mod_t *mp, di_node_t src, char **devtype)
 {
 	int sz;
@@ -134,18 +102,41 @@ di_devtype_get(topo_mod_t *mp, di_node_t src, char **devtype)
 	return (-1);
 }
 
+typedef struct smbios_slot_cb {
+	int		cb_slotnum;
+	const char	*cb_label;
+} smbios_slot_cb_t;
+
+static int
+di_smbios_find_slot(smbios_hdl_t *shp, const smbios_struct_t *strp, void *data)
+{
+	smbios_slot_cb_t *cbp = data;
+	smbios_slot_t slot;
+
+	if (strp->smbstr_type != SMB_TYPE_SLOT ||
+	    smbios_info_slot(shp, strp->smbstr_id, &slot) != 0)
+		return (0);
+
+	if (slot.smbl_id == cbp->cb_slotnum) {
+		cbp->cb_label = slot.smbl_name;
+		return (1);
+	}
+
+	return (0);
+}
+
 static int
 di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int *slotnum, char **slotname)
 {
 	char *slotbuf;
 	int sz;
 	uchar_t *buf;
+	smbios_hdl_t *shp;
+	boolean_t got_slotprop = B_FALSE;
 
 	*slotnum = -1;
-	(void) di_uintprop_get(mp, src, DI_PHYSPROP, (uint_t *)slotnum);
 
-	if (*slotnum == -1)
-		return (0);
+	(void) di_uintprop_get(mp, src, DI_PHYSPROP, (uint_t *)slotnum);
 
 	/*
 	 * For PCI-Express, there is only one downstream device, so check for
@@ -154,9 +145,48 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int *slotnum, char **slotname)
 	 */
 	if (di_bytes_get(mp, src, DI_SLOTPROP, &sz, &buf) == 0 &&
 	    sz > 4) {
+		/*
+		 * If there is a DI_SLOTPROP of the form SlotX (ie set up from
+		 * the IRQ routing table) then trust that in preference to
+		 * DI_PHYSPROP (which is set up from the PCIe slotcap reg).
+		 */
+		got_slotprop = B_TRUE;
+		(void) sscanf((char *)&buf[4], "Slot%d", slotnum);
+	}
+
+	if (*slotnum == -1)
+		return (0);
+
+	/*
+	 * Order of preference
+	 * 1) take slotnum and look up in SMBIOS table
+	 * 2) use slot-names
+	 * 3) fabricate name based on slotnum
+	 */
+	if ((shp = topo_mod_smbios(mp)) != NULL) {
+		/*
+		 * The PCI spec describes slot number 0 as reserved for
+		 * internal PCI devices.  Not all platforms respect
+		 * this, so we have to treat slot 0 as a valid device.
+		 * But other platforms use 0 to identify an internal
+		 * device.  We deal with this by letting SMBIOS be the
+		 * final decision maker.  If SMBIOS is supported, but
+		 * the given slot number is not represented in the
+		 * SMBIOS tables, then ignore the slot entirely.
+		 */
+		smbios_slot_cb_t cbdata;
+
+		cbdata.cb_slotnum = *slotnum;
+		cbdata.cb_label = NULL;
+		if (smbios_iter(shp, di_smbios_find_slot, &cbdata) <= 0)
+			return (0);
+		slotbuf = (char *)cbdata.cb_label;
+		topo_mod_dprintf(mp, "%s: node=%p: using smbios name\n",
+		    __func__, src);
+	} else if (got_slotprop == B_TRUE) {
 		slotbuf = (char *)&buf[4];
-		topo_mod_dprintf(mp, "di_physlotinfo_get: node=%p: "
-		    "found %s property\n", src, DI_SLOTPROP);
+		topo_mod_dprintf(mp, "%s: node=%p: found %s property\n",
+		    __func__, src, DI_SLOTPROP);
 	} else {
 		/*
 		 * Make generic description string "SLOT <num>", allow up to
@@ -164,14 +194,14 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int *slotnum, char **slotname)
 		 */
 		slotbuf = alloca(16);
 		(void) snprintf(slotbuf, 16, "SLOT %d", *slotnum);
-		topo_mod_dprintf(mp, "di_physlotinfo_get: node=%p: "
-		    "using generic slot name\n", src);
+		topo_mod_dprintf(mp, "%s: node=%p: using generic slot name\n",
+		    __func__, src);
 	}
 	if ((*slotname = topo_mod_strdup(mp, slotbuf)) == NULL)
 		return (-1);
 
-	topo_mod_dprintf(mp, "di_physlotinfo_get: node=%p: slotname=%s\n",
-	    src, *slotname);
+	topo_mod_dprintf(mp, "%s: node=%p: slotname=%s\n",
+	    __func__, src, *slotname);
 
 	return (0);
 }
@@ -290,26 +320,29 @@ did_create(topo_mod_t *mp, di_node_t src,
 	 * There *may* be a device type we can capture.
 	 */
 	(void) di_devtype_get(mp, src, &np->dp_devtype);
-	/*
-	 * There *may* be a physical slot number property we can capture.
-	 */
-	if (di_physlotinfo_get(mp,
-	    src, &np->dp_physlot, &np->dp_physlot_name) < 0) {
-		if (np->dp_devtype != NULL)
-			topo_mod_strfree(mp, np->dp_devtype);
-		topo_mod_free(mp, np, sizeof (did_t));
-		return (NULL);
-	}
-	/*
-	 * There *may* be PCI slot info we can capture
-	 */
-	if (di_slotinfo_get(mp, src, &np->dp_nslots, &np->dp_slotnames) < 0) {
-		if (np->dp_devtype != NULL)
-			topo_mod_strfree(mp, np->dp_devtype);
-		if (np->dp_physlot_name != NULL)
-			topo_mod_strfree(mp, np->dp_physlot_name);
-		topo_mod_free(mp, np, sizeof (did_t));
-		return (NULL);
+
+	if (irc >= 0) {
+		/*
+		 * This is a pciex node.
+		 */
+		if (di_physlotinfo_get(mp, src, &np->dp_physlot,
+		    &np->dp_physlot_name) < 0) {
+			if (np->dp_devtype != NULL)
+				topo_mod_strfree(mp, np->dp_devtype);
+			topo_mod_free(mp, np, sizeof (did_t));
+			return (NULL);
+		}
+	} else {
+		/*
+		 * This is a pci node.
+		 */
+		if (di_slotinfo_get(mp, src, &np->dp_nslots,
+		    &np->dp_slotnames) < 0) {
+			if (np->dp_devtype != NULL)
+				topo_mod_strfree(mp, np->dp_devtype);
+			topo_mod_free(mp, np, sizeof (did_t));
+			return (NULL);
+		}
 	}
 	did_hash_insert(mp, src, np);
 	did_hold(np);
@@ -451,13 +484,6 @@ did_rc(did_t *did)
 	return (did->dp_rc);
 }
 
-static int
-did_numlabels(did_t *dp)
-{
-	assert(dp != NULL);
-	return (dp->dp_nslots);
-}
-
 int
 did_excap(did_t *dp)
 {
@@ -484,8 +510,16 @@ did_physlot_name(did_t *dp, int dev)
 	slotnm_t *slot;
 
 	assert(dp != NULL);
+
+	/*
+	 * For pciex, name will be in dp_physlot_name
+	 */
 	if (dp->dp_physlot_name != NULL)
 		return (dp->dp_physlot_name);
+
+	/*
+	 * For pci, name will be in dp_slotnames
+	 */
 	for (slot = dp->dp_slotnames; slot != NULL; slot = slot->snm_next)
 		if (slot->snm_dev == dev)
 			break;
@@ -565,37 +599,6 @@ pciex_cap_get(topo_mod_t *mp, di_node_t dn)
 		return (-1);
 	did_rele(dp);
 	return (dp->dp_excap);
-}
-
-int
-did_inherit(did_t *pdp, did_t *dp)
-{
-	/*
-	 * If the child already has a label, we're done.
-	 */
-	assert(dp != NULL);
-	if (did_numlabels(dp) > 0)
-		return (0);
-
-	assert(pdp != NULL);
-
-	/*
-	 * If the child and parent are the same, we're done.
-	 */
-	if (dp == pdp)
-		return (0);
-
-	if (pdp->dp_physlot_name != NULL) {
-		topo_mod_dprintf(dp->dp_mod,
-		    "%p inherits physlot label from %p.\n", dp, pdp);
-		dp->dp_physlot_name =
-		    topo_mod_strdup(dp->dp_mod, pdp->dp_physlot_name);
-		if (dp->dp_physlot_name == NULL)
-			return (-1);
-	}
-	if (slotnm_cp(pdp, dp, &dp->dp_nslots) < 0)
-		return (-1);
-	return (0);
 }
 
 void

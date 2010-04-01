@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -39,7 +36,7 @@
 /*
  * pci irq routing information table
  */
-static int			pci_irq_nroutes;
+int				pci_irq_nroutes;
 static pci_irq_route_t		*pci_irq_routes;
 
 

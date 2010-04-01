@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = ioboard
 SUN4DIR = ../../sun4/$(MODULE)
@@ -35,7 +33,7 @@ MODULESRCS = $(UTILSRCS) $(IOBSRCS) iob_platform.c
 
 include ../../Makefile.plugin
 
-LDLIBS += -ldevinfo
+LDLIBS += -ldevinfo -lsmbios
 CPPFLAGS += -I$(UTILDIR) -I$(HBDIR) -I$(SUN4DIR)
 
 %.o: $(UTILDIR)/%.c
