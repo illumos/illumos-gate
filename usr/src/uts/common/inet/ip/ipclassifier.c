@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -684,12 +683,6 @@ ipcl_conn_destroy(conn_t *connp)
 		mp = tcp->tcp_timercache;
 
 		tcp->tcp_tcps = NULL;
-
-		if (tcp->tcp_sack_info != NULL) {
-			bzero(tcp->tcp_sack_info, sizeof (tcp_sack_info_t));
-			kmem_cache_free(tcp_sack_info_cache,
-			    tcp->tcp_sack_info);
-		}
 
 		/*
 		 * tcp_rsrv_mp can be NULL if tcp_get_conn() fails to allocate

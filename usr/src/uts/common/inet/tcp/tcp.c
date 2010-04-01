@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -225,8 +224,6 @@
  */
 int tcp_squeue_wput = 2;	/* /etc/systems */
 int tcp_squeue_flag;
-
-kmem_cache_t	*tcp_sack_info_cache;
 
 /*
  * To prevent memory hog, limit the number of entries in tcp_free_list
@@ -502,7 +499,6 @@ void
 tcp_cleanup(tcp_t *tcp)
 {
 	mblk_t		*mp;
-	tcp_sack_info_t	*tcp_sack_info;
 	conn_t		*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	netstack_t	*ns = tcps->tcps_netstack;
@@ -557,7 +553,6 @@ tcp_cleanup(tcp_t *tcp)
 	/* Save some state */
 	mp = tcp->tcp_timercache;
 
-	tcp_sack_info = tcp->tcp_sack_info;
 	tcp_rsrv_mp = tcp->tcp_rsrv_mp;
 
 	if (connp->conn_cred != NULL) {
@@ -583,7 +578,6 @@ tcp_cleanup(tcp_t *tcp)
 	/* restore the state */
 	tcp->tcp_timercache = mp;
 
-	tcp->tcp_sack_info = tcp_sack_info;
 	tcp->tcp_rsrv_mp = tcp_rsrv_mp;
 
 	tcp->tcp_connp = connp;
@@ -1376,13 +1370,8 @@ tcp_free(tcp_t *tcp)
 		tcp->tcp_ordrel_mp = NULL;
 	}
 
-	if (tcp->tcp_sack_info != NULL) {
-		if (tcp->tcp_notsack_list != NULL) {
-			TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list,
-			    tcp);
-		}
-		bzero(tcp->tcp_sack_info, sizeof (tcp_sack_info_t));
-	}
+	TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list, tcp);
+	bzero(&tcp->tcp_sack_info, sizeof (tcp_sack_info_t));
 
 	if (tcp->tcp_hopopts != NULL) {
 		mi_free(tcp->tcp_hopopts);
@@ -2133,14 +2122,8 @@ tcp_reinit_values(tcp)
 	tcp->tcp_ecn_echo_on = B_FALSE;
 	tcp->tcp_is_wnd_shrnk = B_FALSE;
 
-	if (tcp->tcp_sack_info != NULL) {
-		if (tcp->tcp_notsack_list != NULL) {
-			TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list,
-			    tcp);
-		}
-		kmem_cache_free(tcp_sack_info_cache, tcp->tcp_sack_info);
-		tcp->tcp_sack_info = NULL;
-	}
+	TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list, tcp);
+	bzero(&tcp->tcp_sack_info, sizeof (tcp_sack_info_t));
 
 	tcp->tcp_rcv_ws = 0;
 	tcp->tcp_snd_ws = 0;
@@ -3338,7 +3321,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 	if (connp->conn_keepalive) {
 		tcp->tcp_ka_last_intrvl = 0;
 		tcp->tcp_ka_tid = TCP_TIMER(tcp, tcp_keepalive_timer,
-		    MSEC_TO_TICK(tcp->tcp_ka_interval));
+		    tcp->tcp_ka_interval);
 	}
 
 	/*
@@ -4008,14 +3991,6 @@ tcp_iss_key_init(uint8_t *phrase, int len, tcp_stack_t *tcps)
 	mutex_exit(&tcps->tcps_iss_key_lock);
 }
 
-/* ARGSUSED */
-static int
-tcp_sack_info_constructor(void *buf, void *cdrarg, int kmflags)
-{
-	bzero(buf, sizeof (tcp_sack_info_t));
-	return (0);
-}
-
 /*
  * Called by IP when IP is loaded into the kernel
  */
@@ -4026,9 +4001,8 @@ tcp_ddi_g_init(void)
 	    sizeof (tcp_timer_t) + sizeof (mblk_t), 0,
 	    NULL, NULL, NULL, NULL, NULL, 0);
 
-	tcp_sack_info_cache = kmem_cache_create("tcp_sack_info_cache",
-	    sizeof (tcp_sack_info_t), 0,
-	    tcp_sack_info_constructor, NULL, NULL, NULL, NULL, 0);
+	tcp_notsack_blk_cache = kmem_cache_create("tcp_notsack_blk_cache",
+	    sizeof (notsack_blk_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
 
 	mutex_init(&tcp_random_lock, NULL, MUTEX_DEFAULT, NULL);
 
@@ -4184,7 +4158,7 @@ tcp_ddi_g_destroy(void)
 	mutex_destroy(&tcp_random_lock);
 
 	kmem_cache_destroy(tcp_timercache);
-	kmem_cache_destroy(tcp_sack_info_cache);
+	kmem_cache_destroy(tcp_notsack_blk_cache);
 
 	netstack_unregister(NS_TCP);
 }
@@ -4363,11 +4337,6 @@ tcp_squeue_add(squeue_t *sqp)
 	    sizeof (tcp_squeue_priv_t), KM_SLEEP);
 
 	*squeue_getprivate(sqp, SQPRIVATE_TCP) = (intptr_t)tcp_time_wait;
-	/* Kick start the periodic TIME WAIT collector. */
-	tcp_time_wait->tcp_time_wait_tid =
-	    timeout_generic(CALLOUT_NORMAL, tcp_time_wait_collector, sqp,
-	    (hrtime_t)10 * NANOSEC, CALLOUT_TCP_RESOLUTION,
-	    CALLOUT_FLAG_ROUNDUP);
 	if (tcp_free_list_max_cnt == 0) {
 		int tcp_ncpus = ((boot_max_ncpus == -1) ?
 		    max_ncpus : boot_max_ncpus);
@@ -4584,16 +4553,13 @@ tcp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	}
 
 	/*
-	 * tcp_snd_sack_ok can be set in
-	 * tcp_set_destination() if the sack metric
-	 * is set.  So check it here also.
+	 * Note that tcp_snd_sack_ok can be set in tcp_set_destination() if
+	 * the SACK metric is set.  So here we just check the per stack SACK
+	 * permitted param.
 	 */
-	if (tcps->tcps_sack_permitted == 2 ||
-	    tcp->tcp_snd_sack_ok) {
-		if (tcp->tcp_sack_info == NULL) {
-			tcp->tcp_sack_info = kmem_cache_alloc(
-			    tcp_sack_info_cache, KM_SLEEP);
-		}
+	if (tcps->tcps_sack_permitted == 2) {
+		ASSERT(tcp->tcp_num_sack_blk == 0);
+		ASSERT(tcp->tcp_notsack_list == NULL);
 		tcp->tcp_snd_sack_ok = B_TRUE;
 	}
 

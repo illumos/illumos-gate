@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -733,9 +732,7 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 		    (mp = allocb_tryhard(1)) == NULL) {
 			/* Alloc failed; try again next time */
 			tcp->tcp_push_tid = TCP_TIMER(tcp,
-			    tcp_push_timer,
-			    MSEC_TO_TICK(
-			    tcps->tcps_push_timer_interval));
+			    tcp_push_timer, tcps->tcps_push_timer_interval);
 			return (B_TRUE);
 		} else if (sigurg_mpp != NULL) {
 			/*

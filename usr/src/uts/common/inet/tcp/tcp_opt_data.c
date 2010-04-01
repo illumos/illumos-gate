@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -548,8 +547,7 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 				/* Crank up the keepalive timer */
 				tcp->tcp_ka_last_intrvl = 0;
 				tcp->tcp_ka_tid = TCP_TIMER(tcp,
-				    tcp_keepalive_timer,
-				    MSEC_TO_TICK(tcp->tcp_ka_interval));
+				    tcp_keepalive_timer, tcp->tcp_ka_interval);
 				connp->conn_keepalive = 1;
 			}
 			break;
@@ -689,7 +687,7 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 					tcp->tcp_ka_last_intrvl = 0;
 					tcp->tcp_ka_tid = TCP_TIMER(tcp,
 					    tcp_keepalive_timer,
-					    MSEC_TO_TICK(tcp->tcp_ka_interval));
+					    tcp->tcp_ka_interval);
 				}
 			}
 			break;

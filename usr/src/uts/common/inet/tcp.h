@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -146,7 +145,7 @@ typedef struct tcp_s {
 				/* Pointer to next T/W block */
 	struct tcp_s	*tcp_time_wait_prev;
 				/* Pointer to previous T/W next */
-	clock_t		tcp_time_wait_expire;
+	int64_t		tcp_time_wait_expire;
 
 	struct conn_s	*tcp_connp;	/* back pointer to conn_t */
 	tcp_stack_t	*tcp_tcps;	/* back pointer to tcp_stack_t */
@@ -257,17 +256,18 @@ typedef struct tcp_s {
 	mblk_t	*tcp_reass_head;	/* Out of order reassembly list head */
 	mblk_t	*tcp_reass_tail;	/* Out of order reassembly list tail */
 
-	tcp_sack_info_t	*tcp_sack_info;
+	/* SACK related info */
+	tcp_sack_info_t	tcp_sack_info;
 
-#define	tcp_pipe	tcp_sack_info->tcp_pipe
-#define	tcp_fack	tcp_sack_info->tcp_fack
-#define	tcp_sack_snxt	tcp_sack_info->tcp_sack_snxt
-#define	tcp_max_sack_blk	tcp_sack_info->tcp_max_sack_blk
-#define	tcp_num_sack_blk	tcp_sack_info->tcp_num_sack_blk
-#define	tcp_sack_list		tcp_sack_info->tcp_sack_list
-#define	tcp_num_notsack_blk	tcp_sack_info->tcp_num_notsack_blk
-#define	tcp_cnt_notsack_list	tcp_sack_info->tcp_cnt_notsack_list
-#define	tcp_notsack_list		tcp_sack_info->tcp_notsack_list
+#define	tcp_pipe		tcp_sack_info.tcp_pipe
+#define	tcp_fack		tcp_sack_info.tcp_fack
+#define	tcp_sack_snxt		tcp_sack_info.tcp_sack_snxt
+#define	tcp_max_sack_blk	tcp_sack_info.tcp_max_sack_blk
+#define	tcp_num_sack_blk	tcp_sack_info.tcp_num_sack_blk
+#define	tcp_sack_list		tcp_sack_info.tcp_sack_list
+#define	tcp_num_notsack_blk	tcp_sack_info.tcp_num_notsack_blk
+#define	tcp_cnt_notsack_list	tcp_sack_info.tcp_cnt_notsack_list
+#define	tcp_notsack_list	tcp_sack_info.tcp_notsack_list
 
 	mblk_t	*tcp_rcv_list;		/* Queued until push, urgent data, */
 	mblk_t	*tcp_rcv_last_head;	/* optdata, or the count exceeds */

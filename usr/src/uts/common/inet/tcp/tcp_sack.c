@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997-2001, 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -37,6 +33,9 @@
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/tcp.h>
+
+/* kmem cache for notsack_blk_t */
+kmem_cache_t	*tcp_notsack_blk_cache;
 
 /*
  * To insert a new blk to the array of SACK blk in receiver.
@@ -239,7 +238,7 @@ tcp_notsack_insert(notsack_blk_t **head, tcp_seq begin, tcp_seq end,
 			}
 			(*num)--;
 			*sum -= tmp->end - tmp->begin;
-			kmem_free(tmp, sizeof (notsack_blk_t));
+			kmem_cache_free(tcp_notsack_blk_cache, tmp);
 			return;
 		}
 		/* This blk is partially covered. */
@@ -254,8 +253,9 @@ tcp_notsack_insert(notsack_blk_t **head, tcp_seq begin, tcp_seq end,
 				(tmp->sack_cnt)++;
 			} else {
 				/* Split the notsack blk. */
-				if ((new = kmem_alloc(sizeof (notsack_blk_t),
-				    KM_NOSLEEP)) == NULL) {
+				if ((new = kmem_cache_alloc(
+				    tcp_notsack_blk_cache, KM_NOSLEEP)) ==
+				    NULL) {
 					return;
 				}
 				new->end = tmp->end;
@@ -297,11 +297,13 @@ tcp_notsack_insert(notsack_blk_t **head, tcp_seq begin, tcp_seq end,
 				tmp_sum -= tmp->end - tmp->begin;
 				if (prev != NULL) {
 					prev->next = tmp->next;
-					kmem_free(tmp, sizeof (notsack_blk_t));
+					kmem_cache_free(tcp_notsack_blk_cache,
+					    tmp);
 					tmp = prev->next;
 				} else {
 					*head = tmp->next;
-					kmem_free(tmp, sizeof (notsack_blk_t));
+					kmem_cache_free(tcp_notsack_blk_cache,
+					    tmp);
 					tmp = *head;
 				}
 			} else {
@@ -355,11 +357,11 @@ tcp_notsack_remove(notsack_blk_t **head, tcp_seq end, int32_t *num,
 			tmp_sum -= tmp->end - tmp->begin;
 			if (prev == NULL) {
 				*head = tmp->next;
-				kmem_free(tmp, sizeof (notsack_blk_t));
+				kmem_cache_free(tcp_notsack_blk_cache, tmp);
 				tmp = *head;
 			} else {
 				prev->next = tmp->next;
-				kmem_free(tmp, sizeof (notsack_blk_t));
+				kmem_cache_free(tcp_notsack_blk_cache, tmp);
 				tmp = prev->next;
 			}
 		} else {
@@ -394,8 +396,8 @@ void tcp_notsack_update(notsack_blk_t **head, tcp_seq begin, tcp_seq end,
 	tmp = *head;
 	/* If the list is empty, create a new one. */
 	if (tmp == NULL) {
-		if ((tmp = kmem_alloc(sizeof (notsack_blk_t), KM_NOSLEEP)) ==
-		    NULL) {
+		if ((tmp = kmem_cache_alloc(tcp_notsack_blk_cache,
+		    KM_NOSLEEP)) == NULL) {
 			return;
 		}
 		tmp->begin = begin;
@@ -423,7 +425,7 @@ void tcp_notsack_update(notsack_blk_t **head, tcp_seq begin, tcp_seq end,
 		tmp->end = end;
 	} else {
 		/* No.  Need to create a new notsack blk. */
-		tmp->next = kmem_alloc(sizeof (notsack_blk_t), KM_NOSLEEP);
+		tmp->next = kmem_cache_alloc(tcp_notsack_blk_cache, KM_NOSLEEP);
 		if (tmp->next != NULL) {
 			tmp = tmp->next;
 			tmp->begin = begin;

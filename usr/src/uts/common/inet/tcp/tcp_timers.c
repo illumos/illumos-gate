@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -135,8 +134,11 @@ static void	tcp_timer_callback(void *);
 static void	tcp_timer_free(tcp_t *, mblk_t *);
 static void	tcp_timer_handler(void *, mblk_t *, void *, ip_recv_attr_t *);
 
+/*
+ * tim is in millisec.
+ */
 timeout_id_t
-tcp_timeout(conn_t *connp, void (*f)(void *), clock_t tim)
+tcp_timeout(conn_t *connp, void (*f)(void *), hrtime_t tim)
 {
 	mblk_t *mp;
 	tcp_timer_t *tcpt;
@@ -169,7 +171,7 @@ tcp_timeout(conn_t *connp, void (*f)(void *), clock_t tim)
 	 * early before they have a chance to be cancelled.
 	 */
 	tcpt->tcpt_tid = timeout_generic(CALLOUT_NORMAL, tcp_timer_callback, mp,
-	    TICK_TO_NSEC(tim), CALLOUT_TCP_RESOLUTION, CALLOUT_FLAG_ROUNDUP);
+	    tim * MICROSEC, CALLOUT_TCP_RESOLUTION, CALLOUT_FLAG_ROUNDUP);
 
 	return ((timeout_id_t)mp);
 }
@@ -242,7 +244,7 @@ tcp_timeout_cancel(conn_t *connp, timeout_id_t id)
 		CONN_DEC_REF(connp);
 	}
 
-	return (delta);
+	return (TICK_TO_MSEC(delta));
 }
 
 /*
@@ -418,7 +420,7 @@ tcp_keepalive_timer(void *arg)
 	/* Timer fired too early, restart it. */
 	if (tcp->tcp_state < TCPS_ESTABLISHED) {
 		tcp->tcp_ka_tid = TCP_TIMER(tcp, tcp_keepalive_timer,
-		    MSEC_TO_TICK(ka_intrvl));
+		    ka_intrvl);
 		return;
 	}
 
@@ -469,8 +471,7 @@ tcp_keepalive_timer(void *arg)
 					firetime = tcp->tcp_rto;
 				}
 				tcp->tcp_ka_tid = TCP_TIMER(tcp,
-				    tcp_keepalive_timer,
-				    MSEC_TO_TICK(firetime));
+				    tcp_keepalive_timer, firetime);
 				tcp->tcp_ka_last_intrvl = firetime;
 				return;
 			}
@@ -483,8 +484,7 @@ tcp_keepalive_timer(void *arg)
 	if ((firetime = ka_intrvl - idletime) < 0) {
 		firetime = ka_intrvl;
 	}
-	tcp->tcp_ka_tid = TCP_TIMER(tcp, tcp_keepalive_timer,
-	    MSEC_TO_TICK(firetime));
+	tcp->tcp_ka_tid = TCP_TIMER(tcp, tcp_keepalive_timer, firetime);
 }
 
 void
@@ -1018,7 +1018,7 @@ tcp_timer(void *arg)
 	/*
 	 * Remove all rexmit SACK blk to start from fresh.
 	 */
-	if (tcp->tcp_snd_sack_ok && tcp->tcp_notsack_list != NULL)
+	if (tcp->tcp_snd_sack_ok)
 		TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list, tcp);
 	if (mp == NULL) {
 		return;

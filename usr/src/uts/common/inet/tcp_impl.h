@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_INET_TCP_IMPL_H
@@ -103,7 +102,7 @@ extern kmem_cache_t *tcp_timercache;
 
 /*
  * Macro for starting various timers.  Retransmission timer has its own macro,
- * TCP_TIMER_RESTART().
+ * TCP_TIMER_RESTART().  tim is in millisec.
  */
 #define	TCP_TIMER(tcp, f, tim)		\
 	tcp_timeout(tcp->tcp_connp, f, tim)
@@ -111,13 +110,12 @@ extern kmem_cache_t *tcp_timercache;
 	tcp_timeout_cancel(tcp->tcp_connp, id)
 
 /*
- * To restart the TCP retransmission timer.
+ * To restart the TCP retransmission timer.  intvl is in millisec.
  */
 #define	TCP_TIMER_RESTART(tcp, intvl) {					\
 	if ((tcp)->tcp_timer_tid != 0)					\
 		(void) TCP_TIMER_CANCEL((tcp), (tcp)->tcp_timer_tid);	\
-	(tcp)->tcp_timer_tid = TCP_TIMER((tcp), tcp_timer,		\
-	    MSEC_TO_TICK(intvl));					\
+	(tcp)->tcp_timer_tid = TCP_TIMER((tcp), tcp_timer, (intvl));	\
 }
 
 /*
@@ -615,7 +613,7 @@ extern void	tcp_push_timer(void *);
 extern void	tcp_reass_timer(void *);
 extern mblk_t	*tcp_timermp_alloc(int);
 extern void	tcp_timermp_free(tcp_t *);
-extern timeout_id_t tcp_timeout(conn_t *, void (*)(void *), clock_t);
+extern timeout_id_t tcp_timeout(conn_t *, void (*)(void *), hrtime_t);
 extern clock_t	tcp_timeout_cancel(conn_t *, timeout_id_t);
 extern void	tcp_timer(void *arg);
 extern void	tcp_timers_stop(tcp_t *);

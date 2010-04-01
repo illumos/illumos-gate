@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* This file contains all TCP input processing functions. */
@@ -300,7 +299,6 @@ tcp_parse_options(tcpha_t *tcpha, tcp_opt_t *tcpopt)
 			 * If the list is empty, allocate one and assume
 			 * nothing is sack'ed.
 			 */
-			ASSERT(tcp->tcp_sack_info != NULL);
 			if (tcp->tcp_notsack_list == NULL) {
 				tcp_notsack_update(&(tcp->tcp_notsack_list),
 				    tcp->tcp_suna, tcp->tcp_snxt,
@@ -477,23 +475,16 @@ tcp_process_options(tcp_t *tcp, tcpha_t *tcpha)
 	if ((options & TCP_OPT_SACK_OK_PRESENT) &&
 	    (tcp->tcp_snd_sack_ok ||
 	    (tcps->tcps_sack_permitted != 0 && TCP_IS_DETACHED(tcp)))) {
-		/* This should be true only in the passive case. */
-		if (tcp->tcp_sack_info == NULL) {
-			ASSERT(TCP_IS_DETACHED(tcp));
-			tcp->tcp_sack_info =
-			    kmem_cache_alloc(tcp_sack_info_cache, KM_NOSLEEP);
-		}
-		if (tcp->tcp_sack_info == NULL) {
-			tcp->tcp_snd_sack_ok = B_FALSE;
+		ASSERT(tcp->tcp_num_sack_blk == 0);
+		ASSERT(tcp->tcp_notsack_list == NULL);
+
+		tcp->tcp_snd_sack_ok = B_TRUE;
+		if (tcp->tcp_snd_ts_ok) {
+			tcp->tcp_max_sack_blk = 3;
 		} else {
-			tcp->tcp_snd_sack_ok = B_TRUE;
-			if (tcp->tcp_snd_ts_ok) {
-				tcp->tcp_max_sack_blk = 3;
-			} else {
-				tcp->tcp_max_sack_blk = 4;
-			}
+			tcp->tcp_max_sack_blk = 4;
 		}
-	} else {
+	} else if (tcp->tcp_snd_sack_ok) {
 		/*
 		 * Resetting tcp_snd_sack_ok to B_FALSE so that
 		 * no SACK info will be used for this
@@ -501,12 +492,8 @@ tcp_process_options(tcp_t *tcp, tcpha_t *tcpha)
 		 * permission is negotiated.  This may need
 		 * to be changed once this is clarified.
 		 */
-		if (tcp->tcp_sack_info != NULL) {
-			ASSERT(tcp->tcp_notsack_list == NULL);
-			kmem_cache_free(tcp_sack_info_cache,
-			    tcp->tcp_sack_info);
-			tcp->tcp_sack_info = NULL;
-		}
+		ASSERT(tcp->tcp_num_sack_blk == 0);
+		ASSERT(tcp->tcp_notsack_list == NULL);
 		tcp->tcp_snd_sack_ok = B_FALSE;
 	}
 
@@ -761,10 +748,8 @@ tcp_paws_check(tcp_t *tcp, tcpha_t *tcpha, tcp_opt_t *tcpoptp)
 		 * transfer rate built up so far.
 		 */
 		tcp_mss_set(tcp, tcp->tcp_mss + TCPOPT_REAL_TS_LEN);
-		if (tcp->tcp_snd_sack_ok) {
-			ASSERT(tcp->tcp_sack_info != NULL);
+		if (tcp->tcp_snd_sack_ok)
 			tcp->tcp_max_sack_blk = 4;
-		}
 	}
 	return (B_TRUE);
 }
@@ -2823,7 +2808,6 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 			goto ack_check;
 		}
 	} else if (tcp->tcp_snd_sack_ok) {
-		ASSERT(tcp->tcp_sack_info != NULL);
 		tcpopt.tcp = tcp;
 		/*
 		 * SACK info in already updated in tcp_parse_options.  Ignore
@@ -3151,7 +3135,6 @@ ok:;
 		if (seg_len > 0) {
 			/* Fill in the SACK blk list. */
 			if (tcp->tcp_snd_sack_ok) {
-				ASSERT(tcp->tcp_sack_info != NULL);
 				tcp_sack_insert(tcp->tcp_sack_list,
 				    seg_seq, seg_seq + seg_len,
 				    &(tcp->tcp_num_sack_blk));
@@ -3191,8 +3174,7 @@ ok:;
 					if (tcp->tcp_reass_head != NULL) {
 						tcp->tcp_reass_tid = TCP_TIMER(
 						    tcp, tcp_reass_timer,
-						    MSEC_TO_TICK(
-						    tcps->tcps_reass_timeout));
+						    tcps->tcps_reass_timeout);
 					} else {
 						tcp->tcp_reass_tid = 0;
 					}
@@ -3214,8 +3196,8 @@ ok:;
 				if (tcps->tcps_reass_timeout != 0 &&
 				    tcp->tcp_reass_tid == 0) {
 					tcp->tcp_reass_tid = TCP_TIMER(tcp,
-					    tcp_reass_timer, MSEC_TO_TICK(
-					    tcps->tcps_reass_timeout));
+					    tcp_reass_timer,
+					    tcps->tcps_reass_timeout);
 				}
 			}
 		}
@@ -3870,7 +3852,6 @@ process_ack:
 				 * Congestion Control" in SIGCOMM '96.
 				 */
 				if (tcp->tcp_snd_sack_ok) {
-					ASSERT(tcp->tcp_sack_info != NULL);
 					if (tcp->tcp_notsack_list != NULL) {
 						tcp->tcp_pipe = tcp->tcp_snxt -
 						    tcp->tcp_fack;
@@ -4062,8 +4043,7 @@ process_ack:
 			 * Remove all notsack info to avoid confusion with
 			 * the next fast retrasnmit/recovery phase.
 			 */
-			if (tcp->tcp_snd_sack_ok &&
-			    tcp->tcp_notsack_list != NULL) {
+			if (tcp->tcp_snd_sack_ok) {
 				TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list,
 				    tcp);
 			}
@@ -4679,8 +4659,7 @@ update_ack:
 			if (!TCP_IS_DETACHED(tcp))
 				tcp->tcp_push_tid = TCP_TIMER(tcp,
 				    tcp_push_timer,
-				    MSEC_TO_TICK(
-				    tcps->tcps_push_timer_interval));
+				    tcps->tcps_push_timer_interval);
 		}
 	}
 
@@ -4803,9 +4782,9 @@ ack_check:
 		 */
 		if (tcp->tcp_ack_tid == 0) {
 			tcp->tcp_ack_tid = TCP_TIMER(tcp, tcp_ack_timer,
-			    MSEC_TO_TICK(tcp->tcp_localnet ?
-			    (clock_t)tcps->tcps_local_dack_interval :
-			    (clock_t)tcps->tcps_deferred_ack_interval));
+			    tcp->tcp_localnet ?
+			    tcps->tcps_local_dack_interval :
+			    tcps->tcps_deferred_ack_interval);
 		}
 	}
 	if (flags & TH_ORDREL_NEEDED) {

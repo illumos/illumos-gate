@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* This file contains all TCP output processing functions. */
@@ -1546,9 +1545,10 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 
 				ASSERT(tcp->tcp_linger_tid == 0);
 
+				/* conn_lingertime is in sec. */
 				tcp->tcp_linger_tid = TCP_TIMER(tcp,
 				    tcp_close_linger_timeout,
-				    connp->conn_lingertime * hz);
+				    connp->conn_lingertime * MILLISEC);
 
 				/* tcp_close_linger_timeout will finish close */
 				if (tcp->tcp_linger_tid == 0)
@@ -3171,7 +3171,6 @@ tcp_sack_rexmit(tcp_t *tcp, uint_t *flags)
 	mblk_t		*xmit_mp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
-	ASSERT(tcp->tcp_sack_info != NULL);
 	ASSERT(tcp->tcp_notsack_list != NULL);
 	ASSERT(tcp->tcp_rexmit == B_FALSE);
 
@@ -3485,10 +3484,7 @@ tcp_process_shrunk_swnd(tcp_t *tcp, uint32_t shrunk_count)
 	 * If the SACK option is set, delete the entire list of
 	 * notsack'ed blocks.
 	 */
-	if (tcp->tcp_sack_info != NULL) {
-		if (tcp->tcp_notsack_list != NULL)
-			TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list, tcp);
-	}
+	TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list, tcp);
 
 	if (tcp->tcp_suna == tcp->tcp_snxt && tcp->tcp_swnd == 0)
 		/*

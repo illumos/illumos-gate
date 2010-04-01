@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 arp_m_tbl
@@ -259,6 +258,7 @@ tcp_init_wnd_shft
 tcp_max_init_cwnd
 tcp_max_optsize
 tcp_min_conn_listener
+tcp_notsack_blk_cache
 tcp_opt_arr
 tcp_opt_obj
 tcp_outbound_squeue_switch
@@ -274,7 +274,6 @@ tcp_randtbl
 tcp_rinfo
 tcp_rinitv4
 tcp_rinitv6
-tcp_sack_info_cache
 tcp_sock_winit
 tcp_squeue_flag
 tcp_squeue_wput

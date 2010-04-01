@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -119,9 +118,9 @@ void
 tcp_time_wait_append(tcp_t *tcp)
 {
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	squeue_t	*sqp = tcp->tcp_connp->conn_sqp;
 	tcp_squeue_priv_t *tcp_time_wait =
-	    *((tcp_squeue_priv_t **)squeue_getprivate(tcp->tcp_connp->conn_sqp,
-	    SQPRIVATE_TCP));
+	    *((tcp_squeue_priv_t **)squeue_getprivate(sqp, SQPRIVATE_TCP));
 
 	tcp_timers_stop(tcp);
 
@@ -134,23 +133,17 @@ tcp_time_wait_append(tcp_t *tcp)
 	ASSERT(tcp->tcp_flow_stopped == 0);
 	ASSERT(tcp->tcp_time_wait_next == NULL);
 	ASSERT(tcp->tcp_time_wait_prev == NULL);
-	ASSERT(tcp->tcp_time_wait_expire == NULL);
+	ASSERT(tcp->tcp_time_wait_expire == 0);
 	ASSERT(tcp->tcp_listener == NULL);
 
-	tcp->tcp_time_wait_expire = ddi_get_lbolt();
+	tcp->tcp_time_wait_expire = ddi_get_lbolt64();
 	/*
-	 * The value computed below in tcp->tcp_time_wait_expire may
-	 * appear negative or wrap around. That is ok since our
-	 * interest is only in the difference between the current lbolt
-	 * value and tcp->tcp_time_wait_expire. But the value should not
-	 * be zero, since it means the tcp is not in the TIME_WAIT list.
-	 * The corresponding comparison in tcp_time_wait_collector() uses
-	 * modular arithmetic.
+	 * Since tcp_time_wait_expire is lbolt64, it should not wrap around
+	 * in practice.  Hence it cannot be 0.  Note that zero means that the
+	 * tcp_t is not in the TIME_WAIT list.
 	 */
 	tcp->tcp_time_wait_expire += MSEC_TO_TICK(
 	    tcps->tcps_time_wait_interval);
-	if (tcp->tcp_time_wait_expire == 0)
-		tcp->tcp_time_wait_expire = 1;
 
 	ASSERT(TCP_IS_DETACHED(tcp));
 	ASSERT(tcp->tcp_state == TCPS_TIME_WAIT);
@@ -162,12 +155,30 @@ tcp_time_wait_append(tcp_t *tcp)
 	if (tcp_time_wait->tcp_time_wait_head == NULL) {
 		ASSERT(tcp_time_wait->tcp_time_wait_tail == NULL);
 		tcp_time_wait->tcp_time_wait_head = tcp;
+
+		/*
+		 * Even if the list was empty before, there may be a timer
+		 * running since a tcp_t can be removed from the list
+		 * in other places, such as tcp_clean_death().  So check if
+		 * a timer is needed.
+		 */
+		if (tcp_time_wait->tcp_time_wait_tid == 0) {
+			tcp_time_wait->tcp_time_wait_tid =
+			    timeout_generic(CALLOUT_NORMAL,
+			    tcp_time_wait_collector, sqp,
+			    (hrtime_t)(tcps->tcps_time_wait_interval + 1) *
+			    MICROSEC, CALLOUT_TCP_RESOLUTION,
+			    CALLOUT_FLAG_ROUNDUP);
+		}
 	} else {
 		ASSERT(tcp_time_wait->tcp_time_wait_tail != NULL);
 		ASSERT(tcp_time_wait->tcp_time_wait_tail->tcp_state ==
 		    TCPS_TIME_WAIT);
 		tcp_time_wait->tcp_time_wait_tail->tcp_time_wait_next = tcp;
 		tcp->tcp_time_wait_prev = tcp_time_wait->tcp_time_wait_tail;
+
+		/* The list is not empty, so a timer must be running. */
+		ASSERT(tcp_time_wait->tcp_time_wait_tid != 0);
 	}
 	tcp_time_wait->tcp_time_wait_tail = tcp;
 	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
@@ -216,7 +227,7 @@ void
 tcp_time_wait_collector(void *arg)
 {
 	tcp_t *tcp;
-	clock_t now;
+	int64_t now;
 	mblk_t *mp;
 	conn_t *connp;
 	kmutex_t *lock;
@@ -247,17 +258,16 @@ tcp_time_wait_collector(void *arg)
 	/*
 	 * In order to reap time waits reliably, we should use a
 	 * source of time that is not adjustable by the user -- hence
-	 * the call to ddi_get_lbolt().
+	 * the call to ddi_get_lbolt64().
 	 */
-	now = ddi_get_lbolt();
+	now = ddi_get_lbolt64();
 	while ((tcp = tcp_time_wait->tcp_time_wait_head) != NULL) {
 		/*
-		 * Compare times using modular arithmetic, since
-		 * lbolt can wrapover.
+		 * lbolt64 should not wrap around in practice...  So we can
+		 * do a direct comparison.
 		 */
-		if ((now - tcp->tcp_time_wait_expire) < 0) {
+		if (now < tcp->tcp_time_wait_expire)
 			break;
-		}
 
 		removed = tcp_time_wait_remove(tcp, tcp_time_wait);
 		ASSERT(removed);
@@ -389,10 +399,22 @@ tcp_time_wait_collector(void *arg)
 	if (tcp_time_wait->tcp_free_list != NULL)
 		tcp_time_wait->tcp_free_list->tcp_in_free_list = B_TRUE;
 
-	tcp_time_wait->tcp_time_wait_tid =
-	    timeout_generic(CALLOUT_NORMAL, tcp_time_wait_collector, sqp,
-	    TCP_TIME_WAIT_DELAY, CALLOUT_TCP_RESOLUTION,
-	    CALLOUT_FLAG_ROUNDUP);
+	/*
+	 * If the time wait list is not empty and there is no timer running,
+	 * restart it.
+	 */
+	if ((tcp = tcp_time_wait->tcp_time_wait_head) != NULL &&
+	    tcp_time_wait->tcp_time_wait_tid == 0) {
+		hrtime_t firetime;
+
+		firetime = TICK_TO_NSEC(tcp->tcp_time_wait_expire - now);
+		/* This ensures that we won't wake up too often. */
+		firetime = MAX(TCP_TIME_WAIT_DELAY, firetime);
+		tcp_time_wait->tcp_time_wait_tid =
+		    timeout_generic(CALLOUT_NORMAL, tcp_time_wait_collector,
+		    sqp, firetime, CALLOUT_TCP_RESOLUTION,
+		    CALLOUT_FLAG_ROUNDUP);
+	}
 	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
 }
 

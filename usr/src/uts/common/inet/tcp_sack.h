@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_INET_TCP_SACK_H
@@ -78,6 +77,8 @@ extern void tcp_notsack_remove(notsack_blk_t **, tcp_seq, int32_t *,
 extern void tcp_notsack_update(notsack_blk_t **, tcp_seq, tcp_seq,
     int32_t *, uint32_t *);
 
+/* Defined in tcp_sack.c */
+extern kmem_cache_t	*tcp_notsack_blk_cache;
 
 /*
  * Macro to remove all the notsack'ed blks in sender.
@@ -85,20 +86,24 @@ extern void tcp_notsack_update(notsack_blk_t **, tcp_seq, tcp_seq,
  * Param:
  * notsack_blk_t *head: pointer to the head of the list of notsack'ed blks.
  */
-#define	TCP_NOTSACK_REMOVE_ALL(head, tcp)		\
-{ \
-	notsack_blk_t *prev, *tmp; \
-	tmp = (head); \
-	do { \
-		prev = tmp; \
-		tmp = tmp->next; \
-		kmem_free(prev, sizeof (notsack_blk_t)); \
-	} while (tmp != NULL); \
-	(head) = NULL; \
-	(tcp)->tcp_cnt_notsack_list = 0; \
-	(tcp)->tcp_num_notsack_blk = 0; \
+#define	TCP_NOTSACK_REMOVE_ALL(head, tcp)			\
+{								\
+	if ((head) != NULL) {					\
+		notsack_blk_t *prev, *tmp;			\
+		tmp = (head);					\
+		do  {						\
+			prev = tmp;				\
+			tmp = tmp->next;			\
+			kmem_cache_free(tcp_notsack_blk_cache, prev); \
+		} while (tmp != NULL);				\
+		(head) = NULL;					\
+		(tcp)->tcp_cnt_notsack_list = 0;		\
+		(tcp)->tcp_num_notsack_blk = 0;			\
+	} else {						\
+		ASSERT((tcp)->tcp_cnt_notsack_list == 0);	\
+		ASSERT((tcp)->tcp_num_notsack_blk == 0);	\
+	}							\
 }
-
 
 #ifdef	__cplusplus
 }
