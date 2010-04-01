@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sysmacros.h>
@@ -1754,7 +1754,6 @@ pcie_init_root_port_mps(dev_info_t *dip)
 int
 pcie_initchild_mps(dev_info_t *cdip)
 {
-	int		max_payload_size;
 	pcie_bus_t	*bus_p;
 	dev_info_t	*pdip = ddi_get_parent(cdip);
 	uint8_t		dev_type;
@@ -1781,47 +1780,46 @@ pcie_initchild_mps(dev_info_t *cdip)
 			return (DDI_SUCCESS);
 	}
 
-	if (PCIE_IS_RP(bus_p)) {
-		/*
-		 * If this device is a root port, then the mps scan
-		 * saved the mps in the root ports bus_p.
-		 */
-		max_payload_size = bus_p->bus_mps;
-	} else {
-		/*
-		 * If the device is not a root port, then the mps of
-		 * its parent should be used.
-		 */
-		pcie_bus_t *parent_bus_p = PCIE_DIP2BUS(pdip);
-		max_payload_size = parent_bus_p->bus_mps;
-	}
+	if (PCIE_IS_PCIE(bus_p)) {
+		int suggested_mrrs, fabric_mps;
+		uint16_t device_mps, device_mps_cap, device_mrrs, dev_ctrl;
 
-	if (PCIE_IS_PCIE(bus_p) && (max_payload_size >= 0)) {
-		pcie_bus_t *rootp_bus_p = PCIE_DIP2BUS(bus_p->bus_rp_dip);
-		uint16_t mask, dev_ctrl = PCIE_CAP_GET(16, bus_p, PCIE_DEVCTL),
-		    mps = PCIE_CAP_GET(16, bus_p, PCIE_DEVCAP) &
+		if ((fabric_mps = (PCIE_IS_RP(bus_p) ? bus_p :
+		    PCIE_DIP2BUS(pdip))->bus_mps) < 0)
+			return (DDI_SUCCESS);
+
+		dev_ctrl = PCIE_CAP_GET(16, bus_p, PCIE_DEVCTL);
+
+		device_mps_cap = PCIE_CAP_GET(16, bus_p, PCIE_DEVCAP) &
 		    PCIE_DEVCAP_MAX_PAYLOAD_MASK;
 
-		mps = MIN(mps, (uint16_t)max_payload_size);
+		device_mrrs = (dev_ctrl & PCIE_DEVCTL_MAX_READ_REQ_MASK) >>
+		    PCIE_DEVCTL_MAX_READ_REQ_SHIFT;
+
+		if (device_mps_cap < fabric_mps)
+			device_mrrs = device_mps = device_mps_cap;
+		else
+			device_mps = (uint16_t)fabric_mps;
+
+		suggested_mrrs = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY,
+		    cdip, DDI_PROP_DONTPASS, "suggested-mrrs", device_mrrs);
+
+		if ((device_mps == fabric_mps) ||
+		    (suggested_mrrs < device_mrrs))
+			device_mrrs = (uint16_t)suggested_mrrs;
 
 		/*
-		 * If the MPS to be set is less than the root ports
-		 * MPS, then MRRS will have to be set the same as MPS.
+		 * Replace MPS and MRRS settings.
 		 */
-		mask = ((mps < rootp_bus_p->bus_mps) ?
-		    PCIE_DEVCTL_MAX_READ_REQ_MASK : 0) |
-		    PCIE_DEVCTL_MAX_PAYLOAD_MASK;
+		dev_ctrl &= ~(PCIE_DEVCTL_MAX_READ_REQ_MASK |
+		    PCIE_DEVCTL_MAX_PAYLOAD_MASK);
 
-		dev_ctrl &= ~mask;
-		mask = ((mps < rootp_bus_p->bus_mps)
-		    ? mps << PCIE_DEVCTL_MAX_READ_REQ_SHIFT : 0)
-		    | (mps << PCIE_DEVCTL_MAX_PAYLOAD_SHIFT);
-
-		dev_ctrl |= mask;
+		dev_ctrl |= ((device_mrrs << PCIE_DEVCTL_MAX_READ_REQ_SHIFT) |
+		    device_mps << PCIE_DEVCTL_MAX_PAYLOAD_SHIFT);
 
 		PCIE_CAP_PUT(16, bus_p, PCIE_DEVCTL, dev_ctrl);
 
-		bus_p->bus_mps = mps;
+		bus_p->bus_mps = device_mps;
 	}
 
 	return (DDI_SUCCESS);
@@ -1893,6 +1891,14 @@ pcie_get_max_supported(dev_info_t *dip, void *arg)
 		    "Not a PCIe dev\n", ddi_driver_name(dip));
 		goto fail1;
 	}
+
+	/*
+	 * If the suggested-mrrs property exists, then don't include this
+	 * device in the MPS capabilities scan.
+	 */
+	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "suggested-mrrs") != 0)
+		goto fail1;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
 	    (caddr_t)&reg, &rlen) != DDI_PROP_SUCCESS) {
