@@ -17,6 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/*
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 #include <config.h>
 
 #include "closeout.h"
@@ -1952,7 +1956,7 @@ do_unit (PedDevice** dev)
 }
 
 static int
-do_version ()
+do_version (PedDevice** dev)
 {
     printf ("\n%s\n%s",
             prog_name,
