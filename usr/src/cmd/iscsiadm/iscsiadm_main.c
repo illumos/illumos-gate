@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -5716,8 +5715,10 @@ chkConnLoginMaxPollingLoginDelay(IMA_OID oid, int key, int uintValue)
 
 	if (key == CONN_LOGIN_MAX) {
 		getObj.tunable_objectType = ISCSI_LOGIN_POLLING_DELAY;
-	} else {
+	} else if (key == POLLING_LOGIN_DELAY) {
 		getObj.tunable_objectType = ISCSI_CONN_DEFAULT_LOGIN_MAX;
+	} else {
+		return (0);
 	}
 	valuep[0] = '\0';
 	getObj.tunable_objectValue = valuep;
