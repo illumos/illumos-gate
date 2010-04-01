@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SCSI_IMPL_SCSI_SAS_H
@@ -193,10 +192,17 @@ typedef struct sas_phy_stats {
 
 
 /*
- * Phy-mask property names for the target port and attached port
+ * Phy-mask property names for the target port, attached port and receptacle
  */
 #define	SCSI_ADDR_PROP_TARGET_PORT_PM	"target-port-pm"
 #define	SCSI_ADDR_PROP_ATTACHED_PORT_PM	"attached-port-pm"
+#define	SCSI_HBA_PROP_RECEPTACLE_PM	"receptacle-pm"
+
+/*
+ * Target port depth property names - Indicates the number of expanders
+ * between the initiator port and the target port
+ */
+#define	SCSI_ADDR_PROP_TARGET_PORT_DEPTH	"target-port-depth"
 
 
 /*

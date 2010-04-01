@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #include <sys/scsi/adapters/pmcs/pmcs.h>
 
@@ -544,6 +543,13 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	} else {
 		pwp->fwlogfile_aap1[0] = '\0';
 		pwp->fwlogfile_iop[0] = '\0';
+	}
+
+	pwp->open_retry_interval = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "pmcs-open-retry-interval",
+	    OPEN_RETRY_INTERVAL_DEF);
+	if (pwp->open_retry_interval > OPEN_RETRY_INTERVAL_MAX) {
+		pwp->open_retry_interval = OPEN_RETRY_INTERVAL_MAX;
 	}
 
 	mutex_enter(&pmcs_trace_lock);
@@ -1097,6 +1103,26 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	protocol = SAS_SSP_SUPPORT | SAS_SATA_SUPPORT | SAS_SMP_SUPPORT;
 	pmcs_smhba_add_hba_prop(pwp, DATA_TYPE_INT32, PMCS_SUPPORTED_PROTOCOL,
 	    &protocol);
+
+	/* Receptacle properties (FMA) */
+	pwp->recept_labels[0] = PMCS_RECEPT_LABEL_0;
+	pwp->recept_pm[0] = PMCS_RECEPT_PM_0;
+	pwp->recept_labels[1] = PMCS_RECEPT_LABEL_1;
+	pwp->recept_pm[1] = PMCS_RECEPT_PM_1;
+	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
+	    SCSI_HBA_PROP_RECEPTACLE_LABEL, &pwp->recept_labels[0],
+	    PMCS_NUM_RECEPTACLES) != DDI_PROP_SUCCESS) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: failed to create %s property", __func__,
+		    "receptacle-label");
+	}
+	if (ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
+	    SCSI_HBA_PROP_RECEPTACLE_PM, &pwp->recept_pm[0],
+	    PMCS_NUM_RECEPTACLES) != DDI_PROP_SUCCESS) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: failed to create %s property", __func__,
+		    "receptacle-pm");
+	}
 
 	return (DDI_SUCCESS);
 

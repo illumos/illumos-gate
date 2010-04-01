@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -609,6 +608,7 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 	pmcs_xscsi_t *tgt = pwrk->xp;
 	uint32_t event = LE_32(iomb[2]);
 	pmcs_phy_t *pptr = pwrk->phy;
+	pmcs_cb_t callback;
 	uint32_t tag;
 
 	if (tgt != NULL) {
@@ -682,7 +682,7 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 				mutex_exit(&tgt->statlock);
 			}
 			pmcs_unlock_phy(pptr);
-			mutex_exit(&pwrk->lock);
+			mutex_exit(&pwrk->lock); /* XXX: Is this right??? */
 			return;
 		}
 
@@ -691,6 +691,25 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 			    "%s: Not scheduling SSP event recovery for NULL tgt"
 			    " pwrk(%p) tag(0x%x)", __func__, (void *)pwrk,
 			    pwrk->htag);
+			return;
+		}
+
+		/*
+		 * If the SSP event was an OPEN_RETRY_TIMEOUT, we don't want
+		 * to go through the recovery (abort/LU reset) process.
+		 * Simply complete the command and return it as STATUS_BUSY.
+		 * This will cause the target driver to simply retry.
+		 */
+		if (event == PMCOUT_STATUS_IO_XFER_OPEN_RETRY_TIMEOUT) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
+			    "%s: Got OPEN_RETRY_TIMEOUT event (htag 0x%08x)",
+			    __func__, pwrk->htag);
+
+			mutex_exit(&tgt->statlock);
+			pmcs_unlock_phy(pptr);
+			pwrk->ssp_event = event;
+			callback = (pmcs_cb_t)pwrk->ptr;
+			(*callback)(pwp, pwrk, iomb);
 			return;
 		}
 
@@ -740,6 +759,7 @@ pmcs_tgt_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk)
 	htag = pwrk->htag;
 	event = pwrk->ssp_event;
 	pwrk->ssp_event = 0xffffffff;
+
 	if (event == PMCOUT_STATUS_XFER_ERR_BREAK ||
 	    event == PMCOUT_STATUS_XFER_ERR_PHY_NOT_READY ||
 	    event == PMCOUT_STATUS_XFER_ERROR_CMD_ISSUE_ACK_NAK_TIMEOUT) {

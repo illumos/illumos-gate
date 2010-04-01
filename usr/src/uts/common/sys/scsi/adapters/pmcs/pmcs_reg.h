@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * PMC 8x6G register definitions
@@ -352,6 +351,16 @@ extern "C" {
 #define	PMCS_GPIO_TSMODE_BIT0		(1 << 0)
 #define	PMCS_GPIO_TSMODE_BIT1		(1 << 1)
 
+/*
+ * SAS/SATA PHY Layer Registers
+ * These are in MEMBASE-III (i.e. in GSM space)
+ */
+#define	OPEN_RETRY_INTERVAL(phy)	\
+	(phy < 4) ? (0x330B4 + (0x4000 * (phy))) : \
+	(0x430B4 + (0x4000 * (phy - 4)))
+
+#define	OPEN_RETRY_INTERVAL_DEF		20
+#define	OPEN_RETRY_INTERVAL_MAX		0x7FFF
 
 /*
  * Register Access Inline Functions

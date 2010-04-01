@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_IMPL_TRANSPORT_H
@@ -679,6 +678,8 @@ void	scsi_hba_tgtmap_destroy(scsi_hba_tgtmap_t	*tgt_map);
 #define	INST2DEVCTL(x)		(((x) << INST_MINOR_SHIFT) | DEVCTL_MINOR)
 #define	INST2SCSI(x)		(((x) << INST_MINOR_SHIFT) | SCSI_MINOR)
 #define	MINOR2INST(x)		((x) >> INST_MINOR_SHIFT)
+
+#define	SCSI_HBA_PROP_RECEPTACLE_LABEL	"receptacle-label"
 
 #endif	/* _KERNEL */
 

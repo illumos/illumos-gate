@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <limits.h>
@@ -46,6 +45,16 @@ typedef struct per_iport_setting {
 	uint_t  pis_damap_info; /* -m: DAM/damap */
 	uint_t  pis_dtc_info; /* -d: device tree children: dev_info/path_info */
 } per_iport_setting_t;
+
+/*
+ * This structure is used for sorting work structures by the wserno
+ */
+typedef struct wserno_list {
+	int serno;
+	int idx;
+	struct wserno_list *next;
+	struct wserno_list *prev;
+} wserno_list_t;
 
 #define	MDB_RD(a, b, c)		mdb_vread(a, b, (uintptr_t)c)
 #define	NOREAD(a, b)		mdb_warn("could not read " #a " at 0x%p", b)
@@ -540,6 +549,7 @@ display_hwinfo(struct pmcs_hw m, int verbose)
 	mdb_printf("Maximum commands: %d\n", m.max_cmd);
 	mdb_printf("Maximum devices:  %d\n", m.max_dev);
 	mdb_printf("I/O queue depth:  %d\n", m.ioq_depth);
+	mdb_printf("Open retry intvl: %d usecs\n", m.open_retry_interval);
 	if (m.fwlog == 0) {
 		mdb_printf("Firmware logging: Disabled\n");
 	} else {
@@ -777,25 +787,112 @@ display_one_work(pmcwork_t *wp, int verbose, int idx)
 }
 
 static void
-display_work(struct pmcs_hw m, int verbose)
+display_work(struct pmcs_hw m, int verbose, int wserno)
 {
 	int		idx;
 	boolean_t	header_printed = B_FALSE;
-	pmcwork_t	work, *wp = &work;
+	pmcwork_t	*wp;
+	wserno_list_t	*sernop, *sp, *newsp, *sphead = NULL;
 	uintptr_t	_wp;
+	int		serno;
+
+	wp = mdb_alloc(sizeof (pmcwork_t) * m.max_cmd, UM_SLEEP);
+	_wp = (uintptr_t)m.work;
+	sernop = mdb_alloc(sizeof (wserno_list_t) * m.max_cmd, UM_SLEEP);
+	bzero(sernop, sizeof (wserno_list_t) * m.max_cmd);
 
 	mdb_printf("\nActive Work structure information:\n");
 	mdb_printf("----------------------------------\n");
 
-	_wp = (uintptr_t)m.work;
-
+	/*
+	 * Read in all the work structures
+	 */
 	for (idx = 0; idx < m.max_cmd; idx++, _wp += sizeof (pmcwork_t)) {
-		if (MDB_RD(&work, sizeof (pmcwork_t), _wp) == -1) {
+		if (MDB_RD(wp + idx, sizeof (pmcwork_t), _wp) == -1) {
 			NOREAD(pmcwork_t, _wp);
 			continue;
 		}
+	}
 
-		if (!verbose && (wp->htag == PMCS_TAG_TYPE_FREE)) {
+	/*
+	 * Sort by serial number?
+	 */
+	if (wserno) {
+		for (idx = 0; idx < m.max_cmd; idx++) {
+			if ((wp + idx)->htag == 0) {
+				serno = PMCS_TAG_SERNO((wp + idx)->last_htag);
+			} else {
+				serno = PMCS_TAG_SERNO((wp + idx)->htag);
+			}
+
+			/* Start at the beginning of the list */
+			sp = sphead;
+			newsp = sernop + idx;
+			/* If this is the first entry, just add it */
+			if (sphead == NULL) {
+				sphead = sernop;
+				sphead->serno = serno;
+				sphead->idx = idx;
+				sphead->next = NULL;
+				sphead->prev = NULL;
+				continue;
+			}
+
+			newsp->serno = serno;
+			newsp->idx = idx;
+
+			/* Find out where in the list this goes */
+			while (sp) {
+				/* This item goes before sp */
+				if (serno < sp->serno) {
+					newsp->next = sp;
+					newsp->prev = sp->prev;
+					if (newsp->prev == NULL) {
+						sphead = newsp;
+					} else {
+						newsp->prev->next = newsp;
+					}
+					sp->prev = newsp;
+					break;
+				}
+
+				/*
+				 * If sp->next is NULL, this entry goes at the
+				 * end of the list
+				 */
+				if (sp->next == NULL) {
+					sp->next = newsp;
+					newsp->next = NULL;
+					newsp->prev = sp;
+					break;
+				}
+
+				sp = sp->next;
+			}
+		}
+
+		/*
+		 * Now print the sorted list
+		 */
+		mdb_printf(" Idx %8s %10s %20s %8s %8s O D ",
+		    "HTag", "State", "Phy Path", "Target", "Timer");
+		mdb_printf("%8s %10s %18s %18s %18s\n", "LastHTAG",
+		    "LastState", "LastPHY", "LastTgt", "LastArg");
+
+		sp = sphead;
+		while (sp) {
+			display_one_work(wp + sp->idx, 1, sp->idx);
+			sp = sp->next;
+		}
+
+		goto out;
+	}
+
+	/*
+	 * Now print the list, sorted by index
+	 */
+	for (idx = 0; idx < m.max_cmd; idx++) {
+		if (!verbose && ((wp + idx)->htag == PMCS_TAG_TYPE_FREE)) {
 			continue;
 		}
 
@@ -815,8 +912,12 @@ display_work(struct pmcs_hw m, int verbose)
 			header_printed = B_TRUE;
 		}
 
-		display_one_work(wp, verbose, idx);
+		display_one_work(wp + idx, verbose, idx);
 	}
+
+out:
+	mdb_free(wp, sizeof (pmcwork_t) * m.max_cmd);
+	mdb_free(sernop, sizeof (wserno_list_t) * m.max_cmd);
 }
 
 static void
@@ -2579,6 +2680,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t			unconfigured = FALSE;
 	uint_t			damap_info = FALSE;
 	uint_t			dtc_info = FALSE;
+	uint_t			wserno = FALSE;
 	int			rv = DCMD_OK;
 	void			*pmcs_state;
 	char			*state_str;
@@ -2609,6 +2711,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'p', MDB_OPT_SETBITS, TRUE, &phy_info,
 	    'q', MDB_OPT_SETBITS, TRUE, &ibq,
 	    'Q', MDB_OPT_SETBITS, TRUE, &obq,
+	    's', MDB_OPT_SETBITS, TRUE, &wserno,
 	    't', MDB_OPT_SETBITS, TRUE, &target_info,
 	    'T', MDB_OPT_SETBITS, TRUE, &tgt_phy_count,
 	    'u', MDB_OPT_SETBITS, TRUE, &unconfigured,
@@ -2691,8 +2794,8 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (target_info || tgt_phy_count)
 		display_targets(ss, verbose, tgt_phy_count);
 
-	if (work_info)
-		display_work(ss, verbose);
+	if (work_info || wserno)
+		display_work(ss, verbose, wserno);
 
 	if (ic_info)
 		display_ic(ss, verbose);
@@ -2730,6 +2833,7 @@ pmcs_help()
 	    "    -p: Print information about each attached PHY\n"
 	    "    -q: Dump inbound queues\n"
 	    "    -Q: Dump outbound queues\n"
+	    "    -s: Dump all work structures sorted by serial number\n"
 	    "    -t: Print information about each configured target\n"
 	    "    -T: Print target and PHY count summary\n"
 	    "    -u: Show SAS address of all unconfigured targets\n"

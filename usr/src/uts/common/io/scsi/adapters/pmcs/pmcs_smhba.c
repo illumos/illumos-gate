@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * This file contains SM-HBA support for PMC-S driver
@@ -149,6 +148,12 @@ pmcs_smhba_set_scsi_device_props(pmcs_hw_t *pwp, pmcs_phy_t *pptr,
 			    SCSI_ADDR_PROP_ATTACHED_PORT, addr);
 		}
 		kmem_free(addr, PMCS_MAX_UA_SIZE);
+	}
+
+	if (pptr->dtype != EXPANDER) {
+		(void) scsi_device_prop_update_int(sd,
+		    SCSI_DEVICE_PROP_PATH, SCSI_ADDR_PROP_TARGET_PORT_DEPTH,
+		    pptr->level);
 	}
 }
 

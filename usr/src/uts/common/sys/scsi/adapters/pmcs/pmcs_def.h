@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_PMCS_DEF_H
 #define	_PMCS_DEF_H
@@ -558,6 +557,17 @@ typedef struct pmcs_fw_event_hdr_s {
 	uint32_t	fw_el_latest_idx;
 	uint32_t	fw_el_entry_size;
 } pmcs_fw_event_hdr_t;
+
+/*
+ * Receptacle information
+ */
+#define	PMCS_NUM_RECEPTACLES	2
+
+#define	PMCS_RECEPT_LABEL_0	"SAS0"
+#define	PMCS_RECEPT_LABEL_1	"SAS1"
+
+#define	PMCS_RECEPT_PM_0	0xf0
+#define	PMCS_RECEPT_PM_1	0xf
 
 #ifdef	__cplusplus
 }

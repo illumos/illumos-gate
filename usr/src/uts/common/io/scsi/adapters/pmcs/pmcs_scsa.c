@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * SCSI (SCSA) midlayer interface for PMC drier.
@@ -64,7 +63,7 @@ static void pmcs_SATA_done(pmcs_hw_t *, pmcwork_t *, uint32_t *);
 static uint8_t pmcs_SATA_rwparm(uint8_t *, uint32_t *, uint64_t *, uint64_t);
 
 static void pmcs_ioerror(pmcs_hw_t *, pmcs_dtype_t pmcs_dtype,
-    pmcwork_t *, uint32_t *);
+    pmcwork_t *, uint32_t *, uint32_t);
 
 
 int
@@ -2053,7 +2052,7 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 	}
 
 	if (sts != PMCOUT_STATUS_OK) {
-		pmcs_ioerror(pwp, SAS, pwrk, msg);
+		pmcs_ioerror(pwp, SAS, pwrk, msg, sts);
 	} else {
 		if (msg[3]) {
 			uint8_t local[PMCS_QENTRY_SIZE << 1], *xd;
@@ -2641,7 +2640,7 @@ pmcs_SATA_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 			pmcs_unlock_phy(pptr);
 			mutex_enter(&pwrk->lock);
 		}
-		pmcs_ioerror(pwp, SATA, pwrk, msg);
+		pmcs_ioerror(pwp, SATA, pwrk, msg, sts);
 	} else {
 		pmcs_latch_status(pwp, sp, STATUS_GOOD, NULL, 0,
 		    pwrk->phy->path);
@@ -2827,7 +2826,8 @@ pmcs_SATA_rwparm(uint8_t *cdb, uint32_t *xfr, uint64_t *lba, uint64_t lbamax)
  * Called with pwrk lock held.
  */
 static void
-pmcs_ioerror(pmcs_hw_t *pwp, pmcs_dtype_t t, pmcwork_t *pwrk, uint32_t *w)
+pmcs_ioerror(pmcs_hw_t *pwp, pmcs_dtype_t t, pmcwork_t *pwrk, uint32_t *w,
+    uint32_t status)
 {
 	static uint8_t por[] = {
 	    0xf0, 0x0, 0x6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x28
@@ -2840,11 +2840,9 @@ pmcs_ioerror(pmcs_hw_t *pwp, pmcs_dtype_t t, pmcwork_t *pwrk, uint32_t *w)
 	pmcs_cmd_t *sp = pwrk->arg;
 	pmcs_phy_t *phyp = pwrk->phy;
 	struct scsi_pkt *pkt = CMD2PKT(sp);
-	uint32_t status;
 	uint32_t resid;
 
 	ASSERT(w != NULL);
-	status = LE_32(w[2]);
 	resid = LE_32(w[3]);
 
 	msg = pmcs_status_str(status);
@@ -2973,6 +2971,8 @@ pmcs_ioerror(pmcs_hw_t *pwp, pmcs_dtype_t t, pmcwork_t *pwrk, uint32_t *w)
 		break;
 
 	case PMCOUT_STATUS_IO_XFER_OPEN_RETRY_TIMEOUT:
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, phyp->target,
+		    "STATUS_BUSY for htag 0x%08x", sp->cmd_tag);
 		pmcs_latch_status(pwp, sp, STATUS_BUSY, NULL, 0, phyp->path);
 		break;
 

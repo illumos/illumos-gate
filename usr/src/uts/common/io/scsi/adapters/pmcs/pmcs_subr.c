@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -398,6 +397,21 @@ pmcs_setup(pmcs_hw_t *pwp)
 		    PMCS_FERRIE | (PMCS_FATAL_INTERRUPT << PMCS_FERIV_SHIFT));
 		pwp->odb_auto_clear = 0;
 		break;
+	}
+
+	/*
+	 * If the open retry interval is non-zero, set it.
+	 */
+	if (pwp->open_retry_interval != 0) {
+		int phynum;
+
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: Setting open retry interval to %d usecs", __func__,
+		    pwp->open_retry_interval);
+		for (phynum = 0; phynum < pwp->nphy; phynum ++) {
+			pmcs_wr_gsm_reg(pwp, OPEN_RETRY_INTERVAL(phynum),
+			    pwp->open_retry_interval);
+		}
 	}
 
 	/*

@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -453,14 +452,7 @@ pmcs_validate_vpd(pmcs_hw_t *pwp, uint8_t *data)
 
 	if (vpd_header->eeprom_version < PMCS_VPD_VERSION) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: VPD version(%d) out-of-date; (%d) required."
-		    " Thebe card needs to be flashed.",
-		    __func__, vpd_header->eeprom_version, PMCS_VPD_VERSION);
-	}
-	if ((vpd_header->eeprom_version != PMCS_VPD_VERSION) &&
-	    (vpd_header->eeprom_version != (PMCS_VPD_VERSION - 1))) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: VPD version mismatch (%d != %d)",
+		    "%s: VPD version(%d) unsupported; requires version %d.",
 		    __func__, vpd_header->eeprom_version, PMCS_VPD_VERSION);
 		return (B_FALSE);
 	}
@@ -506,8 +498,9 @@ pmcs_validate_vpd(pmcs_hw_t *pwp, uint8_t *data)
 	}
 	ASSERT (*chksump == PMCS_VPD_END);
 	if (chksum) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: VPD checksum(%d)"
-		    " non-zero. Checksum validation failed.", __func__, chksum);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: VPD checksum failure", __func__);
+		return (B_FALSE);
 	}
 
 	/*

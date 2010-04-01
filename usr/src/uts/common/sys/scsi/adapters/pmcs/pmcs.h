@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * This file is the principle header file for the PMCS driver
@@ -674,6 +673,7 @@ struct pmcs_hw {
 	uint16_t			debug_mask;
 	uint16_t			phyid_block_mask;
 	uint16_t			phys_started;
+	uint16_t			open_retry_interval;
 	uint32_t			hipri_queue;
 	uint32_t			mpibar;
 	uint32_t			intr_pri;
@@ -683,6 +683,12 @@ struct pmcs_hw {
 	kmutex_t			ict_lock;
 	kcondvar_t			ict_cv;
 	kthread_t			*ict_thread;
+
+	/*
+	 * Receptacle information - FMA
+	 */
+	char				*recept_labels[PMCS_NUM_RECEPTACLES];
+	int				recept_pm[PMCS_NUM_RECEPTACLES];
 
 #ifdef	DEBUG
 	kmutex_t	dbglock;
