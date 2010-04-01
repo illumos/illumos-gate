@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -1280,9 +1279,9 @@ mc_read_smbios(mc_t *mc, dev_info_t *dip)
 {
 
 	uint16_t bdf;
-	pci_regspec_t *pci_rp;
+	pci_regspec_t *pci_rp = NULL;
 	uint32_t phys_hi;
-	int m;
+	int m = 0;
 	uint_t chip_inst;
 	int rc = 0;
 
@@ -1291,13 +1290,15 @@ mc_read_smbios(mc_t *mc, dev_info_t *dip)
 		phys_hi = pci_rp->pci_phys_hi;
 		bdf = (uint16_t)(PCI_REG_BDFR_G(phys_hi) >>
 		    PCI_REG_FUNC_SHIFT);
+		kmem_free(pci_rp, m);
+		pci_rp = NULL;
 
 		rc = fm_smb_mc_chipinst(bdf, &chip_inst);
 		if (rc == 0) {
 			mc->smb_chipid = chip_inst;
 		} else {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "!mc reads smbios chip info failed");
+			cmn_err(CE_NOTE, "mc read smbios chip info failed!");
 #endif /* DEBUG */
 			return;
 		}
@@ -1305,9 +1306,12 @@ mc_read_smbios(mc_t *mc, dev_info_t *dip)
 #ifdef DEBUG
 		if (mc->smb_bboard == NULL)
 			cmn_err(CE_NOTE,
-			    "!mc reads smbios base boards info failed");
+			    "mc read smbios base boards info failed!");
 #endif /* DEBUG */
 	}
+
+	if (pci_rp != NULL)
+		kmem_free(pci_rp, m);
 }
 
 /*ARGSUSED*/
