@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _LIBDLADM_H
@@ -86,7 +85,7 @@ extern "C" {
 #define	DLADM_WALK_CONTINUE	-1
 
 #define	DLADM_MAX_ARG_CNT	32
-#define	DLADM_MAX_ARG_VALS	32
+#define	DLADM_MAX_ARG_VALS	64
 
 typedef enum {
 	DLADM_STATUS_OK = 0,

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -4886,7 +4885,7 @@ mac_validate_props(mac_impl_t *mip, mac_resource_props_t *mrp)
 		int i, j;
 		mac_cpu_mode_t	fanout;
 
-		if (mrp->mrp_ncpus > ncpus || mrp->mrp_ncpus > MAX_SR_FANOUT)
+		if (mrp->mrp_ncpus > ncpus)
 			return (EINVAL);
 
 		for (i = 0; i < mrp->mrp_ncpus; i++) {

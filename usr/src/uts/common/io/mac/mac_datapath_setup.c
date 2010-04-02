@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -819,7 +818,7 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
 	 * not within limits, an error would have been
 	 * returned to the user.
 	 */
-	ASSERT(mrp->mrp_ncpus > 0 && mrp->mrp_ncpus <= MAX_SR_FANOUT);
+	ASSERT(mrp->mrp_ncpus > 0);
 
 	no_of_cpus = mrp->mrp_ncpus;
 
@@ -886,6 +885,9 @@ mac_flow_user_cpu_init(flow_entry_t *flent, mac_resource_props_t *mrp)
 		 * can have.
 		 */
 		fanout_cnt_per_srs = fanout_cpu_cnt/rx_srs_cnt;
+
+		/* fanout_cnt_per_srs should not be >  MAX_SR_FANOUT */
+		fanout_cnt_per_srs = min(fanout_cnt_per_srs, MAX_SR_FANOUT);
 
 		/* Do the assignment for the default Rx ring */
 		cpu_cnt = 0;
