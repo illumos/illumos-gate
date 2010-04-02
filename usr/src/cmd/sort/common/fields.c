@@ -18,12 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
 
 #include "fields.h"
 
@@ -481,6 +479,8 @@ field_boundary_tabbed(field_t *F, line_rec_t *L, int is_end, int is_blanks,
 	}
 
 	if ((ret = MAX(T - S, 0) + offset) >= L->l_data_length) {
+		if (L->l_data_length <= 0)
+			return (0);
 		if (S[L->l_data_length - 1] == delimiter.sc) {
 			return (L->l_data_length - 1);
 		} else {
@@ -542,6 +542,8 @@ field_boundary_tabbed_wide(field_t *F, line_rec_t *L, int is_end, int is_blanks,
 	}
 
 	if ((ret = MAX(T - S, 0) + offset) >= L->l_data_length) {
+		if (L->l_data_length <= 0)
+			return (0);
 		if (S[L->l_data_length - 1] == delimiter.wc) {
 			return (L->l_data_length - 1);
 		} else {
