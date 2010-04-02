@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/SUNWcs@$(PKGVERS)
@@ -1647,6 +1646,7 @@ file path=usr/share/lib/zoneinfo/America/Yellowknife
 file path=usr/share/lib/zoneinfo/Antarctica/Casey
 file path=usr/share/lib/zoneinfo/Antarctica/Davis
 file path=usr/share/lib/zoneinfo/Antarctica/DumontDUrville
+file path=usr/share/lib/zoneinfo/Antarctica/Macquarie
 file path=usr/share/lib/zoneinfo/Antarctica/Mawson
 file path=usr/share/lib/zoneinfo/Antarctica/McMurdo
 file path=usr/share/lib/zoneinfo/Antarctica/Palmer
