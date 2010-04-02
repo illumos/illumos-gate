@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBMLRPC_H
@@ -159,18 +158,21 @@ extern "C" {
 #define	NDR_DRC_FAULT_OUT_OF_MEMORY		0xF000
 
 /* RPCHDR */
+#define	NDR_DRC_FAULT_RPCHDR_MODE_MISMATCH	0x81FF
+#define	NDR_DRC_FAULT_RPCHDR_RECEIVED_RUNT	0x83FF
+#define	NDR_DRC_FAULT_RPCHDR_DECODE_FAILED	0x86FF
 #define	NDR_DRC_FAULT_RPCHDR_PTYPE_INVALID	0xC0FF	/* PARAM_0_INVALID */
-#define	NDR_DRC_FAULT_RPCHDR_PTYPE_UNIMPLEMENTED 0xD0FF /* PARAM_0_UNIMP */
+#define	NDR_DRC_FAULT_RPCHDR_PTYPE_UNIMPLEMENTED 0xD0FF	/* PARAM_0_UNIMP */
 
 /* Request */
 #define	NDR_DRC_FAULT_REQUEST_PCONT_INVALID	0xC000	/* PARAM_0_INVALID */
 #define	NDR_DRC_FAULT_REQUEST_OPNUM_INVALID	0xC100	/* PARAM_1_INVALID */
 
 /* Bind */
+#define	NDR_DRC_BINDING_MADE			0x000B	/* OK */
 #define	NDR_DRC_FAULT_BIND_PCONT_BUSY		0xC00B	/* PARAM_0_INVALID */
 #define	NDR_DRC_FAULT_BIND_UNKNOWN_SERVICE	0xC10B	/* PARAM_1_INVALID */
 #define	NDR_DRC_FAULT_BIND_NO_SLOTS		0x910B	/* RESOURCE_1 */
-#define	NDR_DRC_BINDING_MADE			0x000B	/* OK */
 
 /* API */
 #define	NDR_DRC_FAULT_API_SERVICE_INVALID	0xC0AA	/* PARAM_0_INVALID */
@@ -502,7 +504,8 @@ void ndr_clnt_free_heap(ndr_client_t *);
 /* ndr_marshal.c */
 ndr_buf_t *ndr_buf_init(ndr_typeinfo_t *);
 void ndr_buf_fini(ndr_buf_t *);
-int ndr_buf_decode(ndr_buf_t *, unsigned, const char *data, size_t, void *);
+int ndr_buf_decode(ndr_buf_t *, unsigned, unsigned, const char *data, size_t,
+    void *);
 int ndr_decode_call(ndr_xa_t *, void *);
 int ndr_encode_return(ndr_xa_t *, void *);
 int ndr_encode_call(ndr_xa_t *, void *);

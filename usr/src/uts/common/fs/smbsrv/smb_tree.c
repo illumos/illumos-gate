@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -330,6 +329,10 @@ smb_tree_release(
 	ASSERT(tree->t_refcnt);
 	tree->t_refcnt--;
 
+	/* flush the ofile and odir lists' delete queues */
+	smb_llist_flush(&tree->t_ofile_list);
+	smb_llist_flush(&tree->t_odir_list);
+
 	if (smb_tree_is_disconnected(tree) && (tree->t_refcnt == 0))
 		smb_user_post_tree(tree->t_user, tree);
 
@@ -474,7 +477,7 @@ smb_tree_acl_access(smb_request_t *sr, const smb_share_t *si, vnode_t *pathvp,
 		 * An autohome share owner gets full access to the share.
 		 * Everyone else is denied access.
 		 */
-		if (smb_strcasecmp(si->shr_name, user->u_name, 0) != 0)
+		if (si->shr_uid != crgetuid(cred))
 			*access = 0;
 		return;
 	}

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SMBSRV_SMB_XDR_H
@@ -120,11 +119,12 @@ typedef struct smb_doorhdr {
 
 typedef struct smb_netuserinfo {
 	uint64_t	ui_session_id;
-	uint16_t	ui_uid;
+	uint16_t	ui_smb_uid;
 	uint16_t	ui_domain_len;
 	char		*ui_domain;
 	uint16_t	ui_account_len;
 	char		*ui_account;
+	uid_t		ui_posix_uid;
 	uint16_t	ui_workstation_len;
 	char		*ui_workstation;
 	smb_inaddr_t	ui_ipaddr;

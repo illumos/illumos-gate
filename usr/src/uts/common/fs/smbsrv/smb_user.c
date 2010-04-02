@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -364,6 +363,10 @@ smb_user_release(
 	mutex_enter(&user->u_mutex);
 	ASSERT(user->u_refcnt);
 	user->u_refcnt--;
+
+	/* flush the tree list's delete queue */
+	smb_llist_flush(&user->u_tree_list);
+
 	switch (user->u_state) {
 	case SMB_USER_STATE_LOGGED_OFF:
 		if (user->u_refcnt == 0)
@@ -892,9 +895,10 @@ smb_user_netinfo_init(smb_user_t *user, smb_netuserinfo_t *info)
 	info->ui_native_os = session->native_os;
 	info->ui_ipaddr = session->ipaddr;
 	info->ui_numopens = session->s_file_cnt;
-	info->ui_uid = user->u_uid;
+	info->ui_smb_uid = user->u_uid;
 	info->ui_logon_time = user->u_logon_time;
 	info->ui_flags = user->u_flags;
+	info->ui_posix_uid = crgetuid(user->u_cred);
 
 	info->ui_domain_len = user->u_domain_len;
 	info->ui_domain = smb_mem_strdup(user->u_domain);

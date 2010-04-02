@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -798,7 +797,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	esi.es_buf = kmem_zalloc(esi.es_bufsize, KM_SLEEP);
-	esi.es_username = sr->uid_user->u_name;
+	esi.es_posix_uid = crgetuid(sr->uid_user->u_cred);
 	(void) smb_kshare_enum(dhdl, &esi);
 
 	/* client buffer size is not big enough to hold any shares */

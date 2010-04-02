@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -54,7 +53,7 @@ typedef struct idmap_handle idmap_handle_t;
 typedef struct idmap_get_handle idmap_get_handle_t;
 
 /* Logger prototype which is based on syslog */
-typedef void (*idmap_logger)(int, const char *, ...);
+typedef void (*idmap_logger_t)(int, const char *, ...);
 
 /*
  * Setup API
@@ -132,7 +131,7 @@ extern idmap_stat idmap_getgidbywinname(const char *, const char *,
 
 
 /* Logger */
-extern void idmap_set_logger(idmap_logger funct);
+extern void idmap_set_logger(idmap_logger_t funct);
 
 #ifdef __cplusplus
 }

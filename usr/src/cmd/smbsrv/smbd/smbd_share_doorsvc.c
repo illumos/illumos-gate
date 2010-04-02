@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -257,15 +256,11 @@ smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 
 	case SMB_SHROP_ENUM:
 		esi.es_bufsize = smb_dr_get_ushort(dec_ctx);
-		esi.es_username = smb_dr_get_string(dec_ctx);
-		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
-			smb_dr_free_string(esi.es_username);
+		esi.es_posix_uid = smb_dr_get_uint32(dec_ctx);
+		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
 			goto decode_error;
-		}
 
 		rc = smbd_share_enum(&esi);
-
-		smb_dr_free_string(esi.es_username);
 
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
@@ -380,7 +375,7 @@ smbd_share_enum(smb_enumshare_info_t *esi)
 			continue;
 
 		if ((si->shr_flags & SMB_SHRF_AUTOHOME) && !autohome_added) {
-			if (strcasecmp(esi->es_username, si->shr_name) == 0)
+			if (esi->es_posix_uid == si->shr_uid)
 				autohome_added = B_TRUE;
 			else
 				continue;
@@ -417,7 +412,7 @@ smbd_share_enum(smb_enumshare_info_t *esi)
 			continue;
 
 		if ((si->shr_flags & SMB_SHRF_AUTOHOME) && !autohome_added) {
-			if (strcasecmp(esi->es_username, si->shr_name) == 0)
+			if (esi->es_posix_uid == si->shr_uid)
 				autohome_added = B_TRUE;
 			else
 				continue;

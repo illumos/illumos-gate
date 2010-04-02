@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -132,7 +131,7 @@ typedef struct smb_quota_tree {
 static list_t smb_quota_fs_list;
 static boolean_t smb_quota_list_init = B_FALSE;
 static boolean_t smb_quota_shutdown = B_FALSE;
-static mutex_t smb_quota_list_mutex;
+static mutex_t smb_quota_list_mutex = DEFAULTMUTEX;
 static cond_t smb_quota_list_condvar;
 static uint32_t smb_quota_tree_cnt = 0;
 static int smb_quota_fini_timeout = 1; /* seconds */
@@ -238,7 +237,7 @@ smb_quota_fini(void)
 
 	(void) cond_broadcast(&smb_quota_list_condvar);
 
-	while (smb_quota_tree_cnt != 0) {
+	while (!list_is_empty(&smb_quota_fs_list)) {
 		qtree = list_head(&smb_quota_fs_list);
 		while (qtree != NULL) {
 			qtree_next = list_next(&smb_quota_fs_list, qtree);
@@ -257,7 +256,7 @@ smb_quota_fini(void)
 			qtree = qtree_next;
 		}
 
-		if (smb_quota_tree_cnt != 0) {
+		if (!list_is_empty(&smb_quota_fs_list)) {
 			if (cond_reltimedwait(&smb_quota_list_condvar,
 			    &smb_quota_list_mutex, &tswait) == ETIME) {
 				syslog(LOG_WARNING,
@@ -823,7 +822,7 @@ smb_quota_tree_create(const char *path)
 
 	assert(MUTEX_HELD(&smb_quota_list_mutex));
 
-	qtree = malloc(sizeof (smb_quota_tree_t));
+	qtree = calloc(sizeof (smb_quota_tree_t), 1);
 	if (qtree == NULL)
 		return (NULL);
 

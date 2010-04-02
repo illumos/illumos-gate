@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -129,12 +128,7 @@ extern idmap_stat	_iter_get_next_list(int, idmap_iter_t *, void *,
 				uchar_t **, size_t, xdrproc_t, xdrproc_t);
 extern idmap_stat	_idmap_rpc2stat(CLIENT *);
 
-extern idmap_stat idmap_get_prop_ds(idmap_handle_t *, idmap_prop_type,
-    idmap_ad_disc_ds_t *);
-extern idmap_stat idmap_get_prop_str(idmap_handle_t *, idmap_prop_type,
-    char **);
-
-extern idmap_logger logger;
+extern idmap_logger_t logger;
 
 #ifdef __cplusplus
 }

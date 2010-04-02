@@ -18,8 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -248,6 +247,7 @@ SUNWprivate {
 	smb_lgrp_add_member;
 	smb_lgrp_delete;
 	smb_lgrp_del_member;
+	smb_lgrp_err_to_ntstatus;
 	smb_lgrp_free;
 	smb_lgrp_getbyname;
 	smb_lgrp_getbyrid;

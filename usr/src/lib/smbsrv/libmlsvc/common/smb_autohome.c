@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -28,9 +27,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <pwd.h>
+#include <nss_dbdefs.h>
 #include <assert.h>
 #include <strings.h>
 #include <sys/stat.h>
+#include <sys/idmap.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>
@@ -59,6 +60,7 @@ static void smb_autohome_setent(void);
 static void smb_autohome_endent(void);
 static smb_autohome_t *smb_autohome_getent(const char *);
 static void smb_autohome_parse_options(smb_share_t *);
+static int smb_autohome_add_private(const char *, uid_t, gid_t);
 
 /*
  * Add an autohome share.  See smb_autohome(4) for details.
@@ -73,49 +75,34 @@ static void smb_autohome_parse_options(smb_share_t *);
 void
 smb_autohome_add(const smb_token_t *token)
 {
-	static mutex_t	autohome_mutex;
-	smb_share_t	si;
-	smb_autohome_t	*ai;
-	char		*username = token->tkn_account_name;
 
-	assert(username);
+	char		*username;
+	struct passwd	pw;
+	char		buf[NSS_LINELEN_PASSWD];
+	uid_t		uid;
+	gid_t		gid;
 
-	if (smb_shr_get((char *)username, &si) == NERR_Success) {
-		/*
-		 * A static share with this name already exists
-		 */
-		if ((si.shr_flags & SMB_SHRF_AUTOHOME) == 0)
+	uid = token->tkn_user.i_id;
+	gid = token->tkn_primary_grp.i_id;
+
+	if (IDMAP_ID_IS_EPHEMERAL(uid)) {
+		username = token->tkn_account_name;
+		assert(username);
+	} else {
+		if (getpwuid_r(uid, &pw, buf, sizeof (buf)) == NULL) {
+			syslog(LOG_ERR, "unable to determine name for " \
+			    "UID: %u\n", uid);
 			return;
-
-		/*
-		 * autohome shares will be added for each login attempt
-		 */
-		(void) smb_shr_add(&si);
-		return;
+		}
+		username = pw.pw_name;
 	}
 
-	(void) mutex_lock(&autohome_mutex);
-
-	if ((ai = smb_autohome_lookup(username)) == NULL) {
-		(void) mutex_unlock(&autohome_mutex);
-		return;
+	if (smb_autohome_add_private(username, uid, gid) != NERR_Success) {
+		if (!smb_isstrlwr(username)) {
+			(void) smb_strlwr(username);
+			(void) smb_autohome_add_private(username, uid, gid);
+		}
 	}
-
-	bzero(&si, sizeof (smb_share_t));
-	(void) strlcpy(si.shr_path, ai->ah_path, MAXPATHLEN);
-	(void) strsubst(si.shr_path, '\\', '/');
-
-	(void) strlcpy(si.shr_name, username, MAXNAMELEN);
-	(void) strlcpy(si.shr_container, ai->ah_container, MAXPATHLEN);
-	(void) strlcpy(si.shr_cmnt, "Autohome", SMB_SHARE_CMNT_MAX);
-	smb_autohome_parse_options(&si);
-	si.shr_flags |= SMB_SHRF_TRANS | SMB_SHRF_AUTOHOME;
-	si.shr_uid = token->tkn_user.i_id;
-	si.shr_gid = token->tkn_primary_grp.i_id;
-
-	(void) mutex_unlock(&autohome_mutex);
-
-	(void) smb_shr_add(&si);
 }
 
 /*
@@ -132,6 +119,58 @@ smb_autohome_remove(const char *username)
 		if (si.shr_flags & SMB_SHRF_AUTOHOME)
 			(void) smb_shr_remove((char *)username);
 	}
+}
+
+/*
+ * An autohome share is not created if a static share using the same name
+ * already exists.  Autohome shares will be added for each login attempt.
+ *
+ * Calling smb_shr_get() may return the first argument in all lower case so
+ * a copy is passed in instead.
+ *
+ * We need to serialize calls to smb_autohome_lookup because it
+ * operates on the global smb_ai structure.
+ */
+static int
+smb_autohome_add_private(const char *username, uid_t uid, gid_t gid)
+{
+	static mutex_t	autohome_mutex;
+	smb_share_t	si;
+	smb_autohome_t	*ai;
+	char 		shr_name[MAXNAMELEN];
+
+	(void) strlcpy(shr_name, username, sizeof (shr_name));
+
+	if (smb_shr_get(shr_name, &si) == NERR_Success) {
+		if ((si.shr_flags & SMB_SHRF_AUTOHOME) == 0)
+			return (NERR_Success);
+
+		(void) smb_shr_add(&si);
+		return (NERR_Success);
+	}
+
+	(void) mutex_lock(&autohome_mutex);
+
+	if ((ai = smb_autohome_lookup(username)) == NULL) {
+		(void) mutex_unlock(&autohome_mutex);
+		return (NERR_ItemNotFound);
+	}
+
+	bzero(&si, sizeof (smb_share_t));
+	(void) strlcpy(si.shr_path, ai->ah_path, MAXPATHLEN);
+	(void) strsubst(si.shr_path, '\\', '/');
+
+	(void) strlcpy(si.shr_name, username, MAXNAMELEN);
+	(void) strlcpy(si.shr_container, ai->ah_container, MAXPATHLEN);
+	(void) strlcpy(si.shr_cmnt, "Autohome", SMB_SHARE_CMNT_MAX);
+	smb_autohome_parse_options(&si);
+	si.shr_flags |= SMB_SHRF_TRANS | SMB_SHRF_AUTOHOME;
+	si.shr_uid = uid;
+	si.shr_gid = gid;
+
+	(void) mutex_unlock(&autohome_mutex);
+
+	return (smb_shr_add(&si));
 }
 
 /*

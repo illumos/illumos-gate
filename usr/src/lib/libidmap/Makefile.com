@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 
@@ -36,7 +35,6 @@ LINT_OBJECTS =	\
 	idmap_api.o		\
 	idmap_cache.o		\
 	miscutils.o		\
-	namemaps.o		\
 	utils.o
 
 OBJECTS = $(LINT_OBJECTS)	\
@@ -46,18 +44,15 @@ include ../../Makefile.lib
 C99MODE = $(C99_ENABLE)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lldap -lsldap -lavl -ladutils -lnsl
-CPPFLAGS += -I$(SRC)/lib/libsldap/common
+LDLIBS +=	-lc -lavl -lnsl
 
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 IDMAP_PROT_X =		$(SRC)/uts/common/rpcsvc/idmap_prot.x
 
-ADUTILS_DIR =		$(SRC)/lib/libadutils/common
-
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(ADUTILS_DIR)
+CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR)
 
 CLOBBERFILES +=	idmap_xdr.c
 

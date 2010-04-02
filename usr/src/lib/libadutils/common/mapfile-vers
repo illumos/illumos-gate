@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -67,6 +66,7 @@ SUNWprivate {
 	ad_disc_compare_ds;
 	ad_disc_compare_trusteddomains;
 	ad_disc_compare_domainsinforest;
+	ad_disc_done;
 	ad_disc_SubnetChanged;
 	ad_disc_get_GlobalCatalog;
 	ad_disc_set_GlobalCatalog;

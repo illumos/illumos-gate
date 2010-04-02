@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -722,7 +721,13 @@ smb_query_pathname(smb_tree_t *tree, smb_node_t *node, boolean_t include_share,
 		buflen -= len;
 	}
 
-	rc = smb_node_getshrpath(node, tree, buf, buflen);
+	if (node == tree->t_snode) {
+		if (!include_share)
+			(void) strlcpy(buf, "\\", buflen);
+		return (0);
+	}
+
+	rc =  smb_node_getshrpath(node, tree, buf, buflen);
 	return (rc);
 }
 

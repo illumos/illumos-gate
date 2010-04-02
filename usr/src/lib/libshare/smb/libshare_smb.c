@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2312,6 +2311,9 @@ disposition_validator(int index, char *value)
  * The properties are given as a list of name-value pair.
  * The name argument should be the optionset property name and the value
  * should be a valid value for the specified property.
+ *
+ * When calling this function for permanent shares, the caller must also
+ * call sa_commit_properties() to commit the changes to SMF.
  */
 static int
 smb_update_optionset_props(sa_handle_t handle, sa_resource_t resource,
@@ -2360,9 +2362,6 @@ smb_update_optionset_props(sa_handle_t handle, sa_resource_t resource,
 
 		cur = nvlist_next_nvpair(nvl, cur);
 	}
-
-	if (err == SA_OK)
-		err = sa_commit_properties(opts, 0);
 
 	return (err);
 }

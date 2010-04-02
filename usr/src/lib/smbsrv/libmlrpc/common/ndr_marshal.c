@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -37,6 +36,7 @@ static const int ndr_native_byte_order = NDR_REPLAB_INTG_LITTLE_ENDIAN;
 #endif
 
 static int ndr_decode_hdr_common(ndr_stream_t *, ndr_common_header_t *);
+static int ndr_decode_pac_hdr(ndr_stream_t *, ndr_pac_hdr_t *);
 
 static int
 ndr_encode_decode_common(ndr_stream_t *nds, unsigned opnum,
@@ -122,10 +122,11 @@ ndr_buf_fini(ndr_buf_t *nbuf)
  *	}
  */
 int
-ndr_buf_decode(ndr_buf_t *nbuf, unsigned opnum, const char *data,
-    size_t datalen, void *result)
+ndr_buf_decode(ndr_buf_t *nbuf, unsigned hdr_type, unsigned opnum,
+    const char *data, size_t datalen, void *result)
 {
 	ndr_common_header_t	hdr;
+	ndr_pac_hdr_t		pac_hdr;
 	unsigned		pdu_size_hint;
 	int			rc;
 
@@ -145,12 +146,28 @@ ndr_buf_decode(ndr_buf_t *nbuf, unsigned opnum, const char *data,
 
 	bcopy(data, nbuf->nb_nds.pdu_base_addr, datalen);
 
-	rc = ndr_decode_hdr_common(&nbuf->nb_nds, &hdr);
-	if (NDR_DRC_IS_FAULT(rc))
-		return (rc);
+	switch (hdr_type) {
+	case NDR_PTYPE_COMMON:
+		rc = ndr_decode_hdr_common(&nbuf->nb_nds, &hdr);
+		if (NDR_DRC_IS_FAULT(rc))
+			return (rc);
 
-	if (!NDR_IS_SINGLE_FRAG(hdr.pfc_flags))
-		return (NDR_DRC_FAULT_DECODE_FAILED);
+		if (!NDR_IS_SINGLE_FRAG(hdr.pfc_flags))
+			return (NDR_DRC_FAULT_DECODE_FAILED);
+		break;
+
+	case NDR_PTYPE_PAC:
+		rc = ndr_decode_pac_hdr(&nbuf->nb_nds, &pac_hdr);
+		if (NDR_DRC_IS_FAULT(rc))
+			return (rc);
+
+		if (pac_hdr.common_hdr.hdrlen != sizeof (ndr_serialtype1_hdr_t))
+			return (NDR_DRC_FAULT_DECODE_FAILED);
+		break;
+
+	default:
+		return (NDR_ERR_UNIMPLEMENTED);
+	}
 
 	rc = ndr_encode_decode_common(&nbuf->nb_nds, opnum, nbuf->nb_ti,
 	    result);
@@ -244,7 +261,7 @@ ndr_decode_pdu_hdr(ndr_xa_t *mxa)
 	 * Verify the protocol version.
 	 */
 	if ((hdr->rpc_vers != 5) || (hdr->rpc_vers_minor != 0))
-		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_DECODE_FAILED));
+		return (NDR_DRC_FAULT_RPCHDR_DECODE_FAILED);
 
 	mxa->ptype = hdr->ptype;
 	return (NDR_DRC_OK);
@@ -259,21 +276,21 @@ ndr_decode_hdr_common(ndr_stream_t *nds, ndr_common_header_t *hdr)
 	int			byte_order;
 
 	if (nds->m_op != NDR_M_OP_UNMARSHALL)
-		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_MODE_MISMATCH));
+		return (NDR_DRC_FAULT_RPCHDR_MODE_MISMATCH);
 
 	/*
 	 * All PDU headers are at least this big
 	 */
 	rc = NDS_GROW_PDU(nds, sizeof (ndr_common_header_t), 0);
 	if (!rc)
-		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_RECEIVED_RUNT));
+		return (NDR_DRC_FAULT_RPCHDR_RECEIVED_RUNT);
 
 	/*
 	 * Peek at the first eight bytes to figure out what we're doing.
 	 */
 	rc = NDS_GET_PDU(nds, 0, 8, (char *)hdr, 0, 0);
 	if (!rc)
-		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_DECODE_FAILED));
+		return (NDR_DRC_FAULT_RPCHDR_DECODE_FAILED);
 
 	/*
 	 * Check for ASCII as the character set.  This is an ASCII
@@ -281,7 +298,7 @@ ndr_decode_hdr_common(ndr_stream_t *nds, ndr_common_header_t *hdr)
 	 */
 	charset = hdr->packed_drep.intg_char_rep & NDR_REPLAB_CHAR_MASK;
 	if (charset != NDR_REPLAB_CHAR_ASCII)
-		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_DECODE_FAILED));
+		return (NDR_DRC_FAULT_RPCHDR_DECODE_FAILED);
 
 	/*
 	 * Set the byte swap flag if the PDU byte-order
@@ -297,6 +314,45 @@ ndr_decode_hdr_common(ndr_stream_t *nds, ndr_common_header_t *hdr)
 	}
 
 	rc = ndr_encode_decode_common(nds, ptype, &TYPEINFO(ndr_hdr), hdr);
+
+	return (NDR_DRC_PTYPE_RPCHDR(rc));
+}
+
+static int
+ndr_decode_pac_hdr(ndr_stream_t *nds, ndr_pac_hdr_t *hdr)
+{
+	int	rc;
+
+	if (nds->m_op != NDR_M_OP_UNMARSHALL)
+		return (NDR_DRC_FAULT_RPCHDR_MODE_MISMATCH);
+
+	/*
+	 * All PDU headers are at least this big
+	 */
+	rc = NDS_GROW_PDU(nds, sizeof (ndr_pac_hdr_t), 0);
+	if (!rc)
+		return (NDR_DRC_FAULT_RPCHDR_RECEIVED_RUNT);
+
+	/*
+	 * Peek at the first eight bytes to figure out what we're doing.
+	 */
+	rc = NDS_GET_PDU(nds, 0, 8, (char *)hdr, 0, 0);
+	if (!rc)
+		return (NDR_DRC_FAULT_RPCHDR_DECODE_FAILED);
+
+	/* Must be set to 1 to indicate type serialization version 1. */
+	if (hdr->common_hdr.version != 1)
+		return (NDR_DRC_FAULT_RPCHDR_DECODE_FAILED);
+
+	/*
+	 * Set the byte swap flag if the PDU byte-order
+	 * is different from the local byte-order.
+	 */
+	nds->swap =
+	    (hdr->common_hdr.endianness != ndr_native_byte_order) ? 1 : 0;
+
+	rc = ndr_encode_decode_common(nds, NDR_PTYPE_PAC,
+	    &TYPEINFO(ndr_hdr), hdr);
 
 	return (NDR_DRC_PTYPE_RPCHDR(rc));
 }
@@ -400,7 +456,7 @@ ndr_encode_pdu_hdr(ndr_xa_t *mxa)
 	int			rc;
 
 	if (nds->m_op != NDR_M_OP_MARSHALL)
-		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_MODE_MISMATCH));
+		return (NDR_DRC_FAULT_RPCHDR_MODE_MISMATCH);
 
 	ptype = hdr->ptype;
 	if (ptype == NDR_PTYPE_REQUEST &&

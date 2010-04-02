@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -128,14 +127,13 @@ smb_kshare_enum(door_handle_t dhdl, smb_enumshare_info_t *enuminfo)
 
 	enuminfo->es_ntotal = enuminfo->es_nsent = 0;
 
-	door_bufsz = enuminfo->es_bufsize + strlen(enuminfo->es_username)
-	    + sizeof (smb_enumshare_info_t);
+	door_bufsz = enuminfo->es_bufsize + sizeof (smb_enumshare_info_t);
 	door_buf = kmem_alloc(door_bufsz, KM_SLEEP);
 
 	enc_ctx = smb_dr_encode_start(door_buf, door_bufsz);
 	smb_dr_put_uint32(enc_ctx, opcode);
 	smb_dr_put_ushort(enc_ctx, enuminfo->es_bufsize);
-	smb_dr_put_string(enc_ctx, enuminfo->es_username);
+	smb_dr_put_uint32(enc_ctx, enuminfo->es_posix_uid);
 
 	if (smb_dr_encode_finish(enc_ctx, &used) != 0) {
 		kmem_free(door_buf, door_bufsz);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -934,6 +933,62 @@ smb_lgrp_strerror(int errnum)
 	}
 
 	return ("unknown local group error");
+}
+
+/*
+ * smb_lgrp_err_to_ntstatus
+ *
+ * This routine maps Local group operation errors to NT Status error codes.
+ */
+uint32_t
+smb_lgrp_err_to_ntstatus(uint32_t lgrp_err)
+{
+	int i;
+	static struct err_map {
+		uint32_t lgrp_err;
+		uint32_t nt_status;
+	} err_map[] = {
+		{ SMB_LGRP_SUCCESS,		NT_STATUS_SUCCESS },
+		{ SMB_LGRP_INVALID_ARG,		NT_STATUS_INVALID_PARAMETER },
+		{ SMB_LGRP_INVALID_MEMBER,	NT_STATUS_INVALID_MEMBER },
+		{ SMB_LGRP_INVALID_NAME,	NT_STATUS_INVALID_PARAMETER },
+		{ SMB_LGRP_NOT_FOUND,		NT_STATUS_NO_SUCH_ALIAS },
+		{ SMB_LGRP_EXISTS,		NT_STATUS_ALIAS_EXISTS },
+		{ SMB_LGRP_NO_SID,		NT_STATUS_INVALID_SID },
+		{ SMB_LGRP_NO_LOCAL_SID,	NT_STATUS_INVALID_SID },
+		{ SMB_LGRP_SID_NOTLOCAL,	NT_STATUS_INVALID_SID },
+		{ SMB_LGRP_WKSID,		NT_STATUS_INVALID_SID },
+		{ SMB_LGRP_NO_MEMORY,		NT_STATUS_NO_MEMORY },
+		{ SMB_LGRP_DB_ERROR,		NT_STATUS_INTERNAL_DB_ERROR },
+		{ SMB_LGRP_DBINIT_ERROR,	NT_STATUS_INTERNAL_DB_ERROR },
+		{ SMB_LGRP_INTERNAL_ERROR,	NT_STATUS_INTERNAL_ERROR },
+		{ SMB_LGRP_MEMBER_IN_GROUP,	NT_STATUS_MEMBER_IN_ALIAS },
+		{ SMB_LGRP_MEMBER_NOT_IN_GROUP,	NT_STATUS_MEMBER_NOT_IN_ALIAS },
+		{ SMB_LGRP_NO_SUCH_PRIV,	NT_STATUS_NO_SUCH_PRIVILEGE },
+		{ SMB_LGRP_NO_SUCH_DOMAIN,	NT_STATUS_NO_SUCH_DOMAIN },
+		{ SMB_LGRP_PRIV_HELD,		NT_STATUS_SUCCESS },
+		{ SMB_LGRP_PRIV_NOT_HELD,	NT_STATUS_PRIVILEGE_NOT_HELD },
+		{ SMB_LGRP_BAD_DATA,		NT_STATUS_DATA_ERROR },
+		{ SMB_LGRP_NO_MORE,		NT_STATUS_NO_MORE_DATA },
+		{ SMB_LGRP_DBOPEN_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
+		{ SMB_LGRP_DBEXEC_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
+		{ SMB_LGRP_DBINIT_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
+		{ SMB_LGRP_DOMLKP_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
+		{ SMB_LGRP_DOMINS_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
+		{ SMB_LGRP_INSERT_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
+		{ SMB_LGRP_DELETE_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
+		{ SMB_LGRP_UPDATE_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
+		{ SMB_LGRP_LOOKUP_FAILED,	NT_STATUS_INTERNAL_DB_ERROR },
+		{ SMB_LGRP_NOT_SUPPORTED,	NT_STATUS_NOT_SUPPORTED },
+		{ SMB_LGRP_OFFLINE,		NT_STATUS_INTERNAL_ERROR }
+	};
+
+	for (i = 0; i < sizeof (err_map)/sizeof (err_map[0]); ++i) {
+		if (err_map[i].lgrp_err == lgrp_err)
+			return (err_map[i].nt_status);
+	}
+
+	return (NT_STATUS_INTERNAL_ERROR);
 }
 
 /*

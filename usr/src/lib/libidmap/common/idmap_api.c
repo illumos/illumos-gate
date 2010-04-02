@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -40,6 +39,7 @@
 #include <dlfcn.h>
 #include <libintl.h>
 #include <ucontext.h>
+#include <syslog.h>
 #include "idmap_impl.h"
 #include "idmap_cache.h"
 
@@ -2580,4 +2580,19 @@ idmap_flush(idmap_handle_t *handle, idmap_flush_op op)
 		return (_idmap_rpc2stat(clnt));
 	}
 	return (res);
+}
+
+
+/*
+ * syslog is the default logger.
+ * It can be overwritten by supplying a logger
+ * with  idmap_set_logger()
+ */
+idmap_logger_t logger = syslog;
+
+
+void
+idmap_set_logger(idmap_logger_t funct)
+{
+	logger = funct;
 }

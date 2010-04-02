@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 
@@ -61,7 +60,6 @@ SUNWprivate {
 	directory_sid_from_user_name;
 	idmap_cache_get_data;
 	idmap_fini;
-	idmap_fini_namemaps;
 	idmap_flush;
 	idmap_free;
 	idmap_getext_gidbysid;
@@ -77,8 +75,9 @@ SUNWprivate {
 	idmap_get_destroy;
 	idmap_get_gidbysid;
 	idmap_get_mappings;
-	idmap_get_namemap;
 	idmap_get_pidbysid;
+	idmap_get_prop_ds;
+	idmap_get_prop_str;
 	idmap_get_sidbygid;
 	idmap_get_sidbyuid;
 	idmap_get_u2w_mapping;
@@ -88,7 +87,6 @@ SUNWprivate {
 	idmap_info_free;
 	idmap_info_mov;
 	idmap_init;
-	idmap_init_namemaps;
 	idmap_iter_destroy;
 	idmap_iter_mappings;
 	idmap_iter_namerules;
@@ -96,7 +94,6 @@ SUNWprivate {
 	idmap_iter_next_namerule;
 	idmap_namerule_cpy;
 	idmap_set_logger;
-	idmap_set_namemap;
 	idmap_stat2string;
 	idmap_stat4prot;
 	idmap_string2stat;
@@ -109,7 +106,6 @@ SUNWprivate {
 	idmap_udt_get_error_index;
 	idmap_udt_get_error_rule;
 	idmap_udt_rm_namerule;
-	idmap_unset_namemap;
 	memdup;
 	sid_free;
 	sid_from_le;

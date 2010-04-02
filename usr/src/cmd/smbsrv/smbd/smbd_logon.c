@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -36,6 +35,9 @@
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
 #include <bsm/audit_uevents.h>
+#include <pwd.h>
+#include <nss_dbdefs.h>
+#include <sys/idmap.h>
 #include "smbd.h"
 
 
@@ -212,11 +214,20 @@ smbd_user_auth_logoff(uint32_t audit_sid)
 	smb_audit_t *entry;
 	adt_session_data_t *ah;
 	adt_event_data_t *event;
+	struct passwd pw;
+	char buf[NSS_LINELEN_PASSWD];
 
 	if ((entry = smbd_audit_unlink(audit_sid)) == NULL)
 		return;
 
-	smb_autohome_remove(entry->sa_username);
+	if (IDMAP_ID_IS_EPHEMERAL(entry->sa_uid)) {
+		smb_autohome_remove(entry->sa_username);
+	} else {
+		if (getpwuid_r(entry->sa_uid, &pw, buf, sizeof (buf)) == NULL)
+			return;
+
+		smb_autohome_remove(pw.pw_name);
+	}
 
 	ah = entry->sa_handle;
 

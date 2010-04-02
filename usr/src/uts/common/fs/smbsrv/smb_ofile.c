@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -928,7 +927,7 @@ smb_ofile_close_and_next(smb_ofile_t *of)
  * Delete an ofile.
  *
  * Remove the ofile from the tree list before freeing resources
- * associated with the odir.
+ * associated with the ofile.
  */
 void
 smb_ofile_delete(void *arg)

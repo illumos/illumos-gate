@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -43,7 +42,6 @@
 static kmem_cache_t	*smb_dtor_cache;
 static boolean_t	smb_llist_initialized = B_FALSE;
 
-static void smb_llist_flush(smb_llist_t *);
 static boolean_t smb_thread_continue_timedwait_locked(smb_thread_t *, int);
 
 time_t tzh_leapcnt = 0;
@@ -558,7 +556,7 @@ smb_llist_exit(smb_llist_t *ll)
  * call in case this leads to additional objects being posted to the delete
  * queue.
  */
-static void
+void
 smb_llist_flush(smb_llist_t *ll)
 {
 	smb_dtor_t    *dtor;

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/list.h>
@@ -45,10 +44,13 @@
 #include <smbsrv/libsmbns.h>
 #include "smbd.h"
 
+#define	SMBD_ARG_MAGIC		0x53415247	/* 'SARG' */
+
 /*
  * Parameter for door operations.
  */
 typedef struct smbd_arg {
+	uint32_t	magic;
 	list_node_t	lnd;
 	smb_doorhdr_t	hdr;
 	const char	*opname;
@@ -56,6 +58,8 @@ typedef struct smbd_arg {
 	size_t		datalen;
 	char		*rbuf;
 	size_t		rsize;
+	boolean_t	response_ready;
+	boolean_t	response_abort;
 	uint32_t	status;
 } smbd_arg_t;
 
@@ -254,7 +258,6 @@ smbd_door_dispatch(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 			hdr->dh_door_rc = SMB_DOP_SUCCESS;
 		else
 			hdr->dh_door_rc = SMB_DOP_NOT_CALLED;
-
 	} else {
 		(void) smbd_door_dispatch_op(&dop_arg);
 	}
@@ -318,6 +321,7 @@ smbd_door_dispatch_async(smbd_arg_t *req_arg)
 	}
 
 	(void) mutex_lock(&smbd_doorsvc.sd_mutex);
+	arg->magic = SMBD_ARG_MAGIC;
 	list_insert_tail(&smbd_doorsvc.sd_async_list, arg);
 	++smbd_doorsvc.sd_async_count;
 	(void) mutex_unlock(&smbd_doorsvc.sd_mutex);
@@ -346,9 +350,13 @@ static void
 smbd_door_release_async(smbd_arg_t *arg)
 {
 	if (arg != NULL) {
+		assert(arg->magic == SMBD_ARG_MAGIC);
+		arg->magic = (uint32_t)~SMBD_ARG_MAGIC;
+
 		list_remove(&smbd_doorsvc.sd_async_list, arg);
 		--smbd_doorsvc.sd_async_count;
 		free(arg->data);
+		arg->data = NULL;
 		free(arg);
 	}
 }
@@ -357,6 +365,10 @@ smbd_door_release_async(smbd_arg_t *arg)
  * All door calls are processed here: synchronous or asynchronous:
  * - synchronous calls are invoked by direct function call
  * - asynchronous calls are invoked from a launched thread
+ *
+ * If the kernel has attempted to collect a response before the op
+ * has completed, the arg will have been marked as response_abort
+ * and we can discard the response data and release the arg.
  *
  * We send a notification when asynchronous (ASYNC) door calls
  * from the kernel (SYSSPACE) have completed.
@@ -385,6 +397,17 @@ smbd_door_dispatch_op(void *thread_arg)
 			if ((hdr->dh_flags & SMB_DF_SYSSPACE) &&
 			    (hdr->dh_flags & SMB_DF_ASYNC)) {
 				assert(hdr->dh_op != SMB_DR_ASYNC_RESPONSE);
+
+				(void) mutex_lock(&smbd_doorsvc.sd_mutex);
+				if (arg->response_abort) {
+					free(arg->rbuf);
+					arg->rbuf = NULL;
+					smbd_door_release_async(arg);
+				} else {
+					arg->response_ready = B_TRUE;
+				}
+				(void) mutex_unlock(&smbd_doorsvc.sd_mutex);
+
 				(void) smb_kmod_event_notify(hdr->dh_txid);
 			}
 
@@ -484,6 +507,10 @@ smbd_dop_null(smbd_arg_t *arg)
  * Async response handler: setup the rbuf and rsize for the specified
  * transaction.  This function is used by the kernel to collect the
  * response half of an asynchronous door call.
+ *
+ * If a door client attempts to collect a response before the op has
+ * completed (!response_ready), mark the arg as response_abort and
+ * set an error.  The response will be discarded when the op completes.
  */
 static int
 smbd_dop_async_response(smbd_arg_t *rsp_arg)
@@ -495,7 +522,17 @@ smbd_dop_async_response(smbd_arg_t *rsp_arg)
 	arg = list_head(arg_list);
 
 	while (arg != NULL) {
+		assert(arg->magic == SMBD_ARG_MAGIC);
+
 		if (arg->hdr.dh_txid == rsp_arg->hdr.dh_txid) {
+			if (!arg->response_ready) {
+				arg->response_abort = B_TRUE;
+				rsp_arg->hdr.dh_door_rc = SMB_DOP_NOT_CALLED;
+				syslog(LOG_NOTICE, "doorsvc[%s]: %u not ready",
+				    arg->opname, arg->hdr.dh_txid);
+				break;
+			}
+
 			rsp_arg->rbuf = arg->rbuf;
 			rsp_arg->rsize = arg->rsize;
 			arg->rbuf = NULL;
@@ -514,7 +551,7 @@ smbd_dop_async_response(smbd_arg_t *rsp_arg)
 static int
 smbd_dop_user_nonauth_logon(smbd_arg_t *arg)
 {
-	uint32_t	sid;
+	uint32_t	sid = 0;
 
 	if (smb_common_decode(arg->data, arg->datalen,
 	    xdr_uint32_t, &sid) != 0)
@@ -527,7 +564,7 @@ smbd_dop_user_nonauth_logon(smbd_arg_t *arg)
 static int
 smbd_dop_user_auth_logoff(smbd_arg_t *arg)
 {
-	uint32_t	sid;
+	uint32_t	sid = 0;
 
 	if (smb_common_decode(arg->data, arg->datalen,
 	    xdr_uint32_t, &sid) != 0)
@@ -574,6 +611,8 @@ smbd_dop_lookup_name(smbd_arg_t *arg)
 	lsa_account_t	acct;
 	char		buf[MAXNAMELEN];
 
+	bzero(&acct, sizeof (lsa_account_t));
+
 	if (smb_common_decode(arg->data, arg->datalen,
 	    lsa_account_xdr, &acct) != 0)
 		return (SMB_DOP_DECODE_ERROR);
@@ -617,6 +656,8 @@ smbd_dop_lookup_sid(smbd_arg_t *arg)
 	lsa_account_t	acct;
 	smb_sid_t	*sid;
 
+	bzero(&acct, sizeof (lsa_account_t));
+
 	if (smb_common_decode(arg->data, arg->datalen,
 	    lsa_account_xdr, &acct) != 0)
 		return (SMB_DOP_DECODE_ERROR);
@@ -652,6 +693,8 @@ smbd_dop_join(smbd_arg_t *arg)
 {
 	smb_joininfo_t	jdi;
 	uint32_t	status;
+
+	bzero(&jdi, sizeof (smb_joininfo_t));
 
 	if (smb_common_decode(arg->data, arg->datalen,
 	    smb_joininfo_xdr, &jdi) != 0)

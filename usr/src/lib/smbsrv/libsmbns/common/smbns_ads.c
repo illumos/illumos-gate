@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -562,6 +561,7 @@ smb_ads_decode_host_ip(int addit_cnt, int ans_cnt, uchar_t **ptr,
 				    [IN6ADDRSZ-1-i] = *(*ptr+i);
 #endif
 			ipaddr.a_family = AF_INET6;
+			*ptr += size;
 		}
 
 		/*

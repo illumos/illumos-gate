@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBSMB_H
@@ -696,6 +695,7 @@ int smb_lgrp_del_member(char *, smb_sid_t *, uint16_t);
 int smb_lgrp_getbyname(char *, smb_group_t *);
 int smb_lgrp_getbyrid(uint32_t, smb_domain_type_t, smb_group_t *);
 void smb_lgrp_free(smb_group_t *);
+uint32_t smb_lgrp_err_to_ntstatus(uint32_t);
 boolean_t smb_lgrp_is_member(smb_group_t *, smb_sid_t *);
 char *smb_lgrp_strerror(int);
 int smb_lgrp_iteropen(smb_giter_t *);

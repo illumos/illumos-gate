@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -62,29 +61,6 @@ typedef struct idmap_udt_handle idmap_udt_handle_t;
 
 /* Opaque iterator */
 typedef struct idmap_iter idmap_iter_t;
-
-
-/*
- * Directory based name map API
- */
-
-typedef struct idmap_nm_handle idmap_nm_handle_t;
-
-/* Set namemap */
-extern idmap_stat idmap_set_namemap(idmap_nm_handle_t *, char *, char *,
-    int, int, int);
-
-/* Unset namemap */
-extern idmap_stat idmap_unset_namemap(idmap_nm_handle_t *, char *, char *,
-    int, int, int);
-
-extern idmap_stat idmap_get_namemap(idmap_nm_handle_t *p, int *, char **,
-    char **, int *, char **,  char **);
-
-extern void idmap_fini_namemaps(idmap_nm_handle_t *);
-
-extern idmap_stat idmap_init_namemaps(idmap_handle_t *, idmap_nm_handle_t **,
-    char *, char *, char *, char *, int);
 
 
 /*
@@ -213,6 +189,11 @@ extern idmap_stat idmap_getext_sidbyuid(idmap_get_handle_t *, uid_t, int,
 extern idmap_stat idmap_getext_sidbygid(idmap_get_handle_t *, gid_t, int,
 	char **, idmap_rid_t *, idmap_info *, idmap_stat *);
 
+/* Properties */
+extern idmap_stat idmap_get_prop_ds(idmap_handle_t *, idmap_prop_type,
+    idmap_ad_disc_ds_t *);
+extern idmap_stat idmap_get_prop_str(idmap_handle_t *, idmap_prop_type,
+    char **);
 
 #ifdef __cplusplus
 }

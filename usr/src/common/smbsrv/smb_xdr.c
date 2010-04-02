@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sunddi.h>
@@ -236,7 +235,7 @@ smb_netuserinfo_xdr(XDR *xdrs, smb_netuserinfo_t *objp)
 {
 	if (!xdr_uint64_t(xdrs, &objp->ui_session_id))
 		return (FALSE);
-	if (!xdr_uint16_t(xdrs, &objp->ui_uid))
+	if (!xdr_uint16_t(xdrs, &objp->ui_smb_uid))
 		return (FALSE);
 	if (!xdr_uint16_t(xdrs, &objp->ui_domain_len))
 		return (FALSE);
@@ -245,6 +244,8 @@ smb_netuserinfo_xdr(XDR *xdrs, smb_netuserinfo_t *objp)
 	if (!xdr_uint16_t(xdrs, &objp->ui_account_len))
 		return (FALSE);
 	if (!xdr_string(xdrs, &objp->ui_account, ~0))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->ui_posix_uid))
 		return (FALSE);
 	if (!xdr_uint16_t(xdrs, &objp->ui_workstation_len))
 		return (FALSE);

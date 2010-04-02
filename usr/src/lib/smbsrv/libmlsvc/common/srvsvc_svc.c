@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -47,6 +46,9 @@
 #include <arpa/inet.h>
 #include <libshare.h>
 #include <libnvpair.h>
+#include <sys/idmap.h>
+#include <pwd.h>
+#include <nss_dbdefs.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/lmerr.h>
@@ -2669,9 +2671,21 @@ static boolean_t
 srvsvc_add_autohome(ndr_xa_t *mxa, smb_svcenum_t *se, void *infop)
 {
 	smb_netuserinfo_t *user = &mxa->pipe->np_user;
-	char *username = user->ui_account;
+	char *username;
 	smb_share_t si;
 	DWORD status;
+	struct passwd pw;
+	char buf[NSS_LINELEN_PASSWD];
+
+	if (IDMAP_ID_IS_EPHEMERAL(user->ui_posix_uid)) {
+		username = user->ui_account;
+	} else {
+		if (getpwuid_r(user->ui_posix_uid, &pw, buf, sizeof (buf)) ==
+		    NULL)
+			return (B_FALSE);
+
+		username = pw.pw_name;
+	}
 
 	if (smb_shr_get(username, &si) != NERR_Success)
 		return (B_FALSE);
@@ -2706,9 +2720,16 @@ srvsvc_share_mkpath(ndr_xa_t *mxa, char *path)
 {
 	char tmpbuf[MAXPATHLEN];
 	char *p;
+	char drive_letter;
 
 	if (strlen(path) == 0)
 		return (NDR_STRDUP(mxa, path));
+
+	drive_letter = smb_shr_drive_letter(path);
+	if (drive_letter != '\0') {
+		(void) snprintf(tmpbuf, MAXPATHLEN, "%c:\\", drive_letter);
+		return (NDR_STRDUP(mxa, tmpbuf));
+	}
 
 	/*
 	 * Strip the volume name from the path (/vol1/home -> /home).

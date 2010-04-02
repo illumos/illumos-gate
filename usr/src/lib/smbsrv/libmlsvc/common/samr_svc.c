@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -37,7 +36,7 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <assert.h>
-
+#include <grp.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
@@ -897,6 +896,193 @@ samr_s_OpenGroup(void *arg, ndr_xa_t *mxa)
 }
 
 /*
+ * samr_s_AddAliasMember
+ *
+ * Add a member to a local SAM group.
+ * The caller must supply a valid group handle.
+ * The member is specified by the sid in the request.
+ */
+static int
+samr_s_AddAliasMember(void *arg, ndr_xa_t *mxa)
+{
+	struct samr_AddAliasMember *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->alias_handle;
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
+	smb_group_t grp;
+	uint32_t rc;
+	uint32_t status = NT_STATUS_SUCCESS;
+
+	if (param->sid == NULL) {
+		bzero(param, sizeof (struct samr_AddAliasMember));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_PARAMETER);
+		return (NDR_DRC_OK);
+	}
+
+	if (!ndr_is_admin(mxa)) {
+		bzero(param, sizeof (struct samr_AddAliasMember));
+		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+		return (NDR_DRC_OK);
+	}
+
+
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_ALIAS)) == NULL) {
+		bzero(param, sizeof (struct samr_AddAliasMember));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (NDR_DRC_OK);
+	}
+
+	data = (samr_keydata_t *)hd->nh_data;
+	rc = smb_lgrp_getbyrid(data->kd_rid, data->kd_type, &grp);
+	if (rc != SMB_LGRP_SUCCESS) {
+		bzero(param, sizeof (struct samr_AddAliasMember));
+		status = smb_lgrp_err_to_ntstatus(rc);
+		param->status = NT_SC_ERROR(status);
+		return (NDR_DRC_OK);
+	}
+
+	rc = smb_lgrp_add_member(grp.sg_name,
+	    (smb_sid_t *)param->sid, SidTypeUser);
+	if (rc != SMB_LGRP_SUCCESS) {
+		bzero(param, sizeof (struct samr_AddAliasMember));
+		status = smb_lgrp_err_to_ntstatus(rc);
+		param->status = NT_SC_ERROR(status);
+	}
+	smb_lgrp_free(&grp);
+
+	param->status = status;
+	return (NDR_DRC_OK);
+}
+
+/*
+ * samr_s_DeleteAliasMember
+ *
+ * Delete a member from a local SAM group.
+ * The caller must supply a valid group handle.
+ * The member is specified by the sid in the request.
+ */
+static int
+samr_s_DeleteAliasMember(void *arg, ndr_xa_t *mxa)
+{
+	struct samr_DeleteAliasMember *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->alias_handle;
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
+	smb_group_t grp;
+	uint32_t rc;
+	uint32_t status = NT_STATUS_SUCCESS;
+
+	if (param->sid == NULL) {
+		bzero(param, sizeof (struct samr_DeleteAliasMember));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_PARAMETER);
+		return (NDR_DRC_OK);
+	}
+
+	if (!ndr_is_admin(mxa)) {
+		bzero(param, sizeof (struct samr_DeleteAliasMember));
+		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+		return (NDR_DRC_OK);
+	}
+
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_ALIAS)) == NULL) {
+		bzero(param, sizeof (struct samr_DeleteAliasMember));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (NDR_DRC_OK);
+	}
+
+	data = (samr_keydata_t *)hd->nh_data;
+	rc = smb_lgrp_getbyrid(data->kd_rid, data->kd_type, &grp);
+	if (rc != SMB_LGRP_SUCCESS) {
+		bzero(param, sizeof (struct samr_DeleteAliasMember));
+		status = smb_lgrp_err_to_ntstatus(rc);
+		param->status = NT_SC_ERROR(status);
+		return (NDR_DRC_OK);
+	}
+
+	rc = smb_lgrp_del_member(grp.sg_name,
+	    (smb_sid_t *)param->sid, SidTypeUser);
+	if (rc != SMB_LGRP_SUCCESS) {
+		bzero(param, sizeof (struct samr_DeleteAliasMember));
+		status = smb_lgrp_err_to_ntstatus(rc);
+		param->status = NT_SC_ERROR(status);
+	}
+	smb_lgrp_free(&grp);
+
+	param->status = status;
+	return (NDR_DRC_OK);
+}
+
+/*
+ * samr_s_ListAliasMembers
+ *
+ * List members from a local SAM group.
+ * The caller must supply a valid group handle.
+ * A list of user SIDs in the specified group is returned to the caller.
+ */
+static int
+samr_s_ListAliasMembers(void *arg, ndr_xa_t *mxa)
+{
+	struct samr_ListAliasMembers *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->alias_handle;
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
+	smb_group_t grp;
+	smb_gsid_t *members;
+	struct samr_SidInfo info;
+	struct samr_SidList *user;
+	uint32_t num = 0, size;
+	int i;
+	uint32_t rc;
+	uint32_t status = NT_STATUS_SUCCESS;
+
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_ALIAS)) == NULL) {
+		bzero(param, sizeof (struct samr_ListAliasMembers));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (NDR_DRC_OK);
+	}
+
+	bzero(&info, sizeof (struct samr_SidInfo));
+	data = (samr_keydata_t *)hd->nh_data;
+	rc = smb_lgrp_getbyrid(data->kd_rid, data->kd_type, &grp);
+	if (rc != SMB_LGRP_SUCCESS) {
+		bzero(param, sizeof (struct samr_ListAliasMembers));
+		status = smb_lgrp_err_to_ntstatus(rc);
+		param->status = NT_SC_ERROR(status);
+		return (NDR_DRC_OK);
+	}
+
+	num = grp.sg_nmembers;
+	members = grp.sg_members;
+	size = num * sizeof (struct samr_SidList);
+	info.sidlist = NDR_MALLOC(mxa, size);
+	if (info.sidlist == NULL) {
+		bzero(param, sizeof (struct samr_ListAliasMembers));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		smb_lgrp_free(&grp);
+		return (NDR_DRC_OK);
+	}
+
+	info.n_entry = num;
+	user = info.sidlist;
+	for (i = 0; i < num; i++) {
+		user->sid = (struct samr_sid *)NDR_SIDDUP(mxa,
+		    members[i].gs_sid);
+		if (user->sid == NULL) {
+			bzero(param, sizeof (struct samr_ListAliasMembers));
+			param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+			smb_lgrp_free(&grp);
+			return (NDR_DRC_OK);
+		}
+		user++;
+	}
+	smb_lgrp_free(&grp);
+
+	param->info = info;
+	param->status = status;
+	return (NDR_DRC_OK);
+}
+
+/*
  * samr_s_Connect
  *
  * This is a request to connect to the local SAM database.
@@ -1220,7 +1406,7 @@ samr_s_OpenAlias(void *arg, ndr_xa_t *mxa)
 		goto open_alias_err;
 	}
 
-	if (param->access_mask != SAMR_ALIAS_ACCESS_GET_INFO) {
+	if ((param->access_mask & SAMR_ALIAS_ACCESS_ALL_ACCESS) == 0) {
 		status = NT_STATUS_ACCESS_DENIED;
 		goto open_alias_err;
 	}
@@ -1278,70 +1464,75 @@ open_alias_err:
 /*
  * samr_s_CreateDomainAlias
  *
- * Creates a local group in the security database, which is the
- * security accounts manager (SAM)
- * For more information you can look at MSDN page for NetLocalGroupAdd.
- * This RPC is used by CMC and right now it returns access denied.
- * The peice of code that creates a local group doesn't get compiled.
+ * Create a local group in the security accounts manager (SAM) database.
+ * A local SAM group can only be added if a Solaris group already exists
+ * with the same name.  On success, a valid group handle is returned.
+ *
+ * The caller must have administrator rights to execute this function.
  */
-/*ARGSUSED*/
 static int
 samr_s_CreateDomainAlias(void *arg, ndr_xa_t *mxa)
 {
 	struct samr_CreateDomainAlias *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->alias_handle;
+	uint32_t status = NT_STATUS_SUCCESS;
+	smb_group_t grp;
+	uint32_t rc;
+	char *gname;
 
-	if (samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN) == NULL) {
+	if (samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN) != NULL) {
 		bzero(param, sizeof (struct samr_CreateDomainAlias));
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (NDR_DRC_OK);
 	}
 
-	bzero(param, sizeof (struct samr_CreateDomainAlias));
-	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-	return (NDR_DRC_OK);
-
-#ifdef SAMR_SUPPORT_ADD_ALIAS
-	DWORD status = NT_STATUS_SUCCESS;
-	nt_group_t *grp;
-	char *alias_name;
-
-	alias_name = param->alias_name.str;
-	if (alias_name == 0) {
-		status = NT_STATUS_INVALID_PARAMETER;
-		goto create_alias_err;
+	gname = (char *)param->alias_name.str;
+	if (gname == NULL) {
+		bzero(&param->alias_handle, sizeof (samr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_PARAMETER);
+		return (NDR_DRC_OK);
 	}
 
-	/*
-	 * Check access mask.  User should be member of
-	 * Administrators or Account Operators local group.
-	 */
-	status = nt_group_add(alias_name, 0,
-	    NT_GROUP_AF_ADD | NT_GROUP_AF_LOCAL);
-
-	if (status != NT_STATUS_SUCCESS)
-		goto create_alias_err;
-
-	grp = nt_group_getinfo(alias_name, RWLOCK_READER);
-	if (grp == NULL) {
-		status = NT_STATUS_INTERNAL_ERROR;
-		goto create_alias_err;
+	if ((!ndr_is_admin(mxa)) ||
+	    ((param->access_mask & SAMR_ALIAS_ACCESS_WRITE_ACCOUNT) == 0)) {
+		bzero(&param->alias_handle, sizeof (samr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+		return (NDR_DRC_OK);
 	}
 
-	(void) smb_sid_getrid(grp->sid, &param->rid);
-	nt_group_putinfo(grp);
-	handle = mlsvc_get_handle(MLSVC_IFSPEC_SAMR, SAMR_ALIAS_KEY,
-	    param->rid);
-	bcopy(handle, &param->alias_handle, sizeof (samr_handle_t));
+	if (getgrnam(gname) == NULL) {
+		bzero(&param->alias_handle, sizeof (samr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_PARAMETER);
+		return (NDR_DRC_OK);
+	}
 
-	param->status = 0;
-	return (NDR_DRC_OK);
+	rc = smb_lgrp_add(gname, "");
+	if (rc != SMB_LGRP_SUCCESS) {
+		bzero(&param->alias_handle, sizeof (samr_handle_t));
+		status = smb_lgrp_err_to_ntstatus(rc);
+		param->status = NT_SC_ERROR(status);
+		return (NDR_DRC_OK);
+	}
 
-create_alias_err:
-	bzero(&param->alias_handle, sizeof (samr_handle_t));
-	param->status = NT_SC_ERROR(status);
+	rc = smb_lgrp_getbyname((char *)gname, &grp);
+	if (rc != SMB_LGRP_SUCCESS) {
+		bzero(&param->alias_handle, sizeof (samr_handle_t));
+		status = smb_lgrp_err_to_ntstatus(rc);
+		param->status = NT_SC_ERROR(status);
+		return (NDR_DRC_OK);
+	}
+
+	id = samr_hdalloc(mxa, SAMR_KEY_ALIAS, SMB_DOMAIN_LOCAL, grp.sg_rid);
+	smb_lgrp_free(&grp);
+	if (id) {
+		bcopy(id, &param->alias_handle, sizeof (samr_handle_t));
+		param->status = status;
+	} else {
+		bzero(&param->alias_handle, sizeof (samr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+	}
+
 	return (NDR_DRC_OK);
-#endif
 }
 
 /*
@@ -1471,60 +1662,72 @@ query_alias_err:
 /*
  * samr_s_DeleteDomainAlias
  *
- * Deletes a local group account and all its members from the
- * security database, which is the security accounts manager (SAM) database.
- * Only members of the Administrators or Account Operators local group can
- * execute this function.
- * For more information you can look at MSDN page for NetLocalGroupSetInfo.
+ * Deletes a local group in the security database, which is the
+ * security accounts manager (SAM). A valid group handle is returned
+ * to the caller upon success.
  *
- * This RPC is used by CMC and right now it returns access denied.
- * The peice of code that removes a local group doesn't get compiled.
+ * The caller must have administrator rights to execute this function.
  */
 static int
 samr_s_DeleteDomainAlias(void *arg, ndr_xa_t *mxa)
 {
 	struct samr_DeleteDomainAlias *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->alias_handle;
+	ndr_handle_t	*hd;
+	smb_group_t grp;
+	samr_keydata_t	*data;
+	smb_domain_type_t	gd_type;
+	uint32_t	rid;
+	uint32_t	rc;
+	uint32_t	status = NT_STATUS_SUCCESS;
 
-	if (samr_hdlookup(mxa, id, SAMR_KEY_ALIAS) == NULL) {
+	if (!ndr_is_admin(mxa)) {
+		bzero(param, sizeof (struct samr_DeleteDomainAlias));
+		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+		return (NDR_DRC_OK);
+	}
+
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_ALIAS)) == NULL) {
 		bzero(param, sizeof (struct samr_DeleteDomainAlias));
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (NDR_DRC_OK);
 	}
 
-	bzero(param, sizeof (struct samr_DeleteDomainAlias));
-	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-	return (NDR_DRC_OK);
+	data = (samr_keydata_t *)hd->nh_data;
+	gd_type = (smb_domain_type_t)data->kd_type;
+	rid = data->kd_rid;
 
-#ifdef SAMR_SUPPORT_DEL_ALIAS
-	nt_group_t *grp;
-	char *alias_name;
-	DWORD status;
+	switch (gd_type) {
+	case SMB_DOMAIN_BUILTIN:
+		bzero(param, sizeof (struct samr_DeleteDomainAlias));
+		status = NT_SC_ERROR(NT_STATUS_NOT_SUPPORTED);
+		break;
 
-	grp = nt_groups_lookup_rid(desc->discrim);
-	if (grp == 0) {
-		status = NT_STATUS_NO_SUCH_ALIAS;
-		goto delete_alias_err;
+	case SMB_DOMAIN_LOCAL:
+		rc = smb_lgrp_getbyrid(rid, gd_type, &grp);
+		if (rc != SMB_LGRP_SUCCESS) {
+			bzero(param, sizeof (struct samr_DeleteDomainAlias));
+			status = smb_lgrp_err_to_ntstatus(rc);
+			status = NT_SC_ERROR(status);
+			break;
+		}
+
+		rc = smb_lgrp_delete(grp.sg_name);
+		if (rc != SMB_LGRP_SUCCESS) {
+			bzero(param, sizeof (struct samr_DeleteDomainAlias));
+			status = smb_lgrp_err_to_ntstatus(rc);
+			status = NT_SC_ERROR(status);
+		}
+		smb_lgrp_free(&grp);
+		break;
+
+	default:
+		bzero(param, sizeof (struct samr_DeleteDomainAlias));
+		status = NT_SC_ERROR(NT_STATUS_NO_SUCH_ALIAS);
 	}
 
-	alias_name = strdup(grp->name);
-	if (alias_name == 0) {
-		status = NT_STATUS_NO_MEMORY;
-		goto delete_alias_err;
-	}
-
-	status = nt_group_delete(alias_name);
-	free(alias_name);
-	if (status != NT_STATUS_SUCCESS)
-		goto delete_alias_err;
-
-	param->status = 0;
+	param->status = status;
 	return (NDR_DRC_OK);
-
-delete_alias_err:
-	param->status = NT_SC_ERROR(status);
-	return (NDR_DRC_OK);
-#endif
 }
 
 /*
@@ -1677,6 +1880,9 @@ static ndr_stub_table_t samr_stub_table[] = {
 	{ samr_s_DeleteDomainAlias,	SAMR_OPNUM_DeleteDomainAlias },
 	{ samr_s_EnumDomainAliases,	SAMR_OPNUM_EnumDomainAliases },
 	{ samr_s_EnumDomainGroups,	SAMR_OPNUM_EnumDomainGroups },
+	{ samr_s_AddAliasMember,	SAMR_OPNUM_AddAliasMember },
+	{ samr_s_DeleteAliasMember,	SAMR_OPNUM_DeleteAliasMember },
+	{ samr_s_ListAliasMembers,	SAMR_OPNUM_ListAliasMembers },
 	{0}
 };
 

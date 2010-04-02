@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * SMB Node State Machine
@@ -1007,34 +1006,71 @@ smb_node_getmntpath(smb_node_t *node, char *buf, uint32_t buflen)
  * Determine the absolute pathname of 'node' within the share (tree).
  * For example if the node represents file "test1.txt" in directory
  * "dir1" the pathname would be: \dir1\test1.txt
- *
- * If node represents a named stream, construct the pathname for the
- * associated unnamed stream then append the stream name.
  */
 int
 smb_node_getshrpath(smb_node_t *node, smb_tree_t *tree,
     char *buf, uint32_t buflen)
 {
 	int rc;
+
+	ASSERT(node);
+	ASSERT(tree);
+	ASSERT(tree->t_snode);
+
+	rc = smb_node_getpath(node, tree->t_snode->vp, buf, buflen);
+	(void) strsubst(buf, '/', '\\');
+	return (rc);
+}
+
+/*
+ * smb_node_getpath
+ *
+ * Determine the absolute pathname of 'node' from 'rootvp'.
+ *
+ * Using vnodetopath is only reliable for directory nodes (due to
+ * its reliance on the DNLC for non-directory nodes). Thus, if node
+ * represents a file, construct the pathname for the parent dnode
+ * and append filename.
+ * If node represents a named stream, construct the pathname for the
+ * associated unnamed stream and append the stream name.
+ *
+ * The pathname returned in buf will be '/' separated.
+ */
+int
+smb_node_getpath(smb_node_t *node, vnode_t *rootvp, char *buf, uint32_t buflen)
+{
+	int rc;
 	vnode_t *vp;
+	smb_node_t *unode, *dnode;
 
-	(void) bzero(buf, buflen);
+	unode = (SMB_IS_STREAM(node)) ? node->n_unode : node;
+	dnode = (smb_node_is_dir(unode)) ? unode : unode->n_dnode;
 
-	if (SMB_IS_STREAM(node))
-		vp = node->n_unode->vp;
-	else
-		vp = node->vp;
-
-	if (vp == tree->t_snode->vp)
-		return (0);
-
-	rc = vnodetopath(tree->t_snode->vp, vp, buf, buflen, kcred);
-	if (rc == 0) {
-		(void) strsubst(buf, '/', '\\');
-
-		if (SMB_IS_STREAM(node))
-			(void) strlcat(buf, node->od_name, buflen);
+	/* find path to directory node */
+	vp = dnode->vp;
+	VN_HOLD(vp);
+	if (rootvp) {
+		VN_HOLD(rootvp);
+		rc = vnodetopath(rootvp, vp, buf, buflen, kcred);
+		VN_RELE(rootvp);
+	} else {
+		rc = vnodetopath(NULL, vp, buf, buflen, kcred);
 	}
+	VN_RELE(vp);
+
+	if (rc != 0)
+		return (rc);
+
+	/* append filename if necessary */
+	if (!smb_node_is_dir(unode)) {
+		if (buf[strlen(buf) - 1] != '/')
+			(void) strlcat(buf, "/", buflen);
+		(void) strlcat(buf, unode->od_name, buflen);
+	}
+
+	/* append named stream name if necessary */
+	if (SMB_IS_STREAM(node))
+		(void) strlcat(buf, node->od_name, buflen);
 
 	return (rc);
 }

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -43,6 +42,7 @@
 #include <unistd.h>
 #include <pwd.h>
 #include <signal.h>
+#include <dirent.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
@@ -54,6 +54,20 @@
 
 #define	SMB_SHR_ERROR_THRESHOLD		3
 #define	SMB_SHR_CSC_BUFSZ		64
+
+typedef struct smb_transient {
+	char		*name;
+	char		*cmnt;
+	char		*path;
+	char		drive;
+	boolean_t	check;
+} smb_transient_t;
+
+static smb_transient_t tshare[] = {
+	{ "IPC$", "Remote IPC",		NULL,		'\0', B_FALSE },
+	{ "c$",   "Default Share",	SMB_CVOL,	'C',  B_FALSE },
+	{ "vss$", "VSS",		SMB_VSS,	'V',  B_TRUE }
+};
 
 static struct {
 	char *value;
@@ -116,6 +130,9 @@ static smb_share_t *smb_shr_cache_findent(char *);
 static uint32_t smb_shr_cache_addent(smb_share_t *);
 static void smb_shr_cache_delent(char *);
 static void smb_shr_cache_freent(HT_ITEM *);
+
+static boolean_t smb_shr_is_empty(const char *);
+static boolean_t smb_shr_is_dot_or_dotdot(const char *);
 
 /*
  * sharemgr functions
@@ -219,16 +236,9 @@ static sema_t smb_proc_sem = DEFAULTSEMA;
 int
 smb_shr_start(void)
 {
-	int i;
-	static struct tshare {
-		char    *name;
-		char	*cmnt;
-		char	*path;
-	} tshare[] = {
-		{ "IPC$",	"Remote IPC",		NULL },
-		{ "c$",		"Default Share",	SMB_CVOL },
-		{ "vss$",	"VSS Share",		SMB_VSS }
-	};
+	smb_transient_t	*ts;
+	uint32_t	nerr;
+	int		i;
 
 	(void) mutex_lock(&smb_sa_handle.sa_mtx);
 	smb_sa_handle.sa_in_service = B_TRUE;
@@ -238,8 +248,13 @@ smb_shr_start(void)
 		return (ENOMEM);
 
 	for (i = 0; i < sizeof (tshare)/sizeof (tshare[0]); ++i) {
-		if (smb_shr_add_transient(tshare[i].name,
-		    tshare[i].cmnt, tshare[i].path) != NERR_Success)
+		ts = &tshare[i];
+
+		if (ts->check && smb_shr_is_empty(ts->path))
+			continue;
+
+		nerr = smb_shr_add_transient(ts->name, ts->cmnt, ts->path);
+		if (nerr != NERR_Success)
 			return (ENOMEM);
 	}
 
@@ -846,6 +861,68 @@ smb_shr_is_admin(char *sharename)
 	    smb_isalpha(sharename[0]) && sharename[1] == '$') {
 		return (B_TRUE);
 	}
+
+	return (B_FALSE);
+}
+
+char
+smb_shr_drive_letter(const char *path)
+{
+	smb_transient_t	*ts;
+	int i;
+
+	if (path == NULL)
+		return ('\0');
+
+	for (i = 0; i < sizeof (tshare)/sizeof (tshare[0]); ++i) {
+		ts = &tshare[i];
+
+		if (ts->path == NULL)
+			continue;
+
+		if (strcasecmp(ts->path, path) == 0)
+			return (ts->drive);
+	}
+
+	return ('\0');
+}
+
+/*
+ * Returns true if the specified directory is empty,
+ * otherwise returns false.
+ */
+static boolean_t
+smb_shr_is_empty(const char *path)
+{
+	DIR *dirp;
+	struct dirent *dp;
+
+	if (path == NULL)
+		return (B_TRUE);
+
+	if ((dirp = opendir(path)) == NULL)
+		return (B_TRUE);
+
+	while ((dp = readdir(dirp)) != NULL) {
+		if (!smb_shr_is_dot_or_dotdot(dp->d_name))
+			return (B_FALSE);
+	}
+
+	(void) closedir(dirp);
+	return (B_TRUE);
+}
+
+/*
+ * Returns true if name is "." or "..", otherwise returns false.
+ */
+static boolean_t
+smb_shr_is_dot_or_dotdot(const char *name)
+{
+	if (*name != '.')
+		return (B_FALSE);
+
+	if ((name[1] == '\0') || (name[1] == '.' && name[2] == '\0'))
+		return (B_TRUE);
 
 	return (B_FALSE);
 }

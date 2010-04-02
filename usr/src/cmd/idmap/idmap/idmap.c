@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -35,6 +34,8 @@
 #include <note.h>
 #include "idmap_engine.h"
 #include "idmap_priv.h"
+#include "namemaps.h"
+#include "libadutils.h"
 
 /* Initialization values for pids/rids: */
 
@@ -3541,11 +3542,15 @@ cleanup:
 
 
 /* printflike */
+static
 void
-/* LINTED E_FUNC_ARG_UNUSED */
-logger(int pri, const char *format, ...)
+idmap_cli_logger(int pri, const char *format, ...)
 {
+	NOTE(ARGUNUSED(pri))
 	va_list args;
+
+	if (pri == LOG_DEBUG)
+		return;
 
 	va_start(args, format);
 
@@ -3567,7 +3572,8 @@ main(int argc, char *argv[])
 	(void) textdomain(TEXT_DOMAIN);
 
 	/* Redirect logging */
-	idmap_set_logger(logger);
+	idmap_set_logger(idmap_cli_logger);
+	adutils_set_logger(idmap_cli_logger);
 
 	/* idmap_engine determines the batch_mode: */
 	rc = engine_init(sizeof (commands) / sizeof (cmd_ops_t),

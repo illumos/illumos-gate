@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMB_SHARE_H
@@ -225,7 +224,7 @@ typedef struct smb_shrlist {
  * This structure is a helper for building NetShareEnum response
  * in user space and send it back down to kernel.
  *
- * es_username	name of the user requesting the shares list which
+ * es_posix_uid	UID of the user requesting the shares list which
  * 		is used to detect if the user has any autohome
  * es_bufsize	size of the response buffer
  * es_buf	pointer to the response buffer
@@ -236,7 +235,7 @@ typedef struct smb_shrlist {
  * 		in the response buffer
  */
 typedef struct smb_enumshare_info {
-	char		*es_username;
+	uid_t		es_posix_uid;
 	uint16_t	es_bufsize;
 	char		*es_buf;
 	uint16_t	es_ntotal;
@@ -286,6 +285,7 @@ boolean_t smb_shr_exists(char *);
 int smb_shr_is_special(char *);
 boolean_t smb_shr_is_restricted(char *);
 boolean_t smb_shr_is_admin(char *);
+char smb_shr_drive_letter(const char *);
 
 sa_handle_t smb_shr_sa_enter(void);
 void smb_shr_sa_exit(void);

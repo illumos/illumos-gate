@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _RPCPDU_NDL_
@@ -129,10 +128,16 @@ typedef struct ndr_representation_label	ndr_replab_t;
 /*
  * Flags in the RPC header for Connection-oriented PDU data types
  * (X/Open CAE Spec 12.6.3.1)
+ *
+ * MS-RPCE 2.2.2.3 PFC_SUPPORT_HEADER_SIGN
+ * For PDU types bind, bind_ack, alter_context and alter_context_resp,
+ * 0x04 means PFC_SUPPORT_HEADER_SIGN.
+ * For other PDU types 0x04 means PFC_PENDING_CANCEL. 
  */
 #define NDR_PFC_FIRST_FRAG		0x01	/* First fragment */
 #define NDR_PFC_LAST_FRAG		0x02	/* Last framgent */
 #define NDR_PFC_PENDING_CANCEL		0x04	/* Cancel was pending@sender*/
+#define NDR_PFC_SUPPORT_HEADER_SIGN	NDR_PFC_PENDING_CANCEL
 #define NDR_PFC_RESERVED_1		0x08	/* */
 #define NDR_PFC_CONC_MPX		0x10	/* supports concurrent muxing
 						 * of single connection */
@@ -141,12 +146,41 @@ typedef struct ndr_representation_label	ndr_replab_t;
 #define NDR_PFC_MAYBE			0x40	/* "maybe" semantics req'ed*/
 #define NDR_PFC_OBJECT_UUID		0x80	/* */
 
+/*
+ * Security Providers
+ * MS-RPCE 2.2.1.1.6
+ */
+#define	NDR_C_AUTHN_NONE			0x00	/* No authentication */
+#define	NDR_C_AUTHN_GSS_NEGOTIATE		0x09	/* SPNEGO */
+#define	NDR_C_AUTHN_WINNT			0x0A	/* NTLM */
+#define	NDR_C_AUTHN_GSS_KERBEROS		0x10	/* Kerberos */
+#define	NDR_C_AUTHN_GSS_NETLOGON		0x44	/* Netlogon */
+#define	NDR_C_AUTHN_GSS_DEFAULT			0xFF	/* Default is NTLM */
+
+/*
+ * Encoding protection levels
+ * X/Open CAE Spec 13.1.2.1
+ * MS-RPCE 2.2.1.1.7
+ */
+#define	NDR_C_AUTHN_LEVEL_DEFAULT		0x00	/* Same as Connect */
+#define	NDR_C_AUTHN_LEVEL_NONE			0x01
+#define	NDR_C_AUTHN_LEVEL_CONNECT		0x02
+#define	NDR_C_AUTHN_LEVEL_CALL			0x03
+#define	NDR_C_AUTHN_LEVEL_PKT			0x04
+#define	NDR_C_AUTHN_LEVEL_PKT_INTEGRITY		0x05
+#define	NDR_C_AUTHN_LEVEL_PKT_PRIVACY		0x06
 
 /*
  * Header common to all Connection-oriented RPC PDUs
- ****************************************************************
  * (X/Open CAE Spec 12.6.3.1)
  */
+_NO_REORDER_
+struct ndr_p_syntax_id {
+	ndr_uuid_t	if_uuid;
+	DWORD		if_version;
+};
+typedef struct ndr_p_syntax_id	ndr_p_syntax_id_t;
+
 _NO_REORDER_
 struct ndr_common_header {
 	BYTE		rpc_vers;	/* 00:01 5 */
@@ -163,19 +197,86 @@ struct ndr_common_header {
 typedef struct ndr_common_header	ndr_common_header_t;
 EXTERNTYPEINFO(ndr_common_header)
 
+/*
+ * MS-RPCE 2.2.6 Type Serialization Version 1 extensions to IDL/+ pickle
+ * One header per serialization stream: the header must be little endian.
+ * The filler must be set to 0xcccccccc during marshaling and ignored
+ * during unmarshaling.
+ */ 
+_NO_REORDER_
+struct ndr_serialtype1_hdr {
+	BYTE		version;	/* 00:01 1 */
+	BYTE		endianness;	/* 01:01 0=big, 1=little */
+	WORD		hdrlen;		/* 02:02 8 */
+	DWORD		filler;		/* 04:04 0xcccccccc */
+					/* 8: */
+};
+typedef struct ndr_serialtype1_hdr  ndr_serialtype1_hdr_t;
+EXTERNTYPEINFO(ndr_serialtype1_hdr)
 
 /*
- * A plethora of supporting types, only defined the ones we need
- * (X/Open CAE Spec 12.6.3.1)
+ * Type Serialization Version 1 Private Header.
+ * A private header must precede a top-level NDR constructed type.
+ */
+_NO_REORDER_
+struct ndr_serialtype1_priv_hdr {
+	DWORD		buflen;		/* 00:04 */
+	DWORD		filler;		/* 04:04 must be zero */
+					/* 8: */
+};
+typedef struct ndr_serialtype1_priv_hdr	ndr_serialtype1_priv_hdr_t;
+EXTERNTYPEINFO(ndr_serialtype1_priv_hdr)
+
+/*
+ * MS-RPCE 2.2.7 Type Serialization Version 2 extensions Version 1 (2.2.6).
+ * The header must be little endian.
+ * The endianinfo and reserved fields must be set to 0xcccccccc during
+ * marshaling and ignored during unmarshaling.
+ */ 
+_NO_REORDER_
+struct ndr_serialtype2_hdr {
+	BYTE		version;	/* 00:01 1 */
+	BYTE		endianness;	/* 01:01 0=big, 1=little */
+	WORD		hdrlen;		/* 02:02 8 */
+	DWORD		endianinfo;	/* 04:04 0xcccccccc */
+	DWORD		reserved[4];	/* 08:16 0xcccccccc */
+	ndr_p_syntax_id_t	transfer_syntax;	/* 24:20 */
+	ndr_p_syntax_id_t	interface_id;		/* 44:20 */
+					/* 64: */
+};
+typedef struct ndr_serialtype2_hdr  ndr_serialtype2_hdr_t;
+EXTERNTYPEINFO(ndr_serialtype2_hdr)
+
+/*
+ * Type Serialization Version 2 Private Header.
+ * A private header must precede a top-level NDR constructed type.
+ */
+_NO_REORDER_
+struct ndr_serialtype2_priv_hdr {
+	DWORD		buflen;		/* 00:04 */
+	DWORD		filler[3];	/* 04:12 must be zero */
+					/* 16: */
+};
+typedef struct ndr_serialtype2_priv_hdr	ndr_serialtype2_priv_hdr_t;
+EXTERNTYPEINFO(ndr_serialtype2_priv_hdr)
+
+/*
+ * This header comes before the NDR-encoded KERB_VALIDATION_INFO structure,
+ * which can be found in one of the info buffers of the PAC.
+ */
+_NO_REORDER_
+struct ndr_pac_hdr {
+	ndr_serialtype1_hdr_t		common_hdr;
+	ndr_serialtype1_priv_hdr_t	priv_hdr;
+	DWORD				ref_pointer;
+};
+typedef struct ndr_pac_hdr	ndr_pac_hdr_t;
+EXTERNTYPEINFO(ndr_pac_hdr)
+
+/*
+ * Supporting types (X/Open CAE Spec 12.6.3.1)
  */
 typedef WORD	ndr_p_context_id_t;
-
-_NO_REORDER_
-struct ndr_p_syntax_id {
-	ndr_uuid_t	if_uuid;
-	DWORD		if_version;
-};
-typedef struct ndr_p_syntax_id	ndr_p_syntax_id_t;
 
 _NO_REORDER_
 struct ndr_p_cont_elem {
@@ -205,19 +306,21 @@ typedef WORD	ndr_p_cont_def_result_t;
 #define NDR_PCDR_USER_REJECTION					1
 #define NDR_PCDR_PROVIDER_REJECTION				2
 
+/*
+ * Reasons for provider rejection.
+ * X/Open CAE Spec 12.6.3.1
+ */
 typedef WORD	ndr_p_provider_reason_t;
-#define NDR_PPR_REASON_NOT_SPECIFIED				0
-#define NDR_PPR_ABSTRACT_SYNTAX_NOT_SUPPORTED			1
-#define NDR_PPR_PROPOSED_TRANSFER_SYNTAXES_NOT_SUPPORTED	2
-#define NDR_PPR_LOCAL_LIMIT_EXCEEDED				3
-
+#define	NDR_PPR_REASON_NOT_SPECIFIED				0
+#define	NDR_PPR_ABSTRACT_SYNTAX_NOT_SUPPORTED			1
+#define	NDR_PPR_PROPOSED_TRANSFER_SYNTAXES_NOT_SUPPORTED	2
+#define	NDR_PPR_LOCAL_LIMIT_EXCEEDED				3
 
 _NO_REORDER_
 struct ndr_p_result {
 	ndr_p_cont_def_result_t	result;		/* NDR_PCDR_... */
 	ndr_p_provider_reason_t	reason;		/* NDR_PPR_... */
-	ndr_p_syntax_id_t		transfer_syntax; /* 0-fill if 
-							  * result!=ACCEPT*/
+	ndr_p_syntax_id_t	transfer_syntax; /* 0-fill if result!=ACCEPT */
 };
 typedef struct ndr_p_result		ndr_p_result_t;
 EXTERNTYPEINFO(ndr_p_result)
@@ -245,6 +348,21 @@ struct ndr_port_any {
 typedef struct ndr_port_any		ndr_port_any_t;
 EXTERNTYPEINFO(ndr_port_any)
 
+/*
+ * Reasons for rejecting an association in the bind_nak PDU.
+ * X/Open CAE Spec 12.6.3.1
+ * MS-RPCE 2.2.2.5
+ */
+#define	NDR_REASON_NOT_SPECIFIED				0
+#define NDR_TEMPORARY_CONGESTION				1
+#define NDR_LOCAL_LIMIT_EXCEEDED				2
+#define NDR_CALLED_PADDR_UNKNOWN				3
+#define NDR_PROTOCOL_VERSION_NOT_SUPPORTED			4
+#define NDR_DEFAULT_CONTEXT_NOT_SUPPORTED			5
+#define NDR_USER_DATA_NOT_READABLE				6
+#define NDR_NO_PSAP_AVAILABLE					7
+#define NDR_AUTH_TYPE_NOT_RECOGNIZED				8
+#define NDR_INAVLID_CHECKSUM					9
 
 /*
  * Alter Context PDU (0x0E)
@@ -498,7 +616,9 @@ typedef struct ndr_fault_hdr	ndr_fault_hdr_t;
 
 #define NDR_PTYPE_COMMON		999
 #define NDR_PTYPE_REQUEST_WITH		998
-
+#define	NDR_PTYPE_SERIALTYPE_V1		997
+#define	NDR_PTYPE_SERIALTYPE_V2		996
+#define	NDR_PTYPE_PAC			995
 
 INTERFACE(0)
 union ndr_hdr {
@@ -525,6 +645,15 @@ union ndr_hdr {
 
     CASE(NDR_PTYPE_ALTER_CONTEXT_RESP)
 	struct ndr_alter_context_rsp_hdr	alter_context_rsp_hdr;
+
+    CASE(NDR_PTYPE_SERIALTYPE_V1)
+	struct ndr_serialtype1_hdr		serialtype1_hdr;
+
+    CASE(NDR_PTYPE_SERIALTYPE_V2)
+	struct ndr_serialtype2_hdr		serialtype2_hdr;
+
+    CASE(NDR_PTYPE_PAC)
+	struct ndr_pac_hdr			pac_hdr;
 
     CASE(NDR_PTYPE_FAULT)
 	struct ndr_fault_hdr			fault_hdr;

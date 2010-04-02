@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -430,6 +429,7 @@ int smb_node_setattr(smb_request_t *, smb_node_t *, cred_t *,
 int smb_node_set_delete_on_close(smb_node_t *, cred_t *, uint32_t);
 void smb_node_reset_delete_on_close(smb_node_t *);
 boolean_t smb_node_file_is_readonly(smb_node_t *);
+int smb_node_getpath(smb_node_t *, vnode_t *, char *, uint32_t);
 int smb_node_getmntpath(smb_node_t *, char *, uint32_t);
 int smb_node_getshrpath(smb_node_t *, smb_tree_t *, char *, uint32_t);
 
@@ -690,6 +690,7 @@ void	smb_llist_constructor(smb_llist_t *, size_t, size_t);
 void	smb_llist_destructor(smb_llist_t *);
 void	smb_llist_exit(smb_llist_t *);
 void	smb_llist_post(smb_llist_t *, void *, smb_dtorproc_t);
+void	smb_llist_flush(smb_llist_t *);
 void	smb_llist_insert_head(smb_llist_t *ll, void *obj);
 void	smb_llist_insert_tail(smb_llist_t *ll, void *obj);
 void	smb_llist_remove(smb_llist_t *ll, void *obj);

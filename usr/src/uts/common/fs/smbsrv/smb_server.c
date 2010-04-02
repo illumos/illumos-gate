@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -231,8 +230,6 @@
 #include <smbsrv/smb_kstat.h>
 
 #define	SMB_EVENT_TIMEOUT		45	/* seconds */
-
-#define	SMB_REAPER_RATE_DEFAULT		4
 
 extern void smb_dispatch_kstat_init(void);
 extern void smb_dispatch_kstat_fini(void);
@@ -1948,7 +1945,7 @@ smb_event_wait(smb_event_t *event)
 	event->se_errno = 0;
 
 	while (!(event->se_notified)) {
-		if (smb_event_debug && ((event->se_waittime % 10) == 0))
+		if (smb_event_debug && ((event->se_waittime % 30) == 0))
 			cmn_err(CE_NOTE, "smb_event_wait[%d] (%d sec)",
 			    event->se_txid, event->se_waittime);
 

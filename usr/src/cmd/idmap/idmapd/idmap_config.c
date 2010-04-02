@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -49,6 +48,14 @@
 #define	GENERAL_PG		"general"
 #define	RECONFIGURE		1
 #define	POKE_AUTO_DISCOVERY	2
+
+enum event_type {
+	EVENT_NOTHING,	/* Woke up for no good reason */
+	EVENT_TIMEOUT,	/* Timeout expired */
+	EVENT_ROUTING,	/* An interesting routing event happened */
+	EVENT_DEGRADE,	/* An error occurred in the mainline */
+	EVENT_REFRESH,	/* SMF refresh */
+};
 
 /*LINTLIBRARY*/
 
@@ -893,8 +900,6 @@ enum_lookup(int value, struct enum_lookup_map *map)
 	return ("(invalid)");
 }
 
-#define	MAX_CHECK_TIME		(20 * 60)
-
 /*
  * Returns 1 if the PF_ROUTE socket event indicates that we should rescan the
  * interfaces.
@@ -902,13 +907,13 @@ enum_lookup(int value, struct enum_lookup_map *map)
  * Shamelessly based on smb_nics_changed() and other PF_ROUTE uses in ON.
  */
 static
-int
+boolean_t
 pfroute_event_is_interesting(int rt_sock)
 {
 	int nbytes;
 	int64_t msg[2048 / 8];
 	struct rt_msghdr *rtm;
-	int is_interesting = FALSE;
+	boolean_t is_interesting = B_FALSE;
 
 	for (;;) {
 		if ((nbytes = read(rt_sock, msg, sizeof (msg))) <= 0)
@@ -922,7 +927,7 @@ pfroute_event_is_interesting(int rt_sock)
 		case RTM_NEWADDR:
 		case RTM_DELADDR:
 		case RTM_IFINFO:
-			is_interesting = TRUE;
+			is_interesting = B_TRUE;
 			break;
 		default:
 			break;
@@ -932,131 +937,161 @@ pfroute_event_is_interesting(int rt_sock)
 }
 
 /*
- * Returns 1 if SIGHUP has been received (see hup_handler() elsewhere) or if an
- * interface address was added or removed; otherwise it returns 0.
+ * Wait for an event, and report what kind of event occurred.
  *
- * Note that port_get() does not update its timeout argument when EINTR, unlike
- * nanosleep().  We probably don't care very much here, but if we did care then
- * we could always use a timer event and associate it with the same event port,
- * then we could get accurate waiting regardless of EINTRs.
+ * Note that there are cases where we are awoken but don't care about
+ * the lower-level event.  We can't just loop here because we can't
+ * readily calculate how long to sleep the next time.  We return
+ * EVENT_NOTHING and let the caller loop.
  */
 static
-int
-wait_for_event(int poke_is_interesting, struct timespec *timeoutp)
+enum event_type
+wait_for_event(struct timespec *timeoutp)
 {
 	port_event_t pe;
 
-retry:
 	memset(&pe, 0, sizeof (pe));
 	if (port_get(idmapd_ev_port, &pe, timeoutp) != 0) {
 		switch (errno) {
 		case EINTR:
-			goto retry;
+			return (EVENT_NOTHING);
 		case ETIME:
 			/* Timeout */
-			return (FALSE);
+			return (EVENT_TIMEOUT);
 		default:
 			/* EBADF, EBADFD, EFAULT, EINVAL (end of time?)? */
 			idmapdlog(LOG_ERR, "Event port failed: %s",
 			    strerror(errno));
 			exit(1);
 			/* NOTREACHED */
-			break;
 		}
 	}
 
-	if (pe.portev_source == PORT_SOURCE_USER &&
-	    pe.portev_events == POKE_AUTO_DISCOVERY)
-		return (poke_is_interesting ? TRUE : FALSE);
 
-	if (pe.portev_source == PORT_SOURCE_FD && pe.portev_object == rt_sock) {
-		/* PF_ROUTE socket read event, re-associate fd, handle event */
-		if (port_associate(idmapd_ev_port, PORT_SOURCE_FD, rt_sock,
-		    POLLIN, NULL) != 0) {
-			idmapdlog(LOG_ERR, "Failed to re-associate the "
-			    "routing socket with the event port: %s",
-			    strerror(errno));
-			exit(1);
-		}
+	switch (pe.portev_source) {
+	case 0:
 		/*
-		 * The network configuration may still be in flux.  No matter,
-		 * the resolver will re-transmit and timout if need be.
+		 * This isn't documented, but seems to be what you get if
+		 * the timeout is zero seconds and there are no events
+		 * pending.
 		 */
-		return (pfroute_event_is_interesting(rt_sock));
-	}
+		return (EVENT_TIMEOUT);
 
-	if (pe.portev_source == PORT_SOURCE_USER &&
-	    pe.portev_events == RECONFIGURE) {
-		int rc;
+	case PORT_SOURCE_USER:
+		if (pe.portev_events == POKE_AUTO_DISCOVERY)
+			return (EVENT_DEGRADE);
+		if (pe.portev_events == RECONFIGURE)
+			return (EVENT_REFRESH);
+		break;
 
-		/*
-		 * Blow away the ccache, we might have re-joined the
-		 * domain or joined a new one
-		 */
-		(void) unlink(IDMAP_CACHEDIR "/ccache");
-		/* HUP is the refresh method, so re-read SMF config */
-		idmapdlog(LOG_INFO, "SMF refresh");
-		rc = idmap_cfg_load(_idmapdstate.cfg, CFG_DISCOVER|CFG_LOG);
-		if (rc < -1) {
-			idmapdlog(LOG_ERR, "Fatal errors while reading "
-			    "SMF properties");
-			exit(1);
-		} else if (rc == -1) {
-			idmapdlog(LOG_WARNING, "Various errors "
-			    "re-loading configuration may cause AD lookups "
-			    "to fail");
+	case PORT_SOURCE_FD:
+		if (pe.portev_object == rt_sock) {
+			/*
+			 * PF_ROUTE socket read event:
+			 *    re-associate fd
+			 *    handle event
+			 */
+			if (port_associate(idmapd_ev_port, PORT_SOURCE_FD,
+			    rt_sock, POLLIN, NULL) != 0) {
+				idmapdlog(LOG_ERR, "Failed to re-associate the "
+				    "routing socket with the event port: %s",
+				    strerror(errno));
+				abort();
+			}
+			/*
+			 * The network configuration may still be in flux.
+			 * No matter, the resolver will re-transmit and
+			 * timeout if need be.
+			 */
+			if (pfroute_event_is_interesting(rt_sock)) {
+				idmapdlog(LOG_DEBUG,
+				    "Interesting routing event");
+				return (EVENT_ROUTING);
+			} else {
+				idmapdlog(LOG_DEBUG,
+				    "Boring routing event");
+				return (EVENT_NOTHING);
+			}
 		}
-		return (FALSE);
+		/* Event on an FD other than the routing FD? Ignore it. */
+		break;
 	}
 
-	return (FALSE);
+	return (EVENT_NOTHING);
 }
 
 void *
 idmap_cfg_update_thread(void *arg)
 {
 
-	int			ttl, changed, poke_is_interesting;
-	idmap_cfg_handles_t	*handles = &_idmapdstate.cfg->handles;
-	ad_disc_t		ad_ctx = handles->ad_ctx;
-	struct timespec		timeout, *timeoutp;
+	const ad_disc_t		ad_ctx = _idmapdstate.cfg->handles.ad_ctx;
 
-	poke_is_interesting = 1;
-	for (ttl = 0, changed = TRUE; ; ttl = ad_disc_get_TTL(ad_ctx)) {
-		/*
-		 * If ttl < 0 then we can wait for an event without timing out.
-		 * If idmapd needs to notice that the system has been joined to
-		 * a Windows domain then idmapd needs to be refreshed.
-		 */
-		timeoutp = (ttl < 0) ? NULL : &timeout;
-		if (ttl > MAX_CHECK_TIME)
-			ttl = MAX_CHECK_TIME;
-		timeout.tv_sec = ttl;
-		timeout.tv_nsec = 0;
-		changed = wait_for_event(poke_is_interesting, timeoutp);
-
-		/*
-		 * If there are no interesting events, and this is not the first
-		 * time through the loop, and we haven't waited the most that
-		 * we're willing to wait, so do nothing but wait some more.
-		 */
-		if (changed == FALSE && ttl > 0 && ttl < MAX_CHECK_TIME)
-			continue;
+	for (;;) {
+		struct timespec timeout;
+		struct timespec	*timeoutp;
+		int		rc;
+		int		ttl;
 
 		(void) ad_disc_SubnetChanged(ad_ctx);
 
-		if (idmap_cfg_load(_idmapdstate.cfg, CFG_DISCOVER) < -1) {
+		rc = idmap_cfg_load(_idmapdstate.cfg, CFG_DISCOVER);
+		if (rc < -1) {
 			idmapdlog(LOG_ERR, "Fatal errors while reading "
 			    "SMF properties");
 			exit(1);
+		} else if (rc == -1) {
+			idmapdlog(LOG_WARNING,
+			    "Errors re-loading configuration may cause AD "
+			    "lookups to fail");
 		}
 
-		if (_idmapdstate.cfg->pgcfg.global_catalog == NULL ||
-		    _idmapdstate.cfg->pgcfg.global_catalog[0].host[0] == '\0')
-			poke_is_interesting = 1;
-		else
-			poke_is_interesting = 0;
+		/*
+		 * Wait for an interesting event.  Note that we might get
+		 * boring events between interesting events.  If so, we loop.
+		 */
+		for (;;) {
+			ttl = ad_disc_get_TTL(ad_ctx);
+
+			if (ttl < 0) {
+				timeoutp = NULL;
+			} else {
+				timeoutp = &timeout;
+				timeout.tv_sec = ttl;
+				timeout.tv_nsec = 0;
+			}
+
+			switch (wait_for_event(timeoutp)) {
+			case EVENT_NOTHING:
+				idmapdlog(LOG_DEBUG, "Boring event.");
+				continue;
+			case EVENT_REFRESH:
+				idmapdlog(LOG_INFO, "SMF refresh");
+				/*
+				 * Blow away the ccache, we might have
+				 * re-joined the domain or joined a new one
+				 */
+				(void) unlink(IDMAP_CACHEDIR "/ccache");
+				break;
+			case EVENT_DEGRADE:
+				idmapdlog(LOG_DEBUG,
+				    "Service degraded");
+				break;
+			case EVENT_TIMEOUT:
+				idmapdlog(LOG_DEBUG, "TTL expired");
+				break;
+			case EVENT_ROUTING:
+				/* Already logged to DEBUG */
+				break;
+			}
+			/* An interesting event! */
+			break;
+		}
 	}
+	/*
+	 * Lint isn't happy with the concept of a function declared to
+	 * return something, that doesn't return.  Of course, merely adding
+	 * the return isn't enough, because it's never reached...
+	 */
 	/*NOTREACHED*/
 	return (NULL);
 }
@@ -1356,6 +1391,8 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 	idmap_trustedforest_t *trustedforests;
 	ad_disc_domainsinforest_t *domainsinforest;
 
+	idmapdlog(LOG_DEBUG, "Running discovery.");
+
 	ad_disc_refresh(ad_ctx);
 
 	if (pgcfg->default_domain == NULL)
@@ -1524,6 +1561,9 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 		    "unable to discover Domains in the Forest");
 	if (pgcfg->trusted_domains == NULL)
 		idmapdlog(LOG_DEBUG, "unable to discover Trusted Domains");
+
+	ad_disc_done(ad_ctx);
+	idmapdlog(LOG_DEBUG, "Discovery done.");
 }
 
 

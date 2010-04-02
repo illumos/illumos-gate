@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _MLSVC_SAM_NDL_
@@ -66,7 +65,7 @@
 #define SAMR_OPNUM_DeleteDomainAlias		0x1e
 #define SAMR_OPNUM_AddAliasMember		0x1f
 #define SAMR_OPNUM_DeleteAliasMember		0x20
-#define SAMR_OPNUM_QueryAliasMember		0x21
+#define SAMR_OPNUM_ListAliasMembers		0x21
 #define SAMR_OPNUM_OpenUser			0x22
 #define SAMR_OPNUM_DeleteUser			0x23
 #define SAMR_OPNUM_QueryUserInfo		0x24
@@ -185,13 +184,17 @@
 #define	SAMR_USER_ALL_UNDEFINED_MASK		0xC0000000
 
 /*
- * specific access rights which can be used in OpenAlias.
- * extracted from Ethereal network analyzer
+ * Alias Access Mask values for SAMR
+ * Section 2.2.1.6 of MS-SAMR
  */
-#define SAMR_ALIAS_ACCESS_SET_INFO		0x00000010
-#define SAMR_ALIAS_ACCESS_GET_INFO		0x00000008
-#define SAMR_ALIAS_ACCESS_GET_MEMBERS		0x00000004
-#define SAMR_ALIAS_ACCESS_DEL_MEMBER		0x00000002
+#define SAMR_ALIAS_ACCESS_EXECUTE		0x00020008
+#define SAMR_ALIAS_ACCESS_WRITE			0x00020013
+#define SAMR_ALIAS_ACCESS_READ			0x00020004
+#define SAMR_ALIAS_ACCESS_ALL_ACCESS		0x000F001F
+#define SAMR_ALIAS_ACCESS_WRITE_ACCOUNT		0x00000010
+#define SAMR_ALIAS_ACCESS_READ_INFO		0x00000008
+#define SAMR_ALIAS_ACCESS_LIST_MEMBERS		0x00000004
+#define SAMR_ALIAS_ACCESS_REMOVE_MEMBER		0x00000002
 #define SAMR_ALIAS_ACCESS_ADD_MEMBER		0x00000001
 
 #define	SAMR_REVISION_1			1	/* Pre Windows 2000 */
@@ -669,7 +672,7 @@ struct samr_SetAliasInfo {
 
 OPERATION(SAMR_OPNUM_DeleteDomainAlias)
 struct samr_DeleteDomainAlias {
-	IN	samr_handle_t alias_handle;
+	INOUT	samr_handle_t alias_handle;
 	OUT	DWORD status;
 };
 
@@ -1126,6 +1129,45 @@ struct samr_StoreGroupInfo {
 	OUT	DWORD status;
 };
 
+/*
+ * AddAliasMember
+ */
+OPERATION(SAMR_OPNUM_AddAliasMember)
+struct samr_AddAliasMember {
+	IN		samr_handle_t alias_handle;
+	IN REFERENCE	struct samr_sid *sid;
+	OUT DWORD	status;
+};
+
+/*
+ * DeleteAliasMember
+ */
+OPERATION(SAMR_OPNUM_DeleteAliasMember)
+struct samr_DeleteAliasMember {
+	IN		samr_handle_t alias_handle;
+	IN REFERENCE	struct samr_sid *sid;
+	OUT DWORD	status;
+};
+
+struct samr_SidList {
+	struct samr_sid		*sid;
+};
+
+struct samr_SidInfo {
+	DWORD n_entry;
+  SIZE_IS(n_entry)
+	struct samr_SidList	*sidlist;
+};
+
+/*
+ * ListAliasMembers
+ */
+OPERATION(SAMR_OPNUM_ListAliasMembers)
+struct samr_ListAliasMembers {
+	IN		samr_handle_t alias_handle;
+	OUT		struct samr_SidInfo info;
+	OUT DWORD	status;
+};
 
 /*
  ***********************************************************************
@@ -1410,6 +1452,12 @@ union samr_interface {
 		struct samr_QueryUserGroups	QueryUserGroups;
 	CASE(SAMR_OPNUM_OpenGroup)
 		struct samr_OpenGroup		OpenGroup;
+	CASE(SAMR_OPNUM_AddAliasMember)
+		struct samr_AddAliasMember	AddAliasMember;
+	CASE(SAMR_OPNUM_DeleteAliasMember)
+		struct samr_DeleteAliasMember	DeleteAliasMember;
+	CASE(SAMR_OPNUM_ListAliasMembers)
+		struct samr_ListAliasMembers	ListAliasMembers;
 	CASE(SAMR_OPNUM_GetUserPwInfo)
 		struct samr_GetUserPwInfo	GetUserPwInfo;
 	CASE(SAMR_OPNUM_CreateUser)
