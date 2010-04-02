@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/ib/ibtl/impl/ibtl.h>
@@ -473,6 +472,24 @@ ibtl_cm_chan_is_opening(ibt_channel_hdl_t chan)
 	mutex_enter(&ibtl_free_qp_mutex);
 	ASSERT(chan->ch_transport.rc.rc_free_flags == 0);
 	chan->ch_transport.rc.rc_free_flags |= IBTL_RC_QP_CONNECTING;
+	mutex_exit(&ibtl_free_qp_mutex);
+}
+
+/*
+ * ibtl_cm_chan_open_is_aborted()
+ *
+ *	Inform IBTL that the connection established on this channel has
+ *	aborted. So undo what was done in ibtl_cm_chan_is_opening().
+ *
+ *	chan	Channel Handle
+ */
+void
+ibtl_cm_chan_open_is_aborted(ibt_channel_hdl_t chan)
+{
+	IBTF_DPRINTF_L3(ibtf_qp, "ibtl_cm_chan_open_is_aborted(%p)", chan);
+	ASSERT(chan->ch_qp.qp_type == IBT_RC_SRV);
+	mutex_enter(&ibtl_free_qp_mutex);
+	chan->ch_transport.rc.rc_free_flags &= ~IBTL_RC_QP_CONNECTING;
 	mutex_exit(&ibtl_free_qp_mutex);
 }
 

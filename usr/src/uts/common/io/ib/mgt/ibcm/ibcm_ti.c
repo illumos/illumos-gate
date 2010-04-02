@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/ib/mgt/ibcm/ibcm_impl.h>
@@ -891,8 +890,10 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		 * In the case that open_channel() fails because of a
 		 * REJ or timeout, change retval to IBT_CM_FAILURE
 		 */
-		if (statep->open_return_data->rc_status != IBT_CM_ACCEPT)
+		if (statep->open_return_data->rc_status != IBT_CM_ACCEPT) {
 			status = IBT_CM_FAILURE;
+			ibtl_cm_chan_open_is_aborted(channel);
+		}
 
 		IBTF_DPRINTF_L3(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "ret status %d cm status %d", channel, status,

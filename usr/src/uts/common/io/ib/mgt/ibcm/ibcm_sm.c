@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/ib/mgt/ibcm/ibcm_impl.h>
@@ -3389,6 +3388,8 @@ ibcm_process_abort(ibcm_state_data_t *statep)
 			ibcm_insert_trace(statep,
 			    IBCM_TRACE_CALLED_CONN_CLOSE_EVENT);
 
+			ibtl_cm_chan_open_is_aborted(statep->channel);
+
 			(void) statep->cm_handler(statep->state_cm_private,
 			    &event, &ret_args, NULL, 0);
 
@@ -5279,6 +5280,8 @@ ibcm_handler_conn_fail(ibcm_state_data_t *statep, uint8_t cf_code,
 	ibt_cm_event_t	event;
 
 	ibcm_path_cache_purge();
+
+	ibtl_cm_chan_open_is_aborted(statep->channel);
 
 	/* Invoke CM handler w/ event passed as arg */
 	if (statep->cm_handler != NULL) {
@@ -7291,6 +7294,8 @@ ibcm_cep_state_rej(ibcm_state_data_t *statep, ibcm_rej_msg_t *rej_msgp,
 		    "ibcm_cep_to_error_state returned %d", statep,
 		    status);
 	}
+
+	ibtl_cm_chan_open_is_aborted(statep->channel);
 
 	/* Disassociate state structure and CM */
 	IBCM_SET_CHAN_PRIVATE(statep->channel, NULL);
