@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "lint.h"
@@ -186,6 +185,8 @@ __csigsetjmp(sigjmp_buf env, int savemask)
 
 	/*
 	 * bp->sjs_sp, bp->sjs_pc, bp->sjs_fp and bp->sjs_i7 are already set.
+	 * Also, if we are running in 64-bit mode (__sparcv9),
+	 * then bp->sjs_asi and bp->sjs_fprs are already set.
 	 */
 	bp->sjs_flags = JB_FRAMEPTR;
 	bp->sjs_uclink = self->ul_siglink;

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/mdb_modapi.h>
@@ -136,7 +135,8 @@ d_sigjmp_buf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		ulong_t sjs_pad[_JBLEN - 6];
 		sigset_t sjs_sigmask;
 #if defined(_LP64)
-		ulong_t sjs_pad1[2];
+		greg_t sjs_asi;
+		greg_t sjs_fprs;
 #endif
 		stack_t sjs_stack;
 	} s;
@@ -158,6 +158,10 @@ d_sigjmp_buf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("  sigset = 0x%08x 0x%08x 0x%08x 0x%08x\n",
 	    s.sjs_sigmask.__sigbits[0], s.sjs_sigmask.__sigbits[1],
 	    s.sjs_sigmask.__sigbits[2], s.sjs_sigmask.__sigbits[3]);
+#if defined(_LP64)
+	mdb_printf("  %%asi   = 0x%lx\n", s.sjs_asi);
+	mdb_printf("  %%fprs  = 0x%lx\n", s.sjs_fprs);
+#endif
 	mdb_printf("  stack  = sp 0x%p size 0x%lx flags %s\n",
 	    s.sjs_stack.ss_sp, s.sjs_stack.ss_size, stack_flags(&s.sjs_stack));
 

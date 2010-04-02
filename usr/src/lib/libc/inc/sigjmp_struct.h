@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SIGJMP_STRUCT_H
 #define	_SIGJMP_STRUCT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -65,7 +62,8 @@ typedef struct {
 	ulong_t		sjs_pad[_JBLEN - 6];
 	sigset_t	sjs_sigmask;
 #if defined(_LP64)
-	ulong_t		sjs_pad1[2];
+	greg_t		sjs_asi;
+	greg_t		sjs_fprs;
 #endif
 	stack_t		sjs_stack;
 } sigjmp_struct_t;

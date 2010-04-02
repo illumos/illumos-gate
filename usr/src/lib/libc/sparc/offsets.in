@@ -1,7 +1,3 @@
-\
-\ Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-\ Use is subject to license terms.
-\
 \ CDDL HEADER START
 \
 \ The contents of this file are subject to the terms of the
@@ -20,6 +16,8 @@
 \ information: Portions Copyright [yyyy] [name of copyright owner]
 \
 \ CDDL HEADER END
+\
+\ Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 \
 
 \
@@ -56,6 +54,10 @@ sigjmp_struct_t
 	sjs_pc
 	sjs_fp
 	sjs_i7
+#ifdef __sparcv9
+	sjs_asi
+	sjs_fprs
+#endif
 
 stack_t
 	ss_sp

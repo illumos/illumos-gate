@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 	.file	"asm_subr.s"
@@ -164,6 +163,12 @@ __sighndlrend:
 	stn	%o2, [%o0 + SJS_PC]	! save caller's pc into env->sjs_pc
 	stn	%fp, [%o0 + SJS_FP]	! save caller's return linkage
 	stn	%i7, [%o0 + SJS_I7]
+#ifdef __sparcv9
+	rd	%asi, %o3
+	rd	%fprs, %o4
+	stx	%o3, [%o0 + SJS_ASI]
+	stx	%o4, [%o0 + SJS_FPRS]
+#endif
 	call	__csigsetjmp
 	sub	%o2, 8, %o7		! __csigsetjmp returns to caller
 	SET_SIZE(sigsetjmp)

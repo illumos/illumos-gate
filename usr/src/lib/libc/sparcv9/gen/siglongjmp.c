@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma weak _siglongjmp = siglongjmp
 
@@ -67,6 +64,8 @@ siglongjmp(sigjmp_buf env, int val)
 	reg[REG_PC] = bp->sjs_pc;
 	reg[REG_nPC] = reg[REG_PC] + 0x4;
 	reg[REG_SP] = bp->sjs_sp;
+	reg[REG_ASI] = bp->sjs_asi;
+	reg[REG_FPRS] = bp->sjs_fprs;
 
 	if (bp->sjs_flags & JB_SAVEMASK) {
 		uc.uc_flags |= UC_SIGMASK;
