@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fmd_alloc.h>
 #include <fmd_eventq.h>
@@ -76,6 +73,41 @@ fmd_eventq_drop(fmd_eventq_t *eq, fmd_eventqelem_t *eqe)
 
 	fmd_event_rele(eqe->eqe_event);
 	fmd_free(eqe, sizeof (fmd_eventqelem_t));
+}
+
+void
+fmd_eventq_drop_topo(fmd_eventq_t *eq)
+{
+	fmd_eventqelem_t *eqe, *tmp;
+	boolean_t got_fm_events = B_FALSE;
+
+	/*
+	 * Here we iterate through the per-module event queue in order to remove
+	 * redundant FMD_EVT_TOPO events.  The trick is to not drop a given
+	 * topo event if there are any FM protocol events in the queue after
+	 * it, as those events need to be processed with the correct topology.
+	 */
+	(void) pthread_mutex_lock(&eq->eq_lock);
+	eqe = fmd_list_prev(&eq->eq_list);
+	while (eqe) {
+		if (FMD_EVENT_TYPE(eqe->eqe_event) == FMD_EVT_TOPO) {
+			if (!got_fm_events) {
+				tmp = eqe;
+				eqe = fmd_list_prev(eqe);
+				fmd_list_delete(&eq->eq_list, tmp);
+				eq->eq_size--;
+				fmd_eventq_drop(eq, tmp);
+			} else {
+				got_fm_events = B_FALSE;
+				eqe = fmd_list_prev(eqe);
+			}
+		} else if (FMD_EVENT_TYPE(eqe->eqe_event) == FMD_EVT_PROTOCOL) {
+			got_fm_events = B_TRUE;
+			eqe = fmd_list_prev(eqe);
+		} else
+			eqe = fmd_list_prev(eqe);
+	}
+	(void) pthread_mutex_unlock(&eq->eq_lock);
 }
 
 /*

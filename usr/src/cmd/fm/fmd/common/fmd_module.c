@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <signal.h>
 #include <dirent.h>
@@ -1133,9 +1130,20 @@ fmd_modhash_dispatch(fmd_modhash_t *mhp, fmd_event_t *ep)
 			(void) pthread_mutex_lock(&mp->mod_lock);
 
 			if ((mp->mod_flags & (FMD_MOD_INIT | FMD_MOD_FINI |
-			    FMD_MOD_QUIT)) == FMD_MOD_INIT && !mp->mod_error)
+			    FMD_MOD_QUIT)) == FMD_MOD_INIT && !mp->mod_error) {
+
+				/*
+				 * If the event we're dispatching is of type
+				 * FMD_EVT_TOPO and there are already redundant
+				 * FMD_EVT_TOPO events in this module's queue,
+				 * then drop those before adding the new one.
+				 */
+				if (FMD_EVENT_TYPE(ep) == FMD_EVT_TOPO)
+					fmd_eventq_drop_topo(mp->mod_queue);
+
 				fmd_eventq_insert_at_time(mp->mod_queue, ep);
 
+			}
 			(void) pthread_mutex_unlock(&mp->mod_lock);
 		}
 	}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_FMD_EVENTQ_H
 #define	_FMD_EVENTQ_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 
@@ -85,6 +81,7 @@ extern void fmd_eventq_cancel(fmd_eventq_t *, uint_t, void *);
 extern void fmd_eventq_suspend(fmd_eventq_t *);
 extern void fmd_eventq_resume(fmd_eventq_t *);
 extern void fmd_eventq_abort(fmd_eventq_t *);
+extern void fmd_eventq_drop_topo(fmd_eventq_t *);
 
 #ifdef	__cplusplus
 }

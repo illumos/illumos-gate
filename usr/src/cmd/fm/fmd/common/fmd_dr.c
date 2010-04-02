@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -78,54 +77,31 @@ fmd_dr_event(sysevent_t *sep)
 	const char *subclass = sysevent_get_subclass_name(sep);
 	hrtime_t evtime;
 	fmd_topo_t *ftp, *prev;
-	boolean_t update_topo = B_FALSE;
 
 	if (strcmp(class, EC_DR) == 0) {
 		if (strcmp(subclass, ESC_DR_AP_STATE_CHANGE) != 0 &&
 		    strcmp(subclass, ESC_DR_TARGET_STATE_CHANGE) != 0)
 			return;
-
-		/*
-		 * The DR generation is only changed in response to DR events.
-		 */
-		update_topo = B_TRUE;
-
-		(void) pthread_mutex_lock(&fmd.d_stats_lock);
-		gen = fmd.d_stats->ds_dr_gen.fmds_value.ui64++;
-		(void) pthread_mutex_unlock(&fmd.d_stats_lock);
-
-		TRACE((FMD_DBG_XPRT, "dr event %p, gen=%llu",
-		    (void *)sep, gen));
+	/* LINTED: E_NOP_IF_STMT */
 	} else if (strcmp(class, EC_DEVFS) == 0) {
 		/*
 		 * A devfs configuration event can change the topology,
 		 * as disk nodes only exist when the device is configured.
 		 */
-		update_topo = B_TRUE;
 	} else if (strcmp(class, EC_PLATFORM) == 0) {
-		if (strcmp(subclass, ESC_PLATFORM_SP_RESET) == 0) {
-			/*
-			 * Since we rely on the SP to enumerate fans,
-			 * power-supplies and sensors/leds, it would be prudent
-			 * to take a new snapshot if the SP resets.
-			 */
-			update_topo = B_TRUE;
-		}
-	} else if (strcmp(class, EC_ZFS) == 0) {
 		/*
-		 * These events can change the resource cache.
+		 * Since we rely on the SP to enumerate fans,
+		 * power-supplies and sensors/leds, it would be prudent
+		 * to take a new snapshot if the SP resets.
 		 */
-		if (strcmp(subclass, ESC_ZFS_VDEV_CLEAR) != 0 &&
-		    strcmp(subclass, ESC_ZFS_VDEV_REMOVE) != 0 &&
-		    strcmp(subclass, ESC_ZFS_POOL_DESTROY) != 0)
+		if (strcmp(subclass, ESC_PLATFORM_SP_RESET) != 0)
 			return;
 	} else if (strcmp(class, EC_DEV_ADD) == 0 ||
 	    strcmp(class, EC_DEV_REMOVE) == 0) {
 		if (strcmp(subclass, ESC_DISK) != 0)
 			return;
-
-		update_topo = B_TRUE;
-	}
+	} else
+		return;
 
 	/*
 	 * Take a topo snapshot and notify modules of the change.  Picking an
@@ -153,8 +129,12 @@ fmd_dr_event(sysevent_t *sep)
 	}
 	fmd_topo_rele(prev);
 
-	if (update_topo)
-		fmd_topo_update(B_FALSE);
+	(void) pthread_mutex_lock(&fmd.d_stats_lock);
+	gen = fmd.d_stats->ds_dr_gen.fmds_value.ui64++;
+	(void) pthread_mutex_unlock(&fmd.d_stats_lock);
+
+	TRACE((FMD_DBG_XPRT, "dr event %p, gen=%llu", (void *)sep, gen));
+	fmd_topo_update(B_FALSE);
 
 	ftp = fmd_topo_hold();
 	e = fmd_event_create(FMD_EVT_TOPO, ftp->ft_time_end, NULL, ftp);

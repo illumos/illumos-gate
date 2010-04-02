@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/mdb_modapi.h>
@@ -1561,6 +1560,82 @@ fmd_xprt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static int
+tsnap_walk_init(mdb_walk_state_t *wsp)
+{
+	fmd_t F;
+
+	if (mdb_readvar(&F, "fmd") != sizeof (F)) {
+		mdb_warn("failed to read fmd meta-data");
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)F.d_topo_list.l_next;
+	return (WALK_NEXT);
+}
+
+static int
+tsnap_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t addr = wsp->walk_addr;
+	fmd_topo_t ftp;
+
+	if (addr == NULL)
+		return (WALK_DONE);
+
+	if (mdb_vread(&ftp, sizeof (ftp), addr) != sizeof (ftp)) {
+		mdb_warn("failed to read fmd_topo_t at %p", addr);
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)ftp.ft_list.l_next;
+	return (wsp->walk_callback(addr, &ftp, wsp->walk_cbdata));
+}
+
+static int
+mq_walk_init(mdb_walk_state_t *wsp)
+{
+	fmd_module_t m;
+	struct fmd_eventq eq;
+
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("NULL fmd_module_t passed in");
+		return (WALK_ERR);
+	}
+
+	if (mdb_vread(&m, sizeof (m), wsp->walk_addr) != sizeof (m)) {
+		mdb_warn("failed to read fmd_module_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	if (mdb_vread(&eq, sizeof (eq), (uintptr_t)m.mod_queue)
+	    != sizeof (eq)) {
+		mdb_warn("failed to read fmd_eventq at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)eq.eq_list.l_next;
+
+	return (WALK_NEXT);
+}
+
+static int
+mq_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t addr = wsp->walk_addr;
+	fmd_eventqelem_t eqe;
+
+	if (addr == NULL)
+		return (WALK_DONE);
+
+	if (mdb_vread(&eqe, sizeof (eqe), addr) != sizeof (eqe)) {
+		mdb_warn("failed to read fmd_eventqelem_t at %p", addr);
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)eqe.eqe_list.l_next;
+	return (wsp->walk_callback(addr, &eqe, wsp->walk_cbdata));
+}
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "fcf_case", "?", "print a FCF case", fcf_case },
 	{ "fcf_event", "?", "print a FCF event", fcf_event },
@@ -1610,6 +1685,10 @@ static const mdb_walker_t walkers[] = {
 		xprt_walk_init, xprt_walk_step, NULL },
 	{ "fmd_xprt_class", "walk hash table of subscription classes",
 		xpc_walk_init, hash_walk_step, hash_walk_fini },
+	{ "fmd_topo", "walk fmd's list of topo snapshots",
+		tsnap_walk_init, tsnap_walk_step, NULL },
+	{ "fmd_mod_queue", "walk per-module event queue",
+		mq_walk_init, mq_walk_step, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -340,7 +339,7 @@ zfs_vdev_repair(fmd_hdl_t *hdl, nvlist_t *nvl)
 
 		topo_hdl_strfree(thp, fmri);
 	}
-
+	nvlist_free(asru);
 	zrp = fmd_hdl_alloc(hdl, sizeof (zfs_retire_repaired_t), FMD_SLEEP);
 	zrp->zrr_next = zdp->zrd_repaired;
 	zrp->zrr_pool = pool_guid;
