@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1990 Mentat Inc.
  */
-/* Copyright (c) 1990 Mentat Inc. */
 
 /*
  * This file contains the interface control functions for IP.
@@ -10793,6 +10792,12 @@ ip_sioctl_mtu(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 */
 	dce_increment_all_generations(ill->ill_isv6, ill->ill_ipst);
 
+	/*
+	 * Refresh IPMP meta-interface MTU if necessary.
+	 */
+	if (IS_UNDER_IPMP(ill))
+		ipmp_illgrp_refresh_mtu(ill->ill_grp);
+
 	/* Update the MTU in SCTP's list */
 	sctp_update_ipif(ipif, SCTP_IPIF_UPDATE);
 	return (0);
@@ -17887,8 +17892,12 @@ ip_loopback_removeif(ldi_handle_t lh, boolean_t isv6, cred_t *cr)
 	bzero(&lifr, sizeof (lifr));
 	(void) strcpy(lifr.lifr_name, ipif_loopback_name);
 
+	/*
+	 * Attempt to remove the interface.  It may legitimately not exist
+	 * (e.g. the zone administrator unplumbed it), so ignore ENXIO.
+	 */
 	err = ip_ioctl(lh, SIOCLIFREMOVEIF, &lifr, sizeof (lifr), cr);
-	if (err != 0) {
+	if (err != 0 && err != ENXIO) {
 		ip0dbg(("ip_loopback_removeif: IP%s SIOCLIFREMOVEIF failed: "
 		    "error %d\n", isv6 ? "v6" : "v4", err));
 	}
@@ -17955,13 +17964,16 @@ ip_ipmp_cleanup(ldi_handle_t lh, boolean_t isv6, cred_t *cr)
 			continue;
 		}
 
-		lifrp->lifr_groupname[0] = '\0';
-		err = ip_ioctl(lh, SIOCSLIFGROUPNAME, lifrp, lifrsize, cr);
-		if (err != 0) {
-			cmn_err(CE_WARN, "ip_ipmp_cleanup: %s: cannot leave "
-			    "IPMP group (error %d); associated IPMP interface "
-			    "may not be shutdown", lifrp->lifr_name, err);
-			continue;
+		if (strchr(lifrp->lifr_name, IPIF_SEPARATOR_CHAR) == 0) {
+			lifrp->lifr_groupname[0] = '\0';
+			if ((err = ip_ioctl(lh, SIOCSLIFGROUPNAME, lifrp,
+			    lifrsize, cr)) != 0) {
+				cmn_err(CE_WARN, "ip_ipmp_cleanup: %s: cannot "
+				    "leave IPMP group (error %d); associated "
+				    "IPMP interface may not be shutdown",
+				    lifrp->lifr_name, err);
+				continue;
+			}
 		}
 	}
 

@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1990 Mentat Inc.
  */
-/* Copyright (c) 1990 Mentat Inc. */
 
 #ifndef	_INET_IP_H
 #define	_INET_IP_H
@@ -3371,6 +3370,7 @@ extern uint_t	ipmp_ill_get_ipmp_ifindex(const ill_t *);
 extern void	ipmp_ill_join_illgrp(ill_t *, ipmp_illgrp_t *);
 extern void	ipmp_ill_leave_illgrp(ill_t *);
 extern ill_t	*ipmp_ill_hold_ipmp_ill(ill_t *);
+extern ill_t	*ipmp_ill_hold_xmit_ill(ill_t *, boolean_t);
 extern boolean_t ipmp_ill_is_active(ill_t *);
 extern void	ipmp_ill_refresh_active(ill_t *);
 extern void	ipmp_phyint_join_grp(phyint_t *, ipmp_grp_t *);
@@ -3381,9 +3381,8 @@ extern ill_t	*ipmp_ipif_hold_bound_ill(const ipif_t *);
 extern boolean_t ipmp_ipif_is_dataaddr(const ipif_t *);
 extern boolean_t ipmp_ipif_is_stubaddr(const ipif_t *);
 extern boolean_t ipmp_packet_is_probe(mblk_t *, ill_t *);
-extern ill_t	*ipmp_ill_get_xmit_ill(ill_t *, boolean_t);
-extern void	ipmp_ncec_flush_nce(ncec_t *);
-extern void	ipmp_ncec_fastpath(ncec_t *, ill_t *);
+extern void	ipmp_ncec_delete_nce(ncec_t *);
+extern void	ipmp_ncec_refresh_nce(ncec_t *);
 
 extern void	conn_drain_insert(conn_t *, idl_tx_list_t *);
 extern void	conn_setqfull(conn_t *, boolean_t *);

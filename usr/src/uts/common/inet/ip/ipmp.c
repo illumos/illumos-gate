@@ -18,8 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <inet/ip.h>
@@ -51,7 +50,6 @@
  */
 #define	IPMP_GRP_HASH_SIZE		64
 #define	IPMP_ILL_REFRESH_TIMEOUT	120	/* seconds */
-
 
 /*
  * IPMP meta-interface kstats (based on those in PSARC/1997/198).
@@ -92,6 +90,7 @@ static void	ipmp_ill_bind_ipif(ill_t *, ipif_t *, enum ip_resolver_action);
 static ipif_t	*ipmp_ill_unbind_ipif(ill_t *, ipif_t *, boolean_t);
 static void	ipmp_phyint_get_kstats(phyint_t *, uint64_t *);
 static boolean_t ipmp_ipif_is_up_dataaddr(const ipif_t *);
+static void	ipmp_ncec_delete_nonlocal(ncec_t *, uchar_t *);
 
 /*
  * Initialize IPMP state for IP stack `ipst'; called from ip_stack_init().
@@ -766,20 +765,6 @@ ipmp_illgrp_hold_cast_ill(ipmp_illgrp_t *illg)
 	}
 	rw_exit(&ipst->ips_ipmp_lock);
 	return (NULL);
-}
-
-/*
- * Callback routine for ncec_walk() that deletes `nce' if it is associated with
- * the `(ill_t *)arg' and it is not one of the local addresses.  Caller must be
- * inside the IPSQ.
- */
-static void
-ipmp_ncec_delete_nonlocal(ncec_t *ncec, uchar_t *arg)
-{
-	if ((ncec != NULL) && !NCE_MYADDR(ncec) &&
-	    ncec->ncec_ill == (ill_t *)arg) {
-		ncec_delete(ncec);
-	}
 }
 
 /*
@@ -1521,7 +1506,7 @@ fail:
 static void
 ipmp_ill_deactivate(ill_t *ill)
 {
-	ill_t		*minill;
+	ill_t		*minill, *ipmp_ill;
 	ipif_t		*ipif, *ubnextipif, *ubheadipif = NULL;
 	mblk_t		*mp;
 	ipmp_grp_t	*grp = ill->ill_phyint->phyint_grp;
@@ -1530,6 +1515,8 @@ ipmp_ill_deactivate(ill_t *ill)
 
 	ASSERT(IAM_WRITER_ILL(ill));
 	ASSERT(IS_UNDER_IPMP(ill));
+
+	ipmp_ill = illg->ig_ipmp_ill;
 
 	/*
 	 * Pull the interface out of the active list.
@@ -1565,8 +1552,8 @@ ipmp_ill_deactivate(ill_t *ill)
 		ipif->ipif_bound_next = ubheadipif;
 		ubheadipif = ipif;
 	}
-	if (!ill->ill_isv6) {
 
+	if (!ill->ill_isv6) {
 		/*
 		 * Refresh static/proxy ARP entries that had been using `ill'.
 		 */
@@ -1586,28 +1573,23 @@ ipmp_ill_deactivate(ill_t *ill)
 			ipmp_ill_bind_ipif(minill, ipif, Res_act_rebind);
 	}
 
-	if (list_is_empty(&illg->ig_actif)) {
-		ill_t *ipmp_ill = illg->ig_ipmp_ill;
-
-		ncec_walk(ipmp_ill, (pfi_t)ncec_delete_per_ill,
-		    (uchar_t *)ipmp_ill, ipmp_ill->ill_ipst);
-	}
-
 	/*
-	 * Remove any IRE_IF_CLONE for this ill since they might have
-	 * an ire_nce_cache/nce_common which refers to another ill in the group.
+	 * Remove any IRE_IF_CLONEs for this ill since they might have an
+	 * ire_nce_cache/nce_common which refers to another ill in the group.
 	 */
-	ire_walk_ill(MATCH_IRE_TYPE, IRE_IF_CLONE, ill_downi_if_clone,
-	    ill, ill);
+	ire_walk_ill(MATCH_IRE_TYPE, IRE_IF_CLONE, ill_downi_if_clone, ill,
+	    ill);
 
 	/*
-	 * Finally, mark the group link down, if necessary.
+	 * Finally, if there are no longer any active interfaces, then delete
+	 * any NCECs associated with the group and mark the group link down.
 	 */
 	if (--grp->gr_nactif == 0) {
+		ncec_walk(ipmp_ill, (pfi_t)ncec_delete_per_ill, ipmp_ill, ipst);
 		mp = grp->gr_linkdownmp;
 		grp->gr_linkdownmp = NULL;
 		ASSERT(mp != NULL);
-		put(illg->ig_ipmp_ill->ill_rq, mp);
+		put(ipmp_ill->ill_rq, mp);
 	}
 }
 
@@ -1854,6 +1836,37 @@ ipmp_ill_hold_ipmp_ill(ill_t *ill)
 	 */
 	rw_exit(&ill->ill_ipst->ips_ipmp_lock);
 	return (NULL);
+}
+
+/*
+ * Return a held pointer to the appropriate underlying ill for sending the
+ * specified type of packet.  (Unfortunately, this function needs to take an
+ * underlying ill rather than an ipmp_illgrp_t because an underlying ill's
+ * ill_grp pointer may become stale when not inside an IPSQ and not holding
+ * ipmp_lock.)  Caller need not be inside the IPSQ.
+ */
+ill_t *
+ipmp_ill_hold_xmit_ill(ill_t *ill, boolean_t is_unicast)
+{
+	ill_t *xmit_ill;
+	ip_stack_t *ipst = ill->ill_ipst;
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	if (ill->ill_grp == NULL) {
+		/*
+		 * The ill was taken out of the group, so just send on it.
+		 */
+		rw_exit(&ipst->ips_ill_g_lock);
+		ill_refhold(ill);
+		return (ill);
+	}
+	if (is_unicast)
+		xmit_ill = ipmp_illgrp_hold_next_ill(ill->ill_grp);
+	else
+		xmit_ill = ipmp_illgrp_hold_cast_ill(ill->ill_grp);
+	rw_exit(&ipst->ips_ill_g_lock);
+
+	return (xmit_ill);
 }
 
 /*
@@ -2130,8 +2143,8 @@ ipmp_ipif_is_up_dataaddr(const ipif_t *ipif)
 }
 
 /*
- * Check if `mp' contains a probe packet by verifying if the IP source address
- * is a test address on an underlying interface `ill'. Caller need not be inside
+ * Check if `mp' contains a probe packet by checking if the IP source address
+ * is a test address on underlying interface `ill'.  Caller need not be inside
  * the IPSQ.
  */
 boolean_t
@@ -2150,7 +2163,7 @@ ipmp_packet_is_probe(mblk_t *mp, ill_t *ill)
 		    ipif_lookup_testaddr_v6(ill, &ip6h->ip6_src, NULL))
 			return (B_TRUE);
 	} else {
-		if ((ipha->ipha_src != INADDR_ANY) &&
+		if (ipha->ipha_src != INADDR_ANY &&
 		    ipif_lookup_testaddr_v4(ill, &ipha->ipha_src, NULL))
 			return (B_TRUE);
 	}
@@ -2158,140 +2171,105 @@ ipmp_packet_is_probe(mblk_t *mp, ill_t *ill)
 }
 
 /*
- * Pick out an appropriate underlying interface for packet transmit.  This
- * function may be called from the data path, so we need to verify that the
- * IPMP group associated with `ill' is non-null after holding the ill_g_lock.
- * Caller need not be inside the IPSQ.
+ * NCEC walker callback: delete `ncec' if it is associated with `ill_arg' and
+ * is not one of our local addresses.  Caller must be inside the IPSQ.
  */
-ill_t *
-ipmp_ill_get_xmit_ill(ill_t *ill, boolean_t is_unicast)
+static void
+ipmp_ncec_delete_nonlocal(ncec_t *ncec, uchar_t *ill_arg)
 {
-	ill_t *xmit_ill;
-	ip_stack_t *ipst = ill->ill_ipst;
-
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-	if (ill->ill_grp == NULL) {
-		/*
-		 * The interface was taken out of the group. Return ill itself,
-		 * but take a ref so that callers will always be able to do
-		 * ill_refrele(ill);
-		 */
-		rw_exit(&ipst->ips_ill_g_lock);
-		ill_refhold(ill);
-		return (ill);
-	}
-	if (!is_unicast)
-		xmit_ill = ipmp_illgrp_hold_cast_ill(ill->ill_grp);
-	else
-		xmit_ill = ipmp_illgrp_hold_next_ill(ill->ill_grp);
-	rw_exit(&ipst->ips_ill_g_lock);
-	return (xmit_ill);
+	if (!NCE_MYADDR(ncec) && ncec->ncec_ill == (ill_t *)ill_arg)
+		ncec_delete(ncec);
 }
 
 /*
- * Flush out any nce that points at `ncec' from an underlying interface
+ * Delete any NCEs tied to the illgrp associated with `ncec'.  Caller need not
+ * be inside the IPSQ.
  */
 void
-ipmp_ncec_flush_nce(ncec_t *ncec)
+ipmp_ncec_delete_nce(ncec_t *ncec)
 {
-	ill_t		*ncec_ill = ncec->ncec_ill;
+	ipmp_illgrp_t	*illg = ncec->ncec_ill->ill_grp;
+	ip_stack_t	*ipst = ncec->ncec_ipst;
 	ill_t		*ill;
-	ipmp_illgrp_t	*illg;
-	ip_stack_t	*ipst = ncec_ill->ill_ipst;
-	list_t		dead;
 	nce_t		*nce;
+	list_t		dead;
 
-	if (!IS_IPMP(ncec_ill))
-		return;
+	ASSERT(IS_IPMP(ncec->ncec_ill));
 
-	illg = ncec_ill->ill_grp;
+	/*
+	 * For each underlying interface, delete `ncec' from its ill_nce list
+	 * via nce_fastpath_list_delete().  Defer the actual nce_refrele()
+	 * until we've dropped ill_g_lock.
+	 */
 	list_create(&dead, sizeof (nce_t), offsetof(nce_t, nce_node));
 
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	ill = list_head(&illg->ig_if);
-	for (; ill != NULL; ill = list_next(&illg->ig_if, ill)) {
+	for (; ill != NULL; ill = list_next(&illg->ig_if, ill))
 		nce_fastpath_list_delete(ill, ncec, &dead);
-	}
 	rw_exit(&ipst->ips_ill_g_lock);
 
-	/*
-	 * we may now nce_refrele() all dead entries since all locks have been
-	 * dropped.
-	 */
-	while ((nce = list_head(&dead)) != NULL) {
-		list_remove(&dead, nce);
+	while ((nce = list_remove_head(&dead)) != NULL)
 		nce_refrele(nce);
-	}
-	ASSERT(list_is_empty(&dead));
+
 	list_destroy(&dead);
 }
 
 /*
- * For each interface in the IPMP group, if there are nce_t entries for the IP
- * address corresponding to `ncec', then their dl_unitdata_req_t and fastpath
- * information must be updated to match the link-layer address information in
- * `ncec'.
+ * Refresh any NCE entries tied to the illgrp associated with `ncec' to
+ * use the information in `ncec'.  Caller need not be inside the IPSQ.
  */
 void
-ipmp_ncec_fastpath(ncec_t *ncec, ill_t *ipmp_ill)
+ipmp_ncec_refresh_nce(ncec_t *ncec)
 {
+	ipmp_illgrp_t	*illg = ncec->ncec_ill->ill_grp;
+	ip_stack_t	*ipst = ncec->ncec_ipst;
 	ill_t		*ill;
-	ipmp_illgrp_t	*illg = ipmp_ill->ill_grp;
-	ip_stack_t	*ipst = ipmp_ill->ill_ipst;
 	nce_t		*nce, *nce_next;
 	list_t		replace;
 
-	ASSERT(IS_IPMP(ipmp_ill));
+	ASSERT(IS_IPMP(ncec->ncec_ill));
 
 	/*
-	 * if ncec itself is not reachable, there is no use in creating nce_t
-	 * entries on the underlying interfaces in the group.
+	 * If `ncec' is not reachable, there is no use in refreshing NCEs.
 	 */
 	if (!NCE_ISREACHABLE(ncec))
 		return;
 
+	/*
+	 * Find all the NCEs matching ncec->ncec_addr.  We cannot update them
+	 * in-situ because we're holding ipmp_lock to prevent changes to IPMP
+	 * group membership and updating indirectly calls nce_fastpath_probe()
+	 * -> putnext() which cannot hold locks.  Thus, move the NCEs to a
+	 * separate list and process that list after dropping ipmp_lock.
+	 */
 	list_create(&replace, sizeof (nce_t), offsetof(nce_t, nce_node));
 	rw_enter(&ipst->ips_ipmp_lock, RW_READER);
 	ill = list_head(&illg->ig_actif);
 	for (; ill != NULL; ill = list_next(&illg->ig_actif, ill)) {
-		/*
-		 * For each underlying interface, we first check if there is an
-		 * nce_t for the address in ncec->ncec_addr. If one exists,
-		 * we should trigger nce_fastpath for that nce_t. However, the
-		 * catch is that we are holding the ips_ipmp_lock to prevent
-		 * changes to the IPMP group membership, so that we cannot
-		 * putnext() to the driver.  So we nce_delete the
-		 * list nce_t entries that need to be updated into the
-		 * `replace' list, and then process the `replace' list
-		 * after dropping the ips_ipmp_lock.
-		 */
 		mutex_enter(&ill->ill_lock);
-		for (nce = list_head(&ill->ill_nce); nce != NULL; ) {
+		nce = list_head(&ill->ill_nce);
+		for (; nce != NULL; nce = nce_next) {
 			nce_next = list_next(&ill->ill_nce, nce);
-			if (!IN6_ARE_ADDR_EQUAL(&nce->nce_addr,
+			if (IN6_ARE_ADDR_EQUAL(&nce->nce_addr,
 			    &ncec->ncec_addr)) {
-				nce = nce_next;
-				continue;
+				nce_refhold(nce);
+				nce_delete(nce);
+				list_insert_tail(&replace, nce);
 			}
-			nce_refhold(nce);
-			nce_delete(nce);
-			list_insert_tail(&replace, nce);
-			nce = nce_next;
 		}
 		mutex_exit(&ill->ill_lock);
 	}
 	rw_exit(&ipst->ips_ipmp_lock);
+
 	/*
-	 * `replace' now has the list of nce's on which we should be triggering
-	 * nce_fastpath(). We now retrigger fastpath by setting up the nce
-	 * again. The code in nce_lookup_then_add_v* ensures that nce->nce_ill
-	 * is still in the group for ncec->ncec_ill
+	 * Process the list; nce_lookup_then_add_v* ensures that nce->nce_ill
+	 * is still in the group for ncec->ncec_ill.
 	 */
-	while ((nce = list_head(&replace)) != NULL) {
-		list_remove(&replace, nce);
+	while ((nce = list_remove_head(&replace)) != NULL) {
 		if (ncec->ncec_ill->ill_isv6) {
 			(void) nce_lookup_then_add_v6(nce->nce_ill,
-			    ncec->ncec_lladdr,  ncec->ncec_lladdr_length,
+			    ncec->ncec_lladdr, ncec->ncec_lladdr_length,
 			    &nce->nce_addr, ncec->ncec_flags, ND_UNCHANGED,
 			    NULL);
 		} else {
@@ -2304,6 +2282,6 @@ ipmp_ncec_fastpath(ncec_t *ncec, ill_t *ipmp_ill)
 		}
 		nce_refrele(nce);
 	}
-	ASSERT(list_is_empty(&replace));
+
 	list_destroy(&replace);
 }

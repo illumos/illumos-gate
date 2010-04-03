@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <inet/ip_arp.h>
@@ -1705,7 +1704,7 @@ arp_announce(ncec_t *ncec)
 
 	if (IS_IPMP(ncec->ncec_ill)) {
 		/* sent on the cast_ill */
-		ill = ipmp_ill_get_xmit_ill(ncec->ncec_ill, B_FALSE);
+		ill = ipmp_ill_hold_xmit_ill(ncec->ncec_ill, B_FALSE);
 		if (ill == NULL)
 			return (B_TRUE);
 		need_refrele = B_TRUE;
@@ -1740,7 +1739,7 @@ arp_probe(ncec_t *ncec)
 	uchar_t *sphys_addr, *dst_lladdr;
 
 	if (IS_IPMP(ncec->ncec_ill)) {
-		ill = ipmp_ill_get_xmit_ill(ncec->ncec_ill, B_FALSE);
+		ill = ipmp_ill_hold_xmit_ill(ncec->ncec_ill, B_FALSE);
 		if (ill == NULL)
 			return (B_TRUE);
 	} else {

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -3088,7 +3087,7 @@ nce_fastpath_create(ill_t *ill, ncec_t *ncec)
  * Note that since ill_fastpath_probe() copies the mblk there is
  * no need to hold the nce or ncec beyond this function.
  *
- * If the caller has passed in a non-null ncec_nce to nce_faspath() that
+ * If the caller has passed in a non-null ncec_nce to nce_fastpath() that
  * ncec_nce must correspond to the nce for ncec with nce_ill == ncec->ncec_ill
  * and will be returned back by this function, so that no extra nce_refrele
  * is required for the caller. The calls from nce_add_common() use this
@@ -3105,9 +3104,9 @@ nce_fastpath(ncec_t *ncec, boolean_t trigger_fp_req, nce_t *ncec_nce)
 
 	if (IS_IPMP(ill) && trigger_fp_req) {
 		trigger_fp_req = B_FALSE;
-		ipmp_ncec_fastpath(ncec, ill);
-
+		ipmp_ncec_refresh_nce(ncec);
 	}
+
 	/*
 	 * If the caller already has the nce corresponding to the ill, use
 	 * that one. Otherwise we have to lookup/add the nce. Calls from
@@ -3204,9 +3203,9 @@ nce_fastpath_list_delete(ill_t *ill, ncec_t *ncec, list_t *dead)
 
 	ASSERT(ill != NULL);
 
-	/* first clean out any nce pointers in the under_ills */
+	/* delete any nces referencing the ncec from underlying ills */
 	if (IS_IPMP(ill))
-		ipmp_ncec_flush_nce(ncec);
+		ipmp_ncec_delete_nce(ncec);
 
 	/* now the ill itself */
 	mutex_enter(&ill->ill_lock);
@@ -3247,7 +3246,7 @@ nce_delete_then_add(nce_t *nce)
 	/*
 	 * Make sure that ncec is not condemned before adding. We hold the
 	 * ill_lock and ncec_lock to synchronize with ncec_delete() and
-	 * ipmp_ncec_flush_nce()
+	 * ipmp_ncec_delete_nce()
 	 */
 	if (!NCE_ISCONDEMNED(nce->nce_common))
 		newnce = nce_add(ill, nce->nce_common);
@@ -3597,7 +3596,7 @@ nce_lookup_then_add_v4(ill_t *ill, uchar_t *hw_addr, uint_t hw_addr_len,
 		 * IPv4 broadcast ncec: compute the hwaddr.
 		 */
 		if (IS_IPMP(ill)) {
-			under = ipmp_ill_get_xmit_ill(ill, B_FALSE);
+			under = ipmp_ill_hold_xmit_ill(ill, B_FALSE);
 			if (under == NULL)  {
 				if (need_ill_refrele)
 					ill_refrele(ill);
@@ -4278,7 +4277,7 @@ nce_resolve_src(ncec_t *ncec, in6_addr_t *src)
 			    B_FALSE, NULL);
 		}
 		if (ipif == NULL && IS_IPMP(ill)) {
-			ill_t *send_ill = ipmp_ill_get_xmit_ill(ill, B_TRUE);
+			ill_t *send_ill = ipmp_ill_hold_xmit_ill(ill, B_TRUE);
 
 			if (send_ill != NULL) {
 				if (isv6) {
@@ -5022,7 +5021,7 @@ nce_resolv_ipmp_ok(ncec_t *ncec)
 			 * For forwarded packets, we use the ipmp rotor
 			 * to find send_ill.
 			 */
-			send_ill = ipmp_ill_get_xmit_ill(ncec->ncec_ill,
+			send_ill = ipmp_ill_hold_xmit_ill(ncec->ncec_ill,
 			    B_TRUE);
 		} else {
 			send_ill = src_ipif->ipif_ill;
