@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -431,6 +431,12 @@ char *nv_setdisc(register Namval_t* np,register const char *event,Namval_t *acti
 	register struct vardisc *vp = (struct vardisc*)np->nvfun;
 	register int type;
 	char *empty = "";
+	while(vp)
+	{
+		if(vp->fun.disc && (vp->fun.disc->setdisc || vp->fun.disc->putval == assign))
+			break;
+		vp = (struct vardisc*)vp->fun.next;
+	}
 	if(vp && !vp->fun.disc)
 		vp = 0;
 	if(np == (Namval_t*)fp)
@@ -494,6 +500,8 @@ char *nv_setdisc(register Namval_t* np,register const char *event,Namval_t *acti
 		memset(dp,0,sizeof(*dp));
 		dp->dsize = sizeof(struct vardisc);
 		dp->putval = assign;
+		if(nv_isarray(np) && !nv_arrayptr(np))
+			nv_putsub(np,(char*)0, 1);
 		nv_stack(np, (Namfun_t*)vp);
 	}
 	if(action==np)
@@ -907,6 +915,8 @@ int nv_clone(Namval_t *np, Namval_t *mp, int flags)
 	        nv_setsize(mp,nv_size(np));
 	if(mp->nvflag == flag)
 	        mp->nvflag = (np->nvflag&~(NV_MINIMAL))|(mp->nvflag&NV_MINIMAL);
+		if(nv_isattr(np,NV_EXPORT))
+			mp->nvflag |= (np->nvflag&NV_MINIMAL);
 	if(mp->nvalue.cp==val && !nv_isattr(np,NV_INTEGER))
 	{
 		if(np->nvalue.cp && np->nvalue.cp!=Empty && (flags&NV_COMVAR) && !(flags&NV_MOVE))
@@ -927,8 +937,13 @@ int nv_clone(Namval_t *np, Namval_t *mp, int flags)
 		np->nvfun = 0;
 		np->nvalue.cp = 0;
 		if(!nv_isattr(np,NV_MINIMAL) || nv_isattr(mp,NV_EXPORT))
+		{
+			mp->nvenv = np->nvenv;
 		        np->nvenv = 0;
-		np->nvflag &= NV_MINIMAL;
+			np->nvflag = 0;
+		}
+		else
+			np->nvflag &= NV_MINIMAL;
 	        nv_setsize(np,0);
 		return(1);
 	}
@@ -1368,3 +1383,14 @@ const Namdisc_t *nv_discfun(int which)
 	return(0);
 }
 
+int nv_hasget(Namval_t *np)
+{
+	register Namfun_t	*fp;
+	for(fp=np->nvfun; fp; fp=fp->next)
+	{
+		if(!fp->disc || (!fp->disc->getnum && !fp->disc->getval))
+			continue;
+		return(1);
+	}
+	return(0);
+}

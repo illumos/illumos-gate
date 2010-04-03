@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -247,6 +247,34 @@ static Shnode_t	*makeparent(Lex_t *lp, int flag, Shnode_t *child)
 	return(par);
 }
 
+static int paramsub(const char *str)
+{
+	register int c,sub=0,lit=0;
+	while(c= *str++)
+	{
+		if(c=='$' && !lit)
+		{
+			if(*str=='(')
+				return(0);
+			if(sub)
+				continue;
+			if(*str=='{')
+				str++;
+			if(!isdigit(*str) && strchr("?#@*!$ ",*str)==0)
+				return(1);
+		}
+		else if(c=='`')
+			return(0);
+		else if(c=='[' && !lit)
+			sub++;
+		else if(c==']' && !lit)
+			sub--;
+		else if(c=='\'')
+			lit = !lit;
+	}
+	return(0);
+}
+
 static Shnode_t *getanode(Lex_t *lp, struct argnod *ap)
 {
 	register Shnode_t *t = getnode(arithnod);
@@ -256,7 +284,11 @@ static Shnode_t *getanode(Lex_t *lp, struct argnod *ap)
 	if(ap->argflag&ARG_RAW)
 		t->ar.arcomp = sh_arithcomp(ap->argval);
 	else
+	{
+		if(sh_isoption(SH_NOEXEC) && (ap->argflag&ARG_MAC) && paramsub(ap->argval))
+			errormsg(SH_DICT,ERROR_warn(0),"%d: parameter substitution requires unnecessary string to number conversion",lp->sh->inlineno-(lp->token=='\n'));
 		t->ar.arcomp = 0;
+	}
 	return(t);
 }
 
@@ -797,6 +829,8 @@ static Shnode_t *funct(Lex_t *lexp)
 		}
 		t->funct.functtre = item(lexp,SH_NOIO);
 	}
+	else if(shp->shcomp)
+		exit(1);
 	sh_popcontext(&buff);
 	loop_level = saveloop;
 	label_last = savelabel;
@@ -1413,7 +1447,7 @@ static Shnode_t *simple(Lex_t *lexp,int flag, struct ionod *io)
 	*argtail = 0;
 	if(argno>0)
 		argmax = argno;
-	t->comtyp = TCOM | (argmax<<(COMBITS+2));
+	t->comtyp = TCOM;
 #if SHOPT_KIA
 	if(lexp->kiafile && !(flag&SH_NOIO))
 	{

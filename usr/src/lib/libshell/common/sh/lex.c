@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -273,6 +273,7 @@ Lex_t *sh_lexopen(Lex_t *lp, Shell_t *sp, int mode)
 	{
 		lp->lexd.noarg = lp->lexd.level= lp->lexd.dolparen = lp->lexd.balance = 0;
 		lp->lexd.nocopy = lp->lexd.docword = lp->lexd.nest = lp->lexd.paren = 0;
+		lp->lexd.lex_state = lp->lexd.lastc=0;
 	}
 	lp->comsub = 0;
 	return(lp);
@@ -1080,9 +1081,6 @@ int sh_lex(Lex_t* lp)
 						return(lp->token=EXPRSYM);
 					}
 					/* backward compatibility */
-					if(lp->lexd.dolparen)
-						fcseek(-1);
-					else
 					{
 						if(lp->lexd.warn)
 							errormsg(SH_DICT,ERROR_warn(0),e_lexnested,shp->inlineno);
@@ -1487,7 +1485,7 @@ static int comsub(register Lex_t *lp, int endtok)
 	register int	n,c,count=1;
 	register int	line=lp->sh->inlineno;
 	char word[5];
-	int messages=0, assignok=lp->assignok, csub;
+	int off, messages=0, assignok=lp->assignok, csub;
 	struct lexstate	save;
 	save = lp->lex;
 	csub = lp->comsub;
@@ -1496,8 +1494,15 @@ static int comsub(register Lex_t *lp, int endtok)
 	lp->lex.incase=0;
 	pushlevel(lp,0,0);
 	lp->comsub = (endtok==LBRACE);
+	off = fcseek(0) - lp->lexd.first;
 	if(sh_lex(lp)==endtok)
 	{
+		if(endtok==LPAREN && fcseek(0)==lp->lexd.first)
+		{
+			count++;
+			lp->lexd.paren = 0;
+			fcseek(off+2);
+		}
 		while(1)
 		{
 			/* look for case and esac */

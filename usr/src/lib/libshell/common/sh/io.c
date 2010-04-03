@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -1294,7 +1294,7 @@ int	sh_redirect(Shell_t *shp,struct ionod *iop, int flag)
 			}
 			if(fd<0)
 			{
-				if(sh_inuse(fn) || fn==shp->infd)
+				if(sh_inuse(fn) || (fn && fn==shp->infd))
 				{
 					if(fn>9 || !(shp->inuse_bits&(1<<fn)))
 						io_preserve(shp,shp->sftable[fn],fn);

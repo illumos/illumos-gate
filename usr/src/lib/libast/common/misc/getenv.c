@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -38,7 +38,12 @@ __STDPP__directive pragma pp:nohide getenv
  * UWIN: no _ast_getenv macro map to maintain ast54 compatibility
  */
 
-Intercepts_t	intercepts = { 0 };
+Intercepts_t	intercepts
+#if _BLD_3d
+		;
+#else
+		= { 0 };
+#endif
 
 #if _UWIN && !defined(getenv)
 

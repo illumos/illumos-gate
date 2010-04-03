@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -36,11 +36,7 @@ extern int	optind;
 extern int	optopt;
 extern char*	optarg;
 
-#ifndef NULL	/* in case <stdlib.h> or <stdio.h> got here first */
-
 extern int	getopt(int, char* const*, const char*);
 extern int	getsubopt(char**, char* const*, char**);
-
-#endif
 
 #endif

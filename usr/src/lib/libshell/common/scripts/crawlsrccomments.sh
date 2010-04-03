@@ -22,8 +22,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Solaris needs /usr/xpg6/bin:/usr/xpg4/bin because the tools in /usr/bin are not POSIX-conformant
@@ -697,8 +696,8 @@ function cat_http_body
     
 	if [[ "${emode}" == "chunked" ]] ; then
 		while IFS=$'\r' read hexchunksize &&
-			[[ "${hexchunksize}" == ~(Elri)[0-9abcdef]* ]] &&
-			(( chunksize=16#${hexchunksize} )) && (( chunksize > 0 )) ; do
+			[[ "${hexchunksize}" == ~(Elri)[0-9abcdef]+ ]] &&
+			(( chunksize=$( printf "16#%s\n" "${hexchunksize}" )  )) && (( chunksize > 0 )) ; do
 			dd bs=1 count="${chunksize}" 2>/dev/null
 		done
 	else
@@ -764,7 +763,7 @@ function cat_url
 			# send HTTP request    
 			request="GET /${path} HTTP/1.1\r\n"
 			request+="Host: ${host}\r\n"
-			request+="User-Agent: crawlsrccomments/ksh93(ssl) (2009-05-08; $(uname -s -r -p))\r\n"
+			request+="User-Agent: crawlsrccomments/ksh93(ssl) (2010-03-27; $(uname -s -r -p))\r\n"
 			request+="Connection: close\r\n"
 			print -n -- "${request}\r\n" >>	"${sslfifo.in}"
 			
@@ -784,7 +783,7 @@ function cat_url
 			# send HTTP request    
 			request="GET /${path} HTTP/1.1\r\n"
 			request+="Host: ${host}\r\n"
-			request+="User-Agent: crawlsrccomments/ksh93 (2009-05-08; $(uname -s -r -p))\r\n"
+			request+="User-Agent: crawlsrccomments/ksh93 (2010-03-27; $(uname -s -r -p))\r\n"
 			request+="Connection: close\r\n"
 			print -n -- "${request}\r\n" >&${netfd}
     
@@ -1141,8 +1140,9 @@ function usage
 }
 
 typeset -r do_getcomments_usage=$'+
-[-?\n@(#)\$Id: getcomments (Roland Mainz) 2009-05-09 \$\n]
+[-?\n@(#)\$Id: getcomments (Roland Mainz) 2010-03-27 \$\n]
 [-author?Roland Mainz <roland.mainz@sun.com>]
+[-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?getcomments - extract license information from source files]
 [+DESCRIPTION?\bgetcomments\b is a small utilty script which extracts
 	license information from the "\bgetcomments\b"-database
@@ -1164,8 +1164,9 @@ typeset -r do_getcomments_usage=$'+
 '
 
 typeset -r do_crawl_usage=$'+
-[-?\n@(#)\$Id: crawl (Roland Mainz) 2009-05-09 \$\n]
+[-?\n@(#)\$Id: crawl (Roland Mainz) 2010-03-27 \$\n]
 [-author?Roland Mainz <roland.mainz@sun.com>]
+[-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?crawl - crawl comment information from source files]
 [+DESCRIPTION?\bcrawl\b is a small utilty script which reads
 	a list of source code files from stdin, determinates the type of
@@ -1180,8 +1181,9 @@ typeset -r do_crawl_usage=$'+
 '
 
 typeset -r crawlsrccomments_usage=$'+
-[-?\n@(#)\$Id: crawlsrccomments (Roland Mainz) 2009-05-09 \$\n]
+[-?\n@(#)\$Id: crawlsrccomments (Roland Mainz) 2010-03-27 \$\n]
 [-author?Roland Mainz <roland.mainz@sun.com>]
+[-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?crawlsrccomments - extract and filter comment information from source files]
 [+DESCRIPTION?\bcrawlsrccomments\b is a small utilty script which reads
 	a list of source code files from stdin, determinates the type of

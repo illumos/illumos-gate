@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -54,7 +54,7 @@ reg size_t	size;
 
 	if(size <= 0)
 		return NIL(Void_t*);
-	else if(size != vd->pool)
+	if(size != vd->pool)
 	{	if(vd->pool <= 0)
 			vd->pool = size;
 		else	return NIL(Void_t*);

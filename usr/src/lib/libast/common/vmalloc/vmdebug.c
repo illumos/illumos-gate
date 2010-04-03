@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -177,7 +177,7 @@ int		type;	/* operation being done		*/
 		bufp = (*_Vmstrcpy)(bufp, (*_Vmitoa)(VLONG(func),-1), ':');
 	}
 
-	*bufp++ = '\n';
+	*(bufp - 1) = '\n';
 	*bufp = '\0';
 
 	vmdbwarn(vm,buf,(bufp-buf));
@@ -463,9 +463,9 @@ Void_t*		data;
 		vmdbcheck(vm);
 
 	if((offset = KPVADDR(vm,data,dbaddr)) != 0)
-	{	if(vm->disc->exceptf)
+	{	dbwarn(vm,(Vmuchar_t*)data,offset == -1L ? 0 : 1,file,line,func,DB_FREE);
+		if(vm->disc->exceptf)
 			(void)(*vm->disc->exceptf)(vm,VM_BADADDR,data,vm->disc);
-		dbwarn(vm,(Vmuchar_t*)data,offset == -1L ? 0 : 1,file,line,func,DB_FREE);
 		CLRLOCK(vd,0);
 		CLRINUSE(vd, inuse);
 		return -1;
@@ -537,9 +537,9 @@ int		type;		/* !=0 for movable, >0 for copy	*/
 		vmdbcheck(vm);
 
 	if((offset = KPVADDR(vm,addr,dbaddr)) != 0)
-	{	if(vm->disc->exceptf)
+	{	dbwarn(vm,(Vmuchar_t*)addr,offset == -1L ? 0 : 1,file,line,func,DB_RESIZE);
+		if(vm->disc->exceptf)
 			(void)(*vm->disc->exceptf)(vm,VM_BADADDR,addr,vm->disc);
-		dbwarn(vm,(Vmuchar_t*)addr,offset == -1L ? 0 : 1,file,line,func,DB_RESIZE);
 		CLRLOCK(vd,0);
 		CLRINUSE(vd, inuse);
 		return NIL(Void_t*);
@@ -742,6 +742,39 @@ done:
 	ANNOUNCE(0, vm, VM_ALLOC, (Void_t*)data, vm->disc);
 	CLRINUSE(vd, inuse);
 	return (Void_t*)data;
+}
+
+/* print statistics of region vm. If vm is NULL, use Vmregion */
+#if __STD_C
+ssize_t vmdbstat(Vmalloc_t* vm)
+#else
+ssize_t vmdbstat(vm)
+Vmalloc_t*	vm;
+#endif
+{	Vmstat_t	st;
+	char		buf[1024], *bufp;
+
+	vmstat(vm ? vm : Vmregion, &st);
+	bufp = buf;
+	bufp = (*_Vmstrcpy)(bufp, "n_busy", '=');
+	bufp = (*_Vmstrcpy)(bufp, (*_Vmitoa)((Vmulong_t)st.n_busy,-1), ',');
+	bufp = (*_Vmstrcpy)(bufp, " s_busy", '=');
+	bufp = (*_Vmstrcpy)(bufp, (*_Vmitoa)(VLONG(st.s_busy),-1), '\n');
+	bufp = (*_Vmstrcpy)(bufp, "n_free", '=');
+	bufp = (*_Vmstrcpy)(bufp, (*_Vmitoa)((Vmulong_t)st.n_free,-1), ',');
+	bufp = (*_Vmstrcpy)(bufp, " s_free", '=');
+	bufp = (*_Vmstrcpy)(bufp, (*_Vmitoa)(VLONG(st.s_free),-1), '\n');
+	bufp = (*_Vmstrcpy)(bufp, "m_busy", '=');
+	bufp = (*_Vmstrcpy)(bufp, (*_Vmitoa)(VLONG(st.m_busy),-1), ',');
+	bufp = (*_Vmstrcpy)(bufp, " m_free", '=');
+	bufp = (*_Vmstrcpy)(bufp, (*_Vmitoa)(VLONG(st.m_free),-1), '\n');
+	bufp = (*_Vmstrcpy)(bufp, "n_segment", '=');
+	bufp = (*_Vmstrcpy)(bufp, (*_Vmitoa)((Vmulong_t)st.n_seg,-1), ',');
+	bufp = (*_Vmstrcpy)(bufp, " extent", '=');
+	bufp = (*_Vmstrcpy)(bufp, (*_Vmitoa)(VLONG(st.extent),-1), '\n');
+	*bufp = 0;
+	write(Dbfd, buf, strlen(buf));
+	return strlen(buf);
 }
 
 static Vmethod_t _Vmdebug =

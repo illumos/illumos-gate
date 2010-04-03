@@ -19,8 +19,7 @@
 # CDDL HEADER END
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
  
 # 
@@ -49,14 +48,14 @@ properly found.
 * Example usage of the script (more information can be found in the
 script itself):
 ## Download AT&T ksh93 sources
-$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/sw/download/beta/INIT.2009-10-14.tgz'
-$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/sw/download/beta/ast-ksh.2009-10-14.tgz'
+$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/sw/download/beta/INIT.2010-03-09.tgz'
+$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/sw/download/beta/ast-ksh.2010-03-09.tgz'
 
 ## Unpack the sources (32bit SPARC):
 $ mkdir build_sparc_32bit
 $ cd build_sparc_32bit
-$ gunzip -c <../INIT.2009-10-14.tgz | tar -xf -
-$ gunzip -c <../ast-ksh.2009-10-14.tgz | tar -xf -
+$ gunzip -c <../INIT.2010-03-09.tgz | tar -xf -
+$ gunzip -c <../ast-ksh.2010-03-09.tgz | tar -xf -
 
 ## Build ast-ksh for 32bit SPARC
 # (build other build flags are:

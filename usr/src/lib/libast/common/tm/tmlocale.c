@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -32,6 +32,7 @@
 #include <iconv.h>
 #include <mc.h>
 #include <tm.h>
+#include <ast_nl_types.h>
 
 #include "lclib.h"
 
@@ -499,19 +500,23 @@ native_lc_time(Lc_info_t* li)
 	register char*	t;
 	register char**	b;
 	register int	n;
-	register int	m;
 	register int	i;
 
 	n = 0;
 	for (i = 0; i < elementsof(map); i++)
-		n += strlen(nl_langinfo(map[i].native)) + 1;
+	{
+		if (!(t = nl_langinfo(map[i].native)))
+			t = tm_data.format[map[i].local];
+		n += strlen(t) + 1;
+	}
 	if (!(b = newof(0, char*, TM_NFORM, n)))
 		return;
 	s = (char*)(b + TM_NFORM);
 	for (i = 0; i < elementsof(map); i++)
 	{
 		b[map[i].local] = s;
-		t = nl_langinfo(map[i].native);
+		if (!(t = nl_langinfo(map[i].native)))
+			t = tm_data.format[map[i].local];
 		while (*s++ = *t++);
 	}
 	fixup(li, b);

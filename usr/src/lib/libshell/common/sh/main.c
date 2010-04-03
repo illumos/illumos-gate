@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -443,7 +443,10 @@ static void	exfile(register Shell_t *shp, register Sfio_t *iop,register int fno)
 		shp->st.execbrk = shp->st.breakcnt = 0;
 		/* check for return from profile or env file */
 		if(sh_isstate(SH_PROFILE) && (jmpval==SH_JMPFUN || jmpval==SH_JMPEXIT))
+		{
+			sh_setstate(states);
 			goto done;
+		}
 		if(!sh_isoption(SH_INTERACTIVE) || sh_isstate(SH_FORKED) || (jmpval > SH_JMPERREXIT && job_close(shp) >=0))
 		{
 			sh_offstate(SH_INTERACTIVE);

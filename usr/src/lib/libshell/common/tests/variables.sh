@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2010 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -646,5 +646,14 @@ do	exp="$cmd ok"
 	got=$(CDPATH=:.. $SHELL -c "PATH=:/bin:/usr/bin; date > /dev/null; cd glean && ./$cmd" 2>&1)
 	[[ $got == "$exp" ]] || err_exit "cd with CDPATH after PATH change failed -- expected '$exp', got '$got'"
 done
+
+v=LC_CTYPE
+unset $v
+[[ -v $v ]] && err_exit "unset $v; [[ -v $v ]] failed"
+eval $v=C
+[[ -v $v ]] || err_exit "$v=C; [[ -v $v ]] failed"
+
+cmd='set --nounset; unset foo; : ${!foo*}'
+$SHELL -c "$cmd" 2>/dev/null || err_exit "'$cmd' exit status $?, expected 0"
 
 exit $((Errors))

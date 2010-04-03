@@ -22,8 +22,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Solaris needs /usr/xpg6/bin:/usr/xpg4/bin because the tools in /usr/bin are not POSIX-conformant
@@ -74,9 +73,7 @@ function svcproptovartree
 		servicename="${servicename/~(El)svc:\//}" # strip "svc:/"
 		propname="${name#~(El).*:properties/}"
 
-		if [[ "$(typeset -p "tree[${servicename}].properties")" == "" ]] ; then
-			compound -A tree[${servicename}].properties
-		fi
+		[[ "${ typeset +p "tree[${servicename}].properties" ; }" == "" ]] && compound -A tree[${servicename}].properties
 	
 		nameref node=tree[${servicename}].properties[${propname}]
 
@@ -110,7 +107,7 @@ builtin uname
 typeset progname="${ basename "${0}" ; }"
 
 typeset -r svcproptree1_usage=$'+
-[-?\n@(#)\$Id: svcproptree1 (Roland Mainz) 2009-06-26 \$\n]
+[-?\n@(#)\$Id: svcproptree1 (Roland Mainz) 2010-04-02 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?svcproptree1 - SMF tree demo]
 [+DESCRIPTION?\bsvcproptree1\b is a small ksh93 compound variable demo

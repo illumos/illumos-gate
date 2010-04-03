@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -17,4 +17,4 @@
 *                  David Korn <dgk@research.att.com>                   *
 *                                                                      *
 ***********************************************************************/
-#define SH_RELEASE	"93t+ 2009-10-12"
+#define SH_RELEASE	"93t+ 2010-03-05"

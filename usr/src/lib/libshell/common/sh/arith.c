@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -58,14 +58,15 @@ static Namval_t FunNode =
 
 static Namval_t *scope(Shell_t *shp,register Namval_t *np,register struct lval *lvalue,int assign)
 {
-	register Namarr_t *ap;
 	register int flag = lvalue->flag;
 	register char *sub=0, *cp=(char*)np;
 	register Namval_t *mp;
 	int	flags = HASH_NOSCOPE|HASH_SCOPE|HASH_BUCKET;
+	int	nosub = lvalue->nosub;
 	Dt_t	*sdict = (shp->st.real_fun? shp->st.real_fun->sdict:0);
 	Dt_t	*root = shp->var_tree;
 	assign = assign?NV_ASSIGN:NV_NOASSIGN;
+	lvalue->nosub = 0;
 	if(cp>=lvalue->expr &&  cp < lvalue->expr+lvalue->elen)
 	{
 		int offset;
@@ -100,7 +101,7 @@ static Namval_t *scope(Shell_t *shp,register Namval_t *np,register struct lval *
 		}
 		np = mp;
 	}
-	if(flag || sub)
+	if(!nosub && (flag || sub))
 	{
 		if(!sub)
 			sub = (char*)&lvalue->expr[flag];
@@ -123,6 +124,7 @@ static Sfdouble_t arith(const char **ptr, struct lval *lvalue, int type, Sfdoubl
 		np = scope(shp,np,lvalue,1);
 		nv_putval(np, (char*)&n, NV_LDOUBLE);
 		r=nv_getnum(np);
+		lvalue->value = (char*)np;
 		break;
 	    }
 	    case LOOKUP:

@@ -1,4 +1,4 @@
-/* : : generated from /home/gisburn/ksh93/ast_ksh_20091014/build_sparc_64bit/src/lib/libast/features/lib by iffe version 2009-10-06 : : */
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20100309/build_sparc_64bit/src/lib/libast/features/lib by iffe version 2009-12-04 : : */
 #ifndef _def_lib_ast
 #define _def_lib_ast	1
 #define _sys_types	1	/* #include <sys/types.h> ok */
@@ -113,6 +113,9 @@
 #define _lib_strtoll	1	/* strtoll() in default lib(s) */
 #define _lib_strtoul	1	/* strtoul() in default lib(s) */
 #define _lib_strtoull	1	/* strtoull() in default lib(s) */
+#define _hdr_signal	1	/* #include <signal.h> ok */
+#define _lib_sigflag	1	/* sigflag() in default lib(s) */
+#define _npt_sigflag	1	/* sigflag() needs a prototype */
 #define _mem_d_ino_dirent	1	/* d_ino is a member of struct dirent */
 #define _mem_d_off_dirent	1	/* d_off is a member of struct dirent */
 #define _mem_d_reclen_dirent	1	/* d_reclen is a member of struct dirent */
@@ -144,7 +147,6 @@
 #define _hdr_string	1	/* #include <string.h> ok */
 #define _lib_memcmp	1	/* standard memcmp interface that works */
 #define _hdr_fcntl	1	/* #include <fcntl.h> ok */
-#define _hdr_signal	1	/* #include <signal.h> ok */
 #define _sys_stat	1	/* #include <sys/stat.h> ok */
 #define _sys_mman	1	/* #include <sys/mman.h> ok */
 #define _lib_memccpy	1	/* standard memccpy interface that works */

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -1686,6 +1686,7 @@ tmxdate(register const char* s, char** e, Time_t now)
 	if (day >= 0 && !(state & (MDAY|WDAY)))
 	{
 		message((-1, "AHA#%d day=%d dir=%d state=" FFMT, __LINE__, day, dir, FLAGS(state)));
+		tmfix(tm);
 		m = dir;
 		if (state & MONTH)
 			tm->tm_mday = 1;
@@ -1700,7 +1701,10 @@ tmxdate(register const char* s, char** e, Time_t now)
 			for (n = tm_data.days[tm->tm_mon] + (tm->tm_mon == 1 && tmisleapyear(tm->tm_year)); (tm->tm_mday + 7) <= n; tm->tm_mday += 7);
 	}
 	else if (day < 0 && (state & FINAL) && (set & DAY))
+	{
+		tmfix(tm);
 		tm->tm_mday = tm_data.days[tm->tm_mon] + (tm->tm_mon == 1 && tmisleapyear(tm->tm_year));
+	}
 	if (state & WORK)
 	{
 		tm->tm_mday = (set & FINAL) ? (tm_data.days[tm->tm_mon] + (tm->tm_mon == 1 && tmisleapyear(tm->tm_year))) : 1;

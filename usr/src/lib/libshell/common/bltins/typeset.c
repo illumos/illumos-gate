@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -540,7 +540,12 @@ static int     b_common(char **argv,register int flag,Dt_t *troot,struct tdata *
 					else if(nv_isnull(np))
 						nv_onattr(np,NV_ARRAY|(comvar?NV_NOFREE:0));
 					else
+					{
+						Namarr_t *ap=nv_arrayptr(np);
+						if(ap && comvar)
+							ap->nelem |= ARRAY_TREE;
 						nv_putsub(np, (char*)0, 0);
+					}
 				}
 				else if(nvflags&NV_ARRAY)
 				{

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -19,7 +19,7 @@
 *                   Phong Vo <kpv@research.att.com>                    *
 *                                                                      *
 ***********************************************************************/
-/* : : generated from /home/gisburn/ksh93/ast_ksh_20091014/build_sparc_64bit/src/lib/libast/features/common by iffe version 2009-10-06 : : */
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20100309/build_sparc_64bit/src/lib/libast/features/common by iffe version 2009-12-04 : : */
 #ifndef _AST_COMMON_H
 #define _AST_COMMON_H	1
 #define _sys_types	1	/* #include <sys/types.h> ok */

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -28,7 +28,7 @@
  */
 
 static const char usage[] =
-"+[-?\n@(#)$Id: tail (AT&T Research) 2009-08-25 $\n]"
+"+[-?\n@(#)$Id: tail (AT&T Research) 2010-03-23 $\n]"
 USAGE_LICENSE
 "[+NAME?tail - output trailing portion of one or more files ]"
 "[+DESCRIPTION?\btail\b copies one or more input files to standard output "
@@ -135,7 +135,8 @@ struct Tail_s
 	Tail_t*		next;
 	char*		name;
 	Sfio_t*		sp;
-	Sfoff_t		last;
+	Sfoff_t		cur;
+	Sfoff_t		end;
 	unsigned long	expire;
 	long		dev;
 	long		ino;
@@ -324,7 +325,7 @@ init(Tail_t* tp, Sfoff_t number, int delim, int flags, const char** format)
 			}
 		}
 	}
-	tp->last = offset;
+	tp->cur = tp->end = offset;
 	if (flags & LOG)
 	{
 		if (fstat(sffileno(tp->sp), &st))
@@ -410,7 +411,6 @@ b_tail(int argc, char** argv, void* context)
 	char*			s;
 	char*			t;
 	char*			r;
-	char*			e;
 	char*			file;
 	Sfoff_t			offset;
 	Sfoff_t			number = DEFAULT;
@@ -418,6 +418,7 @@ b_tail(int argc, char** argv, void* context)
 	struct stat		st;
 	const char*		format = header_fmt+1;
 	ssize_t			z;
+	ssize_t			w;
 	Sfio_t*			op;
 	register Tail_t*	fp;
 	register Tail_t*	pp;
@@ -514,7 +515,7 @@ b_tail(int argc, char** argv, void* context)
 			flags |= TIMEOUT;
 			timeout = strelapsed(opt_info.arg, &s, 1);
 			if (*s)
-				error(ERROR_exit(1), "%s: invalid elapsed time", opt_info.arg);
+				error(ERROR_exit(1), "%s: invalid elapsed time [%s]", opt_info.arg, s);
 			continue;
 		case 'v':
 			flags |= VERBOSE;
@@ -632,40 +633,30 @@ b_tail(int argc, char** argv, void* context)
 			return error_info.errors != 0;
 		pp->next = 0;
 		hp = 0;
+		n = 1;
 		while (fp = files)
 		{
-			if (sfsync(sfstdout))
-				error(ERROR_system(1), "write error");
-#if 0
-			sleep(1);
-#else
-			{
-				struct timespec rqt = { 0L, 1000000000L/4L };
-				(void)nanosleep(&rqt, NULL);
-			}
-#endif
-			n = 0;
+			if (n)
+				n = 0;
+			else
+				sleep(1);
 			pp = 0;
 			while (fp)
 			{
 				if (fstat(sffileno(fp->sp), &st))
 					error(ERROR_system(0), "%s: cannot stat", fp->name);
-				else if (st.st_size > fp->last || fp->fifo)
+				else if (fp->fifo || fp->end < st.st_size)
 				{
 					n = 1;
 					if (timeout)
 						fp->expire = NOW + timeout;
-					z = fp->fifo ? SF_UNBOUND : st.st_size - fp->last;
+					z = fp->fifo ? SF_UNBOUND : st.st_size - fp->cur;
 					i = 0;
 					if ((s = sfreserve(fp->sp, z, SF_LOCKR)) || (z = sfvalue(fp->sp)) && (s = sfreserve(fp->sp, z, SF_LOCKR)) && (i = 1))
 					{
-						if (fp->fifo)
-							z = sfvalue(fp->sp);
-						r = 0;
-						for (e = (t = s) + z; t < e; t++)
-							if (*t == '\n')
-								r = t;
-						if (r || i && (r = e))
+						z = sfvalue(fp->sp);
+						for (r = s + z; r > s && *(r - 1) != '\n'; r--);
+						if ((w = r - s) || i && (w = z))
 						{
 							if ((flags & (HEADERS|VERBOSE)) && hp != fp)
 							{
@@ -673,13 +664,13 @@ b_tail(int argc, char** argv, void* context)
 								sfprintf(sfstdout, format, fp->name);
 								format = header_fmt;
 							}
-							z = r - s + 1;
-							fp->last += z;
-							sfwrite(sfstdout, s, z);
+							fp->cur += w;
+							sfwrite(sfstdout, s, w);
 						}
 						else
-							z = 0;
-						sfread(fp->sp, s, z);
+							w = 0;
+						sfread(fp->sp, s, w);
+						fp->end += w;
 					}
 					goto next;
 				}
@@ -707,14 +698,16 @@ b_tail(int argc, char** argv, void* context)
 					sfclose(fp->sp);
 				if (pp)
 					pp = pp->next = fp->next;
-				else if (!(files = files->next))
-					return error_info.errors != 0;
+				else
+					files = files->next;
 				fp = fp->next;
 				continue;
 			next:
 				pp = fp;
 				fp = fp->next;
 			}
+			if (sfsync(sfstdout))
+				error(ERROR_system(1), "write error");
 		}
 	}
 	else

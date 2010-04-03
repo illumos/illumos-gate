@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2010 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -449,5 +449,24 @@ then
 fi
 $SHELL -c '( sleep 5 </dev/null >/dev/null 2>&1 & );exit 0' | cat 
 (( (SECONDS-t1) > 4 )) && err_exit 'sleep& in subshell hanging'
+
+exp=HOME=$HOME
+( HOME=/bin/sh )
+got=$(env | grep ^HOME=)
+[[ $got == "$exp" ]] ||  err_exit "( HOME=/bin/sh ) cleanup failed -- expected '$exp', got '$got'"
+
+cmd='echo $((case x in x)echo ok;esac);:)'
+exp=ok
+got=$($SHELL -c "$cmd" 2>&1)
+[[ $got == "$exp" ]] ||  err_exit "'$cmd' failed -- expected '$exp', got '$got'"
+
+cmd='eval "for i in 1 2; do eval /bin/echo x; done"'
+exp=$'x\nx'
+got=$($SHELL -c "$cmd")
+if	[[ $got != "$exp" ]]
+then	EXP=$(printf %q "$exp")
+	GOT=$(printf %q "$got")
+	err_exit "'$cmd' failed -- expected $EXP, got $GOT"
+fi
 
 exit $Errors

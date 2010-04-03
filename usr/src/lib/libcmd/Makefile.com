@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 
@@ -48,6 +47,7 @@ OBJECTS =	\
 	fds.o \
 	fmt.o \
 	fold.o \
+	fts_fix.o \
 	getconf.o \
 	head.o \
 	id.o \
@@ -75,6 +75,7 @@ OBJECTS =	\
 	tty.o \
 	uname.o \
 	uniq.o \
+	vmstate.o \
 	wc.o \
 	wclib.o
 
@@ -122,7 +123,7 @@ CPPFLAGS = \
 	'-DUSAGE_LICENSE=\
 		"[-author?Glenn Fowler <gsf@research.att.com>]"\
 		"[-author?David Korn <dgk@research.att.com>]"\
-		"[-copyright?Copyright (c) 1992-2009 AT&T Intellectual Property]"\
+		"[-copyright?Copyright (c) 1992-2010 AT&T Intellectual Property]"\
 		"[-license?http://www.opensource.org/licenses/cpl1.0.txt]"\
 		"[--catalog?libcmd]"'
 
@@ -131,7 +132,9 @@ CFLAGS += \
 CFLAGS64 += \
 	$(ASTCFLAGS64)
 
+pics/cut.o	:= CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED
 pics/sync.o	:= CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED
+pics/vmstate.o	:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
 
 .KEEP_STATE:
 

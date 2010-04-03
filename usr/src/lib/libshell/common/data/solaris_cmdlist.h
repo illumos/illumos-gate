@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SOLARIS_KSH_CMDLIST_H
@@ -38,16 +37,6 @@ extern "C" {
  * tools
  */
 
-/* POSIX compatible commands */
-#ifdef _NOT_YET
-#define	XPG6CMDLIST(f)	\
-	{ "/usr/xpg6/bin/" #f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
-#define	XPG4CMDLIST(f)	\
-	{ "/usr/xpg4/bin/" #f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
-#else
-#define	XPG6CMDLIST(f)
-#define	XPG4CMDLIST(f)
-#endif /* NOT_YET */
 /*
  * Commands which are 100% compatible with native Solaris versions (/bin is
  * a softlink to ./usr/bin, ksh93 takes care about the lookup)
@@ -60,6 +49,18 @@ extern "C" {
 	{ "/sbin/"	#f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
 #define	SUSRBINCMDLIST(f)	\
 	{ "/usr/sbin/"	#f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
+/* POSIX compatible commands */
+#define	XPG6CMDLIST(f)	\
+	{ "/usr/xpg6/bin/" #f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
+#define	XPG4CMDLIST(f)	\
+	{ "/usr/xpg4/bin/" #f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
+#ifdef SHOPT_USR_GNU_BIN_BUILTINS
+/* GNU coreutils compatible commands */
+#define	GNUCMDLIST(f)	\
+	{ "/usr/gnu/bin/" #f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
+#else
+#define	GNUCMDLIST(f)
+#endif
 /*
  * Make all ksh93 builtins accessible when /usr/ast/bin was added to
  * /usr/xpg6/bin:/usr/xpg4/bin:/usr/ccs/bin:/usr/bin:/bin:/opt/SUNWspro/bin
@@ -73,89 +74,115 @@ extern "C" {
 #undef mktemp
 
 /* Generated data, do not edit. */
-XPG4CMDLIST(basename)
 ASTCMDLIST(basename)
-BINCMDLIST(cat)
+GNUCMDLIST(basename)
+XPG4CMDLIST(basename)
 ASTCMDLIST(cat)
-XPG4CMDLIST(chgrp)
+BINCMDLIST(cat)
 ASTCMDLIST(chgrp)
+// XPG4CMDLIST(chgrp)
 ASTCMDLIST(chmod)
-XPG4CMDLIST(chown)
-BINCMDLIST(chown)
 ASTCMDLIST(chown)
-BINCMDLIST(cksum)
+// XPG4CMDLIST(chown)
+BINCMDLIST(chown)
 ASTCMDLIST(cksum)
-BINCMDLIST(cmp)
+BINCMDLIST(cksum)
+GNUCMDLIST(cksum)
 ASTCMDLIST(cmp)
-BINCMDLIST(comm)
+BINCMDLIST(cmp)
 ASTCMDLIST(comm)
-XPG4CMDLIST(cp)
+BINCMDLIST(comm)
+GNUCMDLIST(comm)
 ASTCMDLIST(cp)
-BINCMDLIST(cut)
+// XPG4CMDLIST(cp)
 ASTCMDLIST(cut)
-XPG4CMDLIST(date)
+BINCMDLIST(cut)
+GNUCMDLIST(cut)
 ASTCMDLIST(date)
+// XPG4CMDLIST(date)
 ASTCMDLIST(dirname)
+BINCMDLIST(dirname)
+GNUCMDLIST(dirname)
 ASTCMDLIST(egrep)
-XPG4CMDLIST(expr)
+XPG4CMDLIST(egrep)
 ASTCMDLIST(expr)
+GNUCMDLIST(expr)
+XPG6CMDLIST(expr)
 ASTCMDLIST(fds)
 ASTCMDLIST(fgrep)
+XPG4CMDLIST(fgrep)
 ASTCMDLIST(fmt)
-BINCMDLIST(fold)
 ASTCMDLIST(fold)
+BINCMDLIST(fold)
+GNUCMDLIST(fold)
 ASTCMDLIST(grep)
-BINCMDLIST(head)
+XPG4CMDLIST(grep)
 ASTCMDLIST(head)
-XPG4CMDLIST(id)
+BINCMDLIST(head)
 ASTCMDLIST(id)
-BINCMDLIST(join)
+XPG4CMDLIST(id)
 ASTCMDLIST(join)
-XPG4CMDLIST(ln)
+BINCMDLIST(join)
+GNUCMDLIST(join)
 ASTCMDLIST(ln)
-BINCMDLIST(logname)
+// XPG4CMDLIST(ln)
 ASTCMDLIST(logname)
+BINCMDLIST(logname)
+GNUCMDLIST(logname)
 ASTCMDLIST(md5sum)
-BINCMDLIST(mkdir)
 ASTCMDLIST(mkdir)
-BINCMDLIST(mkfifo)
+BINCMDLIST(mkdir)
+GNUCMDLIST(mkdir)
 ASTCMDLIST(mkfifo)
-BINCMDLIST(mktemp)
+BINCMDLIST(mkfifo)
+GNUCMDLIST(mkfifo)
 ASTCMDLIST(mktemp)
-XPG4CMDLIST(mv)
+BINCMDLIST(mktemp)
+GNUCMDLIST(mktemp)
 ASTCMDLIST(mv)
-BINCMDLIST(paste)
+// XPG4CMDLIST(mv)
 ASTCMDLIST(paste)
-BINCMDLIST(pathchk)
+BINCMDLIST(paste)
+GNUCMDLIST(paste)
 ASTCMDLIST(pathchk)
+BINCMDLIST(pathchk)
+GNUCMDLIST(pathchk)
 ASTCMDLIST(readlink)
-BINCMDLIST(rev)
 ASTCMDLIST(rev)
-XPG4CMDLIST(rm)
+BINCMDLIST(rev)
 ASTCMDLIST(rm)
-BINCMDLIST(rmdir)
+XPG4CMDLIST(rm)
 ASTCMDLIST(rmdir)
-XPG4CMDLIST(stty)
+BINCMDLIST(rmdir)
+GNUCMDLIST(rmdir)
+GNUCMDLIST(sleep)
 ASTCMDLIST(stty)
-BINCMDLIST(sum)
+// XPG4CMDLIST(stty)
 ASTCMDLIST(sum)
-SUSRBINCMDLIST(sync)
-SBINCMDLIST(sync)
-BINCMDLIST(sync)
+BINCMDLIST(sum)
 ASTCMDLIST(sync)
-XPG4CMDLIST(tail)
-BINCMDLIST(tail)
+BINCMDLIST(sync)
+GNUCMDLIST(sync)
+SBINCMDLIST(sync)
+SUSRBINCMDLIST(sync)
 ASTCMDLIST(tail)
-BINCMDLIST(tee)
+BINCMDLIST(tail)
+XPG4CMDLIST(tail)
 ASTCMDLIST(tee)
-BINCMDLIST(tty)
+BINCMDLIST(tee)
+GNUCMDLIST(tee)
 ASTCMDLIST(tty)
+BINCMDLIST(tty)
+GNUCMDLIST(tty)
 ASTCMDLIST(uname)
-BINCMDLIST(uniq)
 ASTCMDLIST(uniq)
-BINCMDLIST(wc)
+BINCMDLIST(uniq)
+GNUCMDLIST(uniq)
 ASTCMDLIST(wc)
+BINCMDLIST(wc)
+GNUCMDLIST(wc)
 ASTCMDLIST(xgrep)
+BINCMDLIST(xgrep)
 
 /* Mandatory for ksh93 test suite and AST scripts */
 BINCMDLIST(getconf)

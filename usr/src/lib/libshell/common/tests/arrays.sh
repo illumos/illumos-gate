@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2010 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -336,18 +336,20 @@ unset bam
 print 'print ${var[0]} ${var[1]}' > $tmp/script
 chmod +x $tmp/script
 [[ $($SHELL -c "var=(foo bar);export var;$tmp/script") == foo ]] || err_exit 'export array not exporting just first element'
+
 unset foo
-set -o allexport
+set --allexport
 foo=one
 foo[1]=two
 foo[0]=three
-[[ $foo == three ]] || err_exit 'export all not working with arrays'
+[[ $foo == three ]] || err_exit '--allexport not working with arrays'
+set --noallexport
+unset foo
+
 cat > $tmp/script <<- \!
 	typeset -A foo
 	print foo${foo[abc]}
 !
-# 04-05-24 bug fix
-unset foo
 [[ $($SHELL -c "typeset -A foo;$tmp/script")  == foo ]] 2> /dev/null || err_exit 'empty associative arrays not being cleared correctly before scripts'
 [[ $($SHELL -c "typeset -A foo;foo[abc]=abc;$tmp/script") == foo ]] 2> /dev/null || err_exit 'associative arrays not being cleared correctly before scripts'
 unset foo
@@ -378,8 +380,12 @@ foo=bar
 set -- "${foo[@]:1}"
 (( $# == 0 )) || err_exit '${foo[@]:1} should not have any values'
 unset bar
+exp=4
 : ${_foo[bar=4]}
-(( bar == 4 )) || err_exit 'subscript of unset variable not evaluated'
+(( bar == 4 )) || err_exit "subscript of unset variable not evaluated -- expected '4', got '$got'"
+unset bar
+: ${_foo[bar=$exp]}
+(( bar == $exp )) || err_exit "subscript of unset variable not evaluated -- expected '$exp', got '$got'"
 unset foo bar
 foo[5]=4
 bar[4]=3
@@ -472,5 +478,24 @@ FILTER=(typeset scope)
 FILTER[0].scope=include
 FILTER[1].scope=exclude
 [[ ${#FILTER[@]} == 2 ]] ||  err_exit "FILTER array should have two elements not ${#FILTER[@]}"
+
+unset x
+function x.get
+{
+	print sub=${.sh.subscript}
+}
+x[2]=
+z=$(: ${x[1]} )
+[[ $z == sub=1 ]] || err_exit 'get function not invoked for index array'
+
+unset x
+typeset -A x
+function x.get
+{
+	print sub=${.sh.subscript}
+}
+x[2]=
+z=$(: ${x[1]} )
+[[ $z == sub=1 ]] || err_exit 'get function not invoked for associative array'
 
 exit $((Errors))

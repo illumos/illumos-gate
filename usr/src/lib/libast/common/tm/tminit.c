@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -95,6 +95,7 @@ _tm_localtime(const time_t* t)
 {
 	struct tm*	r;
 	char*		e;
+	char**		v = environ;
 
 	if (TZ[0])
 	{
@@ -107,8 +108,8 @@ _tm_localtime(const time_t* t)
 	r = localtime(t);
 	if (TZ[0])
 	{
-		if (environ == TE)
-			environ = 0;
+		if (environ != v)
+			environ = v;
 		else
 			environ[0] = e;
 	}
@@ -217,30 +218,34 @@ tmlocal(void)
 
 	static Tm_zone_t	local;
 
-#if _lib_tzset
 #if _tzset_environ
-	if (s = getenv("TZ"))
 	{
-		sfsprintf(TZ, sizeof(TZ), "TZ=%s", s);
-		if (!environ || !*environ)
-			environ = TE;
+		char**	v = environ;
+
+		if (s = getenv("TZ"))
+		{
+			sfsprintf(TZ, sizeof(TZ), "TZ=%s", s);
+			if (!environ || !*environ)
+				environ = TE;
+			else
+				e = environ[0];
+			environ[0] = TZ;
+		}
 		else
-			e = environ[0];
-		environ[0] = TZ;
-	}
-	else
-	{
-		TZ[0] = 0;
-		e = 0;
-	}
+		{
+			TZ[0] = 0;
+			e = 0;
+		}
 #endif
-	tzset();
+#if _lib_tzset
+		tzset();
+#endif
 #if _tzset_environ
-	if (environ == TE)
-		environ = 0;
-	else if (e)
-		environ[0] = e;
-#endif
+		if (environ != v)
+			environ = v;
+		else if (e)
+			environ[0] = e;
+	}
 #endif
 #if _dat_tzname
 	local.standard = strdup(tzname[0]);

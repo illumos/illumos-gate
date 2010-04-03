@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -90,7 +90,7 @@ int		mode;	/* type of region		*/
 			vd = (Vmdata_t*)addr;
 			if((vd->mode&meth->meth) != 0)
 			{	vm->data = vd;
-				return vm;
+				goto done;
 			}
 			else
 			{ open_error:
@@ -140,7 +140,7 @@ int		mode;	/* type of region		*/
 
 	seg = vd->seg;
 	seg->next = NIL(Seg_t*);
-	seg->vm = vm;
+	seg->vmdt = vd;
 	seg->addr = (Void_t*)(addr - (a ? ALIGN-a : 0));
 	seg->extent = s;
 	seg->baddr = addr + s - (a ? ALIGN : 0);
@@ -166,7 +166,7 @@ int		mode;	/* type of region		*/
 
 	vm->data = vd;
 
-	/* put into linked list of regions */
+done:	/* add to the linked list of regions */
 	vm->next = Vmheap->next;
 	Vmheap->next = vm;
 

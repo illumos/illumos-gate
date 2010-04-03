@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2010 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -26,7 +26,7 @@ function err_exit
 
 alias err_exit='err_exit $LINENO'
 
-float DELAY=${1:-0.5}
+float DELAY=${1:-0.2}
 integer FOREGROUND=10 BACKGROUND=2 Errors=0
 
 s=$($SHELL -c '
@@ -108,6 +108,32 @@ then
 	exp='c\nc 3 3\nb\nb 2 2\na\na 1 1'
 	[[ $got == $exp ]] || err_exit "SIGCHLD trap queueing failed -- expected $(printf %q "$exp"), got $(printf %q "$got")"
 
+fi
+
+{
+got=$( ( sleep 1;print $'\n') | $SHELL -c 'function handler { : ;}
+	trap handler CHLD; sleep .3 & IFS= read; print good')
+} 2> /dev/null
+[[ $got == good ]] || err_exit 'SIGCLD handler effects read behavior'
+
+set -- $(
+	(
+	$SHELL -xc $'
+		trap \'wait $!; print $! $?\' CHLD
+		{ sleep 0.1; exit 9; } &
+		print $!
+		sleep 0.5
+	'
+	) 2>/dev/null; print $?
+)
+if	(( $# != 4 ))
+then	err_exit "CHLD trap failed -- expected 4 args, got $#"
+elif	(( $4 != 0 ))
+then	err_exit "CHLD trap failed -- exit code $4"
+elif	(( $1 != $2 ))
+then	err_exit "child pid mismatch -- got '$1' != '$2'"
+elif	(( $3 != 9 ))
+then	err_exit "child status mismatch -- expected '9', got '$3'"
 fi
 
 exit $((Errors))

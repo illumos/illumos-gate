@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -1269,9 +1269,9 @@ USAGE_LICENSE
 "[u]#[fd:=0?Read from file descriptor number \afd\a instead of standard input.]"
 "[t]:[timeout?Specify a timeout \atimeout\a in seconds when reading from "
 	"a terminal or pipe.]"
-"[n]#[nbyte?Read at most \ansize\a characters.  For binary fields \asize\a "
+"[n]#[nchar?Read at most \anchar\a characters.  For binary fields \asize\a "
 	"will be in bytes.]"
-"[N]#[nbyte?Read exactly \ansize\a characters.  For binary fields \asize\a "
+"[N]#[nchar?Read exactly \anchar\a characters.  For binary fields \asize\a "
 	"will be in bytes.]"
 "[v?When reading from a terminal the value of the first variable is displayed "
 	"and used as a default value.]"

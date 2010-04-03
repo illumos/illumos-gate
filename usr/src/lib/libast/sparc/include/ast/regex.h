@@ -47,10 +47,11 @@
 #define REG_MULTIREF	0x00100000	/* multiple digit backrefs	*/
 #define REG_MUSTDELIM	0x08000000	/* all delimiters required	*/
 #define REG_DELIMITED	0x10000000	/* pattern[0] is delimiter	*/
-#define REG_SHELL_GROUP	0x20000000	/* (|&) inside [@|&](...) only	*/
+#define REG_CLASS_ESCAPE 0x80000000	/* \ escapes in [...]		*/
 
 #define REG_SHELL_DOT	0x00200000	/* explicit leading . match	*/
 #define REG_SHELL_ESCAPED 0x00400000	/* \ not special		*/
+#define REG_SHELL_GROUP	0x20000000	/* (|&) inside [@|&](...) only	*/
 #define REG_SHELL_PATH	0x00800000	/* explicit / match		*/
 
 #define REG_REGEXP	0x40000000	/* <regexp.h> compatibility	*/
@@ -98,7 +99,7 @@
 #define REG_BADBR	10		/* invalid {...} digits		*/
 #define REG_ERANGE	11		/* invalid [...] range endpoint	*/
 #define REG_ESPACE	12		/* out of space			*/
-#define REG_BADRPT	13		/* unary op not preceeded by re	*/
+#define REG_BADRPT	13		/* unary op not preceded by re	*/
 #define REG_ENULL	14		/* empty subexpr in pattern	*/
 #define REG_ECOUNT	15		/* re component count overflow	*/
 #define REG_BADESC	16		/* invalid \char escape		*/
@@ -111,7 +112,7 @@ struct regex_s; typedef struct regex_s regex_t;
 struct regdisc_s; typedef struct regdisc_s regdisc_t;
 
 typedef int (*regclass_t) __PROTO__((int));
-typedef int32_t regflags_t;
+typedef uint32_t regflags_t;
 typedef int regoff_t;
 typedef int (*regerror_t) __PROTO__((const regex_t*, regdisc_t*, int, ...));
 typedef __V_* (*regcomp_t) __PROTO__((const regex_t*, const char*, size_t, regdisc_t*));

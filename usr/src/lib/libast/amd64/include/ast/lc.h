@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -47,7 +47,9 @@
 #define LC_undefined		0x00100
 #define LC_utf8			0x00200
 #define LC_verbose		0x00400
-#define LC_user			0x10000
+#define LC_setlocale			0x10000
+#define LC_setenv			0x20000
+#define LC_user			0x40000
 #define LC_language_attribute_max		2
 #define LC_territory_language_max		4
 
@@ -139,6 +141,7 @@ typedef struct Lc_category_s
 	int			internal;
 	Lc_category_set_f	setf;
 	Lc_t*			prev;
+	unsigned int		flags;
 } Lc_category_t;
 
 #if _BLD_ast && defined(__EXPORT__)

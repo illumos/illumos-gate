@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2010 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -1067,5 +1067,30 @@ unset -f foo bar
 :  $(foo)
 [[ $(typeset +f) == *foo* ]] && err_exit 'function in subshell leaving side effects of function foo after reload'
 [[ $(typeset +f) == *bar* ]] && err_exit 'function in subshell leaving side effects of function bar after reload'
+
+unset -f foo
+typeset -A bar
+function foo
+{
+	typeset -i bar[$1].x
+	bar[$1].x=5
+}
+foo sub
+[[ ${!bar[@]} == sub ]] || err_exit 'scoping problem with compound array variables'
+
+function A
+{
+        trap "> /dev/null;print TRAP A" EXIT
+	# (( stderr )) && print >&2
+}
+
+function B
+{
+        trap "> /dev/null;print TRAP B" EXIT
+        A
+}
+            
+x=$(B)      
+[[ $x == $'TRAP A\nTRAP B' ]] || err_exit "trap from funtions in subshells fails got" $x
 
 exit $((Errors))

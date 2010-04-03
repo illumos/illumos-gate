@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 SHELL=/usr/bin/ksh93
@@ -116,6 +115,7 @@ OBJECTS += \
 	common/comp/setpgid.o \
 	common/comp/setsid.o \
 	common/comp/sigunblock.o \
+	common/comp/sigflag.o \
 	common/comp/spawnveg.o \
 	common/comp/statvfs.o \
 	common/comp/strcasecmp.o \
@@ -194,8 +194,6 @@ OBJECTS += \
 	common/misc/getcwd.o \
 	common/misc/getenv.o \
 	common/misc/glob.o \
-	common/misc/liberror.o \
-	common/misc/libevent.o \
 	common/misc/magic.o \
 	common/misc/mime.o \
 	common/misc/mimetype.o \
@@ -715,7 +713,7 @@ CPPFLAGS = \
 	'-DCONF_LIBSUFFIX=".so"' \
 	'-DCONF_LIBPREFIX="lib"' \
 	-DERROR_CATALOG=\""libast"\" \
-	-D__OBSOLETE__=20090101 \
+	-D__OBSOLETE__=20100101 \
 	-D_BLD_ast \
 	-D_PACKAGE_ast \
 	-D_BLD_DLL
@@ -729,6 +727,7 @@ pics/$(MACH)/src/lib/libast/conftab.o \
 pics/$(MACH64)/src/lib/libast/conftab.o	:= CERRWARN += -erroff=E_INIT_DOES_NOT_FIT
 pics/common/comp/setlocale.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/common/comp/setlocale.o		:= CERRWARN += -erroff=E_INIT_DOES_NOT_FIT
+pics/common/comp/setlocale.o		:= CERRWARN += -erroff=E_INIT_SIGN_EXTEND
 pics/common/hash/hashlook.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
 pics/common/hash/memhash.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
 pics/common/hash/memsum.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -26,7 +26,7 @@
  */
 
 static const char usage[] =
-"[-n?\n@(#)$Id: uniq (AT&T Research) 2009-08-10 $\n]"
+"[-n?\n@(#)$Id: uniq (AT&T Research) 2009-11-28 $\n]"
 USAGE_LICENSE
 "[+NAME?uniq - Report or filter out repeated lines in a file]"
 "[+DESCRIPTION?\buniq\b reads the input, compares adjacent lines, and "
@@ -84,8 +84,8 @@ typedef int (*Compare_f)(const char*, const char*, size_t);
 
 static int uniq(Sfio_t *fdin, Sfio_t *fdout, int fields, int chars, int width, int mode, int* all, Compare_f compare)
 {
-	register int n, f, outsize=0;
-	register char *cp, *ep, *bufp, *outp;
+	register int n, f, outsize=0, mb = mbwide();
+	register char *cp, *ep, *mp, *bufp, *outp;
 	char *orecp, *sbufp=0, *outbuff;
 	int reclen,oreclen= -1,count=0,cwidth=0,sep,next;
 	if(mode&C_FLAG)
@@ -102,30 +102,50 @@ static int uniq(Sfio_t *fdin, Sfio_t *fdout, int fields, int chars, int width, i
 		}
 		else
 			n = 0;
-		if(n)
+		if (n)
 		{
 			cp = bufp;
 			ep = cp + n;
-			if(f=fields)
-				while(f-->0 && cp<ep) /* skip over fields */
+			if (f = fields)
+				while (f-->0 && cp<ep) /* skip over fields */
 				{
-					while(cp<ep && *cp==' ' || *cp=='\t')
+					while (cp<ep && *cp==' ' || *cp=='\t')
 						cp++;
-					while(cp<ep && *cp!=' ' && *cp!='\t')
+					while (cp<ep && *cp!=' ' && *cp!='\t')
 						cp++;
 				}
-			if(chars)
-				cp += chars;
-			if((reclen = n - (cp-bufp)) <=0)
+			if (chars)
+			{
+				if (mb)
+					for (f = chars; f; f--)
+						mbchar(cp);
+				else
+					cp += chars;
+			}
+			if ((reclen = n - (cp - bufp)) <= 0)
 			{
 				reclen = 1;
-				cp = bufp + sfvalue(fdin)-1;
+				cp = bufp + n - 1;
 			}
-			else if(width >= 0 && width < reclen)
-				reclen = width;
+			else if (width >= 0 && width < reclen)
+			{
+				if (mb)
+				{
+					reclen = 0;
+					mp = cp;
+					while (reclen < width && mp < ep)
+					{
+						reclen++;
+						mbchar(mp);
+					}
+					reclen = mp - cp;
+				}
+				else
+					reclen = width;
+			}
 		}
 		else
-			reclen=-2;
+			reclen = -2;
 		if(reclen==oreclen && (!reclen || !(*compare)(cp,orecp,reclen)))
 		{
 			count++;

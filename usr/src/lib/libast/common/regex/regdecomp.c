@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -75,6 +75,7 @@ decomp(register Rex_t* e, Sfio_t* sp, int type, int delimiter, regflags_t flags)
 	unsigned char*	s;
 	unsigned char*	t;
 	int		c;
+	int		m;
 	int		cb;
 	int		cd;
 	int		cr;
@@ -152,19 +153,19 @@ decomp(register Rex_t* e, Sfio_t* sp, int type, int delimiter, regflags_t flags)
 				cb = cd = cr = 0;
 				s = nc;
 				t = ic;
-				for (c = 0; c <= UCHAR_MAX; c++)
-					if (settst(e->re.charclass, c))
+				for (m = 0; m <= UCHAR_MAX; m++)
+					if (settst(e->re.charclass, m))
 					{
-						if (c == ']')
+						if (m == ']')
 							cb = 1;
-						else if (c == '-')
+						else if (m == '-')
 							cr = 1;
-						else if (c == delimiter)
+						else if (m == delimiter)
 							cd = 1;
 						else if (nb < 0)
-							ne = nb = c;
-						else if (ne == (c - 1))
-							ne = c;
+							ne = nb = m;
+						else if (ne == (m - 1))
+							ne = m;
 						else
 						{
 							if (ne == nb)
@@ -175,21 +176,21 @@ decomp(register Rex_t* e, Sfio_t* sp, int type, int delimiter, regflags_t flags)
 								*s++ = '-';
 								*s++ = ne;
 							}
-							ne = nb = c;
+							ne = nb = m;
 						}
 					}
 					else
 					{
-						if (c == ']')
+						if (m == ']')
 							cb = -1;
-						else if (c == '-')
+						else if (m == '-')
 							cr = -1;
-						else if (c == delimiter)
+						else if (m == delimiter)
 							cd = -1;
 						else if (ib < 0)
-							ie = ib = c;
-						else if (ie == (c - 1))
-							ie = c;
+							ie = ib = m;
+						else if (ie == (m - 1))
+							ie = m;
 						else
 						{
 							if (ie == ib)
@@ -200,7 +201,7 @@ decomp(register Rex_t* e, Sfio_t* sp, int type, int delimiter, regflags_t flags)
 								*t++ = '-';
 								*t++ = ie;
 							}
-							ie = ib = c;
+							ie = ib = m;
 						}
 					}
 				if (nb >= 0)
@@ -228,7 +229,7 @@ decomp(register Rex_t* e, Sfio_t* sp, int type, int delimiter, regflags_t flags)
 						sfputc(sp, ']');
 					if (cr < 0)
 						sfputc(sp, '-');
-					if (cd < 0)
+					if (cd < 0 && delimiter > 0)
 					{
 						if (flags & REG_ESCAPE)
 							sfputc(sp, '\\');
@@ -242,7 +243,7 @@ decomp(register Rex_t* e, Sfio_t* sp, int type, int delimiter, regflags_t flags)
 						sfputc(sp, ']');
 					if (cr > 0)
 						sfputc(sp, '-');
-					if (cd > 0)
+					if (cd > 0 && delimiter > 0)
 					{
 						if (flags & REG_ESCAPE)
 							sfputc(sp, '\\');
@@ -400,7 +401,7 @@ regdecomp(regex_t* p, regflags_t flags, char* buf, size_t n)
 
 	if (!(sp = sfstropen()))
 		return 0;
-	if (flags < 0)
+	if (flags == (regflags_t)~0)
 		flags = p->env->flags;
 	switch (flags & (REG_AUGMENTED|REG_EXTENDED|REG_SHELL))
 	{
@@ -427,12 +428,12 @@ regdecomp(regex_t* p, regflags_t flags, char* buf, size_t n)
 		sfputc(sp, delimiter);
 	}
 	else
-		delimiter = 0;
+		delimiter = -1;
 	if (decomp(p->env->rex, sp, type, delimiter, flags))
 		r = 0;
 	else
 	{
-		if (delimiter)
+		if (delimiter > 0)
 			sfputc(sp, delimiter);
 		if ((r = sfstrtell(sp) + 1) <= n)
 		{

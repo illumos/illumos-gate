@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -72,5 +72,6 @@ extern __MANGLE__ int	b_tee __PROTO__((int, char**, __V_*));
 extern __MANGLE__ int	b_tty __PROTO__((int, char**, __V_*));
 extern __MANGLE__ int	b_uname __PROTO__((int, char**, __V_*));
 extern __MANGLE__ int	b_uniq __PROTO__((int, char**, __V_*));
+extern __MANGLE__ int	b_vmstate __PROTO__((int, char**, __V_*));
 extern __MANGLE__ int	b_wc __PROTO__((int, char**, __V_*));
 extern __MANGLE__ int	b_xgrep __PROTO__((int, char**, __V_*));

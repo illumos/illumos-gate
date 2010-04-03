@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2010 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -464,5 +464,19 @@ got=$(
 [[ $got == $exp ]] || err_exit "pipe to ( ... ) with conditional fails -- expected '$exp', got '$got'"
 
 ( $SHELL -c 'trap : DEBUG; x=( $foo); exit 0') 2> /dev/null  || err_exit 'trap DEBUG fails'
+
+true=$(whence -p true)
+set -o pipefail
+float start=$SECONDS end 
+for ((i=0; i < 2; i++))
+do	print foo
+	sleep 1.5
+done | { read; $true; end=$SECONDS ;}
+(( (SECONDS-start) < 1 )) && err_exit "pipefail not waiting for pipe to finish"
+set +o pipefail
+(( (SECONDS-start) > 2 )) &&  err_exit "pipefail causing /bin/true to wait for other end of pipe"
+
+
+{ env A__z=C+SHLVL $SHELL -c : ;} 2> /dev/null || err_exit "SHLVL with wrong attribute fails"
 
 exit $((Errors))

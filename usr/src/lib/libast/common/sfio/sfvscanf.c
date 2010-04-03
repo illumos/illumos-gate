@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -462,8 +462,7 @@ loop_fmt:
 					{	t_str = (*_Sffmtintf)(t_str+1,&n);
 						if(*t_str == '$')
 						{	if(!fp &&
-							   !(fp = (*_Sffmtposf)
-								  (f,oform,oargs,ft,1)) )
+							   !(fp = (*_Sffmtposf)(f,oform,oargs,ft,1)) )
 								goto pop_fmt;
 							n = FP_SET(n,argn);
 						}

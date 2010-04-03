@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1985-2009 AT&T Intellectual Property          #
+#          Copyright (c) 1985-2010 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -115,10 +115,17 @@ extern Sig_info_t	sig_info;
 
 #undef	extern
 
+#if _lib_sigflag && _npt_sigflag
+extern int		sigflag(int, int, int);
+#endif
+
 #if _BLD_ast && defined(__EXPORT__)
 #define extern		__EXPORT__
 #endif
 
+#if !_lib_sigflag
+extern int		sigflag(int, int, int);
+#endif
 extern int		sigcritical(int);
 extern int		sigunblock(int);
 

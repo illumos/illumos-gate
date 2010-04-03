@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -29,7 +29,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: paste (AT&T Research) 2008-04-01 $\n]"
+"[-?\n@(#)$Id: paste (AT&T Research) 2009-11-28 $\n]"
 USAGE_LICENSE
 "[+NAME?paste - merge lines of files]"
 "[+DESCRIPTION?\bpaste\b concatenates the corresponding lines of a "
@@ -69,18 +69,23 @@ USAGE_LICENSE
 "[+SEE ALSO?\bcut\b(1), \bcat\b(1), \bjoin\b(1)]"
 ;
 
-
 #include <cmd.h>
+
+typedef struct Delim_s
+{
+	const char*	chr;
+	size_t		len;
+} Delim_t;
 
 /*
  * paste the lines of the <nstreams> defined in <streams> and put results
  * to <out>
  */
 
-static int paste(int nstream,Sfio_t* streams[],Sfio_t *out, register const char *delim,int dlen)
+static int paste(int nstream,Sfio_t* streams[],Sfio_t *out, register const char *delim, int dsiz, int dlen, Delim_t* mp)
 {
 	register const char *cp;
-	register int d, n, more=1;
+	register int d, n, i, z, more=1;
 	register Sfio_t *fp;
 	do
 	{
@@ -95,14 +100,21 @@ static int paste(int nstream,Sfio_t* streams[],Sfio_t *out, register const char 
 						more = 1;
 					else if(!more) /* first stream with output */
 					{
-						if(dlen==1)
+						if(dsiz == 1)
 							sfnputc(out, *delim, n);
 						else if(dlen>0)
 						{
 							for(d=n; d>dlen; d-=dlen)
-								sfwrite(out,delim,dlen);
+								sfwrite(out,delim,dsiz);
 							if(d)
-								sfwrite(out,delim,d);
+							{
+								if(mp)
+									for (i = z = 0; i < d; i++)
+										z += mp[i].len;
+								else
+									z = d;
+								sfwrite(out,delim,z);
+							}
 						}
 						more = n+1;
 					}
@@ -117,29 +129,28 @@ static int paste(int nstream,Sfio_t* streams[],Sfio_t *out, register const char 
 				register int c;
 				if(d >= dlen)
 					d = 0;
-				if(c=delim[d++])
+				if(mp)
+					sfwrite(out,mp[d].chr,mp[d].len);
+				else if(c=delim[d])
 					sfputc(out,c);
+				d++;
 			}
 			else if(n==nstream && !streams[n-1] && more)
 				sfputc(out,'\n');
 		}
-	}
-	while(more);
+	} while(more);
 	return(0);
 }
 
 /*
  * Handles paste -s, for file <in> to file <out> using delimiters <delim>
  */
-static int spaste(Sfio_t *in,register Sfio_t* out,register const char *delim,int dlen)
+static int spaste(Sfio_t *in,register Sfio_t* out,register const char *delim,int dsiz,int dlen,Delim_t* mp)
 {
 	register const char *cp;
 	register int d=0;
-	if(cp = sfgetr(in,'\n',0))
-	{
-		if(sfwrite(out,cp,sfvalue(in)-1) < 0)
-			return(-1);
-	}
+	if((cp = sfgetr(in,'\n',0)) && sfwrite(out,cp,sfvalue(in)-1) < 0)
+		return(-1);
 	while(cp=sfgetr(in, '\n',0)) 
 	{
 		if(dlen)
@@ -147,8 +158,11 @@ static int spaste(Sfio_t *in,register Sfio_t* out,register const char *delim,int
 			register int c;
 			if(d >= dlen)
 				d = 0;
-			if(c=delim[d++])
+			if(mp)
+				sfwrite(out,mp[d].chr,mp[d].len);
+			else if(c=delim[d])
 				sfputc(out,c);
+			d++;
 		}
 		if(sfwrite(out,cp,sfvalue(in)-1) < 0)
 			return(-1);
@@ -163,7 +177,9 @@ b_paste(int argc,register char *argv[], void* context)
 	register int		n, sflag=0;
 	register Sfio_t		*fp, **streams;
 	register char 		*cp, *delim;
-	int			dlen;
+	char			*ep;
+	Delim_t			*mp;
+	int			dlen, dsiz;
 	char			defdelim[2];
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
@@ -186,12 +202,38 @@ b_paste(int argc,register char *argv[], void* context)
 	argv += opt_info.index;
 	if(error_info.errors)
 		error(ERROR_usage(2),"%s", optusage(NiL));
-	if(delim)
-		dlen = stresc(delim);
-	else
+	if(!delim || !*delim)
 	{
-		*(delim = defdelim) = '\t';
-		dlen = 1;
+		delim = defdelim;
+		delim[0] = '\t';
+		delim[1] = 0;
+	}
+	dlen = dsiz = stresc(delim);
+	mp = 0;
+	if (mbwide())
+	{
+		cp = delim;
+		ep = delim + dlen;
+		dlen = 0;
+		while (cp < ep)
+		{
+			mbchar(cp);
+			dlen++;
+		}
+		if(dlen < dsiz)
+		{
+			if (!(mp = newof(0, Delim_t, dlen, 0)))
+				error(ERROR_system(1), "out of space");
+			cp = delim;
+			dlen = 0;
+			while (cp < ep)
+			{
+				mp[dlen].chr = cp;
+				mbchar(cp);
+				mp[dlen].len = cp - mp[dlen].chr;
+				dlen++;
+			}
+		}
 	}
 	if(cp = *argv)
 	{
@@ -214,7 +256,7 @@ b_paste(int argc,register char *argv[], void* context)
 			error(ERROR_system(0),"%s: cannot open",cp);
 		if(fp && sflag)
 		{
-			if(spaste(fp,sfstdout,delim,dlen) < 0)
+			if(spaste(fp,sfstdout,delim,dsiz,dlen,mp) < 0)
 				error(ERROR_system(0),"write failed");
 			if(fp!=sfstdin)
 				sfclose(fp);
@@ -224,12 +266,13 @@ b_paste(int argc,register char *argv[], void* context)
 	} while(cp= *argv++);
 	if(!sflag)
 	{
-		if(error_info.errors==0 && paste(n,streams,sfstdout,delim,dlen) < 0)
+		if(error_info.errors==0 && paste(n,streams,sfstdout,delim,dsiz,dlen,mp) < 0)
 			error(ERROR_system(0),"write failed");
 		while(--n>=0)
 			if((fp=streams[n]) && fp!=sfstdin)
 				sfclose(fp);
 	}
+	if (mp)
+		free(mp);
 	return(error_info.errors);
 }
-

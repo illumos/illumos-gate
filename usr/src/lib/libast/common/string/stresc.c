@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -47,7 +47,7 @@ stresc(register char* s)
 			s = e;
 			if (c > UCHAR_MAX)
 			{
-				t += wctomb(t, c);
+				t += mbconv(t, c);
 				continue;
 			}
 		}

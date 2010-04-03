@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -39,11 +39,13 @@
  *				pathtemp(p,sizeof(p),0,"tn",0)
  *	tmpnam(p)		pathtemp(p,L_tmpnam,0,"tn",0)
  *	tempnam(d,p)		pathtemp(0,d,p,0)
+ *	mktemp(p)		pathtemp(0,0,p,0)
  *
  * if buf==0 then space is malloc'd
  * buf size is size
  * dir and pfx may be 0
- * only first 5 chars of pfx are used
+ * if pfx contains trailing X's then it is a mktemp(3) template
+ * otherwise only first 5 chars of pfx are used
  * if fdp!=0 then the path is opened O_EXCL and *fdp is the open fd
  * malloc'd space returned by successful pathtemp() calls
  * must be freed by the caller
@@ -59,12 +61,17 @@
  *		manual		cycled by application with dir=(nil)
  *		(nil)		cycle TMPPATH
  *	/prefix		dir specifies the default prefix (default ast)
+ *	/private	private file/dir modes
+ *	/public		public file/dir modes
+ *	/seed		dir specifies pseudo-random generator seed
+ *			0 or "0" to re-initialize
  *	/TMPPATH	dir overrides the env value
  *	/TMPDIR		dir overrides the env value
  */
 
 #include <ast.h>
 #include <ls.h>
+#include <tv.h>
 #include <tm.h>
 
 #define ATTEMPT		10
@@ -81,10 +88,11 @@ static struct
 	mode_t		mode;
 	char**		vec;
 	char**		dir;
-	unsigned long	key;
-	unsigned long	rng;
+	uint32_t	key;
+	uint32_t	rng;
 	pid_t		pid;
 	int		manual;
+	int		seed;
 	char*		pfx;
 	char*		tmpdir;
 	char*		tmppath;
@@ -97,11 +105,15 @@ pathtemp(char* buf, size_t len, const char* dir, const char* pfx, int* fdp)
 	register char*		b;
 	register char*		s;
 	register char*		x;
-	char*			fmt;
+	uint32_t		key;
 	int			m;
 	int			n;
+	int			l;
+	int			r;
 	int			z;
 	int			attempt;
+	Tv_t			tv;
+	char			keybuf[16];
 
 	if (pfx && *pfx == '/')
 	{
@@ -126,9 +138,20 @@ pathtemp(char* buf, size_t len, const char* dir, const char* pfx, int* fdp)
 			return (char*)pfx;
 		}
 		else if (streq(pfx, "private"))
+		{
 			tmp.mode = S_IRUSR|S_IWUSR;
+			return (char*)pfx;
+		}
 		else if (streq(pfx, "public"))
+		{
 			tmp.mode = S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH;
+			return (char*)pfx;
+		}
+		else if (streq(pfx, "seed"))
+		{
+			tmp.key = (tmp.seed = (tmp.rng = dir ? (uint32_t)strtoul(dir, NiL, 0) : (uint32_t)1) != 0)? (uint32_t)0x63c63cd9L : 0;
+			return (char*)pfx;
+		}
 		else if (streq(pfx, TMP_ENV))
 		{
 			if (tmp.vec)
@@ -155,6 +178,10 @@ pathtemp(char* buf, size_t len, const char* dir, const char* pfx, int* fdp)
 		}
 		return 0;
 	}
+	if (tmp.seed)
+		tv.tv_nsec = 0;
+	else
+		tvgettime(&tv);
 	if (!(d = (char*)dir) || *d && eaccess(d, W_OK|X_OK))
 	{
 		if (!tmp.vec)
@@ -208,18 +235,37 @@ pathtemp(char* buf, size_t len, const char* dir, const char* pfx, int* fdp)
 	len--;
 	if (!(b = buf) && !(b = newof(0, char, len, 1)))
 		return 0;
-	if (buf && dir && pfx && (buf == (char*)dir && (buf + strlen(buf) + 1) == (char*)pfx || buf == (char*)pfx && !*dir) && !strcmp((char*)pfx + strlen(pfx) + 1, "XXXXX"))
+	z = 0;
+	if (!pfx && !(pfx = tmp.pfx))
+		pfx = "ast";
+	m = strlen(pfx);
+	if (buf && dir && (buf == (char*)dir && (buf + strlen(buf) + 1) == (char*)pfx || buf == (char*)pfx && !*dir) && !strcmp((char*)pfx + m + 1, "XXXXX"))
 	{
-		z = 0;
 		d = (char*)dir;
-		len = m = strlen(d) + strlen(pfx) + 8;
-		fmt = "%03.3.32lu%03.3.32lu";
+		len = m += strlen(d) + 8;
+		l = 3;
+		r = 3;
+	}
+	else if (*pfx && pfx[m - 1] == 'X')
+	{
+		for (l = m; l && pfx[l - 1] == 'X'; l--);
+		r = m - l;
+		m = l;
+		l = r / 2;
+		r -= l;
+	}
+	else if (strchr(pfx, '.'))
+	{
+		m = 5;
+		l = 3;
+		r = 3;
 	}
 	else
 	{
 		z = '.';
 		m = 5;
-		fmt = "%02.2.32lu.%03.3.32lu";
+		l = 2;
+		r = 3;
 	}
 	x = b + len;
 	s = b;
@@ -230,8 +276,6 @@ pathtemp(char* buf, size_t len, const char* dir, const char* pfx, int* fdp)
 		if (s < x && s > b && *(s - 1) != '/')
 			*s++ = '/';
 	}
-	if (!pfx && !(pfx = tmp.pfx))
-		pfx = "ast";
 	if ((x - s) > m)
 		x = s + m;
 	while (s < x && (n = *pfx++))
@@ -244,7 +288,7 @@ pathtemp(char* buf, size_t len, const char* dir, const char* pfx, int* fdp)
 	len -= (s - b);
 	for (attempt = 0; attempt < ATTEMPT; attempt++)
 	{
-		if (!tmp.rng || attempt || tmp.pid != getpid())
+		if (!tmp.rng || !tmp.seed && (attempt || tmp.pid != getpid()))
 		{	
 			register int	r;
 
@@ -253,7 +297,7 @@ pathtemp(char* buf, size_t len, const char* dir, const char* pfx, int* fdp)
 			 */
 
 			tmp.pid = getpid();
-			tmp.rng = (unsigned long)tmp.pid * ((unsigned long)time(NiL) ^ (((unsigned long)(&attempt)) >> 3) ^ (((unsigned long)tmp.dir) >> 3));
+			tmp.rng = (uintptr_t)tmp.pid * ((uintptr_t)time(NiL) ^ (((uintptr_t)(&attempt)) >> 3) ^ (((uintptr_t)tmp.dir) >> 3));
 			if (!tmp.key)
 				tmp.key = (tmp.rng >> 16) | ((tmp.rng & 0xffff) << 16);
 			tmp.rng ^= tmp.key;
@@ -270,8 +314,12 @@ pathtemp(char* buf, size_t len, const char* dir, const char* pfx, int* fdp)
 		 * generate a pseudo-random name
 		 */
 
-		tmp.key = tmp.rng * tmp.key + 987654321L;
-		sfsprintf(s, len, fmt, (tmp.key >> 15) & 0x7fff, tmp.key & 0x7fff);
+		key = tmp.rng * tmp.key + tv.tv_nsec;
+		if (!tmp.seed)
+			tvgettime(&tv);
+		tmp.key = tmp.rng * key + tv.tv_nsec;
+		sfsprintf(keybuf, sizeof(keybuf), "%07.7.32I*u%07.7.32I*u", sizeof(key), key, sizeof(tmp.key), tmp.key);
+		sfsprintf(s, len, "%-.*s%s%-.*s", l, keybuf, z ? "." : "", r, keybuf + sizeof(keybuf) / 2);
 		if (fdp)
 		{
 			if ((n = open(b, O_CREAT|O_RDWR|O_EXCL|O_TEMPORARY, tmp.mode)) >= 0)

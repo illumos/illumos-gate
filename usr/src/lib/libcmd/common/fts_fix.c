@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -16,25 +16,41 @@
 *                                                                      *
 *                 Glenn Fowler <gsf@research.att.com>                  *
 *                  David Korn <dgk@research.att.com>                   *
-*                   Phong Vo <kpv@research.att.com>                    *
 *                                                                      *
 ***********************************************************************/
-#pragma prototyped
 /*
- * Glenn Fowler
- * AT&T Bell Laboratories
+ * -lcmd specific workaround to handle
+ *	fts_namelen
+ *	fts_pathlen
+ *	fts_level
+ * changing from [unsigned] short bit to [s]size_t
  *
- * OBSOLETE: use errormsg()
+ * ksh (or any other main application) that pulls in -lcmd
+ * at runtime may result in old -last running with new -lcmd
+ * which is not a good situation (tm)
+ *
+ * probably safe to drop after 20150101
  */
 
-#include <error.h>
+#include <ast.h>
+#include <fts_fix.h>
 
-void
-liberror(const char* lib, int level, ...)
+#undef	fts_read
+
+FTSENT*
+_fts_read(FTS* fts)
 {
-	va_list	ap;
+	FTSENT*		oe;
 
-	va_start(ap, level);
-	errorv(lib, level, ap);
-	va_end(ap);
+	static FTSENT*	ne;
+
+	if ((oe = _ast_fts_read(fts)) && ast.version < 20100102L && (ne || (ne = newof(0, FTSENT, 1, 0))))
+	{
+		*ne = *oe;
+		oe = ne;
+		ne->fts_namelen = ne->_fts_namelen;
+		ne->fts_pathlen = ne->_fts_pathlen;
+		ne->fts_level = ne->_fts_level;
+	}
+	return oe;
 }

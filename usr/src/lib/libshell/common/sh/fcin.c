@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -186,7 +186,7 @@ int fcmbstate(const char *state, int *s, int *len)
 	    case -1:
 		if(_Fcin._fcfile && (n=(_Fcin.fclast-_Fcin.fcptr)) < MB_LEN_MAX)
 		{
-			memcmp(extra.buff, _Fcin.fcptr, n);
+			memcpy(extra.buff, _Fcin.fcptr, n);
 			_Fcin.fcptr = _Fcin.fclast;
 			for(i=n; i < MB_LEN_MAX+n; i++)
 			{

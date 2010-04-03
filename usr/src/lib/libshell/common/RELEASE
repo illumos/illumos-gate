@@ -1,4 +1,73 @@
-09-10-12  --- Release ksh93t+  ---
+10-03-05  --- Release ksh93t+  ---
+10-03-05  A varibale unset memory leak has been fixed and tests/leaks.sh
+	  has been added to verify the fix.
+10-03-04  Documentation, comment, and disgnostic spelling typos corrected.
+10-02-14  Fix sh_getenv() initialization to cooperate with the 3d fs.
+10-02-12  A bug in which the get discipline function was not invoked for
+	  associative array subscripts for unset array elements has been fixed.
+10-02-12  A bug which could occur if the last line of a script was an eval
+	  that executed multiple commands has been fixed.
+10-02-02  A buffer overflow in read and another in binary type base64
+	  encoding were fixed.
+10-01-20  A bug in the evaluation of arithmetic expression in which the
+	  subscript was evaluated twice for $((foo[x++]++)) has been fixed.
+10-01-19  A workaround for a double-free of a trap in both a subshell and its
+	  parent has been added.
+10-01-18  A bug in type handling of typeset -H has been fixed.
+10-01-15  The "adding empty subscript" warning now only emitted with -x set.
+10-01-01  A bug in the parser in which '$((case i in i):;esac);:))' was not
+	  parsed correctly was fixed.
+10-01-01  A bug in the parser in which '$(( 2 , 3.6 ))' dumped core for locales
+	  with radix char , and thousands separator . has been fixed.
+09-12-28  A bug in the handling of SIGCLD on systems that generated SIGCLD
+	  while blocked waiting for process to complete has been fixed.
+09-12-24  ast setlocale() reworked to differentiate env var changes from user
+	  override.
+09-12-18  A bug with the SHOPT_BGX option set which disabled traps for signals
+	  < SIGCHLD when a trap for a signal > SIGCHLD was set has been fixed.
+09-12-18  A bug where [[ -v var ]] was incorrect for some variables (including
+	  LC_* vars) has been fixed.
+09-12-15  A bug that produced a syntax error when a multibyte character
+	  straddled a buffer boundary has been fixed.
+09-12-11  A bug where the subscript of an unset variable was not evaluated has
+	  been fixed.
+09-12-09  A bug where shcomp dumped core on certain syntax errors has been fixed.
+09-12-07  A bug where a parent shell environment var reset in a subshell removed
+	  the value in subsequent children of the parent shell has been fixed.
+09-12-04  A bug in which in some cases a trap in a function executed in
+	  a subshell could trigger twice has been fixed.
+09-12-03  A bug in which SHLVL exported with some attributes could cause
+	  the shell to abort at startup has been fixed.
+09-12-02  A bug with pipefail in which the shell could hang waiting for the
+	  writer to complete before the last reader command has been fixed.
+09-11-30  A bug in which a trap could be inherited by the first element of
+	  a pipeline when the command had more than 63 arguments that did
+	  not contain any macro expansions has been fixed.
+09-11-19  When read from a terminal was called from with a while or foo loop,
+	  and an edit mode was on, a backspace or erase no longer will
+	  overwrite the prompt.
+09-11-17  Change .paths parse to handle BUILTIN_LIB=foo BUILTIN_LIB=foo-1.2.
+09-11-17  Inside a function, typeset foo.bar will bind foo to global variable
+	  foo if local variable foo does not exist, instead of creating a 
+	  local variable.
+09-11-17  "read -n1" from the terminal has been fixed to read exactly one character.
+09-11-11  Job control now works for subshell commands, (...).
+09-11-11  If set -e is on for an interactive shell errors in special builtins
+	  now cause the shell to exit.
+09-11-11  A bug in which an interrupt handler processed during the read builtin
+	  when IFS did not contain a new line has been fixed.
+09-11-09  A bug in which a variable that has been unset in a subshell and then
+	  exported from that subshell does not show up in the environment
+	  has been fixed.
+09-11-02  ``,2'' is now a valid numeric constant for locales with
+	  decimal_point=','.
+09-11-02  A bug where "return" in .profile did not restore the shell state
+	  has been fixed.
+09-10-31  A bug that corrupted saved exit status when pids wrapped around has
+	  been fixed.
+09-10-26  A bug in { LANG LC_ALL LC_category } ordering has been fixed in -last.
+09-10-16  A bug where notification to libast that the environment has changed
+          has been fixed.
 09-10-12  A bug in which a function loaded in a subshell could leave side
 	  effects in the parent shell has been fixed.
 09-10-12  A bug in converting a printf %d operand to a number when the operand
@@ -38,7 +107,7 @@
 	  did not display an error message has been fixed.
 09-08-24  When processing profiles, ksh93 now violates the POSIX standard and
 	  treats &> as a redirection operator similar to bash.
-09-08-23  A bug in the handling of the trap on SIGPIPE that could lead to am
+09-08-23  A bug in the handling of the trap on SIGPIPE that could lead to a
 	  memory fault has been fixed.
 09-08-21  A bug in the handling of the comma operator in arithmetic expressions
 	  that could cause a core dump on some systems has been fixed.
@@ -107,7 +176,7 @@
 09-05-01  A bug that caused a core dump when SIGWINCH was received and
 	  both vi and emacs mode were off has been fixed.
 09-04-22  Default alias compound='typeset -C' added.
-09-04-15  A bug that caused ${...;} to hang for large files has ben fixed.
+09-04-15  A bug that caused ${...;} to hang for large files has been fixed.
 09-04-08  A change was made in the -n option which printed out an incorrect
 	  warning with <>.
 09-04-07  The emacs edit command M-_ and M_. and the vi command _ was fixed

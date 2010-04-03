@@ -1023,7 +1023,7 @@ subscripts must be in the
 range of
 0 through 4,194,303.
 A negative subscript is treated as an offset from the maximum
-current index +1 so that -1 refers to the last element.
+current index +1 so that \-1 refers to the last element.
 Indexed arrays can be declared with the
 .B \-a
 option to
@@ -5684,7 +5684,7 @@ for usage and description.
 .TP
 \(dg\(dg \f3enum\fP \*(OK \f3\-i\fP  \*(CK \f2type\^\fP\*(OK=(\f2value\^\fP .\|.\|.) \*(CK
 Creates a declaration command named \f2type\^\fP that is an
-integer type that allows one of the specifed \f2value\fPs as
+integer type that allows one of the specified \f2value\fPs as
 enumeration names.  If \f3=(\fP\f2value\^\ .\|.\|.\|\fP\f3)\fP is
 omitted, then \f2type\^\fP must be an indexed array variable with at
 least two elements and the values are taken from this array variable.
@@ -7768,37 +7768,29 @@ then the line number is also printed in square brackets
 .RB ( "[]" )
 after the command or function name.
 .SH FILES
-/etc/profile
+.TP
+.B /etc/profile
 The system wide initialization file, executed for login shells.
-.RE
 .if \nZ=2 \{.br
-/etc/ksh.kshrc
-.RS
+.TP
+.B /etc/ksh.kshrc
 The system wide startup file, executed for interactive shells.
-.RE\}
-.br
-\s-1$HOME\s+1/\f3.\fPprofile
-.RS
+\}
+.TP
+.B \s-1$HOME\s+1/\f3.\fPprofile
 The personal initialization file, executed for login shells after /etc/profile.
-.RE
-.br
+.TP
 \s-1$HOME\s+1/\f3.\fP.kshrc
-.RS
 Default personal initialization file, executed for interactive shells when
 .SM
 .B ENV
 is not set.
-.RE
-.br
-/etc/suid_profile
-.RS
+.TP
+.B /etc/suid_profile
 Alternative initialization file, executed when instead of personal initialization file when the real and effective user or group id do not match.
-.RE
-.br
-/dev/null
-.RS
+.TP
+.B /dev/null
 NULL device
-.RE
 .SH SEE ALSO
 cat(1),
 cd(1),

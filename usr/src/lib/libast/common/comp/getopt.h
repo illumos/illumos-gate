@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -24,11 +24,10 @@
  * gnu getopt interface
  */
 
+#ifndef _GETOPT_H
 #ifdef	_AST_STD_I
 #define _GETOPT_H		-1
-#endif
-
-#ifndef _GETOPT_H
+#else
 #define _GETOPT_H		1
 
 #include <ast_getopt.h>
@@ -48,4 +47,5 @@ struct option
 extern int	getopt_long(int, char* const*, const char*, const struct option*, int*);
 extern int	getopt_long_only(int, char* const*, const char*, const struct option*, int*);
 
+#endif
 #endif

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -111,11 +111,9 @@ b_tee(int argc, register char** argv, void* context)
 {
 	register Tee_t*		tp = 0;
 	register int		oflag = O_WRONLY|O_TRUNC|O_CREAT|O_BINARY;
-	register int		n;
 	register int*		hp;
 	register char*		cp;
 	int			line;
-	Sfdisc_t		tee_disc;
 
 	if (argc <= 0)
 	{

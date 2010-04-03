@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -45,6 +45,12 @@ static int	N_reclaim;	/* # of bestreclaim calls		*/
 #undef	VM_TRUST		/* always check for locking, etc.s	*/
 #define	VM_TRUST	0
 #endif /*DEBUG*/
+
+#if _BLD_posix
+#define logmsg(d,a ...)	logsrc(d,__FILE__,__LINE__,a)
+
+extern int	logsrc(int, const char*, int, const char*, ...);
+#endif /*_BLD_posix*/
 
 #define COMPACT		8	/* factor to decide when to compact	*/
 
@@ -421,6 +427,13 @@ int		c;
 
 			if(ISPFREE(size))	/* backward merge */
 			{	fp = LAST(fp);
+#if _BLD_posix
+				if (fp < (Block_t*)0x00120000)
+				{
+					logmsg(0, "bestreclaim fp=%p", fp);
+					ASSERT(!fp);
+				}
+#endif
 				s = SIZE(fp); /**/ASSERT(!(s&BITS));
 				REMOVE(vd,fp,INDEX(s),t,bestsearch);
 				size = (size&~BITS) + s + sizeof(Head_t);
@@ -429,6 +442,13 @@ int		c;
 
 			for(;;)	/* forward merge */
 			{	np = (Block_t*)((Vmuchar_t*)fp+size+sizeof(Head_t));
+#if _BLD_posix
+				if (np < (Block_t*)0x00120000)
+				{
+					logmsg(0, "bestreclaim np=%p", np);
+					ASSERT(!np);
+				}
+#endif
 				s = SIZE(np);	/**/ASSERT(s > 0);
 				if(!ISBUSY(s))
 				{	/**/ASSERT((s&BITS) == 0);
@@ -641,61 +661,8 @@ reg size_t	size;	/* desired block size		*/
 	reg int		local, inuse;
 	size_t		orgsize = 0;
 
-	if(!(_Vmassert & VM_init))
-	{	char	*chk = getenv("VMCHECK");
-		_Vmassert = VM_init;
-		if(chk)
-		{	int	set = 1;
-			for(;; set ? (_Vmassert |= n) : (_Vmassert &= ~n))
-			{
-				switch (*chk++)
-				{
-				case 0:
-					break;
-				case '-':
-				case '!':
-					set = 0;
-					n = 0;
-					continue;
-				case '+':
-					set = 1;
-					n = 0;
-					continue;
-				case '1':
-					n = VM_check;
-					continue;
-				case '2':
-					n = VM_abort;
-					continue;
-				case '3':
-					n = VM_check|VM_abort;
-					continue;
-				case 'a':
-				case 'A':
-					n = VM_abort;
-					continue;
-				case 'c':
-				case 'C':
-					n = VM_check;
-					continue;
-#if _mem_mmap_anon || _mem_mmap_zero
-				case 'm':
-				case 'M':
-					n = VM_mmap;
-#endif
-					continue;
-				case 'r':
-				case 'R':
-					n = VM_region;
-					continue;
-				default:
-					n = 0;
-					continue;
-				}
-				break;
-			}
-		}
-	}
+	VMOPTIONS();
+
 	/**/COUNT(N_alloc);
 
 	SETINUSE(vd, inuse);
@@ -1386,72 +1353,66 @@ Vmdisc_t*	disc;	/* discipline structure			*/
 #endif /* _mem_sbrk */
 
 #if _mem_mmap_anon /* anonymous mmap */
-		{
-			addr = (Vmuchar_t*)mmap(0, nsize, PROT_READ|PROT_WRITE,
-                                        	MAP_ANON|MAP_PRIVATE, -1, 0);
-			if(addr && addr != (Vmuchar_t*)MAP_FAILED)
-			{	if(okaddr(addr,nsize) >= 0)
-					return addr;
-				(void)munmap(addr, nsize); /* release reserved address */
-			}
+		addr = (Vmuchar_t*)mmap(0, nsize, PROT_READ|PROT_WRITE,
+                                        MAP_ANON|MAP_PRIVATE, -1, 0);
+		if(addr && addr != (Vmuchar_t*)MAP_FAILED)
+		{	if(okaddr(addr,nsize) >= 0)
+				return addr;
+			(void)munmap((char*)addr, nsize); /* release reserved address */
 		}
 #endif /* _mem_mmap_anon */
 
 #if _mem_mmap_zero /* mmap from /dev/zero */
-		{
-			if(mmdc->fd < 0)
-			{	int	fd;
-				if(mmdc->fd != -1)
-					return NIL(Void_t*);
-				if((fd = open("/dev/zero", O_RDONLY)) < 0 )
-				{	mmdc->fd = -2;
-					return NIL(Void_t*);
-				}
-				if(fd >= OPEN_PRIVATE || (mmdc->fd = dup2(fd,OPEN_PRIVATE)) < 0 )
-					mmdc->fd = fd;
-				else	close(fd);
+		if(mmdc->fd < 0)
+		{	int	fd;
+			if(mmdc->fd != -1)
+				return NIL(Void_t*);
+			if((fd = open("/dev/zero", O_RDONLY)) < 0 )
+			{	mmdc->fd = -2;
+				return NIL(Void_t*);
+			}
+			if(fd >= OPEN_PRIVATE || (mmdc->fd = dup2(fd,OPEN_PRIVATE)) < 0 )
+				mmdc->fd = fd;
+			else	close(fd);
 #ifdef FD_CLOEXEC
-				fcntl(mmdc->fd, F_SETFD, FD_CLOEXEC);
+			fcntl(mmdc->fd, F_SETFD, FD_CLOEXEC);
 #endif
+		}
+		addr = (Vmuchar_t*)mmap(0, nsize, PROT_READ|PROT_WRITE,
+					MAP_PRIVATE, mmdc->fd, mmdc->offset);
+		if(addr && addr != (Vmuchar_t*)MAP_FAILED)
+		{	if(okaddr(addr, nsize) >= 0)
+			{	mmdc->offset += nsize;
+				return addr;
 			}
-			addr = (Vmuchar_t*)mmap(0, nsize, PROT_READ|PROT_WRITE,
-						MAP_PRIVATE, mmdc->fd, mmdc->offset);
-			if(addr && addr != (Vmuchar_t*)MAP_FAILED)
-			{	if(okaddr(addr, nsize) >= 0)
-				{	mmdc->offset += nsize;
-					return addr;
-				}
-				(void)munmap(addr, nsize); /* release reserved address */
-			}
+			(void)munmap((char*)addr, nsize); /* release reserved address */
 		}
 #endif /* _mem_mmap_zero */
 
 		return NIL(Void_t*);
 	}
 	else
-	{	addr = caddr; /* in case !_mem_sbrk */
+	{
 
 #if _mem_sbrk
-		{
-			addr = (Vmuchar_t*)sbrk(0);
-			if(!addr || addr == (Vmuchar_t*)BRK_FAILED)
-				addr = caddr;
-			else if(((Vmuchar_t*)caddr+csize) == addr) /* in sbrk-space */
-			{	if(nsize <= csize)
-					addr -= csize-nsize;
-				else if((addr += nsize-csize) < (Vmuchar_t*)caddr)
-					return NIL(Void_t*); /* wrapped around address */
-				else	return brk(addr) == 0 ? caddr : NIL(Void_t*);
-			}
+		addr = (Vmuchar_t*)sbrk(0);
+		if(!addr || addr == (Vmuchar_t*)BRK_FAILED)
+			addr = caddr;
+		else if(((Vmuchar_t*)caddr+csize) == addr) /* in sbrk-space */
+		{	if(nsize <= csize)
+				addr -= csize-nsize;
+			else if((addr += nsize-csize) < (Vmuchar_t*)caddr)
+				return NIL(Void_t*); /* wrapped around address */
+			else	return brk(addr) == 0 ? caddr : NIL(Void_t*);
 		}
+#else
+		addr = caddr;
 #endif /* _mem_sbrk */
 
 #if _mem_mmap_zero || _mem_mmap_anon
-		{
-			if(((Vmuchar_t*)caddr+csize) > addr) /* in mmap-space */
-				if(nsize == 0 && munmap(caddr,csize) == 0)
-					return caddr;
-		}
+		if(((Vmuchar_t*)caddr+csize) > addr) /* in mmap-space */
+			if(nsize == 0 && munmap(caddr,csize) == 0)
+				return caddr;
 #endif /* _mem_mmap_zero || _mem_mmap_anon */
 
 		return NIL(Void_t*);

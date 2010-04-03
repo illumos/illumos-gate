@@ -22,8 +22,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -60,10 +59,14 @@ function add_number_to_tree
 	integer i
 	typeset nodepath # full name of compound variable
 	integer -a pe # path elements
+	integer len
+	typeset revnums="$(rev <<<"${num}")"
 
 	# first built an array containing the names of each path element
 	# (e.g. "135" results in an array containing "( 1 3 5 )")
-	for (( i=$(rev <<<$num) ; i > 0 ; i=i/10 )) ; do
+	# 10#<number> is used to prevent leading zeros being interpreted
+	# as octals
+	for (( len=${#revnums} , i=$( printf "10#%s\n" "${revnums}" ) ; len > 0 ; len--, i=i/10 )) ; do
 		pe+=( $((i % 10)) )
 	done
 
@@ -72,15 +75,30 @@ function add_number_to_tree
 	nodepath="${treename}"
 	for (( i=0 ; i < ${#pe[@]} ; i++ )) ; do
 		nameref x="${nodepath}"
-		[[ ! -v x.node ]] && compound -C -a x.nodes
-	
+		
+		# [[ -v ]] does not work for arrays because [[ -v ar ]]
+		# is equal to [[ -v ar[0] ]]. In this case we can
+		# use the output of typeset +p x.nodes
+		[[ "${ typeset +p x.nodes ;}" == "" ]] && compound -a x.nodes
+		
 		nodepath+=".nodes[${pe[i]}]"
 	done
 	
-	# insert element
+	# insert element (leaf)
 	nameref node="${nodepath}"
-	[[ ! -v node.elements ]] && integer -a node.elements
+	[[ "${ typeset +p node.elements ;}" == "" ]] && integer -a node.elements
 	node.elements+=( ${num} )
+
+	# DEBUG only
+	[[ "${!node.elements[*]}" != ""                ]] || fatal_error "assertion $LINENO FAILED"
+	[[ "${ typeset +p node.elements ;}" == *-a*    ]] || fatal_error "assertion $LINENO FAILED"
+	[[ "${ typeset +p node.elements ;}" == *-i*    ]] || fatal_error "assertion $LINENO FAILED"
+	[[ -v node                                     ]] || fatal_error "assertion $LINENO FAILED"
+	[[ -R node                                     ]] || fatal_error "assertion $LINENO FAILED"
+	[[ "${ typeset +p ${!node} ;}" == *-C*         ]] || fatal_error "assertion $LINENO FAILED"
+	[[ "${!x.nodes[*]}" != ""                      ]] || fatal_error "assertion $LINENO FAILED"
+	[[ "${ typeset +p x.nodes ;}" == *-a*          ]] || fatal_error "assertion $LINENO FAILED"
+	[[ "${ typeset +p x.nodes ;}" == *-C*          ]] || fatal_error "assertion $LINENO FAILED"
 	
 	return 0
 }
@@ -147,7 +165,7 @@ integer i
 typeset progname="${ basename "${0}" ; }"
 
 typeset -r numtree1_usage=$'+
-[-?\n@(#)\$Id: numtree1 (Roland Mainz) 2009-08-17 \$\n]
+[-?\n@(#)\$Id: numtree1 (Roland Mainz) 2010-03-27 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?numtree1 - generate sorted variable tree containing numbers]
 [+DESCRIPTION?\bnumtree1\b is a simple variable tree generator

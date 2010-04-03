@@ -129,9 +129,13 @@ macro{
 	!
 }end
 
+hdr	mntent,mnttab stdio.h
+sys	mntent,mnttab stdio.h
+sys	fs_types,mount,statfs,statvfs,vfs,vmount
+
 mem	mnttab.mt_dev,mnttab.mt_filsys,mnttab.mt_fstyp sys/types.h mnttab.h
 mem	mntent.mnt_opts,w_mntent.mnt_opts,mnttab.mnt_opts sys/types.h stdio.h mntent.h sys/mntent.h
-mem	mntent.mnt_opts,mnttab.mnt_opts sys/types.h mnttab.h sys/mnttab.h
+mem	mntent.mnt_opts,mnttab.mnt_opts stdio.h sys/types.h mnttab.h sys/mnttab.h
 mem	stat.st_blocks,stat.st_blksize,stat.st_rdev sys/types.h sys/stat.h
 mem	statfs.f_files,statfs.f_bavail sys/types.h - sys/statfs.h - sys/vfs.h - sys/param.h sys/mount.h
 mem	statvfs.f_basetype,statvfs.f_frsize sys/types.h sys/statvfs.h
@@ -140,11 +144,9 @@ ary	f_reserved7 sys/types.h sys/statvfs.h note{ statvfs.f_reserved7 can double f
 	int f(vp)struct statvfs* vp;{return vp->f_reserved7[0] = 1;}
 }end
 
-hdr	mntent,mnttab
 lib	getmntent,getmntinfo,mntctl,mntopen,mntread,mntclose,setmntent
 lib	w_getmntent
 lib	statfs,statvfs
-sys	fs_types,mntent,mnttab,mount,statfs,statvfs,vfs,vmount
 
 lib	statfs4 sys/types.h - sys/statfs.h - sys/vfs.h - sys/mount.h compile{
 	int f()

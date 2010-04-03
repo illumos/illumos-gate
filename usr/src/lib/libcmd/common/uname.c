@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -34,7 +34,7 @@ USAGE_LICENSE
 "[+DESCRIPTION?By default \buname\b writes the operating system name to"
 "	standard output. When options are specified, one or more"
 "	system characteristics are written to standard output, space"
-"	separated, on a single line. When more than one option is specifed"
+"	separated, on a single line. When more than one option is specified"
 "	the output is in the order specfied by the \b-A\b option below."
 "	Unsupported option values are listed as \a[option]]\a. If any unknown"
 "	options are specified then the local \b/usr/bin/uname\b is called.]"

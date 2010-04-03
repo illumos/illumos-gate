@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -28,7 +28,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: join (AT&T Research) 2009-08-01 $\n]"
+"[-?\n@(#)$Id: join (AT&T Research) 2009-12-10 $\n]"
 USAGE_LICENSE
 "[+NAME?join - relational database operator]"
 "[+DESCRIPTION?\bjoin\b performs an \aequality join\a on the files \afile1\a "
@@ -93,6 +93,21 @@ USAGE_LICENSE
 #include <cmd.h>
 #include <sfdisc.h>
 
+#if _hdr_wchar && _hdr_wctype && _lib_iswctype
+
+#include <wchar.h>
+#include <wctype.h>
+
+#else
+
+#include <ctype.h>
+
+#ifndef iswspace
+#define iswspace(x)	isspace(x)
+#endif
+
+#endif
+
 #define C_FILE1		001
 #define C_FILE2		002
 #define C_COMMON	004
@@ -104,8 +119,15 @@ USAGE_LICENSE
 #define S_DELIM		1
 #define S_SPACE		2
 #define S_NL		3
+#define S_WIDE		4
 
-typedef struct
+typedef struct Field_s
+{
+	char*		beg;
+	char*		end;
+} Field_t;
+
+typedef struct File_s
 {
 	Sfio_t*		iop;
 	char*		name;
@@ -118,10 +140,10 @@ typedef struct
 	int		spaces;
 	int		hit;
 	int		discard;
-	char**		fieldlist;
+	Field_t*	fields;
 } File_t;
 
-typedef struct 
+typedef struct Join_s
 {
 	unsigned char	state[1<<CHAR_BIT];
 	Sfio_t*		outfile;
@@ -129,9 +151,12 @@ typedef struct
 	int		outmode;
 	int		ooutmode;
 	char*		nullfield;
+	char*		delimstr;
 	int		delim;
+	int		delimlen;
 	int		buffered;
 	int		ignorecase;
+	int		mb;
 	char*		same;
 	int		samesize;
 	void*		context;
@@ -147,10 +172,10 @@ done(register Join_t* jp)
 		sfclose(jp->file[1].iop);
 	if (jp->outlist)
 		free(jp->outlist);
-	if (jp->file[0].fieldlist)
-		free(jp->file[0].fieldlist);
-	if (jp->file[1].fieldlist)
-		free(jp->file[1].fieldlist);
+	if (jp->file[0].fields)
+		free(jp->file[0].fields);
+	if (jp->file[1].fields)
+		free(jp->file[1].fields);
 	if (jp->same)
 		free(jp->same);
 	free(jp);
@@ -160,14 +185,20 @@ static Join_t*
 init(void)
 {
 	register Join_t*	jp;
+	register int		i;
 
+	setlocale(LC_ALL, "");
 	if (jp = newof(0, Join_t, 1, 0))
 	{
+		if (jp->mb = mbwide())
+			for (i = 0x80; i <= 0xff; i++)
+				jp->state[i] = S_WIDE;
 		jp->state[' '] = jp->state['\t'] = S_SPACE;
+		jp->state['\n'] = S_NL;
 		jp->delim = -1;
 		jp->nullfield = 0;
-		if (!(jp->file[0].fieldlist = newof(0, char*, NFIELD + 1, 0)) ||
-		    !(jp->file[1].fieldlist = newof(0, char*, NFIELD + 1, 0)))
+		if (!(jp->file[0].fields = newof(0, Field_t, NFIELD + 1, 0)) ||
+		    !(jp->file[1].fields = newof(0, Field_t, NFIELD + 1, 0)))
 		{
 			done(jp);
 			return 0;
@@ -265,10 +296,11 @@ getrec(Join_t* jp, int index, int discard)
 {
 	register unsigned char*	sp = jp->state;
 	register File_t*	fp = &jp->file[index];
-	register char**		ptr = fp->fieldlist;
-	register char**		ptrmax = ptr + fp->maxfields;
+	register Field_t*	field = fp->fields;
+	register Field_t*	fieldmax = field + fp->maxfields;
 	register char*		cp;
-	register int		n = 0;
+	register int		n;
+	char*			tp;
 
 	if (sh_checksig(jp->context))
 		return 0;
@@ -283,47 +315,147 @@ getrec(Join_t* jp, int index, int discard)
 	}
 	fp->recptr = cp;
 	fp->reclen = sfvalue(fp->iop);
-	if (jp->delim=='\n')	/* handle new-line delimiter specially */
+	if (jp->delim == '\n')	/* handle new-line delimiter specially */
 	{
-		*ptr++ = cp;
+		field->beg = cp;
 		cp += fp->reclen;
+		field->end = cp - 1;
+		field++;
 	}
-	else while (n!=S_NL) /* separate into fields */
-	{
-		if (ptr >= ptrmax)	
+	else
+		do /* separate into fields */
 		{
-			n = 2*fp->maxfields;
-			fp->fieldlist = newof(fp->fieldlist, char*, n + 1, 0);
-			ptr = fp->fieldlist + fp->maxfields;
-			fp->maxfields = n;
-			ptrmax = fp->fieldlist+n;
-		}
-		*ptr++ = cp;
-		if (jp->delim<=0 && sp[*(unsigned char*)cp]==S_SPACE)
-		{
-			fp->spaces = 1;
-			while (sp[*(unsigned char*)cp++]==S_SPACE);
-			cp--;
-		}
-		while ((n=sp[*(unsigned char*)cp++])==0);
-	}
-	*ptr = cp;
-	fp->nfields = ptr - fp->fieldlist;
-	if ((n=fp->field) < fp->nfields)
+			if (field >= fieldmax)	
+			{
+				n = 2 * fp->maxfields;
+				fp->fields = newof(fp->fields, Field_t, n + 1, 0);
+				field = fp->fields + fp->maxfields;
+				fp->maxfields = n;
+				fieldmax = fp->fields + n;
+			}
+			field->beg = cp;
+			if (jp->delim == -1)
+			{
+				switch (sp[*(unsigned char*)cp])
+				{
+				case S_SPACE:
+					cp++;
+					break;
+				case S_WIDE:
+					tp = cp;
+					if (iswspace(mbchar(tp)))
+					{
+						cp = tp;
+						break;
+					}
+					/*FALLTHROUGH*/
+				default:
+					goto next;
+				}
+				fp->spaces = 1;
+				if (jp->mb)
+					for (;;)
+					{
+						switch (sp[*(unsigned char*)cp++])
+						{
+						case S_SPACE:
+							continue;
+						case S_WIDE:
+							tp = cp - 1;
+							if (iswspace(mbchar(tp)))
+							{
+								cp = tp;
+								continue;
+							}
+							break;
+						}
+						break;
+					}
+				else
+					while (sp[*(unsigned char*)cp++]==S_SPACE);
+				cp--;
+			}
+		next:
+			if (jp->mb)
+			{
+				for (;;)
+				{
+					tp = cp;
+					switch (n = sp[*(unsigned char*)cp++])
+					{
+					case 0:
+						continue;
+					case S_WIDE:
+						cp--;
+						n = mbchar(cp);
+						if (n == jp->delim)
+						{
+							n = S_DELIM;
+							break;
+						}
+						if (jp->delim == -1 && iswspace(n))
+						{
+							n = S_SPACE;
+							break;
+						}
+						continue;
+					}
+					break;
+				}
+				field->end = tp;
+			}
+			else
+			{
+				while (!(n = sp[*(unsigned char*)cp++]));
+				field->end = cp - 1;
+			}
+			field++;
+		} while (n != S_NL);
+	fp->nfields = field - fp->fields;
+	if ((n = fp->field) < fp->nfields)
 	{
-		cp = fp->fieldlist[n];
+		cp = fp->fields[n].beg;
 		/* eliminate leading spaces */
 		if (fp->spaces)
 		{
-			while (sp[*(unsigned char*)cp++]==S_SPACE);
+			if (jp->mb)
+				for (;;)
+				{
+					switch (sp[*(unsigned char*)cp++])
+					{
+					case S_SPACE:
+						continue;
+					case S_WIDE:
+						tp = cp - 1;
+						if (iswspace(mbchar(tp)))
+						{
+							cp = tp;
+							continue;
+						}
+						break;
+					}
+					break;
+				}
+			else
+				while (sp[*(unsigned char*)cp++]==S_SPACE);
 			cp--;
 		}
-		fp->fieldlen = (fp->fieldlist[n+1]-cp)-1;
+		fp->fieldlen = fp->fields[n].end - cp;
 		return (unsigned char*)cp;
 	}
 	fp->fieldlen = 0;
 	return (unsigned char*)"";
 }
+
+static unsigned char*
+_trace_getrec(Join_t* jp, int index, int discard)
+{
+	unsigned char*	r;
+
+	r = getrec(jp, index, discard);
+	return r;
+}
+#define getrec	_trace_getrec
 
 #if DEBUG_TRACE
 static unsigned char* u1,u2,u3;
@@ -341,42 +473,78 @@ outfield(Join_t* jp, int index, register int n, int last)
 	register char*		cpmax;
 	register int		size;
 	register Sfio_t*	iop = jp->outfile;
+	char*			tp;
 
 	if (n < fp->nfields)
 	{
-		cp = fp->fieldlist[n];
-		cpmax = fp->fieldlist[n+1];
+		cp = fp->fields[n].beg;
+		cpmax = fp->fields[n].end + 1;
 	}
 	else
 		cp = 0;
-	if ((n=jp->delim)<=0)
+	if ((n = jp->delim) == -1)
 	{
 		if (cp && fp->spaces)
 		{
+			register unsigned char*	sp = jp->state;
+
 			/*eliminate leading spaces */
-			while (jp->state[*(unsigned char*)cp++]==S_SPACE);
+			if (jp->mb)
+				for (;;)
+				{
+					switch (sp[*(unsigned char*)cp++])
+					{
+					case S_SPACE:
+						continue;
+					case S_WIDE:
+						tp = cp - 1;
+						if (iswspace(mbchar(tp)))
+						{
+							cp = tp;
+							continue;
+						}
+						break;
+					}
+					break;
+				}
+			else
+				while (sp[*(unsigned char*)cp++]==S_SPACE);
 			cp--;
 		}
 		n = ' ';
 	}
+	else if (jp->delimstr)
+		n = -1;
 	if (last)
 		n = '\n';
 	if (cp)
-		size = cpmax-cp;
+		size = cpmax - cp;
 	else
 		size = 0;
-	if (size<=1)
+	if (n == -1)
+	{
+		if (size<=1)
+		{
+			if (jp->nullfield && sfputr(iop, jp->nullfield, -1) < 0)
+				return -1;
+		}
+		else if (sfwrite(iop, cp, size) < 0)
+			return -1;
+		if (sfwrite(iop, jp->delimstr, jp->delimlen) < 0)
+			return -1;
+	}
+	else if (size <= 1)
 	{
 		if (!jp->nullfield)
-			sfputc(iop,n);
-		else if (sfputr(iop,jp->nullfield,n) < 0)
+			sfputc(iop, n);
+		else if (sfputr(iop, jp->nullfield, n) < 0)
 			return -1;
 	}
 	else
 	{
 		last = cp[size-1];
 		cp[size-1] = n;
-		if (sfwrite(iop,cp,size) < 0)
+		if (sfwrite(iop, cp, size) < 0)
 			return -1;
 		cp[size-1] = last;
 	}
@@ -735,7 +903,18 @@ b_join(int argc, char** argv, void* context)
 			continue;
 		case 't':
 			jp->state[' '] = jp->state['\t'] = 0;
-			n= *(unsigned char*)opt_info.arg;
+			if (jp->mb)
+			{
+				cp = opt_info.arg;
+				jp->delim = mbchar(cp);
+				if ((n = cp - opt_info.arg) > 1)
+				{
+					jp->delimlen = n;
+					jp->delimstr = opt_info.arg;
+					continue;
+				}
+			}
+			n = *(unsigned char*)opt_info.arg;
 			jp->state[n] = S_DELIM;
 			jp->delim = n;
 			continue;
@@ -802,7 +981,6 @@ b_join(int argc, char** argv, void* context)
 		sfsetbuf(jp->file[0].iop, jp->file[0].iop, SF_UNBOUND);
 		sfsetbuf(jp->file[1].iop, jp->file[1].iop, SF_UNBOUND);
 	}
-	jp->state['\n'] = S_NL;
 	jp->outfile = sfstdout;
 	if (!jp->outlist)
 		jp->nullfield = 0;

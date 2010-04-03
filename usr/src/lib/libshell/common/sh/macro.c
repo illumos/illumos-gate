@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -1852,7 +1852,7 @@ retry2:
 			mac_error(np);
 		}
 	}
-	else if(var && sh_isoption(SH_NOUNSET) && (!np  || nv_isnull(np) || (nv_isarray(np) && !np->nvalue.cp)))
+	else if(var && sh_isoption(SH_NOUNSET) && type<=M_TREE && (!np  || nv_isnull(np) || (nv_isarray(np) && !np->nvalue.cp)))
 	{
 		if(np)
 		{

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -68,7 +67,7 @@ function err_exit
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors++ ))
+	(( Errors < 127 && Errors++ ))
 }
 alias err_exit='err_exit $LINENO'
 
@@ -82,9 +81,9 @@ typeset out
 
 # create temporary test directory
 ocwd="$PWD"
-tmpdir="$(mktemp -d "test_sun_solaris_cr_6862121_shbinexec_kernel_module_defunct.XXXXXXXX")" || err_exit "Cannot create temporary directory"
+tmpdir="$(mktemp -t -d "test_sun_solaris_cr_6862121_shbinexec_kernel_module_defunct.XXXXXXXX")" || err_exit "Cannot create temporary directory"
 
-cd "${tmpdir}" || err_exit "cd ${tmpdir} failed."
+cd "${tmpdir}" || { err_exit "cd ${tmpdir} failed." ; exit $((Errors)) ; }
 
 
 # run tests

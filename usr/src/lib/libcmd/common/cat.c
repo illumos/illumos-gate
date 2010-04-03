@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -406,7 +406,6 @@ b_cat(int argc, char** argv, void* context)
 	char			states[UCHAR_MAX+1];
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
-	setlocale(LC_ALL, "");
 	att = !strcmp(astconf("UNIVERSE", NiL, NiL), "att");
 	mode = "r";
 	for (;;)

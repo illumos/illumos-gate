@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -128,10 +128,12 @@ strelapsed(register const char* s, char** e, int n)
 				v *= 20 * 12 * 4 * 7 * 24 * 60 * 60;
 				break;
 			}
-			/*FALLTHROUGH*/
-		case 0:
 			v += f;
 			f = 0;
+			break;
+		case 0:
+			s--;
+			v += f;
 			break;
 		default:
 			if (p)

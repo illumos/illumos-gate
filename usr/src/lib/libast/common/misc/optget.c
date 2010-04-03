@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -383,6 +383,14 @@ show(register char* s)
 			*t++ = '\\';
 			c = 'f';
 			break;
+		case '\n':
+			*t++ = '\\';
+			c = 'n';
+			break;
+		case '\t':
+			*t++ = '\\';
+			c = 't';
+			break;
 		case '\v':
 			*t++ = '\\';
 			c = 'v';
@@ -543,7 +551,7 @@ skip(register char* s, register int t1, register int t2, register int t3, regist
  */
 
 static int
-match(char* s, char* t, int version, const char* catalog)
+match(char* s, char* t, int version, const char* id, const char* catalog)
 {
 	register char*	w;
 	register char*	x;
@@ -563,7 +571,7 @@ match(char* s, char* t, int version, const char* catalog)
 			{
 				w = skip(t, ':', '?', 0, 1, 0, 0, version);
 				w = sfprints("%-.*s", w - t, t);
-				x = T(error_info.id, catalog, w);
+				x = T(id, catalog, w);
 				if (x == w)
 					continue;
 			}
@@ -667,7 +675,7 @@ search(const void* tab, size_t num, size_t siz, char* s)
 	register char*	e;
 
 	for (e = (p = (char*)tab) + num * siz; p < e; p += siz)
-		if (match(s, *((char**)p), -1, NiL))
+		if (match(s, *((char**)p), -1, NiL, NiL))
 			return (void*)p;
 	return 0;
 }
@@ -710,6 +718,7 @@ static int
 init(register char* s, Optpass_t* p)
 {
 	register char*	t;
+	register char*	u;
 	register int	c;
 	register int	a;
 	register int	n;
@@ -740,6 +749,7 @@ init(register char* s, Optpass_t* p)
 	p->prefix = 2;
 	p->section = 1;
 	p->flags = 0;
+	p->id = error_info.id;
 	p->catalog = 0;
 	s = next(s, 0);
 	if (*s == ':')
@@ -809,32 +819,56 @@ init(register char* s, Optpass_t* p)
 			}
 		}
 		while (*s)
-			if (*s++ == ']' && *s++ == '[')
+			if (*s++ == ']')
 			{
-				if (*s++ != '-')
-				{
-					if (!error_info.id && strneq(s - 1, "+NAME?", 6))
-					{
-						for (t = s += 5; *t && *t != ' ' && *t != ']'; t++);
-						error_info.id = save(sfprints("%-.*s", t - s, s));
-					}
-					break;
-				}
-				if (*s == '-')
+				while (isspace(*s))
 					s++;
-				if (strneq(s, "catalog?", 8))
+				if (*s++ == '[')
 				{
-					s += 8;
-					if ((t = strchr(s, ']')) && (!error_info.id || (t - s) != strlen(error_info.id) || !strneq(s, error_info.id, t - s)))
-						p->catalog = save(sfprints("%-.*s", t - s, s));
-					if (error_info.id)
+					if (*s++ != '-')
+					{
+						if (strneq(s - 1, "+NAME?", 6))
+						{
+							for (s += 5; *s == '\a' || *s == '\b' || *s == '\v' || *s == ' '; s++);
+							if (*s != '\f')
+							{
+								for (t = s; *t && *t != ' ' && *t != ']'; t++);
+								if (t > s)
+								{
+									u = t;
+									if (*(t - 1) == '\a' || *(t - 1) == '\b' || *(t - 1) == '\v')
+										t--;
+									if (t > s)
+									{
+										while (*u == ' ' || *u == '\\')
+											u++;
+										if (*u == '-' || *u == ']')
+											p->id = save(sfprints("%-.*s", t - s, s));
+									}
+								}
+							}
+						}
 						break;
+					}
+					if (*s == '-')
+						s++;
+					if (strneq(s, "catalog?", 8))
+						p->catalog = s += 8;
 				}
 			}
 	}
+	if (!error_info.id)
+	{
+		if (!(error_info.id = p->id))
+			p->id = "command";
+	}
+	else if (p->id == error_info.id)
+		p->id = save(p->id);
+	if (s = p->catalog)
+		p->catalog = ((t = strchr(s, ']')) && (!p->id || (t - s) != strlen(p->id) || !strneq(s, p->id, t - s))) ? save(sfprints("%-.*s", t - s, s)) : (char*)0;
 	if (!p->catalog)
 	{
-		if (opt_info.disc && opt_info.disc->catalog && (!error_info.id || !streq(opt_info.disc->catalog, error_info.id)))
+		if (opt_info.disc && opt_info.disc->catalog && (!p->id || !streq(opt_info.disc->catalog, p->id)))
 			p->catalog = opt_info.disc->catalog;
 		else
 			p->catalog = ID;
@@ -872,7 +906,8 @@ init(register char* s, Optpass_t* p)
 		sfputc(opt_info.state->cp, '[');
 		sfputc(opt_info.state->cp, '-');
 		sfputc(opt_info.state->cp, ']');
-		while (c = *s++)
+		c = *s++;
+		while (c)
 		{
 			sfputc(opt_info.state->cp, '[');
 			sfputc(opt_info.state->cp, c);
@@ -885,24 +920,21 @@ init(register char* s, Optpass_t* p)
 				{
 					while ((c = *s++) && c != ')')
 						sfputc(opt_info.state->cp, c);
-					if (!c || *s != '(')
+					if (!c || (c = *s++) != '(')
 						break;
 					sfputc(opt_info.state->cp, '|');
-					s++;
 				}
 			}
 			sfputc(opt_info.state->cp, ']');
 			if (a)
 				sfputr(opt_info.state->cp, ":[string]", -1);
-			if (!c)
-				break;
 		}
 		if (!(p->oopts = s = sfstruse(opt_info.state->cp)))
 			return -1;
 		s += n;
 	}
 	p->opts = s;
-	message((-1, "version=%d prefix=%d section=%d flags=%04x catalog=%s", p->version, p->prefix, p->section, p->flags, p->catalog));
+	message((-1, "version=%d prefix=%d section=%d flags=%04x id=%s catalog=%s", p->version, p->prefix, p->section, p->flags, p->id, p->catalog));
 	return 0;
 }
 
@@ -939,20 +971,18 @@ font(int f, int style, int set)
  */
 
 static char*
-expand(register char* s, register char* e, char** p, Sfio_t* ip)
+expand(register char* s, register char* e, char** p, Sfio_t* ip, char* id)
 {
 	register int	c;
 	register char*	b = s;
 	int		n;
 
-	message((-23, "AHA#%d expand(%s)", __LINE__, show(s)));
 	n = sfstrtell(ip);
 	c = 1;
 	while ((!e || s < e) && (c = *s++) && c != '\f');
 	sfwrite(ip, b, s - b - 1);
 	sfputc(ip, 0);
 	b = sfstrbase(ip) + n;
-	message((-23, "AHA#%d expand(%s)", __LINE__, b));
 	n = sfstrtell(ip);
 	if (!c)
 		s--;
@@ -960,7 +990,7 @@ expand(register char* s, register char* e, char** p, Sfio_t* ip)
 	{
 		if (!*++b || streq(b, "NAME"))
 		{
-			if (!(b = error_info.id))
+			if (!(b = id))
 				b = "command";
 			sfstrseek(ip, 0, SEEK_SET);
 			sfputr(ip, b, -1);
@@ -984,7 +1014,7 @@ expand(register char* s, register char* e, char** p, Sfio_t* ip)
  */
 
 static Push_t*
-info(Push_t* psp, char* s, char* e, Sfio_t* ip)
+info(Push_t* psp, char* s, char* e, Sfio_t* ip, char* id)
 {
 	register char*	b;
 	int		n;
@@ -992,7 +1022,7 @@ info(Push_t* psp, char* s, char* e, Sfio_t* ip)
 
 	static Push_t	push;
 
-	b = expand(s, e, &s, ip);
+	b = expand(s, e, &s, ip, id);
 	n = strlen(b);
 	if (tsp = newof(0, Push_t, 1, n + 1))
 	{
@@ -1013,7 +1043,7 @@ info(Push_t* psp, char* s, char* e, Sfio_t* ip)
  */
 
 static Push_t*
-localize(Push_t* psp, char* s, char* e, int term, int n, char* catalog, int version, Sfio_t* ip)
+localize(Push_t* psp, char* s, char* e, int term, int n, Sfio_t* ip, int version, char* id, char* catalog)
 {
 	char*		t;
 	char*		u;
@@ -1039,7 +1069,7 @@ localize(Push_t* psp, char* s, char* e, int term, int n, char* catalog, int vers
 		}
 		sfputc(ip, c);
 	}
-	if (!(s = sfstruse(ip)) || (u = T(error_info.id, catalog, s)) == s)
+	if (!(s = sfstruse(ip)) || (u = T(id, catalog, s)) == s)
 		return 0;
 	n = strlen(u);
 	if (tsp = newof(0, Push_t, 1, n + 1))
@@ -1061,7 +1091,7 @@ localize(Push_t* psp, char* s, char* e, int term, int n, char* catalog, int vers
  */
 
 static int
-label(register Sfio_t* sp, int sep, register char* s, int about, int z, int level, int style, int f, Sfio_t* ip, int version, char* catalog)
+label(register Sfio_t* sp, int sep, register char* s, int about, int z, int level, int style, int f, Sfio_t* ip, int version, char* id, char* catalog)
 {
 	register int	c;
 	register char*	t;
@@ -1128,7 +1158,7 @@ label(register Sfio_t* sp, int sep, register char* s, int about, int z, int leve
 			y = p + 1;
 	}
 	if (X(catalog) && (!level || *s == '\a' || *(s - 1) != '+') &&
-	    (tsp = localize(psp, s, e, (sep || level) ? '?' : 0, sep || level, catalog, version, ip)))
+	    (tsp = localize(psp, s, e, (sep || level) ? '?' : 0, sep || level, ip, version, id, catalog)))
 	{
 		psp= tsp;
 		s = psp->nb;
@@ -1192,7 +1222,7 @@ label(register Sfio_t* sp, int sep, register char* s, int about, int z, int leve
 				if (va & OPT_optional)
 					sfputc(sp, '[');
 				sfputc(sp, '=');
-				label(sp, 0, y, 0, -1, 0, style, FONT_ITALIC, ip, version, catalog);
+				label(sp, 0, y, 0, -1, 0, style, FONT_ITALIC, ip, version, id, catalog);
 				if (va & OPT_optional)
 					sfputc(sp, ']');
 				y = 0;
@@ -1206,7 +1236,7 @@ label(register Sfio_t* sp, int sep, register char* s, int about, int z, int leve
 					continue;
 				else if (sep)
 					goto restore;
-				else if (X(catalog) && (tsp = localize(psp, s, e, 0, 1, catalog, version, ip)))
+				else if (X(catalog) && (tsp = localize(psp, s, e, 0, 1, ip, version, id, catalog)))
 				{
 					psp = tsp;
 					s = psp->nb;
@@ -1259,7 +1289,7 @@ label(register Sfio_t* sp, int sep, register char* s, int about, int z, int leve
 			a = FONT_BOLD;
 			goto setfont;
 		case '\f':
-			psp = info(psp, s, e, ip);
+			psp = info(psp, s, e, ip, id);
 			if (psp->nb)
 			{
 				s = psp->nb;
@@ -1362,7 +1392,7 @@ label(register Sfio_t* sp, int sep, register char* s, int about, int z, int leve
  */
 
 static void
-args(register Sfio_t* sp, register char* p, register int n, int flags, int style, Sfio_t* ip, int version, char* catalog)
+args(register Sfio_t* sp, register char* p, register int n, int flags, int style, Sfio_t* ip, int version, char* id, char* catalog)
 {
 	register int	i;
 	register char*	t;
@@ -1383,7 +1413,7 @@ args(register Sfio_t* sp, register char* p, register int n, int flags, int style
 			t = (char*)memchr(p, '\n', n);
 			if (style >= STYLE_man)
 			{
-				if (!(a = error_info.id))
+				if (!(a = id))
 					a = "...";
 				sfprintf(sp, "\t%s%s%s%s[%s%s%s%s%s]", font(FONT_BOLD, style, 1), a, font(FONT_BOLD, style, 0), b, b, font(FONT_ITALIC, style, 1), o, font(FONT_ITALIC, style, 0), b);
 			}
@@ -1391,7 +1421,7 @@ args(register Sfio_t* sp, register char* p, register int n, int flags, int style
 				sfprintf(sp, "%*.*s%s%s%s[%s%s%s]", OPT_USAGE - 1, OPT_USAGE - 1, T(NiL, ID, "Or:"), b, a, b, b, o, b);
 			else
 			{
-				if (!(a = error_info.id))
+				if (!(a = error_info.id) && !(a = id))
 					a = "...";
 				if (!sfstrtell(sp))
 					sfprintf(sp, "[%s%s%s]", b, o, b);
@@ -1406,7 +1436,7 @@ args(register Sfio_t* sp, register char* p, register int n, int flags, int style
 				{
 					sfwrite(ip, p, i);
 					if (b = sfstruse(ip))
-						sfputr(sp, T(error_info.id, catalog, b), -1);
+						sfputr(sp, T(id, catalog, b), -1);
 					else
 						sfwrite(sp, p, i);
 				}
@@ -1429,7 +1459,7 @@ args(register Sfio_t* sp, register char* p, register int n, int flags, int style
 		}
 	}
 	if (n)
-		label(sp, sep, p, 0, n, 0, style, 0, ip, version, catalog);
+		label(sp, sep, p, 0, n, 0, style, 0, ip, version, id, catalog);
 }
 
 /*
@@ -1439,7 +1469,7 @@ args(register Sfio_t* sp, register char* p, register int n, int flags, int style
  */
 
 static int
-item(Sfio_t* sp, char* s, int about, int level, int style, Sfio_t* ip, int version, char* catalog)
+item(Sfio_t* sp, char* s, int about, int level, int style, Sfio_t* ip, int version, char* id, char* catalog)
 {
 	register char*	t;
 	int		n;
@@ -1460,7 +1490,7 @@ item(Sfio_t* sp, char* s, int about, int level, int style, Sfio_t* ip, int versi
 			for (n = 0; n < level; n++)
 				sfputc(sp, '\t');
 		}
-		label(sp, 0, s + 1, about, -1, level, style, FONT_LITERAL, ip, version, catalog);
+		label(sp, 0, s + 1, about, -1, level, style, FONT_LITERAL, ip, version, id, catalog);
 		sfputc(sp, '\n');
 		if (style >= STYLE_nroff)
 			sfprintf(sp, ".DE");
@@ -1490,9 +1520,9 @@ item(Sfio_t* sp, char* s, int about, int level, int style, Sfio_t* ip, int versi
 						opt_info.state->flags |= OPT_proprietary;
 						break;
 					}
-			label(sp, 0, s, about, -1, level, 0, 0, ip, version, catalog);
+			label(sp, 0, s, about, -1, level, 0, 0, ip, version, id, catalog);
 			sfputr(sp, "\">", -1);
-			label(sp, 0, s, about, -1, level, style, level ? FONT_BOLD : 0, ip, version, catalog);
+			label(sp, 0, s, about, -1, level, style, level ? FONT_BOLD : 0, ip, version, id, catalog);
 			sfputr(sp, "</A>", -1);
 			if (!level)
 				sfputr(sp, "</H4>", -1);
@@ -1508,7 +1538,7 @@ item(Sfio_t* sp, char* s, int about, int level, int style, Sfio_t* ip, int versi
 				else if (style != STYLE_options && style != STYLE_match || *s == '-' || *s == '+')
 					sfputc(sp, '\t');
 			}
-			label(sp, 0, s, about, -1, level, style, FONT_BOLD, ip, version, catalog);
+			label(sp, 0, s, about, -1, level, style, FONT_BOLD, ip, version, id, catalog);
 		}
 	}
 	else
@@ -1529,11 +1559,28 @@ item(Sfio_t* sp, char* s, int about, int level, int style, Sfio_t* ip, int versi
  * output text to sp from p according to style
  */
 
+#if _BLD_DEBUG
+
+static char*	textout(Sfio_t*, char*, int, int, int, Sfio_t*, int, char*, char*);
+
 static char*
-textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip, int version, char* catalog)
+trace_textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip, int version, char* id, char* catalog, int line)
 {
-#if 0
-#define textout(a,b,c,d,e,f,g,h)	(sfprintf(a,"(%d)",__LINE__),textout(a,b,c,d,e,f,g,h))
+	static int	depth = 0;
+
+	message((-21, "opthelp: txt#%d +++ %2d \"%s\" style=%d level=%d bump=%d", line, ++depth, show(p), style, level, bump));
+	p = textout(sp, p, style, level, bump, ip, version, id, catalog);
+	message((-21, "opthelp: txt#%d --- %2d \"%s\"", line, depth--, show(p)));
+	return p;
+}
+
+#endif
+
+static char*
+textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip, int version, char* id, char* catalog)
+{
+#if _BLD_DEBUG
+#define textout(sp,p,style,level,bump,ip,version,id,catalog)	trace_textout(sp,p,style,level,bump,ip,version,id,catalog,__LINE__)
 #endif
 	register char*	t;
 	register int	c;
@@ -1573,7 +1620,7 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 		}
 		if (*p == '\f')
 		{
-			psp = info(psp, p + 1, NiL, ip);
+			psp = info(psp, p + 1, NiL, ip, id);
 			if (psp->nb)
 				p = psp->nb;
 			else
@@ -1621,7 +1668,7 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 			if ((c = *p) != '?')
 				return skip(p, 0, 0, 0, 1, level, 1, version);
 			e = C("version");
-			par = item(sp, e, about, level, style, ip, version, ID);
+			par = item(sp, e, about, level, style, ip, version, id, ID);
 			for (;;)
 			{
 				while (isspace(*(p + 1)))
@@ -1658,7 +1705,7 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 						*((t = e) + 1) = '|';
 				}
 			}
-			par = item(sp, t, about, level, style, ip, version, catalog);
+			par = item(sp, t, about, level, style, ip, version, id, catalog);
 			c = *p;
 		}
 		if (!about && level)
@@ -1676,7 +1723,15 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 	if (c == ':')
 		c = *(p = skip(p, '?', 0, 0, 1, 0, 0, version));
 	if ((c == ']' || c == '?' && *(p + 1) == ']' && *(p + 2) != ']' && p++) && (c = *(p = next(p + 1, version))) == GO)
-		p = textout(sp, p, style, level + bump + par + 1, 0, ip, version, catalog);
+	{
+		p = textout(sp, p, style, level + bump + par + 1, 0, ip, version, id, catalog);
+		if (level > lev && *p && *(p = next(p, version)) == '[')
+		{
+			p++;
+			message((-21, "textout#%d p=%s", __LINE__, show(p)));
+			goto again;
+		}
+	}
 	else if (c == '?' || c == ' ')
 	{
 		p++;
@@ -1684,7 +1739,7 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 			sfputc(sp, c);
 		else
 		{
-			if (X(catalog) && (tsp = localize(psp, p, NiL, 0, 1, catalog, version, ip)))
+			if (X(catalog) && (tsp = localize(psp, p, NiL, 0, 1, ip, version, id, catalog)))
 			{
 				psp = tsp;
 				p = psp->nb;
@@ -1800,7 +1855,15 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 							p = skip(p, 0, 0, 0, 1, 0, 1, version);
 						}
 						if (*(p = next(p, version)) == GO)
-							p = textout(sp, p, style, level + bump + !level, 0, ip, version, catalog);
+						{
+							p = textout(sp, p, style, level + bump + !level, 0, ip, version, id, catalog);
+							if (*p && *(p = next(p, version)) == '[' && !isalnum(*(p + 1)))
+							{
+								p++;
+								message((-21, "textout#%d p=%s", __LINE__, show(p)));
+								goto again;
+							}
+						}
 						else if (*p == '[' && level > lev)
 						{
 							p++;
@@ -1811,7 +1874,7 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 							p++;
 							if (style != STYLE_keys)
 							{
-								psp = info(psp, p, NiL, ip);
+								psp = info(psp, p, NiL, ip, id);
 								if (psp->nb)
 									p = psp->nb;
 								else
@@ -1880,7 +1943,7 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 			case '\f':
 				if (style != STYLE_keys)
 				{
-					psp = info(psp, p, NiL, ip);
+					psp = info(psp, p, NiL, ip, id);
 					if (psp->nb)
 						p = psp->nb;
 					else
@@ -2038,7 +2101,6 @@ opthelp(const char* oopts, const char* what)
 	char*			d;
 	char*			v;
 	char*			ov;
-	char*			name;
 	char*			pp;
 	char*			rb;
 	char*			re;
@@ -2065,6 +2127,7 @@ opthelp(const char* oopts, const char* what)
 	int			prefix;
 	int			version;
 	long			tp;
+	char*			id;
 	char*			catalog;
 	Optpass_t*		o;
 	Optpass_t*		q;
@@ -2121,7 +2184,6 @@ opthelp(const char* oopts, const char* what)
 		if (!(opts = sfstruse(sp_help)))
 			goto nospace;
 	}
-	message((-20, "AHA#%d style=%d", __LINE__, style));
  again:
 	if (opts)
 	{
@@ -2205,6 +2267,7 @@ opthelp(const char* oopts, const char* what)
 		p = q->opts;
 		prefix = q->prefix;
 		version = q->version;
+		id = q->id;
 		catalog = q->catalog;
 		switch (style)
 		{
@@ -2232,7 +2295,7 @@ opthelp(const char* oopts, const char* what)
 					c = 'b';
 					break;
 				case '\f':
-					psp = info(psp, p, NiL, sp_info);
+					psp = info(psp, p, NiL, sp_info, id);
 					if (psp->nb)
 						p = psp->nb;
 					else
@@ -2288,7 +2351,7 @@ opthelp(const char* oopts, const char* what)
 				}
 				if (c == '\f')
 				{
-					psp = info(psp, p, NiL, sp_info);
+					psp = info(psp, p, NiL, sp_info, id);
 					if (psp->nb)
 						p = psp->nb;
 					else
@@ -2360,7 +2423,7 @@ opthelp(const char* oopts, const char* what)
 				else
 				{
 					if (*(p + 1) == '\f' && (vp = opt_info.state->vp))
-						p = expand(p + 2, NiL, &t, vp);
+						p = expand(p + 2, NiL, &t, vp, id);
 					p = skip(p, ':', '?', 0, 1, 0, 0, version);
 					if (*p == ':')
 						p++;
@@ -2581,7 +2644,7 @@ opthelp(const char* oopts, const char* what)
 			}
 			if (*p == '\f')
 			{
-				psp = info(psp, p + 1, NiL, sp_info);
+				psp = info(psp, p + 1, NiL, sp_info, id);
 				if (psp->nb)
 					p = psp->nb;
 				else
@@ -2633,7 +2696,7 @@ opthelp(const char* oopts, const char* what)
 							if (!sp_misc && !(sp_misc = sfstropen()))
 								goto nospace;
 							else
-								p = textout(sp_misc, p, style, 1, 3, sp_info, version, catalog);
+								p = textout(sp_misc, p, style, 1, 3, sp_info, version, id, catalog);
 							continue;
 						}
 					}
@@ -2650,11 +2713,11 @@ opthelp(const char* oopts, const char* what)
 								s++;
 							if (*(w + 1) == '-')
 								w++;
-							if (match(w + 1, s, version, catalog))
+							if (match(w + 1, s, version, id, catalog))
 							{
 								if (*(p + 1) == '-')
 									p++;
-								p = textout(sp, p, style, 1, 3, sp_info, version, catalog);
+								p = textout(sp, p, style, 1, 3, sp_info, version, id, catalog);
 								matched = -1;
 								continue;
 							}
@@ -2667,7 +2730,7 @@ opthelp(const char* oopts, const char* what)
 				{
 					if (style >= STYLE_man)
 					{
-						p = textout(sp_body, p, style, 0, 0, sp_info, version, catalog);
+						p = textout(sp_body, p, style, 0, 0, sp_info, version, id, catalog);
 						if (!sp_head)
 						{
 							sp_head = sp_body;
@@ -2682,14 +2745,14 @@ opthelp(const char* oopts, const char* what)
 						{
 							if (p[1] == '?')
 							{
-								p = textout(sp, p, style, 1, 3, sp_info, version, catalog);
+								p = textout(sp, p, style, 1, 3, sp_info, version, id, catalog);
 								continue;
 							}
 							paragraph = 0;
 						}
-						if (match((char*)what + 1, p + 1, version, catalog))
+						if (match((char*)what + 1, p + 1, version, id, catalog))
 						{
-							p = textout(sp, p, style, 1, 3, sp_info, version, catalog);
+							p = textout(sp, p, style, 1, 3, sp_info, version, id, catalog);
 							matched = -1;
 							paragraph = 1;
 							continue;
@@ -2738,7 +2801,7 @@ opthelp(const char* oopts, const char* what)
 					else
 					{
 						if (*p == '\f' && (vp = opt_info.state->vp))
-							p = expand(p + 1, NiL, &t, vp);
+							p = expand(p + 1, NiL, &t, vp, id);
 						else
 							t = 0;
 						if (*p == ':')
@@ -2758,7 +2821,7 @@ opthelp(const char* oopts, const char* what)
 							d = 0;
 						if (style == STYLE_match)
 						{
-							if (wl && !match((char*)what, w, version, catalog))
+							if (wl && !match((char*)what, w, version, id, catalog))
 								wl = 0;
 							if ((!wl || *w == ':' || *w == '?') && (what[1] || sl && !memchr(s, what[0], sl) || !sl && what[0] != f))
 							{
@@ -2911,7 +2974,7 @@ opthelp(const char* oopts, const char* what)
 						if (!head)
 						{
 							head = 1;
-							item(sp_body, (flags & OPT_functions) ? C("FUNCTIONS") : C("OPTIONS"), 0, 0, style, sp_info, version, ID);
+							item(sp_body, (flags & OPT_functions) ? C("FUNCTIONS") : C("OPTIONS"), 0, 0, style, sp_info, version, id, ID);
 						}
 						if (style >= STYLE_nroff)
 						{
@@ -2954,7 +3017,7 @@ opthelp(const char* oopts, const char* what)
 							else
 								sfputr(sp, "void", -1);
 							if (w)
-								label(sp_body, ' ', w, 0, -1, 0, style, FONT_BOLD, sp_info, version, catalog);
+								label(sp_body, ' ', w, 0, -1, 0, style, FONT_BOLD, sp_info, version, id, catalog);
 						}
 						else
 						{
@@ -2966,10 +3029,10 @@ opthelp(const char* oopts, const char* what)
 							sfputc(sp_body, ' ');
 							if (w)
 							{
-								if (label(sp_body, 0, w, 0, -1, 0, style, 0, sp_info, version, catalog))
+								if (label(sp_body, 0, w, 0, -1, 0, style, 0, sp_info, version, id, catalog))
 								{
 									sfputc(sp_body, '|');
-									label(sp_body, 0, w, 0, -1, 0, style, 0, sp_info, version, native);
+									label(sp_body, 0, w, 0, -1, 0, style, 0, sp_info, version, id, native);
 								}
 							}
 							else
@@ -2991,7 +3054,7 @@ opthelp(const char* oopts, const char* what)
 									}
 							sfputc(sp_body, ' ');
 							if (y)
-								label(sp_body, 0, y, 0, -1, 0, style, 0, sp_info, version, catalog);
+								label(sp_body, 0, y, 0, -1, 0, style, 0, sp_info, version, id, catalog);
 							else
 								sfputc(sp_body, '-');
 							if (v)
@@ -3037,10 +3100,10 @@ opthelp(const char* oopts, const char* what)
 								if (prefix > 1)
 									sfputc(sp_body, '-');
 							}
-							if (label(sp_body, 0, w, 0, -1, 0, style, FONT_BOLD, sp_info, version, catalog))
+							if (label(sp_body, 0, w, 0, -1, 0, style, FONT_BOLD, sp_info, version, id, catalog))
 							{
 								sfputc(sp_body, '|');
-								label(sp_body, 0, w, 0, -1, 0, style, FONT_BOLD, sp_info, version, native);
+								label(sp_body, 0, w, 0, -1, 0, style, FONT_BOLD, sp_info, version, id, native);
 							}
 						}
 						if (y)
@@ -3051,7 +3114,7 @@ opthelp(const char* oopts, const char* what)
 								sfputc(sp_body, ' ');
 							if (w)
 								sfputc(sp_body, prefix == 1 ? ' ' : '=');
-							label(sp_body, 0, y, 0, -1, 0, style, FONT_ITALIC, sp_info, version, catalog);
+							label(sp_body, 0, y, 0, -1, 0, style, FONT_ITALIC, sp_info, version, id, catalog);
 							if (a & OPT_optional)
 								sfputc(sp_body, ']');
 						}
@@ -3059,9 +3122,9 @@ opthelp(const char* oopts, const char* what)
 					if (style >= STYLE_match)
 					{
 						if (d)
-							textout(sp_body, d, style, 0, 3, sp_info, version, catalog);
+							textout(sp_body, d, style, 0, 3, sp_info, version, id, catalog);
 						if (u)
-							textout(sp_body, u, style, 0, 3, sp_info, version, catalog);
+							textout(sp_body, u, style, 0, 3, sp_info, version, id, catalog);
 						if ((a & OPT_invert) && w && (d || u))
 						{
 							u = skip(w, ':', '?', 0, 1, 0, 0, version);
@@ -3071,11 +3134,11 @@ opthelp(const char* oopts, const char* what)
 								sfprintf(sp_info, " %s %s\bno%-.*s\b %s.", T(NiL, ID, "On by default; use"), "--"+2-prefix, u - w, w, T(NiL, ID, "to turn off"));
 							if (!(t = sfstruse(sp_info)))
 								goto nospace;
-							textout(sp_body, t, style, 0, 0, sp_info, version, NiL);
+							textout(sp_body, t, style, 0, 0, sp_info, version, NiL, NiL);
 						}
 						if (*p == GO)
 						{
-							p = u ? skip(p + 1, 0, 0, 0, 0, 1, 1, version) : textout(sp_body, p, style, 4, 0, sp_info, version, catalog);
+							p = u ? skip(p + 1, 0, 0, 0, 0, 1, 1, version) : textout(sp_body, p, style, 4, 0, sp_info, version, id, catalog);
 							y = "+?";
 						}
 						else
@@ -3098,7 +3161,7 @@ opthelp(const char* oopts, const char* what)
 								sfprintf(sp_info, "%s%s", y, T(NiL, ID, "The option value may be omitted."));
 							if (!(t = sfstruse(sp_info)))
 								goto nospace;
-							textout(sp_body, t, style, 4, 0, sp_info, version, NiL);
+							textout(sp_body, t, style, 4, 0, sp_info, version, NiL, NiL);
 							y = " ";
 						}
 						if (v)
@@ -3115,7 +3178,7 @@ opthelp(const char* oopts, const char* what)
 							sfputc(sp_info, '.');
 							if (!(t = sfstruse(sp_info)))
 								goto nospace;
-							textout(sp_body, t, style, 4, 0, sp_info, version, NiL);
+							textout(sp_body, t, style, 4, 0, sp_info, version, NiL, NiL);
 						}
 					}
 					else if (!mutex)
@@ -3124,7 +3187,7 @@ opthelp(const char* oopts, const char* what)
 				if (*p == GO)
 				{
 					if (style >= STYLE_match)
-						p = textout(sp_body, p, style, 4, 0, sp_info, version, catalog);
+						p = textout(sp_body, p, style, 4, 0, sp_info, version, id, catalog);
 					else
 						p = skip(p + 1, 0, 0, 0, 0, 1, 1, version);
 				}
@@ -3140,12 +3203,13 @@ opthelp(const char* oopts, const char* what)
 			for (t = p; *t == '\t' || *t == '\n'; t++);
 			if (*t)
 			{
-				item(sp_body, C("IMPLEMENTATION"), 0, 0, style, sp_info, version, ID);
+				item(sp_body, C("IMPLEMENTATION"), 0, 0, style, sp_info, version, id, ID);
 				sfputr(sp_body, p, -1);
 			}
 		}
 	}
 	version = o->version;
+	id = o->id;
 	catalog = o->catalog;
 	if (style >= STYLE_keys)
 	{
@@ -3162,6 +3226,17 @@ opthelp(const char* oopts, const char* what)
 		sfputc(sp, ']');
 	if (style == STYLE_nroff)
 	{
+		char	ud[64];
+
+		s = o->id;
+		t = ud;
+		while (t < &ud[sizeof(ud)-2] && (c = *s++))
+		{
+			if (islower(c))
+				c = toupper(c);
+			*t++ = c;
+		}
+		*t = 0;
 		sfprintf(sp, "\
 .\\\" format with nroff|troff|groff -man\n\
 .fp 5 CW\n\
@@ -3241,7 +3316,7 @@ opthelp(const char* oopts, const char* what)
 .TH %s %d\n\
 "
 , o->prefix == 2 ? "\\\\-\\\\-" : o->prefix == 1 ? "\\\\-" : ""
-, error_info.id
+, ud
 , section
 );
 	}
@@ -3287,7 +3362,7 @@ opthelp(const char* oopts, const char* what)
 			sfclose(sp_head);
 			sp_head = 0;
 		}
-		item(sp, C("SYNOPSIS"), 0, 0, style, sp_info, version, ID);
+		item(sp, C("SYNOPSIS"), 0, 0, style, sp_info, version, id, ID);
 	}
 	if (x)
 	{
@@ -3295,7 +3370,7 @@ opthelp(const char* oopts, const char* what)
 		xl = t - x;
 		if (style >= STYLE_match)
 		{
-			args(sp, x, xl, flags, style, sp_info, version, catalog);
+			args(sp, x, xl, flags, style, sp_info, version, id, catalog);
 			x = 0;
 		}
 	}
@@ -3313,7 +3388,7 @@ opthelp(const char* oopts, const char* what)
 		sp_body = 0;
 	}
 	if (x && style != STYLE_posix)
-		args(sp, x, xl, flags, style, sp_info, version, catalog);
+		args(sp, x, xl, flags, style, sp_info, version, id, catalog);
 	if (sp_info)
 	{
 		sfclose(sp_info);
@@ -3326,16 +3401,10 @@ opthelp(const char* oopts, const char* what)
 	}
 	if (!(p = sfstruse(sp)))
 		goto nospace;
-	name = error_info.id ? error_info.id : "command";
-	m = strlen(name) + 1;
-#if 0
-	if (!opt_info.state->width)
-#endif
-	{
-		astwinsize(1, NiL, &opt_info.state->width);
-		if (opt_info.state->width < 20)
-			opt_info.state->width = OPT_WIDTH;
-	}
+	astwinsize(1, NiL, &opt_info.state->width);
+	if (opt_info.state->width < 20)
+		opt_info.state->width = OPT_WIDTH;
+	m = strlen((style <= STYLE_long && error_info.id && !strchr(error_info.id, '/')) ? error_info.id : id) + 1;
 	margin = style == STYLE_api ? (8 * 1024) : (opt_info.state->width - 1);
 	if (!(opt_info.state->flags & OPT_preformat))
 	{
@@ -3348,8 +3417,19 @@ opthelp(const char* oopts, const char* what)
 			ts = OPT_USAGE + m;
 		if (style == STYLE_html)
 		{
-			sfprintf(mp, "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML//EN\">\n<HTML>\n<HEAD>\n<META name=\"generator\" content=\"optget (AT&T Research) 2000-04-01\">\n%s<TITLE>%s man document</TITLE>\n</HEAD>\n<BODY bgcolor=white>\n", (opt_info.state->flags & OPT_proprietary) ? "<!--INTERNAL-->\n" : "", name);
-			sfprintf(mp, "<H4><TABLE width=100%%><TR><TH align=left>&nbsp;%s&nbsp;(&nbsp;%d&nbsp;)&nbsp;<TH align=center><A href=\".\" title=\"Index\">%s</A><TH align=right>%s&nbsp;(&nbsp;%d&nbsp;)</TR></TABLE></H4>\n<HR>\n", name, section, T(NiL, ID, heading[section % 10]), name, section);
+			char	ud[64];
+
+			s = id;
+			t = ud;
+			while (t < &ud[sizeof(ud)-2] && (c = *s++))
+			{
+				if (islower(c))
+					c = toupper(c);
+				*t++ = c;
+			}
+			*t = 0;
+			sfprintf(mp, "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML//EN\">\n<HTML>\n<HEAD>\n<META name=\"generator\" content=\"optget (AT&T Research) 2000-04-01\">\n%s<TITLE>%s man document</TITLE>\n</HEAD>\n<BODY bgcolor=white>\n", (opt_info.state->flags & OPT_proprietary) ? "<!--INTERNAL-->\n" : "", id);
+			sfprintf(mp, "<H4><TABLE width=100%%><TR><TH align=left>&nbsp;%s&nbsp;(&nbsp;%d&nbsp;)&nbsp;<TH align=center><A href=\".\" title=\"Index\">%s</A><TH align=right>%s&nbsp;(&nbsp;%d&nbsp;)</TR></TABLE></H4>\n<HR>\n", ud, section, T(NiL, ID, heading[section % 10]), ud, section);
 			sfprintf(mp, "<DL compact>\n<DT>");
 			co = 2;
 			*(pt = ptstk) = 0;
@@ -3677,7 +3757,7 @@ optnumber(const char* s, char** t, int* e)
  */
 
 static int
-opterror(register char* p, int version, char* catalog, int err)
+opterror(register char* p, int err, int version, char* id, char* catalog)
 {
 	register Sfio_t*	mp;
 	register Sfio_t*	tp;
@@ -3718,7 +3798,7 @@ opterror(register char* p, int version, char* catalog, int err)
 			if (!X(catalog))
 				sfputc(mp, ' ');
 			else if (p = sfstruse(tp))
-				sfputr(mp, T(error_info.id, catalog, p), ' ');
+				sfputr(mp, T(id, catalog, p), ' ');
 			else
 				goto nospace;
 		}
@@ -3811,6 +3891,7 @@ optget(register char** argv, const char* oopts)
 	char*		y;
 	char*		numopt;
 	char*		opts;
+	char*		id;
 	char*		catalog;
 	int		n;
 	int		m;
@@ -3906,6 +3987,7 @@ optget(register char** argv, const char* oopts)
 	opts = pass->opts;
 	prefix = pass->prefix;
 	version = pass->version;
+	id = pass->id;
 	if (!(xp = opt_info.state->xp) || (catalog = pass->catalog) && !X(catalog))
 		catalog = 0;
 	else /* if (!error_info.catalog) */
@@ -4267,7 +4349,7 @@ optget(register char** argv, const char* oopts)
 			}
 			if (*s == '\f')
 			{
-				psp = info(psp, s + 1, NiL, opt_info.state->xp);
+				psp = info(psp, s + 1, NiL, opt_info.state->xp, id);
 				if (psp->nb)
 					s = psp->nb;
 				else
@@ -4294,7 +4376,7 @@ optget(register char** argv, const char* oopts)
 					if (*(s + 1) == '\f' && (vp = opt_info.state->vp))
 					{
 						sfputc(vp, k);
-						s = expand(s + 2, NiL, &t, vp);
+						s = expand(s + 2, NiL, &t, vp, id);
 						if (*s)
 							*(f = s - 1) = k;
 						else
@@ -4316,7 +4398,7 @@ optget(register char** argv, const char* oopts)
 						{
 							p = skip(s + 1, '?', 0, 0, 1, 0, 0, version);
 							e = sfprints("%-.*s", p - (s + 1), s + 1);
-							g = T(error_info.id, catalog, e);
+							g = T(id, catalog, e);
 							if (g == e)
 								p = 0;
 							else
@@ -4453,7 +4535,7 @@ optget(register char** argv, const char* oopts)
 							if (!(n = (m || *s == ':' || *s == '|' || *s == '?' || *s == ']' || *s == 0)) && x)
 							{
 								psp = pop(psp);
-								return opterror("?", version, catalog, 0);
+								return opterror("?", 0, version, id, catalog);
 							}
 							for (x = k; *(f + 1) == '|' && (j = *(f + 2)) && j != '!' && j != '=' && j != ':' && j != '?' && j != ']'; f += 2);
 							if (*f == ':')
@@ -4706,7 +4788,7 @@ optget(register char** argv, const char* oopts)
 				*w++ = *b++;
 			}
 			if (!num && v)
-				return opterror(no ? "!" : "=", version, catalog, 0);
+				return opterror(no ? "!" : "=", 0, version, id, catalog);
 			w = &opt_info.name[prefix];
 			c = x;
 			s = a;
@@ -4731,7 +4813,7 @@ optget(register char** argv, const char* oopts)
 		if (w || !isdigit(c) || !numopt || !(pass->flags & OPT_numeric))
 		{
 			pop(psp);
-			return opterror("", version, catalog, 0);
+			return opterror("", 0, version, id, catalog);
 		}
 		s = numopt;
 		c = opt_info.option[1] = numchr;
@@ -4754,7 +4836,7 @@ optget(register char** argv, const char* oopts)
 				if (v)
 				{
 					pop(psp);
-					return opterror("!", version, catalog, 0);
+					return opterror("!", 0, version, id, catalog);
 				}
 				opt_info.num = (long)(opt_info.number = 0);
 			}
@@ -4772,7 +4854,7 @@ optget(register char** argv, const char* oopts)
 						if (!opt_info.arg)
 						{
 							pop(psp);
-							return opterror(s, version, catalog, 0);
+							return opterror(s, 0, version, id, catalog);
 						}
 					}
 					else if (*(t = next(s + 2, version)) == '[')
@@ -4798,7 +4880,7 @@ optget(register char** argv, const char* oopts)
 					if (err || e == opt_info.arg)
 					{
 						pop(psp);
-						return opterror(s, version, catalog, err);
+						return opterror(s, err, version, id, catalog);
 					}
 				}
 			}
@@ -4819,7 +4901,7 @@ optget(register char** argv, const char* oopts)
 					else
 					{
 						opt_info.offset = 0;
-						c = opterror(s, version, catalog, err);
+						c = opterror(s, err, version, id, catalog);
 					}
 					pop(psp);
 					return c;
@@ -4855,7 +4937,7 @@ optget(register char** argv, const char* oopts)
 					{
 						pop(psp);
 						opt_info.offset = 0;
-						return opterror(s, version, catalog, err);
+						return opterror(s, err, version, id, catalog);
 					}
 				}
 			}
@@ -4864,7 +4946,7 @@ optget(register char** argv, const char* oopts)
 		{
 			opt_info.index--;
 			pop(psp);
-			return opterror(s, version, catalog, 0);
+			return opterror(s, 0, version, id, catalog);
 		}
 		opt_info.offset = 0;
 	optarg:
@@ -4897,7 +4979,7 @@ optget(register char** argv, const char* oopts)
 							{
 								p = skip(s + 1, '?', 0, 0, 1, 0, 0, version);
 								e = sfprints("%-.*s", p - (s + 1), s + 1);
-								b = T(error_info.id, catalog, e);
+								b = T(id, catalog, e);
 								if (b == e)
 									p = 0;
 								else
@@ -4978,7 +5060,7 @@ optget(register char** argv, const char* oopts)
 								if (!(n = (m || *s == ':' || *s == '|' || *s == '?' || *s == ']')) && x)
 								{
 									pop(psp);
-									return opterror("&", version, catalog, 0);
+									return opterror("&", 0, version, id, catalog);
 								}
 								for (x = k; *(f + 1) == '|' && (j = *(f + 2)) && j != '!' && j != '=' && j != ':' && j != '?' && j != ']'; f += 2);
 								if (*f == ':')
@@ -5010,7 +5092,7 @@ optget(register char** argv, const char* oopts)
 				if (!(opt_info.num = (long)(opt_info.number = x)))
 				{
 					pop(psp);
-					return opterror("*", version, catalog, 0);
+					return opterror("*", 0, version, id, catalog);
 				}
 			}
 		}
@@ -5018,7 +5100,7 @@ optget(register char** argv, const char* oopts)
 	else if (w && v)
 	{
 		pop(psp);
-		return opterror("=", version, catalog, 0);
+		return opterror("=", 0, version, id, catalog);
 	}
 	else
 	{
@@ -5052,11 +5134,11 @@ optget(register char** argv, const char* oopts)
 			}
 			opt_info.state->force = hp->style;
 		}
-		else if (match(s, "ESC", -1, NiL) || match(s, "EMPHASIS", -1, NiL))
+		else if (match(s, "ESC", -1, ID, NiL) || match(s, "EMPHASIS", -1, ID, NiL))
 			opt_info.state->emphasis = n;
-		else if (match(s, "PREFORMAT", -1, NiL))
+		else if (match(s, "PREFORMAT", -1, ID, NiL))
 			opt_info.state->flags |= OPT_preformat;
-		else if (match(s, "TEST", -1, NiL))
+		else if (match(s, "TEST", -1, ID, NiL))
 		{
 			opt_info.state->width = OPT_WIDTH;
 			opt_info.state->emphasis = 1;
@@ -5064,7 +5146,7 @@ optget(register char** argv, const char* oopts)
 		else
 		{
 			pop(psp);
-			return opterror(v, version, catalog, 0);
+			return opterror(v, 0, version, id, catalog);
 		}
 		psp = pop(psp);
 		if (argv == opt_info.state->strv)
@@ -5074,13 +5156,13 @@ optget(register char** argv, const char* oopts)
 	if ((opt_info.arg = opthelp(NiL, v)) == (char*)unknown)
 	{
 		pop(psp);
-		return opterror(v, version, catalog, 0);
+		return opterror(v, 0, version, id, catalog);
 	}
 	pop(psp);
 	return '?';
  nospace:
 	pop(psp);
-	return opterror(NiL, 0, NiL, 0);
+	return opterror(NiL, 0, 0, NiL, NiL);
 }
 
 /*
@@ -5261,5 +5343,5 @@ optstr(const char* str, const char* opts)
 		c = '-';
 	return c;
  nospace:
-	return opterror(NiL, 0, NiL, 0);
+	return opterror(NiL, 0, 0, NiL, NiL);
 }

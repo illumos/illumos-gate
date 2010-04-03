@@ -22,8 +22,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Solaris needs /usr/xpg6/bin:/usr/xpg4/bin because the tools in /usr/bin are not POSIX-conformant
@@ -150,7 +149,7 @@ function browse_manpage
 		# use "cat" here to avoid that "less" may try funny things
 		cat <"${doc_filename}" | less -I -M $"--prompt=MManual\ page\ ${doc_title}\ ?ltline\ %lt?L/%L.:"
 	else    
-		tmpdirname="$(mktemp -d "/tmp/shman_${PPID}_$$_XXXXXX")"
+		tmpdirname="$(mktemp -t -d "shman_${PPID}_$$_XXXXXX")"
 
 		mkdir -p "${tmpdirname}" || { print -u2 -f $"Couldn't create tmp. dir %s\n" "${tmpdirname}" ; return 1 ; }
 
@@ -320,7 +319,7 @@ builtin date
 typeset progname="$(basename "${0}")"
 
 typeset -r man_usage=$'+
-[-?\n@(#)\$Id: shman (Roland Mainz) 2009-06-26 \$\n]
+[-?\n@(#)\$Id: shman (Roland Mainz) 2009-12-02 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [-author?Roland Mainz <roland.mainz@sun.com>]
 [+NAME?man - find and display reference manual pages]

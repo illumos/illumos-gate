@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -39,8 +39,6 @@
 #if SHOPT_PFSH 
 #   ifdef _hdr_exec_attr
 #	include	<exec_attr.h>
-#   else
-#	undef SHOPT_PFSH
 #   endif
 #   if     _lib_vfork
 #	include     <ast_vfork.h>
@@ -139,7 +137,10 @@ static pid_t _spawnveg(const char *path, char* const argv[], char* const envp[],
 		_sh_fork(pid, 0, (int*)0);
 	}
 	job.waitsafe = waitsafe;
-	job_unlock();
+	if(pid>0)
+		job_fork(pid);
+	else
+		job_unlock();
 	return(pid);
 }
 /*
@@ -1497,7 +1498,7 @@ static int path_chkpaths(Pathcomp_t *first, Pathcomp_t* old,Pathcomp_t *pp, int 
 			}
 			*cp = 0;
 			m = ep ? (ep-sp) : 0;
-			if(!m || m==6 && memcmp((void*)sp,(void*)"FPATH=",6)==0)
+			if(m==0 || m==6 && memcmp((void*)sp,(void*)"FPATH=",6)==0)
 			{
 				if(first)
 				{
@@ -1509,8 +1510,13 @@ static int path_chkpaths(Pathcomp_t *first, Pathcomp_t* old,Pathcomp_t *pp, int 
 			}
 			else if(m==12 && memcmp((void*)sp,(void*)"BUILTIN_LIB=",12)==0)
 			{
-				if(!(pp->flags & PATH_BUILTIN_LIB))
+				if(!(pp->flags & PATH_BUILTIN_LIB) || strchr(ep,'-'))
 				{
+					if ((pp->flags & (PATH_BUILTIN_LIB|PATH_STD_DIR)) == PATH_BUILTIN_LIB)
+					{
+						free(pp->blib);
+						pp->blib = 0;
+					}
 					pp->flags |= PATH_BUILTIN_LIB;
 					if (*ep == '.' && !*(ep + 1))
 						pp->flags |= PATH_STD_DIR;

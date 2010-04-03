@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -27,18 +27,7 @@ void _STUB_vmprivate(){}
 
 #include	"vmhdr.h"
 
-static char*	Version = "\n@(#)$Id: Vmalloc (AT&T Research) 2009-06-19 $\0\n";
-
-#if _sys_stat
-#include	<sys/stat.h>
-#endif
-#include	<fcntl.h>
-
-#ifdef S_IRUSR
-#define CREAT_MODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
-#else
-#define CREAT_MODE	0644
-#endif
+static char*	Version = "\n@(#)$Id: Vmalloc (AT&T Research) 2010-01-01 $\0\n";
 
 /*	Private code used in the vmalloc library
 **
@@ -67,13 +56,7 @@ Vmsearch_f	searchf;	/* tree search function		*/
 
 #if DEBUG /* trace all allocation calls through the heap */
 	if(!_Vmtrace && vm == Vmheap && (vd->mode&VM_TRUST) )
-	{	char	*env;
-		int	fd;
-		vd->mode = (vd->mode&~VM_TRUST)|VM_TRACE;
-		if((fd = vmtrace(-1)) >= 0 ||
-		   ((env = getenv("VMTRACE")) && (fd = creat(env, CREAT_MODE)) >= 0 ) )
-			vmtrace(fd);
-	}
+		VMOPTIONS();
 #endif
 
 	if(vd->incr <= 0) /* this is just _Vmheap on the first call */
@@ -135,11 +118,12 @@ Vmsearch_f	searchf;	/* tree search function		*/
 
 	if(seg)
 	{	/* extending current segment */
-		bp = BLOCK(seg->baddr);	/**/ ASSERT((SIZE(bp)&~BITS) == 0);
-					/**/ ASSERT(SEG(bp) == seg);
+		bp = BLOCK(seg->baddr);
 
 		if(vd->mode&(VM_MTBEST|VM_MTDEBUG|VM_MTPROFILE) )
-		{	if(!ISPFREE(SIZE(bp)) )
+		{	/**/ ASSERT((SIZE(bp)&~BITS) == 0);
+			/**/ ASSERT(SEG(bp) == seg);
+			if(!ISPFREE(SIZE(bp)) )
 				SIZE(bp) = size - sizeof(Head_t);
 			else
 			{	/**/ ASSERT(searchf);
@@ -156,7 +140,10 @@ Vmsearch_f	searchf;	/* tree search function		*/
 				seg->free = NIL(Block_t*);
 				SIZE(bp) += size;
 			}
-			else	SIZE(bp) = size - sizeof(Head_t);
+			else
+			{	SEG(bp) = seg;
+				SIZE(bp) = size - sizeof(Head_t);
+			}
 		}
 
 		seg->size += size;
@@ -171,7 +158,7 @@ Vmsearch_f	searchf;	/* tree search function		*/
 			addr += ALIGN-s;
 
 		seg = (Seg_t*)addr;
-		seg->vm = vm;
+		seg->vmdt = vd;
 		seg->addr = (Void_t*)(addr - (s ? ALIGN-s : 0));
 		seg->extent = size;
 		seg->baddr = addr + size - (s ? 2*ALIGN : 0);
@@ -247,8 +234,8 @@ int		exact;
 				less = _Vmpagesize;
 			less = (size/less)*less;
 			less = (less/vd->incr)*vd->incr;
-			if(less > 0 && size > less && (size-less) < sizeof(Block_t) )
-				less = less <= vd->incr ? 0 : less - vd->incr;
+			if(less > 0 && size > (size_t)less && (size-(size_t)less) < sizeof(Block_t) )
+				less = (size_t)less <= vd->incr ? 0 : (size_t)less - vd->incr;
 		}
 
 		if(less <= 0 ||

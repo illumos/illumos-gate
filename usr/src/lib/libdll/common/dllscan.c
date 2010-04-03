@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1997-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1997-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -266,6 +266,19 @@ dllsopen(const char* lib, const char* name, const char* version)
 		memcpy(scan->pb, name, t - (char*)name);
 		name = (const char*)(t + 1);
 	}
+	if (name && !version)
+		for (t = (char*)name; *t; t++)
+			if ((*t == '-' || *t == '.' || *t == '?') && isdigit(*(t + 1)))
+			{
+				if (*t != '-')
+					scan->flags |= DLL_MATCH_VERSION;
+				version = t + 1;
+				if (!(s = vmnewof(vm, 0, char, t - (char*)name, 1)))
+					goto bad;
+				memcpy(s, name, t - (char*)name);
+				name = (const char*)s;
+				break;
+			}
 	if (!version)
 	{
 		scan->flags |= DLL_MATCH_VERSION;
@@ -283,10 +296,7 @@ dllsopen(const char* lib, const char* name, const char* version)
 		sfsprintf(scan->nam, sizeof(scan->nam), "%s", s);
 	}
 	else
-	{
-		scan->flags |= DLL_MATCH_VERSION;
 		sfsprintf(scan->nam, sizeof(scan->nam), "%s%s%s.%s", info->prefix, name, info->suffix, version);
-	}
 	if (scan->flags & (DLL_MATCH_NAME|DLL_MATCH_VERSION))
 	{
 		if (scan->flags & DLL_INFO_PREVER)

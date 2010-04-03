@@ -22,8 +22,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -69,14 +68,18 @@ function add_file_to_tree
 	nodepath="${treename}"
 	for (( i=0 ; i < (${#pe[@]}-1) ; i++ )) ; do
 		nameref x="${nodepath}"
-		[[ ! -v x.node ]] && compound -A x.nodes
+
+		# [[ -v ]] does not work for arrays because [[ -v ar ]]
+		# is equal to [[ -v ar[0] ]]. In this case we can
+		# use the output of typeset +p x.nodes
+		[[ "${ typeset +p x.nodes ; }" == "" ]] && compound -A x.nodes
 	
 		nodepath+=".nodes[${pe[i]}]"
 	done
 	
 	# insert element
 	nameref node="${nodepath}"
-	[[ ! -v node.elements ]] && compound -A node.elements
+	[[ "${ typeset +p node.elements ; }" == "" ]] && compound -A node.elements
 	node.elements[${pe[i]}]=(
 		filepath="${filename}"
 	)
@@ -146,7 +149,7 @@ integer i
 typeset progname="${ basename "${0}" ; }"
 
 typeset -r simplefileattributetree1_usage=$'+
-[-?\n@(#)\$Id: simplefileattributetree1 (Roland Mainz) 2009-06-26 \$\n]
+[-?\n@(#)\$Id: simplefileattributetree1 (Roland Mainz) 2010-03-27 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?simplefileattributetree1 - generate compound variable tree which contains file names and their attributes]
 [+DESCRIPTION?\bsimplefileattributetree1\b is a simple variable tree 

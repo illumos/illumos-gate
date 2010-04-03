@@ -1,3 +1,19 @@
+10-03-07 tail.c: sfsync(sfstdout) after all -f done, fix -f partial line
+10-03-05 mktemp.c: add --regress=seed for testing
+10-03-05 vmstate.c: add
+10-01-26 tail.c: -f sleep(1) only if no progress from last round of checks
+10-01-20 fts_fix.[ch]: use <fts_fix.h> instead of <fts.h> (see fts_fix.c)
+10-01-20 cp.c: free(state) if called from old shell
+09-12-10 join.c: <wctype.h> for iswspace()!
+09-12-04 cmd.h: fix CMD_DYNAMIC logic
+09-12-04 cut.c: handle -d mb
+09-12-03 mkdir.c: add --verbose
+09-11-30 cat.c,date.c,cksum.c: drop setlocale() call already done by optget()
+09-11-30 join.c: handle -t mb
+09-11-28 wclib.c: { -w -L } mb independent of -m
+09-11-28 paste.c: handle -d mb
+09-11-28 uniq.c: handle -s mb
+09-11-28 cksum.c: FTS_SEEDOTDIR by default
 09-09-09 fds.c: add --unit=fd
 09-08-25 tail.c: initialize Tail_t.fifo=0 !!
 09-08-15 tail.c: fix fifo logic

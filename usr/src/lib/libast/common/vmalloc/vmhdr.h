@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -71,6 +71,10 @@
 #define _npt_sbrk		1
 #endif
 
+#ifndef integralof
+#define integralof(x)		(((char*)(x))-((char*)0))
+#endif
+
 #endif /*_PACKAGE_ast*/
 
 #include	"FEATURE/vmalloc"
@@ -130,7 +134,6 @@ typedef int		ssize_t;
 #define VM_abort	0x0002	/* abort() on assertion failure		*/
 #define VM_region	0x0004	/* enable region segment checks		*/
 #define VM_mmap		0x0010	/* favor mmap allocation		*/
-#define VM_init		0x8000	/* VMCHECK env var checked		*/
 
 #if _UWIN
 #include <ast_windows.h>
@@ -334,7 +337,7 @@ struct _tiny_s
 #define TINY(vd)	((vd)->tiny)
 #define CACHE(vd)	((vd)->cache)
 
-typedef struct _vmdata_s
+struct _vmdata_s
 {	int		mode;		/* current mode for region		*/
 	size_t		incr;		/* allocate in multiple of this		*/
 	size_t		pool;		/* size	of an elt in a Vmpool region	*/
@@ -344,13 +347,8 @@ typedef struct _vmdata_s
 	Block_t*	root;		/* root of free tree			*/
 	Block_t*	tiny[S_TINY];	/* small blocks				*/
 	Block_t*	cache[S_CACHE+1]; /* delayed free blocks		*/
-} Vmdata_t;
-
-/* private parts of Vmalloc_t */
-#define _VM_PRIVATE_ \
-	Vmdisc_t*	disc;		/* discipline to get space		*/ \
-	Vmdata_t*	data;		/* the real region data			*/ \
-	Vmalloc_t*	next;		/* linked list of regions		*/
+};
+/* Vmdata_t typedef in <vmalloc.h> */
 
 #include	"vmalloc.h"
 
@@ -363,7 +361,7 @@ typedef struct _vmdata_s
 
 /* segment structure */
 struct _seg_s
-{	Vmalloc_t*	vm;	/* the region that holds this	*/
+{	Vmdata_t*	vmdt;	/* the data region holding this	*/
 	Seg_t*		next;	/* next segment			*/
 	Void_t*		addr;	/* starting segment address	*/
 	size_t		extent;	/* extent of segment		*/
@@ -492,6 +490,7 @@ typedef struct _vmextern_
 					  Vmuchar_t*, Vmuchar_t*, size_t, size_t));
 	void		(*vm_pfclose)_ARG_((Vmalloc_t*));
 	int		vm_assert;
+	int		vm_options;
 } Vmextern_t;
 
 #define _Vmextend	(_Vmextern.vm_extend)
@@ -502,7 +501,11 @@ typedef struct _vmextern_
 #define _Vmtrace	(_Vmextern.vm_trace)
 #define _Vmpfclose	(_Vmextern.vm_pfclose)
 #define _Vmassert	(_Vmextern.vm_assert)
+#define _Vmoptions	(_Vmextern.vm_options)
 
+#define VMOPTIONS()	do { if (!_Vmoptions) { _vmoptions(); } } while (0)
+
+extern void		_vmoptions _ARG_((void));
 extern int		_vmbestcheck _ARG_((Vmdata_t*, Block_t*));
 
 _BEGIN_EXTERNS_

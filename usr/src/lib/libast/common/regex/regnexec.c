@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -628,7 +628,7 @@ collic(register Celt_t* ce, char* key, register char* nxt, int c, int x)
 			c = towlower(c);
 		else
 			return 0;
-		x = wctomb(key, c);
+		x = mbconv(key, c);
 		key[x] = 0;
 		return collelt(ce, key, c, 0);
 	}

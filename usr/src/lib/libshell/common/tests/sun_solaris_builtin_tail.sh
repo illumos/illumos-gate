@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -35,7 +34,7 @@ function err_exit
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors++ ))
+	(( Errors < 127 && Errors++ ))
 }
 alias err_exit='err_exit $LINENO'
 
@@ -99,6 +98,16 @@ function myintseq
         return 0
 }
 
+# quote input string but use single-backslash that "err_exit" prints
+# the strings correctly
+function singlebackslashquote
+{
+	typeset s
+	s="$(printf "%q\n" "$1")"
+	print -r "$s"
+	return 0
+}
+
 # quote input string but use double-backslash that "err_exit" prints
 # the strings correctly
 function doublebackslashquote
@@ -121,9 +130,9 @@ typeset tmpdir
 
 # create temporary test directory
 ocwd="$PWD"
-tmpdir="$(mktemp -d "test_sun_solaris_builtin_tail.XXXXXXXX")" || err_exit "Cannot create temporary directory"
+tmpdir="$(mktemp -t -d "test_sun_solaris_builtin_tail.XXXXXXXX")" || err_exit "Cannot create temporary directory"
 
-cd "${tmpdir}" || err_exit "cd ${tmpdir} failed."
+cd "${tmpdir}" || { err_exit "cd ${tmpdir} failed." ; exit $((Errors)) ; }
 
 
 # run tests:
@@ -282,8 +291,8 @@ for testid in "${!testcases[@]}" ; do
 	for argv_variants in "${!tc.tail_args[@]}" ; do
 		nameref argv=tc.tail_args[${argv_variants}].argv
 		output=$(
-				#set -o pipefail
-	          		print -r -- "${tc.input}" | tail "${argv[@]}"
+				set -o pipefail
+	          		(trap "" PIPE ; print -r -- "${tc.input}") | tail "${argv[@]}"
 			) || err_exit "test ${tc.name}/${argv_variants}: command failed with exit code $?"
 	
 		[[ "${output}" == "${tc.expected_output}" ]] || err_exit "test ${tc.name}/${argv_variants}: Expected $(doublebackslashquote "${tc.expected_output}"), got $(doublebackslashquote "${output}")"
@@ -412,8 +421,8 @@ function followtest1
 		[[ "$( < "${OUTFILE}")" == "${followstr}" ]] || err_exit "${title}: Expected $(doublebackslashquote "${followstr}"), got "$(doublebackslashquote "$( < "${OUTFILE}")")""
 	done
 
-	#kill -TERM ${tailchild} 2>/dev/null
 	kill -KILL ${tailchild} 2>/dev/null
+	#kill -TERM ${tailchild} 2>/dev/null
 	waitpidtimeout ${tailchild} 5
 	
 	if isvalidpid ${tailchild} ; then
@@ -435,6 +444,51 @@ followtest1 "test5a" "tail" true
 #followtest1 "test5d" "/usr/xpg4/bin/tail" false
 #followtest1 "test5e" "/usr/bin/tail" true
 #followtest1 "test5f" "/usr/bin/tail" false
+
+
+# test 6: "tail -f" tests
+function followtest2
+{
+	typeset -r FOLLOWFILE="followfile.txt"
+	typeset -r OUTFILE="outfile.txt"
+
+	typeset title="$1"
+	typeset testcmd="$2"
+	integer tailchild=-1
+
+	rm -f "${FOLLOWFILE}" "${OUTFILE}"
+
+	myintseq 50000 >"${FOLLOWFILE}"
+
+	${testcmd} -n 60000 -f "${FOLLOWFILE}" >"${OUTFILE}" &
+	(( tailchild=$! ))
+	
+	sleep 10
+
+	kill -KILL ${tailchild} 2>/dev/null
+	#kill -TERM ${tailchild} 2>/dev/null
+	waitpidtimeout ${tailchild} 5
+	
+	if isvalidpid ${tailchild} ; then
+		err_exit "${title}: tail pid=${tailchild} hung."
+		kill -KILL ${tailchild} 2>/dev/null
+	fi
+	
+	wait ${tailchild} 2>/dev/null
+		
+	# this tail should be an external process
+	outstr=$(/usr/bin/tail "${OUTFILE}") || err_exit "tail returned non-zero exit code $?"
+        [[ "${outstr}" == 49991*50000 ]] || err_exit "${title}: Expected match for 49991*50000, got "$(singlebackslashquote "${outstr}")""	
+	
+	rm -f "${FOLLOWFILE}" "${OUTFILE}"
+
+	return 0
+}
+
+followtest2 "test6a" "tail"
+followtest2 "test6b" "/usr/xpg4/bin/tail"
+# fixme: later we should test this, too:
+#followtest2 "test6c" "/usr/bin/tail"
 
 
 # cleanup

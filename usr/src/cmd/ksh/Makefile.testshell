@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -40,6 +39,14 @@
 #   -- snip --
 #   options.sh[145]: -G ** failed -- expected 'bam.c bar bar.c bar/bam.c bar/foo.c foo foo/bam.c', got 'bam.c bar bar/bam.c bar.c bar/foo.c foo foo/bam.c'
 #   options.sh[149]: -G **/*.c failed -- expected 'bam.c bar.c bar/bam.c bar/foo.c foo/bam.c', got 'bam.c bar/bam.c bar.c bar/foo.c foo/bam.c'
+#   -- snip --
+#   This may be simply a different sort order or a bug in the test suite.
+#   Currently under investigation.
+#
+# - "glob.sh" may currently fail in some locales (e.g. en_US.UTF-8) with:
+#   -- snip --
+#   glob.sh[157] glob -- expected '<d> <dd> <de> <Beware>', got '<Beware> <d> <dd> <de>'
+#   glob.sh[277] glob -- expected '<abc> <abe> <bdir> <ca> <de> <man> <Beware>', got '<abc> <abe> <bdir> <Beware> <ca> <de> <man>'
 #   -- snip --
 #   This may be simply a different sort order or a bug in the test suite.
 #   Currently under investigation.
@@ -84,7 +91,8 @@ ON_KSH_TEST_LOCALES = \
 # $ export ON_KSH_TEST_LIST=<value> # before $ make install #
 ON_KSH_TEST_LIST = $(TESTSRC)/*.sh
 
-# Flag to control whether we should make test failures non-fatal
+# Boolean (true/false) flag to control whether we should make test
+# failures non-fatal
 ON_KSH_TEST_IGNORE_TESTFAILURE=false
 
 # We must wait for other things in this subdir to finish before running
@@ -124,6 +132,7 @@ testshell: $(PROG)
 	    fi ; \
 	    (for test_item in $(ON_KSH_TEST_LIST) ; do \
 	        [[ "$${test_item}" == "$(TESTSRC)/builtins.sh" || \
+	           "$${test_item}" == "$(TESTSRC)/glob.sh" || \
 	           "$${test_item}" == "$(TESTSRC)/options.sh" ]] || \
 		   $(ON_KSH_TEST_IGNORE_TESTFAILURE) && \
 		   set +o errexit ; \
@@ -149,7 +158,7 @@ testshell: $(PROG)
 		        	    SHELL="$${SHELL}" \
 		        	    LANG="$${test_lang}" \
 		        	    LC_ALL="$${test_lang}" \
-				    VMDEBUG=a \
+				    VMALLOC_OPTIONS=abort \
 				    SHCOMP="$(ROOTBIN)/shcomp" \
 		        	      "$${test_item}" \
 		            ) 2>&1 | while read ; do \

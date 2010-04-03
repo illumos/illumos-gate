@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -286,8 +286,9 @@ static Namval_t *array_find(Namval_t *np,Namarr_t *arp, int flag)
 	np->nvalue.cp = up->cp;
 	if(!up->cp)
 	{
+			char *xp = nv_setdisc(np,"get",np,(Namfun_t*)np);
 		if(flag!=ARRAY_ASSIGN)
-			return(0);
+			return(xp && xp!=(char*)np?np:0);
 		if(!array_covered(np,ap))
 			ap->header.nelem++;
 	}
@@ -922,9 +923,10 @@ int nv_nextsub(Namval_t *np)
 			if(array_isbit(aq->bits, dot,ARRAY_CHILD))
 			{
 				Namval_t *mp = aq->val[dot].np;			
-				if((aq->header.nelem&ARRAY_NOCHILD) && nv_isvtree(mp))
+				if((aq->header.nelem&ARRAY_NOCHILD) && nv_isvtree(mp) && !mp->nvfun->dsize)
 					continue;
-				nv_putsub(mp,NIL(char*),ARRAY_UNDEF);
+				if(nv_isarray(mp))
+					nv_putsub(mp,NIL(char*),ARRAY_UNDEF);
 			}
 			return(1);
 		}
@@ -1255,7 +1257,12 @@ void *nv_associative(register Namval_t *np,const char *sp,int mode)
 		return((void*)ap->cur);
 	    case NV_ANAME:
 		if(ap->cur)
+		{
+			Shell_t *shp = sh_getinterp();
+			if(!shp->instance && nv_isnull(ap->cur))
+				return(NIL(void*));
 			return((void*)ap->cur->nvname);
+		}
 		return(NIL(void*));
 	    default:
 		if(sp)
@@ -1269,7 +1276,7 @@ void *nv_associative(register Namval_t *np,const char *sp,int mode)
 				mode = NV_ADD|HASH_NOSCOPE;
 			else if(ap->header.nelem&ARRAY_NOSCOPE)
 				mode = HASH_NOSCOPE;
-			if(*sp==0 && (mode&NV_ADD))
+			if(*sp==0 && sh_isoption(SH_XTRACE) && (mode&NV_ADD))
 				errormsg(SH_DICT,ERROR_warn(0),"adding empty subscript"); 
 			if(sh.subshell && (mp=nv_search(sp,ap->header.table,0)) && nv_isnull(mp))
 				ap->cur = mp;
@@ -1297,6 +1304,8 @@ void *nv_associative(register Namval_t *np,const char *sp,int mode)
 				ap->pos = mp = (Namval_t*)dtprev(ap->header.table,&fake);
 				ap->nextpos = (Namval_t*)dtnext(ap->header.table,mp);
 			}
+			else if(!mp && *sp && mode==0)
+				mp = nv_search(sp,ap->header.table,NV_ADD);
 			np = mp;
 			if(ap->pos && ap->pos==np)
 				ap->header.nelem |= ARRAY_SCAN;

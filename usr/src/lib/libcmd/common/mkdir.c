@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -27,7 +27,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: mkdir (AT&T Research) 2007-04-25 $\n]"
+"[-?\n@(#)$Id: mkdir (AT&T Research) 2009-12-03 $\n]"
 USAGE_LICENSE
 "[+NAME?mkdir - make directories]"
 "[+DESCRIPTION?\bmkdir\b creates one or more directories.  By "
@@ -43,6 +43,8 @@ USAGE_LICENSE
     "dir\v where the \b-m\b mode option represents that option supplied to "
     "the original invocation of \bmkdir\b, if any. Each dir operand that "
     "names an existing directory shall be ignored without error.]"
+"[v:verbose?Print a message on the standard error for each created "
+    "directory.]"
 "\n"
 "\ndirectory ...\n"
 "\n"
@@ -68,6 +70,7 @@ b_mkdir(int argc, char** argv, void* context)
 	register mode_t	mask = 0;
 	register int	mflag = 0;
 	register int	pflag = 0;
+	register int	vflag = 0;
 	char*		name;
 	mode_t		dmode;
 	struct stat	st;
@@ -79,14 +82,17 @@ b_mkdir(int argc, char** argv, void* context)
 		{
 		case 0:
 			break;
-		case 'p':
-			pflag = 1;
-			continue;
 		case 'm':
 			mflag = 1;
 			mode = strperm(arg = opt_info.arg, &opt_info.arg, mode);
 			if (*opt_info.arg)
 				error(ERROR_exit(0), "%s: invalid mode", arg);
+			continue;
+		case 'p':
+			pflag = 1;
+			continue;
+		case 'v':
+			vflag = 1;
 			continue;
 		case ':':
 			error(2, "%s", opt_info.arg);
@@ -149,6 +155,8 @@ b_mkdir(int argc, char** argv, void* context)
 					error(ERROR_system(0), "%s:", name);
 					break;
 				}
+				if (vflag)
+					error(0, "%s: directory created", name);
 				if (!(*arg = n) && (mode & (S_ISVTX|S_ISUID|S_ISGID)))
 				{
 					if (stat(name, &st))
@@ -164,6 +172,8 @@ b_mkdir(int argc, char** argv, void* context)
 				}
 			}
 		}
+		else if (vflag)
+			error(0, "%s: directory created", arg);
 	}
 	if (mask)
 		umask(mask);

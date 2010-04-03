@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -28,8 +28,7 @@
  * return error message string given errno
  */
 
-#include <ast.h>
-#include <error.h>
+#include "lclib.h"
 
 #include "FEATURE/errno"
 
@@ -113,10 +112,12 @@ _ast_strerror(int err)
 				{
 					t = fmtbuf(z = strlen(s) + 1);
 					strcpy(t, s);
+					ast.locale.set |= AST_LC_internal;
 					p = setlocale(LC_MESSAGES, NiL);
 					setlocale(LC_MESSAGES, "C");
 					sys = (s = strerror(1)) && strcmp(s, t) ? 1 : -1;
 					setlocale(LC_MESSAGES, p);
+					ast.locale.set &= ~AST_LC_internal;
 				}
 			}
 			if (sys > 0)

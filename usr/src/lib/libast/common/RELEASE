@@ -1,3 +1,45 @@
+10-03-08 features/tvlib: fix utimensat probe to include all macros/structs
+10-03-07 features/lib: change stream_peek to test pipes only
+10-03-07 string/strelapsed.c: fix next char return overrun
+10-03-06 tm/tvtouch.c: use runtime fallback if utimensat() fails with ENOSYS
+10-03-05 path/pathtemp.c: add pfx /seed for regression testing
+10-03-04 vmalloc/vmwalk.c: add user supplied handle arg
+10-03-04 path/pathtemp.c: properly handle mktemp()-style *+(X) templates
+10-03-03 include/ast_getopt.h: remove NULL guard - _AST_GETOPT_H now handles it
+10-02-24 comp/getopt.h: fix ast_std.h interactions
+10-02-24 vmalloc/malloc.c: empty { VMALLOC_OPTION VMDEBUG ... } => no debug!
+10-02-02 string/base64.c: fix corner case output buffer overflow
+10-02-02 features/fs: sys/mnttab.h requires stdio.h on some systems!!
+10-02-01 misc/optget.c: uppercase --html heading -- doh
+10-01-29 misc/optget.c: [+NAME?...] overrides error_info.id for >= STYLE_man
+10-01-25 vmalloc/vmprivate.c: fix seg ptr initialization bug (24 years old!!)
+10-01-20 misc/optget.c: handle nested {...} rendering
+10-01-20 misc/state.c: add ast.version for runtime api version
+10-01-20 port/astconf.c: "_AST_VERSION" now returns ast.version
+10-01-20 include/ast_std.h: add ast.version for runtime api version
+10-01-19 astlicense.c: add epl
+10-01-01 vmalloc: VMALLOC_OPTIONS env var for all runtime options
+10-01-01 include: change some <ast.h> refs to less intrusive <ast_*.h>
+10-01-01 setlocale.c,translate.c,fmterror.c: AST_LC_internal retains prev state
+10-01-01 comp/setlocale.c: AST_LC_setenv defers to LC_ALL (for sh)
+10-01-01 ast_std.h: add { AST_LC_internal AST_LC_setenv }
+09-12-24 comp/setlocale.c: fix setlocale(LC_ALL,"") when already initialized
+09-12-17 misc/optget.c: handle mixed solaris usage="x:f:(in)yo:(out)"
+09-12-11 regex/regcomp.c: posix semantics for [z-a]
+09-12-11 regex/regcomp.c: fix BRE/ERE ^^ logic
+09-12-11 regex/regcomp.c: fix regcomb() for REG_LEFT|REG_RIGHT
+09-12-11 regex/regcomp.c: bm complete=0 if REX_END
+09-12-11 comp/sigflag.c: add with npt check in features/sig.sh
+09-12-11 tm/tminit.c: fix _tzset_environ logic
+09-12-09 tm/tmlocale.c: include "ast_nl_types.h" to pull nl_langinfo in!
+09-12-04 features/options: add "opt map-libc" check
+09-12-03 tm/tmxdate.c: fix 'next month final day' for dec -> jan
+09-11-21 misc/magic.tab: add gimp XCF
+09-11-20 vmalloc/vmtrace.c: add pid to assertion disgnostics
+09-11-11 regex.h,regcomp.c: add REG_CLASS_ESCAPE, \ inside [...] literal by default
+09-11-03 regex/regcache.c: change to variable length pattern strings
+09-10-28 include/error.h: fix ERROR_translate() arg parens
+09-10-26 port/lcgen.c,comp/setlocale.c: handle LANG init after LC_* already defined
 09-10-05 _sfopen.c: add but ignore 'F' flags for stdio compatibility
 09-09-28 fts.h,ftwalk.h,fts.c: promote { namelen pathlen level } to (s)size_t
 09-09-28 locales: add AST_LC_LANG for $LANG
@@ -69,7 +111,7 @@
 08-08-19 strn?tol?d: handle long double with smaller exponent range than double
 08-08-18 sfio/sfcvt.c: eliminate excessive multiplies and integral overprecision
 08-08-11 tm/tmxfmt.c: handle %10N and %010N
-08-08-06 include/shcmd.h: add 'int invariant;' for builtin invarinat arg count
+08-08-06 include/shcmd.h: add 'int invariant;' for builtin invariant arg count
 08-08-05 features/ndbm: favor sleepycat ndbm compatibility
 08-07-21 include/glob.h,misc/glob.c: GLOB_STARSTAR only forces lstat on chdir
 08-07-17 sfio: sync with kpv

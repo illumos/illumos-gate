@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -183,9 +183,11 @@ void job_chldtrap(Shell_t *shp, const char *trap, int unpost)
 {
 	register struct process *pw,*pwnext;
 	pid_t bckpid;
-	int oldexit;
+	int oldexit,trapnote;
 	job_lock();
 	shp->sigflag[SIGCHLD] &= ~SH_SIGTRAP;
+	trapnote = shp->trapnote;
+	shp->trapnote = 0;
 	for(pw=job.pwlist;pw;pw=pwnext)
 	{
 		pwnext = pw->p_nxtjob;
@@ -199,11 +201,12 @@ void job_chldtrap(Shell_t *shp, const char *trap, int unpost)
 		if(pw->p_flag&P_SIGNALLED)
 			shp->savexit |= SH_EXITSIG;
 		sh_trap(trap,0);
+		if(pw->p_pid==bckpid && unpost)
+			job_unpost(pw,0);
 		shp->savexit = oldexit;
 		shp->bckpid = bckpid;
-		if(unpost)
-			job_unpost(pw,0);
 	}
+	shp->trapnote = trapnote;
 	job_unlock();
 }
 #endif /* SHOPT_BGX */
@@ -285,7 +288,7 @@ int job_reap(register int sig)
 		if (pid<0 && errno==EINVAL && (flags&WCONTINUED))
 			pid = waitpid((pid_t)-1,&wstat,flags&=~WCONTINUED);
 		sh_sigcheck();
-		if(sig && pid<0 && errno==EINTR)
+		if(pid<0 && errno==EINTR && (sig||job.savesig))
 			continue;
 		if(pid<=0)
 			break;
@@ -569,9 +572,15 @@ void job_init(Shell_t *shp, int lflag)
 #ifdef SIGTSTP
 	/* make sure that we are a process group leader */
 	setpgid(0,shp->pid);
-#   if defined(SA_NOCLDWAIT) && defined(_lib_sigflag)
+#   if defined(SA_NOCLDSTOP) || defined(SA_NOCLDWAIT)
+#   	if !defined(SA_NOCLDSTOP)
+#	    define SA_NOCLDSTOP	0
+#   	endif
+#   	if !defined(SA_NOCLDWAIT)
+#	    define SA_NOCLDWAIT	0
+#   	endif
 	sigflag(SIGCHLD, SA_NOCLDSTOP|SA_NOCLDWAIT, 0);
-#   endif /* SA_NOCLDWAIT */
+#   endif /* SA_NOCLDSTOP || SA_NOCLDWAIT */
 	signal(SIGTTIN,SIG_IGN);
 	signal(SIGTTOU,SIG_IGN);
 	/* The shell now handles ^Z */
@@ -1177,7 +1186,7 @@ int job_post(pid_t pid, pid_t join)
 	job.pwlist = pw;
 	pw->p_env = sh.curenv;
 	pw->p_pid = pid;
-	if(!sh.outpipe || sh_isoption(SH_PIPEFAIL))
+	if(!sh.outpipe || (sh_isoption(SH_PIPEFAIL) && job.waitall))
 		pw->p_flag = P_EXITSAVE;
 	pw->p_exitmin = sh.xargexit;
 	pw->p_exit = 0;
@@ -1413,7 +1422,7 @@ int	job_wait(register pid_t pid)
 					}
 				}
 				px = job_unpost(pw,1);
-				if(!px || !sh_isoption(SH_PIPEFAIL))
+				if(!px || !sh_isoption(SH_PIPEFAIL) || !job.waitall)
 					break;
 				pw = px;
 				continue;
@@ -1623,6 +1632,7 @@ static struct process *job_unpost(register struct process *pwtop,int notify)
 		pw->p_nxtjob = freelist;
 		freelist = pw;
 	}
+	pwtop->p_pid = 0;
 #ifdef DEBUG
 	sfprintf(sfstderr,"ksh: job line %4d: free pid=%d critical=%d job=%d\n",__LINE__,getpid(),job.in_critical,pwtop->p_job);
 	sfsync(sfstderr);
@@ -1837,6 +1847,7 @@ void job_fork(pid_t parent)
 		job.in_critical = 0;
 		break;
 	default:
+		job_chksave(parent);
 		job_unlock();
 		break;
 	}

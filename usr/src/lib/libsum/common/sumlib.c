@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1996-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1996-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -274,7 +274,6 @@ Sum_t*
 sumopen(register const char* name)
 {
 	register int	n;
-	char		pat[256];
 
 	if (!name || !name[0] || name[0] == '-' && !name[1])
 		name = "default";

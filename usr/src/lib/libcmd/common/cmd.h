@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -56,8 +56,6 @@
 #if CMD_DYNAMIC
 
 #include <dlldefs.h>
-
-typedef int (*Shbltin_f)(int, char**, void*);
 
 #else
 
@@ -126,7 +124,7 @@ main(int argc, char** argv)
 			if (fun = (Shbltin_f)dlsym(dll, buf))
 				break;
 		}
-		if (dll = dllfind("cmd", NiL, RTLD_LAZY))
+		if (dll = dllplug(NiL, "cmd", NiL, RTLD_LAZY, NiL, 0))
 		{
 			if (fun = (Shbltin_f)dlsym(dll, buf + 1))
 				break;

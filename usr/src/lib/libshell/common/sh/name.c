@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -53,8 +53,8 @@ pathnative(const char* path, char* buf, size_t siz)
 
 static void	attstore(Namval_t*,void*);
 #ifndef _ENV_H
-static void	pushnam(Namval_t*,void*);
-static char	*staknam(Namval_t*, char*);
+    static void	pushnam(Namval_t*,void*);
+    static char	*staknam(Namval_t*, char*);
 #endif
 static void	ltou(char*);
 static void	utol(char*);
@@ -538,7 +538,11 @@ void nv_setlist(register struct argnod *arg,register int flags, Namval_t *typ)
 
 				}
 				if(!nv_isarray(np) && !typ && (tp->com.comarg || !tp->com.comset || tp->com.comset->argval[0]!='['))
+				{
 					nv_setvtree(np);
+					if(tp->com.comarg || tp->com.comset)
+						np->nvfun->dsize = 0;
+				}
 #if SHOPT_TYPEDEF
 				goto check_type;
 #else
@@ -753,7 +757,7 @@ Namval_t *nv_create(const char *name,  Dt_t *root, int flags, Namfun_t *dp)
 					if(shp->var_tree->walk == shp->var_base)
 					{
 						nq = np;
-						if(flags&NV_NOSCOPE)
+						if((flags&NV_NOSCOPE) && *cp!='.')
 						{
 							if(mode==0)
 								root = shp->var_base;
@@ -857,7 +861,7 @@ Namval_t *nv_create(const char *name,  Dt_t *root, int flags, Namfun_t *dp)
 				
 			}
 			shp->last_root = root;
-			if(cp[1]=='.')
+			if(*cp && cp[1]=='.')
 				cp++;
 			if(c=='.' && (cp[1]==0 ||  cp[1]=='=' || cp[1]=='+'))
 			{
@@ -1357,9 +1361,7 @@ void nv_putval(register Namval_t *np, const char *string, int flags)
 	register char *cp;
 	register int size = 0;
 	register int dot;
-#ifdef _ENV_H
 	int	was_local = nv_local;
-#endif
 	union Value u;
 	if(!(flags&NV_RDONLY) && nv_isattr (np, NV_RDONLY))
 		errormsg(SH_DICT,ERROR_exit(1),e_readonly, nv_name(np));
@@ -1376,10 +1378,8 @@ void nv_putval(register Namval_t *np, const char *string, int flags)
 		{
 			nv_local=1;
 			nv_putv(np,sp,flags,np->nvfun);
-#ifdef _ENV_H
 			if(sp && ((flags&NV_EXPORT) || nv_isattr(np,NV_EXPORT)))
 				sh_envput(sh.env,np);
-#endif
 			return;
 		}
 		/* called from disc, assign the actual value */
@@ -1639,7 +1639,7 @@ void nv_putval(register Namval_t *np, const char *string, int flags)
 		}
 		if(nv_isattr(np,NV_BINARY) && !(flags&NV_RAW))
 			tofree = 0;
-		if(nv_isattr(np,NV_LJUST|NV_RJUST))
+		if(nv_isattr(np,NV_LJUST|NV_RJUST) && nv_isattr(np,NV_LJUST|NV_RJUST)!=(NV_LJUST|NV_RJUST))
 			tofree = 0;
        	 	if (sp)
 		{
@@ -1680,11 +1680,11 @@ void nv_putval(register Namval_t *np, const char *string, int flags)
 			}
 			else
 #endif
-			if(size==0 && nv_isattr(np,NV_LJUST|NV_RJUST|NV_ZFILL))
+			if(size==0 && nv_isattr(np,NV_HOST)!=NV_HOST &&nv_isattr(np,NV_LJUST|NV_RJUST|NV_ZFILL))
 				nv_setsize(np,size=dot);
 			else if(size > dot)
 				dot = size;
-			else if(nv_isattr(np,NV_LJUST) && dot>size)
+			else if(nv_isattr(np,NV_LJUST|NV_RJUST)==NV_LJUST && dot>size)
 				dot = size;
 			if(size==0 || tofree || !(cp=(char*)up->cp))
 			{
@@ -1709,9 +1709,9 @@ void nv_putval(register Namval_t *np, const char *string, int flags)
 			cp[dot] = c;
 			if(nv_isattr(np, NV_RJUST) && nv_isattr(np, NV_ZFILL))
 				rightjust(cp,size,'0');
-			else if(nv_isattr(np, NV_RJUST))
+			else if(nv_isattr(np, NV_LJUST|NV_RJUST)==NV_RJUST)
 				rightjust(cp,size,' ');
-			else if(nv_isattr(np, NV_LJUST))
+			else if(nv_isattr(np, NV_LJUST|NV_RJUST)==NV_LJUST)
 			{
 				register char *dp;
 				dp = strlen (cp) + cp;
@@ -1729,10 +1729,8 @@ void nv_putval(register Namval_t *np, const char *string, int flags)
 		if(tofree && tofree!=Empty)
 			free((void*)tofree);
 	}
-#ifdef _ENV_H
 	if(!was_local && ((flags&NV_EXPORT) || nv_isattr(np,NV_EXPORT)))
 		sh_envput(sh.env,np);
-#endif
 	return;
 }
 
@@ -1920,11 +1918,8 @@ static void pushnam(Namval_t *np, void *data)
 	register struct adata *ap = (struct adata*)data;
 	ap->sh = &sh;
 	ap->tp = 0;
-	if(nv_isattr(np,NV_IMPORT))
-	{
-		if(np->nvenv)
-			*ap->argnam++ = np->nvenv;
-	}
+	if(nv_isattr(np,NV_IMPORT) && np->nvenv)
+		*ap->argnam++ = np->nvenv;
 	else if(value=nv_getval(np))
 		*ap->argnam++ = staknam(np,value);
 	if(nv_isattr(np,NV_RDONLY|NV_UTOL|NV_LTOU|NV_RJUST|NV_LJUST|NV_ZFILL|NV_INTEGER))
@@ -2001,7 +1996,7 @@ static int scanfilter(Dt_t *dict, void *arg, void *data)
 	register struct adata *tp = (struct adata*)sp->scandata;
 	NOT_USED(dict);
 #if SHOPT_TYPEDEF
-	if(tp && !is_abuiltin(np) && tp && tp->tp && nv_type(np)!=tp->tp)
+	if(!is_abuiltin(np) && tp && tp->tp && nv_type(np)!=tp->tp)
 		return(0);
 #endif /*SHOPT_TYPEDEF */
 	if(sp->scanmask?(k&sp->scanmask)==sp->scanflags:(!sp->scanflags || (k&sp->scanflags)))
@@ -2153,10 +2148,8 @@ static void table_unset(Shell_t *shp, register Dt_t *root, int flags, Dt_t *oroo
 				shp->subshell = subshell;
 				np->nvfun = 0;
 			}
-#ifdef _ENV_H
 			if(nv_isattr(nq,NV_EXPORT))
 				sh_envput(shp->env,nq);
-#endif
 		}
 		npnext = (Namval_t*)dtnext(root,np);
 		shp->last_root = root;
@@ -2556,8 +2549,10 @@ done:
 	if(up->cp && nv_isattr(np,NV_BINARY) && !nv_isattr(np,NV_RAW))
 	{
 		char *cp;
+		char *ep;
 		int size= nv_size(np), insize=(4*size)/3+size/45+8;
-		base64encode(up->cp, size, (void**)0, cp=getbuf(insize), insize, (void**)0); 
+		base64encode(up->cp, size, (void**)0, cp=getbuf(insize), insize, (void**)&ep); 
+		*ep = 0;
 		return(cp);
 	}
 #endif
@@ -2673,7 +2668,6 @@ void nv_newattr (register Namval_t *np, unsigned newatts, int size)
 	n = np->nvflag;
 	if(newatts&NV_EXPORT)
 		nv_offattr(np,NV_IMPORT);
-#ifdef _ENV_H
 	if(((n^newatts)&NV_EXPORT))
 	{
 		/* record changes to the environment */
@@ -2682,7 +2676,6 @@ void nv_newattr (register Namval_t *np, unsigned newatts, int size)
 		else
 			sh_envput(sh.env,np);
 	}
-#endif
 	oldsize = nv_size(np);
 	if((size==oldsize|| (n&NV_INTEGER)) && ((n^newatts)&~NV_NOCHANGE)==0)
 	{
@@ -2726,7 +2719,7 @@ void nv_newattr (register Namval_t *np, unsigned newatts, int size)
 			}
 			else
 				nv_unset(np);
-			if(size==0 && (newatts&(NV_LJUST|NV_RJUST|NV_ZFILL)))
+			if(size==0 && (newatts&NV_HOST)!=NV_HOST && (newatts&(NV_LJUST|NV_RJUST|NV_ZFILL)))
 				size = n;
 		}
 		else
@@ -2749,7 +2742,6 @@ void nv_newattr (register Namval_t *np, unsigned newatts, int size)
 	return;
 }
 
-#ifndef _NEXT_SOURCE
 static char *oldgetenv(const char *string)
 {
 	register char c0,c1;
@@ -2774,19 +2766,33 @@ static char *oldgetenv(const char *string)
 /*
  * This version of getenv uses the hash storage to access environment values
  */
-char *getenv(const char *name)
+char *sh_getenv(const char *name)
 /*@
 	assume name!=0;
 @*/ 
 {
 	register Namval_t *np;
 	if(!sh.var_tree)
-		return(oldgetenv(name));
-	if((np = nv_search(name,sh.var_tree,0)) && nv_isattr(np,NV_EXPORT))
+	{
+#if 0
+		if(name[0] == 'P' && name[1] == 'A' && name[2] == 'T' && name[3] == 'H' && name[4] == 0 || name[0] == 'L' && ((name[1] == 'C' || name[1] == 'D') && name[2] == '_' || name[1] == 'A' && name[1] == 'N') || name[0] == 'V' && name[1] == 'P' && name[2] == 'A' && name[3] == 'T' && name[4] == 'H' && name[5] == 0 || name[0] == '_' && name[1] == 'R' && name[2] == 'L' && name[3] == 'D' || name[0] == '_' && name[1] == 'A' && name[2] == 'S' && name[3] == 'T' && name[4] == '_')
+#endif
+			return(oldgetenv(name));
+	}
+	else if((np = nv_search(name,sh.var_tree,0)) && nv_isattr(np,NV_EXPORT))
 		return(nv_getval(np));
-	if(name[0] == 'P' && name[1] == 'A' && name[2] == 'T' && name[3] == 'H' && name[4] == 0)
-		return(oldgetenv(name));
 	return(0);
+}
+
+#ifndef _NEXT_SOURCE
+/*
+ * Some dynamic linkers will make this file see the libc getenv(),
+ * so sh_getenv() is used for the astintercept() callback.  Plain
+ * getenv() is provided for static links.
+ */
+char *getenv(const char *name)
+{
+	return sh_getenv(name);
 }
 #endif /* _NEXT_SOURCE */
 
@@ -2806,11 +2812,10 @@ int putenv(const char *name)
 	return(0);
 }
 
-
 /*
- * Override libast setenv()
+ * Override libast setenviron().
  */
-char* setenviron(const char *name)
+char* sh_setenviron(const char *name)
 {
 	register Namval_t *np;
 	if(name)
@@ -2821,6 +2826,14 @@ char* setenviron(const char *name)
 		nv_unset(np);
 	}
 	return("");
+}
+
+/*
+ * Same linker dance as with getenv() above.
+ */
+char* setenviron(const char *name)
+{
+	return sh_setenviron(name);
 }
 
 /*

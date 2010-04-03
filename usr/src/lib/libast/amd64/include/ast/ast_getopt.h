@@ -19,11 +19,7 @@ extern __MANGLE__ int	optind;
 extern __MANGLE__ int	optopt;
 extern __MANGLE__ char*	optarg;
 
-#ifndef NULL	/* in case <stdlib.h> or <stdio.h> got here first */
-
 extern __MANGLE__ int	getopt __PROTO__((int, char* const*, const char*));
 extern __MANGLE__ int	getsubopt __PROTO__((char**, char* const*, char**));
-
-#endif
 
 #endif

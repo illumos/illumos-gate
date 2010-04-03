@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Override this top level flag so the compiler builds in its native
@@ -66,7 +65,7 @@ LIBSHELLCPPFLAGS = \
 	-DERROR_CONTEXT_T=Error_context_t \
 	'-DUSAGE_LICENSE=\
 		"[-author?David Korn <dgk@research.att.com>]"\
-		"[-copyright?Copyright (c) 1982-2009 AT&T Intellectual Property]"\
+		"[-copyright?Copyright (c) 1982-2010 AT&T Intellectual Property]"\
 		"[-license?http://www.opensource.org/licenses/cpl1.0.txt]"\
 		"[--catalog?libshell]"'
 

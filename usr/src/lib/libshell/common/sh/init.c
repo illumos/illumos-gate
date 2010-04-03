@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -360,12 +360,8 @@ static void put_cdpath(register Namval_t* np,const char *val,int flags,Namfun_t 
     {
 	Shell_t *shp = nv_shell(np);
 	int type;
-	char *lc_all = nv_getval(LCALLNOD);
+	char *cp;
 	char *name = nv_name(np);
-	if((shp->test&1) && !val && !nv_getval(np))
-		return;
-	if(shp->test&2)
-		nv_putv(np, val, flags, fp);
 	if(name==(LCALLNOD)->nvname)
 		type = LC_ALL;
 	else if(name==(LCTYPENOD)->nvname)
@@ -381,25 +377,32 @@ static void put_cdpath(register Namval_t* np,const char *val,int flags,Namfun_t 
 		type = LC_LANG;
 #else
 #define LC_LANG		LC_ALL
-	else if(name==(LANGNOD)->nvname && (!lc_all || !*lc_all))
+	else if(name==(LANGNOD)->nvname && (!(cp=nv_getval(LCALLNOD)) || !*cp))
 		type = LC_LANG;
 #endif
 	else
 		type= -1;
-	if(sh_isstate(SH_INIT) && type>=0 && type!=LC_ALL && lc_all && *lc_all)
-		type= -1;
-	if(type>=0 || type==LC_ALL || type==LC_LANG)
+	if(!sh_isstate(SH_INIT) && (type>=0 || type==LC_ALL || type==LC_LANG))
 	{
-		if(!setlocale(type,val?val:"-") && val)
+		struct lconv*	lc;
+		char*		r;
+#ifdef AST_LC_setenv
+		ast.locale.set |= AST_LC_setenv;
+#endif
+		r = setlocale(type,val?val:"");
+#ifdef AST_LC_setenv
+		ast.locale.set ^= AST_LC_setenv;
+#endif
+		if(!r && val)
 		{
 			if(!sh_isstate(SH_INIT) || shp->login_sh==0)
 				errormsg(SH_DICT,0,e_badlocale,val);
 			return;
 		}
+		shp->decomma = (lc=localeconv()) && lc->decimal_point && *lc->decimal_point==',';
 	}
-	if(!(shp->test&2))
-		nv_putv(np, val, flags, fp);
-	if(CC_NATIVE==CC_ASCII && (type==LC_ALL || type==LC_LANG || type==LC_CTYPE))
+	nv_putv(np, val, flags, fp);
+	if(CC_NATIVE!=CC_ASCII && (type==LC_ALL || type==LC_LANG || type==LC_CTYPE))
 	{
 		if(sh_lexstates[ST_BEGIN]!=sh_lexrstates[ST_BEGIN])
 			free((void*)sh_lexstates[ST_BEGIN]);
@@ -1022,6 +1025,7 @@ Shell_t *sh_init(register int argc,register char *argv[], Shinit_f userinit)
 	Shell_t	*shp = &sh;
 	register int n;
 	int type;
+	long v;
 	static char *login_files[3];
 	memfatal();
 	n = strlen(e_version);
@@ -1107,6 +1111,8 @@ Shell_t *sh_init(register int argc,register char *argv[], Shinit_f userinit)
 		shp->lim.arg_max = ARG_MAX;
 	if(shp->lim.child_max <=0)
 		shp->lim.child_max = CHILD_MAX;
+	if((v = getconf("PID_MAX")) > 0 && shp->lim.child_max > v)
+		shp->lim.child_max = v;
 	if(shp->lim.open_max <0)
 		shp->lim.open_max = OPEN_MAX;
 	if(shp->lim.open_max > (SHRT_MAX-2))
@@ -1301,8 +1307,8 @@ Shell_t *sh_init(register int argc,register char *argv[], Shinit_f userinit)
 	shp->bltindata.shexit = sh_exit;
 	shp->bltindata.shbltin = sh_addbuiltin;
 #if _AST_VERSION >= 20080617L
-	shp->bltindata.shgetenv = getenv;
-	shp->bltindata.shsetenv = setenviron;
+	shp->bltindata.shgetenv = sh_getenv;
+	shp->bltindata.shsetenv = sh_setenviron;
 	astintercept(&shp->bltindata,1);
 #endif
 #if 0
@@ -1732,7 +1738,7 @@ static void env_init(Shell_t *shp)
 				np->nvenv = cp;
 				nv_close(np);
 			}
-			else  /* swap with fron */
+			else  /* swap with front */
 			{
 				ep[-1] = environ[shp->nenv];
 				environ[shp->nenv++] = cp;
@@ -1743,7 +1749,7 @@ static void env_init(Shell_t *shp)
 			if(next = strchr(++cp,'='))
 				*next = 0;
 			np = nv_search(cp+2,shp->var_tree,NV_ADD);
-			if(nv_isattr(np,NV_IMPORT|NV_EXPORT))
+			if(np!=SHLVL && nv_isattr(np,NV_IMPORT|NV_EXPORT))
 			{
 				int flag = *(unsigned char*)cp-' ';
 				int size = *(unsigned char*)(cp+1)-' ';
@@ -1774,6 +1780,8 @@ static void env_init(Shell_t *shp)
 				}
 				nv_newattr(np,flag|NV_IMPORT|NV_EXPORT,size);
 			}
+			else
+				cp += 2;
 		}
 	}
 #ifdef _ENV_H

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -34,6 +34,7 @@
 #include	<error.h>
 #include	<stak.h>
 #include	"FEATURE/externs"
+#include	"defs.h"	/* for sh.decomma */
 
 #ifndef ERROR_dictionary
 #   define ERROR_dictionary(s)	(s)
@@ -162,6 +163,8 @@ Sfdouble_t	arith_exec(Arith_t *ep)
 	node.emode = ep->emode;
 	node.expr = ep->expr;
 	node.elen = ep->elen;
+	node.value = 0;
+	node.nosub = 0;
 	if(level++ >=MAXLEVEL)
 	{
 		arith_error(e_recursive,ep->expr,ep->emode);
@@ -195,17 +198,21 @@ Sfdouble_t	arith_exec(Arith_t *ep)
 			type=0;
 			break;
 		    case A_PLUSPLUS:
+			node.nosub = 1;
 			(*ep->fun)(&ptr,&node,ASSIGN,num+1);
 			break;
 		    case A_MINUSMINUS:
+			node.nosub = 1;
 			(*ep->fun)(&ptr,&node,ASSIGN,num-1);
 			break;
 		    case A_INCR:
 			num = num+1;
+			node.nosub = 1;
 			num = (*ep->fun)(&ptr,&node,ASSIGN,num);
 			break;
 		    case A_DECR:
 			num = num-1;
+			node.nosub = 1;
 			num = (*ep->fun)(&ptr,&node,ASSIGN,num);
 			break;
 		    case A_SWAP:
@@ -248,6 +255,8 @@ Sfdouble_t	arith_exec(Arith_t *ep)
 			*++tp = type;
 			c = 0;
 			break;
+		    case A_ASSIGNOP:
+			node.nosub = 1;
 		    case A_STORE:
 			cp = roundptr(ep,cp,Sfdouble_t*);
 			dp = *((Sfdouble_t**)cp);
@@ -430,15 +439,21 @@ static int gettok(register struct vars *vp)
 		    case A_EOF:
 			vp->nextchr--;
 			break;
-			/*FALL THRU*/
-		    case A_DIG: case A_REG: case A_DOT: case A_LIT:
-			if(op==A_DOT)
+		    case A_COMMA:
+			if(sh.decomma && (c=peekchr(vp))>='0' && c<='9')
 			{
-				if((c=peekchr(vp))>='0' && c<='9')
-					op = A_DIG;
-				else
-					op = A_REG;
+				op = A_DIG;
+		    		goto keep;
 			}
+			break;
+		    case A_DOT:
+			if((c=peekchr(vp))>='0' && c<='9')
+				op = A_DIG;
+			else
+				op = A_REG;
+			/*FALL THRU*/
+		    case A_DIG: case A_REG: case A_LIT:
+		    keep:
 			ungetchr(vp);
 			break;
 		    case A_QUEST:
@@ -483,7 +498,7 @@ static int expr(register struct vars *vp,register int precedence)
 	int		invalid,wasop=0;
 	struct lval	lvalue,assignop;
 	const char	*pos;
-	Sfdouble_t		d;
+	Sfdouble_t	d;
 
 	lvalue.value = 0;
 	lvalue.fun = 0;
@@ -603,7 +618,7 @@ again:
 			}
 			if(!expr(vp,c))
 			{
-				stakseek(-1);
+				stakseek(staktell()-1);
 				return(0);
 			}
 			lvalue.value = 0;
@@ -784,7 +799,7 @@ again:
 				vp->stakmaxsize = vp->staksize;
 			if(assignop.flag<0)
 				assignop.flag = 0;
-			stakputc(A_STORE);
+			stakputc(c&1?A_ASSIGNOP:A_STORE);
 			stakpush(vp,assignop.value,char*);
 			stakpush(vp,assignop.flag,short);
 		}

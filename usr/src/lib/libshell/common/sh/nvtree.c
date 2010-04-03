@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -69,6 +69,7 @@ static int read_tree(Namval_t* np, Sfio_t *iop, int n, Namfun_t *dp)
 static Namval_t *create_tree(Namval_t *np,const char *name,int flag,Namfun_t *dp)
 {
 	register Namfun_t *fp=dp;
+	fp->dsize = 0;
 	while(fp=fp->next)
 	{
 		if(fp->disc && fp->disc->createf)
@@ -723,7 +724,10 @@ static void outval(char *name, const char *vname, struct Walk *wp)
 			nv_attribute(np,wp->out,"typeset",'=');
 		nv_outname(wp->out,name,-1);
 		if((np->nvalue.cp && np->nvalue.cp!=Empty) || nv_isattr(np,~(NV_MINIMAL|NV_NOFREE)) || nv_isvtree(np))  
-			sfputc(wp->out,(isarray==2?'\n':'='));
+		{
+			if(wp->indent>=0 || isarray!=2)
+				sfputc(wp->out,(isarray==2?'\n':'='));
+		}
 		if(isarray==2)
 			return;
 	}
@@ -1015,7 +1019,7 @@ Namfun_t *nv_isvtree(Namval_t *np)
  */
 char *nv_getvtree(register Namval_t *np, Namfun_t *fp)
 {
-	int flags=0;	
+	int flags=0, dsize=fp->dsize;
 	for(; fp && fp->next; fp=fp->next)
 	{
 		if(fp->next->disc && (fp->next->disc->getnum || fp->next->disc->getval))
@@ -1027,6 +1031,8 @@ char *nv_getvtree(register Namval_t *np, Namfun_t *fp)
 		return(nv_getv(np,fp));
 	if(flags = nv_isattr(np,NV_EXPORT))
 		nv_offattr(np,NV_EXPORT);
+	if(dsize && (flags&NV_EXPORT))
+		return("()");
 	return(walk_tree(np,(Namval_t*)0,flags));
 }
 
@@ -1083,6 +1089,7 @@ void nv_setvtree(register Namval_t *np)
 		return;
 	nfp = newof(NIL(void*),Namfun_t,1,0);
 	nfp->disc = &treedisc;
+	nfp->dsize = sizeof(Namfun_t);
 	nv_stack(np, nfp);
 }
 

@@ -22,8 +22,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Solaris needs /usr/xpg6/bin:/usr/xpg4/bin because the tools in /usr/bin are not POSIX-conformant
@@ -93,8 +92,8 @@ function cat_http_body
     
 	if [[ "${emode}" == "chunked" ]] ; then
 		while IFS=$'\r' read hexchunksize &&
-			[[ "${hexchunksize}" == ~(Elri)[0-9abcdef]* ]] &&
-			(( chunksize=16#${hexchunksize} )) && (( chunksize > 0 )) ; do
+			[[ "${hexchunksize}" == ~(Elri)[0-9abcdef]+ ]] &&
+			(( chunksize=$( printf "16#%s\n" "${hexchunksize}" ) )) && (( chunksize > 0 )) ; do
 			dd bs=1 count="${chunksize}" 2>/dev/null
 		done
 	else
@@ -213,10 +212,10 @@ builtin uname
 typeset progname="${ basename "${0}" ; }"
 
 # HTTP protocol client identifer
-typeset -r http_user_agent="shtinyurl/ksh93 (2009-08-12; ${ uname -s -r -p ; })"
+typeset -r http_user_agent="shtinyurl/ksh93 (2010-03-27; ${ uname -s -r -p ; })"
 
 typeset -r shtinyurl_usage=$'+
-[-?\n@(#)\$Id: shtinyurl (Roland Mainz) 2009-08-12 \$\n]
+[-?\n@(#)\$Id: shtinyurl (Roland Mainz) 2010-03-27 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?shtinyurl - create short alias URL from long URL]
 [+DESCRIPTION?\bshtinyurl\b is a small utility which passes a given URL

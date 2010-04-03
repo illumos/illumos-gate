@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 ROOTDEMODIRBASE=	$(ROOT)/usr/demo/ksh
@@ -122,8 +121,10 @@ DEMOFILES= \
 	tests/sun_solaris_builtin_sum.sh \
 	tests/sun_solaris_builtin_tail.sh \
 	tests/sun_solaris_command_substitution.sh \
+	tests/sun_solaris_compound_misc.sh \
 	tests/sun_solaris_compound_nameref.sh \
 	tests/sun_solaris_compoundvario.sh \
+	tests/sun_solaris_cr_xxxxxxxx_template.sh \
 	tests/sun_solaris_cr_6687139_command_substitution_exec_redirection_allocation_loop.sh \
 	tests/sun_solaris_cr_6713682_compound_var_bleeds_through_subshell.sh \
 	tests/sun_solaris_cr_6722134_background_CHLD_trap.sh \
@@ -145,7 +146,13 @@ DEMOFILES= \
 	tests/sun_solaris_cr_6855875_typeset_hexfloat_has_too_few_digits.sh \
 	tests/sun_solaris_cr_6862121_shbinexec_kernel_module_defunct.sh \
 	tests/sun_solaris_cr_6881017_background_process_in_subshell_hangs_caller.sh \
+	tests/sun_solaris_cr_6887363_shell_sometimes_mishandles_return_value_of_its_child_process.sh \
+	tests/sun_solaris_cr_6904557_wc_no_longer_counts_number_of_bytes_correctly.sh \
+	tests/sun_solaris_cr_6904575_cut_-d_with_multibyte_character_no_longer_works.sh \
+	tests/sun_solaris_cr_6904878_join_-t_no_longer_works_with_multibyte_char_separator.sh \
+	tests/sun_solaris_cr_6907460_EXIT_trap_handlers_are_sometimes_executed_twice.sh \
 	tests/sun_solaris_getconf.sh \
+	tests/sun_solaris_locale_misc.sh \
 	tests/sun_solaris_local_compound_nameref001.sh \
 	tests/sun_solaris_staticvariables.sh \
 	tests/sun_solaris_vartree001.sh \
@@ -164,12 +171,8 @@ $(ROOTDEMODIRBASE)/tests/shtests := FILEMODE= 755
 $(ROOTDEMODIRBASE)/fun/%	 := FILEMODE= 755
 $(ROOTDEMODIRBASE)/bin/%	 := FILEMODE= 755
 
-# ToDO: We should replace the "cat $<" below with $ shcomp $< # once the
-# build machines start to ship /usr/bin/shcomp to compile the scripts
-# in bin/ and use $ shcomp -n $< /dev/null 2>&1 # to do minimum lint-style
-# checks before installation.
 $(ROOTDEMODIRBASE)/bin/%: common/scripts/%.sh
-	cat "$<" >"$(@F)"
+	/usr/bin/shcomp "$<" >"$(@F)"
 	$(INS) -s -m $(FILEMODE) -f $(@D) "$(@F)"
 	$(RM) "$(@F)"
 

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -28,17 +28,31 @@ void _STUB_vmregion(){}
 #include	"vmhdr.h"
 
 /*	Return the containing region of an allocated piece of memory.
-**	Beware: this only works with Vmbest and Vmtrace.
+**	Beware: this only works with Vmbest, Vmdebug and Vmprofile.
+**
+**	10/31/2009: Add handling of shared/persistent memory regions.
 **
 **	Written by Kiem-Phong Vo, kpv@research.att.com, 01/16/94.
 */
 #if __STD_C
-Vmalloc_t* vmregion(reg Void_t* addr)
+Vmalloc_t* vmregion(Void_t* addr)
 #else
 Vmalloc_t* vmregion(addr)
-reg Void_t*	addr;
+Void_t*	addr;
 #endif
-{	return addr ? VM(BLOCK(addr)) : NIL(Vmalloc_t*);
+{
+	Vmalloc_t	*vm;
+	Vmdata_t	*vd;
+
+	if(!addr)
+		return NIL(Vmalloc_t*);
+
+	vd = SEG(BLOCK(addr))->vmdt;
+	for(vm = Vmheap; vm; vm = vm->next)
+		if(vm->data == vd)
+			break;
+
+	return vm;
 }
 
 #endif

@@ -20,15 +20,14 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 function err_exit2
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors+=1 ))
+	(( Errors < 127 && Errors++ ))
 }
 
 function testfunc

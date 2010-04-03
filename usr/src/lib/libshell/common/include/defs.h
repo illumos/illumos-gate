@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -31,6 +31,7 @@
 #include	<ast.h>
 #include	<sfio.h>
 #include	<error.h>
+#include	"FEATURE/externs"
 #include	"FEATURE/options"
 #include	<cdt.h>
 #include	<history.h>
@@ -56,6 +57,9 @@
 #   define sh_envput(e,p)	env_change()
 #   define env_delete(e,p)	env_change()
 #endif
+
+extern char*	sh_getenv(const char*);
+extern char*	sh_setenviron(const char*);
 
 /*
  * note that the first few fields have to be the same as for
@@ -170,6 +174,8 @@ struct limits
 	unsigned char	lastsig;	/* last signal received */ \
 	char		subshare;	/* set when in ${..} comsub */ \
 	char		toomany;	/* set when out of fd's */ \
+	char		instance;	/* in set_instance */ \
+	char		decomma;	/* decimal_point=',' */ \
 	char		*readscript;	/* set before reading a script */ \
 	int		*inpipe;	/* input pipe pointer */ \
 	int		*outpipe;	/* output pipe pointer */ \
@@ -335,6 +341,10 @@ struct limits
 
 #ifndef PIPE_BUF
 #   define PIPE_BUF		512
+#endif
+
+#if SHOPT_PFSH && ( !_lib_getexecuser || !_lib_free_execattr )
+#   undef SHOPT_PFSH
 #endif
 
 #define MATCH_MAX		64

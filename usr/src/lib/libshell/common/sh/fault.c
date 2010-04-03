@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -362,7 +362,8 @@ void	sh_sigclear(register int sig)
 	flag &= ~(SH_SIGTRAP|SH_SIGSET);
 	if(trap=sh.st.trapcom[sig])
 	{
-		free(trap);
+		if(!sh.subshell)
+			free(trap);
 		sh.st.trapcom[sig]=0;
 	}
 	sh.sigflag[sig] = flag;
@@ -404,11 +405,13 @@ void	sh_chktrap(void)
 #ifdef SHOPT_BGX
 	if((sh.sigflag[SIGCHLD]&SH_SIGTRAP) && sh.st.trapcom[SIGCHLD])
 		job_chldtrap(&sh,sh.st.trapcom[SIGCHLD],1);
-	while(--sig>=0 && sig!=SIGCHLD)
-#else
-	while(--sig>=0)
 #endif /* SHOPT_BGX */
+	while(--sig>=0)
 	{
+#ifdef SHOPT_BGX
+		if(sig==SIGCHLD)
+			continue;
+#endif /* SHOPT_BGX */
 		if(sh.sigflag[sig]&SH_SIGTRAP)
 		{
 			sh.sigflag[sig] &= ~SH_SIGTRAP;
@@ -437,9 +440,11 @@ int sh_trap(const char *trap, int mode)
 	int	was_verbose = sh_isstate(SH_VERBOSE);
 	int	staktop = staktell();
 	char	*savptr = stakfreeze(0);
+	char	ifstable[256];
 	struct	checkpt buff;
 	Fcin_t	savefc;
 	fcsave(&savefc);
+	memcpy(ifstable,shp->ifstable,sizeof(ifstable));
 	sh_offstate(SH_HISTORY);
 	sh_offstate(SH_VERBOSE);
 	shp->intrap++;
@@ -477,6 +482,7 @@ int sh_trap(const char *trap, int mode)
 		shp->exitval=savxit;
 	stakset(savptr,staktop);
 	fcrestore(&savefc);
+	memcpy(shp->ifstable,ifstable,sizeof(ifstable));
 	if(was_history)
 		sh_onstate(SH_HISTORY);
 	if(was_verbose)

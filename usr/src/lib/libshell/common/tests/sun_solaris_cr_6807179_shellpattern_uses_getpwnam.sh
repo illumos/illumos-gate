@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -51,7 +50,7 @@ function err_exit
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors++ ))
+	(( Errors < 127 && Errors++ ))
 }
 alias err_exit='err_exit $LINENO'
 
@@ -61,7 +60,7 @@ integer Errors=0
 
 typeset tmpfile
 
-tmpfile="$(mktemp "/tmp/sun_solaris_cr_6807179_shellpattern_uses_getpwnam.${PPID}.$$.XXXXXX")" || err_exit "Cannot create temporary file."
+tmpfile="$(mktemp -t "sun_solaris_cr_6807179_shellpattern_uses_getpwnam.${PPID}.$$.XXXXXX")" || err_exit "Cannot create temporary file."
 rm -f "${tmpfile}"
 
 

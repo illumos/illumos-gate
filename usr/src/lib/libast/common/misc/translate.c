@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -173,6 +173,7 @@ init(register char* s)
 	 * locate the default locale catalog
 	 */
 
+	ast.locale.set |= AST_LC_internal;
 	u = setlocale(LC_MESSAGES, NiL);
 	setlocale(LC_MESSAGES, "C");
 	if ((d = find("C", s)) != NOCAT)
@@ -210,6 +211,7 @@ init(register char* s)
 		catclose(d);
 	}
 	setlocale(LC_MESSAGES, u);
+	ast.locale.set &= ~AST_LC_internal;
 	return cp;
 }
 

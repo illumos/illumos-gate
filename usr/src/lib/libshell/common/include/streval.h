@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -78,6 +78,7 @@ struct lval
 	short		emode;
 	short		level;
 	short		elen;
+	char		nosub;
 };
 
 struct mathtab
@@ -159,6 +160,7 @@ typedef struct _arith_
 #define A_DOT		52
 #define A_LIT		53
 #define A_NOTNOT        54
+#define A_ASSIGNOP	55
 
 
 /* define error messages */

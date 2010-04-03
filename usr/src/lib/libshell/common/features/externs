@@ -1,9 +1,10 @@
 set	prototyped
 hdr	nc,exec_attr
 mem	exception.name,_exception.name math.h
-lib	setreuid,setregid,nice,sigflag,fork,spawnveg,fchdir
+lib	setreuid,setregid,nice,fork,spawnveg,fchdir
 lib	pathnative,pathposix,uwin_path,uwin_unpath,fts_notify
 lib	memcntl sys/mman.h
+lib	getexecuser,free_execattr exec_attr.h -lsecdb
 
 reference	unistd.h
 

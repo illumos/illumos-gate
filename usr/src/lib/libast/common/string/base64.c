@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -119,6 +119,16 @@ base64encode(const void* fb, size_t fz, void** fn, void* tb, size_t tz, void** t
  done:
 	if (fz)
 	{
+		if (tp >= te)
+		{
+			if (fn)
+				*fn = fp;
+			if (tn)
+				*tn = tp;
+			n = tp - (unsigned char*)tb + 1;
+			tp = tmp;
+			te = tp + sizeof(tmp) - B64_EC + 1;
+		}
 		b = *fp++ << 16;
 		if (fz == 2)
 			b |= *fp++ << 8;

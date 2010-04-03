@@ -22,8 +22,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Solaris needs /usr/xpg6/bin:/usr/xpg4/bin because the tools in /usr/bin are not POSIX-conformant
@@ -125,8 +124,8 @@ function cat_http_body
     
 	if [[ "${emode}" == "chunked" ]] ; then
 		while IFS=$'\r' read hexchunksize &&
-			[[ "${hexchunksize}" == ~(Elri)[0-9abcdef]* ]] &&
-			(( chunksize=16#${hexchunksize} )) && (( chunksize > 0 )) ; do
+			[[ "${hexchunksize}" == ~(Elri)[0-9abcdef]+ ]] &&
+			(( chunksize=$( printf "16#%s\n" "${hexchunksize}" ) )) && (( chunksize > 0 )) ; do
 			dd bs=1 count="${chunksize}" 2>/dev/null
 		done
 	else
@@ -359,14 +358,14 @@ builtin uname
 typeset progname="${ basename "${0}" ; }"
 
 # HTTP protocol client identifer
-typeset -r http_user_agent="shnote/ksh93 (2009-05-09; $(uname -s -r -p))"
+typeset -r http_user_agent="shnote/ksh93 (2010-03-27; $(uname -s -r -p))"
 
 # name of history log (the number after "history" is some kind of version
 # counter to handle incompatible changes to the history file format)
 typeset -r history_file="${HOME}/.shnote/history0.txt"
 
 typeset -r shnote_usage=$'+
-[-?\n@(#)\$Id: shnote (Roland Mainz) 2009-05-09 \$\n]
+[-?\n@(#)\$Id: shnote (Roland Mainz) 2010-03-27 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?shnote - read/write text data to internet clipboards]
 [+DESCRIPTION?\bshnote\b is a small utilty which can read and write text

@@ -44,7 +44,7 @@ vmalloc \- virtual memory allocation
 .nf
 .MW "Vmalloc_t* vmregion(Void_t* addr);"
 .MW "Void_t* vmsegment(Vmalloc_t* region, Void_t* addr);"
-.MW "int vmwalk(Vmalloc_t* region, int(*walkf)(Vmalloc_t*, Void_t*, size_t, Vmdisc_t*);"
+.MW "int vmwalk(Vmalloc_t* region, int(*walkf)(Vmalloc_t*, Void_t*, size_t, size_t, Vmdisc_t*, Void_t*), Void_t* handle);"
 .MW "long vmaddr(Vmalloc_t* region, Void_t* addr);"
 .MW "long vmsize(Vmalloc_t* region, Void_t* addr);"
 .MW "int vmstat(Vmalloc_t* vm, Vmstat_t* statb);"
@@ -426,9 +426,10 @@ It returns the address of a found segment or \f5NULL\fP if none found.
 .I vmwalk
 walks all segments in \fIregion\fP or if \fIregion\fP is \f5NULL\fP,
 all segments in all regions.
-At each segment, \fI(*walkf)(vm,addr,size,disc)\fP
+At each segment, \fI(*walkf)(vm,addr,size,segno,disc,handle)\fP
 is called where \fIvm\fP is the region, \fIaddr\fP is the segment,
-\fIsize\fP is the size of the segment, and \fIdisc\fP is the region's discipline.
+\fIsize\fP is the size of the segment, \fIsegno\fP is the segment ordinal counting from 0,
+\fIdisc\fP is the region's discipline, and \fIhandle\fP is the user supplied \fIvmwalk\fP handle.
 If \fIwalkf\fP returns a negative value, the walk stops and returns the same value.
 On success, \fIvmwalk\fP returns 0; otherwise, it returns \-1.
 .PP
@@ -514,49 +515,90 @@ The functions
 .PP
 The \fImalloc\fP functions are instrumented for run-time debugging,
 profiling and tracing.
-When these modes are enable, time and space performance will be affected.
+When these modes are enabled, time and space performance will be affected.
 For accurate reporting of files and line numbers,
-code should include \f5vmalloc.h\fP and compile with \f5-DVMFL\fP.
-
-The following environment variables should be set before any memory allocation
-(e.g., before a process starts). They drive different modes:
+code should include \f5vmalloc.h\fP and compile with either \f5-DVMFL\fP
+or \f5-D_BLD_debug\fP (defined by \fBnmake\fP(1) for \f5-g\fP compilations).
+The
+.I VMALLOC_OPTIONS
+environment variable should be set before any memory allocation
+(e.g., before a process starts). Its value is a space-separated list of
+[\fBno\fP]\fIname\fP[=\fIvalue\fP] options that control runtime
+debugging/profiling and other modes:
 .TP
-.I VMETHOD
-This defines the method to use for allocation.
-Its value should be one of the strings:
-\fIVmbest, Vmdebug, Vmprofile, Vmlast, Vmpool\fP.
-The 'V' can be in lower case.
+.B abort
+If Vmregion==Vmdebug then VM_DBABORT is set, otherwise _BLD_debug
+enabled assertions abort() on failure.
 .TP
-.I VMDEBUG
-This is ignored if
-a method other than \f5Vmdebug\fP has been selected with \fIVMETHOD\fP.
-\fIVMDEBUG\fP can be any combination of `a',
-a decimal number and a list of hexadecimal numbers.
-`a' causes the program to abort on any discovered allocation error.
-A hexadecimal number starts with either \fI0x\fP or \fI0X\fP
-and defines an address to watch (see \fIvmdbwatch\fP).
-Any other number is taken to be decimal and defines a period \fIp\fP
-to check the arena for integrity. The default period is 1, ie, the
-arena is checked on every call to a \fImalloc\fP function.
-Other letters not part of the defined set are ignored.
+.B check
+If Vmregion==Vmbest then the region is checked after every operation.
 .TP
-.I VMPROFILE
-This is ignored if a method other than \f5Vmprofile\fP
-has been selected by \fIVMETHOD\fP or \fIVMDEBUG\fP.
-\fIVMPROFILE\fP defines a file name to store profile data.
-Each instance of the pattern `%p' found in \fIVMPROFILE\fP
-is transformed to the process id of the running process.
-If the file cannot be created, file descriptor 2 (standard error)
-is used for output.
+.BI method =method
+Sets Vmregion=\fImethod\fP if not already set.
+.I method
+(\fBVm\fP prefix optional) may be one of:
+.RS
 .TP
-.I VMTRACE
-If this defines a valid writable file, trace messages of all allocation calls
-are written to the given file (see \fIvmopen()\fP and \fIvmtrace()\fP).
-Similar to \fIVMPROFILE\fP, each instance of the pattern `%p' found
-in \fIVMTRACE\fP is turned to the process id of the running process.
+.B best
+.TP
+.B debug
+.TP
+.B last
+.TP
+.B profile
+.RE
+.TP
+.B mmap
+Prefer mmap() over brk() for region allocation.
+.TP
+.BI period =n
+Sets Vmregion=Vmdebug if not already set. If Vmregion==Vmdebug then
+the region is checked every \fIn\fP operations.
+.TP
+.BI profile =file
+Sets Vmregion=Vmprofile if not already set. If Vmregion==Vmprofile then
+profile info is printed to \fIfile\fP.
+.TP
+.B region
+If Vmregion==Vmbest then region block frees verify
+that the block belongs to the region.
+.BI start =n
+Sets Vmregion=Vmdebug if not already set. If Vmregion==Vmdebug then
+region checking starts after \fIn\fP operations.
+.TP
+.BI trace =file
+Operation trace info is printed to \fIfile\fP.
+.TP
+.BI warn =file
+Sets Vmregion=Vmdebug if not already set. If Vmregion==Vmdebug then
+warnings are printed to \fIfile\fP.
+.TP
+.BI watch =address
+Sets Vmregion=Vmdebug if not already set. If Vmregion==Vmdebug then
+operations on \fIaddress\fP are traced.
+.PP
+Output files are created if they don't exist.
+.BI & n
+and
+.BI /dev/fd/ n
+name the file descriptor
+.I n
+which must be open for writing. The pattern
+.B %p
+in a file name is replaced by the current process ID.
+.I VMALLOC_OPTIONS
+combines the features of these previously used env vars {
+.I "VMDEBUG VMETHOD VMPROFILE VMTRACE"
+}.
+For compatibility, if
+.I VMALLOC_OPTIONS
+is not defined, then {
+.I "VMDEBUG VMETHOD VMPROFILE VMTRACE"
+} will be checked -- this will be dropped in a future release.
 
 .SH RECENT CHANGES
-\f5Vmlast\fP: allocated blocks are now allowed to be resized (09/1998).
+\f5Vmlast\fP: allocated blocks are now allowed to be resized (1998-09).
+\fIVMALLOC_OPTIONS\fP now controls all runtime settings (2010-01).
 
 .SH SEE ALSO
 \fImtreplay\fP(1), \fImalloc\fP(3).

@@ -1,3 +1,4 @@
+09-11-17 dllscan.c: handle name[-.]version in dlsopen()
 09-04-15 dllopen.c: add, use dllopen() internally to wrap dlopen()
 08-05-12 dllscan.c: LIBSUFFIX==.dylib => default plugin version match 0.0
 06-10-11 dllscan.c: check sfstruse() return values -- doh

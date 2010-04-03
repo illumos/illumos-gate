@@ -40,6 +40,7 @@
 .SH NAME
 fmt \- string formatting routines
 .SH SYNOPSIS
+.EX
 #include <ast.h>
 #include <ls.h>
 
@@ -101,6 +102,7 @@ seconds.
 The two largest time units are used, limiting the return value length
 to at most 6 characters.
 The units are:
+.RS
 .TP
 .B s
 seconds
@@ -123,6 +125,7 @@ years
 .TP
 .B S
 scores
+.RE
 .PP
 .L fmterror
 returns the system error message text for the error number

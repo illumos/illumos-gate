@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -52,7 +52,7 @@
 #define eol(c)		((c)&WC_NL)
 #define mbc(c)		((c)&WC_MB)
 #define spc(c)		((c)&WC_SP)
-#define mbwc(w,p,n)	(*ast.mb_towc)(&w,(char*)p,n)
+#define mb2wc(w,p,n)	(*ast.mb_towc)(&w,(char*)p,n)
 
 Wc_t* wc_init(int mode)
 {
@@ -163,6 +163,7 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 {
 	register char*		type = wp->type;
 	register unsigned char*	cp;
+	register Sfoff_t	nbytes;
 	register Sfoff_t	nchars;
 	register Sfoff_t	nwords;
 	register Sfoff_t	nlines;
@@ -179,14 +180,14 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 	unsigned char		side[32];
 
 	sfset(fd,SF_WRITE,1);
-	nlines = nwords = nchars = 0;
+	nlines = nwords = nchars = nbytes = 0;
 	wp->longest = 0;
 	if (wp->mb < 0 && (wp->mode & (WC_MBYTE|WC_WORDS)))
 	{
 		cp = buff = endbuff = 0;
 		for (;;)
 		{
-			if (cp >= endbuff || (n = mbwc(x, cp, endbuff-cp)) < 0)
+			if (cp >= endbuff || (n = mb2wc(x, cp, endbuff-cp)) < 0)
 			{
 				if ((o = endbuff-cp) < sizeof(side))
 				{
@@ -205,6 +206,7 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 							wp->longest = nchars - longest;
 						break;
 					}
+					nbytes += n;
 					if ((c = sizeof(side) - o) > n)
 						c = n;
 					if (c)
@@ -247,6 +249,8 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 			}
 			nchars++;
 		}
+		if (!(wp->mode & WC_MBYTE))
+			nchars = nbytes;
 	}
 	else if (!wp->mb && !(wp->mode & WC_LONGEST) || wp->mb > 0 && !(wp->mode & (WC_MBYTE|WC_WORDS|WC_LONGEST)))
 	{
@@ -343,6 +347,7 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 		xspace = iswspace(0xa0) || iswspace(0x85);
 		while ((cp = buff = (unsigned char*)sfreserve(fd, SF_UNBOUND, 0)) && (c = sfvalue(fd)) > 0)
 		{
+			nbytes += c;
 			nchars += c;
 			start = cp-lineoff;
 			/* check to see whether first character terminates word */
@@ -487,7 +492,10 @@ int wc_count(Wc_t *wp, Sfio_t *fd, const char* file)
 			nlines++;
 		else if (!lasttype)
 			nwords++;
-		nchars -= adjust;
+		if (wp->mode & WC_MBYTE)
+			nchars -= adjust;
+		else
+			nchars = nbytes;
 	}
 	wp->chars = nchars;
 	wp->words = nwords;

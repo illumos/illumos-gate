@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -88,21 +88,39 @@ typedef struct ______mstats Mstats_t;
 #define _AST_std_malloc	1
 #endif
 
-#if ( !_std_malloc || !_BLD_ast ) && !_AST_std_malloc
-
-/*	malloc compatibility functions.
-**	These are aware of debugging/profiling and driven by the environment variables:
-**	VMETHOD: select an allocation method by name.
+/*	malloc compatibility functions
 **
-**	VMPROFILE: if is a file name, write profile data to it.
-**	VMTRACE: if is a file name, write trace data to it.
-**	The pattern %p in a file name will be replaced by the process ID.
+**	These are aware of debugging/profiling and are driven by the
+**	VMALLOC_OPTIONS environment variable which is a space-separated
+**	list of [no]name[=value] options:
 **
-**	VMDEBUG:
-**		a:			abort on any warning.
-**		w[decimal]:		file descriptor for warnings.
-**		[decimal]:		period to check arena.
-**		0x[hexadecimal]:	address to watch.
+**	    abort	if Vmregion==Vmdebug then VM_DBABORT is set,
+**			otherwise _BLD_debug enabled assertions abort()
+**			on failure
+**	    check	if Vmregion==Vmbest then the region is checked every op
+**	    method=m	sets Vmregion=m if not defined, m (Vm prefix optional)
+**			may be one of { best debug last profile }
+**	    mmap	prefer mmap() over brk() for region allocation
+**	    period=n	sets Vmregion=Vmdebug if not defined, if
+**			Vmregion==Vmdebug the region is checked every n ops
+**	    profile=f	sets Vmregion=Vmprofile if not set, if
+**			Vmregion==Vmprofile then profile info printed to file f
+**	    region	if Vmregion==Vmbest then block free verifies
+**			that the block belongs to the region
+**	    start=n	sets Vmregion=Vmdebug if not defined, if
+**			Vmregion==Vmdebug region checking starts after n ops
+**	    trace=f	enables tracing to file f
+**	    warn=f	sets Vmregion=Vmdebug if not defined, if
+**			Vmregion==Vmdebug then warnings printed to file f
+**	    watch=a	sets Vmregion=Vmdebug if not defined, if
+**			Vmregion==Vmdebug then address a is watched
+**
+**	Output files are created if they don't exist. &n and /dev/fd/n name
+**	the file descriptor n which must be open for writing. The pattern %p
+**	in a file name is replaced by the process ID.
+**
+**	VMALLOC_OPTIONS combines the features of these previously used env vars:
+**	    { VMDEBUG VMETHOD VMPROFILE VMTRACE }
 **
 **	Written by Kiem-Phong Vo, kpv@research.att.com, 01/16/94.
 */
@@ -117,6 +135,13 @@ typedef struct ______mstats Mstats_t;
 #else
 #define CREAT_MODE	0644
 #endif
+
+static Vmulong_t	_Vmdbstart = 0;
+static Vmulong_t	_Vmdbcheck = 0;
+static Vmulong_t	_Vmdbtime = 0;
+static int		_Vmpffd = -1;
+
+#if ( !_std_malloc || !_BLD_ast ) && !_AST_std_malloc
 
 #if !_map_malloc
 #undef calloc
@@ -182,44 +207,7 @@ lcl_getenv(const char* s)
 #define extern		extern __EXPORT__
 #endif
 
-#if __STD_C
-static Vmulong_t atou(char** sp)
-#else
-static Vmulong_t atou(sp)
-char**	sp;
-#endif
-{
-	char*		s = *sp;
-	Vmulong_t	v = 0;
-
-	if(s[0] == '0' && (s[1] == 'x' || s[1] == 'X') )
-	{	for(s += 2; *s; ++s)
-		{	if(*s >= '0' && *s <= '9')
-				v = (v << 4) + (*s - '0');
-			else if(*s >= 'a' && *s <= 'f')
-				v = (v << 4) + (*s - 'a') + 10;
-			else if(*s >= 'A' && *s <= 'F')
-				v = (v << 4) + (*s - 'A') + 10;
-			else break;
-		}
-	}
-	else
-	{	for(; *s; ++s)
-		{	if(*s >= '0' && *s <= '9')
-				v = v*10 + (*s - '0');
-			else break;
-		}
-	}
-
-	*sp = s;
-	return v;
-}
-
 static int		_Vmflinit = 0;
-static Vmulong_t	_Vmdbstart = 0;
-static Vmulong_t	_Vmdbcheck = 0;
-static Vmulong_t	_Vmdbtime = 0;
-static int		_Vmpffd = -1;
 #define VMFLINIT() \
 	{ if(!_Vmflinit)	vmflinit(); \
 	  if(_Vmdbcheck) \
@@ -232,99 +220,11 @@ static int		_Vmpffd = -1;
 	}
 
 #if __STD_C
-static char* insertpid(char* begs, char* ends)
-#else
-static char* insertpid(begs,ends)
-char*	begs;
-char*	ends;
-#endif
-{	int	pid;
-	char*	s;
-
-	if((pid = getpid()) < 0)
-		return NIL(char*);
-
-	s = ends;
-	do
-	{	if(s == begs)
-			return NIL(char*);
-		*--s = '0' + pid%10;
-	} while((pid /= 10) > 0);
-	while(s < ends)
-		*begs++ = *s++;
-
-	return begs;
-}
-
-#if __STD_C
-static int createfile(char* file)
-#else
-static int createfile(file)
-char*	file;
-#endif
-{
-	char	buf[1024];
-	char	*next, *endb;
-
-	next = buf;
-	endb = buf + sizeof(buf);
-	while(*file)
-	{	if(*file == '%')
-		{	switch(file[1])
-			{
-			case 'p' :
-				if(!(next = insertpid(next,endb)) )
-					return -1;
-				file += 2;
-				break;
-			default :
-				goto copy;
-			}
-		}
-		else
-		{ copy:
-			*next++ = *file++;
-		}
-
-		if(next >= endb)
-			return -1;
-	}
-
-	*next = '\0';
-#if _PACKAGE_ast
-	{	int	fd;
-		fd = open(buf,O_WRONLY|O_CREAT|O_TRUNC,CREAT_MODE);
-#ifdef FD_CLOEXEC
-		if (fd >= 0)
-			fcntl(fd, F_SETFD, FD_CLOEXEC);
-#endif
-		return fd;
-	}
-#else
-	return creat(buf,CREAT_MODE);
-#endif
-}
-
-#if __STD_C
-static void pfprint(void)
-#else
-static void pfprint()
-#endif
-{
-	if(Vmregion->meth.meth == VM_MTPROFILE)
-		vmprofile(Vmregion,_Vmpffd);
-}
-
-#if __STD_C
 static int vmflinit(void)
 #else
 static int vmflinit()
 #endif
 {
-	char*		env;
-	Vmalloc_t*	vm;
-	int		fd;
-	Vmulong_t	addr;
 	char*		file;
 	int		line;
 	Void_t*		func;
@@ -333,82 +233,8 @@ static int vmflinit()
 	_Vmflinit = 1;
 	VMFLF(Vmregion,file,line,func);
 
-	/* if getenv() calls malloc(), the eventual region may not see this */
-	vm = NIL(Vmalloc_t*);
-	if((env = getenv("VMETHOD")) )
-	{	if(strcmp(env,"Vmdebug") == 0 || strcmp(env,"vmdebug") == 0)
-			vm = vmopen(Vmdcsbrk,Vmdebug,0);
-		else if(strcmp(env,"Vmprofile") == 0 || strcmp(env,"vmprofile") == 0 )
-			vm = vmopen(Vmdcsbrk,Vmprofile,0);
-		else if(strcmp(env,"Vmlast") == 0 || strcmp(env,"vmlast") == 0 )
-			vm = vmopen(Vmdcsbrk,Vmlast,0);
-		else if(strcmp(env,"Vmbest") == 0 || strcmp(env,"vmbest") == 0 )
-			vm = Vmheap;
-	}
-
-	if((!vm || vm->meth.meth == VM_MTDEBUG) &&
-	   (env = getenv("VMDEBUG")) && env[0] )
-	{	if(vm || (vm = vmopen(Vmdcsbrk,Vmdebug,0)) )
-		{	reg int	setcheck = 0;
-
-			while(*env)
-			{	if(*env == 'a')
-				{	vmset(vm,VM_DBABORT,1);
-					env += 1;
-				}
-				else if(*env =='w')
-				{	env += 1;
-					if((fd = atou(&env)) >= 0 )
-						vmdebug(fd);
-				}
-				else if(*env < '0' || *env > '9')
-					env += 1;
-				else if(env[0] == '0' && (env[1] == 'x' || env[1] == 'X') )
-				{	if((addr = atou(&env)) != 0)
-						vmdbwatch((Void_t*)addr);
-				}
-				else
-				{	_Vmdbcheck = atou(&env);
-					setcheck = 1;
-					if(*env == ',')
-					{	env += 1;
-						_Vmdbstart = atou(&env);
-					}
-				}
-			}
-			if(!setcheck)
-				_Vmdbcheck = 1;
-		}
-	}
-
-	if((!vm || vm->meth.meth == VM_MTPROFILE) &&
-	   (env = getenv("VMPROFILE")) && env[0] )
-	{	_Vmpffd = createfile(env);
-		if(!vm)
-			vm = vmopen(Vmdcsbrk,Vmprofile,0);
-	}
-
-	/* slip in the new region now so that malloc() will work fine */
-	if(vm)
-		Vmregion = vm;
-
-	/* turn on tracing if requested */
-	if((env = getenv("VMTRACE")) && env[0] && (fd = createfile(env)) >= 0)
-	{	vmset(Vmregion,VM_TRACE,1);
-		vmtrace(fd);
-	}
-
-	/* make sure that profile data is output upon exiting */
-	if(vm && vm->meth.meth == VM_MTPROFILE)
-	{	if(_Vmpffd < 0)
-			_Vmpffd = 2;
-		/* this may wind up calling malloc(), but region is ok now */
-		atexit(pfprint);
-	}
-	else if(_Vmpffd >= 0)
-	{	close(_Vmpffd);
-		_Vmpffd = -1;
-	}
+	/* if getenv() calls malloc(), the options may not affect the eventual region */
+	VMOPTIONS();
 
 	/* reset file and line number to correct values for the call */
 	Vmregion->file = file;
@@ -937,5 +763,360 @@ extern Mstats_t		F0(_ast_mstats, void) { return mstats(); }
 #endif /*_hdr_malloc*/
 
 #endif /*!_std_malloc*/
+
+#if __STD_C
+static Vmulong_t atou(char** sp)
+#else
+static Vmulong_t atou(sp)
+char**	sp;
+#endif
+{
+	char*		s = *sp;
+	Vmulong_t	v = 0;
+
+	if(s[0] == '0' && (s[1] == 'x' || s[1] == 'X') )
+	{	for(s += 2; *s; ++s)
+		{	if(*s >= '0' && *s <= '9')
+				v = (v << 4) + (*s - '0');
+			else if(*s >= 'a' && *s <= 'f')
+				v = (v << 4) + (*s - 'a') + 10;
+			else if(*s >= 'A' && *s <= 'F')
+				v = (v << 4) + (*s - 'A') + 10;
+			else break;
+		}
+	}
+	else
+	{	for(; *s; ++s)
+		{	if(*s >= '0' && *s <= '9')
+				v = v*10 + (*s - '0');
+			else break;
+		}
+	}
+
+	*sp = s;
+	return v;
+}
+
+#if __STD_C
+static char* insertpid(char* begs, char* ends)
+#else
+static char* insertpid(begs,ends)
+char*	begs;
+char*	ends;
+#endif
+{	int	pid;
+	char*	s;
+
+	if((pid = getpid()) < 0)
+		return NIL(char*);
+
+	s = ends;
+	do
+	{	if(s == begs)
+			return NIL(char*);
+		*--s = '0' + pid%10;
+	} while((pid /= 10) > 0);
+	while(s < ends)
+		*begs++ = *s++;
+
+	return begs;
+}
+
+#if __STD_C
+static int createfile(char* file)
+#else
+static int createfile(file)
+char*	file;
+#endif
+{
+	char	buf[1024];
+	char	*next, *endb;
+	int	fd;
+
+	next = buf;
+	endb = buf + sizeof(buf);
+	while(*file)
+	{	if(*file == '%')
+		{	switch(file[1])
+			{
+			case 'p' :
+				if(!(next = insertpid(next,endb)) )
+					return -1;
+				file += 2;
+				break;
+			default :
+				goto copy;
+			}
+		}
+		else
+		{ copy:
+			*next++ = *file++;
+		}
+
+		if(next >= endb)
+			return -1;
+	}
+
+	*next = '\0';
+	file = buf;
+	if (*file == '&' && *(file += 1) || strncmp(file, "/dev/fd/", 8) == 0 && *(file += 8))
+		fd = dup((int)atou(&file));
+	else if (*file)
+#if _PACKAGE_ast
+		fd = open(file, O_WRONLY|O_CREAT|O_TRUNC, CREAT_MODE);
+#else
+		fd = creat(file, CREAT_MODE);
+#endif
+	else
+		return -1;
+#if _PACKAGE_ast
+#ifdef FD_CLOEXEC
+	if (fd >= 0)
+		fcntl(fd, F_SETFD, FD_CLOEXEC);
+#endif
+#endif
+	return fd;
+}
+
+#if __STD_C
+static void pfprint(void)
+#else
+static void pfprint()
+#endif
+{
+	if(Vmregion->meth.meth == VM_MTPROFILE)
+		vmprofile(Vmregion,_Vmpffd);
+}
+
+/*
+ * initialize runtime options from the VMALLOC_OPTIONS env var
+ */
+
+#define COPY(t,e,f)	while ((*t = *f++) && t < e) t++
+
+#if __STD_C
+void _vmoptions(void)
+#else
+void _vmoptions()
+#endif
+{
+	Vmalloc_t*	vm = 0;
+	char*		trace = 0;
+	char*		s;
+	char*		t;
+	char*		v;
+	Vmulong_t	n;
+	int		fd;
+	char		buf[1024];
+
+	_Vmoptions = 1;
+	t = buf;
+	v = &buf[sizeof(buf)-1];
+	if (s = getenv("VMALLOC_OPTIONS"))
+		COPY(t, v, s);
+#if 1 /* backwards compatibility until 2011 */
+	else
+	{
+		char*	p;
+
+		if (s = getenv("VMDEBUG"))
+		{
+			switch (*s++)
+			{
+			case 0:
+				break;
+			case 'a':
+				p = " abort";
+				COPY(t, v, p);
+				break;
+			case 'w':
+				p = " warn";
+				COPY(t, v, p);
+				break;
+			case '0':
+				if (*s-- == 'x')
+				{
+					p = " watch=";
+					COPY(t, v, p);
+					COPY(t, v, s);
+					break;
+				}
+				/*FALLTHROUGH*/
+			default:
+				p = " period=";
+				COPY(t, v, p);
+				COPY(t, v, s);
+				break;
+			}
+		}
+		if ((s = getenv("VMETHOD")) && *s)
+		{
+			p = " method=";
+			COPY(t, v, p);
+			COPY(t, v, s);
+		}
+		if ((s = getenv("VMPROFILE")) && *s)
+		{
+			p = " profile=";
+			COPY(t, v, p);
+			COPY(t, v, s);
+		}
+		if ((s = getenv("VMTRACE")) && *s)
+		{
+			p = " trace=";
+			COPY(t, v, p);
+			COPY(t, v, s);
+		}
+	}
+#endif
+	if (t > buf)
+	{
+		*t = 0;
+		s = buf;
+		for (;;)
+		{
+			while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n')
+				s++;
+			if (!*(t = s))
+				break;
+			v = 0;
+			while (*s)
+				if (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n')
+				{
+					*s++ = 0;
+					break;
+				}
+				else if (!v && *s == '=')
+				{
+					*s++ = 0;
+					if (!*(v = s))
+						v = 0;
+				}
+				else
+					s++;
+			if (t[0] == 'n' && t[1] == 'o')
+				continue;
+			switch (t[0])
+			{
+			case 'a':		/* abort */
+				if (!vm)
+					vm = vmopen(Vmdcsbrk, Vmdebug, 0);
+				if (vm && vm->meth.meth == VM_MTDEBUG)
+					vmset(vm, VM_DBABORT, 1);
+				else
+					_Vmassert |= VM_abort;
+				break;
+			case 'c':		/* check */
+				_Vmassert |= VM_check;
+				break;
+			case 'm':
+				switch (t[1])
+				{
+				case 'e':	/* method=<method> */
+					if (v && !vm)
+					{
+						if ((v[0] == 'V' || v[0] == 'v') && (v[1] == 'M' || v[1] == 'm'))
+							v += 2;
+						if (strcmp(v, "debug") == 0)
+							vm = vmopen(Vmdcsbrk, Vmdebug, 0);
+						else if (strcmp(v, "profile") == 0)
+							vm = vmopen(Vmdcsbrk, Vmprofile, 0);
+						else if (strcmp(v, "last") == 0)
+							vm = vmopen(Vmdcsbrk, Vmlast, 0);
+						else if (strcmp(v, "best") == 0)
+							vm = Vmheap;
+					}
+					break;
+				case 'm':	/* mmap */
+#if _mem_mmap_anon || _mem_mmap_zero
+					_Vmassert |= VM_mmap;
+#endif
+					break;
+				}
+				break;
+			case 'p':
+				if (v)
+					switch (t[1])
+					{
+					case 'e':	/* period=<count> */
+						if (!vm)
+							vm = vmopen(Vmdcsbrk, Vmdebug, 0);
+						if (vm && vm->meth.meth == VM_MTDEBUG)
+							_Vmdbcheck = atou(&v);
+						break;
+					case 'r':	/* profile=<path> */
+						if (!vm)
+							vm = vmopen(Vmdcsbrk, Vmprofile, 0);
+						if (v && vm && vm->meth.meth == VM_MTPROFILE)
+							_Vmpffd = createfile(v);
+						break;
+					}
+				break;
+			case 'r':		/* region */
+				_Vmassert |= VM_region;
+				break;
+			case 's':		/* start=<count> */
+				if (!vm)
+					vm = vmopen(Vmdcsbrk, Vmdebug, 0);
+				if (v && vm && vm->meth.meth == VM_MTDEBUG)
+					_Vmdbstart = atou(&v);
+				break;
+			case 't':		/* trace=<path> */
+				trace = v;
+				break;
+			case 'w':
+				if (t[1] == 'a')
+					switch (t[2])
+					{
+					case 'r':	/* warn=<path> */
+						if (!vm)
+							vm = vmopen(Vmdcsbrk, Vmdebug, 0);
+						if (v && vm && vm->meth.meth == VM_MTDEBUG && (fd = createfile(v)) >= 0)
+							vmdebug(fd);
+						break;
+					case 't':	/* watch=<addr> */
+						if (!vm)
+							vm = vmopen(Vmdcsbrk, Vmdebug, 0);
+						if (v && vm && vm->meth.meth == VM_MTDEBUG && (n = atou(&v)) >= 0)
+							vmdbwatch((Void_t*)n);
+						break;
+					}
+				break;
+			}
+		}
+	}
+
+	/* slip in the new region now so that malloc() will work fine */
+
+	if (vm)
+	{
+		if (vm->meth.meth == VM_MTDEBUG)
+			_Vmdbcheck = 1;
+		Vmregion = vm;
+	}
+
+	/* enable tracing */
+
+	if (trace && (fd = createfile(trace)) >= 0)
+	{
+		vmset(Vmregion, VM_TRACE, 1);
+		vmtrace(fd);
+	}
+
+	/* make sure that profile data is output upon exiting */
+
+	if (vm && vm->meth.meth == VM_MTPROFILE)
+	{	
+		if (_Vmpffd < 0)
+			_Vmpffd = 2;
+		/* this may wind up calling malloc(), but region is ok now */
+		atexit(pfprint);
+	}
+	else if (_Vmpffd >= 0)
+	{	
+		close(_Vmpffd);
+		_Vmpffd = -1;
+	}
+}
 
 #endif /*_UWIN*/

@@ -3,7 +3,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -64,7 +64,7 @@
 
 #ifndef ERROR_translate
 #define ERROR_translating()		(error_info.translate&&(ast.locale.set&(1<<AST_LC_MESSAGES)))
-#define ERROR_translate(l,i,d,m)	(ERROR_translating()?errorx((const char*)l,(const char*)i,(const char*)d,(const char*)m):(m))
+#define ERROR_translate(l,i,d,m)	(ERROR_translating()?errorx((const char*)(l),(const char*)(i),(const char*)(d),(const char*)(m)):(char*)(m))
 #endif
 
 #define ERROR_INFO	0		/* info message -- no err_id	*/

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -340,6 +340,8 @@ int		type;	/* >0: scanf, =0: printf, -1: internal	*/
 	}
 
 	/* get value for positions */
+	if(ft)
+		memcpy(&savft, ft, sizeof(*ft));
 	for(n = 0; n <= maxp; ++n)
 	{	if(fp[n].ft.fmt == 0) /* gap: pretend it's a 'd' pattern */
 		{	fp[n].ft.fmt = 'd';

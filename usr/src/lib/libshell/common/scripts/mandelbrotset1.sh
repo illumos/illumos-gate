@@ -22,8 +22,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -221,14 +220,17 @@ typeset symbollist='    .:0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQR
 typeset symbollistlen=$(( ${#symbollist} - 1))
 typeset mode="parallel"
 
-max_mag=400
-stepwidth=0.1
-numcpus=16
+(( max_mag=400 ))
+(( stepwidth=0.1 ))
+
+# calculate number of worker CPUs and use 3 as fallback
+(( numcpus=$(getconf NPROCESSORS_ONLN || print "3") ))
+(( numcpus=numcpus*4 ))
 
 (( m_width=termsize.columns-1 , m_height=termsize.lines-2 ))
 
 typeset -r mandelbrotset1_usage=$'+
-[-?\n@(#)\$Id: mandelbrotset1 (Roland Mainz) 2009-06-14 \$\n]
+[-?\n@(#)\$Id: mandelbrotset1 (Roland Mainz) 2010-03-31 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?mandelbrotset1 - generate mandelbrot set fractals with ksh93]
 [+DESCRIPTION?\bmandelbrotset1\b mandelbrot set fractal generator

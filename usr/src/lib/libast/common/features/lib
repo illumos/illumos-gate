@@ -41,6 +41,7 @@ lib	lseek64,lstat64 -D_LARGEFILE64_SOURCE
 lib	open64,readdir64,stat64,statvfs64,truncate64 -D_LARGEFILE64_SOURCE
 
 lib,npt	strtod,strtold,strtol,strtoll,strtoul,strtoull stdlib.h
+lib,npt	sigflag signal.h
 
 mem	direct.d_reclen sys/types.h sys/dir.h
 mem	dirent.d_fileno,dirent.d_ino,dirent.d_namlen,dirent.d_off,dirent.d_reclen,dirent.d_type sys/types.h dirent.h
@@ -318,18 +319,23 @@ tst	lib_spawn_mode unistd.h stdlib.h note{ first spawn arg is mode and it works 
 	}
 }end
 
-tst	stream_peek note{ ioctl(I_PEEK) works }end link{
+tst	stream_peek note{ ioctl(I_PEEK) works }end execute{
 	#include <sys/types.h>
+	#include <unistd.h>
 	#include <stropts.h>
 	int
 	main()
-	{	struct strpeek	pbuf;
-		pbuf.flags = 0;
-		pbuf.ctlbuf.maxlen = pbuf.databuf.maxlen =
-		pbuf.ctlbuf.len = pbuf.databuf.len = 0;
-		pbuf.ctlbuf.buf = pbuf.databuf.buf = 0;
-		ioctl(0,I_PEEK,&pbuf);
-		return 0;
+	{	struct strpeek	peek;
+		int		fds[2];
+		char		ctlbuf[32];
+		char		databuf[32];
+		peek.flags = 0;
+		peek.ctlbuf.maxlen = peek.ctlbuf.len = sizeof(ctlbuf);
+		peek.ctlbuf.buf = ctlbuf;
+		peek.databuf.maxlen = peek.databuf.len = sizeof(databuf);
+		peek.databuf.buf = databuf;
+		pipe(fds);
+		return ioctl(fds[0],I_PEEK,&peek) < 0;
 	}
 }end
 

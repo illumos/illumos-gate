@@ -9,7 +9,7 @@ LC_ALL=C
 compile=1
 script=1
 time=1
-vmdebug=a
+vmalloc_options=abort
 while	:
 do	case $1 in
 	-a|--a*)compile=2
@@ -23,7 +23,7 @@ do	case $1 in
 		;;
 	-t|--not*)time=
 		;;
-	-v|--nov*)vmdebug=
+	-v|--nov*)vmalloc_options=
 		;;
 	-*)	echo $0: $1: invalid option >&2
 		exit 2
@@ -38,14 +38,12 @@ do	case $1 in
 	esac
 	shift
 done
-if	[[ ! $vmdebug ]]
-then	unset VMDEBUG
-elif	[[ $VMDEBUG ]]
-then	vmdebug=$VMDEBUG
-else	export VMDEBUG=$vmdebug
+if	[[ $VMALLOC_OPTIONS ]]
+then	vmalloc_options=$VMALLOC_OPTIONS
+else	VMALLOC_OPTIONS=$vmalloc_options
 fi
-[[ $VMDEBUG ]] || timesensitive=.
-export LANG LC_ALL PATH PWD SHELL
+[[ $VMALLOC_OPTIONS ]] || timesensitive=.
+export LANG LC_ALL PATH PWD SHELL VMALLOC_OPTIONS
 PWD=`pwd`
 SHELL=${SHELL-ksh}
 case $0 in
@@ -79,7 +77,11 @@ then	SHCOMP=${SHCOMP:-shcomp}
 fi
 typeset -A tests
 for i in ${*-*.sh}
-do	t=$(grep -c err_exit $i)
+do	if	[[ ! -r $i ]]
+	then	echo $0: $i: not found >&2
+		continue
+	fi
+	t=$(grep -c err_exit $i)
 	if	(( $t > 2 ))
 	then	(( t = $t - 2 ))
 	fi
@@ -92,7 +94,7 @@ do	t=$(grep -c err_exit $i)
 	if	[[ $script ]]
 	then	echo test $i begins ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"}
 		if	[[ $i == $timesensitive ]]
-		then	unset VMDEBUG
+		then	VMALLOC_OPTIONS=
 		fi
 		if	$SHELL $i
 		then	echo test $i passed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} "[ $t $T 0 ${E}s ]"
@@ -107,13 +109,16 @@ do	t=$(grep -c err_exit $i)
 			echo test $i failed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} with exit code $e "[ $t $T $e $E ]"
 		fi
 		if	[[ $i == $timesensitive ]]
-		then	export VMDEBUG=$vmdebug
+		then	VMALLOC_OPTIONS=$vmalloc_options
 		fi
 	fi
 done
 if	[[ $compile ]]
 then	for i in ${*-*.sh}
-	do	t=${tests[$i]}
+	do	if	[[ ! -r $i ]]
+		then	continue
+		fi
+		t=${tests[$i]}
 		T=test
 		if	(( $t != 1 ))
 		then	T=${T}s
@@ -124,7 +129,7 @@ then	for i in ${*-*.sh}
 		E=error
 		if	$SHCOMP $i > $tmp/$o
 		then	if	[[ $i == $timesensitive ]]
-			then	unset VMDEBUG
+			then	VMALLOC_OPTIONS=
 			fi
 			if	$SHELL $tmp/$o
 			then	echo test $o passed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} "[ $t $T 0 ${E}s ]"
@@ -139,7 +144,7 @@ then	for i in ${*-*.sh}
 				echo test $o failed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} with exit code $e "[ $t $T $e $E ]"
 			fi
 			if	[[ $i == $timesensitive ]]
-			then	export VMDEBUG=$vmdebug
+			then	VMALLOC_OPTIONS=$vmalloc_options
 			fi
 		else	e=$?
 			t=1

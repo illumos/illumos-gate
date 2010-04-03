@@ -22,8 +22,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -124,7 +123,7 @@ typeset -T urlconnection_t=(
 				hexchunksize="${hexchunksize//$'\r'/}"
 				[[ "${hexchunksize}" != "" ]] || continue
 				[[ "${hexchunksize}" == ~(Elri)[0-9abcdef]+ ]] || break
-				(( chunksize=16#${hexchunksize} ))
+				(( chunksize=$( printf "16#%s\n" "${hexchunksize}" )  ))
 				(( chunksize > 0 )) || break
 				dd bs=1 count="${chunksize}" 2>/dev/null
 			done
@@ -178,7 +177,7 @@ typeset -T urlconnection_t=(
 	function open_connection
 	{
 		if [[ "${_.protocol}" == "https" ]] ; then
-			_.ssl.fifo.dir="$(mktemp -d)"
+			_.ssl.fifo.dir="$(mktemp -t -d)"
 			_.ssl.fifo.in="${_.ssl.fifo.dir}/in"
 			_.ssl.fifo.out="${_.ssl.fifo.dir}/out"
 
@@ -244,7 +243,7 @@ typeset -T urlconnection_t=(
 			[[ "${_.host}"     != "" ]] || { print -u2 -f "%s: host not set.\n"     "$0" ; return 1 ; }
 			[[ "${_.path}"     != "" ]] || { print -u2 -f "%s: path not set.\n"     "$0" ; return 1 ; }
 
-			_.open_connection
+			_.open_connection || return 1
 
 			# send HTTP request    
 			request="GET /${_.path} HTTP/1.1\r\n"
@@ -563,7 +562,7 @@ function do_rssread
 	set -o errexit
 
 	urlconnection_t hc
-	hc.user_agent="rssread/ksh93(ssl) (2009-08-14; $(uname -s -r -p))"
+	hc.user_agent="rssread/ksh93(ssl) (2010-03-27; $(uname -s -r -p))"
 	hc.init_url "$1"
 	
 	# need extra newline after cat_url to terminate line with $'\n'
@@ -609,12 +608,6 @@ typeset -A bookmark_urls
 # "ramdom" urls for testing
 bookmark_urls=(
 	["google_blogs_ksh"]="http://blogsearch.google.com/blogsearch_feeds?hl=en&scoring=d&q=(%22ksh93%22%7C%22ksh+93%22+%7C+%22korn93%22+%7C+%22korn+93%22)&ie=utf-8&num=100&output=rss"
-	# OpenSolaris.org sites
-	["ksh93_integration"]="http://www.opensolaris.org/rss/os/project/ksh93-integration/announcements/rss2.xml"
-	["ksh93_integration_ssl"]="https://www.opensolaris.org/rss/os/project/ksh93-integration/announcements/rss2.xml"
-	["shell"]="http://www.opensolaris.org/rss/os/project/shell/announcements/rss2.xml"
-	["systemz"]="http://www.opensolaris.org/rss/os/project/systemz/announcements/rss2.xml"
-	["systemz_ssl"]="https://www.opensolaris.org/rss/os/project/systemz/announcements/rss2.xml"
 	# some Sun staff/sites
 	["blogs_sun_com"]="http://blogs.sun.com/main/feed/entries/rss"
 	["bigadmin"]="http://www.sun.com/bigadmin/content/rss/motd.xml"
@@ -634,7 +627,7 @@ bookmark_urls=(
 typeset progname="${ basename "${0}" ; }"
 
 typeset -r rssread_usage=$'+
-[-?\n@(#)\$Id: rssread (Roland Mainz) 2009-08-14 \$\n]
+[-?\n@(#)\$Id: rssread (Roland Mainz) 2010-03-27 \$\n]
 [-author?Roland Mainz <roland.mainz@sun.com>]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?rssread - fetch RSS messages and convert them to plain text]

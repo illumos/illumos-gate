@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/source/demo/system@$(PKGVERS)
@@ -153,6 +152,7 @@ file path=usr/demo/ksh/tests/sun_solaris_builtin_sum.sh
 file path=usr/demo/ksh/tests/sun_solaris_builtin_tail.sh
 file path=usr/demo/ksh/tests/sun_solaris_command_substitution.sh
 file path=usr/demo/ksh/tests/sun_solaris_compound_nameref.sh
+file path=usr/demo/ksh/tests/sun_solaris_compound_misc.sh
 file path=usr/demo/ksh/tests/sun_solaris_compoundvario.sh
 file \
     path=usr/demo/ksh/tests/sun_solaris_cr_6687139_command_substitution_exec_redirection_allocation_loop.sh
@@ -188,7 +188,19 @@ file \
     path=usr/demo/ksh/tests/sun_solaris_cr_6862121_shbinexec_kernel_module_defunct.sh
 file \
     path=usr/demo/ksh/tests/sun_solaris_cr_6881017_background_process_in_subshell_hangs_caller.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6887363_shell_sometimes_mishandles_return_value_of_its_child_process.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6904557_wc_no_longer_counts_number_of_bytes_correctly.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6904575_cut_-d_with_multibyte_character_no_longer_works.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6904878_join_-t_no_longer_works_with_multibyte_char_separator.sh
+file \
+    path=usr/demo/ksh/tests/sun_solaris_cr_6907460_EXIT_trap_handlers_are_sometimes_executed_twice.sh
+file path=usr/demo/ksh/tests/sun_solaris_cr_xxxxxxxx_template.sh
 file path=usr/demo/ksh/tests/sun_solaris_getconf.sh
+file path=usr/demo/ksh/tests/sun_solaris_locale_misc.sh
 file path=usr/demo/ksh/tests/sun_solaris_local_compound_nameref001.sh
 file path=usr/demo/ksh/tests/sun_solaris_staticvariables.sh
 file path=usr/demo/ksh/tests/sun_solaris_vartree001.sh

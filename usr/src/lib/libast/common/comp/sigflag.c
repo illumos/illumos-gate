@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -20,22 +20,33 @@
 *                                                                      *
 ***********************************************************************/
 #pragma prototyped
-/*
- * Glenn Fowler
- * AT&T Research
- *
- * OBSOLETE: use errormsg()
- */
 
-#include <error.h>
+#include <ast.h>
+
+#if _lib_sigflag
+
+NoN(sigflag)
+
+#else
+
+#include <sig.h>
 
 int
-libevent(void* handle, void* discipline, int level, ...)
+sigflag(int sig, int flags, int set)
 {
-	va_list	ap;
+#if _lib_sigaction
+	struct sigaction	sa;
 
-	va_start(ap, level);
-	errorv((level & ERROR_LIBRARY) ? *((char**)handle) : (char*)0, level, ap);
-	va_end(ap);
-	return 0;
+	if (sigaction(sig, NiL, &sa))
+		return -1;
+	if (set)
+		sa.sa_flags |= flags;
+	else
+		sa.sa_flags &= ~flags;
+	return sigaction(sig, &sa, NiL);
+#else
+	return -1;
+#endif
 }
+
+#endif

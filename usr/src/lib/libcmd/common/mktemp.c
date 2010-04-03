@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -21,7 +21,7 @@
 #pragma prototyped
 
 static const char usage[] =
-"[-?\n@(#)$Id: mktemp (AT&T Research) 2009-06-19 $\n]"
+"[-?\n@(#)$Id: mktemp (AT&T Research) 2010-03-05 $\n]"
 USAGE_LICENSE
 "[+NAME?mktemp - make temporary file or directory]"
 "[+DESCRIPTION?\bmktemp\b creates a temporary file with optional base "
@@ -34,12 +34,12 @@ USAGE_LICENSE
     "{"
         "[+*?Lower case to avoid clashes on case ignorant filesystems.]"
         "[+*?Pseudo-random part to deter denial of service attacks.]"
-        "[+*?Pseudo-random part is \a3-chars\a.\a3-chars\a to accomodate "
-            "8.3 filesystems.]"
+        "[+*?Default pseudo-random part (no specific \bX...\b template) "
+            "formatted to accomodate 8.3 filesystems.]"
     "}"
-"[+?A consecutive sequence of \bX\b's in \aprefix\a is replaced by the "
-    "pseudo-random part. If there are no \bX\b's then the pseudo-random part "
-    "is appended to the prefix.]"
+"[+?A consecutive trailing sequence of \bX\b's in \aprefix\a is replaced "
+    "by the pseudo-random part. If there are no \bX\b's then the "
+    "pseudo-random part is appended to the prefix.]"
 "[d:directory?Create a directory instead of a regular file.]"
 "[m:mode]:[mode?Set the mode of the created temporary to \amode\a. "
     "\amode\a is symbolic or octal mode as in \bchmod\b(1). Relative modes "
@@ -47,10 +47,13 @@ USAGE_LICENSE
 "[p:default?Use \adirectory\a if the \bTMPDIR\b environment variable is "
     "not defined. Implies \b--tmp\b.]:[directory]"
 "[q:quiet?Suppress file and directory error diagnostics.]"
+"[R:regress?The pseudo random generator is seeded with \aseed\a instead "
+    "of process/system specific transient data. Use for testing "
+    "only. A seed of \b0\b is silently changed to \b1\b.]#[seed]"
 "[t:tmp|temporary-directory?Create a path rooted in a temporary "
     "directory.]"
 "[u:unsafe|dry-run?Check for file/directory existence but do not create. "
-    "Who would want to do that.]"
+    "Use this for testing only.]"
 "\n"
 "\n[ prefix ]\n"
 "\n"
@@ -105,6 +108,10 @@ b_mktemp(int argc, char** argv, void* context)
 		case 'u':
 			unsafe = 1;
 			fdp = 0;
+			continue;
+		case 'R':
+			if (!pathtemp(NiL, 0, opt_info.arg, "/seed", NiL))
+				error(2, "%s: regression test initializtion failed", opt_info.arg);
 			continue;
 		case ':':
 			error(2, "%s", opt_info.arg);

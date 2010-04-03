@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2010 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -528,5 +528,35 @@ N=(89551 89557)
 i=0 j=1
 [[ $(printf "%d" N[j]-N[i]) == 6 ]] || err_exit 'printf %d N[i]-N[j] failed'
 [[ $((N[j]-N[i])) == 6 ]] || err_exit  '$((N[j]-N[i])) incorrect'
+
+unset a x
+x=0
+((a[++x]++))
+(( x==1)) || err_exit '((a[++x]++)) should only increment x once'
+(( a[1]==1))  || err_exit 'a[1] not incremented'
+unset a
+x=0
+((a[x++]++))
+(( x==1)) || err_exit '((a[x++]++)) should only increment x once'
+(( a[0]==1))  || err_exit 'a[0] not incremented'
+unset a
+x=0
+((a[x+=2]+=1))
+(( x==2)) || err_exit '((a[x+=2]++)) should result in x==2'
+(( a[2]==1))  || err_exit 'a[0] not 1'
+
+unset a i
+typeset -a a
+i=1
+(( a[i]=1 ))
+(( a[0] == 0 )) || err_exit 'a[0] not 0'
+(( a[1] == 1 )) || err_exit 'a[1] not 1'
+
+unset a
+typeset -i a
+for ((i=0;i<1000;i++))
+do ((a[RANDOM%2]++))
+done
+(( (a[0]+a[1])==1000)) || err_exit '(a[0]+a[1])!=1000'
 
 exit $((Errors))

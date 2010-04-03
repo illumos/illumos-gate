@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -50,14 +50,15 @@
 #define USAGE			4
 #define OPEN			5
 #define CPL			6
-#define BSD			7
-#define ZLIB			8
-#define MIT			9
-#define GPL			10
-#define SPECIAL			11
-#define NONEXCLUSIVE		12
-#define NONCOMMERCIAL		13
-#define PROPRIETARY		14
+#define EPL			7
+#define BSD			8
+#define ZLIB			9
+#define MIT			10
+#define GPL			11
+#define SPECIAL			12
+#define NONEXCLUSIVE		13
+#define NONCOMMERCIAL		14
+#define PROPRIETARY		15
 
 #define AUTHOR			0
 #define CLASS			1
@@ -160,6 +161,7 @@ static const Item_t	lic[] =
 	LIC("usage", USAGE),
 	LIC("open", OPEN),
 	LIC("cpl", OPEN),
+	LIC("epl", OPEN),
 	LIC("bsd", OPEN),
 	LIC("zlib", OPEN),
 	LIC("mit", OPEN),
@@ -281,6 +283,7 @@ expand(Notice_t* notice, register Buffer_t* b, const Item_t* item)
 	register char*	x;
 	register char*	z;
 	register int	c;
+	int		m;
 
 	if (t = item->data)
 	{
@@ -290,16 +293,28 @@ expand(Notice_t* notice, register Buffer_t* b, const Item_t* item)
 		{
 			if (*t == '$' && t < (e + 2) && *(t + 1) == '{')
 			{
+				m = 0;
 				x = t += 2;
 				while (t < e && (c = *t++) != '}')
 					if (c == '.')
 						x = t;
+					else if (c == '/')
+					{
+						m = 1;
+						break;
+					}
 				if ((c = lookup(key, x, t - x - 1)) >= 0 && (x = notice->item[c].data))
 				{
 					z = x + notice->item[c].size;
 					while (x < z)
-						PUT(b, *x++);
+					{
+						c = *x++;
+						if (!m || c >= '0' && c <= '9')
+							PUT(b, c);
+					}
 				}
+				if (m)
+					while (t < e && *t++ != '}');
 			}
 			else if (q > 0 && *t == '\\' && (*(t + 1) == q || *(t + 1) == '\\'))
 				t++;
@@ -459,6 +474,7 @@ astlicense(char* p, int size, char* file, char* options, int cc1, int cc2, int c
 			h = lookup(key, x, n);
 			if (c == ']')
 				c = *++s;
+			quote = 0;
 			if (c == '=' || first)
 			{
 				if (c == '=')
@@ -512,7 +528,6 @@ astlicense(char* p, int size, char* file, char* options, int cc1, int cc2, int c
 						}
 						continue;
 					}
-					quote = 0;
 					v = s;
 					while ((c = *s) && (q == '"' && (c == '\\' && (*(s + 1) == '"' || *(s + 1) == '\\') && s++ && (quote = q)) || q && c != q || !q && c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != ',' && c != ';'))
 					{
@@ -671,12 +686,15 @@ astlicense(char* p, int size, char* file, char* options, int cc1, int cc2, int c
 			if (notice.type >= SPECIAL)
 				COMMENT(&notice, &buf, "All Rights Reserved", 0);
 		}
-		if (notice.type == CPL)
+		if (notice.type == CPL || notice.type == EPL)
 		{
 			copy(&tmp, notice.item[PACKAGE].data ? "and" : "This software", -1);
 			copy(&tmp, " is licensed under the", -1);
 			comment(&notice, &buf, BUF(&tmp), USE(&tmp), 0);
-			copy(&tmp, "Common Public License", -1);
+			if (notice.type == EPL)
+				copy(&tmp, "Eclipse Public License", -1);
+			else
+				copy(&tmp, "Common Public License", -1);
 			if (notice.item[VERSION].data)
 			{
 				copy(&tmp, ", Version ", -1);
@@ -718,6 +736,8 @@ astlicense(char* p, int size, char* file, char* options, int cc1, int cc2, int c
 					comment(&notice, &buf, BUF(&tmp), USE(&tmp), 0);
 				}
 			}
+			else if (notice.type == EPL)
+				COMMENT(&notice, &buf, "http://www.eclipse.org/org/documents/epl-v10.html", 0);
 			else
 				COMMENT(&notice, &buf, "http://www.opensource.org/licenses/cpl", 0);
 			comment(&notice, &buf, NiL, 0, 0);

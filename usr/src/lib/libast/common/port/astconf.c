@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -1119,7 +1119,7 @@ print(Sfio_t* sp, register Lookup_t* look, const char* name, const char* path, i
 		{
 			if (streq(p->name, "VERSION"))
 			{
-				v = _AST_VERSION;
+				v = ast.version;
 				break;
 			}
 		}

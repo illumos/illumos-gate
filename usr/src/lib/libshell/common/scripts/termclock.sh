@@ -22,8 +22,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -268,7 +267,7 @@ hours.length=50   hours.scale=12   hours.ch=$"h"
 float update_interval=0.9
 
 typeset -r termclock_usage=$'+
-[-?\n@(#)\$Id: termclock (Roland Mainz) 2009-05-09 \$\n]
+[-?\n@(#)\$Id: termclock (Roland Mainz) 2009-12-02 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [-author?David Korn <dgk@research.att.com>]
 [+NAME?termclock - analog clock for terminals]
@@ -295,7 +294,7 @@ which tput >/dev/null   || fatal_error $"tput not found."
 
 # create temporary file for double-buffering and register an EXIT trap
 # to remove this file when the shell interpreter exits
-scratchfile="${ mktemp "/tmp/termclock.ppid${PPID}_pid$$.XXXXXX" ; }"
+scratchfile="${ mktemp -t "termclock.ppid${PPID}_pid$$.XXXXXX" ; }"
 [[ "${scratchfile}" != "" ]] || fatal_error $"Could not create temporary file name."
 trap 'rm -f "${scratchfile}"' EXIT
 rm -f "${scratchfile}" ; redirect 6<> "${scratchfile}" || fatal_error $"Could not create temporary file."

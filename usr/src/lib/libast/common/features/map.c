@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -30,7 +30,13 @@
 
 #include "FEATURE/lib"
 #include "FEATURE/mmap"
+#include "FEATURE/options"
 #include "FEATURE/vmalloc"
+#include "FEATURE/eaccess"
+
+#if _opt_map_libc && !defined(_map_libc)
+#define _map_libc	1
+#endif
 
 int
 main()
@@ -64,8 +70,10 @@ main()
 	printf("#define basename	_ast_basename\n");
 	printf("#undef	dirname\n");
 	printf("#define dirname		_ast_dirname\n");
+#if !_lib_eaccess
 	printf("#undef	eaccess\n");
 	printf("#define eaccess		_ast_eaccess\n");
+#endif
 #if !_lib_execvpe
 	printf("#undef	execvpe\n");
 	printf("#define execvpe		_ast_execvpe\n");

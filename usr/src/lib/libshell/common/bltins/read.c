@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -146,7 +146,6 @@ int	b_read(int argc,char *argv[], void *extra)
 	if(fd<0 || !(r&IOREAD))
 		errormsg(SH_DICT,ERROR_system(1),e_file+4);
 	/* look for prompt */
-	shp->prompt = default_prompt;
 	if((name = *argv) && (name=strchr(name,'?')) && (r&IOTTY))
 		r = strlen(name++);
 	else
@@ -162,6 +161,7 @@ int	b_read(int argc,char *argv[], void *extra)
 		rp->plen = r;
 	}
 bypass:
+	shp->prompt = default_prompt;
 	if(r && (shp->prompt=(char*)sfreserve(sfstderr,r,SF_LOCKR)))
 	{
 		memcpy(shp->prompt,name,r);
@@ -342,15 +342,21 @@ int sh_readline(register Shell_t *shp,char **names, int fd, int flags,long timeo
 			int	f;
 			for (;;)
 			{
-				c = (flags&NN_FLAG) ? -size : -1;
+				c = size;
 				cp = sfreserve(iop,c,SF_LOCKR);
 				f = 1;
 				if(cp)
 					m = sfvalue(iop);
+				else if(flags&NN_FLAG)
+				{
+					c = size;
+					m = (cp = sfreserve(iop,c,0)) ? sfvalue(iop) : 0;
+					f = 0;
+				}
 				else
 				{
-					m = (cp = sfreserve(iop,size,0)) ? sfvalue(iop) : 0;
-					f = 0;
+					c = sfvalue(iop);
+					m = (cp = sfreserve(iop,c,SF_LOCKR)) ? sfvalue(iop) : 0;
 				}
 				if(m>0 && (flags&N_FLAG) && !binary && (v=memchr(cp,'\n',m)))
 				{
@@ -404,9 +410,13 @@ int sh_readline(register Shell_t *shp,char **names, int fd, int flags,long timeo
 					cur = var;
 #endif
 				*cur = 0;
-				if(c>=size)
-					sfclrerr(iop);
-				break;
+				if(c>=size || (flags&N_FLAG) || m==0)
+				{
+					if(m)
+						sfclrerr(iop);
+					break;
+				}
+				size -= c;
 			}
 		}
 		if(timeslot)
@@ -419,7 +429,7 @@ int sh_readline(register Shell_t *shp,char **names, int fd, int flags,long timeo
 			{
 				Namval_t *mp;
 				if(var==buf)
-					var = memdup(var,c);
+					var = memdup(var,c+1);
 				nv_putval(np,var,NV_RAW);
 				nv_setsize(np,c);
 				if(!nv_isattr(np,NV_IMPORT|NV_EXPORT)  && (mp=(Namval_t*)np->nvenv))

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -27,7 +27,7 @@
  */
 
 static const char usage_head[] =
-"[-?@(#)$Id: cp (AT&T Research) 2009-06-18 $\n]"
+"[-?@(#)$Id: cp (AT&T Research) 2010-01-20 $\n]"
 USAGE_LICENSE
 ;
 
@@ -123,7 +123,7 @@ static const char usage_tail[] =
 #include <cmd.h>
 #include <ls.h>
 #include <times.h>
-#include <fts.h>
+#include <fts_fix.h>
 #include <fs3d.h>
 #include <hashkey.h>
 #include <stk.h>
@@ -274,7 +274,7 @@ visit(State_t* state, register FTSENT* ent)
 	if (state->directory)
 	{
 		if ((state->postsiz + len) > state->pathsiz && !(state->path = newof(state->path, char, state->pathsiz = roundof(state->postsiz + len, PATH_CHUNK), 0)))
-			error(3, "out of space");
+			error(ERROR_SYSTEM|3, "out of space");
 		if (state->hierarchy && ent->fts_level == 0 && strchr(base, '/'))
 		{
 			s = state->path + state->postsiz;
@@ -667,6 +667,7 @@ b_cp(int argc, register char** argv, void* context)
 	struct stat	st;
 	State_t*	state;
 	Shbltin_t*	sh;
+	void*		cleanup = context;
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, ERROR_NOTIFY);
 	if (!(sh = CMD_CONTEXT(context)) || !(state = (State_t*)sh->ptr))
@@ -825,7 +826,7 @@ b_cp(int argc, register char** argv, void* context)
 		argv++;
 	}
 	if (!(v = (char**)stkalloc(stkstd, (argc + 2) * sizeof(char*))))
-		error(3, "out of space");
+		error(ERROR_SYSTEM|3, "out of space");
 	memcpy(v, argv, (argc + 1) * sizeof(char*));
 	argv = v;
 	if (!standard)
@@ -906,7 +907,7 @@ b_cp(int argc, register char** argv, void* context)
 		state->official = 1;
 	state->postsiz = strlen(file);
 	if (state->pathsiz < roundof(state->postsiz + 2, PATH_CHUNK) && !(state->path = newof(state->path, char, state->pathsiz = roundof(state->postsiz + 2, PATH_CHUNK), 0)))
-		error(3, "out of space");
+		error(ERROR_SYSTEM|3, "out of space");
 	memcpy(state->path, file, state->postsiz + 1);
 	if (state->directory && state->path[state->postsiz - 1] != '/')
 		state->path[state->postsiz++] = '/';
@@ -939,5 +940,11 @@ b_cp(int argc, register char** argv, void* context)
 		}
 	else if ((*state->link)(*argv, state->path))
 		error(ERROR_SYSTEM|2, "%s: cannot link to %s", *argv, state->path);
+	if (cleanup && !sh)
+	{
+		if (state->path)
+			free(state->path);
+		free(state);
+	}
 	return error_info.errors != 0;
 }

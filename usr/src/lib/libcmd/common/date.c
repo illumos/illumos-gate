@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2010 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -294,7 +294,6 @@ b_date(int argc, register char** argv, void* context)
 	int		unelapsed = 0;	/* fmtelapsed() => strelapsed	*/
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
-	setlocale(LC_ALL, "");
 	tm_info.flags = TM_DATESTYLE;
 	fmts = &fmt;
 	fmt.format = "";
