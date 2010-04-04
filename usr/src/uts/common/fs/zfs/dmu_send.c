@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -39,6 +38,7 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/zap.h>
 #include <sys/zio_checksum.h>
+#include <sys/zfs_znode.h>
 #include <sys/avl.h>
 #include <sys/ddt.h>
 
@@ -419,6 +419,20 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
 	drr->drr_u.drr_begin.drr_magic = DMU_BACKUP_MAGIC;
 	DMU_SET_STREAM_HDRTYPE(drr->drr_u.drr_begin.drr_versioninfo,
 	    DMU_SUBSTREAM);
+
+#ifdef _KERNEL
+	if (dmu_objset_type(tosnap) == DMU_OST_ZFS) {
+		uint64_t version;
+		if (zfs_get_zplprop(tosnap, ZFS_PROP_VERSION, &version) != 0)
+			return (EINVAL);
+		if (version == ZPL_VERSION_SA) {
+			DMU_SET_FEATUREFLAGS(
+			    drr->drr_u.drr_begin.drr_versioninfo,
+			    DMU_BACKUP_FEATURE_SA_SPILL);
+		}
+	}
+#endif
+
 	drr->drr_u.drr_begin.drr_creation_time =
 	    ds->ds_phys->ds_creation_time;
 	drr->drr_u.drr_begin.drr_type = tosnap->os_phys->os_type;
@@ -645,6 +659,19 @@ recv_existing_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	    dp->dp_spa, tx, cr, "dataset = %lld", dsobj);
 }
 
+
+static boolean_t
+dmu_recv_verify_features(dsl_dataset_t *ds, struct drr_begin *drrb)
+{
+	int featureflags;
+
+	featureflags = DMU_GET_FEATUREFLAGS(drrb->drr_versioninfo);
+
+	/* Verify pool version supports SA if SA_SPILL feature set */
+	return ((featureflags & DMU_BACKUP_FEATURE_SA_SPILL) &&
+	    (spa_version(dsl_dataset_get_spa(ds)) < SPA_VERSION_SA));
+}
+
 /*
  * NB: callers *MUST* call dmu_recv_stream() if dmu_recv_begin()
  * succeeds; otherwise we will leak the holds on the datasets.
@@ -705,6 +732,10 @@ dmu_recv_begin(char *tofs, char *tosnap, char *top_ds, struct drr_begin *drrb,
 	/* open the dataset we are logically receiving into */
 	err = dsl_dataset_hold(tofs, dmu_recv_tag, &ds);
 	if (err == 0) {
+		if (dmu_recv_verify_features(ds, drrb)) {
+			dsl_dataset_rele(ds, dmu_recv_tag);
+			return (ENOTSUP);
+		}
 		/* target fs already exists; recv into temp clone */
 
 		/* Can't recv a clone into an existing fs */
@@ -750,6 +781,11 @@ dmu_recv_begin(char *tofs, char *tosnap, char *top_ds, struct drr_begin *drrb,
 		*cp = '/';
 		if (err)
 			return (err);
+
+		if (dmu_recv_verify_features(ds, drrb)) {
+			dsl_dataset_rele(ds, dmu_recv_tag);
+			return (ENOTSUP);
+		}
 
 		err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 		    recv_new_check, recv_new_sync, ds->ds_dir, &rbsa, 5);

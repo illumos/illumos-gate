@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -316,13 +315,15 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 			    "Insufficient privileges"));
 		} else if (errno == ENOTSUP) {
 			char buf[256];
+			int spa_version;
 
+			VERIFY(zfs_spa_version(zhp, &spa_version) == 0);
 			(void) snprintf(buf, sizeof (buf),
-			    dgettext(TEXT_DOMAIN, "Mismatched versions:  File "
-			    "system is version %llu on-disk format, which is "
-			    "incompatible with this software version %lld!"),
+			    dgettext(TEXT_DOMAIN, "Can't mount a version %lld "
+			    "file system on a version %d pool. Pool must be"
+			    " upgraded to mount this file system."),
 			    (u_longlong_t)zfs_prop_get_int(zhp,
-			    ZFS_PROP_VERSION), ZPL_VERSION);
+			    ZFS_PROP_VERSION), spa_version);
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, buf));
 		} else {
 			zfs_error_aux(hdl, strerror(errno));
