@@ -441,12 +441,12 @@ typedef struct {
 	((atomic_and_ulong_nv(&hwp->work_flags, (ulong_t)-1) & (1 << wrk)) != 0)
 
 #define	WAIT_FOR(p, t, r)					\
+	clock_t	_lb = ddi_get_lbolt();				\
 	r = 0;							\
 	while (!PMCS_COMMAND_DONE(p)) {				\
-		clock_t tmp = cv_timedwait(&p->sleep_cv,	\
-		    &p->lock, ddi_get_lbolt() +			\
-		    drv_usectohz(t * 1000));			\
-		if (!PMCS_COMMAND_DONE(p) && tmp < 0) {		\
+		clock_t _ret = cv_timedwait(&p->sleep_cv,	\
+		    &p->lock, _lb + drv_usectohz(t * 1000));	\
+		if (!PMCS_COMMAND_DONE(p) && _ret < 0) {		\
 			r = 1;					\
 			break;					\
 		}						\

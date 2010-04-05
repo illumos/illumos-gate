@@ -1830,6 +1830,13 @@ pmcs_hot_reset(pmcs_hw_t *pwp)
 	pmcs_register_dump_int(pwp);
 	mutex_exit(&pwp->lock);
 
+	/* Ensure discovery is not running before we proceed */
+	mutex_enter(&pwp->config_lock);
+	while (pwp->configuring) {
+		cv_wait(&pwp->config_cv, &pwp->config_lock);
+	}
+	mutex_exit(&pwp->config_lock);
+
 	/* Issue soft reset and clean up related softstate */
 	if (pmcs_soft_reset(pwp, B_FALSE)) {
 		/*
@@ -2565,6 +2572,7 @@ out:
 		pwp->blocked = 0;
 	}
 	pwp->configuring = 0;
+	cv_signal(&pwp->config_cv);
 	mutex_exit(&pwp->config_lock);
 
 #ifdef DEBUG
@@ -2588,6 +2596,7 @@ restart:
 	pmcs_flush_observations(pwp);
 	mutex_enter(&pwp->config_lock);
 	pwp->configuring = 0;
+	cv_signal(&pwp->config_cv);
 	RESTART_DISCOVERY_LOCKED(pwp);
 	mutex_exit(&pwp->config_lock);
 }
@@ -7067,6 +7076,7 @@ pmcs_flush_target_queues(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt, uint8_t queues)
 	 * with them.
 	 */
 	if (queues & PMCS_TGT_ACTIVE_QUEUE) {
+		mutex_exit(&tgt->statlock);
 		mutex_enter(&tgt->aqlock);
 		sp = STAILQ_FIRST(&tgt->aq);
 		while (sp) {
@@ -7093,7 +7103,6 @@ pmcs_flush_target_queues(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt, uint8_t queues)
 			    "target 0x%p", __func__, (void *)sp, sp->cmd_tag,
 			    (void *)tgt);
 			mutex_exit(&tgt->aqlock);
-			mutex_exit(&tgt->statlock);
 			/*
 			 * Mark the work structure as dead and complete it
 			 */
@@ -7106,10 +7115,10 @@ pmcs_flush_target_queues(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt, uint8_t queues)
 			STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
 			mutex_exit(&pwp->cq_lock);
 			mutex_enter(&tgt->aqlock);
-			mutex_enter(&tgt->statlock);
 			sp = sp_next;
 		}
 		mutex_exit(&tgt->aqlock);
+		mutex_enter(&tgt->statlock);
 	}
 
 	if (queues & PMCS_TGT_SPECIAL_QUEUE) {

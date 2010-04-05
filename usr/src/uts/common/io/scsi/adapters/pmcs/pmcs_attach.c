@@ -501,11 +501,13 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	STAILQ_INIT(&pwp->cq);
 	STAILQ_INIT(&pwp->wf);
 	STAILQ_INIT(&pwp->pf);
+
 	/*
-	 * Create the list for iports
+	 * Create the list for iports and init its lock.
 	 */
 	list_create(&pwp->iports, sizeof (pmcs_iport_t),
 	    offsetof(pmcs_iport_t, list_node));
+	rw_init(&pwp->iports_lock, NULL, RW_DRIVER, NULL);
 
 	pwp->state = STATE_PROBING;
 
@@ -1010,11 +1012,6 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	pwp->hba_attached = 1;
 
-	/*
-	 * Initialize the rwlock for the iport elements.
-	 */
-	rw_init(&pwp->iports_lock, NULL, RW_DRIVER, NULL);
-
 	/* Check all acc & dma handles allocated in attach */
 	if (pmcs_check_acc_dma_handle(pwp)) {
 		ddi_fm_service_impact(pwp->dip, DDI_SERVICE_LOST);
@@ -1370,24 +1367,6 @@ pmcs_unattach(pmcs_hw_t *pwp)
 		curstate = pwp->state;
 	}
 
-	if (&pwp->iports != NULL) {
-		/* Destroy the iports lock */
-		rw_destroy(&pwp->iports_lock);
-		/* Destroy the iports list */
-		ASSERT(list_is_empty(&pwp->iports));
-		list_destroy(&pwp->iports);
-	}
-
-	if (pwp->hss_iportmap != NULL) {
-		/* Destroy the iportmap */
-		scsi_hba_iportmap_destroy(pwp->hss_iportmap);
-	}
-
-	if (pwp->hss_phymap != NULL) {
-		/* Destroy the phymap */
-		sas_phymap_destroy(pwp->hss_phymap);
-	}
-
 	/*
 	 * Make sure that any pending watchdog won't
 	 * be called from this point on out.
@@ -1450,6 +1429,21 @@ pmcs_unattach(pmcs_hw_t *pwp)
 		pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_MASK, 0xffffffff);
 	}
 
+	if (pwp->hss_iportmap != NULL) {
+		/* Destroy the iportmap */
+		scsi_hba_iportmap_destroy(pwp->hss_iportmap);
+	}
+
+	if (pwp->hss_phymap != NULL) {
+		/* Destroy the phymap */
+		sas_phymap_destroy(pwp->hss_phymap);
+	}
+
+	/* Destroy the iports lock and list */
+	rw_destroy(&pwp->iports_lock);
+	ASSERT(list_is_empty(&pwp->iports));
+	list_destroy(&pwp->iports);
+
 	/* Destroy pwp's lock */
 	if (pwp->locks_initted) {
 		mutex_destroy(&pwp->lock);
@@ -1464,6 +1458,7 @@ pmcs_unattach(pmcs_hw_t *pwp)
 #ifdef	DEBUG
 		mutex_destroy(&pwp->dbglock);
 #endif
+		cv_destroy(&pwp->config_cv);
 		cv_destroy(&pwp->ict_cv);
 		cv_destroy(&pwp->drain_cv);
 		pwp->locks_initted = 0;
@@ -2549,6 +2544,7 @@ pmcs_setup_intr(pmcs_hw_t *pwp)
 #endif
 	cv_init(&pwp->ict_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&pwp->drain_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&pwp->config_cv, NULL, CV_DRIVER, NULL);
 	for (i = 0; i < PMCS_NIQ; i++) {
 		mutex_init(&pwp->iqp_lock[i], NULL,
 		    MUTEX_DRIVER, DDI_INTR_PRI(pwp->intr_pri));

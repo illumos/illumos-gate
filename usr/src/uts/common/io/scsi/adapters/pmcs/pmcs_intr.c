@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1468,17 +1467,23 @@ pmcs_check_intr_coal(void *arg)
 {
 	pmcs_hw_t	*pwp = (pmcs_hw_t *)arg;
 	uint32_t	avg_nsecs;
+	clock_t		lbolt, ret;
 	pmcs_io_intr_coal_t *ici;
 
 	ici = &pwp->io_intr_coal;
 	mutex_enter(&pwp->ict_lock);
-
 	while (ici->stop_thread == B_FALSE) {
 		/*
 		 * Wait for next time quantum... collect stats
 		 */
-		(void) cv_timedwait(&pwp->ict_cv, &pwp->ict_lock,
-		    ddi_get_lbolt() + ici->quantum);
+		lbolt = ddi_get_lbolt();
+		while (ici->stop_thread == B_FALSE) {
+			ret = cv_timedwait(&pwp->ict_cv, &pwp->ict_lock,
+			    lbolt + ici->quantum);
+			if (ret == -1) {
+				break;
+			}
+		}
 
 		if (ici->stop_thread == B_TRUE) {
 			continue;

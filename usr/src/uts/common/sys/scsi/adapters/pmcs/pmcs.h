@@ -610,23 +610,26 @@ struct pmcs_hw {
 	/*
 	 * Discovery-related items.
 	 * config_lock: Protects config_changed and should never be held
-	 * outside of getting or setting the value of config_changed.
+	 * outside of getting or setting the value of config_changed or
+	 * configuring.
 	 * config_changed: Boolean indicating whether discovery needs to
 	 * be restarted.
 	 * configuring: 1 = discovery is running, 0 = discovery not running.
 	 * NOTE: configuring is now in the bitfield above.
-	 *
 	 * config_restart_time is set by the tgtmap_[de]activate callbacks each
 	 * time we decide we want SCSA to retry enumeration on some device.
 	 * The watchdog timer will not fire discovery unless it has reached
 	 * config_restart_time and config_restart is TRUE.  This ensures that
 	 * we don't ask SCSA to retry enumerating devices while it is still
 	 * running.
+	 * config_cv can be used by any thread waiting on the configuring
+	 * bit to clear.
 	 */
 	kmutex_t		config_lock;
 	volatile boolean_t	config_changed;
 	boolean_t		config_restart;
 	clock_t			config_restart_time;
+	kcondvar_t		config_cv;
 
 	/*
 	 * Work Related Stuff
