@@ -20,10 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 #include <sys/param.h>
 #include <sys/time.h>
@@ -185,11 +183,11 @@ au_close(int d, int right, au_event_t e_type)
 	 * Count up the bytes used in the record.
 	 */
 	byte_count = sizeof (char) * 2 + sizeof (short) * 2 +
-			sizeof (int32_t) + sizeof (struct timeval);
+	    sizeof (int32_t) + sizeof (struct timeval);
 
 	for (record = dchain; record != (token_t *)0;
-		record = record->tt_next) {
-			byte_count += record->tt_size;
+	    record = record->tt_next) {
+		byte_count += record->tt_size;
 	}
 
 #ifdef _LP64
@@ -223,7 +221,17 @@ au_close(int d, int right, au_event_t e_type)
 	/*
 	 * Build the header
 	 */
-	buffer = malloc((size_t)byte_count);
+	if ((buffer = malloc((size_t)byte_count)) == NULL) {
+		/* free the token chain */
+		while (dchain != (token_t *)0) {
+			record = dchain;
+			dchain = dchain->tt_next;
+			free(record->tt_data);
+			free(record);
+		}
+		(void) mutex_unlock(&mutex_au_d);
+		return (-1);
+	}
 	(void) gettimeofday(&now, NULL);
 	version = TOKEN_VERSION;
 	e_mod = 0;
