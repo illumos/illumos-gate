@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -4703,29 +4702,15 @@ add_boot_entry(menu_t *mp,
 		/* Figure the commands out from the kernel line */
 		if (strstr(kernel, "$ISADIR") != NULL) {
 			module = DIRECT_BOOT_ARCHIVE;
-			k_cmd = KERNEL_DOLLAR_CMD;
-			m_cmd = MODULE_DOLLAR_CMD;
 		} else if (strstr(kernel, "amd64") != NULL) {
 			module = DIRECT_BOOT_ARCHIVE_64;
-			k_cmd = KERNEL_CMD;
-			m_cmd = MODULE_CMD;
 		} else {
 			module = DIRECT_BOOT_ARCHIVE_32;
-			k_cmd = KERNEL_CMD;
-			m_cmd = MODULE_CMD;
 		}
-	} else if ((bam_direct == BAM_DIRECT_DBOOT) &&
-	    (strstr(kernel, "$ISADIR") != NULL)) {
-		/*
-		 * If it's a non-failsafe dboot kernel, use the "kernel$"
-		 * command.  Otherwise, use "kernel".
-		 */
-		k_cmd = KERNEL_DOLLAR_CMD;
-		m_cmd = MODULE_DOLLAR_CMD;
-	} else {
-		k_cmd = KERNEL_CMD;
-		m_cmd = MODULE_CMD;
 	}
+
+	k_cmd = KERNEL_DOLLAR_CMD;
+	m_cmd = MODULE_DOLLAR_CMD;
 
 	if (mp->start) {
 		lineNum = mp->end->lineNum;
