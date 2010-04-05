@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -445,39 +444,75 @@ srpt_stp_free_port(srpt_target_port_t *tgt)
 }
 
 /*
- * srpt_stp_deregister_port()
+ * srpt_stp_destroy_port()
  */
 stmf_status_t
-srpt_stp_deregister_port(srpt_target_port_t *tgt)
+srpt_stp_destroy_port(srpt_target_port_t *tgt)
 {
 	stmf_status_t		status;
+	stmf_change_status_t	cstatus;
+	uint64_t		guid;
 
 	ASSERT(tgt != NULL);
 	ASSERT(tgt->tp_lport != NULL);
 
-	SRPT_DPRINTF_L3("stp_deregister_port, de-register STMF LPORT");
+	SRPT_DPRINTF_L3("stp_destroy_port, de-register STMF LPORT");
 
-retry_deregistration:
-	status = stmf_deregister_local_port(tgt->tp_lport);
+	mutex_enter(&tgt->tp_lock);
+	if (tgt->tp_drv_disabled != 0) {
+		/* already being destroyed, get out now - should not happen */
+		mutex_exit(&tgt->tp_lock);
+		return (STMF_ALREADY);
+	}
+
+	tgt->tp_drv_disabled = 1;
+	guid = tgt->tp_ioc->ioc_guid;
+	mutex_exit(&tgt->tp_lock);
+
+	SRPT_DPRINTF_L2("stp_destroy_port: unbind and de-register"
+	    " services for GUID(%016llx)", (u_longlong_t)guid);
+
+	cstatus.st_completion_status = STMF_SUCCESS;
+	cstatus.st_additional_info = NULL;
+
+	status = stmf_ctl(STMF_CMD_LPORT_OFFLINE, tgt->tp_lport, &cstatus);
+
+	/*
+	 * Wait for asynchronous target off-line operation
+	 * to complete and then deregister the target
+	 * port.
+	 */
+	mutex_enter(&tgt->tp_lock);
+	while (tgt->tp_state != SRPT_TGT_STATE_OFFLINE) {
+		cv_wait(&tgt->tp_offline_complete, &tgt->tp_lock);
+	}
+	mutex_exit(&tgt->tp_lock);
+
+	SRPT_DPRINTF_L3("stp_destroy_port: IOC (0x%016llx) Target"
+	    " SRP off-line complete", (u_longlong_t)guid);
+
+	/* loop waiting for all I/O to drain */
+	for (;;) {
+		status = stmf_deregister_local_port(tgt->tp_lport);
+		if (status == STMF_BUSY) {
+			delay(drv_usectohz(1000000));
+		} else {
+			break;
+		}
+	}
+
 	if (status == STMF_SUCCESS) {
-		SRPT_DPRINTF_L3("stp_deregister_port, LPORT de-register"
+		SRPT_DPRINTF_L3("stp_destroy_port, LPORT de-register"
 		    " complete");
-		return (status);
-	}
-	/*
-	 * This is only done on an administrative thread of
-	 * execution so it is ok to take a while.
-	 */
-	if (status == STMF_BUSY) {
-		delay(drv_usectohz(1000000));
-		goto retry_deregistration;
+	} else {
+		/*
+		 * Something other than a BUSY error, this should not happen.
+		 */
+		SRPT_DPRINTF_L1(
+		    "stp_destroy_port, de-register STMF error(0x%llx)",
+		    (u_longlong_t)status);
 	}
 
-	/*
-	 * Something other than a BUSY error, this should not happen.
-	 */
-	SRPT_DPRINTF_L1("stp_deregister_port, de-register STMF error(0x%llx)",
-	    (u_longlong_t)status);
 	return (status);
 }
 

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -51,8 +50,19 @@
 #include "srpt_stp.h"
 #include "srpt_cm.h"
 #include "srpt_ioctl.h"
+#include "srpt_common.h"
 
 #define	SRPT_NAME_VERSION	"COMSTAR SRP Target"
+
+/*
+ * srpt_enable_by_default - configurable parameter that
+ * determines whether targets are created automatically for
+ * all HCAs when the service is enabled.
+ *
+ * B_TRUE is the legacy default as srpt originally shipped
+ * this way.  Changing it to false is highly desirable.
+ */
+boolean_t	srpt_enable_by_default = B_TRUE;
 
 /*
  * srpt_send_msg_depth - Tunable parameter that specifies the
@@ -166,6 +176,8 @@ _init(void)
 
 	/* Start-up state is DISABLED.  SMF will tell us if we should enable. */
 	srpt_ctxt->sc_svc_state = SRPT_SVC_DISABLED;
+	list_create(&srpt_ctxt->sc_ioc_list, sizeof (srpt_ioc_t),
+	    offsetof(srpt_ioc_t, ioc_node));
 
 	list_create(&srpt_ctxt->sc_ioc_list, sizeof (srpt_ioc_t),
 	    offsetof(srpt_ioc_t, ioc_node));
@@ -294,7 +306,6 @@ static int
 srpt_enable_srp_services(void)
 {
 	int		status;
-	srpt_ioc_t	*ioc;
 
 	ASSERT((rw_read_locked(&srpt_ctxt->sc_rwlock)) == 0);
 
@@ -314,7 +325,9 @@ srpt_enable_srp_services(void)
 	}
 
 	/*
-	 * Initialize IB resources, creating a list of SRP I/O Controllers.
+	 * Initialize IB resources, creating a list of SRP I/O Controllers
+	 * and for each controller, register the SCSI Target Port with STMF
+	 * and prepare profile and services.
 	 */
 	status = srpt_ioc_attach();
 	if (status != DDI_SUCCESS) {
@@ -323,30 +336,15 @@ srpt_enable_srp_services(void)
 		goto err_exit_2;
 	}
 
-	/* Not an error if no iocs yet; we will listen for ATTACH events */
+	/*
+	 * No configured controllers is not a fatal error.  This can happen
+	 * if all HCAs are currently disabled for use by SRP.  The service
+	 * should remain running in case the user changes their mind and
+	 * enables an HCA for SRP services.
+	 */
 	if (srpt_ctxt->sc_num_iocs == 0) {
 		SRPT_DPRINTF_L2("enable_srp: no IB I/O Controllers found");
 		return (DDI_SUCCESS);
-	}
-
-	/*
-	 * For each I/O Controller register the default SCSI Target Port
-	 * with STMF, and prepare profile and services.  SRP will not
-	 * start until the associated LPORT is brought on-line.
-	 */
-	ioc = list_head(&srpt_ctxt->sc_ioc_list);
-
-	while (ioc != NULL) {
-		rw_enter(&ioc->ioc_rwlock, RW_WRITER);
-		ioc->ioc_tgt_port = srpt_stp_alloc_port(ioc, ioc->ioc_guid);
-		if (ioc->ioc_tgt_port == NULL) {
-			SRPT_DPRINTF_L1("enable_srp: alloc SCSI"
-			    " Target Port error on GUID(%016llx)",
-			    (u_longlong_t)ioc->ioc_guid);
-		}
-
-		rw_exit(&ioc->ioc_rwlock);
-		ioc = list_next(&srpt_ctxt->sc_ioc_list, ioc);
 	}
 
 	return (DDI_SUCCESS);
@@ -383,6 +381,11 @@ srpt_drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ddi_remove_minor_node(dip, NULL);
 		srpt_ctxt->sc_dip = NULL;
 
+		if (srpt_ctxt->sc_cfg_hca_nv != NULL) {
+			nvlist_free(srpt_ctxt->sc_cfg_hca_nv);
+			srpt_ctxt->sc_cfg_hca_nv = NULL;
+		}
+
 		rw_exit(&srpt_ctxt->sc_rwlock);
 
 		break;
@@ -407,7 +410,6 @@ static int
 srpt_disable_srp_services(void)
 {
 	stmf_status_t			stmf_status;
-	stmf_change_status_t		cstatus;
 	srpt_ioc_t			*ioc;
 	srpt_target_port_t		*tgt;
 	int				ret_status = 0;
@@ -421,57 +423,17 @@ srpt_disable_srp_services(void)
 	ioc = list_head(&srpt_ctxt->sc_ioc_list);
 
 	while (ioc != NULL) {
-		/*
-		 * Notify STMF to take the I/O Controller SCSI Target Port(s)
-		 * off-line after we mark them as disabled so that they will
-		 * stay off-line.
-		 */
 		rw_enter(&ioc->ioc_rwlock, RW_WRITER);
 
 		tgt = ioc->ioc_tgt_port;
 		if (tgt != NULL) {
-			mutex_enter(&tgt->tp_lock);
-			tgt->tp_drv_disabled = 1;
-			mutex_exit(&tgt->tp_lock);
-
-			SRPT_DPRINTF_L2("disable_srp: unbind and de-register"
-			    " services for GUID(%016llx)",
-			    (u_longlong_t)ioc->ioc_guid);
-
-			cstatus.st_completion_status = STMF_SUCCESS;
-			cstatus.st_additional_info = NULL;
-
-			stmf_status = stmf_ctl(STMF_CMD_LPORT_OFFLINE,
-			    tgt->tp_lport, &cstatus);
-
-			/*
-			 * Wait for asynchronous target off-line operation
-			 * to complete and then deregister the target
-			 * port.
-			 */
-			mutex_enter(&tgt->tp_lock);
-			while (tgt->tp_state != SRPT_TGT_STATE_OFFLINE) {
-				cv_wait(&tgt->tp_offline_complete,
-				    &tgt->tp_lock);
-			}
-			mutex_exit(&tgt->tp_lock);
-			ioc->ioc_tgt_port = NULL;
-
-			SRPT_DPRINTF_L3("disable_srp: IOC (0x%016llx) Target"
-			    " SRP off-line complete",
-			    (u_longlong_t)ioc->ioc_guid);
-
-			stmf_status = srpt_stp_deregister_port(tgt);
-			if (stmf_status != STMF_SUCCESS) {
-				/* Fails if I/O is pending */
-				if (ret_status == 0) {
-					ret_status = EBUSY;
-				}
-				SRPT_DPRINTF_L1("disable_srp: could not"
-				    " de-register LPORT, err(0x%llx)",
-				    (u_longlong_t)stmf_status);
-			} else {
+			stmf_status = srpt_stp_destroy_port(tgt);
+			if (stmf_status == STMF_SUCCESS) {
+				ioc->ioc_tgt_port = NULL;
 				(void) srpt_stp_free_port(tgt);
+			} else {
+				ret_status = DDI_FAILURE;
+				break;
 			}
 		}
 
@@ -586,11 +548,90 @@ srpt_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 static void
 srpt_pp_cb(stmf_port_provider_t *pp, int cmd, void *arg, uint32_t flags)
 {
-	SRPT_DPRINTF_L3("srpt_pp_cb, invoked (%d)", cmd);
+	int		ret;
+	nvlist_t	*in_nvl = (nvlist_t *)arg;
+	nvlist_t	*nvl = NULL;
+	nvlist_t	*hcalist;
+	nvlist_t	*ctxt_nvl;
+	boolean_t	defaultEnabled = B_TRUE;
+	boolean_t	called_by_reg = B_TRUE;
+
+	SRPT_DPRINTF_L2("srpt_pp_cb, invoked (%d)", cmd);
+
+	if (cmd != STMF_PROVIDER_DATA_UPDATED) {
+		return;
+	}
+
 	/*
-	 * We don't currently utilize the port provider call-back, in the
-	 * future we might use it to synchronize provider data via STMF.
+	 * If STMF_PCB_PREG_COMPLETE is set in the flags, we're being
+	 * called back during provider registration with STMF.
+	 * (while we're calling stmf_register_port_provider()).
+	 * srpt_enable_service() already holds the sc_wrlock, and will
+	 * make sure the configuration is activated, so we just need to
+	 * set the config and get out.  If this function is called at any
+	 * time other than SRPT service start, need to grab the sc_wrlock
+	 * as WRITER.
 	 */
+	if (!(flags & STMF_PCB_PREG_COMPLETE)) {
+		SRPT_DPRINTF_L2(
+		    "srpt_pp_cb:  called after registration");
+		called_by_reg = B_FALSE;
+		rw_enter(&srpt_ctxt->sc_rwlock, RW_WRITER);
+	} else {
+		called_by_reg = B_TRUE;
+		SRPT_DPRINTF_L2(
+		    "srpt_pp_cb:  called as part of registration");
+	}
+
+	if (in_nvl != NULL) {
+		/* copy nvlist */
+		ret = nvlist_lookup_nvlist(in_nvl, SRPT_PROP_HCALIST, &hcalist);
+		if (ret != 0) {
+			SRPT_DPRINTF_L1(
+			    "srpt_pp_cb: Could not read hca config, err=%d",
+			    ret);
+			return;
+		}
+
+		ret = nvlist_dup(hcalist, &nvl, 0);
+		if (ret != 0) {
+			SRPT_DPRINTF_L1(
+			    "srpt_pp_cb: Could not copy hca config, err=%d",
+			    ret);
+			return;
+		}
+		if (nvlist_lookup_boolean_value(in_nvl,
+		    SRPT_PROP_DEFAULT_ENABLED, &defaultEnabled) == 0) {
+			/* set whether targets are created by default */
+			SRPT_DPRINTF_L2(
+			    "srpt_pp_cb:  setting default enabled = %d\n",
+			    (int)defaultEnabled);
+			srpt_enable_by_default = defaultEnabled;
+		}
+	} else {
+		SRPT_DPRINTF_L2(
+		    "srpt_pp_cb:  null config received");
+	}
+
+	/* put list in ctxt and set default state */
+	ctxt_nvl = srpt_ctxt->sc_cfg_hca_nv;
+
+	/* set new config, NULL is valid */
+	srpt_ctxt->sc_cfg_hca_nv = nvl;
+
+	/* free the old nvlist */
+	if (ctxt_nvl != NULL) {
+		nvlist_free(ctxt_nvl);
+	}
+
+	if (called_by_reg) {
+		return;
+	}
+
+	/* Update the HCA based on the new config */
+	srpt_ioc_update();
+
+	rw_exit(&srpt_ctxt->sc_rwlock);
 }
 
 static int

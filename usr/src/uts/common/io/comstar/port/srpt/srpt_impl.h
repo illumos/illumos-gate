@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SRPT_IMPL_H_
@@ -446,6 +445,12 @@ typedef struct srpt_ctxt_s {
 
 	/* IBDMA entry points */
 	srpt_ibdma_ops_t		sc_ibdma_ops;
+
+	/*
+	 *  List of explicitly configured HCAs and their configurable
+	 *  attributes.
+	 */
+	nvlist_t			*sc_cfg_hca_nv;
 } srpt_ctxt_t;
 
 typedef struct srpt_iu_data_s {

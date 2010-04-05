@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # include global definitions
@@ -274,6 +273,8 @@ COMMON_SUBDIRS = \
 	cmd/smserverd \
 	cmd/sort \
 	cmd/split \
+	cmd/srptadm \
+	cmd/srptsvc \
 	cmd/ssh \
 	cmd/stat \
 	cmd/stmfadm \
@@ -423,6 +424,7 @@ COMMON_SUBDIRS = \
 	lib/libsmbfs \
 	lib/libsmbios \
 	lib/libsmedia \
+	lib/libsrpt \
 	lib/libstmf \
 	lib/libsun_ima \
 	lib/libthread \

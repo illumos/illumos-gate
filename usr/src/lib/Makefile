@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.master
@@ -154,6 +153,7 @@ SUBDIRS += \
 	krb5	.WAIT	\
 	libsmbfs	\
 	libfcoe		\
+	libsrpt		\
 	libstmf		\
 	libstmfproxy	\
 	libnsctl	\
@@ -460,6 +460,7 @@ HDRSUBDIRS=		\
 	libsocket	\
 	libsqlite	\
 	libfcoe		\
+	libsrpt		\
 	libstmf		\
 	libstmfproxy	\
 	libsum		\

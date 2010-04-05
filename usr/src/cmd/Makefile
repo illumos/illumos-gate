@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.master
@@ -372,6 +371,7 @@ COMMON_SUBDIRS=		\
 	split		\
 	sqlite		\
 	srchtxt		\
+	srptadm		\
 	srptsvc		\
 	ssh		\
 	stat		\
@@ -689,6 +689,7 @@ MSGSUBDIRS=		\
 	smbsrv		\
 	sort		\
 	split		\
+	srptadm		\
 	ssh		\
 	stat		\
 	stmfadm		\

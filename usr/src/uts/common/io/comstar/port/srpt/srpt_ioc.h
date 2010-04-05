@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SRPT_IOC_H
@@ -38,7 +37,10 @@ extern "C" {
 #include "srpt_impl.h"
 
 int srpt_ioc_attach();
+void srpt_ioc_attach_hca(ib_guid_t hca_guid, boolean_t checked);
 void srpt_ioc_detach();
+void srpt_ioc_detach_hca(ib_guid_t hca_guid);
+void srpt_ioc_update(void);
 void srpt_ioc_init_profile(srpt_ioc_t *ioc);
 ibt_status_t srpt_ioc_svc_bind(srpt_target_port_t *tgt, uint_t portnum);
 void srpt_ioc_svc_unbind(srpt_target_port_t *tgt, uint_t portnum);

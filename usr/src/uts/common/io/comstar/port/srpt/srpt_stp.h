@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SRPT_STP_H
@@ -43,7 +42,7 @@ int srpt_stp_start_srp(srpt_target_port_t *tgt);
 void srpt_stp_stop_srp(srpt_target_port_t *tgt);
 srpt_target_port_t *srpt_stp_alloc_port(srpt_ioc_t *ioc, ib_guid_t guid);
 stmf_status_t srpt_stp_free_port(srpt_target_port_t *tgt);
-stmf_status_t srpt_stp_deregister_port(srpt_target_port_t *tgt);
+stmf_status_t srpt_stp_destroy_port(srpt_target_port_t *tgt);
 
 srpt_session_t *srpt_stp_alloc_session(srpt_target_port_t *tgt,
 	uint8_t *i_id, uint8_t *t_id, uint8_t port,

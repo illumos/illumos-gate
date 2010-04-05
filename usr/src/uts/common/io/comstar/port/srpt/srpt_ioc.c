@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -43,15 +42,17 @@
 #include "srpt_ioc.h"
 #include "srpt_stp.h"
 #include "srpt_ch.h"
+#include "srpt_common.h"
 
 /*
  * srpt_ioc_srq_size - Tunable parameter that specifies the number
  * of receive WQ entries that can be posted to the IOC shared
  * receive queue.
  */
-uint32_t	srpt_ioc_srq_size = SRPT_DEFAULT_IOC_SRQ_SIZE;
-extern uint16_t srpt_send_msg_depth;
-extern uint32_t	srpt_iu_size;
+uint32_t		srpt_ioc_srq_size = SRPT_DEFAULT_IOC_SRQ_SIZE;
+extern uint16_t		srpt_send_msg_depth;
+extern uint32_t		srpt_iu_size;
+extern boolean_t	srpt_enable_by_default;
 
 /* IOC profile capabilities mask must be big-endian */
 typedef struct srpt_ioc_opcap_bits_s {
@@ -115,6 +116,7 @@ static struct ibt_clnt_modinfo_s srpt_ibt_modinfo = {
 
 static srpt_ioc_t *srpt_ioc_init(ib_guid_t guid);
 static void srpt_ioc_fini(srpt_ioc_t *ioc);
+static boolean_t srpt_check_hca_cfg_enabled(ib_guid_t hca_guid);
 
 static srpt_vmem_pool_t *srpt_vmem_create(const char *name, srpt_ioc_t *ioc,
     ib_memlen_t chunksize, uint64_t maxsize, ibt_mr_flags_t flags);
@@ -144,7 +146,6 @@ srpt_ioc_attach()
 	int		hca_cnt;
 	int		hca_ndx;
 	ib_guid_t	*guid;
-	srpt_ioc_t	*ioc;
 
 	ASSERT(srpt_ctxt != NULL);
 
@@ -171,25 +172,165 @@ srpt_ioc_attach()
 	}
 
 	for (hca_ndx = 0; hca_ndx < hca_cnt; hca_ndx++) {
-		SRPT_DPRINTF_L2("ioc_attach, adding I/O"
-		    " Controller (%016llx)", (u_longlong_t)guid[hca_ndx]);
-
-		ioc = srpt_ioc_init(guid[hca_ndx]);
-		if (ioc == NULL) {
-			SRPT_DPRINTF_L1("ioc_attach, ioc_init GUID(%016llx)"
-			    " failed", (u_longlong_t)guid[hca_ndx]);
-			continue;
-		}
-		list_insert_tail(&srpt_ctxt->sc_ioc_list, ioc);
-		SRPT_DPRINTF_L2("ioc_attach, I/O Controller ibt HCA hdl (%p)",
-		    (void *)ioc->ioc_ibt_hdl);
-		srpt_ctxt->sc_num_iocs++;
+		SRPT_DPRINTF_L2("ioc_attach, attaching HCA %016llx",
+		    (u_longlong_t)guid[hca_ndx]);
+		srpt_ioc_attach_hca(guid[hca_ndx], B_FALSE);
 	}
 
 	ibt_free_hca_list(guid, hca_cnt);
 	SRPT_DPRINTF_L3("ioc_attach, added %d I/O Controller(s)",
 	    srpt_ctxt->sc_num_iocs);
 	return (DDI_SUCCESS);
+}
+
+/*
+ * Initialize I/O Controllers.  sprt_ctxt->sc_rwlock must be locked by the
+ * caller.
+ *
+ * 'checked' indicates no need to lookup the hca in the HCA configuration
+ * list.
+ */
+void
+srpt_ioc_attach_hca(ib_guid_t hca_guid, boolean_t checked)
+{
+	boolean_t	enable_hca = B_TRUE;
+	srpt_ioc_t	*ioc;
+
+	if (!checked) {
+		enable_hca = srpt_check_hca_cfg_enabled(hca_guid);
+
+		if (!enable_hca) {
+			/* nothing to do */
+			SRPT_DPRINTF_L2(
+			    "ioc_attach_hca, HCA %016llx disabled "
+			    "by srpt config",
+			    (u_longlong_t)hca_guid);
+			return;
+		}
+	}
+
+	SRPT_DPRINTF_L2("ioc_attach_hca, adding I/O"
+	    " Controller (%016llx)", (u_longlong_t)hca_guid);
+
+	ioc = srpt_ioc_init(hca_guid);
+	if (ioc == NULL) {
+		/*
+		 * IOC already exists or an error occurred.  Already
+		 * logged by srpt_ioc_init()
+		 */
+		return;
+	}
+
+	/*
+	 * Create the COMSTAR SRP Target for this IOC.  If this fails,
+	 * remove the IOC.
+	 */
+	rw_enter(&ioc->ioc_rwlock, RW_WRITER);
+	ioc->ioc_tgt_port = srpt_stp_alloc_port(ioc, ioc->ioc_guid);
+	if (ioc->ioc_tgt_port == NULL) {
+		SRPT_DPRINTF_L1("ioc_attach_hca: alloc SCSI"
+		    " Target Port error on GUID(%016llx)",
+		    (u_longlong_t)ioc->ioc_guid);
+		rw_exit(&ioc->ioc_rwlock);
+		srpt_ioc_fini(ioc);
+		return;
+	}
+	rw_exit(&ioc->ioc_rwlock);
+
+	/*
+	 * New HCA added with default SCSI Target Port, SRP service
+	 * will be started when SCSI Target Port is brought
+	 * on-line by STMF.
+	 */
+	list_insert_tail(&srpt_ctxt->sc_ioc_list, ioc);
+	SRPT_DPRINTF_L2("ioc_attach_hca, I/O Controller ibt HCA hdl (%p)",
+	    (void *)ioc->ioc_ibt_hdl);
+
+	srpt_ctxt->sc_num_iocs++;
+}
+
+/*
+ * srpt_check_hca_cfg_enabled()
+ *
+ * Function to check the configuration for the enabled status of a given
+ * HCA.  Returns B_TRUE if SRPT services should be activated for this HCA,
+ * B_FALSE if it should be disabled.
+ */
+static boolean_t
+srpt_check_hca_cfg_enabled(ib_guid_t hca_guid)
+{
+	int		status;
+	char		buf[32];
+	nvlist_t	*hcanv;
+	boolean_t	enable_hca;
+
+	enable_hca = srpt_enable_by_default;
+
+	SRPT_FORMAT_HCAKEY(buf, sizeof (buf), (u_longlong_t)hca_guid);
+
+	if (srpt_ctxt->sc_cfg_hca_nv != NULL) {
+		status = nvlist_lookup_nvlist(srpt_ctxt->sc_cfg_hca_nv,
+		    buf, &hcanv);
+		if (status == 0) {
+			SRPT_DPRINTF_L3("check_hca_cfg, found guid %s",  buf);
+			(void) nvlist_lookup_boolean_value(hcanv,
+			    SRPT_PROP_ENABLED, &enable_hca);
+		} else {
+			SRPT_DPRINTF_L3("check_hca_cfg, did not find guid %s",
+			    buf);
+		}
+	}
+
+	return (enable_hca);
+}
+
+/*
+ * srpt_ioc_update()
+ *
+ * Using the configuration nvlist, enables or disables SRP services
+ * the provided HCAs.  srpt_ctxt->sc_rwlock should be held outside of this call.
+ */
+void
+srpt_ioc_update(void)
+{
+	boolean_t	enabled;
+	nvpair_t	*nvp = NULL;
+	uint64_t	hca_guid;
+	nvlist_t	*nvl;
+	nvlist_t	*cfg = srpt_ctxt->sc_cfg_hca_nv;
+
+	if (cfg == NULL) {
+		SRPT_DPRINTF_L2("ioc_update, no configuration data");
+		return;
+	}
+
+	while ((nvp = nvlist_next_nvpair(cfg, nvp)) != NULL) {
+		enabled = srpt_enable_by_default;
+
+		if ((nvpair_value_nvlist(nvp, &nvl)) != 0) {
+			SRPT_DPRINTF_L2("ioc_update, did not find an nvlist");
+			continue;
+		}
+
+		if ((nvlist_lookup_uint64(nvl, SRPT_PROP_GUID, &hca_guid))
+		    != 0) {
+			SRPT_DPRINTF_L2("ioc_update, did not find a guid");
+			continue;
+		}
+
+		(void) nvlist_lookup_boolean_value(nvl, SRPT_PROP_ENABLED,
+		    &enabled);
+
+		if (enabled) {
+			SRPT_DPRINTF_L2("ioc_update, enabling guid %016llx",
+			    (u_longlong_t)hca_guid);
+			srpt_ioc_attach_hca(hca_guid, B_TRUE);
+		} else {
+			SRPT_DPRINTF_L2("ioc_update, disabling guid %016llx",
+			    (u_longlong_t)hca_guid);
+			srpt_ioc_detach_hca(hca_guid);
+		}
+	}
 }
 
 /*
@@ -202,20 +343,76 @@ srpt_ioc_detach()
 {
 	srpt_ioc_t	*ioc;
 
-	ASSERT(srpt_ctxt != NULL);
-
+	/*
+	 * All SRP targets must be destroyed before calling this
+	 * function.
+	 */
 	while ((ioc = list_head(&srpt_ctxt->sc_ioc_list)) != NULL) {
-		list_remove(&srpt_ctxt->sc_ioc_list, ioc);
 		SRPT_DPRINTF_L2("ioc_detach, removing I/O Controller(%p)"
 		    " (%016llx), ibt_hdl(%p)",
 		    (void *)ioc,
 		    ioc ? (u_longlong_t)ioc->ioc_guid : 0x0ll,
 		    (void *)ioc->ioc_ibt_hdl);
+
+		list_remove(&srpt_ctxt->sc_ioc_list, ioc);
+		ASSERT(ioc->ioc_tgt_port != NULL);
 		srpt_ioc_fini(ioc);
+		srpt_ctxt->sc_num_iocs--;
 	}
 
-	(void) ibt_detach(srpt_ctxt->sc_ibt_hdl);
 	srpt_ctxt->sc_ibt_hdl = NULL;
+}
+
+/*
+ * srpt_ioc_detach_hca()
+ *
+ * Stop SRP Target services on this HCA
+ *
+ * Note that this is not entirely synchronous with srpt_ioc_attach_hca()
+ * in that we don't need to check the configuration to know whether to
+ * disable an HCA.  We get here either because the IB framework has told
+ * us the HCA has been detached, or because the administrator has explicitly
+ * disabled this HCA.
+ *
+ * Must be called with srpt_ctxt->sc_rwlock locked as RW_WRITER.
+ */
+void
+srpt_ioc_detach_hca(ib_guid_t hca_guid)
+{
+	srpt_ioc_t		*ioc;
+	srpt_target_port_t	*tgt;
+	stmf_status_t		stmf_status = STMF_SUCCESS;
+
+	ioc = srpt_ioc_get_locked(hca_guid);
+	if (ioc == NULL) {
+		/* doesn't exist, nothing to do */
+		return;
+	}
+
+	rw_enter(&ioc->ioc_rwlock, RW_WRITER);
+	tgt = ioc->ioc_tgt_port;
+
+	if (tgt != NULL) {
+		stmf_status = srpt_stp_destroy_port(tgt);
+		if (stmf_status == STMF_SUCCESS) {
+			ioc->ioc_tgt_port = NULL;
+			(void) srpt_stp_free_port(tgt);
+		}
+	}
+
+	rw_exit(&ioc->ioc_rwlock);
+
+	if (stmf_status != STMF_SUCCESS) {
+		/* should never happen */
+		return;
+	}
+
+	list_remove(&srpt_ctxt->sc_ioc_list, ioc);
+	srpt_ctxt->sc_num_iocs--;
+
+	srpt_ioc_fini(ioc);
+	SRPT_DPRINTF_L2("ioc_detach_hca, HCA %016llx detached",
+	    (u_longlong_t)hca_guid);
 }
 
 /*
@@ -248,7 +445,7 @@ srpt_ioc_init(ib_guid_t guid)
 
 	ioc = srpt_ioc_get_locked(guid);
 	if (ioc != NULL) {
-		SRPT_DPRINTF_L1("ioc_init, HCA already exists");
+		SRPT_DPRINTF_L2("ioc_init, HCA already exists");
 		return (NULL);
 	}
 
@@ -701,7 +898,6 @@ void
 srpt_ioc_ib_async_hdlr(void *clnt, ibt_hca_hdl_t hdl,
 	ibt_async_code_t code, ibt_async_event_t *event)
 {
-	srpt_ioc_t		*ioc;
 	srpt_channel_t		*ch;
 
 	switch (code) {
@@ -714,47 +910,26 @@ srpt_ioc_ib_async_hdlr(void *clnt, ibt_hca_hdl_t hdl,
 		break;
 
 	case IBT_HCA_ATTACH_EVENT:
+		SRPT_DPRINTF_L2(
+		    "ib_async_hdlr, received attach event for HCA 0x%016llx",
+		    (u_longlong_t)event->ev_hca_guid);
+
 		rw_enter(&srpt_ctxt->sc_rwlock, RW_WRITER);
-		ioc = srpt_ioc_init(event->ev_hca_guid);
-
-		if (ioc == NULL) {
-			rw_exit(&srpt_ctxt->sc_rwlock);
-			SRPT_DPRINTF_L1("ib_async_hdlr, HCA_ATTACH"
-			    " event failed to initialize HCA (0x%016llx)",
-			    (u_longlong_t)event->ev_hca_guid);
-			return;
-		}
-		SRPT_DPRINTF_L2("HCA_ATTACH_EVENT: I/O Controller"
-		    " ibt hdl (%p)",
-		    (void *)ioc->ioc_ibt_hdl);
-
-		rw_enter(&ioc->ioc_rwlock, RW_WRITER);
-		ioc->ioc_tgt_port = srpt_stp_alloc_port(ioc, ioc->ioc_guid);
-		if (ioc->ioc_tgt_port == NULL) {
-			SRPT_DPRINTF_L1("ioc_ib_async_hdlr, alloc SCSI "
-			    "target port error for HCA (0x%016llx)",
-			    (u_longlong_t)event->ev_hca_guid);
-			rw_exit(&ioc->ioc_rwlock);
-			srpt_ioc_fini(ioc);
-			rw_exit(&srpt_ctxt->sc_rwlock);
-			return;
-		}
-
-		/*
-		 * New HCA added with default SCSI Target Port, SRP service
-		 * will be started when SCSI Target Port is brought
-		 * on-line by STMF.
-		 */
-		srpt_ctxt->sc_num_iocs++;
-		list_insert_tail(&srpt_ctxt->sc_ioc_list, ioc);
-
-		rw_exit(&ioc->ioc_rwlock);
+		srpt_ioc_attach_hca(event->ev_hca_guid, B_FALSE);
 		rw_exit(&srpt_ctxt->sc_rwlock);
+
 		break;
 
 	case IBT_HCA_DETACH_EVENT:
 		SRPT_DPRINTF_L1(
-		    "ioc_iob_async_hdlr, HCA_DETACH_EVENT received.");
+		    "ioc_iob_async_hdlr, received HCA_DETACH_EVENT for "
+		    "HCA 0x%016llx",
+		    (u_longlong_t)event->ev_hca_guid);
+
+		rw_enter(&srpt_ctxt->sc_rwlock, RW_WRITER);
+		srpt_ioc_detach_hca(event->ev_hca_guid);
+		rw_exit(&srpt_ctxt->sc_rwlock);
+
 		break;
 
 	case IBT_EVENT_EMPTY_CHAN:
@@ -1445,7 +1620,7 @@ srpt_dereg_mem(srpt_ioc_t *ioc, srpt_mr_t *mr)
 
 	status = ibt_deregister_mr(ioc->ioc_ibt_hdl, mr->mr_hdl);
 	if (status != IBT_SUCCESS) {
-		SRPT_DPRINTF_L1("ioc_fini, error deregistering MR (%d)",
+		SRPT_DPRINTF_L1("srpt_dereg_mem, error deregistering MR (%d)",
 		    status);
 	}
 	kmem_free(mr, sizeof (srpt_mr_t));
