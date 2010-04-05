@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation. All rights reserved.
+ * Copyright 2010 QLogic Corporation. All rights reserved.
  */
 
 #include <qlge.h>
@@ -367,6 +367,7 @@ ql_async_event_parser(qlge_t *qlge, mbx_data_t *mbx_cmds)
 	uint8_t link_type;
 	boolean_t proc_done = B_TRUE;
 	mbx_cmd_t reply_cmd = {0};
+	boolean_t fatal_error = B_FALSE;
 
 	switch (mbx_cmds->mb[0]) {
 	case MBA_IDC_INTERMEDIATE_COMPLETE /* 1000h */:
@@ -381,6 +382,7 @@ ql_async_event_parser(qlge_t *qlge, mbx_data_t *mbx_cmds)
 		    "Firmware Ver# %x",
 		    __func__, qlge->instance, mbx_cmds->mb[1],
 		    mbx_cmds->mb[2], mbx_cmds->mb[3]);
+		fatal_error = B_TRUE;
 		(void) ql_8xxx_binary_core_dump(qlge, &qlge->ql_mpi_coredump);
 		break;
 	case MBA_LINK_UP /* 8011h */:
@@ -443,8 +445,8 @@ ql_async_event_parser(qlge_t *qlge, mbx_data_t *mbx_cmds)
 			    ("%s(%d):unknown Link type \n",
 			    __func__, qlge->instance));
 		}
-
-		cmn_err(CE_NOTE, "mpi link up! link_status %x \n", link_status);
+		cmn_err(CE_NOTE, "qlge(%d) mpi link up! speed %dMbps\n",
+		    qlge->instance, qlge->speed);
 		/*
 		 * start timer if not started to delay some time then
 		 * check if link is really up or down
@@ -479,8 +481,7 @@ ql_async_event_parser(qlge_t *qlge, mbx_data_t *mbx_cmds)
 			    __func__, qlge->instance));
 		}
 
-		cmn_err(CE_NOTE, "mpi link down! link_status %x \n",
-		    link_status);
+		cmn_err(CE_NOTE, "qlge(%d) mpi link down!\n", qlge->instance);
 		ql_restart_timer(qlge);
 		break;
 	case MBA_IDC_COMPLETE /* 8100h */:
@@ -632,6 +633,7 @@ ql_async_event_parser(qlge_t *qlge, mbx_data_t *mbx_cmds)
 		    "received:  mbx[1] %x, mbx[2] %x",
 		    __func__, qlge->instance,
 		    mbx_cmds->mb[1], mbx_cmds->mb[2]);
+		fatal_error = B_TRUE;
 		break;
 	default:
 		if (mbx_cmds->mb[0] > 0x8000) {
@@ -646,6 +648,13 @@ ql_async_event_parser(qlge_t *qlge, mbx_data_t *mbx_cmds)
 			proc_done = B_FALSE;
 		}
 		break;
+	}
+	if (fatal_error) {
+		if (qlge->fm_enable) {
+			ql_fm_ereport(qlge, DDI_FM_DEVICE_NO_RESPONSE);
+			ddi_fm_service_impact(qlge->dip, DDI_SERVICE_LOST);
+			atomic_or_32(&qlge->flags, ADAPTER_ERROR);
+		}
 	}
 	return (proc_done);
 }
@@ -791,6 +800,10 @@ ql_mbx_test2(qlge_t *qlge)
 		    __func__, qlge->instance);
 	}
 out:
+	if ((rtn_val != DDI_SUCCESS) && qlge->fm_enable) {
+		ql_fm_ereport(qlge, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+	}
 	return (rtn_val);
 }
 
@@ -825,6 +838,10 @@ ql_get_fw_state(qlge_t *qlge, uint32_t *fw_state_ptr)
 		*fw_state_ptr = mbx_cmds.mb[1];
 	rtn_val = DDI_SUCCESS;
 out:
+	if ((rtn_val != DDI_SUCCESS) && qlge->fm_enable) {
+		ql_fm_ereport(qlge, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+	}
 	return (rtn_val);
 }
 
@@ -893,7 +910,11 @@ ql_set_IDC_Req(qlge_t *qlge, uint8_t dest_functions, uint8_t timeout)
 	}
 
 out:
-	return (rtn_val);
+	if ((rtn_val != DDI_SUCCESS) && qlge->fm_enable) {
+		ql_fm_ereport(qlge, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+	}
+return (rtn_val);
 }
 
 /*
@@ -901,7 +922,7 @@ out:
  * Send new port configuration.to mpi
  * mailbox cmd:0x122h
  */
-static int
+int
 ql_set_mpi_port_config(qlge_t *qlge, port_cfg_info_t new_cfg)
 {
 	int rtn_val = DDI_FAILURE;
@@ -919,53 +940,51 @@ ql_set_mpi_port_config(qlge_t *qlge, port_cfg_info_t new_cfg)
 	/* verify if the transaction is completed successful */
 	if ((mbx_cmds.mb[0] != MBS_COMMAND_COMPLETE /* 0x4000 */) &&
 	    (mbx_cmds.mb[0] != MBA_IDC_COMPLETE /* 0x8100 */)) {
-		cmn_err(CE_WARN, "%s(%d) failed, 0x%x",
-		    __func__, qlge->instance, mbx_cmds.mb[0]);
+		cmn_err(CE_WARN, "set port config (%d) failed, 0x%x",
+		    qlge->instance, mbx_cmds.mb[0]);
 	} else
 		rtn_val = DDI_SUCCESS;
 out:
+	if ((rtn_val != DDI_SUCCESS) && qlge->fm_enable) {
+		ql_fm_ereport(qlge, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+	}
 	return (rtn_val);
 }
 
-/*
- * ql_set_port_cfg
- * Set new port configuration
- */
 int
-ql_set_port_cfg(qlge_t *qlge)
+ql_set_pause_mode(qlge_t *qlge)
 {
-	uint32_t loop_back_bit_mask = 0x0e; /* bit 1-3 */
 	uint32_t pause_bit_mask = 0x60;	/* bit 5-6 */
 
 	/* clear pause bits */
 	qlge->port_cfg_info.link_cfg &= ~pause_bit_mask;
-	/* clear loop back bits */
-	qlge->port_cfg_info.link_cfg &= ~loop_back_bit_mask;
+
 	/* set new pause mode */
 	if (qlge->pause == PAUSE_MODE_STANDARD)
 		qlge->port_cfg_info.link_cfg |= STD_PAUSE;
 	else if (qlge->pause == PAUSE_MODE_PER_PRIORITY)
 		qlge->port_cfg_info.link_cfg |= PP_PAUSE;
 
+	return (ql_set_mpi_port_config(qlge, qlge->port_cfg_info));
+}
+
+int
+ql_set_loop_back_mode(qlge_t *qlge)
+{
+	uint32_t loop_back_bit_mask = 0x0e; /* bit 1-3 */
+
+	/* clear loop back bits */
+	qlge->port_cfg_info.link_cfg &= ~loop_back_bit_mask;
 	/* loop back cfg: bit1-3 */
 	if (qlge->loop_back_mode == QLGE_LOOP_INTERNAL_PARALLEL)
 		qlge->port_cfg_info.link_cfg |= LOOP_INTERNAL_PARALLEL;
 	else if (qlge->loop_back_mode == QLGE_LOOP_INTERNAL_SERIAL)
 		qlge->port_cfg_info.link_cfg |= LOOP_INTERNAL_SERIAL;
 
-	/* max frame size */
-	if (qlge->mtu == ETHERMTU) {
-		qlge->port_cfg_info.link_cfg &= ~ENABLE_JUMBO;
-		qlge->port_cfg_info.max_frame_size = NORMAL_FRAME_SIZE;
-	} else {
-		qlge->port_cfg_info.link_cfg |= ENABLE_JUMBO;
-		qlge->port_cfg_info.max_frame_size = JUMBO_FRAME_SIZE;
-	}
-
 	return (ql_set_mpi_port_config(qlge, qlge->port_cfg_info));
 
 }
-
 /*
  * ql_get_port_cfg
  * Get port configuration.
@@ -985,8 +1004,8 @@ ql_get_port_cfg(qlge_t *qlge)
 	}
 	/* verify if the transaction is completed successfully */
 	if (mbx_cmds.mb[0] != MBS_COMMAND_COMPLETE /* 0x4000 */) {
-		cmn_err(CE_WARN, "%s(%d) failed, 0x%x",
-		    __func__, qlge->instance, mbx_cmds.mb[0]);
+		cmn_err(CE_WARN, "get port config (%d) failed, 0x%x",
+		    qlge->instance, mbx_cmds.mb[0]);
 	} else { /* verify frame size */
 		if ((mbx_cmds.mb[2] == NORMAL_FRAME_SIZE) ||
 		    (mbx_cmds.mb[2] == JUMBO_FRAME_SIZE)) {
@@ -1001,6 +1020,10 @@ ql_get_port_cfg(qlge_t *qlge)
 		}
 	}
 out:
+	if ((rtn_val != DDI_SUCCESS) && qlge->fm_enable) {
+		ql_fm_ereport(qlge, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+	}
 	return (rtn_val);
 }
 
@@ -1027,7 +1050,7 @@ qlge_get_link_status(qlge_t *qlge,
 	}
 	/* verify if the transaction is completed successful */
 	if (mbx_cmds.mb[0] != MBS_COMMAND_COMPLETE /* 0x4000 */) {
-		cmn_err(CE_WARN, "%s(%d) failed, 0x%x", __func__,
+		cmn_err(CE_WARN, "get link status(%d) failed, 0x%x",
 		    qlge->instance, mbx_cmds.mb[0]);
 	} else {
 		/* EMPTY */
@@ -1045,7 +1068,10 @@ qlge_get_link_status(qlge_t *qlge,
 	}
 	rtn_val = DDI_SUCCESS;
 out:
-
+	if ((rtn_val != DDI_SUCCESS) && qlge->fm_enable) {
+		ql_fm_ereport(qlge, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+	}
 	return (rtn_val);
 }
 
@@ -1072,7 +1098,7 @@ ql_get_firmware_version(qlge_t *qlge,
 
 	/* verify if the transaction is completed successful */
 	if (mbx_cmds.mb[0] != MBS_COMMAND_COMPLETE /* 0x4000 */) {
-		cmn_err(CE_WARN, "%s(%d) failed, 0x%x", __func__,
+		cmn_err(CE_WARN, "get firmware version(%d) failed, 0x%x",
 		    qlge->instance, mbx_cmds.mb[0]);
 	} else {
 		qlge->fw_version_info.major_version =
@@ -1106,6 +1132,10 @@ ql_get_firmware_version(qlge_t *qlge,
 	}
 	rtn_val = DDI_SUCCESS;
 out:
+	if ((rtn_val != DDI_SUCCESS) && qlge->fm_enable) {
+		ql_fm_ereport(qlge, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+	}
 	return (rtn_val);
 }
 
@@ -1186,8 +1216,8 @@ ql_read_risc_ram(qlge_t *qlge, uint32_t risc_address, uint64_t bp,
 			    __func__, qlge->instance));
 			rval = DDI_SUCCESS;
 		} else {
-			cmn_err(CE_WARN, "%s(%d): failed , status %x",
-			    __func__, qlge->instance, mbx_results.mb[0]);
+			cmn_err(CE_WARN, "read_risc_ram(%d): failed, status %x",
+			    qlge->instance, mbx_results.mb[0]);
 		}
 	}
 out:

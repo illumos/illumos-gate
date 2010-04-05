@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation. All rights reserved.
+ * Copyright 2010 QLogic Corporation. All rights reserved.
  */
 
 #ifndef _QLGE_DBG_H

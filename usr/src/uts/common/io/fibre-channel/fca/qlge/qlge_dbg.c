@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation. All rights reserved.
+ * Copyright 2010 QLogic Corporation. All rights reserved.
  */
 
 #include <qlge.h>
@@ -178,6 +178,12 @@ ql_wait_reg_bit(qlge_t *qlge, uint32_t reg, uint32_t wait_bit, int set,
 
 	if (delay_ticks == 0) {
 		rtn_val = DDI_FAILURE;
+		cmn_err(CE_WARN, "qlge(%d)wait reg %x, bit %x time out",
+		    qlge->instance, reg, wait_bit);
+		if (qlge->fm_enable) {
+			ql_fm_ereport(qlge, DDI_FM_DEVICE_NO_RESPONSE);
+			atomic_or_32(&qlge->flags, ADAPTER_ERROR);
+		}
 	}
 	return (rtn_val);
 }
@@ -703,8 +709,8 @@ ql_dump_pci_config(qlge_t *qlge)
 	    pci_config_get16(qlge->pci_handle, 0xa2);
 
 	if (qlge->ql_dbgprnt & DBG_GLD) {
-		ql_printf("%s(%d): enter\n",
-		    __func__, qlge->instance);
+		ql_printf("ql_dump_pci_config(%d): enter\n",
+		    qlge->instance);
 		ql_printf("\tvendorid =0x%x.\n",
 		    qlge->pci_cfg.vendor_id);
 		ql_printf("\tdeviceid =0x%x.\n",
@@ -760,7 +766,7 @@ ql_dump_pci_config(qlge_t *qlge)
 		ql_printf("\tmsi_x_msg_control =0x%x.\n",
 		    qlge->pci_cfg.msi_x_msg_control);
 
-		ql_printf("%s(%d): exit\n", __func__, qlge->instance);
+		ql_printf("ql_dump_pci_config(%d): exit\n", qlge->instance);
 	}
 }
 
@@ -1064,11 +1070,13 @@ ql_chip_ioctl(qlge_t *qlge, queue_t *q, mblk_t *mp)
 			prop_ptr =
 			    (struct qlnic_prop_info *)(void *)dmp->b_rptr;
 			/* get various properties */
+			mutex_enter(&qlge->mbx_mutex);
 			(void) ql_get_firmware_version(qlge,
 			    &prop_ptr->mpi_version);
 			(void) ql_get_fw_state(qlge, &prop_ptr->fw_state);
 			(void) qlge_get_link_status(qlge,
 			    &prop_ptr->link_status);
+			mutex_exit(&qlge->mbx_mutex);
 			break;
 
 		case QLA_LIST_ADAPTER_INFO:
@@ -1502,7 +1510,7 @@ qlge_set_loop_mode(qlge_t *qlge, uint32_t mode)
 	 */
 	qlge->loop_back_mode = mode;
 	mutex_enter(&qlge->mbx_mutex);
-	(void) ql_set_port_cfg(qlge);
+	(void) ql_set_loop_back_mode(qlge);
 	mutex_exit(&qlge->mbx_mutex);
 	return (IOC_REPLY);
 }

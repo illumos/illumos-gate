@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # This Makefile defines all file modules for the directory uts/common
 # and its children. These are the source files which may be considered
@@ -1040,7 +1039,7 @@ QLC_FW_6322_OBJS += ql_fw_6322.o
 
 QLC_FW_8100_OBJS += ql_fw_8100.o
 
-QLGE_OBJS += qlge.o qlge_dbg.o qlge_flash.o qlge_gld.o qlge_mpi.o
+QLGE_OBJS += qlge.o qlge_dbg.o qlge_flash.o qlge_fm.o qlge_gld.o qlge_mpi.o
 
 ZCONS_OBJS += zcons.o
 

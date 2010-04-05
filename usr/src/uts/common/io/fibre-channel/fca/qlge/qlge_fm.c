@@ -23,27 +23,40 @@
  * Copyright 2010 QLogic Corporation. All rights reserved.
  */
 
-#ifndef	_QLGE_OPEN_H
-#define	_QLGE_OPEN_H
+#include <qlge.h>
 
-#ifdef	__cplusplus
-extern "C" {
-#endif
+#define	QL_FM_BUF_LEN	128
 
-#ifndef VERSIONSTR
-#define	VERSIONSTR	"100331-v1.04"
-#endif
+void
+ql_fm_ereport(qlge_t *qlge, char *detail)
+{
+	uint64_t ena;
+	char buf[QL_FM_BUF_LEN];
 
-#ifndef	QL_DEBUG
-#define	QL_DEBUG	0x0
-#endif
-
-#ifndef __func__
-#define	__func__	"qlge"
-#endif
-
-#ifdef	__cplusplus
+	(void) snprintf(buf, QL_FM_BUF_LEN, "%s.%s", DDI_FM_DEVICE, detail);
+	ena = fm_ena_generate(0, FM_ENA_FMT1);
+	if (DDI_FM_EREPORT_CAP(qlge->fm_capabilities)) {
+		ddi_fm_ereport_post(qlge->dip, buf, ena, DDI_NOSLEEP,
+		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
+	}
 }
-#endif
 
-#endif /* _QLGE_OPEN_H */
+int
+ql_fm_check_acc_handle(ddi_acc_handle_t handle)
+{
+	ddi_fm_error_t err;
+
+	ddi_fm_acc_err_get(handle, &err, DDI_FME_VERSION);
+	/* for OpenSolaris */
+	ddi_fm_acc_err_clear(handle, DDI_FME_VERSION);
+	return (err.fme_status);
+}
+
+int
+ql_fm_check_dma_handle(ddi_dma_handle_t handle)
+{
+	ddi_fm_error_t err;
+
+	ddi_fm_dma_err_get(handle, &err, DDI_FME_VERSION);
+	return (err.fme_status);
+}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation. All rights reserved.
+ * Copyright 2010 QLogic Corporation. All rights reserved.
  */
 
 #include <qlge.h>
@@ -548,8 +548,8 @@ ql_flash_flt(qlge_t *qlge)
 
 	if ((qlge->flt.header.version != 1) &&
 	    (qlge->flt.header.version != 0)) {
-		cmn_err(CE_WARN, "%s(%d) read flt header at %x error",
-		    __func__, qlge->instance, addr);
+		cmn_err(CE_WARN, "%s(%d) flt header version %x unsupported",
+		    __func__, qlge->instance, qlge->flt.header.version);
 		bzero(&qlge->flt, sizeof (ql_flt_header_t));
 		return (DDI_FAILURE);
 	}
@@ -1047,6 +1047,11 @@ ql_wait_flash_reg_ready(qlge_t *qlge, uint32_t wait_bit)
 	if (delay == 0) {
 		cmn_err(CE_WARN,
 		    "%s(%d) timeout error!", __func__, qlge->instance);
+		if (qlge->fm_enable) {
+			ql_fm_ereport(qlge, DDI_FM_DEVICE_NO_RESPONSE);
+			atomic_or_32(&qlge->flags, ADAPTER_ERROR);
+			ddi_fm_service_impact(qlge->dip, DDI_SERVICE_LOST);
+		}
 		rtn_val = DDI_FAILURE;
 	}
 	return (rtn_val);

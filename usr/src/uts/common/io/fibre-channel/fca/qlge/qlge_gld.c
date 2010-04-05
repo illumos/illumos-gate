@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation. All rights reserved.
+ * Copyright 2010 QLogic Corporation. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -43,7 +43,6 @@ static int	ql_m_unicst(void *, const uint8_t *);
 static mblk_t	*ql_m_tx(void *, mblk_t *);
 static void	ql_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t ql_m_getcapab(void *, mac_capab_t, void *);
-static int	ql_unicst_set(qlge_t *qlge, const uint8_t *macaddr, int slot);
 
 static int ql_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
@@ -74,6 +73,7 @@ static mac_callbacks_t ql_m_callbacks = {
 
 char *qlge_priv_prop[] = {
 	"_adv_pause_mode",
+	"_fm_enable",
 	NULL
 };
 
@@ -166,7 +166,15 @@ ql_m_multicst(void *arg, boolean_t add, const uint8_t *ep)
 	}
 	mutex_exit(&qlge->gen_mutex);
 
-	return ((ret == DDI_SUCCESS) ? 0 : EIO);
+	if (ret != DDI_SUCCESS) {
+		ret = EIO;
+		if (qlge->fm_enable) {
+			ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+		}
+	} else {
+		ret = 0;
+	}
+	return (ret);
 }
 
 /*
@@ -399,20 +407,29 @@ ql_m_getstat(void *arg, uint_t stat, uint64_t *valp)
 /*
  * Set the physical network address
  */
-static int
+int
 ql_unicst_set(qlge_t *qlge, const uint8_t *macaddr, int slot)
 {
-	int status;
+	int ret;
 
-	status = ql_sem_spinlock(qlge, SEM_MAC_ADDR_MASK);
-	if (status != DDI_SUCCESS)
-		return (EIO);
-	status = ql_set_mac_addr_reg(qlge, (uint8_t *)macaddr,
+	ret = ql_sem_spinlock(qlge, SEM_MAC_ADDR_MASK);
+	if (ret != DDI_SUCCESS)
+		goto exit;
+	ret = ql_set_mac_addr_reg(qlge, (uint8_t *)macaddr,
 	    MAC_ADDR_TYPE_CAM_MAC,
 	    (uint16_t)(qlge->func_number * MAX_CQ + slot));
 	ql_sem_unlock(qlge, SEM_MAC_ADDR_MASK);
 
-	return ((status == DDI_SUCCESS) ? 0 : EIO);
+exit:
+	if (ret != DDI_SUCCESS) {
+		ret = EIO;
+		if (qlge->fm_enable) {
+			ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+		}
+	} else {
+		ret = 0;
+	}
+	return (ret);
 }
 
 /*
@@ -456,9 +473,13 @@ ql_m_tx(void *arg, mblk_t *mp)
 	mblk_t *next;
 	int rval;
 	uint32_t tx_count = 0;
+	caddr_t bp;
+	uint8_t selected_ring = 0;
 
-	if (qlge->port_link_state == LS_DOWN) {
-		cmn_err(CE_WARN, "%s(%d): exit due to link down",
+	if ((qlge->port_link_state == LS_DOWN) ||
+	    (qlge->mac_flags != QL_MAC_STARTED)) {
+
+		cmn_err(CE_WARN, "!%s(%d): exit due to link down",
 		    __func__, qlge->instance);
 		freemsgchain(mp);
 		mp = NULL;
@@ -466,10 +487,11 @@ ql_m_tx(void *arg, mblk_t *mp)
 	}
 
 	/*
-	 * Always send this packet through tx ring 0 for now.
-	 * Will use multiple tx rings when Crossbow is supported
+	 * Calculate which tx ring to send this packet
 	 */
-	tx_ring = &qlge->tx_ring[0];
+	bp = (caddr_t)mp->b_rptr;
+	selected_ring = ql_tx_hashing(qlge, bp);
+	tx_ring = &qlge->tx_ring[selected_ring];
 	mutex_enter(&tx_ring->tx_lock);
 	if (tx_ring->mac_flags != QL_MAC_STARTED) {
 		mutex_exit(&tx_ring->tx_lock);
@@ -684,10 +706,18 @@ qlge_set_priv_prop(qlge_t *qlge, const char *pr_name, uint_t pr_valsize,
 			qlge->pause = (uint32_t)result;
 			if (qlge->flags & INTERRUPTS_ENABLED) {
 				mutex_enter(&qlge->mbx_mutex);
-				if (ql_set_port_cfg(qlge) == DDI_FAILURE)
+				if (ql_set_pause_mode(qlge) == DDI_FAILURE)
 					err = EINVAL;
 				mutex_exit(&qlge->mbx_mutex);
 			}
+		}
+		return (err);
+	} else if (strcmp(pr_name, "_fm_enable") == 0) {
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if ((result != 0) && (result != 1)) {
+			err = EINVAL;
+		} else if (qlge->fm_enable != (boolean_t)result) {
+			qlge->fm_enable = (boolean_t)result;
 		}
 		return (err);
 	}
@@ -772,10 +802,11 @@ qlge_get_priv_prop(qlge_t *qlge, const char *pr_name, uint_t pr_valsize,
 	if (strcmp(pr_name, "_adv_pause_mode") == 0) {
 		value = qlge->pause;
 		err = 0;
-		goto done;
+	} else if (strcmp(pr_name, "_fm_enable") == 0) {
+		value = qlge->fm_enable;
+		err = 0;
 	}
 
-done:
 	if (err == 0) {
 		(void) snprintf(pr_val, pr_valsize, "%d", value);
 	}
@@ -837,11 +868,12 @@ out:
 	return (err);
 }
 
+/* ARGSUSED */
 static void
 ql_m_propinfo(void *barg, const char *pr_name, mac_prop_id_t pr_num,
     mac_prop_info_handle_t prh)
 {
-        _NOTE(ARGUNUSED(barg));
+	_NOTE(ARGUNUSED(barg));
 
 	switch (pr_num) {
 	case MAC_PROP_DUPLEX:
@@ -856,6 +888,8 @@ ql_m_propinfo(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 
 		if (strcmp(pr_name, "_adv_pause_mode") == 0)
 			default_val = 2;
+		else if (strcmp(pr_name, "_fm_enable") == 0)
+			default_val = 1;
 		else
 			return;
 
@@ -896,13 +930,15 @@ ql_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	case MAC_CAPAB_LSO: {
 		mac_capab_lso_t *cap_lso = (mac_capab_lso_t *)cap_data;
 		uint32_t page_size;
+		uint32_t lso_max;
 
 		if ((qlge->cfg_flags & CFG_LSO)&&
 		    (qlge->cfg_flags & CFG_SUPPORT_SCATTER_GATHER)) {
 			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
 			page_size = ddi_ptob(qlge->dip, (ulong_t)1);
-			cap_lso->lso_basic_tcp_ipv4.lso_max = page_size *
-			    (QL_MAX_TX_DMA_HANDLES-1);
+			lso_max = page_size * (QL_MAX_TX_DMA_HANDLES-1);
+			cap_lso->lso_basic_tcp_ipv4.lso_max =
+			    min(lso_max, QL_LSO_MAX);
 			ret = B_TRUE;
 		}
 		break;

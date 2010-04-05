@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation. All rights reserved.
+ * Copyright 2010 QLogic Corporation. All rights reserved.
  */
 
 #ifndef _QLGE_HW_H
@@ -934,15 +934,17 @@ enum {
 #define	JUMBO_MTU		9000
 #define	NORMAL_FRAME_SIZE	2500	/* ETHERMTU,1500 */
 #define	JUMBO_FRAME_SIZE	9600
+#define	LRG_BUF_NORMAL_SIZE	NORMAL_FRAME_SIZE
+#define	LRG_BUF_JUMBO_SIZE	JUMBO_FRAME_SIZE
 #define	VLAN_ID_LEN		2
 #define	VLAN_HEADER_LEN		sizeof (struct ether_vlan_header) /* 18 */
 #define	ETHER_HEADER_LEN	sizeof (struct ether_header)	/* 14 */
 
-#define	NUM_TX_RING_ENTRIES	(2048*2)
-#define	NUM_RX_RING_ENTRIES	(2048)
+#define	NUM_TX_RING_ENTRIES	(1024)
+#define	NUM_RX_RING_ENTRIES	(1024)
 
-#define	NUM_SMALL_BUFFERS	(2048)
-#define	NUM_LARGE_BUFFERS	(2048)
+#define	NUM_SMALL_BUFFERS	(1024)
+#define	NUM_LARGE_BUFFERS	(1024)
 
 #define	RX_TX_RING_SHADOW_SPACE	2	/* 1st one is wqicb and 2nd for cqicb */
 #define	BUF_Q_PTR_SPACE		((((NUM_SMALL_BUFFERS * sizeof (uint64_t))  \
@@ -951,11 +953,17 @@ enum {
 				    / VM_PAGE_SIZE) + 1))
 
 #define	MAX_CQ				128
-#define	DFLT_RX_COALESCE_WAIT		500	/* usec wait for coalescing */
-#define	DFLT_RX_INTER_FRAME_WAIT	25	/* max interframe-wait for */
+#define	DFLT_RX_COALESCE_WAIT		90	/* usec wait for coalescing */
+#define	DFLT_RX_INTER_FRAME_WAIT	30  	/* max interframe-wait for */
 						/* coalescing */
-#define	DFLT_TX_COALESCE_WAIT		800	/* usec wait for coalescing */
-#define	DFLT_TX_INTER_FRAME_WAIT	5	/* max interframe-wait for */
+#define	DFLT_TX_COALESCE_WAIT		90	/* usec wait for coalescing */
+#define	DFLT_TX_INTER_FRAME_WAIT	30	/* max interframe-wait for */
+						/* coalescing */
+#define	DFLT_RX_COALESCE_WAIT_JUMBO	40	/* usec wait for coalescing */
+#define	DFLT_RX_INTER_FRAME_WAIT_JUMBO	10  	/* max interframe-wait for */
+						/* coalescing */
+#define	DFLT_TX_COALESCE_WAIT_JUMBO	40	/* usec wait for coalescing */
+#define	DFLT_TX_INTER_FRAME_WAIT_JUMBO	10	/* max interframe-wait for */
 						/* coalescing */
 #define	DFLT_PAYLOAD_COPY_THRESH	6	/* must be at least 6 usec */
 
@@ -991,16 +999,10 @@ enum link_state_t {
 };
 
 /* qlge->flags definitions. */
-#define	QL_RESET_DONE		BIT_0	/* Reset finished. */
-#define	QL_RESET_ACTIVE		BIT_1	/* Waiting for reset to finish. */
-#define	QL_RESET_START		BIT_2	/* Please reset the chip. */
-#define	QL_LINK_MASTER		BIT_5	/* This driver controls the link */
-#define	QL_ADAPTER_UP		BIT_6	/* Adapter has been brought up. */
-#define	QL_LINK_OPTICAL		BIT_12
-#define	QL_MSI_ENABLED		BIT_13
-#define	INTERRUPTS_ENABLED	BIT_14
-#define	ADAPTER_SUSPENDED	BIT_15
-#define	QLA_PM_CAPABLE		BIT_16
+#define	INTERRUPTS_ENABLED	BIT_0
+#define	ADAPTER_ERROR		BIT_1
+
+#define	ADAPTER_SUSPENDED	BIT_8
 
 /*
  * ISP PCI Configuration Register Set structure definitions.
@@ -1668,6 +1670,7 @@ uint8_t	sub_minor_version;
 #define	ENABLE_JUMBO BIT_16
 #define	STD_PAUSE 0x20
 #define	PP_PAUSE 0x40
+#define	DCBX_ENABLE 0x10
 #define	LOOP_INTERNAL_PARALLEL	0x02
 #define	LOOP_INTERNAL_SERIAL	0x04
 #define	LOOP_EXTERNAL_PHY	0x06

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation. All rights reserved.
+ * Copyright 2010 QLogic Corporation. All rights reserved.
  */
 
 #include <qlge.h>
@@ -41,16 +41,19 @@
  */
 static struct ether_addr ql_ether_broadcast_addr =
 	{0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-static char version[] = "QLogic GLDv3 Driver " VERSIONSTR;
+static char version[] = "GLDv3 QLogic 81XX " VERSIONSTR;
 
 /*
  * Local function prototypes
  */
-static void ql_free_resources(dev_info_t *, qlge_t *);
+static void ql_free_resources(qlge_t *);
 static void ql_fini_kstats(qlge_t *);
 static uint32_t ql_get_link_state(qlge_t *);
 static void ql_read_conf(qlge_t *);
 static int ql_alloc_phys(dev_info_t *, ddi_dma_handle_t *,
+    ddi_device_acc_attr_t *, uint_t, ddi_acc_handle_t *,
+    size_t, size_t, caddr_t *, ddi_dma_cookie_t *);
+static int ql_alloc_phys_rbuf(dev_info_t *, ddi_dma_handle_t *,
     ddi_device_acc_attr_t *, uint_t, ddi_acc_handle_t *,
     size_t, size_t, caddr_t *, ddi_dma_cookie_t *);
 static void ql_free_phys(ddi_dma_handle_t *, ddi_acc_handle_t *);
@@ -63,6 +66,8 @@ static int ql_bringup_adapter(qlge_t *);
 static int ql_asic_reset(qlge_t *);
 static void ql_wake_mpi_reset_soft_intr(qlge_t *);
 static void ql_stop_timer(qlge_t *qlge);
+static void ql_fm_fini(qlge_t *qlge);
+int ql_clean_outbound_rx_ring(struct rx_ring *rx_ring);
 
 /*
  * TX dma maping handlers allow multiple sscatter-gather lists
@@ -79,7 +84,7 @@ ddi_dma_attr_t  tx_mapping_dma_attr = {
 	QL_DMA_SEGMENT_BOUNDARY,	/* segment boundary */
 	QL_MAX_TX_DMA_HANDLES,		/* s/g list length */
 	QL_DMA_GRANULARITY,		/* granularity of device */
-	QL_DMA_XFER_FLAGS		/* DMA transfer flags */
+	DDI_DMA_RELAXED_ORDERING	/* DMA transfer flags */
 };
 
 /*
@@ -99,7 +104,23 @@ ddi_dma_attr_t  dma_attr = {
 	QL_DMA_GRANULARITY,		/* granularity of device */
 	QL_DMA_XFER_FLAGS		/* DMA transfer flags */
 };
-
+/*
+ * Receive buffers do not allow scatter-gather lists
+ */
+ddi_dma_attr_t  dma_attr_rbuf = {
+	DMA_ATTR_V0,			/* dma_attr_version */
+	QL_DMA_LOW_ADDRESS,		/* low DMA address range */
+	QL_DMA_HIGH_64BIT_ADDRESS,	/* high DMA address range */
+	QL_DMA_XFER_COUNTER,		/* DMA counter register */
+	0x1,				/* DMA address alignment, default - 8 */
+	QL_DMA_BURSTSIZES,		/* DMA burstsizes */
+	QL_DMA_MIN_XFER_SIZE,		/* min effective DMA size */
+	QL_DMA_MAX_XFER_SIZE,		/* max DMA xfer size */
+	QL_DMA_SEGMENT_BOUNDARY,	/* segment boundary */
+	1,				/* s/g list length, i.e no sg list */
+	QL_DMA_GRANULARITY,		/* granularity of device */
+	DDI_DMA_RELAXED_ORDERING	/* DMA transfer flags */
+};
 /*
  * DMA access attribute structure.
  */
@@ -142,12 +163,23 @@ const uint8_t key_data[] = {
  * PCI reads. When an entry is placed on an inbound queue, the chip will
  * update the relevant index register and then copy the value to the
  * shadow register in host memory.
+ * Currently, ql_read_sh_reg only read Inbound queues'producer index.
  */
 
 static inline unsigned int
-ql_read_sh_reg(const volatile void *addr)
+ql_read_sh_reg(qlge_t *qlge, struct rx_ring *rx_ring)
 {
-	return (*(volatile uint32_t *)addr);
+	uint32_t rtn;
+
+	/* re-synchronize shadow prod index dma buffer before reading */
+	(void) ddi_dma_sync(qlge->host_copy_shadow_dma_attr.dma_handle,
+	    rx_ring->prod_idx_sh_reg_offset,
+	    sizeof (uint32_t), DDI_DMA_SYNC_FORKERNEL);
+
+	rtn = ddi_get32(qlge->host_copy_shadow_dma_attr.acc_handle,
+	    (uint32_t *)rx_ring->prod_idx_sh_reg);
+
+	return (rtn);
 }
 
 /*
@@ -205,6 +237,13 @@ ql_pci_config(qlge_t *qlge)
 
 	pci_config_put16(qlge->pci_handle, PCI_CONF_COMM, w);
 
+	w = pci_config_get16(qlge->pci_handle, 0x54);
+	cmn_err(CE_NOTE, "!dev_ctl old 0x%x\n", w);
+	w = (uint16_t)(w & (~0x7000));
+	w = (uint16_t)(w | 0x5000);
+	pci_config_put16(qlge->pci_handle, 0x54, w);
+	cmn_err(CE_NOTE, "!dev_ctl new 0x%x\n", w);
+
 	ql_dump_pci_config(qlge);
 }
 
@@ -216,7 +255,7 @@ static int
 ql_set_mac_info(qlge_t *qlge)
 {
 	uint32_t value;
-	int rval = DDI_SUCCESS;
+	int rval = DDI_FAILURE;
 	uint32_t fn0_net, fn1_net;
 
 	/* set default value */
@@ -226,6 +265,7 @@ ql_set_mac_info(qlge_t *qlge)
 	if (ql_read_processor_data(qlge, MPI_REG, &value) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s(%d) read MPI register failed",
 		    __func__, qlge->instance);
+		goto exit;
 	} else {
 		fn0_net = (value >> 1) & 0x07;
 		fn1_net = (value >> 5) & 0x07;
@@ -235,6 +275,7 @@ ql_set_mac_info(qlge_t *qlge)
 			    "nic1 function number %d "
 			    "use default\n",
 			    __func__, qlge->instance, value, fn0_net, fn1_net);
+			goto exit;
 		} else {
 			qlge->fn0_net = fn0_net;
 			qlge->fn1_net = fn1_net;
@@ -252,7 +293,7 @@ ql_set_mac_info(qlge_t *qlge)
 	    (qlge->func_number != qlge->fn1_net)) {
 		cmn_err(CE_WARN,
 		    "Invalid function number = 0x%x\n", qlge->func_number);
-		return (DDI_FAILURE);
+		goto exit;
 	}
 	/* network port 0? */
 	if (qlge->func_number == qlge->fn0_net) {
@@ -262,7 +303,8 @@ ql_set_mac_info(qlge_t *qlge)
 		qlge->xgmac_sem_mask = QL_PORT1_XGMAC_SEM_MASK;
 		qlge->xgmac_sem_bits = QL_PORT1_XGMAC_SEM_BITS;
 	}
-
+	rval = DDI_SUCCESS;
+exit:
 	return (rval);
 
 }
@@ -314,6 +356,10 @@ ql_wait_reg_rdy(qlge_t *qlge, uint32_t reg, uint32_t bit, uint32_t err_bit)
 	}
 	cmn_err(CE_WARN,
 	    "Waiting for reg %x to come ready failed.", reg);
+	if (qlge->fm_enable) {
+		ql_fm_ereport(qlge, DDI_FM_DEVICE_NO_RESPONSE);
+		atomic_or_32(&qlge->flags, ADAPTER_ERROR);
+	}
 	return (DDI_FAILURE);
 }
 
@@ -324,22 +370,7 @@ ql_wait_reg_rdy(qlge_t *qlge, uint32_t reg, uint32_t bit, uint32_t err_bit)
 static int
 ql_wait_cfg(qlge_t *qlge, uint32_t bit)
 {
-	int count = UDELAY_COUNT;
-	uint32_t temp;
-
-	while (count) {
-		temp = ql_read_reg(qlge, REG_CONFIGURATION);
-		if ((temp & CFG_LE) != 0) {
-			break;
-		}
-		if ((temp & bit) == 0)
-			return (DDI_SUCCESS);
-		qlge_delay(UDELAY_DELAY);
-		count--;
-	}
-	cmn_err(CE_WARN,
-	    "Waiting for cfg register bit %x failed.", bit);
-	return (DDI_FAILURE);
+	return (ql_wait_reg_bit(qlge, REG_CONFIGURATION, bit, BIT_RESET, 0));
 }
 
 
@@ -392,28 +423,6 @@ ql_init_instance(qlge_t *qlge)
 	qlge->mac_flags = QL_MAC_INIT;
 	qlge->mtu = ETHERMTU;		/* set normal size as default */
 	qlge->page_size = VM_PAGE_SIZE;	/* default page size */
-	/* Set up the default ring sizes. */
-	qlge->tx_ring_size = NUM_TX_RING_ENTRIES;
-	qlge->rx_ring_size = NUM_RX_RING_ENTRIES;
-
-	/* Set up the coalescing parameters. */
-	qlge->rx_coalesce_usecs = DFLT_RX_COALESCE_WAIT;
-	qlge->tx_coalesce_usecs = DFLT_TX_COALESCE_WAIT;
-	qlge->rx_max_coalesced_frames = DFLT_RX_INTER_FRAME_WAIT;
-	qlge->tx_max_coalesced_frames = DFLT_TX_INTER_FRAME_WAIT;
-	qlge->payload_copy_thresh = DFLT_PAYLOAD_COPY_THRESH;
-	qlge->ql_dbgprnt = 0;
-#if QL_DEBUG
-	qlge->ql_dbgprnt = QL_DEBUG;
-#endif /* QL_DEBUG */
-
-	/*
-	 * TODO: Should be obtained from configuration or based off
-	 * number of active cpus SJP 4th Mar. 09
-	 */
-	qlge->tx_ring_count = 1;
-	qlge->rss_ring_count = 4;
-	qlge->rx_ring_count = qlge->tx_ring_count + qlge->rss_ring_count;
 
 	for (i = 0; i < MAX_RX_RINGS; i++) {
 		qlge->rx_polls[i] = 0;
@@ -435,6 +444,7 @@ ql_init_instance(qlge_t *qlge)
 	 * read user defined properties in .conf file
 	 */
 	ql_read_conf(qlge); /* mtu, pause, LSO etc */
+	qlge->rx_ring_count = qlge->tx_ring_count + qlge->rss_ring_count;
 
 	QL_PRINT(DBG_INIT, ("mtu is %d \n", qlge->mtu));
 
@@ -606,6 +616,43 @@ ql_read_conf(qlge_t *qlge)
 	/* clear configuration flags */
 	qlge->cfg_flags = 0;
 
+	/* Set up the default ring sizes. */
+	qlge->tx_ring_size = NUM_TX_RING_ENTRIES;
+	data = ql_get_prop(qlge, "tx_ring_size");
+	/* if data is valid */
+	if ((data != 0xffffffff) && data) {
+		if (qlge->tx_ring_size != data) {
+			qlge->tx_ring_size = (uint16_t)data;
+		}
+	}
+
+	qlge->rx_ring_size = NUM_RX_RING_ENTRIES;
+	data = ql_get_prop(qlge, "rx_ring_size");
+	/* if data is valid */
+	if ((data != 0xffffffff) && data) {
+		if (qlge->rx_ring_size != data) {
+			qlge->rx_ring_size = (uint16_t)data;
+		}
+	}
+
+	qlge->tx_ring_count = 8;
+	data = ql_get_prop(qlge, "tx_ring_count");
+	/* if data is valid */
+	if ((data != 0xffffffff) && data) {
+		if (qlge->tx_ring_count != data) {
+			qlge->tx_ring_count = (uint16_t)data;
+		}
+	}
+
+	qlge->rss_ring_count = 8;
+	data = ql_get_prop(qlge, "rss_ring_count");
+	/* if data is valid */
+	if ((data != 0xffffffff) && data) {
+		if (qlge->rss_ring_count != data) {
+			qlge->rss_ring_count = (uint16_t)data;
+		}
+	}
+
 	/* Get default rx_copy enable/disable. */
 	if ((data = ql_get_prop(qlge, "force-rx-copy")) == 0xffffffff ||
 	    data == 0) {
@@ -627,6 +674,14 @@ ql_read_conf(qlge_t *qlge)
 		}
 	}
 
+	if (qlge->mtu == JUMBO_MTU) {
+		qlge->rx_coalesce_usecs = DFLT_RX_COALESCE_WAIT_JUMBO;
+		qlge->tx_coalesce_usecs = DFLT_TX_COALESCE_WAIT_JUMBO;
+		qlge->rx_max_coalesced_frames = DFLT_RX_INTER_FRAME_WAIT_JUMBO;
+		qlge->tx_max_coalesced_frames = DFLT_TX_INTER_FRAME_WAIT_JUMBO;
+	}
+
+
 	/* Get pause mode, default is Per Priority mode. */
 	qlge->pause = PAUSE_MODE_PER_PRIORITY;
 	data = ql_get_prop(qlge, "pause");
@@ -636,10 +691,36 @@ ql_read_conf(qlge_t *qlge)
 			cmn_err(CE_NOTE, "new pause mode %d\n", qlge->pause);
 		}
 	}
-
-	/* Get tx_max_coalesced_frames. */
-	qlge->tx_max_coalesced_frames = 5;
-	data = ql_get_prop(qlge, "tx_max_coalesced_frames");
+	/* Receive interrupt delay */
+	qlge->rx_coalesce_usecs = DFLT_RX_COALESCE_WAIT;
+	data = ql_get_prop(qlge, "rx_intr_delay");
+	/* if data is valid */
+	if ((data != 0xffffffff) && data) {
+		if (qlge->rx_coalesce_usecs != data) {
+			qlge->rx_coalesce_usecs = (uint16_t)data;
+		}
+	}
+	/* Rx inter-packet delay. */
+	qlge->rx_max_coalesced_frames = DFLT_RX_INTER_FRAME_WAIT;
+	data = ql_get_prop(qlge, "rx_ipkt_delay");
+	/* if data is valid */
+	if ((data != 0xffffffff) && data) {
+		if (qlge->rx_max_coalesced_frames != data) {
+			qlge->rx_max_coalesced_frames = (uint16_t)data;
+		}
+	}
+	/* Transmit interrupt delay */
+	qlge->tx_coalesce_usecs = DFLT_TX_COALESCE_WAIT;
+	data = ql_get_prop(qlge, "tx_intr_delay");
+	/* if data is valid */
+	if ((data != 0xffffffff) && data) {
+		if (qlge->tx_coalesce_usecs != data) {
+			qlge->tx_coalesce_usecs = (uint16_t)data;
+		}
+	}
+	/* Tx inter-packet delay. */
+	qlge->tx_max_coalesced_frames = DFLT_TX_INTER_FRAME_WAIT;
+	data = ql_get_prop(qlge, "tx_ipkt_delay");
 	/* if data is valid */
 	if ((data != 0xffffffff) && data) {
 		if (qlge->tx_max_coalesced_frames != data) {
@@ -648,7 +729,7 @@ ql_read_conf(qlge_t *qlge)
 	}
 
 	/* Get split header payload_copy_thresh. */
-	qlge->payload_copy_thresh = 6;
+	qlge->payload_copy_thresh = DFLT_PAYLOAD_COPY_THRESH;
 	data = ql_get_prop(qlge, "payload_copy_thresh");
 	/* if data is valid */
 	if ((data != 0xffffffff) && (data != 0)) {
@@ -661,11 +742,28 @@ ql_read_conf(qlge_t *qlge)
 	qlge->lso_enable = 1;
 	data = ql_get_prop(qlge, "lso_enable");
 	/* if data is valid */
-	if (data != 0xffffffff) {
+	if ((data == 0) || (data == 1)) {
 		if (qlge->lso_enable != data) {
 			qlge->lso_enable = (uint16_t)data;
 		}
 	}
+
+	/* dcbx capability. */
+	qlge->dcbx_enable = 1;
+	data = ql_get_prop(qlge, "dcbx_enable");
+	/* if data is valid */
+	if ((data == 0) || (data == 1)) {
+		if (qlge->dcbx_enable != data) {
+			qlge->dcbx_enable = (uint16_t)data;
+		}
+	}
+	/* fault management enable */
+	qlge->fm_enable = B_TRUE;
+	data = ql_get_prop(qlge, "fm-enable");
+	if ((data == 0x1) || (data == 0)) {
+		qlge->fm_enable = (boolean_t)data;
+	}
+
 }
 
 /*
@@ -1088,8 +1186,6 @@ ql_refill_sbuf_free_list(struct bq_desc *sbq_desc, boolean_t alloc_memory)
 
 #endif
 
-	ASSERT(sbq_desc->mp == NULL);
-
 #ifdef QLGE_LOAD_UNLOAD
 	if (rx_ring->rx_indicate > 0xFF000000)
 		cmn_err(CE_WARN, "sbq: indicate(%d) wrong: %d mac_flags %d,"
@@ -1204,7 +1300,6 @@ ql_refill_lbuf_free_list(struct bq_desc *lbq_desc, boolean_t alloc_memory)
 	}
 #endif
 
-	ASSERT(lbq_desc->mp == NULL);
 #ifdef QLGE_LOAD_UNLOAD
 	if (rx_ring->rx_indicate > 0xFF000000)
 		cmn_err(CE_WARN, "lbq: indicate(%d) wrong: %d mac_flags %d,"
@@ -1376,7 +1471,7 @@ ql_alloc_sbufs(qlge_t *qlge, struct rx_ring *rx_ring)
 
 	for (i = 0; i < rx_ring->sbq_len; i++, sbq_desc++) {
 		/* Allocate buffer */
-		if (ql_alloc_phys(qlge->dip, &sbq_desc->bd_dma.dma_handle,
+		if (ql_alloc_phys_rbuf(qlge->dip, &sbq_desc->bd_dma.dma_handle,
 		    &ql_buf_acc_attr,
 		    DDI_DMA_READ | DDI_DMA_STREAMING,
 		    &sbq_desc->bd_dma.acc_handle,
@@ -1520,13 +1615,13 @@ ql_alloc_lbufs(qlge_t *qlge, struct rx_ring *rx_ring)
 	rx_ring->lbq_free_tail = 0;
 
 	lbq_buf_size = (qlge->mtu == ETHERMTU) ?
-	    NORMAL_FRAME_SIZE : JUMBO_FRAME_SIZE;
+	    LRG_BUF_NORMAL_SIZE : LRG_BUF_JUMBO_SIZE;
 
 	lbq_desc = &rx_ring->lbq_desc[0];
 	for (i = 0; i < rx_ring->lbq_len; i++, lbq_desc++) {
 		rx_ring->lbq_buf_size = lbq_buf_size;
 		/* Allocate buffer */
-		if (ql_alloc_phys(qlge->dip, &lbq_desc->bd_dma.dma_handle,
+		if (ql_alloc_phys_rbuf(qlge->dip, &lbq_desc->bd_dma.dma_handle,
 		    &ql_buf_acc_attr,
 		    DDI_DMA_READ | DDI_DMA_STREAMING,
 		    &lbq_desc->bd_dma.acc_handle,
@@ -1695,7 +1790,6 @@ ql_ring_tx(void *arg, mblk_t *mp)
 	if (qlge->port_link_state == LS_DOWN) {
 		/* can not send message while link is down */
 		mblk_t *tp;
-		cmn_err(CE_WARN, "tx failed due to link down");
 
 		while (mp != NULL) {
 			tp = mp->b_next;
@@ -1813,6 +1907,12 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 		cmn_err(CE_WARN, "header in large buffer or invalid!");
 		err_flag |= 1;
 	}
+	/* if whole packet is too big than rx buffer size */
+	if (pkt_len > qlge->max_frame_size) {
+		cmn_err(CE_WARN, "ql_build_rx_mpframe too long(%d)!", pkt_len);
+		err_flag |= 1;
+	}
+
 	/*
 	 * Handle the header buffer if present.
 	 * packet header must be valid and saved in one small buffer
@@ -1837,7 +1937,7 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 			cmn_err(CE_WARN, "%s(%d) ring%d packet saved"
 			    " in wrong small buffer",
 			    __func__, qlge->instance, rx_ring->cq_id);
-			goto fetal_error;
+			goto fatal_error;
 		}
 		/* get this packet */
 		mp1 = sbq_desc->mp;
@@ -1908,7 +2008,7 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 			cmn_err(CE_WARN, "%s(%d) ring%d packet saved"
 			    " in wrong small buffer",
 			    __func__, qlge->instance, rx_ring->cq_id);
-			goto fetal_error;
+			goto fatal_error;
 		}
 		/* get this packet */
 		mp2 = sbq_desc->mp;
@@ -1967,7 +2067,7 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 			cmn_err(CE_WARN, "%s(%d) ring%d packet saved"
 			    " in wrong large buffer",
 			    __func__, qlge->instance, rx_ring->cq_id);
-			goto fetal_error;
+			goto fatal_error;
 		}
 		mp2 = lbq_desc->mp;
 		if ((err_flag != 0) || (mp2 == NULL)) {
@@ -2035,29 +2135,49 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 				    " expected %x, actual %lx",
 				    ial_data_addr_low,
 				    (uintptr_t)lbq_desc->bd_dma.dma_addr);
-				goto fetal_error;
+				goto fatal_error;
 			}
 
-			if (mp_ial == NULL) {
-				mp_ial = mp2 = lbq_desc->mp;
-			} else {
-				mp2->b_cont = lbq_desc->mp;
-				mp2 = lbq_desc->mp;
-			}
-			mp2->b_next = NULL;
-			mp2->b_cont = NULL;
 			size = (payload_len < rx_ring->lbq_buf_size)?
 			    payload_len : rx_ring->lbq_buf_size;
-			mp2->b_wptr = mp2->b_rptr + size;
-			/* Flush DMA'd data */
-			(void) ddi_dma_sync(lbq_desc->bd_dma.dma_handle,
-			    0, size, DDI_DMA_SYNC_FORKERNEL);
 			payload_len -= size;
-			QL_DUMP(DBG_RX, "\t Mac data dump:\n",
-			    (uint8_t *)mp2->b_rptr, 8, size);
+			mp2 = lbq_desc->mp;
+			if ((err_flag != 0) || (mp2 == NULL)) {
+#ifdef QLGE_LOAD_UNLOAD
+				cmn_err(CE_WARN,
+				    "ignore bad data from large buffer");
+#endif
+				ql_refill_lbuf_free_list(lbq_desc, B_FALSE);
+				mp2 = NULL;
+			} else {
+				if (mp_ial == NULL) {
+					mp_ial = mp2;
+				} else {
+					linkb(mp_ial, mp2);
+				}
+
+				mp2->b_next = NULL;
+				mp2->b_cont = NULL;
+				mp2->b_wptr = mp2->b_rptr + size;
+				/* Flush DMA'd data */
+				(void) ddi_dma_sync(lbq_desc->bd_dma.dma_handle,
+				    0, size, DDI_DMA_SYNC_FORKERNEL);
+				QL_PRINT(DBG_RX, ("ial %d payload received \n",
+				    size));
+				QL_DUMP(DBG_RX, "\t Mac data dump:\n",
+				    (uint8_t *)mp2->b_rptr, 8, size);
+			}
 		}
-		mp2 = mp_ial;
-		freemsg(sbq_desc->mp);
+		if (err_flag != 0) {
+#ifdef QLGE_LOAD_UNLOAD
+			/* failed on this packet, put it back for re-arming */
+			cmn_err(CE_WARN, "ignore bad data from small buffer");
+#endif
+			ql_refill_sbuf_free_list(sbq_desc, B_FALSE);
+		} else {
+			mp2 = mp_ial;
+			freemsg(sbq_desc->mp);
+		}
 	}
 	/*
 	 * some packets' hdr not split, then send mp2 upstream, otherwise,
@@ -2080,10 +2200,16 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 	}
 	return (mp);
 
-fetal_error:
-	/* Fetal Error! */
-	*mp->b_wptr = 0;
-	return (mp);
+fatal_error:
+	/* fatal Error! */
+	if (qlge->fm_enable) {
+		ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+		ql_fm_ereport(qlge, DDI_FM_DEVICE_INVAL_STATE);
+		atomic_or_32(&qlge->flags, ADAPTER_ERROR);
+	}
+	/* *mp->b_wptr = 0; */
+	ql_wake_asic_reset_soft_intr(qlge);
+	return (NULL);
 
 }
 
@@ -2170,8 +2296,16 @@ ql_process_chip_ae_intr(qlge_t *qlge,
 
 	if ((soft_req & NEED_MPI_RESET) != 0) {
 		ql_wake_mpi_reset_soft_intr(qlge);
+		if (qlge->fm_enable) {
+			ql_fm_ereport(qlge, DDI_FM_DEVICE_INVAL_STATE);
+			ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+		}
 	} else if ((soft_req & NEED_HW_RESET) != 0) {
 		ql_wake_asic_reset_soft_intr(qlge);
+		if (qlge->fm_enable) {
+			ql_fm_ereport(qlge, DDI_FM_DEVICE_INVAL_STATE);
+			ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
+		}
 	}
 }
 
@@ -2223,14 +2357,16 @@ mblk_t *
 ql_ring_rx(struct rx_ring *rx_ring, int poll_bytes)
 {
 	qlge_t *qlge = rx_ring->qlge;
-	uint32_t prod = ql_read_sh_reg(rx_ring->prod_idx_sh_reg);
+	uint32_t prod = ql_read_sh_reg(qlge, rx_ring);
 	struct ib_mac_iocb_rsp *net_rsp;
 	mblk_t *mp;
 	mblk_t *mblk_head;
 	mblk_t **mblk_tail;
 	uint32_t received_bytes = 0;
-	boolean_t done = B_FALSE;
 	uint32_t length;
+#ifdef QLGE_PERFORMANCE
+	uint32_t pkt_ct = 0;
+#endif
 
 #ifdef QLGE_TRACK_BUFFER_USAGE
 	uint32_t consumer_idx;
@@ -2255,7 +2391,7 @@ ql_ring_rx(struct rx_ring *rx_ring, int poll_bytes)
 	mblk_head = NULL;
 	mblk_tail = &mblk_head;
 
-	while (!done && (prod != rx_ring->cnsmr_idx)) {
+	while ((prod != rx_ring->cnsmr_idx)) {
 		QL_PRINT(DBG_RX,
 		    ("%s cq_id = %d, prod = %d, cnsmr = %d.\n",
 		    __func__, rx_ring->cq_id, prod, rx_ring->cnsmr_idx));
@@ -2276,11 +2412,13 @@ ql_ring_rx(struct rx_ring *rx_ring, int poll_bytes)
 			    le32_to_cpu(net_rsp->hdr_len);
 			if ((poll_bytes != QLGE_POLL_ALL) &&
 			    ((received_bytes + length) > poll_bytes)) {
-				done = B_TRUE;
 				continue;
 			}
 			received_bytes += length;
 
+#ifdef QLGE_PERFORMANCE
+			pkt_ct++;
+#endif
 			mp = ql_build_rx_mp(qlge, rx_ring, net_rsp);
 			if (mp != NULL) {
 				if (rx_ring->mac_flags != QL_MAC_STARTED) {
@@ -2349,9 +2487,29 @@ ql_ring_rx(struct rx_ring *rx_ring, int poll_bytes)
 		}
 		/* increment cnsmr_idx and curr_entry */
 		ql_update_cq(rx_ring);
-		prod = ql_read_sh_reg(rx_ring->prod_idx_sh_reg);
+		prod = ql_read_sh_reg(qlge, rx_ring);
 
 	}
+
+#ifdef QLGE_PERFORMANCE
+	if (pkt_ct >= 7)
+		rx_ring->hist[7]++;
+	else if (pkt_ct == 6)
+		rx_ring->hist[6]++;
+	else if (pkt_ct == 5)
+		rx_ring->hist[5]++;
+	else if (pkt_ct == 4)
+		rx_ring->hist[4]++;
+	else if (pkt_ct == 3)
+		rx_ring->hist[3]++;
+	else if (pkt_ct == 2)
+		rx_ring->hist[2]++;
+	else if (pkt_ct == 1)
+		rx_ring->hist[1]++;
+	else if (pkt_ct == 0)
+		rx_ring->hist[0]++;
+#endif
+
 	/* update cnsmr_idx */
 	ql_write_cq_idx(rx_ring);
 	/* do not enable interrupt for polling mode */
@@ -2429,11 +2587,11 @@ ql_process_mac_tx_intr(qlge_t *qlge, struct ob_mac_iocb_rsp *mac_rsp)
 /*
  * clean up tx completion iocbs
  */
-static int
+int
 ql_clean_outbound_rx_ring(struct rx_ring *rx_ring)
 {
 	qlge_t *qlge = rx_ring->qlge;
-	uint32_t prod = ql_read_sh_reg(rx_ring->prod_idx_sh_reg);
+	uint32_t prod = ql_read_sh_reg(qlge, rx_ring);
 	struct ob_mac_iocb_rsp *net_rsp = NULL;
 	int count = 0;
 	struct tx_ring *tx_ring;
@@ -2497,12 +2655,13 @@ ql_clean_outbound_rx_ring(struct rx_ring *rx_ring)
 		}
 		count++;
 		ql_update_cq(rx_ring);
-		prod = ql_read_sh_reg(rx_ring->prod_idx_sh_reg);
+		prod = ql_read_sh_reg(qlge, rx_ring);
 	}
 	ql_write_cq_idx(rx_ring);
 
 	mutex_exit(&rx_ring->rx_lock);
 
+	net_rsp = (struct ob_mac_iocb_rsp *)rx_ring->curr_entry;
 	tx_ring = &qlge->tx_ring[net_rsp->txq_idx];
 
 	mutex_enter(&tx_ring->tx_lock);
@@ -2535,20 +2694,34 @@ ql_asic_reset_work(caddr_t arg1, caddr_t arg2)
 	int status;
 
 	mutex_enter(&qlge->gen_mutex);
-	status = ql_bringdown_adapter(qlge);
+	(void) ql_do_stop(qlge);
+	/*
+	 * Write default ethernet address to chip register Mac
+	 * Address slot 0 and Enable Primary Mac Function.
+	 */
+	mutex_enter(&qlge->hw_mutex);
+	(void) ql_unicst_set(qlge,
+	    (uint8_t *)qlge->unicst_addr[0].addr.ether_addr_octet, 0);
+	mutex_exit(&qlge->hw_mutex);
+	qlge->mac_flags = QL_MAC_INIT;
+	status = ql_do_start(qlge);
 	if (status != DDI_SUCCESS)
 		goto error;
-
-	status = ql_bringup_adapter(qlge);
-	if (status != DDI_SUCCESS)
-		goto error;
+	qlge->mac_flags = QL_MAC_STARTED;
 	mutex_exit(&qlge->gen_mutex);
+	ddi_fm_service_impact(qlge->dip, DDI_SERVICE_RESTORED);
+
 	return (DDI_INTR_CLAIMED);
 
 error:
 	mutex_exit(&qlge->gen_mutex);
 	cmn_err(CE_WARN,
 	    "qlge up/down cycle failed, closing device");
+	if (qlge->fm_enable) {
+		ql_fm_ereport(qlge, DDI_FM_DEVICE_INVAL_STATE);
+		ddi_fm_service_impact(qlge->dip, DDI_SERVICE_LOST);
+		atomic_or_32(&qlge->flags, ADAPTER_ERROR);
+	}
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -2608,6 +2781,7 @@ static uint_t
 ql_isr(caddr_t arg1, caddr_t arg2)
 {
 	struct rx_ring *rx_ring = (struct rx_ring *)((void *)arg1);
+	struct rx_ring *ob_ring;
 	qlge_t *qlge = rx_ring->qlge;
 	struct intr_ctx *intr_ctx = &qlge->intr_ctx[0];
 	uint32_t var, prod;
@@ -2631,10 +2805,20 @@ ql_isr(caddr_t arg1, caddr_t arg2)
 	ql_disable_completion_interrupt(qlge, intr_ctx->intr);
 
 	/*
+	 * process send completes on first stride tx ring if available
+	 */
+	if (qlge->isr_stride) {
+		ob_ring = &qlge->rx_ring[qlge->isr_stride];
+		if (ql_read_sh_reg(qlge, ob_ring) !=
+		    ob_ring->cnsmr_idx) {
+			(void) ql_clean_outbound_rx_ring(ob_ring);
+		}
+	}
+	/*
 	 * Check the default queue and wake handler if active.
 	 */
 	rx_ring = &qlge->rx_ring[0];
-	prod = ql_read_sh_reg(rx_ring->prod_idx_sh_reg);
+	prod = ql_read_sh_reg(qlge, rx_ring);
 	QL_PRINT(DBG_INTR, ("rx-ring[0] prod index 0x%x, consumer 0x%x ",
 	    prod, rx_ring->cnsmr_idx));
 	/* check if interrupt is due to incoming packet */
@@ -2656,7 +2840,12 @@ ql_isr(caddr_t arg1, caddr_t arg2)
 		var = ql_read_reg(qlge, REG_STATUS);
 		if ((var & STATUS_FE) != 0) {
 			ql_write_reg(qlge, REG_RSVD7, 0xfeed0003);
-
+			if (qlge->fm_enable) {
+				atomic_or_32(&qlge->flags, ADAPTER_ERROR);
+				ql_fm_ereport(qlge, DDI_FM_DEVICE_INVAL_STATE);
+				ddi_fm_service_impact(qlge->dip,
+				    DDI_SERVICE_LOST);
+			}
 			cmn_err(CE_WARN, "Got fatal error, STS = %x.", var);
 			var = ql_read_reg(qlge, REG_ERROR_STATUS);
 			cmn_err(CE_WARN,
@@ -2683,6 +2872,7 @@ ql_isr(caddr_t arg1, caddr_t arg2)
 		}
 	}
 
+
 	if (qlge->intr_type != DDI_INTR_TYPE_MSIX) {
 		/*
 		 * Start the DPC for each active queue.
@@ -2690,7 +2880,7 @@ ql_isr(caddr_t arg1, caddr_t arg2)
 		for (i = 1; i < qlge->rx_ring_count; i++) {
 			rx_ring = &qlge->rx_ring[i];
 
-			if (ql_read_sh_reg(rx_ring->prod_idx_sh_reg) !=
+			if (ql_read_sh_reg(qlge, rx_ring) !=
 			    rx_ring->cnsmr_idx) {
 				QL_PRINT(DBG_INTR,
 				    ("Waking handler for rx_ring[%d].\n", i));
@@ -2746,6 +2936,47 @@ ql_msix_tx_isr(caddr_t arg1, caddr_t arg2)
 }
 
 /*
+ * MSI-X Multiple Vector Interrupt Handler
+ */
+/* ARGSUSED */
+static uint_t
+ql_msix_isr(caddr_t arg1, caddr_t arg2)
+{
+	struct rx_ring *rx_ring = (struct rx_ring *)((void *)arg1);
+	struct rx_ring *ob_ring;
+	qlge_t *qlge = rx_ring->qlge;
+	mblk_t *mp;
+	_NOTE(ARGUNUSED(arg2));
+
+	QL_PRINT(DBG_INTR, ("%s for ring %d\n", __func__, rx_ring->cq_id));
+
+	ql_disable_completion_interrupt(qlge, rx_ring->irq);
+
+	/*
+	 * process send completes on stride tx ring if available
+	 */
+	if (qlge->isr_stride) {
+		ob_ring = rx_ring + qlge->isr_stride;
+		if (ql_read_sh_reg(qlge, ob_ring) !=
+		    ob_ring->cnsmr_idx) {
+			++qlge->rx_interrupts[ob_ring->cq_id];
+			(void) ql_clean_outbound_rx_ring(ob_ring);
+		}
+	}
+
+	++qlge->rx_interrupts[rx_ring->cq_id];
+
+	mutex_enter(&rx_ring->rx_lock);
+	mp = ql_ring_rx(rx_ring, QLGE_POLL_ALL);
+	mutex_exit(&rx_ring->rx_lock);
+
+	if (mp != NULL)
+		RX_UPSTREAM(rx_ring, mp);
+
+	return (DDI_INTR_CLAIMED);
+}
+
+/*
  * Poll n_bytes of chained incoming packets
  */
 mblk_t *
@@ -2778,6 +3009,12 @@ ql_ring_rx_poll(void *arg, int n_bytes)
 			var = ql_read_reg(qlge, REG_ERROR_STATUS);
 			cmn_err(CE_WARN, "Got fatal error %x.", var);
 			ql_wake_asic_reset_soft_intr(qlge);
+			if (qlge->fm_enable) {
+				atomic_or_32(&qlge->flags, ADAPTER_ERROR);
+				ql_fm_ereport(qlge, DDI_FM_DEVICE_INVAL_STATE);
+				ddi_fm_service_impact(qlge->dip,
+				    DDI_SERVICE_LOST);
+			}
 		}
 		/*
 		 * Check MPI processor activity.
@@ -3082,9 +3319,9 @@ ql_alloc_tx_resources(qlge_t *qlge, struct tx_ring *tx_ring)
 		 * 1. oal buffer MAX_SGELEMENTS * sizeof (oal_entry) bytes
 		 * 2. copy buffer of QL_MAX_COPY_LENGTH bytes
 		 */
+		length = (sizeof (struct oal_entry) * MAX_SG_ELEMENTS)
+		    + QL_MAX_COPY_LENGTH;
 		for (i = 0; i < tx_ring->wq_len; i++, tx_ring_desc++) {
-			length = (sizeof (struct oal_entry) * MAX_SG_ELEMENTS)
-			    + QL_MAX_COPY_LENGTH;
 
 			if (ql_alloc_phys(qlge->dip,
 			    &tx_ring_desc->oal_dma.dma_handle,
@@ -3399,7 +3636,6 @@ ql_alloc_mem_resources(qlge_t *qlge)
 	return (DDI_SUCCESS);
 
 err_mem:
-	ql_free_mem_resources(qlge);
 	return (DDI_FAILURE);
 }
 
@@ -3408,6 +3644,82 @@ err_mem:
  * Function used to allocate physical memory and zero it.
  */
 
+static int
+ql_alloc_phys_rbuf(dev_info_t *dip, ddi_dma_handle_t *dma_handle,
+    ddi_device_acc_attr_t *device_acc_attr,
+    uint_t dma_flags,
+    ddi_acc_handle_t *acc_handle,
+    size_t size,
+    size_t alignment,
+    caddr_t *vaddr,
+    ddi_dma_cookie_t *dma_cookie)
+{
+	size_t rlen;
+	uint_t cnt;
+
+	/*
+	 * Workaround for SUN XMITS buffer must end and start on 8 byte
+	 * boundary. Else, hardware will overrun the buffer. Simple fix is
+	 * to make sure buffer has enough room for overrun.
+	 */
+	if (size & 7) {
+		size += 8 - (size & 7);
+	}
+
+	/* Adjust the alignment if requested */
+	if (alignment) {
+		dma_attr.dma_attr_align = alignment;
+	}
+
+	/*
+	 * Allocate DMA handle
+	 */
+	if (ddi_dma_alloc_handle(dip, &dma_attr_rbuf, DDI_DMA_DONTWAIT, NULL,
+	    dma_handle) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, QL_BANG "%s:  ddi_dma_alloc_handle FAILED",
+		    __func__);
+		return (QL_ERROR);
+	}
+	/*
+	 * Allocate DMA memory
+	 */
+	if (ddi_dma_mem_alloc(*dma_handle, size, device_acc_attr,
+	    dma_flags & (DDI_DMA_CONSISTENT|DDI_DMA_STREAMING),
+	    DDI_DMA_DONTWAIT,
+	    NULL, vaddr, &rlen, acc_handle) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "alloc_phys: DMA Memory alloc Failed");
+		ddi_dma_free_handle(dma_handle);
+		return (QL_ERROR);
+	}
+
+	if (ddi_dma_addr_bind_handle(*dma_handle, NULL, *vaddr, rlen,
+	    dma_flags, DDI_DMA_DONTWAIT, NULL,
+	    dma_cookie, &cnt) != DDI_DMA_MAPPED) {
+		ddi_dma_mem_free(acc_handle);
+
+		ddi_dma_free_handle(dma_handle);
+		cmn_err(CE_WARN, "%s ddi_dma_addr_bind_handle FAILED",
+		    __func__);
+		return (QL_ERROR);
+	}
+
+	if (cnt != 1) {
+
+		ql_free_phys(dma_handle, acc_handle);
+
+		cmn_err(CE_WARN, "%s: cnt != 1; Failed segment count",
+		    __func__);
+		return (QL_ERROR);
+	}
+
+	bzero((caddr_t)*vaddr, rlen);
+
+	return (0);
+}
+
+/*
+ * Function used to allocate physical memory and zero it.
+ */
 static int
 ql_alloc_phys(dev_info_t *dip, ddi_dma_handle_t *dma_handle,
     ddi_device_acc_attr_t *device_acc_attr,
@@ -3438,7 +3750,7 @@ ql_alloc_phys(dev_info_t *dip, ddi_dma_handle_t *dma_handle,
 	/*
 	 * Allocate DMA handle
 	 */
-	if (ddi_dma_alloc_handle(dip, &dma_attr, DDI_DMA_SLEEP, NULL,
+	if (ddi_dma_alloc_handle(dip, &dma_attr, DDI_DMA_DONTWAIT, NULL,
 	    dma_handle) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, QL_BANG "%s:  ddi_dma_alloc_handle FAILED",
 		    __func__);
@@ -3448,18 +3760,16 @@ ql_alloc_phys(dev_info_t *dip, ddi_dma_handle_t *dma_handle,
 	 * Allocate DMA memory
 	 */
 	if (ddi_dma_mem_alloc(*dma_handle, size, device_acc_attr,
-	    dma_flags & (DDI_DMA_CONSISTENT|DDI_DMA_STREAMING), DDI_DMA_SLEEP,
+	    dma_flags & (DDI_DMA_CONSISTENT|DDI_DMA_STREAMING),
+	    DDI_DMA_DONTWAIT,
 	    NULL, vaddr, &rlen, acc_handle) != DDI_SUCCESS) {
-		ddi_dma_free_handle(dma_handle);
-	}
-	if (vaddr == NULL) {
-		cmn_err(CE_WARN, "alloc_phys: Memory alloc Failed");
+		cmn_err(CE_WARN, "alloc_phys: DMA Memory alloc Failed");
 		ddi_dma_free_handle(dma_handle);
 		return (QL_ERROR);
 	}
 
 	if (ddi_dma_addr_bind_handle(*dma_handle, NULL, *vaddr, rlen,
-	    dma_flags, DDI_DMA_SLEEP, NULL,
+	    dma_flags, DDI_DMA_DONTWAIT, NULL,
 	    dma_cookie, &cnt) != DDI_DMA_MAPPED) {
 		ddi_dma_mem_free(acc_handle);
 
@@ -3513,6 +3823,8 @@ ql_add_intr_handlers(qlge_t *qlge)
 			    (ddi_intr_handler_t *)intr_ctx->handler,
 			    (void *)&qlge->rx_ring[vector], NULL);
 
+			QL_PRINT(DBG_INIT, ("rx_ring[%d] 0x%p\n",
+			    vector, &qlge->rx_ring[vector]));
 			if (rc != DDI_SUCCESS) {
 				QL_PRINT(DBG_INIT,
 				    ("Add rx interrupt handler failed. "
@@ -3573,7 +3885,7 @@ ql_add_intr_handlers(qlge_t *qlge)
 		(void) ddi_intr_block_enable(qlge->htable, qlge->intr_cnt);
 	} else { /* Non block enable */
 		for (i = 0; i < qlge->intr_cnt; i++) {
-			QL_PRINT(DBG_INIT, ("Non Block Enabling interrupt %d\n,"
+			QL_PRINT(DBG_INIT, ("Non Block Enabling interrupt %d "
 			    "handle 0x%x\n", i, qlge->htable[i]));
 			(void) ddi_intr_enable(qlge->htable[i]);
 		}
@@ -3634,7 +3946,50 @@ ql_resolve_queues_to_irqs(qlge_t *qlge)
 				 * Outbound queue is for outbound completions
 				 * only.
 				 */
-				intr_ctx->handler = ql_msix_tx_isr;
+				if (qlge->isr_stride)
+					intr_ctx->handler = ql_msix_isr;
+				else
+					intr_ctx->handler = ql_msix_tx_isr;
+			} else {
+				/*
+				 * Inbound queues handle unicast frames only.
+				 */
+				if (qlge->isr_stride)
+					intr_ctx->handler = ql_msix_isr;
+				else
+					intr_ctx->handler = ql_msix_rx_isr;
+			}
+		}
+		i = qlge->intr_cnt;
+		for (; i < qlge->rx_ring_count; i++, intr_ctx++) {
+			int iv = i - qlge->isr_stride;
+			qlge->rx_ring[i].irq = iv;
+			intr_ctx->intr = iv;
+			intr_ctx->qlge = qlge;
+
+			/*
+			 * We set up each vectors enable/disable/read bits so
+			 * there's no bit/mask calculations in critical path.
+			 */
+			intr_ctx->intr_en_mask =
+			    INTR_EN_TYPE_MASK | INTR_EN_INTR_MASK |
+			    INTR_EN_TYPE_ENABLE | INTR_EN_IHD_MASK |
+			    INTR_EN_IHD | iv;
+			intr_ctx->intr_dis_mask =
+			    INTR_EN_TYPE_MASK | INTR_EN_INTR_MASK |
+			    INTR_EN_TYPE_DISABLE | INTR_EN_IHD_MASK |
+			    INTR_EN_IHD | iv;
+			intr_ctx->intr_read_mask =
+			    INTR_EN_TYPE_MASK | INTR_EN_INTR_MASK |
+			    INTR_EN_TYPE_READ | INTR_EN_IHD_MASK | INTR_EN_IHD
+			    | iv;
+
+			if (qlge->rx_ring[i].type == TX_Q) {
+				/*
+				 * Outbound queue is for outbound completions
+				 * only.
+				 */
+				intr_ctx->handler = ql_msix_isr;
 			} else {
 				/*
 				 * Inbound queues handle unicast frames only.
@@ -3840,13 +4195,32 @@ ql_request_irq_vectors(qlge_t *qlge, int intr_type)
 	 * For MSI-X, actual might force us to reduce number of tx & rx rings
 	 */
 	if ((intr_type == DDI_INTR_TYPE_MSIX) && (orig > actual)) {
-		if (actual < MAX_RX_RINGS) {
+		if (actual >= (orig / 2)) {
+			count = orig / 2;
+			qlge->rss_ring_count = count;
+			qlge->tx_ring_count = count;
+			qlge->isr_stride = count;
+		} else if (actual >= (orig / 4)) {
+			count = orig / 4;
+			qlge->rss_ring_count = count;
+			qlge->tx_ring_count = count;
+			qlge->isr_stride = count;
+		} else if (actual >= (orig / 8)) {
+			count = orig / 8;
+			qlge->rss_ring_count = count;
+			qlge->tx_ring_count = count;
+			qlge->isr_stride = count;
+		} else if (actual < MAX_RX_RINGS) {
 			qlge->tx_ring_count = 1;
 			qlge->rss_ring_count = actual - 1;
-			qlge->rx_ring_count = qlge->tx_ring_count +
-			    qlge->rss_ring_count;
 		}
+		qlge->intr_cnt = count;
+		qlge->rx_ring_count = qlge->tx_ring_count +
+		    qlge->rss_ring_count;
 	}
+	cmn_err(CE_NOTE, "!qlge(%d) tx %d, rss %d, stride %d\n", qlge->instance,
+	    qlge->tx_ring_count, qlge->rss_ring_count, qlge->isr_stride);
+
 	/*
 	 * Get priority for first vector, assume remaining are all the same
 	 */
@@ -3987,7 +4361,7 @@ ql_free_rx_tx_locks(qlge_t *qlge)
  * Kernel context.
  */
 static void
-ql_free_resources(dev_info_t *dip, qlge_t *qlge)
+ql_free_resources(qlge_t *qlge)
 {
 
 	/* Disable driver timer */
@@ -4062,14 +4436,18 @@ ql_free_resources(dev_info_t *dip, qlge_t *qlge)
 		qlge->flt.ql_flt_entry_ptr = NULL;
 	}
 
+	if (qlge->sequence & INIT_FM) {
+		ql_fm_fini(qlge);
+		qlge->sequence &= ~INIT_FM;
+	}
+
+	ddi_prop_remove_all(qlge->dip);
+	ddi_set_driver_private(qlge->dip, NULL);
+
 	/* finally, free qlge structure */
 	if (qlge->sequence & INIT_SOFTSTATE_ALLOC) {
 		kmem_free(qlge, sizeof (qlge_t));
 	}
-
-	ddi_prop_remove_all(dip);
-	ddi_set_driver_private(dip, NULL);
-
 }
 
 /*
@@ -4516,6 +4894,170 @@ ql_lso_pseudo_cksum(uint8_t *buf)
 }
 
 /*
+ * For IPv4 IP packets, distribute the tx packets evenly among tx rings
+ */
+typedef	uint32_t	ub4; /* unsigned 4-byte quantities */
+typedef	uint8_t		ub1;
+
+#define	hashsize(n)	((ub4)1<<(n))
+#define	hashmask(n)	(hashsize(n)-1)
+
+#define	mix(a, b, c) \
+{ \
+	a -= b; a -= c; a ^= (c>>13); \
+	b -= c; b -= a; b ^= (a<<8); \
+	c -= a; c -= b; c ^= (b>>13); \
+	a -= b; a -= c; a ^= (c>>12);  \
+	b -= c; b -= a; b ^= (a<<16); \
+	c -= a; c -= b; c ^= (b>>5); \
+	a -= b; a -= c; a ^= (c>>3);  \
+	b -= c; b -= a; b ^= (a<<10); \
+	c -= a; c -= b; c ^= (b>>15); \
+}
+
+ub4
+hash(k, length, initval)
+register ub1 *k;	/* the key */
+register ub4 length;	/* the length of the key */
+register ub4 initval;	/* the previous hash, or an arbitrary value */
+{
+	register ub4 a, b, c, len;
+
+	/* Set up the internal state */
+	len = length;
+	a = b = 0x9e3779b9;	/* the golden ratio; an arbitrary value */
+	c = initval;		/* the previous hash value */
+
+	/* handle most of the key */
+	while (len >= 12) {
+		a += (k[0] +((ub4)k[1]<<8) +((ub4)k[2]<<16) +((ub4)k[3]<<24));
+		b += (k[4] +((ub4)k[5]<<8) +((ub4)k[6]<<16) +((ub4)k[7]<<24));
+		c += (k[8] +((ub4)k[9]<<8) +((ub4)k[10]<<16)+((ub4)k[11]<<24));
+		mix(a, b, c);
+		k += 12;
+		len -= 12;
+	}
+
+	/* handle the last 11 bytes */
+	c += length;
+	/* all the case statements fall through */
+	switch (len) {
+		/* FALLTHRU */
+	case 11: c += ((ub4)k[10]<<24);
+		/* FALLTHRU */
+	case 10: c += ((ub4)k[9]<<16);
+		/* FALLTHRU */
+	case 9 : c += ((ub4)k[8]<<8);
+	/* the first byte of c is reserved for the length */
+		/* FALLTHRU */
+	case 8 : b += ((ub4)k[7]<<24);
+		/* FALLTHRU */
+	case 7 : b += ((ub4)k[6]<<16);
+		/* FALLTHRU */
+	case 6 : b += ((ub4)k[5]<<8);
+		/* FALLTHRU */
+	case 5 : b += k[4];
+		/* FALLTHRU */
+	case 4 : a += ((ub4)k[3]<<24);
+		/* FALLTHRU */
+	case 3 : a += ((ub4)k[2]<<16);
+		/* FALLTHRU */
+	case 2 : a += ((ub4)k[1]<<8);
+		/* FALLTHRU */
+	case 1 : a += k[0];
+	/* case 0: nothing left to add */
+	}
+	mix(a, b, c);
+	/* report the result */
+	return (c);
+}
+
+uint8_t
+ql_tx_hashing(qlge_t *qlge, caddr_t bp)
+{
+	struct ip *iphdr = NULL;
+	struct ether_header *ethhdr;
+	struct ether_vlan_header *ethvhdr;
+	struct tcphdr *tcp_hdr;
+	struct udphdr *udp_hdr;
+	uint32_t etherType;
+	int mac_hdr_len, ip_hdr_len;
+	uint32_t h = 0; /* 0 by default */
+	uint8_t tx_ring_id = 0;
+	uint32_t ip_src_addr = 0;
+	uint32_t ip_desc_addr = 0;
+	uint16_t src_port = 0;
+	uint16_t dest_port = 0;
+	uint8_t key[12];
+	QL_PRINT(DBG_TX, ("%s(%d) entered \n", __func__, qlge->instance));
+
+	ethhdr = (struct ether_header *)((void *)bp);
+	ethvhdr = (struct ether_vlan_header *)((void *)bp);
+
+	if (qlge->tx_ring_count == 1)
+		return (tx_ring_id);
+
+	/* Is this vlan packet? */
+	if (ntohs(ethvhdr->ether_tpid) == ETHERTYPE_VLAN) {
+		mac_hdr_len = sizeof (struct ether_vlan_header);
+		etherType = ntohs(ethvhdr->ether_type);
+	} else {
+		mac_hdr_len = sizeof (struct ether_header);
+		etherType = ntohs(ethhdr->ether_type);
+	}
+	/* Is this IPv4 or IPv6 packet? */
+	if (etherType == ETHERTYPE_IP /* 0800 */) {
+		if (IPH_HDR_VERSION((ipha_t *)(void *)(bp+mac_hdr_len))
+		    == IPV4_VERSION) {
+			iphdr = (struct ip *)(void *)(bp+mac_hdr_len);
+		}
+		if (((unsigned long)iphdr) & 0x3) {
+			/*  IP hdr not 4-byte aligned */
+			return (tx_ring_id);
+		}
+	}
+	/* ipV4 packets */
+	if (iphdr) {
+
+		ip_hdr_len = IPH_HDR_LENGTH(iphdr);
+		ip_src_addr = iphdr->ip_src.s_addr;
+		ip_desc_addr = iphdr->ip_dst.s_addr;
+
+		if (iphdr->ip_p == IPPROTO_TCP) {
+			tcp_hdr = (struct tcphdr *)(void *)
+			    ((uint8_t *)iphdr + ip_hdr_len);
+			src_port = tcp_hdr->th_sport;
+			dest_port = tcp_hdr->th_dport;
+		} else if (iphdr->ip_p == IPPROTO_UDP) {
+			udp_hdr = (struct udphdr *)(void *)
+			    ((uint8_t *)iphdr + ip_hdr_len);
+			src_port = udp_hdr->uh_sport;
+			dest_port = udp_hdr->uh_dport;
+		}
+		key[0] = (uint8_t)((ip_src_addr) &0xFF);
+		key[1] = (uint8_t)((ip_src_addr >> 8) &0xFF);
+		key[2] = (uint8_t)((ip_src_addr >> 16) &0xFF);
+		key[3] = (uint8_t)((ip_src_addr >> 24) &0xFF);
+		key[4] = (uint8_t)((ip_desc_addr) &0xFF);
+		key[5] = (uint8_t)((ip_desc_addr >> 8) &0xFF);
+		key[6] = (uint8_t)((ip_desc_addr >> 16) &0xFF);
+		key[7] = (uint8_t)((ip_desc_addr >> 24) &0xFF);
+		key[8] = (uint8_t)((src_port) &0xFF);
+		key[9] = (uint8_t)((src_port >> 8) &0xFF);
+		key[10] = (uint8_t)((dest_port) &0xFF);
+		key[11] = (uint8_t)((dest_port >> 8) &0xFF);
+		h = hash(key, 12, 0); /* return 32 bit */
+		tx_ring_id = (h & (qlge->tx_ring_count - 1));
+		if (tx_ring_id >= qlge->tx_ring_count) {
+			cmn_err(CE_WARN, "%s bad tx_ring_id %d\n",
+			    __func__, tx_ring_id);
+			tx_ring_id = 0;
+		}
+	}
+	return (tx_ring_id);
+}
+
+/*
  * Tell the hardware to do Large Send Offload (LSO)
  *
  * Some fields in ob_mac_iocb need to be set so hardware can know what is
@@ -4732,7 +5274,7 @@ ql_send_common(struct tx_ring *tx_ring, mblk_t *mp)
 	/* get the tx descriptor */
 	mac_iocb_ptr = tx_cb->queue_entry;
 
-	bzero((void *)mac_iocb_ptr, sizeof (*mac_iocb_ptr));
+	bzero((void *)mac_iocb_ptr, 20);
 
 	ASSERT(tx_cb->mp == NULL);
 
@@ -5007,6 +5549,7 @@ bad:
 	now = ddi_get_lbolt();
 	freemsg(mp);
 	mp = NULL;
+	tx_cb->mp = NULL;
 	for (i = 0; i < j; i++)
 		(void) ddi_dma_unbind_handle(tx_cb->tx_dma_handle[i]);
 
@@ -5037,7 +5580,7 @@ ql_do_start(qlge_t *qlge)
 	(void) ql_asic_reset(qlge);
 
 	lbq_buf_size = (uint16_t)
-	    ((qlge->mtu == ETHERMTU)? NORMAL_FRAME_SIZE : JUMBO_FRAME_SIZE);
+	    ((qlge->mtu == ETHERMTU)? LRG_BUF_NORMAL_SIZE : LRG_BUF_JUMBO_SIZE);
 	if (qlge->rx_ring[0].lbq_buf_size != lbq_buf_size) {
 #ifdef QLGE_LOAD_UNLOAD
 		cmn_err(CE_NOTE, "realloc buffers old: %d new: %d\n",
@@ -5086,12 +5629,22 @@ ql_do_start(qlge_t *qlge)
 
 	if (ql_bringup_adapter(qlge) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "qlge bringup adapter failed");
-		ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
 		mutex_exit(&qlge->hw_mutex);
+		if (qlge->fm_enable) {
+			atomic_or_32(&qlge->flags, ADAPTER_ERROR);
+			ddi_fm_service_impact(qlge->dip, DDI_SERVICE_LOST);
+		}
 		return (DDI_FAILURE);
 	}
 
 	mutex_exit(&qlge->hw_mutex);
+	/* if adapter is up successfully but was bad before */
+	if (qlge->flags & ADAPTER_ERROR) {
+		atomic_and_32(&qlge->flags, ~ADAPTER_ERROR);
+		if (qlge->fm_enable) {
+			ddi_fm_service_impact(qlge->dip, DDI_SERVICE_RESTORED);
+		}
+	}
 
 	/* Get current link state */
 	qlge->port_link_state = ql_get_link_state(qlge);
@@ -5451,9 +6004,10 @@ static const ql_ksindex_t ql_kstats_reg[] = {
 	{ 29, "tx dma bind fail on ring 0"	},
 	{ 30, "tx dma no handle on ring 0"	},
 	{ 31, "tx dma no cookie on ring 0"	},
-	{ 32, "MPI firmware major version"},
-	{ 33, "MPI firmware minor version"},
-	{ 34, "MPI firmware sub version"},
+	{ 32, "MPI firmware major version"	},
+	{ 33, "MPI firmware minor version"	},
+	{ 34, "MPI firmware sub version"	},
+	{ 35, "rx no resource"			},
 
 	{ -1, NULL},
 };
@@ -5470,6 +6024,7 @@ ql_kstats_get_reg_and_dev_stats(kstat_t *ksp, int flag)
 	uint32_t val32;
 	int i = 0;
 	struct tx_ring *tx_ring;
+	struct rx_ring *rx_ring;
 
 	if (flag != KSTAT_READ)
 		return (EACCES);
@@ -5521,6 +6076,12 @@ ql_kstats_get_reg_and_dev_stats(kstat_t *ksp, int flag)
 	(knp++)->value.ui32 = qlge->fw_version_info.major_version;
 	(knp++)->value.ui32 = qlge->fw_version_info.minor_version;
 	(knp++)->value.ui32 = qlge->fw_version_info.sub_minor_version;
+
+	for (i = 0; i < qlge->rx_ring_count; i++) {
+		rx_ring = &qlge->rx_ring[i];
+		val32 += rx_ring->rx_packets_dropped_no_buffer;
+	}
+	(knp++)->value.ui32 = val32;
 
 	return (0);
 }
@@ -5625,7 +6186,7 @@ ql_setup_rings(qlge_t *qlge)
 	uint16_t lbq_buf_size;
 
 	lbq_buf_size = (uint16_t)
-	    ((qlge->mtu == ETHERMTU)? NORMAL_FRAME_SIZE : JUMBO_FRAME_SIZE);
+	    ((qlge->mtu == ETHERMTU)? LRG_BUF_NORMAL_SIZE : LRG_BUF_JUMBO_SIZE);
 
 	/*
 	 * rx_ring[0] is always the default queue.
@@ -5698,6 +6259,7 @@ ql_setup_rings(qlge_t *qlge)
 			 * Outbound queue handles outbound completions only
 			 */
 			/* outbound cq is same size as tx_ring it services. */
+			QL_PRINT(DBG_INIT, ("rx_ring 0x%p i %d\n", rx_ring, i));
 			rx_ring->cq_len = qlge->tx_ring_size;
 			rx_ring->cq_size = (uint32_t)
 			    (rx_ring->cq_len * sizeof (struct net_rsp_iocb));
@@ -5748,6 +6310,8 @@ ql_start_rx_ring(qlge_t *qlge, struct rx_ring *rx_ring)
 	/* Set up the shadow registers for this ring. */
 	rx_ring->prod_idx_sh_reg = shadow_reg;
 	rx_ring->prod_idx_sh_reg_dma = shadow_reg_dma;
+	rx_ring->prod_idx_sh_reg_offset = (off_t)(((rx_ring->cq_id *
+	    sizeof (uint64_t) * RX_TX_RING_SHADOW_SPACE) + sizeof (uint64_t)));
 
 	rx_ring->lbq_base_indirect = (uint64_t *)(void *)buf_q_base_reg;
 	rx_ring->lbq_base_indirect_dma = buf_q_base_reg_dma;
@@ -5866,8 +6430,10 @@ ql_start_rx_ring(qlge_t *qlge, struct rx_ring *rx_ring)
 		break;
 
 	case DEFAULT_Q:
-		cqicb->irq_delay = 0;
-		cqicb->pkt_delay = 0;
+		cqicb->irq_delay = (uint16_t)
+		    cpu_to_le16(qlge->rx_coalesce_usecs);
+		cqicb->pkt_delay = (uint16_t)
+		    cpu_to_le16(qlge->rx_max_coalesced_frames);
 		break;
 
 	case RX_Q:
@@ -6278,11 +6844,14 @@ exit:
 static int
 ql_device_initialize(qlge_t *qlge)
 {
-	uint32_t value, mask, required_max_frame_size;
+	uint32_t value, mask;
 	int i;
 	int status = 0;
 	uint16_t pause = PAUSE_MODE_DISABLED;
 	boolean_t update_port_config = B_FALSE;
+	uint32_t pause_bit_mask;
+	boolean_t dcbx_enable = B_FALSE;
+	uint32_t dcbx_bit_mask = 0x10;
 	/*
 	 * Set up the System register to halt on errors.
 	 */
@@ -6314,37 +6883,60 @@ ql_device_initialize(qlge_t *qlge)
 	 * check current port max frame size, if different from OS setting,
 	 * then we need to change
 	 */
-	required_max_frame_size =
+	qlge->max_frame_size =
 	    (qlge->mtu == ETHERMTU)? NORMAL_FRAME_SIZE : JUMBO_FRAME_SIZE;
 
-	if (ql_get_port_cfg(qlge) == DDI_SUCCESS) {
-		/* if correct frame size but different from required size */
-		if (qlge->port_cfg_info.max_frame_size !=
-		    required_max_frame_size) {
+	mutex_enter(&qlge->mbx_mutex);
+	status = ql_get_port_cfg(qlge);
+	mutex_exit(&qlge->mbx_mutex);
+
+	if (status == DDI_SUCCESS) {
+		/* if current frame size is smaller than required size */
+		if (qlge->port_cfg_info.max_frame_size <
+		    qlge->max_frame_size) {
 			QL_PRINT(DBG_MBX,
 			    ("update frame size, current %d, new %d\n",
 			    qlge->port_cfg_info.max_frame_size,
-			    required_max_frame_size));
+			    qlge->max_frame_size));
 			qlge->port_cfg_info.max_frame_size =
-			    required_max_frame_size;
+			    qlge->max_frame_size;
+			qlge->port_cfg_info.link_cfg |= ENABLE_JUMBO;
 			update_port_config = B_TRUE;
 		}
+
 		if (qlge->port_cfg_info.link_cfg & STD_PAUSE)
 			pause = PAUSE_MODE_STANDARD;
 		else if (qlge->port_cfg_info.link_cfg & PP_PAUSE)
 			pause = PAUSE_MODE_PER_PRIORITY;
+
 		if (pause != qlge->pause) {
+			pause_bit_mask = 0x60;	/* bit 5-6 */
+			/* clear pause bits */
+			qlge->port_cfg_info.link_cfg &= ~pause_bit_mask;
+			if (qlge->pause == PAUSE_MODE_STANDARD)
+				qlge->port_cfg_info.link_cfg |= STD_PAUSE;
+			else if (qlge->pause == PAUSE_MODE_PER_PRIORITY)
+				qlge->port_cfg_info.link_cfg |= PP_PAUSE;
 			update_port_config = B_TRUE;
 		}
-		/*
-		 * Always update port config for now to work around
-		 * a hardware bug
-		 */
+
+		if (qlge->port_cfg_info.link_cfg & DCBX_ENABLE)
+			dcbx_enable = B_TRUE;
+		if (dcbx_enable != qlge->dcbx_enable) {
+			qlge->port_cfg_info.link_cfg &= ~dcbx_bit_mask;
+			if (qlge->dcbx_enable)
+				qlge->port_cfg_info.link_cfg |= DCBX_ENABLE;
+		}
+
 		update_port_config = B_TRUE;
 
 		/* if need to update port configuration */
-		if (update_port_config)
-			(void) ql_set_port_cfg(qlge);
+		if (update_port_config) {
+			mutex_enter(&qlge->mbx_mutex);
+			(void) ql_set_mpi_port_config(qlge,
+			    qlge->port_cfg_info);
+			mutex_exit(&qlge->mbx_mutex);
+		}
 	} else
 		cmn_err(CE_WARN, "ql_get_port_cfg failed");
 
@@ -6390,29 +6982,19 @@ ql_device_initialize(qlge_t *qlge)
 
 	return (status);
 }
-
 /*
  * Issue soft reset to chip.
  */
 static int
 ql_asic_reset(qlge_t *qlge)
 {
-	uint32_t value;
-	int max_wait_time = 3;
 	int status = DDI_SUCCESS;
 
 	ql_write_reg(qlge, REG_RESET_FAILOVER, FUNCTION_RESET_MASK
 	    |FUNCTION_RESET);
 
-	max_wait_time = 3;
-	do {
-		value =  ql_read_reg(qlge, REG_RESET_FAILOVER);
-		if ((value & FUNCTION_RESET) == 0)
-			break;
-		qlge_delay(QL_ONE_SEC_DELAY);
-	} while ((--max_wait_time));
-
-	if (max_wait_time == 0) {
+	if (ql_wait_reg_bit(qlge, REG_RESET_FAILOVER, FUNCTION_RESET,
+	    BIT_RESET, 0) != DDI_SUCCESS) {
 		cmn_err(CE_WARN,
 		    "TIMEOUT!!! errored out of resetting the chip!");
 		status = DDI_FAILURE;
@@ -6603,6 +7185,100 @@ ql_init_rx_tx_locks(qlge_t *qlge)
 	return (DDI_SUCCESS);
 }
 
+/*ARGSUSED*/
+/*
+ * Simply call pci_ereport_post which generates ereports for errors
+ * that occur in the PCI local bus configuration status registers.
+ */
+static int
+ql_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
+{
+	pci_ereport_post(dip, err, NULL);
+	return (err->fme_status);
+}
+
+static void
+ql_fm_init(qlge_t *qlge)
+{
+	ddi_iblock_cookie_t iblk;
+
+	QL_PRINT(DBG_INIT, ("ql_fm_init(%d) entered, FMA capability %x\n",
+	    qlge->instance, qlge->fm_capabilities));
+	/*
+	 * Register capabilities with IO Fault Services. The capabilities
+	 * set above may not be supported by the parent nexus, in that case
+	 * some capability bits may be cleared.
+	 */
+	if (qlge->fm_capabilities)
+		ddi_fm_init(qlge->dip, &qlge->fm_capabilities, &iblk);
+
+	/*
+	 * Initialize pci ereport capabilities if ereport capable
+	 */
+	if (DDI_FM_EREPORT_CAP(qlge->fm_capabilities) ||
+	    DDI_FM_ERRCB_CAP(qlge->fm_capabilities)) {
+		pci_ereport_setup(qlge->dip);
+	}
+
+	/* Register error callback if error callback capable */
+	if (DDI_FM_ERRCB_CAP(qlge->fm_capabilities)) {
+		ddi_fm_handler_register(qlge->dip,
+		    ql_fm_error_cb, (void*) qlge);
+	}
+
+	/*
+	 * DDI_FLGERR_ACC indicates:
+	 *  Driver will check its access handle(s) for faults on
+	 *   a regular basis by calling ddi_fm_acc_err_get
+	 *  Driver is able to cope with incorrect results of I/O
+	 *   operations resulted from an I/O fault
+	 */
+	if (DDI_FM_ACC_ERR_CAP(qlge->fm_capabilities)) {
+		ql_dev_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+	}
+
+	/*
+	 * DDI_DMA_FLAGERR indicates:
+	 *  Driver will check its DMA handle(s) for faults on a
+	 *   regular basis using ddi_fm_dma_err_get
+	 *  Driver is able to cope with incorrect results of DMA
+	 *   operations resulted from an I/O fault
+	 */
+	if (DDI_FM_DMA_ERR_CAP(qlge->fm_capabilities)) {
+		tx_mapping_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+		dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+	}
+	QL_PRINT(DBG_INIT, ("ql_fm_init(%d) done\n",
+	    qlge->instance));
+}
+
+static void
+ql_fm_fini(qlge_t *qlge)
+{
+	QL_PRINT(DBG_INIT, ("ql_fm_fini(%d) entered\n",
+	    qlge->instance));
+	/* Only unregister FMA capabilities if we registered some */
+	if (qlge->fm_capabilities) {
+
+		/*
+		 * Release any resources allocated by pci_ereport_setup()
+		 */
+		if (DDI_FM_EREPORT_CAP(qlge->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(qlge->fm_capabilities))
+			pci_ereport_teardown(qlge->dip);
+
+		/*
+		 * Un-register error callback if error callback capable
+		 */
+		if (DDI_FM_ERRCB_CAP(qlge->fm_capabilities))
+			ddi_fm_handler_unregister(qlge->dip);
+
+		/* Unregister from IO Fault Services */
+		ddi_fm_fini(qlge->dip);
+	}
+	QL_PRINT(DBG_INIT, ("ql_fm_fini(%d) done\n",
+	    qlge->instance));
+}
 /*
  * ql_attach - Driver attach.
  */
@@ -6610,10 +7286,12 @@ static int
 ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int instance;
-	qlge_t *qlge;
+	qlge_t *qlge = NULL;
 	int rval;
 	uint16_t w;
 	mac_register_t *macp = NULL;
+	uint32_t data;
+
 	rval = DDI_FAILURE;
 
 	/* first get the instance */
@@ -6622,34 +7300,34 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_ATTACH:
 		/*
-		 * Check that hardware is installed in a DMA-capable slot
-		 */
-		if (ddi_slaveonly(dip) == DDI_SUCCESS) {
-			cmn_err(CE_WARN, "?%s(%d): Not installed in a "
-			    "DMA-capable slot", ADAPTER_NAME, instance);
-			break;
-		}
-
-		/*
-		 * No support for high-level interrupts
-		 */
-		if (ddi_intr_hilevel(dip, 0) != 0) {
-			cmn_err(CE_WARN, "?%s(%d): No support for high-level"
-			    " intrs", ADAPTER_NAME, instance);
-			break;
-		}
-
-		/*
 		 * Allocate our per-device-instance structure
 		 */
-
 		qlge = (qlge_t *)kmem_zalloc(sizeof (*qlge), KM_SLEEP);
 		ASSERT(qlge != NULL);
-
 		qlge->sequence |= INIT_SOFTSTATE_ALLOC;
 
 		qlge->dip = dip;
 		qlge->instance = instance;
+		/* Set up the coalescing parameters. */
+		qlge->ql_dbgprnt = 0;
+#if QL_DEBUG
+		qlge->ql_dbgprnt = QL_DEBUG;
+#endif /* QL_DEBUG */
+
+		/*
+		 * Initialize for fma support
+		 */
+		/* fault management (fm) capabilities. */
+		qlge->fm_capabilities =
+		    DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE;
+		data = ql_get_prop(qlge, "fm-capable");
+		if (data <= 0xf) {
+			qlge->fm_capabilities = data;
+		}
+		ql_fm_init(qlge);
+		qlge->sequence |= INIT_FM;
+		QL_PRINT(DBG_INIT, ("ql_attach(%d): fma init done\n",
+		    qlge->instance));
 
 		/*
 		 * Setup the ISP8x00 registers address mapping to be
@@ -6659,20 +7337,16 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * 0x2   1st Memory Space address - Control Register Set
 		 * 0x3   2nd Memory Space address - Doorbell Memory Space
 		 */
-
 		w = 2;
 		if (ddi_regs_map_setup(dip, w, (caddr_t *)&qlge->iobase, 0,
 		    sizeof (dev_reg_t), &ql_dev_acc_attr,
 		    &qlge->dev_handle) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s(%d): Unable to map device "
 			    "registers", ADAPTER_NAME, instance);
-			ql_free_resources(dip, qlge);
 			break;
 		}
-
 		QL_PRINT(DBG_GLD, ("ql_attach: I/O base = 0x%x\n",
 		    qlge->iobase));
-
 		qlge->sequence |= INIT_REGS_SETUP;
 
 		/* map Doorbell memory space */
@@ -6685,13 +7359,10 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			cmn_err(CE_WARN, "%s(%d): Unable to map Doorbell "
 			    "registers",
 			    ADAPTER_NAME, instance);
-			ql_free_resources(dip, qlge);
 			break;
 		}
-
 		QL_PRINT(DBG_GLD, ("ql_attach: Doorbell I/O base = 0x%x\n",
 		    qlge->doorbell_reg_iobase));
-
 		qlge->sequence |= INIT_DOORBELL_REGS_SETUP;
 
 		/*
@@ -6700,14 +7371,12 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
 			cmn_err(CE_WARN, "%s(%d): mac_alloc failed",
 			    __func__, instance);
-			ql_free_resources(dip, qlge);
-			return (NULL);
+			break;
 		}
 		/* save adapter status to dip private data */
 		ddi_set_driver_private(dip, qlge);
 		QL_PRINT(DBG_INIT, ("%s(%d): Allocate macinfo structure done\n",
 		    ADAPTER_NAME, instance));
-
 		qlge->sequence |= INIT_MAC_ALLOC;
 
 		/*
@@ -6717,55 +7386,68 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (pci_config_setup(dip, &qlge->pci_handle) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s(%d):Unable to get PCI resources",
 			    ADAPTER_NAME, instance);
-			ql_free_resources(dip, qlge);
+			if (qlge->fm_enable) {
+				ql_fm_ereport(qlge, DDI_FM_DEVICE_INVAL_STATE);
+				ddi_fm_service_impact(qlge->dip,
+				    DDI_SERVICE_LOST);
+			}
 			break;
 		}
-
 		qlge->sequence |= INIT_PCI_CONFIG_SETUP;
+		QL_PRINT(DBG_GLD, ("ql_attach(%d): pci_config_setup done\n",
+		    instance));
 
 		if (ql_init_instance(qlge) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s(%d): Unable to initialize device "
 			    "instance", ADAPTER_NAME, instance);
-			ql_free_resources(dip, qlge);
+			if (qlge->fm_enable) {
+				ql_fm_ereport(qlge, DDI_FM_DEVICE_INVAL_STATE);
+				ddi_fm_service_impact(qlge->dip,
+				    DDI_SERVICE_LOST);
+			}
 			break;
 		}
+		QL_PRINT(DBG_GLD, ("ql_attach(%d): ql_init_instance done\n",
+		    instance));
 
 		/* Setup interrupt vectors */
 		if (ql_alloc_irqs(qlge) != DDI_SUCCESS) {
-			ql_free_resources(dip, qlge);
 			break;
 		}
 		qlge->sequence |= INIT_INTR_ALLOC;
+		QL_PRINT(DBG_GLD, ("ql_attach(%d): ql_alloc_irqs done\n",
+		    instance));
 
 		/* Configure queues */
 		if (ql_setup_rings(qlge) != DDI_SUCCESS) {
-			ql_free_resources(dip, qlge);
 			break;
 		}
-
 		qlge->sequence |= INIT_SETUP_RINGS;
+		QL_PRINT(DBG_GLD, ("ql_attach(%d): setup rings done\n",
+		    instance));
+
+		/*
+		 * Allocate memory resources
+		 */
+		if (ql_alloc_mem_resources(qlge) != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "%s(%d): memory allocation failed",
+			    __func__, qlge->instance);
+			break;
+		}
+		qlge->sequence |= INIT_MEMORY_ALLOC;
+		QL_PRINT(DBG_GLD, ("ql_alloc_mem_resources(%d) done\n",
+		    instance));
+
 		/*
 		 * Map queues to interrupt vectors
 		 */
 		ql_resolve_queues_to_irqs(qlge);
-		/*
-		 * Add interrupt handlers
-		 */
-		if (ql_add_intr_handlers(qlge) != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "Failed to add interrupt "
-			    "handlers");
-			ql_free_resources(dip, qlge);
-			break;
-		}
-
-		qlge->sequence |= INIT_ADD_INTERRUPT;
-		QL_PRINT(DBG_GLD, ("%s(%d): Add interrupt handler done\n",
-		    ADAPTER_NAME, instance));
 
 		/* Initialize mutex, need the interrupt priority */
 		(void) ql_init_rx_tx_locks(qlge);
-
 		qlge->sequence |= INIT_LOCKS_CREATED;
+		QL_PRINT(DBG_INIT, ("%s(%d): ql_init_rx_tx_locks done\n",
+		    ADAPTER_NAME, instance));
 
 		/*
 		 * Use a soft interrupt to do something that we do not want
@@ -6774,25 +7456,23 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (ddi_intr_add_softint(qlge->dip, &qlge->mpi_event_intr_hdl,
 		    DDI_INTR_SOFTPRI_MIN, ql_mpi_event_work, (caddr_t)qlge)
 		    != DDI_SUCCESS) {
-			ql_free_resources(dip, qlge);
 			break;
 		}
 
 		if (ddi_intr_add_softint(qlge->dip, &qlge->asic_reset_intr_hdl,
 		    DDI_INTR_SOFTPRI_MIN, ql_asic_reset_work, (caddr_t)qlge)
 		    != DDI_SUCCESS) {
-			ql_free_resources(dip, qlge);
 			break;
 		}
 
 		if (ddi_intr_add_softint(qlge->dip, &qlge->mpi_reset_intr_hdl,
 		    DDI_INTR_SOFTPRI_MIN, ql_mpi_reset_work, (caddr_t)qlge)
 		    != DDI_SUCCESS) {
-			ql_free_resources(dip, qlge);
 			break;
 		}
-
 		qlge->sequence |= INIT_ADD_SOFT_INTERRUPT;
+		QL_PRINT(DBG_INIT, ("%s(%d): ddi_intr_add_softint done\n",
+		    ADAPTER_NAME, instance));
 
 		/*
 		 * mutex to protect the adapter state structure.
@@ -6807,8 +7487,9 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* Mailbox wait and interrupt conditional variable. */
 		cv_init(&qlge->cv_mbx_intr, NULL, CV_DRIVER, NULL);
-
 		qlge->sequence |= INIT_MUTEX;
+		QL_PRINT(DBG_INIT, ("%s(%d): mutex_init done\n",
+		    ADAPTER_NAME, instance));
 
 		/*
 		 * KStats
@@ -6816,20 +7497,34 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (ql_init_kstats(qlge) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s(%d): KState initialization failed",
 			    ADAPTER_NAME, instance);
-			ql_free_resources(dip, qlge);
 			break;
 		}
 		qlge->sequence |= INIT_KSTATS;
+		QL_PRINT(DBG_INIT, ("%s(%d): ql_init_kstats done\n",
+		    ADAPTER_NAME, instance));
 
 		/*
 		 * Initialize gld macinfo structure
 		 */
 		ql_gld3_init(qlge, macp);
+		/*
+		 * Add interrupt handlers
+		 */
+		if (ql_add_intr_handlers(qlge) != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "Failed to add interrupt "
+			    "handlers");
+			break;
+		}
+		qlge->sequence |= INIT_ADD_INTERRUPT;
+		QL_PRINT(DBG_INIT, ("%s(%d): Add interrupt handler done\n",
+		    ADAPTER_NAME, instance));
 
+		/*
+		 * MAC Register
+		 */
 		if (mac_register(macp, &qlge->mh) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s(%d): mac_register failed",
 			    __func__, instance);
-			ql_free_resources(dip, qlge);
 			break;
 		}
 		qlge->sequence |= INIT_MAC_REGISTERED;
@@ -6841,21 +7536,10 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		qlge->mac_flags = QL_MAC_ATTACHED;
 
-		/*
-		 * Allocate memory resources
-		 */
-		if (ql_alloc_mem_resources(qlge) != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "%s(%d): memory allocation failed",
-			    __func__, qlge->instance);
-			ql_free_mem_resources(qlge);
-			ddi_fm_service_impact(qlge->dip, DDI_SERVICE_DEGRADED);
-			return (DDI_FAILURE);
-		}
-		qlge->sequence |= INIT_MEMORY_ALLOC;
-
 		ddi_report_dev(dip);
 
 		rval = DDI_SUCCESS;
+
 	break;
 /*
  * DDI_RESUME
@@ -6884,6 +7568,14 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	default:
 		break;
 	}
+
+	/* if failed to attach */
+	if ((cmd == DDI_ATTACH) && (rval != DDI_SUCCESS) && (qlge != NULL)) {
+		cmn_err(CE_WARN, "qlge driver attach failed, sequence %x",
+		    qlge->sequence);
+		ql_free_resources(qlge);
+	}
+
 	return (rval);
 }
 
@@ -6935,6 +7627,15 @@ ql_wait_tx_quiesce(qlge_t *qlge)
 			producer_idx = temp & 0x0000ffff;
 			consumer_idx = (temp >> 16);
 
+			if (qlge->isr_stride) {
+				struct rx_ring *ob_ring;
+				ob_ring = &qlge->rx_ring[tx_ring->cq_id];
+				if (producer_idx != ob_ring->cnsmr_idx) {
+					cmn_err(CE_NOTE, " force clean \n");
+					(void) ql_clean_outbound_rx_ring(
+					    ob_ring);
+				}
+			}
 			/*
 			 * Get the pending iocb count, ones which have not been
 			 * pulled down by the chip
@@ -7135,7 +7836,7 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			ql_free_mem_resources(qlge);
 			qlge->sequence &= ~INIT_MEMORY_ALLOC;
 		}
-		ql_free_resources(dip, qlge);
+		ql_free_resources(qlge);
 
 		break;
 

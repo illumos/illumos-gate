@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 QLogic Corporation. All rights reserved.
+ * Copyright 2010 QLogic Corporation. All rights reserved.
  */
 
 #ifndef _QLGE_H
@@ -53,6 +53,10 @@ extern "C" {
 #include <sys/miiregs.h>
 #include <sys/kstat.h>
 #include <sys/byteorder.h>
+#include <sys/ddifm.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#include <sys/fm/io/ddi.h>
 
 #include <qlge_hw.h>
 #include <qlge_dbg.h>
@@ -242,9 +246,10 @@ struct dma_info {
 #define	ADAPTER_INIT			BIT_12
 #define	INIT_MAC_REGISTERED		BIT_13
 #define	INIT_KSTATS			BIT_14
-#define	INIT_ADAPTER_UP			BIT_15
-#define	INIT_ALLOC_RX_BUF		BIT_16
-#define	INIT_INTR_ENABLED		BIT_17
+#define	INIT_FM				BIT_15
+#define	INIT_ADAPTER_UP			BIT_16
+#define	INIT_ALLOC_RX_BUF		BIT_17
+#define	INIT_INTR_ENABLED		BIT_18
 
 
 #define	LS_64BITS(x)	(uint32_t)(0xffffffff & ((uint64_t)x))
@@ -254,10 +259,10 @@ typedef uint64_t dma_addr_t;
 extern int ql_quiesce(dev_info_t *dip);
 
 /*
- * LSO can support up to 65536 bytes of data, but can not be sent in one IOCB
+ * LSO can support up to 65535 bytes of data, but can not be sent in one IOCB
  * which only has 8 TX OALs, additional OALs must be applied separately.
  */
-#define	QL_LSO_MAX		65536 /* Maximum supported LSO data Length */
+#define	QL_LSO_MAX		65535 /* Maximum supported LSO data Length */
 
 enum tx_mode_t {
 	USE_DMA,
@@ -511,6 +516,7 @@ struct rx_ring {
 	uint32_t		cq_size;
 	uint32_t		cq_len;
 	uint16_t		cq_id;
+	off_t			prod_idx_sh_reg_offset;
 	volatile uint32_t	*prod_idx_sh_reg;	/* Shadowed prod reg */
 	uint64_t		prod_idx_sh_reg_dma;	/* Physical address */
 	uint32_t		*cnsmr_idx_db_reg;	/* PCI db mem area 0 */
@@ -566,6 +572,9 @@ struct rx_ring {
 	uint32_t		sbuf_copy_count;
 	uint32_t		lbuf_copy_count;
 
+#ifdef QLGE_PERFORMANCE
+	uint32_t		hist[8];
+#endif
 };
 
 struct intr_ctx {
@@ -610,7 +619,9 @@ typedef struct qlge {
 	uint32_t		sequence;
 	struct intr_ctx		intr_ctx[MAX_RX_RINGS];
 	struct dma_info		ricb_dma;
-
+	/* fault management capabilities */
+	int			fm_capabilities;
+	boolean_t		fm_enable;
 	enum mac_state		mac_flags;
 
 	volatile uint32_t	cfg_flags;
@@ -691,6 +702,7 @@ typedef struct qlge {
 	uint32_t		fn1_net;	/* network function 1 port */
 
 	uint32_t		mtu;
+	uint32_t		max_frame_size;
 	uint32_t		port_link_state;
 	uint32_t		speed;
 	uint16_t		link_type;
@@ -698,6 +710,7 @@ typedef struct qlge {
 	uint32_t		pause;	/* flow-control mode */
 	uint32_t		loop_back_mode;
 	uint32_t		lso_enable;
+	uint32_t		dcbx_enable;	/* dcbx mode */
 	/*
 	 * PCI status
 	 */
@@ -794,6 +807,7 @@ typedef struct qlge {
 	uint32_t		rss_ring_count;
 	uint32_t		tx_ring_first_cq_id;
 	uint32_t		tx_ring_count;
+	uint32_t		isr_stride;
 #ifdef QLGE_TRACK_BUFFER_USAGE
 	/* Count no of times the buffers fell below 32 */
 	uint32_t		rx_sb_low_count[MAX_RX_RINGS];
@@ -857,6 +871,7 @@ extern void ql_enable_completion_interrupt(qlge_t *, uint32_t);
 extern mblk_t *ql_ring_rx_poll(void *, int);
 extern void ql_disable_completion_interrupt(qlge_t *qlge, uint32_t intr);
 extern mblk_t *ql_ring_tx(void *arg, mblk_t *mp);
+extern uint8_t ql_tx_hashing(qlge_t *qlge, caddr_t bp);
 extern void ql_atomic_set_32(volatile uint32_t *target, uint32_t newval);
 extern uint32_t ql_atomic_read_32(volatile uint32_t *target);
 extern void ql_restart_timer(qlge_t *qlge);
@@ -879,7 +894,9 @@ extern int qlge_get_link_status(qlge_t *, struct qlnic_link_status_info *);
 extern int ql_mbx_test(qlge_t *qlge);
 extern int ql_mbx_test2(qlge_t *qlge);
 extern int ql_get_port_cfg(qlge_t *qlge);
-extern int ql_set_port_cfg(qlge_t *qlge);
+extern int ql_set_mpi_port_config(qlge_t *qlge, port_cfg_info_t new_cfg);
+extern int ql_set_loop_back_mode(qlge_t *qlge);
+extern int ql_set_pause_mode(qlge_t *qlge);
 extern int ql_get_LED_config(qlge_t *);
 extern int ql_dump_sfp(qlge_t *, void *bp, int mode);
 extern int ql_set_IDC_Req(qlge_t *, uint8_t dest_functions, uint8_t timeout);
@@ -896,6 +913,19 @@ extern void ql_core_dump(qlge_t *);
 extern void ql_dump_crash_record(qlge_t *);
 extern void ql_dump_buf(char *, uint8_t *, uint8_t, uint32_t);
 extern void ql_printf(const char *, ...);
+
+/*
+ * Global Function Prototypes in qlge_gld.c source file.
+ */
+extern int ql_unicst_set(qlge_t *qlge, const uint8_t *macaddr, int slot);
+
+/*
+ * Global Function Prototypes in qlge_fm.c source file.
+ */
+extern void ql_fm_ereport(qlge_t *qlge, char *detail);
+extern int ql_fm_check_acc_handle(ddi_acc_handle_t handle);
+extern int ql_fm_check_dma_handle(ddi_dma_handle_t handle);
+
 
 #ifdef __cplusplus
 }
