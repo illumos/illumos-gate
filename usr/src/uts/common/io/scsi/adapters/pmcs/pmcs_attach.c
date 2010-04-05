@@ -111,7 +111,7 @@ static uint_t pmcs_all_intr(caddr_t, caddr_t);
 static int pmcs_quiesce(dev_info_t *dip);
 static boolean_t pmcs_fabricate_wwid(pmcs_hw_t *);
 
-static void pmcs_create_phy_stats(pmcs_iport_t *);
+static void pmcs_create_all_phy_stats(pmcs_iport_t *);
 int pmcs_update_phy_stats(kstat_t *, int);
 static void pmcs_destroy_phy_stats(pmcs_iport_t *);
 
@@ -374,7 +374,7 @@ pmcs_iport_attach(dev_info_t *dip)
 	mutex_exit(&iport->lock);
 
 	/* Create kstats for each of the phys in this port */
-	pmcs_create_phy_stats(iport);
+	pmcs_create_all_phy_stats(iport);
 
 	/*
 	 * Insert this iport handle into our list and set
@@ -3008,14 +3008,77 @@ pmcs_release_scratch(pmcs_hw_t *pwp)
 	pwp->scratch_locked = 0;
 }
 
-static void
-pmcs_create_phy_stats(pmcs_iport_t *iport)
+/* Called with iport_lock and phy lock held */
+void
+pmcs_create_one_phy_stats(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 {
 	sas_phy_stats_t		*ps;
 	pmcs_hw_t		*pwp;
-	pmcs_phy_t		*phyp;
 	int			ndata;
 	char			ks_name[KSTAT_STRLEN];
+
+	ASSERT(mutex_owned(&iport->lock));
+	pwp = iport->pwp;
+	ASSERT(pwp != NULL);
+	ASSERT(mutex_owned(&phyp->phy_lock));
+
+	if (phyp->phy_stats != NULL) {
+		/*
+		 * Delete existing kstats with name containing
+		 * old iport instance# and allow creation of
+		 * new kstats with new iport instance# in the name.
+		 */
+		kstat_delete(phyp->phy_stats);
+	}
+
+	ndata = (sizeof (sas_phy_stats_t)/sizeof (kstat_named_t));
+
+	(void) snprintf(ks_name, sizeof (ks_name),
+	    "%s.%llx.%d.%d", ddi_driver_name(iport->dip),
+	    (longlong_t)pwp->sas_wwns[0],
+	    ddi_get_instance(iport->dip), phyp->phynum);
+
+	phyp->phy_stats = kstat_create("pmcs",
+	    ddi_get_instance(iport->dip), ks_name, KSTAT_SAS_PHY_CLASS,
+	    KSTAT_TYPE_NAMED, ndata, 0);
+
+	if (phyp->phy_stats == NULL) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL,
+		    "%s: Failed to create %s kstats for PHY(0x%p) at %s",
+		    __func__, ks_name, (void *)phyp, phyp->path);
+	}
+
+	ps = (sas_phy_stats_t *)phyp->phy_stats->ks_data;
+
+	kstat_named_init(&ps->seconds_since_last_reset,
+	    "SecondsSinceLastReset", KSTAT_DATA_ULONGLONG);
+	kstat_named_init(&ps->tx_frames,
+	    "TxFrames", KSTAT_DATA_ULONGLONG);
+	kstat_named_init(&ps->rx_frames,
+	    "RxFrames", KSTAT_DATA_ULONGLONG);
+	kstat_named_init(&ps->tx_words,
+	    "TxWords", KSTAT_DATA_ULONGLONG);
+	kstat_named_init(&ps->rx_words,
+	    "RxWords", KSTAT_DATA_ULONGLONG);
+	kstat_named_init(&ps->invalid_dword_count,
+	    "InvalidDwordCount", KSTAT_DATA_ULONGLONG);
+	kstat_named_init(&ps->running_disparity_error_count,
+	    "RunningDisparityErrorCount", KSTAT_DATA_ULONGLONG);
+	kstat_named_init(&ps->loss_of_dword_sync_count,
+	    "LossofDwordSyncCount", KSTAT_DATA_ULONGLONG);
+	kstat_named_init(&ps->phy_reset_problem_count,
+	    "PhyResetProblemCount", KSTAT_DATA_ULONGLONG);
+
+	phyp->phy_stats->ks_private = phyp;
+	phyp->phy_stats->ks_update = pmcs_update_phy_stats;
+	kstat_install(phyp->phy_stats);
+}
+
+static void
+pmcs_create_all_phy_stats(pmcs_iport_t *iport)
+{
+	pmcs_hw_t		*pwp;
+	pmcs_phy_t		*phyp;
 
 	ASSERT(iport != NULL);
 	pwp = iport->pwp;
@@ -3027,58 +3090,9 @@ pmcs_create_phy_stats(pmcs_iport_t *iport)
 	    phyp != NULL;
 	    phyp = list_next(&iport->phys, phyp)) {
 
-		pmcs_lock_phy(phyp);
-
-		if (phyp->phy_stats != NULL) {
-			pmcs_unlock_phy(phyp);
-			/* We've already created this kstat instance */
-			continue;
-		}
-
-		ndata = (sizeof (sas_phy_stats_t)/sizeof (kstat_named_t));
-
-		(void) snprintf(ks_name, sizeof (ks_name),
-		    "%s.%llx.%d.%d", ddi_driver_name(iport->dip),
-		    (longlong_t)pwp->sas_wwns[0],
-		    ddi_get_instance(iport->dip), phyp->phynum);
-
-		phyp->phy_stats = kstat_create("pmcs",
-		    ddi_get_instance(iport->dip), ks_name, KSTAT_SAS_PHY_CLASS,
-		    KSTAT_TYPE_NAMED, ndata, 0);
-
-		if (phyp->phy_stats == NULL) {
-			pmcs_unlock_phy(phyp);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL,
-			    "%s: Failed to create %s kstats", __func__,
-			    ks_name);
-			continue;
-		}
-
-		ps = (sas_phy_stats_t *)phyp->phy_stats->ks_data;
-
-		kstat_named_init(&ps->seconds_since_last_reset,
-		    "SecondsSinceLastReset", KSTAT_DATA_ULONGLONG);
-		kstat_named_init(&ps->tx_frames,
-		    "TxFrames", KSTAT_DATA_ULONGLONG);
-		kstat_named_init(&ps->rx_frames,
-		    "RxFrames", KSTAT_DATA_ULONGLONG);
-		kstat_named_init(&ps->tx_words,
-		    "TxWords", KSTAT_DATA_ULONGLONG);
-		kstat_named_init(&ps->rx_words,
-		    "RxWords", KSTAT_DATA_ULONGLONG);
-		kstat_named_init(&ps->invalid_dword_count,
-		    "InvalidDwordCount", KSTAT_DATA_ULONGLONG);
-		kstat_named_init(&ps->running_disparity_error_count,
-		    "RunningDisparityErrorCount", KSTAT_DATA_ULONGLONG);
-		kstat_named_init(&ps->loss_of_dword_sync_count,
-		    "LossofDwordSyncCount", KSTAT_DATA_ULONGLONG);
-		kstat_named_init(&ps->phy_reset_problem_count,
-		    "PhyResetProblemCount", KSTAT_DATA_ULONGLONG);
-
-		phyp->phy_stats->ks_private = phyp;
-		phyp->phy_stats->ks_update = pmcs_update_phy_stats;
-		kstat_install(phyp->phy_stats);
-		pmcs_unlock_phy(phyp);
+		mutex_enter(&phyp->phy_lock);
+		pmcs_create_one_phy_stats(iport, phyp);
+		mutex_exit(&phyp->phy_lock);
 	}
 
 	mutex_exit(&iport->lock);
@@ -3141,12 +3155,17 @@ pmcs_destroy_phy_stats(pmcs_iport_t *iport)
 		return;
 	}
 
-	pmcs_lock_phy(phyp);
-	if (phyp->phy_stats != NULL) {
-		kstat_delete(phyp->phy_stats);
-		phyp->phy_stats = NULL;
+	for (phyp = list_head(&iport->phys);
+	    phyp != NULL;
+	    phyp = list_next(&iport->phys, phyp)) {
+
+		mutex_enter(&phyp->phy_lock);
+		if (phyp->phy_stats != NULL) {
+			kstat_delete(phyp->phy_stats);
+			phyp->phy_stats = NULL;
+		}
+		mutex_exit(&phyp->phy_lock);
 	}
-	pmcs_unlock_phy(phyp);
 
 	mutex_exit(&iport->lock);
 }

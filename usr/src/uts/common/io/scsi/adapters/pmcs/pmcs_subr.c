@@ -7897,6 +7897,9 @@ pmcs_add_phy_to_iport(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 	list_insert_tail(&iport->phys, phyp);
 	pmcs_smhba_add_iport_prop(iport, DATA_TYPE_INT32, PMCS_NUM_PHYS,
 	    &iport->nphy);
+	mutex_enter(&phyp->phy_lock);
+	pmcs_create_one_phy_stats(iport, phyp);
+	mutex_exit(&phyp->phy_lock);
 	mutex_enter(&iport->refcnt_lock);
 	iport->refcnt++;
 	mutex_exit(&iport->refcnt_lock);
@@ -7920,6 +7923,10 @@ pmcs_remove_phy_from_iport(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 		    pptr = next_pptr) {
 			next_pptr = list_next(&iport->phys, pptr);
 			mutex_enter(&pptr->phy_lock);
+			if (pptr->phy_stats != NULL) {
+				kstat_delete(pptr->phy_stats);
+				pptr->phy_stats = NULL;
+			}
 			pptr->iport = NULL;
 			pmcs_update_phy_pm_props(pptr, pptr->att_port_pm_tmp,
 			    pptr->tgt_port_pm_tmp, B_FALSE);

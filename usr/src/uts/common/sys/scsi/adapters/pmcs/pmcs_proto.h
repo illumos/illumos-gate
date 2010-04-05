@@ -289,7 +289,7 @@ void pmcs_set_intr_coal_timer(pmcs_hw_t *pwp, pmcs_coal_timer_adj_t adj);
  */
 void pmcs_check_iomb_status(pmcs_hw_t *pwp, uint32_t *iomb);
 void pmcs_clear_xp(pmcs_hw_t *, pmcs_xscsi_t *);
-
+void pmcs_create_one_phy_stats(pmcs_iport_t *, pmcs_phy_t *);
 int pmcs_run_sata_cmd(pmcs_hw_t *, pmcs_phy_t *, fis_t, uint32_t,
     uint32_t, uint32_t);
 int pmcs_sata_identify(pmcs_hw_t *, pmcs_phy_t *);
