@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -34,9 +33,12 @@
  * - Victoria Falls
  */
 
+#include <sys/pcie_impl.h>
+
 /* ARGSUSED */
 static int
-px_cb_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
+px_cb_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
+    pf_data_t *pfd_p)
 {
 	int err = 0;
 
@@ -227,7 +229,8 @@ px_cb_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 
 /* ARGSUSED */
 static int
-px_mmu_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
+px_mmu_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
+    pf_data_t *pfd_p)
 {
 	int err = 0;
 
@@ -410,7 +413,8 @@ px_mmu_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 
 /* ARGSUSED */
 static int
-px_intr_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
+px_intr_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
+    pf_data_t *pfd_p)
 {
 	int err = 0;
 
@@ -526,7 +530,7 @@ px_intr_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 				switch (epkt->rc_descr.dir) {
 				case DIR_IRR:
 					err = px_intr_handle_errors(dip, derr,
-					    epkt);
+					    epkt, pfd_p);
 					break;
 				} /* DIR */
 				break;
@@ -591,13 +595,10 @@ px_port_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
     pf_data_t *pfd_p)
 {
 	int err = 0;
-	int flag = 0;
 
 	/* STOP bit indicates a secondary error. Panic if it is set */
-	if (epkt->rc_descr.STOP == 1) {
-		PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = PF_AFFECTED_SELF;
+	if (epkt->rc_descr.STOP == 1)
 		return (PX_PANIC);
-	}
 
 	switch (epkt->rc_descr.op) {
 	case OP_DMA:
@@ -608,6 +609,10 @@ px_port_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 				switch (epkt->rc_descr.dir) {
 				case DIR_READ:
 					err = PX_PANIC;
+					PFD_SET_AFFECTED_FLAG(pfd_p,
+					    PF_AFFECTED_BDF);
+					PFD_SET_AFFECTED_BDF(pfd_p,
+					    (uint16_t)epkt->reserved);
 					break;
 				} /* DIR */
 				break;
@@ -623,6 +628,10 @@ px_port_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 				switch (epkt->rc_descr.dir) {
 				case DIR_IRR:
 					err = PX_PANIC;
+					PFD_SET_AFFECTED_FLAG(pfd_p,
+					    PF_AFFECTED_BDF);
+					PFD_SET_AFFECTED_BDF(pfd_p,
+					    (uint16_t)epkt->reserved);
 					break;
 				} /* DIR */
 				break;
@@ -638,9 +647,17 @@ px_port_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 				switch (epkt->rc_descr.dir) {
 				case DIR_READ:
 					err = PX_PANIC;
+					PFD_SET_AFFECTED_FLAG(pfd_p,
+					    PF_AFFECTED_BDF);
+					PFD_SET_AFFECTED_BDF(pfd_p,
+					    (uint16_t)epkt->reserved);
 					break;
 				case DIR_UNKNOWN:
 					err = PX_PANIC;
+					PFD_SET_AFFECTED_FLAG(pfd_p,
+					    PF_AFFECTED_BDF);
+					PFD_SET_AFFECTED_BDF(pfd_p,
+					    (uint16_t)epkt->reserved);
 					break;
 				} /* DIR */
 				break;
@@ -660,7 +677,6 @@ px_port_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 				case DIR_WRITE:
 					err = px_port_handle_errors(dip, derr,
 					    epkt, pfd_p);
-					flag = 1;
 					break;
 				} /* DIR */
 				break;
@@ -669,7 +685,6 @@ px_port_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 				case DIR_WRITE:
 					err = px_port_handle_errors(dip, derr,
 					    epkt, pfd_p);
-					flag = 1;
 					break;
 				} /* DIR */
 				break;
@@ -699,14 +714,15 @@ px_port_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt,
 				switch (epkt->rc_descr.dir) {
 				case DIR_UNKNOWN:
 					err = PX_PANIC;
+					PFD_SET_AFFECTED_FLAG(pfd_p,
+					    PF_AFFECTED_BDF);
+					PFD_SET_AFFECTED_BDF(pfd_p,
+					    (uint16_t)epkt->reserved);
 					break;
 				} /* DIR */
 			} /* CND */
 		} /* PH */
 	} /* OP */
-
-	if (flag == 0)
-		PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = PF_AFFECTED_SELF;
 
 	return (err);
 }

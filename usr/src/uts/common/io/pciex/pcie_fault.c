@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sysmacros.h>
@@ -443,6 +442,9 @@ pf_in_addr_range(pcie_bus_t *bus_p, uint64_t addr)
 	uint_t		i;
 	uint64_t	low, hi;
 	ppb_ranges_t	*ranges_p = bus_p->bus_addr_ranges;
+
+	if (!addr)
+		return (B_FALSE);
 
 	/* check if given address belongs to this device */
 	if (pf_in_assigned_addr(bus_p, addr))

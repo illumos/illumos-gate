@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_PCIE_IMPL_H
@@ -166,6 +165,10 @@ extern "C" {
 #define	PCIE_ADV_RP_REG(pfd_p) \
 	PCIE_ADV_REG(pfd_p)->pcie_ext.pcie_adv_rp_regs
 #define	PFD_AFFECTED_DEV(pfd_p)	   pfd_p->pe_affected_dev
+#define	PFD_SET_AFFECTED_FLAG(pfd_p, aff_flag) \
+	PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = aff_flag
+#define	PFD_SET_AFFECTED_BDF(pfd_p, bdf) \
+	PFD_AFFECTED_DEV(pfd_p)->pe_affected_bdf = bdf
 
 #define	PFD_IS_ROOT(pfd_p)	   PCIE_IS_ROOT(PCIE_PFD2BUS(pfd_p))
 #define	PFD_IS_RC(pfd_p)	   PCIE_IS_RC(PCIE_PFD2BUS(pfd_p))

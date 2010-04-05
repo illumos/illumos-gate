@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_PX_FM_H
@@ -52,7 +51,10 @@ extern "C" {
  *              Set when SW determines this error is forgivable during safe acc.
  * No-panic     Errors that don't directly result in panic'ing the system.
  * No-Error     When an interrupt occured and no errors were seen
+ * Fabric Scan	Indicates that fabric scan will determine final severity of a
+ *		panicable error.
  */
+#define	PX_FABRIC_SCAN		(0x1 << 6)
 #define	PX_HW_RESET		(0x1 << 5)
 #define	PX_PANIC		(0x1 << 4)
 #define	PX_EXPECTED		(0x1 << 3)
