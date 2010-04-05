@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
@@ -864,6 +863,7 @@ pr_read_map_common(prnode_t *pnp, uio_t *uiop, prnodetype_t type)
 	list_t iolhead;
 	int error;
 
+readmap_common:
 	if ((error = prlock(pnp, ZNO)) != 0)
 		return (error);
 
@@ -875,8 +875,13 @@ pr_read_map_common(prnode_t *pnp, uio_t *uiop, prnodetype_t type)
 		return (0);
 	}
 
+	if (!AS_LOCK_TRYENTER(as, &as->a_lock, RW_WRITER)) {
+		prunlock(pnp);
+		delay(1);
+		goto readmap_common;
+	}
 	mutex_exit(&p->p_lock);
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+
 	switch (type) {
 	case PR_XMAP:
 		error = prgetxmap(p, &iolhead);
@@ -888,6 +893,7 @@ pr_read_map_common(prnode_t *pnp, uio_t *uiop, prnodetype_t type)
 		error = prgetmap(p, 0, &iolhead);
 		break;
 	}
+
 	AS_LOCK_EXIT(as, &as->a_lock);
 	mutex_enter(&p->p_lock);
 	prunlock(pnp);
@@ -1942,6 +1948,7 @@ pr_read_map_common_32(prnode_t *pnp, uio_t *uiop, prnodetype_t type)
 	list_t	iolhead;
 	int error;
 
+readmap32_common:
 	if ((error = prlock(pnp, ZNO)) != 0)
 		return (error);
 
@@ -1958,8 +1965,13 @@ pr_read_map_common_32(prnode_t *pnp, uio_t *uiop, prnodetype_t type)
 		return (EOVERFLOW);
 	}
 
+	if (!AS_LOCK_TRYENTER(as, &as->a_lock, RW_WRITER)) {
+		prunlock(pnp);
+		delay(1);
+		goto readmap32_common;
+	}
 	mutex_exit(&p->p_lock);
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+
 	switch (type) {
 	case PR_XMAP:
 		error = prgetxmap32(p, &iolhead);
