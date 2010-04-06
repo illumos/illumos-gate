@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -1324,20 +1323,37 @@ static int
 xattr_dir_realvp(vnode_t *vp, vnode_t **realvp, caller_context_t *ct)
 {
 	xattr_dir_t *xattr_dir;
-	int error;
 
 	mutex_enter(&vp->v_lock);
 	xattr_dir = vp->v_data;
 	if (xattr_dir->xattr_realvp) {
 		*realvp = xattr_dir->xattr_realvp;
-		error = 0;
+		mutex_exit(&vp->v_lock);
+		return (0);
 	} else {
-		if ((error = xattr_dir_realdir(vp, &xattr_dir->xattr_realvp,
-		    LOOKUP_XATTR, kcred, NULL)) == 0)
-			*realvp = xattr_dir->xattr_realvp;
+		vnode_t *xdvp;
+		int error;
+
+		mutex_exit(&vp->v_lock);
+		if ((error = xattr_dir_realdir(vp, &xdvp,
+		    LOOKUP_XATTR, kcred, NULL)) == 0) {
+			/*
+			 * verify we aren't racing with another thread
+			 * to find the xattr_realvp
+			 */
+			mutex_enter(&vp->v_lock);
+			if (xattr_dir->xattr_realvp == NULL) {
+				xattr_dir->xattr_realvp = xdvp;
+				*realvp = xdvp;
+				mutex_exit(&vp->v_lock);
+			} else {
+				*realvp = xattr_dir->xattr_realvp;
+				mutex_exit(&vp->v_lock);
+				VN_RELE(xdvp);
+			}
+		}
+		return (error);
 	}
-	mutex_exit(&vp->v_lock);
-	return (error);
 }
 
 static const fs_operation_def_t xattr_dir_tops[] = {
