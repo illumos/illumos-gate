@@ -1551,7 +1551,9 @@ pmcs_check_intr_coal(void *arg)
 		 * from the watchdog timer) can cause livelocks.
 		 */
 		if (pwp->fwlog_file) {
+			mutex_exit(&pwp->ict_lock);
 			pmcs_gather_fwlog(pwp);
+			mutex_enter(&pwp->ict_lock);
 		}
 	}
 
