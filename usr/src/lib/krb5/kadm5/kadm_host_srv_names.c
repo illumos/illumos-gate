@@ -1,8 +1,6 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 /*
  * lib/kad5/kadm_host_srv_names.c
@@ -244,7 +242,7 @@ kadm5_ret_t kadm5_is_master(krb5_context context, const char *realm,
 
 	kadm5_ret_t ret;
 	char *admin_host = NULL;
-	krb5_address **master_addr = NULL;
+	krb5_address **tmp_addr, **master_addr = NULL;
 	krb5_address **local_addr = NULL;
 
 	if (is_master)
@@ -269,8 +267,8 @@ kadm5_ret_t kadm5_is_master(krb5_context context, const char *realm,
 	}
 
 	/* Compare them */
-	for (; *master_addr; master_addr++) {
-		if (krb5_address_search(context, *master_addr, local_addr)) {
+	for (tmp_addr = master_addr; *tmp_addr; tmp_addr++) {
+		if (krb5_address_search(context, *tmp_addr, local_addr)) {
 			*is_master = TRUE;
 			break;
 		}
