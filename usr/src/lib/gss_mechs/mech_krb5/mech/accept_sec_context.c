@@ -71,8 +71,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "k5-int.h"
@@ -592,7 +591,14 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    krb5_auth_con_setflags(context, auth_context,
 			  KRB5_AUTH_CONTEXT_DO_SEQUENCE);
 
-   krb5_auth_con_getauthenticator(context, auth_context, &authdat);
+   /* Solaris Kerberos */
+   code = krb5_auth_con_getauthenticator(context, auth_context, &authdat);
+   if (code) {
+	   KRB5_LOG(KRB5_ERR, "krb5_gss_accept_sec_context() "
+		  "krb5_auth_con_getauthenticator() error code %d", code);
+	   major_status = GSS_S_FAILURE;
+	   goto fail;
+   }
 
 #if 0
    /* make sure the necessary parts of the authdat are present */
