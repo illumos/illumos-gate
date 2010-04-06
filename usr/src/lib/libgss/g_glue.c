@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "mglueP.h"
@@ -579,6 +578,9 @@ OM_uint32 gssint_convert_name_to_union_name(minor_status, mech,
 	    goto allocation_failure;
     }
 	
+    union_name->external_name->length = 0;
+    union_name->external_name->value = 0;
+
     major_status = mech->gss_display_name(
 	    mech->context,  /* SUNW17PACresync */
 	    minor_status,
