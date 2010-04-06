@@ -124,13 +124,9 @@ krb5_os_hostaddr(krb5_context context, const char *name, krb5_address ***ret_add
     return 0;
 
 errout:
-    if (addrs) {
-	for (i = 0; addrs[i]; i++) {
-	    free (addrs[i]->contents);
-	    free (addrs[i]);
-	}
+    /* Solaris Kerberos */
+    if (addrs)
 	krb5_free_addresses(context, addrs);
-    }
     if (ai)
 	freeaddrinfo(ai);
     return retval;
