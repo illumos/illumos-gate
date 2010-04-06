@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Common definitions for open and closed headers.
@@ -51,6 +50,21 @@ ib/%.check:		ib/%.h
 	$(DOT_H_CHECK)
 
 ib/clients/ibd/%.check:	ib/clients/ibd/%.h
+	$(DOT_H_CHECK)
+
+ib/clients/of/%.check:		ib/clients/of/%.h
+	$(DOT_H_CHECK)
+
+ib/clients/of/rdma/%.check:		ib/clients/of/rdma/%.h
+	$(DOT_H_CHECK)
+
+ib/clients/of/sol_ofs/%.check:		ib/clients/of/sol_ofs/%.h
+	$(DOT_H_CHECK)
+
+ib/clients/of/sol_uverbs/%.check:	ib/clients/of/sol_uverbs/%.h
+	$(DOT_H_CHECK)
+
+ib/clients/of/sol_ucma/%.check:		ib/clients/of/sol_ucma/%.h
 	$(DOT_H_CHECK)
 
 ib/ibtl/%.check:	ib/ibtl/%.h
@@ -189,6 +203,11 @@ ROOTDIRS=			\
 	$(ROOTDIR)/ib/mgt/ibmf	\
 	$(ROOTDIR)/ib/ibnex	\
 	$(ROOTDIR)/ib/clients/ibd \
+	$(ROOTDIR)/ib/clients/of	\
+	$(ROOTDIR)/ib/clients/of/rdma	\
+	$(ROOTDIR)/ib/clients/of/sol_ofs	\
+	$(ROOTDIR)/ib/clients/of/sol_uverbs	\
+	$(ROOTDIR)/ib/clients/of/sol_ucma	\
 	$(ROOTDIR)/idm		\
 	$(ROOTDIR)/iscsit	\
 	$(ROOTDIR)/lvm		\
@@ -239,6 +258,11 @@ ROOTIBTLIMPLHDRS= $(IBTLIMPLHDRS:%=$(ROOTDIR)/ib/ibtl/impl/%)
 ROOTIBNEXHDRS= $(IBNEXHDRS:%=$(ROOTDIR)/ib/ibnex/%)
 ROOTIBMGTHDRS= $(IBMGTHDRS:%=$(ROOTDIR)/ib/mgt/%)
 ROOTIBMFHDRS= $(IBMFHDRS:%=$(ROOTDIR)/ib/mgt/ibmf/%)
+ROOTOFHDRS= $(OFHDRS:%=$(ROOTDIR)/ib/clients/of/%)
+ROOTRDMAHDRS= $(RDMAHDRS:%=$(ROOTDIR)/ib/clients/of/rdma/%)
+ROOTSOL_OFSHDRS= $(SOL_OFSHDRS:%=$(ROOTDIR)/ib/clients/of/sol_ofs/%)
+ROOTSOL_UVERBSHDRS= $(SOL_UVERBSHDRS:%=$(ROOTDIR)/ib/clients/of/sol_uverbs/%)
+ROOTSOL_UCMAHDRS= $(SOL_UCMAHDRS:%=$(ROOTDIR)/ib/clients/of/sol_ucma/%)
 ROOTTAVORHDRS= $(TAVORHDRS:%=$(ROOTDIR)/ib/adapters/tavor/%)
 ROOTHERMONHDRS= $(HERMONHDRS:%=$(ROOTDIR)/ib/adapters/hermon/%)
 
@@ -353,6 +377,21 @@ $(ROOTDIR)/ib/%:		ib/%
 	$(INS.file)
 
 $(ROOTDIR)/ib/clients/ibd/%:	ib/clients/ibd/%
+	$(INS.file)
+
+$(ROOTDIR)/ib/clients/of/%:		of/%
+	$(INS.file)
+
+$(ROOTDIR)/ib/clients/of/rdma/%:	ib/clients/of/rdma/%
+	$(INS.file)
+
+$(ROOTDIR)/ib/clients/of/sol_ofs/%:	ib/clients/of/sol_ofs/%
+	$(INS.file)
+
+$(ROOTDIR)/ib/clients/of/sol_uverbs/%:	ib/clients/of/sol_uverbs/%
+	$(INS.file)
+
+$(ROOTDIR)/ib/clients/of/sol_ucma/%:	ib/clients/of/sol_ucma/%
 	$(INS.file)
 
 $(ROOTDIR)/ib/ibtl/%:		ib/ibtl/%

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile contains the common definitions for all sparc
 #	implementation architecture independent modules.
@@ -282,7 +281,7 @@ DRV_KMODS	+= wusb_df hwahc hwarc wusb_ca
 DRV_KMODS	+= usbecm
 DRV_KMODS	+= hci1394 av1394 scsa1394 dcam1394
 DRV_KMODS	+= sbp2
-DRV_KMODS	+= ib ibd rdsib sdp iser daplt hermon tavor
+DRV_KMODS	+= ib ibd rdsib sdp iser daplt hermon tavor sol_ucma sol_uverbs
 DRV_KMODS	+= pci_pci pcieb pcieb_bcm
 DRV_KMODS	+= i8042 kb8042 mouse8042
 DRV_KMODS	+= fcode
@@ -405,6 +404,7 @@ MISC_KMODS	+= ibdm
 MISC_KMODS	+= ibdma
 MISC_KMODS	+= ibmf
 MISC_KMODS	+= ibtl
+MISC_KMODS	+= sol_ofs
 MISC_KMODS	+= idm
 MISC_KMODS	+= idmap
 MISC_KMODS	+= hook

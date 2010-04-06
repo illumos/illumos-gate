@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -497,7 +496,7 @@ DRV_KMODS	+= dcam1394
 #
 #	InfiniBand pseudo drivers
 #
-DRV_KMODS	+= ib ibd rdsib sdp iser daplt hermon tavor
+DRV_KMODS	+= ib ibd rdsib sdp iser daplt hermon tavor sol_ucma sol_uverbs
 
 #
 #	LVM modules
@@ -625,6 +624,7 @@ MISC_KMODS	+= rsmops
 MISC_KMODS	+= sata
 MISC_KMODS	+= scsi
 MISC_KMODS	+= sda
+MISC_KMODS	+= sol_ofs
 MISC_KMODS	+= spuni
 MISC_KMODS	+= strategy
 MISC_KMODS	+= strplumb

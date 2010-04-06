@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -86,6 +85,11 @@ dir path=usr/include/sys/ib/adapters/hermon
 dir path=usr/include/sys/ib/adapters/tavor
 dir path=usr/include/sys/ib/clients
 dir path=usr/include/sys/ib/clients/ibd
+dir path=usr/include/sys/ib/clients/of
+dir path=usr/include/sys/ib/clients/of/rdma
+dir path=usr/include/sys/ib/clients/of/sol_ofs
+dir path=usr/include/sys/ib/clients/of/sol_ucma
+dir path=usr/include/sys/ib/clients/of/sol_uverbs
 dir path=usr/include/sys/ib/ibnex
 dir path=usr/include/sys/ib/ibtl
 dir path=usr/include/sys/ib/ibtl/impl
@@ -1064,6 +1068,23 @@ file path=usr/include/sys/iapriocntl.h
 file path=usr/include/sys/ib/adapters/hermon/hermon_ioctl.h
 file path=usr/include/sys/ib/adapters/tavor/tavor_ioctl.h
 file path=usr/include/sys/ib/clients/ibd/ibd.h
+file path=usr/include/sys/ib/clients/of/ofa_solaris.h
+file path=usr/include/sys/ib/clients/of/ofed_kernel.h
+file path=usr/include/sys/ib/clients/of/rdma/ib_user_verbs.h
+file path=usr/include/sys/ib/clients/of/rdma/ib_verbs.h
+file path=usr/include/sys/ib/clients/of/rdma/rdma_cm.h
+file path=usr/include/sys/ib/clients/of/rdma/rdma_user_cm.h
+file path=usr/include/sys/ib/clients/of/sol_ofs/sol_cma.h
+file path=usr/include/sys/ib/clients/of/sol_ofs/sol_ib_cma.h
+file path=usr/include/sys/ib/clients/of/sol_ofs/sol_ofs_common.h
+file path=usr/include/sys/ib/clients/of/sol_ucma/sol_rdma_user_cm.h
+file path=usr/include/sys/ib/clients/of/sol_ucma/sol_ucma.h
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs.h
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs2ucma.h
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs_comp.h
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs_event.h
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs_hca.h
+file path=usr/include/sys/ib/clients/of/sol_uverbs/sol_uverbs_qp.h
 file path=usr/include/sys/ib/ib_pkt_hdrs.h
 file path=usr/include/sys/ib/ib_types.h
 file path=usr/include/sys/ib/ibnex/ibnex_devctl.h

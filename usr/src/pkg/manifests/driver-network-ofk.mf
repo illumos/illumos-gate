@@ -1,0 +1,56 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+#
+# This package will install successfully into any zone, global or
+# non-global.  The files, directories, links, and hardlinks, however,
+# will only be installed into the global zone.
+#
+<include hollow_zone_pkg>
+set name=pkg.fmri value=pkg:/driver/network/ofk@$(PKGVERS)
+set name=pkg.description value="The Solaris Open Fabrics kernel components package provides support of the OFED defined kernel RDMA KPI, as well as providing kernel modules to facilitate OFED userland libraries."
+set name=pkg.summary value="Solaris Open Fabrics kernel components"
+set name=info.classification value=org.opensolaris.category.2010:System/Hardware
+set name=variant.arch value=$(ARCH)
+set name=variant.opensolaris.zone value=global value=nonglobal
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=kernel/misc group=sys
+dir path=kernel/misc/$(ARCH64) group=sys
+driver name=sol_uverbs perms="* 0666 root sys"
+driver name=sol_ucma perms="* 0666 root sys"
+file path=kernel/drv/$(ARCH64)/sol_uverbs group=sys
+file path=kernel/drv/$(ARCH64)/sol_ucma group=sys
+$(i386_ONLY)file path=kernel/drv/sol_uverbs group=sys
+$(i386_ONLY)file path=kernel/drv/sol_ucma group=sys
+file path=kernel/drv/sol_uverbs.conf group=sys
+file path=kernel/drv/sol_ucma.conf group=sys
+file path=kernel/misc/$(ARCH64)/sol_ofs group=sys mode=0755
+$(i386_ONLY)file path=kernel/misc/sol_ofs group=sys mode=0755
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license uts/common/io/ib/clients/of/lic_of \
+    license=uts/common/io/ib/clients/of/lic_of

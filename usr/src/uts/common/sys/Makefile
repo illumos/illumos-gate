@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -729,6 +728,33 @@ IBMGTHDRS=		\
 IBDHDRS=		\
 	ibd.h
 
+OFHDRS=			\
+	ofa_solaris.h	\
+	ofed_kernel.h
+
+RDMAHDRS=		\
+	ib_verbs.h 	\
+	ib_user_verbs.h \
+	rdma_cm.h 	\
+	rdma_user_cm.h
+
+SOL_UVERBSHDRS=		\
+	sol_uverbs.h	\
+	sol_uverbs2ucma.h	\
+	sol_uverbs_comp.h	\
+	sol_uverbs_hca.h	\
+	sol_uverbs_qp.h		\
+	sol_uverbs_event.h
+
+SOL_UCMAHDRS=		\
+	sol_ucma.h	\
+	sol_rdma_user_cm.h
+
+SOL_OFSHDRS=		\
+	sol_cma.h	\
+	sol_ib_cma.h	\
+	sol_ofs_common.h
+
 TAVORHDRS=		\
 	tavor_ioctl.h
 
@@ -1131,6 +1157,11 @@ CHECKHDRS=						\
 	$(IBNEXHDRS:%.h=ib/ibnex/%.check)	\
 	$(IBMGTHDRS:%.h=ib/mgt/%.check)			\
 	$(IBMFHDRS:%.h=ib/mgt/ibmf/%.check)		\
+	$(OFHDRS:%.h=ib/clients/of/%.check)			\
+	$(RDMAHDRS:%.h=ib/clients/of/rdma/%.check)		\
+	$(SOL_UVERBSHDRS:%.h=ib/clients/of/sol_uverbs/%.check)	\
+	$(SOL_UCMAHDRS:%.h=ib/clients/of/sol_ucma/%.check)	\
+	$(SOL_OFSHDRS:%.h=ib/clients/of/sol_ofs/%.check)	\
 	$(TAVORHDRS:%.h=ib/adapters/tavor/%.check)	\
 	$(HERMONHDRS:%.h=ib/adapters/hermon/%.check)	\
 	$(IDMHDRS:%.h=idm/%.check)			\
@@ -1201,6 +1232,11 @@ CHECKHDRS=						\
 	$(ROOTIBNEXHDRS)	\
 	$(ROOTIBMGTHDRS)	\
 	$(ROOTIBMFHDRS)		\
+	$(ROOTOFHDRS)		\
+	$(ROOTRDMAHDRS)		\
+	$(ROOTSOL_OFSHDRS)	\
+	$(ROOTSOL_UVERBSHDRS)	\
+	$(ROOTSOL_UCMAHDRS)	\
 	$(ROOTTAVORHDRS)	\
 	$(ROOTHERMONHDRS)	\
 	$(ROOTLVMHDRS)		\
@@ -1264,6 +1300,11 @@ install_h:			\
 	$(ROOTIBNEXHDRS)	\
 	$(ROOTIBMGTHDRS)	\
 	$(ROOTIBMFHDRS)		\
+	$(ROOTOFHDRS)		\
+	$(ROOTRDMAHDRS)		\
+	$(ROOTSOL_OFSHDRS)	\
+	$(ROOTSOL_UVERBSHDRS)	\
+	$(ROOTSOL_UCMAHDRS)	\
 	$(ROOTTAVORHDRS)	\
 	$(ROOTHERMONHDRS)	\
 	$(ROOTLVMHDRS)		\

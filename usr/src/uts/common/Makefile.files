@@ -694,6 +694,14 @@ HERMON_OBJS +=	hermon.o hermon_agents.o hermon_cfg.o hermon_ci.o hermon_cmd.o \
 
 DAPLT_OBJS +=	daplt.o
 
+SOL_OFS_OBJS +=	sol_cma.o sol_ib_cma.o sol_uobj.o \
+		sol_ofs_debug_util.o sol_ofs_gen_util.o
+
+SOL_UCMA_OBJS +=	sol_ucma.o
+
+SOL_UVERBS_OBJS +=	sol_uverbs.o sol_uverbs_comp.o sol_uverbs_event.o \
+			sol_uverbs_hca.o sol_uverbs_qp.o
+
 KSTAT_OBJS +=	kstat.o
 
 KSYMS_OBJS +=	ksyms.o
