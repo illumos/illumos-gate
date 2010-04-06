@@ -29,8 +29,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _PKINIT_CRYPTO_OPENSSL_H
@@ -144,7 +143,8 @@ struct _pkinit_cert_iter_data {
     unsigned int index;
 };
 
-static void openssl_init(void);
+/* Solaris Kerberos */
+static krb5_error_code openssl_init(void);
 
 static krb5_error_code pkinit_init_pkinit_oids(pkinit_plg_crypto_context );
 static void pkinit_fini_pkinit_oids(pkinit_plg_crypto_context );

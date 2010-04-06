@@ -29,8 +29,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <errno.h>
@@ -41,8 +40,10 @@
 #include <unistd.h>
 #include <dirent.h>
 
+
 /* Solaris Kerberos */
 #include <libintl.h>
+#include "k5-int.h"
 
 /*
  * Q: What is this SILLYDECRYPT stuff about?
@@ -363,7 +364,8 @@ unsigned char pkinit_4096_dhprime[4096/8] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 };
 
-/* Solaris Kerberos: May not be thread safe! */
+/* Solaris Kerberos */
+static k5_mutex_t oids_mutex = K5_MUTEX_PARTIAL_INITIALIZER;
 static int pkinit_oids_refs = 0;
 
 krb5_error_code
@@ -373,7 +375,10 @@ pkinit_init_plg_crypto(pkinit_plg_crypto_context *cryptoctx) {
     pkinit_plg_crypto_context ctx = NULL;
 
     /* initialize openssl routines */
-    openssl_init();
+    /* Solaris Kerberos */
+    retval = openssl_init();
+    if (retval != 0)
+	goto out;
 
     ctx = (pkinit_plg_crypto_context)malloc(sizeof(*ctx));
     if (ctx == NULL)
@@ -515,6 +520,11 @@ pkinit_init_pkinit_oids(pkinit_plg_crypto_context ctx)
 	} \
 	ctx->vn = OBJ_nid2obj(nid);
     
+    /* Solaris Kerberos */
+    retval = k5_mutex_lock(&oids_mutex);
+    if (retval != 0)
+	goto out;
+
     CREATE_OBJ_IF_NEEDED("1.3.6.1.5.2.2", id_pkinit_san,
 			 "id-pkinit-san", "KRB5PrincipalName");
 
@@ -553,8 +563,9 @@ pkinit_init_pkinit_oids(pkinit_plg_crypto_context ctx)
     /* Success */
     retval = 0;
     
-    /* Solaris Kerberos: May not be thread safe! */
     pkinit_oids_refs++;
+    /* Solaris Kerberos */
+    k5_mutex_unlock(&oids_mutex);
 
 out:
     return retval;
@@ -638,8 +649,11 @@ pkinit_fini_pkinit_oids(pkinit_plg_crypto_context ctx)
 	return;
 
     /* Only call OBJ_cleanup once! */
-    if (--pkinit_oids_refs == 0) /* Solaris Kerberos: May not be thread safe! */
+    /* Solaris Kerberos: locking */
+    k5_mutex_lock(&oids_mutex);
+    if (--pkinit_oids_refs == 0)
 	OBJ_cleanup();
+    k5_mutex_unlock(&oids_mutex);
 }
 
 static krb5_error_code
@@ -2464,18 +2478,29 @@ server_process_dh(krb5_context context,
     return retval;
 }
 
-static void
+/*
+ * Solaris Kerberos:
+ * Add locking around did_init to make it MT-safe.
+ */
+static krb5_error_code
 openssl_init()
 {
+    krb5_error_code ret = 0;
     static int did_init = 0;
+    static k5_mutex_t init_mutex = K5_MUTEX_PARTIAL_INITIALIZER;
 
-    if (!did_init) {
-	/* initialize openssl routines */
-	CRYPTO_malloc_init();
-	ERR_load_crypto_strings();
-	OpenSSL_add_all_algorithms();
-	did_init++;
+    ret = k5_mutex_lock(&init_mutex);
+    if (ret == 0) {
+	if (!did_init) {
+	    /* initialize openssl routines */
+	    CRYPTO_malloc_init();
+	    ERR_load_crypto_strings();
+	    OpenSSL_add_all_algorithms();
+	    did_init++;
+	}
+	k5_mutex_unlock(&init_mutex);
     }
+    return (ret);
 }
 
 static krb5_error_code
