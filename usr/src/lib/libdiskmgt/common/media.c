@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <fcntl.h>
@@ -413,7 +412,13 @@ get_attrs(disk_t *dp, int fd, nvlist_t *attrs)
 		return (ENOMEM);
 	}
 
+	/* only for disks < 1TB  and x86 */
+#if defined(i386) || defined(__amd64)
+	if (ioctl(fd, DKIOCG_PHYGEOM, &geometry) >= 0) {
+#else
+	/* sparc call */
 	if (ioctl(fd, DKIOCGGEOM, &geometry) >= 0) {
+#endif
 		struct extvtoc	vtoc;
 
 		if (nvlist_add_uint64(attrs, DM_START, 0) != 0) {
