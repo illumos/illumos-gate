@@ -94,7 +94,8 @@ krb5_build_principal_ext(krb5_context context,  krb5_principal * princ,
     return 0;
 
 free_out:
-    while (i-- >= 0)
+    /* Solaris Kerberos */
+    while (--i >= 0)
 	krb5_xfree(princ_data[i].data);
     krb5_xfree(princ_data);
     krb5_xfree(princ_ret);
