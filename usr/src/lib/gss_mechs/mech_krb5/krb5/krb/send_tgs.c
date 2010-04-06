@@ -1,8 +1,6 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 /*
  * lib/krb5/krb/send_tgs.c
@@ -108,8 +106,11 @@ krb5_send_tgs_basic(krb5_context context, krb5_data *in_data, krb5_creds *in_cre
 	goto cleanup_ticket;
 
     retval = encode_krb5_ap_req(&request, &toutbuf);
-    *outbuf = *toutbuf;
-    krb5_xfree(toutbuf);
+    /* Solaris Kerberos */
+    if (retval == 0) {
+	*outbuf = *toutbuf;
+	krb5_xfree(toutbuf);
+    }
 
 
     memset(request.authenticator.ciphertext.data, 0,
@@ -199,7 +200,9 @@ krb5_send_tgs(krb5_context context, krb5_flags kdcoptions,
     	tgsreq.ktype = (krb5_enctype *)ktypes;
     } else {
         /* Get the default ktypes */
-        krb5_get_tgs_ktypes(context, sname, &(tgsreq.ktype));
+	/* Solaris Kerberos */
+	if ((retval = krb5_get_tgs_ktypes(context, sname, &(tgsreq.ktype))))
+		goto send_tgs_error_2;
 	for(tgsreq.nktypes = 0; tgsreq.ktype[tgsreq.nktypes]; tgsreq.nktypes++);
     }
 
