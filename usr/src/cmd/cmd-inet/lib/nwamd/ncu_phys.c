@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -935,8 +934,14 @@ find_best_wlan_cb(nwam_known_wlan_handle_t kwh, void *data)
 			(void) strlcpy(link->nwamd_link_wifi_essid,
 			    cur_wlan->nww_essid,
 			    sizeof (link->nwamd_link_wifi_essid));
-			/* set BSSID if wireless_strict_bssid is specified */
-			if (wireless_strict_bssid) {
+			/*
+			 * Set BSSID if wireless_strict_bssid is specified or
+			 * if this is a hidden WLAN.  Store the BSSID here and
+			 * then later determine the hidden WLAN's name in the
+			 * connect thread.
+			 */
+			if (wireless_strict_bssid ||
+			    cur_wlan->nww_essid[0] == '\0') {
 				(void) strlcpy(link->nwamd_link_wifi_bssid,
 				    cur_wlan->nww_bssid,
 				    sizeof (link->nwamd_link_wifi_bssid));
