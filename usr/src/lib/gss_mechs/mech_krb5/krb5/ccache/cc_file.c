@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -551,6 +550,8 @@ krb5_fcc_read_addrs(krb5_context context, krb5_ccache id, krb5_address ***addrs)
 	  (*addrs)[i] = (krb5_address *) malloc(sizeof(krb5_address));
 	  if ((*addrs)[i] == NULL) {
 	      krb5_free_addresses(context, *addrs);
+	      /* Solaris Kerberos */
+	      *addrs = NULL;
 	      return KRB5_CC_NOMEM;
 	  }
 	  (*addrs)[i]->contents = NULL;
