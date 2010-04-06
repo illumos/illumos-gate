@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2535,9 +2534,8 @@ checkexport(fsid_t *fsid, fid_t *fid)
 			if (exi->exi_export.ex_flags & EX_PUBLIC) {
 				exi = exi_public;
 			}
-			mutex_enter(&exi->exi_lock);
-			exi->exi_count++;
-			mutex_exit(&exi->exi_lock);
+
+			exi_hold(exi);
 			rw_exit(&exported_lock);
 			return (exi);
 		}
@@ -2673,6 +2671,14 @@ loadindex(struct exportdata *kex)
 	bcopy(index, kex->ex_index, len);
 
 	return (0);
+}
+
+void
+exi_hold(struct exportinfo *exi)
+{
+	mutex_enter(&exi->exi_lock);
+	exi->exi_count++;
+	mutex_exit(&exi->exi_lock);
 }
 
 /*
