@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  */
 
@@ -285,13 +284,18 @@ main(int ac, char *av[])
 
 	if (((silent == 0) || (dump != 0)) &&
 	    ((list = papiJobGetAttributeList(job)) != NULL)) {
-		int32_t id = 0;
+		int32_t id = -1;
 
 		if (printer == NULL)
 			papiAttributeListGetString(list, NULL,
 			    "printer-name", &printer);
 
-		papiAttributeListGetInteger(list, NULL, "job-id", &id);
+		papiAttributeListGetInteger(list, NULL,
+		    "job-id-requested", &id);
+		if (id == -1) {
+			papiAttributeListGetInteger(list, NULL, "job-id", &id);
+		}
+
 		printf(gettext("request id is %s-%d "), printer, id);
 		if (ac != optind)
 			printf("(%d file(s))\n", ac - optind);

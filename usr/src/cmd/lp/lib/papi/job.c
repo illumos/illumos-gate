@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*LINTLIBRARY*/
@@ -50,6 +49,67 @@ static papi_status_t psm_modifyAttrsList(char *file, papi_attribute_t **attrs,
 					papi_attribute_t ***newAttrs);
 #endif
 
+int32_t
+check_job_id(papi_service_t svc, char *printer, int32_t id)
+{
+	papi_job_t *jobs = NULL;
+	papi_status_t status;
+	int ret = -1;
+	char *jattrs[] = { "job-id",
+	    "job-id-requested", NULL };
+
+	status = papiPrinterListJobs(svc, printer, jattrs, PAPI_LIST_JOBS_ALL,
+	    0, &jobs);
+
+	if (status != PAPI_OK) {
+		detailed_error(svc,
+		    gettext("Failed to query service for %s: %s\n"),
+		    printer, lpsched_status_string(status));
+		return (-1);
+	}
+
+	if (jobs != NULL) {
+		int i = 0;
+
+		for (i = 0; jobs[i] != NULL; i++) {
+			int32_t rid = -1;
+			int32_t jid = -1;
+			papi_attribute_t **list =
+			    papiJobGetAttributeList(jobs[i]);
+
+			papiAttributeListGetInteger(list, NULL,
+			    "job-id-requested", &rid);
+			papiAttributeListGetInteger(list, NULL,
+			    "job-id", &jid);
+
+			/*
+			 * check if id matches with either rid or jid
+			 */
+			if (rid == id) {
+				/* get the actual id and return it */
+				papiAttributeListGetInteger(list, NULL,
+				    "job-id", &id);
+				return (id);
+			} else if (jid == id) {
+				if (rid != -1) {
+					/*
+					 * It is a remote lpd job.
+					 * It cannot be modified based on job-id
+					 * or spool number
+					 */
+					return (-1);
+				} else {
+					/*
+					 * It is either local job or
+					 * remote ipp job
+					 */
+					return (id);
+				}
+			}
+		}
+	}
+	return (id);
+}
 
 void
 papiJobFree(papi_job_t job)
@@ -1092,6 +1152,7 @@ papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
 	char *dest;
 	REQUEST *r = NULL;
 	char lpfile[BUFSIZ];
+	int32_t job_id_actual;
 
 	if ((svc == NULL) || (printer == NULL) || (job_id < 0) ||
 	    (attributes == NULL))
@@ -1101,7 +1162,23 @@ papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
 		return (PAPI_TEMPORARY_ERROR);
 
 	dest = printer_name_from_uri_id(printer, job_id);
-	status = lpsched_start_change(svc, dest, job_id, &file);
+
+	/*
+	 * job-id might be job-id-requested
+	 * If it is job-id-requested then we need to
+	 * look for corresponding job-id
+	 */
+	job_id_actual = check_job_id(svc, printer, job_id);
+
+	if (job_id_actual < 0) {
+		status = PAPI_NOT_FOUND;
+		detailed_error(svc,
+		    "failed to initiate change for job (%s-%d): %s",
+		    dest, job_id, "no such resource");
+		return (status);
+	}
+
+	status = lpsched_start_change(svc, dest, job_id_actual, &file);
 	if (status != PAPI_OK)
 		return (status);
 
@@ -1111,11 +1188,11 @@ papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
 #ifdef LP_USE_PAPI_ATTR
 		/*
 		 * store the job attributes in the PAPI job attribute file
-		 * that was created by the origonal job request. We need to
+		 * that was created by the original job request. We need to
 		 * modify the attributes in the file as per the new attributes
 		 */
 		snprintf(lpfile, sizeof (lpfile), "%s%d-%s",
-		    "/var/spool/lp/temp/", job_id, LP_PAPIATTRNAME);
+		    "/var/spool/lp/temp/", job_id_actual, LP_PAPIATTRNAME);
 		status = psm_modifyAttrsFile(attributes, lpfile);
 		if (status != PAPI_OK) {
 			detailed_error(svc,
@@ -1138,11 +1215,11 @@ papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
 		return (PAPI_DEVICE_ERROR);
 	}
 
-	status = lpsched_end_change(svc, dest, job_id);
+	status = lpsched_end_change(svc, dest, job_id_actual);
 	lpsched_request_to_job_attributes(r, j);
 
 	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
-	    "job-id", job_id);
+	    "job-id", job_id_actual);
 
 	freerequest(r);
 
