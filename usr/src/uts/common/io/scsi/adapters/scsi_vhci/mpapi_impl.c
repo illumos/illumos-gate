@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -135,6 +134,9 @@ static int vhci_is_model_type32(int);
 static int vhci_mpapi_copyout_iocdata(void *, void *, int);
 static int vhci_mpapi_chk_last_path(mdi_pathinfo_t *);
 static int vhci_mpapi_sync_lu_oid_list(struct scsi_vhci *);
+static void vhci_mpapi_set_lu_valid(struct scsi_vhci *, mpapi_item_t *, int);
+static void vhci_mpapi_set_tpg_as_prop(struct scsi_vhci *, mpapi_item_t *,
+    uint32_t);
 static mpapi_item_list_t *vhci_mpapi_get_tpg_for_lun(struct scsi_vhci *,
     char *, void *, void *);
 static int vhci_mpapi_check_tp_in_tpg(mpapi_tpg_data_t *tpgdata, void *tp);
@@ -1731,6 +1733,7 @@ vhci_enable_auto_failback(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 	int			rval = 0;
 	mpapi_item_list_t	*ilist;
 	mpapi_lu_data_t		*lud;
+	uint64_t		raw_oid;
 
 	mutex_enter(&vhci->vhci_mutex);
 	vhci->vhci_conf_flags |= VHCI_CONF_FLAGS_AUTO_FAILBACK;
@@ -1744,6 +1747,14 @@ vhci_enable_auto_failback(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 		ilist = ilist->next;
 	}
 
+	/*
+	 * We don't really know the plugin OSN so just set 0, it will be ignored
+	 * by libmpscsi_vhci.
+	 */
+	raw_oid = 0;
+	vhci_mpapi_log_sysevent(vhci->vhci_dip, &raw_oid,
+	    ESC_SUN_MP_PLUGIN_CHANGE);
+
 	return (rval);
 }
 
@@ -1755,6 +1766,7 @@ vhci_disable_auto_failback(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 	int			rval = 0;
 	mpapi_item_list_t	*ilist;
 	mpapi_lu_data_t		*lud;
+	uint64_t		raw_oid;
 
 	mutex_enter(&vhci->vhci_mutex);
 	vhci->vhci_conf_flags &= ~VHCI_CONF_FLAGS_AUTO_FAILBACK;
@@ -1767,6 +1779,14 @@ vhci_disable_auto_failback(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 		lud->prop.autoFailbackEnabled = 0;
 		ilist = ilist->next;
 	}
+
+	/*
+	 * We don't really know the plugin OSN so just set 0, it will be ignored
+	 * by libmpscsi_vhci.
+	 */
+	raw_oid = 0;
+	vhci_mpapi_log_sysevent(vhci->vhci_dip, &raw_oid,
+	    ESC_SUN_MP_PLUGIN_CHANGE);
 
 	return (rval);
 }
@@ -2743,7 +2763,6 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 
 			lu = kmem_zalloc(sizeof (mpapi_lu_data_t), KM_SLEEP);
 			lu->resp = res;
-			lu->valid = 1;
 			lu->prop.id = (uint64_t)item->oid.raw_oid;
 			/*
 			 * XXX: luGroupID is currently unsupported
@@ -2794,9 +2813,7 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 			lu->path_list = vhci_mpapi_create_list_head();
 			lu->tpg_list = vhci_mpapi_create_list_head();
 			item->idata = (void *)lu;
-			vhci_mpapi_log_sysevent(vhci->vhci_dip,
-			    &(item->oid.raw_oid), ESC_SUN_MP_LU_CHANGE);
-
+			vhci_mpapi_set_lu_valid(vhci, item, 1);
 		}
 		break;
 
@@ -2928,7 +2945,7 @@ vhci_update_mpapi_data(struct scsi_vhci *vhci, scsi_vhci_lun_t *vlun,
 		 * SAME LUN came online!! So, update the resp in main list.
 		 */
 		ld = lu_list->item->idata;
-		ld->valid = 1;
+		vhci_mpapi_set_lu_valid(vhci, lu_list->item, 1);
 		ld->resp = vlun;
 	}
 
@@ -3544,7 +3561,7 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr,
 		 * SAME LUN came online!! So, update the resp in main list.
 		 */
 		ld = lu_list->item->idata;
-		ld->valid = 1;
+		vhci_mpapi_set_lu_valid(vhci, lu_list->item, 1);
 		ld->resp = vlun;
 	}
 
@@ -3941,6 +3958,65 @@ vhci_mpapi_sync_lu_oid_list(struct scsi_vhci *vhci)
 }
 
 /*
+ * Set new value for the valid field of an MP LU.
+ *
+ * This should be called to set new value for the valid field instead of
+ * accessing it directly. If the value has changed, the appropriate
+ * sysevent is generated.
+ *
+ * An exception is when the LU is created an the valid field is set for
+ * the first time. In this case we do not want to generate an event
+ * so the field should be set directly instead of calling this function.
+ *
+ * Rationale for introducing ESC_SUN_MP_LU_{ADD|REMOVE}: When the last
+ * path to a MPLU goes offline, the client node is offlined (not removed).
+ * When a path to the MPLU goes back online, the client node is onlined.
+ * There is no existing sysevent that whould announce this.
+ * EC_DEVFS / ESC_DEVFS_DEVI_{ADD|REMOVE} do not work, because the
+ * client node is just offlined/onlined, not removed/re-added.
+ * EC_DEV_{ADD|REMOVE} / ESC_DISK only works for block devices, not
+ * for other LUs (such as tape). Therefore special event subclasses
+ * for addition/removal of a MPLU are needed.
+ */
+static void vhci_mpapi_set_lu_valid(struct scsi_vhci *vhci,
+    mpapi_item_t *lu_item, int valid)
+{
+	mpapi_lu_data_t *lu_data;
+
+	lu_data = (mpapi_lu_data_t *)lu_item->idata;
+	if (valid == lu_data->valid)
+		return;
+	lu_data->valid = valid;
+
+	vhci_mpapi_log_sysevent(vhci->vhci_dip, &(lu_item->oid.raw_oid),
+	    valid ? ESC_SUN_MP_LU_ADD : ESC_SUN_MP_LU_REMOVE);
+}
+
+/*
+ * Set new value for TPG accessState property.
+ *
+ * This should be called to set the new value instead of changing the field
+ * directly. If the value has changed, the appropriate sysevent is generated.
+ *
+ * An exception is when the TPG is created and the accessState field is set
+ * for the first time. In this case we do not want to generate an event
+ * so the field should be set directly instead of calling this function.
+ */
+static void vhci_mpapi_set_tpg_as_prop(struct scsi_vhci *vhci,
+    mpapi_item_t *tpg_item, uint32_t new_state)
+{
+	mpapi_tpg_data_t *tpg_data;
+
+	tpg_data = (mpapi_tpg_data_t *)tpg_item->idata;
+	if (new_state == tpg_data->prop.accessState)
+		return;
+	tpg_data->prop.accessState = new_state;
+
+	vhci_mpapi_log_sysevent(vhci->vhci_dip, &(tpg_item->oid.raw_oid),
+	    ESC_SUN_MP_TPG_CHANGE);
+}
+
+/*
  * Routine to sync Initiator Port List with what MDI maintains. This means
  * MP API knows about Initiator Ports which don't have a pip.
  */
@@ -4030,7 +4106,8 @@ vhci_mpapi_set_path_state(dev_info_t *vdip, mdi_pathinfo_t *pip, int state)
 	scsi_vhci_priv_t	*svp;
 	mpapi_item_list_t	*ilist, *lu_list;
 	mpapi_path_data_t	*pp;
-	mpapi_lu_data_t		*ld;
+	int			old_state;
+	int			old_in_okay, new_in_okay;
 
 	vhci = ddi_get_soft_state(vhci_softstate, ddi_get_instance(vdip));
 
@@ -4039,8 +4116,27 @@ vhci_mpapi_set_path_state(dev_info_t *vdip, mdi_pathinfo_t *pip, int state)
 	if (ilist != NULL) {
 		mutex_enter(&ilist->item->item_mutex);
 		pp = ilist->item->idata;
+		old_state = pp->prop.pathState;
 		pp->prop.pathState = state;
 		pp->valid = 1;
+
+		/*
+		 * MP API does not distiguish between ACTIVE and PASSIVE
+		 * and thus libmpscsi_vhci renders both as MP_PATH_STATE_OKAY.
+		 * Therefore if we are transitioning between ACTIVE and PASSIVE
+		 * we do not want to generate an event.
+		 */
+
+		old_in_okay = (old_state == MP_DRVR_PATH_STATE_ACTIVE ||
+		    old_state == MP_DRVR_PATH_STATE_PASSIVE);
+		new_in_okay = (state == MP_DRVR_PATH_STATE_ACTIVE ||
+		    state == MP_DRVR_PATH_STATE_PASSIVE);
+
+		if (state != old_state && !(old_in_okay && new_in_okay)) {
+			vhci_mpapi_log_sysevent(vdip,
+			    &(ilist->item->oid.raw_oid),
+			    ESC_SUN_MP_PATH_CHANGE);
+		}
 	} else {
 		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_mpapi_set_path_state: "
 		    "pip(%p) not found", (void *)pip));
@@ -4089,8 +4185,8 @@ vhci_mpapi_set_path_state(dev_info_t *vdip, mdi_pathinfo_t *pip, int state)
 			lu_list = vhci_get_mpapi_item(vhci, NULL,
 			    MP_OBJECT_TYPE_MULTIPATH_LU, (void *)svl);
 			if (lu_list != NULL) {
-				ld = lu_list->item->idata;
-				ld->valid = 0;
+				vhci_mpapi_set_lu_valid(vhci, lu_list->item, 0);
+
 				VHCI_DEBUG(6, (CE_NOTE, NULL,
 				    "vhci_mpapi_set_path_state: "
 				    " Invalidated LU(%s)", svl->svl_lun_wwn));
@@ -4206,7 +4302,6 @@ vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *vhci,
 		return (-1);
 	}
 	lu_data->resp = vlun;
-	lu_data->valid = 1;
 
 	/*
 	 * For each "pclass of PATH" and "pclass of TPG" match of this LU,
@@ -4241,22 +4336,28 @@ vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *vhci,
 				    tpg_data->prop.tpgId,
 				    tpg_data->pclass));
 				if (MDI_PI_IS_ONLINE(path_data->resp)) {
-					tpg_data->prop.accessState =
-					    MP_DRVR_ACCESS_STATE_ACTIVE;
+					vhci_mpapi_set_tpg_as_prop(vhci,
+					    tpg_list->item,
+					    MP_DRVR_ACCESS_STATE_ACTIVE);
 					break;
 				} else if (MDI_PI_IS_STANDBY(path_data->resp)) {
-					tpg_data->prop.accessState =
-					    MP_DRVR_ACCESS_STATE_STANDBY;
+					vhci_mpapi_set_tpg_as_prop(vhci,
+					    tpg_list->item,
+					    MP_DRVR_ACCESS_STATE_STANDBY);
 					break;
 				} else {
-					tpg_data->prop.accessState =
-					    MP_DRVR_ACCESS_STATE_UNAVAILABLE;
+					vhci_mpapi_set_tpg_as_prop(vhci,
+					    tpg_list->item,
+					    MP_DRVR_ACCESS_STATE_UNAVAILABLE);
 				}
 			}
 			path_list = path_list->next;
 		}
 		tpg_list = tpg_list->next;
 	}
+
+	if (vhci_mpapi_chk_last_path((mdi_pathinfo_t *)path_data->resp) != -1)
+		vhci_mpapi_set_lu_valid(vhci, lu_list->item, 1);
 
 	return (rval);
 }

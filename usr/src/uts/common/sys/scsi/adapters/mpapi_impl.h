@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SCSI_ADAPTERS_MPAPI_IMPL_H
@@ -439,7 +438,11 @@ typedef struct mp_iocdata32 {
  */
 #define	EC_SUN_MP			"EC_sun_mp"
 
+#define	ESC_SUN_MP_PLUGIN_CHANGE	"ESC_sun_mp_plugin_change"
+
 #define	ESC_SUN_MP_LU_CHANGE		"ESC_sun_mp_lu_change"
+#define	ESC_SUN_MP_LU_ADD		"ESC_sun_mp_lu_add"
+#define	ESC_SUN_MP_LU_REMOVE		"ESC_sun_mp_lu_remove"
 
 #define	ESC_SUN_MP_PATH_CHANGE		"ESC_sun_mp_path_change"
 #define	ESC_SUN_MP_PATH_ADD		"ESC_sun_mp_path_add"
