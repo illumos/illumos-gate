@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2005 SilverStorm Technologies, Inc. All rights reserved.
@@ -1064,6 +1063,8 @@ rds_poll_send_completions(ibt_cq_hdl_t cq, rds_ep_t *ep, boolean_t lock)
 				    "EP(%p): WC ID: %p ERROR: %d", ep,
 				    wc[ix].wc_id, wc[ix].wc_status);
 
+				send_error = 1;
+
 				if (wc[ix].wc_id == RDS_RDMAW_WRID) {
 					mutex_enter(&ep->ep_lock);
 					ep->ep_rdmacnt--;
@@ -1095,7 +1096,7 @@ rds_poll_send_completions(ibt_cq_hdl_t cq, rds_ep_t *ep, boolean_t lock)
 					rw_exit(&sp->session_lock);
 				}
 
-				send_error++;
+				send_error = 1;
 
 				if (wc[ix].wc_id == RDS_RDMAW_WRID) {
 					mutex_enter(&ep->ep_lock);
