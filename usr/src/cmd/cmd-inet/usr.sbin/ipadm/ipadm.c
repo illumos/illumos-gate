@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #include <arpa/inet.h>
 #include <errno.h>
@@ -946,20 +945,20 @@ do_show_prop(int argc, char **argv, const char *use)
  * then sets IPADM_OPT_APPEND or IPADM_OPT_REMOVE, accordingly.
  */
 static void
-parse_modifiers(char *pstr, uint_t *flags, const char *use)
+parse_modifiers(const char *pstr, uint_t *flags, const char *use)
 {
 	char *p;
 
-	p = strpbrk(pstr, "+-");
-	if (p == NULL)
-		return;		/* Nothing to parse, return */
+	if ((p = strchr(pstr, '=')) == NULL)
+		return;
 
-	if (p[1] != '=')
-		die("badly used modifier.\n%s", use);
+	if (p == pstr)
+		die("Invalid prop=val specified\n%s", use);
 
-	if (p[0] == '+')
+	--p;
+	if (*p == '+')
 		*flags |= IPADM_OPT_APPEND;
-	else
+	else if (*p == '-')
 		*flags |= IPADM_OPT_REMOVE;
 }
 

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _LIBIPADM_IMPL_H
@@ -125,10 +124,14 @@ struct ipadm_prop_desc {
 	char		*ipd_name;	/* property name */
 	uint_t		ipd_class; 	/* prop. class - global/perif/both */
 	uint_t		ipd_proto;	/* protocol to which property belongs */
+	uint_t		ipd_flags;	/* see below */
 	ipadm_pd_setf_t	*ipd_set;	/* set callback function */
 	ipadm_pd_getf_t	*ipd_get_range;	/* get range callback function */
 	ipadm_pd_getf_t	*ipd_get;	/* get value callback function */
 };
+
+/* ipd_flags values */
+#define	IPADMPROP_MULVAL	0x00000001	/* property multi-valued */
 
 extern ipadm_prop_desc_t	ipadm_addrprop_table[];
 extern ipadm_pd_getf_t		i_ipadm_get_onoff;

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -97,31 +96,31 @@ static ipadm_pd_setf_t	i_ipadm_set_prefixlen, i_ipadm_set_addr_flag,
 
 /* address properties description table */
 ipadm_prop_desc_t ipadm_addrprop_table[] = {
-	{ "broadcast", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE,
+	{ "broadcast", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    NULL, NULL, i_ipadm_get_broadcast },
 
-	{ "deprecated", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE,
+	{ "deprecated", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_addr_flag, i_ipadm_get_onoff,
 	    i_ipadm_get_addr_flag },
 
-	{ "prefixlen", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE,
+	{ "prefixlen", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_prefixlen, i_ipadm_get_prefixlen,
 	    i_ipadm_get_prefixlen },
 
-	{ "private", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE,
+	{ "private", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_addr_flag, i_ipadm_get_onoff, i_ipadm_get_addr_flag },
 
-	{ "transmit", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE,
+	{ "transmit", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_addr_flag, i_ipadm_get_onoff, i_ipadm_get_addr_flag },
 
-	{ "zone", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE,
+	{ "zone", IPADMPROP_CLASS_ADDR, MOD_PROTO_NONE, 0,
 	    i_ipadm_set_zone, NULL, i_ipadm_get_zone },
 
-	{ NULL, 0, 0, NULL, NULL, NULL }
+	{ NULL, 0, 0, 0, NULL, NULL, NULL }
 };
 
 static ipadm_prop_desc_t up_addrprop = { "up", IPADMPROP_CLASS_ADDR,
-					MOD_PROTO_NONE, NULL, NULL, NULL };
+					MOD_PROTO_NONE, 0, NULL, NULL, NULL };
 
 /*
  * Helper function that initializes the `ipadm_ifname', `ipadm_aobjname', and
@@ -1489,6 +1488,11 @@ ipadm_set_addrprop(ipadm_handle_t iph, const char *pname,
 	if (pdp->ipd_set == NULL || (reset && pdp->ipd_get == NULL))
 		return (IPADM_NOTSUP);
 
+	if (!(pdp->ipd_flags & IPADMPROP_MULVAL) &&
+	    (pflags & (IPADM_OPT_APPEND|IPADM_OPT_REMOVE))) {
+		return (IPADM_INVALID_ARG);
+	}
+
 	/*
 	 * For the given aobjname, get the addrobj it represents and
 	 * set the property value for that object.
@@ -2163,13 +2167,14 @@ ipadm_create_addrobj(ipadm_addr_type_t type, const char *aobjname,
 		newaddr->ipadm_af = AF_INET;
 		break;
 
-		case IPADM_ADDR_STATIC:
-			newaddr->ipadm_af = AF_UNSPEC;
-			newaddr->ipadm_static_prefixlen = 0;
-			break;
-		default:
-			status = IPADM_INVALID_ARG;
-			goto fail;
+	case IPADM_ADDR_STATIC:
+		newaddr->ipadm_af = AF_UNSPEC;
+		newaddr->ipadm_static_prefixlen = 0;
+		break;
+
+	default:
+		status = IPADM_INVALID_ARG;
+		goto fail;
 	}
 	newaddr->ipadm_atype = type;
 	*ipaddr = newaddr;
