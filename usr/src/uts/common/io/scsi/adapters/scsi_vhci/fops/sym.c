@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -64,6 +63,7 @@ char *symmetric_dev_table[] = {
 	"SUN     StorageTek NAS",	/* StorageTek NAS */
 	"SUN     MRA300_R",		/* Shamrock - Controller */
 	"SUN     MRA300_E",		/* Shamrock - Expansion */
+	"STEC    ZeusIOPs",		/* Zeus SAS SSD */
 
 	NULL
 };
