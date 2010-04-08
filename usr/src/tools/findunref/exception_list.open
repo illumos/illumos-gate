@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -257,3 +256,11 @@
 #
 ./usr/src/cmd/dfs.cmds/sharemgr/amd64/Makefile
 ./usr/src/cmd/dfs.cmds/sharemgr/sparcv9/Makefile
+
+#
+# Ignore the license description file for Open Fabrics Alliance
+# license file (lic_of). This exception is needed because the
+# name of the license file does not have a prefix of :
+# 	THIRDPARTYLICENSE
+#
+./usr/src/uts/common/io/ib/clients/of/lic_of.descrip
