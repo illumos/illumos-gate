@@ -19,18 +19,14 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		../Makefile.cmd
 
 SUBDIRS=	etc lib sbin usr.bin usr.sbin usr.lib usr.sadm
-MSGSUBDIRS=	lib usr.bin usr.sbin usr.lib usr.sadm
-POFILES=	lib/lib.po usr.bin/usr.bin.po usr.sbin/usr.sbin.po \
-		usr.sadm/usr.sadm.po
+MSGSUBDIRS=	usr.bin usr.sbin usr.lib usr.sadm
+POFILES=	usr.bin/usr.bin.po usr.sbin/usr.sbin.po usr.sadm/usr.sadm.po
 POFILE=		cmd-inet.po
 
 all:=		TARGET= all

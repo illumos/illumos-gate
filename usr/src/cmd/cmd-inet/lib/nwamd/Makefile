@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # usr/src/cmd/cmd-inet/lib/nwamd/Makefile
 #
@@ -50,8 +48,6 @@ ROOTCFGFILES=	$(LOCFILES:%=$(ROOTLOCDIR)/%) \
 include		../../../Makefile.cmd
 
 $(ROOTCFGFILES) := FILEMODE= 644
-
-POFILE=		$(PROG).po
 
 ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
 
@@ -104,4 +100,3 @@ $(NONETLOCDIR)/%: $(NONETLOCDIR) %
 	$(INS.file)
 
 include		../../../Makefile.targ
-include		../../Makefile.msg

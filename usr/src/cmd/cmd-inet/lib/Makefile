@@ -19,17 +19,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 SUBDIRS=	ipmgmtd nwamd netcfgd
-MSGSUBDIRS=	ipmgmtd nwamd
 
 include         ../../Makefile.cmd
-
-POFILES=        $(MSGSUBDIRS:%=%/%.po)
-POFILE=		lib.po
 
 all:=		TARGET= all
 install:=	TARGET= install
@@ -45,5 +40,3 @@ $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-
-include         ../Makefile.msg

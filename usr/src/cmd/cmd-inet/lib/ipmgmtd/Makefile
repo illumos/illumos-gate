@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # Needed for ROOTFS_LIBDIR definition
@@ -34,9 +33,6 @@ CFGFILES=	ipadm.conf
 
 # Needed for ROOTETC definition
 include		../../../Makefile.cmd
-
-POFILE=		$(PROG).po
-POFILES=	ipmgmt_main.po ipmgmt_door.po
 
 ROOTCFGDIR=		$(ROOTETC)/ipadm
 ROOTCFGFILES=		$(CFGFILES:%=$(ROOTCFGDIR)/%)
@@ -87,4 +83,3 @@ $(ROOTCFGDIR)/%: $(ROOTCFGDIR) %
 	$(INS.file)
 
 include 	../../../Makefile.targ
-include		../../Makefile.msg
