@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -6311,6 +6310,9 @@ lscf_service_import(void *v, void *pvt)
 	    gettext("%s changed unexpectedly (instance \"%s\" deleted).\n");
 	const char * const badsnap = gettext("\"%s\" snapshot of svc:/%s:%s "
 	    "is corrupt (missing service snaplevel).\n");
+	const char * const s_mfile_upd =
+	    gettext("Unable to update the manifest file connection "
+	    "for %s\n");
 
 	li_only = 0;
 	/* Validate the service name */
@@ -6811,8 +6813,34 @@ lscf_service_import(void *v, void *pvt)
 			 * last-import snapshot.
 			 */
 			if (have_ge) {
+				pgroup_t *mfpg;
+				scf_callback_t mfcbdata;
+
 				li_only = 1;
 				no_refresh = 1;
+				/*
+				 * Need to go ahead and import the manifestfiles
+				 * pg if it exists. If the last-import snapshot
+				 * upgrade code is ever removed this code can
+				 * be removed as well.
+				 */
+				mfpg = internal_pgroup_find(s,
+				    SCF_PG_MANIFESTFILES, SCF_GROUP_FRAMEWORK);
+
+				if (mfpg) {
+					mfcbdata.sc_handle = g_hndl;
+					mfcbdata.sc_parent = imp_svc;
+					mfcbdata.sc_service = 1;
+					mfcbdata.sc_flags = SCI_FORCE;
+					mfcbdata.sc_source_fmri = s->sc_fmri;
+					mfcbdata.sc_target_fmri = s->sc_fmri;
+					if (entity_pgroup_import(mfpg,
+					    &mfcbdata) != UU_WALK_NEXT) {
+						warn(s_mfile_upd, s->sc_fmri);
+						r = UU_WALK_ERROR;
+						goto deltemp;
+					}
+				}
 				break;
 			}
 
