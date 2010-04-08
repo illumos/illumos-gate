@@ -19,24 +19,48 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 # 
-# This is a transient dummy service for Trusted Solaris.  It's function is
-# to disable selected services so they will not be started in labeled zones.
+# This is a transient service for Trusted Extensions to perform miscellaneous
+# set-up in a labeled zone.  It can be extended to disable any selected
+# services so they will not be started in zones.
 # 
 
 . /lib/svc/share/smf_include.sh
 
-if [ `/sbin/zonename` = "global" ]; then
 
-	# In the global zone, there's nothing to do so this service exits.
-	/usr/sbin/svcadm disable $SMF_FMRI || exit 1
+# Add pam entries for labeling.
+do_addpam()
+{
+	pamconf=/etc/pam.conf
 
+	grep '^[ 	]*other.*account.*pam_tsol_account' $pamconf \
+	    > /dev/null 2>&1
+	if [ $? -ne 0 ] ; then
+		# Append new entry
+		cat >> $pamconf << EOF
+other		account		required	pam_tsol_account.so.1
+EOF
+	fi
+}
+
+
+# In the global zone, there's nothing to do so this service exits.
+if smf_is_globalzone; then
+	/usr/sbin/svcadm disable $SMF_FMRI
+	exit $SMF_EXIT_OK
 fi
+
+
+# Exit if Trusted Extensions is not enabled.
+smf_is_system_labeled || exit $SMF_EXIT_OK
+
+
+# Add pam entries for the labeled zone.
+do_addpam
+
 
 # Disable any services here (remember to add dependencies to the
 # tsol-zones XML manifest) ...
