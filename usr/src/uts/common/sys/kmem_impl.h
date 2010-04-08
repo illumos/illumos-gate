@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_KMEM_IMPL_H
@@ -69,6 +68,7 @@ extern "C" {
 
 #define	KMF_DUMPDIVERT	0x00001000	/* use alternate memory at dump time */
 #define	KMF_DUMPUNSAFE	0x00002000	/* flag caches used at dump time */
+#define	KMF_PREFILL	0x00004000	/* Prefill the slab when created. */
 
 #define	KMF_BUFTAG	(KMF_DEADBEEF | KMF_REDZONE)
 #define	KMF_TOUCH	(KMF_BUFTAG | KMF_LITE | KMF_CONTENTS)

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1133,6 +1132,7 @@ static taskq_t		*kmem_move_taskq;
 
 static void kmem_cache_scan(kmem_cache_t *);
 static void kmem_cache_defrag(kmem_cache_t *);
+static void kmem_slab_prefill(kmem_cache_t *, kmem_slab_t *);
 
 
 kmem_log_header_t	*kmem_transaction_log;
@@ -1654,18 +1654,19 @@ kmem_slab_destroy(kmem_cache_t *cp, kmem_slab_t *sp)
 }
 
 static void *
-kmem_slab_alloc_impl(kmem_cache_t *cp, kmem_slab_t *sp)
+kmem_slab_alloc_impl(kmem_cache_t *cp, kmem_slab_t *sp, boolean_t prefill)
 {
 	kmem_bufctl_t *bcp, **hash_bucket;
 	void *buf;
+	boolean_t new_slab = (sp->slab_refcnt == 0);
 
 	ASSERT(MUTEX_HELD(&cp->cache_lock));
 	/*
 	 * kmem_slab_alloc() drops cache_lock when it creates a new slab, so we
 	 * can't ASSERT(avl_is_empty(&cp->cache_partial_slabs)) here when the
-	 * slab is newly created (sp->slab_refcnt == 0).
+	 * slab is newly created.
 	 */
-	ASSERT((sp->slab_refcnt == 0) || (KMEM_SLAB_IS_PARTIAL(sp) &&
+	ASSERT(new_slab || (KMEM_SLAB_IS_PARTIAL(sp) &&
 	    (sp == avl_first(&cp->cache_partial_slabs))));
 	ASSERT(sp->slab_cache == cp);
 
@@ -1674,31 +1675,7 @@ kmem_slab_alloc_impl(kmem_cache_t *cp, kmem_slab_t *sp)
 	sp->slab_refcnt++;
 
 	bcp = sp->slab_head;
-	if ((sp->slab_head = bcp->bc_next) == NULL) {
-		ASSERT(KMEM_SLAB_IS_ALL_USED(sp));
-		if (sp->slab_refcnt == 1) {
-			ASSERT(sp->slab_chunks == 1);
-		} else {
-			ASSERT(sp->slab_chunks > 1); /* the slab was partial */
-			avl_remove(&cp->cache_partial_slabs, sp);
-			sp->slab_later_count = 0; /* clear history */
-			sp->slab_flags &= ~KMEM_SLAB_NOMOVE;
-			sp->slab_stuck_offset = (uint32_t)-1;
-		}
-		list_insert_head(&cp->cache_complete_slabs, sp);
-		cp->cache_complete_slab_count++;
-	} else {
-		ASSERT(KMEM_SLAB_IS_PARTIAL(sp));
-		if (sp->slab_refcnt == 1) {
-			avl_add(&cp->cache_partial_slabs, sp);
-		} else {
-			/*
-			 * The slab is now more allocated than it was, so the
-			 * order remains unchanged.
-			 */
-			ASSERT(!avl_update(&cp->cache_partial_slabs, sp));
-		}
-	}
+	sp->slab_head = bcp->bc_next;
 
 	if (cp->cache_flags & KMF_HASH) {
 		/*
@@ -1716,6 +1693,45 @@ kmem_slab_alloc_impl(kmem_cache_t *cp, kmem_slab_t *sp)
 	}
 
 	ASSERT(KMEM_SLAB_MEMBER(sp, buf));
+
+	if (sp->slab_head == NULL) {
+		ASSERT(KMEM_SLAB_IS_ALL_USED(sp));
+		if (new_slab) {
+			ASSERT(sp->slab_chunks == 1);
+		} else {
+			ASSERT(sp->slab_chunks > 1); /* the slab was partial */
+			avl_remove(&cp->cache_partial_slabs, sp);
+			sp->slab_later_count = 0; /* clear history */
+			sp->slab_flags &= ~KMEM_SLAB_NOMOVE;
+			sp->slab_stuck_offset = (uint32_t)-1;
+		}
+		list_insert_head(&cp->cache_complete_slabs, sp);
+		cp->cache_complete_slab_count++;
+		return (buf);
+	}
+
+	ASSERT(KMEM_SLAB_IS_PARTIAL(sp));
+	/*
+	 * Peek to see if the magazine layer is enabled before
+	 * we prefill.  We're not holding the cpu cache lock,
+	 * so the peek could be wrong, but there's no harm in it.
+	 */
+	if (new_slab && prefill && (cp->cache_flags & KMF_PREFILL) &&
+	    (KMEM_CPU_CACHE(cp)->cc_magsize != 0))  {
+		kmem_slab_prefill(cp, sp);
+		return (buf);
+	}
+
+	if (new_slab) {
+		avl_add(&cp->cache_partial_slabs, sp);
+		return (buf);
+	}
+
+	/*
+	 * The slab is now more allocated than it was, so the
+	 * order remains unchanged.
+	 */
+	ASSERT(!avl_update(&cp->cache_partial_slabs, sp));
 	return (buf);
 }
 
@@ -1749,7 +1765,7 @@ kmem_slab_alloc(kmem_cache_t *cp, int kmflag)
 		cp->cache_bufslab += sp->slab_chunks;
 	}
 
-	buf = kmem_slab_alloc_impl(cp, sp);
+	buf = kmem_slab_alloc_impl(cp, sp, B_TRUE);
 	ASSERT((cp->cache_slab_create - cp->cache_slab_destroy) ==
 	    (cp->cache_complete_slab_count +
 	    avl_numnodes(&cp->cache_partial_slabs) +
@@ -2627,14 +2643,79 @@ kmem_slab_free_constructed(kmem_cache_t *cp, void *buf, boolean_t freed)
 }
 
 /*
+ * Used when there's no room to free a buffer to the per-CPU cache.
+ * Drops and re-acquires &ccp->cc_lock, and returns non-zero if the
+ * caller should try freeing to the per-CPU cache again.
+ * Note that we don't directly install the magazine in the cpu cache,
+ * since its state may have changed wildly while the lock was dropped.
+ */
+static int
+kmem_cpucache_magazine_alloc(kmem_cpu_cache_t *ccp, kmem_cache_t *cp)
+{
+	kmem_magazine_t *emp;
+	kmem_magtype_t *mtp;
+
+	ASSERT(MUTEX_HELD(&ccp->cc_lock));
+	ASSERT(((uint_t)ccp->cc_rounds == ccp->cc_magsize ||
+	    ((uint_t)ccp->cc_rounds == -1)) &&
+	    ((uint_t)ccp->cc_prounds == ccp->cc_magsize ||
+	    ((uint_t)ccp->cc_prounds == -1)));
+
+	emp = kmem_depot_alloc(cp, &cp->cache_empty);
+	if (emp != NULL) {
+		if (ccp->cc_ploaded != NULL)
+			kmem_depot_free(cp, &cp->cache_full,
+			    ccp->cc_ploaded);
+		kmem_cpu_reload(ccp, emp, 0);
+		return (1);
+	}
+	/*
+	 * There are no empty magazines in the depot,
+	 * so try to allocate a new one.  We must drop all locks
+	 * across kmem_cache_alloc() because lower layers may
+	 * attempt to allocate from this cache.
+	 */
+	mtp = cp->cache_magtype;
+	mutex_exit(&ccp->cc_lock);
+	emp = kmem_cache_alloc(mtp->mt_cache, KM_NOSLEEP);
+	mutex_enter(&ccp->cc_lock);
+
+	if (emp != NULL) {
+		/*
+		 * We successfully allocated an empty magazine.
+		 * However, we had to drop ccp->cc_lock to do it,
+		 * so the cache's magazine size may have changed.
+		 * If so, free the magazine and try again.
+		 */
+		if (ccp->cc_magsize != mtp->mt_magsize) {
+			mutex_exit(&ccp->cc_lock);
+			kmem_cache_free(mtp->mt_cache, emp);
+			mutex_enter(&ccp->cc_lock);
+			return (1);
+		}
+
+		/*
+		 * We got a magazine of the right size.  Add it to
+		 * the depot and try the whole dance again.
+		 */
+		kmem_depot_free(cp, &cp->cache_empty, emp);
+		return (1);
+	}
+
+	/*
+	 * We couldn't allocate an empty magazine,
+	 * so fall through to the slab layer.
+	 */
+	return (0);
+}
+
+/*
  * Free a constructed object to cache cp.
  */
 void
 kmem_cache_free(kmem_cache_t *cp, void *buf)
 {
 	kmem_cpu_cache_t *ccp = KMEM_CPU_CACHE(cp);
-	kmem_magazine_t *emp;
-	kmem_magtype_t *mtp;
 
 	/*
 	 * The client must not free either of the buffers passed to the move
@@ -2660,6 +2741,9 @@ kmem_cache_free(kmem_cache_t *cp, void *buf)
 	}
 
 	mutex_enter(&ccp->cc_lock);
+	/*
+	 * Any changes to this logic should be reflected in kmem_slab_prefill()
+	 */
 	for (;;) {
 		/*
 		 * If there's a slot available in the current CPU's
@@ -2687,64 +2771,110 @@ kmem_cache_free(kmem_cache_t *cp, void *buf)
 		if (ccp->cc_magsize == 0)
 			break;
 
-		/*
-		 * Try to get an empty magazine from the depot.
-		 */
-		emp = kmem_depot_alloc(cp, &cp->cache_empty);
-		if (emp != NULL) {
-			if (ccp->cc_ploaded != NULL)
-				kmem_depot_free(cp, &cp->cache_full,
-				    ccp->cc_ploaded);
-			kmem_cpu_reload(ccp, emp, 0);
-			continue;
-		}
-
-		/*
-		 * There are no empty magazines in the depot,
-		 * so try to allocate a new one.  We must drop all locks
-		 * across kmem_cache_alloc() because lower layers may
-		 * attempt to allocate from this cache.
-		 */
-		mtp = cp->cache_magtype;
-		mutex_exit(&ccp->cc_lock);
-		emp = kmem_cache_alloc(mtp->mt_cache, KM_NOSLEEP);
-		mutex_enter(&ccp->cc_lock);
-
-		if (emp != NULL) {
+		if (!kmem_cpucache_magazine_alloc(ccp, cp)) {
 			/*
-			 * We successfully allocated an empty magazine.
-			 * However, we had to drop ccp->cc_lock to do it,
-			 * so the cache's magazine size may have changed.
-			 * If so, free the magazine and try again.
+			 * We couldn't free our constructed object to the
+			 * magazine layer, so apply its destructor and free it
+			 * to the slab layer.
 			 */
-			if (ccp->cc_magsize != mtp->mt_magsize) {
-				mutex_exit(&ccp->cc_lock);
-				kmem_cache_free(mtp->mt_cache, emp);
-				mutex_enter(&ccp->cc_lock);
-				continue;
-			}
-
-			/*
-			 * We got a magazine of the right size.  Add it to
-			 * the depot and try the whole dance again.
-			 */
-			kmem_depot_free(cp, &cp->cache_empty, emp);
-			continue;
+			break;
 		}
-
-		/*
-		 * We couldn't allocate an empty magazine,
-		 * so fall through to the slab layer.
-		 */
-		break;
 	}
 	mutex_exit(&ccp->cc_lock);
+	kmem_slab_free_constructed(cp, buf, B_TRUE);
+}
+
+static void
+kmem_slab_prefill(kmem_cache_t *cp, kmem_slab_t *sp)
+{
+	kmem_cpu_cache_t *ccp = KMEM_CPU_CACHE(cp);
+	int cache_flags = cp->cache_flags;
+
+	kmem_bufctl_t *next, *head;
+	size_t nbufs;
 
 	/*
-	 * We couldn't free our constructed object to the magazine layer,
-	 * so apply its destructor and free it to the slab layer.
+	 * Completely allocate the newly created slab and put the pre-allocated
+	 * buffers in magazines. Any of the buffers that cannot be put in
+	 * magazines must be returned to the slab.
 	 */
-	kmem_slab_free_constructed(cp, buf, B_TRUE);
+	ASSERT(MUTEX_HELD(&cp->cache_lock));
+	ASSERT((cache_flags & (KMF_PREFILL|KMF_BUFTAG)) == KMF_PREFILL);
+	ASSERT(cp->cache_constructor == NULL);
+	ASSERT(sp->slab_cache == cp);
+	ASSERT(sp->slab_refcnt == 1);
+	ASSERT(sp->slab_head != NULL && sp->slab_chunks > sp->slab_refcnt);
+	ASSERT(avl_find(&cp->cache_partial_slabs, sp, NULL) == NULL);
+
+	head = sp->slab_head;
+	nbufs = (sp->slab_chunks - sp->slab_refcnt);
+	sp->slab_head = NULL;
+	sp->slab_refcnt += nbufs;
+	cp->cache_bufslab -= nbufs;
+	cp->cache_slab_alloc += nbufs;
+	list_insert_head(&cp->cache_complete_slabs, sp);
+	cp->cache_complete_slab_count++;
+	mutex_exit(&cp->cache_lock);
+	mutex_enter(&ccp->cc_lock);
+
+	while (head != NULL) {
+		void *buf = KMEM_BUF(cp, head);
+		/*
+		 * If there's a slot available in the current CPU's
+		 * loaded magazine, just put the object there and
+		 * continue.
+		 */
+		if ((uint_t)ccp->cc_rounds < ccp->cc_magsize) {
+			ccp->cc_loaded->mag_round[ccp->cc_rounds++] =
+			    buf;
+			ccp->cc_free++;
+			nbufs--;
+			head = head->bc_next;
+			continue;
+		}
+
+		/*
+		 * The loaded magazine is full.  If the previously
+		 * loaded magazine was empty, exchange them and try
+		 * again.
+		 */
+		if (ccp->cc_prounds == 0) {
+			kmem_cpu_reload(ccp, ccp->cc_ploaded,
+			    ccp->cc_prounds);
+			continue;
+		}
+
+		/*
+		 * If the magazine layer is disabled, break out now.
+		 */
+
+		if (ccp->cc_magsize == 0) {
+			break;
+		}
+
+		if (!kmem_cpucache_magazine_alloc(ccp, cp))
+			break;
+	}
+	mutex_exit(&ccp->cc_lock);
+	if (nbufs != 0) {
+		ASSERT(head != NULL);
+
+		/*
+		 * If there was a failure, return remaining objects to
+		 * the slab
+		 */
+		while (head != NULL) {
+			ASSERT(nbufs != 0);
+			next = head->bc_next;
+			head->bc_next = NULL;
+			kmem_slab_free(cp, KMEM_BUF(cp, head));
+			head = next;
+			nbufs--;
+		}
+	}
+	ASSERT(head == NULL);
+	ASSERT(nbufs == 0);
+	mutex_enter(&cp->cache_lock);
 }
 
 void *
@@ -3667,6 +3797,9 @@ kmem_cache_create(
 	if (cflags & KMC_NOTOUCH)
 		cp->cache_flags &= ~KMF_TOUCH;
 
+	if (cflags & KMC_PREFILL)
+		cp->cache_flags |= KMF_PREFILL;
+
 	if (cflags & KMC_NOHASH)
 		cp->cache_flags &= ~(KMF_AUDIT | KMF_FIREWALL);
 
@@ -3778,6 +3911,17 @@ kmem_cache_create(
 
 	cp->cache_maxchunks = (cp->cache_slabsize / cp->cache_chunksize);
 	cp->cache_partial_binshift = highbit(cp->cache_maxchunks / 16) + 1;
+
+	/*
+	 * Disallowing prefill when either the DEBUG or HASH flag is set or when
+	 * there is a constructor avoids some tricky issues with debug setup
+	 * that may be revisited later. We cannot allow prefill in a
+	 * metadata cache because of potential recursion.
+	 */
+	if (vmp == kmem_msb_arena ||
+	    cp->cache_flags & (KMF_HASH | KMF_BUFTAG) ||
+	    cp->cache_constructor != NULL)
+		cp->cache_flags &= ~KMF_PREFILL;
 
 	if (cp->cache_flags & KMF_HASH) {
 		ASSERT(!(cflags & KMC_NOHASH));
@@ -4873,7 +5017,8 @@ kmem_move_begin(kmem_cache_t *cp, kmem_slab_t *sp, void *buf, int flags)
 		return (B_TRUE);
 	}
 
-	to_buf = kmem_slab_alloc_impl(cp, avl_first(&cp->cache_partial_slabs));
+	to_buf = kmem_slab_alloc_impl(cp, avl_first(&cp->cache_partial_slabs),
+	    B_FALSE);
 	callback->kmm_to_buf = to_buf;
 	avl_insert(&cp->cache_defrag->kmd_moves_pending, callback, index);
 

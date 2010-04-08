@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -204,7 +203,7 @@ anon_init(void)
 	anon_hash = (struct anon **)
 	    kmem_zalloc(sizeof (struct anon *) * anon_hash_size, KM_SLEEP);
 	anon_cache = kmem_cache_create("anon_cache", sizeof (struct anon),
-	    AN_CACHE_ALIGN, NULL, NULL, NULL, NULL, NULL, 0);
+	    AN_CACHE_ALIGN, NULL, NULL, NULL, NULL, NULL, KMC_PREFILL);
 	anonmap_cache = kmem_cache_create("anonmap_cache",
 	    sizeof (struct anon_map), 0,
 	    anonmap_cache_constructor, anonmap_cache_destructor, NULL,

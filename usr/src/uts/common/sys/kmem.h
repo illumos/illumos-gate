@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -78,6 +77,7 @@ extern size_t kmem_dump_finish(char *buf, size_t size);
 #define	KMC_QCACHE	0x00100000
 #define	KMC_KMEM_ALLOC	0x00200000	/* internal use only */
 #define	KMC_IDENTIFIER	0x00400000	/* internal use only */
+#define	KMC_PREFILL	0x00800000
 
 struct kmem_cache;		/* cache structure is opaque to kmem clients */
 
