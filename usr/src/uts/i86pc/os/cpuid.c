@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2009, Intel Corporation.
@@ -476,7 +475,7 @@ determine_platform()
 {
 	struct cpuid_regs cp;
 	char *xen_str;
-	uint32_t xen_signature[4];
+	uint32_t xen_signature[4], base;
 
 	platform_type = HW_NATIVE;
 
@@ -485,22 +484,30 @@ determine_platform()
 
 	/*
 	 * In a fully virtualized domain, Xen's pseudo-cpuid function
-	 * 0x40000000 returns a string representing the Xen signature in
-	 * %ebx, %ecx, and %edx.  %eax contains the maximum supported cpuid
-	 * function.
+	 * returns a string representing the Xen signature in %ebx, %ecx,
+	 * and %edx. %eax contains the maximum supported cpuid function.
+	 * We need at least a (base + 2) leaf value to do what we want
+	 * to do. Try different base values, since the hypervisor might
+	 * use a different one depending on whether hyper-v emulation
+	 * is switched on by default or not.
 	 */
-	cp.cp_eax = 0x40000000;
-	(void) __cpuid_insn(&cp);
-	xen_signature[0] = cp.cp_ebx;
-	xen_signature[1] = cp.cp_ecx;
-	xen_signature[2] = cp.cp_edx;
-	xen_signature[3] = 0;
-	xen_str = (char *)xen_signature;
-	if (strcmp("XenVMMXenVMM", xen_str) == 0 && cp.cp_eax <= 0x40000002) {
-		platform_type = HW_XEN_HVM;
-	} else if (vmware_platform()) { /* running under vmware hypervisor? */
-		platform_type = HW_VMWARE;
+	for (base = 0x40000000; base < 0x40010000; base += 0x100) {
+		cp.cp_eax = base;
+		(void) __cpuid_insn(&cp);
+		xen_signature[0] = cp.cp_ebx;
+		xen_signature[1] = cp.cp_ecx;
+		xen_signature[2] = cp.cp_edx;
+		xen_signature[3] = 0;
+		xen_str = (char *)xen_signature;
+		if (strcmp("XenVMMXenVMM", xen_str) == 0 &&
+		    cp.cp_eax >= (base + 2)) {
+			platform_type = HW_XEN_HVM;
+			return;
+		}
 	}
+
+	if (vmware_platform()) /* running under vmware hypervisor? */
+		platform_type = HW_VMWARE;
 }
 
 int

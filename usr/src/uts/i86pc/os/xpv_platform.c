@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -94,7 +93,7 @@ void
 xen_hvm_init(void)
 {
 	struct cpuid_regs cp;
-	uint32_t xen_signature[4];
+	uint32_t xen_signature[4], base;
 	char *xen_str;
 	struct xen_add_to_physmap xatp;
 	xen_capabilities_info_t caps;
@@ -107,27 +106,34 @@ xen_hvm_init(void)
 	xen_hvm_inited = 1;
 
 	/*
-	 * Xen's pseudo-cpuid function 0x40000000 returns a string
-	 * representing the Xen signature in %ebx, %ecx, and %edx.
+	 * Xen's pseudo-cpuid function returns a string representing
+	 * the Xen signature in %ebx, %ecx, and %edx.
+	 * Loop over the base values, since it may be different if
+	 * the hypervisor has hyper-v emulation switched on.
+	 *
 	 * %eax contains the maximum supported cpuid function.
 	 */
-	cp.cp_eax = 0x40000000;
-	(void) __cpuid_insn(&cp);
-	xen_signature[0] = cp.cp_ebx;
-	xen_signature[1] = cp.cp_ecx;
-	xen_signature[2] = cp.cp_edx;
-	xen_signature[3] = 0;
-	xen_str = (char *)xen_signature;
-	if (strcmp("XenVMMXenVMM", xen_str) != 0 ||
-	    cp.cp_eax < 0x40000002)
+	for (base = 0x40000000; base < 0x40010000; base += 0x100) {
+		cp.cp_eax = base;
+		(void) __cpuid_insn(&cp);
+		xen_signature[0] = cp.cp_ebx;
+		xen_signature[1] = cp.cp_ecx;
+		xen_signature[2] = cp.cp_edx;
+		xen_signature[3] = 0;
+		xen_str = (char *)xen_signature;
+		if (strcmp("XenVMMXenVMM", xen_str)  == 0 &&
+		    cp.cp_eax >= (base + 2))
+			break;
+	}
+	if (base >= 0x40010000)
 		return;
 
 	/*
-	 * cpuid function 0x40000001 returns the Xen version in %eax.  The
+	 * cpuid function at base + 1 returns the Xen version in %eax.  The
 	 * top 16 bits are the major version, the bottom 16 are the minor
 	 * version.
 	 */
-	cp.cp_eax = 0x40000001;
+	cp.cp_eax = base + 1;
 	(void) __cpuid_insn(&cp);
 	xen_major = cp.cp_eax >> 16;
 	xen_minor = cp.cp_eax & 0xffff;
@@ -141,7 +147,7 @@ xen_hvm_init(void)
 		return;
 
 	/*
-	 * cpuid function 0x40000002 returns information about the
+	 * cpuid function at base + 2 returns information about the
 	 * hypercall page.  %eax nominally contains the number of pages
 	 * with hypercall code, but according to the Xen guys, "I'll
 	 * guarantee that remains one forever more, so you can just
@@ -149,7 +155,7 @@ xen_hvm_init(void)
 	 * return more than one page."  %ebx contains an MSR we use to ask
 	 * Xen to remap each page at a specific pfn.
 	 */
-	cp.cp_eax = 0x40000002;
+	cp.cp_eax = base + 2;
 	(void) __cpuid_insn(&cp);
 
 	/*
