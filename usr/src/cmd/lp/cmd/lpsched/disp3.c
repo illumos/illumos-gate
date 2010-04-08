@@ -20,15 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "dispatch.h"
 #include <syslog.h>
@@ -56,7 +53,7 @@ remount_form(register PSTATUS *pps, FSTATUS *pfs, short trayNum)
 		register FSTATUS	*Opfs	= pps->forms[trayNum].form;
 
 		pps->forms[trayNum].form = 0;
-		pps->forms[trayNum].isAvailable = 0;
+		pps->forms[trayNum].isAvailable = 1;
 		Opfs->mounted--;
 
 		/*
@@ -267,7 +264,7 @@ s_max_trays(char *m, MESG *md)
 
 			for (i = pps->numForms; i < numTrays; i++) {
 				ppfs[i].form = NULL;
-				ppfs[i].isAvailable = 0;
+				ppfs[i].isAvailable = 1;
 			}
 			pps->forms = ppfs;
 			pps->numForms = numTrays;
