@@ -2099,9 +2099,11 @@ zfs_freevfs(vfs_t *vfsp)
 
 	/*
 	 * If this is a snapshot, we have an extra VFS_HOLD on our parent
-	 * from zfs_mount().  Release it here.
+	 * from zfs_mount().  Release it here.  If we came through
+	 * zfs_mountroot() instead, we didn't grab an extra hold, so
+	 * skip the VFS_RELE for rootvfs.
 	 */
-	if (zfsvfs->z_issnap)
+	if (zfsvfs->z_issnap && (vfsp != rootvfs))
 		VFS_RELE(zfsvfs->z_parent->z_vfs);
 
 	zfsvfs_free(zfsvfs);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <libzfs.h>
@@ -67,6 +66,18 @@ ziprintf(const char *fmt, ...)
 	va_end(ap);
 }
 
+static void
+compress_slashes(const char *src, char *dest)
+{
+	while (*src != '\0') {
+		*dest = *src++;
+		while (*dest == '/' && *src == '/')
+			++src;
+		++dest;
+	}
+	*dest = '\0';
+}
+
 /*
  * Given a full path to a file, translate into a dataset name and a relative
  * path within the dataset.  'dataset' must be at least MAXNAMELEN characters,
@@ -74,13 +85,16 @@ ziprintf(const char *fmt, ...)
  * buffer, which we need later to get the object ID.
  */
 static int
-parse_pathname(const char *fullpath, char *dataset, char *relpath,
+parse_pathname(const char *inpath, char *dataset, char *relpath,
     struct stat64 *statbuf)
 {
 	struct extmnttab mp;
 	FILE *fp;
 	int match;
 	const char *rel;
+	char fullpath[MAXPATHLEN];
+
+	compress_slashes(inpath, fullpath);
 
 	if (fullpath[0] != '/') {
 		(void) fprintf(stderr, "invalid object '%s': must be full "
