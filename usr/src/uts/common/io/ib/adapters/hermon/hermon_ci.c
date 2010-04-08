@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2502,7 +2501,6 @@ hermon_ci_map_mem_area(ibc_hca_hdl_t hca, ibt_va_attr_t *va_attrs,
 	status = ddi_dma_alloc_handle(state->hs_dip, &dma_attr,
 	    callback, NULL, &ma_hdl->h_ma_dmahdl);
 	if (status != DDI_SUCCESS) {
-		kmem_free(ma_hdl, sizeof (*ma_hdl));
 		ibt_status = IBT_INSUFF_RESOURCE;
 		goto marea_fail0;
 	}
