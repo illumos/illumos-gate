@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -615,6 +614,7 @@ __res_vinit(res_state statp, int preinit) {
 	return (statp->res_h_errno);
 #ifdef  SUNW_INITCHKIF
 freedata:
+	RES_SET_H_ERRNO(statp, NETDB_INTERNAL);
 	if (statp->_u._ext.ext != NULL) {
 		free(statp->_u._ext.ext);
 		statp->_u._ext.ext = NULL;

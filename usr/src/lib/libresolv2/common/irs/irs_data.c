@@ -1,4 +1,8 @@
 /*
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/*
  * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996,1999 by Internet Software Consortium.
  *
@@ -223,11 +227,15 @@ __h_errno(void) {
 	struct net_data *net_data = net_data_init(NULL);
 	if (net_data && net_data->res)
 		return (&net_data->res->res_h_errno);
+#ifdef	ORIGINAL_ISC_CODE
 #if !(__GLIBC__ > 2 || __GLIBC__ == 2 &&  __GLIBC_MINOR__ >= 3)
 	return(&_res.res_h_errno);
 #else
 	return (&h_errno);
 #endif
+#else
+	return (&h_errno);
+#endif	/* ORIGINAL_ISC_CODE */
 }
 
 void

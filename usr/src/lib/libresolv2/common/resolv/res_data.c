@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -91,8 +90,10 @@ struct __res_state _res
 # endif
         ;
 
+#ifdef	ORIGINAL_ISC_CODE
 #if defined(DO_PTHREADS) || defined(__linux)
 #define _res (*__res_state())
+#endif
 #endif
 
 /* Proto. */
