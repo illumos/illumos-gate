@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -5667,8 +5666,10 @@ out:
 		    "CONSTRAINT flag. dip=%p", (void *)dip));
 		DEVI(dip)->devi_flags |= DEVI_R_CONSTRAINT;
 	} else if ((DEVI(dip)->devi_flags & DEVI_RETIRING) &&
-	    DEVI(dip)->devi_ref == 0) {
-		/* also allow retire if device is not in use */
+	    ((DEVI(dip)->devi_ops != NULL &&
+	    DEVI(dip)->devi_ops->devo_bus_ops != NULL) ||
+	    DEVI(dip)->devi_ref == 0)) {
+		/* also allow retire if nexus or if device is not in use */
 		RIO_VERBOSE((CE_NOTE, "e_ddi_offline_notify(): device not in "
 		    "use. Setting CONSTRAINT flag. dip=%p", (void *)dip));
 		DEVI(dip)->devi_flags |= DEVI_R_CONSTRAINT;
@@ -8158,8 +8159,6 @@ e_ddi_retire_finalize(dev_info_t *dip, void *arg)
 	int finalize;
 	int phci_only;
 
-	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(dip)));
-
 	mutex_enter(&DEVI(dip)->devi_lock);
 	if (!(DEVI(dip)->devi_flags & DEVI_RETIRING)) {
 		RIO_DEBUG((CE_WARN,
@@ -8178,6 +8177,8 @@ e_ddi_retire_finalize(dev_info_t *dip, void *arg)
 	 */
 	finalize = 0;
 	if (constraint) {
+		ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+
 		ASSERT(DEVI(dip)->devi_flags & DEVI_R_CONSTRAINT);
 		ASSERT(!(DEVI(dip)->devi_flags & DEVI_R_BLOCKED));
 		DEVI(dip)->devi_flags &= ~DEVI_R_CONSTRAINT;
@@ -8219,7 +8220,7 @@ e_ddi_retire_finalize(dev_info_t *dip, void *arg)
 	 */
 	phci_only = 0;
 	if (MDI_PHCI(dip))
-		mdi_phci_retire_finalize(dip, phci_only);
+		mdi_phci_retire_finalize(dip, phci_only, arg);
 
 	return (DDI_WALK_CONTINUE);
 }
@@ -8498,6 +8499,7 @@ i_ddi_check_retire(dev_info_t *dip)
 	dev_info_t	*pdip;
 	int		circ;
 	int		phci_only;
+	int		constraint;
 
 	pdip = ddi_get_parent(dip);
 
@@ -8546,8 +8548,9 @@ i_ddi_check_retire(dev_info_t *dip)
 	 * offline the PHCI
 	 */
 	phci_only = 1;
+	constraint = 1;
 	if (MDI_PHCI(dip))
-		mdi_phci_retire_finalize(dip, phci_only);
+		mdi_phci_retire_finalize(dip, phci_only, &constraint);
 }
 
 void

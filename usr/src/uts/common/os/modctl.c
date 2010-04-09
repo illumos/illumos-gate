@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -992,10 +991,12 @@ modctl_retire(char *path, char *uconstraints, size_t ulen)
 
 	/*
 	 * First check if the device is already retired.
-	 * If it is, this becomes a NOP
+	 * If it is, then persist the retire anyway, just in case the retire
+	 * store has got out of sync with the boot archive.
 	 */
 	if (e_ddi_device_retired(devpath)) {
 		cmn_err(CE_NOTE, "Device: already retired: %s", devpath);
+		(void) e_ddi_retire_persist(devpath);
 		kmem_free(devpath, strlen(devpath) + 1);
 		return (0);
 	}

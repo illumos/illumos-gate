@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SUNMDI_H
@@ -145,7 +144,7 @@ int mdi_devi_offline(dev_info_t *, uint_t);
  */
 void mdi_phci_mark_retiring(dev_info_t *dip, char **cons_array);
 void mdi_phci_retire_notify(dev_info_t *dip, int *constraint);
-void mdi_phci_retire_finalize(dev_info_t *dip, int phci_only);
+void mdi_phci_retire_finalize(dev_info_t *dip, int phci_only, void *constraint);
 void mdi_phci_unretire(dev_info_t *dip);
 
 /*

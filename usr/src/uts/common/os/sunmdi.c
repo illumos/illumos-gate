@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -5371,9 +5370,14 @@ mdi_phci_retire_notify(dev_info_t *dip, int *constraint)
  * offline the path(s) hanging off the pHCI. If the
  * last path to any client, check that constraints
  * have been applied.
+ *
+ * If constraint is 0, we aren't going to retire the 
+ * pHCI. However we still need to go through the paths
+ * calling e_ddi_retire_finalize() to clear their
+ * contract barriers.
  */
 void
-mdi_phci_retire_finalize(dev_info_t *dip, int phci_only)
+mdi_phci_retire_finalize(dev_info_t *dip, int phci_only, void *constraint)
 {
 	mdi_phci_t	*ph;
 	mdi_client_t	*ct;
@@ -5381,7 +5385,7 @@ mdi_phci_retire_finalize(dev_info_t *dip, int phci_only)
 	mdi_pathinfo_t	*next;
 	dev_info_t	*cdip;
 	int		unstable = 0;
-	int		constraint;
+	int		tmp_constraint;
 
 	if (!MDI_PHCI(dip))
 		return;
@@ -5435,23 +5439,31 @@ mdi_phci_retire_finalize(dev_info_t *dip, int phci_only)
 			i_mdi_client_unlock(ct);
 			MDI_PHCI_UNLOCK(ph);
 			/*
-			 * We don't retire clients we just retire the
-			 * path to a client. If it is the last path
-			 * to a client, constraints are checked and
-			 * if we pass the last path is offlined. MPXIO will
-			 * then fail all I/Os to the client. Since we don't
-			 * want to retire the client on a path error
-			 * set constraint = 0 so that the client dip
-			 * is not retired.
+			 * This is the last path to this client.
+			 *
+			 * Constraint will only be set to 1 if this client can
+			 * be retired (as already determined by
+			 * mdi_phci_retire_notify). However we don't actually
+			 * need to retire the client (we just retire the last
+			 * path - MPXIO will then fail all I/Os to the client).
+			 * But we still need to call e_ddi_retire_finalize so
+			 * the contract barriers can be cleared. Therefore we
+			 * temporarily set constraint = 0 so that the client
+			 * dip is not retired.
 			 */
-			constraint = 0;
-			(void) e_ddi_retire_finalize(cdip, &constraint);
+			tmp_constraint = 0;
+			(void) e_ddi_retire_finalize(cdip, &tmp_constraint);
 			MDI_PHCI_LOCK(ph);
 			pip = next;
 		} else {
 			i_mdi_client_unlock(ct);
 			pip = next;
 		}
+	}
+
+	if (!phci_only && *((int *)constraint) == 0) {
+		MDI_PHCI_UNLOCK(ph);
+		return;
 	}
 
 	/*
