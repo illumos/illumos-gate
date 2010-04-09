@@ -1,4 +1,4 @@
-# @(#)asia	8.58
+# @(#)asia	8.59
 # This file is in the public domain, so clarified as of
 # 2009-05-17 by Arthur David Olson.
 
@@ -1912,13 +1912,35 @@ Zone	Asia/Muscat	3:54:20 -	LMT	1920
 # [T]he German Consulate General in Karachi reported me today that Pakistan
 # will go back to standard time on 1st of November.
 
+# From Steffen Thorsen (2010-03-26):
+# Steffen Thorsen wrote:
+# > On Thursday (2010-03-25) it was announced that DST would start in
+# > Pakistan on 2010-04-01.
+# >
+# > Then today, the president said that they might have to revert the
+# > decision if it is not supported by the parliament. So at the time
+# > being, it seems unclear if DST will be actually observed or not - but
+# > April 1 could be a more likely date than April 15.
+# Now, it seems that the decision to not observe DST in final:
+#
+# "Govt Withdraws Plan To Advance Clocks"
+# <a href="http://www.apakistannews.com/govt-withdraws-plan-to-advance-clocks-172041">
+# http://www.apakistannews.com/govt-withdraws-plan-to-advance-clocks-172041
+# </a>
+#
+# "People laud PM's announcement to end DST"
+# <a href="http://www.app.com.pk/en_/index.php?option=com_content&task=view&id=99374&Itemid=2">
+# http://www.app.com.pk/en_/index.php?option=com_content&task=view&id=99374&Itemid=2
+# </a>
+
 # Rule	NAME	FROM	TO	TYPE	IN	ON	AT	SAVE	LETTER/S
 Rule Pakistan	2002	only	-	Apr	Sun>=2	0:01	1:00	S
 Rule Pakistan	2002	only	-	Oct	Sun>=2	0:01	0	-
 Rule Pakistan	2008	only	-	Jun	1	0:00	1:00	S
 Rule Pakistan	2008	only	-	Nov	1	0:00	0	-
-Rule Pakistan	2009	max	-	Apr	15	0:00	1:00	S
-Rule Pakistan	2009	max	-	Nov	1	0:00	0	-
+Rule Pakistan	2009	only	-	Apr	15	0:00	1:00	S
+Rule Pakistan	2009	only	-	Nov	1	0:00	0	-
+
 # Zone	NAME		GMTOFF	RULES	FORMAT	[UNTIL]
 Zone	Asia/Karachi	4:28:12 -	LMT	1907
 			5:30	-	IST	1942 Sep
