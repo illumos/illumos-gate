@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -129,7 +128,7 @@ struct cmd {
 #define	SHELP_REBOOT	"reboot [-- boot_arguments]"
 #define	SHELP_LIST	"list [-cipv]"
 #define	SHELP_VERIFY	"verify"
-#define	SHELP_INSTALL	"install [-x nodataset] [brand-specific args]"
+#define	SHELP_INSTALL	"install [brand-specific args]"
 #define	SHELP_UNINSTALL	"uninstall [-F] [brand-specific args]"
 #define	SHELP_CLONE	"clone [-m method] [-s <ZFS snapshot>] "\
 	"[brand-specific args] zonename"
@@ -253,10 +252,7 @@ long_help(int cmd_num)
 		    "physical network interfaces exist, etc."));
 	case CMD_INSTALL:
 		return (gettext("Install the configuration on to the system.  "
-		    "The -x nodataset option\n\tcan be used to prevent the "
-		    "creation of a new ZFS file system for the\n\tzone "
-		    "(assuming the zonepath is within a ZFS file system).\n\t"
-		    "All other arguments are passed to the brand installation "
+		    "All arguments are passed to the brand installation "
 		    "function;\n\tsee brands(5) for more information."));
 	case CMD_UNINSTALL:
 		return (gettext("Uninstall the configuration from the system.  "
@@ -2811,7 +2807,6 @@ install_func(int argc, char *argv[])
 	char zonepath[MAXPATHLEN];
 	brand_handle_t bh = NULL;
 	int status;
-	boolean_t nodataset = B_FALSE;
 	boolean_t do_postinstall = B_FALSE;
 	boolean_t brand_help = B_FALSE;
 	char opts[128];
@@ -2889,13 +2884,6 @@ install_func(int argc, char *argv[])
 			}
 			/* Ignore unknown options - may be brand specific. */
 			break;
-		case 'x':
-			/* Handle this option internally, don't pass to brand */
-			if (strcmp(optarg, "nodataset") == 0) {
-				/* Handle this option internally */
-				nodataset = B_TRUE;
-			}
-			continue;
 		default:
 			/* Ignore unknown options - may be brand specific. */
 			break;
@@ -2948,8 +2936,7 @@ install_func(int argc, char *argv[])
 			goto done;
 		}
 
-		if (!nodataset)
-			create_zfs_zonepath(zonepath);
+		create_zfs_zonepath(zonepath);
 	}
 
 	status = do_subproc(cmdbuf);
@@ -2961,6 +2948,7 @@ install_func(int argc, char *argv[])
 			zonecfg_release_lock_file(target_zone, lockfd);
 			return (Z_ERR);
 		}
+		errno = subproc_err;
 		err = Z_ERR;
 		goto done;
 	}
@@ -2980,6 +2968,7 @@ install_func(int argc, char *argv[])
 		if ((subproc_err =
 		    subproc_status(gettext("brand-specific post-install"),
 		    status, B_FALSE)) != ZONE_SUBPROC_OK) {
+			errno = subproc_err;
 			err = Z_ERR;
 			(void) zone_set_state(target_zone,
 			    ZONE_STATE_INCOMPLETE);
@@ -2994,13 +2983,15 @@ done:
 	 * first.
 	 */
 	if (subproc_err == ZONE_SUBPROC_NOTCOMPLETE) {
-		if ((err = cleanup_zonepath(zonepath, B_FALSE)) != Z_OK) {
-			errno = err;
+		int temp_err;
+
+		if ((temp_err = cleanup_zonepath(zonepath, B_FALSE)) != Z_OK) {
+			errno = err = temp_err;
 			zperror2(target_zone,
 			    gettext("cleaning up zonepath failed"));
-		} else if ((err = zone_set_state(target_zone,
+		} else if ((temp_err = zone_set_state(target_zone,
 		    ZONE_STATE_CONFIGURED)) != Z_OK) {
-			errno = err;
+			errno = err = temp_err;
 			zperror2(target_zone, gettext("could not set state"));
 		}
 	}
@@ -3375,7 +3366,7 @@ valid_brand_clone(char *source_zone, char *target_zone)
 		return (Z_ERR);
 	}
 
-	if (strcmp(source_brand, target_brand) != NULL) {
+	if (strcmp(source_brand, target_brand) != 0) {
 		(void) fprintf(stderr,
 		    gettext("%s: Zones '%s' and '%s' have different brand "
 		    "types.\n"), execname, source_zone, target_zone);
