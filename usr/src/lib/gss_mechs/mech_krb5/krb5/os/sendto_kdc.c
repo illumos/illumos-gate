@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * lib/krb5/os/sendto_kdc.c
@@ -379,7 +378,7 @@ krb5_sendto_kdc (krb5_context context, const krb5_data *message,
 		 int *use_master, int tcp_only)
 {
     krb5_error_code retval, retval2;
-    struct addrlist addrs;
+    struct addrlist addrs = ADDRLIST_INIT;	/* Solaris Kerberos */
     int socktype1 = 0, socktype2 = 0, addr_used;
 
     /*

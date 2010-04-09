@@ -28,8 +28,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -486,7 +485,7 @@ krb5int_clean_hostname(krb5_context context, const char *host, char *local_host,
 krb5_error_code
 krb5int_domain_get_realm(krb5_context context, const char *domain, char **realm) {
     krb5_error_code retval;
-    struct addrlist addrlist;
+    struct addrlist addrlist = ADDRLIST_INIT;	/* Solaris Kerberos */
     krb5_data drealm;
     char *cp = NULL;
     char *fqdn = NULL;
