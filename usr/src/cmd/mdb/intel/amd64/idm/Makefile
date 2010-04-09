@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 MODULE = idm.so
@@ -30,6 +29,7 @@ MODSRCS = idm.c
 
 ISCSITBASE = ../../../../../uts/common/io/comstar/port/iscsit
 ISCSIBASE = ../../../../../uts/common/io/scsi/adapters/iscsi
+ISERBASE = ../../../../../uts/common
 
 include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64
@@ -38,3 +38,4 @@ include ../../../Makefile.module
 
 CPPFLAGS += -I$(ISCSITBASE)
 CPPFLAGS += -I$(ISCSIBASE)
+CPPFLAGS += -I$(ISERBASE)
