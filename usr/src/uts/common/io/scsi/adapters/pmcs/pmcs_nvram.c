@@ -53,6 +53,7 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	uint8_t *sstart, *send;		/* SPCBoot */
 	uint32_t *fwvp;
 	int defret = 0;
+	int first_pass = 1;
 	long fw_version, ila_version;
 	uint8_t *fw_verp, *ila_verp;
 
@@ -211,6 +212,11 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 		return (-1);
 	}
 
+repeat:
+	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+	    "%s: Beginning firmware update of %s image.",
+	    __func__, (first_pass ? "first" : "second"));
+
 	if (pmcs_fw_flash(pwp, (void *)istart,
 	    (uint32_t)((size_t)iend - (size_t)istart))) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
@@ -229,17 +235,27 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 		return (-1);
 	}
 
-	(void) ddi_modclose(modhp);
-
 	if (pmcs_soft_reset(pwp, B_FALSE)) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: soft reset after flash update failed", __func__);
+		(void) ddi_modclose(modhp);
 		return (-1);
 	} else {
-		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
-		    "%s: Firmware successfully upgraded.", __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: %s image successfully upgraded.",
+		    __func__, (first_pass ? "First" : "Second"));
 		pwp->last_reset_reason = PMCS_LAST_RST_FW_UPGRADE;
 	}
+
+	if (first_pass) {
+		first_pass = 0;
+		goto repeat;
+	}
+
+	pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+	    "%s: Firmware successfully upgraded", __func__);
+
+	(void) ddi_modclose(modhp);
 	return (0);
 }
 
