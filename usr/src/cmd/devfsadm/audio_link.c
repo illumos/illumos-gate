@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <regex.h>
@@ -41,7 +40,7 @@
 
 extern int system_labeled;
 
-static void check_audio_link(char *secondary_link,
+static void check_audio_link(di_node_t anynode, char *secondary_link,
     const char *primary_link_format);
 
 static int audio_process(di_minor_t minor, di_node_t node);
@@ -99,12 +98,22 @@ static devfsadm_remove_t audio_remove_cbt[] = {
 
 DEVFSADM_REMOVE_INIT_V0(audio_remove_cbt);
 
+static di_node_t anynode;
+
+int
+minor_init(void)
+{
+	anynode = DI_NODE_NIL;
+	return (DEVFSADM_SUCCESS);
+}
+
 int
 minor_fini(void)
 {
-	check_audio_link("audio", "sound/%d");
-	check_audio_link("audioctl", "sound/%dctl");
-	check_audio_link("dsp", "dsp%d");
+	check_audio_link(anynode, "audio", "sound/%d");
+	check_audio_link(anynode, "audioctl", "sound/%dctl");
+	check_audio_link(anynode, "dsp", "dsp%d");
+	anynode = DI_NODE_NIL;
 	return (DEVFSADM_SUCCESS);
 }
 
@@ -144,6 +153,7 @@ sndstat_process(di_minor_t minor, di_node_t node)
 	char *mn;
 
 	mn = di_minor_name(minor);
+	anynode = node;
 
 	/*
 	 * "Special" handling for /dev/sndstat and /dev/mixer.
@@ -184,6 +194,7 @@ audio_process(di_minor_t minor, di_node_t node)
 	if (system_labeled)
 		flags = DA_ADD|DA_AUDIO;
 
+	anynode = node;
 	mn = di_minor_name(minor);
 
 	if ((tmp = di_devfs_path(node)) == NULL) {
@@ -300,14 +311,14 @@ audio_process(di_minor_t minor, di_node_t node)
 }
 
 static void
-check_audio_link(char *secondary, const char *primary_format)
+check_audio_link(di_node_t anynode, char *secondary, const char *primary_format)
 {
 	char primary[PATH_MAX + 1];
 	int i;
 	int flags = 0;
 
 	/* if link is present, return */
-	if (devfsadm_link_valid(secondary) == DEVFSADM_TRUE) {
+	if (devfsadm_link_valid(anynode, secondary) == DEVFSADM_TRUE) {
 		return;
 	}
 
@@ -316,7 +327,7 @@ check_audio_link(char *secondary, const char *primary_format)
 
 	for (i = 0; i < MAX_AUDIO_LINK; i++) {
 		(void) sprintf(primary, primary_format, i);
-		if (devfsadm_link_valid(primary) == DEVFSADM_TRUE) {
+		if (devfsadm_link_valid(anynode, primary) == DEVFSADM_TRUE) {
 			/* we read link to get it to the master "real" link */
 			(void) devfsadm_secondary_link(secondary,
 			    primary, flags);

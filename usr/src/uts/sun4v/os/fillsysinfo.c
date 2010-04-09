@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -50,6 +49,7 @@
 #include <sys/mmu.h>
 #include <sys/bitmap.h>
 #include <sys/intreg.h>
+#include <sys/instance.h>
 
 struct cpu_node cpunodes[NCPU];
 
@@ -1049,6 +1049,144 @@ init_md_broken(md_t *mdp, mde_cookie_t *cpulist)
 		broken_md_flag = 1;
 
 	md_free_scan_dag(mdp, &platlist);
+}
+
+#define	PLAT_MAX_IOALIASES	8
+
+static plat_alias_t *plat_ioaliases;
+static uint64_t plat_num_ioaliases;
+
+/*
+ * split the aliases property into its
+ * component strings for easy searching.
+ */
+static void
+split_alias(plat_alias_t *pali, char *str)
+{
+	char *aliasv[PLAT_MAX_IOALIASES], *p;
+	int i, duplen;
+	char *dup;
+
+	/* skip leading space */
+	str = dup = strdup(str);
+	duplen = strlen(dup) + 1;
+	str += strspn(str, " ");
+	for (i = 0; *str != '\0'; str = p) {
+
+		p = strpbrk(str, " ");
+		if (p != NULL) {
+			*p++ = '\0';
+		}
+
+		VERIFY(i < PLAT_MAX_IOALIASES);
+		aliasv[i++] = strdup(str);
+		if (p == NULL)
+			break;
+		p += strspn(p, " ");
+	}
+
+	kmem_free(dup, duplen);
+
+	if (i == 0) {
+		pali->pali_naliases = 0;
+		pali->pali_aliases = NULL;
+		return;
+	}
+
+	pali->pali_naliases = i;
+	pali->pali_aliases = kmem_alloc(i * sizeof (char *), KM_SLEEP);
+	for (i = 0; i < pali->pali_naliases; i++) {
+		pali->pali_aliases[i] = aliasv[i];
+	}
+}
+
+/*
+ * retrieve the ioalias info from the MD,
+ * and init the ioalias struct.
+ *
+ * NOTE: Assumes that the ioalias info does not change at runtime
+ * This routine is invoked only once at boot time.
+ *
+ * No lock needed as this is called at boot with a DDI lock held
+ */
+void
+plat_ioaliases_init(void)
+{
+	md_t *mdp;
+	mde_cookie_t *ionodes, alinode;
+	plat_alias_t *pali;
+	int nio;
+	int i;
+	int err;
+
+	mdp = md_get_handle();
+	if (mdp == NULL) {
+		cmn_err(CE_PANIC, "no machine description (MD)");
+		/*NOTREACHED*/
+	}
+
+	nio = md_alloc_scan_dag(mdp, md_root_node(mdp),
+	    "ioaliases", "fwd", &ionodes);
+
+
+	/* not all platforms support aliases */
+	if (nio < 1) {
+		(void) md_fini_handle(mdp);
+		return;
+	}
+	if (nio > 1) {
+		cmn_err(CE_PANIC, "multiple ioalias nodes in MD");
+		/*NOTREACHED*/
+	}
+
+	alinode = ionodes[0];
+	md_free_scan_dag(mdp, &ionodes);
+
+	nio = md_alloc_scan_dag(mdp, alinode, "ioalias", "fwd", &ionodes);
+	if (nio <= 0) {
+		cmn_err(CE_PANIC, "MD alias node has no aliases");
+		/*NOTREACHED*/
+	}
+
+	plat_num_ioaliases = nio;
+	plat_ioaliases = pali = kmem_zalloc(nio * sizeof (plat_alias_t),
+	    KM_SLEEP);
+
+	/*
+	 * Each ioalias map will have a composite property of
+	 * aliases and the current valid path.
+	 */
+	for (i = 0; i < nio; i++) {
+		char *str;
+
+		err = md_get_prop_str(mdp, ionodes[i], "current", &str);
+		if (err != 0) {
+			cmn_err(CE_PANIC, "malformed ioalias node");
+			/*NOTREACHED*/
+		}
+		pali->pali_current = strdup(str);
+
+		err = md_get_prop_str(mdp, ionodes[i], "aliases", &str);
+		if (err != 0) {
+			cmn_err(CE_PANIC, "malformed aliases");
+			/*NOTREACHED*/
+		}
+		split_alias(pali, str);
+		pali++;
+	}
+
+	md_free_scan_dag(mdp, &ionodes);
+
+	/*
+	 * Register the io-aliases array with the DDI framework
+	 * The DDI framework assumes that this array and its contents
+	 * will not change post-register. The DDI framework will
+	 * cache this array and is free to access this array at
+	 * any time without any locks.
+	 */
+	ddi_register_aliases(plat_ioaliases, plat_num_ioaliases);
+
+	(void) md_fini_handle(mdp);
 }
 
 /*

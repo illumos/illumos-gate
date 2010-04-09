@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Syscall to write out the instance number data structures to
@@ -123,11 +120,17 @@ _fini(void)
 
 static int in_write_instance(struct vnode *vp);
 
+static int inst_sync_disable = 0;
+
 static int
 in_sync_sys(char *pathname, uint_t flags)
 {
 	struct vnode *vp;
 	int error;
+
+	/* For debugging/testing */
+	if (inst_sync_disable)
+		return (0);
 
 	/*
 	 * We must have sufficient privilege to do this, since we lock critical
@@ -293,6 +296,9 @@ in_walktree(in_node_t *np, char *this)
 	in_drv_t *dp;
 
 	for (error = 0; np; np = np->in_sibling) {
+
+		if (np->in_drivers == NULL)
+			continue;
 
 		if (np->in_unit_addr[0] == '\0')
 			(void) sprintf(this, "/%s", np->in_node_name);

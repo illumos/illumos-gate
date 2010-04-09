@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DEVINFO_IMPL_H
@@ -123,6 +122,7 @@ extern "C" {
 #define	DI_LNODE(addr)		((struct di_lnode *)((void *)(addr)))
 #define	DI_PRIV_FORMAT(addr)	((struct di_priv_format *)((void *)(addr)))
 #define	DI_HP(addr)		((struct di_hp *)((void *)(addr)))
+#define	DI_ALIAS(addr)		((struct di_alias *)((void *)(addr)))
 
 /*
  * multipath component definitions:  Follows the registered component of
@@ -146,17 +146,19 @@ struct di_all {
 	int	generation;	/* reserved for future use */
 	uint32_t	cache_checksum;	/* snapshot checksum */
 	uint64_t	snapshot_time;	/* snapshot timestamp */
-	di_off_t	top_devinfo;
+	di_off_t	top_devinfo;  /* actual top devinfo in snapshot */
 	di_off_t	top_vhci_devinfo;
 	di_off_t	devnames;
 	di_off_t	ppdata_format;	/* parent priv data format array */
 	di_off_t	dpdata_format;	/* driver priv data format array */
+	di_off_t	aliases;	/* offset to alias tree */
 	int	n_ppdata;	/* size of ppdata_format array */
 	int	n_dpdata;	/* size of pddata_format array */
 	int	devcnt;		/* size of devnames array */
 	uint_t	command;	/* same as in di_init() */
 	uint_t	map_size;	/* size of the snapshot */
-	char	root_path[1];	/* path to snapshot root */
+	char	req_path[MAXPATHLEN];	/* path to requested root */
+	char	root_path[1];	/* path to actual snapshot root */
 };
 
 struct di_devnm {
@@ -408,6 +410,17 @@ struct di_priv_data {
 	int n_driver;
 	struct di_priv_format *parent;
 	struct di_priv_format *driver;
+};
+
+
+/*
+ * structure for saving alias information
+ */
+struct di_alias {
+	di_off_t	self;		/* make it self addressable */
+	di_off_t	curroff;	/* offset to curr dip's snapshot */
+	di_off_t	next;		/* next alias */
+	char		alias[1];	/* alias path */
 };
 
 /*

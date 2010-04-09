@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1092,6 +1091,23 @@ founddv:
 	if (rv != NDI_SUCCESS) {
 		rv = ENOENT;
 		goto notfound;
+	}
+
+	ASSERT(devi);
+
+	/* Check if this is a path alias */
+	if (ddi_aliases_present == B_TRUE && ddi_get_parent(devi) != pdevi) {
+		char *curr = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+		(void) ddi_pathname(devi, curr);
+
+		vp = NULL;
+		if (devfs_lookupname(curr, NULL, &vp) == 0 && vp) {
+			dv = VTODV(vp);
+			kmem_free(curr, MAXPATHLEN);
+			goto found;
+		}
+		kmem_free(curr, MAXPATHLEN);
 	}
 
 	/*

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <unistd.h>
@@ -419,7 +418,7 @@ out:
  *	NULL otherwise
  */
 static char *
-check_compat_ports(char *phys_path, char *minor)
+check_compat_ports(di_node_t node, char *phys_path, char *minor)
 {
 	char portid = *minor;
 	char port[PATH_MAX];
@@ -429,7 +428,7 @@ check_compat_ports(char *phys_path, char *minor)
 		return (NULL);
 
 	(void) snprintf(port, sizeof (port), "term/%c", portid);
-	if (devfsadm_read_link(port, &devfs_path) == DEVFSADM_SUCCESS &&
+	if (devfsadm_read_link(node, port, &devfs_path) == DEVFSADM_SUCCESS &&
 	    portcmp(devfs_path, phys_path) != 0) {
 		free(devfs_path);
 		return (NULL);
@@ -438,7 +437,7 @@ check_compat_ports(char *phys_path, char *minor)
 	free(devfs_path);
 
 	(void) snprintf(port, sizeof (port), "cua/%c", portid);
-	if (devfsadm_read_link(port, &devfs_path) == DEVFSADM_SUCCESS &&
+	if (devfsadm_read_link(node, port, &devfs_path) == DEVFSADM_SUCCESS &&
 	    portcmp(devfs_path, phys_path) != 0) {
 		free(devfs_path);
 		return (NULL);
@@ -500,7 +499,7 @@ onbrd_port_create(di_minor_t minor, di_node_t node)
 	buf = NULL;
 
 #ifdef __i386
-	buf = check_compat_ports(p_path, minor_name);
+	buf = check_compat_ports(node, p_path, minor_name);
 #endif
 
 	/*
@@ -562,7 +561,7 @@ onbrd_dialout_create(di_minor_t minor, di_node_t node)
 	buf = NULL;
 
 #ifdef __i386
-	buf = check_compat_ports(p_path, mn);
+	buf = check_compat_ports(node, p_path, mn);
 #endif
 
 	/*

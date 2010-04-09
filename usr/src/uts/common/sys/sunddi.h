@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SUNDDI_H
@@ -398,10 +397,13 @@ typedef enum {
 #define	DDI_MODEL_NATIVE	DATAMODEL_NATIVE
 #define	DDI_MODEL_NONE		DATAMODEL_NONE
 
+/* if set to B_TRUE is DER_MODE is equivalent to DERE_PANIC */
+extern boolean_t ddi_err_panic;
+
 /*
  * Defines for ddi_err().
  */
-typedef enum ddi_err {
+typedef enum {
 	DER_INVALID = 0,	/* must be 0 */
 	DER_CONT = 1,
 	DER_CONS,
@@ -414,9 +416,8 @@ typedef enum ddi_err {
 	DER_DEBUG
 } ddi_err_t;
 
-/* if set to B_TRUE is DER_MODE is equivalent to DERE_PANIC */
-extern boolean_t ddi_err_panic;
 extern void ddi_err(ddi_err_t de, dev_info_t *rdip, const char *fmt, ...);
+
 
 extern char *ddi_strdup(const char *str, int flag);
 extern char *strdup(const char *str);
@@ -2247,6 +2248,34 @@ int	ddi_cb_unregister(ddi_cb_handle_t hdl);
 
 /* Notify DDI of memory added */
 void ddi_mem_update(uint64_t addr, uint64_t size);
+
+/* Path alias interfaces */
+typedef struct plat_alias {
+	char *pali_current;
+	uint64_t pali_naliases;
+	char **pali_aliases;
+} plat_alias_t;
+
+typedef struct alias_pair {
+	char *pair_alias;
+	char *pair_curr;
+} alias_pair_t;
+
+extern boolean_t ddi_aliases_present;
+
+typedef struct ddi_alias {
+	alias_pair_t	*dali_alias_pairs;
+	alias_pair_t	*dali_curr_pairs;
+	int		dali_num_pairs;
+	mod_hash_t	*dali_alias_TLB;
+	mod_hash_t	*dali_curr_TLB;
+} ddi_alias_t;
+
+extern ddi_alias_t ddi_aliases;
+
+void ddi_register_aliases(plat_alias_t *pali, uint64_t npali);
+dev_info_t *ddi_alias_redirect(char *alias);
+char *ddi_curr_redirect(char *curr);
 
 #endif	/* _KERNEL */
 

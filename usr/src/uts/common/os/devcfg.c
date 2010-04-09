@@ -55,13 +55,13 @@
 #include <sys/sunldi.h>
 #include <sys/sunldi_impl.h>
 #include <sys/bootprops.h>
+#include <sys/varargs.h>
+#include <sys/modhash.h>
+#include <sys/instance.h>
 
 #if defined(__amd64) && !defined(__xpv)
 #include <sys/iommulib.h>
 #endif
-
-/* XXX remove before putback */
-boolean_t ddi_err_panic = B_TRUE;
 
 #ifdef DEBUG
 int ddidebug = DDI_AUDIT;
@@ -170,9 +170,17 @@ int mtc_off;					/* turn off mt config */
 
 int quiesce_debug = 0;
 
+boolean_t ddi_aliases_present = B_FALSE;
+ddi_alias_t ddi_aliases;
+uint_t tsd_ddi_redirect;
+
+#define	DDI_ALIAS_HASH_SIZE	(2700)
+
 static kmem_cache_t *ddi_node_cache;		/* devinfo node cache */
 static devinfo_log_header_t *devinfo_audit_log;	/* devinfo log */
 static int devinfo_log_size;			/* size in pages */
+
+boolean_t ddi_err_panic = B_FALSE;
 
 static int lookup_compatible(dev_info_t *, uint_t);
 static char *encode_composite_string(char **, uint_t, size_t *, uint_t);
@@ -208,6 +216,10 @@ static int ndi_devi_unbind_driver(dev_info_t *dip);
 static void i_ddi_check_retire(dev_info_t *dip);
 
 static void quiesce_one_device(dev_info_t *, void *);
+
+dev_info_t *ddi_alias_redirect(char *alias);
+char *ddi_curr_redirect(char *currpath);
+
 
 /*
  * dev_info cache and node management
@@ -5485,21 +5497,30 @@ again:			(void) i_ndi_make_spec_children(pdip, flags);
  * an entire branch.
  */
 int
-ndi_devi_config_one(dev_info_t *dip, char *devnm, dev_info_t **dipp, int flags)
+ndi_devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **dipp, int flags)
 {
 	int error;
 	int (*f)();
+	char *nmdup;
+	int duplen;
 	int branch_event = 0;
 
+	ASSERT(pdip);
+	ASSERT(devnm);
 	ASSERT(dipp);
-	ASSERT(i_ddi_devi_attached(dip));
+	ASSERT(i_ddi_devi_attached(pdip));
 
 	NDI_CONFIG_DEBUG((CE_CONT,
 	    "ndi_devi_config_one: par = %s%d (%p), child = %s\n",
-	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip, devnm));
+	    ddi_driver_name(pdip), ddi_get_instance(pdip),
+	    (void *)pdip, devnm));
 
-	if (pm_pre_config(dip, devnm) != DDI_SUCCESS)
+	*dipp = NULL;
+
+	if (pm_pre_config(pdip, devnm) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "preconfig failed: %s", devnm);
 		return (NDI_FAILURE);
+	}
 
 	if ((flags & (NDI_NO_EVENT | NDI_BRANCH_EVENT_OP)) == 0 &&
 	    (flags & NDI_CONFIG)) {
@@ -5507,17 +5528,47 @@ ndi_devi_config_one(dev_info_t *dip, char *devnm, dev_info_t **dipp, int flags)
 		branch_event = 1;
 	}
 
-	if ((DEVI(dip)->devi_ops->devo_bus_ops == NULL) ||
-	    (DEVI(dip)->devi_ops->devo_bus_ops->busops_rev < BUSO_REV_5) ||
-	    (f = DEVI(dip)->devi_ops->devo_bus_ops->bus_config) == NULL) {
-		error = devi_config_one(dip, devnm, dipp, flags, 0);
+	nmdup = strdup(devnm);
+	duplen = strlen(devnm) + 1;
+
+	if ((DEVI(pdip)->devi_ops->devo_bus_ops == NULL) ||
+	    (DEVI(pdip)->devi_ops->devo_bus_ops->busops_rev < BUSO_REV_5) ||
+	    (f = DEVI(pdip)->devi_ops->devo_bus_ops->bus_config) == NULL) {
+		error = devi_config_one(pdip, devnm, dipp, flags, 0);
 	} else {
 		/* call bus_config entry point */
-		error = (*f)(dip, flags, BUS_CONFIG_ONE, (void *)devnm, dipp);
+		error = (*f)(pdip, flags, BUS_CONFIG_ONE, (void *)devnm, dipp);
 	}
 
-	if (error || (flags & NDI_CONFIG) == 0) {
-		pm_post_config(dip, devnm);
+	if (error) {
+		*dipp = NULL;
+	}
+
+	/*
+	 * if we fail to lookup and this could be an alias, lookup currdip
+	 * To prevent recursive lookups into the same hash table, only
+	 * do the currdip lookups once the hash table init is complete.
+	 * Use tsd so that redirection doesn't recurse
+	 */
+	if (error) {
+		char *alias = kmem_alloc(MAXPATHLEN, KM_NOSLEEP);
+		if (alias == NULL) {
+			ddi_err(DER_PANIC, pdip, "alias alloc failed: %s",
+			    nmdup);
+		}
+		(void) ddi_pathname(pdip, alias);
+		(void) strlcat(alias, "/", MAXPATHLEN);
+		(void) strlcat(alias, nmdup, MAXPATHLEN);
+
+		*dipp = ddi_alias_redirect(alias);
+		error = (*dipp ? NDI_SUCCESS : NDI_FAILURE);
+
+		kmem_free(alias, MAXPATHLEN);
+	}
+	kmem_free(nmdup, duplen);
+
+	if (error || !(flags & NDI_CONFIG)) {
+		pm_post_config(pdip, devnm);
 		return (error);
 	}
 
@@ -5529,14 +5580,13 @@ ndi_devi_config_one(dev_info_t *dip, char *devnm, dev_info_t **dipp, int flags)
 	ASSERT(*dipp);
 	error = devi_config_common(*dipp, flags, DDI_MAJOR_T_NONE);
 
-	pm_post_config(dip, devnm);
+	pm_post_config(pdip, devnm);
 
 	if (branch_event)
 		(void) i_log_devfs_branch_add(*dipp);
 
 	return (error);
 }
-
 
 /*
  * Enumerate and attach a child specified by name 'devnm'.
@@ -8551,6 +8601,375 @@ i_ddi_check_retire(dev_info_t *dip)
 	constraint = 1;
 	if (MDI_PHCI(dip))
 		mdi_phci_retire_finalize(dip, phci_only, &constraint);
+}
+
+
+#define	VAL_ALIAS(array, x)	(strlen(array[x].pair_alias))
+#define	VAL_CURR(array, x)	(strlen(array[x].pair_curr))
+#define	SWAP(array, x, y)			\
+{						\
+	alias_pair_t tmpair = array[x];		\
+	array[x] = array[y];			\
+	array[y] = tmpair;			\
+}
+
+static int
+partition_curr(alias_pair_t *array, int start, int end)
+{
+	int	i = start - 1;
+	int	j = end + 1;
+	int	pivot = start;
+
+	for (;;) {
+		do {
+			j--;
+		} while (VAL_CURR(array, j) > VAL_CURR(array, pivot));
+
+		do {
+			i++;
+		} while (VAL_CURR(array, i) < VAL_CURR(array, pivot));
+
+		if (i < j)
+			SWAP(array, i, j)
+		else
+			return (j);
+	}
+}
+
+static int
+partition_aliases(alias_pair_t *array, int start, int end)
+{
+	int	i = start - 1;
+	int	j = end + 1;
+	int	pivot = start;
+
+	for (;;) {
+		do {
+			j--;
+		} while (VAL_ALIAS(array, j) > VAL_ALIAS(array, pivot));
+
+		do {
+			i++;
+		} while (VAL_ALIAS(array, i) < VAL_ALIAS(array, pivot));
+
+		if (i < j)
+			SWAP(array, i, j)
+		else
+			return (j);
+	}
+}
+static void
+sort_alias_pairs(alias_pair_t *array, int start, int end)
+{
+	int mid;
+
+	if (start < end) {
+		mid = partition_aliases(array, start, end);
+		sort_alias_pairs(array, start, mid);
+		sort_alias_pairs(array, mid + 1, end);
+	}
+}
+
+static void
+sort_curr_pairs(alias_pair_t *array, int start, int end)
+{
+	int mid;
+
+	if (start < end) {
+		mid = partition_curr(array, start, end);
+		sort_curr_pairs(array, start, mid);
+		sort_curr_pairs(array, mid + 1, end);
+	}
+}
+
+static void
+create_sorted_pairs(plat_alias_t *pali, int npali)
+{
+	int		i;
+	int		j;
+	int		k;
+	int		count;
+
+	count = 0;
+	for (i = 0; i < npali; i++) {
+		count += pali[i].pali_naliases;
+	}
+
+	ddi_aliases.dali_alias_pairs = kmem_zalloc(
+	    (sizeof (alias_pair_t)) * count, KM_NOSLEEP);
+	if (ddi_aliases.dali_alias_pairs == NULL) {
+		cmn_err(CE_PANIC, "alias path-pair alloc failed");
+		/*NOTREACHED*/
+	}
+
+	ddi_aliases.dali_curr_pairs = kmem_zalloc(
+	    (sizeof (alias_pair_t)) * count, KM_NOSLEEP);
+	if (ddi_aliases.dali_curr_pairs == NULL) {
+		cmn_err(CE_PANIC, "curr path-pair alloc failed");
+		/*NOTREACHED*/
+	}
+
+	for (i = 0, k = 0; i < npali; i++) {
+		for (j = 0; j < pali[i].pali_naliases; j++, k++) {
+			ddi_aliases.dali_alias_pairs[k].pair_curr =
+			    ddi_aliases.dali_curr_pairs[k].pair_curr =
+			    pali[i].pali_current;
+			ddi_aliases.dali_alias_pairs[k].pair_alias =
+			    ddi_aliases.dali_curr_pairs[k].pair_alias =
+			    pali[i].pali_aliases[j];
+		}
+	}
+
+	ASSERT(k == count);
+
+	ddi_aliases.dali_num_pairs = count;
+
+	/* Now sort the array based on length of pair_alias */
+	sort_alias_pairs(ddi_aliases.dali_alias_pairs, 0, count - 1);
+	sort_curr_pairs(ddi_aliases.dali_curr_pairs, 0, count - 1);
+}
+
+void
+ddi_register_aliases(plat_alias_t *pali, uint64_t npali)
+{
+
+	ASSERT((pali == NULL) ^ (npali != 0));
+
+	if (npali == 0) {
+		ddi_err(DER_PANIC, NULL, "npali == 0");
+		/*NOTREACHED*/
+	}
+
+	if (ddi_aliases_present == B_TRUE) {
+		ddi_err(DER_PANIC, NULL, "multiple init");
+		/*NOTREACHED*/
+	}
+
+	ddi_aliases.dali_alias_TLB = mod_hash_create_strhash(
+	    "ddi-alias-tlb", DDI_ALIAS_HASH_SIZE, mod_hash_null_valdtor);
+	if (ddi_aliases.dali_alias_TLB == NULL) {
+		ddi_err(DER_PANIC, NULL, "alias TLB hash alloc failed");
+		/*NOTREACHED*/
+	}
+
+	ddi_aliases.dali_curr_TLB = mod_hash_create_strhash(
+	    "ddi-curr-tlb", DDI_ALIAS_HASH_SIZE, mod_hash_null_valdtor);
+	if (ddi_aliases.dali_curr_TLB == NULL) {
+		ddi_err(DER_PANIC, NULL, "curr TLB hash alloc failed");
+		/*NOTREACHED*/
+	}
+
+	create_sorted_pairs(pali, npali);
+
+	tsd_create(&tsd_ddi_redirect, NULL);
+
+	ddi_aliases_present = B_TRUE;
+}
+
+static dev_info_t *
+path_to_dip(char *path)
+{
+	dev_info_t	*currdip;
+	int		error;
+	char		*pdup;
+
+	pdup = ddi_strdup(path, KM_NOSLEEP);
+	if (pdup == NULL) {
+		cmn_err(CE_PANIC, "path strdup failed: %s", path);
+		/*NOTREACHED*/
+	}
+
+	error = resolve_pathname(pdup, &currdip, NULL, NULL);
+
+	kmem_free(pdup, strlen(path) + 1);
+
+	return (error ? NULL : currdip);
+}
+
+dev_info_t *
+ddi_alias_to_currdip(char *alias, int i)
+{
+	alias_pair_t *pair;
+	char *curr;
+	dev_info_t *currdip = NULL;
+	char *aliasdup;
+	int len;
+
+	pair = &(ddi_aliases.dali_alias_pairs[i]);
+	len = strlen(pair->pair_alias);
+
+	curr = NULL;
+	aliasdup = ddi_strdup(alias, KM_NOSLEEP);
+	if (aliasdup == NULL) {
+		cmn_err(CE_PANIC, "aliasdup alloc failed");
+		/*NOTREACHED*/
+	}
+
+	if (strncmp(alias, pair->pair_alias, len)  != 0)
+		goto out;
+
+	if (alias[len] != '/' && alias[len] != '\0')
+		goto out;
+
+
+	curr = kmem_alloc(MAXPATHLEN, KM_NOSLEEP);
+	if (curr == NULL) {
+		cmn_err(CE_PANIC, "curr alloc failed");
+		/*NOTREACHED*/
+	}
+	(void) strlcpy(curr, pair->pair_curr, MAXPATHLEN);
+	if (alias[len] == '/') {
+		(void) strlcat(curr, "/", MAXPATHLEN);
+		(void) strlcat(curr, &alias[len + 1], MAXPATHLEN);
+	}
+
+	currdip = path_to_dip(curr);
+
+out:
+	if (currdip) {
+		(void) mod_hash_insert(ddi_aliases.dali_alias_TLB,
+		    (mod_hash_key_t)aliasdup, (mod_hash_val_t)curr);
+	} else {
+		(void) mod_hash_insert(ddi_aliases.dali_alias_TLB,
+		    (mod_hash_key_t)aliasdup, (mod_hash_val_t)NULL);
+		if (curr)
+			kmem_free(curr, MAXPATHLEN);
+	}
+
+	return (currdip);
+}
+
+char *
+ddi_curr_to_alias(char *curr, int i)
+{
+	alias_pair_t	*pair;
+	char		*alias;
+	char		*currdup;
+	int		len;
+
+	pair = &(ddi_aliases.dali_curr_pairs[i]);
+
+	len = strlen(pair->pair_curr);
+
+	alias = NULL;
+
+	currdup = ddi_strdup(curr, KM_NOSLEEP);
+	if (currdup == NULL) {
+		cmn_err(CE_PANIC, "currdup alloc failed");
+		/*NOTREACHED*/
+	}
+
+	if (strncmp(curr, pair->pair_curr, len) != 0)
+		goto out;
+
+	if (curr[len] != '/' && curr[len] != '\0')
+		goto out;
+
+	alias = kmem_alloc(MAXPATHLEN, KM_NOSLEEP);
+	if (alias == NULL) {
+		cmn_err(CE_PANIC, "alias alloc failed");
+		/*NOTREACHED*/
+	}
+
+	(void) strlcpy(alias, pair->pair_alias, MAXPATHLEN);
+	if (curr[len] == '/') {
+		(void) strlcat(alias, "/", MAXPATHLEN);
+		(void) strlcat(alias, &curr[len + 1], MAXPATHLEN);
+	}
+
+	if (e_ddi_path_to_instance(alias) == NULL) {
+		kmem_free(alias, MAXPATHLEN);
+		alias = NULL;
+	}
+
+out:
+	(void) mod_hash_insert(ddi_aliases.dali_curr_TLB,
+	    (mod_hash_key_t)currdup, (mod_hash_val_t)alias);
+
+	return (alias);
+}
+
+dev_info_t *
+ddi_alias_redirect(char *alias)
+{
+	char		*curr;
+	char		*aliasdup;
+	dev_info_t	*currdip;
+	int		i;
+
+	if (ddi_aliases_present == B_FALSE)
+		return (NULL);
+
+	if (tsd_get(tsd_ddi_redirect))
+		return (NULL);
+
+	(void) tsd_set(tsd_ddi_redirect, (void *)1);
+
+	ASSERT(ddi_aliases.dali_alias_TLB);
+	ASSERT(ddi_aliases.dali_alias_pairs);
+
+	curr = NULL;
+	if (mod_hash_find(ddi_aliases.dali_alias_TLB,
+	    (mod_hash_key_t)alias, (mod_hash_val_t *)&curr) == 0) {
+		currdip = curr ? path_to_dip(curr) : NULL;
+		goto out;
+	}
+
+	aliasdup = ddi_strdup(alias, KM_NOSLEEP);
+	if (aliasdup == NULL) {
+		cmn_err(CE_PANIC, "aliasdup alloc failed");
+		/*NOTREACHED*/
+	}
+
+	/* The TLB has no translation, do it the hard way */
+	currdip = NULL;
+	for (i = ddi_aliases.dali_num_pairs - 1; i >= 0; i--) {
+		currdip = ddi_alias_to_currdip(alias, i);
+		if (currdip)
+			break;
+	}
+out:
+	(void) tsd_set(tsd_ddi_redirect, NULL);
+
+	return (currdip);
+}
+
+char *
+ddi_curr_redirect(char *curr)
+{
+	char 	*alias;
+	int i;
+
+	if (ddi_aliases_present == B_FALSE)
+		return (NULL);
+
+	if (tsd_get(tsd_ddi_redirect))
+		return (NULL);
+
+	(void) tsd_set(tsd_ddi_redirect, (void *)1);
+
+	ASSERT(ddi_aliases.dali_curr_TLB);
+	ASSERT(ddi_aliases.dali_curr_pairs);
+
+	alias = NULL;
+	if (mod_hash_find(ddi_aliases.dali_curr_TLB,
+	    (mod_hash_key_t)curr, (mod_hash_val_t *)&alias) == 0) {
+		goto out;
+	}
+
+
+	/* The TLB has no translation, do it the slow way */
+	alias = NULL;
+	for (i = ddi_aliases.dali_num_pairs - 1; i >= 0; i--) {
+		alias = ddi_curr_to_alias(curr, i);
+		if (alias)
+			break;
+	}
+
+out:
+	(void) tsd_set(tsd_ddi_redirect, NULL);
+
+	return (alias);
 }
 
 void

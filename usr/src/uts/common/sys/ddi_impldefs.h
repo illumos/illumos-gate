@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_DDI_IMPLDEFS_H
@@ -122,6 +121,8 @@ struct iommulib_unit;
 typedef struct iommulib_unit *iommulib_handle_t;
 typedef uint8_t	ndi_flavor_t;
 struct ddi_hp_cn_handle;
+
+struct in_node;
 
 struct dev_info  {
 
@@ -273,6 +274,8 @@ struct dev_info  {
 
 	/* Owned by hotplug framework */
 	struct ddi_hp_cn_handle *devi_hp_hdlp;   /* hotplug handle list */
+
+	struct in_node  *devi_in_node; /* pointer to devinfo node's in_node_t */
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))

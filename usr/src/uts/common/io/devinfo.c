@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -767,12 +766,13 @@ di_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 #endif
 
 	/* Copyin ioctl args, store in the snapshot. */
-	if (copyinstr((void *)arg, all->root_path,
+	if (copyinstr((void *)arg, all->req_path,
 	    sizeof (((struct dinfo_io *)(NULL))->root_path), &size) != 0) {
 		di_freemem(st);
 		(void) di_setstate(st, IOC_IDLE);
 		return (EFAULT);
 	}
+	(void) strcpy(all->root_path, all->req_path);
 	off += size;				/* real length of root_path */
 
 	if ((st->command & DINFOCLEANUP) && !DEVICES_FILES_CLEANABLE(st)) {
@@ -1295,6 +1295,44 @@ di_key_cmp(mod_hash_key_t key1, mod_hash_key_t key2)
 	}
 }
 
+static void
+di_copy_aliases(struct di_state *st, alias_pair_t *apair, di_off_t *offp)
+{
+	di_off_t 		off;
+	struct di_all		*all = DI_ALL_PTR(st);
+	struct di_alias		*di_alias;
+	di_off_t		curroff;
+	dev_info_t		*currdip;
+	size_t			size;
+
+	currdip = NULL;
+	if (resolve_pathname(apair->pair_alias, &currdip, NULL, NULL) != 0) {
+		return;
+	}
+
+	if (di_dip_find(st, currdip, &curroff) != 0) {
+		ndi_rele_devi(currdip);
+		return;
+	}
+	ndi_rele_devi(currdip);
+
+	off = *offp;
+	size = sizeof (struct di_alias);
+	size += strlen(apair->pair_alias) + 1;
+	off = di_checkmem(st, off, size);
+	di_alias = DI_ALIAS(di_mem_addr(st, off));
+
+	di_alias->self = off;
+	di_alias->next = all->aliases;
+	all->aliases = off;
+	(void) strcpy(di_alias->alias, apair->pair_alias);
+	di_alias->curroff = curroff;
+
+	off += size;
+
+	*offp = off;
+}
+
 /*
  * This is the main function that takes a snapshot
  */
@@ -1308,9 +1346,22 @@ di_snapshot(struct di_state *st)
 	int		plen;
 	char		*path;
 	vnode_t		*vp;
+	int		i;
 
 	all = DI_ALL_PTR(st);
 	dcmn_err((CE_CONT, "Taking a snapshot of devinfo tree...\n"));
+
+	/*
+	 * Translate requested root path if an alias and snap-root != "/"
+	 */
+	if (ddi_aliases_present == B_TRUE && strcmp(all->root_path, "/") != 0) {
+		/* If there is no redirected alias, use root_path as is */
+		rootnode = ddi_alias_redirect(all->root_path);
+		if (rootnode) {
+			(void) ddi_pathname(rootnode, all->root_path);
+			goto got_root;
+		}
+	}
 
 	/*
 	 * Verify path before entrusting it to e_ddi_hold_devi_by_path because
@@ -1341,6 +1392,7 @@ di_snapshot(struct di_state *st)
 		return (0);
 	}
 
+got_root:
 	(void) snprintf(buf, sizeof (buf),
 	    "devinfo registered dips (statep=%p)", (void *)st);
 
@@ -1391,6 +1443,15 @@ di_snapshot(struct di_state *st)
 		off = di_getlink_data(off, st);
 	}
 
+	all->aliases = 0;
+	if (ddi_aliases_present == B_FALSE)
+		goto done;
+
+	for (i = 0; i < ddi_aliases.dali_num_pairs; i++) {
+		di_copy_aliases(st, &(ddi_aliases.dali_alias_pairs[i]), &off);
+	}
+
+done:
 	/*
 	 * Free up hash tables
 	 */

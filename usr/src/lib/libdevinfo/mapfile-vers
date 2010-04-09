@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -39,6 +38,7 @@
 
 SUNW_1.4 {
     global:
+	di_alias2curr;
 	di_path_bus_addr;
 	di_path_client_devfs_path;
 	di_path_client_next_path;

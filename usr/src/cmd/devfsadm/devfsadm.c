@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -250,6 +249,8 @@ static mutex_t  syseventq_mutex = DEFAULTMUTEX;
 static syseventq_t *syseventq_front;
 static syseventq_t *syseventq_back;
 static void process_syseventq();
+
+static di_node_t devi_root_node = DI_NODE_NIL;
 
 int
 main(int argc, char *argv[])
@@ -1040,6 +1041,7 @@ devi_tree_walk(struct dca_impl *dcip, int flags, char *ev_subclass)
 		flush_path_to_inst();
 
 	dcip->dci_arg = &mlist;
+	devi_root_node = node;	/* protected by lock_dev() */
 
 	vprint(CHATTY_MID, "walking device tree\n");
 
@@ -1064,6 +1066,7 @@ devi_tree_walk(struct dca_impl *dcip, int flags, char *ev_subclass)
 		update_devdb = 0;
 	}
 
+	devi_root_node = DI_NODE_NIL;	/* protected by lock_dev() */
 	di_fini(node);
 }
 
@@ -2720,6 +2723,7 @@ create_link_common(char *devlink, char *contents, int *exists)
 
 	/* Database is not updated when file_mods == FALSE */
 	if (file_mods == FALSE) {
+		/* we want *actual* link contents so no alias redirection */
 		linksize = readlink(devlink, checkcontents, PATH_MAX);
 		if (linksize > 0) {
 			checkcontents[linksize] = '\0';
@@ -2786,6 +2790,13 @@ create_link_common(char *devlink, char *contents, int *exists)
 
 		case READ_LINK:
 
+			/*
+			 * If there is redirection, new phys path
+			 * and old phys path will not match and the
+			 * link will be created with new phys path
+			 * which is what we want. So we want real
+			 * contents.
+			 */
 			linksize = readlink(devlink, checkcontents, PATH_MAX);
 			if (linksize >= 0) {
 				checkcontents[linksize] = '\0';
@@ -2867,9 +2878,13 @@ set_logindev_perms(char *devlink)
 	 * minor node using a snapshot on the physical path
 	 */
 	(void) resolve_link(devlink, NULL, NULL, &devfs_path, 0);
+	/*
+	 * We dont need redirection here - the actual link contents
+	 * whether "alias" or "current" are fine
+	 */
 	if (devfs_path) {
 		di_node_t node;
-		char *drv = NULL;
+		char *drv;
 		struct driver_list *list;
 		char *p;
 
@@ -2887,6 +2902,7 @@ set_logindev_perms(char *devlink)
 
 		node = di_init(pwd_buf, DINFOMINOR);
 
+		drv = NULL;
 		if (node) {
 			drv = di_driver_name(node);
 
@@ -2894,7 +2910,6 @@ set_logindev_perms(char *devlink)
 				vprint(FILES_MID, "%s: driver is %s\n",
 				    devlink, drv);
 			}
-			di_fini(node);
 		}
 		/* search thru the driver list specified in logindevperm */
 		list = newdev->ldev_driver_list;
@@ -2915,6 +2930,7 @@ set_logindev_perms(char *devlink)
 			}
 		}
 		free(devfs_path);
+		di_fini(node);
 	} else {
 		return;
 	}
@@ -3126,20 +3142,31 @@ devfsadm_rm_work(char *file, int recurse, int file_type)
 
 	vprint(REMOVE_MID, "%s%s\n", fcn, file);
 
-	/* TYPE_LINK split into multiple if's due to excessive indentations */
-	if (file_type == TYPE_LINK) {
-		(void) strcpy(newfile, dev_dir);
-		(void) strcat(newfile, "/");
-		(void) strcat(newfile, file);
+	/*
+	 * Note: we don't remove /devices (non-links) entries because they are
+	 *	covered by devfs.
+	 */
+	if (file_type != TYPE_LINK) {
+		return;
 	}
 
-	if ((file_type == TYPE_LINK) && (recurse == TRUE) &&
+	/* split into multiple if's due to excessive indentations */
+	(void) strcpy(newfile, dev_dir);
+	(void) strcat(newfile, "/");
+	(void) strcat(newfile, file);
+
+	/*
+	 * we dont care about the content of the symlink, so
+	 * redirection is not needed.
+	 */
+	if ((recurse == TRUE) &&
 	    ((linksize = readlink(newfile, contents, PATH_MAX)) > 0)) {
 		contents[linksize] = '\0';
 
-		if (is_minor_node(contents, &ptr) == DEVFSADM_TRUE) {
-			devfsadm_rm_work(++ptr, FALSE, TYPE_DEVICES);
-		} else {
+		/*
+		 * recurse if link points to another link
+		 */
+		if (is_minor_node(contents, &ptr) != DEVFSADM_TRUE) {
 			if (strncmp(contents, DEV "/", strlen(DEV) + 1) == 0) {
 				devfsadm_rm_work(&contents[strlen(DEV) + 1],
 				    TRUE, TYPE_LINK);
@@ -3158,21 +3185,14 @@ devfsadm_rm_work(char *file, int recurse, int file_type)
 		}
 	}
 
-	if (file_type == TYPE_LINK) {
-		vprint(VERBOSE_MID, DEVFSADM_UNLINK, newfile);
-		if (file_mods == TRUE) {
-			rm_link_from_cache(file);
-			s_unlink(newfile);
-			rm_parent_dir_if_empty(newfile);
-			invalidate_enumerate_cache();
-			(void) di_devlink_rm_link(devlink_cache, file);
-		}
+	vprint(VERBOSE_MID, DEVFSADM_UNLINK, newfile);
+	if (file_mods == TRUE) {
+		rm_link_from_cache(file);
+		s_unlink(newfile);
+		rm_parent_dir_if_empty(newfile);
+		invalidate_enumerate_cache();
+		(void) di_devlink_rm_link(devlink_cache, file);
 	}
-
-	/*
-	 * Note: we don't remove /devices entries because they are
-	 *	covered by devfs.
-	 */
 }
 
 void
@@ -3284,6 +3304,9 @@ rm_parent_dir_if_empty(char *pathname)
  * dir_re, and then it searches all links in that cache looking for
  * any link whose contents match "valid_link_contents" with a corresponding link
  * which does not match "valid_link".  Any such matches are stale and removed.
+ *
+ * This happens outside the context of a "reparenting" so we dont need
+ * redirection.
  */
 void
 devfsadm_rm_stale_links(char *dir_re, char *valid_link, di_node_t node,
@@ -3421,6 +3444,10 @@ build_devlink_list(char *devlink, void *data)
 	(void) strcpy(newlink, devlink);
 
 	do {
+		/*
+		 * None of the consumers of this function need redirection
+		 * so this readlink gets the "current" contents
+		 */
 		linksize = readlink(newlink, contents, PATH_MAX);
 		if (linksize <= 0) {
 			/*
@@ -4429,6 +4456,10 @@ matching_dev(char *devpath, void *data)
 	if (nfphash_lookup(devpath + norm_len) != NULL)
 		return;
 
+	/*
+	 * Dangling check will work whether "alias" or "current"
+	 * so no need to redirect.
+	 */
 	if (resolve_link(devpath, NULL, NULL, NULL, 1) == TRUE) {
 		if (call_minor_init(cleanup_data->rm->modptr) ==
 		    DEVFSADM_FAILURE) {
@@ -4456,9 +4487,10 @@ matching_dev(char *devpath, void *data)
 }
 
 int
-devfsadm_read_link(char *link, char **devfs_path)
+devfsadm_read_link(di_node_t anynode, char *link, char **devfs_path)
 {
 	char devlink[PATH_MAX];
+	char *path;
 
 	*devfs_path = NULL;
 
@@ -4468,16 +4500,20 @@ devfsadm_read_link(char *link, char **devfs_path)
 	(void) strcat(devlink, link);
 
 	/* We *don't* want a stat of the /devices node */
-	(void) resolve_link(devlink, NULL, NULL, devfs_path, 0);
+	path = NULL;
+	(void) resolve_link(devlink, NULL, NULL, &path, 0);
 
+	/* redirect if alias to current */
+	*devfs_path = di_alias2curr(anynode, path);
+	free(path);
 	return (*devfs_path ? DEVFSADM_SUCCESS : DEVFSADM_FAILURE);
 }
 
 int
-devfsadm_link_valid(char *link)
+devfsadm_link_valid(di_node_t anynode, char *link)
 {
 	struct stat sb;
-	char devlink[PATH_MAX + 1], *contents = NULL;
+	char devlink[PATH_MAX + 1], *contents, *raw_contents;
 	int rv, type;
 	int instance = 0;
 
@@ -4490,12 +4526,21 @@ devfsadm_link_valid(char *link)
 		return (DEVFSADM_FALSE);
 	}
 
-	contents = NULL;
+	raw_contents = NULL;
 	type = 0;
-	if (resolve_link(devlink, &contents, &type, NULL, 1) == TRUE) {
+	if (resolve_link(devlink, &raw_contents, &type, NULL, 1) == TRUE) {
 		rv = DEVFSADM_FALSE;
 	} else {
 		rv = DEVFSADM_TRUE;
+	}
+
+	/*
+	 * resolve alias paths for primary links
+	 */
+	contents = raw_contents;
+	if (type == DI_PRIMARY_LINK) {
+		contents = di_alias2curr(anynode, raw_contents);
+		free(raw_contents);
 	}
 
 	/*
@@ -4524,6 +4569,7 @@ devfsadm_link_valid(char *link)
  *	TRUE if dangling
  *	FALSE if not or if caller doesn't care
  * Caller is assumed to have initialized pointer contents to NULL
+ *
  */
 static int
 resolve_link(char *devpath, char **content_p, int *type_p, char **devfs_path,
@@ -4537,6 +4583,10 @@ resolve_link(char *devpath, char **content_p, int *type_p, char **devfs_path,
 	int rv = TRUE;
 	struct stat sb;
 
+	/*
+	 * This routine will return the "raw" contents. It is upto the
+	 * the caller to redirect "alias" to "current" (or vice versa)
+	 */
 	linksize = readlink(devpath, contents, PATH_MAX);
 
 	if (linksize <= 0) {
@@ -5639,6 +5689,7 @@ create_cached_numeral(char *path, numeral_set_t *setp, char *numeral_id,
 	numeral_t *np;
 	int linksize;
 	struct stat sb;
+	char *contents;
 	const char *fcn = "create_cached_numeral";
 
 	assert(index >= 0 && index < setp->re_count);
@@ -5692,14 +5743,21 @@ create_cached_numeral(char *path, numeral_set_t *setp, char *numeral_id,
 	linkbuf[linksize] = '\0';
 
 	/*
+	 * redirect alias path to current path
+	 * devi_root_node is protected by lock_dev()
+	 */
+	contents = di_alias2curr(devi_root_node, linkbuf);
+
+	/*
 	 * the following just points linkptr to the root of the /devices
 	 * node if it is a minor node, otherwise, to the first char of
 	 * linkbuf if it is a link.
 	 */
-	(void) is_minor_node(linkbuf, &linkptr);
+	(void) is_minor_node(contents, &linkptr);
 
 	cmp_str = alloc_cmp_str(linkptr, &rules[index]);
 	if (cmp_str == NULL) {
+		free(contents);
 		return;
 	}
 
@@ -5713,6 +5771,8 @@ create_cached_numeral(char *path, numeral_set_t *setp, char *numeral_id,
 
 	np->next = setp->headnumeral;
 	setp->headnumeral = np;
+
+	free(contents);
 }
 
 
@@ -5832,6 +5892,11 @@ devfsadm_copy_file(const char *file, const struct stat *stat,
 			return (DEVFSADM_SUCCESS);
 		}
 	} else if ((stat->st_mode & S_IFMT) == S_IFLNK)  {
+		/*
+		 * No need to redirect alias paths. We want a
+		 * true copy. The system on first boot after install
+		 * will redirect paths
+		 */
 		if ((bytes = readlink(file, linkcontents, PATH_MAX)) == -1)  {
 			err_print(READLINK_FAILED, fcn, file, strerror(errno));
 			return (DEVFSADM_SUCCESS);

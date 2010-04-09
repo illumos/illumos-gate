@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -3696,8 +3695,53 @@ di_walk_lnode(di_node_t root, uint_t flag, void *arg,
 	return (0);
 }
 
-di_node_t
-di_lookup_node(di_node_t root, char *devfspath)
+static char *
+alias_to_curr(di_node_t anynode, char *devfspath, di_node_t *nodep)
+{
+	caddr_t		pa;
+	struct di_all	*all;
+	struct di_alias *di_alias;
+	di_node_t	node;
+	char		*curr;
+	char		*cp;
+	char		*alias;
+	di_off_t off;
+	char buf[MAXPATHLEN];
+
+	*nodep = NULL;
+
+	assert(anynode != DI_NODE_NIL);
+
+	pa = (caddr_t)anynode - DI_NODE(anynode)->self;
+	all = DI_ALL(pa);
+
+	di_alias = NULL;
+	for (off = all->aliases; off > 0; off = di_alias->next) {
+		di_alias = DI_ALIAS(pa + off);
+		alias = di_alias->alias;
+		if (strncmp(devfspath, alias, strlen(alias)) == 0) {
+			cp = devfspath + strlen(alias);
+			node = DI_NODE(pa + di_alias->curroff);
+			assert(node != DI_NODE_NIL);
+			if (*cp == '\0') {
+				*nodep = node;
+				return (NULL);
+			} else if (*cp == '/') {
+				curr = di_devfs_path(node);
+				(void) snprintf(buf, sizeof (buf), "%s%s",
+				    curr, cp);
+				di_devfs_path_free(curr);
+				curr = strdup(buf);
+				return (curr);
+			}
+		}
+	}
+
+	return (NULL);
+}
+
+static di_node_t
+di_lookup_node_impl(di_node_t root, char *devfspath)
 {
 	struct di_all *dap;
 	di_node_t node;
@@ -3783,6 +3827,46 @@ di_lookup_node(di_node_t root, char *devfspath)
 	assert(node != DI_NODE_NIL);
 	free(copy);
 	return (node);
+}
+
+di_node_t
+di_lookup_node(di_node_t root, char *devfspath)
+{
+	di_node_t	node;
+	char		*curr;
+
+	node = di_lookup_node_impl(root, devfspath);
+	if (node != DI_NODE_NIL) {
+		return (node);
+	}
+
+	/* node is already set to DI_NODE_NIL */
+	curr = alias_to_curr(root, devfspath, &node);
+	if (curr == NULL) {
+		/* node may or may node be DI_NODE_NIL */
+		return (node);
+	}
+
+	node = di_lookup_node_impl(root, curr);
+
+	free(curr);
+
+	return (node);
+}
+
+char *
+di_alias2curr(di_node_t anynode, char *alias)
+{
+	di_node_t currnode = DI_NODE_NIL;
+	char *curr = alias_to_curr(anynode, alias, &currnode);
+
+	if (curr == NULL && currnode != DI_NODE_NIL) {
+		return (di_devfs_path(currnode));
+	} else if (curr == NULL) {
+		return (strdup(alias));
+	}
+
+	return (curr);
 }
 
 di_path_t

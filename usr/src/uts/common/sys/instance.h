@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_INSTANCE_H
 #define	_SYS_INSTANCE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Instance number assignment data structures
@@ -35,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/dditypes.h>
+#include <sys/list.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -42,6 +40,7 @@ extern "C" {
 
 #define	INSTANCE_FILE	"/etc/path_to_inst"
 #define	INSTANCE_FILE_SUFFIX	".old"
+
 
 #if	defined(_KERNEL) || defined(_KMEMUSER)
 
@@ -60,9 +59,10 @@ typedef struct in_node {
 	char		*in_node_name;	/* devi_node_name of this node	*/
 	char		*in_unit_addr;	/* address part of name		*/
 	struct in_node	*in_child;	/* children of this node	*/
-	struct in_node	*in_sibling;	/* "peers" of this node	*/
+	struct in_node	*in_sibling;	/* "peers" of this node		*/
 	struct in_drv	*in_drivers;	/* drivers bound to this node	*/
 	struct in_node	*in_parent;	/* parent of this node		*/
+	dev_info_t	*in_devi;	/* corresponding devinfo	*/
 } in_node_t;
 
 typedef struct in_drv {
@@ -84,6 +84,14 @@ typedef struct in_drv {
 #define	IN_PROVISIONAL	0x1	/* provisional instance number assigned */
 #define	IN_PERMANENT	0x2	/* instance number has been confirmed */
 #define	IN_UNKNOWN	0x3	/* instance number not yet assigned */
+#define	IN_BORROWED	0x4	/* instance number from alias */
+
+
+/*
+ * Guard for path to instance file
+ */
+#define	PTI_GUARD "#\n#\tCaution! This file contains critical kernel state\n#\n"
+
 
 /*
  * special value for dn_instance
@@ -113,7 +121,12 @@ int impl_free_instance(dev_info_t *dip);
 
 /* walk the instance tree */
 int e_ddi_walk_instances(int (*)(const char *,
-	in_node_t *, in_drv_t *, void *), void *);
+    in_node_t *, in_drv_t *, void *), void *);
+
+/* for DDI-MP */
+in_node_t *e_ddi_path_to_instance(char *path);
+void e_ddi_borrow_instance(dev_info_t *cdip, in_node_t *cnp);
+void e_ddi_return_instance(dev_info_t *cdip, char *addr, in_node_t *cnp);
 
 /* return values from e_ddi_walk_instances callback */
 #define	INST_WALK_CONTINUE	0

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _DEVFSADM_H
@@ -212,7 +211,7 @@ typedef struct enumerate_file {
 
 int devfsadm_noupdate(void);
 const char *devfsadm_root_path(void);
-int devfsadm_link_valid(char *link);
+int devfsadm_link_valid(di_node_t anynode, char *link);
 int devfsadm_mklink(char *link, di_node_t node, di_minor_t minor, int flags);
 int devfsadm_secondary_link(char *link, char *primary_link, int flags);
 void devfsadm_rm_link(char *file);
@@ -241,7 +240,7 @@ int disk_enumerate_int(char *devfs_path, int index, char **buf,
  */
 int devfsadm_enumerate_char_start(char *devfs_path, int index,
     char **buf, devfsadm_enumerate_t rules[], int nrules, char *start);
-int devfsadm_read_link(char *link, char **devfs_path);
+int devfsadm_read_link(di_node_t node, char *link, char **devfs_path);
 char *s_strdup(const char *ptr);
 
 /* Private interface between reserve subsystm and disks link generator */

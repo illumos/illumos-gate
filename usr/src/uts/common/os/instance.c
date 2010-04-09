@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -48,6 +47,9 @@
 #include <sys/modctl.h>
 #include <sys/console.h>
 #include <sys/cladm.h>
+#include <sys/sysmacros.h>
+#include <sys/crc32.h>
+
 
 static void in_preassign_instance(void);
 static void i_log_devfs_instance_mod(void);
@@ -71,8 +73,12 @@ static int in_pathin(char *cp, int instance, char *bname, struct bind **args);
 static int in_next_instance_block(major_t, int);
 static int in_next_instance(major_t);
 
+#pragma weak plat_ioaliases_init
+
+
 /* external functions */
 extern char *i_binding_to_drv_name(char *bname);
+extern void plat_ioaliases_init(void);
 
 /*
  * This plus devnames defines the entire software state of the instance world.
@@ -87,7 +93,7 @@ typedef struct in_softstate {
 	kmutex_t	ins_serial;
 	kcondvar_t	ins_serial_cv;
 	int		ins_busy;
-	char		ins_dirty;	/* need flush */
+	boolean_t	ins_dirty;	/* instance info needs flush */
 } in_softstate_t;
 
 static in_softstate_t e_ddi_inst_state;
@@ -106,7 +112,7 @@ static in_softstate_t e_ddi_inst_state;
  * IN_PROVISIONAL:  When a node is assigned an instance number in
  *	e_ddi_assign_instance(), its state is set to IN_PROVISIONAL.
  *	Subsequently, the framework will always call either
- *	e_ddi_keep_instance() which makes the node IN_PERMANENT,
+ *	e_ddi_keep_instance() which makes the node IN_PERMANENT
  *	or e_ddi_free_instance(), which deletes the node.
  * IN_PERMANENT:
  *	If e_ddi_keep_instance() is called on an IN_PROVISIONAL node,
@@ -122,6 +128,7 @@ static char *instance_file_backup = INSTANCE_FILE INSTANCE_FILE_SUFFIX;
 #define	PTI_FOUND	0
 #define	PTI_NOT_FOUND	1
 #define	PTI_REBUILD	2
+
 
 /*
  * Path to instance file magic string used for first time boot after
@@ -149,6 +156,12 @@ e_ddi_instance_init(void)
 	 * our assumptions in the code.
 	 */
 	e_ddi_enter_instance();
+
+	/*
+	 * Init the ioaliases if the platform supports it
+	 */
+	if (&plat_ioaliases_init)
+		plat_ioaliases_init();
 
 	/*
 	 * Create the root node, instance zallocs to 0.
@@ -192,6 +205,12 @@ e_ddi_instance_init(void)
 		break;
 
 	case PTI_REBUILD:
+		/*
+		 * path_to_inst has magic str requesting a create
+		 * Convert boot to reconfig boot to ensure /dev is
+		 * in sync with new path_to_inst.
+		 */
+		boothowto |= RB_RECONFIG;
 		cmn_err(CE_CONT,
 		    "?Using default device instance data\n");
 		break;
@@ -486,7 +505,7 @@ in_assign_instance_block(dev_info_t *dip)
 		/* notify devfsadmd to sync of path_to_inst file */
 		mutex_enter(&e_ddi_inst_state.ins_serial);
 		i_log_devfs_instance_mod();
-		e_ddi_inst_state.ins_dirty = 1;
+		e_ddi_inst_state.ins_dirty = B_TRUE;
 		mutex_exit(&e_ddi_inst_state.ins_serial);
 		return (1);
 	}
@@ -549,19 +568,38 @@ e_ddi_assign_instance(dev_info_t *dip)
 	ASSERT(np == in_devwalk(dip, &ap, NULL));
 
 	/*
+	 * Link the devinfo node and in_node_t
+	 */
+	if (DEVI(dip)->devi_in_node || np->in_devi) {
+		ddi_err(DER_MODE, dip, "devinfo and  instance node (%p) "
+		    "interlink fields are not NULL", (void *)np);
+	}
+	DEVI(dip)->devi_in_node = np;
+	np->in_devi = dip;
+
+	/*
 	 * Look for driver entry, allocate one if not found
 	 */
 	bname = (char *)ddi_driver_name(dip);
 	dp = in_drvwalk(np, bname);
 	if (dp == NULL) {
-		dp = in_alloc_drv(bname);
-		ASSERT(dp != NULL);
-		major = ddi_driver_major(dip);
-		ASSERT(major != DDI_MAJOR_T_NONE);
-		in_endrv(np, dp);
-		in_set_instance(dip, dp, major);
-		dp->ind_state = IN_PROVISIONAL;
-		in_hashdrv(dp);
+
+		if (ddi_aliases_present == B_TRUE) {
+			e_ddi_borrow_instance(dip, np);
+		}
+
+		if ((dp = in_drvwalk(np, bname)) == NULL) {
+			dp = in_alloc_drv(bname);
+			ASSERT(dp != NULL);
+			major = ddi_driver_major(dip);
+			ASSERT(major != DDI_MAJOR_T_NONE);
+			in_endrv(np, dp);
+			in_set_instance(dip, dp, major);
+			dp->ind_state = IN_PROVISIONAL;
+			in_hashdrv(dp);
+		} else {
+			dp->ind_state = IN_BORROWED;
+		}
 	}
 
 	ret = dp->ind_instance;
@@ -738,10 +776,25 @@ e_ddi_free_instance(dev_info_t *dip, char *addr)
 	e_ddi_enter_instance();
 	np = in_devwalk(dip, &ap, addr);
 	ASSERT(np);
+
+	/*
+	 * Break the interlink between dip and np
+	 */
+	if (DEVI(dip)->devi_in_node != np || np->in_devi != dip) {
+		ddi_err(DER_MODE, dip, "devinfo node linked to "
+		    "wrong instance node: %p", (void *)np);
+	}
+	DEVI(dip)->devi_in_node = NULL;
+	np->in_devi = NULL;
+
 	dp = in_drvwalk(np, name);
 	ASSERT(dp);
 	if (dp->ind_state == IN_PROVISIONAL) {
 		in_removedrv(dnp, dp);
+	}
+	if (dp->ind_state == IN_BORROWED) {
+		dp->ind_state = IN_PERMANENT;
+		e_ddi_return_instance(dip, addr, np);
 	}
 	if (np->in_drivers == NULL) {
 		in_removenode(dnp, np, ap);
@@ -785,10 +838,10 @@ e_ddi_keep_instance(dev_info_t *dip)
 	ASSERT(dp);
 
 	mutex_enter(&e_ddi_inst_state.ins_serial);
-	if (dp->ind_state == IN_PROVISIONAL) {
+	if (dp->ind_state == IN_PROVISIONAL || dp->ind_state == IN_BORROWED) {
 		dp->ind_state = IN_PERMANENT;
 		i_log_devfs_instance_mod();
-		e_ddi_inst_state.ins_dirty = 1;
+		e_ddi_inst_state.ins_dirty = B_TRUE;
 	}
 	mutex_exit(&e_ddi_inst_state.ins_serial);
 	e_ddi_exit_instance();
@@ -840,6 +893,7 @@ in_removenode(struct devnames *dnp, in_node_t *mp, in_node_t *ap)
 	in_node_t *np;
 
 	ASSERT(e_ddi_inst_state.ins_busy);
+
 	/*
 	 * Assertion: parents are always instantiated by the framework
 	 * before their children, destroyed after them
@@ -906,6 +960,7 @@ in_devwalk(dev_info_t *dip, in_node_t **ap, char *addr)
 		}
 		np = np->in_sibling;
 	}
+
 	return (np);
 }
 
@@ -930,7 +985,6 @@ in_pathin(char *cp, int instance, char *bname, struct bind **args)
 		cmn_err(CE_WARN,
 		    "invalid instance file entry %s %d",
 		    cp, instance);
-
 		return (0);
 	}
 
@@ -939,11 +993,7 @@ in_pathin(char *cp, int instance, char *bname, struct bind **args)
 
 	np = in_make_path(cp);
 	ASSERT(np);
-	if (in_inuse(instance, bname)) {
-		cmn_err(CE_WARN,
-		    "instance already in use: %s %d", cp, instance);
-		return (0);
-	}
+
 	dp = in_drvwalk(np, bname);
 	if (dp != NULL) {
 		cmn_err(CE_WARN,
@@ -952,6 +1002,13 @@ in_pathin(char *cp, int instance, char *bname, struct bind **args)
 		    cp, bname, dp->ind_instance);
 		return (0);
 	}
+
+	if (in_inuse(instance, bname)) {
+		cmn_err(CE_WARN,
+		    "instance already in use: %s %d", cp, instance);
+		return (0);
+	}
+
 	dp = in_alloc_drv(bname);
 	in_endrv(np, dp);
 	dp->ind_instance = instance;
@@ -975,8 +1032,10 @@ in_make_path(char *path)
 	char *cp, *name, *addr;
 
 	ASSERT(e_ddi_inst_state.ins_busy);
+
 	if (path == NULL || path[0] != '/')
 		return (NULL);
+
 	(void) snprintf(buf, sizeof (buf), "%s", path);
 	cp = buf + 1;	/* skip over initial '/' in path */
 	name = in_name_addr(&cp, &addr);
@@ -994,7 +1053,8 @@ in_make_path(char *path)
 		name = in_name_addr(&cp, &addr);
 
 	ap = e_ddi_inst_state.ins_root;
-	rp = np = e_ddi_inst_state.ins_root->in_child;
+	np = e_ddi_inst_state.ins_root->in_child;
+	rp = np;
 	while (name) {
 		while (name && np) {
 			if (in_eqstr(name, np->in_node_name) &&
@@ -1004,7 +1064,6 @@ in_make_path(char *path)
 					return (np);
 				ap = np;
 				np = np->in_child;
-				continue;
 			} else {
 				np = np->in_sibling;
 			}
@@ -1016,6 +1075,7 @@ in_make_path(char *path)
 		np = NULL;	/* can have no children */
 		name = in_name_addr(&cp, &addr);
 	}
+
 	return (rp);
 }
 
@@ -1378,7 +1438,7 @@ i_log_devfs_instance_mod(void)
 }
 
 void
-e_ddi_enter_instance()
+e_ddi_enter_instance(void)
 {
 	mutex_enter(&e_ddi_inst_state.ins_serial);
 	if (e_ddi_inst_state.ins_thread == curthread)
@@ -1394,7 +1454,7 @@ e_ddi_enter_instance()
 }
 
 void
-e_ddi_exit_instance()
+e_ddi_exit_instance(void)
 {
 	mutex_enter(&e_ddi_inst_state.ins_serial);
 	e_ddi_inst_state.ins_busy--;
@@ -1406,19 +1466,19 @@ e_ddi_exit_instance()
 }
 
 int
-e_ddi_instance_is_clean()
+e_ddi_instance_is_clean(void)
 {
-	return (e_ddi_inst_state.ins_dirty == 0);
+	return (e_ddi_inst_state.ins_dirty == B_FALSE);
 }
 
 void
-e_ddi_instance_set_clean()
+e_ddi_instance_set_clean(void)
 {
-	e_ddi_inst_state.ins_dirty = 0;
+	e_ddi_inst_state.ins_dirty = B_FALSE;
 }
 
 in_node_t *
-e_ddi_instance_root()
+e_ddi_instance_root(void)
 {
 	return (e_ddi_inst_state.ins_root);
 }
@@ -1450,6 +1510,7 @@ in_walk_instances(in_node_t *np, char *path, char *this,
 					break;
 			}
 		}
+
 		if (np->in_child) {
 			rval = in_walk_instances(np->in_child,
 			    path, next, f, arg);
@@ -1480,8 +1541,82 @@ e_ddi_walk_instances(int (*f)(const char *,
 	e_ddi_enter_instance();
 	root = e_ddi_instance_root();
 	rval = in_walk_instances(root->in_child, path, path, f, arg);
+
 	e_ddi_exit_instance();
 
 	kmem_free(path, MAXPATHLEN);
 	return (rval);
+}
+
+in_node_t *
+e_ddi_path_to_instance(char *path)
+{
+	in_node_t *np;
+
+	np = in_make_path(path);
+	if (np && np->in_drivers && np->in_drivers->ind_state == IN_PERMANENT) {
+		return (np);
+	}
+	return (NULL);
+}
+
+void
+e_ddi_borrow_instance(dev_info_t *cdip, in_node_t *cnp)
+{
+	char		*alias;
+	in_node_t	*anp;
+	char		*curr = kmem_alloc(MAXPATHLEN, KM_NOSLEEP);
+
+	if (curr == NULL) {
+		ddi_err(DER_PANIC, cdip, "curr alloc failed");
+		/*NOTREACHED*/
+	}
+
+	(void) ddi_pathname(cdip, curr);
+
+	if (cnp->in_drivers) {
+		ddi_err(DER_PANIC, cdip, "cnp has instance: %p", cnp);
+		/*NOTREACHED*/
+	}
+
+	alias = ddi_curr_redirect(curr);
+	kmem_free(curr, MAXPATHLEN);
+
+	if (alias && (anp = e_ddi_path_to_instance(alias)) != NULL) {
+		cnp->in_drivers = anp->in_drivers;
+		anp->in_drivers = NULL;
+	}
+}
+
+void
+e_ddi_return_instance(dev_info_t *cdip, char *addr, in_node_t *cnp)
+{
+	in_node_t	*anp;
+	char 		*alias;
+	char		*curr = kmem_alloc(MAXPATHLEN, KM_NOSLEEP);
+
+	if (curr == NULL) {
+		ddi_err(DER_PANIC, cdip, "alloc of curr failed");
+		/*NOTREACHED*/
+	}
+
+	(void) ddi_pathname(cdip, curr);
+	if (addr) {
+		(void) strlcat(curr, "@", MAXPATHLEN);
+		(void) strlcat(curr, addr, MAXPATHLEN);
+
+	}
+	if (cnp->in_drivers == NULL) {
+		ddi_err(DER_PANIC, cdip, "cnp has no inst: %p", cnp);
+		/*NOTREACHED*/
+	}
+
+	alias = ddi_curr_redirect(curr);
+	kmem_free(curr, MAXPATHLEN);
+
+	if (alias && (anp = e_ddi_path_to_instance(alias)) != NULL) {
+		ASSERT(anp->in_drivers == NULL);
+		anp->in_drivers = cnp->in_drivers;
+		cnp->in_drivers = NULL;
+	}
 }
