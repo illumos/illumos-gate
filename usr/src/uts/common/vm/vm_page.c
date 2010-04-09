@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T	*/
@@ -6213,13 +6212,21 @@ struct page_capture_callback pc_cb[PC_NUM_CALLBACKS];
 /* Note that this is a circular linked list */
 typedef struct page_capture_hash_bucket {
 	page_t *pp;
-	uint_t szc;
+	uchar_t szc;
+	uchar_t pri;
 	uint_t flags;
 	clock_t expires;	/* lbolt at which this request expires. */
 	void *datap;		/* Cached data passed in for callback */
 	struct page_capture_hash_bucket *next;
 	struct page_capture_hash_bucket *prev;
 } page_capture_hash_bucket_t;
+
+#define	PC_PRI_HI	0	/* capture now */
+#define	PC_PRI_LO	1	/* capture later */
+#define	PC_NUM_PRI	2
+
+#define	PAGE_CAPTURE_PRIO(pp) (PP_ISRAF(pp) ? PC_PRI_LO : PC_PRI_HI)
+
 
 /*
  * Each hash bucket will have it's own mutex and two lists which are:
@@ -6241,7 +6248,7 @@ typedef struct page_capture_hash_bucket {
  */
 typedef struct page_capture_hash_head {
 	kmutex_t pchh_mutex;
-	uint_t num_pages;
+	uint_t num_pages[PC_NUM_PRI];
 	page_capture_hash_bucket_t lists[2]; /* sentinel nodes */
 } page_capture_hash_head_t;
 
@@ -6317,7 +6324,8 @@ page_capture_unregister_callback(uint_t index)
 					 * hold appropriate locks here.
 					 */
 					page_clrtoxic(head->pp, PR_CAPTURE);
-					page_capture_hash[i].num_pages--;
+					page_capture_hash[i].
+					    num_pages[bp2->pri]--;
 					continue;
 				}
 				bp1 = bp1->next;
@@ -6363,8 +6371,20 @@ page_capture_move_to_walked(page_t *pp)
 			bp->prev = &page_capture_hash[index].lists[1];
 			page_capture_hash[index].lists[1].next = bp;
 			bp->next->prev = bp;
-			mutex_exit(&page_capture_hash[index].pchh_mutex);
 
+			/*
+			 * There is a small probability of page on a free
+			 * list being retired while being allocated
+			 * and before P_RAF is set on it. The page may
+			 * end up marked as high priority request instead
+			 * of low priority request.
+			 * If P_RAF page is not marked as low priority request
+			 * change it to low priority request.
+			 */
+			page_capture_hash[index].num_pages[bp->pri]--;
+			bp->pri = PAGE_CAPTURE_PRIO(pp);
+			page_capture_hash[index].num_pages[bp->pri]++;
+			mutex_exit(&page_capture_hash[index].pchh_mutex);
 			return (1);
 		}
 		bp = bp->next;
@@ -6388,6 +6408,7 @@ page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
 	int index;
 	int cb_index;
 	int i;
+	uchar_t pri;
 #ifdef DEBUG
 	page_capture_hash_bucket_t *tp1;
 	int l;
@@ -6453,11 +6474,13 @@ page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
 
 #endif
 		page_settoxic(pp, PR_CAPTURE);
+		pri = PAGE_CAPTURE_PRIO(pp);
+		bp1->pri = pri;
 		bp1->next = page_capture_hash[index].lists[0].next;
 		bp1->prev = &page_capture_hash[index].lists[0];
 		bp1->next->prev = bp1;
 		page_capture_hash[index].lists[0].next = bp1;
-		page_capture_hash[index].num_pages++;
+		page_capture_hash[index].num_pages[pri]++;
 		if (flags & CAPTURE_RETIRE) {
 			page_retire_incr_pend_count(datap);
 		}
@@ -6785,7 +6808,8 @@ page_capture_take_action(page_t *pp, uint_t flags, void *datap)
 				if (bp1->pp == pp) {
 					bp1->next->prev = bp1->prev;
 					bp1->prev->next = bp1->next;
-					page_capture_hash[index].num_pages--;
+					page_capture_hash[index].
+					    num_pages[bp1->pri]--;
 					page_clrtoxic(pp, PR_CAPTURE);
 					found = 1;
 					break;
@@ -6866,8 +6890,9 @@ page_capture_take_action(page_t *pp, uint_t flags, void *datap)
 		bp1->next = page_capture_hash[index].lists[1].next;
 		bp1->prev = &page_capture_hash[index].lists[1];
 		bp1->next->prev = bp1;
+		bp1->pri = PAGE_CAPTURE_PRIO(pp);
 		page_capture_hash[index].lists[1].next = bp1;
-		page_capture_hash[index].num_pages++;
+		page_capture_hash[index].num_pages[bp1->pri]++;
 		mutex_exit(&page_capture_hash[index].pchh_mutex);
 		return (ret);
 	}
@@ -6897,6 +6922,9 @@ page_capture_take_action(page_t *pp, uint_t flags, void *datap)
 						bp2->datap = bp1->datap;
 					}
 				}
+				page_capture_hash[index].num_pages[bp2->pri]--;
+				bp2->pri = PAGE_CAPTURE_PRIO(pp);
+				page_capture_hash[index].num_pages[bp2->pri]++;
 				mutex_exit(&page_capture_hash[index].
 				    pchh_mutex);
 				kmem_free(bp1, sizeof (*bp1));
@@ -7126,10 +7154,16 @@ page_retire_mdboot()
 	page_t *pp;
 	int i, j;
 	page_capture_hash_bucket_t *bp;
+	uchar_t pri;
 
 	/* walk lists looking for pages to scrub */
 	for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++) {
-		if (page_capture_hash[i].num_pages == 0)
+		for (pri = 0; pri < PC_NUM_PRI; pri++) {
+			if (page_capture_hash[i].num_pages[pri] != 0) {
+				break;
+			}
+		}
+		if (pri == PC_NUM_PRI)
 			continue;
 
 		mutex_enter(&page_capture_hash[i].pchh_mutex);
@@ -7166,11 +7200,17 @@ page_capture_async()
 	uint_t szc;
 	uint_t flags;
 	void *datap;
+	uchar_t pri;
 
 	/* If there are outstanding pages to be captured, get to work */
 	for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++) {
-		if (page_capture_hash[i].num_pages == 0)
+		for (pri = 0; pri < PC_NUM_PRI; pri++) {
+			if (page_capture_hash[i].num_pages[pri] != 0)
+				break;
+		}
+		if (pri == PC_NUM_PRI)
 			continue;
+
 		/* Append list 1 to list 0 and then walk through list 0 */
 		mutex_enter(&page_capture_hash[i].pchh_mutex);
 		bp1 = &page_capture_hash[i].lists[1];
@@ -7195,7 +7235,7 @@ page_capture_async()
 				page_capture_hash[i].lists[0].next = bp1->next;
 				bp1->next->prev =
 				    &page_capture_hash[i].lists[0];
-				page_capture_hash[i].num_pages--;
+				page_capture_hash[i].num_pages[bp1->pri]--;
 
 				/*
 				 * We can safely remove the PR_CAPTURE bit
@@ -7332,28 +7372,35 @@ static void
 page_capture_thread(void)
 {
 	callb_cpr_t c;
-	int outstanding;
 	int i;
+	int high_pri_pages;
+	int low_pri_pages;
+	clock_t timeout;
 
 	CALLB_CPR_INIT(&c, &pc_thread_mutex, callb_generic_cpr, "page_capture");
 
 	mutex_enter(&pc_thread_mutex);
 	for (;;) {
-		outstanding = 0;
-		for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++)
-			outstanding += page_capture_hash[i].num_pages;
-		if (outstanding) {
-			page_capture_handle_outstanding();
-			CALLB_CPR_SAFE_BEGIN(&c);
-			(void) cv_reltimedwait(&pc_cv, &pc_thread_mutex,
-			    pc_thread_shortwait, TR_CLOCK_TICK);
-			CALLB_CPR_SAFE_END(&c, &pc_thread_mutex);
-		} else {
-			CALLB_CPR_SAFE_BEGIN(&c);
-			(void) cv_reltimedwait(&pc_cv, &pc_thread_mutex,
-			    pc_thread_longwait, TR_CLOCK_TICK);
-			CALLB_CPR_SAFE_END(&c, &pc_thread_mutex);
+		high_pri_pages = 0;
+		low_pri_pages = 0;
+		for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++) {
+			high_pri_pages +=
+			    page_capture_hash[i].num_pages[PC_PRI_HI];
+			low_pri_pages +=
+			    page_capture_hash[i].num_pages[PC_PRI_LO];
 		}
+
+		timeout = pc_thread_longwait;
+		if (high_pri_pages != 0) {
+			timeout = pc_thread_shortwait;
+			page_capture_handle_outstanding();
+		} else if (low_pri_pages != 0) {
+			page_capture_async();
+		}
+		CALLB_CPR_SAFE_BEGIN(&c);
+		(void) cv_reltimedwait(&pc_cv, &pc_thread_mutex,
+		    timeout, TR_CLOCK_TICK);
+		CALLB_CPR_SAFE_END(&c, &pc_thread_mutex);
 	}
 	/*NOTREACHED*/
 }

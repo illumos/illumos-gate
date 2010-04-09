@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -893,6 +892,7 @@ int	page_szc_user_filtered(size_t);
 #define	P_MIGRATE	0x20		/* Migrate page on next touch */
 #define	P_SWAP		0x10		/* belongs to vnode that is V_ISSWAP */
 #define	P_BOOTPAGES	0x08		/* member of bootpages list */
+#define	P_RAF		0x04		/* page retired at free */
 
 #define	PP_ISFREE(pp)		((pp)->p_state & P_FREE)
 #define	PP_ISAGED(pp)		(((pp)->p_state & P_FREE) && \
@@ -903,6 +903,7 @@ int	page_szc_user_filtered(size_t);
 #define	PP_ISMIGRATE(pp)	((pp)->p_state & P_MIGRATE)
 #define	PP_ISSWAP(pp)		((pp)->p_state & P_SWAP)
 #define	PP_ISBOOTPAGES(pp)	((pp)->p_state & P_BOOTPAGES)
+#define	PP_ISRAF(pp)		((pp)->p_state & P_RAF)
 
 #define	PP_SETFREE(pp)		((pp)->p_state = ((pp)->p_state & ~P_MIGRATE) \
 				| P_FREE)
@@ -911,6 +912,7 @@ int	page_szc_user_filtered(size_t);
 #define	PP_SETMIGRATE(pp)	((pp)->p_state |= P_MIGRATE)
 #define	PP_SETSWAP(pp)		((pp)->p_state |= P_SWAP)
 #define	PP_SETBOOTPAGES(pp)	((pp)->p_state |= P_BOOTPAGES)
+#define	PP_SETRAF(pp)		((pp)->p_state |= P_RAF)
 
 #define	PP_CLRFREE(pp)		((pp)->p_state &= ~P_FREE)
 #define	PP_CLRAGED(pp)		ASSERT(!PP_ISAGED(pp))
@@ -918,6 +920,7 @@ int	page_szc_user_filtered(size_t);
 #define	PP_CLRMIGRATE(pp)	((pp)->p_state &= ~P_MIGRATE)
 #define	PP_CLRSWAP(pp)		((pp)->p_state &= ~P_SWAP)
 #define	PP_CLRBOOTPAGES(pp)	((pp)->p_state &= ~P_BOOTPAGES)
+#define	PP_CLRRAF(pp)		((pp)->p_state &= ~P_RAF)
 
 /*
  * Flags for page_t p_toxic, for tracking memory hardware errors.

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -576,9 +575,14 @@ segkp_get_internal(
 		/*
 		 * Now, release lock on the page.
 		 */
-		if (flags & KPD_LOCKED)
+		if (flags & KPD_LOCKED) {
+			/*
+			 * Indicate to page_retire framework that this
+			 * page can only be retired when it is freed.
+			 */
+			PP_SETRAF(pp);
 			page_downgrade(pp);
-		else
+		} else
 			page_unlock(pp);
 	}
 
@@ -701,6 +705,9 @@ segkp_release_internal(struct seg *seg, struct segkp_data *kpd, size_t len)
 					    "kp_anon: no page to unlock ");
 					/*NOTREACHED*/
 				}
+				if (PP_ISRAF(pp))
+					PP_CLRRAF(pp);
+
 				page_unlock(pp);
 			}
 			if ((kpd->kp_flags & KPD_HASAMP) == 0) {
@@ -721,6 +728,8 @@ segkp_release_internal(struct seg *seg, struct segkp_data *kpd, size_t len)
 					    "no page to unlock");
 					/*NOTREACHED*/
 				}
+				if (PP_ISRAF(pp))
+					PP_CLRRAF(pp);
 				/*
 				 * We should just upgrade the lock here
 				 * but there is no upgrade that waits.
