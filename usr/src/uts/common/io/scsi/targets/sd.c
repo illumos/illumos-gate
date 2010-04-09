@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -20278,6 +20277,7 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
  *		flag  - SD_TARGET_START
  *			SD_TARGET_STOP
  *			SD_TARGET_EJECT
+ *			SD_TARGET_CLOSE
  *		path_flag - SD_PATH_DIRECT to use the USCSI "direct" chain and
  *			the normal command waitq, or SD_PATH_DIRECT_PRIORITY
  *			to use the USCSI "direct" chain and bypass the normal
@@ -20312,7 +20312,8 @@ sd_send_scsi_START_STOP_UNIT(sd_ssc_t *ssc, int pc_flag, int flag,
 	    "sd_send_scsi_START_STOP_UNIT: entry: un:0x%p\n", un);
 
 	if (un->un_f_check_start_stop &&
-	    ((pc_flag == SD_START_STOP) && (flag != SD_TARGET_EJECT)) &&
+	    (pc_flag == SD_START_STOP) &&
+	    ((flag == SD_TARGET_START) || (flag == SD_TARGET_STOP)) &&
 	    (un->un_f_start_stop_supported != TRUE)) {
 		return (0);
 	}
