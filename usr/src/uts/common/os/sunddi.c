@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -7973,7 +7972,7 @@ ddi_debug_devid_devts_per_path(char *path, int ndevs, dev_t *devs)
 
 /*
  * Register device id into DDI framework.
- * Must be called when device is attached.
+ * Must be called when the driver is bound.
  */
 static int
 i_ddi_devid_register(dev_info_t *dip, ddi_devid_t devid)
@@ -8051,7 +8050,11 @@ ddi_devid_register(dev_info_t *dip, ddi_devid_t devid)
 			mutex_enter(&DEVI(dip)->devi_lock);
 			DEVI(dip)->devi_flags |= DEVI_REGISTERED_DEVID;
 			mutex_exit(&DEVI(dip)->devi_lock);
-		} else {
+		} else if (ddi_get_name_addr(dip)) {
+			/*
+			 * We only expect cache_register DDI_FAILURE when we
+			 * can't form the full path because of NULL devi_addr.
+			 */
 			cmn_err(CE_WARN, "%s%d: failed to cache devid",
 			    ddi_driver_name(dip), ddi_get_instance(dip));
 		}

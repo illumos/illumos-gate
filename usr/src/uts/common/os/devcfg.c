@@ -844,6 +844,7 @@ init_node(dev_info_t *dip)
 	int (*f)(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *, void *);
 	char *path;
 	major_t	major;
+	ddi_devid_t devid = NULL;
 
 	ASSERT(i_ddi_node_state(dip) == DS_BOUND);
 
@@ -903,6 +904,20 @@ init_node(dev_info_t *dip)
 		    (error == DDI_SUCCESS) ? "" : " failed"));
 		error = DDI_FAILURE;
 		goto out;
+	}
+
+	/*
+	 * If a devid was registered for a DS_BOUND node then the devid_cache
+	 * may not have captured the path. Detect this situation and ensure that
+	 * the path enters the cache now that devi_addr is established.
+	 */
+	if (!(DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) &&
+	    (ddi_devid_get(dip, &devid) == DDI_SUCCESS)) {
+		if (e_devid_cache_register(dip, devid) == DDI_SUCCESS) {
+			DEVI(dip)->devi_flags |= DEVI_REGISTERED_DEVID;
+		}
+
+		ddi_devid_free(devid);
 	}
 
 	/*

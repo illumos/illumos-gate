@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -5090,6 +5089,8 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 	char			*dname = NULL;
 	ddi_devid_t		devid;
 	int			have_devid = 0;
+	ddi_devid_t		cdevid;
+	int			have_cdevid = 0;
 	char			*devid_str;
 	char			*guid = NULL;
 
@@ -5241,7 +5242,7 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 		    (ndi_prop_update_string(DDI_DEV_T_NONE, dchild,
 		    "class", "scsi") != DDI_PROP_SUCCESS)) {
 			SCSI_HBA_LOG((_LOG(2), self, NULL,
-			    "@%s failed devinfo decoration", addr));
+			    "devinfo @%s failed decoration", addr));
 			(void) scsi_hba_remove_node(dchild);
 			dchild = NULL;
 			goto out;
@@ -5282,7 +5283,11 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 			    "pathinfo alloc failed"));
 			goto out;
 		}
+
 		ASSERT(pchild);
+		dchild = mdi_pi_get_client(pchild);
+		ASSERT(dchild);
+		ndi_flavor_set(dchild, SCSA_FLAVOR_SCSI_DEVICE);
 
 		/*
 		 * Decorate new node with addressing properties via
@@ -5290,18 +5295,68 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 		 */
 		if (scsi_hba_ua_set(addr, NULL, pchild) == 0) {
 			SCSI_HBA_LOG((_LOG(1), self, NULL,
-			    "%s pathinfo decoration failed",
+			    "pathinfo %s decoration failed",
 			    mdi_pi_spathname(pchild)));
-
 			(void) mdi_pi_free(pchild, 0);
 			pchild = NULL;
 			goto out;
+		}
+
+		/* Bind the driver */
+		if (ndi_devi_bind_driver(dchild, 0) != NDI_SUCCESS) {
+			/* need to bind in order to register a devid */
+			SCSI_HBA_LOG((_LOGCFG, self, NULL,
+			    "pathinfo %s created, no client driver-> "
+			    "no devid_register", mdi_pi_spathname(pchild)));
+			goto out;
+		}
+
+		/* Watch out for inconsistancies in devids. */
+		if (ddi_devid_get(dchild, &cdevid) == DDI_SUCCESS)
+			have_cdevid = 1;
+
+		if (have_devid && !have_cdevid) {
+			/* Client does not yet have devid, register ours. */
+			if (ddi_devid_register(dchild, devid) == DDI_FAILURE)
+				SCSI_HBA_LOG((_LOG(1), self, NULL,
+				    "pathinfo %s created, "
+				    "devid register failed",
+				    mdi_pi_spathname(pchild)));
+			else
+				SCSI_HBA_LOG((_LOG(2), self, NULL,
+				    "pathinfo %s created with devid",
+				    mdi_pi_spathname(pchild)));
+		} else if (have_devid && have_cdevid) {
+			/*
+			 * We have devid and client already has devid:
+			 * they must be the same.
+			 */
+			if (ddi_devid_compare(cdevid, devid) != 0) {
+				SCSI_HBA_LOG((_LOG(WARN), NULL, dchild,
+				    "mismatched devid on path %s",
+				    mdi_pi_spathname(pchild)));
+			}
+		} else if (!have_devid && have_cdevid) {
+			/*
+			 * Client already has a devid, but we don't:
+			 * we should not have missing devids.
+			 */
+			SCSI_HBA_LOG((_LOG(WARN), NULL, dchild,
+			    "missing devid on path %s",
+			    mdi_pi_spathname(pchild)));
+		} else if (!have_cdevid && !have_devid) {
+			/* devid not supported */
+			SCSI_HBA_LOG((_LOG(2), self, NULL,
+			    "pathinfo %s created, no devid",
+			    mdi_pi_spathname(pchild)));
 		}
 	}
 
 	/* free the node name and compatible information */
 out:	if (have_devid)
 		ddi_devid_free(devid);
+	if (have_cdevid)
+		ddi_devid_free(cdevid);
 	if (guid)
 		ddi_devid_free_guid(guid);
 	if (compat)
@@ -5314,17 +5369,16 @@ out:	if (have_devid)
 		ddi_prop_free(binding_set);
 
 	/* return child_type results */
-	ASSERT(!(dchild && pchild));
-	if (dchild) {
-		*dchildp = dchild;
-		*pchildp = NULL;
-		return (CHILD_TYPE_DEVINFO);
-	}
 	if (pchild) {
 		*dchildp = NULL;
 		*pchildp = pchild;
 		return (CHILD_TYPE_PATHINFO);
+	} else if (dchild) {
+		*dchildp = dchild;
+		*pchildp = NULL;
+		return (CHILD_TYPE_DEVINFO);
 	}
+
 	return (CHILD_TYPE_NONE);
 }
 

@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
 #include <sys/t_lock.h>
@@ -498,6 +495,15 @@ e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
 	int pathlen;
 	list_t *listp;
 	int is_dirty = 0;
+
+	/*
+	 * We are willing to accept DS_BOUND nodes if we can form a full
+	 * ddi_pathname (i.e. the node is part way to becomming
+	 * DS_INITIALIZED and devi_addr/ddi_get_name_addr are non-NULL).
+	 */
+	if (ddi_get_name_addr(dip) == NULL) {
+		return (DDI_FAILURE);
+	}
 
 	ASSERT(ddi_devid_valid(devid) == DDI_SUCCESS);
 
