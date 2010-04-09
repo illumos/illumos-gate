@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ *  Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * Solaris x86 Generic ACPI Video Extensions Hotkey driver
  */
 #include <sys/hotkey_drv.h>
+#include <sys/smbios.h>
 
 /*
  * Vendor specific hotkey support list
@@ -81,6 +81,27 @@ static struct acpi_video {
 } acpi_video_hotkey;
 
 int hotkey_drv_debug = 0;
+
+static struct acpi_video_smbios_info {
+	char *manufacturer;
+	char *product;
+} acpi_brightness_get_blacklist[] = {
+	{ /* Dell AdamoXPS laptop */
+		"Dell Inc.",
+		"Adamo XPS"
+	},
+	{ /* termination entry */
+		NULL,
+		NULL
+	}
+};
+/*
+ * -1 = check acpi_brightness_get_blacklist[].
+ * 0 = enable brightness get.
+ * 1 = disable brightness get.
+ */
+int acpi_brightness_get_disable = -1;
+
 
 #define	ACPI_METHOD_DOS			"_DOS"
 #define	ACPI_METHOD_DOD			"_DOD"
@@ -154,6 +175,13 @@ static int
 acpi_video_brightness_get(struct acpi_video_brightness *vidbp)
 {
 	int i;
+
+	if (acpi_brightness_get_disable) {
+		/* simply initialize current brightness to the highest level */
+		vidbp->cur_level_index = vidbp->nlevel - 1;
+		vidbp->cur_level = vidbp->levels[vidbp->cur_level_index];
+		return (ACPI_DRV_OK);
+	}
 
 	if (acpica_eval_int(vidbp->dev.hdl, "_BQC", &vidbp->cur_level)
 	    != AE_OK) {
@@ -698,6 +726,38 @@ acpi_drv_hotkey_ioctl(int cmd, intptr_t arg, int mode, cred_t *cr,
 	}
 }
 
+static void
+acpi_video_check_blacklist(void)
+{
+	smbios_hdl_t *smhdl = NULL;
+	id_t smid;
+	smbios_system_t smsys;
+	smbios_info_t sminfo;
+	char *mfg, *product;
+	struct acpi_video_smbios_info *pblacklist;
+
+	acpi_brightness_get_disable = 0;
+	smhdl = smbios_open(NULL, SMB_VERSION, ksmbios_flags, NULL);
+	if (smhdl == NULL ||
+	    ((smid = smbios_info_system(smhdl, &smsys)) == SMB_ERR) ||
+	    (smbios_info_common(smhdl, smid, &sminfo) == SMB_ERR)) {
+		goto done;
+	}
+
+	mfg = (char *)sminfo.smbi_manufacturer;
+	product = (char *)sminfo.smbi_product;
+	for (pblacklist = acpi_brightness_get_blacklist;
+	    pblacklist->manufacturer != NULL; pblacklist++) {
+		if ((strcmp(mfg, pblacklist->manufacturer) == 0) &&
+		    (strcmp(product, pblacklist->product) == 0)) {
+			acpi_brightness_get_disable = 1;
+		}
+	}
+done:
+	if (smhdl != NULL)
+		smbios_close(smhdl);
+}
+
 static int
 hotkey_acpi_video_check(hotkey_drv_t *htkp)
 {
@@ -705,6 +765,8 @@ hotkey_acpi_video_check(hotkey_drv_t *htkp)
 
 	vidp = &acpi_video_hotkey;
 	bzero(vidp, sizeof (struct acpi_video));
+	if (acpi_brightness_get_disable == -1)
+		acpi_video_check_blacklist();
 	/* Find ACPI Video device handle */
 	if (ACPI_FAILURE(AcpiGetDevices(NULL, acpi_video_find_and_alloc,
 	    vidp, NULL))) {
