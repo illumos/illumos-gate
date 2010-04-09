@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * This file provides prototype function definitions.
@@ -54,7 +53,7 @@ typedef enum {
 	int lvl = level;					\
 	if (((pwp->debug_mask & (1 << lvl)) != 0) ||		\
 	    (lvl > PMCS_PRT_DEBUG_DEVEL)) {			\
-		pmcs_prt_impl(pwp, lvl, phy, tgt, fmt);	\
+		pmcs_prt_impl(pwp, lvl, phy, tgt, fmt);		\
 	}							\
 }
 
@@ -223,11 +222,6 @@ int pmcs_iport_tgtmap_destroy(pmcs_iport_t *);
 int pmcs_sas_diag_execute(pmcs_hw_t *, uint32_t, uint32_t, uint8_t);
 int pmcs_get_diag_report(pmcs_hw_t *, uint32_t, uint8_t);
 int pmcs_clear_diag_counters(pmcs_hw_t *, uint8_t);
-
-/*
- * Get current firmware timestamp
- */
-int pmcs_get_time_stamp(pmcs_hw_t *, uint64_t *);
 
 /*
  * Register Dump (including "internal" registers)

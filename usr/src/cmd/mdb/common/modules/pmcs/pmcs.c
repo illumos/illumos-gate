@@ -78,6 +78,52 @@ print_sas_address(pmcs_phy_t *phy)
 	}
 }
 
+static void
+pmcs_fwtime_to_systime(struct pmcs_hw ss, uint32_t fw_hi, uint32_t fw_lo,
+    struct timespec *stime)
+{
+	uint64_t fwtime;
+	time_t secs;
+	long nsecs;
+	boolean_t backward_time = B_FALSE;
+
+	fwtime = ((uint64_t)fw_hi << 32) | fw_lo;
+
+	/*
+	 * If fwtime < ss.fw_timestamp, then we need to adjust the clock
+	 * time backwards from ss.sys_timestamp.  Otherwise, the adjustment
+	 * goes forward in time
+	 */
+	if (fwtime >= ss.fw_timestamp) {
+		fwtime -= ss.fw_timestamp;
+	} else {
+		fwtime = ss.fw_timestamp - fwtime;
+		backward_time = B_TRUE;
+	}
+
+	secs = ((time_t)fwtime / NSECS_PER_SEC);
+	nsecs = ((long)fwtime % NSECS_PER_SEC);
+
+	stime->tv_sec = ss.sys_timestamp.tv_sec;
+	stime->tv_nsec = ss.sys_timestamp.tv_nsec;
+
+	if (backward_time) {
+		if (stime->tv_nsec < nsecs) {
+			stime->tv_sec--;
+			stime->tv_nsec = stime->tv_nsec + NSECS_PER_SEC - nsecs;
+		} else {
+			stime->tv_nsec -= nsecs;
+		}
+		stime->tv_sec -= secs;
+	} else {
+		if (stime->tv_nsec + nsecs > NSECS_PER_SEC) {
+			stime->tv_sec++;
+		}
+		stime->tv_nsec = (stime->tv_nsec + nsecs) % NSECS_PER_SEC;
+		stime->tv_sec += secs;
+	}
+}
+
 /*ARGSUSED*/
 static void
 display_ic(struct pmcs_hw m, int verbose)
@@ -507,6 +553,102 @@ display_completion_queue(struct pmcs_hw ss)
 		}
 		ccbp = ccb.next;
 	}
+}
+
+static void
+display_event_log(struct pmcs_hw ss)
+{
+	pmcs_fw_event_hdr_t fwhdr;
+	char *header_id, *entry, *fwlogp;
+	uint32_t total_size = PMCS_FWLOG_SIZE, log_size, index, *swapp, sidx;
+	pmcs_fw_event_entry_t *fw_entryp;
+	struct timespec systime;
+
+	if (ss.fwlogp == NULL) {
+		mdb_printf("There is no firmware event log.\n");
+		return;
+	}
+
+	fwlogp = (char *)ss.fwlogp;
+
+	while (total_size != 0) {
+		if (mdb_vread(&fwhdr, sizeof (pmcs_fw_event_hdr_t),
+		    (uintptr_t)fwlogp) != sizeof (pmcs_fw_event_hdr_t)) {
+			mdb_warn("Unable to read firmware event log header\n");
+			return;
+		}
+
+		/*
+		 * Firmware event log is little-endian
+		 */
+		swapp = (uint32_t *)&fwhdr;
+		for (sidx = 0; sidx < (sizeof (pmcs_fw_event_hdr_t) /
+		    sizeof (uint32_t)); sidx++) {
+			*swapp = LE_32(*swapp);
+			swapp++;
+		}
+
+		if (fwhdr.fw_el_signature == PMCS_FWLOG_AAP1_SIG) {
+			header_id = "AAP1";
+		} else if (fwhdr.fw_el_signature == PMCS_FWLOG_IOP_SIG) {
+			header_id = "IOP";
+		} else {
+			mdb_warn("Invalid firmware event log signature\n");
+			return;
+		}
+
+		mdb_printf("Event Log:    %s\n", header_id);
+		mdb_printf("Oldest entry: %d\n", fwhdr.fw_el_oldest_idx);
+		mdb_printf("Latest entry: %d\n", fwhdr.fw_el_latest_idx);
+
+		entry = mdb_alloc(fwhdr.fw_el_entry_size, UM_SLEEP);
+		fw_entryp = (pmcs_fw_event_entry_t *)((void *)entry);
+		total_size -= sizeof (pmcs_fw_event_hdr_t);
+		log_size = fwhdr.fw_el_buf_size;
+		fwlogp += fwhdr.fw_el_entry_start_offset;
+		swapp = (uint32_t *)((void *)entry);
+		index = 0;
+
+		mdb_printf("%8s %16s %32s %8s %3s %8s %8s %8s %8s",
+		    "Index", "Timestamp", "Time", "Seq Num", "Sev", "Word 0",
+		    "Word 1", "Word 2", "Word 3");
+		mdb_printf("\n");
+
+		while (log_size != 0) {
+			if (mdb_vread(entry, fwhdr.fw_el_entry_size,
+			    (uintptr_t)fwlogp) != fwhdr.fw_el_entry_size) {
+				mdb_warn("Unable to read event log entry\n");
+				goto bail_out;
+			}
+
+			for (sidx = 0; sidx < (fwhdr.fw_el_entry_size /
+			    sizeof (uint32_t)); sidx++) {
+				*(swapp + sidx) = LE_32(*(swapp + sidx));
+			}
+
+			if (fw_entryp->ts_upper || fw_entryp->ts_lower) {
+				pmcs_fwtime_to_systime(ss, fw_entryp->ts_upper,
+				    fw_entryp->ts_lower, &systime);
+				mdb_printf("%8d %08x%08x [%Y.%09ld] %8d %3d "
+				    "%08x %08x %08x %08x\n", index,
+				    fw_entryp->ts_upper, fw_entryp->ts_lower,
+				    systime, fw_entryp->seq_num,
+				    fw_entryp->severity, fw_entryp->logw0,
+				    fw_entryp->logw1, fw_entryp->logw2,
+				    fw_entryp->logw3);
+			}
+
+			fwlogp += fwhdr.fw_el_entry_size;
+			total_size -= fwhdr.fw_el_entry_size;
+			log_size -= fwhdr.fw_el_entry_size;
+			index++;
+		}
+
+		mdb_printf("\n");
+	}
+
+bail_out:
+	mdb_free(entry, fwhdr.fw_el_entry_size);
 }
 
 /*ARGSUSED*/
@@ -1960,7 +2102,7 @@ display_phys(struct pmcs_hw ss, int verbose, struct pmcs_phy *parent, int level,
 
 static int
 pmcs_dump_tracelog(boolean_t filter, int instance, uint64_t tail_lines,
-    const char *phy_path, uint64_t sas_address)
+    const char *phy_path, uint64_t sas_address, uint64_t verbose)
 {
 	pmcs_tbuf_t *tbuf_addr;
 	uint_t tbuf_idx;
@@ -2109,7 +2251,16 @@ pmcs_dump_tracelog(boolean_t filter, int instance, uint64_t tail_lines,
 		}
 
 		if (!elem_filtered) {
-			mdb_printf("%Y.%09ld %s\n", tbuf.timestamp, tbuf.buf);
+			/*
+			 * If the -v flag was given, print the firmware
+			 * timestamp along with the clock time
+			 */
+			mdb_printf("%Y.%09ld ", tbuf.timestamp);
+			if (verbose) {
+				mdb_printf("(0x%" PRIx64 ") ",
+				    tbuf.fw_timestamp);
+			}
+			mdb_printf("%s\n", tbuf.buf);
 		}
 
 		--elems_to_print;
@@ -2617,6 +2768,7 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	struct dev_info	dip;
 	const char	*match_phy_path = NULL;
 	uint64_t 	match_sas_address = 0, tail_lines = 0;
+	uint_t		verbose = 0;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		pmcs_state = NULL;
@@ -2636,6 +2788,7 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'l', MDB_OPT_UINT64, &tail_lines,
 	    'p', MDB_OPT_STR, &match_phy_path,
 	    's', MDB_OPT_UINT64, &match_sas_address,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
 	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
@@ -2652,10 +2805,10 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (!(flags & DCMD_LOOP)) {
 		return (pmcs_dump_tracelog(B_TRUE, dip.devi_instance,
-		    tail_lines, match_phy_path, match_sas_address));
+		    tail_lines, match_phy_path, match_sas_address, verbose));
 	} else if (flags & DCMD_LOOPFIRST) {
 		return (pmcs_dump_tracelog(B_FALSE, 0, tail_lines,
-		    match_phy_path, match_sas_address));
+		    match_phy_path, match_sas_address, verbose));
 	} else {
 		return (DCMD_OK);
 	}
@@ -2681,6 +2834,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t			damap_info = FALSE;
 	uint_t			dtc_info = FALSE;
 	uint_t			wserno = FALSE;
+	uint_t			fwlog = FALSE;
 	int			rv = DCMD_OK;
 	void			*pmcs_state;
 	char			*state_str;
@@ -2704,6 +2858,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (mdb_getopts(argc, argv,
 	    'c', MDB_OPT_SETBITS, TRUE, &compq,
 	    'd', MDB_OPT_SETBITS, TRUE, &dtc_info,
+	    'e', MDB_OPT_SETBITS, TRUE, &fwlog,
 	    'h', MDB_OPT_SETBITS, TRUE, &hw_info,
 	    'i', MDB_OPT_SETBITS, TRUE, &ic_info,
 	    'I', MDB_OPT_SETBITS, TRUE, &iport_info,
@@ -2745,7 +2900,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (((flags & DCMD_ADDRSPEC) && !(flags & DCMD_LOOP)) ||
 	    (flags & DCMD_LOOPFIRST) || phy_info || target_info || hw_info ||
 	    work_info || waitqs_info || ibq || obq || tgt_phy_count || compq ||
-	    unconfigured) {
+	    unconfigured || fwlog) {
 		if ((flags & DCMD_LOOP) && !(flags & DCMD_LOOPFIRST))
 			mdb_printf("\n");
 		mdb_printf("%16s %9s %4s B C  WorkFlags wserno DbgMsk %16s\n",
@@ -2815,6 +2970,9 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (unconfigured)
 		display_unconfigured_targets(addr);
 
+	if (fwlog)
+		display_event_log(ss);
+
 	mdb_dec_indent(4);
 
 	return (rv);
@@ -2826,6 +2984,7 @@ pmcs_help()
 	mdb_printf("Prints summary information about each pmcs instance.\n"
 	    "    -c: Dump the completion queue\n"
 	    "    -d: Print per-iport information about device tree children\n"
+	    "    -e: Display the in-memory firmware event log\n"
 	    "    -h: Print more detailed hardware information\n"
 	    "    -i: Print interrupt coalescing information\n"
 	    "    -I: Print information about each iport\n"
@@ -2864,11 +3023,11 @@ pmcs_tag_help()
 }
 
 static const mdb_dcmd_t dcmds[] = {
-	{ "pmcs", "?[-cdhiImpQqtTuwWv]", "print pmcs information",
+	{ "pmcs", "?[-cdehiImpQqtTuwWv]", "print pmcs information",
 	    pmcs_dcmd, pmcs_help
 	},
 	{ "pmcs_log",
-	    "?[-p PHY_PATH | -s SAS_ADDRESS | -l TAIL_LINES]",
+	    "?[-v] [-p PHY_PATH | -s SAS_ADDRESS | -l TAIL_LINES]",
 	    "dump pmcs log file", pmcs_log, pmcs_log_help
 	},
 	{ "pmcs_tag", "?[-t tagtype|-s serialnum|-i index]",

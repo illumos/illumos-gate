@@ -46,7 +46,7 @@ uint32_t pmcs_tbuf_num_elems = 0;
 pmcs_tbuf_t *pmcs_tbuf_ptr;
 uint32_t pmcs_tbuf_idx = 0;
 boolean_t pmcs_tbuf_wrap = B_FALSE;
-static kmutex_t pmcs_trace_lock;
+kmutex_t pmcs_trace_lock;
 
 /*
  * If pmcs_force_syslog value is non-zero, all messages put in the trace log
@@ -1113,7 +1113,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "%s: failed to create %s property", __func__,
 		    "receptacle-label");
 	}
-	if (ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
+	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
 	    SCSI_HBA_PROP_RECEPTACLE_PM, &pwp->recept_pm[0],
 	    PMCS_NUM_RECEPTACLES) != DDI_PROP_SUCCESS) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
@@ -2847,6 +2847,7 @@ pmcs_prt_impl(pmcs_hw_t *pwp, pmcs_prt_level_t level,
 	uint32_t elem_size = PMCS_TBUF_ELEM_SIZE - 1;
 	boolean_t system_log;
 	int system_log_level;
+	hrtime_t hrtimestamp;
 
 	switch (level) {
 	case PMCS_PRT_DEBUG_DEVEL:
@@ -2880,7 +2881,17 @@ pmcs_prt_impl(pmcs_hw_t *pwp, pmcs_prt_level_t level,
 	}
 
 	mutex_enter(&pmcs_trace_lock);
+	hrtimestamp = gethrtime();
 	gethrestime(&pmcs_tbuf_ptr->timestamp);
+
+	if (pwp->fw_timestamp != 0) {
+		/* Calculate the approximate firmware time stamp... */
+		pmcs_tbuf_ptr->fw_timestamp = pwp->fw_timestamp +
+		    ((hrtimestamp - pwp->hrtimestamp) / PMCS_FWLOG_TIMER_DIV);
+	} else {
+		pmcs_tbuf_ptr->fw_timestamp = 0;
+	}
+
 	ptr = pmcs_tbuf_ptr->buf;
 
 	/*

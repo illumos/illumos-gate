@@ -17,11 +17,11 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 /*
  * PMC Compile Time Tunable Parameters
  */
@@ -47,6 +47,12 @@ extern "C" {
 
 #define	PMCS_MIN_CHUNK_PAGES	512
 #define	PMCS_ADDTL_CHUNK_PAGES	8
+
+/*
+ * Maximum amount of time (in milliseconds) we'll wait for writing one chunk
+ * of firmware image data to the chip
+ */
+#define	PMCS_FLASH_WAIT_TIME	10000	/* 10 seconds */
 
 /*
  * Scratch area has to hold Max SMP Request and Max SMP Response,

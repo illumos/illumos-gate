@@ -691,7 +691,17 @@ struct pmcs_hw {
 	 * Receptacle information - FMA
 	 */
 	char				*recept_labels[PMCS_NUM_RECEPTACLES];
-	int				recept_pm[PMCS_NUM_RECEPTACLES];
+	char				*recept_pm[PMCS_NUM_RECEPTACLES];
+
+	/*
+	 * fw_timestamp: Firmware timestamp taken after PHYs are started
+	 * sys_timestamp: System timestamp taken at roughly the same time
+	 * hrtimestamp is the hrtime at roughly the same time
+	 * All of these are protected by the global pmcs_trace_lock.
+	 */
+	uint64_t	fw_timestamp;
+	timespec_t	sys_timestamp;
+	hrtime_t	hrtimestamp;
 
 #ifdef	DEBUG
 	kmutex_t	dbglock;

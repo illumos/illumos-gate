@@ -383,7 +383,7 @@ pmcs_flash_chunk(pmcs_hw_t *pwp, uint8_t *chunk)
 		(void) memset(msg, 0xaf, sizeof (msg));
 		pwrk->state = PMCS_WORK_STATE_ONCHIP;
 		INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-		WAIT_FOR(pwrk, 5000, result);
+		WAIT_FOR(pwrk, PMCS_FLASH_WAIT_TIME, result);
 		pmcs_pwork(pwp, pwrk);
 		if (result) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,

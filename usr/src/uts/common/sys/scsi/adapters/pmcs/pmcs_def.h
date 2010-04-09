@@ -514,6 +514,8 @@ typedef struct {
 #define	HEXDIGIT(x)	(((x) >= '0' && (x) <= '9') || \
 	((x) >= 'a' && (x) <= 'f') || ((x) >= 'A' && (x) <= 'F'))
 
+#define	NSECS_PER_SEC	1000000000UL
+
 
 typedef void (*pmcs_cb_t) (pmcs_hw_t *, pmcwork_t *, uint32_t *);
 
@@ -522,12 +524,7 @@ typedef void (*pmcs_cb_t) (pmcs_hw_t *, pmcwork_t *, uint32_t *);
  */
 
 #define	PMCS_TBUF_ELEM_SIZE	120
-
-#ifdef DEBUG
 #define	PMCS_TBUF_NUM_ELEMS_DEF	100000
-#else
-#define	PMCS_TBUF_NUM_ELEMS_DEF	15000
-#endif
 
 #define	PMCS_TBUF_UA_MAX_SIZE	32
 typedef struct {
@@ -540,13 +537,13 @@ typedef struct {
 	pmcs_dtype_t	phy_dtype;
 	/* Log data */
 	timespec_t	timestamp;
+	uint64_t	fw_timestamp;
 	char		buf[PMCS_TBUF_ELEM_SIZE];
 } pmcs_tbuf_t;
 
 /*
  * Firmware event log header format
  */
-
 typedef struct pmcs_fw_event_hdr_s {
 	uint32_t	fw_el_signature;
 	uint32_t	fw_el_entry_start_offset;
@@ -559,6 +556,26 @@ typedef struct pmcs_fw_event_hdr_s {
 } pmcs_fw_event_hdr_t;
 
 /*
+ * Firmware event log entry format
+ */
+typedef struct pmcs_fw_event_entry_s {
+	uint32_t	num_words : 3,
+			reserved : 25,
+			severity: 4;
+	uint32_t	ts_upper;
+	uint32_t	ts_lower;
+	uint32_t	seq_num;
+	uint32_t	logw0;
+	uint32_t	logw1;
+	uint32_t	logw2;
+	uint32_t	logw3;
+} pmcs_fw_event_entry_t;
+
+#define	PMCS_FWLOG_TIMER_DIV	8	/* fw timer has 8ns granularity */
+#define	PMCS_FWLOG_AAP1_SIG	0x1234AAAA
+#define	PMCS_FWLOG_IOP_SIG	0x5678CCCC
+
+/*
  * Receptacle information
  */
 #define	PMCS_NUM_RECEPTACLES	2
@@ -566,8 +583,8 @@ typedef struct pmcs_fw_event_hdr_s {
 #define	PMCS_RECEPT_LABEL_0	"SAS0"
 #define	PMCS_RECEPT_LABEL_1	"SAS1"
 
-#define	PMCS_RECEPT_PM_0	0xf0
-#define	PMCS_RECEPT_PM_1	0xf
+#define	PMCS_RECEPT_PM_0	"f0"
+#define	PMCS_RECEPT_PM_1	"f"
 
 #ifdef	__cplusplus
 }

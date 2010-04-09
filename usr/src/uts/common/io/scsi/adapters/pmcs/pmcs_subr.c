@@ -72,6 +72,7 @@ static boolean_t pmcs_tgtmap_deactivate_cb(void *, char *,
     scsi_tgtmap_tgt_type_t, void *, scsi_tgtmap_deact_rsn_t);
 static void pmcs_add_dead_phys(pmcs_hw_t *, pmcs_phy_t *);
 static void pmcs_get_fw_version(pmcs_hw_t *);
+static int pmcs_get_time_stamp(pmcs_hw_t *, uint64_t *, hrtime_t *);
 
 /*
  * Often used strings
@@ -81,6 +82,7 @@ const char pmcs_nomsg[] = "%s: unable to get Inbound Message entry";
 const char pmcs_timeo[] = "%s: command timed out";
 
 extern const ddi_dma_attr_t pmcs_dattr;
+extern kmutex_t pmcs_trace_lock;
 
 /*
  * Some Initial setup steps.
@@ -696,7 +698,7 @@ pmcs_start_phy(pmcs_hw_t *pwp, int phynum, int linkmode, int speed)
 int
 pmcs_start_phys(pmcs_hw_t *pwp)
 {
-	int i;
+	int i, rval;
 
 	for (i = 0; i < pwp->nphy; i++) {
 		if ((pwp->phyid_block_mask & (1 << i)) == 0) {
@@ -712,6 +714,16 @@ pmcs_start_phys(pmcs_hw_t *pwp)
 			}
 		}
 	}
+
+	rval = pmcs_get_time_stamp(pwp, &pwp->fw_timestamp, &pwp->hrtimestamp);
+	if (rval) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: Failed to obtain firmware timestamp", __func__);
+	} else {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "Firmware timestamp: 0x%" PRIx64, pwp->fw_timestamp);
+	}
+
 	return (0);
 }
 
@@ -1042,8 +1054,8 @@ pmcs_clear_diag_counters(pmcs_hw_t *pwp, uint8_t phynum)
 /*
  * Get firmware timestamp
  */
-int
-pmcs_get_time_stamp(pmcs_hw_t *pwp, uint64_t *ts)
+static int
+pmcs_get_time_stamp(pmcs_hw_t *pwp, uint64_t *fw_ts, hrtime_t *sys_hr_ts)
 {
 	uint32_t htag, *ptr, msg[PMCS_MSG_SIZE << 1];
 	int result;
@@ -1079,7 +1091,12 @@ pmcs_get_time_stamp(pmcs_hw_t *pwp, uint64_t *ts)
 		pmcs_timed_out(pwp, htag, __func__);
 		return (-1);
 	}
-	*ts = LE_32(msg[2]) | (((uint64_t)LE_32(msg[3])) << 32);
+
+	mutex_enter(&pmcs_trace_lock);
+	*sys_hr_ts = gethrtime();
+	gethrestime(&pwp->sys_timestamp);
+	*fw_ts = LE_32(msg[2]) | (((uint64_t)LE_32(msg[3])) << 32);
+	mutex_exit(&pmcs_trace_lock);
 	return (0);
 }
 
