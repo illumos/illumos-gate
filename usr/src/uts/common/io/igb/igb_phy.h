@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,11 +20,14 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  */
 
-/* IntelVersion: 1.76 scm_100809_154340 */
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/* IntelVersion: 1.81 v3_3_14_3_BHSW1 */
 
 #ifndef _IGB_PHY_H
 #define	_IGB_PHY_H
@@ -113,7 +114,6 @@ s32 e1000_get_cable_length_82577(struct e1000_hw *hw);
 #define	I82577_CFG_ASSERT_CRS_ON_TX	(1 << 15)
 #define	I82577_CFG_ENABLE_DOWNSHIFT	(3 << 10) /* auto downshift 100/10 */
 #define	I82577_CTRL_REG			23
-#define	I82577_CTRL_DOWNSHIFT_MASK	(7 << 10)
 
 /* 82577 specific PHY registers */
 #define	I82577_PHY_CTRL_2		18

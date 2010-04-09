@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,11 +20,14 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  */
 
-/* IntelVersion: 1.78 scm_100809_154340 */
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/* IntelVersion: 1.82.2.1 v3_3_14_3_BHSW1 */
 
 #ifndef _IGB_REGS_H
 #define	_IGB_REGS_H
@@ -455,6 +456,7 @@ extern "C" {
 #define	E1000_SWSM2		0x05B58
 #define	E1000_DCA_ID		0x05B70 /* DCA Requester ID Information - RO */
 #define	E1000_DCA_CTRL		0x05B74 /* DCA Control - RW */
+#define	E1000_UFUSE		0x05B78 /* UFUSE - RO */
 #define	E1000_FFLT_DBG		0x05F04 /* Debug Register */
 #define	E1000_HICR		0x08F00 /* Host Interface Control */
 
@@ -503,6 +505,7 @@ extern "C" {
 #define	E1000_VMOLR(_n)		(0x05AD0 + (4 * (_n)))
 /* VLAN Virtual Machine Filter - RW */
 #define	E1000_VLVF(_n)		(0x05D00 + (4 * (_n)))
+#define	E1000_VMVIR(_n)		(0x03700 + (4 * (_n)))
 
 /* Filtering Registers */
 #define	E1000_SAQF(_n)	(0x05980 + (4 * (_n))) /* Source Address Queue Fltr */
@@ -564,8 +567,10 @@ extern "C" {
 #define	E1000_FCRTC	0x02170 /* Flow Control Rx high watermark */
 #define	E1000_PCIEMISC	0x05BB8 /* PCIE misc config register */
 
+/* PCIe Parity Status Register */
+#define	E1000_PCIEERRSTS	0x05BA8
+
 #ifdef __cplusplus
 }
 #endif
-
 #endif	/* _IGB_REGS_H */

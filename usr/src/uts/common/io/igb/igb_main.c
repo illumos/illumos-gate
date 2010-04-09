@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,14 +20,17 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.13";
+static char igb_version[] = "igb 1.1.14";
 
 /*
  * Local function protoypes

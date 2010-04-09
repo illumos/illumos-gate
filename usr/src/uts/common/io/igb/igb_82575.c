@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,11 +20,14 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  */
 
-/* IntelVersion: 1.143 scm_100809_154340 */
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/* IntelVersion: 1.146.2.2 v3_3_14_3_BHSW1 */
 
 /*
  * 82575EB Gigabit Network Connection
@@ -265,6 +266,13 @@ e1000_init_mac_params_82575(struct e1000_hw *hw)
 	}
 
 	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
+
+	/*
+	 * if using i2c make certain the MDICNFG register is cleared to prevent
+	 * communications from being misrouted to the mdic registers
+	 */
+	if ((ctrl_ext & E1000_CTRL_I2C_ENA) && (hw->mac.type == e1000_82580))
+		E1000_WRITE_REG(hw, E1000_MDICNFG, 0);
 
 	/* Set mta register count */
 	mac->mta_reg_count = 128;
@@ -1146,6 +1154,9 @@ e1000_setup_copper_link_82575(struct e1000_hw *hw)
 		goto out;
 
 	if (e1000_sgmii_active_82575(hw) && !hw->phy.reset_disable) {
+		/* allow time for SFP cage time to power up phy */
+		msec_delay(300);
+
 		ret_val = hw->phy.ops.reset(hw);
 		if (ret_val) {
 			DEBUGOUT("Error resetting the PHY.\n");
@@ -1187,7 +1198,8 @@ out:
 static s32
 e1000_setup_serdes_link_82575(struct e1000_hw *hw)
 {
-	u32 ctrl_reg, reg;
+	u32 ctrl_ext, ctrl_reg, reg;
+	bool pcs_autoneg;
 
 	DEBUGFUNC("e1000_setup_serdes_link_82575");
 
@@ -1204,9 +1216,9 @@ e1000_setup_serdes_link_82575(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_SCTL, E1000_SCTL_DISABLE_SERDES_LOOPBACK);
 
 	/* power on the sfp cage if present */
-	reg = E1000_READ_REG(hw, E1000_CTRL_EXT);
-	reg &= ~E1000_CTRL_EXT_SDP3_DATA;
-	E1000_WRITE_REG(hw, E1000_CTRL_EXT, reg);
+	ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
+	ctrl_ext &= ~E1000_CTRL_EXT_SDP3_DATA;
+	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
 
 	ctrl_reg = E1000_READ_REG(hw, E1000_CTRL);
 	ctrl_reg |= E1000_CTRL_SLU;
@@ -1223,15 +1235,31 @@ e1000_setup_serdes_link_82575(struct e1000_hw *hw)
 
 	reg = E1000_READ_REG(hw, E1000_PCS_LCTL);
 
-	if (e1000_sgmii_active_82575(hw)) {
-		/* allow time for SFP cage to power up phy */
-		msec_delay(300);
+	/* default pcs_autoneg to the same setting as mac autoneg */
+	pcs_autoneg = hw->mac.autoneg;
 
-		/* AN time out should be disabled for SGMII mode */
+	switch (ctrl_ext & E1000_CTRL_EXT_LINK_MODE_MASK) {
+	case E1000_CTRL_EXT_LINK_MODE_SGMII:
+		/* sgmii mode lets the phy handle forcing speed/duplex */
+		pcs_autoneg = true;
+		/* autoneg time out should be disabled for SGMII mode */
 		reg &= ~(E1000_PCS_LCTL_AN_TIMEOUT);
-	} else {
+		break;
+	case E1000_CTRL_EXT_LINK_MODE_1000BASE_KX:
+		/* disable PCS autoneg and support parallel detect only */
+		pcs_autoneg = false;
+	default:
+		/*
+		 * non-SGMII modes only supports a speed of 1000/Full for the
+		 * link so it is best to just force the MAC and let the pcs
+		 * link either autoneg or be forced to 1000/Full
+		 */
 		ctrl_reg |= E1000_CTRL_SPD_1000 | E1000_CTRL_FRCSPD |
 		    E1000_CTRL_FD | E1000_CTRL_FRCDPX;
+
+		/* set speed of 1000/Full if speed/duplex is forced */
+		reg |= E1000_PCS_LCTL_FSV_1000 | E1000_PCS_LCTL_FDV_FULL;
+		break;
 	}
 
 	E1000_WRITE_REG(hw, E1000_CTRL, ctrl_reg);
@@ -1252,36 +1280,14 @@ e1000_setup_serdes_link_82575(struct e1000_hw *hw)
 	 */
 	reg |= E1000_PCS_LCTL_FORCE_FCTRL;
 
-	/*
-	 * we always set sgmii to autoneg since it is the phy that will be
-	 * forcing the link and the serdes is just a go-between
-	 */
-	if (hw->mac.autoneg || e1000_sgmii_active_82575(hw)) {
+	if (pcs_autoneg) {
 		/* Set PCS register for autoneg */
-		reg |= E1000_PCS_LCTL_FSV_1000 | /* Force 1000 */
-		    E1000_PCS_LCTL_FDV_FULL |    /* SerDes Full dplx */
-		    E1000_PCS_LCTL_AN_ENABLE |   /* Enable Autoneg */
-		    E1000_PCS_LCTL_AN_RESTART;   /* Restart autoneg */
+		reg |= E1000_PCS_LCTL_AN_ENABLE | /* Enable Autoneg */
+		    E1000_PCS_LCTL_AN_RESTART; /* Restart autoneg */
 		DEBUGOUT1("Configuring Autoneg:PCS_LCTL=0x%08X\n", reg);
 	} else {
-		/* Check for duplex first */
-		if (hw->mac.forced_speed_duplex & E1000_ALL_FULL_DUPLEX)
-			reg |= E1000_PCS_LCTL_FDV_FULL;
-
-		/*
-		 * No need to check for 1000/full since the spec states that
-		 * it requires autoneg to be enabled
-		 */
-
-		/* Now set speed */
-		if (hw->mac.forced_speed_duplex & E1000_ALL_100_SPEED)
-			reg |= E1000_PCS_LCTL_FSV_100;
-
-		/* Force speed and force link */
-		reg |= E1000_PCS_LCTL_FSD |
-		    E1000_PCS_LCTL_FORCE_LINK |
-		    E1000_PCS_LCTL_FLV_LINK_UP;
-
+		/* Set PCS register for forced link */
+		reg |= E1000_PCS_LCTL_FSD;	/* Force Speed */
 		DEBUGOUT1("Configuring Forced Link:PCS_LCTL=0x%08X\n", reg);
 	}
 

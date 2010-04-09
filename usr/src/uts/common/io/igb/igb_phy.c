@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,11 +20,14 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  */
 
-/* IntelVersion: 1.155 scm_100809_154340 */
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/* IntelVersion: 1.161 v3_3_14_3_BHSW1 */
 
 #include "igb_api.h"
 
@@ -834,15 +835,6 @@ e1000_copper_link_setup_82577(struct e1000_hw *hw)
 	phy_data |= I82577_CFG_ENABLE_DOWNSHIFT;
 
 	ret_val = phy->ops.write_reg(hw, I82577_CFG_REG, phy_data);
-	if (ret_val)
-		goto out;
-
-	/* Set number of link attempts before downshift */
-	ret_val = phy->ops.read_reg(hw, I82577_CTRL_REG, &phy_data);
-	if (ret_val)
-		goto out;
-	phy_data &= ~I82577_CTRL_DOWNSHIFT_MASK;
-	ret_val = phy->ops.write_reg(hw, I82577_CTRL_REG, phy_data);
 
 out:
 	return (ret_val);
@@ -1179,7 +1171,7 @@ out:
  * return successful.  Otherwise, setup advertisement and flow control to
  * the appropriate values for the wanted auto-negotiation.
  */
-s32
+static s32
 e1000_phy_setup_autoneg(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
