@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -68,9 +67,9 @@ struct	sockaddr_un {
 #if !defined(_SIZE_T) || __cplusplus >= 199711L
 #define	_SIZE_T
 #if defined(_LP64) || defined(_I32LPx)
-typedef	ulong_t	size_t;		/* size of something in bytes */
+typedef	unsigned long	size_t;		/* size of something in bytes */
 #else
-typedef	uint_t	size_t;		/* (historical version) */
+typedef	unsigned int	size_t;		/* (historical version) */
 #endif
 #endif	/* _SIZE_T */
 
