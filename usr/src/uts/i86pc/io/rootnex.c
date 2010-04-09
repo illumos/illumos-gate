@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -3325,13 +3324,12 @@ rootnex_setup_windows(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 		/*
 		 * if we need windows because we have more cookies than the H/W
 		 * can handle, the number of windows we would need here would
-		 * be (cookie count / cookies count H/W supports) plus one for
-		 * remainder, and plus 2 to handle the extra pages on the trim
-		 * (see above comment about trim)
+		 * be (cookie count / cookies count H/W supports minus 1[for
+		 * trim]) plus one for remainder.
 		 */
 		if (attr->dma_attr_sgllen < sinfo->si_sgl_size) {
-			sglwin = ((sinfo->si_sgl_size / attr->dma_attr_sgllen)
-			    + 1) + 2;
+			sglwin = (sinfo->si_sgl_size /
+			    (attr->dma_attr_sgllen - 1)) + 1;
 		} else {
 			sglwin = 0;
 		}
