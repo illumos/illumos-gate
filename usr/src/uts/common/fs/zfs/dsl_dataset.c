@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/dmu_objset.h>
@@ -3576,7 +3575,9 @@ dsl_dataset_user_release_one(const char *dsname, void *arg)
 
 	if (might_destroy) {
 #ifdef _KERNEL
+		name = kmem_asprintf("%s@%s", dsname, ha->snapname);
 		error = zfs_unmount_snap(name, NULL);
+		strfree(name);
 		if (error) {
 			dsl_dataset_rele(ds, dtag);
 			return (error);
