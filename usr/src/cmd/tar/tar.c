@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -5968,12 +5967,12 @@ setbytes_to_skip(struct stat *st, int err)
 	 * to skip should be the size from Xtarhdr.
 	 */
 	if ((err != 0) && (dblock.dbuf.typeflag == 'A') &&
-	    (Xhdrflag != 0)) {
+	    (xhdr_flgs & _X_SIZE)) {
 		st->st_size += TBLOCK + Xtarhdr.x_filesz;
 		xhdr_flgs |= _X_XHDR;
 	} else if ((dblock.dbuf.typeflag != 'A') &&
-	    (Xhdrflag != 0)) {
-		st->st_size = Xtarhdr.x_filesz;
+	    (xhdr_flgs & _X_SIZE)) {
+		st->st_size += Xtarhdr.x_filesz;
 		xhdr_flgs |= _X_XHDR;
 	}
 }
