@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_NXGE_NXGE_PHY_HW_H
@@ -49,6 +48,7 @@ extern "C" {
 #define	BCM8704_CHIP_ID			0x8704
 #define	BCM8706_CHIP_ID			0x8706
 #define	MRVL88X201X_CHIP_ID		0x5043
+#define	NLP2020_CHIP_ID			0x0211
 
 /*
  * Description of BCM_PHY_ID_MASK:
@@ -82,6 +82,16 @@ extern "C" {
  * identifier
  */
 #define	TN1010_DEV_ID_MASK		0xfffffc00
+/*
+ * The Netlogic device ID and mask:
+ * The device ID assigned to Netlogic is stored in AEL2020 register
+ * 1.2 and register 1.3 except bits[7:4] of register 1.3 have the model number
+ * and bits[3:0] of register 1.3 have the revision number. Use mask 0xffffff00
+ * to mask off model number and revision number and keep AEL2020 device
+ * identifier
+ */
+#define	NLP2020_DEV_ID			0x3429000
+#define	NLP2020_DEV_ID_MASK		0xffffff00
 
 #define	CLAUSE_45_TYPE	1
 #define	CLAUSE_22_TYPE	2
@@ -98,6 +108,19 @@ extern "C" {
  */
 #define	GOA_CLAUSE45_PORT_ADDR_BASE		16
 #define	ALT_GOA_CLAUSE45_PORT1_ADDR		20
+
+/*
+ * Phy addresses for AEL2020 used in QSFP for RF systems
+ */
+#define	NLP2020_CL45_PORT0_ADDR0	0x10
+#define	NLP2020_CL45_PORT0_ADDR1	0x12
+#define	NLP2020_CL45_PORT0_ADDR2	0x15
+#define	NLP2020_CL45_PORT0_ADDR3	0x17
+#define	NLP2020_CL45_PORT1_ADDR0	0x11
+#define	NLP2020_CL45_PORT1_ADDR1	0x13
+#define	NLP2020_CL45_PORT1_ADDR2	0x14
+#define	NLP2020_CL45_PORT1_ADDR3	0x16
+
 /*
  * Phy addresses for Maramba support. Support for P0 will eventually
  * be removed.
@@ -883,6 +906,98 @@ typedef union _tn1010_phyxs_ctrl {
 /* Shift right 4 bits so bit4 becomes bit0 */
 #define	TN1010_VENDOR_MMD1_AN_SPEED_SHIFT	4
 
+/*
+ * Definitions for Netlogic AEL2020 PHY
+ */
+#define	NLP2020_PMA_PMD_ADDR		1
+#define	NLP2020_PMA_PMD_CTL_REG		0
+#define	NLP2020_PMA_PMD_PHY_RST		0x8000
+
+#define	NLP2020_PMA_PMD_STAT1_REG	0x0001
+#define	NLP2020_PMA_PMD_LINK_UP		0x0004
+
+#define	NLP2020_PMA_PMD_RX_SIG_DET_REG	0x000A
+#define	NLP2020_PMA_PMD_RX_SIG_ON	0x0001
+
+#define	NLP2020_PMA_PMD_STAT2_REG	0x0008
+
+#define	NLP2020_OPT_SET_REG		0xC017
+#define	NLP2020_RXLOS_ACT_H		0x0020
+
+#define	NLP2020_TX_DRV_CTL1_REG		0xC241
+#define	NLP2020_TX_DRV_CTL1_PREEMP_EN	0xA000
+
+#define	NLP2020_TX_DRV_CTL2_REG		0xC243
+#define	NLP2020_TX_DRV_CTL2_EMP_VAL	0xFFD3
+
+#define	NLP2020_UC_CTL_REG		0xD092
+#define	NLP2020_UC_CTL_STOP		1
+#define	NLP2020_UC_CTL_START		0
+
+#define	NLP2020_UC_PC_START_REG		0xD080
+#define	NLP2020_UC_PC_START_VAL		0x100
+
+#define	NLP2020_PHY_PCS_ADDR		3
+#define	NLP2020_PHY_PCS_STAT1_REG	0x0001
+#define	NLP2020_PHY_PCS_LINK_UP		0x0004
+
+#define	NLP2020_PHY_PCS_10GBR_STAT1_REG		0x0020
+#define	NLP2020_PHY_PCS_10GBR_RX_LINK_UP	0x1000
+
+#define	NLP2020_PHY_PCS_STAT2_REG	0x0008
+
+#define	NLP2020_PHY_XS_ADDR		4
+#define	NLP2020_PHY_XS_STAT1_REG	0x0001
+#define	NLP2020_PHY_XS_LINK_UP		0x0004
+
+#define	NLP2020_PHY_XS_LN_ST_REG	0x0018
+#define	NLP2020_PHY_XS_LN_ALIGN_SYNC	0x100f
+
+#define	NLP2020_PHY_XS_STAT2_REG	0x0008
+
+#define	NLP2020_GPIO_ADDR		1
+#define	NLP2020_GPIO_CTL_REG		0xC108
+#define	NLP2020_GPIO_STAT_REG		0xC10C
+#define	NLP2020_GPIO_STAT_MD_SHIFT	0x0004
+#define	NLP2020_GPIO_STAT_MD_MASK	0x00f0
+#define	NLP2020_GPIO_PT3_CFG_REG	0xC113
+
+#define	NLP2020_GPIO_ACT		0x0a00
+#define	NLP2020_GPIO_INACT		0x0b00
+
+#define	NLP2020_I2C_SNOOP_DEV_ADDR	1
+#define	NLP2020_I2C_SNOOP_ADDR_REG	0xC30A
+#define	NLP2020_I2C_SNOOP_DATA_REG	0xC30B
+#define	NLP2020_I2C_SNOOP_STAT_REG	0xC30C
+#define	NLP2020_XCVR_I2C_ADDR		0x00A0
+#define	NLP2020_XCVR_I2C_ADDR_SH	0x0008
+
+/*
+ * QSFP defines
+ */
+#define	SFPP_COPPER_TWINAX	0x21
+#define	SFPP_FIBER		0x7
+#define	QSFP_FIBER		0xC
+#define	QSFP_COPPER_TWINAX	0x21
+
+#define	QSFP_MSA_CONN_REG	 130
+#define	QSFP_MSA_LPM_REG	 93
+#define	QSFP_MSA_LEN_REG	 0x92
+#define	QSFP_MSA_LPM_HIGH	 0x1
+
+typedef enum {
+	NXGE_NLP_CONN_FIBER,
+	NXGE_NLP_CONN_COPPER_LT_7M,
+	NXGE_NLP_CONN_COPPER_7M_ABOVE
+} nxge_nlp_conn_t;
+
+/*
+ * struct for PHY addr-value pairs
+ */
+typedef struct _nxge_nlp_initseq_t {
+	uint32_t	dev_reg;
+	uint16_t	val;
+} nxge_nlp_initseq_t, *p_nxge_nlp_initseq_t;
 
 #ifdef	__cplusplus
 }

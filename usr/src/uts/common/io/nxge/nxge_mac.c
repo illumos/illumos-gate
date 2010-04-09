@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/nxge/nxge_impl.h>
@@ -88,6 +87,7 @@ static uint32_t nxge_get_cl45_pma_pmd_id(p_nxge_t, int);
 static uint32_t nxge_get_cl45_pcs_id(p_nxge_t, int);
 static uint32_t nxge_get_cl22_phy_id(p_nxge_t, int);
 static boolean_t nxge_is_supported_phy(uint32_t, uint8_t);
+static boolean_t nxge_hswap_phy_present(p_nxge_t, uint8_t);
 static boolean_t nxge_is_phy_present(p_nxge_t, int, uint32_t, uint32_t);
 static nxge_status_t nxge_n2_serdes_init(p_nxge_t);
 static nxge_status_t nxge_n2_kt_serdes_init(p_nxge_t);
@@ -108,6 +108,13 @@ static nxge_status_t nxge_1G_xcvr_init(p_nxge_t);
 static void nxge_bcm5464_link_led_off(p_nxge_t);
 static nxge_status_t nxge_check_mrvl88x2011_link(p_nxge_t, boolean_t *);
 static nxge_status_t nxge_mrvl88x2011_xcvr_init(p_nxge_t);
+static nxge_status_t nxge_check_nlp2020_link(p_nxge_t, boolean_t *);
+static nxge_status_t nxge_nlp2020_xcvr_init(p_nxge_t);
+static int nxge_nlp2020_i2c_read(p_nxge_t, uint8_t, uint16_t, uint16_t,
+	    uint8_t *);
+static boolean_t nxge_is_nlp2020_phy(p_nxge_t);
+static uint8_t nxge_get_nlp2020_connector_type(p_nxge_t);
+static nxge_status_t nxge_set_nlp2020_param(p_nxge_t);
 static nxge_status_t nxge_get_num_of_xaui(uint32_t *port_pma_pmd_dev_id,
 	uint32_t *port_pcs_dev_id, uint32_t *port_phy_id, uint8_t *num_xaui);
 static nxge_status_t nxge_get_tn1010_speed(p_nxge_t nxgep, uint16_t *speed);
@@ -317,27 +324,8 @@ nxge_get_xcvr_type(p_nxge_t nxgep)
 			return (NXGE_ERROR);
 		}
 
-		/*
-		 * If this is the 2nd NIU port, then check 2 addresses
-		 * to take care of the Goa NEM card. Port 1 can have addr 17
-		 * (in the eval board) or 20 (in the P0 board).
-		 */
-		if (portn == 1) {
-			if (nxge_is_phy_present(nxgep,
-			    ALT_GOA_CLAUSE45_PORT1_ADDR, BCM8706_DEV_ID,
-			    BCM_PHY_ID_MASK)) {
-				nxgep->xcvr_addr =
-				    ALT_GOA_CLAUSE45_PORT1_ADDR;
-				goto found_phy;
-			}
-		}
-		if (nxge_is_phy_present(nxgep,
-		    GOA_CLAUSE45_PORT_ADDR_BASE + portn,
-		    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
-			nxgep->xcvr_addr = GOA_CLAUSE45_PORT_ADDR_BASE +
-			    portn;
+		if (nxge_hswap_phy_present(nxgep, portn))
 			goto found_phy;
-		}
 
 		nxgep->phy_absent = B_TRUE;
 
@@ -444,7 +432,15 @@ check_phy_done:
 					}
 					NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 					    "TN1010 Xcvr"));
-				} else {  /* For Fiber XAUI */
+				} else if (nxge_is_nlp2020_phy(nxgep)) {
+					if ((status =
+					    nxge_set_nlp2020_param(nxgep))
+					    != NXGE_OK) {
+						return (status);
+					}
+					NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+					    "NLP2020 Xcvr"));
+				} else { /* For Fiber XAUI */
 					nxgep->statsp->mac_stats.xcvr_inuse
 					    = XPCS_XCVR;
 					nxgep->mac.portmode = PORT_10G_FIBER;
@@ -596,6 +592,7 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 			    "Serdes"));
 			break;
 		case PORT_10G_FIBER:
+		case PORT_10G_COPPER:
 		case PORT_10G_SERDES:
 			nxgep->xcvr = nxge_n2_10G_table;
 			if (nxgep->nxge_hw_p->xcvr_addr[portn]) {
@@ -604,7 +601,8 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 			}
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "NIU 10G %s Xcvr",
 			    (nxgep->mac.portmode == PORT_10G_FIBER) ? "Fiber" :
-			    "Serdes"));
+			    ((nxgep->mac.portmode == PORT_10G_COPPER) ?
+			    "Copper" : "Serdes")));
 			break;
 		case PORT_1G_TN1010:
 			nxgep->xcvr = nxge_n2_1G_tn1010_table;
@@ -816,7 +814,8 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 		}
 	}
 
-	if (nxgep->mac.portmode == PORT_10G_FIBER) {
+	if (nxgep->mac.portmode == PORT_10G_FIBER ||
+	    nxgep->mac.portmode == PORT_10G_COPPER) {
 		uint32_t pma_pmd_id;
 		pma_pmd_id = nxge_get_cl45_pma_pmd_id(nxgep,
 		    nxgep->xcvr_addr);
@@ -825,6 +824,12 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 			    "nxge_setup_xcvr_table: "
 			    "Chip ID  MARVELL [0x%x] for 10G xcvr", chip_id));
+		} else if ((pma_pmd_id & NLP2020_DEV_ID_MASK) ==
+		    NLP2020_DEV_ID) {
+			chip_id = NLP2020_CHIP_ID;
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "nxge_setup_xcvr_table: "
+			    "Chip ID  AEL2020 [0x%x] for 10G xcvr", chip_id));
 		} else if ((status = nxge_mdio_read(nxgep, nxgep->xcvr_addr,
 		    BCM8704_PCS_DEV_ADDR, BCM8704_CHIP_ID_REG,
 		    &chip_id)) == NXGE_OK) {
@@ -1078,6 +1083,7 @@ nxge_xif_init(p_nxge_t nxgep)
 		xif_cfg |= CFG_XMAC_XIF_TX_OUTPUT;
 
 		if ((portmode == PORT_10G_FIBER) ||
+		    (portmode == PORT_10G_COPPER) ||
 		    (portmode == PORT_10G_TN1010) ||
 		    (portmode == PORT_1G_TN1010) ||
 		    (portmode == PORT_HSP_MODE) ||
@@ -1509,6 +1515,7 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 	}
 
 	if (nxgep->mac.portmode == PORT_10G_FIBER ||
+	    nxgep->mac.portmode == PORT_10G_COPPER ||
 	    nxgep->mac.portmode == PORT_10G_TN1010 ||
 	    nxgep->mac.portmode == PORT_HSP_MODE ||
 	    nxgep->mac.portmode == PORT_10G_SERDES) {
@@ -1685,7 +1692,7 @@ static nxge_status_t
 nxge_n2_kt_serdes_init(p_nxge_t nxgep)
 {
 	uint8_t portn;
-	int chan;
+	int chan, i;
 	k_esr_ti_cfgpll_l_t pll_cfg_l;
 	k_esr_ti_cfgrx_l_t rx_cfg_l;
 	k_esr_ti_cfgrx_h_t rx_cfg_h;
@@ -1697,11 +1704,14 @@ nxge_n2_kt_serdes_init(p_nxge_t nxgep)
 	k_esr_ti_testcfg_t test_cfg;
 	nxge_status_t status = NXGE_OK;
 	boolean_t mode_1g = B_FALSE;
+	uint64_t val;
+	npi_handle_t handle;
 
 	portn = nxgep->mac.portnum;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "==> nxge_n2_kt_serdes_init port<%d>", portn));
+	handle = nxgep->npi_handle;
 
 	tx_cfg_l.value = 0;
 	tx_cfg_h.value = 0;
@@ -1731,6 +1741,7 @@ nxge_n2_kt_serdes_init(p_nxge_t nxgep)
 		}
 	}
 	if (nxgep->mac.portmode == PORT_10G_FIBER ||
+	    nxgep->mac.portmode == PORT_10G_COPPER ||
 	    nxgep->mac.portmode == PORT_10G_TN1010 ||
 	    nxgep->mac.portmode == PORT_10G_SERDES) {
 		tx_cfg_l.bits.entx = K_CFGTX_ENABLE_TX;
@@ -1939,6 +1950,67 @@ nxge_n2_kt_serdes_init(p_nxge_t nxgep)
 		    "==> nxge_n2_kt_serdes_init port<%d>: "
 		    "chan %d rx_cfg_h 0x%x", portn, chan, rx_cfg_h.value));
 	}
+
+	if (portn == 0) {
+		/* Wait for serdes to be ready */
+		for (i = 0; i < MAX_SERDES_RDY_RETRIES; i++) {
+			ESR_REG_RD(handle, ESR_INTERNAL_SIGNALS_REG, &val);
+			if ((val & ESR_SIG_P0_BITS_MASK) !=
+			    (ESR_SIG_SERDES_RDY0_P0 | ESR_SIG_DETECT0_P0 |
+			    ESR_SIG_XSERDES_RDY_P0 |
+			    ESR_SIG_XDETECT_P0_CH3 |
+			    ESR_SIG_XDETECT_P0_CH2 |
+			    ESR_SIG_XDETECT_P0_CH1 |
+			    ESR_SIG_XDETECT_P0_CH0))
+
+				NXGE_DELAY(SERDES_RDY_WT_INTERVAL);
+			else
+				break;
+		}
+
+		if (i == MAX_SERDES_RDY_RETRIES) {
+			/*
+			 * RDY signal stays low may due to the absent of the
+			 * external PHY, it is not an error condition.
+			 * But still print the message for the debugging
+			 * purpose when link stays down
+			 */
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_n2_kt_serdes_init: "
+			    "Serdes/signal for port<%d> not ready", portn));
+				goto done;
+		}
+	} else if (portn == 1) {
+		/* Wait for serdes to be ready */
+		for (i = 0; i < MAX_SERDES_RDY_RETRIES; i++) {
+			ESR_REG_RD(handle, ESR_INTERNAL_SIGNALS_REG, &val);
+			if ((val & ESR_SIG_P1_BITS_MASK) !=
+			    (ESR_SIG_SERDES_RDY0_P1 | ESR_SIG_DETECT0_P1 |
+			    ESR_SIG_XSERDES_RDY_P1 |
+			    ESR_SIG_XDETECT_P1_CH3 |
+			    ESR_SIG_XDETECT_P1_CH2 |
+			    ESR_SIG_XDETECT_P1_CH1 |
+			    ESR_SIG_XDETECT_P1_CH0))
+
+				NXGE_DELAY(SERDES_RDY_WT_INTERVAL);
+			else
+				break;
+		}
+
+		if (i == MAX_SERDES_RDY_RETRIES) {
+			/*
+			 * RDY signal stays low may due to the absent of the
+			 * external PHY, it is not an error condition.
+			 * But still print the message for the debugging
+			 * purpose when link stays down
+			 */
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_n2_kt_serdes_init: "
+			    "Serdes/signal for port<%d> not ready", portn));
+				goto done;
+		}
+	}
+done:
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "<== nxge_n2_kt_serdes_init port<%d>", portn));
@@ -2735,6 +2807,781 @@ fail:
 	return (status);
 }
 
+static int
+nxge_nlp2020_i2c_read(p_nxge_t nxgep, uint8_t ctrl_port, uint16_t address,
+	    uint16_t reg, uint8_t *data)
+{
+	int  phy_dev, phy_reg;
+	uint16_t phy_data = 0;
+	uint16_t stat;
+	uint8_t count = 100;
+
+	/*
+	 * NLP2020_I2C_SNOOP_ADDR_REG [15:9][1] - Address
+	 * NLP2020_I2C_SNOOP_ADDR_REG[7:0] - register in the xcvr's i2c
+	 */
+	phy_dev = NLP2020_I2C_SNOOP_DEV_ADDR;
+	phy_reg = NLP2020_I2C_SNOOP_ADDR_REG;
+	phy_data = ((address + 1) << NLP2020_XCVR_I2C_ADDR_SH) | reg;
+	if (nxge_mdio_write(nxgep, ctrl_port,
+	    phy_dev, phy_reg, phy_data) != NXGE_OK)
+		goto fail;
+
+	phy_reg = NLP2020_I2C_SNOOP_STAT_REG;
+	(void) nxge_mdio_read(nxgep, ctrl_port, phy_dev, phy_reg, &stat);
+	while ((stat != 0x01) && (count-- > 0)) {
+		(void) nxge_mdio_read(nxgep, ctrl_port, phy_dev, phy_reg,
+		    &stat);
+	}
+	if (count) {
+		phy_reg = NLP2020_I2C_SNOOP_DATA_REG;
+		(void) nxge_mdio_read(nxgep, ctrl_port, phy_dev, phy_reg,
+		    &phy_data);
+		*data = (phy_data >> 8);
+		return (0);
+	}
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "nxge_nlp2020_i2c_read: FAILED"));
+	return (1);
+
+}
+
+/* Initialize the Netlogic AEL2020 Transceiver */
+
+#define	NLP_INI_WAIT	1
+#define	NLP_INI_STOP	0
+
+static nxge_nlp_initseq_t nlp2020_revC_fiber_init[] = {
+	{0x1C003, 0x3101},
+	{0x1CC01, 0x488a},
+	{0x1CB1B, 0x0200},
+	{0x1CB1C, 0x00f0},
+	{0x1CC06, 0x00e0},
+	{NLP_INI_STOP, 0},
+};
+
+static nxge_nlp_initseq_t nlp2020_revC_copper_init[] = {
+
+	{0x1C003, 0x3101},
+	{0x1CD40, 0x0001},
+
+	{0x1CA12, 0x0100},
+	{0x1CA22, 0x0100},
+	{0x1CA42, 0x0100},
+	{0x1C20D, 0x0002},
+	{NLP_INI_WAIT, 100},
+
+	{0x1ff28, 0x4001},
+	{0x1ff2A, 0x004A},
+	{NLP_INI_WAIT, 500},
+
+	{0x1d000, 0x5200},
+	{NLP_INI_WAIT, 500},
+
+	{0x1d800, 0x4009},
+	{0x1d801, 0x2fff},
+	{0x1d802, 0x300f},
+	{0x1d803, 0x40aa},
+	{0x1d804, 0x401c},
+	{0x1d805, 0x401e},
+	{0x1d806, 0x20c5},
+	{0x1d807, 0x3c05},
+	{0x1d808, 0x6536},
+	{0x1d809, 0x2fe4},
+	{0x1d80a, 0x3dc4},
+	{0x1d80b, 0x6624},
+	{0x1d80c, 0x2ff4},
+	{0x1d80d, 0x3dc4},
+	{0x1d80e, 0x2035},
+	{0x1d80f, 0x30a5},
+	{0x1d810, 0x6524},
+	{0x1d811, 0x2ca2},
+	{0x1d812, 0x3012},
+	{0x1d813, 0x1002},
+	{0x1d814, 0x2882},
+	{0x1d815, 0x3022},
+	{0x1d816, 0x1002},
+	{0x1d817, 0x2972},
+	{0x1d818, 0x3022},
+	{0x1d819, 0x1002},
+	{0x1d81a, 0x2892},
+	{0x1d81b, 0x3012},
+	{0x1d81c, 0x1002},
+	{0x1d81d, 0x24e2},
+	{0x1d81e, 0x3022},
+	{0x1d81f, 0x1002},
+	{0x1d820, 0x27e2},
+	{0x1d821, 0x3012},
+	{0x1d822, 0x1002},
+	{0x1d823, 0x2422},
+	{0x1d824, 0x3022},
+	{0x1d825, 0x1002},
+	{0x1d826, 0x22cd},
+	{0x1d827, 0x301d},
+	{0x1d828, 0x2992},
+	{0x1d829, 0x3022},
+	{0x1d82a, 0x1002},
+	{0x1d82b, 0x5553},
+	{0x1d82c, 0x0307},
+	{0x1d82d, 0x2572},
+	{0x1d82e, 0x3022},
+	{0x1d82f, 0x1002},
+	{0x1d830, 0x21a2},
+	{0x1d831, 0x3012},
+	{0x1d832, 0x1002},
+	{0x1d833, 0x4016},
+	{0x1d834, 0x5e63},
+	{0x1d835, 0x0344},
+	{0x1d836, 0x21a2},
+	{0x1d837, 0x3012},
+	{0x1d838, 0x1002},
+	{0x1d839, 0x400e},
+	{0x1d83a, 0x2572},
+	{0x1d83b, 0x3022},
+	{0x1d83c, 0x1002},
+	{0x1d83d, 0x2b22},
+	{0x1d83e, 0x3012},
+	{0x1d83f, 0x1002},
+	{0x1d840, 0x28e2},
+	{0x1d841, 0x3022},
+	{0x1d842, 0x1002},
+	{0x1d843, 0x2782},
+	{0x1d844, 0x3022},
+	{0x1d845, 0x1002},
+	{0x1d846, 0x2fa4},
+	{0x1d847, 0x3dc4},
+	{0x1d848, 0x6624},
+	{0x1d849, 0x2e8b},
+	{0x1d84a, 0x303b},
+	{0x1d84b, 0x56b3},
+	{0x1d84c, 0x03c6},
+	{0x1d84d, 0x866b},
+	{0x1d84e, 0x400c},
+	{0x1d84f, 0x2782},
+	{0x1d850, 0x3012},
+	{0x1d851, 0x1002},
+	{0x1d852, 0x2c4b},
+	{0x1d853, 0x309b},
+	{0x1d854, 0x56b3},
+	{0x1d855, 0x03c3},
+	{0x1d856, 0x866b},
+	{0x1d857, 0x400c},
+	{0x1d858, 0x22a2},
+	{0x1d859, 0x3022},
+	{0x1d85a, 0x1002},
+	{0x1d85b, 0x28e2},
+	{0x1d85c, 0x3022},
+	{0x1d85d, 0x1002},
+	{0x1d85e, 0x2782},
+	{0x1d85f, 0x3022},
+	{0x1d860, 0x1002},
+	{0x1d861, 0x2fb4},
+	{0x1d862, 0x3dc4},
+	{0x1d863, 0x6624},
+	{0x1d864, 0x56b3},
+	{0x1d865, 0x03c3},
+	{0x1d866, 0x866b},
+	{0x1d867, 0x401c},
+	{0x1d868, 0x2c45},
+	{0x1d869, 0x3095},
+	{0x1d86a, 0x5b53},
+	{0x1d86b, 0x23d2},
+	{0x1d86c, 0x3012},
+	{0x1d86d, 0x13c2},
+	{0x1d86e, 0x5cc3},
+	{0x1d86f, 0x2782},
+	{0x1d870, 0x3012},
+	{0x1d871, 0x1312},
+	{0x1d872, 0x2b22},
+	{0x1d873, 0x3012},
+	{0x1d874, 0x1002},
+	{0x1d875, 0x28e2},
+	{0x1d876, 0x3022},
+	{0x1d877, 0x1002},
+	{0x1d878, 0x2672},
+	{0x1d879, 0x3022},
+	{0x1d87a, 0x1002},
+	{0x1d87b, 0x21a2},
+	{0x1d87c, 0x3012},
+	{0x1d87d, 0x1002},
+	{0x1d87e, 0x628f},
+	{0x1d87f, 0x2985},
+	{0x1d880, 0x33a5},
+	{0x1d881, 0x2782},
+	{0x1d882, 0x3022},
+	{0x1d883, 0x1002},
+	{0x1d884, 0x5653},
+	{0x1d885, 0x03d2},
+	{0x1d886, 0x401e},
+	{0x1d887, 0x6f72},
+	{0x1d888, 0x1002},
+	{0x1d889, 0x628f},
+	{0x1d88a, 0x2304},
+	{0x1d88b, 0x3c84},
+	{0x1d88c, 0x6436},
+	{0x1d88d, 0xdff4},
+	{0x1d88e, 0x6436},
+	{0x1d88f, 0x2ff5},
+	{0x1d890, 0x3005},
+	{0x1d891, 0x8656},
+	{0x1d892, 0xdfba},
+	{0x1d893, 0x56a3},
+	{0x1d894, 0xd05a},
+	{0x1d895, 0x29e2},
+	{0x1d896, 0x3012},
+	{0x1d897, 0x1392},
+	{0x1d898, 0xd05a},
+	{0x1d899, 0x56a3},
+	{0x1d89a, 0xdfba},
+	{0x1d89b, 0x0383},
+	{0x1d89c, 0x6f72},
+	{0x1d89d, 0x1002},
+	{0x1d89e, 0x2a64},
+	{0x1d89f, 0x3014},
+	{0x1d8a0, 0x2005},
+	{0x1d8a1, 0x3d75},
+	{0x1d8a2, 0xc451},
+	{0x1d8a3, 0x2a42},
+	{0x1d8a4, 0x3022},
+	{0x1d8a5, 0x1002},
+	{0x1d8a6, 0x178c},
+	{0x1d8a7, 0x1898},
+	{0x1d8a8, 0x19a4},
+	{0x1d8a9, 0x1ab0},
+	{0x1d8aa, 0x1bbc},
+	{0x1d8ab, 0x1cc8},
+	{0x1d8ac, 0x1dd3},
+	{0x1d8ad, 0x1ede},
+	{0x1d8ae, 0x1fe9},
+	{0x1d8af, 0x20f4},
+	{0x1d8b0, 0x21ff},
+	{0x1d8b1, 0x0000},
+	{0x1d8b2, 0x27e1},
+	{0x1d8b3, 0x3021},
+	{0x1d8b4, 0x1001},
+	{0x1d8b5, 0xc620},
+	{0x1d8b6, 0x0000},
+	{0x1d8b7, 0xc621},
+	{0x1d8b8, 0x0000},
+	{0x1d8b9, 0xc622},
+	{0x1d8ba, 0x00e2},
+	{0x1d8bb, 0xc623},
+	{0x1d8bc, 0x007f},
+	{0x1d8bd, 0xc624},
+	{0x1d8be, 0x00ce},
+	{0x1d8bf, 0xc625},
+	{0x1d8c0, 0x0000},
+	{0x1d8c1, 0xc627},
+	{0x1d8c2, 0x0000},
+	{0x1d8c3, 0xc628},
+	{0x1d8c4, 0x0000},
+	{0x1d8c5, 0xc90a},
+	{0x1d8c6, 0x3a7c},
+	{0x1d8c7, 0xc62c},
+	{0x1d8c8, 0x0000},
+	{0x1d8c9, 0x0000},
+	{0x1d8ca, 0x27e1},
+	{0x1d8cb, 0x3021},
+	{0x1d8cc, 0x1001},
+	{0x1d8cd, 0xc502},
+	{0x1d8ce, 0x53ac},
+	{0x1d8cf, 0xc503},
+	{0x1d8d0, 0x2cd3},
+	{0x1d8d1, 0xc600},
+	{0x1d8d2, 0x2a6e},
+	{0x1d8d3, 0xc601},
+	{0x1d8d4, 0x2a2c},
+	{0x1d8d5, 0xc605},
+	{0x1d8d6, 0x5557},
+	{0x1d8d7, 0xc60c},
+	{0x1d8d8, 0x5400},
+	{0x1d8d9, 0xc710},
+	{0x1d8da, 0x0700},
+	{0x1d8db, 0xc711},
+	{0x1d8dc, 0x0f06},
+	{0x1d8dd, 0xc718},
+	{0x1d8de, 0x0700},
+	{0x1d8df, 0xc719},
+	{0x1d8e0, 0x0f06},
+	{0x1d8e1, 0xc720},
+	{0x1d8e2, 0x4700},
+	{0x1d8e3, 0xc721},
+	{0x1d8e4, 0x0f06},
+	{0x1d8e5, 0xc728},
+	{0x1d8e6, 0x0700},
+	{0x1d8e7, 0xc729},
+	{0x1d8e8, 0x1207},
+	{0x1d8e9, 0xc801},
+	{0x1d8ea, 0x7f50},
+	{0x1d8eb, 0xc802},
+	{0x1d8ec, 0x7760},
+	{0x1d8ed, 0xc803},
+	{0x1d8ee, 0x7fce},
+	{0x1d8ef, 0xc804},
+	{0x1d8f0, 0x520e},
+	{0x1d8f1, 0xc805},
+	{0x1d8f2, 0x5c11},
+	{0x1d8f3, 0xc806},
+	{0x1d8f4, 0x3c51},
+	{0x1d8f5, 0xc807},
+	{0x1d8f6, 0x4061},
+	{0x1d8f7, 0xc808},
+	{0x1d8f8, 0x49c1},
+	{0x1d8f9, 0xc809},
+	{0x1d8fa, 0x3840},
+	{0x1d8fb, 0xc80a},
+	{0x1d8fc, 0x0000},
+	{0x1d8fd, 0xc821},
+	{0x1d8fe, 0x0002},
+	{0x1d8ff, 0xc822},
+	{0x1d900, 0x0046},
+	{0x1d901, 0xc844},
+	{0x1d902, 0x182f},
+	{0x1d903, 0xc849},
+	{0x1d904, 0x0400},
+	{0x1d905, 0xc84a},
+	{0x1d906, 0x0002},
+	{0x1d907, 0xc013},
+	{0x1d908, 0xf341},
+	{0x1d909, 0xc084},
+	{0x1d90a, 0x0030},
+	{0x1d90b, 0xc904},
+	{0x1d90c, 0x1401},
+	{0x1d90d, 0xcb0c},
+	{0x1d90e, 0x0004},
+	{0x1d90f, 0xcb0e},
+	{0x1d910, 0xa00a},
+	{0x1d911, 0xcb0f},
+	{0x1d912, 0xc0c0},
+	{0x1d913, 0xcb10},
+	{0x1d914, 0xc0c0},
+	{0x1d915, 0xcb11},
+	{0x1d916, 0x00a0},
+	{0x1d917, 0xcb12},
+	{0x1d918, 0x0007},
+	{0x1d919, 0xc241},
+	{0x1d91a, 0xa000},
+	{0x1d91b, 0xc243},
+	{0x1d91c, 0x7fe0},
+	{0x1d91d, 0xc604},
+	{0x1d91e, 0x000e},
+	{0x1d91f, 0xc609},
+	{0x1d920, 0x00f5},
+	{0x1d921, 0x0c61},
+	{0x1d922, 0x000e},
+	{0x1d923, 0xc660},
+	{0x1d924, 0x9600},
+	{0x1d925, 0xc687},
+	{0x1d926, 0x0004},
+	{0x1d927, 0xc60a},
+	{0x1d928, 0x04f5},
+	{0x1d929, 0x0000},
+	{0x1d92a, 0x27e1},
+	{0x1d92b, 0x3021},
+	{0x1d92c, 0x1001},
+	{0x1d92d, 0xc620},
+	{0x1d92e, 0x14e5},
+	{0x1d92f, 0xc621},
+	{0x1d930, 0xc53d},
+	{0x1d931, 0xc622},
+	{0x1d932, 0x3cbe},
+	{0x1d933, 0xc623},
+	{0x1d934, 0x4452},
+	{0x1d935, 0xc624},
+	{0x1d936, 0xc5c5},
+	{0x1d937, 0xc625},
+	{0x1d938, 0xe01e},
+	{0x1d939, 0xc627},
+	{0x1d93a, 0x0000},
+	{0x1d93b, 0xc628},
+	{0x1d93c, 0x0000},
+	{0x1d93d, 0xc62c},
+	{0x1d93e, 0x0000},
+	{0x1d93f, 0xc90a},
+	{0x1d940, 0x3a7c},
+	{0x1d941, 0x0000},
+	{0x1d942, 0x2b84},
+	{0x1d943, 0x3c74},
+	{0x1d944, 0x6435},
+	{0x1d945, 0xdff4},
+	{0x1d946, 0x6435},
+	{0x1d947, 0x2806},
+	{0x1d948, 0x3006},
+	{0x1d949, 0x8565},
+	{0x1d94a, 0x2b24},
+	{0x1d94b, 0x3c24},
+	{0x1d94c, 0x6436},
+	{0x1d94d, 0x1002},
+	{0x1d94e, 0x2b24},
+	{0x1d94f, 0x3c24},
+	{0x1d950, 0x6436},
+	{0x1d951, 0x4045},
+	{0x1d952, 0x8656},
+	{0x1d953, 0x5663},
+	{0x1d954, 0x0302},
+	{0x1d955, 0x401e},
+	{0x1d956, 0x1002},
+	{0x1d957, 0x2017},
+	{0x1d958, 0x3b17},
+	{0x1d959, 0x2084},
+	{0x1d95a, 0x3c14},
+	{0x1d95b, 0x6724},
+	{0x1d95c, 0x2807},
+	{0x1d95d, 0x31a7},
+	{0x1d95e, 0x20c4},
+	{0x1d95f, 0x3c24},
+	{0x1d960, 0x6724},
+	{0x1d961, 0x2ff7},
+	{0x1d962, 0x30f7},
+	{0x1d963, 0x20c4},
+	{0x1d964, 0x3c04},
+	{0x1d965, 0x6724},
+	{0x1d966, 0x1002},
+	{0x1d967, 0x2807},
+	{0x1d968, 0x3187},
+	{0x1d969, 0x20c4},
+	{0x1d96a, 0x3c24},
+	{0x1d96b, 0x6724},
+	{0x1d96c, 0x2fe4},
+	{0x1d96d, 0x3dc4},
+	{0x1d96e, 0x6437},
+	{0x1d96f, 0x20c4},
+	{0x1d970, 0x3c04},
+	{0x1d971, 0x6724},
+	{0x1d972, 0x2017},
+	{0x1d973, 0x3d17},
+	{0x1d974, 0x2084},
+	{0x1d975, 0x3c14},
+	{0x1d976, 0x6724},
+	{0x1d977, 0x1002},
+	{0x1d978, 0x24f4},
+	{0x1d979, 0x3c64},
+	{0x1d97a, 0x6436},
+	{0x1d97b, 0xdff4},
+	{0x1d97c, 0x6436},
+	{0x1d97d, 0x1002},
+	{0x1d97e, 0x2006},
+	{0x1d97f, 0x3d76},
+	{0x1d980, 0xc161},
+	{0x1d981, 0x6134},
+	{0x1d982, 0x6135},
+	{0x1d983, 0x5443},
+	{0x1d984, 0x0303},
+	{0x1d985, 0x6524},
+	{0x1d986, 0x00fb},
+	{0x1d987, 0x1002},
+	{0x1d988, 0x20d4},
+	{0x1d989, 0x3c24},
+	{0x1d98a, 0x2025},
+	{0x1d98b, 0x3005},
+	{0x1d98c, 0x6524},
+	{0x1d98d, 0x1002},
+	{0x1d98e, 0xd019},
+	{0x1d98f, 0x2104},
+	{0x1d990, 0x3c24},
+	{0x1d991, 0x2105},
+	{0x1d992, 0x3805},
+	{0x1d993, 0x6524},
+	{0x1d994, 0xdff4},
+	{0x1d995, 0x4005},
+	{0x1d996, 0x6524},
+	{0x1d997, 0x2e8d},
+	{0x1d998, 0x303d},
+	{0x1d999, 0x2408},
+	{0x1d99a, 0x35d8},
+	{0x1d99b, 0x5dd3},
+	{0x1d99c, 0x0307},
+	{0x1d99d, 0x8887},
+	{0x1d99e, 0x63a7},
+	{0x1d99f, 0x8887},
+	{0x1d9a0, 0x63a7},
+	{0x1d9a1, 0xdffd},
+	{0x1d9a2, 0x00f9},
+	{0x1d9a3, 0x1002},
+	{0x1d9a4, 0x866a},
+	{0x1d9a5, 0x6138},
+	{0x1d9a6, 0x5883},
+	{0x1d9a7, 0x2b42},
+	{0x1d9a8, 0x3022},
+	{0x1d9a9, 0x1302},
+	{0x1d9aa, 0x2ff7},
+	{0x1d9ab, 0x3007},
+	{0x1d9ac, 0x8785},
+	{0x1d9ad, 0xb887},
+	{0x1d9ae, 0x8786},
+	{0x1d9af, 0xb8c6},
+	{0x1d9b0, 0x5a53},
+	{0x1d9b1, 0x2a52},
+	{0x1d9b2, 0x3022},
+	{0x1d9b3, 0x13c2},
+	{0x1d9b4, 0x2474},
+	{0x1d9b5, 0x3c84},
+	{0x1d9b6, 0x64d7},
+	{0x1d9b7, 0x64d7},
+	{0x1d9b8, 0x2ff5},
+	{0x1d9b9, 0x3c05},
+	{0x1d9ba, 0x8757},
+	{0x1d9bb, 0xb886},
+	{0x1d9bc, 0x9767},
+	{0x1d9bd, 0x67c4},
+	{0x1d9be, 0x6f72},
+	{0x1d9bf, 0x1002},
+	{0x1d9c0, 0x0000},
+	{0x1d080, 0x0100},
+	{0x1d092, 0x0000},
+	{NLP_INI_STOP, 0},
+};
+
+static nxge_status_t
+nxge_nlp2020_xcvr_init(p_nxge_t nxgep)
+{
+	uint8_t			phy_port_addr;
+	nxge_status_t		status = NXGE_OK;
+	uint16_t		ctrl_reg, rst_val, pmd_ctl, rx_los;
+	int			i = 0, count = 1000;
+
+	uint8_t			connector = 0, len, lpm;
+	p_nxge_nlp_initseq_t	initseq;
+	uint16_t		dev, reg, val;
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_nlp2020_xcvr_init: "
+	    "port<%d>, phyaddr[0x%x]", nxgep->mac.portnum,
+	    nxgep->statsp->mac_stats.xcvr_portn));
+
+	phy_port_addr = nxgep->statsp->mac_stats.xcvr_portn;
+
+	/* Reset the transceiver */
+	rst_val = ctrl_reg = NLP2020_PMA_PMD_PHY_RST;
+	if ((status = nxge_mdio_write(nxgep, phy_port_addr,
+	    NLP2020_PMA_PMD_ADDR, NLP2020_PMA_PMD_CTL_REG, rst_val))
+	    != NXGE_OK)
+		goto fail;
+	while ((count--) && (ctrl_reg & rst_val)) {
+		drv_usecwait(1000);
+		(void) nxge_mdio_read(nxgep, phy_port_addr,
+		    NLP2020_PMA_PMD_ADDR, NLP2020_PMA_PMD_CTL_REG, &ctrl_reg);
+	}
+	if (count == 0) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_nlp2020_xcvr_init: "
+		    "PMA_PMD reset failed"));
+		goto fail;
+	}
+
+	/* Set loopback mode if required */
+	/* Set PMA PMD system loopback */
+	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
+	    NLP2020_PMA_PMD_ADDR, NLP2020_PMA_PMD_CTL_REG, &pmd_ctl))
+	    != NXGE_OK)
+		goto fail;
+
+	if (nxgep->statsp->port_stats.lb_mode == nxge_lb_phy10g)
+		pmd_ctl |= 0x0001;
+	else
+		pmd_ctl &= 0xfffe;
+	if ((status = nxge_mdio_write(nxgep, phy_port_addr,
+	    NLP2020_PMA_PMD_ADDR, NLP2020_PMA_PMD_CTL_REG, pmd_ctl))
+	    != NXGE_OK)
+		goto fail;
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_nlp2020_xcvr_init: "
+	    "setting LB, wrote NLP2020_PMA_PMD_CTL_REG[0x%x]", pmd_ctl));
+
+	/* Check connector details using I2c */
+	if (nxge_nlp2020_i2c_read(nxgep, phy_port_addr, NLP2020_XCVR_I2C_ADDR,
+	    QSFP_MSA_CONN_REG, &connector) == 1) {
+		goto fail;
+	}
+
+	switch (connector) {
+	case SFPP_FIBER:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "nxge_nlp2020_xcvr_init: SFPP_FIBER detected"));
+		initseq = nlp2020_revC_fiber_init;
+		nxgep->nlp_conn = NXGE_NLP_CONN_FIBER;
+		break;
+	case QSFP_FIBER:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "nxge_nlp2020_xcvr_init: QSFP_FIBER detected"));
+		initseq = nlp2020_revC_fiber_init;
+		nxgep->nlp_conn = NXGE_NLP_CONN_FIBER;
+		break;
+	case QSFP_COPPER_TWINAX:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "nxge_nlp2020_xcvr_init: QSFP_COPPER_TWINAX/"
+		    "SFPP_COPPER_TWINAX detected"));
+
+		initseq = nlp2020_revC_copper_init;
+		nxgep->nlp_conn = NXGE_NLP_CONN_COPPER_LT_7M;
+		break;
+	default:
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_nlp2020_xcvr_init: Unknown type [0x%x] detected",
+		    "...setting to QSFP_FIBER",
+		    connector));
+		initseq = nlp2020_revC_fiber_init;
+		nxgep->nlp_conn = NXGE_NLP_CONN_FIBER;
+		break;
+	}
+
+	/* Run appropriate init sequence */
+	for (i = 0; initseq[i].dev_reg != NLP_INI_STOP; i++) {
+		dev = initseq[i].dev_reg >> 16;
+		reg = initseq[i].dev_reg & 0xffff;
+		val = initseq[i].val;
+
+		if (reg == NLP_INI_WAIT) {
+			drv_usecwait(1000 * val);
+		} else {
+			if ((status = nxge_mdio_write(nxgep, phy_port_addr,
+			    dev, reg, val)) != NXGE_OK)
+				goto fail;
+		}
+	}
+
+	/* rx_los inversion */
+	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
+	    NLP2020_PMA_PMD_ADDR, NLP2020_OPT_SET_REG, &rx_los)) != NXGE_OK)
+			goto fail;
+
+	rx_los &= ~(NLP2020_RXLOS_ACT_H);
+
+	if ((status = nxge_mdio_write(nxgep, phy_port_addr,
+	    NLP2020_PMA_PMD_ADDR, NLP2020_OPT_SET_REG, rx_los)) != NXGE_OK)
+			goto fail;
+
+	if (nxge_nlp2020_i2c_read(nxgep, phy_port_addr, NLP2020_XCVR_I2C_ADDR,
+	    QSFP_MSA_LEN_REG, &len) == 1) {
+		goto fail;
+	}
+
+	if (nxge_nlp2020_i2c_read(nxgep, phy_port_addr, NLP2020_XCVR_I2C_ADDR,
+	    QSFP_MSA_LPM_REG, &lpm) == 1) {
+		goto fail;
+	}
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "nxge_nlp2020_xcvr_init: len[0x%x] lpm[0x%x]", len, lpm));
+
+	if (connector == QSFP_COPPER_TWINAX) {
+		if (len >= 7) {
+			nxgep->nlp_conn = NXGE_NLP_CONN_COPPER_7M_ABOVE;
+			/* enable pre-emphasis */
+			(void) nxge_mdio_write(nxgep, phy_port_addr,
+			    NLP2020_PMA_PMD_ADDR, NLP2020_TX_DRV_CTL1_REG,
+			    NLP2020_TX_DRV_CTL1_PREEMP_EN);
+			/* write emphasis value */
+			(void) nxge_mdio_write(nxgep, phy_port_addr,
+			    NLP2020_PMA_PMD_ADDR, NLP2020_TX_DRV_CTL2_REG,
+			    NLP2020_TX_DRV_CTL2_EMP_VAL);
+			/* stop microcontroller */
+			(void) nxge_mdio_write(nxgep, phy_port_addr,
+			    NLP2020_PMA_PMD_ADDR, NLP2020_UC_CTL_REG,
+			    NLP2020_UC_CTL_STOP);
+			/* reset program counter */
+			(void) nxge_mdio_write(nxgep, phy_port_addr,
+			    NLP2020_PMA_PMD_ADDR, NLP2020_UC_PC_START_REG,
+			    NLP2020_UC_PC_START_VAL);
+			/* start microcontroller */
+			(void) nxge_mdio_write(nxgep, phy_port_addr,
+			    NLP2020_PMA_PMD_ADDR, NLP2020_UC_CTL_REG,
+			    NLP2020_UC_CTL_START);
+		}
+	}
+	if (lpm & QSFP_MSA_LPM_HIGH) {
+		/* enable high power mode */
+		(void) nxge_mdio_write(nxgep, phy_port_addr,
+		    NLP2020_GPIO_ADDR, NLP2020_GPIO_CTL_REG,
+		    NLP2020_GPIO_ACT);
+	} else {
+		/* revert to low power mode */
+		(void) nxge_mdio_write(nxgep, phy_port_addr,
+		    NLP2020_GPIO_ADDR, NLP2020_GPIO_CTL_REG,
+		    NLP2020_GPIO_INACT);
+	}
+	/* It takes ~2s for EDC to settle */
+	drv_usecwait(2000000);
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_nlp2020_xcvr_init: "
+	    "port<%d> phyaddr[0x%x]", nxgep->mac.portnum, phy_port_addr));
+
+	return (NXGE_OK);
+
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "nxge_nlp2020_xcvr_init: failed to initialize transceiver for "
+	    "port<%d>", nxgep->mac.portnum));
+	return (status);
+}
+
+static boolean_t nxge_is_nlp2020_phy(p_nxge_t nxgep)
+{
+	uint8_t	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+	uint32_t	pcs_id = 0;
+	uint32_t	pma_pmd_id = 0;
+	uint8_t		xcvr_addr =  nxgep->nxge_hw_p->xcvr_addr[portn];
+
+	pma_pmd_id = nxge_get_cl45_pma_pmd_id(nxgep, xcvr_addr);
+	pcs_id = nxge_get_cl45_pcs_id(nxgep, xcvr_addr);
+
+	if (((pma_pmd_id & NLP2020_DEV_ID_MASK) == NLP2020_DEV_ID) ||
+	    ((pcs_id & NLP2020_DEV_ID_MASK) == NLP2020_DEV_ID)) {
+		return (B_TRUE);
+	} else {
+		return (B_FALSE);
+	}
+}
+
+static uint8_t nxge_get_nlp2020_connector_type(p_nxge_t nxgep)
+{
+	uint8_t	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+	uint8_t xcvr_addr =  nxgep->nxge_hw_p->xcvr_addr[portn];
+	uint8_t	connector = 0;
+
+	(void) nxge_nlp2020_i2c_read(nxgep, xcvr_addr, NLP2020_XCVR_I2C_ADDR,
+	    QSFP_MSA_CONN_REG, &connector);
+
+	return (connector);
+}
+
+static nxge_status_t nxge_set_nlp2020_param(p_nxge_t nxgep)
+{
+	uint8_t connector = 0;
+
+	connector = nxge_get_nlp2020_connector_type(nxgep);
+
+	switch (connector) {
+	case SFPP_FIBER:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "nxge_set_nlp2020_param: SFPP_FIBER detected"));
+		nxgep->mac.portmode = PORT_10G_FIBER;
+		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+		break;
+	case QSFP_FIBER:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "nxge_set_nlp2020_param: QSFP_FIBER detected"));
+		nxgep->mac.portmode = PORT_10G_FIBER;
+		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+		break;
+	case QSFP_COPPER_TWINAX:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "nxge_set_nlp2020_param: QSFP_COPPER_TWINAX/"
+		    "SFPP_COPPER_TWINAX detected"));
+		nxgep->mac.portmode = PORT_10G_COPPER;
+		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+		break;
+	default:
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_set_nlp2020_param: Unknown type [0x%x] detected"
+		    "...setting to QSFP_FIBER",
+		    connector));
+		nxgep->mac.portmode = PORT_10G_FIBER;
+		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+		break;
+	}
+
+	return (NXGE_OK);
+}
+
 #define	CHK_STAT(x)	status = (x); if (status != NXGE_OK) goto fail
 
 #define	MRVL88X2011_RD(nxgep, port, d, r, p) \
@@ -2883,8 +3730,13 @@ nxge_10G_xcvr_init(p_nxge_t nxgep)
 		break;
 	case MRVL88X201X_CHIP_ID:
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_10G_xcvr_init: "
-		    "Chip ID 8706 [0x%x] for 10G xcvr", nxgep->chip_id));
+		    "Chip ID MRVL [0x%x] for 10G xcvr", nxgep->chip_id));
 		status = nxge_mrvl88x2011_xcvr_init(nxgep);
+		break;
+	case NLP2020_CHIP_ID:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_10G_xcvr_init: "
+		    "Chip ID NL2020 [0x%x] for 10G xcvr", nxgep->chip_id));
+		status = nxge_nlp2020_xcvr_init(nxgep);
 		break;
 	default:
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_xcvr_init: "
@@ -5285,29 +6137,9 @@ nxge_check_10g_link(p_nxge_t nxgep)
 		if (nxgep->hot_swappable_phy) {
 			boolean_t phy_present_now = B_FALSE;
 
-			/*
-			 * If this is the 2nd Goa port, then check 2 addresses
-			 * to take care of the Goa NEM card requirements.
-			 */
-			if (portn == 1) {
-				if (nxge_is_phy_present(nxgep,
-				    ALT_GOA_CLAUSE45_PORT1_ADDR,
-				    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
-					phy_present_now = B_TRUE;
-					nxgep->xcvr_addr =
-					    ALT_GOA_CLAUSE45_PORT1_ADDR;
-					goto phy_check_done;
-				}
-			}
-			if (nxge_is_phy_present(nxgep,
-			    (GOA_CLAUSE45_PORT_ADDR_BASE) + portn,
-			    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
-				nxgep->xcvr_addr =
-				    (GOA_CLAUSE45_PORT_ADDR_BASE) + portn;
+			if (nxge_hswap_phy_present(nxgep, portn))
 				phy_present_now = B_TRUE;
-			}
 
-phy_check_done:
 			/* Check back-to-back XAUI connect to detect Opus NEM */
 			rs = npi_xmac_xpcs_read(nxgep->npi_handle,
 			    nxgep->mac.portnum, XPCS_REG_STATUS, &val);
@@ -5390,11 +6222,19 @@ phy_check_done:
 
 			}
 		}
-		if (nxgep->chip_id == MRVL88X201X_CHIP_ID) {
+
+		switch (nxgep->chip_id) {
+		case MRVL88X201X_CHIP_ID:
 			status = nxge_check_mrvl88x2011_link(nxgep, &link_up);
-		} else {
+			break;
+		case NLP2020_CHIP_ID:
+			status = nxge_check_nlp2020_link(nxgep, &link_up);
+			break;
+		default:
 			status = nxge_check_bcm8704_link(nxgep, &link_up);
+			break;
 		}
+
 		if (status != NXGE_OK)
 			goto fail;
 		break;
@@ -5520,6 +6360,7 @@ nxge_link_is_up(p_nxge_t nxgep)
 
 	/* Clean up symbol errors incurred during link transition */
 	if ((nxgep->mac.portmode == PORT_10G_FIBER) ||
+	    (nxgep->mac.portmode == PORT_10G_COPPER) ||
 	    (nxgep->mac.portmode == PORT_10G_SERDES)) {
 		(void) npi_xmac_xpcs_read(nxgep->npi_handle, nxgep->mac.portnum,
 		    XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &val);
@@ -5723,6 +6564,7 @@ nxge_link_monitor(p_nxge_t nxgep, link_mon_enable_t enable)
 	 * (At least, we don't have 4-port XMAC cards yet.)
 	 */
 	if ((nxgep->mac.portmode == PORT_10G_FIBER ||
+	    nxgep->mac.portmode == PORT_10G_COPPER ||
 	    nxgep->mac.portmode == PORT_10G_SERDES) &&
 	    (nxgep->mac.portnum > 1))
 		return (NXGE_OK);
@@ -6438,6 +7280,122 @@ fail:
 	return (status);
 }
 
+static nxge_status_t
+nxge_check_nlp2020_link(p_nxge_t nxgep, boolean_t *link_up)
+{
+	uint8_t		phy;
+	nxge_status_t   status = NXGE_OK;
+	uint16_t	pmd_rx_sig, pcs_10gbr_stat1, phy_xs_ln_stat;
+	uint8_t		connector = 0;
+
+	phy = nxgep->statsp->mac_stats.xcvr_portn;
+	*link_up = B_FALSE;
+
+	/* Check from Netlogic AEL2020 if 10G link is up or down */
+
+	status = nxge_mdio_read(nxgep, phy, NLP2020_PMA_PMD_ADDR,
+	    NLP2020_PMA_PMD_RX_SIG_DET_REG, &pmd_rx_sig);
+	if (status != NXGE_OK)
+		goto fail;
+
+	status = nxge_mdio_read(nxgep, phy, NLP2020_PHY_PCS_ADDR,
+	    NLP2020_PHY_PCS_10GBR_STAT1_REG, &pcs_10gbr_stat1);
+	if (status != NXGE_OK)
+		goto fail;
+
+	status = nxge_mdio_read(nxgep, phy, NLP2020_PHY_XS_ADDR,
+	    NLP2020_PHY_XS_LN_ST_REG, &phy_xs_ln_stat);
+	if (status != NXGE_OK)
+		goto fail;
+
+	if ((pmd_rx_sig & NLP2020_PMA_PMD_RX_SIG_ON) &&
+	    (pcs_10gbr_stat1 & NLP2020_PHY_PCS_10GBR_RX_LINK_UP) &&
+	    (phy_xs_ln_stat & NLP2020_PHY_XS_LN_ALIGN_SYNC))
+		*link_up = B_TRUE;
+	/*
+	 * If previously link was down, check the connector type as
+	 * it might have been changed.
+	 */
+	if (nxgep->statsp->mac_stats.link_up == 0) {
+		(void) nxge_nlp2020_i2c_read(nxgep, phy,
+		    NLP2020_XCVR_I2C_ADDR, QSFP_MSA_CONN_REG, &connector);
+
+		switch (connector) {
+		case SFPP_FIBER:
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "nxge_check_nlp2020_link: SFPP_FIBER"));
+			if (nxgep->mac.portmode != PORT_10G_FIBER) {
+				nxgep->mac.portmode = PORT_10G_FIBER;
+				(void) nxge_nlp2020_xcvr_init(nxgep);
+			}
+			break;
+		case QSFP_FIBER:
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "nxge_check_nlp2020_link: QSFP_FIBER"));
+			if (nxgep->mac.portmode != PORT_10G_FIBER) {
+				nxgep->mac.portmode = PORT_10G_FIBER;
+				(void) nxge_nlp2020_xcvr_init(nxgep);
+			}
+			break;
+		case QSFP_COPPER_TWINAX:
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "nxge_check_nlp2020_link: "
+			    "QSFP_COPPER_TWINAX/"
+			    "SFPP_COPPER_TWINAX"));
+			if (nxgep->mac.portmode != PORT_10G_COPPER) {
+				nxgep->mac.portmode = PORT_10G_COPPER;
+				(void) nxge_nlp2020_xcvr_init(nxgep);
+			} else {
+				uint8_t len = 0;
+				(void) nxge_nlp2020_i2c_read(nxgep, phy,
+				    NLP2020_XCVR_I2C_ADDR, QSFP_MSA_LEN_REG,
+				    &len);
+				if (((len < 7) &&
+				    (nxgep->nlp_conn ==
+				    NXGE_NLP_CONN_COPPER_7M_ABOVE)) ||
+				    ((len >= 7) &&
+				    (nxgep->nlp_conn ==
+				    NXGE_NLP_CONN_COPPER_LT_7M))) {
+					(void) nxge_nlp2020_xcvr_init(nxgep);
+				}
+			}
+			break;
+		default:
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "nxge_check_nlp2020_link: Unknown type [0x%x] "
+			    "detected...setting to QSFP_FIBER",
+			    connector));
+			if (nxgep->mac.portmode != PORT_10G_FIBER) {
+				nxgep->mac.portmode = PORT_10G_FIBER;
+				(void) nxge_nlp2020_xcvr_init(nxgep);
+			}
+			break;
+		}
+	}
+fail:
+	if (*link_up == B_FALSE && nxgep->statsp->mac_stats.link_up == 1) {
+		/* Turn link LED OFF */
+		(void) nxge_mdio_write(nxgep, phy,
+		    NLP2020_GPIO_ADDR, NLP2020_GPIO_CTL_REG, 0xb000);
+		(void) nxge_mdio_write(nxgep, phy,
+		    NLP2020_GPIO_ADDR, NLP2020_GPIO_PT3_CFG_REG, 0x0);
+	} else if (*link_up == B_TRUE &&
+	    nxgep->statsp->mac_stats.link_up == 0) {
+		/* Turn link LED ON */
+		(void) nxge_mdio_write(nxgep, phy,
+		    NLP2020_GPIO_ADDR, NLP2020_GPIO_CTL_REG, 0xd000);
+		(void) nxge_mdio_write(nxgep, phy,
+		    NLP2020_GPIO_ADDR, NLP2020_GPIO_PT3_CFG_REG, 0xfbff);
+		(void) nxge_mdio_write(nxgep, phy,
+		    NLP2020_GPIO_ADDR, 0xff2a, 0x004a);
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    " <== nxge_check_nlp2020_link: up=%d", *link_up));
+	return (status);
+}
+
+
 nxge_status_t
 nxge_10g_link_led_on(p_nxge_t nxgep)
 {
@@ -6456,6 +7414,83 @@ nxge_10g_link_led_off(p_nxge_t nxgep)
 		return (NXGE_ERROR);
 	else
 		return (NXGE_OK);
+}
+
+static boolean_t
+nxge_hswap_phy_present(p_nxge_t nxgep, uint8_t portn)
+{
+	/*
+	 * check for BCM PHY (GOA NEM)
+	 */
+	/*
+	 * If this is the 2nd NIU port, then check 2 addresses
+	 * to take care of the Goa NEM card. Port 1 can have addr 17
+	 * (in the eval board) or 20 (in the P0 board).
+	 */
+	if (portn == 1) {
+		if (nxge_is_phy_present(nxgep, ALT_GOA_CLAUSE45_PORT1_ADDR,
+		    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
+			nxgep->xcvr_addr = ALT_GOA_CLAUSE45_PORT1_ADDR;
+			goto found_phy;
+		}
+	}
+	if (nxge_is_phy_present(nxgep, GOA_CLAUSE45_PORT_ADDR_BASE + portn,
+	    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
+		nxgep->xcvr_addr = GOA_CLAUSE45_PORT_ADDR_BASE + portn;
+			goto found_phy;
+	}
+
+	/*
+	 * check for NLP2020 PHY on C4 NEM
+	 */
+	switch (portn) {
+	case 0:
+		if (nxge_is_phy_present(nxgep, NLP2020_CL45_PORT0_ADDR0,
+		    NLP2020_DEV_ID, NLP2020_DEV_ID_MASK)) {
+			nxgep->xcvr_addr = NLP2020_CL45_PORT0_ADDR0;
+			goto found_phy;
+		} else if (nxge_is_phy_present(nxgep, NLP2020_CL45_PORT0_ADDR1,
+		    NLP2020_DEV_ID, NLP2020_DEV_ID_MASK)) {
+			nxgep->xcvr_addr = NLP2020_CL45_PORT0_ADDR1;
+			goto found_phy;
+		} else if (nxge_is_phy_present(nxgep, NLP2020_CL45_PORT0_ADDR2,
+		    NLP2020_DEV_ID, NLP2020_DEV_ID_MASK)) {
+			nxgep->xcvr_addr = NLP2020_CL45_PORT0_ADDR2;
+			goto found_phy;
+		} else if (nxge_is_phy_present(nxgep, NLP2020_CL45_PORT0_ADDR3,
+		    NLP2020_DEV_ID, NLP2020_DEV_ID_MASK)) {
+			nxgep->xcvr_addr = NLP2020_CL45_PORT0_ADDR3;
+			goto found_phy;
+		}
+		break;
+
+	case 1:
+		if (nxge_is_phy_present(nxgep, NLP2020_CL45_PORT1_ADDR0,
+		    NLP2020_DEV_ID, NLP2020_DEV_ID_MASK)) {
+			nxgep->xcvr_addr = NLP2020_CL45_PORT1_ADDR0;
+			goto found_phy;
+		} else if (nxge_is_phy_present(nxgep, NLP2020_CL45_PORT1_ADDR1,
+		    NLP2020_DEV_ID, NLP2020_DEV_ID_MASK)) {
+			nxgep->xcvr_addr = NLP2020_CL45_PORT1_ADDR1;
+			goto found_phy;
+		} else if (nxge_is_phy_present(nxgep, NLP2020_CL45_PORT1_ADDR2,
+		    NLP2020_DEV_ID, NLP2020_DEV_ID_MASK)) {
+			nxgep->xcvr_addr = NLP2020_CL45_PORT1_ADDR2;
+			goto found_phy;
+		} else if (nxge_is_phy_present(nxgep, NLP2020_CL45_PORT1_ADDR3,
+		    NLP2020_DEV_ID, NLP2020_DEV_ID_MASK)) {
+			nxgep->xcvr_addr = NLP2020_CL45_PORT1_ADDR3;
+			goto found_phy;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return (B_FALSE);
+found_phy:
+	return (B_TRUE);
+
 }
 
 static boolean_t
@@ -6500,7 +7535,8 @@ nxge_is_supported_phy(uint32_t id, uint8_t type)
 		for (i = 0; i < NUM_CLAUSE_45_IDS; i++) {
 			if (((nxge_supported_cl45_ids[i] & BCM_PHY_ID_MASK) ==
 			    (id & BCM_PHY_ID_MASK)) ||
-			    (TN1010_DEV_ID == (id & TN1010_DEV_ID_MASK))) {
+			    (TN1010_DEV_ID == (id & TN1010_DEV_ID_MASK)) ||
+			    (NLP2020_DEV_ID == (id & NLP2020_DEV_ID_MASK))) {
 				found = B_TRUE;
 				break;
 			}
@@ -6667,6 +7703,10 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				if ((pma_pmd_dev_id & TN1010_DEV_ID_MASK)
 				    == TN1010_DEV_ID) {
 					port_pma_pmd_dev_id[j] = TN1010_DEV_ID;
+				} else if ((pma_pmd_dev_id &
+				    NLP2020_DEV_ID_MASK) == NLP2020_DEV_ID) {
+					port_pma_pmd_dev_id[j] =
+					    NLP2020_DEV_ID;
 				} else {
 					port_pma_pmd_dev_id[j] =
 					    pma_pmd_dev_id & BCM_PHY_ID_MASK;
@@ -6689,6 +7729,10 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				    == TN1010_DEV_ID) {
 					port_pcs_dev_id[j - 1] =
 					    TN1010_DEV_ID;
+				} else if ((pcs_dev_id & NLP2020_DEV_ID_MASK)
+				    == NLP2020_DEV_ID) {
+					port_pcs_dev_id[j - 1] =
+					    NLP2020_DEV_ID;
 				} else {
 					port_pcs_dev_id[j - 1] =
 					    pcs_dev_id &
@@ -6700,6 +7744,11 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 					    == TN1010_DEV_ID) {
 						port_pcs_dev_id[j] =
 						    TN1010_DEV_ID;
+					} else if ((pcs_dev_id &
+					    NLP2020_DEV_ID_MASK)
+					    == NLP2020_DEV_ID) {
+						port_pcs_dev_id[j] =
+						    NLP2020_DEV_ID;
 					} else {
 						port_pcs_dev_id[j] =
 						    pcs_dev_id &
@@ -6845,6 +7894,23 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				for (i = 0; i < 2; i++) {
 					hw_p->xcvr_addr[i] = port_fd_arr[i];
 				}
+
+			/* 2 10G optical Netlogic AEL2020 ports */
+			} else if (((port_pcs_dev_id[0] == NLP2020_DEV_ID) &&
+			    (port_pcs_dev_id[1]  == NLP2020_DEV_ID)) ||
+			    ((port_pma_pmd_dev_id[0]  == NLP2020_DEV_ID) &&
+			    (port_pma_pmd_dev_id[1] == NLP2020_DEV_ID))) {
+				if (hw_p->platform_type != P_NEPTUNE_NIU) {
+					hw_p->platform_type =
+					    P_NEPTUNE_GENERIC;
+					hw_p->niu_type =
+					    NEPTUNE_2_10GF;
+				}
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "Found 2 NL PHYs at addrs 0x%x and 0x%x",
+				    port_fd_arr[0], port_fd_arr[1]));
+				hw_p->xcvr_addr[0] = port_fd_arr[0];
+				hw_p->xcvr_addr[1] = port_fd_arr[1];
 
 			/* Both XAUI slots have copper XAUI cards */
 			} else if ((((port_pcs_dev_id[0] & TN1010_DEV_ID_MASK)
@@ -7046,6 +8112,62 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 					hw_p->xcvr_addr[nxgep->function_num] =
 					    port_fd_arr[0];
 				}
+			} else if (port_pcs_dev_id[0] == NLP2020_DEV_ID ||
+			    port_pma_pmd_dev_id[0] == NLP2020_DEV_ID) {
+				/* A 10G NLP2020 PHY in slot0 or slot1 */
+				switch (port_fd_arr[0]) {
+				case NLP2020_CL45_PORT0_ADDR0:
+				case NLP2020_CL45_PORT0_ADDR1:
+				case NLP2020_CL45_PORT0_ADDR2:
+				case NLP2020_CL45_PORT0_ADDR3:
+				case NLP2020_CL45_PORT1_ADDR0:
+				case NLP2020_CL45_PORT1_ADDR1:
+				case NLP2020_CL45_PORT1_ADDR2:
+				case NLP2020_CL45_PORT1_ADDR3:
+					/*
+					 * If hw_p->platform_type ==
+					 * P_NEPTUNE_NIU, then portmode
+					 * is already known, so there is
+					 * no need to figure out hw_p->
+					 * platform_type because
+					 * platform_type is only for
+					 * figuring out portmode.
+					 */
+					if (hw_p->platform_type !=
+					    P_NEPTUNE_NIU) {
+						hw_p->platform_type =
+						    P_NEPTUNE_GENERIC;
+						hw_p->niu_type =
+						    NEPTUNE_2_10GF;
+					}
+					break;
+				default:
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					    "Unsupported neptune type 10-1"));
+					goto error_exit;
+				}
+				switch (port_fd_arr[0]) {
+				case NLP2020_CL45_PORT0_ADDR0:
+				case NLP2020_CL45_PORT0_ADDR1:
+				case NLP2020_CL45_PORT0_ADDR2:
+				case NLP2020_CL45_PORT0_ADDR3:
+					hw_p->xcvr_addr[0] = port_fd_arr[0];
+					break;
+				case NLP2020_CL45_PORT1_ADDR0:
+				case NLP2020_CL45_PORT1_ADDR1:
+				case NLP2020_CL45_PORT1_ADDR2:
+				case NLP2020_CL45_PORT1_ADDR3:
+					hw_p->xcvr_addr[1] = port_fd_arr[0];
+					break;
+				default:
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					    "Unsupported neptune type 10-11"));
+					goto error_exit;
+				}
+
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "Found 1 NL PHYs at addr 0x%x",
+				    port_fd_arr[0]));
 
 			/* A 10G copper XAUI in either slot0 or slot1 */
 			} else if ((port_pcs_dev_id[0] & TN1010_DEV_ID_MASK)
