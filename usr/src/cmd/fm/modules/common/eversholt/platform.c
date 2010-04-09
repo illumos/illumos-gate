@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * platform.c -- interfaces to the platform's configuration information
  *
@@ -228,12 +227,15 @@ struct node *
 platform_getpath(nvlist_t *nvl)
 {
 	struct node	*ret;
-	nvlist_t	*dfmri;
+	nvlist_t	*dfmri, *real_fmri, *resource;
 	char		*scheme;
 	char		*path;
 	char		*devid;
+	char		*tp;
 	uint32_t	cpuid;
-	enum {DT_HC, DT_DEVID, DT_DEV, DT_CPU, DT_UNKNOWN} type = DT_UNKNOWN;
+	int		err;
+	enum {DT_HC, DT_DEVID, DT_TP, DT_DEV, DT_CPU, DT_UNKNOWN} type =
+		DT_UNKNOWN;
 
 	/* Find the detector */
 	if (nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &dfmri) != 0) {
@@ -250,12 +252,18 @@ platform_getpath(nvlist_t *nvl)
 	/* based on scheme, determine type */
 	if (strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
 		/* already in hc scheme */
-		return (hc_fmri_nodeize(dfmri));
+		type = DT_HC;
 	} else if (strcmp(scheme, FM_FMRI_SCHEME_DEV) == 0) {
-		/* devid takes precedence over path */
+		/*
+		 * devid takes precedence over tp which takes precedence over
+		 * path
+		 */
 		if (nvlist_lookup_string(dfmri,
 		    FM_FMRI_DEV_ID, &devid) == 0)
 			type = DT_DEVID;
+		else if (nvlist_lookup_string(nvl,
+		    TOPO_STORAGE_TARGET_PORT_L0ID, &tp) == 0)
+			type = DT_TP;
 		else if (nvlist_lookup_string(dfmri,
 		    FM_FMRI_DEV_PATH, &path) == 0)
 			type = DT_DEV;
@@ -287,18 +295,46 @@ platform_getpath(nvlist_t *nvl)
 	Usednames = NULL;
 	in_getpath = 1;
 	if (config_snapshot() == NULL) {
+		if (type == DT_HC) {
+			/*
+			 * If hc-scheme use the fmri that was passed in.
+			 */
+			in_getpath = 0;
+			return (hc_fmri_nodeize(dfmri));
+		}
 		out(O_ALTFP, "XFILE: cannot snapshot configuration");
 		in_getpath = 0;
 		return (NULL);
 	}
 
-	/* Look up the path, cpuid, or devid in the last config snapshot. */
+	/*
+	 * For hc scheme, if we can find the resource from the tolopogy, use
+	 * that - otherwise use the fmri that was passed in. For other schemes
+	 * look up the path, cpuid, tp or devid in the topology.
+	 */
 	switch (type) {
+	case DT_HC:
+		if (topo_fmri_getprop(Eft_topo_hdl, dfmri, TOPO_PGROUP_PROTOCOL,
+		    TOPO_PROP_RESOURCE, NULL, &resource, &err) == -1)
+			ret = hc_fmri_nodeize(dfmri);
+		else if (nvlist_lookup_nvlist(resource,
+		    TOPO_PROP_VAL_VAL, &real_fmri) != 0)
+			ret = hc_fmri_nodeize(dfmri);
+		else
+			ret = hc_fmri_nodeize(real_fmri);
+		break;
+
 	case DT_DEV:
 		if ((ret = config_bydev_lookup(Lastcfg, path)) == NULL)
 			out(O_ALTFP, "platform_getpath: no configuration node "
 			    "has device path matching \"%s\".", path);
 
+		break;
+
+	case DT_TP:
+		if ((ret = config_bytp_lookup(Lastcfg, tp)) == NULL)
+			out(O_ALTFP, "platform_getpath: no configuration node "
+			    "has tp matching \"%s\".", tp);
 		break;
 
 	case DT_DEVID:
@@ -403,6 +439,9 @@ add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
 	boolean_t bool;
 	uint64_t ui64;
 	char buf[32];	/* big enough for any 64-bit int */
+	uint_t nelem;
+	int i, j, sz;
+	char **propvv;
 
 	/*
 	 * malformed prop nvpair
@@ -410,10 +449,23 @@ add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
 	if (propn == NULL)
 		return;
 
-	/*
-	 * We can only handle properties of string type
-	 */
 	switch (nvpair_type(pv_nvp)) {
+	case DATA_TYPE_STRING_ARRAY:
+		/*
+		 * Convert string array into single space-separated string
+		 */
+		(void) nvpair_value_string_array(pv_nvp, &propvv, &nelem);
+		for (sz = 0, i = 0; i < nelem; i++)
+			sz += strlen(propvv[i]) + 1;
+		propv = MALLOC(sz);
+		for (j = 0, i = 0; i < nelem; j++, i++) {
+			(void) strcpy(&propv[j], propvv[i]);
+			j += strlen(propvv[i]);
+			if (i < nelem - 1)
+				propv[j] = ' ';
+		}
+		break;
+
 	case DATA_TYPE_STRING:
 		(void) nvpair_value_string(pv_nvp, &propv);
 		break;
@@ -493,6 +545,9 @@ add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
 	    propn, propv);
 	if (strcmp(propn, TOPO_PROP_RESOURCE) == 0)
 		out(O_ALTFP|O_VERB3, "cfgcollect: %s", propv);
+
+	if (nvpair_type(pv_nvp) == DATA_TYPE_STRING_ARRAY)
+		FREE(propv);
 
 	rawdata->nextfree += addlen;
 
@@ -686,6 +741,7 @@ platform_config_snapshot(void)
 	Lastcfg->cooked = NULL;
 	Lastcfg->devcache = NULL;
 	Lastcfg->devidcache = NULL;
+	Lastcfg->tpcache = NULL;
 	Lastcfg->cpucache = NULL;
 
 

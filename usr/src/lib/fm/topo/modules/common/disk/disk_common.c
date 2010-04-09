@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -139,6 +138,10 @@ static const topo_pgroup_info_t storage_pgroup = {
  *	group: storage	 properties:
  *		- logical-disk, disk-model, disk-manufacturer, serial-number
  *		- firmware-revision, capacity-in-bytes
+ *
+ * NOTE: the io and storage groups won't be present if the dnode passed in is
+ * NULL. This happens when a disk is found through ses, but is not enumerated
+ * in the devinfo tree.
  */
 static int
 disk_set_props(topo_mod_t *mod, tnode_t *parent,
@@ -148,20 +151,6 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 	char		*label = NULL;
 	nvlist_t	*fmri = NULL;
 	int		err;
-
-	/* form and set the asru */
-	if ((asru = topo_mod_devfmri(mod, FM_DEV_SCHEME_VERSION,
-	    dnode->ddn_dpath, dnode->ddn_devid)) == NULL) {
-		err = ETOPO_FMRI_UNKNOWN;
-		topo_mod_dprintf(mod, "disk_set_props: "
-		    "asru error %s\n", topo_strerror(err));
-		goto error;
-	}
-	if (topo_node_asru_set(dtn, asru, 0, &err) != 0) {
-		topo_mod_dprintf(mod, "disk_set_props: "
-		    "asru_set error %s\n", topo_strerror(err));
-		goto error;
-	}
 
 	/* pull the label property down from our parent 'bay' node */
 	if (topo_node_label(parent, &label, &err) != 0) {
@@ -195,6 +184,33 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 		goto error;
 	}
 
+	/* create the storage group */
+	if (topo_pgroup_create(dtn, &storage_pgroup, &err) != 0) {
+		topo_mod_dprintf(mod, "disk_set_props: "
+		    "create storage error %s\n", topo_strerror(err));
+		goto error;
+	}
+
+	/* no dnode was found for this disk - skip the io and storage groups */
+	if (dnode == NULL) {
+		err = 0;
+		goto out;
+	}
+
+	/* form and set the asru */
+	if ((asru = topo_mod_devfmri(mod, FM_DEV_SCHEME_VERSION,
+	    dnode->ddn_dpath, dnode->ddn_devid)) == NULL) {
+		err = ETOPO_FMRI_UNKNOWN;
+		topo_mod_dprintf(mod, "disk_set_props: "
+		    "asru error %s\n", topo_strerror(err));
+		goto error;
+	}
+	if (topo_node_asru_set(dtn, asru, 0, &err) != 0) {
+		topo_mod_dprintf(mod, "disk_set_props: "
+		    "asru_set error %s\n", topo_strerror(err));
+		goto error;
+	}
+
 	/* create/set the devfs-path and devid in the io group */
 	if (topo_pgroup_create(dtn, &io_pgroup, &err) != 0) {
 		topo_mod_dprintf(mod, "disk_set_props: "
@@ -209,8 +225,8 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 		goto error;
 	}
 
-	if (topo_prop_set_string(dtn, TOPO_PGROUP_IO, TOPO_IO_DEVID,
-	    TOPO_PROP_IMMUTABLE, dnode->ddn_devid, &err) != 0) {
+	if (dnode->ddn_devid && topo_prop_set_string(dtn, TOPO_PGROUP_IO,
+	    TOPO_IO_DEVID, TOPO_PROP_IMMUTABLE, dnode->ddn_devid, &err) != 0) {
 		topo_mod_dprintf(mod, "disk_set_props: "
 		    "set devid error %s\n", topo_strerror(err));
 		goto error;
@@ -222,13 +238,6 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 	    dnode->ddn_ppath_count, &err) != 0) {
 		topo_mod_dprintf(mod, "disk_set_props: "
 		    "set phys-path error %s\n", topo_strerror(err));
-		goto error;
-	}
-
-	/* create the storage group */
-	if (topo_pgroup_create(dtn, &storage_pgroup, &err) != 0) {
-		topo_mod_dprintf(mod, "disk_set_props: "
-		    "create storage error %s\n", topo_strerror(err));
 		goto error;
 	}
 
@@ -343,9 +352,9 @@ disk_auth_clean(topo_mod_t *mod, const char *str)
 }
 
 /* create the disk topo node */
-static tnode_t *
+static int
 disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
-    disk_di_node_t *dnode, const char *name, topo_instance_t i)
+    disk_di_node_t *dnode, const char *name, topo_instance_t i, tnode_t **rval)
 {
 	int		len;
 	nvlist_t	*fmri;
@@ -354,10 +363,15 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	nvlist_t	*auth;
 	char		*mfg, *model, *firm, *serial;
 
-	mfg = disk_auth_clean(mod, dnode->ddn_mfg);
-	model = disk_auth_clean(mod, dnode->ddn_model);
-	firm = disk_auth_clean(mod, dnode->ddn_firm);
-	serial = disk_auth_clean(mod, dnode->ddn_serial);
+	*rval = NULL;
+	if (dnode != NULL) {
+		mfg = disk_auth_clean(mod, dnode->ddn_mfg);
+		model = disk_auth_clean(mod, dnode->ddn_model);
+		firm = disk_auth_clean(mod, dnode->ddn_firm);
+		serial = disk_auth_clean(mod, dnode->ddn_serial);
+	} else {
+		mfg = model = firm = serial = NULL;
+	}
 
 	/* form 'part=' of fmri as "<mfg>-<model>" */
 	if (mfg != NULL && model != NULL) {
@@ -383,16 +397,23 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 		    "hcfmri (%s%d/%s%d) error %s\n",
 		    topo_node_name(parent), topo_node_instance(parent),
 		    name, i, topo_strerror(topo_mod_errno(mod)));
-		return (NULL);
+		return (-1);
 	}
 
 	if ((dtn = topo_node_bind(mod, parent, name, i, fmri)) == NULL) {
+		if (topo_mod_errno(mod) == EMOD_NODE_BOUND) {
+			/*
+			 * if disk 0 is already there then we're done
+			 */
+			nvlist_free(fmri);
+			return (0);
+		}
 		topo_mod_dprintf(mod, "disk_tnode_create: "
 		    "bind (%s%d/%s%d) error %s\n",
 		    topo_node_name(parent), topo_node_instance(parent),
 		    name, i, topo_strerror(topo_mod_errno(mod)));
 		nvlist_free(fmri);
-		return (NULL);
+		return (-1);
 	}
 	nvlist_free(fmri);
 
@@ -403,19 +424,23 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 		    topo_node_name(parent), topo_node_instance(parent),
 		    name, i, topo_strerror(topo_mod_errno(mod)));
 		topo_node_unbind(dtn);
-		return (NULL);
+		return (-1);
 	}
-	return (dtn);
+	*rval = dtn;
+	return (0);
 }
 
 static int
-disk_declare(topo_mod_t *mod, tnode_t *parent, disk_di_node_t *dnode)
+disk_declare(topo_mod_t *mod, tnode_t *parent, disk_di_node_t *dnode,
+    tnode_t **childp)
 {
-	tnode_t		*dtn;
+	tnode_t		*dtn = NULL;
+	int		rval;
 
-	/* create the disk topo node: one disk per 'bay' */
-	dtn = disk_tnode_create(mod, parent, dnode, DISK, 0);
+	rval = disk_tnode_create(mod, parent, dnode, DISK, 0, &dtn);
 	if (dtn == NULL) {
+		if (rval == 0)
+			return (0);
 		topo_mod_dprintf(mod, "disk_declare: "
 		    "disk_tnode_create error %s\n",
 		    topo_strerror(topo_mod_errno(mod)));
@@ -430,6 +455,8 @@ disk_declare(topo_mod_t *mod, tnode_t *parent, disk_di_node_t *dnode)
 		topo_node_unbind(dtn);
 		return (-1);
 	}
+	if (childp != NULL)
+		*childp = dtn;
 	return (0);
 }
 
@@ -451,7 +478,7 @@ disk_declare_path(topo_mod_t *mod, tnode_t *parent, topo_list_t *listp,
 
 		for (i = 0; i < dnode->ddn_ppath_count; i++) {
 			if (di_devfs_path_match(dnode->ddn_ppath[0], path))
-				return (disk_declare(mod, parent, dnode));
+				return (disk_declare(mod, parent, dnode, NULL));
 		}
 	}
 
@@ -462,7 +489,7 @@ disk_declare_path(topo_mod_t *mod, tnode_t *parent, topo_list_t *listp,
 
 int
 disk_declare_addr(topo_mod_t *mod, tnode_t *parent, topo_list_t *listp,
-    const char *addr)
+    const char *addr, tnode_t **childp)
 {
 	disk_di_node_t *dnode;
 	int i;
@@ -476,13 +503,25 @@ disk_declare_addr(topo_mod_t *mod, tnode_t *parent, topo_list_t *listp,
 		for (i = 0; i < dnode->ddn_target_port_count; i++) {
 			if (strncmp(dnode->ddn_target_port[i], addr,
 			    strcspn(dnode->ddn_target_port[i], ":")) == 0)
-				return (disk_declare(mod, parent, dnode));
+				return (disk_declare(mod, parent, dnode,
+				    childp));
 		}
 	}
 
 	topo_mod_dprintf(mod, "disk_declare_addr: "
 	    "failed to find disk matching addr %s", addr);
-	return (0);
+
+	return (1);
+}
+
+/*
+ * Used to declare a disk that has been discovered through other means (usually
+ * ses), that is not enumerated in the devinfo tree.
+ */
+int
+disk_declare_non_enumerated(topo_mod_t *mod, tnode_t *parent, tnode_t **childp)
+{
+	return (disk_declare(mod, parent, NULL, childp));
 }
 
 /* di_devlink callback for disk_di_node_add */
@@ -518,7 +557,8 @@ disk_di_node_free(topo_mod_t *mod, disk_di_node_t *dnode)
 	int i;
 
 	/* free the stuff we point to */
-	topo_mod_strfree(mod, dnode->ddn_devid);
+	if (dnode->ddn_devid)
+		topo_mod_strfree(mod, dnode->ddn_devid);
 	for (i = 0; i < dnode->ddn_ppath_count; i++)
 		topo_mod_strfree(mod, dnode->ddn_ppath[i]);
 	topo_mod_free(mod, dnode->ddn_ppath,
@@ -560,23 +600,32 @@ disk_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	int		pathcount, portcount;
 	int 		ret, i;
 
-	/* check for list duplicate using devid search */
-	for (dnode = topo_list_next(cbp->dcb_list);
-	    dnode != NULL; dnode = topo_list_next(dnode)) {
-		if (devid_str_compare(dnode->ddn_devid, devid) == 0) {
-			topo_mod_dprintf(mod, "disk_di_node_add: "
-			    "already there %s\n", devid);
-			return (0);
+	if (devid) {
+		/*
+		 * Check for list duplicate using devid search.
+		 * Note if there is no devid, then we can end up with duplicates
+		 * in the list, but this doesn't do any harm.
+		 */
+		for (dnode = topo_list_next(cbp->dcb_list);
+		    dnode != NULL; dnode = topo_list_next(dnode)) {
+			if (dnode->ddn_devid &&
+			    devid_str_compare(dnode->ddn_devid, devid) == 0) {
+				topo_mod_dprintf(mod, "disk_di_node_add: "
+				    "already there %s\n", devid);
+				return (0);
+			}
 		}
 	}
 
 	if ((dnode = topo_mod_zalloc(mod, sizeof (disk_di_node_t))) == NULL)
 		return (-1);
 
-	/* Establish the devid. */
-	dnode->ddn_devid = topo_mod_strdup(mod, devid);
-	if (dnode->ddn_devid == NULL)
-		goto error;
+	if (devid) {
+		/* Establish the devid. */
+		dnode->ddn_devid = topo_mod_strdup(mod, devid);
+		if (dnode->ddn_devid == NULL)
+			goto error;
+	}
 
 	/* Establish the devinfo dpath */
 	if ((path = di_devfs_path(node)) == NULL) {
@@ -748,7 +797,7 @@ disk_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	}
 
 	topo_mod_dprintf(mod, "disk_di_node_add: "
-	    "adding %s\n", dnode->ddn_devid);
+	    "adding %s\n", devid ? dnode->ddn_devid : "NULL devid");
 	topo_mod_dprintf(mod, "                  "
 	    "       %s\n", dnode->ddn_dpath);
 	for (i = 0; i < dnode->ddn_ppath_count; i++) {
@@ -768,12 +817,19 @@ static int
 disk_walk_di_nodes(di_node_t node, void *arg)
 {
 	char			*devidstr = NULL;
+	char			*s;
 
-	/* only interested in nodes that have devids */
-	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
-	    DEVID_PROP_NAME, &devidstr) < 0) {
+	/*
+	 * if it's not a scsi_vhci client and doesn't have a target port
+	 * then we're not interested
+	 */
+	if (di_path_client_next_path(node, NULL) == NULL &&
+	    di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+	    SCSI_ADDR_PROP_TARGET_PORT, &s) <= 0) {
 		return (DI_WALK_CONTINUE);
 	}
+	(void) di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+	    DEVID_PROP_NAME, &devidstr);
 
 	/* create/find the devid scsi topology node */
 	(void) disk_di_node_add(node, devidstr, arg);
@@ -804,7 +860,7 @@ disk_list_gather(topo_mod_t *mod, topo_list_t *listp)
 	dcb.dcb_list = listp;
 	dcb.dcb_devhdl = devhdl;
 
-	/* walk the devinfo snapshot looking for nodes with devids */
+	/* walk the devinfo snapshot looking for disk nodes */
 	(void) di_walk_node(devtree, DI_WALK_CLDFIRST, &dcb,
 	    disk_walk_di_nodes);
 

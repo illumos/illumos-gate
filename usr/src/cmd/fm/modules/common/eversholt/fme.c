@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * fme.c -- fault management exercise module
  *
@@ -794,6 +793,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	cfgdata->cooked = NULL;
 	cfgdata->devcache = NULL;
 	cfgdata->devidcache = NULL;
+	cfgdata->tpcache = NULL;
 	cfgdata->cpucache = NULL;
 	cfgdata->raw_refcnt = 1;
 

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -351,19 +350,39 @@ config_cook(struct cfgdata *cdata)
 		}
 
 		/*
-		 * If this property is a device path or devid, cache it
+		 * If this property is a device path, tp or devid, cache it
 		 * for quick lookup.
 		 */
 		if (pn == stable(TOPO_IO_DEV)) {
 			sv = stable(equals + 1);
-			out(O_ALTFP|O_VERB3, "caching dev %s\n", sv);
+			out(O_ALTFP|O_VERB3, "caching dev %s", sv);
 			cdata->devcache = lut_add(cdata->devcache,
 			    (void *)sv, (void *)newnode, NULL);
 		} else if (pn == stable(TOPO_IO_DEVID)) {
 			sv = stable(equals + 1);
-			out(O_ALTFP|O_VERB3, "caching devid %s\n", sv);
+			out(O_ALTFP|O_VERB3, "caching devid %s", sv);
 			cdata->devidcache = lut_add(cdata->devidcache,
 			    (void *)sv, (void *)newnode, NULL);
+		} else if (pn == stable(TOPO_STORAGE_TARGET_PORT_L0IDS)) {
+			/*
+			 * This was stored as a set of space-separated strings.
+			 * Find each string in turn and add to the lut. Then if
+			 * a ereport comes in with a target-path matching any
+			 * of the strings we will match it.
+			 */
+			char *x, *y = equals;
+			while (y != NULL) {
+				x = y + 1;
+				y = strchr(x, ' ');
+				if (y != NULL)
+					*y = '\0';
+				sv = stable(x);
+				out(O_ALTFP|O_VERB3, "caching tp %s", sv);
+				cdata->tpcache = lut_add(cdata->tpcache,
+				    (void *)sv, (void *)newnode, NULL);
+				if (y != NULL)
+					*y = ' ';
+			}
 		}
 
 		*equals = '=';
@@ -426,6 +445,9 @@ config_free(struct cfgdata *cp)
 		if (cp->devcache != NULL)
 			lut_free(cp->devcache, NULL, NULL);
 		cp->devcache = NULL;
+		if (cp->tpcache != NULL)
+			lut_free(cp->tpcache, NULL, NULL);
+		cp->tpcache = NULL;
 		if (cp->devidcache != NULL)
 			lut_free(cp->devidcache, NULL, NULL);
 		cp->devidcache = NULL;
@@ -546,6 +568,13 @@ prtdevidcache(void *lhs, void *rhs, void *arg)
 
 /*ARGSUSED*/
 static void
+prttpcache(void *lhs, void *rhs, void *arg)
+{
+	out(O_ALTFP|O_VERB3, "%s -> %p", (char *)lhs, rhs);
+}
+
+/*ARGSUSED*/
+static void
 prtcpucache(void *lhs, void *rhs, void *arg)
 {
 	out(O_ALTFP|O_VERB, "%u -> %p", (uint32_t)lhs, rhs);
@@ -592,6 +621,32 @@ config_bydevid_lookup(struct cfgdata *fromcfg, const char *devid)
 
 	if ((find = lut_lookup(fromcfg->devidcache,
 	    (void *) stable(devid), NULL)) == NULL)
+		return (NULL);
+
+	np = config_nodeize(find);
+	if (np != NULL) {
+		out(O_ALTFP|O_VERB, "Matching config entry:");
+		ptree_name_iter(O_ALTFP|O_VERB|O_NONL, np);
+		out(O_ALTFP|O_VERB, NULL);
+	}
+	return (np);
+}
+
+/*
+ * config_bytp_lookup -- look up the path in our TPcache lut.
+ * If we find it return the config path, but as a struct node.
+ */
+struct node *
+config_bytp_lookup(struct cfgdata *fromcfg, const char *tp)
+{
+	struct config *find;
+	struct node *np;
+
+	out(O_ALTFP|O_VERB3, "Device id cache:");
+	lut_walk(fromcfg->devcache, (lut_cb)prttpcache, NULL);
+
+	if ((find = lut_lookup(fromcfg->tpcache,
+	    (void *) stable(tp), NULL)) == NULL)
 		return (NULL);
 
 	np = config_nodeize(find);

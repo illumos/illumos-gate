@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _TOPO_HC_H
@@ -105,6 +104,10 @@ extern "C" {
 #define	TOPO_PCI_BDF		"BDF"
 #define	TOPO_PCI_CLASS		"class-code"
 #define	TOPO_PCI_AADDR		"assigned-addresses"
+
+#define	TOPO_PGROUP_STORAGE	"storage"
+#define	TOPO_STORAGE_TARGET_PORT_L0ID	"target-port-l0id"
+#define	TOPO_STORAGE_TARGET_PORT_L0IDS	"target-port-l0ids"
 
 #define	TOPO_PGROUP_BINDING	"binding"
 #define	TOPO_BINDING_OCCUPANT	"occupant-path"

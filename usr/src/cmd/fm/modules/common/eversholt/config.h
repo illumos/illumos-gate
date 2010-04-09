@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * config.h -- public definitions for config module
  *
@@ -30,8 +29,6 @@
 
 #ifndef	_EFT_CONFIG_H
 #define	_EFT_CONFIG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -56,6 +53,7 @@ struct cfgdata {
 	struct config *cooked;
 	struct lut *devcache;
 	struct lut *devidcache;
+	struct lut *tpcache;
 	struct lut *cpucache;
 };
 
@@ -87,6 +85,7 @@ void config_print(int flags, struct config *croot);
 struct node *config_bydev_lookup(struct cfgdata *, const char *);
 struct node *config_bycpuid_lookup(struct cfgdata *, uint32_t);
 struct node *config_bydevid_lookup(struct cfgdata *, const char *);
+struct node *config_bytp_lookup(struct cfgdata *, const char *);
 
 #ifdef	__cplusplus
 }

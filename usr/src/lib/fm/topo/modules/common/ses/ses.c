@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <alloca.h>
@@ -34,6 +33,7 @@
 #include <unistd.h>
 #include <sys/dkio.h>
 #include <sys/fm/protocol.h>
+#include <sys/libdevid.h>
 #include <sys/scsi/scsi_types.h>
 
 #include "disk.h"
@@ -509,7 +509,8 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 	nvlist_t **sas;
 	uint_t s, nsas;
 	char **paths;
-	int err;
+	int err, ret;
+	tnode_t *child = NULL;
 
 	/*
 	 * Skip devices that are not in a present (and possibly damaged) state.
@@ -552,11 +553,47 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 	err = 0;
 
 	for (s = 0; s < nsas; s++) {
-		if (disk_declare_addr(mod, pnode,
-		    &sdp->sed_disks, paths[s]) != 0 &&
-		    topo_mod_errno(mod) != EMOD_NODE_BOUND) {
+		ret = disk_declare_addr(mod, pnode, &sdp->sed_disks, paths[s],
+		    &child);
+		if (ret == 0) {
+			break;
+		} else if (ret < 0) {
 			err = -1;
 			break;
+		}
+	}
+
+	if (s == nsas)
+		disk_declare_non_enumerated(mod, pnode, &child);
+
+	/* copy sas_addresses (target-ports) from parent (with 'w'added) */
+	if (child != NULL) {
+		int i;
+		char **tports;
+		uint64_t wwn;
+
+		tports = topo_mod_zalloc(mod, sizeof (char *) * nsas);
+		if (tports != NULL) {
+			for (i = 0; i < nsas; i++) {
+				if (scsi_wwnstr_to_wwn(paths[i], &wwn) !=
+				    DDI_SUCCESS)
+					break;
+				tports[i] = scsi_wwn_to_wwnstr(wwn, 1, NULL);
+				if (tports[i] == NULL)
+					break;
+			}
+			/* if they all worked then create the property */
+			if (i == nsas)
+				(void) topo_prop_set_string_array(child,
+				    TOPO_PGROUP_STORAGE,
+				    TOPO_STORAGE_TARGET_PORT_L0IDS,
+				    TOPO_PROP_IMMUTABLE, (const char **)tports,
+				    nsas, &err);
+
+			for (i = 0; i < nsas; i++)
+				if (tports[i] != NULL)
+					scsi_free_wwnstr(tports[i]);
+			topo_mod_free(mod, tports, sizeof (char *) * nsas);
 		}
 	}
 

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _DISK_H
@@ -55,10 +54,11 @@ struct topo_list;
 /* Methods shared with the ses module (disk_common.c) */
 extern int disk_list_gather(topo_mod_t *, struct topo_list *);
 extern void disk_list_free(topo_mod_t *, struct topo_list *);
+extern int disk_declare_non_enumerated(topo_mod_t *, tnode_t *, tnode_t **);
 extern int disk_declare_path(topo_mod_t *, tnode_t *,
     struct topo_list *, const char *);
 extern int disk_declare_addr(topo_mod_t *, tnode_t *,
-    struct topo_list *, const char *);
+    struct topo_list *, const char *, tnode_t **);
 extern char *disk_auth_clean(topo_mod_t *, const char *);
 
 #ifdef __cplusplus
