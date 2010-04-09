@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Internal PCI Fast DVMA implementation
@@ -204,11 +201,14 @@ pci_fdvma_reserve(dev_info_t *dip, dev_info_t *rdip, pci_t *pci_p,
 		return (DDI_DMA_BADLIMITS);
 
 	/*
-	 * Check the size of the request.
+	 * Allocate DVMA space from reserve.
 	 */
 	npages = dmareq->dmar_object.dmao_size;
-	if (npages > iommu_p->iommu_dvma_reserve)
+	if ((long)atomic_add_long_nv(&iommu_p->iommu_dvma_reserve,
+	    -npages) < 0) {
+		atomic_add_long(&iommu_p->iommu_dvma_reserve, npages);
 		return (DDI_DMA_NORESOURCES);
+	}
 
 	/*
 	 * Allocate the dma handle.
@@ -226,10 +226,10 @@ pci_fdvma_reserve(dev_info_t *dip, dev_info_t *rdip, pci_t *pci_p,
 		counter_max, (void *)lo, (void *)(hi + 1),
 		dmareq->dmar_fp == DDI_DMA_SLEEP ? VM_SLEEP : VM_NOSLEEP));
 	if (dvma_pg == 0) {
+		atomic_add_long(&iommu_p->iommu_dvma_reserve, npages);
 		kmem_free(mp, sizeof (pci_dma_hdl_t));
 		return (DDI_DMA_NOMAPPING);
 	}
-	iommu_p->iommu_dvma_reserve -= npages;
 
 	/*
 	 * Create the fast dvma request structure.
@@ -289,7 +289,7 @@ pci_fdvma_release(dev_info_t *dip, pci_t *pci_p, ddi_dma_impl_t *mp)
 	npages = mp->dmai_ndvmapages;
 	pci_vmem_free(iommu_p, mp, (void *)mp->dmai_mapping, npages);
 
-	iommu_p->iommu_dvma_reserve += npages;
+	atomic_add_long(&iommu_p->iommu_dvma_reserve, npages);
 	mp->dmai_ndvmapages = 0;
 
 	/* see if there is anyone waiting for dvma space */
