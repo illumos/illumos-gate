@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -928,19 +927,16 @@ dmu_read_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size)
 	return (err);
 }
 
-int
-dmu_write_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size,
-    dmu_tx_t *tx)
+static int
+dmu_write_uio_dnode(dnode_t *dn, uio_t *uio, uint64_t size, dmu_tx_t *tx)
 {
 	dmu_buf_t **dbp;
-	int numbufs, i;
+	int numbufs;
 	int err = 0;
+	int i;
 
-	if (size == 0)
-		return (0);
-
-	err = dmu_buf_hold_array(os, object, uio->uio_loffset, size,
-	    FALSE, FTAG, &numbufs, &dbp);
+	err = dmu_buf_hold_array_by_dnode(dn, uio->uio_loffset, size,
+	    FALSE, FTAG, &numbufs, &dbp, DMU_READ_PREFETCH);
 	if (err)
 		return (err);
 
@@ -978,7 +974,40 @@ dmu_write_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size,
 
 		size -= tocpy;
 	}
+
 	dmu_buf_rele_array(dbp, numbufs, FTAG);
+	return (err);
+}
+
+int
+dmu_write_uio_dbuf(dmu_buf_t *zdb, uio_t *uio, uint64_t size,
+    dmu_tx_t *tx)
+{
+	if (size == 0)
+		return (0);
+
+	return (dmu_write_uio_dnode(((dmu_buf_impl_t *)zdb)->db_dnode,
+	    uio, size, tx));
+}
+
+int
+dmu_write_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size,
+    dmu_tx_t *tx)
+{
+	dnode_t *dn;
+	int err;
+
+	if (size == 0)
+		return (0);
+
+	err = dnode_hold(os, object, FTAG, &dn);
+	if (err)
+		return (err);
+
+	err = dmu_write_uio_dnode(dn, uio, size, tx);
+
+	dnode_rele(dn, FTAG);
+
 	return (err);
 }
 
