@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "benv.h"
@@ -438,6 +437,7 @@ static void
 print_var(char *name, eplist_t *list)
 {
 	benv_ent_t *p;
+	char *bootcmd;
 
 	/*
 	 * The console property is kept in both menu.lst and bootenv.rc.  The
@@ -453,13 +453,17 @@ print_var(char *name, eplist_t *list)
 				    name);
 			}
 		}
+	} else if (strcmp(name, "bootcmd") == 0) {
+		bootcmd = getbootcmd();
+		(void) printf("%s=%s\n", name, bootcmd ? bootcmd : "");
 	} else if ((strcmp(name, "boot-file") == 0) ||
 	    (strcmp(name, "boot-args") == 0)) {
 		(void) print_bootadm_value(name, 0);
-	} else if ((p = get_var(name, list)) == NULL)
+	} else if ((p = get_var(name, list)) == NULL) {
 		(void) printf("%s: data not available.\n", name);
-	else
+	} else {
 		(void) printf("%s=%s\n", name, p->val ? p->val : "");
+	}
 }
 
 static void
@@ -596,6 +600,9 @@ set_var(char *name, char *val, eplist_t *list)
 {
 	benv_ent_t *p;
 	int old_verbose;
+
+	if (strcmp(name, "bootcmd") == 0)
+		return (0);
 
 	if ((strcmp(name, "boot-file") == 0) ||
 	    (strcmp(name, "boot-args") == 0)) {
@@ -951,7 +958,6 @@ add_cmd(benv_des_t *bd, char *last, char **next, int *line)
 		(*line)++;
 	};
 
-	add_bent(bd->elist, NULL, "getprop", "bootcmd", getbootcmd());
 }
 
 /*
