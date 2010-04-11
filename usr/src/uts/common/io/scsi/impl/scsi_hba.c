@@ -8092,9 +8092,15 @@ scsi_hba_bus_unconfig(dev_info_t *self, uint_t flags,
 	if (tran->tran_hba_flags & SCSI_HBA_HBA) {
 		/* The bus_config request is to unconfigure iports below HBA. */
 		if (tran->tran_iportmap) {
-			/* unconfig based on scsi_hba_iportmap API */
+			/* SCSAv3 unconfig based on scsi_hba_iportmap API */
 			ret = scsi_hba_bus_unconfig_iportmap(self,
 			    flags, op, arg);
+		} else if (tran->tran_bus_unconfig) {
+			/* HBA unconfig based on Sun-private/legacy API */
+			ret = tran->tran_bus_unconfig(self, flags, op, arg);
+		} else {
+			/* Standard framework unconfig. */
+			ret = ndi_busop_bus_unconfig(self, flags, op, arg);
 		}
 		return (ret);
 	}
