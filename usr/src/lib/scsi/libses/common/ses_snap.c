@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <scsi/libses.h>
 #include "ses_impl.h"
@@ -158,7 +155,7 @@ ses_snap_ctl_page(ses_snap_t *sp, ses2_diag_page_t page, size_t dlen,
 	ASSERT(dp != NULL);
 
 	len = dp->spd_ctl_len(sp->ss_n_elem, page, dlen);
-	if (pp->ssp_alloc < dlen && grow_snap_page(pp, len) != 0)
+	if (pp->ssp_alloc < len && grow_snap_page(pp, len) != 0)
 		return (NULL);
 	pp->ssp_len = len;
 	bzero(pp->ssp_page, len);
@@ -239,12 +236,19 @@ again:
 	ASSERT(buf == pp->ssp_page);
 	ASSERT(alloc == pp->ssp_alloc);
 
-	if (pp->ssp_len == pp->ssp_alloc && pp->ssp_alloc < UINT16_MAX) {
+	if (pp->ssp_alloc - pp->ssp_len < 0x80 && pp->ssp_alloc < UINT16_MAX) {
 		bzero(pp->ssp_page, pp->ssp_len);
 		pp->ssp_len = 0;
 		if (grow_snap_page(pp, 0) != 0)
 			return (-1);
 		goto again;
+	}
+
+	if (pp->ssp_len < offsetof(spc3_diag_page_impl_t, sdpi_data)) {
+		bzero(pp->ssp_page, pp->ssp_len);
+		pp->ssp_len = 0;
+		return (ses_error(ESES_BAD_RESPONSE, "target returned "
+		    "truncated page 0x%x (length %d)", page, pp->ssp_len));
 	}
 
 	pip = (spc3_diag_page_impl_t *)buf;
@@ -447,6 +451,7 @@ ses_snap_new(ses_target_t *tp)
 	ses_pagedesc_t *dp;
 	size_t pages, pagesize, pagelen;
 	char *scratch;
+	boolean_t simple;
 
 	if ((sp = ses_zalloc(sizeof (ses_snap_t))) == NULL)
 		return (NULL);
@@ -464,6 +469,16 @@ again:
 	sp->ss_generation = (uint32_t)-1;
 	sp->ss_time = gethrtime();
 
+	/*
+	 * First check for the short enclosure status diagnostic page and
+	 * determine if this is a simple subenclosure or not.
+	 */
+	simple = B_FALSE;
+	for (pp = sp->ss_pages; pp != NULL; pp = pp->ssp_next) {
+		if (pp->ssp_num == SES2_DIAGPAGE_SHORT_STATUS)
+			simple = B_TRUE;
+	}
+
 	for (pp = sp->ss_pages; pp != NULL; pp = pp->ssp_next) {
 		/*
 		 * We skip all of:
@@ -478,8 +493,20 @@ again:
 		    SES_PAGE_DIAG)) == NULL)
 			continue;
 
-		if (read_status_page(sp, pp->ssp_num) != 0)
+		if (read_status_page(sp, pp->ssp_num) != 0)  {
+			/*
+			 * If this page is required, and this is not a simple
+			 * subenclosure, then fail the entire snapshot.
+			 */
+			if (dp->spd_req == SES_REQ_MANDATORY_ALL ||
+			    (dp->spd_req == SES_REQ_MANDATORY_STANDARD &&
+			    !simple)) {
+				ses_snap_free(sp);
+				return (NULL);
+			}
+
 			continue;
+		}
 
 		/*
 		 * If the generation code has changed, we don't have a valid

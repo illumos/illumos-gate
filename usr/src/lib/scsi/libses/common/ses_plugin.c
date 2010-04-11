@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <scsi/libses.h>
 #include "ses_impl.h"
@@ -358,8 +355,8 @@ ses_plugin_load(ses_target_t *tp)
 		pluginpath = LIBSES_DEFAULT_PLUGINDIR;
 	ses_plugin_dlclose = (getenv("SES_NODLCLOSE") == NULL);
 
-	for (p = pluginpath, q = strchr(p, ':'); p != NULL; p = q) {
-		if (q != NULL) {
+	for (p = pluginpath; p != NULL; p = q) {
+		if ((q = strchr(p, ':')) != NULL) {
 			ptrdiff_t len = q - p;
 			(void) strncpy(pluginroot, p, len);
 			pluginroot[len] = '\0';
@@ -376,7 +373,7 @@ ses_plugin_load(ses_target_t *tp)
 		if (pluginroot[0] != '/')
 			continue;
 
-		if (ses_plugin_load_dir(tp, pluginpath) != 0)
+		if (ses_plugin_load_dir(tp, pluginroot) != 0)
 			return (-1);
 	}
 

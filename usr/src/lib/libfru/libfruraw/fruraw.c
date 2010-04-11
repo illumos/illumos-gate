@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -551,8 +550,9 @@ frt_get_segment_name(fru_seghdl_t node, char **name)
 		for (each_seg = 0; each_seg < num_segment; each_seg++) {
 			if (segs[each_seg].handle == node) {
 				segs[each_seg].name[FRU_SEGNAMELEN] = '\0';
-				*name = segs[each_seg].name;
+				*name = strdup(segs[each_seg].name);
 				free(sects);
+				free(segs);
 				return (FRU_SUCCESS);
 			}
 		}

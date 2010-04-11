@@ -27,7 +27,6 @@
 #define	_DISK_H
 
 #include <fm/topo_mod.h>
-#include <fm/topo_hc.h>
 #include <libdevinfo.h>
 
 #ifdef __cplusplus
@@ -49,11 +48,42 @@ extern "C" {
 #define	TOPO_STORAGE_FIRMWARE_REV	"firmware-revision"
 #define	TOPO_STORAGE_CAPACITY		"capacity-in-bytes"
 
+/*
+ * Properties for binding group: The binding group required in platform
+ * specific xml that describes 'bay' nodes containing internal disks.
+ */
+#define	TOPO_PGROUP_BINDING		"binding"
+#define	TOPO_BINDING_OCCUPANT		"occupant-path"
+
+/*
+ * device node information.
+ */
+typedef struct dev_di_node {
+	topo_list_t	ddn_list;	/* list of devices */
+
+	/* the following two fields are always defined */
+	char		*ddn_devid;	/* devid of device */
+	char		*ddn_dpath;	/* path to devinfo (may be vhci) */
+	char		**ddn_ppath;	/* physical path to device (phci) */
+	int		ddn_ppath_count;
+
+	char		*ddn_lpath;	/* logical path (public /dev name) */
+
+	char		*ddn_mfg;	/* misc information about device */
+	char		*ddn_model;
+	char		*ddn_serial;
+	char		*ddn_firm;
+	char		*ddn_cap;
+
+	char		**ddn_target_port;
+	int		ddn_target_port_count;
+} dev_di_node_t;
+
 struct topo_list;
 
 /* Methods shared with the ses module (disk_common.c) */
-extern int disk_list_gather(topo_mod_t *, struct topo_list *);
-extern void disk_list_free(topo_mod_t *, struct topo_list *);
+extern int dev_list_gather(topo_mod_t *, struct topo_list *);
+extern void dev_list_free(topo_mod_t *, struct topo_list *);
 extern int disk_declare_non_enumerated(topo_mod_t *, tnode_t *, tnode_t **);
 extern int disk_declare_path(topo_mod_t *, tnode_t *,
     struct topo_list *, const char *);

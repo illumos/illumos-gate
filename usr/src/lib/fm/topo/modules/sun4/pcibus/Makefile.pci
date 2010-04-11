@@ -29,7 +29,7 @@ SUN4DIR = ../../sun4/$(MODULE)
 UTILDIR = ../../common/pcibus
 HBDIR = ../../common/hostbridge
 UTILSRCS = did.c did_hash.c did_props.c util.c
-PCISRCS = pcibus.c pcibus_labels.c pci_sun4.c
+PCISRCS = pcibus.c pcibus_labels.c pci_sun4.c pcibus_hba.c
 
 MODULESRCS = $(PCISRCS) $(UTILSRCS) pci_$(ARCH).c
 

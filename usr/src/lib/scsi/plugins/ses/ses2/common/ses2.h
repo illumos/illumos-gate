@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#ifndef	_FRAMEWORK_SES_H
-#define	_FRAMEWORK_SES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef	_FRAMEWORK_SES2_H
+#define	_FRAMEWORK_SES2_H
 
 #ifdef	__cplusplus
 extern "C" {
@@ -81,6 +78,7 @@ typedef enum ses_element_status_code {
 
 #define	SES_PROP_ELEMENT_CLASS_INDEX	"ses-element-class-index" /* U64 */
 #define	SES_PROP_ELEMENT_INDEX		"ses-element-index"	/* U64 */
+#define	SES_PROP_ELEMENT_ONLY_INDEX	"ses-element-only-index" /* U64 */
 #define	SES_PROP_BAY_NUMBER		"ses-bay-number"	/* U64 */
 #define	SES_PROP_PRDFAIL		"ses-failure-predicted"
 #define	SES_PROP_SWAP			"ses-swapped"
@@ -515,9 +513,10 @@ typedef enum ses2_diag_page {
 #define	SES_CTL_PROP_UCODE_DATA		"ses-ctl-ucode-data"
 #define	SES_CTL_PROP_UCODE_BUFID	"ses-ctl-ucode-bufid"
 #define	SES_CTL_PROP_UCODE_MODE		"ses-ctl-ucode-mode"
+#define	SES_CTL_PROP_UCODE_DATA_LEN	"ses-ctl-ucode-data-length" /* U64 */
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _FRAMEWORK_SES_H */
+#endif	/* _FRAMEWORK_SES2_H */

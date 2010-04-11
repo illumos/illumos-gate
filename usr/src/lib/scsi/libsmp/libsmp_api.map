@@ -1,0 +1,51 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+{
+	smp_strerror = FUNCTION extern;
+	smp_errname = FUNCTION extern;
+	smp_errcode = FUNCTION extern;
+	smp_alloc = FUNCTION extern;
+	smp_zalloc = FUNCTION extern;
+	smp_strdup = FUNCTION extern;
+	smp_free = FUNCTION extern;
+	smp_set_errno = FUNCTION extern;
+	smp_verror = FUNCTION extern;
+	smp_error = FUNCTION extern;
+	smp_action_get_timeout = FUNCTION extern;
+	smp_action_get_request = FUNCTION extern;
+	smp_action_get_response = FUNCTION extern;
+	smp_action_get_request_frame = FUNCTION extern;
+	smp_action_get_response_frame = FUNCTION extern;
+	smp_action_get_function_def = FUNCTION extern;
+	smp_action_set_response_len = FUNCTION extern;
+	smp_action_set_result = FUNCTION extern;
+	smp_target_getcap = FUNCTION extern;
+	smp_target_set_change_count = FUNCTION extern;
+	smp_target_get_change_count = FUNCTION extern;
+	smp_assert = FUNCTION extern;
+	smp_engine_register = FUNCTION extern;
+	smp_plugin_register = FUNCTION extern;
+};

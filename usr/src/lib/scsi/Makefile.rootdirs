@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Define the transitive set of rules to create a common module's install dir
@@ -56,6 +54,27 @@ $(ROOTPLUGINLIBDIR)/ses/vendor: $(ROOTPLUGINLIBDIR)/ses
 $(ROOTPLUGINLIBDIR)/ses/vendor/$(MACH64): $(ROOTPLUGINLIBDIR)/ses/vendor
 	$(INS.dir)
 
+$(ROOTPLUGINLIBDIR)/smp: $(ROOTPLUGINLIBDIR)
+	$(INS.dir)
+
+$(ROOTPLUGINLIBDIR)/smp/engine: $(ROOTPLUGINLIBDIR)/smp
+	$(INS.dir)
+
+$(ROOTPLUGINLIBDIR)/smp/engine/$(MACH64): $(ROOTPLUGINLIBDIR)/smp/engine
+	$(INS.dir)
+
+$(ROOTPLUGINLIBDIR)/smp/framework: $(ROOTPLUGINLIBDIR)/smp
+	$(INS.dir)
+
+$(ROOTPLUGINLIBDIR)/smp/framework/$(MACH64): $(ROOTPLUGINLIBDIR)/smp/framework
+	$(INS.dir)
+
+$(ROOTPLUGINLIBDIR)/smp/vendor: $(ROOTPLUGINLIBDIR)/smp
+	$(INS.dir)
+
+$(ROOTPLUGINLIBDIR)/smp/vendor/$(MACH64): $(ROOTPLUGINLIBDIR)/smp/vendor
+	$(INS.dir)
+
 $(ROOTPLUGINHDRDIR):
 	$(INS.dir)
 
@@ -67,3 +86,16 @@ $(ROOTPLUGINHDRDIR)/ses/framework: $(ROOTPLUGINHDRDIR)/ses
 
 $(ROOTPLUGINHDRDIR)/ses/vendor: $(ROOTPLUGINHDRDIR)/ses
 	$(INS.dir)
+
+$(ROOTPLUGINHDRDIR)/smp: $(ROOTPLUGINHDRDIR)
+	$(INS.dir)
+
+$(ROOTPLUGINHDRDIR)/smp/engine: $(ROOTPLUGINHDRDIR)/smp
+	$(INS.dir)
+
+$(ROOTPLUGINHDRDIR)/smp/framework: $(ROOTPLUGINHDRDIR)/smp
+	$(INS.dir)
+
+$(ROOTPLUGINHDRDIR)/smp/vendor: $(ROOTPLUGINHDRDIR)/smp
+	$(INS.dir)
+

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_FRAMEWORK_LIBSES_H
@@ -52,6 +51,8 @@ extern "C" {
  */
 #define	LIBSES_PROP_PART		"libses-part-number"
 #define	LIBSES_PROP_SERIAL		"libses-serial-number"
+#define	LIBSES_PROP_FRU			"libses-is-fru"
+#define	LIBSES_PROP_PHYS_PARENT		"libses-physical-parent-element-index"
 
 /*
  * The chassis serial number is a pseudo property that doesn't exist in SES
@@ -75,6 +76,12 @@ extern "C" {
  * support the concept of a subchassis.
  */
 #define	LIBSES_EN_PROP_SUBCHASSIS_ID	"libses-subchassis-id"
+
+/*
+ * Maximum allowed firmware upload chunk size.  Obtained in a vendor- or
+ * platform-specific manner but generic in nature.
+ */
+#define	LIBSES_EN_PROP_FIRMWARE_CHUNK_SIZE	"libses-firmware-chunksize"
 
 #ifdef	__cplusplus
 }

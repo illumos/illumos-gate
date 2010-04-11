@@ -29,7 +29,7 @@ CLASS = arch
 UTILDIR = ../../common/pcibus
 HBDIR = ../../common/hostbridge
 UTILSRCS = did.c did_hash.c did_props.c util.c
-PCISRCS = pcibus.c pcibus_labels.c
+PCISRCS = pcibus.c pcibus_labels.c pcibus_hba.c
 
 MODULESRCS = $(UTILSRCS) $(PCISRCS) pci_i86pc.c
 

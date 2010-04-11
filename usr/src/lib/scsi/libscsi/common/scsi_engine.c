@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/isa_defs.h>
@@ -73,8 +70,8 @@ get_engine(libscsi_hdl_t *hp, const char *name)
 	isa[0] = '\0';
 #endif
 
-	for (p = engine_path, q = strchr(p, ':'); p != NULL; p = q) {
-		if (q != NULL) {
+	for (p = engine_path; p != NULL; p = q) {
+		if ((q = strchr(p, ':')) != NULL) {
 			ptrdiff_t len = q - p;
 			(void) strncpy(engine_dir, p, len);
 			engine_dir[len] = '\0';

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/developer/library/lint@$(PKGVERS)
@@ -336,10 +335,13 @@ file path=usr/lib/llib-lzoneinfo
 file path=usr/lib/llib-lzoneinfo.ln
 file path=usr/lib/scsi/$(ARCH64)/llib-lscsi.ln
 file path=usr/lib/scsi/$(ARCH64)/llib-lses.ln
+file path=usr/lib/scsi/$(ARCH64)/llib-lsmp.ln
 file path=usr/lib/scsi/llib-lscsi
 file path=usr/lib/scsi/llib-lscsi.ln
 file path=usr/lib/scsi/llib-lses
 file path=usr/lib/scsi/llib-lses.ln
+file path=usr/lib/scsi/llib-lsmp
+file path=usr/lib/scsi/llib-lsmp.ln
 file path=usr/lib/values-Xa.o
 file path=usr/lib/values-Xc.o
 file path=usr/lib/values-Xs.o

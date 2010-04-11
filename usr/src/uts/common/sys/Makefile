@@ -904,6 +904,7 @@ SCSIGENHDRS=		\
 	mode.h		\
 	persist.h	\
 	sense.h		\
+	sff_frames.h	\
 	smp_frames.h	\
 	status.h
 
@@ -1179,6 +1180,7 @@ CHECKHDRS=						\
 	$(SCSICONFHDRS:%.h=scsi/conf/%.check)		\
 	$(SCSIIMPLHDRS:%.h=scsi/impl/%.check)		\
 	$(SCSIISCSIHDRS:%.h=scsi/adapters/%.check)	\
+	$(SCSIGENHDRS:%.h=scsi/generic/%.check)		\
 	$(SCSITARGETSHDRS:%.h=scsi/targets/%.check)	\
 	$(SCSIVHCIHDRS:%.h=scsi/adapters/%.check)	\
 	$(SATAGENHDRS:%.h=sata/%.check)			\

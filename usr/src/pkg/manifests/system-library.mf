@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/library@$(PKGVERS)
@@ -74,6 +73,11 @@ dir path=usr/lib/scsi/plugins/ses/framework
 dir path=usr/lib/scsi/plugins/ses/framework/$(ARCH64)
 dir path=usr/lib/scsi/plugins/ses/vendor
 $(sparc_ONLY)dir path=usr/lib/scsi/plugins/ses/vendor/$(ARCH64)
+dir path=usr/lib/scsi/plugins/smp
+dir path=usr/lib/scsi/plugins/smp/framework
+dir path=usr/lib/scsi/plugins/smp/framework/$(ARCH64)
+dir path=usr/lib/scsi/plugins/smp/engine
+dir path=usr/lib/scsi/plugins/smp/engine/$(ARCH64)
 dir path=usr/lib/security
 dir path=usr/lib/security/$(ARCH64)
 dir path=usr/xpg4
@@ -375,14 +379,20 @@ file path=usr/lib/raidcfg/$(ARCH64)/mpt.so.1
 file path=usr/lib/raidcfg/mpt.so.1
 file path=usr/lib/scsi/$(ARCH64)/libscsi.so.1
 file path=usr/lib/scsi/$(ARCH64)/libses.so.1
+file path=usr/lib/scsi/$(ARCH64)/libsmp.so.1
 file path=usr/lib/scsi/libscsi.so.1
 file path=usr/lib/scsi/libses.so.1
+file path=usr/lib/scsi/libsmp.so.1
 file path=usr/lib/scsi/plugins/scsi/engines/$(ARCH64)/uscsi.so
 file path=usr/lib/scsi/plugins/scsi/engines/uscsi.so
+file path=usr/lib/scsi/plugins/smp/engine/$(ARCH64)/usmp.so
+file path=usr/lib/scsi/plugins/smp/engine/usmp.so
 file path=usr/lib/scsi/plugins/ses/framework/$(ARCH64)/libses.so
 file path=usr/lib/scsi/plugins/ses/framework/$(ARCH64)/ses2.so
 file path=usr/lib/scsi/plugins/ses/framework/libses.so
 file path=usr/lib/scsi/plugins/ses/framework/ses2.so
+file path=usr/lib/scsi/plugins/smp/framework/$(ARCH64)/sas2.so
+file path=usr/lib/scsi/plugins/smp/framework/sas2.so
 file path=usr/lib/security/$(ARCH64)/crypt_bsdbf.so.1
 file path=usr/lib/security/$(ARCH64)/crypt_bsdmd5.so.1
 file path=usr/lib/security/$(ARCH64)/crypt_sha256.so.1
@@ -1095,8 +1105,10 @@ link path=usr/lib/nss_nis.so.1 target=../../lib/nss_nis.so.1
 link path=usr/lib/nss_user.so.1 target=../../lib/nss_user.so.1
 link path=usr/lib/scsi/$(ARCH64)/libscsi.so target=./libscsi.so.1
 link path=usr/lib/scsi/$(ARCH64)/libses.so target=./libses.so.1
+link path=usr/lib/scsi/$(ARCH64)/libsmp.so target=./libsmp.so.1
 link path=usr/lib/scsi/libscsi.so target=./libscsi.so.1
 link path=usr/lib/scsi/libses.so target=./libses.so.1
+link path=usr/lib/scsi/libsmp.so target=./libsmp.so.1
 link path=usr/lib/security/$(ARCH64)/crypt_bsdbf.so target=./crypt_bsdbf.so.1
 link path=usr/lib/security/$(ARCH64)/crypt_bsdmd5.so target=./crypt_bsdmd5.so.1
 link path=usr/lib/security/$(ARCH64)/crypt_sha256.so target=./crypt_sha256.so.1

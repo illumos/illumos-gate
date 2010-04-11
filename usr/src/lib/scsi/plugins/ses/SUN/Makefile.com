@@ -20,13 +20,19 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 MODULE =	SUN
-SRCS =		sun_spms.c
+SRCS =		sun.c	\
+		sun_element.c	\
+		sun_enclosure.c	\
+		sun_pages.c
+
 SRCDIR =	../common
 PLUGINTYPE =	vendor
 
 include ../../Makefile.lib
+
+$(PROG) := LDLIBS += -lnvfru
+

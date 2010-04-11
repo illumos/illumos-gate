@@ -428,7 +428,8 @@ static void
 declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
     int board, int bridge, int rc, int devno, int fnno, int depth)
 {
-	int dcnt = 0;
+	int dcnt = 0, rcnt;
+	char *propstr;
 	tnode_t *fn;
 	uint_t class, subclass;
 	uint_t vid, did;
@@ -521,6 +522,28 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 					    XAUI, XAUI, fnno, fnno, fn);
 				}
 			}
+		}
+	} else if (class == PCI_CLASS_MASS) {
+		di_node_t cn;
+		int niports = 0;
+		extern void pci_iports_instantiate(topo_mod_t *, tnode_t *,
+		    di_node_t, int);
+		extern void pci_receptacle_instantiate(topo_mod_t *, tnode_t *,
+		    di_node_t);
+
+		for (cn = di_child_node(din); cn != DI_NODE_NIL;
+		    cn = di_sibling_node(cn)) {
+			if (strcmp(di_node_name(cn), IPORT) == 0)
+				niports++;
+		}
+		if (niports > 0)
+			pci_iports_instantiate(mod, fn, din, niports);
+
+		if ((rcnt = di_prop_lookup_strings(DDI_DEV_T_ANY, din,
+		    DI_RECEPTACLE_PHYMASK, &propstr)) > 0) {
+			if (topo_node_range_create(mod, fn, RECEPTACLE, 0,
+			    rcnt) >= 0)
+				pci_receptacle_instantiate(mod, fn, din);
 		}
 	}
 }

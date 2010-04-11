@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SES_H
@@ -60,8 +59,12 @@ typedef struct ses_enum_target {
 #define	TOPO_PGROUP_SES		"ses"
 #define	TOPO_PROP_NODE_ID	"node-id"
 #define	TOPO_PROP_TARGET_PATH	"target-path"
-#define	TOPO_PROP_SAS_ADDR	"sas-address"
 #define	TOPO_PROP_PATHS		"paths"
+#define	TOPO_PROP_SAS_ADDR	"sas-address"
+#define	TOPO_PROP_PHY_COUNT	"phy-count"
+#define	TOPO_PROP_CHASSIS_TYPE	"chassis-type"
+#define	TOPO_PROP_SAS_PHY_MASK	"phy-mask"
+#define	TOPO_PROP_SAS_CONNECTOR_TYPE	"sas-connector-type"
 
 #ifndef	NDEBUG
 #define	verify(x)	assert(x)

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.lib
@@ -49,6 +48,6 @@ libldom: libmdesc libfmd_agent
 
 libfmd_snmp: libfmd_adm topo
 
-topo: $($(MACH)_SUBDIRS) libfmd_agent
+topo: $($(MACH)_SUBDIRS) libfmd_agent libdiskstatus
 
 include ./Makefile.subdirs

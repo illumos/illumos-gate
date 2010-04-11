@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <scsi/libses.h>
 #include "ses_impl.h"
@@ -145,7 +142,7 @@ ses_build_snap_skel(ses_snap_t *sp)
 	off_t toff;
 	char *tp, *text;
 	int err;
-	uint64_t idx;
+	uint64_t idx, eidx;
 
 	pp = ses_snap_find_page(sp, SES2_DIAGPAGE_CONFIG, B_FALSE);
 	if (pp == NULL)
@@ -221,7 +218,7 @@ ses_build_snap_skel(ses_snap_t *sp)
 
 	tp = (char *)(ftip + n_etds);
 
-	for (i = 0, toff = 0, idx = 0; i < n_etds; i++) {
+	for (i = 0, toff = 0, idx = eidx = 0; i < n_etds; i++) {
 		tip = ftip + i;
 
 		if (!SES_WITHIN_PAGE_STRUCT(tip, pp->ssp_page, pp->ssp_len))
@@ -231,6 +228,7 @@ ses_build_snap_skel(ses_snap_t *sp)
 		    tip->sthi_subenclosure_id);
 		if (pnp == NULL) {
 			idx += tip->sthi_max_elements + 1;
+			eidx += tip->sthi_max_elements;
 			toff += tip->sthi_text_len;
 			continue;
 		}
@@ -243,6 +241,8 @@ ses_build_snap_skel(ses_snap_t *sp)
 			} else {
 				SES_NV_ADD(uint64, err, pnp->sn_props,
 				    SES_PROP_ELEMENT_INDEX, idx + 1);
+				SES_NV_ADD(uint64, err, pnp->sn_props,
+				    SES_PROP_ELEMENT_ONLY_INDEX, eidx);
 				pnp->sn_rootidx = idx + 1;
 			}
 
@@ -261,6 +261,7 @@ ses_build_snap_skel(ses_snap_t *sp)
 				return (-1);
 
 			idx += tip->sthi_max_elements + 1;
+			eidx += tip->sthi_max_elements;
 			continue;
 		}
 
@@ -303,10 +304,14 @@ ses_build_snap_skel(ses_snap_t *sp)
 			SES_NV_ADD(uint64, err, cnp->sn_props,
 			    SES_PROP_ELEMENT_INDEX, np->sn_rootidx + j + 1);
 			SES_NV_ADD(uint64, err, cnp->sn_props,
+			    SES_PROP_ELEMENT_ONLY_INDEX, eidx + j);
+			SES_NV_ADD(uint64, err, cnp->sn_props,
 			    SES_PROP_ELEMENT_CLASS_INDEX, j);
 			SES_NV_ADD(uint64, err, cnp->sn_props,
 			    SES_PROP_ELEMENT_TYPE, tip->sthi_element_type);
 		}
+
+		eidx += tip->sthi_max_elements;
 	}
 
 	np->sn_snapshot->ss_n_elem = idx;

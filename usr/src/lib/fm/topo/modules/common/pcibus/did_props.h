@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _DID_PROPS_H
@@ -68,6 +67,8 @@ typedef struct txprop {
 #define	DI_PHYSPROP	"physical-slot#"
 #define	DI_SLOTPROP	"slot-names"
 #define	DI_AADDRPROP	"assigned-addresses"
+#define	DI_RECEPTACLE_PHYMASK	"receptacle-pm"
+#define	DI_RECEPTACLE_LABEL	"receptacle-label"
 
 extern int did_props_set(tnode_t *, did_t *, txprop_t[], int);
 extern tnode_t *find_predecessor(tnode_t *, char *);

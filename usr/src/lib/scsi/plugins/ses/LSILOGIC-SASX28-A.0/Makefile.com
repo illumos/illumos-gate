@@ -20,16 +20,13 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 
 MODULE =	LSILOGIC-SASX28-A.0
 SRCS =		lsilogic.c
 SRCDIR =	../common
 PLUGINTYPE =	vendor
-ALIASES =
+ALIASES =	LSILOGIC-SASX28-A.1
 
 include ../../Makefile.lib

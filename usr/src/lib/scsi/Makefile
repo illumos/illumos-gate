@@ -20,14 +20,13 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 SUBDIRS = \
 	libscsi	\
 	libses \
+	libsmp \
 	plugins
 
 .KEEP_STATE:
@@ -36,6 +35,6 @@ SUBDIRS = \
 
 libses: libscsi
 
-plugins: libscsi libses
+plugins: libscsi libses libsmp
 
 include Makefile.subdirs

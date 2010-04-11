@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stddef.h>
 #include <strings.h>
@@ -359,61 +356,74 @@ ses2_subnickout_len(uint_t nelem, int page, size_t datalen)
 ses_pagedesc_t ses2_pages[] = {
 {
 	.spd_pagenum = SES2_DIAGPAGE_SUPPORTED_PAGES,
+	.spd_req = SES_REQ_MANDATORY_ALL,
 	.spd_gcoff = -1
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_CONFIG,
+	.spd_req = SES_REQ_MANDATORY_STANDARD,
 	.spd_gcoff = offsetof(ses2_config_page_impl_t, scpi_generation_code)
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_ENCLOSURE_CTL_STATUS,
+	.spd_req = SES_REQ_MANDATORY_STANDARD,
 	.spd_index = ses2_status_index,
 	.spd_gcoff = offsetof(ses2_status_page_impl_t, sspi_generation_code)
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_HELP_TEXT,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff = -1
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_STRING_IO,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff = -1
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_THRESHOLD_IO,
 	.spd_index = ses2_threshold_index,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff =
 	    offsetof(ses2_threshold_in_page_impl_t, stipi_generation_code)
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_ELEMENT_DESC,
 	.spd_index = ses2_element_index,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff = offsetof(ses2_elem_desc_page_impl_t, sedpi_generation_code)
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_ADDL_ELEM_STATUS,
 	.spd_index = ses2_aes_index,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff = offsetof(ses2_aes_page_impl_t, sapi_generation_code)
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_SUBENCLOSURE_HELP_TEXT,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff = offsetof(ses2_subhelp_page_impl_t, sspi_generation_code)
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_SUBENCLOSURE_STRING_IO,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff =
 	    offsetof(ses2_substring_in_page_impl_t, ssipi_generation_code)
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_SUPPORTED_SES_PAGES,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff = -1
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_DL_MICROCODE_CTL_STATUS,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff =
 	    offsetof(ses2_ucode_status_page_impl_t, suspi_generation_code)
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_SUBENCLOSURE_NICKNAME_CTL_STATUS,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff =
 	    offsetof(ses2_subnick_status_page_impl_t, sspci_generation_code)
 },
@@ -422,23 +432,27 @@ ses_pagedesc_t ses2_pages[] = {
 	.spd_pagenum = SES2_DIAGPAGE_ENCLOSURE_CTL_STATUS,
 	.spd_ctl_len = ses2_ctl_len,
 	.spd_ctl_fill = ses2_ctl_fill,
+	.spd_req = SES_REQ_MANDATORY_STANDARD,
 	.spd_gcoff = offsetof(ses2_control_page_impl_t, scpi_generation_code)
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_STRING_IO,
 	.spd_ctl_len = ses2_stringout_len,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff = -1
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_THRESHOLD_IO,
 	.spd_ctl_len = ses2_threshout_len,
 	.spd_ctl_fill = ses2_threshout_ctl_fill,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff =
 	    offsetof(ses2_threshold_out_page_impl_t, stopi_generation_code)
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_SUBENCLOSURE_STRING_IO,
 	.spd_ctl_len = ses2_substrout_len,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff =
 	    offsetof(ses2_substring_out_page_impl_t, ssopi_generation_code)
 },
@@ -446,12 +460,14 @@ ses_pagedesc_t ses2_pages[] = {
 	.spd_pagenum = SES2_DIAGPAGE_DL_MICROCODE_CTL_STATUS,
 	.spd_ctl_len = ses2_ucodeout_len,
 	.spd_ctl_fill = ses2_ucodeout_ctl_fill,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff =
 	    offsetof(ses2_ucode_ctl_page_impl_t, sucpi_generation_code)
 },
 {
 	.spd_pagenum = SES2_DIAGPAGE_SUBENCLOSURE_NICKNAME_CTL_STATUS,
 	.spd_ctl_len = ses2_subnickout_len,
+	.spd_req = SES_REQ_OPTIONAL_STANDARD,
 	.spd_gcoff =
 	    offsetof(ses2_subnick_ctl_page_impl_t, sspci_generation_code)
 },

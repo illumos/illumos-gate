@@ -18,17 +18,10 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stddef.h>
@@ -40,7 +33,7 @@
 #include <scsi/libses.h>
 #include "ses2_impl.h"
 
-#define	SES_UCODE_CHUNK_SIZE	(32 * 1024)
+#define	SES_UCODE_DEF_CHUNK	(32 * 1024)
 
 /*ARGSUSED*/
 static int
@@ -53,6 +46,7 @@ enc_do_ucode(ses_plugin_t *sp, ses_node_t *np, nvlist_t *nvl)
 	size_t offset, len, pagelen;
 	uint_t datalen;
 	uint64_t mode;
+	uint64_t chunksz = SES_UCODE_DEF_CHUNK;
 
 	/*
 	 * Get the data and check the length.
@@ -83,10 +77,15 @@ enc_do_ucode(ses_plugin_t *sp, ses_node_t *np, nvlist_t *nvl)
 		bufid = 0;
 
 	(void) nvlist_lookup_uint64(nvl, SES_CTL_PROP_UCODE_BUFID, &bufid);
+	(void) nvlist_lookup_uint64(nvl, SES_CTL_PROP_UCODE_DATA_LEN, &chunksz);
 
-	for (offset = 0; offset < datalen; offset += SES_UCODE_CHUNK_SIZE)  {
+	if (chunksz & 3)
+		return (ses_error(ESES_RANGE,
+		    "upload chunk size %llu is not divisible by 4", chunksz));
 
-		len = MIN(datalen - offset, SES_UCODE_CHUNK_SIZE);
+	for (offset = 0; offset < datalen; offset += chunksz)  {
+
+		len = MIN(datalen - offset, chunksz);
 		if (len & 0x3)
 			pagelen = (len + 4) & ~0x3;
 		else
@@ -114,6 +113,7 @@ enc_do_ucode(ses_plugin_t *sp, ses_node_t *np, nvlist_t *nvl)
 	(void) nvlist_remove_all(nvl, SES_CTL_PROP_UCODE_DATA);
 	(void) nvlist_remove_all(nvl, SES_CTL_PROP_UCODE_MODE);
 	(void) nvlist_remove_all(nvl, SES_CTL_PROP_UCODE_BUFID);
+	(void) nvlist_remove_all(nvl, SES_CTL_PROP_UCODE_DATA_LEN);
 
 	return (0);
 }

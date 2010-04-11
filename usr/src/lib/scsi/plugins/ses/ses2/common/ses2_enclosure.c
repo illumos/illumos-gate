@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stddef.h>
 #include <string.h>
@@ -77,7 +74,7 @@ enc_parse_help(ses_plugin_t *sp, ses_node_t *np)
 	ses2_subhelp_text_impl_t *tip;
 	nvlist_t *nvl = ses_node_props(np);
 	uint64_t eid;
-	size_t len;
+	size_t len, textlen;
 	off_t pos;
 	int nverr;
 
@@ -97,14 +94,15 @@ enc_parse_help(ses_plugin_t *sp, ses_node_t *np)
 			if (tip->ssti_subenclosure_identifier != eid)
 				continue;
 
+			textlen = SCSI_READ16(
+			    &tip->ssti_subenclosure_help_text_length);
+
 			if (!SES_WITHIN_PAGE(tip->ssti_subenclosure_help_text,
-			    tip->ssti_subenclosure_help_text_length, shpip,
-			    len))
+			    textlen, shpip, len))
 				break;
 
 			SES_NV_ADD(fixed_string, nverr, nvl, SES_EN_PROP_HELP,
-			    tip->ssti_subenclosure_help_text,
-			    tip->ssti_subenclosure_help_text_length);
+			    tip->ssti_subenclosure_help_text, textlen);
 			return (0);
 		}
 	}
@@ -155,13 +153,15 @@ enc_parse_string_in(ses_plugin_t *sp, ses_node_t *np)
 			if (dip->ssidi_subenclosure_identifier != eid)
 				continue;
 
-			if (!SES_WITHIN_PAGE(dip->ssidi_data,
-			    dip->ssidi_substring_data_length, ssip, len))
+			textlen =
+			    SCSI_READ16(&dip->ssidi_substring_data_length);
+
+			if (!SES_WITHIN_PAGE(dip->ssidi_data, textlen,
+			    ssip, len))
 				break;
 
 			SES_NV_ADD(fixed_string, nverr, nvl, SES_EN_PROP_STRING,
-			    (char *)dip->ssidi_data,
-			    dip->ssidi_substring_data_length);
+			    (char *)dip->ssidi_data, textlen);
 			return (0);
 		}
 	}

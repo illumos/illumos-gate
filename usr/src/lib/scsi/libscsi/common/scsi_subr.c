@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/scsi/generic/commands.h>
@@ -300,12 +297,13 @@ libscsi_get_inquiry(libscsi_hdl_t *hp, libscsi_target_t *tp)
 
 	if ((ap = libscsi_action_alloc(hp, SPC3_CMD_INQUIRY,
 	    LIBSCSI_AF_READ | LIBSCSI_AF_SILENT | LIBSCSI_AF_DIAGNOSE, &data,
-	    sizeof (data))) == NULL)
+	    offsetof(spc3_inquiry_data_t, id_vs_36[0]))) == NULL)
 		return (-1);
 
 	cp = (spc3_inquiry_cdb_t *)libscsi_action_get_cdb(ap);
 
-	SCSI_WRITE16(&cp->ic_allocation_length, sizeof (data));
+	SCSI_WRITE16(&cp->ic_allocation_length,
+	    offsetof(spc3_inquiry_data_t, id_vs_36[0]));
 
 	if (libscsi_exec(ap, tp) != 0 ||
 	    libscsi_action_get_status(ap) != 0) {

@@ -659,7 +659,8 @@ smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
 libv12n:	libds libuuid
 libvrrpadm:	libsocket libdladm libscf
 libvscan:	libscf
-scsi:		libnvpair
+libfru:		libfruutils
+scsi:		libnvpair libfru
 mpapi:		libpthread libdevinfo libsysevent libnvpair
 sun_fc:		libdevinfo libsysevent libnvpair
 libsun_ima:	libdevinfo libsysevent libnsl

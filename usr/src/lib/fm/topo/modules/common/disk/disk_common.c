@@ -47,31 +47,8 @@
 #include <fm/topo_list.h>
 #include <fm/libdiskstatus.h>
 #include <sys/fm/protocol.h>
+#include <sys/scsi/generic/inquiry.h>
 #include "disk.h"
-
-/*
- * disk node information.
- */
-typedef struct disk_di_node {
-	topo_list_t	ddn_list;	/* list of disks */
-
-	/* the following two fields are always defined */
-	char		*ddn_devid;	/* devid of disk */
-	char		*ddn_dpath;	/* path to devinfo (may be vhci) */
-	char		**ddn_ppath;	/* physical path to device (phci) */
-	int		ddn_ppath_count;
-
-	char		*ddn_lpath;	/* logical path (public /dev name) */
-
-	char		*ddn_mfg;	/* misc information about device */
-	char		*ddn_model;
-	char		*ddn_serial;
-	char		*ddn_firm;
-	char		*ddn_cap;
-
-	char		**ddn_target_port;
-	int		ddn_target_port_count;
-} disk_di_node_t;
 
 /* common callback information for di_walk_node() and di_devlink_walk */
 typedef struct disk_cbdata {
@@ -79,7 +56,7 @@ typedef struct disk_cbdata {
 	topo_list_t		*dcb_list;
 
 	di_devlink_handle_t	dcb_devhdl;
-	disk_di_node_t		*dcb_dnode;	/* for di_devlink_walk only */
+	dev_di_node_t		*dcb_dnode;	/* for di_devlink_walk only */
 } disk_cbdata_t;
 
 /*
@@ -130,7 +107,7 @@ static const topo_pgroup_info_t storage_pgroup = {
 };
 
 /*
- * Set the properties of the disk node, from disk_di_node_t data.
+ * Set the properties of the disk node, from dev_di_node_t data.
  * Properties include:
  *	group: protocol	 properties: resource, asru, label, fru
  *	group: authority properties: product-id, chasis-id, server-id
@@ -145,7 +122,7 @@ static const topo_pgroup_info_t storage_pgroup = {
  */
 static int
 disk_set_props(topo_mod_t *mod, tnode_t *parent,
-    tnode_t *dtn, disk_di_node_t *dnode)
+    tnode_t *dtn, dev_di_node_t *dnode)
 {
 	nvlist_t	*asru = NULL;
 	char		*label = NULL;
@@ -354,7 +331,7 @@ disk_auth_clean(topo_mod_t *mod, const char *str)
 /* create the disk topo node */
 static int
 disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
-    disk_di_node_t *dnode, const char *name, topo_instance_t i, tnode_t **rval)
+    dev_di_node_t *dnode, const char *name, topo_instance_t i, tnode_t **rval)
 {
 	int		len;
 	nvlist_t	*fmri;
@@ -431,7 +408,7 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 }
 
 static int
-disk_declare(topo_mod_t *mod, tnode_t *parent, disk_di_node_t *dnode,
+disk_declare(topo_mod_t *mod, tnode_t *parent, dev_di_node_t *dnode,
     tnode_t **childp)
 {
 	tnode_t		*dtn = NULL;
@@ -464,7 +441,7 @@ int
 disk_declare_path(topo_mod_t *mod, tnode_t *parent, topo_list_t *listp,
     const char *path)
 {
-	disk_di_node_t		*dnode;
+	dev_di_node_t		*dnode;
 	int i;
 
 	/*
@@ -491,7 +468,7 @@ int
 disk_declare_addr(topo_mod_t *mod, tnode_t *parent, topo_list_t *listp,
     const char *addr, tnode_t **childp)
 {
-	disk_di_node_t *dnode;
+	dev_di_node_t *dnode;
 	int i;
 
 	/* Check for match using addr. */
@@ -524,13 +501,13 @@ disk_declare_non_enumerated(topo_mod_t *mod, tnode_t *parent, tnode_t **childp)
 	return (disk_declare(mod, parent, NULL, childp));
 }
 
-/* di_devlink callback for disk_di_node_add */
+/* di_devlink callback for dev_di_node_add */
 static int
 disk_devlink_callback(di_devlink_t dl, void *arg)
 {
 	disk_cbdata_t	*cbp = (disk_cbdata_t *)arg;
 	topo_mod_t	*mod = cbp->dcb_mod;
-	disk_di_node_t	*dnode = cbp->dcb_dnode;
+	dev_di_node_t	*dnode = cbp->dcb_dnode;
 	const char	*devpath;
 	char		*ctds, *slice;
 
@@ -552,7 +529,7 @@ disk_devlink_callback(di_devlink_t dl, void *arg)
 }
 
 static void
-disk_di_node_free(topo_mod_t *mod, disk_di_node_t *dnode)
+dev_di_node_free(topo_mod_t *mod, dev_di_node_t *dnode)
 {
 	int i;
 
@@ -578,14 +555,14 @@ disk_di_node_free(topo_mod_t *mod, disk_di_node_t *dnode)
 	    dnode->ddn_target_port_count * sizeof (uintptr_t));
 
 	/* free self */
-	topo_mod_free(mod, dnode, sizeof (disk_di_node_t));
+	topo_mod_free(mod, dnode, sizeof (dev_di_node_t));
 }
 
 static int
-disk_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
+dev_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 {
 	topo_mod_t	*mod = cbp->dcb_mod;
-	disk_di_node_t	*dnode;
+	dev_di_node_t	*dnode;
 	di_path_t	pnode;
 	char		*path;
 	int		mlen;
@@ -598,6 +575,7 @@ disk_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	uint_t		dblksize;
 	char		lentry[MAXPATHLEN];
 	int		pathcount, portcount;
+	int		*inq_dtype, itype;
 	int 		ret, i;
 
 	if (devid) {
@@ -610,14 +588,14 @@ disk_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 		    dnode != NULL; dnode = topo_list_next(dnode)) {
 			if (dnode->ddn_devid &&
 			    devid_str_compare(dnode->ddn_devid, devid) == 0) {
-				topo_mod_dprintf(mod, "disk_di_node_add: "
+				topo_mod_dprintf(mod, "dev_di_node_add: "
 				    "already there %s\n", devid);
 				return (0);
 			}
 		}
 	}
 
-	if ((dnode = topo_mod_zalloc(mod, sizeof (disk_di_node_t))) == NULL)
+	if ((dnode = topo_mod_zalloc(mod, sizeof (dev_di_node_t))) == NULL)
 		return (-1);
 
 	if (devid) {
@@ -740,24 +718,32 @@ disk_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	}
 
 	/*
-	 * Find the public /dev name by adding a minor name and using
+	 * Find the public /dev name for a disk by adding a minor name and using
 	 * di_devlink interface for reverse translation (use devinfo path).
 	 */
-	mlen = strlen(dnode->ddn_dpath) + strlen(extn) + 1;
-	if ((minorpath = topo_mod_alloc(mod, mlen)) == NULL)
-		goto error;
-	(void) snprintf(minorpath, mlen, "%s%s", dnode->ddn_dpath, extn);
-	cbp->dcb_dnode = dnode;
-	(void) di_devlink_walk(cbp->dcb_devhdl, "^dsk/", minorpath,
-	    DI_PRIMARY_LINK, cbp, disk_devlink_callback);
-	topo_mod_free(mod, minorpath, mlen);
-	if (dnode->ddn_lpath == NULL) {
-		topo_mod_dprintf(mod, "disk_di_node_add: "
-		    "failed to determine logical path");
-		goto error;
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "inquiry-device-type",
+	    &inq_dtype) > 0) {
+		itype = (*inq_dtype) & DTYPE_MASK;
+		if (itype == DTYPE_DIRECT) {
+			mlen = strlen(dnode->ddn_dpath) + strlen(extn) + 1;
+			if ((minorpath = topo_mod_alloc(mod, mlen)) == NULL)
+				goto error;
+			(void) snprintf(minorpath, mlen, "%s%s",
+			    dnode->ddn_dpath, extn);
+			cbp->dcb_dnode = dnode;
+			(void) di_devlink_walk(cbp->dcb_devhdl, "^dsk/",
+			    minorpath, DI_PRIMARY_LINK, cbp,
+			    disk_devlink_callback);
+			topo_mod_free(mod, minorpath, mlen);
+			if (dnode->ddn_lpath == NULL) {
+				topo_mod_dprintf(mod, "dev_di_node_add: "
+				    "failed to determine logical path");
+				goto error;
+			}
+		}
 	}
 
-	/* cache various bits of optional information about the disk */
+	/* cache various bits of optional information about the device. */
 	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
 	    INQUIRY_VENDOR_ID, &s) > 0) {
 		if ((dnode->ddn_mfg = disk_trim_whitespace(mod, s)) == NULL)
@@ -796,7 +782,7 @@ disk_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 			goto error;
 	}
 
-	topo_mod_dprintf(mod, "disk_di_node_add: "
+	topo_mod_dprintf(mod, "dev_di_node_add: "
 	    "adding %s\n", devid ? dnode->ddn_devid : "NULL devid");
 	topo_mod_dprintf(mod, "                  "
 	    "       %s\n", dnode->ddn_dpath);
@@ -808,13 +794,14 @@ disk_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	return (0);
 
 error:
-	disk_di_node_free(mod, dnode);
+	dev_di_node_free(mod, dnode);
 	return (-1);
 }
 
+
 /* di_walk_node callback for disk_list_gather */
 static int
-disk_walk_di_nodes(di_node_t node, void *arg)
+dev_walk_di_nodes(di_node_t node, void *arg)
 {
 	char			*devidstr = NULL;
 	char			*s;
@@ -832,13 +819,13 @@ disk_walk_di_nodes(di_node_t node, void *arg)
 	    DEVID_PROP_NAME, &devidstr);
 
 	/* create/find the devid scsi topology node */
-	(void) disk_di_node_add(node, devidstr, arg);
+	(void) dev_di_node_add(node, devidstr, arg);
 
 	return (DI_WALK_CONTINUE);
 }
 
 int
-disk_list_gather(topo_mod_t *mod, topo_list_t *listp)
+dev_list_gather(topo_mod_t *mod, topo_list_t *listp)
 {
 	di_node_t		devtree;
 	di_devlink_handle_t	devhdl;
@@ -862,7 +849,7 @@ disk_list_gather(topo_mod_t *mod, topo_list_t *listp)
 
 	/* walk the devinfo snapshot looking for disk nodes */
 	(void) di_walk_node(devtree, DI_WALK_CLDFIRST, &dcb,
-	    disk_walk_di_nodes);
+	    dev_walk_di_nodes);
 
 	(void) di_devlink_fini(&devhdl);
 
@@ -870,14 +857,14 @@ disk_list_gather(topo_mod_t *mod, topo_list_t *listp)
 }
 
 void
-disk_list_free(topo_mod_t *mod, topo_list_t *listp)
+dev_list_free(topo_mod_t *mod, topo_list_t *listp)
 {
-	disk_di_node_t	*dnode;
+	dev_di_node_t	*dnode;
 
 	while ((dnode = topo_list_next(listp)) != NULL) {
 		/* order of delete/free is important */
 		topo_list_delete(listp, dnode);
-		disk_di_node_free(mod, dnode);
+		dev_di_node_free(mod, dnode);
 	}
 }
 

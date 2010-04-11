@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBSCSI_H
 #define	_LIBSCSI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -94,9 +91,6 @@ typedef struct libscsi_status {
 
 struct libscsi_action;
 typedef struct libscsi_action libscsi_action_t;
-
-struct libscsi_result;
-typedef struct libscsi_result libscsi_result_t;
 
 typedef struct libscsi_engine_ops {
 	void *(*lseo_open)(libscsi_hdl_t *, const void *);

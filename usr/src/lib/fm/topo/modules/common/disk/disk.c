@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <devid.h>
@@ -121,7 +119,7 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 		return (-1);
 	}
 
-	if (disk_list_gather(mod, dlistp) != 0) {
+	if (dev_list_gather(mod, dlistp) != 0) {
 		topo_mod_unregister(mod);
 		topo_mod_free(mod, dlistp, sizeof (topo_list_t));
 		topo_mod_dprintf(mod, "_topo_init: "
@@ -141,7 +139,7 @@ void
 _topo_fini(topo_mod_t *mod)
 {
 	topo_list_t *dlistp = topo_mod_getspecific(mod);
-	disk_list_free(mod, dlistp);
+	dev_list_free(mod, dlistp);
 	topo_mod_free(mod, dlistp, sizeof (topo_list_t));
 	topo_mod_unregister(mod);
 	topo_mod_dprintf(mod, "_topo_fini: "

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved. 
 #
 
 set name=pkg.fmri value=pkg:/system/io/tests@$(PKGVERS)
@@ -59,6 +58,7 @@ $(i386_ONLY)file path=usr/kernel/drv/tclient group=sys
 $(i386_ONLY)file path=usr/kernel/drv/tphci group=sys
 $(i386_ONLY)file path=usr/kernel/drv/tvhci group=sys
 file path=usr/lib/scsi/sestopo mode=0555
+file path=usr/lib/scsi/smp mode=0555
 file path=usr/sbin/devctl mode=0555
 file path=usr/sbin/emul64ioctl mode=0555
 legacy pkg=SUNWioth arch=$(ARCH) category=system desc="I/O Test Header Files" \

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/library/storage/scsi-plugins@$(PKGVERS)
@@ -57,3 +56,7 @@ link path=usr/lib/scsi/plugins/ses/vendor/$(ARCH64)/SUN-Storage-J4200.so \
     target=SUN-Storage-J4400.so
 link path=usr/lib/scsi/plugins/ses/vendor/SUN-Storage-J4200.so \
     target=SUN-Storage-J4400.so
+link path=usr/lib/scsi/plugins/ses/vendor/$(ARCH64)/LSILOGIC-SASX28-A.1.so \
+    target=LSILOGIC-SASX28-A.0.so
+link path=usr/lib/scsi/plugins/ses/vendor/LSILOGIC-SASX28-A.1.so \
+    target=LSILOGIC-SASX28-A.0.so

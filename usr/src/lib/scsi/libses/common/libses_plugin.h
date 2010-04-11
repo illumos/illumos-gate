@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBSES_PLUGIN_H
 #define	_LIBSES_PLUGIN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -47,6 +44,13 @@ typedef enum {
 	SES_PAGE_CTL
 } ses_pagetype_t;
 
+typedef enum ses_page_req {
+	SES_REQ_OPTIONAL,
+	SES_REQ_MANDATORY_ALL,
+	SES_REQ_MANDATORY_STANDARD,
+	SES_REQ_OPTIONAL_STANDARD
+} ses_page_req_t;
+
 typedef struct ses_pagedesc {
 	int		spd_pagenum;
 	size_t		(*spd_ctl_len)(uint_t, int, size_t);
@@ -55,6 +59,7 @@ typedef struct ses_pagedesc {
 	void		*(*spd_index)(ses_plugin_t *, ses_node_t *,
 	    void *, size_t, size_t *);
 	int		spd_gcoff;
+	ses_page_req_t	spd_req;
 } ses_pagedesc_t;
 
 typedef struct ses_plugin_config {

@@ -30,16 +30,21 @@
 #include <inttypes.h>
 #include <pthread.h>
 #include <strings.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/dkio.h>
 #include <sys/fm/protocol.h>
 #include <sys/libdevid.h>
 #include <sys/scsi/scsi_types.h>
+#include <sys/byteorder.h>
 
 #include "disk.h"
 #include "ses.h"
 
 #define	SES_VERSION	1
+
+#define	SES_STARTING_SUBCHASSIS 256	/* valid subchassis IDs are uint8_t */
+#define	NO_SUBCHASSIS	((uint64_t)-1)
 
 static int ses_snap_freq = 250;		/* in milliseconds */
 
@@ -74,17 +79,17 @@ typedef struct ses_enum_chassis {
 	topo_list_t		sec_nodes;
 	topo_list_t		sec_targets;
 	const char		*sec_csn;
-	const char		*sec_lid;
 	ses_node_t		*sec_enclosure;
 	ses_enum_target_t	*sec_target;
 	topo_instance_t		sec_instance;
 	topo_instance_t		sec_scinstance;
+	topo_instance_t		sec_maxinstance;
 	boolean_t		sec_hasdev;
 	boolean_t		sec_internal;
 } ses_enum_chassis_t;
 
 typedef struct ses_enum_data {
-	topo_list_t		sed_disks;
+	topo_list_t		sed_devs;
 	topo_list_t		sed_chassis;
 	ses_enum_chassis_t	*sed_current;
 	ses_enum_target_t	*sed_target;
@@ -94,12 +99,75 @@ typedef struct ses_enum_data {
 	topo_instance_t		sed_instance;
 } ses_enum_data_t;
 
+typedef struct sas_connector_phy_data {
+	uint64_t    index;
+	uint64_t    phy_mask;
+} sas_connector_phy_data_t;
+
+typedef struct sas_connector_type {
+	uint64_t    type;
+	char	    *name;
+} sas_connector_type_t;
+
+static const sas_connector_type_t sas_connector_type_list[] = {
+	{   0x0, "Information unknown"  },
+	{   0x1, "External SAS 4x receptacle (see SAS-2 and SFF-8470)"	},
+	{   0x2, "Exteranl Mini SAS 4x receptacle (see SAS-2 and SFF-8088)" },
+	{   0xF, "Vendor-specific external connector"	},
+	{   0x10, "Internal wide SAS 4i plug (see SAS-2 and SFF-8484)"	},
+	{   0x11,
+	"Internal wide Mini SAS 4i receptacle (see SAS-2 and SFF-8087)"	},
+	{   0x20, "Internal SAS Drive receptacle (see SAS-2 and SFF-8482)"  },
+	{   0x21, "Internal SATA host plug (see SAS-2 and SATA-2)"  },
+	{   0x22, "Internal SAS Drive plug (see SAS-2 and SFF-8482)"	},
+	{   0x23, "Internal SATA device plug (see SAS-2 and SATA-2)"	},
+	{   0x2F, "Internal SAS virtual connector"  },
+	{   0x3F, "Vendor-specific internal connector"	},
+	{   0x70, "Other Vendor-specific connector"	},
+	{   0x71, "Other Vendor-specific connector"	},
+	{   0x72, "Other Vendor-specific connector"	},
+	{   0x73, "Other Vendor-specific connector"	},
+	{   0x74, "Other Vendor-specific connector"	},
+	{   0x75, "Other Vendor-specific connector"	},
+	{   0x76, "Other Vendor-specific connector"	},
+	{   0x77, "Other Vendor-specific connector"	},
+	{   0x78, "Other Vendor-specific connector"	},
+	{   0x79, "Other Vendor-specific connector"	},
+	{   0x7A, "Other Vendor-specific connector"	},
+	{   0x7B, "Other Vendor-specific connector"	},
+	{   0x7C, "Other Vendor-specific connector"	},
+	{   0x7D, "Other Vendor-specific connector"	},
+	{   0x7E, "Other Vendor-specific connector"	},
+	{   0x7F, "Other Vendor-specific connector"	},
+	{   0x80, "Not Defined"	}
+};
+
+#define	SAS_CONNECTOR_TYPE_CODE_NOT_DEFINED  0x80
+#define	SAS_CONNECTOR_TYPE_NOT_DEFINED \
+	"Connector type not definedi by SES-2 standard"
+#define	SAS_CONNECTOR_TYPE_RESERVED \
+	"Connector type reserved by SES-2 standard"
+
 typedef enum {
 	SES_NEW_CHASSIS		= 0x1,
 	SES_NEW_SUBCHASSIS	= 0x2,
 	SES_DUP_CHASSIS		= 0x4,
 	SES_DUP_SUBCHASSIS	= 0x8
 } ses_chassis_type_e;
+
+static const topo_pgroup_info_t io_pgroup = {
+	TOPO_PGROUP_IO,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
+
+static const topo_pgroup_info_t storage_pgroup = {
+	TOPO_PGROUP_STORAGE,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
 
 static int ses_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
@@ -180,7 +248,7 @@ ses_data_free(ses_enum_data_t *sdp, ses_enum_chassis_t *pcp)
 	}
 
 	if (pcp == NULL) {
-		disk_list_free(mod, &sdp->sed_disks);
+		dev_list_free(mod, &sdp->sed_devs);
 		topo_mod_free(mod, sdp, sizeof (ses_enum_data_t));
 	}
 }
@@ -401,13 +469,15 @@ ses_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 }
 
 /*
- * Sets standard properties for a ses node (enclosure or bay).  This includes
- * setting the FRU to be the same as the resource, as well as setting the
- * authority information.
+ * Sets standard properties for a ses node (enclosure, bay, controller
+ * or expander).
+ * This includes setting the FRU, as well as setting the
+ * authority information.  When  the fru topo node(frutn) is not NULL
+ * its resouce should be used as FRU.
  */
 static int
-ses_set_standard_props(topo_mod_t *mod, tnode_t *tn, nvlist_t *auth,
-    uint64_t nodeid, const char *path)
+ses_set_standard_props(topo_mod_t *mod, tnode_t *frutn, tnode_t *tn,
+    nvlist_t *auth, uint64_t nodeid, const char *path)
 {
 	int err;
 	char *product, *chassis;
@@ -440,11 +510,20 @@ ses_set_standard_props(topo_mod_t *mod, tnode_t *tn, nvlist_t *auth,
 	/*
 	 * Copy the resource and set that as the FRU.
 	 */
-	if (topo_node_resource(tn, &fmri, &err) != 0) {
-		topo_mod_dprintf(mod,
-		    "topo_node_resource() failed : %s\n",
-		    topo_strerror(err));
-		return (topo_mod_seterrno(mod, err));
+	if (frutn != NULL) {
+		if (topo_node_resource(frutn, &fmri, &err) != 0) {
+			topo_mod_dprintf(mod,
+			    "topo_node_resource() failed : %s\n",
+			    topo_strerror(err));
+			return (topo_mod_seterrno(mod, err));
+		}
+	} else {
+		if (topo_node_resource(tn, &fmri, &err) != 0) {
+			topo_mod_dprintf(mod,
+			    "topo_node_resource() failed : %s\n",
+			    topo_strerror(err));
+			return (topo_mod_seterrno(mod, err));
+		}
 	}
 
 	if (topo_node_fru_set(tn, fmri, 0, &err) != 0) {
@@ -518,7 +597,8 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 	if (nvlist_lookup_uint64(props, SES_PROP_STATUS_CODE, &status) != 0)
 		return (0);
 
-	if (status != SES_ESC_OK &&
+	if (status != SES_ESC_UNSUPPORTED &&
+	    status != SES_ESC_OK &&
 	    status != SES_ESC_CRITICAL &&
 	    status != SES_ESC_NONCRITICAL &&
 	    status != SES_ESC_UNRECOVERABLE &&
@@ -553,7 +633,7 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 	err = 0;
 
 	for (s = 0; s < nsas; s++) {
-		ret = disk_declare_addr(mod, pnode, &sdp->sed_disks, paths[s],
+		ret = disk_declare_addr(mod, pnode, &sdp->sed_devs, paths[s],
 		    &child);
 		if (ret == 0) {
 			break;
@@ -675,11 +755,11 @@ error:
 }
 
 /*
- * Callback to create a basic node (bay, psu, fan, or controller).
+ * Callback to create a basic node (bay, psu, fan, or controller and expander).
  */
 static int
 ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
-    tnode_t *pnode, const char *nodename, const char *labelname)
+    tnode_t *pnode, const char *nodename, const char *labelname, tnode_t **node)
 {
 	ses_node_t *np = snp->sen_node;
 	ses_node_t *parent;
@@ -687,7 +767,7 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	topo_mod_t *mod = sdp->sed_mod;
 	nvlist_t *props, *aprops;
 	nvlist_t *auth = NULL, *fmri = NULL;
-	tnode_t *tn;
+	tnode_t *tn = NULL, *frutn = NULL;
 	char label[128];
 	int err;
 	char *part = NULL, *serial = NULL, *revision = NULL;
@@ -758,8 +838,8 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 		parent = ses_node_parent(np);
 		aprops = ses_node_props(parent);
 		if (nvlist_lookup_string(aprops, SES_PROP_CLASS_DESCRIPTION,
-		    &desc) == 0 && desc[0] != '\0')
-			labelname = desc;
+		    &desc) != 0 || desc[0] == '\0')
+			desc = (char *)labelname;
 		(void) snprintf(label, sizeof (label), "%s %llu", desc,
 		    instance);
 		desc = label;
@@ -768,11 +848,21 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	if (topo_node_label_set(tn, desc, &err) != 0)
 		goto error;
 
-	if (ses_set_standard_props(mod, tn, NULL, ses_node_id(np),
+	/*
+	 * For an expander node, set the FRU to its parent(controller).
+	 * For a connector node, set the FRU to its grand parent(controller).
+	 */
+	if (strcmp(nodename, SASEXPANDER) == 0) {
+		frutn = pnode;
+	} else if (strcmp(nodename, RECEPTACLE) == 0) {
+		frutn = topo_node_parent(pnode);
+	}
+
+	if (ses_set_standard_props(mod, frutn, tn, NULL, ses_node_id(np),
 	    snp->sen_target->set_devpath) != 0)
 		goto error;
 
-	if (strcmp(nodename, "bay") == 0) {
+	if (strcmp(nodename, BAY) == 0) {
 		if (ses_add_bay_props(mod, tn, snp) != 0)
 			goto error;
 
@@ -785,11 +875,15 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 			    topo_mod_errmsg(mod));
 			goto error;
 		}
-	} else {
+	} else if ((strcmp(nodename, FAN) == 0) ||
+	    (strcmp(nodename, PSU) == 0) ||
+	    (strcmp(nodename, CONTROLLER) == 0)) {
 		/*
 		 * Only fan, psu, and controller nodes have a 'present' method.
 		 * Bay nodes are always present, and disk nodes are present by
-		 * virtue of being enumerated.
+		 * virtue of being enumerated and SAS expander nodes and
+		 * SAS connector nodes are also always present once
+		 * the parent controller is found.
 		 */
 		if (topo_method_register(mod, tn, ses_component_methods) != 0) {
 			topo_mod_dprintf(mod,
@@ -805,12 +899,563 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 
 	nvlist_free(auth);
 	nvlist_free(fmri);
+	if (node != NULL) *node = tn;
 	return (0);
 
 error:
 	nvlist_free(auth);
 	nvlist_free(fmri);
 	return (-1);
+}
+
+/*
+ * Create SAS expander specific props.
+ */
+/*ARGSUSED*/
+static int
+ses_set_expander_props(ses_enum_data_t *sdp, ses_enum_node_t *snp,
+    tnode_t *ptnode, tnode_t *tnode, int *phycount, int64_t *connlist)
+{
+	ses_node_t *np = snp->sen_node;
+	topo_mod_t *mod = sdp->sed_mod;
+	nvlist_t *auth = NULL, *fmri = NULL;
+	nvlist_t *props, **phylist;
+	int err, i;
+	uint_t pcount;
+	uint64_t sasaddr, connidx;
+	char sasaddr_str[17];
+	boolean_t found = B_FALSE;
+	dev_di_node_t *dnode;
+
+	props = ses_node_props(np);
+
+	/*
+	 * the uninstalled expander is not enumerated by checking
+	 * the element status code.  No present present' method provided.
+	 */
+	/*
+	 * Get the Expander SAS address.  It should exist.
+	 */
+	if (nvlist_lookup_uint64(props, SES_EXP_PROP_SAS_ADDR,
+	    &sasaddr) != 0) {
+		topo_mod_dprintf(mod,
+		    "Failed to get prop %s.", SES_EXP_PROP_SAS_ADDR);
+		goto error;
+	}
+
+	(void) sprintf(sasaddr_str, "%llx", sasaddr);
+
+	/* search matching dev_di_node. */
+	for (dnode = topo_list_next(&sdp->sed_devs); dnode != NULL;
+	    dnode = topo_list_next(dnode)) {
+		if (strstr(dnode->ddn_dpath, sasaddr_str) != NULL) {
+			found = B_TRUE;
+			break;
+		}
+	}
+
+	if (!found) {
+		topo_mod_dprintf(mod,
+		    "ses_set_expander_props: Failed to find matching "
+		    "devinfo node for Exapnder SAS address %s",
+		    SES_EXP_PROP_SAS_ADDR);
+		/* continue on to get storage group props. */
+	} else {
+		/* create/set the devfs-path and devid in the io group */
+		if (topo_pgroup_create(tnode, &io_pgroup, &err) != 0) {
+			topo_mod_dprintf(mod, "ses_set_expander_props: "
+			    "create io error %s\n", topo_strerror(err));
+			goto error;
+		} else {
+			if (topo_prop_set_string(tnode, TOPO_PGROUP_IO,
+			    TOPO_IO_DEV_PATH, TOPO_PROP_IMMUTABLE,
+			    dnode->ddn_dpath, &err) != 0) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set dev error %s\n", topo_strerror(err));
+			}
+			if (topo_prop_set_string(tnode, TOPO_PGROUP_IO,
+			    TOPO_IO_DEVID, TOPO_PROP_IMMUTABLE,
+			    dnode->ddn_devid, &err) != 0) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set devid error %s\n", topo_strerror(err));
+			}
+			if (dnode->ddn_ppath_count != 0 &&
+			    topo_prop_set_string_array(tnode, TOPO_PGROUP_IO,
+			    TOPO_IO_PHYS_PATH, TOPO_PROP_IMMUTABLE,
+			    (const char **)dnode->ddn_ppath,
+			    dnode->ddn_ppath_count, &err) != 0) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set phys-path error %s\n",
+				    topo_strerror(err));
+			}
+		}
+	}
+
+	/* create the storage group */
+	if (topo_pgroup_create(tnode, &storage_pgroup, &err) != 0) {
+		topo_mod_dprintf(mod, "ses_set_expander_props: "
+		    "create storage error %s\n", topo_strerror(err));
+		goto error;
+	} else {
+		/* set the SAS address prop of the expander. */
+		if (topo_prop_set_string(tnode, TOPO_PGROUP_STORAGE,
+		    TOPO_PROP_SAS_ADDR, TOPO_PROP_IMMUTABLE, sasaddr_str,
+		    &err) != 0) {
+			topo_mod_dprintf(mod, "ses_set_expander_props: "
+			    "set %S error %s\n", TOPO_PROP_SAS_ADDR,
+			    topo_strerror(err));
+		}
+
+		/* Get the phy information for the expander */
+		if (nvlist_lookup_nvlist_array(props, SES_SAS_PROP_PHYS,
+		    &phylist, &pcount) != 0) {
+			topo_mod_dprintf(mod,
+			    "Failed to get prop %s.", SES_SAS_PROP_PHYS);
+		} else {
+			/*
+			 * For each phy, get the connector element index and
+			 * stores into connector element index array.
+			 */
+			*phycount = pcount;
+			for (i = 0; i < pcount; i++) {
+				if (nvlist_lookup_uint64(phylist[i],
+				    SES_PROP_CE_IDX, &connidx) == 0) {
+					if (connidx != 0xff) {
+						connlist[i] = connidx;
+					} else {
+						connlist[i] = -1;
+					}
+				} else {
+					/* Fail to get the index. set to -1. */
+					connlist[i] = -1;
+				}
+			}
+
+			/* set the phy count prop of the expander. */
+			if (topo_prop_set_uint64(tnode, TOPO_PGROUP_STORAGE,
+			    TOPO_PROP_PHY_COUNT, TOPO_PROP_IMMUTABLE, pcount,
+			    &err) != 0) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set %S error %s\n", TOPO_PROP_PHY_COUNT,
+				    topo_strerror(err));
+			}
+
+			/*
+			 * set the connector element index of
+			 * the expander phys.
+			 */
+		}
+
+		/* populate other misc storage group properties */
+		if (found) {
+			if (dnode->ddn_mfg && (topo_prop_set_string(tnode,
+			    TOPO_PGROUP_STORAGE, TOPO_STORAGE_MANUFACTURER,
+			    TOPO_PROP_IMMUTABLE, dnode->ddn_mfg, &err) != 0)) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set mfg error %s\n", topo_strerror(err));
+			}
+
+			if (dnode->ddn_model && (topo_prop_set_string(tnode,
+			    TOPO_PGROUP_STORAGE, TOPO_STORAGE_MODEL,
+			    TOPO_PROP_IMMUTABLE,
+			    dnode->ddn_model, &err) != 0)) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set model error %s\n", topo_strerror(err));
+			}
+
+			if (dnode->ddn_serial && (topo_prop_set_string(tnode,
+			    TOPO_PGROUP_STORAGE, TOPO_STORAGE_SERIAL_NUM,
+			    TOPO_PROP_IMMUTABLE,
+			    dnode->ddn_serial, &err) != 0)) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set serial error %s\n",
+				    topo_strerror(err));
+			}
+
+			if (dnode->ddn_firm && (topo_prop_set_string(tnode,
+			    TOPO_PGROUP_STORAGE,
+			    TOPO_STORAGE_FIRMWARE_REV, TOPO_PROP_IMMUTABLE,
+			    dnode->ddn_firm, &err) != 0)) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set firm error %s\n", topo_strerror(err));
+			}
+		}
+	}
+
+	return (0);
+
+error:
+	nvlist_free(auth);
+	nvlist_free(fmri);
+	return (-1);
+}
+
+/*
+ * Create SAS expander specific props.
+ */
+/*ARGSUSED*/
+static int
+ses_set_connector_props(ses_enum_data_t *sdp, ses_enum_node_t *snp,
+    tnode_t *tnode, int64_t phy_mask)
+{
+	ses_node_t *np = snp->sen_node;
+	topo_mod_t *mod = sdp->sed_mod;
+	nvlist_t *props;
+	int err, i;
+	uint64_t conntype;
+	char phymask_str[17], *conntype_str;
+	boolean_t   found;
+
+	props = ses_node_props(np);
+
+	/*
+	 * convert phy mask to string.
+	 */
+	(void) snprintf(phymask_str, 17, "%llx", phy_mask);
+
+	/* create the storage group */
+	if (topo_pgroup_create(tnode, &storage_pgroup, &err) != 0) {
+		topo_mod_dprintf(mod, "ses_set_expander_props: "
+		    "create storage error %s\n", topo_strerror(err));
+		return (-1);
+	} else {
+		/* set the SAS address prop of the expander. */
+		if (topo_prop_set_string(tnode, TOPO_PGROUP_STORAGE,
+		    TOPO_STORAGE_SAS_PHY_MASK, TOPO_PROP_IMMUTABLE,
+		    phymask_str, &err) != 0) {
+			topo_mod_dprintf(mod, "ses_set_expander_props: "
+			    "set %S error %s\n", TOPO_STORAGE_SAS_PHY_MASK,
+			    topo_strerror(err));
+		}
+
+		/* Get the connector type information for the expander */
+		if (nvlist_lookup_uint64(props,
+		    SES_SC_PROP_CONNECTOR_TYPE, &conntype) != 0) {
+			topo_mod_dprintf(mod, "Failed to get prop %s.",
+			    TOPO_STORAGE_SAS_PHY_MASK);
+		} else {
+			found = B_FALSE;
+			for (i = 0; ; i++) {
+				if (sas_connector_type_list[i].type ==
+				    SAS_CONNECTOR_TYPE_CODE_NOT_DEFINED) {
+					break;
+				}
+				if (sas_connector_type_list[i].type ==
+				    conntype) {
+					conntype_str =
+					    sas_connector_type_list[i].name;
+					found = B_TRUE;
+					break;
+				}
+			}
+
+			if (!found) {
+				if (conntype <
+				    SAS_CONNECTOR_TYPE_CODE_NOT_DEFINED) {
+					conntype_str =
+					    SAS_CONNECTOR_TYPE_RESERVED;
+				} else {
+					conntype_str =
+					    SAS_CONNECTOR_TYPE_NOT_DEFINED;
+				}
+			}
+
+			/* set the phy count prop of the expander. */
+			if (topo_prop_set_string(tnode, TOPO_PGROUP_STORAGE,
+			    TOPO_STORAGE_SAS_CONNECTOR_TYPE,
+			    TOPO_PROP_IMMUTABLE, conntype_str, &err) != 0) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set %S error %s\n", TOPO_PROP_PHY_COUNT,
+				    topo_strerror(err));
+			}
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * Instantiate SAS expander nodes for a given ESC Electronics node(controller)
+ * nodes.
+ */
+/*ARGSUSED*/
+static int
+ses_create_esc_sasspecific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
+    tnode_t *pnode, ses_enum_chassis_t *cp,
+    boolean_t dorange)
+{
+	topo_mod_t *mod = sdp->sed_mod;
+	tnode_t	*exptn, *contn;
+	boolean_t found;
+	sas_connector_phy_data_t connectors[64] = {NULL};
+	uint64_t max;
+	ses_enum_node_t *ctlsnp, *xsnp, *consnp;
+	ses_node_t *np = snp->sen_node;
+	nvlist_t *props, *psprops;
+	uint64_t index, psindex, conindex, psstatus, i, j, count;
+	int64_t cidxlist[256] = {NULL};
+	int phycount;
+
+	props = ses_node_props(np);
+
+	if (nvlist_lookup_uint64(props, SES_PROP_ELEMENT_ONLY_INDEX,
+	    &index) != 0)
+		return (-1);
+
+	/*
+	 * For SES constroller node, check to see if there are
+	 * associated SAS expanders.
+	 */
+	found = B_FALSE;
+	max = 0;
+	for (ctlsnp = topo_list_next(&cp->sec_nodes); ctlsnp != NULL;
+	    ctlsnp = topo_list_next(ctlsnp)) {
+		if (ctlsnp->sen_type == SES_ET_SAS_EXPANDER) {
+			found = B_TRUE;
+			if (ctlsnp->sen_instance > max)
+				max = ctlsnp->sen_instance;
+		}
+	}
+
+	/*
+	 * No SAS expander found notthing to process.
+	 */
+	if (!found)
+		return (0);
+
+	topo_mod_dprintf(mod, "%s Controller %d: creating "
+	    "%llu %s nodes", cp->sec_csn, index, max + 1, SASEXPANDER);
+
+	/*
+	 * The max number represent the number of elements
+	 * deducted from the highest SES_PROP_ELEMENT_CLASS_INDEX
+	 * of SET_ET_SAS_EXPANDER type element.
+	 *
+	 * There may be multiple ESC Electronics element(controllers)
+	 * within JBOD(typicall two for redundancy) and SAS expander
+	 * elements are associated with only one of them.  We are
+	 * still creating the range based max number here.
+	 * That will cover the case that all expanders are associated
+	 * with one SES controller.
+	 */
+	if (dorange && topo_node_range_create(mod, pnode,
+	    SASEXPANDER, 0, max) != 0) {
+		topo_mod_dprintf(mod,
+		    "topo_node_create_range() failed: %s",
+		    topo_mod_errmsg(mod));
+		return (-1);
+	}
+
+	/*
+	 * Search exapnders with the parent index matching with
+	 * ESC Electronics element index.
+	 * Note the index used here is a global index across
+	 * SES elements.
+	 */
+	for (xsnp = topo_list_next(&cp->sec_nodes); xsnp != NULL;
+	    xsnp = topo_list_next(xsnp)) {
+		if (xsnp->sen_type == SES_ET_SAS_EXPANDER) {
+			/*
+			 * get the parent ESC controller.
+			 */
+			psprops = ses_node_props(xsnp->sen_node);
+			if (nvlist_lookup_uint64(psprops,
+			    SES_PROP_STATUS_CODE, &psstatus) == 0) {
+				if (psstatus == SES_ESC_NOT_INSTALLED) {
+					/*
+					 * Not installed.
+					 * Don't create a ndoe.
+					 */
+					continue;
+				}
+			} else {
+				/*
+				 * The element should have status code.
+				 * If not there is no way to find
+				 * out if the expander element exist or
+				 * not.
+				 */
+				continue;
+			}
+
+			/* Get the physical parent index to compare. */
+			if (nvlist_lookup_uint64(psprops,
+			    LIBSES_PROP_PHYS_PARENT, &psindex) == 0) {
+				if (index == psindex) {
+		/* indentation moved forward */
+		/*
+		 * Handle basic node information of SAS expander
+		 * element - binding to parent node and
+		 * allocating FMRI...
+		 */
+		if (ses_create_generic(sdp, xsnp, pnode, SASEXPANDER,
+		    "SAS-EXPANDER", &exptn) != 0)
+			continue;
+		/*
+		 * Now handle SAS expander unique portion of node creation.
+		 * The max nubmer of the phy count is 256 since SES-2
+		 * defines as 1 byte field.  The cidxlist has the same
+		 * number of elements.
+		 *
+		 * We use size 64 array to store the connectors.
+		 * Typically a connectors associated with 4 phys so that
+		 * matches with the max number of connecters associated
+		 * with an expander.
+		 * The phy count goes up to 38 for Sun supported
+		 * JBOD.
+		 */
+		memset(cidxlist, 0, sizeof (int64_t) * 64);
+		if (ses_set_expander_props(sdp, xsnp, pnode, exptn, &phycount,
+		    cidxlist) != 0) {
+			/*
+			 * error on getting specific prop failed.
+			 * continue on.  Note that the node is
+			 * left bound.
+			 */
+			continue;
+		}
+
+		/*
+		 * count represetns the number of connectors discovered so far.
+		 */
+		count = 0;
+		memset(connectors, 0, sizeof (sas_connector_phy_data_t) * 64);
+		for (i = 0; i < phycount; i++) {
+			if (cidxlist[i] != -1) {
+				/* connector index is valid. */
+				for (j = 0; j < count; j++) {
+					if (connectors[j].index ==
+					    cidxlist[i]) {
+						/*
+						 * Just update phy mask.
+						 * The postion for connector
+						 * index lists(cidxlist index)
+						 * is set.
+						 */
+						connectors[j].phy_mask =
+						    connectors[j].phy_mask |
+						    (1ULL << i);
+						break;
+					}
+				}
+				/*
+				 * If j and count matche a  new connector
+				 * index is found.
+				 */
+				if (j == count) {
+					/* add a new index and phy mask. */
+					connectors[count].index = cidxlist[i];
+					connectors[count].phy_mask =
+					    connectors[count].phy_mask |
+					    (1ULL << i);
+					count++;
+				}
+			}
+		}
+
+		/*
+		 * create range for the connector nodes.
+		 * The class index of the ses connector element
+		 * is set as the instance nubmer for the node.
+		 * Even though one expander may not have all connectors
+		 * are associated with we are creating the range with
+		 * max possible instance number.
+		 */
+		found = B_FALSE;
+		max = 0;
+		for (consnp = topo_list_next(&cp->sec_nodes);
+		    consnp != NULL; consnp = topo_list_next(consnp)) {
+			if (consnp->sen_type == SES_ET_SAS_CONNECTOR) {
+				psprops = ses_node_props(consnp->sen_node);
+				found = B_TRUE;
+				if (consnp->sen_instance > max)
+					max = consnp->sen_instance;
+			}
+		}
+
+		/*
+		 * No SAS connector found nothing to process.
+		 */
+		if (!found)
+			return (0);
+
+		if (dorange && topo_node_range_create(mod, exptn,
+		    RECEPTACLE, 0, max) != 0) {
+			topo_mod_dprintf(mod,
+			    "topo_node_create_range() failed: %s",
+			    topo_mod_errmsg(mod));
+			return (-1);
+		}
+
+		/* search matching connector element using the index. */
+		for (i = 0; i < count; i++) {
+			found = B_FALSE;
+			for (consnp = topo_list_next(&cp->sec_nodes);
+			    consnp != NULL; consnp = topo_list_next(consnp)) {
+				if (consnp->sen_type == SES_ET_SAS_CONNECTOR) {
+					psprops = ses_node_props(
+					    consnp->sen_node);
+					/*
+					 * Get the physical parent index to
+					 * compare.
+					 * The connector elements are children
+					 * of ESC Electronics element even
+					 * though we enumerate them under
+					 * an expander in libtopo.
+					 */
+					if (nvlist_lookup_uint64(psprops,
+					    SES_PROP_ELEMENT_ONLY_INDEX,
+					    &conindex) == 0) {
+						if (conindex ==
+						    connectors[i].index) {
+							found = B_TRUE;
+							break;
+						}
+					}
+				}
+			}
+
+			/* now create a libtopo node. */
+			if (found) {
+				/* Create generic props. */
+				if (ses_create_generic(sdp, consnp, exptn,
+				    RECEPTACLE, "RECEPTACLE", &contn) !=
+				    0) {
+					continue;
+				}
+				/* Create connector specific props. */
+				if (ses_set_connector_props(sdp, consnp,
+				    contn, connectors[i].phy_mask) != 0) {
+					continue;
+				}
+			}
+		}
+		/* end indentation change */
+				}
+			}
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * Instantiate any protocol specific portion of a node.
+ */
+/*ARGSUSED*/
+static int
+ses_create_protocol_specific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
+    tnode_t *pnode, uint64_t type, ses_enum_chassis_t *cp,
+    boolean_t dorange)
+{
+
+	if (type == SES_ET_ESC_ELECTRONICS) {
+		/* create SAS specific children(expanders and connectors. */
+		return (ses_create_esc_sasspecific(sdp, snp, pnode, cp,
+		    dorange));
+	}
+
+	return (0);
 }
 
 /*
@@ -825,6 +1470,7 @@ ses_create_children(ses_enum_data_t *sdp, tnode_t *pnode, uint64_t type,
 	boolean_t found;
 	uint64_t max;
 	ses_enum_node_t *snp;
+	tnode_t	*tn;
 
 	/*
 	 * First go through and count how many matching nodes we have.
@@ -864,8 +1510,22 @@ ses_create_children(ses_enum_data_t *sdp, tnode_t *pnode, uint64_t type,
 	    snp = topo_list_next(snp)) {
 		if (snp->sen_type == type) {
 			if (ses_create_generic(sdp, snp, pnode,
-			    nodename, defaultlabel) != 0)
+			    nodename, defaultlabel, &tn) != 0)
 				return (-1);
+			/*
+			 * For some SES element there may be protocol specific
+			 * information to process.   Here we are processing
+			 * the association between enclosure controller and
+			 * SAS expanders.
+			 */
+			if (type == SES_ET_ESC_ELECTRONICS) {
+				/* create SAS expander node */
+				if (ses_create_protocol_specific(sdp, snp,
+				    tn, type, cp, dorange) != 0) {
+					return (-1);
+				}
+			}
+
 		}
 	}
 
@@ -883,7 +1543,6 @@ ses_create_subchassis(ses_enum_data_t *sdp, tnode_t *pnode,
 	tnode_t *tn;
 	nvlist_t *props;
 	nvlist_t *auth = NULL, *fmri = NULL;
-	char *part = NULL, *revision = NULL;
 	uint64_t instance = scp->sec_instance;
 	char *desc;
 	char label[128];
@@ -905,8 +1564,8 @@ ses_create_subchassis(ses_enum_data_t *sdp, tnode_t *pnode,
 	 * piece of code will need to be updated via an RFE.
 	 */
 	if ((fmri = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION,
-	    SUBCHASSIS, (topo_instance_t)instance, NULL, auth, part, revision,
-	    scp->sec_lid)) == NULL) {
+	    SUBCHASSIS, (topo_instance_t)instance, NULL, auth, NULL, NULL,
+	    NULL)) == NULL) {
 		topo_mod_dprintf(mod, "topo_mod_hcfmri() failed: %s",
 		    topo_mod_errmsg(mod));
 		goto error;
@@ -944,9 +1603,23 @@ ses_create_subchassis(ses_enum_data_t *sdp, tnode_t *pnode,
 	if (topo_node_label_set(tn, desc, &err) != 0)
 		goto error;
 
-	if (ses_set_standard_props(mod, tn, NULL,
+	if (ses_set_standard_props(mod, NULL, tn, NULL,
 	    ses_node_id(scp->sec_enclosure), scp->sec_target->set_devpath) != 0)
 		goto error;
+
+	/*
+	 * Set the 'chassis-type' property for this subchassis.  This is either
+	 * 'ses-class-description' or 'subchassis'.
+	 */
+	if (nvlist_lookup_string(props, SES_PROP_CLASS_DESCRIPTION, &desc) != 0)
+		desc = "subchassis";
+
+	if (topo_prop_set_string(tn, TOPO_PGROUP_SES,
+	    TOPO_PROP_CHASSIS_TYPE, TOPO_PROP_IMMUTABLE, desc, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to create property %s: %s\n",
+		    TOPO_PROP_CHASSIS_TYPE, topo_strerror(err));
+		goto error;
+	}
 
 	/*
 	 * For enclosures, we want to include all possible targets (for upgrade
@@ -1115,7 +1788,7 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 		goto error;
 	}
 
-	if (ses_set_standard_props(mod, tn, auth,
+	if (ses_set_standard_props(mod, NULL, tn, auth,
 	    ses_node_id(cp->sec_enclosure), cp->sec_target->set_devpath) != 0)
 		goto error;
 
@@ -1145,7 +1818,9 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	}
 
 	/*
-	 * Create the nodes for power supplies, fans, and devices.
+	 * Create the nodes for power supplies, fans, controllers and devices.
+	 * Note that SAS exopander nodes and connector nodes are handled
+	 * through protocol specific processing of controllers.
 	 */
 	if (ses_create_children(sdp, tn, SES_ET_POWER_SUPPLY,
 	    PSU, "PSU", cp, B_TRUE) != 0 ||
@@ -1159,9 +1834,9 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	    BAY, "BAY", cp, B_TRUE) != 0)
 		goto error;
 
-	if (cp->sec_scinstance > 0 &&
-	    topo_node_range_create(mod, tn, SUBCHASSIS, 0,
-	    cp->sec_scinstance - 1) != 0) {
+	if (cp->sec_maxinstance >= 0 &&
+	    (topo_node_range_create(mod, tn, SUBCHASSIS, 0,
+	    cp->sec_maxinstance) != 0)) {
 		topo_mod_dprintf(mod, "topo_node_create_range() failed: %s",
 		    topo_mod_errmsg(mod));
 		goto error;
@@ -1174,8 +1849,9 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 			goto error;
 
 		topo_mod_dprintf(mod, "created Subchassis node with "
-		    "LID (%s)\n  and target (%s) under Chassis with CSN (%s)",
-		    scp->sec_lid, scp->sec_target->set_devpath, cp->sec_csn);
+		    "instance %u\nand target (%s) under Chassis with CSN %s",
+		    scp->sec_instance, scp->sec_target->set_devpath,
+		    cp->sec_csn);
 
 		sc_count++;
 	}
@@ -1238,21 +1914,22 @@ ses_create_bays(ses_enum_data_t *sdp, tnode_t *pnode)
 static int
 ses_init_chassis(topo_mod_t *mod, ses_enum_data_t *sdp, ses_enum_chassis_t *pcp,
     ses_enum_chassis_t *cp, ses_node_t *np, nvlist_t *props,
-    char *lid, ses_chassis_type_e flags)
+    uint64_t subchassis, ses_chassis_type_e flags)
 {
 	boolean_t internal, ident;
 
 	assert((flags & (SES_NEW_CHASSIS | SES_NEW_SUBCHASSIS |
 	    SES_DUP_CHASSIS | SES_DUP_SUBCHASSIS)) != 0);
 
-	assert((cp != NULL) && (np != NULL) && (props != NULL) &&
-	    (lid != NULL));
+	assert(cp != NULL);
+	assert(np != NULL);
+	assert(props != NULL);
 
 	if (flags & (SES_NEW_SUBCHASSIS | SES_DUP_SUBCHASSIS))
 		assert(pcp != NULL);
 
-	topo_mod_dprintf(mod, "ses_init_chassis: %s: lid(%s), flags (%d)",
-	    sdp->sed_name, lid, flags);
+	topo_mod_dprintf(mod, "ses_init_chassis: %s: index %llu, flags (%d)",
+	    sdp->sed_name, subchassis, flags);
 
 	if (flags & (SES_NEW_CHASSIS | SES_NEW_SUBCHASSIS)) {
 
@@ -1261,15 +1938,22 @@ ses_init_chassis(topo_mod_t *mod, ses_enum_data_t *sdp, ses_enum_chassis_t *pcp,
 		    LIBSES_EN_PROP_INTERNAL, &internal) == 0)
 			cp->sec_internal = internal;
 
-		cp->sec_lid = lid;
 		cp->sec_enclosure = np;
 		cp->sec_target = sdp->sed_target;
 
 		if (flags & SES_NEW_CHASSIS) {
-			cp->sec_instance = sdp->sed_instance++;
+			if (!cp->sec_internal)
+				cp->sec_instance = sdp->sed_instance++;
 			topo_list_append(&sdp->sed_chassis, cp);
 		} else {
-			cp->sec_instance = pcp->sec_scinstance++;
+			if (subchassis != NO_SUBCHASSIS)
+				cp->sec_instance = subchassis;
+			else
+				cp->sec_instance = pcp->sec_scinstance++;
+
+			if (cp->sec_instance > pcp->sec_maxinstance)
+				pcp->sec_maxinstance = cp->sec_instance;
+
 			topo_list_append(&pcp->sec_subchassis, cp);
 		}
 
@@ -1307,8 +1991,7 @@ ses_enum_gather(ses_node_t *np, void *data)
 	uint64_t instance, type;
 	uint64_t prevstatus, status;
 	boolean_t report;
-	boolean_t have_subchassis = B_TRUE;
-	char *lid;
+	uint64_t subchassis = NO_SUBCHASSIS;
 
 	if (ses_node_type(np) == SES_NODE_ENCLOSURE) {
 		/*
@@ -1328,14 +2011,12 @@ ses_enum_gather(ses_node_t *np, void *data)
 		    &csn) != 0)
 			return (SES_WALK_ACTION_TERMINATE);
 
-		if (nvlist_lookup_string(props, LIBSES_EN_PROP_SUBCHASSIS_ID,
-		    &lid) != 0) {
-			have_subchassis = B_FALSE;
-			lid = "";
-		}
+		(void) nvlist_lookup_uint64(props, LIBSES_EN_PROP_SUBCHASSIS_ID,
+		    &subchassis);
 
 		topo_mod_dprintf(mod, "ses_enum_gather: Enclosure Node (%s) "
-		    "CSN (%s), LID (%s)", sdp->sed_name, csn, lid);
+		    "CSN (%s), subchassis (%llu)", sdp->sed_name, csn,
+		    subchassis);
 
 		/*
 		 * We need to determine whether this enclosure node
@@ -1376,24 +2057,26 @@ ses_enum_gather(ses_node_t *np, void *data)
 			    sizeof (ses_enum_chassis_t))) == NULL)
 				goto error;
 
+			cp->sec_scinstance = SES_STARTING_SUBCHASSIS;
+			cp->sec_maxinstance = -1;
 			cp->sec_csn = csn;
 
-			if (!have_subchassis || strcmp(csn, lid) == 0) {
+			if (subchassis == NO_SUBCHASSIS) {
 				/* 1.1 This is a new chassis */
 
 				topo_mod_dprintf(mod, "%s: Initialize new "
-				    "chassis with CSN (%s) and LID (%s)",
-				    sdp->sed_name, csn, lid);
+				    "chassis with CSN %s", sdp->sed_name, csn);
 
 				if (ses_init_chassis(mod, sdp, NULL, cp,
-				    np, props, lid, SES_NEW_CHASSIS) < 0)
+				    np, props, NO_SUBCHASSIS,
+				    SES_NEW_CHASSIS) < 0)
 					goto error;
 			} else {
 				/* 1.2 This is a new subchassis */
 
 				topo_mod_dprintf(mod, "%s: Initialize new "
-				    "subchassis with CSN (%s) and LID (%s)",
-				    sdp->sed_name, csn, lid);
+				    "subchassis with CSN %s and index %llu",
+				    sdp->sed_name, csn, subchassis);
 
 				if ((scp = topo_mod_zalloc(mod,
 				    sizeof (ses_enum_chassis_t))) == NULL)
@@ -1401,39 +2084,41 @@ ses_enum_gather(ses_node_t *np, void *data)
 
 				scp->sec_csn = csn;
 
-				if (ses_init_chassis(mod, sdp, cp, scp,
-				    np, props, lid, SES_NEW_SUBCHASSIS) < 0)
+				if (ses_init_chassis(mod, sdp, cp, scp, np,
+				    props, subchassis, SES_NEW_SUBCHASSIS) < 0)
 					goto error;
 			}
 		} else {
-			/* 2. We have a chassis with this CSN */
-
-			if (!have_subchassis || strcmp(csn, lid) == 0) {
-				/* This is a chassis */
-
-				if (!have_subchassis ||
-				    strlen(cp->sec_lid) > 0) {
+			/*
+			 * We have a chassis or subchassis with this CSN.  If
+			 * it's a chassis, we must check to see whether it is
+			 * a placeholder previously created because we found a
+			 * subchassis with this CSN.  We will know that because
+			 * the sec_target value will not be set; it is set only
+			 * in ses_init_chassis().  In that case, initialise it
+			 * as a new chassis; otherwise, it's a duplicate and we
+			 * need to append only.
+			 */
+			if (subchassis == NO_SUBCHASSIS) {
+				if (cp->sec_target != NULL) {
 					/* 2.1 This is a duplicate chassis */
 
 					topo_mod_dprintf(mod, "%s: Append "
-					    "duplicate chassis with CSN (%s) "
-					    "and LID (%s)",
-					    sdp->sed_name, csn, lid);
+					    "duplicate chassis with CSN (%s)",
+					    sdp->sed_name, csn);
 
 					if (ses_init_chassis(mod, sdp, NULL, cp,
-					    np, props, lid,
+					    np, props, NO_SUBCHASSIS,
 					    SES_DUP_CHASSIS) < 0)
 						goto error;
 				} else {
-					/* 2.2 Init the placeholder chassis */
-
+					/* Placeholder chassis - init it up */
 					topo_mod_dprintf(mod, "%s: Initialize"
-					    "placeholder chassis with CSN (%s) "
-					    "and LID (%s)",
-					    sdp->sed_name, csn, lid);
+					    "placeholder chassis with CSN %s",
+					    sdp->sed_name, csn);
 
-					if (ses_init_chassis(mod, sdp, NULL, cp,
-					    np, props, lid,
+					if (ses_init_chassis(mod, sdp, NULL,
+					    cp, np, props, NO_SUBCHASSIS,
 					    SES_NEW_CHASSIS) < 0)
 						goto error;
 
@@ -1443,7 +2128,7 @@ ses_enum_gather(ses_node_t *np, void *data)
 
 				for (scp = topo_list_next(&cp->sec_subchassis);
 				    scp != NULL; scp = topo_list_next(scp))
-					if (strcmp(scp->sec_lid, lid) == 0)
+					if (scp->sec_instance == subchassis)
 						break;
 
 				if (scp == NULL) {
@@ -1452,7 +2137,7 @@ ses_enum_gather(ses_node_t *np, void *data)
 					topo_mod_dprintf(mod, "%s: Initialize "
 					    "new subchassis with CSN (%s) "
 					    "and LID (%s)",
-					    sdp->sed_name, csn, lid);
+					    sdp->sed_name, csn);
 
 					if ((scp = topo_mod_zalloc(mod,
 					    sizeof (ses_enum_chassis_t)))
@@ -1462,7 +2147,7 @@ ses_enum_gather(ses_node_t *np, void *data)
 					scp->sec_csn = csn;
 
 					if (ses_init_chassis(mod, sdp, cp, scp,
-					    np, props, lid,
+					    np, props, subchassis,
 					    SES_NEW_SUBCHASSIS) < 0)
 						goto error;
 				} else {
@@ -1470,11 +2155,10 @@ ses_enum_gather(ses_node_t *np, void *data)
 
 					topo_mod_dprintf(mod, "%s: Append "
 					    "duplicate subchassis with "
-					    "CSN (%s) and LID (%s)",
-					    sdp->sed_name, csn, lid);
+					    "CSN (%s)", sdp->sed_name, csn);
 
 					if (ses_init_chassis(mod, sdp, cp, scp,
-					    np, props, lid,
+					    np, props, subchassis,
 					    SES_DUP_SUBCHASSIS) < 0)
 						goto error;
 				}
@@ -1498,7 +2182,9 @@ ses_enum_gather(ses_node_t *np, void *data)
 		    type != SES_ET_ARRAY_DEVICE &&
 		    type != SES_ET_COOLING &&
 		    type != SES_ET_POWER_SUPPLY &&
-		    type != SES_ET_ESC_ELECTRONICS)
+		    type != SES_ET_ESC_ELECTRONICS &&
+		    type != SES_ET_SAS_EXPANDER &&
+		    type != SES_ET_SAS_CONNECTOR)
 			return (SES_WALK_ACTION_CONTINUE);
 
 		/*
@@ -1714,7 +2400,7 @@ ses_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
 		data->sed_mod = mod;
 		topo_mod_setspecific(mod, data);
 
-		if (disk_list_gather(mod, &data->sed_disks) != 0)
+		if (dev_list_gather(mod, &data->sed_devs) != 0)
 			goto error;
 
 		/*

@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_PLUGIN_SES_IMPL_H
 #define	_PLUGIN_SES_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -1348,7 +1345,7 @@ typedef struct ses2_subhelp_text_impl {
 } ses2_subhelp_text_impl_t;
 
 #define	SES2_SUBHELP_LEN(stip)	\
-	((stip)->ssti_subenclosure_help_text_length + \
+	(SCSI_READ16(&(stip)->ssti_subenclosure_help_text_length) + \
 	    offsetof(ses2_subhelp_text_impl_t, ssti_subenclosure_help_text[0]))
 /*
  * SES-2 Subenclosure String Out diagnostic page (Table 42, 6.1.15).
@@ -1383,7 +1380,7 @@ typedef struct ses2_substring_in_data_impl {
 } ses2_substring_in_data_impl_t;
 
 #define	SES2_SUBSTR_LEN(sdip)	\
-	((sdip)->ssidi_substring_data_length + \
+	(SCSI_READ16(&(sdip)->ssidi_substring_data_length) + \
 	    offsetof(ses2_substring_in_data_impl_t, ssidi_data[0]))
 
 /*

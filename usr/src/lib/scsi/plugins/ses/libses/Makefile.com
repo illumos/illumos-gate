@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE =	libses
 SRCS =		libses.c	\
@@ -34,6 +32,8 @@ PLUGINTYPE =	framework
 include ../../Makefile.lib
 
 SES2HDR =	$(ROOTPLUGINHDRDIR)/ses/framework/ses2.h
+
+CLEANFILES +=	../common/libses_elemtype.c
 
 ../common/libses_elemtype.c: ../common/mkelemtype.sh $(SES2HDR)
 	sh ../common/mkelemtype.sh < $(SES2HDR) > $@

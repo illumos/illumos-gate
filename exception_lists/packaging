@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -45,6 +44,7 @@ usr/include/security/pam_impl.h
 usr/include/sys/clock_impl.h
 usr/include/sys/ieeefp.h
 usr/include/sys/winlockio.h
+usr/include/scsi/plugins/ses/vendor/sun_impl.h
 #
 # Private/Internal libraries of the Cryptographic Framework.
 #

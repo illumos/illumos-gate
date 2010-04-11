@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -188,7 +187,7 @@ convert_element(const uint8_t *data, const fru_regdef_t *def, char *ppath,
 			return;
 		for (i = head, n = 0, data += sizeof (uint32_t); n < num;
 		    i = ((i + 1) % def->iterationCount), n++) {
-			if (nvlist_alloc(&nv_elems[n], 0, 0) != 0)
+			if (nvlist_alloc(&nv_elems[n], NV_UNIQUE_NAME, 0) != 0)
 				return;
 			(void) snprintf(num_str, sizeof (num_str), "%d", n);
 			convert_element((data + i*iterlen), &newdef, num_str,
@@ -201,7 +200,7 @@ convert_element(const uint8_t *data, const fru_regdef_t *def, char *ppath,
 		nvlist_t *nv_record;
 
 		if (!from_iter) {
-			if (nvlist_alloc(&nv_record, 0, 0) != 0) {
+			if (nvlist_alloc(&nv_record, NV_UNIQUE_NAME, 0) != 0) {
 				return;
 			}
 		} else {
@@ -323,7 +322,7 @@ convert_packets_in_segment(fru_seghdl_t segment, void *args)
 	}
 
 	/* create a new nvlist for each segment */
-	ret = nvlist_alloc(&nv_segment, 0, 0);
+	ret = nvlist_alloc(&nv_segment, NV_UNIQUE_NAME, 0);
 	if (ret) {
 		free(name);
 		return (FRU_FAILURE);
@@ -361,7 +360,7 @@ convert_fru(fru_nodehdl_t hdl, nvlist_t **nvlist)
 		return (-1);
 	}
 
-	err = nvlist_alloc(&nv, 0, 0);
+	err = nvlist_alloc(&nv, NV_UNIQUE_NAME, 0);
 	if (err) {
 		return (err);
 	}

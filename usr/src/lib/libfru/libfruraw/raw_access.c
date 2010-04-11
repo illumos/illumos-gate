@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1197,12 +1196,10 @@ fru_close_container(container_hdl_t container)
 			}
 		}
 
-		free(sec_hash_obj->u.sec_obj); /* free section hash object */
-
 		prev_hash = sec_hash_obj;
-
 		sec_hash_obj = sec_hash_obj->u.sec_obj->next;
 
+		free(prev_hash->u.sec_obj); /* free section hash object */
 		free(prev_hash); /* free section hash */
 	}
 
