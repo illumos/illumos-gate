@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -139,7 +138,7 @@ static char *interface_name;
 static char all_polheads;	/* So we can easily get "". */
 
 /* Error reporting stuff */
-#define	CBUF_LEN		4096		/* Maximum size of the cmd */
+#define	CBUF_LEN		8192		/* Maximum size of the cmd */
 /*
  * Following are used for reporting errors with arguments.
  * We store the line numbers of each argument as we parse them,
@@ -345,6 +344,7 @@ static int	pfp_delete_rule(uint64_t);
 static void	ipsec_conf_admin(uint8_t);
 static void	print_bit_range(int, int);
 static void	nuke_adds();
+static boolean_t combined_mode(uint_t);
 
 #ifdef DEBUG
 static void	dump_conf(ips_conf_t *);
@@ -864,7 +864,7 @@ ips_act_wild_props_to_action(struct spd_attribute *ap,
     const ips_act_props_t *act_ptr)
 {
 	ips_act_props_t tact = *act_ptr;
-	boolean_t use_ah, use_esp, use_espa;
+	boolean_t use_ah, use_esp, use_espa, combined;
 	boolean_t wild_auth, wild_encr, wild_eauth;
 	uint_t	auth_alg, auth_idx, auth_min, auth_max;
 	uint_t	eauth_alg, eauth_idx, eauth_min, eauth_max;
@@ -911,6 +911,8 @@ ips_act_wild_props_to_action(struct spd_attribute *ap,
 		    !alg_rangecheck(ESP_ENCR, encr_alg, &act_ptr->iap_eencr))
 			continue;
 
+		combined = combined_mode(encr_alg);
+
 		for (auth_idx = auth_min; auth_idx <= auth_max; auth_idx++) {
 			auth_alg = WHICH_ALG(AH_AUTH, wild_auth, auth_idx);
 
@@ -925,18 +927,28 @@ ips_act_wild_props_to_action(struct spd_attribute *ap,
 				eauth_alg = WHICH_ALG(ESP_AUTH, wild_eauth,
 				    eauth_idx);
 
-				if (use_espa &&
+				if (!combined && use_espa &&
 				    !alg_rangecheck(ESP_AUTH, eauth_alg,
 				    &act_ptr->iap_eauth))
 					continue;
 
 				tact.iap_eencr.alg_id = encr_alg;
-				tact.iap_eauth.alg_id = eauth_alg;
 				tact.iap_aauth.alg_id = auth_alg;
+
+				/*
+				 * If the cipher is combined-mode don't do any
+				 * ESP authentication.
+				 */
+				tact.iap_eauth.alg_id =
+				    combined ? SADB_AALG_NONE : eauth_alg;
 
 				(*act_cntp)++;
 				ap = ips_act_props_to_action(ap,
 				    rule_priorityp, &tact);
+
+				/* Stop now if the cipher is combined-mode. */
+				if (combined)
+					break;	/* Out of for loop. */
 			}
 		}
 	}
@@ -1870,7 +1882,7 @@ ipsec_read_dump(int pfd)
 		warnx(gettext("dump read: message corruption,"
 		    " %d len exceeds %d boundary."),
 		    SADB_64TO8((uintptr_t)(offset - buf)),
-		    SADB_64TO8((uintptr_t)(buf + len)));
+		    SADB_64TO8((uintptr_t)(len)));
 		return (NULL);
 	}
 
@@ -3017,8 +3029,10 @@ parse_address(int type, char *addr_str)
 		*ptr++ = NULL;
 
 		prefix_len = in_getprefixlen(ptr);
-		if (prefix_len < 0)
+		if (prefix_len < 0) {
+			warnx(gettext("Unparseable prefix: '%s'."), ptr);
 			return (-1);
+		}
 	}
 
 	/*
@@ -3068,10 +3082,12 @@ parse_address(int type, char *addr_str)
 			hp = ne_hent;
 			break;
 		default:
-			warnx("Address type %d not supported.", ne->n_addrtype);
+			warnx(gettext("Address type %d not supported."),
+			    ne->n_addrtype);
 			return (-1);
 		}
 	} else {
+		warnx(gettext("Could not resolve address %s."), addr_str);
 		return (-1);
 	}
 
@@ -3416,15 +3432,20 @@ parse_port(int type, char *port_str, ips_conf_t *conf)
 }
 
 static boolean_t
-combined_mode(ips_act_props_t *iap)
+combined_mode(uint_t alg_id)
 {
 	struct ipsecalgent *alg;
+	boolean_t rc;
 
-	alg = getipsecalgbynum(iap->iap_eencr.alg_id, IPSEC_PROTO_ESP, NULL);
-	if (alg != NULL)
+	alg = getipsecalgbynum(alg_id, IPSEC_PROTO_ESP, NULL);
+	if (alg != NULL) {
+		rc = (ALG_FLAG_COMBINED & alg->a_alg_flags);
 		freeipsecalgent(alg);
+	} else {
+		rc = B_FALSE;
+	}
 
-	return (ALG_FLAG_COMBINED & alg->a_alg_flags);
+	return (rc);
 }
 
 static int
@@ -4920,7 +4941,8 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 					    IPSEC_CONF_IPSEC_EALGS, line_no);
 					return (-1);
 				}
-				is_combined_mode = combined_mode(iap);
+				is_combined_mode =
+				    combined_mode(iap->iap_eencr.alg_id);
 				ipsec_ealg = B_TRUE;
 				break;
 			case SPD_ATTR_ESP_AUTH:
