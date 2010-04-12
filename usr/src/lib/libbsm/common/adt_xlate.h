@@ -21,8 +21,7 @@
 /*
  * adt_xlate.h
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  */
 
@@ -196,7 +195,7 @@ struct adt_internal_state {
 	 *		.ai_termid.at_addr[3]
 	 * ai_asid				session id
 	 */
-	int		as_audit_enabled;	/* audit enable/disable state */
+	int		as_audit_state;		/* audit state */
 	/*
 	 * data above this line is exported / imported
 	 * To maintain upward compatibility, the above structures
@@ -242,7 +241,7 @@ struct adt_export_v2 {
 	uint32_t	ax_type;
 	uint32_t	ax_addr[4];
 	uint32_t	ax_asid;
-	int		ax_audit_enabled;
+	int		ax_audit_state;
 	pid_t		ax_pid;
 	size32_t	ax_label_len;	/* 0, unlabeled */
 /*	char		ax_label[ax_label_len];	if, is_system_labeled */
@@ -259,7 +258,7 @@ struct adt_export_v1 {
 	uint32_t	ax_type;
 	uint32_t	ax_addr[4];
 	uint32_t	ax_asid;
-	int		ax_audit_enabled;
+	int		ax_audit_state;
 	uint32_t	ax_size_of_tsol_data;	/* zero for non-TSOL systems */
 };
 struct export_link {

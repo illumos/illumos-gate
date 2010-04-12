@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <bsm/adt.h>
@@ -68,6 +67,29 @@ static int adt_get_local_address(int, struct ifaddrlist *);
 #define	DFLUSH
 #endif
 
+/*
+ * Local audit states are a bit mask
+ *
+ * The global audit states are
+ *
+ * AUC_UNSET             0      - on/off hasn't been decided
+ * AUC_ENABLED           1      - loaded and enabled
+ *
+ * The local Zone states are
+ *
+ * AUC_AUDITING         0x1     - audit daemon is active
+ * AUC_NOAUDIT          0x2     - audit daemon is not active
+ * AUC_INIT_AUDIT       0x4     - audit is ready but auditd has not run
+ * AUC_NOSPACE          0x8     - audit enabled, no space for audit records
+ *
+ * The only values returned by auditon(A_GETCOND) are:
+ * AUC_INIT_AUDIT, AUC_AUDITING, AUC_NOAUDIT, AUC_NOSPACE
+ *
+ * The pseudo audit state used when the c2audit module is excluded is
+ *
+ * AUC_DISABLED		0x100	- c2audit module is excluded
+ */
+
 static int auditstate = AUC_DISABLED;	/* default state */
 
 /*
@@ -104,22 +126,12 @@ adt_write_syslog(const char *message, int err)
 }
 
 /*
- * return true if audit is enabled.  "Enabled" is any state
- * other than AUC_DISABLED.
+ * return true if c2audit is not excluded.
  *
- * states are
- *		AUC_INIT_AUDIT	-- c2audit queuing enabled.
- *		AUC_AUDITING	-- up and running
- *		AUC_DISABLED	-- no audit subsystem loaded
- *		AUC_UNSET	-- early boot state
- *		AUC_NOAUDIT	-- subsystem loaded, turned off via
- *				   auditon(A_SETCOND...)
- *		AUC_NOSPACE	-- up and running, but log partitions are full
- *
- *	For purpose of this API, anything but AUC_DISABLED or
- *	AUC_UNSET is enabled; however one never actually sees
- *	AUC_DISABLED since auditon returns EINVAL in that case.  Any
- *	auditon error is considered the same as EINVAL for our
+ *	For purpose of this API, anything but AUC_DISABLED
+ *	is enabled; however one never actually sees
+ *	AUC_DISABLED since auditon returns ENOTSUP in that case.  Any
+ *	auditon error is considered the same as ENOTSUP for our
  *	purpose.  auditstate is not changed by auditon if an error
  *	is returned.
  */
@@ -131,6 +143,8 @@ adt_write_syslog(const char *message, int err)
  *	users are zoneadmd and init.
  *	All but dtlogin are in ON, so we can do this without cross gate
  *	synchronization.
+ *
+ *	No longer used in adt.c.
  */
 
 boolean_t
@@ -155,7 +169,7 @@ adt_audit_state(int state)
 
 	(void) auditon(A_GETCOND, (caddr_t)&auditstate, sizeof (auditstate));
 
-	return (auditstate == state);
+	return (auditstate & state);
 }
 
 /*
@@ -176,7 +190,8 @@ adt_get_mask_from_user(uid_t uid, au_mask_t *mask)
 	char		pwd_buff[NSS_BUFSIZ];
 	char		naflag_buf[NAFLAG_LEN];
 
-	if (auditstate == AUC_DISABLED) {
+	if (auditstate & AUC_DISABLED) {
+		/* c2audit excluded */
 		mask->am_success = 0;
 		mask->am_failure = 0;
 	} else if (uid <= MAXUID) {
@@ -335,22 +350,25 @@ adt_start_session(adt_session_data_t **new_session,
 	adt_internal_state_t	*state;
 	adt_session_flags_t	flgmask = ADT_FLAGS_ALL;
 
-	*new_session = NULL;	/* assume failure */
-
-	/* ensure that auditstate is set */
-	(void) adt_audit_enabled();
+	/* test and set auditstate */
+	if (adt_audit_state(AUC_DISABLED)) {
+		/* c2audit excluded */
+		*new_session = NULL;
+		return (0);
+	}
 
 	if ((flags & ~flgmask) != 0) {
 		errno = EINVAL;
 		goto return_err;
 	}
-	state = calloc(1, sizeof (adt_internal_state_t));
 
-	if (state == NULL)
+	if ((state = calloc(1, sizeof (adt_internal_state_t))) == NULL) {
 		goto return_err;
+	}
 
-	if (adt_init(state, flags & ADT_USE_PROC_DATA) != 0)
+	if (adt_init(state, flags & ADT_USE_PROC_DATA) != 0) {
 		goto return_err_free;    /* errno from adt_init() */
+	}
 
 	/*
 	 * The imported state overwrites the initial state if the
@@ -368,16 +386,13 @@ adt_start_session(adt_session_data_t **new_session,
 	DPRINTF(("(%lld) Starting session id = %08X\n",
 	    (long long) getpid(), state->as_info.ai_asid));
 
-	if (state->as_audit_enabled) {
-		*new_session = (adt_session_data_t *)state;
-	} else {
-		free(state);
-	}
-
+	*new_session = (adt_session_data_t *)state;
 	return (0);
+
 return_err_free:
 	free(state);
 return_err:
+	*new_session = NULL;
 	adt_write_syslog("audit session create failed", errno);
 	return (-1);
 }
@@ -614,24 +629,25 @@ adt_load_termid(int fd, adt_termid_t **termid)
 	int			peerlen = sizeof (peer);
 	int			socklen = sizeof (sock);
 
-	*termid = NULL;
-
 	/* get peer name if its a socket, else assume local terminal */
 
 	if (getpeername(fd, (struct sockaddr *)&peer, (socklen_t *)&peerlen)
 	    < 0) {
-		if (errno == ENOTSOCK)
+		if (errno == ENOTSOCK) {
 			return (adt_load_hostname(NULL, termid));
+		}
 		goto return_err;
 	}
 
-	if ((p_term = calloc(1, sizeof (au_tid_addr_t))) == NULL)
+	if ((p_term = calloc(1, sizeof (au_tid_addr_t))) == NULL) {
 		goto return_err;
+	}
 
 	/* get sock name */
 	if (getsockname(fd, (struct sockaddr *)&sock,
-	    (socklen_t *)&socklen) < 0)
+	    (socklen_t *)&socklen) < 0) {
 		goto return_err_free;
+	}
 
 	if (peer.sin6_family == AF_INET6) {
 		adt_do_ipv6_address(&peer, &sock, p_term);
@@ -646,6 +662,7 @@ adt_load_termid(int fd, adt_termid_t **termid)
 return_err_free:
 	free(p_term);
 return_err:
+	*termid = NULL;
 	return (-1);
 }
 
@@ -671,6 +688,14 @@ adt_have_termid(au_tid_addr_t *dest)
 
 	return (B_TRUE);
 }
+
+/*
+ * adt_get_hostIP - construct a terminal id from a hostname
+ *
+ *	Returns	 0 = success
+ *		-1 = failure and errno = ENETDOWN with the address
+ *		     defaulted to IPv4 loopback.
+ */
 
 static int
 adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
@@ -716,7 +741,25 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 		}
 		freeaddrinfo(ai);
 		return (0);
-	} else {
+	} else if (auditstate & (AUC_AUDITING | AUC_NOSPACE)) {
+		auditinfo_addr_t  audit_info;
+
+		/*
+		 * auditd is running so there should be a
+		 * kernel audit context
+		 */
+		if (auditon(A_GETKAUDIT, (caddr_t)&audit_info,
+		    sizeof (audit_info)) < 0) {
+			adt_write_syslog("unable to get kernel audit context",
+			    errno);
+			goto try_interface;
+		}
+		adt_write_syslog("setting Audit IP address to kernel", 0);
+		*p_term = audit_info.ai_termid;
+		return (0);
+	}
+try_interface:
+	{
 		struct ifaddrlist al;
 		int	family;
 		char	ntop[INET6_ADDRSTRLEN];
@@ -724,7 +767,8 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 		/*
 		 * getaddrinfo has failed to map the hostname
 		 * to an IP address, try to get an IP address
-		 * from a local interface.
+		 * from a local interface.  If none up, default
+		 * to loopback.
 		 */
 		family = AF_INET6;
 		if (adt_get_local_address(family, &al) != 0) {
@@ -732,8 +776,14 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 
 			if (adt_get_local_address(family, &al) != 0) {
 				adt_write_syslog("adt_get_local_address "
-				    "failed, no Audit IP address available",
+				    "failed, no Audit IP address available, "
+				    "faking loopback and error",
 				    errno);
+				IN_SET_LOOPBACK_ADDR(
+				    (struct sockaddr_in *)&(al.addr.addr));
+				(void) memcpy(p_term->at_addr, &al.addr.addr,
+				    AU_IPv4);
+				p_term->at_type = AU_IPv4;
 				return (-1);
 			}
 		}
@@ -760,10 +810,14 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
  * the terminal id has already been set; instead it returns the
  * existing terminal id.
  *
- * If audit is off and the hostname lookup fails, no error is
- * returned, since an error may be interpreted by the caller
- * as grounds for denying a login.  Otherwise the caller would
- * need to be aware of the audit state.
+ * If c2audit is excluded, success is returned.
+ * If the hostname lookup fails, the loopback address is assumed,
+ * errno is set to ENETDOWN, this allows the caller to interpret
+ * whether failure is fatal, and if not to have a address for the
+ * hostname.
+ * Otherwise the caller would need to be aware of the audit state.
+ *
+ * Other errors are ignored if not auditing.
  */
 
 int
@@ -772,13 +826,15 @@ adt_load_hostname(const char *hostname, adt_termid_t **termid)
 	char		localhost[MAXHOSTNAMELEN + 1];
 	au_tid_addr_t	*p_term;
 
-	*termid = NULL;
-
-	if (!adt_audit_enabled())
+	if (adt_audit_state(AUC_DISABLED)) {
+		/* c2audit excluded */
+		*termid = NULL;
 		return (0);
+	}
 
-	if ((p_term = calloc(1, sizeof (au_tid_addr_t))) == NULL)
+	if ((p_term = calloc(1, sizeof (au_tid_addr_t))) == NULL) {
 		goto return_err;
+	}
 
 	if (adt_have_termid(p_term)) {
 		*termid = (adt_termid_t *)p_term;
@@ -790,19 +846,19 @@ adt_load_hostname(const char *hostname, adt_termid_t **termid)
 		(void) sysinfo(SI_HOSTNAME, localhost, MAXHOSTNAMELEN);
 		hostname = localhost;
 	}
-	if (adt_get_hostIP(hostname, p_term))
-		goto return_err_free;
-
-	*termid = (adt_termid_t *)p_term;
-	return (0);
-
-return_err_free:
-	free(p_term);
+	if (adt_get_hostIP(hostname, p_term) == 0) {
+		*termid = (adt_termid_t *)p_term;
+		return (0);
+	} else {
+		*termid = (adt_termid_t *)p_term;
+		return (-1);
+	}
 
 return_err:
-	if ((auditstate == AUC_DISABLED) ||
-	    (auditstate == AUC_NOAUDIT))
+	*termid = NULL;
+	if (auditstate & AUC_NOAUDIT) {
 		return (0);
+	}
 
 	return (-1);
 }
@@ -814,10 +870,15 @@ return_err:
  * the terminal id has already been set; instead it returns the
  * existing terminal id.
  *
- * If audit is off and the ttyname lookup fails, no error is
- * returned, since an error may be interpreted by the caller
- * as grounds for denying a login.  Otherwise the caller would
- * need to be aware of the audit state.
+ * If c2audit is excluded, success is returned.
+ * The local hostname is used for the local IP address.
+ * If that hostname lookup fails, the loopback address is assumed,
+ * errno is set to ENETDOWN, this allows the caller to interpret
+ * whether failure is fatal, and if not to have a address for the
+ * hostname.
+ * Otherwise the caller would need to be aware of the audit state.
+ *
+ * Other errors are ignored if not auditing.
  */
 
 int
@@ -827,13 +888,15 @@ adt_load_ttyname(const char *ttyname, adt_termid_t **termid)
 	au_tid_addr_t	*p_term;
 	struct stat	stat_buf;
 
-	*termid = NULL;
-
-	if (!adt_audit_enabled())
+	if (adt_audit_state(AUC_DISABLED)) {
+		/* c2audit excluded */
+		*termid = NULL;
 		return (0);
+	}
 
-	if ((p_term = calloc(1, sizeof (au_tid_addr_t))) == NULL)
+	if ((p_term = calloc(1, sizeof (au_tid_addr_t))) == NULL) {
 		goto return_err;
+	}
 
 	if (adt_have_termid(p_term)) {
 		*termid = (adt_termid_t *)p_term;
@@ -842,29 +905,34 @@ adt_load_ttyname(const char *ttyname, adt_termid_t **termid)
 
 	p_term->at_port = 0;
 
-	if (sysinfo(SI_HOSTNAME, localhost, MAXHOSTNAMELEN) < 0)
+	if (sysinfo(SI_HOSTNAME, localhost, MAXHOSTNAMELEN) < 0) {
 		goto return_err_free; /* errno from sysinfo */
+	}
 
 	if (ttyname != NULL && *ttyname != '\0') {
-		if (stat(ttyname, &stat_buf) < 0)
+		if (stat(ttyname, &stat_buf) < 0) {
 			goto return_err_free;
+		}
 
 		p_term->at_port = stat_buf.st_rdev;
 	}
 
-	if (adt_get_hostIP(localhost, p_term))
-		goto return_err_free;
-
-	*termid = (adt_termid_t *)p_term;
-	return (0);
+	if (adt_get_hostIP(localhost, p_term) == 0) {
+		*termid = (adt_termid_t *)p_term;
+		return (0);
+	} else {
+		*termid = (adt_termid_t *)p_term;
+		return (-1);
+	}
 
 return_err_free:
 	free(p_term);
 
 return_err:
-	if ((auditstate == AUC_DISABLED) ||
-	    (auditstate == AUC_NOAUDIT))
+	*termid = NULL;
+	if (auditstate & AUC_NOAUDIT) {
 		return (0);
+	}
 
 	return (-1);
 }
@@ -1051,7 +1119,7 @@ adt_from_export_format(adt_internal_state_t *internal,
 		adrm_int32(&context,
 		    (int *)&(internal->as_info.ai_termid.at_addr[0]), 4);
 		adrm_int32(&context, (int *)&(internal->as_info.ai_asid), 1);
-		adrm_int32(&context, (int *)&(internal->as_audit_enabled), 1);
+		adrm_int32(&context, (int *)&(internal->as_audit_state), 1);
 		internal->as_pid = (pid_t)-1;
 		internal->as_label = NULL;
 	} else if (version == PROTOCOL_VERSION_2) {
@@ -1069,7 +1137,7 @@ adt_from_export_format(adt_internal_state_t *internal,
 		adrm_int32(&context,
 		    (int *)&(internal->as_info.ai_termid.at_addr[0]), 4);
 		adrm_int32(&context, (int *)&(internal->as_info.ai_asid), 1);
-		adrm_int32(&context, (int *)&(internal->as_audit_enabled), 1);
+		adrm_int32(&context, (int *)&(internal->as_audit_state), 1);
 		adrm_int32(&context, (int *)&(internal->as_pid), 1);
 		adrm_int32(&context, (int *)&label_len, 1);
 		if (label_len > 0) {
@@ -1143,7 +1211,7 @@ adt_to_export_format(adt_export_data_t *external,
 	adrm_putint32(&context,
 	    (int *)&(internal->as_info.ai_termid.at_addr[0]), 4);
 	adrm_putint32(&context, (int *)&(internal->as_info.ai_asid), 1);
-	adrm_putint32(&context, (int *)&(internal->as_audit_enabled), 1);
+	adrm_putint32(&context, (int *)&(internal->as_audit_state), 1);
 	adrm_putint32(&context, (int *)&(internal->as_pid), 1);
 	adrm_putint32(&context, (int *)&label_len, 1);
 	if (internal->as_label != NULL) {
@@ -1173,7 +1241,7 @@ adt_to_export_format(adt_export_data_t *external,
 	adrm_putint32(&context,
 	    (int *)&(internal->as_info.ai_termid.at_addr[0]), 4);
 	adrm_putint32(&context, (int *)&(internal->as_info.ai_asid), 1);
-	adrm_putint32(&context, (int *)&(internal->as_audit_enabled), 1);
+	adrm_putint32(&context, (int *)&(internal->as_audit_state), 1);
 	/* ignored in v1 */
 	adrm_putint32(&context, (int *)&label_len, 1);
 
@@ -1212,8 +1280,8 @@ adt_import(adt_internal_state_t *internal, const adt_export_data_t *external)
 {
 	au_mask_t mask;
 
-	/* save local audit enabled state */
-	int	local_audit_enabled = internal->as_audit_enabled;
+	/* save local audit state */
+	int	local_audit_state = internal->as_audit_state;
 
 	if (adt_from_export_format(internal, external) < 1)
 		return (-1); /* errno from adt_from_export_format */
@@ -1229,7 +1297,7 @@ adt_import(adt_internal_state_t *internal, const adt_export_data_t *external)
 	 * recoverable.
 	 */
 
-	if (!internal->as_audit_enabled) {
+	if (!(internal->as_audit_state & AUC_DISABLED)) {
 		if (adt_get_mask_from_user(internal->as_info.ai_auid,
 		    &(internal->as_info.ai_mask)))
 			return (-1);
@@ -1243,7 +1311,7 @@ adt_import(adt_internal_state_t *internal, const adt_export_data_t *external)
 			    mask.am_failure;
 		}
 	}
-	internal->as_audit_enabled = local_audit_enabled;
+	internal->as_audit_state = local_audit_state;
 
 	DPRINTF(("(%lld)imported asid = %X %u\n", (long long) getpid(),
 	    internal->as_info.ai_asid,
@@ -1308,14 +1376,14 @@ return_length_free:
 static void
 adt_setto_unaudited(adt_internal_state_t *state)
 {
-	state->as_ruid = AU_NOAUDITID;
-	state->as_euid = AU_NOAUDITID;
-	state->as_rgid = AU_NOAUDITID;
-	state->as_egid = AU_NOAUDITID;
-	state->as_pid = (pid_t)-1;
-	state->as_label = NULL;
-
-	if (state->as_audit_enabled) {
+	if (state->as_audit_state & AUC_DISABLED) {
+		state->as_ruid = AU_NOAUDITID;
+		state->as_euid = AU_NOAUDITID;
+		state->as_rgid = AU_NOAUDITID;
+		state->as_egid = AU_NOAUDITID;
+		state->as_pid = (pid_t)-1;
+		state->as_label = NULL;
+	} else {
 		state->as_info.ai_asid = 0;
 		state->as_info.ai_auid = AU_NOAUDITID;
 
@@ -1340,8 +1408,10 @@ adt_setto_unaudited(adt_internal_state_t *state)
 static int
 adt_init(adt_internal_state_t *state, int use_proc_data)
 {
+	/* ensure auditstate is set */
 
-	state->as_audit_enabled = (auditstate == AUC_DISABLED) ? 0 : 1;
+	(void) adt_audit_state(0);
+	state->as_audit_state = auditstate;
 
 	if (use_proc_data) {
 		state->as_ruid = getuid();
@@ -1350,7 +1420,7 @@ adt_init(adt_internal_state_t *state, int use_proc_data)
 		state->as_egid = getegid();
 		state->as_pid = getpid();
 
-		if (state->as_audit_enabled) {
+		if (!(state->as_audit_state & AUC_DISABLED)) {
 			const au_tid64_addr_t	*tid;
 			const au_mask_t		*mask;
 			ucred_t			*ucred = ucred_get(P_MYID);
@@ -1396,7 +1466,7 @@ adt_init(adt_internal_state_t *state, int use_proc_data)
 	}
 	state->as_session_model = ADT_SESSION_MODEL;	/* default */
 
-	if (state->as_audit_enabled &&
+	if ((state->as_audit_state & (AUC_AUDITING | AUC_NOSPACE)) &&
 	    auditon(A_GETPOLICY, (caddr_t)&(state->as_kernel_audit_policy),
 	    sizeof (state->as_kernel_audit_policy))) {
 		return (-1);  /* errno set by auditon */
@@ -1425,8 +1495,9 @@ adt_set_proc(const adt_session_data_t *session_data)
 {
 	adt_internal_state_t	*state;
 
-	if (auditstate == AUC_DISABLED || (session_data == NULL))
+	if (session_data == NULL) {
 		return (0);
+	}
 
 	state = (adt_internal_state_t *)session_data;
 
@@ -1916,9 +1987,10 @@ adt_put_event(const adt_event_data_t *event, int status, int return_val)
 	}
 	event_state = (struct adt_event_state *)event;
 
-	/* if audit off or this is a broken session, exit */
-	if (auditstate == AUC_DISABLED ||
-	    (event_state->ae_session == NULL)) {
+	/* if this is a broken session or not auditing, exit */
+	if ((event_state->ae_session == NULL) ||
+	    !(event_state->ae_session->as_audit_state &
+	    (AUC_AUDITING | AUC_NOSPACE))) {
 		return (0);
 	}
 
@@ -2028,7 +2100,7 @@ adt_selected(struct adt_event_state *event, au_event_t actual_id, int status)
  * to act as the hosts IP address for auditing.
  */
 
-int
+static int
 adt_get_local_address(int family, struct ifaddrlist *al)
 {
 	struct ifaddrlist	*ifal;

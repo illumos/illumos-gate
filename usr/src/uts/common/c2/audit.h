@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -43,17 +42,18 @@ extern "C" {
 
 /*
  * Audit conditions, statements reguarding what's to be done with
- * audit records.  Neither AUC_ENABLED, AUC_DISABLED, nor AUC_UNSET
- * are returned on an auditconfig -getcond call.
+ * audit records.  None of the "global state" is returned by an
+ * auditconfig -getcond call.  AUC_NOSPACE no longer seems used.
  */
 /* global state */
-#define	AUC_DISABLED	-1	/* audit module loaded but not enabled */
 #define	AUC_UNSET	0	/* on/off hasn't been decided */
 #define	AUC_ENABLED	1	/* loaded and enabled */
+/* pseudo state used in libbsm */
+#define	AUC_DISABLED	0x100	/* c2audit module is excluded */
 /* local zone state */
-#define	AUC_INIT_AUDIT	0x4	/* c2audit is ready but auditd has not run */
-#define	AUC_AUDITING	0x1	/* auditing is being done */
-#define	AUC_NOAUDIT	0x2	/* auditing is not being done */
+#define	AUC_AUDITING	0x1	/* audit daemon is active */
+#define	AUC_NOAUDIT	0x2	/* audit daemon is not active */
+#define	AUC_INIT_AUDIT	0x4	/* audit ready but auditd has not run */
 #define	AUC_NOSPACE	0x8	/* audit enabled, no space for audit records */
 
 /*
