@@ -933,7 +933,7 @@ arp_process_packet(ill_t *ill, mblk_t *mp)
 	 */
 	if ((*(uint8_t *)&src_paddr) == IN_LOOPBACKNET ||
 	    (*(uint8_t *)&dst_paddr) == IN_LOOPBACKNET ||
-	    IN_MULTICAST(src_paddr) || IN_MULTICAST(dst_paddr)) {
+	    CLASSD(src_paddr) || CLASSD(dst_paddr)) {
 		arp_drop_packet("Martian IP addr", mp, ill);
 		return;
 	}
