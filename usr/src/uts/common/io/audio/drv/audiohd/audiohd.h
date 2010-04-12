@@ -112,7 +112,7 @@ extern "C" {
 #define	AUDIOHD_URCAP_MASK	0x80
 #define	AUDIOHD_DTCCAP_MASK	0x4
 #define	AUDIOHD_UR_ENABLE_OFF	8
-#define	AUDIOHD_UR_TAG_MASK	0x1f
+#define	AUDIOHD_UR_TAG_MASK	0x3f
 
 #define	AUDIOHD_CIS_MASK	0x40000000
 
@@ -138,7 +138,7 @@ extern "C" {
 #define	AUDIOHD_PIN_NO_CONN	0x40000000
 #define	AUDIOHD_PIN_IN_ENABLE	0x20
 #define	AUDIOHD_PIN_OUT_ENABLE	0x40
-#define	AUDIOHD_PIN_PRES_OFF	0x20
+#define	AUDIOHD_PIN_PRES_MASK	0x80000000
 #define	AUDIOHD_PIN_CONTP_OFF	0x1e
 #define	AUDIOHD_PIN_CON_JACK	0
 #define	AUDIOHD_PIN_CON_FIXED	0x2
@@ -151,7 +151,6 @@ extern "C" {
 #define	AUDIOHD_PIN_VREF_MASK	0xff
 #define	AUDIOHD_PIN_CLR_MASK	0xf
 #define	AUDIOHD_PIN_CLR_OFF	12
-
 
 #define	AUDIOHD_VERB_ADDR_OFF	28
 #define	AUDIOHD_VERB_NID_OFF	20
@@ -348,7 +347,9 @@ extern "C" {
 #define	AUDIOHDC_VERB_SET_PIN_CTRL		0x707
 
 #define	AUDIOHDC_VERB_GET_UNS_ENABLE		0xf08
+#define	AUDIOHDC_VERB_SET_UNS_ENABLE		0x708
 
+#define	AUDIOHDC_VERB_GET_PIN_SENSE		0xf09
 #define	AUDIOHDC_VERB_GET_PIN_SENSE		0xf09
 #define	AUDIOHDC_VERB_EXEC_PIN_SENSE		0x709
 
@@ -362,11 +363,11 @@ extern "C" {
 #define	AUDIOHDC_VERB_GET_SPDIF_CTL		0xf0d
 #define	AUDIOHDC_VERB_SET_SPDIF_LCL		0x70d
 
-#define	AUDIOHDC_VERB_SET_URCTRL		0x708
-#define	AUDIOHDC_VERB_GET_PIN_SENSE		0xf09
-
 #define	AUDIOHDC_VERB_GET_GPIO_MASK		0xf16
 #define	AUDIOHDC_VERB_SET_GPIO_MASK		0x716
+
+#define	AUDIOHDC_VERB_GET_UNSOL_ENABLE_MASK	0xf19
+#define	AUDIOHDC_VERB_SET_UNSOL_ENABLE_MASK	0x719
 
 #define	AUDIOHDC_VERB_GET_GPIO_DIREC		0xf17
 #define	AUDIOHDC_VERB_SET_GPIO_DIREC		0x717
@@ -802,22 +803,11 @@ struct audiohd_state {
 	ddi_acc_handle_t	hda_pci_handle;
 	ddi_acc_handle_t	hda_reg_handle;
 
-	ddi_intr_handle_t 	*htable; 	/* For array of interrupts */
-	boolean_t		intr_added;
-	int			intr_type;	/* What type of interrupt */
-	int			intr_rqst;	/* # of request intrs count */
-	int			intr_cnt;	/* # of intrs count returned */
-	uint_t			intr_pri;	/* Interrupt priority */
-	int			intr_cap;	/* Interrupt capabilities */
-	boolean_t		msi_enable;
-
 	audiohd_dma_t	hda_dma_corb;
 	audiohd_dma_t	hda_dma_rirb;
 
-
 	uint8_t		hda_rirb_rp;		/* read pointer for rirb */
 	uint16_t	hda_codec_mask;
-
 
 	audio_dev_t	*adev;
 	uint32_t	devid;

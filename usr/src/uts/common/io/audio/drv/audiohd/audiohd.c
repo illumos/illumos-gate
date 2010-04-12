@@ -41,9 +41,6 @@ static int audiohd_quiesce(dev_info_t *);
 static int audiohd_resume(audiohd_state_t *);
 static int audiohd_suspend(audiohd_state_t *);
 
-/* interrupt handler */
-static uint_t audiohd_intr(caddr_t, caddr_t);
-
 /*
  * Local routines
  */
@@ -89,6 +86,7 @@ static void audiohd_do_set_beep_volume(audiohd_state_t *,
     audiohd_path_t *, uint64_t);
 static void audiohd_set_beep_volume(audiohd_state_t *);
 static int audiohd_set_beep(void *, uint64_t);
+static void audiohd_pin_sense(audiohd_state_t *, uint32_t, uint32_t);
 
 static	int	audiohd_beep;
 static	int	audiohd_beep_divider;
@@ -295,174 +293,11 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 	audio_dev_set_version(statep->adev, vers);
 }
 
-
-/*
- * audiohd_add_intrs:
- *
- * Register FIXED or MSI interrupts.
- */
-static int
-audiohd_add_intrs(audiohd_state_t *statep, int intr_type)
-{
-	dev_info_t 		*dip = statep->hda_dip;
-	ddi_intr_handle_t	ihandle;
-	int 			avail;
-	int 			actual;
-	int 			intr_size;
-	int 			count;
-	int 			i, j;
-	int 			ret, flag;
-
-	/* Get number of interrupts */
-	ret = ddi_intr_get_nintrs(dip, intr_type, &count);
-	if ((ret != DDI_SUCCESS) || (count == 0)) {
-		audio_dev_warn(statep->adev,
-		    "ddi_intr_get_nintrs() failure, ret: %d, count: %d",
-		    ret, count);
-		return (DDI_FAILURE);
-	}
-
-	/* Get number of available interrupts */
-	ret = ddi_intr_get_navail(dip, intr_type, &avail);
-	if ((ret != DDI_SUCCESS) || (avail == 0)) {
-		audio_dev_warn(statep->adev, "ddi_intr_get_navail() failure, "
-		    "ret: %d, avail: %d", ret, avail);
-		return (DDI_FAILURE);
-	}
-
-	if (avail < 1) {
-		audio_dev_warn(statep->adev,
-		    "Interrupts count: %d, available: %d",
-		    count, avail);
-	}
-
-	/* Allocate an array of interrupt handles */
-	intr_size = count * sizeof (ddi_intr_handle_t);
-	statep->htable = kmem_alloc(intr_size, KM_SLEEP);
-	statep->intr_rqst = count;
-
-	flag = (intr_type == DDI_INTR_TYPE_MSI) ?
-	    DDI_INTR_ALLOC_STRICT:DDI_INTR_ALLOC_NORMAL;
-
-	/* Call ddi_intr_alloc() */
-	ret = ddi_intr_alloc(dip, statep->htable, intr_type, 0,
-	    count, &actual, flag);
-	if (ret != DDI_SUCCESS || actual == 0) {
-		/* ddi_intr_alloc() failed  */
-		kmem_free(statep->htable, intr_size);
-		return (DDI_FAILURE);
-	}
-
-	if (actual < 1) {
-		audio_dev_warn(statep->adev,
-		    "Interrupts requested: %d, received: %d",
-		    count, actual);
-	}
-
-	statep->intr_cnt = actual;
-
-	/*
-	 * Get priority for first msi, assume remaining are all the same
-	 */
-	if ((ret = ddi_intr_get_pri(statep->htable[0], &statep->intr_pri)) !=
-	    DDI_SUCCESS) {
-		audio_dev_warn(statep->adev, "ddi_intr_get_pri() failed %d",
-		    ret);
-		/* Free already allocated intr */
-		for (i = 0; i < actual; i++) {
-			(void) ddi_intr_free(statep->htable[i]);
-		}
-		kmem_free(statep->htable, intr_size);
-		return (DDI_FAILURE);
-	}
-
-	/* Test for high level mutex */
-	if (statep->intr_pri >= ddi_intr_get_hilevel_pri()) {
-		audio_dev_warn(statep->adev,
-		    "Hi level interrupt not supported");
-		for (i = 0; i < actual; i++)
-			(void) ddi_intr_free(statep->htable[i]);
-		kmem_free(statep->htable, intr_size);
-		return (DDI_FAILURE);
-	}
-
-	/* Call ddi_intr_add_handler() */
-	for (i = 0; i < actual; i++) {
-		if ((ret = ddi_intr_add_handler(statep->htable[i], audiohd_intr,
-		    (caddr_t)statep, (caddr_t)(uintptr_t)i)) != DDI_SUCCESS) {
-			audio_dev_warn(statep->adev, "ddi_intr_add_handler() "
-			    "failed %d", ret);
-			/* Remove already added intr */
-			for (j = 0; j < i; j++) {
-				ihandle = statep->htable[j];
-				(void) ddi_intr_remove_handler(ihandle);
-			}
-			/* Free already allocated intr */
-			for (i = 0; i < actual; i++) {
-				(void) ddi_intr_free(statep->htable[i]);
-			}
-			kmem_free(statep->htable, intr_size);
-			return (DDI_FAILURE);
-		}
-	}
-
-	if ((ret = ddi_intr_get_cap(statep->htable[0], &statep->intr_cap))
-	    != DDI_SUCCESS) {
-		audio_dev_warn(statep->adev,
-		    "ddi_intr_get_cap() failed %d", ret);
-		for (i = 0; i < actual; i++) {
-			(void) ddi_intr_remove_handler(statep->htable[i]);
-			(void) ddi_intr_free(statep->htable[i]);
-		}
-		kmem_free(statep->htable, intr_size);
-		return (DDI_FAILURE);
-	}
-
-	for (i = 0; i < actual; i++) {
-		(void) ddi_intr_clr_mask(statep->htable[i]);
-	}
-
-	return (DDI_SUCCESS);
-}
-
-/*
- * audiohd_rem_intrs:
- *
- * Unregister FIXED or MSI interrupts
- */
-static void
-audiohd_rem_intrs(audiohd_state_t *statep)
-{
-
-	int i;
-
-	/* Disable all interrupts */
-	if (statep->intr_cap & DDI_INTR_FLAG_BLOCK) {
-		/* Call ddi_intr_block_disable() */
-		(void) ddi_intr_block_disable(statep->htable, statep->intr_cnt);
-	} else {
-		for (i = 0; i < statep->intr_cnt; i++) {
-			(void) ddi_intr_disable(statep->htable[i]);
-		}
-	}
-
-	/* Call ddi_intr_remove_handler() */
-	for (i = 0; i < statep->intr_cnt; i++) {
-		(void) ddi_intr_remove_handler(statep->htable[i]);
-		(void) ddi_intr_free(statep->htable[i]);
-	}
-
-	kmem_free(statep->htable,
-	    statep->intr_rqst * sizeof (ddi_intr_handle_t));
-}
-
 static int
 audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	audiohd_state_t		*statep;
 	int			instance;
-	int 			intr_types;
-	int			i, rc = 0;
 
 	instance = ddi_get_instance(dip);
 	switch (cmd) {
@@ -475,13 +310,6 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (audiohd_resume(statep));
 
 	default:
-		return (DDI_FAILURE);
-	}
-
-	/* High-level interrupt isn't supported by this driver */
-	if (ddi_intr_hilevel(dip, 0) != 0) {
-		cmn_err(CE_WARN,
-		    "unsupported high level interrupt");
 		return (DDI_FAILURE);
 	}
 
@@ -535,67 +363,7 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* disable interrupts and clear interrupt status */
 	audiohd_disable_intr(statep);
 
-	/*
-	 * Get supported interrupt types
-	 */
-	if (ddi_intr_get_supported_types(dip, &intr_types) != DDI_SUCCESS) {
-		audio_dev_warn(statep->adev,
-		    "ddi_intr_get_supported_types failed");
-		goto error;
-	}
-
-	/*
-	 * Add the h/w interrupt handler and initialise mutexes
-	 */
-	if ((intr_types & DDI_INTR_TYPE_MSI) && statep->msi_enable) {
-		if (audiohd_add_intrs(statep, DDI_INTR_TYPE_MSI) ==
-		    DDI_SUCCESS) {
-			statep->intr_type = DDI_INTR_TYPE_MSI;
-			statep->intr_added = B_TRUE;
-		}
-	}
-	if (!(statep->intr_added) &&
-	    (intr_types & DDI_INTR_TYPE_FIXED)) {
-		/* MSI registration failed, trying FIXED interrupt type */
-		if (audiohd_add_intrs(statep, DDI_INTR_TYPE_FIXED) !=
-		    DDI_SUCCESS) {
-			audio_dev_warn(statep->adev, "FIXED interrupt "
-			    "registration failed");
-			goto error;
-		}
-		/* FIXED interrupt type is supported */
-		statep->intr_type = DDI_INTR_TYPE_FIXED;
-		statep->intr_added = B_TRUE;
-	}
-	if (!(statep->intr_added)) {
-		audio_dev_warn(statep->adev, "No interrupts registered");
-		goto error;
-	}
-	mutex_init(&statep->hda_mutex, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(statep->intr_pri));
-
-	/*
-	 * Now that mutex lock is initialized, enable interrupts.
-	 */
-	if (statep->intr_cap & DDI_INTR_FLAG_BLOCK) {
-		/* Call ddi_intr_block_enable() for MSI interrupts */
-		rc = ddi_intr_block_enable(statep->htable, statep->intr_cnt);
-		if (rc != DDI_SUCCESS) {
-			audio_dev_warn(statep->adev,
-			    "Enable block intr failed: %d\n", rc);
-			return (DDI_FAILURE);
-		}
-	} else {
-		/* Call ddi_intr_enable for MSI or FIXED interrupts */
-		for (i = 0; i < statep->intr_cnt; i++) {
-			rc = ddi_intr_enable(statep->htable[i]);
-			if (rc != DDI_SUCCESS) {
-				audio_dev_warn(statep->adev,
-				    "Enable intr failed: %d\n", rc);
-				return (DDI_FAILURE);
-			}
-		}
-	}
+	mutex_init(&statep->hda_mutex, NULL, MUTEX_DRIVER, 0);
 
 	/*
 	 * Register audio controls.
@@ -609,7 +377,6 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	ddi_report_dev(dip);
 
-	/* enable interrupt */
 	AUDIOHD_REG_SET32(AUDIOHD_REG_INTCTL, AUDIOHD_INTCTL_BIT_GIE);
 	return (DDI_SUCCESS);
 error:
@@ -743,10 +510,6 @@ static void
 audiohd_destroy(audiohd_state_t *statep)
 {
 	audiohd_stop_dma(statep);
-	audiohd_disable_intr(statep);
-	if (statep->intr_added) {
-		audiohd_rem_intrs(statep);
-	}
 	if (statep->hda_ksp)
 		kstat_delete(statep->hda_ksp);
 	audiohd_free_port(statep);
@@ -1108,9 +871,11 @@ audiohd_engine_stop(void *arg)
 static void
 audiohd_update_port(audiohd_port_t *port)
 {
-	uint32_t		pos;
-	uint32_t		len;
+	uint32_t		pos, len;
 	audiohd_state_t		*statep = port->statep;
+	int			i, ret;
+	uint32_t		status, resp = 0, respex = 0;
+	uint8_t			rirbsts;
 
 	pos = AUDIOHD_REG_GET32(port->regoff + AUDIOHD_SDREG_OFFSET_LPIB);
 	/* Convert the position into a frame count */
@@ -1126,6 +891,46 @@ audiohd_update_port(audiohd_port_t *port)
 	ASSERT(len <= port->nframes);
 	port->curpos = pos;
 	port->count += len;
+
+	/*
+	 * Check unsolicited response from pins, maybe something plugged in or
+	 * out of the jack.
+	 */
+	status = AUDIOHD_REG_GET32(AUDIOHD_REG_INTSTS);
+	if (status == 0) {
+		/* No pending interrupt we should take care */
+		return;
+	}
+
+	if (status & AUDIOHD_CIS_MASK) {
+		/* Clear the unsolicited response interrupt */
+		rirbsts = AUDIOHD_REG_GET8(AUDIOHD_REG_RIRBSTS);
+		AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBSTS, rirbsts);
+
+		/*
+		 * We have to wait and try several times to make sure the
+		 * unsolicited response is generated by our pins.
+		 * we need to make it work for audiohd spec 0.9, which is
+		 * just a draft version and requires more time to wait.
+		 */
+		for (i = 0; i < AUDIOHD_TEST_TIMES; i++) {
+			ret = audiohd_response_from_codec(statep, &resp,
+			    &respex);
+			if ((ret == DDI_SUCCESS) &&
+			    (respex & AUDIOHD_RIRB_UR_MASK)) {
+				/*
+				 * A pin may generate more than one ur rirb,
+				 * we only need handle one of them, and clear
+				 * the other ones
+				 */
+				statep->hda_rirb_rp =
+				    AUDIOHD_REG_GET16(AUDIOHD_REG_RIRBWP) &
+				    AUDIOHD_RIRB_WPMASK;
+				audiohd_pin_sense(statep, resp, respex);
+				break;
+			}
+		}
+	}
 }
 
 static uint64_t
@@ -2070,7 +1875,6 @@ audiohd_quiesce(dev_info_t *dip)
 	statep = ddi_get_driver_private(dip);
 
 	audiohd_stop_dma(statep);
-	audiohd_disable_intr(statep);
 
 	return (DDI_SUCCESS);
 }
@@ -2156,9 +1960,6 @@ audiohd_init_state(audiohd_state_t *statep, dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 	statep->adev = adev;
-	statep->intr_added = B_FALSE;
-	statep->msi_enable = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "msi_enable", B_TRUE);
 
 	/* set device information */
 	audio_dev_set_description(adev, AUDIOHD_DEV_CONFIG);
@@ -2234,11 +2035,11 @@ audiohd_init_pci(audiohd_state_t *statep, ddi_device_acc_attr_t *acc_attr)
 		pci_config_put8(statep->hda_pci_handle, AUDIOHD_ATI_PCI_MISC2,
 		    (cTmp & AUDIOHD_ATI_MISC2_MASK) | AUDIOHD_ATI_MISC2_SNOOP);
 		break;
+	case AUDIOHD_VID_NVIDIA:
 		/*
 		 * Refer to the datasheet, we set snoop for NVIDIA
 		 * like hardware
 		 */
-	case AUDIOHD_VID_NVIDIA:
 		cTmp = pci_config_get8(statep->hda_pci_handle,
 		    AUDIOHD_CORB_SIZE_OFF);
 		pci_config_put8(statep->hda_pci_handle, AUDIOHD_CORB_SIZE_OFF,
@@ -2600,15 +2401,6 @@ audiohd_init_controller(audiohd_state_t *statep)
 	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBRP, 0);
 	AUDIOHD_REG_SET8(AUDIOHD_REG_CORBCTL, AUDIOHDR_CORBCTL_DMARUN);
 
-	/* work around for some chipsets which could not enable MSI */
-	switch (statep->devid) {
-	case AUDIOHD_CONTROLLER_MCP51:
-		statep->msi_enable = B_FALSE;
-		break;
-	default:
-		break;
-	}
-
 	return (DDI_SUCCESS);
 }	/* audiohd_init_controller() */
 
@@ -2807,7 +2599,7 @@ audiohd_get_pin_config(audiohd_widget_t *widget)
 			urctrl = (uint8_t)(1 << (AUDIOHD_UR_ENABLE_OFF - 1));
 			urctrl |= (wid & AUDIOHD_UR_TAG_MASK);
 			(void) audioha_codec_verb_get(statep, caddr,
-			    wid, AUDIOHDC_VERB_SET_URCTRL, urctrl);
+			    wid, AUDIOHDC_VERB_SET_UNS_ENABLE, urctrl);
 	}
 	/* accommodate all the pins in a link list sorted by assoc and seq */
 	if (codec->first_pin == NULL) {
@@ -3090,6 +2882,9 @@ audiohd_create_codec(audiohd_state_t *statep)
 			 */
 			(void) audioha_codec_verb_get(statep, i, wid,
 			    AUDIOHDC_VERB_SET_GPIO_MASK, AUDIOHDC_GPIO_ENABLE);
+			(void) audioha_codec_verb_get(statep, i, wid,
+			    AUDIOHDC_VERB_SET_UNSOL_ENABLE_MASK,
+			    AUDIOHDC_GPIO_ENABLE);
 			(void) audioha_codec_verb_get(statep, i, wid,
 			    AUDIOHDC_VERB_SET_GPIO_DIREC, AUDIOHDC_GPIO_DIRECT);
 			(void) audioha_codec_verb_get(statep, i, wid,
@@ -5194,7 +4989,7 @@ audiohd_reset_pins_ur_cap(audiohd_state_t *statep)
 				(void) audioha_codec_verb_get(statep,
 				    codec->index,
 				    pin->wid,
-				    AUDIOHDC_VERB_SET_URCTRL, urctrl);
+				    AUDIOHDC_VERB_SET_UNS_ENABLE, urctrl);
 			}
 			pin = pin->next;
 		}
@@ -5287,7 +5082,6 @@ audiohd_suspend(audiohd_state_t *statep)
 	/* set widget power to D2 */
 	audiohd_change_widget_power_state(statep, AUDIOHD_PW_D2);
 	/* Disable h/w */
-	audiohd_disable_intr(statep);
 	audiohd_stop_dma(statep);
 	audiohd_fini_pci(statep);
 	mutex_exit(&statep->hda_mutex);
@@ -5517,7 +5311,7 @@ audiohd_pin_sense(audiohd_state_t *statep, uint32_t resp, uint32_t respex)
 
 	rs = audioha_codec_verb_get(statep, index, id,
 	    AUDIOHDC_VERB_GET_PIN_SENSE, 0);
-	if (rs >> (AUDIOHD_PIN_PRES_OFF - 1) & 1) {
+	if (rs & AUDIOHD_PIN_PRES_MASK) {
 		/* A MIC is plugged in, we select the MIC as input */
 		if ((widget->type == WTYPE_PIN) &&
 		    (pin = (audiohd_pin_t *)widget->priv) &&
@@ -5543,90 +5337,6 @@ audiohd_pin_sense(audiohd_state_t *statep, uint32_t resp, uint32_t respex)
 	}
 
 }
-/*
- * audiohd_intr()
- *
- * Description
- *
- *
- * Arguments:
- *	caddr_t     arg Pointer to the interrupting device's state
- *	            structure
- *
- * Returns:
- *	DDI_INTR_CLAIMED    Interrupt claimed and processed
- *	DDI_INTR_UNCLAIMED  Interrupt not claimed, and thus ignored
- */
-static uint_t
-audiohd_intr(caddr_t arg1, caddr_t arg2)
-{
-	audiohd_state_t	*statep = (void *)arg1;
-	uint32_t	status;
-	uint32_t	resp, respex;
-	uint8_t		rirbsts;
-	int		i, ret;
-
-	_NOTE(ARGUNUSED(arg2))
-
-	mutex_enter(&statep->hda_mutex);
-	if (statep->suspended) {
-		mutex_exit(&statep->hda_mutex);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	status = AUDIOHD_REG_GET32(AUDIOHD_REG_INTSTS);
-	if (status == 0) {
-		mutex_exit(&statep->hda_mutex);
-		return (DDI_INTR_UNCLAIMED);
-	}
-	AUDIOHD_REG_SET32(AUDIOHD_REG_INTSTS, status);
-
-	/*
-	 * unsolicited response from pins, maybe something plugged in or out
-	 * of the jack.
-	 */
-	if (status & AUDIOHD_CIS_MASK) {
-		/* clear the unsolicited response interrupt */
-		rirbsts = AUDIOHD_REG_GET8(AUDIOHD_REG_RIRBSTS);
-		AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBSTS, rirbsts);
-		/*
-		 * We have to wait and try several times to make sure the
-		 * unsolicited response is generated by our pins.
-		 * we need to make it work for audiohd spec 0.9, which is
-		 * just a draft version and requires more time to wait.
-		 */
-		for (i = 0; i < AUDIOHD_TEST_TIMES; i++) {
-			ret = audiohd_response_from_codec(statep, &resp,
-			    &respex);
-			if ((ret == DDI_SUCCESS) &&
-			    (respex & AUDIOHD_RIRB_UR_MASK)) {
-				/*
-				 * A pin may generate more than one ur rirb,
-				 * we only need handle one of them, and clear
-				 * the other ones
-				 */
-				statep->hda_rirb_rp =
-				    AUDIOHD_REG_GET16(AUDIOHD_REG_RIRBWP) &
-				    AUDIOHD_RIRB_WPMASK;
-				break;
-			}
-		}
-		if ((ret == DDI_SUCCESS) &&
-		    (respex & AUDIOHD_RIRB_UR_MASK)) {
-			audiohd_pin_sense(statep, resp, respex);
-		}
-	}
-
-	/* update the kernel interrupt statistics */
-	if (statep->hda_ksp) {
-		((kstat_intr_t *)
-		    (statep->hda_ksp->ks_data))->intrs[KSTAT_INTR_HARD]++;
-	}
-
-	mutex_exit(&statep->hda_mutex);
-
-	return (DDI_INTR_CLAIMED);
-}	/* audiohd_intr() */
 
 /*
  * audiohd_disable_intr()
