@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1964,6 +1963,9 @@ start_audit_session(repcache_client_t *cp)
 	 * subsequent calls to adt_* functions.
 	 */
 	cp->rc_adt_session = NULL;
+
+	if (!adt_audit_state(AUC_AUDITING))
+		return;
 
 	if (door_ucred(&cred) != 0) {
 		switch (errno) {
