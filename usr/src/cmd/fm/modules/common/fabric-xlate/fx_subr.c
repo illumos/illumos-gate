@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #include <strings.h>
 #include <fm/topo_hc.h>
@@ -503,6 +502,28 @@ fail:
 	if (xpathObj != NULL)
 		xmlXPathFreeObject(xpathObj);
 	return (NULL);
+}
+
+char *
+fab_find_rppath_by_devpath(fmd_hdl_t *hdl, const char *devpath)
+{
+	char	query[500];
+
+	/*
+	 * Explanation of the XSL XPATH Query
+	 * Line 1: Look at all nodes with the node name "propval"
+	 * Line 2: See if the node is pciexrc
+	 * Line 3: Go up to the io pgroup
+	 * Line 4: See if the "dev" prop is parent of devpath
+	 * Line 5: Get the 'dev' prop
+	 */
+	(void) snprintf(query, sizeof (query), "//propval"
+	    "[@name='extended-capabilities' and @value='%s']"
+	    "/parent::*/parent::*/propgroup[@name='io']"
+	    "/propval[@name='dev' and starts-with('%s', concat(@value, '/'))]"
+	    "/@value", PCIEX_ROOT, devpath);
+
+	return (fab_xpath_query(hdl, query));
 }
 
 /* ARGSUSED */

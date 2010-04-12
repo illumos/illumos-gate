@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _FABRIC_XLATE_H
@@ -165,6 +164,7 @@ extern boolean_t fab_get_hcpath(fmd_hdl_t *, nvlist_t *, char **, size_t *);
 extern boolean_t fab_get_rcpath(fmd_hdl_t *, nvlist_t *, char *);
 extern char *fab_find_rppath_by_df(fmd_hdl_t *, nvlist_t *, uint8_t);
 extern char *fab_find_rppath_by_devbdf(fmd_hdl_t *, nvlist_t *, pcie_req_id_t);
+extern char *fab_find_rppath_by_devpath(fmd_hdl_t *, const char *);
 extern char *fab_find_addr(fmd_hdl_t *hdl, nvlist_t *nvl, uint64_t addr);
 extern char *fab_find_bdf(fmd_hdl_t *hdl, nvlist_t *nvl, pcie_req_id_t bdf);
 extern boolean_t fab_hc2dev(fmd_hdl_t *, const char *, char **);

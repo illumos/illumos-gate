@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #include <sys/types.h>
 #include <px_err.h>
@@ -151,7 +150,7 @@ fab_xlate_epkt_erpts(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 	void *ptr;
 	uint8_t ver;
 	int err;
-	char *rppath = NULL;
+	char *devpath, *rppath = NULL;
 	nvlist_t *detector;
 
 	fmd_hdl_debug(hdl, "epkt ereport received: %s\n", class);
@@ -236,9 +235,18 @@ fab_xlate_epkt_erpts(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 		    (uint64_t)data.pcie_ue_tgt_addr);
 
 		/* find the root port to which this error is related */
-		if (data.pcie_ue_tgt_bdf)
+		if (rppath == NULL && data.pcie_ue_tgt_bdf)
 			rppath = fab_find_rppath_by_devbdf(hdl, nvl,
 			    data.pcie_ue_tgt_bdf);
+	}
+
+	/* find the root port by address */
+	if (rppath == NULL && epkt.rc_descr.M != 0) {
+		devpath = fab_find_addr(hdl, nvl, epkt.addr);
+		if (devpath) {
+			rppath = fab_find_rppath_by_devpath(hdl, devpath);
+			fmd_hdl_strfree(hdl, devpath);
+		}
 	}
 
 	/*
