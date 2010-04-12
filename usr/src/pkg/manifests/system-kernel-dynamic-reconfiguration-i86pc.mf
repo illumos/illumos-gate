@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -54,7 +53,7 @@ file path=platform/i86pc/kernel/misc/$(ARCH64)/drmach_acpi group=sys \
 dir path=usr group=sys
 dir path=usr/platform group=sys
 dir path=usr/platform/i86pc group=sys
-dir path=usr/platform/i86pc/lib group=sys
+dir path=usr/platform/i86pc/lib
 file path=platform/i86pc/kernel/drv/$(ARCH64)/dr group=sys
 driver name=dr alias=acpidr_sbd
 file path=platform/i86pc/kernel/drv/dr.conf group=sys mode=0644
