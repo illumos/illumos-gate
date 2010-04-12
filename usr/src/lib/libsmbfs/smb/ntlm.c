@@ -33,8 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -407,8 +406,7 @@ ntlm_put_v2_responses(struct smb_ctx *ctx, struct mbdata *ti_mbp,
 {
 	uchar_t *lmresp, *ntresp;
 	int err;
-	char *ucdom = NULL;	/* user's domain */
-	char *ucuser = NULL;	/* account name */
+	char *ucuser = NULL;	/* upper-case user name */
 	uchar_t v2hash[NTLM_HASH_SZ];
 	struct mbuf *tim = ti_mbp->mb_top;
 
@@ -420,20 +418,20 @@ ntlm_put_v2_responses(struct smb_ctx *ctx, struct mbdata *ti_mbp,
 	/*
 	 * Convert the user name to upper-case, as
 	 * that's what's used when computing LMv2
-	 * and NTLMv2 responses.  Also the domain.
+	 * and NTLMv2 responses.  Note that the
+	 * domain name is NOT upper-cased!
 	 */
-	ucdom  = utf8_str_toupper(ctx->ct_domain);
 	ucuser = utf8_str_toupper(ctx->ct_user);
-	if (ucdom == NULL || ucuser == NULL) {
+	if (ucuser == NULL) {
 		err = ENOMEM;
 		goto out;
 	}
 
 	/*
-	 * Compute the NTLMv2 hash (see above)
-	 * Needs upper-case user, domain.
+	 * Compute the NTLMv2 hash
 	 */
-	err = ntlm_v2_hash(v2hash, ctx->ct_nthash, ucuser, ucdom);
+	err = ntlm_v2_hash(v2hash, ctx->ct_nthash,
+	    ucuser, ctx->ct_domain);
 	if (err)
 		goto out;
 
@@ -483,7 +481,6 @@ out:
 		mb_done(lm_mbp);
 		mb_done(nt_mbp);
 	}
-	free(ucdom);
 	free(ucuser);
 
 	return (err);

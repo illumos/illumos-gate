@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -70,18 +69,17 @@ static int
 nb_ssn_send(struct smb_ctx *ctx, struct mbdata *mbp,
 	    int mtype, int mlen)
 {
-	mbuf_t *m = mbp->mb_top;
-	int fd = ctx->ct_tran_fd;
-	int err, flags;
+	mbuf_t *m;
 	uint32_t hdr, hdrbuf;
+	int err;
 
+	m = mbp->mb_top;
 	if (m == NULL)
 		return (EINVAL);
 
 	/*
 	 * Prepend the NetBIOS header.
-	 * Using mbuf trickery to ensure it's
-	 * not separated from the body.
+	 * Our mbufs leave space for this.
 	 */
 	hdr = (mtype << 24) | mlen;
 	hdrbuf = htonl(hdr);
@@ -89,19 +87,27 @@ nb_ssn_send(struct smb_ctx *ctx, struct mbdata *mbp,
 	m->m_len  += 4;
 	bcopy(&hdrbuf, m->m_data, 4);
 
-	/* Send it. */
-	while (m) {
-		flags = (m->m_next) ? T_MORE : T_PUSH;
-		if (t_snd(fd, m->m_data, m->m_len, flags) < 0) {
-			if (t_errno == TSYSERR)
-				err = errno;
-			else
-				err = EPROTO;
-			DPRINT("t_snd: t_errno %d, err %d", t_errno, err);
-			return (err);
-		}
-		m = m->m_next;
+	/*
+	 * Get contiguous data (so TCP won't fragment)
+	 * Note: replaces mb_top.
+	 */
+	err = m_lineup(mbp->mb_top, &mbp->mb_top);
+	if (err)
+		return (err);
+	m = mbp->mb_top;
+
+	/*
+	 * Send it.
+	 */
+	if (t_snd(ctx->ct_tran_fd, m->m_data, m->m_len, 0) < 0) {
+		if (t_errno == TSYSERR)
+			err = errno;
+		else
+			err = EPROTO;
+		DPRINT("t_snd: t_errno %d, err %d", t_errno, err);
+		return (err);
 	}
+
 	return (0);
 }
 

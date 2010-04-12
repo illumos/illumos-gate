@@ -33,8 +33,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -77,6 +76,10 @@
 #define	TRUE	1
 #endif
 
+struct nv {
+	char *name;
+	int value;
+};
 
 /* These two may be set by commands. */
 int smb_debug, smb_verbose;
@@ -485,7 +488,6 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc,
 	const char *p = unc;
 	char *p1, *colon;
 	char tmp[1024];
-	char tmp2[1024];
 	int error;
 
 	/*
@@ -512,7 +514,6 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc,
 			error = EINVAL;
 			goto out;
 		}
-		nls_str_upper(tmp, tmp);
 		error = smb_ctx_setdomain(ctx, unpercent(tmp), TRUE);
 		if (error)
 			goto out;
@@ -562,17 +563,6 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc,
 		error = EINVAL;
 		goto out;
 	}
-
-	/*
-	 * It's safe to uppercase this string, which
-	 * consists of ascii characters that should
-	 * be uppercased, %s, and ascii characters representing
-	 * hex digits 0-9 and A-F (already uppercased, and
-	 * if not uppercased they need to be). However,
-	 * it is NOT safe to uppercase after it has been
-	 * "unpercent" converted, below!
-	 */
-	nls_str_upper(tmp2, tmp);
 
 	/*
 	 * Save ct_fullserver without case conversion.
@@ -683,11 +673,9 @@ smb_ctx_setfullserver(struct smb_ctx *ctx, const char *name)
 	return (0);
 }
 
-/* this routine does not uppercase the server name */
 int
 smb_ctx_setserver(struct smb_ctx *ctx, const char *name)
 {
-	/* don't uppercase the server name */
 	strlcpy(ctx->ct_srvname, name,
 	    sizeof (ctx->ct_srvname));
 	return (0);
@@ -710,7 +698,6 @@ smb_ctx_setuser(struct smb_ctx *ctx, const char *name, int from_cmd)
 	if (!from_cmd && (ctx->ct_flags & SMBCF_CMD_USR))
 		return (0);
 
-	/* don't uppercase the username, just copy it. */
 	strlcpy(ctx->ct_user, name,
 	    sizeof (ctx->ct_user));
 
@@ -722,10 +709,6 @@ smb_ctx_setuser(struct smb_ctx *ctx, const char *name, int from_cmd)
 }
 
 /*
- * Never uppercase the workgroup
- * name here, because it might come
- * from a Windows codepage encoding.
- *
  * Don't overwrite a domain name from the
  * command line with one from anywhere else.
  * See smb_ctx_init() for notes about this.
@@ -907,6 +890,66 @@ smb_parse_owner(char *pair, uid_t *uid, gid_t *gid)
 }
 
 /*
+ * Suport a securty options arg, i.e. -S noext,lm,ntlm
+ * for testing various type of authenticators.
+ */
+static struct nv
+sectype_table[] = {
+	/* noext - handled below */
+	{ "anon",	SMB_AT_ANON },
+	{ "lm",		SMB_AT_LM1 },
+	{ "ntlm",	SMB_AT_NTLM1 },
+	{ "ntlm2",	SMB_AT_NTLM2 },
+	{ "krb5",	SMB_AT_KRB5 },
+	{ NULL, 	0 },
+};
+int
+smb_parse_secopts(struct smb_ctx *ctx, const char *arg)
+{
+	const char *sep = ":;,";
+	const char *p = arg;
+	struct nv *nv;
+	int nlen, tlen;
+	int authflags = 0;
+
+	for (;;) {
+		/* skip separators */
+		tlen = strspn(p, sep);
+		p += tlen;
+
+		nlen = strcspn(p, sep);
+		if (nlen == 0)
+			break;
+
+		if (nlen == 5 && 0 == strncmp(p, "noext", nlen)) {
+			/* Don't offer extended security. */
+			ctx->ct_vopt &= ~SMBVOPT_EXT_SEC;
+			p += nlen;
+			continue;
+		}
+
+		/* This is rarely called, so not optimized. */
+		for (nv = sectype_table; nv->name; nv++) {
+			tlen = strlen(nv->name);
+			if (tlen == nlen && 0 == strncmp(p, nv->name, tlen))
+				break;
+		}
+		if (nv->name == NULL) {
+			smb_error(dgettext(TEXT_DOMAIN,
+			    "%s: invalid security options"), 0, p);
+			return (EINVAL);
+		}
+		authflags |= nv->value;
+		p += nlen;
+	}
+
+	if (authflags)
+		ctx->ct_authflags = authflags;
+
+	return (0);
+}
+
+/*
  * Commands use this with getopt.  See:
  *   STDPARAM_OPT, STDPARAM_ARGS
  * Called after smb_ctx_readrc().
@@ -947,12 +990,15 @@ smb_ctx_opt(struct smb_ctx *ctx, int opt, const char *arg)
 	case 'R':
 		/* retry count - ignored */
 		break;
+	case 'S':
+		/* Security options (undocumented, just for tests) */
+		error = smb_parse_secopts(ctx, arg);
+		break;
 	case 'T':
 		/* timeout - ignored */
 		break;
 	case 'D':	/* domain */
 	case 'W':	/* workgroup (legacy alias) */
-		nls_str_upper(tmp, arg);
 		error = smb_ctx_setdomain(ctx, tmp, TRUE);
 		break;
 	}
@@ -995,6 +1041,9 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 	uchar_t cstbl[256];
 	uint_t i;
 #endif
+
+	if (smb_debug)
+		dump_ctx("before smb_ctx_resolve", ctx);
 
 	ctx->ct_flags &= ~SMBCF_RESOLVED;
 
@@ -1076,12 +1125,6 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 		 */
 		if (ctx->ct_password[0] == '\0')
 			(void) smb_get_keychain(ctx);
-		/*
-		 * If we're doing p/w based auth,
-		 * that means not using Kerberos.
-		 */
-		if (ctx->ct_password[0] != '\0')
-			ctx->ct_authflags &= ~SMB_AT_KRB5;
 		/*
 		 * Mask out disallowed auth types.
 		 */
@@ -1327,15 +1370,12 @@ smb_ctx_get_ssnkey(struct smb_ctx *ctx, uchar_t *key, size_t len)
 	return (0);
 }
 
-
 /*
  * RC file parsing stuff
  */
 
-struct nv {
-	char *name;
-	int value;
-} minauth_table[] = {
+static struct nv
+minauth_table[] = {
 	/* Allowed auth. types */
 	{ "kerberos",	SMB_AT_KRB5 },
 	{ "ntlmv2",	SMB_AT_KRB5|SMB_AT_NTLM2 },
@@ -1432,7 +1472,6 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 		 */
 		rc_getstringptr(smb_rc, sname, "workgroup", &p);
 		if (p) {
-			nls_str_upper(p, p);
 			error = smb_ctx_setdomain(ctx, p, 0);
 			if (error)
 				smb_error(dgettext(TEXT_DOMAIN,
@@ -1441,7 +1480,6 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 		}
 		rc_getstringptr(smb_rc, sname, "domain", &p);
 		if (p) {
-			nls_str_upper(p, p);
 			error = smb_ctx_setdomain(ctx, p, 0);
 			if (error)
 				smb_error(dgettext(TEXT_DOMAIN,

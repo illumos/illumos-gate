@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -51,7 +50,6 @@
 
 #include <netsmb/smb_lib.h>
 
-#define	ALARM_TIME	30	/* sec. */
 #define	EXIT_FAIL	1
 #define	EXIT_OK		0
 
@@ -69,6 +67,7 @@
 mutex_t	iod_mutex = DEFAULTMUTEX;
 int iod_thr_count;	/* threads, excluding main */
 int iod_terminating;
+int iod_alarm_time = 30; /* sec. */
 
 void iod_dispatch(void *cookie, char *argp, size_t argsz,
     door_desc_t *dp, uint_t n_desc);
@@ -91,6 +90,7 @@ main(int argc, char **argv)
 		smb_debug = atoi(env);
 		if (smb_debug < 1)
 			smb_debug = 1;
+		iod_alarm_time = 300;
 	}
 
 	/*
@@ -168,7 +168,7 @@ main(int argc, char **argv)
 	 * Post the initial alarm, and then just
 	 * wait for signals.
 	 */
-	alarm(ALARM_TIME);
+	alarm(iod_alarm_time);
 again:
 	sig = sigwait(&tmpmask);
 	DPRINT("main: sig=%d\n", sig);
@@ -261,7 +261,7 @@ iod_dispatch(void *cookie, char *argp, size_t argsz,
 	mutex_lock(&iod_mutex);
 	if (--iod_thr_count == 0) {
 		DPRINT("iod_dispatch: schedule alarm\n");
-		alarm(ALARM_TIME);
+		alarm(iod_alarm_time);
 	}
 	mutex_unlock(&iod_mutex);
 
@@ -353,7 +353,7 @@ iod_work(void *arg)
 	mutex_lock(&iod_mutex);
 	if (--iod_thr_count == 0) {
 		DPRINT("iod_work: schedule alarm\n");
-		alarm(ALARM_TIME);
+		alarm(iod_alarm_time);
 	}
 	mutex_unlock(&iod_mutex);
 

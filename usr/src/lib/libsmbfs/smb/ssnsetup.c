@@ -31,8 +31,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -287,7 +286,7 @@ smb_ssnsetup_spnego(struct smb_ctx *ctx, struct mbdata *hint_mb)
 			break; /* normal loop termination */
 		if (ntstatus != STATUS_MORE_PROCESSING_REQUIRED) {
 			err = EAUTH;
-			break;
+			goto out;
 		}
 
 		/* middle calls get both in, out */

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/smb@$(PKGVERS)
@@ -111,3 +110,5 @@ license lic_CDDL license=lic_CDDL
 link path=usr/lib/security/$(ARCH64)/pam_smbfs_login.so \
     target=pam_smbfs_login.so.1
 link path=usr/lib/security/pam_smbfs_login.so target=pam_smbfs_login.so.1
+# libsmbfs uses iconv_open() which requires this at run-time.
+depend fmri=system/library/iconv/utf-8 type=require

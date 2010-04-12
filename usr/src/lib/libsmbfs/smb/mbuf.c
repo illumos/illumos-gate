@@ -33,8 +33,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -121,14 +120,15 @@ m_lineup(struct mbuf *m0, struct mbuf **mpp)
 {
 	struct mbuf *nm, *m;
 	char *dp;
-	size_t len;
+	size_t len, totlen;
 	int error;
 
 	if (m0->m_next == NULL) {
 		*mpp = m0;
 		return (0);
 	}
-	if ((error = m_get(m_totlen(m0), &nm)) != 0)
+	totlen = m_totlen(m0);
+	if ((error = m_get(totlen, &nm)) != 0)
 		return (error);
 	dp = mtod(nm, char *);
 	while (m0) {
@@ -139,6 +139,7 @@ m_lineup(struct mbuf *m0, struct mbuf **mpp)
 		m_free(m0);
 		m0 = m;
 	}
+	nm->m_len = totlen;
 	*mpp = nm;
 	return (0);
 }

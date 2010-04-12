@@ -31,8 +31,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -75,6 +74,11 @@
 
 #include <kerberosv5/krb5.h>
 #include <kerberosv5/com_err.h>
+#include <gssapi/gssapi.h>
+#include <gssapi/mechs/krb5/include/auth_con.h>
+
+/* RFC 4121 checksum type ID. */
+#define	CKSUM_TYPE_RFC4121	0x8003
 
 /* RFC 1964 token ID codes */
 #define	KRB_AP_REQ	1
@@ -179,8 +183,28 @@ krb5ssp_get_tkt(krb5ssp_state_t *ss, char *server,
 		goto out;
 	}
 
-	/* Override the krb5 library default. */
-	indata.data = "";
+	/* Get ss_auth now so we can set req_chsumtype. */
+	kerr = krb5_auth_con_init(kctx, &ss->ss_auth);
+	if (kerr != 0) {
+		fn = "krb5_auth_con_init";
+		goto out;
+	}
+	/* Missing krb5_auth_con_set_req_cksumtype(), so inline. */
+	ss->ss_auth->req_cksumtype = CKSUM_TYPE_RFC4121;
+
+	/*
+	 * Build an RFC 4121 "checksum" with NULL channel bindings,
+	 * like make_gss_checksum().  Numbers here from the RFC.
+	 */
+	indata.length = 24;
+	if ((indata.data = calloc(1, indata.length)) == NULL) {
+		kerr = ENOMEM;
+		fn = "malloc checksum";
+		goto out;
+	}
+	indata.data[0] = 16; /* length of "Bnd" field. */
+	indata.data[20] = GSS_C_MUTUAL_FLAG | GSS_C_INTEG_FLAG;
+	/* Done building the "checksum". */
 
 	kerr = krb5_mk_req(kctx, &ss->ss_auth, rq_opts, "cifs", server,
 	    &indata, kcc, &outdata);
@@ -209,6 +233,9 @@ out:
 
 	if (outdata.data)
 		krb5_free_data_contents(kctx, &outdata);
+
+	if (indata.data)
+		free(indata.data);
 
 	/* Free kctx in krb5ssp_destroy */
 	return (kerr);

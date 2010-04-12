@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -394,34 +393,26 @@ ntlmssp_put_type3(struct ssp_ctx *sp, struct mbdata *out_mb)
 		struct sec_buf h_domain;
 		struct sec_buf h_user;
 		struct sec_buf h_wksta;
+		struct sec_buf h_ssn_key;
+		uint32_t h_flags;
 	} hdr;
-	struct mbdata lm_mbc, nt_mbc, ti_mbc;
-	struct mbdata mb2;	/* 2nd part */
+	struct mbdata lm_mbc;	/* LM response */
+	struct mbdata nt_mbc;	/* NT response */
+	struct mbdata ti_mbc;	/* target info */
+	struct mbdata mb2;	/* payload */
 	int err, uc;
-	char *ucdom = NULL;	/* user's domain */
-	char *ucuser = NULL;	/* user name */
-	char *ucwksta = NULL;	/* workstation */
 	struct smb_ctx *ctx = sp->smb_ctx;
 	ntlmssp_state_t *ssp_st = sp->sp_private;
 
+	bzero(&hdr, sizeof (hdr));
 	bzero(&lm_mbc, sizeof (lm_mbc));
 	bzero(&nt_mbc, sizeof (nt_mbc));
 	bzero(&ti_mbc, sizeof (ti_mbc));
 	bzero(&mb2, sizeof (mb2));
 
 	/*
-	 * Convert the user name to upper-case, as that's what's
-	 * used when computing LMv2 and NTLMv2 responses.  Also
-	 * domain, workstation
+	 * Fill in the NTLMSSP header, etc.
 	 */
-	ucdom  = utf8_str_toupper(ctx->ct_domain);
-	ucuser = utf8_str_toupper(ctx->ct_user);
-	ucwksta = utf8_str_toupper(ctx->ct_locname);
-	if (ucdom == NULL || ucuser == NULL || ucwksta == NULL) {
-		err = ENOMEM;
-		goto out;
-	}
-
 	if ((err = mb_init(&mb2)) != 0)
 		goto out;
 	mb2.mb_count = sizeof (hdr);
@@ -429,6 +420,7 @@ ntlmssp_put_type3(struct ssp_ctx *sp, struct mbdata *out_mb)
 
 	bcopy(ntlmssp_id, &hdr.h_id, ID_SZ);
 	hdr.h_type = 3; /* Type 3 */
+	hdr.h_flags = ssp_st->ss_flags;
 
 	/*
 	 * Put the LMv2,NTLMv2 responses, or
@@ -461,15 +453,23 @@ ntlmssp_put_type3(struct ssp_ctx *sp, struct mbdata *out_mb)
 	/*
 	 * Put the "target" (domain), user, workstation
 	 */
-	err = mb_put_sb_string(&mb2, &hdr.h_domain, ucdom, uc);
+	err = mb_put_sb_string(&mb2, &hdr.h_domain, ctx->ct_domain, uc);
 	if (err)
 		goto out;
-	err = mb_put_sb_string(&mb2, &hdr.h_user, ucuser, uc);
+	err = mb_put_sb_string(&mb2, &hdr.h_user, ctx->ct_user, uc);
 	if (err)
 		goto out;
-	err = mb_put_sb_string(&mb2, &hdr.h_wksta, ucwksta, uc);
+	err = mb_put_sb_string(&mb2, &hdr.h_wksta, ctx->ct_locname, uc);
 	if (err)
 		goto out;
+
+	/*
+	 * Put the "Random Session Key".  We don't set
+	 * NTLMSSP_NEGOTIATE_KEY_EXCH, so it's empty.
+	 * (In-line mb_put_sb_data here.)
+	 */
+	hdr.h_ssn_key.sb_maxlen = hdr.h_ssn_key.sb_length = 0;
+	hdr.h_ssn_key.sb_offset = mb2.mb_count;
 
 	/*
 	 * Marshal the header (in LE order)
@@ -485,17 +485,17 @@ ntlmssp_put_type3(struct ssp_ctx *sp, struct mbdata *out_mb)
 	(void) mb_put_sb_hdr(out_mb, &hdr.h_user);
 	(void) mb_put_sb_hdr(out_mb, &hdr.h_wksta);
 
+	(void) mb_put_sb_hdr(out_mb, &hdr.h_ssn_key);
+	(void) mb_put_uint32le(out_mb, hdr.h_flags);
+
 	err = mb_put_mbuf(out_mb, mb2.mb_top);
 	mb2.mb_top = NULL; /* consumed */
 
 out:
-	free(ucdom);
-	free(ucuser);
-	free(ucwksta);
-
 	mb_done(&mb2);
 	mb_done(&lm_mbc);
 	mb_done(&nt_mbc);
+	mb_done(&ti_mbc);
 
 	return (err);
 }
