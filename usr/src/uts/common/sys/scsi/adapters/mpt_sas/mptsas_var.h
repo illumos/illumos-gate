@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -202,6 +201,9 @@ typedef	struct mptsas_target {
 
 		uint16_t		m_qfull_retry_interval;
 		uint8_t			m_qfull_retries;
+		uint16_t		m_enclosure;
+		uint16_t		m_slot_num;
+		uint32_t		m_tgt_unconfigured;
 
 } mptsas_target_t;
 
@@ -1277,7 +1279,8 @@ int mptsas_ioc_init(mptsas_t *mpt);
  */
 int mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
     uint16_t *dev_handle, uint64_t *sas_wwn, uint32_t *dev_info,
-    uint8_t *physport, uint8_t *phynum);
+    uint8_t *physport, uint8_t *phynum, uint16_t *slot_num,
+    uint16_t *enclosure);
 int mptsas_get_sas_io_unit_page(mptsas_t *mpt);
 int mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt);
 int mptsas_get_sas_expander_page0(mptsas_t *mpt, uint32_t page_address,
@@ -1330,7 +1333,7 @@ void mptsas_printf(char *fmt, ...);
 
 #define	NDBG12(args)	MPTSAS_DBGPR(0x1000, args)	/* enumeration */
 #define	NDBG13(args)	MPTSAS_DBGPR(0x2000, args)	/* configuration page */
-#define	NDBG14(args)	MPTSAS_DBGPR(0x4000, args)
+#define	NDBG14(args)	MPTSAS_DBGPR(0x4000, args)	/* LED control */
 #define	NDBG15(args)	MPTSAS_DBGPR(0x8000, args)
 
 #define	NDBG16(args)	MPTSAS_DBGPR(0x010000, args)

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1392,7 +1391,7 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	int			rval = DDI_SUCCESS, i;
 	uint8_t			*sas_addr = NULL;
 	uint8_t			tmp_sas_wwn[SAS_WWN_BYTE_SIZE];
-	uint16_t		*devhdl;
+	uint16_t		*devhdl, *bay_num, *enclosure;
 	uint64_t		*sas_wwn;
 	uint32_t		*dev_info;
 	uint8_t			*physport, *phynum;
@@ -1426,6 +1425,8 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	dev_info = va_arg(ap, uint32_t *);
 	physport = va_arg(ap, uint8_t *);
 	phynum = va_arg(ap, uint8_t *);
+	bay_num = va_arg(ap, uint16_t *);
+	enclosure = va_arg(ap, uint16_t *);
 
 	sasdevpage = (pMpi2SasDevicePage0_t)page_memp;
 
@@ -1439,6 +1440,8 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	*sas_wwn = LE_64(*sas_wwn);
 	*physport = ddi_get8(accessp, &sasdevpage->PhysicalPort);
 	*phynum = ddi_get8(accessp, &sasdevpage->PhyNum);
+	*bay_num = ddi_get16(accessp, &sasdevpage->Slot);
+	*enclosure = ddi_get16(accessp, &sasdevpage->EnclosureHandle);
 	return (rval);
 }
 
@@ -1449,7 +1452,7 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 int
 mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
     uint16_t *dev_handle, uint64_t *sas_wwn, uint32_t *dev_info,
-    uint8_t *physport, uint8_t *phynum)
+    uint8_t *physport, uint8_t *phynum, uint16_t *bay_num, uint16_t *enclosure)
 {
 	int rval = DDI_SUCCESS;
 
@@ -1463,7 +1466,7 @@ mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
 	    MPI2_CONFIG_ACTION_PAGE_READ_CURRENT,
 	    MPI2_CONFIG_EXTPAGETYPE_SAS_DEVICE, 0, page_address,
 	    mptsas_sasdevpage_0_cb, page_address, dev_handle, sas_wwn,
-	    dev_info, physport, phynum);
+	    dev_info, physport, phynum, bay_num, enclosure);
 
 	return (rval);
 }
