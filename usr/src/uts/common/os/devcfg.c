@@ -6411,7 +6411,18 @@ ndi_devi_online(dev_info_t *dip, uint_t flags)
 	 */
 	if ((rv = devi_attach_node(dip, flags)) == NDI_SUCCESS) {
 		if ((flags & NDI_CONFIG) || DEVI_NEED_NDI_CONFIG(dip)) {
+			/*
+			 * Hold the attached dip, and exit the parent while
+			 * we drive configuration of children below the
+			 * attached dip.
+			 */
+			ndi_hold_devi(dip);
+			ndi_devi_exit(pdip, circ);
+
 			(void) ndi_devi_config(dip, flags);
+
+			ndi_devi_enter(pdip, &circ);
+			ndi_rele_devi(dip);
 		}
 
 		if (branch_event)
@@ -7022,7 +7033,6 @@ attach_driver_nodes(major_t major)
 	struct devnames *dnp;
 	dev_info_t *dip;
 	int error = DDI_FAILURE;
-	int circ;
 
 	dnp = &devnamesp[major];
 	LOCK_DEV_OPS(&dnp->dn_lock);
@@ -7041,9 +7051,7 @@ attach_driver_nodes(major_t major)
 		 */
 		if ((error == DDI_SUCCESS) && (ddi_prop_exists(DDI_DEV_T_ANY,
 		    dip, DDI_PROP_DONTPASS, "ddi-config-driver-node"))) {
-			ndi_devi_enter(dip, &circ);
 			(void) ndi_devi_config(dip, NDI_NO_EVENT);
-			ndi_devi_exit(dip, circ);
 		}
 		LOCK_DEV_OPS(&dnp->dn_lock);
 		ndi_rele_devi(dip);
