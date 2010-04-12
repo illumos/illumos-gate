@@ -18,8 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -254,6 +253,16 @@ tree_add_child(treenode_t *parent, treenode_t *newchild)
 	parent->tree_child_first = newchild;
 }
 
+/* Look up among direct children a node with the exact tree_vis pointer */
+static treenode_t *
+tree_find_child_by_vis(treenode_t *t, exp_visible_t *vis)
+{
+	for (t = t->tree_child_first; t; t = t->tree_sibling)
+		if (t->tree_vis == vis)
+			return (t);
+	return (NULL);
+}
+
 /*
  * Add new node to the head of subtree pointed by 'n'. n can be NULL.
  * Interconnects the new treenode with exp_visible and exportinfo
@@ -368,28 +377,88 @@ tree_remove_node(treenode_t *node)
  *                        +------------+
  *
  * more_visible() will:
- * - add t3 (with t4,t5,t6) as a child of t0 (t3 will become sibling of t1)
- * - t3->tree_vis = v0 (plus bump vis_count for v0) and free v2
+ * - kmem_free() t3 and v2
+ * - add t4, t5, t6 as a child of t1 (t4 will become sibling of t2)
  * - add v3 to the end of E0->exi_visible
  *
  * Note that v4 and v5 were already proccesed in pseudo_exportfs() and
  * added to E2. The outer loop of more_visible() will loop only over v2
  * and v3. The inner loop of more_visible() always loops over v0 and v1.
+ *
+ * Illustration for this scenario:
+ *
+ * mkdir -p /v/a/b/c
+ * share /v/a/b/c
+ * mkdir /v/a/b/c1
+ * mkdir -p /v/a1
+ * mv /v/a/b /v/a1
+ * share /v/a1/b/c1
+ *
+ *           EXISTING
+ *           treenode
+ *           namespace:    +-----------+   visibles
+ *                         |exportinfo |-->v->a->b->c
+ * connect_point->+---+--->+-----------+
+ *                | / |T0
+ *                +---+
+ *                  |                            NEW treenode chain:
+ *         child->+---+
+ *                | v |T1                          +---+<-curr
+ *                +---+                          N1| v |
+ *                  |                              +---+
+ *                +---+                              |
+ *                | a |T2                          +---+<-tree_head
+ *                +---+                          N2| a1|
+ *                  |                              +---+
+ *                +---+                              |
+ *                | b |T3                          +---+
+ *                +---+                          N3| b |
+ *                  |                              +---+
+ *                +---+                              |
+ *                | c |T4                          +---+
+ *                +---+                          N4| c1|
+ *                                                 +---+
+ *
+ * The picture above illustrates the position of following pointers after line
+ * 'child = tree_find_child_by_vis(connect_point, curr->tree_vis);'
+ * was executed for the first time in the outer 'for' loop:
+ *
+ * connect_point..parent treenode in the EXISTING namespace to which the 'curr'
+ *                should be connected. If 'connect_point' already has a child
+ *                with the same value of tree_vis as the curr->tree_vis is,
+ *                the 'curr' will not be added, but kmem_free()d.
+ * child..........the result of tree_find_child_by_vis()
+ * curr...........currently processed treenode from the NEW treenode chain
+ * tree_head......current head of the NEW treenode chain, in this case it was
+ *                already moved down to its child - preparation for another loop
+ *
+ * What will happen to NEW treenodes N1, N2, N3, N4 in more_visible() later:
+ *
+ * N1: is merged - i.e. N1 is kmem_free()d. T0 has a child T1 with the same
+ *     tree_vis as N1
+ * N2: is added as a new child of T1
+ *     Note: not just N2, but the whole chain N2->N3->N4 is added
+ * N3: not processed separately (it was added together with N2)
+ *     Even that N3 and T3 have same tree_vis, they are NOT merged, but will
+ *     become duplicates.
+ * N4: not processed separately
  */
 static void
 more_visible(struct exportinfo *exi, treenode_t *tree_head)
 {
 	struct exp_visible *vp1, *vp2, *vis_head, *tail, *next;
 	int found;
+	treenode_t *child, *curr, *connect_point;
 
 	vis_head = tree_head->tree_vis;
-	tree_add_child(exi->exi_tree, tree_head);
+	connect_point = exi->exi_tree;
 
 	/*
 	 * If exportinfo doesn't already have a visible
 	 * list just assign the entire supplied list.
 	 */
 	if (exi->exi_visible == NULL) {
+		tree_add_child(exi->exi_tree, tree_head);
 		exi->exi_visible = vis_head;
 		return;
 	}
@@ -406,22 +475,9 @@ more_visible(struct exportinfo *exi, treenode_t *tree_head)
 				found = 1;
 				vp2->vis_count++;
 				VN_RELE(vp1->vis_vp);
-				/*
-				 * Transfer vis_exported from vp1 to vp2.
-				 * For example, if /export/home was shared
-				 * (and a mountpoint), then "export" and
-				 * "home" would each have visible structs in
-				 * the root pseudo exportinfo. The vis_exported
-				 * for home would be 1, and vis_exported for
-				 * export would be 0.  Now, if /export was
-				 * also shared, more_visible would find the
-				 * existing visible struct for export, and
-				 * see that vis_exported was 0.  The code
-				 * below will set it to 1.
-				 */
+				/* Transfer vis_exported from vp1 to vp2. */
 				if (vp1->vis_exported && !vp2->vis_exported)
 					vp2->vis_exported = 1;
-
 				kmem_free(vp1, sizeof (*vp1));
 				tree_head->tree_vis = vp2;
 				break;
@@ -433,7 +489,33 @@ more_visible(struct exportinfo *exi, treenode_t *tree_head)
 			tail->vis_next = vp1;
 			vp1->vis_next = NULL;
 		}
+
+		curr = tree_head;
 		tree_head = tree_head->tree_child_first;
+
+		if (! connect_point) /* No longer merging */
+			continue;
+		/*
+		 * The inner loop could set curr->tree_vis to the EXISTING
+		 * exp_visible vp2, so we can search among the children of
+		 * connect_point for the curr->tree_vis. No need for EQFID.
+		 */
+		child = tree_find_child_by_vis(connect_point, curr->tree_vis);
+		if (child) { /* Merging */
+			if (curr->tree_exi) { /* Transfer the exportinfo */
+				/*
+				 * more_visible() is not called for a reshare,
+				 * so the existing tree_exi must be NULL.
+				 */
+				ASSERT(child->tree_exi == NULL);
+				child->tree_exi = curr->tree_exi;
+				child->tree_exi->exi_tree = child;
+			}
+			kmem_free(curr, sizeof (treenode_t));
+		} else { /* Branching */
+			tree_add_child(connect_point, curr);
+		}
+		connect_point = child;
 	}
 }
 
@@ -461,7 +543,7 @@ less_visible(struct exportinfo *exi, struct exp_visible *vp1)
 
 		next = vp2->vis_next;
 
-		if (EQFID(&vp1->vis_fid, &vp2->vis_fid)) {
+		if (vp1 == vp2) {
 			/*
 			 * Decrement the ref count.
 			 * Remove the entry if it's zero.
@@ -475,29 +557,7 @@ less_visible(struct exportinfo *exi, struct exp_visible *vp1)
 				srv_secinfo_list_free(vp2->vis_secinfo,
 				    vp2->vis_seccnt);
 				kmem_free(vp2, sizeof (*vp1));
-			} else {
-				/*
-				 * If we're here, then the vp2 will
-				 * remain in the vis list.  If the
-				 * vis entry corresponds to the object
-				 * being unshared, then vis_exported
-				 * needs to be set to 0.
-				 *
-				 * vp1 is a node from caller's list
-				 * vp2 is node from exportinfo's list
-				 *
-				 * Only 1 node in the caller's list
-				 * will have vis_exported set to 1,
-				 * and it corresponds to the obj being
-				 * unshared.  It should always be the
-				 * last element of the caller's list.
-				 */
-				if (vp1->vis_exported &&
-				    vp2->vis_exported) {
-					vp2->vis_exported = 0;
-				}
 			}
-
 			break;
 		}
 		prev = vp2;
@@ -764,6 +824,9 @@ treeclimb_unexport(struct exportinfo *exip)
 	 */
 	tnode->tree_exi = NULL;
 
+	if (tnode->tree_vis) /* system root has tree_vis == NULL */
+		tnode->tree_vis->vis_exported = 0;
+
 	while (tnode) {
 
 		/* Stop at VROOT node which is exported or has child */
@@ -861,47 +924,17 @@ untraverse(vnode_t *vp)
 struct exportinfo *
 get_root_export(struct exportinfo *exip)
 {
-	vnode_t *dvp, *vp;
-	fid_t fid;
-	struct exportinfo *exi = exip;
-	int error;
+	treenode_t *tnode = exip->exi_tree;
+	exportinfo_t *exi = NULL;
 
-	vp = exi->exi_vp;
-	VN_HOLD(vp);
-
-	for (;;) {
-
-		if (vp->v_flag & VROOT) {
-			ASSERT(exi != NULL);
+	while (tnode) {
+		if (TREE_ROOT(tnode)) {
+			exi = tnode->tree_exi;
 			break;
 		}
-
-		/*
-		 * Now, do a ".." to find parent dir of vp.
-		 */
-		error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, CRED(),
-		    NULL, NULL, NULL);
-
-		if (error) {
-			exi = NULL;
-			break;
-		}
-
-		VN_RELE(vp);
-		vp = dvp;
-
-		bzero(&fid, sizeof (fid));
-		fid.fid_len = MAXFIDSZ;
-		error = vop_fid_pseudo(vp, &fid);
-		if (error) {
-			exi = NULL;
-			break;
-		}
-
-		exi = checkexport4(&vp->v_vfsp->vfs_fsid, &fid, vp);
+		tnode = tnode->tree_parent;
 	}
-
-	VN_RELE(vp);
+	ASSERT(exi);
 	return (exi);
 }
 
@@ -929,9 +962,7 @@ has_visible(struct exportinfo *exi, vnode_t *vp)
 	 * Only the exportinfo of a fs root node may have a visible list.
 	 * Either it is a pseudo root node, or a real exported root node.
 	 */
-	if ((exi = get_root_export(exi)) == NULL) {
-		return (0);
-	}
+	exi = get_root_export(exi);
 
 	if (!exi->exi_visible)
 		return (0);
@@ -998,10 +1029,8 @@ nfs_visible(struct exportinfo *exi, vnode_t *vp, int *expseudo)
 	 * Only a PSEUDO node has a visible list or an exported VROOT
 	 * node may have a visible list.
 	 */
-	if (! PSEUDO(exi) && (exi = get_root_export(exi)) == NULL) {
-		*expseudo = 0;
-		return (0);
-	}
+	if (! PSEUDO(exi))
+		exi = get_root_export(exi);
 
 	/* Get the fid of the vnode */
 
@@ -1109,10 +1138,8 @@ nfs_visible_inode(struct exportinfo *exi, ino64_t ino, int *expseudo)
 	 * Only a PSEUDO node has a visible list or an exported VROOT
 	 * node may have a visible list.
 	 */
-	if (! PSEUDO(exi) && (exi = get_root_export(exi)) == NULL) {
-		*expseudo = 0;
-		return (0);
-	}
+	if (! PSEUDO(exi))
+		exi = get_root_export(exi);
 
 	for (visp = exi->exi_visible; visp; visp = visp->vis_next)
 		if ((u_longlong_t)ino == visp->vis_ino) {
