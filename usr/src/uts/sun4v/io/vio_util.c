@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -113,10 +112,8 @@ vio_create_mblks(uint64_t num_mblks, size_t mblk_size, uint8_t *mblk_datap,
 			return (ENOSPC);
 		}
 
-		if ((vmplp->flag & VMPL_FLAG_CLIENT_DATA) != 0) {
-			vmp->index = i;
-			vmp->state = VIO_MBLK_FREE;
-		}
+		vmp->index = i;
+		vmp->state = VIO_MBLK_FREE;
 
 		/* put this vmp on the free stack */
 		vmplp->quep[vmplp->tail] = vmp;
