@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -969,9 +968,12 @@ spa_vdev_state_enter(spa_t *spa, int oplocks)
 	 * any I/O when we are doing the actual open.
 	 */
 	if (spa_is_root(spa)) {
-		spa_config_enter(spa, SCL_STATE | SCL_L2ARC, spa, RW_WRITER);
+		int low = locks & ~(SCL_ZIO - 1);
+		int high = locks & ~low;
+
+		spa_config_enter(spa, high, spa, RW_WRITER);
 		vdev_hold(spa->spa_root_vdev);
-		spa_config_enter(spa, SCL_ZIO | oplocks, spa, RW_WRITER);
+		spa_config_enter(spa, low, spa, RW_WRITER);
 	} else {
 		spa_config_enter(spa, locks, spa, RW_WRITER);
 	}
