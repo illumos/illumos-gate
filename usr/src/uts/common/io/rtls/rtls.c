@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -92,6 +91,12 @@ static int rtls_m_unicst(void *, const uint8_t *);
 static int rtls_m_multicst(void *, boolean_t, const uint8_t *);
 static int rtls_m_promisc(void *, boolean_t);
 static mblk_t *rtls_m_tx(void *, mblk_t *);
+static int rtls_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
+    void *);
+static int rtls_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
+    const void *);
+static void rtls_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 static int rtls_m_stat(void *, uint_t, uint64_t *);
 
 static uint_t rtls_intr(caddr_t);
@@ -173,14 +178,22 @@ uchar_t rtls_broadcastaddr[] = {
 };
 
 static mac_callbacks_t rtls_m_callbacks = {
-	MC_SETPROP | MC_GETPROP,
+	MC_PROPERTIES,
 	rtls_m_stat,
 	rtls_m_start,
 	rtls_m_stop,
 	rtls_m_promisc,
 	rtls_m_multicst,
 	rtls_m_unicst,
-	rtls_m_tx
+	rtls_m_tx,
+	NULL,
+	NULL,  /* mc_ioctl */
+	NULL,  /* mc_getcapab */
+	NULL,  /* mc_open */
+	NULL,  /* mc_close */
+	rtls_m_setprop,
+	rtls_m_getprop,
+	rtls_m_propinfo
 };
 
 static mii_ops_t rtls_mii_ops = {
@@ -900,6 +913,33 @@ rtls_m_stat(void *arg, uint_t stat, uint64_t *val)
 #endif
 
 	return (0);
+}
+
+int
+rtls_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    void *val)
+{
+	rtls_t *rtlsp = arg;
+
+	return (mii_m_getprop(rtlsp->mii, name, num, sz, val));
+}
+
+int
+rtls_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    const void *val)
+{
+	rtls_t *rtlsp = arg;
+
+	return (mii_m_setprop(rtlsp->mii, name, num, sz, val));
+}
+
+static void
+rtls_m_propinfo(void *arg, const char *name, mac_prop_id_t num,
+    mac_prop_info_handle_t prh)
+{
+	rtls_t *rtlsp = arg;
+
+	mii_m_propinfo(rtlsp->mii, name, num, prh);
 }
 
 /*
