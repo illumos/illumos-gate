@@ -18,8 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <unistd.h>
@@ -118,7 +117,8 @@ print_help()
 	(void) printf("\tadd   rule|preshared {%s}|%s\n",
 	    gettext("definition"), gettext("filename"));
 	(void) printf("\tdel   p1|rule|preshared %s\n", gettext("identifier"));
-	(void) printf("\tdump  p1|rule|preshared|certcache\n");
+	(void) printf("\tdump  p1|rule|preshared|certcache|groups|"
+	    "encralgs|authalgs\n");
 	(void) printf("\tflush p1|certcache\n");
 	(void) printf("\tread  rule|preshared [%s]\n", gettext("filename"));
 	(void) printf("\twrite rule|preshared %s\n", gettext("filename"));
@@ -236,6 +236,12 @@ print_dump_help()
 	(void) printf(gettext("all preshared keys\n"));
 	(void) printf("\tcertcache\t");
 	(void) printf(gettext("all cached certificates\n"));
+	(void) printf("\tgroups\t\t");
+	(void) printf(gettext("all implemented Diffie-Hellman groups\n"));
+	(void) printf("\tencralgs\t");
+	(void) printf(gettext("all encryption algorithms for IKE\n"));
+	(void) printf("\tauthalgs\t");
+	(void) printf(gettext("all authentication algorithms IKE\n"));
 	(void) printf("\n");
 
 	command_complete(0);
@@ -444,6 +450,9 @@ parsecmd(char *cmdstr, char *objstr)
 				{"rule",	IKE_SVC_DUMP_RULES},
 				{"preshared",	IKE_SVC_DUMP_PS},
 				{"certcache",	IKE_SVC_DUMP_CERTCACHE},
+				{"groups",	IKE_SVC_DUMP_GROUPS},
+				{"encralgs",	IKE_SVC_DUMP_ENCRALGS},
+				{"authalgs",	IKE_SVC_DUMP_AUTHALGS},
 				{NULL,		IKE_SVC_ERROR}
 			}
 		},
@@ -1881,6 +1890,63 @@ badkey:
 }
 
 static void
+print_group_header(void)
+{
+	(void) printf(gettext("\nList of Diffie-Hellman groups for setting "
+	    "up IKE SAs"));
+	(void) printf(gettext("\nThe values match the IPsec attribute "
+	    "assigned numbers published by IANA\n\n"));
+	(void) printf("%-6s%-9s%-50s\n",
+	    gettext("Value"), gettext("Strength"), gettext("Description"));
+}
+
+static void
+print_group(ike_group_t *gp)
+{
+	(void) printf("%-6u%-9u%-50s\n",
+	    gp->group_number, gp->group_bits, gp->group_label);
+}
+
+static void
+print_encralg_header(void)
+{
+	(void) printf(gettext("\nList of encryption algorithms for IKE"));
+	(void) printf(gettext("\nThe values match the IPsec attribute "
+	    "assigned numbers published by IANA\n\n"));
+	(void) printf("%-6s%-20s%-15s\n", gettext("Value"),
+	    gettext("Name"), gettext("Keylen range"));
+}
+
+static void
+print_encralg(ike_encralg_t *ep)
+{
+	char keylen_str[16];
+
+	(void) strlcpy(keylen_str, "N/A", sizeof (keylen_str));
+	if (ep->encr_keylen_min != 0 || ep->encr_keylen_max != 0)
+		(void) snprintf(keylen_str, sizeof (keylen_str), "%d-%d",
+		    ep->encr_keylen_min, ep->encr_keylen_max);
+	(void) printf("%-6u%-20s%-15s\n",
+	    ep->encr_value, ep->encr_name, keylen_str);
+}
+
+static void
+print_authalg_header(void)
+{
+	(void) printf(gettext("\nList of authentication algorithms for IKE"));
+	(void) printf(gettext("\nThe values match the IPsec attribute "
+	    "assigned numbers published by IANA\n\n"));
+	(void) printf("%-6s%-20s\n", gettext("Value"), gettext("Name"));
+}
+
+static void
+print_authalg(ike_authalg_t *ap)
+{
+	(void) printf("%-6u%-20s\n",
+	    ap->auth_value, ap->auth_name);
+}
+
+static void
 print_p1(ike_p1_sa_t *p1)
 {
 	ike_p1_stats_t	*sp;
@@ -2593,6 +2659,18 @@ do_dump(int cmd)
 	case IKE_SVC_DUMP_CERTCACHE:
 		name = gettext("certcache");
 		break;
+	case IKE_SVC_DUMP_GROUPS:
+		name = gettext("groups");
+		print_group_header();
+		break;
+	case IKE_SVC_DUMP_ENCRALGS:
+		name = gettext("encralgs");
+		print_encralg_header();
+		break;
+	case IKE_SVC_DUMP_AUTHALGS:
+		name = gettext("authalgs");
+		print_authalg_header();
+		break;
 	default:
 		bail_msg(gettext("unrecognized dump command (%d)"), cmd);
 	}
@@ -2626,6 +2704,15 @@ do_dump(int cmd)
 			break;
 		case IKE_SVC_DUMP_CERTCACHE:
 			print_certcache((ike_certcache_t *)(dump + 1));
+			break;
+		case IKE_SVC_DUMP_GROUPS:
+			print_group((ike_group_t *)(dump + 1));
+			break;
+		case IKE_SVC_DUMP_ENCRALGS:
+			print_encralg((ike_encralg_t *)(dump + 1));
+			break;
+		case IKE_SVC_DUMP_AUTHALGS:
+			print_authalg((ike_authalg_t *)(dump + 1));
 			break;
 		}
 
@@ -3227,6 +3314,9 @@ parseit(int argc, char **argv, char *notused, boolean_t notused_either)
 		break;
 	case IKE_SVC_DUMP_P1S:
 	case IKE_SVC_DUMP_RULES:
+	case IKE_SVC_DUMP_GROUPS:
+	case IKE_SVC_DUMP_ENCRALGS:
+	case IKE_SVC_DUMP_AUTHALGS:
 	case IKE_SVC_DUMP_PS:
 	case IKE_SVC_DUMP_CERTCACHE:
 		if (argc != NULL) {

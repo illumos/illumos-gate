@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_IKEDOOR_H
@@ -50,7 +49,7 @@ extern "C" {
  * apart from trivial 4-byte enums or base headers, that all structures are
  * multiples of 8-bytes (64-bits).
  */
-#define	DOORVER 3
+#define	DOORVER 4
 #define	DOORNM	"/var/run/ike_door"
 
 
@@ -91,6 +90,10 @@ typedef enum {
 
 	IKE_SVC_DUMP_CERTCACHE,
 	IKE_SVC_FLUSH_CERTCACHE,
+
+	IKE_SVC_DUMP_GROUPS,
+	IKE_SVC_DUMP_ENCRALGS,
+	IKE_SVC_DUMP_AUTHALGS,
 
 	IKE_SVC_ERROR
 } ike_svccmd_t;
@@ -417,6 +420,26 @@ typedef struct {
 	 */
 } ike_rule_t;
 
+/* data formatting structure for DH group dumps */
+typedef struct {
+	uint16_t	group_number;
+	uint16_t	group_bits;
+	char		group_label[MAX_LABEL_LEN];
+} ike_group_t;
+
+/* data formatting structure for encryption algorithm dumps */
+typedef struct {
+	uint_t		encr_value;
+	char		encr_name[MAX_LABEL_LEN];
+	int		encr_keylen_min;
+	int		encr_keylen_max;
+} ike_encralg_t;
+
+/* data formatting structure for authentication algorithm dumps */
+typedef struct {
+	uint_t		auth_value;
+	char		auth_name[MAX_LABEL_LEN];
+} ike_authalg_t;
 
 /*
  * data formatting structure for preshared keys
