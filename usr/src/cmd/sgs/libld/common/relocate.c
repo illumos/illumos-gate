@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -349,7 +348,7 @@ ld_disp_errmsg(const char *msg, Rel_desc *rsp, Ofl_desc *ofl)
 
 	eprintf(ofl->ofl_lml, ERR_WARNING, msg,
 	    conv_reloc_type(ifl->ifl_ehdr->e_machine, rsp->rel_rtype,
-	    0, &inv_buf), ifl->ifl_name, rsp->rel_sname, str,
+	    0, &inv_buf), ifl->ifl_name, ld_reloc_sym_name(rsp), str,
 	    EC_OFF(rsp->rel_roffset));
 }
 
@@ -462,56 +461,332 @@ disp_inspect(Ofl_desc *ofl, Rel_desc *rld, Boolean rlocal)
 }
 
 /*
- * Output relocation numbers can vary considerably between building executables
- * or shared objects (pic vs. non-pic), etc.  But, they typically aren't very
- * large, so for these objects use a standard bucket size.  For building
- * relocatable objects, typically there will be an output relocation for every
- * input relocation.
+ * Return a Rel_cachebuf with an available Rel_desc entry from the
+ * specified cache, allocating a cache buffer if necessary.
+ *
+ * entry:
+ *	ofl - Output file descriptor
+ *	rcp - Relocation cache to allocate the descriptor from.
+ *		One of &ofl->ofl_actrels or &ofl->ofl_outrels.
+ *
+ * exit:
+ *	Returns the allocated descriptor, or NULL if the allocation fails.
  */
-Rel_cache *
-ld_add_rel_cache(Ofl_desc *ofl, APlist **alpp, size_t *nextsize, size_t low,
-    size_t hi)
+static Rel_cachebuf *
+ld_add_rel_cache(Ofl_desc *ofl, Rel_cache *rcp)
 {
-	Rel_cache	*rcp;
-	size_t		size;
-	APlist		*alp = *alpp;
+	Rel_cachebuf	*rcbp;
+	size_t		nelts, size, alloc_cnt;
 
 	/*
 	 * If there is space available in the present cache bucket, return the
 	 * next free entry.
 	 */
-	if (alp && ((rcp = alp->apl_data[aplist_nitems(alp) - 1]) != NULL) &&
-	    (rcp->rc_free < rcp->rc_end))
-		return (rcp);
+	alloc_cnt = aplist_nitems(rcp->rc_list);
+	if (rcp->rc_list &&
+	    ((rcbp = rcp->rc_list->apl_data[alloc_cnt - 1]) != NULL) &&
+	    (rcbp->rc_free < rcbp->rc_end))
+		return (rcbp);
 
 	/*
-	 * Allocate a new bucket.
+	 * Allocate a new bucket. As we cannot know the number of relocations
+	 * we'll have in the active and output cache until after the link is
+	 * complete, the size of the bucket is a heuristic.
+	 *
+	 * In general, if the output object is an executable, or a sharable
+	 * object, then the size of the active relocation list will be nearly
+	 * the same as the number of input relocations, and the output
+	 * relocation list will be very short. If the output object is a
+	 * relocatable object, then the reverse is true. Therefore, the initial
+	 * allocation for the appropriate list is sized to fit all the input
+	 * allocations in a single shot.
+	 *
+	 * All other allocations are done in units of REL_CACHEBUF_ALLOC,
+	 * which is chosen to be large enough to cover most common cases,
+	 * but small enough that not using it fully is inconsequential.
+	 *
+	 * In an ideal scenario, this results in one allocation on each list.
 	 */
-	if (*nextsize == 0) {
-		if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
-			if ((size = ofl->ofl_relocincnt) == 0)
-				size = low;
-			if (size > hi)
-				*nextsize = hi;
-			else
-				*nextsize = low;
-		} else
-			*nextsize = size = hi;
-	} else
-		size = *nextsize;
+	nelts = REL_CACHEBUF_ALLOC;
+	if ((alloc_cnt == 0) && (ofl->ofl_relocincnt > REL_CACHEBUF_ALLOC)) {
+		Boolean is_rel = (ofl->ofl_flags & FLG_OF_RELOBJ) != 0;
 
-	size = size * sizeof (Rel_desc);
+		if (((rcp == &ofl->ofl_actrels) && !is_rel) ||
+		    ((rcp == &ofl->ofl_outrels) && is_rel))
+			nelts = ofl->ofl_relocincnt;
+	}
 
-	if (((rcp = libld_malloc(sizeof (Rel_cache) + size)) == NULL) ||
-	    (aplist_append(alpp, rcp, AL_CNT_OFL_RELS) == NULL))
-		return ((Rel_cache *)S_ERROR);
+	/*
+	 * Compute the total number of bytes to allocate. The first element
+	 * of the array is built into the Rel_cachebuf header, so we subtract
+	 * one from nelts.
+	 */
+	size = sizeof (Rel_cachebuf) + ((nelts - 1) * sizeof (Rel_desc));
 
-	/* LINTED */
-	rcp->rc_free = (Rel_desc *)(rcp + 1);
-	/* LINTED */
-	rcp->rc_end = (Rel_desc *)((char *)rcp->rc_free + size);
+	if (((rcbp = libld_malloc(size)) == NULL) ||
+	    (aplist_append(&rcp->rc_list, rcbp, AL_CNT_OFL_RELS) == NULL))
+		return (NULL);
 
-	return (rcp);
+	rcbp->rc_free = rcbp->rc_arr;
+	rcbp->rc_end = rcbp->rc_arr + nelts;
+
+	return (rcbp);
+}
+
+/*
+ * Allocate a Rel_aux descriptor and attach it to the given Rel_desc,
+ * allocating an auxiliary cache buffer if necessary.
+ *
+ * entry:
+ *	ofl - Output file descriptor
+ *	rdp - Rel_desc descriptor that requires an auxiliary block
+ *
+ * exit:
+ *	Returns TRUE on success, and FALSE if the allocation fails.
+ *	On success, the caller is responsible for initializing the
+ *	auxiliary block properly.
+ */
+static Boolean
+ld_add_rel_aux(Ofl_desc *ofl, Rel_desc *rdesc)
+{
+	Rel_aux_cachebuf	*racp = NULL;
+	size_t			size;
+
+	/*
+	 * If there is space available in the present cache bucket, use it.
+	 * Otherwise, allocate a new bucket.
+	 */
+	if (ofl->ofl_relaux) {
+		racp = ofl->ofl_relaux->apl_data[
+		    ofl->ofl_relaux->apl_nitems - 1];
+
+		if (racp && (racp->rac_free >= racp->rac_end))
+			racp = NULL;
+	}
+	if (racp == NULL) {
+		/*
+		 * Compute the total number of bytes to allocate. The first
+		 * element of the array is built into the Rel_aux_cachebuf
+		 * header, so we subtract one from the number of elements.
+		 */
+		size = sizeof (Rel_aux_cachebuf) +
+		    ((RELAUX_CACHEBUF_ALLOC - 1) * sizeof (Rel_aux));
+		if (((racp = libld_malloc(size)) == NULL) ||
+		    (aplist_append(&ofl->ofl_relaux, racp, AL_CNT_OFL_RELS) ==
+		    NULL))
+			return (FALSE);
+
+		racp->rac_free = racp->rac_arr;
+		racp->rac_end = racp->rac_arr + RELAUX_CACHEBUF_ALLOC;
+	}
+
+	/* Take an auxiliary descriptor from the cache and add it to rdesc */
+	rdesc->rel_aux = racp->rac_free++;
+
+	return (TRUE);
+}
+
+/*
+ * Enter a copy of the given Rel_desc relocation descriptor, and
+ * any associated auxiliary Rel_aux it may reference, into the
+ * specified relocation cache.
+ *
+ * entry:
+ *	ofl - Output file descriptor
+ *	rcp - Relocation descriptor cache to recieve relocation
+ *	rdesc - Rel_desc image to be inserted
+ *	flags - Flags to add to rdest->rel_flags in the inserted descriptor
+ *
+ * exit:
+ *	Returns the pointer to the inserted descriptor on success.
+ *	Returns NULL if an allocation error occurs.
+ */
+Rel_desc *
+ld_reloc_enter(Ofl_desc *ofl, Rel_cache *rcp, Rel_desc *rdesc, Word flags)
+{
+	Rel_desc	*arsp;
+	Rel_aux		*auxp;
+	Rel_cachebuf	*rcbp;
+
+
+	/*
+	 * If no relocation cache structures are available, allocate a new
+	 * one and link it to the buffer list.
+	 */
+	rcbp = ld_add_rel_cache(ofl, rcp);
+	if (rcbp == NULL)
+		return (NULL);
+	arsp = rcbp->rc_free;
+
+	/*
+	 * If there is an auxiliary block on the original, allocate
+	 * one for the clone. Save the pointer, because the struct copy
+	 * below will crush it.
+	 */
+	if (rdesc->rel_aux != NULL) {
+		if (!ld_add_rel_aux(ofl, arsp))
+			return (NULL);
+		auxp = arsp->rel_aux;
+	}
+
+	/* Copy contents of the original into the clone */
+	*arsp = *rdesc;
+
+	/*
+	 * If there is an auxiliary block, restore the clone's pointer to
+	 * it, and copy the auxiliary contents.
+	 */
+	if (rdesc->rel_aux != NULL) {
+		arsp->rel_aux = auxp;
+		*auxp = *rdesc->rel_aux;
+	}
+	arsp->rel_flags |= flags;
+
+	rcbp->rc_free++;
+	rcp->rc_cnt++;
+
+	return (arsp);
+}
+
+/*
+ * Initialize a relocation descriptor auxiliary block to default
+ * values.
+ *
+ * entry:
+ *	rdesc - Relocation descriptor, with a non-NULL rel_aux field
+ *		pointing at the auxiliary block to be initialized.
+ *
+ * exit:
+ *	Each field in rdesc->rel_aux has been set to its default value
+ */
+static void
+ld_init_rel_aux(Rel_desc *rdesc)
+{
+	Rel_aux	*rap = rdesc->rel_aux;
+
+	/*
+	 * The default output section is the one the input section
+	 * is assigned to, assuming that there is an input section.
+	 * Failing that, NULL is the only possibility, and we expect
+	 * that the caller will assign an explicit value.
+	 */
+	rap->ra_osdesc = (rdesc->rel_isdesc == NULL) ? NULL :
+	    rdesc->rel_isdesc->is_osdesc;
+
+	/* The ra_usym defaults to the value in rel_sym */
+	rap->ra_usym = rdesc->rel_sym;
+
+	/* Remaining fields are zeroed */
+	rap->ra_move = NULL;
+	rap->ra_typedata = 0;
+}
+
+/*
+ * The ld_reloc_set_aux_XXX() functions are used to set the value of an
+ * auxiliary relocation item on a relocation descriptor that exists in
+ * the active or output relocation cache. These descriptors are created
+ * via a call to ld_reloc_enter().
+ *
+ * These functions preserve the illusion that every relocation descriptor
+ * has a non-NULL auxiliary block into which values can be set, while
+ * only creating an auxiliary block if one is actually necessary, preventing
+ * the large memory allocations that would otherwise occur. They operate
+ * as follows:
+ *
+ * -	If an auxiliary block already exists, set the desired value and
+ *	and return TRUE.
+ *
+ * -	If no auxiliary block exists, but the desired value is the default
+ *	value for the specified item, then no auxiliary block is needed,
+ *	and TRUE is returned.
+ *
+ * -	If no auxiliary block exists, and the desired value is not the
+ *	default for the specified item, allocate an auxiliary block for
+ *	the descriptor, initialize its contents to default values for all
+ *	items, set the specified value, and return TRUE.
+ *
+ * -	If an auxiliary block needs to be added, but the allocation fails,
+ *	an error is issued, and FALSE is returned.
+ *
+ * Note that we only provide an ld_reloc_set_aux_XXX() function for those
+ * auxiliary items that libld actually modifies in Rel_desc descriptors
+ * in the active or output caches. If another one is needed, add it here.
+ *
+ * The PROCESS_NULL_REL_AUX macro is used to provide a single implementation
+ * for the logic that determines if an auxiliary block is needed or not,
+ * and handles the details of allocating and initializing it. It accepts
+ * one argument, _isdefault_predicate, which should be a call to the
+ * RELAUX_ISDEFAULT_xxx() macro appropriate for the auxiliary item
+ */
+
+#define	PROCESS_NULL_REL_AUX(_isdefault_predicate) \
+	if (rdesc->rel_aux == NULL) { \
+		/* If requested value is the default, no need for aux block */ \
+		if (_isdefault_predicate) \
+			return (TRUE); \
+		/* Allocate and attach an auxiliary block */ \
+		if (!ld_add_rel_aux(ofl, rdesc)) \
+			return (FALSE); \
+		/* Initialize the auxiliary block with default values */ \
+		ld_init_rel_aux(rdesc); \
+	}
+
+Boolean
+ld_reloc_set_aux_osdesc(Ofl_desc *ofl, Rel_desc *rdesc, Os_desc *osp)
+{
+	PROCESS_NULL_REL_AUX(RELAUX_ISDEFAULT_OSDESC(rdesc, osp))
+	rdesc->rel_aux->ra_osdesc = osp;
+	return (TRUE);
+}
+
+Boolean
+ld_reloc_set_aux_usym(Ofl_desc *ofl, Rel_desc *rdesc, Sym_desc *sdp)
+{
+	PROCESS_NULL_REL_AUX(RELAUX_ISDEFAULT_USYM(rdesc, sdp))
+	rdesc->rel_aux->ra_usym = sdp;
+	return (TRUE);
+}
+
+#undef PROCESS_NULL_REL_AUX
+
+/*
+ * Return a descriptive name for the symbol associated with the
+ * given relocation descriptor. This will be the actual symbol
+ * name if one exists, or a suitable alternative otherwise.
+ *
+ * entry:
+ *	rsp - Relocation descriptor
+ */
+const char *
+ld_reloc_sym_name(Rel_desc *rsp)
+{
+	Sym_desc	*sdp = rsp->rel_sym;
+
+	if (sdp != NULL) {
+		/* If the symbol has a valid name use it */
+		if (sdp->sd_name && *sdp->sd_name)
+			return (demangle(sdp->sd_name));
+
+		/*
+		 * If the symbol is STT_SECTION, and the corresponding
+		 * section symbol has the specially prepared string intended
+		 * for this use, use that string. The string is of the form
+		 *	secname (section)
+		 */
+		if ((ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) &&
+		    (sdp->sd_isc != NULL) && (sdp->sd_isc->is_sym_name != NULL))
+			return (demangle(sdp->sd_isc->is_sym_name));
+	} else {
+		/*
+		 * Use an empty name for a register relocation with
+		 * no symbol.
+		 */
+		if (IS_REGISTER(rsp->rel_rtype))
+			return (MSG_ORIG(MSG_STR_EMPTY));
+	}
+
+	/* If all else fails, report it as <unknown> */
+	return (MSG_INTL(MSG_STR_UNKNOWN));
 }
 
 /*
@@ -521,24 +796,9 @@ uintptr_t
 ld_add_actrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Rel_desc	*arsp;
-	Rel_cache	*rcp;
-	static size_t	nextsize = 0;
 
-	/*
-	 * If no relocation cache structures are available, allocate a new
-	 * one and link it into the bucket list.
-	 */
-	if ((rcp = ld_add_rel_cache(ofl, &ofl->ofl_actrels, &nextsize,
-	    REL_LAIDESCNO, REL_HAIDESCNO)) == (Rel_cache *)S_ERROR)
+	if ((arsp = ld_reloc_enter(ofl, &ofl->ofl_actrels, rsp, flags)) == NULL)
 		return (S_ERROR);
-
-	arsp = rcp->rc_free;
-
-	*arsp = *rsp;
-	arsp->rel_flags |= flags;
-
-	rcp->rc_free++;
-	ofl->ofl_actrelscnt++;
 
 	/*
 	 * Any GOT relocation reference requires the creation of a .got table.
@@ -784,7 +1044,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 	 * normally carried out before we get to the data segment relocations).
 	 */
 	if ((ELF_ST_TYPE(sym->st_info) == STT_OBJECT) &&
-	    (rsp->rel_osdesc->os_shdr->sh_flags & SHF_WRITE)) {
+	    (RELAUX_GET_OSDESC(rsp)->os_shdr->sh_flags & SHF_WRITE)) {
 		if (sdp->sd_flags & FLG_SY_MVTOCOMM)
 			return (ld_add_actrel(NULL, rsp, ofl));
 		else
@@ -804,7 +1064,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		    conv_sym_info_type(sdp->sd_file->ifl_ehdr->e_machine,
 		    ELF_ST_TYPE(sym->st_info), 0, &inv_buf),
 		    rsp->rel_isdesc->is_file->ifl_name,
-		    demangle(rsp->rel_sname), sdp->sd_file->ifl_name);
+		    ld_reloc_sym_name(rsp), sdp->sd_file->ifl_name);
 		return ((*ld_targ.t_mr.mr_add_outrel)(NULL, rsp, ofl));
 	}
 
@@ -818,9 +1078,9 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 	 * we want to use it's strong counter part.
 	 *
 	 * The results of this logic should be:
-	 *	rel_usym: assigned to strong
-	 *	 rel_sym: assigned to symbol to perform
-	 *		  copy_reloc against (weak or strong).
+	 *	ra_usym: assigned to strong
+	 *	rel_sym: assigned to symbol to perform
+	 *		copy_reloc against (weak or strong).
 	 */
 	if (sap->sa_linkndx) {
 		_sdp = sdp->sd_file->ifl_oldndx[sap->sa_linkndx];
@@ -853,9 +1113,10 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		 * symbol into local .bss.  If there is a copy_reloc to be
 		 * performed, that should still occur against the WEAK symbol.
 		 */
-		if ((ELF_ST_BIND(sdp->sd_sym->st_info) == STB_WEAK) ||
-		    (sdp->sd_flags & FLG_SY_WEAKDEF))
-			rsp->rel_usym = _sdp;
+		if (((ELF_ST_BIND(sdp->sd_sym->st_info) == STB_WEAK) ||
+		    (sdp->sd_flags & FLG_SY_WEAKDEF)) &&
+		    !ld_reloc_set_aux_usym(ofl, rsp, _sdp))
+			return (S_ERROR);
 	} else
 		_sdp = 0;
 
@@ -866,7 +1127,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 	 * initialized, then generate a copy relocation that will copy the data
 	 * to the executables .bss at runtime.
 	 */
-	if (!(rsp->rel_usym->sd_flags & FLG_SY_MVTOCOMM)) {
+	if (!(RELAUX_GET_USYM(rsp)->sd_flags & FLG_SY_MVTOCOMM)) {
 		Word		rtype = rsp->rel_rtype;
 		Copy_rel	cr;
 
@@ -911,7 +1172,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		 * (we don't know the real alignment so we have to make the
 		 * worst case guess).
 		 */
-		_sdp = rsp->rel_usym;
+		_sdp = RELAUX_GET_USYM(rsp);
 		stval = _sdp->sd_sym->st_value;
 		if (ld_sym_copy(_sdp) == S_ERROR)
 			return (S_ERROR);
@@ -978,7 +1239,7 @@ reloc_generic(Rel_desc *rsp, Ofl_desc *ofl)
 
 	eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_UNEXPREL),
 	    conv_reloc_type(ifl->ifl_ehdr->e_machine, rsp->rel_rtype,
-	    0, &inv_buf), ifl->ifl_name, demangle(rsp->rel_sname));
+	    0, &inv_buf), ifl->ifl_name, ld_reloc_sym_name(rsp));
 
 	/*
 	 * If building a shared object then put the relocation off
@@ -1037,7 +1298,7 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_REL_PICREDLOC),
-			    demangle(rsp->rel_sname), ifl->ifl_name,
+			    ld_reloc_sym_name(rsp), ifl->ifl_name,
 			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 			    rsp->rel_rtype, 0, &inv_buf));
 			return (S_ERROR);
@@ -1094,7 +1355,7 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	if (OFL_IS_STATIC_EXEC(ofl)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSSTAT),
 		    conv_reloc_type(mach, rtype, 0, &inv_buf1), ifl->ifl_name,
-		    demangle(rsp->rel_sname));
+		    ld_reloc_sym_name(rsp));
 		return (S_ERROR);
 	}
 
@@ -1105,7 +1366,7 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	if ((type = ELF_ST_TYPE(sdp->sd_sym->st_info)) != STT_TLS) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBADSYM),
 		    conv_reloc_type(mach, rtype, 0, &inv_buf1), ifl->ifl_name,
-		    demangle(rsp->rel_sname),
+		    ld_reloc_sym_name(rsp),
 		    conv_sym_info_type(mach, type, 0, &inv_buf2));
 		return (S_ERROR);
 	}
@@ -1119,7 +1380,7 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	    ((flags & FLG_OF_EXEC) && IS_TLS_LE(rtype)))) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBND),
 		    conv_reloc_type(mach, rtype, 0, &inv_buf1), ifl->ifl_name,
-		    demangle(rsp->rel_sname), sdp->sd_file->ifl_name);
+		    ld_reloc_sym_name(rsp), sdp->sd_file->ifl_name);
 		return (S_ERROR);
 	}
 
@@ -1141,7 +1402,7 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_REL_TLSLE),
 			    conv_reloc_type(mach, rtype, 0, &inv_buf1),
-			    ifl->ifl_name, demangle(rsp->rel_sname));
+			    ifl->ifl_name, ld_reloc_sym_name(rsp));
 			return (S_ERROR);
 
 		} else if ((IS_TLS_IE(rtype)) &&
@@ -1149,7 +1410,7 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_REL_TLSIE),
 			    conv_reloc_type(mach, rtype, 0, &inv_buf1),
-			    ifl->ifl_name, demangle(rsp->rel_sname));
+			    ifl->ifl_name, ld_reloc_sym_name(rsp));
 		}
 	}
 
@@ -1169,7 +1430,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 
 	DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD, ld_targ.t_m.m_mach,
 	    ld_targ.t_m.m_rel_sht_type, (void *)reloc, isname, isscnndx,
-	    reld->rel_sname));
+	    ld_reloc_sym_name(reld)));
 
 	/*
 	 * Indicate this symbol is being used for relocation and therefore must
@@ -1186,11 +1447,12 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 		sdp->sd_isc->is_file->ifl_flags |= FLG_IF_FILEREF;
 	}
 
-	reld->rel_usym = sdp;
+	if (!ld_reloc_set_aux_usym(ofl, reld, sdp))
+		return (S_ERROR);
 
 	/*
 	 * Determine if this symbol is actually an alias to another symbol.  If
-	 * so, and the alias is not REF_DYN_SEEN, set rel_usym to point to the
+	 * so, and the alias is not REF_DYN_SEEN, set ra_usym to point to the
 	 * weak symbols strong counter-part.  The one exception is if the
 	 * FLG_SY_MVTOCOMM flag is set on the weak symbol.  If this is the case,
 	 * the strong is only here because of its promotion, and the weak symbol
@@ -1204,8 +1466,9 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 		Sym_desc	*_sdp;
 
 		_sdp = sdp->sd_file->ifl_oldndx[sap->sa_linkndx];
-		if (_sdp->sd_ref != REF_DYN_SEEN)
-			reld->rel_usym = _sdp;
+		if ((_sdp->sd_ref != REF_DYN_SEEN) &&
+		    !ld_reloc_set_aux_usym(ofl, reld, _sdp))
+			return (S_ERROR);
 	}
 
 	/*
@@ -1307,7 +1570,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 		 * The above test is relaxed if the target section is
 		 * non-allocable.
 		 */
-		if (reld->rel_osdesc->os_shdr->sh_flags & SHF_ALLOC) {
+		if (RELAUX_GET_OSDESC(reld)->os_shdr->sh_flags & SHF_ALLOC) {
 			Ifl_desc	*ifl = reld->rel_isdesc->is_file;
 
 			eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -1594,13 +1857,11 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	 * rather than from a symbol value.
 	 */
 	if (IS_REGISTER(rtype) && (rsndx == 0)) {
-		reld->rel_sym = 0;
-		reld->rel_sname = MSG_ORIG(MSG_STR_EMPTY);
-
+		reld->rel_sym = NULL;
 		DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD,
 		    ld_targ.t_m.m_mach, isp->is_shdr->sh_type,
 		    (void *)reloc, isp->is_name, isp->is_scnndx,
-		    reld->rel_sname));
+		    ld_reloc_sym_name(reld)));
 		if (ld_targ.t_mr.mr_reloc_register == NULL) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_REL_NOREG));
@@ -1610,31 +1871,23 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	}
 
 	/*
-	 * Come up with a descriptive name for the symbol:
-	 *	- If it is a named symbol, use the name as is
-	 *	- If it is an STT_SECTION symbol, generate a descriptive
-	 *		string that incorporates the section name.
-	 *	- Otherwise, supply an "unknown" string.
-	 * Note that bogus relocations can result in a null symbol descriptor
-	 * (sdp), the error condition should be caught below after determining
-	 * whether a valid symbol name exists.
+	 * If this is a STT_SECTION symbol, make sure the associated
+	 * section has a descriptive non-NULL is_sym_name field that can
+	 * be accessed by ld_reloc_sym_name() to satisfy debugging output
+	 * and errors.
+	 *
+	 * In principle, we could add this string to every input section
+	 * as it is created, but we defer it until we see a relocation
+	 * symbol that might need it. Not every section will have such
+	 * a relocation, so we create fewer of them this way.
 	 */
-	sdp = ifl->ifl_oldndx[rsndx];
-	if ((sdp != NULL) && sdp->sd_name && *sdp->sd_name) {
-		reld->rel_sname = sdp->sd_name;
-	} else if ((sdp != NULL) &&
+	sdp = reld->rel_sym = ifl->ifl_oldndx[rsndx];
+	if ((sdp != NULL) &&
 	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) &&
-	    (sdp->sd_isc != NULL) && (sdp->sd_isc->is_name != NULL)) {
-		if ((reld->rel_sname = ld_stt_section_sym_name(sdp->sd_isc)) ==
-		    NULL)
-			return (S_ERROR);
-	} else {
-		static char *strunknown;
-
-		if (strunknown == 0)
-			strunknown = (char *)MSG_INTL(MSG_STR_UNKNOWN);
-		reld->rel_sname = strunknown;
-	}
+	    (sdp->sd_isc != NULL) && (sdp->sd_isc->is_name != NULL) &&
+	    (sdp->sd_isc->is_sym_name == NULL) &&
+	    (ld_stt_section_sym_name(sdp->sd_isc) == NULL))
+		return (S_ERROR);
 
 	/*
 	 * If for some reason we have a null relocation record issue a
@@ -1645,7 +1898,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 		DBG_CALL(Dbg_reloc_in(ofl->ofl_lml, ELF_DBG_LD,
 		    ld_targ.t_m.m_mach, ld_targ.t_m.m_rel_sht_type,
 		    (void *)reloc, isp->is_name, isp->is_scnndx,
-		    reld->rel_sname));
+		    ld_reloc_sym_name(reld)));
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_NULL),
 		    ifl->ifl_name, EC_WORD(isp->is_scnndx), isp->is_name);
 		return (1);
@@ -1725,12 +1978,12 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 					    ifl->ifl_name,
 					    EC_WORD(isp->is_scnndx),
 					    isp->is_name,
-					    demangle(reld->rel_sname),
+					    ld_reloc_sym_name(reld),
 					    EC_WORD(sdp->sd_isc->is_scnndx),
 					    sdp->sd_isc->is_name);
 				return (1);
 			}
-		} else if (reld->rel_sname == sdp->sd_name)
+		} else if ((sdp != NULL) && sdp->sd_name && *sdp->sd_name)
 			nsdp = ld_sym_find(sdp->sd_name, SYM_NOHASH, NULL, ofl);
 
 		if (nsdp == NULL) {
@@ -1739,12 +1992,17 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 			    reld->rel_rtype, 0, &inv_buf), ifl->ifl_name,
 			    EC_WORD(isp->is_scnndx), isp->is_name,
-			    demangle(reld->rel_sname),
+			    ld_reloc_sym_name(reld),
 			    EC_WORD(sdp->sd_isc->is_scnndx),
 			    sdp->sd_isc->is_name);
 			return (S_ERROR);
 		}
 		ifl->ifl_oldndx[rsndx] = sdp = nsdp;
+		if ((ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) &&
+		    (sdp->sd_isc != NULL) && (sdp->sd_isc->is_name != NULL) &&
+		    (sdp->sd_isc->is_sym_name == NULL) &&
+		    (ld_stt_section_sym_name(sdp->sd_isc) == NULL))
+			return (S_ERROR);
 	}
 
 	/*
@@ -1787,7 +2045,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_UNKNWSYM),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
 		    0, &inv_buf), ifl->ifl_name, EC_WORD(isp->is_scnndx),
-		    isp->is_name, demangle(reld->rel_sname),
+		    isp->is_name, ld_reloc_sym_name(reld),
 		    EC_XWORD(reloc->r_offset), EC_WORD(rsndx));
 		return (S_ERROR);
 	}
@@ -1808,6 +2066,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	}
 
 	reld->rel_sym = sdp;
+	if (reld->rel_aux)
+		reld->rel_aux->ra_usym = sdp;
 	return (ld_process_sym_reloc(ofl, reld, reloc, isp, isp->is_name,
 	    isp->is_scnndx));
 }
@@ -1820,6 +2080,7 @@ reloc_section(Ofl_desc *ofl, Is_desc *isect, Is_desc *rsect, Os_desc *osect)
 	Xword		rsize;		/* size of relocation section data */
 	Xword		entsize;	/* size of relocation entry */
 	Rel_desc	reld;		/* relocation descriptor */
+	Rel_aux	rel_aux;
 	Shdr *		shdr;
 	Word		flags = 0;
 	uintptr_t	ret = 1;
@@ -1841,9 +2102,10 @@ reloc_section(Ofl_desc *ofl, Is_desc *isect, Is_desc *rsect, Os_desc *osect)
 	/*
 	 * Build up the basic information in for the Rel_desc structure.
 	 */
-	reld.rel_osdesc = osect;
 	reld.rel_isdesc = isect;
-	reld.rel_move = 0;
+	reld.rel_aux = &rel_aux;
+	ld_init_rel_aux(&reld);
+	rel_aux.ra_osdesc = osect;
 
 	if ((ofl->ofl_flags & FLG_OF_RELOBJ) ||
 	    (osect && (osect->os_sgdesc->sg_phdr.p_type == PT_LOAD)))
@@ -1866,7 +2128,18 @@ reloc_section(Ofl_desc *ofl, Is_desc *isect, Is_desc *rsect, Os_desc *osect)
 		 * relocation records processing.
 		 */
 		reld.rel_flags = flags;
-		rsndx = (*ld_targ.t_mr.mr_init_rel)(&reld, (void *)reloc);
+		rsndx = (*ld_targ.t_mr.mr_init_rel)(&reld,
+		    &rel_aux.ra_typedata, (void *)reloc);
+
+		/*
+		 * Determine whether or not to pass an auxiliary block
+		 * in with this Rel_desc. It is not needed if both the
+		 * osdesc and typedata fields have default values.
+		 */
+		reld.rel_aux =
+		    (RELAUX_ISDEFAULT_OSDESC(&reld, rel_aux.ra_osdesc) &&
+		    RELAUX_ISDEFAULT_TYPEDATA(&reld, rel_aux.ra_typedata)) ?
+		    NULL : &rel_aux;
 
 		if (process_reld(ofl, rsect, &reld, rsndx, reloc) == S_ERROR)
 			ret = S_ERROR;
@@ -1976,6 +2249,7 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 	Rel		*rend, *reloc;
 	Xword 		rsize, entsize;
 	Rel_desc 	reld;
+	Rel_aux	rel_aux;
 
 	rsize = rsect->is_shdr->sh_size;
 	reloc = (Rel *)rsect->is_indata->d_buf;
@@ -1993,6 +2267,13 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 	}
 
 	/*
+	 * The requirement for move data ensures that we have to supply a
+	 * Rel_aux auxiliary block.
+	 */
+	reld.rel_aux = &rel_aux;
+	ld_init_rel_aux(&reld);
+
+	/*
 	 * Go through the relocation entries.
 	 */
 	for (rend = (Rel *)((uintptr_t)reloc + (uintptr_t)rsize);
@@ -2006,20 +2287,22 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 		 * Initialize the relocation record information.
 		 */
 		reld.rel_flags = FLG_REL_LOAD;
-		rsndx = (*ld_targ.t_mr.mr_init_rel)(&reld, (void *)reloc);
+		rsndx = (*ld_targ.t_mr.mr_init_rel)(&reld,
+		    &rel_aux.ra_typedata, (void *)reloc);
 
 		if (((mvp = get_move_entry(rsect, reloc->r_offset)) == NULL) ||
-		    ((reld.rel_move = libld_malloc(sizeof (Mv_reloc))) == NULL))
+		    ((rel_aux.ra_move =
+		    libld_malloc(sizeof (Mv_reloc))) == NULL))
 			return (S_ERROR);
 
 		psdp = file->ifl_oldndx[ELF_M_SYM(mvp->m_info)];
-		reld.rel_move->mr_move = mvp;
-		reld.rel_move->mr_sym = psdp;
+		rel_aux.ra_move->mr_move = mvp;
+		rel_aux.ra_move->mr_sym = psdp;
 
 		if (psdp->sd_flags & FLG_SY_PAREXPN) {
 			int	_num, num = mvp->m_repeat;
 
-			reld.rel_osdesc = ofl->ofl_isparexpn->is_osdesc;
+			rel_aux.ra_osdesc = ofl->ofl_isparexpn->is_osdesc;
 			reld.rel_isdesc = ofl->ofl_isparexpn;
 			reld.rel_roffset = mvp->m_poffset;
 
@@ -2040,7 +2323,7 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 			 * Generate Reld
 			 */
 			reld.rel_flags |= FLG_REL_MOVETAB;
-			reld.rel_osdesc = ofl->ofl_osmove;
+			rel_aux.ra_osdesc = ofl->ofl_osmove;
 			reld.rel_isdesc = ld_os_first_isdesc(ofl->ofl_osmove);
 
 			if (process_reld(ofl,
@@ -2228,7 +2511,7 @@ static uintptr_t
 do_sorted_outrelocs(Ofl_desc *ofl)
 {
 	Rel_desc	*orsp;
-	Rel_cache	*rcp;
+	Rel_cachebuf	*rcbp;
 	Aliste		idx;
 	Reloc_list	*sorted_list;
 	Word		index = 0;
@@ -2251,59 +2534,52 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 	 * relocations is used by ld.so.1 to determine what symbol a PLT
 	 * relocation is against.
 	 */
-	for (APLIST_TRAVERSE(ofl->ofl_outrels, idx, rcp)) {
-		/*LINTED*/
-		for (orsp = (Rel_desc *)(rcp + 1);
-		    orsp < rcp->rc_free; orsp++) {
-			if (debug == 0) {
-				DBG_CALL(Dbg_reloc_dooutrel(ofl->ofl_lml,
-				    ld_targ.t_m.m_rel_sht_type));
-				debug = 1;
-			}
-
-			/*
-			 * If it's a PLT relocation we output it now in the
-			 * order that it was originally processed.
-			 */
-			if (orsp->rel_flags & FLG_REL_PLT) {
-				if ((*ld_targ.t_mr.mr_perform_outreloc)(orsp,
-				    ofl) == S_ERROR)
-					error = S_ERROR;
-				continue;
-			}
-
-			if ((orsp->rel_rtype == ld_targ.t_m.m_r_relative) ||
-			    (orsp->rel_rtype == ld_targ.t_m.m_r_register)) {
-				sorted_list[index].rl_key1 = 0;
-				sorted_list[index].rl_key2 =
-				    /* LINTED */
-				    (Sym_desc *)(uintptr_t)orsp->rel_rtype;
-			} else {
-				sorted_list[index].rl_key1 =
-				    orsp->rel_sym->sd_file->ifl_neededndx;
-				sorted_list[index].rl_key2 =
-				    orsp->rel_sym;
-			}
-
-			if (orsp->rel_flags & FLG_REL_GOT)
-				sorted_list[index].rl_key3 =
-				    (*ld_targ.t_mr.mr_calc_got_offset)(orsp,
-				    ofl);
-			else {
-				if (orsp->rel_rtype == ld_targ.t_m.m_r_register)
-					sorted_list[index].rl_key3 = 0;
-				else {
-					sorted_list[index].rl_key3 =
-					    orsp->rel_roffset +
-					    (Xword)_elf_getxoff(orsp->
-					    rel_isdesc->is_indata) +
-					    orsp->rel_isdesc->is_osdesc->
-					    os_shdr->sh_addr;
-				}
-			}
-
-			sorted_list[index++].rl_rsp = orsp;
+	REL_CACHE_TRAVERSE(&ofl->ofl_outrels, idx, rcbp, orsp) {
+		if (debug == 0) {
+			DBG_CALL(Dbg_reloc_dooutrel(ofl->ofl_lml,
+			    ld_targ.t_m.m_rel_sht_type));
+			debug = 1;
 		}
+
+		/*
+		 * If it's a PLT relocation we output it now in the
+		 * order that it was originally processed.
+		 */
+		if (orsp->rel_flags & FLG_REL_PLT) {
+			if ((*ld_targ.t_mr.mr_perform_outreloc)(orsp, ofl) ==
+			    S_ERROR)
+				error = S_ERROR;
+			continue;
+		}
+
+		if ((orsp->rel_rtype == ld_targ.t_m.m_r_relative) ||
+		    (orsp->rel_rtype == ld_targ.t_m.m_r_register)) {
+			sorted_list[index].rl_key1 = 0;
+			sorted_list[index].rl_key2 =
+			    /* LINTED */
+			    (Sym_desc *)(uintptr_t)orsp->rel_rtype;
+		} else {
+			sorted_list[index].rl_key1 =
+			    orsp->rel_sym->sd_file->ifl_neededndx;
+			sorted_list[index].rl_key2 = orsp->rel_sym;
+		}
+
+		if (orsp->rel_flags & FLG_REL_GOT) {
+			sorted_list[index].rl_key3 =
+			    (*ld_targ.t_mr.mr_calc_got_offset)(orsp, ofl);
+		} else {
+			if (orsp->rel_rtype == ld_targ.t_m.m_r_register) {
+					sorted_list[index].rl_key3 = 0;
+			} else {
+				sorted_list[index].rl_key3 = orsp->rel_roffset +
+				    (Xword)_elf_getxoff(orsp->
+				    rel_isdesc->is_indata) +
+				    orsp->rel_isdesc->is_osdesc->
+				    os_shdr->sh_addr;
+			}
+		}
+
+		sorted_list[index++].rl_rsp = orsp;
 	}
 
 	qsort(sorted_list, (size_t)ofl->ofl_reloccnt, sizeof (Reloc_list),
@@ -2526,7 +2802,7 @@ ld_reloc_remain_entry(Rel_desc *orsp, Os_desc *osp, Ofl_desc *ofl)
 	}
 
 	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_REL_REMAIN_2),
-	    demangle(orsp->rel_sname), EC_OFF(orsp->rel_roffset),
+	    ld_reloc_sym_name(orsp), EC_OFF(orsp->rel_roffset),
 	    orsp->rel_isdesc->is_file->ifl_name);
 }
 
@@ -2608,8 +2884,8 @@ newroffset_for_move(Sym_desc *sdp, Move *mvp, Xword offset1, Xword *offset2)
 void
 ld_adj_movereloc(Ofl_desc *ofl, Rel_desc *arsp)
 {
-	Move		*move = arsp->rel_move->mr_move;
-	Sym_desc	*psdp = arsp->rel_move->mr_sym;
+	Move		*move = arsp->rel_aux->ra_move->mr_move;
+	Sym_desc	*psdp = arsp->rel_aux->ra_move->mr_sym;
 	Xword		newoffset;
 
 	if (arsp->rel_flags & FLG_REL_MOVETAB) {
@@ -2676,7 +2952,7 @@ ld_swap_reloc_data(Ofl_desc *ofl, Rel_desc *rsp)
 	 * automatically xlate.
 	 */
 	if ((ofl->ofl_flags1 & FLG_OF1_ENCDIFF) != 0) {
-		switch (rsp->rel_osdesc->os_shdr->sh_type) {
+		switch (RELAUX_GET_OSDESC(rsp)->os_shdr->sh_type) {
 		case SHT_PROGBITS:
 			return (1);
 
@@ -2760,8 +3036,7 @@ ld_reloc_targval_get(Ofl_desc *ofl, Rel_desc *rsp, uchar_t *data, Xword *value)
 			    MSG_INTL(MSG_REL_UNSUPSZ),
 			    conv_reloc_type(ld_targ.t_m.m_mach, rsp->rel_rtype,
 			    0, &inv_buf), rsp->rel_isdesc->is_file->ifl_name,
-			    (rsp->rel_sname ? demangle(rsp->rel_sname) :
-			    MSG_INTL(MSG_STR_UNKNOWN)), (int)rep->re_fsize);
+			    ld_reloc_sym_name(rsp), (int)rep->re_fsize);
 		}
 		return (0);
 	}
@@ -2825,8 +3100,7 @@ ld_reloc_targval_set(Ofl_desc *ofl, Rel_desc *rsp, uchar_t *data, Xword value)
 			    MSG_INTL(MSG_REL_UNSUPSZ),
 			    conv_reloc_type(ld_targ.t_m.m_mach, rsp->rel_rtype,
 			    0, &inv_buf), rsp->rel_isdesc->is_file->ifl_name,
-			    (rsp->rel_sname ? demangle(rsp->rel_sname) :
-			    MSG_INTL(MSG_STR_UNKNOWN)), (int)rep->re_fsize);
+			    ld_reloc_sym_name(rsp), (int)rep->re_fsize);
 		}
 		return (0);
 	}

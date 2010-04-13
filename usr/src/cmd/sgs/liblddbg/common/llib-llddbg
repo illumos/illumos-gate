@@ -22,8 +22,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -291,10 +290,10 @@ void	Dbg32_reloc_copy(Rt_map *, Rt_map *, const char *, int);
 void	Dbg64_reloc_copy(Rt_map *, Rt_map *, const char *, int);
 void	Dbg32_reloc_discard(Lm_list *, Elf32_Half, Rel_desc *);
 void	Dbg64_reloc_discard(Lm_list *, Elf64_Half, Rel_desc *);
-void	Dbg32_reloc_doact(Lm_list *, int, Elf32_Half, Elf32_Word, Elf32_Word,
-	    Elf32_Word, Elf32_Word, const char *, Os_desc *);
-void	Dbg64_reloc_doact(Lm_list *, int, Elf64_Half, Elf64_Word, Elf64_Word,
-	    Elf64_Xword, Elf64_Xword, const char *, Os_desc *);
+void	Dbg32_reloc_doact(Lm_list *, int, Elf32_Half, Elf32_Word, Rel_desc *,
+	    Elf32_Word, Elf32_Word, rel_desc_sname_func_t);
+void	Dbg64_reloc_doact(Lm_list *, int, Elf64_Half, Elf64_Word, Rel_desc *,
+	    Elf64_Xword, Elf64_Xword, rel_desc_sname_func_t);
 void	Dbg32_reloc_doact_title(Lm_list *);
 void	Dbg64_reloc_doact_title(Lm_list *);
 void	Dbg32_reloc_dooutrel(Lm_list *, Elf32_Word);
@@ -323,8 +322,10 @@ void	Dbg32_reloc_proc(Lm_list *, Os_desc *, Is_desc *, Is_desc *);
 void	Dbg64_reloc_proc(Lm_list *, Os_desc *, Is_desc *, Is_desc *);
 void	Dbg32_reloc_run(Rt_map *, uint_t, int, int);
 void	Dbg64_reloc_run(Rt_map *, uint_t, int, int);
-void	Dbg32_reloc_transition(Lm_list *, Elf32_Half, Elf32_Word, Rel_desc *);
-void	Dbg64_reloc_transition(Lm_list *, Elf64_Half, Elf64_Word, Rel_desc *);
+void	Dbg32_reloc_transition(Lm_list *, Elf32_Half, Elf32_Word, Rel_desc *,
+	    rel_desc_sname_func_t);
+void	Dbg64_reloc_transition(Lm_list *, Elf64_Half, Elf64_Word, Rel_desc *,
+	    rel_desc_sname_func_t);
 
 void	Dbg32_sec_added(Lm_list *, Os_desc *, Sg_desc *);
 void	Dbg64_sec_added(Lm_list *, Os_desc *, Sg_desc *);

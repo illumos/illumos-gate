@@ -24,8 +24,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Get the x86 version of the relocation engine */
@@ -91,7 +90,7 @@ ld_calc_got_offset(Rel_desc *rdesc, Ofl_desc *ofl)
 }
 
 static Word
-ld_init_rel(Rel_desc *reld, void *reloc)
+ld_init_rel(Rel_desc *reld, Word *typedata, void *reloc)
 {
 	Rel	*rel = (Rel *)reloc;
 
@@ -99,7 +98,7 @@ ld_init_rel(Rel_desc *reld, void *reloc)
 	reld->rel_rtype = (Word)ELF_R_TYPE(rel->r_info, M_MACH);
 	reld->rel_roffset = rel->r_offset;
 	reld->rel_raddend = 0;
-	reld->rel_typedata = 0;
+	*typedata = 0;
 
 	return ((Word)ELF_R_SYM(rel->r_info));
 }
@@ -249,7 +248,7 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 	 * If this is a relocation against a move table, or expanded move
 	 * table, adjust the relocation entries.
 	 */
-	if (orsp->rel_move)
+	if (RELAUX_GET_MOVE(orsp))
 		ld_adj_movereloc(ofl, orsp);
 
 	/*
@@ -296,7 +295,7 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 		osp = ofl->ofl_isbss->is_osdesc;
 		roffset = (Word)value;
 	} else {
-		osp = orsp->rel_osdesc;
+		osp = RELAUX_GET_OSDESC(orsp);
 
 		/*
 		 * Calculate virtual offset of reference point; equals offset
@@ -351,7 +350,7 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 		 */
 		addr = (uchar_t *)((uintptr_t)orsp->rel_roffset +
 		    (uintptr_t)_elf_getxoff(orsp->rel_isdesc->is_indata));
-		addr += (uintptr_t)orsp->rel_osdesc->os_outdata->d_buf;
+		addr += (uintptr_t)RELAUX_GET_OSDESC(orsp)->os_outdata->d_buf;
 		if (ld_reloc_targval_set(ofl, orsp, addr, addend) == 0)
 			return (S_ERROR);
 	}
@@ -361,7 +360,7 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 	rea.r_info = ELF_R_INFO(ndx, orsp->rel_rtype);
 	rea.r_offset = roffset;
 	DBG_CALL(Dbg_reloc_out(ofl, ELF_DBG_LD, SHT_REL, &rea, relosp->os_name,
-	    orsp->rel_sname));
+	    ld_reloc_sym_name(orsp)));
 
 	/*
 	 * Assert we haven't walked off the end of our relocation table.
@@ -447,7 +446,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 
 	offset = (uchar_t *)((uintptr_t)arsp->rel_roffset +
 	    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->is_indata) +
-	    (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
+	    (uintptr_t)RELAUX_GET_OSDESC(arsp)->os_outdata->d_buf);
 
 	if (sdp->sd_ref == REF_DYN_NEED) {
 		/*
@@ -465,7 +464,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 			 *	0x6 addl x@gotntpoff(r1), %eax
 			 */
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-			    R_386_TLS_GOTIE, arsp));
+			    R_386_TLS_GOTIE, arsp, ld_reloc_sym_name));
 			arsp->rel_rtype = R_386_TLS_GOTIE;
 			arsp->rel_roffset += 5;
 
@@ -490,7 +489,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 			 * Fixup done via the TLS_GD relocation
 			 */
 			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-			    R_386_NONE, arsp));
+			    R_386_NONE, arsp, ld_reloc_sym_name));
 			return (FIX_DONE);
 		}
 	}
@@ -512,7 +511,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 *	0xc
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    R_386_TLS_LE, arsp));
+		    R_386_TLS_LE, arsp, ld_reloc_sym_name));
 
 		arsp->rel_rtype = R_386_TLS_LE;
 		arsp->rel_roffset += 4;
@@ -532,12 +531,12 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 * Fixup done via the TLS_GD relocation
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    R_386_NONE, arsp));
+		    R_386_NONE, arsp, ld_reloc_sym_name));
 		return (FIX_DONE);
 
 	case R_386_TLS_LDM_PLT:
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    R_386_NONE, arsp));
+		    R_386_NONE, arsp, ld_reloc_sym_name));
 
 		/*
 		 * Transition:
@@ -558,7 +557,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 
 	case R_386_TLS_LDM:
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    R_386_NONE, arsp));
+		    R_386_NONE, arsp, ld_reloc_sym_name));
 
 		/*
 		 * Transition:
@@ -586,7 +585,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		offset -= 2;
 
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    R_386_TLS_LE, arsp));
+		    R_386_TLS_LE, arsp, ld_reloc_sym_name));
 		arsp->rel_rtype = R_386_TLS_LE;
 		return (FIX_RELOC);
 
@@ -616,7 +615,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 * Note: reg1 != 4 (%esp)
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
-		    R_386_TLS_LE, arsp));
+		    R_386_TLS_LE, arsp, ld_reloc_sym_name));
 		arsp->rel_rtype = R_386_TLS_LE;
 
 		offset -= 2;
@@ -646,7 +645,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 			    MSG_INTL(MSG_REL_BADTLSINS),
 			    conv_reloc_386_type(arsp->rel_rtype, 0, &inv_buf),
 			    arsp->rel_isdesc->is_file->ifl_name,
-			    demangle(arsp->rel_sname),
+			    ld_reloc_sym_name(arsp),
 			    arsp->rel_isdesc->is_name,
 			    EC_OFF(arsp->rel_roffset));
 		}
@@ -713,7 +712,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 			    MSG_INTL(MSG_REL_BADTLSINS),
 			    conv_reloc_386_type(arsp->rel_rtype, 0, &inv_buf),
 			    arsp->rel_isdesc->is_file->ifl_name,
-			    demangle(arsp->rel_sname),
+			    ld_reloc_sym_name(arsp),
 			    arsp->rel_isdesc->is_name,
 			    EC_OFF(arsp->rel_roffset));
 		}
@@ -726,417 +725,381 @@ static uintptr_t
 ld_do_activerelocs(Ofl_desc *ofl)
 {
 	Rel_desc	*arsp;
-	Rel_cache	*rcp;
+	Rel_cachebuf	*rcbp;
 	Aliste		idx;
 	uintptr_t	return_code = 1;
 	ofl_flag_t	flags = ofl->ofl_flags;
 
-	if (ofl->ofl_actrels)
+	if (aplist_nitems(ofl->ofl_actrels.rc_list) != 0)
 		DBG_CALL(Dbg_reloc_doact_title(ofl->ofl_lml));
 
 	/*
 	 * Process active relocations.
 	 */
-	for (APLIST_TRAVERSE(ofl->ofl_actrels, idx, rcp)) {
-		/* LINTED */
-		for (arsp = (Rel_desc *)(rcp + 1);
-		    arsp < rcp->rc_free; arsp++) {
-			uchar_t		*addr;
-			Xword 		value;
-			Sym_desc	*sdp;
-			const char	*ifl_name;
-			Xword		refaddr;
-			int		moved = 0;
-			Gotref		gref;
+	REL_CACHE_TRAVERSE(&ofl->ofl_actrels, idx, rcbp, arsp) {
+		uchar_t		*addr;
+		Xword 		value;
+		Sym_desc	*sdp;
+		const char	*ifl_name;
+		Xword		refaddr;
+		int		moved = 0;
+		Gotref		gref;
+		Os_desc		*osp;
 
-			/*
-			 * If the section this relocation is against has been
-			 * discarded (-zignore), then discard (skip) the
-			 * relocation itself.
-			 */
-			if ((arsp->rel_isdesc->is_flags & FLG_IS_DISCARD) &&
-			    ((arsp->rel_flags &
-			    (FLG_REL_GOT | FLG_REL_BSS |
-			    FLG_REL_PLT | FLG_REL_NOINFO)) == 0)) {
-				DBG_CALL(Dbg_reloc_discard(ofl->ofl_lml,
-				    M_MACH, arsp));
+		/*
+		 * If the section this relocation is against has been discarded
+		 * (-zignore), then discard (skip) the relocation itself.
+		 */
+		if ((arsp->rel_isdesc->is_flags & FLG_IS_DISCARD) &&
+		    ((arsp->rel_flags & (FLG_REL_GOT | FLG_REL_BSS |
+		    FLG_REL_PLT | FLG_REL_NOINFO)) == 0)) {
+			DBG_CALL(Dbg_reloc_discard(ofl->ofl_lml, M_MACH, arsp));
+			continue;
+		}
+
+		/*
+		 * We determine what the 'got reference' model (if required)
+		 * is at this point.  This needs to be done before tls_fixup()
+		 * since it may 'transition' our instructions.
+		 *
+		 * The got table entries have already been assigned,
+		 * and we bind to those initial entries.
+		 */
+		if (arsp->rel_flags & FLG_REL_DTLS)
+			gref = GOT_REF_TLSGD;
+		else if (arsp->rel_flags & FLG_REL_MTLS)
+			gref = GOT_REF_TLSLD;
+		else if (arsp->rel_flags & FLG_REL_STLS)
+			gref = GOT_REF_TLSIE;
+		else
+			gref = GOT_REF_GENERIC;
+
+		/*
+		 * Perform any required TLS fixups.
+		 */
+		if (arsp->rel_flags & FLG_REL_TLSFIX) {
+			Fixupret	ret;
+
+			if ((ret = tls_fixups(ofl, arsp)) == FIX_ERROR)
+				return (S_ERROR);
+			if (ret == FIX_DONE)
 				continue;
-			}
+		}
 
+		/*
+		 * If this is a relocation against a move table, or
+		 * expanded move table, adjust the relocation entries.
+		 */
+		if (RELAUX_GET_MOVE(arsp))
+			ld_adj_movereloc(ofl, arsp);
+
+		sdp = arsp->rel_sym;
+		refaddr = arsp->rel_roffset +
+		    (Off)_elf_getxoff(arsp->rel_isdesc->is_indata);
+
+		if (arsp->rel_flags & FLG_REL_CLVAL)
+			value = 0;
+		else if (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) {
 			/*
-			 * We determine what the 'got reference'
-			 * model (if required) is at this point.  This
-			 * needs to be done before tls_fixup() since
-			 * it may 'transition' our instructions.
-			 *
-			 * The got table entries have already been assigned,
-			 * and we bind to those initial entries.
+			 * The value for a symbol pointing to a SECTION
+			 * is based off of that sections position.
 			 */
-			if (arsp->rel_flags & FLG_REL_DTLS)
-				gref = GOT_REF_TLSGD;
-			else if (arsp->rel_flags & FLG_REL_MTLS)
-				gref = GOT_REF_TLSLD;
-			else if (arsp->rel_flags & FLG_REL_STLS)
-				gref = GOT_REF_TLSIE;
-			else
-				gref = GOT_REF_GENERIC;
+			if (sdp->sd_isc->is_flags & FLG_IS_RELUPD) {
+				Sym_desc	*sym;
+				Xword		radd;
+				uchar_t		*raddr = (uchar_t *)
+				    arsp->rel_isdesc->is_indata->d_buf +
+				    arsp->rel_roffset;
 
-			/*
-			 * Perform any required TLS fixups.
-			 */
-			if (arsp->rel_flags & FLG_REL_TLSFIX) {
-				Fixupret	ret;
-
-				if ((ret = tls_fixups(ofl, arsp)) == FIX_ERROR)
-					return (S_ERROR);
-				if (ret == FIX_DONE)
-					continue;
-			}
-
-			/*
-			 * If this is a relocation against a move table, or
-			 * expanded move table, adjust the relocation entries.
-			 */
-			if (arsp->rel_move)
-				ld_adj_movereloc(ofl, arsp);
-
-			sdp = arsp->rel_sym;
-			refaddr = arsp->rel_roffset +
-			    (Off)_elf_getxoff(arsp->rel_isdesc->is_indata);
-
-			if (arsp->rel_flags & FLG_REL_CLVAL)
-				value = 0;
-			else if (ELF_ST_TYPE(sdp->sd_sym->st_info) ==
-			    STT_SECTION) {
 				/*
-				 * The value for a symbol pointing to a SECTION
-				 * is based off of that sections position.
+				 * This is a REL platform. Hence, the second
+				 * argument of ld_am_I_partial() is the value
+				 * stored at the target address where the
+				 * relocation is going to be applied.
 				 */
-				if (sdp->sd_isc->is_flags & FLG_IS_RELUPD) {
-					Sym_desc	*sym;
-					Xword		radd;
-					uchar_t		*raddr = (uchar_t *)
-					    arsp->rel_isdesc->is_indata->d_buf +
-					    arsp->rel_roffset;
+				if (ld_reloc_targval_get(ofl, arsp, raddr,
+				    &radd) == 0)
+					return (S_ERROR);
+				sym = ld_am_I_partial(arsp, radd);
+				if (sym) {
+					Sym	*osym = sym->sd_osym;
 
 					/*
-					 * This is a REL platform. Hence, the
-					 * second argument of ld_am_I_partial()
-					 * is the value stored at the target
-					 * address where the relocation is
-					 * going to be applied.
+					 * The symbol was moved, so adjust the
+					 * value relative to the new section.
 					 */
-					if (ld_reloc_targval_get(ofl, arsp,
-					    raddr, &radd) == 0)
-						return (S_ERROR);
-					sym = ld_am_I_partial(arsp, radd);
-					if (sym) {
-						Sym	*osym = sym->sd_osym;
+					value = sym->sd_sym->st_value;
+					moved = 1;
 
-						/*
-						 * The symbol was moved, so
-						 * adjust the value relative
-						 * to the new section.
-						 */
-						value = sym->sd_sym->st_value;
-						moved = 1;
-
-						/*
-						 * The original raddend covers
-						 * the displacement from the
-						 * section start to the desired
-						 * address. The value computed
-						 * above gets us from the
-						 * section start to the start
-						 * of the symbol range. Adjust
-						 * the old raddend to remove the
-						 * offset from section start to
-						 * symbol start, leaving the
-						 * displacement within the
-						 * range of the symbol.
-						 */
-						if (osym->st_value != 0) {
-							radd -= osym->st_value;
-							if (ld_reloc_targval_set
-							    (ofl, arsp, raddr,
-							    radd) == 0)
-								return (
-								    S_ERROR);
-						}
+					/*
+					 * The original raddend covers the
+					 * displacement from the section start
+					 * to the desired address. The value
+					 * computed above gets us from the
+					 * section start to the start of the
+					 * symbol range. Adjust the old raddend
+					 * to remove the offset from section
+					 * start to symbol start, leaving the
+					 * displacement within the range of
+					 * the symbol.
+					 */
+					if (osym->st_value != 0) {
+						radd -= osym->st_value;
+						if (ld_reloc_targval_set(ofl,
+						    arsp, raddr, radd) == 0)
+							return (S_ERROR);
 					}
 				}
-				if (!moved) {
-					value = _elf_getxoff(
-					    sdp->sd_isc->is_indata);
-					if (sdp->sd_isc->is_shdr->sh_flags &
-					    SHF_ALLOC)
-						value += sdp->sd_isc->
-						    is_osdesc->os_shdr->sh_addr;
-				}
-				if (sdp->sd_isc->is_shdr->sh_flags & SHF_TLS)
-					value -= ofl->ofl_tlsphdr->p_vaddr;
+			}
+			if (!moved) {
+				value = _elf_getxoff(sdp->sd_isc->is_indata);
+				if (sdp->sd_isc->is_shdr->sh_flags & SHF_ALLOC)
+					value += sdp->sd_isc->
+					    is_osdesc->os_shdr->sh_addr;
+			}
+			if (sdp->sd_isc->is_shdr->sh_flags & SHF_TLS)
+				value -= ofl->ofl_tlsphdr->p_vaddr;
 
-			} else if (IS_SIZE(arsp->rel_rtype)) {
-				/*
-				 * Size relocations require the symbols size.
-				 */
-				value = sdp->sd_sym->st_size;
+		} else if (IS_SIZE(arsp->rel_rtype)) {
+			/*
+			 * Size relocations require the symbols size.
+			 */
+			value = sdp->sd_sym->st_size;
 
-			} else if ((sdp->sd_flags & FLG_SY_CAP) &&
-			    sdp->sd_aux && sdp->sd_aux->sa_PLTndx) {
-				/*
-				 * If this relocation is against a capabilities
-				 * symbol, then we need to jump to an associated
-				 * PLT, so that at runtime ld.so.1 is involved
-				 * to determine the best binding choice.
-				 * Otherwise, the value is the symbols value.
-				 */
+		} else if ((sdp->sd_flags & FLG_SY_CAP) &&
+		    sdp->sd_aux && sdp->sd_aux->sa_PLTndx) {
+			/*
+			 * If relocation is against a capabilities symbol, we
+			 * need to jump to an associated PLT, so that at runtime
+			 * ld.so.1 is involved to determine the best binding
+			 * choice. Otherwise, the value is the symbols value.
+			 */
+			value = ld_calc_plt_addr(sdp, ofl);
+
+		} else
+			value = sdp->sd_sym->st_value;
+
+		/*
+		 * Relocation against the GLOBAL_OFFSET_TABLE.
+		 */
+		if ((arsp->rel_flags & FLG_REL_GOT) &&
+		    !ld_reloc_set_aux_osdesc(ofl, arsp, ofl->ofl_osgot))
+			return (S_ERROR);
+		osp = RELAUX_GET_OSDESC(arsp);
+
+		/*
+		 * If loadable and not producing a relocatable object add the
+		 * sections virtual address to the reference address.
+		 */
+		if ((arsp->rel_flags & FLG_REL_LOAD) &&
+		    ((flags & FLG_OF_RELOBJ) == 0))
+			refaddr +=
+			    arsp->rel_isdesc->is_osdesc->os_shdr->sh_addr;
+
+		/*
+		 * If this entry has a PLT assigned to it, its value is actually
+		 * the address of the PLT (and not the address of the function).
+		 */
+		if (IS_PLT(arsp->rel_rtype)) {
+			if (sdp->sd_aux && sdp->sd_aux->sa_PLTndx)
 				value = ld_calc_plt_addr(sdp, ofl);
+		}
 
-			} else
-				value = sdp->sd_sym->st_value;
-
-			/*
-			 * Relocation against the GLOBAL_OFFSET_TABLE.
-			 */
-			if (arsp->rel_flags & FLG_REL_GOT)
-				arsp->rel_osdesc = ofl->ofl_osgot;
-
-			/*
-			 * If loadable and not producing a relocatable object
-			 * add the sections virtual address to the reference
-			 * address.
-			 */
-			if ((arsp->rel_flags & FLG_REL_LOAD) &&
-			    ((flags & FLG_OF_RELOBJ) == 0))
-				refaddr += arsp->rel_isdesc->is_osdesc->
-				    os_shdr->sh_addr;
+		/*
+		 * Determine whether the value needs further adjustment. Filter
+		 * through the attributes of the relocation to determine what
+		 * adjustment is required.  Note, many of the following cases
+		 * are only applicable when a .got is present.  As a .got is
+		 * not generated when a relocatable object is being built,
+		 * any adjustments that require a .got need to be skipped.
+		 */
+		if ((arsp->rel_flags & FLG_REL_GOT) &&
+		    ((flags & FLG_OF_RELOBJ) == 0)) {
+			Xword		R1addr;
+			uintptr_t	R2addr;
+			Word		gotndx;
+			Gotndx		*gnp;
 
 			/*
-			 * If this entry has a PLT assigned to it, it's
-			 * value is actually the address of the PLT (and
-			 * not the address of the function).
+			 * Perform relocation against GOT table.  Since this
+			 * doesn't fit exactly into a relocation we place the
+			 * appropriate byte in the GOT directly
+			 *
+			 * Calculate offset into GOT at which to apply
+			 * the relocation.
 			 */
-			if (IS_PLT(arsp->rel_rtype)) {
-				if (sdp->sd_aux && sdp->sd_aux->sa_PLTndx)
-					value = ld_calc_plt_addr(sdp, ofl);
-			}
+			gnp = ld_find_got_ndx(sdp->sd_GOTndxs, gref, ofl, NULL);
+			assert(gnp);
 
-			/*
-			 * Determine whether the value needs further adjustment.
-			 * Filter through the attributes of the relocation to
-			 * determine what adjustment is required.  Note, many
-			 * of the following cases are only applicable when a
-			 * .got is present.  As a .got is not generated when a
-			 * relocatable object is being built, any adjustments
-			 * that require a .got need to be skipped.
-			 */
-			if ((arsp->rel_flags & FLG_REL_GOT) &&
-			    ((flags & FLG_OF_RELOBJ) == 0)) {
-				Xword		R1addr;
-				uintptr_t	R2addr;
-				Word		gotndx;
-				Gotndx		*gnp;
-
-				/*
-				 * Perform relocation against GOT table.  Since
-				 * this doesn't fit exactly into a relocation
-				 * we place the appropriate byte in the GOT
-				 * directly
-				 *
-				 * Calculate offset into GOT at which to apply
-				 * the relocation.
-				 */
-				gnp = ld_find_got_ndx(sdp->sd_GOTndxs, gref,
-				    ofl, NULL);
-				assert(gnp);
-
-				if (arsp->rel_rtype == R_386_TLS_DTPOFF32)
-					gotndx = gnp->gn_gotndx + 1;
-				else
-					gotndx = gnp->gn_gotndx;
-
-				R1addr = (Xword)(gotndx * M_GOT_ENTSIZE);
-
-				/*
-				 * Add the GOTs data's offset.
-				 */
-				R2addr = R1addr + (uintptr_t)
-				    arsp->rel_osdesc->os_outdata->d_buf;
-
-				DBG_CALL(Dbg_reloc_doact(ofl->ofl_lml,
-				    ELF_DBG_LD_ACT, M_MACH, SHT_REL,
-				    arsp->rel_rtype, R1addr, value,
-				    arsp->rel_sname, arsp->rel_osdesc));
-
-				/*
-				 * And do it.
-				 */
-				if (ofl->ofl_flags1 & FLG_OF1_ENCDIFF)
-					*(Xword *)R2addr =
-					    ld_bswap_Xword(value);
-				else
-					*(Xword *)R2addr = value;
-				continue;
-
-			} else if (IS_GOT_BASED(arsp->rel_rtype) &&
-			    ((flags & FLG_OF_RELOBJ) == 0)) {
-				value -= ofl->ofl_osgot->os_shdr->sh_addr;
-
-			} else if (IS_GOT_PC(arsp->rel_rtype) &&
-			    ((flags & FLG_OF_RELOBJ) == 0)) {
-				value =
-				    (Xword)(ofl->ofl_osgot->os_shdr->sh_addr) -
-				    refaddr;
-
-			} else if ((IS_PC_RELATIVE(arsp->rel_rtype)) &&
-			    (((flags & FLG_OF_RELOBJ) == 0) ||
-			    (arsp->rel_osdesc == sdp->sd_isc->is_osdesc))) {
-				value -= refaddr;
-
-			} else if (IS_TLS_INS(arsp->rel_rtype) &&
-			    IS_GOT_RELATIVE(arsp->rel_rtype) &&
-			    ((flags & FLG_OF_RELOBJ) == 0)) {
-				Gotndx	*gnp;
-
-				gnp = ld_find_got_ndx(sdp->sd_GOTndxs, gref,
-				    ofl, NULL);
-				assert(gnp);
-				value = (Xword)gnp->gn_gotndx * M_GOT_ENTSIZE;
-				if (arsp->rel_rtype == R_386_TLS_IE) {
-					value +=
-					    ofl->ofl_osgot->os_shdr->sh_addr;
-				}
-
-			} else if (IS_GOT_RELATIVE(arsp->rel_rtype) &&
-			    ((flags & FLG_OF_RELOBJ) == 0)) {
-				Gotndx *gnp;
-
-				gnp = ld_find_got_ndx(sdp->sd_GOTndxs,
-				    GOT_REF_GENERIC, ofl, NULL);
-				assert(gnp);
-				value = (Xword)gnp->gn_gotndx * M_GOT_ENTSIZE;
-
-			} else if ((arsp->rel_flags & FLG_REL_STLS) &&
-			    ((flags & FLG_OF_RELOBJ) == 0)) {
-				Xword	tlsstatsize;
-
-				/*
-				 * This is the LE TLS reference model.  Static
-				 * offset is hard-coded.
-				 */
-				tlsstatsize =
-				    S_ROUND(ofl->ofl_tlsphdr->p_memsz,
-				    M_TLSSTATALIGN);
-				value = tlsstatsize - value;
-
-				/*
-				 * Since this code is fixed up, it assumes a
-				 * negative offset that can be added to the
-				 * thread pointer.
-				 */
-				if ((arsp->rel_rtype == R_386_TLS_LDO_32) ||
-				    (arsp->rel_rtype == R_386_TLS_LE))
-					value = -value;
-			}
-
-			if (arsp->rel_isdesc->is_file)
-				ifl_name = arsp->rel_isdesc->is_file->ifl_name;
+			if (arsp->rel_rtype == R_386_TLS_DTPOFF32)
+				gotndx = gnp->gn_gotndx + 1;
 			else
-				ifl_name = MSG_INTL(MSG_STR_NULL);
+				gotndx = gnp->gn_gotndx;
+
+			R1addr = (Xword)(gotndx * M_GOT_ENTSIZE);
 
 			/*
-			 * Make sure we have data to relocate.  Compiler and
-			 * assembler developers have been known to generate
-			 * relocations against invalid sections (normally .bss),
-			 * so for their benefit give them sufficient information
-			 * to help analyze the problem.  End users should never
-			 * see this.
+			 * Add the GOTs data's offset.
 			 */
-			if (arsp->rel_isdesc->is_indata->d_buf == 0) {
-				Conv_inv_buf_t	inv_buf;
-
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_REL_EMPTYSEC),
-				    conv_reloc_386_type(arsp->rel_rtype,
-				    0, &inv_buf),
-				    ifl_name, demangle(arsp->rel_sname),
-				    EC_WORD(arsp->rel_isdesc->is_scnndx),
-				    arsp->rel_isdesc->is_name);
-				return (S_ERROR);
-			}
-
-			/*
-			 * Get the address of the data item we need to modify.
-			 */
-			addr = (uchar_t *)((uintptr_t)arsp->rel_roffset +
-			    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->
-			    is_indata));
+			R2addr = R1addr + (uintptr_t)osp->os_outdata->d_buf;
 
 			DBG_CALL(Dbg_reloc_doact(ofl->ofl_lml, ELF_DBG_LD_ACT,
-			    M_MACH, SHT_REL, arsp->rel_rtype, EC_NATPTR(addr),
-			    value, arsp->rel_sname, arsp->rel_osdesc));
-			addr += (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf;
-
-			if ((((uintptr_t)addr - (uintptr_t)ofl->ofl_nehdr) >
-			    ofl->ofl_size) || (arsp->rel_roffset >
-			    arsp->rel_osdesc->os_shdr->sh_size)) {
-				Conv_inv_buf_t	inv_buf;
-				int		class;
-
-				if (((uintptr_t)addr -
-				    (uintptr_t)ofl->ofl_nehdr) > ofl->ofl_size)
-					class = ERR_FATAL;
-				else
-					class = ERR_WARNING;
-
-				eprintf(ofl->ofl_lml, class,
-				    MSG_INTL(MSG_REL_INVALOFFSET),
-				    conv_reloc_386_type(arsp->rel_rtype,
-				    0, &inv_buf), ifl_name,
-				    EC_WORD(arsp->rel_isdesc->is_scnndx),
-				    arsp->rel_isdesc->is_name,
-				    demangle(arsp->rel_sname),
-				    EC_ADDR((uintptr_t)addr -
-				    (uintptr_t)ofl->ofl_nehdr));
-
-				if (class == ERR_FATAL) {
-					return_code = S_ERROR;
-					continue;
-				}
-			}
+			    M_MACH, SHT_REL, arsp, R1addr, value,
+			    ld_reloc_sym_name));
 
 			/*
-			 * The relocation is additive.  Ignore the previous
-			 * symbol value if this local partial symbol is
-			 * expanded.
+			 * And do it.
 			 */
-			if (moved)
-				value -= *addr;
+			if (ofl->ofl_flags1 & FLG_OF1_ENCDIFF)
+				*(Xword *)R2addr = ld_bswap_Xword(value);
+			else
+				*(Xword *)R2addr = value;
+			continue;
 
-			/*
-			 * If we have a replacement value for the relocation
-			 * target, put it in place now.
-			 */
-			if (arsp->rel_flags & FLG_REL_NADDEND) {
-				Xword addend = arsp->rel_raddend;
+		} else if (IS_GOT_BASED(arsp->rel_rtype) &&
+		    ((flags & FLG_OF_RELOBJ) == 0)) {
+			value -= ofl->ofl_osgot->os_shdr->sh_addr;
 
-				if (ld_reloc_targval_set(ofl, arsp,
-				    addr, addend) == 0)
-					return (S_ERROR);
+		} else if (IS_GOT_PC(arsp->rel_rtype) &&
+		    ((flags & FLG_OF_RELOBJ) == 0)) {
+			value = (Xword)(ofl->ofl_osgot->os_shdr->sh_addr) -
+			    refaddr;
+
+		} else if ((IS_PC_RELATIVE(arsp->rel_rtype)) &&
+		    (((flags & FLG_OF_RELOBJ) == 0) ||
+		    (osp == sdp->sd_isc->is_osdesc))) {
+			value -= refaddr;
+
+		} else if (IS_TLS_INS(arsp->rel_rtype) &&
+		    IS_GOT_RELATIVE(arsp->rel_rtype) &&
+		    ((flags & FLG_OF_RELOBJ) == 0)) {
+			Gotndx	*gnp;
+
+			gnp = ld_find_got_ndx(sdp->sd_GOTndxs, gref, ofl, NULL);
+			assert(gnp);
+			value = (Xword)gnp->gn_gotndx * M_GOT_ENTSIZE;
+			if (arsp->rel_rtype == R_386_TLS_IE) {
+				value += ofl->ofl_osgot->os_shdr->sh_addr;
 			}
 
+		} else if (IS_GOT_RELATIVE(arsp->rel_rtype) &&
+		    ((flags & FLG_OF_RELOBJ) == 0)) {
+			Gotndx *gnp;
+
+			gnp = ld_find_got_ndx(sdp->sd_GOTndxs,
+			    GOT_REF_GENERIC, ofl, NULL);
+			assert(gnp);
+			value = (Xword)gnp->gn_gotndx * M_GOT_ENTSIZE;
+
+		} else if ((arsp->rel_flags & FLG_REL_STLS) &&
+		    ((flags & FLG_OF_RELOBJ) == 0)) {
+			Xword	tlsstatsize;
+
 			/*
-			 * If '-z noreloc' is specified - skip the do_reloc_ld
-			 * stage.
+			 * This is the LE TLS reference model.  Static
+			 * offset is hard-coded.
 			 */
-			if (OFL_DO_RELOC(ofl)) {
-				if (do_reloc_ld((uchar_t)arsp->rel_rtype, addr,
-				    &value, arsp->rel_sname, ifl_name,
-				    OFL_SWAP_RELOC_DATA(ofl, arsp),
-				    ofl->ofl_lml) == 0)
-					return_code = S_ERROR;
+			tlsstatsize = S_ROUND(ofl->ofl_tlsphdr->p_memsz,
+			    M_TLSSTATALIGN);
+			value = tlsstatsize - value;
+
+			/*
+			 * Since this code is fixed up, it assumes a
+			 * negative offset that can be added to the
+			 * thread pointer.
+			 */
+			if ((arsp->rel_rtype == R_386_TLS_LDO_32) ||
+			    (arsp->rel_rtype == R_386_TLS_LE))
+				value = -value;
+		}
+
+		if (arsp->rel_isdesc->is_file)
+			ifl_name = arsp->rel_isdesc->is_file->ifl_name;
+		else
+			ifl_name = MSG_INTL(MSG_STR_NULL);
+
+		/*
+		 * Make sure we have data to relocate.  Compiler and assembler
+		 * developers have been known to generate relocations against
+		 * invalid sections (normally .bss), so for their benefit give
+		 * them sufficient information to help analyze the problem.
+		 * End users should never see this.
+		 */
+		if (arsp->rel_isdesc->is_indata->d_buf == 0) {
+			Conv_inv_buf_t	inv_buf;
+
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_EMPTYSEC),
+			    conv_reloc_386_type(arsp->rel_rtype, 0, &inv_buf),
+			    ifl_name, ld_reloc_sym_name(arsp),
+			    EC_WORD(arsp->rel_isdesc->is_scnndx),
+			    arsp->rel_isdesc->is_name);
+			return (S_ERROR);
+		}
+
+		/*
+		 * Get the address of the data item we need to modify.
+		 */
+		addr = (uchar_t *)((uintptr_t)arsp->rel_roffset +
+		    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->is_indata));
+
+		DBG_CALL(Dbg_reloc_doact(ofl->ofl_lml, ELF_DBG_LD_ACT,
+		    M_MACH, SHT_REL, arsp, EC_NATPTR(addr), value,
+		    ld_reloc_sym_name));
+		addr += (uintptr_t)osp->os_outdata->d_buf;
+
+		if ((((uintptr_t)addr - (uintptr_t)ofl->ofl_nehdr) >
+		    ofl->ofl_size) || (arsp->rel_roffset >
+		    osp->os_shdr->sh_size)) {
+			Conv_inv_buf_t	inv_buf;
+			int		class;
+
+			if (((uintptr_t)addr - (uintptr_t)ofl->ofl_nehdr) >
+			    ofl->ofl_size)
+				class = ERR_FATAL;
+			else
+				class = ERR_WARNING;
+
+			eprintf(ofl->ofl_lml, class,
+			    MSG_INTL(MSG_REL_INVALOFFSET),
+			    conv_reloc_386_type(arsp->rel_rtype, 0, &inv_buf),
+			    ifl_name, EC_WORD(arsp->rel_isdesc->is_scnndx),
+			    arsp->rel_isdesc->is_name, ld_reloc_sym_name(arsp),
+			    EC_ADDR((uintptr_t)addr -
+			    (uintptr_t)ofl->ofl_nehdr));
+
+			if (class == ERR_FATAL) {
+				return_code = S_ERROR;
+				continue;
 			}
+		}
+
+		/*
+		 * The relocation is additive.  Ignore the previous symbol
+		 * value if this local partial symbol is expanded.
+		 */
+		if (moved)
+			value -= *addr;
+
+		/*
+		 * If we have a replacement value for the relocation
+		 * target, put it in place now.
+		 */
+		if (arsp->rel_flags & FLG_REL_NADDEND) {
+			Xword addend = arsp->rel_raddend;
+
+			if (ld_reloc_targval_set(ofl, arsp, addr, addend) == 0)
+				return (S_ERROR);
+		}
+
+		/*
+		 * If '-z noreloc' is specified - skip the do_reloc_ld stage.
+		 */
+		if (OFL_DO_RELOC(ofl)) {
+			if (do_reloc_ld(arsp, addr, &value, ld_reloc_sym_name,
+			    ifl_name, OFL_SWAP_RELOC_DATA(ofl, arsp),
+			    ofl->ofl_lml) == 0)
+				return_code = S_ERROR;
 		}
 	}
 	return (return_code);
@@ -1149,9 +1112,7 @@ static uintptr_t
 ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Rel_desc	*orsp;
-	Rel_cache	*rcp;
 	Sym_desc	*sdp = rsp->rel_sym;
-	static size_t	nextsize = 0;
 
 	/*
 	 * Static executables *do not* want any relocations against them.
@@ -1161,15 +1122,6 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 	 */
 	if (OFL_IS_STATIC_EXEC(ofl))
 		return (1);
-
-	/*
-	 * Obtain the new available relocation cache entry.
-	 */
-	if ((rcp = ld_add_rel_cache(ofl, &ofl->ofl_outrels, &nextsize,
-	    REL_LOIDESCNO, REL_HOIDESCNO)) == (Rel_cache *)S_ERROR)
-		return (S_ERROR);
-
-	orsp = rcp->rc_free;
 
 	/*
 	 * If we are adding a output relocation against a section
@@ -1204,11 +1156,9 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 		}
 	}
 
-	*orsp = *rsp;
-	orsp->rel_flags |= flags;
-
-	rcp->rc_free++;
-	ofl->ofl_outrelscnt++;
+	/* Enter it into the output relocation cache */
+	if ((orsp = ld_reloc_enter(ofl, &ofl->ofl_outrels, rsp, flags)) == NULL)
+		return (S_ERROR);
 
 	if (flags & FLG_REL_GOT)
 		ofl->ofl_relocgotsz += (Xword)sizeof (Rel);
@@ -1219,7 +1169,7 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 	else if (flags & FLG_REL_NOINFO)
 		ofl->ofl_relocrelsz += (Xword)sizeof (Rel);
 	else
-		orsp->rel_osdesc->os_szoutrels += (Xword)sizeof (Rel);
+		RELAUX_GET_OSDESC(orsp)->os_szoutrels += (Xword)sizeof (Rel);
 
 	if (orsp->rel_rtype == M_R_RELATIVE)
 		ofl->ofl_relocrelcnt++;
@@ -1303,20 +1253,20 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 	    ((shndx == SHN_UNDEF) ||
 	    ((sdp->sd_ref == REF_DYN_NEED) &&
 	    ((sdp->sd_flags & FLG_SY_MVTOCOMM) == 0)))) {
-		Conv_inv_buf_t inv_buf;
+		Conv_inv_buf_t	inv_buf;
+		Os_desc		*osp = RELAUX_GET_OSDESC(rsp);
 
 		/*
 		 * If the relocation is against a SHT_SUNW_ANNOTATE
 		 * section - then silently ignore that the relocation
 		 * can not be resolved.
 		 */
-		if (rsp->rel_osdesc &&
-		    (rsp->rel_osdesc->os_shdr->sh_type == SHT_SUNW_ANNOTATE))
+		if (osp && (osp->os_shdr->sh_type == SHT_SUNW_ANNOTATE))
 			return (0);
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_EXTERNSYM),
 		    conv_reloc_386_type(rsp->rel_rtype, 0, &inv_buf),
 		    rsp->rel_isdesc->is_file->ifl_name,
-		    demangle(rsp->rel_sname), rsp->rel_osdesc->os_name);
+		    ld_reloc_sym_name(rsp), osp->os_name);
 		return (1);
 	}
 
@@ -1428,14 +1378,12 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 			return (S_ERROR);
 
 		rsp->rel_sym = tlsgetsym;
-		rsp->rel_sname = tlsgetsym->sd_name;
 		rsp->rel_rtype = R_386_PLT32;
 
 		if (ld_reloc_plt(rsp, ofl) == S_ERROR)
 			return (S_ERROR);
 
 		rsp->rel_sym = sdp;
-		rsp->rel_sname = sdp->sd_name;
 		rsp->rel_rtype = rtype;
 		return (1);
 	}

@@ -1575,3 +1575,4 @@ Bugid   Risk Synopsis
 6931056 pvs -r output can include empty versions in output
 6938628 ld.so.1 should produce diagnostics for all dl*() entry points
 6938111 nm `No symbol table data' message goes to stdout
+6941727 ld relocation cache memory use is excessive

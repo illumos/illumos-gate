@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<stdio.h>
@@ -212,11 +211,11 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	    (sym->st_shndx == SHN_UNDEF))) {
 		/* If section symbol, construct a printable name for it */
 		if (ELF_ST_TYPE(sym->st_info) == STT_SECTION) {
-			const char *stt_sym_name =
-			    ld_stt_section_sym_name(gisc);
+			if (gisc->is_sym_name == NULL)
+				(void) ld_stt_section_sym_name(gisc);
 
-			if (stt_sym_name != NULL)
-				str = stt_sym_name;
+			if (gisc->is_sym_name != NULL)
+				str = gisc->is_sym_name;
 		}
 
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_GRP_INVALSYM),

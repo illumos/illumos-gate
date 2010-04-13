@@ -20,13 +20,101 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+#include	<stdio.h>
 #include	"_debug.h"
 #include	"msg.h"
 #include	"libld.h"
+
+static const char *
+fmt_human_units(size_t bytes, char *buf, size_t bufsize)
+{
+	static int	unit_arr[] = { 'K', 'M', 'G', 'T' };
+
+	int		i, unit_ch;
+	size_t		unit_bytes = bytes;
+
+	/* Convert to human readable units */
+	for (i = 0; i < sizeof (unit_arr) / sizeof (unit_arr[0]); i++) {
+		if (unit_bytes < 1024)
+			break;
+		unit_ch = unit_arr[i];
+		unit_bytes /= 1024;
+	}
+	if (unit_bytes == bytes)
+		buf[0] = '\0';
+	else
+		(void) snprintf(buf, bufsize, MSG_ORIG(MSG_FMT_MEMUNIT),
+		    EC_XWORD(unit_bytes), unit_ch);
+
+	return (buf);
+}
+
+/*
+ * Generate a relocation cache statistics line for the active or
+ * output relocation cache.
+ *
+ * entry:
+ *	ofl - output file descriptor
+ *	alp - One of ofl->ofl_actrels or ofl->ofl_outrels.
+ */
+static void
+rel_cache_statistics(Ofl_desc *ofl, const char *title, APlist *alp)
+{
+	Lm_list		*lml = ofl->ofl_lml;
+	size_t		desc_cnt = 0, desc_used = 0, bytes;
+	Aliste		idx;
+	Rel_cachebuf	*rcp;
+	char		unit_buf[CONV_INV_BUFSIZE + 10];
+
+	/* Sum the total memory allocated across all the buffers */
+	for (APLIST_TRAVERSE(alp, idx, rcp)) {
+		desc_cnt += rcp->rc_end - rcp->rc_arr;
+		desc_used += rcp->rc_free - rcp->rc_arr;
+	}
+	bytes = desc_cnt * sizeof (Rel_desc);
+
+	dbg_print(lml, MSG_INTL(MSG_STATS_REL_CACHE), title,
+	    EC_WORD(aplist_nitems(alp)),
+	    EC_XWORD(desc_used), EC_XWORD(desc_cnt),
+	    (desc_cnt == 0) ? 100 : EC_WORD((desc_used * 100) / desc_cnt),
+	    EC_XWORD(bytes),
+	    fmt_human_units(bytes, unit_buf, sizeof (unit_buf)));
+}
+
+
+/*
+ * Generate a statistics line for the auxiliary relocation descriptor cache.
+ *
+ * entry:
+ *	ofl - output file descriptor
+ */
+static void
+rel_aux_cache_statistics(Ofl_desc *ofl)
+{
+	Rel_aux_cachebuf	*racp;
+	Lm_list	*lml = ofl->ofl_lml;
+	size_t	desc_cnt = 0, desc_used = 0, bytes;
+	Aliste	idx;
+	char	unit_buf[CONV_INV_BUFSIZE + 10];
+
+	/* Sum the total memory allocated across all the buffers */
+	for (APLIST_TRAVERSE(ofl->ofl_relaux, idx, racp)) {
+		desc_cnt += racp->rac_end - racp->rac_arr;
+		desc_used += racp->rac_free - racp->rac_arr;
+	}
+	bytes = desc_cnt * sizeof (Rel_desc);
+
+	dbg_print(lml, MSG_INTL(MSG_STATS_REL_ACACHE),
+	    EC_WORD(aplist_nitems(ofl->ofl_relaux)),
+	    EC_XWORD(desc_used), EC_XWORD(desc_cnt),
+	    (desc_cnt == 0) ? 100 : EC_WORD((desc_used * 100) / desc_cnt),
+	    EC_XWORD(bytes),
+	    fmt_human_units(bytes, unit_buf, sizeof (unit_buf)));
+}
+
 
 void
 Dbg_statistics_ld(Ofl_desc *ofl)
@@ -55,15 +143,18 @@ Dbg_statistics_ld(Ofl_desc *ofl)
 		    EC_XWORD(ofl->ofl_elimcnt));
 	}
 
-	if (ofl->ofl_outrelscnt) {
-		dbg_print(lml, MSG_INTL(MSG_STATS_RELOCS_OUT),
-		    EC_XWORD(ofl->ofl_outrelscnt));
-	}
-	if (ofl->ofl_entrelscnt || ofl->ofl_actrelscnt) {
-		dbg_print(lml, MSG_INTL(MSG_STATS_RELOCS_IN),
-		    EC_XWORD(ofl->ofl_entrelscnt),
-		    EC_XWORD(ofl->ofl_actrelscnt));
-	}
+	dbg_print(lml, MSG_INTL(MSG_STATS_REL_OUT),
+	    EC_XWORD(ofl->ofl_outrels.rc_cnt));
+
+	dbg_print(lml, MSG_INTL(MSG_STATS_REL_IN),
+	    EC_XWORD(ofl->ofl_entrelscnt), EC_XWORD(ofl->ofl_actrels.rc_cnt));
+
+	dbg_print(lml, MSG_INTL(MSG_STATS_REL_TICACHE));
+	rel_cache_statistics(ofl, MSG_INTL(MSG_STATS_REL_TIOUT),
+	    ofl->ofl_outrels.rc_list);
+	rel_cache_statistics(ofl, MSG_INTL(MSG_STATS_REL_TIACT),
+	    ofl->ofl_actrels.rc_list);
+	rel_aux_cache_statistics(ofl);
 }
 
 void

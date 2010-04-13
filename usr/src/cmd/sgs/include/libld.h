@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBLD_H
@@ -100,6 +99,14 @@ typedef enum {
 	REF_REL_NEED,			/* a .o symbol */
 	REF_NUM				/* the number of symbol references */
 } Symref;
+
+/*
+ * Relocation descriptor cache
+ */
+struct rel_cache {
+	APlist		*rc_list;	/* list of Rel_cachebuf */
+	Word		rc_cnt;		/* 	and count */
+};
 
 /*
  * GOT reference models
@@ -264,10 +271,9 @@ struct ofl_desc {
 	Word		ofl_soscnt;	/* 	and count */
 	APlist		*ofl_soneed;	/* list of implicitly required .so's */
 	APlist		*ofl_socntl;	/* list of .so control definitions */
-	APlist		*ofl_outrels;	/* list of output relocations */
-	Word		ofl_outrelscnt;	/* 	and count */
-	APlist		*ofl_actrels;	/* list of relocations to perform */
-	Word		ofl_actrelscnt;	/* 	and count */
+	Rel_cache	ofl_outrels;	/* list of output relocations */
+	Rel_cache	ofl_actrels;	/* list of relocations to perform */
+	APlist		*ofl_relaux;	/* Rel_aux cache for outrels/actrels */
 	Word		ofl_entrelscnt;	/* no of relocations entered */
 	Alist		*ofl_copyrels;	/* list of copy relocations */
 	APlist		*ofl_ordered;	/* list of shf_ordered sections */
@@ -582,26 +588,113 @@ typedef struct {
 
 /*
  * Relocation (active & output) processing structure - transparent to common
- * code.
+ * code. There can be millions of these structures in a large link, so it
+ * is important to keep it small. You should only add new items to Rel_desc
+ * if they are critical, apply to most relocations, and cannot be easily
+ * computed from the other information.
+ *
+ * Items that can be derived should be implemented as a function that accepts
+ * a Rel_desc argument, and returns the desired data. ld_reloc_sym_name() is
+ * an example of this.
+ *
+ * Lesser used relocation data is kept in an auxiliary block, Rel_aux,
+ * that is only allocated as necessary. In exchange for adding one pointer
+ * of overhead to Rel_desc (rel_aux), most relocations are reduced in size
+ * by the size of Rel_aux. This strategy relies on the data in Rel_aux
+ * being rarely needed --- otherwise it will backfire badly.
  *
  * Note that rel_raddend is primarily only of interest to RELA relocations,
  * and is set to 0 for REL. However, there is an exception: If FLG_REL_NADDEND
  * is set, then rel_raddend contains a replacement value for the implicit
  * addend found in the relocation target.
+ *
+ * Fields should be ordered from largest to smallest, to minimize packing
+ * holes in the struct layout.
  */
 struct rel_desc {
-	Os_desc		*rel_osdesc;	/* output section reloc is against */
 	Is_desc		*rel_isdesc;	/* input section reloc is against */
-	const char	*rel_sname;	/* symbol name (may be "unknown") */
 	Sym_desc	*rel_sym;	/* sym relocation is against */
-	Sym_desc	*rel_usym;	/* strong sym if this is a weak pair */
-	Mv_reloc	*rel_move;	/* move table information */
-	Word		rel_flags;	/* misc. flags for relocations */
-	Word		rel_rtype;	/* relocation type */
+	Rel_aux		*rel_aux;	/* NULL, or auxiliary data */
 	Xword		rel_roffset;	/* relocation offset */
 	Sxword		rel_raddend;	/* addend from input relocation */
-	Word		rel_typedata;	/* ELF_R_TYPE_DATA(info) */
+	Word		rel_flags;	/* misc. flags for relocations */
+	Word		rel_rtype;	/* relocation type */
 };
+
+/*
+ * Data that would be kept in Rel_desc if the size of that structure was
+ * not an issue. This auxiliary block is only allocated as needed,
+ * and must only contain rarely needed items. The goal is for the vast
+ * majority of Rel_desc structs to not have an auxiliary block.
+ *
+ * When a Rel_desc does not have an auxiliary block, a default value
+ * is assumed for each auxiliary item:
+ *
+ * -	ra_osdesc:
+ *	Output section to which relocation applies. The default
+ *	value for this is the output section associated with the
+ *	input section (rel_isdesc->is_osdesc), or NULL if there
+ *	is no associated input section.
+ *
+ * -	ra_usym:
+ *	If the symbol associated with a relocation is part of a weak/strong
+ *	pair, then ra_usym contains the strong symbol and rel_sym the weak.
+ *	Otherwise, the default value is the same value as rel_sym.
+ *
+ * -	ra_move:
+ *	Move table data. The default value is NULL.
+ *
+ * -	ra_typedata:
+ *	ELF_R_TYPE_DATA(info). This value applies only to a small
+ *	subset of 64-bit sparc relocations, and is otherwise 0. The
+ *	default value is 0.
+ *
+ * If any value in Rel_aux is non-default, then an auxiliary block is
+ * necessary, and each field contains its actual value. If all the auxiliary
+ * values are default, no Rel_aux is needed, and the RELAUX_GET_xxx()
+ * macros below are able to supply the proper default.
+ *
+ * To set a Rel_aux value, use the ld_reloc_set_aux_XXX() functions.
+ * These functions are written to avoid unnecessary auxiliary allocations,
+ * and know the rules for each item.
+ */
+struct rel_aux {
+	Os_desc		*ra_osdesc;	/* output section reloc is against */
+	Sym_desc	*ra_usym;	/* strong sym if this is a weak pair */
+	Mv_reloc	*ra_move;	/* move table information */
+	Word		ra_typedata;	/* ELF_R_TYPE_DATA(info) */
+};
+
+/*
+ * Test a given auxiliary value to determine if it has the default value
+ * for that item, as described above. If all the auxiliary items have
+ * their default values, no auxiliary place is necessary to represent them.
+ * If any one of them is non-default, the auxiliary block is needed.
+ */
+#define	RELAUX_ISDEFAULT_MOVE(_rdesc, _mv) (_mv == NULL)
+#define	RELAUX_ISDEFAULT_USYM(_rdesc, _usym) ((_rdesc)->rel_sym == _usym)
+#define	RELAUX_ISDEFAULT_OSDESC(_rdesc, _osdesc) \
+	((((_rdesc)->rel_isdesc == NULL) && (_osdesc == NULL)) || \
+	((_rdesc)->rel_isdesc && ((_rdesc)->rel_isdesc->is_osdesc == _osdesc)))
+#define	RELAUX_ISDEFAULT_TYPEDATA(_rdesc, _typedata) (_typedata == 0)
+
+/*
+ * Retrieve the value of an auxiliary relocation item, preserving the illusion
+ * that every relocation descriptor has an auxiliary block attached. The
+ * real implementation is that an auxiliary block is only present if one or
+ * more auxiliary items have non-default values. These macros return the true
+ * value if an auxiliary block is present, and the default value for the
+ * item otherwise.
+ */
+#define	RELAUX_GET_MOVE(_rdesc) \
+	((_rdesc)->rel_aux ? (_rdesc)->rel_aux->ra_move : NULL)
+#define	RELAUX_GET_USYM(_rdesc) \
+	((_rdesc)->rel_aux ? (_rdesc)->rel_aux->ra_usym : (_rdesc)->rel_sym)
+#define	RELAUX_GET_OSDESC(_rdesc) \
+	((_rdesc)->rel_aux ? (_rdesc)->rel_aux->ra_osdesc : \
+	((_rdesc)->rel_isdesc ? (_rdesc)->rel_isdesc->is_osdesc : NULL))
+#define	RELAUX_GET_TYPEDATA(_rdesc) \
+	((_rdesc)->rel_aux ? (_rdesc)->rel_aux->ra_typedata : 0)
 
 /*
  * common flags used on the Rel_desc structure (defined in machrel.h).
@@ -648,17 +741,55 @@ struct rel_desc {
 					/*	relocations, not to RELA. */
 
 /*
- * Structure to hold a cache of Relocations.
+ * We often need the name of the symbol contained in a relocation descriptor
+ * for diagnostic or error output. This is usually the symbol name, but
+ * we substitute a constructed name in some cases. Hence, the name is
+ * generated on the fly by a private function within libld. This is the
+ * prototype for that function.
  */
-struct rel_cache {
+typedef const char *(* rel_desc_sname_func_t)(Rel_desc *);
+
+/*
+ * Header for a relocation descriptor cache buffer.
+ */
+struct rel_cachebuf {
 	Rel_desc	*rc_end;
 	Rel_desc	*rc_free;
+	Rel_desc	rc_arr[1];
 };
+
+/*
+ * Header for a relocation auxiliary descriptor cache buffer.
+ */
+struct rel_aux_cachebuf {
+	Rel_aux		*rac_end;
+	Rel_aux		*rac_free;
+	Rel_aux		rac_arr[1];
+};
+
+/*
+ * Convenience macro for traversing every relocation descriptor found within
+ * a given relocation cache, transparently handling the cache buffers and
+ * skipping any unallocated descriptors within the buffers.
+ *
+ * entry:
+ *	_rel_cache - Relocate descriptor cache (Rel_cache) to traverse
+ *	_idx - Aliste index variable for use by the macro
+ *	_rcbp - Cache buffer pointer, for use by the macro
+ *	_orsp - Rel_desc pointer, which will take on the value of a different
+ *		relocation descriptor in the cache in each iteration.
+ *
+ * The caller must not assign new values to _idx, _rcbp, or _orsp within
+ * the scope of REL_CACHE_TRAVERSE.
+ */
+#define	REL_CACHE_TRAVERSE(_rel_cache, _idx, _rcbp, _orsp) \
+	for (APLIST_TRAVERSE((_rel_cache)->rc_list, _idx, _rcbp)) \
+		for (_orsp = _rcbp->rc_arr; _orsp < _rcbp->rc_free; _orsp++)
 
 /*
  * Symbol value descriptor.  For relocatable objects, each symbols value is
  * its offset within its associated section.  Therefore, to uniquely define
- * each symbol within a reloctable object, record and sort the sh_offset and
+ * each symbol within a relocatable object, record and sort the sh_offset and
  * symbol value.  This information is used to search for displacement
  * relocations as part of copy relocation validation.
  */
@@ -734,6 +865,8 @@ struct ifl_desc {			/* input file descriptor */
 
 struct is_desc {			/* input section descriptor */
 	const char	*is_name;	/* original section name */
+	const char	*is_sym_name;	/* NULL, or name string to use for */
+					/*	related STT_SECTION symbols */
 	Shdr		*is_shdr;	/* the elf section header */
 	Ifl_desc	*is_file;	/* infile desc for this section */
 	Os_desc		*is_osdesc;	/* new output section for this */

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 @ _START_
@@ -1148,8 +1147,15 @@
 @ MSG_STATS_SYMBOLS_OUT	"      Symbols output: globals=%-10lld locals=%lld"
 @ MSG_STATS_SYMBOLS_IN	"      Symbols  input: globals=%-10lld scoped=%-10lld \
 			 eliminated=%lld"
-@ MSG_STATS_RELOCS_OUT	"  Relocations output: records=%lld"
-@ MSG_STATS_RELOCS_IN	"  Relocations  input: records=%-10lld applied=%lld"
+@ MSG_STATS_REL_OUT	"  Relocations output: records=%lld"
+@ MSG_STATS_REL_IN	"  Relocations  input: records=%-10lld applied=%lld"
+@ MSG_STATS_REL_TICACHE	"  Relocation Cache"
+@ MSG_STATS_REL_TIACT	"Active"
+@ MSG_STATS_REL_TIOUT	"Output"
+@ MSG_STATS_REL_CACHE	"      %s: buffers=%d, used=%lld/%lld (%d%%), \
+			 size=%lld%s"
+@ MSG_STATS_REL_ACACHE	"      Aux:    buffers=%d, used=%lld/%lld (%d%%), \
+			 size=%lld%s"
 
 # Capabilities messages
 
@@ -1639,6 +1645,7 @@
 
 @ MSG_FMT_INDEX		" [%d]"
 @ MSG_FMT_ISEC_NAME	"[%u]%s"
+@ MSG_FMT_MEMUNIT	" (%lld%c)"
 
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
 

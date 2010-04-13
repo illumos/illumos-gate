@@ -24,8 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Global include file for all sgs.
  */
@@ -228,6 +227,10 @@ typedef struct isa_opt		Isa_opt;
 typedef struct os_desc		Os_desc;
 typedef struct ofl_desc		Ofl_desc;
 typedef	struct rel_cache	Rel_cache;
+typedef	struct rel_cachebuf	Rel_cachebuf;
+typedef	struct rel_aux_cachebuf	Rel_aux_cachebuf;
+typedef struct rel_aux		Rel_aux;
+typedef struct rel_desc		Rel_desc;
 typedef	struct sdf_desc		Sdf_desc;
 typedef	struct sdv_desc		Sdv_desc;
 typedef struct sec_order	Sec_order;
@@ -239,11 +242,6 @@ typedef struct sym_desc		Sym_desc;
 typedef	struct uts_desc		Uts_desc;
 typedef struct ver_desc		Ver_desc;
 typedef struct ver_index	Ver_index;
-
-/*
- * Data structures defined in machrel.h.
- */
-typedef struct rel_desc		Rel_desc;
 
 /*
  * Data structures defined in rtld.h.

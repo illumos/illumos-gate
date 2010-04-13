@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_DEBUG_H
@@ -906,8 +905,8 @@ extern	void	Dbg_reloc_apply_val(Lm_list *, int, Xword, Xword);
 extern	void	Dbg_reloc_ars_entry(Lm_list *, int, Word, Half, Rel_desc *);
 extern	void	Dbg_reloc_copy(Rt_map *, Rt_map *, const char *, int);
 extern	void	Dbg_reloc_discard(Lm_list *, Half, Rel_desc *);
-extern	void	Dbg_reloc_doact(Lm_list *, int, Half, Word, Word, Xword, Xword,
-		    const char *, Os_desc *);
+extern	void	Dbg_reloc_doact(Lm_list *, int, Half, Word, Rel_desc *,
+		    Xword, Xword, rel_desc_sname_func_t);
 extern	void	Dbg_reloc_doact_title(Lm_list *);
 extern	void	Dbg_reloc_dooutrel(Lm_list *, Word);
 extern	void	Dbg_reloc_entry(Lm_list *, const char *, Half, Word, void *,
@@ -922,7 +921,8 @@ extern	void	Dbg_reloc_out(Ofl_desc *, int, Word, void *, const char *,
 		    const char *);
 extern	void	Dbg_reloc_proc(Lm_list *, Os_desc *, Is_desc *, Is_desc *);
 extern	void	Dbg_reloc_run(Rt_map *, uint_t, int, int);
-extern	void	Dbg_reloc_transition(Lm_list *, Half, Word, Rel_desc *);
+extern	void	Dbg_reloc_transition(Lm_list *, Half, Word, Rel_desc *,
+		    rel_desc_sname_func_t);
 extern	void	Dbg_reloc_sloppycomdat(Lm_list *, Sym_desc *);
 
 extern	void	Dbg_sec_added(Lm_list *, Os_desc *, Sg_desc *);

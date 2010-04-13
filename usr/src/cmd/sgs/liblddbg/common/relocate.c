@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<sys/elf_SPARC.h>
@@ -209,17 +208,19 @@ Dbg_reloc_doact_title(Lm_list *lml)
 }
 
 void
-Dbg_reloc_doact(Lm_list *lml, int caller, Half mach, Word type, Word rtype,
-    Xword off, Xword value, const char *symname, Os_desc *osp)
+Dbg_reloc_doact(Lm_list *lml, int caller, Half mach, Word type, Rel_desc *rdesc,
+    Xword off, Xword value, rel_desc_sname_func_t rel_desc_sname_func)
 {
 	Conv_inv_buf_t	inv_buf;
 	const char	*secname;
+	Os_desc		*osp;
 
 	if (DBG_NOTCLASS(DBG_C_RELOC))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
+	osp = RELAUX_GET_OSDESC(rdesc);
 	if (osp) {
 		secname = osp->os_name;
 		off += osp->os_shdr->sh_offset;
@@ -227,8 +228,9 @@ Dbg_reloc_doact(Lm_list *lml, int caller, Half mach, Word type, Word rtype,
 		secname = MSG_ORIG(MSG_STR_EMPTY);
 
 	Elf_reloc_entry_2(lml, caller, MSG_ORIG(MSG_STR_EMPTY), type,
-	    conv_reloc_type(mach, rtype, 0, &inv_buf),
-	    off, value, secname, symname, MSG_ORIG(MSG_STR_EMPTY));
+	    conv_reloc_type(mach, rdesc->rel_rtype, 0, &inv_buf),
+	    off, value, secname, (*rel_desc_sname_func)(rdesc),
+	    MSG_ORIG(MSG_STR_EMPTY));
 }
 
 void
@@ -267,7 +269,8 @@ Dbg_reloc_discard(Lm_list *lml, Half mach, Rel_desc *rsp)
 }
 
 void
-Dbg_reloc_transition(Lm_list *lml, Half mach, Word rtype, Rel_desc *rsp)
+Dbg_reloc_transition(Lm_list *lml, Half mach, Word rtype, Rel_desc *rsp,
+    rel_desc_sname_func_t rel_desc_sname_func)
 {
 	dbg_isec_name_buf_t	buf;
 	char			*alloc_mem;
@@ -281,7 +284,7 @@ Dbg_reloc_transition(Lm_list *lml, Half mach, Word rtype, Rel_desc *rsp)
 	dbg_print(lml, MSG_INTL(MSG_REL_TRANSITION),
 	    conv_reloc_type(mach, rsp->rel_rtype, 0, &inv_buf1),
 	    dbg_fmt_isec_name(isp, buf, &alloc_mem), isp->is_file->ifl_name,
-	    EC_OFF(rsp->rel_roffset), rsp->rel_sname,
+	    EC_OFF(rsp->rel_roffset), (*rel_desc_sname_func)(rsp),
 	    conv_reloc_type(mach, rtype, 0, &inv_buf2));
 	if (alloc_mem != NULL)
 		free(alloc_mem);
@@ -364,16 +367,17 @@ Dbg_reloc_ors_entry(Lm_list *lml, int caller, Word type, Half mach,
 	if (DBG_NOTDETAIL())
 		return;
 
-	if (orsp->rel_flags & (FLG_REL_GOT | FLG_REL_RFPTR1 | FLG_REL_RFPTR2))
+	if (orsp->rel_flags & (FLG_REL_GOT | FLG_REL_RFPTR1 | FLG_REL_RFPTR2)) {
 		secname = MSG_ORIG(MSG_SCN_GOT);
-	else if (orsp->rel_flags & FLG_REL_PLT)
+	} else if (orsp->rel_flags & FLG_REL_PLT) {
 		secname = MSG_ORIG(MSG_SCN_PLT);
-	else if (orsp->rel_flags & FLG_REL_BSS)
+	} else if (orsp->rel_flags & FLG_REL_BSS) {
 		secname = MSG_ORIG(MSG_SCN_BSS);
-	else if (orsp->rel_osdesc)
-		secname = orsp->rel_osdesc->os_name;
-	else
-		secname = MSG_INTL(MSG_STR_NULL);
+	} else {
+		Os_desc *osp = RELAUX_GET_OSDESC(orsp);
+
+		secname = osp ? osp->os_name : MSG_INTL(MSG_STR_NULL);
+	}
 
 	/*
 	 * Register symbols can be relocated/initialized to a constant, which
@@ -408,7 +412,7 @@ Dbg_reloc_ars_entry(Lm_list *lml, int caller, Word type, Half mach,
 	if (arsp->rel_flags & (FLG_REL_GOT | FLG_REL_FPTR))
 		secname = MSG_ORIG(MSG_SCN_GOT);
 	else
-		secname = arsp->rel_osdesc->os_name;
+		secname = RELAUX_GET_OSDESC(arsp)->os_name;
 
 	Elf_reloc_entry_2(lml, caller, MSG_INTL(MSG_STR_ACT), type,
 	    conv_reloc_type(mach, arsp->rel_rtype, 0, &inv_buf),

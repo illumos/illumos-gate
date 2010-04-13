@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_RELOC_DOT_H
 #define	_RELOC_DOT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(_KERNEL)
 #include <sys/bootconf.h>
@@ -126,8 +123,25 @@ extern	const Rel_entry	reloc_table[];
  * Relocation engine.
  *
  * The do_reloc() code is used in three different places: The kernel,
- * the linker, and the runtime linker. All three use the same first
- * 5 arguments. In addition:
+ * the link-editor, and the runtime linker. All three convey the same
+ * basic information with the first 5 arguments:
+ *
+ * 1)	Relocation type. The kernel and runtime linker pass this as
+ *	an integer value, while the link-editor passes it as a Rel_desc
+ *	descriptor. The relocation engine only looks at the rel_rtype
+ *	field of this descriptor, and does not examine the other fields,
+ *	which are explicitly allowed to contain garbage.
+ * 2)	Address of offset
+ * 3)	Address of value
+ * 4)	Name of symbol associated with the relocation, used if it is
+ *	necessary to report an error. The kernel and runtime linker pass
+ *	directly as a string pointer. The link-editor passes the address
+ *	of a rel_desc_sname_func_t function, which can be called by do_reloc(),
+ *	passing it the Rel_desc pointer (argument 1, above), to obtain the
+ *	string pointer.
+ * 5)	String giving the source file for the relocation.
+ *
+ * In addition:
  *	- The linker and rtld want a link map pointer argument
  *	- The linker wants to pass a byte swap argument that tells
  *		the relocation engine that the data it is relocating
@@ -160,8 +174,8 @@ extern	const Rel_entry	reloc_table[];
 extern	int	do_reloc_krtld(uchar_t, uchar_t *, Xword *, const char *,
 		    const char *);
 #elif defined(DO_RELOC_LIBLD)
-extern	int	do_reloc_ld(uchar_t, uchar_t *, Xword *, const char *,
-		    const char *, int, void *);
+extern	int	do_reloc_ld(Rel_desc *, uchar_t *, Xword *,
+		    rel_desc_sname_func_t, const char *, int, void *);
 #else
 extern	int	do_reloc_rtld(uchar_t, uchar_t *, Xword *, const char *,
 		    const char *, void *);

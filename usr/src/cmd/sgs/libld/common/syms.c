@@ -24,8 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -3072,54 +3071,43 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 
 /*
  * STT_SECTION symbols have their st_name field set to NULL, and consequently
- * have no name. Generate a name suitable for diagnostic use for such a symbol.
- * The resulting name will be of the form:
+ * have no name. Generate a name suitable for diagnostic use for such a symbol
+ * and store it in the input section descriptor. The resulting name will be
+ * of the form:
  *
  *	"XXX (section)"
  *
  * where XXX is the name of the section.
- *
- * Diagnostics for STT_SECTION symbols tend to come in clusters,
- * so we use a static variable to retain the last string we generate. If
- * another one comes along for the same section before some other section
- * intervenes, we will reuse the string.
  *
  * entry:
  *	isc - Input section associated with the symbol.
  *	fmt - NULL, or format string to use.
  *
  * exit:
- *	Returns the allocated string, or NULL on allocation failure.
+ *	Sets isp->is_sym_name to the allocated string. Returns the
+ *	string pointer, or NULL on allocation failure.
  */
 const const char *
 ld_stt_section_sym_name(Is_desc *isp)
 {
-	static const char	*last_fmt;
-	static Is_desc		*last_isp = NULL;
-	static char		*namestr;
+	const char	*fmt;
+	char		*str;
+	size_t		len;
 
-	const char		*fmt;
-	size_t			len;
+	if ((isp == NULL) || (isp->is_name == NULL))
+		return (NULL);
 
-	if ((isp != NULL) && (isp->is_name != NULL)) {
+	if (isp->is_sym_name == NULL) {
 		fmt = (isp->is_flags & FLG_IS_GNSTRMRG) ?
 		    MSG_INTL(MSG_STR_SECTION_MSTR) : MSG_INTL(MSG_STR_SECTION);
 
-		if ((last_isp == isp) && (last_fmt == fmt))
-			return (namestr);
-
 		len = strlen(fmt) + strlen(isp->is_name) + 1;
 
-		if ((namestr = libld_malloc(len)) == 0)
+		if ((str = libld_malloc(len)) == NULL)
 			return (NULL);
-		(void) snprintf(namestr, len, fmt, isp->is_name);
-
-		/* Remember for next time */
-		last_fmt = fmt;
-		last_isp = isp;
-
-		return (namestr);
+		(void) snprintf(str, len, fmt, isp->is_name);
+		isp->is_sym_name = str;
 	}
 
-	return (NULL);
+	return (isp->is_sym_name);
 }

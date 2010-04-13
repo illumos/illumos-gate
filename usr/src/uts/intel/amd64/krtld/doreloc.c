@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if	defined(_KERNEL)
 #include	<sys/types.h>
@@ -188,7 +185,8 @@ do_reloc_krtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 #elif defined(DO_RELOC_LIBLD)
 /*ARGSUSED5*/
 int
-do_reloc_ld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
+do_reloc_ld(Rel_desc *rdesc, uchar_t *off, Xword *value,
+    rel_desc_sname_func_t rel_desc_sname_func,
     const char *file, int bswap, void *lml)
 #else
 int
@@ -196,6 +194,10 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
     const char *file, void *lml)
 #endif
 {
+#ifdef DO_RELOC_LIBLD
+#define	sym (* rel_desc_sname_func)(rdesc)
+	uchar_t	rtype = rdesc->rel_rtype;
+#endif
 	const Rel_entry	*rep;
 
 	rep = &reloc_table[rtype];
@@ -321,4 +323,8 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		return (0);
 	}
 	return (1);
+
+#ifdef DO_RELOC_LIBLD
+#undef sym
+#endif
 }

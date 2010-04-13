@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -199,7 +198,7 @@ typedef struct {
 typedef struct {
 	const Rel_entry	*mr_reloc_table;
 
-	Word		(* mr_init_rel)(Rel_desc *, void *);
+	Word		(* mr_init_rel)(Rel_desc *, Word *, void *);
 	void 		(* mr_mach_eflags)(Ehdr *, Ofl_desc *);
 	void		(* mr_mach_make_dynamic)(Ofl_desc *, size_t *);
 	void		(* mr_mach_update_odynamic)(Ofl_desc *, Dyn **);
@@ -482,13 +481,12 @@ typedef enum {
 #define	DYNAMIC_EXTRA_ELTS	10
 
 /*
- * Relocation buckets are sized based on the number of input relocations and
- * the following constants.
+ * Default relocation cache allocation unit. This number should be small
+ * enough to not hurt memory use significantly, but large enough to avoid
+ * the need for too many subsequent allocations.
  */
-#define	REL_HAIDESCNO	1000		/* high water mark active buckets */
-#define	REL_LAIDESCNO	50		/* low water mark active buckets */
-#define	REL_HOIDESCNO	500		/* high water mark output buckets */
-#define	REL_LOIDESCNO	10		/* low water mark output buckets */
+#define	REL_CACHEBUF_ALLOC	3000
+#define	RELAUX_CACHEBUF_ALLOC	1500
 
 /*
  * Given a symbol of a type that is allowed within a .SUNW_dynsymsort or
@@ -678,7 +676,6 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 
 #define	ld_add_actrel		ld64_add_actrel
 #define	ld_add_libdir		ld64_add_libdir
-#define	ld_add_rel_cache	ld64_add_rel_cache
 #define	ld_adj_movereloc	ld64_adj_movereloc
 #define	ld_am_I_partial		ld64_am_I_partial
 #define	ld_ar_member		ld64_ar_member
@@ -720,9 +717,13 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_process_open		ld64_process_open
 #define	ld_process_ordered	ld64_process_ordered
 #define	ld_process_sym_reloc	ld64_process_sym_reloc
+#define	ld_reloc_enter		ld64_reloc_enter
 #define	ld_reloc_GOT_relative	ld64_reloc_GOT_relative
 #define	ld_reloc_plt		ld64_reloc_plt
 #define	ld_reloc_remain_entry	ld64_reloc_remain_entry
+#define	ld_reloc_set_aux_osdesc	ld64_reloc_set_aux_osdesc
+#define	ld_reloc_set_aux_usym	ld64_reloc_set_aux_usym
+#define	ld_reloc_sym_name	ld64_reloc_sym_name
 #define	ld_reloc_targval_get	ld64_reloc_targval_get
 #define	ld_reloc_targval_set	ld64_reloc_targval_set
 #define	ld_sec_validate		ld64_sec_validate
@@ -771,7 +772,6 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 
 #define	ld_add_actrel		ld32_add_actrel
 #define	ld_add_libdir		ld32_add_libdir
-#define	ld_add_rel_cache	ld32_add_rel_cache
 #define	ld_adj_movereloc	ld32_adj_movereloc
 #define	ld_am_I_partial		ld32_am_I_partial
 #define	ld_ar_member		ld32_ar_member
@@ -813,9 +813,13 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_process_open		ld32_process_open
 #define	ld_process_ordered	ld32_process_ordered
 #define	ld_process_sym_reloc	ld32_process_sym_reloc
+#define	ld_reloc_enter		ld32_reloc_enter
 #define	ld_reloc_GOT_relative	ld32_reloc_GOT_relative
 #define	ld_reloc_plt		ld32_reloc_plt
 #define	ld_reloc_remain_entry	ld32_reloc_remain_entry
+#define	ld_reloc_set_aux_osdesc	ld32_reloc_set_aux_osdesc
+#define	ld_reloc_set_aux_usym	ld32_reloc_set_aux_usym
+#define	ld_reloc_sym_name	ld32_reloc_sym_name
 #define	ld_reloc_targval_get	ld32_reloc_targval_get
 #define	ld_reloc_targval_set	ld32_reloc_targval_set
 #define	ld_sec_validate		ld32_sec_validate
@@ -867,8 +871,6 @@ extern int		dbg_setup(Ofl_desc *, const char *, int);
 
 extern uintptr_t	ld_add_actrel(Word, Rel_desc *, Ofl_desc *);
 extern uintptr_t	ld_add_libdir(Ofl_desc *, const char *);
-extern Rel_cache	*ld_add_rel_cache(Ofl_desc *, APlist **, size_t *,
-			    size_t, size_t);
 extern void 		ld_adj_movereloc(Ofl_desc *, Rel_desc *);
 extern Sym_desc * 	ld_am_I_partial(Rel_desc *, Xword);
 extern void		ld_ar_member(Ar_desc *, Elf_Arsym *, Ar_aux *,
@@ -937,10 +939,18 @@ extern uintptr_t	ld_process_ordered(Ofl_desc *, Ifl_desc *,
 extern uintptr_t	ld_process_sym_reloc(Ofl_desc *, Rel_desc *, Rel *,
 			    Is_desc *, const char *, Word);
 
+extern Rel_desc		*ld_reloc_enter(Ofl_desc *, Rel_cache *, Rel_desc *,
+			    Word);
 extern uintptr_t	ld_reloc_GOT_relative(Boolean, Rel_desc *, Ofl_desc *);
 extern uintptr_t	ld_reloc_plt(Rel_desc *, Ofl_desc *);
 extern void		ld_reloc_remain_entry(Rel_desc *, Os_desc *,
 			    Ofl_desc *);
+extern Boolean		ld_reloc_set_aux_osdesc(Ofl_desc *, Rel_desc *,
+			    Os_desc *);
+extern Boolean		ld_reloc_set_aux_usym(Ofl_desc *, Rel_desc *,
+			    Sym_desc *);
+
+extern const char	*ld_reloc_sym_name(Rel_desc *);
 extern int		ld_reloc_targval_get(Ofl_desc *, Rel_desc *,
 			    uchar_t *, Xword *);
 extern int		ld_reloc_targval_set(Ofl_desc *, Rel_desc *,

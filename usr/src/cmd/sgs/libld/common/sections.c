@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -268,7 +267,8 @@ ignore_section_processing(Ofl_desc *ofl)
 	Is_desc		*isp;
 	Os_desc		*osp;
 	Ifl_desc	*ifl;
-	Rel_cache	*rcp;
+	Rel_cachebuf	*rcbp;
+	Rel_desc	*rsp;
 	int		allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
 	Aliste		idx1;
 
@@ -346,45 +346,39 @@ ignore_section_processing(Ofl_desc *ofl)
 	 * Scan all output relocations searching for those against discarded or
 	 * ignored sections.  If one is found, decrement the total outrel count.
 	 */
-	for (APLIST_TRAVERSE(ofl->ofl_outrels, idx1, rcp)) {
-		Rel_desc	*rsp;
+	REL_CACHE_TRAVERSE(&ofl->ofl_outrels, idx1, rcbp, rsp) {
+		Is_desc		*isc = rsp->rel_isdesc;
+		uint_t		flags, entsize;
+		Shdr		*shdr;
 
-		/* LINTED */
-		for (rsp = (Rel_desc *)(rcp + 1); rsp < rcp->rc_free; rsp++) {
-			Is_desc		*isc = rsp->rel_isdesc;
-			uint_t		flags, entsize;
-			Shdr		*shdr;
+		if ((isc == NULL) || ((isc->is_flags & (FLG_IS_SECTREF))) ||
+		    ((ifl = isc->is_file) == NULL) ||
+		    ((ifl->ifl_flags & FLG_IF_IGNORE) == 0) ||
+		    ((shdr = isc->is_shdr) == NULL) ||
+		    ((shdr->sh_flags & SHF_ALLOC) == 0))
+			continue;
 
-			if ((isc == NULL) ||
-			    ((isc->is_flags & (FLG_IS_SECTREF))) ||
-			    ((ifl = isc->is_file) == NULL) ||
-			    ((ifl->ifl_flags & FLG_IF_IGNORE) == 0) ||
-			    ((shdr = isc->is_shdr) == NULL) ||
-			    ((shdr->sh_flags & SHF_ALLOC) == 0))
-				continue;
+		flags = rsp->rel_flags;
 
-			flags = rsp->rel_flags;
+		if (flags & (FLG_REL_GOT | FLG_REL_BSS |
+		    FLG_REL_NOINFO | FLG_REL_PLT))
+			continue;
 
-			if (flags & (FLG_REL_GOT | FLG_REL_BSS |
-			    FLG_REL_NOINFO | FLG_REL_PLT))
-				continue;
+		osp = RELAUX_GET_OSDESC(rsp);
 
-			osp = rsp->rel_osdesc;
+		if (rsp->rel_flags & FLG_REL_RELA)
+			entsize = sizeof (Rela);
+		else
+			entsize = sizeof (Rel);
 
-			if (rsp->rel_flags & FLG_REL_RELA)
-				entsize = sizeof (Rela);
-			else
-				entsize = sizeof (Rel);
+		assert(osp->os_szoutrels > 0);
+		osp->os_szoutrels -= entsize;
 
-			assert(osp->os_szoutrels > 0);
-			osp->os_szoutrels -= entsize;
+		if (!(flags & FLG_REL_PLT))
+			ofl->ofl_reloccntsub++;
 
-			if (!(flags & FLG_REL_PLT))
-				ofl->ofl_reloccntsub++;
-
-			if (rsp->rel_rtype == ld_targ.t_m.m_r_relative)
-				ofl->ofl_relocrelcnt--;
-		}
+		if (rsp->rel_rtype == ld_targ.t_m.m_r_relative)
+			ofl->ofl_relocrelcnt--;
 	}
 
 	/*
@@ -858,9 +852,8 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, APlist *alp)
 	 * Create relocations against this section to initialize it to the
 	 * function addresses.
 	 */
-	reld.rel_osdesc = osp;
 	reld.rel_isdesc = isec;
-	reld.rel_move = 0;
+	reld.rel_aux = NULL;
 	reld.rel_flags = FLG_REL_LOAD;
 
 	/*
@@ -870,7 +863,6 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, APlist *alp)
 	reld.rel_rtype = ld_targ.t_m.m_r_arrayaddr;
 	reld.rel_roffset = 0;
 	reld.rel_raddend = 0;
-	reld.rel_typedata = 0;
 
 	/*
 	 * Create a minimal relocation record to satisfy process_sym_reloc()
@@ -883,7 +875,6 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, APlist *alp)
 	DBG_CALL(Dbg_reloc_generate(ofl->ofl_lml, osp,
 	    ld_targ.t_m.m_rel_sht_type));
 	for (APLIST_TRAVERSE(alp, idx, sdp)) {
-		reld.rel_sname = sdp->sd_name;
 		reld.rel_sym = sdp;
 
 		if (ld_process_sym_reloc(ofl, &reld, (Rel *)&reloc, isec,
@@ -2715,8 +2706,8 @@ strmerge_get_reloc_str(Ofl_desc *ofl, Rel_desc *rsp)
  *		one of the input sections being merged.
  *	sym_alpp - APlist to receive pointer to any symbols that reference
  *		one of the input sections being merged.
- *	reloc_list - List of relocation descriptors to examine.
- *		Either ofl->&ofl->ofl_actrels (active relocations)
+ *	rcp - Pointer to cache of relocation descriptors to examine.
+ *		Either &ofl->ofl_actrels (active relocations)
  *		or &ofl->ofl_outrels (output relocations).
  *
  * exit:
@@ -2728,57 +2719,48 @@ strmerge_get_reloc_str(Ofl_desc *ofl, Rel_desc *rsp)
  */
 static int
 strmerge_pass1(Ofl_desc *ofl, Os_desc *osp, Str_tbl *mstrtab,
-    APlist **rel_alpp, APlist **sym_alpp, APlist *reloc_alp)
+    APlist **rel_alpp, APlist **sym_alpp, Rel_cache *rcp)
 {
 	Aliste		idx;
-	Rel_cache	*rcp;
+	Rel_cachebuf	*rcbp;
 	Sym_desc	*sdp;
 	Sym_desc	*last_sdp = NULL;
 	Rel_desc	*rsp;
 	const char	*name;
 
-	for (APLIST_TRAVERSE(reloc_alp, idx, rcp)) {
-		/* LINTED */
-		for (rsp = (Rel_desc *)(rcp + 1); rsp < rcp->rc_free; rsp++) {
-			sdp = rsp->rel_sym;
-			if ((sdp->sd_isc == NULL) ||
-			    ((sdp->sd_isc->is_flags &
-			    (FLG_IS_DISCARD | FLG_IS_INSTRMRG)) !=
-			    FLG_IS_INSTRMRG) ||
-			    (sdp->sd_isc->is_osdesc != osp))
-				continue;
+	REL_CACHE_TRAVERSE(rcp, idx, rcbp, rsp) {
+		sdp = rsp->rel_sym;
+		if ((sdp->sd_isc == NULL) || ((sdp->sd_isc->is_flags &
+		    (FLG_IS_DISCARD | FLG_IS_INSTRMRG)) != FLG_IS_INSTRMRG) ||
+		    (sdp->sd_isc->is_osdesc != osp))
+			continue;
 
-			/*
-			 * Remember symbol for use in the third pass.
-			 * There is no reason to save a given symbol more
-			 * than once, so we take advantage of the fact that
-			 * relocations to a given symbol tend to cluster
-			 * in the list. If this is the same symbol we saved
-			 * last time, don't bother.
-			 */
-			if (last_sdp != sdp) {
-				if (aplist_append(sym_alpp, sdp,
-				    AL_CNT_STRMRGSYM) == NULL)
-					return (0);
-				last_sdp = sdp;
-			}
-
-			/* Enter the string into our new string table */
-			name = strmerge_get_reloc_str(ofl, rsp);
-			if (st_insert(mstrtab, name) == -1)
+		/*
+		 * Remember symbol for use in the third pass. There is no
+		 * reason to save a given symbol more than once, so we take
+		 * advantage of the fact that relocations to a given symbol
+		 * tend to cluster in the list. If this is the same symbol
+		 * we saved last time, don't bother.
+		 */
+		if (last_sdp != sdp) {
+			if (aplist_append(sym_alpp, sdp, AL_CNT_STRMRGSYM) ==
+			    NULL)
 				return (0);
-
-			/*
-			 * If this is an STT_SECTION symbol, then the
-			 * second pass will need to modify this relocation,
-			 * so hang on to it.
-			 */
-			if ((ELF_ST_TYPE(sdp->sd_sym->st_info) ==
-			    STT_SECTION) &&
-			    (aplist_append(rel_alpp, rsp,
-			    AL_CNT_STRMRGREL) == NULL))
-				return (0);
+			last_sdp = sdp;
 		}
+
+		/* Enter the string into our new string table */
+		name = strmerge_get_reloc_str(ofl, rsp);
+		if (st_insert(mstrtab, name) == -1)
+			return (0);
+
+		/*
+		 * If this is an STT_SECTION symbol, then the second pass
+		 * will need to modify this relocation, so hang on to it.
+		 */
+		if ((ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) &&
+		    (aplist_append(rel_alpp, rsp, AL_CNT_STRMRGREL) == NULL))
+			return (0);
 	}
 
 	return (1);
@@ -2892,10 +2874,10 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
 	 * and insert the strings they reference into the mstrtab string table.
 	 */
 	if (strmerge_pass1(ofl, osp, mstrtab, rel_alpp, sym_alpp,
-	    ofl->ofl_actrels) == 0)
+	    &ofl->ofl_actrels) == 0)
 		goto return_s_error;
 	if (strmerge_pass1(ofl, osp, mstrtab, rel_alpp, sym_alpp,
-	    ofl->ofl_outrels) == 0)
+	    &ofl->ofl_outrels) == 0)
 		goto return_s_error;
 
 	/*
@@ -2970,13 +2952,12 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
 		rsp->rel_raddend = (Sxword)stoff;
 
 		/*
-		 * Change the descriptor name to reflect the fact that it
-		 * points at our merged section. This shows up in debug
-		 * output and helps show how the relocation has changed
-		 * from its original input section to our merged one.
+		 * Generate a symbol name string for STT_SECTION symbols
+		 * that might reference our merged section. This shows up
+		 * in debug output and helps show how the relocation has
+		 * changed from its original input section to our merged one.
 		 */
-		rsp->rel_sname = ld_stt_section_sym_name(mstrsec);
-		if (rsp->rel_sname == NULL)
+		if (ld_stt_section_sym_name(mstrsec) == NULL)
 			goto return_s_error;
 	}
 
