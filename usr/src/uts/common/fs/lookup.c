@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1008,8 +1007,7 @@ localpath(char *path, struct vnode *vrootp, cred_t *cr)
 /*
  * Given a directory, return the full, resolved path.  This looks up "..",
  * searches for the given vnode in the parent, appends the component, etc.  It
- * is used to implement vnodetopath() and getcwd() when the cached path fails
- * (or vfs_vnode_path is not set).
+ * is used to implement vnodetopath() and getcwd() when the cached path fails.
  */
 static int
 dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
@@ -1256,15 +1254,6 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
 	 */
 	if (bufloc != buf)
 		ovbcopy(bufloc, buf, buflen - (bufloc - buf));
-
-	/*
-	 * We got here because of invalid v_path in startvp.
-	 * Now, we have all info to fix it.
-	 * Path must not include leading slash to let vn_renamepath
-	 * pre-attach chroot'd root directory path. Also, trailing '\0'
-	 * is not counted to length.
-	 */
-	vn_renamepath(vrootp, startvp, &buf[1], buflen - (bufloc - buf) - 2);
 
 out:
 	/*
