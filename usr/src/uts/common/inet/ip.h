@@ -858,8 +858,6 @@ struct idl_s {
 	idl_tx_list_t	*idl_itl;
 };
 
-#define	CONN_DRAIN_LIST_LOCK(connp)	(&((connp)->conn_idl->idl_lock))
-
 /*
  * Interface route structure which holds the necessary information to recreate
  * routes that are tied to an interface i.e. have ire_ill set.

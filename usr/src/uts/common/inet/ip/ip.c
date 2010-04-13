@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1990 Mentat Inc.
  */
-/* Copyright (c) 1990 Mentat Inc. */
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -4170,16 +4169,16 @@ ip_quiesce_conn(conn_t *connp)
 	ipcl_hash_remove(connp);
 
 	/*
-	 * Remove this conn from the drain list, and do
-	 * any other cleanup that may be required.
-	 * (Only non-tcp conns may have a non-null conn_idl.
-	 * TCP conns are never flow controlled, and
-	 * conn_idl will be null)
+	 * Remove this conn from the drain list, and do any other cleanup that
+	 * may be required.  (TCP conns are never flow controlled, and
+	 * conn_idl will be NULL.)
 	 */
 	if (drain_cleanup_reqd && connp->conn_idl != NULL) {
-		mutex_enter(&connp->conn_idl->idl_lock);
+		idl_t *idl = connp->conn_idl;
+
+		mutex_enter(&idl->idl_lock);
 		conn_drain(connp, B_TRUE);
-		mutex_exit(&connp->conn_idl->idl_lock);
+		mutex_exit(&idl->idl_lock);
 	}
 
 	if (connp == ipst->ips_ip_g_mrouter)
@@ -13036,20 +13035,17 @@ conn_drain_insert(conn_t *connp, idl_tx_list_t *tx_list)
 	}
 	mutex_exit(&connp->conn_lock);
 
-	mutex_enter(CONN_DRAIN_LIST_LOCK(connp));
+	idl = connp->conn_idl;
+	mutex_enter(&idl->idl_lock);
 	if ((connp->conn_drain_prev != NULL) ||
 	    (connp->conn_state_flags & CONN_CLOSING)) {
 		/*
-		 * The conn is already in the drain list, OR
-		 * the conn is closing. We need to check again for
-		 * the closing case again since close can happen
-		 * after we drop the conn_lock, and before we
-		 * acquire the CONN_DRAIN_LIST_LOCK.
+		 * The conn is either already in the drain list or closing.
+		 * (We needed to check for CONN_CLOSING again since close can
+		 * sneak in between dropping conn_lock and acquiring idl_lock.)
 		 */
-		mutex_exit(CONN_DRAIN_LIST_LOCK(connp));
+		mutex_exit(&idl->idl_lock);
 		return;
-	} else {
-		idl = connp->conn_idl;
 	}
 
 	/*
@@ -13074,7 +13070,7 @@ conn_drain_insert(conn_t *connp, idl_tx_list_t *tx_list)
 	 * For non streams based sockets assert flow control.
 	 */
 	conn_setqfull(connp, NULL);
-	mutex_exit(CONN_DRAIN_LIST_LOCK(connp));
+	mutex_exit(&idl->idl_lock);
 }
 
 static void
@@ -13154,6 +13150,8 @@ conn_drain(conn_t *connp, boolean_t closing)
 	}
 
 	idl = connp->conn_idl;
+	ASSERT(MUTEX_HELD(&idl->idl_lock));
+
 	if (!closing) {
 		next_connp = connp->conn_drain_next;
 		while (next_connp != connp) {
