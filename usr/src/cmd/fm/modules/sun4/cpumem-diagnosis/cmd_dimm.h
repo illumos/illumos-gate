@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _CMD_DIMM_H
@@ -117,7 +116,6 @@ typedef struct cmd_mq {
 	uint16_t mq_ckwd;		/* phys addr mod 64 */
 	uint64_t mq_phys_addr;		/* from ereport */
 	uint16_t mq_unit_position;	/* bit for sun4u, nibble for sun4v */
-	int16_t mq_dram;		/* by table lookup from unit pos */
 	fmd_event_t *mq_ep;		/* ereport - for potential fault */
 	char *mq_serdnm;		/* serd eng to retain CE events */
 } cmd_mq_t;

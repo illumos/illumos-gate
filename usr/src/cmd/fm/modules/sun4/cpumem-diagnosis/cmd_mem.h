@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _CMD_MEM_H
@@ -115,7 +114,6 @@ typedef cmd_evdisp_t cmd_xe_handler_f(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
 
 extern ce_dispact_t cmd_mem_name2type(const char *, int);
 extern int cmd_synd2upos(uint16_t);
-extern int cmd_upos2dram(uint16_t);
 extern cmd_evdisp_t cmd_ce(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 extern cmd_evdisp_t cmd_ue(fmd_hdl_t *, fmd_event_t *, nvlist_t *,

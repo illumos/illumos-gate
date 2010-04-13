@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -106,7 +105,7 @@ ce_thresh_check(fmd_hdl_t *hdl, gmem_dimm_t *dimm)
  */
 gmem_mq_t *
 mq_create(fmd_hdl_t *hdl, fmd_event_t *ep,
-    uint64_t afar, uint16_t upos, uint16_t dram, uint16_t ckwd, uint64_t now)
+    uint64_t afar, uint16_t upos, uint16_t ckwd, uint64_t now)
 {
 	gmem_mq_t *cp;
 	cp = fmd_hdl_zalloc(hdl, sizeof (gmem_mq_t), FMD_SLEEP);
@@ -114,7 +113,6 @@ mq_create(fmd_hdl_t *hdl, fmd_event_t *ep,
 	cp->mq_ckwd = ckwd;
 	cp->mq_phys_addr = afar;
 	cp->mq_unit_position = upos;
-	cp->mq_dram = (int16_t)dram;
 	cp->mq_ep = ep;
 	cp->mq_serdnm =
 	    gmem_mq_serdnm_create(hdl, "mq", afar, ckwd, upos);
@@ -158,7 +156,7 @@ mq_destroy(fmd_hdl_t *hdl, gmem_list_t *lp, gmem_mq_t *ip)
  */
 void
 mq_add(fmd_hdl_t *hdl, gmem_dimm_t *dimm, fmd_event_t *ep,
-    uint64_t afar, uint16_t unit_position, uint16_t dram, uint16_t ckwd,
+    uint64_t afar, uint16_t unit_position, uint16_t ckwd,
     uint64_t now)
 {
 	gmem_mq_t *ip, *jp;
@@ -180,7 +178,7 @@ mq_add(fmd_hdl_t *hdl, gmem_dimm_t *dimm, fmd_event_t *ep,
 			ip = gmem_list_next(ip);
 		}
 	}
-	jp = mq_create(hdl, ep, afar, unit_position, dram, cw, now);
+	jp = mq_create(hdl, ep, afar, unit_position, cw, now);
 	if (ip == NULL)
 		gmem_list_append(&dimm->mq_root[cw], jp);
 	else
@@ -216,9 +214,8 @@ mq_prune(fmd_hdl_t *hdl, gmem_dimm_t *dimm, uint64_t now)
 
 /*
  * Check the MQSC index lists (one for each checkword) by making a
- * complete pass through each list, checking if the criteria for either
- * Rule 4A or 4B have been met.  Rule 4A checking is done for each checkword;
- * 4B check is done at end.
+ * complete pass through each list, checking if the criteria for
+ * Rule 4A has been met.  Rule 4A checking is done for each checkword.
  *
  * Rule 4A: fault a DIMM  "whenever Solaris reports two or more CEs from
  * two or more different physical addresses on each of two or more different
@@ -228,27 +225,15 @@ mq_prune(fmd_hdl_t *hdl, gmem_dimm_t *dimm, uint64_t now)
  * from one bit position, with unique addresses, and two from another,
  * also with unique addresses, and the lower 6 bits of all the addresses
  * are the same."
- *
- * Rule 4B: fault a DIMM "whenever Solaris reports two or more CEs from
- * two or more different physical addresses on each of three or more
- * different outputs from the same DRAM within 72 hours of each other, as
- * long as the three outputs do not all correspond to the same relative
- * bit position in their respective checkwords.  [Note: This means at least
- * 6 CEs; two from one DRAM output signal, with unique addresses, two from
- * another output from the same DRAM, also with unique addresses, and two
- * more from yet another output from the same DRAM, again with unique
- * addresses, as long as the three outputs do not all correspond to the
- * same relative bit position in their respective checkwords.]"
  */
 
 void
-mq_check(fmd_hdl_t *hdl, gmem_dimm_t *dimm, int16_t dram)
+mq_check(fmd_hdl_t *hdl, gmem_dimm_t *dimm)
 {
-	int upos_pairs, curr_upos, cw, i, j, k;
+	int upos_pairs, curr_upos, cw, i, j;
 	nvlist_t *flt, *rsc;
 	typedef struct upos_pair {
 		int upos;
-		int dram;
 		gmem_mq_t *mq1;
 		gmem_mq_t *mq2;
 	} upos_pair_t;
@@ -293,10 +278,9 @@ mq_check(fmd_hdl_t *hdl, gmem_dimm_t *dimm, int16_t dram)
 				continue;
 			} else if (upos_array[i].mq1 == NULL) {
 				/* Have a pair. Add to upos_array[] */
-				fmd_hdl_debug(hdl, "pair:upos=%d dram=%d",
-				    curr_upos, ip->mq_dram);
+				fmd_hdl_debug(hdl, "pair:upos=%d",
+				    curr_upos);
 				upos_array[i].upos = curr_upos;
-				upos_array[i].dram = ip->mq_dram;
 				upos_array[i].mq1 = gmem_list_prev(ip);
 				upos_array[i].mq2 = ip;
 				upos_array[++i].mq1 = NULL;
@@ -326,84 +310,15 @@ mq_check(fmd_hdl_t *hdl, gmem_dimm_t *dimm, int16_t dram)
 		upos_pairs = i;
 		assert(upos_pairs < 16);
 	}
-
-	if ((dram == INVALID_DRAM) || (upos_pairs  < 3)) {
-		fmd_hdl_debug(hdl, "Skip rules 4B upos_pairs=%d\n", upos_pairs);
-		return; /* 4B violation needs at least 3 pairs */
-	}
-
-	/*
-	 * Walk through checking for a rule 4B violation.
-	 * Since we only keep track of two CE pairs per CW we'll only have
-	 * a max of potentially 16 lements in the array. So as not to run
-	 * off the end of the array, need to be careful with i and j indexes.
-	 */
-	for (i = 0; i < (upos_pairs - 2); i++) {
-		for (j = i+1; j < (upos_pairs - 1); j++) {
-			if (upos_array[i].dram != upos_array[j].dram)
-				/*
-				 * These two pairs aren't the same dram;
-				 * continue looking for pairs that are.
-				 */
-				continue;
-			for (k = j+1; k < upos_pairs; k++) {
-				if (upos_array[j].dram != upos_array[k].dram)
-					/*
-					 * DRAMs must be the same for a rule
-					 * 4B violation. Continue looking for
-					 * pairs that have the same DRAMs.
-					 */
-					continue;
-				if ((upos_array[i].upos !=
-				    upos_array[j].upos) ||
-				    (upos_array[j].upos !=
-				    upos_array[k].upos)) {
-					rsc = gmem_find_dimm_rsc(hdl,
-					    dimm->dimm_serial);
-					flt = fmd_nvl_create_fault(hdl,
-					    GMEM_FAULT_DIMM_4B, GMEM_FLTMAXCONF,
-					    NULL, gmem_dimm_fru(dimm), rsc);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[i].mq1->mq_ep);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[i].mq2->mq_ep);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[j].mq1->mq_ep);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[j].mq2->mq_ep);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[k].mq1->mq_ep);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[k].mq2->mq_ep);
-					fmd_case_add_suspect(hdl,
-					    dimm->dimm_case.cc_cp, flt);
-					fmd_case_solve(hdl,
-					    dimm->dimm_case.cc_cp);
-					dimm->dimm_flags |= GMEM_F_FAULTING;
-					gmem_dimm_dirty(hdl, dimm);
-					if (rsc != NULL)
-						nvlist_free(rsc);
-					return;
-				}
-			}
-		}
-	}
 }
 
 /*ARGSUSED*/
 gmem_evdisp_t
 gmem_ce(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
-	uint16_t symbol_pos, erpt_dram, cw;
+	uint16_t symbol_pos, cw;
 	uint64_t phyaddr, offset;
 	uint32_t filter_ratio = 0;
-	int16_t dram;
 	gmem_dimm_t *dimm;
 	gmem_page_t *page;
 	nvlist_t *fru = NULL;
@@ -468,31 +383,26 @@ gmem_ce(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	/*
 	 * Add to MQSC correlation lists all CEs which pass validity
 	 * checks above. If there is no symbol_pos & relative ckword
-	 * in the ereport, skip rules 4A & 4B checking.
-	 * If there is no dram in the ereport, skip the rule 4B checking.
+	 * in the ereport, skip rule 4A checking.
 	 */
-	if (nvlist_lookup_uint16(nvl, GMEM_ERPT_PAYLOAD_DRAM, &erpt_dram) != 0)
-		dram = INVALID_DRAM;
-	else
-		dram = (int16_t)erpt_dram;
 
 	err = nvlist_lookup_uint16(nvl, GMEM_ERPT_PAYLOAD_SYMBOLPOS,
 	    &symbol_pos);
 	err |= nvlist_lookup_uint16(nvl, GMEM_ERPT_PAYLOAD_CKW, &cw);
 
 	if (err == 0)
-		fmd_hdl_debug(hdl, "symbol_pos=%d dram=%d cw=%d",
-		    symbol_pos, dram, cw);
+		fmd_hdl_debug(hdl, "symbol_pos=%d cw=%d",
+		    symbol_pos, cw);
 
 	if (!(dimm->dimm_flags & GMEM_F_FAULTING) && (err == 0)) {
 		uint64_t *now;
 		uint_t nelem;
 		if (nvlist_lookup_uint64_array(nvl,
 		    "__tod", &now, &nelem) == 0) {
-			mq_add(hdl, dimm, ep, phyaddr, symbol_pos, dram,
+			mq_add(hdl, dimm, ep, phyaddr, symbol_pos,
 			    cw, *now);
 			mq_prune(hdl, dimm, *now);
-			mq_check(hdl, dimm, dram);
+			mq_check(hdl, dimm);
 		}
 	}
 

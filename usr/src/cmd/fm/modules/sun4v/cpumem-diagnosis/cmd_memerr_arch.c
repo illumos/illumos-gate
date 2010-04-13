@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -666,18 +665,6 @@ cmd_synd2upos(uint16_t syndrome) {
 			return (30); /* d d d 0 => N30 */
 		return (-1);
 	} else return (-1);
-}
-
-int
-cmd_upos2dram(uint16_t upos) {
-
-	/*
-	 * If and/or when x8 DIMMs are used on sun4v systems, this
-	 * function will become more complicated.
-	 */
-
-	return ((int)upos);
-
 }
 
 nvlist_t *

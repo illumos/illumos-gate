@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -184,7 +183,6 @@ mq_create(fmd_hdl_t *hdl, fmd_event_t *ep,
 	cp->mq_ckwd = ckwd;
 	cp->mq_phys_addr = afar;
 	cp->mq_unit_position = upos;
-	cp->mq_dram = cmd_upos2dram(upos);
 	cp->mq_ep = ep;
 	cp->mq_serdnm =
 	    cmd_mq_serdnm_create(hdl, "mq", afar, ckwd, upos);
@@ -296,9 +294,8 @@ mq_prune(fmd_hdl_t *hdl, cmd_dimm_t *dimm, uint64_t now)
 
 /*
  * Check the MQSC index lists (one for each checkword) by making a
- * complete pass through each list, checking if the criteria for either
- * Rule 4A or 4B have been met.  Rule 4A checking is done for each checkword;
- * 4B check is done at end.
+ * complete pass through each list, checking if the criteria for
+ * Rule 4A has been met.  Rule 4A checking is done for each checkword.
  *
  * Rule 4A: fault a DIMM  "whenever Solaris reports two or more CEs from
  * two or more different physical addresses on each of two or more different
@@ -308,27 +305,15 @@ mq_prune(fmd_hdl_t *hdl, cmd_dimm_t *dimm, uint64_t now)
  * from one bit position, with unique addresses, and two from another,
  * also with unique addresses, and the lower 6 bits of all the addresses
  * are the same."
- *
- * Rule 4B: fault a DIMM "whenever Solaris reports two or more CEs from
- * two or more different physical addresses on each of three or more
- * different outputs from the same DRAM within 72 hours of each other, as
- * long as the three outputs do not all correspond to the same relative
- * bit position in their respective checkwords.  [Note: This means at least
- * 6 CEs; two from one DRAM output signal, with unique addresses, two from
- * another output from the same DRAM, also with unique addresses, and two
- * more from yet another output from the same DRAM, again with unique
- * addresses, as long as the three outputs do not all correspond to the
- * same relative bit position in their respective checkwords.]"
  */
 
 void
 mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 {
-	int upos_pairs, curr_upos, cw, i, j, k;
+	int upos_pairs, curr_upos, cw, i, j;
 	nvlist_t *flt;
 	typedef struct upos_pair {
 		int upos;
-		int dram;
 		cmd_mq_t *mq1;
 		cmd_mq_t *mq2;
 	} upos_pair_t;
@@ -378,7 +363,6 @@ mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 				 * Have a pair, add to upos_array[].
 				 */
 				upos_array[i].upos = curr_upos;
-				upos_array[i].dram = ip->mq_dram;
 				upos_array[i].mq1 = cmd_list_prev(ip);
 				upos_array[i].mq2 = ip;
 				upos_array[++i].mq1 = NULL;
@@ -406,88 +390,6 @@ mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 		}
 		upos_pairs = i;
 		assert(upos_pairs < 8);
-	}
-
-	if (upos_pairs < 3)
-		return; /* 4B violation needs at least 3 pairs */
-
-	/*
-	 * Walk through checking for a rule 4B violation.
-	 * Since we only keep track of two CE pairs per CW we'll only have
-	 * a max of potentially 8 elements in the array. So as not to run
-	 * off the end of the array, need to be careful with i and j indexes.
-	 */
-	for (i = 0; i < (upos_pairs - 2); i++) {
-		if (upos_array[i].dram == -1) {
-			/*
-			 * Don't match failure codes. There is
-			 * no platform DRAM xlation - return.
-			 */
-			fmd_hdl_debug(hdl, "Unable to determine DRAM"
-			    " from the unit position\n");
-			return;
-		}
-
-		for (j = i+1; j < (upos_pairs - 1); j++) {
-			if (upos_array[i].dram != upos_array[j].dram) {
-				/*
-				 * These two pairs aren't the same dram;
-				 * continue looking for pairs that are.
-				 */
-				continue;
-			}
-
-			for (k = j+1; k < upos_pairs; k++) {
-				if (upos_array[j].dram != upos_array[k].dram) {
-					/*
-					 * DRAMs must be the same for a rule
-					 * 4B violation. Continue looking for
-					 * pairs that have the same DRAMs.
-					 */
-					continue;
-				}
-
-				if ((upos_array[i].upos !=
-				    upos_array[j].upos) ||
-				    (upos_array[j].upos !=
-				    upos_array[k].upos)) {
-					/*
-					 * We've determined that all the dram
-					 * CEs are the same dram, if all the
-					 * unit positions are not the same,
-					 * then we have a rule 4B violation.
-					 */
-					flt = cmd_dimm_create_fault(hdl, dimm,
-					    "fault.memory.dram-ue-imminent",
-					    CMD_FLTMAXCONF);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[i].mq1->mq_ep);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[i].mq2->mq_ep);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[j].mq1->mq_ep);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[j].mq2->mq_ep);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[k].mq1->mq_ep);
-					fmd_case_add_ereport(hdl,
-					    dimm->dimm_case.cc_cp,
-					    upos_array[k].mq2->mq_ep);
-					dimm->dimm_flags |= CMD_MEM_F_FAULTING;
-					cmd_dimm_dirty(hdl, dimm);
-					fmd_case_add_suspect(hdl,
-					    dimm->dimm_case.cc_cp, flt);
-					fmd_case_solve(hdl,
-					    dimm->dimm_case.cc_cp);
-					return;
-				}
-			}
-		}
 	}
 }
 
