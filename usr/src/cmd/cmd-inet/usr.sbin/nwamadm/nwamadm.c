@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1288,26 +1287,33 @@ select_wifi_func(int argc, char *argv[])
 			break;
 	}
 
-	if (choice == i + 1) {
+	if (choice == i + 1 || wlans[choice - 1].nww_essid[0] == '\0') {
 		nwam_known_wlan_handle_t kwh = NULL;
 		nwam_value_t keynameval = NULL;
 
-		/* "Other" was selected - ESSID/secmode must be specified. */
+		/* If "Other" or a hidden WLAN is selected, ask for ESSID */
 		do {
 			(void) printf(gettext("\nEnter WLAN name: "));
 			while (fgets(essid, sizeof (essid), stdin) == NULL) {}
 			essid[strlen(essid) - 1] = '\0';
 		} while (strspn(essid, " \t") == strlen(essid));
 
-		for (;;) {
-			(void) printf(gettext("1: None\n"));
-			(void) printf(gettext("2: WEP\n"));
-			(void) printf(gettext("3: WPA\n"));
-			(void) printf(gettext("Enter security mode: "));
-			if (fgets(modestr, sizeof (choicestr), stdin) != NULL &&
-			    (security_mode = atoi(modestr)) >= 1 &&
-			    security_mode <= 3)
-				break;
+		/* If "Other" was selected, secmode must be specified. */
+		if (choice == i + 1) {
+			for (;;) {
+				(void) printf(gettext("1: None\n"));
+				(void) printf(gettext("2: WEP\n"));
+				(void) printf(gettext("3: WPA\n"));
+				(void) printf(gettext("Enter security mode: "));
+				if (fgets(modestr, sizeof (choicestr), stdin)
+				    != NULL &&
+				    (security_mode = atoi(modestr)) >= 1 &&
+				    security_mode <= 3)
+					break;
+			}
+		} else {
+			security_mode = wlans[choice - 1].nww_security_mode;
+			have_key = wlans[choice - 1].nww_have_key;
 		}
 
 		/*

@@ -703,6 +703,66 @@ nwamd_set_selected_connected(nwamd_ncu_t *ncu, boolean_t selected,
 	}
 }
 
+/*
+ * Callback used on each known WLAN - if the BSSID is matched, set
+ * the ESSID of the hidden WLAN to the known WLAN name.
+ */
+static int
+find_bssid_cb(nwam_known_wlan_handle_t kwh, void *data)
+{
+	nwamd_link_t *link = data;
+	nwam_error_t err;
+	nwam_value_t bssidval;
+	char **bssids, *name;
+	uint_t num_bssids, i;
+
+	if ((err = nwam_known_wlan_get_prop_value(kwh,
+	    NWAM_KNOWN_WLAN_PROP_BSSIDS, &bssidval)) != NWAM_SUCCESS) {
+		nlog(LOG_ERR, "find_bssid_cb: nwam_known_wlan_get_prop: %s",
+		    nwam_strerror(err));
+		return (0);
+	}
+	if ((err = nwam_value_get_string_array(bssidval, &bssids, &num_bssids))
+	    != NWAM_SUCCESS) {
+		nlog(LOG_ERR, "find_bssid_cb: nwam_value_get_string_array: %s",
+		    nwam_strerror(err));
+		nwam_value_free(bssidval);
+		return (0);
+	}
+	for (i = 0; i < num_bssids; i++) {
+		if (strcmp(bssids[i], link->nwamd_link_wifi_bssid) == 0) {
+			if ((err = nwam_known_wlan_get_name(kwh, &name))
+			    != NWAM_SUCCESS) {
+				nlog(LOG_ERR, "find_bssid_cb: "
+				    "nwam_known_wlan_get_name: %s",
+				    nwam_strerror(err));
+				continue;
+			}
+			(void) strlcpy(link->nwamd_link_wifi_essid, name,
+			    sizeof (link->nwamd_link_wifi_essid));
+			free(name);
+			nwam_value_free(bssidval);
+			/* Found ESSID for BSSID so terminate walk */
+			return (1);
+		}
+	}
+	nwam_value_free(bssidval);
+
+	return (0);
+}
+
+/*
+ * We may have encountered a BSSID for a hidden WLAN before and as a result
+ * may have a known WLAN entry with this BSSID.  Walk known WLANs, searching
+ * for a BSSID match.  Called with object lock held.
+ */
+static void
+check_if_hidden_wlan_was_visited(nwamd_link_t *link)
+{
+	(void) nwam_walk_known_wlans(find_bssid_cb, link,
+	    NWAM_FLAG_KNOWN_WLAN_WALK_PRIORITY_ORDER, NULL);
+}
+
 nwam_error_t
 nwamd_wlan_select(const char *linkname, const char *essid, const char *bssid,
     uint32_t security_mode, boolean_t add_to_known_wlans)
@@ -734,6 +794,9 @@ nwamd_wlan_select(const char *linkname, const char *essid, const char *bssid,
 	/* unset selected, connected flag for previously connected wlan */
 	nwamd_set_selected_connected(ncu, B_FALSE, B_FALSE);
 
+	/* Disconnect to allow new selection to go ahead */
+	(void) dladm_wlan_disconnect(dld_handle, link->nwamd_link_id);
+
 	(void) strlcpy(link->nwamd_link_wifi_essid, essid,
 	    sizeof (link->nwamd_link_wifi_essid));
 	(void) strlcpy(link->nwamd_link_wifi_bssid, bssid,
@@ -741,8 +804,9 @@ nwamd_wlan_select(const char *linkname, const char *essid, const char *bssid,
 	link->nwamd_link_wifi_security_mode = security_mode;
 	link->nwamd_link_wifi_add_to_known_wlans = add_to_known_wlans;
 
-	/* Disconnect to allow new selection to go ahead */
-	(void) dladm_wlan_disconnect(dld_handle, link->nwamd_link_id);
+	/* If this is a hidden wlan, then essid is empty */
+	if (link->nwamd_link_wifi_essid[0] == '\0')
+		check_if_hidden_wlan_was_visited(link);
 
 	/* set selected flag for newly-selected WLAN */
 	nwamd_set_selected_connected(ncu, B_TRUE, B_FALSE);
@@ -1416,66 +1480,6 @@ nwamd_wlan_scan(const char *linkname)
  * WLAN connection code.
  */
 
-/*
- * Callback used on each known WLAN - if the BSSID is matched, set
- * the ESSID of the hidden WLAN to the known WLAN name.
- */
-static int
-find_bssid_cb(nwam_known_wlan_handle_t kwh, void *data)
-{
-	nwamd_link_t *link = data;
-	nwam_error_t err;
-	nwam_value_t bssidval;
-	char **bssids, *name;
-	uint_t num_bssids, i;
-
-	if ((err = nwam_known_wlan_get_prop_value(kwh,
-	    NWAM_KNOWN_WLAN_PROP_BSSIDS, &bssidval)) != NWAM_SUCCESS) {
-		nlog(LOG_ERR, "find_bssid_cb: nwam_known_wlan_get_prop: %s",
-		    nwam_strerror(err));
-		return (0);
-	}
-	if ((err = nwam_value_get_string_array(bssidval, &bssids, &num_bssids))
-	    != NWAM_SUCCESS) {
-		nlog(LOG_ERR, "find_bssid_cb: nwam_value_get_string_array: %s",
-		    nwam_strerror(err));
-		nwam_value_free(bssidval);
-		return (0);
-	}
-	for (i = 0; i < num_bssids; i++) {
-		if (strcmp(bssids[i], link->nwamd_link_wifi_bssid) == 0) {
-			if ((err = nwam_known_wlan_get_name(kwh, &name))
-			    != NWAM_SUCCESS) {
-				nlog(LOG_ERR, "find_bssid_cb: "
-				    "nwam_known_wlan_get_name: %s",
-				    nwam_strerror(err));
-				continue;
-			}
-			(void) strlcpy(link->nwamd_link_wifi_essid, name,
-			    sizeof (link->nwamd_link_wifi_essid));
-			free(name);
-			nwam_value_free(bssidval);
-			/* Found ESSID for BSSID so terminate walk */
-			return (1);
-		}
-	}
-	nwam_value_free(bssidval);
-
-	return (0);
-}
-
-/*
- * We may have encountered a BSSID for a hidden WLAN before and as a result
- * may have a known WLAN entry with this BSSID.  Walk known WLANs, searching
- * for a BSSID match.  Called with object lock held.
- */
-static void
-check_if_hidden_wlan_was_visited(nwamd_link_t *link)
-{
-	(void) nwam_walk_known_wlans(find_bssid_cb, link,
-	    NWAM_FLAG_KNOWN_WLAN_WALK_PRIORITY_ORDER, NULL);
-}
-
 static dladm_status_t
 do_connect(uint32_t link_id, dladm_wlan_attr_t *attrp, dladm_wlan_key_t *key,
     uint_t keycount, uint_t flags)
@@ -1526,11 +1530,6 @@ wlan_connect_thread(void *arg)
 		goto done;
 	}
 
-	(void) memset(&attr, 0, sizeof (attr));
-	/* try to apply essid selected by the user */
-	if (link->nwamd_link_wifi_essid[0] == '\0')
-		check_if_hidden_wlan_was_visited(link);
-
 	/* If it is already connected to the required AP, just return. */
 	if (nwamd_wlan_connected(ncu_obj)) {
 		nwamd_object_set_state(NWAM_OBJECT_TYPE_NCU,
@@ -1539,6 +1538,7 @@ wlan_connect_thread(void *arg)
 		goto done;
 	}
 
+	(void) memset(&attr, 0, sizeof (attr));
 	if (dladm_wlan_str2essid(link->nwamd_link_wifi_essid, &attr.wa_essid)
 	    != DLADM_STATUS_OK) {
 		nlog(LOG_ERR, "wlan_connect_thread: invalid ESSID '%s' "
