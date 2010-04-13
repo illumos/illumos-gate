@@ -1780,8 +1780,6 @@ loop:
 
 			continue;
 		} else {
-			int prm;
-
 			if (PP_ISFREE(pp)) {
 				continue;
 			}
