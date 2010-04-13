@@ -19,23 +19,21 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # cmd/iscsid/Makefile
 #
 
-PROG= 		iscsi-initiator
+PROG= 		iscsid
 MANIFEST=	iscsi-initiator.xml
-SVCMETHOD=	iscsi-initiator
+SVCMETHOD=	iscsi-initiator	\
+		iscsid
 
 PRODUCT=	$(PROG)
 OBJS=		iscsid.o
 SRCS=		$(OBJS:%.o=./%.c)
 LLOBJS=		$(OBJS:%.o=%.ll)
-POFILES= $(OBJS:%.o=%.po)
-POFILE= iscsi-initiator.po
 
 include ../Makefile.cmd
 
@@ -62,10 +60,6 @@ clean:
 	$(RM) $(PROG) $(OBJS) $(LLOBJS)
 
 lint:	lint_SRCS
-
-$(POFILE): $(POFILES)
-	$(RM) $@
-	cat $(POFILES) > $@
 
 install: all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 

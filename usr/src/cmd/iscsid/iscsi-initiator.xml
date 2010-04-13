@@ -22,8 +22,7 @@
 
  CDDL HEADER END
 
-	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-	Use is subject to license terms.
+ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 
 	Service manifests for the iSCSI Initiator
 -->
@@ -76,6 +75,14 @@ potential to specialize all the properties/methods.
     <single_instance/>
 
     <dependency
+	name='network'
+	grouping='require_any'
+	restart_on='error'
+	type='service'>
+	<service_fmri value='svc:/milestone/network' />
+    </dependency>
+
+    <dependency
         name='net'
         grouping='require_all'
         restart_on='none'
@@ -91,6 +98,13 @@ potential to specialize all the properties/methods.
         <service_fmri value='svc:/network/loopback' />
     </dependency>
 
+    <dependent
+	name='iscsi-initiator_multi-user'
+	grouping='optional_all'
+	restart_on='none'>
+	<service_fmri value='svc:/milestone/multi-user' />
+    </dependent>
+
 	<!--
 	   Set a timeout of -1 to signify to inetd that we don't want
 	   to timeout this service, since the forked process is the
@@ -102,13 +116,13 @@ potential to specialize all the properties/methods.
 	<exec_method
 		type='method'
 		name='start'
-		exec='/lib/svc/method/iscsi-initiator'
+		exec='/lib/svc/method/iscsi-initiator %m'
 		timeout_seconds='600'>
 		<method_context>
 			<method_credential
 			user='root'
 			group='root'
-			privileges='basic,sys_devices'
+			privileges='basic,sys_devices,sys_mount'
 			/>
 		</method_context>
 	</exec_method>
@@ -116,13 +130,13 @@ potential to specialize all the properties/methods.
 	<exec_method
 		type='method'
 		name='stop'
-		exec=':kill'
+		exec='/lib/svc/method/iscsi-initiator %m'
 		timeout_seconds='600'>
 		<method_context>
 			<method_credential
 			user='root'
 			group='root'
-			privileges='basic,sys_devices'
+			privileges='basic,sys_devices,sys_mount'
 			/>
 		</method_context>
 	</exec_method>

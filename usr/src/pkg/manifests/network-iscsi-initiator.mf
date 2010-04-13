@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/network/iscsi/initiator@$(PKGVERS)
@@ -61,6 +60,8 @@ file path=kernel/drv/iscsi.conf group=sys opensolaris.zone=global \
     original_name=SUNWiscsi:kernel/drv/iscsi.conf preserve=true \
     reboot-needed=false variant.opensolaris.zone=global
 file path=lib/svc/method/iscsi-initiator mode=0555 opensolaris.zone=global \
+    variant.opensolaris.zone=global
+file path=lib/svc/method/iscsid mode=0555 opensolaris.zone=global \
     variant.opensolaris.zone=global
 file path=usr/sbin/iscsiadm mode=0555
 file path=lib/svc/manifest/network/iscsi/iscsi-initiator.xml group=sys mode=0444 \
