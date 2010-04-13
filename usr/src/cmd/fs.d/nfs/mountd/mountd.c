@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -77,6 +76,8 @@
 #include <sys/tsol/label_macro.h>
 #include <libtsnet.h>
 #include <sys/sdt.h>
+#include <sys/nvpair.h>
+#include <attr.h>
 
 extern int daemonize_init(void);
 extern void daemonize_fini(int fd);
@@ -1401,14 +1402,73 @@ done:
 	return (error);
 }
 
+/*
+ * Determine whether two paths are within the same file system.
+ * Returns nonzero (true) if paths are the same, zero (false) if
+ * they are different.  If an error occurs, return false.
+ *
+ * Use the actual FSID if it's available (via getattrat()); otherwise,
+ * fall back on st_dev.
+ *
+ * With ZFS snapshots, st_dev differs from the regular file system
+ * versus the snapshot.  But the fsid is the same throughout.  Thus
+ * the fsid is a better test.
+ */
+static int
+same_file_system(const char *path1, const char *path2)
+{
+	uint64_t fsid1, fsid2;
+	struct stat64 st1, st2;
+	nvlist_t *nvl1 = NULL;
+	nvlist_t *nvl2 = NULL;
+
+	if ((getattrat(AT_FDCWD, XATTR_VIEW_READONLY, path1, &nvl1) == 0) &&
+	    (getattrat(AT_FDCWD, XATTR_VIEW_READONLY, path2, &nvl2) == 0) &&
+	    (nvlist_lookup_uint64(nvl1, A_FSID, &fsid1) == 0) &&
+	    (nvlist_lookup_uint64(nvl2, A_FSID, &fsid2) == 0)) {
+		nvlist_free(nvl1);
+		nvlist_free(nvl2);
+		/*
+		 * We have found fsid's for both paths.
+		 */
+
+		if (fsid1 == fsid2)
+			return (B_TRUE);
+
+		return (B_FALSE);
+	}
+
+	if (nvl1 != NULL)
+		nvlist_free(nvl1);
+	if (nvl2 != NULL)
+		nvlist_free(nvl2);
+
+	/*
+	 * We were unable to find fsid's for at least one of the paths.
+	 * fall back on st_dev.
+	 */
+
+	if (stat64(path1, &st1) < 0) {
+		syslog(LOG_NOTICE, "%s: %m", path1);
+		return (B_FALSE);
+	}
+	if (stat64(path2, &st2) < 0) {
+		syslog(LOG_NOTICE, "%s: %m", path2);
+		return (B_FALSE);
+	}
+
+	if (st1.st_dev == st2.st_dev)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
 share_t *
 findentry(char *path)
 {
 	share_t *sh = NULL;
 	struct sh_list *shp;
 	register char *p1, *p2;
-	struct stat st1;
-	struct stat64 st2;
 
 	check_sharetab();
 
@@ -1431,31 +1491,15 @@ findentry(char *path)
 		 *
 		 * Parent: /export/foo/		(no trailing slash on child)
 		 * Child:  /export/foo
-		 *
-		 * Then compare the dev_t of the parent and child to
-		 * make sure that they're both in the same filesystem.
 		 */
 		if ((*p1 == '\0' && *p2 == '/') ||
 		    (*p1 == '\0' && *(p1-1) == '/') ||
 		    (*p2 == '\0' && *p1 == '/' && *(p1+1) == '\0')) {
-			if (stat(sh->sh_path, &st1) < 0) {
-				if (verbose)
-					syslog(LOG_NOTICE, "%s: %m", p1);
-				shp = NULL;
-				goto done;
-			}
-
 			/*
-			 * Use stat64 on "path" since it might be larger
-			 * than 2 Gb and 32 bit stat would fail EOVERFLOW
+			 * We have a subdirectory.  Test whether the
+			 * subdirectory is in the same file system.
 			 */
-			if (stat64(path, &st2) < 0) {
-				if (verbose)
-					syslog(LOG_NOTICE, "%s: %m", p2);
-				shp = NULL;
-				goto done;
-			}
-			if (st1.st_dev == st2.st_dev)
+			if (same_file_system(path, sh->sh_path))
 				goto done;
 		}
 	}

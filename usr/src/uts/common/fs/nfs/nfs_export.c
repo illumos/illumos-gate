@@ -1828,7 +1828,9 @@ nfs_getfh(struct nfs_getfh_args *args, model_t model, cred_t *cr)
 			int i, sz, pad;
 
 			error = makefh3(&fh, vp, exi);
-			l = fh.fh3_length;
+			l = RNDUP(fh.fh3_length);
+			if (!error && (l > sizeof (fhandle3_t)))
+				error = EREMOTE;
 			logptr = logbuf;
 			if (!error) {
 				i = 0;
