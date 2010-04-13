@@ -21,8 +21,7 @@
 
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -149,12 +148,28 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			if (iarg >= 0)
 				fd_too_big(p);
 			error = EINVAL;
-		} else if ((retval = ufalloc_file(iarg, fp)) == -1) {
-			error = EMFILE;
-		} else {
+			goto done;
+		}
+		/*
+		 * We need to increment the f_count reference counter
+		 * before allocating a new file descriptor.
+		 * Doing it other way round opens a window for race condition
+		 * with closeandsetf() on the target file descriptor which can
+		 * close the file still referenced by the original
+		 * file descriptor.
+		 */
+		mutex_enter(&fp->f_tlock);
+		fp->f_count++;
+		mutex_exit(&fp->f_tlock);
+		if ((retval = ufalloc_file(iarg, fp)) == -1) {
+			/*
+			 * New file descriptor can't be allocated.
+			 * Revert the reference count.
+			 */
 			mutex_enter(&fp->f_tlock);
-			fp->f_count++;
+			fp->f_count--;
 			mutex_exit(&fp->f_tlock);
+			error = EMFILE;
 		}
 		goto done;
 
