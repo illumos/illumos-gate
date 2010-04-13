@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -203,11 +202,13 @@ _kva2str(kva_t *kva, char *buf, int buflen, char *ass, char *del)
 		if (data[i].value != NULL) {
 			if (snprintf(tmp, buflen, "%s%s%s%s",
 			    data[i].key, ass, data[i].value, del) >= buflen) {
+				free((void *)tmp);
 				return (0);
 			}
 			(void) strcat(buf, tmp);
 		}
 	}
+	free((void *)tmp);
 	return (0);
 }
 
