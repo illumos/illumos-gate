@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2744,6 +2743,9 @@ prgetusage(kthread_t *t, prhusage_t *pup)
 	 */
 	waitrq = t->t_waitrq;	/* hopefully atomic */
 	if (waitrq != 0) {
+		if (waitrq > curtime) {
+			curtime = gethrtime_unscaled();
+		}
 		tmp1 = curtime - waitrq;
 		scalehrtime(&tmp1);
 		pup->pr_wtime += tmp1;
@@ -2903,6 +2905,9 @@ praddusage(kthread_t *t, prhusage_t *pup)
 	 */
 	waitrq = t->t_waitrq;	/* hopefully atomic */
 	if (waitrq != 0) {
+		if (waitrq > curtime) {
+			curtime = gethrtime_unscaled();
+		}
 		tmp = curtime - waitrq;
 		scalehrtime(&tmp);
 		pup->pr_wtime += tmp;
