@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_CPUPART_H
@@ -124,6 +123,15 @@ extern cpupart_t	cp_default;
 extern cpupart_t	*cp_list_head;
 extern uint_t		cp_numparts;
 extern uint_t		cp_numparts_nonempty;
+
+/*
+ * Each partition contains a bitset that indicates which CPUs are halted and
+ * which ones are running. Given the growing number of CPUs in current and
+ * future platforms, it's important to fanout each CPU within its partition's
+ * haltset to prevent contention due to false sharing. The fanout factor
+ * is platform specific, and declared accordingly.
+ */
+extern uint_t cp_haltset_fanout;
 
 extern void	cpupart_initialize_default();
 extern cpupart_t *cpupart_find(psetid_t);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/bitset.h>
@@ -41,6 +40,17 @@ bitset_init(bitset_t *b)
 }
 
 /*
+ * Initialize a bitset_t using a fanout. The fanout factor is platform
+ * specific and passed in as a power of two.
+ */
+void
+bitset_init_fanout(bitset_t *b, uint_t fanout)
+{
+	bzero(b, sizeof (bitset_t));
+	b->bs_fanout = fanout;
+}
+
+/*
  * Uninitialize a bitset_t.
  * This will free the bitset's data, leaving it zero sized.
  */
@@ -52,18 +62,18 @@ bitset_fini(bitset_t *b)
 }
 
 /*
- * Resize a bitset to where it can hold sz number of bits.
+ * Resize a bitset to where it can hold els number of elements.
  * This can either grow or shrink the bitset holding capacity.
  * In the case of shrinkage, elements that reside outside the new
  * holding capacity of the bitset are lost.
  */
 void
-bitset_resize(bitset_t *b, uint_t sz)
+bitset_resize(bitset_t *b, uint_t els)
 {
 	uint_t	nwords;
 	ulong_t	*bset_new, *bset_tmp;
 
-	nwords = BT_BITOUL(sz);
+	nwords = BT_BITOUL(els << b->bs_fanout);
 	if (b->bs_words == nwords)
 		return;	/* already properly sized */
 
@@ -87,11 +97,12 @@ bitset_resize(bitset_t *b, uint_t sz)
 	/* free up the old array */
 	if (b->bs_words > 0)
 		kmem_free(bset_tmp, b->bs_words * sizeof (ulong_t));
+
 	b->bs_words = nwords;
 }
 
 /*
- * Returns the current holding capacity of the bitset
+ * Returns the current holding capacity of the bitset.
  */
 uint_t
 bitset_capacity(bitset_t *b)
@@ -100,35 +111,33 @@ bitset_capacity(bitset_t *b)
 }
 
 /*
- * Add and delete bits in the bitset.
+ * Add (set) and delete (clear) bits in the bitset.
  *
- * Adding a bit that is already set, and clearing a bit that's already clear
+ * Adding a bit that is already set, or removing a bit that's already clear
  * is legal.
  *
  * Adding or deleting an element that falls outside the bitset's current
  * holding capacity is illegal.
  */
-
-/*
- * Set a bit
- */
 void
 bitset_add(bitset_t *b, uint_t elt)
 {
-	ASSERT(b->bs_words * BT_NBIPUL > elt);
+	uint_t pos = (elt << b->bs_fanout);
 
-	BT_SET(b->bs_set, elt);
+	ASSERT(b->bs_words * BT_NBIPUL > pos);
+	BT_SET(b->bs_set, pos);
 }
 
 /*
- * Set a bit in an atomically safe way
+ * Set a bit in an atomically safe way.
  */
 void
 bitset_atomic_add(bitset_t *b, uint_t elt)
 {
-	ASSERT(b->bs_words * BT_NBIPUL > elt);
+	uint_t pos = (elt << b->bs_fanout);
 
-	BT_ATOMIC_SET(b->bs_set, elt);
+	ASSERT(b->bs_words * BT_NBIPUL > pos);
+	BT_ATOMIC_SET(b->bs_set, pos);
 }
 
 /*
@@ -138,34 +147,37 @@ bitset_atomic_add(bitset_t *b, uint_t elt)
 int
 bitset_atomic_test_and_add(bitset_t *b, uint_t elt)
 {
-	int r;
+	uint_t pos = (elt << b->bs_fanout);
+	int ret;
 
-	ASSERT(b->bs_words * BT_NBIPUL > elt);
-	BT_ATOMIC_SET_EXCL(b->bs_set, elt, r);
+	ASSERT(b->bs_words * BT_NBIPUL > pos);
+	BT_ATOMIC_SET_EXCL(b->bs_set, pos, ret);
 
-	return (r);
+	return (ret);
 }
 
 /*
- * Clear a bit
+ * Clear a bit.
  */
 void
 bitset_del(bitset_t *b, uint_t elt)
 {
-	ASSERT(b->bs_words * BT_NBIPUL > elt);
+	uint_t pos = (elt << b->bs_fanout);
 
-	BT_CLEAR(b->bs_set, elt);
+	ASSERT(b->bs_words * BT_NBIPUL > pos);
+	BT_CLEAR(b->bs_set, pos);
 }
 
 /*
- * Clear a bit in an atomically safe way
+ * Clear a bit in an atomically safe way.
  */
 void
 bitset_atomic_del(bitset_t *b, uint_t elt)
 {
-	ASSERT(b->bs_words * BT_NBIPUL > elt);
+	uint_t pos = (elt << b->bs_fanout);
 
-	BT_ATOMIC_CLEAR(b->bs_set, elt);
+	ASSERT(b->bs_words * BT_NBIPUL > pos);
+	BT_ATOMIC_CLEAR(b->bs_set, pos);
 }
 
 /*
@@ -175,33 +187,36 @@ bitset_atomic_del(bitset_t *b, uint_t elt)
 int
 bitset_atomic_test_and_del(bitset_t *b, uint_t elt)
 {
-	int r;
+	uint_t pos = (elt << b->bs_fanout);
+	int ret;
 
-	ASSERT(b->bs_words * BT_NBIPUL > elt);
-	BT_ATOMIC_CLEAR_EXCL(b->bs_set, elt, r);
+	ASSERT(b->bs_words * BT_NBIPUL > pos);
+	BT_ATOMIC_CLEAR_EXCL(b->bs_set, pos, ret);
 
-	return (r);
+	return (ret);
 }
 
 /*
- * Return non-zero if the bit is present in the set
+ * Return non-zero if the bit is present in the set.
  */
 int
 bitset_in_set(bitset_t *b, uint_t elt)
 {
-	if (elt >= b->bs_words * BT_NBIPUL)
+	uint_t pos = (elt << b->bs_fanout);
+
+	if (pos >= b->bs_words * BT_NBIPUL)
 		return (0);
 
-	return (BT_TEST(b->bs_set, elt));
+	return (BT_TEST(b->bs_set, pos));
 }
 
 /*
- * Return non-zero if the bitset is empty
+ * Return non-zero if the bitset is empty.
  */
 int
 bitset_is_null(bitset_t *b)
 {
-	int	i;
+	int i;
 
 	for (i = 0; i < b->bs_words; i++)
 		if (b->bs_set[i] != 0)
@@ -210,9 +225,9 @@ bitset_is_null(bitset_t *b)
 }
 
 /*
- * Perform a non-victimizing search for a set bit in a word
+ * Perform a non-victimizing search for a set bit in a word.
  * A "seed" is passed to pseudo-randomize the search.
- * Return -1 if no set bit was found
+ * Return -1 if no set bit was found.
  */
 static uint_t
 bitset_find_in_word(ulong_t w, uint_t seed)
@@ -245,6 +260,8 @@ bitset_find(bitset_t *b)
 	uint_t seed;
 
 	seed = CPU_PSEUDO_RANDOM();
+
+	ASSERT(b->bs_words > 0);
 	start = seed % b->bs_words;
 
 	i = start;
@@ -252,7 +269,7 @@ bitset_find(bitset_t *b)
 		elt = bitset_find_in_word(b->bs_set[i], seed);
 		if (elt != (uint_t)-1) {
 			elt += i * BT_NBIPUL;
-			break;
+			return (elt >> b->bs_fanout);
 		}
 		if (++i == b->bs_words)
 			i = 0;
@@ -262,13 +279,16 @@ bitset_find(bitset_t *b)
 }
 
 /*
- * AND, OR, and XOR bitset computations
- * Returns 1 if resulting bitset has any set bits
+ * AND, OR, and XOR bitset computations, returns 1 if resulting bitset has any
+ * set bits. Operands must have the same fanout, if any.
  */
 int
 bitset_and(bitset_t *bs1, bitset_t *bs2, bitset_t *res)
 {
 	int i, anyset;
+
+	ASSERT(bs1->bs_fanout == bs2->bs_fanout);
+	ASSERT(bs1->bs_fanout == res->bs_fanout);
 
 	for (anyset = 0, i = 0; i < bs1->bs_words; i++) {
 		if ((res->bs_set[i] = (bs1->bs_set[i] & bs2->bs_set[i])) != 0)
@@ -282,6 +302,9 @@ bitset_or(bitset_t *bs1, bitset_t *bs2, bitset_t *res)
 {
 	int i, anyset;
 
+	ASSERT(bs1->bs_fanout == bs2->bs_fanout);
+	ASSERT(bs1->bs_fanout == res->bs_fanout);
+
 	for (anyset = 0, i = 0; i < bs1->bs_words; i++) {
 		if ((res->bs_set[i] = (bs1->bs_set[i] | bs2->bs_set[i])) != 0)
 			anyset = 1;
@@ -292,8 +315,10 @@ bitset_or(bitset_t *bs1, bitset_t *bs2, bitset_t *res)
 int
 bitset_xor(bitset_t *bs1, bitset_t *bs2, bitset_t *res)
 {
-	int i;
-	int anyset = 0;
+	int i, anyset = 0;
+
+	ASSERT(bs1->bs_fanout == bs2->bs_fanout);
+	ASSERT(bs1->bs_fanout == res->bs_fanout);
 
 	for (i = 0; i < bs1->bs_words; i++) {
 		if ((res->bs_set[i] = (bs1->bs_set[i] ^ bs2->bs_set[i])) != 0)
@@ -303,7 +328,7 @@ bitset_xor(bitset_t *bs1, bitset_t *bs2, bitset_t *res)
 }
 
 /*
- * return 1 if bitmaps are identical
+ * Return 1 if bitmaps are identical.
  */
 int
 bitset_match(bitset_t *bs1, bitset_t *bs2)
@@ -320,7 +345,7 @@ bitset_match(bitset_t *bs1, bitset_t *bs2)
 }
 
 /*
- * Zero a bitset_t
+ * Zero a bitset_t.
  */
 void
 bitset_zero(bitset_t *b)
@@ -328,12 +353,12 @@ bitset_zero(bitset_t *b)
 	bzero(b->bs_set, sizeof (ulong_t) * b->bs_words);
 }
 
-
 /*
- * Copy a bitset_t
+ * Copy a bitset_t.
  */
 void
 bitset_copy(bitset_t *src, bitset_t *dest)
 {
+	ASSERT(src->bs_fanout == dest->bs_fanout);
 	bcopy(src->bs_set, dest->bs_set, sizeof (ulong_t) * src->bs_words);
 }

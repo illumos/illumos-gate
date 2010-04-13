@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -96,7 +95,6 @@ static uint_t		cp_max_numparts;
  */
 #define	PSTOCP(psid)	((cpupartid_t)((psid) == PS_NONE ? CP_DEFAULT : (psid)))
 #define	CPTOPS(cpid)	((psetid_t)((cpid) == CP_DEFAULT ? PS_NONE : (cpid)))
-
 
 static int cpupart_unbind_threads(cpupart_t *, boolean_t);
 
@@ -312,7 +310,8 @@ cpupart_initialize_default(void)
 	t0.t_lpl = &cp_default.cp_lgrploads[LGRP_ROOTID];
 
 	bitset_init(&cp_default.cp_cmt_pgs);
-	bitset_init(&cp_default.cp_haltset);
+	bitset_init_fanout(&cp_default.cp_haltset, cp_haltset_fanout);
+
 	bitset_resize(&cp_default.cp_haltset, max_ncpus);
 }
 
@@ -856,9 +855,9 @@ cpupart_create(psetid_t *psid)
 	bitset_init(&pp->cp_cmt_pgs);
 
 	/*
-	 * Initialize and size the partition's bitset of halted CPUs
+	 * Initialize and size the partition's bitset of halted CPUs.
 	 */
-	bitset_init(&pp->cp_haltset);
+	bitset_init_fanout(&pp->cp_haltset, cp_haltset_fanout);
 	bitset_resize(&pp->cp_haltset, max_ncpus);
 
 	/*

@@ -20,8 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -219,6 +218,8 @@ void	(*non_deep_idle_disp_enq_thread)(cpu_t *, int);
 hpet_t hpet;
 
 #endif	/* ifndef __xpv */
+
+uint_t cp_haltset_fanout = 0;
 
 /*ARGSUSED*/
 int

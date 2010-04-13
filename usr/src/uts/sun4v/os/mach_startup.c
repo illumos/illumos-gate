@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/machsystm.h>
@@ -76,6 +75,8 @@ static int enable_halt_idle_cpus = 1;
 
 extern int	clock_tick_threshold;
 extern int	clock_tick_ncpus;
+
+uint_t cp_haltset_fanout = 3;
 
 void
 setup_trap_table(void)

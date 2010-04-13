@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_BITSET_H
@@ -37,12 +36,14 @@ extern "C" {
 typedef struct bitset {
 	ulong_t	*bs_set;
 	uint_t	bs_words;
+	uint_t	bs_fanout;
 } bitset_t;
 
 /*
  * Bitset initialiation / teardown
  */
 void		bitset_init(bitset_t *);
+void		bitset_init_fanout(bitset_t *, uint_t);
 void		bitset_fini(bitset_t *);
 
 /*
