@@ -604,7 +604,7 @@ extern pad_mutex_t ph_mutex[];
  * Flags used while creating pages.
  */
 #define	PG_EXCL		0x0001
-#define	PG_WAIT		0x0002
+#define	PG_WAIT		0x0002		/* Blocking memory allocations */
 #define	PG_PHYSCONTIG	0x0004		/* NOT SUPPORTED */
 #define	PG_MATCH_COLOR	0x0008		/* SUPPORTED by free list routines */
 #define	PG_NORELOC	0x0010		/* Non-relocatable alloc hint. */
@@ -612,7 +612,8 @@ extern pad_mutex_t ph_mutex[];
 #define	PG_PANIC	0x0020		/* system will panic if alloc fails */
 #define	PG_PUSHPAGE	0x0040		/* alloc may use reserve */
 #define	PG_LOCAL	0x0080		/* alloc from given lgrp only */
-
+#define	PG_NORMALPRI	0x0100		/* PG_WAIT like priority, but */
+					/* non-blocking */
 /*
  * When p_selock has the SE_EWANTED bit set, threads waiting for SE_EXCL
  * access are given priority over all other waiting threads.
@@ -968,7 +969,7 @@ int	page_szc_user_filtered(size_t);
 #define	PR_UE		0x02	/* page has an unhandled UE */
 #define	PR_UE_SCRUBBED	0x04	/* page has seen a UE but was cleaned */
 #define	PR_FMA		0x08	/* A DE wants this page retired */
-#define	PR_CAPTURE	0x10	/* Generic page capture flag */
+#define	PR_CAPTURE	0x10	/* page is hashed on page_capture_hash[] */
 #define	PR_RESV		0x20	/* Reserved for future use */
 #define	PR_MSG		0x40	/* message(s) already printed for this page */
 #define	PR_RETIRED	0x80	/* This page has been retired */

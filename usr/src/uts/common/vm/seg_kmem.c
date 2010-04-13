@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -842,6 +841,10 @@ segkmem_page_create(void *addr, size_t size, int vmflag, void *arg)
 		pgflags |= PG_PANIC;
 	if (vmflag & VM_PUSHPAGE)
 		pgflags |= PG_PUSHPAGE;
+	if (vmflag & VM_NORMALPRI) {
+		ASSERT(vmflag & VM_NOSLEEP);
+		pgflags |= PG_NORMALPRI;
+	}
 
 	return (page_create_va(vp, (u_offset_t)(uintptr_t)addr, size,
 	    pgflags, &kseg, addr));
@@ -1109,6 +1112,8 @@ segkmem_page_create_large(void *addr, size_t size, int vmflag, void *arg)
 		pgflags |= PG_WAIT;
 	if (vmflag & VM_PUSHPAGE)
 		pgflags |= PG_PUSHPAGE;
+	if (vmflag & VM_NORMALPRI)
+		pgflags |= PG_NORMALPRI;
 
 	return (page_create_va_large(&kvp, (u_offset_t)(uintptr_t)addr, size,
 	    pgflags, &kvseg, addr, arg));

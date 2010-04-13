@@ -45,6 +45,7 @@ extern "C" {
 #define	KM_NOSLEEP	0x0001	/* cannot block for memory; may fail */
 #define	KM_PANIC	0x0002	/* if memory cannot be allocated, panic */
 #define	KM_PUSHPAGE	0x0004	/* can block for memory; may use reserve */
+#define	KM_NORMALPRI	0x0008  /* with KM_NOSLEEP, lower priority allocation */
 #define	KM_VMFLAGS	0x00ff	/* flags that must match VM_* flags */
 
 #define	KM_FLAGS	0xffff	/* all settable kmem flags */

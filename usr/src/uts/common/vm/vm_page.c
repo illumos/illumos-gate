@@ -1474,6 +1474,14 @@ page_create_throttle(pgcnt_t npages, int flags)
 	pgcnt_t tf;	/* effective value of throttlefree */
 
 	/*
+	 * Normal priority allocations.
+	 */
+	if ((flags & (PG_WAIT | PG_NORMALPRI)) == PG_NORMALPRI) {
+		ASSERT(!(flags & (PG_PANIC | PG_PUSHPAGE)));
+		return (freemem >= npages + throttlefree);
+	}
+
+	/*
 	 * Never deny pages when:
 	 * - it's a thread that cannot block [NOMEMWAIT()]
 	 * - the allocation cannot block and must not fail
@@ -2141,7 +2149,7 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	ASSERT(vp != NULL);
 
 	ASSERT((flags & ~(PG_EXCL | PG_WAIT |
-	    PG_NORELOC | PG_PANIC | PG_PUSHPAGE)) == 0);
+	    PG_NORELOC | PG_PANIC | PG_PUSHPAGE | PG_NORMALPRI)) == 0);
 	/* but no others */
 
 	ASSERT((flags & PG_EXCL) == PG_EXCL);
@@ -2276,7 +2284,7 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 		/*NOTREACHED*/
 	}
 	ASSERT((flags & ~(PG_EXCL | PG_WAIT |
-	    PG_NORELOC | PG_PANIC | PG_PUSHPAGE)) == 0);
+	    PG_NORELOC | PG_PANIC | PG_PUSHPAGE | PG_NORMALPRI)) == 0);
 	    /* but no others */
 
 	pages_req = npages = btopr(bytes);

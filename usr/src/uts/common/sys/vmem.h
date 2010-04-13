@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_VMEM_H
@@ -40,6 +39,7 @@ extern "C" {
 #define	VM_NOSLEEP	0x00000001	/* same as KM_NOSLEEP */
 #define	VM_PANIC	0x00000002	/* same as KM_PANIC */
 #define	VM_PUSHPAGE	0x00000004	/* same as KM_PUSHPAGE */
+#define	VM_NORMALPRI	0x00000008	/* same as KM_NORMALPRI */
 #define	VM_KMFLAGS	0x000000ff	/* flags that must match KM_* flags */
 
 #define	VM_BESTFIT	0x00000100

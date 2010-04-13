@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -75,7 +74,6 @@ struct kcage_stats_scan {
 	uint_t	kt_cantlock;
 	uint_t	kt_gotone;
 	uint_t	kt_gotonefree;
-	uint_t	kt_skiplevel;
 	uint_t	kt_skipshared;
 	uint_t	kt_skiprefd;
 	uint_t	kt_destroy;
@@ -1185,14 +1183,8 @@ kcage_cageout_init()
 int
 kcage_create_throttle(pgcnt_t npages, int flags)
 {
-	int niter = 0;
-	pgcnt_t lastfree;
-	int enough = kcage_freemem > kcage_throttlefree + npages;
 
 	KCAGE_STAT_INCR(kct_calls);		/* unprotected incr. */
-
-	kcage_cageout_wakeup();			/* just to be sure */
-	KCAGE_STAT_INCR(kct_cagewake);		/* unprotected incr. */
 
 	/*
 	 * Obviously, we can't throttle the cageout thread since
@@ -1209,7 +1201,7 @@ kcage_create_throttle(pgcnt_t npages, int flags)
 	 * if freemem is very low.
 	 */
 	if (NOMEMWAIT()) {
-		if (enough) {
+		if (kcage_freemem > kcage_throttlefree + npages) {
 			KCAGE_STAT_INCR(kct_exempt);	/* unprotected incr. */
 			return (KCT_CRIT);
 		} else if (freemem < minfree) {
@@ -1235,9 +1227,6 @@ kcage_create_throttle(pgcnt_t npages, int flags)
 	 */
 	while (kcage_freemem < kcage_throttlefree + npages) {
 		ASSERT(kcage_on);
-
-		lastfree = kcage_freemem;
-
 		if (kcage_cageout_ready) {
 			mutex_enter(&kcage_throttle_mutex);
 
@@ -1265,23 +1254,20 @@ kcage_create_throttle(pgcnt_t npages, int flags)
 			atomic_add_long(&kcage_needfree, -npages);
 		}
 
-		if ((flags & PG_WAIT) == 0) {
-			if (kcage_freemem > lastfree) {
-				KCAGE_STAT_INCR(kct_progress);
-				niter = 0;
-			} else {
-				KCAGE_STAT_INCR(kct_noprogress);
-				if (++niter >= kcage_maxwait) {
-					KCAGE_STAT_INCR(kct_timeout);
-					return (KCT_FAILURE);
-				}
-			}
-		}
-
 		if (NOMEMWAIT() && freemem < minfree) {
 			return (KCT_CRIT);
 		}
+		if ((flags & PG_WAIT) == 0) {
+			pgcnt_t limit = (flags & PG_NORMALPRI) ?
+			    throttlefree : pageout_reserve;
 
+			if ((kcage_freemem < kcage_throttlefree + npages) &&
+			    (freemem < limit + npages)) {
+				return (KCT_FAILURE);
+			} else {
+				return (KCT_NONCRIT);
+			}
+		}
 	}
 	return (KCT_NONCRIT);
 }
@@ -1393,9 +1379,9 @@ check_free_and_return:
 		if (page_trylock(pp, SE_SHARED)) {
 			if (PP_ISNORELOC(pp))
 				goto check_free_and_return;
-		} else
+		} else {
 			return (EAGAIN);
-
+		}
 		if (!PP_ISFREE(pp)) {
 			page_unlock(pp);
 			return (EAGAIN);
@@ -1471,14 +1457,13 @@ kcage_expand()
 	 * Exit early if expansion amount is equal to or less than zero.
 	 * (<0 is possible if kcage_freemem rises suddenly.)
 	 *
-	 * Exit early when the global page pool (apparently) does not
-	 * have enough free pages to page_relocate() even a single page.
+	 * Exit early when freemem drops below pageout_reserve plus the request.
 	 */
 	wanted = MAX(kcage_lotsfree, kcage_throttlefree + kcage_needfree)
 	    - kcage_freemem;
-	if (wanted <= 0)
+	if (wanted <= 0) {
 		return (0);
-	else if (freemem < pageout_reserve + 1) {
+	} else if (freemem < pageout_reserve + wanted) {
 		KCAGE_STAT_INCR(ke_lowfreemem);
 		return (0);
 	}
@@ -1670,6 +1655,18 @@ kcage_invalidate_page(page_t *pp, pgcnt_t *nfreedp)
 	return (0);
 }
 
+/*
+ * Expand cage only if there is not enough memory to satisfy
+ * current request. We only do one (complete) scan of the cage.
+ * Dirty pages and pages with shared mappings are skipped;
+ * Locked pages (p_lckcnt and p_cowcnt) are also skipped.
+ * All other pages are freed (if they can be locked).
+ * This may affect caching of user pages which are in cage by freeing/
+ * reclaiming them more often. However cage is mainly for kernel (heap)
+ * pages and we want to keep user pages outside of cage. The above policy
+ * should also reduce cage expansion plus it should speed up cage mem
+ * allocations.
+ */
 static void
 kcage_cageout()
 {
@@ -1677,12 +1674,7 @@ kcage_cageout()
 	page_t *pp;
 	callb_cpr_t cprinfo;
 	int did_something;
-	int scan_again;
 	pfn_t start_pfn;
-	int pass;
-	int last_pass;
-	int pages_skipped;
-	int shared_skipped;
 	ulong_t shared_level = 8;
 	pgcnt_t nfreed;
 #ifdef KCAGE_STATS
@@ -1713,14 +1705,9 @@ loop:
 	KCAGE_STAT_INCR(kt_wakeups);
 	KCAGE_STAT_SET_SCAN(kt_freemem_start, freemem);
 	KCAGE_STAT_SET_SCAN(kt_kcage_freemem_start, kcage_freemem);
-	pass = 0;
-	last_pass = 0;
-
 #ifdef KCAGE_STATS
 	scan_start = ddi_get_lbolt();
 #endif
-
-again:
 	if (!kcage_on)
 		goto loop;
 
@@ -1728,16 +1715,16 @@ again:
 	KCAGE_STAT_INCR_SCAN(kt_passes);
 
 	did_something = 0;
-	pages_skipped = 0;
-	shared_skipped = 0;
-	while ((kcage_freemem < kcage_lotsfree || kcage_needfree) &&
-	    (pfn = kcage_walk_cage(pfn == PFN_INVALID)) != PFN_INVALID) {
+	while (kcage_freemem < kcage_lotsfree + kcage_needfree) {
+
+		if ((pfn = kcage_walk_cage(pfn == PFN_INVALID)) ==
+		    PFN_INVALID) {
+			break;
+		}
 
 		if (start_pfn == PFN_INVALID)
 			start_pfn = pfn;
 		else if (start_pfn == pfn) {
-			last_pass = pass;
-			pass += 1;
 			/*
 			 * Did a complete walk of kernel cage, but didn't free
 			 * any pages.  If only one cpu is active then
@@ -1813,60 +1800,9 @@ again:
 				continue;
 			}
 
-			KCAGE_STAT_SET_SCAN(kt_skiplevel, shared_level);
 			if (hat_page_checkshare(pp, shared_level)) {
 				page_unlock(pp);
-				pages_skipped = 1;
-				shared_skipped = 1;
 				KCAGE_STAT_INCR_SCAN(kt_skipshared);
-				continue;
-			}
-
-			/*
-			 * In pass {0, 1}, skip page if ref bit is set.
-			 * In pass {0, 1, 2}, skip page if mod bit is set.
-			 */
-			prm = hat_pagesync(pp,
-			    HAT_SYNC_DONTZERO | HAT_SYNC_STOPON_MOD);
-
-			/* On first pass ignore ref'd pages */
-			if (pass <= 1 && (prm & P_REF)) {
-				KCAGE_STAT_INCR_SCAN(kt_skiprefd);
-				pages_skipped = 1;
-				page_unlock(pp);
-				continue;
-			}
-
-			/* On pass 2, VN_DISPOSE if mod bit is not set */
-			if (pass <= 2) {
-				if (pp->p_szc != 0 || (prm & P_MOD) ||
-				    pp->p_lckcnt || pp->p_cowcnt) {
-					pages_skipped = 1;
-					page_unlock(pp);
-				} else {
-
-					/*
-					 * unload the mappings before
-					 * checking if mod bit is set
-					 */
-					(void) hat_pageunload(pp,
-					    HAT_FORCE_PGUNLOAD);
-
-					/*
-					 * skip this page if modified
-					 */
-					if (hat_ismod(pp)) {
-						pages_skipped = 1;
-						page_unlock(pp);
-						continue;
-					}
-
-					KCAGE_STAT_INCR_SCAN(kt_destroy);
-					/* constant in conditional context */
-					/* LINTED */
-					VN_DISPOSE(pp, B_INVAL, 0, kcred);
-					did_something = 1;
-				}
 				continue;
 			}
 
@@ -1883,66 +1819,17 @@ again:
 		}
 	}
 
-	/*
-	 * Expand the cage only if available cage memory is really low.
-	 * This test is done only after a complete scan of the cage.
-	 * The reason for not checking and expanding more often is to
-	 * avoid rapid expansion of the cage. Naturally, scanning the
-	 * cage takes time. So by scanning first, we use that work as a
-	 * delay loop in between expand decisions.
-	 */
+	if (kcage_freemem < kcage_throttlefree + kcage_needfree)
+		(void) kcage_expand();
 
-	scan_again = 0;
-	if (kcage_freemem < kcage_minfree || kcage_needfree) {
-		/*
-		 * Kcage_expand() will return a non-zero value if it was
-		 * able to expand the cage -- whether or not the new
-		 * pages are free and immediately usable. If non-zero,
-		 * we do another scan of the cage. The pages might be
-		 * freed during that scan or by time we get back here.
-		 * If not, we will attempt another expansion.
-		 * However, if kcage_expand() returns zero, then it was
-		 * unable to expand the cage. This is the case when the
-		 * the growth list is exausted, therefore no work was done
-		 * and there is no reason to scan the cage again.
-		 * Note: Kernel cage scan is not repeated when only one
-		 * cpu is active to avoid kernel cage thread hogging cpu.
-		 */
-		if (pass <= 3 && pages_skipped && cp_default.cp_ncpus > 1)
-			scan_again = 1;
-		else
-			(void) kcage_expand(); /* don't scan again */
-	} else if (kcage_freemem < kcage_lotsfree) {
-		/*
-		 * If available cage memory is less than abundant
-		 * and a full scan of the cage has not yet been completed,
-		 * or a scan has completed and some work was performed,
-		 * or pages were skipped because of sharing,
-		 * or we simply have not yet completed two passes,
-		 * then do another scan.
-		 */
-		if (pass <= 2 && pages_skipped)
-			scan_again = 1;
-		if (pass == last_pass || did_something)
-			scan_again = 1;
-		else if (shared_skipped && shared_level < (8<<24)) {
-			shared_level <<= 1;
-			scan_again = 1;
-		}
-	}
+	if (kcage_on && kcage_cageout_ready)
+		cv_broadcast(&kcage_throttle_cv);
 
-	if (scan_again && cp_default.cp_ncpus > 1)
-		goto again;
-	else {
-		if (shared_level > 8)
-			shared_level >>= 1;
-
-		KCAGE_STAT_SET_SCAN(kt_freemem_end, freemem);
-		KCAGE_STAT_SET_SCAN(kt_kcage_freemem_end, kcage_freemem);
-		KCAGE_STAT_SET_SCAN(kt_ticks, ddi_get_lbolt() - scan_start);
-		KCAGE_STAT_INC_SCAN_INDEX;
-		goto loop;
-	}
+	KCAGE_STAT_SET_SCAN(kt_freemem_end, freemem);
+	KCAGE_STAT_SET_SCAN(kt_kcage_freemem_end, kcage_freemem);
+	KCAGE_STAT_SET_SCAN(kt_ticks, ddi_get_lbolt() - scan_start);
+	KCAGE_STAT_INC_SCAN_INDEX;
+	goto loop;
 
 	/*NOTREACHED*/
 }
