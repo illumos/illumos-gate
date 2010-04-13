@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -50,20 +49,20 @@
 int
 renameat(int fromfd, char *old, int tofd, char *new)
 {
-	file_t *fromfp;
-	file_t *tofp;
-	vnode_t	*fromvp, *tovp;
+	vnode_t	*fromvp = NULL;
+	vnode_t	*tovp = NULL;
+	file_t *fp;
 	int error;
-	proc_t *p = curproc;
-	char oldstart, newstart;
+	char oldstart;
+	char newstart;
 
-	tovp = fromvp = NULL;
-
-	if ((fromfd == AT_FDCWD && old == NULL) ||
-	    (tofd == AT_FDCWD && new == NULL))
+	if (copyin(old, &oldstart, sizeof (char)) ||
+	    copyin(new, &newstart, sizeof (char)))
 		return (set_errno(EFAULT));
 
 	if (fromfd == AT_FDCWD || tofd == AT_FDCWD) {
+		proc_t *p = curproc;
+
 		mutex_enter(&p->p_lock);
 		if (fromfd == AT_FDCWD) {
 			fromvp = PTOU(p)->u_cdir;
@@ -76,40 +75,26 @@ renameat(int fromfd, char *old, int tofd, char *new)
 		mutex_exit(&p->p_lock);
 	}
 
-	if (copyin(old, &oldstart, sizeof (char)))
-		return (set_errno(EFAULT));
-
-	if (copyin(new, &newstart, sizeof (char)))
-		return (set_errno(EFAULT));
-
-	if (fromvp == NULL) {
-		if (oldstart != '/') {
-			if ((fromfp = getf(fromfd)) == NULL) {
-				if (tovp != NULL)
-					VN_RELE(tovp);
-				return (set_errno(EBADF));
-			}
-			fromvp = fromfp->f_vnode;
-			VN_HOLD(fromvp);
-			releasef(fromfd);
-		} else {
-			fromvp = NULL;
+	if (fromvp == NULL && oldstart != '/') {
+		if ((fp = getf(fromfd)) == NULL) {
+			if (tovp != NULL)
+				VN_RELE(tovp);
+			return (set_errno(EBADF));
 		}
+		fromvp = fp->f_vnode;
+		VN_HOLD(fromvp);
+		releasef(fromfd);
 	}
 
-	if (tovp == NULL) {
-		if (newstart != '/') {
-			if ((tofp = getf(tofd)) == NULL) {
-				if (fromvp != NULL)
-					VN_RELE(fromvp);
-				return (set_errno(EBADF));
-			}
-			tovp = tofp->f_vnode;
-			VN_HOLD(tovp);
-			releasef(tofd);
-		} else {
-			tovp = NULL;
+	if (tovp == NULL && newstart != '/') {
+		if ((fp = getf(tofd)) == NULL) {
+			if (fromvp != NULL)
+				VN_RELE(fromvp);
+			return (set_errno(EBADF));
 		}
+		tovp = fp->f_vnode;
+		VN_HOLD(tovp);
+		releasef(tofd);
 	}
 
 	error = vn_renameat(fromvp, old, tovp, new, UIO_USERSPACE);
@@ -118,9 +103,9 @@ renameat(int fromfd, char *old, int tofd, char *new)
 		VN_RELE(fromvp);
 	if (tovp != NULL)
 		VN_RELE(tovp);
-	if (error != 0)
+	if (error)
 		return (set_errno(error));
-	return (error);
+	return (0);
 }
 
 int
