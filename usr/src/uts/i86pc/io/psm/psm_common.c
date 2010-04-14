@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -358,9 +357,9 @@ psm_is_pci_bridge(dev_info_t *dip)
 	return (rv);
 }
 
-
 /*
  * Examines ACPI node for presence of _PRT object
+ * Check _STA to make sure node is present and/or enabled
  *
  * Returns:
  *	0 if no _PRT or error
@@ -370,10 +369,20 @@ static int
 psm_node_has_prt(ACPI_HANDLE *ah)
 {
 	ACPI_HANDLE rh;
+	int sta;
+
+	/*
+	 * Return 0 for "no _PRT" if device does not exist
+	 * According to ACPI Spec,
+	 * 1) setting either bit 0 or bit 3 means that device exists.
+	 * 2) Absence of _STA method means all status bits set.
+	 */
+	if (ACPI_SUCCESS(acpica_eval_int(ah, "_STA", &sta)) &&
+	    !(sta & (ACPI_STA_DEVICE_PRESENT | ACPI_STA_DEVICE_FUNCTIONING)))
+		return (0);
 
 	return (AcpiGetHandle(ah, "_PRT", &rh) == AE_OK);
 }
-
 
 /*
  * Look first for an ACPI PCI bus node matching busid, then for a _PRT on the
