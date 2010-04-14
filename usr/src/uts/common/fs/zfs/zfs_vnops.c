@@ -2953,27 +2953,43 @@ top:
 	if (attrzp)
 		mutex_enter(&attrzp->z_lock);
 
-	if (mask & AT_UID) {
-		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_UID(zfsvfs), NULL,
-		    &new_uid, sizeof (new_uid));
-		zp->z_uid = zfs_fuid_map_id(zfsvfs, new_uid, cr, ZFS_OWNER);
-		if (attrzp) {
-			SA_ADD_BULK_ATTR(xattr_bulk, xattr_count,
-			    SA_ZPL_UID(zfsvfs), NULL, &new_uid,
-			    sizeof (new_uid));
-			attrzp->z_gid = zp->z_uid;
-		}
-	}
+	if (mask & (AT_UID|AT_GID)) {
 
-	if (mask & AT_GID) {
-		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_GID(zfsvfs), NULL,
-		    &new_gid, sizeof (new_gid));
-		zp->z_gid = zfs_fuid_map_id(zfsvfs, new_gid, cr, ZFS_GROUP);
+		if (mask & AT_UID) {
+			SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_UID(zfsvfs), NULL,
+			    &new_uid, sizeof (new_uid));
+			zp->z_uid = zfs_fuid_map_id(zfsvfs, new_uid,
+			    cr, ZFS_OWNER);
+			if (attrzp) {
+				SA_ADD_BULK_ATTR(xattr_bulk, xattr_count,
+				    SA_ZPL_UID(zfsvfs), NULL, &new_uid,
+				    sizeof (new_uid));
+				attrzp->z_gid = zp->z_uid;
+			}
+		}
+
+		if (mask & AT_GID) {
+			SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_GID(zfsvfs),
+			    NULL, &new_gid, sizeof (new_gid));
+			zp->z_gid = zfs_fuid_map_id(zfsvfs, new_gid, cr,
+			    ZFS_GROUP);
+			if (attrzp) {
+				SA_ADD_BULK_ATTR(xattr_bulk, xattr_count,
+				    SA_ZPL_GID(zfsvfs), NULL, &new_gid,
+				    sizeof (new_gid));
+				attrzp->z_gid = zp->z_gid;
+			}
+		}
+		if (!(mask & AT_MODE)) {
+			SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MODE(zfsvfs),
+			    NULL, &new_mode, sizeof (new_mode));
+			new_mode = zp->z_mode;
+		}
+		err = zfs_acl_chown_setattr(zp);
+		ASSERT(err == 0);
 		if (attrzp) {
-			SA_ADD_BULK_ATTR(xattr_bulk, xattr_count,
-			    SA_ZPL_GID(zfsvfs), NULL, &new_gid,
-			    sizeof (new_gid));
-			attrzp->z_gid = zp->z_gid;
+			err = zfs_acl_chown_setattr(attrzp);
+			ASSERT(err == 0);
 		}
 	}
 
@@ -2982,6 +2998,7 @@ top:
 		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MODE(zfsvfs), NULL,
 		    &new_mode, sizeof (new_mode));
 		zp->z_mode = new_mode;
+		ASSERT3U((uintptr_t)aclp, !=, NULL);
 		err = zfs_aclset_common(zp, aclp, cr, tx);
 		ASSERT3U(err, ==, 0);
 		zp->z_acl_cached = aclp;

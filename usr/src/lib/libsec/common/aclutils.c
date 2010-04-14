@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -391,7 +390,7 @@ acl_strip(const char *file, uid_t owner, gid_t group, mode_t mode)
 {
 	int	error = 0;
 	aclent_t min_acl[MIN_ACL_ENTRIES];
-	ace_t	min_ace_acl[6];	/* owner, group, everyone + complement denies */
+	ace_t	*min_ace_acl;
 	int	acl_flavor;
 	int	aclcnt;
 
@@ -420,16 +419,11 @@ acl_strip(const char *file, uid_t owner, gid_t group, mode_t mode)
 		aclcnt = 4;
 		error = acl(file, SETACL, aclcnt, min_acl);
 	} else if (acl_flavor & _ACL_ACE_ENABLED) {
-		(void) memcpy(min_ace_acl, trivial_acl, sizeof (ace_t) * 6);
-
-		/*
-		 * Make aces match request mode
-		 */
-		adjust_ace_pair(&min_ace_acl[0], (mode & 0700) >> 6);
-		adjust_ace_pair(&min_ace_acl[2], (mode & 0070) >> 3);
-		adjust_ace_pair(&min_ace_acl[4], mode & 0007);
-
-		error = acl(file, ACE_SETACL, 6, min_ace_acl);
+		if ((error = acl_trivial_create(mode, &min_ace_acl,
+		    &aclcnt)) != 0)
+			return (error);
+		error = acl(file, ACE_SETACL, aclcnt, min_ace_acl);
+		free(min_ace_acl);
 	} else {
 		errno = EINVAL;
 		error = 1;

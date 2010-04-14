@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_FS_ZFS_ACL_H
@@ -238,7 +237,9 @@ zfs_acl_t *zfs_acl_alloc(int);
 zfs_acl_node_t *zfs_acl_node_alloc(size_t);
 void zfs_acl_xform(struct znode *, zfs_acl_t *, cred_t *);
 void zfs_acl_data_locator(void **, uint32_t *, uint32_t, boolean_t, void *);
-uint64_t zfs_mode_compute(uint64_t, zfs_acl_t *, uint64_t *);
+uint64_t zfs_mode_compute(uint64_t, zfs_acl_t *,
+    uint64_t *, uint64_t, uint64_t);
+int zfs_acl_chown_setattr(struct znode *);
 
 #endif
 

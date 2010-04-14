@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1677,12 +1676,13 @@ record_ancestry(char *file, struct stat *pstatb, struct lbuf *rep,
 #define	IS_TYPE_ALLOWED(type)	((type) == ACE_ACCESS_ALLOWED_ACE_TYPE)
 
 int
-grp_mask_to_mode(acl_t *acep)
+grp_mask_to_mode(struct lbuf *p)
 {
 	int mode = 0, seen = 0;
 	int acecnt;
 	int flags;
 	ace_t *ap;
+	acl_t *acep = p->aclp;
 
 	acecnt = acl_cnt(acep);
 	for (ap = (ace_t *)acl_data(acep); acecnt--; ap++) {
@@ -1700,7 +1700,8 @@ grp_mask_to_mode(acl_t *acep)
 		 * that will be the group mode bit.
 		 */
 		flags = ap->a_flags & ACE_TYPE_FLAGS;
-		if (flags == OWNED_GROUP || flags == ACE_EVERYONE) {
+		if (flags == OWNED_GROUP || (flags == ACE_IDENTIFIER_GROUP &&
+		    ap->a_who == p->lgid) || flags == ACE_EVERYONE) {
 			if (ap->a_access_mask & ACE_READ_DATA) {
 				if (!(seen & S_IRGRP)) {
 					seen |= S_IRGRP;
@@ -2052,7 +2053,7 @@ gstat(char *file, int argfl, struct ditem *myparent)
 
 				} else if (acl_type(rep->aclp) == ACE_T) {
 					int mode;
-					mode = grp_mask_to_mode(rep->aclp);
+					mode = grp_mask_to_mode(rep);
 					rep->lflags &= ~S_IRWXG;
 					rep->lflags |= mode;
 				}

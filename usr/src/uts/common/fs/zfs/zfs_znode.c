@@ -968,7 +968,8 @@ zfs_mknode(znode_t *dzp, vattr_t *vap, dmu_tx_t *tx, cred_t *cr,
 		SA_ADD_BULK_ATTR(sa_attrs, cnt, SA_ZPL_DACL_ACES(zfsvfs),
 		    zfs_acl_data_locator, &locate,
 		    acl_ids->z_aclp->z_acl_bytes);
-		mode = zfs_mode_compute(mode, acl_ids->z_aclp, &pflags);
+		mode = zfs_mode_compute(mode, acl_ids->z_aclp, &pflags,
+		    acl_ids->z_fuid, acl_ids->z_fgid);
 	}
 
 	VERIFY(sa_replace_all_by_template(sa_hdl, sa_attrs, cnt, tx) == 0);

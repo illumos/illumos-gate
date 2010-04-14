@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "libzfs_jni_property.h"
@@ -69,7 +68,6 @@ static jobject create_default_ObjectProperty(
     JNIEnv *, zfs_prop_t, str_to_obj_f, uint64_to_obj_f, char *, char *);
 static jobject str_to_enum_element(JNIEnv *, char *, char *);
 static jobject str_to_aclinherit(JNIEnv *, char *);
-static jobject str_to_aclmode(JNIEnv *, char *);
 static jobject str_to_checksum(JNIEnv *, char *);
 static jobject str_to_compression(JNIEnv *, char *);
 static jobject str_to_snapdir(JNIEnv *, char *);
@@ -115,10 +113,6 @@ custom_prop_desct_t props_custom[] = {
 	{ ZFS_PROP_ACLINHERIT, str_to_aclinherit, NULL,
 	    ZFSJNI_PACKAGE_DATA "AclInheritProperty",
 	    ZFSJNI_PACKAGE_DATA "AclInheritProperty$AclInherit" },
-
-	{ ZFS_PROP_ACLMODE, str_to_aclmode, NULL,
-	    ZFSJNI_PACKAGE_DATA "AclModeProperty",
-	    ZFSJNI_PACKAGE_DATA "AclModeProperty$AclMode" },
 
 	{ ZFS_PROP_CHECKSUM, str_to_checksum, NULL,
 	    ZFSJNI_PACKAGE_DATA "ChecksumProperty",
@@ -454,13 +448,6 @@ str_to_aclinherit(JNIEnv *env, char *str)
 {
 	return (str_to_enum_element(env, str,
 	    ZFSJNI_PACKAGE_DATA "AclInheritProperty$AclInherit"));
-}
-
-static jobject
-str_to_aclmode(JNIEnv *env, char *str)
-{
-	return (str_to_enum_element(env, str,
-	    ZFSJNI_PACKAGE_DATA "AclModeProperty$AclMode"));
 }
 
 static jobject

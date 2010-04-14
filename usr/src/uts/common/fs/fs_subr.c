@@ -23,8 +23,7 @@
 
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -583,7 +582,6 @@ fs_fab_acl(
 	caller_context_t *ct)
 {
 	aclent_t	*aclentp;
-	ace_t		*acep;
 	struct vattr	vattr;
 	int		error;
 	size_t		aclsize;
@@ -623,18 +621,12 @@ fs_fab_acl(
 		aclentp->a_perm = (ushort_t)(0007);
 		aclentp->a_id = (gid_t)-1;	/* Really undefined */
 	} else if (vsecattr->vsa_mask & (VSA_ACECNT | VSA_ACE)) {
-		aclsize = 6 * sizeof (ace_t);
-		vsecattr->vsa_aclcnt	= 6;
-		vsecattr->vsa_aclentp = kmem_zalloc(aclsize, KM_SLEEP);
-		vsecattr->vsa_aclentsz = aclsize;
-		acep = vsecattr->vsa_aclentp;
-		(void) memcpy(acep, trivial_acl, sizeof (ace_t) * 6);
-		adjust_ace_pair(acep, (vattr.va_mode & 0700) >> 6);
-		adjust_ace_pair(acep + 2, (vattr.va_mode & 0070) >> 3);
-		adjust_ace_pair(acep + 4, vattr.va_mode & 0007);
+		VERIFY(0 == acl_trivial_create(vattr.va_mode,
+		    (ace_t **)&vsecattr->vsa_aclentp, &vsecattr->vsa_aclcnt));
+		vsecattr->vsa_aclentsz = vsecattr->vsa_aclcnt * sizeof (ace_t);
 	}
 
-	return (0);
+	return (error);
 }
 
 /*
@@ -797,7 +789,6 @@ fs_acl_nontrivial(vnode_t *vp, cred_t *cr)
 			    vsecattr.vsa_dfaclcnt * sizeof (aclent_t));
 	}
 	if (acl_flavor & _ACL_ACE_ENABLED) {
-
 		isnontrivial = ace_trivial(vsecattr.vsa_aclentp,
 		    vsecattr.vsa_aclcnt);
 
