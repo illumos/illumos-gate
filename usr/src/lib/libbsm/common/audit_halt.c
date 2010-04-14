@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -98,7 +97,7 @@ audit_halt_success()
 		canaudit = ((cond == AUC_AUDITING) || (cond == AUC_NOSPACE));
 
 		/* turn off audit daemon and try to flush audit queue */
-		if (canaudit && system("/usr/sbin/audit -t"))
+		if (canaudit && system("/usr/sbin/audit -T"))
 			res = -1;
 		else
 		/* give a chance for syslogd to do the job */

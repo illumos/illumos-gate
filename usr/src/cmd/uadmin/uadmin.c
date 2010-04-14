@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -361,7 +360,7 @@ turnoff_auditd(void)
 	int	retries = RETRY_COUNT;
 
 	if ((rc = (int)fork()) == 0) {
-		(void) execl("/usr/sbin/audit", "audit", "-t", NULL);
+		(void) execl("/usr/sbin/audit", "audit", "-T", NULL);
 		(void) fprintf(stderr, "error disabling auditd: %s\n",
 		    strerror(errno));
 		_exit(-1);
