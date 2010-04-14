@@ -20,8 +20,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1982, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* ONC_PLUS EXTRACT END */
 
@@ -1000,8 +999,8 @@ load_bootpath_drivers(char *bootpath)
 	 * InfiniBand.
 	 */
 	if (netboot_over_ib(bootpath) &&
-	    modloadonly("drv", "ibd") == -1) {
-		cmn_err(CE_CONT, "ibd: cannot load platform driver\n");
+	    modloadonly("drv", "ibp") == -1) {
+		cmn_err(CE_CONT, "ibp: cannot load platform driver\n");
 		kmem_free(pathcopy, pathcopy_len);
 		return (NULL);
 	}

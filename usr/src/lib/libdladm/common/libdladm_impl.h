@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _LIBDLADM_IMPL_H
@@ -101,6 +100,11 @@ extern void		dladm_free_args(dladm_arg_list_t *);
  */
 #define	FSIMNETTYPE	"simnettype"	/* uint64_t */
 #define	FSIMNETPEER	"simnetpeer"	/* uint64_t */
+
+/*
+ * Set for IB partitions only
+ */
+#define	FPORTPKEY	"pkey"		/* uint64_t */
 
 /*
  * Common fields

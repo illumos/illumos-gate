@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -19,35 +20,28 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-LIBRARY = libdladm.a
-VERS    = .1
-OBJECTS = libdladm.o secobj.o linkprop.o libdllink.o libdlaggr.o \
-	libdlwlan.o libdlvnic.o libdlmgmt.o libdlvlan.o	libdlib.o\
-	flowattr.o flowprop.o propfuncs.o libdlflow.o libdlstat.o \
-	usage.o libdlether.o libdlsim.o libdlbridge.o libdliptun.o
+. /lib/svc/share/smf_include.sh
 
-include ../../Makefile.lib
+#
+# Actual work of ibd upgrade is done in network/physical service.
+# Here we mearly set the property to indicate that the ibd upgrade has been
+# done. Setting of the property can not be done in network/physical service
+# because the file system is read-only at that point.
+#
+if smf_is_globalzone; then
+	NETPHYS=svc:/network/physical:default
+	PROP=ibd/ibd_upgraded
 
-# install this library in the root filesystem
-include ../../Makefile.rootfs
+	upgrade_done=`/bin/svcprop -c -p $PROP $NETPHYS 2> /dev/null`
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-ldevinfo -lc -linetutil -lsocket -lscf -lrcm -lnvpair \
-		-lexacct -lnsl -lkstat -lcurses -lpool
+	if [ "$upgrade_done" != "true" ]; then
+		/usr/sbin/svccfg -s $NETPHYS addpg ibd system 2> /dev/null
+		/usr/sbin/svccfg -s $NETPHYS setprop $PROP = boolean: true
+	fi
+fi
 
-SRCDIR =	../common
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
-
-.KEEP_STATE:
-
-all:		$(LIBS)
-
-lint:		lintcheck
-
-include $(SRC)/lib/Makefile.targ
+/usr/sbin/svcadm disable $SMF_FMRI
+exit $SMF_EXIT_OK

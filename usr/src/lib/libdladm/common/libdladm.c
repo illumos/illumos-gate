@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <unistd.h>
@@ -385,6 +384,27 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_POOLCPU:
 		s = "pool and cpus property are mutually exclusive";
 		break;
+	case DLADM_STATUS_INVALID_PORT_INSTANCE:
+		s = "invalid IB phys link";
+		break;
+	case DLADM_STATUS_PORT_IS_DOWN:
+		s = "port is down";
+		break;
+	case DLADM_STATUS_PARTITION_EXISTS:
+		s = "partition already exists";
+		break;
+	case DLADM_STATUS_PKEY_NOT_PRESENT:
+		s = "PKEY is not present on the port";
+		break;
+	case DLADM_STATUS_INVALID_PKEY:
+		s = "invalid PKEY";
+		break;
+	case DLADM_STATUS_NO_IB_HW_RESOURCE:
+		s = "IB internal resource not available";
+		break;
+	case DLADM_STATUS_INVALID_PKEY_TBL_SIZE:
+		s = "invalid PKEY table size";
+		break;
 	default:
 		s = "<unknown error>";
 		break;
@@ -617,6 +637,9 @@ dladm_class2str(datalink_class_t class, char *buf)
 		break;
 	case DATALINK_CLASS_BRIDGE:
 		s = "bridge";
+		break;
+	case DATALINK_CLASS_PART:
+		s = "part";
 		break;
 	default:
 		s = "unknown";

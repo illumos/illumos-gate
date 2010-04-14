@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY=       	udapl_tavor.a 
@@ -133,7 +132,7 @@ OBJECTS = $(LOCOBJS) $(TAVOROBJS)
 include $(SRC)/lib/Makefile.lib
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-ldevinfo -lsocket -lnsl -ldat -lc
+LDLIBS +=	-ldevinfo -lsocket -lnsl -ldat -lc -ldladm
 
 SRCDIR =	../common
 TAVORSRCDIR =	../tavor

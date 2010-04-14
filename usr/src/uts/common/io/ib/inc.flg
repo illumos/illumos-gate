@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -62,14 +61,14 @@ find_files "s.*"	\
 	usr/src/uts/sparc/ibdm		\
 	usr/src/uts/sparc/ibmf		\
 	usr/src/uts/sparc/ibtl		\
-	usr/src/uts/sparc/ibd		\
+	usr/src/uts/sparc/ibp		\
 	usr/src/uts/sparc/rpcib		\
 	usr/src/uts/intel/ib		\
 	usr/src/uts/intel/ibcm		\
 	usr/src/uts/intel/ibdm		\
 	usr/src/uts/intel/ibmf		\
 	usr/src/uts/intel/ibtl		\
-	usr/src/uts/intel/ibd		\
+	usr/src/uts/intel/ibp		\
 	usr/src/uts/intel/rpcib	
 
 # packaging files

@@ -195,6 +195,7 @@ COMMON_SUBDIRS=		\
 	hotplug		\
 	hotplugd	\
 	hwdata		\
+	ibd_upgrade	\
 	id		\
 	idmap		\
 	infocmp		\

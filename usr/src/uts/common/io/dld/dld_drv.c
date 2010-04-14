@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1373,7 +1372,8 @@ static dld_ioc_modentry_t dld_ioc_modtable[] = {
 	{VNIC_IOC,	"vnic",	0, NULL, 0},
 	{SIMNET_IOC,	"simnet", 0, NULL, 0},
 	{BRIDGE_IOC,	"bridge", 0, NULL, 0},
-	{IPTUN_IOC,	"iptun", 0, NULL, 0}
+	{IPTUN_IOC,	"iptun", 0, NULL, 0},
+	{IBPART_IOC,	"ibp", -1, NULL, 0}
 };
 #define	DLDIOC_CNT	\
 	(sizeof (dld_ioc_modtable) / sizeof (dld_ioc_modentry_t))

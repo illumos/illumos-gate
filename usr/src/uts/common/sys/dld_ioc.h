@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DLD_IOC_H
@@ -59,6 +58,7 @@ extern "C" {
 #define	SIMNET_IOC	0x5132
 #define	IPTUN_IOC	0x454A
 #define	BRIDGE_IOC	0xB81D
+#define	IBPART_IOC	0x6171
 
 /* GLDv3 modules use these macros to generate unique ioctl commands */
 #define	DLDIOC(cmdid)		DLD_IOC_CMD(DLD_IOC, (cmdid))
@@ -67,6 +67,7 @@ extern "C" {
 #define	SIMNETIOC(cmdid)	DLD_IOC_CMD(SIMNET_IOC, (cmdid))
 #define	IPTUNIOC(cmdid)		DLD_IOC_CMD(IPTUN_IOC, (cmdid))
 #define	BRIDGEIOC(cmdid)	DLD_IOC_CMD(BRIDGE_IOC, (cmdid))
+#define	IBPARTIOC(cmdid)	DLD_IOC_CMD(IBPART_IOC, (cmdid))
 
 #ifdef _KERNEL
 

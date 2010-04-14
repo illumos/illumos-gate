@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_IBTL_IBTI_COMMON_H
@@ -32,6 +31,9 @@
  * This file contains the shared/common transport data types and function
  * prototypes.
  */
+#include <sys/types.h>
+#include <sys/ib/ib_types.h>
+#include <sys/ib/ibtl/ibtl_status.h>
 #include <sys/ib/ibtl/ibtl_types.h>
 #include <sys/ib/ibtl/ibti_cm.h>
 #include <sys/isa_defs.h>
@@ -1909,6 +1911,28 @@ ibt_status_t ibt_alloc_io_mem(ibt_hca_hdl_t, size_t, ibt_mr_flags_t,
     caddr_t *, ibt_mem_alloc_hdl_t *);
 
 ibt_status_t ibt_free_io_mem(ibt_hca_hdl_t, ibt_mem_alloc_hdl_t);
+
+/*
+ * Interfaces to get IB partition information.
+ */
+
+typedef struct ibt_part_attr_s {
+	datalink_id_t	pa_dlinkid;
+	datalink_id_t	pa_plinkid;
+	uint8_t		pa_port;
+	ib_guid_t	pa_hca_guid;
+	ib_guid_t	pa_port_guid;
+	ib_pkey_t	pa_pkey;
+} ibt_part_attr_t;
+
+void ibt_register_part_attr_cb(
+    ibt_status_t (*)(datalink_id_t, ibt_part_attr_t *),
+    ibt_status_t (*)(ibt_part_attr_t **, int *));
+void ibt_unregister_part_attr_cb(void);
+
+ibt_status_t ibt_get_part_attr(datalink_id_t, ibt_part_attr_t *);
+ibt_status_t ibt_get_all_part_attr(ibt_part_attr_t **, int *);
+ibt_status_t ibt_free_part_attr(ibt_part_attr_t *, int);
 
 #ifdef __cplusplus
 }

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_IB_IBNEX_IBNEX_H
@@ -86,12 +85,15 @@ typedef struct ibnex_pseudo_node_s {
  * Any changes to these need to be reflected in that file as well.
  */
 typedef enum {
-	IBNEX_PORT_COMMSVC_NODE,
-	IBNEX_VPPA_COMMSVC_NODE,
-	IBNEX_HCASVC_COMMSVC_NODE,
-	IBNEX_IOC_NODE,
-	IBNEX_PSEUDO_NODE
+	IBNEX_PORT_COMMSVC_NODE		= 0,
+	IBNEX_VPPA_COMMSVC_NODE		= 1,
+	IBNEX_HCASVC_COMMSVC_NODE	= 2,
+	IBNEX_IOC_NODE			= 4,
+	IBNEX_PSEUDO_NODE		= 8
 } ibnex_node_type_t;
+
+#define	IBNEX_HCA_CHILD_NODE (IBNEX_PORT_COMMSVC_NODE |	\
+	    IBNEX_VPPA_COMMSVC_NODE | IBNEX_HCASVC_COMMSVC_NODE)
 
 
 /*
@@ -223,6 +225,8 @@ typedef struct ibnex_s {
 	kcondvar_t		ibnex_ioc_list_cv;
 	uint32_t		ibnex_ioc_list_state;
 	ibdm_ioc_info_t		*ibnex_ioc_list;
+
+	ddi_taskq_t		*ibnex_taskq_id;
 } ibnex_t;
 
 /*
@@ -283,6 +287,10 @@ typedef enum {
 #define	IBNEX_DEVTREE_NOT_CHECKED	-1
 #define	IBNEX_HW_NOT_IN_DEVTREE		0
 #define	IBNEX_HW_IN_DEVTREE		1
+
+/*
+ * Function prototype declarations
+ */
 
 #ifdef __cplusplus
 }

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -63,44 +62,110 @@
 
 #include <sys/ib/mgt/ibmf/ibmf.h>	/* for ibd_get_portspeed */
 
+#include <sys/priv_names.h>
+#include <sys/dls.h>
+#include <sys/dld_ioc.h>
+#include <sys/policy.h>
+#include <sys/ibpart.h>
+#include <sys/file.h>
+
 /*
- * Per-interface tunables (for developers)
+ * The write-up below includes details on the following:
+ * 1. The dladm administrative model.
+ * 2. Late HCA initialization feature.
+ * 3. Brussels support and its implications to the current architecture.
  *
- * ibd_tx_copy_thresh
- *     This sets the threshold at which ibd will attempt to do a bcopy of the
- *     outgoing data into a pre-mapped buffer. The IPoIB driver's send behavior
- *     is restricted by various parameters, so setting of this value must be
- *     made after careful considerations only.  For instance, IB HCAs currently
- *     impose a relatively small limit (when compared to ethernet NICs) on the
- *     length of the SGL for transmit. On the other hand, the ip stack could
- *     send down mp chains that are quite long when LSO is enabled.
+ * 1. The dladm administrative model.
+ * ------------------------------------------
+ * With the dladm model, ibnex will create one ibd instance per port. These
+ * instances will be created independent of the port state.
  *
- * ibd_num_swqe
- *     Number of "send WQE" elements that will be allocated and used by ibd.
- *     When tuning this parameter, the size of pre-allocated, pre-mapped copy
- *     buffer in each of these send wqes must be taken into account. This
- *     copy buffer size is determined by the value of IBD_TX_BUF_SZ (this is
- *     currently set to the same value of ibd_tx_copy_thresh, but may be
- *     changed independently if needed).
+ * The ibd driver is two faceted: One side of it working as the port driver and
+ * the other as the partition object driver.
  *
- * ibd_num_rwqe
- *     Number of "receive WQE" elements that will be allocated and used by
- *     ibd. This parameter is limited by the maximum channel size of the HCA.
- *     Each buffer in the receive wqe will be of MTU size.
+ * The port instance is a child of the HCA, and will have an entry in the devfs.
+ * A DDI attach only happens for the port driver, and its attach is
+ * handled in ibd_port_attach(). Similary, a DDI detach for the port driver is
+ * handled in ibd_port_unattach().
  *
- * ibd_num_lso_bufs
- *     Number of "larger-than-MTU" copy buffers to use for cases when the
- *     outgoing mblk chain is too fragmented to be used with ibt_map_mem_iov()
- *     and too large to be used with regular MTU-sized copy buffers. It is
- *     not recommended to tune this variable without understanding the
- *     application environment and/or memory resources. The size of each of
- *     these lso buffers is determined by the value of IBD_LSO_BUFSZ.
+ * The partition object is only a registrant to the mac layer via mac_register()
+ * and does not have an entry in the device tree. There is no DDI softstate
+ * managed by the DDI framework for the partition objects. However, the state is
+ * managed inside the ibd driver, and every partition object hangs off the
+ * "ibd_objlist_head".
  *
- * ibd_num_ah
- *     Number of AH cache entries to allocate
+ * The partition object first comes into existence when a user runs the
+ * 'create-part' subcommand of dladm. This is like invoking the attach entry
+ * point of the partition object. The partition object goes away with the
+ * 'delete-part' subcommand of dladm. This is like invoking the detach entry
+ * point of the partition object.
  *
- * ibd_hash_size
- *     Hash table size for the active AH list
+ * The create-part and delete-part subcommands result in dld ioctls that end up
+ * calling ibd_create_parition() and ibd_delete_partition respectively.
+ * There ioctls are registered with the dld layer in _init() via a call to
+ * dld_ioc_register().
+ *
+ * The port instance by itself cannot be plumbed. It is only the partition
+ * objects that can be plumbed and they alone participate in I/O and not the
+ * port driver.
+ *
+ * There are some info ioctls supported in ibd which are used by dladm(1M) to
+ * display useful information. The info entry point for ibd is
+ * ibd_get_partition_info().
+ *
+ * 2. Late HCA initialization feature.
+ * ------------------------------------
+ * As mentioned in section 1, the user creates the partition objects via
+ * dladm(1M). It is possible that:
+ * a) The physical port itself is down and the SM cannot be reached.
+ * b) The PKEY specified by the used has not been created in the SM yet.
+ * c) An IPoIB broadcast group for the specified PKEY is not present.
+ *
+ * In all of the above cases, complete initialization of the partition object is
+ * not possible. However, the new model allows the creation of partition
+ * objects even in such cases but will defer the initialization for later.
+ * When such a partition object is plumbed, the link state will be displayed as
+ * "down".
+ * The driver, at this point, is listening to events that herald the
+ * availability of resources -
+ * i)   LINK_UP when the link becomes available
+ * ii)  PORT_CHANGE when the PKEY has been created
+ * iii) MCG_CREATED when the IPoIB broadcast group for the given pkey has been
+ * created
+ * via ibd_async_handler() for events i) and ii), and via
+ * ibd_snet_notices_handler() for iii.
+ * The driver handles these events (as and when they arrive) and completes the
+ * initialization of the partition object and transitions it to a usable state.
+ *
+ * 3. Brussels support and its implications to the current architecture.
+ * ---------------------------------------------------------------------
+ * The brussels support introduces two new interfaces to the ibd driver -
+ * ibd_m_getprop() and ibd_m_setprop().
+ * These interfaces allow setting and retrieval of certain properties.
+ * Some of them are public properties while most other are private properties
+ * meant to be used by developers. Tuning the latter kind can cause
+ * performance issues and should not be used without understanding the
+ * implications. All properties are specific to an instance of either the
+ * partition object or the port driver.
+ *
+ * The public properties are : mtu and linkmode.
+ * mtu is a read-only property.
+ * linkmode can take two values - UD and CM.
+ *
+ * Changing the linkmode requires some bookkeeping in the driver. The
+ * capabilities need to be re-reported to the mac layer. This is done by
+ * calling mac_capab_update().  The maxsdu is updated by calling
+ * mac_maxsdu_update().
+ * The private properties retain their values across the change of linkmode.
+ * NOTE:
+ * - The port driver does not support any property apart from mtu.
+ * - All other properties are only meant for the partition object.
+ * - The properties cannot be set when an instance is plumbed. The
+ * instance has to be unplumbed to effect any setting.
+ */
+
+/*
+ * Driver wide tunables
  *
  * ibd_tx_softintr
  * ibd_rx_softintr
@@ -113,48 +178,16 @@
  *     allocated and logging is enabled only when IBD_LOGGING is defined.
  *
  */
-uint_t ibd_tx_copy_thresh = 0x1000;
-uint_t ibd_num_swqe = 4000;
-uint_t ibd_num_rwqe = 4000;
-uint_t ibd_num_lso_bufs = 0x400;
-uint_t ibd_num_ah = 256;
-uint_t ibd_hash_size = 32;
 uint_t ibd_rx_softintr = 1;
 uint_t ibd_tx_softintr = 1;
-uint_t ibd_create_broadcast_group = 1;
+
 #ifdef IBD_LOGGING
 uint_t ibd_log_sz = 0x20000;
 #endif
 
-#define	IBD_TX_COPY_THRESH		ibd_tx_copy_thresh
-#define	IBD_TX_BUF_SZ			ibd_tx_copy_thresh
-#define	IBD_NUM_SWQE			ibd_num_swqe
-#define	IBD_NUM_RWQE			ibd_num_rwqe
-#define	IBD_NUM_LSO_BUFS		ibd_num_lso_bufs
-#define	IBD_NUM_AH			ibd_num_ah
-#define	IBD_HASH_SIZE			ibd_hash_size
 #ifdef IBD_LOGGING
 #define	IBD_LOG_SZ			ibd_log_sz
 #endif
-
-/*
- * ibd_rc_tx_copy_thresh
- *     This sets the threshold upto which ibd will attempt to do a bcopy of the
- *     outgoing data into a pre-mapped buffer.
- */
-uint_t ibd_rc_tx_copy_thresh = 0x1000;
-
-/*
- * Receive CQ moderation parameters: tunable (for developers)
- */
-uint_t ibd_rxcomp_count = 4;
-uint_t ibd_rxcomp_usec = 10;
-
-/*
- * Send CQ moderation parameters: tunable (for developers)
- */
-uint_t ibd_txcomp_count = 16;
-uint_t ibd_txcomp_usec = 300;
 
 /* Post IBD_RX_POST_CNT receive work requests at a time. */
 #define	IBD_RX_POST_CNT			8
@@ -170,7 +203,6 @@ uint_t ibd_txcomp_usec = 300;
  */
 #define	IBD_LSO_MAXLEN			65536
 #define	IBD_LSO_BUFSZ			8192
-#define	IBD_PROP_LSO_POLICY		"lso-policy"
 
 /*
  * Async operation states
@@ -184,32 +216,35 @@ uint_t ibd_txcomp_usec = 300;
 /*
  * State of IBD driver initialization during attach/m_start
  */
-#define	IBD_DRV_STATE_INITIALIZED	0x00001
-#define	IBD_DRV_RXINTR_ADDED		0x00002
-#define	IBD_DRV_TXINTR_ADDED		0x00004
-#define	IBD_DRV_IBTL_ATTACH_DONE	0x00008
-#define	IBD_DRV_HCA_OPENED		0x00010
-#define	IBD_DRV_PD_ALLOCD		0x00020
-#define	IBD_DRV_MAC_REGISTERED		0x00040
-#define	IBD_DRV_PORT_DETAILS_OBTAINED	0x00080
-#define	IBD_DRV_BCAST_GROUP_FOUND	0x00100
-#define	IBD_DRV_ACACHE_INITIALIZED	0x00200
-#define	IBD_DRV_CQS_ALLOCD		0x00400
-#define	IBD_DRV_UD_CHANNEL_SETUP	0x00800
-#define	IBD_DRV_TXLIST_ALLOCD		0x01000
-#define	IBD_DRV_SCQ_NOTIFY_ENABLED	0x02000
-#define	IBD_DRV_RXLIST_ALLOCD		0x04000
-#define	IBD_DRV_BCAST_GROUP_JOINED	0x08000
-#define	IBD_DRV_ASYNC_THR_CREATED	0x10000
-#define	IBD_DRV_RCQ_NOTIFY_ENABLED	0x20000
-#define	IBD_DRV_SM_NOTICES_REGISTERED	0x40000
-#define	IBD_DRV_STARTED			0x80000
+#define	IBD_DRV_STATE_INITIALIZED	0x000001
+#define	IBD_DRV_RXINTR_ADDED		0x000002
+#define	IBD_DRV_TXINTR_ADDED		0x000004
+#define	IBD_DRV_IBTL_ATTACH_DONE	0x000008
+#define	IBD_DRV_HCA_OPENED		0x000010
+#define	IBD_DRV_PD_ALLOCD		0x000020
+#define	IBD_DRV_MAC_REGISTERED		0x000040
+#define	IBD_DRV_PORT_DETAILS_OBTAINED	0x000080
+#define	IBD_DRV_BCAST_GROUP_FOUND	0x000100
+#define	IBD_DRV_ACACHE_INITIALIZED	0x000200
+#define	IBD_DRV_CQS_ALLOCD		0x000400
+#define	IBD_DRV_UD_CHANNEL_SETUP	0x000800
+#define	IBD_DRV_TXLIST_ALLOCD		0x001000
+#define	IBD_DRV_SCQ_NOTIFY_ENABLED	0x002000
+#define	IBD_DRV_RXLIST_ALLOCD		0x004000
+#define	IBD_DRV_BCAST_GROUP_JOINED	0x008000
+#define	IBD_DRV_ASYNC_THR_CREATED	0x010000
+#define	IBD_DRV_RCQ_NOTIFY_ENABLED	0x020000
+#define	IBD_DRV_SM_NOTICES_REGISTERED	0x040000
+#define	IBD_DRV_STARTED			0x080000
 #define	IBD_DRV_RC_SRQ_ALLOCD		0x100000
 #define	IBD_DRV_RC_LARGEBUF_ALLOCD	0x200000
 #define	IBD_DRV_RC_LISTEN		0x400000
 #ifdef DEBUG
 #define	IBD_DRV_RC_PRIVATE_STATE	0x800000
 #endif
+#define	IBD_DRV_IN_DELETION		0x1000000
+#define	IBD_DRV_IN_LATE_HCA_INIT 	0x2000000
+#define	IBD_DRV_REQ_LIST_INITED 	0x4000000
 
 /*
  * Start/stop in-progress flags; note that restart must always remain
@@ -218,12 +253,16 @@ uint_t ibd_txcomp_usec = 300;
 #define	IBD_DRV_START_IN_PROGRESS	0x10000000
 #define	IBD_DRV_STOP_IN_PROGRESS	0x20000000
 #define	IBD_DRV_RESTART_IN_PROGRESS	0x30000000
+#define	IBD_DRV_DELETE_IN_PROGRESS	IBD_DRV_RESTART_IN_PROGRESS
 
 /*
  * Miscellaneous constants
  */
 #define	IB_MGID_IPV4_LOWGRP_MASK	0xFFFFFFFF
 #define	IBD_DEF_MAX_SDU			2044
+#define	IBD_DEF_MAX_MTU			(IBD_DEF_MAX_SDU + IPOIB_HDRSIZE)
+#define	IBD_DEF_RC_MAX_SDU		65520
+#define	IBD_DEF_RC_MAX_MTU		(IBD_DEF_RC_MAX_SDU + IPOIB_HDRSIZE)
 #define	IBD_DEFAULT_QKEY		0xB1B
 #ifdef IBD_LOGGING
 #define	IBD_DMAX_LINE			100
@@ -247,6 +286,12 @@ void *ibd_list;
  * Driver Global Data
  */
 ibd_global_state_t ibd_gstate;
+
+/*
+ * Partition object list
+ */
+ibd_state_t	*ibd_objlist_head = NULL;
+kmutex_t	ibd_objlist_lock;
 
 /*
  * Logging
@@ -274,6 +319,15 @@ static int ibd_m_multicst(void *, boolean_t, const uint8_t *);
 static int ibd_m_unicst(void *, const uint8_t *);
 static mblk_t *ibd_m_tx(void *, mblk_t *);
 static boolean_t ibd_m_getcapab(void *, mac_capab_t, void *);
+
+static int ibd_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
+    const void *);
+static int ibd_m_getprop(void *, const char *, mac_prop_id_t, uint_t, void *);
+static void ibd_m_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
+static int ibd_set_priv_prop(ibd_state_t *, const char *, uint_t,
+    const void *);
+static int ibd_get_priv_prop(ibd_state_t *, const char *, uint_t, void *);
 
 /*
  * Private driver entry points for GLDv3
@@ -339,6 +393,8 @@ static void ibd_drain_scq(ibd_state_t *, ibt_cq_hdl_t);
 static void ibd_freemsg_cb(char *);
 static void ibd_async_handler(void *, ibt_hca_hdl_t, ibt_async_code_t,
     ibt_async_event_t *);
+static void ibdpd_async_handler(void *, ibt_hca_hdl_t, ibt_async_code_t,
+    ibt_async_event_t *);
 static void ibd_snet_notices_handler(void *, ib_gid_t,
     ibt_subnet_event_code_t, ibt_subnet_event_t *);
 
@@ -393,8 +449,7 @@ static int ibd_locate_pkey(ib_pkey_t *, uint16_t, ib_pkey_t, uint16_t *);
  * Helpers for attach/start routines
  */
 static int ibd_register_mac(ibd_state_t *, dev_info_t *);
-static int ibd_record_capab(ibd_state_t *, dev_info_t *);
-static int ibd_unattach(ibd_state_t *, dev_info_t *);
+static int ibd_record_capab(ibd_state_t *);
 static int ibd_get_port_details(ibd_state_t *);
 static int ibd_alloc_cqs(ibd_state_t *);
 static int ibd_setup_ud_channel(ibd_state_t *);
@@ -402,6 +457,11 @@ static int ibd_start(ibd_state_t *);
 static int ibd_undo_start(ibd_state_t *, link_state_t);
 static void ibd_set_mac_progress(ibd_state_t *, uint_t);
 static void ibd_clr_mac_progress(ibd_state_t *, uint_t);
+static int ibd_part_attach(ibd_state_t *state, dev_info_t *dip);
+static int ibd_part_unattach(ibd_state_t *state);
+static int ibd_port_attach(dev_info_t *);
+static int ibd_port_unattach(ibd_state_t *state, dev_info_t *dip);
+static int ibd_get_port_state(ibd_state_t *, link_state_t *);
 
 
 /*
@@ -414,6 +474,10 @@ static int ibd_prepare_sgl(ibd_state_t *, mblk_t *, ibd_swqe_t *, uint_t);
 static void *list_get_head(list_t *);
 static int ibd_hash_key_cmp(mod_hash_key_t, mod_hash_key_t);
 static uint_t ibd_hash_by_id(void *, mod_hash_key_t);
+
+ibt_status_t ibd_get_part_attr(datalink_id_t, ibt_part_attr_t *);
+ibt_status_t ibd_get_all_part_attr(ibt_part_attr_t **, int *);
+
 #ifdef IBD_LOGGING
 static void ibd_log(const char *, ...);
 #endif
@@ -441,13 +505,23 @@ static struct ibt_clnt_modinfo_s ibd_clnt_modinfo = {
 	IBT_NETWORK,
 	ibd_async_handler,
 	NULL,
+	"IBPART"
+};
+
+static struct ibt_clnt_modinfo_s ibdpd_clnt_modinfo = {
+	IBTI_V_CURR,
+	IBT_NETWORK,
+	ibdpd_async_handler,
+	NULL,
 	"IPIB"
 };
 
 /*
  * GLDv3 entry points
  */
-#define	IBD_M_CALLBACK_FLAGS	(MC_GETCAPAB)
+#define	IBD_M_CALLBACK_FLAGS	\
+	(MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO)
+
 static mac_callbacks_t ibd_m_callbacks = {
 	IBD_M_CALLBACK_FLAGS,
 	ibd_m_stat,
@@ -459,7 +533,55 @@ static mac_callbacks_t ibd_m_callbacks = {
 	ibd_m_tx,
 	NULL,
 	NULL,
-	ibd_m_getcapab
+	ibd_m_getcapab,
+	NULL,
+	NULL,
+	ibd_m_setprop,
+	ibd_m_getprop,
+	ibd_m_propinfo
+};
+
+/* Private properties */
+char *ibd_priv_props[] = {
+	"_ibd_broadcast_group",
+	"_ibd_coalesce_completions",
+	"_ibd_create_broadcast_group",
+	"_ibd_hash_size",
+	"_ibd_lso_enable",
+	"_ibd_num_ah",
+	"_ibd_num_lso_bufs",
+	"_ibd_rc_enable_srq",
+	"_ibd_rc_num_rwqe",
+	"_ibd_rc_num_srq",
+	"_ibd_rc_num_swqe",
+	"_ibd_rc_rx_comp_count",
+	"_ibd_rc_rx_comp_usec",
+	"_ibd_rc_rx_copy_thresh",
+	"_ibd_rc_rx_rwqe_thresh",
+	"_ibd_rc_tx_comp_count",
+	"_ibd_rc_tx_comp_usec",
+	"_ibd_rc_tx_copy_thresh",
+	"_ibd_ud_num_rwqe",
+	"_ibd_ud_num_swqe",
+	"_ibd_ud_rx_comp_count",
+	"_ibd_ud_rx_comp_usec",
+	"_ibd_ud_tx_comp_count",
+	"_ibd_ud_tx_comp_usec",
+	"_ibd_ud_tx_copy_thresh",
+	NULL
+};
+
+static int ibd_create_partition(void *, intptr_t, int, cred_t *, int *);
+static int ibd_delete_partition(void *, intptr_t, int, cred_t *, int *);
+static int ibd_get_partition_info(void *, intptr_t, int, cred_t *, int *);
+
+static dld_ioc_info_t ibd_dld_ioctl_list[] = {
+	{IBD_CREATE_IBPART, DLDCOPYINOUT, sizeof (ibpart_ioctl_t),
+	    ibd_create_partition, secpolicy_dl_config},
+	{IBD_DELETE_IBPART, DLDCOPYIN, sizeof (ibpart_ioctl_t),
+	    ibd_delete_partition, secpolicy_dl_config},
+	{IBD_INFO_IBPART, DLDCOPYIN, sizeof (ibd_ioctl_t),
+	    ibd_get_partition_info, NULL}
 };
 
 /*
@@ -701,8 +823,8 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared or single-threaded",
     ibd_state_s::id_bgroup_created
     ibd_state_s::id_mac_state
     ibd_state_s::id_mtu
-    ibd_state_s::id_num_rwqe
-    ibd_state_s::id_num_swqe
+    ibd_state_s::id_ud_num_rwqe
+    ibd_state_s::id_ud_num_swqe
     ibd_state_s::id_qpnum
     ibd_state_s::id_rcq_hdl
     ibd_state_s::id_rx_buf_sz
@@ -885,7 +1007,9 @@ _init()
 		return (status);
 	}
 
-	mac_init_ops(&ibd_dev_ops, "ibd");
+	mutex_init(&ibd_objlist_lock, NULL, MUTEX_DRIVER, NULL);
+
+	mac_init_ops(&ibd_dev_ops, "ibp");
 	status = mod_install(&ibd_modlinkage);
 	if (status != 0) {
 		DPRINT(10, "_init:failed in mod_install()");
@@ -900,6 +1024,13 @@ _init()
 	ibd_gstate.ig_ibt_hdl_ref_cnt = 0;
 	ibd_gstate.ig_service_list = NULL;
 	mutex_exit(&ibd_gstate.ig_mutex);
+
+	if (dld_ioc_register(IBPART_IOC, ibd_dld_ioctl_list,
+	    DLDIOCCNT(ibd_dld_ioctl_list)) != 0) {
+		return (EIO);
+	}
+
+	ibt_register_part_attr_cb(ibd_get_part_attr, ibd_get_all_part_attr);
 
 #ifdef IBD_LOGGING
 	ibd_log_init();
@@ -922,7 +1053,10 @@ _fini()
 	if (status != 0)
 		return (status);
 
+	ibt_unregister_part_attr_cb();
+
 	mac_fini_ops(&ibd_dev_ops);
+	mutex_destroy(&ibd_objlist_lock);
 	ddi_soft_state_fini(&ibd_list);
 	mutex_destroy(&ibd_gstate.ig_mutex);
 #ifdef IBD_LOGGING
@@ -1091,6 +1225,17 @@ ibd_async_work(ibd_state_t *state)
 			mutex_exit(&state->id_acache_req_lock);
 
 			/*
+			 * If we are in late hca initialization mode, do not
+			 * process any other async request other than TRAP. TRAP
+			 * is used for indicating creation of a broadcast group;
+			 * in which case, we need to join/create the group.
+			 */
+			if ((state->id_mac_state & IBD_DRV_IN_LATE_HCA_INIT) &&
+			    (ptr->rq_op != IBD_ASYNC_TRAP)) {
+				goto free_req_and_continue;
+			}
+
+			/*
 			 * Once we have done the operation, there is no
 			 * guarantee the request slot is going to be valid,
 			 * it might be freed up (as in IBD_ASYNC_LEAVE, REAP,
@@ -1152,6 +1297,7 @@ ibd_async_work(ibd_state_t *state)
 					ibd_async_rc_recycle_ace(state, ptr);
 					break;
 			}
+free_req_and_continue:
 			if (ptr != NULL)
 				kmem_cache_free(state->id_req_kmc, ptr);
 
@@ -1252,9 +1398,6 @@ ibd_acache_init(ibd_state_t *state)
 	ibd_ace_t *ce;
 	int i;
 
-	mutex_init(&state->id_acache_req_lock, NULL, MUTEX_DRIVER, NULL);
-	cv_init(&state->id_acache_req_cv, NULL, CV_DEFAULT, NULL);
-
 	mutex_init(&state->id_ac_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&state->id_mc_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_enter(&state->id_ac_mutex);
@@ -1263,19 +1406,17 @@ ibd_acache_init(ibd_state_t *state)
 	list_create(&state->id_ah_active, sizeof (ibd_ace_t),
 	    offsetof(ibd_ace_t, ac_list));
 	state->id_ah_active_hash = mod_hash_create_extended("IBD AH hash",
-	    IBD_HASH_SIZE, mod_hash_null_keydtor, mod_hash_null_valdtor,
+	    state->id_hash_size, mod_hash_null_keydtor, mod_hash_null_valdtor,
 	    ibd_hash_by_id, NULL, ibd_hash_key_cmp, KM_SLEEP);
 	list_create(&state->id_mc_full, sizeof (ibd_mce_t),
 	    offsetof(ibd_mce_t, mc_list));
 	list_create(&state->id_mc_non, sizeof (ibd_mce_t),
 	    offsetof(ibd_mce_t, mc_list));
-	list_create(&state->id_req_list, sizeof (ibd_req_t),
-	    offsetof(ibd_req_t, rq_list));
 	state->id_ac_hot_ace = NULL;
 
 	state->id_ac_list = ce = (ibd_ace_t *)kmem_zalloc(sizeof (ibd_ace_t) *
-	    IBD_NUM_AH, KM_SLEEP);
-	for (i = 0; i < IBD_NUM_AH; i++, ce++) {
+	    state->id_num_ah, KM_SLEEP);
+	for (i = 0; i < state->id_num_ah; i++, ce++) {
 		if (ibt_alloc_ud_dest(state->id_hca_hdl, IBT_UD_DEST_NO_FLAGS,
 		    state->id_pd_hdl, &ce->ac_dest) != IBT_SUCCESS) {
 			mutex_exit(&state->id_ac_mutex);
@@ -1316,13 +1457,10 @@ ibd_acache_fini(ibd_state_t *state)
 	list_destroy(&state->id_ah_active);
 	list_destroy(&state->id_mc_full);
 	list_destroy(&state->id_mc_non);
-	list_destroy(&state->id_req_list);
-	kmem_free(state->id_ac_list, sizeof (ibd_ace_t) * IBD_NUM_AH);
+	kmem_free(state->id_ac_list, sizeof (ibd_ace_t) * state->id_num_ah);
 	mutex_exit(&state->id_ac_mutex);
 	mutex_destroy(&state->id_ac_mutex);
 	mutex_destroy(&state->id_mc_mutex);
-	mutex_destroy(&state->id_acache_req_lock);
-	cv_destroy(&state->id_acache_req_cv);
 }
 
 /*
@@ -1960,6 +2098,12 @@ ibd_locate_pkey(ib_pkey_t *pkey_tbl, uint16_t pkey_tbl_sz, ib_pkey_t pkey,
 }
 
 /*
+ * Late HCA Initialization:
+ * If plumb had succeeded without the availability of an active port or the
+ * pkey, and either of their availability is now being indicated via PORT_UP
+ * or PORT_CHANGE respectively, try a start of the interface.
+ *
+ * Normal Operation:
  * When the link is notified up, we need to do a few things, based
  * on the port's current p_init_type_reply claiming a reinit has been
  * done or not. The reinit steps are:
@@ -1995,10 +2139,21 @@ ibd_link_mod(ibd_state_t *state, ibt_async_code_t code)
 	mutex_enter(&state->id_link_mutex);
 
 	/*
-	 * If the init code in ibd_m_start hasn't yet set up the
-	 * pkey/gid, nothing to do; that code will set the link state.
+	 * If the link state is unknown, a plumb has not yet been attempted
+	 * on the interface. Nothing to do.
 	 */
 	if (state->id_link_state == LINK_STATE_UNKNOWN) {
+		mutex_exit(&state->id_link_mutex);
+		goto link_mod_return;
+	}
+
+	/*
+	 * If link state is down because of plumb failure, and we are not in
+	 * late HCA init, and we were not successfully plumbed, nothing to do.
+	 */
+	if ((state->id_link_state == LINK_STATE_DOWN) &&
+	    ((state->id_mac_state & IBD_DRV_IN_LATE_HCA_INIT) == 0) &&
+	    ((state->id_mac_state & IBD_DRV_STARTED) == 0)) {
 		mutex_exit(&state->id_link_mutex);
 		goto link_mod_return;
 	}
@@ -2025,6 +2180,21 @@ ibd_link_mod(ibd_state_t *state, ibt_async_code_t code)
 	    (port_infop->p_linkstate != IBT_PORT_ACTIVE)) {
 		new_link_state = LINK_STATE_DOWN;
 		goto update_link_state;
+	}
+
+	/*
+	 * If in the previous attempt, the pkey was not found either due to the
+	 * port state being down, or due to it's absence in the pkey table,
+	 * look for it now and try to start the interface.
+	 */
+	if (state->id_mac_state & IBD_DRV_IN_LATE_HCA_INIT) {
+		mutex_exit(&state->id_link_mutex);
+		if ((ret = ibd_start(state)) != 0) {
+			DPRINT(10, "ibd_linkmod: cannot start from late HCA "
+			    "init, ret=%d", ret);
+		}
+		ibt_free_portinfo(port_infop, port_infosz);
+		goto link_mod_return;
 	}
 
 	/*
@@ -2234,11 +2404,14 @@ ibd_register_mac(ibd_state_t *state, dev_info_t *dip)
 	macp->m_src_addr = (uint8_t *)&state->id_macaddr;
 	macp->m_callbacks = &ibd_m_callbacks;
 	macp->m_min_sdu = 0;
-	if (state->id_enable_rc) {
+	if (state->id_type == IBD_PORT_DRIVER) {
+		macp->m_max_sdu = IBD_DEF_RC_MAX_SDU;
+	} else if (state->id_enable_rc) {
 		macp->m_max_sdu = state->rc_mtu - IPOIB_HDRSIZE;
 	} else {
 		macp->m_max_sdu = IBD_DEF_MAX_SDU;
 	}
+	macp->m_priv_props = ibd_priv_props;
 
 	/*
 	 *  Register ourselves with the GLDv3 interface
@@ -2255,7 +2428,7 @@ ibd_register_mac(ibd_state_t *state, dev_info_t *dip)
 }
 
 static int
-ibd_record_capab(ibd_state_t *state, dev_info_t *dip)
+ibd_record_capab(ibd_state_t *state)
 {
 	ibt_hca_attr_t hca_attrs;
 	ibt_status_t ibt_status;
@@ -2285,17 +2458,9 @@ ibd_record_capab(ibd_state_t *state, dev_info_t *dip)
 	 * 2. Set LSO policy, capability and maximum length
 	 */
 	if (state->id_enable_rc) {
-		state->id_lso_policy = B_FALSE;
 		state->id_lso_capable = B_FALSE;
 		state->id_lso_maxlen = 0;
 	} else {
-		if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS
-		    |DDI_PROP_NOTPROM, IBD_PROP_LSO_POLICY, 1)) {
-			state->id_lso_policy = B_TRUE;
-		} else {
-			state->id_lso_policy = B_FALSE;
-		}
-
 		if (hca_attrs.hca_max_lso_size > 0) {
 			state->id_lso_capable = B_TRUE;
 			if (hca_attrs.hca_max_lso_size > IBD_LSO_MAXLEN)
@@ -2356,28 +2521,30 @@ ibd_record_capab(ibd_state_t *state, dev_info_t *dip)
 
 	/*
 	 * 5. Set number of recv and send wqes after checking hca maximum
-	 *    channel size
+	 *    channel size. Store the max channel size in the state so that it
+	 *    can be referred to when the swqe/rwqe change is requested via
+	 *    dladm.
 	 */
-	if (hca_attrs.hca_max_chan_sz < IBD_NUM_RWQE) {
-		state->id_num_rwqe = hca_attrs.hca_max_chan_sz;
-	} else {
-		state->id_num_rwqe = IBD_NUM_RWQE;
-	}
-	state->id_rx_bufs_outstanding_limit = state->id_num_rwqe - IBD_RWQE_MIN;
-	if (hca_attrs.hca_max_chan_sz < IBD_NUM_SWQE) {
-		state->id_num_swqe = hca_attrs.hca_max_chan_sz;
-	} else {
-		state->id_num_swqe = IBD_NUM_SWQE;
-	}
+
+	state->id_hca_max_chan_sz = hca_attrs.hca_max_chan_sz;
+
+	if (hca_attrs.hca_max_chan_sz < state->id_ud_num_rwqe)
+		state->id_ud_num_rwqe = hca_attrs.hca_max_chan_sz;
+
+	state->id_rx_bufs_outstanding_limit = state->id_ud_num_rwqe -
+	    IBD_RWQE_MIN;
+
+	if (hca_attrs.hca_max_chan_sz < state->id_ud_num_swqe)
+		state->id_ud_num_swqe = hca_attrs.hca_max_chan_sz;
+
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*state))
 
 	return (DDI_SUCCESS);
 }
 
 static int
-ibd_unattach(ibd_state_t *state, dev_info_t *dip)
+ibd_part_unattach(ibd_state_t *state)
 {
-	int instance;
 	uint32_t progress = state->id_mac_state;
 	ibt_status_t ret;
 
@@ -2403,6 +2570,33 @@ ibd_unattach(ibd_state_t *state, dev_info_t *dip)
 	if (progress & IBD_DRV_MAC_REGISTERED) {
 		(void) mac_unregister(state->id_mh);
 		state->id_mac_state &= (~IBD_DRV_MAC_REGISTERED);
+	}
+
+	if (progress & IBD_DRV_ASYNC_THR_CREATED) {
+		/*
+		 * No new async requests will be posted since the device
+		 * link state has been marked as unknown; completion handlers
+		 * have been turned off, so Tx handler will not cause any
+		 * more IBD_ASYNC_REAP requests.
+		 *
+		 * Queue a request for the async thread to exit, which will
+		 * be serviced after any pending ones. This can take a while,
+		 * specially if the SM is unreachable, since IBMF will slowly
+		 * timeout each SM request issued by the async thread.  Reap
+		 * the thread before continuing on, we do not want it to be
+		 * lingering in modunloaded code.
+		 */
+		ibd_queue_work_slot(state, &state->id_ah_req, IBD_ASYNC_EXIT);
+		thread_join(state->id_async_thrid);
+
+		state->id_mac_state &= (~IBD_DRV_ASYNC_THR_CREATED);
+	}
+
+	if (progress & IBD_DRV_REQ_LIST_INITED) {
+		list_destroy(&state->id_req_list);
+		mutex_destroy(&state->id_acache_req_lock);
+		cv_destroy(&state->id_acache_req_cv);
+		state->id_mac_state &= ~IBD_DRV_REQ_LIST_INITED;
 	}
 
 	if (progress & IBD_DRV_PD_ALLOCD) {
@@ -2471,44 +2665,22 @@ ibd_unattach(ibd_state_t *state, dev_info_t *dip)
 		state->id_mac_state &= (~IBD_DRV_STATE_INITIALIZED);
 	}
 
-	instance = ddi_get_instance(dip);
-	ddi_soft_state_free(ibd_list, instance);
-
 	return (DDI_SUCCESS);
 }
 
-/*
- * Attach device to the IO framework.
- */
-static int
-ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+int
+ibd_part_attach(ibd_state_t *state, dev_info_t *dip)
 {
-	ibd_state_t *state = NULL;
-	ib_guid_t hca_guid;
-	int instance;
 	ibt_status_t ret;
 	int rv;
-
-	/*
-	 * IBD doesn't support suspend/resume
-	 */
-	if (cmd != DDI_ATTACH)
-		return (DDI_FAILURE);
-
-	/*
-	 * Allocate softstate structure
-	 */
-	instance = ddi_get_instance(dip);
-	if (ddi_soft_state_zalloc(ibd_list, instance) == DDI_FAILURE)
-		return (DDI_FAILURE);
-	state = ddi_get_soft_state(ibd_list, instance);
+	kthread_t *kht;
 
 	/*
 	 * Initialize mutexes and condition variables
 	 */
 	if (ibd_state_init(state, dip) != DDI_SUCCESS) {
 		DPRINT(10, "ibd_attach: failed in ibd_state_init()");
-		goto attach_fail;
+		return (DDI_FAILURE);
 	}
 	state->id_mac_state |= IBD_DRV_STATE_INITIALIZED;
 
@@ -2520,7 +2692,7 @@ ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    NULL, NULL, ibd_intr, (caddr_t)state)) != DDI_SUCCESS) {
 			DPRINT(10, "ibd_attach: failed in "
 			    "ddi_add_softintr(id_rx),  ret=%d", rv);
-			goto attach_fail;
+			return (DDI_FAILURE);
 		}
 		state->id_mac_state |= IBD_DRV_RXINTR_ADDED;
 	}
@@ -2530,34 +2702,9 @@ ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    (caddr_t)state)) != DDI_SUCCESS) {
 			DPRINT(10, "ibd_attach: failed in "
 			    "ddi_add_softintr(id_tx), ret=%d", rv);
-			goto attach_fail;
+			return (DDI_FAILURE);
 		}
 		state->id_mac_state |= IBD_DRV_TXINTR_ADDED;
-	}
-
-	/*
-	 * Obtain IBA P_Key, port number and HCA guid and validate
-	 * them (for P_Key, only full members are allowed as per
-	 * IPoIB specification; neither port number nor HCA guid
-	 * can be zero)
-	 */
-	if ((state->id_pkey = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
-	    "port-pkey", IB_PKEY_INVALID_LIMITED)) <= IB_PKEY_INVALID_FULL) {
-		DPRINT(10, "ibd_attach: port device has wrong partition (0x%x)",
-		    state->id_pkey);
-		goto attach_fail;
-	}
-	if ((state->id_port = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
-	    "port-number", 0)) == 0) {
-		DPRINT(10, "ibd_attach: invalid port number (%d)",
-		    state->id_port);
-		goto attach_fail;
-	}
-	if ((hca_guid = ddi_prop_get_int64(DDI_DEV_T_ANY, dip, 0,
-	    "hca-guid", 0)) == 0) {
-		DPRINT(10, "ibd_attach: port hca has invalid guid (0x%llx)",
-		    hca_guid);
-		goto attach_fail;
 	}
 
 	/*
@@ -2570,15 +2717,14 @@ ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			DPRINT(10, "ibd_attach: global: failed in "
 			    "ibt_attach(), ret=%d", ret);
 			mutex_exit(&ibd_gstate.ig_mutex);
-			goto attach_fail;
+			return (DDI_FAILURE);
 		}
 	}
 	if ((ret = ibt_attach(&ibd_clnt_modinfo, dip, state,
 	    &state->id_ibt_hdl)) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_attach: failed in ibt_attach(), ret=%d",
-		    ret);
+		DPRINT(10, "ibd_attach: failed in ibt_attach(), ret=%d", ret);
 		mutex_exit(&ibd_gstate.ig_mutex);
-		goto attach_fail;
+		return (DDI_FAILURE);
 	}
 	ibd_gstate.ig_ibt_hdl_ref_cnt++;
 	mutex_exit(&ibd_gstate.ig_mutex);
@@ -2587,22 +2733,19 @@ ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Open the HCA
 	 */
-	if ((ret = ibt_open_hca(state->id_ibt_hdl, hca_guid,
+	if ((ret = ibt_open_hca(state->id_ibt_hdl, state->id_hca_guid,
 	    &state->id_hca_hdl)) != IBT_SUCCESS) {
 		DPRINT(10, "ibd_attach: ibt_open_hca() failed, ret=%d", ret);
-		goto attach_fail;
+		return (DDI_FAILURE);
 	}
 	state->id_mac_state |= IBD_DRV_HCA_OPENED;
-
-	/* Get RC config before ibd_record_capab */
-	ibd_rc_get_conf(state);
 
 #ifdef DEBUG
 	/* Initialize Driver Counters for Reliable Connected Mode */
 	if (state->id_enable_rc) {
 		if (ibd_rc_init_stats(state) != DDI_SUCCESS) {
 			DPRINT(10, "ibd_attach: failed in ibd_rc_init_stats");
-			goto attach_fail;
+			return (DDI_FAILURE);
 		}
 		state->id_mac_state |= IBD_DRV_RC_PRIVATE_STATE;
 	}
@@ -2611,7 +2754,7 @@ ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Record capabilities
 	 */
-	(void) ibd_record_capab(state, dip);
+	(void) ibd_record_capab(state);
 
 	/*
 	 * Allocate a protection domain on the HCA
@@ -2619,32 +2762,49 @@ ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if ((ret = ibt_alloc_pd(state->id_hca_hdl, IBT_PD_NO_FLAGS,
 	    &state->id_pd_hdl)) != IBT_SUCCESS) {
 		DPRINT(10, "ibd_attach: ibt_alloc_pd() failed, ret=%d", ret);
-		goto attach_fail;
+		return (DDI_FAILURE);
 	}
 	state->id_mac_state |= IBD_DRV_PD_ALLOCD;
 
 
 	/*
-	 * Register ibd interfaces with the Nemo framework
+	 * We need to initialise the req_list that is required for the
+	 * operation of the async_thread.
 	 */
-	if (ibd_register_mac(state, dip) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_attach: failed in ibd_register_mac()");
-		goto attach_fail;
-	}
-	state->id_mac_state |= IBD_DRV_MAC_REGISTERED;
+	mutex_init(&state->id_acache_req_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&state->id_acache_req_cv, NULL, CV_DEFAULT, NULL);
+	list_create(&state->id_req_list, sizeof (ibd_req_t),
+	    offsetof(ibd_req_t, rq_list));
+	state->id_mac_state |= IBD_DRV_REQ_LIST_INITED;
 
 	/*
-	 * We're done with everything we could to make the attach
-	 * succeed.  All the buffer allocations and IPoIB broadcast
-	 * group joins are deferred to when the interface instance
-	 * is actually plumbed to avoid wasting memory.
+	 * Create the async thread; thread_create never fails.
 	 */
-	return (DDI_SUCCESS);
+	kht = thread_create(NULL, 0, ibd_async_work, state, 0, &p0,
+	    TS_RUN, minclsyspri);
+	state->id_async_thrid = kht->t_did;
+	state->id_mac_state |= IBD_DRV_ASYNC_THR_CREATED;
 
-attach_fail:
-	(void) ibd_unattach(state, dip);
-	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*state))
-	return (DDI_FAILURE);
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Attach device to the IO framework.
+ */
+static int
+ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+	int ret;
+
+	switch (cmd) {
+		case DDI_ATTACH:
+			ret = ibd_port_attach(dip);
+			break;
+		default:
+			ret = DDI_FAILURE;
+			break;
+	}
+	return (ret);
 }
 
 /*
@@ -2673,7 +2833,7 @@ ibd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * done ibd_attach(), ibd_m_start() and ibd_m_stop() correctly
 	 * so far, we should find all the flags we need in id_mac_state.
 	 */
-	return (ibd_unattach(state, dip));
+	return (ibd_port_unattach(state, dip));
 }
 
 /*
@@ -2708,12 +2868,10 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 	state->id_rx_list.dl_cnt = 0;
 	mutex_init(&state->id_rx_list.dl_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&state->id_rx_free_list.dl_mutex, NULL, MUTEX_DRIVER, NULL);
-	(void) sprintf(buf, "ibd_req%d", ddi_get_instance(dip));
+	(void) sprintf(buf, "ibd_req%d_%x", ddi_get_instance(dip),
+	    state->id_pkey);
 	state->id_req_kmc = kmem_cache_create(buf, sizeof (ibd_req_t),
 	    0, NULL, NULL, NULL, NULL, NULL, 0);
-
-	mutex_init(&state->id_macst_lock, NULL, MUTEX_DRIVER, NULL);
-	cv_init(&state->id_macst_cv, NULL, CV_DEFAULT, NULL);
 
 	/* For Reliable Connected Mode */
 	mutex_init(&state->rc_rx_lock, NULL, MUTEX_DRIVER, NULL);
@@ -2722,6 +2880,41 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 	mutex_init(&state->rc_srq_free_list.dl_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&state->rc_pass_chan_list.chan_list_mutex, NULL,
 	    MUTEX_DRIVER, NULL);
+
+	/*
+	 * Make the default link mode as RC. If this fails during connection
+	 * setup, the link mode is automatically transitioned to UD.
+	 * Also set the RC MTU.
+	 */
+	state->id_enable_rc = IBD_DEF_LINK_MODE;
+	state->rc_mtu = IBD_DEF_RC_MAX_MTU;
+	state->id_mtu = IBD_DEF_MAX_MTU;
+
+	/* Iniatialize all tunables to default */
+	state->id_lso_policy = IBD_DEF_LSO_POLICY;
+	state->id_num_lso_bufs = IBD_DEF_NUM_LSO_BUFS;
+	state->id_num_ah = IBD_DEF_NUM_AH;
+	state->id_hash_size = IBD_DEF_HASH_SIZE;
+	state->id_create_broadcast_group = IBD_DEF_CREATE_BCAST_GROUP;
+	state->id_allow_coalesce_comp_tuning = IBD_DEF_COALESCE_COMPLETIONS;
+	state->id_ud_rx_comp_count = IBD_DEF_UD_RX_COMP_COUNT;
+	state->id_ud_rx_comp_usec = IBD_DEF_UD_RX_COMP_USEC;
+	state->id_ud_tx_comp_count = IBD_DEF_UD_TX_COMP_COUNT;
+	state->id_ud_tx_comp_usec = IBD_DEF_UD_TX_COMP_USEC;
+	state->id_rc_rx_comp_count = IBD_DEF_RC_RX_COMP_COUNT;
+	state->id_rc_rx_comp_usec = IBD_DEF_RC_RX_COMP_USEC;
+	state->id_rc_tx_comp_count = IBD_DEF_RC_TX_COMP_COUNT;
+	state->id_rc_tx_comp_usec = IBD_DEF_RC_TX_COMP_USEC;
+	state->id_ud_tx_copy_thresh = IBD_DEF_UD_TX_COPY_THRESH;
+	state->id_rc_rx_copy_thresh = IBD_DEF_RC_RX_COPY_THRESH;
+	state->id_rc_tx_copy_thresh = IBD_DEF_RC_TX_COPY_THRESH;
+	state->id_ud_num_rwqe = IBD_DEF_UD_NUM_RWQE;
+	state->id_ud_num_swqe = IBD_DEF_UD_NUM_SWQE;
+	state->id_rc_num_rwqe = IBD_DEF_RC_NUM_RWQE;
+	state->id_rc_num_swqe = IBD_DEF_RC_NUM_SWQE;
+	state->rc_enable_srq = IBD_DEF_RC_ENABLE_SRQ;
+	state->id_rc_num_srq = IBD_DEF_RC_NUM_SRQ;
+	state->id_rc_rx_rwqe_thresh = IBD_DEF_RC_RX_RWQE_THRESH;
 
 	return (DDI_SUCCESS);
 }
@@ -2732,9 +2925,6 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 static void
 ibd_state_fini(ibd_state_t *state)
 {
-	cv_destroy(&state->id_macst_cv);
-	mutex_destroy(&state->id_macst_lock);
-
 	kmem_cache_destroy(state->id_req_kmc);
 
 	mutex_destroy(&state->id_rx_list.dl_mutex);
@@ -3213,6 +3403,7 @@ ibd_find_bgroup(ibd_state_t *state)
 	ibt_mcg_info_t mcg_info;
 
 	state->id_bgroup_created = B_FALSE;
+	state->id_bgroup_present = B_FALSE;
 
 query_bcast_grp:
 	bzero(&mcg_attr, sizeof (ibt_mcg_attr_t));
@@ -3242,7 +3433,7 @@ query_bcast_grp:
 	}
 
 	if (!found) {
-		if (ibd_create_broadcast_group) {
+		if (state->id_create_broadcast_group) {
 			/*
 			 * If we created the broadcast group, but failed to
 			 * find it, we can't do anything except leave the
@@ -3300,6 +3491,7 @@ query_bcast_grp:
 		goto find_bgroup_fail;
 	}
 	state->id_mtu = mcgmtu;
+	state->id_bgroup_present = B_TRUE;
 
 	return (IBT_SUCCESS);
 
@@ -3323,30 +3515,30 @@ ibd_alloc_tx_copybufs(ibd_state_t *state)
 	 */
 	state->id_tx_buf_sz = state->id_mtu;
 	if (state->id_lso_policy && state->id_lso_capable &&
-	    (IBD_TX_BUF_SZ > state->id_mtu)) {
-		state->id_tx_buf_sz = IBD_TX_BUF_SZ;
+	    (state->id_ud_tx_copy_thresh > state->id_mtu)) {
+		state->id_tx_buf_sz = state->id_ud_tx_copy_thresh;
 	}
 
-	state->id_tx_bufs = kmem_zalloc(state->id_num_swqe *
+	state->id_tx_bufs = kmem_zalloc(state->id_ud_num_swqe *
 	    state->id_tx_buf_sz, KM_SLEEP);
 
-	state->id_tx_wqes = kmem_zalloc(state->id_num_swqe *
+	state->id_tx_wqes = kmem_zalloc(state->id_ud_num_swqe *
 	    sizeof (ibd_swqe_t), KM_SLEEP);
 
 	/*
 	 * Do one memory registration on the entire txbuf area
 	 */
 	mem_attr.mr_vaddr = (uint64_t)(uintptr_t)state->id_tx_bufs;
-	mem_attr.mr_len = state->id_num_swqe * state->id_tx_buf_sz;
+	mem_attr.mr_len = state->id_ud_num_swqe * state->id_tx_buf_sz;
 	mem_attr.mr_as = NULL;
 	mem_attr.mr_flags = IBT_MR_SLEEP;
 	if (ibt_register_mr(state->id_hca_hdl, state->id_pd_hdl, &mem_attr,
 	    &state->id_tx_mr_hdl, &state->id_tx_mr_desc) != IBT_SUCCESS) {
 		DPRINT(10, "ibd_alloc_tx_copybufs: ibt_register_mr failed");
 		kmem_free(state->id_tx_wqes,
-		    state->id_num_swqe * sizeof (ibd_swqe_t));
+		    state->id_ud_num_swqe * sizeof (ibd_swqe_t));
 		kmem_free(state->id_tx_bufs,
-		    state->id_num_swqe * state->id_tx_buf_sz);
+		    state->id_ud_num_swqe * state->id_tx_buf_sz);
 		state->id_tx_bufs = NULL;
 		return (DDI_FAILURE);
 	}
@@ -3375,7 +3567,7 @@ ibd_alloc_tx_lsobufs(ibd_state_t *state)
 	/*
 	 * Allocate the entire lso memory and register it
 	 */
-	memsz = IBD_NUM_LSO_BUFS * IBD_LSO_BUFSZ;
+	memsz = state->id_num_lso_bufs * IBD_LSO_BUFSZ;
 	membase = kmem_zalloc(memsz, KM_SLEEP);
 
 	mem_attr.mr_vaddr = (uint64_t)(uintptr_t)membase;
@@ -3398,7 +3590,7 @@ ibd_alloc_tx_lsobufs(ibd_state_t *state)
 	 * can always derive the address of a buflist entry from the address of
 	 * an lso buffer.
 	 */
-	buflist = kmem_zalloc(IBD_NUM_LSO_BUFS * sizeof (ibd_lsobuf_t),
+	buflist = kmem_zalloc(state->id_num_lso_bufs * sizeof (ibd_lsobuf_t),
 	    KM_SLEEP);
 
 	/*
@@ -3406,7 +3598,7 @@ ibd_alloc_tx_lsobufs(ibd_state_t *state)
 	 */
 	memp = membase;
 	lbufp = buflist;
-	for (i = 0; i < IBD_NUM_LSO_BUFS; i++) {
+	for (i = 0; i < state->id_num_lso_bufs; i++) {
 		lbufp->lb_isfree = 1;
 		lbufp->lb_buf = memp;
 		lbufp->lb_next = lbufp + 1;
@@ -3424,7 +3616,7 @@ ibd_alloc_tx_lsobufs(ibd_state_t *state)
 	bktp->bkt_bufl = buflist;
 	bktp->bkt_free_head = buflist;
 	bktp->bkt_mem = membase;
-	bktp->bkt_nelem = IBD_NUM_LSO_BUFS;
+	bktp->bkt_nelem = state->id_num_lso_bufs;
 	bktp->bkt_nfree = bktp->bkt_nelem;
 
 	state->id_lso = bktp;
@@ -3450,7 +3642,7 @@ ibd_init_txlist(ibd_state_t *state)
 
 	if (state->id_lso_policy && state->id_lso_capable) {
 		if (ibd_alloc_tx_lsobufs(state) != DDI_SUCCESS)
-			state->id_lso_policy = B_FALSE;
+			state->id_lso_capable = B_FALSE;
 	}
 
 	mutex_enter(&state->id_tx_list.dl_mutex);
@@ -3472,7 +3664,7 @@ ibd_init_txlist(ibd_state_t *state)
 	len = state->id_tx_buf_sz;
 	swqe = state->id_tx_wqes;
 	mutex_enter(&state->id_tx_list.dl_mutex);
-	for (i = 0; i < state->id_num_swqe; i++, swqe++, bufaddr += len) {
+	for (i = 0; i < state->id_ud_num_swqe; i++, swqe++, bufaddr += len) {
 		swqe->swqe_next = NULL;
 		swqe->swqe_im_mblk = NULL;
 
@@ -3633,8 +3825,10 @@ ibd_free_tx_copybufs(ibd_state_t *state)
 	/*
 	 * Free txbuf memory
 	 */
-	kmem_free(state->id_tx_wqes, state->id_num_swqe * sizeof (ibd_swqe_t));
-	kmem_free(state->id_tx_bufs, state->id_num_swqe * state->id_tx_buf_sz);
+	kmem_free(state->id_tx_wqes, state->id_ud_num_swqe *
+	    sizeof (ibd_swqe_t));
+	kmem_free(state->id_tx_bufs, state->id_ud_num_swqe *
+	    state->id_tx_buf_sz);
 	state->id_tx_wqes = NULL;
 	state->id_tx_bufs = NULL;
 }
@@ -3828,10 +4022,10 @@ ibd_alloc_rx_copybufs(ibd_state_t *state)
 	 */
 	state->id_rx_buf_sz = state->id_mtu + IPOIB_GRH_SIZE;
 
-	state->id_rx_bufs = kmem_zalloc(state->id_num_rwqe *
+	state->id_rx_bufs = kmem_zalloc(state->id_ud_num_rwqe *
 	    state->id_rx_buf_sz, KM_SLEEP);
 
-	state->id_rx_wqes = kmem_zalloc(state->id_num_rwqe *
+	state->id_rx_wqes = kmem_zalloc(state->id_ud_num_rwqe *
 	    sizeof (ibd_rwqe_t), KM_SLEEP);
 
 	state->id_rx_nqueues = 1 << IBD_LOG_RX_POST;
@@ -3846,16 +4040,16 @@ ibd_alloc_rx_copybufs(ibd_state_t *state)
 	 * Do one memory registration on the entire rxbuf area
 	 */
 	mem_attr.mr_vaddr = (uint64_t)(uintptr_t)state->id_rx_bufs;
-	mem_attr.mr_len = state->id_num_rwqe * state->id_rx_buf_sz;
+	mem_attr.mr_len = state->id_ud_num_rwqe * state->id_rx_buf_sz;
 	mem_attr.mr_as = NULL;
 	mem_attr.mr_flags = IBT_MR_SLEEP | IBT_MR_ENABLE_LOCAL_WRITE;
 	if (ibt_register_mr(state->id_hca_hdl, state->id_pd_hdl, &mem_attr,
 	    &state->id_rx_mr_hdl, &state->id_rx_mr_desc) != IBT_SUCCESS) {
 		DPRINT(10, "ibd_alloc_rx_copybufs: ibt_register_mr failed");
 		kmem_free(state->id_rx_wqes,
-		    state->id_num_rwqe * sizeof (ibd_rwqe_t));
+		    state->id_ud_num_rwqe * sizeof (ibd_rwqe_t));
 		kmem_free(state->id_rx_bufs,
-		    state->id_num_rwqe * state->id_rx_buf_sz);
+		    state->id_ud_num_rwqe * state->id_rx_buf_sz);
 		state->id_rx_bufs = NULL;
 		state->id_rx_wqes = NULL;
 		return (DDI_FAILURE);
@@ -3928,7 +4122,7 @@ ibd_init_rxlist(ibd_state_t *state)
 	rwqe = state->id_rx_wqes;
 	bufaddr = state->id_rx_bufs;
 	list = NULL;
-	for (i = 0; i < state->id_num_rwqe; i++, rwqe++, bufaddr += len) {
+	for (i = 0; i < state->id_ud_num_rwqe; i++, rwqe++, bufaddr += len) {
 		rwqe->w_state = state;
 		rwqe->w_freemsg_cb.free_func = ibd_freemsg_cb;
 		rwqe->w_freemsg_cb.free_arg = (char *)rwqe;
@@ -4001,8 +4195,10 @@ ibd_free_rx_copybufs(ibd_state_t *state)
 	}
 	kmem_free(state->id_rx_queues, state->id_rx_nqueues *
 	    sizeof (ibd_rx_queue_t));
-	kmem_free(state->id_rx_wqes, state->id_num_rwqe * sizeof (ibd_rwqe_t));
-	kmem_free(state->id_rx_bufs, state->id_num_rwqe * state->id_rx_buf_sz);
+	kmem_free(state->id_rx_wqes, state->id_ud_num_rwqe *
+	    sizeof (ibd_rwqe_t));
+	kmem_free(state->id_rx_bufs, state->id_ud_num_rwqe *
+	    state->id_rx_buf_sz);
 	state->id_rx_queues = NULL;
 	state->id_rx_wqes = NULL;
 	state->id_rx_bufs = NULL;
@@ -4017,7 +4213,7 @@ ibd_free_rx_rsrcs(ibd_state_t *state)
 		mutex_exit(&state->id_rx_free_list.dl_mutex);
 		return;
 	}
-	ASSERT(state->id_rx_free_list.dl_cnt == state->id_num_rwqe);
+	ASSERT(state->id_rx_free_list.dl_cnt == state->id_ud_num_rwqe);
 	ibd_free_rx_copybufs(state);
 	state->id_rx_free_list.dl_cnt = 0;
 	state->id_rx_free_list.dl_head = NULL;
@@ -4182,6 +4378,15 @@ ibd_snet_notices_handler(void *arg, ib_gid_t gid, ibt_subnet_event_code_t code,
 		case IBT_SM_EVENT_MCG_CREATED:
 		case IBT_SM_EVENT_MCG_DELETED:
 			/*
+			 * If it is a "deleted" event and we are in late hca
+			 * init, nothing to do.
+			 */
+			if (((state->id_mac_state & IBD_DRV_IN_LATE_HCA_INIT) ==
+			    IBD_DRV_IN_LATE_HCA_INIT) && (code ==
+			    IBT_SM_EVENT_MCG_DELETED)) {
+				break;
+			}
+			/*
 			 * Common processing of creation/deletion traps.
 			 * First check if the instance is being
 			 * [de]initialized; back off then, without doing
@@ -4206,8 +4411,48 @@ ibd_async_trap(ibd_state_t *state, ibd_req_t *req)
 {
 	ib_gid_t mgid = req->rq_gid;
 	ibt_subnet_event_code_t code = (ibt_subnet_event_code_t)req->rq_ptr;
+	int ret;
+	ib_pkey_t pkey = (mgid.gid_prefix >> 16) & 0xffff;
 
 	DPRINT(10, "ibd_async_trap : %d\n", code);
+
+	/*
+	 * Check if we have already joined the IPoIB broadcast group for our
+	 * PKEY. If joined, perform the rest of the operation.
+	 * Else, the interface is not initialised. Do the initialisation here
+	 * by calling ibd_start() and return.
+	 */
+
+	if (((state->id_mac_state & IBD_DRV_IN_LATE_HCA_INIT) ==
+	    IBD_DRV_IN_LATE_HCA_INIT) && (state->id_bgroup_present == 0) &&
+	    (code == IBT_SM_EVENT_MCG_CREATED)) {
+		/*
+		 * If we are in late HCA init and a notification for the
+		 * creation of a MCG came in, check if it is the IPoIB MCG for
+		 * this pkey. If not, return.
+		 */
+		if ((mgid.gid_guid != IB_MGID_IPV4_LOWGRP_MASK) || (pkey !=
+		    state->id_pkey)) {
+			ibd_async_done(state);
+			return;
+		}
+		ibd_set_mac_progress(state, IBD_DRV_RESTART_IN_PROGRESS);
+		/*
+		 * Check if there is still a necessity to start the interface.
+		 * It is possible that the user attempted unplumb at just about
+		 * the same time, and if unplumb succeeded, we have nothing to
+		 * do.
+		 */
+		if (((state->id_mac_state & IBD_DRV_IN_LATE_HCA_INIT) ==
+		    IBD_DRV_IN_LATE_HCA_INIT) &&
+		    ((ret = ibd_start(state)) != 0)) {
+			DPRINT(10, "ibd_async_trap: cannot start from late HCA "
+			    "init, ret=%d", ret);
+		}
+		ibd_clr_mac_progress(state, IBD_DRV_RESTART_IN_PROGRESS);
+		ibd_async_done(state);
+		return;
+	}
 
 	/*
 	 * Atomically search the nonmember and sendonlymember lists and
@@ -4249,6 +4494,9 @@ static boolean_t
 ibd_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
 	ibd_state_t *state = arg;
+
+	if (state->id_type == IBD_PORT_DRIVER)
+		return (B_FALSE);
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM: {
@@ -4299,6 +4547,759 @@ ibd_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	return (B_TRUE);
 }
 
+/*
+ * callback function for set/get of properties
+ */
+static int
+ibd_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, const void *pr_val)
+{
+	ibd_state_t *state = arg;
+	int err = 0;
+	uint32_t link_mode;
+
+	/* Cannot set properties on a port driver */
+	if (state->id_type == IBD_PORT_DRIVER) {
+		return (ENOTSUP);
+	}
+
+	switch (pr_num) {
+		case MAC_PROP_IB_LINKMODE:
+			if (state->id_mac_state & IBD_DRV_STARTED) {
+				err = EBUSY;
+				break;
+			}
+			if (pr_val == NULL) {
+				err = EINVAL;
+				break;
+			}
+			bcopy(pr_val, &link_mode, sizeof (link_mode));
+			if (link_mode != IBD_LINK_MODE_UD &&
+			    link_mode != IBD_LINK_MODE_RC) {
+				err = EINVAL;
+			} else {
+				if (link_mode == IBD_LINK_MODE_RC) {
+					if (state->id_enable_rc) {
+						return (0);
+					}
+					state->id_enable_rc = 1;
+					/* inform MAC framework of new MTU */
+					err = mac_maxsdu_update(state->id_mh,
+					    state->rc_mtu - IPOIB_HDRSIZE);
+				} else {
+					if (!state->id_enable_rc) {
+						return (0);
+					}
+					state->id_enable_rc = 0;
+					err = mac_maxsdu_update(state->id_mh,
+					    state->id_mtu - IPOIB_HDRSIZE);
+				}
+				(void) ibd_record_capab(state);
+				mac_capab_update(state->id_mh);
+			}
+			break;
+		case MAC_PROP_PRIVATE:
+			err = ibd_set_priv_prop(state, pr_name,
+			    pr_valsize, pr_val);
+			break;
+		default:
+			err = ENOTSUP;
+			break;
+	}
+	return (err);
+}
+
+static int
+ibd_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, void *pr_val)
+{
+	ibd_state_t *state = arg;
+	int err = 0;
+
+	switch (pr_num) {
+		case MAC_PROP_MTU:
+			break;
+		default:
+			if (state->id_type == IBD_PORT_DRIVER) {
+				return (ENOTSUP);
+			}
+			break;
+	}
+
+	switch (pr_num) {
+		case MAC_PROP_IB_LINKMODE:
+			*(uint_t *)pr_val = state->id_enable_rc;
+			break;
+		case MAC_PROP_PRIVATE:
+			err = ibd_get_priv_prop(state, pr_name, pr_valsize,
+			    pr_val);
+			break;
+		default:
+			err = ENOTSUP;
+			break;
+	}
+	return (err);
+}
+
+static void
+ibd_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	ibd_state_t *state = arg;
+
+	switch (pr_num) {
+	case MAC_PROP_IB_LINKMODE: {
+		mac_prop_info_set_default_uint32(prh, IBD_DEF_LINK_MODE);
+		break;
+	}
+	case MAC_PROP_MTU: {
+		uint32_t min, max;
+		if (state->id_type == IBD_PORT_DRIVER) {
+			min = 1500;
+			max = IBD_DEF_RC_MAX_SDU;
+		} else if (state->id_enable_rc) {
+			min = max = IBD_DEF_RC_MAX_SDU;
+		} else {
+			min = max = state->id_mtu - IPOIB_HDRSIZE;
+		}
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_range_uint32(prh, min, max);
+		break;
+	}
+	case MAC_PROP_PRIVATE: {
+		char valstr[64];
+		int value;
+
+		if (strcmp(pr_name, "_ibd_broadcast_group") == 0) {
+			mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+			return;
+		} else if (strcmp(pr_name, "_ibd_coalesce_completions") == 0) {
+			value = IBD_DEF_COALESCE_COMPLETIONS;
+		} else if (strcmp(pr_name,
+		    "_ibd_create_broadcast_group") == 0) {
+			value = IBD_DEF_CREATE_BCAST_GROUP;
+		} else if (strcmp(pr_name, "_ibd_hash_size") == 0) {
+			value = IBD_DEF_HASH_SIZE;
+		} else if (strcmp(pr_name, "_ibd_lso_enable") == 0) {
+			value = IBD_DEF_LSO_POLICY;
+		} else if (strcmp(pr_name, "_ibd_num_ah") == 0) {
+			value = IBD_DEF_NUM_AH;
+		} else if (strcmp(pr_name, "_ibd_num_lso_bufs") == 0) {
+			value = IBD_DEF_NUM_LSO_BUFS;
+		} else if (strcmp(pr_name, "_ibd_rc_enable_srq") == 0) {
+			value = IBD_DEF_RC_ENABLE_SRQ;
+		} else if (strcmp(pr_name, "_ibd_rc_num_rwqe") == 0) {
+			value = IBD_DEF_RC_NUM_RWQE;
+		} else if (strcmp(pr_name, "_ibd_rc_num_srq") == 0) {
+			value = IBD_DEF_RC_NUM_SRQ;
+		} else if (strcmp(pr_name, "_ibd_rc_num_swqe") == 0) {
+			value = IBD_DEF_RC_NUM_SWQE;
+		} else if (strcmp(pr_name, "_ibd_rc_rx_comp_count") == 0) {
+			value = IBD_DEF_RC_RX_COMP_COUNT;
+		} else if (strcmp(pr_name, "_ibd_rc_rx_comp_usec") == 0) {
+			value = IBD_DEF_RC_RX_COMP_USEC;
+		} else if (strcmp(pr_name, "_ibd_rc_rx_copy_thresh") == 0) {
+			value = IBD_DEF_RC_RX_COPY_THRESH;
+		} else if (strcmp(pr_name, "_ibd_rc_rx_rwqe_thresh") == 0) {
+			value = IBD_DEF_RC_RX_RWQE_THRESH;
+		} else if (strcmp(pr_name, "_ibd_rc_tx_comp_count") == 0) {
+			value = IBD_DEF_RC_TX_COMP_COUNT;
+		} else if (strcmp(pr_name, "_ibd_rc_tx_comp_usec") == 0) {
+			value = IBD_DEF_RC_TX_COMP_USEC;
+		} else if (strcmp(pr_name, "_ibd_rc_tx_copy_thresh") == 0) {
+			value = IBD_DEF_RC_TX_COPY_THRESH;
+		} else if (strcmp(pr_name, "_ibd_ud_num_rwqe") == 0) {
+			value = IBD_DEF_UD_NUM_RWQE;
+		} else if (strcmp(pr_name, "_ibd_ud_num_swqe") == 0) {
+			value = IBD_DEF_UD_NUM_SWQE;
+		} else if (strcmp(pr_name, "_ibd_ud_rx_comp_count") == 0) {
+			value = IBD_DEF_UD_RX_COMP_COUNT;
+		} else if (strcmp(pr_name, "_ibd_ud_rx_comp_usec") == 0) {
+			value = IBD_DEF_UD_RX_COMP_USEC;
+		} else if (strcmp(pr_name, "_ibd_ud_tx_comp_count") == 0) {
+			value = IBD_DEF_UD_TX_COMP_COUNT;
+		} else if (strcmp(pr_name, "_ibd_ud_tx_comp_usec") == 0) {
+			value = IBD_DEF_UD_TX_COMP_USEC;
+		} else if (strcmp(pr_name, "_ibd_ud_tx_copy_thresh") == 0) {
+			value = IBD_DEF_UD_TX_COPY_THRESH;
+		} else {
+			return;
+		}
+
+		(void) snprintf(valstr, sizeof (valstr), "%d", value);
+		mac_prop_info_set_default_str(prh, valstr);
+		break;
+	}
+	} /* switch (pr_num) */
+}
+
+/* ARGSUSED2 */
+static int
+ibd_set_priv_prop(ibd_state_t *state, const char *pr_name,
+    uint_t pr_valsize, const void *pr_val)
+{
+	int err = 0;
+	long result;
+
+	if (strcmp(pr_name, "_ibd_coalesce_completions") == 0) {
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > 1) {
+			err = EINVAL;
+		} else {
+			state->id_allow_coalesce_comp_tuning = (result == 1) ?
+			    B_TRUE: B_FALSE;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_create_broadcast_group") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > 1) {
+			err = EINVAL;
+		} else {
+			state->id_create_broadcast_group = (result == 1) ?
+			    B_TRUE: B_FALSE;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_hash_size") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_HASH_SIZE || result > IBD_MAX_HASH_SIZE) {
+			err = EINVAL;
+		} else {
+			state->id_hash_size = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_lso_enable") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > 1) {
+			err = EINVAL;
+		} else {
+			state->id_lso_policy = (result == 1) ?
+			    B_TRUE: B_FALSE;
+		}
+		mac_capab_update(state->id_mh);
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_num_ah") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_NUM_AH || result > IBD_MAX_NUM_AH) {
+			err = EINVAL;
+		} else {
+			state->id_num_ah = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_num_lso_bufs") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (!state->id_lso_policy || !state->id_lso_capable) {
+			return (EINVAL);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_NUM_LSO_BUFS ||
+		    result > IBD_MAX_NUM_LSO_BUFS) {
+			err = EINVAL;
+		} else {
+			state->id_num_lso_bufs = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_rc_enable_srq") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 0 || result > 1) {
+			err = EINVAL;
+		} else {
+			state->rc_enable_srq = (result == 1) ?
+			    B_TRUE: B_FALSE;
+		}
+		if (!state->rc_enable_srq) {
+			state->id_rc_num_srq = 0;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_rc_num_rwqe") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_RC_NUM_RWQE ||
+		    result > IBD_MAX_RC_NUM_RWQE) {
+			err = EINVAL;
+		} else {
+			state->id_rc_num_rwqe = (uint32_t)result;
+			if (state->id_allow_coalesce_comp_tuning &&
+			    state->id_rc_rx_comp_count > state->id_rc_num_rwqe)
+				state->id_rc_rx_comp_count =
+				    state->id_rc_num_rwqe;
+			if (state->id_rc_num_srq > state->id_rc_num_rwqe)
+				state->id_rc_num_srq =
+				    state->id_rc_num_rwqe - 1;
+			/*
+			 * If rx_rwqe_threshold is greater than the number of
+			 * rwqes, pull it back to 25% of number of rwqes.
+			 */
+			if (state->id_rc_rx_rwqe_thresh > state->id_rc_num_rwqe)
+				state->id_rc_rx_rwqe_thresh =
+				    (state->id_rc_num_rwqe >> 2);
+
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_rc_num_srq") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		if (!state->rc_enable_srq)
+			return (EINVAL);
+
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_RC_NUM_SRQ ||
+		    result >= state->id_rc_num_rwqe) {
+			err = EINVAL;
+		} else
+			state->id_rc_num_srq = (uint32_t)result;
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_rc_num_swqe") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_RC_NUM_SWQE ||
+		    result > IBD_MAX_RC_NUM_SWQE) {
+			err = EINVAL;
+		} else {
+			state->id_rc_num_swqe = (uint32_t)result;
+			if (state->id_allow_coalesce_comp_tuning &&
+			    state->id_rc_tx_comp_count > state->id_rc_num_swqe)
+				state->id_rc_tx_comp_count =
+				    state->id_rc_num_swqe;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_rc_rx_comp_count") == 0) {
+		if (!state->id_allow_coalesce_comp_tuning) {
+			return (ENOTSUP);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 1 || result > state->id_rc_num_rwqe) {
+			err = EINVAL;
+		} else {
+			state->id_rc_rx_comp_count = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_rc_rx_comp_usec") == 0) {
+		if (!state->id_allow_coalesce_comp_tuning) {
+			return (ENOTSUP);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 1) {
+			err = EINVAL;
+		} else {
+			state->id_rc_rx_comp_usec = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_rc_rx_copy_thresh") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_RC_RX_COPY_THRESH ||
+		    result > state->rc_mtu) {
+			err = EINVAL;
+		} else {
+			state->id_rc_rx_copy_thresh = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_rc_rx_rwqe_thresh") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_RC_RX_RWQE_THRESH ||
+		    result >= state->id_rc_num_rwqe) {
+			err = EINVAL;
+		} else {
+			state->id_rc_rx_rwqe_thresh = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_rc_tx_comp_count") == 0) {
+		if (!state->id_allow_coalesce_comp_tuning) {
+			return (ENOTSUP);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 1 || result > state->id_rc_num_swqe) {
+			err = EINVAL;
+		} else {
+			state->id_rc_tx_comp_count = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_rc_tx_comp_usec") == 0) {
+		if (!state->id_allow_coalesce_comp_tuning) {
+			return (ENOTSUP);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 1)
+			err = EINVAL;
+		else {
+			state->id_rc_tx_comp_usec = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_rc_tx_copy_thresh") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_RC_TX_COPY_THRESH ||
+		    result > state->rc_mtu) {
+			err = EINVAL;
+		} else {
+			state->id_rc_tx_copy_thresh = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_ud_num_rwqe") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_UD_NUM_RWQE ||
+		    result > IBD_MAX_UD_NUM_RWQE) {
+			err = EINVAL;
+		} else {
+			if (result > state->id_hca_max_chan_sz) {
+				state->id_ud_num_rwqe =
+				    state->id_hca_max_chan_sz;
+			} else {
+				state->id_ud_num_rwqe = (uint32_t)result;
+			}
+			if (state->id_allow_coalesce_comp_tuning &&
+			    state->id_ud_rx_comp_count > state->id_ud_num_rwqe)
+				state->id_ud_rx_comp_count =
+				    state->id_ud_num_rwqe;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_ud_num_swqe") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_UD_NUM_SWQE ||
+		    result > IBD_MAX_UD_NUM_SWQE) {
+			err = EINVAL;
+		} else {
+			if (result > state->id_hca_max_chan_sz) {
+				state->id_ud_num_swqe =
+				    state->id_hca_max_chan_sz;
+			} else {
+				state->id_ud_num_swqe = (uint32_t)result;
+			}
+			if (state->id_allow_coalesce_comp_tuning &&
+			    state->id_ud_tx_comp_count > state->id_ud_num_swqe)
+				state->id_ud_tx_comp_count =
+				    state->id_ud_num_swqe;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_ud_rx_comp_count") == 0) {
+		if (!state->id_allow_coalesce_comp_tuning) {
+			return (ENOTSUP);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 1 || result > state->id_ud_num_rwqe) {
+			err = EINVAL;
+		} else {
+			state->id_ud_rx_comp_count = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_ud_rx_comp_usec") == 0) {
+		if (!state->id_allow_coalesce_comp_tuning) {
+			return (ENOTSUP);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 1) {
+			err = EINVAL;
+		} else {
+			state->id_ud_rx_comp_usec = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_ud_tx_comp_count") == 0) {
+		if (!state->id_allow_coalesce_comp_tuning) {
+			return (ENOTSUP);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 1 || result > state->id_ud_num_swqe) {
+			err = EINVAL;
+		} else {
+			state->id_ud_tx_comp_count = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_ud_tx_comp_usec") == 0) {
+		if (!state->id_allow_coalesce_comp_tuning) {
+			return (ENOTSUP);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < 1) {
+			err = EINVAL;
+		} else {
+			state->id_ud_tx_comp_usec = (uint32_t)result;
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_ibd_ud_tx_copy_thresh") == 0) {
+		if (state->id_mac_state & IBD_DRV_STARTED) {
+			return (EBUSY);
+		}
+		if (pr_val == NULL) {
+			return (EINVAL);
+		}
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		if (result < IBD_MIN_UD_TX_COPY_THRESH ||
+		    result > IBD_MAX_UD_TX_COPY_THRESH) {
+			err = EINVAL;
+		} else {
+			state->id_ud_tx_copy_thresh = (uint32_t)result;
+		}
+		return (err);
+	}
+	return (ENOTSUP);
+}
+
+static int
+ibd_get_priv_prop(ibd_state_t *state, const char *pr_name, uint_t pr_valsize,
+    void *pr_val)
+{
+	int err = ENOTSUP;
+	int value;
+
+	if (strcmp(pr_name, "_ibd_broadcast_group") == 0) {
+		value = state->id_bgroup_present;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_coalesce_completions") == 0) {
+		value = state->id_allow_coalesce_comp_tuning;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_create_broadcast_group") == 0) {
+		value = state->id_create_broadcast_group;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_hash_size") == 0) {
+		value = state->id_hash_size;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_lso_enable") == 0) {
+		value = state->id_lso_policy;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_num_ah") == 0) {
+		value = state->id_num_ah;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_num_lso_bufs") == 0) {
+		value = state->id_num_lso_bufs;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_rc_enable_srq") == 0) {
+		value = state->rc_enable_srq;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_rc_num_rwqe") == 0) {
+		value = state->id_rc_num_rwqe;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_rc_num_srq") == 0) {
+		value = state->id_rc_num_srq;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_rc_num_swqe") == 0) {
+		value = state->id_rc_num_swqe;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_rc_rx_comp_count") == 0) {
+		value = state->id_rc_rx_comp_count;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_rc_rx_comp_usec") == 0) {
+		value = state->id_rc_rx_comp_usec;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_rc_rx_copy_thresh") == 0) {
+		value = state->id_rc_rx_copy_thresh;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_rc_rx_rwqe_thresh") == 0) {
+		value = state->id_rc_rx_rwqe_thresh;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_rc_tx_comp_count") == 0) {
+		value = state->id_rc_tx_comp_count;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_rc_tx_comp_usec") == 0) {
+		value = state->id_rc_tx_comp_usec;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_rc_tx_copy_thresh") == 0) {
+		value = state->id_rc_tx_copy_thresh;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_ud_num_rwqe") == 0) {
+		value = state->id_ud_num_rwqe;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_ud_num_swqe") == 0) {
+		value = state->id_ud_num_swqe;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_ud_rx_comp_count") == 0) {
+		value = state->id_ud_rx_comp_count;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_ud_rx_comp_usec") == 0) {
+		value = state->id_ud_rx_comp_usec;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_ud_tx_comp_count") == 0) {
+		value = state->id_ud_tx_comp_count;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_ud_tx_comp_usec") == 0) {
+		value = state->id_ud_tx_comp_usec;
+		err = 0;
+		goto done;
+	}
+	if (strcmp(pr_name, "_ibd_ud_tx_copy_thresh") == 0) {
+		value = state->id_ud_tx_copy_thresh;
+		err = 0;
+		goto done;
+	}
+done:
+	if (err == 0) {
+		(void) snprintf(pr_val, pr_valsize, "%d", value);
+	}
+	return (err);
+}
+
 static int
 ibd_get_port_details(ibd_state_t *state)
 {
@@ -4321,41 +5322,31 @@ ibd_get_port_details(ibd_state_t *state)
 	}
 
 	/*
-	 * If the link already went down by the time we get here,
-	 * give up
-	 */
-	if (port_infop->p_linkstate != IBT_PORT_ACTIVE) {
-		mutex_exit(&state->id_link_mutex);
-		ibt_free_portinfo(port_infop, port_infosz);
-		DPRINT(10, "ibd_get_port_details: port is not active");
-		return (ENETDOWN);
-	}
-
-	/*
 	 * If the link is active, verify the pkey
 	 */
-	if ((ret = ibt_pkey2index(state->id_hca_hdl, state->id_port,
-	    state->id_pkey, &state->id_pkix)) != IBT_SUCCESS) {
-		mutex_exit(&state->id_link_mutex);
-		ibt_free_portinfo(port_infop, port_infosz);
-		DPRINT(10, "ibd_get_port_details: ibt_pkey2index "
-		    "failed, ret=%d", ret);
-		return (ENONET);
+	if (port_infop->p_linkstate == IBT_PORT_ACTIVE) {
+		if ((ret = ibt_pkey2index(state->id_hca_hdl, state->id_port,
+		    state->id_pkey, &state->id_pkix)) != IBT_SUCCESS) {
+			state->id_link_state = LINK_STATE_DOWN;
+		} else {
+			state->id_link_state = LINK_STATE_UP;
+		}
+		state->id_mtu = (128 << port_infop->p_mtu);
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(state->id_sgid))
+		state->id_sgid = *port_infop->p_sgid_tbl;
+		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(state->id_sgid))
+		/*
+		 * Now that the port is active, record the port speed
+		 */
+		state->id_link_speed = ibd_get_portspeed(state);
+	} else {
+		/* Make sure that these are handled in PORT_UP/CHANGE */
+		state->id_mtu = 0;
+		state->id_link_state = LINK_STATE_DOWN;
+		state->id_link_speed = 0;
 	}
-
-	state->id_mtu = (128 << port_infop->p_mtu);
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(state->id_sgid))
-	state->id_sgid = *port_infop->p_sgid_tbl;
-	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(state->id_sgid))
-	state->id_link_state = LINK_STATE_UP;
-
 	mutex_exit(&state->id_link_mutex);
 	ibt_free_portinfo(port_infop, port_infosz);
-
-	/*
-	 * Now that the port is active, record the port speed
-	 */
-	state->id_link_speed = ibd_get_portspeed(state);
 
 	return (0);
 }
@@ -4367,6 +5358,8 @@ ibd_alloc_cqs(ibd_state_t *state)
 	ibt_cq_attr_t cq_attr;
 	ibt_status_t ret;
 	uint32_t real_size;
+	uint_t num_rwqe_change = 0;
+	uint_t num_swqe_change = 0;
 
 	ret = ibt_query_hca(state->id_hca_hdl, &hca_attrs);
 	ASSERT(ret == IBT_SUCCESS);
@@ -4385,11 +5378,12 @@ ibd_alloc_cqs(ibd_state_t *state)
 	/*
 	 * Allocate Receive CQ.
 	 */
-	if (hca_attrs.hca_max_cq_sz >= (state->id_num_rwqe + 1)) {
-		cq_attr.cq_size = state->id_num_rwqe + 1;
+	if (hca_attrs.hca_max_cq_sz >= (state->id_ud_num_rwqe + 1)) {
+		cq_attr.cq_size = state->id_ud_num_rwqe + 1;
 	} else {
 		cq_attr.cq_size = hca_attrs.hca_max_cq_sz;
-		state->id_num_rwqe = cq_attr.cq_size - 1;
+		num_rwqe_change = state->id_ud_num_rwqe;
+		state->id_ud_num_rwqe = cq_attr.cq_size - 1;
 	}
 
 	if ((ret = ibt_alloc_cq(state->id_hca_hdl, &cq_attr,
@@ -4399,8 +5393,8 @@ ibd_alloc_cqs(ibd_state_t *state)
 		return (DDI_FAILURE);
 	}
 
-	if ((ret = ibt_modify_cq(state->id_rcq_hdl,
-	    ibd_rxcomp_count, ibd_rxcomp_usec, 0)) != IBT_SUCCESS) {
+	if ((ret = ibt_modify_cq(state->id_rcq_hdl, state->id_ud_rx_comp_count,
+	    state->id_ud_rx_comp_usec, 0)) != IBT_SUCCESS) {
 		DPRINT(10, "ibd_alloc_cqs: Receive CQ interrupt "
 		    "moderation failed, ret=%d\n", ret);
 	}
@@ -4413,11 +5407,12 @@ ibd_alloc_cqs(ibd_state_t *state)
 	/*
 	 * Allocate Send CQ.
 	 */
-	if (hca_attrs.hca_max_cq_sz >= (state->id_num_swqe + 1)) {
-		cq_attr.cq_size = state->id_num_swqe + 1;
+	if (hca_attrs.hca_max_cq_sz >= (state->id_ud_num_swqe + 1)) {
+		cq_attr.cq_size = state->id_ud_num_swqe + 1;
 	} else {
 		cq_attr.cq_size = hca_attrs.hca_max_cq_sz;
-		state->id_num_swqe = cq_attr.cq_size - 1;
+		num_swqe_change = state->id_ud_num_swqe;
+		state->id_ud_num_swqe = cq_attr.cq_size - 1;
 	}
 
 	if ((ret = ibt_alloc_cq(state->id_hca_hdl, &cq_attr,
@@ -4429,8 +5424,8 @@ ibd_alloc_cqs(ibd_state_t *state)
 		(void) ibt_free_cq(state->id_rcq_hdl);
 		return (DDI_FAILURE);
 	}
-	if ((ret = ibt_modify_cq(state->id_scq_hdl,
-	    ibd_txcomp_count, ibd_txcomp_usec, 0)) != IBT_SUCCESS) {
+	if ((ret = ibt_modify_cq(state->id_scq_hdl, state->id_ud_tx_comp_count,
+	    state->id_ud_tx_comp_usec, 0)) != IBT_SUCCESS) {
 		DPRINT(10, "ibd_alloc_cqs: Send CQ interrupt "
 		    "moderation failed, ret=%d\n", ret);
 	}
@@ -4443,13 +5438,13 @@ ibd_alloc_cqs(ibd_state_t *state)
 	 * Print message in case we could not allocate as many wqe's
 	 * as was requested.
 	 */
-	if (state->id_num_rwqe != IBD_NUM_RWQE) {
+	if (num_rwqe_change) {
 		ibd_print_warn(state, "Setting #rwqe = %d instead of default "
-		    "%d", state->id_num_rwqe, IBD_NUM_RWQE);
+		    "%d", state->id_ud_num_rwqe, num_rwqe_change);
 	}
-	if (state->id_num_swqe != IBD_NUM_SWQE) {
+	if (num_swqe_change) {
 		ibd_print_warn(state, "Setting #swqe = %d instead of default "
-		    "%d", state->id_num_swqe, IBD_NUM_SWQE);
+		    "%d", state->id_ud_num_swqe, num_swqe_change);
 	}
 
 	return (DDI_SUCCESS);
@@ -4471,8 +5466,8 @@ ibd_setup_ud_channel(ibd_state_t *state)
 	ud_alloc_attr.ud_hca_port_num	= state->id_port;
 	ud_alloc_attr.ud_sizes.cs_sq_sgl = state->id_max_sqseg;
 	ud_alloc_attr.ud_sizes.cs_rq_sgl = IBD_MAX_RQSEG;
-	ud_alloc_attr.ud_sizes.cs_sq    = state->id_num_swqe;
-	ud_alloc_attr.ud_sizes.cs_rq    = state->id_num_rwqe;
+	ud_alloc_attr.ud_sizes.cs_sq    = state->id_ud_num_swqe;
+	ud_alloc_attr.ud_sizes.cs_rq    = state->id_ud_num_rwqe;
 	ud_alloc_attr.ud_qkey		= state->id_mcinfo->mc_qkey;
 	ud_alloc_attr.ud_scq		= state->id_scq_hdl;
 	ud_alloc_attr.ud_rcq		= state->id_rcq_hdl;
@@ -4528,11 +5523,16 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 		state->id_link_state = LINK_STATE_UNKNOWN;
 	}
 	mutex_exit(&state->id_link_mutex);
+	bzero(&state->id_macaddr, sizeof (ipoib_mac_t));
 	mac_link_update(state->id_mh, state->id_link_state);
 
 	state->id_mac_state &= (~IBD_DRV_PORT_DETAILS_OBTAINED);
 	if (progress & IBD_DRV_STARTED) {
 		state->id_mac_state &= (~IBD_DRV_STARTED);
+	}
+
+	if (progress & IBD_DRV_IN_LATE_HCA_INIT) {
+		state->id_mac_state &= (~IBD_DRV_IN_LATE_HCA_INIT);
 	}
 
 	/* Stop listen under Reliable Connected Mode */
@@ -4626,7 +5626,7 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 		mutex_enter(&state->id_tx_rel_list.dl_mutex);
 		attempts = 10;
 		while (state->id_tx_list.dl_cnt + state->id_tx_rel_list.dl_cnt
-		    != state->id_num_swqe) {
+		    != state->id_ud_num_swqe) {
 			if (--attempts == 0)
 				break;
 			mutex_exit(&state->id_tx_rel_list.dl_mutex);
@@ -4637,7 +5637,7 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 		}
 		ibt_set_cq_handler(state->id_scq_hdl, 0, 0);
 		if (state->id_tx_list.dl_cnt + state->id_tx_rel_list.dl_cnt !=
-		    state->id_num_swqe) {
+		    state->id_ud_num_swqe) {
 			cmn_err(CE_WARN, "tx resources not freed\n");
 		}
 		mutex_exit(&state->id_tx_rel_list.dl_mutex);
@@ -4655,28 +5655,6 @@ ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 		}
 
 		state->id_mac_state &= (~IBD_DRV_SCQ_NOTIFY_ENABLED);
-	}
-
-	if (progress & IBD_DRV_ASYNC_THR_CREATED) {
-		/*
-		 * No new async requests will be posted since the device
-		 * link state has been marked as unknown; completion handlers
-		 * have been turned off, so Tx handler will not cause any
-		 * more IBD_ASYNC_REAP requests.
-		 *
-		 * Queue a request for the async thread to exit, which will
-		 * be serviced after any pending ones. This can take a while,
-		 * specially if the SM is unreachable, since IBMF will slowly
-		 * timeout each SM request issued by the async thread.  Reap
-		 * the thread before continuing on, we do not want it to be
-		 * lingering in modunloaded code (or we could move the reap
-		 * to ibd_detach(), provided we keep track of the current
-		 * id_async_thrid somewhere safe).
-		 */
-		ibd_queue_work_slot(state, &state->id_ah_req, IBD_ASYNC_EXIT);
-		thread_join(state->id_async_thrid);
-
-		state->id_mac_state &= (~IBD_DRV_ASYNC_THR_CREATED);
 	}
 
 	if (progress & IBD_DRV_BCAST_GROUP_JOINED) {
@@ -4811,26 +5789,37 @@ ibd_m_start(void *arg)
 	ibd_state_t *state = arg;
 	int	ret;
 
+	if (state->id_type == IBD_PORT_DRIVER)
+		return (EINVAL);
+
 	ibd_set_mac_progress(state, IBD_DRV_START_IN_PROGRESS);
+	if (state->id_mac_state & IBD_DRV_IN_DELETION) {
+		ibd_clr_mac_progress(state, IBD_DRV_START_IN_PROGRESS);
+		return (EIO);
+	}
 
 	ret = ibd_start(state);
-
 	ibd_clr_mac_progress(state, IBD_DRV_START_IN_PROGRESS);
-
 	return (ret);
 }
 
 static int
 ibd_start(ibd_state_t *state)
 {
-	kthread_t *kht;
 	int err;
 	ibt_status_t ret;
+	int late_hca_init = 0;
 
 	if (state->id_mac_state & IBD_DRV_STARTED)
 		return (DDI_SUCCESS);
 
-	if (atomic_inc_32_nv(&state->id_running) != 1) {
+	/*
+	 * We do not increment the running flag when calling ibd_start() as
+	 * a result of some event which moves the state away from late HCA
+	 * initialization viz. MCG_CREATED, PORT_CHANGE or link availability.
+	 */
+	if (!(state->id_mac_state & IBD_DRV_IN_LATE_HCA_INIT) &&
+	    (atomic_inc_32_nv(&state->id_running) != 1)) {
 		DPRINT(10, "ibd_start: id_running is non-zero");
 		cmn_err(CE_WARN, "ibd_start: id_running was not 0\n");
 		atomic_dec_32(&state->id_running);
@@ -4838,22 +5827,31 @@ ibd_start(ibd_state_t *state)
 	}
 
 	/*
-	 * Get port details; if we fail here, very likely the port
-	 * state is inactive or the pkey can't be verified.
+	 * Get port details; if we fail here, something bad happened.
+	 * Fail plumb.
 	 */
 	if ((err = ibd_get_port_details(state)) != 0) {
 		DPRINT(10, "ibd_start: ibd_get_port_details() failed");
 		goto start_fail;
 	}
+	/*
+	 * If state->id_link_state is DOWN, it indicates that either the port
+	 * is down, or the pkey is not available. In both cases, resort to late
+	 * initialization. Register for subnet notices, and return success.
+	 */
 	state->id_mac_state |= IBD_DRV_PORT_DETAILS_OBTAINED;
+	if (state->id_link_state == LINK_STATE_DOWN) {
+		late_hca_init = 1;
+		goto late_hca_init_return;
+	}
 
 	/*
 	 * Find the IPoIB broadcast group
 	 */
 	if (ibd_find_bgroup(state) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_start: ibd_find_bgroup() failed");
-		err = ENOTACTIVE;
-		goto start_fail;
+		/* Resort to late initialization */
+		late_hca_init = 1;
+		goto reg_snet_notices;
 	}
 	state->id_mac_state |= IBD_DRV_BCAST_GROUP_FOUND;
 
@@ -4932,16 +5930,6 @@ ibd_start(ibd_state_t *state)
 	state->id_mac_state |= IBD_DRV_BCAST_GROUP_JOINED;
 
 	/*
-	 * Create the async thread; thread_create never fails.
-	 */
-	kht = thread_create(NULL, 0, ibd_async_work, state, 0, &p0,
-	    TS_RUN, minclsyspri);
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(state->id_async_thrid))
-	state->id_async_thrid = kht->t_did;
-	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(state->id_async_thrid))
-	state->id_mac_state |= IBD_DRV_ASYNC_THR_CREATED;
-
-	/*
 	 * When we did mac_register() in ibd_attach(), we didn't register
 	 * the real macaddr and we didn't have the true port mtu. Now that
 	 * we're almost ready, set the local mac address and broadcast
@@ -4980,7 +5968,9 @@ ibd_start(ibd_state_t *state)
 	}
 	state->id_mac_state |= IBD_DRV_RCQ_NOTIFY_ENABLED;
 
+reg_snet_notices:
 	/*
+	 * In case of normal initialization sequence,
 	 * Setup the subnet notices handler after we've initialized the acache/
 	 * mcache and started the async thread, both of which are required for
 	 * the trap handler to function properly.
@@ -4989,13 +5979,37 @@ ibd_start(ibd_state_t *state)
 	 * a mac_register() during attach so mac_tx_update() can be called
 	 * if necessary without any problem), we can enable the trap handler
 	 * to queue requests to the async thread.
+	 *
+	 * In case of late hca initialization, the subnet notices handler will
+	 * only handle MCG created/deleted event. The action performed as part
+	 * of handling these events is to start the interface. So, the
+	 * acache/mcache initialization is not a necessity in such cases for
+	 * registering the subnet notices handler. Also, if we are in
+	 * ibd_start() as a result of, say, some event handling after entering
+	 * late hca initialization phase no need to register again.
 	 */
-	ibt_register_subnet_notices(state->id_ibt_hdl,
-	    ibd_snet_notices_handler, state);
-	mutex_enter(&state->id_trap_lock);
-	state->id_trap_stop = B_FALSE;
-	mutex_exit(&state->id_trap_lock);
-	state->id_mac_state |= IBD_DRV_SM_NOTICES_REGISTERED;
+	if ((state->id_mac_state & IBD_DRV_SM_NOTICES_REGISTERED) == 0) {
+		ibt_register_subnet_notices(state->id_ibt_hdl,
+		    ibd_snet_notices_handler, state);
+		mutex_enter(&state->id_trap_lock);
+		state->id_trap_stop = B_FALSE;
+		mutex_exit(&state->id_trap_lock);
+		state->id_mac_state |= IBD_DRV_SM_NOTICES_REGISTERED;
+	}
+
+late_hca_init_return:
+	if (late_hca_init == 1) {
+		state->id_mac_state |= IBD_DRV_IN_LATE_HCA_INIT;
+		/*
+		 * In case of late initialization, mark the link state as down,
+		 * immaterial of the actual link state as reported in the
+		 * port_info.
+		 */
+		state->id_link_state = LINK_STATE_DOWN;
+		mac_unicst_update(state->id_mh, (uint8_t *)&state->id_macaddr);
+		mac_link_update(state->id_mh, state->id_link_state);
+		return (DDI_SUCCESS);
+	}
 
 	if (state->id_enable_rc) {
 		if (state->rc_enable_srq) {
@@ -5043,8 +6057,9 @@ ibd_start(ibd_state_t *state)
 	 * notifications to GLDv3 till we reach here in the initialization
 	 * sequence.
 	 */
-	state->id_mac_state |= IBD_DRV_STARTED;
 	mac_link_update(state->id_mh, state->id_link_state);
+	state->id_mac_state &= ~IBD_DRV_IN_LATE_HCA_INIT;
+	state->id_mac_state |= IBD_DRV_STARTED;
 
 	return (DDI_SUCCESS);
 
@@ -5068,6 +6083,9 @@ ibd_m_stop(void *arg)
 {
 	ibd_state_t *state = (ibd_state_t *)arg;
 
+	if (state->id_type == IBD_PORT_DRIVER)
+		return;
+
 	ibd_set_mac_progress(state, IBD_DRV_STOP_IN_PROGRESS);
 
 	(void) ibd_undo_start(state, state->id_link_state);
@@ -5083,6 +6101,9 @@ static int
 ibd_m_unicst(void *arg, const uint8_t *macaddr)
 {
 	ibd_state_t *state = arg;
+
+	if (state->id_type == IBD_PORT_DRIVER)
+		return (EINVAL);
 
 	/*
 	 * Don't bother even comparing the macaddr if we haven't
@@ -5133,6 +6154,9 @@ ibd_m_multicst(void *arg, boolean_t add, const uint8_t *mcmac)
 	ipoib_mac_t maddr, *mcast;
 	ib_gid_t mgid;
 	ibd_req_t *req;
+
+	if (state->id_type == IBD_PORT_DRIVER)
+		return (EINVAL);
 
 	/*
 	 * If we haven't completed ibd_m_start(), async thread wouldn't
@@ -5288,6 +6312,9 @@ ibd_m_promisc(void *arg, boolean_t on)
 {
 	ibd_state_t *state = (ibd_state_t *)arg;
 	ibd_req_t *req;
+
+	if (state->id_type == IBD_PORT_DRIVER)
+		return (EINVAL);
 
 	/*
 	 * Async thread wouldn't have been started if we haven't
@@ -5700,7 +6727,7 @@ ibd_prepare_sgl(ibd_state_t *state, mblk_t *mp, ibd_swqe_t *node,
 	 * the maximum acceptable.
 	 */
 	if ((state->id_hca_res_lkey_capab) &&
-	    (pktsize > IBD_TX_COPY_THRESH) &&
+	    (pktsize > state->id_ud_tx_copy_thresh) &&
 	    (nmblks < state->id_max_sqseg_hiwm)) {
 		ibt_iov_t iov_arr[IBD_MAX_SQSEG];
 		ibt_iov_attr_t iov_attr;
@@ -6073,7 +7100,7 @@ ibd_send(ibd_state_t *state, mblk_t *mp)
 		 * the "copy-threshold", and if the number of mp
 		 * fragments is less than the maximum acceptable.
 		 */
-		if (pktsize <= ibd_rc_tx_copy_thresh) {
+		if (pktsize <= state->id_rc_tx_copy_thresh) {
 			atomic_inc_64(&state->rc_xmt_small_pkt);
 			/*
 			 * Only process unicast packet in Reliable Connected
@@ -6358,7 +7385,13 @@ ibd_m_tx(void *arg, mblk_t *mp)
 	ibd_state_t *state = (ibd_state_t *)arg;
 	mblk_t *next;
 
-	if (state->id_link_state != LINK_STATE_UP) {
+	if (state->id_type == IBD_PORT_DRIVER) {
+		freemsgchain(mp);
+		return (NULL);
+	}
+
+	if ((state->id_link_state != LINK_STATE_UP) ||
+	    !(state->id_mac_state & IBD_DRV_STARTED)) {
 		freemsgchain(mp);
 		mp = NULL;
 	}
@@ -6502,7 +7535,7 @@ ibd_drain_rcq(ibd_state_t *state, ibt_cq_hdl_t cq_hdl)
 		 * Post more here, if less than one fourth full.
 		 */
 		if (atomic_add_32_nv(&state->id_rx_list.dl_cnt, -num_polled) <
-		    (state->id_num_rwqe / 4))
+		    (state->id_ud_num_rwqe / 4))
 			ibd_post_recv_intr(state);
 	}
 }
@@ -7054,3 +8087,765 @@ ibd_log(const char *fmt, ...)
 	bcopy(tmpbuf, ibd_lbuf+off, msglen);	/* no lock needed for this */
 }
 #endif
+
+/* ARGSUSED */
+static int
+ibd_create_partition(void *karg, intptr_t arg, int mode, cred_t *credp,
+    int *rvalp)
+{
+	ibd_create_ioctl_t	*cmd = karg;
+	ibd_state_t		*state, *port_state, *p;
+	int			i, err, rval = 0;
+	mac_register_t		*macp;
+	ibt_hca_portinfo_t 	*pinfop = NULL;
+	ibt_status_t 		ibt_status;
+	uint_t 			psize, pinfosz;
+	boolean_t		force_create = B_FALSE;
+
+	cmd->ibdioc.ioc_status = 0;
+
+	if (cmd->ibdioc.ioc_port_inst < 0) {
+		cmd->ibdioc.ioc_status = IBD_INVALID_PORT_INST;
+		return (EINVAL);
+	}
+	port_state = ddi_get_soft_state(ibd_list, cmd->ibdioc.ioc_port_inst);
+	if (port_state == NULL) {
+		DPRINT(10, "ibd_create_partition: failed to get state %d",
+		    cmd->ibdioc.ioc_port_inst);
+		cmd->ibdioc.ioc_status = IBD_INVALID_PORT_INST;
+		return (EINVAL);
+	}
+
+	/* Limited PKeys not supported */
+	if (cmd->ioc_pkey <= IB_PKEY_INVALID_FULL) {
+		rval = EINVAL;
+		goto part_create_return;
+	}
+
+	if (cmd->ioc_force_create == 0) {
+		/*
+		 * Check if the port pkey table contains the pkey for which
+		 * this partition is being created.
+		 */
+		ibt_status = ibt_query_hca_ports(port_state->id_hca_hdl,
+		    port_state->id_port, &pinfop, &psize, &pinfosz);
+
+		if ((ibt_status != IBT_SUCCESS) || (psize != 1)) {
+			rval = EINVAL;
+			goto part_create_return;
+		}
+
+		if (pinfop->p_linkstate != IBT_PORT_ACTIVE) {
+			rval = ENETDOWN;
+			cmd->ibdioc.ioc_status = IBD_PORT_IS_DOWN;
+			goto part_create_return;
+		}
+
+		for (i = 0; i < pinfop->p_pkey_tbl_sz; i++) {
+			if (pinfop->p_pkey_tbl[i] == cmd->ioc_pkey) {
+				break;
+			}
+		}
+		if (i == pinfop->p_pkey_tbl_sz) {
+			rval = EINVAL;
+			cmd->ibdioc.ioc_status = IBD_PKEY_NOT_PRESENT;
+			goto part_create_return;
+		}
+	} else {
+		force_create = B_TRUE;
+	}
+
+	mutex_enter(&ibd_objlist_lock);
+	for (p = ibd_objlist_head; p; p = p->id_next) {
+		if ((p->id_port_inst == cmd->ibdioc.ioc_port_inst) &&
+		    (p->id_pkey == cmd->ioc_pkey)) {
+			mutex_exit(&ibd_objlist_lock);
+			rval = EEXIST;
+			cmd->ibdioc.ioc_status = IBD_PARTITION_EXISTS;
+			goto part_create_return;
+		}
+	}
+	mutex_exit(&ibd_objlist_lock);
+
+	state = kmem_zalloc(sizeof (ibd_state_t), KM_SLEEP);
+
+	state->id_type		= IBD_PARTITION_OBJ;
+
+	state->id_plinkid	= cmd->ioc_partid;
+	state->id_dlinkid	= cmd->ibdioc.ioc_linkid;
+	state->id_port_inst	= cmd->ibdioc.ioc_port_inst;
+
+	state->id_dip		= port_state->id_dip;
+	state->id_port		= port_state->id_port;
+	state->id_pkey		= cmd->ioc_pkey;
+	state->id_hca_guid	= port_state->id_hca_guid;
+	state->id_port_guid	= port_state->id_port_guid;
+	state->id_force_create	= force_create;
+
+	mutex_init(&state->id_macst_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&state->id_macst_cv, NULL, CV_DEFAULT, NULL);
+
+	if (ibd_part_attach(state, state->id_dip) != DDI_SUCCESS) {
+		rval = EIO;
+		cmd->ibdioc.ioc_status = IBD_NO_HW_RESOURCE;
+		goto fail;
+	}
+
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
+		rval = EAGAIN;
+		goto fail;
+	}
+
+	macp->m_type_ident	= MAC_PLUGIN_IDENT_IB;
+	macp->m_dip		= port_state->id_dip;
+	macp->m_instance	= (uint_t)-1;
+	macp->m_driver		= state;
+	macp->m_src_addr	= (uint8_t *)&state->id_macaddr;
+	macp->m_callbacks	= &ibd_m_callbacks;
+	macp->m_min_sdu		= 0;
+	if (state->id_enable_rc) {
+		macp->m_max_sdu		= IBD_DEF_RC_MAX_SDU;
+	} else {
+		macp->m_max_sdu		= IBD_DEF_MAX_SDU;
+	}
+	macp->m_priv_props = ibd_priv_props;
+
+	err = mac_register(macp, &state->id_mh);
+	mac_free(macp);
+
+	if (err != 0) {
+		DPRINT(10, "ibd_create_partition: mac_register() failed %d",
+		    err);
+		rval = err;
+		goto fail;
+	}
+
+	err = dls_devnet_create(state->id_mh,
+	    cmd->ioc_partid, crgetzoneid(credp));
+	if (err != 0) {
+		DPRINT(10, "ibd_create_partition: dls_devnet_create() failed "
+		    "%d", err);
+		rval = err;
+		(void) mac_unregister(state->id_mh);
+		goto fail;
+	}
+
+	/*
+	 * Add the new partition state structure to the list
+	 */
+	mutex_enter(&ibd_objlist_lock);
+	if (ibd_objlist_head)
+		state->id_next = ibd_objlist_head;
+
+	ibd_objlist_head = state;
+	mutex_exit(&ibd_objlist_lock);
+
+part_create_return:
+	if (pinfop) {
+		ibt_free_portinfo(pinfop, pinfosz);
+	}
+	return (rval);
+
+fail:
+	if (pinfop) {
+		ibt_free_portinfo(pinfop, pinfosz);
+	}
+	(void) ibd_part_unattach(state);
+	kmem_free(state, sizeof (ibd_state_t));
+	return (rval);
+}
+
+/* ARGSUSED */
+static int
+ibd_delete_partition(void *karg, intptr_t arg, int mode, cred_t *credp,
+    int *rvalp)
+{
+	int err;
+	datalink_id_t tmpid;
+	ibd_state_t *node, *prev;
+	ibd_delete_ioctl_t *cmd = karg;
+
+	prev = NULL;
+
+	mutex_enter(&ibd_objlist_lock);
+	node = ibd_objlist_head;
+
+	/* Find the ibd state structure corresponding the partion */
+	while (node != NULL) {
+		if (node->id_plinkid == cmd->ioc_partid)
+			break;
+		prev = node;
+		node = node->id_next;
+	}
+
+	if (node == NULL) {
+		mutex_exit(&ibd_objlist_lock);
+		return (ENOENT);
+	}
+
+	if ((err = dls_devnet_destroy(node->id_mh, &tmpid, B_TRUE)) != 0) {
+		DPRINT(10, "ibd_delete_partition: dls_devnet_destroy() failed "
+		    "%d", err);
+		mutex_exit(&ibd_objlist_lock);
+		return (err);
+	}
+
+	if ((err = mac_disable(node->id_mh)) != 0) {
+		(void) dls_devnet_create(node->id_mh, cmd->ioc_partid,
+		    crgetzoneid(credp));
+		mutex_exit(&ibd_objlist_lock);
+		return (err);
+	}
+
+	/*
+	 * Call ibd_part_unattach() only after making sure that the instance has
+	 * not been started yet and is also not in late hca init mode.
+	 */
+	ibd_set_mac_progress(node, IBD_DRV_DELETE_IN_PROGRESS);
+	if ((node->id_mac_state & IBD_DRV_STARTED) ||
+	    (node->id_mac_state & IBD_DRV_IN_LATE_HCA_INIT) ||
+	    (ibd_part_unattach(node) != DDI_SUCCESS)) {
+		ibd_clr_mac_progress(node, IBD_DRV_DELETE_IN_PROGRESS);
+		mutex_exit(&ibd_objlist_lock);
+		return (EBUSY);
+	}
+	node->id_mac_state |= IBD_DRV_IN_DELETION;
+	ibd_clr_mac_progress(node, IBD_DRV_DELETE_IN_PROGRESS);
+
+	/* Remove the partition state structure from the linked list */
+	if (prev == NULL)
+		ibd_objlist_head = node->id_next;
+	else
+		prev->id_next = node->id_next;
+	mutex_exit(&ibd_objlist_lock);
+
+	if ((err = mac_unregister(node->id_mh)) != 0) {
+		DPRINT(10, "ibd_delete_partition: mac_unregister() failed %d",
+		    err);
+	}
+
+	cv_destroy(&node->id_macst_cv);
+	mutex_destroy(&node->id_macst_lock);
+
+	kmem_free(node, sizeof (ibd_state_t));
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+ibd_get_partition_info(void *karg, intptr_t arg, int mode, cred_t *cred,
+    int *rvalp)
+{
+	ibd_ioctl_t		cmd;
+	ibpart_ioctl_t		partioc;
+	ibport_ioctl_t		portioc;
+#ifdef _MULTI_DATAMODEL
+	ibport_ioctl32_t	portioc32;
+#endif
+	ibd_state_t		*state, *port_state;
+	int			size;
+	ibt_hca_portinfo_t 	*pinfop = NULL;
+	ibt_status_t 		ibt_status;
+	uint_t 			psize, pinfosz;
+	int			rval = 0;
+
+	size = sizeof (ibd_ioctl_t);
+	if (ddi_copyin((void *)arg, &cmd, size, mode)) {
+		return (EFAULT);
+	}
+	cmd.ioc_status = 0;
+	switch (cmd.ioc_info_cmd) {
+	case IBD_INFO_CMD_IBPART:
+		size = sizeof (ibpart_ioctl_t);
+		if (ddi_copyin((void *)arg, &partioc, size, mode)) {
+			return (EFAULT);
+		}
+
+		mutex_enter(&ibd_objlist_lock);
+		/* Find the ibd state structure corresponding the partition */
+		for (state = ibd_objlist_head; state; state = state->id_next) {
+			if (state->id_plinkid == cmd.ioc_linkid) {
+				break;
+			}
+		}
+
+		if (state == NULL) {
+			mutex_exit(&ibd_objlist_lock);
+			return (ENOENT);
+		}
+
+		partioc.ibdioc.ioc_linkid = state->id_dlinkid;
+		partioc.ibdioc.ioc_port_inst = state->id_port_inst;
+		partioc.ibdioc.ioc_portnum = state->id_port;
+		partioc.ibdioc.ioc_hcaguid = state->id_hca_guid;
+		partioc.ibdioc.ioc_portguid = state->id_port_guid;
+		partioc.ibdioc.ioc_status = 0;
+		partioc.ioc_partid = state->id_plinkid;
+		partioc.ioc_pkey = state->id_pkey;
+		partioc.ioc_force_create = state->id_force_create;
+		if (ddi_copyout((void *)&partioc, (void *)arg, size, mode)) {
+			mutex_exit(&ibd_objlist_lock);
+			return (EFAULT);
+		}
+		mutex_exit(&ibd_objlist_lock);
+
+		break;
+
+	case IBD_INFO_CMD_IBPORT:
+		if ((cmd.ioc_port_inst < 0) || ((port_state =
+		    ddi_get_soft_state(ibd_list, cmd.ioc_port_inst)) == NULL)) {
+			DPRINT(10, "ibd_create_partition: failed to get"
+			    " state %d", cmd.ioc_port_inst);
+			size = sizeof (ibd_ioctl_t);
+			cmd.ioc_status = IBD_INVALID_PORT_INST;
+			if (ddi_copyout((void *)&cmd, (void *)arg, size,
+			    mode)) {
+				return (EFAULT);
+			}
+			return (EINVAL);
+		}
+		ibt_status = ibt_query_hca_ports(port_state->id_hca_hdl,
+		    port_state->id_port, &pinfop, &psize, &pinfosz);
+		if ((ibt_status != IBT_SUCCESS) || (psize != 1)) {
+			return (EINVAL);
+		}
+#ifdef _MULTI_DATAMODEL
+		switch (ddi_model_convert_from(mode & FMODELS)) {
+		case DDI_MODEL_ILP32: {
+			size = sizeof (ibport_ioctl32_t);
+			if (ddi_copyin((void *)arg, &portioc32, size, mode)) {
+				rval = EFAULT;
+				goto fail;
+			}
+			portioc32.ibdioc.ioc_status = 0;
+			portioc32.ibdioc.ioc_portnum = port_state->id_port;
+			portioc32.ibdioc.ioc_hcaguid =
+			    port_state->id_hca_guid;
+			portioc32.ibdioc.ioc_portguid =
+			    port_state->id_port_guid;
+			if (portioc32.ioc_pkey_tbl_sz !=
+			    pinfop->p_pkey_tbl_sz) {
+				rval = EINVAL;
+				size = sizeof (ibd_ioctl_t);
+				portioc32.ibdioc.ioc_status =
+				    IBD_INVALID_PKEY_TBL_SIZE;
+				if (ddi_copyout((void *)&portioc32.ibdioc,
+				    (void *)arg, size, mode)) {
+					rval = EFAULT;
+					goto fail;
+				}
+				goto fail;
+			}
+			size = pinfop->p_pkey_tbl_sz * sizeof (ib_pkey_t);
+			if (ddi_copyout((void *)pinfop->p_pkey_tbl,
+			    (void *)(uintptr_t)portioc32.ioc_pkeys, size,
+			    mode)) {
+				rval = EFAULT;
+				goto fail;
+			}
+			size = sizeof (ibport_ioctl32_t);
+			if (ddi_copyout((void *)&portioc32, (void *)arg, size,
+			    mode)) {
+				rval = EFAULT;
+				goto fail;
+			}
+			break;
+		}
+		case DDI_MODEL_NONE:
+			size = sizeof (ibport_ioctl_t);
+			if (ddi_copyin((void *)arg, &portioc, size, mode)) {
+				rval = EFAULT;
+				goto fail;
+			}
+			portioc.ibdioc.ioc_status = 0;
+			portioc.ibdioc.ioc_portnum = port_state->id_port;
+			portioc.ibdioc.ioc_hcaguid = port_state->id_hca_guid;
+			portioc.ibdioc.ioc_portguid = port_state->id_port_guid;
+			if (portioc.ioc_pkey_tbl_sz != pinfop->p_pkey_tbl_sz) {
+				rval = EINVAL;
+				size = sizeof (ibd_ioctl_t);
+				portioc.ibdioc.ioc_status =
+				    IBD_INVALID_PKEY_TBL_SIZE;
+				if (ddi_copyout((void *)&portioc.ibdioc,
+				    (void *)arg, size, mode)) {
+					rval = EFAULT;
+					goto fail;
+				}
+				goto fail;
+			}
+			size = pinfop->p_pkey_tbl_sz * sizeof (ib_pkey_t);
+			if (ddi_copyout((void *)pinfop->p_pkey_tbl,
+			    (void *)(portioc.ioc_pkeys), size, mode)) {
+				rval = EFAULT;
+				goto fail;
+			}
+			size = sizeof (ibport_ioctl_t);
+			if (ddi_copyout((void *)&portioc, (void *)arg, size,
+			    mode)) {
+				rval = EFAULT;
+				goto fail;
+			}
+			break;
+		}
+#else /* ! _MULTI_DATAMODEL */
+		size = sizeof (ibport_ioctl_t);
+		if (ddi_copyin((void *)arg, &portioc, size, mode)) {
+			rval = EFAULT;
+			goto fail;
+		}
+		portioc.ibdioc.ioc_status = 0;
+		portioc.ibdioc.ioc_portnum = port_state->id_port;
+		portioc.ibdioc.ioc_hcaguid = port_state->id_hca_guid;
+		portioc.ibdioc.ioc_portguid = port_state->id_port_guid;
+		if (portioc.ioc_pkey_tbl_sz != pinfop->p_pkey_tbl_sz) {
+			rval = EINVAL;
+			size = sizeof (ibd_ioctl_t);
+			portioc.ibdioc.ioc_status = IBD_INVALID_PKEY_TBL_SIZE;
+			if (ddi_copyout((void *)&portioc.ibdioc, (void *)arg,
+			    size, mode)) {
+				rval = EFAULT;
+				goto fail;
+			}
+			goto fail;
+		}
+		size = pinfop->p_pkey_tbl_sz * sizeof (ib_pkey_t);
+		if (ddi_copyout((void *)pinfop->p_pkey_tbl,
+		    (void *)(portioc.ioc_pkeys), size, mode)) {
+			rval = EFAULT;
+			goto fail;
+		}
+		size = sizeof (ibport_ioctl_t);
+		if (ddi_copyout((void *)&portioc, (void *)arg, size,
+		    mode)) {
+			rval = EFAULT;
+			goto fail;
+		}
+#endif /* _MULTI_DATAMODEL */
+
+		break;
+
+	case IBD_INFO_CMD_PKEYTBLSZ:
+		if ((cmd.ioc_port_inst < 0) || ((port_state =
+		    ddi_get_soft_state(ibd_list, cmd.ioc_port_inst)) == NULL)) {
+			DPRINT(10, "ibd_create_partition: failed to get"
+			    " state %d", cmd.ioc_port_inst);
+			size = sizeof (ibd_ioctl_t);
+			cmd.ioc_status = IBD_INVALID_PORT_INST;
+			if (ddi_copyout((void *)&cmd, (void *)arg, size,
+			    mode)) {
+				return (EFAULT);
+			}
+			return (EINVAL);
+		}
+		ibt_status = ibt_query_hca_ports(port_state->id_hca_hdl,
+		    port_state->id_port, &pinfop, &psize, &pinfosz);
+		if ((ibt_status != IBT_SUCCESS) || (psize != 1)) {
+			return (EINVAL);
+		}
+#ifdef _MULTI_DATAMODEL
+		switch (ddi_model_convert_from(mode & FMODELS)) {
+		case DDI_MODEL_ILP32: {
+			size = sizeof (ibport_ioctl32_t);
+			if (ddi_copyin((void *)arg, &portioc32, size, mode)) {
+				rval = EFAULT;
+				goto fail;
+			}
+			portioc32.ibdioc.ioc_status = 0;
+			portioc32.ibdioc.ioc_portnum = port_state->id_port;
+			portioc32.ibdioc.ioc_hcaguid =
+			    port_state->id_hca_guid;
+			portioc32.ibdioc.ioc_portguid =
+			    port_state->id_port_guid;
+			portioc32.ioc_pkey_tbl_sz = pinfop->p_pkey_tbl_sz;
+			if (ddi_copyout((void *)&portioc32, (void *)arg, size,
+			    mode)) {
+				rval = EFAULT;
+				goto fail;
+			}
+			break;
+		}
+		case DDI_MODEL_NONE:
+			size = sizeof (ibport_ioctl_t);
+			if (ddi_copyin((void *)arg, &portioc, size, mode)) {
+				rval = EFAULT;
+				goto fail;
+			}
+			portioc.ibdioc.ioc_status = 0;
+			portioc.ibdioc.ioc_portnum = port_state->id_port;
+			portioc.ibdioc.ioc_hcaguid = port_state->id_hca_guid;
+			portioc.ibdioc.ioc_portguid = port_state->id_port_guid;
+			portioc.ioc_pkey_tbl_sz = pinfop->p_pkey_tbl_sz;
+			if (ddi_copyout((void *)&portioc, (void *)arg, size,
+			    mode)) {
+				rval = EFAULT;
+				goto fail;
+			}
+			break;
+		}
+#else /* ! _MULTI_DATAMODEL */
+		size = sizeof (ibport_ioctl_t);
+		if (ddi_copyin((void *)arg, &portioc, size, mode)) {
+			rval = EFAULT;
+			goto fail;
+		}
+		portioc.ibdioc.ioc_status = 0;
+		portioc.ibdioc.ioc_portnum = port_state->id_port;
+		portioc.ibdioc.ioc_hcaguid = port_state->id_hca_guid;
+		portioc.ibdioc.ioc_portguid = port_state->id_port_guid;
+		portioc.ioc_pkey_tbl_sz = pinfop->p_pkey_tbl_sz;
+		if (ddi_copyout((void *)&portioc, (void *)arg, size,
+		    mode)) {
+			rval = EFAULT;
+			goto fail;
+		}
+#endif /* _MULTI_DATAMODEL */
+		break;
+
+	default:
+		return (EINVAL);
+
+	} /* switch (cmd.ioc_info_cmd) */
+fail:
+	if (pinfop) {
+		ibt_free_portinfo(pinfop, pinfosz);
+	}
+	return (rval);
+}
+
+/* ARGSUSED */
+static void
+ibdpd_async_handler(void *arg, ibt_hca_hdl_t hca_hdl,
+    ibt_async_code_t code, ibt_async_event_t *event)
+{
+	ibd_state_t *state = (ibd_state_t *)arg;
+	link_state_t	lstate;
+
+	switch (code) {
+	case IBT_EVENT_PORT_UP:
+	case IBT_ERROR_PORT_DOWN:
+		if (ibd_get_port_state(state, &lstate) != 0)
+			break;
+
+		if (state->id_link_state != lstate) {
+			state->id_link_state = lstate;
+			mac_link_update(state->id_mh, lstate);
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+static int
+ibd_get_port_state(ibd_state_t *state, link_state_t *lstate)
+{
+	ibt_hca_portinfo_t *port_infop;
+	uint_t psize, port_infosz;
+	ibt_status_t	ret;
+
+	ret = ibt_query_hca_ports(state->id_hca_hdl, state->id_port,
+	    &port_infop, &psize, &port_infosz);
+	if ((ret != IBT_SUCCESS) || (psize != 1))
+		return (-1);
+
+	state->id_sgid = *port_infop->p_sgid_tbl;
+	state->id_link_speed = ibd_get_portspeed(state);
+
+	if (port_infop->p_linkstate == IBT_PORT_ACTIVE)
+		*lstate = LINK_STATE_UP;
+	else
+		*lstate = LINK_STATE_DOWN;
+
+	ibt_free_portinfo(port_infop, port_infosz);
+	return (0);
+}
+
+static int
+ibd_port_attach(dev_info_t *dip)
+{
+	ibd_state_t		*state;
+	link_state_t		lstate;
+	int			instance;
+	ibt_status_t		ret;
+
+	/*
+	 * Allocate softstate structure
+	 */
+	instance = ddi_get_instance(dip);
+	if (ddi_soft_state_zalloc(ibd_list, instance) == DDI_FAILURE) {
+		DPRINT(10, "ibd_attach: ddi_soft_state_zalloc() failed");
+		return (DDI_FAILURE);
+	}
+
+	state = ddi_get_soft_state(ibd_list, instance);
+
+	state->id_dip = dip;
+	state->id_type = IBD_PORT_DRIVER;
+
+	if ((state->id_port = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+	    "port-number", 0)) == 0) {
+		DPRINT(10, "ibd_attach: invalid port number (%d)",
+		    state->id_port);
+		return (DDI_FAILURE);
+	}
+	if ((state->id_hca_guid = ddi_prop_get_int64(DDI_DEV_T_ANY, dip, 0,
+	    "hca-guid", 0)) == 0) {
+		DPRINT(10, "ibd_attach: hca has invalid guid (0x%llx)",
+		    state->id_hca_guid);
+		return (DDI_FAILURE);
+	}
+	if ((state->id_port_guid = ddi_prop_get_int64(DDI_DEV_T_ANY, dip, 0,
+	    "port-guid", 0)) == 0) {
+		DPRINT(10, "ibd_attach: port has invalid guid (0x%llx)",
+		    state->id_port_guid);
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Attach to IBTL
+	 */
+	if ((ret = ibt_attach(&ibdpd_clnt_modinfo, dip, state,
+	    &state->id_ibt_hdl)) != IBT_SUCCESS) {
+		DPRINT(10, "ibd_attach: failed in ibt_attach(), ret=%d", ret);
+		goto done;
+	}
+
+	state->id_mac_state |= IBD_DRV_IBTL_ATTACH_DONE;
+
+	if ((ret = ibt_open_hca(state->id_ibt_hdl, state->id_hca_guid,
+	    &state->id_hca_hdl)) != IBT_SUCCESS) {
+		DPRINT(10, "ibd_attach: ibt_open_hca() failed, ret=%d", ret);
+		goto done;
+	}
+	state->id_mac_state |= IBD_DRV_HCA_OPENED;
+
+	/* Update link status */
+
+	if (ibd_get_port_state(state, &lstate) != 0) {
+		DPRINT(10, "ibd_attach: ibt_open_hca() failed, ret=%d", ret);
+		goto done;
+	}
+	state->id_link_state = lstate;
+	/*
+	 * Register ibd interfaces with the Nemo framework
+	 */
+	if (ibd_register_mac(state, dip) != IBT_SUCCESS) {
+		DPRINT(10, "ibd_attach: failed in ibd_register_mac()");
+		goto done;
+	}
+	state->id_mac_state |= IBD_DRV_MAC_REGISTERED;
+
+	mac_link_update(state->id_mh, lstate);
+
+	return (DDI_SUCCESS);
+done:
+	(void) ibd_port_unattach(state, dip);
+	return (DDI_FAILURE);
+}
+
+static int
+ibd_port_unattach(ibd_state_t *state, dev_info_t *dip)
+{
+	int instance;
+	uint32_t progress = state->id_mac_state;
+	ibt_status_t ret;
+
+	if (progress & IBD_DRV_MAC_REGISTERED) {
+		(void) mac_unregister(state->id_mh);
+		state->id_mac_state &= (~IBD_DRV_MAC_REGISTERED);
+	}
+
+	if (progress & IBD_DRV_HCA_OPENED) {
+		if ((ret = ibt_close_hca(state->id_hca_hdl)) !=
+		    IBT_SUCCESS) {
+			ibd_print_warn(state, "failed to close "
+			    "HCA device, ret=%d", ret);
+		}
+		state->id_hca_hdl = NULL;
+		state->id_mac_state &= (~IBD_DRV_HCA_OPENED);
+	}
+
+	if (progress & IBD_DRV_IBTL_ATTACH_DONE) {
+		if ((ret = ibt_detach(state->id_ibt_hdl)) != IBT_SUCCESS) {
+			ibd_print_warn(state,
+			    "ibt_detach() failed, ret=%d", ret);
+		}
+		state->id_ibt_hdl = NULL;
+		state->id_mac_state &= (~IBD_DRV_IBTL_ATTACH_DONE);
+	}
+	instance = ddi_get_instance(dip);
+	ddi_soft_state_free(ibd_list, instance);
+
+	return (DDI_SUCCESS);
+}
+
+ibt_status_t
+ibd_get_part_attr(datalink_id_t linkid, ibt_part_attr_t *attr)
+{
+	ibd_state_t	*state;
+
+	mutex_enter(&ibd_objlist_lock);
+
+	/* Find the ibd state structure corresponding the partition */
+	for (state = ibd_objlist_head; state; state = state->id_next) {
+		if (state->id_plinkid == linkid) {
+			break;
+		}
+	}
+
+	if (state == NULL) {
+		mutex_exit(&ibd_objlist_lock);
+		return (IBT_NO_SUCH_OBJECT);
+	}
+
+	attr->pa_dlinkid = state->id_dlinkid;
+	attr->pa_plinkid = state->id_plinkid;
+	attr->pa_port = state->id_port;
+	attr->pa_hca_guid = state->id_hca_guid;
+	attr->pa_port_guid = state->id_port_guid;
+	attr->pa_pkey = state->id_pkey;
+
+	mutex_exit(&ibd_objlist_lock);
+
+	return (IBT_SUCCESS);
+}
+
+ibt_status_t
+ibd_get_all_part_attr(ibt_part_attr_t **attr_list, int *nparts)
+{
+	ibd_state_t	*state;
+	int		n = 0;
+	ibt_part_attr_t	*attr;
+
+	mutex_enter(&ibd_objlist_lock);
+
+	for (state = ibd_objlist_head; state; state = state->id_next)
+		n++;
+
+	*nparts = n;
+	if (n == 0) {
+		*attr_list = NULL;
+		mutex_exit(&ibd_objlist_lock);
+		return (IBT_SUCCESS);
+	}
+
+	*attr_list = kmem_alloc(sizeof (ibt_part_attr_t) * n, KM_SLEEP);
+	attr = *attr_list;
+	for (state = ibd_objlist_head; state; state = state->id_next) {
+#ifdef DEBUG
+		ASSERT(n > 0);
+		n--;
+#endif
+		attr->pa_dlinkid = state->id_dlinkid;
+		attr->pa_plinkid = state->id_plinkid;
+		attr->pa_port = state->id_port;
+		attr->pa_hca_guid = state->id_hca_guid;
+		attr->pa_port_guid = state->id_port_guid;
+		attr->pa_pkey = state->id_pkey;
+		attr++;
+	}
+
+	mutex_exit(&ibd_objlist_lock);
+	return (IBT_SUCCESS);
+}

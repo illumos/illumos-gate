@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -55,72 +54,7 @@
 #include <sys/ib/clients/ibd/ibd.h>
 
 extern ibd_global_state_t ibd_gstate;
-
-/* Per-interface tunables (for developers) */
-extern uint_t ibd_rc_tx_copy_thresh;
-/*
- * ibd_rc_rx_copy_thresh
- *     If (the size of incoming buffer <= ibd_rc_rx_copy_thresh), ibd will
- * attempt to allocate a buffer and do a bcopy of the incoming data into
- * the alocated buffer.
- *
- * ibd_rc_rx_rwqe_thresh
- *     If (the number of available rwqe < ibd_rc_rx_rwqe_thresh), ibd will
- * attempt to allocate a buffer and do a bcopy of the incoming data into
- * the allocated buffer.
- */
-uint_t ibd_rc_rx_copy_thresh = 0x1000;
-uint_t ibd_rc_rx_rwqe_thresh = 0x200;	/* old is 32; */
-
-/*
- * ibd_rc_num_swqe
- *	1) Send CQ size = ibd_rc_num_swqe
- *	2) The send queue size = ibd_rc_num_swqe -1
- *	3) Number of pre-allocated Tx buffers for ibt_post_send() =
- * ibd_rc_num_swqe - 1.
- */
-uint_t ibd_rc_num_swqe = 0x1ff;
-
-/*
- * ibd_rc_num_rwqe
- *	1) For non-SRQ, we pre-post ibd_rc_num_rwqe number of WRs
- * via ibt_post_receive() for receive queue of each RC channel.
- *	2) For SRQ and non-SRQ, receive CQ size = ibd_rc_num_rwqe
- */
-uint_t ibd_rc_num_rwqe = 0x7ff;
-
-/*
- * For SRQ
- *	If using SRQ, we allocate ibd_rc_num_srq number of buffers (the size of
- * each buffer is equal to RC mtu). And post them by ibt_post_srq().
- *
- *	ibd_rc_num_srq should not be larger than ibd_rc_num_rwqe, otherwise
- * it will cause a bug with the following warnings:
- * NOTICE: hermon0: Device Error: EQE cq overrun or protection error
- * NOTICE: hermon0: Device Error: EQE local work queue catastrophic error
- * NOTICE: ibd0: HCA GUID 0003ba0001008984 port 1 PKEY ffff catastrophic
- * channel error
- * NOTICE: ibd0: HCA GUID 0003ba0001008984 port 1 PKEY ffff completion queue
- * error
- */
-uint_t ibd_rc_num_srq = 0x7fe;
-
-boolean_t ibd_rc_enable_cq_moderation = B_TRUE;
-
-/*
- * Send CQ moderation parameters
- */
-uint_t ibd_rc_txcomp_count = 10;
-uint_t ibd_rc_txcomp_usec = 300;
-
-/*
- * Receive CQ moderation parameters
- */
-uint_t ibd_rc_rxcomp_count = 4;
-uint_t ibd_rc_rxcomp_usec = 10;
-
 uint_t ibd_rc_tx_softintr = 1;
-
 /*
  * If the number of WRs in receive queue of each RC connection less than
  * IBD_RC_RX_WR_THRESHOLD, we will post more receive WRs into it.
@@ -362,47 +296,6 @@ too_big_fail:
 	mutex_exit(&ace->tx_too_big_mutex);
 }
 
-void
-ibd_rc_get_conf(ibd_state_t *state)
-{
-	int *props;
-	uint_t num_props;
-	int instance;
-
-	instance = ddi_get_instance(state->id_dip);
-
-	/*
-	 * Get the array of "enable_rc" properties from "ibd.conf" file
-	 */
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, state->id_dip,
-	    DDI_PROP_DONTPASS, "enable_rc", &props, &num_props)
-	    == DDI_PROP_SUCCESS) {
-		if (instance < num_props) {
-			if (props[instance] == 1) {
-				state->id_enable_rc = B_TRUE;
-			} else {
-				state->id_enable_rc = B_FALSE;
-			}
-		} else {
-			/* not enough properties configured */
-			state->id_enable_rc = B_FALSE;
-			DPRINT(40, "ibd_rc_get_conf: Not enough "
-			    "enable_rc values in ibd.conf,"
-			    " disable RC mode, instance=%d", instance);
-		}
-
-		/* free memory allocated for properties */
-		ddi_prop_free(props);
-	} else {
-		state->id_enable_rc = B_FALSE;
-		DPRINT(30, "ibd_rc_get_conf: fail to find "
-		    "enable_rc in ibd.conf, disable RC mode");
-	}
-
-	state->rc_mtu = 65524;
-	state->rc_enable_srq = B_TRUE;
-}
-
 #ifdef DEBUG
 /*
  * ibd_rc_update_stats - update driver private kstat counters
@@ -479,12 +372,15 @@ ibd_rc_init_stats(ibd_state_t *state)
 {
 	kstat_t *ksp;
 	ibd_rc_stat_t *ibd_rc_ksp;
+	char stat_name[32];
+	int inst;
 
 	/*
 	 * Create and init kstat
 	 */
-	ksp = kstat_create("ibd", ddi_get_instance(state->id_dip),
-	    "statistics", "net", KSTAT_TYPE_NAMED,
+	inst = ddi_get_instance(state->id_dip);
+	(void) snprintf(stat_name, 31, "statistics%d_%x", inst, state->id_pkey);
+	ksp = kstat_create("ibd", 0, stat_name, "net", KSTAT_TYPE_NAMED,
 	    sizeof (ibd_rc_stat_t) / sizeof (kstat_named_t), 0);
 
 	if (ksp == NULL) {
@@ -611,11 +507,11 @@ ibd_rc_alloc_chan(ibd_rc_chan_t **ret_chan, ibd_state_t *state,
 
 	/* Allocate IB structures for a new RC channel. */
 	if (is_tx_chan) {
-		chan->scq_size = ibd_rc_num_swqe;
+		chan->scq_size = state->id_rc_num_swqe;
 		chan->rcq_size = IBD_RC_MIN_CQ_SIZE;
 	} else {
 		chan->scq_size = IBD_RC_MIN_CQ_SIZE;
-		chan->rcq_size = ibd_rc_num_rwqe;
+		chan->rcq_size = state->id_rc_num_rwqe;
 	}
 	cq_atts.cq_size = chan->scq_size;
 	cq_atts.cq_sched = NULL;
@@ -629,12 +525,10 @@ ibd_rc_alloc_chan(ibd_rc_chan_t **ret_chan, ibd_state_t *state,
 		goto alloc_scq_err;
 	}	/* if failure to alloc cq */
 
-	if (ibd_rc_enable_cq_moderation) {
-		if (ibt_modify_cq(chan->scq_hdl, ibd_rc_txcomp_count,
-		    ibd_rc_txcomp_usec, 0) != IBT_SUCCESS) {
-			ibd_print_warn(state, "ibd_rc_alloc_chan: Send CQ "
-			    "interrupt moderation failed");
-		}
+	if (ibt_modify_cq(chan->scq_hdl, state->id_rc_tx_comp_count,
+	    state->id_rc_tx_comp_usec, 0) != IBT_SUCCESS) {
+		ibd_print_warn(state, "ibd_rc_alloc_chan: Send CQ "
+		    "interrupt moderation failed");
 	}
 
 	ibt_set_cq_private(chan->scq_hdl, (void *) (uintptr_t)chan);
@@ -652,13 +546,12 @@ ibd_rc_alloc_chan(ibd_rc_chan_t **ret_chan, ibd_state_t *state,
 		goto alloc_rcq_err;
 	}	/* if failure to alloc cq */
 
-	if (ibd_rc_enable_cq_moderation) {
-		if (ibt_modify_cq(chan->rcq_hdl, ibd_rc_rxcomp_count,
-		    ibd_rc_rxcomp_usec, 0) != IBT_SUCCESS) {
-			ibd_print_warn(state, "ibd_rc_alloc_chan: Receive CQ "
-			    "interrupt moderation failed");
-		}
+	if (ibt_modify_cq(chan->rcq_hdl, state->id_rc_rx_comp_count,
+	    state->id_rc_rx_comp_usec, 0) != IBT_SUCCESS) {
+		ibd_print_warn(state, "ibd_rc_alloc_chan: Receive CQ "
+		    "interrupt moderation failed");
 	}
+
 	ibt_set_cq_private(chan->rcq_hdl, (void *) (uintptr_t)chan);
 	ibt_set_cq_handler(chan->rcq_hdl, ibd_rc_rcq_handler,
 	    (void *)(uintptr_t)chan);
@@ -978,7 +871,7 @@ ibd_rc_init_srq_list(ibd_state_t *state)
 	ibt_status_t ret;
 
 	srq_sizes.srq_sgl_sz = 1;
-	srq_sizes.srq_wr_sz = ibd_rc_num_srq;
+	srq_sizes.srq_wr_sz = state->id_rc_num_srq;
 	ret = ibt_alloc_srq(state->id_hca_hdl, IBT_SRQ_NO_FLAGS,
 	    state->id_pd_hdl, &srq_sizes, &state->rc_srq_hdl, &srq_real_sizes);
 	if (ret != IBT_SUCCESS) {
@@ -1443,7 +1336,7 @@ ibd_rc_process_rx(ibd_rc_chan_t *chan, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 
 
 #ifdef DEBUG
-	if (rxcnt < ibd_rc_rx_rwqe_thresh) {
+	if (rxcnt < state->id_rc_rx_rwqe_thresh) {
 		state->rc_rwqe_short++;
 	}
 #endif
@@ -1451,8 +1344,8 @@ ibd_rc_process_rx(ibd_rc_chan_t *chan, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 	/*
 	 * Possibly replenish the Rx pool if needed.
 	 */
-	if ((rxcnt >= ibd_rc_rx_rwqe_thresh) &&
-	    (wc->wc_bytes_xfer > ibd_rc_rx_copy_thresh)) {
+	if ((rxcnt >= state->id_rc_rx_rwqe_thresh) &&
+	    (wc->wc_bytes_xfer > state->id_rc_rx_copy_thresh)) {
 		atomic_add_64(&state->rc_rcv_trans_byte, wc->wc_bytes_xfer);
 		atomic_inc_64(&state->rc_rcv_trans_pkt);
 
@@ -1758,7 +1651,7 @@ ibd_rc_init_tx_largebuf_list(ibd_state_t *state)
 	size_t  mem_size;
 	int i;
 
-	num_swqe = ibd_rc_num_swqe - 1;
+	num_swqe = state->id_rc_num_swqe - 1;
 
 	/*
 	 * Allocate one big chunk for all Tx large copy bufs
@@ -1814,7 +1707,7 @@ ibd_rc_fini_tx_largebuf_list(ibd_state_t *state)
 {
 	uint32_t num_swqe;
 
-	num_swqe = ibd_rc_num_swqe - 1;
+	num_swqe = state->id_rc_num_swqe - 1;
 
 	if (ibt_deregister_mr(state->id_hca_hdl,
 	    state->rc_tx_mr_hdl) != IBT_SUCCESS) {
@@ -1843,7 +1736,7 @@ ibd_rc_alloc_tx_copybufs(ibd_rc_chan_t *chan)
 	/*
 	 * Allocate one big chunk for all regular tx copy bufs
 	 */
-	mem_attr.mr_len = chan->scq_size * ibd_rc_tx_copy_thresh;
+	mem_attr.mr_len = chan->scq_size * state->id_rc_tx_copy_thresh;
 
 	chan->tx_mr_bufs = kmem_zalloc(mem_attr.mr_len, KM_SLEEP);
 
@@ -1857,7 +1750,7 @@ ibd_rc_alloc_tx_copybufs(ibd_rc_chan_t *chan)
 	    &chan->tx_mr_hdl, &chan->tx_mr_desc) != IBT_SUCCESS) {
 		DPRINT(40, "ibd_rc_alloc_tx_copybufs: ibt_register_mr failed");
 		ASSERT(mem_attr.mr_len ==
-		    chan->scq_size * ibd_rc_tx_copy_thresh);
+		    chan->scq_size * state->id_rc_tx_copy_thresh);
 		kmem_free(chan->tx_mr_bufs, mem_attr.mr_len);
 		chan->tx_mr_bufs = NULL;
 		return (DDI_FAILURE);
@@ -1875,6 +1768,7 @@ ibd_rc_init_txlist(ibd_rc_chan_t *chan)
 	ibd_swqe_t *swqe;
 	int i;
 	ibt_lkey_t lkey;
+	ibd_state_t *state = chan->state;
 
 	if (ibd_rc_alloc_tx_copybufs(chan) != DDI_SUCCESS)
 		return (DDI_FAILURE);
@@ -1896,7 +1790,7 @@ ibd_rc_init_txlist(ibd_rc_chan_t *chan)
 		swqe->w_swr.wr_id = (ibt_wrid_t)(uintptr_t)swqe;
 		swqe->w_swr.wr_flags = IBT_WR_SEND_SIGNAL;
 		swqe->swqe_copybuf.ic_sgl.ds_va = (ib_vaddr_t)(uintptr_t)
-		    (chan->tx_mr_bufs + i * ibd_rc_tx_copy_thresh);
+		    (chan->tx_mr_bufs + i * state->id_rc_tx_copy_thresh);
 		swqe->w_swr.wr_trans = IBT_RC_SRV;
 
 		/* Add to list */
@@ -1916,6 +1810,7 @@ ibd_rc_init_txlist(ibd_rc_chan_t *chan)
 static void
 ibd_rc_fini_txlist(ibd_rc_chan_t *chan)
 {
+	ibd_state_t *state = chan->state;
 	if (chan->tx_mr_hdl != NULL) {
 		if (ibt_deregister_mr(chan->state->id_hca_hdl,
 		    chan->tx_mr_hdl) != IBT_SUCCESS) {
@@ -1927,7 +1822,7 @@ ibd_rc_fini_txlist(ibd_rc_chan_t *chan)
 
 	if (chan->tx_mr_bufs != NULL) {
 		kmem_free(chan->tx_mr_bufs, chan->scq_size *
-		    ibd_rc_tx_copy_thresh);
+		    state->id_rc_tx_copy_thresh);
 		chan->tx_mr_bufs = NULL;
 	}
 

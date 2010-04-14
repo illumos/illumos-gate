@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -37,6 +36,8 @@
 
 #include <sys/kstr.h>
 #include <sys/t_kuser.h>
+
+#include <sys/dls.h>
 
 extern char cmlog[];
 
@@ -202,64 +203,55 @@ arp_ibaddr_error:
 		return (IBT_SUCCESS);
 }
 
-
-static int
-ibcm_arp_get_ibd_insts_cb(dev_info_t *dip, void *arg)
+void
+ibcm_arp_free_ibds(ibcm_arp_ibd_insts_t *ibds)
 {
-	ibcm_arp_ibd_insts_t *ibds = (ibcm_arp_ibd_insts_t *)arg;
-	ibcm_arp_ip_t	*ipp;
-	ib_pkey_t	pkey;
-	uint8_t		port;
-	ib_guid_t	hca_guid;
-	ib_gid_t	port_gid;
-
-	if (i_ddi_devi_attached(dip) &&
-	    (strcmp(ddi_node_name(dip), "ibport") == 0) &&
-	    (strstr(ddi_get_name_addr(dip), "ipib") != NULL)) {
-
-		if (ibds->ibcm_arp_ibd_cnt >= ibds->ibcm_arp_ibd_alloc) {
-			ibcm_arp_ip_t	*tmp = NULL;
-			uint8_t		new_count;
-
-			new_count = ibds->ibcm_arp_ibd_alloc +
-			    IBCM_ARP_IBD_INSTANCES;
-
-			tmp = (ibcm_arp_ip_t *)kmem_zalloc(
-			    new_count * sizeof (ibcm_arp_ip_t), KM_SLEEP);
-			bcopy(ibds->ibcm_arp_ip, tmp,
-			    ibds->ibcm_arp_ibd_alloc * sizeof (ibcm_arp_ip_t));
-			kmem_free(ibds->ibcm_arp_ip,
-			    ibds->ibcm_arp_ibd_alloc * sizeof (ibcm_arp_ip_t));
-			ibds->ibcm_arp_ibd_alloc = new_count;
-			ibds->ibcm_arp_ip = tmp;
-		}
-
-		if (((hca_guid = ddi_prop_get_int64(DDI_DEV_T_ANY, dip, 0,
-		    "hca-guid", 0)) == 0) ||
-		    ((port = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
-		    "port-number", 0)) == 0) ||
-		    (ibt_get_port_state_byguid(hca_guid, port, &port_gid,
-		    NULL) != IBT_SUCCESS) ||
-		    ((pkey = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
-		    "port-pkey", IB_PKEY_INVALID_LIMITED)) <=
-		    IB_PKEY_INVALID_FULL)) {
-			return (DDI_WALK_CONTINUE);
-		}
-
-		ipp = &ibds->ibcm_arp_ip[ibds->ibcm_arp_ibd_cnt];
-		ipp->ip_inst = ddi_get_instance(dip);
-		ipp->ip_pkey = pkey;
-		ipp->ip_hca_guid = hca_guid;
-		ipp->ip_port_gid = port_gid;
-		ibds->ibcm_arp_ibd_cnt++;
+	if (ibds->ibcm_arp_ip) {
+		kmem_free(ibds->ibcm_arp_ip, ibds->ibcm_arp_ibd_alloc *
+		    sizeof (ibcm_arp_ip_t));
+		ibds->ibcm_arp_ibd_alloc = 0;
+		ibds->ibcm_arp_ibd_cnt = 0;
+		ibds->ibcm_arp_ip = NULL;
 	}
-	return (DDI_WALK_CONTINUE);
 }
 
 static void
 ibcm_arp_get_ibd_insts(ibcm_arp_ibd_insts_t *ibds)
 {
-	ddi_walk_devs(ddi_root_node(), ibcm_arp_get_ibd_insts_cb, ibds);
+	ibcm_arp_ip_t	*ipp;
+	ib_gid_t	port_gid;
+	ibt_part_attr_t	*attr_list, *attr;
+	int		nparts;
+
+	if ((ibt_get_all_part_attr(&attr_list, &nparts) != IBT_SUCCESS) ||
+	    (nparts == 0)) {
+		ibds->ibcm_arp_ibd_alloc = 0;
+		ibds->ibcm_arp_ibd_cnt = 0;
+		ibds->ibcm_arp_ip = NULL;
+		return;
+	}
+
+	ibds->ibcm_arp_ibd_alloc = nparts;
+	ibds->ibcm_arp_ibd_cnt = 0;
+	ibds->ibcm_arp_ip = (ibcm_arp_ip_t *)kmem_zalloc(
+	    nparts * sizeof (ibcm_arp_ip_t), KM_SLEEP);
+
+	attr = attr_list;
+	while (nparts--) {
+		if (ibt_get_port_state_byguid(attr->pa_hca_guid,
+		    attr->pa_port, &port_gid, NULL) == IBT_SUCCESS) {
+
+			ipp = &ibds->ibcm_arp_ip[ibds->ibcm_arp_ibd_cnt];
+			ipp->ip_linkid = attr->pa_plinkid;
+			ipp->ip_pkey = attr->pa_pkey;
+			ipp->ip_hca_guid = attr->pa_hca_guid;
+			ipp->ip_port_gid = port_gid;
+			ibds->ibcm_arp_ibd_cnt++;
+		}
+		attr++;
+	}
+
+	(void) ibt_free_part_attr(attr_list, ibds->ibcm_arp_ibd_alloc);
 }
 
 /*
@@ -331,6 +323,37 @@ ibcm_do_lifconf(struct lifconf *lifcp, uint_t *bufsizep, sa_family_t family_loc)
 	return (0);
 }
 
+static ibcm_arp_ip_t *
+ibcm_arp_lookup(ibcm_arp_ibd_insts_t *ibds, char *linkname)
+{
+	datalink_id_t	linkid;
+	int		i;
+
+	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_lookup: linkname =  %s\n", linkname);
+
+	/*
+	 * If at first we don't succeed, try again, just in case it is in
+	 * hiding. The first call requires the datalink management daemon
+	 * (the authorative source of information about name to id mapping)
+	 * to be present and answering upcalls, the second does not.
+	 */
+	if (dls_mgmt_get_linkid(linkname, &linkid) != 0) {
+		if (dls_devnet_macname2linkid(linkname, &linkid) != 0) {
+			IBTF_DPRINTF_L4(cmlog, "ibcm_arp_lookup: could not "
+			    "get linkid from linkname\n");
+			return (NULL);
+		}
+	}
+
+	for (i = 0; i < ibds->ibcm_arp_ibd_cnt; i++) {
+		if (ibds->ibcm_arp_ip[i].ip_linkid == linkid)
+			return (&ibds->ibcm_arp_ip[i]);
+	}
+
+	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_lookup: returning NULL\n");
+	return (NULL);
+}
+
 /*
  * Fill in `ibds' with IP addresses tied to IFT_IB IP interfaces.  Returns
  * B_TRUE if at least one address was filled in.
@@ -352,12 +375,13 @@ ibcm_arp_get_ibd_ipaddr(ibcm_arp_ibd_insts_t *ibds, sa_family_t family_loc)
 	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibd_ipaddr: Family %d, nifs %d",
 	    family_loc, nifs);
 
-	for (lifrp = lifc.lifc_req, i = 0;
-	    i < nifs && naddr < ibds->ibcm_arp_ibd_cnt; i++, lifrp++) {
+	for (lifrp = lifc.lifc_req, i = 0; i < nifs; i++, lifrp++) {
 		if (lifrp->lifr_type != IFT_IB)
 			continue;
 
-		ipp = &ibds->ibcm_arp_ip[naddr];
+		if ((ipp = ibcm_arp_lookup(ibds, lifrp->lifr_name)) == NULL)
+			continue;
+
 		switch (lifrp->lifr_addr.ss_family) {
 		case AF_INET:
 			ipp->ip_inet_family = AF_INET;
@@ -399,6 +423,7 @@ ibcm_arp_get_ibds(ibcm_arp_ibd_insts_t *ibdp, sa_family_t family_loc)
 	if (!ibcm_arp_get_ibd_ipaddr(ibdp, family_loc)) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_get_ibds: failed to get "
 		    "ibd instance: IBT_SRC_IP_NOT_FOUND");
+		ibcm_arp_free_ibds(ibdp);
 		return (IBT_SRC_IP_NOT_FOUND);
 	}
 
@@ -407,9 +432,9 @@ ibcm_arp_get_ibds(ibcm_arp_ibd_insts_t *ibdp, sa_family_t family_loc)
 		char    my_buf[INET6_ADDRSTRLEN];
 		ibcm_arp_ip_t	*aip = &ibdp->ibcm_arp_ip[i];
 
-		IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibds: ibd[%d]: Family %d "
-		    "Instance %d PKey 0x%lX \n HCAGUID 0x%llX SGID %llX:%llX",
-		    i, aip->ip_inet_family, aip->ip_inst, aip->ip_pkey,
+		IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibds: Linkid %d Family %d "
+		    "PKey 0x%lX \n HCAGUID 0x%llX SGID %llX:%llX",
+		    aip->ip_linkid, aip->ip_inet_family, aip->ip_pkey,
 		    aip->ip_hca_guid, aip->ip_port_gid.gid_prefix,
 		    aip->ip_port_gid.gid_guid);
 		if (aip->ip_inet_family == AF_INET) {

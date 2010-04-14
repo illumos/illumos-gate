@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_MAC_H
@@ -205,6 +204,7 @@ typedef enum {
 	MAC_PROP_MAX_RX_RINGS_AVAIL,
 	MAC_PROP_MAX_RXHWCLNT_AVAIL,
 	MAC_PROP_MAX_TXHWCLNT_AVAIL,
+	MAC_PROP_IB_LINKMODE,
 	MAC_PROP_PRIVATE = -1
 } mac_prop_id_t;
 

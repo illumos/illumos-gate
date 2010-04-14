@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 
@@ -32,38 +31,27 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= ibd
+MODULE		= ibp
 OBJECTS		= $(IBD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(IBD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/ibd
-LDFLAGS		+= -dy -Nmisc/mac -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf -Ndrv/ip
-WARLOCK_OUT     = $(IBD_OBJS:%.o=%.ll)
+LDFLAGS		+= -dy -Nmisc/mac -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf -Ndrv/ip \
+		-Nmisc/dls -Nmisc/dld
+WARLOCK_OUT	= $(IBD_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
 WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 #
 #	Include common rules.
 #
-include $(UTSBASE)/sparc/Makefile.sparc
+include $(UTSBASE)/intel/Makefile.intel
 
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
+ALL_TARGET	= $(BINARY) $(CONFMOD)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
-
-#
-#	Overrides
-#
-ALL_BUILDS	= $(ALL_BUILDSONLY64)
-DEF_BUILDS	= $(DEF_BUILDSONLY64)
-CLEANLINTFILES	+= $(LINT32_FILES)
-
-# 
-# lint pass one enforcement 
-# 
-CFLAGS += $(CCVERBOSE)
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -90,7 +78,7 @@ clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
-modlintlib:	$(MODLINTLIB_DEPS) lint32
+modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
@@ -99,7 +87,7 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/sparc/Makefile.targ
+include $(UTSBASE)/intel/Makefile.targ
 
 #
 #       Defines for local commands.
@@ -109,7 +97,7 @@ WLCC            = wlcc
 TOUCH           = touch
 TEST            = test
 
-warlock: $(WARLOCK_OK) $(WARLOCK_OUT)
+warlock: $(WARLOCK_OK)
 
 $(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/ibd.wlcmd warlock_ddi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/ibd.wlcmd $(WARLOCK_OUT) \

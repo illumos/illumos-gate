@@ -19,35 +19,43 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-LIBRARY = libdladm.a
-VERS    = .1
-OBJECTS = libdladm.o secobj.o linkprop.o libdllink.o libdlaggr.o \
-	libdlwlan.o libdlvnic.o libdlmgmt.o libdlvlan.o	libdlib.o\
-	flowattr.o flowprop.o propfuncs.o libdlflow.o libdlstat.o \
-	usage.o libdlether.o libdlsim.o libdlbridge.o libdliptun.o
+MANIFEST = ibd-post-upgrade.xml
+SVCMETHOD = ibd-post-upgrade
 
-include ../../Makefile.lib
+include ../Makefile.cmd
 
-# install this library in the root filesystem
-include ../../Makefile.rootfs
+SHFILES = ibd_upgrade
+IBD_DELETE_LINK = ibd_delete_link
+OBJS = $(IBD_DELETE_LINK).o
+SRCS = $(OBJS:%.o=%.c)
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-ldevinfo -lc -linetutil -lsocket -lscf -lrcm -lnvpair \
-		-lexacct -lnsl -lkstat -lcurses -lpool
+CLOBBERFILES = $(SHFILES) $(IBD_DELETE_LINK) $(OBJS)
 
-SRCDIR =	../common
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
+ROOTMANIFESTDIR = $(ROOTSVCNETWORK)
+LDLIBS += -ldladm
 
 .KEEP_STATE:
 
-all:		$(LIBS)
+all: $(IBD_DELETE_LINK) $(SHFILES)
 
-lint:		lintcheck
+install: all					\
+	$(ROOTSBIN)/$(IBD_DELETE_LINK)		\
+	$(ROOTMANIFEST)				\
+	$(ROOTSVCMETHOD)			\
+	$(ROOTSBIN)/ibd_upgrade
 
-include $(SRC)/lib/Makefile.targ
+check:	$(CHKMANIFEST)
+	$(CSTYLE) -pP $(SRCS)
+
+clean:
+
+lint:	lint_SRCS
+
+include ../Makefile.targ
+
+$(ROOTSBIN)/%: %
+	$(INS.file)
+

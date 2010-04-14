@@ -24,8 +24,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -327,7 +326,6 @@ struct dapl_hca {
 	ib_uint32_t partition_max;
 	ib_uint32_t partition_key;
 	ib_uint32_t tavor_idx;
-	ib_uint32_t hca_ibd_inst;
 	ib_guid_t node_GUID;
 	ib_lid_t lid;
 	int max_inline_send;

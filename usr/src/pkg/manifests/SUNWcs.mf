@@ -1171,6 +1171,7 @@ file path=usr/lib/rcm/modules/SUNW_swap_rcm.so mode=0555
 $(sparc_ONLY)file path=usr/lib/rcm/modules/SUNW_ttymux_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_vlan_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_vnic_rcm.so mode=0555
+file path=usr/lib/rcm/modules/SUNW_ibpart_rcm.so mode=0555
 file path=usr/lib/rcm/rcm_daemon mode=0555
 file path=usr/lib/reparse/reparsed group=sys mode=0555
 file path=usr/lib/saf/listen group=sys mode=0755

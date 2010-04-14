@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -55,6 +54,7 @@
 #include <libdlwlan.h>
 #include <libdlvlan.h>
 #include <libdlvnic.h>
+#include <libdlib.h>
 #include <libdlether.h>
 #include <libdliptun.h>
 #include <libdlsim.h>
@@ -66,6 +66,7 @@
 #include <libdlvnic.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ib/ib_types.h>
 #include <sys/processor.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -155,6 +156,25 @@ typedef struct show_vnic_state {
 	ofmt_handle_t	vs_ofmt;
 } show_vnic_state_t;
 
+typedef struct show_part_state {
+	datalink_id_t	ps_over_id;
+	char		ps_part[MAXLINKNAMELEN];
+	boolean_t	ps_parsable;
+	boolean_t	ps_found;
+	dladm_status_t	ps_status;
+	uint32_t	ps_flags;
+	ofmt_handle_t	ps_ofmt;
+} show_part_state_t;
+
+typedef struct show_ib_state {
+	datalink_id_t	is_link_id;
+	char		is_link[MAXLINKNAMELEN];
+	boolean_t	is_parsable;
+	dladm_status_t	is_status;
+	uint32_t	is_flags;
+	ofmt_handle_t	is_ofmt;
+} show_ib_state_t;
+
 typedef struct show_usage_state_s {
 	boolean_t	us_plot;
 	boolean_t	us_parsable;
@@ -189,6 +209,8 @@ static cmdfunc_t do_show_linkmap;
 static cmdfunc_t do_show_ether;
 static cmdfunc_t do_create_vnic, do_delete_vnic, do_show_vnic;
 static cmdfunc_t do_up_vnic;
+static cmdfunc_t do_create_part, do_delete_part, do_show_part, do_show_ib;
+static cmdfunc_t do_up_part;
 static cmdfunc_t do_create_etherstub, do_delete_etherstub, do_show_etherstub;
 static cmdfunc_t do_create_simnet, do_modify_simnet;
 static cmdfunc_t do_delete_simnet, do_show_simnet, do_up_simnet;
@@ -199,6 +221,8 @@ static cmdfunc_t do_create_iptun, do_modify_iptun, do_delete_iptun;
 static cmdfunc_t do_show_iptun, do_up_iptun, do_down_iptun;
 
 static void 	do_up_vnic_common(int, char **, const char *, boolean_t);
+
+static int show_part(dladm_handle_t, datalink_id_t, void *);
 
 static void	altroot_cmd(char *, int, char **);
 static int	show_linkprop_onelink(dladm_handle_t, datalink_id_t, void *);
@@ -327,6 +351,17 @@ static cmd_t	cmds[] = {
 	    "    show-vnic        [-pP] [-l <link>] [-s [-i <interval>]] "
 	    "[<link>]\n"						},
 	{ "up-vnic",		do_up_vnic,		NULL		},
+	{ "create-part",	do_create_part,
+	    "    create-part      [-t] [-f] -l <link> [-P <pkey>]\n"
+	    "\t\t     [-R <root-dir>] <part-link>"			},
+	{ "delete-part",	do_delete_part,
+	    "    delete-part      [-t] [-R <root-dir>] <part-link>"},
+	{ "show-part",		do_show_part,
+	    "    show-part        [-pP] [-o <field>,...][-l <linkover>]\n"
+	    "\t\t     [<part-link>]"		},
+	{ "show-ib",		do_show_ib,
+	    "    show-ib          [-p] [-o <field>,...] [<link>]\n"	},
+	{ "up-part",		do_up_part,		NULL		},
 	{ "create-etherstub",	do_create_etherstub,
 	    "    create-etherstub [-t] <link>"				},
 	{ "delete-etherstub",	do_delete_etherstub,
@@ -480,6 +515,25 @@ static const struct option vnic_lopts[] = {
 	{"mac-prefix",	required_argument,	0, 'r'	},
 	{"vrid",	required_argument,	0, 'V'	},
 	{"address-family",	required_argument,	0, 'A'	},
+	{ 0, 0, 0, 0 }
+};
+
+static const struct option part_lopts[] = {
+	{"temporary",	no_argument,		0, 't'  },
+	{"pkey",	required_argument,	0, 'P'  },
+	{"link",	required_argument,	0, 'l'  },
+	{"force",	no_argument,		0, 'f'  },
+	{"root-dir",	required_argument,	0, 'R'  },
+	{"prop",	required_argument,	0, 'p'  },
+	{ 0, 0, 0, 0 }
+};
+
+static const struct option show_part_lopts[] = {
+	{"parsable",	no_argument,		0, 'p'  },
+	{"parseable",	no_argument,		0, 'p'  },
+	{"link",	required_argument,	0, 'l'  },
+	{"persistent",	no_argument,		0, 'P'  },
+	{"output",	required_argument,	0, 'o'  },
 	{ 0, 0, 0, 0 }
 };
 
@@ -973,6 +1027,59 @@ static const ofmt_field_t vnic_fields[] = {
 	offsetof(vnic_fields_buf_t, vnic_vid), print_default_cb},
 { NULL,			0, 0, NULL}}
 ;
+
+/*
+ * structures for 'dladm show-ib'
+ */
+typedef struct ib_fields_buf_s
+{
+	char ib_link[DLPI_LINKNAME_MAX];
+	char ib_hcaguid[17];
+	char ib_portguid[17];
+	char ib_portnum[4];
+	char ib_state[6];
+	char ib_pkeys[MAXPKEYSTRSZ];
+} ib_fields_buf_t;
+
+static const ofmt_field_t ib_fields[] = {
+{ "LINK",		13,
+	offsetof(ib_fields_buf_t, ib_link),	print_default_cb},
+{ "HCAGUID",		IBGUIDSTRLEN,
+	offsetof(ib_fields_buf_t, ib_hcaguid),	print_default_cb},
+{ "PORTGUID",		IBGUIDSTRLEN,
+	offsetof(ib_fields_buf_t, ib_portguid),	print_default_cb},
+{ "PORT",		IBPORTSTRLEN,
+	offsetof(ib_fields_buf_t, ib_portnum), print_default_cb},
+{ "STATE",		7,
+	offsetof(ib_fields_buf_t, ib_state), print_default_cb},
+{ "PKEYS",	18,
+	offsetof(ib_fields_buf_t, ib_pkeys), print_default_cb},
+{ NULL,			0, 0, NULL}};
+
+/*
+ * structures for 'dladm show-part'
+ */
+typedef struct part_fields_buf_s
+{
+	char part_link[DLPI_LINKNAME_MAX];
+	char part_pkey[5];
+	char part_over[DLPI_LINKNAME_MAX];
+	char part_state[8];
+	char part_flags[5];
+} part_fields_buf_t;
+
+static const ofmt_field_t part_fields[] = {
+{ "LINK",		13,
+	offsetof(part_fields_buf_t, part_link),	print_default_cb},
+{ "PKEY",		MAXPKEYLEN,
+	offsetof(part_fields_buf_t, part_pkey),	print_default_cb},
+{ "OVER",		13,
+	offsetof(part_fields_buf_t, part_over), print_default_cb},
+{ "STATE",		9,
+	offsetof(part_fields_buf_t, part_state), print_default_cb},
+{ "FLAGS",	5,
+	offsetof(part_fields_buf_t, part_flags), print_default_cb},
+{ NULL,			0, 0, NULL}};
 
 /*
  * structures for 'dladm show-simnet'
@@ -2597,6 +2704,22 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 			(void) strcpy(lbuf->link_over, "?");
 		break;
 	}
+
+	case DATALINK_CLASS_PART: {
+		dladm_part_attr_t	pinfo;
+
+		if (dladm_part_info(handle, linkid, &pinfo, flags) !=
+		    DLADM_STATUS_OK) {
+			(void) strcpy(lbuf->link_over, "?");
+			break;
+		}
+		if (dladm_datalink_id2info(handle, pinfo.dia_physlinkid, NULL,
+		    NULL, NULL, lbuf->link_over, sizeof (lbuf->link_over)) !=
+		    DLADM_STATUS_OK)
+			(void) strcpy(lbuf->link_over, "?");
+		break;
+	}
+
 	case DATALINK_CLASS_BRIDGE: {
 		datalink_id_t *dlp;
 		uint_t i, nports;
@@ -8950,4 +9073,612 @@ dladm_ofmt_check(ofmt_status_t oferr, boolean_t parsable,
 	} else {
 		warn(buf);
 	}
+}
+
+/*
+ * Called from the walker dladm_walk_datalink_id() for each IB partition to
+ * display IB partition specific information.
+ */
+static dladm_status_t
+print_part(show_part_state_t *state, datalink_id_t linkid)
+{
+	dladm_part_attr_t	attr;
+	dladm_status_t		status;
+	dladm_conf_t		conf;
+	char			part_over[MAXLINKNAMELEN];
+	char			part_name[MAXLINKNAMELEN];
+	part_fields_buf_t	pbuf;
+	boolean_t		force_in_conf = B_FALSE;
+
+	/*
+	 * Get the information about the IB partition from the partition
+	 * datlink ID 'linkid'.
+	 */
+	if ((status = dladm_part_info(handle, linkid, &attr, state->ps_flags))
+	    != DLADM_STATUS_OK)
+		return (status);
+
+	/*
+	 * If an IB Phys link name was provided on the command line we have
+	 * the Phys link's datalink ID in the ps_over_id field of the state
+	 * structure. Proceed only if the IB partition represented by 'linkid'
+	 * was created over Phys link denoted by ps_over_id. The
+	 * 'dia_physlinkid' field of dladm_part_attr_t represents the IB Phys
+	 * link over which the partition was created.
+	 */
+	if (state->ps_over_id != DATALINK_ALL_LINKID)
+		if (state->ps_over_id != attr.dia_physlinkid)
+			return (DLADM_STATUS_OK);
+
+	/*
+	 * The linkid argument passed to this function is the datalink ID
+	 * of the IB Partition. Get the partitions name from this linkid.
+	 */
+	if (dladm_datalink_id2info(handle, linkid, NULL, NULL,
+	    NULL, part_name, sizeof (part_name)) != DLADM_STATUS_OK)
+		return (DLADM_STATUS_BADARG);
+
+	bzero(part_over, sizeof (part_over));
+
+	/*
+	 * The 'dia_physlinkid' field contains the datalink ID of the IB Phys
+	 * link over which the partition was created. Use this linkid to get the
+	 * linkover field.
+	 */
+	if (dladm_datalink_id2info(handle, attr.dia_physlinkid, NULL, NULL,
+	    NULL, part_over, sizeof (part_over)) != DLADM_STATUS_OK)
+		(void) sprintf(part_over, "?");
+	state->ps_found = B_TRUE;
+
+	/*
+	 * Read the FFORCE field from this datalink's persistent configuration
+	 * database line to determine if this datalink was created forcibly.
+	 * If this datalink is a temporary datalink, then it will not have an
+	 * entry in the persistent configuration, so check if force create flag
+	 * is set in the partition attributes.
+	 *
+	 * We need this two level check since persistent partitions brought up
+	 * by up-part during boot will have force create flag always set, since
+	 * we want up-part to always succeed even if the port is currently down
+	 * or P_Key is not yet available in the subnet.
+	 */
+	if ((status = dladm_read_conf(handle, linkid, &conf)) ==
+	    DLADM_STATUS_OK) {
+		(void) dladm_get_conf_field(handle, conf, FFORCE,
+		    &force_in_conf, sizeof (boolean_t));
+		dladm_destroy_conf(handle, conf);
+	} else if (status == DLADM_STATUS_NOTFOUND) {
+		/*
+		 * for a temp link the force create flag will determine
+		 * whether it was created with force flag.
+		 */
+		force_in_conf = ((attr.dia_flags & DLADM_IBPART_FORCE_CREATE)
+		    != 0);
+	}
+
+	(void) snprintf(pbuf.part_link, sizeof (pbuf.part_link),
+	    "%s", part_name);
+
+	(void) snprintf(pbuf.part_over, sizeof (pbuf.part_over),
+	    "%s", part_over);
+
+	(void) snprintf(pbuf.part_pkey, sizeof (pbuf.part_pkey),
+	    "%X", attr.dia_pkey);
+
+	(void) get_linkstate(pbuf.part_link, B_TRUE, pbuf.part_state);
+
+	(void) snprintf(pbuf.part_flags, sizeof (pbuf.part_flags),
+	    "%c----", force_in_conf ? 'f' : '-');
+
+	ofmt_print(state->ps_ofmt, &pbuf);
+
+	return (DLADM_STATUS_OK);
+}
+
+/* ARGSUSED */
+static int
+show_part(dladm_handle_t dh, datalink_id_t linkid, void *arg)
+{
+	((show_part_state_t *)arg)->ps_status = print_part(arg, linkid);
+	return (DLADM_WALK_CONTINUE);
+}
+
+/*
+ * Show the information about the IB partition objects.
+ */
+static void
+do_show_part(int argc, char *argv[], const char *use)
+{
+	int			option;
+	boolean_t		l_arg = B_FALSE;
+	uint32_t		flags = DLADM_OPT_ACTIVE;
+	datalink_id_t		linkid = DATALINK_ALL_LINKID;
+	datalink_id_t		over_linkid = DATALINK_ALL_LINKID;
+	char			over_link[MAXLINKNAMELEN];
+	show_part_state_t	state;
+	dladm_status_t		status;
+	boolean_t		o_arg = B_FALSE;
+	char			*fields_str = NULL;
+	ofmt_handle_t		ofmt;
+	ofmt_status_t		oferr;
+	uint_t			ofmtflags = 0;
+
+	bzero(&state, sizeof (state));
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":pPl:o:", show_part_lopts,
+	    NULL)) != -1) {
+		switch (option) {
+		case 'p':
+			state.ps_parsable = B_TRUE;
+			break;
+		case 'P':
+			flags = DLADM_OPT_PERSIST;
+			break;
+		case 'l':
+			/*
+			 * The data link ID of the IB Phys link. When this
+			 * argument is provided we list only the partition
+			 * objects created over this IB Phys link.
+			 */
+			if (strlcpy(over_link, optarg, MAXLINKNAMELEN) >=
+			    MAXLINKNAMELEN)
+				die("link name too long");
+
+			l_arg = B_TRUE;
+			break;
+		case 'o':
+			o_arg = B_TRUE;
+			fields_str = optarg;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+		}
+	}
+
+	/*
+	 * Get the partition ID (optional last argument).
+	 */
+	if (optind == (argc - 1)) {
+		status = dladm_name2info(handle, argv[optind], &linkid, NULL,
+		    NULL, NULL);
+		if (status != DLADM_STATUS_OK) {
+			die_dlerr(status, "invalid partition link name '%s'",
+			    argv[optind]);
+		}
+		(void) strlcpy(state.ps_part, argv[optind], MAXLINKNAMELEN);
+	} else if (optind != argc) {
+		usage();
+	}
+
+	if (state.ps_parsable && !o_arg)
+		die("-p requires -o");
+
+	/*
+	 * If an IB Phys link name was provided as an argument, then get its
+	 * datalink ID.
+	 */
+	if (l_arg) {
+		status = dladm_name2info(handle, over_link, &over_linkid, NULL,
+		    NULL, NULL);
+		if (status != DLADM_STATUS_OK) {
+			die_dlerr(status, "invalid link name '%s'", over_link);
+		}
+	}
+
+	state.ps_over_id = over_linkid; /* IB Phys link ID */
+	state.ps_found = B_FALSE;
+	state.ps_flags = flags;
+
+	if (state.ps_parsable)
+		ofmtflags |= OFMT_PARSABLE;
+	oferr = ofmt_open(fields_str, part_fields, ofmtflags, 0, &ofmt);
+	dladm_ofmt_check(oferr, state.ps_parsable, ofmt);
+	state.ps_ofmt = ofmt;
+
+	/*
+	 * If a specific IB partition name was not provided as an argument,
+	 * walk all the datalinks and display the information for all
+	 * IB partitions. If IB Phys link was provided limit it to only
+	 * IB partitions created over that IB Phys link.
+	 */
+	if (linkid == DATALINK_ALL_LINKID) {
+		(void) dladm_walk_datalink_id(show_part, handle, &state,
+		    DATALINK_CLASS_PART, DATALINK_ANY_MEDIATYPE, flags);
+	} else {
+		(void) show_part(handle, linkid, &state);
+		if (state.ps_status != DLADM_STATUS_OK) {
+			ofmt_close(ofmt);
+			die_dlerr(state.ps_status, "failed to show IB partition"
+			    " '%s'", state.ps_part);
+		}
+	}
+	ofmt_close(ofmt);
+}
+
+
+/*
+ * Called from the walker dladm_walk_datalink_id() for each IB Phys link to
+ * display IB specific information for these Phys links.
+ */
+static dladm_status_t
+print_ib(show_ib_state_t *state, datalink_id_t phys_linkid)
+{
+	dladm_ib_attr_t		attr;
+	dladm_status_t		status;
+	char			linkname[MAXLINKNAMELEN];
+	char			pkeystr[MAXPKEYLEN];
+	int			i;
+	ib_fields_buf_t		ibuf;
+
+	bzero(&attr, sizeof (attr));
+
+	/*
+	 * Get the attributes of the IB Phys link from active/Persistent config
+	 * based on the flag passed.
+	 */
+	if ((status = dladm_ib_info(handle, phys_linkid, &attr,
+	    state->is_flags)) != DLADM_STATUS_OK)
+		return (status);
+
+	if ((state->is_link_id != DATALINK_ALL_LINKID) && (state->is_link_id
+	    != attr.dia_physlinkid)) {
+		dladm_free_ib_info(&attr);
+		return (DLADM_STATUS_OK);
+	}
+
+	/*
+	 * Get the data link name for the phys_linkid. If we are doing show-ib
+	 * for all IB Phys links, we have only the datalink IDs not the
+	 * datalink name.
+	 */
+	if (dladm_datalink_id2info(handle, phys_linkid, NULL, NULL, NULL,
+	    linkname, MAXLINKNAMELEN) != DLADM_STATUS_OK)
+		return (status);
+
+	(void) snprintf(ibuf.ib_link, sizeof (ibuf.ib_link),
+	    "%s", linkname);
+
+	(void) snprintf(ibuf.ib_portnum, sizeof (ibuf.ib_portnum),
+	    "%d", attr.dia_portnum);
+
+	(void) snprintf(ibuf.ib_hcaguid, sizeof (ibuf.ib_hcaguid),
+	    "%llX", attr.dia_hca_guid);
+
+	(void) snprintf(ibuf.ib_portguid, sizeof (ibuf.ib_portguid),
+	    "%llX", attr.dia_port_guid);
+
+	(void) get_linkstate(linkname, B_TRUE, ibuf.ib_state);
+
+	/*
+	 * Create a comma separated list of pkeys from the pkey table returned
+	 * by the IP over IB driver instance.
+	 */
+	bzero(ibuf.ib_pkeys, attr.dia_port_pkey_tbl_sz * sizeof (ib_pkey_t));
+	for (i = 0; i < attr.dia_port_pkey_tbl_sz; i++) {
+		if (attr.dia_port_pkeys[i] != IB_PKEY_INVALID_FULL &&
+		    attr.dia_port_pkeys[i] != IB_PKEY_INVALID_LIMITED) {
+			if (i == 0)
+				(void) snprintf(pkeystr, MAXPKEYLEN, "%X",
+				    attr.dia_port_pkeys[i]);
+			else
+				(void) snprintf(pkeystr, MAXPKEYLEN, ",%X",
+				    attr.dia_port_pkeys[i]);
+			(void) strlcat(ibuf.ib_pkeys, pkeystr, MAXPKEYSTRSZ);
+		}
+	}
+
+	dladm_free_ib_info(&attr);
+
+	ofmt_print(state->is_ofmt, &ibuf);
+
+	return (DLADM_STATUS_OK);
+}
+
+/* ARGSUSED */
+static int
+show_ib(dladm_handle_t dh, datalink_id_t linkid, void *arg)
+{
+	((show_ib_state_t *)arg)->is_status = print_ib(arg, linkid);
+	return (DLADM_WALK_CONTINUE);
+}
+
+/*
+ * Show the properties of one/all IB Phys links. This is different from
+ * show-phys command since this will display IB specific information about the
+ * Phys link like, HCA GUID, PORT GUID, PKEYS active for this port etc.
+ */
+static void
+do_show_ib(int argc, char *argv[], const char *use)
+{
+	int			option;
+	uint32_t		flags = DLADM_OPT_ACTIVE;
+	datalink_id_t		linkid = DATALINK_ALL_LINKID;
+	show_ib_state_t		state;
+	dladm_status_t		status;
+	boolean_t		o_arg = B_FALSE;
+	char			*fields_str = NULL;
+	ofmt_handle_t		ofmt;
+	ofmt_status_t		oferr;
+	uint_t			ofmtflags = 0;
+
+	bzero(&state, sizeof (state));
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":po:", show_lopts,
+	    NULL)) != -1) {
+		switch (option) {
+		case 'p':
+			state.is_parsable = B_TRUE;
+			break;
+		case 'o':
+			o_arg = B_TRUE;
+			fields_str = optarg;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+		}
+	}
+
+	/* get IB Phys link ID (optional last argument) */
+	if (optind == (argc - 1)) {
+		status = dladm_name2info(handle, argv[optind], &linkid, NULL,
+		    NULL, NULL);
+		if (status != DLADM_STATUS_OK) {
+			die_dlerr(status, "invalid IB port name '%s'",
+			    argv[optind]);
+		}
+		(void) strlcpy(state.is_link, argv[optind], MAXLINKNAMELEN);
+	} else if (optind != argc) {
+		usage();
+	}
+
+	if (state.is_parsable && !o_arg)
+		die("-p requires -o");
+
+	/*
+	 * linkid is the data link ID of the IB Phys link. By default it will
+	 * be DATALINK_ALL_LINKID.
+	 */
+	state.is_link_id = linkid;
+	state.is_flags = flags;
+
+	if (state.is_parsable)
+		ofmtflags |= OFMT_PARSABLE;
+	oferr = ofmt_open(fields_str, ib_fields, ofmtflags, 0, &ofmt);
+	dladm_ofmt_check(oferr, state.is_parsable, ofmt);
+	state.is_ofmt = ofmt;
+
+	/*
+	 * If we are going to display the information for all IB Phys links
+	 * then we'll walk through all the datalinks for datalinks of Phys
+	 * class and media type IB.
+	 */
+	if (linkid == DATALINK_ALL_LINKID) {
+		(void) dladm_walk_datalink_id(show_ib, handle, &state,
+		    DATALINK_CLASS_PHYS, DL_IB, flags);
+	} else {
+		/*
+		 * We need to display the information only for the IB phys link
+		 * linkid. Call show_ib for this link.
+		 */
+		(void) show_ib(handle, linkid, &state);
+		if (state.is_status != DLADM_STATUS_OK) {
+			ofmt_close(ofmt);
+			die_dlerr(state.is_status, "failed to show IB Phys link"
+			    " '%s'", state.is_link);
+		}
+	}
+	ofmt_close(ofmt);
+}
+
+/*
+ * Create an IP over Infiniband partition object over an IB Phys link. The IB
+ * Phys link is associated with an Infiniband HCA port. The IB partition object
+ * is created over a port, pkey combination. This partition object represents
+ * an instance of IP over IB interface.
+ */
+/* ARGSUSED */
+static void
+do_create_part(int argc, char *argv[], const char *use)
+{
+	int		status, option;
+	int		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	char		*pname;
+	char		*l_arg = NULL;
+	char		*altroot = NULL;
+	datalink_id_t	physlinkid = 0;
+	datalink_id_t	partlinkid = 0;
+	ib_pkey_t	pkey = 0;
+	char		*endp = NULL;
+	char		propstr[DLADM_STRSIZE];
+	dladm_arg_list_t	*proplist = NULL;
+
+	propstr[0] = '\0';
+	while ((option = getopt_long(argc, argv, ":tfl:P:R:p:",
+	    part_lopts, NULL)) != -1) {
+		switch (option) {
+		case 't':
+			/*
+			 * Create a temporary IB partition object. This
+			 * instance is not entered into the persistent database
+			 * so it will not be recreated automatically on a
+			 * reboot.
+			 */
+			flags &= ~DLADM_OPT_PERSIST;
+			break;
+		case 'l':
+			/*
+			 * The IB phys link over which the partition object will
+			 * be created.
+			 */
+			l_arg = optarg;
+			break;
+		case 'R':
+			altroot = optarg;
+			break;
+		case 'p':
+			(void) strlcat(propstr, optarg, DLADM_STRSIZE);
+			if (strlcat(propstr, ",", DLADM_STRSIZE) >=
+			    DLADM_STRSIZE)
+				die("property list too long '%s'", propstr);
+			break;
+		case 'P':
+			/*
+			 * The P_Key for the port, pkey tuple of the partition
+			 * object. This P_Key should exist in the IB subnet.
+			 * The partition creation for a non-existent P_Key will
+			 * fail unless the -f option is used.
+			 *
+			 * The P_Key is expected to be a hexadecimal number.
+			 */
+			pkey = strtoul(optarg, &endp, 16);
+			if (errno == ERANGE || pkey > USHRT_MAX ||
+			    *endp != '\0')
+				die("Invalid pkey");
+			break;
+		case 'f':
+			flags |= DLADM_OPT_FORCE;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+			break;
+		}
+	}
+
+	/* check required options */
+	if (!l_arg)
+		usage();
+
+	/* the partition name is a required operand */
+	if (optind != (argc - 1))
+		usage();
+
+	pname = argv[argc - 1];
+
+	/*
+	 * Verify that the partition object's name is in the valid link name
+	 * format.
+	 */
+	if (!dladm_valid_linkname(pname))
+		die("Invalid link name '%s'", pname);
+
+	/* pkey is a mandatory argument */
+	if (pkey == 0)
+		usage();
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	/*
+	 * Get the data link id of the IB Phys link over which we will be
+	 * creating partition object.
+	 */
+	if (dladm_name2info(handle, l_arg,
+	    &physlinkid, NULL, NULL, NULL) != DLADM_STATUS_OK)
+		die("invalid link name '%s'", l_arg);
+
+	/*
+	 * parse the property list provided with -p option.
+	 */
+	if (dladm_parse_link_props(propstr, &proplist, B_FALSE)
+	    != DLADM_STATUS_OK)
+		die("invalid IB partition property");
+
+	/*
+	 * Call the library routine to create the partition object.
+	 */
+	status = dladm_part_create(handle, physlinkid, pkey, flags, pname,
+	    &partlinkid, proplist);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status,
+		    "partition %x creation over %s failed", pkey, l_arg);
+}
+
+/*
+ * Delete an IP over Infiniband partition object. The partition object should
+ * be unplumbed before attempting the delete.
+ */
+static void
+do_delete_part(int argc, char *argv[], const char *use)
+{
+	int option, flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	int status;
+	char *altroot = NULL;
+	datalink_id_t	partid;
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, "R:t", part_lopts,
+	    NULL)) != -1) {
+		switch (option) {
+		case 't':
+			flags &= ~DLADM_OPT_PERSIST;
+			break;
+		case 'R':
+			altroot = optarg;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+		}
+	}
+
+	/* get partition name (required last argument) */
+	if (optind != (argc - 1))
+		usage();
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	/*
+	 * Get the data link id of the partition object given the partition
+	 * name.
+	 */
+	status = dladm_name2info(handle, argv[optind], &partid, NULL, NULL,
+	    NULL);
+	if (status != DLADM_STATUS_OK)
+		die("invalid link name '%s'", argv[optind]);
+
+	/*
+	 * Call the library routine to delete the IB partition. This will
+	 * result in the IB partition object and all its resources getting
+	 * deleted.
+	 */
+	status = dladm_part_delete(handle, partid, flags);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "%s: partition deletion failed",
+		    argv[optind]);
+}
+
+/*
+ * Bring up all or one IB partition already present in the persistent database
+ * but not active yet.
+ *
+ * This sub-command is used during the system boot up to bring up all IB
+ * partitions present in the persistent database. This is similar to a
+ * create partition except that, the partitions are always created even if the
+ * HCA port is down or P_Key is not present in the IB subnet. This is similar
+ * to using the 'force' option while creating the partition except that the 'f'
+ * flag will be set in the flags field only if the create-part for this command
+ * was called with '-f' option.
+ */
+/* ARGSUSED */
+static void
+do_up_part(int argc, char *argv[], const char *use)
+{
+	datalink_id_t	partid = DATALINK_ALL_LINKID;
+	dladm_status_t status;
+
+	/*
+	 * If a partition name was passed as an argument, get its data link
+	 * id. By default we'll attempt to bring up all IB partition data
+	 * links.
+	 */
+	if (argc == 2) {
+		status = dladm_name2info(handle, argv[argc - 1], &partid, NULL,
+		    NULL, NULL);
+		if (status != DLADM_STATUS_OK)
+			return;
+	} else if (argc > 2) {
+		usage();
+	}
+
+	(void) dladm_part_up(handle, partid, 0);
 }

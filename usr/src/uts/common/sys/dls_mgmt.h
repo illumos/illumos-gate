@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_DLS_MGMT_H
@@ -46,13 +45,14 @@ typedef enum {
 	DATALINK_CLASS_ETHERSTUB	= 0x10,
 	DATALINK_CLASS_SIMNET		= 0x20,
 	DATALINK_CLASS_BRIDGE		= 0x40,
-	DATALINK_CLASS_IPTUN		= 0x60
+	DATALINK_CLASS_IPTUN		= 0x60,
+	DATALINK_CLASS_PART		= 0x100
 } datalink_class_t;
 
 #define	DATALINK_CLASS_ALL	(DATALINK_CLASS_PHYS |	\
 	DATALINK_CLASS_VLAN | DATALINK_CLASS_AGGR | DATALINK_CLASS_VNIC | \
 	DATALINK_CLASS_ETHERSTUB | DATALINK_CLASS_SIMNET | \
-	DATALINK_CLASS_BRIDGE | DATALINK_CLASS_IPTUN)
+	DATALINK_CLASS_BRIDGE | DATALINK_CLASS_IPTUN | DATALINK_CLASS_PART)
 
 /*
  * A combination of flags and media.

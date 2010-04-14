@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -58,12 +57,14 @@ static int		ibnex_get_commsvcnode_snapshot(nvlist_t **, ib_guid_t,
 static int		ibnex_fill_ioc_tmp(nvlist_t **, ibdm_ioc_info_t *);
 static int		ibnex_fill_nodeinfo(nvlist_t **, ibnex_node_data_t *,
 			    void *);
-static void		ibnex_figure_ap_devstate(dev_info_t *,
+static void		ibnex_figure_ap_devstate(ibnex_node_data_t *,
 			    devctl_ap_state_t *);
 static void		ibnex_figure_ib_apid_devstate(devctl_ap_state_t *);
 static	char 		*ibnex_get_apid(struct devctl_iocdata *);
 static int		ibnex_get_dip_from_apid(char *, dev_info_t **,
 			    ibnex_node_data_t **);
+extern int		ibnex_get_node_and_dip_from_guid(ib_guid_t, int,
+			    ib_pkey_t, ibnex_node_data_t **, dev_info_t **);
 static ibnex_rval_t	ibnex_handle_pseudo_configure(char *);
 static ibnex_rval_t	ibnex_handle_ioc_configure(char *);
 static ibnex_rval_t	ibnex_handle_commsvcnode_configure(char *);
@@ -212,7 +213,8 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	ibnex_rval_t		ret_val;
 	ib_service_type_t	svc_type = IB_NONE;
 	devctl_ap_state_t	ap_state;
-	ibnex_node_data_t	*nodep, *scanp;
+	ibnex_node_data_t	*nodep = NULL;
+	ibnex_node_data_t	*scanp;
 	struct devctl_iocdata	*dcp = NULL;
 
 	IBTF_DPRINTF_L4("ibnex", "\tdevctl: cmd=%x, arg=%p, mode=%x, cred=%p, "
@@ -257,7 +259,7 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			/* rv could be something undesirable, so reset it */
 			rv = 0;
 
-			ibnex_figure_ap_devstate(apid_dip, &ap_state);
+			ibnex_figure_ap_devstate(nodep, &ap_state);
 		}
 
 		/* copy the return-AP-state information to the user space */
@@ -1390,9 +1392,9 @@ ibnex_get_commsvcnode_snapshot(nvlist_t **nvlpp, ib_guid_t hca_guid,
 	    "node_type = %x", hca_guid, port_guid, svc_index, p_key, node_type);
 
 	/* check if this node was seen before? */
-	rval = ibnex_get_dip_from_guid(port_guid, svc_index, p_key, &dip);
-	if (rval == IBNEX_SUCCESS && dip) {
-		nodep = ddi_get_parent_data(dip);
+	rval = ibnex_get_node_and_dip_from_guid(port_guid, svc_index, p_key,
+	    &nodep, &dip);
+	if (rval == IBNEX_SUCCESS && nodep != NULL) {
 
 		if (ibnex_fill_nodeinfo(nvlpp, nodep, NULL) != 0) {
 			IBTF_DPRINTF_L2("ibnex",
@@ -1646,7 +1648,7 @@ ibnex_fill_nodeinfo(nvlist_t **nvlpp, ibnex_node_data_t *node_datap, void *tmp)
 	    IBNEX_NODE_TYPE_NVL, node_datap->node_type);
 
 	/* figure out "ostate", "rstate" and "condition" */
-	ibnex_figure_ap_devstate(node_datap->node_dip, &state);
+	ibnex_figure_ap_devstate(node_datap, &state);
 
 	if (nvlist_add_int32(*nvlpp, IBNEX_NODE_RSTATE_NVL, state.ap_rstate)) {
 		IBTF_DPRINTF_L2("ibnex", "ibnex_fill_nodeinfo: "
@@ -1684,16 +1686,19 @@ ibnex_fill_nodeinfo(nvlist_t **nvlpp, ibnex_node_data_t *node_datap, void *tmp)
  *	"last_change" value.
  */
 static void
-ibnex_figure_ap_devstate(dev_info_t *dip, devctl_ap_state_t *ap_state)
+ibnex_figure_ap_devstate(ibnex_node_data_t *nodep, devctl_ap_state_t *ap_state)
 {
-	IBTF_DPRINTF_L5("ibnex", "ibnex_figure_ap_devstate: dip = %p", dip);
+	IBTF_DPRINTF_L5("ibnex", "ibnex_figure_ap_devstate: nodep = %p", nodep);
 
 	ap_state->ap_rstate = AP_RSTATE_CONNECTED;
-	if (dip == NULL) {	/* for nodes not seen by IBNEX yet */
+	if (nodep == NULL) {	/* for nodes not seen by IBNEX yet */
 		ap_state->ap_ostate = AP_OSTATE_UNCONFIGURED;
 		ap_state->ap_condition = AP_COND_UNKNOWN;
 	} else {
-		if (i_ddi_node_state(dip) < DS_BOUND) {
+		/*
+		 * IBNEX_NODE_AP_UNCONFIGURED & IBNEX_NODE_AP_CONFIGURING.
+		 */
+		if (nodep->node_ap_state >= IBNEX_NODE_AP_UNCONFIGURED) {
 			ap_state->ap_ostate = AP_OSTATE_UNCONFIGURED;
 			ap_state->ap_condition = AP_COND_UNKNOWN;
 		} else {

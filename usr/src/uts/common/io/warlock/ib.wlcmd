@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 # ibnexus Callback handlers for IBDM
 add	ibdm.ibdm_ibnex_callback targets	ibnex_dm_callback
@@ -46,6 +44,7 @@ root	ibdm_saa_handle_new_gid
 
 # ibnex reprobe function, called from taskq
 root	ibnex_handle_reprobe_dev
+root	ibnex_handle_hca_attach
 
 # ibnex other functions
 root	ibnex_name_child

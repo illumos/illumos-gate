@@ -261,6 +261,7 @@ CHKHDRS=			\
 	hwconf.h		\
 	ia.h			\
 	iapriocntl.h		\
+	ibpart.h		\
 	id32.h			\
 	idmap.h 		\
 	ieeefp.h		\

@@ -29,35 +29,38 @@
 # will only be installed into the global zone.
 #
 <include hollow_zone_pkg>
-set name=pkg.fmri value=pkg:/driver/network/ib@$(PKGVERS)
-set name=pkg.description value="Sun InfiniBand Framework"
-set name=pkg.summary value="Sun InfiniBand Framework"
+set name=pkg.fmri value=pkg:/driver/network/ibp@$(PKGVERS)
+set name=pkg.description value="Sun IP over InfiniBand"
+set name=pkg.summary value="Sun IP over InfiniBand"
 set name=info.classification value=org.opensolaris.category.2008:System/Hardware
 set name=variant.arch value=$(ARCH)
 set name=variant.opensolaris.zone value=global value=nonglobal
+
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
-dir path=kernel/misc group=sys
-dir path=kernel/misc/$(ARCH64) group=sys
-driver name=ib perms="* 0644 root sys"
-file path=kernel/drv/$(ARCH64)/ib group=sys
-$(i386_ONLY)file path=kernel/drv/ib group=sys
-file path=kernel/drv/ib.conf group=sys original_name=SUNWib:kernel/drv/ib.conf \
-    preserve=renameold reboot-needed=false
-file path=kernel/misc/$(ARCH64)/ibcm group=sys mode=0755 reboot-needed=true
-file path=kernel/misc/$(ARCH64)/ibdm group=sys mode=0755 reboot-needed=true
-file path=kernel/misc/$(ARCH64)/ibmf group=sys mode=0755 reboot-needed=true
-file path=kernel/misc/$(ARCH64)/ibtl group=sys mode=0755 reboot-needed=true
-$(i386_ONLY)file path=kernel/misc/ibcm group=sys mode=0755 reboot-needed=true
-$(i386_ONLY)file path=kernel/misc/ibdm group=sys mode=0755 reboot-needed=true
-$(i386_ONLY)file path=kernel/misc/ibmf group=sys mode=0755 reboot-needed=true
-$(i386_ONLY)file path=kernel/misc/ibtl group=sys mode=0755 reboot-needed=true
-legacy pkg=SUNWib arch=$(ARCH) category=system desc="Sun InfiniBand Framework" \
+driver name=ibp alias=ib.ipib clone_perms="ibp 0666 root sys" \
+    perms="* 0666 root sys"
+file path=kernel/drv/$(ARCH64)/ibp group=sys
+$(i386_ONLY)file path=kernel/drv/ibp group=sys
+file path=kernel/drv/ibp.conf group=sys \
+    original_name=SUNWipoib:kernel/drv/ibd.conf preserve=renameold
+
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/method
+file path=lib/svc/method/ibd-post-upgrade mode=0555
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/network group=sys
+file path=lib/svc/manifest/network/ibd-post-upgrade.xml group=sys mode=0444
+
+dir path=sbin group=sys
+file path=sbin/ibd_upgrade mode=0555
+file path=sbin/ibd_delete_link mode=0555
+
+legacy pkg=SUNWipoib arch=$(ARCH) category=system desc="Sun IP over InfiniBand" \
     hotline="Please contact your local service provider" \
-    name="Sun InfiniBand Framework" vendor="Sun Microsystems, Inc." \
+    name="Sun IP over InfiniBand" vendor="Sun Microsystems, Inc." \
     version=11.11,REV=2009.11.11
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license lic_OSBL license=lic_OSBL
-license lic_OSBL_preamble license=lic_OSBL_preamble

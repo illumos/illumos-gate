@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -110,6 +109,8 @@ static void ibtl_kstat_fini(ibtl_hca_devinfo_t *);
 static void ibtl_kstat_stats_create(ibtl_hca_devinfo_t *, uint_t);
 static void ibtl_kstat_pkeys_create(ibtl_hca_devinfo_t *, uint_t);
 
+extern kmutex_t ibtl_part_attr_mutex;
+
 /*
  * IBTF Loadable Module Routines.
  */
@@ -147,6 +148,8 @@ _init(void)
 	mutex_init(&ibtl_qp_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&ibtl_qp_cv, NULL, CV_DEFAULT, NULL);
 
+	mutex_init(&ibtl_part_attr_mutex, NULL, MUTEX_DEFAULT, NULL);
+
 	ibtl_thread_init();
 
 	return (rval);
@@ -173,6 +176,7 @@ _fini(void)
 	cv_destroy(&ibtl_close_hca_cv);
 	mutex_destroy(&ibtl_qp_mutex);
 	cv_destroy(&ibtl_qp_cv);
+	mutex_destroy(&ibtl_part_attr_mutex);
 
 	/*
 	 * Stop Logging

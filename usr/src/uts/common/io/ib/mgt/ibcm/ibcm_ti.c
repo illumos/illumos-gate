@@ -6357,12 +6357,6 @@ ibt_get_src_ip(ib_gid_t gid, ib_pkey_t pkey, ibt_ip_addr_t *src_ip)
 		return (IBT_INVALID_PARAM);
 	}
 
-	bzero(&ibds, sizeof (ibcm_arp_ibd_insts_t));
-	ibds.ibcm_arp_ibd_alloc = IBCM_ARP_IBD_INSTANCES;
-	ibds.ibcm_arp_ibd_cnt = 0;
-	ibds.ibcm_arp_ip = (ibcm_arp_ip_t *)kmem_zalloc(
-	    ibds.ibcm_arp_ibd_alloc * sizeof (ibcm_arp_ip_t), KM_SLEEP);
-
 	retval = ibcm_arp_get_ibds(&ibds, AF_UNSPEC);
 	if (retval != IBT_SUCCESS) {
 		IBTF_DPRINTF_L2(cmlog, "ibt_get_src_ip: ibcm_arp_get_ibds "
@@ -6403,10 +6397,7 @@ ibt_get_src_ip(ib_gid_t gid, ib_pkey_t pkey, ibt_ip_addr_t *src_ip)
 	}
 
 get_src_ip_end:
-	if (ibds.ibcm_arp_ip)
-		kmem_free(ibds.ibcm_arp_ip,
-		    ibds.ibcm_arp_ibd_alloc * sizeof (ibcm_arp_ip_t));
-
+	ibcm_arp_free_ibds(&ibds);
 	return (retval);
 }
 

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_IB_IBTL_IBTL_STATUS_H
@@ -124,6 +123,7 @@ typedef enum ibt_status_e {
 						/* records was returned. */
 	IBT_DEST_IP_GID_NOT_FOUND	= 25,	/* No IP to GID Mapping */
 	IBT_SRC_IP_NOT_FOUND		= 26,	/* SRC IP Endpoint not found */
+	IBT_NO_SUCH_OBJECT		= 27,	/* No such object */
 
 	/*
 	 * Resource Errors

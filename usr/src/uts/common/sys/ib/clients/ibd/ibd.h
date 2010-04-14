@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_IB_CLIENTS_IBD_H
@@ -81,6 +80,61 @@ extern "C" {
  */
 #define	IBD_SEND			0
 #define	IBD_RECV			1
+
+/* Tunables defaults and limits */
+#define	IBD_LINK_MODE_UD		0
+#define	IBD_LINK_MODE_RC		1
+
+#define	IBD_DEF_LINK_MODE		IBD_LINK_MODE_RC
+#define	IBD_DEF_LSO_POLICY		B_TRUE
+#define	IBD_DEF_NUM_LSO_BUFS		1024
+#define	IBD_DEF_CREATE_BCAST_GROUP	B_TRUE
+#define	IBD_DEF_COALESCE_COMPLETIONS	B_TRUE
+#define	IBD_DEF_UD_RX_COMP_COUNT	4
+#define	IBD_DEF_UD_RX_COMP_USEC		10
+#define	IBD_DEF_UD_TX_COMP_COUNT	16
+#define	IBD_DEF_UD_TX_COMP_USEC		300
+#define	IBD_DEF_RC_RX_COMP_COUNT	4
+#define	IBD_DEF_RC_RX_COMP_USEC		10
+#define	IBD_DEF_RC_TX_COMP_COUNT	10
+#define	IBD_DEF_RC_TX_COMP_USEC		300
+#define	IBD_DEF_UD_TX_COPY_THRESH	4096
+#define	IBD_DEF_RC_RX_COPY_THRESH	4096
+#define	IBD_DEF_RC_TX_COPY_THRESH	4096
+#define	IBD_DEF_UD_NUM_RWQE		4000
+#define	IBD_DEF_UD_NUM_SWQE		4000
+#define	IBD_DEF_RC_ENABLE_SRQ		B_TRUE
+#define	IBD_DEF_RC_NUM_RWQE		2047
+#define	IBD_DEF_RC_NUM_SWQE		511
+#define	IBD_DEF_NUM_AH			256
+#define	IBD_DEF_HASH_SIZE		32
+#define	IBD_DEF_RC_NUM_SRQ		(IBD_DEF_RC_NUM_RWQE - 1)
+#define	IBD_DEF_RC_RX_RWQE_THRESH	(IBD_DEF_RC_NUM_RWQE >> 2)
+
+/* Tunable limits */
+#define	IBD_MIN_NUM_LSO_BUFS		512
+#define	IBD_MAX_NUM_LSO_BUFS		4096
+#define	IBD_MIN_UD_TX_COPY_THRESH	2048
+#define	IBD_MAX_UD_TX_COPY_THRESH	65536
+#define	IBD_MIN_UD_NUM_SWQE		512
+#define	IBD_MAX_UD_NUM_SWQE		8000
+#define	IBD_MIN_UD_NUM_RWQE		512
+#define	IBD_MAX_UD_NUM_RWQE		8000
+#define	IBD_MIN_NUM_AH			32
+#define	IBD_MAX_NUM_AH			8192
+#define	IBD_MIN_HASH_SIZE		32
+#define	IBD_MAX_HASH_SIZE		1024
+
+#define	IBD_MIN_RC_NUM_SWQE		511
+#define	IBD_MAX_RC_NUM_SWQE		8000
+#define	IBD_MIN_RC_NUM_RWQE		511
+#define	IBD_MAX_RC_NUM_RWQE		8000
+#define	IBD_MIN_RC_RX_COPY_THRESH	1500
+#define	IBD_MAX_RC_RX_COPY_THRESH	65520
+#define	IBD_MIN_RC_TX_COPY_THRESH	1500
+#define	IBD_MAX_RC_TX_COPY_THRESH	65520
+#define	IBD_MIN_RC_NUM_SRQ		(IBD_MIN_RC_NUM_RWQE - 1)
+#define	IBD_MIN_RC_RX_RWQE_THRESH	(IBD_MIN_RC_NUM_RWQE >> 2)
 
 /*
  * Thresholds
@@ -511,7 +565,7 @@ typedef struct ibd_rc_stat_s {
 	kstat_named_t		rc_rwqe_short;	/* short rwqe */
 
 	kstat_named_t		rc_xmt_bytes;
-	/* pkt size <= ibd_rc_tx_copy_thresh */
+	/* pkt size <= state->id_rc_tx_copy_thresh */
 	kstat_named_t		rc_xmt_small_pkt;
 	kstat_named_t		rc_xmt_fragmented_pkt;
 	/* fail in ibt_map_mem_iov() */
@@ -652,6 +706,9 @@ typedef struct ibd_lsobkt_s {
 	uint_t		bkt_nfree;
 } ibd_lsobkt_t;
 
+#define	IBD_PORT_DRIVER		0x1
+#define	IBD_PARTITION_OBJ	0x2
+
 /*
  * Posting to a single software rx post queue is contentious,
  * so break it out to (multiple) an array of queues.
@@ -673,6 +730,7 @@ typedef struct ibd_rx_queue_s {
  * (per network interface).
  */
 typedef struct ibd_state_s {
+	uint_t			id_type;
 	dev_info_t		*id_dip;
 	ibt_clnt_hdl_t		id_ibt_hdl;
 	ibt_hca_hdl_t		id_hca_hdl;
@@ -720,7 +778,13 @@ typedef struct ibd_state_s {
 	ibt_mr_hdl_t		id_rx_mr_hdl;
 	ibt_mr_desc_t		id_rx_mr_desc;
 	uint_t			id_rx_buf_sz;
-	uint32_t		id_num_rwqe;
+	/*
+	 * id_ud_num_rwqe
+	 * Number of "receive WQE" elements that will be allocated and used
+	 * by ibd. This parameter is limited by the maximum channel size of
+	 * the HCA. Each buffer in the receive wqe will be of MTU size.
+	 */
+	uint32_t		id_ud_num_rwqe;
 	ibd_list_t		id_rx_list;
 	ddi_softintr_t		id_rx;
 	uint32_t		id_rx_bufs_outstanding_limit;
@@ -789,7 +853,16 @@ typedef struct ibd_state_s {
 
 	uint64_t		id_num_intrs;
 	uint64_t		id_tx_short;
-	uint32_t		id_num_swqe;
+	/*
+	 * id_ud_num_swqe
+	 * Number of "send WQE" elements that will be allocated and used by
+	 * ibd. When tuning this parameter, the size of pre-allocated, pre-
+	 * mapped copy buffer in each of these send wqes must be taken into
+	 * account. This copy buffer size is determined by the value of
+	 * IBD_TX_BUF_SZ (this is currently set to the same value of
+	 * ibd_tx_copy_thresh, but may be changed independently if needed).
+	 */
+	uint32_t		id_ud_num_swqe;
 
 	uint64_t		id_xmt_bytes;
 	uint64_t		id_rcv_bytes;
@@ -953,6 +1026,112 @@ typedef struct ibd_state_s {
 #ifdef DEBUG
 	kstat_t 		*rc_ksp;
 #endif
+	ib_guid_t		id_hca_guid;
+	ib_guid_t		id_port_guid;
+	datalink_id_t		id_dlinkid;
+	datalink_id_t		id_plinkid;
+	int			id_port_inst;
+	struct ibd_state_s	*id_next;
+	boolean_t		id_force_create;
+	boolean_t		id_bgroup_present;
+	uint_t			id_hca_max_chan_sz;
+
+	/*
+	 * UD Mode Tunables
+	 *
+	 * id_ud_tx_copy_thresh
+	 * This sets the threshold at which ibd will attempt to do a bcopy
+	 * of the outgoing data into a pre-mapped buffer. IPoIB driver's
+	 * send behavior is restricted by various parameters, so setting of
+	 * this value must be made after careful considerations only. For
+	 * instance, IB HCAs currently impose a relatively small limit
+	 * (when compared to ethernet NICs) on the length of the SGL for
+	 * transmit. On the other hand, the ip stack could send down mp
+	 * chains that are quite long when LSO is enabled.
+	 *
+	 * id_num_lso_bufs
+	 * Number of "larger-than-MTU" copy buffers to use for cases when the
+	 * outgoing mblk chain is too fragmented to be used with
+	 * ibt_map_mem_iov() and too large to be used with regular MTU-sized
+	 * copy buffers. It is not recommended to tune this variable without
+	 * understanding the application environment and/or memory resources.
+	 * The size of each of these lso buffers is determined by the value of
+	 * IBD_LSO_BUFSZ.
+	 *
+	 * id_num_ah
+	 * Number of AH cache entries to allocate
+	 *
+	 * id_hash_size
+	 * Hash table size for the active AH list
+	 *
+	 */
+	uint_t id_ud_tx_copy_thresh;
+	uint_t id_num_lso_bufs;
+	uint_t id_num_ah;
+	uint_t id_hash_size;
+
+	boolean_t id_create_broadcast_group;
+
+	boolean_t id_allow_coalesce_comp_tuning;
+	uint_t id_ud_rx_comp_count;
+	uint_t id_ud_rx_comp_usec;
+	uint_t id_ud_tx_comp_count;
+	uint_t id_ud_tx_comp_usec;
+
+	/* RC Mode Tunables */
+
+	uint_t id_rc_rx_comp_count;
+	uint_t id_rc_rx_comp_usec;
+	uint_t id_rc_tx_comp_count;
+	uint_t id_rc_tx_comp_usec;
+	/*
+	 * id_rc_tx_copy_thresh
+	 * This sets the threshold at which ibd will attempt to do a bcopy
+	 * of the outgoing data into a pre-mapped buffer.
+	 *
+	 * id_rc_rx_copy_thresh
+	 * If (the size of incoming buffer <= id_rc_rx_copy_thresh), ibd
+	 * will attempt to allocate a buffer and do a bcopy of the incoming
+	 * data into the allocated buffer.
+	 *
+	 * id_rc_rx_rwqe_thresh
+	 * If (the number of available rwqe < ibd_rc_rx_rwqe_thresh), ibd
+	 * will attempt to allocate a buffer and do a bcopy of the incoming
+	 * data into the allocated buffer.
+	 *
+	 * id_rc_num_swqe
+	 * 1) Send CQ size = ibd_rc_num_swqe
+	 * 2) The send queue size = ibd_rc_num_swqe -1
+	 * 3) Number of pre-allocated Tx buffers for ibt_post_send() =
+	 * ibd_rc_num_swqe - 1.
+	 *
+	 * id_rc_num_rwqe
+	 * 1) For non-SRQ, we pre-post ibd_rc_num_rwqe number of WRs
+	 * via ibt_post_receive() for receive queue of each RC channel.
+	 * 2) For SRQ and non-SRQ, receive CQ size = ibd_rc_num_rwqe
+	 *
+	 * For SRQ
+	 * If using SRQ, we allocate ibd_rc_num_srq number of buffers (the
+	 * size of each buffer is equal to RC mtu). And post them by
+	 * ibt_post_srq().
+	 *
+	 * id_rc_num_srq
+	 * ibd_rc_num_srq should not be larger than ibd_rc_num_rwqe,
+	 * otherwise it will cause a bug with the following warnings:
+	 * NOTICE: hermon0: Device Error: EQE cq overrun or protection error
+	 * NOTICE: hermon0: Device Error: EQE local work queue catastrophic
+	 * error
+	 * NOTICE: ibd0: HCA GUID 0003ba0001008984 port 1 PKEY ffff
+	 * catastrophic channel error
+	 * NOTICE: ibd0: HCA GUID 0003ba0001008984 port 1 PKEY ffff
+	 * completion queue error
+	 */
+	uint_t id_rc_tx_copy_thresh;
+	uint_t id_rc_rx_copy_thresh;
+	uint_t id_rc_rx_rwqe_thresh;
+	uint_t id_rc_num_swqe;
+	uint_t id_rc_num_rwqe;
+	uint_t id_rc_num_srq;
 } ibd_state_t;
 
 /*

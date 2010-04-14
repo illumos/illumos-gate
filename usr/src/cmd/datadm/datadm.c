@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <net/if.h>
@@ -37,7 +37,12 @@
 #include <errno.h>
 #include <libintl.h>
 #include <locale.h>
-#include <libdevinfo.h>
+#include <fcntl.h>
+#include <libdlpi.h>
+#include <libdladm.h>
+#include <libdlib.h>
+#include <libdllink.h>
+#include <sys/ib/ibnex/ibnex_devctl.h>
 
 #define	DATADM_OP_VIEW		0x0000
 #define	DATADM_OP_UPDATE	0x0001
@@ -48,7 +53,6 @@
 #define	DATADM_LINESZ		1024
 #define	DATADM_NUM_SP_TOKENS	7
 #define	DATADM_NUM_DAT_TOKENS	8
-#define	DATADM_IA_NAME		"ibd"
 #define	DATADM_DRV_NAME		"driver_name"
 #define	DATADM_MAX_TOKENS	16
 
@@ -106,7 +110,7 @@ typedef struct datadm_sp_entry {
  * are added when sp entry processing occurs. duplicate
  * sp entries are not added to this list. the ia_list may
  * be built statically using the information in dat.conf or
- * dynamically using libdevinfo. similar to the sp_list,
+ * dynamically. similar to the sp_list,
  * the ia_list contains only unique entries.
  */
 typedef struct datadm_hca_entry {
@@ -119,12 +123,12 @@ typedef struct datadm_hca_entry {
 /*
  * an ia_entry is created when a new ia name is encountered
  * during sp_entry processing or when a new ia name is
- * discovered by datadm_fill_ia_list. ia_entry holds the ia
+ * discovered by datadm_build_ia_lists. ia_entry holds the ia
  * device's instance number.
  */
 typedef struct datadm_ia_entry {
 	datadm_entry_t		iae_header;
-	int			iae_devnum;
+	char			iae_name[MAXLINKNAMELEN];
 } datadm_ia_entry_t;
 
 /*
@@ -137,6 +141,11 @@ typedef struct datadm_cmnt_entry {
 	datadm_entry_t		cmnt_header;
 	char			*cmnt_line;
 } datadm_cmnt_entry_t;
+
+typedef struct datadm_hca_find_by_name {
+	char			*hf_name;
+	datadm_hca_entry_t	*hf_hca_entry;
+} datadm_hca_find_by_name_t;
 
 /*
  * 2nd argument to datadm_hca_entry_find.
@@ -151,20 +160,20 @@ typedef struct datadm_hca_find {
 /*
  * 2nd argument to datadm_ia_entry_find.
  * if_ia_entry is filled in if an ia_entry with
- * a matching ia_devnum is found.
+ * a matching ia_name is found.
  */
 typedef struct datadm_ia_find {
-	int			if_ia_devnum;
+	char			*if_ia_name;
 	datadm_ia_entry_t	*if_ia_entry;
 } datadm_ia_find_t;
 
 /*
- * this gets passed to datadm_fill_ia_list.
- * we do this to avoid regenerating the device
- * tree for each hca_entry we process.
+ * this gets passed to datadm_add_plink.
  */
 typedef struct datadm_fill_ia_list {
-	di_node_t		ia_root_node;
+	datadm_list_t		*ia_hca_list;
+	dladm_handle_t		ia_dlh;
+	int			ia_ibnex_fd;
 	int			ia_sock_fd_v4;
 	int			ia_sock_fd_v6;
 } datadm_fill_ia_list_t;
@@ -183,10 +192,8 @@ static datadm_args_t		datadm_args;
 static datadm_list_t		datadm_conf_header;
 static char			*datadm_conf_header_default =
 	"#\n"
-	"# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.\n"
-	"# Use is subject to license terms.\n"
-	"#\n"
-	"# ident \"@(#)dat.conf   1.1     03/08/26 SMI\"\n"
+	"# Copyright (c) 2003, 2010, Oracle and/or its affiliates. "
+	"All rights reserved.\n"
 	"#\n"
 	"# DAT configuration file.\n"
 	"#\n"
@@ -215,7 +222,7 @@ static int datadm_parse_default(char *, datadm_sp_entry_t *);
 static int datadm_parse_libpath(char *, datadm_sp_entry_t *);
 static int datadm_parse_sp_version(char *, datadm_sp_entry_t *);
 static int datadm_parse_sp_data(char *, datadm_sp_entry_t *);
-static int datadm_parse_ia_name(char *, int *);
+static int datadm_parse_ia_name(char *, char *);
 
 /*
  * utility functions
@@ -245,13 +252,13 @@ static void datadm_free_cmnt_entry(datadm_cmnt_entry_t *);
  */
 static int datadm_parse_sp_conf(datadm_list_t *);
 static int datadm_parse_dat_conf(datadm_list_t *);
-static int datadm_process_sp_entry(datadm_list_t *, datadm_sp_entry_t *, int);
+static int datadm_process_sp_entry(datadm_list_t *, datadm_sp_entry_t *,
+    char *);
 
 /*
  * ia devices discovery
  */
 static int datadm_build_ia_lists(datadm_list_t *);
-static int datadm_fill_ia_list(datadm_hca_entry_t *, datadm_fill_ia_list_t *);
 
 /*
  * helper function for OP_REMOVE
@@ -429,27 +436,11 @@ datadm_parse_version(char *str, datadm_version_t *version)
  * parses the ia_name field in dat.conf
  */
 static int
-datadm_parse_ia_name(char *str, int *ia_devnum)
+datadm_parse_ia_name(char *str, char *ia_name)
 {
-	int	len;
-	int	i, start;
-
-	len = strlen(DATADM_IA_NAME);
-	if (strncmp(str, DATADM_IA_NAME, len) != 0) {
+	if (strlen(str) >= MAXLINKNAMELEN)
 		return (-1);
-	}
-	start = i = len;
-	len = strlen(str);
-	if (str[i] == '\0') {
-		return (-1);
-	}
-	for (; i < len; i++) {
-		if (!isdigit(str[i])) break;
-	}
-	if (i != len) {
-		return (-1);
-	}
-	*ia_devnum = atoi(str + start);
+	(void) strlcpy(ia_name, str, MAXLINKNAMELEN);
 	return (0);
 }
 
@@ -803,7 +794,7 @@ datadm_hca_entry_find(datadm_hca_entry_t *h1, datadm_hca_find_t *hf)
 static int
 datadm_ia_entry_find(datadm_ia_entry_t *i1, datadm_ia_find_t *iaf)
 {
-	if (i1->iae_devnum == iaf->if_ia_devnum) {
+	if (strcmp(i1->iae_name, iaf->if_ia_name) == 0) {
 		iaf->if_ia_entry = i1;
 		return (1);
 	}
@@ -930,7 +921,7 @@ datadm_parse_line(char *line_buf, char *tokens[], int *token_count)
  */
 static int
 datadm_process_sp_entry(datadm_list_t *hca_list, datadm_sp_entry_t *sp_entry,
-	int ia_devnum)
+	char *ia_name)
 {
 	datadm_hca_find_t	hca_find;
 	datadm_ia_find_t	ia_find;
@@ -963,10 +954,10 @@ datadm_process_sp_entry(datadm_list_t *hca_list, datadm_sp_entry_t *sp_entry,
 	} else {
 		hca_entry = hca_find.hf_hca_entry;
 	}
-	if (ia_devnum == -1) {
+	if (ia_name == NULL) {
 		goto put_sp_entry;
 	}
-	ia_find.if_ia_devnum = ia_devnum;
+	ia_find.if_ia_name = ia_name;
 	ia_find.if_ia_entry = NULL;
 	(void) datadm_walk_list(&hca_entry->he_ia_list,
 	    (int (*)(datadm_entry_t *, void *))datadm_ia_entry_find, &ia_find);
@@ -982,7 +973,7 @@ datadm_process_sp_entry(datadm_list_t *hca_list, datadm_sp_entry_t *sp_entry,
 		if (ia_entry == NULL) {
 			return (-1);
 		}
-		ia_entry->iae_devnum = ia_devnum;
+		(void) strlcpy(ia_entry->iae_name, ia_name, MAXLINKNAMELEN);
 		datadm_enqueue_entry(&hca_entry->he_ia_list,
 		    (datadm_entry_t *)ia_entry);
 	}
@@ -1069,7 +1060,7 @@ datadm_parse_sp_conf(datadm_list_t *hca_list)
 			}
 
 			retval = datadm_process_sp_entry(hca_list,
-			    sp_entry, -1);
+			    sp_entry, NULL);
 			if (retval != 0) {
 				datadm_free_sp_entry(sp_entry);
 				if (retval == 1) {
@@ -1168,7 +1159,7 @@ datadm_parse_dat_conf(datadm_list_t *hca_list)
 		}
 		if (token_count == DATADM_NUM_DAT_TOKENS) {
 			int i = 0;
-			int ia_devnum = -1;
+			char ia_name[MAXLINKNAMELEN];
 
 			/*
 			 * we stop saving comment lines once
@@ -1195,7 +1186,7 @@ datadm_parse_dat_conf(datadm_list_t *hca_list)
 					 * does not belong to an
 					 * sp_entry
 					 */
-					arg = (void *)&ia_devnum;
+					arg = (void *)ia_name;
 				} else {
 					arg = (void *)sp_entry;
 				}
@@ -1217,10 +1208,12 @@ datadm_parse_dat_conf(datadm_list_t *hca_list)
 			 * doing update
 			 */
 			if (datadm_args.da_op_type == DATADM_OP_UPDATE) {
-				ia_devnum = -1;
+				retval = datadm_process_sp_entry(hca_list,
+				    sp_entry, NULL);
+			} else {
+				retval = datadm_process_sp_entry(hca_list,
+				    sp_entry, ia_name);
 			}
-			retval = datadm_process_sp_entry(hca_list, sp_entry,
-			    ia_devnum);
 			if (retval != 0) {
 				datadm_free_sp_entry(sp_entry);
 				if (retval == 1) {
@@ -1246,96 +1239,6 @@ datadm_parse_dat_conf(datadm_list_t *hca_list)
 	}
 	(void) fclose(dat_file);
 	return (retval);
-}
-
-/*
- * discovers all ibd devices under a particular hca
- */
-static int
-datadm_fill_ia_list(datadm_hca_entry_t *hca, datadm_fill_ia_list_t *args)
-{
-	di_node_t	root_node;
-	di_node_t	hca_node;
-	int		retval = 0;
-	int		sv4, sv6;
-
-	root_node = args->ia_root_node;
-	sv4 = args->ia_sock_fd_v4;
-	sv6 = args->ia_sock_fd_v6;
-
-	hca_node = di_drv_first_node(hca->he_name, root_node);
-	if (hca_node == DI_NODE_NIL) {
-		return (0);
-	}
-	while (hca_node != DI_NODE_NIL) {
-		di_node_t	ibd_node;
-
-		ibd_node = di_drv_first_node(DATADM_IA_NAME, hca_node);
-		while (ibd_node != DI_NODE_NIL) {
-			datadm_ia_find_t	ia_find;
-			datadm_ia_entry_t	*ia_entry;
-			struct lifreq		req;
-			int			devnum, rval;
-
-			if (hca_node != di_parent_node(ibd_node)) {
-				ibd_node = di_drv_next_node(ibd_node);
-				continue;
-			}
-			devnum = di_instance(ibd_node);
-			if (devnum == -1) {
-				ibd_node = di_drv_next_node(ibd_node);
-				continue;
-			}
-
-			(void) snprintf(req.lifr_name, sizeof (req.lifr_name),
-			    "%s%d", DATADM_IA_NAME, devnum);
-			/*
-			 * we don't really need to know the ip address.
-			 * we just want to check if the device is plumbed
-			 * or not.
-			 */
-			rval = ioctl(sv4, SIOCGLIFADDR, (caddr_t)&req);
-			if (rval != 0) {
-				/*
-				 * we try v6 if the v4 address isn't found.
-				 */
-				rval = ioctl(sv6, SIOCGLIFADDR, (caddr_t)&req);
-				if (rval != 0) {
-					ibd_node = di_drv_next_node(ibd_node);
-					continue;
-				}
-			}
-			ia_find.if_ia_devnum = devnum;
-			ia_find.if_ia_entry = NULL;
-			(void) datadm_walk_list(&hca->he_ia_list,
-			    (int (*)(datadm_entry_t *, void *))
-			    datadm_ia_entry_find, &ia_find);
-
-			if (ia_find.if_ia_entry == NULL) {
-				/*
-				 * we insert an ia entry only if
-				 * it is unique.
-				 */
-				ia_entry = datadm_alloc_ia_entry();
-				if (ia_entry == NULL) {
-					retval = -1;
-					break;
-				}
-				ia_entry->iae_devnum = devnum;
-				datadm_enqueue_entry(&hca->he_ia_list,
-				    (datadm_entry_t *)ia_entry);
-			} else {
-				ia_entry = ia_find.if_ia_entry;
-			}
-			ibd_node = di_drv_next_node(ibd_node);
-		}
-		hca_node = di_drv_next_node(hca_node);
-	}
-	if (retval != 0) {
-		datadm_free_list(&hca->he_ia_list,
-		    (void (*)(datadm_entry_t *))datadm_free_ia_entry);
-	}
-	return (0);
 }
 
 /*
@@ -1382,45 +1285,146 @@ datadm_invalidate_common_sp_entries(datadm_list_t *hl1, datadm_list_t *hl2)
 	}
 }
 
+static int
+datadm_hca_entry_find_by_name(datadm_hca_entry_t *h1,
+    datadm_hca_find_by_name_t *hf)
+{
+	if (datadm_str_match(h1->he_name, hf->hf_name)) {
+		hf->hf_hca_entry = h1;
+		return (1);
+	}
+	return (0);
+}
+
+datadm_hca_entry_t *
+datadm_hca_lookup_by_name(datadm_list_t *hca_list, char *hca_driver_name)
+{
+	datadm_hca_find_by_name_t	hf;
+
+	hf.hf_name = hca_driver_name;
+	hf.hf_hca_entry = NULL;
+	(void) datadm_walk_list(hca_list,
+	    (int (*)(datadm_entry_t *, void *))datadm_hca_entry_find_by_name,
+	    &hf);
+	return (hf.hf_hca_entry);
+}
+
+static boolean_t
+datadm_add_plink(char *linkname, datadm_fill_ia_list_t *ia_args)
+{
+	datalink_class_t	class;
+	datalink_id_t		linkid;
+	dladm_ib_attr_t		ib_attr;
+	ibnex_ctl_query_hca_t	query_hca;
+	datadm_hca_entry_t	*hca;
+	struct lifreq		req;
+	datadm_ia_find_t	ia_find;
+	datadm_ia_entry_t	*ia_entry;
+
+	if ((dladm_name2info(ia_args->ia_dlh, linkname, &linkid, NULL, &class,
+	    NULL) != DLADM_STATUS_OK) ||
+	    (class != DATALINK_CLASS_PART) ||
+	    (dladm_part_info(ia_args->ia_dlh, linkid, &ib_attr,
+	    DLADM_OPT_ACTIVE) != DLADM_STATUS_OK)) {
+		return (B_FALSE);
+	}
+
+	(void) strlcpy(req.lifr_name, linkname, sizeof (req.lifr_name));
+	/*
+	 * we don't really need to know the ip address.
+	 * we just want to check if the device is plumbed
+	 * or not.
+	 */
+	if (ioctl(ia_args->ia_sock_fd_v4, SIOCGLIFADDR, (caddr_t)&req) != 0) {
+		/*
+		 * we try v6 if the v4 address isn't found.
+		 */
+		if (ioctl(ia_args->ia_sock_fd_v6, SIOCGLIFADDR,
+		    (caddr_t)&req) != 0)
+			return (B_FALSE);
+	}
+
+	bzero(&query_hca, sizeof (query_hca));
+	query_hca.hca_guid = ib_attr.dia_hca_guid;
+	if (ioctl(ia_args->ia_ibnex_fd, IBNEX_CTL_QUERY_HCA, &query_hca) == -1)
+		return (B_FALSE);
+
+	if ((hca = datadm_hca_lookup_by_name(ia_args->ia_hca_list,
+	    query_hca.hca_info.hca_driver_name)) == NULL)
+		return (B_FALSE);
+
+	ia_find.if_ia_name = linkname;
+	ia_find.if_ia_entry = NULL;
+	(void) datadm_walk_list(&hca->he_ia_list,
+	    (int (*)(datadm_entry_t *, void *))
+	    datadm_ia_entry_find, &ia_find);
+
+	if (ia_find.if_ia_entry == NULL) {
+		/*
+		 * we insert an ia entry only if
+		 * it is unique.
+		 */
+		ia_entry = datadm_alloc_ia_entry();
+		if (ia_entry != NULL) {
+			(void) strlcpy(ia_entry->iae_name, linkname,
+			    MAXLINKNAMELEN);
+			datadm_enqueue_entry(&hca->he_ia_list,
+			    (datadm_entry_t *)ia_entry);
+		}
+	}
+
+	return (B_FALSE);
+}
+
 /*
- * applies datadm_fill_ia_list on each hca_list element
+ * build ia lists for each hca_list element
  */
 static int
 datadm_build_ia_lists(datadm_list_t *hca_list)
 {
+	dladm_handle_t		dlh;
 	datadm_fill_ia_list_t	ia_args;
-	di_node_t		root_node;
-	int			retval = 0;
-	int			sv4, sv6;
+	int			rv = -1;
+	int			fd = -1;
+	int			sv4 = -1;
+	int			sv6 = -1;
 
-	root_node = di_init("/", DINFOCPYALL);
-	if (root_node == DI_NODE_NIL) {
-		perror("datadm: di_init");
+	if (dladm_open(&dlh) != DLADM_STATUS_OK)
 		return (-1);
-	}
-	sv4 = socket(AF_INET, SOCK_DGRAM, 0);
-	if (sv4 < 0) {
+
+	if ((fd = open(IBNEX_DEVCTL_DEV, O_RDONLY)) < 0)
+		goto out;
+
+	if ((sv4 = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 		perror("datadm: socket");
-		di_fini(root_node);
-		return (-1);
+		goto out;
 	}
-	sv6 = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (sv6 < 0) {
+
+	if ((sv6 = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
 		perror("datadm: socket");
-		di_fini(root_node);
-		return (-1);
+		goto out;
 	}
-	ia_args.ia_root_node = root_node;
+
+	ia_args.ia_hca_list = hca_list;
+	ia_args.ia_dlh = dlh;
+	ia_args.ia_ibnex_fd = fd;
 	ia_args.ia_sock_fd_v4 = sv4;
 	ia_args.ia_sock_fd_v6 = sv6;
 
-	retval = datadm_walk_list(hca_list,
-	    (int (*)(datadm_entry_t *, void *))datadm_fill_ia_list, &ia_args);
+	dlpi_walk((boolean_t (*) (const char *, void *))datadm_add_plink,
+	    &ia_args, 0);
+	rv = 0;
 
-	(void) close(sv4);
-	(void) close(sv6);
-	di_fini(root_node);
-	return (retval);
+out:
+	if (sv4 != -1)
+		(void) close(sv4);
+	if (sv6 != -1)
+		(void) close(sv6);
+	if (fd != -1)
+		(void) close(fd);
+
+	dladm_close(dlh);
+	return (rv);
 }
 
 static int
@@ -1430,8 +1434,8 @@ datadm_generate_conf_entry(FILE *outfile, datadm_ia_entry_t *ia_entry,
 	int	retval;
 
 	retval = fprintf(outfile,
-	    "%s%d  %s%d.%d  %s  %s  %s  %s%d.%d  \"%s\"  \"%s%s%s\"\n",
-	    DATADM_IA_NAME, ia_entry->iae_devnum,
+	    "%s  %s%d.%d  %s  %s  %s  %s%d.%d  \"%s\"  \"%s%s%s\"\n",
+	    ia_entry->iae_name,
 	    (sp_entry->spe_api_version.dv_name ?
 	    sp_entry->spe_api_version.dv_name : ""),
 	    sp_entry->spe_api_version.dv_major,

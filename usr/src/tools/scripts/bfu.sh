@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Upgrade a machine from a cpio archive area in about 5 minutes.
 # By Roger Faulkner and Jeff Bonwick, April 1993.
@@ -7822,6 +7821,16 @@ mondo_loop() {
 	rm -f $root/kernel/drv/amd64/pcelx
 	rm -f $usr/include/sys/pcmcia/pcgld.h
 	rm -f $usr/include/sys/pcmcia/pcelx.h
+
+	#
+	# Remove the old ibd driver. It is replaced by ibp driver.
+	#
+	rm -f $root/kernel/drv/ibd
+	rm -f $root/kernel/drv/amd64/ibd
+	rm -f $root/kernel/drv/sparcv9/ibd
+	if [ -f $root/kernel/drv/ibd.conf ]; then
+		mv $root/kernel/drv/ibd.conf $root/kernel/drv/ibp.conf.old
+	fi
 
 	#
 	# Remove bpp, esp, and dma

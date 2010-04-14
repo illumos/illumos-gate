@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -40,6 +39,7 @@
 #include <libdlaggr.h>
 #include <libdlvlan.h>
 #include <libdlvnic.h>
+#include <libdlib.h>
 #include <libdllink.h>
 #include <libdlmgmt.h>
 #include <libdladm_impl.h>
@@ -691,6 +691,22 @@ i_dladm_vlan_link_del(dladm_handle_t handle, datalink_id_t vlanid, void *arg)
 }
 
 static int
+i_dladm_part_link_del(dladm_handle_t handle, datalink_id_t partid, void *arg)
+{
+	consumer_del_phys_arg_t	*del_arg = arg;
+	dladm_part_attr_t	pinfo;
+	dladm_status_t		status;
+
+	status = dladm_part_info(handle, partid, &pinfo, DLADM_OPT_PERSIST);
+	if (status != DLADM_STATUS_OK)
+		return (DLADM_WALK_CONTINUE);
+
+	if (pinfo.dia_physlinkid == del_arg->linkid)
+		(void) dladm_part_delete(handle, partid, DLADM_OPT_PERSIST);
+	return (DLADM_WALK_CONTINUE);
+}
+
+static int
 i_dladm_aggr_link_del(dladm_handle_t handle, datalink_id_t aggrid, void *arg)
 {
 	consumer_del_phys_arg_t		*del_arg = arg;
@@ -766,6 +782,10 @@ i_dladm_phys_delete(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 		(void) dladm_walk_datalink_id(i_dladm_vlan_link_del, handle,
 		    &del_arg, DATALINK_CLASS_VLAN, DATALINK_ANY_MEDIATYPE,
 		    DLADM_OPT_PERSIST);
+	} else if (media == DL_IB) {
+		del_arg.linkid = linkid;
+		(void) dladm_walk_datalink_id(i_dladm_part_link_del, handle,
+		    &del_arg, DATALINK_CLASS_PART, DL_IB, DLADM_OPT_PERSIST);
 	}
 
 	(void) dladm_remove_conf(handle, linkid);

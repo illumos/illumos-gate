@@ -24,8 +24,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -299,7 +298,6 @@ dapls_inet_ntop(struct sockaddr *addr, char *buf, size_t len)
  *	DAT_INTERNAL_ERROR
  */
 
-#define	IBD_NAME	"ibd"
 #define	NS_MAX_RETRIES	60
 
 DAT_RETURN
@@ -464,9 +462,7 @@ dapls_ns_lookup_v6(
 	}
 	(void) dapl_os_memzero(&lifr, sizeof (lifr));
 	(void) dapl_os_memcpy(&lifr.lifr_nd.lnr_addr, addr, sizeof (*addr));
-	(void) dapl_os_strcpy(lifr.lifr_name, IBD_NAME);
-	(void) sprintf(&lifr.lifr_name[dapl_os_strlen(IBD_NAME)], "%d",
-	    ia_ptr->hca_ptr->hca_ibd_inst);
+	(void) dapl_os_strcpy(lifr.lifr_name, ia_ptr->hca_ptr->name);
 
 again:;
 	if (ioctl(s, SIOCLIFGETND, (caddr_t)&lifr) < 0)  {
@@ -550,9 +546,7 @@ dapls_ns_subnet_match_v4(int s, DAPL_IA *ia_ptr, struct sockaddr_in *addr)
 	int			retval;
 	uint32_t		netmask, netaddr, netaddr_dest;
 
-	(void) dapl_os_strcpy(lifreq.lifr_name, IBD_NAME);
-	(void) sprintf(&lifreq.lifr_name[dapl_os_strlen(IBD_NAME)], "%d",
-	    ia_ptr->hca_ptr->hca_ibd_inst);
+	(void) dapl_os_strcpy(lifreq.lifr_name, ia_ptr->hca_ptr->name);
 
 	retval = ioctl(s, SIOCGLIFNETMASK, (caddr_t)&lifreq);
 	if (retval < 0) {
@@ -597,9 +591,7 @@ dapls_ns_subnet_match_v6(int s, DAPL_IA *ia_ptr, struct sockaddr_in6 *addr)
 	uchar_t			*netmask, *local_addr, *dest_addr;
 	int			i, retval;
 
-	(void) dapl_os_strcpy(lifreq.lifr_name, IBD_NAME);
-	(void) sprintf(&lifreq.lifr_name[dapl_os_strlen(IBD_NAME)], "%d",
-	    ia_ptr->hca_ptr->hca_ibd_inst);
+	(void) dapl_os_strcpy(lifreq.lifr_name, ia_ptr->hca_ptr->name);
 
 	retval = ioctl(s, SIOCGLIFNETMASK, (caddr_t)&lifreq);
 	if (retval < 0) {

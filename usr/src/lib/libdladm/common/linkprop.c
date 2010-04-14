@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -42,6 +41,7 @@
 #include <libdlwlan.h>
 #include <libdlvlan.h>
 #include <libdlvnic.h>
+#include <libdlib.h>
 #include <libintl.h>
 #include <dlfcn.h>
 #include <link.h>
@@ -150,7 +150,7 @@ static pd_getf_t	get_zone, get_autopush, get_rate_mod, get_rate,
 			get_bridge_pvid, get_protection, get_rxrings,
 			get_txrings, get_cntavail,
 			get_allowedips, get_allowedcids, get_pool,
-			get_rings_range;
+			get_rings_range, get_linkmode_prop;
 
 static pd_setf_t	set_zone, set_rate, set_powermode, set_radio,
 			set_public_prop, set_resource, set_stp_prop,
@@ -360,6 +360,8 @@ static link_attr_t link_attr[] = {
 
 	{ MAC_PROP_MAX_TXHWCLNT_AVAIL,	sizeof (uint_t), "txhwclnt-available"},
 
+	{ MAC_PROP_IB_LINKMODE,	sizeof (uint32_t),	"linkmode"},
+
 	{ MAC_PROP_PRIVATE,	0,			"driver-private"}
 };
 
@@ -431,6 +433,11 @@ static  val_desc_t	stp_p2p_vals[] = {
 	{ "auto",	P2P_AUTO		}
 };
 
+static  val_desc_t	dladm_ibpart_linkmode_vals[] = {
+	{ "cm",		DLADM_IBPART_CM_MODE	},
+	{ "ud",		DLADM_IBPART_UD_MODE	},
+};
+
 #define	VALCNT(vals)    (sizeof ((vals)) / sizeof (val_desc_t))
 #define	RESET_VAL	((uintptr_t)-1)
 #define	UNSPEC_VAL	((uintptr_t)-2)
@@ -452,6 +459,11 @@ static prop_desc_t	prop_table[] = {
 	    set_radio, NULL,
 	    get_radio, NULL, 0,
 	    DATALINK_CLASS_PHYS, DL_WIFI },
+
+	{ "linkmode",	{ "cm", DLADM_IBPART_CM_MODE },
+	    dladm_ibpart_linkmode_vals, VALCNT(dladm_ibpart_linkmode_vals),
+	    set_public_prop, NULL, get_linkmode_prop, NULL, 0,
+	    DATALINK_CLASS_PART, DL_IB },
 
 	{ "speed",	{ "", 0 }, NULL, 0,
 	    set_rate, get_rate_mod,
@@ -4435,4 +4447,36 @@ done:
 	if (buf != NULL)
 		free(buf);
 	return (status);
+}
+
+/* ARGSUSED */
+static dladm_status_t
+get_linkmode_prop(dladm_handle_t handle, prop_desc_t *pdp,
+    datalink_id_t linkid, char **prop_val, uint_t *val_cnt,
+    datalink_media_t media, uint_t flags, uint_t *perm_flags)
+{
+	char			*s;
+	uint32_t		v;
+	dladm_status_t		status;
+
+	status = i_dladm_get_public_prop(handle, linkid, pdp->pd_name, flags,
+	    perm_flags, &v, sizeof (v));
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	switch (v) {
+	case DLADM_IBPART_CM_MODE:
+		s = "cm";
+		break;
+	case DLADM_IBPART_UD_MODE:
+		s = "ud";
+		break;
+	default:
+		s = "";
+		break;
+	}
+	(void) snprintf(prop_val[0], DLADM_STRSIZE, "%s", s);
+
+	*val_cnt = 1;
+	return (DLADM_STATUS_OK);
 }

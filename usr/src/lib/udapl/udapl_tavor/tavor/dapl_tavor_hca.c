@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -36,14 +35,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <libdevinfo.h>
+#include <strings.h>
+#include <fcntl.h>
+#include <libdladm.h>
+#include <libdlib.h>
+#include <libdllink.h>
+#include <sys/ib/ibnex/ibnex_devctl.h>
 
 #include "dapl.h"
 #include "dapl_adapter_util.h"
 #include "dapl_tavor_ibtf_impl.h"
 #include "dapl_hca_util.h"
 #include "dapl_name_service.h"
-#define	IF_NAME			"ibd"
 #define	MAX_HCAS		64
 #define	PROP_HCA_GUID		"hca-guid"
 #define	PROP_PORT_NUM		"port-number"
@@ -52,9 +55,9 @@
 #define	DEVDAPLT		"/dev/daplt"
 
 /* function prototypes */
-static DAT_RETURN dapli_process_tavor_node(di_node_t node, int *hca_idx,
+static DAT_RETURN dapli_process_tavor_node(char *dev_path, int *hca_idx,
     int try_blueflame);
-static DAT_RETURN dapli_process_ibd_node(di_node_t node, DAPL_HCA *hca_ptr,
+static DAT_RETURN dapli_process_ia(dladm_ib_attr_t *ib_attr, DAPL_HCA *hca_ptr,
     int hca_idx);
 
 #if defined(IBHOSTS_NAMING)
@@ -70,63 +73,75 @@ DAT_RETURN
 dapli_init_hca(
 	IN   DAPL_HCA			*hca_ptr)
 {
-	di_node_t	root_node;
-	di_node_t	hca_node;
-	di_node_t	ibd_node;
-	DAT_RETURN	dat_status = DAT_SUCCESS;
-	int		hca_idx = 0;
-	int		ia_instance;
-	int		check_for_bf = 0;
+	DAT_RETURN		dat_status = DAT_SUCCESS;
+	int			hca_idx = 0;
+	int			check_for_bf = 0;
+	datalink_class_t	class;
+	datalink_id_t		linkid;
+	dladm_ib_attr_t		ib_attr;
+	ibnex_ctl_query_hca_t	query_hca;
+	int			ibnex_fd = -1;
+	dladm_handle_t		dlh;
+	char			hca_device_path[MAXPATHLEN];
 
-	ia_instance = (int)dapl_os_strtol(hca_ptr->name + strlen(IF_NAME),
-	    NULL, 0);
-
-	root_node = di_init("/", DINFOCPYALL);
-	if (root_node == DI_NODE_NIL) {
+	if (dladm_open(&dlh) != DLADM_STATUS_OK) {
 		dapl_dbg_log(DAPL_DBG_TYPE_ERR,
-		    "init_hca: di_init failed %s\n", strerror(errno));
+		    "init_hca: dladm_open failed\n");
 		return (DAT_INTERNAL_ERROR);
 	}
 
-	ibd_node = di_drv_first_node(IF_NAME, root_node);
-	while (ibd_node != DI_NODE_NIL) {
-		/* find the ibd node matching our ianame */
-		if (di_instance(ibd_node) == ia_instance) {
-			break;
-		}
-		ibd_node = di_drv_next_node(ibd_node);
-	}
-
-	if (ibd_node == DI_NODE_NIL) {
+	if ((ibnex_fd = open(IBNEX_DEVCTL_DEV, O_RDONLY)) < 0) {
 		dat_status = DAT_ERROR(DAT_NAME_NOT_FOUND, 0);
-		dapl_dbg_log(DAPL_DBG_TYPE_ERR,
-		    "init_hcas: ibd%d di_node not found\n", ia_instance);
+		dapl_dbg_log(DAPL_DBG_TYPE_UTIL,
+		    "init_hca: could not open ib nexus (%s)\n",
+		    strerror(errno));
 		goto bail;
 	}
 
-	hca_node = di_parent_node(ibd_node);
-	if ((hca_node != DI_NODE_NIL) && (strncmp(di_driver_name(hca_node),
-	    "tavor", strlen("tavor")) == 0))
+	if ((dladm_name2info(dlh, hca_ptr->name, &linkid, NULL, &class,
+	    NULL) != DLADM_STATUS_OK) ||
+	    (class != DATALINK_CLASS_PART) ||
+	    (dladm_part_info(dlh, linkid, &ib_attr,
+	    DLADM_OPT_ACTIVE) != DLADM_STATUS_OK)) {
+		dat_status = DAT_ERROR(DAT_NAME_NOT_FOUND, 0);
+		dapl_dbg_log(DAPL_DBG_TYPE_UTIL,
+		    "init_hca: %s not found - couldn't get partition info\n",
+		    hca_ptr->name);
+		goto bail;
+	}
+
+	bzero(&query_hca, sizeof (query_hca));
+	query_hca.hca_guid = ib_attr.dia_hca_guid;
+	query_hca.hca_device_path = hca_device_path;
+	query_hca.hca_device_path_alloc_sz = sizeof (hca_device_path);
+	if (ioctl(ibnex_fd, IBNEX_CTL_QUERY_HCA, &query_hca) == -1) {
+		dat_status = DAT_ERROR(DAT_NAME_NOT_FOUND, 0);
+		dapl_dbg_log(DAPL_DBG_TYPE_UTIL,
+		    "init_hca: %s not found; query_hca failed\n",
+		    hca_ptr->name);
+		goto bail;
+	}
+
+	if (strcmp(query_hca.hca_info.hca_driver_name, "tavor") == 0)
 		dapls_init_funcs_tavor(hca_ptr);
-	else if ((hca_node != DI_NODE_NIL) && (strncmp(di_driver_name
-	    (hca_node), "arbel", strlen("arbel")) == 0))
+	else if (strcmp(query_hca.hca_info.hca_driver_name, "arbel") == 0)
 		dapls_init_funcs_arbel(hca_ptr);
-	else if ((hca_node != DI_NODE_NIL) && (strncmp(di_driver_name
-	    (hca_node), "hermon", strlen("hermon")) == 0)) {
+	else if (strcmp(query_hca.hca_info.hca_driver_name, "hermon") == 0) {
 		dapls_init_funcs_hermon(hca_ptr);
 		check_for_bf = 1;
 	} else {
 		dat_status = DAT_ERROR(DAT_NAME_NOT_FOUND, 0);
 		dapl_dbg_log(DAPL_DBG_TYPE_UTIL,
-		    "init_hcas: ibd%d hca_node not found\n", ia_instance);
+		    "init_hca: %s not found\n", hca_ptr->name);
 		goto bail;
 	}
 
-	dat_status = dapli_process_tavor_node(hca_node, &hca_idx, check_for_bf);
+	dat_status = dapli_process_tavor_node(hca_device_path, &hca_idx,
+	    check_for_bf);
 	if (dat_status != DAT_SUCCESS) {
 		dapl_dbg_log(DAPL_DBG_TYPE_UTIL,
-		    "init_hcas: ibd%d process_tavor_node failed(0x%x)\n",
-		    ia_instance, dat_status);
+		    "init_hcas: %s process_tavor_node failed(0x%x)\n",
+		    hca_ptr->name, dat_status);
 		goto bail;
 	}
 
@@ -136,27 +151,28 @@ dapli_init_hca(
 		dat_status = DAT_ERROR(DAT_NAME_NOT_FOUND, 0);
 	}
 #else
-	dat_status = dapli_process_ibd_node(ibd_node, hca_ptr, hca_idx);
+	dat_status = dapli_process_ia(&ib_attr, hca_ptr, hca_idx);
 #endif
 	if (dat_status != DAT_SUCCESS) {
 		dapl_dbg_log(DAPL_DBG_TYPE_UTIL,
-		    "init_hcas: ibd%d process_ibd_node failed(0x%x)\n",
-		    ia_instance, dat_status);
+		    "init_hcas: %s process_ia failed(0x%x)\n",
+		    hca_ptr->name, dat_status);
 		goto bail;
 	}
 
 	dapl_dbg_log(DAPL_DBG_TYPE_UTIL,
-	    "init_hcas: done ibd%d\n", ia_instance);
+	    "init_hcas: done %s\n", hca_ptr->name);
 
 bail:
-	di_fini(root_node);
+	if (ibnex_fd != -1)
+		(void) close(ibnex_fd);
+	dladm_close(dlh);
 	return (dat_status);
 }
 
 static DAT_RETURN
-dapli_process_tavor_node(di_node_t node, int *hca_idx, int try_blueflame)
+dapli_process_tavor_node(char *dev_path, int *hca_idx, int try_blueflame)
 {
-	char		*dev_path;
 	char		path_buf[MAXPATHLEN];
 	int		i, idx, fd;
 #ifndef _LP64
@@ -183,7 +199,6 @@ dapli_process_tavor_node(di_node_t node, int *hca_idx, int try_blueflame)
 		dapl_os_unlock(&g_tavor_state_lock);
 		return (DAT_ERROR(DAT_INSUFFICIENT_RESOURCES, 0));
 	}
-	dev_path = di_devfs_path(node);
 
 	for (i = 0; i < idx; i++) {
 		if (strcmp(dev_path, g_tavor_state[i].hca_path) == 0) {
@@ -199,7 +214,6 @@ dapli_process_tavor_node(di_node_t node, int *hca_idx, int try_blueflame)
 		dapl_dbg_log(DAPL_DBG_TYPE_ERR,
 		    "process_tavor: devfs path %s is too long\n",
 		    dev_path);
-		di_devfs_path_free(dev_path);
 		dapl_os_unlock(&g_tavor_state_lock);
 		return (DAT_ERROR(DAT_INTERNAL_ERROR, 0));
 	}
@@ -207,7 +221,6 @@ dapli_process_tavor_node(di_node_t node, int *hca_idx, int try_blueflame)
 	(void) dapl_os_strcat(path_buf, dev_path);
 	(void) dapl_os_strcat(path_buf, ":devctl");
 	(void) dapl_os_strcpy(g_tavor_state[idx].hca_path, dev_path);
-	di_devfs_path_free(dev_path);
 
 	pagesize = (size_t)sysconf(_SC_PAGESIZE);
 	if (pagesize == 0) {
@@ -294,49 +307,18 @@ done:
 }
 
 static DAT_RETURN
-dapli_process_ibd_node(di_node_t node, DAPL_HCA *hca_ptr, int hca_idx)
+dapli_process_ia(dladm_ib_attr_t *ib_attr, DAPL_HCA *hca_ptr, int hca_idx)
 {
-	di_prop_t	prop;
-	ib_guid_t	hca_guid = 0;
 	struct lifreq	lifreq;
-	uint32_t	port_num = 0;
-	uint32_t	partition_key = 0;
-	int		instance, sfd, retval, af;
-	int		tmp;
-	int		digits;
-	char		*drv_name;
+	int		sfd, retval, af;
 	char		addr_buf[64];
 
-	prop = di_prop_next(node, DI_PROP_NIL);
-	while (prop != DI_PROP_NIL) {
-		char		*prop_name;
-		uchar_t		*bytep;
-		int		*intp, count;
-
-		prop_name = di_prop_name(prop);
-		count = 0;
-
-		if (strcmp(prop_name, PROP_HCA_GUID) == 0) {
-			count = di_prop_bytes(prop, &bytep);
-			dapl_os_assert(count == sizeof (ib_guid_t));
-			(void) dapl_os_memcpy((void *)&hca_guid, (void *)bytep,
-			    sizeof (ib_guid_t));
-		} else if (strcmp(prop_name, PROP_PORT_NUM) == 0) {
-			count = di_prop_ints(prop, &intp);
-			dapl_os_assert(count == 1);
-			port_num = (uint32_t)intp[0];
-		} else if (strcmp(prop_name, PROP_PORT_PKEY) == 0) {
-			count = di_prop_ints(prop, &intp);
-			dapl_os_assert(count == 1);
-			partition_key = (uint32_t)intp[0];
-		}
-		prop = di_prop_next(node, prop);
-	}
-	if (hca_guid == 0 || port_num == 0 || partition_key == 0) {
+	if (ib_attr->dia_hca_guid == 0 || ib_attr->dia_portnum == 0 ||
+	    ib_attr->dia_pkey == 0) {
 		dapl_dbg_log(DAPL_DBG_TYPE_ERR,
-		    "process_ibd: invalid properties: guid 0x%016llx, "
-		    "port %d, pkey 0x%08x\n", hca_guid, port_num,
-		    partition_key);
+		    "process_ia: invalid properties: guid 0x%016llx, "
+		    "port %d, pkey 0x%08x\n", ib_attr->dia_hca_guid,
+		    ib_attr->dia_portnum, (uint_t)ib_attr->dia_pkey);
 		return (DAT_ERROR(DAT_INVALID_PARAMETER, 0));
 	}
 
@@ -349,31 +331,20 @@ again:
 	sfd = socket(af, SOCK_DGRAM, 0);
 	if (sfd < 0) {
 		dapl_dbg_log(DAPL_DBG_TYPE_ERR,
-		    "process_ibd: socket failed: %s\n", strerror(errno));
+		    "process_ia: socket failed: %s\n", strerror(errno));
 		return (DAT_ERROR(DAT_INSUFFICIENT_RESOURCES, 0));
 	}
-	instance = di_instance(node);
-	drv_name = di_driver_name(node);
 
-	/* calculate the number of digits in instance */
-	tmp = instance;
-	digits = 0;
-	do {
-		tmp = tmp / 10;
-		digits++;
-	} while (tmp > 0);
 	/* check if name will fit in lifr_name */
-	if (dapl_os_strlen(drv_name) + digits +  1 > LIFNAMSIZ) {
+	if (dapl_os_strlen(hca_ptr->name) >= LIFNAMSIZ) {
 		(void) close(sfd);
 		dapl_dbg_log(DAPL_DBG_TYPE_ERR,
-		    "process_ibd: if name overflow %s:%d\n",
-		    drv_name, instance);
+		    "process_ia: if name overflow %s\n",
+		    hca_ptr->name);
 		return (DAT_ERROR(DAT_INVALID_PARAMETER, 0));
 	}
 
-	(void) dapl_os_strcpy(lifreq.lifr_name, drv_name);
-	(void) sprintf(&lifreq.lifr_name[dapl_os_strlen(drv_name)], "%d",
-	    instance);
+	(void) dapl_os_strcpy(lifreq.lifr_name, hca_ptr->name);
 	retval = ioctl(sfd, SIOCGLIFADDR, (caddr_t)&lifreq);
 	if (retval < 0) {
 		(void) close(sfd);
@@ -382,7 +353,7 @@ again:
 			 * the interface is not plumbed.
 			 */
 			dapl_dbg_log(DAPL_DBG_TYPE_UTIL,
-			    "process_ibd: %s: ip address not found\n",
+			    "process_ia: %s: ip address not found\n",
 			    lifreq.lifr_name);
 			return (DAT_ERROR(DAT_INSUFFICIENT_RESOURCES, 0));
 		} else {
@@ -396,19 +367,18 @@ again:
 	}
 	(void) close(sfd);
 
-	hca_ptr->hca_ibd_inst = instance;
 	hca_ptr->tavor_idx = hca_idx;
-	hca_ptr->node_GUID = hca_guid;
-	hca_ptr->port_num = port_num;
-	hca_ptr->partition_key = partition_key;
+	hca_ptr->node_GUID = ib_attr->dia_hca_guid;
+	hca_ptr->port_num = ib_attr->dia_portnum;
+	hca_ptr->partition_key = ib_attr->dia_pkey;
 	(void) dapl_os_memcpy((void *)&hca_ptr->hca_address,
 	    (void *)&lifreq.lifr_addr, sizeof (hca_ptr->hca_address));
 	hca_ptr->max_inline_send = dapls_tavor_max_inline();
 
 	dapl_dbg_log(DAPL_DBG_TYPE_UTIL,
-	    "process_ibd: interface %s, hca guid 0x%016llx, port %d, "
-	    "pkey 0x%08x, ip addr %s\n", lifreq.lifr_name, hca_guid,
-	    port_num, partition_key, dapls_inet_ntop(
+	    "process_ia: interface %s, hca guid 0x%016llx, port %d, "
+	    "pkey 0x%08x, ip addr %s\n", lifreq.lifr_name, hca_ptr->node_GUID,
+	    hca_ptr->port_num, hca_ptr->partition_key, dapls_inet_ntop(
 	    (struct sockaddr *)&hca_ptr->hca_address, addr_buf, 64));
 	return (DAT_SUCCESS);
 }
@@ -674,7 +644,6 @@ dapli_process_fake_ibds(DAPL_HCA *hca_ptr, int hca_idx)
 		(void) sprintf(line_buf, "%s-ib%d", localhost, count + 1);
 		if (strncmp(line_buf, host_buf, strlen(line_buf)) == 0) {
 			guid &= 0xfffffffffffffff0;
-			hca_ptr->hca_ibd_inst = count + 1;
 			hca_ptr->tavor_idx = hca_idx;
 			hca_ptr->node_GUID = guid;
 			hca_ptr->port_num = count + 1;

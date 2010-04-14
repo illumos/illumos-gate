@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 . /lib/svc/share/smf_include.sh
@@ -525,6 +524,19 @@ case "$1" in
 			. "${upgrade_script}"
 		fi
 
+		#
+		# Upgrade handling for ibd:
+		# After we are done with the upgrade handling, we can not set the
+		# ibd/ibd_upgraded property to "true" as the file system is
+		# read-only at this point. It will be done later by ibd-post-upgrade
+		# service.
+		#
+		ibd_upgraded=`/bin/svcprop -c -p ibd/ibd_upgraded \
+		    svc:/network/physical:default 2> /dev/null`
+		if [ "$ibd_upgraded" != "true" ]; then
+			/sbin/ibd_upgrade -v
+		fi
+
 		# Bring up simnet instances
 		/sbin/dladm up-simnet
 		# Initialize security objects.
@@ -536,6 +548,7 @@ case "$1" in
 		#
 		/sbin/dladm up-vnic
 		/sbin/dladm up-vlan
+		/sbin/dladm up-part
 		/sbin/dladm up-aggr
 		/sbin/flowadm init-flow
 	fi
