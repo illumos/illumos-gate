@@ -20,8 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * iSCSI protocol login and enumeration
  */
@@ -235,7 +234,7 @@ login_retry:
 		if (itp->t_blocking == B_TRUE) {
 			goto login_start;
 		} else {
-			if (ddi_taskq_dispatch(isp->sess_taskq,
+			if (ddi_taskq_dispatch(isp->sess_login_taskq,
 			    (void(*)())iscsi_login_start, itp, DDI_SLEEP) !=
 			    DDI_SUCCESS) {
 				iscsi_login_end(icp,
@@ -255,6 +254,7 @@ static void
 iscsi_login_end(iscsi_conn_t *icp, iscsi_status_t status, iscsi_task_t *itp)
 {
 	iscsi_sess_t	*isp;
+	uint32_t	event_count;
 
 	ASSERT(icp != NULL);
 	isp = icp->conn_sess;
@@ -279,9 +279,10 @@ iscsi_login_end(iscsi_conn_t *icp, iscsi_status_t status, iscsi_task_t *itp)
 		iscsi_login_update_state(icp, LOGIN_FFP);
 
 		/* Notify the session that a connection is logged in */
-		mutex_enter(&isp->sess_state_mutex);
-		iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N1);
-		mutex_exit(&isp->sess_state_mutex);
+		event_count = atomic_inc_32_nv(&isp->sess_state_event_count);
+		iscsi_sess_enter_state_zone(isp);
+		iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N1, event_count);
+		iscsi_sess_exit_state_zone(isp);
 	} else {
 		/* If login failed reset nego tpgt */
 		isp->sess_tpgt_nego = ISCSI_DEFAULT_TPGT;
@@ -303,10 +304,12 @@ iscsi_login_end(iscsi_conn_t *icp, iscsi_status_t status, iscsi_task_t *itp)
 				    ISCSI_CONN_STATE_POLLING);
 			}
 			mutex_exit(&icp->conn_state_mutex);
-
-			mutex_enter(&isp->sess_state_mutex);
-			iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N6);
-			mutex_exit(&isp->sess_state_mutex);
+			event_count = atomic_inc_32_nv(
+			    &isp->sess_state_event_count);
+			iscsi_sess_enter_state_zone(isp);
+			iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N6,
+			    event_count);
+			iscsi_sess_exit_state_zone(isp);
 
 			if (status == ISCSI_STATUS_LOGIN_TIMED_OUT) {
 				iscsi_conn_retry(isp, icp);
@@ -317,11 +320,14 @@ iscsi_login_end(iscsi_conn_t *icp, iscsi_status_t status, iscsi_task_t *itp)
 				iscsi_conn_update_state_locked(icp,
 				    ISCSI_CONN_STATE_FREE);
 				mutex_exit(&icp->conn_state_mutex);
+				event_count = atomic_inc_32_nv(
+				    &isp->sess_state_event_count);
+				iscsi_sess_enter_state_zone(isp);
 
-				mutex_enter(&isp->sess_state_mutex);
 				iscsi_sess_state_machine(isp,
-				    ISCSI_SESS_EVENT_N6);
-				mutex_exit(&isp->sess_state_mutex);
+				    ISCSI_SESS_EVENT_N6, event_count);
+
+				iscsi_sess_exit_state_zone(isp);
 			} else {
 				/* ISCSI_STATUS_LOGIN_TIMED_OUT */
 				if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {

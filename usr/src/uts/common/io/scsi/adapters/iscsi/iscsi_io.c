@@ -20,8 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * iSCSI Pseudo HBA Driver
  */
@@ -112,7 +111,7 @@ static void iscsi_handle_nop(iscsi_conn_t *icp, uint32_t itt, uint32_t ttt);
 
 static void iscsi_timeout_checks(iscsi_sess_t *isp);
 static void iscsi_nop_checks(iscsi_sess_t *isp);
-static boolean_t iscsi_decode_sense(uint8_t *sense_data);
+static boolean_t iscsi_decode_sense(uint8_t *sense_data, iscsi_cmd_t *icmdp);
 static void iscsi_flush_cmd_after_reset(uint32_t cmd_sn, uint16_t lun_num,
     iscsi_conn_t *icp);
 
@@ -557,7 +556,7 @@ iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
 				    sts_sensedata, senselen_to_copy);
 
 				affect = iscsi_decode_sense(
-				    (uint8_t *)&arqstat->sts_sensedata);
+				    (uint8_t *)&arqstat->sts_sensedata, icmdp);
 			}
 			arqstat->sts_rqpkt_resid = sensebuf_len -
 			    senselen_to_copy;
@@ -1436,11 +1435,17 @@ iscsi_rx_process_async_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 		 * a couple targets still spending these requests.
 		 * Those targets were specifically sending them
 		 * for notification of a LUN/Volume change
-		 * (ex. LUN addition/removal).  Take a general
-		 * action to these events of dis/reconnecting.
-		 * Once reconnected we perform a reenumeration.
+		 * (ex. LUN addition/removal). Fire the enumeration
+		 * to handle the change.
 		 */
-		idm_ini_conn_disconnect(ic);
+		if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+			rw_enter(&isp->sess_state_rwlock, RW_READER);
+			if (isp->sess_state == ISCSI_SESS_STATE_LOGGED_IN) {
+				(void) iscsi_sess_enum_request(isp, B_FALSE,
+				    isp->sess_state_event_count);
+			}
+			rw_exit(&isp->sess_state_rwlock);
+		}
 		break;
 
 	case ISCSI_ASYNC_EVENT_REQUEST_LOGOUT:
@@ -1466,7 +1471,7 @@ iscsi_rx_process_async_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 		itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
 		itp->t_arg = icp;
 		itp->t_blocking = B_FALSE;
-		if (ddi_taskq_dispatch(isp->sess_taskq,
+		if (ddi_taskq_dispatch(isp->sess_login_taskq,
 		    (void(*)())iscsi_logout_start, itp, DDI_SLEEP) !=
 		    DDI_SUCCESS) {
 			idm_conn_rele(ic);
@@ -1525,7 +1530,7 @@ iscsi_rx_process_async_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 		itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
 		itp->t_arg = icp;
 		itp->t_blocking = B_FALSE;
-		if (ddi_taskq_dispatch(isp->sess_taskq,
+		if (ddi_taskq_dispatch(isp->sess_login_taskq,
 		    (void(*)())iscsi_logout_start, itp, DDI_SLEEP) !=
 		    DDI_SUCCESS) {
 			/* Disconnect if we couldn't dispatch the task */
@@ -1788,18 +1793,37 @@ iscsi_tx_thread(iscsi_thread_t *thread, void *arg)
 		 */
 		mutex_enter(&isp->sess_queue_pending.mutex);
 		while ((isp->sess_window_open == B_TRUE) &&
-		    ((icmdp = isp->sess_queue_pending.head) != NULL) &&
-		    (((icmdp->cmd_type != ISCSI_CMD_TYPE_SCSI) &&
-		    (ISCSI_CONN_STATE_FULL_FEATURE(icp->conn_state))) ||
-		    (icp->conn_state == ISCSI_CONN_STATE_LOGGED_IN))) {
+		    ((icmdp = isp->sess_queue_pending.head) != NULL)) {
+			if (((icmdp->cmd_type != ISCSI_CMD_TYPE_SCSI) &&
+			    (ISCSI_CONN_STATE_FULL_FEATURE(icp->conn_state))) ||
+			    (icp->conn_state == ISCSI_CONN_STATE_LOGGED_IN)) {
 
-			/* update command with this connection info */
-			icmdp->cmd_conn = icp;
-			/* attempt to send this command */
-			iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E2, isp);
+				/* update command with this connection info */
+				icmdp->cmd_conn = icp;
+				/* attempt to send this command */
+				iscsi_cmd_state_machine(icmdp,
+				    ISCSI_CMD_EVENT_E2, isp);
 
-			ASSERT(!mutex_owned(&isp->sess_queue_pending.mutex));
-			mutex_enter(&isp->sess_queue_pending.mutex);
+				ASSERT(!mutex_owned(
+				    &isp->sess_queue_pending.mutex));
+				mutex_enter(&isp->sess_queue_pending.mutex);
+			} else {
+				while (icmdp != NULL) {
+					if ((icmdp->cmd_type !=
+					    ISCSI_CMD_TYPE_SCSI) &&
+					    (ISCSI_CONN_STATE_FULL_FEATURE
+					    (icp->conn_state) != B_TRUE)) {
+						icmdp->cmd_misc_flags |=
+						    ISCSI_CMD_MISCFLAG_STUCK;
+					} else if (icp->conn_state !=
+					    ISCSI_CONN_STATE_LOGGED_IN) {
+						icmdp->cmd_misc_flags |=
+						    ISCSI_CMD_MISCFLAG_STUCK;
+					}
+					icmdp = icmdp->cmd_next;
+				}
+				break;
+			}
 		}
 		mutex_exit(&isp->sess_queue_pending.mutex);
 
@@ -2565,10 +2589,10 @@ iscsi_handle_reset(iscsi_sess_t *isp, int level, iscsi_lun_t *ilp)
 	 * LOGGED_IN state we are in the process of
 	 * failing.  Just respond that we are BUSY.
 	 */
-	mutex_enter(&isp->sess_state_mutex);
+	rw_enter(&isp->sess_state_rwlock, RW_READER);
 	if (!ISCSI_SESS_STATE_FULL_FEATURE(isp->sess_state)) {
 		/* We aren't connected to the target fake success */
-		mutex_exit(&isp->sess_state_mutex);
+		rw_exit(&isp->sess_state_rwlock);
 
 		if (level == RESET_LUN) {
 			rw_enter(&isp->sess_lun_list_rwlock, RW_WRITER);
@@ -2586,7 +2610,7 @@ iscsi_handle_reset(iscsi_sess_t *isp, int level, iscsi_lun_t *ilp)
 	mutex_enter(&isp->sess_queue_pending.mutex);
 	iscsi_cmd_state_machine(&icmd, ISCSI_CMD_EVENT_E1, isp);
 	mutex_exit(&isp->sess_queue_pending.mutex);
-	mutex_exit(&isp->sess_state_mutex);
+	rw_exit(&isp->sess_state_rwlock);
 
 	/* stall until completed */
 	mutex_enter(&icmd.cmd_mutex);
@@ -2859,17 +2883,17 @@ iscsi_handle_text(iscsi_conn_t *icp, char *buf, uint32_t buf_len,
 	icmdp->cmd_un.text.stage	= ISCSI_CMD_TEXT_INITIAL_REQ;
 
 long_text_response:
-	mutex_enter(&isp->sess_state_mutex);
+	rw_enter(&isp->sess_state_rwlock, RW_READER);
 	if (!ISCSI_SESS_STATE_FULL_FEATURE(isp->sess_state)) {
 		iscsi_cmd_free(icmdp);
-		mutex_exit(&isp->sess_state_mutex);
+		rw_exit(&isp->sess_state_rwlock);
 		return (ISCSI_STATUS_NO_CONN_LOGGED_IN);
 	}
 
 	mutex_enter(&isp->sess_queue_pending.mutex);
 	iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E1, isp);
 	mutex_exit(&isp->sess_queue_pending.mutex);
-	mutex_exit(&isp->sess_state_mutex);
+	rw_exit(&isp->sess_state_rwlock);
 
 	/* stall until completed */
 	mutex_enter(&icmdp->cmd_mutex);
@@ -2999,9 +3023,9 @@ iscsi_handle_passthru(iscsi_sess_t *isp, uint16_t lun, struct uscsi_cmd *ucmdp)
 	 * Step 2. Push IO onto pending queue.  If we aren't in
 	 * FULL_FEATURE we need to fail the IO.
 	 */
-	mutex_enter(&isp->sess_state_mutex);
+	rw_enter(&isp->sess_state_rwlock, RW_READER);
 	if (!ISCSI_SESS_STATE_FULL_FEATURE(isp->sess_state)) {
-		mutex_exit(&isp->sess_state_mutex);
+		rw_exit(&isp->sess_state_rwlock);
 
 		iscsi_cmd_free(icmdp);
 		kmem_free(pkt->pkt_cdbp, ucmdp->uscsi_cdblen);
@@ -3015,7 +3039,7 @@ iscsi_handle_passthru(iscsi_sess_t *isp, uint16_t lun, struct uscsi_cmd *ucmdp)
 	mutex_enter(&isp->sess_queue_pending.mutex);
 	iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E1, isp);
 	mutex_exit(&isp->sess_queue_pending.mutex);
-	mutex_exit(&isp->sess_state_mutex);
+	rw_exit(&isp->sess_state_rwlock);
 
 	/*
 	 * Step 3. Wait on cv_wait for completion routine
@@ -3042,6 +3066,15 @@ iscsi_handle_passthru(iscsi_sess_t *isp, uint16_t lun, struct uscsi_cmd *ucmdp)
 		ucmdp->uscsi_rqresid = arqstat->sts_rqpkt_resid;
 		bcopy(&arqstat->sts_sensedata, ucmdp->uscsi_rqbuf,
 		    ucmdp->uscsi_rqlen - arqstat->sts_rqpkt_resid);
+	}
+
+	if ((ucmdp->uscsi_status == STATUS_CHECK) &&
+	    ((icmdp->cmd_misc_flags & ISCSI_CMD_MISCFLAG_INTERNAL)) == B_TRUE) {
+		/*
+		 * Internal SCSI commands received status
+		 */
+		(void) iscsi_decode_sense(
+		    (uint8_t *)&arqstat->sts_sensedata, icmdp);
 	}
 
 	/* clean up */
@@ -3383,7 +3416,7 @@ iscsi_timeout_checks(iscsi_sess_t *isp)
 	ASSERT(isp != NULL);
 
 	/* PENDING */
-	mutex_enter(&isp->sess_state_mutex);
+	rw_enter(&isp->sess_state_rwlock, RW_READER);
 	mutex_enter(&isp->sess_queue_pending.mutex);
 	for (icmdp = isp->sess_queue_pending.head;
 	    icmdp; icmdp = nicmdp) {
@@ -3418,7 +3451,7 @@ iscsi_timeout_checks(iscsi_sess_t *isp)
 		iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E6, isp);
 	}
 	mutex_exit(&isp->sess_queue_pending.mutex);
-	mutex_exit(&isp->sess_state_mutex);
+	rw_exit(&isp->sess_state_rwlock);
 
 	rw_enter(&isp->sess_conn_list_rwlock, RW_READER);
 	icp = isp->sess_conn_list;
@@ -3606,17 +3639,21 @@ iscsi_flush_cmd_after_reset(uint32_t cmd_sn, uint16_t lun_num,
 
 /*
  * iscsi_decode_sense - decode the sense data in the cmd response
- *
- * Here we only care about Unit Attention with 0x29.
+ * and take proper actions
  */
 static boolean_t
-iscsi_decode_sense(uint8_t *sense_data)
+iscsi_decode_sense(uint8_t *sense_data, iscsi_cmd_t *icmdp)
 {
-	uint8_t	sense_key   = 0;
-	uint8_t	asc	    = 0;
-	boolean_t affect    = B_FALSE;
+	uint8_t		sense_key	= 0;
+	uint8_t		asc		= 0;
+	uint8_t		ascq		= 0;
+	boolean_t	flush_io	= B_FALSE;
+	boolean_t	reconfig_lun	= B_FALSE;
+	iscsi_sess_t	*isp		= NULL;
 
 	ASSERT(sense_data != NULL);
+
+	isp = icmdp->cmd_conn->conn_sess;
 
 	sense_key = scsi_sense_key(sense_data);
 	switch (sense_key) {
@@ -3628,13 +3665,13 @@ iscsi_decode_sense(uint8_t *sense_data)
 					 * POWER ON, RESET, OR BUS_DEVICE RESET
 					 * OCCURRED
 					 */
-					affect = B_TRUE;
+					flush_io = B_TRUE;
 					break;
+				case ISCSI_SCSI_LUNCHANGED_CODE:
+					ascq = scsi_sense_ascq(sense_data);
+					if (ascq == ISCSI_SCSI_LUNCHANGED_ASCQ)
+						reconfig_lun = B_TRUE;
 				default:
-					/*
-					 * Currently we don't care
-					 * about other sense key.
-					 */
 					break;
 			}
 			break;
@@ -3645,5 +3682,18 @@ iscsi_decode_sense(uint8_t *sense_data)
 			 */
 			break;
 	}
-	return (affect);
+
+	if (reconfig_lun == B_TRUE) {
+		rw_enter(&isp->sess_state_rwlock, RW_READER);
+		if ((isp->sess_state == ISCSI_SESS_STATE_LOGGED_IN) &&
+		    (iscsi_sess_enum_request(isp, B_FALSE,
+		    isp->sess_state_event_count) !=
+		    ISCSI_SESS_ENUM_SUBMITTED)) {
+			cmn_err(CE_WARN, "Unable to commit re-enumeration for"
+			    " session(%u) %s", isp->sess_oid, isp->sess_name);
+		}
+		rw_exit(&isp->sess_state_rwlock);
+	}
+
+	return (flush_io);
 }

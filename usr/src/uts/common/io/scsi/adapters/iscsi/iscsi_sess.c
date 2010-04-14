@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * iSCSI session interfaces
  */
@@ -40,11 +39,13 @@ boolean_t iscsi_sess_logging = B_FALSE;
  * lun_valid:	if TRUE means the entry contains a valid entry
  * lun_found:	if TRUE means the lun has been found in the sess_lun_list
  * lun_num:	contains the lun_number
+ * lun_addr_type:	indicates lun's type of addressing
  */
 typedef	struct replun_data {
 	boolean_t	lun_valid;
 	boolean_t	lun_found;
 	uint16_t	lun_num;
+	uint8_t		lun_addr_type;
 } replun_data_t;
 
 int	iscsi_sess_enum_timeout = ISCSI_SESS_ENUM_TIMEOUT_DEFAULT;
@@ -56,6 +57,19 @@ int	iscsi_sess_enum_timeout = ISCSI_SESS_ENUM_TIMEOUT_DEFAULT;
  * seconds of retry for a unreachable target during the login.
  */
 int	iscsi_sess_max_delay = ISCSI_DEFAULT_MAX_STORM_DELAY;
+
+/*
+ * Warning messages for the session scsi enumeration
+ */
+static const char *iscsi_sess_enum_warn_msgs[] = {
+	"completed",
+	"partially successful",
+	"IO failures",
+	"submitted",
+	"unable to submit the enumeration",
+	"session is gone",
+	"test unit ready failed"
+};
 
 /* internal interfaces */
 /* LINTED E_STATIC_UNUSED */
@@ -69,23 +83,26 @@ static iscsi_status_t retrieve_lundata(uint32_t lun_count, unsigned char *buf,
 
 /* internal state machine interfaces */
 static void iscsi_sess_state_free(iscsi_sess_t *isp,
-    iscsi_sess_event_t event);
+    iscsi_sess_event_t event, uint32_t event_count);
 static void iscsi_sess_state_logged_in(iscsi_sess_t *isp,
-    iscsi_sess_event_t event);
+    iscsi_sess_event_t event, uint32_t event_count);
 static void iscsi_sess_state_failed(iscsi_sess_t *isp,
-    iscsi_sess_event_t event);
+    iscsi_sess_event_t event, uint32_t event_count);
 static void iscsi_sess_state_in_flush(iscsi_sess_t *isp,
-    iscsi_sess_event_t event);
+    iscsi_sess_event_t event, uint32_t event_count);
 static void iscsi_sess_state_flushed(iscsi_sess_t *isp,
-    iscsi_sess_event_t event);
+    iscsi_sess_event_t event, uint32_t event_count);
 
 /* internal enumeration interfaces */
 static void iscsi_sess_enumeration(void *arg);
-static iscsi_status_t iscsi_sess_testunitready(iscsi_sess_t *isp);
-static iscsi_status_t iscsi_sess_reportluns(iscsi_sess_t *isp);
+static iscsi_status_t iscsi_sess_testunitready(iscsi_sess_t *isp,
+    uint32_t event_count);
+static iscsi_status_t iscsi_sess_reportluns(iscsi_sess_t *isp,
+    uint32_t event_count);
 static void iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num,
-    uint8_t lun_addr_type);
+    uint8_t lun_addr_type, uint32_t event_count, iscsi_lun_t *ilp);
 static void iscsi_sess_update_busy_luns(iscsi_sess_t *isp, boolean_t clear);
+static void iscsi_sess_enum_warn(iscsi_sess_t *isp, iscsi_enum_result_t r);
 
 /*
  * +--------------------------------------------------------------------+
@@ -217,10 +234,9 @@ clean_failed_sess:
 	isp->sess_name_length		= 0;
 	isp->sess_sig			= ISCSI_SIG_SESS;
 	isp->sess_state			= ISCSI_SESS_STATE_FREE;
-	mutex_init(&isp->sess_state_mutex, NULL, MUTEX_DRIVER, NULL);
+	rw_init(&isp->sess_state_rwlock, NULL, RW_DRIVER, NULL);
 	mutex_init(&isp->sess_reset_mutex, NULL, MUTEX_DRIVER, NULL);
 	isp->sess_hba			= ihp;
-	isp->sess_enum_in_progress	= B_FALSE;
 
 	isp->sess_isid[0]		= ISCSI_SUN_ISID_0;
 	isp->sess_isid[1]		= ISCSI_SUN_ISID_1;
@@ -269,14 +285,24 @@ clean_failed_sess:
 	if (snprintf(tq_name, (ISCSI_TH_MAX_NAME_LEN - 1),
 	    ISCSI_SESS_LOGIN_TASKQ_NAME_FORMAT, ihp->hba_oid, isp->sess_oid) <
 	    ISCSI_TH_MAX_NAME_LEN) {
-		isp->sess_taskq = ddi_taskq_create(ihp->hba_dip,
+		isp->sess_login_taskq = ddi_taskq_create(ihp->hba_dip,
 		    tq_name, 1, TASKQ_DEFAULTPRI, 0);
 	}
-	kmem_free(tq_name, ISCSI_TH_MAX_NAME_LEN);
-	if (isp->sess_taskq == NULL) {
+	if (isp->sess_login_taskq == NULL) {
+		kmem_free(tq_name, ISCSI_TH_MAX_NAME_LEN);
 		goto iscsi_sess_cleanup2;
 	}
 
+	if (snprintf(tq_name, (ISCSI_TH_MAX_NAME_LEN - 1),
+	    ISCSI_SESS_ENUM_TASKQ_NAME_FORMAT, ihp->hba_oid, isp->sess_oid) <
+	    ISCSI_TH_MAX_NAME_LEN) {
+		isp->sess_enum_taskq = ddi_taskq_create(ihp->hba_dip,
+		    tq_name, 1, TASKQ_DEFAULTPRI, 0);
+	}
+	kmem_free(tq_name, ISCSI_TH_MAX_NAME_LEN);
+	if (isp->sess_enum_taskq == NULL) {
+		goto iscsi_sess_cleanup1;
+	}
 	/* startup watchdog */
 	th_name = kmem_zalloc(ISCSI_TH_MAX_NAME_LEN, KM_SLEEP);
 	if (snprintf(th_name, (ISCSI_TH_MAX_NAME_LEN - 1),
@@ -289,7 +315,7 @@ clean_failed_sess:
 
 	kmem_free(th_name, ISCSI_TH_MAX_NAME_LEN);
 	if (isp->sess_wd_thread == NULL) {
-		goto iscsi_sess_cleanup1;
+		goto iscsi_sess_cleanup0;
 	}
 
 	status = iscsi_sess_threads_create(isp);
@@ -308,10 +334,25 @@ clean_failed_sess:
 
 	(void) iscsi_sess_kstat_init(isp);
 
-	return (isp);
+	if (type == ISCSI_SESS_TYPE_NORMAL) {
+		isp->sess_enum_status = ISCSI_SESS_ENUM_FREE;
+		isp->sess_enum_result = ISCSI_SESS_ENUM_COMPLETE;
+		isp->sess_enum_result_count = 0;
+		mutex_init(&isp->sess_enum_lock, NULL, MUTEX_DRIVER, NULL);
+		cv_init(&isp->sess_enum_cv, NULL, CV_DRIVER, NULL);
+	}
 
+	mutex_init(&isp->sess_state_wmutex, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&isp->sess_state_wcv, NULL, CV_DRIVER, NULL);
+	isp->sess_state_hasw = B_FALSE;
+
+	isp->sess_state_event_count = 0;
+
+	return (isp);
+iscsi_sess_cleanup0:
+	ddi_taskq_destroy(isp->sess_enum_taskq);
 iscsi_sess_cleanup1:
-	ddi_taskq_destroy(isp->sess_taskq);
+	ddi_taskq_destroy(isp->sess_login_taskq);
 iscsi_sess_cleanup2:
 	if (isp->sess_wd_thread != NULL) {
 		iscsi_thread_destroy(isp->sess_wd_thread);
@@ -326,7 +367,7 @@ iscsi_sess_cleanup2:
 	rw_destroy(&isp->sess_lun_list_rwlock);
 	iscsi_destroy_queue(&isp->sess_queue_completion);
 	iscsi_destroy_queue(&isp->sess_queue_pending);
-	mutex_destroy(&isp->sess_state_mutex);
+	rw_destroy(&isp->sess_state_rwlock);
 	mutex_destroy(&isp->sess_reset_mutex);
 	kmem_free(isp, sizeof (iscsi_sess_t));
 
@@ -375,6 +416,7 @@ iscsi_sess_online(void *arg)
 	iscsi_hba_t	*ihp;
 	iscsi_conn_t	*icp;
 	int		idx;
+	uint32_t	event_count;
 
 	isp = (iscsi_sess_t *)arg;
 
@@ -472,10 +514,11 @@ iscsi_sess_online(void *arg)
 		}
 	} else if (icp->conn_state == ISCSI_CONN_STATE_LOGGED_IN) {
 		mutex_exit(&icp->conn_state_mutex);
-		mutex_enter(&isp->sess_state_mutex);
+		event_count = atomic_inc_32_nv(&isp->sess_state_event_count);
+		iscsi_sess_enter_state_zone(isp);
 		iscsi_sess_state_machine(isp,
-		    ISCSI_SESS_EVENT_N1);
-		mutex_exit(&isp->sess_state_mutex);
+		    ISCSI_SESS_EVENT_N1, event_count);
+		iscsi_sess_exit_state_zone(isp);
 	} else {
 		mutex_exit(&icp->conn_state_mutex);
 	}
@@ -577,7 +620,8 @@ iscsi_sess_destroy(iscsi_sess_t *isp)
 	}
 
 	/* Destroy session task queue */
-	ddi_taskq_destroy(isp->sess_taskq);
+	ddi_taskq_destroy(isp->sess_enum_taskq);
+	ddi_taskq_destroy(isp->sess_login_taskq);
 
 	/* destroy pending and completion queues */
 	iscsi_destroy_queue(&isp->sess_queue_pending);
@@ -608,15 +652,29 @@ iscsi_sess_destroy(iscsi_sess_t *isp)
 		}
 	}
 
+	if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+		/* Wait for all enum requests complete */
+		mutex_enter(&isp->sess_enum_lock);
+		while (isp->sess_enum_result_count > 0) {
+			cv_wait(&isp->sess_enum_cv, &isp->sess_enum_lock);
+		}
+		mutex_exit(&isp->sess_enum_lock);
+	}
+
 	/* Destroy this Sessions Data */
 	(void) iscsi_sess_kstat_term(isp);
 	rw_destroy(&isp->sess_lun_list_rwlock);
 	rw_destroy(&isp->sess_conn_list_rwlock);
 	mutex_destroy(&isp->sess_cmdsn_mutex);
-	mutex_destroy(&isp->sess_state_mutex);
+	rw_destroy(&isp->sess_state_rwlock);
 	mutex_destroy(&isp->sess_reset_mutex);
+	if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+		mutex_destroy(&isp->sess_enum_lock);
+		cv_destroy(&isp->sess_enum_cv);
+	}
+	mutex_destroy(&isp->sess_state_wmutex);
+	cv_destroy(&isp->sess_state_wcv);
 	kmem_free(isp, sizeof (iscsi_sess_t));
-
 	return (rval);
 }
 
@@ -1014,12 +1072,21 @@ iscsi_sess_redrive_io(iscsi_sess_t *isp)
  *      is discarded.
  * -N7: Login parameters for session have changed.
  *	Re-negeotation required.
+ *
+ * Any caller to the state machine (and so as a state writer) must
+ * enter the state zone before calling this function, and vice versa
+ * any caller that doesn't change the state machine shouldn't enter
+ * the zone, and should act as a reader for a better performance.
+ *
+ * The handler of state transition shouldn't try to enter the state
+ * zone in the same thread or dead lock will occur.
  */
 void
-iscsi_sess_state_machine(iscsi_sess_t *isp, iscsi_sess_event_t event)
+iscsi_sess_state_machine(iscsi_sess_t *isp, iscsi_sess_event_t event,
+    uint32_t event_count)
 {
 	ASSERT(isp != NULL);
-	ASSERT(mutex_owned(&isp->sess_state_mutex));
+	ASSERT(rw_read_locked(&isp->sess_state_rwlock) == 0);
 
 	DTRACE_PROBE3(event, iscsi_sess_t *, isp,
 	    char *, iscsi_sess_state_str(isp->sess_state),
@@ -1033,23 +1100,23 @@ iscsi_sess_state_machine(iscsi_sess_t *isp, iscsi_sess_event_t event)
 	isp->sess_state_lbolt = ddi_get_lbolt();
 
 	ISCSI_SESS_LOG(CE_NOTE,
-	    "DEBUG: sess_state: isp: %p state: %d event: %d",
-	    (void *)isp, isp->sess_state, event);
+	    "DEBUG: sess_state: isp: %p state: %d event: %d event count: %d",
+	    (void *)isp, isp->sess_state, event, event_count);
 	switch (isp->sess_state) {
 	case ISCSI_SESS_STATE_FREE:
-		iscsi_sess_state_free(isp, event);
+		iscsi_sess_state_free(isp, event, event_count);
 		break;
 	case ISCSI_SESS_STATE_LOGGED_IN:
-		iscsi_sess_state_logged_in(isp, event);
+		iscsi_sess_state_logged_in(isp, event, event_count);
 		break;
 	case ISCSI_SESS_STATE_FAILED:
-		iscsi_sess_state_failed(isp, event);
+		iscsi_sess_state_failed(isp, event, event_count);
 		break;
 	case ISCSI_SESS_STATE_IN_FLUSH:
-		iscsi_sess_state_in_flush(isp, event);
+		iscsi_sess_state_in_flush(isp, event, event_count);
 		break;
 	case ISCSI_SESS_STATE_FLUSHED:
-		iscsi_sess_state_flushed(isp, event);
+		iscsi_sess_state_flushed(isp, event, event_count);
 		break;
 	default:
 		ASSERT(FALSE);
@@ -1099,10 +1166,11 @@ iscsi_sess_state_str(iscsi_sess_state_t state)
  *
  */
 static void
-iscsi_sess_state_free(iscsi_sess_t *isp, iscsi_sess_event_t event)
+iscsi_sess_state_free(iscsi_sess_t *isp, iscsi_sess_event_t event,
+    uint32_t event_count)
 {
 	iscsi_hba_t		*ihp;
-	iscsi_task_t		*itp;
+	iscsi_enum_result_t	enum_result;
 
 	ASSERT(isp != NULL);
 	ihp = isp->sess_hba;
@@ -1116,25 +1184,20 @@ iscsi_sess_state_free(iscsi_sess_t *isp, iscsi_sess_event_t event)
 	 */
 	case ISCSI_SESS_EVENT_N1:
 		isp->sess_state = ISCSI_SESS_STATE_LOGGED_IN;
+		rw_downgrade(&isp->sess_state_rwlock);
 		if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
 			cmn_err(CE_NOTE,
 			    "!iscsi session(%u) %s online\n",
 			    isp->sess_oid, isp->sess_name);
-
-			if (isp->sess_enum_in_progress == B_FALSE) {
-				isp->sess_enum_in_progress = B_TRUE;
-				mutex_exit(&isp->sess_state_mutex);
-
-				/* start enumeration */
-				itp = kmem_zalloc(sizeof (iscsi_task_t),
-				    KM_SLEEP);
-				itp->t_arg = isp;
-				itp->t_blocking = B_TRUE;
-				iscsi_sess_enumeration(itp);
-				kmem_free(itp, sizeof (iscsi_task_t));
-
-				mutex_enter(&isp->sess_state_mutex);
-				isp->sess_enum_in_progress = B_FALSE;
+			enum_result =
+			    iscsi_sess_enum_request(isp, B_TRUE,
+			    event_count);
+			if (enum_result == ISCSI_SESS_ENUM_SUBMITTED) {
+				enum_result =
+				    iscsi_sess_enum_query(isp);
+			}
+			if (enum_result != ISCSI_SESS_ENUM_COMPLETE) {
+				iscsi_sess_enum_warn(isp, enum_result);
 			}
 		}
 		break;
@@ -1175,9 +1238,10 @@ iscsi_sess_state_free(iscsi_sess_t *isp, iscsi_sess_event_t event)
  *
  */
 static void
-iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event)
+iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event,
+    uint32_t event_count)
 {
-	iscsi_task_t		*itp;
+	iscsi_enum_result_t	enum_result;
 
 	ASSERT(isp != NULL);
 	ASSERT(isp->sess_state == ISCSI_SESS_STATE_LOGGED_IN);
@@ -1193,20 +1257,16 @@ iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event)
 		 * A different connection already logged in.  If the
 		 * session is NORMAL, just re-enumerate the session.
 		 */
-		if ((isp->sess_type == ISCSI_SESS_TYPE_NORMAL) &&
-		    (isp->sess_enum_in_progress == B_FALSE)) {
-			isp->sess_enum_in_progress = B_TRUE;
-			mutex_exit(&isp->sess_state_mutex);
-
-			/* start enumeration */
-			itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
-			itp->t_arg = isp;
-			itp->t_blocking = B_TRUE;
-			iscsi_sess_enumeration(itp);
-			kmem_free(itp, sizeof (iscsi_task_t));
-
-			mutex_enter(&isp->sess_state_mutex);
-			isp->sess_enum_in_progress = B_FALSE;
+		if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+			rw_downgrade(&isp->sess_state_rwlock);
+			enum_result =
+			    iscsi_sess_enum_request(isp, B_TRUE, event_count);
+			if (enum_result == ISCSI_SESS_ENUM_SUBMITTED) {
+				enum_result = iscsi_sess_enum_query(isp);
+			}
+			if (enum_result != ISCSI_SESS_ENUM_COMPLETE) {
+				iscsi_sess_enum_warn(isp, enum_result);
+			}
 		}
 		break;
 
@@ -1229,6 +1289,7 @@ iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event)
 		} else {
 			isp->sess_state = ISCSI_SESS_STATE_FAILED;
 		}
+		rw_downgrade(&isp->sess_state_rwlock);
 
 		/* no longer connected reset nego tpgt */
 		isp->sess_tpgt_nego = ISCSI_DEFAULT_TPGT;
@@ -1242,10 +1303,6 @@ iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event)
 				    isp->sess_oid, isp->sess_name);
 			}
 			/*
-			 * An enumeration may also in progress
-			 * in the same session. Release the
-			 * sess_state_mutex to avoid deadlock
-			 *
 			 * During the process of offlining the LUNs
 			 * our ic thread might be calling back into
 			 * the driver via a target driver failure
@@ -1254,10 +1311,7 @@ iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event)
 			 * while we are killing these threads so
 			 * they don't get deadlocked.
 			 */
-			mutex_exit(&isp->sess_state_mutex);
 			iscsi_sess_offline_luns(isp);
-		} else {
-			mutex_exit(&isp->sess_state_mutex);
 		}
 
 		mutex_enter(&isp->sess_reset_mutex);
@@ -1266,7 +1320,6 @@ iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event)
 		/* update busy luns if needed */
 		iscsi_sess_update_busy_luns(isp, B_TRUE);
 
-		mutex_enter(&isp->sess_state_mutex);
 		break;
 
 	/*
@@ -1299,10 +1352,11 @@ iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event)
  *
  */
 static void
-iscsi_sess_state_failed(iscsi_sess_t *isp, iscsi_sess_event_t event)
+iscsi_sess_state_failed(iscsi_sess_t *isp, iscsi_sess_event_t event,
+    uint32_t event_count)
 {
 	iscsi_hba_t		*ihp;
-	iscsi_task_t		*itp;
+	iscsi_enum_result_t	enum_result;
 
 	ASSERT(isp != NULL);
 	ihp = isp->sess_hba;
@@ -1314,28 +1368,18 @@ iscsi_sess_state_failed(iscsi_sess_t *isp, iscsi_sess_event_t event)
 	/* -N1: A session continuation attempt succeeded */
 	case ISCSI_SESS_EVENT_N1:
 		isp->sess_state = ISCSI_SESS_STATE_LOGGED_IN;
-		if ((isp->sess_type == ISCSI_SESS_TYPE_NORMAL) &&
-		    (isp->sess_enum_in_progress == B_FALSE)) {
-			isp->sess_enum_in_progress = B_TRUE;
-			mutex_exit(&isp->sess_state_mutex);
-
-			/* start enumeration */
-			itp = kmem_zalloc(sizeof (iscsi_task_t),
-			    KM_SLEEP);
-			itp->t_arg = isp;
-			itp->t_blocking = B_FALSE;
-			if (ddi_taskq_dispatch(isp->sess_taskq,
-			    iscsi_sess_enumeration, itp, DDI_SLEEP) !=
-			    DDI_SUCCESS) {
-				kmem_free(itp, sizeof (iscsi_task_t));
-				cmn_err(CE_WARN,
-				    "iscsi connection (%u) failure - "
-				    "unable to schedule enumeration",
-				    isp->sess_oid);
+		rw_downgrade(&isp->sess_state_rwlock);
+		if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+			enum_result =
+			    iscsi_sess_enum_request(isp, B_TRUE,
+			    event_count);
+			if (enum_result == ISCSI_SESS_ENUM_SUBMITTED) {
+				enum_result =
+				    iscsi_sess_enum_query(isp);
 			}
-
-			mutex_enter(&isp->sess_state_mutex);
-			isp->sess_enum_in_progress = B_FALSE;
+			if (enum_result != ISCSI_SESS_ENUM_COMPLETE) {
+				iscsi_sess_enum_warn(isp, enum_result);
+			}
 		}
 		break;
 
@@ -1360,9 +1404,8 @@ iscsi_sess_state_failed(iscsi_sess_t *isp, iscsi_sess_event_t event)
 			    isp->sess_oid, isp->sess_name);
 		}
 
-		mutex_exit(&isp->sess_state_mutex);
+		rw_downgrade(&isp->sess_state_rwlock);
 		iscsi_sess_offline_luns(isp);
-		mutex_enter(&isp->sess_state_mutex);
 		break;
 
 	/*
@@ -1379,13 +1422,14 @@ iscsi_sess_state_failed(iscsi_sess_t *isp, iscsi_sess_event_t event)
 	}
 }
 
-
 /*
  * iscsi_sess_state_in_flush -
  *
  */
+/* ARGSUSED */
 static void
-iscsi_sess_state_in_flush(iscsi_sess_t *isp, iscsi_sess_event_t event)
+iscsi_sess_state_in_flush(iscsi_sess_t *isp, iscsi_sess_event_t event,
+    uint32_t event_count)
 {
 	ASSERT(isp != NULL);
 	ASSERT(isp->sess_state == ISCSI_SESS_STATE_IN_FLUSH);
@@ -1416,6 +1460,7 @@ iscsi_sess_state_in_flush(iscsi_sess_t *isp, iscsi_sess_event_t event)
 		} else {
 			isp->sess_state = ISCSI_SESS_STATE_FLUSHED;
 		}
+		rw_downgrade(&isp->sess_state_rwlock);
 
 		/* no longer connected reset nego tpgt */
 		isp->sess_tpgt_nego = ISCSI_DEFAULT_TPGT;
@@ -1428,10 +1473,6 @@ iscsi_sess_state_in_flush(iscsi_sess_t *isp, iscsi_sess_event_t event)
 				    isp->sess_oid, isp->sess_name);
 			}
 			/*
-			 * An enumeration may also in progress
-			 * in the same session. Release the
-			 * sess_state_mutex to avoid deadlock
-			 *
 			 * During the process of offlining the LUNs
 			 * our ic thread might be calling back into
 			 * the driver via a target driver failure
@@ -1440,10 +1481,7 @@ iscsi_sess_state_in_flush(iscsi_sess_t *isp, iscsi_sess_event_t event)
 			 * while we are killing these threads so
 			 * they don't get deadlocked.
 			 */
-			mutex_exit(&isp->sess_state_mutex);
 			iscsi_sess_offline_luns(isp);
-		} else {
-			mutex_exit(&isp->sess_state_mutex);
 		}
 
 		mutex_enter(&isp->sess_reset_mutex);
@@ -1452,7 +1490,6 @@ iscsi_sess_state_in_flush(iscsi_sess_t *isp, iscsi_sess_event_t event)
 		/* update busy luns if needed */
 		iscsi_sess_update_busy_luns(isp, B_TRUE);
 
-		mutex_enter(&isp->sess_state_mutex);
 		break;
 
 	/*
@@ -1485,10 +1522,11 @@ iscsi_sess_state_in_flush(iscsi_sess_t *isp, iscsi_sess_event_t event)
  *
  */
 static void
-iscsi_sess_state_flushed(iscsi_sess_t *isp, iscsi_sess_event_t event)
+iscsi_sess_state_flushed(iscsi_sess_t *isp, iscsi_sess_event_t event,
+    uint32_t event_count)
 {
 	iscsi_hba_t	*ihp;
-	iscsi_task_t	*itp;
+	iscsi_enum_result_t	enum_result;
 
 	ASSERT(isp != NULL);
 	ASSERT(isp->sess_state == ISCSI_SESS_STATE_FLUSHED);
@@ -1500,28 +1538,18 @@ iscsi_sess_state_flushed(iscsi_sess_t *isp, iscsi_sess_event_t event)
 	/* -N1: A session continuation attempt succeeded */
 	case ISCSI_SESS_EVENT_N1:
 		isp->sess_state = ISCSI_SESS_STATE_LOGGED_IN;
-		if ((isp->sess_type == ISCSI_SESS_TYPE_NORMAL) &&
-		    (isp->sess_enum_in_progress == B_FALSE)) {
-			isp->sess_enum_in_progress = B_TRUE;
-			mutex_exit(&isp->sess_state_mutex);
-
-			/* start enumeration */
-			itp = kmem_zalloc(sizeof (iscsi_task_t),
-			    KM_SLEEP);
-			itp->t_arg = isp;
-			itp->t_blocking = B_FALSE;
-			if (ddi_taskq_dispatch(isp->sess_taskq,
-			    iscsi_sess_enumeration, itp, DDI_SLEEP) !=
-			    DDI_SUCCESS) {
-				kmem_free(itp, sizeof (iscsi_task_t));
-				cmn_err(CE_WARN,
-				    "iscsi connection (%u) failure - "
-				    "unable to schedule enumeration",
-				    isp->sess_oid);
+		rw_downgrade(&isp->sess_state_rwlock);
+		if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+			enum_result =
+			    iscsi_sess_enum_request(isp, B_TRUE,
+			    event_count);
+			if (enum_result == ISCSI_SESS_ENUM_SUBMITTED) {
+				enum_result =
+				    iscsi_sess_enum_query(isp);
 			}
-
-			mutex_enter(&isp->sess_state_mutex);
-			isp->sess_enum_in_progress = B_FALSE;
+			if (enum_result != ISCSI_SESS_ENUM_COMPLETE) {
+				iscsi_sess_enum_warn(isp, enum_result);
+			}
 		}
 		break;
 
@@ -1533,15 +1561,14 @@ iscsi_sess_state_flushed(iscsi_sess_t *isp, iscsi_sess_event_t event)
 	 */
 	case ISCSI_SESS_EVENT_N6:
 		isp->sess_state = ISCSI_SESS_STATE_FREE;
+		rw_downgrade(&isp->sess_state_rwlock);
 
 		if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
 			cmn_err(CE_NOTE, "!iscsi session(%u) %s offline\n",
 			    isp->sess_oid, isp->sess_name);
 		}
 
-		mutex_exit(&isp->sess_state_mutex);
 		iscsi_sess_offline_luns(isp);
-		mutex_enter(&isp->sess_state_mutex);
 		break;
 
 	/*
@@ -1628,6 +1655,8 @@ iscsi_sess_enumeration(void *arg)
 	iscsi_task_t		*itp = (iscsi_task_t *)arg;
 	iscsi_sess_t		*isp;
 	iscsi_status_t		rval    = ISCSI_STATUS_SUCCESS;
+	iscsi_enum_result_t	enum_result = ISCSI_SESS_ENUM_COMPLETE;
+	uint32_t		event_count = itp->t_event_count;
 
 	ASSERT(itp != NULL);
 	isp = (iscsi_sess_t *)itp->t_arg;
@@ -1637,14 +1666,14 @@ iscsi_sess_enumeration(void *arg)
 	 * Send initial TEST_UNIT_READY to target.  If it fails this we
 	 * stop our enumeration as the target is not responding properly.
 	 */
-	rval = iscsi_sess_testunitready(isp);
+	rval = iscsi_sess_testunitready(isp, event_count);
 	if (ISCSI_SUCCESS(rval)) {
 		/*
 		 * Now we know the target is ready start our enumeration with
 		 * REPORT LUNs, If this fails we will have to fall back to
 		 * stepping
 		 */
-		rval = iscsi_sess_reportluns(isp);
+		rval = iscsi_sess_reportluns(isp, event_count);
 		if (!ISCSI_SUCCESS(rval)) {
 			/*
 			 * report luns failed so lets just check for LUN 0.
@@ -1653,17 +1682,24 @@ iscsi_sess_enumeration(void *arg)
 			 * respond poorly.
 			 */
 			if (isp->sess_lun_list == NULL) {
-				iscsi_sess_inquiry(isp, 0, 0);
+				iscsi_sess_inquiry(isp, 0, 0, event_count,
+				    NULL);
 			}
 		}
 	} else {
-		cmn_err(CE_NOTE, "iscsi session(%u) unable to enumerate "
-		    "logical units - test unit ready failed", isp->sess_oid);
+		enum_result = ISCSI_SESS_ENUM_TUR_FAIL;
 	}
 
-	if (itp->t_blocking == B_FALSE) {
-		kmem_free(itp, sizeof (iscsi_task_t));
+	kmem_free(itp, sizeof (iscsi_task_t));
+	mutex_enter(&isp->sess_enum_lock);
+	if (isp->sess_enum_result_count != 0) {
+		isp->sess_enum_status = ISCSI_SESS_ENUM_DONE;
+	} else {
+		isp->sess_enum_status = ISCSI_SESS_ENUM_FREE;
 	}
+	isp->sess_enum_result = enum_result;
+	cv_broadcast(&isp->sess_enum_cv);
+	mutex_exit(&isp->sess_enum_lock);
 }
 
 /*
@@ -1671,7 +1707,7 @@ iscsi_sess_enumeration(void *arg)
  * ensure an array is ready to be enumerated.
  */
 static iscsi_status_t
-iscsi_sess_testunitready(iscsi_sess_t *isp)
+iscsi_sess_testunitready(iscsi_sess_t *isp, uint32_t event_count)
 {
 	iscsi_status_t			rval		= ISCSI_STATUS_SUCCESS;
 	int				retries		= 0;
@@ -1681,7 +1717,8 @@ iscsi_sess_testunitready(iscsi_sess_t *isp)
 	ASSERT(isp != NULL);
 
 	/* loop until successful sending test unit ready or retries out */
-	do {
+	while ((retries++ < 3) &&
+	    (isp->sess_state_event_count == event_count)) {
 		/* cdb is all zeros */
 		bzero(&cdb[0], CDB_GROUP0);
 
@@ -1701,8 +1738,7 @@ iscsi_sess_testunitready(iscsi_sess_t *isp)
 		if (ISCSI_SUCCESS(rval)) {
 			break;
 		}
-
-	} while (retries++ < 3);
+	}
 
 	return (rval);
 }
@@ -1724,7 +1760,7 @@ iscsi_sess_testunitready(iscsi_sess_t *isp)
  * ensure an array is ready to be enumerated.
  */
 static iscsi_status_t
-iscsi_sess_reportluns(iscsi_sess_t *isp)
+iscsi_sess_reportluns(iscsi_sess_t *isp, uint32_t event_count)
 {
 	iscsi_status_t		rval		= ISCSI_STATUS_SUCCESS;
 	iscsi_hba_t		*ihp;
@@ -1751,7 +1787,8 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 	 * Attempt to send report luns until we successfully
 	 * get all the data or the retries run out.
 	 */
-	do {
+	while ((retries++ < 3) &&
+	    (isp->sess_state_event_count == event_count)) {
 		/*
 		 * Allocate our buffer based on current buf_len.
 		 * buf_len may change after we received a response
@@ -1810,10 +1847,17 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 		} else {
 			retries++;
 		}
+	}
 
-	} while (retries < 3);
+	if (isp->sess_state_event_count != event_count) {
+		if (buf != NULL) {
+			kmem_free(buf, buf_len);
+			buf = NULL;
+		}
+		return (rval);
+	}
 
-	/* If not successful go no farther */
+	/* If not successful go no further */
 	if (!ISCSI_SUCCESS(rval)) {
 		kmem_free(buf, buf_len);
 		return (rval);
@@ -1832,12 +1876,10 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 	 * for each lun in this list
 	 *	look to see if this lun is in the SCSI ReportLun list we
 	 *	    just retrieved
-	 *	if it is in the SCSI ReportLun list and it is already ONLINE
-	 *	    nothing needs to be done
-	 *	if it is in the SCSI ReportLun list and it is OFFLINE,
-	 *	    issue the iscsi_lun_online()
-	 *	if it isn't in the SCSI ReportLunlist then
-	 *	    issue the iscsi_sess_inquiry()
+	 *	if it is in the SCSI ReportLun list and it is already ONLINE or
+	 *	if it is in the SCSI ReportLun list and it is OFFLINE or
+	 *	if it isn't in the SCSI ReportLunlist or then
+	 *	    issue the iscsi_sess_inquiry() to handle
 	 *
 	 *	as we walk the SCSI ReportLun list, we save this lun information
 	 *	    into the buffer we just allocated.  This will save us from
@@ -1846,6 +1888,9 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 	lun_start = 0;
 	rw_enter(&isp->sess_lun_list_rwlock, RW_WRITER);
 	for (ilp = isp->sess_lun_list; ilp; ilp = ilp_next) {
+		if (isp->sess_state_event_count != event_count)
+			break;
+
 		ilp_next = ilp->lun_next;
 
 		for (lun_count = lun_start; lun_count < lun_total;
@@ -1868,62 +1913,52 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 			 * Report Lun buffer
 			 * we retrieved to get lun info
 			 */
-			if (saved_replun_ptr[lun_count].lun_valid ==
-			    B_TRUE) {
-				if (saved_replun_ptr[lun_count].lun_num ==
-				    ilp->lun_num) {
+			if ((saved_replun_ptr[lun_count].lun_valid
+			    == B_TRUE) &&
+			    (saved_replun_ptr[lun_count].lun_num
+			    == ilp->lun_num)) {
 				/*
-				 * the lun we are looking for is found
-				 *
-				 * if the state of the lun is currently OFFLINE
-				 * or with INVALID, try to turn it back online
+				 * the lun we are looking for is found,
+				 * give it to iscsi_sess_inquiry()
 				 */
-				if ((ilp->lun_state &
-				    ISCSI_LUN_STATE_OFFLINE) ||
-				    (ilp->lun_state &
-				    ISCSI_LUN_STATE_INVALID)) {
-					DTRACE_PROBE2(
-					    sess_reportluns_lun_is_not_online,
-					    int, ilp->lun_num, int,
-					    ilp->lun_state);
-					iscsi_lun_online(ihp, ilp);
-				}
-				saved_replun_ptr[lun_count].lun_found = B_TRUE;
+				rw_exit(&isp->sess_lun_list_rwlock);
+				iscsi_sess_inquiry(isp, ilp->lun_num,
+				    saved_replun_ptr[lun_count].lun_addr_type,
+				    event_count, ilp);
+				rw_enter(&isp->sess_lun_list_rwlock,
+				    RW_WRITER);
+				saved_replun_ptr[lun_count].lun_found
+				    = B_TRUE;
 				break;
-			}
-		} else {
-			/*
-			 * lun information is not found in the saved_replun
-			 * buffer, retrieve lun information from the SCSI
-			 * Report Lun buffer and store this information in
-			 * the saved_replun buffer
-			 */
-			if (retrieve_lundata(lun_count, buf, isp, &lun_num,
-			    &lun_addr_type) != ISCSI_STATUS_SUCCESS) {
-				continue;
-			}
-			saved_replun_ptr[lun_count].lun_valid = B_TRUE;
-			saved_replun_ptr[lun_count].lun_num = lun_num;
-			if (ilp->lun_num == lun_num) {
+			} else {
 				/*
-				 * lun is found in the SCSI Report Lun buffer
-				 * make sure the lun is in the ONLINE state
+				 * lun information is not found in the
+				 * saved_replun buffer, retrieve lun
+				 * information from the SCSI Report Lun buffer
+				 * and store this information in the
+				 * saved_replun buffer
 				 */
-				saved_replun_ptr[lun_count].lun_found = B_TRUE;
-					if ((ilp->lun_state &
-					    ISCSI_LUN_STATE_OFFLINE) ||
-					    (ilp->lun_state &
-					    ISCSI_LUN_STATE_INVALID)) {
-#define	SRLINON sess_reportluns_lun_is_not_online
-						DTRACE_PROBE2(
-						    SRLINON,
-						    int, ilp->lun_num, int,
-						    ilp->lun_state);
-
-							iscsi_lun_online(
-							    ihp, ilp);
-#undef SRLINON
-					}
+				if (retrieve_lundata(lun_count, buf, isp,
+				    &lun_num, &lun_addr_type) !=
+				    ISCSI_STATUS_SUCCESS) {
+					continue;
+				}
+				saved_replun_ptr[lun_count].lun_valid = B_TRUE;
+				saved_replun_ptr[lun_count].lun_num = lun_num;
+				saved_replun_ptr[lun_count].lun_addr_type =
+				    lun_addr_type;
+				if (ilp->lun_num == lun_num) {
+					/*
+					 * lun is found in the SCSI Report Lun
+					 * buffer, give it to inquiry
+					 */
+					rw_exit(&isp->sess_lun_list_rwlock);
+					iscsi_sess_inquiry(isp, lun_num,
+					    lun_addr_type, event_count, ilp);
+					rw_enter(&isp->sess_lun_list_rwlock,
+					    RW_WRITER);
+					saved_replun_ptr[lun_count].lun_found
+					    = B_TRUE;
 					break;
 				}
 			}
@@ -1935,14 +1970,14 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 			 * not exist anymore, need to offline this lun
 			 */
 
-			DTRACE_PROBE2(sess_reportluns_lun_no_longer_exists,
+			DTRACE_PROBE2(
+			    sess_reportluns_lun_no_longer_exists,
 			    int, ilp->lun_num, int, ilp->lun_state);
 
 			(void) iscsi_lun_destroy(ihp, ilp);
 		}
 	}
 	rw_exit(&isp->sess_lun_list_rwlock);
-
 	/*
 	 * look for new luns that we found in the SCSI Report Lun buffer that
 	 * we did not have in the sess->lun_list and add them into the list
@@ -1968,6 +2003,8 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 				continue;
 			}
 			lun_num = saved_replun_ptr[lun_count].lun_num;
+			lun_addr_type =
+			    saved_replun_ptr[lun_count].lun_addr_type;
 		}
 
 
@@ -1982,16 +2019,19 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 
 		if (ilp == NULL) {
 			/* new lun found, add this lun */
-			iscsi_sess_inquiry(isp, lun_num, lun_addr_type);
+			iscsi_sess_inquiry(isp, lun_num, lun_addr_type,
+			    event_count, NULL);
 		} else {
 			cmn_err(CE_NOTE,
 			    "!Duplicate Lun Number(%d) recieved from "
 			    "Target(%s)", lun_num, isp->sess_name);
 		}
 	}
-
-	kmem_free(buf, buf_len);
+	if (buf != NULL) {
+		kmem_free(buf, buf_len);
+	}
 	kmem_free(saved_replun_ptr, lun_total * sizeof (replun_data_t));
+
 	return (rval);
 }
 
@@ -2000,17 +2040,29 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 
 /*
  * iscsi_sess_inquiry - Final processing of a LUN before we create a tgt
- * mapping.  We need to collect the stardard inquiry page and the
+ * mapping, if necessary the old lun will be deleted.
+ *
+ * We need to collect the stardard inquiry page and the
  * vendor identification page for this LUN.  If both of these are
  * successful and the identification page contains a NAA or EUI type
  * we will continue.  Otherwise we fail the creation of a tgt for
  * this LUN.
  *
- * The GUID creation in this function will be removed
- * we are pushing to have all this GUID code somewhere else.
+ * Keep the old lun unchanged if it is online and following things are
+ * match, lun_addr_type, lun_type, and lun_guid.
+ *
+ * Online the old lun if it is offline/invalid and those three things
+ * are match.
+ *
+ * Online a new lun if the old lun is offline and any of those three things
+ * is not match, and needs to destroy the old first.
+ *
+ * Destroy the old lun and online the new lun if the old is online/invalid
+ * and any of those three things is not match, and then online the new lun
  */
 static void
-iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type)
+iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
+    uint32_t event_count, iscsi_lun_t *ilp)
 {
 	iscsi_status_t		rval;
 	struct uscsi_cmd	ucmd;
@@ -2022,12 +2074,49 @@ iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type)
 	int			retries;
 	ddi_devid_t		devid;
 	char			*guid = NULL;
+	iscsi_hba_t		*ihp;
+	iscsi_status_t		status = ISCSI_STATUS_SUCCESS;
+	boolean_t		inq_ready = B_FALSE;
+	boolean_t		inq83_ready = B_FALSE;
+	boolean_t		nochange = B_FALSE;
+	uchar_t			lun_type;
 
 	ASSERT(isp != NULL);
+	ihp	= isp->sess_hba;
+	ASSERT(ihp != NULL);
 
 	inq	= kmem_zalloc(ISCSI_MAX_INQUIRY_BUF_SIZE, KM_SLEEP);
 	inq83	= kmem_zalloc(ISCSI_MAX_INQUIRY_BUF_SIZE, KM_SLEEP);
 
+	if (ilp == NULL) {
+		/* easy case, just to create the new lun */
+		goto sess_inq;
+	}
+
+	if (ilp->lun_addr_type != lun_addr_type) {
+		goto offline_old;
+	}
+
+	goto sess_inq;
+
+offline_old:
+	if (isp->sess_state_event_count != event_count) {
+		goto inq_done;
+	}
+
+	status = iscsi_lun_destroy(ihp, ilp);
+	if (status != ISCSI_STATUS_SUCCESS) {
+		/* have to abort the process */
+		cmn_err(CE_WARN, "iscsi session(%u) is unable to offline"
+		    " obsolete logical unit %d", isp->sess_oid, lun_num);
+		goto inq_done;
+	}
+	ilp = NULL;
+
+sess_inq:
+	if (inq_ready == B_TRUE) {
+		goto sess_inq83;
+	}
 	/*
 	 * STANDARD INQUIRY - We need the standard inquiry information
 	 * to feed into the scsi_hba_nodename_compatible_get function.
@@ -2048,7 +2137,8 @@ iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type)
 
 	/* Attempt to get inquiry information until successful or retries */
 	retries = 0;
-	do {
+	while ((retries++ < ISCSI_MAX_INQUIRY_RETRIES) &&
+	    (isp->sess_state_event_count == event_count)) {
 		/* issue passthru */
 		rval = iscsi_handle_passthru(isp, lun_num, &ucmd);
 
@@ -2065,7 +2155,7 @@ iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type)
 		}
 
 		/* loop until we are successful or retries run out */
-	} while (retries++ < ISCSI_MAX_INQUIRY_RETRIES);
+	}
 
 	/* If failed don't continue */
 	if (!ISCSI_SUCCESS(rval)) {
@@ -2075,14 +2165,32 @@ iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type)
 
 		goto inq_done;
 	}
+	inq_ready = B_TRUE;
 
+sess_inq83:
 	/*
 	 * T-10 SPC Section 6.4.2.  Standard INQUIRY Peripheral
 	 * qualifier of 000b is the only type we should attempt
 	 * to plumb under the IO stack.
 	 */
 	if ((inq[0] & SCSI_INQUIRY_PQUAL_MASK) != 0x00) {
+		/* shouldn't enumerate, destroy the old one if exists */
+		if (ilp != NULL) {
+			goto offline_old;
+		}
 		goto inq_done;
+	}
+
+	/*
+	 * If lun type has changed
+	 */
+	lun_type = ((struct scsi_inquiry *)inq)->inq_dtype & DTYPE_MASK;
+	if ((ilp != NULL) && (ilp->lun_type != lun_type)) {
+		goto offline_old;
+	}
+
+	if (inq83_ready == B_TRUE) {
+		goto guid_ready;
 	}
 
 	/*
@@ -2106,7 +2214,8 @@ iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type)
 
 	/* Attempt to get inquiry information until successful or retries */
 	retries = 0;
-	do {
+	while ((retries++ < ISCSI_MAX_INQUIRY_RETRIES) &&
+	    (isp->sess_state_event_count == event_count)) {
 		/* issue passthru command */
 		rval = iscsi_handle_passthru(isp, lun_num, &ucmd);
 
@@ -2122,8 +2231,7 @@ iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type)
 			    ucmd.uscsi_resid;
 			break;
 		}
-
-	} while (retries++ < ISCSI_MAX_INQUIRY_RETRIES);
+	}
 
 	/*
 	 * If we were successful collecting page 83 data attempt
@@ -2145,16 +2253,44 @@ iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type)
 			ddi_devid_free(devid);
 		}
 	}
+	inq83_ready = B_TRUE;
 
-	rval = iscsi_lun_create(isp, lun_num, lun_addr_type,
-	    (struct scsi_inquiry *)inq, guid);
+guid_ready:
 
-	if (guid != NULL) {
-		/* guid no longer needed */
-		ddi_devid_free_guid(guid);
+	if (ilp != NULL) {
+		if ((guid == NULL) && (ilp->lun_guid == NULL)) {
+			nochange = B_TRUE;
+		}
+
+		if ((guid != NULL) && (ilp->lun_guid != NULL) &&
+		    ((strlen(guid) + 1) == ilp->lun_guid_size) &&
+		    (bcmp(guid, ilp->lun_guid, ilp->lun_guid_size) == 0)) {
+			nochange = B_TRUE;
+		}
+
+		if (nochange != B_TRUE) {
+			goto offline_old;
+		}
+
+		if (ilp->lun_state & (ISCSI_LUN_STATE_OFFLINE |
+		    ISCSI_LUN_STATE_INVALID)) {
+			if (isp->sess_state_event_count == event_count) {
+				(void) iscsi_lun_online(ihp, ilp);
+			}
+		}
+	} else {
+		if (isp->sess_state_event_count == event_count) {
+			(void) iscsi_lun_create(isp, lun_num, lun_addr_type,
+			    (struct scsi_inquiry *)inq, guid);
+		}
 	}
 
 inq_done:
+	if (guid != NULL) {
+		/* guid is no longer needed */
+		ddi_devid_free_guid(guid);
+	}
+
 	/* free up memory now that we are done */
 	kmem_free(inq, ISCSI_MAX_INQUIRY_BUF_SIZE);
 	kmem_free(inq83, ISCSI_MAX_INQUIRY_BUF_SIZE);
@@ -2219,7 +2355,6 @@ iscsi_sess_flush(iscsi_sess_t *isp)
 	mutex_enter(&isp->sess_queue_pending.mutex);
 	icmdp = isp->sess_queue_pending.head;
 	while (icmdp != NULL) {
-
 		if (isp->sess_state == ISCSI_SESS_STATE_FAILED) {
 			mutex_enter(&icmdp->cmd_mutex);
 			if (icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI) {
@@ -2319,4 +2454,103 @@ iscsi_sess_update_busy_luns(iscsi_sess_t *isp, boolean_t clear)
 		ilp = ilp->lun_next;
 	}
 	rw_exit(&isp->sess_lun_list_rwlock);
+}
+
+/*
+ * Submits the scsi enumeration request. Returns
+ * ISCSI_SESS_ENUM_SUBMITTED upon success, or others if failures are met.
+ * If the request is submitted and the wait is set to B_TRUE, the caller
+ * must call iscsi_sess_enum_query at a later time to unblock next enum
+ */
+iscsi_enum_result_t
+iscsi_sess_enum_request(iscsi_sess_t *isp, boolean_t wait,
+    uint32_t event_count) {
+	iscsi_task_t		*itp;
+
+	itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
+	itp->t_arg = isp;
+	itp->t_event_count = event_count;
+
+	mutex_enter(&isp->sess_enum_lock);
+	while ((isp->sess_enum_status != ISCSI_SESS_ENUM_FREE) &&
+	    (isp->sess_enum_status != ISCSI_SESS_ENUM_INPROG)) {
+		cv_wait(&isp->sess_enum_cv, &isp->sess_enum_lock);
+	}
+	if (isp->sess_enum_status == ISCSI_SESS_ENUM_INPROG) {
+		/* easy case */
+		if (wait == B_TRUE) {
+			isp->sess_enum_result_count ++;
+		}
+		mutex_exit(&isp->sess_enum_lock);
+		kmem_free(itp, sizeof (iscsi_task_t));
+		return (ISCSI_SESS_ENUM_SUBMITTED);
+	}
+
+	ASSERT(isp->sess_enum_status == ISCSI_SESS_ENUM_FREE);
+	ASSERT(isp->sess_enum_result_count == 0);
+
+	isp->sess_enum_status = ISCSI_SESS_ENUM_INPROG;
+	if (ddi_taskq_dispatch(isp->sess_enum_taskq,
+	    iscsi_sess_enumeration, itp, DDI_SLEEP) != DDI_SUCCESS) {
+		isp->sess_enum_status = ISCSI_SESS_ENUM_FREE;
+		mutex_exit(&isp->sess_enum_lock);
+		kmem_free(itp, sizeof (iscsi_task_t));
+		return (ISCSI_SESS_ENUM_SUBFAIL);
+	}
+	if (wait == B_TRUE) {
+		isp->sess_enum_result_count ++;
+	}
+	mutex_exit(&isp->sess_enum_lock);
+	return (ISCSI_SESS_ENUM_SUBMITTED);
+}
+
+/*
+ * Wait and query the result of the enumeration.
+ * The last caller is responsible for kicking off the DONE status
+ */
+iscsi_enum_result_t
+iscsi_sess_enum_query(iscsi_sess_t *isp) {
+	iscsi_enum_result_t	ret = ISCSI_SESS_ENUM_IOFAIL;
+
+	mutex_enter(&isp->sess_enum_lock);
+	while (isp->sess_enum_status != ISCSI_SESS_ENUM_DONE) {
+		cv_wait(&isp->sess_enum_cv, &isp->sess_enum_lock);
+	}
+	ret = isp->sess_enum_result;
+	isp->sess_enum_result_count --;
+	if (isp->sess_enum_result_count == 0) {
+		isp->sess_enum_status = ISCSI_SESS_ENUM_FREE;
+		cv_broadcast(&isp->sess_enum_cv);
+	}
+	mutex_exit(&isp->sess_enum_lock);
+
+	return (ret);
+}
+
+static void
+iscsi_sess_enum_warn(iscsi_sess_t *isp, iscsi_enum_result_t r) {
+	cmn_err(CE_WARN, "iscsi session (%u) enumeration fails - %s",
+	    isp->sess_oid, iscsi_sess_enum_warn_msgs[r]);
+}
+
+void
+iscsi_sess_enter_state_zone(iscsi_sess_t *isp) {
+	mutex_enter(&isp->sess_state_wmutex);
+	while (isp->sess_state_hasw == B_TRUE) {
+		cv_wait(&isp->sess_state_wcv, &isp->sess_state_wmutex);
+	}
+	isp->sess_state_hasw = B_TRUE;
+	mutex_exit(&isp->sess_state_wmutex);
+
+	rw_enter(&isp->sess_state_rwlock, RW_WRITER);
+}
+
+void
+iscsi_sess_exit_state_zone(iscsi_sess_t *isp) {
+	rw_exit(&isp->sess_state_rwlock);
+
+	mutex_enter(&isp->sess_state_wmutex);
+	isp->sess_state_hasw = B_FALSE;
+	cv_signal(&isp->sess_state_wcv);
+	mutex_exit(&isp->sess_state_wmutex);
 }

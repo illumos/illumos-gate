@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2206,6 +2205,7 @@ iscsi_reconfig_boot_sess(iscsi_hba_t *ihp)
 	int			isid, size;
 	char			*name;
 	boolean_t		rtn = B_TRUE;
+	uint32_t		event_count;
 
 	if (iscsiboot_prop == NULL) {
 		return (B_FALSE);
@@ -2277,10 +2277,13 @@ iscsi_reconfig_boot_sess(iscsi_hba_t *ihp)
 					 * couldn't destroy stale sessions
 					 * at least poke it to disconnect
 					 */
-					mutex_enter(&isp->sess_state_mutex);
+					event_count = atomic_inc_32_nv(
+					    &isp->sess_state_event_count);
+					iscsi_sess_enter_state_zone(isp);
 					iscsi_sess_state_machine(isp,
-					    ISCSI_SESS_EVENT_N7);
-					mutex_exit(&isp->sess_state_mutex);
+					    ISCSI_SESS_EVENT_N7, event_count);
+					iscsi_sess_exit_state_zone(isp);
+
 					isp = isp->sess_next;
 					cmn_err(CE_NOTE, "session(%s) - "
 					    "failed to setup multiple"

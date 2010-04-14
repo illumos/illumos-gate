@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * iSCSI connection interfaces
  */
@@ -387,6 +386,7 @@ iscsi_client_notify(idm_conn_t *ic, idm_client_notify_t icn, uintptr_t data)
 	iscsi_cn_task_t		*cn;
 	iscsi_conn_t		*icp = ic->ic_handle;
 	iscsi_sess_t		*isp;
+	uint32_t		event_count;
 
 	/*
 	 * Don't access icp if the notification is CN_CONNECT_DESTROY
@@ -462,10 +462,13 @@ iscsi_client_notify(idm_conn_t *ic, idm_client_notify_t icn, uintptr_t data)
 		cmn_err(CE_WARN, "iscsi connection(%u) failure - "
 		    "unable to schedule notify task", icp->conn_oid);
 		iscsi_conn_update_state(icp, ISCSI_CONN_STATE_FREE);
-		mutex_enter(&isp->sess_state_mutex);
+		event_count = atomic_inc_32_nv(&isp->sess_state_event_count);
+		iscsi_sess_enter_state_zone(isp);
+
 		iscsi_sess_state_machine(isp,
-		    ISCSI_SESS_EVENT_N6);
-		mutex_exit(&isp->sess_state_mutex);
+		    ISCSI_SESS_EVENT_N6, event_count);
+
+		iscsi_sess_exit_state_zone(isp);
 	}
 
 	return (IDM_STATUS_SUCCESS);
@@ -482,6 +485,7 @@ iscsi_client_notify_task(void *cn_task_void)
 	uintptr_t		data;
 	idm_ffp_disable_t	disable_type;
 	boolean_t		in_login;
+	uint32_t		event_count;
 
 	ic = cn_task->ct_ic;
 	icn = cn_task->ct_icn;
@@ -596,19 +600,29 @@ iscsi_client_notify_task(void *cn_task_void)
 		 */
 		mutex_enter(&icp->conn_state_mutex);
 		if (icp->conn_state != ISCSI_CONN_STATE_FAILED) {
+			mutex_exit(&icp->conn_state_mutex);
+			event_count = atomic_inc_32_nv(
+			    &isp->sess_state_event_count);
+			iscsi_sess_enter_state_zone(isp);
 
-			mutex_enter(&isp->sess_state_mutex);
-			iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N3);
-			mutex_exit(&isp->sess_state_mutex);
+			iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N3,
+			    event_count);
 
+			iscsi_sess_exit_state_zone(isp);
+
+			mutex_enter(&icp->conn_state_mutex);
 			iscsi_conn_update_state_locked(icp,
 			    ISCSI_CONN_STATE_FREE);
 		} else {
+			mutex_exit(&icp->conn_state_mutex);
+			event_count = atomic_inc_32_nv(
+			    &isp->sess_state_event_count);
+			iscsi_sess_enter_state_zone(isp);
 
-			mutex_enter(&isp->sess_state_mutex);
 			iscsi_sess_state_machine(isp,
-			    ISCSI_SESS_EVENT_N5);
-			mutex_exit(&isp->sess_state_mutex);
+			    ISCSI_SESS_EVENT_N5, event_count);
+
+			iscsi_sess_exit_state_zone(isp);
 
 			/*
 			 * If session type is NORMAL, try to reestablish the
@@ -617,13 +631,18 @@ iscsi_client_notify_task(void *cn_task_void)
 			if ((isp->sess_type == ISCSI_SESS_TYPE_NORMAL) &&
 			    !(ISCSI_LOGIN_TPGT_NEGO_ERROR(icp))) {
 				iscsi_conn_retry(isp, icp);
+				mutex_enter(&icp->conn_state_mutex);
 			} else {
+				event_count = atomic_inc_32_nv(
+				    &isp->sess_state_event_count);
+				iscsi_sess_enter_state_zone(isp);
 
-				mutex_enter(&isp->sess_state_mutex);
 				iscsi_sess_state_machine(isp,
-				    ISCSI_SESS_EVENT_N6);
-				mutex_exit(&isp->sess_state_mutex);
+				    ISCSI_SESS_EVENT_N6, event_count);
 
+				iscsi_sess_exit_state_zone(isp);
+
+				mutex_enter(&icp->conn_state_mutex);
 				iscsi_conn_update_state_locked(icp,
 				    ISCSI_CONN_STATE_FREE);
 			}
@@ -1003,6 +1022,7 @@ void
 iscsi_conn_retry(iscsi_sess_t *isp, iscsi_conn_t *icp)
 {
 	iscsi_task_t *itp;
+	uint32_t event_count;
 
 	ASSERT(isp != NULL);
 	ASSERT(icp != NULL);
@@ -1028,7 +1048,7 @@ iscsi_conn_retry(iscsi_sess_t *isp, iscsi_conn_t *icp)
 	itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
 	itp->t_arg = icp;
 	itp->t_blocking = B_FALSE;
-	if (ddi_taskq_dispatch(isp->sess_taskq,
+	if (ddi_taskq_dispatch(isp->sess_login_taskq,
 	    (void(*)())iscsi_login_start, itp, DDI_SLEEP) !=
 	    DDI_SUCCESS) {
 		kmem_free(itp, sizeof (iscsi_task_t));
@@ -1036,10 +1056,14 @@ iscsi_conn_retry(iscsi_sess_t *isp, iscsi_conn_t *icp)
 		    "unable to schedule login task", icp->conn_oid);
 
 		iscsi_conn_update_state(icp, ISCSI_CONN_STATE_FREE);
-		mutex_enter(&isp->sess_state_mutex);
+		event_count = atomic_inc_32_nv(
+		    &isp->sess_state_event_count);
+		iscsi_sess_enter_state_zone(isp);
+
 		iscsi_sess_state_machine(isp,
-		    ISCSI_SESS_EVENT_N6);
-		mutex_exit(&isp->sess_state_mutex);
+		    ISCSI_SESS_EVENT_N6, event_count);
+
+		iscsi_sess_exit_state_zone(isp);
 	}
 }
 

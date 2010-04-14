@@ -20,8 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * iSCSI Software Initiator
  */
@@ -933,9 +932,20 @@ iscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 * all connections are down and retries have
 	 * been exhausted.  Fail command with fatal error.
 	 */
-	mutex_enter(&isp->sess_state_mutex);
+	rw_enter(&isp->sess_state_rwlock, RW_READER);
 	if (isp->sess_state == ISCSI_SESS_STATE_FREE) {
-		mutex_exit(&isp->sess_state_mutex);
+		rw_exit(&isp->sess_state_rwlock);
+		return (TRAN_FATAL_ERROR);
+	}
+
+	/*
+	 * If we haven't received data from the target in the
+	 * max specified period something is wrong with the
+	 * transport.  Fail IO with FATAL_ERROR.
+	 */
+	if (isp->sess_rx_lbolt + SEC_TO_TICK(iscsi_rx_max_window) <
+	    ddi_get_lbolt()) {
+		rw_exit(&isp->sess_state_rwlock);
 		return (TRAN_FATAL_ERROR);
 	}
 
@@ -947,19 +957,8 @@ iscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 * exhausted the state machine will move us to FREE.
 	 */
 	if (isp->sess_state != ISCSI_SESS_STATE_LOGGED_IN) {
-		mutex_exit(&isp->sess_state_mutex);
+		rw_exit(&isp->sess_state_rwlock);
 		return (TRAN_BUSY);
-	}
-
-	/*
-	 * If we haven't received data from the target in the
-	 * max specified period something is wrong with the
-	 * transport.  Fail IO with FATAL_ERROR.
-	 */
-	if (isp->sess_rx_lbolt + SEC_TO_TICK(iscsi_rx_max_window) <
-	    ddi_get_lbolt()) {
-		mutex_exit(&isp->sess_state_mutex);
-		return (TRAN_FATAL_ERROR);
 	}
 
 	/*
@@ -970,7 +969,7 @@ iscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 */
 	if (isp->sess_rx_lbolt + SEC_TO_TICK(iscsi_rx_window) <
 	    ddi_get_lbolt()) {
-		mutex_exit(&isp->sess_state_mutex);
+		rw_exit(&isp->sess_state_rwlock);
 		return (TRAN_BUSY);
 	}
 
@@ -987,7 +986,7 @@ iscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	mutex_enter(&isp->sess_queue_pending.mutex);
 	iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E1, isp);
 	mutex_exit(&isp->sess_queue_pending.mutex);
-	mutex_exit(&isp->sess_state_mutex);
+	rw_exit(&isp->sess_state_rwlock);
 
 	/*
 	 * If this packet doesn't have FLAG_NOINTR set, it could have
@@ -1513,6 +1512,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	boolean_t		discovered = B_TRUE;
 	iscsi_tunable_object_t	*tpsg;
 	iscsi_tunable_object_t	*tpss;
+	iscsi_reen_t	*reenum;
 
 	instance = getminor(dev);
 	ihp = (iscsi_hba_t *)ddi_get_soft_state(iscsi_state, instance);
@@ -2008,6 +2008,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 						}
 						isp = ihp->hba_sess_list;
 					} else {
+						uint32_t event_count;
 						/*
 						 * Reset the session
 						 * parameters.
@@ -2029,12 +2030,18 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 						 * login parameters have
 						 * changed.
 						 */
-						mutex_enter(&isp->
-						    sess_state_mutex);
+						event_count = atomic_inc_32_nv(
+						    &isp->
+						    sess_state_event_count);
+						iscsi_sess_enter_state_zone(
+						    isp);
+
 						iscsi_sess_state_machine(isp,
-						    ISCSI_SESS_EVENT_N7);
-						mutex_exit(&isp->
-						    sess_state_mutex);
+						    ISCSI_SESS_EVENT_N7,
+						    event_count);
+
+						iscsi_sess_exit_state_zone(
+						    isp);
 					}
 				}
 			}
@@ -4444,6 +4451,47 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		}
 
 		rtn = iscsi_ioctl_copyout(bootProp, size, (caddr_t)arg, mode);
+		break;
+
+	case ISCSI_TARGET_REENUM:
+		size = sizeof (iscsi_reen_t);
+		reenum = (iscsi_reen_t *)kmem_alloc(size, KM_SLEEP);
+
+		if (ddi_copyin((caddr_t)arg, reenum, size, mode) != 0) {
+			rtn = EFAULT;
+			kmem_free(reenum, size);
+			break;
+		}
+		if (reenum->re_ver != ISCSI_INTERFACE_VERSION) {
+			rtn = EINVAL;
+			kmem_free(reenum, size);
+			break;
+		}
+		rw_enter(&ihp->hba_sess_list_rwlock, RW_READER);
+		rtn = iscsi_sess_get(reenum->re_oid, ihp, &isp);
+		if (rtn != 0) {
+			rtn = iscsi_sess_get_by_target(
+			    reenum->re_oid, ihp, &isp);
+		}
+
+		if (rtn != 0) {
+			rw_exit(&ihp->hba_sess_list_rwlock);
+			kmem_free(reenum, size);
+			break;
+		}
+		kmem_free(reenum, size);
+		if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+			rw_enter(&isp->sess_state_rwlock, RW_READER);
+			if ((isp->sess_state ==
+			    ISCSI_SESS_STATE_LOGGED_IN) &&
+			    (iscsi_sess_enum_request(isp, B_TRUE,
+			    isp->sess_state_event_count)
+			    == ISCSI_SESS_ENUM_SUBMITTED)) {
+				(void) iscsi_sess_enum_query(isp);
+			}
+			rw_exit(&isp->sess_state_rwlock);
+		}
+		rw_exit(&ihp->hba_sess_list_rwlock);
 		break;
 
 	case ISCSI_TUNABLE_PARAM_SET:

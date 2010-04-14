@@ -20,8 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _ISCSI_H
@@ -87,6 +86,7 @@ extern boolean_t iscsi_sess_logging;
 #define	ISCSI_SESS_IOTH_NAME_FORMAT		"io_thrd_%d.%d"
 #define	ISCSI_SESS_WD_NAME_FORMAT		"wd_thrd_%d.%d"
 #define	ISCSI_SESS_LOGIN_TASKQ_NAME_FORMAT	"login_taskq_%d.%d"
+#define	ISCSI_SESS_ENUM_TASKQ_NAME_FORMAT	"enum_taskq_%d.%d"
 #define	ISCSI_CONN_CN_TASKQ_NAME_FORMAT		"conn_cn_taskq_%d.%d.%d"
 #define	ISCSI_CONN_RXTH_NAME_FORMAT		"rx_thrd_%d.%d.%d"
 #define	ISCSI_CONN_TXTH_NAME_FORMAT		"tx_thrd_%d.%d.%d"
@@ -293,6 +293,7 @@ typedef struct iscsi_auth {
 typedef struct iscsi_task {
 	void			*t_arg;
 	boolean_t		t_blocking;
+	uint32_t		t_event_count;
 } iscsi_task_t;
 
 /*
@@ -556,6 +557,9 @@ typedef struct iscsi_lun {
 #define	ISCSI_LUN_CAP_RESET	    0x01
 
 #define	ISCSI_SCSI_RESET_SENSE_CODE 0x29
+#define	ISCSI_SCSI_LUNCHANGED_CODE	0x3f
+
+#define	ISCSI_SCSI_LUNCHANGED_ASCQ	0x0e
 
 /*
  *
@@ -824,6 +828,22 @@ typedef enum iscsi_sess_type {
 #define	ISCSI_DEFAULT_SESS_BOUND	B_FALSE
 #define	ISCSI_DEFAULT_SESS_NUM		1
 
+typedef enum iscsi_enum_status {
+	ISCSI_SESS_ENUM_FREE		=	0,
+	ISCSI_SESS_ENUM_INPROG,
+	ISCSI_SESS_ENUM_DONE
+} iscsi_enum_status_t;
+
+typedef enum iscsi_enum_result {
+	ISCSI_SESS_ENUM_COMPLETE	=	0,
+	ISCSI_SESS_ENUM_PARTIAL,
+	ISCSI_SESS_ENUM_IOFAIL,
+	ISCSI_SESS_ENUM_SUBMITTED,
+	ISCSI_SESS_ENUM_SUBFAIL,
+	ISCSI_SESS_ENUM_GONE,
+	ISCSI_SESS_ENUM_TUR_FAIL
+} iscsi_enum_result_t;
+
 /*
  * iSCSI Session(Target) Structure
  */
@@ -834,7 +854,7 @@ typedef struct iscsi_sess {
 	iscsi_sess_state_t	sess_prev_state;
 	clock_t			sess_state_lbolt;
 	/* protects the session state and synchronizes the state machine */
-	kmutex_t		sess_state_mutex;
+	krwlock_t		sess_state_rwlock;
 
 	/*
 	 * Associated target OID.
@@ -984,9 +1004,7 @@ typedef struct iscsi_sess {
 	boolean_t		sess_boot;
 	iscsi_sess_type_t	sess_type;
 
-	boolean_t		sess_enum_in_progress;
-
-	ddi_taskq_t		*sess_taskq;
+	ddi_taskq_t		*sess_login_taskq;
 
 	iscsi_thread_t		*sess_wd_thread;
 
@@ -997,6 +1015,19 @@ typedef struct iscsi_sess {
 	boolean_t		sess_reset_in_progress;
 
 	boolean_t		sess_boot_nic_reset;
+	kmutex_t		sess_enum_lock;
+	kcondvar_t		sess_enum_cv;
+	iscsi_enum_status_t	sess_enum_status;
+	iscsi_enum_result_t	sess_enum_result;
+	uint32_t		sess_enum_result_count;
+	ddi_taskq_t		*sess_enum_taskq;
+
+	kmutex_t		sess_state_wmutex;
+	kcondvar_t		sess_state_wcv;
+	boolean_t		sess_state_hasw;
+
+	/* to accelerate the state change in case of new event */
+	volatile uint32_t	sess_state_event_count;
 } iscsi_sess_t;
 
 /*
@@ -1260,7 +1291,8 @@ iscsi_sess_t *iscsi_sess_create(iscsi_hba_t *ihp,
 void iscsi_sess_online(void *arg);
 int iscsi_sess_get(uint32_t oid, iscsi_hba_t *ihp, iscsi_sess_t **ispp);
 iscsi_status_t iscsi_sess_destroy(iscsi_sess_t *isp);
-void iscsi_sess_state_machine(iscsi_sess_t *isp, iscsi_sess_event_t event);
+void iscsi_sess_state_machine(iscsi_sess_t *isp, iscsi_sess_event_t event,
+    uint32_t event_count);
 char *iscsi_sess_state_str(iscsi_sess_state_t state);
 boolean_t iscsi_sess_set_auth(iscsi_sess_t *isp);
 iscsi_status_t iscsi_sess_reserve_scsi_itt(iscsi_cmd_t *icmdp);
@@ -1269,8 +1301,12 @@ iscsi_status_t iscsi_sess_reserve_itt(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
 void iscsi_sess_release_itt(iscsi_sess_t *isp, iscsi_cmd_t *icmdp);
 void iscsi_sess_redrive_io(iscsi_sess_t *isp);
 int iscsi_sess_get_by_target(uint32_t target_oid, iscsi_hba_t *ihp,
-	iscsi_sess_t **ispp);
-
+    iscsi_sess_t **ispp);
+iscsi_enum_result_t iscsi_sess_enum_request(iscsi_sess_t *isp,
+    boolean_t wait, uint32_t event_count);
+iscsi_enum_result_t iscsi_sess_enum_query(iscsi_sess_t *isp);
+void iscsi_sess_enter_state_zone(iscsi_sess_t *isp);
+void iscsi_sess_exit_state_zone(iscsi_sess_t *isp);
 
 /* iscsi_conn.c */
 iscsi_status_t iscsi_conn_create(struct sockaddr *addr, iscsi_sess_t *isp,

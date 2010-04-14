@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <arpa/inet.h>
@@ -1326,12 +1325,12 @@ IMA_STATUS SUN_IMA_GetLuProperties(
 			(void) di_devlink_walk(hdl, NULL, minor_path,
 			    DI_PRIMARY_LINK, (void *)&warg, get_lun_devlink);
 			if (devlinkp != NULL) {
-				/* OS device name synchronously made */
 				(void) mbstowcs(pProps->imaProps.osDeviceName,
 				    devlinkp, MAXPATHLEN);
 				free(devlinkp);
 				pProps->imaProps.osDeviceNameValid = IMA_TRUE;
 			} else {
+				/* OS device name is asynchronously made */
 				pProps->imaProps.osDeviceNameValid = IMA_FALSE;
 			}
 
@@ -3215,5 +3214,27 @@ IMA_STATUS SUN_IMA_GetSvcStatus(
 	}
 
 	(void) close(fd);
+	return (IMA_STATUS_SUCCESS);
+}
+
+IMA_STATUS SUN_IMA_ReEnumeration(
+	IMA_OID targetId
+)
+{
+	int		fd;
+	int		status;
+	iscsi_reen_t	reet;
+
+	reet.re_ver = ISCSI_INTERFACE_VERSION;
+	reet.re_oid = (uint32_t)targetId.objectSequenceNumber;
+
+	if ((status = open_driver(&fd))) {
+		return (SUN_IMA_ERROR_SYSTEM_ERROR | status);
+	}
+
+	(void) ioctl(fd, ISCSI_TARGET_REENUM, &reet);
+
+	(void) close(fd);
+
 	return (IMA_STATUS_SUCCESS);
 }
