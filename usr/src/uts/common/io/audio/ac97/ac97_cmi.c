@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -290,7 +289,7 @@ cmi_setup_volume(ac97_t *ac)
 	 * override or fine tune AC'97 controls (i.e. creative cards)
 	 * use these C-Media codecs.
 	 */
-	(void) audio_dev_add_soft_volume(ac_get_dev(ac));
+	audio_dev_add_soft_volume(ac_get_dev(ac));
 }
 
 void

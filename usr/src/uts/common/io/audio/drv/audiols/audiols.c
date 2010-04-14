@@ -20,15 +20,13 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * Purpose: Driver for the Creative Audigy LS sound card
  */
 /*
- *
  * Copyright (C) 4Front Technologies 1996-2009.
  */
 
@@ -1082,7 +1080,7 @@ audigyls_alloc_ctrl(audigyls_dev_t *dev, uint32_t num, uint64_t val)
 static void
 audigyls_add_controls(audigyls_dev_t *dev)
 {
-	(void) audio_dev_add_soft_volume(dev->adev);
+	audio_dev_add_soft_volume(dev->adev);
 
 	audigyls_alloc_ctrl(dev, CTL_FRONT, 75 | (75 << 8));
 	audigyls_alloc_ctrl(dev, CTL_SURROUND, 75 | (75 << 8));

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_AUDIO_CLIENT_H
@@ -113,7 +112,7 @@ audio_stream_t *auclnt_output_stream(audio_client_t *);
 
 int auclnt_get_oflag(audio_client_t *);
 
-int auclnt_open(audio_client_t *, uint_t, int);
+int auclnt_open(audio_client_t *, int);
 void auclnt_close(audio_client_t *);
 
 void auclnt_register_ops(minor_t, audio_client_ops_t *);

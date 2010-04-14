@@ -21,8 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_AUDIO_IMPL_H
@@ -237,7 +236,6 @@ struct audio_stats {
 	kstat_named_t		st_format;
 	kstat_named_t		st_nchan;
 	kstat_named_t		st_rate;
-	kstat_named_t		st_intrs;
 	kstat_named_t		st_errors;
 	kstat_named_t		st_engine_underruns;
 	kstat_named_t		st_engine_overruns;
@@ -286,7 +284,6 @@ struct audio_engine {
 	uint_t			e_fragfr;
 	uint_t			e_playahead;
 
-	int			e_intrs;
 	int			e_errors;
 	int			e_overruns;
 	int			e_underruns;
@@ -323,8 +320,7 @@ struct audio_engine {
 	 * List of of streams attached to this engine.
 	 */
 	list_t			e_streams;
-	int			e_nrunning;
-	int			e_suspended;
+	boolean_t		e_suspended;
 	boolean_t		e_failed;
 
 	boolean_t		e_need_start;
@@ -433,7 +429,12 @@ struct	audio_ctrl {
 /* audio_format.c */
 int auimpl_format_alloc(audio_stream_t *);
 void auimpl_format_free(audio_stream_t *);
-int auimpl_format_setup(audio_stream_t *, audio_parms_t *);
+int auimpl_format_setup(audio_stream_t *, audio_parms_t *, uint_t);
+#define	FORMAT_MSK_NONE		(0x0)
+#define	FORMAT_MSK_FMT		(0x1)
+#define	FORMAT_MSK_RATE		(0x2)
+#define	FORMAT_MSK_CHAN		(0x4)
+#define	FOMMAT_MSK_ALL		(0x7)
 
 /* audio_output.c */
 void auimpl_export_16ne(audio_engine_t *, uint_t, uint_t);
@@ -481,7 +482,8 @@ audio_dev_t *auimpl_dev_hold_by_index(int);
 void auimpl_dev_release(audio_dev_t *);
 int auimpl_choose_format(int);
 
-int auimpl_engine_open(audio_dev_t *, int, int, audio_stream_t *);
+int auimpl_engine_open(audio_stream_t *, int);
+int auimpl_engine_setup(audio_stream_t *, int, audio_parms_t *, uint_t);
 void auimpl_engine_close(audio_stream_t *);
 
 void auimpl_dev_walk_engines(audio_dev_t *,
@@ -502,7 +504,7 @@ void auimpl_dev_vwarn(audio_dev_t *, const char *, va_list);
 #define	ENG_QLEN(e)		E_OP(e, qlen)(E_PRV(e))
 #define	ENG_PLAYAHEAD(e)	E_OP(e, playahead)(E_PRV(e))
 #define	ENG_CLOSE(e)		E_OP(e, close)(E_PRV(e))
-#define	ENG_OPEN(e, nf, d) 	E_OP(e, open)(E_PRV(e), e->e_flags, nf, d)
+#define	ENG_OPEN(e, flg, nf, d) E_OP(e, open)(E_PRV(e), flg, nf, d)
 #define	ENG_CHINFO(e, c, o, i)	E_OP(e, chinfo(E_PRV(e), c, o, i))
 
 /* audio_sun.c */

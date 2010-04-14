@@ -21,8 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -149,7 +148,7 @@ auimpl_input_callback(void *arg)
 
 	mutex_enter(&e->e_lock);
 
-	if (e->e_suspended || e->e_failed) {
+	if (e->e_suspended || e->e_failed || !e->e_periodic) {
 		mutex_exit(&e->e_lock);
 		return;
 	}

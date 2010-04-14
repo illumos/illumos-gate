@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1069,7 +1068,7 @@ devaudio_open(audio_client_t *c, int oflag)
 {
 	int	rv;
 
-	if ((rv = auclnt_open(c, AUDIO_FORMAT_PCM, oflag)) != 0) {
+	if ((rv = auclnt_open(c, oflag)) != 0) {
 		return (rv);
 	}
 
@@ -1095,7 +1094,7 @@ devaudioctl_open(audio_client_t *c, int oflag)
 
 	oflag &= ~(FWRITE | FREAD);
 
-	if ((rv = auclnt_open(c, AUDIO_FORMAT_NONE, 0)) != 0) {
+	if ((rv = auclnt_open(c, 0)) != 0) {
 		return (rv);
 	}
 

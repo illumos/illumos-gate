@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -235,7 +234,7 @@ audio_dev_del_control(audio_ctrl_t *ctrl)
 	kmem_free(ctrl, sizeof (*ctrl));
 }
 
-int
+void
 audio_dev_add_soft_volume(audio_dev_t *d)
 {
 	audio_ctrl_desc_t	desc;
@@ -252,7 +251,6 @@ audio_dev_add_soft_volume(audio_dev_t *d)
 		    auimpl_get_pcmvol, auimpl_set_pcmvol, d);
 		d->d_pcmvol = 75;
 	}
-	return (0);
 }
 
 /*

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Purpose: Driver for CMEDIA CM8738 PCI audio controller.
@@ -585,7 +584,7 @@ static void
 cmpci_add_controls(cmpci_dev_t *dev)
 {
 	if (dev->softvol) {
-		(void) audio_dev_add_soft_volume(dev->adev);
+		audio_dev_add_soft_volume(dev->adev);
 	} else {
 		cmpci_alloc_ctrl(dev, CTL_VOLUME, 75);
 	}

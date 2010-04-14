@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/audio/audio_driver.h>
@@ -1774,7 +1773,7 @@ audiohd_create_controls(audiohd_state_t *statep)
 	/*
 	 * We always use soft volume control to adjust PCM volume.
 	 */
-	(void) audio_dev_add_soft_volume(statep->adev);
+	audio_dev_add_soft_volume(statep->adev);
 
 	/* Allocate other controls */
 	for (i = 0; i < statep->pathnum; i++) {

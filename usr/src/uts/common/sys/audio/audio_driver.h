@@ -21,8 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_AUDIO_AUDIO_DRIVER_H
@@ -165,8 +164,6 @@ void audio_dump_dwords(const uint32_t *w, int dcount);
 
 #define	ENGINE_OUTPUT		(1U << 16)	/* fields not for driver use */
 #define	ENGINE_INPUT		(1U << 17)
-#define	ENGINE_OPEN		(1U << 18)
-#define	ENGINE_RUNNING		(1U << 19)
 #define	ENGINE_EXCLUSIVE	(1U << 20)	/* exclusive use, e.g. AC3 */
 #define	ENGINE_NDELAY		(1U << 21)	/* non-blocking open */
 
@@ -209,7 +206,7 @@ audio_ctrl_t *audio_dev_add_control(audio_dev_t *,
  * result in loss range.  The control is implemented using
  * AUDIO_CTRL_ID_VOLUME.
  */
-int audio_dev_add_soft_volume(audio_dev_t *);
+void audio_dev_add_soft_volume(audio_dev_t *);
 
 /*
  * This will remove a control from an audio device.

@@ -21,8 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -37,6 +36,7 @@
 #include "audio_impl.h"
 #include "audio_grc3.h"
 
+extern uint_t	audio_intrhz;
 
 /*
  * Note: In the function below, the division by the number of channels is
@@ -690,23 +690,45 @@ static const struct audio_format_info {
 };
 
 int
-auimpl_format_setup(audio_stream_t *sp, audio_parms_t *uparms)
+auimpl_format_setup(audio_stream_t *sp, audio_parms_t *parms, uint_t mask)
 {
-	audio_parms_t			*source = &sp->s_cnv_src_parms;
-	audio_parms_t			*target = &sp->s_cnv_dst_parms;
+	audio_parms_t			source;
+	audio_parms_t			target;
+	audio_parms_t			*uparms;
 	audio_cnv_func_t		converter = NULL;
 	const struct audio_format_info	*info;
 	int				expand = AUDIO_UNIT_EXPAND;
 	unsigned			cnv_sampsz = sizeof (uint32_t);
 	unsigned			cnv_max;
+	boolean_t			needsrc = B_FALSE;
 
-	if (sp == &sp->s_client->c_ostream) {
-		source = uparms;
-	} else {
-		target = uparms;
-	}
+	uint_t				framesz;
+	uint_t				fragfr;
+	uint_t				fragbytes;
+	uint_t				nfrags;
 
 	ASSERT(mutex_owned(&sp->s_lock));
+
+	source = sp->s_cnv_src_parms;
+	target = sp->s_cnv_dst_parms;
+
+	if (sp == &sp->s_client->c_ostream) {
+		if (mask & FORMAT_MSK_FMT)
+			source.p_format = parms->p_format;
+		if (mask & FORMAT_MSK_RATE)
+			source.p_rate = parms->p_rate;
+		if (mask & FORMAT_MSK_CHAN)
+			source.p_nchan = parms->p_nchan;
+		uparms = &source;
+	} else {
+		if (mask & FORMAT_MSK_FMT)
+			target.p_format = parms->p_format;
+		if (mask & FORMAT_MSK_RATE)
+			target.p_rate = parms->p_rate;
+		if (mask & FORMAT_MSK_CHAN)
+			target.p_nchan = parms->p_nchan;
+		uparms = &target;
+	}
 
 	/*
 	 * At least one of the source or target are S24_NE.
@@ -714,10 +736,13 @@ auimpl_format_setup(audio_stream_t *sp, audio_parms_t *uparms)
 	 * If we have a signed/native endian format, then pick an
 	 * optimized converter.  While at it, ensure that a valid
 	 * format is selected.
+	 *
+	 * After this function executes, "info" will point to the
+	 * format information for the user parameters.
 	 */
-	if (source->p_format != AUDIO_FORMAT_S24_NE) {
+	if (source.p_format != AUDIO_FORMAT_S24_NE) {
 		for (info = &audio_format_info[0]; info->sampsize; info++) {
-			if (source->p_format == info->format) {
+			if (source.p_format == info->format) {
 				converter = info->from;
 				expand *= sizeof (int32_t);
 				expand /= info->sampsize;
@@ -726,61 +751,55 @@ auimpl_format_setup(audio_stream_t *sp, audio_parms_t *uparms)
 				break;
 			}
 		}
-		if (info->format == AUDIO_FORMAT_NONE) {
-			audio_dev_warn(sp->s_client->c_dev,
-			    "invalid source format selected");
-			return (EINVAL);
-		}
-
-	} else if (target->p_format != AUDIO_FORMAT_S24_NE) {
+	} else {
+		/*
+		 * Target format.  Note that this case is also taken
+		 * if we're operating on S24_NE data.  In that case
+		 * the converter will be NULL and expand will not be
+		 * altered.
+		 */
 		for (info = &audio_format_info[0]; info->sampsize; info++) {
-			if (target->p_format == info->format) {
+			if (target.p_format == info->format) {
 				converter = info->to;
 				expand *= info->sampsize;
 				expand /= sizeof (int32_t);
 				break;
 			}
 		}
-		if (info->format == AUDIO_FORMAT_NONE) {
-			audio_dev_warn(sp->s_client->c_dev,
-			    "invalid target format selected");
-			return (EINVAL);
-		}
+	}
+	if (info->format == AUDIO_FORMAT_NONE) {
+		audio_dev_warn(sp->s_client->c_dev, "invalid format selected");
+		return (EINVAL);
 	}
 
-	if (source->p_nchan != target->p_nchan) {
+
+	ASSERT(info->sampsize);
+
+	if (source.p_nchan != target.p_nchan) {
 		/*
 		 * if channels need conversion, then we must use the
 		 * default.
 		 */
 		converter = cnv_default;
-		expand *= target->p_nchan;
-		expand /= source->p_nchan;
+		expand *= target.p_nchan;
+		expand /= source.p_nchan;
 	}
 
-	if (source->p_rate != target->p_rate) {
-		/*
-		 * We need SRC; if we can avoid data conversion, do so.
-		 */
-		setup_src(sp, source->p_rate, target->p_rate,
-		    source->p_nchan, target->p_nchan);
-
+	if (source.p_rate != target.p_rate) {
+		needsrc = B_TRUE;
 		converter = (converter == NULL) ? cnv_srconly : cnv_default;
 
-		expand *= target->p_rate;
-		expand /= source->p_rate;
+		expand *= target.p_rate;
+		expand /= source.p_rate;
 	}
-
-	ASSERT(sp->s_engine);
-	ASSERT(sp->s_engine->e_intrs);
 
 	/*
 	 * Figure out the size of the conversion buffer we need.  We
 	 * assume room for two full source fragments, which ought to
 	 * be enough, even with rounding errors.
 	 */
-	cnv_max = 2 * (source->p_rate / sp->s_engine->e_intrs) *
-	    cnv_sampsz * source->p_nchan;
+	cnv_max = 2 * (source.p_rate / audio_intrhz) *
+	    cnv_sampsz * source.p_nchan;
 
 	/*
 	 * If the conversion will cause us to expand fragments, then
@@ -793,8 +812,45 @@ auimpl_format_setup(audio_stream_t *sp, audio_parms_t *uparms)
 		cnv_max /= AUDIO_UNIT_EXPAND;
 	}
 
+	framesz = info->sampsize * uparms->p_nchan;
+	fragfr = (uparms->p_rate / audio_intrhz);
+	fragbytes = fragfr * framesz;
+
+	/*
+	 * We need to "tune" the buffer and fragment counts for some
+	 * uses...  OSS applications may like to configure a low
+	 * latency, and they rely upon write() to block to prevent too
+	 * much data from being queued up.
+	 */
+	if (sp->s_hintsz) {
+		nfrags = sp->s_hintsz / fragbytes;
+	} else if (sp->s_hintfrags) {
+		nfrags = sp->s_hintfrags;
+	} else {
+		nfrags = sp->s_allocsz / fragbytes;
+	}
+
+	/*
+	 * Now make sure that the hint works -- we need at least 2 fragments,
+	 * and we need to fit within the room allocated to us.
+	 */
+	if (nfrags < 2) {
+		nfrags = 2;
+	}
+	while ((nfrags * fragbytes) > sp->s_allocsz) {
+		nfrags--;
+	}
+	/* if the resulting configuration is invalid, note it */
+	if (nfrags < 2) {
+		return (EINVAL);
+	}
+
 	/*
 	 * Now we need to allocate space.
+	 *
+	 * NB: Once the allocation succeeds, we must not fail.  We are
+	 * modifying the the stream settings and these changes must be
+	 * made atomically.
 	 */
 	if (sp->s_cnv_max < cnv_max) {
 		uint32_t *buf0, *buf1;
@@ -822,55 +878,19 @@ auimpl_format_setup(audio_stream_t *sp, audio_parms_t *uparms)
 		sp->s_cnv_max = cnv_max;
 	}
 
-	/*
-	 * NB: From here on, we must not fail.
-	 */
-
-	/*
-	 * Configure default fragment setup.
-	 */
-	for (info = &audio_format_info[0]; info->sampsize; info++) {
-		if (uparms->p_format == info->format) {
-			break;
-		}
-	}
-	ASSERT(info->sampsize);
-
-	sp->s_framesz = info->sampsize * uparms->p_nchan;
-	sp->s_fragfr = (uparms->p_rate / sp->s_engine->e_intrs);
-	sp->s_fragbytes = sp->s_fragfr * sp->s_framesz;
-
-	/*
-	 * We need to "tune" the buffer and fragment counts for some
-	 * uses...  OSS applications may like to configure a low
-	 * latency, and they rely upon write() to block to prevent too
-	 * much data from being queued up.
-	 */
-	if (sp->s_hintsz) {
-		sp->s_nfrags = sp->s_hintsz / sp->s_fragbytes;
-	} else if (sp->s_hintfrags) {
-		sp->s_nfrags = sp->s_hintfrags;
-	} else {
-		sp->s_nfrags = sp->s_allocsz / sp->s_fragbytes;
+	/* Set up the SRC state if we will be using SRC. */
+	if (needsrc) {
+		setup_src(sp, source.p_rate, target.p_rate,
+		    source.p_nchan, target.p_nchan);
 	}
 
-	/*
-	 * Now make sure that the hint works -- we need at least 2 fragments,
-	 * and we need to fit within the room allocated to us.
-	 */
-	if (sp->s_nfrags < 2) {
-		sp->s_nfrags = 2;
-	}
-	while ((sp->s_nfrags * sp->s_fragbytes) > sp->s_allocsz) {
-		sp->s_nfrags--;
-	}
-	/* if the resulting configuration is invalid, note it */
-	if (sp->s_nfrags < 2) {
-		return (EINVAL);
-	}
 
-	sp->s_nframes = sp->s_nfrags * sp->s_fragfr;
-	sp->s_nbytes = sp->s_nframes * sp->s_framesz;
+	sp->s_framesz = framesz;
+	sp->s_fragfr = fragfr;
+	sp->s_fragbytes = fragbytes;
+	sp->s_nfrags = nfrags;
+	sp->s_nframes = nfrags * fragfr;
+	sp->s_nbytes = sp->s_nframes * framesz;
 	*sp->s_user_parms = *uparms;
 	sp->s_converter = converter;
 

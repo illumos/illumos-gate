@@ -21,8 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -93,13 +92,10 @@ auclnt_set_rate(audio_stream_t *sp, int rate)
 	if ((rate < 5000) || (rate > 192000)) {
 		return (EINVAL);
 	}
-	mutex_enter(&sp->s_lock);
-	parms = *sp->s_user_parms;
-	if (rate != parms.p_rate) {
+	if (rate != sp->s_user_parms->p_rate) {
 		parms.p_rate = rate;
-		rv = auimpl_format_setup(sp, &parms);
+		rv = auimpl_engine_setup(sp, 0, &parms, FORMAT_MSK_RATE);
 	}
-	mutex_exit(&sp->s_lock);
 	return (rv);
 }
 
@@ -599,16 +595,13 @@ auclnt_set_format(audio_stream_t *sp, int fmt)
 	}
 
 
-	mutex_enter(&sp->s_lock);
-	parms = *sp->s_user_parms;
-
 	/*
 	 * Optimization.  Some personalities send us the same format
 	 * over and over again.  (Sun personality does this
 	 * repeatedly.)  setup_src is potentially expensive, so we
 	 * avoid doing it unless we really need to.
 	 */
-	if (fmt != parms.p_format) {
+	if (fmt != sp->s_user_parms->p_format) {
 		/*
 		 * Note that setting the format doesn't check that the
 		 * audio streams have been paused.  As a result, any
@@ -618,9 +611,8 @@ auclnt_set_format(audio_stream_t *sp, int fmt)
 		 * formats.
 		 */
 		parms.p_format = fmt;
-		rv = auimpl_format_setup(sp, &parms);
+		rv = auimpl_engine_setup(sp, 0, &parms, FORMAT_MSK_FMT);
 	}
-	mutex_exit(&sp->s_lock);
 
 	return (rv);
 }
@@ -654,13 +646,10 @@ auclnt_set_channels(audio_stream_t *sp, int nchan)
 		return (EINVAL);
 	}
 
-	mutex_enter(&sp->s_lock);
-	parms = *sp->s_user_parms;
-	if (nchan != parms.p_nchan) {
+	if (nchan != sp->s_user_parms->p_nchan) {
 		parms.p_nchan = nchan;
-		rv = auimpl_format_setup(sp, &parms);
+		rv = auimpl_engine_setup(sp, 0, &parms, FORMAT_MSK_CHAN);
 	}
-	mutex_exit(&sp->s_lock);
 
 	return (rv);
 }
@@ -1295,13 +1284,12 @@ restart:
 
 
 int
-auclnt_open(audio_client_t *c, uint_t fmts, int oflag)
+auclnt_open(audio_client_t *c, int oflag)
 {
 	audio_stream_t	*sp;
 	audio_dev_t	*d = c->c_dev;
 	int		rv = 0;
 	int		flags;
-	audio_parms_t	parms;
 
 	flags = 0;
 	if (oflag & FNDELAY)
@@ -1309,34 +1297,14 @@ auclnt_open(audio_client_t *c, uint_t fmts, int oflag)
 
 	if (oflag & FWRITE) {
 		sp = &c->c_ostream;
-		rv = auimpl_engine_open(d, fmts, flags | ENGINE_OUTPUT, sp);
-
-		if (rv != 0) {
+		if ((rv = auimpl_engine_open(sp, flags | ENGINE_OUTPUT)) != 0)
 			goto done;
-		}
-		mutex_enter(&sp->s_lock);
-		parms = *sp->s_user_parms;
-		rv = auimpl_format_setup(sp, &parms);
-		mutex_exit(&sp->s_lock);
-		if (rv != 0) {
-			goto done;
-		}
 	}
 
 	if (oflag & FREAD) {
 		sp = &c->c_istream;
-		rv = auimpl_engine_open(d, fmts, flags | ENGINE_INPUT, sp);
-
-		if (rv != 0) {
+		if ((rv = auimpl_engine_open(sp, flags | ENGINE_INPUT)) != 0)
 			goto done;
-		}
-		mutex_enter(&sp->s_lock);
-		parms = *sp->s_user_parms;
-		rv = auimpl_format_setup(sp, &parms);
-		mutex_exit(&sp->s_lock);
-		if (rv != 0) {
-			goto done;
-		}
 	}
 
 done:

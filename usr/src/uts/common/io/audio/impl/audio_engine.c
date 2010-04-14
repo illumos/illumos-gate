@@ -21,8 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -360,46 +359,63 @@ auimpl_choose_format(int fmts)
 }
 
 int
-auimpl_engine_open(audio_dev_t *d, int fmts, int flags, audio_stream_t *sp)
+auimpl_engine_open(audio_stream_t *sp, int flags)
 {
+	return (auimpl_engine_setup(sp, flags, NULL, FORMAT_MSK_NONE));
+}
+
+
+int
+auimpl_engine_setup(audio_stream_t *sp, int flags, audio_parms_t *parms,
+    uint_t mask)
+{
+	audio_dev_t	*d = sp->s_client->c_dev;
 	audio_engine_t	*e = NULL;
+	audio_parms_t	uparms;
 	list_t		*list;
-	uint_t		caps;
+	uint_t		cap;
 	int		priority = 0;
 	int		rv = ENODEV;
 	int		sampsz;
 	int		i;
 	int		fragfr;
+	int		fmts;
 
-	/*
-	 * Engine selection:
-	 *
-	 * We try hard to avoid consuming an engine that can be used
-	 * for another purpose.
-	 *
-	 */
-
-	/*
-	 * Which direction are we opening.  (We must open exactly
-	 * one direction, otherwise the open is meaningless.)
-	 */
-	if (flags & ENGINE_OUTPUT)
-		caps = ENGINE_OUTPUT_CAP;
-	else if (flags & ENGINE_INPUT)
-		caps = ENGINE_INPUT_CAP;
-	else
-		return (EINVAL);
-
-	list = &d->d_engines;
 
 	mutex_enter(&d->d_lock);
 
+	uparms = *sp->s_user_parms;
+	if (mask & FORMAT_MSK_FMT)
+		uparms.p_format = parms->p_format;
+	if (mask & FORMAT_MSK_RATE)
+		uparms.p_rate = parms->p_rate;
+	if (mask & FORMAT_MSK_CHAN)
+		uparms.p_nchan = parms->p_nchan;
+
 	/*
-	 * First we want to know if we already have "default" input
-	 * and output engines.
+	 * Which direction are we opening?  (We must open exactly
+	 * one direction, otherwise the open is meaningless.)
 	 */
 
-	/* if engine suspended, wait for it not to be */
+	if (sp == &sp->s_client->c_ostream) {
+		cap = ENGINE_OUTPUT_CAP;
+		flags |= ENGINE_OUTPUT;
+	} else {
+		cap = ENGINE_INPUT_CAP;
+		flags |= ENGINE_INPUT;
+	}
+
+	if (uparms.p_format == AUDIO_FORMAT_AC3) {
+		fmts = AUDIO_FORMAT_AC3;
+		flags |= ENGINE_EXCLUSIVE;
+	} else {
+		fmts = AUDIO_FORMAT_PCM;
+	}
+
+	list = &d->d_engines;
+
+
+	/* If the device is suspended, wait for it to resume. */
 	while (d->d_suspended) {
 		cv_wait(&d->d_ctrl_cv, &d->d_lock);
 	}
@@ -407,36 +423,72 @@ auimpl_engine_open(audio_dev_t *d, int fmts, int flags, audio_stream_t *sp)
 again:
 
 	for (audio_engine_t *t = list_head(list); t; t = list_next(list, t)) {
-		int	mypri;
+		int		mypri;
+		int		r;
 
-		/* make sure the engine can do what we want it to */
+		/* Make sure the engine can do what we want it to. */
 		mutex_enter(&t->e_lock);
 
-		if ((((t->e_flags & caps) & caps) == 0) ||
-		    ((ENG_FORMAT(t) & fmts) == 0)) {
+		if ((t->e_flags & cap) == 0) {
 			mutex_exit(&t->e_lock);
 			continue;
 		}
 
-		/* if in failed state, don't assign a new stream here */
+		/*
+		 * Open the engine early, as the inquiries to rate and format
+		 * may not be accurate until this is done.
+		 */
+		if (list_is_empty(&t->e_streams)) {
+			if (ENG_OPEN(t, flags, &t->e_nframes, &t->e_data)) {
+				mutex_exit(&t->e_lock);
+				rv = EIO;
+				continue;
+			}
+		}
+
+		if ((ENG_FORMAT(t) & fmts) == 0) {
+			if (list_is_empty(&t->e_streams))
+				ENG_CLOSE(t);
+			mutex_exit(&t->e_lock);
+			continue;
+		}
+
+
+		/* If it is in failed state, don't use this engine. */
 		if (t->e_failed) {
+			if (list_is_empty(&t->e_streams))
+				ENG_CLOSE(t);
 			mutex_exit(&t->e_lock);
-			rv = EIO;
+			rv = rv ? EIO : 0;
 			continue;
 		}
 
-		/* if engine is in exclusive use, can't do it */
-		if (t->e_flags & ENGINE_EXCLUSIVE) {
+		/*
+		 * If the engine is in exclusive use, we can't use it.
+		 * This is intended for use with AC3 or digital
+		 * streams that cannot tolerate mixing.
+		 */
+		if ((t->e_flags & ENGINE_EXCLUSIVE) && (t != sp->s_engine)) {
+			if (list_is_empty(&t->e_streams))
+				ENG_CLOSE(t);
 			mutex_exit(&t->e_lock);
-			rv = EBUSY;
+			rv = rv ? EBUSY : 0;
 			continue;
 		}
 
-		/* if engine is in incompatible use, can't do it */
+		/*
+		 * If the engine is in use incompatibly, we can't use
+		 * it.  This should only happen for half-duplex audio
+		 * devices.  I've not seen any of these that are
+		 * recent enough to be supported by Solaris.
+		 */
 		if (((flags & ENGINE_INPUT) && (t->e_flags & ENGINE_OUTPUT)) ||
 		    ((flags & ENGINE_OUTPUT) && (t->e_flags & ENGINE_INPUT))) {
+			if (list_is_empty(&t->e_streams))
+				ENG_CLOSE(t);
 			mutex_exit(&t->e_lock);
-			rv = EBUSY;
+			/* Only override the ENODEV or EIO. */
+			rv = rv ? EBUSY : 0;
 			continue;
 		}
 
@@ -454,26 +506,99 @@ again:
 		 * results in denying service to any client.
 		 */
 
+		/*
+		 * This engine *can* support us, so we should no longer
+		 * have a failure mode.
+		 */
 		rv = 0;
-		mypri = 2000;
+		mypri = (1U << 0);
 
-		/* try not to pick on idle engines */
-		if (list_is_empty(&t->e_streams)) {
-			mypri -= 1000;
+
+		/*
+		 * Mixing is cheap, so try not to pick on idle
+		 * engines.  This avoids burning bus bandwidth (which
+		 * may be precious for certain classes of traffic).
+		 * Note that idleness is given a low priority compared
+		 * to the other considerations.
+		 *
+		 * We also use this opportunity open the engine, if
+		 * not already done so, so that our parameter
+		 * inquiries will be valid.
+		 */
+		if (!list_is_empty(&t->e_streams))
+			mypri |= (1U << 1);
+
+		/*
+		 * Slight preference is given to reuse an engine that
+		 * we might already be using.
+		 */
+		if (t == sp->s_engine)
+			mypri |= (1U << 2);
+
+
+		/*
+		 * Sample rate conversion avoidance.  Upsampling
+		 * requires multiplications and is moderately
+		 * expensive.  Downsampling requires division and is
+		 * quite expensive, and hence to be avoided if at all
+		 * possible.
+		 */
+		r = ENG_RATE(t);
+		if (uparms.p_rate == r) {
+			/*
+			 * No conversion needed at all.  This is ideal.
+			 */
+			mypri |= (1U << 4) | (1U << 3);
+		} else {
+			int src, dst;
+
+			if (flags & ENGINE_INPUT) {
+				src = r;
+				dst = uparms.p_rate;
+			} else {
+				src = uparms.p_rate;
+				dst = r;
+			}
+			if ((src < dst) && ((dst % src) == 0)) {
+				/*
+				 * Pure upsampling only. This
+				 * penalizes any engine which requires
+				 * downsampling.
+				 */
+				mypri |= (1U << 3);
+			}
 		}
 
-		/* try not to pick on duplex engines first */
-		if ((t->e_flags & ENGINE_CAPS) != caps) {
-			mypri -= 100;
+		/*
+		 * Try not to pick on duplex engines.  This way we
+		 * leave engines that can be used for recording or
+		 * playback available as such.  All modern drivers
+		 * use separate unidirectional engines for playback
+		 * and record.
+		 */
+		if ((t->e_flags & ENGINE_CAPS) == cap) {
+			mypri |= (1U << 5);
 		}
 
-		/* try not to pick on engines that can do other formats */
-		if (t->e_format & ~fmts) {
-			mypri -= 10;
+		/*
+		 * Try not to pick on engines that can do other
+		 * formats.  This will generally be false, but if it
+		 * happens we pretty strongly avoid using a limited
+		 * resource.
+		 */
+		if ((t->e_format & ~fmts) == 0) {
+			mypri |= (1U << 6);
 		}
 
 		if (mypri > priority) {
 			if (e != NULL) {
+				/*
+				 * If we opened this for our own use
+				 * and we are no longer using it, then
+				 * close it back down.
+				 */
+				if (list_is_empty(&e->e_streams))
+					ENG_CLOSE(e);
 				mutex_exit(&e->e_lock);
 			}
 			e = t;
@@ -481,6 +606,11 @@ again:
 		} else {
 			mutex_exit(&t->e_lock);
 		}
+
+		/*
+		 * Locking: at this point, if we have an engine, "e", it is
+		 * locked.  No other engines should have a lock held.
+		 */
 	}
 
 	if ((rv == EBUSY) && ((flags & ENGINE_NDELAY) == 0)) {
@@ -501,13 +631,52 @@ again:
 	ASSERT(e != NULL);
 	ASSERT(mutex_owned(&e->e_lock));
 
-	/*
-	 * If the engine is already open, there is no need for further
-	 * work.  The first open will be relatively expensive, but
-	 * subsequent opens should be as cheap as possible.
-	 */
-	if (!list_is_empty(&e->e_streams)) {
-		rv = 0;
+	if (sp->s_engine && (sp->s_engine != e)) {
+		/*
+		 * If this represents a potential engine change, then
+		 * we close off everything, and start anew. This turns
+		 * out to be vastly simpler than trying to close all
+		 * the races associated with a true hand off.  This
+		 * ought to be relatively uncommon (changing engines).
+		 */
+
+		/* Drop the new reference. */
+		if (list_is_empty(&e->e_streams))
+			ENG_CLOSE(e);
+		mutex_exit(&e->e_lock);
+		mutex_exit(&d->d_lock);
+
+		auimpl_engine_close(sp);
+
+		/* Try again. */
+		return (auimpl_engine_setup(sp, flags, parms, mask));
+	}
+
+	if (sp->s_engine == NULL) {
+		/*
+		 * Add a reference to this engine if we don't already
+		 * have one.
+		 */
+		sp->s_engine = e;
+
+		if (!list_is_empty(&e->e_streams)) {
+			/*
+			 * If the engine is already open, there is no
+			 * need for further work.  The first open will
+			 * be relatively expensive, but subsequent
+			 * opens should be as cheap as possible.
+			 */
+			list_insert_tail(&e->e_streams, sp);
+			goto ok;
+		}
+		list_insert_tail(&e->e_streams, sp);
+
+	} else {
+		ASSERT(sp->s_engine == e);
+		/*
+		 * No change in engine... hence don't reprogram the
+		 * engine, and don't change references.
+		 */
 		goto ok;
 	}
 
@@ -515,7 +684,7 @@ again:
 	e->e_nchan = ENG_CHANNELS(e);
 	e->e_rate = ENG_RATE(e);
 
-	/* Find out the "best" sample format supported by the device */
+	/* Select format converters for the engine. */
 	switch (e->e_format) {
 	case AUDIO_FORMAT_S24_NE:
 		e->e_export = auimpl_export_24ne;
@@ -566,7 +735,7 @@ again:
 		goto done;
 	}
 
-	/* sanity test a few values */
+	/* Sanity test a few values. */
 	if ((e->e_nchan < 0) || (e->e_nchan > AUDIO_MAX_CHANNELS) ||
 	    (e->e_rate < 5000) || (e->e_rate > 192000)) {
 		audio_dev_warn(d, "bad engine channels or rate");
@@ -574,11 +743,6 @@ again:
 		goto done;
 	}
 
-	rv = ENG_OPEN(e, &e->e_nframes, &e->e_data);
-	if (rv != 0) {
-		audio_dev_warn(d, "unable to open engine");
-		goto done;
-	}
 	if ((e->e_nframes <= (fragfr * 2)) || (e->e_data == NULL)) {
 		audio_dev_warn(d, "improper engine configuration");
 		rv = EINVAL;
@@ -586,7 +750,6 @@ again:
 	}
 
 	e->e_framesz = e->e_nchan * sampsz;
-	e->e_intrs = audio_intrhz;
 	e->e_fragfr = fragfr;
 	e->e_head = 0;
 	e->e_tail = 0;
@@ -624,16 +787,7 @@ again:
 		}
 	}
 
-	e->e_flags |= (ENGINE_OPEN | (flags & (ENGINE_OUTPUT | ENGINE_INPUT)));
-
-	/*
-	 * Start the output callback to populate the engine on
-	 * startup.  This avoids a false underrun when we're first
-	 * starting up.
-	 */
-	if (flags & ENGINE_OUTPUT) {
-		auimpl_output_preload(e);
-	}
+	e->e_flags |= flags;
 
 	/*
 	 * Arrange for the engine to be started.  We defer this to the
@@ -646,7 +800,14 @@ again:
 	 */
 	e->e_need_start = B_TRUE;
 
-	if (e->e_flags & ENGINE_OUTPUT) {
+	if (flags & ENGINE_OUTPUT) {
+		/*
+		 * Start the output callback to populate the engine on
+		 * startup.  This avoids a false underrun when we're
+		 * first starting up.
+		 */
+		auimpl_output_preload(e);
+
 		e->e_periodic = ddi_periodic_add(auimpl_output_callback, e,
 		    NANOSEC / audio_intrhz, audio_priority);
 	} else {
@@ -658,12 +819,15 @@ ok:
 	sp->s_phys_parms->p_rate = e->e_rate;
 	sp->s_phys_parms->p_nchan = e->e_nchan;
 
-	list_insert_tail(&e->e_streams, sp);
-	sp->s_engine = e;
+	/* Configure the engine. */
+	mutex_enter(&sp->s_lock);
+	rv = auimpl_format_setup(sp, parms, mask);
+	mutex_exit(&sp->s_lock);
 
 done:
 	mutex_exit(&e->e_lock);
 	mutex_exit(&d->d_lock);
+
 	return (rv);
 }
 
@@ -672,7 +836,6 @@ auimpl_engine_close(audio_stream_t *sp)
 {
 	audio_engine_t	*e = sp->s_engine;
 	audio_dev_t	*d;
-	ddi_periodic_t	p = 0;
 
 	if (e == NULL)
 		return;
@@ -683,21 +846,21 @@ auimpl_engine_close(audio_stream_t *sp)
 	while (d->d_suspended) {
 		cv_wait(&d->d_ctrl_cv, &d->d_lock);
 	}
+
 	mutex_enter(&e->e_lock);
 	sp->s_engine = NULL;
 	list_remove(&e->e_streams, sp);
 	if (list_is_empty(&e->e_streams)) {
 		ENG_STOP(e);
-		p = e->e_periodic;
+		ddi_periodic_delete(e->e_periodic);
+		e->e_periodic = 0;
 		e->e_flags &= ENGINE_DRIVER_FLAGS;
 		ENG_CLOSE(e);
 	}
 	mutex_exit(&e->e_lock);
+
 	cv_broadcast(&d->d_cv);
 	mutex_exit(&d->d_lock);
-	if (p != 0) {
-		ddi_periodic_delete(p);
-	}
 }
 
 int
@@ -813,7 +976,6 @@ auimpl_engine_ksupdate(kstat_t *ksp, int rw)
 	st->st_format.value.ui32 = e->e_format;
 	st->st_nchan.value.ui32 = e->e_nchan;
 	st->st_rate.value.ui32 = e->e_rate;
-	st->st_intrs.value.ui32 = e->e_intrs;
 	st->st_errors.value.ui32 = e->e_errors;
 	st->st_engine_underruns.value.ui32 = e->e_underruns;
 	st->st_engine_overruns.value.ui32 = e->e_overruns;
@@ -859,7 +1021,6 @@ auimpl_engine_ksinit(audio_dev_t *d, audio_engine_t *e)
 	kstat_named_init(&st->st_format, "format", KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_nchan, "channels", KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_rate, "rate", KSTAT_DATA_UINT32);
-	kstat_named_init(&st->st_intrs, "intrhz", KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_errors, "errors", KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_engine_overruns, "engine_overruns",
 	    KSTAT_DATA_UINT32);
