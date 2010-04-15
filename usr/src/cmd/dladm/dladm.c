@@ -9531,8 +9531,7 @@ do_create_part(int argc, char *argv[], const char *use)
 			 * The P_Key is expected to be a hexadecimal number.
 			 */
 			pkey = strtoul(optarg, &endp, 16);
-			if (errno == ERANGE || pkey > USHRT_MAX ||
-			    *endp != '\0')
+			if (errno == ERANGE || *endp != '\0')
 				die("Invalid pkey");
 			break;
 		case 'f':
