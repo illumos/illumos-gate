@@ -791,8 +791,7 @@ e_ddi_free_instance(dev_info_t *dip, char *addr)
 	ASSERT(dp);
 	if (dp->ind_state == IN_PROVISIONAL) {
 		in_removedrv(dnp, dp);
-	}
-	if (dp->ind_state == IN_BORROWED) {
+	} else if (dp->ind_state == IN_BORROWED) {
 		dp->ind_state = IN_PERMANENT;
 		e_ddi_return_instance(dip, addr, np);
 	}
