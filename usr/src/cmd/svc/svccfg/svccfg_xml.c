@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -45,6 +44,7 @@
 #include <sasl/saslutil.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -3038,7 +3038,28 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 	if (lxml_check_upgrade(s->sc_name) == SCF_SUCCESS &&
 	    svc->doc->name != NULL &&
 	    bundle->sc_bundle_type == SVCCFG_MANIFEST) {
-		char *buf, *base, *fname;
+		char *buf, *base, *fname, *bname;
+		size_t	base_sz = 0;
+
+		/*
+		 * Must remove the PKG_INSTALL_ROOT, point to the correct
+		 * directory after install
+		 */
+		bname = uu_zalloc(PATH_MAX + 1);
+		if (realpath(svc->doc->name, bname) == NULL) {
+			uu_die(gettext("Unable to create the real path of the "
+			    "manifest file \"%s\" : %d\n"), svc->doc->name,
+			    errno);
+		}
+
+		base = getenv("PKG_INSTALL_ROOT");
+		if (base != NULL && strncmp(bname, base, strlen(base)) == 0) {
+			base_sz = strlen(base);
+		}
+		fname = safe_strdup(bname + base_sz);
+
+		uu_free(bname);
+		buf = mhash_filename_to_propname(svc->doc->name, B_FALSE);
 
 		pg = internal_pgroup_create_strict(s, SCF_PG_MANIFESTFILES,
 		    SCF_GROUP_FRAMEWORK);
@@ -3048,14 +3069,6 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 			    "\"%s\", already exists in %s\n"),
 			    SCF_PG_MANIFESTFILES, s->sc_name);
 		}
-		buf = mhash_filename_to_propname(svc->doc->name, B_FALSE);
-		/*
-		 * Must remove the PKG_INSTALL_ROOT, point to the correct
-		 * directory after install
-		 */
-		base = getenv("PKG_INSTALL_ROOT");
-		fname = safe_strdup(svc->doc->name +
-		    ((base != NULL) ? strlen(base) : 0));
 
 		p = internal_property_create(buf, SCF_TYPE_ASTRING, 1, fname);
 

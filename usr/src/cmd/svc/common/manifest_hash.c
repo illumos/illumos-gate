@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -55,6 +54,7 @@ mhash_filename_to_propname(const char *in, boolean_t deathrow)
 {
 	char *out, *cp, *base;
 	size_t len, piece_len;
+	size_t base_sz = 0;
 
 	out = uu_zalloc(PATH_MAX + 1);
 	if (deathrow) {
@@ -77,7 +77,10 @@ mhash_filename_to_propname(const char *in, boolean_t deathrow)
 	 * not relevant to when we boot with this repository.
 	 */
 
-	cp = out + ((base != NULL)? strlen(base) : 0);
+	if (base != NULL && strncmp(out, base, strlen(base)) == 0)
+		base_sz = strlen(base);
+
+	cp = out + base_sz;
 	if (*cp == '/')
 		cp++;
 	(void) memmove(out, cp, strlen(cp) + 1);
