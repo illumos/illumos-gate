@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1984, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -179,7 +178,8 @@ ufs_dirlook(
 	char *namep,
 	struct inode **ipp,
 	struct cred *cr,
-	int skipdnlc)			/* skip the 1st level dnlc */
+	int skipdnlc,			/* skip the 1st level dnlc */
+	int skipcaching)		/* force directory caching off */
 {
 	uint64_t handle;
 	struct fbuf *fbp;		/* a buffer of directory entries */
@@ -313,7 +313,7 @@ restart:
 	 * Any attempt after the disable time has expired will enable
 	 * the caching again.
 	 */
-	if (dp->i_size >= ufs_min_dir_cache) {
+	if (!skipcaching && (dp->i_size >= ufs_min_dir_cache)) {
 		/*
 		 * if the directory caching disable time has expired
 		 * enable the caching again.
@@ -690,7 +690,7 @@ ufs_direnter_cm(
 		if (tdp->i_ufsvfs)
 			ulp = &tdp->i_ufsvfs->vfs_ulockfs;
 		rw_exit(&tdp->i_rwlock);
-		if (err = ufs_dirlook(tdp, namep, ipp, cr, 0)) {
+		if (err = ufs_dirlook(tdp, namep, ipp, cr, 0, 0)) {
 			if (err == EAGAIN)
 				return (err);
 
@@ -802,7 +802,6 @@ out:
 
 /*
  * Write a new directory entry for DE_LINK, DE_SYMLINK or DE_RENAME operations.
- * If tvpp is non-null, return with the pointer to the target vnode.
  */
 int
 ufs_direnter_lr(
@@ -811,8 +810,7 @@ ufs_direnter_lr(
 	enum de_op op,		/* entry operation */
 	struct inode *sdp,	/* source inode parent if rename */
 	struct inode *sip,	/* source inode */
-	struct cred *cr,	/* user credentials */
-	vnode_t **tvpp)		/* Return: (held) vnode of (existing) target */
+	struct cred *cr)	/* user credentials */
 {
 	struct inode *tip;	/* inode of (existing) target file */
 	char *s;
@@ -968,19 +966,10 @@ out:
 	/*
 	 * If we renamed a file over the top of an existing file,
 	 * or linked a file to an existing file (or tried to),
-	 * then set *tvpp to the target vnode, if tvpp is non-null
-	 * otherwise, release and delete (or just release) the inode.
-	 *
-	 * N.B., by returning the target's vnode pointer to the caller,
-	 * that caller becomes responsible for doing the VN_RELE.
+	 * then release and delete (or just release) the inode.
 	 */
-	if (tip) {
-		if ((err == 0) && (tvpp != NULL)) {
-			*tvpp = ITOV(tip);
-		} else {
-			VN_RELE(ITOV(tip));
-		}
-	}
+	if (tip)
+		VN_RELE(ITOV(tip));
 
 out2:
 	if (err) {
@@ -2412,9 +2401,6 @@ fail:
 /*
  * Delete a directory entry.  If oip is nonzero the entry is checked
  * to make sure it still reflects oip.
- *
- * If vpp is non-null, return the ptr of the (held) vnode associated with
- * the removed name.  The caller is responsible for doing the VN_RELE().
  */
 int
 ufs_dirremove(
@@ -2423,8 +2409,7 @@ ufs_dirremove(
 	struct inode *oip,
 	struct vnode *cdir,
 	enum dr_op op,
-	struct cred *cr,
-	vnode_t **vpp)	/* Return (held) vnode ptr of removed file/dir */
+	struct cred *cr)
 {
 	struct direct *ep, *pep, *nep;
 	struct inode *ip;
@@ -2761,18 +2746,11 @@ out_novfs:
 	rw_exit(&dp->i_ufsvfs->vfs_dqrwlock);
 
 	/*
-	 * If no error and vpp is non-NULL, return the vnode ptr to the caller.
-	 * The caller becomes responsible for the VN_RELE().  Otherwise,
 	 * Release (and delete) the inode after we drop vfs_dqrwlock to
 	 * avoid deadlock since ufs_delete() grabs vfs_dqrwlock as reader.
 	 */
-	if (ip) {
-		if ((err == 0) && (vpp != NULL)) {
-			*vpp = ITOV(ip);
-		} else {
-			VN_RELE(vp);
-		}
-	}
+	if (ip)
+		VN_RELE(vp);
 
 	return (err);
 }

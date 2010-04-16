@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -849,17 +848,17 @@ extern void	ufs_itimes_nolock(struct inode *);
 
 extern	int	ufs_diraccess(struct inode *, int, struct cred *);
 extern	int	ufs_dirlook(struct inode *, char *, struct inode **,
-    cred_t *, int);
+    cred_t *, int, int);
 extern	int	ufs_direnter_cm(struct inode *, char *, enum de_op,
     struct vattr *, struct inode **, cred_t *, int);
 extern	int	ufs_direnter_lr(struct inode *, char *, enum de_op,
-    struct inode *, struct inode *, cred_t *, vnode_t **);
+    struct inode *, struct inode *, cred_t *);
 extern	int	ufs_dircheckpath(ino_t, struct inode *, struct inode *,
     struct cred *);
 extern	int	ufs_dirmakeinode(struct inode *, struct inode **,
     struct vattr *, enum de_op, cred_t *);
 extern	int	ufs_dirremove(struct inode *, char *, struct inode *,
-    vnode_t *, enum dr_op, cred_t *, vnode_t **);
+    vnode_t *, enum dr_op, cred_t *);
 extern  int	ufs_dircheckforname(struct inode *, char *, int,
     struct ufs_slot *, struct inode **, struct cred *, int);
 extern	int	ufs_xattrdirempty(struct inode *, ino_t, cred_t *);

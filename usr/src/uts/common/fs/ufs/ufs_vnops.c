@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1984, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -180,6 +179,8 @@ static	int ufs_getsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
 static	int ufs_setsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
 		caller_context_t *);
 static	int ufs_priv_access(void *, int, struct cred *);
+static	int ufs_eventlookup(struct vnode *, char *, struct cred *,
+    struct vnode **);
 extern int as_map_locked(struct as *, caddr_t, size_t, int ((*)()), void *);
 
 /*
@@ -2854,7 +2855,7 @@ retry_lookup:
 	if (error)
 		goto out;
 
-	error = ufs_dirlook(ip, nm, &xip, cr, 1);
+	error = ufs_dirlook(ip, nm, &xip, cr, 1, 0);
 
 fastpath:
 	if (error == 0) {
@@ -3209,6 +3210,14 @@ ufs_remove(struct vnode *vp, char *nm, struct cred *cr,
 	if (ufsvfsp->vfs_delete.uq_ne > ufs_idle_max)
 		ufs_delete_drain(vp->v_vfsp, 1, 1);
 
+	error = ufs_eventlookup(vp, nm, cr, &rmvp);
+	if (rmvp != NULL) {
+		/* Only send the event if there were no errors */
+		if (error == 0)
+			vnevent_remove(rmvp, vp, nm, ct);
+		VN_RELE(rmvp);
+	}
+
 retry_remove:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_REMOVE_MASK);
 	if (error)
@@ -3227,7 +3236,7 @@ retry_remove:
 	if (indeadlock)
 		goto retry_remove;
 	error = ufs_dirremove(ip, nm, (struct inode *)0, (struct vnode *)0,
-	    DR_REMOVE, cr, &rmvp);
+	    DR_REMOVE, cr);
 	rw_exit(&ip->i_rwlock);
 
 	if (ulp) {
@@ -3235,15 +3244,6 @@ retry_remove:
 		ufs_lockfs_end(ulp);
 	}
 
-	/*
-	 * This must be called after the remove transaction is closed.
-	 */
-	if (rmvp != NULL) {
-		/* Only send the event if there were no errors */
-		if (error == 0)
-			vnevent_remove(rmvp, vp, nm, ct);
-		VN_RELE(rmvp);
-	}
 out:
 	return (error);
 }
@@ -3314,7 +3314,7 @@ retry_link:
 	if (indeadlock)
 		goto retry_link;
 	error = ufs_direnter_lr(tdp, tnm, DE_LINK, (struct inode *)0,
-	    sip, cr, NULL);
+	    sip, cr);
 	rw_exit(&tdp->i_rwlock);
 
 unlock:
@@ -3363,6 +3363,7 @@ ufs_rename(
 	struct inode *ip = NULL;	/* check inode */
 	struct inode *sdp;		/* old (source) parent inode */
 	struct inode *tdp;		/* new (target) parent inode */
+	struct vnode *svp = NULL;	/* source vnode */
 	struct vnode *tvp = NULL;	/* target vnode, if it exists */
 	struct vnode *realvp;
 	struct ufsvfs *ufsvfsp;
@@ -3375,10 +3376,39 @@ ufs_rename(
 	krwlock_t *first_lock;
 	krwlock_t *second_lock;
 	krwlock_t *reverse_lock;
+	int serr, terr;
 
 	sdp = VTOI(sdvp);
 	slot.fbp = NULL;
 	ufsvfsp = sdp->i_ufsvfs;
+
+	if (VOP_REALVP(tdvp, &realvp, ct) == 0)
+		tdvp = realvp;
+
+	terr = ufs_eventlookup(tdvp, tnm, cr, &tvp);
+	serr = ufs_eventlookup(sdvp, snm, cr, &svp);
+
+	if ((serr == 0) && ((terr == 0) || (terr == ENOENT))) {
+		if (tvp != NULL)
+			vnevent_rename_dest(tvp, tdvp, tnm, ct);
+
+		/*
+		 * Notify the target directory of the rename event
+		 * if source and target directories are not the same.
+		 */
+		if (sdvp != tdvp)
+			vnevent_rename_dest_dir(tdvp, ct);
+
+		if (svp != NULL)
+			vnevent_rename_src(svp, sdvp, snm, ct);
+	}
+
+	if (tvp != NULL)
+		VN_RELE(tvp);
+
+	if (svp != NULL)
+		VN_RELE(svp);
+
 retry_rename:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_RENAME_MASK);
 	if (error)
@@ -3411,7 +3441,7 @@ retry_rename:
 	 * Look up inode of file we're supposed to rename.
 	 */
 	gethrestime(&now);
-	if (error = ufs_dirlook(sdp, snm, &sip, cr, 0)) {
+	if (error = ufs_dirlook(sdp, snm, &sip, cr, 0, 0)) {
 		if (error == EAGAIN) {
 			if (ulp) {
 				TRANS_END_CSYNC(ufsvfsp, error, issync,
@@ -3665,11 +3695,9 @@ retry_firstlock:
 	}
 
 	/*
-	 * Link source to the target.  If a target exists, return its
-	 * vnode pointer in tvp.  We'll release it after sending the
-	 * vnevent.
+	 * Link source to the target.
 	 */
-	if (error = ufs_direnter_lr(tdp, tnm, DE_RENAME, sdp, sip, cr, &tvp)) {
+	if (error = ufs_direnter_lr(tdp, tnm, DE_RENAME, sdp, sip, cr)) {
 		/*
 		 * ESAME isn't really an error; it indicates that the
 		 * operation should not be done because the source and target
@@ -3688,7 +3716,7 @@ retry_firstlock:
 	 * the source inode.
 	 */
 	if ((error = ufs_dirremove(sdp, snm, sip, (struct vnode *)0,
-	    DR_RENAME, cr, NULL)) == ENOENT)
+	    DR_RENAME, cr)) == ENOENT)
 		error = 0;
 
 errout:
@@ -3700,42 +3728,13 @@ errout:
 		rw_exit(&sdp->i_rwlock);
 	}
 
+	VN_RELE(ITOV(sip));
+
 unlock:
 	if (ulp) {
 		TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_RENAME, trans_size);
 		ufs_lockfs_end(ulp);
 	}
-
-	/*
-	 * If no errors, send the appropriate events on the source
-	 * and destination (a.k.a, target) vnodes, if they exist.
-	 * This has to be done after the rename transaction has closed.
-	 */
-	if (error == 0) {
-		if (tvp != NULL)
-			vnevent_rename_dest(tvp, tdvp, tnm, ct);
-
-		/*
-		 * Notify the target directory of the rename event
-		 * if source and target directories are not same.
-		 */
-		if (sdvp != tdvp)
-			vnevent_rename_dest_dir(tdvp, ct);
-
-		/*
-		 * Note that if ufs_direnter_lr() returned ESAME then
-		 * this event will still be sent.  This isn't expected
-		 * to be a problem for anticipated usage by consumers.
-		 */
-		if (sip != NULL)
-			vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
-	}
-
-	if (tvp != NULL)
-		VN_RELE(tvp);
-
-	if (sip != NULL)
-		VN_RELE(ITOV(sip));
 
 out:
 	return (error);
@@ -3843,6 +3842,14 @@ ufs_rmdir(struct vnode *vp, char *nm, struct vnode *cdir, struct cred *cr,
 	if (ufsvfsp->vfs_delete.uq_ne > ufs_idle_max)
 		ufs_delete_drain(vp->v_vfsp, 1, 1);
 
+	error = ufs_eventlookup(vp, nm, cr, &rmvp);
+	if (rmvp != NULL) {
+		/* Only send the event if there were no errors */
+		if (error == 0)
+			vnevent_rmdir(rmvp, vp, nm, ct);
+		VN_RELE(rmvp);
+	}
+
 retry_rmdir:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_RMDIR_MASK);
 	if (error)
@@ -3860,8 +3867,8 @@ retry_rmdir:
 	ufs_tryirwlock_trans(&ip->i_rwlock, RW_WRITER, TOP_RMDIR, retry);
 	if (indeadlock)
 		goto retry_rmdir;
-	error = ufs_dirremove(ip, nm, (struct inode *)0, cdir, DR_RMDIR, cr,
-	    &rmvp);
+	error = ufs_dirremove(ip, nm, (struct inode *)0, cdir, DR_RMDIR, cr);
+
 	rw_exit(&ip->i_rwlock);
 
 	if (ulp) {
@@ -3870,15 +3877,6 @@ retry_rmdir:
 		ufs_lockfs_end(ulp);
 	}
 
-	/*
-	 * This must be done AFTER the rmdir transaction has closed.
-	 */
-	if (rmvp != NULL) {
-		/* Only send the event if there were no errors */
-		if (error == 0)
-			vnevent_rmdir(rmvp, vp, nm, ct);
-		VN_RELE(rmvp);
-	}
 out:
 	return (error);
 }
@@ -4232,7 +4230,7 @@ again:
 	 */
 
 	rw_enter(&dip->i_rwlock, RW_WRITER);
-	error = ufs_direnter_lr(dip, linkname, DE_SYMLINK, NULL, ip, cr, NULL);
+	error = ufs_direnter_lr(dip, linkname, DE_SYMLINK, NULL, ip, cr);
 	rw_exit(&dip->i_rwlock);
 
 	/*
@@ -6561,4 +6559,86 @@ out:
 	}
 
 	return (err);
+}
+
+/*
+ * Locate the vnode to be used for an event notification. As this will
+ * be called prior to the name space change perform basic verification
+ * that the change will be allowed.
+ */
+
+static int
+ufs_eventlookup(struct vnode *dvp, char *nm, struct cred *cr,
+    struct vnode **vpp)
+{
+	int	namlen;
+	int	error;
+	struct vnode	*vp;
+	struct inode	*ip;
+	struct inode	*xip;
+	struct ufsvfs	*ufsvfsp;
+	struct ulockfs	*ulp;
+
+	ip = VTOI(dvp);
+	*vpp = NULL;
+
+	if ((namlen = strlen(nm)) == 0)
+		return (EINVAL);
+
+	if (nm[0] == '.') {
+		if (namlen == 1)
+			return (EINVAL);
+		else if ((namlen == 2) && nm[1] == '.') {
+			return (EEXIST);
+		}
+	}
+
+	/*
+	 * Check accessibility and write access of parent directory as we
+	 * only want to post the event if we're able to make a change.
+	 */
+	if (error = ufs_diraccess(ip, IEXEC|IWRITE, cr))
+		return (error);
+
+	if (vp = dnlc_lookup(dvp, nm)) {
+		if (vp == DNLC_NO_VNODE) {
+			VN_RELE(vp);
+			return (ENOENT);
+		}
+
+		*vpp = vp;
+		return (0);
+	}
+
+	/*
+	 * Keep the idle queue from getting too long by idling two
+	 * inodes before attempting to allocate another.
+	 * This operation must be performed before entering lockfs
+	 * or a transaction.
+	 */
+	if (ufs_idle_q.uq_ne > ufs_idle_q.uq_hiwat)
+		if ((curthread->t_flag & T_DONTBLOCK) == 0) {
+			ins.in_lidles.value.ul += ufs_lookup_idle_count;
+			ufs_idle_some(ufs_lookup_idle_count);
+		}
+
+	ufsvfsp = ip->i_ufsvfs;
+
+retry_lookup:
+	if (error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_LOOKUP_MASK))
+		return (error);
+
+	if ((error = ufs_dirlook(ip, nm, &xip, cr, 1, 1)) == 0) {
+		vp = ITOV(xip);
+		*vpp = vp;
+	}
+
+	if (ulp) {
+		ufs_lockfs_end(ulp);
+	}
+
+	if (error == EAGAIN)
+		goto retry_lookup;
+
+	return (error);
 }
