@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -61,17 +60,23 @@
 #define	MPX_LIST		0x01
 #define	MPX_MAP			0x02
 #define	MPX_CAPABLE_CTRL	0x04
+#define	MPX_DEV_PATH		0x06
 #define	MPX_INIT		0x08
 #define	MPX_PHYSICAL		0x10
 #define	MPX_BOOTPATH		0x20
 #define	MPX_UPDATEVFSTAB	0x40
+#define	MPX_GETPATH		0x60
 #define	MPX_USAGE		0x80
 #define	MSG_INFO		0x01
 #define	MSG_ERROR		0x02
 #define	MSG_PANIC		0x04
 
+#define	BOOT_PATH		0x02
 #define	BOOT			0x01
 #define	NONBOOT			0x00
+
+#define	DISPLAY_ONE_PATH	0x00
+#define	DISPLAY_ALL_PATH	0x01
 
 static di_node_t devinfo_root = DI_NODE_NIL;
 static char *ondiskname = "/etc/mpxio/devid_path.cache";
@@ -106,9 +111,10 @@ static void usage();
 static void parse_args(int argc, char *argv[]);
 static void get_devid(di_node_t node, ddi_devid_t *thisdevid);
 static int print_bootpath();
-static void vhci_to_phci(char *devpath, char *physpath);
+static void vhci_to_phci(char *devpath, char *slice, int d_flag);
 static int update_vfstab();
-
+static void report_dev_node_name(char *strdevfspath);
+static void print_node_name(char *drv_name, char *strdevfspath);
 int
 main(int argc, char **argv)
 {
@@ -280,6 +286,10 @@ main(int argc, char **argv)
 		rv = update_vfstab();
 		di_fini(devinfo_root);
 		return (rv);
+	} else if (globarg == MPX_GETPATH) {
+		report_dev_node_name(devicep);
+	} else if (globarg == MPX_DEV_PATH) {
+		report_map(devicep, BOOT_PATH);
 	} else if (globarg != MPX_INIT) {
 		if (globarg & MPX_LIST)
 			list_devs(guid, limctrl);
@@ -384,7 +394,7 @@ parse_args(int argc, char *argv[])
 	 *	file to /etc/mpxio/vfstab.new. If we have any remapped
 	 *	devices, exit with status 0, otherwise -1 for error.
 	 */
-	while ((opt = getopt(argc, argv, "bdD:ghil:Lm:nNp:u")) != EOF) {
+	while ((opt = getopt(argc, argv, "bdD:ghil:Lm:nNo:p:q:u")) != EOF) {
 		switch (opt) {
 		case 'b':
 			globarg = MPX_BOOTPATH;
@@ -451,8 +461,28 @@ parse_args(int argc, char *argv[])
 		case 'n':
 			globarg = MPX_CAPABLE_CTRL;
 			break;
+		case 'o':
+			globarg = MPX_GETPATH;
+			if ((devicep = calloc(1, MAXPATHLEN)) == NULL) {
+				logmsg(MSG_ERROR,
+				    gettext("Unable to allocate space for a "
+				    "device name\n"));
+				exit(errno);
+			}
+			devicep = strdup(optarg);
+			break;
 		case 'p':
 			globarg = MPX_PHYSICAL;
+			if ((devicep = calloc(1, MAXPATHLEN)) == NULL) {
+				logmsg(MSG_ERROR,
+				    gettext("Unable to allocate space for a "
+				    "device name\n"));
+				exit(errno);
+			}
+			devicep = strdup(optarg);
+			break;
+		case 'q':
+			globarg = MPX_DEV_PATH;
 			if ((devicep = calloc(1, MAXPATHLEN)) == NULL) {
 				logmsg(MSG_ERROR,
 				    gettext("Unable to allocate space for a "
@@ -652,7 +682,7 @@ report_map(char *argdev, int physpath)
 
 	(void) strlcpy(prefixt, argdev, strlen(argdev) + 1);
 
-	slice = strrchr(argdev, (physpath == BOOT) ? ':' : 's');
+	slice = strrchr(argdev, (physpath == NONBOOT) ? 's' : ':');
 	if (slice != NULL) {
 		slicelen = strlen(slice);
 		if (slicelen > 3)
@@ -678,7 +708,8 @@ report_map(char *argdev, int physpath)
 		if (prefixp != NULL)
 			prefixt[strlen(argdev) - strlen(prefixp) + 1] = '\0';
 	} else {
-		if (physpath != BOOT) {
+		if ((physpath != BOOT) &&
+		    (physpath != BOOT_PATH)) {
 			logmsg(MSG_INFO, "Invalid device path provided\n");
 			(void) printf("NOT_MAPPED\n");
 			free(stripdev);
@@ -701,7 +732,8 @@ report_map(char *argdev, int physpath)
 	/* search for the shortened version */
 	rv = nvlist_lookup_string(mapnvl, stripdev, &thisdevid);
 	if (rv) {
-		if (physpath != BOOT) {
+		if ((physpath != BOOT) &&
+		    (physpath != BOOT_PATH)) {
 			logmsg(MSG_INFO,
 			    "searched mapnvl for '%s', got %s (%d)\n",
 			    stripdev, strerror(rv), rv);
@@ -739,20 +771,17 @@ report_map(char *argdev, int physpath)
 		if ((strstr(argdev, "/scsi_vhci") != NULL) &&
 		    (strncmp(argdev, mpxpath, strlen(mpxpath)) == 0)) {
 			/* Need to translate vhci to phci */
-			char *realpath;
-
-			if ((realpath = calloc(1, MAXPATHLEN + 1)) == NULL) {
-				logmsg(MSG_ERROR,
-				    gettext("Unable to allocate "
-				    "memory for a path element\n"));
-				free(stripdev);
-				free(prefixt);
-				return;
-			}
-			vhci_to_phci(stripdev, realpath);
-			(void) printf("%s%s\n", realpath,
+			vhci_to_phci(stripdev, slice, DISPLAY_ONE_PATH);
+		} else {
+			(void) printf("%s%s\n", mpxpath,
 			    ((slicelen > 0) && slice != NULL) ? slice : "");
-			free(realpath);
+		}
+	} else if (physpath == BOOT_PATH) {
+		(void) nvlist_lookup_string(thisdev, NVL_PHYSPATH, &mpxpath);
+		if ((strstr(argdev, "/scsi_vhci") != NULL) &&
+		    (strncmp(argdev, mpxpath, strlen(mpxpath)) == 0)) {
+			/* Need to translate vhci to phci */
+			vhci_to_phci(stripdev, slice, DISPLAY_ALL_PATH);
 		} else {
 			(void) printf("%s%s\n", mpxpath,
 			    ((slicelen > 0) && slice != NULL) ? slice : "");
@@ -823,6 +852,50 @@ validate_devnvl()
 		return (-1);
 
 	return (0);
+}
+
+/*
+ * According to devfs path name, it will print device node name.
+ */
+static void
+print_node_name(char *drv_name, char *strdevfspath)
+{
+	di_node_t	curnode;
+	char *devfspath = NULL;
+	char *node_name = NULL;
+
+	curnode = di_drv_first_node(drv_name, devinfo_root);
+	for (; curnode != DI_NODE_NIL; curnode = di_drv_next_node(curnode)) {
+		devfspath = di_devfs_path(curnode);
+		logmsg(MSG_INFO, "find: devfspath %s\n", devfspath);
+
+		if (devfspath == NULL)
+			continue;
+
+		if (strncmp(strdevfspath, devfspath,
+		    strlen(strdevfspath)) == 0) {
+			node_name = find_link(curnode);
+			if (node_name == NULL) {
+				(void) printf("NOT MAPPED\n");
+			} else {
+				(void) printf("%s\n", node_name);
+			}
+			return;
+		}
+	}
+}
+
+/*
+ * report device node name, search "ssd" and "sd" nodes,
+ * print the device node name which device path is same as
+ * parameter.
+ */
+static void
+report_dev_node_name(char *strdevfspath)
+{
+	logmsg(MSG_INFO, "strdevfspath: %s\n", strdevfspath);
+	print_node_name("ssd", strdevfspath);
+	print_node_name("sd", strdevfspath);
 }
 
 static int
@@ -1000,10 +1073,9 @@ popcheck_devnvl(di_node_t thisnode, nvlist_t *devnvl, char *strdevid)
 
 	rv = nvlist_lookup_string(devnvl, NVL_MPXPATH, &path);
 
-	if (path == NULL && scsivhciparent)
+	if (scsivhciparent) {
 		(void) nvlist_add_string(devnvl, NVL_MPXPATH, curpath);
-
-	if (!scsivhciparent) {
+	} else {
 		(void) nvlist_add_string(devnvl, NVL_PATH, curpath);
 		path = curpath;
 	}
@@ -1021,28 +1093,18 @@ popcheck_devnvl(di_node_t thisnode, nvlist_t *devnvl, char *strdevid)
 		}
 		logmsg(MSG_INFO, "popcheck_devnvl: added path %s :: %s\n",
 		    path, strdevid);
-		if (nvlist_add_string(mapnvl, curpath, strdevid) != 0) {
+	}
+
+	if (nvlist_add_string(mapnvl, curpath, strdevid) != 0) {
 			logmsg(MSG_ERROR,
 			    gettext("Unable to add device %s with devid "
 			    "%s to mapnvl: %s\n"),
 			    curpath, strdevid, strerror(errno));
 			return (-1);
-		}
-		logmsg(MSG_INFO, "popcheck_devnvl: added curpath %s :: %s\n",
-		    curpath, strdevid);
 	}
-	if (scsivhciparent) {
-		if (nvlist_add_string(devnvl, NVL_MPXPATH, curpath) != 0) {
-			logmsg(MSG_ERROR,
-			    gettext("Unable to add property %s for device "
-			    "%s: %s\n"),
-			    NVL_MPXPATH, devfspath, strerror(errno));
-			return (-1);
-		} else {
-			logmsg(MSG_INFO, "added curpath (%s) as NVL_MPXPATH "
-			    "to devnvl for devid %s\n", curpath, strdevid);
-		}
-	}
+	logmsg(MSG_INFO, "popcheck_devnvl: added curpath %s :: %s\n",
+	    curpath, strdevid);
+
 	return (0);
 }
 
@@ -1243,19 +1305,22 @@ get_phci_driver_name(char *phci_path, char **driver_name)
 	}
 	di_fini(phci_node);
 }
+
 /*
  * We only call this routine if we have a scsi_vhci node and must
  * determine the actual physical path of its first online client
  * path.
  */
 static void
-vhci_to_phci(char *devpath, char *physpath)
+vhci_to_phci(char *devpath, char *slice, int d_flag)
 {
 	sv_iocdata_t	ioc;
 	sv_path_info_t	*pi;
 	int		vhci_fd;
 	int		rv;
 	uint_t		npaths = 0;
+	char nodename[MAXPATHLEN];
+	char *phci_driver = NULL;
 
 	vhci_fd = open(VHCI_CTL_NODE, O_RDWR);
 	if (vhci_fd < 0)
@@ -1284,26 +1349,28 @@ vhci_to_phci(char *devpath, char *physpath)
 		logmsg(MSG_INFO,
 		    "SCSI_VHCI_GET_CLIENT_MULTIPATH_INFO ioctl() (#2) "
 		    "failed, %s (%d)\n", strerror(rv), rv);
+		free(ioc.ret_buf);
 		goto failure;
 	}
 
 	if (ioc.buf_elem < npaths)
 		npaths = ioc.buf_elem;
 
+	phci_driver = malloc(10);
+	if (phci_driver == NULL) {
+		logmsg(MSG_INFO,
+		    "vhci_to_phci: Memory allocation failed\n");
+		free(ioc.ret_buf);
+		goto failure;
+	}
+
 	pi = (sv_path_info_t *)ioc.ret_buf;
 	while (npaths--) {
 		if (pi->ret_state == MDI_PATHINFO_STATE_ONLINE) {
-			char nodename[5];
-			char *phci_driver = NULL;
 
-			bzero(nodename, 5);
-			phci_driver = malloc(10);
-			if (phci_driver == NULL) {
-				logmsg(MSG_INFO,
-				    "vhci_to_phci: Memory allocation failed\n");
-				goto failure;
-			}
+			bzero(nodename, MAXPATHLEN);
 			bzero(phci_driver, 10);
+
 			get_phci_driver_name(pi->device.ret_phci,
 			    &phci_driver);
 			logmsg(MSG_INFO, "phci driver name: %s\n", phci_driver);
@@ -1322,17 +1389,33 @@ vhci_to_phci(char *devpath, char *physpath)
 			} else {
 				(void) snprintf(nodename, 5, "disk");
 			}
-			(void) snprintf(physpath, MAXPATHLEN, "%s/%s@%s",
-			    pi->device.ret_phci, nodename, pi->ret_addr);
-			free(ioc.ret_buf);
-			free(phci_driver);
-			return;
+			if (d_flag == DISPLAY_ONE_PATH) {
+				(void) printf("%s/%s@%s", pi->device.ret_phci,
+				    nodename, pi->ret_addr);
+				if ((slice != NULL) && (strlen(slice) <= 3)) {
+					(void) printf("%s\n", slice);
+				} else {
+					(void) printf("\n");
+				}
+				break;
+			} else if (d_flag == DISPLAY_ALL_PATH) {
+				(void) printf("%s/%s@%s", pi->device.ret_phci,
+				    nodename, pi->ret_addr);
+				if ((slice != NULL) && (strlen(slice) <= 3)) {
+					(void) printf("%s\n", slice);
+				} else {
+					(void) printf("\n");
+				}
+			}
 		}
 		pi++;
 	}
+	free(ioc.ret_buf);
+	free(phci_driver);
+	return;
 
 failure:
-	(void) snprintf(physpath, MAXPATHLEN, "NOT_MAPPED");
+	(void) printf("NOT_MAPPED\n");
 }
 
 /*

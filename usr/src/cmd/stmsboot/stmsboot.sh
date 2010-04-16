@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 PATH=/usr/bin:/usr/sbin:$PATH; export PATH
@@ -260,7 +259,6 @@ update_sysfiles()
 			$CP /boot/solaris/$BOOTENV_FILE $SAVEDIR/$BOOTENV_FILE.$cmd.$NOW
 			$EEPROM bootpath="$new_bootpath"
 		fi
-
 		# Enable the mpxio-upgrade service for the reboot
 		$SVCADM disable -t $STMSINSTANCE
 		$SVCCFG -s $STMSINSTANCE "setprop general/enabled=true"
@@ -590,7 +588,7 @@ fi
 
 if [ "$cmd" = "enable" -o "$cmd" = "disable" ]; then
 
-	msgneeded=`echo "$DRVLIST" |grep " "`
+	msgneeded=`echo "$DRVLIST" |$GREP " "`
 	if [ -n "$msgneeded" ]; then
 		emit_driver_warning_msg
 	fi
@@ -619,12 +617,14 @@ if [ "$cmd" = "enable" -o "$cmd" = "disable" ]; then
 			# to keep track of what / maps to in case
 			# it's an active-active device and we boot from
 			# the other path
-			ROOTSCSIVHCI=`$DF /|$AWK -F":" '{print $1}' | \
-			    $AWK -F"(" '{print $2}'| \
-			    $SED -e"s,dsk,rdsk," -e"s,s.[ ]*),,"`
-			$STMSBOOTUTIL -L | $GREP $ROOTSCSIVHCI | \
-			    $AWK '{print $1}' | $SED -e"s,rdsk,dsk,g" \
-			    >$BOOTDEVICES
+			HASZFSROOT=`$DF -g / |$GREP zfs`
+			if [ -z "$HASZFSROOT" ]; then
+				ROOTSCSIVHCI=`$DF /|$AWK -F":" '{print $1}' | \
+					$AWK -F"(" '{print $2}'| $SED -e"s,),,"`
+				TMPROOTDEV=`$LS -l $ROOTSCSIVHCI |$AWK -F">" '{print $2}' | \
+					$SED -e"s, ../../devices,,"`
+				$STMSBOOTUTIL -q $TMPROOTDEV > $BOOTDEVICES
+			fi
 		fi
 		update_sysfiles
 	else

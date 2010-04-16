@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 . /lib/svc/share/fs_include.sh
@@ -37,6 +36,7 @@ DEVFSADM=/usr/sbin/devfsadm
 DUMPADM=/usr/sbin/dumpadm
 METADEVADM=/usr/sbin/metadevadm
 ISROOTDEV=""
+ISROOTDEVPATH=""
 usrmounted=0
 UNAME=/usr/bin/uname
 ECHO=/usr/bin/echo
@@ -126,15 +126,14 @@ mpxio_mount_root()
 				$MOUNT -o remount,rw $new_special / \
 				    >/dev/msglog 2>&1
 			else
-				SLICE=`$ECHO $special | $AWK -F"s" '{print $3}'`
 				for device in `$CAT $BOOTDEVICES`; do
-					new_special="${device}s${SLICE}"
+					new_special="/devices${device}"
 					$MOUNT -m -F $fstype -o $mntopts \
 					    $new_special $mountp >/dev/msglog 2>&1
 					if [ $? -eq 0 ]; then
 						# success, break out
-						ISROOTDEV=`$ECHO $new_special |
-						    $SED -e "s,/dev/dsk/,,"`
+						ISROOTDEVPATH=`$ECHO $device | \
+						$AWK -F":" '{print $1}'`
 					    break;
 					fi
 				done
@@ -337,6 +336,10 @@ mpxio_main()
 		cecho "stmsboot: configuring devices"
 		$DEVFSADM
 
+		if [ -n "$ISROOTDEVPATH" ]; then
+			ISROOTDEV=`$STMSBOOTUTIL -o $ISROOTDEVPATH`
+		fi
+
 		# update /etc/vfstab to reflect device name changes
 		$STMSBOOTUTIL -u >/dev/msglog 2>&1
 		if [ $? -eq 0 ]; then
@@ -350,7 +353,7 @@ mpxio_main()
 					# we got a different path for root
 					exec < $SAVEDIR/vfstab.new; readvfstab /
 					FILEDEV=`$ECHO $special | \
-					    $SED -e"s,/dev/dsk/,,"`
+					    $SED -e"s,/dev/dsk/,," -e"s,s[0-9]*,,"`
 					$SED -e"s,$FILEDEV,$ISROOTDEV,g" < \
 					    $SAVEDIR/vfstab.new > /etc/vfstab
 				fi
