@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -75,7 +74,7 @@ mac_add_name(mblk_t *mp, char *name, int ndd_flags)
 	if (mp->b_wptr + len >= mp->b_datap->db_lim) {
 		mp->b_cont = allocb(len, BPRI_HI);
 		mp = mp->b_cont;
-		if (mp != NULL)
+		if (mp == NULL)
 			return (B_FALSE);
 	}
 	cp = (char *)mp->b_wptr;
@@ -187,7 +186,7 @@ mac_ndd_get_ioctl(mac_impl_t *mip, mblk_t *mp, int avail, int *rval)
 	char		*valp;
 	uchar_t 	*value;
 	uint32_t	new_value;
-	int		size_out, i;
+	int		size_out = 0, i;
 	int		status = EINVAL;
 	char		*name, priv_name[MAXLINKPROPNAME];
 	uint8_t		u8;
