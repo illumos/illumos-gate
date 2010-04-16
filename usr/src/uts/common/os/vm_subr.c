@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -36,8 +34,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -114,9 +110,8 @@ void
 physio_bufs_init(void)
 {
 	physio_buf_cache = kmem_cache_create("physio_buf_cache",
-		sizeof (struct buf), 0,
-		physio_buf_constructor, physio_buf_destructor,
-		NULL, NULL, NULL, 0);
+	    sizeof (struct buf), 0, physio_buf_constructor,
+	    physio_buf_destructor, NULL, NULL, NULL, 0);
 }
 
 
@@ -149,10 +144,10 @@ default_physio(int (*strat)(struct buf *), struct buf *bp, dev_t dev,
 
 	/* Kernel probe */
 	TNF_PROBE_4(physio_start, "io rawio", /* CSTYLED */,
-		tnf_device,	device,		dev,
-		tnf_offset,	offset,		uio->uio_loffset,
-		tnf_size,	size,		uio->uio_resid,
-		tnf_bioflags,	rw,		rw);
+	    tnf_device,		device,		dev,
+	    tnf_offset,		offset,		uio->uio_loffset,
+	    tnf_size,		size,		uio->uio_resid,
+	    tnf_bioflags,	rw,		rw);
 
 	if (rw == B_READ) {
 		CPU_STATS_ADD_K(sys, phread, 1);
@@ -161,7 +156,7 @@ default_physio(int (*strat)(struct buf *), struct buf *bp, dev_t dev,
 	}
 
 	TRACE_1(TR_FAC_PHYSIO, TR_PHYSIO_GETBUF_START,
-		"getbuf_start: bp %p", bp);
+	    "getbuf_start: bp %p", bp);
 
 	if (bp == NULL) {
 		bp = kmem_cache_alloc(physio_buf_cache, KM_SLEEP);
@@ -248,8 +243,7 @@ default_physio(int (*strat)(struct buf *), struct buf *bp, dev_t dev,
 			if (error != 0) {
 				bp->b_flags |= B_ERROR;
 				bp->b_error = error;
-				bp->b_flags &=
-					~(B_BUSY|B_WANTED|B_PHYS);
+				bp->b_flags &= ~(B_BUSY|B_WANTED|B_PHYS);
 				break;
 			}
 			bp->b_shadow = pplist;
@@ -267,13 +261,13 @@ default_physio(int (*strat)(struct buf *), struct buf *bp, dev_t dev,
 			 * unlock the pages
 			 */
 			TRACE_1(TR_FAC_PHYSIO, TR_PHYSIO_UNLOCK_START,
-				"as_pageunlock_start: bp %p", bp);
+			    "as_pageunlock_start: bp %p", bp);
 
 			as_pageunlock(asp, pplist, a, c,
-				rw == B_READ? S_WRITE : S_READ);
+			    rw == B_READ? S_WRITE : S_READ);
 
 			TRACE_0(TR_FAC_PHYSIO, TR_PHYSIO_UNLOCK_END,
-				"as_pageunlock_end:");
+			    "as_pageunlock_end:");
 
 			c -= bp->b_resid;
 			iov->iov_base += c;
@@ -373,7 +367,7 @@ cow_mapin(struct as *as, caddr_t uaddr, caddr_t kaddr, struct page **cached_ppp,
 		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
 		seg = as_findseg(as, uaddr, 0);
 		if ((seg == NULL) || ((base = seg->s_base) > uaddr) ||
-			(uaddr + total) > base + seg->s_size) {
+		    (uaddr + total) > base + seg->s_size) {
 			AS_LOCK_EXIT(as, &as->a_lock);
 			return (EINVAL);
 		}
@@ -415,8 +409,7 @@ tryagain:
 			 * segment. The disadvantage is that it locks the
 			 * page from being used by anybody else.
 			 */
-			ahm = &anonhash_lock[
-			    AH_LOCK(pp->p_vnode, pp->p_offset)];
+			ahm = AH_MUTEX(pp->p_vnode, pp->p_offset);
 			mutex_enter(ahm);
 			*app = swap_anon(pp->p_vnode, pp->p_offset);
 			/*

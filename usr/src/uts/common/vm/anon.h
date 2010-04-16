@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -38,8 +37,6 @@
 
 #ifndef	_VM_ANON_H
 #define	_VM_ANON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cred.h>
 #include <sys/zone.h>
@@ -116,7 +113,7 @@ struct anon {
  */
 extern kmutex_t anoninfo_lock;
 extern kmutex_t swapinfo_lock;
-extern kmutex_t anonhash_lock[];
+extern pad_mutex_t *anonhash_lock;
 extern pad_mutex_t anon_array_lock[];
 extern kcondvar_t anon_array_cv[];
 
@@ -130,8 +127,11 @@ extern struct anon **anon_hash;
 #define	ANON_HASH(VP, OFF)	\
 ((((uintptr_t)(VP) >> 7)  ^ ((OFF) >> PAGESHIFT)) & (ANON_HASH_SIZE - 1))
 
-#define	AH_LOCK_SIZE	64
-#define	AH_LOCK(vp, off) (ANON_HASH((vp), (off)) & (AH_LOCK_SIZE -1))
+#define	AH_LOCK_SIZE	(2 << NCPU_LOG2)
+
+#define	AH_MUTEX(vp, off)				\
+	(&anonhash_lock[(ANON_HASH((vp), (off)) &	\
+	    (AH_LOCK_SIZE - 1))].pad_mutex)
 
 #endif	/* _KERNEL */
 

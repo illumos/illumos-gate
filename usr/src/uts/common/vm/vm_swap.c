@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1987, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -357,7 +356,7 @@ swap_anon(struct vnode *vp, u_offset_t off)
 {
 	struct anon *ap;
 
-	ASSERT(MUTEX_HELD(&anonhash_lock[AH_LOCK(vp, off)]));
+	ASSERT(MUTEX_HELD(AH_MUTEX(vp, off)));
 
 	for (ap = anon_hash[ANON_HASH(vp, off)]; ap != NULL; ap = ap->an_hash) {
 		if (ap->an_vp == vp && ap->an_off == off)
@@ -1452,7 +1451,8 @@ swapdel(
 	 * may change under us.
 	 */
 	for (app = anon_hash; app < &anon_hash[ANON_HASH_SIZE]; app++) {
-		ahm = &anonhash_lock[(app-anon_hash) & (AH_LOCK_SIZE - 1)];
+		ahm = &anonhash_lock[(app - anon_hash) &
+		    (AH_LOCK_SIZE - 1)].pad_mutex;
 		mutex_enter(ahm);
 top:
 		for (ap = *app; ap != NULL; ap = ap->an_hash) {
@@ -1612,7 +1612,7 @@ again:
 	 */
 	if (!alloc_pg)
 		page_io_lock(pp);
-	ahm = &anonhash_lock[AH_LOCK(vp, off)];
+	ahm = AH_MUTEX(vp, off);
 	mutex_enter(ahm);
 	ap = swap_anon(vp, off);
 	if ((ap == NULL || ap->an_pvp == NULL) && alloc_pg) {
@@ -1681,7 +1681,7 @@ swap_newphysname(
 		 * No swap available so return error unless requested
 		 * offset is already backed in which case return that.
 		 */
-		ahm = &anonhash_lock[AH_LOCK(vp, offset)];
+		ahm = AH_MUTEX(vp, offset);
 		mutex_enter(ahm);
 		if ((ap = swap_anon(vp, offset)) == NULL) {
 			error = SE_NOANON;
@@ -1709,7 +1709,7 @@ swap_newphysname(
 
 	for (off = start, poff = pstart; poff < pstart + plen;
 	    off += PAGESIZE, poff += PAGESIZE) {
-		ahm = &anonhash_lock[AH_LOCK(vp, off)];
+		ahm = AH_MUTEX(vp, off);
 		mutex_enter(ahm);
 		if ((ap = swap_anon(vp, off)) != NULL) {
 			/* Free old slot if any, and assign new one */
@@ -1779,7 +1779,7 @@ swap_getphysname(
 	int error = 0;
 	kmutex_t *ahm;
 
-	ahm = &anonhash_lock[AH_LOCK(vp, off)];
+	ahm = AH_MUTEX(vp, off);
 	mutex_enter(ahm);
 
 	/* Get anon slot for vp, off */

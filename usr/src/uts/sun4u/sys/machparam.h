@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -28,8 +27,6 @@
 
 #ifndef _SYS_MACHPARAM_H
 #define	_SYS_MACHPARAM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -79,6 +76,32 @@ extern "C" {
 #define	NCPU	32
 #endif
 #endif	/* _STARFIRE && !lint */
+
+#if	(NCPU <= 1)
+#define	NCPU_LOG2	0
+#elif	(NCPU <= 2)
+#define	NCPU_LOG2	1
+#elif	(NCPU <= 4)
+#define	NCPU_LOG2	2
+#elif	(NCPU <= 8)
+#define	NCPU_LOG2	3
+#elif	(NCPU <= 16)
+#define	NCPU_LOG2	4
+#elif	(NCPU <= 32)
+#define	NCPU_LOG2	5
+#elif	(NCPU <= 64)
+#define	NCPU_LOG2	6
+#elif	(NCPU <= 128)
+#define	NCPU_LOG2	7
+#elif	(NCPU <= 256)
+#define	NCPU_LOG2	8
+#elif	(NCPU <= 512)
+#define	NCPU_LOG2	9
+#elif	(NCPU <= 1024)
+#define	NCPU_LOG2	10
+#else
+#error	"add test for larger NCPU"
+#endif
 
 /*
  * Maximum number of processors that we support.  With CMP processors, the

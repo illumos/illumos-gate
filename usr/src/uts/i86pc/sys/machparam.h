@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -55,8 +54,10 @@ extern "C" {
 
 #if defined(__amd64)
 #define	NCPU	256
+#define	NCPU_LOG2	8
 #elif defined(__i386)
 #define	NCPU	32
+#define	NCPU_LOG2	5
 #endif
 
 /*

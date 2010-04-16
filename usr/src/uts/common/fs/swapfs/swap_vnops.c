@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -241,7 +240,7 @@ again:
 				    PAGESIZE, flags, cr, NULL);
 
 				if (!err) {
-					ahm = &anonhash_lock[AH_LOCK(vp, off)];
+					ahm = AH_MUTEX(vp, off);
 					mutex_enter(ahm);
 
 					ap = swap_anon(vp, off);
@@ -422,7 +421,7 @@ swap_getconpage(
 				struct anon *ap;
 				kmutex_t *ahm;
 
-				ahm = &anonhash_lock[AH_LOCK(vp, off)];
+				ahm = AH_MUTEX(vp, off);
 				mutex_enter(ahm);
 				ap = swap_anon(vp, off);
 				if (ap == NULL)

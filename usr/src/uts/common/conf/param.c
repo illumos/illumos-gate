@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -114,6 +113,7 @@ const unsigned long	_pgthresh	= (unsigned long)PGTHRESH;
 const unsigned int	_maxslp		= (unsigned int)MAXSLP;
 const unsigned long	_maxhandspreadpages = (unsigned long)MAXHANDSPREADPAGES;
 const int		_ncpu 		= (int)NCPU;
+const int		_ncpu_log2	= (int)NCPU_LOG2;
 const unsigned long	_defaultstksz	= (unsigned long)DEFAULTSTKSZ;
 const unsigned int	_nbpg		= (unsigned int)MMU_PAGESIZE;
 
