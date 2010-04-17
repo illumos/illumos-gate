@@ -85,7 +85,7 @@ static	void	vr_prt(const char *fmt, ...);
 #define	VR_DEBUG(args)	do ; _NOTE(CONSTANTCONDITION) while (0)
 #endif
 
-static char vr_ident[] = "VIA Rhine Ethernet v1.42";
+static char vr_ident[] = "VIA Rhine Ethernet";
 
 /*
  * Attributes for accessing registers and memory descriptors for this device.
@@ -1194,11 +1194,20 @@ vr_intr(caddr_t arg1, caddr_t arg2)
 	vrp = (void *)arg1;
 	_NOTE(ARGUNUSED(arg2))
 
+	mutex_enter(&vrp->intrlock);
+	/*
+	 * If the driver is not in running state it is not our interrupt.
+	 * Shared interrupts can end up here without us being started.
+	 */
+	if (vrp->chip.state != CHIPSTATE_RUNNING) {
+		mutex_exit(&vrp->intrlock);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	/*
 	 * Read the status register to see if the interrupt is from our device
 	 * This read also ensures that posted writes are brought to main memory.
 	 */
-	mutex_enter(&vrp->intrlock);
 	status = VR_GET16(vrp->acc_reg, VR_ISR0) & VR_ICR0_CFG;
 	if (status == 0) {
 		/*
