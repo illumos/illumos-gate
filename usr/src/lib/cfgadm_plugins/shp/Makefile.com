@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY= shp.a
@@ -31,10 +30,6 @@ OBJECTS= shp.o pci_strings.o
 include ../../../Makefile.lib
 
 SRCDIR =	../common
-INS.dir.root.sys=       $(INS) -s -d -m $(DIRMODE) $@
-$(CH)INS.dir.root.sys=  $(INS) -s -d -m $(DIRMODE) -u root -g sys $@
-INS.dir.bin.bin=        $(INS) -s -d -m $(DIRMODE) $@
-$(CH)INS.dir.bin.bin=   $(INS) -s -d -m $(DIRMODE) -u bin -g bin $@
 
 USR_LIB_DIR		= $(ROOT)/usr/lib
 USR_LIB_DIR_CFGADM	= $(USR_LIB_DIR)/cfgadm
