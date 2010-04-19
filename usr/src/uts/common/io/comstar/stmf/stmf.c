@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -3636,10 +3635,9 @@ stmf_itl_kstat_lookup(char *kstat_nm)
 	stmf_i_itl_kstat_t	tmp;
 	stmf_i_itl_kstat_t	*itl_kstat;
 
+	ASSERT(mutex_owned(&stmf_state.stmf_lock));
 	(void) strcpy(tmp.iitl_kstat_nm, kstat_nm);
-	mutex_enter(&stmf_state.stmf_lock);
 	itl_kstat = avl_find(&stmf_state.stmf_itl_kstat_list, &tmp, NULL);
-	mutex_exit(&stmf_state.stmf_lock);
 	return (itl_kstat);
 }
 
@@ -3684,6 +3682,7 @@ stmf_itl_kstat_create(stmf_itl_data_t *itl, char *nm,
 	stmf_i_itl_kstat_t	*ks_itl;
 	int			i, len;
 
+	ASSERT(mutex_owned(&stmf_state.stmf_lock));
 	if ((ks_itl = stmf_itl_kstat_lookup(nm)) != NULL)
 		return (ks_itl);
 
@@ -3705,9 +3704,7 @@ stmf_itl_kstat_create(stmf_itl_data_t *itl, char *nm,
 	ks_itl->iitl_kstat_taskq = itl->itl_kstat_taskq;
 	ks_itl->iitl_kstat_lu_xfer = itl->itl_kstat_lu_xfer;
 	ks_itl->iitl_kstat_lport_xfer = itl->itl_kstat_lport_xfer;
-	mutex_enter(&stmf_state.stmf_lock);
 	avl_add(&stmf_state.stmf_itl_kstat_list, ks_itl);
-	mutex_exit(&stmf_state.stmf_lock);
 
 	return (ks_itl);
 }
@@ -3971,22 +3968,29 @@ stmf_register_itl_handle(stmf_lu_t *lu, uint8_t *lun,
 		iss = (stmf_i_scsi_session_t *)ss->ss_stmf_private;
 	}
 
+	/*
+	 * Acquire stmf_lock for stmf_itl_kstat_lookup.
+	 */
+	mutex_enter(&stmf_state.stmf_lock);
 	rw_enter(iss->iss_lockp, RW_WRITER);
 	n = ((uint16_t)lun[1] | (((uint16_t)(lun[0] & 0x3F)) << 8));
 	lun_map_ent = (stmf_lun_map_ent_t *)
 	    stmf_get_ent_from_map(iss->iss_sm, n);
 	if ((lun_map_ent == NULL) || (lun_map_ent->ent_lu != lu)) {
 		rw_exit(iss->iss_lockp);
+		mutex_exit(&stmf_state.stmf_lock);
 		return (STMF_NOT_FOUND);
 	}
 	if (lun_map_ent->ent_itl_datap != NULL) {
 		rw_exit(iss->iss_lockp);
+		mutex_exit(&stmf_state.stmf_lock);
 		return (STMF_ALREADY);
 	}
 
 	itl = (stmf_itl_data_t *)kmem_zalloc(sizeof (*itl), KM_NOSLEEP);
 	if (itl == NULL) {
 		rw_exit(iss->iss_lockp);
+		mutex_exit(&stmf_state.stmf_lock);
 		return (STMF_ALLOC_FAILURE);
 	}
 
@@ -3999,6 +4003,7 @@ stmf_register_itl_handle(stmf_lu_t *lu, uint8_t *lun,
 	if (stmf_setup_itl_kstats(itl) != STMF_SUCCESS) {
 		kmem_free(itl, sizeof (*itl));
 		rw_exit(iss->iss_lockp);
+		mutex_exit(&stmf_state.stmf_lock);
 		return (STMF_ALLOC_FAILURE);
 	}
 
@@ -4008,6 +4013,7 @@ stmf_register_itl_handle(stmf_lu_t *lu, uint8_t *lun,
 	mutex_exit(&ilu->ilu_task_lock);
 	lun_map_ent->ent_itl_datap = itl;
 	rw_exit(iss->iss_lockp);
+	mutex_exit(&stmf_state.stmf_lock);
 
 	return (STMF_SUCCESS);
 }
