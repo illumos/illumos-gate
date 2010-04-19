@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -822,7 +821,8 @@ dbuf_free_range(dnode_t *dn, uint64_t start, uint64_t end, dmu_tx_t *tx)
 				 * size to reflect that this buffer may
 				 * contain new data when we sync.
 				 */
-				if (db->db_blkid > dn->dn_maxblkid)
+				if (db->db_blkid != DMU_SPILL_BLKID &&
+				    db->db_blkid > dn->dn_maxblkid)
 					dn->dn_maxblkid = db->db_blkid;
 				dbuf_unoverride(dr);
 			} else {
@@ -1482,7 +1482,8 @@ dbuf_findbp(dnode_t *dn, int level, uint64_t blkid, int fail_sparse,
 
 	if (blkid == DMU_SPILL_BLKID) {
 		mutex_enter(&dn->dn_mtx);
-		if (dn->dn_phys->dn_flags & DNODE_FLAG_SPILL_BLKPTR)
+		if (dn->dn_have_spill &&
+		    (dn->dn_phys->dn_flags & DNODE_FLAG_SPILL_BLKPTR))
 			*bpp = &dn->dn_phys->dn_spill;
 		else
 			*bpp = NULL;
@@ -1867,7 +1868,6 @@ void
 dbuf_rm_spill(dnode_t *dn, dmu_tx_t *tx)
 {
 	dbuf_free_range(dn, DMU_SPILL_BLKID, DMU_SPILL_BLKID, tx);
-	dnode_rm_spill(dn, tx);
 }
 
 #pragma weak dmu_buf_add_ref = dbuf_add_ref

@@ -1698,12 +1698,10 @@ out:
 
 	zfs_dirent_unlock(dl);
 
-	if (!delete_now) {
+	if (!delete_now)
 		VN_RELE(vp);
-	} else if (xzp) {
-		/* this rele is delayed to prevent nesting transactions */
+	if (xzp)
 		VN_RELE(ZTOV(xzp));
-	}
 
 	ZFS_EXIT(zfsvfs);
 	return (error);

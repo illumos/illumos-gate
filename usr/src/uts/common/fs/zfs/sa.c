@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -1067,7 +1066,7 @@ sa_attr_iter(objset_t *os, sa_hdr_phys_t *hdr, dmu_object_type_t type,
 	avl_index_t loc;
 	sa_os_t *sa = os->os_sa;
 	int i;
-	uint16_t *length_start;
+	uint16_t *length_start = NULL;
 	uint8_t length_idx = 0;
 
 	if (tab == NULL) {

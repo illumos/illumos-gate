@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -531,7 +530,7 @@ dnode_sync(dnode_t *dn, dmu_tx_t *tx)
 		dn->dn_id_flags |= DN_ID_SYNC;
 		dn->dn_phys->dn_flags |= DNODE_FLAG_USERUSED_ACCOUNTED;
 		mutex_exit(&dn->dn_mtx);
-		dmu_objset_userquota_get_ids(dn, B_FALSE);
+		dmu_objset_userquota_get_ids(dn, B_FALSE, tx);
 	} else {
 		/* Once we account for it, we should always account for it. */
 		ASSERT(!(dn->dn_phys->dn_flags &
@@ -562,6 +561,7 @@ dnode_sync(dnode_t *dn, dmu_tx_t *tx)
 		    SPA_MINBLOCKSIZE) == 0);
 		ASSERT(BP_IS_HOLE(&dnp->dn_blkptr[0]) ||
 		    dn->dn_maxblkid == 0 || list_head(list) != NULL ||
+		    avl_last(&dn->dn_ranges[txgoff]) ||
 		    dn->dn_next_blksz[txgoff] >> SPA_MINBLOCKSHIFT ==
 		    dnp->dn_datablkszsec);
 		dnp->dn_datablkszsec =
@@ -613,18 +613,10 @@ dnode_sync(dnode_t *dn, dmu_tx_t *tx)
 	mutex_exit(&dn->dn_mtx);
 
 	if (kill_spill) {
-		dmu_buf_impl_t *spilldb;
 		(void) free_blocks(dn, &dn->dn_phys->dn_spill, 1, tx);
 		mutex_enter(&dn->dn_mtx);
 		dnp->dn_flags &= ~DNODE_FLAG_SPILL_BLKPTR;
 		mutex_exit(&dn->dn_mtx);
-		rw_enter(&dn->dn_struct_rwlock, RW_READER);
-		spilldb = dbuf_find(dn, 0, DMU_SPILL_BLKID);
-		if (spilldb) {
-			spilldb->db_blkptr = NULL;
-			mutex_exit(&spilldb->db_mtx);
-		}
-		rw_exit(&dn->dn_struct_rwlock);
 	}
 
 	/* process all the "freed" ranges in the file */

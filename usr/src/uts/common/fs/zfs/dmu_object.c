@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -127,7 +126,11 @@ dmu_object_reclaim(objset_t *os, uint64_t object, dmu_object_type_t ot,
 		return (0);
 	}
 
-	nblkptr = 1 + ((DN_MAX_BONUSLEN - bonuslen) >> SPA_BLKPTRSHIFT);
+	if (bonustype == DMU_OT_SA) {
+		nblkptr = 1;
+	} else {
+		nblkptr = 1 + ((DN_MAX_BONUSLEN - bonuslen) >> SPA_BLKPTRSHIFT);
+	}
 
 	/*
 	 * If we are losing blkptrs or changing the block size this must

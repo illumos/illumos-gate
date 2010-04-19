@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DMU_OBJSET_H
@@ -151,7 +150,7 @@ int dmu_objset_open_impl(spa_t *spa, struct dsl_dataset *ds, blkptr_t *bp,
     objset_t **osp);
 void dmu_objset_evict(objset_t *os);
 void dmu_objset_do_userquota_updates(objset_t *os, dmu_tx_t *tx);
-void dmu_objset_userquota_get_ids(dnode_t *dn, boolean_t before);
+void dmu_objset_userquota_get_ids(dnode_t *dn, boolean_t before, dmu_tx_t *tx);
 boolean_t dmu_objset_userused_enabled(objset_t *os);
 int dmu_objset_userspace_upgrade(objset_t *os);
 boolean_t dmu_objset_userspace_present(objset_t *os);

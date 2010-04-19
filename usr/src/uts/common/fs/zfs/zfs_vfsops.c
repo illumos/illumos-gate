@@ -594,8 +594,20 @@ zfs_space_delta_cb(dmu_object_type_t bonustype, void *data,
 	znode_phys_t *znp = data;
 	int error = 0;
 
+	/*
+	 * Is it a valid type of object to track?
+	 */
 	if (bonustype != DMU_OT_ZNODE && bonustype != DMU_OT_SA)
 		return (ENOENT);
+
+	/*
+	 * If we have a NULL data pointer
+	 * then assume the id's aren't changing and
+	 * return EEXIST to the dmu to let it know to
+	 * use the same ids
+	 */
+	if (data == NULL)
+		return (EEXIST);
 
 	if (bonustype == DMU_OT_ZNODE) {
 		*userp = znp->zp_uid;
@@ -612,7 +624,13 @@ zfs_space_delta_cb(dmu_object_type_t bonustype, void *data,
 			*groupp = *((uint64_t *)((uintptr_t)data + hdrsize +
 			    SA_GID_OFFSET));
 		} else {
-			error = ENOENT;
+			/*
+			 * This should only happen for newly created
+			 * files that haven't had the znode data filled
+			 * in yet.
+			 */
+			*userp = 0;
+			*groupp = 0;
 		}
 	}
 	return (error);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -278,11 +277,10 @@ void
 dnode_rm_spill(dnode_t *dn, dmu_tx_t *tx)
 {
 	ASSERT3U(refcount_count(&dn->dn_holds), >=, 1);
+	ASSERT(RW_WRITE_HELD(&dn->dn_struct_rwlock));
 	dnode_setdirty(dn, tx);
-	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
 	dn->dn_rm_spillblk[tx->tx_txg&TXG_MASK] = DN_KILL_SPILLBLK;
 	dn->dn_have_spill = B_FALSE;
-	rw_exit(&dn->dn_struct_rwlock);
 }
 
 static void
@@ -322,6 +320,7 @@ dnode_create(objset_t *os, dnode_phys_t *dnp, dmu_buf_impl_t *db,
 	dn->dn_bonuslen = dnp->dn_bonuslen;
 	dn->dn_maxblkid = dnp->dn_maxblkid;
 	dn->dn_have_spill = ((dnp->dn_flags & DNODE_FLAG_SPILL_BLKPTR) != 0);
+	dn->dn_id_flags = 0;
 
 	dmu_zfetch_init(&dn->dn_zfetch, dn);
 
@@ -463,7 +462,8 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 	ASSERT(dn->dn_object != DMU_META_DNODE_OBJECT || dmu_tx_private_ok(tx));
 	ASSERT(tx->tx_txg != 0);
 	ASSERT((bonustype == DMU_OT_NONE && bonuslen == 0) ||
-	    (bonustype != DMU_OT_NONE && bonuslen != 0));
+	    (bonustype != DMU_OT_NONE && bonuslen != 0) ||
+	    (bonustype == DMU_OT_SA && bonuslen == 0));
 	ASSERT3U(bonustype, <, DMU_OT_NUMTYPES);
 	ASSERT3U(bonuslen, <=, DN_MAX_BONUSLEN);
 
@@ -482,14 +482,18 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 	}
 	if (dn->dn_bonuslen != bonuslen)
 		dn->dn_next_bonuslen[tx->tx_txg&TXG_MASK] = bonuslen;
-	nblkptr = 1 + ((DN_MAX_BONUSLEN - bonuslen) >> SPA_BLKPTRSHIFT);
+
+	if (bonustype == DMU_OT_SA) /* Maximize bonus space for SA */
+		nblkptr = 1;
+	else
+		nblkptr = 1 + ((DN_MAX_BONUSLEN - bonuslen) >> SPA_BLKPTRSHIFT);
 	if (dn->dn_bonustype != bonustype)
 		dn->dn_next_bonustype[tx->tx_txg&TXG_MASK] = bonustype;
 	if (dn->dn_nblkptr != nblkptr)
 		dn->dn_next_nblkptr[tx->tx_txg&TXG_MASK] = nblkptr;
 	if (dn->dn_phys->dn_flags & DNODE_FLAG_SPILL_BLKPTR) {
-		dn->dn_rm_spillblk[tx->tx_txg&TXG_MASK] = DN_KILL_SPILLBLK;
-		dn->dn_have_spill = B_FALSE;
+		dbuf_rm_spill(dn, tx);
+		dnode_rm_spill(dn, tx);
 	}
 	rw_exit(&dn->dn_struct_rwlock);
 
@@ -761,7 +765,7 @@ dnode_setdirty(dnode_t *dn, dmu_tx_t *tx)
 	/*
 	 * Determine old uid/gid when necessary
 	 */
-	dmu_objset_userquota_get_ids(dn, B_TRUE);
+	dmu_objset_userquota_get_ids(dn, B_TRUE, tx);
 
 	mutex_enter(&os->os_lock);
 

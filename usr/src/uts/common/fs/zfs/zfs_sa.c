@@ -203,7 +203,6 @@ zfs_sa_upgrade(sa_handle_t *hdl, dmu_tx_t *tx)
 	uint64_t uid, gid, mode, rdev, xattr, parent;
 	uint64_t crtime[2], mtime[2], ctime[2];
 	zfs_acl_phys_t znode_acl;
-	char *slink = NULL;
 	char scanstamp[AV_SCANSTAMP_SZ];
 
 	/*
@@ -212,7 +211,7 @@ zfs_sa_upgrade(sa_handle_t *hdl, dmu_tx_t *tx)
 	 * and ready the ACL would require special "locked"
 	 * interfaces that would be messy
 	 */
-	if (zp->z_acl_cached == NULL)
+	if (zp->z_acl_cached == NULL || ZTOV(zp)->v_type == VLNK)
 		return;
 
 	/* First do a bulk query of the attributes that aren't cached */
@@ -274,31 +273,6 @@ zfs_sa_upgrade(sa_handle_t *hdl, dmu_tx_t *tx)
 		SA_ADD_BULK_ATTR(sa_attrs, count, SA_ZPL_RDEV(zfsvfs),
 		    NULL, &rdev, 8);
 
-	/*
-	 * is it a symlink ?
-	 *
-	 * this will probably never be exercised since we won't
-	 * have the cached ACL.
-	 */
-	if (ZTOV(zp)->v_type == VLNK) {
-		slink = kmem_zalloc(zp->z_size + 1, KM_SLEEP);
-		if (zp->z_size + ZFS_OLD_ZNODE_PHYS_SIZE)
-			bcopy((caddr_t)db->db_data + ZFS_OLD_ZNODE_PHYS_SIZE,
-			    slink, zp->z_size);
-		else {
-			dmu_buf_t *dbp;
-			if (dmu_buf_hold(zfsvfs->z_os, zp->z_id, 0,
-			    FTAG, &dbp)) {
-				kmem_free(slink, zp->z_size + 1);
-				return;
-			}
-			bcopy(dbp->db_data, slink, zp->z_size);
-			dmu_buf_rele(dbp, FTAG);
-		}
-		SA_ADD_BULK_ATTR(sa_attrs, count, SA_ZPL_SYMLINK(zfsvfs),
-		    NULL, slink, zp->z_size);
-	}
-
 	/* if scanstamp then add scanstamp */
 
 	if (zp->z_pflags & ZFS_BONUS_SCANSTAMP) {
@@ -317,9 +291,6 @@ zfs_sa_upgrade(sa_handle_t *hdl, dmu_tx_t *tx)
 		    znode_acl.z_acl_extern_obj, tx));
 
 	zp->z_is_sa = B_TRUE;
-	if (slink)
-		kmem_free(slink, zp->z_size + 1);
-
 }
 
 void

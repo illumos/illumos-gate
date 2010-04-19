@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cred.h>
@@ -1150,15 +1149,46 @@ dmu_objset_do_userquota_updates(objset_t *os, dmu_tx_t *tx)
 	}
 }
 
+/*
+ * Returns a pointer to data to find uid/gid from
+ *
+ * If a dirty record for transaction group that is syncing can't
+ * be found then NULL is returned.  In the NULL case it is assumed
+ * the uid/gid aren't changing.
+ */
+static void *
+dmu_objset_userquota_find_data(dmu_buf_impl_t *db, dmu_tx_t *tx)
+{
+	dbuf_dirty_record_t *dr, **drp;
+	void *data;
+
+	if (db->db_dirtycnt == 0)
+		return (db->db.db_data);  /* Nothing is changing */
+
+	for (drp = &db->db_last_dirty; (dr = *drp) != NULL; drp = &dr->dr_next)
+		if (dr->dr_txg == tx->tx_txg)
+			break;
+
+	if (dr == NULL)
+		data = NULL;
+	else if (dr->dr_dbuf->db_dnode->dn_bonuslen == 0 &&
+	    dr->dr_dbuf->db_blkid == DMU_SPILL_BLKID)
+		data = dr->dt.dl.dr_data->b_data;
+	else
+		data = dr->dt.dl.dr_data;
+	return (data);
+}
+
 void
-dmu_objset_userquota_get_ids(dnode_t *dn, boolean_t before)
+dmu_objset_userquota_get_ids(dnode_t *dn, boolean_t before, dmu_tx_t *tx)
 {
 	objset_t *os = dn->dn_objset;
 	void *data = NULL;
-	dmu_buf_t *spilldb = NULL;
+	dmu_buf_impl_t *db = NULL;
 	uint64_t *user, *group;
 	int flags = dn->dn_id_flags;
 	int error;
+	boolean_t have_spill = B_FALSE;
 
 	if (!dmu_objset_userused_enabled(dn->dn_objset))
 		return;
@@ -1169,17 +1199,26 @@ dmu_objset_userquota_get_ids(dnode_t *dn, boolean_t before)
 
 	if (before && dn->dn_bonuslen != 0)
 		data = DN_BONUS(dn->dn_phys);
-	else if (!before && dn->dn_bonuslen != 0)
-		data = dn->dn_bonus != NULL ?
-		    dn->dn_bonus->db.db_data : DN_BONUS(dn->dn_phys);
-	else if (dn->dn_bonuslen == 0 && dn->dn_bonustype == DMU_OT_SA) {
+	else if (!before && dn->dn_bonuslen != 0) {
+		if (dn->dn_bonus) {
+			db = dn->dn_bonus;
+			mutex_enter(&db->db_mtx);
+			data = dmu_objset_userquota_find_data(db, tx);
+		} else {
+			data = DN_BONUS(dn->dn_phys);
+		}
+	} else if (dn->dn_bonuslen == 0 && dn->dn_bonustype == DMU_OT_SA) {
 			int rf = 0;
 
 			if (RW_WRITE_HELD(&dn->dn_struct_rwlock))
 				rf |= DB_RF_HAVESTRUCT;
-			error = dmu_spill_hold_by_dnode(dn, rf, FTAG, &spilldb);
+			error = dmu_spill_hold_by_dnode(dn, rf,
+			    FTAG, (dmu_buf_t **)&db);
 			ASSERT(error == 0);
-			data = spilldb->db_data;
+			mutex_enter(&db->db_mtx);
+			data = (before) ? db->db.db_data :
+			    dmu_objset_userquota_find_data(db, tx);
+			have_spill = B_TRUE;
 	} else {
 		mutex_enter(&dn->dn_mtx);
 		dn->dn_id_flags |= DN_ID_CHKED_BONUS;
@@ -1188,16 +1227,41 @@ dmu_objset_userquota_get_ids(dnode_t *dn, boolean_t before)
 	}
 
 	if (before) {
+		ASSERT(data);
 		user = &dn->dn_olduid;
 		group = &dn->dn_oldgid;
-	} else {
+	} else if (data) {
 		user = &dn->dn_newuid;
 		group = &dn->dn_newgid;
 	}
 
-	ASSERT(data);
+	/*
+	 * Must always call the callback in case the object
+	 * type has changed and that type isn't an object type to track
+	 */
 	error = used_cbs[os->os_phys->os_type](dn->dn_bonustype, data,
 	    user, group);
+
+	/*
+	 * Preserve existing uid/gid when the callback can't determine
+	 * what the new uid/gid are and the callback returned EEXIST.
+	 * The EEXIST error tells us to just use the existing uid/gid.
+	 * If we don't know what the old values are then just assign
+	 * them to 0, since that is a new file  being created.
+	 */
+	if (!before && data == NULL && error == EEXIST) {
+		if (flags & DN_ID_OLD_EXIST) {
+			dn->dn_newuid = dn->dn_olduid;
+			dn->dn_newgid = dn->dn_oldgid;
+		} else {
+			dn->dn_newuid = 0;
+			dn->dn_newgid = 0;
+		}
+		error = 0;
+	}
+
+	if (db)
+		mutex_exit(&db->db_mtx);
 
 	mutex_enter(&dn->dn_mtx);
 	if (error == 0 && before)
@@ -1205,14 +1269,14 @@ dmu_objset_userquota_get_ids(dnode_t *dn, boolean_t before)
 	if (error == 0 && !before)
 		dn->dn_id_flags |= DN_ID_NEW_EXIST;
 
-	if (spilldb) {
+	if (have_spill) {
 		dn->dn_id_flags |= DN_ID_CHKED_SPILL;
 	} else {
 		dn->dn_id_flags |= DN_ID_CHKED_BONUS;
 	}
 	mutex_exit(&dn->dn_mtx);
-	if (spilldb)
-		dmu_buf_rele(spilldb, FTAG);
+	if (have_spill)
+		dmu_buf_rele((dmu_buf_t *)db, FTAG);
 }
 
 boolean_t
