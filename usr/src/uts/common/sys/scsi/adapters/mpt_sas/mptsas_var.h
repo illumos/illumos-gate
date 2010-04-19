@@ -58,6 +58,8 @@
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_ioctl.h>
+#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
+#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -83,6 +85,7 @@ extern "C" {
 typedef uint16_t		mptsas_phymask_t;
 
 #define	MPTSAS_INVALID_DEVHDL	0xffff
+#define	MPTSAS_SATA_GUID	"sata-guid"
 
 /*
  * MPT HW defines
@@ -213,6 +216,8 @@ typedef struct mptsas_smp {
 	uint8_t		reserved1;
 	uint16_t	m_devhdl;
 	uint32_t	m_deviceinfo;
+	uint16_t	m_pdevhdl;
+	uint32_t	m_pdevinfo;
 } mptsas_smp_t;
 
 typedef struct mptsas_hash_data {
@@ -590,6 +595,30 @@ typedef struct mptsas_tgt_private {
 /*
  * Macro for phy_flags
  */
+
+typedef struct smhba_info {
+	kmutex_t	phy_mutex;
+	uint8_t		phy_id;
+	uint64_t	sas_addr;
+	char		path[8];
+	uint16_t	owner_devhdl;
+	uint16_t	attached_devhdl;
+	uint8_t		attached_phy_identify;
+	uint32_t	attached_phy_info;
+	uint8_t		programmed_link_rate;
+	uint8_t		hw_link_rate;
+	uint8_t		change_count;
+	uint32_t	phy_info;
+	uint8_t		negotiated_link_rate;
+	uint8_t		port_num;
+	kstat_t		*phy_stats;
+	uint32_t	invalid_dword_count;
+	uint32_t	running_disparity_error_count;
+	uint32_t	loss_of_dword_sync_count;
+	uint32_t	phy_reset_problem_count;
+	void		*mpt;
+} smhba_info_t;
+
 typedef struct mptsas_phy_info {
 	uint8_t			port_num;
 	uint8_t			port_flags;
@@ -597,7 +626,9 @@ typedef struct mptsas_phy_info {
 	uint32_t		phy_device_type;
 	uint16_t		attached_devhdl;
 	mptsas_phymask_t	phy_mask;
+	smhba_info_t		smhba_info;
 } mptsas_phy_info_t;
+
 
 typedef struct mptsas_doneq_thread_arg {
 	void		*mpt;
@@ -818,6 +849,8 @@ typedef struct mptsas {
 	uint8_t			m_num_phys;		/* # of PHYs */
 	mptsas_phy_info_t	m_phy_info[MPTSAS_MAX_PHYS];
 	uint8_t			m_port_chng;	/* initiator port changes */
+	MPI2_CONFIG_PAGE_MAN_0   m_MANU_page0;   /* Manufactor page 0 info */
+	MPI2_CONFIG_PAGE_MAN_1   m_MANU_page1;   /* Manufactor page 1 info */
 
 	/* FMA Capabilities */
 	int			m_fm_capabilities;
@@ -1279,8 +1312,8 @@ int mptsas_ioc_init(mptsas_t *mpt);
  */
 int mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
     uint16_t *dev_handle, uint64_t *sas_wwn, uint32_t *dev_info,
-    uint8_t *physport, uint8_t *phynum, uint16_t *slot_num,
-    uint16_t *enclosure);
+    uint8_t *physport, uint8_t *phynum, uint16_t *pdevhandle,
+    uint16_t *slot_num, uint16_t *enclosure);
 int mptsas_get_sas_io_unit_page(mptsas_t *mpt);
 int mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt);
 int mptsas_get_sas_expander_page0(mptsas_t *mpt, uint32_t page_address,
@@ -1290,7 +1323,18 @@ int mptsas_get_manufacture_page5(mptsas_t *mpt);
 int mptsas_get_sas_port_page0(mptsas_t *mpt, uint32_t page_address,
     uint64_t *sas_wwn, uint8_t *portwidth);
 int mptsas_get_bios_page3(mptsas_t *mpt,  uint32_t *bios_version);
-
+int
+mptsas_get_sas_phy_page0(mptsas_t *mpt, uint32_t page_address,
+    smhba_info_t *info);
+int
+mptsas_get_sas_phy_page1(mptsas_t *mpt, uint32_t page_address,
+    smhba_info_t *info);
+int
+mptsas_get_manufacture_page0(mptsas_t *mpt);
+void
+mptsas_create_phy_stats(mptsas_t *mpt, char *iport, dev_info_t *dip);
+void mptsas_destroy_phy_stats(mptsas_t *mpt);
+int mptsas_smhba_phy_init(mptsas_t *mpt);
 /*
  * RAID functions
  */

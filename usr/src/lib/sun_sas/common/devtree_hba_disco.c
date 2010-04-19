@@ -20,10 +20,8 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 #include	<sun_sas.h>
 #include	<sys/modctl.h>
@@ -332,6 +330,14 @@ refresh_hba(di_node_t hbaNode, struct sun_sas_hba *hba_ptr)
 	}
 
 	while (portNode != DI_NODE_NIL) {
+		if (di_prop_lookup_ints(DDI_DEV_T_ANY, portNode,
+		    "virtual-port", &propIntData) >= 0) {
+			if (*propIntData) {
+				/* ignore a virtual port. */
+				portNode = di_sibling_node(portNode);
+				continue;
+			}
+		}
 		if (add_hba_port_info(portNode, hba_ptr, protocol)
 		    == HBA_STATUS_ERROR) {
 			S_FREE(hba_ptr->first_port);
@@ -540,6 +546,14 @@ devtree_get_one_hba(di_node_t hbaNode)
 	}
 
 	while (portNode != DI_NODE_NIL) {
+		if (di_prop_lookup_ints(DDI_DEV_T_ANY, portNode,
+		    "virtual-port", &propIntData) >= 0) {
+			if (*propIntData) {
+				/* ignore a virtual port. */
+				portNode = di_sibling_node(portNode);
+				continue;
+			}
+		}
 		if (add_hba_port_info(portNode, new_hba, protocol)
 		    == HBA_STATUS_ERROR) {
 			S_FREE(new_hba->first_port);

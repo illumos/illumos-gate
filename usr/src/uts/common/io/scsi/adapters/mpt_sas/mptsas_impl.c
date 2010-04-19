@@ -80,6 +80,7 @@
  * private header files.
  */
 #include <sys/scsi/adapters/mpt_sas/mptsas_var.h>
+#include <sys/scsi/adapters/mpt_sas/mptsas_smhba.h>
 
 /*
  * FMA header files.
@@ -1395,6 +1396,7 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	uint64_t		*sas_wwn;
 	uint32_t		*dev_info;
 	uint8_t			*physport, *phynum;
+	uint16_t		*pdevhdl;
 	uint32_t		page_address;
 
 	if ((iocstatus != MPI2_IOCSTATUS_SUCCESS) &&
@@ -1425,8 +1427,10 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	dev_info = va_arg(ap, uint32_t *);
 	physport = va_arg(ap, uint8_t *);
 	phynum = va_arg(ap, uint8_t *);
+	pdevhdl = va_arg(ap, uint16_t *);
 	bay_num = va_arg(ap, uint16_t *);
 	enclosure = va_arg(ap, uint16_t *);
+
 
 	sasdevpage = (pMpi2SasDevicePage0_t)page_memp;
 
@@ -1440,6 +1444,7 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	*sas_wwn = LE_64(*sas_wwn);
 	*physport = ddi_get8(accessp, &sasdevpage->PhysicalPort);
 	*phynum = ddi_get8(accessp, &sasdevpage->PhyNum);
+	*pdevhdl = ddi_get16(accessp, &sasdevpage->ParentDevHandle);
 	*bay_num = ddi_get16(accessp, &sasdevpage->Slot);
 	*enclosure = ddi_get16(accessp, &sasdevpage->EnclosureHandle);
 	return (rval);
@@ -1452,7 +1457,8 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 int
 mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
     uint16_t *dev_handle, uint64_t *sas_wwn, uint32_t *dev_info,
-    uint8_t *physport, uint8_t *phynum, uint16_t *bay_num, uint16_t *enclosure)
+    uint8_t *physport, uint8_t *phynum, uint16_t *pdev_handle,
+    uint16_t *bay_num, uint16_t *enclosure)
 {
 	int rval = DDI_SUCCESS;
 
@@ -1466,7 +1472,8 @@ mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
 	    MPI2_CONFIG_ACTION_PAGE_READ_CURRENT,
 	    MPI2_CONFIG_EXTPAGETYPE_SAS_DEVICE, 0, page_address,
 	    mptsas_sasdevpage_0_cb, page_address, dev_handle, sas_wwn,
-	    dev_info, physport, phynum, bay_num, enclosure);
+	    dev_info, physport, phynum, pdev_handle,
+	    bay_num, enclosure);
 
 	return (rval);
 }
@@ -1487,6 +1494,7 @@ mptsas_sasexpdpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	uint64_t		*sas_wwn;
 	uint8_t			physport;
 	mptsas_phymask_t	*phymask;
+	uint16_t		*pdevhdl;
 	uint32_t		page_address;
 
 	if ((iocstatus != MPI2_IOCSTATUS_SUCCESS) &&
@@ -1515,18 +1523,21 @@ mptsas_sasexpdpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	devhdl = va_arg(ap, uint16_t *);
 	sas_wwn = va_arg(ap, uint64_t *);
 	phymask = va_arg(ap, mptsas_phymask_t *);
+	pdevhdl = va_arg(ap, uint16_t *);
 
 	expddevpage = (pMpi2ExpanderPage0_t)page_memp;
 
 	*devhdl = ddi_get16(accessp, &expddevpage->DevHandle);
 	physport = ddi_get8(accessp, &expddevpage->PhysicalPort);
 	*phymask = mptsas_physport_to_phymask(mpt, physport);
+	*pdevhdl = ddi_get16(accessp, &expddevpage->ParentDevHandle);
 	sas_addr = (uint8_t *)(&expddevpage->SASAddress);
 	for (i = 0; i < SAS_WWN_BYTE_SIZE; i++) {
 		tmp_sas_wwn[i] = ddi_get8(accessp, sas_addr + i);
 	}
 	bcopy(tmp_sas_wwn, sas_wwn, SAS_WWN_BYTE_SIZE);
 	*sas_wwn = LE_64(*sas_wwn);
+
 	return (rval);
 }
 
@@ -1550,7 +1561,7 @@ mptsas_get_sas_expander_page0(mptsas_t *mpt, uint32_t page_address,
 	    MPI2_CONFIG_ACTION_PAGE_READ_CURRENT,
 	    MPI2_CONFIG_EXTPAGETYPE_SAS_EXPANDER, 0, page_address,
 	    mptsas_sasexpdpage_0_cb, page_address, &info->m_devhdl,
-	    &info->m_sasaddr, &info->m_phymask);
+	    &info->m_sasaddr, &info->m_phymask, &info->m_pdevhdl);
 
 	return (rval);
 }
@@ -1724,7 +1735,6 @@ mptsas_sasiou_page_1_cb(mptsas_t *mpt, caddr_t page_memp,
 		    &sasioupage1->PhyData[i].Port);
 		mpt->m_phy_info[i].port_flags = port_flags;
 		mpt->m_phy_info[i].phy_device_type = cpdi[i];
-
 	}
 	return (rval);
 }
@@ -2415,6 +2425,437 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 	mptsas_log(mpt, CE_NOTE, "!mpt%d: Initiator WWNs: 0x%016llx-0x%016llx",
 	    mpt->m_instance, (unsigned long long)mpt->un.m_base_wwid,
 	    (unsigned long long)mpt->un.m_base_wwid + mpt->m_num_phys - 1);
+
+	if ((mptsas_check_dma_handle(recv_dma_handle) != DDI_SUCCESS) ||
+	    (mptsas_check_dma_handle(page_dma_handle) != DDI_SUCCESS)) {
+		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
+		rval = DDI_FAILURE;
+		goto done;
+	}
+	if ((mptsas_check_acc_handle(recv_accessp) != DDI_SUCCESS) ||
+	    (mptsas_check_acc_handle(page_accessp) != DDI_SUCCESS)) {
+		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
+		rval = DDI_FAILURE;
+	}
+done:
+	/*
+	 * free up memory
+	 */
+	if (recv_dmastate & MPTSAS_DMA_HANDLE_BOUND)
+		(void) ddi_dma_unbind_handle(recv_dma_handle);
+	if (page_dmastate & MPTSAS_DMA_HANDLE_BOUND)
+		(void) ddi_dma_unbind_handle(page_dma_handle);
+	if (recv_dmastate & MPTSAS_DMA_MEMORY_ALLOCD)
+		(void) ddi_dma_mem_free(&recv_accessp);
+	if (page_dmastate & MPTSAS_DMA_MEMORY_ALLOCD)
+		(void) ddi_dma_mem_free(&page_accessp);
+	if (recv_dmastate & MPTSAS_DMA_HANDLE_ALLOCD)
+		ddi_dma_free_handle(&recv_dma_handle);
+	if (page_dmastate & MPTSAS_DMA_HANDLE_ALLOCD)
+		ddi_dma_free_handle(&page_dma_handle);
+
+	MPTSAS_ENABLE_INTR(mpt);
+
+	return (rval);
+}
+
+static int
+mptsas_sasphypage_0_cb(mptsas_t *mpt, caddr_t page_memp,
+    ddi_acc_handle_t accessp, uint16_t iocstatus, uint32_t iocloginfo,
+    va_list ap)
+{
+#ifndef __lock_lint
+	_NOTE(ARGUNUSED(ap))
+#endif
+	pMpi2SasPhyPage0_t	sasphypage;
+	int			rval = DDI_SUCCESS;
+	uint16_t		*owner_devhdl, *attached_devhdl;
+	uint8_t			*attached_phy_identify;
+	uint32_t		*attached_phy_info;
+	uint8_t			*programmed_link_rate;
+	uint8_t			*hw_link_rate;
+	uint8_t			*change_count;
+	uint32_t		*phy_info;
+	uint8_t			*negotiated_link_rate;
+	uint32_t		page_address;
+
+	if ((iocstatus != MPI2_IOCSTATUS_SUCCESS) &&
+	    (iocstatus != MPI2_IOCSTATUS_CONFIG_INVALID_PAGE)) {
+		mptsas_log(mpt, CE_WARN, "mptsas_get_sas_expander_page0 "
+		    "config: IOCStatus=0x%x, IOCLogInfo=0x%x",
+		    iocstatus, iocloginfo);
+		rval = DDI_FAILURE;
+		return (rval);
+	}
+	page_address = va_arg(ap, uint32_t);
+	/*
+	 * The INVALID_PAGE status is normal if using GET_NEXT_HANDLE and there
+	 * are no more pages.  If everything is OK up to this point but the
+	 * status is INVALID_PAGE, change rval to FAILURE and quit.  Also,
+	 * signal that device traversal is complete.
+	 */
+	if (iocstatus == MPI2_IOCSTATUS_CONFIG_INVALID_PAGE) {
+		if ((page_address & MPI2_SAS_EXPAND_PGAD_FORM_MASK) ==
+		    MPI2_SAS_EXPAND_PGAD_FORM_GET_NEXT_HNDL) {
+			mpt->m_done_traverse_smp = 1;
+		}
+		rval = DDI_FAILURE;
+		return (rval);
+	}
+	owner_devhdl = va_arg(ap, uint16_t *);
+	attached_devhdl = va_arg(ap, uint16_t *);
+	attached_phy_identify = va_arg(ap, uint8_t *);
+	attached_phy_info = va_arg(ap, uint32_t *);
+	programmed_link_rate = va_arg(ap, uint8_t *);
+	hw_link_rate = va_arg(ap, uint8_t *);
+	change_count = va_arg(ap, uint8_t *);
+	phy_info = va_arg(ap, uint32_t *);
+	negotiated_link_rate = va_arg(ap, uint8_t *);
+
+	sasphypage = (pMpi2SasPhyPage0_t)page_memp;
+
+	*owner_devhdl =
+	    ddi_get16(accessp, &sasphypage->OwnerDevHandle);
+	*attached_devhdl =
+	    ddi_get16(accessp, &sasphypage->AttachedDevHandle);
+	*attached_phy_identify =
+	    ddi_get8(accessp, &sasphypage->AttachedPhyIdentifier);
+	*attached_phy_info =
+	    ddi_get32(accessp, &sasphypage->AttachedPhyInfo);
+	*programmed_link_rate =
+	    ddi_get8(accessp, &sasphypage->ProgrammedLinkRate);
+	*hw_link_rate =
+	    ddi_get8(accessp, &sasphypage->HwLinkRate);
+	*change_count =
+	    ddi_get8(accessp, &sasphypage->ChangeCount);
+	*phy_info =
+	    ddi_get32(accessp, &sasphypage->PhyInfo);
+	*negotiated_link_rate =
+	    ddi_get8(accessp, &sasphypage->NegotiatedLinkRate);
+
+	return (rval);
+}
+
+/*
+ * Request MPI configuration page SAS phy page 0 to get DevHandle, phymask
+ * and SAS address.
+ */
+int
+mptsas_get_sas_phy_page0(mptsas_t *mpt, uint32_t page_address,
+    smhba_info_t *info)
+{
+	int			rval = DDI_SUCCESS;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	/*
+	 * Get the header and config page.  reply contains the reply frame,
+	 * which holds status info for the request.
+	 */
+	rval = mptsas_access_config_page(mpt,
+	    MPI2_CONFIG_ACTION_PAGE_READ_CURRENT,
+	    MPI2_CONFIG_EXTPAGETYPE_SAS_PHY, 0, page_address,
+	    mptsas_sasphypage_0_cb, page_address, &info->owner_devhdl,
+	    &info->attached_devhdl, &info->attached_phy_identify,
+	    &info->attached_phy_info, &info->programmed_link_rate,
+	    &info->hw_link_rate, &info->change_count,
+	    &info->phy_info, &info->negotiated_link_rate);
+
+	return (rval);
+}
+
+static int
+mptsas_sasphypage_1_cb(mptsas_t *mpt, caddr_t page_memp,
+    ddi_acc_handle_t accessp, uint16_t iocstatus, uint32_t iocloginfo,
+    va_list ap)
+{
+#ifndef __lock_lint
+	_NOTE(ARGUNUSED(ap))
+#endif
+	pMpi2SasPhyPage1_t	sasphypage;
+	int			rval = DDI_SUCCESS;
+
+	uint32_t		*invalid_dword_count;
+	uint32_t		*running_disparity_error_count;
+	uint32_t		*loss_of_dword_sync_count;
+	uint32_t		*phy_reset_problem_count;
+	uint32_t		page_address;
+
+	if ((iocstatus != MPI2_IOCSTATUS_SUCCESS) &&
+	    (iocstatus != MPI2_IOCSTATUS_CONFIG_INVALID_PAGE)) {
+		mptsas_log(mpt, CE_WARN, "mptsas_get_sas_expander_page1 "
+		    "config: IOCStatus=0x%x, IOCLogInfo=0x%x",
+		    iocstatus, iocloginfo);
+		rval = DDI_FAILURE;
+		return (rval);
+	}
+	page_address = va_arg(ap, uint32_t);
+	/*
+	 * The INVALID_PAGE status is normal if using GET_NEXT_HANDLE and there
+	 * are no more pages.  If everything is OK up to this point but the
+	 * status is INVALID_PAGE, change rval to FAILURE and quit.  Also,
+	 * signal that device traversal is complete.
+	 */
+	if (iocstatus == MPI2_IOCSTATUS_CONFIG_INVALID_PAGE) {
+		if ((page_address & MPI2_SAS_EXPAND_PGAD_FORM_MASK) ==
+		    MPI2_SAS_EXPAND_PGAD_FORM_GET_NEXT_HNDL) {
+			mpt->m_done_traverse_smp = 1;
+		}
+		rval = DDI_FAILURE;
+		return (rval);
+	}
+
+	invalid_dword_count = va_arg(ap, uint32_t *);
+	running_disparity_error_count = va_arg(ap, uint32_t *);
+	loss_of_dword_sync_count = va_arg(ap, uint32_t *);
+	phy_reset_problem_count = va_arg(ap, uint32_t *);
+
+	sasphypage = (pMpi2SasPhyPage1_t)page_memp;
+
+	*invalid_dword_count =
+	    ddi_get32(accessp, &sasphypage->InvalidDwordCount);
+	*running_disparity_error_count =
+	    ddi_get32(accessp, &sasphypage->RunningDisparityErrorCount);
+	*loss_of_dword_sync_count =
+	    ddi_get32(accessp, &sasphypage->LossDwordSynchCount);
+	*phy_reset_problem_count =
+	    ddi_get32(accessp, &sasphypage->PhyResetProblemCount);
+
+	return (rval);
+}
+
+/*
+ * Request MPI configuration page SAS phy page 0 to get DevHandle, phymask
+ * and SAS address.
+ */
+int
+mptsas_get_sas_phy_page1(mptsas_t *mpt, uint32_t page_address,
+    smhba_info_t *info)
+{
+	int			rval = DDI_SUCCESS;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	/*
+	 * Get the header and config page.  reply contains the reply frame,
+	 * which holds status info for the request.
+	 */
+	rval = mptsas_access_config_page(mpt,
+	    MPI2_CONFIG_ACTION_PAGE_READ_CURRENT,
+	    MPI2_CONFIG_EXTPAGETYPE_SAS_PHY, 1, page_address,
+	    mptsas_sasphypage_1_cb, page_address,
+	    &info->invalid_dword_count,
+	    &info->running_disparity_error_count,
+	    &info->loss_of_dword_sync_count,
+	    &info->phy_reset_problem_count);
+
+	return (rval);
+}
+/*
+ * mptsas_get_manufacture_page0
+ *
+ * This function will retrieve the base
+ * Chip name, Board Name,Board Trace number from the adapter.
+ * Since this function is only called during the
+ * initialization process, use handshaking.
+ */
+int
+mptsas_get_manufacture_page0(mptsas_t *mpt)
+{
+	ddi_dma_attr_t			recv_dma_attrs, page_dma_attrs;
+	ddi_dma_cookie_t		recv_cookie, page_cookie;
+	ddi_dma_handle_t		recv_dma_handle, page_dma_handle;
+	ddi_acc_handle_t		recv_accessp, page_accessp;
+	size_t				recv_alloc_len, page_alloc_len;
+	pMpi2ConfigReply_t		configreply;
+	uint_t				recv_ncookie, page_ncookie;
+	caddr_t				recv_memp, page_memp;
+	int				recv_numbytes;
+	pMpi2ManufacturingPage0_t	m0;
+	int				recv_dmastate = 0;
+	int				page_dmastate = 0;
+	uint32_t			flagslength;
+	int				rval = DDI_SUCCESS;
+	uint_t				iocstatus;
+	uint8_t				i = 0;
+
+	MPTSAS_DISABLE_INTR(mpt);
+
+	if (mptsas_send_config_request_msg(mpt, MPI2_CONFIG_ACTION_PAGE_HEADER,
+	    MPI2_CONFIG_PAGETYPE_MANUFACTURING, 0, 0, 0, 0, 0, 0)) {
+		rval = DDI_FAILURE;
+		goto done;
+	}
+
+	/*
+	 * dynamically create a customized dma attribute structure
+	 * that describes the MPT's config reply page request structure.
+	 */
+	recv_dma_attrs = mpt->m_msg_dma_attr;
+	recv_dma_attrs.dma_attr_sgllen = 1;
+	recv_dma_attrs.dma_attr_granular = (sizeof (MPI2_CONFIG_REPLY));
+
+	if (ddi_dma_alloc_handle(mpt->m_dip, &recv_dma_attrs,
+	    DDI_DMA_SLEEP, NULL, &recv_dma_handle) != DDI_SUCCESS) {
+		mptsas_log(mpt, CE_WARN,
+		    "(unable to allocate dma handle.");
+		rval = DDI_FAILURE;
+		goto done;
+	}
+	recv_dmastate |= MPTSAS_DMA_HANDLE_ALLOCD;
+
+	if (ddi_dma_mem_alloc(recv_dma_handle,
+	    (sizeof (MPI2_CONFIG_REPLY)),
+	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
+	    &recv_memp, &recv_alloc_len, &recv_accessp) != DDI_SUCCESS) {
+		mptsas_log(mpt, CE_WARN,
+		    "unable to allocate config_reply structure.");
+		rval = DDI_FAILURE;
+		goto done;
+	}
+	recv_dmastate |= MPTSAS_DMA_MEMORY_ALLOCD;
+
+	if (ddi_dma_addr_bind_handle(recv_dma_handle, NULL, recv_memp,
+	    recv_alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
+	    NULL, &recv_cookie, &recv_ncookie) != DDI_DMA_MAPPED) {
+		mptsas_log(mpt, CE_WARN, "unable to bind DMA resources.");
+		rval = DDI_FAILURE;
+		goto done;
+	}
+	recv_dmastate |= MPTSAS_DMA_HANDLE_BOUND;
+	bzero(recv_memp, sizeof (MPI2_CONFIG_REPLY));
+	configreply = (pMpi2ConfigReply_t)recv_memp;
+	recv_numbytes = sizeof (MPI2_CONFIG_REPLY);
+
+	/*
+	 * get config reply message
+	 */
+	if (mptsas_get_handshake_msg(mpt, recv_memp, recv_numbytes,
+	    recv_accessp)) {
+		rval = DDI_FAILURE;
+		goto done;
+	}
+
+	if (iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus)) {
+		mptsas_log(mpt, CE_WARN, "mptsas_get_manufacture_page5 update: "
+		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
+		    ddi_get32(recv_accessp, &configreply->IOCLogInfo));
+		goto done;
+	}
+
+	/*
+	 * dynamically create a customized dma attribute structure
+	 * that describes the MPT's config page structure.
+	 */
+	page_dma_attrs = mpt->m_msg_dma_attr;
+	page_dma_attrs.dma_attr_sgllen = 1;
+	page_dma_attrs.dma_attr_granular = (sizeof (MPI2_CONFIG_PAGE_MAN_0));
+
+	if (ddi_dma_alloc_handle(mpt->m_dip, &page_dma_attrs,
+	    DDI_DMA_SLEEP, NULL, &page_dma_handle) != DDI_SUCCESS) {
+		mptsas_log(mpt, CE_WARN,
+		    "(unable to allocate dma handle.");
+		rval = DDI_FAILURE;
+		goto done;
+	}
+	page_dmastate |= MPTSAS_DMA_HANDLE_ALLOCD;
+
+	if (ddi_dma_mem_alloc(page_dma_handle,
+	    (sizeof (MPI2_CONFIG_PAGE_MAN_0)),
+	    &mpt->m_dev_acc_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
+	    &page_memp, &page_alloc_len, &page_accessp) != DDI_SUCCESS) {
+		mptsas_log(mpt, CE_WARN,
+		    "unable to allocate manufacturing page structure.");
+		rval = DDI_FAILURE;
+		goto done;
+	}
+	page_dmastate |= MPTSAS_DMA_MEMORY_ALLOCD;
+
+	if (ddi_dma_addr_bind_handle(page_dma_handle, NULL, page_memp,
+	    page_alloc_len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
+	    NULL, &page_cookie, &page_ncookie) != DDI_DMA_MAPPED) {
+		mptsas_log(mpt, CE_WARN, "unable to bind DMA resources.");
+		rval = DDI_FAILURE;
+		goto done;
+	}
+	page_dmastate |= MPTSAS_DMA_HANDLE_BOUND;
+	bzero(page_memp, sizeof (MPI2_CONFIG_PAGE_MAN_0));
+	m0 = (pMpi2ManufacturingPage0_t)page_memp;
+
+	/*
+	 * Give reply address to IOC to store config page in and send
+	 * config request out.
+	 */
+
+	flagslength = sizeof (MPI2_CONFIG_PAGE_MAN_0);
+	flagslength |= ((uint32_t)(MPI2_SGE_FLAGS_LAST_ELEMENT |
+	    MPI2_SGE_FLAGS_END_OF_BUFFER | MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
+	    MPI2_SGE_FLAGS_SYSTEM_ADDRESS | MPI2_SGE_FLAGS_32_BIT_ADDRESSING |
+	    MPI2_SGE_FLAGS_IOC_TO_HOST |
+	    MPI2_SGE_FLAGS_END_OF_LIST) << MPI2_SGE_FLAGS_SHIFT);
+
+	if (mptsas_send_config_request_msg(mpt,
+	    MPI2_CONFIG_ACTION_PAGE_READ_CURRENT,
+	    MPI2_CONFIG_PAGETYPE_MANUFACTURING, 0, 0,
+	    ddi_get8(recv_accessp, &configreply->Header.PageVersion),
+	    ddi_get8(recv_accessp, &configreply->Header.PageLength),
+	    flagslength, page_cookie.dmac_address)) {
+		rval = DDI_FAILURE;
+		goto done;
+	}
+
+	/*
+	 * get reply view handshake
+	 */
+	if (mptsas_get_handshake_msg(mpt, recv_memp, recv_numbytes,
+	    recv_accessp)) {
+		rval = DDI_FAILURE;
+		goto done;
+	}
+
+	if (iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus)) {
+		mptsas_log(mpt, CE_WARN, "mptsas_get_manufacture_page0 config: "
+		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
+		    ddi_get32(recv_accessp, &configreply->IOCLogInfo));
+		goto done;
+	}
+
+	(void) ddi_dma_sync(page_dma_handle, 0, 0, DDI_DMA_SYNC_FORCPU);
+
+	/*
+	 * Fusion-MPT stores fields in little-endian format.  This is
+	 * why the low-order 32 bits are stored first.
+	 */
+
+	for (i = 0; i < 16; i++) {
+		mpt->m_MANU_page0.ChipName[i] =
+		    ddi_get8(page_accessp,
+		    (uint8_t *)(void *)&m0->ChipName[i]);
+	}
+
+	for (i = 0; i < 8; i++) {
+		mpt->m_MANU_page0.ChipRevision[i] =
+		    ddi_get8(page_accessp,
+		    (uint8_t *)(void *)&m0->ChipRevision[i]);
+	}
+
+	for (i = 0; i < 16; i++) {
+		mpt->m_MANU_page0.BoardName[i] =
+		    ddi_get8(page_accessp,
+		    (uint8_t *)(void *)&m0->BoardName[i]);
+	}
+
+	for (i = 0; i < 16; i++) {
+		mpt->m_MANU_page0.BoardAssembly[i] =
+		    ddi_get8(page_accessp,
+		    (uint8_t *)(void *)&m0->BoardAssembly[i]);
+	}
+
+	for (i = 0; i < 16; i++) {
+		mpt->m_MANU_page0.BoardTracerNumber[i] =
+		    ddi_get8(page_accessp,
+		    (uint8_t *)(void *)&m0->BoardTracerNumber[i]);
+	}
 
 	if ((mptsas_check_dma_handle(recv_dma_handle) != DDI_SUCCESS) ||
 	    (mptsas_check_dma_handle(page_dma_handle) != DDI_SUCCESS)) {
