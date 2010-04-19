@@ -455,6 +455,8 @@ typedef struct {
 	uint16_t	ps_key_off;
 	uint16_t	ps_key_len;
 	uint16_t	ps_key_bits;
+	int		ps_localid_plen;
+	int		ps_remoteid_plen;
 	/*
 	 * followed by variable-length structures, as indicated by
 	 * offset/length fields.

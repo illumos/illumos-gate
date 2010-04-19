@@ -1035,13 +1035,14 @@ parse_ps(int argc, char **argv, ike_ps_t **presharedpp, int *len)
 {
 	uint_t		c = 0, locidlen, remidlen, keylen, keybits;
 	uint_t		a_locidtotal = 0, a_remidtotal = 0;
-	char		*locid, *remid;
+	char		*locid, *remid, *locpfx = NULL, *rempfx = NULL;
 	uint8_t		*keyp = NULL;
 	uint16_t	fldid, locidtype, remidtype, mtype;
 	struct hostent	*loche = NULL, *remhe = NULL;
 	ike_ps_t	*psp = NULL;
 	sadb_ident_t	*sidp;
 	boolean_t	whacked = B_FALSE;
+	int pfxlen = 0;
 
 	if ((argv[c] == NULL) || (argv[c][0] != '{'))
 		return (-1);
@@ -1060,6 +1061,11 @@ parse_ps(int argc, char **argv, ike_ps_t **presharedpp, int *len)
 		argv[argc - 1][strlen(argv[argc - 1]) - 1] = '\0';
 		whacked = B_TRUE;
 	}
+
+	/* Default to type IP */
+	locidtype = remidtype = SADB_IDENTTYPE_RESERVED;
+	/* Default to base exchanges */
+	mtype = IKE_XCHG_BASE;
 
 	while ((c < argc) && (argv[c] != NULL) && (argv[c][0] != '}')) {
 		if ((argv[c + 1] == NULL) || (argv[c + 1][0] == '}'))
@@ -1131,6 +1137,12 @@ parse_ps(int argc, char **argv, ike_ps_t **presharedpp, int *len)
 
 	psp->ps_localid_off = sizeof (ike_ps_t);
 	if (locidtype == SADB_IDENTTYPE_RESERVED) {
+		locpfx = strchr(locid, '/');
+		if (locpfx != NULL) {
+			*locpfx = '\0';
+			locpfx++;
+		}
+
 		/*
 		 * this is an ip address, store in the sockaddr field;
 		 * we won't use an sadb_ident_t.
@@ -1156,6 +1168,12 @@ parse_ps(int argc, char **argv, ike_ps_t **presharedpp, int *len)
 
 	psp->ps_remoteid_off = psp->ps_localid_off + a_locidtotal;
 	if (remidtype == SADB_IDENTTYPE_RESERVED) {
+		rempfx = strchr(remid, '/');
+		if (rempfx != NULL) {
+			*rempfx = '\0';
+			rempfx++;
+		}
+
 		/*
 		 * this is an ip address, store in the sockaddr field;
 		 * we won't use an sadb_ident_t.
@@ -1186,6 +1204,10 @@ parse_ps(int argc, char **argv, ike_ps_t **presharedpp, int *len)
 	psp->ps_key_len = keylen;
 	psp->ps_key_bits = keybits;
 	(void) memcpy((uint8_t *)((int)psp + psp->ps_key_off), keyp, keylen);
+	if (locpfx != NULL && ((pfxlen = atoi(locpfx)) > 0))
+		psp->ps_localid_plen = pfxlen;
+	if (rempfx != NULL && ((pfxlen = atoi(rempfx)) > 0))
+		psp->ps_remoteid_plen = pfxlen;
 
 	*presharedpp = psp;
 
@@ -1754,7 +1776,8 @@ print_addr_range(char *prefix, ike_addr_pr_t *pr)
 #define	DONT_PRINT_INIT	3
 
 static void
-print_addr(char *prefix, struct sockaddr_storage *sa, int init_instr)
+print_addr(char *prefix, struct sockaddr_storage *sa, int init_instr,
+    int mask)
 {
 	(void) printf(gettext("%s Address"), prefix);
 
@@ -1765,7 +1788,8 @@ print_addr(char *prefix, struct sockaddr_storage *sa, int init_instr)
 		(void) printf(":\n");
 
 	(void) printf("%s ", prefix);
-	(void) dump_sockaddr((struct sockaddr *)sa, 0, B_FALSE, stdout, nflag);
+	(void) dump_sockaddr((struct sockaddr *)sa, mask, B_FALSE, stdout,
+	    nflag);
 }
 
 static void
@@ -1966,8 +1990,8 @@ print_p1(ike_p1_sa_t *p1)
 		lstat = IS_RESPONDER;
 		rstat = IS_INITIATOR;
 	}
-	print_addr("LOCIP:", &p1->p1sa_ipaddrs.loc_addr, lstat);
-	print_addr("REMIP:", &p1->p1sa_ipaddrs.rem_addr, rstat);
+	print_addr("LOCIP:", &p1->p1sa_ipaddrs.loc_addr, lstat, 0);
+	print_addr("REMIP:", &p1->p1sa_ipaddrs.rem_addr, rstat, 0);
 
 	/*
 	 * the stat len might be 0; but still make the call
@@ -2060,7 +2084,8 @@ print_ps(ike_ps_t *ps)
 		    ((int)(ps) + ps->ps_localid_off);
 		print_id("LOCID:", lidp, DONT_PRINT_INIT);
 	} else {
-		print_addr("LOCIP:", &ps->ps_ipaddrs.loc_addr, DONT_PRINT_INIT);
+		print_addr("LOCIP:", &ps->ps_ipaddrs.loc_addr, DONT_PRINT_INIT,
+		    ps->ps_localid_plen > 0 ? ps->ps_localid_plen : 0);
 	}
 
 	if (ps->ps_remoteid_len > 0) {
@@ -2068,7 +2093,8 @@ print_ps(ike_ps_t *ps)
 		    ((int)(ps) + ps->ps_remoteid_off);
 		print_id("REMID:", ridp, DONT_PRINT_INIT);
 	} else {
-		print_addr("REMIP:", &ps->ps_ipaddrs.rem_addr, DONT_PRINT_INIT);
+		print_addr("REMIP:", &ps->ps_ipaddrs.rem_addr, DONT_PRINT_INIT,
+		    ps->ps_remoteid_plen > 0 ? ps->ps_remoteid_plen : 0);
 	}
 }
 
