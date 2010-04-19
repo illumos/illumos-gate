@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1022,6 +1021,128 @@ static const mdb_bitmask_t tcp_flags[] = {
 	{ NULL,		0,		0	}
 };
 
+/* TCP option length */
+#define	TCPOPT_HEADER_LEN	2
+#define	TCPOPT_MAXSEG_LEN	4
+#define	TCPOPT_WS_LEN		3
+#define	TCPOPT_TSTAMP_LEN	10
+#define	TCPOPT_SACK_OK_LEN	2
+
+static void
+tcphdr_print_options(uint8_t *opts, uint32_t opts_len)
+{
+	uint8_t *endp;
+	uint32_t len, val;
+
+	mdb_printf("%<b>Options:%</b>");
+	endp = opts + opts_len;
+	while (opts < endp) {
+		len = endp - opts;
+		switch (*opts) {
+		case TCPOPT_EOL:
+			mdb_printf(" EOL");
+			opts++;
+			break;
+
+		case TCPOPT_NOP:
+			mdb_printf(" NOP");
+			opts++;
+			break;
+
+		case TCPOPT_MAXSEG: {
+			uint16_t mss;
+
+			if (len < TCPOPT_MAXSEG_LEN ||
+			    opts[1] != TCPOPT_MAXSEG_LEN) {
+				mdb_printf(" <Truncated MSS>\n");
+				return;
+			}
+			mdb_nhconvert(&mss, opts + TCPOPT_HEADER_LEN,
+			    sizeof (mss));
+			mdb_printf(" MSS=%u", mss);
+			opts += TCPOPT_MAXSEG_LEN;
+			break;
+		}
+
+		case TCPOPT_WSCALE:
+			if (len < TCPOPT_WS_LEN || opts[1] != TCPOPT_WS_LEN) {
+				mdb_printf(" <Truncated WS>\n");
+				return;
+			}
+			mdb_printf(" WS=%u", opts[2]);
+			opts += TCPOPT_WS_LEN;
+			break;
+
+		case TCPOPT_TSTAMP: {
+			if (len < TCPOPT_TSTAMP_LEN ||
+			    opts[1] != TCPOPT_TSTAMP_LEN) {
+				mdb_printf(" <Truncated TS>\n");
+				return;
+			}
+
+			opts += TCPOPT_HEADER_LEN;
+			mdb_nhconvert(&val, opts, sizeof (val));
+			mdb_printf(" TS_VAL=%u,", val);
+
+			opts += sizeof (val);
+			mdb_nhconvert(&val, opts, sizeof (val));
+			mdb_printf("TS_ECHO=%u", val);
+
+			opts += sizeof (val);
+			break;
+		}
+
+		case TCPOPT_SACK_PERMITTED:
+			if (len < TCPOPT_SACK_OK_LEN ||
+			    opts[1] != TCPOPT_SACK_OK_LEN) {
+				mdb_printf(" <Truncated SACK_OK>\n");
+				return;
+			}
+			mdb_printf(" SACK_OK");
+			opts += TCPOPT_SACK_OK_LEN;
+			break;
+
+		case TCPOPT_SACK: {
+			uint32_t sack_len;
+
+			if (len <= TCPOPT_HEADER_LEN || len < opts[1] ||
+			    opts[1] <= TCPOPT_HEADER_LEN) {
+				mdb_printf(" <Truncated SACK>\n");
+				return;
+			}
+			sack_len = opts[1] - TCPOPT_HEADER_LEN;
+			opts += TCPOPT_HEADER_LEN;
+
+			mdb_printf(" SACK=");
+			while (sack_len > 0) {
+				if (opts + 2 * sizeof (val) > endp) {
+					mdb_printf("<Truncated SACK>\n");
+					opts = endp;
+					break;
+				}
+
+				mdb_nhconvert(&val, opts, sizeof (val));
+				mdb_printf("<%u,", val);
+				opts += sizeof (val);
+				mdb_nhconvert(&val, opts, sizeof (val));
+				mdb_printf("%u>", val);
+				opts += sizeof (val);
+
+				sack_len -= 2 * sizeof (val);
+			}
+			break;
+		}
+
+		default:
+			mdb_printf(" Opts=<val=%u,len=%u>", *opts,
+			    opts[1]);
+			opts += opts[1];
+			break;
+		}
+	}
+	mdb_printf("\n");
+}
+
 static void
 tcphdr_print(struct tcphdr *tcph)
 {
@@ -1053,6 +1174,7 @@ static int
 tcphdr(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
 {
 	struct tcphdr	tcph;
+	uint32_t	opt_len;
 
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
@@ -1062,6 +1184,22 @@ tcphdr(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
 		return (DCMD_ERR);
 	}
 	tcphdr_print(&tcph);
+
+	/* If there are options, print them out also. */
+	opt_len = (tcph.th_off << 2) - TCP_MIN_HEADER_LENGTH;
+	if (opt_len > 0) {
+		uint8_t *opts, *opt_buf;
+
+		opt_buf = mdb_alloc(opt_len, UM_SLEEP);
+		opts = (uint8_t *)addr + sizeof (tcph);
+		if (mdb_vread(opt_buf, opt_len, (uintptr_t)opts) == -1) {
+			mdb_warn("failed to read TCP options at %p", opts);
+			return (DCMD_ERR);
+		}
+		tcphdr_print_options(opt_buf, opt_len);
+		mdb_free(opt_buf, opt_len);
+	}
+
 	return (DCMD_OK);
 }
 

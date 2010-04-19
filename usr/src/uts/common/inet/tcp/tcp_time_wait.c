@@ -171,14 +171,19 @@ tcp_time_wait_append(tcp_t *tcp)
 			    CALLOUT_FLAG_ROUNDUP);
 		}
 	} else {
+		/*
+		 * The list is not empty, so a timer must be running.  If not,
+		 * tcp_time_wait_collector() must be running on this
+		 * tcp_time_wait list at the same time.
+		 */
+		ASSERT(tcp_time_wait->tcp_time_wait_tid != 0 ||
+		    tcp_time_wait->tcp_time_wait_running);
 		ASSERT(tcp_time_wait->tcp_time_wait_tail != NULL);
 		ASSERT(tcp_time_wait->tcp_time_wait_tail->tcp_state ==
 		    TCPS_TIME_WAIT);
 		tcp_time_wait->tcp_time_wait_tail->tcp_time_wait_next = tcp;
 		tcp->tcp_time_wait_prev = tcp_time_wait->tcp_time_wait_tail;
 
-		/* The list is not empty, so a timer must be running. */
-		ASSERT(tcp_time_wait->tcp_time_wait_tid != 0);
 	}
 	tcp_time_wait->tcp_time_wait_tail = tcp;
 	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
@@ -241,6 +246,9 @@ tcp_time_wait_collector(void *arg)
 
 	mutex_enter(&tcp_time_wait->tcp_time_wait_lock);
 	tcp_time_wait->tcp_time_wait_tid = 0;
+#ifdef DEBUG
+	tcp_time_wait->tcp_time_wait_running = B_TRUE;
+#endif
 
 	if (tcp_time_wait->tcp_free_list != NULL &&
 	    tcp_time_wait->tcp_free_list->tcp_in_free_list == B_TRUE) {
@@ -415,6 +423,9 @@ tcp_time_wait_collector(void *arg)
 		    sqp, firetime, CALLOUT_TCP_RESOLUTION,
 		    CALLOUT_FLAG_ROUNDUP);
 	}
+#ifdef DEBUG
+	tcp_time_wait->tcp_time_wait_running = B_FALSE;
+#endif
 	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
 }
 

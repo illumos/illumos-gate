@@ -153,6 +153,13 @@ typedef struct tcp_squeue_priv_s {
 	tcp_t		*tcp_time_wait_tail;
 	tcp_t		*tcp_free_list;
 	uint_t		tcp_free_list_cnt;
+#ifdef DEBUG
+	/*
+	 * For debugging purpose, true when tcp_time_wait_collector() is
+	 * running.
+	 */
+	boolean_t	tcp_time_wait_running;
+#endif
 } tcp_squeue_priv_t;
 
 /*
