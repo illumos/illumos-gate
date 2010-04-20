@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _CMD_MODLOAD_ADDREM_H
@@ -73,7 +72,7 @@ extern "C" {
 #define	NAM_TO_MAJ	"/etc/name_to_major"
 #define	REM_NAM_TO_MAJ	"/etc/rem_name_to_major"
 
-#define	ADD_REM_LOCK	"/tmp/AdDrEm.lck"
+#define	ADD_REM_LOCK	"/var/run/AdDrEm.lck"
 #define	TMPHOLD		"/etc/TmPhOlD"
 
 #if defined(__x86)
