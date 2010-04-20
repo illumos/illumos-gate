@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -59,6 +58,17 @@
 #include <rpc/rpcsec_gss.h>
 
 #define	MAXCLIENTS	16
+
+/*
+ * Currently there is no maximum length defined withing the gss
+ * specification. Because of security issues the maximum gss
+ * authentication length is checked to be under the MAXAUTHLEN
+ * defined below. The value was chosen because it will be a safe
+ * maximum value for some time.  Currently lengths are generally
+ * under the 16 byte length
+ */
+#define	MINAUTHLEN	1	/* minimum gss authentication length */
+#define	MAXAUTHLEN	65535	/* maximum gss authentication length */
 static int clnt_authdes_cachesz = 64;
 
 static uint_t authdes_win = 5*60;  /* 5 minutes -- should be mount option */
@@ -123,20 +133,21 @@ gss_clnt_loadinfo(caddr_t usrdata, caddr_t *kdata, model_t model)
 		error = EFAULT;
 
 	if (error == 0) {
-		if (data->mechanism.length > 0) {
+		if (data->mechanism.length >= MINAUTHLEN &&
+		    data->mechanism.length <= MAXAUTHLEN) {
 			elements = kmem_alloc(data->mechanism.length, KM_SLEEP);
 			if (!(copyin(data->mechanism.elements, elements,
 			    data->mechanism.length))) {
 				data->mechanism.elements = elements;
 				*kdata = (caddr_t)data;
 				return (0);
-			} else
-				kmem_free(elements, data->mechanism.length);
+			}
+			kmem_free(elements, data->mechanism.length);
 		}
-	} else {
-		*kdata = NULL;
-		kmem_free(data, sizeof (*data));
 	}
+	*kdata = NULL;
+	kmem_free(data, sizeof (*data));
+
 	return (EFAULT);
 }
 
@@ -182,11 +193,11 @@ dh_k4_clnt_loadinfo(caddr_t usrdata, caddr_t *kdata, model_t model)
 
 	if (error == 0) {
 		syncaddr = &data->syncaddr;
-		if (syncaddr == NULL)
+		if (syncaddr->len < MINAUTHLEN || syncaddr->len > MAXAUTHLEN)
 			error = EINVAL;
 		else {
 			userbufptr = syncaddr->buf;
-			syncaddr->buf =  kmem_alloc(syncaddr->len, KM_SLEEP);
+			syncaddr->buf = kmem_alloc(syncaddr->len, KM_SLEEP);
 			syncaddr->maxlen = syncaddr->len;
 			if (copyin(userbufptr, syncaddr->buf, syncaddr->len)) {
 				kmem_free(syncaddr->buf, syncaddr->len);
@@ -731,6 +742,12 @@ sec_clnt_revoke(int rpcflavor, uid_t uid, cred_t *cr, void *mechanism,
 		if (copyin(mechanism, mech, sizeof (rpc_gss_OID_desc))) {
 			kmem_free(mech, sizeof (rpc_gss_OID_desc));
 			return (EFAULT);
+		}
+
+		if (mech->length < MINAUTHLEN ||
+		    mech->length > MAXAUTHLEN) {
+			kmem_free(mech, sizeof (rpc_gss_OID_desc));
+			return (EINVAL);
 		}
 
 		elements = kmem_alloc(mech->length, KM_SLEEP);
