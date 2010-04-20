@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1032,7 +1031,6 @@ sysdc_leave(sysdc_t *sdc)
 	mutex_exit(&sdl->sdl_lock);
 
 	mutex_enter(&sysdc_pset_lock);
-	sdp = sdc->sdc_pset;
 	ASSERT(sdp != NULL);
 	ASSERT(sdp->sdp_nthreads > 0);
 	--sdp->sdp_nthreads;
