@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -36,6 +35,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
 
 #include <sys/stat.h>
@@ -1432,34 +1432,6 @@ prefixdir(char *dir, char *suffix)
 
 
 /*
- * get_backup_path
- *
- * Find the backup path from the environment variables
- */
-static char *
-get_backup_path(ndmpd_module_params_t *params)
-{
-	char *bkpath;
-
-	bkpath = MOD_GETENV(params, "PREFIX");
-	if (bkpath == NULL)
-		bkpath = MOD_GETENV(params, "FILESYSTEM");
-
-	if (bkpath == NULL) {
-		MOD_LOG(params, "Error: restore path not specified.\n");
-		return (NULL);
-	}
-
-	if (*bkpath != '/') {
-		MOD_LOG(params, "Error: relative backup path not allowed.\n");
-		return (NULL);
-	}
-
-	return (bkpath);
-}
-
-
-/*
  * get_nfiles
  *
  * Get the count of files to be restored
@@ -1664,7 +1636,7 @@ ndmp_backup_extract_params(ndmpd_session_t *session,
 		MOD_LOG(params, "Error: Internal error: nlp == NULL.\n");
 		return (NDMP_ILLEGAL_ARGS_ERR);
 	}
-	if ((nlp->nlp_backup_path = get_backup_path(params)) == NULL)
+	if ((nlp->nlp_backup_path = get_backup_path_v2(params)) == NULL)
 		return (NDMP_FILE_NOT_FOUND_ERR);
 
 	if ((rv = check_backup_dir_validity(params,
@@ -1834,7 +1806,7 @@ ndmp_restore_extract_params(ndmpd_session_t *session,
 	}
 
 	/* Extract directory from where the backup was made. */
-	if ((bkpath = get_backup_path(params)) == NULL)
+	if ((bkpath = get_backup_path_v2(params)) == NULL)
 		return (NDMP_ILLEGAL_ARGS_ERR);
 
 	nlp->nlp_restore_bk_path = bkpath;
@@ -1892,8 +1864,9 @@ ndmp_restore_extract_params(ndmpd_session_t *session,
  * and release the snapshot at the end.
  */
 int
-ndmpd_tar_backup_starter(ndmpd_module_params_t *mod_params)
+ndmpd_tar_backup_starter(void *arg)
 {
+	ndmpd_module_params_t *mod_params = arg;
 	int err;
 	ndmpd_session_t *session;
 	ndmp_lbr_params_t *nlp;
@@ -1998,8 +1971,9 @@ ndmpd_tar_backup_abort(void *module_cookie)
  */
 
 int
-ndmpd_tar_restore_starter(ndmpd_module_params_t *mod_params)
+ndmpd_tar_restore_starter(void *arg)
 {
+	ndmpd_module_params_t *mod_params = arg;
 	int err;
 	ndmpd_session_t *session;
 	ndmp_lbr_params_t *nlp;

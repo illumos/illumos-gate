@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -36,6 +35,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/* Copyright (c) 2007, The Storage Networking Industry Association. */
+/* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -621,39 +622,6 @@ voliswr(char *path)
 	NDMP_LOG(LOG_DEBUG, "%d path \"%s\"", rv, path);
 	return (rv);
 
-}
-
-
-/*
- * get_bk_path_v3
- *
- * Get the backup path from the NDMP environment variables.
- *
- * Parameters:
- *   params (input) - pointer to the parameters structure.
- *
- * Returns:
- *   The backup path: if anything is specified
- *   NULL: Otherwise
- */
-char *
-get_bk_path_v3(ndmpd_module_params_t *params)
-{
-	char *bkpath;
-
-	bkpath = MOD_GETENV(params, "PREFIX");
-	if (!bkpath)
-		bkpath = MOD_GETENV(params, "FILESYSTEM");
-
-
-	if (!bkpath) {
-		MOD_LOGV3(params, NDMP_LOG_ERROR,
-		    "Backup path not defined.\n");
-	} else {
-		NDMP_LOG(LOG_DEBUG, "bkpath: \"%s\"", bkpath);
-	}
-
-	return (bkpath);
 }
 
 
@@ -2454,6 +2422,7 @@ tar_backup_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 			nctx.nc_plname = ndmpd_get_prop(NDMP_PLUGIN_PATH);
 			nctx.nc_cmds = cmds;
 			nctx.nc_params = params;
+			nctx.nc_ddata = (void *) session;
 			if ((err = ndmp_pl->np_pre_backup(ndmp_pl, &nctx,
 			    nlp->nlp_backup_path)) != 0) {
 				NDMP_LOG(LOG_ERR, "Pre-backup plug-in: %m");
@@ -3231,8 +3200,10 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		/* Plug-in module */
 		if (ndmp_pl != NULL &&
 		    ndmp_pl->np_pre_restore != NULL) {
+			(void) memset(&nctx, 0, sizeof (ndmp_context_t));
 			nctx.nc_cmds = cmds;
 			nctx.nc_params = params;
+			nctx.nc_ddata = (void *) session;
 			ep = (mem_ndmp_name_v3_t *)MOD_GETNAME(params,
 			    dar_index - 1);
 
@@ -3487,7 +3458,6 @@ get_absolute_path(const char *bkpath)
 	return (rv);
 }
 
-
 /*
  * Expands the format string and logs the resulting message to the
  * remote DMA
@@ -3591,8 +3561,10 @@ ndmpd_rs_sar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		/* Plug-in module */
 		if (ndmp_pl != NULL &&
 		    ndmp_pl->np_pre_restore != NULL) {
+			(void) memset(&nctx, 0, sizeof (ndmp_context_t));
 			nctx.nc_cmds = cmds;
 			nctx.nc_params = params;
+			nctx.nc_ddata = (void *) session;
 			if ((err = ndmp_plugin_pre_restore(&nctx, params,
 			    nlp->nlp_nfiles))
 			    != 0) {
@@ -3703,7 +3675,7 @@ ndmp_backup_get_params_v3(ndmpd_session_t *session,
 		    "Internal error: NULL nlp.\n");
 		rv = NDMP_ILLEGAL_ARGS_ERR;
 	} else {
-		if (!(nlp->nlp_backup_path = get_bk_path_v3(params)))
+		if (!(nlp->nlp_backup_path = get_backup_path_v3(params)))
 			rv = NDMP_FILE_NOT_FOUND_ERR;
 		else if (!is_valid_backup_dir_v3(params, nlp->nlp_backup_path))
 			rv = NDMP_ILLEGAL_ARGS_ERR;
@@ -3766,8 +3738,9 @@ ndmp_backup_get_params_v3(ndmpd_session_t *session,
  *   != 0: otherwise
  */
 int
-ndmpd_tar_backup_starter_v3(ndmpd_module_params_t *params)
+ndmpd_tar_backup_starter_v3(void *arg)
 {
+	ndmpd_module_params_t *params = arg;
 	int err;
 	ndmpd_session_t *session;
 	ndmp_lbr_params_t *nlp;
@@ -3888,7 +3861,7 @@ ndmp_restore_get_params_v3(ndmpd_session_t *session,
 	if (!(nlp = ndmp_get_nlp(session))) {
 		NDMP_LOG(LOG_DEBUG, "nlp is NULL");
 		rv = NDMP_ILLEGAL_ARGS_ERR;
-	} else if (!(nlp->nlp_backup_path = get_bk_path_v3(params)))
+	} else if (!(nlp->nlp_backup_path = get_backup_path_v3(params)))
 		rv = NDMP_ILLEGAL_ARGS_ERR;
 	else if ((nlp->nlp_nfiles = session->ns_data.dd_nlist_len) == 0) {
 		NDMP_LOG(LOG_DEBUG, "nfiles: %d", nlp->nlp_nfiles);
@@ -3943,8 +3916,9 @@ ndmp_restore_get_params_v3(ndmpd_session_t *session,
  *   != NDMP_NO_ERR: otherwise
  */
 int
-ndmpd_tar_restore_starter_v3(ndmpd_module_params_t *params)
+ndmpd_tar_restore_starter_v3(void *arg)
 {
+	ndmpd_module_params_t *params = arg;
 	int err;
 	ndmpd_session_t *session;
 	ndmp_lbr_params_t *nlp;

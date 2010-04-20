@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -98,16 +97,6 @@ int ndmp_max_mover_recsize = MAX_MOVER_RECSIZE; /* patchable */
 
 #define	TAPE_READ_ERR		-1
 #define	TAPE_NO_WRITER_ERR	-2
-
-#define	NDMP_APILOG(s, t, m, ...) \
-{ \
-	if (((ndmpd_session_t *)(s))->ns_protocol_version == NDMPV4) \
-		(void) ndmpd_api_log_v4(s, t, m, __VA_ARGS__); \
-	else if (((ndmpd_session_t *)(s))->ns_protocol_version == NDMPV3) \
-		(void) ndmpd_api_log_v3(s, t, m, __VA_ARGS__); \
-	else \
-		(void) ndmpd_api_log_v2(s, __VA_ARGS__); \
-}
 
 /*
  * ************************************************************************
@@ -1608,7 +1597,7 @@ ndmpd_local_read(ndmpd_session_t *session, char *data, ulong_t length)
 				return (-1);
 			}
 			/*
-			 * Wait for until the state is changed by
+			 * Wait until the state is changed by
 			 * an abort or continue request.
 			 */
 			nlp_ref_nw(session);
@@ -3351,12 +3340,19 @@ start_mover_for_backup(ndmpd_session_t *session)
  * Returns:
  *   0: not started
  *   non-zero: started
+ *	Note: non-zero is also returned if the backup type is
+ *		neither TAR nor DUMP.  I.e. the is_writer_running()
+ *		check does not apply in this case and things should
+ * 		appear successful.
  */
 static boolean_t
 is_writer_running(ndmpd_session_t *session)
 {
 	boolean_t rv;
 	ndmp_lbr_params_t *nlp;
+
+	if (session && (session->ns_butype > NDMP_BUTYPE_DUMP))
+		return (1);
 
 	if (session == NULL)
 		rv = 0;
@@ -3380,12 +3376,19 @@ is_writer_running(ndmpd_session_t *session)
  * Returns:
  *   0: not started
  *   non-zero: started
+ *	Note: non-zero is also returned if the backup type is
+ *		neither TAR nor DUMP.  I.e. the is_writer_running()
+ *		check does not apply in this case and things should
+ * 		appear successful.
  */
 static boolean_t
 is_writer_running_v3(ndmpd_session_t *session)
 {
 	boolean_t rv;
 	ndmp_lbr_params_t *nlp;
+
+	if (session && (session->ns_butype > NDMP_BUTYPE_DUMP))
+		return (1);
 
 	if (session == NULL)
 		rv = 0;

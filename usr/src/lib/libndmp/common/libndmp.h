@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -36,6 +35,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/* Copyright (c) 2007, The Storage Networking Industry Association. */
+/* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
 #ifndef	_LIBNDMP_H
 #define	_LIBNDMP_H
 
@@ -64,9 +65,10 @@ extern int ndmp_errno;
 typedef struct ndmp_context {
 	char *nc_plname;
 	uint_t nc_plversion;
-	void *nc_pldata;
+	void *nc_pldata;	/* data private to the plugin */
 	void *nc_cmds;
 	void *nc_params;
+	void *nc_ddata;		/* data private to the daemon */
 } ndmp_context_t;
 
 typedef struct ndmp_plugin {
@@ -91,6 +93,14 @@ typedef enum ndmp_log_dma_type {
 	NDMP_LOGD_ERROR = 2,
 	NDMP_LOGD_WARNING = 3
 } ndmp_log_dma_type_t;
+
+typedef enum {
+	NDMP_BUTYPE_TAR = 0,
+	NDMP_BUTYPE_DUMP,
+	NDMP_BUTYPE_ZFS
+} ndmpd_backup_type_t;
+
+extern ndmpd_backup_type_t ndmp_get_backup_type(ndmp_context_t *);
 
 /* libndmp error codes */
 #define	ENDMP_BASE	2000

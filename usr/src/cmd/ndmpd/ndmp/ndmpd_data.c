@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -61,23 +60,18 @@ static ndmp_error data_connect_sock_v3(ndmpd_session_t *session, ulong_t addr,
 static int discard_data_v3(ndmpd_session_t *session, ulong_t length);
 static void nlp_release_job_stat(ndmpd_session_t *session);
 static u_longlong_t ndmpd_data_get_info(ndmpd_session_t *session);
-static ndmp_error start_backup_v3(ndmpd_session_t *session, char *bu_type,
-    ndmp_pval *env_val, ulong_t env_len);
-static ndmp_error start_backup(ndmpd_session_t *session, char *bu_type,
-    ndmp_pval *env_val, ulong_t env_len);
-static ndmp_error start_recover(ndmpd_session_t *session, char *bu_type,
-    ndmp_pval *env_val, ulong_t env_len, ndmp_name *nlist_val,
-    ulong_t nlist_len);
-static ndmp_error start_recover_v3(ndmpd_session_t *session, char *bu_type,
-    ndmp_pval *env_val, ulong_t env_len, ndmp_name_v3 *nlist_val,
-    ulong_t nlist_len);
-static ndmp_error start_backup(ndmpd_session_t *session, char *bu_type,
-    ndmp_pval *env_val, ulong_t env_len);
-static ndmp_error start_recover(ndmpd_session_t *session, char *bu_type,
-    ndmp_pval *env_val, ulong_t env_len, ndmp_name *nlist_val,
-    ulong_t nlist_len);
-static u_longlong_t ndmpd_data_get_info(ndmpd_session_t *session);
-static void nlp_release_job_stat(ndmpd_session_t *session);
+
+static ndmp_error ndmpd_tar_start_backup_v2(ndmpd_session_t *, char *,
+    ndmp_pval *, ulong_t);
+static ndmp_error ndmpd_tar_start_recover_v2(ndmpd_session_t *, char *,
+    ndmp_pval *, ulong_t, ndmp_name *, ulong_t);
+static ndmp_error ndmpd_tar_start_backup_v3(ndmpd_session_t *, char *,
+    ndmp_pval *, ulong_t);
+static ndmp_error ndmpd_tar_start_recover_v3(ndmpd_session_t *,
+    ndmp_pval *, ulong_t, ndmp_name_v3 *, ulong_t);
+
+static ndmp_error ndmpd_zfs_start_op(ndmpd_session_t *,
+    ndmp_pval *, ulong_t, ndmp_name_v3 *, ulong_t, enum ndmp_data_operation);
 
 
 /*
@@ -153,8 +147,8 @@ ndmpd_data_start_backup_v2(ndmp_connection_t *connection, void *body)
 	reply.error = NDMP_NO_ERR;
 	session->ns_data.dd_mover = request->mover;
 
-	err = start_backup(session, request->bu_type, request->env.env_val,
-	    request->env.env_len);
+	err = ndmpd_tar_start_backup_v2(session, request->bu_type,
+	    request->env.env_val, request->env.env_len);
 
 	/*
 	 * start_backup sends the reply if the backup is successfully started.
@@ -168,7 +162,6 @@ ndmpd_data_start_backup_v2(ndmp_connection_t *connection, void *body)
 		ndmpd_data_cleanup(session);
 	}
 }
-
 
 /*
  * ndmpd_data_start_recover_v2
@@ -193,9 +186,10 @@ ndmpd_data_start_recover_v2(ndmp_connection_t *connection, void *body)
 	request = (ndmp_data_start_recover_request_v2 *) body;
 	session->ns_data.dd_mover = request->mover;
 
-	err = start_recover(session, request->bu_type, request->env.env_val,
-	    request->env.env_len, request->nlist.nlist_val,
-	    request->nlist.nlist_len);
+	err = ndmpd_tar_start_recover_v2(session, request->bu_type,
+	    request->env.env_val, request->env.env_len,
+	    request->nlist.nlist_val, request->nlist.nlist_len);
+
 	/*
 	 * start_recover sends the reply if the recover is successfully started.
 	 * Otherwise, send the reply containing the error here.
@@ -207,7 +201,6 @@ ndmpd_data_start_recover_v2(ndmp_connection_t *connection, void *body)
 		ndmpd_data_cleanup(session);
 	}
 }
-
 
 /*
  * ndmpd_data_get_env_v2
@@ -401,28 +394,77 @@ ndmpd_data_start_backup_v3(ndmp_connection_t *connection, void *body)
 	ndmp_data_start_backup_request_v3 *request;
 	ndmp_data_start_backup_reply_v3 reply;
 	ndmpd_session_t *session = ndmp_get_client_data(connection);
-	ndmp_error err;
 
 	request = (ndmp_data_start_backup_request_v3 *)body;
 
 	(void) memset((void*)&reply, 0, sizeof (reply));
 
-	err = start_backup_v3(session, request->bu_type, request->env.env_val,
-	    request->env.env_len);
+	if (session->ns_data.dd_state != NDMP_DATA_STATE_CONNECTED) {
+		NDMP_LOG(LOG_ERR,
+		    "Can't start new backup in current state.");
+		NDMP_LOG(LOG_ERR,
+		    "Connection to the mover is not established.");
+		reply.error = NDMP_ILLEGAL_STATE_ERR;
+		goto _error;
+	}
+
+	if (session->ns_data.dd_data_addr.addr_type == NDMP_ADDR_LOCAL) {
+		if (session->ns_tape.td_mode == NDMP_TAPE_READ_MODE) {
+			NDMP_LOG(LOG_ERR, "Write protected device.");
+			reply.error = NDMP_WRITE_PROTECT_ERR;
+			goto _error;
+		}
+	}
+
+	if (strcasecmp(request->bu_type, NDMP_TAR_TYPE) == 0) {
+		session->ns_butype = NDMP_BUTYPE_TAR;
+	} else if (strcasecmp(request->bu_type, NDMP_DUMP_TYPE) == 0) {
+		session->ns_butype = NDMP_BUTYPE_DUMP;
+	} else if (strcasecmp(request->bu_type, NDMP_ZFS_TYPE) == 0) {
+		session->ns_butype = NDMP_BUTYPE_ZFS;
+	} else {
+		char msg_invalid[32];
+		char msg_types[32];
+
+		(void) snprintf(msg_invalid, 32, "Invalid backup type: %s.",
+		    request->bu_type);
+		(void) snprintf(msg_types, 32,
+		    "Supported backup types are tar, dump, and zfs.");
+
+		NDMP_APILOG((void *) session, NDMP_LOG_ERROR, ++ndmp_log_msg_id,
+		    msg_invalid);
+		NDMP_APILOG((void *) session, NDMP_LOG_ERROR, ++ndmp_log_msg_id,
+		    msg_types);
+		NDMP_LOG(LOG_ERR, msg_invalid);
+		NDMP_LOG(LOG_ERR, msg_types);
+
+		reply.error = NDMP_ILLEGAL_ARGS_ERR;
+		goto _error;
+	}
+
+	if (session->ns_butype == NDMP_BUTYPE_ZFS) {
+		reply.error = ndmpd_zfs_start_op(session, request->env.env_val,
+		    request->env.env_len, NULL, 0, NDMP_DATA_OP_BACKUP);
+	} else {
+		reply.error = ndmpd_tar_start_backup_v3(session,
+		    request->bu_type, request->env.env_val,
+		    request->env.env_len);
+	}
 
 	/*
-	 * start_backup_v3 sends the reply if the backup is
+	 * *_start_backup* sends the reply if the backup is
 	 * successfully started.  Otherwise, send the reply
 	 * containing the error here.
 	 */
-	if (err != NDMP_NO_ERR) {
-		reply.error = err;
+
+_error:
+
+	if (reply.error != NDMP_NO_ERR) {
 		ndmp_send_reply(connection, &reply,
 		    "sending data_start_backup_v3 reply");
 		ndmpd_data_cleanup(session);
 	}
 }
-
 
 /*
  * ndmpd_data_start_recover_v3
@@ -442,30 +484,68 @@ ndmpd_data_start_recover_v3(ndmp_connection_t *connection, void *body)
 	ndmp_data_start_recover_request_v3 *request;
 	ndmp_data_start_recover_reply_v3 reply;
 	ndmpd_session_t *session = ndmp_get_client_data(connection);
-	ndmp_error err;
 
 	request = (ndmp_data_start_recover_request_v3 *)body;
 
 	(void) memset((void*)&reply, 0, sizeof (reply));
 
-	err = start_recover_v3(session, request->bu_type, request->env.env_val,
-	    request->env.env_len, request->nlist.nlist_val,
-	    request->nlist.nlist_len);
+	if (session->ns_data.dd_state != NDMP_DATA_STATE_CONNECTED) {
+		NDMP_LOG(LOG_ERR, "Can't start new recover in current state.");
+		reply.error = NDMP_ILLEGAL_STATE_ERR;
+		goto _error;
+	}
+
+	if (strcasecmp(request->bu_type, NDMP_TAR_TYPE) == 0) {
+		session->ns_butype = NDMP_BUTYPE_TAR;
+	} else if (strcasecmp(request->bu_type, NDMP_DUMP_TYPE) == 0) {
+		session->ns_butype = NDMP_BUTYPE_DUMP;
+	} else if (strcasecmp(request->bu_type, NDMP_ZFS_TYPE) == 0) {
+		session->ns_butype = NDMP_BUTYPE_ZFS;
+	} else {
+		char msg_invalid[32];
+		char msg_types[32];
+
+		(void) snprintf(msg_invalid, 32, "Invalid backup type: %s.",
+		    request->bu_type);
+		(void) snprintf(msg_types, 32,
+		    "Supported backup types are tar, dump, and zfs.");
+
+		NDMP_APILOG((void *) session, NDMP_LOG_ERROR, ++ndmp_log_msg_id,
+		    msg_invalid);
+		NDMP_APILOG((void *) session, NDMP_LOG_ERROR, ++ndmp_log_msg_id,
+		    msg_types);
+		NDMP_LOG(LOG_ERR, msg_invalid);
+		NDMP_LOG(LOG_ERR, msg_types);
+
+		reply.error = NDMP_ILLEGAL_ARGS_ERR;
+		goto _error;
+	}
+
+	if (session->ns_butype == NDMP_BUTYPE_ZFS) {
+		reply.error = ndmpd_zfs_start_op(session, request->env.env_val,
+		    request->env.env_len, request->nlist.nlist_val,
+		    request->nlist.nlist_len, NDMP_DATA_OP_RECOVER);
+	} else {
+		reply.error = ndmpd_tar_start_recover_v3(session,
+		    request->env.env_val, request->env.env_len,
+		    request->nlist.nlist_val, request->nlist.nlist_len);
+	}
 
 	/*
-	 * start_recover_v3 sends the reply if the recover is
+	 * *_start_recover* sends the reply if the recover is
 	 * successfully started.  Otherwise, send the reply
 	 * containing the error here.
 	 */
-	if (err != NDMP_NO_ERR) {
-		reply.error = err;
+
+_error:
+
+	if (reply.error != NDMP_NO_ERR) {
 		ndmp_send_reply(connection, &reply,
 		    "sending data_start_recover_v3 reply");
 		ndmpd_data_error(session, NDMP_DATA_HALT_INTERNAL_ERROR);
 		ndmpd_data_cleanup(session);
 	}
 }
-
 
 /*
  * ndmpd_data_abort_v3
@@ -1281,23 +1361,23 @@ data_connect_sock_v3(ndmpd_session_t *session, ulong_t addr, ushort_t port)
 
 
 /*
- * start_backup_v3
+ * ndmpd_tar_start_backup_v3
  *
  * Start the backup work
  *
  * Parameters:
- *   session (input) - session pointer.
- *   bu_type (input) - backup type.
- *   env_val (input) - environment variable array.
- *   env_len (input) - length of env_val.
+ *   session   (input) - session pointer.
+ *   bu_type   (input) - backup type.
+ *   env_val   (input) - environment variable array.
+ *   env_len   (input) - length of env_val.
  *
  * Returns:
  *   NDMP_NO_ERR - backup successfully started.
  *   otherwise - error code of backup start error.
  */
 static ndmp_error
-start_backup_v3(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
-    ulong_t env_len)
+ndmpd_tar_start_backup_v3(ndmpd_session_t *session, char *bu_type,
+    ndmp_pval *env_val, ulong_t env_len)
 {
 	int err;
 	ndmp_lbr_params_t *nlp;
@@ -1305,28 +1385,6 @@ start_backup_v3(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
 	ndmp_data_start_backup_reply_v3 reply;
 
 	(void) memset((void*)&reply, 0, sizeof (reply));
-
-	if (session->ns_data.dd_state != NDMP_DATA_STATE_CONNECTED) {
-		NDMP_LOG(LOG_ERR,
-		    "Can't start new backup in current state.");
-		NDMP_LOG(LOG_ERR,
-		    "Connection to the mover is not established.");
-		return (NDMP_ILLEGAL_STATE_ERR);
-	}
-
-	if (session->ns_data.dd_data_addr.addr_type == NDMP_ADDR_LOCAL) {
-		if (session->ns_tape.td_mode == NDMP_TAPE_READ_MODE) {
-			NDMP_LOG(LOG_ERR, "Write protected device.");
-			return (NDMP_WRITE_PROTECT_ERR);
-		}
-	}
-
-	if (strcmp(bu_type, NDMP_DUMP_TYPE) != 0 &&
-	    strcmp(bu_type, NDMP_TAR_TYPE) != 0) {
-		NDMP_LOG(LOG_ERR, "Invalid backup type: %s.", bu_type);
-		NDMP_LOG(LOG_ERR, "Supported backup types are tar and dump.");
-		return (NDMP_ILLEGAL_ARGS_ERR);
-	}
 
 	err = ndmpd_save_env(session, env_val, env_len);
 	if (err != NDMP_NO_ERR)
@@ -1414,7 +1472,7 @@ start_backup_v3(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
 	/*
 	 * perform the backup
 	 *
-	 * Cannot wait for the thread to exit as we are replying the
+	 * Cannot wait for the thread to exit as we are replying to the
 	 * client request here.
 	 */
 	err = pthread_create(NULL, NULL,
@@ -1428,25 +1486,27 @@ start_backup_v3(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
 	return (NDMP_NO_ERR);
 }
 
-
 /*
- * start_recover_v3
+ * ndmpd_tar_start_recover_v3
  *
  * Start the restore work
  *
  * Parameters:
- *   session (input) - session pointer.
+ *   session   (input) - session pointer.
  *   bu_type   (input) - backup type.
  *   env_val   (input) - environment variable array.
  *   env_len   (input) - length of env_val.
+ *   nlist_val (input) - list of files.
+ *   nlist_len (input) - length of nlist_val.
  *
  * Returns:
  *   NDMP_NO_ERR - recover successfully started.
  *   otherwise   - error code of recover start error.
  */
 static ndmp_error
-start_recover_v3(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
-    ulong_t env_len, ndmp_name_v3 *nlist_val, ulong_t nlist_len)
+ndmpd_tar_start_recover_v3(ndmpd_session_t *session,
+    ndmp_pval *env_val, ulong_t env_len, ndmp_name_v3 *nlist_val,
+    ulong_t nlist_len)
 {
 	ndmp_data_start_recover_reply_v3 reply;
 	ndmpd_module_params_t *params;
@@ -1454,17 +1514,6 @@ start_recover_v3(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
 	int err;
 
 	(void) memset((void*)&reply, 0, sizeof (reply));
-
-	if (session->ns_data.dd_state != NDMP_DATA_STATE_CONNECTED) {
-		NDMP_LOG(LOG_ERR, "Can't start new recover in current state.");
-		return (NDMP_ILLEGAL_STATE_ERR);
-	}
-	if (strcmp(bu_type, NDMP_DUMP_TYPE) != 0 &&
-	    strcmp(bu_type, NDMP_TAR_TYPE) != 0) {
-		NDMP_LOG(LOG_ERR, "Invalid backup type: %s.", bu_type);
-		NDMP_LOG(LOG_ERR, "Supported backup types are tar and dump.");
-		return (NDMP_ILLEGAL_ARGS_ERR);
-	}
 
 	nlp = ndmp_get_nlp(session);
 	NDMP_FREE(nlp->nlp_params);
@@ -1566,6 +1615,115 @@ start_recover_v3(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
 	return (NDMP_NO_ERR);
 }
 
+static ndmp_error
+ndmpd_zfs_start_op(ndmpd_session_t *session, ndmp_pval *env_val,
+    ulong_t env_len, ndmp_name_v3 *nlist_val, ulong_t nlist_len,
+    enum ndmp_data_operation op)
+{
+	ndmpd_zfs_args_t *ndmpd_zfs_args = &session->ns_ndmpd_zfs_args;
+	ndmp_data_start_backup_reply_v3 backup_reply;
+	ndmp_data_start_recover_reply_v3 recover_reply;
+	pthread_t tid;
+	void *reply;
+	char str[8];
+	int err;
+
+	if (ndmpd_zfs_init(session) != 0)
+		return (NDMP_UNDEFINED_ERR);
+
+	err = ndmpd_save_env(session, env_val, env_len);
+	if (err != NDMP_NO_ERR) {
+		ndmpd_zfs_fini(ndmpd_zfs_args);
+		return (err);
+	}
+
+	switch (op) {
+	case NDMP_DATA_OP_BACKUP:
+		if (!ndmpd_zfs_backup_parms_valid(ndmpd_zfs_args)) {
+			ndmpd_zfs_fini(ndmpd_zfs_args);
+			return (NDMP_ILLEGAL_ARGS_ERR);
+		}
+
+		if (ndmpd_zfs_pre_backup(ndmpd_zfs_args)) {
+			NDMP_LOG(LOG_ERR, "pre_backup error");
+			return (NDMP_ILLEGAL_ARGS_ERR);
+		}
+
+		session->ns_data.dd_module.dm_start_func =
+		    ndmpd_zfs_backup_starter;
+		(void) strlcpy(str, "backup", 8);
+		break;
+	case NDMP_DATA_OP_RECOVER:
+		err = ndmpd_save_nlist_v3(session, nlist_val, nlist_len);
+		if (err != NDMP_NO_ERR) {
+			ndmpd_zfs_fini(ndmpd_zfs_args);
+			return (NDMP_NO_MEM_ERR);
+		}
+
+		if (!ndmpd_zfs_restore_parms_valid(ndmpd_zfs_args)) {
+			ndmpd_zfs_fini(ndmpd_zfs_args);
+			return (NDMP_ILLEGAL_ARGS_ERR);
+		}
+
+		if (ndmpd_zfs_pre_restore(ndmpd_zfs_args)) {
+			NDMP_LOG(LOG_ERR, "pre_restore error");
+			(void) ndmpd_zfs_post_restore(ndmpd_zfs_args);
+			return (NDMP_ILLEGAL_ARGS_ERR);
+		}
+		session->ns_data.dd_module.dm_start_func =
+		    ndmpd_zfs_restore_starter;
+		(void) strlcpy(str, "recover", 8);
+		break;
+	}
+
+	ndmpd_zfs_params->mp_operation = op;
+	session->ns_data.dd_operation = op;
+	session->ns_data.dd_module.dm_abort_func = ndmpd_zfs_abort;
+	session->ns_data.dd_state = NDMP_DATA_STATE_ACTIVE;
+	session->ns_data.dd_abort = FALSE;
+
+	if (op == NDMP_DATA_OP_BACKUP) {
+		(void) memset((void*)&backup_reply, 0, sizeof (backup_reply));
+		backup_reply.error = NDMP_NO_ERR;
+		reply = &backup_reply;
+	} else {
+		(void) memset((void*)&recover_reply, 0, sizeof (recover_reply));
+		recover_reply.error = NDMP_NO_ERR;
+		reply = &recover_reply;
+	}
+
+	if (ndmp_send_response(session->ns_connection, NDMP_NO_ERR,
+	    reply) < 0) {
+		NDMP_LOG(LOG_DEBUG, "Sending data_start_%s_v3 reply", str);
+		if (op == NDMP_DATA_OP_RECOVER)
+			ndmpd_data_error(session, NDMP_DATA_HALT_CONNECT_ERROR);
+		ndmpd_zfs_fini(ndmpd_zfs_args);
+		return (NDMP_NO_ERR);
+	}
+
+	err = pthread_create(&tid, NULL,
+	    (funct_t)session->ns_data.dd_module.dm_start_func, ndmpd_zfs_args);
+
+	if (err) {
+		NDMP_LOG(LOG_ERR, "Can't start %s session (errno %d)",
+		    str, err);
+		ndmpd_zfs_fini(ndmpd_zfs_args);
+		MOD_DONE(ndmpd_zfs_params, -1);
+		return (NDMP_NO_ERR);
+	}
+
+	(void) pthread_detach(tid);
+
+	if (op == NDMP_DATA_OP_BACKUP)
+		NS_INC(nbk);
+	else
+		NS_INC(nrs);
+
+	ndmpd_zfs_dma_log(ndmpd_zfs_args, NDMP_LOG_NORMAL,
+	    "'zfs' %s starting\n", str);
+
+	return (NDMP_NO_ERR);
+}
 
 /*
  * discard_data_v3
@@ -1886,7 +2044,7 @@ ndmp_data_get_mover_mode(ndmpd_session_t *session)
 		    NDMP_ADDR_TCP)) ? "remote" : "local");
 		break;
 	default:
-		rv = "Uknonwn";
+		rv = "Unknown";
 		NDMP_LOG(LOG_ERR, "Invalid protocol version %d.",
 		    session->ns_protocol_version);
 	}
@@ -1897,7 +2055,7 @@ ndmp_data_get_mover_mode(ndmpd_session_t *session)
 /* *** static functions ******************************************** */
 
 /*
- * start_backup
+ * ndmpd_tar_start_backup_v2
  *
  * Request handling code common to version 1 and
  * version 2 data_start_backup request handlers.
@@ -1913,8 +2071,8 @@ ndmp_data_get_mover_mode(ndmpd_session_t *session)
  *   otherwise - error code of backup start error.
  */
 static ndmp_error
-start_backup(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
-    ulong_t env_len)
+ndmpd_tar_start_backup_v2(ndmpd_session_t *session, char *bu_type,
+    ndmp_pval *env_val, ulong_t env_len)
 {
 	ndmp_data_start_backup_reply reply;
 	ndmpd_module_params_t *params;
@@ -2043,9 +2201,8 @@ start_backup(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
 	return (NDMP_NO_ERR);
 }
 
-
 /*
- * start_recover
+ * ndmpd_tar_start_recover_v2
  *
  * The main recover/restore function
  *
@@ -2054,16 +2211,17 @@ start_backup(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
  *   bu_type   (input) - backup type.
  *   env_val   (input) - environment variable array.
  *   env_len   (input) - length of env_val.
- *   nlist_val (input) - list of files
- *   nlist_len (input) - length of nlist_val
+ *   nlist_val (input) - list of files.
+ *   nlist_len (input) - length of nlist_val.
  *
  * Returns:
  *   NDMP_NO_ERR - recover successfully started.
  *   otherwise - error code of backup start error.
  */
 static ndmp_error
-start_recover(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
-    ulong_t env_len, ndmp_name *nlist_val, ulong_t nlist_len)
+ndmpd_tar_start_recover_v2(ndmpd_session_t *session, char *bu_type,
+    ndmp_pval *env_val, ulong_t env_len, ndmp_name *nlist_val,
+    ulong_t nlist_len)
 {
 	ndmp_data_start_recover_reply_v2 reply;
 	ndmpd_module_params_t *params;
@@ -2170,7 +2328,7 @@ start_recover(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
 	/*
 	 * perform the restore
 	 *
-	 * Cannot wait for the thread to exit as we are replying the
+	 * Cannot wait for the thread to exit as we are replying to the
 	 * client request here.
 	 */
 	(void) pthread_create(NULL, NULL,
@@ -2179,7 +2337,6 @@ start_recover(ndmpd_session_t *session, char *bu_type, ndmp_pval *env_val,
 
 	return (NDMP_NO_ERR);
 }
-
 
 /*
  * ndmpd_data_get_info

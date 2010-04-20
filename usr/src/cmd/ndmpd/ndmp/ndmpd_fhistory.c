@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -769,7 +768,8 @@ ndmpd_fhpath_v3_cb(lbr_fhlog_call_backs_t *cbp, char *path, struct stat64 *stp,
 		if (!params || !params->mp_file_history_path_func) {
 			err = -1;
 		} else {
-			char *p = ndmp_get_relative_path(get_bk_path_v3(params),
+			char *p =
+			    ndmp_get_relative_path(get_backup_path_v3(params),
 			    path);
 			if ((err = ndmpd_api_file_history_file_v3(cbp->
 			    fh_cookie, p, stp, off)) < 0)

@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1652,4 +1651,63 @@ ndmp_malloc(size_t size)
 	}
 
 	return (data);
+}
+
+/*
+ * get_backup_path_v3
+ *
+ * Get the backup path from the NDMP environment variables.
+ *
+ * Parameters:
+ *   params (input) - pointer to the parameters structure.
+ *
+ * Returns:
+ *   The backup path: if anything is specified
+ *   NULL: Otherwise
+ */
+char *
+get_backup_path_v3(ndmpd_module_params_t *params)
+{
+	char *bkpath;
+
+	bkpath = MOD_GETENV(params, "PREFIX");
+	if (!bkpath)
+		bkpath = MOD_GETENV(params, "FILESYSTEM");
+
+
+	if (!bkpath) {
+		MOD_LOGV3(params, NDMP_LOG_ERROR,
+		    "Backup path not defined.\n");
+	} else {
+		NDMP_LOG(LOG_DEBUG, "bkpath: \"%s\"", bkpath);
+	}
+
+	return (bkpath);
+}
+
+/*
+ * get_backup_path
+ *
+ * Find the backup path from the environment variables (v2)
+ */
+char *
+get_backup_path_v2(ndmpd_module_params_t *params)
+{
+	char *bkpath;
+
+	bkpath = MOD_GETENV(params, "PREFIX");
+	if (bkpath == NULL)
+		bkpath = MOD_GETENV(params, "FILESYSTEM");
+
+	if (bkpath == NULL) {
+		MOD_LOG(params, "Error: restore path not specified.\n");
+		return (NULL);
+	}
+
+	if (*bkpath != '/') {
+		MOD_LOG(params, "Error: relative backup path not allowed.\n");
+		return (NULL);
+	}
+
+	return (bkpath);
 }

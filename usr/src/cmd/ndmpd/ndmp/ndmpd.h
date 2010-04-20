@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -114,15 +113,16 @@ typedef void *(*funct_t)(void *);	/* function pointer */
 #define	ROOT_INODE	2
 
 /*
- * NDMP backup image signature.
+ * NDMP backup image signature
  */
 #define	NDMPUTF8MAGIC "NDMPUTF8MAGIC"
 
 /*
  * Supported BU types
  */
-#define	NDMP_DUMP_TYPE	"dump"
 #define	NDMP_TAR_TYPE	"tar"
+#define	NDMP_DUMP_TYPE	"dump"
+#define	NDMP_ZFS_TYPE	"zfs"
 
 /* All 1's binary maximum mover window */
 #define	MAX_WINDOW_SIZE	0xffffffffffffffffULL
@@ -284,7 +284,6 @@ typedef struct mem_ndmp_name_v3 {
 	ndmp_error nm3_err;
 } mem_ndmp_name_v3_t;
 
-
 typedef struct ndmpd_file_handler {
 	int fh_fd;
 	ulong_t fh_mode;
@@ -427,6 +426,76 @@ typedef struct ndmpd_session_file_history_v3 {
 	ulong_t fh_dir_name_buf_index;
 } ndmpd_session_file_history_v3_t;
 
+/*
+ * zfs-based backup (zfs send/recv)
+ */
+
+typedef enum {
+	NDMPD_ZFS_MAJOR_0,
+} ndmpd_zfs_major_t;
+
+typedef enum {
+	NDMPD_ZFS_MINOR_0,
+} ndmpd_zfs_minor_t;
+
+typedef enum {
+	NDMPD_ZFS_PROP_MAJOR_0,
+} ndmpd_zfs_prop_major_t;
+
+typedef enum {
+	NDMPD_ZFS_PROP_MINOR_0,
+} ndmpd_zfs_prop_minor_t;
+
+#define	NDMPD_ZFS_MAJOR_VERSION NDMPD_ZFS_MAJOR_0
+#define	NDMPD_ZFS_MINOR_VERSION NDMPD_ZFS_MINOR_0
+#define	NDMPD_ZFS_PROP_MAJOR_VERSION NDMPD_ZFS_PROP_MAJOR_0
+#define	NDMPD_ZFS_PROP_MINOR_VERSION NDMPD_ZFS_PROP_MINOR_0
+
+#pragma pack(1)
+typedef struct {
+	char nzh_magic[14]; /* NDMPUTF8MAGIC\0 */
+	uint32_t nzh_major; /* major version */
+	uint32_t nzh_minor; /* minor version */
+	uint32_t nzh_hdrlen; /* length of hdr in bytes including magic */
+	/* future extensions */
+} ndmpd_zfs_header_t;
+#pragma pack()
+
+#define	PIPE_TAPE 0
+#define	PIPE_ZFS 1
+
+#define	NDMPD_ZFS_DMP_NAME_MAX 32
+
+typedef struct ndmpd_zfs_args {
+	zfs_type_t nz_type;			/* type of ZFS dataset */
+	char nz_dataset[ZFS_MAXNAMELEN];	/* dataset name */
+	char nz_snapname[ZFS_MAXNAMELEN];	/* snapname (following '@') */
+	char nz_fromsnap[ZFS_MAXNAMELEN];	/* snap of L-1 bkup */
+	char nz_snapprop[ZFS_MAXPROPLEN];	/* contents of snap incr prop */
+	boolean_t nz_ndmpd_snap;		/* ndmpd-generated snap? */
+
+	pthread_t nz_sendrecv_thread;		/* thread for send/recv */
+	pthread_t nz_tape_thread;		/* thread for tape r/w */
+	int32_t nz_pipe_fd[2];			/* pipe for above 2 threads */
+	int32_t nz_bufsize;			/* tape r/w buf size */
+	int64_t nz_window_len;			/* DMA window length */
+
+	int nz_level;				/* val of LEVEL env var */
+	char nz_zfs_mode;			/* val of ZFS_MODE env var */
+	boolean_t nz_zfs_force;			/* val of ZFS_FORCE env var */
+	boolean_t nz_update;			/* val of UPDATE env var */
+	char nz_dmp_name[NDMPD_ZFS_DMP_NAME_MAX]; /* val of DMP_NAME env var */
+
+	ndmpd_module_params_t nz_params;
+	ndmp_lbr_params_t *nz_nlp;
+	libzfs_handle_t *nz_zlibh;		/* session-specific lzfs hdl */
+	ndmp_context_t nz_nctx;			/* used by plugin */
+
+	ndmpd_zfs_header_t nz_tape_header;	/* tape hdr for "zfs" backup */
+} ndmpd_zfs_args_t;
+
+#define	ndmpd_zfs_params (&(ndmpd_zfs_args)->nz_params)
+
 typedef struct ndmpd_session {
 	ndmp_connection_t *ns_connection;	/* NDMP connection to client */
 	boolean_t ns_eof;		/* connection EOF flag */
@@ -439,6 +508,8 @@ typedef struct ndmpd_session {
 	ndmpd_file_handler_t *ns_file_handler_list; /* for I/O multiplexing */
 	int ns_nref;
 	ndmp_lbr_params_t *ns_ndmp_lbr_params;
+	struct ndmpd_zfs_args ns_ndmpd_zfs_args;
+	ndmpd_backup_type_t ns_butype;
 	mutex_t ns_lock;
 
 	/*
@@ -911,7 +982,6 @@ extern ndmp_error ndmp_restore_get_params_v3(ndmpd_session_t *,
     ndmpd_module_params_t *);
 extern ndmp_error ndmp_backup_get_params_v3(ndmpd_session_t *,
     ndmpd_module_params_t *);
-extern char *get_bk_path_v3(ndmpd_module_params_t *);
 
 /*
  * door init and fini function from ndmpd_door_serv.c
@@ -938,11 +1008,11 @@ extern void ndmpd_abort_marking_v2(ndmpd_session_t *);
 extern int ndmpd_mark_inodes_v3(ndmpd_session_t *, ndmp_lbr_params_t *);
 extern ndmp_lbr_params_t *ndmp_get_nlp(void *);
 
-module_start_func_t	ndmpd_tar_backup_starter;
-module_abort_func_t	ndmpd_tar_backup_abort;
+module_start_func_t ndmpd_tar_backup_starter;
+module_abort_func_t ndmpd_tar_backup_abort;
 
-module_start_func_t	ndmpd_tar_restore_starter;
-module_abort_func_t	ndmpd_tar_restore_abort;
+module_start_func_t ndmpd_tar_restore_starter;
+module_abort_func_t ndmpd_tar_restore_abort;
 
 module_start_func_t ndmpd_tar_backup_starter_v3;
 module_abort_func_t ndmpd_tar_backup_abort_v3;
@@ -969,8 +1039,8 @@ extern int tcp_get_peer(int, unsigned int *, int *);
 extern char *gethostaddr(void);
 extern int tlm_init(void);
 
-extern int chkpnt_backup_successful(char *, char *);
-extern int chkpnt_backup_prepare(char *, char *);
+extern int chkpnt_backup_successful(char *, char *, boolean_t, int *);
+extern int chkpnt_backup_prepare(char *, char *, boolean_t);
 
 extern boolean_t fs_is_chkpntvol(char *);
 extern boolean_t fs_is_chkpnt_enabled(char *);
@@ -1005,4 +1075,42 @@ extern struct sasd_drive *sasd_drive(int);
 extern void *ndmp_malloc(size_t size);
 
 extern ndmp_plugin_t *ndmp_pl;
+
+#define	NDMP_APILOG(s, t, m, ...) \
+{ \
+	if (((ndmpd_session_t *)(s))->ns_protocol_version == NDMPV4) \
+		(void) ndmpd_api_log_v4(s, t, m, __VA_ARGS__); \
+	else if (((ndmpd_session_t *)(s))->ns_protocol_version == NDMPV3) \
+		(void) ndmpd_api_log_v3(s, t, m, __VA_ARGS__); \
+	else \
+		(void) ndmpd_api_log_v2(s, __VA_ARGS__); \
+}
+
+/*
+ * Backup path utility functions
+ */
+extern char *get_backup_path_v3(ndmpd_module_params_t *);
+extern char *get_backup_path_v2(ndmpd_module_params_t *);
+
+/*
+ * Functions for zfs-based backup
+ */
+
+module_start_func_t ndmpd_zfs_backup_starter;
+module_start_func_t ndmpd_zfs_restore_starter;
+module_abort_func_t ndmpd_zfs_abort;
+
+int ndmpd_zfs_init(ndmpd_session_t *);
+void ndmpd_zfs_fini(ndmpd_zfs_args_t *);
+
+boolean_t ndmpd_zfs_backup_parms_valid(ndmpd_zfs_args_t *);
+boolean_t ndmpd_zfs_restore_parms_valid(ndmpd_zfs_args_t *);
+
+int ndmpd_zfs_pre_backup(ndmpd_zfs_args_t *);
+int ndmpd_zfs_pre_restore(ndmpd_zfs_args_t *);
+int ndmpd_zfs_post_backup(ndmpd_zfs_args_t *);
+int ndmpd_zfs_post_restore(ndmpd_zfs_args_t *);
+
+void ndmpd_zfs_dma_log(ndmpd_zfs_args_t *, ndmp_log_type, char *, ...);
+
 #endif /* _NDMPD_H */

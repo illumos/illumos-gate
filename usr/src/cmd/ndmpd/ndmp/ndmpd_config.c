@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -429,15 +428,21 @@ void
 ndmpd_config_get_butype_info_v3(ndmp_connection_t *connection, void *body)
 {
 	ndmp_config_get_butype_info_reply_v3 reply;
-	ndmp_butype_info info[2];
+	ndmp_butype_info info[3];
 	ndmp_pval envs[8];
 	ulong_t attrs;
 	ndmp_pval *envp = envs;
 
+	ndmp_pval zfs_envs[9];
+	ulong_t zfs_attrs;
+	ndmp_pval *zfs_envp = zfs_envs;
+
 	(void) memset((void*)&reply, 0, sizeof (reply));
 
 	/*
-	 * Supported environment variables and their default values.
+	 * Supported environment variables and their default values
+	 * for dump and tar.
+	 *
 	 * The environment variables for dump and tar format are the
 	 * same, because we use the same backup engine for both.
 	 */
@@ -472,6 +477,31 @@ ndmpd_config_get_butype_info_v3(ndmp_connection_t *connection, void *body)
 	info[1].default_env.default_env_len = ARRAY_LEN(envs, ndmp_pval);
 	info[1].default_env.default_env_val = envs;
 	info[1].attrs = attrs;
+
+	/*
+	 * Supported environment variables and their default values
+	 * for type "zfs."
+	 */
+
+	NDMP_SETENV(zfs_envp, "PREFIX", "");
+	NDMP_SETENV(zfs_envp, "FILESYSTEM", "");
+	NDMP_SETENV(zfs_envp, "TYPE", "zfs");
+	NDMP_SETENV(zfs_envp, "HIST", "n");
+	NDMP_SETENV(zfs_envp, "LEVEL", "0");
+	NDMP_SETENV(zfs_envp, "ZFS_MODE", "recursive");
+	NDMP_SETENV(zfs_envp, "ZFS_FORCE", "FALSE");
+	NDMP_SETENV(zfs_envp, "UPDATE", "TRUE");
+	NDMP_SETENV(zfs_envp, "DMP_NAME", "level");
+
+	zfs_attrs = NDMP_BUTYPE_BACKUP_UTF8 |
+	    NDMP_BUTYPE_RECOVER_UTF8 |
+	    NDMP_BUTYPE_BACKUP_INCREMENTAL;
+
+	/* zfs backup type */
+	info[2].butype_name = "zfs";
+	info[2].default_env.default_env_len = ARRAY_LEN(zfs_envs, ndmp_pval);
+	info[2].default_env.default_env_val = zfs_envs;
+	info[2].attrs = zfs_attrs;
 
 	reply.error = NDMP_NO_ERR;
 	reply.butype_info.butype_info_len = ARRAY_LEN(info, ndmp_butype_info);
@@ -899,15 +929,23 @@ void
 ndmpd_config_get_butype_info_v4(ndmp_connection_t *connection, void *body)
 {
 	ndmp_config_get_butype_info_reply_v4 reply;
-	ndmp_butype_info info[2];
+	ndmp_butype_info info[3];
+
 	ndmp_pval envs[12];
 	ulong_t attrs;
 	ndmp_pval *envp = envs;
 
+	ndmp_pval zfs_envs[11];
+	ulong_t zfs_attrs;
+	ndmp_pval *zfs_envp = zfs_envs;
+
+
 	(void) memset((void*)&reply, 0, sizeof (reply));
 
 	/*
-	 * Supported environment variables and their default values.
+	 * Supported environment variables and their default values
+	 * for dump and tar.
+	 *
 	 * The environment variables for dump and tar format are the
 	 * same, because we use the same backup engine for both.
 	 */
@@ -949,6 +987,33 @@ ndmpd_config_get_butype_info_v4(ndmp_connection_t *connection, void *body)
 	info[1].default_env.default_env_len = ARRAY_LEN(envs, ndmp_pval);
 	info[1].default_env.default_env_val = envs;
 	info[1].attrs = attrs;
+
+	/*
+	 * Supported environment variables and their default values
+	 * for type "zfs."
+	 */
+
+	NDMP_SETENV(zfs_envp, "USER", "");
+	NDMP_SETENV(zfs_envp, "CMD", "");
+	NDMP_SETENV(zfs_envp, "FILESYSTEM", "");
+	NDMP_SETENV(zfs_envp, "PATHNAME_SEPARATOR", "/");
+	NDMP_SETENV(zfs_envp, "TYPE", "zfs");
+	NDMP_SETENV(zfs_envp, "HIST", "n");
+	NDMP_SETENV(zfs_envp, "LEVEL", "0");
+	NDMP_SETENV(zfs_envp, "ZFS_MODE", "recursive");
+	NDMP_SETENV(zfs_envp, "ZFS_FORCE", "n");
+	NDMP_SETENV(zfs_envp, "UPDATE", "y");
+	NDMP_SETENV(zfs_envp, "DMP_NAME", "level");
+
+	zfs_attrs = NDMP_BUTYPE_BACKUP_UTF8 |
+	    NDMP_BUTYPE_RECOVER_UTF8 |
+	    NDMP_BUTYPE_BACKUP_INCREMENTAL;
+
+	/* zfs backup type */
+	info[2].butype_name = "zfs";
+	info[2].default_env.default_env_len = ARRAY_LEN(zfs_envs, ndmp_pval);
+	info[2].default_env.default_env_val = zfs_envs;
+	info[2].attrs = zfs_attrs;
 
 	reply.error = NDMP_NO_ERR;
 	reply.butype_info.butype_info_len = ARRAY_LEN(info, ndmp_butype_info);
