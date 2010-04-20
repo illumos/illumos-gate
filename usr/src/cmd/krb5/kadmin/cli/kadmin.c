@@ -1,8 +1,6 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 /*
  * Copyright 1994 by the Massachusetts Institute of Technology.
@@ -1042,14 +1040,6 @@ kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 			     argv[i]);
 		     return -1;
  		}
-				if (date <= now) {
-					fprintf(stderr,
-						gettext("Date specified is "
-							"in the past "
-							"\"%s\".\n"),
-						argv[i]);
-					return (-1);
-				}
 		oprinc->max_life = date - now;
 		*mask |= KADM5_MAX_LIFE;
 		continue;
@@ -1069,14 +1059,6 @@ kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 			     argv[i]);
 		     return -1;
  		}
-				if (date <= now) {
-					fprintf(stderr,
-						gettext("Date specified is "
-							"in the past "
-							"\"%s\".\n"),
-						argv[i]);
-					return (-1);
-				}
 		oprinc->max_renewable_life = date - now;
 		*mask |= KADM5_MAX_RLIFE;
 		continue;
