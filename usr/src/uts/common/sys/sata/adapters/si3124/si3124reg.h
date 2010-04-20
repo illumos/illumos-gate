@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SI3124REG_H
 #define	_SI3124REG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -70,103 +67,106 @@ typedef struct fis_reg_h2d {
 	uint32_t fish_type_pmp_rsvd_cmddevctl_cmd_features;
 
 #define	SET_FIS_TYPE(fis, type)	\
-	(fis.fish_type_pmp_rsvd_cmddevctl_cmd_features |= (type & 0xff))
+	((&fis)->fish_type_pmp_rsvd_cmddevctl_cmd_features |= (type & 0xff))
 
 #define	SET_FIS_PMP(fis, pmp)	\
-	(fis.fish_type_pmp_rsvd_cmddevctl_cmd_features |= ((pmp & 0xf) << 8))
+	((&fis)->fish_type_pmp_rsvd_cmddevctl_cmd_features |= \
+	    ((pmp & 0xf) << 8))
 
 #define	SET_FIS_CDMDEVCTL(fis, cmddevctl)	\
-	(fis.fish_type_pmp_rsvd_cmddevctl_cmd_features |=	\
+	((&fis)->fish_type_pmp_rsvd_cmddevctl_cmd_features |=	\
 		((cmddevctl & 0x1) << 15))
 
 #define	SET_FIS_COMMAND(fis, command)	\
-	(fis.fish_type_pmp_rsvd_cmddevctl_cmd_features |=	\
+	((&fis)->fish_type_pmp_rsvd_cmddevctl_cmd_features |=	\
 		((command & 0xff) << 16))
 
 #define	GET_FIS_COMMAND(fis)	\
-	((fis.fish_type_pmp_rsvd_cmddevctl_cmd_features >> 16) & 0xff)
+	(((&fis)->fish_type_pmp_rsvd_cmddevctl_cmd_features >> 16) & 0xff)
 
 #define	SET_FIS_FEATURES(fis, features)	\
-	(fis.fish_type_pmp_rsvd_cmddevctl_cmd_features |=	\
+	((&fis)->fish_type_pmp_rsvd_cmddevctl_cmd_features |=	\
 		((features & 0xff) << 24))
 
 #define	GET_FIS_FEATURES(fis)	\
-	((fis.fish_type_pmp_rsvd_cmddevctl_cmd_features >> 24) & 0xff)
+	(((&fis)->fish_type_pmp_rsvd_cmddevctl_cmd_features >> 24) & 0xff)
 
 	/* offset 0x04 */
 	uint32_t fish_sector_cyllow_cylhi_devhead;
 
 #define	SET_FIS_SECTOR(fis, sector)	\
-	(fis.fish_sector_cyllow_cylhi_devhead |= ((sector & 0xff)))
+	((&fis)->fish_sector_cyllow_cylhi_devhead |= ((sector & 0xff)))
 
 #define	GET_FIS_SECTOR(fis)	\
-	(fis.fish_sector_cyllow_cylhi_devhead & 0xff)
+	((&fis)->fish_sector_cyllow_cylhi_devhead & 0xff)
 
 #define	SET_FIS_CYL_LOW(fis, cyl_low)	\
-	(fis.fish_sector_cyllow_cylhi_devhead |= ((cyl_low & 0xff) << 8))
+	((&fis)->fish_sector_cyllow_cylhi_devhead |= ((cyl_low & 0xff) << 8))
 
 #define	GET_FIS_CYL_LOW(fis)	\
-	((fis.fish_sector_cyllow_cylhi_devhead >> 8) & 0xff)
+	(((&fis)->fish_sector_cyllow_cylhi_devhead >> 8) & 0xff)
 
 #define	SET_FIS_CYL_HI(fis, cyl_hi)	\
-	(fis.fish_sector_cyllow_cylhi_devhead |= ((cyl_hi & 0xff) << 16))
+	((&fis)->fish_sector_cyllow_cylhi_devhead |= ((cyl_hi & 0xff) << 16))
 
 #define	GET_FIS_CYL_HI(fis)	\
-	((fis.fish_sector_cyllow_cylhi_devhead >> 16) & 0xff)
+	(((&fis)->fish_sector_cyllow_cylhi_devhead >> 16) & 0xff)
 
 #define	SET_FIS_DEV_HEAD(fis, dev_head)	\
-	(fis.fish_sector_cyllow_cylhi_devhead |= ((dev_head & 0xff) << 24))
+	((&fis)->fish_sector_cyllow_cylhi_devhead |= ((dev_head & 0xff) << 24))
 
 #define	GET_FIS_DEV_HEAD(fis)	\
-	((fis.fish_sector_cyllow_cylhi_devhead >> 24) & 0xff)
+	(((&fis)->fish_sector_cyllow_cylhi_devhead >> 24) & 0xff)
 
 
 	/* offset 0x08 */
 	uint32_t fish_sectexp_cyllowexp_cylhiexp_featuresexp;
 
 #define	SET_FIS_SECTOR_EXP(fis, sectorexp)	\
-	(fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp |=	\
+	((&fis)->fish_sectexp_cyllowexp_cylhiexp_featuresexp |=	\
 		((sectorexp & 0xff)))
 
 #define	GET_FIS_SECTOR_EXP(fis)	\
-	(fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp  & 0xff)
+	((&fis)->fish_sectexp_cyllowexp_cylhiexp_featuresexp  & 0xff)
 
 #define	SET_FIS_CYL_LOW_EXP(fis, cyllowexp)			\
-	(fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp |= 	\
+	((&fis)->fish_sectexp_cyllowexp_cylhiexp_featuresexp |= 	\
 		((cyllowexp & 0xff) << 8))
 
 #define	GET_FIS_CYL_LOW_EXP(fis)			\
-	((fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp >> 8) & 0xff)
+	(((&fis)->fish_sectexp_cyllowexp_cylhiexp_featuresexp >> 8) & 0xff)
 
 #define	SET_FIS_CYL_HI_EXP(fis, cylhiexp)			\
-	(fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp |= 	\
+	((&fis)->fish_sectexp_cyllowexp_cylhiexp_featuresexp |= 	\
 		((cylhiexp & 0xff) << 16))
 
 #define	GET_FIS_CYL_HI_EXP(fis)			\
-	((fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp >> 16) & 0xff)
+	(((&fis)->fish_sectexp_cyllowexp_cylhiexp_featuresexp >> 16) & 0xff)
 
 #define	SET_FIS_FEATURES_EXP(fis, features_exp)		\
-	(fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp |= 	\
+	((&fis)->fish_sectexp_cyllowexp_cylhiexp_featuresexp |= 	\
 		((features_exp & 0xff) << 24))
 
 	/* offset 0x0c */
 	uint32_t fish_sectcount_sectcountexp_rsvd_devctl;
 
 #define	SET_FIS_SECTOR_COUNT(fis, sector_count)	\
-	(fis.fish_sectcount_sectcountexp_rsvd_devctl |= ((sector_count & 0xff)))
+	((&fis)->fish_sectcount_sectcountexp_rsvd_devctl |= \
+	    ((sector_count & 0xff)))
 
 #define	GET_FIS_SECTOR_COUNT(fis)	\
-	(fis.fish_sectcount_sectcountexp_rsvd_devctl & 0xff)
+	((&fis)->fish_sectcount_sectcountexp_rsvd_devctl & 0xff)
 
 #define	SET_FIS_SECTOR_COUNT_EXP(fis, sector_count_exp)	\
-	(fis.fish_sectcount_sectcountexp_rsvd_devctl |= \
+	((&fis)->fish_sectcount_sectcountexp_rsvd_devctl |= \
 		((sector_count_exp & 0xff) << 8))
 
 #define	GET_FIS_SECTOR_COUNT_EXP(fis)	\
-	((fis.fish_sectcount_sectcountexp_rsvd_devctl >> 8) & 0xff)
+	(((&fis)->fish_sectcount_sectcountexp_rsvd_devctl >> 8) & 0xff)
 
 #define	SET_FIS_SECTOR_DEVCTL(fis, devctl)	\
-	(fis.fish_sectcount_sectcountexp_rsvd_devctl |= ((devctl & 0xff) << 24))
+	((&fis)->fish_sectcount_sectcountexp_rsvd_devctl |= \
+	    ((devctl & 0xff) << 24))
 
 	/* offset 0x10 */
 	uint32_t fish_rsvd3;		/* should be zero */
