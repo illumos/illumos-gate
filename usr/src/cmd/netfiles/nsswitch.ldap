@@ -17,10 +17,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # /etc/nsswitch.ldap:
@@ -39,19 +37,19 @@ passwd:     files ldap
 group:      files ldap
 
 # consult /etc "files" only if ldap is down. 
-hosts:      ldap [NOTFOUND=return] files
+hosts:      files ldap
 
 # Note that IPv4 addresses are searched for in all of the ipnodes databases
 # before searching the hosts databases.
-ipnodes:    ldap [NOTFOUND=return] files
+ipnodes:    files ldap
 
-networks:   ldap [NOTFOUND=return] files
-protocols:  ldap [NOTFOUND=return] files
-rpc:        ldap [NOTFOUND=return] files
-ethers:     ldap [NOTFOUND=return] files
-netmasks:   ldap [NOTFOUND=return] files
-bootparams: ldap [NOTFOUND=return] files
-publickey:  ldap [NOTFOUND=return] files
+networks:   files ldap
+protocols:  files ldap
+rpc:        files ldap
+ethers:     files ldap
+netmasks:   files ldap
+bootparams: files ldap
+publickey:  files ldap
 
 netgroup:   ldap
 
