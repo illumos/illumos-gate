@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_FS_AUTOFS_H
@@ -280,7 +279,8 @@ extern int auto_lookup_aux(fnnode_t *, char *, cred_t *);
 extern void auto_new_mount_thread(fnnode_t *, char *, cred_t *);
 extern int auto_nobrowse_option(char *);
 
-extern void unmount_tree(struct autofs_globals *, int);
+extern int unmount_subtree(fnnode_t *, boolean_t);
+extern void unmount_tree(struct autofs_globals *, boolean_t);
 extern void autofs_free_globals(struct autofs_globals *);
 extern void autofs_shutdown_zone(struct autofs_globals *);
 /*

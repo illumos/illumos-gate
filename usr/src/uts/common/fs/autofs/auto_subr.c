@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -78,6 +77,10 @@
 #define	TYPICALMAXPATHLEN	64
 
 static kmutex_t autofs_nodeid_lock;
+
+/* max number of unmount threads running */
+static int autofs_unmount_threads = 5;
+static int autofs_unmount_thread_timer = 120;	/* in seconds */
 
 static int auto_perform_link(fnnode_t *, struct linka *, cred_t *);
 static int auto_perform_actions(fninfo_t *, fnnode_t *,
@@ -606,14 +609,13 @@ auto_calldaemon(
 }
 
 static int
-auto_null_request(fninfo_t *fnip, bool_t hard)
+auto_null_request(zoneid_t zoneid, bool_t hard)
 {
 	int error;
-	struct autofs_globals *fngp = vntofn(fnip->fi_rootvp)->fn_globals;
 
 	AUTOFS_DPRINT((4, "\tauto_null_request\n"));
 
-	error = auto_calldaemon(fngp->fng_zoneid, NULLPROC,
+	error = auto_calldaemon(zoneid, NULLPROC,
 	    xdr_void, NULL, xdr_void, NULL, 0, hard);
 
 	AUTOFS_DPRINT((5, "\tauto_null_request: error=%d\n", error));
@@ -1834,42 +1836,31 @@ unmount_triggers(fnnode_t *fnp, action_list **alp)
 
 /*
  * This routine locks the mountpoint of every trigger node if they're
- * not busy, or returns EBUSY if any node is busy. If a trigger node should
- * be unmounted first, then it sets nfnp to point to it, otherwise nfnp
- * points to NULL.
+ * not busy, or returns EBUSY if any node is busy.
  */
-static int
-triggers_busy(fnnode_t *fnp, fnnode_t **nfnp)
+static boolean_t
+triggers_busy(fnnode_t *fnp)
 {
-	int error = 0, done;
+	int done;
 	int lck_error = 0;
 	fnnode_t *tp, *t1p;
 	vfs_t *vfsp;
 
 	ASSERT(RW_WRITE_HELD(&fnp->fn_rwlock));
 
-	*nfnp = NULL;
 	for (tp = fnp->fn_trigger; tp != NULL; tp = tp->fn_next) {
 		AUTOFS_DPRINT((10, "\ttrigger: %s\n", tp->fn_name));
+		/* MF_LOOKUP should never be set on trigger nodes */
+		ASSERT((tp->fn_flags & MF_LOOKUP) == 0);
 		vfsp = fntovn(tp)->v_vfsp;
-		error = 0;
+
 		/*
 		 * The vn_vfsunlock will be done in auto_inkernel_unmount.
 		 */
 		lck_error = vn_vfswlock(vfsp->vfs_vnodecovered);
-		if (lck_error == 0) {
-			mutex_enter(&tp->fn_lock);
-			ASSERT((tp->fn_flags & MF_LOOKUP) == 0);
-			if (tp->fn_flags & MF_INPROG) {
-				/*
-				 * a mount is in progress
-				 */
-				error = EBUSY;
-			}
-			mutex_exit(&tp->fn_lock);
-		}
-		if (lck_error || error || DEEPER(tp) ||
-		    ((fntovn(tp))->v_count) > 2) {
+
+		if (lck_error != 0 || (tp->fn_flags & MF_INPROG) ||
+		    DEEPER(tp) || ((fntovn(tp))->v_count) > 2) {
 			/*
 			 * couldn't lock it because it's busy,
 			 * It is mounted on or has dirents?
@@ -1879,14 +1870,7 @@ triggers_busy(fnnode_t *fnp, fnnode_t **nfnp)
 			 * is for the trigger node.
 			 */
 			AUTOFS_DPRINT((10, "\ttrigger busy\n"));
-			if ((lck_error == 0) && (error == 0)) {
-				*nfnp = tp;
-				/*
-				 * The matching VN_RELE is done in
-				 * unmount_tree().
-				 */
-				VN_HOLD(fntovn(*nfnp));
-			}
+
 			/*
 			 * Unlock previously locked mountpoints
 			 */
@@ -1908,33 +1892,11 @@ triggers_busy(fnnode_t *fnp, fnnode_t **nfnp)
 				}
 				done = (t1p == tp);
 			}
-			error = EBUSY;
-			break;
+			return (B_TRUE);
 		}
 	}
 
-	AUTOFS_DPRINT((4, "triggers_busy: error=%d\n", error));
-	return (error);
-}
-
-/*
- * Unlock previously locked trigger nodes.
- */
-static int
-triggers_unlock(fnnode_t *fnp)
-{
-	fnnode_t *tp;
-	vfs_t *vfsp;
-
-	ASSERT(RW_WRITE_HELD(&fnp->fn_rwlock));
-
-	for (tp = fnp->fn_trigger; tp != NULL; tp = tp->fn_next) {
-		AUTOFS_DPRINT((10, "\tunlock trigger: %s\n", tp->fn_name));
-		vfsp = fntovn(tp)->v_vfsp;
-		vn_vfsunlock(vfsp->vfs_vnodecovered);
-	}
-
-	return (0);
+	return (B_FALSE);
 }
 
 /*
@@ -2028,9 +1990,11 @@ done:
 }
 
 /*
- * vp is the "root" of the AUTOFS filesystem.
  * return EBUSY if any thread is holding a reference to this vnode
- * other than us.
+ * other than us. Result of this function cannot be relied on, since
+ * it doesn't follow proper locking rules (i.e. vp->v_vfsmountedhere
+ * and fnp->fn_trigger can change throughout this function). However
+ * it's good enough for rough estimation.
  */
 static int
 check_auto_node(vnode_t *vp)
@@ -2045,8 +2009,6 @@ check_auto_node(vnode_t *vp)
 
 	AUTOFS_DPRINT((4, "\tcheck_auto_node vp=%p ", (void *)vp));
 	fnp = vntofn(vp);
-	ASSERT(fnp->fn_flags & MF_INPROG);
-	ASSERT((fnp->fn_flags & MF_LOOKUP) == 0);
 
 	count = 1;		/* we are holding a reference to vp */
 	if (fnp->fn_flags & MF_TRIGGER) {
@@ -2061,10 +2023,16 @@ check_auto_node(vnode_t *vp)
 		 */
 		count++;
 	}
+	if (vn_ismntpt(vp)) {
+		/*
+		 * File system is mounted on us.
+		 */
+		count++;
+	}
 	mutex_enter(&vp->v_lock);
+	ASSERT(vp->v_count > 0);
 	if (vp->v_flag & VROOT)
 		count++;
-	ASSERT(vp->v_count > 0);
 	AUTOFS_DPRINT((10, "\tcount=%u ", vp->v_count));
 	if (vp->v_count > count)
 		error = EBUSY;
@@ -2083,305 +2051,136 @@ check_auto_node(vnode_t *vp)
  * the root and its immediate subdirs.
  * The daemon will "AUTOFS direct-mount" only one level below the root.
  */
-static int
+static void
 unmount_autofs(vnode_t *rootvp)
 {
 	fnnode_t *fnp, *rootfnp, *nfnp;
-	int error;
 
 	AUTOFS_DPRINT((4, "\tunmount_autofs rootvp=%p ", (void *)rootvp));
 
-	error = check_auto_node(rootvp);
-	if (error == 0) {
-		/*
-		 * Remove all its immediate subdirectories.
-		 */
-		rootfnp = vntofn(rootvp);
-		rw_enter(&rootfnp->fn_rwlock, RW_WRITER);
-		nfnp = NULL;	/* lint clean */
-		for (fnp = rootfnp->fn_dirents; fnp != NULL; fnp = nfnp) {
-			ASSERT(fntovn(fnp)->v_count == 0);
-			ASSERT(fnp->fn_dirents == NULL);
-			ASSERT(fnp->fn_linkcnt == 2);
-			fnp->fn_linkcnt--;
-			auto_disconnect(rootfnp, fnp);
-			nfnp = fnp->fn_next;
-			auto_freefnnode(fnp);
-		}
-		rw_exit(&rootfnp->fn_rwlock);
+	/*
+	 * Remove all its immediate subdirectories.
+	 */
+	rootfnp = vntofn(rootvp);
+	rw_enter(&rootfnp->fn_rwlock, RW_WRITER);
+	for (fnp = rootfnp->fn_dirents; fnp != NULL; fnp = nfnp) {
+		ASSERT(fntovn(fnp)->v_count == 0);
+		ASSERT(fnp->fn_dirents == NULL);
+		ASSERT(fnp->fn_linkcnt == 2);
+		fnp->fn_linkcnt--;
+		auto_disconnect(rootfnp, fnp);
+		nfnp = fnp->fn_next;
+		auto_freefnnode(fnp);
 	}
-	AUTOFS_DPRINT((5, "\tunmount_autofs error=%d ", error));
-	return (error);
+	rw_exit(&rootfnp->fn_rwlock);
 }
 
 /*
- * max number of unmount threads running
+ * If a node matches all unmount criteria, do:
+ *     destroy subordinate trigger node(s) if there is any
+ *     unmount filesystem mounted on top of the node if there is any
+ *
+ * Function should be called with locked fnp's mutex. The mutex is
+ * unlocked before return from function.
  */
-static int autofs_unmount_threads = 5;
-
-/*
- * XXX unmount_tree() is not suspend-safe within the scope of
- * the present model defined for cpr to suspend the system. Calls made
- * by the unmount_tree() that have been identified to be unsafe are
- * (1) RPC client handle setup and client calls to automountd which can
- * block deep down in the RPC library, (2) kmem_alloc() calls with the
- * KM_SLEEP flag which can block if memory is low, and (3) VFS_*() and
- * VOP_*() calls which can result in over the wire calls to servers.
- * The thread should be completely reevaluated to make it suspend-safe in
- * case of future updates to the cpr model.
- */
-void
-unmount_tree(struct autofs_globals *fngp, int force)
+static int
+try_unmount_node(fnnode_t *fnp, boolean_t force)
 {
-	vnode_t *vp, *newvp;
-	vfs_t *vfsp;
-	fnnode_t *fnp, *nfnp, *pfnp;
-	action_list *alp;
-	int error, ilocked_it = 0;
-	fninfo_t *fnip;
-	time_t ref_time;
-	int autofs_busy_root, unmount_as_unit, unmount_done = 0;
-	timestruc_t now;
+	boolean_t	trigger_unmount = B_FALSE;
+	action_list	*alp = NULL;
+	vnode_t		*vp;
+	int		error = 0;
+	fninfo_t	*fnip;
+	vfs_t		*vfsp;
+	struct autofs_globals *fngp;
 
-	callb_cpr_t cprinfo;
-	kmutex_t unmount_tree_cpr_lock;
+	AUTOFS_DPRINT((10, "\ttry_unmount_node: processing node %p\n",
+	    (void *)fnp));
 
-	mutex_init(&unmount_tree_cpr_lock, NULL, MUTEX_DEFAULT, NULL);
-	CALLB_CPR_INIT(&cprinfo, &unmount_tree_cpr_lock, callb_generic_cpr,
-	    "unmount_tree");
+	ASSERT(MUTEX_HELD(&fnp->fn_lock));
 
-	/*
-	 * Got to release lock before attempting unmount in case
-	 * it hangs.
-	 */
-	rw_enter(&fngp->fng_rootfnnodep->fn_rwlock, RW_READER);
-	if ((fnp = fngp->fng_rootfnnodep->fn_dirents) == NULL) {
-		ASSERT(fngp->fng_fnnode_count == 1);
-		/*
-		 * no autofs mounted, done.
-		 */
-		rw_exit(&fngp->fng_rootfnnodep->fn_rwlock);
-		goto done;
-	}
-	VN_HOLD(fntovn(fnp));
-	rw_exit(&fngp->fng_rootfnnodep->fn_rwlock);
-
+	fngp = fnp->fn_globals;
 	vp = fntovn(fnp);
 	fnip = vfstofni(vp->v_vfsp);
-	/*
-	 * autofssys() will be calling in from the global zone and doing
-	 * work on the behalf of the given zone, hence we can't always assert
-	 * that we have the right credentials, nor that the caller is always in
-	 * the correct zone.
-	 *
-	 * We do, however, know that if this is a "forced unmount" operation
-	 * (which autofssys() does), then we won't go down to the krpc layers,
-	 * so we don't need to fudge with the credentials.
-	 */
-	ASSERT(force || fnip->fi_zoneid == getzoneid());
-	if (!force && auto_null_request(fnip, FALSE) != 0) {
-		/*
-		 * automountd not running in this zone,
-		 * don't attempt unmounting this round.
-		 */
-		VN_RELE(vp);
-		goto done;
-	}
-	/* reference time for this unmount round */
-	ref_time = gethrestime_sec();
-	/*
-	 * If this an autofssys() call, we need to make sure we don't skip
-	 * nodes because we think we saw them recently.
-	 */
-	mutex_enter(&fnp->fn_lock);
-	if (force && fnp->fn_unmount_ref_time >= ref_time)
-		ref_time = fnp->fn_unmount_ref_time + 1;
-	mutex_exit(&fnp->fn_lock);
 
-	AUTOFS_DPRINT((4, "unmount_tree (ID=%ld)\n", ref_time));
-top:
-	AUTOFS_DPRINT((10, "unmount_tree: %s\n", fnp->fn_name));
-	ASSERT(fnp);
-	vp = fntovn(fnp);
-	if (vp->v_type == VLNK) {
-		/*
-		 * can't unmount symbolic links
-		 */
-		goto next;
-	}
-	fnip = vfstofni(vp->v_vfsp);
-	ASSERT(vp->v_count > 0);
-	error = 0;
-	autofs_busy_root = unmount_as_unit = 0;
-	alp = NULL;
-
-	ilocked_it = 0;
-	mutex_enter(&fnp->fn_lock);
+	/*
+	 * If either a mount, lookup or another unmount of this subtree is in
+	 * progress, don't attempt to unmount at this time.
+	 */
 	if (fnp->fn_flags & (MF_INPROG | MF_LOOKUP)) {
-		/*
-		 * Either a mount, lookup or another unmount of this
-		 * subtree is in progress, don't attempt to unmount at
-		 * this time.
-		 */
 		mutex_exit(&fnp->fn_lock);
-		error = EBUSY;
-		goto next;
+		return (EBUSY);
 	}
-	if (fnp->fn_unmount_ref_time >= ref_time) {
-		/*
-		 * Already been here, try next node.
-		 */
-		mutex_exit(&fnp->fn_lock);
-		error = EBUSY;
-		goto next;
-	}
-	fnp->fn_unmount_ref_time = ref_time;
 
 	/*
-	 * If forced operation ignore timeout values
+	 * Bail out if someone else is holding reference to this vnode.
+	 * This check isn't just an optimization (someone is probably
+	 * just about to trigger mount). It is necessary to prevent a deadlock
+	 * in domount() called from auto_perform_actions() if unmount of
+	 * trigger parent fails. domount() calls lookupname() to resolve
+	 * special in mount arguments. Special is set to a map name in case
+	 * of autofs triggers (i.e. auto_ws.sun.com). Thus if current
+	 * working directory is set to currently processed node, lookupname()
+	 * calls into autofs vnops in order to resolve special, which deadlocks
+	 * the process.
+	 *
+	 * Note: This should be fixed. Autofs shouldn't pass the map name
+	 * in special and avoid useless lookup with potentially disasterous
+	 * consequence.
 	 */
-	if (!force && fnp->fn_ref_time + fnip->fi_mount_to >
-	    gethrestime_sec()) {
-		/*
-		 * Node has been referenced recently, try the
-		 * unmount of its children if any.
-		 */
+	if (check_auto_node(vp) == EBUSY) {
 		mutex_exit(&fnp->fn_lock);
-		AUTOFS_DPRINT((10, "fn_ref_time within range\n"));
-		rw_enter(&fnp->fn_rwlock, RW_READER);
-		if (fnp->fn_dirents) {
-			/*
-			 * Has subdirectory, attempt their
-			 * unmount first
-			 */
-			nfnp = fnp->fn_dirents;
-			VN_HOLD(fntovn(nfnp));
-			rw_exit(&fnp->fn_rwlock);
-
-			VN_RELE(vp);
-			fnp = nfnp;
-			goto top;
-		}
-		rw_exit(&fnp->fn_rwlock);
-		/*
-		 * No children, try next node.
-		 */
-		error = EBUSY;
-		goto next;
+		return (EBUSY);
 	}
 
+	/*
+	 * If not forced operation, back out if node has been referenced
+	 * recently.
+	 */
+	if (!force &&
+	    fnp->fn_ref_time + fnip->fi_mount_to > gethrestime_sec()) {
+		mutex_exit(&fnp->fn_lock);
+		return (EBUSY);
+	}
+
+	/* block mounts/unmounts on the node */
 	AUTOFS_BLOCK_OTHERS(fnp, MF_INPROG);
 	fnp->fn_error = 0;
 	mutex_exit(&fnp->fn_lock);
-	ilocked_it = 1;
 
+	/* unmount next level triggers if there are any */
 	rw_enter(&fnp->fn_rwlock, RW_WRITER);
 	if (fnp->fn_trigger != NULL) {
-		unmount_as_unit = 1;
-		if ((vn_mountedvfs(vp) == NULL) && (check_auto_node(vp))) {
-			/*
-			 * AUTOFS mountpoint is busy, there's
-			 * no point trying to unmount. Fall through
-			 * to attempt to unmount subtrees rooted
-			 * at a possible trigger node, but remember
-			 * not to unmount this tree.
-			 */
-			autofs_busy_root = 1;
-		}
+		trigger_unmount = B_TRUE;
 
-		if (triggers_busy(fnp, &nfnp)) {
+		if (triggers_busy(fnp)) {
 			rw_exit(&fnp->fn_rwlock);
-			if (nfnp == NULL) {
-				error = EBUSY;
-				goto next;
-			}
-			/*
-			 * nfnp is busy, try to unmount it first
-			 */
 			mutex_enter(&fnp->fn_lock);
 			AUTOFS_UNBLOCK_OTHERS(fnp, MF_INPROG);
 			mutex_exit(&fnp->fn_lock);
-			VN_RELE(vp);
-			ASSERT(fntovn(nfnp)->v_count > 1);
-			fnp = nfnp;
-			goto top;
+			return (EBUSY);
 		}
 
 		/*
 		 * At this point, we know all trigger nodes are locked,
 		 * and they're not busy or mounted on.
+		 *
+		 * Attempt to unmount all trigger nodes, save the
+		 * action_list in case we need to remount them later.
+		 * The action_list will be freed later if there was no
+		 * need to remount the trigger nodes.
 		 */
-
-		if (autofs_busy_root) {
-			/*
-			 * Got to unlock the the trigger nodes since
-			 * I'm not really going to unmount the filesystem.
-			 */
-			(void) triggers_unlock(fnp);
-		} else {
-			/*
-			 * Attempt to unmount all the trigger nodes,
-			 * save the action_list in case we need to
-			 * remount them later. The action_list will be
-			 * freed later if there was no need to remount the
-			 * trigger nodes.
-			 */
-			unmount_triggers(fnp, &alp);
-		}
+		unmount_triggers(fnp, &alp);
 	}
 	rw_exit(&fnp->fn_rwlock);
-
-	if (autofs_busy_root)
-		goto next;
 
 	(void) vn_vfswlock_wait(vp);
 
 	vfsp = vn_mountedvfs(vp);
 	if (vfsp != NULL) {
-		/*
-		 * Node is mounted on.
-		 */
-		AUTOFS_DPRINT((10, "\tNode is mounted on\n"));
-
-		/*
-		 * Deal with /xfn/host/jurassic alikes here...
-		 */
-		if (vfs_matchops(vfsp, vfs_getops(vp->v_vfsp))) {
-			/*
-			 * If the filesystem mounted here is AUTOFS, and it
-			 * is busy, try to unmount the tree rooted on it
-			 * first. We know this call to VFS_ROOT is safe to
-			 * call while holding VVFSLOCK, since it resolves
-			 * to a call to auto_root().
-			 */
-			AUTOFS_DPRINT((10, "\t\tAUTOFS mounted here\n"));
-			if (VFS_ROOT(vfsp, &newvp)) {
-				cmn_err(CE_PANIC,
-				    "unmount_tree: VFS_ROOT(vfs=%p) failed",
-				    (void *)vfsp);
-			}
-			nfnp = vntofn(newvp);
-			if (DEEPER(nfnp)) {
-				vn_vfsunlock(vp);
-				mutex_enter(&fnp->fn_lock);
-				AUTOFS_UNBLOCK_OTHERS(fnp, MF_INPROG);
-				mutex_exit(&fnp->fn_lock);
-				VN_RELE(vp);
-				fnp = nfnp;
-				goto top;
-			}
-			/*
-			 * Fall through to unmount this filesystem
-			 */
-			VN_RELE(newvp);
-		}
-
-		/*
-		 * vn_vfsunlock(vp) is done inside unmount_node()
-		 */
+		/* vn_vfsunlock(vp) is done inside unmount_node() */
 		error = unmount_node(vp, force);
 		if (error == ECONNRESET) {
-			AUTOFS_DPRINT((10, "\tConnection dropped\n"));
 			if (vn_mountedvfs(vp) == NULL) {
 				/*
 				 * The filesystem was unmounted before the
@@ -2400,172 +2199,283 @@ top:
 				 */
 				error = 0;
 				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
-				    CE_WARN, "unmount_tree: automountd "
-				    "connection dropped");
-				if (fnip->fi_flags & MF_DIRECT) {
-					auto_log(fngp->fng_verbose,
-					    fngp->fng_zoneid, CE_WARN,
-					    "unmount_tree: "
-					    "%s successfully unmounted - "
-					    "do not remount triggers",
-					    fnip->fi_path);
-				} else {
-					auto_log(fngp->fng_verbose,
-					    fngp->fng_zoneid, CE_WARN,
-					    "unmount_tree: "
-					    "%s/%s successfully unmounted - "
-					    "do not remount triggers",
-					    fnip->fi_path, fnp->fn_name);
-				}
+				    CE_WARN, "autofs: automountd "
+				    "connection dropped when unmounting %s/%s",
+				    fnip->fi_path, (fnip->fi_flags & MF_DIRECT)
+				    ? "" : fnp->fn_name);
 			}
 		}
 	} else {
 		vn_vfsunlock(vp);
-		AUTOFS_DPRINT((10, "\tNode is AUTOFS\n"));
-		if (unmount_as_unit) {
-			AUTOFS_DPRINT((10, "\tunmount as unit\n"));
-			error = unmount_autofs(vp);
-		} else {
-			AUTOFS_DPRINT((10, "\tunmount one at a time\n"));
-			rw_enter(&fnp->fn_rwlock, RW_READER);
-			if (fnp->fn_dirents != NULL) {
-				/*
-				 * Has subdirectory, attempt their
-				 * unmount first
-				 */
-				nfnp = fnp->fn_dirents;
-				VN_HOLD(fntovn(nfnp));
-				rw_exit(&fnp->fn_rwlock);
-
-				mutex_enter(&fnp->fn_lock);
-				AUTOFS_UNBLOCK_OTHERS(fnp, MF_INPROG);
-				mutex_exit(&fnp->fn_lock);
-				VN_RELE(vp);
-				fnp = nfnp;
-				goto top;
-			}
-			rw_exit(&fnp->fn_rwlock);
-			goto next;
-		}
+		/* Destroy all dirents of fnp if we unmounted its triggers */
+		if (trigger_unmount)
+			unmount_autofs(vp);
 	}
 
-	if (error) {
-		AUTOFS_DPRINT((10, "\tUnmount failed\n"));
-		if (alp != NULL) {
-			/*
-			 * Unmount failed, got to remount triggers.
-			 */
+	/* If unmount failed, we got to remount triggers */
+	if (error != 0) {
+		if (trigger_unmount) {
+			int	ret;
+
 			ASSERT((fnp->fn_flags & MF_THISUID_MATCH_RQD) == 0);
-			error = auto_perform_actions(fnip, fnp, alp, CRED());
-			if (error) {
+
+			/*
+			 * The action list was free'd by auto_perform_actions
+			 */
+			ret = auto_perform_actions(fnip, fnp, alp, CRED());
+			if (ret != 0) {
 				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
 				    CE_WARN, "autofs: can't remount triggers "
-				    "fnp=%p error=%d", (void *)fnp, error);
-				error = 0;
-				/*
-				 * The action list should have been
-				 * free'd by auto_perform_actions
-				 * since an error occured
-				 */
-				alp = NULL;
+				    "fnp=%p error=%d", (void *)fnp, ret);
 			}
 		}
-	} else {
-		/*
-		 * The unmount succeeded, which will cause this node to
-		 * be removed from its parent if its an indirect mount,
-		 * therefore update the parent's atime and mtime now.
-		 * I don't update them in auto_disconnect() because I
-		 * don't want atime and mtime changing every time a
-		 * lookup goes to the daemon and creates a new node.
-		 */
-		unmount_done = 1;
-		if ((fnip->fi_flags & MF_DIRECT) == 0) {
-			gethrestime(&now);
-			if (fnp->fn_parent == fngp->fng_rootfnnodep)
-				fnp->fn_atime = fnp->fn_mtime = now;
-			else {
-				fnp->fn_parent->fn_atime = now;
-				fnp->fn_parent->fn_mtime = now;
-			}
-		}
-
-		/*
-		 * Free the action list here
-		 */
-		if (alp != NULL) {
-			xdr_free(xdr_action_list, (char *)alp);
-			alp = NULL;
-		}
-	}
-
-	fnp->fn_ref_time = gethrestime_sec();
-
-next:
-	/*
-	 * Obtain parent's readers lock before grabbing
-	 * reference to next sibling.
-	 * XXX Note that nodes in the top level list (mounted
-	 * in user space not by the daemon in the kernel) parent is itself,
-	 * therefore grabbing the lock makes no sense, but doesn't
-	 * hurt either.
-	 */
-	pfnp = fnp->fn_parent;
-	ASSERT(pfnp != NULL);
-	rw_enter(&pfnp->fn_rwlock, RW_READER);
-	if ((nfnp = fnp->fn_next) != NULL)
-		VN_HOLD(fntovn(nfnp));
-	rw_exit(&pfnp->fn_rwlock);
-
-	if (ilocked_it) {
 		mutex_enter(&fnp->fn_lock);
-		if (unmount_done) {
-			/*
-			 * Other threads may be waiting for this unmount to
-			 * finish. We must let it know that in order to
-			 * proceed, it must trigger the mount itself.
-			 */
-			fnp->fn_flags &= ~MF_IK_MOUNT;
-			if (fnp->fn_flags & MF_WAITING)
-				fnp->fn_error = EAGAIN;
-			unmount_done = 0;
-		}
 		AUTOFS_UNBLOCK_OTHERS(fnp, MF_INPROG);
 		mutex_exit(&fnp->fn_lock);
-		ilocked_it = 0;
+	} else {
+		/* Free the action list here */
+		if (trigger_unmount)
+			xdr_free(xdr_action_list, (char *)alp);
+
+		/*
+		 * Other threads may be waiting for this unmount to
+		 * finish. We must let it know that in order to
+		 * proceed, it must trigger the mount itself.
+		 */
+		mutex_enter(&fnp->fn_lock);
+		fnp->fn_flags &= ~MF_IK_MOUNT;
+		if (fnp->fn_flags & MF_WAITING)
+			fnp->fn_error = EAGAIN;
+		AUTOFS_UNBLOCK_OTHERS(fnp, MF_INPROG);
+		mutex_exit(&fnp->fn_lock);
 	}
 
-	if (nfnp != NULL) {
-		VN_RELE(vp);
-		fnp = nfnp;
+	return (error);
+}
+
+/*
+ * This is an implementation of depth-first search in a tree rooted by
+ * start_fnp and composed from fnnodes. Links between tree levels are
+ * fn_dirents, fn_trigger in fnnode_t and v_mountedvfs in vnode_t (if
+ * mounted vfs is autofs). The algorithm keeps track of visited nodes
+ * by means of a timestamp (fn_unmount_ref_time).
+ *
+ * Upon top-down traversal of the tree we apply following locking scheme:
+ *	lock fn_rwlock of current node
+ *	grab reference to child's vnode (VN_HOLD)
+ *	unlock fn_rwlock
+ *	free reference to current vnode (VN_RELE)
+ * Similar locking scheme is used for down-top and left-right traversal.
+ *
+ * Algorithm examines the most down-left node in tree, which hasn't been
+ * visited yet. From this follows that nodes are processed in bottom-up
+ * fashion.
+ *
+ * Function returns either zero if unmount of root node was successful
+ * or error code (mostly EBUSY).
+ */
+int
+unmount_subtree(fnnode_t *rootfnp, boolean_t force)
+{
+	fnnode_t	*currfnp; /* currently examined node in the tree */
+	fnnode_t	*lastfnp; /* previously processed node */
+	fnnode_t	*nextfnp; /* next examined node in the tree */
+	vnode_t		*curvp;
+	vnode_t		*newvp;
+	vfs_t		*vfsp;
+	time_t		timestamp;
+
+	ASSERT(fntovn(rootfnp)->v_type != VLNK);
+	AUTOFS_DPRINT((10, "unmount_subtree: root=%p (%s)\n", (void *)rootfnp,
+	    rootfnp->fn_name));
+
+	/*
+	 * Timestamp, which visited nodes are marked with, to distinguish them
+	 * from unvisited nodes.
+	 */
+	timestamp = gethrestime_sec();
+	currfnp = lastfnp = rootfnp;
+
+	/* Loop until we examine all nodes in the tree */
+	mutex_enter(&currfnp->fn_lock);
+	while (currfnp != rootfnp || rootfnp->fn_unmount_ref_time < timestamp) {
+		curvp = fntovn(currfnp);
+		AUTOFS_DPRINT((10, "\tunmount_subtree: entering node %p (%s)\n",
+		    (void *)currfnp, currfnp->fn_name));
+
 		/*
-		 * Unmount next element
+		 * New candidate for processing must have been already visited,
+		 * by us because we want to process tree nodes in bottom-up
+		 * order.
 		 */
-		goto top;
+		if (currfnp->fn_unmount_ref_time == timestamp &&
+		    currfnp != lastfnp) {
+			(void) try_unmount_node(currfnp, force);
+			lastfnp = currfnp;
+			mutex_enter(&currfnp->fn_lock);
+			/*
+			 * Fall through to next if-branch to pick
+			 * sibling or parent of this node.
+			 */
+		}
+
+		/*
+		 * If this node has been already visited, it means that it's
+		 * dead end and we need to pick sibling or parent as next node.
+		 */
+		if (currfnp->fn_unmount_ref_time >= timestamp ||
+		    curvp->v_type == VLNK) {
+			mutex_exit(&currfnp->fn_lock);
+			/*
+			 * Obtain parent's readers lock before grabbing
+			 * reference to sibling.
+			 */
+			rw_enter(&currfnp->fn_parent->fn_rwlock, RW_READER);
+			if ((nextfnp = currfnp->fn_next) != NULL) {
+				VN_HOLD(fntovn(nextfnp));
+				rw_exit(&currfnp->fn_parent->fn_rwlock);
+				VN_RELE(curvp);
+				currfnp = nextfnp;
+				mutex_enter(&currfnp->fn_lock);
+				continue;
+			}
+			rw_exit(&currfnp->fn_parent->fn_rwlock);
+
+			/*
+			 * All descendants and siblings were visited. Perform
+			 * bottom-up move.
+			 */
+			nextfnp = currfnp->fn_parent;
+			VN_HOLD(fntovn(nextfnp));
+			VN_RELE(curvp);
+			currfnp = nextfnp;
+			mutex_enter(&currfnp->fn_lock);
+			continue;
+		}
+
+		/*
+		 * Mark node as visited. Note that the timestamp could have
+		 * been updated by somebody else in the meantime.
+		 */
+		if (currfnp->fn_unmount_ref_time < timestamp)
+			currfnp->fn_unmount_ref_time = timestamp;
+		mutex_exit(&currfnp->fn_lock);
+
+		/*
+		 * Examine descendants in this order: triggers, dirents, autofs
+		 * mounts.
+		 */
+
+		rw_enter(&currfnp->fn_rwlock, RW_READER);
+		if ((nextfnp = currfnp->fn_trigger) != NULL) {
+			VN_HOLD(fntovn(nextfnp));
+			rw_exit(&currfnp->fn_rwlock);
+			VN_RELE(curvp);
+			currfnp = nextfnp;
+			mutex_enter(&currfnp->fn_lock);
+			continue;
+		}
+
+		if ((nextfnp = currfnp->fn_dirents) != NULL) {
+			VN_HOLD(fntovn(nextfnp));
+			rw_exit(&currfnp->fn_rwlock);
+			VN_RELE(curvp);
+			currfnp = nextfnp;
+			mutex_enter(&currfnp->fn_lock);
+			continue;
+		}
+		rw_exit(&currfnp->fn_rwlock);
+
+		(void) vn_vfswlock_wait(curvp);
+		vfsp = vn_mountedvfs(curvp);
+		if (vfsp != NULL &&
+		    vfs_matchops(vfsp, vfs_getops(curvp->v_vfsp))) {
+			/*
+			 * Deal with /xfn/host/jurassic alikes here...
+			 *
+			 * We know this call to VFS_ROOT is safe to call while
+			 * holding VVFSLOCK, since it resolves to a call to
+			 * auto_root().
+			 */
+			if (VFS_ROOT(vfsp, &newvp)) {
+				cmn_err(CE_PANIC,
+				    "autofs: VFS_ROOT(vfs=%p) failed",
+				    (void *)vfsp);
+			}
+			vn_vfsunlock(curvp);
+			VN_RELE(curvp);
+			currfnp = vntofn(newvp);
+			mutex_enter(&currfnp->fn_lock);
+			continue;
+		}
+		vn_vfsunlock(curvp);
+		mutex_enter(&currfnp->fn_lock);
 	}
 
 	/*
-	 * We don't want to unmount rootfnnodep, so the check is made here
+	 * Now we deal with the root node (currfnp's mutex is unlocked
+	 * in try_unmount_node()).
 	 */
-	ASSERT(pfnp != fnp);
-	if (pfnp != fngp->fng_rootfnnodep) {
-		/*
-		 * Now attempt to unmount my parent
-		 */
-		VN_HOLD(fntovn(pfnp));
-		VN_RELE(vp);
-		fnp = pfnp;
+	return (try_unmount_node(currfnp, force));
+}
 
-		goto top;
-	}
+/*
+ * XXX unmount_tree() is not suspend-safe within the scope of
+ * the present model defined for cpr to suspend the system. Calls made
+ * by the unmount_tree() that have been identified to be unsafe are
+ * (1) RPC client handle setup and client calls to automountd which can
+ * block deep down in the RPC library, (2) kmem_alloc() calls with the
+ * KM_SLEEP flag which can block if memory is low, and (3) VFS_*() and
+ * VOP_*() calls which can result in over the wire calls to servers.
+ * The thread should be completely reevaluated to make it suspend-safe in
+ * case of future updates to the cpr model.
+ */
+void
+unmount_tree(struct autofs_globals *fngp, boolean_t force)
+{
+	callb_cpr_t	cprinfo;
+	kmutex_t	unmount_tree_cpr_lock;
+	fnnode_t	*root, *fnp, *next;
 
-	VN_RELE(vp);
+	mutex_init(&unmount_tree_cpr_lock, NULL, MUTEX_DEFAULT, NULL);
+	CALLB_CPR_INIT(&cprinfo, &unmount_tree_cpr_lock, callb_generic_cpr,
+	    "unmount_tree");
 
 	/*
-	 * At this point we've walked the entire tree and attempted to unmount
-	 * as much as we can one level at a time.
+	 * autofssys() will be calling in from the global zone and doing
+	 * work on the behalf of the given zone, hence we can't always
+	 * assert that we have the right credentials, nor that the
+	 * caller is always in the correct zone.
+	 *
+	 * We do, however, know that if this is a "forced unmount"
+	 * operation (which autofssys() does), then we won't go down to
+	 * the krpc layers, so we don't need to fudge with the
+	 * credentials.
 	 */
-done:
+	ASSERT(force || fngp->fng_zoneid == getzoneid());
+
+	/*
+	 * If automountd is not running in this zone,
+	 * don't attempt unmounting this round.
+	 */
+	if (force || auto_null_request(fngp->fng_zoneid, FALSE) == 0) {
+		/*
+		 * Iterate over top level autofs filesystems and call
+		 * unmount_subtree() for each of them.
+		 */
+		root = fngp->fng_rootfnnodep;
+		rw_enter(&root->fn_rwlock, RW_READER);
+		for (fnp = root->fn_dirents; fnp != NULL; fnp = next) {
+			VN_HOLD(fntovn(fnp));
+			rw_exit(&root->fn_rwlock);
+			(void) unmount_subtree(fnp, force);
+			rw_enter(&root->fn_rwlock, RW_READER);
+			next = fnp->fn_next;
+			VN_RELE(fntovn(fnp));
+		}
+		rw_exit(&root->fn_rwlock);
+	}
+
 	mutex_enter(&unmount_tree_cpr_lock);
 	CALLB_CPR_EXIT(&cprinfo);
 	mutex_destroy(&unmount_tree_cpr_lock);
@@ -2574,18 +2484,18 @@ done:
 static void
 unmount_zone_tree(struct autofs_globals *fngp)
 {
-	unmount_tree(fngp, 0);
+	AUTOFS_DPRINT((5, "unmount_zone_tree started. Thread created.\n"));
+
+	unmount_tree(fngp, B_FALSE);
 	mutex_enter(&fngp->fng_unmount_threads_lock);
 	fngp->fng_unmount_threads--;
 	mutex_exit(&fngp->fng_unmount_threads_lock);
 
-	AUTOFS_DPRINT((5, "unmount_tree done. Thread exiting.\n"));
+	AUTOFS_DPRINT((5, "unmount_zone_tree done. Thread exiting.\n"));
 
 	zthread_exit();
 	/* NOTREACHED */
 }
-
-static int autofs_unmount_thread_timer = 120;	/* in seconds */
 
 void
 auto_do_unmount(struct autofs_globals *fngp)
