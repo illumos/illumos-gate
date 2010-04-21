@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -1588,6 +1587,7 @@ sbd_set_lu_standby(sbd_set_lu_standby_t *stlu, uint32_t *err_ret)
 	sbd_lu_t *sl;
 	sbd_status_t sret;
 	stmf_status_t stret;
+	uint8_t old_access_state;
 
 	sret = sbd_find_and_lock_lu(stlu->stlu_guid, NULL,
 	    SL_OP_MODIFY_LU, &sl);
@@ -1603,12 +1603,13 @@ sbd_set_lu_standby(sbd_set_lu_standby_t *stlu, uint32_t *err_ret)
 		return (EIO);
 	}
 
+	old_access_state = sl->sl_access_state;
 	sl->sl_access_state = SBD_LU_TRANSITION_TO_STANDBY;
 	stret = stmf_set_lu_access((stmf_lu_t *)sl->sl_lu, STMF_LU_STANDBY);
 	if (stret != STMF_SUCCESS) {
 		sl->sl_trans_op = SL_OP_NONE;
 		*err_ret = SBD_RET_ACCESS_STATE_FAILED;
-		sl->sl_access_state = SBD_LU_TRANSITION_TO_STANDBY;
+		sl->sl_access_state = old_access_state;
 		return (EIO);
 	}
 
@@ -2508,6 +2509,7 @@ sim_sli_loaded:
 			it->sbd_it_ua_conditions |=
 			    SBD_UA_ASYMMETRIC_ACCESS_CHANGED;
 			it->sbd_it_ua_conditions |= SBD_UA_POR;
+			it->sbd_it_flags |=  SBD_IT_PGR_CHECK_FLAG;
 		}
 		mutex_exit(&sl->sl_lock);
 		/* call set access state */

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/atomic.h>
@@ -41,7 +40,7 @@
 
 int  sbd_pgr_reservation_conflict(scsi_task_t *);
 void sbd_pgr_reset(sbd_lu_t *);
-void sbd_pgr_initialize_it(scsi_task_t *);
+void sbd_pgr_initialize_it(scsi_task_t *, sbd_it_data_t *);
 void sbd_handle_pgr_in_cmd(scsi_task_t *, stmf_data_buf_t *);
 void sbd_handle_pgr_out_cmd(scsi_task_t *, stmf_data_buf_t *);
 void sbd_handle_pgr_out_data(scsi_task_t *, stmf_data_buf_t *);
@@ -713,11 +712,10 @@ sbd_pgr_key_registered(sbd_pgr_t *pgr, scsi_devid_desc_t *lpt,
 }
 
 void
-sbd_pgr_initialize_it(scsi_task_t *task)
+sbd_pgr_initialize_it(scsi_task_t *task, sbd_it_data_t *it)
 {
 	sbd_lu_t *slu = (sbd_lu_t *)task->task_lu->lu_provider_private;
-	stmf_scsi_session_t *ses = task->task_session;
-	sbd_it_data_t *it = slu->sl_it_list;
+	stmf_scsi_session_t	*ses = task->task_session;
 	sbd_pgr_t		*pgr = slu->sl_pgr;
 	sbd_pgr_key_t		*key;
 	scsi_devid_desc_t	*lpt, *rpt, *id;

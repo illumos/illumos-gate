@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -99,7 +98,7 @@ void sbd_handle_mode_select_xfer(scsi_task_t *task, uint8_t *buf,
     uint32_t buflen);
 void sbd_handle_mode_select(scsi_task_t *task, stmf_data_buf_t *dbuf);
 
-extern void sbd_pgr_initialize_it(scsi_task_t *);
+extern void sbd_pgr_initialize_it(scsi_task_t *, sbd_it_data_t *);
 extern int sbd_pgr_reservation_conflict(scsi_task_t *);
 extern void sbd_pgr_reset(sbd_lu_t *);
 extern void sbd_pgr_remove_it_handle(sbd_lu_t *, sbd_it_data_t *);
@@ -1521,7 +1520,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 		DTRACE_PROBE1(itl__nexus__start, scsi_task *, task);
 
-		sbd_pgr_initialize_it(task);
+		sbd_pgr_initialize_it(task, it);
 		if (stmf_register_itl_handle(task->task_lu, task->task_lun_no,
 		    task->task_session, it->sbd_it_session_id, it)
 		    != STMF_SUCCESS) {
@@ -1534,7 +1533,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			it->sbd_it_ua_conditions = SBD_UA_POR;
 		}
 	} else if (it->sbd_it_flags & SBD_IT_PGR_CHECK_FLAG) {
-		sbd_pgr_initialize_it(task);
+		sbd_pgr_initialize_it(task, it);
 		mutex_enter(&sl->sl_lock);
 		it->sbd_it_flags &= ~SBD_IT_PGR_CHECK_FLAG;
 		mutex_exit(&sl->sl_lock);
@@ -1573,7 +1572,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	}
 
 	/* Reservation conflict checks */
-	if (sl->sl_access_state != SBD_LU_STANDBY) {
+	if (sl->sl_access_state == SBD_LU_ACTIVE) {
 		if (SBD_PGR_RSVD(sl->sl_pgr)) {
 			if (sbd_pgr_reservation_conflict(task)) {
 				stmf_scsilib_send_status(task,
