@@ -445,6 +445,9 @@ static void doxtract(char *argv[], int cnt);
 static void dotable(char *argv[]);
 static void doxtract(char *argv[]);
 #endif
+static int has_dot_dot(char *name);
+static int is_absolute(char *name);
+static char *make_relative_name(char *name, char **stripped_prefix);
 static void fatal(char *format, ...);
 static void vperror(int exit_status, char *fmt, ...);
 static void flushtape(void);
@@ -6060,6 +6063,87 @@ fill_in_attr_info(char *attr, char *longname, char *attrparent, int atparentfd,
 }
 
 /*
+ * Test if name has a '..' sequence in it.
+ *
+ * Return 1 if found, 0 otherwise.
+ */
+
+static int
+has_dot_dot(char *name)
+{
+	char *s;
+	size_t name_len = strlen(name);
+
+	for (s = name; s < (name + name_len - 2); s++) {
+		if (s[0] == '.' && s[1] == '.' && ((s[2] == '/') || !s[2]))
+			return (1);
+
+		while (! (*s == '/')) {
+			if (! *s++)
+				return (0);
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * Test if name is an absolute path name.
+ *
+ * Return 1 if true, 0 otherwise.
+ */
+
+static int
+is_absolute(char *name)
+{
+	return (name[0] == '/');
+}
+
+/*
+ * Adjust the pathname to make it a relative one. Strip off any leading
+ * '/' characters and if the pathname contains any '..' sequences, strip
+ * upto and including the last occurance of '../' (or '..' if found at
+ * the very end of the pathname).
+ *
+ * Return the relative pathname. stripped_prefix will also return the
+ * portion of name that was stripped off and should be freed by the
+ * calling routine when no longer needed.
+ */
+
+static char *
+make_relative_name(char *name, char **stripped_prefix)
+{
+	char *s;
+	size_t prefix_len = 0;
+	size_t name_len = strlen(name);
+
+	for (s = name + prefix_len; s < (name + name_len - 2); ) {
+		if (s[0] == '.' && s[1] == '.' && ((s[2] == '/') || !s[2]))
+			prefix_len = s + 2 - name;
+
+		do {
+			char c = *s++;
+
+			if (c == '/')
+				break;
+		} while (*s);
+	}
+
+	for (s = name + prefix_len; *s == '/'; s++)
+		continue;
+	prefix_len = s - name;
+
+	/* Create the portion of the name that was stripped off. */
+	s = malloc(prefix_len + 1);
+	memcpy(s, name, prefix_len);
+	s[prefix_len] = 0;
+	*stripped_prefix = s;
+	s = &name[prefix_len];
+
+	return (s);
+}
+
+/*
  *  Return through *namep a pointer to the proper fullname (i.e  "<name> |
  *  <prefix>/<name>"), as represented in the header entry dblock.dbuf.
  *
@@ -6087,6 +6171,27 @@ check_prefix(char **namep, char **dirp, char **compp)
 		else
 			(void) sprintf(fullname, "%.*s", NAMSIZ,
 			    dblock.dbuf.name);
+	}
+
+	/*
+	 * If we are printing a table of contents or extracting an archive,
+	 * make absolute pathnames relative and prohibit the unpacking of
+	 * files contain ".." in their name (unless the user has supplied
+	 * the -P option).
+	 */
+	if ((tflag || xflag) && !Pflag) {
+		if (is_absolute(fullname) || has_dot_dot(fullname)) {
+			char *stripped_prefix;
+			size_t prefix_len = 0;
+
+			(void) strcpy(savename, fullname);
+			strcpy(fullname,
+			    make_relative_name(savename, &stripped_prefix));
+			(void) fprintf(stderr,
+			    gettext("tar: Removing leading '%s' from '%s'\n"),
+			    stripped_prefix, savename);
+			free(stripped_prefix);
+		}
 	}
 
 	/*
