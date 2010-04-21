@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -36,8 +35,6 @@
  * contributors.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -912,7 +909,8 @@ gotit:
 }
 
 /*
- * Return 1 if inode has unmapped blocks (UFS holes).
+ * Return 1 if inode has unmapped blocks (UFS holes) or if another thread
+ * is in the critical region of wrip().
  */
 int
 bmap_has_holes(struct inode *ip)
@@ -928,6 +926,15 @@ bmap_has_holes(struct inode *ip)
 
 	int	fsbshift = fs->fs_bshift;
 	int	fsboffset = (1 << fsbshift) - 1;
+
+	/*
+	 * Check for writer in critical region, if found then we
+	 * cannot trust the values of i_size and i_blocks
+	 * simply return true.
+	 */
+	if (ip->i_writer != NULL && ip->i_writer != curthread) {
+		return (1);
+	}
 
 	dblks = (ip->i_size + fsboffset) >> fsbshift;
 	mblks = (ldbtob((u_offset_t)ip->i_blocks) + fsboffset) >> fsbshift;
