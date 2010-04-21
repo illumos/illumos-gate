@@ -19,16 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-COBJS64 =	sn1_librtld_db64.o
+COBJS64 =	brand_librtld_db64.o
 
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
 CLOBBERFILES =	$(ROOTLIBDIR64)/$(DYNLIB)
-DYNFLAGS +=	-M../common/mapfile-vers.64
+DYNFLAGS +=	-M$(BRAND_SHARED)/librtld_db/common/mapfile-vers.64
 
 install: all $(ROOTLIBS64)

@@ -19,14 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-ISASRCDIR =		.
+ISAOBJDIR =	$(BRAND_SHARED)/brand/amd64/pics/
 
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
+
+CPPFLAGS +=     -I$(BRAND_SHARED)/brand/amd64
 
 #
 # see ../Makefile.com for why we MUST explicity make ld.so.1 our interpreter

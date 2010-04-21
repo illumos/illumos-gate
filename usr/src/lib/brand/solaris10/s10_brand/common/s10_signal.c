@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -35,6 +34,7 @@
 #include <signal.h>
 
 #include <s10_brand.h>
+#include <brand_misc.h>
 #include <s10_misc.h>
 #include <s10_signal.h>
 
@@ -192,7 +192,7 @@ s10sigset_to_native(const sigset_t *s10_set, sigset_t *native_set)
 	int nativesig;
 	sigset_t srcset, newset;
 
-	if (s10_uucopy(s10_set, &srcset, sizeof (sigset_t)) != 0)
+	if (brand_uucopy(s10_set, &srcset, sizeof (sigset_t)) != 0)
 		return (EFAULT);
 
 	(void) sigemptyset(&newset);
@@ -217,7 +217,7 @@ s10sigset_to_native(const sigset_t *s10_set, sigset_t *native_set)
 			SIGADDSET(&newset, nativesig);
 	}
 
-	if (s10_uucopy(&newset, native_set, sizeof (sigset_t)) != 0)
+	if (brand_uucopy(&newset, native_set, sizeof (sigset_t)) != 0)
 		return (EFAULT);
 
 	return (0);
@@ -263,7 +263,7 @@ nativesigset_to_s10(const sigset_t *native_set, sigset_t *s10_set)
 	int s10sig;
 	sigset_t srcset, newset;
 
-	if (s10_uucopy(native_set, &srcset, sizeof (sigset_t)) != 0)
+	if (brand_uucopy(native_set, &srcset, sizeof (sigset_t)) != 0)
 		return (EFAULT);
 
 	(void) sigemptyset(&newset);
@@ -288,7 +288,7 @@ nativesigset_to_s10(const sigset_t *native_set, sigset_t *s10_set)
 			SIGADDSET(&newset, s10sig);
 	}
 
-	if (s10_uucopy(&newset, s10_set, sizeof (sigset_t)) != 0)
+	if (brand_uucopy(&newset, s10_set, sizeof (sigset_t)) != 0)
 		return (EFAULT);
 
 	return (0);
@@ -307,7 +307,7 @@ s10_sigacthandler(int sig, siginfo_t *sip, void *uvp)
 
 	s10_sig = nativesig_to_s10(sig);
 	if (s10_sig <= 0)	/* can't happen? */
-		s10_abort(sig, "Received an impossible signal");
+		brand_abort(sig, "Received an impossible signal");
 	if (sip != NULL) {
 		/*
 		 * All we really have to do is map the signal number,
@@ -316,7 +316,7 @@ s10_sigacthandler(int sig, siginfo_t *sip, void *uvp)
 		 * same between s10 and native.
 		 */
 		if (sip->si_signo != sig)	/* can't happen? */
-			s10_abort(sig, "Received an impossible siginfo");
+			brand_abort(sig, "Received an impossible siginfo");
 		sip->si_signo = s10_sig;
 	}
 	if ((ucp = uvp) != NULL &&
@@ -404,7 +404,7 @@ s10_sigsuspend(sysret_t *rval, const sigset_t *set)
 	int err;
 
 	if ((err = s10sigset_to_native(set, &sigset_set)) != 0) {
-		(void) S10_TRUSS_POINT_1(rval, SYS_sigsuspend, err, set);
+		(void) B_TRUSS_POINT_1(rval, SYS_sigsuspend, err, set);
 		return (err);
 	}
 
@@ -439,7 +439,7 @@ s10_sigaction(sysret_t *rval,
 	void (*handler)();
 
 	if ((nativesig = s10sig_to_native(sig)) < 0) {
-		(void) S10_TRUSS_POINT_3(rval, SYS_sigaction, EINVAL,
+		(void) B_TRUSS_POINT_3(rval, SYS_sigaction, EINVAL,
 		    sig, act, oact);
 		return (EINVAL);
 	}
@@ -449,12 +449,12 @@ s10_sigaction(sysret_t *rval,
 	} else {
 		sigactp = &sigact;
 
-		if (s10_uucopy(act, sigactp, sizeof (struct sigaction)) != 0)
+		if (brand_uucopy(act, sigactp, sizeof (struct sigaction)) != 0)
 			return (EFAULT);
 
 		if ((err = s10sigset_to_native(&sigactp->sa_mask,
 		    &sigactp->sa_mask)) != 0) {
-			(void) S10_TRUSS_POINT_3(rval, SYS_sigaction, err,
+			(void) B_TRUSS_POINT_3(rval, SYS_sigaction, err,
 			    sig, act, oact);
 			return (err);
 		}
@@ -488,8 +488,8 @@ s10_sigaction(sysret_t *rval,
 		if (osigactp->sa_handler == s10_sigacthandler)
 			osigactp->sa_handler = s10_handlers[sig - 1];
 
-		if (err == 0 &&
-		    s10_uucopy(osigactp, oact, sizeof (struct sigaction)) != 0)
+		if (err == 0 && brand_uucopy(osigactp, oact,
+		    sizeof (struct sigaction)) != 0)
 			err = EFAULT;
 	}
 
@@ -541,7 +541,7 @@ s10_sigsendsys(sysret_t *rval, procset_t *psp, int sig)
 	int nativesig;
 
 	if ((nativesig = s10sig_to_native(sig)) < 0) {
-		(void) S10_TRUSS_POINT_2(rval, SYS_sigsendsys, EINVAL,
+		(void) B_TRUSS_POINT_2(rval, SYS_sigsendsys, EINVAL,
 		    psp, sig);
 		return (EINVAL);
 	}
@@ -639,7 +639,7 @@ s10_sigtimedwait(sysret_t *rval,
 	int err, sig;
 
 	if ((err = s10sigset_to_native(set, &sigset_set)) != 0) {
-		(void) S10_TRUSS_POINT_3(rval, SYS_sigtimedwait, err,
+		(void) B_TRUSS_POINT_3(rval, SYS_sigtimedwait, err,
 		    set, info, timeout);
 		return (err);
 	}
@@ -682,7 +682,7 @@ s10_sigqueue(sysret_t *rval, pid_t pid, int signo, void *value, int si_code)
 	int nativesig;
 
 	if ((nativesig = s10sig_to_native(signo)) < 0) {
-		(void) S10_TRUSS_POINT_4(rval, SYS_sigqueue, EINVAL,
+		(void) B_TRUSS_POINT_4(rval, SYS_sigqueue, EINVAL,
 		    pid, signo, value, si_code);
 		return (EINVAL);
 	}
@@ -715,11 +715,11 @@ s10_signotify(sysret_t *rval,
 	if (cmd == SN_PROC) {
 		int nativesig;
 
-		if (s10_uucopy(infop, &info, sizeof (siginfo_t)) != 0)
+		if (brand_uucopy(infop, &info, sizeof (siginfo_t)) != 0)
 			return (EFAULT);
 
 		if ((nativesig = s10sig_to_native(info.si_signo)) < 0) {
-			(void) S10_TRUSS_POINT_3(rval, SYS_signotify, EINVAL,
+			(void) B_TRUSS_POINT_3(rval, SYS_signotify, EINVAL,
 			    cmd, siginfo, sn_id);
 			return (EINVAL);
 		}
@@ -740,7 +740,7 @@ s10_kill(sysret_t *rval, pid_t pid, int sig)
 	int nativesig;
 
 	if ((nativesig = s10sig_to_native(sig)) < 0) {
-		(void) S10_TRUSS_POINT_2(rval, SYS_kill, EINVAL, pid, sig);
+		(void) B_TRUSS_POINT_2(rval, SYS_kill, EINVAL, pid, sig);
 		return (EINVAL);
 	}
 
@@ -761,7 +761,7 @@ s10_lwp_create(sysret_t *rval, ucontext_t *ucp, int flags, id_t *new_lwp)
 {
 	ucontext_t s10_uc;
 
-	if (s10_uucopy(ucp, &s10_uc, sizeof (ucontext_t)) != 0)
+	if (brand_uucopy(ucp, &s10_uc, sizeof (ucontext_t)) != 0)
 		return (EFAULT);
 
 	if (s10_uc.uc_flags & UC_SIGMASK)
@@ -781,7 +781,7 @@ s10_lwp_kill(sysret_t *rval, id_t lwpid, int sig)
 	int nativesig;
 
 	if ((nativesig = s10sig_to_native(sig)) < 0) {
-		(void) S10_TRUSS_POINT_2(rval, SYS_lwp_kill, EINVAL,
+		(void) B_TRUSS_POINT_2(rval, SYS_lwp_kill, EINVAL,
 		    lwpid, sig);
 		return (EINVAL);
 	}

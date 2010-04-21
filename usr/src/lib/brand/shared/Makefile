@@ -18,38 +18,32 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-PROG=query
-SHARED=	common.ksh query uninstall.ksh
-CLOBBERFILES= query
+default: all
 
-include $(SRC)/cmd/Makefile.cmd
-include ../Makefile.brand
+# Build everything in parallel; use .WAIT for dependencies
+.PARALLEL:
 
-$(ROOTSHAREDDIR)/common.ksh := FILEMODE = 0444
-$(ROOTSHAREDDIR)/uninstall.ksh := FILEMODE = 0444
+SUBDIRS =	brand zone
+MSGSUBDIRS =	zone
 
-CLOBBERFILES=	$(ROOTSHARED) $(PROG)
+all :=		TARGET= all
+install :=	TARGET= install
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+lint :=		TARGET= lint
+_msg :=		TARGET= _msg
 
-POFILES=	common.po query.po uninstall.po
-POFILE=		shared.po
+.KEEP_STATE:
 
-$(POFILE): $(POFILES)
-	$(RM) $@
-	$(CAT) $(POFILES) > $@
+all install clean clobber lint: $(SUBDIRS)
 
-all: $(PROG)
+_msg: $(MSGSUBDIRS)
 
-install: $(ROOTSHARED)
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-clean:
-	-$(RM) $(PROG) $(POFILES)
-
-lint:
-
-include $(SRC)/cmd/Makefile.targ
+FRC:

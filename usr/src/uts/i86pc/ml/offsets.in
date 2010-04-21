@@ -1,6 +1,5 @@
 \
-\ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-\ Use is subject to license terms.
+\ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 \
 \ CDDL HEADER START
 \
@@ -387,6 +386,9 @@ copyops
 
 brand
 	b_machops
+
+brand_proc_data_t
+	spd_handler
 
 fastboot_file_t
 	fb_va

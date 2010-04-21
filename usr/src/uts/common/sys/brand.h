@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_BRAND_H
@@ -33,6 +32,7 @@ extern "C" {
 
 #include <sys/proc.h>
 #include <sys/exec.h>
+#include <sys/modctl.h>
 
 /*
  * All Brands supported by this kernel must use BRAND_VER_1.
@@ -49,6 +49,7 @@ extern "C" {
 #define	B_ELFDATA		3
 #define	B_EXEC_NATIVE		4
 #define	B_EXEC_BRAND		5
+#define	B_TRUSS_POINT		6
 
 /*
  * Structure used by zoneadmd to communicate the name of a brand and the
@@ -65,10 +66,34 @@ struct brand_attr {
 /* What we call the labeled brand. */
 #define	LABELED_BRAND_NAME	"labeled"
 
-#ifdef	_KERNEL
+/*
+ * Aux vector containing lddata pointer of brand library linkmap.
+ * Used by common {brand}_librtld_db.
+ */
+#define	AT_SUN_BRAND_COMMON_LDDATA	AT_SUN_BRAND_AUX1
 
-/* Root for branded zone's native binaries */
-#define	NATIVE_ROOT	"/native/"
+/*
+ * Information needed by the brand library to launch an executable.
+ */
+typedef struct brand_elf_data {
+	ulong_t		sed_phdr;
+	ulong_t		sed_phent;
+	ulong_t		sed_phnum;
+	ulong_t		sed_entry;
+	ulong_t		sed_base;
+	ulong_t		sed_ldentry;
+	ulong_t		sed_lddata;
+} brand_elf_data_t;
+
+/*
+ * Common structure used to register a branded processes
+ */
+typedef struct brand_proc_reg {
+	uint_t		sbr_version;	/* version number */
+	caddr_t		sbr_handler;	/* base address of handler */
+} brand_proc_reg_t;
+
+#ifdef	_KERNEL
 
 struct proc;
 struct uarg;
@@ -141,6 +166,59 @@ extern void	brand_unregister_zone(brand_t *);
 extern int	brand_zone_count(brand_t *);
 extern void	brand_setbrand(proc_t *);
 extern void	brand_clearbrand(proc_t *);
+
+/*
+ * The following functions can be shared among kernel brand modules which
+ * implement Solaris-derived brands, all of which need to do similar tasks to
+ * manage the brand.
+ */
+extern int	brand_solaris_cmd(int, uintptr_t, uintptr_t, uintptr_t,
+		    struct brand *, int);
+extern void	brand_solaris_copy_procdata(proc_t *, proc_t *,
+		    struct brand *);
+extern int	brand_solaris_elfexec(vnode_t *, execa_t *, uarg_t *,
+		    intpdata_t *, int, long *, int, caddr_t, cred_t *, int,
+		    struct brand *, char *, char *, char *, char *, char *);
+extern void	brand_solaris_exec(struct brand *);
+extern int	brand_solaris_fini(char **, struct modlinkage *,
+		    struct brand *);
+extern void	brand_solaris_forklwp(klwp_t *, klwp_t *, struct brand *);
+extern void	brand_solaris_freelwp(klwp_t *, struct brand *);
+extern int	brand_solaris_initlwp(klwp_t *, struct brand *);
+extern void	brand_solaris_lwpexit(klwp_t *, struct brand *);
+extern void	brand_solaris_proc_exit(struct proc *, klwp_t *,
+		    struct brand *);
+extern void	brand_solaris_setbrand(proc_t *, struct brand *);
+
+#if defined(_SYSCALL32)
+typedef struct brand_elf_data32 {
+	uint32_t	sed_phdr;
+	uint32_t	sed_phent;
+	uint32_t	sed_phnum;
+	uint32_t	sed_entry;
+	uint32_t	sed_base;
+	uint32_t	sed_ldentry;
+	uint32_t	sed_lddata;
+} brand_elf_data32_t;
+
+typedef struct brand_common_reg32 {
+	uint32_t	sbr_version;	/* version number */
+	caddr32_t	sbr_handler;	/* base address of handler */
+} brand_common_reg32_t;
+#endif /* _SYSCALL32 */
+
+/*
+ * Common information associated with all branded processes
+ */
+typedef struct brand_proc_data {
+	caddr_t		spd_handler;	/* address of user-space handler */
+	brand_elf_data_t spd_elf_data;	/* common ELF data for branded app. */
+} brand_proc_data_t;
+
+#define	BRAND_NATIVE_DIR	"/.SUNWnative/"
+#define	BRAND_NATIVE_LINKER32	BRAND_NATIVE_DIR "lib/ld.so.1"
+#define	BRAND_NATIVE_LINKER64	BRAND_NATIVE_DIR "lib/64/ld.so.1"
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

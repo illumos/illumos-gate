@@ -19,18 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	s10_brand.a
 VERS =		.1
 COBJS =		s10_brand.o s10_deleted.o s10_signal.o
-ASOBJS =	s10_crt.o s10_handler.o s10_runexe.o
-OFFSETS_SRC =	../common/offsets.in
-OFFSETS_H =	assym.h
-OBJECTS =	$(COBJS) $(ASOBJS)
-CLOBBERFILES +=	$(OFFSETS_H)
+ASOBJS =	crt.o handler.o runexe.o brand_util.o
+OBJECTS =	$(COBJS)
 
 include ../../Makefile.s10
 include $(SRC)/lib/Makefile.lib
@@ -40,19 +36,8 @@ UTSBASE =	$(SRC)/uts
 
 LIBS =		$(DYNLIB)
 CSRCS =		$(COBJS:%o=../common/%c)
-ASSRCS =	$(ASOBJS:%o=$(ISASRCDIR)/%s)
-SRCS =		$(CSRCS) $(ASSRCS)
-
-#
-# Ugh, this is a gross hack.  Our assembly routines uses lots of defines
-# to simplify variable access.  All these defines work fine for amd64
-# compiles because when compiling for amd64 we use the GNU assembler,
-# gas.  For 32-bit code we use the Sun assembler, as.  Unfortunatly
-# as does not handle certian constructs that gas does.  So rather than
-# make our code less readable, we'll just use gas to compile our 32-bit
-# code as well.
-#
-i386_AS		= $(amd64_AS)
+SHAREDOBJS =	$(ASOBJS:%o=$(ISAOBJDIR)/%o)
+SRCS =		$(CSRCS)
 
 #
 # Note that the architecture specific makefiles MUST update DYNFLAGS to
@@ -87,33 +72,23 @@ i386_AS		= $(amd64_AS)
 # via mmap() instead of brk().
 #
 CPPFLAGS +=	-D_REENTRANT -U_ASM \
-		-I. -I../sys -I$(UTSBASE)/common/brand/solaris10 \
+		-I. -I$(BRAND_SHARED)/brand/sys -I../sys \
+		-I$(UTSBASE)/common/brand/solaris10 \
 		-I$(SRC)/uts/common/fs/zfs
 CFLAGS +=	$(CCVERBOSE)
 # Needed to handle zfs include files
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
-ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM -I. -I../sys
 DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION) -Wl,-e_start
 LDLIBS +=	-lc -lmapmalloc
+
+$(LIBS):= PICS += $(SHAREDOBJS)
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
 lint: lintcheck
-
-#
-# build the offset header before trying to compile any files.  (it's included
-# by s10_misc.h, so it's needed for all objects, not just assembly ones.)
-#
-$(OBJECTS:%=pics/%): $(OFFSETS_H)
-$(OFFSETS_H): $(OFFSETS_SRC)
-	$(OFFSETS_CREATE) $(CTF_FLAGS) < $(OFFSETS_SRC) >$@
-
-pics/%.o: $(ISASRCDIR)/%.s
-	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
 
 include $(SRC)/lib/Makefile.targ

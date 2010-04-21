@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -38,6 +37,7 @@
 #include <sys/syscall.h>
 
 #include <s10_brand.h>
+#include <brand_misc.h>
 #include <s10_misc.h>
 
 /*
@@ -293,7 +293,7 @@ s10_utime(sysret_t *rval, const char *path, const struct utimbuf *times)
 	if (times == NULL) {
 		tsp = NULL;
 	} else {
-		if (s10_uucopy(times, &ltimes, sizeof (ltimes)) != 0)
+		if (brand_uucopy(times, &ltimes, sizeof (ltimes)) != 0)
 			return (EFAULT);
 		ts[0].tv_sec = ltimes.actime;
 		ts[0].tv_nsec = 0;
@@ -316,7 +316,7 @@ s10_utimes(sysret_t *rval, const char *path, const struct timeval times[2])
 	if (times == NULL) {
 		tsp = NULL;
 	} else {
-		if (s10_uucopy(times, ltimes, sizeof (ltimes)) != 0)
+		if (brand_uucopy(times, ltimes, sizeof (ltimes)) != 0)
 			return (EFAULT);
 		ts[0].tv_sec = ltimes[0].tv_sec;
 		ts[0].tv_nsec = ltimes[0].tv_usec * 1000;
@@ -340,7 +340,7 @@ s10_futimesat(sysret_t *rval,
 	if (times == NULL) {
 		tsp = NULL;
 	} else {
-		if (s10_uucopy(times, ltimes, sizeof (ltimes)) != 0)
+		if (brand_uucopy(times, ltimes, sizeof (ltimes)) != 0)
 			return (EFAULT);
 		ts[0].tv_sec = ltimes[0].tv_sec;
 		ts[0].tv_nsec = ltimes[0].tv_usec * 1000;

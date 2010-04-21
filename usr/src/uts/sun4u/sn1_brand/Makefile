@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile drives the production of the kernel component of
 #	the N-1 Solaris brand
@@ -36,8 +35,6 @@ SN1_BASE =	$(UTSBASE)/common/brand/sn1
 #	Define the module and object file sets.
 #
 MODULE =	sn1_brand
-OFFSETS_H =	$(OBJS_DIR)/sn1_offsets.h
-OFFSETS_SRC =	$(SN1_BASE)/sn1_offsets.in
 OBJECTS =	$(SN1_BRAND_OBJS:%=$(OBJS_DIR)/%)
 LINTS =		$(SN1_BRAND_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE =	$(ROOT_PSM_BRAND_DIR)/$(MODULE)
@@ -50,9 +47,9 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 #
 #	Define targets
 #
-ALL_TARGET =		$(OFFSETS_H) $(BINARY)
+ALL_TARGET =		$(BINARY)
 LINT_TARGET =		$(MODULE).lint
-INSTALL_TARGET =	$(OFFSETS_H) $(BINARY) $(ROOTMODULE)
+INSTALL_TARGET =	$(BINARY) $(ROOTMODULE)
 
 #
 #	Update compiler variables.
@@ -80,12 +77,6 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
-
-#
-# Create genassym.h
-#
-$(OFFSETS_H): $(OFFSETS_SRC)
-	$(OFFSETS_CREATE) <$(OFFSETS_SRC) >$@
 
 #
 #	Include common targets.

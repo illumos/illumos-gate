@@ -19,14 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # lib/brand/sn1/i386/Makefile
 
-ISASRCDIR =		.
+ISAOBJDIR =	$(BRAND_SHARED)/brand/i386/pics
 
 include ../Makefile.com
+
+CPPFLAGS +=     -I$(BRAND_SHARED)/brand/i386
 
 #
 # see ../Makefile.com for why we explicity make ld.so.1 our interpreter

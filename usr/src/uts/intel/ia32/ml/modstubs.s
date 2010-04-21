@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/asm_linkage.h>
@@ -1421,6 +1420,18 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(ksocket, ksocket_shutdown, nomod_minus_one);
 	NO_UNLOAD_STUB(ksocket, ksocket_close, nomod_minus_one);
 	END_MODULE(ksocket);
+#endif
+
+/*
+ * Stubs for elfexec
+ */
+#ifndef ELFEXEC_MODULE
+	MODULE(elfexec,exec);
+	STUB(elfexec, elfexec,      	nomod_einval);
+	STUB(elfexec, elf32exec,	nomod_einval);
+	STUB(elfexec, mapexec_brand,	nomod_einval);
+	STUB(elfexec, mapexec32_brand,	nomod_einval);
+	END_MODULE(elfexec);
 #endif
 
 / this is just a marker for the area of text that contains stubs 

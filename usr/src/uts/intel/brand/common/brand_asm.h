@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _COMMON_BRAND_ASM_H
@@ -236,64 +235,6 @@ extern "C" {
 	mov	handler(scr), scr;	/* get p_brand_data->XX_handler */ \
 	shl	$4, SYSCALL_REG;	/* syscall_num * 16 */		\
 	add	SYSCALL_REG, scr	/* leave return addr in scr reg. */
-
-#if defined(__amd64)
-
-/*
- * To 'return' to our user-space handler, we just need to place its address
- * into 'retreg'.  The original return address is passed back in SYSCALL_REG.
- */
-#define	SYSCALL_EMUL(emul_table, handler, retreg)			\
-	CALLBACK_PROLOGUE(emul_table, handler, SYSCALL_REG, SCR_REG, SCR_REGB);\
-	CALC_TABLE_ADDR(SCR_REG, handler);				\
-	mov	retreg, SYSCALL_REG; /* save orig return addr in syscall_reg */\
-	mov	SCR_REG, retreg;	/* place new return addr in retreg */\
-	mov	%gs:CPU_RTMP_R15, SCR_REG; /* restore scratch register */\
-	mov	V_SSP(SP_REG), SP_REG	/* restore user stack pointer */
-
-/*
- * To 'return' to our user-space handler we need to update the user's %eip
- * pointer in the saved interrupt state on the stack.  The interrupt state was
- * pushed onto our stack automatically when the interrupt occured; see the
- * comments above.  The original return address is passed back in SYSCALL_REG.
- */
-#define	INT_EMUL(emul_table, handler)					\
-	CALLBACK_PROLOGUE(emul_table, handler, SYSCALL_REG, SCR_REG, SCR_REGB);\
-	CALC_TABLE_ADDR(SCR_REG, handler); /* new return addr is in scratch */ \
-	mov	SCR_REG, SYSCALL_REG;	/* place new ret addr in syscallreg */ \
-	mov	%gs:CPU_RTMP_R15, SCR_REG; /* restore scratch register */ \
-	mov	V_SSP(SP_REG), SP_REG;	/* restore intr stack pointer */ \
-	/*CSTYLED*/							\
-	xchg	(SP_REG), SYSCALL_REG	/* swap new and orig. return addrs */
-
-#else	/* !__amd64 */
-
-/*
- * To 'return' to our user-space handler, we just need to place its address
- * into 'retreg'.  The original return address is passed back in SYSCALL_REG.
- */
-#define	SYSCALL_EMUL(emul_table, handler, retreg)			\
-	CALLBACK_PROLOGUE(emul_table, handler, SYSCALL_REG, SCR_REG, SCR_REGB);\
-	mov	retreg, SCR_REG;	/* save orig return addr in scr reg */ \
-	CALC_TABLE_ADDR(retreg, handler); /* new return addr is in retreg */ \
-	mov	SCR_REG, SYSCALL_REG;	/* save orig return addr in %eax */ \
-	GET_V(SP_REG, 0, V_U_EBX, SCR_REG) /* restore scratch register */
-
-/*
- * To 'return' to our user-space handler, we need to replace the
- * iret target address.
- * The original return address is passed back in %eax.
- */
-#define	INT_EMUL(emul_table, handler)					\
-	CALLBACK_PROLOGUE(emul_table, handler, SYSCALL_REG, SCR_REG, SCR_REGB);\
-	CALC_TABLE_ADDR(SCR_REG, handler); /* new return addr is in scratch */ \
-	mov	SCR_REG, SYSCALL_REG;	/* place new ret addr in syscallreg */ \
-	GET_V(SP_REG, 0, V_U_EBX, SCR_REG); /* restore scratch register */ \
-	add	$V_END, SP_REG;		/* restore intr stack pointer */ \
-	/*CSTYLED*/							\
-	xchg	(SP_REG), SYSCALL_REG	/* swap new and orig. return addrs */
-
-#endif	/* !__amd64 */
 
 #endif	/* _ASM */
 

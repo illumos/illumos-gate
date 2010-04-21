@@ -19,18 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	sn1_brand.a
 VERS =		.1
 COBJS =		sn1_brand.o
-ASOBJS =	sn1_crt.o sn1_handler.o sn1_runexe.o
-OFFSETS_SRC =	../common/offsets.in
-OFFSETS_H =	assym.h
-OBJECTS =	$(COBJS) $(ASOBJS)
-CLOBBERFILES +=	$(OFFSETS_H)
+ASOBJS =	crt.o handler.o runexe.o brand_util.o
+OBJECTS =	$(COBJS)
 
 include ../../Makefile.sn1
 include $(SRC)/lib/Makefile.lib
@@ -40,19 +36,8 @@ UTSBASE =	$(SRC)/uts
 
 LIBS =		$(DYNLIB)
 CSRCS =		$(COBJS:%o=../common/%c)
-ASSRCS =	$(ASOBJS:%o=$(ISASRCDIR)/%s)
-SRCS =		$(CSRCS) $(ASSRCS)
-
-#
-# Ugh, this is a gross hack.  Our assembly routines uses lots of defines
-# to simplify variable access.  All these defines work fine for amd64
-# compiles because when compiling for amd64 we use the GNU assembler,
-# gas.  For 32-bit code we use the Sun assembler, as.  Unfortunatly
-# as does not handle certian constructs that gas does.  So rather than
-# make our code less readable, we'll just use gas to compile our 32-bit
-# code as well.
-#
-i386_AS		= $(amd64_AS)
+SHAREDOBJS =	$(ASOBJS:%o=$(ISAOBJDIR)/%o)
+SRCS =		$(CSRCS)
 
 #
 # Note that the architecture specific makefiles MUST update DYNFLAGS to
@@ -76,30 +61,20 @@ i386_AS		= $(amd64_AS)
 # regular and suid binaries).
 #
 NATIVE_DIR =	/.SUNWnative
-CPPFLAGS +=	-D_REENTRANT -U_ASM -I. -I../sys -I$(UTSBASE)/common/brand/sn1
+CPPFLAGS +=	-D_REENTRANT -U_ASM \
+		-I. -I$(BRAND_SHARED)/brand/sys -I$(UTSBASE)/common/brand/sn1
 CFLAGS +=	$(CCVERBOSE)
-ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM -I. -I../sys
 DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION) -Wl,-e_start
 #DYNFLAGS +=	-R$(NATIVE_DIR)/lib -R$(NATIVE_DIR)/usr/lib
 LDLIBS +=	-lc -lmapmalloc
+
+$(LIBS):= PICS += $(SHAREDOBJS)
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
 lint: lintcheck
-
-#
-# build the offset header before trying to compile any files.  (it's included
-# by sn1_misc.h, so it's needed for all objects, not just assembly ones.)
-#
-$(OBJECTS:%=pics/%): $(OFFSETS_H)
-$(OFFSETS_H): $(OFFSETS_SRC)
-	$(OFFSETS_CREATE) $(CTF_FLAGS) < $(OFFSETS_SRC) >$@
-
-pics/%.o: $(ISASRCDIR)/%.s
-	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
 
 include $(SRC)/lib/Makefile.targ
