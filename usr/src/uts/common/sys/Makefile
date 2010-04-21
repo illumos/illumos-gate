@@ -465,6 +465,7 @@ CHKHDRS=			\
 	random.h		\
 	rctl.h			\
 	rctl_impl.h		\
+	rds.h			\
 	reboot.h		\
 	refstr.h		\
 	refstr_impl.h		\
@@ -754,7 +755,8 @@ SOL_UCMAHDRS=		\
 SOL_OFSHDRS=		\
 	sol_cma.h	\
 	sol_ib_cma.h	\
-	sol_ofs_common.h
+	sol_ofs_common.h	\
+	sol_kverb_impl.h
 
 TAVORHDRS=		\
 	tavor_ioctl.h

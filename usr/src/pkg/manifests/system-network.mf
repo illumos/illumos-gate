@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/network@$(PKGVERS)
@@ -70,7 +69,7 @@ file path=etc/inet/secret/ike.preshared group=sys mode=0600 \
     original_name=SUNWcnetr:etc/inet/secret/ike.preshared preserve=true
 file path=etc/inet/secret/ipseckeys.sample group=sys mode=0600
 file path=etc/inet/sock2path group=sys \
-    original_name=SUNWcnetr:etc/inet/sock2path preserve=true
+    original_name=SUNWcnetr:etc/inet/sock2path preserve=renameold
 file path=etc/ipadm/ipadm.conf group=netadm owner=netadm preserve=true
 file path=etc/nwam/loc/NoNet/ipf.conf.dfl group=netadm owner=netadm \
     preserve=true

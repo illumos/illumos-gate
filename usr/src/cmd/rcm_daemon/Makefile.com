@@ -65,7 +65,8 @@ COMMON_PERL_SCRIPT_SRC =
 
 sparc_PERL_SCRIPT_SRC = SUNW,vdevices.pl
 
-COMMON_SHELL_SCRIPT_SRC = SUNW,ibsdpu.sh
+COMMON_SHELL_SCRIPT_SRC = SUNW,ibsdpu.sh	\
+			SUNW,rdsv3u.sh
 
 COMMON_MOD_OBJ = \
 	filesys_rcm.o \

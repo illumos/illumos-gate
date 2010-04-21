@@ -649,6 +649,135 @@ typedef struct ib_client {
 	} state;
 } ib_client_t;
 
+int ib_register_client(struct ib_client *client);
+void ib_unregister_client(struct ib_client *client);
+
+void *ib_get_client_data(struct ib_device *device, struct ib_client *client);
+void  ib_set_client_data(struct ib_device *device, struct ib_client *client,
+    void *data);
+
+int ib_query_device(struct ib_device *device,
+    struct ib_device_attr *device_attr);
+
+/*
+ * ib_alloc_pd - Allocates an unused protection domain.
+ * @device: The device on which to allocate the protection domain.
+ *
+ * A protection domain object provides an association between QPs, shared
+ * receive queues, address handles, memory regions, and memory windows.
+ */
+struct ib_pd *ib_alloc_pd(struct ib_device *device);
+
+/*
+ * ib_dealloc_pd - Deallocates a protection domain.
+ * @pd: The protection domain to deallocate.
+ */
+int ib_dealloc_pd(struct ib_pd *pd);
+
+/*
+ * ib_create_qp - Creates a QP associated with the specified protection
+ *   domain.
+ * @pd: The protection domain associated with the QP.
+ * @qp_init_attr: A list of initial attributes required to create the
+ *   QP.  If QP creation succeeds, then the attributes are updated to
+ *   the actual capabilities of the created QP.
+ */
+struct ib_qp *ib_create_qp(struct ib_pd *pd,
+    struct ib_qp_init_attr *qp_init_attr);
+
+/*
+ * ib_modify_qp - Modifies the attributes for the specified QP and then
+ *   transitions the QP to the given state.
+ * @qp: The QP to modify.
+ * @qp_attr: On input, specifies the QP attributes to modify.  On output,
+ *   the current values of selected QP attributes are returned.
+ * @qp_attr_mask: A bit-mask used to specify which attributes of the QP
+ *   are being modified.
+ */
+int ib_modify_qp(struct ib_qp *qp, struct ib_qp_attr *qp_attr,
+    int qp_attr_mask);
+
+/*
+ * ib_destroy_qp - Destroys the specified QP.
+ * @qp: The QP to destroy.
+ */
+int ib_destroy_qp(struct ib_qp *qp);
+
+/*
+ * ib_create_cq - Creates a CQ on the specified device.
+ * @device: The device on which to create the CQ.
+ * @comp_handler: A user-specified callback that is invoked when a
+ *   completion event occurs on the CQ.
+ * @event_handler: A user-specified callback that is invoked when an
+ *   asynchronous event not associated with a completion occurs on the CQ.
+ * @cq_context: Context associated with the CQ returned to the user via
+ *   the associated completion and event handlers.
+ * @cqe: The minimum size of the CQ.
+ * @comp_vector - Completion vector used to signal completion events.
+ *     Must be >= 0 and < context->num_comp_vectors.
+ *
+ * Users can examine the cq structure to determine the actual CQ size.
+ */
+struct ib_cq *ib_create_cq(struct ib_device *device,
+    ib_comp_handler comp_handler,
+    void (*event_handler)(struct ib_event *, void *),
+    void *cq_context, int cqe, int comp_vector);
+
+/*
+ * ib_destroy_cq - Destroys the specified CQ.
+ * @cq: The CQ to destroy.
+ */
+int ib_destroy_cq(struct ib_cq *cq);
+
+/*
+ * ib_poll_cq - poll a CQ for completion(s)
+ * @cq:the CQ being polled
+ * @num_entries:maximum number of completions to return
+ * @wc:array of at least @num_entries &struct ib_wc where completions
+ *   will be returned
+ *
+ * Poll a CQ for (possibly multiple) completions.  If the return value
+ * is < 0, an error occurred.  If the return value is >= 0, it is the
+ * number of completions returned.  If the return value is
+ * non-negative and < num_entries, then the CQ was emptied.
+ */
+int ib_poll_cq(struct ib_cq *cq, int num_entries, struct ib_wc *wc);
+
+/*
+ * ib_req_notify_cq - Request completion notification on a CQ.
+ * @cq: The CQ to generate an event for.
+ * @flags:
+ *   Must contain exactly one of %IB_CQ_SOLICITED or %IB_CQ_NEXT_COMP
+ *   to request an event on the next solicited event or next work
+ *   completion at any type, respectively. %IB_CQ_REPORT_MISSED_EVENTS
+ *   may also be |ed in to request a hint about missed events, as
+ *   described below.
+ *
+ * Return Value:
+ *    < 0 means an error occurred while requesting notification
+ *   == 0 means notification was requested successfully, and if
+ *        IB_CQ_REPORT_MISSED_EVENTS was passed in, then no events
+ *        were missed and it is safe to wait for another event.  In
+ *        this case is it guaranteed that any work completions added
+ *        to the CQ since the last CQ poll will trigger a completion
+ *        notification event.
+ *    > 0 is only returned if IB_CQ_REPORT_MISSED_EVENTS was passed
+ *        in.  It means that the consumer must poll the CQ again to
+ *        make sure it is empty to avoid missing an event because of a
+ *        race between requesting notification and an entry being
+ *        added to the CQ.  This return value means it is possible
+ *        (but not guaranteed) that a work completion has been added
+ *        to the CQ since the last poll without triggering a
+ *        completion notification event.
+ */
+int ib_req_notify_cq(struct ib_cq *cq, enum ib_cq_notify_flags flags);
+
+struct rdma_cm_id;
+ibt_hca_hdl_t ib_get_ibt_hca_hdl(struct ib_device *device);
+
+ibt_channel_hdl_t
+ib_get_ibt_channel_hdl(struct rdma_cm_id *cm);
+
 #ifdef __cplusplus
 }
 #endif

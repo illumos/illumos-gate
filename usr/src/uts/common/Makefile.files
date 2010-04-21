@@ -593,10 +593,18 @@ SCTP_SOCK_MOD_OBJS += sockmod_sctp.o socksctp.o socksctpsubr.o
 
 PFP_SOCK_MOD_OBJS += sockmod_pfp.o
 
+RDS_SOCK_MOD_OBJS += sockmod_rds.o
+
 RDS_OBJS +=	rdsddi.o rdssubr.o rds_opt.o rds_ioctl.o
 
 RDSIB_OBJS +=	rdsib.o rdsib_ib.o rdsib_cm.o rdsib_ep.o rdsib_buf.o \
 		rdsib_debug.o rdsib_sc.o
+
+RDSV3_OBJS +=	af_rds.o rdsv3_ddi.o bind.o loop.o threads.o connection.o \
+		transport.o cong.o sysctl.o message.o rds_recv.o send.o \
+		stats.o info.o page.o rdma_transport.o ib_ring.o ib_rdma.o \
+		ib_recv.o ib.o ib_send.o ib_sysctl.o ib_stats.o ib_cm.o \
+		rdsv3_sc.o rdsv3_debug.o rdsv3_impl.o rdma.o
 
 ISER_OBJS +=	iser.o iser_cm.o iser_cq.o iser_ib.o iser_idm.o \
 		iser_resource.o iser_xfer.o
@@ -695,7 +703,8 @@ HERMON_OBJS +=	hermon.o hermon_agents.o hermon_cfg.o hermon_ci.o hermon_cmd.o \
 DAPLT_OBJS +=	daplt.o
 
 SOL_OFS_OBJS +=	sol_cma.o sol_ib_cma.o sol_uobj.o \
-		sol_ofs_debug_util.o sol_ofs_gen_util.o
+		sol_ofs_debug_util.o sol_ofs_gen_util.o \
+		sol_kverbs.o
 
 SOL_UCMA_OBJS +=	sol_ucma.o
 

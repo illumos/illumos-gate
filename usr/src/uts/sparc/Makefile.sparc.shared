@@ -219,6 +219,7 @@ DRV_KMODS	+= dlpistub
 DRV_KMODS	+= vnic
 DRV_KMODS	+= xge
 DRV_KMODS	+= rds
+DRV_KMODS	+= rdsv3
 DRV_KMODS	+= chxge
 DRV_KMODS	+= smbsrv
 DRV_KMODS	+= vscan
@@ -504,6 +505,7 @@ MAC_KMODS	+= mac_ib
 SOCKET_KMODS	+= sockpfp
 SOCKET_KMODS	+= socksctp
 SOCKET_KMODS	+= socksdp
+SOCKET_KMODS	+= sockrds
 
 #
 #	kiconv modules (/kernel/kiconv):

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1156,8 +1155,7 @@ so_queue_msg(sock_upper_handle_t sock_handle, mblk_t *mp,
 	ASSERT(errorp != NULL);
 	*errorp = 0;
 	if (mp == NULL) {
-		if (msg_size > 0) {
-			ASSERT(so->so_downcalls->sd_recv_uio != NULL);
+		if (so->so_downcalls->sd_recv_uio != NULL) {
 			mutex_enter(&so->so_lock);
 			/* the notify functions will drop the lock */
 			if (flags & MSG_OOB)
@@ -1166,6 +1164,7 @@ so_queue_msg(sock_upper_handle_t sock_handle, mblk_t *mp,
 				so_notify_data(so, msg_size);
 			return (0);
 		}
+		ASSERT(msg_size == 0);
 		/*
 		 * recv space check
 		 */

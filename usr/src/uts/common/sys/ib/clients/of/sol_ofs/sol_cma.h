@@ -140,8 +140,19 @@ typedef enum {
 #define	SOL_CMA_DISCONNECT_OK(chanp)	(((chanp)->chan_connect_flag ==	\
     SOL_CMA_CONNECT_INITIATED) || SOL_CMAID_IS_CONNECTED(chanp))
 
+/*
+ * CMID_DESTROYED	- Flag to indicate rdma_destroy_id has been
+ * 			called for this CMID
+ *
+ * EVENT_PROGRESS	- RDMACM Event for this CMID been passed to
+ * 			the sol_ofs client.
+ *
+ * API_PROGRESS		- rdma_resolve_addr() / rdma_resolve_route() /
+ *			rdma_listen() is in progress.
+ */
 #define	SOL_CMA_CALLER_CMID_DESTROYED		0x01
 #define	SOL_CMA_CALLER_EVENT_PROGRESS		0x02
+#define	SOL_CMA_CALLER_API_PROGRESS		0x04
 
 typedef enum {
 	REQ_CMID_NONE = 0,
@@ -210,6 +221,9 @@ typedef struct {
 
 	/* Session ID for completion */
 	void			*chan_session_id;
+
+	uint32_t		chan_qp_num;
+	uint8_t			chan_is_srq;
 
 	union {
 		ibcma_chan_t	chan_ib_xport;
@@ -308,10 +322,8 @@ cma_get_acpt_idp(struct rdma_cm_id *root_idp, void *qp_hdl)
 	sol_cma_chan_t		*root_chanp;
 
 	root_chanp = (sol_cma_chan_t *)root_idp;
-	mutex_enter(&root_chanp->chan_mutex);
 	acpt_idp = (struct rdma_cm_id *)avl_find(
 	    &root_chanp->chan_acpt_avl_tree, (void *)qp_hdl, NULL);
-	mutex_exit(&root_chanp->chan_mutex);
 	return (acpt_idp);
 }
 #ifdef __cplusplus

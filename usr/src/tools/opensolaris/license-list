@@ -148,6 +148,7 @@ usr/src/uts/common/io/drm/THIRDPARTYLICENSE
 usr/src/uts/common/io/elxl/THIRDPARTYLICENSE
 usr/src/uts/common/io/ib/clients/of/lic_of
 usr/src/uts/common/io/ib/clients/rds/THIRDPARTYLICENSE
+usr/src/uts/common/io/ib/clients/rdsv3/LICENSE
 usr/src/uts/common/io/ipw/THIRDPARTYLICENSE
 usr/src/uts/common/io/ipw/fw-ipw2100/LICENSE
 usr/src/uts/common/io/iwh/THIRDPARTYLICENSE

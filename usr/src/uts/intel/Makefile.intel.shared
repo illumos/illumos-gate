@@ -309,6 +309,7 @@ DRV_KMODS	+= ral
 DRV_KMODS	+= ramdisk
 DRV_KMODS	+= random
 DRV_KMODS	+= rds
+DRV_KMODS	+= rdsv3
 DRV_KMODS	+= rpcib
 DRV_KMODS	+= rsm
 DRV_KMODS	+= rts
@@ -732,6 +733,7 @@ MAC_KMODS	+= mac_ib
 SOCKET_KMODS	+= sockpfp
 SOCKET_KMODS	+= socksctp
 SOCKET_KMODS    += socksdp
+SOCKET_KMODS	+= sockrds
 
 #
 #	kiconv modules (/kernel/kiconv):
