@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_VDSK_COMMON_H
@@ -579,6 +578,12 @@ void vd_efi_free(vd_efi_dev_t *dev, efi_gpt_t *gpt, efi_gpe_t *gpe);
 	if ((vd)->io_stats != NULL) {					\
 		ASSERT(MUTEX_HELD(&(vd)->lock));			\
 		kstat_waitq_to_runq(KSTAT_IO_PTR((vd)->io_stats));	\
+	}
+
+#define	VD_KSTAT_RUNQ_BACK_TO_WAITQ(vd)					\
+	if ((vd)->io_stats != NULL) {					\
+		ASSERT(MUTEX_HELD(&(vd)->lock));			\
+		kstat_runq_back_to_waitq(KSTAT_IO_PTR((vd)->io_stats));	\
 	}
 
 #define	VD_KSTAT_RUNQ_ENTER(vd)						\

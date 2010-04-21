@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -238,11 +237,52 @@ static void	vdc_eio_thread(void *arg);
  */
 
 /*
+ * Number of handshake retries with the current server before switching to
+ * a different server. These retries are done so that we stick with the same
+ * server if vdc receives a LDC reset event during the initiation of the
+ * handshake. This can happen if vdc reset the LDC channel and then immediately
+ * retry a connexion before it has received the LDC reset event.
+ *
+ * If there is only one server then we "switch" to the same server. We also
+ * switch if the handshake has reached the attribute negotiate step whatever
+ * the number of handshake retries might be.
+ */
+static uint_t vdc_hshake_retries = VDC_HSHAKE_RETRIES;
+
+/*
+ * If the handshake done during the attach fails then the two following
+ * variables will also be used to control the number of retries for the
+ * next handshakes. In that case, when a handshake is done after the
+ * attach (i.e. the vdc lifecycle is VDC_ONLINE_PENDING) then the handshake
+ * will be retried until we have done an attribution negotiation with each
+ * server, with a specified minimum total number of negotations (the value
+ * of the vdc_hattr_min_initial or vdc_hattr_min variable).
+ *
+ * This prevents new I/Os on a newly used vdisk to block forever if the
+ * attribute negotiations can not be done, and to limit the amount of time
+ * before I/Os will fail. Basically, attribute negotiations will fail when
+ * the service is up but the backend does not exist. In that case, vds will
+ * typically retry to access the backend during 50 seconds. So I/Os will fail
+ * after the following amount of time:
+ *
+ *	50 seconds x max(number of servers, vdc->hattr_min)
+ *
+ * After that the handshake done during the attach has failed then the next
+ * handshake will use vdc_attr_min_initial. This handshake will correspond to
+ * the very first I/O to the device. If this handshake also fails then
+ * vdc_hattr_min will be used for subsequent handshakes. We typically allow
+ * more retries for the first handshake (VDC_HATTR_MIN_INITIAL = 3) to give more
+ * time for the backend to become available (50s x VDC_HATTR_MIN_INITIAL = 150s)
+ * in case this is a critical vdisk (e.g. vdisk access during boot). Then we use
+ * a smaller value (VDC_HATTR_MIN = 1) to avoid waiting too long for each I/O.
+ */
+static uint_t vdc_hattr_min_initial = VDC_HATTR_MIN_INITIAL;
+static uint_t vdc_hattr_min = VDC_HATTR_MIN;
+
+/*
  * Tunable variables to control how long vdc waits before timing out on
  * various operations
  */
-static int	vdc_hshake_retries = 3;
-
 static int	vdc_timeout = 0; /* units: seconds */
 static int 	vdc_ldcup_timeout = 1; /* units: seconds */
 
@@ -457,7 +497,9 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_exit(&vdc->ownership_lock);
 
 	/* mark instance as detaching */
+	mutex_enter(&vdc->lock);
 	vdc->lifecycle	= VDC_LC_DETACHING;
+	mutex_exit(&vdc->lock);
 
 	/*
 	 * Try and disable callbacks to prevent another handshake. We have to
@@ -744,9 +786,9 @@ vdc_do_attach(dev_info_t *dip)
 	 * available when creating the kstat
 	 */
 	vdc_set_err_kstats(vdc);
-
 	ddi_report_dev(dip);
-	vdc->lifecycle	= VDC_LC_ONLINE;
+	ASSERT(vdc->lifecycle == VDC_LC_ONLINE ||
+	    vdc->lifecycle == VDC_LC_ONLINE_PENDING);
 	DMSG(vdc, 0, "[%d] Attach tasks successful\n", instance);
 
 return_status:
@@ -2433,13 +2475,6 @@ vdc_init_ports(vdc_t *vdc, md_t *mdp, mde_cookie_t vd_nodep)
 		vdc->num_servers++;
 	}
 
-	/*
-	 * Adjust the max number of handshake retries to match
-	 * the number of vdisk servers.
-	 */
-	if (vdc_hshake_retries < vdc->num_servers)
-		vdc_hshake_retries = vdc->num_servers;
-
 	/* pick first server as current server */
 	if (vdc->server_list != NULL) {
 		vdc->curr_server = vdc->server_list;
@@ -2906,7 +2941,7 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 	/*
 	 * If this is a block read/write operation we update the I/O statistics
 	 * to indicate that the request is being put on the waitq to be
-	 * serviced.
+	 * serviced. Operations which are resubmitted are already in the waitq.
 	 *
 	 * We do it here (a common routine for both synchronous and strategy
 	 * calls) for performance reasons - we are already holding vdc->lock
@@ -2914,7 +2949,8 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 	 * grab the 'lock' mutex to update the stats if we were to do this
 	 * higher up the stack in vdc_strategy() et. al.
 	 */
-	if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
+	if (((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) &&
+	    !(flags & VDC_OP_RESUBMIT)) {
 		DTRACE_IO1(start, buf_t *, bufp);
 		VD_KSTAT_WAITQ_ENTER(vdcp);
 	}
@@ -2968,7 +3004,7 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 		}
 
 	} while (vdc_populate_descriptor(vdcp, operation, addr,
-	    nbytes, slice, offset, bufp, dir, flags));
+	    nbytes, slice, offset, bufp, dir, flags & ~VDC_OP_RESUBMIT));
 
 done:
 	/*
@@ -2976,7 +3012,9 @@ done:
 	 * to indicate that this request has been placed on the queue for
 	 * processing (i.e sent to the vDisk server) - iostat(1M) will
 	 * report the time waiting for the vDisk server under the %b column
-	 * In the case of an error we simply take it off the wait queue.
+	 *
+	 * In the case of an error we take it off the wait queue only if
+	 * the I/O was not resubmited.
 	 */
 	if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
 		if (rv == 0) {
@@ -2984,8 +3022,10 @@ done:
 			DTRACE_PROBE1(send, buf_t *, bufp);
 		} else {
 			VD_UPDATE_ERR_STATS(vdcp, vd_transerrs);
-			VD_KSTAT_WAITQ_EXIT(vdcp);
-			DTRACE_IO1(done, buf_t *, bufp);
+			if (!(flags & VDC_OP_RESUBMIT)) {
+				VD_KSTAT_WAITQ_EXIT(vdcp);
+				DTRACE_IO1(done, buf_t *, bufp);
+			}
 		}
 	}
 
@@ -3235,24 +3275,31 @@ vdc_do_op(vdc_t *vdc, int op, caddr_t addr, size_t nbytes, int slice,
 	} else {
 		/* wait for the response message */
 		rv = vdc_wait_for_response(vdc, &vio_msg);
+
+		if (rv == 0)
+			rv = vdc_process_data_msg(vdc, &vio_msg);
+
 		if (rv) {
 			/*
 			 * If this is a block read/write we update the I/O
 			 * statistics kstat to take it off the run queue.
+			 * If it is a resubmit then it needs to stay in
+			 * in the waitq, and it will be removed when the
+			 * I/O is eventually completed or cancelled.
 			 */
 			mutex_enter(&vdc->lock);
 			if (op == VD_OP_BREAD || op == VD_OP_BWRITE) {
-				VD_UPDATE_ERR_STATS(vdc, vd_transerrs);
-				VD_KSTAT_RUNQ_EXIT(vdc);
-				DTRACE_IO1(done, buf_t *, bufp);
+				if (flags & VDC_OP_RESUBMIT) {
+					VD_KSTAT_RUNQ_BACK_TO_WAITQ(vdc);
+				} else {
+					VD_KSTAT_RUNQ_EXIT(vdc);
+					DTRACE_IO1(done, buf_t *, bufp);
+				}
 			}
 			mutex_exit(&vdc->lock);
 			goto done;
 		}
 
-		rv = vdc_process_data_msg(vdc, &vio_msg);
-		if (rv)
-			goto done;
 	}
 
 	if (bufp == &buf)
@@ -3927,7 +3974,8 @@ vdc_resubmit_backup_dring(vdc_t *vdcp)
 			    curr_ldep->addr, curr_ldep->nbytes,
 			    curr_ldep->slice, curr_ldep->offset,
 			    curr_ldep->buf, curr_ldep->dir,
-			    curr_ldep->flags & ~VDC_OP_STATE_RUNNING);
+			    (curr_ldep->flags & ~VDC_OP_STATE_RUNNING) |
+			    VDC_OP_RESUBMIT);
 
 			if (rv) {
 				DMSG(vdcp, 1, "[%d] resubmit entry %d failed\n",
@@ -4027,7 +4075,7 @@ vdc_cancel_backup_dring(vdc_t *vdcp)
 			if (ldep->operation == VD_OP_BREAD ||
 			    ldep->operation == VD_OP_BWRITE) {
 				VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
-				VD_KSTAT_RUNQ_EXIT(vdcp);
+				VD_KSTAT_WAITQ_EXIT(vdcp);
 				DTRACE_IO1(done, buf_t *, bufp);
 			}
 			bioerror(bufp, EIO);
@@ -4057,12 +4105,8 @@ vdc_cancel_backup_dring(vdc_t *vdcp)
  * Description:
  *	This function is invoked if the timeout set to establish the connection
  *	with vds expires. This will happen if we spend too much time in the
- *	VDC_STATE_INIT_WAITING or VDC_STATE_NEGOTIATE states.
- *
- *	If the timeout does not expire, it will be cancelled when we reach the
- *	VDC_STATE_HANDLE_PENDING, VDC_STATE_FAILED or VDC_STATE_DETACH state.
- *	This function can also be invoked while we are in those states, in
- *	which case we do nothing because the timeout is being cancelled.
+ *	VDC_STATE_INIT_WAITING, VDC_STATE_NEGOTIATE or VDC_STATE_HANDLE_PENDING
+ *	states.
  *
  * Arguments:
  *	arg	- argument of the timeout function actually a soft state
@@ -4078,17 +4122,7 @@ vdc_connection_timeout(void *arg)
 
 	mutex_enter(&vdcp->lock);
 
-	if (vdcp->state == VDC_STATE_HANDLE_PENDING ||
-	    vdcp->state == VDC_STATE_DETACH ||
-	    vdcp->state == VDC_STATE_FAILED) {
-		/*
-		 * The connection has just been re-established, has failed or
-		 * we are detaching.
-		 */
-		vdcp->ctimeout_reached = B_FALSE;
-	} else {
-		vdcp->ctimeout_reached = B_TRUE;
-	}
+	vdcp->ctimeout_reached = B_TRUE;
 
 	mutex_exit(&vdcp->lock);
 }
@@ -4111,7 +4145,8 @@ vdc_connection_timeout(void *arg)
 static void
 vdc_backup_local_dring(vdc_t *vdcp)
 {
-	int dring_size;
+	int b_idx, count, dring_size;
+	vdc_local_desc_t *curr_ldep;
 
 	ASSERT(MUTEX_HELD(&vdcp->lock));
 	ASSERT(vdcp->state == VDC_STATE_RESETTING);
@@ -4150,6 +4185,28 @@ vdc_backup_local_dring(vdc_t *vdcp)
 
 	vdcp->local_dring_backup_tail = vdcp->dring_curr_idx;
 	vdcp->local_dring_backup_len = vdcp->dring_len;
+
+	/*
+	 * At this point, pending read or write I/Os are recorded in the
+	 * runq. We update the I/O statistics to indicate that they are now
+	 * back in the waitq.
+	 */
+	b_idx = vdcp->local_dring_backup_tail;
+	for (count = 0; count < vdcp->local_dring_backup_len; count++) {
+
+		curr_ldep = &(vdcp->local_dring_backup[b_idx]);
+
+		if (!curr_ldep->is_free &&
+		    (curr_ldep->operation == VD_OP_BREAD ||
+		    curr_ldep->operation == VD_OP_BWRITE)) {
+			VD_KSTAT_RUNQ_BACK_TO_WAITQ(vdcp);
+		}
+
+		/* get the next element */
+		if (++b_idx >= vdcp->local_dring_backup_len)
+			b_idx = 0;
+	}
+
 }
 
 static void
@@ -4238,6 +4295,108 @@ vdc_print_svc_status(vdc_t *vdcp)
 	vdcp->curr_server->log_state = svc_state;
 }
 
+/*
+ * Function:
+ *	vdc_handshake_retry
+ *
+ * Description:
+ *	This function indicates if the handshake should be retried or not.
+ *	This depends on the lifecycle of the driver:
+ *
+ *	VDC_LC_ATTACHING: the handshake is retried until we have tried
+ *	a handshake with each server. We don't care how far each handshake
+ *	went, the goal is just to try the handshake. We want to minimize the
+ *	the time spent doing the attach because this is locking the device
+ *	tree.
+ *
+ *	VDC_LC_ONLINE_PENDING: the handshake is retried while we haven't done
+ *	consecutive attribute negotiations with each server, and we haven't
+ *	reached a minimum total of consecutive negotiations (hattr_min). The
+ *	number of attribution negotiations determines the time spent before
+ *	failing	pending I/Os if the handshake is not successful.
+ *
+ *	VDC_LC_ONLINE: the handshake is always retried, until we have a
+ *	successful handshake with a server.
+ *
+ *	VDC_LC_DETACHING: N/A
+ *
+ * Arguments:
+ *	hshake_cnt	- number of handshake attempts
+ *	hattr_cnt	- number of attribute negotiation attempts
+ *
+ * Return Code:
+ *	B_TRUE		- handshake should be retried
+ *	B_FALSE		- handshake should not be retried
+ */
+static boolean_t
+vdc_handshake_retry(vdc_t *vdcp, int hshake_cnt, int hattr_cnt)
+{
+	int		hattr_total = 0;
+	vdc_server_t	*srvr;
+
+	ASSERT(vdcp->lifecycle != VDC_LC_DETACHING);
+
+	/* update handshake counters */
+	vdcp->curr_server->hshake_cnt = hshake_cnt;
+	vdcp->curr_server->hattr_cnt = hattr_cnt;
+
+	/*
+	 * If no attribute negotiation was done then we reset the total
+	 *  number otherwise we cumulate the number.
+	 */
+	if (hattr_cnt == 0)
+		vdcp->curr_server->hattr_total = 0;
+	else
+		vdcp->curr_server->hattr_total += hattr_cnt;
+
+	/*
+	 * If we are online (i.e. at least one handshake was successfully
+	 * completed) then we always retry the handshake.
+	 */
+	if (vdcp->lifecycle == VDC_LC_ONLINE)
+		return (B_TRUE);
+
+	/*
+	 * If we are attaching then we retry the handshake only if we haven't
+	 * tried with all servers.
+	 */
+	if (vdcp->lifecycle == VDC_LC_ATTACHING) {
+
+		for (srvr = vdcp->server_list; srvr != NULL;
+		    srvr = srvr->next) {
+			if (srvr->hshake_cnt == 0) {
+				return (B_TRUE);
+			}
+		}
+
+		return (B_FALSE);
+	}
+
+	/*
+	 * Here we are in the case where we haven't completed any handshake
+	 * successfully yet.
+	 */
+	ASSERT(vdcp->lifecycle == VDC_LC_ONLINE_PENDING);
+
+	/*
+	 * We retry the handshake if we haven't done an attribute negotiation
+	 * with each server. This is to handle the case where one service domain
+	 * is down.
+	 */
+	for (srvr = vdcp->server_list; srvr != NULL; srvr = srvr->next) {
+		if (srvr->hattr_cnt == 0) {
+			return (B_TRUE);
+		}
+		hattr_total += srvr->hattr_total;
+	}
+
+	/*
+	 * We retry the handshake if we haven't reached the minimum number of
+	 * attribute negotiation.
+	 */
+	return (hattr_total < vdcp->hattr_min);
+}
+
 /* -------------------------------------------------------------------------- */
 
 /*
@@ -4264,14 +4423,19 @@ vdc_print_svc_status(vdc_t *vdcp)
 static void
 vdc_process_msg_thread(vdc_t *vdcp)
 {
+	boolean_t	failure_msg = B_FALSE;
 	int		status;
 	int		ctimeout;
 	timeout_id_t	tmid = 0;
 	clock_t		ldcup_timeout = 0;
 	vdc_server_t	*srvr;
 	vdc_service_state_t svc_state;
+	int		hshake_cnt = 0;
+	int		hattr_cnt = 0;
 
 	mutex_enter(&vdcp->lock);
+
+	ASSERT(vdcp->lifecycle == VDC_LC_ATTACHING);
 
 	for (;;) {
 
@@ -4287,6 +4451,7 @@ vdc_process_msg_thread(vdc_t *vdcp)
 		    Q(VDC_STATE_RESETTING)
 		    Q(VDC_STATE_DETACH)
 		    "UNKNOWN");
+#undef Q
 
 		switch (vdcp->state) {
 		case VDC_STATE_INIT:
@@ -4331,20 +4496,28 @@ vdc_process_msg_thread(vdc_t *vdcp)
 				break;
 			}
 
-			/* Check if we are re-initializing repeatedly */
-			if (vdcp->hshake_cnt > vdc_hshake_retries &&
-			    vdcp->lifecycle != VDC_LC_ONLINE) {
+			/*
+			 * Switch to another server when we reach the limit of
+			 * the number of handshake per server or if we have done
+			 * an attribute negotiation.
+			 */
+			if (hshake_cnt >= vdc_hshake_retries || hattr_cnt > 0) {
 
-				DMSG(vdcp, 0, "[%d] too many handshakes,cnt=%d",
-				    vdcp->instance, vdcp->hshake_cnt);
-				vdcp->state = VDC_STATE_FAILED;
-				break;
+				if (!vdc_handshake_retry(vdcp, hshake_cnt,
+				    hattr_cnt)) {
+					DMSG(vdcp, 0, "[%d] too many "
+					    "handshakes", vdcp->instance);
+					vdcp->state = VDC_STATE_FAILED;
+					break;
+				}
+
+				vdc_switch_server(vdcp);
+
+				hshake_cnt = 0;
+				hattr_cnt = 0;
 			}
 
-			/* Switch server */
-			if (vdcp->hshake_cnt > 0)
-				vdc_switch_server(vdcp);
-			vdcp->hshake_cnt++;
+			hshake_cnt++;
 
 			/* Bring up connection with vds via LDC */
 			status = vdc_start_ldc_connection(vdcp);
@@ -4400,6 +4573,8 @@ vdc_process_msg_thread(vdc_t *vdcp)
 				    status);
 				goto reset;
 			}
+
+			hattr_cnt++;
 
 			switch (status = vdc_attr_negotiation(vdcp)) {
 			case 0:
@@ -4523,8 +4698,17 @@ done:
 			 * reported and we wait for a new I/O before attempting
 			 * another connection.
 			 */
+
 			cmn_err(CE_NOTE, "vdisk@%d disk access failed",
 			    vdcp->instance);
+			failure_msg = B_TRUE;
+
+			if (vdcp->lifecycle == VDC_LC_ATTACHING) {
+				vdcp->lifecycle = VDC_LC_ONLINE_PENDING;
+				vdcp->hattr_min = vdc_hattr_min_initial;
+			} else {
+				vdcp->hattr_min = vdc_hattr_min;
+			}
 
 			/* cancel any timeout */
 			if (tmid != 0) {
@@ -4549,10 +4733,14 @@ done:
 			for (srvr = vdcp->server_list; srvr != NULL;
 			    srvr = srvr->next) {
 				srvr->svc_state = VDC_SERVICE_OFFLINE;
+				srvr->hshake_cnt = 0;
+				srvr->hattr_cnt = 0;
+				srvr->hattr_total = 0;
 			}
 
 			/* reset variables */
-			vdcp->hshake_cnt = 0;
+			hshake_cnt = 0;
+			hattr_cnt = 0;
 			vdcp->ctimeout_reached = B_FALSE;
 
 			vdcp->state = VDC_STATE_RESETTING;
@@ -4561,11 +4749,24 @@ done:
 
 		/* enter running state */
 		case VDC_STATE_RUNNING:
+
+			if (vdcp->lifecycle == VDC_LC_DETACHING) {
+				vdcp->state = VDC_STATE_DETACH;
+				break;
+			}
+
+			vdcp->lifecycle = VDC_LC_ONLINE;
+
+			if (failure_msg) {
+				cmn_err(CE_NOTE, "vdisk@%d disk access "
+				    "recovered", vdcp->instance);
+				failure_msg = B_FALSE;
+			}
+
 			/*
 			 * Signal anyone waiting for the connection
 			 * to come on line.
 			 */
-			vdcp->hshake_cnt = 0;
 			cv_broadcast(&vdcp->running_cv);
 
 			/* backend has to be checked after reset */
@@ -4607,7 +4808,13 @@ done:
 			    srvr = srvr->next) {
 				srvr->svc_state = VDC_SERVICE_OFFLINE;
 				srvr->log_state = VDC_SERVICE_NONE;
+				srvr->hshake_cnt = 0;
+				srvr->hattr_cnt = 0;
+				srvr->hattr_total = 0;
 			}
+
+			hshake_cnt = 0;
+			hattr_cnt = 0;
 
 			vdc_print_svc_status(vdcp);
 
@@ -4795,20 +5002,9 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 	if (msg->tag.vio_subtype == VIO_SUBTYPE_NACK) {
 		/*
 		 * Update the I/O statistics to indicate that an error ocurred.
-		 *
-		 * We need to update the run queue if a read or write request
-		 * is being NACKed - otherwise there will appear to be an
-		 * indefinite outstanding request and statistics reported by
-		 * iostat(1M) will be incorrect. The transaction will be
-		 * resubmitted from the backup DRing following the reset
-		 * and the wait/run queues will be entered again.
+		 * No need to update the wait/run queues, this will be done by
+		 * the thread calling this function.
 		 */
-		ldep = &vdcp->local_dring[idx];
-		op = ldep->operation;
-		if ((op == VD_OP_BREAD) || (op == VD_OP_BWRITE)) {
-			DTRACE_IO1(done, buf_t *, ldep->buf);
-			VD_KSTAT_RUNQ_EXIT(vdcp);
-		}
 		VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
 		VDC_DUMP_DRING_MSG(dring_msg);
 		DMSG(vdcp, 0, "[%d] DATA NACK\n", vdcp->instance);

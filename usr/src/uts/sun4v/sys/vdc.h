@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_VDC_H
@@ -100,6 +99,7 @@ extern "C" {
 #define	VDC_OP_ERRCHK_BACKEND	0x02	/* check backend on error */
 #define	VDC_OP_ERRCHK_CONFLICT	0x04	/* check resv conflict on error */
 #define	VDC_OP_DRING_RESERVED	0x08	/* use dring reserved entry */
+#define	VDC_OP_RESUBMIT		0x10	/* I/O is being resubmitted */
 
 #define	VDC_OP_ERRCHK	(VDC_OP_ERRCHK_BACKEND | VDC_OP_ERRCHK_CONFLICT)
 #define	VDC_OP_NORMAL	(VDC_OP_STATE_RUNNING | VDC_OP_ERRCHK)
@@ -123,16 +123,12 @@ extern "C" {
 	VDSK_EFI_DEV_SET(dev, vdsk, ioctl,	\
 	    (vdsk)->vdisk_bsize, (vdsk)->vdisk_size)
 
-/*
- * variables controlling how long to wait before timing out and how many
- * retries to attempt before giving up when communicating with vds.
- *
- * These values need to be sufficiently large so that a guest can survive
- * the reboot of the service domain.
- */
-#define	VDC_RETRIES	10
+/* max number of handshake retries per server */
+#define	VDC_HSHAKE_RETRIES	3
 
-#define	VDC_USEC_TIMEOUT_MIN	(30 * MICROSEC)		/* 30 sec */
+/* minimum number of attribute negotiations before handshake failure */
+#define	VDC_HATTR_MIN_INITIAL	3
+#define	VDC_HATTR_MIN		1
 
 /*
  * This macro returns the number of Hz that the vdc driver should wait before
@@ -216,6 +212,7 @@ typedef enum vdc_service_state {
  */
 typedef enum vdc_lc_state {
 	VDC_LC_ATTACHING,	/* driver is attaching */
+	VDC_LC_ONLINE_PENDING,	/* driver is attached, handshake pending */
 	VDC_LC_ONLINE,		/* driver is attached and online */
 	VDC_LC_DETACHING	/* driver is detaching */
 } vdc_lc_state_t;
@@ -282,6 +279,9 @@ typedef struct vdc_server {
 	ldc_handle_t		ldc_handle;		/* Server LDC handle */
 	ldc_status_t		ldc_state;		/* Server LDC state */
 	uint64_t		ctimeout;		/* conn tmout (secs) */
+	uint_t			hshake_cnt;		/* handshakes count */
+	uint_t			hattr_cnt;		/* attr. neg. count */
+	uint_t			hattr_total;		/* attr. neg. total */
 } vdc_server_t;
 
 /*
@@ -300,8 +300,8 @@ typedef struct vdc {
 
 	int		initialized;	/* keeps track of what's init'ed */
 	vdc_lc_state_t	lifecycle;	/* Current state of the vdc instance */
+	uint_t		hattr_min;	/* min. # attribute negotiations */
 
-	int		hshake_cnt;	/* number of failed handshakes */
 	uint8_t		open[OTYPCNT];	/* mask of opened slices */
 	uint8_t		open_excl;	/* mask of exclusively opened slices */
 	ulong_t		open_lyr[V_NUMPAR]; /* number of layered opens */
