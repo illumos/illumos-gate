@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -28,8 +27,6 @@
 
 #ifndef	_SYS_FS_UDF_INODE_H
 #define	_SYS_FS_UDF_INODE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
 
@@ -634,19 +631,18 @@ int32_t		ud_putapage(struct vnode *, page_t *, u_offset_t *,
 /*
  * udf_inode.c
  */
-int32_t		ud_iget(struct vfs *, uint16_t, uint32_t,
-			struct ud_inode **, struct buf *, struct cred *);
-void		ud_iinactive(struct ud_inode *, struct cred *);
-void		ud_iupdat(struct ud_inode *, int32_t);
-int32_t		ud_itrunc(struct ud_inode *, u_offset_t, int32_t,
-			struct cred *);
-int32_t		ud_iaccess(struct ud_inode *, int32_t, struct cred *);
-int32_t		ud_iflush(struct vfs *);
-void		ud_imark(struct ud_inode *);
-void		ud_itimes_nolock(struct ud_inode *);
-void		ud_delcache(struct ud_inode *);
-void		ud_idrop(struct ud_inode *);
-void		ud_init_inodes(void);
+int32_t	ud_iget(struct vfs *, uint16_t, uint32_t, struct ud_inode **,
+    struct buf *, struct cred *);
+void	ud_iinactive(struct ud_inode *, struct cred *);
+void	ud_iupdat(struct ud_inode *, int32_t);
+int32_t	ud_itrunc(struct ud_inode *, u_offset_t, int32_t, struct cred *);
+int32_t	ud_iaccess(struct ud_inode *, int32_t, struct cred *, int dolock);
+int32_t	ud_iflush(struct vfs *);
+void	ud_imark(struct ud_inode *);
+void	ud_itimes_nolock(struct ud_inode *);
+void	ud_delcache(struct ud_inode *);
+void	ud_idrop(struct ud_inode *);
+void	ud_init_inodes(void);
 
 
 /*

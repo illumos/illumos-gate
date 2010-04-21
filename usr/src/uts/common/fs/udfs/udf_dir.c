@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -148,7 +145,7 @@ restart:
 	if (dip->i_type != VDIR) {
 		return (ENOTDIR);
 	}
-	if (error = ud_iaccess(dip, IEXEC, cr)) {
+	if (error = ud_iaccess(dip, IEXEC, cr, 1)) {
 		return (error);
 	}
 
@@ -162,7 +159,7 @@ restart:
 	}
 	namelen = strlen(namep);
 	if ((namelen == 1) &&
-		(namep[0] == '.') && (namep[1] == '\0')) {
+	    (namep[0] == '.') && (namep[1] == '\0')) {
 		/* Current directory */
 		VN_HOLD(dvp);
 		*ipp = dip;
@@ -209,7 +206,7 @@ recheck:
 	while (adhoc_search--) {
 		while (offset < end) {
 			error = ud_get_next_fid(dip, &fbp,
-					offset, &fid, &fname, buf);
+			    offset, &fid, &fname, buf);
 			if (error != 0) {
 				break;
 			}
@@ -222,33 +219,32 @@ recheck:
 					dummy[2] = '\0';
 				} else {
 					if ((error = ud_uncompress(
-						fid->fid_idlen, &id_len,
-						fname, dname)) != 0) {
+					    fid->fid_idlen, &id_len,
+					    fname, dname)) != 0) {
 						break;
 					}
 					fname = (uint8_t *)dname;
 					fname[id_len] = '\0';
 				}
 				if ((namelen == id_len) &&
-					(strncmp(namep, (caddr_t)fname,
-							namelen) == 0)) {
+				    (strncmp(namep, (caddr_t)fname,
+				    namelen) == 0)) {
 					uint32_t loc;
 					uint16_t prn;
 
 
 					loc = SWAP_32(fid->fid_icb.lad_ext_loc);
 					prn = SWAP_16(fid->fid_icb.lad_ext_prn);
-					dip->i_diroff = offset +
-							FID_LEN(fid);
+					dip->i_diroff = offset + FID_LEN(fid);
 
 					if (doingchk) {
 						if ((loc == old_loc) &&
-							(prn == old_prn)) {
+						    (prn == old_prn)) {
 							goto checkok;
 						} else {
 							if (fbp != NULL) {
 								fbrelse(fbp,
-								S_READ);
+								    S_READ);
 								fbp = NULL;
 							}
 							VN_RELE(ITOV(*ipp));
@@ -259,8 +255,8 @@ recheck:
 					}
 
 					if (namelen == 2 &&
-						fname[0] == '.' &&
-						fname[1] == '.') {
+					    fname[0] == '.' &&
+					    fname[1] == '.') {
 
 						struct timespec32 omtime;
 
@@ -268,19 +264,19 @@ recheck:
 						rw_exit(&dip->i_rwlock);
 
 						error = ud_iget(dip->i_vfs, prn,
-							loc, ipp, NULL, cr);
+						    loc, ipp, NULL, cr);
 
 						rw_enter(&dip->i_rwlock,
-							RW_READER);
+						    RW_READER);
 
 						if (error) {
 							goto done;
 						}
 
 						if ((omtime.tv_sec !=
-							dip->i_mtime.tv_sec) ||
-							(omtime.tv_nsec !=
-							dip->i_mtime.tv_nsec)) {
+						    dip->i_mtime.tv_sec) ||
+						    (omtime.tv_nsec !=
+						    dip->i_mtime.tv_nsec)) {
 
 							doingchk = 1;
 							old_prn = prn;
@@ -288,7 +284,7 @@ recheck:
 							dip->i_diroff = 0;
 							if (fbp != NULL) {
 								fbrelse(fbp,
-								S_READ);
+								    S_READ);
 								fbp = NULL;
 							}
 							goto recheck;
@@ -296,12 +292,12 @@ recheck:
 					} else {
 
 						error = ud_iget(dip->i_vfs, prn,
-							loc, ipp, NULL, cr);
+						    loc, ipp, NULL, cr);
 					}
 checkok:
 					if (error == 0) {
 						dnlc_enter(dvp, namep,
-							ITOV(*ipp));
+						    ITOV(*ipp));
 					}
 					goto done;
 				}
@@ -435,7 +431,7 @@ ud_direnter(
 	/*
 	 * Execute access is required to search the directory.
 	 */
-	if (err = ud_iaccess(tdp, IEXEC, cr)) {
+	if (err = ud_iaccess(tdp, IEXEC, cr, 1)) {
 		goto out2;
 	}
 	/*
@@ -456,7 +452,7 @@ ud_direnter(
 		if ((sip->i_type == VDIR) && (sdp != tdp)) {
 			uint32_t blkno;
 
-			if ((err = ud_iaccess(sip, IWRITE, cr))) {
+			if ((err = ud_iaccess(sip, IWRITE, cr, 0))) {
 				rw_exit(&sip->i_contents);
 				goto out2;
 			}
@@ -476,7 +472,7 @@ ud_direnter(
 	buf = kmem_zalloc(udf_vfsp->udf_lbsize, KM_SLEEP);
 	rw_enter(&tdp->i_contents, RW_WRITER);
 	if (err = ud_dircheckforname(tdp,
-			namep, namlen, &slot, &tip, buf, cr)) {
+	    namep, namlen, &slot, &tip, buf, cr)) {
 		goto out;
 	}
 	if (tip) {
@@ -492,7 +488,7 @@ ud_direnter(
 				break;
 			case DE_RENAME :
 				err = ud_dirrename(sdp, sip, tdp, tip,
-						namep, buf, &slot, cr);
+				    namep, buf, &slot, cr);
 				/*
 				 * We used to VN_RELE() here, but this
 				 * was moved down so that we could send
@@ -512,7 +508,7 @@ ud_direnter(
 		 * The entry does not exist. Check write permission in
 		 * directory to see if entry can be created.
 		 */
-		if (err = ud_iaccess(tdp, IWRITE, cr)) {
+		if (err = ud_iaccess(tdp, IWRITE, cr, 0)) {
 			goto out;
 		}
 		if ((op == DE_CREATE) || (op == DE_MKDIR)) {
@@ -662,7 +658,7 @@ ud_dirremove(
 	 * Access for write is interpreted as allowing
 	 * deletion of files in the directory.
 	 */
-	if (err = ud_iaccess(dp, IEXEC|IWRITE, cr)) {
+	if (err = ud_iaccess(dp, IEXEC|IWRITE, cr, 1)) {
 		return (err);
 	}
 
@@ -670,8 +666,8 @@ ud_dirremove(
 
 	rw_enter(&dp->i_contents, RW_WRITER);
 
-	if (err = ud_dircheckforname(dp,
-			namep, namelen, &slot, &ip, buf, cr)) {
+	if (err = ud_dircheckforname(dp, namep, namelen, &slot, &ip,
+	    buf, cr)) {
 		goto out_novfs;
 	}
 	if (ip == NULL) {
@@ -726,7 +722,7 @@ ud_dirremove(
 		} else if (ip->i_type != VDIR) {
 			err = ENOTDIR;
 		} else if ((ip->i_nlink != 1) ||
-			(!ud_dirempty(ip, dp->i_uniqid, cr))) {
+		    (!ud_dirempty(ip, dp->i_uniqid, cr))) {
 			/*
 			 * Directories do not have an
 			 * entry for "." so only one link
@@ -791,7 +787,7 @@ ud_dirremove(
 		}
 
 		ud_make_tag(dp->i_udf, &fid->fid_tag,
-			UD_FILE_ID_DESC, tbno, FID_LEN(fid));
+		    UD_FILE_ID_DESC, tbno, FID_LEN(fid));
 
 		err = ud_write_fid(dp, &slot, buf);
 	}
@@ -908,7 +904,7 @@ ud_dircheckforname(struct ud_inode *tdp,
 
 		temp = 1024; /* set to size of dname allocated above */
 		if ((error = ud_compress(namelen, &temp,
-				(uint8_t *)namep, dname)) != 0) {
+		    (uint8_t *)namep, dname)) != 0) {
 			goto end;
 		}
 		sz_req = F_LEN + temp;
@@ -917,26 +913,25 @@ ud_dircheckforname(struct ud_inode *tdp,
 
 	while (offset < dirsize) {
 		if ((error = ud_get_next_fid(tdp, &fbp,
-				offset, &fid, &nm, buf)) != 0) {
+		    offset, &fid, &nm, buf)) != 0) {
 			break;
 		}
 		if ((error = ud_uncompress(fid->fid_idlen,
-				&id_len, nm, dname)) != 0) {
+		    &id_len, nm, dname)) != 0) {
 			break;
 		}
 		if ((fid->fid_flags & FID_DELETED) == 0) {
 			/* Check for name match */
 			if (((namelen == id_len) &&
-				(strncmp(namep, (caddr_t)dname, namelen) ==
-							0)) ||
-				((fid->fid_flags & FID_PARENT) &&
-				(namep[0] == '.' &&
-					(namelen == 1 ||
-					(namelen == 2 && namep[1] == '.'))))) {
+			    (strncmp(namep, (caddr_t)dname, namelen) == 0)) ||
+			    ((fid->fid_flags & FID_PARENT) &&
+			    (namep[0] == '.' &&
+			    (namelen == 1 ||
+			    (namelen == 2 && namep[1] == '.'))))) {
 
 				tdp->i_diroff = offset;
 				if ((fid->fid_flags & FID_PARENT) &&
-					(namelen == 1) && (namep[0] == '.')) {
+				    (namelen == 1) && (namep[0] == '.')) {
 					struct vnode *vp = ITOV(tdp);
 
 					*ipp = tdp;
@@ -948,7 +943,7 @@ ud_dircheckforname(struct ud_inode *tdp,
 					prn = SWAP_16(fid->fid_icb.lad_ext_prn);
 					loc = SWAP_32(fid->fid_icb.lad_ext_loc);
 					if ((error = ud_iget(tdp->i_vfs, prn,
-						loc, ipp, NULL, cr)) != 0) {
+					    loc, ipp, NULL, cr)) != 0) {
 
 						fbrelse(fbp, S_OTHER);
 						goto end;
@@ -968,8 +963,7 @@ ud_dircheckforname(struct ud_inode *tdp,
 			 * empty slot and the current slot
 			 * matches
 			 */
-			if ((slotp->status != FOUND) ||
-				(matched == 0)) {
+			if ((slotp->status != FOUND) || (matched == 0)) {
 				sz = FID_LEN(fid);
 				if (sz == sz_req) {
 					slotp->status = FOUND;
@@ -978,8 +972,8 @@ ud_dircheckforname(struct ud_inode *tdp,
 				}
 				if (matched == 0) {
 					if ((namelen == id_len) &&
-						(strncmp(namep, (caddr_t)dname,
-						namelen) == 0)) {
+					    (strncmp(namep, (caddr_t)dname,
+					    namelen) == 0)) {
 						matched = 1;
 						slotp->status = FOUND;
 						slotp->offset = offset;
@@ -1006,7 +1000,7 @@ ud_dircheckforname(struct ud_inode *tdp,
 			slotp->size = tdp->i_max_emb - tdp->i_size;
 		} else {
 			slotp->size = udf_vfsp->udf_lbsize -
-				slotp->offset & udf_vfsp->udf_lbmask;
+			    slotp->offset & udf_vfsp->udf_lbmask;
 		}
 		slotp->endoff = 0;
 	}
@@ -1053,9 +1047,8 @@ ud_dirempty(struct ud_inode *ip, uint64_t ino, struct cred *cr)
 		 */
 
 		rcount = sizeof (struct file_id);
-		error = ud_rdwri(UIO_READ, FREAD,
-				ip, addr, rcount, off,
-				UIO_SYSSPACE, &count, cr);
+		error = ud_rdwri(UIO_READ, FREAD, ip, addr, rcount, off,
+		    UIO_SYSSPACE, &count, cr);
 		if ((error != 0) || (count != 0)) {
 			empty = 0;
 			break;
@@ -1084,9 +1077,8 @@ ud_dirempty(struct ud_inode *ip, uint64_t ino, struct cred *cr)
 		 */
 
 		rcount = FID_LEN(fid);
-		error = ud_rdwri(UIO_READ, FREAD,
-				ip, addr, rcount, off,
-				UIO_SYSSPACE, &count, cr);
+		error = ud_rdwri(UIO_READ, FREAD, ip, addr, rcount, off,
+		    UIO_SYSSPACE, &count, cr);
 		if ((error != 0) || (count != 0)) {
 			empty = 0;
 			break;
@@ -1160,7 +1152,7 @@ ud_dircheckpath(int32_t blkno,
 	 */
 	for (;;) {
 		if ((err = fbread(ITOV(ip), 0,
-			udf_vfsp->udf_lbsize, S_READ, &fbp)) != 0) {
+		    udf_vfsp->udf_lbsize, S_READ, &fbp)) != 0) {
 			break;
 		}
 
@@ -1188,8 +1180,8 @@ ud_dircheckpath(int32_t blkno,
 		}
 		prn = SWAP_16(fid->fid_icb.lad_ext_prn);
 		lbno = SWAP_32(fid->fid_icb.lad_ext_loc);
-		parent_icb_loc = ud_xlate_to_daddr(udf_vfsp,
-				prn, lbno, 1, &dummy);
+		parent_icb_loc =
+		    ud_xlate_to_daddr(udf_vfsp, prn, lbno, 1, &dummy);
 		ASSERT(dummy == 1);
 		if (parent_icb_loc == blkno) {
 			err = EINVAL;
@@ -1333,7 +1325,7 @@ ud_diraddentry(struct ud_inode *tdp, char *namep,
 
 	temp = udf_vfsp->udf_lbsize - F_LEN;
 	if ((error = ud_compress(namelen, &temp,
-			(uint8_t *)namep, fid->fid_spec)) == 0) {
+	    (uint8_t *)namep, fid->fid_spec)) == 0) {
 		fid->fid_idlen = (uint8_t)temp;
 		error = ud_dirprepareentry(tdp, slotp, buf, cr);
 	}
@@ -1366,13 +1358,13 @@ ud_dirmakedirect(struct ud_inode *ip,
 	parent_len = sizeof (struct file_id);
 
 	if ((ip->i_desc_type != ICB_FLAG_ONE_AD) ||
-		(parent_len > ip->i_max_emb)) {
+	    (parent_len > ip->i_max_emb)) {
 		ASSERT(ip->i_ext);
 		/*
 		 * Allocate space for the directory we're creating.
 		 */
 		if ((err = ud_alloc_space(ip->i_vfs, ip->i_icb_prn,
-				0, 1, &blkno, &size, 0, 0)) != 0) {
+		    0, 1, &blkno, &size, 0, 0)) != 0) {
 			return (err);
 		}
 		/*
@@ -1414,7 +1406,7 @@ ud_dirmakedirect(struct ud_inode *ip,
 	 */
 	rw_exit(&ip->i_contents);
 	if ((err = fbread(ITOV(ip), (offset_t)0,
-			ip->i_udf->udf_lbsize, S_WRITE, &fbp)) != 0) {
+	    ip->i_udf->udf_lbsize, S_WRITE, &fbp)) != 0) {
 		rw_enter(&ip->i_contents, RW_WRITER);
 		return (err);
 	}
@@ -1435,7 +1427,7 @@ ud_dirmakedirect(struct ud_inode *ip,
 
 	if ((err = ud_ip_off2bno(ip, 0, &tbno)) == 0) {
 		ud_make_tag(ip->i_udf, &fid->fid_tag,
-			UD_FILE_ID_DESC, tbno, FID_LEN(fid));
+		    UD_FILE_ID_DESC, tbno, FID_LEN(fid));
 	}
 
 	err = ud_fbwrite(fbp, ip);
@@ -1456,6 +1448,7 @@ ud_dirrename(struct ud_inode *sdp, struct ud_inode *sip,
 	ASSERT(sdp->i_udf != NULL);
 	ASSERT(MUTEX_HELD(&sdp->i_udf->udf_rename_lck));
 	ASSERT(RW_WRITE_HELD(&tdp->i_rwlock));
+	ASSERT(RW_WRITE_HELD(&tdp->i_contents));
 	ASSERT(buf);
 	ASSERT(slotp->ep);
 
@@ -1486,7 +1479,7 @@ ud_dirrename(struct ud_inode *sdp, struct ud_inode *sip,
 	/*
 	 * Must have write permission to rewrite target entry.
 	 */
-	if ((error = ud_iaccess(tdp, IWRITE, cr)) != 0 ||
+	if ((error = ud_iaccess(tdp, IWRITE, cr, 0)) != 0 ||
 	    (error = ud_sticky_remove_access(tdp, tip, cr)) != 0)
 		goto out;
 
@@ -1538,7 +1531,7 @@ ud_dirrename(struct ud_inode *sdp, struct ud_inode *sip,
 	dnlc_enter(ITOV(tdp), namep, ITOV(sip));
 
 	ud_make_tag(tdp->i_udf, &fid->fid_tag, UD_FILE_ID_DESC,
-			SWAP_32(fid->fid_tag.tag_loc), FID_LEN(fid));
+	    SWAP_32(fid->fid_tag.tag_loc), FID_LEN(fid));
 
 	error = ud_write_fid(tdp, slotp, buf);
 
@@ -1641,8 +1634,7 @@ ud_dirprepareentry(struct ud_inode *dp,
 
 	ASSERT(RW_WRITE_HELD(&dp->i_rwlock));
 
-	ASSERT((slotp->status == NONE) ||
-		(slotp->status == FOUND));
+	ASSERT((slotp->status == NONE) || (slotp->status == FOUND));
 
 	ud_printf("ud_dirprepareentry\n");
 	lbsize = dp->i_udf->udf_lbsize;
@@ -1673,8 +1665,8 @@ ud_dirprepareentry(struct ud_inode *dp,
 			old_dtype = dp->i_desc_type;
 			old_size = (uint32_t)dp->i_size;
 			error = ud_bmap_write(dp, slotp->offset,
-				blkoff(dp->i_udf, slotp->offset) + entrysize,
-				0, cr);
+			    blkoff(dp->i_udf, slotp->offset) + entrysize,
+			    0, cr);
 			if (error != 0) {
 				return (error);
 			}
@@ -1687,12 +1679,12 @@ ud_dirprepareentry(struct ud_inode *dp,
 				 * than one lbsize to handle here
 				 */
 				if ((error = ud_ip_off2bno(dp,
-						0, &tbno)) != 0) {
+				    0, &tbno)) != 0) {
 					return (error);
 				}
 				if ((error = fbread(ITOV(dp), 0,
-						dp->i_udf->udf_lbsize,
-						S_WRITE, &fbp)) != 0) {
+				    dp->i_udf->udf_lbsize,
+				    S_WRITE, &fbp)) != 0) {
 					return (error);
 				}
 				off = 0;
@@ -1700,10 +1692,11 @@ ud_dirprepareentry(struct ud_inode *dp,
 					struct file_id *tfid;
 
 					tfid = (struct file_id *)
-						(fbp->fb_addr + off);
+					    (fbp->fb_addr + off);
 
 					ud_make_tag(dp->i_udf, &tfid->fid_tag,
-					UD_FILE_ID_DESC, tbno, FID_LEN(tfid));
+					    UD_FILE_ID_DESC, tbno,
+					    FID_LEN(tfid));
 
 					off += FID_LEN(tfid);
 				}
@@ -1716,7 +1709,7 @@ ud_dirprepareentry(struct ud_inode *dp,
 			if (dp->i_desc_type != ICB_FLAG_ONE_AD) {
 				ASSERT(dp->i_ext);
 				dp->i_ext[dp->i_ext_used - 1].ib_count +=
-						entrysize;
+				    entrysize;
 			}
 		}
 		dp->i_size += entrysize;
@@ -1730,8 +1723,8 @@ ud_dirprepareentry(struct ud_inode *dp,
 	if ((error = ud_ip_off2bno(dp, slotp->offset, &tbno)) != 0) {
 		return (error);
 	}
-	ud_make_tag(dp->i_udf, &fid->fid_tag,
-			UD_FILE_ID_DESC, tbno, FID_LEN(fid));
+	ud_make_tag(dp->i_udf, &fid->fid_tag, UD_FILE_ID_DESC,
+	    tbno, FID_LEN(fid));
 
 	/*
 	 * fbread cannot cross a
@@ -1739,7 +1732,7 @@ ud_dirprepareentry(struct ud_inode *dp,
 	 */
 	offset = slotp->offset;
 	if ((error = fbread(ITOV(dp), offset & mask, lbsize,
-				S_WRITE, &fbp)) != 0) {
+	    S_WRITE, &fbp)) != 0) {
 		return (error);
 	}
 	if ((offset & mask) != ((offset + entrysize) & mask)) {
@@ -1755,7 +1748,7 @@ ud_dirprepareentry(struct ud_inode *dp,
 
 	if (entrysize > count) {
 		if ((error = fbread(ITOV(dp), (offset + entrysize) & mask,
-				lbsize, S_WRITE, &fbp)) != 0) {
+		    lbsize, S_WRITE, &fbp)) != 0) {
 			return (error);
 		}
 		bcopy((caddr_t)(buf + count), fbp->fb_addr, entrysize - count);
@@ -1793,10 +1786,10 @@ ud_dirfixdotdot(struct ud_inode *dp,
 	ASSERT(RW_WRITE_HELD(&npdp->i_rwlock));
 
 	err = fbread(ITOV(dp), (offset_t)0,
-			dp->i_udf->udf_lbsize, S_WRITE, &fbp);
+	    dp->i_udf->udf_lbsize, S_WRITE, &fbp);
 
 	if (err || dp->i_nlink == 0 ||
-		dp->i_size < sizeof (struct file_id)) {
+	    dp->i_size < sizeof (struct file_id)) {
 		goto bad;
 	}
 
@@ -1815,8 +1808,8 @@ ud_dirfixdotdot(struct ud_inode *dp,
 	}
 
 	loc = ud_xlate_to_daddr(dp->i_udf,
-		SWAP_16(fid->fid_icb.lad_ext_prn),
-		SWAP_32(fid->fid_icb.lad_ext_loc), 1, &dummy);
+	    SWAP_16(fid->fid_icb.lad_ext_prn),
+	    SWAP_32(fid->fid_icb.lad_ext_loc), 1, &dummy);
 	ASSERT(dummy == 1);
 	if (loc == npdp->i_icb_lbano) {
 		goto bad;
@@ -1843,7 +1836,7 @@ ud_dirfixdotdot(struct ud_inode *dp,
 	fid->fid_icb.lad_ext_loc = SWAP_32(npdp->i_icb_block);
 	fid->fid_icb.lad_ext_prn = SWAP_16(npdp->i_icb_prn);
 	ud_make_tag(npdp->i_udf, &fid->fid_tag,
-		UD_FILE_ID_DESC, tbno, FID_LEN(fid));
+	    UD_FILE_ID_DESC, tbno, FID_LEN(fid));
 	dnlc_enter(ITOV(dp), "..", ITOV(npdp));
 
 	err = ud_fbwrite(fbp, dp);
@@ -1896,12 +1889,11 @@ ud_write_fid(struct ud_inode *dp, struct slot *slot, uint8_t *buf)
 	lbmask = dp->i_udf->udf_lbmask;
 
 	if (((uint8_t *)fid >= buf) &&
-		((uint8_t *)fid < &buf[udf_vfsp->udf_lbsize])) {
-
+	    ((uint8_t *)fid < &buf[udf_vfsp->udf_lbsize])) {
 
 		if ((error = fbread(ITOV(dp),
-			(offset_t)(slot->offset & ~lbmask),
-			lbsize, S_WRITE, &lfbp)) != 0) {
+		    (offset_t)(slot->offset & ~lbmask),
+		    lbsize, S_WRITE, &lfbp)) != 0) {
 			goto out;
 		}
 
@@ -1947,7 +1939,7 @@ ud_write_fid(struct ud_inode *dp, struct slot *slot, uint8_t *buf)
 		if ((error = ud_fbwrite(slot->fbp, dp)) != 0) {
 			fid->fid_flags &= ~FID_DELETED;
 			ud_make_tag(dp->i_udf, &fid->fid_tag, UD_FILE_ID_DESC,
-				SWAP_32(fid->fid_tag.tag_loc), FID_LEN(fid));
+			    SWAP_32(fid->fid_tag.tag_loc), FID_LEN(fid));
 		}
 	}
 	slot->fbp = NULL;

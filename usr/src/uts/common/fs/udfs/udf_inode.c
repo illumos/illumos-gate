@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -147,11 +143,10 @@ ud_search_icache(struct vfs *vfsp, uint16_t prn, uint32_t ploc)
 	hno = UD_INOHASH(vfsp->vfs_dev, loc);
 	ih = &ud_ihead[hno];
 	for (ip = ih->ih_chain[0];
-			ip != (struct ud_inode *)ih;
-			ip = ip->i_forw) {
-		if ((prn == ip->i_icb_prn) &&
-			(ploc == ip->i_icb_block) &&
-			(vfsp->vfs_dev == ip->i_dev)) {
+	    ip != (struct ud_inode *)ih;
+	    ip = ip->i_forw) {
+		if ((prn == ip->i_icb_prn) && (ploc == ip->i_icb_block) &&
+		    (vfsp->vfs_dev == ip->i_dev)) {
 			mutex_exit(&ud_icache_lock);
 			return (ip);
 		}
@@ -196,12 +191,12 @@ loop:
 
 	ih = &ud_ihead[hno];
 	for (ip = ih->ih_chain[0];
-			ip != (struct ud_inode *)ih;
-			ip = ip->i_forw) {
+	    ip != (struct ud_inode *)ih;
+	    ip = ip->i_forw) {
 
 		if ((prn == ip->i_icb_prn) &&
-			(ploc == ip->i_icb_block) &&
-			(vfsp->vfs_dev == ip->i_dev)) {
+		    (ploc == ip->i_icb_block) &&
+		    (vfsp->vfs_dev == ip->i_dev)) {
 
 			vp = ITOV(ip);
 			VN_HOLD(vp);
@@ -261,8 +256,8 @@ tryagain:
 	 * it has attached pages. Otherwise, make a new one.
 	 */
 	if (udf_ifreeh &&
-		(nomem || !vn_has_cached_data(ITOV(udf_ifreeh)) ||
-		ud_cur_inodes >= ud_max_inodes)) {
+	    (nomem || !vn_has_cached_data(ITOV(udf_ifreeh)) ||
+	    ud_cur_inodes >= ud_max_inodes)) {
 
 		mutex_exit(&ud_nino_lock);
 		ip = udf_ifreeh;
@@ -305,14 +300,14 @@ tryagain:
 
 		if (ip->i_ext) {
 			kmem_free(ip->i_ext,
-				sizeof (struct icb_ext) * ip->i_ext_count);
+			    sizeof (struct icb_ext) * ip->i_ext_count);
 			ip->i_ext = 0;
 			ip->i_ext_count = ip->i_ext_used = 0;
 		}
 
 		if (ip->i_con) {
 			kmem_free(ip->i_con,
-				sizeof (struct icb_ext) * ip->i_con_count);
+			    sizeof (struct icb_ext) * ip->i_con_count);
 			ip->i_con = 0;
 			ip->i_con_count = ip->i_con_used = ip->i_con_read = 0;
 		}
@@ -334,7 +329,7 @@ tryagain:
 		 * before releasing memory.
 		 */
 		ip = (struct ud_inode *)kmem_zalloc(sizeof (struct ud_inode),
-				KM_NOSLEEP);
+		    KM_NOSLEEP);
 		vp = vn_alloc(KM_NOSLEEP);
 		if ((ip == NULL) || (vp == NULL)) {
 			mutex_enter(&udf_ifree_lock);
@@ -351,8 +346,8 @@ tryagain:
 				if (ip == NULL)
 					ip = (struct ud_inode *)
 					    kmem_zalloc(
-						sizeof (struct ud_inode),
-						KM_SLEEP);
+					    sizeof (struct ud_inode),
+					    KM_SLEEP);
 				if (vp == NULL)
 					vp = vn_alloc(KM_SLEEP);
 			}
@@ -427,8 +422,8 @@ read_de:
 		bp = pbp;
 	} else {
 		bp = ud_bread(ip->i_dev,
-			ip->i_icb_lbano << udf_vfsp->udf_l2d_shift,
-			udf_vfsp->udf_lbsize);
+		    ip->i_icb_lbano << udf_vfsp->udf_l2d_shift,
+		    udf_vfsp->udf_lbsize);
 	}
 
 	/*
@@ -440,9 +435,9 @@ read_de:
 	    ip->i_icb_block, 1, udf_vfsp->udf_lbsize) != 0)) {
 
 		if (((bp->b_flags & B_ERROR) == 0) &&
-			(ftype == STRAT_TYPE4096)) {
+		    (ftype == STRAT_TYPE4096)) {
 			if (ud_check_te_unrec(udf_vfsp,
-				bp->b_un.b_addr, ip->i_icb_block) == 0) {
+			    bp->b_un.b_addr, ip->i_icb_block) == 0) {
 
 				brelse(bp);
 
@@ -457,14 +452,13 @@ read_de:
 				 * reread old file entry
 				 */
 				bp = ud_bread(ip->i_dev,
-					old_lbano << udf_vfsp->udf_l2d_shift,
-					udf_vfsp->udf_lbsize);
+				    old_lbano << udf_vfsp->udf_l2d_shift,
+				    udf_vfsp->udf_lbsize);
 				if ((bp->b_flags & B_ERROR) == 0) {
 					fe = (struct file_entry *)
-						bp->b_un.b_addr;
+					    bp->b_un.b_addr;
 					if (ud_verify_tag_and_desc(&fe->fe_tag,
-					    UD_FILE_ENTRY, ip->i_icb_block,
-					    1,
+					    UD_FILE_ENTRY, ip->i_icb_block, 1,
 					    udf_vfsp->udf_lbsize) == 0) {
 						goto end_4096;
 					}
@@ -541,9 +535,9 @@ error_ret:
 		 * IE is supposed to be in the next block
 		 * of DE
 		 */
-		ibp = ud_bread(ip->i_dev, (ip->i_icb_lbano + 1) <<
-				udf_vfsp->udf_l2d_shift,
-				udf_vfsp->udf_lbsize);
+		ibp = ud_bread(ip->i_dev,
+		    (ip->i_icb_lbano + 1) << udf_vfsp->udf_l2d_shift,
+		    udf_vfsp->udf_lbsize);
 		if (ibp->b_flags & B_ERROR) {
 			/*
 			 * Get rid of current ibp and
@@ -556,18 +550,16 @@ ie_error:
 
 		ie = (struct indirect_entry *)ibp->b_un.b_addr;
 		if (ud_verify_tag_and_desc(&ie->ie_tag,
-		    UD_INDIRECT_ENT,
-		    ip->i_icb_block + 1,
+		    UD_INDIRECT_ENT, ip->i_icb_block + 1,
 		    1, udf_vfsp->udf_lbsize) == 0) {
 			struct long_ad *lad;
-
 
 			lad = &ie->ie_indirecticb;
 			ip->i_icb_prn = SWAP_16(lad->lad_ext_prn);
 			ip->i_icb_block = SWAP_32(lad->lad_ext_loc);
 			ip->i_icb_lbano = ud_xlate_to_daddr(udf_vfsp,
-				ip->i_icb_prn, ip->i_icb_block,
-				1, &dummy);
+			    ip->i_icb_prn, ip->i_icb_block,
+			    1, &dummy);
 			brelse(ibp);
 			brelse(bp);
 			goto read_de;
@@ -578,7 +570,7 @@ ie_error:
 		 * are at the last entry
 		 */
 		if (ud_check_te_unrec(udf_vfsp, ibp->b_un.b_addr,
-				ip->i_icb_block + 1) != 0) {
+		    ip->i_icb_block + 1) != 0) {
 			/*
 			 * This is not an unrecorded block
 			 * Check if it a valid IE and
@@ -606,8 +598,7 @@ end_4096:
 		ip->i_gid = ud_default_gid;
 	}
 	ip->i_perm = SWAP_32(fe->fe_perms) & 0xFFFF;
-	if (fe->fe_icb_tag.itag_strategy ==
-			SWAP_16(STRAT_TYPE4096)) {
+	if (fe->fe_icb_tag.itag_strategy == SWAP_16(STRAT_TYPE4096)) {
 		ip->i_perm &= ~(IWRITE | (IWRITE >> 5) | (IWRITE >> 10));
 	}
 
@@ -623,17 +614,14 @@ end_4096:
 	ip->i_uniqid = SWAP_64(fe->fe_uniq_id);
 	icb_tag_flags = SWAP_16(fe->fe_icb_tag.itag_flags);
 
-
 	if ((fe->fe_icb_tag.itag_ftype == FTYPE_CHAR_DEV) ||
-		(fe->fe_icb_tag.itag_ftype == FTYPE_BLOCK_DEV)) {
+	    (fe->fe_icb_tag.itag_ftype == FTYPE_BLOCK_DEV)) {
 
 		eah = (struct ext_attr_hdr *)fe->fe_spec;
 		ea_off = GET_32(&eah->eah_ial);
 		ea_len = GET_32(&fe->fe_len_ear);
 		if (ea_len && (ud_verify_tag_and_desc(&eah->eah_tag,
-		    UD_EXT_ATTR_HDR,
-		    ip->i_icb_block,
-		    1,
+		    UD_EXT_ATTR_HDR, ip->i_icb_block, 1,
 		    sizeof (struct file_entry) -
 		    offsetof(struct file_entry, fe_spec)) == 0)) {
 
@@ -646,7 +634,9 @@ end_4096:
 				if ((ea_len - ea_off) <
 				    sizeof (struct attr_hdr)) {
 					cmn_err(CE_NOTE,
-"ea_len(0x%x) - ea_off(0x%x) is too small to hold attr. info. blockno 0x%x\n",
+					    "ea_len(0x%x) - ea_off(0x%x) is "
+					    "too small to hold attr. info. "
+					    "blockno 0x%x\n",
 					    ea_len, ea_off, ip->i_icb_block);
 					goto error_ret;
 				}
@@ -659,16 +649,20 @@ end_4096:
 					(ah->ahdr_astype == 1)) {
 					struct dev_spec_ear *ds;
 
-				    if ((ea_len - ea_off) <
-					sizeof (struct dev_spec_ear)) {
-					cmn_err(CE_NOTE,
-"ea_len(0x%x) - ea_off(0x%x) is too small to hold dev_spec_ear. blockno 0x%x\n",
-					    ea_len, ea_off, ip->i_icb_block);
-					goto error_ret;
-				    }
-				    ds = (struct dev_spec_ear *)ah;
-				    ip->i_major = GET_32(&ds->ds_major_id);
-				    ip->i_minor = GET_32(&ds->ds_minor_id);
+					if ((ea_len - ea_off) <
+					    sizeof (struct dev_spec_ear)) {
+						cmn_err(CE_NOTE,
+						    "ea_len(0x%x) - "
+						    "ea_off(0x%x) is too small "
+						    "to hold dev_spec_ear."
+						    " blockno 0x%x\n",
+						    ea_len, ea_off,
+						    ip->i_icb_block);
+						goto error_ret;
+					}
+					ds = (struct dev_spec_ear *)ah;
+					ip->i_major = GET_32(&ds->ds_major_id);
+					ip->i_minor = GET_32(&ds->ds_minor_id);
 				}
 
 				/*
@@ -733,22 +727,21 @@ end_4096:
 
 		ip->i_ext_used = 0;
 		ip->i_ext_count = ndesc =
-			SWAP_32(fe->fe_len_adesc) / sizeof (struct short_ad);
-		ip->i_ext_count = ((ip->i_ext_count / EXT_PER_MALLOC) + 1) *
-					EXT_PER_MALLOC;
+		    SWAP_32(fe->fe_len_adesc) / sizeof (struct short_ad);
+		ip->i_ext_count =
+		    ((ip->i_ext_count / EXT_PER_MALLOC) + 1) * EXT_PER_MALLOC;
 		ip->i_ext = (struct icb_ext  *)kmem_zalloc(ip->i_ext_count *
-					sizeof (struct icb_ext), KM_SLEEP);
+		    sizeof (struct icb_ext), KM_SLEEP);
 		ip->i_cur_max_ext = ip->i_max_emb / sizeof (struct short_ad);
 		ip->i_cur_max_ext --;
 
-
 		if ((ip->i_astrat != STRAT_TYPE4) &&
-			(ip->i_astrat != STRAT_TYPE4096)) {
+		    (ip->i_astrat != STRAT_TYPE4096)) {
 			goto error_ret;
 		}
 
 		sad = (struct short_ad *)
-				(fe->fe_spec + SWAP_32(fe->fe_len_ear));
+		    (fe->fe_spec + SWAP_32(fe->fe_len_ear));
 		iext = ip->i_ext;
 		while (ndesc --) {
 			length = SWAP_32(sad->sad_ext_len);
@@ -761,9 +754,9 @@ end_4096:
 					ip->i_con_used = 0;
 					ip->i_con_read = 0;
 					ip->i_con = kmem_zalloc(
-						ip->i_con_count *
-						sizeof (struct icb_ext),
-						KM_SLEEP);
+					    ip->i_con_count *
+					    sizeof (struct icb_ext),
+					    KM_SLEEP);
 				}
 				con = &ip->i_con[ip->i_con_used];
 				con->ib_prn = 0;
@@ -782,7 +775,7 @@ end_4096:
 			iext->ib_marker1 = (uint32_t)0xAAAAAAAA;
 			iext->ib_marker2 = (uint32_t)0xBBBBBBBB;
 			offset += (iext->ib_count + udf_vfsp->udf_lbmask) &
-					(~udf_vfsp->udf_lbmask);
+			    (~udf_vfsp->udf_lbmask);
 
 			iext->ib_flags = (length >> 30) & IB_MASK;
 
@@ -796,22 +789,22 @@ end_4096:
 
 		ip->i_ext_used = 0;
 		ip->i_ext_count = ndesc =
-			SWAP_32(fe->fe_len_adesc) / sizeof (struct long_ad);
-		ip->i_ext_count = ((ip->i_ext_count / EXT_PER_MALLOC) + 1) *
-					EXT_PER_MALLOC;
+		    SWAP_32(fe->fe_len_adesc) / sizeof (struct long_ad);
+		ip->i_ext_count =
+		    ((ip->i_ext_count / EXT_PER_MALLOC) + 1) * EXT_PER_MALLOC;
 		ip->i_ext = (struct icb_ext  *)kmem_zalloc(ip->i_ext_count *
-					sizeof (struct icb_ext), KM_SLEEP);
+		    sizeof (struct icb_ext), KM_SLEEP);
 
 		ip->i_cur_max_ext = ip->i_max_emb / sizeof (struct long_ad);
 		ip->i_cur_max_ext --;
 
 		if ((ip->i_astrat != STRAT_TYPE4) &&
-			(ip->i_astrat != STRAT_TYPE4096)) {
+		    (ip->i_astrat != STRAT_TYPE4096)) {
 			goto error_ret;
 		}
 
 		lad = (struct long_ad *)
-				(fe->fe_spec + SWAP_32(fe->fe_len_ear));
+		    (fe->fe_spec + SWAP_32(fe->fe_len_ear));
 		iext = ip->i_ext;
 		while (ndesc --) {
 			length = SWAP_32(lad->lad_ext_len);
@@ -824,9 +817,9 @@ end_4096:
 					ip->i_con_used = 0;
 					ip->i_con_read = 0;
 					ip->i_con = kmem_zalloc(
-						ip->i_con_count *
-						sizeof (struct icb_ext),
-						KM_SLEEP);
+					    ip->i_con_count *
+					    sizeof (struct icb_ext),
+					    KM_SLEEP);
 				}
 				con = &ip->i_con[ip->i_con_used];
 				con->ib_prn = SWAP_16(lad->lad_ext_prn);
@@ -844,7 +837,7 @@ end_4096:
 			iext->ib_marker1 = (uint32_t)0xAAAAAAAA;
 			iext->ib_marker2 = (uint32_t)0xBBBBBBBB;
 			offset += (iext->ib_count + udf_vfsp->udf_lbmask) &
-				(~udf_vfsp->udf_lbmask);
+			    (~udf_vfsp->udf_lbmask);
 
 			iext->ib_flags = (length >> 30) & IB_MASK;
 
@@ -861,7 +854,7 @@ end_4096:
 	} else {
 		/* Not to be used in UDF 1.50 */
 		cmn_err(CE_NOTE, "Invalid Allocation Descriptor type %x\n",
-				ip->i_desc_type);
+		    ip->i_desc_type);
 		goto error_ret;
 	}
 
@@ -968,8 +961,7 @@ ud_iinactive(struct ud_inode *ip, struct cred *cr)
 		cmn_err(CE_WARN, "ud_iinactive: v_count < 1\n");
 		return;
 	}
-	if ((vp->v_count > 1) ||
-		((ip->i_flag & IREF) == 0)) {
+	if ((vp->v_count > 1) || ((ip->i_flag & IREF) == 0)) {
 		vp->v_count--;		/* release our hold from vn_rele */
 		mutex_exit(&vp->v_lock);
 		rw_exit(&ip->i_contents);
@@ -1185,8 +1177,8 @@ ud_iupdat(struct ud_inode *ip, int32_t waitfor)
 		}
 
 		bp = ud_bread(ip->i_dev,
-			ip->i_icb_lbano << udf_vfsp->udf_l2d_shift,
-			ip->i_udf->udf_lbsize);
+		    ip->i_icb_lbano << udf_vfsp->udf_l2d_shift,
+		    ip->i_udf->udf_lbsize);
 		if (bp->b_flags & B_ERROR) {
 			brelse(bp);
 			return;
@@ -1246,16 +1238,15 @@ ud_iupdat(struct ud_inode *ip, int32_t waitfor)
 		ud_update_regid(&fe->fe_impl_id);
 
 		crc_len = ((uint32_t)&((struct file_entry *)0)->fe_spec) +
-				SWAP_32(fe->fe_len_ear);
+		    SWAP_32(fe->fe_len_ear);
 		if (ip->i_desc_type == ICB_FLAG_ONE_AD) {
 			crc_len += ip->i_size;
 			fe->fe_len_adesc = SWAP_32(((uint32_t)ip->i_size));
-		} else if ((ip->i_size != 0) &&
-				(ip->i_ext != NULL) &&
-				(ip->i_ext_used != 0)) {
+		} else if ((ip->i_size != 0) && (ip->i_ext != NULL) &&
+		    (ip->i_ext_used != 0)) {
 
 			if ((error = ud_read_icb_till_off(ip,
-					ip->i_size)) == 0) {
+			    ip->i_size)) == 0) {
 				if (ip->i_astrat == STRAT_TYPE4) {
 					error = ud_updat_ext4(ip, fe);
 				} else if (ip->i_astrat == STRAT_TYPE4096) {
@@ -1274,10 +1265,10 @@ ud_iupdat(struct ud_inode *ip, int32_t waitfor)
 		 * Zero out the rest of the block
 		 */
 		bzero(bp->b_un.b_addr + crc_len,
-			ip->i_udf->udf_lbsize - crc_len);
+		    ip->i_udf->udf_lbsize - crc_len);
 
 		ud_make_tag(ip->i_udf, &fe->fe_tag,
-			UD_FILE_ENTRY, ip->i_icb_block, crc_len);
+		    UD_FILE_ENTRY, ip->i_icb_block, crc_len);
 
 
 		if (waitfor) {
@@ -1308,8 +1299,8 @@ ud_iupdat(struct ud_inode *ip, int32_t waitfor)
 		 * (synchronous) disk update, flush the inode.
 		 */
 		if (waitfor && (flag & IBDWRITE)) {
-			blkflush(ip->i_dev, (daddr_t)
-				fsbtodb(udf_vfsp, ip->i_icb_lbano));
+			blkflush(ip->i_dev,
+			    (daddr_t)fsbtodb(udf_vfsp, ip->i_icb_lbano));
 			ip->i_flag &= ~(IBDWRITE);
 		}
 	}
@@ -1330,16 +1321,16 @@ ud_updat_ext4(struct ud_inode *ip, struct file_entry *fe)
 	ASSERT(ip);
 	ASSERT(fe);
 	ASSERT((ip->i_desc_type == ICB_FLAG_SHORT_AD) ||
-			(ip->i_desc_type == ICB_FLAG_LONG_AD));
+	    (ip->i_desc_type == ICB_FLAG_LONG_AD));
 
 	if (ip->i_desc_type == ICB_FLAG_SHORT_AD) {
 		elen = sizeof (struct short_ad);
 		sad = (struct short_ad *)
-			(fe->fe_spec + SWAP_32(fe->fe_len_ear));
+		    (fe->fe_spec + SWAP_32(fe->fe_len_ear));
 	} else if (ip->i_desc_type == ICB_FLAG_LONG_AD) {
 		elen = sizeof (struct long_ad);
 		lad = (struct long_ad *)
-			(fe->fe_spec + SWAP_32(fe->fe_len_ear));
+		    (fe->fe_spec + SWAP_32(fe->fe_len_ear));
 	} else {
 		/* This cannot happen return */
 		return (EINVAL);
@@ -1368,8 +1359,7 @@ ud_updat_ext4(struct ud_inode *ip, struct file_entry *fe)
 				 * into the file_entry
 				 */
 				count = ndent - 1;
-				fe->fe_len_adesc =
-					SWAP_32(ndent * elen);
+				fe->fe_len_adesc = SWAP_32(ndent * elen);
 				bp = NULL;
 
 				/*
@@ -1383,12 +1373,12 @@ ud_updat_ext4(struct ud_inode *ip, struct file_entry *fe)
 				icon = &ip->i_con[con_index];
 
 				bno = ud_xlate_to_daddr(ip->i_udf,
-					icon->ib_prn, icon->ib_block,
-					icon->ib_count >>
-					ip->i_udf->udf_l2d_shift, &dummy);
-				bp = ud_bread(ip->i_dev, bno  <<
-						ip->i_udf->udf_l2d_shift,
-						ip->i_udf->udf_lbsize);
+				    icon->ib_prn, icon->ib_block,
+				    icon->ib_count >> ip->i_udf->udf_l2d_shift,
+				    &dummy);
+				bp = ud_bread(ip->i_dev,
+				    bno << ip->i_udf->udf_l2d_shift,
+				    ip->i_udf->udf_lbsize);
 				if (bp->b_flags & B_ERROR) {
 					brelse(bp);
 					return (EIO);
@@ -1399,7 +1389,7 @@ ud_updat_ext4(struct ud_inode *ip, struct file_entry *fe)
 				 * this time
 				 */
 				count = (bp->b_bcount -
-					sizeof (struct alloc_ext_desc)) / elen;
+				    sizeof (struct alloc_ext_desc)) / elen;
 				if (count > (ip->i_ext_used - index)) {
 					count = ip->i_ext_used - index;
 				} else {
@@ -1423,8 +1413,8 @@ ud_updat_ext4(struct ud_inode *ip, struct file_entry *fe)
 			if (ip->i_desc_type == ICB_FLAG_SHORT_AD) {
 				if (index != 0) {
 					sad = (struct short_ad *)
-						(bp->b_un.b_addr +
-						sizeof (struct alloc_ext_desc));
+					    (bp->b_un.b_addr +
+					    sizeof (struct alloc_ext_desc));
 				}
 				ud_make_sad(iext, sad, count);
 				sad += count;
@@ -1434,8 +1424,8 @@ ud_updat_ext4(struct ud_inode *ip, struct file_entry *fe)
 			} else {
 				if (index != 0) {
 					lad = (struct long_ad *)
-						(bp->b_un.b_addr +
-						sizeof (struct alloc_ext_desc));
+					    (bp->b_un.b_addr +
+					    sizeof (struct alloc_ext_desc));
 				}
 				ud_make_lad(iext, lad, count);
 				lad += count;
@@ -1458,14 +1448,14 @@ ud_updat_ext4(struct ud_inode *ip, struct file_entry *fe)
 				aed->aed_len_aed = SWAP_32(sz);
 				if (con_index == 1) {
 					aed->aed_rev_ael =
-						SWAP_32(ip->i_icb_block);
+					    SWAP_32(ip->i_icb_block);
 				} else {
 					aed->aed_rev_ael =
-						SWAP_32(oicon->ib_block);
+					    SWAP_32(oicon->ib_block);
 				}
 				sz += sizeof (struct alloc_ext_desc);
 				ud_make_tag(ip->i_udf, &aed->aed_tag,
-					UD_ALLOC_EXT_DESC, oicon->ib_block, sz);
+				    UD_ALLOC_EXT_DESC, oicon->ib_block, sz);
 			}
 
 			/*
@@ -1492,7 +1482,7 @@ ud_updat_ext4(struct ud_inode *ip, struct file_entry *fe)
 			icon = &ip->i_con[con_index];
 			count = (icon->ib_count + lbmask) >> l2b;
 			ud_free_space(ip->i_udf->udf_vfs, icon->ib_prn,
-					icon->ib_block, count);
+			    icon->ib_block, count);
 			count = (count << l2b) - sizeof (struct alloc_ext_desc);
 			ip->i_cur_max_ext -= (count / elen) - 1;
 		}
@@ -1520,7 +1510,7 @@ ud_make_sad(struct icb_ext *iext, struct short_ad *sad, int32_t count)
 		ASSERT(count > 0);
 		while (index < count) {
 			scount = (iext->ib_count & 0x3FFFFFFF) |
-					(iext->ib_flags << 30);
+			    (iext->ib_flags << 30);
 			sad->sad_ext_len = SWAP_32(scount);
 			sad->sad_ext_loc = SWAP_32(iext->ib_block);
 			sad++;
@@ -1544,7 +1534,7 @@ ud_make_lad(struct icb_ext *iext, struct long_ad *lad, int32_t count)
 		while (index < count) {
 			lad->lad_ext_prn = SWAP_16(iext->ib_prn);
 			scount = (iext->ib_count & 0x3FFFFFFF) |
-				(iext->ib_flags << 30);
+			    (iext->ib_flags << 30);
 			lad->lad_ext_len = SWAP_32(scount);
 			lad->lad_ext_loc = SWAP_32(iext->ib_block);
 			lad++;
@@ -1562,7 +1552,7 @@ ud_make_lad(struct icb_ext *iext, struct long_ad *lad, int32_t count)
 /* ARGSUSED */
 int
 ud_itrunc(struct ud_inode *oip, u_offset_t length,
-	int32_t flags, struct cred *cr)
+    int32_t flags, struct cred *cr)
 {
 	int32_t error, boff;
 	off_t bsize;
@@ -1586,7 +1576,7 @@ ud_itrunc(struct ud_inode *oip, u_offset_t length,
 		return (0);
 	}
 	if ((mode != VREG) && (mode != VDIR) &&
-		(!(mode == VLNK && length == 0))) {
+	    (!(mode == VLNK && length == 0))) {
 		return (EINVAL);
 	}
 	if (length == oip->i_size) {
@@ -1607,7 +1597,7 @@ ud_itrunc(struct ud_inode *oip, u_offset_t length,
 		 */
 		if (boff == 0) {
 			error = ud_bmap_write(oip, length - 1,
-				(int)bsize, 0, cr);
+			    (int)bsize, 0, cr);
 		} else {
 			error = ud_bmap_write(oip, length - 1, boff, 0, cr);
 		}
@@ -1623,7 +1613,7 @@ ud_itrunc(struct ud_inode *oip, u_offset_t length,
 			 */
 			if ((boff = blkoff(udf_vfsp, osize)) != 0) {
 				pvn_vpzero(ITOV(oip), osize,
-						(uint32_t)(bsize - boff));
+				    (uint32_t)(bsize - boff));
 			}
 			mutex_enter(&oip->i_tlock);
 			oip->i_flag |= ICHG;
@@ -1642,7 +1632,7 @@ ud_itrunc(struct ud_inode *oip, u_offset_t length,
 	 */
 	if (boff == 0) {
 		(void) pvn_vplist_dirty(ITOV(oip), length,
-				ud_putapage, B_INVAL | B_TRUNC, CRED());
+		    ud_putapage, B_INVAL | B_TRUNC, CRED());
 	} else {
 		/*
 		 * Make sure that the last block is properly allocated.
@@ -1658,7 +1648,7 @@ ud_itrunc(struct ud_inode *oip, u_offset_t length,
 		pvn_vpzero(ITOV(oip), length, (uint32_t)(bsize - boff));
 
 		(void) pvn_vplist_dirty(ITOV(oip), length,
-				ud_putapage, B_INVAL | B_TRUNC, CRED());
+		    ud_putapage, B_INVAL | B_TRUNC, CRED());
 	}
 
 
@@ -1701,7 +1691,7 @@ ud_trunc_ext4(struct ud_inode *ip, u_offset_t length)
 	uint32_t con_freed;
 
 	ASSERT((ip->i_desc_type == ICB_FLAG_SHORT_AD) ||
-			(ip->i_desc_type == ICB_FLAG_LONG_AD));
+	    (ip->i_desc_type == ICB_FLAG_LONG_AD));
 
 	if (ip->i_ext_used == 0) {
 		return;
@@ -1724,7 +1714,7 @@ ud_trunc_ext4(struct ud_inode *ip, u_offset_t length)
 		 */
 		ext_beg = iext->ib_offset;
 		ext_end = iext->ib_offset +
-			((iext->ib_count + lbmask) & ~lbmask);
+		    ((iext->ib_count + lbmask) & ~lbmask);
 
 		/*
 		 * This is the extent that has offset "length"
@@ -1732,8 +1722,7 @@ ud_trunc_ext4(struct ud_inode *ip, u_offset_t length)
 		 * remember the index. We can use
 		 * it to free blocks
 		 */
-		if ((length <= ext_end) &&
-			(length >= ext_beg)) {
+		if ((length <= ext_end) && (length >= ext_beg)) {
 			text = *iext;
 
 			iext->ib_count = length - ext_beg;
@@ -1747,7 +1736,7 @@ ud_trunc_ext4(struct ud_inode *ip, u_offset_t length)
 	if (ip->i_ext_used != index) {
 		if (iext->ib_flags != IB_UN_RE_AL) {
 			ip->i_lbr +=
-			((iext->ib_count + lbmask) & ~lbmask) >> l2b;
+			    ((iext->ib_count + lbmask) & ~lbmask) >> l2b;
 		}
 	}
 
@@ -1764,9 +1753,9 @@ ud_trunc_ext4(struct ud_inode *ip, u_offset_t length)
 		count = (ext_end - length) >> l2b;
 		if (count) {
 			loc = text.ib_block +
-			(((length - text.ib_offset) + lbmask) >> l2b);
+			    (((length - text.ib_offset) + lbmask) >> l2b);
 			ud_free_space(ip->i_udf->udf_vfs, text.ib_prn,
-					loc, count);
+			    loc, count);
 		}
 	}
 	for (index = ip->i_ext_used; index < ext_used; index++) {
@@ -1774,7 +1763,7 @@ ud_trunc_ext4(struct ud_inode *ip, u_offset_t length)
 		if (iext->ib_flags != IB_UN_RE_AL) {
 			count = (iext->ib_count + lbmask) >> l2b;
 			ud_free_space(ip->i_udf->udf_vfs, iext->ib_prn,
-					iext->ib_block, count);
+			    iext->ib_block, count);
 		}
 		bzero(iext, sizeof (struct icb_ext));
 		continue;
@@ -1806,8 +1795,8 @@ ud_trunc_ext4(struct ud_inode *ip, u_offset_t length)
 		for (index = 0; index < ip->i_con_used; index++) {
 			icon = &ip->i_con[index];
 			nient = icon->ib_count -
-				(sizeof (struct alloc_ext_desc) + elen);
-				/* Header + 1 indirect extent */
+			    (sizeof (struct alloc_ext_desc) + elen);
+			/* Header + 1 indirect extent */
 			nient /= elen;
 			if (ecount) {
 				if (ecount > nient) {
@@ -1817,10 +1806,9 @@ ud_trunc_ext4(struct ud_inode *ip, u_offset_t length)
 				}
 			} else {
 				count = ((icon->ib_count + lbmask) &
-						~lbmask) >> l2b;
+				    ~lbmask) >> l2b;
 				ud_free_space(ip->i_udf->udf_vfs,
-					icon->ib_prn, icon->ib_block,
-					count);
+				    icon->ib_prn, icon->ib_block, count);
 				con_freed++;
 				ip->i_cur_max_ext -= nient;
 			}
@@ -1937,12 +1925,14 @@ ud_iflush(struct vfs *vfsp)
  * function will check for privileges.
  */
 int
-ud_iaccess(struct ud_inode *ip, int32_t mode, struct cred *cr)
+ud_iaccess(struct ud_inode *ip, int32_t mode, struct cred *cr, int dolock)
 {
 	int shift = 0;
-/*
- *	ASSERT(RW_READ_HELD(&ip->i_contents));
- */
+	int ret = 0;
+
+	if (dolock)
+		rw_enter(&ip->i_contents, RW_READER);
+	ASSERT(RW_LOCK_HELD(&ip->i_contents));
 
 	ud_printf("ud_iaccess\n");
 	if (mode & IWRITE) {
@@ -1955,7 +1945,8 @@ ud_iaccess(struct ud_inode *ip, int32_t mode, struct cred *cr)
 			if ((ip->i_type != VCHR) &&
 			    (ip->i_type != VBLK) &&
 			    (ip->i_type != VFIFO)) {
-				return (EROFS);
+				ret = EROFS;
+				goto out;
 			}
 		}
 	}
@@ -1975,10 +1966,15 @@ ud_iaccess(struct ud_inode *ip, int32_t mode, struct cred *cr)
 	mode &= ~(ip->i_perm << shift);
 
 	if (mode == 0)
-		return (0);
+		goto out;
 
-	return (secpolicy_vnode_access(cr, ITOV(ip), ip->i_uid,
-							UD2VA_PERM(mode)));
+	ret = secpolicy_vnode_access(cr, ITOV(ip), ip->i_uid,
+	    UD2VA_PERM(mode));
+
+out:
+	if (dolock)
+		rw_exit(&ip->i_contents);
+	return (ret);
 }
 
 void
@@ -2139,20 +2135,18 @@ ud_remove_from_free_list(struct ud_inode *ip, uint32_t at)
 		}
 		if (found != 1) {
 			cmn_err(CE_WARN, "ip %p is found %x times\n",
-				(void *)ip,  found);
+			    (void *)ip,  found);
 		}
 	}
 #endif
 
-	if ((ip->i_freef == NULL) &&
-		(ip->i_freeb == NULL)) {
+	if ((ip->i_freef == NULL) && (ip->i_freeb == NULL)) {
 		if (ip != udf_ifreeh) {
 			return;
 		}
 	}
 
-	if ((at == UD_BEGIN) ||
-		(ip == udf_ifreeh)) {
+	if ((at == UD_BEGIN) || (ip == udf_ifreeh)) {
 		udf_ifreeh = ip->i_freef;
 		if (ip->i_freef == NULL) {
 			udf_ifreet = NULL;

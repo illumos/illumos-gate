@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -479,7 +478,7 @@ udf_getattr(
 static int
 ud_iaccess_vmode(void *ip, int mode, struct cred *cr)
 {
-	return (ud_iaccess(ip, UD_UPERM2DPERM(mode), cr));
+	return (ud_iaccess(ip, UD_UPERM2DPERM(mode), cr, 0));
 }
 
 /*ARGSUSED4*/
@@ -555,7 +554,7 @@ udf_setattr(
 			error = EISDIR;
 			goto update_inode;
 		}
-		if (error = ud_iaccess(ip, IWRITE, cr)) {
+		if (error = ud_iaccess(ip, IWRITE, cr, 0)) {
 			goto update_inode;
 		}
 		if (vap->va_size > MAXOFFSET_T) {
@@ -611,7 +610,6 @@ udf_access(
 	caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
-	int32_t error;
 
 	ud_printf("udf_access\n");
 
@@ -619,9 +617,7 @@ udf_access(
 		return (EIO);
 	}
 
-	error = ud_iaccess(ip, UD_UPERM2DPERM(mode), cr);
-
-	return (error);
+	return (ud_iaccess(ip, UD_UPERM2DPERM(mode), cr, 1));
 }
 
 int32_t udfs_stickyhack = 1;
@@ -663,7 +659,7 @@ udf_lookup(
 		/*
 		 * Check accessibility of directory.
 		 */
-		if ((error = ud_iaccess(ip, IEXEC, cr)) != 0) {
+		if ((error = ud_iaccess(ip, IEXEC, cr, 1)) != 0) {
 			VN_RELE(vp);
 		}
 		xip = VTOI(vp);
@@ -762,7 +758,7 @@ udf_create(
 				error = EISDIR;
 			} else if (mode) {
 				error = ud_iaccess(ip,
-				    UD_UPERM2DPERM(mode), cr);
+				    UD_UPERM2DPERM(mode), cr, 0);
 			} else {
 				error = 0;
 			}
@@ -952,7 +948,7 @@ udf_rename(
 	 */
 	rw_enter(&sdp->i_contents, RW_READER);
 	rw_enter(&sip->i_contents, RW_READER);
-	if ((error = ud_iaccess(sdp, IWRITE, cr)) != 0 ||
+	if ((error = ud_iaccess(sdp, IWRITE, cr, 0)) != 0 ||
 	    (error = ud_sticky_remove_access(sdp, sip, cr)) != 0) {
 		rw_exit(&sip->i_contents);
 		rw_exit(&sdp->i_contents);

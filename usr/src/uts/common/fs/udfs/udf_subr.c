@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -1866,11 +1863,13 @@ ud_sticky_remove_access(struct ud_inode *dir, struct ud_inode *entry,
 {
 	uid_t uid;
 
+	ASSERT(RW_LOCK_HELD(&entry->i_contents));
+
 	if ((dir->i_char & ISVTX) &&
 	    (uid = crgetuid(cr)) != dir->i_uid &&
 	    uid != entry->i_uid &&
 	    (entry->i_type != VREG ||
-	    ud_iaccess(entry, IWRITE, cr) != 0))
+	    ud_iaccess(entry, IWRITE, cr, 0) != 0))
 		return (secpolicy_vnode_remove(cr));
 
 	return (0);
