@@ -19,9 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights
+# reserved.
 #
 
 #
@@ -304,7 +303,7 @@ $(K5MECHLINK):	$(ROOTLIBDIR)/$(LIBLINKS)$(VERS)
 $(K5MECHLINK64):	$(ROOTLIBDIR64)/$(LIBLINKS)$(VERS)
 	$(INS.liblink2)
 
-LDLIBS += -lgss -lsocket -lresolv -lc -lpkcs11 -lnsl
+LDLIBS += -lgss -lsocket -lresolv -lc -lpkcs11 -lnsl -lkstat
 # -z ignore causes linker to ignore unneeded dependencies.  This is
 #  needed because -lnsl is only used if DEBUG is defined.
 DYNFLAGS += $(ZIGNORE)

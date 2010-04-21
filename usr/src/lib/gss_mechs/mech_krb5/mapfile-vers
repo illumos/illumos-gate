@@ -19,9 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights
+# reserved.
 #
 
 #
@@ -625,6 +624,7 @@ SUNWprivate_1.1 {
 	krb5_rc_register_type;
 	krb5_rc_resolve;
 	krb5_rc_resolve_full;
+	krb5_rc_store;
 	krb5_rd_cred;
 	krb5_rd_error;
 	krb5_rd_priv;
