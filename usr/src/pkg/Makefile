@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -460,6 +459,7 @@ repository-metadata: publish_pkgs
 	$(PKGDEBUG)for r in $(REPOS); do \
 		/usr/lib/pkg.depotd -d $(PKGDEST)/repo.$$r \
 			--add-content --exit-ready; \
+		chmod a+r $(PKGDEST)/repo.$$r/cfg_cache; \
 	done
 
 #
