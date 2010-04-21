@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sunddi.h>
@@ -67,45 +66,20 @@ amd_iommu_get_src_bdf(amd_iommu_t *iommu, int32_t bdf, int32_t *src_bdfp)
 	amd_iommu_acpi_ivhd_t *hinfop;
 
 	hinfop = amd_iommu_lookup_ivhd(bdf);
-	if (hinfop == NULL || hinfop->ach_src_deviceid == -1)
-		*src_bdfp = bdf;
-	else
-		*src_bdfp = hinfop->ach_src_deviceid;
-
-	return (DDI_SUCCESS);
-}
-
-static dev_info_t *
-amd_iommu_pci_dip(dev_info_t *rdip, const char *path)
-{
-	dev_info_t *pdip;
-	const char *driver = ddi_driver_name(rdip);
-	int instance = ddi_get_instance(rdip);
-	const char *f = "amd_iommu_pci_dip";
-
-	/* Hold rdip so it and its parents don't go away */
-	ndi_hold_devi(rdip);
-
-	if (ddi_is_pci_dip(rdip))
-		return (rdip);
-
-	pdip = rdip;
-	while (pdip = ddi_get_parent(pdip)) {
-		if (ddi_is_pci_dip(pdip)) {
-			ndi_hold_devi(pdip);
-			ndi_rele_devi(rdip);
-			return (pdip);
+	if (hinfop == NULL) {
+		if (bdf == -1) {
+			*src_bdfp = bdf;
+		} else {
+			cmn_err(CE_WARN, "No IVHD entry for 0x%x", bdf);
+			return (DDI_FAILURE);
 		}
+	} else if (hinfop->ach_src_deviceid == -1) {
+		*src_bdfp = bdf;
+	} else {
+		*src_bdfp = hinfop->ach_src_deviceid;
 	}
 
-	cmn_err(CE_WARN, "%s: %s%d dip = %p has no PCI parent, path = %s",
-	    f, driver, instance, (void *)rdip, path);
-
-	ndi_rele_devi(rdip);
-
-	ASSERT(0);
-
-	return (NULL);
+	return (DDI_SUCCESS);
 }
 
 /*ARGSUSED*/
@@ -381,14 +355,12 @@ init_devtbl(amd_iommu_t *iommu, uint64_t *devtbl_entry, domain_id_t domainid,
 
 	entry[3] = 0;
 	entry[2] = 0;
-	AMD_IOMMU_REG_SET64(&(entry[1]), AMD_IOMMU_DEVTBL_SYSMGT, 1);
 	AMD_IOMMU_REG_SET64(&(entry[1]), AMD_IOMMU_DEVTBL_EX, 1);
 	AMD_IOMMU_REG_SET64(&(entry[1]), AMD_IOMMU_DEVTBL_SD, 0);
 	AMD_IOMMU_REG_SET64(&(entry[1]), AMD_IOMMU_DEVTBL_CACHE, 0);
 	AMD_IOMMU_REG_SET64(&(entry[1]), AMD_IOMMU_DEVTBL_IOCTL, 1);
 	AMD_IOMMU_REG_SET64(&(entry[1]), AMD_IOMMU_DEVTBL_SA, 0);
 	AMD_IOMMU_REG_SET64(&(entry[1]), AMD_IOMMU_DEVTBL_SE, 1);
-	AMD_IOMMU_REG_SET64(&(entry[1]), AMD_IOMMU_DEVTBL_IOTLB, 1);
 	AMD_IOMMU_REG_SET64(&(entry[1]), AMD_IOMMU_DEVTBL_DOMAINID,
 	    (uint16_t)domainid);
 	AMD_IOMMU_REG_SET64(&(entry[0]), AMD_IOMMU_DEVTBL_IW, 1);
@@ -1597,7 +1569,7 @@ amd_iommu_map_pa2va(amd_iommu_t *iommu, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 		}
 
 		if (amd_iommu_debug & AMD_IOMMU_DEBUG_PAGE_TABLES) {
-			cmn_err(CE_NOTE, "%s: successfuly created page tables "
+			cmn_err(CE_NOTE, "%s: successfully created page tables "
 			    "for pfn = %p, vapg = %p, path = %s",
 			    f, (void *)(uintptr_t)pfn,
 			    (void *)(uintptr_t)pg, path);

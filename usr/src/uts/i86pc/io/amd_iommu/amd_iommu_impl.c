@@ -20,11 +20,11 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sunddi.h>
+#include <sys/sunndi.h>
 #include <sys/iommulib.h>
 #include <sys/amd_iommu.h>
 #include <sys/pci_cap.h>
@@ -932,10 +932,8 @@ amd_iommu_init(dev_info_t *dip, ddi_acc_handle_t handle, int idx,
 	uint64_t pgoffset;
 	amd_iommu_acpi_global_t *global;
 	amd_iommu_acpi_ivhd_t *hinfop;
+	int bus, device, func;
 	const char *f = "amd_iommu_init";
-
-	global = amd_iommu_lookup_acpi_global();
-	hinfop = amd_iommu_lookup_any_ivhd();
 
 	low_addr32 = PCI_CAP_GET32(handle, 0, cap_base,
 	    AMD_IOMMU_CAP_ADDR_LOW_OFF);
@@ -956,6 +954,17 @@ amd_iommu_init(dev_info_t *dip, ddi_acc_handle_t handle, int idx,
 	iommu->aiomt_dip = dip;
 	iommu->aiomt_idx = idx;
 
+	if (acpica_get_bdf(iommu->aiomt_dip, &bus, &device, &func)
+	    != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: Failed to get BDF"
+		    "Unable to use IOMMU unit idx=%d - skipping ...",
+		    f, driver, instance, idx);
+		return (NULL);
+	}
+
+	iommu->aiomt_bdf = ((uint8_t)bus << 8) | ((uint8_t)device << 3) |
+	    (uint8_t)func;
+
 	/*
 	 * Since everything in the capability block is locked and RO at this
 	 * point, copy everything into the IOMMU struct
@@ -967,6 +976,9 @@ amd_iommu_init(dev_info_t *dip, ddi_acc_handle_t handle, int idx,
 	iommu->aiomt_npcache = AMD_IOMMU_REG_GET32(&caphdr,
 	    AMD_IOMMU_CAP_NPCACHE);
 	iommu->aiomt_httun = AMD_IOMMU_REG_GET32(&caphdr, AMD_IOMMU_CAP_HTTUN);
+
+	global = amd_iommu_lookup_acpi_global();
+	hinfop = amd_iommu_lookup_any_ivhd(iommu);
 
 	if (hinfop)
 		iommu->aiomt_iotlb = hinfop->ach_IotlbSup;
@@ -1134,6 +1146,15 @@ amd_iommu_init(dev_info_t *dip, ddi_acc_handle_t handle, int idx,
 	 * before setting up gfx passthru
 	 */
 	if (amd_iommu_setup_passthru(iommu) != DDI_SUCCESS) {
+		mutex_exit(&iommu->aiomt_mutex);
+		(void) amd_iommu_fini(iommu, AMD_IOMMU_TEARDOWN);
+		return (NULL);
+	}
+
+	/* Initialize device table entries based on ACPI settings */
+	if (amd_iommu_acpi_init_devtbl(iommu) !=  DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: Can't initialize device table",
+		    f, driver, instance);
 		mutex_exit(&iommu->aiomt_mutex);
 		(void) amd_iommu_fini(iommu, AMD_IOMMU_TEARDOWN);
 		return (NULL);
@@ -1349,6 +1370,43 @@ amd_iommu_teardown(dev_info_t *dip, amd_iommu_state_t *statep, int type)
 	return (error);
 }
 
+dev_info_t *
+amd_iommu_pci_dip(dev_info_t *rdip, const char *path)
+{
+	dev_info_t *pdip;
+	const char *driver = ddi_driver_name(rdip);
+	int instance = ddi_get_instance(rdip);
+	const char *f = "amd_iommu_pci_dip";
+
+	/* Hold rdip so it and its parents don't go away */
+	ndi_hold_devi(rdip);
+
+	if (ddi_is_pci_dip(rdip))
+		return (rdip);
+
+	pdip = rdip;
+	while (pdip = ddi_get_parent(pdip)) {
+		if (ddi_is_pci_dip(pdip)) {
+			ndi_hold_devi(pdip);
+			ndi_rele_devi(rdip);
+			return (pdip);
+		}
+	}
+
+	cmn_err(
+#ifdef	DEBUG
+	    CE_PANIC,
+#else
+	    CE_WARN,
+#endif	/* DEBUG */
+	    "%s: %s%d dip = %p has no PCI parent, path = %s",
+	    f, driver, instance, (void *)rdip, path);
+
+	ndi_rele_devi(rdip);
+
+	return (NULL);
+}
+
 /* Interface with IOMMULIB */
 /*ARGSUSED*/
 static int
@@ -1356,7 +1414,14 @@ amd_iommu_probe(iommulib_handle_t handle, dev_info_t *rdip)
 {
 	const char *driver = ddi_driver_name(rdip);
 	char *s;
+	int bus, device, func, bdf;
+	amd_iommu_acpi_ivhd_t *hinfop;
+	dev_info_t *pci_dip;
 	amd_iommu_t *iommu = iommulib_iommu_getdata(handle);
+	const char *f = "amd_iommu_probe";
+	int instance = ddi_get_instance(iommu->aiomt_dip);
+	const char *idriver = ddi_driver_name(iommu->aiomt_dip);
+	char *path, *pathp;
 
 	if (amd_iommu_disable_list) {
 		s = strstr(amd_iommu_disable_list, driver);
@@ -1371,7 +1436,40 @@ amd_iommu_probe(iommulib_handle_t handle, dev_info_t *rdip)
 		}
 	}
 
-	return (DDI_SUCCESS);
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	if ((pathp = ddi_pathname(rdip, path)) == NULL)
+		pathp = "<unknown>";
+
+	pci_dip = amd_iommu_pci_dip(rdip, path);
+	if (pci_dip == NULL) {
+		cmn_err(CE_WARN, "%s: %s%d: idx = %d, failed to get PCI dip "
+		    "for rdip=%p, path = %s",
+		    f, idriver, instance, iommu->aiomt_idx, (void *)rdip,
+		    pathp);
+		kmem_free(path, MAXPATHLEN);
+		return (DDI_FAILURE);
+	}
+
+	if (acpica_get_bdf(pci_dip, &bus, &device, &func) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: idx = %d, failed to get BDF "
+		    "for rdip=%p, path = %s",
+		    f, idriver, instance, iommu->aiomt_idx, (void *)rdip,
+		    pathp);
+		kmem_free(path, MAXPATHLEN);
+		return (DDI_FAILURE);
+	}
+	kmem_free(path, MAXPATHLEN);
+
+	/*
+	 * See whether device is described by IVRS as being managed
+	 * by this IOMMU
+	 */
+	bdf = ((uint8_t)bus << 8) | ((uint8_t)device << 3) | (uint8_t)func;
+	hinfop = amd_iommu_lookup_ivhd(bdf);
+	if (hinfop && hinfop->ach_IOMMU_deviceid == iommu->aiomt_bdf)
+		return (DDI_SUCCESS);
+
+	return (DDI_FAILURE);
 }
 
 /*ARGSUSED*/

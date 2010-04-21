@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "amd_iommu_acpi.h"
@@ -615,6 +614,50 @@ add_deventry_info(ivhd_t *ivhdp, ivhd_deventry_t *deventry,
 	hash[idx] = acpi_ivhdp;
 }
 
+/*
+ * A device entry may be declared implicitly as a source device ID
+ * in an alias entry. This routine adds it to the hash
+ */
+static void
+add_implicit_deventry(ivhd_container_t *ivhdcp, amd_iommu_acpi_ivhd_t **hash)
+{
+	ivhd_deventry_t *d;
+	int deviceid;
+
+	for (d = ivhdcp->ivhdc_first_deventry; d; d = d->idev_next) {
+
+		if ((d->idev_type != DEVENTRY_ALIAS_SELECT) &&
+		    (d->idev_type != DEVENTRY_ALIAS_RANGE))
+			continue;
+
+		deviceid = d->idev_src_deviceid;
+
+		if (amd_iommu_lookup_ivhd(deviceid) == NULL) {
+			ivhd_deventry_t deventry;
+
+			/* Fake a SELECT entry */
+			deventry.idev_type = DEVENTRY_SELECT;
+			deventry.idev_len = 4;
+			deventry.idev_deviceid = deviceid;
+			deventry.idev_src_deviceid = -1;
+
+			deventry.idev_Lint1Pass = d->idev_Lint1Pass;
+			deventry.idev_Lint0Pass = d->idev_Lint0Pass;
+			deventry.idev_SysMgt = d->idev_SysMgt;
+			deventry.idev_NMIPass = d->idev_NMIPass;
+			deventry.idev_ExtIntPass = d->idev_ExtIntPass;
+			deventry.idev_INITPass = d->idev_INITPass;
+
+			add_deventry_info(ivhdcp->ivhdc_ivhd, &deventry, hash);
+
+			if (amd_iommu_debug & AMD_IOMMU_DEBUG_ACPI) {
+				cmn_err(CE_NOTE, "Added implicit IVHD entry "
+				    "for: deviceid = %u", deviceid);
+			}
+		}
+	}
+}
+
 static void
 add_ivhdc_info(ivhd_container_t *ivhdcp, amd_iommu_acpi_ivhd_t **hash)
 {
@@ -625,6 +668,9 @@ add_ivhdc_info(ivhd_container_t *ivhdcp, amd_iommu_acpi_ivhd_t **hash)
 	    deventry = deventry->idev_next) {
 		add_deventry_info(ivhdp, deventry, hash);
 	}
+
+	add_implicit_deventry(ivhdcp, hash);
+
 }
 
 static void
@@ -746,6 +792,69 @@ create_acpi_hash(amd_iommu_acpi_t *acpi)
 	return (DDI_SUCCESS);
 }
 
+static void
+set_deventry(amd_iommu_t *iommu, int entry, amd_iommu_acpi_ivhd_t *hinfop)
+{
+	uint64_t *dentry;
+
+	dentry = (uint64_t *)(intptr_t)
+	    &iommu->aiomt_devtbl[entry * AMD_IOMMU_DEVTBL_ENTRY_SZ];
+
+	AMD_IOMMU_REG_SET64(&(dentry[1]), AMD_IOMMU_DEVTBL_SYSMGT,
+	    hinfop->ach_SysMgt);
+}
+
+/* Initialize device table according to IVHD */
+int
+amd_iommu_acpi_init_devtbl(amd_iommu_t *iommu)
+{
+	int i, j;
+	amd_iommu_acpi_ivhd_t *hinfop;
+
+	for (i = 0; i <= AMD_IOMMU_ACPI_INFO_HASH_SZ; i++) {
+		for (hinfop = amd_iommu_acpi_ivhd_hash[i];
+		    hinfop; hinfop = hinfop->ach_next) {
+
+			if (hinfop->ach_IOMMU_deviceid != iommu->aiomt_bdf)
+				continue;
+
+			switch (hinfop->ach_dev_type) {
+			case DEVENTRY_ALL:
+				for (j = 0; j < AMD_IOMMU_MAX_DEVICEID; j++)
+					set_deventry(iommu, j, hinfop);
+				break;
+			case DEVENTRY_SELECT:
+			case DEVENTRY_EXTENDED_SELECT:
+				set_deventry(iommu,
+				    hinfop->ach_deviceid_start,
+				    hinfop);
+				break;
+			case DEVENTRY_RANGE:
+			case DEVENTRY_EXTENDED_RANGE:
+				for (j = hinfop->ach_deviceid_start;
+				    j <= hinfop->ach_deviceid_end;
+				    j++)
+					set_deventry(iommu, j, hinfop);
+				break;
+			case DEVENTRY_ALIAS_SELECT:
+			case DEVENTRY_ALIAS_RANGE:
+			case DEVENTRY_SPECIAL_DEVICE:
+				set_deventry(iommu,
+				    hinfop->ach_src_deviceid,
+				    hinfop);
+				break;
+			default:
+				cmn_err(CE_WARN,
+				    "%s: Unknown deventry type",
+				    amd_iommu_modname);
+				return (DDI_FAILURE);
+			}
+		}
+	}
+
+	return (DDI_SUCCESS);
+}
+
 amd_iommu_acpi_global_t *
 amd_iommu_lookup_acpi_global(void)
 {
@@ -787,14 +896,15 @@ amd_iommu_lookup_all_ivmd(void)
 }
 
 amd_iommu_acpi_ivhd_t *
-amd_iommu_lookup_any_ivhd(void)
+amd_iommu_lookup_any_ivhd(amd_iommu_t *iommu)
 {
 	int i;
 	amd_iommu_acpi_ivhd_t *hinfop;
 
 	for (i = AMD_IOMMU_ACPI_INFO_HASH_SZ; i >= 0; i--) {
-		/*LINTED*/
-		if (hinfop = amd_iommu_acpi_ivhd_hash[i])
+		hinfop = amd_iommu_acpi_ivhd_hash[i];
+		if ((hinfop != NULL) &&
+		    hinfop->ach_IOMMU_deviceid == iommu->aiomt_bdf)
 			break;
 	}
 
@@ -808,8 +918,7 @@ amd_iommu_lookup_any_ivmd(void)
 	amd_iommu_acpi_ivmd_t *minfop;
 
 	for (i = AMD_IOMMU_ACPI_INFO_HASH_SZ; i >= 0; i--) {
-		/*LINTED*/
-		if (minfop = amd_iommu_acpi_ivmd_hash[i])
+		if ((minfop = amd_iommu_acpi_ivmd_hash[i]) != NULL)
 			break;
 	}
 
@@ -839,7 +948,7 @@ amd_iommu_lookup_ivhd(int32_t deviceid)
 	amd_iommu_acpi_ivhd_t *hinfop;
 	uint16_t idx;
 
-	if (amd_iommu_debug == AMD_IOMMU_DEBUG_ACPI) {
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_ACPI) {
 		cmn_err(CE_NOTE, "Attempting to get ACPI IVHD info "
 		    "for deviceid: %d", deviceid);
 	}
@@ -871,7 +980,7 @@ range:
 		    deviceid > hinfop->ach_deviceid_end)
 			continue;
 
-		if (amd_iommu_debug == AMD_IOMMU_DEBUG_ACPI) {
+		if (amd_iommu_debug & AMD_IOMMU_DEBUG_ACPI) {
 			cmn_err(CE_NOTE, "Found ACPI IVHD match: %p, "
 			    "actual deviceid = %u, start = %u, end = %u",
 			    (void *)hinfop, deviceid,
@@ -884,12 +993,10 @@ range:
 	if (idx !=  AMD_IOMMU_ACPI_INFO_HASH_SZ) {
 		idx = AMD_IOMMU_ACPI_INFO_HASH_SZ;
 		goto range;
-	} else {
-		cmn_err(CE_PANIC, "IVHD not found for deviceid: %x", deviceid);
 	}
 
 out:
-	if (amd_iommu_debug == AMD_IOMMU_DEBUG_ACPI) {
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_ACPI) {
 		cmn_err(CE_NOTE, "%u: %s ACPI IVHD %p", deviceid,
 		    hinfop ? "GOT" : "Did NOT get", (void *)hinfop);
 	}
@@ -903,7 +1010,7 @@ amd_iommu_lookup_ivmd(int32_t deviceid)
 	amd_iommu_acpi_ivmd_t *minfop;
 	uint16_t idx;
 
-	if (amd_iommu_debug == AMD_IOMMU_DEBUG_ACPI) {
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_ACPI) {
 		cmn_err(CE_NOTE, "Attempting to get ACPI IVMD info "
 		    "for deviceid: %u", deviceid);
 	}
@@ -914,7 +1021,6 @@ amd_iommu_lookup_ivmd(int32_t deviceid)
 
 	idx = deviceid_hashfn(deviceid);
 
-
 range:
 	minfop = amd_iommu_acpi_ivmd_hash[idx];
 
@@ -923,7 +1029,7 @@ range:
 		    deviceid > minfop->acm_deviceid_end)
 			continue;
 
-		if (amd_iommu_debug == AMD_IOMMU_DEBUG_ACPI) {
+		if (amd_iommu_debug & AMD_IOMMU_DEBUG_ACPI) {
 			cmn_err(CE_NOTE, "Found ACPI IVMD match: %p, "
 			    "actual deviceid = %u, start = %u, end = %u",
 			    (void *)minfop, deviceid,
@@ -937,12 +1043,10 @@ range:
 	if (idx !=  AMD_IOMMU_ACPI_INFO_HASH_SZ) {
 		idx = AMD_IOMMU_ACPI_INFO_HASH_SZ;
 		goto range;
-	} else {
-		cmn_err(CE_PANIC, "IVMD not found for deviceid: %x", deviceid);
 	}
 
 out:
-	if (amd_iommu_debug == AMD_IOMMU_DEBUG_ACPI) {
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_ACPI) {
 		cmn_err(CE_NOTE, "%u: %s ACPI IVMD info %p", deviceid,
 		    minfop ? "GOT" : "Did NOT get", (void *)minfop);
 	}

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_AMD_IOMMU_IMPL_H
@@ -343,6 +342,7 @@ typedef struct amd_iommu {
 	kmutex_t aiomt_eventlock;
 	kmutex_t aiomt_cmdlock;
 	dev_info_t *aiomt_dip;
+	uint16_t aiomt_bdf;
 	int aiomt_idx;
 	iommulib_handle_t aiomt_iommulib_handle;
 	iommulib_ops_t *aiomt_iommulib_ops;
@@ -475,6 +475,7 @@ extern char *amd_iommu_disable_list;
 extern uint64_t amd_iommu_reg_get64_workaround(uint64_t *regp, uint32_t bits);
 extern uint64_t amd_iommu_reg_set64_workaround(uint64_t *regp, uint32_t bits,
     uint64_t value);
+extern dev_info_t *amd_iommu_pci_dip(dev_info_t *rdip, const char *path);
 
 int amd_iommu_cmd(amd_iommu_t *iommu, amd_iommu_cmd_t cmd,
     amd_iommu_cmdargs_t *cmdargs, amd_iommu_cmd_flags_t flags, int lock_held);

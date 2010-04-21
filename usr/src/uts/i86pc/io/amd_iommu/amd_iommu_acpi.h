@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _AMD_IOMMU_ACPI_H
@@ -291,11 +290,12 @@ int amd_iommu_acpi_init(void);
 void amd_iommu_acpi_fini(void);
 amd_iommu_acpi_ivhd_t *amd_iommu_lookup_all_ivhd(void);
 amd_iommu_acpi_ivmd_t *amd_iommu_lookup_all_ivmd(void);
-amd_iommu_acpi_ivhd_t *amd_iommu_lookup_any_ivhd(void);
+amd_iommu_acpi_ivhd_t *amd_iommu_lookup_any_ivhd(amd_iommu_t *);
 amd_iommu_acpi_ivmd_t *amd_iommu_lookup_any_ivmd(void);
 amd_iommu_acpi_global_t *amd_iommu_lookup_acpi_global(void);
 amd_iommu_acpi_ivhd_t *amd_iommu_lookup_ivhd(int32_t deviceid);
 amd_iommu_acpi_ivmd_t *amd_iommu_lookup_ivmd(int32_t deviceid);
+int amd_iommu_acpi_init_devtbl(amd_iommu_t *iommu);
 
 #endif /* _KERNEL */
 
