@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #define	_POSIX_PTHREAD_SEMANTICS	/* for getgrnam_r */
@@ -169,6 +168,8 @@ logindevperm(const char *ttyn, uid_t uid, gid_t gid, void (*errmsg)(char *))
 	char *ptr;
 	int mode;
 	FILE *fp;
+	char ttyn_path[PATH_MAX + 1];
+	int n;
 
 	if ((fp = fopen(LOGINDEVPERM, "r")) == NULL) {
 		if (errmsg) {
@@ -180,8 +181,14 @@ logindevperm(const char *ttyn, uid_t uid, gid_t gid, void (*errmsg)(char *))
 		return (-1);
 	}
 
+	if ((n = resolvepath(ttyn, ttyn_path, PATH_MAX)) == -1)
+		return (-1);
+	ttyn_path[n] = '\0';
+
 	while (fgets(line, MAX_LINELEN, fp) != NULL) {
 		char *last;
+		char tmp[PATH_MAX + 1];
+
 		lineno++;
 
 		if ((ptr = strchr(line, '#')) != NULL)
@@ -193,21 +200,12 @@ logindevperm(const char *ttyn, uid_t uid, gid_t gid, void (*errmsg)(char *))
 		if (console == NULL)
 			continue;	/* ignore blank lines */
 
-		/*
-		 * If "console" read from /dev/logindevperm is
-		 * "/dev/vt/active", then the first user who logged into
-		 * consoles (/dev/vt/# or /dev/console) takes ownership.
-		 * Otherwise the first user who logged into "console"
-		 * takes owership.
-		 */
-		if (strcmp(console, ttyn) != 0) {
-			if (strcmp(console, "/dev/vt/active") != 0)
-				continue;	/* not our tty, skip */
-			if (strncmp(ttyn, "/dev/vt/",
-			    strlen("/dev/vt/")) != 0 && strcmp(ttyn,
-			    "/dev/console") != 0)
-				continue;	/* not our tty, skip */
-		}
+		if ((n = resolvepath(console, tmp, PATH_MAX)) == -1)
+			continue;
+		tmp[n] = '\0';
+
+		if (strcmp(ttyn_path, tmp) != 0)
+			continue;
 
 		mode_str = strtok_r(last, field_delims, &last);
 		if (mode_str == NULL) {

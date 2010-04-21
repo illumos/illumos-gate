@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 add	bus_ops::bus_add_eventcall	target	warlock_dummy
@@ -58,12 +57,14 @@ fi
 #
 readable	wc_dip
 readable	vc_active_console
+readable	vc_cons_user
 readable	vc_state::vc_flags
 
 #
 # Only called from sdev_vtops.c, will be checked in wc_devfs.wlcmd
 #
 ignore	vt_getactive
+ignore	vt_getconsuser
 ignore	vt_wc_attached
 
 #
@@ -72,7 +73,6 @@ ignore	vt_wc_attached
 ignore	vc_state::vc_acqsig
 ignore	vc_state::vc_bufcallid
 ignore	vc_state::vc_dispnum
-ignore	vc_state::vc_fb_mode
 ignore	vc_state::vc_login
 ignore	vc_state::vc_minor
 ignore	vc_state::vc_pid

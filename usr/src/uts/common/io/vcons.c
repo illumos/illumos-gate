@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1077,6 +1076,52 @@ vt_ioctl(queue_t *q, mblk_t *mp)
 		tmp->b_wptr += sizeof (int);
 		vt_copyout(q, mp, tmp, sizeof (int));
 		return;
+
+	case VT_GET_CONSUSER:
+		if (!(tmp = allocb(sizeof (int), BPRI_MED))) {
+			error = ENOMEM;
+			break;
+		}
+
+		if (vc_cons_user == VT_MINOR_INVALID) {
+			/*
+			 * Return -1 if console user link points to
+			 * /dev/console
+			 */
+			*(int *)(void *)tmp->b_rptr = -1;
+		} else {
+			*(int *)(void *)tmp->b_rptr = vc_cons_user;
+		}
+
+		tmp->b_wptr += sizeof (int);
+		vt_copyout(q, mp, tmp, sizeof (int));
+		return;
+
+	case VT_RESET_CONSUSER:
+		/* always enforce sys_devices privilege */
+		if ((error = secpolicy_console(iocp->ioc_cr)) != 0)
+			break;
+
+		/* Ensure it comes from /dev/console */
+		if (pvc->vc_minor != 0) {
+			error = ENXIO;
+			break;
+		}
+
+		mutex_enter(&vc_lock);
+		vc_cons_user = VT_MINOR_INVALID;
+		mutex_exit(&vc_lock);
+		break;
+
+	case VT_SET_CONSUSER:
+		/* always enforce sys_devices privilege */
+		if ((error = secpolicy_console(iocp->ioc_cr)) != 0)
+			break;
+
+		mutex_enter(&vc_lock);
+		vc_cons_user = pvc->vc_minor;
+		mutex_exit(&vc_lock);
+		break;
 
 	default:
 		error = ENXIO;

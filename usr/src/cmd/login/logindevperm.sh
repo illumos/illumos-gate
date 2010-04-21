@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # This is the script that generates the logindevperm file. It is
@@ -34,8 +33,7 @@
 
 cat <<EOM
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # /etc/logindevperm - login-based device permissions
 #
@@ -44,7 +42,7 @@ cat <<EOM
 # "devices" field will be set to that of the user.  Similarly, the mode
 # will be set to the mode specified in the "mode" field.
 #
-# If the "console" is "/dev/vt/active" which is a symlink to the current
+# If the "console" is "/dev/vt/console_user" which is a symlink to the current
 # active virtual console (/dev/console, or /dev/vt/#), then the first
 # user to log into any virtual console will get ownership of all the
 # devices until they log out.
@@ -60,29 +58,18 @@ cat <<EOM
 #
 # console	mode	devices
 #
-/dev/console	0600	/dev/mouse:/dev/kbd
-/dev/console	0600	/dev/kdmouse		# mouse devices
-/dev/console	0600	/dev/sound/*		# audio devices
-/dev/console	0600	/dev/fbs/*		# frame buffers
-/dev/console	0600	/dev/dri/*		# dri devices
-/dev/console	0400	/dev/removable-media/dsk/*	# removable media
-/dev/console	0400	/dev/removable-media/rdsk/*	# removable media
-/dev/console	0400	/dev/hotpluggable/dsk/*		# hotpluggable storage
-/dev/console	0400	/dev/hotpluggable/rdsk/*	# hotpluggable storage
-/dev/console	0600	/dev/video[0-9]+	# video devices
-/dev/console	0600	/dev/usb/hid[0-9]+	# hid devices should have the same permission with conskbd and consms
-/dev/console	0600	/dev/usb/[0-9a-f]+[.][0-9a-f]+/[0-9]+/* driver=scsa2usb,usb_mid,usbprn,ugen	#libusb/ugen devices
-/dev/vt/active	0600	/dev/mouse:/dev/kbd
-/dev/vt/active	0600	/dev/sound/*		# audio devices
-/dev/vt/active	0600	/dev/fbs/*		# frame buffers
-/dev/vt/active	0600	/dev/dri/*		# dri devices
-/dev/vt/active	0400	/dev/removable-media/dsk/*	# removable media
-/dev/vt/active	0400	/dev/removable-media/rdsk/*	# removable media
-/dev/vt/active	0400	/dev/hotpluggable/dsk/*		# hotpluggable storage
-/dev/vt/active	0400	/dev/hotpluggable/rdsk/*	# hotpluggable storage
-/dev/vt/active	0600	/dev/video[0-9]+	# video devices
-/dev/vt/active	0600	/dev/usb/hid[0-9]+	# hid devices should have the same permission with conskbd and consms
-/dev/vt/active	0600	/dev/usb/[0-9a-f]+[.][0-9a-f]+/[0-9]+/* driver=scsa2usb,usb_mid,usbprn,ugen	#libusb/ugen devices
+/dev/vt/console_user	0600	/dev/mouse:/dev/kbd
+/dev/vt/console_user	0600	/dev/mouse:/dev/kbd
+/dev/vt/console_user	0600	/dev/sound/*		# audio devices
+/dev/vt/console_user	0600	/dev/fbs/*		# frame buffers
+/dev/vt/console_user	0600	/dev/dri/*		# dri devices
+/dev/vt/console_user	0400	/dev/removable-media/dsk/*	# removable media
+/dev/vt/console_user	0400	/dev/removable-media/rdsk/*	# removable media
+/dev/vt/console_user	0400	/dev/hotpluggable/dsk/*		# hotpluggable storage
+/dev/vt/console_user	0400	/dev/hotpluggable/rdsk/*	# hotpluggable storage
+/dev/vt/console_user	0600	/dev/video[0-9]+	# video devices
+/dev/vt/console_user	0600	/dev/usb/hid[0-9]+	# hid devices should have the same permission with conskbd and consms
+/dev/vt/console_user	0600	/dev/usb/[0-9a-f]+[.][0-9a-f]+/[0-9]+/* driver=scsa2usb,usb_mid,usbprn,ugen	#libusb/ugen devices
 EOM
 
 case "$MACH" in

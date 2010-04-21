@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -48,6 +47,7 @@ _NOTE(SCHEME_PROTECTS_DATA("Do not care", sdev_node vattr vnode))
 #define	DEVVT_GID_DEFAULT	(0)
 #define	DEVVT_DEVMODE_DEFAULT	(0600)
 #define	DEVVT_ACTIVE_NAME	"active"
+#define	DEVVT_CONSUSER_NAME	"console_user"
 
 #define	isdigit(ch)	((ch) >= '0' && (ch) <= '9')
 
@@ -113,14 +113,28 @@ devvt_validate(struct sdev_node *dv)
 
 		(void) vt_getactive(link, MAXPATHLEN);
 		if (strcmp(link, dv->sdev_symlink) != 0) {
-			kmem_free(dv->sdev_symlink,
-			    strlen(dv->sdev_symlink) + 1);
-			dv->sdev_symlink = i_ddi_strdup(link, KM_SLEEP);
+			strfree(dv->sdev_symlink);
+			dv->sdev_symlink = strdup(link);
 			dv->sdev_attr->va_size = strlen(link);
 		}
 		kmem_free(link, MAXPATHLEN);
 		return (SDEV_VTOR_VALID);
-	} else if (devvt_str2minor(nm, &min) != 0) {
+	}
+
+	if (strcmp(nm, DEVVT_CONSUSER_NAME) == 0) {
+		char *link = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+
+		(void) vt_getconsuser(link, MAXPATHLEN);
+		if (strcmp(link, dv->sdev_symlink) != 0) {
+			strfree(dv->sdev_symlink);
+			dv->sdev_symlink = strdup(link);
+			dv->sdev_attr->va_size = strlen(link);
+		}
+		kmem_free(link, MAXPATHLEN);
+		return (SDEV_VTOR_VALID);
+	}
+
+	if (devvt_str2minor(nm, &min) != 0) {
 		return (SDEV_VTOR_INVALID);
 	}
 
@@ -151,6 +165,10 @@ devvt_create_rvp(struct sdev_node *ddv, char *nm,
 		return (0);
 	}
 
+	if (strcmp(nm, DEVVT_CONSUSER_NAME) == 0) {
+		(void) vt_getconsuser((char *)*arg, MAXPATHLEN);
+		return (0);
+	}
 	if (devvt_str2minor(nm, &min) != 0)
 		return (-1);
 
@@ -174,7 +192,8 @@ devvt_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 	struct vnode *rvp = NULL;
 	int type, error;
 
-	if (strcmp(nm, DEVVT_ACTIVE_NAME) == 0) {
+	if ((strcmp(nm, DEVVT_ACTIVE_NAME) == 0) ||
+	    (strcmp(nm, DEVVT_CONSUSER_NAME) == 0)) {
 		type = SDEV_VLINK;
 	} else {
 		type = SDEV_VATTR;
@@ -223,6 +242,7 @@ devvt_create_snode(struct sdev_node *ddv, char *nm, struct cred *cred, int type)
 		return;
 
 	if (strcmp(nm, DEVVT_ACTIVE_NAME) != 0 &&
+	    strcmp(nm, DEVVT_CONSUSER_NAME) != 0 &&
 	    devvt_str2minor(nm, &min) != 0)
 		return;
 
@@ -307,7 +327,7 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 	struct sdev_node *sdvp = VTOSDEV(dvp);
 	struct sdev_node *dv, *next = NULL;
 	int min, cnt;
-	int found = 0;
+	char found = 0;
 
 	mutex_enter(&vc_lock);
 	cnt = VC_INSTANCES_COUNT;
@@ -351,7 +371,7 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 		}
 	}
 
-	/* 2. create active link node */
+	/* 2. create active link node and console user link node */
 	found = 0;
 	for (dv = SDEV_FIRST_ENTRY(sdvp); dv; dv = next) {
 		next = SDEV_NEXT_ENTRY(sdvp, dv);
@@ -362,13 +382,19 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 		/* validate and prune only ready nodes */
 		if (dv->sdev_state != SDEV_READY)
 			continue;
-		if ((strcmp(dv->sdev_name, DEVVT_ACTIVE_NAME) == NULL)) {
-			found = 1;
+		if ((strcmp(dv->sdev_name, DEVVT_ACTIVE_NAME) == NULL))
+			found |= 0x01;
+		if ((strcmp(dv->sdev_name, DEVVT_CONSUSER_NAME) == NULL))
+			found |= 0x02;
+
+		if ((found & 0x01) && (found & 0x02))
 			break;
-		}
 	}
-	if (!found)
+	if (!(found & 0x01))
 		devvt_create_snode(sdvp, DEVVT_ACTIVE_NAME, cred, SDEV_VLINK);
+
+	if (!(found & 0x02))
+		devvt_create_snode(sdvp, DEVVT_CONSUSER_NAME, cred, SDEV_VLINK);
 
 	/* 3. cleanup invalid nodes */
 	devvt_prunedir(sdvp);

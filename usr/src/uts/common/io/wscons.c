@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1987, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -40,9 +39,9 @@
  * So for the most time we do not need locking in this module, but with
  * the following exceptions:
  *
- *   - wc shares three global variables (wc_dip, vc_active_consle, vc_avl_root)
- *     with virtual console devname part (fs/dev/sdev_vtops.c) which get
- *     compiled into genunix.
+ *   - wc shares three global variables (wc_dip, vc_active_console,
+ *     vc_cons_user, vc_avl_root) with virtual console devname part
+ *    (fs/dev/sdev_vtops.c) which get compiled into genunix.
  *
  *   - wc_modechg_cb() is a callback function which will triggered when
  *     framebuffer display mode is changed.
@@ -51,13 +50,13 @@
  *     safe.
  *
  * Based on the fact that virtual console devname part and wc_modechg_cb()
- * only do read access to the above mentioned shared three global variables,
+ * only do read access to the above mentioned shared four global variables,
  * It is safe to do locking this way:
- * 1) all read access to the three global variables in THIS WC MODULE do not
+ * 1) all read access to the four global variables in THIS WC MODULE do not
  *    need locking;
- * 2) all write access to the three global variables in THIS WC MODULE must
+ * 2) all write access to the four global variables in THIS WC MODULE must
  *    hold vc_lock;
- * 3) any access to the three global variables in either DEVNAME PART or the
+ * 3) any access to the four global variables in either DEVNAME PART or the
  *    CALLBACK must hold vc_lock;
  * 4) other global variables which are only shared in this wc module and only
  *    accessible through STREAMS entry points such as "vc_last_console",
@@ -458,6 +457,14 @@ wcclose(queue_t *q, int flag, cred_t *crp)
 	qprocsoff(q);
 
 	mutex_enter(&vc_lock);
+
+	/*
+	 * If we are closing the VT node which
+	 * /dev/vt/console_user points to, revert
+	 * /dev/vt/console to /dev/console
+	 */
+	if (vc_cons_user == pvc->vc_minor)
+		vc_cons_user = VT_MINOR_INVALID;
 
 	if (pvc->vc_minor == 0 || pvc->vc_minor == vc_active_console) {
 

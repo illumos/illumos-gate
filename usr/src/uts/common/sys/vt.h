@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_VT_H
@@ -52,6 +51,10 @@ extern "C" {
  * Inquires if the vt functionality is available.
  */
 #define	VT_ENABLED	(VTIOC|101)
+
+/* get/set the target of /dev/vt/console_user symbol link */
+#define	VT_GET_CONSUSER	(VTIOC|108)
+#define	VT_SET_CONSUSER	(VTIOC|109)
 
 struct vt_mode {
 	char	mode;	/* mode to set vt into, VT_AUTO or VT_PROCESS */
@@ -95,6 +98,12 @@ struct vt_stat {
  */
 #define	VT_SET_TARGET	(VTIOC|106)
 #define	VT_GETACTIVE	(VTIOC|107)
+
+/*
+ * Used by cn to convert a VT_SET_CONSUSER to a internal interface
+ * so that /dev/console and /dev/vt/0 could be differentiated.
+ */
+#define	VT_RESET_CONSUSER	(VTIOC|110)
 
 /*
  * structure used by VT_GETDISPINFO

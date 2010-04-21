@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_VT_IMPL_H
@@ -120,11 +119,13 @@ vc_state_t *vt_minor2vc(minor_t);
 extern dev_info_t *wc_dip;
 extern avl_tree_t vc_avl_root;
 extern minor_t	vc_active_console;
+extern minor_t	vc_cons_user;
 extern kmutex_t vc_lock;
 extern minor_t vc_last_console;
 
 major_t vt_wc_attached(void);
 void vt_getactive(char *, int);
+void vt_getconsuser(char *, int);
 boolean_t vt_minor_valid(minor_t minor);
 void vt_resize(uint_t);
 void vt_attach(void);

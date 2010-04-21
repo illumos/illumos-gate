@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1982, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -67,6 +66,7 @@
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/vt.h>
 
 static int cnopen(dev_t *, int, int, struct cred *);
 static int cnclose(dev_t, int, int, struct cred *);
@@ -463,13 +463,24 @@ cnioctl(dev_t dev, int cmd, intptr_t arg, int flag, struct cred *cred,
 	if (rconsvp == NULL)
 		return (0);
 
+	/*
+	 * In wc, VT_SET_CONSUSER which comes from minor node 0
+	 * has two sources -- either /dev/console or /dev/vt/0 .
+	 * We need a way to differentiate them, so here we
+	 * change VT_SET_CONSUSER to a private VT_RESET_CONSUSER
+	 * ioctl.
+	 */
+	if (cmd == VT_SET_CONSUSER)
+		cmd = VT_RESET_CONSUSER;
+
 	if ((cmd & _CNIOC_MASK) == _CNIOC)
 		return (cnprivateioc(dev, cmd, arg, flag, cred, rvalp));
-	else if (rconsvp->v_stream != NULL)
-		return (strioctl(rconsvp, cmd, arg, flag, U_TO_K, cred,
-		    rvalp));
-	else
-		return (cdev_ioctl(rconsdev, cmd, arg, flag, cred, rvalp));
+
+	if (rconsvp->v_stream != NULL)
+		return (strioctl(rconsvp, cmd, arg, flag, U_TO_K,
+		    cred, rvalp));
+
+	return (cdev_ioctl(rconsdev, cmd, arg, flag, cred, rvalp));
 }
 
 /* ARGSUSED */

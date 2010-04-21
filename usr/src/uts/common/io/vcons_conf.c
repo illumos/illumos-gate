@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -52,12 +51,19 @@
 dev_info_t *wc_dip = NULL;
 /* active virtual console minor number */
 minor_t vc_active_console = VT_MINOR_INVALID;
+/*
+ * console_user symbol link minor number.
+ * VT_MINOR_INVALID	:	/dev/console
+ * 	N		: 	/dev/vt/N
+ */
+minor_t vc_cons_user = VT_MINOR_INVALID;
 /* vc_state_t AVL tree */
 avl_tree_t vc_avl_root;
 /* virtual console global lock */
 kmutex_t vc_lock;
 
-_NOTE(MUTEX_PROTECTS_DATA(vc_lock, wc_dip vc_avl_root vc_active_console))
+_NOTE(MUTEX_PROTECTS_DATA(vc_lock, wc_dip vc_avl_root vc_active_console
+vc_cons_user))
 
 /*
  * Called from vt devname part. Checks if dip is attached. If it is,
@@ -89,8 +95,26 @@ vt_getactive(char *buf, int buflen)
 	if (vc_active_console == 0 || vc_active_console == VT_MINOR_INVALID)
 		(void) snprintf(buf, buflen, "/dev/console");
 	else
-		(void) snprintf(buf, buflen, "%d", vc_active_console);
+		(void) snprintf(buf, buflen, "%u", vc_active_console);
 
+	mutex_exit(&vc_lock);
+}
+
+void
+vt_getconsuser(char *buf, int buflen)
+{
+	ASSERT(buf);
+	ASSERT(buflen != 0);
+
+	mutex_enter(&vc_lock);
+
+	if (vc_cons_user == VT_MINOR_INVALID) {
+		(void) snprintf(buf, buflen, "/dev/console");
+		mutex_exit(&vc_lock);
+		return;
+	}
+
+	(void) snprintf(buf, buflen, "%u", vc_cons_user);
 	mutex_exit(&vc_lock);
 }
 

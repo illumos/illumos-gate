@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -236,7 +235,7 @@ exit:
 	return (ret);
 }
 
-#define	CONSOLE "/dev/console"
+#define	CONSOLE_USER_LINK "/dev/vt/console_user"
 
 static int
 is_cons_user(const char *user)
@@ -248,7 +247,7 @@ is_cons_user(const char *user)
 	if (user == NULL) {
 		return (0);
 	}
-	if (stat(CONSOLE, &cons) == -1) {
+	if (stat(CONSOLE_USER_LINK, &cons) == -1) {
 		return (0);
 	}
 	if (getpwnam_r(user, &pw, pwbuf, sizeof (pwbuf)) == NULL) {
