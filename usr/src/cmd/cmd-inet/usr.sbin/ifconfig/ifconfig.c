@@ -979,6 +979,17 @@ setifaddr(char *addr, int64_t param)
 
 	/* This check is temporary until libipadm supports IPMP interfaces. */
 	if (ifconfig_use_libipadm(s, name)) {
+		char	addrstr[INET6_ADDRSTRLEN];
+
+		if (af == AF_INET) {
+			sin = (struct sockaddr_in *)&laddr;
+			(void) inet_ntop(AF_INET, &sin->sin_addr, addrstr,
+			    sizeof (addrstr));
+		} else {
+			sin6 = (struct sockaddr_in6 *)&laddr;
+			(void) inet_ntop(AF_INET6, &sin6->sin6_addr, addrstr,
+			    sizeof (addrstr));
+		}
 		istatus = ipadm_create_addrobj(IPADM_ADDR_STATIC, name,
 		    &ipaddr);
 		if (istatus != IPADM_SUCCESS)
@@ -991,8 +1002,10 @@ setifaddr(char *addr, int64_t param)
 			 */
 			prefixlen = mask2plen(&lifr.lifr_addr);
 			(void) snprintf(cidraddr, sizeof (cidraddr), "%s/%d",
-			    addr, prefixlen);
+			    addrstr, prefixlen);
 			addr = cidraddr;
+		} else {
+			addr = addrstr;
 		}
 		istatus = ipadm_set_addr(ipaddr, addr, af);
 		if (istatus != IPADM_SUCCESS)
