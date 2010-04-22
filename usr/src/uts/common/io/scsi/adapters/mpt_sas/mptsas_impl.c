@@ -880,10 +880,10 @@ mptsas_kick_start(mptsas_t *mpt)
 	uint32_t	diag_reg, ioc_state, saved_HCB_size;
 
 	/*
-	 * Start a hard reset.  Write magic number and wait 900 uSeconds.
+	 * Start a hard reset.  Write magic number and wait 500 mSeconds.
 	 */
 	MPTSAS_ENABLE_DRWE(mpt);
-	drv_usecwait(900);
+	drv_usecwait(500000);
 
 	/*
 	 * Read the current Diag Reg and save the Host Controlled Boot size.

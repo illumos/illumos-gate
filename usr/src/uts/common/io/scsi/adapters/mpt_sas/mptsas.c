@@ -538,7 +538,7 @@ static struct dev_ops mptsas_ops = {
 };
 
 
-#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.23"
+#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.24"
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module. This one is a driver */
@@ -9911,9 +9911,9 @@ mptsas_start_passthru(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		 */
 		if (function == MPI2_FUNCTION_SCSI_IO_REQUEST) {
 			desc_type = MPI2_REQ_DESCRIPT_FLAGS_SCSI_IO;
+			request_desc_high = (ddi_get16(acc_hdl,
+			    &scsi_io_req->DevHandle) << 16);
 		}
-		request_desc_high = (ddi_get16(acc_hdl,
-		    &scsi_io_req->DevHandle) << 16);
 	}
 
 	/*
