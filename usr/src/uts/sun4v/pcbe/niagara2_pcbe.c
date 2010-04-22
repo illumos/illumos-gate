@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -551,7 +550,7 @@ ni2_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	 * Set PERF_CONTROL bits in L2_CONTROL_REG only when events have
 	 * SL bits equal to 3.
 	 */
-	if ((evsel & SL3_MASK) == SL3_MASK) {
+	if ((evsel & SL_MASK) == SL3_MASK) {
 		if ((hv_niagara_setperf(HV_L2_CTL, l2ctl)) != 0)
 			return (CPC_HV_NO_ACCESS);
 	}

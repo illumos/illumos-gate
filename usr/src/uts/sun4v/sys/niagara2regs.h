@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_NIAGARA2REGS_H
@@ -193,6 +192,7 @@ extern "C" {
 
 #define	L2_CTL_MASK		0x3
 #define	SL3_MASK		0x300
+#define	SL_MASK			0xf00
 
 #elif defined(KT_IMPL)
 /*
@@ -224,6 +224,7 @@ extern "C" {
 
 #define	L2_CTL_MASK		0x3
 #define	SL3_MASK		0x300
+#define	SL_MASK			0xf00
 
 #endif
 
