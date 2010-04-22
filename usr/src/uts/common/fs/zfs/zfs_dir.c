@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -934,11 +933,12 @@ zfs_make_xattrdir(znode_t *zp, vattr_t *vap, vnode_t **xvpp, cred_t *cr)
 	if (fuid_dirtied)
 		zfs_fuid_sync(zfsvfs, tx);
 
-	if ((error = sa_lookup(xzp->z_sa_hdl, SA_ZPL_PARENT(zfsvfs),
-	    &parent, sizeof (parent))) != 0)
-		return (0);
+#ifdef DEBUG
+	error = sa_lookup(xzp->z_sa_hdl, SA_ZPL_PARENT(zfsvfs),
+	    &parent, sizeof (parent));
+	ASSERT(error == 0 && parent == zp->z_id);
+#endif
 
-	ASSERT(parent == zp->z_id);
 	VERIFY(0 == sa_update(zp->z_sa_hdl, SA_ZPL_XATTR(zfsvfs), &xzp->z_id,
 	    sizeof (xzp->z_id), tx));
 

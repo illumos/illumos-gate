@@ -2147,8 +2147,10 @@ zfs_zaccess_aces_check(znode_t *zp, uint32_t *working_mode,
 	ASSERT(zp->z_acl_cached);
 
 	if ((error = sa_lookup(zp->z_sa_hdl, SA_ZPL_GID(zfsvfs),
-	    &gowner, sizeof (gowner))) != 0)
+	    &gowner, sizeof (gowner))) != 0) {
+		mutex_exit(&zp->z_acl_lock);
 		return (error);
+	}
 
 	while (acep = zfs_acl_next_ace(aclp, acep, &who, &access_mask,
 	    &iflags, &type)) {

@@ -4615,8 +4615,10 @@ zfs_fid(vnode_t *vp, fid_t *fidp, caller_context_t *ct)
 	ZFS_VERIFY_ZP(zp);
 
 	if ((error = sa_lookup(zp->z_sa_hdl, SA_ZPL_GEN(zfsvfs),
-	    &gen64, sizeof (uint64_t))) != 0)
+	    &gen64, sizeof (uint64_t))) != 0) {
+		ZFS_EXIT(zfsvfs);
 		return (error);
+	}
 
 	gen = (uint32_t)gen64;
 
