@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_PCI_CFGSPACE_IMPL_H
@@ -45,6 +44,20 @@ extern uint32_t pci_mech1_getl(int bus, int dev, int func, int reg);
 extern void pci_mech1_putb(int bus, int dev, int func, int reg, uint8_t val);
 extern void pci_mech1_putw(int bus, int dev, int func, int reg, uint16_t val);
 extern void pci_mech1_putl(int bus, int dev, int func, int reg, uint32_t val);
+
+/*
+ * AMD family >= 0x10 Mechanism 1 routines with ECS support
+ */
+extern boolean_t pci_check_amd_ioecs(void);
+extern uint8_t pci_mech1_amd_getb(int bus, int dev, int func, int reg);
+extern uint16_t pci_mech1_amd_getw(int bus, int dev, int func, int reg);
+extern uint32_t pci_mech1_amd_getl(int bus, int dev, int func, int reg);
+extern void pci_mech1_amd_putb(int bus, int dev, int func, int reg,
+    uint8_t val);
+extern void pci_mech1_amd_putw(int bus, int dev, int func, int reg,
+    uint16_t val);
+extern void pci_mech1_amd_putl(int bus, int dev, int func, int reg,
+    uint32_t val);
 
 /*
  * Generic Mechanism 2 routines

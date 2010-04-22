@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -62,6 +61,11 @@ int	PCI_PROBE_TYPE = 0;
 uint64_t mcfg_mem_base = 0;
 uint8_t mcfg_bus_start = 0;
 uint8_t mcfg_bus_end = 0xff;
+
+/*
+ * Maximum offset in config space when not using MMIO
+ */
+uint_t pci_iocfg_max_offset = 0xff;
 
 /*
  * These function pointers lead to the actual implementation routines
@@ -173,6 +177,14 @@ pci_check(void)
 			pci_putb_func = pci_orion_putb;
 			pci_putw_func = pci_orion_putw;
 			pci_putl_func = pci_orion_putl;
+		} else if (pci_check_amd_ioecs()) {
+			pci_getb_func = pci_mech1_amd_getb;
+			pci_getw_func = pci_mech1_amd_getw;
+			pci_getl_func = pci_mech1_amd_getl;
+			pci_putb_func = pci_mech1_amd_putb;
+			pci_putw_func = pci_mech1_amd_putw;
+			pci_putl_func = pci_mech1_amd_putl;
+			pci_iocfg_max_offset = 0xfff;
 		} else {
 			pci_getb_func = pci_mech1_getb;
 			pci_getw_func = pci_mech1_getw;

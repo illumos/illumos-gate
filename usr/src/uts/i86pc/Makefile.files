@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This Makefile defines file modules in the directory uts/i86pc
 #	and its children. These are the source files which are i86pc
@@ -101,6 +100,7 @@ CORE_OBJS +=			\
 	pci_cfgacc_x86.o	\
 	pci_cfgspace.o		\
 	pci_mech1.o		\
+	pci_mech1_amd.o		\
 	pci_mech2.o		\
 	pci_neptune.o		\
 	pci_orion.o		\

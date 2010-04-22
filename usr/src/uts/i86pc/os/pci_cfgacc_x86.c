@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -32,6 +31,7 @@
 #include <sys/sysmacros.h>
 #include <sys/x86_archext.h>
 #include <sys/pci.h>
+#include <sys/cmn_err.h>
 #include <vm/hat_i86.h>
 #include <vm/seg_kmem.h>
 #include <vm/kboot_mmu.h>
@@ -73,22 +73,20 @@ pci_cfgacc_map(paddr_t phys_addr)
 		 * Note: no need to unmap first, clear_boot_mappings() will
 		 * do that for us.
 		 */
-		if (pci_cfgacc_virt_base < (caddr_t)kernelbase) {
-			if ((pci_cfgacc_virt_base = vmem_alloc(heap_arena,
-			    MMU_PAGESIZE, VM_NOSLEEP)) == NULL)
-				return (NULL);
-		}
+		if (pci_cfgacc_virt_base < (caddr_t)kernelbase)
+			pci_cfgacc_virt_base = vmem_alloc(heap_arena,
+			    MMU_PAGESIZE, VM_SLEEP);
+
 		hat_devload(kas.a_hat, pci_cfgacc_virt_base,
 		    MMU_PAGESIZE, pfn, PROT_READ | PROT_WRITE |
 		    HAT_STRICTORDER, HAT_LOAD_LOCK);
 	} else {
 		paddr_t	pa_base = P2ALIGN(phys_addr, MMU_PAGESIZE);
 
-		if (pci_cfgacc_virt_base == NULL) {
-			if ((pci_cfgacc_virt_base = (caddr_t)
-			    alloc_vaddr(MMU_PAGESIZE, MMU_PAGESIZE)) == NULL)
-				return (NULL);
-		}
+		if (pci_cfgacc_virt_base == NULL)
+			pci_cfgacc_virt_base =
+			    (caddr_t)alloc_vaddr(MMU_PAGESIZE, MMU_PAGESIZE);
+
 		kbm_map((uintptr_t)pci_cfgacc_virt_base, pa_base, 0, 0);
 	}
 
@@ -106,18 +104,14 @@ pci_cfgacc_unmap()
 static void
 pci_cfgacc_io(pci_cfgacc_req_t *req)
 {
-	uint8_t bus, dev, func, ioacc_offset;
-
-	if (req->offset > 0xff) {
-		if (!req->write)
-			VAL64(req) = (uint64_t)-1;
-		return;
-	}
+	uint8_t bus, dev, func;
+	uint16_t ioacc_offset;	/* 4K config access with IO ECS */
 
 	bus = PCI_BDF_BUS(req->bdf);
 	dev = PCI_BDF_DEV(req->bdf);
 	func = PCI_BDF_FUNC(req->bdf);
 	ioacc_offset = req->offset;
+
 	switch (req->size) {
 	case 1:
 		if (req->write)
@@ -143,26 +137,33 @@ pci_cfgacc_io(pci_cfgacc_req_t *req)
 			VAL32(req) = (*pci_getl_func)(bus, dev, func,
 			    ioacc_offset);
 		break;
-	default:
-		return;
+	case 8:
+		if (req->write) {
+			(*pci_putl_func)(bus, dev, func,
+			    ioacc_offset, VAL64(req) & 0xffffffff);
+			(*pci_putl_func)(bus, dev, func,
+			    ioacc_offset + 4, VAL64(req) >> 32);
+		} else {
+			VAL64(req) = (*pci_getl_func)(bus, dev, func,
+			    ioacc_offset);
+			VAL64(req) |= (uint64_t)(*pci_getl_func)(bus, dev, func,
+			    ioacc_offset + 4) << 32;
+		}
+		break;
 	}
 }
 
-static int
+static void
 pci_cfgacc_mmio(pci_cfgacc_req_t *req)
 {
 	caddr_t vaddr;
 	paddr_t paddr;
-	int rval = DDI_SUCCESS;
 
 	paddr = (paddr_t)req->bdf << 12;
 	paddr += mcfg_mem_base + req->offset;
 
 	mutex_enter(&pcicfg_mmio_mutex);
-	if ((vaddr = pci_cfgacc_map(paddr)) == NULL) {
-		mutex_exit(&pcicfg_mmio_mutex);
-		return (DDI_FAILURE);
-	}
+	vaddr = pci_cfgacc_map(paddr);
 
 	switch (req->size) {
 	case 1:
@@ -189,56 +190,56 @@ pci_cfgacc_mmio(pci_cfgacc_req_t *req)
 		else
 			VAL64(req) = *((uint64_t *)vaddr);
 		break;
-	default:
-		rval = DDI_FAILURE;
 	}
 	pci_cfgacc_unmap();
 	mutex_exit(&pcicfg_mmio_mutex);
-
-	return (rval);
 }
 
 static boolean_t
-pci_cfgacc_valid(pci_cfgacc_req_t *req)
+pci_cfgacc_valid(pci_cfgacc_req_t *req, uint16_t maxoffset)
 {
-	return (IS_P2ALIGNED(req->offset, req->size) &&
-	    (req->offset < PCIE_CFG_SPACE_SIZE));
+	int sz = req->size;
+
+	if (IS_P2ALIGNED(req->offset, sz) &&
+	    (req->offset < maxoffset) &&
+	    ((sz & 0xf) && ISP2(sz)))
+		return (B_TRUE);
+
+	cmn_err(CE_WARN, "illegal PCI request: offset = %x, size = %d",
+	    req->offset, sz);
+	return (B_FALSE);
+}
+
+void
+pci_cfgacc_check_io(pci_cfgacc_req_t *req)
+{
+	uint8_t bus;
+
+	bus = PCI_BDF_BUS(req->bdf);
+
+	if (pci_cfgacc_force_io || (mcfg_mem_base == NULL) ||
+	    (bus < mcfg_bus_start) || (bus > mcfg_bus_end) ||
+	    pci_cfgacc_find_workaround(req->bdf))
+		req->ioacc = B_TRUE;
 }
 
 void
 pci_cfgacc_acc(pci_cfgacc_req_t *req)
 {
-	uint8_t bus;
+	extern uint_t pci_iocfg_max_offset;
 
 	if (!req->write)
-		VAL64(req) = 0;
+		VAL64(req) = (uint64_t)-1;
 
-	if (!pci_cfgacc_valid(req)) {
-		if (!req->write)
-			VAL64(req) = (uint64_t)-1;
-		return;
+	pci_cfgacc_check_io(req);
+
+	if (req->ioacc) {
+		if (pci_cfgacc_valid(req, pci_iocfg_max_offset))
+			pci_cfgacc_io(req);
+	} else {
+		if (pci_cfgacc_valid(req, PCIE_CFG_SPACE_SIZE))
+			pci_cfgacc_mmio(req);
 	}
-
-	bus = PCI_BDF_BUS(req->bdf);
-	if (pci_cfgacc_force_io || (mcfg_mem_base == NULL) ||
-	    (bus < mcfg_bus_start) || (bus > mcfg_bus_end))
-		goto ioacc;
-
-	if (req->ioacc)
-		goto ioacc;
-
-	/* check if workaround is needed */
-	if (pci_cfgacc_find_workaround(req->bdf))
-		goto ioacc;
-
-	if (pci_cfgacc_mmio(req) != DDI_SUCCESS)
-		goto ioacc;
-
-	return;
-
-ioacc:
-	pci_cfgacc_io(req);
-	req->ioacc = B_TRUE;
 }
 
 typedef	struct cfgacc_bus_range {
