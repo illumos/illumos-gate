@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  */
 
@@ -150,9 +149,9 @@ main(int ac, char *av[])
 				    NULL, cli_auth_callback, encryption, NULL);
 			}
 			if (status != PAPI_OK) {
-				fprintf(stderr,
-				    gettext("Failed to contact service for %s:"
-				    " %s\n"), printer,
+				fprintf(stderr, gettext(
+				    "Failed to contact service for %s: %s\n"),
+				    printer,
 				    verbose_papi_message(svc, status));
 				exit(1);
 			}
@@ -164,7 +163,7 @@ main(int ac, char *av[])
 #define	OUT	((status == PAPI_OK) ? stdout : stderr)
 
 		if (id != -1) {	/* it's a job */
-			char *mesg = "cancelled";
+			char *mesg = gettext("cancelled");
 
 			/*
 			 * Check if the job-id is job-id-requested
@@ -179,15 +178,17 @@ main(int ac, char *av[])
 				 * not found
 				 */
 				exit_code = 1;
-				fprintf(OUT, "%s-%d: not-found\n", printer, id);
+				fprintf(OUT, "%s-%d: %s\n",
+				    printer, id, gettext("not-found"));
 			} else {
 				status = papiJobCancel(svc, printer, rid);
 				if (status == PAPI_NOT_AUTHORIZED) {
 					mesg = papiStatusString(status);
 					exit_code = 1;
 				} else if (status != PAPI_OK) {
-					mesg =
-					    verbose_papi_message(svc, status);
+					mesg = gettext(
+					    verbose_papi_message(
+					    svc, status));
 					exit_code = 1;
 				}
 				fprintf(OUT, "%s-%d: %s\n", printer, id, mesg);
@@ -209,7 +210,7 @@ main(int ac, char *av[])
 				}
 
 				if (jobs != NULL && *jobs != NULL) {
-					char *mesg = "cancelled";
+					char *mesg = gettext("cancelled");
 					id = papiJobGetId(*jobs);
 
 					status = papiJobCancel(svc,
@@ -219,8 +220,9 @@ main(int ac, char *av[])
 						mesg = papiStatusString(status);
 						exit_code = 1;
 					} else if (status != PAPI_OK) {
-						mesg = verbose_papi_message(
-						    svc, status);
+						mesg = gettext(
+						    verbose_papi_message(
+						    svc, status));
 						exit_code = 1;
 					}
 					/*
