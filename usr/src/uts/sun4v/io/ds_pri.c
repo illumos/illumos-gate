@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -265,7 +264,8 @@ _fini(void)
 
 	ddi_soft_state_fini(&ds_pri_statep);
 
-	(void) hsvc_unregister(&pboot_hsvc);
+	if (hsvc_pboot_available)
+		(void) hsvc_unregister(&pboot_hsvc);
 
 	return (retval);
 }
@@ -360,7 +360,7 @@ ds_pri_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * See if we can get the static hv pri data. Static pri data
 	 * is only available for privileged domains.
 	 */
-	if (hsvc_pboot_available == B_TRUE) {
+	if (hsvc_pboot_available) {
 		if ((status = ds_get_hv_pri(sp)) != 0) {
 			cmn_err(CE_NOTE, "ds_get_hv_pri failed: 0x%lx", status);
 		}
@@ -889,14 +889,21 @@ ds_get_hv_pri(ds_pri_state_t *sp)
 	 */
 	pri_size = 0LL;
 	status = hv_mach_pri((uint64_t)0, &pri_size);
-	DS_PRI_DBG("ds_get_hv_pri: hv_mach_pri pri size: 0x%lx\n", pri_size);
-	if (pri_size == 0)
-		return (1);
-
 	if (status == H_ENOTSUPPORTED || status == H_ENOACCESS) {
+		/*
+		 * hv_mach_pri() is not supported on a guest domain.
+		 * Unregister pboot API group to prevent failures.
+		 */
+		(void) hsvc_unregister(&pboot_hsvc);
+		hsvc_pboot_available = B_FALSE;
 		DS_PRI_DBG("ds_get_hv_pri: hv_mach_pri service is not "
 		    "available. errorno: 0x%lx\n", status);
-		return (status);
+		return (0);
+	} else if (pri_size == 0) {
+		return (1);
+	} else {
+		DS_PRI_DBG("ds_get_hv_pri: hv_mach_pri pri size: 0x%lx\n",
+		    pri_size);
 	}
 
 	/*
