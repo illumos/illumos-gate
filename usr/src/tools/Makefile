@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include ../Makefile.master
@@ -93,11 +92,16 @@ ROOTDIRS= \
 	$(ROOTONBLD)/lib \
 	$(ROOTONBLD)/lib/$(MACH) \
 	$(ROOTONBLD)/lib/perl \
-	$(ROOTONBLD)/lib/python \
-	$(ROOTONBLD)/lib/python/onbld \
-	$(ROOTONBLD)/lib/python/onbld/Checks \
-	$(ROOTONBLD)/lib/python/onbld/hgext \
-	$(ROOTONBLD)/lib/python/onbld/Scm \
+	$(ROOTONBLD)/lib/python2.4 \
+	$(ROOTONBLD)/lib/python2.4/onbld \
+	$(ROOTONBLD)/lib/python2.4/onbld/Checks \
+	$(ROOTONBLD)/lib/python2.4/onbld/hgext \
+	$(ROOTONBLD)/lib/python2.4/onbld/Scm \
+	$(ROOTONBLD)/lib/python2.6 \
+	$(ROOTONBLD)/lib/python2.6/onbld \
+	$(ROOTONBLD)/lib/python2.6/onbld/Checks \
+	$(ROOTONBLD)/lib/python2.6/onbld/hgext \
+	$(ROOTONBLD)/lib/python2.6/onbld/Scm \
 	$(ROOTONBLD)/env \
 	$(ROOTONBLD)/etc \
 	$(ROOTONBLD)/etc/exception_lists \
@@ -138,10 +142,13 @@ _msg: $(MSGSUBDIRS)
 
 $(SUBDIRS) $(CLOSED_SUBDIRS): $(BOOT_SUBDIRS)
 
-$(BOOT_SUBDIRS) $(SUBDIRS): $$(DOROOTDIRS) FRC
+$(BOOT_SUBDIRS) $(SUBDIRS): $$(DOROOTDIRS) $(ROOTONBLDLIBPY) FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 $(ROOTDIRS):
 	$(INS.dir)
+
+$(ROOTONBLDLIBPY): $(ROOTDIRS)
+	$(RM) -r $@; $(SYMLINK) python2.4 $@
 
 FRC:

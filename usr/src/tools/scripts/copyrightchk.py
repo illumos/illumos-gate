@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -31,8 +30,11 @@
 
 import sys, os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../lib/python'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "lib",
+                                "python%d.%d" % sys.version_info[:2]))
+
+# Allow running from the source tree, using the modules in the source tree
+sys.path.insert(2, os.path.join(os.path.dirname(__file__), '..'))
 
 from onbld.Checks.Copyright import copyright
 

@@ -15,8 +15,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 '''
@@ -28,8 +27,12 @@ workspace in support of webrev's Mercurial support.
 # NB: This assumes the normal onbld directory structure
 #
 import sys, os
-sys.path.insert(1, "%s/../lib/python" % os.path.dirname(__file__))
-sys.path.insert(1, "%s/.." % os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "lib",
+                                "python%d.%d" % sys.version_info[:2]))
+
+# Allow running from the source tree, using the modules in the source tree
+sys.path.insert(2, os.path.join(os.path.dirname(__file__), ".."))
 
 from onbld.Scm import Version
 

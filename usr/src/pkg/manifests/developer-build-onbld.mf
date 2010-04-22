@@ -48,11 +48,16 @@ dir path=opt/onbld/gk
 dir path=opt/onbld/lib
 dir path=opt/onbld/lib/$(ARCH)
 dir path=opt/onbld/lib/perl
-dir path=opt/onbld/lib/python
-dir path=opt/onbld/lib/python/onbld
-dir path=opt/onbld/lib/python/onbld/Checks
-dir path=opt/onbld/lib/python/onbld/Scm
-dir path=opt/onbld/lib/python/onbld/hgext
+dir path=opt/onbld/lib/python2.4
+dir path=opt/onbld/lib/python2.4/onbld
+dir path=opt/onbld/lib/python2.4/onbld/Checks
+dir path=opt/onbld/lib/python2.4/onbld/Scm
+dir path=opt/onbld/lib/python2.4/onbld/hgext
+dir path=opt/onbld/lib/python2.6
+dir path=opt/onbld/lib/python2.6/onbld
+dir path=opt/onbld/lib/python2.6/onbld/Checks
+dir path=opt/onbld/lib/python2.6/onbld/Scm
+dir path=opt/onbld/lib/python2.6/onbld/hgext
 dir path=opt/onbld/man
 dir path=opt/onbld/man/man1
 dir path=opt/onbld/man/sman1
@@ -158,46 +163,84 @@ file path=opt/onbld/gk/.login
 file path=opt/onbld/gk/gen_make.machines mode=0755
 file path=opt/onbld/lib/$(ARCH)/libdwarf.so.1
 file path=opt/onbld/lib/perl/onbld_elfmod.pm
-file path=opt/onbld/lib/python/onbld/Checks/CStyle.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/CStyle.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Cddl.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Cddl.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/CmtBlk.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/CmtBlk.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Comments.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Comments.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Copyright.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Copyright.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/DbLookups.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/DbLookups.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/HdrChk.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/HdrChk.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/JStyle.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/JStyle.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Keywords.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Keywords.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Mapfile.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Mapfile.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/ProcessCheck.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/ProcessCheck.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Rti.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/Rti.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/__init__.py mode=0444
-file path=opt/onbld/lib/python/onbld/Checks/__init__.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Scm/Backup.py mode=0444
-file path=opt/onbld/lib/python/onbld/Scm/Backup.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Scm/Version.py mode=0444
-file path=opt/onbld/lib/python/onbld/Scm/Version.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Scm/WorkSpace.py mode=0444
-file path=opt/onbld/lib/python/onbld/Scm/WorkSpace.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/Scm/__init__.py mode=0444
-file path=opt/onbld/lib/python/onbld/Scm/__init__.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/__init__.py mode=0444
-file path=opt/onbld/lib/python/onbld/__init__.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/hgext/__init__.py mode=0444
-file path=opt/onbld/lib/python/onbld/hgext/__init__.pyc mode=0444
-file path=opt/onbld/lib/python/onbld/hgext/cdm.py mode=0444
-file path=opt/onbld/lib/python/onbld/hgext/cdm.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/CStyle.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/CStyle.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Cddl.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Cddl.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/CmtBlk.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/CmtBlk.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Comments.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Comments.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Copyright.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Copyright.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/DbLookups.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/DbLookups.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/HdrChk.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/HdrChk.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/JStyle.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/JStyle.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Keywords.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Keywords.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Mapfile.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Mapfile.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/ProcessCheck.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/ProcessCheck.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Rti.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/Rti.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/__init__.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Checks/__init__.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Scm/Backup.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Scm/Backup.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Scm/Version.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Scm/Version.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Scm/WorkSpace.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Scm/WorkSpace.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Scm/__init__.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/Scm/__init__.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/__init__.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/__init__.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/hgext/__init__.py mode=0444
+file path=opt/onbld/lib/python2.4/onbld/hgext/__init__.pyc mode=0444
+file path=opt/onbld/lib/python2.4/onbld/hgext/cdm.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/CStyle.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/CStyle.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Cddl.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Cddl.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/CmtBlk.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/CmtBlk.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Comments.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Comments.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Copyright.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Copyright.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/DbLookups.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/DbLookups.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/HdrChk.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/HdrChk.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/JStyle.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/JStyle.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Keywords.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Keywords.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Mapfile.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Mapfile.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/ProcessCheck.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/ProcessCheck.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Rti.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/Rti.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/__init__.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Checks/__init__.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/Backup.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/Backup.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/Version.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/Version.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/WorkSpace.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/WorkSpace.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/__init__.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/Scm/__init__.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/__init__.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/__init__.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/hgext/__init__.py mode=0444
+file path=opt/onbld/lib/python2.6/onbld/hgext/__init__.pyc mode=0444
+file path=opt/onbld/lib/python2.6/onbld/hgext/cdm.py mode=0444
 file path=opt/onbld/man/man1/Install.1
 file path=opt/onbld/man/man1/bldenv.1
 file path=opt/onbld/man/man1/bringovercheck.1
@@ -246,3 +289,4 @@ license lic_CDDL license=lic_CDDL
 license tools/ctf/dwarf/THIRDPARTYLICENSE \
     license=tools/ctf/dwarf/THIRDPARTYLICENSE
 license tools/onbld/THIRDPARTYLICENSE license=tools/onbld/THIRDPARTYLICENSE
+link path=opt/onbld/lib/python target=python2.4

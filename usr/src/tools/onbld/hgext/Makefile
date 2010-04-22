@@ -20,34 +20,39 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 include ../../Makefile.tools
 
-PYSRCS= \
+PYSRCS = \
 	__init__.py	\
 	cdm.py
 
-PYOBJS = $(PYSRCS:%.py=%.pyc)
+#
+# We deliver .pyc files specific to the python version, with the
+# exception of cdm.pyc, which we don't deliver at all.
+#
+# An exception to this is cdm.py, which is typically loaded using an
+# extension path in an .hgrc.  This path might refer to a Python
+# version that's different from the one Mercurial is using.  If we
+# delivered a cdm.pyc, differing Pythons running Mercurial could cause
+# it to be overwritten, causing packaging noise.  Logic within cdm.py
+# causes modules loaded from there to be those built by the correct
+# version of Python.
+# 
+PYSRC2 =	$(PYSRCS:cdm.py=)
+PYOBJS =	$(PYSRC2:%.py=%.pyc)
+PYTOPDIR =	$(ROOTONBLDLIB)
+PYMODDIR =	onbld/hgext
 
-PYFILES = $(PYSRCS) $(PYOBJS)
+include ../../Makefile.python
 
-ROOTONBLDHGEXTFILES= $(PYFILES:%=$(ROOTONBLDLIBPY)/onbld/hgext/%)
+all: $(PYVERSOBJS)
 
-$(ROOTONBLDHGEXTFILES) := FILEMODE = 0444
-
-.KEEP_STATE:
-
-all: $(PYOBJS)
-
-install: all .WAIT $(ROOTONBLDHGEXTFILES)
+install: all $(ROOTPYFILES)
 
 clean:
 
-$(ROOTONBLDLIBPY)/onbld/hgext/%: %
-	$(INS.pyfile)
-
-include ../../Makefile.targ
+clobber: clean pyclobber

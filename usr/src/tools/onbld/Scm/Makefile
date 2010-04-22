@@ -20,36 +20,28 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 include ../../Makefile.tools
 
-PYSRCS= \
+PYSRCS = \
 	__init__.py	\
 	Backup.py	\
 	Version.py	\
 	WorkSpace.py
 
-PYOBJS = $(PYSRCS:%.py=%.pyc)
+PYOBJS =	$(PYSRCS:%.py=%.pyc)
+PYTOPDIR =	$(ROOTONBLDLIB)
+PYMODDIR =	onbld/Scm
 
-PYFILES = $(PYSRCS) $(PYOBJS)
+include ../../Makefile.python
 
-ROOTONBLDSCMFILES= $(PYFILES:%=$(ROOTONBLDLIBPY)/onbld/Scm/%)
+all: $(PYVERSOBJS)
 
-$(ROOTONBLDSCMFILES) := FILEMODE = 0444
-
-.KEEP_STATE:
-
-all: $(PYOBJS)
-
-install: all .WAIT $(ROOTONBLDSCMFILES)
+install: all $(ROOTPYFILES)
 
 clean:
 
-$(ROOTONBLDLIBPY)/onbld/Scm/%: %
-	$(INS.pyfile)
-
-include ../../Makefile.targ
+clobber: clean pyclobber

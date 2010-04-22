@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -32,41 +31,37 @@ SUBDIRS= \
 	hgext	\
 	Scm
 
-PYSRCS= \
+PYSRCS = \
 	__init__.py
 
-PYOBJS= $(PYSRCS:%.py=%.pyc)
+PYOBJS =	$(PYSRCS:%.py=%.pyc)
+PYTOPDIR = 	$(ROOTONBLDLIB)
+PYMODDIR =	onbld
 
-PYFILES= $(PYSRCS) $(PYOBJS)
-
-all := TARGET = all
+all	:= TARGET = all
 install := TARGET = install
-clean := TARGET = clean
+clean	:= TARGET = clean
 clobber := TARGET = clobber
-
-ROOTONBLDBASEFILES=	$(PYFILES:%=$(ROOTONBLDLIBPY)/onbld/%)
-$(ROOTONBLDBASEFILES) := FILEMODE = 0444
 
 CLOBBERFILES += THIRDPARTYLICENSE
 
+include ../Makefile.python
+
 .KEEP_STATE:
 
-all: $(PYOBJS) $(SUBDIRS) THIRDPARTYLICENSE
+all: $(PYVERSOBJS) $(SUBDIRS) THIRDPARTYLICENSE
 
-install: all $(ROOTONBLDBASEFILES) $(SUBDIRS)
+install: all $(ROOTPYFILES) $(SUBDIRS)
 
-clean clobber: $(SUBDIRS)
+clean: $(SUBDIRS)
+
+clobber: clean pyclobber $(SUBDIRS)
 
 THIRDPARTYLICENSE: $(SRC)/pkg/license_files/lic_GPLv2
 	$(RM) $@
 	$(CAT) $? > $@
 
-$(ROOTONBLDLIBPY)/onbld/%: %
-	$(INS.pyfile)
-
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-
-include ../Makefile.targ

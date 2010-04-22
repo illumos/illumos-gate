@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 
 
 This directory contains the tools used to do a full build of the
@@ -56,11 +55,18 @@ Layout of /opt/onbld
 /opt/onbld/lib
 	libraries used by the build tools.
 
-/opt/onbld/lib/python
+/opt/onbld/lib/python<version>/
 	python modules used by the build tools.
 
-/opt/onbld/lib/python/onbld/hgext
+/opt/onbld/lib/python<version>/onbld/hgext
 	Mercurial extensions.
+
+/opt/onbld/lib/python/ 
+        symlink to the modules directory of the currently preferred
+        python version.  This exists to retain compatibility both for
+        tools expecting only one supported version of python, and for
+        user .hgrc files that expect to find cdm.py in
+        /opt/onbld/lib/python/onbld/hgext.
 
 /opt/onbld/man
 	rudimentary man pages for some of the tools.

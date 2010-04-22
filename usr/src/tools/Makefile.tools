@@ -19,16 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Definitions common to tool source.
 #
 include $(SRC)/Makefile.master
 
 FILEMODE=	0555
-
-CLOBBERFILES += $(PYOBJS)
 
 TOOLS=			$(SRC)/tools
 TOOLS_PROTO=		$(TOOLS)/proto/root_$(MACH)-nd
@@ -41,6 +38,8 @@ ROOTONBLDLIB=		$(ROOTONBLD)/lib
 ROOTONBLDLIBMACH=	$(ROOTONBLD)/lib/$(MACH)
 ROOTONBLDLIBPERL=	$(ROOTONBLD)/lib/perl
 ROOTONBLDLIBPY=		$(ROOTONBLD)/lib/python
+ROOTONBLDLIBPY_24=	$(ROOTONBLD)/lib/python2.4
+ROOTONBLDLIBPY_26=	$(ROOTONBLD)/lib/python2.6
 ROOTONBLDENV=		$(ROOTONBLD)/env
 ROOTONBLDGK=		$(ROOTONBLD)/gk
 ROOTONBLDMAN=		$(ROOTONBLD)/man

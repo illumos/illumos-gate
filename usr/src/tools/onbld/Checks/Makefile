@@ -20,14 +20,13 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 include ../../Makefile.tools
 
-PYSRCS= \
+PYSRCS = \
 	CStyle.py	\
 	Cddl.py		\
 	CmtBlk.py	\
@@ -42,22 +41,16 @@ PYSRCS= \
 	Rti.py		\
 	__init__.py
 
-PYOBJS = $(PYSRCS:%.py=%.pyc)
+PYOBJS =	$(PYSRCS:%.py=%.pyc)
+PYTOPDIR =	$(ROOTONBLDLIB)
+PYMODDIR = 	onbld/Checks
 
-PYFILES= $(PYSRCS) $(PYOBJS)
+include ../../Makefile.python
 
-ROOTONBLDCHECKSFILES=	$(PYFILES:%=$(ROOTONBLDLIBPY)/onbld/Checks/%)
-$(ROOTONBLDCHECKSFILES) := FILEMODE = 0444
+all: $(PYVERSOJBS)
 
-.KEEP_STATE:
-
-all: $(PYOBJS)
-
-install: $(ROOTONBLDCHECKSFILES)
+install: all $(ROOTPYFILES)
 
 clean:
 
-$(ROOTONBLDLIBPY)/onbld/Checks/%: %
-	$(INS.pyfile)
-
-include ../../Makefile.targ
+clobber: clean pyclobber

@@ -14,8 +14,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 '''OpenSolaris workspace extensions for mercurial
@@ -31,15 +30,28 @@ Run pre-putback checks					- pbchk
 Collapse all your changes into a single changeset	- recommit'''
 
 
-#
-# NB: This assumes the normal directory structure, with this
-#     extension 2 levels below .../lib/python.
-#
-#     If you change that, change this
-#
 import atexit, os, stat, sys, termios
 
-sys.path.insert(1, "%s/../../" % os.path.dirname(__file__))
+#
+# Adjust the load path based on the location of cdm.py and the version
+# of python into which it is being loaded.  This assumes the normal
+# onbld directory structure, where cdm.py is in
+# lib/python(version)?/onbld/hgext/.  If that changes so too must
+# this.
+#
+# This and the case below are not equivalent.  In this case we may be
+# loading a cdm.py in python2.X/ via the lib/python/ symlink but need
+# python2.Y in sys.path.
+#
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "..", "..",
+                                "python%d.%d" % sys.version_info[:2]))
+
+#
+# Add the relative path from cdm.py to usr/src/tools to the load path,
+# such that a cdm.py loaded from the source tree uses the modules also
+# within the source tree.
+#
+sys.path.insert(2, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from onbld.Scm import Version
 from mercurial import util
