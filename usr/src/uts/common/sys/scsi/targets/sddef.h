@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_TARGETS_SDDEF_H
@@ -258,6 +257,9 @@ struct sd_lun {
 	/* The size of a logical block on the target, in bytes. */
 	uint32_t	un_tgt_blocksize;
 
+	/* The size of a physical block on the target, in bytes. */
+	uint32_t	un_phy_blocksize;
+
 	/*
 	 * The number of logical blocks on the target. This is adjusted
 	 * to be in terms of the block size specified by un_sys_blocksize
@@ -456,7 +458,8 @@ struct sd_lun {
 	    un_f_is_solid_state		:1,	/* has solid state media */
 	    un_f_mmc_gesn_polling	:1,	/* use GET EVENT STATUS */
 						/* NOTIFICATION for polling */
-	    un_f_reserved		:5;
+	    un_f_enable_rmw		:1,	/* Force RMW in sd driver */
+	    un_f_reserved		:4;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;
@@ -574,6 +577,10 @@ struct sd_lun {
 /* Convert a byte count to a number of target blocks */
 #define	SD_BYTES2TGTBLOCKS(un, bytecount)				\
 	((bytecount + (un->un_tgt_blocksize - 1))/un->un_tgt_blocksize)
+
+/* Convert a byte count to a number of physical blocks */
+#define	SD_BYTES2PHYBLOCKS(un, bytecount)				\
+	((bytecount + (un->un_phy_blocksize - 1))/un->un_phy_blocksize)
 
 /* Convert a target block count to a number of bytes */
 #define	SD_TGTBLOCKS2BYTES(un, blockcount)				\
@@ -916,6 +923,11 @@ typedef struct sd_prout {
 #define	SD_REINSTATE_RESV_DELAY		6000000
 
 #define	SD_MODE2_BLKSIZE		2336	/* bytes */
+
+/*
+ * Solid State Drive default sector size
+ */
+#define	SSD_SECSIZE			4096
 
 /*
  * Resource type definitions for multi host control operations. Specifically,

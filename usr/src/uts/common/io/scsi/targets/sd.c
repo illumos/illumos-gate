@@ -795,7 +795,17 @@ static sd_disk_config_t sd_disk_table[] = {
 static const int sd_disk_table_size =
 	sizeof (sd_disk_table)/ sizeof (sd_disk_config_t);
 
+/*
+ * Emulation mode disk drive VID/PID table
+ */
+static char sd_flash_dev_table[][25] = {
+	"ATA     MARVELL SD88SA02",
+	"MARVELL SD88SA02",
+	"TOSHIBA THNSNV05",
+};
 
+static const int sd_flash_dev_table_size =
+	sizeof (sd_flash_dev_table) / sizeof (sd_flash_dev_table[0]);
 
 #define	SD_INTERCONNECT_PARALLEL	0
 #define	SD_INTERCONNECT_FABRIC		1
@@ -879,6 +889,7 @@ static int sd_pm_idletime = 1;
 #define	sd_chk_vers1_data		ssd_chk_vers1_data
 #define	sd_set_vers1_properties		ssd_set_vers1_properties
 #define	sd_check_solid_state		ssd_check_solid_state
+#define	sd_check_emulation_mode		ssd_check_emulation_mode
 
 #define	sd_get_physical_geometry	ssd_get_physical_geometry
 #define	sd_get_virtual_geometry		ssd_get_virtual_geometry
@@ -1278,7 +1289,7 @@ static int   sd_get_write_cache_enabled(sd_ssc_t *ssc, int *is_enabled);
 static void  sd_get_nv_sup(sd_ssc_t *ssc);
 static dev_t sd_make_device(dev_info_t *devi);
 static void  sd_check_solid_state(sd_ssc_t *ssc);
-
+static void  sd_check_emulation_mode(sd_ssc_t *ssc);
 static void  sd_update_block_info(struct sd_lun *un, uint32_t lbasize,
 	uint64_t capacity);
 
@@ -7581,6 +7592,7 @@ sd_unit_attach(dev_info_t *devi)
 	 */
 	un->un_f_disksort_disabled = FALSE;
 	un->un_f_rmw_type = SD_RMW_TYPE_DEFAULT;
+	un->un_f_enable_rmw = FALSE;
 
 	/*
 	 * GET EVENT STATUS NOTIFICATION media polling enabled by default, but
@@ -7631,6 +7643,11 @@ sd_unit_attach(dev_info_t *devi)
 	 */
 	un->un_tgt_blocksize  = un->un_sys_blocksize  = DEV_BSIZE;
 	un->un_blockcount = 0;
+
+	/*
+	 * physical sector size default to DEV_BSIZE currently.
+	 */
+	un->un_phy_blocksize = DEV_BSIZE;
 
 	/*
 	 * Set up the per-instance info needed to determine the correct
@@ -8151,6 +8168,11 @@ sd_unit_attach(dev_info_t *devi)
 	 */
 	sd_check_solid_state(ssc);
 
+	/*
+	 * Check whether the drive is in emulation mode.
+	 */
+	sd_check_emulation_mode(ssc);
+
 	cmlb_alloc_handle(&un->un_cmlbhandle);
 
 #if defined(__i386) || defined(__amd64)
@@ -8230,8 +8252,9 @@ sd_unit_attach(dev_info_t *devi)
 	un->un_f_write_cache_enabled = (wc_enabled != 0);
 	mutex_exit(SD_MUTEX(un));
 
-	if (un->un_f_rmw_type != SD_RMW_TYPE_RETURN_ERROR &&
-	    un->un_tgt_blocksize != DEV_BSIZE) {
+	if ((un->un_f_rmw_type != SD_RMW_TYPE_RETURN_ERROR &&
+	    un->un_tgt_blocksize != DEV_BSIZE) ||
+	    un->un_f_enable_rmw) {
 		if (!(un->un_wm_cache)) {
 			(void) snprintf(name_str, sizeof (name_str),
 			    "%s%d_cache",
@@ -10646,9 +10669,10 @@ sd_ready_and_valid(sd_ssc_t *ssc, int part)
 	 * a media is changed this routine will be called and the
 	 * block size is a function of media rather than device.
 	 */
-	if ((un->un_f_rmw_type != SD_RMW_TYPE_RETURN_ERROR ||
+	if (((un->un_f_rmw_type != SD_RMW_TYPE_RETURN_ERROR ||
 	    un->un_f_non_devbsize_supported) &&
-	    un->un_tgt_blocksize != DEV_BSIZE) {
+	    un->un_tgt_blocksize != DEV_BSIZE) ||
+	    un->un_f_enable_rmw) {
 		if (!(un->un_wm_cache)) {
 			(void) snprintf(name_str, sizeof (name_str),
 			    "%s%d_cache",
@@ -10877,7 +10901,8 @@ sdread(dev_t dev, struct uio *uio, cred_t *cred_p)
 	/*
 	 * Read requests are restricted to multiples of the system block size.
 	 */
-	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR)
+	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR &&
+	    !un->un_f_enable_rmw)
 		secmask = un->un_tgt_blocksize - 1;
 	else
 		secmask = DEV_BSIZE - 1;
@@ -10966,7 +10991,8 @@ sdwrite(dev_t dev, struct uio *uio, cred_t *cred_p)
 	/*
 	 * Write requests are restricted to multiples of the system block size.
 	 */
-	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR)
+	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR &&
+	    !un->un_f_enable_rmw)
 		secmask = un->un_tgt_blocksize - 1;
 	else
 		secmask = DEV_BSIZE - 1;
@@ -11055,7 +11081,8 @@ sdaread(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 	/*
 	 * Read requests are restricted to multiples of the system block size.
 	 */
-	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR)
+	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR &&
+	    !un->un_f_enable_rmw)
 		secmask = un->un_tgt_blocksize - 1;
 	else
 		secmask = DEV_BSIZE - 1;
@@ -11144,7 +11171,8 @@ sdawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 	/*
 	 * Write requests are restricted to multiples of the system block size.
 	 */
-	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR)
+	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR &&
+	    !un->un_f_enable_rmw)
 		secmask = un->un_tgt_blocksize - 1;
 	else
 		secmask = DEV_BSIZE - 1;
@@ -11524,16 +11552,24 @@ sd_xbuf_init(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 		index = un->un_buf_chain_type;
 		if ((!un->un_f_has_removable_media) &&
 		    (un->un_tgt_blocksize != 0) &&
-		    (un->un_tgt_blocksize != DEV_BSIZE)) {
+		    (un->un_tgt_blocksize != DEV_BSIZE ||
+		    un->un_f_enable_rmw)) {
 			int secmask = 0, blknomask = 0;
-			blknomask =
-			    (un->un_tgt_blocksize / DEV_BSIZE) - 1;
-			secmask = un->un_tgt_blocksize - 1;
+			if (un->un_f_enable_rmw) {
+				blknomask =
+				    (un->un_phy_blocksize / DEV_BSIZE) - 1;
+				secmask = un->un_phy_blocksize - 1;
+			} else {
+				blknomask =
+				    (un->un_tgt_blocksize / DEV_BSIZE) - 1;
+				secmask = un->un_tgt_blocksize - 1;
+			}
 
 			if ((bp->b_lblkno & (blknomask)) ||
 			    (bp->b_bcount & (secmask))) {
-				if (un->un_f_rmw_type !=
-				    SD_RMW_TYPE_RETURN_ERROR) {
+				if ((un->un_f_rmw_type !=
+				    SD_RMW_TYPE_RETURN_ERROR) ||
+				    un->un_f_enable_rmw) {
 					if (un->un_f_pm_is_enabled == FALSE)
 						index =
 						    SD_CHAIN_INFO_MSS_DSK_NO_PM;
@@ -12543,14 +12579,19 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 	(void) cmlb_partinfo(un->un_cmlbhandle, partition,
 	    &nblocks, &partition_offset, NULL, NULL, (void *)SD_PATH_DIRECT);
 
-	blknomask = (un->un_tgt_blocksize / DEV_BSIZE) - 1;
-	secmask = un->un_tgt_blocksize - 1;
+	if (un->un_f_enable_rmw) {
+		blknomask = (un->un_phy_blocksize / DEV_BSIZE) - 1;
+		secmask = un->un_phy_blocksize - 1;
+	} else {
+		blknomask = (un->un_tgt_blocksize / DEV_BSIZE) - 1;
+		secmask = un->un_tgt_blocksize - 1;
+	}
 
 	if ((bp->b_lblkno & (blknomask)) || (bp->b_bcount & (secmask))) {
 		is_aligned = FALSE;
 	}
 
-	if (!(NOT_DEVBSIZE(un))) {
+	if (!(NOT_DEVBSIZE(un)) || un->un_f_enable_rmw) {
 		/*
 		 * If I/O is aligned, no need to involve RMW(Read Modify Write)
 		 * Convert the logical block number to target's physical sector
@@ -12561,12 +12602,17 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 		} else {
 			switch (un->un_f_rmw_type) {
 			case SD_RMW_TYPE_RETURN_ERROR:
-				bp->b_flags |= B_ERROR;
-				goto error_exit;
+				if (un->un_f_enable_rmw)
+					break;
+				else {
+					bp->b_flags |= B_ERROR;
+					goto error_exit;
+				}
 
 			case SD_RMW_TYPE_DEFAULT:
 				mutex_enter(SD_MUTEX(un));
-				if (un->un_rmw_msg_timeid == NULL) {
+				if (!un->un_f_enable_rmw &&
+				    un->un_rmw_msg_timeid == NULL) {
 					scsi_log(SD_DEVINFO(un), sd_label,
 					    CE_WARN, "I/O request is not "
 					    "aligned with %d disk sector size. "
@@ -12809,7 +12855,7 @@ sd_mapblocksize_iostart(int index, struct sd_lun *un, struct buf *bp)
 	 * un->un_sys_blocksize as its block size or if bcount == 0.
 	 * In this case there is no layer-private data block allocated.
 	 */
-	if ((un->un_tgt_blocksize == DEV_BSIZE) ||
+	if ((un->un_tgt_blocksize == DEV_BSIZE && !un->un_f_enable_rmw) ||
 	    (bp->b_bcount == 0)) {
 		goto done;
 	}
@@ -12868,9 +12914,18 @@ sd_mapblocksize_iostart(int index, struct sd_lun *un, struct buf *bp)
 	 * block of the request, but that's what is needed for the computation.
 	 */
 	first_byte  = SD_SYSBLOCKS2BYTES((offset_t)xp->xb_blkno);
-	start_block = xp->xb_blkno = first_byte / un->un_tgt_blocksize;
-	end_block   = (first_byte + bp->b_bcount + un->un_tgt_blocksize - 1) /
-	    un->un_tgt_blocksize;
+	if (un->un_f_enable_rmw) {
+		start_block = xp->xb_blkno =
+		    (first_byte / un->un_phy_blocksize) *
+		    (un->un_phy_blocksize / DEV_BSIZE);
+		end_block   = ((first_byte + bp->b_bcount +
+		    un->un_phy_blocksize - 1) / un->un_phy_blocksize) *
+		    (un->un_phy_blocksize / DEV_BSIZE);
+	} else {
+		start_block = xp->xb_blkno = first_byte / un->un_tgt_blocksize;
+		end_block   = (first_byte + bp->b_bcount +
+		    un->un_tgt_blocksize - 1) / un->un_tgt_blocksize;
+	}
 
 	/* request_bytes is rounded up to a multiple of the target block size */
 	request_bytes = (end_block - start_block) * un->un_tgt_blocksize;
@@ -12880,9 +12935,16 @@ sd_mapblocksize_iostart(int index, struct sd_lun *un, struct buf *bp)
 	 * length are aligned on a un->un_tgt_blocksize boundary. If aligned
 	 * then we do not need to allocate a shadow buf to handle the request.
 	 */
-	if (((first_byte   % un->un_tgt_blocksize) == 0) &&
-	    ((bp->b_bcount % un->un_tgt_blocksize) == 0)) {
-		is_aligned = TRUE;
+	if (un->un_f_enable_rmw) {
+		if (((first_byte % un->un_phy_blocksize) == 0) &&
+		    ((bp->b_bcount % un->un_phy_blocksize) == 0)) {
+			is_aligned = TRUE;
+		}
+	} else {
+		if (((first_byte % un->un_tgt_blocksize) == 0) &&
+		    ((bp->b_bcount % un->un_tgt_blocksize) == 0)) {
+			is_aligned = TRUE;
+		}
 	}
 
 	if ((bp->b_flags & B_READ) == 0) {
@@ -12939,10 +13001,17 @@ sd_mapblocksize_iostart(int index, struct sd_lun *un, struct buf *bp)
 		 * command (which will be based upon the target blocksize). Note
 		 * that this is only really used if the request is unaligned.
 		 */
-		bsp->mbs_copy_offset = (ssize_t)(first_byte -
-		    ((offset_t)xp->xb_blkno * un->un_tgt_blocksize));
-		ASSERT((bsp->mbs_copy_offset >= 0) &&
-		    (bsp->mbs_copy_offset < un->un_tgt_blocksize));
+		if (un->un_f_enable_rmw) {
+			bsp->mbs_copy_offset = (ssize_t)(first_byte -
+			    ((offset_t)xp->xb_blkno * un->un_sys_blocksize));
+			ASSERT((bsp->mbs_copy_offset >= 0) &&
+			    (bsp->mbs_copy_offset < un->un_phy_blocksize));
+		} else {
+			bsp->mbs_copy_offset = (ssize_t)(first_byte -
+			    ((offset_t)xp->xb_blkno * un->un_tgt_blocksize));
+			ASSERT((bsp->mbs_copy_offset >= 0) &&
+			    (bsp->mbs_copy_offset < un->un_tgt_blocksize));
+		}
 
 		shadow_bsp->mbs_copy_offset = bsp->mbs_copy_offset;
 
@@ -13010,7 +13079,7 @@ sd_mapblocksize_iodone(int index, struct sd_lun *un, struct buf *bp)
 	 * There is no shadow buf or layer-private data if the target is
 	 * using un->un_sys_blocksize as its block size or if bcount == 0.
 	 */
-	if ((un->un_tgt_blocksize == DEV_BSIZE) ||
+	if ((un->un_tgt_blocksize == DEV_BSIZE && !un->un_f_enable_rmw) ||
 	    (bp->b_bcount == 0)) {
 		goto exit;
 	}
@@ -13077,7 +13146,11 @@ sd_mapblocksize_iodone(int index, struct sd_lun *un, struct buf *bp)
 	 * shadow_start and shadow_len indicate the location and size of
 	 * the data returned with the shadow IO request.
 	 */
-	shadow_start  = SD_TGTBLOCKS2BYTES(un, (offset_t)xp->xb_blkno);
+	if (un->un_f_enable_rmw) {
+		shadow_start  = SD_SYSBLOCKS2BYTES((offset_t)xp->xb_blkno);
+	} else {
+		shadow_start  = SD_TGTBLOCKS2BYTES(un, (offset_t)xp->xb_blkno);
+	}
 	shadow_end    = shadow_start + bp->b_bcount - bp->b_resid;
 
 	/*
@@ -13088,7 +13161,14 @@ sd_mapblocksize_iodone(int index, struct sd_lun *un, struct buf *bp)
 	 * data to be copied (in bytes).
 	 */
 	copy_offset  = bsp->mbs_copy_offset;
-	ASSERT((copy_offset >= 0) && (copy_offset < un->un_tgt_blocksize));
+	if (un->un_f_enable_rmw) {
+		ASSERT((copy_offset >= 0) &&
+		    (copy_offset < un->un_phy_blocksize));
+	} else {
+		ASSERT((copy_offset >= 0) &&
+		    (copy_offset < un->un_tgt_blocksize));
+	}
+
 	copy_length  = orig_bp->b_bcount;
 	request_end  = shadow_start + copy_offset + orig_bp->b_bcount;
 
@@ -14532,7 +14612,7 @@ sd_add_buf_to_waitq(struct sd_lun *un, struct buf *bp)
 	 * If sorting is disabled, just add the buf to the tail end of
 	 * the wait queue and return.
 	 */
-	if (un->un_f_disksort_disabled) {
+	if (un->un_f_disksort_disabled || un->un_f_enable_rmw) {
 		un->un_waitq_tailp->av_forw = bp;
 		un->un_waitq_tailp = bp;
 		bp->av_forw = NULL;
@@ -19996,6 +20076,8 @@ sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
 			    &lbasize, &pbsize, path_flag);
 			if (status != 0) {
 				return (status);
+			} else {
+				goto rc16_done;
 			}
 		}
 		break;	/* Success! */
@@ -20050,6 +20132,8 @@ sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
 	 */
 	if (un->un_f_has_removable_media)
 		capacity *= (lbasize / un->un_sys_blocksize);
+
+rc16_done:
 
 	/*
 	 * Copy the values from the READ CAPACITY command into the space
@@ -20253,6 +20337,32 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
 		return (status);
 	}
 
+	/*
+	 * Some ATAPI CD-ROM drives report inaccurate LBA size values
+	 * (2352 and 0 are common) so for these devices always force the value
+	 * to 2048 as required by the ATAPI specs.
+	 */
+	if ((un->un_f_cfg_is_atapi == TRUE) && (ISCD(un))) {
+		lbasize = 2048;
+	}
+
+	/*
+	 * Get the maximum LBA value from the READ CAPACITY 16 data.
+	 * Here we assume that the Partial Medium Indicator (PMI) bit
+	 * was cleared when issuing the command. This means that the LBA
+	 * returned from the device is the LBA of the last logical block
+	 * on the logical unit.  The actual logical block count will be
+	 * this value plus one.
+	 */
+	capacity += 1;
+
+	/*
+	 * Currently, for removable media, the capacity is saved in terms
+	 * of un->un_sys_blocksize, so scale the capacity value to reflect this.
+	 */
+	if (un->un_f_has_removable_media)
+		capacity *= (lbasize / un->un_sys_blocksize);
+
 	*capp = capacity;
 	*lbap = lbasize;
 	*psp = pbsize;
@@ -20261,6 +20371,14 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
 	    "capacity:0x%llx  lbasize:0x%x, pbsize: 0x%x\n",
 	    capacity, lbasize, pbsize);
 
+	if ((capacity == 0) || (lbasize == 0) || (pbsize == 0)) {
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, -1,
+		    "sd_send_scsi_READ_CAPACITY_16 received invalid value "
+		    "capacity %llu lbasize %d pbsize %d", capacity, lbasize);
+		return (EIO);
+	}
+
+	sd_ssc_assessment(ssc, SD_FMT_STANDARD);
 	return (0);
 }
 
@@ -23486,17 +23604,24 @@ sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
 	 * Now read the capacity so we can provide the lbasize,
 	 * pbsize and capacity.
 	 */
-	rval = sd_send_scsi_READ_CAPACITY_16(ssc, &capacity, &lbasize, &pbsize,
-	    SD_PATH_DIRECT);
+	if (un->un_f_descr_format_supported)
+		rval = sd_send_scsi_READ_CAPACITY_16(ssc, &capacity, &lbasize,
+		    &pbsize, SD_PATH_DIRECT);
 
-	if (rval != 0) {
+	if (rval != 0 || !un->un_f_descr_format_supported) {
 		rval = sd_send_scsi_READ_CAPACITY(ssc, &capacity, &lbasize,
 		    SD_PATH_DIRECT);
 
 		switch (rval) {
 		case 0:
-			pbsize = lbasize;
+			if (un->un_f_enable_rmw &&
+			    un->un_phy_blocksize != 0) {
+				pbsize = un->un_phy_blocksize;
+			} else {
+				pbsize = lbasize;
+			}
 			media_capacity = capacity;
+
 			/*
 			 * sd_send_scsi_READ_CAPACITY() reports capacity in
 			 * un->un_sys_blocksize chunks. So we need to convert
@@ -23515,6 +23640,13 @@ sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
 			goto done;
 		}
 	} else {
+		if (un->un_f_enable_rmw &&
+		    !ISP2(pbsize % DEV_BSIZE)) {
+			pbsize = SSD_SECSIZE;
+		} else if (!ISP2(lbasize % DEV_BSIZE) ||
+		    !ISP2(pbsize % DEV_BSIZE)) {
+			pbsize = lbasize = DEV_BSIZE;
+		}
 		media_capacity = capacity;
 	}
 
@@ -23530,8 +23662,8 @@ sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
 	mutex_exit(SD_MUTEX(un));
 
 	media_info_ext.dki_lbsize = lbasize;
-	media_info_ext.dki_capacity = media_capacity;
 	media_info_ext.dki_pbsize = pbsize;
+	media_info_ext.dki_capacity = media_capacity;
 
 	if (ddi_copyout(&media_info_ext, arg, sizeof (struct dk_minfo_ext),
 	    flag)) {
@@ -31606,4 +31738,67 @@ sd_check_solid_state(sd_ssc_t *ssc)
 	} else {
 		mutex_exit(SD_MUTEX(un));
 	}
+}
+
+/*
+ *	Function: sd_check_emulation_mode
+ *
+ *   Description: Check whether the SSD is at emulation mode
+ *		  by issuing READ_CAPACITY_16 to see whether
+ *		  we can get physical block size of the drive.
+ *
+ *	 Context: Kernel thread or interrupt context.
+ */
+
+static void
+sd_check_emulation_mode(sd_ssc_t *ssc)
+{
+	int		rval = 0;
+	uint64_t	capacity;
+	uint_t		lbasize;
+	uint_t		pbsize;
+	int		i;
+	int		devid_len;
+	struct sd_lun	*un;
+
+	ASSERT(ssc != NULL);
+	un = ssc->ssc_un;
+	ASSERT(un != NULL);
+	ASSERT(!mutex_owned(SD_MUTEX(un)));
+
+	mutex_enter(SD_MUTEX(un));
+	if (ISCD(un)) {
+		mutex_exit(SD_MUTEX(un));
+		return;
+	}
+
+	if (un->un_f_descr_format_supported) {
+		mutex_exit(SD_MUTEX(un));
+		rval = sd_send_scsi_READ_CAPACITY_16(ssc, &capacity, &lbasize,
+		    &pbsize, SD_PATH_DIRECT);
+		mutex_enter(SD_MUTEX(un));
+
+		if (rval != 0) {
+			un->un_phy_blocksize = DEV_BSIZE;
+		} else {
+			if (!ISP2(pbsize % DEV_BSIZE) || pbsize == 0) {
+				un->un_phy_blocksize = DEV_BSIZE;
+			} else {
+				un->un_phy_blocksize = pbsize;
+			}
+		}
+	}
+
+	for (i = 0; i < sd_flash_dev_table_size; i++) {
+		devid_len = (int)strlen(sd_flash_dev_table[i]);
+		if (sd_sdconf_id_match(un, sd_flash_dev_table[i], devid_len)
+		    == SD_SUCCESS) {
+			un->un_phy_blocksize = SSD_SECSIZE;
+			if (un->un_f_is_solid_state &&
+			    un->un_phy_blocksize != un->un_tgt_blocksize)
+				un->un_f_enable_rmw = TRUE;
+		}
+	}
+
+	mutex_exit(SD_MUTEX(un));
 }
