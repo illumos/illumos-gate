@@ -12776,6 +12776,7 @@ mptsas_bus_config(dev_info_t *pdip, uint_t flag,
 	uint8_t		phy = 0xFF;
 	int		lun = 0;
 	uint_t		mflags = flag;
+	int		bconfig = TRUE;
 
 	if (scsi_hba_iport_unit_address(pdip) == 0) {
 		return (DDI_FAILURE);
@@ -12830,12 +12831,25 @@ mptsas_bus_config(dev_info_t *pdip, uint_t flag,
 				ret = NDI_FAILURE;
 				break;
 			}
+			*childp = NULL;
 			if (ptr[0] == 'w') {
 				ret = mptsas_config_one_addr(pdip, wwid,
 				    lun, childp);
 			} else if (ptr[0] == 'p') {
 				ret = mptsas_config_one_phy(pdip, phy, lun,
 				    childp);
+			}
+
+			/*
+			 * If this is CD/DVD device in OBP path, the
+			 * ndi_busop_bus_config can be skipped as config one
+			 * operation is done above.
+			 */
+			if ((ret == NDI_SUCCESS) && (*childp != NULL) &&
+			    (strcmp(ddi_node_name(*childp), "cdrom") == 0) &&
+			    (strncmp((char *)arg, "disk", 4) == 0)) {
+				bconfig = FALSE;
+				ndi_hold_devi(*childp);
 			}
 		} else {
 			ret = NDI_FAILURE;
@@ -12854,7 +12868,7 @@ mptsas_bus_config(dev_info_t *pdip, uint_t flag,
 		break;
 	}
 
-	if (ret == NDI_SUCCESS) {
+	if ((ret == NDI_SUCCESS) && bconfig) {
 		ret = ndi_busop_bus_config(pdip, mflags, op,
 		    (devnm == NULL) ? arg : devnm, childp, 0);
 	}
@@ -14503,7 +14517,7 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 
 		}
 
-		if (inq->inq_dtype == 0) {
+		if ((inq->inq_dtype == 0) || (inq->inq_dtype == 5)) {
 			/*
 			 * add 'obp-path' properties for devinfo
 			 */

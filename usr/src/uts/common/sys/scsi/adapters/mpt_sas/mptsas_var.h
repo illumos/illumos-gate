@@ -98,9 +98,9 @@ typedef uint16_t		mptsas_phymask_t;
 
 /*
  * 64-bit SAS WWN is displayed as 16 characters as HEX characters,
- * plus one means the end of the string '\0'.
+ * plus two means the prefix 'w' and end of the string '\0'.
  */
-#define	MPTSAS_WWN_STRLEN 16 + 1
+#define	MPTSAS_WWN_STRLEN	(16 + 2)
 #define	MPTSAS_MAX_GUID_LEN	64
 
 /*
