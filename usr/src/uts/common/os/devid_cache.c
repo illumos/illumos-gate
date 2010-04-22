@@ -32,6 +32,7 @@
 #include <sys/hwconf.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
+#include <sys/sunmdi.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/ndi_impldefs.h>
 #include <sys/kobj.h>
@@ -79,7 +80,7 @@
  *	Number of times discovery will be attempted prior to mounting root.
  *	Must be done at least once to recover from corrupted or missing
  *	devid cache backing store.  Probably there's no reason to ever
- * 	set this to greater than one as a missing device will remain
+ *	set this to greater than one as a missing device will remain
  *	unavailable no matter how often the system searches for it.
  *
  * devid_discovery_postboot (default 1)
@@ -482,9 +483,14 @@ e_ddi_devid_discovery(ddi_devid_t devid)
  * As part of registering a devid for a device,
  * update the devid cache with this device/devid pair
  * or note that this combination has registered.
+ *
+ * If a devpath is provided it will be used as the path to register the
+ * devid against, otherwise we use ddi_pathname(dip).  In both cases
+ * we duplicate the path string so that it can be cached/freed indepdently
+ * of the original owner.
  */
-int
-e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
+static int
+e_devid_cache_register_cmn(dev_info_t *dip, ddi_devid_t devid, char *devpath)
 {
 	nvp_devid_t *np;
 	nvp_devid_t *new_nvp;
@@ -496,23 +502,29 @@ e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
 	list_t *listp;
 	int is_dirty = 0;
 
-	/*
-	 * We are willing to accept DS_BOUND nodes if we can form a full
-	 * ddi_pathname (i.e. the node is part way to becomming
-	 * DS_INITIALIZED and devi_addr/ddi_get_name_addr are non-NULL).
-	 */
-	if (ddi_get_name_addr(dip) == NULL) {
-		return (DDI_FAILURE);
-	}
 
 	ASSERT(ddi_devid_valid(devid) == DDI_SUCCESS);
 
-	fullpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-	(void) ddi_pathname(dip, fullpath);
-	pathlen = strlen(fullpath) + 1;
-	path = kmem_alloc(pathlen, KM_SLEEP);
-	bcopy(fullpath, path, pathlen);
-	kmem_free(fullpath, MAXPATHLEN);
+	if (devpath) {
+		pathlen = strlen(devpath) + 1;
+		path = kmem_alloc(pathlen, KM_SLEEP);
+		bcopy(devpath, path, pathlen);
+	} else {
+		/*
+		 * We are willing to accept DS_BOUND nodes if we can form a full
+		 * ddi_pathname (i.e. the node is part way to becomming
+		 * DS_INITIALIZED and devi_addr/ddi_get_name_addr are non-NULL).
+		 */
+		if (ddi_get_name_addr(dip) == NULL)
+			return (DDI_FAILURE);
+
+		fullpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		(void) ddi_pathname(dip, fullpath);
+		pathlen = strlen(fullpath) + 1;
+		path = kmem_alloc(pathlen, KM_SLEEP);
+		bcopy(fullpath, path, pathlen);
+		kmem_free(fullpath, MAXPATHLEN);
+	}
 
 	DEVID_LOG_REG(("register", devid, path));
 
@@ -606,6 +618,12 @@ exit:
 	return (DDI_SUCCESS);
 }
 
+int
+e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
+{
+	return (e_devid_cache_register_cmn(dip, devid, NULL));
+}
+
 /*
  * Unregister a device's devid
  * Called as an instance detachs
@@ -634,6 +652,15 @@ e_devid_cache_unregister(dev_info_t *dip)
 	}
 
 	rw_exit(nvf_lock(dcfd_handle));
+}
+
+int
+e_devid_cache_pathinfo(mdi_pathinfo_t *pip, ddi_devid_t devid)
+{
+	char *path = mdi_pi_pathname(pip);
+
+	return (e_devid_cache_register_cmn(mdi_pi_get_client(pip), devid,
+	    path));
 }
 
 /*
@@ -985,6 +1012,130 @@ void
 e_devid_cache_free_devt_list(int ndevts, dev_t *devt_list)
 {
 	kmem_free(devt_list, ndevts * sizeof (dev_t *));
+}
+
+/*
+ * If given a full path and NULL ua, search for a cache entry
+ * whose path matches the full path.  On a cache hit duplicate the
+ * devid of the matched entry into the given devid (caller
+ * must free);  nodenamebuf is not touched for this usage.
+ *
+ * Given a path and a non-NULL unit address, search the cache for any entry
+ * matching "<path>/%@<unit-address>" where '%' is a wildcard meaning
+ * any node name.  The path should not end a '/'.  On a cache hit
+ * duplicate the devid as before (caller must free) and copy into
+ * the caller-provided nodenamebuf (if not NULL) the nodename of the
+ * matched entry.
+ *
+ * We must not make use of nvp_dip since that may be NULL for cached
+ * entries that are not present in the current tree.
+ */
+int
+e_devid_cache_path_to_devid(char *path, char *ua,
+    char *nodenamebuf, ddi_devid_t *devidp)
+{
+	size_t pathlen, ualen;
+	int rv = DDI_FAILURE;
+	nvp_devid_t *np;
+	list_t *listp;
+	char *cand;
+
+	if (path == NULL || *path == '\0' || (ua && *ua == '\0') ||
+	    devidp == NULL)
+		return (DDI_FAILURE);
+
+	*devidp = NULL;
+
+	if (ua) {
+		pathlen = strlen(path);
+		ualen = strlen(ua);
+	}
+
+	rw_enter(nvf_lock(dcfd_handle), RW_READER);
+
+	listp = nvf_list(dcfd_handle);
+	for (np = list_head(listp); np; np = list_next(listp, np)) {
+		size_t nodelen, candlen, n;
+		ddi_devid_t devid_dup;
+		char *uasep, *node;
+
+		if (np->nvp_devid == NULL)
+			continue;
+
+		if (ddi_devid_valid(np->nvp_devid) != DDI_SUCCESS) {
+			DEVIDERR((CE_CONT,
+			    "pathsearch: invalid devid %s\n",
+			    np->nvp_devpath));
+			continue;
+		}
+
+		cand = np->nvp_devpath;		/* candidate path */
+
+		/* If a full pathname was provided the compare is easy */
+		if (ua == NULL) {
+			if (strcmp(cand, path) == 0)
+				goto match;
+			else
+				continue;
+		}
+
+		/*
+		 * The compare for initial path plus ua and unknown nodename
+		 * is trickier.
+		 *
+		 * Does the initial path component match 'path'?
+		 */
+		if (strncmp(path, cand, pathlen) != 0)
+			continue;
+
+		candlen = strlen(cand);
+
+		/*
+		 * The next character must be a '/' and there must be no
+		 * further '/' thereafter.  Begin by checking that the
+		 * candidate is long enough to include at mininum a
+		 * "/<nodename>@<ua>" after the initial portion already
+		 * matched assuming a nodename length of 1.
+		 */
+		if (candlen < pathlen + 1 + 1 + 1 + ualen ||
+		    cand[pathlen] != '/' ||
+		    strchr(cand + pathlen + 1, '/') != NULL)
+			continue;
+
+		node = cand + pathlen + 1;	/* <node>@<ua> string */
+
+		/*
+		 * Find the '@' before the unit address.  Check for
+		 * unit address match.
+		 */
+		if ((uasep = strchr(node, '@')) == NULL)
+			continue;
+
+		/*
+		 * Check we still have enough length and that ua matches
+		 */
+		nodelen = (uintptr_t)uasep - (uintptr_t)node;
+		if (candlen < pathlen + 1 + nodelen + 1 + ualen ||
+		    strncmp(ua, uasep + 1, ualen) != 0)
+			continue;
+match:
+		n = ddi_devid_sizeof(np->nvp_devid);
+		devid_dup = kmem_alloc(n, KM_SLEEP);	/* caller must free */
+		(void) bcopy(np->nvp_devid, devid_dup, n);
+		*devidp = devid_dup;
+
+		if (ua && nodenamebuf) {
+			(void) strncpy(nodenamebuf, node, nodelen);
+			nodenamebuf[nodelen] = '\0';
+		}
+
+		rv = DDI_SUCCESS;
+		break;
+	}
+
+	rw_exit(nvf_lock(dcfd_handle));
+
+	return (rv);
 }
 
 #ifdef	DEBUG

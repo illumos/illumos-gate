@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PCI ECC support
@@ -92,9 +89,9 @@ ecc_create(pci_t *pci_p)
 
 	DEBUG1(DBG_ATTACH, dip, "ecc_create: csr=%x\n", ecc_p->ecc_csr_pa);
 	DEBUG2(DBG_ATTACH, dip, "ecc_create: ue_afsr=%x, ue_afar=%x\n",
-		ecc_p->ecc_ue.ecc_afsr_pa, ecc_p->ecc_ue.ecc_afar_pa);
+	    ecc_p->ecc_ue.ecc_afsr_pa, ecc_p->ecc_ue.ecc_afar_pa);
 	DEBUG2(DBG_ATTACH, dip, "ecc_create: ce_afsr=%x, ce_afar=%x\n",
-		ecc_p->ecc_ce.ecc_afsr_pa, ecc_p->ecc_ce.ecc_afar_pa);
+	    ecc_p->ecc_ce.ecc_afsr_pa, ecc_p->ecc_ce.ecc_afar_pa);
 
 	ecc_configure(pci_p);
 
@@ -167,11 +164,11 @@ ecc_configure(pci_t *pci_p)
 	 */
 	DEBUG0(DBG_ATTACH, dip, "ecc_configure: clearing UE and CE errors\n");
 	l = (COMMON_ECC_UE_AFSR_E_MASK << COMMON_ECC_UE_AFSR_PE_SHIFT) |
-		(COMMON_ECC_UE_AFSR_E_MASK << COMMON_ECC_UE_AFSR_SE_SHIFT);
+	    (COMMON_ECC_UE_AFSR_E_MASK << COMMON_ECC_UE_AFSR_SE_SHIFT);
 	stdphysio(ecc_p->ecc_ue.ecc_afsr_pa, l);
 
 	l = (COMMON_ECC_CE_AFSR_E_MASK << COMMON_ECC_CE_AFSR_PE_SHIFT) |
-		(COMMON_ECC_CE_AFSR_E_MASK << COMMON_ECC_CE_AFSR_SE_SHIFT);
+	    (COMMON_ECC_CE_AFSR_E_MASK << COMMON_ECC_CE_AFSR_SE_SHIFT);
 	stdphysio(ecc_p->ecc_ce.ecc_afsr_pa, l);
 
 	/*
@@ -339,19 +336,19 @@ ecc_errstate_get(ecc_errstate_t *ecc_err_p)
 	ecc_err_p->ecc_afar = lddphysio(ecc_err_p->ecc_ii_p.ecc_afar_pa);
 
 	ecc_err_p->ecc_offset = ((ecc_err_p->ecc_afsr &
-				ecc_err_p->ecc_ii_p.ecc_offset_mask) >>
-			ecc_err_p->ecc_ii_p.ecc_offset_shift) <<
-		ecc_err_p->ecc_ii_p.ecc_size_log2;
+	    ecc_err_p->ecc_ii_p.ecc_offset_mask) >>
+	    ecc_err_p->ecc_ii_p.ecc_offset_shift) <<
+	    ecc_err_p->ecc_ii_p.ecc_size_log2;
 
 	ecc_err_p->ecc_aflt.flt_id = gethrtime();
 	ecc_err_p->ecc_aflt.flt_stat = ecc_err_p->ecc_afsr;
 	ecc_err_p->ecc_aflt.flt_addr = P2ALIGN(ecc_err_p->ecc_afar, 64) +
-		ecc_err_p->ecc_offset;
+	    ecc_err_p->ecc_offset;
 	ecc_err_p->ecc_aflt.flt_bus_id = bus_id;
 	ecc_err_p->ecc_aflt.flt_inst = CPU->cpu_id;
 	ecc_err_p->ecc_aflt.flt_status = ECC_IOBUS;
-	ecc_err_p->ecc_aflt.flt_in_memory = (pf_is_memory
-			(ecc_err_p->ecc_afar >> MMU_PAGESHIFT))? 1: 0;
+	ecc_err_p->ecc_aflt.flt_in_memory =
+	    (pf_is_memory(ecc_err_p->ecc_afar >> MMU_PAGESHIFT))? 1: 0;
 	ecc_err_p->ecc_aflt.flt_class = BUS_FAULT;
 }
 
@@ -433,21 +430,21 @@ ecc_err_handler(ecc_errstate_t *ecc_err_p)
 
 	ecc_errstate_get(ecc_err_p);
 	pri_err = (ecc_err_p->ecc_afsr >> COMMON_ECC_UE_AFSR_PE_SHIFT) &
-		COMMON_ECC_UE_AFSR_E_MASK;
+	    COMMON_ECC_UE_AFSR_E_MASK;
 
 	sec_err = (ecc_err_p->ecc_afsr >> COMMON_ECC_UE_AFSR_SE_SHIFT) &
-		COMMON_ECC_UE_AFSR_E_MASK;
+	    COMMON_ECC_UE_AFSR_E_MASK;
 
 	switch (ecc_ii_p->ecc_type) {
 	case CBNINTR_UE:
 		if (pri_err) {
 			ecc_err_p->ecc_aflt.flt_synd =
-				pci_ecc_get_synd(ecc_err_p->ecc_afsr);
+			    pci_ecc_get_synd(ecc_err_p->ecc_afsr);
 			ecc_err_p->ecc_pri = 1;
 			pci_ecc_classify(pri_err, ecc_err_p);
 			errorq_dispatch(pci_ecc_queue, (void *)ecc_err_p,
-				sizeof (ecc_errstate_t),
-				ecc_err_p->ecc_aflt.flt_panic);
+			    sizeof (ecc_errstate_t),
+			    ecc_err_p->ecc_aflt.flt_panic);
 		}
 		if (sec_err) {
 			ecc_sec_err = *ecc_err_p;
@@ -474,7 +471,7 @@ ecc_err_handler(ecc_errstate_t *ecc_err_p)
 			ecc_err_p->ecc_aflt.flt_panic = 1;
 
 		if (ecc_err_p->ecc_aflt.flt_panic &&
-				ecc_err_p->ecc_aflt.flt_in_memory)
+		    ecc_err_p->ecc_aflt.flt_in_memory)
 			panic_aflt = ecc_err_p->ecc_aflt;
 
 		if (ecc_err_p->ecc_aflt.flt_panic) {
@@ -492,10 +489,10 @@ ecc_err_handler(ecc_errstate_t *ecc_err_p)
 			ecc_err_p->ecc_pri = 1;
 			pci_ecc_classify(pri_err, ecc_err_p);
 			ecc_err_p->ecc_aflt.flt_synd =
-				pci_ecc_get_synd(ecc_err_p->ecc_afsr);
+			    pci_ecc_get_synd(ecc_err_p->ecc_afsr);
 			ce_scrub(&ecc_err_p->ecc_aflt);
 			errorq_dispatch(pci_ecc_queue, (void *)ecc_err_p,
-					sizeof (ecc_errstate_t), ERRORQ_ASYNC);
+			    sizeof (ecc_errstate_t), ERRORQ_ASYNC);
 			nonfatal++;
 		}
 		if (sec_err) {
@@ -587,7 +584,7 @@ ecc_err_drain(void *not_used, ecc_errstate_t *ecc_err, errorq_elem_t *eqep)
 	}
 
 	ecc_cpu_call(ecc, ecc_err->ecc_unum, (ecc_type == CBNINTR_UE) ?
-			ECC_IO_UE : ECC_IO_CE);
+	    ECC_IO_UE : ECC_IO_CE);
 
 	switch (ecc_type) {
 	case CBNINTR_UE:
@@ -681,7 +678,7 @@ ecc_ereport_post(dev_info_t *dip, ecc_errstate_t *ecc_err)
 	    ecc_err->ecc_bridge_type, ecc_err->ecc_aflt.flt_erpt_class);
 
 	ecc_err->ecc_ena = ecc_err->ecc_ena ? ecc_err->ecc_ena :
-		fm_ena_generate(0, FM_ENA_FMT1);
+	    fm_ena_generate(0, FM_ENA_FMT1);
 
 	eqep = errorq_reserve(fmhdl->fh_errorq);
 	if (eqep == NULL)
@@ -701,7 +698,8 @@ ecc_ereport_post(dev_info_t *dip, ecc_errstate_t *ecc_err)
 	if (ptr)
 		*ptr = '\0';
 
-	fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL, dev_path, NULL);
+	fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL, dev_path,
+	    NULL, NULL);
 
 	if (ecc_err->ecc_pri) {
 		if ((ecc_err->ecc_fmri = fm_nvlist_create(nva)) != NULL) {

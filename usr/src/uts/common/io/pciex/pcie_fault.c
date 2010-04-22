@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sysmacros.h>
@@ -2649,7 +2649,7 @@ pf_ereport_setup(dev_info_t *dip, uint64_t ena, nvlist_t **ereport,
 	}
 
 	fm_fmri_dev_set(*detector, FM_DEV_SCHEME_VERSION, NULL,
-	    device_path, NULL);
+	    device_path, NULL, NULL);
 
 	if (ena == 0)
 		ena = fm_ena_generate(0, FM_ENA_FMT1);

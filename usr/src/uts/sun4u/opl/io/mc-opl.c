@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2008
  */
-
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -968,7 +966,7 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 	flt_stat = mc_aflt->mflt_stat[0];
 	(void) ddi_pathname(mc_aflt->mflt_mcp->mc_dip, device_path);
 	(void) fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL,
-	    device_path, NULL);
+	    device_path, NULL, NULL);
 
 	/*
 	 * Encode all the common data into the ereport.

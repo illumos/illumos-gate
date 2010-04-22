@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <limits.h>
@@ -128,26 +127,23 @@ dev_release(topo_mod_t *mod, tnode_t *node)
 static ssize_t
 fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
-	nvlist_t *anvl = NULL;
-	nvpair_t *apair;
-	uint8_t version;
-	ssize_t size = 0;
-	char *devid = NULL;
+	char *devid = NULL, *tpl0id = NULL;
 	char *devpath = NULL;
-	char *aname, *aval;
+	ssize_t size = 0;
+	uint8_t version;
 	int err;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    version > FM_DEV_SCHEME_VERSION)
 		return (-1);
 
-	/* Get authority, if present */
-	err = nvlist_lookup_nvlist(nvl, FM_FMRI_AUTHORITY, &anvl);
+	/* Get devid, if present */
+	err = nvlist_lookup_string(nvl, FM_FMRI_DEV_ID, &devid);
 	if (err != 0 && err != ENOENT)
 		return (-1);
 
-	/* Get devid, if present */
-	err = nvlist_lookup_string(nvl, FM_FMRI_DEV_ID, &devid);
+	/* Get target-port-l0id, if present */
+	err = nvlist_lookup_string(nvl, FM_FMRI_DEV_TGTPTLUN0, &tpl0id);
 	if (err != 0 && err != ENOENT)
 		return (-1);
 
@@ -156,31 +152,40 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	if (err != 0 || devpath == NULL)
 		return (-1);
 
-
-	/* dev:// */
+	/*
+	 * dev:///
+	 *
+	 * The dev scheme does not render fmri authority information
+	 * in the string form of an fmri.  It is meaningless to
+	 * transmit a dev scheme fmri outside of the immediate fault
+	 * manager.
+	 */
 	topo_fmristr_build(&size,
-	    buf, buflen, FM_FMRI_SCHEME_DEV, NULL, "://");
-
-	/* authority, if any */
-	if (anvl != NULL) {
-		for (apair = nvlist_next_nvpair(anvl, NULL);
-		    apair != NULL; apair = nvlist_next_nvpair(anvl, apair)) {
-			if (nvpair_type(apair) != DATA_TYPE_STRING ||
-			    nvpair_value_string(apair, &aval) != 0)
-				continue;
-			aname = nvpair_name(apair);
-			topo_fmristr_build(&size, buf, buflen, ":", NULL, NULL);
-			topo_fmristr_build(&size, buf, buflen, "=",
-			    aname, aval);
-		}
-	}
+	    buf, buflen, FM_FMRI_SCHEME_DEV, NULL, ":///");
 
 	/* device-id part, topo_fmristr_build does nothing if devid is NULL */
 	topo_fmristr_build(&size,
-	    buf, buflen, devid, "/:" FM_FMRI_DEV_ID "=", NULL);
+	    buf, buflen, devid, ":" FM_FMRI_DEV_ID "=", NULL);
 
-	/* device-path part */
-	topo_fmristr_build(&size, buf, buflen, devpath, "/", NULL);
+	/* target-port-l0id part */
+	topo_fmristr_build(&size,
+	    buf, buflen, tpl0id, ":" FM_FMRI_DEV_TGTPTLUN0 "=", NULL);
+
+	/*
+	 * device-path part; the devpath should always start with a /
+	 * so you'd think we don't need to add a further / prefix here;
+	 * however past implementation has always added the / if
+	 * there is a devid component so we continue to do that
+	 * so strings match exactly as before.  So we can have:
+	 *
+	 *	dev:////pci@0,0/...
+	 *	dev:///<devid-and-tpl0>//pci@0,0/...
+	 *
+	 *	where <devid-and-tpl0> =
+	 *			[:devid=<devid>][:target-port-l0id=<tpl0>]
+	 */
+	topo_fmristr_build(&size, buf, buflen, devpath,
+	    devid || tpl0id ? "/" : NULL, NULL);
 
 	return (size);
 }
@@ -223,10 +228,11 @@ static int
 dev_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
 {
+	char *cur, *devid = NULL, *tpl0id = NULL;
+	char *str, *strcp;
 	nvlist_t *fmri;
 	char *devpath;
-	char *devid = NULL;
-	char *str;
+	size_t len;
 	int err;
 
 	if (version > TOPO_METH_STR2NVL_VERSION)
@@ -235,42 +241,124 @@ dev_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	if (nvlist_lookup_string(in, "fmri-string", &str) != 0)
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 
-	/* We're expecting a string version of a dev scheme FMRI */
-	if (strncmp(str, "dev:///", 7) != 0)
+	len = strlen(str);
+
+	/*
+	 * We're expecting a string version of a dev scheme FMRI, and
+	 * no fmri authority information.
+	 *
+	 * The shortest legal string would be "dev:////" (len 8) for a string
+	 * with no FMRI auth info, no devid or target-port-l0id and
+	 * an empty devpath string.
+	 */
+	if (len < 8 || strncmp(str, "dev:///", 7) != 0)
 		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
 
-	devpath = str + 7;
-	if (strncmp(devpath, ":" FM_FMRI_DEV_ID "=", 7) == 0) {
-		char *n;
-		int len;
+	strcp = alloca(len + 1);
+	(void) memcpy(strcp, str, len);
+	strcp[len] = '\0';
+	cur = strcp + 7;	/* already parsed "dev:///" */
 
-		n = strchr(devpath + 7, '/');
-		if (n == NULL)
+	/*
+	 * If the first character after the "/" that terminates the (empty)
+	 * fmri authority is a colon then we have devid and/or target-port-l0id
+	 * info.  They could be in either order.
+	 *
+	 * If not a colon then it must be the / that begins the devpath.
+	 */
+	if (*cur == ':') {
+		char *eos, *part[2];
+		int i;
+		/*
+		 * Look ahead to the "/" that starts the devpath.  If not
+		 * found or if straight after the : then we're busted.
+		 */
+		eos = devpath = strchr(cur, '/');
+		if (devpath == NULL || devpath == cur + 1)
 			return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
-		len = n - (devpath + 7);
-		devid = alloca(len + 1);
-		(void) memcpy(devid, devpath + 7, len);
-		devid[len] = 0;
-		devpath = n + 1;
-	}
 
-	/* the device-path should start with a slash */
-	if (*devpath != '/')
+		part[0] = ++cur;
+
+		/*
+		 * Replace the initial "/" of the devpath with a NUL
+		 * to terminate the string before it.  We'll undo this
+		 * before rendering devpath.
+		 */
+		*eos = '\0';
+
+		/*
+		 * We should now have a NUL-terminated string matching
+		 * foo=<pat1>[:bar=<pat2>] (we stepped over the initial :)
+		 * Look for a second colon; if found there must be space
+		 * after it for the additional component, but no more colons.
+		 */
+		if ((part[1] = strchr(cur, ':')) != NULL) {
+			if (part[1] + 1 == eos ||
+			    strchr(part[1] + 1, ':') != NULL)
+				return (topo_mod_seterrno(mod,
+				    EMOD_FMRI_MALFORM));
+			*part[1] = '\0'; /* terminate part[0] */
+			part[1]++;
+		}
+
+		for (i = 0; i < 2; i++) {
+			char *eq;
+
+			if (!part[i])
+				continue;
+
+			if ((eq = strchr(part[i], '=')) == NULL ||
+			    *(eq + 1) == '\0')
+				return (topo_mod_seterrno(mod,
+				    EMOD_FMRI_MALFORM));
+
+			*eq = '\0';
+			if (strcmp(part[i], FM_FMRI_DEV_ID) == 0)
+				devid = eq + 1;
+			else if (strcmp(part[i], FM_FMRI_DEV_TGTPTLUN0) == 0)
+				tpl0id = eq + 1;
+			else
+				return (topo_mod_seterrno(mod,
+				    EMOD_FMRI_MALFORM));
+		}
+
+		if (devid == NULL && tpl0id == NULL)
+			return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
+
+		cur = devpath;	/* initial slash is NULled */
+	} else if (*cur != '/') {
+		/* the device-path should start with a slash */
 		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
+	} else {
+		devpath = cur;
+	}
 
 	if (topo_mod_nvalloc(mod, &fmri, NV_UNIQUE_NAME) != 0)
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 
 	err = nvlist_add_uint8(fmri, FM_VERSION, FM_DEV_SCHEME_VERSION);
 	err |= nvlist_add_string(fmri, FM_FMRI_SCHEME, FM_FMRI_SCHEME_DEV);
-	err |= nvlist_add_string(fmri, FM_FMRI_DEV_PATH, devpath);
+
 	if (devid != NULL)
 		err |= nvlist_add_string(fmri, FM_FMRI_DEV_ID, devid);
+
+	if (tpl0id != NULL)
+		err |= nvlist_add_string(fmri, FM_FMRI_DEV_TGTPTLUN0, tpl0id);
+
+	if (devid != NULL || tpl0id != NULL)
+		*devpath = '/';	/* we NULed this earlier; put it back */
+
+	/* step over repeated initial / in the devpath */
+	while (*(devpath + 1) == '/')
+		devpath++;
+
+	err |= nvlist_add_string(fmri, FM_FMRI_DEV_PATH, devpath);
 
 	if (err != 0) {
 		nvlist_free(fmri);
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 	}
+
 	*out = fmri;
 
 	return (0);

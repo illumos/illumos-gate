@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2839,7 +2838,8 @@ cb_ereport_post(dev_info_t *dip, uint64_t ena, cb_errstate_t *cb_err)
 	if (ptr)
 		*ptr = '\0';
 
-	fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL, dev_path, NULL);
+	fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL, dev_path,
+	    NULL, NULL);
 
 	DEBUG1(DBG_ERR_INTR, dip, "cb_ereport_post: ereport_set: %s", buf);
 

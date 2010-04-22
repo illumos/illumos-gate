@@ -43,6 +43,7 @@
 #include <sys/damap.h>
 #include <sys/time.h>
 #include <sys/sunldi.h>
+#include <sys/fm/protocol.h>
 
 extern struct scsi_pkt *scsi_init_cache_pkt(struct scsi_address *,
 		    struct scsi_pkt *, struct buf *, int, int, int, int,
@@ -600,8 +601,9 @@ scsi_hba_log(int level, const char *func, dev_info_t *self, dev_info_t *child,
 	mutex_exit(&scsi_hba_log_mutex);
 }
 
-static int	scsi_enumeration_failed_panic = 0;
-static int	scsi_enumeration_failed_hotplug = 1;
+int	scsi_enumeration_failed_panic = 0;
+int	scsi_enumeration_failed_hotplug = 1;
+
 static void
 scsi_enumeration_failed(dev_info_t *child, scsi_enum_t se,
     char *arg, char *when)
@@ -5094,6 +5096,9 @@ scsi_findchild(dev_info_t *self, char *name, char *addr, int init,
  * If no driver binds to the device using driver_alias we establish the driver
  * passed in as the node name.
  */
+
+extern int e_devid_cache_pathinfo(mdi_pathinfo_t *, ddi_devid_t);
+
 static int
 scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
     struct scsi_device *sdprobe, dev_info_t **dchildp, mdi_pathinfo_t **pchildp)
@@ -5379,6 +5384,21 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 			SCSI_HBA_LOG((_LOG(2), self, NULL,
 			    "pathinfo %s created, no devid",
 			    mdi_pi_spathname(pchild)));
+		}
+
+		/*
+		 * The above has registered devid for the device under
+		 * the client node.  Now register it under the full pHCI
+		 * path to the device.  We'll get an entry equivalent to
+		 * booting with mpxio disabled.  This is needed for
+		 * telemetry during enumeration.
+		 */
+		if (e_devid_cache_pathinfo(pchild, devid) == DDI_SUCCESS) {
+			SCSI_HBA_LOG((_LOG(2), NULL, dchild,
+			    "pathinfo @%s created with devid", addr));
+		} else {
+			SCSI_HBA_LOG((_LOG(1), NULL, dchild,
+			    "pathinfo @%s devid cache failed", addr));
 		}
 	}
 

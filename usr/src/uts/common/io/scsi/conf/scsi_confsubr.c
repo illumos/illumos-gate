@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -34,6 +33,7 @@
 #include <sys/scsi/scsi.h>
 #include <sys/modctl.h>
 #include <sys/bitmap.h>
+#include <sys/fm/protocol.h>
 
 /*
  * macro for filling in lun value for scsi-1 support
@@ -57,6 +57,31 @@ static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modlmisc, NULL
 };
 
+/*
+ * Contexts from which we call scsi_test
+ */
+enum scsi_test_ctxt {
+	/*
+	 * Those in scsi_hba_probe_pi()
+	 */
+	STC_PROBE_FIRST_INQ,
+	STC_PROBE_FIRST_INQ_RETRY,
+	STC_PROBE_PARTIAL_SUCCESS,
+	STC_PROBE_RQSENSE1,
+	STC_PROBE_CHK_CLEARED,
+	STC_PROBE_RQSENSE2,
+	STC_PROBE_INQ_FINAL,
+	/*
+	 * Those in check_vpd_page_support8083()
+	 */
+	STC_VPD_CHECK,
+	/*
+	 * Those in scsi_device_identity()
+	 */
+	STC_IDENTITY_PG80,
+	STC_IDENTITY_PG83,
+};
+
 static void create_inquiry_props(struct scsi_device *);
 
 static int scsi_check_ss2_LUN_limit(struct scsi_device *);
@@ -67,7 +92,8 @@ static int check_vpd_page_support8083(struct scsi_device *sd,
 		int (*callback)(), int *, int *);
 static int send_scsi_INQUIRY(struct scsi_device *sd,
 		int (*callback)(), uchar_t *bufaddr, size_t buflen,
-		uchar_t evpd, uchar_t page_code, size_t *lenp);
+		uchar_t evpd, uchar_t page_code, size_t *lenp,
+		enum scsi_test_ctxt);
 
 /*
  * this int-array HBA-node property keeps track of strictly SCSI-2
@@ -137,6 +163,50 @@ int	scsi_probe_debug = 0;
 
 int	scsi_test_busy_timeout = SCSI_POLL_TIMEOUT;	/* in seconds */
 int	scsi_test_busy_delay = 10000;			/* 10msec in usec */
+
+
+/*
+ * Returns from scsi_test.
+ *
+ * SCSI_TEST_CMPLT_GOOD => TRAN_ACCEPT, CMD_CMPLT, STATUS_GOOD
+ *
+ * SCSI_TEST_CMPLT_BUSY => TRAN_ACCEPT, CMD_CMPLT, STATUS_BUSY
+ *
+ * SCSI_TEST_CMPLT_CHECK => TRAN_ACCEPT, CMD_CMPLT, STATUS_CHECK
+ *
+ * SCSI_TEST_CMPLT_OTHER => TRAN_ACCEPT, CMD_CMPLT, !STATUS_{GOOD,BUSY,CHECK}
+ *
+ * SCSI_TEST_CMD_INCOMPLETE => TRAN_ACCEPT, CMD_INCOMPLETE
+ *
+ * SCSI_TEST_NOTCMPLT => TRAN_ACCEPT, pkt_reason != CMD_{CMPLT,INCOMPLETE}
+ *
+ * SCSI_TEST_TRAN_BUSY => (Repeated) TRAN_BUSY from attempt scsi_transport
+ *
+ * SCSI_TEST_TRAN_REJECT => TRAN_BADPKT or TRAN_FATAL_ERROR
+ *
+ */
+#define	SCSI_TEST_CMPLT_GOOD		0x01U
+#define	SCSI_TEST_CMPLT_BUSY		0x02U
+#define	SCSI_TEST_CMPLT_CHECK		0x04U
+#define	SCSI_TEST_CMPLT_OTHER		0x08U
+
+#define	SCSI_TEST_CMPLTMASK \
+	(SCSI_TEST_CMPLT_GOOD | SCSI_TEST_CMPLT_BUSY | \
+	SCSI_TEST_CMPLT_CHECK | SCSI_TEST_CMPLT_OTHER)
+
+#define	SCSI_TEST_PARTCMPLTMASK \
+	(SCSI_TEST_CMPLTMASK & ~SCSI_TEST_CMPLT_GOOD)
+
+#define	SCSI_TEST_CMD_INCOMPLETE	0x10U
+#define	SCSI_TEST_NOTCMPLT		0x20U
+#define	SCSI_TEST_TRAN_BUSY		0x40U
+#define	SCSI_TEST_TRAN_REJECT		0x80U
+
+#define	SCSI_TEST_FAILMASK \
+	(SCSI_TEST_CMD_INCOMPLETE | SCSI_TEST_NOTCMPLT | \
+	SCSI_TEST_TRAN_BUSY | SCSI_TEST_TRAN_REJECT)
+
+#define	SCSI_TEST_FAILURE(x) (((x) & SCSI_TEST_FAILMASK) != 0)
 
 /*
  * architecture dependent allocation restrictions. For x86, we'll set
@@ -386,12 +456,454 @@ scsi_unprobe(struct scsi_device *sd)
 }
 
 /*
+ * We log all scsi_test failures (as long as we are SE_HP etc).  The
+ * following table controls the "driver-assessment" payload item
+ * in the ereports we raise.  If a scsi_test return features in the
+ * retry mask then the calling context will retry; if it features in
+ * the fatal mask then the caller will not retry (although higher-level
+ * software might); if in neither (which shouldn't happen - you either
+ * retry or give up) default to 'retry'.
+ */
+static const struct scsi_test_profile {
+	enum scsi_test_ctxt stp_ctxt;	/* Calling context */
+	uint32_t stp_retrymask;		/* Returns caller will retry for */
+	uint32_t stp_fatalmask;		/* Returns caller considers fatal */
+} scsi_test_profile[] = {
+	/*
+	 * This caller will retry on SCSI_TEST_FAILMASK as long as it was
+	 * not SCSI_TEST_CMD_INCOMPLETE which is terminal.  A return from
+	 * SCSI_TEST_PARTCMPLTMASK (command complete but status other than
+	 * STATUS_GOOD) is not terminal and we'll move on to the context
+	 * of STC_PROBE_PARTIAL_SUCCESS so that's a retry, too.
+	 */
+	{
+		STC_PROBE_FIRST_INQ,
+		SCSI_TEST_FAILMASK & ~SCSI_TEST_CMD_INCOMPLETE |
+		    SCSI_TEST_PARTCMPLTMASK,
+		SCSI_TEST_CMD_INCOMPLETE
+	},
+
+	/*
+	 * If the first inquiry fails outright we always retry just once
+	 * (except for SCSI_TEST_CMD_INCOMPLETE as above).  A return in
+	 * SCSI_TEST_FAILMASK is terminal; for SCSI_TEST_PARTCMPLTMASK
+	 * we will retry at STC_PROBE_PARTIAL_SUCCESS.
+	 */
+	{
+		STC_PROBE_FIRST_INQ_RETRY,
+		SCSI_TEST_PARTCMPLTMASK,
+		SCSI_TEST_FAILMASK
+	},
+
+	/*
+	 * If we've met with partial success we retry at caller context
+	 * STC_PROBE_PARTIAL_SUCCESS.  Any SCSI_TEST_FAILMASK return
+	 * here is terminal, as too is SCSI_TEST_CMPLT_BUSY.  A return in
+	 * SCSI_TEST_PARTCMPLTMASK and we will continue with further
+	 * inquiry attempts.
+	 */
+	{
+		STC_PROBE_PARTIAL_SUCCESS,
+		SCSI_TEST_PARTCMPLTMASK & ~SCSI_TEST_CMPLT_BUSY,
+		SCSI_TEST_FAILMASK | SCSI_TEST_CMPLT_BUSY
+	},
+
+	/*
+	 * If we get past the above target busy case then we will
+	 * perform a sense request if scsi_test indicates STATUS_CHECK
+	 * and ARQ was not done.  We are not interested in logging telemetry
+	 * for transports that do not perform ARQ automatically.
+	 */
+	{
+		STC_PROBE_RQSENSE1,
+		0,
+		0
+	},
+
+	/*
+	 * If "something" responded to the probe but then the next inquiry
+	 * sees a change of heart then we fail the probe on any of
+	 * SCSI_TEST_FAILMASK or SCSI_TEST_CMPLT_BUSY.  For other values
+	 * in SCSI_TEST_PARTCMPLTMASK we soldier on.
+	 */
+	{
+		STC_PROBE_CHK_CLEARED,
+		SCSI_TEST_PARTCMPLTMASK & ~SCSI_TEST_CMPLT_BUSY,
+		SCSI_TEST_FAILMASK | SCSI_TEST_CMPLT_BUSY
+	},
+
+	/*
+	 * If after all that there we still have STATUS_CHECK from the
+	 * inquiry status then we resend the sense request but the
+	 * result is ignored (just clearing the condition).  Do not
+	 * log.
+	 */
+	{
+		STC_PROBE_RQSENSE2,
+		0,
+		0
+	},
+
+	/*
+	 * After the above sense request we once again send an inquiry.
+	 * If it fails outright or STATUS_CHECK persists we give up.
+	 * Any partial result is considered success.
+	 */
+	{
+		STC_PROBE_INQ_FINAL,
+		0,
+		SCSI_TEST_FAILMASK | SCSI_TEST_CMPLT_CHECK
+	},
+
+	/*
+	 * check_vpd_page_support8083 called from scsi_device_identity
+	 * performs an inquiry with EVPD set (and page necessarily 0)
+	 * to see what pages are supported.
+	 *
+	 * Some devices do not support this command and therefore
+	 * check_vpd_page_support8083 only returns an error of kmem_zalloc
+	 * fails.  If the send_scsi_INQUIRY does not meet with complete
+	 * success (SCSI_TEST_CMPLT_GOOD) it returns -1, othewise 0.
+	 * So any scsi_test failure here will cause us to assume no page
+	 * 80/83 support, and we will proceed without devid support.
+	 * So -1 returns from send_scsi_INQUIRY are not terminal.
+	 */
+	{
+		STC_VPD_CHECK,
+		0,
+		0
+	},
+
+	/*
+	 * If the above inquiry claims pg80 support then scsi_device_identity
+	 * will perform a send_scsi_INQUIRY to retrieve that page.
+	 * Anything other than SCSI_TEST_CMPLT_GOOD is a failure and will
+	 * cause scsi_device_identity to return non-zero at which point the
+	 * caller goes to SCSIPROBE_FAILURE.
+	 */
+	{
+		STC_IDENTITY_PG80,
+		0,
+		SCSI_TEST_FAILMASK | SCSI_TEST_CMPLTMASK
+	},
+
+	/*
+	 * Similarly for pg83
+	 */
+	{
+		STC_IDENTITY_PG83,
+		0,
+		SCSI_TEST_FAILMASK | SCSI_TEST_CMPLTMASK
+	}
+};
+
+int scsi_test_ereport_disable = 0;
+
+extern int e_devid_cache_path_to_devid(char *, char *, char *, ddi_devid_t *);
+
+static void
+scsi_test_ereport_post(struct scsi_pkt *pkt, enum scsi_test_ctxt ctxt,
+    uint32_t stresult)
+{
+	char *nodename = NULL, *devidstr_buf = NULL, *devidstr = NULL;
+	const struct scsi_test_profile *tp = &scsi_test_profile[ctxt];
+	char ua[SCSI_MAXNAMELEN], nodenamebuf[SCSI_MAXNAMELEN];
+	union scsi_cdb *cdbp = (union scsi_cdb *)pkt->pkt_cdbp;
+	struct scsi_address *ap = &pkt->pkt_address;
+	char *tgt_port, *tpl0 = NULL;
+	ddi_devid_t devid = NULL;
+	dev_info_t *probe, *hba;
+	struct scsi_device *sd;
+	scsi_lun64_t lun64;
+	const char *d_ass;
+	const char *class;
+	char *pathbuf;
+	nvlist_t *pl;
+	uint64_t wwn;
+	int err = 0;
+	int dad = 0;
+	size_t len;
+	int lun;
+
+	if (scsi_test_ereport_disable)
+		return;
+
+	ASSERT(tp->stp_ctxt == ctxt);
+
+	if ((sd = scsi_address_device(ap)) == NULL)
+		return;		/* Not SCSI_HBA_ADDR_COMPLEX */
+
+	probe = sd->sd_dev;
+	hba = ddi_get_parent(probe);
+
+	/*
+	 * We only raise telemetry for SE_HP style enumeration
+	 */
+	if (!ndi_dev_is_hotplug_node(hba))
+		return;
+
+	/*
+	 * scsi_fm_ereport_post will use the hba for the fm-enabled devinfo
+	 */
+	if (!DDI_FM_EREPORT_CAP(ddi_fm_capable(hba)))
+		return;
+
+	/*
+	 * Retrieve the unit address we were probing and the target
+	 * port component thereof.
+	 */
+	if (!scsi_ua_get(sd, ua, sizeof (ua)) ||
+	    scsi_device_prop_lookup_string(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_TARGET_PORT, &tgt_port) != DDI_PROP_SUCCESS)
+		return;
+
+	/*
+	 * Determine whether unit address is location based or identity (wwn)
+	 * based.  If we can't convert the target port address to a wwn then
+	 * we're location based.
+	 */
+	if (scsi_wwnstr_to_wwn(tgt_port, &wwn) == DDI_FAILURE)
+		return;
+
+	/*
+	 * Get lun and lun64
+	 */
+	lun = scsi_device_prop_get_int(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_LUN, 0);
+	lun64 = scsi_device_prop_get_int64(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_LUN64, lun);
+
+	/*
+	 * We are guaranteed not to be in interrupt or any other
+	 * problematic context.  So instead of repeated varargs
+	 * style calls to scsi_fm_ereport_post for each flavour of
+	 * ereport we have the luxury of being able to allocate
+	 * and build an nvlist here.
+	 *
+	 * The ereports we raise here are all under the category
+	 * ereport.io.scsi.cmd.disk category, namely
+	 *
+	 *	ereport.io.scsi.cmd.disk.
+	 *			{dev.rqs.derr,dev.serr,tran}.
+	 *
+	 * For all ereports we also add the scsi_test specific payload.
+	 * If we have it then we always include the devid in the payload
+	 * (but only in the detector for device-as-detector ereports).
+	 *
+	 * Inherited From	Member Name
+	 * -------------------- -------------------
+	 *	.cmd		driver-assessment
+	 *	.cmd		op-code
+	 *	.cmd		cdb
+	 *	.cmd		pkt-reason
+	 *	.cmd		pkt-state
+	 *	.cmd		pkt-stats
+	 *	.cmd.disk	stat-code
+	 *	-		scsi-test-return
+	 *	-		scsi-test-context
+	 */
+
+	if (nvlist_alloc(&pl, NV_UNIQUE_NAME, 0) != 0)
+		return;
+
+	err |= nvlist_add_uint8(pl, "op-code", cdbp->scc_cmd);
+	err |= nvlist_add_uint8_array(pl, "cdb", pkt->pkt_cdbp,
+	    pkt->pkt_cdblen);
+	err |= nvlist_add_uint8(pl, "pkt-reason", pkt->pkt_reason);
+	err |= nvlist_add_uint32(pl, "pkt-state", pkt->pkt_state);
+	err |= nvlist_add_uint32(pl, "pkt-stats", pkt->pkt_statistics);
+	err |= nvlist_add_uint32(pl, "stat-code", *pkt->pkt_scbp);
+	err |= nvlist_add_uint32(pl, "scsi-test-return", stresult);
+	err |= nvlist_add_int32(pl, "scsi-test-context", ctxt);
+
+	switch (stresult) {
+	case SCSI_TEST_CMPLT_BUSY:
+		dad = 1;
+		class = "cmd.disk.dev.serr";
+		break;
+
+	case SCSI_TEST_CMPLT_CHECK:
+		dad = 1;
+
+		if ((pkt->pkt_state & STATE_ARQ_DONE)) {
+			struct scsi_arq_status *arqstat;
+			uint8_t key, asc, ascq;
+			uint8_t *sensep;
+
+			class = "cmd.disk.dev.rqs.derr";
+			arqstat = (struct scsi_arq_status *)pkt->pkt_scbp;
+			sensep = (uint8_t *)&arqstat->sts_sensedata;
+			key = scsi_sense_key(sensep);
+			asc = scsi_sense_asc(sensep);
+			ascq = scsi_sense_ascq(sensep);
+
+			/*
+			 * Add to payload.
+			 */
+			err |= nvlist_add_uint8(pl, "key", key);
+			err |= nvlist_add_uint8(pl, "asc", asc);
+			err |= nvlist_add_uint8(pl, "ascq", ascq);
+			err |= nvlist_add_uint8_array(pl, "sense-data",
+			    sensep, sizeof (arqstat->sts_sensedata));
+		} else {
+			class = "cmd.disk.dev.serr";
+		}
+
+		break;
+
+	case SCSI_TEST_CMPLT_OTHER:
+		dad = 1;
+		class = "cmd.disk.dev.serr";
+		break;
+
+	case SCSI_TEST_CMD_INCOMPLETE:
+	case SCSI_TEST_NOTCMPLT:
+	case SCSI_TEST_TRAN_BUSY:
+	case SCSI_TEST_TRAN_REJECT:
+		class = "cmd.disk.tran";
+		break;
+	}
+
+	/*
+	 * Determine driver-assessment and add to payload.
+	 */
+	if (dad) {
+		/*
+		 * While higher level software can retry the enumeration
+		 * the belief is that any device-as-detector style error
+		 * will be persistent and will survive retries.  So we
+		 * can make a local determination of driver assessment.
+		 * Some day it may be more elegant to raise an ereport from
+		 * scsi_tgtmap_scsi_deactivate to confirm retries failed,
+		 * and correlate that ereport during diagnosis.
+		 */
+		if (stresult & tp->stp_fatalmask)
+			d_ass = (const char *)"fatal";
+		else if (stresult & tp->stp_retrymask)
+			d_ass = (const char *)"retry";
+		else
+			d_ass = (const char *)"retry";
+	} else {
+		/* We do not diagnose transport errors (yet) */
+			d_ass = (const char *)"retry";
+	}
+
+	err |= nvlist_add_string(pl, "driver-assessment", d_ass);
+
+	/*
+	 * If we're hoping for a device-as-detector style ereport then
+	 * we're going to need a devid for the detector FMRI.  We
+	 * don't have the devid because the target won't talk to us.
+	 * But we do know which hba iport we were probing out of, and
+	 * we know the unit address that was being probed (but not
+	 * what type of device is or should be there).  So we
+	 * search the devid cache for any cached devid matching
+	 * path <iport-path>/<nodename>@<unit-address> with nodename
+	 * wildcarded.  If a match is made we are returned not only the
+	 * devid but also the nodename for the path that cached that
+	 * entry.
+	 *
+	 * We also attempt to dig up a devid even for transport errors;
+	 * we'll include that in the payload but not in the detector FMRI.
+	 */
+
+	pathbuf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(hba, pathbuf);
+
+	if (e_devid_cache_path_to_devid(pathbuf, ua, nodenamebuf,
+	    &devid) == DDI_SUCCESS) {
+		nodename = nodenamebuf;
+		devidstr = devidstr_buf = ddi_devid_str_encode(devid, NULL);
+		kmem_free(devid, ddi_devid_sizeof(devid));
+		err |= nvlist_add_string(pl, "devid", devidstr);
+	}
+
+	/*
+	 * If this is lun 0 we will include the target-port-l0id
+	 * in the dev scheme detector for device-as-detector.
+	 */
+	if (dad && (lun == 0 || lun64 == 0))
+		tpl0 = tgt_port;
+
+	/* Construct the devpath to use in the detector */
+	(void) ddi_pathname(hba, pathbuf);
+	len = strlen(pathbuf);
+	(void) snprintf(pathbuf + len, MAXPATHLEN - len, "/%s@%s",
+	    nodename ? nodename : "unknown", ua);
+
+	/*
+	 * Let's review.
+	 *
+	 * Device-as-detector ereports for which the attempted lookup of
+	 * devid and nodename succeeded:
+	 *
+	 *	- pathbuf has the full device path including nodename we
+	 *	  dug up from the devid cache
+	 *
+	 *	- class is one of cmd.disk.{dev.rqs.derr,dev.serr}
+	 *
+	 *	- devidstr is non NULL and a valid devid string
+	 *
+	 * Would-be device-as-detector ereport for which the attempted lookup
+	 * of devid failed:
+	 *
+	 *	- pathbuf has a device path with leaf nodename of "unknown"
+	 *	  but still including the unit-address
+	 *	- class is one of cmd.disk.{dev.rqs.derr,dev.serr}
+	 *
+	 * Transport errors:
+	 *
+	 *	class is cmd.disk.tran
+	 *	devidstr is NULL
+	 *
+	 *	- we may have succeeded in looking up a devid and nodename -
+	 *	  the devid we'll have added to the payload but we must not
+	 *	  add to detector FMRI, and if we have have nodename then
+	 *	  we have a full devpath otherwise one with "unknown" for
+	 *	  nodename
+	 */
+
+	if (err)
+		(void) nvlist_add_boolean_value(pl, "payload-incomplete",
+		    B_TRUE);
+
+	scsi_fm_ereport_post(
+	    sd,
+	    0,				/* path_instance - always 0 */
+	    pathbuf,			/* devpath for detector */
+	    class,			/* ereport class suffix */
+	    0,				/* ENA - generate for us */
+	    dad ? devidstr : NULL,	/* dtcr devid, dev-as-det only */
+	    tpl0,			/* target-port-l0id */
+	    DDI_SLEEP,
+	    pl, /* preconstructed payload */
+	    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+	    NULL);
+
+	nvlist_free(pl);
+	if (devidstr_buf)
+		ddi_devid_str_free(devidstr_buf);
+	kmem_free(pathbuf, MAXPATHLEN);
+}
+
+#ifdef	DEBUG
+/*
+ * Testing - fake scsi_test fails
+ */
+char scsi_test_fail_ua[SCSI_MAXNAMELEN];	/* unit address to object to */
+int scsi_test_fail_rc = TRAN_ACCEPT;		/* scsi_transport return */
+uchar_t scsi_test_fail_pkt_reason = CMD_CMPLT;	/* pkt_reason */
+uchar_t scsi_test_fail_status = STATUS_BUSY;	/* status */
+uint_t scsi_test_fail_repeat = (uint_t)-1;	/* number of times to fail ua */
+#endif
+
+/*
  * This is like scsi_poll, but only does retry for TRAN_BUSY.
  */
-static int
-scsi_test(struct scsi_pkt *pkt)
+static uint32_t
+scsi_test(struct scsi_pkt *pkt, enum scsi_test_ctxt ctxt)
 {
-	int		rval = -1;
+	uint32_t	rval;
 	int		wait_usec;
 	int		rc;
 	extern int	do_polled_io;
@@ -427,19 +939,77 @@ scsi_test(struct scsi_pkt *pkt)
 		}
 	}
 
-	if (rc != TRAN_ACCEPT) {
-		goto exit;
-	} else if (pkt->pkt_reason == CMD_INCOMPLETE && pkt->pkt_state == 0) {
-		goto exit;
-	} else if (pkt->pkt_reason != CMD_CMPLT) {
-		goto exit;
-	} else if (((*pkt->pkt_scbp) & STATUS_MASK) == STATUS_BUSY) {
-		rval = 0;
-	} else {
-		rval = 0;
+#ifdef	DEBUG
+	if (scsi_test_fail_ua[0] != '\0' && scsi_test_fail_repeat > 0) {
+		struct scsi_address *ap = &pkt->pkt_address;
+		struct scsi_device *sd;
+		dev_info_t *probe;
+		char ua[SCSI_MAXNAMELEN];
+
+		if ((sd = scsi_address_device(ap)) != NULL) {
+			probe = sd->sd_dev;
+
+			if (probe && scsi_ua_get(sd, ua, sizeof (ua)) &&
+			    strncmp(ua, scsi_test_fail_ua, sizeof (ua)) == 0) {
+				scsi_test_fail_repeat--;
+				rc = scsi_test_fail_rc;
+				if (rc == TRAN_ACCEPT)
+					pkt->pkt_reason =
+					    scsi_test_fail_pkt_reason;
+				*pkt->pkt_scbp = scsi_test_fail_status;
+				if (scsi_test_fail_status == STATUS_CHECK)
+					pkt->pkt_state |= STATE_ARQ_DONE;
+
+			}
+		}
+	}
+#endif
+
+	switch (rc) {
+	case TRAN_ACCEPT:
+		switch (pkt->pkt_reason) {
+		case CMD_CMPLT:
+			switch ((*pkt->pkt_scbp) & STATUS_MASK) {
+			case STATUS_GOOD:
+				rval = SCSI_TEST_CMPLT_GOOD;
+				break;
+
+			case STATUS_BUSY:
+				rval = SCSI_TEST_CMPLT_BUSY;
+				break;
+
+			case STATUS_CHECK:
+				rval = SCSI_TEST_CMPLT_CHECK;
+				break;
+
+			default:
+				rval = SCSI_TEST_CMPLT_OTHER;
+				break;
+			}
+			break;
+
+		case CMD_INCOMPLETE:
+			rval = SCSI_TEST_CMD_INCOMPLETE;
+			break;
+
+		default:
+			rval = SCSI_TEST_NOTCMPLT;
+			break;
+		}
+		break;
+
+	case TRAN_BUSY:
+		rval = SCSI_TEST_TRAN_BUSY;
+		break;
+
+	default:
+		rval = SCSI_TEST_TRAN_REJECT;
+		break;
 	}
 
-exit:
+	if (rval != SCSI_TEST_CMPLT_GOOD)
+		scsi_test_ereport_post(pkt, ctxt, rval);
+
 	return (rval);
 }
 
@@ -510,6 +1080,7 @@ scsi_hba_probe_pi(struct scsi_device *sd, int (*callback)(), int pi)
 	struct buf		*rq_bp = NULL;
 	int			(*cb_flag)();
 	int			pass = 1;
+	uint32_t		str;
 
 	if (sd->sd_inq == NULL) {
 		sd->sd_inq = (struct scsi_inquiry *)
@@ -565,35 +1136,41 @@ scsi_hba_probe_pi(struct scsi_device *sd, int (*callback)(), int pi)
 	bzero((caddr_t)sd->sd_inq, SUN_INQSIZE);
 again:	FILL_SCSI1_LUN(sd, inq_pkt);
 
-	if (scsi_test(inq_pkt) < 0) {
-		if (inq_pkt->pkt_reason == CMD_INCOMPLETE) {
+	str = scsi_test(inq_pkt, STC_PROBE_FIRST_INQ);
+	if (SCSI_TEST_FAILURE(str)) {
+		if (str == SCSI_TEST_CMD_INCOMPLETE) {
 			rval = SCSIPROBE_NORESP;
 			goto out;
-		} else {
-			/*
-			 * retry one more time
-			 */
-			if (scsi_test(inq_pkt) < 0) {
-				rval = SCSIPROBE_FAILURE;
-				goto out;
-			}
+		}
+
+		/*
+		 * Retry one more time for anything other than CMD_INCOMPLETE.
+		 */
+		str = scsi_test(inq_pkt, STC_PROBE_FIRST_INQ_RETRY);
+		if (SCSI_TEST_FAILURE(str)) {
+			rval = SCSIPROBE_FAILURE;
+			goto out;
 		}
 	}
 
 	/*
-	 * if we are lucky, this inquiry succeeded
+	 * Did the inquiry complete and transfer inquiry information,
+	 * perhaps after retry?
 	 */
-	if ((inq_pkt->pkt_reason == CMD_CMPLT) &&
-	    (((*inq_pkt->pkt_scbp) & STATUS_MASK) == 0)) {
+	if (str == SCSI_TEST_CMPLT_GOOD)
 		goto done;
-	}
 
 	/*
-	 * the second inquiry, allows the host adapter to negotiate
+	 * We get here for SCSI_TEST_CMPLT_{BUSY,CHECK,OTHER}. We term
+	 * this "partial success" in that at least something is talking
+	 * to us.
+	 *
+	 * A second inquiry allows the host adapter to negotiate
 	 * synchronous transfer period and offset
 	 */
-	if (scsi_test(inq_pkt) < 0) {
-		if (inq_pkt->pkt_reason == CMD_INCOMPLETE)
+	str = scsi_test(inq_pkt, STC_PROBE_PARTIAL_SUCCESS);
+	if (SCSI_TEST_FAILURE(str)) {
+		if (str == SCSI_TEST_CMD_INCOMPLETE)
 			rval = SCSIPROBE_NORESP;
 		else
 			rval = SCSIPROBE_FAILURE;
@@ -601,72 +1178,73 @@ again:	FILL_SCSI1_LUN(sd, inq_pkt);
 	}
 
 	/*
-	 * if target is still busy, give up now
+	 * If target is still busy, give up now.
+	 * XXX There's no interval between retries - scsi_test should
+	 * probably have a builtin retry on target busy.
 	 */
-	if (((struct scsi_status *)inq_pkt->pkt_scbp)->sts_busy) {
+	if (str == SCSI_TEST_CMPLT_BUSY) {
 		rval = SCSIPROBE_BUSY;
 		goto out;
 	}
 
 	/*
-	 * do a rqsense if there was a check condition and ARQ was not done
+	 * At this point we are SCSI_TEST_CMPLT_GOOD, SCSI_TEST_CMPLT_CHECK
+	 * or SCSI_TEST_CMPLT_OTHER.
+	 *
+	 * Do a rqsense if there was a check condition and ARQ was not done
 	 */
-	if ((inq_pkt->pkt_state & STATE_ARQ_DONE) == 0) {
-		if (((struct scsi_status *)inq_pkt->pkt_scbp)->sts_chk) {
+	if (str == SCSI_TEST_CMPLT_CHECK &&
+	    (inq_pkt->pkt_state & STATE_ARQ_DONE) == 0) {
+		/*
+		 * prepare rqsense packet
+		 * there is no real need for this because the
+		 * check condition should have been cleared by now.
+		 */
+		rq_bp = scsi_alloc_consistent_buf(ROUTE, (struct buf *)NULL,
+		    (uint_t)SENSE_LENGTH, B_READ, cb_flag, NULL);
+		if (rq_bp == NULL) {
+			goto out;
+		}
 
-			/*
-			 * prepare rqsense packet
-			 * there is no real need for this because the
-			 * check condition should have been cleared by now.
-			 */
-			rq_bp = scsi_alloc_consistent_buf(ROUTE,
-			    (struct buf *)NULL,
-			    (uint_t)SENSE_LENGTH, B_READ, cb_flag, NULL);
-			if (rq_bp == NULL) {
-				goto out;
-			}
+		rq_pkt = scsi_init_pkt(ROUTE, (struct scsi_pkt *)NULL,
+		    rq_bp, CDB_GROUP0, 1, 0, PKT_CONSISTENT, callback, NULL);
 
-			rq_pkt = scsi_init_pkt(ROUTE, (struct scsi_pkt *)NULL,
-			    rq_bp, CDB_GROUP0, 1, 0, PKT_CONSISTENT, callback,
-			    NULL);
+		if (rq_pkt == NULL) {
+			if (rq_bp->b_error == 0)
+				rval = SCSIPROBE_NOMEM_CB;
+			goto out;
+		}
+		ASSERT(rq_bp->b_error == 0);
 
-			if (rq_pkt == NULL) {
-				if (rq_bp->b_error == 0)
-					rval = SCSIPROBE_NOMEM_CB;
-				goto out;
-			}
-			ASSERT(rq_bp->b_error == 0);
+		(void) scsi_setup_cdb((union scsi_cdb *)rq_pkt->
+		    pkt_cdbp, SCMD_REQUEST_SENSE, 0, SENSE_LENGTH, 0);
+		FILL_SCSI1_LUN(sd, rq_pkt);
+		rq_pkt->pkt_flags = FLAG_NOINTR|FLAG_NOPARITY;
 
-			(void) scsi_setup_cdb((union scsi_cdb *)rq_pkt->
-			    pkt_cdbp, SCMD_REQUEST_SENSE, 0, SENSE_LENGTH, 0);
-			FILL_SCSI1_LUN(sd, rq_pkt);
-			rq_pkt->pkt_flags = FLAG_NOINTR|FLAG_NOPARITY;
+		/*
+		 * set transport path
+		 */
+		if (pi && scsi_pkt_allocated_correctly(rq_pkt)) {
+			rq_pkt->pkt_path_instance = pi;
+			rq_pkt->pkt_flags |= FLAG_PKT_PATH_INSTANCE;
+		}
 
-			/*
-			 * set transport path
-			 */
-			if (pi && scsi_pkt_allocated_correctly(rq_pkt)) {
-				rq_pkt->pkt_path_instance = pi;
-				rq_pkt->pkt_flags |= FLAG_PKT_PATH_INSTANCE;
-			}
-
-			/*
-			 * The FILL_SCSI1_LUN above will find "inq_ansi != 1"
-			 * on first pass, see "again" comment above.
-			 *
-			 * The controller type is as yet unknown, so we
-			 * have to do a throwaway non-extended request sense,
-			 * and hope that that clears the check condition for
-			 * that unit until we can find out what kind of drive
-			 * it is. A non-extended request sense is specified
-			 * by stating that the sense block has 0 length,
-			 * which is taken to mean that it is four bytes in
-			 * length.
-			 */
-			if (scsi_test(rq_pkt) < 0) {
-				rval = SCSIPROBE_FAILURE;
-				goto out;
-			}
+		/*
+		 * The FILL_SCSI1_LUN above will find "inq_ansi != 1"
+		 * on first pass, see "again" comment above.
+		 *
+		 * The controller type is as yet unknown, so we
+		 * have to do a throwaway non-extended request sense,
+		 * and hope that that clears the check condition for
+		 * that unit until we can find out what kind of drive
+		 * it is. A non-extended request sense is specified
+		 * by stating that the sense block has 0 length,
+		 * which is taken to mean that it is four bytes in
+		 * length.
+		 */
+		if (SCSI_TEST_FAILURE(scsi_test(rq_pkt, STC_PROBE_RQSENSE1))) {
+			rval = SCSIPROBE_FAILURE;
+			goto out;
 		}
 	}
 
@@ -678,12 +1256,13 @@ again:	FILL_SCSI1_LUN(sd, inq_pkt);
 	 * lie about a unit being ready, e.g., the Emulex MD21).
 	 */
 
-	if (scsi_test(inq_pkt) < 0) {
+	str = scsi_test(inq_pkt, STC_PROBE_CHK_CLEARED);
+	if (SCSI_TEST_FAILURE(str)) {
 		rval = SCSIPROBE_FAILURE;
 		goto out;
 	}
 
-	if (((struct scsi_status *)inq_pkt->pkt_scbp)->sts_busy) {
+	if (str == SCSI_TEST_CMPLT_BUSY) {
 		rval = SCSIPROBE_BUSY;
 		goto out;
 	}
@@ -697,23 +1276,22 @@ again:	FILL_SCSI1_LUN(sd, inq_pkt);
 	 * target/lun).
 	 */
 
-	if (((struct scsi_status *)inq_pkt->pkt_scbp)->sts_chk) {
+	if (str == SCSI_TEST_CMPLT_CHECK) {
 		/*
 		 * try a request sense if we have a pkt, otherwise
 		 * just retry the inquiry one more time
 		 */
-		if (rq_pkt) {
-			(void) scsi_test(rq_pkt);
-		}
+		if (rq_pkt)
+			(void) scsi_test(rq_pkt, STC_PROBE_RQSENSE2);
 
 		/*
 		 * retry inquiry
 		 */
-		if (scsi_test(inq_pkt) < 0) {
+		str = scsi_test(inq_pkt, STC_PROBE_INQ_FINAL);
+		if (SCSI_TEST_FAILURE(str)) {
 			rval = SCSIPROBE_FAILURE;
 			goto out;
-		}
-		if (((struct scsi_status *)inq_pkt->pkt_scbp)->sts_chk) {
+		} else if (str == SCSI_TEST_CMPLT_CHECK) {
 			rval = SCSIPROBE_FAILURE;
 			goto out;
 		}
@@ -997,12 +1575,16 @@ scsi_device_prop_update_inqstring(struct scsi_device *sd,
 /*
  * Interfaces associated with SCSI_HBA_ADDR_COMPLEX
  * per-scsi_device HBA private data support.
+ *
+ * scsi_address_device returns NULL if we're not SCSI_HBA_ADDR_COMPLEX,
+ * thereby allowing use of scsi_address_device as a test for
+ * SCSI_HBA_ADDR_COMPLEX.
  */
 struct scsi_device *
 scsi_address_device(struct scsi_address *sa)
 {
-	ASSERT(sa->a_hba_tran->tran_hba_flags & SCSI_HBA_ADDR_COMPLEX);
-	return (sa->a.a_sd);
+	return ((sa->a_hba_tran->tran_hba_flags & SCSI_HBA_ADDR_COMPLEX) ?
+	    sa->a.a_sd : NULL);
 }
 
 void
@@ -1431,7 +2013,7 @@ scsi_device_identity(struct scsi_device *sd, int (*callback)())
 		}
 
 		rval = send_scsi_INQUIRY(sd, callback, inq80,
-		    MAX_INQUIRY_SIZE, 0x01, 0x80, &len);
+		    MAX_INQUIRY_SIZE, 0x01, 0x80, &len, STC_IDENTITY_PG80);
 		if (rval)
 			goto out;		/* should have worked */
 
@@ -1454,7 +2036,7 @@ scsi_device_identity(struct scsi_device *sd, int (*callback)())
 		}
 
 		rval = send_scsi_INQUIRY(sd, callback, inq83,
-		    MAX_INQUIRY_SIZE, 0x01, 0x83, &len);
+		    MAX_INQUIRY_SIZE, 0x01, 0x83, &len, STC_IDENTITY_PG83);
 		if (rval)
 			goto out;		/* should have worked */
 
@@ -1511,7 +2093,7 @@ check_vpd_page_support8083(struct scsi_device *sd, int (*callback)(),
 
 	/* issue page 0 (Supported VPD Pages) INQUIRY with evpd set */
 	rval = send_scsi_INQUIRY(sd, callback,
-	    page_list, MAX_INQUIRY_SIZE_EVPD, 1, 0, NULL);
+	    page_list, MAX_INQUIRY_SIZE_EVPD, 1, 0, NULL, STC_VPD_CHECK);
 
 	/*
 	 * Now we must validate that the device accepted the command (some
@@ -1559,7 +2141,8 @@ check_vpd_page_support8083(struct scsi_device *sd, int (*callback)(),
 static int
 send_scsi_INQUIRY(struct scsi_device *sd, int (*callback)(),
     uchar_t *bufaddr, size_t buflen,
-    uchar_t evpd, uchar_t page_code, size_t *lenp)
+    uchar_t evpd, uchar_t page_code, size_t *lenp,
+    enum scsi_test_ctxt ctxt)
 {
 	int		(*cb_flag)();
 	struct buf	*inq_bp;
@@ -1601,9 +2184,7 @@ send_scsi_INQUIRY(struct scsi_device *sd, int (*callback)(),
 	 * NOPARITY is used. Also seems like we should check pkt_stat for
 	 * STATE_XFERRED_DATA.
 	 */
-	if ((scsi_test(inq_pkt) == 0) &&
-	    (inq_pkt->pkt_reason == CMD_CMPLT) &&
-	    (((*inq_pkt->pkt_scbp) & STATUS_MASK) == 0)) {
+	if (scsi_test(inq_pkt, ctxt) == SCSI_TEST_CMPLT_GOOD) {
 		ASSERT(inq_pkt->pkt_resid >= 0);
 		ASSERT(inq_pkt->pkt_resid <= buflen);
 
@@ -1613,6 +2194,10 @@ send_scsi_INQUIRY(struct scsi_device *sd, int (*callback)(),
 			*lenp = (buflen - inq_pkt->pkt_resid);
 		rval = 0;
 	}
+
+	/*
+	 * XXX We should retry on target busy
+	 */
 
 out:	if (inq_pkt)
 		scsi_destroy_pkt(inq_pkt);

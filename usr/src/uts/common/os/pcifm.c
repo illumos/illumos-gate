@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1187,7 +1186,7 @@ pci_fm_ereport_post(dev_info_t *dip, const char *error_class, uint64_t ena,
 
 	(void) ddi_pathname(dip, device_path);
 	fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL,
-	    device_path, NULL);
+	    device_path, NULL, NULL);
 	(void) snprintf(ddi_error_class, FM_MAX_CLASS, "%s.%s",
 	    DDI_IO_CLASS, error_class);
 	fm_ereport_set(ereport, version, ddi_error_class, ena, detector, NULL);

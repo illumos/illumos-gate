@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -36,7 +35,8 @@
 /* consolidation private interface to generate dev scheme ereport */
 extern void fm_dev_ereport_postv(dev_info_t *dip, dev_info_t *eqdip,
     const char *devpath, const char *minor_name, const char *devid,
-    const char *error_class, uint64_t ena, int sflag, va_list ap);
+    const char *tpl0, const char *error_class, uint64_t ena, int sflag,
+    nvlist_t *, va_list ap);
 extern char *mdi_pi_pathname_by_instance(int);
 
 #define	FM_SCSI_CLASS	"scsi"
@@ -88,30 +88,45 @@ scsi_fm_fini(struct scsi_device *sd)
 
 /*
  *
- * scsi_fm_erepot_post - Post an ereport.
+ * scsi_fm_ereport_post - Post an ereport
  */
 void
 scsi_fm_ereport_post(struct scsi_device *sd, int path_instance,
-    const char *error_class, uint64_t ena, char *devid, int sflag, ...)
+    char *devpath, const char *error_class, uint64_t ena,
+    char *devid, char *tpl0, int sflag, nvlist_t *pl, ...)
 {
 	char		class[ERPT_CLASS_SZ];
 	dev_info_t	*dip = sd->sd_dev;
-	char		*devpath, *minor_name;
+	dev_info_t	*eqdip = dip;
+	char		*minor_name;
 	va_list		ap;
+
+	/*
+	 * If the scsi_device eqdip is not yet ereport capable, send the
+	 * report based on parent capabilities.  This is needed for
+	 * telemetry during enumeration.
+	 */
+	if (!DDI_FM_EREPORT_CAP(ddi_fm_capable(eqdip)))
+		eqdip = ddi_get_parent(eqdip);
 
 	/* Add "scsi." as a prefix to the class */
 	(void) snprintf(class, ERPT_CLASS_SZ, "%s.%s",
 	    FM_SCSI_CLASS, error_class);
 
 	/*
-	 * Get the path: If pkt_path_instance is non-zero then the packet was
+	 * Get the path:
+	 *
+	 * If path_instance is non-zero then the packet was
 	 * sent to scsi_vhci. We return the pathinfo path_string associated
 	 * with the path_instance path - which refers to the actual hardware.
+	 *
+	 * If path_instance is zero then use the devpath provided by the
+	 * caller;  if it was NULL then this will cause fm_dev_ereport_post
+	 * to use the devinfo path of the first devi we pass to it, ie
+	 * sd->sd_dev.
 	 */
 	if (path_instance)
 		devpath = mdi_pi_pathname_by_instance(path_instance);
-	else
-		devpath = NULL;
 
 	/*
 	 * Set the minor_name to NULL. The block location of a media error
@@ -130,8 +145,8 @@ scsi_fm_ereport_post(struct scsi_device *sd, int path_instance,
 	 */
 
 	/* Post the ereport */
-	va_start(ap, sflag);
-	fm_dev_ereport_postv(dip, dip, devpath, minor_name, devid,
-	    class, ena, sflag, ap);
+	va_start(ap, pl);
+	fm_dev_ereport_postv(dip, eqdip, devpath, minor_name, devid, tpl0,
+	    class, ena, sflag, pl, ap);
 	va_end(ap);
 }

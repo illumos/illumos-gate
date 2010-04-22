@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SCSI_SCSI_FM_H
@@ -40,7 +39,8 @@ void scsi_fm_fini(struct scsi_device *);
 
 /* ereport generation: */
 void scsi_fm_ereport_post(struct scsi_device *sd, int path_instance,
-    const char *error_class, uint64_t ena, char *devid, int sflag, ...);
+    char *devpath, const char *error_class, uint64_t ena,
+    char *devid, char *tpl0, int sflag, nvlist_t *pl, ...);
 
 #ifdef	__cplusplus
 }

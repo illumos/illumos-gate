@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_FM_PROTOCOL_H
@@ -247,6 +246,7 @@ extern "C" {
 
 /* dev scheme member names */
 #define	FM_FMRI_DEV_ID			"devid"
+#define	FM_FMRI_DEV_TGTPTLUN0		"target-port-l0id"
 #define	FM_FMRI_DEV_PATH		"device-path"
 
 /* pkg scheme member names */
@@ -315,7 +315,7 @@ extern int i_fm_payload_set(nvlist_t *, const char *, va_list);
 extern void fm_fmri_hc_set(nvlist_t *, int, const nvlist_t *, nvlist_t *,
     int, ...);
 extern void fm_fmri_dev_set(nvlist_t *, int, const nvlist_t *, const char *,
-    const char *);
+    const char *, const char *);
 extern void fm_fmri_de_set(nvlist_t *, int, const nvlist_t *, const char *);
 extern void fm_fmri_cpu_set(nvlist_t *, int, const nvlist_t *, uint32_t,
     uint8_t *, const char *);

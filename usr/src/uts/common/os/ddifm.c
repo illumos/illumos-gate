@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -317,11 +316,29 @@ i_ddi_drv_ereport_post(dev_info_t *dip, const char *error_class,
  * non-null devpath, minor_name, and devid arguments depending on
  * wether MPXIO is enabled, and wether a transport or non-transport
  * error is being posted.
+ *
+ * Additional event payload is specified via the varargs plist and, if
+ * not NULL, the nvlist passed in (such an nvlist will be merged into
+ * the payload; the caller is responsible for freeing this nvlist).
+ * Do not specify any high-level protocol event member names as part of the
+ * payload - eg no payload to be named "class", "version", "detector" etc
+ * or they will replace the members we construct here.
+ *
+ * The 'target-port-l0id' argument is SCSI specific. It is used
+ * by SCSI enumeration code when a devid is unavailable. If non-NULL
+ * the property-value becomes part of the ereport detector. The value
+ * specified might match one of the target-port-l0ids values of a
+ * libtopo disk chassis node. When libtopo finds a disk with a guaranteed
+ * unique wWWN target-port of a single-lun 'real' disk, it can add
+ * the target-port value to the libtopo disk chassis node target-port-l0ids
+ * string array property. Kernel code has no idea if this type of
+ * libtopo chassis node exists, or if matching will in fact occur.
  */
 void
 fm_dev_ereport_postv(dev_info_t *dip, dev_info_t *eqdip,
     const char *devpath, const char *minor_name, const char *devid,
-    const char *error_class, uint64_t ena, int sflag, va_list ap)
+    const char *tpl0, const char *error_class, uint64_t ena, int sflag,
+    nvlist_t *pl, va_list ap)
 {
 	nv_alloc_t		*nva = NULL;
 	struct i_ddi_fmhdl	*fmhdl = NULL;
@@ -334,6 +351,7 @@ fm_dev_ereport_postv(dev_info_t *dip, dev_info_t *eqdip,
 	char			class[ERPT_CLASS_SZ];
 	char			path[MAXPATHLEN];
 
+	ASSERT(ap != NULL);	/* must supply at least ereport version */
 	ASSERT(dip && eqdip && error_class);
 
 	/*
@@ -376,7 +394,7 @@ fm_dev_ereport_postv(dev_info_t *dip, dev_info_t *eqdip,
 	/*
 	 * Form parts of an ereport:
 	 *	A: version
-	 * 	B: error_class
+	 *	B: error_class
 	 *	C: ena
 	 *	D: detector	(path and optional devid authority)
 	 *	E: payload
@@ -414,12 +432,17 @@ fm_dev_ereport_postv(dev_info_t *dip, dev_info_t *eqdip,
 		(void) strlcat(path, minor_name, sizeof (path));
 	}
 	detector = fm_nvlist_create(nva);
-	fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL, path, devid);
+	fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL, path,
+	    devid, tpl0);
 
 	/* Pull parts of ereport together into ereport. */
 	fm_ereport_set(ereport, version, class, ena, detector, NULL);
 
-	/* Add the payload to ereport. */
+	/* Merge any preconstructed payload into the event. */
+	if (pl)
+		(void) nvlist_merge(ereport, pl, 0);
+
+	/* Add any remaining (after version) varargs payload to ereport. */
 	name = va_arg(ap, char *);
 	(void) i_fm_payload_set(ereport, name, ap);
 
@@ -466,8 +489,8 @@ ddi_fm_ereport_post(dev_info_t *dip,
 
 	ASSERT(dip && error_class);
 	va_start(ap, sflag);
-	fm_dev_ereport_postv(dip, dip, NULL, NULL, NULL,
-	    error_class, ena, sflag, ap);
+	fm_dev_ereport_postv(dip, dip, NULL, NULL, NULL, NULL,
+	    error_class, ena, sflag, NULL, ap);
 	va_end(ap);
 }
 
@@ -479,8 +502,8 @@ ndi_fm_ereport_post(dev_info_t *dip,
 
 	ASSERT(dip && error_class && (sflag == DDI_SLEEP));
 	va_start(ap, sflag);
-	fm_dev_ereport_postv(dip, ddi_get_parent(dip), NULL, NULL, NULL,
-	    error_class, ena, sflag, ap);
+	fm_dev_ereport_postv(dip, ddi_get_parent(dip), NULL, NULL, NULL, NULL,
+	    error_class, ena, sflag, NULL, ap);
 	va_end(ap);
 }
 

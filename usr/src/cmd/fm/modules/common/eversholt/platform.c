@@ -261,7 +261,7 @@ platform_getpath(nvlist_t *nvl)
 		if (nvlist_lookup_string(dfmri,
 		    FM_FMRI_DEV_ID, &devid) == 0)
 			type = DT_DEVID;
-		else if (nvlist_lookup_string(nvl,
+		else if (nvlist_lookup_string(dfmri,
 		    TOPO_STORAGE_TARGET_PORT_L0ID, &tp) == 0)
 			type = DT_TP;
 		else if (nvlist_lookup_string(dfmri,

@@ -128,8 +128,6 @@ extern "C" {
 #define	TOPO_STORAGE_MANUFACTURER	"manufacturer"
 #define	TOPO_STORAGE_MODEL		"model"
 #define	TOPO_STORAGE_FIRMWARE_REV	"firmware-revision"
-#define	TOPO_STORAGE_TARGET_PORT_L0ID	"target-port-l0id"
-#define	TOPO_STORAGE_TARGET_PORT_L0IDS	"target-port-l0ids"
 #define	TOPO_STORAGE_SAS_PHY_MASK	"receptacle-pm"
 #define	TOPO_STORAGE_SAS_CONNECTOR_TYPE	"sas-connector-type"
 

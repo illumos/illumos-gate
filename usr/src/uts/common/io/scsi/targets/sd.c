@@ -31223,6 +31223,9 @@ sd_tg_getinfo(dev_info_t *devi, int cmd, void *arg, void *tg_cookie)
  *
  *    Context: Kernel thread or interrupt context.
  */
+
+#define	DEVID_IF_KNOWN(d) "devid", DATA_TYPE_STRING, (d) ? (d) : "unknown"
+
 static void
 sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 {
@@ -31318,9 +31321,11 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 	 * driver-assessment will always be "recovered" here.
 	 */
 	if (drv_assess == SD_FM_DRV_RECOVERY) {
-		scsi_fm_ereport_post(un->un_sd, uscsi_path_instance,
-		    "cmd.disk.recovered", uscsi_ena, devid, DDI_NOSLEEP,
+		scsi_fm_ereport_post(un->un_sd, uscsi_path_instance, NULL,
+		    "cmd.disk.recovered", uscsi_ena, devid, NULL,
+		    DDI_NOSLEEP, NULL,
 		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+		    DEVID_IF_KNOWN(devid),
 		    "driver-assessment", DATA_TYPE_STRING, assessment,
 		    "op-code", DATA_TYPE_UINT8, op_code,
 		    "cdb", DATA_TYPE_UINT8_ARRAY,
@@ -31344,8 +31349,10 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 	if (ssc->ssc_flags & ssc_invalid_flags) {
 		if (ssc->ssc_flags & SSC_FLAGS_INVALID_SENSE) {
 			scsi_fm_ereport_post(un->un_sd, uscsi_path_instance,
-			    "cmd.disk.dev.uderr", uscsi_ena, devid, DDI_NOSLEEP,
+			    NULL, "cmd.disk.dev.uderr", uscsi_ena, devid,
+			    NULL, DDI_NOSLEEP, NULL,
 			    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+			    DEVID_IF_KNOWN(devid),
 			    "driver-assessment", DATA_TYPE_STRING,
 			    drv_assess == SD_FM_DRV_FATAL ?
 			    "fail" : assessment,
@@ -31371,8 +31378,11 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 			 * level payload or inside un-decode-info.
 			 */
 			scsi_fm_ereport_post(un->un_sd, uscsi_path_instance,
-			    "cmd.disk.dev.uderr", uscsi_ena, devid, DDI_NOSLEEP,
+			    NULL,
+			    "cmd.disk.dev.uderr", uscsi_ena, devid,
+			    NULL, DDI_NOSLEEP, NULL,
 			    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+			    DEVID_IF_KNOWN(devid),
 			    "driver-assessment", DATA_TYPE_STRING,
 			    drv_assess == SD_FM_DRV_FATAL ?
 			    "fail" : assessment,
@@ -31409,9 +31419,10 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 		if (ssc->ssc_flags & SSC_FLAGS_TRAN_ABORT)
 			ssc->ssc_flags &= ~SSC_FLAGS_TRAN_ABORT;
 
-		scsi_fm_ereport_post(un->un_sd, uscsi_path_instance,
-		    "cmd.disk.tran", uscsi_ena, NULL, DDI_NOSLEEP, FM_VERSION,
-		    DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+		scsi_fm_ereport_post(un->un_sd, uscsi_path_instance, NULL,
+		    "cmd.disk.tran", uscsi_ena, NULL, NULL, DDI_NOSLEEP, NULL,
+		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+		    DEVID_IF_KNOWN(devid),
 		    "driver-assessment", DATA_TYPE_STRING,
 		    drv_assess == SD_FM_DRV_FATAL ? "fail" : assessment,
 		    "op-code", DATA_TYPE_UINT8, op_code,
@@ -31445,10 +31456,12 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 				 * drv_assess is SD_FM_DRV_FATAL.
 				 */
 				scsi_fm_ereport_post(un->un_sd,
-				    uscsi_path_instance,
+				    uscsi_path_instance, NULL,
 				    "cmd.disk.dev.rqs.merr",
-				    uscsi_ena, devid, DDI_NOSLEEP, FM_VERSION,
-				    DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+				    uscsi_ena, devid, NULL, DDI_NOSLEEP, NULL,
+				    FM_VERSION, DATA_TYPE_UINT8,
+				    FM_EREPORT_VERS0,
+				    DEVID_IF_KNOWN(devid),
 				    "driver-assessment",
 				    DATA_TYPE_STRING,
 				    drv_assess == SD_FM_DRV_FATAL ?
@@ -31492,11 +31505,13 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 					 * SD_FM_DRV_FATAL.
 					 */
 					scsi_fm_ereport_post(un->un_sd,
-					    uscsi_path_instance,
+					    uscsi_path_instance, NULL,
 					    "cmd.disk.dev.rqs.derr",
-					    uscsi_ena, devid, DDI_NOSLEEP,
+					    uscsi_ena, devid,
+					    NULL, DDI_NOSLEEP, NULL,
 					    FM_VERSION,
 					    DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+					    DEVID_IF_KNOWN(devid),
 					    "driver-assessment",
 					    DATA_TYPE_STRING,
 					    drv_assess == SD_FM_DRV_FATAL ?
@@ -31545,10 +31560,12 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 			 * driver-assessment will be set based on parameter
 			 * drv_assess.
 			 */
-			scsi_fm_ereport_post(un->un_sd,
-			    uscsi_path_instance, "cmd.disk.dev.serr", uscsi_ena,
-			    devid, DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8,
-			    FM_EREPORT_VERS0,
+			scsi_fm_ereport_post(un->un_sd, uscsi_path_instance,
+			    NULL,
+			    "cmd.disk.dev.serr", uscsi_ena,
+			    devid, NULL, DDI_NOSLEEP, NULL,
+			    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+			    DEVID_IF_KNOWN(devid),
 			    "driver-assessment", DATA_TYPE_STRING,
 			    drv_assess == SD_FM_DRV_FATAL ? "fail" : assessment,
 			    "op-code", DATA_TYPE_UINT8, op_code,
