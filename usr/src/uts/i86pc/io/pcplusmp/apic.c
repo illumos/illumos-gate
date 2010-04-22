@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -80,6 +79,7 @@
  */
 static void apic_init_intr();
 static void apic_nmi_intr(caddr_t arg, struct regs *rp);
+static processorid_t apic_find_cpu(int flag);
 
 /*
  *	standard MP entries
@@ -2221,7 +2221,8 @@ apic_disable_intr(processorid_t cpun)
 
 			if (irq_ptr->airq_temp_cpu == cpun) {
 				do {
-					bind_cpu = apic_find_next_cpu_intr();
+					bind_cpu =
+					    apic_find_cpu(APIC_CPU_INTR_ENABLE);
 				} while (apic_rebind_all(irq_ptr, bind_cpu));
 			}
 		}
@@ -2792,6 +2793,42 @@ ioapic_write_eoi(int ioapic_ix, uint32_t value)
 }
 
 /*
+ * Round-robin algorithm to find the next CPU with interrupts enabled.
+ * It can't share the same static variable apic_next_bind_cpu with
+ * apic_get_next_bind_cpu(), since that will cause all interrupts to be
+ * bound to CPU1 at boot time.  During boot, only CPU0 is online with
+ * interrupts enabled when apic_get_next_bind_cpu() and apic_find_cpu()
+ * are called.  However, the pcplusmp driver assumes that there will be
+ * boot_ncpus CPUs configured eventually so it tries to distribute all
+ * interrupts among CPU0 - CPU[boot_ncpus - 1].  Thus to prevent all
+ * interrupts being targetted at CPU1, we need to use a dedicated static
+ * variable for find_next_cpu() instead of sharing apic_next_bind_cpu.
+ */
+
+static processorid_t
+apic_find_cpu(int flag)
+{
+	int i;
+	static processorid_t acid = 0;
+
+	ASSERT(LOCK_HELD(&apic_ioapic_lock));
+
+	/* Find the first CPU with the passed-in flag set */
+	for (i = 0; i < apic_nproc; i++) {
+		if (++acid >= apic_nproc) {
+			acid = 0;
+		}
+		if (apic_cpu_in_range(acid) &&
+		    (apic_cpus[acid].aci_status & flag)) {
+			break;
+		}
+	}
+
+	ASSERT((apic_cpus[acid].aci_status & flag) != 0);
+	return (acid);
+}
+
+/*
  * Call rebind to do the actual programming.
  * Must be called with interrupts disabled and apic_ioapic_lock held
  * 'p' is polymorphic -- if this function is called to process a deferred
@@ -2826,7 +2863,8 @@ apic_setup_io_intr(void *p, int irq, boolean_t deferred)
 		 * CPU is not up or interrupts are disabled. Fall back to
 		 * the first available CPU
 		 */
-		rv = apic_rebind(irqptr, apic_find_next_cpu_intr(), drep);
+		rv = apic_rebind(irqptr, apic_find_cpu(APIC_CPU_INTR_ENABLE),
+		    drep);
 	}
 
 	return (rv);

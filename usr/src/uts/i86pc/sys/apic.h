@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_APIC_APIC_H
@@ -787,7 +786,6 @@ extern int apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
     psm_intr_op_t intr_op, int *result);
 extern int apic_state(psm_state_request_t *);
 extern boolean_t apic_cpu_in_range(int cpu);
-extern processorid_t apic_find_next_cpu_intr(void);
 extern int apic_check_msi_support();
 extern apic_irq_t *apic_find_irq(dev_info_t *dip, struct intrspec *ispec,
     int type);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1275,29 +1274,23 @@ apic_cpu_in_range(int cpu)
  * Must be called with interrupts disabled and the apic_ioapic_lock held.
  */
 processorid_t
-apic_find_next_cpu_intr(void)
+apic_get_next_bind_cpu(void)
 {
 	int i, count;
 	processorid_t cpuid = 0;
 
 	ASSERT(LOCK_HELD(&apic_ioapic_lock));
 
-	/*
-	 * Find next CPU with INTR_ENABLE flag set.
-	 * Assume that there is at least one CPU with interrupts enabled.
-	 */
 	for (count = 0; count < apic_nproc; count++) {
 		if (apic_next_bind_cpu >= apic_nproc) {
 			apic_next_bind_cpu = 0;
 		}
 		i = apic_next_bind_cpu++;
-		if (apic_cpu_in_range(i) &&
-		    (apic_cpus[i].aci_status & APIC_CPU_INTR_ENABLE)) {
+		if (apic_cpu_in_range(i)) {
 			cpuid = i;
 			break;
 		}
 	}
-	ASSERT((apic_cpus[cpuid].aci_status & APIC_CPU_INTR_ENABLE) != 0);
 
 	return (cpuid);
 }
@@ -2605,7 +2598,7 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 	if (rc != DDI_PROP_SUCCESS) {
 		iflag = intr_clear();
 		lock_set(&apic_ioapic_lock);
-		bind_cpu = apic_find_next_cpu_intr();
+		bind_cpu = apic_get_next_bind_cpu();
 		lock_clear(&apic_ioapic_lock);
 		intr_restore(iflag);
 	}
