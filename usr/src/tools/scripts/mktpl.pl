@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -121,12 +120,9 @@ chdir($top) or die "Can't chdir to $top: $!\n";
 $top = getcwd();
 
 my $isclosed = qr"^usr/closed";
-my $istools = qr"^usr/src/tools";
 my $iscrypto = qr"(^usr/src/common/crypto)|(^usr/src/lib/pkcs11)";
 
 my @closedlist;
-my @toolslist;
-my @bfulist;
 my @cryptolist;
 
 open(IX, "<$indexfile") or die "Can't open $indexfile: $!\n";
@@ -139,13 +135,6 @@ while (<IX>) {
 	if ($lic =~ /$iscrypto/ && signedcrypto($lic)) {
 		push @cryptolist, $lic;
 	}
-	if (! $opt_c) {
-		if ($lic =~ /$istools/) {
-			push @toolslist, $lic;
-		} else {
-			push @bfulist, $lic;
-		}
-	}
 }
 close IX;
 
@@ -154,8 +143,6 @@ close IX;
 #
 
 maketpl("ON-BINARIES", @closedlist);
-maketpl("ON-BUILD-TOOLS", @toolslist);
-maketpl("BFU-ARCHIVES", @bfulist);
 maketpl("ON-CRYPTO", @cryptolist);
 
 exit $exitstatus;

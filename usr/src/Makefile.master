@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # Makefile.master, global definitions for system source
@@ -89,6 +88,16 @@ INTEL_BLD_1=    $(MACH:sparc=$(POUND_SIGN))
 INTEL_BLD=      $(INTEL_BLD_1:i386=)
 
 STRIP_COMMENTS=	$(INTERNAL_RELEASE_BUILD)
+
+# Are we building tonic closedbins? Unless you have used the
+# -O flag to nightly or bldenv, leave the definition of TONICBUILD
+# as $(POUND_SIGN).
+#
+# IF YOU CHANGE CLOSEDROOT, you MUST change install.bin
+# to match the new definition.
+TONICBUILD=     $(POUND_SIGN)
+$(TONICBUILD)CLOSEDROOT= $(ROOT)-closed
+
 
 # set __GNUC= in the environment to build 32-bit with the gcc compiler.
 # The default is to use the Sun Studio compiler for all processor types.
@@ -218,6 +227,12 @@ MANIFEST_CHECK=	\
 	SVCCFG_CONFIGD_PATH=$(SRC)/cmd/svc/configd/svc.configd-native \
 	$(SRC)/cmd/svc/svccfg/svccfg-native validate $<
 
+#
+# IMPORTANT:: If you change any of INS.file, INS.dir, INS.rename,
+# INS.link or INS.symlink here, then you must also change the
+# corresponding override definitions in $CLOSED/Makefile.tonic.
+# If you do not do this, then the closedbins build for the OpenSolaris
+# community will break. PS, the gatekeepers will be upset too.
 INS.file=	$(RM) $@; $(INS) -s -m $(FILEMODE) -f $(@D) $<
 INS.dir=	$(INS) -s -d -m $(DIRMODE) $@
 # installs and renames at once
@@ -227,6 +242,8 @@ INS.rename=	$(INS.file); $(MV) $(@D)/$(<F) $@
 # install a link
 INSLINKTARGET=	$<
 INS.link=	$(RM) $@; $(LN) $(INSLINKTARGET) $@
+INS.symlink=	$(RM) $@; $(SYMLINK) $(INSLINKTARGET) $@
+
 #
 # Python bakes the mtime of the .py file into the compiled .pyc and
 # rebuilds if the baked-in mtime != the mtime of the source file

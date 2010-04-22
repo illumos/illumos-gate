@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Create an encumbered binaries tarball from a full build proto area,
 # less the contents of an OpenSolaris proto area.  Special handling
@@ -30,7 +29,7 @@
 # Engineering.
 #
 
-usage="bindrop [-n] full-root open-root basename"
+usage="bindrop [-n] basename"
 
 isa=`uname -p`
 
@@ -78,22 +77,21 @@ while getopts n flag; do
 done
 shift $(($OPTIND - 1))
 
-if [[ $# -ne 3 ]]; then
+if [[ $# -ne 1 ]]; then
 	print -u2 "usage: $usage"
 	exit 1
 fi
 
-full="$1"
-open="$2"
-tarfile="$CODEMGR_WS/$3.$isa.tar"
+tarfile="$CODEMGR_WS/$1.$isa.tar"
 
 rootdir="root_$isa"
+suffix=""
 if [[ "$nondebug" = y ]]; then
 	rootdir="root_$isa-nd"
+	suffix="-nd"
 fi
 
-[[ -d "$full" ]] || fail "can't find $full."
-[[ -d "$open" ]] || fail "can't find $open."
+[[ -d "${ROOT}${suffix}-closed" ]] || fail "can't find closed root proto area."
 
 tmpdir=$(mktemp -dt bindropXXXXX)
 [[ -n "$tmpdir" ]] || fail "can't create temporary directory."
@@ -107,9 +105,9 @@ needdirs=$(mktemp -t needdirsXXXXX)
 [[ -n "$needdirs" ]] || fail "can't create temporary directory list file."
 
 #
-# Copy the full tree into a temp directory.
+# Copy the closed root parallel tree into a temp directory.
 #
-(cd "$full"; tar cf - .) | (cd "$tmpdir/closed/$rootdir"; tar xpf -)
+(cd "${ROOT}${suffix}-closed"; tar cf - .) | (cd "$tmpdir/closed/$rootdir"; tar xpf -)
 
 #
 # Remove internal ON crypto signing certs
@@ -219,12 +217,6 @@ for f in $delete; do
 done
 
 #
-# Remove files that the open tree already has.
-#
-(cd "$open"; find . -type f -print -o -type l -print) > "$tmpdir/deleteme"
-(cd "$tmpdir/closed/$rootdir"; cat "$tmpdir/deleteme" | xargs rm -f)
-
-#
 # Remove any header files.  If they're in the closed tree, they're
 # probably not freely redistributable.
 #
@@ -232,7 +224,6 @@ done
 	-a \! -name lc_core.h \
 	-a \! -name localedef.h \
 	-exec rm -f {} \;)
-
 
 #
 # Remove empty directories that the open tree doesn't need.
@@ -260,15 +251,6 @@ MACH=$(uname -p)
 	sort -r | xargs -l rmdir 2>/dev/null )
 
 rm "$needdirs"
-
-#
-# Up above we removed the files that were already in the open tree.
-# But that blew away the minimal closed binaries that are needed to do
-# an open build, so restore them here.
-#
-
-mkclosed "$isa" "$full" "$tmpdir/closed/$rootdir" || \
-    fail "can't restore minimal binaries."
 
 #
 # Exclude signed crypto binaries; they are delivered in their

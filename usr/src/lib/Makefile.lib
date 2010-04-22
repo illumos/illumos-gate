@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # Definitions common to libraries.
@@ -160,6 +159,13 @@ BUILD.SO=	$(CC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS)
 BUILDCCC.SO=	$(CCC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS)
 
 # default dynamic library symlink
+# IMPORTANT:: If you change INS.liblink OR INS.liblink64 here, then you 
+# MUST also change the corresponding override definitions in
+# $CLOSED/Makefile.tonic.
+#
+# If you do not do this, then the closedbins build for the OpenSolaris
+# community will break. PS, the gatekeepers will be upset too.
+#
 INS.liblink=	-$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKS)$(VERS) $@
 INS.liblinkccc=	-$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKSCCC)$(VERS) $@
 

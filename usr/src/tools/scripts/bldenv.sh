@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Uses supplied "env" file, based on /opt/onbld/etc/env, to set shell variables
 # before spawning a shell for doing a release-style builds interactively
@@ -267,8 +266,8 @@ NIGHTLY_OPTIONS="-${NIGHTLY_OPTIONS#-}"
 while getopts '+0AaBCDdFfGIilMmNnOopRrS:tUuWwXxz' FLAG "$NIGHTLY_OPTIONS"
 do
 	case "$FLAG" in
-	  O)	flags.O=true  ;;
-	  +O)	flags.O=false ;;
+	  O)    flags.O=true  ;;
+	  +O)   flags.O=false ;;
 	  o)	flags.o=true  ;;
 	  +o)	flags.o=false ;;
 	  t)	flags.t=true  ;;
@@ -304,14 +303,7 @@ else
 	unset EXTRA_CFLAGS
 fi
 
-if ${flags.O} ; then
-	export MULTI_PROTO="yes"
-	if [[ "$CLOSED_IS_PRESENT" == "yes" ]]; then
-		print "CLOSED_IS_PRESENT is 'no' (because of '-O')"
-	fi
-	export CLOSED_IS_PRESENT=no
-	export ON_CLOSED_BINS="$CODEMGR_WS/closed.skel"
-fi
+[[ "${flags.O}" ]] && export MULTI_PROTO="yes"
 
 # update build-type variables
 CPIODIR="${CPIODIR}${SUFFIX}"
@@ -418,16 +410,29 @@ ENVCPPFLAGS4=
 PARENT_ROOT=
 PARENT_TOOLS_ROOT=
 
-"${flags.O}" && export ROOT="$ROOT-open"
-
 if [[ "$MULTI_PROTO" != "yes" && "$MULTI_PROTO" != "no" ]]; then
 	printf \
-	    'WARNING: invalid value for MULTI_PROTO (%s);setting to "no".\n' \
+	    'WARNING: invalid value for MULTI_PROTO (%s); setting to "no".\n' \
 	    "$MULTI_PROTO"
 	export MULTI_PROTO="no"
 fi
 
 [[ "$MULTI_PROTO" == "yes" ]] && export ROOT="${ROOT}${SUFFIX}"
+
+export TONICBUILD="#"
+
+if "${flags.O}" ; then 
+	if [[ "$CLOSED_IS_PRESENT" != "yes" ]]; then
+		print "OpenSolaris closed binary generation requires "
+		print "closed tree"
+		exit 1
+	fi
+	print "Generating OpenSolaris deliverables"
+	# We only need CLOSEDROOT in the env for convenience. Makefile.master
+	# figures out what it needs when it matters.
+	export CLOSEDROOT="${ROOT}-closed"
+	export TONICBUILD=""
+fi
 
 ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
 ENVCPPFLAGS1="-I$ROOT/usr/include"

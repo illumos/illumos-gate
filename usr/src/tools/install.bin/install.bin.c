@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <stdio.h>
@@ -43,14 +40,21 @@
 
 #define	FILE_BUFF	40960
 
-int supress = 0;
+static int suppress = 0;
+
+static void usage(void);
+static void file_copy(char *src_file, char *dest_file);
+static void chown_file(const char *file, const char *group, const char *owner);
+static void formclosed(char *root, char *closedroot);
+static char *find_basename(const char *str);
+static int creatdir(char *fn);
 
 
 void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "usage: install [-sd][-m mode][-g group][-u owner] "
+	    "usage: install [-sdO][-m mode][-g group][-u owner] "
 	    "-f dir file ...\n");
 }
 
@@ -63,29 +67,32 @@ file_copy(char *src_file, char *dest_file)
 	static char file_buff[FILE_BUFF];
 
 	if ((src_fd = open(src_file, O_RDONLY))  == -1) {
-		perror(src_file);
+		(void) fprintf(stderr, "install:file_copy: %s failed "
+		    "(%d): %s\n", src_file, errno, strerror(errno));
 		exit(1);
 	}
 
 	if ((dest_fd = open(dest_file, O_CREAT|O_WRONLY|O_TRUNC, 0755)) == -1) {
-		perror(dest_file);
+		(void) fprintf(stderr, "install:file_copy: %s failed "
+		    "(%d): %s\n", dest_file, errno, strerror(errno));
 		exit(1);
 	}
 
 	while ((count = read(src_fd, file_buff, FILE_BUFF)) > 0) {
-		write(dest_fd, file_buff, count);
+		(void) write(dest_fd, file_buff, count);
 	}
 
 	if (count == -1) {
-		perror("file_copy(read)");
+		(void) fprintf(stderr, "install:file_copy:read failed "
+		    "(%d): %s\n", errno, strerror(errno));
 		exit(1);
 	}
 
-	if (!supress)
+	if (!suppress)
 		(void) printf("%s installed as %s\n", src_file, dest_file);
 
-	close(src_fd);
-	close(dest_fd);
+	(void) close(src_fd);
+	(void) close(dest_fd);
 }
 
 
@@ -111,10 +118,29 @@ chown_file(const char *file, const char *group, const char *owner)
 	}
 
 	if (chown(file, own, grp) == -1) {
-		perror("chown");
+		(void) fprintf(stderr, "install:chown_file: failed "
+		    "(%d): %s\n", errno, strerror(errno));
 		exit(1);
 	}
 }
+
+
+void
+formclosed(char *root, char *closedroot)
+{
+	int wholelen, residlen;
+	char *temp;
+
+	wholelen = strlen(root);
+	temp = strstr(strstr(root, "proto/root_"), "/");
+	temp++;
+	temp = strstr(temp, "/");
+	residlen = strlen(temp);
+	(void) strlcpy(closedroot, root, wholelen - residlen + 1);
+	(void) strlcat(closedroot, "-closed", MAXPATHLEN);
+	(void) strlcat(closedroot, temp, MAXPATHLEN);
+}
+
 
 char *
 find_basename(const char *str)
@@ -130,6 +156,20 @@ find_basename(const char *str)
 	return ((char *)str);
 }
 
+int
+creatdir(char *fn) {
+
+	errno = 0;
+
+	if (mkdirp(fn, 0755) == -1) {
+		if (errno != EEXIST)
+			return (errno);
+	} else if (!suppress) {
+		(void) printf("directory %s created\n", fn);
+	}
+	return (0);
+}
+
 
 int
 main(int argc, char **argv)
@@ -143,9 +183,12 @@ main(int argc, char **argv)
 	char	*ins_file = NULL;
 	int	mode = -1;
 	char	dest_file[MAXPATHLEN];
+	char    shadow_dest[MAXPATHLEN];
+	char	shadow_dirb[MAXPATHLEN];
+	int	tonic = 0;
+	int	rv = 0;
 
-
-	while ((c = getopt(argc, argv, "f:sm:du:g:")) != EOF) {
+	while ((c = getopt(argc, argv, "f:sm:du:g:O")) != EOF) {
 		switch (c) {
 		case 'f':
 			dirb = optarg;
@@ -163,7 +206,10 @@ main(int argc, char **argv)
 			mode = strtol(optarg, NULL, 8);
 			break;
 		case 's':
-			supress = 1;
+			suppress = 1;
+			break;
+		case 'O':
+			tonic = 1;
 			break;
 		case '?':
 			errflg++;
@@ -187,49 +233,85 @@ main(int argc, char **argv)
 		return (1);
 	}
 
-
 	for (c = optind; c < argc; c++) {
 		ins_file = argv[c];
 
 		if (dirflg) {
-			struct stat buf;
-
-			if (stat(ins_file, &buf) == 0) {
-				if ((buf.st_mode & S_IFMT) == S_IFDIR)
-					continue;
-			} else {
-				if (errno != ENOENT) {
-					perror("install: stat");
-					return (1);
+			if (tonic) {
+				formclosed(ins_file, shadow_dest);
+				rv = creatdir(shadow_dest);
+				if (rv) {
+					(void) fprintf(stderr,
+					    "install: tonic creatdir "
+					    "%s (%d): (%s)\n",
+					    shadow_dest, errno,
+					    strerror(errno));
+					return (rv);
 				}
 			}
-
-			(void) strcpy(dest_file, ins_file);
-
-			if (mkdirp(dest_file, 0755) == -1) {
-				if (!supress) {
-					(void) printf(
-					    "install: mkdirp of %s failed\n",
-					    dest_file);
-				}
-			} else if (!supress) {
-				(void) printf("directory %s created\n",
-				    dest_file);
+			rv = creatdir(ins_file);
+			if (rv) {
+				(void) fprintf(stderr,
+				    "install: creatdir %s (%d): %s\n",
+				    ins_file, errno, strerror(errno));
+				return (rv);
 			}
+			(void) strlcpy(dest_file, ins_file, MAXPATHLEN);
+
 		} else {
 			(void) strcat(strcat(strcpy(dest_file, dirb), "/"),
 			    find_basename(ins_file));
 			file_copy(ins_file, dest_file);
+
+			if (tonic) {
+				formclosed(dirb, shadow_dirb);
+				/*
+				 * The standard directories in the proto
+				 * area are created as part of "make setup",
+				 * but that doesn't create them in the
+				 * closed proto area. So if the target
+				 * directory doesn't exist, we need to
+				 * create it now.
+				 */
+				rv = creatdir(shadow_dirb);
+				if (rv) {
+					(void) fprintf(stderr,
+					    "install: tonic creatdir(f) "
+					    "%s (%d): %s\n",
+					    shadow_dirb, errno,
+					    strerror(errno));
+					return (rv);
+				}
+				(void) strcat(strcat(strcpy(shadow_dest,
+				    shadow_dirb), "/"),
+				    find_basename(ins_file));
+				file_copy(ins_file, shadow_dest);
+			}
 		}
 
-		if (group || owner)
+		if (group || owner) {
 			chown_file(dest_file, group, owner);
-
+			if (tonic)
+				chown_file(shadow_dest, group, owner);
+		}
 		if (mode != -1) {
-			umask(0);
+			(void) umask(0);
 			if (chmod(dest_file, mode) == -1) {
-				perror("chmod");
+				(void) fprintf(stderr,
+				    "install: chmod of %s to mode %o failed "
+				    "(%d): %s\n",
+				    dest_file, mode, errno, strerror(errno));
 				return (1);
+			}
+			if (tonic) {
+				if (chmod(shadow_dest, mode) == -1) {
+					(void) fprintf(stderr,
+					    "install: tonic chmod of %s "
+					    "to mode %o failed (%d): %s\n",
+					    shadow_dest, mode,
+					    errno, strerror(errno));
+					return (1);
+				}
 			}
 		}
 	}

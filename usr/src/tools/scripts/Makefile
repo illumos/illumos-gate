@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 SHELL=/usr/bin/ksh93
@@ -28,7 +27,6 @@ SHELL=/usr/bin/ksh93
 SHFILES= \
 	Install \
 	bfu \
-	bfudrop \
 	bindrop \
 	bldenv \
 	build_cscope \
@@ -46,7 +44,6 @@ SHFILES= \
 	mkbfu \
 	mkclosed \
 	nightly \
-	onblddrop \
 	onu \
 	protocmp.terse \
 	sccscheck \
@@ -54,7 +51,6 @@ SHFILES= \
 	sccshist \
 	sccsmv \
 	sccsrm \
-	sdrop \
 	webrev \
 	which_scm \
 	ws \

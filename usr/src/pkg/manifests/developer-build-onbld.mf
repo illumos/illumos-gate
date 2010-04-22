@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/developer/build/onbld@$(PKGVERS)
@@ -86,7 +85,6 @@ $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize.exe mode=0555
 file path=opt/onbld/bin/Install mode=0555
 file path=opt/onbld/bin/bfu mode=0555
-file path=opt/onbld/bin/bfudrop mode=0555
 file path=opt/onbld/bin/bindrop mode=0555
 file path=opt/onbld/bin/bldenv mode=0555
 file path=opt/onbld/bin/bringovercheck mode=0555
@@ -122,7 +120,6 @@ file path=opt/onbld/bin/mkclosed mode=0555
 file path=opt/onbld/bin/mkreadme_osol mode=0555
 file path=opt/onbld/bin/mktpl mode=0555
 file path=opt/onbld/bin/nightly mode=0555
-file path=opt/onbld/bin/onblddrop mode=0555
 file path=opt/onbld/bin/onu mode=0555
 file path=opt/onbld/bin/protocmp.terse mode=0555
 file path=opt/onbld/bin/rtichk mode=0555
@@ -131,7 +128,6 @@ file path=opt/onbld/bin/sccscp mode=0555
 file path=opt/onbld/bin/sccshist mode=0555
 file path=opt/onbld/bin/sccsmv mode=0555
 file path=opt/onbld/bin/sccsrm mode=0555
-file path=opt/onbld/bin/sdrop mode=0555
 file path=opt/onbld/bin/signit mode=0555
 file path=opt/onbld/bin/signproto mode=0555
 file path=opt/onbld/bin/validate_flg mode=0555

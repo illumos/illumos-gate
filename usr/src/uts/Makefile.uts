@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -571,6 +570,11 @@ include $(SRC)/Makefile.psm
 #	The "-r" on the remove may be considered temporary, but is required
 #	while the replacement of the SUNW,SPARCstation-10,SX directory by
 #	a symbolic link is being propagated.
+#
+# IMPORTANT:: if you change any of these INS.mumble rules, then you MUST also
+# change the corresponding override definitions in $CLOSED/Makefile.tonic.
+# If you do not do this, then the closedbins build for the OpenSolaris
+# community will break. PS, the gatekeepers will be upset too.
 #
 INS.slink1= $(RM) -r $@; $(SYMLINK) $(PLATFORM) $@
 INS.slink2= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/$(@F) $@

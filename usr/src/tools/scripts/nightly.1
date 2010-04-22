@@ -1,4 +1,3 @@
-.\" " CDDL HEADER START
 .\" "
 .\" " The contents of this file are subject to the terms of the
 .\" " Common Development and Distribution License (the "License").
@@ -17,9 +16,9 @@
 .\" "
 .\" " CDDL HEADER END
 .\" "
-.\" "Copyright 2010 Sun Microsystems, Inc.  All rights reserved."
-.\" "Use is subject to license terms."
-.TH nightly 1 "14 Jan 2010"
+.\" "Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+.\" "
+.TH nightly 1 "21 April 2010"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -244,12 +243,10 @@ a time.
 .B Miscellaneous options
 .TP 10
 .B \-O
-generate deliverables for OpenSolaris.  Tarballs containing a source
-snapshot, binaries of closed-source components, compiled ON tools
-(SUNWonbld), and BFU archives are put in $CODEMGR_WS.  A tarball
-containing signed cryptographic binaries is put in the parent
-directory of $PKGARCHIVE (by default they are put in
-$CODEMGR_WS/packages/$MACH).
+generate deliverables for OpenSolaris.  Tarballs containing binaries
+of closed-source components are put in $CODEMGR_WS.  A tarball containing
+signed cryptographic binaries is put in the parent directory of
+$PKGARCHIVE (by default they are put in $CODEMGR_WS/packages/$MACH).
 .TP 10
 .B \-V VERS
 set the build version string to VERS, overriding VERSION
@@ -345,9 +342,9 @@ If $MULTI_PROTO is "no", $ROOT may contain a DEBUG or non-DEBUG
 build.  If $MULTI_PROTO is "yes", $ROOT contains the DEBUG build and
 $ROOT-nd contains the non-DEBUG build.
 .LP
-For OpenSolaris deliveries (\fB\-O\fR), $ROOT-open contains the DEBUG
-build of just the open source tree, and $ROOT-open-nd contains the
-non-DEBUG build.
+For OpenSolaris deliveries (\fB\-O\fR), $ROOT-closed contains a parallel
+proto area containing the DEBUG build of just usr/closed components, and
+$ROOT-nd-closed contains the non-DEBUG equivalent.
 .RE
 .LP
 .B TOOLS_ROOT

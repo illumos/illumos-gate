@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -167,35 +166,12 @@ function crypto_from_proto {
 }
 
 #
-# Print the tag string used to identify a build (e.g., "DEBUG
-# open-only")
-# usage: tagstring debug-part open-part
-#
-function tagstring {
-	debug_part=$1
-	open_part=$2
-
-	if [ -n "$open_part" ]; then
-		echo "$debug_part $open_part"
-	else
-		echo "$debug_part"
-	fi
-}
-
-#
 # Function to do a DEBUG and non-DEBUG build. Needed because we might
 # need to do another for the source build, and since we only deliver DEBUG or
 # non-DEBUG packages.
 #
-# usage: normal_build [-O]
+# usage: normal_build
 #
-# -O	OpenSolaris delivery build.  Put the proto area and
-#	packages in -open directories.  Use skeleton closed binaries.
-#	Don't generate archives--that needs to be done later, after
-#	we've generated the closed binaries.  Use the signed binaries
-#	from the earlier full build.
-#
-
 function normal_build {
 
 	typeset orig_p_FLAG="$p_FLAG"
@@ -205,37 +181,14 @@ function normal_build {
 	typeset gencrypto=no
 
 	suffix=""
-	open_only=""
 	[ -n "$CODESIGN_USER" ] && gencrypto=yes
-
-	if (( $# == 1 )); then
-		if [ "$1" = "-O" ]; then
-			suffix="-open"
-			open_only="open-only"
-			p_FLAG=n
-			a_FLAG=n
-			gencrypto=no
-			if [ -n "$CODESIGN_USER" ]; then
-				#
-				# Crypto doesn't get signed in the
-				# open-only build (no closed tree ->
-				# no internal signing -> no signing
-				# for off-SWAN).  So use the earlier
-				# signed crypto.
-				#
-				crypto_in=$PKGARCHIVE/../on-crypto.$MACH.tar.bz2
-				crypto_signer=""
-			fi
-		fi
-	fi
 
 	# non-DEBUG build begins
 
 	if [ "$F_FLAG" = "n" ]; then
 		set_non_debug_build_flags
-		mytag=`tagstring "non-DEBUG" "$open_only"`
 		CODESIGN_USER="$crypto_signer" \
-		    build "$mytag" "$suffix-nd" "-nd" "$MULTI_PROTO" \
+		    build "non-DEBUG" "$suffix-nd" "-nd" "$MULTI_PROTO" \
 		    $(ndcrypto "$crypto_in")
 		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
 		    "$p_FLAG" = "y" ]; then
@@ -245,7 +198,6 @@ function normal_build {
 		if [[ "$gencrypto" = yes && "$build_ok" = y ]]; then
 			crypto_from_proto non-DEBUG -nd
 		fi
-
 	else
 		echo "\n==== No non-DEBUG $open_only build ====\n" >> "$LOGFILE"
 	fi
@@ -256,9 +208,8 @@ function normal_build {
 
 	if [ "$D_FLAG" = "y" ]; then
 		set_debug_build_flags
-		mytag=`tagstring "DEBUG" "$open_only"`
 		CODESIGN_USER="$crypto_signer" \
-		    build "$mytag" "$suffix" "" "$MULTI_PROTO" "$crypto_in"
+		    build "DEBUG" "$suffix" "" "$MULTI_PROTO" "$crypto_in"
 		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
 		    "$p_FLAG" = "y" ]; then
 			copy_ihv_pkgs DEBUG ""
@@ -267,7 +218,6 @@ function normal_build {
 		if [[ "$gencrypto" = yes && "$build_ok" = y ]]; then
 			crypto_from_proto DEBUG ""
 		fi
-
 	else
 		echo "\n==== No DEBUG $open_only build ====\n" >> "$LOGFILE"
 	fi
@@ -709,6 +659,11 @@ function build {
 	ORIGROOT=$ROOT
 	[ $MULTIPROTO = no ] || export ROOT=$ROOT$SUFFIX
 
+	if [[ "$O_FLAG" = y ]]; then
+		echo "\nSetting CLOSEDROOT= ${ROOT}-closed\n" >> $LOGFILE
+		export CLOSEDROOT=${ROOT}-closed
+	fi
+
 	export ENVLDLIBS1=`myldlibs $ROOT`
 	export ENVCPPFLAGS1=`myheaders $ROOT`
 
@@ -1028,7 +983,7 @@ function copy_ihv_proto {
 		fi
 		echo "copying $IA32_IHV_ROOT to $ROOT\n" >> $LOGFILE
 		cd $IA32_IHV_ROOT
-		tar -cf - . | (cd $ROOT; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
+		tar cf - . | (cd $ROOT; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
 	else
 		echo "$IA32_IHV_ROOT: not found" >> $LOGFILE
 	fi
@@ -1050,7 +1005,7 @@ function copy_ihv_proto {
 			echo "$IA32_IHV_ROOT{-nd,}: not found" >> $LOGFILE
 			return
 		fi
-		tar -cf - . | (cd $ROOT-nd; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
+		tar cf - . | (cd $ROOT-nd; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
 	fi
 }
 
@@ -1067,7 +1022,7 @@ function copy_ihv_pkgs {
 		>> $LOGFILE
 	if [ -d "$IA32_IHV_PKGS" ]; then
 		cd $IA32_IHV_PKGS
-		tar -cf - * | \
+		tar cf - * | \
 		   (cd $PKGARCHIVE; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
 	else
 		echo "$IA32_IHV_PKGS: not found" >> $LOGFILE
@@ -1077,7 +1032,7 @@ function copy_ihv_pkgs {
 		>> $LOGFILE
 	if [ -d "$IA32_IHV_BINARY_PKGS" ]; then
 		cd $IA32_IHV_BINARY_PKGS
-		tar -cf - * | \
+		tar cf - * | \
 		    (cd $PKGARCHIVE; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
 	else
 		echo "$IA32_IHV_BINARY_PKGS: not found" >> $LOGFILE
@@ -1803,6 +1758,12 @@ if [[ "$O_FLAG" = y && -z "$CODESIGN_USER" ]]; then
 	fi
 fi
 
+if [[ "$O_FLAG" = y ]]; then
+	export TONICBUILD=""
+else
+	export TONICBUILD="#"
+fi
+
 if [ "${SUNWSPRO}" != "" ]; then
 	PATH="${SUNWSPRO}/bin:$PATH"
 	export PATH
@@ -2106,13 +2067,14 @@ function create_lock {
 #
 function allprotos {
 	roots="$ROOT $TOOLS_PROTO"
-	if [ $O_FLAG = y ]; then
-		# OpenSolaris deliveries require separate proto areas.
-		[ $D_FLAG = y ] && roots="$roots $ROOT-open"
-		[ $F_FLAG = n ] && roots="$roots $ROOT-open-nd"
-	fi
+	
 	if [[ $D_FLAG = y && $F_FLAG = n ]]; then
 		[ $MULTI_PROTO = yes ] && roots="$roots $ROOT-nd"
+	fi
+
+	if [[ $O_FLAG = y ]]; then
+		roots="$roots $ROOT-closed"
+		[ $MULTI_PROTO = yes ] && roots="$roots $ROOT-nd-closed"
 	fi
 
 	echo $roots
@@ -2797,8 +2759,16 @@ if [ "$n_FLAG" = "n" ]; then
 	#
 	CLOSED_IS_PRESENT="$orig_closed_is_present"
 	check_closed_tree
+
 else
 	echo "\n==== No bringover to $CODEMGR_WS ====\n" >> $LOGFILE
+fi
+
+if [[ "$O_FLAG" = y && "$CLOSED_IS_PRESENT" != "yes" ]]; then
+	build_ok=n
+	echo "OpenSolaris binary deliverables need usr/closed." \
+	    | tee -a "$mail_msg_file" >> $LOGFILE
+	exit 1
 fi
 
 if [ "$CLOSED_IS_PRESENT" = no ]; then
@@ -2948,54 +2918,6 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	fi
 fi
 
-#
-# If OpenSolaris deliverables were requested, do the open-only build
-# now, so that it happens at roughly the same point as the source
-# product builds.  This lets us take advantage of checks that come
-# later (e.g., the core file check).
-#
-if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
-	#
-	# Generate skeleton (minimal) closed binaries for open-only
-	# build.  There's no need to distinguish DEBUG from non-DEBUG
-	# binaries, but it simplifies file management to have separate
-	# trees.
-	#
-
-	echo "\n==== Generating skeleton closed binaries for" \
-	    "open-only build ====\n" | \
-	    tee -a $LOGFILE >> $mail_msg_file
-
-	rm -rf $CODEMGR_WS/closed.skel
-	if [ "$D_FLAG" = y ]; then
-		mkclosed $MACH $ROOT $CODEMGR_WS/closed.skel/root_$MACH \
-		    >>$LOGFILE 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create skeleton DEBUG closed binaries." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
-	fi
-	if [ "$F_FLAG" = n ]; then
-		mkclosed $MACH $ROOT-nd $CODEMGR_WS/closed.skel/root_$MACH-nd \
-		    >>$LOGFILE 2>&1
-		if (( $? != 0 )) ; then
-			echo "Couldn't create skeleton non-DEBUG closed binaries." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
-	fi
-
-	ORIG_CLOSED_IS_PRESENT=$CLOSED_IS_PRESENT
-	export CLOSED_IS_PRESENT=no
-
-	ORIG_ON_CLOSED_BINS="$ON_CLOSED_BINS"
-	export ON_CLOSED_BINS=$CODEMGR_WS/closed.skel
-
-	normal_build -O
-
-	ON_CLOSED_BINS=$ORIG_ON_CLOSED_BINS
-	CLOSED_IS_PRESENT=$ORIG_CLOSED_IS_PRESENT
-fi
-
 ORIG_SRC=$SRC
 BINARCHIVE=${CODEMGR_WS}/bin-${MACH}.cpio.Z
 
@@ -3049,35 +2971,34 @@ if [ "$SO_FLAG" = "y" -a $build_ok = y ]; then
 fi
 
 if [ "$SO_FLAG" = "y" -a $build_ok = y ]; then
-	SRC=$OPEN_SRCDIR/usr/src
 
-	# Try not to clobber any user-provided closed binaries.
-	export ON_CLOSED_BINS=$CODEMGR_WS/closed$$
+	echo "\n==== Generating skeleton closed binaries for" \
+	    "open-only build ====\n" | \
+	    tee -a $LOGFILE >> $mail_msg_file
 
-	echo "\n==== Copying skeleton closed binaries to" \
-	    "$ON_CLOSED_BINS ====\n" | \
-	    tee -a $mail_msg_file >> $LOGFILE
-
+	rm -rf $CODEMGR_WS/closed.skel
 	if [ "$D_FLAG" = y ]; then
-		mkclosed $MACH $ROOT $ON_CLOSED_BINS/root_$MACH >>$LOGFILE 2>&1
+		mkclosed $MACH $ROOT $CODEMGR_WS/closed.skel/root_$MACH \
+		    >>$LOGFILE 2>&1
 		if (( $? != 0 )) ; then
-			build_ok=n
-			echo "Couldn't create DEBUG closed binaries." |
+			echo "Couldn't create skeleton DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
 	fi
 	if [ "$F_FLAG" = n ]; then
 		root=$ROOT
 		[ "$MULTI_PROTO" = yes ] && root=$ROOT-nd
-		mkclosed $MACH $root $ON_CLOSED_BINS/root_$MACH-nd \
+		mkclosed $MACH $root $CODEMGR_WS/closed.skel/root_$MACH-nd \
 		    >>$LOGFILE 2>&1
 		if (( $? != 0 )) ; then
-			build_ok=n
-			echo "Couldn't create non-DEBUG closed binaries." |
+			echo "Couldn't create skeleton non-DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
 	fi
-
+      
+	SRC=$OPEN_SRCDIR/usr/src
+	# Try not to clobber any user-provided closed binaries.
+	export ON_CLOSED_BINS=$CODEMGR_WS/closed.skel
 	export CLOSED_IS_PRESENT=no
 fi
 
@@ -3484,7 +3405,10 @@ function crypto_passthrough {
 	fi
 }
 
-if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
+# If we are doing an OpenSolaris _source_ build (-S O) then we do
+# not have usr/closed available to us to generate closedbins from,
+# so skip this part.
+if [ "$SO_FLAG" = n -a "$O_FLAG" = y -a "$build_ok" = y ]; then
 	echo "\n==== Generating OpenSolaris tarballs ====\n" | \
 	    tee -a $mail_msg_file >> $LOGFILE
 
@@ -3502,28 +3426,18 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	echo "Generating closed binaries tarball(s)..." >> $LOGFILE
 	closed_basename=on-closed-bins
 	if [ "$D_FLAG" = y ]; then
-		bindrop "$ROOT" "$ROOT-open" "$closed_basename" \
-		    >>"$LOGFILE" 2>&1
+		bindrop "$closed_basename" >>"$LOGFILE" 2>&1
 		if (( $? != 0 )) ; then
 			echo "Couldn't create DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
 	fi
 	if [ "$F_FLAG" = n ]; then
-		bindrop -n "$ROOT-nd" "$ROOT-open-nd" "$closed_basename-nd" \
-		    >>"$LOGFILE" 2>&1
+		bindrop -n "$closed_basename-nd" >>"$LOGFILE" 2>&1
 		if (( $? != 0 )) ; then
 			echo "Couldn't create non-DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
-	fi
-
-	echo "Generating onbld tools tarball..." >> $LOGFILE
-	PKGARCHIVE=$PKGARCHIVE_ORIG
-	onblddrop >> $LOGFILE 2>&1
-	if (( $? != 0 )) ; then
-		echo "Couldn't create onbld tools tarball." |
-		    tee -a $mail_msg_file >> $LOGFILE
 	fi
 
 	echo "Generating README.opensolaris..." >> $LOGFILE
@@ -3532,34 +3446,6 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	if (( $? != 0 )) ; then
 		echo "Couldn't create README.opensolaris." |
 		    tee -a $mail_msg_file >> $LOGFILE
-	fi
-
-	# This step walks the source tree, so it must come after
-	# findunref.  It depends on README.opensolaris.
-	echo "Generating source tarball..." >> $LOGFILE
-	sdrop >>$LOGFILE 2>&1
-	if (( $? != 0 )) ; then
-		echo "Couldn't create source tarball." |
-		    tee -a "$mail_msg_file" >> "$LOGFILE"
-	fi
-
-	# This step depends on the closed binaries tarballs.
-	echo "Generating BFU tarball(s)..." >> $LOGFILE
-	if [ "$D_FLAG" = y ]; then
-		makebfu_filt bfudrop "$ROOT-open" \
-		    "$closed_basename.$MACH.tar.bz2" nightly-osol
-		if (( $? != 0 )) ; then
-			echo "Couldn't create DEBUG archives tarball." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
-	fi
-	if [ "$F_FLAG" = n ]; then
-		makebfu_filt bfudrop -n "$ROOT-open-nd" \
-		    "$closed_basename-nd.$MACH.tar.bz2" nightly-osol-nd
-		if (( $? != 0 )) ; then
-			echo "Couldn't create non-DEBUG archives tarball." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
 	fi
 
 	if [ -n "$ON_CRYPTO_BINS" ]; then
