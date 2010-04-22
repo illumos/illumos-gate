@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -130,7 +131,7 @@ int	scsi_lunrpt_failed_do1lun = (1 << SE_HP);
 char	*scsi_binding_set_spi = "spi";
 
 /* enable NDI_DEVI_DEBUG for bus_[un]config operations */
-int	scsi_hba_busconfig_debug = 0;
+int	scsi_hba_bus_config_debug = 0;
 
 /* number of probe serilization messages */
 int	scsi_hba_wait_msg = 5;
@@ -141,8 +142,27 @@ int	scsi_hba_wait_msg = 5;
  */
 int	scsi_hba_barrier_timeout = (60);		/* seconds */
 
+#ifdef	DEBUG
+int	scsi_hba_bus_config_failure_msg = 0;
+int	scsi_hba_bus_config_failure_dbg = 0;
+int	scsi_hba_bus_config_success_msg = 0;
+int	scsi_hba_bus_config_success_dbg = 0;
+#endif	/* DEBUG */
+
 /*
- * Structure for scsi_hba_tgtmap_* implementation.
+ * Structure for scsi_hba_iportmap_* implementation/wrap.
+ */
+typedef struct impl_scsi_iportmap {
+	dev_info_t	*iportmap_hba_dip;
+	damap_t		*iportmap_dam;
+	int		iportmap_create_window;
+	uint64_t	iportmap_create_time;		/* clock64_t */
+	int		iportmap_create_csync_usec;
+	int		iportmap_settle_usec;
+} impl_scsi_iportmap_t;
+
+/*
+ * Structure for scsi_hba_tgtmap_* implementation/wrap.
  *
  * Every call to scsi_hba_tgtmap_set_begin will increment tgtmap_reports,
  * and a call to scsi_hba_tgtmap_set_end will reset tgtmap_reports to zero.
@@ -157,17 +177,27 @@ int	scsi_hba_barrier_timeout = (60);		/* seconds */
  */
 typedef struct impl_scsi_tgtmap {
 	scsi_hba_tran_t *tgtmap_tran;
-	int		tgtmap_reports;		/* _begin without _end */
+	int		tgtmap_reports;			/* _begin, no _end */
 	int		tgtmap_noisy;
-	scsi_tgt_activate_cb_t tgtmap_activate_cb;
-	scsi_tgt_deactivate_cb_t tgtmap_deactivate_cb;
+	scsi_tgt_activate_cb_t		tgtmap_activate_cb;
+	scsi_tgt_deactivate_cb_t	tgtmap_deactivate_cb;
 	void		*tgtmap_mappriv;
 	damap_t		*tgtmap_dam[SCSI_TGT_NTYPES];
+	int		tgtmap_create_window;
+	uint64_t	tgtmap_create_time;		/* clock64_t */
+	int		tgtmap_create_csync_usec;
+	int		tgtmap_settle_usec;
 } impl_scsi_tgtmap_t;
 #define	LUNMAPSIZE 256		/* 256 LUNs/target */
 
 /* Produce warning if number of begins without an end exceed this value */
 int	scsi_hba_tgtmap_reports_max = 256;
+
+static int	scsi_tgtmap_sync(scsi_hba_tgtmap_t *, int);
+
+/* Default settle_usec damap_sync factor */
+int	scsi_hba_map_settle_f = 10;
+
 
 /* Prototype for static dev_ops devo_*() functions */
 static int	scsi_hba_info(
@@ -3427,7 +3457,7 @@ scsi_addr_to_sfunc(char *addr)
 		s = strchr(addr, ',');			/* "addr,lun" */
 		if (s) {
 			s++;				/* skip ',', at lun */
-			s = strchr(s, ',');		/* "lun,sfunc]" */
+			s = strchr(s, ',');		/* "lun,sfunc" */
 			if (s == NULL)
 				return (-1);		/* no ",sfunc" */
 			s++;				/* skip ',', at sfunc */
@@ -7789,7 +7819,7 @@ scsi_hba_bus_config_spi(dev_info_t *self, uint_t flags,
 		return (ndi_busop_bus_config(self, flags, op, arg, childp, 0));
 	}
 
-	if (scsi_hba_busconfig_debug)
+	if (scsi_hba_bus_config_debug)
 		flags |= NDI_DEVI_DEBUG;
 
 	/*
@@ -7847,7 +7877,7 @@ scsi_hba_bus_unconfig_spi(dev_info_t *self, uint_t flags,
 	if ((mt & SCSI_ENUMERATION_ENABLE) == 0)
 		return (ndi_busop_bus_unconfig(self, flags, op, arg));
 
-	if (scsi_hba_busconfig_debug)
+	if (scsi_hba_bus_config_debug)
 		flags |= NDI_DEVI_DEBUG;
 
 	scsi_hba_devi_enter(self, &circ);
@@ -7881,22 +7911,127 @@ static int
 scsi_hba_bus_config_tgtmap(dev_info_t *self, uint_t flags,
     ddi_bus_config_op_t op, void *arg, dev_info_t **childp)
 {
-	int ret = NDI_FAILURE;
+	scsi_hba_tran_t		*tran;
+	impl_scsi_tgtmap_t	*tgtmap;
+	uint64_t		tsa = 0;	/* clock64_t */
+	int			maxdev;
+	int			sync_usec;
+	int			synced;
+	int			ret = NDI_FAILURE;
 
-	switch (op) {
-	case BUS_CONFIG_ONE:
-		ret = scsi_hba_bus_configone(self, flags, arg, childp);
-		break;
+	if ((op != BUS_CONFIG_ONE) && (op != BUS_CONFIG_ALL) &&
+	    (op != BUS_CONFIG_DRIVER))
+		goto out;
 
-	case BUS_CONFIG_ALL:
-	case BUS_CONFIG_DRIVER:
+	tran = ndi_flavorv_get(self, SCSA_FLAVOR_SCSI_DEVICE);
+	tgtmap = (impl_scsi_tgtmap_t *)tran->tran_tgtmap;
+	ASSERT(tgtmap);
+
+	/*
+	 * MPXIO is never a sure thing (and we have mixed children), so
+	 * set NDI_NDI_FALLBACK so that ndi_busop_bus_config will
+	 * search for both devinfo and pathinfo children.
+	 *
+	 * Future: Remove NDI_MDI_FALLBACK since devcfg.c now looks for
+	 * devinfo/pathinfo children in parallel (instead of old way of
+	 * looking for one form of child and then doing "fallback" to
+	 * look for other form of child).
+	 */
+	flags |= NDI_MDI_FALLBACK;	/* devinfo&pathinfo children */
+
+	/*
+	 * If bus_config occurred within the map create-to-hotplug_sync window,
+	 * we need the framework to wait for children that are physicaly
+	 * present at map create time to show up (via tgtmap hotplug config).
+	 *
+	 * The duration of this window is specified by the HBA driver at
+	 * scsi_hba_tgtmap_create(9F) time (during attach(9E)). Its
+	 * 'csync_usec' value is selected based on how long it takes the HBA
+	 * driver to get from map creation to initial observation for something
+	 * already plugged in. Estimate high, a low estimate can result in
+	 * devices not showing up correctly on first reference. The call to
+	 * ndi_busop_bus_config needs a timeout value large enough so that
+	 * the map sync call further down is not a noop (i.e. done against
+	 * an empty map when something is infact plugged in). With
+	 * BUS_CONFIG_ONE, the call to ndi_busop_bus_config will return as
+	 * soon as the desired device is enumerated via hotplug - so we are
+	 * not committed to waiting the entire time.
+	 *
+	 * We are typically outside the window, so timeout is 0.
+	 */
+	sync_usec = tgtmap->tgtmap_create_csync_usec;
+	if (tgtmap->tgtmap_create_window) {
+		tsa = ddi_get_lbolt64() - tgtmap->tgtmap_create_time;
+		if (tsa < drv_usectohz(sync_usec)) {
+			tsa = drv_usectohz(sync_usec) - tsa;
+			ret = ndi_busop_bus_config(self,
+			    flags, op, arg, childp, (clock_t)tsa);
+		} else
+			tsa = 0;	/* passed window */
+
+		/* First one out closes the window. */
+		tgtmap->tgtmap_create_window = 0;
+	} else if (op == BUS_CONFIG_ONE)
 		ret = ndi_busop_bus_config(self, flags, op, arg, childp, 0);
-		break;
 
-	default:
-		break;
+	/* Return if doing a BUS_CONFIG_ONE and we found what we want. */
+	if ((op == BUS_CONFIG_ONE) && (ret == NDI_SUCCESS))
+		goto out;		/* performance path */
+
+	/*
+	 * Sync current observations in the map and look again.  We place an
+	 * upper bound on the amount of time we will wait for sync to complete
+	 * to avoid a bad device causing this busconfig operation to hang.
+	 *
+	 * We are typically stable, so damap_sync returns immediately.
+	 *
+	 * Max time to wait for sync is settle_usec per possible device.
+	 */
+	maxdev = damap_size(tgtmap->tgtmap_dam[SCSI_TGT_SCSI_DEVICE]);
+	maxdev = (maxdev > scsi_hba_map_settle_f) ? maxdev :
+	    scsi_hba_map_settle_f;
+	sync_usec = maxdev * tgtmap->tgtmap_settle_usec;
+	synced = scsi_tgtmap_sync((scsi_hba_tgtmap_t *)tgtmap, sync_usec);
+	if (!synced)
+		SCSI_HBA_LOG((_LOGCFG, self, NULL,
+		    "tgtmap_sync timeout"));
+
+	if (op == BUS_CONFIG_ONE)
+		ret = scsi_hba_bus_configone(self, flags, arg, childp);
+	else
+		ret = ndi_busop_bus_config(self, flags, op, arg, childp, 0);
+
+out:
+#ifdef	DEBUG
+	if (ret != NDI_SUCCESS) {
+		if (scsi_hba_bus_config_failure_msg ||
+		    scsi_hba_bus_config_failure_dbg) {
+			scsi_hba_bus_config_failure_msg--;
+			printf("%s%d: bus_config_tgtmap %p failure on %s: "
+			    "%d %d\n",
+			    ddi_driver_name(self), ddi_get_instance(self),
+			    (void *)tgtmap,
+			    (op == BUS_CONFIG_ONE) ? (char *)arg : "ALL",
+			    (int)tsa, synced);
+		}
+		if (scsi_hba_bus_config_failure_dbg) {
+			scsi_hba_bus_config_failure_dbg--;
+			debug_enter("config_tgtmap failure");
+		}
+	} else if (scsi_hba_bus_config_success_msg ||
+	    scsi_hba_bus_config_success_dbg) {
+		scsi_hba_bus_config_success_msg--;
+		printf("%s%d: bus_config_tgtmap %p success on %s: %d %d\n",
+		    ddi_driver_name(self), ddi_get_instance(self),
+		    (void *)tgtmap,
+		    (op == BUS_CONFIG_ONE) ? (char *)arg : "ALL",
+		    (int)tsa, synced);
+		if (scsi_hba_bus_config_success_dbg) {
+			scsi_hba_bus_config_success_dbg--;
+			debug_enter("config_tgtmap success");
+		}
 	}
-
+#endif	/* DEBUG */
 	return (ret);
 }
 
@@ -7927,9 +8062,22 @@ static int
 scsi_hba_bus_config_iportmap(dev_info_t *self, uint_t flags,
     ddi_bus_config_op_t op, void *arg, dev_info_t **childp)
 {
-	dev_info_t	*child;
-	int		circ;
-	int		ret = NDI_FAILURE;
+	scsi_hba_tran_t		*tran;
+	impl_scsi_iportmap_t	*iportmap;
+	dev_info_t		*child;
+	int			circ;
+	uint64_t		tsa = 0;	/* clock64_t */
+	int			sync_usec;
+	int			synced;
+	int			ret = NDI_FAILURE;
+
+	if ((op != BUS_CONFIG_ONE) && (op != BUS_CONFIG_ALL) &&
+	    (op != BUS_CONFIG_DRIVER))
+		goto out;
+
+	tran = ndi_flavorv_get(self, SCSA_FLAVOR_SCSI_DEVICE);
+	iportmap = (impl_scsi_iportmap_t *)tran->tran_iportmap;
+	ASSERT(iportmap);
 
 	/*
 	 * MPXIO is never a sure thing (and we have mixed children), so
@@ -7942,10 +8090,64 @@ scsi_hba_bus_config_iportmap(dev_info_t *self, uint_t flags,
 	 * look for other form of child).
 	 */
 	flags |= NDI_MDI_FALLBACK;	/* devinfo&pathinfo children */
-	switch (op) {
-	case BUS_CONFIG_ONE:
-		scsi_hba_devi_enter(self, &circ);
+
+	/*
+	 * If bus_config occurred within the map create-to-hotplug_sync window,
+	 * we need the framework to wait for children that are physicaly
+	 * present at map create time to show up (via iportmap hotplug config).
+	 *
+	 * The duration of this window is specified by the HBA driver at
+	 * scsi_hba_iportmap_create(9F) time (during attach(9E)). Its
+	 * 'csync_usec' value is selected based on how long it takes the HBA
+	 * driver to get from map creation to initial observation for something
+	 * already plugged in. Estimate high, a low estimate can result in
+	 * devices not showing up correctly on first reference. The call to
+	 * ndi_busop_bus_config needs a timeout value large enough so that
+	 * the map sync call further down is not a noop (i.e. done against
+	 * an empty map when something is infact plugged in). With
+	 * BUS_CONFIG_ONE, the call to ndi_busop_bus_config will return as
+	 * soon as the desired device is enumerated via hotplug - so we are
+	 * not committed to waiting the entire time.
+	 *
+	 * We are typically outside the window, so timeout is 0.
+	 */
+	sync_usec = iportmap->iportmap_create_csync_usec;
+	if (iportmap->iportmap_create_window) {
+		tsa = ddi_get_lbolt64() - iportmap->iportmap_create_time;
+		if (tsa < drv_usectohz(sync_usec)) {
+			tsa = drv_usectohz(sync_usec) - tsa;
+			ret = ndi_busop_bus_config(self,
+			    flags, op, arg, childp, (clock_t)tsa);
+		} else
+			tsa = 0;	/* passed window */
+
+		/* First one out closes the window. */
+		iportmap->iportmap_create_window = 0;
+	} else if (op == BUS_CONFIG_ONE)
+		ret = ndi_busop_bus_config(self, flags, op, arg, childp, 0);
+
+	/* Return if doing a BUS_CONFIG_ONE and we found what we want. */
+	if ((op == BUS_CONFIG_ONE) && (ret == NDI_SUCCESS))
+		goto out;		/* performance path */
+
+	/*
+	 * Sync current observations in the map and look again.  We place an
+	 * upper bound on the amount of time we will wait for sync to complete
+	 * to avoid a bad device causing this busconfig operation to hang.
+	 *
+	 * We are typically stable, so damap_sync returns immediately.
+	 *
+	 * Max time to wait for sync is settle_usec times settle factor.
+	 */
+	sync_usec = scsi_hba_map_settle_f * iportmap->iportmap_settle_usec;
+	synced = damap_sync(iportmap->iportmap_dam, sync_usec);
+	if (!synced)
+		SCSI_HBA_LOG((_LOGCFG, self, NULL,
+		    "iportmap_sync timeout"));
+
+	if (op == BUS_CONFIG_ONE) {
 		/* create the iport node child */
+		scsi_hba_devi_enter(self, &circ);
 		if ((child = scsi_hba_bus_config_port(self, (char *)arg,
 		    SE_BUSCONFIG)) != NULL) {
 			if (childp) {
@@ -7955,16 +8157,40 @@ scsi_hba_bus_config_iportmap(dev_info_t *self, uint_t flags,
 			ret = NDI_SUCCESS;
 		}
 		scsi_hba_devi_exit(self, circ);
-		break;
-
-	case BUS_CONFIG_ALL:
-	case BUS_CONFIG_DRIVER:
+	} else
 		ret = ndi_busop_bus_config(self, flags, op, arg, childp, 0);
-		break;
 
-	default:
-		break;
+out:
+#ifdef	DEBUG
+	if (ret != NDI_SUCCESS) {
+		if (scsi_hba_bus_config_failure_msg ||
+		    scsi_hba_bus_config_failure_dbg) {
+			scsi_hba_bus_config_failure_msg--;
+			printf("%s%d: bus_config_iportmap %p failure on %s: "
+			    "%d %d\n",
+			    ddi_driver_name(self), ddi_get_instance(self),
+			    (void *)iportmap,
+			    (op == BUS_CONFIG_ONE) ? (char *)arg : "ALL",
+			    (int)tsa, synced);
+		}
+		if (scsi_hba_bus_config_failure_dbg) {
+			scsi_hba_bus_config_failure_dbg--;
+			debug_enter("config_iportmap failure");
+		}
+	} else if (scsi_hba_bus_config_success_msg ||
+	    scsi_hba_bus_config_success_dbg) {
+		scsi_hba_bus_config_success_msg--;
+		printf("%s%d: bus_config_iportmap %p success on %s: %d %d\n",
+		    ddi_driver_name(self), ddi_get_instance(self),
+		    (void *)iportmap,
+		    (op == BUS_CONFIG_ONE) ? (char *)arg : "ALL",
+		    (int)tsa, synced);
+		if (scsi_hba_bus_config_success_dbg) {
+			scsi_hba_bus_config_success_dbg--;
+			debug_enter("config_iportmap success");
+		}
 	}
+#endif	/* DEBUG */
 	return (ret);
 }
 
@@ -8341,8 +8567,9 @@ scsi_tgtmap_scsi_deactivate(void *map_priv, char *tgt_addr, int addrid,
 
 int
 scsi_hba_tgtmap_create(dev_info_t *self, scsi_tgtmap_mode_t mode,
-    clock_t settle, void *tgtmap_priv, scsi_tgt_activate_cb_t activate_cb,
-    scsi_tgt_deactivate_cb_t deactivate_cb, scsi_hba_tgtmap_t **handle)
+    int csync_usec, int settle_usec, void *tgtmap_priv,
+    scsi_tgt_activate_cb_t activate_cb, scsi_tgt_deactivate_cb_t deactivate_cb,
+    scsi_hba_tgtmap_t **handle)
 {
 	scsi_hba_tran_t		*tran;
 	damap_t			*mapp;
@@ -8352,7 +8579,8 @@ scsi_hba_tgtmap_create(dev_info_t *self, scsi_tgtmap_mode_t mode,
 	char			*scsi_binding_set;
 	int			optflags;
 
-	if (self == NULL || settle == 0 || handle == NULL)
+	if (self == NULL || csync_usec == 0 ||
+	    settle_usec == 0 || handle == NULL)
 		return (DDI_FAILURE);
 
 	*handle = NULL;
@@ -8382,6 +8610,11 @@ scsi_hba_tgtmap_create(dev_info_t *self, scsi_tgtmap_mode_t mode,
 	tgtmap->tgtmap_deactivate_cb = deactivate_cb;
 	tgtmap->tgtmap_mappriv = tgtmap_priv;
 
+	tgtmap->tgtmap_create_window = 1;	/* start with window */
+	tgtmap->tgtmap_create_time = ddi_get_lbolt64();
+	tgtmap->tgtmap_create_csync_usec = csync_usec;
+	tgtmap->tgtmap_settle_usec = settle_usec;
+
 	optflags = (ddi_prop_get_int(DDI_DEV_T_ANY, self,
 	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "scsi-enumeration",
 	    scsi_enumeration) & SCSI_ENUMERATION_MT_TARGET_DISABLE) ?
@@ -8390,7 +8623,7 @@ scsi_hba_tgtmap_create(dev_info_t *self, scsi_tgtmap_mode_t mode,
 	(void) snprintf(context, sizeof (context), "%s%d.tgtmap.scsi",
 	    ddi_driver_name(self), ddi_get_instance(self));
 	SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s", context));
-	if (damap_create(context, rpt_style, optflags, settle,
+	if (damap_create(context, rpt_style, optflags, settle_usec,
 	    tgtmap, scsi_tgtmap_scsi_activate, scsi_tgtmap_scsi_deactivate,
 	    tran, scsi_tgtmap_scsi_config, scsi_tgtmap_scsi_unconfig,
 	    &mapp) != DAM_SUCCESS) {
@@ -8403,7 +8636,7 @@ scsi_hba_tgtmap_create(dev_info_t *self, scsi_tgtmap_mode_t mode,
 	    ddi_driver_name(self), ddi_get_instance(self));
 	SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s", context));
 	if (damap_create(context, rpt_style, optflags,
-	    settle, tgtmap, scsi_tgtmap_smp_activate,
+	    settle_usec, tgtmap, scsi_tgtmap_smp_activate,
 	    scsi_tgtmap_smp_deactivate,
 	    tran, scsi_tgtmap_smp_config, scsi_tgtmap_smp_unconfig,
 	    &mapp) != DAM_SUCCESS) {
@@ -8450,31 +8683,54 @@ scsi_hba_tgtmap_destroy(scsi_hba_tgtmap_t *handle)
 	kmem_free(tgtmap, sizeof (*tgtmap));
 }
 
+/* return 1 if all maps ended up syned */
 static int
-scsi_tgtmap_sync(scsi_hba_tgtmap_t *handle)
+scsi_tgtmap_sync(scsi_hba_tgtmap_t *handle, int sync_usec)
 {
 	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)handle;
 	dev_info_t		*self = tgtmap->tgtmap_tran->tran_iport_dip;
-	int			empty = 1;
+	int			all_synced = 1;
+	int			synced;
 	int			i;
 
 	for (i = 0; i < SCSI_TGT_NTYPES; i++) {
 		if (tgtmap->tgtmap_dam[i]) {
 			SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s sync begin",
 			    damap_name(tgtmap->tgtmap_dam[i])));
+			synced = damap_sync(tgtmap->tgtmap_dam[i], sync_usec);
+			all_synced &= synced;
+			SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s sync end %d",
+			    damap_name(tgtmap->tgtmap_dam[i]), synced));
 
-			/* return 1 if all maps ended up empty */
-			empty &= damap_sync(tgtmap->tgtmap_dam[i]);
-
-			SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s sync end",
-			    damap_name(tgtmap->tgtmap_dam[i])));
 		}
 	}
-	return (empty);
+	return (all_synced);
+}
+
+/* return 1 if all maps ended up empty */
+static int
+scsi_tgtmap_is_empty(scsi_hba_tgtmap_t *handle)
+{
+	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)handle;
+	dev_info_t		*self = tgtmap->tgtmap_tran->tran_iport_dip;
+	int			all_empty = 1;
+	int			empty;
+	int			i;
+
+	for (i = 0; i < SCSI_TGT_NTYPES; i++) {
+		if (tgtmap->tgtmap_dam[i]) {
+			empty = damap_is_empty(tgtmap->tgtmap_dam[i]);
+			all_empty &= empty;
+			SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s is_empty %d",
+			    damap_name(tgtmap->tgtmap_dam[i]), empty));
+		}
+	}
+
+	return (all_empty);
 }
 
 static int
-scsi_tgtmap_begin_or_flush(scsi_hba_tgtmap_t *handle, boolean_t do_begin)
+scsi_tgtmap_beginf(scsi_hba_tgtmap_t *handle, boolean_t do_begin)
 {
 	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)handle;
 	dev_info_t		*self = tgtmap->tgtmap_tran->tran_iport_dip;
@@ -8495,7 +8751,7 @@ scsi_tgtmap_begin_or_flush(scsi_hba_tgtmap_t *handle, boolean_t do_begin)
 				 * 'context' string, diagnose the case where
 				 * the tgtmap caller is failing to make
 				 * forward progress, i.e. the caller is never
-				 * completing an observation, and calling
+				 * completing an observation by calling
 				 * scsi_hbg_tgtmap_set_end. If this occurs,
 				 * the solaris target/lun state may be out
 				 * of sync with hardware.
@@ -8504,9 +8760,10 @@ scsi_tgtmap_begin_or_flush(scsi_hba_tgtmap_t *handle, boolean_t do_begin)
 				    scsi_hba_tgtmap_reports_max) {
 					tgtmap->tgtmap_noisy++;
 					if (tgtmap->tgtmap_noisy == 1) {
-						SCSI_HBA_LOG((_LOG(WARN), self,
-						    NULL, "%s: failing a tgtmap"
-						    " observation", context));
+						SCSI_HBA_LOG((_LOG(WARN),
+						    self, NULL,
+						    "%s: failing tgtmap begin",
+						    context));
 					}
 				}
 			}
@@ -8530,13 +8787,13 @@ scsi_tgtmap_begin_or_flush(scsi_hba_tgtmap_t *handle, boolean_t do_begin)
 int
 scsi_hba_tgtmap_set_begin(scsi_hba_tgtmap_t *handle)
 {
-	return (scsi_tgtmap_begin_or_flush(handle, B_TRUE));
+	return (scsi_tgtmap_beginf(handle, B_TRUE));
 }
 
 int
 scsi_hba_tgtmap_set_flush(scsi_hba_tgtmap_t *handle)
 {
-	return (scsi_tgtmap_begin_or_flush(handle, B_FALSE));
+	return (scsi_tgtmap_beginf(handle, B_FALSE));
 }
 
 int
@@ -9096,11 +9353,6 @@ scsi_hba_bus_config_iports(dev_info_t *self, uint_t flags,
 	return (ret);
 }
 
-typedef struct impl_scsi_iportmap {
-	dev_info_t	*iportmap_hba_dip;
-	damap_t		*iportmap_dam;
-} impl_scsi_iportmap_t;
-
 static int
 scsi_iportmap_config(void *arg, damap_t *mapp, damap_id_t tgtid)
 {
@@ -9164,7 +9416,8 @@ scsi_iportmap_unconfig(void *arg, damap_t *mapp, damap_id_t tgtid)
 	(void) scsi_hba_tgtmap_set_end(tran->tran_tgtmap, 0);
 
 	/* wait for unconfigure */
-	empty = scsi_tgtmap_sync(tran->tran_tgtmap);
+	(void) scsi_tgtmap_sync(tran->tran_tgtmap, 0);
+	empty = scsi_tgtmap_is_empty(tran->tran_tgtmap);
 
 	scsi_hba_devi_enter(self, &circ);
 	ndi_rele_devi(childp);
@@ -9189,7 +9442,7 @@ scsi_iportmap_unconfig(void *arg, damap_t *mapp, damap_id_t tgtid)
 
 
 int
-scsi_hba_iportmap_create(dev_info_t *self, clock_t settle,
+scsi_hba_iportmap_create(dev_info_t *self, int csync_usec, int settle_usec,
     scsi_hba_iportmap_t **handle)
 {
 	scsi_hba_tran_t		*tran;
@@ -9197,7 +9450,8 @@ scsi_hba_iportmap_create(dev_info_t *self, clock_t settle,
 	char			context[64];
 	impl_scsi_iportmap_t	*iportmap;
 
-	if (self == NULL || settle == 0 || handle == NULL)
+	if (self == NULL || csync_usec == 0 ||
+	    settle_usec == 0 || handle == NULL)
 		return (DDI_FAILURE);
 
 	*handle = NULL;
@@ -9214,7 +9468,7 @@ scsi_hba_iportmap_create(dev_info_t *self, clock_t settle,
 	    ddi_driver_name(self), ddi_get_instance(self));
 
 	if (damap_create(context, DAMAP_REPORT_PERADDR, DAMAP_SERIALCONFIG,
-	    settle, NULL, NULL, NULL, self,
+	    settle_usec, NULL, NULL, NULL, self,
 	    scsi_iportmap_config, scsi_iportmap_unconfig, &mapp) !=
 	    DAM_SUCCESS) {
 		return (DDI_FAILURE);
@@ -9222,6 +9476,11 @@ scsi_hba_iportmap_create(dev_info_t *self, clock_t settle,
 	iportmap = kmem_zalloc(sizeof (*iportmap), KM_SLEEP);
 	iportmap->iportmap_hba_dip = self;
 	iportmap->iportmap_dam = mapp;
+
+	iportmap->iportmap_create_window = 1;	/* start with window */
+	iportmap->iportmap_create_time = ddi_get_lbolt64();
+	iportmap->iportmap_create_csync_usec = csync_usec;
+	iportmap->iportmap_settle_usec = settle_usec;
 
 	tran->tran_iportmap = (scsi_hba_iportmap_t *)iportmap;
 	*handle = (scsi_hba_iportmap_t *)iportmap;
@@ -9427,7 +9686,7 @@ scsi_lunmap_destroy(dev_info_t *self, impl_scsi_tgtmap_t *tgtmap, char *taddr)
 	SCSI_HBA_LOG((_LOGLUN, self, NULL,
 	    "%s sync begin", damap_name(lundam)));
 
-	(void) damap_sync(lundam);	/* wait for unconfigure */
+	(void) damap_sync(lundam, 0);	/* wait for unconfigure */
 
 	SCSI_HBA_LOG((_LOGLUN, self, NULL,
 	    "%s sync end", damap_name(lundam)));
@@ -9736,7 +9995,7 @@ sas_phymap_unconfig(void *arg, damap_t *phydam, damap_id_t phyid)
 }
 
 int
-sas_phymap_create(dev_info_t *self, clock_t settle,
+sas_phymap_create(dev_info_t *self, int settle_usec,
     sas_phymap_mode_t mode, void *mode_argument, void *phymap_priv,
     sas_phymap_activate_cb_t  activate_cb,
     sas_phymap_deactivate_cb_t deactivate_cb,
@@ -9746,7 +10005,7 @@ sas_phymap_create(dev_info_t *self, clock_t settle,
 	char			context[64];
 	impl_sas_phymap_t	*phymap;
 
-	if (self == NULL || settle == 0 || handlep == NULL)
+	if (self == NULL || settle_usec == 0 || handlep == NULL)
 		return (DDI_FAILURE);
 
 	if (mode != PHYMAP_MODE_SIMPLE)
@@ -9765,7 +10024,7 @@ sas_phymap_create(dev_info_t *self, clock_t settle,
 	SCSI_HBA_LOG((_LOGPHY, self, NULL, "%s", context));
 
 	if (damap_create(context, DAMAP_REPORT_PERADDR, DAMAP_SERIALCONFIG,
-	    settle, NULL, NULL, NULL,
+	    settle_usec, NULL, NULL, NULL,
 	    phymap, sas_phymap_config, sas_phymap_unconfig,
 	    &phymap->phymap_dam) != DAM_SUCCESS)
 		goto fail;

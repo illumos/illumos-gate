@@ -31,7 +31,8 @@
 /*
  * Local static data
  */
-static int tgtmap_usec = MICROSEC;
+static int tgtmap_stable_usec = MICROSEC;	/* 1 second */
+static int tgtmap_csync_usec = 10 * MICROSEC;	/* 10 seconds */
 
 /*
  * SAS Topology Configuration
@@ -2024,8 +2025,9 @@ pmcs_iport_tgtmap_create(pmcs_iport_t *iport)
 	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_MAP, NULL, NULL, "%s", __func__);
 
 	/* create target map */
-	if (scsi_hba_tgtmap_create(iport->dip, SCSI_TM_FULLSET, tgtmap_usec,
-	    (void *)iport, pmcs_tgtmap_activate_cb, pmcs_tgtmap_deactivate_cb,
+	if (scsi_hba_tgtmap_create(iport->dip, SCSI_TM_FULLSET,
+	    tgtmap_csync_usec, tgtmap_stable_usec, (void *)iport,
+	    pmcs_tgtmap_activate_cb, pmcs_tgtmap_deactivate_cb,
 	    &iport->iss_tgtmap) != DDI_SUCCESS) {
 		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: failed to create tgtmap", __func__);

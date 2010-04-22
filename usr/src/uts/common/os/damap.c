@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -56,7 +55,7 @@ static void dam_addrset_deactivate(dam_t *, bitset_t *);
 static void dam_stabilize_map(void *);
 static void dam_addr_stable_cb(void *);
 static void dam_addrset_stable_cb(void *);
-static void dam_sched_tmo(dam_t *, clock_t, void (*tmo_cb)());
+static void dam_sched_timeout(void (*timeout_cb)(), dam_t *, clock_t);
 static void dam_addr_report(dam_t *, dam_da_t *, id_t, int);
 static void dam_addr_release(dam_t *, id_t);
 static void dam_addr_report_release(dam_t *, id_t);
@@ -120,7 +119,7 @@ extern pri_t maxclsyspri;
  */
 int
 damap_create(char *name, damap_rptmode_t mode, int map_opts,
-    clock_t stable_usec, void *activate_arg, damap_activate_cb_t activate_cb,
+    int stable_usec, void *activate_arg, damap_activate_cb_t activate_cb,
     damap_deactivate_cb_t deactivate_cb,
     void *config_arg, damap_configure_cb_t configure_cb,
     damap_unconfig_cb_t unconfig_cb,
@@ -132,11 +131,11 @@ damap_create(char *name, damap_rptmode_t mode, int map_opts,
 		return (DAM_EINVAL);
 
 	DTRACE_PROBE3(damap__create, char *, name,
-	    damap_rptmode_t, mode, clock_t, stable_usec);
+	    damap_rptmode_t, mode, int, stable_usec);
 
 	mapp = kmem_zalloc(sizeof (*mapp), KM_SLEEP);
 	mapp->dam_options = map_opts;
-	mapp->dam_stabletmo = drv_usectohz(stable_usec);
+	mapp->dam_stable_ticks = drv_usectohz(stable_usec);
 	mapp->dam_size = 0;
 	mapp->dam_rptmode = mode;
 	mapp->dam_activate_arg = activate_arg;
@@ -147,7 +146,7 @@ damap_create(char *name, damap_rptmode_t mode, int map_opts,
 	mapp->dam_unconfig_cb = (unconfig_cb_t)unconfig_cb;
 	mapp->dam_name = i_ddi_strdup(name, KM_SLEEP);
 	mutex_init(&mapp->dam_lock, NULL, MUTEX_DRIVER, NULL);
-	cv_init(&mapp->dam_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&mapp->dam_sync_cv, NULL, CV_DRIVER, NULL);
 	bitset_init(&mapp->dam_active_set);
 	bitset_init(&mapp->dam_stable_set);
 	bitset_init(&mapp->dam_report_set);
@@ -232,9 +231,9 @@ damap_destroy(damap_t *damapp)
 		 * wait for outstanding reports to stabilize and cancel
 		 * the timer for this map
 		 */
-		(void) damap_sync(damapp);
+		(void) damap_sync(damapp, 0);
 		mutex_enter(&mapp->dam_lock);
-		dam_sched_tmo(mapp, 0, NULL);
+		dam_sched_timeout(NULL, mapp, 0);
 
 		/*
 		 * map is at full stop
@@ -258,56 +257,97 @@ damap_destroy(damap_t *damapp)
 		ddi_strid_fini(&mapp->dam_addr_hash);
 		ddi_soft_state_fini(&mapp->dam_da);
 		kstat_delete(mapp->dam_kstatsp);
-	}
+	} else
+		mutex_exit(&mapp->dam_lock);
+
 	bitset_fini(&mapp->dam_active_set);
 	bitset_fini(&mapp->dam_stable_set);
 	bitset_fini(&mapp->dam_report_set);
 	mutex_destroy(&mapp->dam_lock);
-	cv_destroy(&mapp->dam_cv);
+	cv_destroy(&mapp->dam_sync_cv);
 	if (mapp->dam_name)
 		kmem_free(mapp->dam_name, strlen(mapp->dam_name) + 1);
 	kmem_free(mapp, sizeof (*mapp));
 }
 
 /*
- * Wait for map stability.
+ * Wait for map stability.  If sync was successfull then return 1.
+ * If called with a non-zero sync_usec, then a return value of 0 means a
+ * timeout occurred prior to sync completion. NOTE: if sync_usec is
+ * non-zero, it should be much longer than dam_stable_ticks.
  *
  * damapp:	address map
+ * sync_usec:	micorseconds until we give up on sync completion.
  */
-int
-damap_sync(damap_t *damapp)
-{
 #define	WAITFOR_FLAGS (DAM_SETADD | DAM_SPEND)
-
-	dam_t *mapp = (dam_t *)damapp;
-	int   none_active;
+int
+damap_sync(damap_t *damapp, int sync_usec)
+{
+	dam_t	*mapp = (dam_t *)damapp;
+	int	rv;
 
 	ASSERT(mapp);
-
 	DTRACE_PROBE2(damap__map__sync__start, char *, mapp->dam_name,
 	    dam_t *, mapp);
 
 	/*
-	 * block where waiting for
-	 * a) stabilization pending or a fullset update pending
-	 * b) any scheduled timeouts to fire
-	 * c) the report set to finalize (bitset is null)
+	 * Block when waiting for
+	 *	a) stabilization pending or a fullset update pending
+	 *	b) the report set to finalize (bitset is null)
+	 *	c) any scheduled timeouts to fire
 	 */
+	rv = 1;					/* return synced */
 	mutex_enter(&mapp->dam_lock);
-	while ((mapp->dam_flags & WAITFOR_FLAGS) ||
-	    (!bitset_is_null(&mapp->dam_report_set)) || (mapp->dam_tid != 0)) {
+again:	while ((mapp->dam_flags & WAITFOR_FLAGS) ||
+	    (!bitset_is_null(&mapp->dam_report_set)) ||
+	    (mapp->dam_tid != 0)) {
 		DTRACE_PROBE2(damap__map__sync__waiting, char *, mapp->dam_name,
 		    dam_t *, mapp);
-		cv_wait(&mapp->dam_cv, &mapp->dam_lock);
+
+		/* Wait for condition relayed via timeout */
+		if (sync_usec) {
+			if (cv_reltimedwait(&mapp->dam_sync_cv, &mapp->dam_lock,
+			    drv_usectohz(sync_usec), TR_MICROSEC) == -1) {
+				mapp->dam_sync_to_cnt++;
+				rv = 0;		/* return timeout */
+				break;
+			}
+		} else
+			cv_wait(&mapp->dam_sync_cv, &mapp->dam_lock);
 	}
 
-	none_active = bitset_is_null(&mapp->dam_active_set);
-
+	if (rv) {
+		/*
+		 * Delay one stabilization time after the apparent sync above
+		 * and verify accuracy - resync if not accurate.
+		 */
+		(void) cv_reltimedwait(&mapp->dam_sync_cv, &mapp->dam_lock,
+		    mapp->dam_stable_ticks, TR_MICROSEC);
+		if (rv && ((mapp->dam_flags & WAITFOR_FLAGS) ||
+		    (!bitset_is_null(&mapp->dam_report_set)) ||
+		    (mapp->dam_tid != 0)))
+			goto again;
+	}
 	mutex_exit(&mapp->dam_lock);
-	DTRACE_PROBE3(damap__map__sync__end, char *, mapp->dam_name, int,
-	    none_active, dam_t *, mapp);
 
-	return (none_active);
+	DTRACE_PROBE3(damap__map__sync__end, char *, mapp->dam_name,
+	    int, rv, dam_t *, mapp);
+	return (rv);
+}
+
+/*
+ * Return 1 if active set is empty
+ */
+int
+damap_is_empty(damap_t *damapp)
+{
+	dam_t	*mapp = (dam_t *)damapp;
+	int	rv;
+
+	mutex_enter(&mapp->dam_lock);
+	rv = bitset_is_null(&mapp->dam_active_set);
+	mutex_exit(&mapp->dam_lock);
+	return (rv);
 }
 
 /*
@@ -323,6 +363,21 @@ damap_name(damap_t *damapp)
 	dam_t *mapp = (dam_t *)damapp;
 
 	return (mapp ? mapp->dam_name : "UNKNOWN_damap");
+}
+
+/*
+ * Get the current size of the device address map
+ *
+ * damapp:	address map
+ *
+ * Returns:	size
+ */
+int
+damap_size(damap_t *damapp)
+{
+	dam_t *mapp = (dam_t *)damapp;
+
+	return (mapp->dam_size);
 }
 
 /*
@@ -437,7 +492,7 @@ damap_addr_del(damap_t *damapp, char *address)
 static int
 damap_addrset_flush_locked(damap_t *damapp)
 {
-	dam_t   *mapp = (dam_t *)damapp;
+	dam_t	*mapp = (dam_t *)damapp;
 	int	idx;
 
 	ASSERT(mapp);
@@ -455,7 +510,7 @@ damap_addrset_flush_locked(damap_t *damapp)
 		/*
 		 * cancel stabilization timeout
 		 */
-		dam_sched_tmo(mapp, 0, NULL);
+		dam_sched_timeout(NULL, mapp, 0);
 		DAM_INCR_STAT(mapp, dam_jitter);
 
 		/*
@@ -469,6 +524,7 @@ damap_addrset_flush_locked(damap_t *damapp)
 
 		bitset_zero(&mapp->dam_report_set);
 		mapp->dam_flags &= ~DAM_SETADD;
+		cv_signal(&mapp->dam_sync_cv);
 	}
 
 	return (DAM_SUCCESS);
@@ -514,10 +570,10 @@ damap_addrset_begin(damap_t *damapp)
 /*
  * Cancel full-set report
  *
- * damapp:      address map
+ * damapp:	address map
  *
- * Returns:     DAM_SUCCESS
- *	      DAM_EINVAL      Invalid argument(s)
+ * Returns:	DAM_SUCCESS
+ *		DAM_EINVAL	Invalid argument(s)
  */
 int
 damap_addrset_flush(damap_t *damapp)
@@ -627,13 +683,14 @@ damap_addrset_end(damap_t *damapp, int flags)
 	if (flags & DAMAP_END_RESET) {
 		DTRACE_PROBE2(damap__addrset__end__reset, char *,
 		    mapp->dam_name, dam_t *, mapp);
-		dam_sched_tmo(mapp, 0, NULL);
+		dam_sched_timeout(NULL, mapp, 0);
 		for (i = 1; i < mapp->dam_high; i++)
 			if (DAM_IN_REPORT(mapp, i))
 				dam_addr_report_release(mapp, i);
 	} else {
 		mapp->dam_last_update = gethrtime();
-		dam_sched_tmo(mapp, mapp->dam_stabletmo, dam_addrset_stable_cb);
+		dam_sched_timeout(dam_addrset_stable_cb, mapp,
+		    mapp->dam_stable_ticks);
 	}
 	mutex_exit(&mapp->dam_lock);
 	return (DAM_SUCCESS);
@@ -1245,9 +1302,10 @@ dam_stabilize_map(void *arg)
 		 * no difference
 		 */
 		bitset_zero(&mapp->dam_stable_set);
-		mapp->dam_flags  &= ~DAM_SPEND;
-		cv_signal(&mapp->dam_cv);
+		mapp->dam_flags &= ~DAM_SPEND;
+		cv_signal(&mapp->dam_sync_cv);
 		mutex_exit(&mapp->dam_lock);
+
 		bitset_fini(&uncfg);
 		bitset_fini(&cfg);
 		bitset_fini(&delta);
@@ -1302,9 +1360,10 @@ dam_stabilize_map(void *arg)
 	DTRACE_PROBE3(damap__map__stable__end, char *, mapp->dam_name,
 	    dam_t *, mapp, int, n_active);
 
-	mapp->dam_flags  &= ~DAM_SPEND;
-	cv_signal(&mapp->dam_cv);
+	mapp->dam_flags &= ~DAM_SPEND;
+	cv_signal(&mapp->dam_sync_cv);
 	mutex_exit(&mapp->dam_lock);
+
 	bitset_fini(&uncfg);
 	bitset_fini(&cfg);
 	bitset_fini(&delta);
@@ -1321,9 +1380,7 @@ dam_addr_stable_cb(void *arg)
 	dam_da_t *passp;
 	int spend = 0;
 	int tpend = 0;
-	int64_t	next_tmov = mapp->dam_stabletmo;
-	int64_t tmo_delta;
-	int64_t ts = ddi_get_lbolt64();
+	int64_t ts, next_ticks, delta_ticks;
 
 	mutex_enter(&mapp->dam_lock);
 	if (mapp->dam_tid == 0) {
@@ -1342,7 +1399,8 @@ dam_addr_stable_cb(void *arg)
 	if (mapp->dam_flags & DAM_SPEND) {
 		DAM_INCR_STAT(mapp, dam_overrun);
 		mapp->dam_stable_overrun++;
-		dam_sched_tmo(mapp, mapp->dam_stabletmo, dam_addr_stable_cb);
+		dam_sched_timeout(dam_addr_stable_cb, mapp,
+		    mapp->dam_stable_ticks);
 		DTRACE_PROBE2(damap__map__addr__stable__overrun, char *,
 		    mapp->dam_name, dam_t *, mapp);
 		mutex_exit(&mapp->dam_lock);
@@ -1359,6 +1417,8 @@ dam_addr_stable_cb(void *arg)
 	 * address from the stable set
 	 */
 	bitset_copy(&mapp->dam_active_set, &mapp->dam_stable_set);
+	ts = ddi_get_lbolt64();
+	next_ticks = mapp->dam_stable_ticks;
 	for (i = 1; i < mapp->dam_high; i++) {
 		if (!bitset_in_set(&mapp->dam_report_set, i))
 			continue;
@@ -1380,9 +1440,9 @@ dam_addr_stable_cb(void *arg)
 		 * not stabilized, determine next map timeout
 		 */
 		tpend++;
-		tmo_delta = passp->da_deadline - ts;
-		if (tmo_delta < next_tmov)
-			next_tmov = tmo_delta;
+		delta_ticks = passp->da_deadline - ts;
+		if (delta_ticks < next_ticks)
+			next_ticks = delta_ticks;
 	}
 
 	/*
@@ -1391,7 +1451,7 @@ dam_addr_stable_cb(void *arg)
 	if (spend) {
 		if (taskq_dispatch(system_taskq, dam_stabilize_map,
 		    mapp, TQ_NOSLEEP | TQ_NOQUEUE)) {
-			mapp->dam_flags  |= DAM_SPEND;
+			mapp->dam_flags |= DAM_SPEND;
 			DTRACE_PROBE2(damap__map__addr__stable__start, char *,
 			    mapp->dam_name, dam_t *, mapp);
 		} else {
@@ -1401,10 +1461,10 @@ dam_addr_stable_cb(void *arg)
 			 * Avoid waiting the entire stabalization
 			 * time again if taskq_diskpatch fails.
 			 */
-			tmo_delta = drv_usectohz(
+			delta_ticks = drv_usectohz(
 			    damap_taskq_dispatch_retry_usec);
-			if (tmo_delta < next_tmov)
-				next_tmov = tmo_delta;
+			if (delta_ticks < next_ticks)
+				next_ticks = delta_ticks;
 		}
 	}
 
@@ -1413,7 +1473,8 @@ dam_addr_stable_cb(void *arg)
 	 * still pending
 	 */
 	if (tpend)
-		dam_sched_tmo(mapp, (clock_t)next_tmov, dam_addr_stable_cb);
+		dam_sched_timeout(dam_addr_stable_cb, mapp,
+		    (clock_t)next_ticks);
 
 	mutex_exit(&mapp->dam_lock);
 }
@@ -1445,9 +1506,8 @@ dam_addrset_stable_cb(void *arg)
 	    TQ_NOSLEEP | TQ_NOQUEUE) == NULL)) {
 		DAM_INCR_STAT(mapp, dam_overrun);
 		mapp->dam_stable_overrun++;
-		dam_sched_tmo(mapp,
-		    drv_usectohz(damap_taskq_dispatch_retry_usec),
-		    dam_addrset_stable_cb);
+		dam_sched_timeout(dam_addrset_stable_cb, mapp,
+		    drv_usectohz(damap_taskq_dispatch_retry_usec));
 
 		DTRACE_PROBE2(damap__map__addrset__stable__overrun, char *,
 		    mapp->dam_name, dam_t *, mapp);
@@ -1461,34 +1521,36 @@ dam_addrset_stable_cb(void *arg)
 	bitset_zero(&mapp->dam_report_set);
 	mapp->dam_flags |= DAM_SPEND;
 	mapp->dam_flags &= ~DAM_SETADD;
+	/* NOTE: don't need cv_signal since DAM_SPEND is still set */
+
 	DTRACE_PROBE2(damap__map__addrset__stable__start, char *,
 	    mapp->dam_name, dam_t *, mapp);
 	mutex_exit(&mapp->dam_lock);
 }
 
 /*
- * schedule map timeout 'tmo_ms' ticks
- * if map timer is currently running, cancel if tmo_ms == 0
+ * schedule map timeout in 'ticks' ticks
+ * if map timer is currently running, cancel if ticks == 0
  */
 static void
-dam_sched_tmo(dam_t *mapp, clock_t tmo_ms, void (*tmo_cb)())
+dam_sched_timeout(void (*timeout_cb)(), dam_t *mapp, clock_t ticks)
 {
 	timeout_id_t tid;
 
-	DTRACE_PROBE3(damap__sched__tmo, char *, mapp->dam_name, dam_t *, mapp,
-	    clock_t, tmo_ms);
+	DTRACE_PROBE3(damap__sched__timeout, char *, mapp->dam_name,
+	    dam_t *, mapp, int, ticks);
 
 	ASSERT(mutex_owned(&mapp->dam_lock));
 	if ((tid = mapp->dam_tid) != 0) {
-		if (tmo_ms == 0) {
+		if (ticks == 0) {
 			mapp->dam_tid = 0;
 			mutex_exit(&mapp->dam_lock);
 			(void) untimeout(tid);
 			mutex_enter(&mapp->dam_lock);
 		}
 	} else {
-		if (tmo_cb && (tmo_ms != 0))
-			mapp->dam_tid = timeout(tmo_cb, mapp, tmo_ms);
+		if (timeout_cb && (ticks != 0))
+			mapp->dam_tid = timeout(timeout_cb, mapp, ticks);
 	}
 }
 
@@ -1508,13 +1570,13 @@ dam_addr_report(dam_t *mapp, dam_da_t *passp, id_t addrid, int rpt_type)
 	passp->da_last_report = gethrtime();
 	mapp->dam_last_update = gethrtime();
 	passp->da_report_cnt++;
-	passp->da_deadline = ddi_get_lbolt64() + mapp->dam_stabletmo;
+	passp->da_deadline = ddi_get_lbolt64() + mapp->dam_stable_ticks;
 	if (rpt_type == RPT_ADDR_DEL)
 		passp->da_flags |= DA_RELE;
 	else if (rpt_type == RPT_ADDR_ADD)
 		passp->da_flags &= ~DA_RELE;
 	bitset_add(&mapp->dam_report_set, addrid);
-	dam_sched_tmo(mapp, mapp->dam_stabletmo, dam_addr_stable_cb);
+	dam_sched_timeout(dam_addr_stable_cb, mapp, mapp->dam_stable_ticks);
 }
 
 /*

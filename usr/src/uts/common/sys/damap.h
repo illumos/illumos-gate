@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DAMAP_H
@@ -129,14 +128,16 @@ typedef enum {DAMAP_REPORT_PERADDR, DAMAP_REPORT_FULLSET} damap_rptmode_t;
 #define	DAMAP_SERIALCONFIG	0
 #define	DAMAP_MTCONFIG		1
 
-int	damap_create(char *, damap_rptmode_t, int, clock_t,
+int	damap_create(char *, damap_rptmode_t, int, int,
 	    void *, damap_activate_cb_t, damap_deactivate_cb_t,
 	    void *, damap_configure_cb_t, damap_unconfig_cb_t,
 	    damap_t **);
 void	damap_destroy(damap_t *);
 
 char	*damap_name(damap_t *);
-int	damap_sync(damap_t *);
+int	damap_size(damap_t *);
+int	damap_is_empty(damap_t *);
+int	damap_sync(damap_t *, int);
 
 int	damap_addr_add(damap_t *, char *, damap_id_t *, nvlist_t *, void *);
 int	damap_addr_del(damap_t *, char *);

@@ -137,6 +137,10 @@ int	swaploaded;		/* set after swap driver and fs are loaded */
 int	bop_io_quiesced = 0;	/* set when BOP I/O can no longer be used */
 int	last_module_id;
 clock_t	mod_uninstall_interval = 0;
+int	mod_uninstall_pass_max = 6;
+int	mod_uninstall_ref_zero;	/* # modules that went mod_ref == 0 */
+int	mod_uninstall_pass_exc;	/* mod_uninstall_all left new stuff */
+
 int	ddi_modclose_unload = 1;	/* 0 -> just decrement reference */
 
 int	devcnt_incr	= 256;		/* allow for additional drivers */
@@ -2829,6 +2833,8 @@ modunrload(modid_t id, struct modctl **rmodp, int unload)
 	if (rmodp) {
 		mutex_enter(&mod_lock);
 		modp->mod_ref--;
+		if (modp->mod_ref == 0)
+			mod_uninstall_ref_zero++;
 		mutex_exit(&mod_lock);
 		*rmodp = modp;
 	}
@@ -3054,6 +3060,8 @@ mod_release_stub(struct mod_stub_info *stub)
 	ASSERT(mp->mod_ref &&
 	    (mp->mod_loaded || (stub->mods_flag & MODS_WEAK)));
 	mp->mod_ref--;
+	if (mp->mod_ref == 0)
+		mod_uninstall_ref_zero++;
 	if (mp->mod_want) {
 		mp->mod_want = 0;
 		cv_broadcast(&mod_cv);
@@ -3794,7 +3802,8 @@ static void
 mod_uninstall_all(void)
 {
 	struct modctl	*mp;
-	modid_t		modid = 0;
+	int		pass;
+	modid_t		modid;
 
 	/* synchronize with any active modunload_disable() */
 	modunload_begin();
@@ -3805,22 +3814,40 @@ mod_uninstall_all(void)
 	(void) devfs_clean(ddi_root_node(), NULL, 0);
 	(void) ndi_devi_unconfig(ddi_root_node(), NDI_AUTODETACH);
 
-	while ((mp = mod_hold_next_by_id(modid)) != NULL) {
-		modid = mp->mod_id;
-		/*
-		 * Skip modules with the MOD_NOAUTOUNLOAD flag set
-		 */
-		if (mp->mod_loadflags & MOD_NOAUTOUNLOAD) {
+	/*
+	 * Loop up to max times if we keep producing unreferenced modules.
+	 * A new unreferenced module is an opportunity to unload.
+	 */
+	for (pass = 0; pass < mod_uninstall_pass_max; pass++) {
+
+		/* zero count of modules that go unreferenced during pass */
+		mod_uninstall_ref_zero = 0;
+
+		modid = 0;
+		while ((mp = mod_hold_next_by_id(modid)) != NULL) {
+			modid = mp->mod_id;
+
+			/*
+			 * Skip modules with the MOD_NOAUTOUNLOAD flag set
+			 */
+			if (mp->mod_loadflags & MOD_NOAUTOUNLOAD) {
+				mod_release_mod(mp);
+				continue;
+			}
+
+			if (moduninstall(mp) == 0) {
+				mod_unload(mp);
+				CPU_STATS_ADDQ(CPU, sys, modunload, 1);
+			}
 			mod_release_mod(mp);
-			continue;
 		}
 
-		if (moduninstall(mp) == 0) {
-			mod_unload(mp);
-			CPU_STATS_ADDQ(CPU, sys, modunload, 1);
-		}
-		mod_release_mod(mp);
+		/* break if no modules went unreferenced during pass */
+		if (mod_uninstall_ref_zero == 0)
+			break;
 	}
+	if (pass >= mod_uninstall_pass_max)
+		mod_uninstall_pass_exc++;
 
 	(void) tsd_set(mod_autounload_key, NULL);
 	modunload_end();
@@ -4273,6 +4300,8 @@ mod_release_requisites(struct modctl *modp)
 		req = modl->modl_modp;
 		ASSERT(req->mod_ref >= 1 && req->mod_loaded);
 		req->mod_ref--;
+		if (req->mod_ref == 0)
+			mod_uninstall_ref_zero++;
 
 		/*
 		 * Check if the module has to be unloaded or not.

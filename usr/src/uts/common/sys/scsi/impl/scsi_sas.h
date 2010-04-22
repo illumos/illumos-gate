@@ -44,7 +44,7 @@ typedef void (*sas_phymap_deactivate_cb_t)
 		(void *phymap_priv, char *ua, void *ua_priv);
 
 extern int	sas_phymap_create(dev_info_t		*hba_dip,
-				clock_t			settle_us,
+				int			settle_usec,
 				sas_phymap_mode_t	mode,
 				void			*mode_argument,
 				void			*phymap_priv,

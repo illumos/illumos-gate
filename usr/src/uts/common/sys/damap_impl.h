@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DAMAP_IMPL_H
@@ -67,7 +66,7 @@ struct dam {
 	int		dam_flags;		/* map state and cv flags */
 	int		dam_options;		/* map options */
 	int		dam_rptmode;		/* report mode */
-	clock_t		dam_stabletmo;		/* stabilization (ticks) */
+	clock_t		dam_stable_ticks;	/* stabilization */
 	uint_t		dam_size;		/* max index for addr hash */
 	id_t		dam_high;		/* highest index allocated */
 	timeout_id_t	dam_tid;		/* timeout(9F) ID */
@@ -89,9 +88,10 @@ struct dam {
 	hrtime_t	dam_last_stable;	/* last map stable */
 	int		dam_stable_cnt;		/* # of times map stabilized */
 	int		dam_stable_overrun;
-	kcondvar_t	dam_cv;
+	kcondvar_t	dam_sync_cv;
 	kmutex_t	dam_lock;
 	kstat_t		*dam_kstatsp;
+	int		dam_sync_to_cnt;
 };
 
 #define	DAM_SPEND		0x10	/* stable pending */
@@ -110,7 +110,7 @@ typedef struct {
 	nvlist_t	*da_nvl;	/* stable nvlist */
 	void		*da_ppriv_rpt;	/* reported provider-private */
 	nvlist_t	*da_nvl_rpt;	/* reported nvlist */
-	int64_t		da_deadline;	/* lbolt64 value when stable */
+	int64_t		da_deadline;	/* ddi_get_lbolt64 value when stable */
 	hrtime_t	da_last_report;	/* timestamp of last report */
 	int		da_report_cnt;	/* # of times address reported */
 	hrtime_t	da_last_stable;	/* timestamp of last stable address */

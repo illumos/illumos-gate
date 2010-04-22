@@ -67,8 +67,9 @@ static int fwlog_level = 3;
 static int physpeed = PHY_LINK_ALL;
 static int phymode = PHY_LM_AUTO;
 static int block_mask = 0;
-static int phymap_usec = 3 * MICROSEC;
-static int iportmap_usec = 2 * MICROSEC;
+static int phymap_stable_usec = 3 * MICROSEC;
+static int iportmap_stable_usec = 2 * MICROSEC;
+static int iportmap_csync_usec = 20 * MICROSEC;
 
 #ifdef DEBUG
 static int debug_mask = 1;
@@ -1021,7 +1022,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Create the phymap for this HBA instance
 	 */
-	if (sas_phymap_create(dip, phymap_usec, PHYMAP_MODE_SIMPLE, NULL,
+	if (sas_phymap_create(dip, phymap_stable_usec, PHYMAP_MODE_SIMPLE, NULL,
 	    pwp, pmcs_phymap_activate, pmcs_phymap_deactivate,
 	    &pwp->hss_phymap) != DDI_SUCCESS) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
@@ -1033,8 +1034,8 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Create the iportmap for this HBA instance
 	 */
-	if (scsi_hba_iportmap_create(dip, iportmap_usec,
-	    &pwp->hss_iportmap) != DDI_SUCCESS) {
+	if (scsi_hba_iportmap_create(dip, iportmap_csync_usec,
+	    iportmap_stable_usec, &pwp->hss_iportmap) != DDI_SUCCESS) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: pmcs%d iportmap_create failed", __func__, inst);
 		goto failure;
