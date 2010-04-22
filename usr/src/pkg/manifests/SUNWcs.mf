@@ -1,27 +1,4 @@
-#
-# CDDL HEADER START
-#
-# The contents of this file are subject to the terms of the
-# Common Development and Distribution License (the "License").
-# You may not use this file except in compliance with the License.
-#
-# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or http://www.opensolaris.org/os/licensing.
-# See the License for the specific language governing permissions
-# and limitations under the License.
-#
-# When distributing Covered Code, include this CDDL HEADER in each
-# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-# If applicable, add the following below this CDDL HEADER, with the
-# fields enclosed by brackets "[]" replaced with your own identifying
-# information: Portions Copyright [yyyy] [name of copyright owner]
-#
-# CDDL HEADER END
-#
-
-#
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-#
 
 set name=pkg.fmri value=pkg:/SUNWcs@$(PKGVERS)
 set name=pkg.description \
@@ -929,12 +906,6 @@ file path=usr/lib/help/auths/locale/C/AuditHeader.html
 file path=usr/lib/help/auths/locale/C/AuditRead.html
 file path=usr/lib/help/auths/locale/C/AuthJobsAdmin.html
 file path=usr/lib/help/auths/locale/C/AuthJobsUser.html
-file path=usr/lib/help/auths/locale/C/AuthMMSDeviceLog.html
-file path=usr/lib/help/auths/locale/C/AuthMMSDeviceState.html
-file path=usr/lib/help/auths/locale/C/AuthMMSIORead.html
-file path=usr/lib/help/auths/locale/C/AuthMMSIOWrite.html
-file path=usr/lib/help/auths/locale/C/AuthMMSMedia.html
-file path=usr/lib/help/auths/locale/C/AuthMMSRequest.html
 file path=usr/lib/help/auths/locale/C/AuthProfmgrAssign.html
 file path=usr/lib/help/auths/locale/C/AuthProfmgrDelegate.html
 file path=usr/lib/help/auths/locale/C/AuthProfmgrExecattrWrite.html
@@ -962,7 +933,6 @@ file path=usr/lib/help/auths/locale/C/LinkSecurity.html
 file path=usr/lib/help/auths/locale/C/LoginEnable.html
 file path=usr/lib/help/auths/locale/C/LoginHeader.html
 file path=usr/lib/help/auths/locale/C/LoginRemote.html
-file path=usr/lib/help/auths/locale/C/MMSHeader.html
 file path=usr/lib/help/auths/locale/C/NetworkAutoconfRead.html
 file path=usr/lib/help/auths/locale/C/NetworkAutoconfSelect.html
 file path=usr/lib/help/auths/locale/C/NetworkAutoconfWlan.html
@@ -991,7 +961,6 @@ file path=usr/lib/help/auths/locale/C/SmfLocationStates.html
 file path=usr/lib/help/auths/locale/C/SmfMDNSStates.html
 file path=usr/lib/help/auths/locale/C/SmfManageHeader.html
 file path=usr/lib/help/auths/locale/C/SmfManageHotplug.html
-file path=usr/lib/help/auths/locale/C/SmfManageMMS.html
 file path=usr/lib/help/auths/locale/C/SmfManageZFSSnap.html
 file path=usr/lib/help/auths/locale/C/SmfModifyAppl.html
 file path=usr/lib/help/auths/locale/C/SmfModifyDepend.html
@@ -1022,7 +991,6 @@ file path=usr/lib/help/auths/locale/C/SmfValueIPsec.html
 file path=usr/lib/help/auths/locale/C/SmfValueIdmap.html
 file path=usr/lib/help/auths/locale/C/SmfValueInetd.html
 file path=usr/lib/help/auths/locale/C/SmfValueMDNS.html
-file path=usr/lib/help/auths/locale/C/SmfValueMMS.html
 file path=usr/lib/help/auths/locale/C/SmfValueNADD.html
 file path=usr/lib/help/auths/locale/C/SmfValueNDMP.html
 file path=usr/lib/help/auths/locale/C/SmfValueNWAM.html
@@ -1076,9 +1044,6 @@ file path=usr/lib/help/profiles/locale/C/RtInetdMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtKerberosClntMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtKerberosSrvrMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtLogMngmnt.html
-file path=usr/lib/help/profiles/locale/C/RtMMSAdmin.html
-file path=usr/lib/help/profiles/locale/C/RtMMSOper.html
-file path=usr/lib/help/profiles/locale/C/RtMMSUser.html
 file path=usr/lib/help/profiles/locale/C/RtMailMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtMaintAndRepair.html
 file path=usr/lib/help/profiles/locale/C/RtMediaBkup.html
