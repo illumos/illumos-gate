@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -68,3 +67,10 @@
 ./usr/closed/uts/common/io/bnx/status_code.h
 ./usr/closed/uts/common/io/bnx/tcp_ctx.h
 ./usr/closed/uts/common/io/bnx/toe_ctx.h
+
+#
+# Ignore Makefile.tonic - not used unless we're running an
+# OpenSolaris closedbins delivery build
+#
+./usr/closed/Makefile.tonic
+
