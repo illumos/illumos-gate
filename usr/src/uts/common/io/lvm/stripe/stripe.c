@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -1282,6 +1281,7 @@ stripe_replace_dev(md_dev64_t dev, void *junk, int ci, ms_new_dev_t *nd,
 	set_t		setno;
 	side_t		side;
 	md_dev64_t	this_dev;
+	md_dev64_t	old_dev;
 
 	mnum = md_getminor(dev);
 	ui = MDI_UNIT(mnum);
@@ -1294,6 +1294,7 @@ stripe_replace_dev(md_dev64_t dev, void *junk, int ci, ms_new_dev_t *nd,
 	comp = (struct ms_comp *)((void *)&((char *)un)[un->un_ocomp]);
 
 	comp += ci;
+	old_dev = comp->un_dev;
 
 	/*
 	 * Count the number of components
@@ -1479,10 +1480,10 @@ stripe_replace_dev(md_dev64_t dev, void *junk, int ci, ms_new_dev_t *nd,
 		 * if it's a  metadevice.
 		 */
 		if (md_getmajor(comp->un_dev) == md_major) {
-			minor_t	  comp_mnum = md_getminor(comp->un_dev);
+			minor_t	  comp_mnum = md_getminor(old_dev);
 			md_unit_t *comp_un = MD_UNIT(comp_mnum);
 
-			md_reset_parent(comp->un_dev);
+			md_reset_parent(old_dev);
 			recids[rid++] = MD_RECID(comp_un);
 		}
 	}

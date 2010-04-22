@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2356,7 +2355,7 @@ meta_sp_print(
 			}
 			if (sp_parent_printed[setno] == NULL)
 				sp_parent_printed[setno] =
-				    Zalloc(BT_BITOUL(MD_MAXUNITS));
+				    Zalloc(BT_SIZEOFMAP(MD_MAXUNITS));
 			BT_SET(sp_parent_printed[setno], unit);
 		}
 	}

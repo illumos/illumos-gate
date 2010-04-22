@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -161,6 +160,10 @@ printset(mdsetname_t *sp, md_error_t *ep)
 			 * nodes would have different nodelists possibly
 			 * causing different nodes to to choose different
 			 * masters.
+			 *
+			 * Standard hostname field is 17 bytes but metaset
+			 * will display up to MD_MAX_NODENAME, defined in
+			 * meta_basic.h
 			 */
 			if (!(nd->nd_flags & MD_MN_NODE_OK)) {
 				nd = nd->nd_next;
@@ -169,26 +172,30 @@ printset(mdsetname_t *sp, md_error_t *ep)
 			if ((nd->nd_flags & MD_MN_NODE_ALIVE) &&
 			    (nd->nd_flags & MD_MN_NODE_OWN)) {
 				(void) printf(
-				    gettext("  %-17.17s  %-12.12s  %-4.4s\n"),
+				    gettext("  %-17.*s  %-12.12s  %-4.4s\n"),
+				    MD_MAX_NODENAME,
 				    nd->nd_nodename, gettext("multi-owner"),
 				    gettext("Yes"));
 			} else if ((!(nd->nd_flags & MD_MN_NODE_ALIVE)) &&
 			    (nd->nd_flags & MD_MN_NODE_OWN)) {
 				/* Should never be able to happen */
 				(void) printf(
-				    gettext("  %-17.17s  %-12.12s  %-4.4s\n"),
+				    gettext("  %-17.*s  %-12.12s  %-4.4s\n"),
+				    MD_MAX_NODENAME,
 				    nd->nd_nodename, gettext("multi-owner"),
 				    gettext("No"));
 			} else if ((nd->nd_flags & MD_MN_NODE_ALIVE) &&
 			    (!(nd->nd_flags & MD_MN_NODE_OWN))) {
 				(void) printf(
-				    gettext("  %-17.17s  %-12.12s  %-4.4s\n"),
+				    gettext("  %-17.*s  %-12.12s  %-4.4s\n"),
+				    MD_MAX_NODENAME,
 				    nd->nd_nodename, gettext(""),
 				    gettext("Yes"));
 			} else if ((!(nd->nd_flags & MD_MN_NODE_ALIVE)) &&
 			    (!(nd->nd_flags & MD_MN_NODE_OWN))) {
 				(void) printf(
-				    gettext("  %-17.17s  %-12.12s  %-4.4s\n"),
+				    gettext("  %-17.*s  %-12.12s  %-4.4s\n"),
+				    MD_MAX_NODENAME,
 				    nd->nd_nodename, gettext(""),
 				    gettext("No"));
 			}
