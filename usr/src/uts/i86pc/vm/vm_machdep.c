@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -58,6 +57,7 @@
 #include <sys/exechdr.h>
 #include <sys/debug.h>
 #include <sys/vmsystm.h>
+#include <sys/swap.h>
 
 #include <vm/hat.h>
 #include <vm/as.h>

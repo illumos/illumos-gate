@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -42,14 +41,14 @@
 #include <vm/seg_kmem.h>
 
 /*
- * This global mutex is for logical page locking.
+ * This global mutex array is for logical page locking.
  * The following fields in the page structure are protected
  * by this lock:
  *
  *	p_lckcnt
  *	p_cowcnt
  */
-kmutex_t page_llock;
+pad_mutex_t page_llocks[8 * NCPU_P2];
 
 /*
  * This is a global lock for the logical page free list.  The
@@ -127,14 +126,10 @@ static pad_mutex_t	pszc_mutex[PSZC_MTX_TABLE_SIZE];
  * an address of a vnode.
  */
 
-/*
- * XX64	VPH_TABLE_SIZE and VP_HASH_FUNC might break in 64 bit world.
- *	Need to review again.
- */
 #if defined(_LP64)
-#define	VPH_TABLE_SIZE  (1 << (VP_SHIFT + 3))
+#define	VPH_TABLE_SIZE  (8 * NCPU_P2)
 #else	/* 32 bits */
-#define	VPH_TABLE_SIZE	(2 << VP_SHIFT)
+#define	VPH_TABLE_SIZE	(2 * NCPU_P2)
 #endif
 
 #define	VP_HASH_FUNC(vp) \

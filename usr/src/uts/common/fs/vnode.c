@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2284,8 +2283,11 @@ vn_cache_destructor(void *buf, void *cdrarg)
 void
 vn_create_cache(void)
 {
-	vn_cache = kmem_cache_create("vn_cache", sizeof (struct vnode), 64,
-	    vn_cache_constructor, vn_cache_destructor, NULL, NULL,
+	/* LINTED */
+	ASSERT((1 << VNODE_ALIGN_LOG2) ==
+	    P2ROUNDUP(sizeof (struct vnode), VNODE_ALIGN));
+	vn_cache = kmem_cache_create("vn_cache", sizeof (struct vnode),
+	    VNODE_ALIGN, vn_cache_constructor, vn_cache_destructor, NULL, NULL,
 	    NULL, 0);
 }
 

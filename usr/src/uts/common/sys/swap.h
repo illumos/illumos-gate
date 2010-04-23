@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1987, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -39,8 +37,6 @@
 
 #ifndef	_SYS_SWAP_H
 #define	_SYS_SWAP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/isa_defs.h>
 #include <sys/feature_tests.h>
@@ -159,23 +155,17 @@ struct	swapinfo {
 /*
  * Stuff to convert an anon slot pointer to a page name.
  * Because the address of the slot (ap) is a unique identifier, we
- * use it to generate a unique (vp,off), as shown below.
- *
- *  	|<-- 11 bits -->|<------32 - 11 --------->|
- *	   vp index bits	off bits
+ * use it to generate a unique (vp,off), as shown in the comment for
+ * swap_alloc().
  *
  * The off bits are shifted PAGESHIFT to directly form a page aligned
  * offset; the vp index bits map 1-1 to a vnode.
  *
- * Note: if we go to 64 bit offsets, we could use all the bits as the
- * unique offset and just have one vnode.
  */
-#define	AN_OFFSHIFT	11			/* vnum # bits */
-#define	AN_VPSHIFT	21 			/* 32 - 11 */
-#define	AN_VPSIZEMASK	0x7FF			/* vp index mask */
-#define	MAX_SWAP_VNODES	2048			/* 1 << AN_OFFSHIFT */
-#define	AN_CACHE_ALIGN	16			/* anon address aligned */
-						/* 16 bytes */
+#define	MAX_SWAP_VNODES_LOG2	11		/* log2(MAX_SWAP_VNODES) */
+#define	MAX_SWAP_VNODES	(1U << MAX_SWAP_VNODES_LOG2)	/* max # swap vnodes */
+#define	AN_VPMASK	(MAX_SWAP_VNODES - 1)	/* vp index mask */
+#define	AN_VPSHIFT	MAX_SWAP_VNODES_LOG2
 /*
  * Convert from an anon slot to associated vnode and offset.
  */
@@ -189,24 +179,24 @@ struct	swapinfo {
 /*
  * Get a vnode name for an anon slot.
  * The vnum, offset are derived from anon struct address which is
- * 16 bytes aligned. To get swap offset the anon address is shifted
- * by additional 11 bits which yields 32K aligned swap offset
- * (11 bits plus 4 bits alignment).
- * The vnum (vnode index) is created from bits 31-21.
- * The 64 bit swap offset is created from bits 63-32 and 20-4.
- * The 32 bit offset is created from bits 20-4.
+ * 16 bytes aligned.  anon structs may be kmem_cache_alloc'd concurrently by
+ * multiple threads and come from a small range of addresses (same slab), in
+ * which case high order AP bits do not vary much, so choose vnum from low
+ * order bits which vary the most.  Different threads will thus get different
+ * vnums and vnodes, which avoids vph_mutex_contention on the subsequent
+ * page_hashin().
  *
- * +-----------...----------+--------+-----------------------+----+
- * |        swap offset     |  vnum  |       swap offset     |0000|
- * +-----------...----------+--------+-----------------------+----+
- *  63	                  32 31    21 20	            4 3  0
+ * +-----------...-------------------+-----------------------+----+
+ * |        swap offset              |           vnum        |0000|
+ * +-----------...-------------------+-----------------------+----+
+ *  63                             15 14                    4 3   0
  */
 #define	swap_alloc(AP)							\
 {									\
-	(AP)->an_vp = swapfs_getvp(((uintptr_t)(AP) >> AN_VPSHIFT)	\
-	    & AN_VPSIZEMASK); 						\
-	(AP)->an_off = (anoff_t)(((uintptr_t)(AP) & ~(uintptr_t)0xFFFFFFFF) \
-	    | (((uintptr_t)(AP) << AN_OFFSHIFT) & (uintptr_t)0xFFFFFFFF)); \
+	(AP)->an_vp = swapfs_getvp(((uintptr_t)(AP) >> AN_CACHE_ALIGN_LOG2) \
+	    & AN_VPMASK); 						\
+	(AP)->an_off = (anoff_t)((((uintptr_t)(AP)) >>			\
+	    AN_VPSHIFT + AN_CACHE_ALIGN_LOG2) << PAGESHIFT);		\
 }
 
 /*

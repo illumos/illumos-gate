@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -260,6 +259,10 @@ typedef struct vnode {
 
 #define	IS_DEVVP(vp)	\
 	((vp)->v_type == VCHR || (vp)->v_type == VBLK || (vp)->v_type == VFIFO)
+
+#define	VNODE_ALIGN	64
+/* Count of low-order 0 bits in a vnode *, based on size and alignment. */
+#define	VNODE_ALIGN_LOG2	8
 
 /*
  * vnode flags.

@@ -60,6 +60,9 @@ extern "C" {
 #define	NCPU_LOG2	5
 #endif
 
+/* NCPU_P2 is NCPU rounded to a power of 2 */
+#define	NCPU_P2	(1 << NCPU_LOG2)
+
 /*
  * The value defined below could grow to 16. hat structure and
  * page_t have room for 16 nodes.

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_MUTEX_H
@@ -70,6 +69,18 @@ typedef struct mutex {
 } kmutex_t;
 
 #ifdef _KERNEL
+
+/*
+ * A padded mutex, one per 64 byte cache line.  Use when false sharing is
+ * an issue but beware of the extra memory it uses.  Consumers may want to
+ * consider aligning their pad_mutex_t's to a cache line boundary as well.
+ */
+typedef struct pad_mutex {
+	kmutex_t	pad_mutex;
+#ifdef _LP64
+	char		pad_pad[64 - sizeof (kmutex_t)];
+#endif
+} pad_mutex_t;
 
 #define	MUTEX_HELD(x)		(mutex_owned(x))
 #define	MUTEX_NOT_HELD(x)	(!mutex_owned(x) || panicstr || quiesce_active)

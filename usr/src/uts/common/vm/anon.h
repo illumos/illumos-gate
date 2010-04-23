@@ -91,6 +91,11 @@ struct anon {
 	int an_refcnt;		/* # of people sharing slot */
 };
 
+#define	AN_CACHE_ALIGN_LOG2	4	/* log2(AN_CACHE_ALIGN) */
+#define	AN_CACHE_ALIGN	(1U << AN_CACHE_ALIGN_LOG2) /* anon address aligned */
+						/* 16 bytes */
+
+
 #ifdef _KERNEL
 /*
  * The swapinfo_lock protects:
@@ -121,11 +126,24 @@ extern kcondvar_t anon_array_cv[];
  * Global hash table to provide a function from (vp, off) -> ap
  */
 extern size_t anon_hash_size;
+extern unsigned int anon_hash_shift;
 extern struct anon **anon_hash;
 #define	ANON_HASH_SIZE	anon_hash_size
 #define	ANON_HASHAVELEN	4
-#define	ANON_HASH(VP, OFF)	\
-((((uintptr_t)(VP) >> 7)  ^ ((OFF) >> PAGESHIFT)) & (ANON_HASH_SIZE - 1))
+/*
+ * Try to use as many bits of randomness from both vp and off as we can.
+ * This should help spreading evenly for a variety of workloads.  See comments
+ * for PAGE_HASH_FUNC for more explanation.
+ */
+#define	ANON_HASH(vp, off)	\
+	(((((uintptr_t)(off) >> PAGESHIFT) ^ \
+		((uintptr_t)(off) >> (PAGESHIFT + anon_hash_shift))) ^ \
+		(((uintptr_t)(vp) >> 3) ^ \
+		((uintptr_t)(vp) >> (3 + anon_hash_shift)) ^ \
+		((uintptr_t)(vp) >> (3 + 2 * anon_hash_shift)) ^ \
+		((uintptr_t)(vp) << \
+		    (anon_hash_shift - AN_VPSHIFT - VNODE_ALIGN_LOG2)))) & \
+		(anon_hash_size - 1))
 
 #define	AH_LOCK_SIZE	(2 << NCPU_LOG2)
 

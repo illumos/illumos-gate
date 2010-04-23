@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -53,6 +52,7 @@
 #include <sys/cpuvar.h>
 #include <sys/dlpi.h>
 #include <sys/clock_impl.h>
+#include <sys/swap.h>
 #include <errno.h>
 
 #include <vm/seg_vn.h>
@@ -628,9 +628,11 @@ uintptr_t
 mdb_page_lookup(uintptr_t vp, u_offset_t offset)
 {
 	long page_hashsz, ndx;
+	int page_hashsz_shift;	/* Needed for PAGE_HASH_FUNC */
 	uintptr_t page_hash, pp;
 
 	if (mdb_readvar(&page_hashsz, "page_hashsz") == -1 ||
+	    mdb_readvar(&page_hashsz_shift, "page_hashsz_shift") == -1 ||
 	    mdb_readvar(&page_hash, "page_hash") == -1)
 		return (NULL);
 

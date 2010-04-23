@@ -103,6 +103,9 @@ extern "C" {
 #error	"add test for larger NCPU"
 #endif
 
+/* NCPU_P2 is NCPU rounded to a power of 2 */
+#define	NCPU_P2	(1 << NCPU_LOG2)
+
 /*
  * Maximum number of processors that we support.  With CMP processors, the
  * portid may not be equal to cpuid.  MAX_CPU_CHIPID can be defined in a

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -380,6 +380,7 @@ extern const unsigned long _defaultstksz;
 extern const unsigned int _nbpg;
 extern const int _ncpu;
 extern const int _ncpu_log2;
+extern const int _ncpu_p2;
 extern const int _clsize;
 #endif	/* defined(_KERNEL) && !defined(_ASM) */
 
@@ -399,6 +400,7 @@ extern const int _clsize;
 #define	DEFAULTSTKSZ	_defaultstksz
 #define	NCPU		_ncpu
 #define	NCPU_LOG2	_ncpu_log2
+#define	NCPU_P2		_ncpu_p2
 
 #endif	/* defined(_MACHDEP) */
 

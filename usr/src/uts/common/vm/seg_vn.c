@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -6483,10 +6482,26 @@ segvn_claim_pages(
 	ASSERT(pg_idx <= pgcnt);
 	ppa[pg_idx] = NULL;
 
-	if (prot & PROT_WRITE)
-		err = page_addclaim_pages(ppa);
-	else
-		err = page_subclaim_pages(ppa);
+
+	/* Find each large page within ppa, and adjust its claim */
+
+	/* Does ppa cover a single large page? */
+	if (ppa[0]->p_szc == seg->s_szc) {
+		if (prot & PROT_WRITE)
+			err = page_addclaim_pages(ppa);
+		else
+			err = page_subclaim_pages(ppa);
+	} else {
+		for (i = 0; ppa[i]; i += pgcnt) {
+			ASSERT(IS_P2ALIGNED(page_pptonum(ppa[i]), pgcnt));
+			if (prot & PROT_WRITE)
+				err = page_addclaim_pages(&ppa[i]);
+			else
+				err = page_subclaim_pages(&ppa[i]);
+			if (err == 0)
+				break;
+		}
+	}
 
 	for (i = 0; i < pg_idx; i++) {
 		ASSERT(ppa[i] != NULL);

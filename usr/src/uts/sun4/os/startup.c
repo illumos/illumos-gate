@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/machsystm.h>
@@ -62,6 +61,7 @@
 #include <sys/memnode.h>
 #include <sys/mem_cage.h>
 #include <sys/mmu.h>
+#include <sys/swap.h>
 
 extern void setup_trap_table(void);
 extern int cpu_intrq_setup(struct cpu *);
@@ -174,6 +174,7 @@ pgcnt_t obp_pages;		/* Physical pages used by OBP */
  * VM data structures
  */
 long page_hashsz;		/* Size of page hash table (power of two) */
+unsigned int page_hashsz_shift;	/* log2(page_hashsz) */
 struct page *pp_base;		/* Base of system page struct array */
 size_t pp_sz;			/* Size in bytes of page struct array */
 struct page **page_hash;	/* Page hash table */
@@ -748,13 +749,16 @@ calc_kpmpp_sz(pgcnt_t npages)
 size_t
 calc_pagehash_sz(pgcnt_t npages)
 {
-
+	/* LINTED */
+	ASSERT(P2SAMEHIGHBIT((1 << PP_SHIFT), (sizeof (struct page))));
 	/*
 	 * The page structure hash table size is a power of 2
 	 * such that the average hash chain length is PAGE_HASHAVELEN.
 	 */
 	page_hashsz = npages / PAGE_HASHAVELEN;
-	page_hashsz = 1 << highbit(page_hashsz);
+	page_hashsz_shift = MAX((AN_VPSHIFT + VNODE_ALIGN_LOG2 + 1),
+	    highbit(page_hashsz));
+	page_hashsz = 1 << page_hashsz_shift;
 	return (page_hashsz * sizeof (struct page *));
 }
 

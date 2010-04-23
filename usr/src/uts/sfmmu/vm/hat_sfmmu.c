@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -775,15 +774,26 @@ kpm_shlk_t	*kpmp_stable;
 uint_t		kpmp_stable_sz;	/* must be a power of 2 */
 
 /*
- * SPL_HASH was improved to avoid false cache line sharing
+ * SPL_TABLE_SIZE is 2 * NCPU, but no smaller than 128.
+ * SPL_SHIFT is log2(SPL_TABLE_SIZE).
  */
-#define	SPL_TABLE_SIZE	128
+#if ((2*NCPU_P2) > 128)
+#define	SPL_SHIFT	((unsigned)(NCPU_LOG2 + 1))
+#else
+#define	SPL_SHIFT	7U
+#endif
+#define	SPL_TABLE_SIZE	(1U << SPL_SHIFT)
 #define	SPL_MASK	(SPL_TABLE_SIZE - 1)
-#define	SPL_SHIFT	7		/* log2(SPL_TABLE_SIZE) */
 
+/*
+ * We shift by PP_SHIFT to take care of the low-order 0 bits of a page_t
+ * and by multiples of SPL_SHIFT to get as many varied bits as we can.
+ */
 #define	SPL_INDEX(pp) \
-	((((uintptr_t)(pp) >> SPL_SHIFT) ^ \
-	((uintptr_t)(pp) >> (SPL_SHIFT << 1))) & \
+	((((uintptr_t)(pp) >> PP_SHIFT) ^ \
+	((uintptr_t)(pp) >> (PP_SHIFT + SPL_SHIFT)) ^ \
+	((uintptr_t)(pp) >> (PP_SHIFT + SPL_SHIFT * 2)) ^ \
+	((uintptr_t)(pp) >> (PP_SHIFT + SPL_SHIFT * 3))) & \
 	(SPL_TABLE_SIZE - 1))
 
 #define	SPL_HASH(pp)    \

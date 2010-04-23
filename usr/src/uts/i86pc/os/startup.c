@@ -289,6 +289,7 @@ int segzio_fromheap = 1;
  * VM data structures
  */
 long page_hashsz;		/* Size of page hash table (power of two) */
+unsigned int page_hashsz_shift;	/* log2(page_hashsz) */
 struct page *pp_base;		/* Base of initial system page struct array */
 struct page **page_hash;	/* Page hash table */
 pad_mutex_t *pse_mutex;		/* Locks protecting pp->p_selock */
@@ -1126,12 +1127,15 @@ startup_memlist(void)
 	ADD_TO_ALLOCATIONS(bios_rsvd, rsvdmemlist_sz);
 	PRM_DEBUG(rsvdmemlist_sz);
 
+	/* LINTED */
+	ASSERT(P2SAMEHIGHBIT((1 << PP_SHIFT), sizeof (struct page)));
 	/*
 	 * The page structure hash table size is a power of 2
 	 * such that the average hash chain length is PAGE_HASHAVELEN.
 	 */
 	page_hashsz = npages / PAGE_HASHAVELEN;
-	page_hashsz = 1 << highbit(page_hashsz);
+	page_hashsz_shift = highbit(page_hashsz);
+	page_hashsz = 1 << page_hashsz_shift;
 	pagehash_sz = sizeof (struct page *) * page_hashsz;
 	ADD_TO_ALLOCATIONS(page_hash, pagehash_sz);
 	PRM_DEBUG(pagehash_sz);

@@ -3977,11 +3977,27 @@ page_pp_useclaim(
 	uint_t	write_perm) 	/* set if vpage has PROT_WRITE */
 {
 	int payback = 0;
+	int nidx, oidx;
 
 	ASSERT(PAGE_LOCKED(opp));
 	ASSERT(PAGE_LOCKED(npp));
 
-	page_struct_lock(opp);
+	/*
+	 * Since we have two pages we probably have two locks.  We need to take
+	 * them in a defined order to avoid deadlocks.  It's also possible they
+	 * both hash to the same lock in which case this is a non-issue.
+	 */
+	nidx = PAGE_LLOCK_HASH(PP_PAGEROOT(npp));
+	oidx = PAGE_LLOCK_HASH(PP_PAGEROOT(opp));
+	if (nidx < oidx) {
+		page_struct_lock(npp);
+		page_struct_lock(opp);
+	} else if (oidx < nidx) {
+		page_struct_lock(opp);
+		page_struct_lock(npp);
+	} else {	/* The pages hash to the same lock */
+		page_struct_lock(npp);
+	}
 
 	ASSERT(npp->p_cowcnt == 0);
 	ASSERT(npp->p_lckcnt == 0);
@@ -4017,7 +4033,16 @@ page_pp_useclaim(
 		pages_useclaim--;
 		mutex_exit(&freemem_lock);
 	}
-	page_struct_unlock(opp);
+
+	if (nidx < oidx) {
+		page_struct_unlock(opp);
+		page_struct_unlock(npp);
+	} else if (oidx < nidx) {
+		page_struct_unlock(npp);
+		page_struct_unlock(opp);
+	} else {	/* The pages hash to the same lock */
+		page_struct_unlock(npp);
+	}
 }
 
 /*
@@ -4103,21 +4128,27 @@ page_subclaim(page_t *pp)
 	return (r);
 }
 
+/*
+ * Variant of page_addclaim(), where ppa[] contains the pages of a single large
+ * page.
+ */
 int
 page_addclaim_pages(page_t  **ppa)
 {
-
 	pgcnt_t	lckpgs = 0, pg_idx;
 
 	VM_STAT_ADD(pagecnt.pc_addclaim_pages);
 
-	mutex_enter(&page_llock);
+	/*
+	 * Only need to take the page struct lock on the large page root.
+	 */
+	page_struct_lock(ppa[0]);
 	for (pg_idx = 0; ppa[pg_idx] != NULL; pg_idx++) {
 
 		ASSERT(PAGE_LOCKED(ppa[pg_idx]));
 		ASSERT(ppa[pg_idx]->p_lckcnt != 0);
 		if (ppa[pg_idx]->p_cowcnt == (ushort_t)PAGE_LOCK_MAXIMUM) {
-			mutex_exit(&page_llock);
+			page_struct_unlock(ppa[0]);
 			return (0);
 		}
 		if (ppa[pg_idx]->p_lckcnt > 1)
@@ -4131,7 +4162,7 @@ page_addclaim_pages(page_t  **ppa)
 			pages_claimed += lckpgs;
 		} else {
 			mutex_exit(&freemem_lock);
-			mutex_exit(&page_llock);
+			page_struct_unlock(ppa[0]);
 			return (0);
 		}
 		mutex_exit(&freemem_lock);
@@ -4141,10 +4172,14 @@ page_addclaim_pages(page_t  **ppa)
 		ppa[pg_idx]->p_lckcnt--;
 		ppa[pg_idx]->p_cowcnt++;
 	}
-	mutex_exit(&page_llock);
+	page_struct_unlock(ppa[0]);
 	return (1);
 }
 
+/*
+ * Variant of page_subclaim(), where ppa[] contains the pages of a single large
+ * page.
+ */
 int
 page_subclaim_pages(page_t  **ppa)
 {
@@ -4152,13 +4187,16 @@ page_subclaim_pages(page_t  **ppa)
 
 	VM_STAT_ADD(pagecnt.pc_subclaim_pages);
 
-	mutex_enter(&page_llock);
+	/*
+	 * Only need to take the page struct lock on the large page root.
+	 */
+	page_struct_lock(ppa[0]);
 	for (pg_idx = 0; ppa[pg_idx] != NULL; pg_idx++) {
 
 		ASSERT(PAGE_LOCKED(ppa[pg_idx]));
 		ASSERT(ppa[pg_idx]->p_cowcnt != 0);
 		if (ppa[pg_idx]->p_lckcnt == (ushort_t)PAGE_LOCK_MAXIMUM) {
-			mutex_exit(&page_llock);
+			page_struct_unlock(ppa[0]);
 			return (0);
 		}
 		if (ppa[pg_idx]->p_lckcnt != 0)
@@ -4177,7 +4215,7 @@ page_subclaim_pages(page_t  **ppa)
 		ppa[pg_idx]->p_lckcnt++;
 
 	}
-	mutex_exit(&page_llock);
+	page_struct_unlock(ppa[0]);
 	return (1);
 }
 

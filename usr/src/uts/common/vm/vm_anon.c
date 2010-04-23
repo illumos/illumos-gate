@@ -138,6 +138,7 @@ kcondvar_t	anon_array_cv[ANON_LOCKSIZE];
  */
 extern	int swap_maxcontig;
 size_t	anon_hash_size;
+unsigned int anon_hash_shift;
 struct anon **anon_hash;
 
 static struct kmem_cache *anon_cache;
@@ -199,7 +200,8 @@ anon_init(void)
 	pad_mutex_t *tmp;
 
 	/* These both need to be powers of 2 so round up to the next power */
-	anon_hash_size = 1L << highbit((physmem / ANON_HASHAVELEN) - 1);
+	anon_hash_shift = highbit((physmem / ANON_HASHAVELEN) - 1);
+	anon_hash_size = 1L << anon_hash_shift;
 
 	/*
 	 * We need to align the anonhash_lock and anonpages_hash_lock arrays
