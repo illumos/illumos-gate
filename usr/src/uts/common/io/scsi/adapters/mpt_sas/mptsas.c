@@ -14208,6 +14208,17 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 				goto virt_create_done;
 			}
 		}
+		/*
+		 * Create the phy-num property
+		 */
+		if (mdi_prop_update_int(*pip, "phy-num",
+		    ptgt->m_phynum) != DDI_SUCCESS) {
+			mptsas_log(mpt, CE_WARN, "mptsas driver unable to "
+			    "create phy-num property for target %d lun %d",
+			    target, lun);
+			mdi_rtn = MDI_FAILURE;
+			goto virt_create_done;
+		}
 		NDBG20(("new path:%s onlining,", MDI_PI(*pip)->pi_addr));
 		mdi_rtn = mdi_pi_online(*pip, 0);
 		if (mdi_rtn == MDI_SUCCESS) {
@@ -14540,7 +14551,20 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 				goto phys_create_done;
 			}
 		}
-
+		/*
+		 * Create the phy-num property for non-raid disk
+		 */
+		if (ptgt->m_phymask != 0) {
+			if (ndi_prop_update_int(DDI_DEV_T_NONE,
+			    *lun_dip, "phy-num", ptgt->m_phynum) !=
+			    DDI_PROP_SUCCESS) {
+				mptsas_log(mpt, CE_WARN, "mptsas driver "
+				    "failed to create phy-num property for "
+				    "target %d", target);
+				ndi_rtn = NDI_FAILURE;
+				goto phys_create_done;
+			}
+		}
 phys_create_done:
 		/*
 		 * If props were setup ok, online the lun
