@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -150,6 +149,11 @@
 #define	up_state(state)	((state) == RESTARTER_STATE_ONLINE || \
 	(state) == RESTARTER_STATE_DEGRADED || \
 	(state) == RESTARTER_STATE_OFFLINE)
+
+#define	is_depgrp_bypassed(v) ((v->gv_type == GVT_GROUP) && \
+	((v->gv_depgroup == DEPGRP_EXCLUDE_ALL) || \
+	(v->gv_depgroup == DEPGRP_OPTIONAL_ALL) || \
+	(v->gv_restart < RERR_RESTART)))
 
 static uu_list_pool_t *graph_edge_pool, *graph_vertex_pool;
 static uu_list_t *dgraph;
@@ -4313,6 +4317,14 @@ insubtree_dependents_down(graph_vertex_t *v)
 				return (B_FALSE);
 		} else {
 			/*
+			 * Skip all excluded and optional_all dependencies
+			 * and decide whether to offline the service based
+			 * on restart_on attribute.
+			 */
+			if (is_depgrp_bypassed(vv))
+				continue;
+
+			/*
 			 * For dependency groups or service vertices, keep
 			 * traversing to see if instances are running.
 			 */
@@ -5240,9 +5252,7 @@ mark_subtree(graph_edge_t *e, void *arg)
 		 * Skip all excluded and optional_all dependencies and decide
 		 * whether to offline the service based on restart_on attribute.
 		 */
-		if (v->gv_depgroup == DEPGRP_EXCLUDE_ALL ||
-		    v->gv_depgroup == DEPGRP_OPTIONAL_ALL ||
-		    v->gv_restart < RERR_RESTART)
+		if (is_depgrp_bypassed(v))
 			return (UU_WALK_NEXT);
 		break;
 	}
