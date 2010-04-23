@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_MACHCLOCK_H
@@ -47,6 +46,22 @@ extern "C" {
 
 #define	RD_TICK(out, scr1, scr2, label)		\
 	RD_TICK_NO_SUSPEND_CHECK(out, scr1);
+
+/*
+ * These macros on sun4u read the %tick register, due to :
+ * - %stick does not have enough precision, it's very low frequency
+ * - %stick accesses are very slow on UltraSPARC IIe
+ * Instead, consumers read %tick and scale it by the current stick/tick ratio.
+ * This only works because all cpus in a system change clock ratios
+ * synchronously and the changes are all initiated by the kernel.
+ */
+#define	RD_CLOCK_TICK(out, scr1, scr2, label)	\
+/* CSTYLED */					\
+	RD_TICK(out,scr1,scr2,label)
+
+#define	RD_CLOCK_TICK_NO_SUSPEND_CHECK(out, scr1)	\
+/* CSTYLED */						\
+	RD_TICK_NO_SUSPEND_CHECK(out,scr1)
 
 #endif /* _ASM */
 
@@ -172,6 +187,9 @@ struct tod_ops {
 
 extern struct tod_ops	tod_ops;
 extern char		*tod_module_name;
+
+extern uint64_t gettick_counter(void);
+#define	CLOCK_TICK_COUNTER() gettick_counter()
 
 /*
  * These defines allow common code to use TOD functions independant

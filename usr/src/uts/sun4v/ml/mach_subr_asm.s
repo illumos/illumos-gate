@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -33,6 +32,8 @@
 #else	/* lint */
 #include "assym.h"
 #endif	/* lint */
+
+#define CPU_MODULE /* need it for NSEC_SHIFT used by NATIVE_TIME_TO_NSEC() */
 
 #include <sys/asm_linkage.h>
 #include <sys/machsystm.h>
@@ -202,18 +203,10 @@ tick2ns(hrtime_t tick, uint_t cpuid)
 #else	/* lint */
 
 	ENTRY_NP(tick2ns)
-	sethi	%hi(cpunodes), %o4
-	or	%o4, %lo(cpunodes), %o4		! %o4 = &cpunodes
-	! Register usage:
 	!
-	! o0 = timestamp
-	! o2 = byte offset into cpunodes for tick_nsec_scale of this CPU
-	! o4 = &cpunodes
+	! Use nsec_scale for sun4v which is based on %stick
 	!
-	mulx	%o1, CPU_NODE_SIZE, %o2	! %o2 = byte offset into cpunodes
-	add	%o2, TICK_NSEC_SCALE, %o2
-	ld	[%o4 + %o2], %o2	! %o2 = cpunodes[cpuid].tick_nsec_scale
-	NATIVE_TIME_TO_NSEC_SCALE(%o0, %o2, %o3, TICK_NSEC_SHIFT)
+	NATIVE_TIME_TO_NSEC(%o0, %o2, %o3)
 	retl
 	nop
 	SET_SIZE(tick2ns)

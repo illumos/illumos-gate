@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -61,6 +60,7 @@
 #include <sys/cpu.h>
 #include <sys/ivintr.h>
 #include <sys/clock_impl.h>
+#include <sys/machclock.h>
 
 int maxphys = MMU_PAGESIZE * 16;	/* 128k */
 int klustsize = MMU_PAGESIZE * 16;	/* 128k */
@@ -549,7 +549,7 @@ cpu_intr_swtch_enter(kthread_id_t t)
 	if (t->t_intr_start) {
 		do {
 			start = t->t_intr_start;
-			interval = gettick_counter() - start;
+			interval = CLOCK_TICK_COUNTER() - start;
 		} while (cas64(&t->t_intr_start, start, 0) != start);
 		cpu = CPU;
 		if (cpu->cpu_m.divisor > 1)
@@ -577,7 +577,7 @@ cpu_intr_swtch_exit(kthread_id_t t)
 
 	do {
 		ts = t->t_intr_start;
-	} while (cas64(&t->t_intr_start, ts, gettick_counter()) != ts);
+	} while (cas64(&t->t_intr_start, ts, CLOCK_TICK_COUNTER()) != ts);
 }
 
 

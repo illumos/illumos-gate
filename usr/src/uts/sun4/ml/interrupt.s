@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #if defined(lint)
@@ -389,7 +388,7 @@ intr_thread(struct regs *regs, uint64_t iv_p, uint_t pil)
 	! resume() hasn't yet stored a timestamp for it. Or, it could be in
 	! swtch() after its slice has been accounted for.
 	! Only account for the time slice if the starting timestamp is non-zero.
-	RD_TICK(%o4,%l2,%l3,__LINE__)
+	RD_CLOCK_TICK(%o4,%l2,%l3,__LINE__)
 	sub	%o4, %o3, %o4			! o4 has interval
 
 	! A high-level interrupt in current_thread() interrupting here
@@ -518,7 +517,7 @@ intr_thread(struct regs *regs, uint64_t iv_p, uint_t pil)
 	add	THREAD_REG, T_INTR_START, %o3
 1:
 	ldx	[%o3], %o5
-	RD_TICK(%o4,%l2,%l3,__LINE__)
+	RD_CLOCK_TICK(%o4,%l2,%l3,__LINE__)
 	casx	[%o3], %o5, %o4
 	cmp	%o4, %o5
 	! If a high-level interrupt occurred while we were attempting to store
@@ -583,7 +582,7 @@ intr_thread(struct regs *regs, uint64_t iv_p, uint_t pil)
 	or	%o0, %lo(intr_thread_t_intr_start_zero), %o0
 9:
 #endif /* DEBUG */
-	RD_TICK(%o1,%l2,%l3,__LINE__)
+	RD_CLOCK_TICK(%o1,%l2,%l3,__LINE__)
 	sub	%o1, %o0, %l2			! l2 has interval
 	!
 	! The general outline of what the code here does is:
@@ -773,7 +772,7 @@ intr_thread(struct regs *regs, uint64_t iv_p, uint_t pil)
 	add	THREAD_REG, T_INTR_START, %o3	! o3 has &curthread->t_intr_star
 0:
 	ldx	[%o3], %o4			! o4 = t_intr_start before
-	RD_TICK(%o5,%l2,%l3,__LINE__)
+	RD_CLOCK_TICK(%o5,%l2,%l3,__LINE__)
 	casx	[%o3], %o4, %o5			! put o5 in ts if o4 == ts after
 	cmp	%o4, %o5
 	! If a high-level interrupt occurred while we were attempting to store
@@ -1046,7 +1045,7 @@ no_onfault:
 	or	%o0, %lo(current_thread_nested_pil_zero), %o0
 9:
 #endif /* DEBUG */
-	RD_TICK_NO_SUSPEND_CHECK(%l1, %l2)
+	RD_CLOCK_TICK_NO_SUSPEND_CHECK(%l1, %l2)
 	sub	%l1, %l3, %l3			! interval in %l3
 	!
 	! Check for Energy Star mode
@@ -1101,7 +1100,7 @@ no_onfault:
 	nop
 
 	stx	%g0, [THREAD_REG + T_INTR_START]
-	RD_TICK_NO_SUSPEND_CHECK(%o4, %l2)
+	RD_CLOCK_TICK_NO_SUSPEND_CHECK(%o4, %l2)
 	sub	%o4, %o5, %o5			! o5 has the interval
 
 	! Check for Energy Star mode
@@ -1154,7 +1153,7 @@ no_onfault:
 	sllx    %o4, 3, %o4			! index to byte offset
 	add	%o4, CPU_MCPU, %o4	! CPU_PIL_HIGH_START is too large
 	add	%o4, MCPU_PIL_HIGH_START, %o4
-	RD_TICK_NO_SUSPEND_CHECK(%o5, %l2)
+	RD_CLOCK_TICK_NO_SUSPEND_CHECK(%o5, %l2)
         stx     %o5, [%o3 + %o4]
 	
 	wrpr	%g0, %o2, %pil			! enable interrupts
@@ -1244,7 +1243,7 @@ current_thread_complete:
 	sllx    %o4, 3, %o4			! index to byte offset
 	add	%o4, CPU_MCPU, %o4	! CPU_PIL_HIGH_START is too large
 	add	%o4, MCPU_PIL_HIGH_START, %o4
-	RD_TICK_NO_SUSPEND_CHECK(%o5, %o0)
+	RD_CLOCK_TICK_NO_SUSPEND_CHECK(%o5, %o0)
 	ldx     [%o3 + %o4], %o0
 #ifdef DEBUG
 	! ASSERT(cpu.cpu_m.pil_high_start[pil - (LOCK_LEVEL + 1)] != 0)
@@ -1334,7 +1333,7 @@ current_thread_complete:
 	sll	%o5, 3, %o5		! convert array index to byte offset
 	add	%o5, CPU_MCPU, %o5	! CPU_PIL_HIGH_START is too large
 	add	%o5, MCPU_PIL_HIGH_START, %o5
-	RD_TICK_NO_SUSPEND_CHECK(%o4, %l2)
+	RD_CLOCK_TICK_NO_SUSPEND_CHECK(%o4, %l2)
 	! Another high-level interrupt is active below this one, so
 	! there is no need to check for an interrupt thread. That will be
 	! done by the lowest priority high-level interrupt active.
@@ -1349,7 +1348,7 @@ current_thread_complete:
 	bz,pt	%xcc, 7f
 	nop
 
-	RD_TICK_NO_SUSPEND_CHECK(%o4, %l2)
+	RD_CLOCK_TICK_NO_SUSPEND_CHECK(%o4, %l2)
 	stx	%o4, [THREAD_REG + T_INTR_START]
 
 7:
@@ -2191,7 +2190,7 @@ intr_get_time(void)
 	! Calculate elapsed time since t_intr_start. Update t_intr_start,
 	! get delta, and multiply by cpu_divisor if necessary.
 	!
-	RD_TICK_NO_SUSPEND_CHECK(%o2, %o0)
+	RD_CLOCK_TICK_NO_SUSPEND_CHECK(%o2, %o0)
 	stx	%o2, [THREAD_REG + T_INTR_START]
 	sub	%o2, %o3, %o0
 

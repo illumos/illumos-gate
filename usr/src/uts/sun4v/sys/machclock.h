@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_MACHCLOCK_H
@@ -65,6 +64,41 @@ extern "C" {
 	sllx	out, 1, out;					\
 	srlx	out, 1, out;					\
 	add	out, scr1, out
+
+/*
+ * These macros on sun4v read the %stick register, because :
+ *
+ * For sun4v platforms %tick can change dynamically *without* kernel
+ * knowledge, due to SP side power & thermal management cases,
+ * which is triggered externally by SP and handled by Hypervisor.
+ *
+ * The frequency of %tick cannot be relied upon by kernel code,
+ * since it changes dynamically without the kernel being aware.
+ * So, always use the constant-frequency %stick on sun4v.
+ */
+#define	RD_CLOCK_TICK(out, scr1, scr2, label)			\
+/* CSTYLED */							\
+	RD_STICK(out,scr1,scr2,label)
+
+#define	RD_STICK_NO_SUSPEND_CHECK(out, scr1)			\
+	sethi	%hi(native_stick_offset), scr1;			\
+	ldx	[scr1 + %lo(native_stick_offset)], scr1;	\
+	rd	STICK, out;					\
+	sllx	out, 1, out;					\
+	srlx	out, 1, out;					\
+	add	out, scr1, out
+
+#define	RD_CLOCK_TICK_NO_SUSPEND_CHECK(out, scr1)		\
+/* CSTYLED */							\
+	RD_STICK_NO_SUSPEND_CHECK(out,scr1)
+
+#ifndef	_ASM
+#ifdef	_KERNEL
+extern u_longlong_t gettick(void);
+#define	CLOCK_TICK_COUNTER()	gettick()	/* returns %stick */
+#endif	/* _KERNEL */
+#endif	/* _ASM */
+
 
 #define	RD_TICK(out, scr1, scr2, label)				\
 .rd_tick.label:							\

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
  
 /*
@@ -434,7 +433,7 @@ resume(kthread_id_t t)
 	add	THREAD_REG, T_INTR_START, %o2
 1:	
 	ldx	[%o2], %o1
-	RD_TICK(%o0,%o3,%g5,__LINE__)
+	RD_CLOCK_TICK(%o0,%o3,%g5,__LINE__)
 	casx	[%o2], %o1, %o0
 	cmp	%o0, %o1
 	be,pt	%xcc, 5b
@@ -594,7 +593,7 @@ resume_from_intr(kthread_id_t t)
 	add	THREAD_REG, T_INTR_START, %o2
 2:
 	ldx	[%o2], %o1
-	RD_TICK(%o0,%o3,%l1,__LINE__)
+	RD_CLOCK_TICK(%o0,%o3,%l1,__LINE__)
 	casx	[%o2], %o1, %o0
 	cmp	%o0, %o1
 	bne,pn	%xcc, 2b
