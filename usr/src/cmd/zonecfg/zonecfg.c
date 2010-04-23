@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1193,10 +1192,10 @@ usage(boolean_t verbose, uint_t flags)
 		    pt_to_str(PT_MAXSEMIDS));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_SHARES));
-		(void) fprintf(fp, "\t%s\t\t%s, %s, %s, %s\n", rt_to_str(RT_FS),
-		    pt_to_str(PT_DIR), pt_to_str(PT_SPECIAL),
-		    pt_to_str(PT_RAW), pt_to_str(PT_TYPE),
-		    pt_to_str(PT_OPTIONS));
+		(void) fprintf(fp, "\t%s\t\t%s, %s, %s, %s, %s\n",
+		    rt_to_str(RT_FS), pt_to_str(PT_DIR),
+		    pt_to_str(PT_SPECIAL), pt_to_str(PT_RAW),
+		    pt_to_str(PT_TYPE), pt_to_str(PT_OPTIONS));
 		(void) fprintf(fp, "\t%s\t%s\n", rt_to_str(RT_IPD),
 		    pt_to_str(PT_DIR));
 		(void) fprintf(fp, "\t%s\t\t%s, %s, %s\n", rt_to_str(RT_NET),
