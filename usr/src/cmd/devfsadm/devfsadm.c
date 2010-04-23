@@ -258,7 +258,6 @@ main(int argc, char *argv[])
 	struct passwd *pw;
 	struct group *gp;
 	pid_t pid;
-	int cond = 0;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -322,27 +321,7 @@ main(int argc, char *argv[])
 	/*
 	 * Check if device allocation is enabled.
 	 */
-	if (system_labeled) {
-		/*
-		 * In TX, the first line in /etc/security/device_allocate has
-		 * DEVICE_ALLOCATION=ON if the feature is enabled.
-		 */
-		devalloc_is_on = da_is_on();
-	} else if (auditon(A_GETCOND, (caddr_t)&cond, sizeof (cond)) == 0) {
-		/*
-		 * auditon returns -1 and sets errno to EINVAL if BSM
-		 * is not enabled, so devalloc_is_on must be 0 if no BSM.
-		 *
-		 * Device allocation (and auditing) is enabled by default
-		 * if BSM is enabled, but by default DEVICE_ALLOCATE=
-		 * string is absent from device_allocate, so da_is_on
-		 * will return -1.  To preserve the historical default
-		 * behavior but allow disabling device allocation where needed,
-		 * set devalloc_is_on to true for non-0, false only for 0.
-		 *
-		 */
-		devalloc_is_on = (da_is_on() == 0) ? 0 : 1;
-	}
+	devalloc_is_on = (da_is_on() == 1) ? 1 : 0;
 
 #ifdef DEBUG
 	if (system_labeled == FALSE) {
