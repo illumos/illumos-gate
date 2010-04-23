@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  */
 
@@ -62,13 +61,13 @@ bsdaddr_to_uri(papi_attribute_t **list, char *bsdaddr)
 		bsd[0] = strtok_r(tmp, ":,", &iter);
 		if ((bsd[1] = strtok_r(NULL, ":,", &iter)) == NULL)
 			papiAttributeListGetString(list, NULL,
-					"printer-name", &bsd[1]);
+			    "printer-name", &bsd[1]);
 		bsd[2] = strtok_r(NULL, ":,", &iter);
 
 		snprintf(buf, sizeof (buf), "lpd://%s/printers/%s%s%s", bsd[0],
-			(bsd[1] != NULL) ? bsd[1] : "",
-			(bsd[2] != NULL) ? "#" : "",
-			(bsd[2] != NULL) ? bsd[2] : "");
+		    (bsd[1] != NULL) ? bsd[1] : "",
+		    (bsd[2] != NULL) ? "#" : "",
+		    (bsd[2] != NULL) ? bsd[2] : "");
 
 		free(tmp);
 
@@ -97,7 +96,7 @@ solaris_lpsched_shortcircuit_hack(papi_attribute_t ***list)
 		return;
 
 	papiAttributeListGetString(*list, NULL,
-				"printer-uri-supported", &printer);
+	    "printer-uri-supported", &printer);
 	/* if there is no printer-uri-supported, there is nothing to do */
 	if (printer == NULL) {
 		return;
@@ -140,9 +139,9 @@ solaris_lpsched_shortcircuit_hack(papi_attribute_t ***list)
 	}
 
 	snprintf(buf, sizeof (buf), "lpsched://%s/printers/%s",
-			(uri->host ? uri->host : "localhost"), printer);
+	    (uri->host ? uri->host : "localhost"), printer);
 	papiAttributeListAddString(list, PAPI_ATTR_REPLACE,
-			"printer-uri-supported", buf);
+	    "printer-uri-supported", buf);
 	uri_free(uri);
 }
 #endif
@@ -178,7 +177,7 @@ fill_printer_uri_supported(papi_attribute_t ***list)
 
 		if (uri != NULL) {
 			papiAttributeListAddString(list, PAPI_ATTR_APPEND,
-					"printer-uri-supported", uri);
+			    "printer-uri-supported", uri);
 			papiAttributeListDelete(list, "bsdaddr");
 			free(uri);
 			return;
@@ -198,9 +197,9 @@ fill_printer_uri_supported(papi_attribute_t ***list)
 			char buf[BUFSIZ];
 
 			snprintf(buf, sizeof (buf), "lpd://%s/printers/%s",
-				string, rp);
+			    string, rp);
 			papiAttributeListAddString(list, PAPI_ATTR_APPEND,
-					"printer-uri-supported", strdup(buf));
+			    "printer-uri-supported", strdup(buf));
 			return;
 		}
 	}
@@ -228,7 +227,7 @@ fill_printer_uri(papi_attribute_t ***list)
 	 * use in the future.
 	 */
 	papiAttributeListAddString(list, PAPI_ATTR_EXCL, "printer-uri",
-			"broken printer-uri semantic");
+	    "broken printer-uri semantic");
 }
 #endif /* NEED_BROKEN_PRINTER_URI_SEMANTIC */
 
@@ -252,7 +251,7 @@ cvt_all_to_member_names(papi_attribute_t ***list)
 		    value != NULL;
 		    value = strtok_r(NULL, ", \t", &s_iter))
 			papiAttributeListAddString(list, PAPI_ATTR_APPEND,
-					"member-names", value);
+			    "member-names", value);
 		free(tmp);
 	}
 }
@@ -260,9 +259,9 @@ cvt_all_to_member_names(papi_attribute_t ***list)
 static papi_attribute_t **
 _cvt_nss_entry_to_printer(char *entry)
 {
-	char    *key = NULL,
-		*cp,
-		buf[BUFSIZ];
+	char    *key = NULL;
+	char    *cp;
+	char    buf[BUFSIZ];
 	int in_namelist = 1, buf_pos = 0;
 	papi_attribute_t **list = NULL;
 
@@ -275,11 +274,11 @@ _cvt_nss_entry_to_printer(char *entry)
 		case ':':	/* end of kvp */
 			if (in_namelist != 0) {
 				papiAttributeListAddString(&list,
-					PAPI_ATTR_APPEND, "printer-name", buf);
+				    PAPI_ATTR_APPEND, "printer-name", buf);
 				in_namelist = 0;
 			} else if (key != NULL) {
 				papiAttributeListAddString(&list,
-					PAPI_ATTR_APPEND, key, buf);
+				    PAPI_ATTR_APPEND, key, buf);
 				free(key);
 			}
 			memset(buf, 0, sizeof (buf));
@@ -297,7 +296,7 @@ _cvt_nss_entry_to_printer(char *entry)
 		case '|':	/* namelist seperator */
 			if (in_namelist != 0) {
 				papiAttributeListAddString(&list,
-					PAPI_ATTR_APPEND, "printer-name", buf);
+				    PAPI_ATTR_APPEND, "printer-name", buf);
 				memset(buf, 0, sizeof (buf));
 				buf_pos = 0;
 			} else	/* add it to the buffer */
@@ -437,6 +436,7 @@ getprinterentry(char *ns)
 	nss_XbyY_args_t arg;
 
 	private_ns = ns;
+	buf[0] = '\0';
 	NSS_XbyY_INIT(&arg, buf, buf, sizeof (buf), str2printer);
 	res = nss_getent(&db_root, _nss_initf_printers, &context, &arg);
 	(void) NSS_XbyY_FINI(&arg);
@@ -476,17 +476,17 @@ getprinterbyname(char *name, char *ns)
 
 	if (strstr(name, "://") != NULL) {	/* shortcut for URI form */
 		papiAttributeListAddString(&result, PAPI_ATTR_APPEND,
-				"printer-name", name);
+		    "printer-name", name);
 		papiAttributeListAddString(&result, PAPI_ATTR_APPEND,
-				"printer-uri-supported", name);
+		    "printer-uri-supported", name);
 	} else if (strchr(name, ':') != NULL) {	/* shortcut for POSIX form */
 		char *uri = bsdaddr_to_uri(result, name);
 
 		papiAttributeListAddString(&result, PAPI_ATTR_APPEND,
-				"printer-name", name);
+		    "printer-name", name);
 		if (uri != NULL) {
 			papiAttributeListAddString(&result, PAPI_ATTR_APPEND,
-					"printer-uri-supported", uri);
+			    "printer-uri-supported", uri);
 			free(uri);
 		}
 	} else {				/* anything else */
@@ -503,7 +503,7 @@ getprinterbyname(char *name, char *ns)
 		NSS_XbyY_INIT(&arg, buf, buf, sizeof (buf), str2printer);
 		arg.key.name = name;
 		res = nss_search(&db_root, _nss_initf_printers,
-				NSS_DBOP_PRINTERS_BYNAME, &arg);
+		    NSS_DBOP_PRINTERS_BYNAME, &arg);
 		(void) NSS_XbyY_FINI(&arg);
 		private_ns = NULL;
 
@@ -519,7 +519,7 @@ getprinterbyname(char *name, char *ns)
 #endif
 #ifdef DEBUG
 	printf("getprinterbyname(%s): %s = 0x%8.8x\n", (ns ? ns : "NULL"),
-		name, result);
+	    name, result);
 	if (result != NULL) {
 		char buf[4096];
 
