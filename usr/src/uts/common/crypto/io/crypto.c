@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -1652,16 +1651,24 @@ get_provider_mechanism_info(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	pd = cm->cm_provider_array[mechanism_info.mi_provider_id];
 
+	/* First check if the provider supports the mechanism. */
 	for (i = 0; i < pd->pd_mech_list_count; i++) {
 		if (strncmp(pd->pd_mechanisms[i].cm_mech_name,
 		    mechanism_info.mi_mechanism_name,
 		    CRYPTO_MAX_MECH_NAME) == 0) {
 			mi = &pd->pd_mechanisms[i];
+			break;
 		}
 	}
 
 	if (mi == NULL) {
 		rv = CRYPTO_ARGUMENTS_BAD;
+		goto fail;
+	}
+
+	/* Now check if the mechanism is enabled for the provider. */
+	if (is_mech_disabled(pd, mechanism_info.mi_mechanism_name)) {
+		rv = CRYPTO_MECHANISM_INVALID;
 		goto fail;
 	}
 
