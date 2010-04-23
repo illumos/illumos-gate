@@ -369,23 +369,23 @@ uint_t rdsv3_ib_dma_map_sg(struct ib_device *dev, struct rdsv3_scatterlist
 	*scat, uint_t num);
 void rdsv3_ib_dma_unmap_sg(ib_device_t *dev, struct rdsv3_scatterlist *scat,
     uint_t num);
-inline void
+static inline void
 rdsv3_sk_sock_hold(struct rsock *sk)
 {
 	atomic_add_32(&sk->sk_refcount, 1);
 }
-inline void
+static inline void
 rdsv3_sk_sock_put(struct rsock *sk)
 {
 	if (atomic_dec_and_test(&sk->sk_refcount))
 		rdsv3_sock_exit_data(sk);
 }
-inline int
+static inline int
 rdsv3_sk_sock_flag(struct rsock *sk, uint_t flag)
 {
 	return (test_bit(flag, &sk->sk_flag));
 }
-inline void
+static inline void
 rdsv3_sk_sock_orphan(struct rsock *sk)
 {
 	set_bit(SOCK_DEAD, &sk->sk_flag);

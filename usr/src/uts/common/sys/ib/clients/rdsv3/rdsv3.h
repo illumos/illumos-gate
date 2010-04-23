@@ -507,13 +507,13 @@ struct rdsv3_sock {
 	zoneid_t		rs_zoneid;
 };
 
-inline struct rdsv3_sock *
+static inline struct rdsv3_sock *
 rdsv3_sk_to_rs(const struct rsock *sk)
 {
 	return ((struct rdsv3_sock *)sk->sk_protinfo);
 }
 
-inline struct rsock *
+static inline struct rsock *
 rdsv3_rs_to_sk(const struct rdsv3_sock *rs)
 {
 	return ((struct rsock *)rs->rs_sk);
@@ -524,14 +524,14 @@ rdsv3_rs_to_sk(const struct rdsv3_sock *rs)
  * to account for overhead.  We don't account for overhead, we just apply
  * the number of payload bytes to the specified value.
  */
-inline int
+static inline int
 rdsv3_sk_sndbuf(struct rdsv3_sock *rs)
 {
 	/* XXX */
 	return (rdsv3_rs_to_sk(rs)->sk_sndbuf);
 }
 
-inline int
+static inline int
 rdsv3_sk_rcvbuf(struct rdsv3_sock *rs)
 {
 	/* XXX */
@@ -611,19 +611,19 @@ rdsv3_conn_transition(struct rdsv3_connection *conn, int old, int new)
 	return (atomic_cmpxchg(&conn->c_state, old, new) == old);
 }
 
-inline int
+static inline int
 rdsv3_conn_state(struct rdsv3_connection *conn)
 {
 	return (atomic_get(&conn->c_state));
 }
 
-inline int
+static inline int
 rdsv3_conn_up(struct rdsv3_connection *conn)
 {
 	return (atomic_get(&conn->c_state) == RDSV3_CONN_UP);
 }
 
-inline int
+static inline int
 rdsv3_conn_connecting(struct rdsv3_connection *conn)
 {
 	return (atomic_get(&conn->c_state) == RDSV3_CONN_CONNECTING);
@@ -763,7 +763,7 @@ void rdsv3_message_put(struct rdsv3_message *rm);
 void rdsv3_message_wait(struct rdsv3_message *rm);
 void rdsv3_message_unmapped(struct rdsv3_message *rm);
 
-inline void
+static inline void
 rdsv3_message_make_checksum(struct rdsv3_header *hdr)
 {
 	hdr->h_csum = 0;
@@ -771,7 +771,7 @@ rdsv3_message_make_checksum(struct rdsv3_header *hdr)
 	    rdsv3_ip_fast_csum((void *)hdr, sizeof (*hdr) >> 2);
 }
 
-inline int
+static inline int
 rdsv3_message_verify_checksum(const struct rdsv3_header *hdr)
 {
 	return (!hdr->h_csum ||

@@ -412,7 +412,7 @@ rdsv3_for_each_conn_info(struct rsock *sock, unsigned int len,
     int (*visitor)(struct rdsv3_connection *, void *),
     size_t item_len)
 {
-#ifndef __lock_lint
+#if !defined(__lock_lint) && !defined(__GNUC__)
 	uint64_t buffer[(item_len + 7) / 8];
 #else
 	uint64_t buffer[256];

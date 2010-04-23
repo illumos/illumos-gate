@@ -80,19 +80,19 @@ struct rdsv3_rdma_op {
 	struct rdsv3_rdma_sg	r_rdma_sg[1];
 };
 
-inline rdsv3_rdma_cookie_t
+static inline rdsv3_rdma_cookie_t
 rdsv3_rdma_make_cookie(uint32_t r_key, uint32_t offset)
 {
 	return (r_key | (((uint64_t)offset) << 32));
 }
 
-inline uint32_t
+static inline uint32_t
 rdsv3_rdma_cookie_key(rdsv3_rdma_cookie_t cookie)
 {
 	return ((uint32_t)cookie);
 }
 
-inline uint32_t
+static inline uint32_t
 rdsv3_rdma_cookie_offset(rdsv3_rdma_cookie_t cookie)
 {
 	return (cookie >> 32);
