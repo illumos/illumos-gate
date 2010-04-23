@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -38,6 +37,8 @@
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
 #include <sys/fs/lofs_node.h>
+#include <sys/fs/zfs.h>
+#include <sys/dsl_prop.h>
 #include <inet/ip6.h>
 #include <rpc/auth.h>
 #include <rpc/clnt.h>
@@ -220,6 +221,37 @@ getflabel_cipso(vfs_t *vfsp)
 	return (reszone->zone_slabel);
 }
 
+/*
+ * Get the label if any of a zfs filesystem.  Get the dataset, then
+ * get its mlslabel property, convert as needed, and return it.  If
+ * there's no mlslabel or it is the default one, return NULL.
+ */
+static ts_label_t *
+getflabel_zfs(vfs_t *vfsp)
+{
+	int		error;
+	ts_label_t	*tsl = NULL;
+	refstr_t	*resource_ref;
+	bslabel_t	ds_sl;
+	char		ds_hexsl[MAXNAMELEN];
+	const char	*osname;
+
+	resource_ref = vfs_getresource(vfsp);
+	osname = refstr_value(resource_ref);
+
+	error = dsl_prop_get(osname, zfs_prop_to_name(ZFS_PROP_MLSLABEL),
+	    1, sizeof (ds_hexsl), &ds_hexsl, NULL);
+	refstr_rele(resource_ref);
+
+	if ((error) || (strcasecmp(ds_hexsl, ZFS_MLSLABEL_DEFAULT) == 0))
+		return (NULL);
+	if (hexstr_to_label(ds_hexsl, &ds_sl) != 0)
+		return (NULL);
+
+	tsl = labelalloc(&ds_sl, default_doi, KM_SLEEP);
+	return (tsl);
+}
+
 static ts_label_t *
 getflabel_nfs(vfs_t *vfsp)
 {
@@ -338,6 +370,20 @@ getflabel(vnode_t *vp)
 	}
 
 	/*
+	 * For zfs filesystem, return the explicit label property if a
+	 * meaningful one exists.
+	 */
+	if (strncmp(vfssw[rvfsp->vfs_fstype].vsw_name, "zfs", 3) == 0) {
+		ts_label_t *tsl;
+
+		tsl = getflabel_zfs(rvfsp);
+
+		/* if label found, return it, otherwise continue... */
+		if (tsl != NULL)
+			return (tsl);
+	}
+
+	/*
 	 * If a mountpoint exists, hold the vfs while we reference it.
 	 * Otherwise if mountpoint is NULL it should not be held (e.g.,
 	 * a hold/release on spec_vfs would result in an attempted free
@@ -420,6 +466,17 @@ zone_out:
 			while (nvfs != vfsp) {
 				const char	*rstr;
 				size_t		rlen = 0;
+
+				/*
+				 * Skip checking this vfs if it's not lofs
+				 * (the only way to export from the global
+				 * zone to a zone).
+				 */
+				if (strncmp(vfssw[nvfs->vfs_fstype].vsw_name,
+				    "lofs", 4) != 0) {
+					nvfs = nvfs->vfs_next;
+					continue;
+				}
 
 				rstr = refstr_value(nvfs->vfs_resource);
 				if (rstr != NULL)

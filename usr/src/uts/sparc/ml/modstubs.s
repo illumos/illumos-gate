@@ -628,7 +628,9 @@ stubs_base:
  */
 #ifndef ZFS_MODULE
 	MODULE(zfs,fs);
+	STUB(zfs, dsl_prop_get, nomod_minus_one);
 	STUB(zfs, spa_boot_init, nomod_minus_one);
+	STUB(zfs, zfs_prop_to_name, nomod_zero);
 	END_MODULE(zfs);
 #endif
 
