@@ -20,8 +20,7 @@
  */
 
 /*
- *  Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- *  Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -100,6 +99,8 @@ static int
     pciehpc_slot_poweroff(pcie_hp_slot_t *slot_p, ddi_hp_cn_state_t *result);
 static int pciehpc_slot_probe(pcie_hp_slot_t *slot_p);
 static int pciehpc_slot_unprobe(pcie_hp_slot_t *slot_p);
+static void pciehpc_handle_power_fault(dev_info_t *dip);
+static void pciehpc_power_fault_handler(void *arg);
 
 #ifdef	DEBUG
 static void pciehpc_dump_hpregs(pcie_hp_ctrl_t *ctrl_p);
@@ -338,16 +339,7 @@ pciehpc_intr(dev_info_t *dip)
 			pciehpc_reg_put16(ctrl_p, bus_p->bus_pcie_off +
 			    PCIE_SLOTCTL, control & ~PCIE_SLOTCTL_PWR_FAULT_EN);
 
-			/*
-			 * Send the event to DDI Hotplug framework, power off
-			 * the slot
-			 */
-			(void) ndi_hp_state_change_req(dip,
-			    slot_p->hs_info.cn_name,
-			    DDI_HP_CN_STATE_EMPTY, DDI_HP_REQ_ASYNC);
-
-			pciehpc_set_led_state(ctrl_p, PCIE_HP_ATTN_LED,
-			    PCIE_HP_LED_ON);
+			pciehpc_handle_power_fault(dip);
 		}
 	}
 
@@ -2222,6 +2214,52 @@ pciehpc_set_led_state(pcie_hp_ctrl_t *ctrl_p, pcie_hp_led_t led,
 	    pcie_led_state_text(pciehpc_led_state_to_hpc(
 	    pcie_slotctl_attn_indicator_get(control))));
 #endif
+}
+
+static void
+pciehpc_handle_power_fault(dev_info_t *dip)
+{
+	/*
+	 * Hold the parent's ref so that it won't disappear when the taskq is
+	 * scheduled to run.
+	 */
+	ndi_hold_devi(dip);
+
+	if (!taskq_dispatch(system_taskq, pciehpc_power_fault_handler, dip,
+	    TQ_NOSLEEP)) {
+		ndi_rele_devi(dip);
+		PCIE_DBG("pciehpc_intr(): "
+		    "Failed to dispatch power fault handler, dip %p\n", dip);
+	}
+}
+
+static void
+pciehpc_power_fault_handler(void *arg)
+{
+	dev_info_t *dip = (dev_info_t *)arg;
+	pcie_hp_ctrl_t  *ctrl_p;
+	pcie_hp_slot_t  *slot_p;
+
+	/* get the soft state structure for this dip */
+	if ((ctrl_p = PCIE_GET_HP_CTRL(dip)) == NULL) {
+		ndi_rele_devi(dip);
+		return;
+	}
+	slot_p = ctrl_p->hc_slots[0];
+
+	/*
+	 * Send the event to DDI Hotplug framework, power off
+	 * the slot
+	 */
+	(void) ndi_hp_state_change_req(dip,
+	    slot_p->hs_info.cn_name,
+	    DDI_HP_CN_STATE_EMPTY, DDI_HP_REQ_SYNC);
+
+	mutex_enter(&ctrl_p->hc_mutex);
+	pciehpc_set_led_state(ctrl_p, PCIE_HP_ATTN_LED,
+	    PCIE_HP_LED_ON);
+	mutex_exit(&ctrl_p->hc_mutex);
+	ndi_rele_devi(dip);
 }
 
 #ifdef DEBUG
