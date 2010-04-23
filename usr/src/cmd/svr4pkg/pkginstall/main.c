@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -269,6 +268,7 @@ main(int argc, char *argv[])
 	char			param[MAX_PKG_PARAM_LENGTH];
 	char			script[PATH_MAX];
 	char			altscript[PATH_MAX];
+	char			*temp;
 	int			c;
 	int			disableAttributes = 0;
 	int			err;
@@ -2039,9 +2039,19 @@ main(int argc, char *argv[])
 	}
 
 	(void) time(&clock);
+
+	/*
+	 * We do not want the time in locale in the pkginfo.
+	 * save the LC_TIME and set it to C. Reset it with saved one
+	 * after cftime().
+	 */
+	temp = setlocale(LC_TIME, NULL);
+	(void) setlocale(LC_TIME, "C");
+
 	/* LINTED warning: do not use cftime(); ... */
 	(void) cftime(cbuf, "%b %d \045Y \045H:\045M", &clock);
 	putparam("INSTDATE", qstrdup(cbuf));
+	(void) setlocale(LC_TIME, temp);
 
 	/*
 	 * Store information about package being installed;
