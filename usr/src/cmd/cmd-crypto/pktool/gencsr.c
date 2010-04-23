@@ -18,9 +18,7 @@
  *
  * CDDL HEADER END
  *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -559,10 +557,21 @@ pk_gencsr(int argc, char *argv[])
 	 * and that it can be created.
 	 */
 	rv = verify_file(outcsr);
-	if (rv != KMF_OK) {
-		cryptoerror(LOG_STDERR, gettext("output file (%s) "
-		    "cannot be created.\n"), outcsr);
-		return (PK_ERR_USAGE);
+	if (rv == KMF_ERR_OPEN_FILE) {
+		cryptoerror(LOG_STDERR,
+		    gettext("Warning: file \"%s\" exists, "
+		    "will be overwritten."), outcsr);
+		if (yesno(gettext("Continue with gencsr? "),
+		    gettext("Respond with yes or no.\n"), B_FALSE) == B_FALSE) {
+			return (0);
+		} else {
+			/* remove the file */
+			(void) unlink(outcsr);
+		}
+	} else if (rv != KMF_OK)  {
+		cryptoerror(LOG_STDERR,
+		    gettext("Warning: error accessing \"%s\""), outcsr);
+		return (rv);
 	}
 
 	if ((kstype == KMF_KEYSTORE_NSS || kstype == KMF_KEYSTORE_PK11TOKEN)) {

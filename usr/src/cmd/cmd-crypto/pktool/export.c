@@ -18,9 +18,7 @@
  *
  * CDDL HEADER END
  *
- *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -833,8 +831,8 @@ pk_export(int argc, char *argv[])
 		}
 	}
 
-	/* Check if the file exists and might be overwritten. */
-	if (access(filename, F_OK) == 0) {
+	/* Check if the file exists */
+	if (verify_file(filename) != KMF_OK) {
 		cryptoerror(LOG_STDERR,
 		    gettext("Warning: file \"%s\" exists, "
 		    "will be overwritten."), filename);
@@ -844,13 +842,6 @@ pk_export(int argc, char *argv[])
 		} else {
 			/* remove the file */
 			(void) unlink(filename);
-		}
-	} else {
-		rv = verify_file(filename);
-		if (rv != KMF_OK) {
-			cryptoerror(LOG_STDERR, gettext("The file (%s) "
-			    "cannot be created.\n"), filename);
-			return (PK_ERR_USAGE);
 		}
 	}
 

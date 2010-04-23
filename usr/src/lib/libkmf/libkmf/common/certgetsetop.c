@@ -17,13 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
+ *
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <link.h>
@@ -48,6 +44,13 @@ copy_data(KMF_DATA *dst, KMF_DATA *src)
 
 	if (dst == NULL || src == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
+
+	if (src->Length == 0) {
+		dst->Length = 0;
+		dst->Data = NULL;
+		src->Data = NULL;
+		return (ret);
+	}
 
 	dst->Data = malloc(src->Length);
 	if (dst->Data == NULL)

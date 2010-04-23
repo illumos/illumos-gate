@@ -1,5 +1,6 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
  * Use is subject to license terms.
  */
 /*
@@ -318,11 +319,6 @@ KMF_Plugin_Initialize()
 
 	(void) mutex_lock(&init_lock);
 	if (!ssl_initialized) {
-		OpenSSL_add_all_algorithms();
-
-		/* Enable error strings for reporting */
-		ERR_load_crypto_strings();
-
 		/*
 		 * Add support for extension OIDs that are not yet in the
 		 * openssl default set.
@@ -359,7 +355,14 @@ KMF_Plugin_Initialize()
 		}
 
 		CRYPTO_set_id_callback((unsigned long (*)())thread_id);
-		CRYPTO_set_locking_callback((void (*)())locking_cb);
+		if (CRYPTO_get_locking_callback() == NULL)
+			CRYPTO_set_locking_callback((void (*)())locking_cb);
+
+		OpenSSL_add_all_algorithms();
+
+		/* Enable error strings for reporting */
+		ERR_load_crypto_strings();
+
 		ssl_initialized = 1;
 	}
 	(void) mutex_unlock(&init_lock);
@@ -1756,10 +1759,17 @@ cleanup:
 static int
 fixbnlen(BIGNUM *bn, unsigned char *buf, int len) {
 	int bytes = len - BN_num_bytes(bn);
+
+	/* prepend with leading 0x00 if necessary */
 	while (bytes-- > 0)
 		*buf++ = 0;
 
-	return (BN_bn2bin(bn, buf));
+	(void) BN_bn2bin(bn, buf);
+	/*
+	 * Return the desired length since we prepended it
+	 * with the necessary 0x00 padding.
+	 */
+	return (len);
 }
 
 KMF_RETURN
@@ -1867,8 +1877,10 @@ OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 			int i;
 			output->Length = i = fixbnlen(dsasig->r, output->Data,
 			    hashlen);
+
 			output->Length += fixbnlen(dsasig->s, &output->Data[i],
 			    hashlen);
+
 			DSA_SIG_free(dsasig);
 		} else {
 			SET_ERROR(kmfh, ERR_get_error());

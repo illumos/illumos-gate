@@ -18,8 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -49,9 +48,6 @@ verify_cert_with_key(KMF_HANDLE_T, KMF_DATA *, const KMF_DATA *);
 
 static KMF_RETURN
 verify_cert_with_cert(KMF_HANDLE_T, const KMF_DATA *, const KMF_DATA *);
-
-static KMF_RETURN
-get_sigalg_from_cert(KMF_DATA *, KMF_ALGORITHM_INDEX *);
 
 static KMF_RETURN
 get_keyalg_from_cert(KMF_DATA *cert, KMF_KEY_ALG *keyalg)
@@ -204,17 +200,18 @@ check_key_usage(void *handle,
 		 * contain public keys used to validate digital
 		 * signatures on certificates.
 		 */
-		ret = kmf_get_cert_basic_constraint(cert, &critical,
-		    &constraint);
+		if (keyusage.KeyUsageBits & KMF_keyCertSign) {
+			ret = kmf_get_cert_basic_constraint(cert,
+			    &critical, &constraint);
 
-		if ((ret != KMF_ERR_EXTENSION_NOT_FOUND) && (ret != KMF_OK)) {
-			/* real error */
-			return (ret);
-		}
+			if (ret != KMF_OK)
+				return (ret);
 
-		if ((!critical) || (!constraint.cA) ||
-		    (!(keyusage.KeyUsageBits & KMF_keyCertSign)))
+			if ((!critical) || (!constraint.cA))
+				return (KMF_ERR_KEYUSAGE);
+		} else {
 			return (KMF_ERR_KEYUSAGE);
+		}
 		break;
 	case KMF_KU_SIGN_DATA:
 		/*
@@ -385,6 +382,107 @@ setup_findprikey_attrlist(KMF_ATTRIBUTE *src_attrlist, int src_num,
 	return (KMF_OK);
 }
 
+/*
+ * Determine a default signature type to use based on
+ * the key algorithm.
+ */
+static KMF_OID *
+get_default_signoid(KMF_KEY_HANDLE *key)
+{
+	KMF_OID *oid;
+
+	switch (key->keyalg) {
+		case KMF_RSA:
+			oid = (KMF_OID *)&KMFOID_SHA256WithRSA;
+			break;
+		case KMF_DSA:
+			/* NSS doesnt support DSA-SHA2 hashes yet */
+			if (key->kstype == KMF_KEYSTORE_NSS)
+				oid = (KMF_OID *)&KMFOID_X9CM_DSAWithSHA1;
+			else
+				oid = (KMF_OID *)&KMFOID_SHA256WithDSA;
+			break;
+		case KMF_ECDSA:
+			oid = (KMF_OID *)&KMFOID_SHA256WithECDSA;
+			break;
+		default:
+			oid = NULL;
+			break;
+	}
+	return (oid);
+}
+
+/*
+ * This is to check to see if a certificate being signed has
+ * the keyCertSign KeyUsage bit set, and if so, make sure the
+ * "BasicConstraints" extension is also set accordingly.
+ */
+static KMF_RETURN
+check_for_basic_constraint(KMF_DATA *cert)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_X509EXT_KEY_USAGE  keyUsage;
+	KMF_X509_CERTIFICATE *x509cert = NULL;
+
+	rv = kmf_get_cert_ku((const KMF_DATA *)cert, &keyUsage);
+	if (rv == KMF_OK) {
+		KMF_X509EXT_BASICCONSTRAINTS basicConstraint;
+		KMF_BOOL critical;
+		/* If keyCertSign is set, look for basicConstraints */
+		if (keyUsage.KeyUsageBits & KMF_keyCertSign)
+			rv = kmf_get_cert_basic_constraint(
+			    (const KMF_DATA *)cert,
+			    &critical, &basicConstraint);
+
+		/*
+		 * If we got KMF_OK (or an error), then return
+		 * because the extension is already present.  We
+		 * only want to continue with this function if
+		 * the extension is NOT found.
+		 */
+		if (rv != KMF_ERR_EXTENSION_NOT_FOUND)
+			return (rv);
+
+		/*
+		 * Don't limit the pathLen (for now).
+		 * This should probably be a policy setting in the
+		 * future.
+		 */
+		basicConstraint.cA = TRUE;
+		basicConstraint.pathLenConstraintPresent = FALSE;
+
+		/*
+		 * Decode the DER cert data into the internal
+		 * X.509 structure we need to set extensions.
+		 */
+		rv = DerDecodeSignedCertificate(cert, &x509cert);
+		if (rv != KMF_OK)
+			return (rv);
+		/*
+		 * Add the missing basic constraint.
+		 */
+		rv = kmf_set_cert_basic_constraint(x509cert,
+		    TRUE, &basicConstraint);
+		if (rv != KMF_OK) {
+			kmf_free_signed_cert(x509cert);
+			free(x509cert);
+			return (rv);
+		}
+		/* Free the old cert data record */
+		kmf_free_data(cert);
+
+		/* Re-encode the cert with the extension */
+		rv = kmf_encode_cert_record(x509cert, cert);
+
+		/* cleanup */
+		kmf_free_signed_cert(x509cert);
+		free(x509cert);
+	}
+	if (rv == KMF_ERR_EXTENSION_NOT_FOUND)
+		rv = KMF_OK;
+
+	return (rv);
+}
 
 /*
  * Name: kmf_sign_cert
@@ -452,6 +550,19 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	if (signer_cert != NULL && sign_key_ptr != NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
+	oid = kmf_get_attr_ptr(KMF_OID_ATTR, attrlist, numattr);
+	if (oid == NULL) {
+		/*
+		 * If the signature OID was not given, check
+		 * for an algorithm index identifier instead.
+		 */
+		KMF_ALGORITHM_INDEX AlgId;
+		ret = kmf_get_attr(KMF_ALGORITHM_INDEX_ATTR, attrlist, numattr,
+		    &AlgId, NULL);
+		if (ret == KMF_OK)
+			oid = x509_algid_to_algoid(AlgId);
+	}
+
 	if (signer_cert != NULL) {
 		policy = handle->policy;
 		ret = check_key_usage(handle, signer_cert, KMF_KU_SIGN_CERT);
@@ -478,7 +589,6 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 		freethekey = 1;
 	}
 
-	/* Now we are ready to sign */
 	tbs_cert = kmf_get_attr_ptr(KMF_TBS_CERT_DATA_ATTR, attrlist,
 	    numattr);
 	if (tbs_cert == NULL) {
@@ -489,21 +599,27 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 			goto out;
 		}
 
-		/* determine signature OID from cert request */
-		oid = CERT_ALG_OID(x509cert);
-
 		ret = kmf_encode_cert_record(x509cert, &unsignedCert);
 		if (ret != KMF_OK)
 			goto out;
 
 		tbs_cert = &unsignedCert;
 	}
-	/* If OID still not found, decode the TBS Cert and pull it out */
+	/*
+	 * Check for the keyCertSign bit in the KeyUsage extn.  If it is set,
+	 * then the basicConstraints must also be present and be
+	 * marked critical.
+	 */
+	ret = check_for_basic_constraint(tbs_cert);
+	if (ret)
+		goto out;
+
 	if (oid == NULL) {
-		ret = DerDecodeTbsCertificate(tbs_cert, &decodedTbsCert);
-		if (ret != KMF_OK)
-			goto out;
-		oid = &decodedTbsCert->signature.algorithm;
+		/*
+		 * If OID is not known yet, use a default value
+		 * based on the signers key type.
+		 */
+		oid = get_default_signoid(sign_key_ptr);
 	}
 
 	signed_cert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist,
@@ -514,7 +630,6 @@ kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	}
 
 	ret = sign_cert(handle, tbs_cert, sign_key_ptr, oid, signed_cert);
-
 out:
 	if (new_attrlist)
 		(void) free(new_attrlist);
@@ -527,33 +642,6 @@ out:
 	if (decodedTbsCert != NULL) {
 		kmf_free_tbs_cert(decodedTbsCert);
 		free(decodedTbsCert);
-	}
-	return (ret);
-}
-
-static KMF_RETURN
-get_sigalg_from_cert(KMF_DATA *signer_cert, KMF_ALGORITHM_INDEX *AlgId)
-{
-	KMF_RETURN ret = KMF_OK;
-	KMF_X509_CERTIFICATE *x509_cert = NULL;
-	KMF_OID *oid;
-
-	*AlgId = KMF_ALGID_NONE;
-
-	/* if no OID and no AlgID, use the signer cert */
-	ret = DerDecodeSignedCertificate(signer_cert, &x509_cert);
-	if (ret != KMF_OK)
-		return (ret);
-
-	oid = CERT_ALG_OID(x509_cert);
-	*AlgId = x509_algoid_to_algid(oid);
-
-	if (*AlgId == KMF_ALGID_NONE)
-		ret = KMF_ERR_BAD_PARAMETER;
-
-	if (x509_cert != NULL) {
-		kmf_free_signed_cert(x509_cert);
-		free(x509_cert);
 	}
 	return (ret);
 }
@@ -658,34 +746,21 @@ kmf_sign_data(KMF_HANDLE_T handle, int numattr,
 
 	/*
 	 * Get the algorithm index attribute and its oid. If this attribute
-	 * is not provided, then we use the algorithm in the signer cert.
+	 * is not provided, then we use a default value.
 	 */
 	oid = kmf_get_attr_ptr(KMF_OID_ATTR, attrlist, numattr);
-	ret = kmf_get_attr(KMF_ALGORITHM_INDEX_ATTR, attrlist, numattr,
-	    &AlgId, NULL);
-	/*
-	 * We need to know the Algorithm ID, it can be found 3 ways:
-	 * 1. caller supplied OID in the attribute list.
-	 * 2. caller supplied Algorithm Index in the attribute list.
-	 * 3. caller supplied neither, but did supply a certificate, find
-	 *    the ALG OID from the certificate.
-	 */
-	/* If none of the above, return error. */
-	if (oid == NULL && ret != KMF_OK && signer_cert == NULL) {
+	if (oid == NULL) {
+		ret = kmf_get_attr(KMF_ALGORITHM_INDEX_ATTR, attrlist,
+		    numattr, &AlgId, NULL);
+		/* If there was no Algorithm ID, use default based on key */
+		if (ret != KMF_OK)
+			oid = get_default_signoid(sign_key_ptr);
+		else
+			oid = x509_algid_to_algoid(AlgId);
+	}
+	if (sign_key_ptr->keyp == NULL) {
 		ret = KMF_ERR_BAD_PARAMETER;
 		goto cleanup;
-	} else if (oid == NULL && ret != KMF_OK) {
-		ret = get_sigalg_from_cert(signer_cert, &AlgId);
-		if (ret != KMF_OK)
-			goto cleanup;
-		oid = x509_algid_to_algoid(AlgId);
-	} else if (oid == NULL && ret == KMF_OK) {
-		/* AlgID was given by caller, convert it to OID */
-		oid = x509_algid_to_algoid(AlgId);
-	} else if (oid != NULL && ret == KMF_ERR_ATTR_NOT_FOUND) {
-		AlgId = x509_algoid_to_algid(oid);
-	} else { /* Else, the OID must have been given */
-		ret = KMF_OK;
 	}
 
 	/* Now call the plugin function to sign it */
@@ -705,8 +780,8 @@ kmf_sign_data(KMF_HANDLE_T handle, int numattr,
 	 * signature and expect a 40-byte DSA signature.
 	 */
 	if (plugin->type == KMF_KEYSTORE_NSS &&
-	    (AlgId == KMF_ALGID_SHA1WithDSA ||
-	    AlgId == KMF_ALGID_SHA256WithDSA)) {
+	    (IsEqualOid(oid, (KMF_OID *)&KMFOID_X9CM_DSAWithSHA1) ||
+	    IsEqualOid(oid, (KMF_OID *)&KMFOID_SHA256WithDSA))) {
 		ret = DerDecodeDSASignature(output, &signature);
 		if (ret != KMF_OK)
 			goto cleanup;
@@ -2947,7 +3022,8 @@ sign_cert(KMF_HANDLE_T handle,
 	}
 
 	/* We are re-signing this cert, so clear out old signature data */
-	if (subj_cert->signature.algorithmIdentifier.algorithm.Length == 0) {
+	if (!IsEqualOid(&subj_cert->signature.algorithmIdentifier.algorithm,
+	    signature_oid)) {
 		kmf_free_algoid(&subj_cert->signature.algorithmIdentifier);
 		ret = set_algoid(&subj_cert->signature.algorithmIdentifier,
 		    signature_oid);

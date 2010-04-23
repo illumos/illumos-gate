@@ -17,10 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ *
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1168,8 +1166,12 @@ verify_file(char *filename)
 	 * parent directory itself does not exist.
 	 */
 	fd = open(filename, O_CREAT | O_EXCL, 0600);
-	if (fd == -1)
-		return (KMF_ERR_OPEN_FILE);
+	if (fd == -1) {
+		if (errno == EEXIST)
+			return (KMF_ERR_OPEN_FILE);
+		else
+			return (KMF_ERR_WRITE_FILE);
+	}
 
 	/* If we were able to create it, delete it. */
 	(void) close(fd);

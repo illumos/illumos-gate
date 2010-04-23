@@ -17,13 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
+ *
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -119,7 +115,7 @@ pk_download(int argc, char *argv[])
 		return (PK_ERR_USAGE);
 	}
 	/* Check if the file exists and might be overwritten. */
-	if (access(fullpath, F_OK) == 0) {
+	if (verify_file(fullpath) != KMF_OK) {
 		cryptoerror(LOG_STDERR,
 		    gettext("Warning: file \"%s\" exists, "
 		    "will be overwritten."), fullpath);
@@ -127,16 +123,7 @@ pk_download(int argc, char *argv[])
 		    gettext("Respond with yes or no.\n"), B_FALSE) == B_FALSE) {
 			return (0);
 		}
-	} else {
-		rv = verify_file(fullpath);
-		if (rv != KMF_OK) {
-			cryptoerror(LOG_STDERR, gettext("The file (%s) "
-			    "cannot be created.\n"), fullpath);
-			return (PK_ERR_USAGE);
-		}
 	}
-
-
 	/* URI MUST be specified */
 	if (url == NULL) {
 		cryptoerror(LOG_STDERR, gettext("A URL must be specified\n"));

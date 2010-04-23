@@ -17,10 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ *
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -159,6 +157,10 @@ gencert_pkcs11(KMF_HANDLE_T kmfhandle,
 	/* output buffer for the signed cert */
 	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_DATA_ATTR,
 	    &x509DER, sizeof (KMF_DATA));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_ALGORITHM_INDEX_ATTR,
+	    &sigAlg, sizeof (sigAlg));
 	numattr++;
 
 	if ((kmfrv = kmf_sign_cert(kmfhandle, numattr, attrlist)) !=
@@ -362,6 +364,10 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 	    &x509DER, sizeof (KMF_DATA));
 	numattr++;
 
+	kmf_set_attr_at_index(attrlist, numattr, KMF_ALGORITHM_INDEX_ATTR,
+	    &sigAlg, sizeof (sigAlg));
+	numattr++;
+
 	if ((kmfrv = kmf_sign_cert(kmfhandle, numattr, attrlist)) !=
 	    KMF_OK) {
 		goto cleanup;
@@ -508,6 +514,10 @@ gencert_nss(KMF_HANDLE_T kmfhandle,
 	/* output buffer for the signed cert */
 	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_DATA_ATTR,
 	    &x509DER, sizeof (KMF_DATA));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_ALGORITHM_INDEX_ATTR,
+	    &sigAlg, sizeof (sigAlg));
 	numattr++;
 
 	if ((kmfrv = kmf_sign_cert(kmfhandle, numattr, attrlist)) !=

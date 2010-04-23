@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -110,7 +109,6 @@ static int	pk_help(int argc, char *argv[]);
  \
 	"list objtype=key[:[public | private | both ]]\n\t\t" \
 	"[ keystore=pkcs11 ]\n\t\t" \
-	"[ subject=subject-DN ]\n\t\t" \
 	"[ label=key-label ]\n\t\t" \
 	"[ token=token[:manuf[:serial]]]\n\t" \
  \
@@ -190,7 +188,6 @@ static int	pk_help(int argc, char *argv[]);
  \
 	"delete keystore=pkcs11 " \
 	"objtype=key[:[public | private | both]]\n\t\t" \
-	"[ subject=subject-DN ]\n\t\t" \
 	"[ label=key-label ]\n\t\t" \
 	"[ token=token[:manuf[:serial]]]\n\t" \
  \
@@ -441,7 +438,7 @@ static int	pk_help(int argc, char *argv[]);
 	"serial=serial number hex string\n\t\t" \
 	"outcert=filename for final certificate\n\t\t" \
 	"issuer=issuer-DN\n\t\t" \
-	"[ store=y|n ] (store the new cert in NSS DB, default=n)\n\t\t" \
+	"[ store=y|n ] (store the new cert on the token, default=n)\n\t\t" \
 	"[ outlabel=certificate label ]\n\t\t" \
 	"[ format=pem|der ] (output format)\n\t\t" \
 	"[ subject=subject-DN ] (new subject name)\n\t\t" \

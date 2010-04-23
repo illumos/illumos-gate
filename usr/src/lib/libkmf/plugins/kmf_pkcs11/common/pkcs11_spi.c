@@ -17,12 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
+ *
  * PKCS11 token KMF Plugin
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h> /* debugging only */
@@ -2180,7 +2178,7 @@ KMFPK11_FindPrikeyByCert(KMF_HANDLE_T handle, int numattr,
 	CK_ATTRIBUTE templ[4];
 	CK_OBJECT_HANDLE pri_obj = CK_INVALID_HANDLE;
 	CK_ULONG obj_count;
-	CK_OBJECT_CLASS certClass = CKO_PRIVATE_KEY;
+	CK_OBJECT_CLASS objClass = CKO_PRIVATE_KEY;
 	CK_BBOOL true = TRUE;
 	KMF_DATA Id = { NULL, 0 };
 	KMF_KEY_HANDLE *key = NULL;
@@ -2228,7 +2226,7 @@ KMFPK11_FindPrikeyByCert(KMF_HANDLE_T handle, int numattr,
 	}
 
 	/* Start searching */
-	SETATTR(templ, 0, CKA_CLASS, &certClass, sizeof (certClass));
+	SETATTR(templ, 0, CKA_CLASS, &objClass, sizeof (objClass));
 	SETATTR(templ, 1, CKA_TOKEN, &true, sizeof (true));
 	SETATTR(templ, 2, CKA_PRIVATE, &true, sizeof (true));
 	SETATTR(templ, 3, CKA_ID, Id.Data, Id.Length);
@@ -2248,7 +2246,7 @@ KMFPK11_FindPrikeyByCert(KMF_HANDLE_T handle, int numattr,
 
 	if (obj_count == 0) {
 		SET_ERROR(kmfh, ckrv);
-		rv = KMF_ERR_INTERNAL;
+		rv = KMF_ERR_KEY_NOT_FOUND;
 		goto errout;
 	}
 

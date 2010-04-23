@@ -18,9 +18,7 @@
  *
  * CDDL HEADER END
  *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -207,30 +205,32 @@ cleanup:
 
 static int
 pk_sign_cert(KMF_HANDLE_T handle, KMF_X509_CERTIFICATE *cert,
-	KMF_KEY_HANDLE *key, KMF_DATA *outdata)
+	KMF_KEY_HANDLE *key, KMF_OID *sigoid, KMF_DATA *outdata)
 {
 	KMF_RETURN rv;
 	int numattr;
 	KMF_ATTRIBUTE attrlist[4];
 
 	numattr = 0;
-	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEYSTORE_TYPE_ATTR,
 	    &key->kstype, sizeof (KMF_KEYSTORE_TYPE));
-	numattr++;
 
-	kmf_set_attr_at_index(attrlist, numattr, KMF_KEY_HANDLE_ATTR,
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEY_HANDLE_ATTR,
 	    key, sizeof (KMF_KEY_HANDLE_ATTR));
-	numattr++;
 
 	/* cert data that is to be signed */
-	kmf_set_attr_at_index(attrlist, numattr, KMF_X509_CERTIFICATE_ATTR,
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_X509_CERTIFICATE_ATTR,
 	    cert, sizeof (KMF_X509_CERTIFICATE));
-	numattr++;
 
 	/* output buffer for the signed cert */
-	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_DATA_ATTR,
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_CERT_DATA_ATTR,
 	    outdata, sizeof (KMF_DATA));
-	numattr++;
+
+	/* Set the signature OID value so KMF knows how to generate the sig */
+	if (sigoid) {
+		kmf_set_attr_at_index(attrlist, numattr++, KMF_OID_ATTR,
+		    sigoid, sizeof (KMF_OID));
+	}
 
 	if ((rv = kmf_sign_cert(handle, numattr, attrlist)) != KMF_OK) {
 		cryptoerror(LOG_STDERR,
@@ -332,7 +332,7 @@ pk_signcsr_files(KMF_HANDLE_T handle,
 		goto cleanup;
 	}
 
-	rv = pk_sign_cert(handle, &signedCert, &cakey, &certdata);
+	rv = pk_sign_cert(handle, &signedCert, &cakey, NULL, &certdata);
 	if (rv != KMF_OK) {
 		cryptoerror(LOG_STDERR, gettext(
 		    "Error signing certificate.\n"));
@@ -362,15 +362,15 @@ pk_signcsr_pk11_nss(KMF_HANDLE_T handle,
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_DATA outcert = {NULL, 0};
-	KMF_CSR_DATA csrdata;
+	KMF_CSR_DATA csrdata = {NULL, 0};
 	KMF_KEY_HANDLE casignkey;
 	KMF_KEY_CLASS keyclass = KMF_ASYM_PRI;
-	int numattr = 0;
-	int keys = 1;
 	KMF_ATTRIBUTE attrlist[16];
 	KMF_X509_CERTIFICATE signedCert;
 	boolean_t token_bool = B_TRUE;
 	boolean_t private_bool = B_TRUE;
+	int numattr = 0;
+	int keys = 1;
 
 	(void) memset(&casignkey, 0, sizeof (KMF_KEY_HANDLE));
 	(void) memset(&signedCert, 0, sizeof (signedCert));
@@ -456,11 +456,11 @@ pk_signcsr_pk11_nss(KMF_HANDLE_T handle,
 		    gettext("Failed to find signing key\n"));
 		goto cleanup;
 	}
-
 	/*
 	 * If we found the key, now we can sign the cert.
 	 */
-	rv = pk_sign_cert(handle, &signedCert, &casignkey, &outcert);
+	rv = pk_sign_cert(handle, &signedCert, &casignkey, NULL,
+	    &outcert);
 	if (rv != KMF_OK) {
 		cryptoerror(LOG_STDERR, gettext(
 		    "Error signing certificate.\n"));
