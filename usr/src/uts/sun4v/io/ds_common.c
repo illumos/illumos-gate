@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1241,6 +1240,18 @@ done:
 	mutex_exit(&ds_svcs.lock);
 }
 
+static boolean_t
+ds_port_is_ready(ds_port_t *port)
+{
+	boolean_t is_ready;
+
+	mutex_enter(&port->lock);
+	is_ready = (port->ldc.state == LDC_UP) &&
+	    (port->state == DS_PORT_READY);
+	mutex_exit(&port->lock);
+	return (is_ready);
+}
+
 static void
 ds_try_next_port(ds_svc_t *svc, int portid)
 {
@@ -1276,8 +1287,15 @@ ds_try_next_port(ds_svc_t *svc, int portid)
 		}
 
 		port = &ds_ports[portid];
+
+		if (!ds_port_is_ready(port))
+			continue;
+
 		DS_DBG_LDC(CE_NOTE, "ds@%x: %s trying ldc.id: %d" DS_EOL,
 		    portid, __func__, (uint_t)(port->ldc.id));
+
+		DS_PORTSET_ADD(svc->tried, portid);
+
 		if (ds_send_reg_req(svc, port) == 0) {
 			DS_DBG_LDC(CE_NOTE, "ds@%x: %s reg msg send OK" DS_EOL,
 			    portid, __func__);
@@ -2117,10 +2135,13 @@ ds_svc_register_onport(ds_svc_t *svc, ds_port_t *port)
 	if (DS_PORT_IN_SET(svc->tried, PORTID(port)))
 		return (0);
 
+	if (!ds_port_is_ready(port))
+		return (0);
+
 	if ((svc->flags & DSSF_ISCLIENT) == 0) {
-		DS_PORTSET_ADD(svc->tried, PORTID(port));
 		if (svc->state != DS_SVC_INACTIVE)
 			return (0);
+		DS_PORTSET_ADD(svc->tried, PORTID(port));
 	} else {
 		ds_set_svc_port_tried(svc->cap.svc_id, port);
 
@@ -2517,7 +2538,7 @@ ds_ucap_init(ds_capability_t *cap, ds_clnt_ops_t *ops, uint32_t flags,
 	/* check if the service is already registered */
 	if (i_ds_hdl_lookup(cap->svc_id, is_client, NULL, 1) == 1) {
 		/* already registered */
-		cmn_err(CE_NOTE, "Service '%s'/%s already registered" DS_EOL,
+		DS_DBG_USR(CE_NOTE, "Service '%s'/%s already registered" DS_EOL,
 		    cap->svc_id,
 		    (flags & DSSF_ISCLIENT) ? "client" : "service");
 		mutex_exit(&ds_svcs.lock);
