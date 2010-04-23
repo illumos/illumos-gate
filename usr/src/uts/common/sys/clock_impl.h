@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_CLOCK_IMPL_H
@@ -66,11 +65,11 @@ typedef struct lbolt_info {
 		cyclic_id_t lbi_cyclic_id;	/* lbolt's cyclic id */
 		int64_t lbi_id_pad;		/* 64bit padding */
 	} id;
-	int64_t lbi_internal;		/* lbolt source when on cyclic mode */
-	int64_t lbi_debug_time;		/* time spent in the debugger */
-	int64_t lbi_debug_ts;		/* last time we dropped into kmdb */
 	int64_t lbi_thresh_calls;	/* max calls per interval */
 	int64_t lbi_thresh_interval;	/* interval window for the # of calls */
+	int64_t lbi_debug_ts;		/* last time we dropped into kmdb */
+	int64_t lbi_debug_time;		/* time spent in the debugger */
+	int64_t lbi_internal;		/* lbolt source when on cyclic mode */
 	uint32_t lbi_token;		/* synchronize cyclic mode switch */
 	boolean_t lbi_cyc_deactivate;	/* lbolt_cyclic self deactivation */
 	int64_t lbi_cyc_deac_start;	/* deactivation interval */
@@ -110,7 +109,7 @@ extern lbolt_info_t *lb_info;
 #define	LBOLT_FASTPATH64						\
 	(lbolt_hybrid == lbolt_cyclic_driven ?				\
 	    (lb_info->lbi_internal - lb_info->lbi_debug_time) :		\
-	    ddi_get_lbolt64())
+	    lbolt_event_driven())
 
 #define	LBOLT_FASTPATH		(clock_t)LBOLT_FASTPATH64
 

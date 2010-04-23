@@ -22,8 +22,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -2535,26 +2534,35 @@ int64_t
 lbolt_cyclic_driven(void)
 {
 	int64_t lb = lb_info->lbi_internal;
-	int cpu = CPU->cpu_seqid;
+	int cpu;
 
-	if ((lb - lb_cpu[cpu].lbc_cnt_start) < lb_info->lbi_thresh_interval) {
+	/*
+	 * If a CPU has already prevented the lbolt cyclic from deactivating
+	 * itself, don't bother tracking the usage. Otherwise check if we're
+	 * within the interval and how the per CPU counter is doing.
+	 */
+	if (lb_info->lbi_cyc_deactivate) {
+		cpu = CPU->cpu_seqid;
+		if ((lb - lb_cpu[cpu].lbc_cnt_start) <
+		    lb_info->lbi_thresh_interval) {
 
-		if (lb_cpu[cpu].lbc_counter == 0)
+			if (lb_cpu[cpu].lbc_counter == 0)
+				/*
+				 * Reached the threshold within the interval,
+				 * prevent the lbolt cyclic from turning itself
+				 * off.
+				 */
+				lb_info->lbi_cyc_deactivate = B_FALSE;
+			else
+				lb_cpu[cpu].lbc_counter--;
+		} else {
 			/*
-			 * Reached the threshold within the interval,
-			 * prevent the lbolt cyclic from turning itself
-			 * off.
+			 * Only reset the usage statistics when we have
+			 * exceeded the interval.
 			 */
-			lb_info->lbi_cyc_deactivate = B_FALSE;
-		else
-			lb_cpu[cpu].lbc_counter--;
-	} else {
-		/*
-		 * Only reset the usage statistics when the interval has
-		 * exceeded.
-		 */
-		lb_cpu[cpu].lbc_counter = lb_info->lbi_thresh_calls;
-		lb_cpu[cpu].lbc_cnt_start = lb;
+			lb_cpu[cpu].lbc_counter = lb_info->lbi_thresh_calls;
+			lb_cpu[cpu].lbc_cnt_start = lb;
+		}
 	}
 
 	ASSERT(lb >= lb_info->lbi_debug_time);
