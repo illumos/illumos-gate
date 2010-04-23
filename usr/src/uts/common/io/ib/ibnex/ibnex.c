@@ -2653,6 +2653,7 @@ ibnex_dm_callback(void *arg, ibdm_events_t flag)
 		if (ddi_taskq_dispatch(ibnex.ibnex_taskq_id,
 		    ibnex_handle_hca_attach, guid, DDI_NOSLEEP)
 		    != DDI_SUCCESS) {
+			kmem_free(guid, sizeof (ib_guid_t));
 			IBTF_DPRINTF_L4("ibnex", "\tdm_callback: failed to "
 			    "dispatch HCA add event for guid %s", hca_guid);
 		}

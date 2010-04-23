@@ -543,6 +543,7 @@ ddi_bus_config_op_t op, uint_t *flag, dev_info_t **child)
 		    &index, &pkey, &port_num) != IBNEX_SUCCESS) {
 			IBTF_DPRINTF_L2("ibnex",
 			    "\tconfig_port_node: Invalid Service Name");
+			kmem_free(device_name, len);
 			return (IBNEX_FAILURE);
 		}
 
@@ -596,6 +597,7 @@ ibnex_handle_hca_attach(void *cb_arg)
 	hca_list = ibdm_ibnex_get_hca_info_by_guid(hca_guid);
 	if (hca_list == NULL) {
 		ndi_devi_exit(phci, circ);
+		kmem_free(cb_arg, sizeof (ib_guid_t));
 		return;
 	}
 	ibnex_create_hcasvc_nodes(phci, hca_list->hl_hca_port_attr);
@@ -605,4 +607,5 @@ ibnex_handle_hca_attach(void *cb_arg)
 	}
 	ibdm_ibnex_free_hca_list(hca_list);
 	ndi_devi_exit(phci, circ);
+	kmem_free(cb_arg, sizeof (ib_guid_t));
 }
