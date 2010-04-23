@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -600,6 +599,9 @@ check_resync_regions(daemon_request_t *timeout)
 		if ((ui->ui_tstate & MD_ABR_CAP) ||
 		    (un->c.un_status & MD_UN_OFFLINE_SM) || (un->un_nsm < 2)) {
 			md_unit_readerexit(ui);
+			/* Remove this thread from the CPR callback table. */
+			mutex_enter(&un->un_prr_cpr_mx);
+			CALLB_CPR_EXIT(&cprinfo);
 			continue;
 		}
 
