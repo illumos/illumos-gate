@@ -160,6 +160,7 @@ typedef struct impl_scsi_iportmap {
 	uint64_t	iportmap_create_time;		/* clock64_t */
 	int		iportmap_create_csync_usec;
 	int		iportmap_settle_usec;
+	int		iportmap_sync_cnt;
 } impl_scsi_iportmap_t;
 
 /*
@@ -188,6 +189,7 @@ typedef struct impl_scsi_tgtmap {
 	uint64_t	tgtmap_create_time;		/* clock64_t */
 	int		tgtmap_create_csync_usec;
 	int		tgtmap_settle_usec;
+	int		tgtmap_sync_cnt;
 } impl_scsi_tgtmap_t;
 #define	LUNMAPSIZE 256		/* 256 LUNs/target */
 
@@ -7999,22 +8001,33 @@ scsi_hba_bus_config_tgtmap(dev_info_t *self, uint_t flags,
 		goto out;		/* performance path */
 
 	/*
-	 * Sync current observations in the map and look again.  We place an
-	 * upper bound on the amount of time we will wait for sync to complete
-	 * to avoid a bad device causing this busconfig operation to hang.
-	 *
-	 * We are typically stable, so damap_sync returns immediately.
-	 *
-	 * Max time to wait for sync is settle_usec per possible device.
+	 * We sync if we were in the window, on the first bus_config_one, and
+	 * every bus_config_all (or bus_config_driver).
 	 */
-	maxdev = damap_size(tgtmap->tgtmap_dam[SCSI_TGT_SCSI_DEVICE]);
-	maxdev = (maxdev > scsi_hba_map_settle_f) ? maxdev :
-	    scsi_hba_map_settle_f;
-	sync_usec = maxdev * tgtmap->tgtmap_settle_usec;
-	synced = scsi_tgtmap_sync((scsi_hba_tgtmap_t *)tgtmap, sync_usec);
-	if (!synced)
-		SCSI_HBA_LOG((_LOGCFG, self, NULL,
-		    "tgtmap_sync timeout"));
+	if (tsa || (tgtmap->tgtmap_sync_cnt == 0) ||
+	    (op != BUS_CONFIG_ONE)) {
+		/*
+		 * Sync current observations in the map and look again.  We
+		 * place an upper bound on the amount of time we will wait for
+		 * sync to complete to avoid a bad device causing this
+		 * busconfig operation to hang.
+		 *
+		 * We are typically stable, so damap_sync returns immediately.
+		 *
+		 * Max time to wait for sync is settle_usec per possible device.
+		 */
+		tgtmap->tgtmap_sync_cnt++;
+		maxdev = damap_size(tgtmap->tgtmap_dam[SCSI_TGT_SCSI_DEVICE]);
+		maxdev = (maxdev > scsi_hba_map_settle_f) ? maxdev :
+		    scsi_hba_map_settle_f;
+		sync_usec = maxdev * tgtmap->tgtmap_settle_usec;
+		synced = scsi_tgtmap_sync((scsi_hba_tgtmap_t *)tgtmap,
+		    sync_usec);
+		if (!synced)
+			SCSI_HBA_LOG((_LOGCFG, self, NULL,
+			    "tgtmap_sync timeout"));
+	} else
+		synced = -1;
 
 	if (op == BUS_CONFIG_ONE)
 		ret = scsi_hba_bus_configone(self, flags, arg, childp);
@@ -8151,19 +8164,28 @@ scsi_hba_bus_config_iportmap(dev_info_t *self, uint_t flags,
 		goto out;		/* performance path */
 
 	/*
-	 * Sync current observations in the map and look again.  We place an
-	 * upper bound on the amount of time we will wait for sync to complete
-	 * to avoid a bad device causing this busconfig operation to hang.
-	 *
-	 * We are typically stable, so damap_sync returns immediately.
-	 *
-	 * Max time to wait for sync is settle_usec times settle factor.
+	 * We sync if we were in the window, on the first bus_config_one, and
+	 * every bus_config_all (or bus_config_driver).
 	 */
-	sync_usec = scsi_hba_map_settle_f * iportmap->iportmap_settle_usec;
-	synced = damap_sync(iportmap->iportmap_dam, sync_usec);
-	if (!synced)
-		SCSI_HBA_LOG((_LOGCFG, self, NULL,
-		    "iportmap_sync timeout"));
+	if (tsa || (iportmap->iportmap_sync_cnt == 0) ||
+	    (op != BUS_CONFIG_ONE)) {
+		/*
+		 * Sync current observations in the map and look again.  We
+		 * place an upper bound on the amount of time we will wait for
+		 * sync to complete to avoid a bad device causing this
+		 * busconfig operation to hang.
+		 *
+		 * We are typically stable, so damap_sync returns immediately.
+		 *
+		 * Max time to wait for sync is settle_usec times settle factor.
+		 */
+		iportmap->iportmap_sync_cnt++;
+		synced = damap_sync(iportmap->iportmap_dam, sync_usec);
+		if (!synced)
+			SCSI_HBA_LOG((_LOGCFG, self, NULL,
+			    "iportmap_sync timeout"));
+	} else
+		synced = -1;
 
 	if (op == BUS_CONFIG_ONE) {
 		/* create the iport node child */
@@ -8634,6 +8656,7 @@ scsi_hba_tgtmap_create(dev_info_t *self, scsi_tgtmap_mode_t mode,
 	tgtmap->tgtmap_create_time = ddi_get_lbolt64();
 	tgtmap->tgtmap_create_csync_usec = csync_usec;
 	tgtmap->tgtmap_settle_usec = settle_usec;
+	tgtmap->tgtmap_sync_cnt = 0;
 
 	optflags = (ddi_prop_get_int(DDI_DEV_T_ANY, self,
 	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "scsi-enumeration",
@@ -9501,6 +9524,7 @@ scsi_hba_iportmap_create(dev_info_t *self, int csync_usec, int settle_usec,
 	iportmap->iportmap_create_time = ddi_get_lbolt64();
 	iportmap->iportmap_create_csync_usec = csync_usec;
 	iportmap->iportmap_settle_usec = settle_usec;
+	iportmap->iportmap_sync_cnt = 0;
 
 	tran->tran_iportmap = (scsi_hba_iportmap_t *)iportmap;
 	*handle = (scsi_hba_iportmap_t *)iportmap;
