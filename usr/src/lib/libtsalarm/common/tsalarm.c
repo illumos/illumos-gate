@@ -19,16 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * Telco-alarm library, which communicates through libpcp to set/get
  * alarms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -99,18 +96,18 @@ tsalarm_get(uint32_t alarm_type, uint32_t *alarm_state)
 	}
 
 	/*
+	 * verify that the Alarm action has taken place
+	 */
+	if ((resp_ptr = (tsalarm_resp_t *)recv_msg.msg_data) == NULL)
+		goto cleanup;
+
+	/*
 	 * validate that this data was meant for us
 	 */
 	if (recv_msg.msg_type != TSALARM_CONTROL_R) {
 		rc = TSALARM_UNBOUND_PACKET_RECVD;
 		goto cleanup;
 	}
-
-	/*
-	 * verify that the Alarm action has taken place
-	 */
-	if ((resp_ptr = (tsalarm_resp_t *)recv_msg.msg_data) == NULL)
-		goto cleanup;
 
 	if (resp_ptr->status == TSALARM_ERROR) {
 		rc = TSALARM_GET_ERROR;
@@ -127,8 +124,10 @@ tsalarm_get(uint32_t alarm_type, uint32_t *alarm_state)
 cleanup:
 	if (req_ptr != NULL)
 		free(req_ptr);
-	if (recv_msg.msg_data != NULL)
-		free(recv_msg.msg_data);
+
+	/* free recv_msg.msg_data through pointer to make sure it is valid */
+	if (resp_ptr != NULL)
+		free(resp_ptr);
 
 	/* close virtual channel fd */
 	(void) pcp_close(chnl_fd);
@@ -192,18 +191,18 @@ tsalarm_set(uint32_t alarm_type, uint32_t alarm_state)
 	}
 
 	/*
+	 * verify that the Alarm action has taken place
+	 */
+	if ((resp_ptr = (tsalarm_resp_t *)recv_msg.msg_data) == NULL)
+		goto cleanup;
+
+	/*
 	 * validate that this data was meant for us
 	 */
 	if (recv_msg.msg_type != TSALARM_CONTROL_R) {
 		rc = TSALARM_UNBOUND_PACKET_RECVD;
 		goto cleanup;
 	}
-
-	/*
-	 * verify that the Alarm action has taken place
-	 */
-	if ((resp_ptr = (tsalarm_resp_t *)recv_msg.msg_data) == NULL)
-		goto cleanup;
 
 	if (resp_ptr->status == TSALARM_ERROR) {
 		rc = TSALARM_SET_ERROR;
@@ -229,8 +228,10 @@ tsalarm_set(uint32_t alarm_type, uint32_t alarm_state)
 cleanup:
 	if (req_ptr != NULL)
 		free(req_ptr);
-	if (recv_msg.msg_data != NULL)
-		free(recv_msg.msg_data);
+
+	/* free recv_msg.msg_data through pointer to make sure it is valid */
+	if (resp_ptr != NULL)
+		free(resp_ptr);
 
 	/* close virtual channel fd */
 	(void) pcp_close(chnl_fd);
