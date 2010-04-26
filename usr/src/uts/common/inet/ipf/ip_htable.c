@@ -3,11 +3,8 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -467,12 +464,15 @@ ipf_stack_t *ifs;
 /* Parameters:  tptr(I)    - pointer to the pool to search                  */
 /*              version(I) - IP protocol version (4 or 6)                   */
 /*              aptr(I)    - pointer to address information                 */
+/*		fin	   - pointer to packet information		    */
+/*		ifs	   - ipf stack instance				    */
 /*                                                                          */
 /* Search the hash table for a given address and return a search result.    */
 /* ------------------------------------------------------------------------ */
-int fr_iphmfindip(tptr, version, aptr, ifs)
+int fr_iphmfindip(tptr, version, aptr, fin, ifs)
 void *tptr, *aptr;
 int version;
+fr_info_t *fin;
 ipf_stack_t *ifs;
 {
 	i6addr_t *addr;
@@ -503,10 +503,13 @@ ipf_stack_t *ifs;
 		ipe = fr_iphmfind(iph, &addr->in4);
 	else
 		ipe = NULL;
-	if (ipe != NULL)
+	if (ipe != NULL) {
+		ipe->ipe_hits++;
+		ipe->ipe_bytes += fin->fin_plen;
 		rval = 0;
-	else
+	} else {
 		rval = 1;
+	}
 	RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 	return rval;
 }

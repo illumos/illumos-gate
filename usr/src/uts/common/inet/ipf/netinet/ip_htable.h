@@ -3,11 +3,8 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef __IP_HTABLE_H__
 #define __IP_HTABLE_H__
@@ -21,6 +18,8 @@ typedef	struct	iphtent_s	{
 	sa_family_t	ipe_family;
 	i6addr_t	ipe_addr;
 	i6addr_t	ipe_mask;
+	U_QUAD_T	ipe_hits;
+	U_QUAD_T	ipe_bytes;
 	int		ipe_ref;
 	union	{
 		char	ipeu_char[16];
@@ -77,7 +76,7 @@ extern void fr_derefhtable __P((iphtable_t *, ipf_stack_t *));
 extern void fr_derefhtent __P((iphtent_t *));
 extern void fr_delhtable __P((iphtable_t *, ipf_stack_t *));
 extern void *fr_iphmfindgroup __P((void *, int, void *, ipf_stack_t *));
-extern int fr_iphmfindip __P((void *, int, void *, ipf_stack_t *));
+extern int fr_iphmfindip __P((void *, int, void *, fr_info_t *, ipf_stack_t *));
 extern int fr_gethtablestat __P((iplookupop_t *, ipf_stack_t *));
 extern int fr_htable_getnext __P((ipftoken_t *, ipflookupiter_t *, ipf_stack_t *));
 extern void fr_htable_iterderef __P((u_int, int, void *, ipf_stack_t *));

@@ -3,8 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #if defined(KERNEL) || defined(_KERNEL)
@@ -1710,7 +1709,8 @@ int portcmp;
 	 */
 #ifdef	IPFILTER_LOOKUP
 	if (fr->fr_satype == FRI_LOOKUP) {
-		i = (*fr->fr_srcfunc)(fr->fr_srcptr, fi->fi_v, lip, ifs);
+		fin->fin_flx |= FI_DONTCACHE;
+		i = (*fr->fr_srcfunc)(fr->fr_srcptr, fi->fi_v, lip, fin, ifs);
 		if (i == -1)
 			return 1;
 		lip += 3;
@@ -1752,7 +1752,8 @@ int portcmp;
 	lip++, lm++, ld++;
 #ifdef	IPFILTER_LOOKUP
 	if (fr->fr_datype == FRI_LOOKUP) {
-		i = (*fr->fr_dstfunc)(fr->fr_dstptr, fi->fi_v, lip, ifs);
+		fin->fin_flx |= FI_DONTCACHE;
+		i = (*fr->fr_dstfunc)(fr->fr_dstptr, fi->fi_v, lip, fin, ifs);
 		if (i == -1)
 			return 1;
 		lip += 3;
@@ -1977,8 +1978,9 @@ u_32_t pass;
 		 * If the function pointer is bad, just make like we ignore
 		 * it, except for increasing the hit counter.
 		 */
+		IPF_BUMP(fr->fr_hits);
+		fr->fr_bytes += (U_QUAD_T)fin->fin_plen;
 		if ((passt & FR_CALLNOW) != 0) {
-			IPF_BUMP(fr->fr_hits);
 			if ((fr->fr_func != NULL) &&
 			    (fr->fr_func != (ipfunc_t)-1)) {
 				frentry_t *frs;
@@ -2013,7 +2015,6 @@ u_32_t pass;
 			logged = 1;
 		}
 #endif /* IPFILTER_LOG */
-		fr->fr_bytes += (U_QUAD_T)fin->fin_plen;
 		passo = pass;
 		if (FR_ISSKIP(passt))
 			skip = fr->fr_arg;
@@ -2022,7 +2023,6 @@ u_32_t pass;
 		if (passt & (FR_RETICMP|FR_FAKEICMP))
 			fin->fin_icode = fr->fr_icode;
 		FR_DEBUG(("pass %#x\n", pass));
-		IPF_BUMP(fr->fr_hits);
 		fin->fin_rule = rulen;
 		(void) strncpy(fin->fin_group, fr->fr_group, FR_GROUPLEN);
 		if (fr->fr_grp != NULL) {
@@ -2171,6 +2171,7 @@ u_32_t *passp;
 
 		if ((fr = fin->fin_fr) != NULL) {
 			IPF_BUMP(fr->fr_hits);
+			fr->fr_bytes += (U_QUAD_T)fin->fin_plen;
 			pass = fr->fr_flags;
 		}
 	} else {
@@ -4277,7 +4278,8 @@ int rev;
 /* Parameters:  type(I)     - type of lookup these parameters are for.      */
 /*              number(I)   - table number to use when searching            */
 /*              funcptr(IO) - pointer to pointer for storing IP address     */
-/*                           searching function.                            */
+/*			      searching function.			    */
+/*		ifs	    - ipf stack instance			    */
 /*                                                                          */
 /* Search for the "table" number passed in amongst those configured for     */
 /* that particular type.  If the type is recognised then the function to    */

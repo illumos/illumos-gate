@@ -6,8 +6,7 @@
  * @(#)ip_fil.h	1.35 6/5/96
  * $Id: ip_fil.h,v 2.170.2.22 2005/07/16 05:55:35 darrenr Exp $
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	__IP_FIL_H__
@@ -151,9 +150,9 @@ struct ipscan;
 struct ifnet;
 
 typedef struct ipf_stack ipf_stack_t;
+typedef struct fr_info fr_info_t;
 
-typedef	int	(* lookupfunc_t) __P((void *, int, void *, ipf_stack_t *));
-
+typedef	int	(* lookupfunc_t) __P((void *, int, void *, fr_info_t *, ipf_stack_t *));
 
 /*
  * i6addr is used as a container for both IPv4 and IPv6 addresses, as well
@@ -353,7 +352,7 @@ typedef	struct	fr_ip	{
 
 
 
-typedef	struct	fr_info	{
+struct	fr_info	{
 	void	*fin_ifp;		/* interface packet is `on' */
 	fr_ip_t	fin_fi;		/* IP Packet summary */
 	union	{
@@ -394,7 +393,7 @@ typedef	struct	fr_info	{
 #ifdef	__sgi
 	void	*fin_hbuf;
 #endif
-} fr_info_t;
+};
 
 #define	fin_ip		fin_ipu.fip_ip
 #define	fin_ip6		fin_ipu.fip_ip6

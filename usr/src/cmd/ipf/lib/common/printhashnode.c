@@ -3,11 +3,8 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
 
@@ -47,6 +44,11 @@ int opts;
 #endif
 			printmask(4, (u_32_t *)&ipe.ipe_mask.in4_addr);
 
+#ifdef USE_QUAD_T
+		PRINTF("\tHits %qu\tBytes %qu", ipe.ipe_hits, ipe.ipe_bytes);
+#else
+		PRINTF("\tHits %lu\tBytes %lu", ipe.ipe_hits, ipe.ipe_bytes);
+#endif
 		PRINTF("\tRef. Count: %d\tGroup: %s\n", ipe.ipe_ref,
 			ipe.ipe_group);
 	} else {

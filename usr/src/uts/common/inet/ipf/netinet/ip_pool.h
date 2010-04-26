@@ -5,11 +5,8 @@
  *
  * $Id: ip_pool.h,v 2.26.2.3 2005/06/12 07:18:27 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	__IP_POOL_H__
 #define	__IP_POOL_H__
@@ -42,7 +39,8 @@ typedef	struct ip_pool_node {
 	int			ipn_info;
 	int			ipn_ref;
 	char			ipn_name[FR_GROUPLEN];
-	u_long			ipn_hits;
+	U_QUAD_T		ipn_hits;
+	U_QUAD_T		ipn_bytes;
 	struct ip_pool_node	*ipn_next, **ipn_pnext;
 } ip_pool_node_t;
 
@@ -52,7 +50,7 @@ typedef	struct ip_pool_s {
 	struct ip_pool_s	**ipo_pnext;
 	struct radix_node_head	*ipo_head;
 	ip_pool_node_t	*ipo_list;
-	u_long		ipo_hits;
+	U_QUAD_T	ipo_hits;
 	int		ipo_unit;
 	int		ipo_flags;
 	int		ipo_ref;
@@ -69,7 +67,7 @@ typedef	struct	ip_pool_stat	{
 	ip_pool_t	*ipls_list[IPL_LOGSIZE];
 } ip_pool_stat_t;
 
-extern	int	ip_pool_search __P((void *, int, void *, ipf_stack_t *));
+extern	int	ip_pool_search __P((void *, int, void *, fr_info_t *, ipf_stack_t *));
 extern	int	ip_pool_init __P((ipf_stack_t *));
 extern	void	ip_pool_fini __P((ipf_stack_t *));
 extern	int	ip_pool_create __P((iplookupop_t *, ipf_stack_t *));

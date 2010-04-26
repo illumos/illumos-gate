@@ -3,11 +3,8 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -120,6 +117,7 @@ main(argc, argv)
 	iplookupop_t op;
 	ip_pool_t *ipo;
 	i6addr_t ip;
+	fr_info_t fin;
 
 	RWLOCK_INIT(&ifs->ifs_ip_poolrw, "poolrw");
 	ip_pool_init(ifs);
@@ -165,41 +163,42 @@ main(argc, argv)
 #ifdef	DEBUG_POOL
 treeprint(ipo);
 #endif
+	fin.fin_plen = 20;
 	ip.in4.s_addr = 0x0a00aabb;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip, ifs));
+		ip_pool_search(ipo, 4, &ip, &fin, ifs));
 
 	ip.in4.s_addr = 0x0a000001;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip, ifs));
+		ip_pool_search(ipo, 4, &ip, &fin, ifs));
 
 	ip.in4.s_addr = 0x0a000101;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip, ifs));
+		ip_pool_search(ipo, 4, &ip, &fin, ifs));
 
 	ip.in4.s_addr = 0x0a010001;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip, ifs));
+		ip_pool_search(ipo, 4, &ip, &fin, ifs));
 
 	ip.in4.s_addr = 0x0a010101;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip, ifs));
+		ip_pool_search(ipo, 4, &ip, &fin, ifs));
 
 	ip.in4.s_addr = 0x0a010201;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip, ifs));
+		ip_pool_search(ipo, 4, &ip, &fin, ifs));
 
 	ip.in4.s_addr = 0x0a010203;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip, ifs));
+		ip_pool_search(ipo, 4, &ip, &fin, ifs));
 
 	ip.in4.s_addr = 0x0a01020f;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip, ifs));
+		ip_pool_search(ipo, 4, &ip, &fin, ifs));
 
 	ip.in4.s_addr = 0x0b00aabb;
 	printf("search(%#x) = %d (-1)\n", ip.in4.s_addr,
-		ip_pool_search(ipo, 4, &ip, ifs));
+		ip_pool_search(ipo, 4, &ip, &fin, ifs));
 
 #ifdef	DEBUG_POOL
 treeprint(ipo);
@@ -368,13 +367,16 @@ addrfamily_t *addr, *mask;
 /* Parameters:  tptr(I)    - pointer to the pool to search                  */
 /*              version(I) - IP protocol version (4 or 6)                   */
 /*              dptr(I)    - pointer to address information                 */
+/*		fin	   - pointer to packet information		    */
+/*		ifs	   - ipf stack instance				    */
 /*                                                                          */
 /* Search the pool for a given address and return a search result.          */
 /* ------------------------------------------------------------------------ */
-int ip_pool_search(tptr, version, dptr, ifs)
+int ip_pool_search(tptr, version, dptr, fin, ifs)
 void *tptr;
 int version;
 void *dptr;
+fr_info_t *fin;
 ipf_stack_t *ifs;
 {
 	struct radix_node *rn;
@@ -413,6 +415,7 @@ ipf_stack_t *ifs;
 		m = (ip_pool_node_t *)rn;
 		ipo->ipo_hits++;
 		m->ipn_hits++;
+		m->ipn_bytes += fin->fin_plen;
 		rv = m->ipn_info;
 	}
 	RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
