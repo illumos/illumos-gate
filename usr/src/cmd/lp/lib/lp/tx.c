@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/zone.h>
@@ -38,6 +35,7 @@
 #undef  PS_FAULTED
 #endif /* PS_FAULTED */
 #include "lp.h"
+#include <sys/tsol/label_macro.h>
 
 /*
  * get_labeled_zonename - gets the the zonename with the same label.
@@ -109,24 +107,40 @@ get_peer_label(int fd, char **slabel)
 	if (is_system_labeled()) {
 		ucred_t *uc = NULL;
 		m_label_t *sl;
+		m_label_t admin_low;
+		m_label_t admin_high;
 		char *pslabel = NULL; /* peer's slabel */
 
 		if ((fd < 0) || (slabel == NULL)) {
 			errno = EINVAL;
 			return (-1);
 		}
+		bsllow(&admin_low);
+		bslhigh(&admin_high);
 
 		if (getpeerucred(fd, &uc) == -1)
 			return (-1);
 
 		sl = ucred_getlabel(uc);
+
+		/*
+		 * Remote print requests from the global zone
+		 * arrive at admin_low, make them admin_high to
+		 * avoid downgrade.
+		 */
+		if (blequal(sl, &admin_low)) {
+			sl = &admin_high;
+			syslog(LOG_DEBUG, "get_peer_label(): upgrade"
+			    " admin_low label to admin_high");
+		}
+
 		if (label_to_str(sl, &pslabel, M_INTERNAL, DEF_NAMES) != 0)
 			syslog(LOG_WARNING, "label_to_str(): %m");
 		ucred_free(uc);
 
 		if (pslabel != NULL) {
 			syslog(LOG_DEBUG, "get_peer_label(%d, %s): becomes %s",
-				fd, (*slabel ? *slabel : "NULL"), pslabel);
+			    fd, (*slabel ? *slabel : "NULL"), pslabel);
 			if (*slabel != NULL)
 				free(*slabel);
 			*slabel = strdup(pslabel);
