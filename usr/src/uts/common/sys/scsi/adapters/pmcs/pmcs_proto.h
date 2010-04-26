@@ -76,7 +76,7 @@ pmcwork_t *pmcs_gwork(pmcs_hw_t *, uint32_t, pmcs_phy_t *);
 void pmcs_pwork(pmcs_hw_t *, struct pmcwork *);
 
 /* given a tag, find a work structure */
-pmcwork_t *pmcs_tag2wp(pmcs_hw_t *, uint32_t);
+pmcwork_t *pmcs_tag2wp(pmcs_hw_t *, uint32_t, boolean_t);
 
 /*
  * Abort function
@@ -146,11 +146,6 @@ void pmcs_report_fwversion(pmcs_hw_t *);
  * Build a device name.
  */
 void pmcs_phy_name(pmcs_hw_t *, pmcs_phy_t *, char *, size_t);
-
-/*
- * Find a PHY by device_id
- */
-pmcs_phy_t *pmcs_find_phy_by_devid(pmcs_hw_t *, uint32_t);
 
 /*
  * Find a PHY by wwn
@@ -302,6 +297,7 @@ boolean_t pmcs_set_nvmd(pmcs_hw_t *pwp, pmcs_nvmd_type_t nvmd_type,
 void pmcs_complete_work_impl(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
     size_t amt);
 void pmcs_flush_target_queues(pmcs_hw_t *, pmcs_xscsi_t *, uint8_t);
+void pmcs_flush_nonio_cmds(pmcs_hw_t *);
 boolean_t pmcs_iport_has_targets(pmcs_hw_t *, pmcs_iport_t *);
 void pmcs_free_dma_chunklist(pmcs_hw_t *);
 void pmcs_dev_state_recovery(pmcs_hw_t *, pmcs_phy_t *);

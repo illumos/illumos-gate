@@ -316,7 +316,8 @@ typedef struct {
  * bits		what
  * ------------------------
  * 31		done bit
- * 30..28	tag type
+ * 30		non-io cmd bit
+ * 29..28	tag type
  * 27..12	rolling serial number
  * 11..0	index into work area to get pmcwork structure
  *
@@ -346,7 +347,8 @@ typedef struct {
 #define	PMCS_TAG_TYPE_SHIFT	28
 #define	PMCS_TAG_SERNO_SHIFT	12
 #define	PMCS_TAG_INDEX_SHIFT	0
-#define	PMCS_TAG_TYPE_MASK	0x70000000
+#define	PMCS_TAG_TYPE_MASK	0x30000000
+#define	PMCS_TAG_NONIO_CMD	0x40000000
 #define	PMCS_TAG_DONE		0x80000000
 #define	PMCS_TAG_SERNO_MASK	0x0ffff000
 #define	PMCS_TAG_INDEX_MASK	0x00000fff

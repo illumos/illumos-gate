@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * PMC 8x6G IOMB Definitions
@@ -116,7 +116,7 @@ extern "C" {
 #define	PMCIN_GPIO							0x22
 #define	PMCIN_SAS_DIAG_MODE_START_END					0x23
 #define	PMCIN_SAS_DIAG_EXECUTE						0x24
-#define	PMCIN_SAW_HW_EVENT_ACK						0x25
+#define	PMCIN_SAS_HW_EVENT_ACK						0x25
 #define	PMCIN_GET_TIME_STAMP						0x26
 #define	PMCIN_PORT_CONTROL						0x27
 #define	PMCIN_GET_NVMD_DATA						0x28

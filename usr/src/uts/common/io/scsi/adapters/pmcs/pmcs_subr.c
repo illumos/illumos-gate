@@ -2324,7 +2324,8 @@ pmcs_phymap_activate(void *arg, char *ua, void **privp)
 	pmcs_iport_t	*iport = NULL;
 
 	mutex_enter(&pwp->lock);
-	if ((pwp->state == STATE_UNPROBING) || (pwp->state == STATE_DEAD)) {
+	if ((pwp->state == STATE_UNPROBING) || (pwp->state == STATE_DEAD) ||
+	    (pwp->state == STATE_IN_RESET)) {
 		mutex_exit(&pwp->lock);
 		return;
 	}
@@ -4163,6 +4164,7 @@ again:
 	(void) memset(pwp->scratch, 0x77, PMCS_SCRATCH_SIZE);
 	pwrk->arg = pwp->scratch;
 	pwrk->dtype = pptr->dtype;
+	pwrk->htag |= PMCS_TAG_NONIO_CMD;
 	mutex_enter(&pwp->iqp_lock[PMCS_IQ_OTHER]);
 	ptr = GET_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
 	if (ptr == NULL) {
@@ -4399,6 +4401,7 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 	(void) memset(pwp->scratch, 0x77, PMCS_SCRATCH_SIZE);
 	pwrk->arg = pwp->scratch;
 	pwrk->dtype = expander->dtype;
+	pwrk->htag |= PMCS_TAG_NONIO_CMD;
 	msg[0] = LE_32(PMCS_HIPRI(pwp, PMCS_OQ_GENERAL, PMCIN_SMP_REQUEST));
 	msg[1] = LE_32(pwrk->htag);
 	msg[2] = LE_32(expander->device_id);
@@ -4806,9 +4809,10 @@ pmcs_pwork(pmcs_hw_t *pwp, pmcwork_t *p)
  * Find a work structure based upon a tag and make sure that the tag
  * serial number matches the work structure we've found.
  * If a structure is found, its lock is held upon return.
+ * If lock_phy is B_TRUE, then lock the phy also when returning the work struct
  */
 pmcwork_t *
-pmcs_tag2wp(pmcs_hw_t *pwp, uint32_t htag)
+pmcs_tag2wp(pmcs_hw_t *pwp, uint32_t htag, boolean_t lock_phy)
 {
 	pmcwork_t *p;
 	uint32_t idx = PMCS_TAG_INDEX(htag);
@@ -4817,6 +4821,11 @@ pmcs_tag2wp(pmcs_hw_t *pwp, uint32_t htag)
 
 	mutex_enter(&p->lock);
 	if (p->htag == htag) {
+		if (lock_phy) {
+			mutex_exit(&p->lock);
+			mutex_enter(&p->phy->phy_lock);
+			mutex_enter(&p->lock);
+		}
 		return (p);
 	}
 	mutex_exit(&p->lock);
@@ -4872,6 +4881,7 @@ pmcs_abort(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint32_t tag, int all_cmds,
 	}
 
 	pwrk->dtype = pptr->dtype;
+	pwrk->htag |= PMCS_TAG_NONIO_CMD;
 	if (wait) {
 		pwrk->arg = msg;
 	}
@@ -5039,6 +5049,7 @@ pmcs_ssp_tmf(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t tmf, uint32_t tag,
 	 * NB: so as to not get entangled in normal I/O
 	 * NB: processing.
 	 */
+	pwrk->htag |= PMCS_TAG_NONIO_CMD;
 	msg[0] = LE_32(PMCS_HIPRI(pwp, PMCS_OQ_GENERAL,
 	    PMCIN_SSP_INI_TM_START));
 	msg[1] = LE_32(pwrk->htag);
@@ -5254,6 +5265,7 @@ pmcs_sata_abort_ncq(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	if (pwrk == NULL) {
 		return (ENOMEM);
 	}
+	pwrk->htag |= PMCS_TAG_NONIO_CMD;
 	msg[0] = LE_32(PMCS_IOMB_IN_SAS(PMCS_OQ_IODONE,
 	    PMCIN_SATA_HOST_IO_START));
 	msg[1] = LE_32(pwrk->htag);
@@ -5677,69 +5689,6 @@ pmcs_phy_name(pmcs_hw_t *pwp, pmcs_phy_t *pptr, char *obuf, size_t olen)
 }
 
 /*
- * Implementation for pmcs_find_phy_by_devid.
- * If the PHY is found, it is returned locked.
- */
-static pmcs_phy_t *
-pmcs_find_phy_by_devid_impl(pmcs_phy_t *phyp, uint32_t device_id)
-{
-	pmcs_phy_t *match, *cphyp, *nphyp;
-
-	ASSERT(!mutex_owned(&phyp->phy_lock));
-
-	while (phyp) {
-		pmcs_lock_phy(phyp);
-
-		if ((phyp->valid_device_id) && (phyp->device_id == device_id)) {
-			return (phyp);
-		}
-		if (phyp->children) {
-			cphyp = phyp->children;
-			pmcs_unlock_phy(phyp);
-			match = pmcs_find_phy_by_devid_impl(cphyp, device_id);
-			if (match) {
-				ASSERT(mutex_owned(&match->phy_lock));
-				return (match);
-			}
-			pmcs_lock_phy(phyp);
-		}
-
-		if (IS_ROOT_PHY(phyp)) {
-			pmcs_unlock_phy(phyp);
-			phyp = NULL;
-		} else {
-			nphyp = phyp->sibling;
-			pmcs_unlock_phy(phyp);
-			phyp = nphyp;
-		}
-	}
-
-	return (NULL);
-}
-
-/*
- * If the PHY is found, it is returned locked
- */
-pmcs_phy_t *
-pmcs_find_phy_by_devid(pmcs_hw_t *pwp, uint32_t device_id)
-{
-	pmcs_phy_t *phyp, *match = NULL;
-
-	phyp = pwp->root_phys;
-
-	while (phyp) {
-		match = pmcs_find_phy_by_devid_impl(phyp, device_id);
-		if (match) {
-			ASSERT(mutex_owned(&match->phy_lock));
-			return (match);
-		}
-		phyp = phyp->sibling;
-	}
-
-	return (NULL);
-}
-
-/*
  * This function is called as a sanity check to ensure that a newly registered
  * PHY doesn't have a device_id that exists with another registered PHY.
  */
@@ -6019,6 +5968,7 @@ pmcs_spinup_release(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 
 		phyp->spinup_hold = 0;
 		bzero(msg, PMCS_QENTRY_SIZE);
+		pwrk->htag |= PMCS_TAG_NONIO_CMD;
 		msg[0] = LE_32(PMCS_HIPRI(pwp, PMCS_OQ_GENERAL,
 		    PMCIN_LOCAL_PHY_CONTROL));
 		msg[1] = LE_32(pwrk->htag);
@@ -6247,7 +6197,7 @@ pmcs_ack_events(pmcs_hw_t *pwp)
 		}
 
 		msg[0] = LE_32(PMCS_HIPRI(pwp, PMCS_OQ_GENERAL,
-		    PMCIN_SAW_HW_EVENT_ACK));
+		    PMCIN_SAS_HW_EVENT_ACK));
 		msg[1] = LE_32(pwrk->htag);
 		msg[2] = LE_32(pptr->hw_event_ack);
 
@@ -7100,7 +7050,7 @@ pmcs_flush_target_queues(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt, uint8_t queues)
 		sp = STAILQ_FIRST(&tgt->aq);
 		while (sp) {
 			sp_next = STAILQ_NEXT(sp, cmd_next);
-			pwrk = pmcs_tag2wp(pwp, sp->cmd_tag);
+			pwrk = pmcs_tag2wp(pwp, sp->cmd_tag, B_FALSE);
 
 			/*
 			 * If we don't find a work structure, it's because
@@ -7152,6 +7102,39 @@ pmcs_flush_target_queues(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt, uint8_t queues)
 			mutex_enter(&pwp->cq_lock);
 			STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
 			mutex_exit(&pwp->cq_lock);
+		}
+	}
+
+	if (queues == PMCS_TGT_ALL_QUEUES) {
+		mutex_exit(&tgt->statlock);
+		(void) pmcs_flush_nonio_cmds(pwp);
+		mutex_enter(&tgt->statlock);
+	}
+}
+
+/*
+ * Clean up work structures with no associated pmcs_cmd_t struct
+ */
+void
+pmcs_flush_nonio_cmds(pmcs_hw_t *pwp)
+{
+	int i;
+	pmcwork_t *p;
+
+	for (i = 0; i < pwp->max_cmd; i++) {
+		p = &pwp->work[i];
+		mutex_enter(&p->lock);
+		if (p->htag & PMCS_TAG_NONIO_CMD) {
+			if (!PMCS_COMMAND_ACTIVE(p) || PMCS_COMMAND_DONE(p)) {
+				mutex_exit(&p->lock);
+				continue;
+			}
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, p->phy, p->xp,
+			    "%s: Completing non-io cmd with HTAG 0x%x",
+			    __func__, p->htag);
+			pmcs_complete_work_impl(pwp, p, NULL, 0);
+		} else {
+			mutex_exit(&p->lock);
 		}
 	}
 }
@@ -7545,13 +7528,15 @@ pmcs_free_all_phys(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		tphyp = nphyp;
 	}
 
+	mutex_enter(&pwp->dead_phylist_lock);
 	tphyp = pwp->dead_phys;
 	while (tphyp) {
-		nphyp = tphyp->sibling;
+		nphyp = tphyp->dead_next;
 		kmem_cache_free(pwp->phy_cache, tphyp);
 		tphyp = nphyp;
 	}
 	pwp->dead_phys = NULL;
+	mutex_exit(&pwp->dead_phylist_lock);
 }
 
 /*
@@ -7921,6 +7906,7 @@ pmcs_add_phy_to_iport(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 	ASSERT(mutex_owned(&iport->lock));
 	ASSERT(phyp);
 	ASSERT(!list_link_active(&phyp->list_node));
+
 	iport->nphy++;
 	list_insert_tail(&iport->phys, phyp);
 	pmcs_smhba_add_iport_prop(iport, DATA_TYPE_INT32, PMCS_NUM_PHYS,

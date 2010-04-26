@@ -1454,7 +1454,7 @@ inbound_iomb_opcode(uint32_t opcode)
 	case PMCIN_SAS_DIAG_EXECUTE:
 		return ("SAS_DIAG_EXECUTE");
 		break;
-	case PMCIN_SAW_HW_EVENT_ACK:
+	case PMCIN_SAS_HW_EVENT_ACK:
 		return ("SAS_HW_EVENT_ACK");
 		break;
 	case PMCIN_GET_TIME_STAMP:

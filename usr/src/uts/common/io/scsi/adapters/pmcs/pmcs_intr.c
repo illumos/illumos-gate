@@ -166,7 +166,7 @@ pmcs_process_io_completion(pmcs_hw_t *pwp, pmcs_iocomp_cb_t *ioccb, size_t amt)
 	uint32_t tag_type;
 	uint32_t htag = LE_32(((uint32_t *)((void *)ioccb->iomb))[1]);
 
-	pwrk = pmcs_tag2wp(pwp, htag);
+	pwrk = pmcs_tag2wp(pwp, htag, B_FALSE);
 	if (pwrk == NULL) {
 		pmcs_work_not_found(pwp, htag, (void *)&ioccb->iomb);
 		kmem_cache_free(pwp->iocomp_cb_cache, ioccb);
@@ -237,7 +237,7 @@ pmcs_process_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	pmcwork_t *pwrk;
 	uint32_t htag = LE_32(((uint32_t *)iomb)[1]);
 
-	pwrk = pmcs_tag2wp(pwp, htag);
+	pwrk = pmcs_tag2wp(pwp, htag, B_FALSE);
 	if (pwrk == NULL) {
 		pmcs_work_not_found(pwp, htag, iomb);
 		return;
@@ -1061,7 +1061,7 @@ pmcs_process_echo_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	echo_test_t fred;
 	pmcwork_t *pwrk;
 	uint32_t *msg = iomb, htag = LE_32(msg[1]);
-	pwrk = pmcs_tag2wp(pwp, htag);
+	pwrk = pmcs_tag2wp(pwp, htag, B_FALSE);
 	if (pwrk) {
 		(void) memcpy(&fred, &((uint32_t *)iomb)[2], sizeof (fred));
 		fred.ptr[0]++;
@@ -1087,7 +1087,7 @@ pmcs_process_ssp_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	status = LE_32(w[2]);
 
 
-	pwrk = pmcs_tag2wp(pwp, htag);
+	pwrk = pmcs_tag2wp(pwp, htag, B_FALSE);
 	if (pwrk == NULL) {
 		path = "????";
 	} else {
@@ -1150,25 +1150,12 @@ pmcs_process_sata_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	 */
 	path = NULL;
 	if (htag) {
-		pwrk = pmcs_tag2wp(pwp, htag);
+		pwrk = pmcs_tag2wp(pwp, htag, B_TRUE);
 		if (pwrk) {
-			pmcs_lock_phy(pwrk->phy);
 			pptr = pwrk->phy;
 			path = pptr->path;
 		}
 	}
-	if (path == NULL) {
-		mutex_enter(&pwp->lock);
-		pptr = pmcs_find_phy_by_devid(pwp, LE_32(w[4]));
-		/* This PHY is now locked */
-		mutex_exit(&pwp->lock);
-		if (pptr) {
-			path = pptr->path;
-		} else {
-			path = "????";
-		}
-	}
-
 	if (status != PMCOUT_STATUS_XFER_CMD_FRAME_ISSUED) {
 		char buf[20];
 		const char *emsg = pmcs_status_str(status);
@@ -1209,7 +1196,7 @@ pmcs_process_sata_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	}
 
 	if (pptr) {
-		pmcs_unlock_phy(pptr);
+		mutex_exit(&pptr->phy_lock);
 	}
 }
 
@@ -1223,7 +1210,7 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	uint32_t scp = LE_32(((uint32_t *)iomb)[3]) & 0x1;
 	char *path;
 
-	pwrk = pmcs_tag2wp(pwp, htag);
+	pwrk = pmcs_tag2wp(pwp, htag, B_TRUE);
 	if (pwrk == NULL) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: cannot find work structure for ABORT", __func__);
@@ -1236,7 +1223,6 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		 * Don't use pmcs_lock_phy here since it could potentially lock
 		 * other PHYs beneath, which is unnecessary in this context.
 		 */
-		mutex_enter(&pptr->phy_lock);
 		pptr->abort_pending = 0;
 		pptr->abort_sent = 0;
 
@@ -1327,7 +1313,7 @@ pmcs_process_general_event(pmcs_hw_t *pwp, uint32_t *iomb)
 	iomb[PMCS_MSG_SIZE - 1] = 0;
 	htag = LE_32(iomb[1]);
 	pmcs_print_entry(pwp, PMCS_PRT_DEBUG, local, iomb);
-	pwrk = pmcs_tag2wp(pwp, htag);
+	pwrk = pmcs_tag2wp(pwp, htag, B_FALSE);
 	if (pwrk) {
 		pmcs_complete_work(pwp, pwrk, iomb, PMCS_QENTRY_SIZE);
 	}

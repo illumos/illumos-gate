@@ -668,7 +668,7 @@ pmcs_scsa_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 	/*
 	 * See if we have a real work structure associated with this cmd.
 	 */
-	pwrk = pmcs_tag2wp(pwp, sp->cmd_tag);
+	pwrk = pmcs_tag2wp(pwp, sp->cmd_tag, B_FALSE);
 	if (pwrk && pwrk->arg == sp) {
 		tag = pwrk->htag;
 		pptr = pwrk->phy;

@@ -918,7 +918,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	pwp->work = kmem_zalloc(pwp->max_cmd * sizeof (pmcwork_t), KM_SLEEP);
-	for (i = 0; i < pwp->max_cmd - 1; i++) {
+	for (i = 0; i < pwp->max_cmd; i++) {
 		pmcwork_t *pwrk = &pwp->work[i];
 		mutex_init(&pwrk->lock, NULL, MUTEX_DRIVER,
 		    DDI_INTR_PRI(pwp->intr_pri));
@@ -1600,7 +1600,7 @@ pmcs_unattach(pmcs_hw_t *pwp)
 	 */
 
 	if (pwp->work && pwp->max_cmd) {
-		for (i = 0; i < pwp->max_cmd - 1; i++) {
+		for (i = 0; i < pwp->max_cmd; i++) {
 			pmcwork_t *pwrk = &pwp->work[i];
 			mutex_destroy(&pwrk->lock);
 			cv_destroy(&pwrk->sleep_cv);
@@ -3054,6 +3054,7 @@ pmcs_create_one_phy_stats(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL,
 		    "%s: Failed to create %s kstats for PHY(0x%p) at %s",
 		    __func__, ks_name, (void *)phyp, phyp->path);
+		return;
 	}
 
 	ps = (sas_phy_stats_t *)phyp->phy_stats->ks_data;
