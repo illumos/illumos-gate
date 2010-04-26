@@ -265,16 +265,30 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 
 		hdr_frag_len = cur_context.hdr_len - (len - MBLKL(next_mp));
 		/*
-		 * There are two cases we need to reallocate a mblk for the
+		 * There are three cases we need to reallocate a mblk for the
 		 * last header fragment:
+		 *
 		 * 1. the header is in multiple mblks and the last fragment
 		 * share the same mblk with the payload
+		 *
 		 * 2. the header is in a single mblk shared with the payload
 		 * and the header is physical memory non-contiguous
+		 *
+		 * 3. there is 4 KB boundary within the header and 64 bytes
+		 * following the end of the header bytes. The case may cause
+		 * TCP data corruption issue.
+		 *
+		 * The workaround for the case #2 and case #3 is:
+		 *   Assuming standard Ethernet/IP/TCP headers of 54 bytes,
+		 *   this means that the buffer(containing the headers) should
+		 *   not start -118 bytes before a 4 KB boundary. For example,
+		 *   128-byte alignment for this buffer could be used to fulfill
+		 *   this condition.
 		 */
 		if ((next_mp != mp) ||
-		    (P2NPHASE((uintptr_t)next_mp->b_rptr, Adapter->sys_page_sz)
-		    < cur_context.hdr_len)) {
+		    (P2NPHASE((uintptr_t)next_mp->b_rptr,
+		    E1000_LSO_FIRST_DESC_ALIGNMENT_BOUNDARY_4K)
+		    < E1000_LSO_FIRST_DESC_ALIGNMENT)) {
 			E1000G_DEBUG_STAT(tx_ring->stat_lso_header_fail);
 			/*
 			 * reallocate the mblk for the last header fragment,
@@ -374,7 +388,7 @@ adjust_threshold:
 	packet->mp = mp;
 
 	/* Try to recycle the tx descriptors again */
-	if (tx_ring->tbd_avail < (desc_total + 2)) {
+	if (tx_ring->tbd_avail < (desc_total + 3)) {
 		E1000G_DEBUG_STAT(tx_ring->stat_recycle_retry);
 		(void) e1000g_recycle(tx_ring);
 	}
@@ -386,7 +400,7 @@ adjust_threshold:
 	 * (one redundant descriptor and one hw checksum context descriptor are
 	 * included), then return failure.
 	 */
-	if (tx_ring->tbd_avail < (desc_total + 2)) {
+	if (tx_ring->tbd_avail < (desc_total + 3)) {
 		E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
 		    "No Enough Tx descriptors\n");
 		E1000G_STAT(tx_ring->stat_no_desc);

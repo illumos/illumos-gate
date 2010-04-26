@@ -745,7 +745,15 @@ Notes on packaging:
 
 5.3.22
 ======
-  This version has the following fix:
+  This version has the following fixes:
    6903292 Running flag not set on IPMP underlying e1000g interfaces
    6913835 e1000g driver passes bad messages up the stack when jumbograms received
    6919873 panic: BAD TRAP: type=e (#pf Page fault) in module "e1000g" during ifconfig plumb group ipmp0
+
+5.3.23
+=====
+  This version has the following fixes:
+   6838180 tcp corruption seen with northstar cards
+   6925276 e1000g not consistent with link_lock usage
+   6933844 NULL ptr deref in e1000g_rx_setup() due to inconsistency between recv_list & rx_desc_num
+

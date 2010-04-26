@@ -487,7 +487,7 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 		 * Buffer Address.
 		 */
 		packet =
-		    (p_rx_sw_packet_t)QUEUE_GET_HEAD(&rx_data->recv_list);
+		    (p_rx_sw_packet_t)QUEUE_POP_HEAD(&rx_data->recv_list);
 		ASSERT(packet != NULL);
 
 		rx_buf = packet->rx_buf;
@@ -586,8 +586,6 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 				rx_data->rx_mblk_len -=
 				    ETHERFCSL - length;
 
-				QUEUE_POP_HEAD(&rx_data->recv_list);
-
 				goto rx_end_of_packet;
 			}
 		}
@@ -682,16 +680,6 @@ rx_copy:
 			 */
 			bcopy(rx_buf->address, nmp->b_wptr, length);
 		}
-
-		/*
-		 * The rx_sw_packet MUST be popped off the
-		 * RxSwPacketList before either a putnext or freemsg
-		 * is done on the mp that has now been created by the
-		 * desballoc. If not, it is possible that the free
-		 * routine will get called from the interrupt context
-		 * and try to put this packet on the free list
-		 */
-		(p_rx_sw_packet_t)QUEUE_POP_HEAD(&rx_data->recv_list);
 
 		ASSERT(nmp != NULL);
 		nmp->b_wptr += length;
@@ -857,8 +845,6 @@ rx_drop:
 		rx_data->rbd_next++;
 
 	last_desc = current_desc;
-
-	(p_rx_sw_packet_t)QUEUE_POP_HEAD(&rx_data->recv_list);
 
 	QUEUE_PUSH_TAIL(&rx_data->recv_list, &packet->Link);
 	/*

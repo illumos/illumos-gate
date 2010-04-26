@@ -278,7 +278,9 @@ extern "C" {
 #define	MAXIMUM_FRAME_SIZE	\
 	(MAXIMUM_MTU + sizeof (struct ether_vlan_header) + ETHERFCSL)
 
-#define	E1000_LSO_MAXLEN	65535
+#define	E1000_LSO_MAXLEN				65535
+#define	E1000_LSO_FIRST_DESC_ALIGNMENT_BOUNDARY_4K	4096
+#define	E1000_LSO_FIRST_DESC_ALIGNMENT			128
 
 /* Defines for Tx stall check */
 #define	E1000G_STALL_WATCHDOG_COUNT	8
@@ -927,9 +929,8 @@ typedef struct e1000g {
 	 */
 	kmutex_t watchdog_lock;
 	/*
-	 * The link_lock protects the link fields in struct e1000g,
-	 * such as link_state, link_speed, link_duplex, link_complete, and
-	 * link_tid.
+	 * The link_lock protects the link_complete and link_tid
+	 * fields in struct e1000g.
 	 */
 	kmutex_t link_lock;
 	/*
