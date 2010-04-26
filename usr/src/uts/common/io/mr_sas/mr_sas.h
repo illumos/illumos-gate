@@ -34,8 +34,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_MR_SAS_H_
 #define	_MR_SAS_H_
@@ -50,11 +49,14 @@ extern "C" {
 /*
  * MegaRAID SAS2.0 Driver meta data
  */
-#define	MRSAS_VERSION				"LSIv2.4"
-#define	MRSAS_RELDATE				"Feb 28, 2010"
+#define	MRSAS_VERSION				"LSIv2.5"
+#define	MRSAS_RELDATE				"Apr 21, 2010"
 
 #define	MRSAS_TRUE				1
 #define	MRSAS_FALSE				0
+
+#define	ADAPTER_RESET_NOT_REQUIRED		0
+#define	ADAPTER_RESET_REQUIRED			1
 
 /*
  * MegaRAID SAS2.0 device id conversion definitions.
@@ -86,7 +88,7 @@ extern "C" {
 #define	MRSAS_PD_TGT_MAX	255
 #define	MRSAS_GET_PD_MAX(s)	((s)->mr_pd_max)
 #define	WWN_STRLEN		17
-
+#define		APP_RESERVE_CMDS		32
 /*
  * =====================================
  * MegaRAID SAS2.0 MFI firmware definitions
@@ -146,7 +148,7 @@ extern "C" {
 #define	MFI_FRAME_DIR_WRITE			0x0008
 #define	MFI_FRAME_DIR_READ			0x0010
 #define	MFI_FRAME_DIR_BOTH			0x0018
-#define	MFI_FRAME_IEEE				0x0020
+#define		MFI_FRAME_IEEE			0x0020
 
 /*
  * Definition for cmd_status
@@ -368,20 +370,23 @@ typedef struct mrsas_instance {
 
 	uint32_t	*reply_queue;
 	dma_obj_t	mfi_internal_dma_obj;
-
+	uint16_t	adapterresetinprogress;
+	uint16_t	deadadapter;
 	uint8_t		init_id;
 	uint8_t		flag_ieee;
-	uint8_t		reserved[2];
+	uint8_t		disable_online_ctrl_reset;
+	uint8_t		fw_fault_count_after_ocr;
 
 	uint16_t	max_num_sge;
 	uint16_t	max_fw_cmds;
 	uint32_t	max_sectors_per_req;
 
 	struct mrsas_cmd **cmd_list;
-
 	mlist_t		cmd_pool_list;
 	kmutex_t	cmd_pool_mtx;
 
+	mlist_t		app_cmd_pool_list;
+	kmutex_t	app_cmd_pool_mtx;
 	mlist_t		cmd_pend_list;
 	kmutex_t	cmd_pend_mtx;
 
@@ -443,6 +448,7 @@ typedef struct mrsas_instance {
 
 	ddi_taskq_t	*taskq;
 	struct mrsas_ld	*mr_ld_list;
+	kmutex_t	ocr_flags_mtx;
 } mrsas_t;
 
 struct mrsas_func_ptr {
@@ -474,11 +480,13 @@ struct mrsas_func_ptr {
  * console messages debug levels
  */
 #define	CL_NONE		0	/* No debug information */
-#define	CL_ANN		1	/* print unconditionally, announcements */
-#define	CL_ANN1		2	/* No o/p  */
-#define	CL_DLEVEL1	3	/* debug level 1, informative */
-#define	CL_DLEVEL2	4	/* debug level 2, verbose */
-#define	CL_DLEVEL3	5	/* debug level 3, very verbose */
+#define	CL_TEST_OCR	1
+#define	CL_ANN		2	/* print unconditionally, announcements */
+#define	CL_ANN1		3	/* No o/p  */
+#define	CL_DLEVEL1	4	/* debug level 1, informative */
+#define	CL_DLEVEL2	5	/* debug level 2, verbose */
+#define	CL_DLEVEL3	6	/* debug level 3, very verbose */
+
 
 #ifdef __SUNPRO_C
 #define	__func__ ""
@@ -538,6 +546,9 @@ struct mrsas_func_ptr {
 
 #define	HIGH_LEVEL_INTR			1
 #define	NORMAL_LEVEL_INTR		0
+
+#define		IO_RETRY_COUNT		3
+#define		MAX_FW_RESET_COUNT	3
 
 /*
  * scsa_cmd  - Per-command mr private data
@@ -602,6 +613,8 @@ struct mrsas_cmd {
 	uint32_t		frame_count;
 	struct scsa_cmd		*cmd;
 	struct scsi_pkt		*pkt;
+	uint16_t		retry_count_for_ocr;
+	uint16_t		drv_pkt_time;
 };
 
 #define	MAX_MGMT_ADAPTERS			1024
@@ -648,11 +661,18 @@ struct mrsas_ctrl_prop {
 
 	uint8_t		cluster_enable;
 	uint8_t		coercion_mode;
-	uint8_t		disk_write_cache_disable;
 	uint8_t		alarm_enable;
+	uint8_t		reserved_1[13];
+/* Add properties that can be controlled by a bit in the following structure */
+	struct {
+	    uint32_t	reserved_2				    : 10;
+	    uint32_t    disable_online_ctrl_reset   : 1;
+	    uint32_t    reserved_3				    : 21;
+	} on_off_properties;
 
-	uint8_t		reserved[44];
+	uint8_t		reserved_4[28];
 };
+
 
 /*
  * SAS controller information
@@ -869,10 +889,22 @@ struct mrsas_ctrl_info {
 #define	OB_SCRATCH_PAD_0_OFF		0xB0	/* ROC */
 #define	OB_INTR_MASK			0xFFFFFFFF
 #define	OB_DOORBELL_CLEAR_MASK		0xFFFFFFFF
-
+#define		WRITE_SEQ_OFF			0x000000FC
+#define		HOST_DIAG_OFF			0x000000F8
+#define		DIAG_RESET_ADAPTER		0x00000004
+#define		DIAG_WRITE_ENABLE		0x00000080
 /*
  * All MFI register set macros accept mrsas_register_set*
  */
+#define	WR_IB_WRITE_SEQ(v, instance) 	ddi_put32((instance)->regmap_handle, \
+	(uint32_t *)((uintptr_t)(instance)->regmap + WRITE_SEQ_OFF), (v))
+
+#define	RD_OB_DRWE(instance) 		ddi_get32((instance)->regmap_handle, \
+	(uint32_t *)((uintptr_t)(instance)->regmap + HOST_DIAG_OFF))
+
+#define	WR_IB_DRWE(v, instance) 	ddi_put32((instance)->regmap_handle, \
+	(uint32_t *)((uintptr_t)(instance)->regmap + HOST_DIAG_OFF), (v))
+
 #define	WR_IB_MSG_0(v, instance) 	ddi_put32((instance)->regmap_handle, \
 	(uint32_t *)((uintptr_t)(instance)->regmap + IB_MSG_0_OFF), (v))
 
@@ -1767,7 +1799,21 @@ static void	mrsas_issue_evt_taskq(struct mrsas_eventinfo *);
 static int	mrsas_service_evt(struct mrsas_instance *, int, int, int,
 			uint64_t);
 static int	mrsas_mode_sense_build(struct scsi_pkt *);
+static void	push_pending_mfi_pkt(struct mrsas_instance *,
+			struct mrsas_cmd *);
+static int 	mrsas_issue_init_mfi(struct mrsas_instance *);
+static int 	mrsas_issue_pending_cmds(struct mrsas_instance *);
+static int 	mrsas_print_pending_cmds(struct mrsas_instance *);
+static int  mrsas_complete_pending_cmds(struct mrsas_instance *);
+static int	mrsas_reset_ppc(struct mrsas_instance *);
+static uint32_t mrsas_initiate_ocr_if_fw_is_faulty(struct mrsas_instance *);
+static int  mrsas_kill_adapter(struct mrsas_instance *);
+static void io_timeout_checker(void *instance);
+static void complete_cmd_in_sync_mode(struct mrsas_instance *,
+		struct mrsas_cmd *);
+
 #endif	/* KMDB_MODULE */
+
 
 #ifdef	__cplusplus
 }
