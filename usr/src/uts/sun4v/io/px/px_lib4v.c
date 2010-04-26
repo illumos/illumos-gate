@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -52,6 +51,7 @@ uint_t px_ranges_phi_mask = ((1 << 28) -1);
 /*
  * Hypervisor VPCI services information for the px nexus driver.
  */
+static	uint64_t	px_vpci_maj_ver; /* Negotiated VPCI API major version */
 static	uint64_t	px_vpci_min_ver; /* Negotiated VPCI API minor version */
 static	uint_t		px_vpci_users = 0; /* VPCI API users */
 static	hsvc_info_t px_hsvc_vpci = {
@@ -149,17 +149,38 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	/*
 	 * Negotiate the API version for VPCI hypervisor services.
 	 */
-	if ((px_vpci_users == 0) &&
-	    ((ret = hsvc_register(&px_hsvc_vpci, &px_vpci_min_ver)) != 0)) {
+	if (px_vpci_users == 0) {
+		if ((ret = hsvc_register(&px_hsvc_vpci, &px_vpci_min_ver))
+		    == 0) {
+			px_vpci_maj_ver = px_hsvc_vpci.hsvc_major;
+			goto hv_negotiation_complete;
+		}
+		/*
+		 * Negotiation with the latest known VPCI hypervisor services
+		 * failed.  Fallback to version 1.0.
+		 */
+		px_hsvc_vpci.hsvc_major = PX_HSVC_MAJOR_VER_1;
+		px_hsvc_vpci.hsvc_minor = PX_HSVC_MINOR_VER_0;
+
+		if ((ret = hsvc_register(&px_hsvc_vpci, &px_vpci_min_ver))
+		    == 0) {
+			px_vpci_maj_ver = px_hsvc_vpci.hsvc_major;
+			goto hv_negotiation_complete;
+		}
+
 		cmn_err(CE_WARN, "%s: cannot negotiate hypervisor services "
 		    "group: 0x%lx major: 0x%lx minor: 0x%lx errno: %d\n",
 		    px_hsvc_vpci.hsvc_modname, px_hsvc_vpci.hsvc_group,
 		    px_hsvc_vpci.hsvc_major, px_hsvc_vpci.hsvc_minor, ret);
+
 		return (DDI_FAILURE);
 	}
+hv_negotiation_complete:
+
 	px_vpci_users++;
+
 	DBG(DBG_ATTACH, dip, "px_lib_dev_init: negotiated VPCI API version, "
-	    "major 0x%lx minor 0x%lx\n", px_hsvc_vpci.hsvc_major,
+	    "major 0x%lx minor 0x%lx\n", px_vpci_maj_ver,
 	    px_vpci_min_ver);
 
 	/*
@@ -428,11 +449,12 @@ px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 		pfns[i] = MMU_PTOB(PX_ADDR2PFN(addr, pfn_index, flags, i));
 
 	/*
-	 * If HV VPCI version is 1.1 and higher, pass BDF, phantom function,
+	 * If HV VPCI version is 2.0 and higher, pass BDF, phantom function,
 	 * and relaxed ordering attributes. Otherwise, pass only read or write
 	 * attribute.
 	 */
-	if (px_vpci_min_ver == PX_HSVC_MINOR_VER_0)
+	if ((px_vpci_maj_ver == PX_HSVC_MAJOR_VER_1) &&
+	    (px_vpci_min_ver == PX_HSVC_MINOR_VER_0))
 		attr = attr & (PCI_MAP_ATTR_READ | PCI_MAP_ATTR_WRITE);
 
 	while ((ttes_mapped = pfn_p - pfns) < pages) {
@@ -572,11 +594,12 @@ px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra, io_attributes_t attr,
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getbypass: dip 0x%p ra 0x%llx "
 	    "attr 0x%llx\n", dip, ra, attr);
 	/*
-	 * If HV VPCI version is 1.1 and higher, pass BDF, phantom function,
+	 * If HV VPCI version is 2.0 and higher, pass BDF, phantom function,
 	 * and relaxed ordering attributes. Otherwise, pass only read or write
 	 * attribute.
 	 */
-	if (px_vpci_min_ver == PX_HSVC_MINOR_VER_0)
+	if ((px_vpci_maj_ver == PX_HSVC_MAJOR_VER_1) &&
+	    (px_vpci_min_ver == PX_HSVC_MINOR_VER_0))
 		attr &= PCI_MAP_ATTR_READ | PCI_MAP_ATTR_WRITE;
 
 	if ((ret = hvio_iommu_getbypass(DIP_TO_HANDLE(dip), ra,

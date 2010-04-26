@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_PX_LIB4V_H
@@ -98,16 +97,20 @@ extern "C" {
  * Hypercall service versioning
  */
 #define	PX_HSVC_MAJOR_VER_1	0x1ull
+#define	PX_HSVC_MAJOR_VER_2	0x2ull
 #define	PX_HSVC_MINOR_VER_0	0x0ull
 #define	PX_HSVC_MINOR_VER_1	0x1ull
 #define	PX_HSVC_MINOR_VER_2	0x2ull
 
 /*
  * VPCI API versioning.
- * Currently PX nexus driver supports VPCI API version 1.2
+ * Currently PX nexus driver supports VPCI API version 2.0
+ * 1.0 - Negotiated/supported.
+ * 1.1/1.2 - Deprecated.
+ * 2.0 - Negotiated/supported.
  */
-#define	PX_VPCI_MAJOR_VER	PX_HSVC_MAJOR_VER_1
-#define	PX_VPCI_MINOR_VER	PX_HSVC_MINOR_VER_2
+#define	PX_VPCI_MAJOR_VER	PX_HSVC_MAJOR_VER_2
+#define	PX_VPCI_MINOR_VER	PX_HSVC_MINOR_VER_0
 
 /*
  * SDIO API versioning.

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -30,16 +29,38 @@
 #include <sys/pcie_impl.h>
 #include <sys/pcie_pwr.h>
 
-/* ARGSUSED */
 void
 pcie_init_plat(dev_info_t *dip)
 {
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
+
+	if (PCIE_IS_PCIE_BDG(bus_p)) {
+		bus_p->bus_pcie2pci_secbus = bus_p->bus_bdg_secbus;
+	} else {
+		dev_info_t *pdip;
+
+		for (pdip = ddi_get_parent(dip); pdip;
+		    pdip = ddi_get_parent(pdip)) {
+			pcie_bus_t *parent_bus_p = PCIE_DIP2BUS(pdip);
+
+			if (parent_bus_p->bus_pcie2pci_secbus) {
+				bus_p->bus_pcie2pci_secbus =
+				    parent_bus_p->bus_pcie2pci_secbus;
+				break;
+			}
+			if (PCIE_IS_ROOT(parent_bus_p))
+				break;
+		}
+	}
 }
 
-/* ARGSUSED */
 void
 pcie_fini_plat(dev_info_t *dip)
 {
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
+
+	if (PCIE_IS_PCIE_BDG(bus_p))
+		bus_p->bus_pcie2pci_secbus = 0;
 }
 
 int

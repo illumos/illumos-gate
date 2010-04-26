@@ -37,7 +37,7 @@ extern "C" {
 #define	PCI_GET_SEC_BUS(dip)	\
 	PCIE_DIP2BUS(dip)->bus_bdg_secbus
 #define	PCI_GET_PCIE2PCI_SECBUS(dip) \
-	PCIE_DIP2BUS(dip)->bus_bdg_secbus
+	PCIE_DIP2BUS(dip)->bus_pcie2pci_secbus
 
 #define	DEVI_PORT_TYPE_PCI \
 	((PCI_CLASS_BRIDGE << 16) | (PCI_BRIDGE_PCI << 8) | \
@@ -332,6 +332,9 @@ typedef struct pcie_bus {
 	int		bus_ari;		/* ARI device */
 
 	uint64_t	bus_cfgacc_base;	/* config space base address */
+
+	/* workaround for PCI/PCI-X devs behind PCIe2PCI Bridge */
+	pcie_req_id_t   bus_pcie2pci_secbus;
 } pcie_bus_t;
 
 /*
