@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -316,7 +315,7 @@ sockparams_destroy(struct sockparams *sp)
 	sockparams_sdev_fini(sp);
 
 	if (sp->sp_smod_info != NULL)
-		SMOD_DEC_REF(sp, sp->sp_smod_info);
+		SMOD_DEC_REF(sp->sp_smod_info, sp->sp_smod_name);
 	kmem_free(sp->sp_smod_name, strlen(sp->sp_smod_name) + 1);
 	sp->sp_smod_name = NULL;
 	sp->sp_smod_info = NULL;
@@ -770,8 +769,9 @@ solookup(int family, int type, int protocol, struct sockparams **spp)
 	rw_exit(&splist_lock);
 
 	if (sp->sp_smod_info == NULL) {
-		sp->sp_smod_info = smod_lookup_byname(sp->sp_smod_name);
-		if (sp->sp_smod_info == NULL) {
+		smod_info_t *smod = smod_lookup_byname(sp->sp_smod_name);
+
+		if (smod == NULL) {
 			/*
 			 * We put a hold on the sockparams entry
 			 * earlier, hoping everything would work out.
@@ -787,6 +787,18 @@ solookup(int family, int type, int protocol, struct sockparams **spp)
 			 */
 			return (ENXIO);
 		}
+		/*
+		 * Another thread might have already looked up the socket
+		 * module for this entry. In that case we need to drop our
+		 * reference to `smod' to ensure that the sockparams entry
+		 * only holds one reference.
+		 */
+		mutex_enter(&sp->sp_lock);
+		if (sp->sp_smod_info == NULL)
+			sp->sp_smod_info = smod;
+		else
+			SMOD_DEC_REF(smod, sp->sp_smod_name);
+		mutex_exit(&sp->sp_lock);
 	}
 
 	/*

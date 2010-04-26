@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -425,11 +424,11 @@ typedef struct sockparams_stats {
 /*
  * sockparams
  *
- * Used for mapping family/type/protocol to module
+ * Used for mapping family/type/protocol to a socket module or STREAMS device
  */
 struct sockparams {
 	/*
-	 * The family, type, protocol, sdev_info and smod_info are
+	 * The family, type, protocol, sdev_info and smod_name are
 	 * set when the entry is created, and they will never change
 	 * thereafter.
 	 */
@@ -439,10 +438,11 @@ struct sockparams {
 
 	sdev_info_t	sp_sdev_info;	/* STREAM device */
 	char		*sp_smod_name;	/* socket module name */
+
+	kmutex_t	sp_lock;	/* lock for refcnt and smod_info */
+	uint64_t	sp_refcnt;	/* entry reference count */
 	smod_info_t	*sp_smod_info;	/* socket module */
 
-	kmutex_t	sp_lock;	/* lock for refcnt */
-	uint64_t	sp_refcnt;	/* entry reference count */
 	sockparams_stats_t sp_stats;
 	kstat_t		*sp_kstat;
 
@@ -489,7 +489,7 @@ extern smod_info_t *smod_lookup_byname(const char *);
  * kernel. If the module can't unload, just leave the module entry with
  * a zero refcnt.
  */
-#define	SMOD_DEC_REF(sp, smodp) {					\
+#define	SMOD_DEC_REF(smodp, modname) {					\
 	ASSERT((smodp) != NULL);					\
 	ASSERT((smodp)->smod_refcnt != 0);				\
 	atomic_dec_uint(&(smodp)->smod_refcnt);				\
@@ -500,7 +500,7 @@ extern smod_info_t *smod_lookup_byname(const char *);
 	 * here is multiple calls to mod_remove_by_name(), which is OK.	\
 	 */								\
 	if ((smodp)->smod_refcnt == 0)					\
-		(void) mod_remove_by_name((sp)->sp_smod_name);		\
+		(void) mod_remove_by_name(modname);			\
 }
 
 /* Increase the reference count */
@@ -530,8 +530,10 @@ extern smod_info_t *smod_lookup_byname(const char *);
 			sockparams_ephemeral_drop_last_ref((sp));	\
 		} else {						\
 			(sp)->sp_refcnt--;				\
-			if ((sp)->sp_smod_info != NULL)			\
-				SMOD_DEC_REF(sp, (sp)->sp_smod_info);	\
+			if ((sp)->sp_smod_info != NULL) {		\
+				SMOD_DEC_REF((sp)->sp_smod_info,	\
+				    (sp)->sp_smod_name);		\
+			}						\
 			(sp)->sp_smod_info = NULL;			\
 			mutex_exit(&(sp)->sp_lock);			\
 		}							\
