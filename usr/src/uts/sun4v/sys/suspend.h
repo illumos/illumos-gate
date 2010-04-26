@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SUSPEND_H
@@ -36,6 +35,7 @@ int suspend_start(char *error_reason, size_t max_reason_length);
 int suspend_post(char *error_reason, size_t max_reason_length);
 void suspend_sync_tick_stick_npt(void);
 boolean_t suspend_supported(void);
+boolean_t suspend_memdr_allowed(void);
 
 #ifdef	__cplusplus
 }

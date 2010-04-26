@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _DR_MEM_H
@@ -99,6 +98,12 @@ typedef struct {
 #define	DR_MEM_RES_EREFUSED		0xC	/* operation refused */
 #define	DR_MEM_RES_EDUP			0xD	/* memory span duplicate */
 #define	DR_MEM_RES_EINVAL		0xE	/* invalid argument */
+
+/*
+ * Sub-Result Codes
+ */
+#define	DR_MEM_SRES_NONE		0x0	/* no sub-result */
+#define	DR_MEM_SRES_OS_SUSPENDED	0x1	/* blocked due to OS suspend */
 
 /*
  * Status Codes

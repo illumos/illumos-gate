@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/mutex.h>
@@ -157,6 +156,11 @@ static int suspend_update_cpu_mappings = 1;
 static uint64_t suspend_tick_stick_max_delta = 1000; /* microseconds */
 
 /*
+ * The number of times the system has been suspended and resumed.
+ */
+static uint64_t suspend_count = 0;
+
+/*
  * DBG and DBG_PROM() macro.
  */
 #ifdef	DEBUG
@@ -208,6 +212,17 @@ suspend_supported(void)
 
 	return ((major == SUSPEND_CORE_MAJOR && minor >= SUSPEND_CORE_MINOR) ||
 	    (major > SUSPEND_CORE_MAJOR));
+}
+
+/*
+ * Memory DR is not permitted if the system has been suspended and resumed.
+ * It is the responsibility of the caller of suspend_start and the DR
+ * subsystem to serialize DR operations and suspend_memdr_allowed() checks.
+ */
+boolean_t
+suspend_memdr_allowed(void)
+{
+	return (suspend_count == 0);
 }
 
 /*
@@ -636,6 +651,8 @@ suspend_start(char *error_reason, size_t max_reason_len)
 		DBG("suspend: failed, rv: %ld\n", rv);
 		return (rv);
 	}
+
+	suspend_count++;
 
 	/* Update the global tick and stick offsets and the preserved TOD */
 	set_tick_offsets(source_tick, source_stick, &source_tod);

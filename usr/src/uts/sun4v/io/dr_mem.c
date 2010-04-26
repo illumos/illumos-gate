@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -69,6 +68,7 @@
 #include <sys/drctl.h>
 #include <sys/dr_util.h>
 #include <sys/dr_mem.h>
+#include <sys/suspend.h>
 
 
 /*
@@ -168,6 +168,12 @@ dr_mem_estr[] = {
 	"operation refused",		/* DR_MEM_RES_EREFUSED */
 	"memory span duplicate",	/* DR_MEM_RES_EDUP */
 	"invalid argument"		/* DR_MEM_RES_EINVAL */
+};
+
+static char *
+dr_mem_estr_detail[] = {
+	"",					/* DR_MEM_SRES_NONE */
+	"memory DR disabled after migration"	/* DR_MEM_SRES_OS_SUSPENDED */
 };
 
 typedef struct {
@@ -382,6 +388,27 @@ done:
 	}
 }
 
+static char *
+dr_mem_get_errstr(int result, int subresult)
+{
+	size_t len;
+	char *errstr;
+	const char *separator = ": ";
+
+	if (subresult == DR_MEM_SRES_NONE)
+		return (i_ddi_strdup(dr_mem_estr[result], KM_SLEEP));
+
+	len = snprintf(NULL, 0, "%s%s%s", dr_mem_estr[result],
+	    separator, dr_mem_estr_detail[subresult]) + 1;
+
+	errstr = kmem_alloc(len, KM_SLEEP);
+
+	(void) snprintf(errstr, len, "%s%s%s", dr_mem_estr[result],
+	    separator, dr_mem_estr_detail[subresult]);
+
+	return (errstr);
+}
+
 /*
  * Common routine to config or unconfig multiple mblks.
  *
@@ -394,7 +421,9 @@ dr_mem_list_wrk(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 	int		idx;
 	int		count;
 	int		result;
+	int		subresult;
 	int		status;
+	boolean_t	suspend_allows_dr;
 	fn_t		dr_fn;
 	int		se_hint;
 	dr_mem_blk_t	*req_mblks;
@@ -468,6 +497,18 @@ dr_mem_list_wrk(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 	/* create the result scratch array */
 	res = dr_mem_res_array_init(req, drctl_rsrc, count);
 
+	/*
+	 * Memory DR operations are not safe if we have been suspended and
+	 * resumed. Until this limitation is lifted, check to see if memory
+	 * DR operations are permitted at this time by the suspend subsystem.
+	 */
+	if ((suspend_allows_dr = suspend_memdr_allowed()) == B_FALSE) {
+		result = DR_MEM_RES_BLOCKED;
+		subresult = DR_MEM_SRES_OS_SUSPENDED;
+	} else {
+		subresult = DR_MEM_SRES_NONE;
+	}
+
 	/* perform the specified operation on each of the mblks */
 	for (idx = 0; idx < count; idx++) {
 		/*
@@ -481,15 +522,21 @@ dr_mem_list_wrk(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 			continue;
 		}
 
-		/* call the function to perform the actual operation */
-		result = (*dr_fn)(&req_mblks[idx], &status);
+		/*
+		 * If memory DR operations are permitted at this time by
+		 * the suspend subsystem, call the function to perform the
+		 * operation, otherwise return a result indicating that the
+		 * operation was blocked.
+		 */
+		if (suspend_allows_dr)
+			result = (*dr_fn)(&req_mblks[idx], &status);
 
 		/* save off results of the operation */
 		res[idx].result = result;
 		res[idx].status = status;
 		res[idx].addr = req_mblks[idx].addr;	/* for partial case */
 		res[idx].size = req_mblks[idx].size;	/* for partial case */
-		res[idx].string = i_ddi_strdup(dr_mem_estr[result], KM_SLEEP);
+		res[idx].string = dr_mem_get_errstr(result, subresult);
 
 		/* save result for drctl fini() reusing init() msg memory */
 		drctl_req[idx].status = (result != DR_MEM_RES_OK) ?

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -697,20 +696,50 @@ pack_message(int cmd,
 }
 
 /*
- * Block DR operations
+ * Depending on the should_block argument, either wait for ongoing DR
+ * operations to finish and then block subsequent operations, or if a DR
+ * operation is already in progress, return EBUSY immediately without
+ * blocking subsequent DR operations.
  */
-void
-drctl_block(void)
+static int
+drctl_block_conditional(boolean_t should_block)
 {
-	/* Wait for any in progress DR operation to complete */
 	mutex_enter(&drctlp->drc_lock);
+	/* If DR in progress and should_block is false, return */
+	if (!should_block && drctlp->drc_busy != NULL) {
+		mutex_exit(&drctlp->drc_lock);
+		return (EBUSY);
+	}
+
+	/* Wait for any in progress DR operation to complete */
 	while (drctlp->drc_busy != NULL)
 		(void) cv_wait_sig(&drctlp->drc_busy_cv, &drctlp->drc_lock);
+
 	/* Mark the link busy */
 	drctlp->drc_busy = (drctl_cookie_t)-1;
 	drctlp->drc_cmd = DRCTL_DRC_BLOCK;
 	drctlp->drc_flags = 0;
 	mutex_exit(&drctlp->drc_lock);
+	return (0);
+}
+
+/*
+ * Wait for ongoing DR operations to finish, block subsequent operations.
+ */
+void
+drctl_block(void)
+{
+	(void) drctl_block_conditional(B_TRUE);
+}
+
+/*
+ * If a DR operation is already in progress, return EBUSY immediately
+ * without blocking subsequent DR operations.
+ */
+int
+drctl_tryblock(void)
+{
+	return (drctl_block_conditional(B_FALSE));
 }
 
 /*

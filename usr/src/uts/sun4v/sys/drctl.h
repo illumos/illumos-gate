@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_DRCTL_H
@@ -137,6 +136,7 @@ extern int drctl_config_init(int, int,
     drctl_rsrc_t *, int, drctl_resp_t **, size_t *, drctl_cookie_t);
 extern int drctl_config_fini(drctl_cookie_t, drctl_rsrc_t *, int);
 extern void drctl_block(void);
+extern int drctl_tryblock(void);
 extern void drctl_unblock(void);
 
 /*

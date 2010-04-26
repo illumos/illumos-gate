@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -39,6 +38,7 @@
 #include <sys/suspend.h>
 #include <sys/proc.h>
 #include <sys/disp.h>
+#include <sys/drctl.h>
 
 /*
  * Debugging routines
@@ -603,22 +603,37 @@ ps_suspend_sequence(ps_suspend_data_t *data)
 	uint32_t		rec_result;
 	char			*error_reason;
 	boolean_t		recovered = B_TRUE;
-	uint_t			rv;
+	uint_t			rv = 0;
+	int			dr_block;
 
 	ASSERT(data != NULL);
 
 	msg = data->buf;
 	error_reason = (char *)kmem_zalloc(SUSPEND_MAX_REASON_SIZE, KM_SLEEP);
 
-	/* Pre-suspend */
-	rv = suspend_pre(error_reason, SUSPEND_MAX_REASON_SIZE, &recovered);
-	if (rv != 0) {
+	/*
+	 * Abort the suspend if a DR operation is in progress. Otherwise,
+	 * continue whilst blocking any new DR operations.
+	 */
+	if ((dr_block = drctl_tryblock()) == 0) {
+		/* Pre-suspend */
+		rv = suspend_pre(error_reason, SUSPEND_MAX_REASON_SIZE,
+		    &recovered);
+	} else {
+		/* A DR operation is in progress */
+		(void) strncpy(error_reason, DOMAIN_SUSPEND_DR_ERROR_STR,
+		    SUSPEND_MAX_REASON_SIZE);
+	}
+
+	if (dr_block != 0 || rv != 0) {
 		rec_result = (recovered ? DOMAIN_SUSPEND_REC_SUCCESS :
 		    DOMAIN_SUSPEND_REC_FAILURE);
 
 		ps_suspend_send_response(&ds_suspend_handle, msg->req_num,
 		    DOMAIN_SUSPEND_PRE_FAILURE, rec_result, error_reason, 0, 0);
 
+		if (dr_block == 0)
+			drctl_unblock();
 		kmem_free(error_reason, SUSPEND_MAX_REASON_SIZE);
 		return;
 	}
@@ -636,6 +651,7 @@ ps_suspend_sequence(ps_suspend_data_t *data)
 		    DOMAIN_SUSPEND_SUSPEND_FAILURE, rec_result, error_reason,
 		    0, 0);
 
+		drctl_unblock();
 		kmem_free(error_reason, SUSPEND_MAX_REASON_SIZE);
 		return;
 	}
@@ -652,6 +668,7 @@ ps_suspend_sequence(ps_suspend_data_t *data)
 		    ps_suspend_rereg_delay, ps_suspend_retry_intval);
 	}
 
+	drctl_unblock();
 	kmem_free(error_reason, SUSPEND_MAX_REASON_SIZE);
 }
 

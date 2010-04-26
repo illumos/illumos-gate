@@ -20,10 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # This makefile drives the production of the platsvc kernel module.
 #
@@ -68,7 +65,7 @@ CFLAGS		+= -dalign
 #
 # Module Dependencies
 #
-LDFLAGS		+= -dy -Nmisc/ds
+LDFLAGS		+= -dy -Nmisc/ds -Ndrv/drctl
 
 #
 # Default build targets.

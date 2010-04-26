@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _PLATSVC_H
@@ -77,6 +76,13 @@ extern "C" {
  */
 #define	DOMAIN_SUSPEND_REC_SUCCESS	0x0
 #define	DOMAIN_SUSPEND_REC_FAILURE	0x1
+
+/*
+ * String used as the error reason in the failure response when a
+ * suspend request is denied due to an ongoing DR operation.
+ */
+#define	DOMAIN_SUSPEND_DR_ERROR_STR	\
+	"suspend failure: DR operation in progress"
 
 typedef struct platsvc_md_update_req {
 	uint64_t	req_num;
