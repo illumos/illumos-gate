@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/ib/mgt/ibcm/ibcm_impl.h>
@@ -3924,6 +3923,7 @@ ippath_error:
 
 	if (p_arg->func) {   /* Do these only for Async Get Paths */
 		ibt_path_info_t *tmp_path_p;
+		ibt_path_ip_src_t	*tmp_src_ip_p;
 
 		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*p_arg))
 		p_arg->retval = retval;
@@ -3943,6 +3943,15 @@ ippath_error:
 
 			kmem_free(p_arg->paths,
 			    sizeof (ibt_path_info_t) * max_paths);
+
+			tmp_src_ip_p = kmem_alloc(
+			    sizeof (ibt_path_ip_src_t) * num_path, KM_SLEEP);
+
+			bcopy(p_arg->src_ip_p, tmp_src_ip_p,
+			    num_path * sizeof (ibt_path_ip_src_t));
+
+			kmem_free(p_arg->src_ip_p,
+			    sizeof (ibt_path_ip_src_t) * max_paths);
 		} else if (retval != IBT_SUCCESS) {
 			if (p_arg->paths)
 				kmem_free(p_arg->paths,
@@ -3951,11 +3960,13 @@ ippath_error:
 				kmem_free(p_arg->src_ip_p,
 				    sizeof (ibt_path_ip_src_t) * max_paths);
 			tmp_path_p = NULL;
+			tmp_src_ip_p = NULL;
 		} else {
 			tmp_path_p = p_arg->paths;
+			tmp_src_ip_p = p_arg->src_ip_p;
 		}
 		(*(p_arg->func))(p_arg->arg, retval, tmp_path_p, num_path,
-		    p_arg->src_ip_p);
+		    tmp_src_ip_p);
 
 		cv_destroy(&p_arg->ip_cv);
 		mutex_destroy(&p_arg->ip_lock);

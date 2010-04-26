@@ -715,9 +715,8 @@ uverbs_uqp_rsrc_free(uverbs_uqp_uobj_t *uqp, uverbs_uctxt_uobj_t *uctxt)
 	} else if (uscq)
 		sol_ofs_uobj_put(&uscq->uobj);
 	if (urcq && urcq->active_qp_cnt == 0 && urcq->free_pending) {
-		rc = uverbs_ucq_free(urcq, uctxt);
+		ret = uverbs_ucq_free(urcq, uctxt);
 		if (ret && rc == 0) {
-		if (rc)
 			SOL_OFS_DPRINTF_L2(sol_uverbs_dbg_str,
 			    "uqp_rsrc_free: ucq_free failed");
 			rc = ret;
@@ -725,7 +724,7 @@ uverbs_uqp_rsrc_free(uverbs_uqp_uobj_t *uqp, uverbs_uctxt_uobj_t *uctxt)
 	} else if (urcq)
 		sol_ofs_uobj_put(&urcq->uobj);
 	if (usrq && usrq->active_qp_cnt == 0 && usrq->free_pending) {
-		rc = uverbs_usrq_free(usrq, uctxt);
+		ret = uverbs_usrq_free(usrq, uctxt);
 		if (ret && rc == 0) {
 			SOL_OFS_DPRINTF_L2(sol_uverbs_dbg_str,
 			    "uqp_rsrc_free: usrq_free failed");
@@ -742,8 +741,6 @@ err_free:
 		sol_ofs_uobj_put(&uscq->uobj);
 	if (urcq)
 		sol_ofs_uobj_put(&urcq->uobj);
-	if (usrq)
-		sol_ofs_uobj_put(&usrq->uobj);
 
 	return (rc);
 }
@@ -827,7 +824,6 @@ sol_uverbs_destroy_qp(uverbs_uctxt_uobj_t *uctxt, char *buf,
 	struct ib_uverbs_destroy_qp_resp	resp;
 	uverbs_uqp_uobj_t			*uqp;
 	int					rc;
-	int					uobj_put_req = 1;
 
 	(void) memcpy(&cmd, buf, sizeof (cmd));
 	(void) memset(&resp, 0, sizeof (resp));
@@ -872,17 +868,13 @@ sol_uverbs_destroy_qp(uverbs_uctxt_uobj_t *uctxt, char *buf,
 		SOL_OFS_DPRINTF_L5(sol_uverbs_dbg_str,
 		    "destroy_qp() - freeing QP : %p", uqp);
 		rc = uverbs_uqp_free(uqp, uctxt);
-		uobj_put_req = 0;
 	}
 
 	if (rc) {
 		SOL_OFS_DPRINTF_L2(sol_uverbs_dbg_str,
 		    "destroy_qp() - ibt_free_qp() fail %d", rc);
 		rc = sol_uverbs_ibt_to_kernel_status(rc);
-		if (uobj_put_req)
-			goto err_busy;
-		else
-			goto err_out;
+		goto err_out;
 	}
 
 report_qp_evts:
@@ -1038,10 +1030,6 @@ uverbs_modify_update(struct ib_uverbs_modify_qp *cmd,
 				    &qp_infop->qp_current_state;
 
 				switch (cur_state) {
-				case IB_QPS_RTR:
-					*ibt_curr = IBT_STATE_RTR;
-					break;
-
 				case IB_QPS_RTS:
 					*ibt_curr = IBT_STATE_RTS;
 					break;

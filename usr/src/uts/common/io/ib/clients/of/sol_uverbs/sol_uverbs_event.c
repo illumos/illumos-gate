@@ -70,15 +70,15 @@ uverbs_async_event_common(uverbs_uctxt_uobj_t *, uint64_t, uint32_t,
 void
 sol_uverbs_event_file_close(uverbs_ufile_uobj_t *ufile)
 {
-	SOL_OFS_DPRINTF_L5(sol_uverbs_dbg_str,
-	    "UFILE CLOSE: Is async? %s",
-	    ufile->is_async ? "yes" : "no");
-
 	if (!ufile) {
 		SOL_OFS_DPRINTF_L3(sol_uverbs_dbg_str,
 		    "UFILE CLOSE: Ufile NULL\n");
 		return;
 	}
+
+	SOL_OFS_DPRINTF_L5(sol_uverbs_dbg_str,
+	    "UFILE CLOSE: Is async? %s",
+	    ufile->is_async ? "yes" : "no");
 
 	/*
 	 * Remove the user file from the user object table and
@@ -350,18 +350,6 @@ uverbs_alloc_event_file(uverbs_uctxt_uobj_t *uctxt, int is_async)
 	ufile->uobj.uo_live	= 1;
 	rw_exit(&ufile->uobj.uo_lock);
 	return (ufile);
-
-free_uobj:
-	/*
-	 * Need to set uo_live, so sol_ofs_uobj_remove() will
-	 * remove the object from the object table.
-	 */
-	ufile->uobj.uo_live	= 1;
-	(void) sol_ofs_uobj_remove(&uverbs_ufile_uo_tbl, &ufile->uobj);
-	rw_exit(&ufile->uobj.uo_lock);
-	sol_ofs_uobj_deref(&ufile->uobj, sol_ofs_uobj_free);
-
-	return (NULL);
 }
 
 /*
@@ -452,6 +440,7 @@ uverbs_ibt_to_ofa_event_code(ibt_async_code_t code)
 		break;
 
 	case IBT_EVENT_COM_EST:
+		ofa_code = IB_EVENT_COMM_EST;
 		break;
 
 	case IBT_ERROR_CATASTROPHIC_CHAN:

@@ -2102,6 +2102,9 @@ sol_uverbs_reg_mr(uverbs_uctxt_uobj_t *uctxt, char *buf, int in_len,
 	if ((cmd.access_flags & IB_ACCESS_MW_BIND) == IB_ACCESS_MW_BIND) {
 		new_mem_attr.mr_flags |= IBT_MR_ENABLE_WINDOW_BIND;
 	}
+	if ((cmd.access_flags & IB_ACCESS_SO) == IB_ACCESS_SO) {
+		new_mem_attr.mr_flags |= IBT_MR_DISABLE_RO;
+	}
 
 	umr = kmem_zalloc(sizeof (*umr), KM_NOSLEEP);
 	if (umr == NULL) {

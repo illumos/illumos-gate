@@ -43,10 +43,8 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 
-#include <sys/ib/clients/of/sol_ofs/sol_ofs_common.h>
 #include <sys/ib/clients/of/ofed_kernel.h>
 #include <sys/ib/clients/of/rdma/ib_addr.h>
-#include <sys/ib/clients/of/rdma/rdma_cm.h>
 
 #include <sys/ib/clients/of/sol_ofs/sol_cma.h>
 #include <sys/ib/clients/of/sol_ofs/sol_kverb_impl.h>
@@ -212,7 +210,9 @@ _info(struct modinfo *modinfop)
 
 typedef struct cma_device {
 	kmutex_t		cma_mutex;
+	/* Ptr in the global sol_cma_dev_list */
 	llist_head_t		cma_list;
+	/* List of listeners for this device */
 	genlist_t		cma_epchan_list;
 	struct ib_device	*cma_device;
 	uint_t			cma_ref_count;
@@ -488,7 +488,7 @@ rdma_destroy_id(struct rdma_cm_id *rdma_idp)
 	 * for which REQ CMIDs have not been created.
 	 */
 	if (is_passive || (is_root_cmid && chanp->chan_req_state !=
-	    REQ_CMID_CREATED)) {
+	    REQ_CMID_QUEUED)) {
 		SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "rdma_destroy_id: "
 		    "Skipping passive %p, %x, %x", chanp->chan_listenp,
 		    is_root_cmid, chanp->chan_req_state);
@@ -511,7 +511,7 @@ rdma_destroy_id(struct rdma_cm_id *rdma_idp)
 			next_chan = AVL_NEXT(
 			    &chanp->chan_req_avl_tree, req_cmid_chan);
 			if (req_cmid_chan->chan_req_state ==
-			    REQ_CMID_CREATED) {
+			    REQ_CMID_NOTIFIED) {
 				avl_remove(&chanp->chan_req_avl_tree,
 				    req_cmid_chan);
 				chanp->chan_req_cnt--;
@@ -519,7 +519,10 @@ rdma_destroy_id(struct rdma_cm_id *rdma_idp)
 				mutex_exit(&chanp->chan_mutex);
 				mutex_enter(&req_cmid_chan->chan_mutex);
 				req_cmid_chan->chan_req_state =
-				    REQ_CMID_NONE;
+				    REQ_CMID_SERVER_NONE;
+				if (rdma_idp->ps == RDMA_PS_TCP)
+					cma_set_chan_state(req_cmid_chan,
+					    SOL_CMA_CHAN_DESTROY_PENDING);
 				mutex_exit(&req_cmid_chan->chan_mutex);
 				(void) rdma_disconnect(
 				    (struct rdma_cm_id *)req_cmid_chan);
@@ -529,8 +532,6 @@ rdma_destroy_id(struct rdma_cm_id *rdma_idp)
 					    &req_cmid_chan->chan_mutex);
 					req_cmid_chan->listen_root =
 					    rdma_idp;
-					cma_set_chan_state(req_cmid_chan,
-					    SOL_CMA_CHAN_DESTROY_PENDING);
 					mutex_exit(
 					    &req_cmid_chan->chan_mutex);
 				} else {
@@ -557,9 +558,11 @@ rdma_destroy_id(struct rdma_cm_id *rdma_idp)
 		cma_set_chan_state(chanp, SOL_CMA_CHAN_DESTROY_WAIT);
 		cv_wait(&chanp->chan_destroy_cv, &chanp->chan_mutex);
 	}
+	mutex_exit(&chanp->chan_mutex);
 
 	if (root_chanp)
 		mutex_enter(&root_chanp->chan_mutex);
+	mutex_enter(&chanp->chan_mutex);
 #ifdef	DEBUG
 	SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "rdma_destroy_id: "
 	    "root_idp %p, cnt %x, state %x", root_chanp,
@@ -576,7 +579,7 @@ rdma_destroy_id(struct rdma_cm_id *rdma_idp)
 skip_passive_handling :
 	state = cma_get_chan_state(chanp);
 	if (is_root_cmid == 0 && state != SOL_CMA_CHAN_DISCONNECT &&
-	    SOL_CMA_DISCONNECT_OK(chanp)) {
+	    SOL_CMAID_CONNECTED(chanp)) {
 		/*
 		 * A connected CM ID has not been disconnected.
 		 * Call rdma_disconnect() to disconnect it.
@@ -592,16 +595,11 @@ skip_passive_handling :
 		mutex_enter(&chanp->chan_mutex);
 		if (root_chanp && chanp->listen_root == NULL)
 			chanp->listen_root = (struct rdma_cm_id *)root_chanp;
-		mutex_exit(&chanp->chan_mutex);
 		SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str,
 		    "rdma_destroy_id(chanp %p, connect %x, ps %x)",
 		    chanp, chanp->chan_connect_flag, rdma_idp->ps);
-		if ((SOL_CMAID_IS_CONNECTED(chanp) &&
-		    rdma_idp->ps == RDMA_PS_TCP) ||
-		    (IS_UDP_CMID(rdma_idp) &&
-		    chanp->chan_connect_flag == SOL_CMA_CONNECT_INITIATED)) {
+		if (SOL_CMAID_CONNECTED(chanp)) {
 			if (do_wait) {
-				mutex_enter(&chanp->chan_mutex);
 				cma_set_chan_state(chanp,
 				    SOL_CMA_CHAN_DESTROY_WAIT);
 				cv_wait(&chanp->chan_destroy_cv,
@@ -609,22 +607,20 @@ skip_passive_handling :
 				mutex_exit(&chanp->chan_mutex);
 				cma_destroy_id(rdma_idp);
 			} else {
-				mutex_enter(&chanp->chan_mutex);
 				cma_set_chan_state(chanp,
 				    SOL_CMA_CHAN_DESTROY_PENDING);
 				mutex_exit(&chanp->chan_mutex);
 			}
 		} else {
 			/*
-			 * Disconnected a CMID for which CONNECT has been
-			 * Initiated but not complete.
 			 * No more callbacks are expected for this CMID.
 			 * Free this CMID.
 			 */
+			mutex_exit(&chanp->chan_mutex);
 			cma_destroy_id(rdma_idp);
 		}
 	} else if (is_root_cmid == 0 && state ==
-	    SOL_CMA_CHAN_DISCONNECT && SOL_CMAID_IS_CONNECTED(chanp)) {
+	    SOL_CMA_CHAN_DISCONNECT && SOL_CMAID_CONNECTED(chanp)) {
 		/*
 		 * CM ID was connected and disconnect is process.
 		 * Free of this CM ID is done for the DISCONNECT
@@ -926,7 +922,7 @@ int
 rdma_listen(struct rdma_cm_id *idp, int bklog)
 {
 	sol_cma_chan_t		*chanp;
-	int			ret;
+	int			ret = 0;
 	genlist_entry_t		*entry;
 	cma_chan_state_t	state;
 
@@ -1052,40 +1048,52 @@ rdma_accept(struct rdma_cm_id *idp, struct rdma_conn_param *conn_param)
 	SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "accept: root_idp %p",
 	    root_idp);
 
-	/* Delete from REQ_AVL_TREE on passive side */
-	if (root_idp) {
+	/* For TCP, delete from REQ AVL & insert to ACPT AVL */
+	if (root_idp && root_idp->ps == RDMA_PS_TCP) {
+		void		*find_ret;
+		avl_index_t	where;
+
 		SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "accept: root_idp %p"
 		    "REQ AVL remove %p", root_chanp, idp);
 		mutex_enter(&root_chanp->chan_mutex);
+		mutex_enter(&chanp->chan_mutex);
+
+		/*
+		 * This CMID has been deleted, maybe because of timeout.
+		 * Return EINVAL.
+		 */
+		if (chanp->chan_req_state != REQ_CMID_NOTIFIED) {
+			mutex_exit(&chanp->chan_mutex);
+			mutex_exit(&root_chanp->chan_mutex);
+			SOL_OFS_DPRINTF_L3(sol_rdmacm_dbg_str,
+			    "accept: root_idp %p chanp %p, not in REQ "
+			    "AVL tree",  root_chanp, chanp);
+			return (EINVAL);
+		}
+		ASSERT(cma_get_req_idp(root_idp, chanp->chan_session_id));
 		avl_remove(&root_chanp->chan_req_avl_tree, idp);
 
-		/* For TCP, insert into ACPT_AVL_TREE */
-		if (idp->ps == RDMA_PS_TCP) {
-			void		*find_ret;
-			avl_index_t	where;
 
-			SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str,
-			    "Add to ACPT AVL of %p IDP, idp %p, qp_hdl %p",
+		SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str,
+		    "Add to ACPT AVL of %p IDP, idp %p, qp_hdl %p",
+		    root_idp, idp, chanp->chan_qp_hdl);
+		find_ret = avl_find(&root_chanp->chan_acpt_avl_tree,
+		    (void *)chanp->chan_qp_hdl, &where);
+		if (find_ret) {
+			chanp->chan_req_state = REQ_CMID_SERVER_NONE;
+			mutex_exit(&chanp->chan_mutex);
+			mutex_exit(&root_chanp->chan_mutex);
+			SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
+			    "DUPLICATE ENTRY in ACPT AVL : root %p, "
+			    "idp %p, qp_hdl %p",
 			    root_idp, idp, chanp->chan_qp_hdl);
-			find_ret = avl_find(&root_chanp->chan_acpt_avl_tree,
-			    (void *)chanp->chan_qp_hdl, &where);
-			if (find_ret) {
-				mutex_exit(&root_chanp->chan_mutex);
-				SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
-				    "DUPLICATE ENTRY in ACPT AVL : root %p, "
-				    "idp %p, qp_hdl %p",
-				    root_idp, idp, chanp->chan_qp_hdl);
-				return (EINVAL);
-			}
-			avl_insert(&root_chanp->chan_acpt_avl_tree,
-			    (void *)idp, where);
+			return (EINVAL);
 		}
-		mutex_exit(&root_chanp->chan_mutex);
-
-		mutex_enter(&chanp->chan_mutex);
-		/* Update chan_req_state to ACCEPTED */
+		avl_insert(&root_chanp->chan_acpt_avl_tree,
+		    (void *)idp, where);
 		chanp->chan_req_state = REQ_CMID_ACCEPTED;
 		mutex_exit(&chanp->chan_mutex);
+		mutex_exit(&root_chanp->chan_mutex);
 	}
 
 	if (root_idp && IS_UDP_CMID(root_idp)) {
@@ -1095,13 +1103,15 @@ rdma_accept(struct rdma_cm_id *idp, struct rdma_conn_param *conn_param)
 		 * Accepting the connect request, no more events for this
 		 * connection.
 		 */
-		mutex_enter(&chanp->chan_mutex);
 		cma_handle_nomore_events(chanp);
+		mutex_enter(&chanp->chan_mutex);
 		chan_state = cma_get_chan_state(chanp);
 		mutex_exit(&chanp->chan_mutex);
 		/* If rdma_destroy_id() was called, destroy CMID */
-		if (chan_state == SOL_CMA_CHAN_DESTROY_PENDING)
+		if (chan_state == SOL_CMA_CHAN_DESTROY_PENDING) {
 			cma_destroy_id((struct rdma_cm_id *)chanp);
+			return (EINVAL);
+		}
 	}
 
 	if (chanp->chan_xport_type == SOL_CMA_XPORT_IB)
@@ -1112,15 +1122,36 @@ rdma_accept(struct rdma_cm_id *idp, struct rdma_conn_param *conn_param)
 #endif	/* IWARP_SUPPORT */
 
 	if (ret && root_idp && idp->ps == RDMA_PS_TCP) {
+		void		*find_ret;
+		avl_index_t	where;
+
 		SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str,
 		    "Delete from REQ AVL of %p IDP, idp %p",
 		    root_idp, idp);
 		mutex_enter(&root_chanp->chan_mutex);
-		avl_remove(&root_chanp->chan_acpt_avl_tree, idp);
-		mutex_exit(&root_chanp->chan_mutex);
 		mutex_enter(&chanp->chan_mutex);
-		chanp->chan_req_state = REQ_CMID_NONE;
+		if (chanp->chan_req_state == REQ_CMID_ACCEPTED) {
+			ASSERT(cma_get_acpt_idp(root_idp,
+			    chanp->chan_qp_hdl));
+			avl_remove(&root_chanp->chan_acpt_avl_tree,
+			    idp);
+			find_ret = avl_find(&root_chanp->chan_req_avl_tree,
+			    (void *)chanp->chan_qp_hdl, &where);
+			if (find_ret) {
+				chanp->chan_req_state = REQ_CMID_SERVER_NONE;
+				mutex_exit(&chanp->chan_mutex);
+				mutex_exit(&root_chanp->chan_mutex);
+				SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
+				    "DUPLICATE ENTRY in REQ AVL : root %p, "
+				    "idp %p, session_id %p",
+				    root_idp, idp, chanp->chan_session_id);
+				return (EINVAL);
+			}
+			avl_insert(&root_chanp->chan_req_avl_tree, idp, where);
+			chanp->chan_req_state = REQ_CMID_NOTIFIED;
+		}
 		mutex_exit(&chanp->chan_mutex);
+		mutex_exit(&root_chanp->chan_mutex);
 	}
 
 	SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "rdma_accept: ret %x", ret);
@@ -1175,6 +1206,32 @@ rdma_reject(struct rdma_cm_id *idp, const void *priv_data,
 	}
 	mutex_exit(&chanp->chan_mutex);
 
+	if (root_idp) {
+		SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "reject: root_idp %p"
+		    "REQ AVL remove %p", root_chanp, idp);
+
+		/*
+		 * Remove from REQ AVL tree. If this CMID has been deleted,
+		 * it maybe because of timeout. Return EINVAL.
+		 */
+		mutex_enter(&root_chanp->chan_mutex);
+		mutex_enter(&chanp->chan_mutex);
+		if (chanp->chan_req_state != REQ_CMID_NOTIFIED &&
+		    chanp->chan_req_state != REQ_CMID_QUEUED) {
+			mutex_exit(&chanp->chan_mutex);
+			mutex_exit(&root_chanp->chan_mutex);
+			SOL_OFS_DPRINTF_L3(sol_rdmacm_dbg_str,
+			    "reject: root_idp %p chanp %p, not in REQ "
+			    "AVL tree",  root_chanp, chanp);
+			return (EINVAL);
+		}
+		ASSERT(cma_get_req_idp(root_idp, chanp->chan_session_id));
+		avl_remove(&root_chanp->chan_req_avl_tree, idp);
+		chanp->chan_req_state = REQ_CMID_SERVER_NONE;
+		mutex_exit(&chanp->chan_mutex);
+		mutex_exit(&root_chanp->chan_mutex);
+	}
+
 	if (chanp->chan_xport_type == SOL_CMA_XPORT_IB)
 		ret = rdma_ib_reject(idp, priv_data, priv_data_len);
 #ifdef	IWARP_SUPPORT
@@ -1186,27 +1243,43 @@ rdma_reject(struct rdma_cm_id *idp, const void *priv_data,
 	if (!ret && root_idp) {
 		cma_chan_state_t	chan_state;
 
-		SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "reject: root_idp %p"
-		    "REQ AVL remove %p", root_chanp, idp);
-		/* Remove from Req AVL tree */
-		mutex_enter(&root_chanp->chan_mutex);
-		avl_remove(&root_chanp->chan_req_avl_tree, idp);
-		mutex_exit(&root_chanp->chan_mutex);
-
-		/* Update chan_req_state to REJECTED */
-		mutex_enter(&chanp->chan_mutex);
-		chanp->chan_req_state = REQ_CMID_REJECTED;
-
 		/*
 		 * Rejecting connect request, no more events for this
 		 * connection.
 		 */
 		cma_handle_nomore_events(chanp);
+		mutex_enter(&chanp->chan_mutex);
 		chan_state = cma_get_chan_state(chanp);
 		mutex_exit(&chanp->chan_mutex);
 		/* If rdma_destroy_id() was called, destroy CMID */
 		if (chan_state == SOL_CMA_CHAN_DESTROY_PENDING)
 			cma_destroy_id((struct rdma_cm_id *)chanp);
+	} else if (ret && root_idp) {
+		avl_index_t	where;
+
+		SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str,
+		    "reject fail: Add to Req AVL of %p IDP, idp %p,"
+		    "session_id %p", root_idp, idp,
+		    chanp->chan_session_id);
+		mutex_enter(&root_chanp->chan_mutex);
+		mutex_enter(&chanp->chan_mutex);
+		if (chanp->chan_req_state == REQ_CMID_SERVER_NONE) {
+			if (avl_find(&root_chanp->chan_req_avl_tree,
+			    (void *)chanp->chan_session_id, &where)) {
+				mutex_exit(&chanp->chan_mutex);
+				mutex_exit(&root_chanp->chan_mutex);
+				SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
+				    "DUPLICATE ENTRY in REQ AVL : root %p, "
+				    "idp %p, session_id %p",
+				    root_idp, idp, chanp->chan_session_id);
+				return (EINVAL);
+			}
+			avl_insert(&root_chanp->chan_req_avl_tree,
+			    (void *)idp, where);
+			chanp->chan_req_state = REQ_CMID_NOTIFIED;
+		}
+		mutex_exit(&chanp->chan_mutex);
+		mutex_exit(&root_chanp->chan_mutex);
 	}
 
 	SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "rdma_reject: ret %x", ret);
@@ -1227,7 +1300,7 @@ rdma_disconnect(struct rdma_cm_id *idp)
 		return (0);
 
 	mutex_enter(&chanp->chan_mutex);
-	if (!(SOL_CMA_DISCONNECT_OK(chanp))) {
+	if (!(SOL_CMAID_CONNECTED(chanp))) {
 		SOL_OFS_DPRINTF_L3(sol_rdmacm_dbg_str,
 		    "rdma_disconnect(%p) - Not connected!!", idp);
 		mutex_exit(&chanp->chan_mutex);
@@ -1688,52 +1761,74 @@ cma_generate_event_sync(struct rdma_cm_id *idp, enum rdma_cm_event_type event,
 	ret = (idp->event_handler) (idp, &cm_event);
 
 	if (ret) {
+		/*
+		 * If the consumer returned failure :
+		 * 	CONNECT_REQUEST :
+		 * 	1. rdma_disconnect() to disconnect connection.
+		 * 	2. wakeup destroy, if destroy has been called
+		 * 		for this CMID
+		 * 	3. Destroy CMID if rdma_destroy has not been
+		 * 		called.
+		 * 	DISCONNECTED :
+		 * 	1. call cma_handle_nomore_events() to cleanup
+		 * 	Other Events :
+		 * 	1. Client is expected to destroy the CMID.
+		 */
 		if (event == RDMA_CM_EVENT_CONNECT_REQUEST) {
 			SOL_OFS_DPRINTF_L4(sol_rdmacm_dbg_str,
 			    "cma_generate_event_async: consumer failed %d "
 			    "event", event);
-			/*
-			 * Disconnect if the consumer returned non zero.
-			 * rdma_disconnect will send a REJ to the active
-			 * side / client.
-			 */
-			if (rdma_disconnect(idp))
+			if (rdma_disconnect(idp)) {
 				SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
 				    "generate_event_async: rdma_disconnect "
 				    "failed");
-		} else
+			}
+			mutex_enter(&chanp->chan_mutex);
+			ASSERT(SOL_IS_SERVER_CMID(chanp));
+			chanp->chan_req_state = REQ_CMID_SERVER_NONE;
+			chanp->chan_cmid_destroy_state &=
+			    ~SOL_CMA_CALLER_EVENT_PROGRESS;
+			if (chanp->chan_cmid_destroy_state &
+			    SOL_CMA_CALLER_CMID_DESTROYED) {
+				cv_broadcast(&chanp->chan_destroy_cv);
+				mutex_exit(&chanp->chan_mutex);
+			} else {
+				mutex_exit(&chanp->chan_mutex);
+				rdma_destroy_id(idp);
+			}
+		} else if (event == RDMA_CM_EVENT_DISCONNECTED) {
 			SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
 			    "generate_event_async: consumer failed %d event",
 			    event);
-
-		mutex_enter(&chanp->chan_mutex);
-		chanp->chan_req_state = REQ_CMID_NONE;
-		chanp->chan_connect_flag = SOL_CMA_CONNECT_NONE;
-		chanp->chan_cmid_destroy_state &=
-		    ~SOL_CMA_CALLER_EVENT_PROGRESS;
-		if (chanp->chan_cmid_destroy_state &
-		    SOL_CMA_CALLER_CMID_DESTROYED) {
-			cv_broadcast(&chanp->chan_destroy_cv);
-			mutex_exit(&chanp->chan_mutex);
+			cma_handle_nomore_events(chanp);
+			mutex_enter(&chanp->chan_mutex);
+			chan_state = cma_get_chan_state(chanp);
+			chanp->chan_cmid_destroy_state &=
+			    ~SOL_CMA_CALLER_EVENT_PROGRESS;
+			if (chanp->chan_cmid_destroy_state &
+			    SOL_CMA_CALLER_CMID_DESTROYED) {
+				cv_broadcast(&chanp->chan_destroy_cv);
+				mutex_exit(&chanp->chan_mutex);
+			} else if (chan_state == SOL_CMA_CHAN_DESTROY_PENDING) {
+				/* rdma_destroy_id() called: destroy CMID */
+				mutex_exit(&chanp->chan_mutex);
+				cma_destroy_id((struct rdma_cm_id *)chanp);
+			} else
+				mutex_exit(&chanp->chan_mutex);
 		} else {
-			mutex_exit(&chanp->chan_mutex);
-			rdma_destroy_id(idp);
+			SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
+			    "generate_event_async: consumer failed %d event",
+			    event);
 		}
+
 		return;
 	}
 ofs_consume_event:
-	if (event == RDMA_CM_EVENT_DISCONNECTED || event ==
-	    RDMA_CM_EVENT_REJECTED) {
-		mutex_enter(&chanp->chan_mutex);
-		chanp->chan_connect_flag = SOL_CMA_CONNECT_NONE;
-		chanp->chan_qp_hdl = NULL;
-		mutex_exit(&chanp->chan_mutex);
-	}
-	if (event == RDMA_CM_EVENT_DISCONNECTED && root_idp) {
+	if (event == RDMA_CM_EVENT_DISCONNECTED) {
 		cma_chan_state_t	chan_state;
 
-		mutex_enter(&chanp->chan_mutex);
 		cma_handle_nomore_events(chanp);
+		mutex_enter(&chanp->chan_mutex);
 		chan_state = cma_get_chan_state(chanp);
 		chanp->chan_cmid_destroy_state &=
 		    ~SOL_CMA_CALLER_EVENT_PROGRESS;
@@ -1748,35 +1843,11 @@ ofs_consume_event:
 		} else
 			mutex_exit(&chanp->chan_mutex);
 		return;
-	} else if (event == RDMA_CM_EVENT_DISCONNECTED && !root_idp) {
-		/*
-		 * Client side TCP CMID :
-		 *	If rdma_destroy_id() was called, destroy CMID.
-		 *
-		 *	If not chan_connect_flag is set to CONNECT_NONE
-		 *	so it can be deleted when rdma_destroy_id is
-		 *	called.
-		 */
-		mutex_enter(&chanp->chan_mutex);
-		chan_state = cma_get_chan_state(chanp);
-		chanp->chan_cmid_destroy_state &=
-		    ~SOL_CMA_CALLER_EVENT_PROGRESS;
-		if (chanp->chan_cmid_destroy_state &
-		    SOL_CMA_CALLER_CMID_DESTROYED) {
-			cv_broadcast(&chanp->chan_destroy_cv);
-			mutex_exit(&chanp->chan_mutex);
-		} else if (chan_state == SOL_CMA_CHAN_DESTROY_PENDING) {
-			mutex_exit(&chanp->chan_mutex);
-			cma_destroy_id(idp);
-		} else
-			mutex_exit(&chanp->chan_mutex);
-		return;
 	} else if (IS_UDP_CMID(idp) && event == RDMA_CM_EVENT_UNREACHABLE) {
 		/*
 		 * If rdma_destroy_id() was called, destroy CMID
-		 * If not chan_connect_flag is set to CONNECT_NONE
-		 * so it can be deleted when rdma_destroy_id is
-		 * called.
+		 * If not chan_connect_flag/ chan_req_state has already been
+		 * set to indicate that it can be deleted.
 		 */
 		mutex_enter(&chanp->chan_mutex);
 		chan_state = cma_get_chan_state(chanp);
@@ -2019,7 +2090,7 @@ cma_destroy_id(struct rdma_cm_id *idp)
 		if (state == SOL_CMA_CHAN_DESTROY_PENDING &&
 		    req_nodes == 0UL && acpt_nodes == 0UL) {
 			mutex_enter(&root_chanp->chan_mutex);
-			root_chanp->chan_req_state = REQ_CMID_NONE;
+			root_chanp->chan_req_state = REQ_CMID_SERVER_NONE;
 			mutex_exit(&root_chanp->chan_mutex);
 			cma_destroy_id(root_idp);
 		} else if (state == SOL_CMA_CHAN_DESTROY_WAIT &&
@@ -2027,7 +2098,7 @@ cma_destroy_id(struct rdma_cm_id *idp)
 			mutex_enter(&root_chanp->chan_mutex);
 			cma_set_chan_state(root_chanp,
 			    SOL_CMA_CHAN_DESTROY_PENDING);
-			root_chanp->chan_req_state = REQ_CMID_NONE;
+			root_chanp->chan_req_state = REQ_CMID_SERVER_NONE;
 			cv_broadcast(&root_chanp->chan_destroy_cv);
 			mutex_exit(&root_chanp->chan_mutex);
 		}
@@ -2040,17 +2111,11 @@ cma_destroy_id(struct rdma_cm_id *idp)
 
 /*
  * Server TCP disconnect for an established channel.
- *	Remove from EST AVL tree.
- *
  *	If destroy_id() has been called for the listening
  *	CMID and there are no more CMIDs with pending
  *	events corresponding to the listening CMID, free
  *	the listening CMID.
  *
- *
- *	If not chan_connect_flag is set to CONNECT_NONE
- *	so it can be deleted when rdma_destroy_id is
- *	called.
  */
 static void
 cma_handle_nomore_events(sol_cma_chan_t *chanp)
@@ -2066,24 +2131,34 @@ cma_handle_nomore_events(sol_cma_chan_t *chanp)
 	if (!root_chanp)
 		return;
 
-	CHAN_LISTEN_ROOT(chanp) = NULL;
 	mutex_enter(&root_chanp->chan_mutex);
+	mutex_enter(&chanp->chan_mutex);
+	CHAN_LISTEN_ROOT(chanp) = NULL;
 	root_chanp->chan_req_total_cnt--;
-	if (!root_chanp->chan_req_total_cnt)
-		root_chanp->chan_req_state = REQ_CMID_NONE;
-	if (root_idp->ps == RDMA_PS_TCP && chanp->chan_req_state ==
-	    REQ_CMID_ACCEPTED) {
+
+	/*
+	 * Removal of CMID from the AVL trees should already have been done
+	 * by now. Below code mainly as a  safety net.
+	 */
+	if (chanp->chan_req_state == REQ_CMID_ACCEPTED) {
+		ASSERT(chanp->chan_qp_hdl);
+		ASSERT(cma_get_acpt_idp(root_idp,
+		    chanp->chan_qp_hdl));
 		avl_remove(&root_chanp->chan_acpt_avl_tree, idp);
-		chanp->chan_req_state = REQ_CMID_NONE;
+		chanp->chan_req_state = REQ_CMID_SERVER_NONE;
 	}
-	if (chanp->chan_req_state == REQ_CMID_CREATED ||
-	    chanp->chan_req_state == REQ_CMID_NOTIFIED) {
+	if (REQ_CMID_IN_REQ_AVL_TREE(chanp)) {
+		ASSERT(chanp->chan_session_id);
+		ASSERT(cma_get_req_idp(root_idp,
+		    chanp->chan_session_id));
 		avl_remove(&root_chanp->chan_req_avl_tree, idp);
-		chanp->chan_req_state = REQ_CMID_NONE;
+		chanp->chan_req_state = REQ_CMID_SERVER_NONE;
 	}
+
 	state = cma_get_chan_state(root_chanp);
 	req_nodes = avl_numnodes(&root_chanp->chan_req_avl_tree);
 	acpt_nodes = avl_numnodes(&root_chanp->chan_acpt_avl_tree);
+	mutex_exit(&chanp->chan_mutex);
 	mutex_exit(&root_chanp->chan_mutex);
 	if (state == SOL_CMA_CHAN_DESTROY_PENDING && req_nodes == 0UL &&
 	    acpt_nodes == 0UL)

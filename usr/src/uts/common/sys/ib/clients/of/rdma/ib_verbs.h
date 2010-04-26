@@ -574,7 +574,8 @@ enum ib_access_flags {
 	IB_ACCESS_REMOTE_WRITE	= (1<<1),
 	IB_ACCESS_REMOTE_READ	= (1<<2),
 	IB_ACCESS_REMOTE_ATOMIC	= (1<<3),
-	IB_ACCESS_MW_BIND	= (1<<4)
+	IB_ACCESS_MW_BIND	= (1<<4),
+	IB_ACCESS_SO		= (1<<5)	/* MR with Strong Ordering */
 };
 
 struct ib_pd {

@@ -124,21 +124,73 @@ typedef enum {
 	SOL_CMA_XPORT_IWARP
 } sol_cma_xport_type_t;
 
+/*
+ * This is used to track the state of a client side CMID.
+ * 	CONNECT_NONE	Server side CMID, or CMID for which
+ * 			rdma_connect() has not been called.
+ *
+ * 	CLIENT_NONE	Client side CMID for which connection
+ * 			has been torn down.
+ *
+ * 			For UDP it also represents connection
+ * 			established (no more IBTF CM events
+ * 			expected).
+ *
+ * 	INITIATED	rdma_connect() has been called not yet
+ * 			established.
+ *
+ * 	ESTABLISHED	Client CMID has connection established.
+ */
 typedef enum {
 	SOL_CMA_CONNECT_NONE = 0,
+	SOL_CMA_CONNECT_CLIENT_NONE,
 	SOL_CMA_CONNECT_INITIATED,
-	SOL_CMA_CONNECT_CLIENT_DONE,
-	SOL_CMA_CONNECT_SERVER_RCVD,
-	SOL_CMA_CONNECT_SERVER_DONE,
-	SOL_CMA_DISCONNECT_NOTIFIED
+	SOL_CMA_CONNECT_ESTABLISHED,
 } sol_cma_connect_flag_t;
 
-#define	SOL_CMAID_IS_CONNECTED(chanp)	((chanp)->chan_connect_flag ==	\
-    SOL_CMA_CONNECT_CLIENT_DONE || (chanp)->chan_connect_flag ==	\
-    SOL_CMA_CONNECT_SERVER_DONE || (chanp)->chan_connect_flag ==	\
-    SOL_CMA_CONNECT_SERVER_RCVD)
-#define	SOL_CMA_DISCONNECT_OK(chanp)	(((chanp)->chan_connect_flag ==	\
-    SOL_CMA_CONNECT_INITIATED) || SOL_CMAID_IS_CONNECTED(chanp))
+/*
+ * This is used to track the state of CMIDs created for Connection
+ * Requests and listening CMID.
+ *
+ * 	NONE		Client CMID, listen CMID with no REQs yet.
+ *
+ * 	SERVER_DONE	REQ CMID connection done, no more events.
+ *
+ * 			For listening CMID all REQ CMIDs have events
+ * 			completed.
+ *
+ * 	CREATED		listening CMID with > 1 REQ CMID with events
+ * 			pending.
+ *
+ * 	QUEUED		REQ CMID in REQ AVL tree of listening CMID
+ *
+ * 	ACCEPTED	REQ CMID accepted and in ACPT AVL tree of the
+ * 			listening CMID.
+ */
+typedef enum {
+	REQ_CMID_NONE = 0,
+	REQ_CMID_SERVER_NONE,
+	REQ_CMID_CREATED,
+	REQ_CMID_QUEUED,
+	REQ_CMID_NOTIFIED,
+	REQ_CMID_ACCEPTED,
+} cma_req_cmid_state_t;
+
+#define	SOL_IS_SERVER_CMID(chanp)	\
+	((chanp)->chan_req_state != REQ_CMID_NONE)
+#define	SOL_IS_CLIENT_CMID(chanp)	\
+	((chanp)->chan_connect_flag != SOL_CMA_CONNECT_NONE)
+
+#define	REQ_CMID_IN_REQ_AVL_TREE(chanp)	\
+	((chanp)->chan_req_state == REQ_CMID_QUEUED ||	\
+	(chanp)->chan_req_state == REQ_CMID_NOTIFIED)
+#define	SOL_CMID_CLOSE_REQUIRED(chanp)		\
+	((chanp)->chan_connect_flag == SOL_CMA_CONNECT_INITIATED ||	\
+	(chanp)->chan_connect_flag == SOL_CMA_CONNECT_ESTABLISHED || \
+	(chanp)->chan_req_state == REQ_CMID_ACCEPTED)
+#define	SOL_CMAID_CONNECTED(chanp)	\
+	(SOL_CMID_CLOSE_REQUIRED(chanp) ||	\
+	(chanp)->chan_req_state  ==  REQ_CMID_NOTIFIED)
 
 /*
  * CMID_DESTROYED	- Flag to indicate rdma_destroy_id has been
@@ -153,15 +205,6 @@ typedef enum {
 #define	SOL_CMA_CALLER_CMID_DESTROYED		0x01
 #define	SOL_CMA_CALLER_EVENT_PROGRESS		0x02
 #define	SOL_CMA_CALLER_API_PROGRESS		0x04
-
-typedef enum {
-	REQ_CMID_NONE = 0,
-	REQ_CMID_CREATED,
-	REQ_CMID_NOTIFIED,
-	REQ_CMID_ACCEPTED,
-	REQ_CMID_REJECTED,
-	REQ_CMID_DISCONNECTED
-} cma_req_cmid_state_t;
 
 typedef struct {
 	struct rdma_cm_id	chan_rdma_cm;
@@ -187,7 +230,9 @@ typedef struct {
 	uint64_t		chan_req_total_cnt;
 
 
+	/* State for Server side and client side CMIDs */
 	cma_req_cmid_state_t	chan_req_state;
+	sol_cma_connect_flag_t	chan_connect_flag;
 
 	kmutex_t		chan_mutex;
 	kcondvar_t		chan_destroy_cv;
@@ -216,7 +261,6 @@ typedef struct {
 #define	CHAN_LISTEN_LIST(chanp)	(((chanp)->chan_listenp)->listen_list)
 #define	CHAN_LISTEN_ROOT(chanp)	((chanp)->listen_root)
 
-	sol_cma_connect_flag_t	chan_connect_flag;
 	struct rdma_conn_param	chan_param;
 
 	/* Session ID for completion */
@@ -308,10 +352,9 @@ cma_get_req_idp(struct rdma_cm_id *root_idp, void *qp_hdl)
 	sol_cma_chan_t		*root_chanp;
 
 	root_chanp = (sol_cma_chan_t *)root_idp;
-	mutex_enter(&root_chanp->chan_mutex);
+	ASSERT(MUTEX_HELD(&root_chanp->chan_mutex));
 	req_idp = (struct rdma_cm_id *)avl_find(
 	    &root_chanp->chan_req_avl_tree, (void *)qp_hdl, NULL);
-	mutex_exit(&root_chanp->chan_mutex);
 	return (req_idp);
 }
 
@@ -322,6 +365,7 @@ cma_get_acpt_idp(struct rdma_cm_id *root_idp, void *qp_hdl)
 	sol_cma_chan_t		*root_chanp;
 
 	root_chanp = (sol_cma_chan_t *)root_idp;
+	ASSERT(MUTEX_HELD(&root_chanp->chan_mutex));
 	acpt_idp = (struct rdma_cm_id *)avl_find(
 	    &root_chanp->chan_acpt_avl_tree, (void *)qp_hdl, NULL);
 	return (acpt_idp);

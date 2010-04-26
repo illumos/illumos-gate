@@ -1903,7 +1903,7 @@ rdma2usr_pathrec(struct ib_sa_path_rec *kern_path,
 	    kern_path->packet_life_time_selector;
 	usr_path->packet_life_time = kern_path->packet_life_time;
 	usr_path->preference = kern_path->preference;
-	usr_path->numb_path = usr_path->numb_path;
+	usr_path->numb_path = kern_path->numb_path;
 }
 
 static void

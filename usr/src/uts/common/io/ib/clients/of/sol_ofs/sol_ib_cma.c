@@ -45,6 +45,9 @@ extern char 	*sol_rdmacm_dbg_str;
 /* Delay of 5 secs */
 #define	SOL_OFS_REQ_DELAY	5000000
 
+/* Default Qkey used for IPoIB. */
+#define	SOL_IPOIB_DEFAULT_QKEY	0xB1B
+
 /*	Solaris CM Event Callbacks 	*/
 static ibt_cm_status_t ibcma_rc_hdlr(void *, ibt_cm_event_t *,
     ibt_cm_return_args_t *, void *, ibt_priv_data_len_t);
@@ -179,6 +182,7 @@ rdma_ib_bind_addr(struct rdma_cm_id *idp, struct sockaddr *addr)
 	return (ret);
 }
 
+extern void cma_resolve_addr_callback(sol_cma_chan_t *, int);
 int
 rdma_ib_resolve_addr(struct rdma_cm_id *idp, struct sockaddr *src_addr,
     struct sockaddr *dst_addr, int timeout_ms)
@@ -245,6 +249,8 @@ rdma_ib_resolve_addr(struct rdma_cm_id *idp, struct sockaddr *src_addr,
 		if (ret == 0 && idp->device == NULL)
 			idp->device = sol_cma_acquire_device(ntohll(
 			    ibchanp->chan_devp->dev_node_guid));
+
+		cma_resolve_addr_callback(chanp, 0);
 		return (0);
 	}
 
@@ -338,7 +344,10 @@ rdma_ib_init_qp_attr(struct rdma_cm_id *idp, struct ib_qp_attr *qpattr,
 		    (ibchanp->chan_rtr_data).req_rnr_nak_time;
 		return (0);
 	} else if (IS_UDP_CMID(idp)) {
-		qpattr->qkey = RDMA_UDP_QKEY;
+		if (idp->ps == RDMA_PS_UDP)
+			qpattr->qkey = RDMA_UDP_QKEY;
+		else
+			qpattr->qkey = SOL_IPOIB_DEFAULT_QKEY;
 		*qp_attr_mask = IB_QP_STATE | IB_QP_PKEY_INDEX |
 		    IB_QP_PORT | IB_QP_QKEY;
 		return (0);
@@ -694,7 +703,6 @@ rdma_ib_accept(struct rdma_cm_id *idp, struct rdma_conn_param *conn_param)
 				kmem_free(privp, SOL_REP_PRIV_DATA_SZ);
 			return (EINVAL);
 		}
-		chanp->chan_connect_flag = SOL_CMA_CONNECT_SERVER_DONE;
 
 		if (privp)
 			kmem_free(privp, SOL_REP_PRIV_DATA_SZ);
@@ -772,76 +780,78 @@ rdma_ib_disconnect(struct rdma_cm_id *idp)
 {
 	sol_cma_chan_t		*root_chanp, *chanp;
 	ibt_status_t		status;
+	struct rdma_cm_id	*root_idp;
 
 	ASSERT(idp);
 	SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str, "ib_disconnect(%p)", idp);
 	chanp = (sol_cma_chan_t *)idp;
-	mutex_enter(&chanp->chan_mutex);
 
-	root_chanp = (sol_cma_chan_t *)CHAN_LISTEN_ROOT(chanp);
-	if (IS_UDP_CMID(idp) && chanp->chan_connect_flag ==
-	    SOL_CMA_CONNECT_SERVER_RCVD && root_chanp) {
+	root_idp = CHAN_LISTEN_ROOT(chanp);
+	root_chanp = (sol_cma_chan_t *)root_idp;
+	if (!root_chanp)
+		goto handle_close_chan;
+
+	mutex_enter(&chanp->chan_mutex);
+	if (chanp->chan_req_state == REQ_CMID_NOTIFIED ||
+	    chanp->chan_req_state == REQ_CMID_CREATED) {
 		CHAN_LISTEN_ROOT(chanp) = NULL;
 		mutex_exit(&chanp->chan_mutex);
 
-		status = ibt_cm_ud_proceed(chanp->chan_session_id,
-		    NULL, IBT_CM_NO_CHANNEL, NULL, NULL, 0);
-		if (status != IBT_SUCCESS) {
-			SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
-			    "ib_disconnect(%p) Reject for incoming REQ "
-			    "failed, status %d", status);
-			return (EINVAL);
-		}
-		mutex_enter(&chanp->chan_mutex);
-		if (chanp->chan_req_state == REQ_CMID_CREATED ||
-		    chanp->chan_req_state == REQ_CMID_NOTIFIED) {
-			mutex_enter(&root_chanp->chan_mutex);
-			avl_remove(&root_chanp->chan_req_avl_tree, idp);
-			mutex_exit(&root_chanp->chan_mutex);
-			chanp->chan_req_state = REQ_CMID_NONE;
-		}
-	}
-	if (idp->ps == RDMA_PS_TCP && chanp->chan_connect_flag ==
-	    SOL_CMA_CONNECT_SERVER_RCVD && chanp->chan_session_id) {
-		ibt_cm_proceed_reply_t	cm_reply;
+		if (IS_UDP_CMID(idp)) {
+			status = ibt_cm_ud_proceed(chanp->chan_session_id,
+			    NULL, IBT_CM_NO_CHANNEL, NULL, NULL, 0);
+			if (status != IBT_SUCCESS) {
+				SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
+				    "ib_disconnect(%p) Reject for incoming REQ "
+				    "failed, status %d", status);
+				return (EINVAL);
+			}
+		} else {
+			ibt_cm_proceed_reply_t	cm_reply;
 
+			bzero(&cm_reply, sizeof (cm_reply));
+			status = ibt_cm_proceed(IBT_CM_EVENT_REQ_RCV,
+			    chanp->chan_session_id, IBT_CM_REJECT, &cm_reply,
+			    NULL, 0);
+			if (status != IBT_SUCCESS) {
+				SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
+				    "ib_disconnect(%p) Reject for incoming REQ "
+				    "failed, status %d", status);
+				return (EINVAL);
+			}
+		}
+		mutex_enter(&root_chanp->chan_mutex);
+		mutex_enter(&chanp->chan_mutex);
+		if (REQ_CMID_IN_REQ_AVL_TREE(chanp)) {
+			ASSERT(cma_get_req_idp(root_idp,
+			    chanp->chan_session_id));
+			avl_remove(&root_chanp->chan_req_avl_tree, idp);
+			chanp->chan_req_state = REQ_CMID_SERVER_NONE;
+		}
 		mutex_exit(&chanp->chan_mutex);
-		bzero(&cm_reply, sizeof (cm_reply));
-		status = ibt_cm_proceed(IBT_CM_EVENT_REQ_RCV,
-		    chanp->chan_session_id, IBT_CM_REJECT, &cm_reply,
-		    NULL, 0);
-		if (status != IBT_SUCCESS) {
-			SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
-			    "ib_disconnect(%p) Reject for incoming REQ "
-			    "failed, status %d", status);
-			return (EINVAL);
-		}
-		mutex_enter(&chanp->chan_mutex);
-		if (chanp->chan_req_state == REQ_CMID_CREATED ||
-		    chanp->chan_req_state == REQ_CMID_NOTIFIED) {
-			mutex_enter(&root_chanp->chan_mutex);
-			avl_remove(&root_chanp->chan_req_avl_tree, idp);
-			mutex_exit(&root_chanp->chan_mutex);
-			chanp->chan_req_state = REQ_CMID_NONE;
-		}
-	}
+		mutex_exit(&root_chanp->chan_mutex);
+	} else
+		mutex_exit(&chanp->chan_mutex);
 
+handle_close_chan :
 	/*
 	 * Close RC channel for RC.
 	 * No explicit Disconnect required for UD
 	 */
+	mutex_enter(&chanp->chan_mutex);
 	if (idp->ps == RDMA_PS_TCP && chanp->chan_qp_hdl &&
-	    chanp->chan_connect_flag != SOL_CMA_CONNECT_NONE) {
+	    SOL_CMID_CLOSE_REQUIRED(chanp)) {
 		ibt_execution_mode_t	mode;
 		void			*qp_hdl = chanp->chan_qp_hdl;
 
 
 		/*
-		 * No callbacks for CMIDs for which CONNECT has been
-		 * initiated but not completed.
+		 * No callbacks for CMIDs for which destroy_id() has
+		 * been called.
 		 */
-		mode = (SOL_CMAID_IS_CONNECTED(chanp)) ? IBT_BLOCKING :
-		    IBT_NOCALLBACKS;
+		mode = (chanp->chan_cmid_destroy_state &
+		    SOL_CMA_CALLER_CMID_DESTROYED) ? IBT_NOCALLBACKS :
+		    IBT_BLOCKING;
 		mutex_exit(&chanp->chan_mutex);
 		status = ibt_close_rc_channel(qp_hdl,
 		    mode, NULL, 0, NULL, NULL, NULL);
@@ -919,7 +929,10 @@ rdma_ib_join_multicast(struct rdma_cm_id *idp, struct sockaddr *addr,
 	mcg_attr.mc_pkey = devp->dev_pkey;
 	mcg_attr.mc_rate_req.r_selector = IBT_BEST;
 	mcg_attr.mc_join_state = IB_MC_JSTATE_FULL;
-	mcg_attr.mc_qkey = RDMA_UDP_QKEY;
+	if (idp->ps == RDMA_PS_UDP)
+		mcg_attr.mc_qkey = RDMA_UDP_QKEY;
+	else
+		mcg_attr.mc_qkey = SOL_IPOIB_DEFAULT_QKEY;
 	mcg_infop = kmem_zalloc(sizeof (ibt_mcg_info_t), KM_SLEEP);
 
 	status = ibt_join_mcg(ibchanp->chan_devp->dev_sgid,
@@ -1064,7 +1077,7 @@ ibcma_tcp_connect(struct rdma_cm_id *idp, ibcma_chan_t *ibchanp,
 		    "tcp_connect: ibv_open_rc_channel failed %x",
 		    status);
 		kmem_free(args.oc_priv_data, SOL_REQ_PRIV_DATA_SZ);
-		chanp->chan_connect_flag = SOL_CMA_CONNECT_NONE;
+		chanp->chan_connect_flag = SOL_CMA_CONNECT_CLIENT_NONE;
 		return (EINVAL);
 	}
 	kmem_free(args.oc_priv_data, SOL_REQ_PRIV_DATA_SZ);
@@ -1129,7 +1142,7 @@ ibcma_udp_connect(struct rdma_cm_id *idp, ibcma_chan_t *ibchanp,
 		SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str, "\tibudp_connect: "
 		    "ibt_ud_get_dqpn failed with status %x", status);
 		kmem_free(attr.ud_priv_data, attr.ud_priv_data_len);
-		chanp->chan_connect_flag = SOL_CMA_CONNECT_NONE;
+		chanp->chan_connect_flag = SOL_CMA_CONNECT_CLIENT_NONE;
 		return (EINVAL);
 	}
 
@@ -1217,7 +1230,13 @@ ibcma_query_local_ip(struct rdma_cm_id *idp, sol_cma_chan_t *chanp,
 	return (0);
 }
 
-extern void cma_resolve_addr_callback(sol_cma_chan_t *, int);
+#define	IBCMA_FREE_IN_IPPATH_HDLR()				\
+	if (pathp)						\
+		kmem_free(pathp, sizeof (ibt_path_info_t) * 	\
+		    num_paths);					\
+	if (src_ip_p)						\
+		kmem_free(src_ip_p, sizeof (ibt_path_ip_src_t) 	\
+		    * num_paths);
 
 static void
 ibcma_path_hdlr(void *arg, ibt_status_t retval, ibt_path_info_t *pathp,
@@ -1232,6 +1251,7 @@ ibcma_path_hdlr(void *arg, ibt_status_t retval, ibt_path_info_t *pathp,
 
 	if (retval != IBT_SUCCESS && retval != IBT_INSUFF_DATA) {
 		cma_resolve_addr_callback(chanp, 1);
+		IBCMA_FREE_IN_IPPATH_HDLR();
 		return;
 	}
 
@@ -1251,12 +1271,14 @@ ibcma_path_hdlr(void *arg, ibt_status_t retval, ibt_path_info_t *pathp,
 			kmem_free(ibchanp->chan_pathp,
 			    ibchanp->chan_path_size);
 			cma_resolve_addr_callback(chanp, 1);
+			IBCMA_FREE_IN_IPPATH_HDLR();
 			return;
 		}
 	}
 
 	if (ibchanp->chan_devp == NULL) {
 		cma_resolve_addr_callback(chanp, 1);
+		IBCMA_FREE_IN_IPPATH_HDLR();
 		return;
 	}
 
@@ -1271,6 +1293,7 @@ ibcma_path_hdlr(void *arg, ibt_status_t retval, ibt_path_info_t *pathp,
 		    &((idp->route.path_rec)[i]), base_lid);
 
 	cma_resolve_addr_callback(chanp, 0);
+	IBCMA_FREE_IN_IPPATH_HDLR();
 }
 
 static int
@@ -1395,11 +1418,9 @@ ibcma_ud_hdlr(void *inp, ibt_cm_ud_event_t *eventp,
 		(event_idp->route).num_paths = 0;
 
 		event_chanp = (sol_cma_chan_t *)event_idp;
-		event_chanp->chan_req_state = REQ_CMID_CREATED;
+		event_chanp->chan_req_state = REQ_CMID_NOTIFIED;
 		event_ibchanp = &event_chanp->chan_ib;
 		event_chanp->chan_session_id = eventp->cm_session_id;
-		event_chanp->chan_connect_flag =
-		    SOL_CMA_CONNECT_SERVER_RCVD;
 		bcopy(&info.src_addr, &event_ibchanp->chan_remote_addr,
 		    sizeof (ibt_ip_addr_t));
 		ipaddr2sockaddr(&info.src_addr,
@@ -1428,6 +1449,7 @@ ibcma_ud_hdlr(void *inp, ibt_cm_ud_event_t *eventp,
 			    root_idp, event_idp,
 			    event_chanp->chan_session_id);
 			mutex_exit(&root_chanp->chan_mutex);
+			event_chanp->chan_req_state = REQ_CMID_CREATED;
 			rdma_destroy_id(event_idp);
 			return (IBT_CM_REJECT);
 		}
@@ -1445,7 +1467,7 @@ ibcma_ud_hdlr(void *inp, ibt_cm_ud_event_t *eventp,
 
 		ASSERT(chanp->chan_connect_flag == SOL_CMA_CONNECT_INITIATED);
 		mutex_enter(&chanp->chan_mutex);
-		chanp->chan_connect_flag = SOL_CMA_CONNECT_NONE;
+		chanp->chan_connect_flag = SOL_CMA_CONNECT_CLIENT_NONE;
 		chanp->chan_cmid_destroy_state |= SOL_CMA_CALLER_EVENT_PROGRESS;
 		mutex_exit(&chanp->chan_mutex);
 		sidr_rep = &((eventp->cm_event).sidr_rep);
@@ -1624,10 +1646,9 @@ ibcma_handle_req(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 	*event_id_ptr = event_idp;
 
 	event_chanp = (sol_cma_chan_t *)event_idp;
-	event_chanp->chan_req_state = REQ_CMID_CREATED;
+	event_chanp->chan_req_state = REQ_CMID_NOTIFIED;
 	event_ibchanp = &event_chanp->chan_ib;
 	event_chanp->chan_session_id = eventp->cm_session_id;
-	event_chanp->chan_connect_flag = SOL_CMA_CONNECT_SERVER_RCVD;
 	bcopy((void *)(&reqp->req_prim_addr),
 	    (void *)(&event_ibchanp->chan_rcreq_addr),
 	    sizeof (ibt_adds_vect_t));
@@ -1645,10 +1666,10 @@ ibcma_handle_req(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 	 * Insert the CMID into the REQ_AVL_TREE. This is
 	 * deleted when the connection is accepted or rejected.
 	 */
-	mutex_enter(&root_chanp->chan_mutex);
 	SOL_OFS_DPRINTF_L5(sol_rdmacm_dbg_str,
 	    "Add to REQ AVL of %p IDP, idp %p, session_id %p",
 	    root_idp, event_idp, event_chanp->chan_session_id);
+	mutex_enter(&root_chanp->chan_mutex);
 	find_ret = avl_find(&root_chanp->chan_req_avl_tree,
 	    (void *)event_chanp->chan_session_id, &where);
 	if (find_ret) {
@@ -1658,15 +1679,19 @@ ibcma_handle_req(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 		    root_idp, event_idp,
 		    event_chanp->chan_session_id);
 		mutex_exit(&root_chanp->chan_mutex);
+		event_chanp->chan_req_state = REQ_CMID_CREATED;
+		if (paramp->private_data)
+			kmem_free((void *)paramp->private_data,
+			    paramp->private_data_len);
 		rdma_destroy_id(event_idp);
 		return (IBT_CM_REJECT);
 	}
 	root_chanp->chan_req_cnt++;
 	root_chanp->chan_req_state = REQ_CMID_CREATED;
 	root_chanp->chan_req_total_cnt++;
+
 	avl_insert(&root_chanp->chan_req_avl_tree, (void *)event_idp, where);
 	mutex_exit(&root_chanp->chan_mutex);
-	event_chanp->chan_req_state = REQ_CMID_NOTIFIED;
 
 	return (IBT_CM_DEFER);
 }
@@ -1714,7 +1739,7 @@ ibcma_handle_est(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 	chanp = (sol_cma_chan_t *)idp;
 	if (chanp->chan_listenp == NULL) {
 		ASSERT(chanp->chan_connect_flag == SOL_CMA_CONNECT_INITIATED);
-		chanp->chan_connect_flag = SOL_CMA_CONNECT_CLIENT_DONE;
+		chanp->chan_connect_flag = SOL_CMA_CONNECT_ESTABLISHED;
 		*event_id_ptr = idp;
 		bcopy(&chanp->chan_param, paramp,
 		    sizeof (struct rdma_conn_param));
@@ -1751,7 +1776,6 @@ ibcma_handle_est(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 	*event_id_ptr = event_idp;
 	event_chanp = (sol_cma_chan_t *)event_idp;
 	mutex_enter(&event_chanp->chan_mutex);
-	event_chanp->chan_connect_flag = SOL_CMA_CONNECT_SERVER_DONE;
 	event_chanp->chan_cmid_destroy_state |=
 	    SOL_CMA_CALLER_EVENT_PROGRESS;
 	mutex_exit(&event_chanp->chan_mutex);
@@ -1789,6 +1813,8 @@ ibcma_handle_closed(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 	if (!root_idp) {
 		chanp->chan_cmid_destroy_state |=
 		    SOL_CMA_CALLER_EVENT_PROGRESS;
+		chanp->chan_qp_hdl = NULL;
+		chanp->chan_connect_flag = SOL_CMA_CONNECT_CLIENT_NONE;
 		mutex_exit(&chanp->chan_mutex);
 		*event_id_ptr = idp;
 		return (IBT_CM_DEFAULT);
@@ -1810,7 +1836,7 @@ ibcma_handle_closed(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 	avl_remove(&root_chanp->chan_acpt_avl_tree, event_idp);
 	mutex_exit(&root_chanp->chan_mutex);
 	mutex_enter(&event_chanp->chan_mutex);
-	event_chanp->chan_req_state = REQ_CMID_NONE;
+	event_chanp->chan_req_state = REQ_CMID_SERVER_NONE;
 	event_chanp->chan_cmid_destroy_state |=
 	    SOL_CMA_CALLER_EVENT_PROGRESS;
 	mutex_exit(&event_chanp->chan_mutex);
@@ -1824,7 +1850,6 @@ ibcma_handle_failed(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
     ibt_cm_event_t *eventp, struct rdma_conn_param *paramp,
     enum rdma_cm_event_type *event, int *evt_status)
 {
-
 	struct rdma_cm_id	*root_idp, *event_idp;
 	sol_cma_chan_t		*event_chanp, *chanp, *root_chanp;
 	ibt_cm_conn_failed_t	*failedp;
@@ -1871,32 +1896,33 @@ ibcma_handle_failed(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 			mutex_enter(&root_chanp->chan_mutex);
 			event_idp = cma_get_acpt_idp(root_idp,
 			    eventp->cm_channel);
-			mutex_exit(&root_chanp->chan_mutex);
 			if (event_idp == NULL) {
-				SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
+				SOL_OFS_DPRINTF_L3(sol_rdmacm_dbg_str,
 				    "ibcma_handle_failed: No matching CMID "
 				    "for qp_hdl %p in ACPT AVL of CMID %p",
 				    eventp->cm_channel, idp);
+				mutex_exit(&root_chanp->chan_mutex);
 				break;
 			}
 
 			event_chanp = (sol_cma_chan_t *)event_idp;
+			*event_id_ptr = event_idp;
 			mutex_enter(&event_chanp->chan_mutex);
-			event_chanp->chan_req_state = REQ_CMID_NONE;
+			avl_remove(&root_chanp->chan_acpt_avl_tree,
+			    event_idp);
+			event_chanp->chan_req_state = REQ_CMID_SERVER_NONE;
 			event_chanp->chan_cmid_destroy_state |=
 			    SOL_CMA_CALLER_EVENT_PROGRESS;
 			event_chanp->chan_qp_hdl = NULL;
 			mutex_exit(&event_chanp->chan_mutex);
-			*event_id_ptr = event_idp;
-			mutex_enter(&root_chanp->chan_mutex);
-			avl_remove(&root_chanp->chan_acpt_avl_tree,
-			    event_idp);
 			mutex_exit(&root_chanp->chan_mutex);
 		} else {
 			mutex_enter(&chanp->chan_mutex);
 			chanp->chan_cmid_destroy_state |=
 			    SOL_CMA_CALLER_EVENT_PROGRESS;
 			chanp->chan_qp_hdl = NULL;
+			chanp->chan_connect_flag =
+			    SOL_CMA_CONNECT_CLIENT_NONE;
 			mutex_exit(&chanp->chan_mutex);
 			*event_id_ptr  = idp;
 		}
@@ -1910,10 +1936,12 @@ ibcma_handle_failed(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 		 * status as IBT_CM_TIMEOUT.
 		 */
 		if (eventp->cm_session_id && root_idp) {
+			mutex_enter(&root_chanp->chan_mutex);
 			event_idp = cma_get_req_idp(root_idp,
 			    eventp->cm_session_id);
 			if (event_idp == NULL) {
-				SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
+				mutex_exit(&root_chanp->chan_mutex);
+				SOL_OFS_DPRINTF_L3(sol_rdmacm_dbg_str,
 				    "ibcma_handle_failed: No matching CMID "
 				    "for qp_hdl %p in REQ AVL of CMID %p",
 				    eventp->cm_session_id, idp);
@@ -1922,15 +1950,15 @@ ibcma_handle_failed(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 
 			event_chanp = (sol_cma_chan_t *)event_idp;
 			mutex_enter(&event_chanp->chan_mutex);
-			event_chanp->chan_req_state = REQ_CMID_NONE;
-			event_chanp->chan_qp_hdl = NULL;
-			mutex_exit(&event_chanp->chan_mutex);
 			*event_id_ptr = event_idp;
-			mutex_enter(&root_chanp->chan_mutex);
 			avl_remove(&root_chanp->chan_req_avl_tree,
 			    event_idp);
 			root_chanp->chan_req_cnt--;
+			event_chanp->chan_req_state = REQ_CMID_SERVER_NONE;
+			event_chanp->chan_qp_hdl = NULL;
+			mutex_exit(&event_chanp->chan_mutex);
 			mutex_exit(&root_chanp->chan_mutex);
+
 
 			*evt_status = IBT_CM_TIMEOUT;
 			*event = RDMA_CM_EVENT_REJECTED;
@@ -1946,6 +1974,8 @@ ibcma_handle_failed(struct rdma_cm_id *idp, struct rdma_cm_id **event_id_ptr,
 			chanp->chan_cmid_destroy_state |=
 			    SOL_CMA_CALLER_EVENT_PROGRESS;
 			chanp->chan_qp_hdl = NULL;
+			chanp->chan_connect_flag =
+			    SOL_CMA_CONNECT_CLIENT_NONE;
 			mutex_exit(&chanp->chan_mutex);
 			*evt_status = IBT_CM_TIMEOUT;
 			*event = RDMA_CM_EVENT_REJECTED;
@@ -2099,7 +2129,10 @@ ibcma_multicast_hdlr(void *arg, ibt_status_t status, ibt_mcg_info_t *mcg_infop)
 	if (status == IBT_SUCCESS) {
 		mcginfo2ah(mcg_infop, &ud_param->ah_attr);
 		ud_param->qp_num = IB_MC_QPN;
-		ud_param->qkey = RDMA_UDP_QKEY;
+		if (idp->ps == RDMA_PS_UDP)
+			ud_param->qkey = RDMA_UDP_QKEY;
+		else
+			ud_param->qkey = SOL_IPOIB_DEFAULT_QKEY;
 	}
 
 	/* Send the event to consumer of sol_cma.  */

@@ -534,8 +534,10 @@ sol_uverbs_resize_cq(uverbs_uctxt_uobj_t *uctxt, char *buf,
 	resize_status = ibt_resize_cq(ucq->cq, cmd.cqe, &resp.cqe);
 	if (resize_status != IBT_SUCCESS) {
 		SOL_OFS_DPRINTF_L2(sol_uverbs_dbg_str,
-		    "resize_cq: ibt_resize_cq() (rc=%d), using "
-		    "original CQ", rc);
+		    "resize_cq: ibt_resize_cq() (resize_status=%d), using "
+		    "original CQ", resize_status);
+		rc = sol_uverbs_ibt_to_kernel_status(resize_status);
+		goto err_out;
 	}
 
 	sol_ofs_uobj_put(&ucq->uobj);
@@ -770,18 +772,18 @@ sol_uverbs_comp_event_handler(ibt_cq_hdl_t ibt_cq, void *arg)
 	uverbs_ufile_uobj_t	*ufile;
 	uverbs_event_t		*entry;
 
-#ifdef DEBUG
-	SOL_OFS_DPRINTF_L5(sol_uverbs_dbg_str, "comp_evt_hdlr(%p, %p) - ",
-	    "ucq = %p, ucq->cq = %p, ucq->uctxt = %p, ucq->comp_chan =%p",
-	    ibt_cq, arg, ucq, ucq->cq, ucq->uctxt, ucq->comp_chan);
-#endif
-
 	if (!ucq || !ucq->comp_chan) {
 		SOL_OFS_DPRINTF_L2(sol_uverbs_dbg_str, "comp_evt_hdlr "
 		    "ucq %p ucq->comp_chan %p", ucq, (ucq) ? ucq->comp_chan :
 		    NULL);
 		return;
 	}
+
+#ifdef DEBUG
+	SOL_OFS_DPRINTF_L5(sol_uverbs_dbg_str, "comp_evt_hdlr(%p, %p) - ",
+	    "ucq = %p, ucq->cq = %p, ucq->uctxt = %p, ucq->comp_chan =%p",
+	    ibt_cq, arg, ucq, ucq->cq, ucq->uctxt, ucq->comp_chan);
+#endif
 
 	ufile = ucq->comp_chan;
 
