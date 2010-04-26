@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Generic interface definition for usr/src/cmd/sgs/libld.
 #
@@ -40,7 +39,7 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.5 {
+SUNWprivate_4.6 {
 	global:
 		dbg_print  = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
 

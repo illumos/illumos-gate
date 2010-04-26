@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # Generic interface definition for usr/src/cmd/sgs/liblddbg.
@@ -41,7 +40,7 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.78 {
+SUNWprivate_4.79 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -381,10 +380,12 @@ SUNWprivate_4.78 {
 
 		Dbg32_syms_ar_checking;
 		Dbg64_syms_ar_checking;
-		Dbg32_syms_ar_entry;
-		Dbg64_syms_ar_entry;
+		Dbg32_syms_ar_force;
+		Dbg64_syms_ar_force;
 		Dbg32_syms_ar_resolve;
 		Dbg64_syms_ar_resolve;
+		Dbg32_syms_ar_skip;
+		Dbg64_syms_ar_skip;
 		Dbg32_syms_ar_title;
 		Dbg64_syms_ar_title;
 		Dbg32_syms_cap_convert;

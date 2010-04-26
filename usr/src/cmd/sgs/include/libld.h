@@ -1428,8 +1428,8 @@ typedef enum {
  */
 typedef struct ar_mem {
 	Elf		*am_elf;	/* elf descriptor for this member */
-	char		*am_name;	/* members name */
-	char		*am_path;	/* path (ie. lib(foo.o)) */
+	const char	*am_name;	/* members name */
+	const char	*am_path;	/* path (ie. lib(foo.o)) */
 	Sym		*am_syms;	/* start of global symbols */
 	char		*am_strs;	/* associated string table start */
 	Xword		am_symn;	/* no. of global symbols */

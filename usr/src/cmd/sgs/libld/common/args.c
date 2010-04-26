@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -267,8 +266,7 @@ ld_rescan_archives(Ofl_desc *ofl, int isgrp, int end_arg_ndx)
 			 * is unnecessary, as the file is already available in
 			 * memory.
 			 */
-			if (ld_process_archive(adp->ad_name, -1,
-			    adp, ofl) == S_ERROR)
+			if (!ld_process_archive(adp->ad_name, -1, adp, ofl))
 				return (S_ERROR);
 			if (ofl->ofl_flags & FLG_OF_FATAL)
 				return (1);
@@ -1809,7 +1807,7 @@ process_files_com(Ofl_desc *ofl, int argc, char **argv)
 {
 	for (; optind < argc; optind++) {
 		int		fd;
-		Ifl_desc	*ifl;
+		uintptr_t	open_ret;
 		char		*path;
 		Rej_desc	rej = { 0 };
 
@@ -1840,11 +1838,11 @@ process_files_com(Ofl_desc *ofl, int argc, char **argv)
 
 		DBG_CALL(Dbg_args_file(ofl->ofl_lml, optind, path));
 
-		ifl = ld_process_open(path, path, &fd, ofl,
-		    (FLG_IF_CMDLINE | FLG_IF_NEEDED), &rej);
+		open_ret = ld_process_open(path, path, &fd, ofl,
+		    (FLG_IF_CMDLINE | FLG_IF_NEEDED), &rej, NULL);
 		if (fd != -1)
 			(void) close(fd);
-		if (ifl == (Ifl_desc *)S_ERROR)
+		if (open_ret == S_ERROR)
 			return (S_ERROR);
 
 		/*

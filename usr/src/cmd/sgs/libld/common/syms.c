@@ -2682,6 +2682,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			}
 		}
 	}
+	DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 
 	/*
 	 * Associate weak (alias) symbols to their non-weak counterparts by

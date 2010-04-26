@@ -925,15 +925,15 @@ extern Place_path_info	*ld_place_path_info_init(Ofl_desc *, Ifl_desc *,
 			    Place_path_info *);
 extern Os_desc		*ld_place_section(Ofl_desc *, Is_desc *,
 			    Place_path_info *path_info,  int, const char *);
-extern uintptr_t	ld_process_archive(const char *, int, Ar_desc *,
+extern Boolean		ld_process_archive(const char *, int, Ar_desc *,
 			    Ofl_desc *);
 extern uintptr_t	ld_process_files(Ofl_desc *, int, char **);
 extern uintptr_t	ld_process_flags(Ofl_desc *, int, char **);
-extern Ifl_desc		*ld_process_ifl(const char *, const char *, int, Elf *,
-			    Word, Ofl_desc *, Rej_desc *);
+extern uintptr_t	ld_process_ifl(const char *, const char *, int, Elf *,
+			    Word, Ofl_desc *, Rej_desc *, Ifl_desc **);
 extern uintptr_t	ld_process_move(Ofl_desc *);
-extern Ifl_desc		*ld_process_open(const char *, const char *, int *,
-			    Ofl_desc *, Word, Rej_desc *);
+extern uintptr_t	ld_process_open(const char *, const char *, int *,
+			    Ofl_desc *, Word, Rej_desc *, Ifl_desc **);
 extern uintptr_t	ld_process_ordered(Ofl_desc *, Ifl_desc *,
 			    Place_path_info *path_info,  Word);
 extern uintptr_t	ld_process_sym_reloc(Ofl_desc *, Rel_desc *, Rel *,

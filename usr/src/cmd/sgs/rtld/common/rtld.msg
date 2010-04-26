@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 @ _START_
@@ -194,6 +193,7 @@
 @ MSG_LDD_REJ_MACHCAP	"  - machine capability (CA_SUNW_MACH) unsupported: %s"
 @ MSG_LDD_REJ_PLATCAP	"  - platform capability (CA_SUNW_PLAT) unsupported: %s"
 @ MSG_LDD_REJ_HWCAP_2	"  - hardware capability (CA_SUNW_HW_2) unsupported: %s"
+@ MSG_LDD_REJ_ARCHIVE	"  - invalid archive use"
 
 @ MSG_LDD_WARN_UNKCAP	"%s: unknown capability: %d"
 @ MSG_LDD_WARN_HWCAP_1	"%s: warning: hardware capability (CA_SUNW_HW_1) \
@@ -226,6 +226,7 @@
 @ MSG_ERR_REJ_MACHCAP	"%s: machine capability (CA_SUNW_MACH) unsupported: %s"
 @ MSG_ERR_REJ_PLATCAP	"%s: platform capability (CA_SUNW_PLAT) unsupported: %s"
 @ MSG_ERR_REJ_HWCAP_2	"%s: hardware capability (CA_SUNW_HW_2) unsupported: %s"
+@ MSG_ERR_REJ_ARCHIVE	"%s: invalid archive use"
 
 # Error TLS failures
 

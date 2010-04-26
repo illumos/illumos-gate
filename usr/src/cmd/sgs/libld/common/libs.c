@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -32,6 +31,7 @@
  */
 #include	<stdio.h>
 #include	<string.h>
+#include	<ar.h>
 #include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
@@ -55,8 +55,12 @@
  *	taken.  The visibility of the defined symbol is irrelevant, as the most
  *	restrictive visibility of the reference and the definition will be
  *	applied to the final symbol.
+ *
+ * exit:
+ *	Returns 1 if there is a match, 0 if no match is seen, and S_ERROR if an
+ *	error occurred.
  */
-static int
+static uintptr_t
 process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 {
 	Sym	*syms, *osym = sdp->sd_sym;
@@ -80,7 +84,7 @@ process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 				eprintf(ofl->ofl_lml, ERR_ELF,
 				    MSG_INTL(MSG_ELF_GETSHDR), amp->am_path);
 				ofl->ofl_flags |= FLG_OF_FATAL;
-				return (0);
+				return (S_ERROR);
 			}
 			if ((shdr->sh_type == SHT_SYMTAB) ||
 			    (shdr->sh_type == SHT_DYNSYM))
@@ -90,7 +94,7 @@ process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 			eprintf(ofl->ofl_lml, ERR_ELF,
 			    MSG_INTL(MSG_ELF_GETDATA), amp->am_path);
 			ofl->ofl_flags |= FLG_OF_FATAL;
-			return (0);
+			return (S_ERROR);
 		}
 		syms = (Sym *)data->d_buf;
 		syms += shdr->sh_info;
@@ -105,13 +109,13 @@ process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 			eprintf(ofl->ofl_lml, ERR_ELF,
 			    MSG_INTL(MSG_ELF_GETSCN), amp->am_path);
 			ofl->ofl_flags |= FLG_OF_FATAL;
-			return (0);
+			return (S_ERROR);
 		}
 		if ((data = elf_getdata(scn, NULL)) == NULL) {
 			eprintf(ofl->ofl_lml, ERR_ELF,
 			    MSG_INTL(MSG_ELF_GETDATA), amp->am_path);
 			ofl->ofl_flags |= FLG_OF_FATAL;
-			return (0);
+			return (S_ERROR);
 		}
 		strs = data->d_buf;
 
@@ -190,18 +194,20 @@ ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 	Elf_Arsym *	start;
 
 	/*
-	 * Get the archive symbol table. If this fails, we will
-	 * ignore this file with a warning message.
+	 * Unless, -z allextract is specified, get the archive symbol table
+	 * if one exists, and ignore the file with a warning message otherwise.
 	 */
-	if ((start = elf_getarsym(elf, &number)) == NULL) {
+	if (ofl->ofl_flags1 & FLG_OF1_ALLEXRT) {
+		start = NULL;
+	} else  if ((start = elf_getarsym(elf, &number)) == NULL) {
 		if (elf_errno()) {
 			eprintf(ofl->ofl_lml, ERR_ELF,
 			    MSG_INTL(MSG_ELF_GETARSYM), name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
-		} else
+		} else {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_ELF_ARSYM), name);
-
+		}
 		return (0);
 	}
 
@@ -213,8 +219,13 @@ ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 	adp->ad_name = name;
 	adp->ad_elf = elf;
 	adp->ad_start = start;
-	if ((adp->ad_aux = libld_calloc(sizeof (Ar_aux), number)) == NULL)
-		return ((Ar_desc *)S_ERROR);
+	if (start) {
+		adp->ad_aux = libld_calloc(sizeof (Ar_aux), number);
+		if (adp->ad_aux == NULL)
+			return ((Ar_desc *)S_ERROR);
+	} else {
+		adp->ad_aux = NULL;
+	}
 
 	/*
 	 * Retain any command line options that are applicable to archive
@@ -266,6 +277,18 @@ ld_ar_member(Ar_desc * adp, Elf_Arsym * arsym, Ar_aux * aup, Ar_mem * amp)
 	Ar_aux *	_aup = aup;
 	size_t		_off = arsym->as_off;
 
+	if (adp->ad_start == NULL)
+		return;
+
+	/*
+	 * Note: This algorithm assumes that the archive symbol table is
+	 * built from the member objects, in the same order as those
+	 * members are found in the archive. As such, the symbols for a
+	 * given member will all cluster together. If this is not true,
+	 * we will fail to mark some symbols. In that case, archive
+	 * processing may be less efficient than it would be otherwise.
+	 */
+
 	if (_arsym != adp->ad_start) {
 		do {
 			_arsym--;
@@ -286,6 +309,150 @@ ld_ar_member(Ar_desc * adp, Elf_Arsym * arsym, Ar_aux * aup, Ar_mem * amp)
 		_arsym++;
 		_aup++;
 	} while (_arsym->as_name);
+}
+
+/*
+ * Prepare an object from the given archive to be input to the link.
+ * Creates a path name for the object, and passes it to any registered
+ * support libraries.
+ *
+ * entry:
+ *	name - Name of archive
+ *	fd - Open file descriptor for archive
+ *	adp - Archive descriptor
+ *	ofl - output descriptor
+ *	arelf - Address of variable containing pointer to ELF descriptor
+ *		for archive member.
+ *	arsym - NULL, or archive symbol entry that is triggering the
+ *		pending extraction of this archive member.
+ *	arname - Address of pointer to be set to name of archive member.
+ *	arpath - Address of pointer to be set to constructed path name
+ *		for object.
+ *
+ * exit:
+ *	This routine can return one of the following:
+ *	S_ERROR:  Fatal error encountered.
+ *	0: Caller should skip this archive member and not continue with it.
+ *	1: Caller should procede with this archive member. *arname and *arpath
+ *		have been updated. *arelf may have been replaced by a support
+ *		library with a different object to use.
+ */
+static uintptr_t
+archive_prepare(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl,
+    Elf **arelf, Elf_Arsym *arsym, const char **arname, const char **arpath)
+{
+	Elf_Arhdr	*arhdr;
+	size_t		len, off;
+	char		*path;
+
+	/*
+	 * Construct the member filename.
+	 */
+	if ((arhdr = elf_getarhdr(*arelf)) == NULL) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETARHDR),
+		    name);
+		ofl->ofl_flags |= FLG_OF_FATAL;
+		return (S_ERROR);
+	}
+	*arname = arhdr->ar_name;
+
+	if (arsym != NULL) {	/* symbol resolution driven extraction */
+		off = arsym->as_off;
+	} else {		/* allextract extraction */
+		/*
+		 * Skip the symbol table, string table, or any other special
+		 * archive member. These all start with a '/' character.
+		 */
+		if (**arname == '/') {
+			(void) elf_end(*arelf);
+			return (0);
+		}
+
+		/*
+		 * ld_sup_open() requires the offset of this archive
+		 * member within the file. We don't have a direct
+		 * way of obtaining that, but elf_getbase() gives
+		 * us the base offset for the object data, and we
+		 * know that the archive header is directly above it
+		 * without any additional padding.
+		 */
+		off = elf_getbase(*arelf) - sizeof (struct ar_hdr);
+	}
+
+	/*
+	 * Construct the member's full pathname, using
+	 * the format "%s(%s)".
+	 */
+	len = strlen(name) + strlen(*arname) + 3;
+	if ((path = libld_malloc(len)) == NULL)
+		return (S_ERROR);
+	(void) snprintf(path, len, MSG_ORIG(MSG_FMT_ARMEM), name, *arname);
+	*arpath = path;
+
+	/*
+	 * Determine whether the support libraries wish to process this
+	 * open. See comments in ld_process_open().
+	 */
+	ld_sup_open(ofl, arpath, arname, &fd, (FLG_IF_EXTRACT | FLG_IF_NEEDED),
+	    arelf, adp->ad_elf, off, elf_kind(*arelf));
+
+	/* Return 1 if *arelf is not NULL, and 0 if it is */
+	return (*arelf != NULL);
+}
+
+/*
+ * Input the specified archive member to the link.
+ *
+ * entry:
+ *	fd - Open file descriptor for archive
+ *	adp - Archive descriptor
+ *	ofl - output descriptor
+ *	arelf - ELF descriptor for archive member.
+ *	arpath - Address of pointer to be set to constructed path name
+ *		for object.
+ *	rej - Rejection descriptor to pass to ld_process_ifl().
+ *
+ * exit:
+ *	This routine can return one of the following:
+ *	S_ERROR:  Fatal error encountered.
+ *	0: Object was rejected, and should be ignored.
+ *		rej will carry the rejection information.
+ *	1: The archive member has been input to the link.
+ */
+static uintptr_t
+archive_input(int fd, Ar_desc *adp, Ofl_desc *ofl, Elf *arelf,
+    const char *arpath, Rej_desc *rej)
+{
+	Rej_desc	_rej = { 0 };
+
+	switch (ld_process_ifl(arpath, NULL, fd, arelf,
+	    (FLG_IF_EXTRACT | FLG_IF_NEEDED), ofl, &_rej, NULL)) {
+	case S_ERROR:
+		return (S_ERROR);
+	case 0:
+		/*
+		 * If this member is rejected maintain the first rejection
+		 * error for possible later display.
+		 */
+		if (_rej.rej_type) {
+			if (rej->rej_type == 0) {
+				rej->rej_type = _rej.rej_type;
+				rej->rej_info = _rej.rej_info;
+				rej->rej_name = arpath;
+			}
+			(void) elf_end(arelf);
+			return (0);
+		}
+	}
+
+	/*
+	 * Indicate that the extracted member is in use.  This
+	 * enables debugging diags, and indicates that a further
+	 * rescan of all archives may be necessary.
+	 */
+	ofl->ofl_flags1 |= FLG_OF1_EXTRACT;
+	adp->ad_flags |= FLG_ARD_EXTRACT;
+	return (1);
 }
 
 /*
@@ -313,40 +480,44 @@ sym_vis[STV_NUM] = {
  * corresponding object from the archive is processed.  The archive symbol
  * table is searched until we go through a complete pass without satisfying any
  * unresolved symbols
+ *
+ * entry:
+ *	name - Name of archive
+ *	fd - Open file descriptor for archive
+ *	adp - Archive descriptor
+ *	ofl - output descriptor
+ *	found - Address of variable to set to TRUE if any objects are extracted
+ *	rej - Rejection descriptor to pass to ld_process_ifl().
+ *
+ * exit:
+ *	Returns FALSE on fatal error. On success, *found will be TRUE
+ *	if any object was extracted, rej will be set if any object
+ *	was rejected, and TRUE is returned.
  */
-uintptr_t
-ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
+static Boolean
+archive_extract_bysym(const char *name, int fd, Ar_desc *adp,
+    Ofl_desc *ofl, Boolean *found, Rej_desc *rej)
 {
 	Elf_Arsym *	arsym;
-	Elf_Arhdr *	arhdr;
 	Elf *		arelf;
 	Ar_aux *	aup;
 	Sym_desc *	sdp;
-	char 		*arname, *arpath;
-	Xword		ndx;
-	int		found, again;
-	int		allexrt = (ofl->ofl_flags1 & FLG_OF1_ALLEXRT) != 0;
+	const char	*arname, *arpath;
+	Boolean		again = FALSE;
 	uintptr_t	err;
-	Rej_desc	rej = { 0 };
 
 	/*
-	 * If a fatal error condition has been set there's really no point in
-	 * processing the archive further.  Having got to this point we have at
-	 * least established that the archive exists (thus verifying that the
-	 * command line options that got us to this archive are correct).  Very
-	 * large archives can take a significant time to process, therefore
-	 * continuing on from here may significantly delay the fatal error
-	 * message the user is already set to receive.
+	 * An archive without a symbol table should not reach this function,
+	 * because it can only get past ld_ar_setup() in the case where
+	 * the archive is first seen under the influence of '-z allextract'.
+	 * That will cause the entire archive to be extracted, and any
+	 * subsequent reference to the archive will be ignored by
+	 * ld_process_archive().
 	 */
-	if (ofl->ofl_flags & FLG_OF_FATAL)
-		return (1);
-
-	/*
-	 * If this archive was processed with -z allextract, then all members
-	 * have already been extracted.
-	 */
-	if (adp->ad_elf == NULL)
-		return (1);
+	if (adp->ad_start == NULL) {
+		assert(adp->ad_start != NULL);
+		return (TRUE);
+	}
 
 	/*
 	 * Loop through archive symbol table until we make a complete pass
@@ -355,18 +526,18 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 	 * symbol table.  If so, and if that symbol is still unresolved or
 	 * tentative, process the corresponding archive member.
 	 */
-	found = again = 0;
 	do {
 		DBG_CALL(Dbg_file_ar(ofl->ofl_lml, name, again));
 		DBG_CALL(Dbg_syms_ar_title(ofl->ofl_lml, name, again));
+		again = FALSE;
 
-		ndx = again = 0;
 		for (arsym = adp->ad_start, aup = adp->ad_aux; arsym->as_name;
-		    ++arsym, ++aup, ndx++) {
-			Rej_desc	_rej = { 0 };
+		    ++arsym, ++aup) {
 			Ar_mem		*amp;
 			Sym		*sym;
 			Boolean		visible = TRUE;
+			Boolean		vers;
+			Ifl_desc	*ifl;
 
 			/*
 			 * If the auxiliary members value indicates that this
@@ -381,14 +552,13 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			/*
 			 * If the auxiliary symbol element is non-zero lookup
 			 * the symbol from the internal symbol table.
-			 * (But you skip this if allextract is specified.)
 			 */
-			if ((allexrt == 0) && ((sdp = aup->au_syms) == NULL)) {
+			if ((sdp = aup->au_syms) == NULL) {
 				if ((sdp = ld_sym_find(arsym->as_name,
 				    /* LINTED */
 				    (Word)arsym->as_hash, NULL, ofl)) == NULL) {
-					DBG_CALL(Dbg_syms_ar_entry(ofl->ofl_lml,
-					    ndx, arsym));
+					DBG_CALL(Dbg_syms_ar_skip(ofl->ofl_lml,
+					    name, arsym));
 					continue;
 				}
 				aup->au_syms = sdp;
@@ -414,40 +584,36 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			 * visibility, then a definition of this symbol from
 			 * within the archive is a better candidate.
 			 */
-			if (allexrt == 0) {
-				Boolean		vers = TRUE;
-				Ifl_desc	*ifl = sdp->sd_file;
+			vers = TRUE;
+			ifl = sdp->sd_file;
 
-				sym = sdp->sd_sym;
+			sym = sdp->sd_sym;
 
-				if (sdp->sd_ref == REF_DYN_NEED) {
-					uchar_t	vis;
+			if (sdp->sd_ref == REF_DYN_NEED) {
+				uchar_t	vis;
 
-					if (ifl->ifl_vercnt) {
-						Word		vndx;
-						Ver_index	*vip;
+				if (ifl->ifl_vercnt) {
+					Word		vndx;
+					Ver_index	*vip;
 
-						vndx = sdp->sd_aux->sa_dverndx;
-						vip = &ifl->ifl_verndx[vndx];
-						if ((vip->vi_flags &
-						    FLG_VER_AVAIL) == 0)
-							vers = FALSE;
-					}
-
-					vis = ELF_ST_VISIBILITY(sym->st_other);
-					visible = sym_vis[vis];
+					vndx = sdp->sd_aux->sa_dverndx;
+					vip = &ifl->ifl_verndx[vndx];
+					if (!(vip->vi_flags & FLG_VER_AVAIL))
+						vers = FALSE;
 				}
 
-				if (((ifl->ifl_flags & FLG_IF_NEEDED) == 0) ||
-				    (visible && vers &&
-				    (sym->st_shndx != SHN_UNDEF) &&
-				    (sym->st_shndx != SHN_COMMON)) ||
-				    ((ELF_ST_BIND(sym->st_info) == STB_WEAK) &&
-				    (!(ofl->ofl_flags1 & FLG_OF1_WEAKEXT)))) {
-					DBG_CALL(Dbg_syms_ar_entry(ofl->ofl_lml,
-					    ndx, arsym));
-					continue;
-				}
+				vis = ELF_ST_VISIBILITY(sym->st_other);
+				visible = sym_vis[vis];
+			}
+
+			if (((ifl->ifl_flags & FLG_IF_NEEDED) == 0) ||
+			    (visible && vers && (sym->st_shndx != SHN_UNDEF) &&
+			    (sym->st_shndx != SHN_COMMON)) ||
+			    ((ELF_ST_BIND(sym->st_info) == STB_WEAK) &&
+			    (!(ofl->ofl_flags1 & FLG_OF1_WEAKEXT)))) {
+				DBG_CALL(Dbg_syms_ar_skip(ofl->ofl_lml,
+				    name, arsym));
+				continue;
 			}
 
 			/*
@@ -459,8 +625,6 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				arname = amp->am_name;
 				arpath = amp->am_path;
 			} else {
-				size_t	len;
-
 				/*
 				 * Set up a new elf descriptor for this member.
 				 */
@@ -468,10 +632,10 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				    arsym->as_off) {
 					eprintf(ofl->ofl_lml, ERR_ELF,
 					    MSG_INTL(MSG_ELF_ARMEM), name,
-					    EC_WORD(arsym->as_off), ndx,
+					    EC_WORD(arsym->as_off),
 					    demangle(arsym->as_name));
 					ofl->ofl_flags |= FLG_OF_FATAL;
-					return (0);
+					return (FALSE);
 				}
 
 				if ((arelf = elf_begin(fd, ELF_C_READ,
@@ -479,46 +643,14 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 					eprintf(ofl->ofl_lml, ERR_ELF,
 					    MSG_INTL(MSG_ELF_BEGIN), name);
 					ofl->ofl_flags |= FLG_OF_FATAL;
-					return (0);
+					return (FALSE);
 				}
 
-				/*
-				 * Construct the member filename.
-				 */
-				if ((arhdr = elf_getarhdr(arelf)) == NULL) {
-					eprintf(ofl->ofl_lml, ERR_ELF,
-					    MSG_INTL(MSG_ELF_GETARHDR), name);
-					ofl->ofl_flags |= FLG_OF_FATAL;
-					return (0);
-				}
-				arname = arhdr->ar_name;
-
-				/*
-				 * Construct the members full pathname, using
-				 * the format "%s(%s)".
-				 */
-				len = strlen(name) + strlen(arname) + 3;
-				if ((arpath = libld_malloc(len)) == NULL)
-					return (S_ERROR);
-				(void) snprintf(arpath, len,
-				    MSG_ORIG(MSG_FMT_ARMEM), name, arname);
-
-				/*
-				 * Determine whether the support library wishes
-				 * to process this open.  See comments in
-				 * ld_process_open().
-				 */
-				ld_sup_open(ofl, (const char **)&arpath,
-				    (const char **)&arname, &fd,
-				    (FLG_IF_EXTRACT | FLG_IF_NEEDED),
-				    &arelf, adp->ad_elf, arsym->as_off,
-				    elf_kind(arelf));
-
-				/*
-				 * An ELF descriptor of zero indicates that
-				 * the archive member should be ignored.
-				 */
-				if (arelf == NULL) {
+				switch (archive_prepare(name, fd, adp, ofl,
+				    &arelf, NULL, &arname, &arpath)) {
+				case S_ERROR:
+					return (FALSE);
+				case 0:		/* Ignore this archive member */
 					aup->au_mem = FLG_ARMEM_PROC;
 					continue;
 				}
@@ -538,9 +670,8 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			 *	dependency, but the reference expects to be
 			 *	reduced to hidden or protected visibility.
 			 */
-			if ((allexrt == 0) &&
-			    ((sym->st_shndx == SHN_COMMON) ||
-			    (visible == FALSE))) {
+			if ((sym->st_shndx == SHN_COMMON) ||
+			    (visible == FALSE)) {
 				/*
 				 * If we don't already have a member structure
 				 * allocate one.
@@ -548,16 +679,16 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				if (!amp) {
 					if ((amp = libld_calloc(sizeof (Ar_mem),
 					    1)) == NULL)
-						return (S_ERROR);
+						return (FALSE);
 					amp->am_elf = arelf;
 					amp->am_name = arname;
 					amp->am_path = arpath;
 				}
 				DBG_CALL(Dbg_syms_ar_checking(ofl->ofl_lml,
-				    ndx, arsym, arname));
+				    name, arname, arsym));
 				if ((err = process_member(amp, arsym->as_name,
 				    sdp, ofl)) == S_ERROR)
-					return (S_ERROR);
+					return (FALSE);
 
 				/*
 				 * If it turns out that we don't need this
@@ -579,49 +710,150 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			 * Process the archive member.  Retain any error for
 			 * return to the caller.
 			 */
-			DBG_CALL(Dbg_syms_ar_resolve(ofl->ofl_lml, ndx, arsym,
-			    arname, allexrt));
-			if ((err = (uintptr_t)ld_process_ifl(arpath, NULL, fd,
-			    arelf, (FLG_IF_EXTRACT | FLG_IF_NEEDED), ofl,
-			    &_rej)) == S_ERROR)
-				return (S_ERROR);
-
-			/*
-			 * If this member is rejected maintain the first
-			 * rejection error for possible later display.  Keep the
-			 * member as extracted so that we don't try and process
-			 * it again on a rescan.
-			 */
-			if (_rej.rej_type) {
-				if (rej.rej_type == 0) {
-					rej.rej_type = _rej.rej_type;
-					rej.rej_info = _rej.rej_info;
-					rej.rej_name = (const char *)arpath;
-				}
+			DBG_CALL(Dbg_syms_ar_resolve(ofl->ofl_lml,
+			    name, arname, arsym));
+			switch (archive_input(fd, adp, ofl, arelf, arpath,
+			    rej)) {
+			case S_ERROR:
+				return (FALSE);
+			case 0:
+				/*
+				 * Mark the member as extracted so that we
+				 * don't try and process it again on a rescan.
+				 */
 				ld_ar_member(adp, arsym, aup, FLG_ARMEM_PROC);
 				continue;
 			}
 
 			/*
-			 * Indicate that the extracted member is in use.  This
-			 * enables debugging diags, and indicates that a further
-			 * rescan of all archives may be necessary.
+			 * Note that this archive has contributed something
+			 * during this specific operation, and also signal
+			 * the need to rescan the archive.
 			 */
-			found = 1;
-			ofl->ofl_flags1 |= FLG_OF1_EXTRACT;
-			adp->ad_flags |= FLG_ARD_EXTRACT;
-
-			/*
-			 * If not under '-z allextract' signal the need to
-			 * rescan this archive.
-			 */
-			if (allexrt == 0)
-				again = 1;
+			*found = again = TRUE;
 
 			ld_ar_member(adp, arsym, aup, FLG_ARMEM_PROC);
-			DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 		}
 	} while (again);
+
+	return (TRUE);
+}
+
+
+/*
+ * Extract every object in the given archive directly without going through
+ * the symbol table.
+ *
+ * entry:
+ *	name - Name of archive
+ *	fd - Open file descriptor for archive
+ *	adp - Archive descriptor
+ *	ofl - output descriptor
+ *	found - Address of variable to set to TRUE if any objects are extracted
+ *	rej - Rejection descriptor to pass to ld_process_ifl().
+ *
+ * exit:
+ *	Returns FALSE on fatal error. On success, *found will be TRUE
+ *	if any object was extracted, rej will be set if any object
+ *	was rejected, and TRUE is returned.
+ */
+static Boolean
+archive_extract_all(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl,
+    Boolean *found, Rej_desc *rej)
+{
+	Elf_Cmd		cmd = ELF_C_READ;
+	Elf		*arelf;
+	const char	*arname, *arpath;
+
+	DBG_CALL(Dbg_file_ar(ofl->ofl_lml, name, FALSE));
+
+	while ((arelf = elf_begin(fd, cmd, adp->ad_elf)) != NULL) {
+		/*
+		 * Call elf_next() so that the next call to elf_begin() will
+		 * fetch the archive member following this one. We do this now
+		 * because it simplifies the logic below, and because the
+		 * support libraries called via archive_prepare() can set our
+		 * handle to NULL.
+		 */
+		cmd = elf_next(arelf);
+
+		switch (archive_prepare(name, fd, adp, ofl, &arelf, NULL,
+		    &arname, &arpath)) {
+		case S_ERROR:
+			return (FALSE);
+		case 0:		/* Ignore this archive member */
+			continue;
+		}
+
+		DBG_CALL(Dbg_syms_ar_force(ofl->ofl_lml, name, arname));
+		switch (archive_input(fd, adp, ofl, arelf, arpath, rej)) {
+		case S_ERROR:
+			return (FALSE);
+		case 0:
+			continue;
+		}
+
+		*found = TRUE;
+
+	}
+
+	/*
+	 * As this archive was extracted by -z allextract, the ar_aux table
+	 * and elf descriptor can be freed.  Set ad_elf to NULL to mark the
+	 * archive is completely processed.
+	 */
+	(void) elf_end(adp->ad_elf);
+	adp->ad_elf = NULL;
+
+	return (TRUE);
+}
+
+
+/*
+ * Process the given archive and extract objects for inclusion into
+ * the link.
+ *
+ * entry:
+ *	name - Name of archive
+ *	fd - Open file descriptor for archive
+ *	adp - Archive descriptor
+ *	ofl - output descriptor
+ *
+ * exit:
+ *	Returns FALSE on fatal error, TRUE otherwise.
+ */
+Boolean
+ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
+{
+	Boolean		found = FALSE;
+	Rej_desc	rej = { 0 };
+
+	/*
+	 * If a fatal error condition has been set there's really no point in
+	 * processing the archive further.  Having got to this point we have at
+	 * least established that the archive exists (thus verifying that the
+	 * command line options that got us to this archive are correct).  Very
+	 * large archives can take a significant time to process, therefore
+	 * continuing on from here may significantly delay the fatal error
+	 * message the user is already set to receive.
+	 */
+	if (ofl->ofl_flags & FLG_OF_FATAL)
+		return (TRUE);
+
+	/*
+	 * If this archive was processed with -z allextract, then all members
+	 * have already been extracted.
+	 */
+	if (adp->ad_elf == NULL)
+		return (TRUE);
+
+	if (ofl->ofl_flags1 & FLG_OF1_ALLEXRT) {
+		if (!archive_extract_all(name, fd, adp, ofl, &found, &rej))
+			return (FALSE);
+	} else {
+		if (!archive_extract_bysym(name, fd, adp, ofl, &found, &rej))
+			return (FALSE);
+	}
 
 	/*
 	 * If no objects have been found in the archive test for any rejections
@@ -637,15 +869,6 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 		    conv_reject_desc(&rej, &rej_buf, ld_targ.t_m.m_mach));
 	}
 
-	/*
-	 * If this archive was extracted by -z allextract, the ar_aux table
-	 * and elf descriptor can be freed.  Set ad_elf to NULL to mark the
-	 * archive is completely processed.
-	 */
-	if (allexrt) {
-		(void) elf_end(adp->ad_elf);
-		adp->ad_elf = NULL;
-	}
 
-	return (1);
+	return (TRUE);
 }

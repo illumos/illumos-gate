@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<stdio.h>
@@ -126,53 +125,54 @@ Dbg_syms_lazy_rescan(Lm_list *lml, const char *name)
 }
 
 void
-Dbg_syms_ar_title(Lm_list *lml, const char *file, int again)
+Dbg_syms_ar_title(Lm_list *lml, const char *file, Boolean again)
 {
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
 		return;
 
-	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_SYM_AR_FILE), file,
 	    again ? MSG_INTL(MSG_STR_AGAIN) : MSG_ORIG(MSG_STR_EMPTY));
 }
 
 void
-Dbg_syms_ar_entry(Lm_list *lml, Xword ndx, Elf_Arsym *arsym)
+Dbg_syms_ar_skip(Lm_list *lml, const char *archive, Elf_Arsym *arsym)
 {
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
 		return;
 
-	dbg_print(lml, MSG_INTL(MSG_SYM_AR_ENTRY), EC_XWORD(ndx),
+	dbg_print(lml, MSG_INTL(MSG_SYM_AR_SKIP), archive,
 	    Dbg_demangle_name(arsym->as_name));
 }
 
 void
-Dbg_syms_ar_checking(Lm_list *lml, Xword ndx, Elf_Arsym *arsym,
-    const char *name)
+Dbg_syms_ar_checking(Lm_list *lml, const char *fname, const char *objname,
+    Elf_Arsym *arsym)
 {
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
 		return;
 
-	dbg_print(lml, MSG_INTL(MSG_SYM_AR_CHECK), EC_XWORD(ndx),
-	    Dbg_demangle_name(arsym->as_name), name);
+	dbg_print(lml, MSG_INTL(MSG_SYM_AR_CHECK), fname, objname,
+	    Dbg_demangle_name(arsym->as_name));
 }
 
 void
-Dbg_syms_ar_resolve(Lm_list *lml, Xword ndx, Elf_Arsym *arsym,
-    const char *fname, int flag)
+Dbg_syms_ar_resolve(Lm_list *lml, const char *fname, const char *objname,
+    Elf_Arsym *arsym)
 {
-	const char	*fmt;
-
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
 		return;
 
-	if (flag)
-		fmt = MSG_INTL(MSG_SYM_AR_FORCEDEXRT);
-	else
-		fmt = MSG_INTL(MSG_SYM_AR_RESOLVE);
+	dbg_print(lml, MSG_INTL(MSG_SYM_AR_RESOLVE), fname, objname,
+	    Dbg_demangle_name(arsym->as_name));
+}
 
-	dbg_print(lml, fmt, EC_XWORD(ndx), Dbg_demangle_name(arsym->as_name),
-	    fname);
+void
+Dbg_syms_ar_force(Lm_list *lml, const char *fname, const char *objname)
+{
+	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_SYM_AR_FORCE), fname, objname);
 }
 
 void

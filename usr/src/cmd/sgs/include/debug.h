@@ -449,8 +449,9 @@ extern	void		Dbg_help(void);
 #define	Dbg_syminfo_title	Dbg64_syminfo_title
 
 #define	Dbg_syms_ar_checking	Dbg64_syms_ar_checking
-#define	Dbg_syms_ar_entry	Dbg64_syms_ar_entry
+#define	Dbg_syms_ar_force	Dbg64_syms_ar_force
 #define	Dbg_syms_ar_resolve	Dbg64_syms_ar_resolve
+#define	Dbg_syms_ar_skip	Dbg64_syms_ar_skip
 #define	Dbg_syms_ar_title	Dbg64_syms_ar_title
 #define	Dbg_syms_cap_convert	Dbg64_syms_cap_convert
 #define	Dbg_syms_cap_local	Dbg64_syms_cap_local
@@ -679,8 +680,9 @@ extern	void		Dbg_help(void);
 #define	Dbg_syminfo_title	Dbg32_syminfo_title
 
 #define	Dbg_syms_ar_checking	Dbg32_syms_ar_checking
-#define	Dbg_syms_ar_entry	Dbg32_syms_ar_entry
+#define	Dbg_syms_ar_force	Dbg32_syms_ar_force
 #define	Dbg_syms_ar_resolve	Dbg32_syms_ar_resolve
+#define	Dbg_syms_ar_skip	Dbg32_syms_ar_skip
 #define	Dbg_syms_ar_title	Dbg32_syms_ar_title
 #define	Dbg_syms_cap_convert	Dbg32_syms_cap_convert
 #define	Dbg_syms_cap_local	Dbg32_syms_cap_local
@@ -813,7 +815,7 @@ extern	void	Dbg_ent_print(Lm_list *, uchar_t, Half, APlist *);
 extern	void	Dbg_file_analyze(Rt_map *);
 extern	void	Dbg_file_aout(Lm_list *, const char *, Addr, size_t,
 		    const char *, Aliste);
-extern	void	Dbg_file_ar(Lm_list *, const char *, int);
+extern	void	Dbg_file_ar(Lm_list *, const char *, Boolean);
 extern	void	Dbg_file_ar_rescan(Lm_list *, int, int);
 extern	void	Dbg_file_bind_entry(Lm_list *, Bnd_desc *);
 extern	void	Dbg_file_bindings(Rt_map *, int);
@@ -963,12 +965,13 @@ extern	void	Dbg_syminfo_entry(Lm_list *, Word, Syminfo *, Sym *,
 		    const char *, Dyn *);
 extern	void	Dbg_syminfo_title(Lm_list *);
 
-extern	void	Dbg_syms_ar_checking(Lm_list *, Xword, Elf_Arsym *,
-		    const char *);
-extern	void	Dbg_syms_ar_entry(Lm_list *, Xword, Elf_Arsym *);
-extern	void	Dbg_syms_ar_resolve(Lm_list *, Xword, Elf_Arsym *,
-		    const char *, int);
-extern	void	Dbg_syms_ar_title(Lm_list *, const char *, int);
+extern	void	Dbg_syms_ar_checking(Lm_list *, const char *, const char *,
+		    Elf_Arsym *);
+extern	void	Dbg_syms_ar_force(Lm_list *, const char *, const char *);
+extern	void	Dbg_syms_ar_resolve(Lm_list *, const char *, const char *,
+		    Elf_Arsym *);
+extern	void	Dbg_syms_ar_skip(Lm_list *, const char *, Elf_Arsym *);
+extern	void	Dbg_syms_ar_title(Lm_list *, const char *, Boolean);
 extern	void	Dbg_syms_cap_convert(Ofl_desc *, Word, const char *, Sym *);
 extern	void	Dbg_syms_cap_local(Ofl_desc *, Word, const char *, Sym *,
 		    Sym_desc *);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<sys/auxv.h>
@@ -633,7 +632,7 @@ Dbg_file_ar_rescan(Lm_list *lml, int argv_start_ndx, int argv_end_ndx)
 }
 
 void
-Dbg_file_ar(Lm_list *lml, const char *name, int again)
+Dbg_file_ar(Lm_list *lml, const char *name, Boolean again)
 {
 	const char	*str;
 
@@ -706,6 +705,7 @@ Dbg_file_reuse(Lm_list *lml, const char *nname, const char *oname)
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
+	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_REUSE), nname, oname);
 }
 

@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -171,14 +170,14 @@ ld_add_libdir(Ofl_desc *ofl, const char *path)
  * Process a required library.  Combine the directory and filename, and then
  * append either a `.so' or `.a' suffix and try opening the associated pathname.
  */
-static Ifl_desc *
+static uintptr_t
 find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 {
 	int		fd;
 	size_t		dlen;
 	char		*_path, path[PATH_MAX + 2];
 	const char	*_dir = dir;
-	Ifl_desc	*ifl;
+	uintptr_t	open_ret;
 
 	/*
 	 * Determine the size of the directory.  The directory and filename are
@@ -203,14 +202,14 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 		if ((fd = open(path, O_RDONLY)) != -1) {
 
 			if ((_path = libld_malloc(strlen(path) + 1)) == NULL)
-				return ((Ifl_desc *)S_ERROR);
+				return (S_ERROR);
 			(void) strcpy(_path, path);
 
-			ifl = ld_process_open(_path, &_path[dlen], &fd, ofl,
-			    FLG_IF_NEEDED, rej);
+			open_ret = ld_process_open(_path, &_path[dlen], &fd,
+			    ofl, FLG_IF_NEEDED, rej, NULL);
 			if (fd != -1)
 				(void) close(fd);
-			return (ifl);
+			return (open_ret);
 
 		} else if (errno != ENOENT) {
 			/*
@@ -233,14 +232,14 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 	if ((fd = open(path, O_RDONLY)) != -1) {
 
 		if ((_path = libld_malloc(strlen(path) + 1)) == NULL)
-			return ((Ifl_desc *)S_ERROR);
+			return (S_ERROR);
 		(void) strcpy(_path, path);
 
-		ifl = ld_process_open(_path, &_path[dlen], &fd, ofl,
-		    FLG_IF_NEEDED, rej);
+		open_ret = ld_process_open(_path, &_path[dlen], &fd, ofl,
+		    FLG_IF_NEEDED, rej, NULL);
 		if (fd != -1)
 			(void) close(fd);
-		return (ifl);
+		return (open_ret);
 
 	} else if (errno != ENOENT) {
 		/*
@@ -252,7 +251,7 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 		rej->rej_name = strdup(path);
 	}
 
-	return (NULL);
+	return (0);
 }
 
 /*
@@ -273,7 +272,7 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 {
 	Aliste		idx;
 	char		*path;
-	Ifl_desc	*ifl = 0;
+	uintptr_t	open_ret;
 	Rej_desc	rej = { 0 };
 
 	/*
@@ -282,12 +281,12 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 	for (APLIST_TRAVERSE(ofl->ofl_ulibdirs, idx, path)) {
 		Rej_desc	_rej = { 0 };
 
-		if ((ifl = find_lib_name(path, name, ofl, &_rej)) == NULL) {
+		if ((open_ret = find_lib_name(path, name, ofl, &_rej)) == 0) {
 			if (_rej.rej_type && (rej.rej_type == 0))
 				rej = _rej;
 			continue;
 		}
-		return ((uintptr_t)ifl);
+		return (open_ret);
 	}
 
 	/*
@@ -296,12 +295,12 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 	for (APLIST_TRAVERSE(ofl->ofl_dlibdirs, idx, path)) {
 		Rej_desc	_rej = { 0 };
 
-		if ((ifl = find_lib_name(path, name, ofl, &_rej)) == NULL) {
+		if ((open_ret = find_lib_name(path, name, ofl, &_rej)) == 0) {
 			if (_rej.rej_type && (rej.rej_type == 0))
 				rej = _rej;
 			continue;
 		}
-		return ((uintptr_t)ifl);
+		return (open_ret);
 	}
 
 	/*

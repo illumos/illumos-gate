@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -950,7 +949,8 @@ conv_reject_desc(Rej_desc * rej, Conv_reject_desc_buf_t *reject_desc_buf,
 		return (conv_ehdr_flags(mach, (Word)info, 0,
 		    &reject_desc_buf->flags_buf));
 	case SGS_REJ_UNKFILE:
-		return ((const char *)0);
+	case SGS_REJ_ARCHIVE:
+		return (NULL);
 	case SGS_REJ_STR:
 	case SGS_REJ_HWCAP_1:
 	case SGS_REJ_SFCAP_1:

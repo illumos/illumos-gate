@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -3010,10 +3009,29 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
  *	needed entry contained a `/'), or the basename of the located file.
  *	These libraries are processed to verify symbol binding but are not
  *	recorded as dependencies of the output file being generated.
+ *
+ * entry:
+ *	name - File name
+ *	soname - SONAME for needed sharable library, as described above
+ *	fd - Open file descriptor
+ *	elf - Open ELF handle
+ *	flags - FLG_IF_ flags applicable to file
+ *	ofl - Output file descriptor
+ *	rej - Rejection descriptor used to record rejection reason
+ *	ifl_ret - NULL, or address of pointer to receive reference to
+ *		resulting input descriptor for file. If ifl_ret is non-NULL,
+ *		the file cannot be an archive or it will be rejected.
+ *
+ * exit:
+ *	If a error occurs in examining the file, S_ERROR is returned.
+ *	If the file can be examined, but is not suitable, *rej is updated,
+ *	and 0 is returned. If the file is acceptable, 1 is returned, and if
+ *	ifl_ret is non-NULL, *ifl_ret is set to contain the pointer to the
+ *	resulting input descriptor.
  */
-Ifl_desc *
+uintptr_t
 ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
-    Word flags, Ofl_desc *ofl, Rej_desc *rej)
+    Word flags, Ofl_desc *ofl, Rej_desc *rej, Ifl_desc **ifl_ret)
 {
 	Ifl_desc	*ifl;
 	Ehdr		*ehdr;
@@ -3038,6 +3056,24 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 	switch (elf_kind(elf)) {
 	case ELF_K_AR:
 		/*
+		 * If the caller has supplied a non-NULL ifl_ret, then
+		 * we cannot process archives, for there will be no
+		 * input file descriptor for us to return. In this case,
+		 * reject the attempt.
+		 */
+		if (ifl_ret != NULL) {
+			_rej.rej_type = SGS_REJ_ARCHIVE;
+			_rej.rej_name = name;
+			DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej,
+			    ld_targ.t_m.m_mach));
+			if (rej->rej_type == 0) {
+				*rej = _rej;
+				rej->rej_name = strdup(_rej.rej_name);
+			}
+			return (0);
+		}
+
+		/*
 		 * Determine if we've already come across this archive file.
 		 */
 		if (!(flags & FLG_IF_EXTRACT)) {
@@ -3058,8 +3094,9 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				DBG_CALL(Dbg_file_reuse(ofl->ofl_lml, name,
 				    adp->ad_name));
 				(void) elf_end(elf);
-				return ((Ifl_desc *)ld_process_archive(name, -1,
-				    adp, ofl));
+				if (!ld_process_archive(name, -1, adp, ofl))
+					return (S_ERROR);
+				return (1);
 			}
 		}
 
@@ -3069,7 +3106,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		 */
 		adp = ld_ar_setup(name, elf, ofl);
 		if ((adp == NULL) || (adp == (Ar_desc *)S_ERROR))
-			return ((Ifl_desc *)adp);
+			return ((uintptr_t)adp);
 		adp->ad_stdev = status.st_dev;
 		adp->ad_stino = status.st_ino;
 
@@ -3091,10 +3128,12 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 			eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_CNTL),
 			    name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
-			return (NULL);
+			return (0);
 		}
 
-		return ((Ifl_desc *)ld_process_archive(name, -1, adp, ofl));
+		if (!ld_process_archive(name, -1, adp, ofl))
+			return (S_ERROR);
+		return (1);
 
 	case ELF_K_ELF:
 		/*
@@ -3105,12 +3144,11 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 			int	_class = gelf_getclass(elf);
 
 			/*
-			 * Failure could occur for a number of reasons at this
-			 * point.  Typically the files class is incorrect (ie.
-			 * user is building 64-bit but managed to pint at 32-bit
-			 * libraries).  However any number of elf errors can
-			 * also occur, such as from a truncated or corrupt file.
-			 * Here we try and get the best error message possible.
+			 * This can fail for a number of reasons. Typically
+			 * the object class is incorrect (ie. user is building
+			 * 64-bit but managed to point at 32-bit libraries).
+			 * Other ELF errors can include a truncated or corrupt
+			 * file. Try to get the best error message possible.
 			 */
 			if (ld_targ.t_m.m_class != _class) {
 				_rej.rej_type = SGS_REJ_CLASS;
@@ -3126,7 +3164,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				*rej = _rej;
 				rej->rej_name = strdup(_rej.rej_name);
 			}
-			return (NULL);
+			return (0);
 		}
 
 		/*
@@ -3189,7 +3227,9 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    errmsg, name, ifl->ifl_name);
 				}
-				return (ifl);
+				if (ifl_ret)
+					*ifl_ret = ifl;
+				return (1);
 			}
 		}
 
@@ -3199,7 +3239,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		 */
 		ifl = ifl_setup(name, ehdr, elf, flags, ofl, rej);
 		if ((ifl == NULL) || (ifl == (Ifl_desc *)S_ERROR))
-			return (ifl);
+			return ((uintptr_t)ifl);
 		ifl->ifl_stdev = status.st_dev;
 		ifl->ifl_stino = status.st_ino;
 
@@ -3222,7 +3262,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_FIL_SOINSTAT), name);
 				ofl->ofl_flags |= FLG_OF_FATAL;
-				return (NULL);
+				return (0);
 			}
 
 			/*
@@ -3269,7 +3309,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				*rej = _rej;
 				rej->rej_name = strdup(_rej.rej_name);
 			}
-			return (NULL);
+			return (0);
 		}
 		break;
 	default:
@@ -3282,12 +3322,14 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 			*rej = _rej;
 			rej->rej_name = strdup(_rej.rej_name);
 		}
-		return (NULL);
+		return (0);
 	}
 	if ((error == 0) || (error == S_ERROR))
-		return ((Ifl_desc *)error);
-	else
-		return (ifl);
+		return (error);
+
+	if (ifl_ret)
+		*ifl_ret = ifl;
+	return (1);
 }
 
 /*
@@ -3296,9 +3338,9 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
  * from the elf initialization required to process a relocatable object from an
  * archive (see libs.c: ld_process_archive()).
  */
-Ifl_desc *
+uintptr_t
 ld_process_open(const char *opath, const char *ofile, int *fd, Ofl_desc *ofl,
-    Word flags, Rej_desc *rej)
+    Word flags, Rej_desc *rej, Ifl_desc **ifl_ret)
 {
 	Elf		*elf;
 	const char	*npath = opath;
@@ -3307,7 +3349,7 @@ ld_process_open(const char *opath, const char *ofile, int *fd, Ofl_desc *ofl,
 	if ((elf = elf_begin(*fd, ELF_C_READ, NULL)) == NULL) {
 		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN), npath);
 		ofl->ofl_flags |= FLG_OF_FATAL;
-		return (NULL);
+		return (0);
 	}
 
 	/*
@@ -3327,9 +3369,10 @@ ld_process_open(const char *opath, const char *ofile, int *fd, Ofl_desc *ofl,
 	    elf_kind(elf));
 
 	if ((*fd == -1) || (elf == NULL))
-		return (NULL);
+		return (0);
 
-	return (ld_process_ifl(npath, nfile, *fd, elf, flags, ofl, rej));
+	return (ld_process_ifl(npath, nfile, *fd, elf, flags, ofl, rej,
+	    ifl_ret));
 }
 
 /*
@@ -3341,7 +3384,9 @@ Ifl_desc *
 ld_process_mem(const char *path, const char *file, char *addr, size_t size,
     Ofl_desc *ofl, Rej_desc *rej)
 {
-	Elf	*elf;
+	Elf		*elf;
+	uintptr_t	open_ret;
+	Ifl_desc	*ifl;
 
 	if ((elf = elf_memory(addr, size)) == NULL) {
 		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_MEMORY), path);
@@ -3349,7 +3394,10 @@ ld_process_mem(const char *path, const char *file, char *addr, size_t size,
 		return (0);
 	}
 
-	return (ld_process_ifl(path, file, 0, elf, 0, ofl, rej));
+	open_ret = ld_process_ifl(path, file, 0, elf, 0, ofl, rej, &ifl);
+	if (open_ret != 1)
+		return ((Ifl_desc *) open_ret);
+	return (ifl);
 }
 
 /*
@@ -3395,15 +3443,19 @@ process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
 	if ((fd = open(path, O_RDONLY)) == -1)
 		return (0);
 	else {
+		uintptr_t	open_ret;
 		Ifl_desc	*ifl;
 		char		*_path;
 
 		if ((_path = libld_malloc(strlen(path) + 1)) == NULL)
 			return ((Ifl_desc *)S_ERROR);
 		(void) strcpy(_path, path);
-		ifl = ld_process_open(_path, &_path[dlen], &fd, ofl, 0, rej);
+		open_ret = ld_process_open(_path, &_path[dlen], &fd, ofl,
+		    0, rej, &ifl);
 		if (fd != -1)
 			(void) close(fd);
+		if (open_ret != 1)
+			return ((Ifl_desc *)open_ret);
 		return (ifl);
 	}
 }
@@ -3476,13 +3528,14 @@ ld_finish_libs(Ofl_desc *ofl)
 				    MSG_INTL(MSG_FIL_NOTFOUND), file,
 				    sdf->sdf_rfile);
 			} else {
+				uintptr_t	open_ret;
 				Rej_desc	_rej = { 0 };
 
-				ifl = ld_process_open(file, ++slash, &fd, ofl,
-				    0, &_rej);
+				open_ret = ld_process_open(file, ++slash, &fd,
+				    ofl, 0, &_rej, &ifl);
 				if (fd != -1)
 					(void) close(fd);
-				if (ifl == (Ifl_desc *)S_ERROR)
+				if (open_ret == S_ERROR)
 					return (S_ERROR);
 
 				if (_rej.rej_type) {

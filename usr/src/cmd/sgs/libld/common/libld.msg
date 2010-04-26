@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 @ _START_
@@ -438,7 +437,7 @@
 @ MSG_ELF_LIBELF	"libelf: version not supported: %d"
 
 @ MSG_ELF_ARMEM		"file %s: unable to locate archive member;\n\t\
-			 offset=%x, symbol[%d]=%s"
+			 offset=%x, symbol=%s"
 
 @ MSG_ELF_ARSYM		"file %s ignored: unable to locate archive symbol table"
 
@@ -665,6 +664,7 @@
 			 unsupported: %s"
 @ MSG_REJ_HWCAP_2	"file %s: hardware capability (CA_SUNW_HW_2) \
 			 unsupported: %s"
+@ MSG_REJ_ARCHIVE	"file %s: invalid archive use"
 
 
 @ _END_

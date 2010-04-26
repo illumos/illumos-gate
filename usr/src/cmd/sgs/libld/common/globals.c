@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -57,10 +56,10 @@ char		def64_Plibpath[] = "/lib/64:/usr/lib/64";
 char		def32_Plibpath[] = "/usr/ccs/lib:/lib:/usr/lib";
 
 /*
- * Rejected file error messages (indexed to match FLG_RJC_ values).
+ * Rejected file error messages (indexed to match SGS_REJ_ values).
  */
 const Msg
-reject[] = {
+reject[SGS_REJ_NUM] = {
 		MSG_STR_EMPTY,
 		MSG_REJ_MACH,		/* MSG_INTL(MSG_REJ_MACH) */
 		MSG_REJ_CLASS,		/* MSG_INTL(MSG_REJ_CLASS) */
@@ -78,8 +77,12 @@ reject[] = {
 		MSG_REJ_SFCAP_1,	/* MSG_INTL(MSG_REJ_SFCAP_1) */
 		MSG_REJ_MACHCAP,	/* MSG_INTL(MSG_REJ_MACHCAP) */
 		MSG_REJ_PLATCAP,	/* MSG_INTL(MSG_REJ_PLATCAP) */
-		MSG_REJ_HWCAP_2		/* MSG_INTL(MSG_REJ_HWCAP_2) */
+		MSG_REJ_HWCAP_2,	/* MSG_INTL(MSG_REJ_HWCAP_2) */
+		MSG_REJ_ARCHIVE		/* MSG_INTL(MSG_REJ_ARCHIVE) */
 	};
+#if SGS_REJ_NUM != (SGS_REJ_ARCHIVE + 1)
+#error SGS_REJ_NUM has changed
+#endif
 
 /*
  * Symbol types that we include in .SUNW_ldynsym sections

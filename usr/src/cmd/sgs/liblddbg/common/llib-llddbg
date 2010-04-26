@@ -121,6 +121,8 @@ void	Dbg32_file_aout(Lm_list *, const char *, Addr, size_t, const char *,
 	    Aliste);
 void	Dbg64_file_aout(Lm_list *, const char *, Addr, size_t, const char *,
 	    Aliste);
+void	Dbg32_file_ar(Lm_list *, const char *, Boolean);
+void	Dbg64_file_ar(Lm_list *, const char *, Boolean);
 void	Dbg32_file_archive(Lm_list *, const char *, int);
 void	Dbg64_file_archive(Lm_list *, const char *, int);
 void	Dbg32_file_bind_entry(Lm_list *, Bnd_desc *);
@@ -389,14 +391,22 @@ void	Dbg64_syminfo_entry(Lm_list *, Elf64_Word, Syminfo *, Sym *, const char *,
 void	Dbg32_syminfo_title(Lm_list *);
 void	Dbg64_syminfo_title(Lm_list *);
 
-void	Dbg32_syms_ar_checking(Lm_list *, Xword, Elf_Arsym *, const char *);
-void	Dbg64_syms_ar_checking(Lm_list *, Xword, Elf_Arsym *, const char *);
+void	Dbg32_syms_ar_checking(Lm_list *, const char *, const char *,
+	    Elf_Arsym *);
+void	Dbg64_syms_ar_checking(Lm_list *, const char *, const char *,
+	    Elf_Arsym *);
 void	Dbg32_syms_ar_entry(Lm_list *, Xword, Elf_Arsym *);
 void	Dbg64_syms_ar_entry(Lm_list *, Xword, Elf_Arsym *);
-void	Dbg32_syms_ar_resolve(Lm_list *, Xword, Elf_Arsym *, const char *, int);
-void	Dbg64_syms_ar_resolve(Lm_list *, Xword, Elf_Arsym *, const char *, int);
-void	Dbg32_syms_ar_title(Lm_list *, const char *, int);
-void	Dbg64_syms_ar_title(Lm_list *, const char *, int);
+void	Dbg32_syms_ar_force(Lm_list *, const char *, const char *);
+void	Dbg64_syms_ar_force(Lm_list *, const char *, const char *);
+void	Dbg32_syms_ar_resolve(Lm_list *, const char *, const char *,
+	    Elf_Arsym *);
+void	Dbg64_syms_ar_resolve(Lm_list *, const char *, const char *,
+	    Elf_Arsym *);
+void	Dbg32_syms_ar_skip(Lm_list *, const char *, Elf_Arsym *);
+void	Dbg64_syms_ar_skip(Lm_list *, const char *, Elf_Arsym *);
+void	Dbg32_syms_ar_title(Lm_list *, const char *, Boolean);
+void	Dbg64_syms_ar_title(Lm_list *, const char *, Boolean);
 void	Dbg32_syms_cap_convert(Ofl_desc *, Word, const char *, Sym *);
 void	Dbg64_syms_cap_convert(Ofl_desc *, Word, const char *, Sym *);
 void	Dbg32_syms_cap_local(Ofl_desc *, Word, const char *, Sym *, Sym_desc *);

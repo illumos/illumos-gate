@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<sys/types.h>
@@ -208,7 +207,7 @@ const char	*nosym_str = NULL;
  * Rejection error message tables.
  */
 const Msg
-ldd_reject[] = {
+ldd_reject[SGS_REJ_NUM] = {
 		MSG_STR_EMPTY,
 		MSG_LDD_REJ_MACH,	/* MSG_INTL(MSG_LDD_REJ_MACH) */
 		MSG_LDD_REJ_CLASS,	/* MSG_INTL(MSG_LDD_REJ_CLASS) */
@@ -226,11 +225,15 @@ ldd_reject[] = {
 		MSG_LDD_REJ_SFCAP_1,	/* MSG_INTL(MSG_LDD_REJ_SFCAP_1) */
 		MSG_LDD_REJ_MACHCAP,	/* MSG_INTL(MSG_LDD_REJ_MACHCAP) */
 		MSG_LDD_REJ_PLATCAP,	/* MSG_INTL(MSG_LDD_REJ_PLATCAP) */
-		MSG_LDD_REJ_HWCAP_2	/* MSG_INTL(MSG_LDD_REJ_HWCAP_2) */
+		MSG_LDD_REJ_HWCAP_2,	/* MSG_INTL(MSG_LDD_REJ_HWCAP_2) */
+		MSG_LDD_REJ_ARCHIVE	/* MSG_INTL(MSG_LDD_REJ_ARCHIVE) */
 	};
+#if SGS_REJ_NUM != (SGS_REJ_ARCHIVE + 1)
+#error SGS_REJ_NUM has changed
+#endif
 
 const Msg
-err_reject[] = {
+err_reject[SGS_REJ_NUM] = {
 		MSG_STR_EMPTY,
 		MSG_ERR_REJ_MACH,	/* MSG_INTL(MSG_ERR_REJ_MACH) */
 		MSG_ERR_REJ_CLASS,	/* MSG_INTL(MSG_ERR_REJ_CLASS) */
@@ -248,11 +251,15 @@ err_reject[] = {
 		MSG_ERR_REJ_SFCAP_1,	/* MSG_INTL(MSG_ERR_REJ_SFCAP_1) */
 		MSG_ERR_REJ_MACHCAP,	/* MSG_INTL(MSG_ERR_REJ_MACHCAP) */
 		MSG_ERR_REJ_PLATCAP,	/* MSG_INTL(MSG_ERR_REJ_PLATCAP) */
-		MSG_ERR_REJ_HWCAP_2	/* MSG_INTL(MSG_ERR_REJ_HWCAP_2) */
+		MSG_ERR_REJ_HWCAP_2,	/* MSG_INTL(MSG_ERR_REJ_HWCAP_2) */
+		MSG_ERR_REJ_ARCHIVE,	/* MSG_INTL(MSG_ERR_REJ_ARCHIVE) */
 	};
+#if SGS_REJ_NUM != (SGS_REJ_ARCHIVE + 1)
+#error SGS_REJ_NUM has changed
+#endif
 
 const Msg
-ldd_warn[] = {
+ldd_warn[SGS_REJ_NUM] = {
 		MSG_STR_EMPTY,
 		MSG_STR_EMPTY,
 		MSG_STR_EMPTY,
@@ -270,5 +277,9 @@ ldd_warn[] = {
 		MSG_LDD_WARN_SFCAP_1,	/* MSG_INTL(MSG_LDD_WARN_SFCAP_1) */
 		MSG_LDD_WARN_MACHCAP,	/* MSG_INTL(MSG_LDD_WARN_MACHCAP) */
 		MSG_LDD_WARN_PLATCAP,	/* MSG_INTL(MSG_LDD_WARN_PLATCAP) */
-		MSG_LDD_WARN_HWCAP_2	/* MSG_INTL(MSG_LDD_WARN_HWCAP_2) */
+		MSG_LDD_WARN_HWCAP_2,	/* MSG_INTL(MSG_LDD_WARN_HWCAP_2) */
+		MSG_STR_EMPTY
 	};
+#if SGS_REJ_NUM != (SGS_REJ_ARCHIVE + 1)
+#error SGS_REJ_NUM has changed
+#endif
