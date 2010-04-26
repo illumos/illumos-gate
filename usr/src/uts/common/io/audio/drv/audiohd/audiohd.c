@@ -376,7 +376,6 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	ddi_report_dev(dip);
 
-	AUDIOHD_REG_SET32(AUDIOHD_REG_INTCTL, AUDIOHD_INTCTL_BIT_GIE);
 	return (DDI_SUCCESS);
 error:
 	audiohd_destroy(statep);
@@ -1289,7 +1288,7 @@ audiohd_set_pin_monitor_gain(hda_codec_t *codec, audiohd_state_t *statep,
 				    pin->mg_wid[k],
 				    AUDIOHDC_VERB_SET_AMP_MUTE,
 				    AUDIOHDC_AMP_SET_RIGHT|
-				    widget->selmon[i]<<
+				    widget->monitor_path_next[i]<<
 				    AUDIOHDC_AMP_SET_INDEX_OFFSET |
 				    pin->mg_dir[k] | rtmp);
 				(void) audioha_codec_4bit_verb_get(
@@ -1298,7 +1297,7 @@ audiohd_set_pin_monitor_gain(hda_codec_t *codec, audiohd_state_t *statep,
 				    pin->mg_wid[k],
 				    AUDIOHDC_VERB_SET_AMP_MUTE,
 				    AUDIOHDC_AMP_SET_LEFT|
-				    widget->selmon[i]<<
+				    widget->monitor_path_next[i]<<
 				    AUDIOHDC_AMP_SET_INDEX_OFFSET |
 				    pin->mg_dir[k] | ltmp);
 			}
@@ -2647,7 +2646,9 @@ audiohd_create_widgets(hda_codec_t *codec)
 		    kmem_zalloc(sizeof (audiohd_widget_t), KM_SLEEP);
 		codec->widget[wid] = widget;
 		widget->codec = codec;
-		widget->selconn = AUDIOHD_NULL_CONN;
+		widget->output_path_next = AUDIOHD_NULL_CONN;
+		widget->input_path_next = AUDIOHD_NULL_CONN;
+		widget->beep_path_next = AUDIOHD_NULL_CONN;
 
 		widcap = audioha_codec_verb_get(statep, caddr, wid,
 		    AUDIOHDC_VERB_GET_PARAM, AUDIOHDC_PAR_AUDIO_WID_CAP);
@@ -3018,17 +3019,18 @@ audiohd_find_dac(hda_codec_t *codec, wid_t wid,
 		break;
 
 	case WTYPE_AUDIO_MIX:
+		(*mixernum)++;
+		/* FALLTHRU */
 	case WTYPE_AUDIO_SEL:
-		if (widget->type == WTYPE_AUDIO_MIX)
-			(*mixernum)++;
 		for (int i = 0; i < widget->nconns; i++) {
 			retval = audiohd_find_dac(codec,
 			    widget->avail_conn[i],
 			    mixer, mixernum,
 			    exclusive, depth + 1);
 			if (retval != (uint32_t)DDI_FAILURE) {
-				if (widget->selconn == AUDIOHD_NULL_CONN) {
-					widget->selconn = i;
+				if (widget->output_path_next ==
+				    AUDIOHD_NULL_CONN) {
+					widget->output_path_next = i;
 					wdac = retval;
 				}
 				widget->path_flags |= AUDIOHD_PATH_DAC;
@@ -3052,7 +3054,7 @@ audiohd_find_dac(hda_codec_t *codec, wid_t wid,
  *	Search an output path for each pin in the codec.
  * Arguments:
  *	hda_codec_t	*codec		where the output path exists
- *	int		mixer		wheter the path needs mixer widget
+ *	int		mixer		whether the path needs mixer widget
  *	int		*mnum		total of mixer widget in the path
  *	int		exclusive	an exclusive path or shared path
  *	int		depth		search depth
@@ -3063,9 +3065,9 @@ audiohd_do_build_output_path(hda_codec_t *codec, int mixer, int *mnum,
 {
 	audiohd_pin_t		*pin;
 	audiohd_widget_t	*widget, *wdac;
-	audiohd_path_t	*path;
+	audiohd_path_t		*path;
 	wid_t			wid;
-	audiohd_state_t	*statep;
+	audiohd_state_t		*statep;
 	int			i;
 
 	statep = codec->soft_statep;
@@ -3118,7 +3120,7 @@ audiohd_do_build_output_path(hda_codec_t *codec, int mixer, int *mnum,
 			pin->finish = 1;
 			widget->path_flags |= AUDIOHD_PATH_DAC;
 			widget->out_weight++;
-			widget->selconn = i;
+			widget->output_path_next = i;
 			statep->path[statep->pathnum++] = path;
 			break;
 		}
@@ -3177,14 +3179,14 @@ audiohd_build_output_amp(hda_codec_t *codec)
 	audiohd_path_t		*path;
 	audiohd_widget_t	*w, *widget, *wpin, *wdac;
 	audiohd_pin_t		*pin;
-	wid_t		wid;
+	wid_t		wid, next;
 	int		weight;
 	int		i, j;
 	uint32_t	gain;
 
 	for (i = 0; i < codec->soft_statep->pathnum; i++) {
 		path = codec->soft_statep->path[i];
-		if (path == NULL || path->path_type == RECORD ||
+		if (path == NULL || path->path_type != PLAY ||
 		    path->codec != codec)
 			continue;
 		for (j = 0; j < path->pin_nums; j++) {
@@ -3212,9 +3214,10 @@ audiohd_build_output_amp(hda_codec_t *codec)
 					pin->mute_dir = AUDIOHDC_AMP_SET_INPUT;
 					break;
 				}
-				if (widget->selconn == AUDIOHD_NULL_CONN)
+				next = widget->output_path_next;
+				if (next == AUDIOHD_NULL_CONN)
 					break;
-				wid = widget->avail_conn[widget->selconn];
+				wid = widget->avail_conn[next];
 				widget = codec->widget[wid];
 				if (widget && widget->out_weight != weight)
 					break;
@@ -3243,9 +3246,10 @@ audiohd_build_output_amp(hda_codec_t *codec)
 					pin->gain_bits = gain;
 					pin->gain_wid = widget->wid_wid;
 				}
-				if (widget->selconn == AUDIOHD_NULL_CONN)
+				next = widget->output_path_next;
+				if (next == AUDIOHD_NULL_CONN)
 					break;
-				wid = widget->avail_conn[widget->selconn];
+				wid = widget->avail_conn[next];
 				widget = codec->widget[wid];
 				if (widget && widget->out_weight != weight)
 					break;
@@ -3271,7 +3275,7 @@ audiohd_build_output_amp(hda_codec_t *codec)
 			wid = path->pin_wid[0];
 			w = codec->widget[wid];
 			while (w && w->out_weight != weight) {
-				wid = w->avail_conn[w->selconn];
+				wid = w->avail_conn[w->output_path_next];
 				w = codec->widget[wid];
 			}
 
@@ -3292,9 +3296,10 @@ audiohd_build_output_amp(hda_codec_t *codec)
 					    AUDIOHDC_AMP_SET_INPUT;
 					break;
 				}
-				if (widget->selconn == AUDIOHD_NULL_CONN)
+				next = widget->output_path_next;
+				if (next == AUDIOHD_NULL_CONN)
 					break;
-				wid = widget->avail_conn[widget->selconn];
+				wid = widget->avail_conn[next];
 				widget = codec->widget[wid];
 			}
 
@@ -3319,9 +3324,10 @@ audiohd_build_output_amp(hda_codec_t *codec)
 					path->gain_bits = gain;
 					path->gain_wid = widget->wid_wid;
 				}
-				if (widget->selconn == AUDIOHD_NULL_CONN)
+				next = widget->output_path_next;
+				if (next == AUDIOHD_NULL_CONN)
 					break;
-				wid = widget->avail_conn[widget->selconn];
+				wid = widget->avail_conn[next];
 				widget = codec->widget[wid];
 			}
 			path->gain_bits >>= AUDIOHD_GAIN_OFF;
@@ -3345,7 +3351,7 @@ audiohd_finish_output_path(hda_codec_t *codec)
 	audiohd_widget_t	*widget;
 	audiohd_pin_t		*pin;
 	uint_t			caddr = codec->index;
-	wid_t			wid;
+	wid_t			wid, next;
 	int			i, j;
 
 	for (i = 0; i < codec->soft_statep->pathnum; i++) {
@@ -3382,51 +3388,49 @@ audiohd_finish_output_path(hda_codec_t *codec)
 			}
 
 			(void) audioha_codec_verb_get(statep, caddr, wid,
-			    AUDIOHDC_VERB_SET_CONN_SEL, widget->selconn);
+			    AUDIOHDC_VERB_SET_CONN_SEL,
+			    widget->output_path_next);
 
-			wid = widget->avail_conn[widget->selconn];
+			wid = widget->avail_conn[widget->output_path_next];
 			widget = codec->widget[wid];
 
 			while (widget) {
 				/*
 				 * Set all amplifiers in this path to
-				 * the maximum
-				 * volume and unmute them.
+				 * the maximum volume and unmute them.
 				 */
 				if (widget->outamp_cap) {
 					(void) audioha_codec_4bit_verb_get(
-					    statep,
-					    caddr,
+					    statep, caddr,
 					    wid, AUDIOHDC_VERB_SET_AMP_MUTE,
 					    AUDIOHDC_AMP_SET_LR_OUTPUT |
 					    AUDIOHDC_GAIN_MAX);
 				}
 				if (widget->inamp_cap) {
 					(void) audioha_codec_4bit_verb_get(
-					    statep,
-					    caddr,
+					    statep, caddr,
 					    wid, AUDIOHDC_VERB_SET_AMP_MUTE,
 					    AUDIOHDC_AMP_SET_LR_INPUT |
 					    AUDIOHDC_GAIN_MAX |
-					    (widget->selconn <<
+					    (widget->output_path_next <<
 					    AUDIOHDC_AMP_SET_INDEX_OFFSET));
 				}
 
-				if (widget->selconn == AUDIOHD_NULL_CONN)
+				next = widget->output_path_next;
+				if (next == AUDIOHD_NULL_CONN)
 					break;
 				/*
 				 * Accoding to HD spec, mixer doesn't support
 				 * "select connection"
 				 */
-				if ((widget->type != WTYPE_AUDIO_MIX) &&
+				if ((widget->type == WTYPE_AUDIO_SEL) &&
 				    (widget->nconns > 1))
 					(void) audioha_codec_verb_get(statep,
-					    caddr,
-					    wid,
+					    caddr, wid,
 					    AUDIOHDC_VERB_SET_CONN_SEL,
-					    widget->selconn);
+					    widget->output_path_next);
 
-				wid = widget->avail_conn[widget->selconn];
+				wid = widget->avail_conn[next];
 				widget = codec->widget[wid];
 			}
 		}
@@ -3501,11 +3505,11 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 		 * consider it as a real sum widget.
 		 */
 		if (widget->nconns == 1) {
-			widget->selconn = 0;
+			widget->input_path_next = 0;
 			retval = audiohd_find_input_pins(codec,
 			    widget->avail_conn[0],
 			    allowmixer, depth + 1, path);
-			if (retval != DDI_FAILURE) {
+			if (retval == DDI_SUCCESS) {
 				widget->path_flags |= AUDIOHD_PATH_ADC;
 				widget->in_weight++;
 			}
@@ -3522,17 +3526,14 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 				retval = audiohd_find_input_pins(codec,
 				    widget->avail_conn[i], 0, depth + 1,
 				    path);
-				if (retval != DDI_FAILURE) {
+				if (retval == DDI_SUCCESS) {
+					widget->input_path_next = i;
 					widget->in_weight++;
 					num = path->pin_nums - 1;
 					path->sum_selconn[num] = i;
 					path->sum_wid = wid;
 					widget->path_flags |=
 					    AUDIOHD_PATH_ADC;
-					if (widget->selconn ==
-					    AUDIOHD_NULL_CONN) {
-						widget->selconn = i;
-					}
 				}
 			}
 
@@ -3548,8 +3549,8 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 				retval = audiohd_find_input_pins(codec,
 				    widget->avail_conn[i], 0, depth + 1,
 				    path);
-				if (retval != DDI_FAILURE) {
-					widget->selconn = i;
+				if (retval == DDI_SUCCESS) {
+					widget->input_path_next = i;
 					widget->path_flags |= AUDIOHD_PATH_ADC;
 					widget->in_weight++;
 					break;
@@ -3586,7 +3587,7 @@ audiohd_build_input_path(hda_codec_t *codec)
 		widget = codec->widget[wid];
 
 		/* check if it is an ADC widget */
-		if (!widget || widget->type != WTYPE_AUDIO_IN)
+		if (widget == NULL || widget->type != WTYPE_AUDIO_IN)
 			continue;
 
 		if (path == NULL)
@@ -3617,7 +3618,7 @@ audiohd_build_input_path(hda_codec_t *codec)
 				path->tag = ++rtag;
 				codec->nistream++;
 				statep->path[statep->pathnum++] = path;
-				widget->selconn = i;
+				widget->input_path_next = i;
 				widget->priv = path;
 				path = NULL;
 				break;
@@ -3641,7 +3642,7 @@ audiohd_build_input_amp(hda_codec_t *codec)
 	audiohd_widget_t	*wsum, *wadc, *w;
 	audiohd_pin_t		*pin;
 	uint_t			gain;
-	wid_t			wid;
+	wid_t			wid, next;
 	int			i, j;
 	int			weight;
 
@@ -3673,9 +3674,10 @@ audiohd_build_input_amp(hda_codec_t *codec)
 				break;
 			}
 
-			if (w->selconn == AUDIOHD_NULL_CONN)
+			next = w->input_path_next;
+			if (next == AUDIOHD_NULL_CONN)
 				break;
-			wid = w->avail_conn[w->selconn];
+			wid = w->avail_conn[next];
 			w = path->codec->widget[wid];
 			if (w && w->in_weight != weight)
 				break;
@@ -3701,9 +3703,11 @@ audiohd_build_input_amp(hda_codec_t *codec)
 				path->gain_bits = gain;
 				path->gain_wid = w->wid_wid;
 			}
-			if (w->selconn == AUDIOHD_NULL_CONN)
+
+			next = w->input_path_next;
+			if (next == AUDIOHD_NULL_CONN)
 				break;
-			wid = w->avail_conn[w->selconn];
+			wid = w->avail_conn[next];
 			w = path->codec->widget[wid];
 		}
 		path->gain_bits >>= AUDIOHD_GAIN_OFF;
@@ -3760,9 +3764,10 @@ audiohd_build_input_amp(hda_codec_t *codec)
 						break;
 					}
 
-					if (w->selconn == AUDIOHD_NULL_CONN)
+					next = w->input_path_next;
+					if (next == AUDIOHD_NULL_CONN)
 						break;
-					wid = w->avail_conn[w->selconn];
+					wid = w->avail_conn[next];
 					w = path->codec->widget[wid];
 				}
 			}
@@ -3786,9 +3791,11 @@ audiohd_build_input_amp(hda_codec_t *codec)
 					pin->gain_bits = gain;
 					pin->gain_wid = w->wid_wid;
 				}
-				if (w->selconn == AUDIOHD_NULL_CONN)
+
+				next = w->input_path_next;
+				if (next == AUDIOHD_NULL_CONN)
 					break;
-				wid = w->avail_conn[w->selconn];
+				wid = w->avail_conn[next];
 				w = path->codec->widget[wid];
 			}
 			pin->gain_bits >>= AUDIOHD_GAIN_OFF;
@@ -3823,8 +3830,8 @@ audiohd_finish_input_path(hda_codec_t *codec)
 		    (w->type != WTYPE_PIN)) {
 			if ((w->type == WTYPE_AUDIO_SEL) && (w->nconns > 1))
 				(void) audioha_codec_verb_get(statep, caddr,
-				    w->wid_wid,
-				    AUDIOHDC_VERB_SET_CONN_SEL, w->selconn);
+				    w->wid_wid, AUDIOHDC_VERB_SET_CONN_SEL,
+				    w->input_path_next);
 
 			if (w->outamp_cap) {
 				(void) audioha_codec_4bit_verb_get(statep,
@@ -3840,11 +3847,11 @@ audiohd_finish_input_path(hda_codec_t *codec)
 				    w->wid_wid, AUDIOHDC_VERB_SET_AMP_MUTE,
 				    AUDIOHDC_AMP_SET_LR_INPUT |
 				    AUDIOHDC_GAIN_MAX |
-				    (w->selconn <<
+				    (w->input_path_next <<
 				    AUDIOHDC_AMP_SET_INDEX_OFFSET));
 			}
 
-			wid = w->avail_conn[w->selconn];
+			wid = w->avail_conn[w->input_path_next];
 			w = path->codec->widget[wid];
 		}
 
@@ -3897,7 +3904,7 @@ audiohd_finish_input_path(hda_codec_t *codec)
 					(void) audioha_codec_verb_get(statep,
 					    caddr, w->wid_wid,
 					    AUDIOHDC_VERB_SET_CONN_SEL,
-					    w->selconn);
+					    w->input_path_next);
 
 				if (w->outamp_cap) {
 					(void) audioha_codec_4bit_verb_get(
@@ -3917,10 +3924,10 @@ audiohd_finish_input_path(hda_codec_t *codec)
 					    AUDIOHDC_VERB_SET_AMP_MUTE,
 					    AUDIOHDC_AMP_SET_LR_INPUT |
 					    AUDIOHDC_GAIN_MAX |
-					    (w->selconn <<
+					    (w->input_path_next <<
 					    AUDIOHDC_AMP_SET_INDEX_OFFSET));
 				}
-				wid = w->avail_conn[w->selconn];
+				wid = w->avail_conn[w->input_path_next];
 				w = path->codec->widget[wid];
 			}
 		}
@@ -3942,7 +3949,7 @@ static int
 audiohd_find_inpin_for_monitor(hda_codec_t *codec, wid_t id, int mixer)
 {
 	wid_t 			wid;
-	audiohd_widget_t	*widget;
+	audiohd_widget_t	*widget, *w;
 	audiohd_pin_t		*pin;
 	int 			i, find = 0;
 
@@ -3957,17 +3964,9 @@ audiohd_find_inpin_for_monitor(hda_codec_t *codec, wid_t id, int mixer)
 			return (uint32_t)(DDI_FAILURE);
 		switch (pin->device) {
 			case DTYPE_SPDIF_IN:
-				widget->path_flags |= AUDIOHD_PATH_MON;
-				return (DDI_SUCCESS);
 			case DTYPE_CD:
-				widget->path_flags |= AUDIOHD_PATH_MON;
-				return (DDI_SUCCESS);
 			case DTYPE_LINE_IN:
-				widget->path_flags |= AUDIOHD_PATH_MON;
-				return (DDI_SUCCESS);
 			case DTYPE_MIC_IN:
-				widget->path_flags |= AUDIOHD_PATH_MON;
-				return (DDI_SUCCESS);
 			case DTYPE_AUX:
 				widget->path_flags |= AUDIOHD_PATH_MON;
 				return (DDI_SUCCESS);
@@ -3989,32 +3988,32 @@ audiohd_find_inpin_for_monitor(hda_codec_t *codec, wid_t id, int mixer)
 	switch (widget->type) {
 		case WTYPE_AUDIO_MIX:
 			for (i = 0; i < widget->nconns; i++) {
-				if (widget->selconn == i && widget->path_flags &
-				    AUDIOHD_PATH_DAC)
+				if (widget->output_path_next == i)
 					continue;
 				if (audiohd_find_inpin_for_monitor(codec,
 				    widget->avail_conn[i], mixer) ==
 				    DDI_SUCCESS) {
-					widget->selmon[widget->used++] = i;
-					widget->path_flags |= AUDIOHD_PATH_MON;
+					w = widget;
+					w->monitor_path_next[w->used++] = i;
+					w->path_flags |= AUDIOHD_PATH_MON;
 					find = 1;
 				}
 			}
 			break;
 		case WTYPE_AUDIO_SEL:
 			for (i = 0; i < widget->nconns; i++) {
-				if (widget->selconn == i && widget->path_flags &
-				    AUDIOHD_PATH_DAC)
+				if (widget->output_path_next == i)
 					continue;
 				if (audiohd_find_inpin_for_monitor(codec,
-				    widget->avail_conn[i],
-				    mixer) ==
+				    widget->avail_conn[i], mixer) ==
 				    DDI_SUCCESS) {
-					widget->selmon[0] = i;
+					widget->monitor_path_next[0] = i;
 					widget->path_flags |= AUDIOHD_PATH_MON;
-					return (DDI_SUCCESS);
+					find = 1;
+					break;
 				}
 			}
+			break;
 		default:
 			break;
 	}
@@ -4041,15 +4040,16 @@ static void
 audiohd_build_monitor_path(hda_codec_t *codec)
 {
 	audiohd_path_t		*path;
-	audiohd_widget_t	*widget;
+	audiohd_widget_t	*widget, *w;
 	audiohd_state_t		*statep = codec->soft_statep;
-	wid_t			wid;
+	wid_t			wid, next;
 	int			i, j, k, l, find;
 	int			mixernum = 0;
 
 	for (i = 0; i < statep->pathnum; i++) {
 		path = statep->path[i];
-		if (!path || path->codec != codec ||path->path_type != PLAY)
+		if (path == NULL || path->codec != codec ||
+		    path->path_type != PLAY)
 			continue;
 		for (j = 0; j < path->pin_nums; j++) {
 			wid = path->pin_wid[j];
@@ -4059,21 +4059,20 @@ audiohd_build_monitor_path(hda_codec_t *codec)
 				while (widget &&
 				    ((widget->type != WTYPE_AUDIO_MIX) ||
 				    (widget->nconns < 2))) {
-					if (widget->selconn ==
-					    AUDIOHD_NULL_CONN)
+					next = widget->output_path_next;
+					if (next == AUDIOHD_NULL_CONN)
 						break;
-					wid =
-					    widget->avail_conn[widget->selconn];
+					wid = widget->avail_conn[next];
 					widget = codec->widget[wid];
 				}
 
 				/*
 				 * No mixer in this output path, we cannot build
 				 * mixer path for this path, skip it,
-				 * and continue
-				 * for next output path.
+				 * and continue for next output path.
 				 */
-				if (widget == NULL || widget->selconn ==
+				if (widget == NULL ||
+				    widget->output_path_next ==
 				    AUDIOHD_NULL_CONN) {
 					break;
 				}
@@ -4086,7 +4085,7 @@ audiohd_build_monitor_path(hda_codec_t *codec)
 					 * widget, we needn't waste time for
 					 * it
 					 */
-					if (widget->selconn == k)
+					if (widget->output_path_next == k)
 						continue;
 					find = 0;
 					if (audiohd_find_inpin_for_monitor(
@@ -4094,9 +4093,10 @@ audiohd_build_monitor_path(hda_codec_t *codec)
 					    widget->avail_conn[k], 0) ==
 					    DDI_SUCCESS) {
 						path->mon_wid[j][l] = wid;
-						widget->selmon[widget->used++] =
-						    k;
-						widget->path_flags |=
+						w = widget;
+						w->monitor_path_next[w->used++]
+						    = k;
+						w->path_flags |=
 						    AUDIOHD_PATH_MON;
 						find = 1;
 					} else if (
@@ -4105,28 +4105,28 @@ audiohd_build_monitor_path(hda_codec_t *codec)
 					    widget->avail_conn[k], 1) ==
 					    DDI_SUCCESS) {
 						path->mon_wid[j][l] = wid;
-						widget->selmon[widget->used++] =
-						    k;
-						widget->path_flags |=
+						w = widget;
+						w->monitor_path_next[w->used++]
+						    = k;
+						w->path_flags |=
 						    AUDIOHD_PATH_MON;
 						find = 1;
-
 					}
 
 				}
 
 				/*
-				 * we needn't check widget->selconn here
-				 * since this
-				 * widget is a selector or mixer, it cannot
-				 * be NULL connection.
+				 * we needn't check widget->output_path_next
+				 * here since this widget is a selector or
+				 * mixer, it cannot be NULL connection.
 				 */
 				if (!find) {
 					path->mon_wid[j][l] = 0;
 					widget->path_flags |=
 					    AUDIOHD_PATH_NOMON;
 				}
-				wid = widget->avail_conn[widget->selconn];
+				next = widget->output_path_next;
+				wid = widget->avail_conn[next];
 				widget = codec->widget[wid];
 				l++;
 			}
@@ -4161,34 +4161,30 @@ audiohd_do_finish_monitor_path(hda_codec_t *codec, audiohd_widget_t *wgt)
 		return;
 	if (widget->path_flags & AUDIOHD_PATH_ADC)
 		share = 1;
-	if ((widget->outamp_cap)&&!share)
-			(void) audioha_codec_4bit_verb_get(statep, caddr,
-			    widget->wid_wid,
-			    AUDIOHDC_VERB_SET_AMP_MUTE,
-			    AUDIOHDC_AMP_SET_LR_OUTPUT
-			    | AUDIOHDC_GAIN_MAX);
-	if ((widget->inamp_cap)&&!share) {
+	if ((widget->outamp_cap) && !share)
+		(void) audioha_codec_4bit_verb_get(statep, caddr,
+		    widget->wid_wid, AUDIOHDC_VERB_SET_AMP_MUTE,
+		    AUDIOHDC_AMP_SET_LR_OUTPUT | AUDIOHDC_GAIN_MAX);
+	if ((widget->inamp_cap) && !share) {
 		for (i = 0; i < widget->used; i++) {
 		(void) audioha_codec_4bit_verb_get(statep, caddr,
 		    widget->wid_wid, AUDIOHDC_VERB_SET_AMP_MUTE,
-		    AUDIOHDC_AMP_SET_LR_INPUT |
-		    AUDIOHDC_GAIN_MAX |
-		    (widget->selmon[i] <<
-		    AUDIOHDC_AMP_SET_INDEX_OFFSET));
+		    AUDIOHDC_AMP_SET_LR_INPUT | AUDIOHDC_GAIN_MAX |
+		    (widget->monitor_path_next[i]
+		    << AUDIOHDC_AMP_SET_INDEX_OFFSET));
 		}
 	}
 	if ((widget->type == WTYPE_AUDIO_SEL) && (widget->nconns > 1) &&
 	    !share) {
-		(void) audioha_codec_verb_get(statep, caddr,
-		    widget->wid_wid,
-		    AUDIOHDC_VERB_SET_CONN_SEL, widget->selmon[0]);
+		(void) audioha_codec_verb_get(statep, caddr, widget->wid_wid,
+		    AUDIOHDC_VERB_SET_CONN_SEL, widget->monitor_path_next[0]);
 	}
 	widget->finish = 1;
 	if (widget->used == 0)
 		return;
 	if (widget->used > 0) {
 		for (i = 0; i < widget->used; i++) {
-			wid = widget->avail_conn[widget->selmon[i]];
+			wid = widget->avail_conn[widget->monitor_path_next[i]];
 			w = codec->widget[wid];
 			audiohd_do_finish_monitor_path(codec, w);
 		}
@@ -4269,7 +4265,7 @@ audiohd_do_build_monitor_amp(hda_codec_t *codec, audiohd_pin_t *pin,
 		}
 	}
 	for (i = 0; i < w->used; i++) {
-		wid = w->avail_conn[w->selmon[i]];
+		wid = w->avail_conn[w->monitor_path_next[i]];
 		audiohd_do_build_monitor_amp(codec, pin, codec->widget[wid]);
 	}
 
@@ -4345,21 +4341,22 @@ audiohd_find_beep(hda_codec_t *codec, wid_t wid, int depth)
 		widget->path_flags |= AUDIOHD_PATH_BEEP;
 		wbeep = widget->wid_wid;
 		break;
-
 	case WTYPE_AUDIO_MIX:
 	case WTYPE_AUDIO_SEL:
 		for (int i = 0; i < widget->nconns; i++) {
 			retval = audiohd_find_beep(codec,
 			    widget->avail_conn[i], depth + 1);
-			if (retval != (uint32_t)DDI_FAILURE) {
-				if (widget->selconn != AUDIOHD_NULL_CONN)
+			if (retval == DDI_SUCCESS) {
+				if (widget->output_path_next !=
+				    AUDIOHD_NULL_CONN)
 					continue;
-				widget->selconn = i;
+				widget->beep_path_next = i;
 				wbeep = retval;
 				widget->path_flags |= AUDIOHD_PATH_BEEP;
 				return (wbeep);
 			}
 		}
+		break;
 	default:
 		break;
 	}
@@ -4415,7 +4412,7 @@ audiohd_build_beep_path(hda_codec_t *codec)
 			 */
 			if (wid == (wid_t)DDI_FAILURE)
 				continue;
-			if (widget->selconn != AUDIOHD_NULL_CONN)
+			if (widget->output_path_next != AUDIOHD_NULL_CONN)
 				continue;
 			path = (audiohd_path_t *)
 			    kmem_zalloc(sizeof (audiohd_path_t),
@@ -4428,9 +4425,8 @@ audiohd_build_beep_path(hda_codec_t *codec)
 			path->codec = codec;
 			path->statep = statep;
 			widget->path_flags |= AUDIOHD_PATH_BEEP;
-			widget->selconn = i;
+			widget->beep_path_next = i;
 			statep->path[statep->pathnum++] = path;
-
 			break;
 		}
 	}
@@ -4438,7 +4434,7 @@ audiohd_build_beep_path(hda_codec_t *codec)
 	if (!beeppath) {
 		for (int i = 0; i < AUDIOHD_CODEC_MAX; i++) {
 			codec = statep->codec[i];
-			if (!codec)
+			if (codec == NULL)
 				continue;
 			for (wid = codec->first_wid; wid <= codec->last_wid;
 			    wid++) {
@@ -4474,7 +4470,7 @@ audiohd_build_beep_amp(hda_codec_t *codec)
 {
 	audiohd_path_t		*path;
 	audiohd_widget_t	*widget, *wpin, *wbeep;
-	wid_t			wid;
+	wid_t			wid, next;
 	int			i, j;
 	uint32_t		gain;
 
@@ -4512,9 +4508,10 @@ audiohd_build_beep_amp(hda_codec_t *codec)
 					    AUDIOHDC_AMP_SET_OUTPUT;
 					break;
 				}
-				if (widget->selconn == AUDIOHD_NULL_CONN)
+				next = widget->beep_path_next;
+				if (next == AUDIOHD_NULL_CONN)
 					break;
-				wid = widget->avail_conn[widget->selconn];
+				wid = widget->avail_conn[next];
 				widget = codec->widget[wid];
 			}
 
@@ -4534,9 +4531,10 @@ audiohd_build_beep_amp(hda_codec_t *codec)
 						    widget->wid_wid;
 					}
 				}
-				if (widget->selconn == AUDIOHD_NULL_CONN)
+				next = widget->beep_path_next;
+				if (next == AUDIOHD_NULL_CONN)
 					break;
-				wid = widget->avail_conn[widget->selconn];
+				wid = widget->avail_conn[next];
 				widget = codec->widget[wid];
 			}
 			path->gain_bits >>= AUDIOHD_GAIN_OFF;
@@ -4557,7 +4555,7 @@ audiohd_finish_beep_path(hda_codec_t *codec)
 	audiohd_path_t		*path;
 	audiohd_widget_t	*widget;
 	uint_t			caddr = codec->index;
-	wid_t			wid;
+	wid_t			wid, next;
 	int			i, j;
 
 	for (i = 0; i < codec->soft_statep->pathnum; i++) {
@@ -4579,7 +4577,7 @@ audiohd_finish_beep_path(hda_codec_t *codec)
 				    path->beep_wid, AUDIOHDC_VERB_SET_AMP_MUTE,
 				    AUDIOHDC_AMP_SET_LR_INPUT |
 				    AUDIOHDC_GAIN_MAX |
-				    (widget->selconn <<
+				    (widget->beep_path_next <<
 				    AUDIOHDC_AMP_SET_INDEX_OFFSET));
 			}
 			continue;
@@ -4590,39 +4588,37 @@ audiohd_finish_beep_path(hda_codec_t *codec)
 			widget = codec->widget[wid];
 
 			(void) audioha_codec_verb_get(statep, caddr, wid,
-			    AUDIOHDC_VERB_SET_CONN_SEL, widget->selconn);
+			    AUDIOHDC_VERB_SET_CONN_SEL, widget->beep_path_next);
 
-			wid = widget->avail_conn[widget->selconn];
+			wid = widget->avail_conn[widget->beep_path_next];
 			widget = codec->widget[wid];
 
 			while (widget) {
 				/*
 				 * Set all amplifiers in this path to
-				 * the maximum
-				 * volume and unmute them.
+				 * the maximum volume and unmute them.
 				 */
 				if (widget->out_weight != 0)
 					continue;
 				if (widget->outamp_cap) {
 					(void) audioha_codec_4bit_verb_get(
-					    statep,
-					    caddr,
+					    statep, caddr,
 					    wid, AUDIOHDC_VERB_SET_AMP_MUTE,
 					    AUDIOHDC_AMP_SET_LR_OUTPUT |
 					    AUDIOHDC_GAIN_MAX);
 				}
 				if (widget->inamp_cap) {
 					(void) audioha_codec_4bit_verb_get(
-					    statep,
-					    caddr,
+					    statep, caddr,
 					    wid, AUDIOHDC_VERB_SET_AMP_MUTE,
 					    AUDIOHDC_AMP_SET_LR_INPUT |
 					    AUDIOHDC_GAIN_MAX |
-					    (widget->selconn <<
+					    (widget->beep_path_next <<
 					    AUDIOHDC_AMP_SET_INDEX_OFFSET));
 				}
 
-				if (widget->selconn == AUDIOHD_NULL_CONN)
+				next = widget->beep_path_next;
+				if (next == AUDIOHD_NULL_CONN)
 					break;
 				/*
 				 * Accoding to HD spec, mixer doesn't support
@@ -4631,12 +4627,11 @@ audiohd_finish_beep_path(hda_codec_t *codec)
 				if ((widget->type != WTYPE_AUDIO_MIX) &&
 				    (widget->nconns > 1))
 					(void) audioha_codec_verb_get(statep,
-					    caddr,
-					    wid,
+					    caddr, wid,
 					    AUDIOHDC_VERB_SET_CONN_SEL,
-					    widget->selconn);
+					    widget->beep_path_next);
 
-				wid = widget->avail_conn[widget->selconn];
+				wid = widget->avail_conn[next];
 				widget = codec->widget[wid];
 			}
 		}
@@ -5050,8 +5045,6 @@ audiohd_resume(audiohd_state_t *statep)
 	}
 	/* reset to enable the capability of unsolicited response for pin */
 	audiohd_reset_pins_ur_cap(statep);
-	/* Enable interrupt */
-	AUDIOHD_REG_SET32(AUDIOHD_REG_INTCTL, AUDIOHD_INTCTL_BIT_GIE);
 	/* clear the unsolicited response interrupt */
 	rirbsts = AUDIOHD_REG_GET8(AUDIOHD_REG_RIRBSTS);
 	AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBSTS, rirbsts);

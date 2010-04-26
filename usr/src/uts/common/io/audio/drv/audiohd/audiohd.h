@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef _SYS_AUDIOHD_IMPL_H_
 #define	_SYS_AUDIOHD_IMPL_H_
@@ -65,34 +64,29 @@ extern "C" {
  * PCI Express traffic class select register in PCI configure space
  */
 #define	AUDIOHD_INTEL_PCI_TCSEL 0x44
+#define	AUDIOHD_INTEL_TCS_MASK	0xf8
 
 /*
  * Only for ATI SB450:
  * MISC control register 2
  */
 #define	AUDIOHD_ATI_PCI_MISC2	0x42
+#define	AUDIOHD_ATI_MISC2_MASK	0xf8
 #define	AUDIOHD_ATI_MISC2_SNOOP	0x02
+
+/* NVIDIA snoop */
+#define	AUDIOHD_NVIDIA_SNOOP	0x0f
+
 #define	AUDIOHDC_NID(x)		x
 #define	AUDIOHDC_NULL_NODE	-1
 #define	AUDIOHD_NULL_CONN	((uint_t)(-1))
-/*
- * currently, only the format of 48K sample rate, 16-bit
- * 2-channel is supported.
- */
-#define	AUDIOHD_FMT_PCMOUT	0x0011
-#define	AUDIOHD_FMT_PCMIN	0x0011
 
 #define	AUDIOHD_EXT_AMP_MASK	0x00010000
 #define	AUDIOHD_EXT_AMP_ENABLE	0x02
-/* NVIDIA snoop */
-#define	AUDIOHD_NVIDIA_SNOOP	0x0f
 
 /* Power On/Off */
 #define	AUDIOHD_PW_D0		0
 #define	AUDIOHD_PW_D2		2
-
-#define	AUDIOHD_INTEL_TCS_MASK	0xf8
-#define	AUDIOHD_ATI_MISC2_MASK	0xf8
 
 /* Pin speaker On/Off */
 #define	AUDIOHD_SP_ON		1
@@ -271,7 +265,6 @@ extern "C" {
 	(AUDIOHDR_SD_STS_BCIS | \
 	AUDIOHDR_SD_STS_FIFOE |	\
 	AUDIOHDR_SD_STS_DESE)
-
 
 /* bits for GCTL register */
 #define	AUDIOHDR_GCTL_CRST		0x00000001
@@ -481,7 +474,6 @@ extern "C" {
 #define	AUDIOHD_WIDCAP_TO_WIDTYPE(wcap)		\
 	((wcap & AUDIOHD_WIDCAP_TYPE) >> 20)
 
-
 #define	AUDIOHD_CODEC_FAILURE	(uint32_t)(-1)
 
 /*
@@ -594,21 +586,22 @@ struct audiohd_widget {
 	int		finish;
 
 	/*
-	 * wid of possible & selected input connections
-	 */
-	wid_t		avail_conn[AUDIOHD_MAX_CONN];
-	wid_t		selconn;
-	/*
-	 * for monitor path
-	 */
-	wid_t		selmon[AUDIOHD_MAX_CONN];
-	uint16_t 	used;
-
-	/*
 	 * available (input) connections. 0 means this widget
 	 * has fixed connection
 	 */
 	int		nconns;
+
+	/*
+	 * wid of possible & selected input & output connections
+	 */
+	wid_t		avail_conn[AUDIOHD_MAX_CONN];
+	wid_t		output_path_next;	/* output pin -> DAC */
+	wid_t		input_path_next;	/* ADC -> input pin */
+	wid_t		monitor_path_next[AUDIOHD_MAX_CONN];
+						/* output pin -> input pin */
+	wid_t		beep_path_next;		/* output pin -> beep widget */
+
+	uint16_t 	used;
 
 	/*
 	 * pointer to struct depending on widget type:
@@ -829,6 +822,7 @@ struct audiohd_state {
 	 * for parsing codec topology
 	 */
 	hda_codec_t	*codec[AUDIOHD_CODEC_MAX];
+
 	/*
 	 * Suspend/Resume used fields
 	 */
