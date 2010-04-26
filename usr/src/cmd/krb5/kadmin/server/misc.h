@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _MISC_H
@@ -54,9 +53,6 @@ kadm5_ret_t
 schpw_util_wrapper(void *server_handle, krb5_principal princ,
 		   char *new_pw, char **ret_pw,
 		   char *msg_ret, unsigned int msg_len);
-
-kadm5_ret_t check_min_life(void *server_handle, krb5_principal principal,
-			   char *msg_ret, unsigned int msg_len);
 
 kadm5_ret_t kadm5_get_principal_v1(void *server_handle,
 				   krb5_principal principal, 

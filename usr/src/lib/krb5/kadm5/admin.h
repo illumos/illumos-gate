@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	__KADM5_ADMIN_H__
@@ -433,6 +432,10 @@ kadm5_ret_t    kadm5_lock(void *server_handle);
 kadm5_ret_t    kadm5_unlock(void *server_handle);
 kadm5_ret_t    kadm5_flush(void *server_handle);
 kadm5_ret_t    kadm5_destroy(void *server_handle);
+kadm5_ret_t    kadm5_check_min_life(void *server_handle,	/* Solaris Kerberos */
+			      krb5_principal principal,
+			      char *msg_ret,
+			      unsigned int msg_len);
 kadm5_ret_t    kadm5_create_principal(void *server_handle,
 				      kadm5_principal_ent_t ent,
 				      long mask, char *pass);
