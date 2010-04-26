@@ -474,8 +474,8 @@ typedef struct	apic_irq {
 	 */
 	major_t	airq_major;	/* major number corresponding to the device */
 	ushort_t airq_rdt_entry;	/* level, polarity & trig mode */
-	uint32_t airq_cpu;		/* Which CPU are we bound to ? */
-	uint32_t airq_temp_cpu; /* Could be diff from cpu due to disable_intr */
+	uint32_t airq_cpu;		/* target CPU, non-reserved IRQ only */
+	uint32_t airq_temp_cpu;   /* non-reserved IRQ only, for disable_intr */
 	uchar_t	airq_vector;		/* Vector chosen for this irq */
 	uchar_t	airq_share;		/* number of interrupts at this irq */
 	uchar_t	airq_share_id;		/* id to identify source from irqno */

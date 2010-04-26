@@ -336,7 +336,11 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode)
 	 * Fill in the pcitool_intr_get_t to be returned,
 	 * with the CPU, num_devs_ret and num_devs.
 	 */
-	iget->cpu_id = intr_info.avgi_cpu_id & ~PSMGI_CPU_USER_BOUND;
+	if (intr_info.avgi_cpu_id == IRQ_UNBOUND ||
+	    intr_info.avgi_cpu_id == IRQ_UNINIT)
+		iget->cpu_id = 0;
+	else
+		iget->cpu_id = intr_info.avgi_cpu_id & ~PSMGI_CPU_USER_BOUND;
 
 	/* Number of devices returned by apic. */
 	iget->num_devs = intr_info.avgi_num_devs;

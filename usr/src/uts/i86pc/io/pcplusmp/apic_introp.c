@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -842,8 +841,9 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 	irq_p = apic_irq_table[irqno];
 
 	if ((irq_p == NULL) ||
-	    (irq_p->airq_temp_cpu == IRQ_UNBOUND) ||
-	    (irq_p->airq_temp_cpu == IRQ_UNINIT)) {
+	    ((irq_p->airq_mps_intr_index != RESERVE_INDEX) &&
+	    ((irq_p->airq_temp_cpu == IRQ_UNBOUND) ||
+	    (irq_p->airq_temp_cpu == IRQ_UNINIT)))) {
 		mutex_exit(&airq_mutex);
 		return (PSM_FAILURE);
 	}
