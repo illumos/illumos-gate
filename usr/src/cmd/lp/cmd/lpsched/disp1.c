@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -226,14 +225,16 @@ s_print_request(char *m, MESG *md)
 					rp->request->title =
 					    Strdup(*rp->request->file_list);
 				else {
-					/*
-					 * In case of standard input
-					 * the title page should be
-					 * 'standard input'
-					 */
+					char *r;
+					if (r = strrchr(
+					    *rp->request->file_list, '/'))
+						r++;
+					else
+						r = *rp->request->file_list;
+
 					rp->request->title = malloc(25);
 					sprintf(rp->request->title,
-					    "%-.24s", "standard input");
+					    "%-.24s", r);
 				}
 			}
 

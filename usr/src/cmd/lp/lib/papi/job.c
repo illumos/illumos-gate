@@ -834,6 +834,9 @@ papiJobStreamOpen(papi_service_t handle, char *printer,
 	if (status != PAPI_OK)
 		return (status);
 
+	papiAttributeListAddString(&job_attributes, PAPI_ATTR_EXCL,
+	    "job-name", "standard input");
+
 	s->request = create_request(svc, (char *)printer,
 	    (papi_attribute_t **)job_attributes);
 	snprintf(lpfile, sizeof (lpfile), "/var/spool/lp/temp/%s-1",
