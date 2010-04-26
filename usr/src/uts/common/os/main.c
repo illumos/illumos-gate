@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -377,6 +376,7 @@ main(void)
 	extern int	pm_adjust_timestamps(dev_info_t *, void *);
 	extern void	start_other_cpus(int);
 	extern void	sysevent_evc_thrinit();
+	extern kmutex_t	ualock;
 #if defined(__x86)
 	extern void	fastboot_post_startup(void);
 	extern void	progressbar_start(void);
@@ -392,6 +392,14 @@ main(void)
 	ASSERT(CPU == CPU->cpu_self);
 	ASSERT(curthread == CPU->cpu_thread);
 	ASSERT_STACK_ALIGNED();
+
+	/*
+	 * We take the ualock until we have completed the startup
+	 * to prevent kadmin() from disrupting this work. In particular,
+	 * we don't want kadmin() to bring the system down while we are
+	 * trying to start it up.
+	 */
+	mutex_enter(&ualock);
 
 	/*
 	 * Setup root lgroup and leaf lgroup for CPU 0
@@ -631,6 +639,9 @@ main(void)
 	    NULL, 0, &p0, TS_RUN, minclsyspri);
 
 	pid_setmin();
+
+	/* system is now ready */
+	mutex_exit(&ualock);
 
 	bcopy("sched", PTOU(curproc)->u_psargs, 6);
 	bcopy("sched", PTOU(curproc)->u_comm, 5);
