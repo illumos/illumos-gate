@@ -209,8 +209,8 @@
 static	int si_attach(dev_info_t *, ddi_attach_cmd_t);
 static	int si_detach(dev_info_t *, ddi_detach_cmd_t);
 static	int si_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
-static int si_power(dev_info_t *, int, int);
-
+static	int si_power(dev_info_t *, int, int);
+static	int si_quiesce(dev_info_t *);
 /*
  * Function prototypes for SATA Framework interfaces
  */
@@ -296,6 +296,7 @@ static 	void si_rem_intrs(si_ctl_state_t *);
 
 static	int si_reset_dport_wait_till_ready(si_ctl_state_t *,
 				si_port_state_t *, int, int);
+static int si_clear_port(si_ctl_state_t *, int);
 static	int si_initialize_port_wait_till_ready(si_ctl_state_t *, int);
 
 static void si_timeout_pkts(si_ctl_state_t *, si_port_state_t *, int, uint32_t);
@@ -364,7 +365,7 @@ static struct dev_ops sictl_dev_ops = {
 	(struct cb_ops *)0,	/* driver operations */
 	NULL,			/* bus operations */
 	si_power,		/* power */
-	ddi_quiesce_not_supported,	/* devo_quiesce */
+	si_quiesce,		/* devo_quiesce */
 };
 
 static sata_tran_hotplug_ops_t si_tran_hotplug_ops = {
@@ -5521,4 +5522,64 @@ si_copy_out_regs(sata_cmd_t *scmd, si_ctl_state_t *si_ctlp, uint8_t port,
 		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_error_reg %x\n",
 		    scmd->satacmd_error_reg);
 	}
+}
+
+/*
+ * This function clear the special port by send the PORT RESET
+ * After reset was sent, all commands running on the port
+ * is aborted
+ */
+static int
+si_clear_port(si_ctl_state_t *si_ctlp, int port)
+{
+
+	if (si_ctlp == NULL)
+		return (SI_FAILURE);
+	/*
+	 * reset this port so that all existing command
+	 * is clear
+	 */
+	ddi_put32(si_ctlp->sictl_port_acc_handle,
+	    (uint32_t *)PORT_CONTROL_SET(si_ctlp, port),
+	    PORT_CONTROL_SET_BITS_PORT_RESET);
+
+	/* Port reset is not self clearing. So clear it now. */
+	ddi_put32(si_ctlp->sictl_port_acc_handle,
+	    (uint32_t *)PORT_CONTROL_CLEAR(si_ctlp, port),
+	    PORT_CONTROL_CLEAR_BITS_PORT_RESET);
+	return (SI_SUCCESS);
+}
+
+/*
+ * quiesce(9E) entry point.
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+si_quiesce(dev_info_t *dip)
+{
+	si_ctl_state_t *si_ctlp;
+	int instance;
+	int port;
+
+	SIDBG0(SIDBG_INIT|SIDBG_ENTRY, NULL, "si_quiesce enter");
+	instance = ddi_get_instance(dip);
+	si_ctlp = ddi_get_soft_state(si_statep, instance);
+	if (si_ctlp == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * Disable all the interrupts before quiesce
+	 */
+
+	for (port = 0; port < si_ctlp->sictl_num_ports; port++) {
+		si_disable_port_interrupts(si_ctlp, port);
+		(void) si_clear_port(si_ctlp, port);
+	}
+
+	return (DDI_SUCCESS);
 }
