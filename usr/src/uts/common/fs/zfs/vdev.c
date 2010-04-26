@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -1005,6 +1004,10 @@ vdev_probe(vdev_t *vd, zio_t *zio)
 		    vdev_probe_done, vps,
 		    vps->vps_flags | ZIO_FLAG_DONT_PROPAGATE);
 
+		/*
+		 * We can't change the vdev state in this context, so we
+		 * kick off an async task to do it on our behalf.
+		 */
 		if (zio != NULL) {
 			vd->vdev_probe_wanted = B_TRUE;
 			spa_async_request(spa, SPA_ASYNC_PROBE);
@@ -1250,8 +1253,8 @@ vdev_open(vdev_t *vd)
 	 */
 	if (vd->vdev_ops->vdev_op_leaf &&
 	    (error = zio_wait(vdev_probe(vd, NULL))) != 0) {
-		vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
-		    VDEV_AUX_IO_FAILURE);
+		vdev_set_state(vd, B_TRUE, VDEV_STATE_FAULTED,
+		    VDEV_AUX_ERR_EXCEEDED);
 		return (error);
 	}
 
@@ -2073,6 +2076,7 @@ vdev_fault(spa_t *spa, uint64_t guid, vdev_aux_t aux)
 	/*
 	 * Faulted state takes precedence over degraded.
 	 */
+	vd->vdev_delayed_close = B_FALSE;
 	vd->vdev_faulted = 1ULL;
 	vd->vdev_degraded = 0ULL;
 	vdev_set_state(vd, B_FALSE, VDEV_STATE_FAULTED, aux);
@@ -2891,13 +2895,16 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 
 	/*
 	 * If we are setting the vdev state to anything but an open state, then
-	 * always close the underlying device.  Otherwise, we keep accessible
-	 * but invalid devices open forever.  We don't call vdev_close() itself,
-	 * because that implies some extra checks (offline, etc) that we don't
-	 * want here.  This is limited to leaf devices, because otherwise
-	 * closing the device will affect other children.
+	 * always close the underlying device unless the device has requested
+	 * a delayed close (i.e. we're about to remove or fault the device).
+	 * Otherwise, we keep accessible but invalid devices open forever.
+	 * We don't call vdev_close() itself, because that implies some extra
+	 * checks (offline, etc) that we don't want here.  This is limited to
+	 * leaf devices, because otherwise closing the device will affect other
+	 * children.
 	 */
-	if (vdev_is_dead(vd) && vd->vdev_ops->vdev_op_leaf)
+	if (!vd->vdev_delayed_close && vdev_is_dead(vd) &&
+	    vd->vdev_ops->vdev_op_leaf)
 		vd->vdev_ops->vdev_op_close(vd);
 
 	/*
@@ -2978,9 +2985,6 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 				break;
 			case VDEV_AUX_BAD_LABEL:
 				class = FM_EREPORT_ZFS_DEVICE_BAD_LABEL;
-				break;
-			case VDEV_AUX_IO_FAILURE:
-				class = FM_EREPORT_ZFS_IO_FAILURE;
 				break;
 			default:
 				class = FM_EREPORT_ZFS_DEVICE_UNKNOWN;

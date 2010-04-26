@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -134,6 +133,7 @@ vdev_file_close(vdev_t *vd)
 		VN_RELE(vf->vf_vnode);
 	}
 
+	vd->vdev_delayed_close = B_FALSE;
 	kmem_free(vf, sizeof (vdev_file_t));
 	vd->vdev_tsd = NULL;
 }

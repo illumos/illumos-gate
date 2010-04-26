@@ -481,6 +481,14 @@ translate_device(const char *pool, const char *device, err_type_t label_type,
 		record->zi_start = offsetof(vdev_label_t, vl_vdev_phys);
 		record->zi_end = record->zi_start + VDEV_PHYS_SIZE - 1;
 		break;
+	case TYPE_LABEL_PAD1:
+		record->zi_start = offsetof(vdev_label_t, vl_pad1);
+		record->zi_end = record->zi_start + VDEV_PAD_SIZE - 1;
+		break;
+	case TYPE_LABEL_PAD2:
+		record->zi_start = offsetof(vdev_label_t, vl_pad2);
+		record->zi_end = record->zi_start + VDEV_PAD_SIZE - 1;
+		break;
 	}
 	return (0);
 }

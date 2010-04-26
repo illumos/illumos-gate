@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -277,6 +276,16 @@ zio_handle_device_injection(vdev_t *vd, zio_t *zio, int error)
 				if (error == ENXIO)
 					vd->vdev_stat.vs_aux =
 					    VDEV_AUX_OPEN_FAILED;
+
+				/*
+				 * Treat these errors as if they had been
+				 * retried so that all the appropriate stats
+				 * and FMA events are generated.
+				 */
+				if (!handler->zi_record.zi_failfast &&
+				    zio != NULL)
+					zio->io_flags |= ZIO_FLAG_IO_RETRY;
+
 				ret = error;
 				break;
 			}

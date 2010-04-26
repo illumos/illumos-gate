@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_VDEV_IMPL_H
@@ -182,6 +181,7 @@ struct vdev {
 	boolean_t	vdev_checkremove; /* temporary online test	*/
 	boolean_t	vdev_forcefault; /* force online fault		*/
 	boolean_t	vdev_splitting;	/* split or repair in progress  */
+	boolean_t	vdev_delayed_close; /* delayed device close?	*/
 	uint8_t		vdev_tmpoffline; /* device taken offline temporarily? */
 	uint8_t		vdev_detached;	/* device detached?		*/
 	uint8_t		vdev_cant_read;	/* vdev is failing all reads	*/

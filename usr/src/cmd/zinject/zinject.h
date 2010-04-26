@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_ZINJECT_H
 #define	_ZINJECT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/zfs_ioctl.h>
 
@@ -46,6 +43,8 @@ typedef enum {
 	TYPE_ERRLOG,		/* persistent error log		*/
 	TYPE_LABEL_UBERBLOCK,	/* label specific uberblock	*/
 	TYPE_LABEL_NVLIST,	/* label specific nvlist	*/
+	TYPE_LABEL_PAD1,	/* label specific 8K pad1 area	*/
+	TYPE_LABEL_PAD2,	/* label specific 8K pad2 area	*/
 	TYPE_INVAL
 } err_type_t;
 

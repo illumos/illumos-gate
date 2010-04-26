@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -4737,7 +4736,8 @@ static void
 spa_async_remove(spa_t *spa, vdev_t *vd)
 {
 	if (vd->vdev_remove_wanted) {
-		vd->vdev_remove_wanted = 0;
+		vd->vdev_remove_wanted = B_FALSE;
+		vd->vdev_delayed_close = B_FALSE;
 		vdev_set_state(vd, B_FALSE, VDEV_STATE_REMOVED, VDEV_AUX_NONE);
 
 		/*
@@ -4761,7 +4761,7 @@ static void
 spa_async_probe(spa_t *spa, vdev_t *vd)
 {
 	if (vd->vdev_probe_wanted) {
-		vd->vdev_probe_wanted = 0;
+		vd->vdev_probe_wanted = B_FALSE;
 		vdev_reopen(vd);	/* vdev_open() does the actual probe */
 	}
 

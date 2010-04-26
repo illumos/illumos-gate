@@ -319,6 +319,7 @@ vdev_disk_close(vdev_t *vd)
 	if (dvd->vd_lh != NULL)
 		(void) ldi_close(dvd->vd_lh, spa_mode(vd->vdev_spa), kcred);
 
+	vd->vdev_delayed_close = B_FALSE;
 	kmem_free(dvd, sizeof (vdev_disk_t));
 	vd->vdev_tsd = NULL;
 }
@@ -510,6 +511,8 @@ vdev_disk_io_done(zio_t *zio)
 			zfs_post_remove(zio->io_spa, vd);
 			vd->vdev_remove_wanted = B_TRUE;
 			spa_async_request(zio->io_spa, SPA_ASYNC_REMOVE);
+		} else if (!vd->vdev_delayed_close) {
+			vd->vdev_delayed_close = B_TRUE;
 		}
 	}
 }

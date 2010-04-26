@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -42,12 +41,12 @@
  * any attempt to read from the device will return EIO, but any attempt to
  * reopen the device will also return ENXIO.
  * For label faults, the -L option must be specified. This allows faults
- * to be injected into either the nvlist or uberblock region of all the labels
- * for the specified device.
+ * to be injected into either the nvlist, uberblock, pad1, or pad2 region
+ * of all the labels for the specified device.
  *
  * This form of the command looks like:
  *
- * 	zinject -d device [-e errno] [-L <uber | nvlist>] pool
+ * 	zinject -d device [-e errno] [-L <uber | nvlist | pad1 | pad2>] pool
  *
  *
  * DATA FAULTS
@@ -168,7 +167,9 @@ static const char *errtable[TYPE_INVAL] = {
 	"spacemap",
 	"errlog",
 	"uber",
-	"nvlist"
+	"nvlist",
+	"pad1",
+	"pad2"
 };
 
 static err_type_t
@@ -227,10 +228,11 @@ usage(void)
 	    "\t\tfunctions which call spa_vdev_config_exit(), or \n"
 	    "\t\tspa_vdev_exit() will trigger a panic.\n"
 	    "\n"
-	    "\tzinject -d device [-e errno] [-L <nvlist|uber>] [-F]\n"
+	    "\tzinject -d device [-e errno] [-L <nvlist|uber|pad1|pad2>] [-F]\n"
 	    "\t    [-T <read|write|free|claim|all> pool\n"
 	    "\t\tInject a fault into a particular device or the device's\n"
-	    "\t\tlabel.  Label injection can either be 'nvlist' or 'uber'.\n"
+	    "\t\tlabel.  Label injection can either be 'nvlist', 'uber',\n "
+	    "\t\t'pad1', or 'pad2'.\n"
 	    "\t\t'errno' can either be 'nxio' (the default) or 'io'.\n"
 	    "\n"
 	    "\tzinject -d device -A <degrade|fault> pool\n"
