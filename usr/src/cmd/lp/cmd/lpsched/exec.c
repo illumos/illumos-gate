@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -314,7 +313,7 @@ exec(int type, ...)
 	char	*mail_zonename = NULL;
 	char	*slabel = NULL;
 	int	setid = 1;
-	char	*ridno = NULL;
+	char	*ridno = NULL, *tmprid = NULL;
 
 	syslog(LOG_DEBUG, "exec(%s)", _exec_name(type));
 
@@ -770,13 +769,18 @@ exec(int type, ...)
 				 */
 				if (STRNEQU(options, "job-id-requested=", 17)) {
 					ridno = strdup(options + 17);
-					if (ridno != NULL)
+					tmprid = strstr(ridno, " ");
+					if (ridno != NULL) {
 						/*
 						 * Read job-id-requested
 						 * successfully
 						 */
+						tmprid = strstr(ridno, " ");
+						if (tmprid != NULL)
+							*tmprid = '\0';
+
 						setid = 0;
-					else
+					} else
 						/*
 						 * could not read
 						 * ridno from the string
@@ -861,6 +865,9 @@ exec(int type, ...)
 
 			if (ridno != NULL)
 				free(ridno);
+
+			if (tmprid != NULL)
+				free(tmprid);
 		}
 
 		av[ac++] = arg_string(UNTRUSTED, "%s", request->request->user);
