@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 . /lib/svc/share/smf_include.sh
@@ -109,5 +108,8 @@ then
 		result=$SMF_EXIT_ERR_FATAL
 	fi
 fi
+
+# Add swap filesystems
+/sbin/swapadd >/dev/null 2>&1
 
 exit $result
