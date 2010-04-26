@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -79,30 +78,22 @@ struct cms_ctl {
 };
 
 #define	CMI_MAX_CHIPID_NBITS		6	/* max chipid of 63 */
-#define	CMI_MAX_CORES_PER_CHIP_NBITS	4	/* 16 cores per chip max */
-#define	CMI_MAX_STRANDS_PER_CORE_NBITS	3	/* 8 strands per core max */
 
 #define	CMI_MAX_CHIPID			((1 << (CMI_MAX_CHIPID_NBITS)) - 1)
-#define	CMI_MAX_CORES_PER_CHIP		(1 << CMI_MAX_CORES_PER_CHIP_NBITS)
-#define	CMI_MAX_STRANDS_PER_CORE	(1 << CMI_MAX_STRANDS_PER_CORE_NBITS)
-#define	CMI_MAX_STRANDS_PER_CHIP	(CMI_MAX_CORES_PER_CHIP * \
-					    CMI_MAX_STRANDS_PER_CORE)
-
-#define	CMI_HDL_ARR_IDX_CORE(coreid) \
-	(((coreid) & (CMI_MAX_CORES_PER_CHIP - 1)) << \
-	CMI_MAX_STRANDS_PER_CORE_NBITS)
-
-#define	CMI_HDL_ARR_IDX_STRAND(strandid) \
-	(((strandid) & (CMI_MAX_STRANDS_PER_CORE - 1)))
-
-#define	CMI_HDL_ARR_IDX(coreid, strandid) \
-	(CMI_HDL_ARR_IDX_CORE(coreid) | CMI_HDL_ARR_IDX_STRAND(strandid))
+#define	CMI_MAX_CORES_PER_CHIP(cbits)	(1 << (cbits))
+#define	CMI_MAX_COREID(cbits)		((1 << (cbits)) - 1)
+#define	CMI_MAX_STRANDS_PER_CORE(sbits)	(1 << (sbits))
+#define	CMI_MAX_STRANDID(sbits)		((1 << (sbits)) - 1)
+#define	CMI_MAX_STRANDS_PER_CHIP(cbits, sbits)	\
+	(CMI_MAX_CORES_PER_CHIP(cbits) * CMI_MAX_STRANDS_PER_CORE(sbits))
 
 #define	CMI_CHIPID_ARR_SZ		(1 << CMI_MAX_CHIPID_NBITS)
 
 struct cmih_walk_state {
 	int chipid, coreid, strandid;	/* currently visited cpu */
 	cmi_hdl_ent_t *chip_tab[CMI_CHIPID_ARR_SZ];
+	uint_t core_nbits;
+	uint_t strand_nbits;
 };
 
 /*
@@ -116,22 +107,22 @@ cmih_ent_next(struct cmih_walk_state *wsp)
 	uint_t carry = 0;
 
 	/* Check for end of the table */
-	if (wsp->chipid == CMI_MAX_CHIPID &&
-	    wsp->coreid == (CMI_MAX_CORES_PER_CHIP - 1) &&
-	    wsp->strandid == (CMI_MAX_STRANDS_PER_CORE - 1))
+	if (wsp->chipid >= CMI_MAX_CHIPID &&
+	    wsp->coreid >= CMI_MAX_COREID(wsp->core_nbits) &&
+	    wsp->strandid >= CMI_MAX_STRANDID(wsp->strand_nbits))
 		return (B_FALSE);
 
 	/* increment the strand id */
 	wsp->strandid++;
-	carry =  wsp->strandid >> CMI_MAX_STRANDS_PER_CORE_NBITS;
-	wsp->strandid =  wsp->strandid & (CMI_MAX_STRANDS_PER_CORE - 1);
+	carry =  wsp->strandid >> wsp->strand_nbits;
+	wsp->strandid =  wsp->strandid & CMI_MAX_STRANDID(wsp->strand_nbits);
 	if (carry == 0)
 		return (B_TRUE);
 
 	/* increment the core id */
 	wsp->coreid++;
-	carry = wsp->coreid >> CMI_MAX_CORES_PER_CHIP_NBITS;
-	wsp->coreid = wsp->coreid & (CMI_MAX_CORES_PER_CHIP - 1);
+	carry = wsp->coreid >> wsp->core_nbits;
+	wsp->coreid = wsp->coreid & CMI_MAX_COREID(wsp->core_nbits);
 	if (carry == 0)
 		return (B_TRUE);
 
@@ -142,7 +133,7 @@ cmih_ent_next(struct cmih_walk_state *wsp)
 }
 
 /*
- * Lookup for the hdl entry of a given <chip,core,strand>
+ * Lookup for the hdl entry of a given <chip,core,strand> tuple
  */
 static cmi_hdl_ent_t *
 cmih_ent_lookup(struct cmih_walk_state *wsp)
@@ -151,7 +142,9 @@ cmih_ent_lookup(struct cmih_walk_state *wsp)
 		return (NULL);	/* chip is not present */
 
 	return (wsp->chip_tab[wsp->chipid] +
-	    CMI_HDL_ARR_IDX(wsp->coreid, wsp->strandid));
+	    (((wsp->coreid & CMI_MAX_COREID(wsp->core_nbits)) <<
+	    wsp->strand_nbits) |
+	    ((wsp->strandid) & CMI_MAX_STRANDID(wsp->strand_nbits))));
 }
 
 /* forward decls */
@@ -175,6 +168,20 @@ cmih_walk_init(mdb_walk_state_t *wsp)
 	wsp->walk_data = awsp =
 	    mdb_zalloc(sizeof (struct cmih_walk_state), UM_SLEEP);
 
+	/* read the number of core bits and strand bits */
+	if (mdb_readvar(&awsp->core_nbits, "cmi_core_nbits") == -1) {
+		mdb_warn("read of cmi_core_nbits failed");
+		mdb_free(wsp->walk_data, sizeof (struct cmih_walk_state));
+		wsp->walk_data = NULL;
+		return (WALK_ERR);
+	}
+	if (mdb_readvar(&awsp->strand_nbits, "cmi_strand_nbits") == -1) {
+		mdb_warn("read of cmi_strand_nbits failed");
+		mdb_free(wsp->walk_data, sizeof (struct cmih_walk_state));
+		wsp->walk_data = NULL;
+		return (WALK_ERR);
+	}
+
 	/* table of chipid entries */
 	if ((sz = mdb_readvar(&awsp->chip_tab, "cmi_chip_tab")) == -1) {
 		mdb_warn("read of cmi_chip_tab failed");
@@ -190,7 +197,8 @@ cmih_walk_init(mdb_walk_state_t *wsp)
 	}
 
 	/* read the per-chip table that contains all strands of the chip */
-	sz = CMI_MAX_STRANDS_PER_CHIP * sizeof (cmi_hdl_ent_t);
+	sz = CMI_MAX_STRANDS_PER_CHIP(awsp->core_nbits, awsp->strand_nbits) *
+	    sizeof (cmi_hdl_ent_t);
 	for (i = 0; i < CMI_CHIPID_ARR_SZ; i++) {
 		if (awsp->chip_tab[i] == NULL)
 			continue; /* this chip(i) is not present */
@@ -246,12 +254,13 @@ cmih_walk_fini(mdb_walk_state_t *wsp)
 
 	if (awsp != NULL) {
 		int i;
+		int max_strands = CMI_MAX_STRANDS_PER_CHIP(awsp->core_nbits,
+		    awsp->strand_nbits);
 		for (i = 0; i < CMI_CHIPID_ARR_SZ; i++) {
 			/* free the per-chip table */
 			if (awsp->chip_tab[i] != NULL) {
 				mdb_free((void *)awsp->chip_tab[i],
-				    CMI_MAX_STRANDS_PER_CHIP *
-				    sizeof (cmi_hdl_ent_t));
+				    max_strands * sizeof (cmi_hdl_ent_t));
 				awsp->chip_tab[i] = NULL;
 			}
 		}

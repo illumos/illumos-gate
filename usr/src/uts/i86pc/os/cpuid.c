@@ -4214,3 +4214,69 @@ patch_memops(uint_t vendor)
 	}
 }
 #endif  /* __amd64 && !__xpv */
+
+/*
+ * This function finds the number of bits to represent the number of cores per
+ * chip and the number of strands per core for the Intel platforms.
+ * It re-uses the x2APIC cpuid code of the cpuid_pass2().
+ */
+void
+cpuid_get_ext_topo(uint_t vendor, uint_t *core_nbits, uint_t *strand_nbits)
+{
+	struct cpuid_regs regs;
+	struct cpuid_regs *cp = &regs;
+
+	if (vendor != X86_VENDOR_Intel) {
+		return;
+	}
+
+	/* if the cpuid level is 0xB, extended topo is available. */
+	cp->cp_eax = 0;
+	if (__cpuid_insn(cp) >= 0xB) {
+
+		cp->cp_eax = 0xB;
+		cp->cp_edx = cp->cp_ebx = cp->cp_ecx = 0;
+		(void) __cpuid_insn(cp);
+
+		/*
+		 * Check CPUID.EAX=0BH, ECX=0H:EBX is non-zero, which
+		 * indicates that the extended topology enumeration leaf is
+		 * available.
+		 */
+		if (cp->cp_ebx) {
+			uint_t coreid_shift = 0;
+			uint_t chipid_shift = 0;
+			uint_t i;
+			uint_t level;
+
+			for (i = 0; i < CPI_FNB_ECX_MAX; i++) {
+				cp->cp_eax = 0xB;
+				cp->cp_ecx = i;
+
+				(void) __cpuid_insn(cp);
+				level = CPI_CPU_LEVEL_TYPE(cp);
+
+				if (level == 1) {
+					/*
+					 * Thread level processor topology
+					 * Number of bits shift right APIC ID
+					 * to get the coreid.
+					 */
+					coreid_shift = BITX(cp->cp_eax, 4, 0);
+				} else if (level == 2) {
+					/*
+					 * Core level processor topology
+					 * Number of bits shift right APIC ID
+					 * to get the chipid.
+					 */
+					chipid_shift = BITX(cp->cp_eax, 4, 0);
+				}
+			}
+
+			if (coreid_shift > 0 && chipid_shift > coreid_shift) {
+				*strand_nbits = coreid_shift;
+				*core_nbits = chipid_shift - coreid_shift;
+			}
+		}
+	}
+}

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -178,25 +177,12 @@ static const struct cmi_hdl_ops cmi_hdl_ops;
 #define	CMI_MAX_STRANDS_PER_CORE_NBITS	3	/* 8 strands per core max */
 
 #define	CMI_MAX_CHIPID			((1 << (CMI_MAX_CHIPID_NBITS)) - 1)
-#define	CMI_MAX_CORES_PER_CHIP		(1 << CMI_MAX_CORES_PER_CHIP_NBITS)
-#define	CMI_MAX_STRANDS_PER_CORE	(1 << CMI_MAX_STRANDS_PER_CORE_NBITS)
-#define	CMI_MAX_STRANDS_PER_CHIP	(CMI_MAX_CORES_PER_CHIP * \
-					    CMI_MAX_STRANDS_PER_CORE)
-
-/*
- * Handle array indexing within a per-chip table
- *	[6:3] = Core in package,
- *	[2:0] = Strand in core,
- */
-#define	CMI_HDL_ARR_IDX_CORE(coreid) \
-	(((coreid) & (CMI_MAX_CORES_PER_CHIP - 1)) << \
-	CMI_MAX_STRANDS_PER_CORE_NBITS)
-
-#define	CMI_HDL_ARR_IDX_STRAND(strandid) \
-	(((strandid) & (CMI_MAX_STRANDS_PER_CORE - 1)))
-
-#define	CMI_HDL_ARR_IDX(coreid, strandid) \
-	(CMI_HDL_ARR_IDX_CORE(coreid) | CMI_HDL_ARR_IDX_STRAND(strandid))
+#define	CMI_MAX_CORES_PER_CHIP(cbits)	(1 << (cbits))
+#define	CMI_MAX_COREID(cbits)		((1 << (cbits)) - 1)
+#define	CMI_MAX_STRANDS_PER_CORE(sbits)	(1 << (sbits))
+#define	CMI_MAX_STRANDID(sbits)		((1 << (sbits)) - 1)
+#define	CMI_MAX_STRANDS_PER_CHIP(cbits, sbits)	\
+	(CMI_MAX_CORES_PER_CHIP(cbits) * CMI_MAX_STRANDS_PER_CORE(sbits))
 
 #define	CMI_CHIPID_ARR_SZ		(1 << CMI_MAX_CHIPID_NBITS)
 
@@ -206,6 +192,13 @@ typedef struct cmi_hdl_ent {
 } cmi_hdl_ent_t;
 
 static cmi_hdl_ent_t *cmi_chip_tab[CMI_CHIPID_ARR_SZ];
+
+/*
+ * Default values for the number of core and strand bits.
+ */
+uint_t cmi_core_nbits = CMI_MAX_CORES_PER_CHIP_NBITS;
+uint_t cmi_strand_nbits = CMI_MAX_STRANDS_PER_CORE_NBITS;
+static int cmi_ext_topo_check = 0;
 
 /*
  * Controls where we will source PCI config space data.
@@ -1205,6 +1198,9 @@ cpu_is_cmt(void *priv)
 static cmi_hdl_ent_t *
 cmi_hdl_ent_lookup(uint_t chipid, uint_t coreid, uint_t strandid)
 {
+	int max_strands = CMI_MAX_STRANDS_PER_CHIP(cmi_core_nbits,
+	    cmi_strand_nbits);
+
 	/*
 	 * Allocate per-chip table which contains a list of handle of
 	 * all strands of the chip.
@@ -1213,16 +1209,20 @@ cmi_hdl_ent_lookup(uint_t chipid, uint_t coreid, uint_t strandid)
 		size_t sz;
 		cmi_hdl_ent_t *pg;
 
-		sz = CMI_MAX_STRANDS_PER_CHIP * sizeof (cmi_hdl_ent_t);
+		sz = max_strands * sizeof (cmi_hdl_ent_t);
 		pg = kmem_zalloc(sz, KM_SLEEP);
 
 		/* test and set the per-chip table if it is not allocated */
 		if (atomic_cas_ptr(&cmi_chip_tab[chipid], NULL, pg) != NULL)
-			kmem_free(pg, sz); /* someone beat us */
+			kmem_free(pg, sz); /* someone beats us */
 	}
 
-	return (cmi_chip_tab[chipid] + CMI_HDL_ARR_IDX(coreid, strandid));
+	return (cmi_chip_tab[chipid] +
+	    ((((coreid) & CMI_MAX_COREID(cmi_core_nbits)) << cmi_strand_nbits) |
+	    ((strandid) & CMI_MAX_STRANDID(cmi_strand_nbits))));
 }
+
+extern void cpuid_get_ext_topo(uint_t, uint_t *, uint_t *);
 
 cmi_hdl_t
 cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
@@ -1231,6 +1231,7 @@ cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 	cmi_hdl_impl_t *hdl;
 	void *priv;
 	cmi_hdl_ent_t *ent;
+	uint_t vendor;
 
 #ifdef __xpv
 	ASSERT(class == CMI_HDL_SOLARIS_xVM_MCA);
@@ -1238,12 +1239,28 @@ cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 	ASSERT(class == CMI_HDL_NATIVE);
 #endif
 
-	if (chipid > CMI_MAX_CHIPID ||
-	    coreid > CMI_MAX_CORES_PER_CHIP - 1 ||
-	    strandid > CMI_MAX_STRANDS_PER_CORE - 1)
+	if ((priv = cpu_search(class, chipid, coreid, strandid)) == NULL)
 		return (NULL);
 
-	if ((priv = cpu_search(class, chipid, coreid, strandid)) == NULL)
+	/*
+	 * Assume all chips in the system are the same type.
+	 * For Intel, attempt to check if extended topology is available
+	 * CPUID.EAX=0xB. If so, get the number of core and strand bits.
+	 */
+#ifdef __xpv
+	vendor = _cpuid_vendorstr_to_vendorcode(
+	    (char *)xen_physcpu_vendorstr((xen_mc_lcpu_cookie_t)priv));
+#else
+	vendor = cpuid_getvendor((cpu_t *)priv);
+#endif
+	if (vendor == X86_VENDOR_Intel && cmi_ext_topo_check == 0) {
+		cpuid_get_ext_topo(vendor, &cmi_core_nbits, &cmi_strand_nbits);
+		cmi_ext_topo_check = 1;
+	}
+
+	if (chipid > CMI_MAX_CHIPID ||
+	    coreid > CMI_MAX_COREID(cmi_core_nbits) ||
+	    strandid > CMI_MAX_STRANDID(cmi_strand_nbits))
 		return (NULL);
 
 	hdl = kmem_zalloc(sizeof (*hdl), KM_SLEEP);
@@ -1473,8 +1490,8 @@ cmi_hdl_lookup(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 	cmi_hdl_ent_t *ent;
 
 	if (chipid > CMI_MAX_CHIPID ||
-	    coreid > CMI_MAX_CORES_PER_CHIP - 1 ||
-	    strandid > CMI_MAX_STRANDS_PER_CORE - 1)
+	    coreid > CMI_MAX_COREID(cmi_core_nbits) ||
+	    strandid > CMI_MAX_STRANDID(cmi_strand_nbits))
 		return (NULL);
 
 	ent = cmi_hdl_ent_lookup(chipid, coreid, strandid);
@@ -1502,11 +1519,13 @@ cmi_hdl_any(void)
 {
 	int i, j;
 	cmi_hdl_ent_t *ent;
+	int max_strands = CMI_MAX_STRANDS_PER_CHIP(cmi_core_nbits,
+	    cmi_strand_nbits);
 
 	for (i = 0; i < CMI_CHIPID_ARR_SZ; i++) {
 		if (cmi_chip_tab[i] == NULL)
 			continue;
-		for (j = 0, ent = cmi_chip_tab[i]; j < CMI_MAX_STRANDS_PER_CHIP;
+		for (j = 0, ent = cmi_chip_tab[i]; j < max_strands;
 		    j++, ent++) {
 			if (cmi_hdl_canref(ent))
 				return ((cmi_hdl_t)ent->cmae_hdlp);
@@ -1522,11 +1541,13 @@ cmi_hdl_walk(int (*cbfunc)(cmi_hdl_t, void *, void *, void *),
 {
 	int i, j;
 	cmi_hdl_ent_t *ent;
+	int max_strands = CMI_MAX_STRANDS_PER_CHIP(cmi_core_nbits,
+	    cmi_strand_nbits);
 
 	for (i = 0; i < CMI_CHIPID_ARR_SZ; i++) {
 		if (cmi_chip_tab[i] == NULL)
 			continue;
-		for (j = 0, ent = cmi_chip_tab[i]; j < CMI_MAX_STRANDS_PER_CHIP;
+		for (j = 0, ent = cmi_chip_tab[i]; j < max_strands;
 		    j++, ent++) {
 			if (cmi_hdl_canref(ent)) {
 				cmi_hdl_impl_t *hdl = ent->cmae_hdlp;
