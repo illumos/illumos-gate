@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <security/cryptoki.h>
@@ -321,7 +318,7 @@ C_Login(CK_SESSION_HANDLE hSession, CK_USER_TYPE userType, CK_UTF8CHAR_PTR pPin,
 		return (rv);
 
 	/* Check the load status of keystore */
-	if (!soft_keystore_status(KEYSTORE_VERSION_OK)) {
+	if (!soft_keystore_status(KEYSTORE_LOAD)) {
 		SES_REFRELE(session_p, lock_held);
 		return (CKR_DEVICE_REMOVED);
 	}

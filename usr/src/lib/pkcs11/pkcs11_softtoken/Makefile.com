@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # lib/pkcs11/pkcs11_softtoken/Makefile.com
 #
@@ -133,7 +132,7 @@ SRCS =	\
 
 # libelfsign needs a static pkcs11_softtoken
 LIBS    =       $(DYNLIB)
-LDLIBS  +=      -lc -lmd -lcryptoutil -lsoftcrypto
+LDLIBS  +=      -lc -lmd -lcryptoutil -lsoftcrypto -lgen
 
 CFLAGS 	+=      $(CCVERBOSE)
 

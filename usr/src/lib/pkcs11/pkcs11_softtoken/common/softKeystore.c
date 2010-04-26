@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <crypt.h>
@@ -89,9 +88,11 @@ soft_gen_hashed_pin(CK_UTF8CHAR_PTR pPin, char **result, char **salt)
 		new_salt = B_TRUE;
 		/*
 		 * crypt_gensalt() will allocate memory to store the new salt.
-		 * on return.
+		 * on return.  Pass "$5" here to default to crypt_sha256 since
+		 * SHA256 is a FIPS 140-2 certified algorithm and we shouldn't
+		 * assume the system default is that strong.
 		 */
-		if ((*salt = crypt_gensalt(NULL, pw)) == NULL) {
+		if ((*salt = crypt_gensalt("$5", pw)) == NULL) {
 			return (-1);
 		}
 	}

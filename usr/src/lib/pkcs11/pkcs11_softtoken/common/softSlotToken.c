@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <strings.h>
@@ -306,12 +305,6 @@ C_GetSlotInfo(CK_SLOT_ID slotID, CK_SLOT_INFO_PTR pInfo)
 CK_RV
 C_GetTokenInfo(CK_SLOT_ID slotID, CK_TOKEN_INFO_PTR pInfo)
 {
-
-	ulong_t	token_flag = 0;
-	boolean_t pin_initialized = B_FALSE;
-	char	*ks_cryptpin = NULL;
-	CK_RV rv = CKR_OK;
-
 	if (!softtoken_initialized)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 
@@ -322,25 +315,16 @@ C_GetTokenInfo(CK_SLOT_ID slotID, CK_TOKEN_INFO_PTR pInfo)
 	if (pInfo == NULL)
 		return (CKR_ARGUMENTS_BAD);
 
-	if (!soft_keystore_status(KEYSTORE_VERSION_OK))
-		return (CKR_DEVICE_REMOVED);
-
+	pInfo->flags = SOFT_TOKEN_FLAGS;
+	if (soft_slot.keystore_load_status == KEYSTORE_UNAVAILABLE) {
+		pInfo->flags |= CKF_WRITE_PROTECTED;
+	}
 	/* Provide information about a token in the provided buffer */
 	(void) strncpy((char *)pInfo->label, SOFT_TOKEN_LABEL, 32);
 	(void) strncpy((char *)pInfo->manufacturerID, SOFT_MANUFACTURER_ID, 32);
 	(void) strncpy((char *)pInfo->model, TOKEN_MODEL, 16);
 	(void) strncpy((char *)pInfo->serialNumber, SOFT_TOKEN_SERIAL, 16);
 
-	rv = soft_keystore_pin_initialized(&pin_initialized, &ks_cryptpin,
-	    B_FALSE);
-	if (rv != CKR_OK)
-		return (rv);
-	if (!pin_initialized)
-		token_flag = CKF_USER_PIN_TO_BE_CHANGED;
-	if (ks_cryptpin)
-		free(ks_cryptpin);
-
-	pInfo->flags = SOFT_TOKEN_FLAGS | token_flag;
 	pInfo->ulMaxSessionCount = CK_EFFECTIVELY_INFINITE;
 	pInfo->ulSessionCount = soft_session_cnt;
 	pInfo->ulMaxRwSessionCount = CK_EFFECTIVELY_INFINITE;
@@ -463,7 +447,10 @@ C_InitToken(CK_SLOT_ID slotID, CK_UTF8CHAR_PTR pPin, CK_ULONG ulPinLen,
 	if (!softtoken_initialized)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 
-	return (CKR_FUNCTION_NOT_SUPPORTED);
+	if (create_keystore() != 0)
+		return (CKR_FUNCTION_FAILED);
+
+	return (CKR_OK);
 }
 
 /*ARGSUSED*/
@@ -497,7 +484,7 @@ C_SetPIN(CK_SESSION_HANDLE hSession, CK_UTF8CHAR_PTR pOldPin,
 	if (rv != CKR_OK)
 		return (rv);
 
-	if (!soft_keystore_status(KEYSTORE_VERSION_OK)) {
+	if (!soft_keystore_status(KEYSTORE_LOAD)) {
 		SES_REFRELE(session_p, lock_held);
 		return (CKR_DEVICE_REMOVED);
 	}

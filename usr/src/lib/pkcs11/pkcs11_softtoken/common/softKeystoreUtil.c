@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -38,6 +37,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <limits.h>
+#include <libgen.h>
 #include <strings.h>
 #include <security/cryptoki.h>
 #include <cryptoutil.h>
@@ -158,47 +158,34 @@ static char		keystore_path[MAXPATHLEN];
 static boolean_t	keystore_path_initialized = B_FALSE;
 static int		desc_fd = 0;
 
-
-static char *
-get_user_home_sunw_path(char *home_path)
-{
-	struct passwd pwd, *user_info;
-	char pwdbuf[PWD_BUFFER_SIZE];
-
-	(void) getpwuid_r(getuid(), &pwd, pwdbuf, PWD_BUFFER_SIZE, &user_info);
-
-	(void) snprintf(home_path, MAXPATHLEN, "%s/%s",
-	    user_info ? user_info->pw_dir : "", SUNW_PATH);
-
-	return (home_path);
-}
-
 static char *
 get_keystore_path()
 {
-	char *env_val;
-	char home_path[MAXPATHLEN];
+	char *home = getenv("HOME");
+	char *alt = getenv(ALTERNATE_KEYSTORE_PATH);
 
-	if (!keystore_path_initialized) {
-		env_val = getenv(ALTERNATE_KEYSTORE_PATH);
-		bzero(keystore_path, sizeof (keystore_path));
-		/*
-		 * If it isn't set or is set to the empty string use the
-		 * default location.  We need to check for the empty string
-		 * because some users "unset" environment variables by giving
-		 * them no value, this isn't the same thing as removing it
-		 * from the environment.
-		 *
-		 * We don't want that to attempt to open /.sunw/pkcs11_sofftoken
-		 */
-		if ((env_val == NULL) || (strcmp(env_val, "") == 0)) {
-			/* alternate path not specified, use user's home dir */
-			(void) snprintf(keystore_path, MAXPATHLEN, "%s/%s",
-			    get_user_home_sunw_path(home_path), KEYSTORE_PATH);
-		} else {
-			(void) snprintf(keystore_path, MAXPATHLEN, "%s/%s",
-			    env_val, KEYSTORE_PATH);
-		}
+	if (keystore_path_initialized) {
+		return (keystore_path);
+	}
+
+	bzero(keystore_path, sizeof (keystore_path));
+	/*
+	 * If it isn't set or is set to the empty string use the
+	 * default location.  We need to check for the empty string
+	 * because some users "unset" environment variables by giving
+	 * them no value, this isn't the same thing as removing it
+	 * from the environment.
+	 *
+	 * We don't want that to attempt to open /.sunw/pkcs11_sofftoken
+	 */
+	if ((alt != NULL) && (strcmp(alt, "") != 0)) {
+		(void) snprintf(keystore_path, MAXPATHLEN, "%s/%s",
+		    alt, KEYSTORE_PATH);
+		keystore_path_initialized = B_TRUE;
+	} else if ((home != NULL) && (strcmp(home, "") != 0)) {
+		/* alternate path not specified, try user's home dir */
+		(void) snprintf(keystore_path, MAXPATHLEN, "%s/%s/%s",
+		    home, SUNW_PATH, KEYSTORE_PATH);
 		keystore_path_initialized = B_TRUE;
 	}
 	return (keystore_path);
@@ -316,7 +303,7 @@ lock_file(int fd, boolean_t read_lock, boolean_t set_lock)
 	return (0);
 }
 
-static int
+int
 create_keystore()
 {
 	int fd, buf;
@@ -326,7 +313,7 @@ create_keystore()
 	    ks_desc_file[MAXPATHLEN];
 	CK_BYTE salt[KS_KEY_SALT_SIZE];
 	char *hashed_pin = NULL, *hashed_pin_salt = NULL;
-	char *env_val;
+	char *alt;
 
 	/* keystore doesn't exist, create keystore directory */
 	if (mkdir(get_keystore_path(), S_IRUSR|S_IWUSR|S_IXUSR) < 0) {
@@ -340,24 +327,24 @@ create_keystore()
 
 		/* can't create keystore directory */
 		if (errno == ENOENT) { /* part of the path doesn't exist */
+			char keystore[MAXPATHLEN];
 			/*
-			 * try to create $HOME/.sunw if it doesn't
-			 * exist.  If it is a alternate path provided by the
-			 * user, it should have existed.  Will not
+			 * try to create $HOME/.sunw/pkcs11_softtoken if it
+			 * doesn't exist.  If it is a alternate path provided
+			 * by the user, it should have existed.  Will not
 			 * create for them.
 			 */
-			env_val = getenv(ALTERNATE_KEYSTORE_PATH);
-			if ((env_val == NULL) || (strcmp(env_val, "") == 0)) {
-				char sunw_path[MAXPATHLEN];
+			alt = getenv(ALTERNATE_KEYSTORE_PATH);
+			if ((alt == NULL) || (strcmp(alt, "") == 0)) {
+				char *home = getenv("HOME");
 
-				/* create $HOME/.sunw */
-				if (mkdir(get_user_home_sunw_path(sunw_path),
-				    S_IRUSR|S_IWUSR|S_IXUSR) < 0) {
+				if (home == NULL || strcmp(home, "") == 0) {
 					return (-1);
 				}
-
 				/* create $HOME/.sunw/pkcs11_softtoken */
-				if (mkdir(get_keystore_path(),
+				(void) snprintf(keystore, sizeof (keystore),
+				    "%s/%s/$s", home, SUNW_PATH, KEYSTORE_PATH);
+				if (mkdirp(keystore,
 				    S_IRUSR|S_IWUSR|S_IXUSR) < 0) {
 					return (-1);
 				}
@@ -1048,7 +1035,7 @@ soft_keystore_get_version(uint_t *version, boolean_t lock_held)
 	uint_t buf;
 
 	if ((fd = open_and_lock_keystore_desc(O_RDONLY,
-	    B_TRUE, lock_held)) < 0) {
+	    B_FALSE, lock_held)) < 0) {
 		return (-1);
 	}
 
@@ -1158,7 +1145,7 @@ soft_keystore_getpin(char **hashed_pin, boolean_t lock_held)
 	int fd, ret_val = -1;
 	CK_RV rv;
 
-	if ((fd = open_and_lock_keystore_desc(O_RDONLY, B_TRUE,
+	if ((fd = open_and_lock_keystore_desc(O_RDONLY, B_FALSE,
 	    lock_held)) < 0) {
 		return (-1);
 	}
@@ -1471,7 +1458,7 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 		user_logged_in = B_TRUE;
 	}
 
-	if ((fd = open_and_lock_keystore_desc(O_RDWR, B_FALSE,
+	if ((fd = open_and_lock_keystore_desc(O_RDWR, B_TRUE,
 	    lock_held)) < 0) {
 		return (-1);
 	}
@@ -1925,7 +1912,7 @@ soft_keystore_get_objs(ks_search_type_t search_type,
 	 * objects won't get added/deleted/modified while we are
 	 * doing the search
 	 */
-	if ((ks_fd = open_and_lock_keystore_desc(O_RDONLY, B_TRUE,
+	if ((ks_fd = open_and_lock_keystore_desc(O_RDONLY, B_FALSE,
 	    B_FALSE)) < 0) {
 		return (CKR_FUNCTION_FAILED);
 	}
@@ -2230,7 +2217,7 @@ soft_keystore_put_new_obj(uchar_t *buf, size_t len, boolean_t public,
 	}
 
 	/* open keystore, and set write lock */
-	if ((fd = open_and_lock_keystore_desc(O_RDWR, B_TRUE,
+	if ((fd = open_and_lock_keystore_desc(O_RDWR, B_FALSE,
 	    lock_held)) < 0) {
 		return (-1);
 	}
@@ -2793,7 +2780,7 @@ soft_keystore_get_pin_salt(char **salt)
 	int fd, ret_val = -1;
 	uint64_t hashed_pin_salt_size;
 
-	if ((fd = open_and_lock_keystore_desc(O_RDONLY, B_TRUE,
+	if ((fd = open_and_lock_keystore_desc(O_RDONLY, B_FALSE,
 	    B_FALSE)) < 0) {
 		return (-1);
 	}
@@ -2867,7 +2854,7 @@ soft_keystore_pin_initialized(boolean_t *initialized, char **hashed_pin,
 	CK_BYTE crypt_salt[KS_KEY_SALT_SIZE], tmp_buf[KS_KEY_SALT_SIZE];
 	CK_RV ret_val = CKR_OK;
 
-	if ((fd = open_and_lock_keystore_desc(O_RDONLY, B_TRUE,
+	if ((fd = open_and_lock_keystore_desc(O_RDONLY, B_FALSE,
 	    lock_held)) < 0) {
 		return (CKR_FUNCTION_FAILED);
 	}
@@ -2941,7 +2928,8 @@ soft_keystore_exists()
  *		reading of token objects until they are needed or never at
  *		all if they are not used.
  *
- *		It is only called by soft_keystore_status() when the
+ *		Primary use is from C_InitToken().
+ *		It is also called by soft_keystore_status() when the
  *		"desired_state" is not the the current load state of keystore.
  *
  */
@@ -2999,12 +2987,12 @@ soft_keystore_init(int desired_state)
 			break;
 		}
 
-		soft_slot.keystore_load_status = KEYSTORE_VERSION_OK;
-		if (desired_state <= KEYSTORE_VERSION_OK)
+		soft_slot.keystore_load_status = KEYSTORE_LOAD;
+		if (desired_state <= KEYSTORE_LOAD)
 			break;
 
 	/* FALLTHRU */
-	case KEYSTORE_VERSION_OK:
+	case KEYSTORE_LOAD:
 		/* Load all the public token objects from keystore */
 		if (soft_get_token_objects_from_keystore(PUB_TOKENOBJS)
 		    != CKR_OK) {

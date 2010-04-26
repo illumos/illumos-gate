@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SOFTKEYSTOREUTIL_H
 #define	_SOFTKEYSTOREUTIL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Structures and function prototypes for the keystore
@@ -41,7 +38,7 @@ extern "C" {
 /* Keystore State values */
 #define	KEYSTORE_UNINITIALIZED	0
 #define	KEYSTORE_PRESENT	1
-#define	KEYSTORE_VERSION_OK	2
+#define	KEYSTORE_LOAD		2
 #define	KEYSTORE_INITIALIZED	3
 #define	KEYSTORE_UNAVAILABLE	4
 
@@ -100,6 +97,8 @@ int soft_keystore_get_pin_salt(char **salt);
 CK_RV soft_keystore_pin_initialized(boolean_t *initialized, char **hashed_pin,
     boolean_t lock_held);
 boolean_t soft_keystore_status(int desired_state);
+int soft_keystore_init(int desired_state);
+int create_keystore();
 
 #ifdef __cplusplus
 }
