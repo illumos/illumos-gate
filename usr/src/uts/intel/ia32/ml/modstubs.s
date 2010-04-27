@@ -1430,9 +1430,11 @@ fcnname/**/_info:							\
 #ifndef ELFEXEC_MODULE
 	MODULE(elfexec,exec);
 	STUB(elfexec, elfexec,      	nomod_einval);
-	STUB(elfexec, elf32exec,	nomod_einval);
 	STUB(elfexec, mapexec_brand,	nomod_einval);
+#if defined(__amd64)
+	STUB(elfexec, elf32exec,	nomod_einval);
 	STUB(elfexec, mapexec32_brand,	nomod_einval);
+#endif
 	END_MODULE(elfexec);
 #endif
 
