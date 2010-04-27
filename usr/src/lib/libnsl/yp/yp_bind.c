@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -32,9 +31,6 @@
  * under license from the Regents of the University of
  * California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include "../rpc/rpc_mt.h"
 #include <stdio.h>
@@ -546,7 +542,6 @@ __yp_dobind_cflookup(
 	struct ypbind_resp *ypbind_resp; /* Response from local ypbinder */
 	struct ypbind_domain ypbd;
 	int status, err = YPERR_DOMAIN;
-	int tries = 4; /* if not hardlookup, try 4 times max to bind */
 	int first_try = 1;
 	CLIENT *tb = NULL;
 
@@ -602,7 +597,7 @@ __yp_dobind_cflookup(
 		}
 	}
 
-	while (hardlookup ? 1 : tries--) {
+	do {
 		if (first_try)
 			first_try = 0;
 		else {
@@ -663,7 +658,8 @@ __yp_dobind_cflookup(
 			err = YPERR_YPBIND;
 		clnt_destroy(tb);
 		tb = NULL;
-	}
+	} while (hardlookup);
+
 	if (tb != NULL)
 		clnt_destroy(tb);
 	(void) mutex_unlock(&bound_domains_lock);
@@ -715,7 +711,6 @@ __yp_dobind_rsvdport_cflookup(
 	struct ypbind_resp *ypbind_resp; /* Response from local ypbinder */
 	struct ypbind_domain ypbd;
 	int status,  err = YPERR_DOMAIN;
-	int tries = 4; /* if not hardlookup, try a few times to bind */
 	int first_try = 1;
 	CLIENT *tb = NULL;
 
@@ -756,14 +751,14 @@ __yp_dobind_rsvdport_cflookup(
 		}
 	}
 
-	while (hardlookup ? 1 : tries--) {
+	do {
 		if (first_try)
 			first_try = 0;
 		else {
 			/*
 			 * ===> sleep() -- Ugh.  And with the lock held, too.
 			 */
-			(void) sleep(_ypsleeptime*tries);
+			(void) sleep(_ypsleeptime);
 		}
 		tb = __clnt_create_loopback(YPBINDPROG, YPBINDVERS, &err);
 		if (tb == NULL) {
@@ -819,7 +814,8 @@ __yp_dobind_rsvdport_cflookup(
 			err = YPERR_YPBIND;
 		clnt_destroy(tb);
 		tb = NULL;
-	}
+	} while (hardlookup);
+
 	if (tb != NULL)
 		clnt_destroy(tb);
 	(void) mutex_unlock(&bound_domains_lock);

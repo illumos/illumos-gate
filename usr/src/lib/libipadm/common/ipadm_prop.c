@@ -494,7 +494,6 @@ i_ipadm_set_eprivport(ipadm_handle_t iph, const void *arg,
 	nvpair_t	*nvp;
 	ipadm_status_t	status = IPADM_SUCCESS;
 	int		err;
-	char		*port;
 	uint_t		count = 0;
 
 	if (flags & IPADM_OPT_DEFAULT) {
@@ -511,35 +510,29 @@ i_ipadm_set_eprivport(ipadm_handle_t iph, const void *arg,
 		++count;
 	}
 
-	/* We allow only one port to be added or removed, at a time */
-	if (count > 1 && (flags & (IPADM_OPT_APPEND|IPADM_OPT_REMOVE)))
+	if (iph->iph_flags & IPH_INIT) {
+		flags |= IPADM_OPT_APPEND;
+	} else if (count > 1) {
+		/*
+		 * We allow only one port to be added, removed or
+		 * assigned at a time.
+		 *
+		 * However on reboot, while initializing protocol
+		 * properties, extra_priv_ports might have multiple
+		 * values. Only in that case we allow setting multiple
+		 * values.
+		 */
+		nvlist_free(portsnvl);
 		return (IPADM_INVALID_ARG);
+	}
 
-	/*
-	 * However on reboot, while initializing protocol properties,
-	 * extra_priv_ports might have multiple values. Only in that case
-	 * we allow setting multiple properties.
-	 */
-	if (count > 1 && !(iph->iph_flags & IPH_INIT))
-		return (IPADM_INVALID_ARG);
-
-	count = 0;
 	for (nvp = nvlist_next_nvpair(portsnvl, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(portsnvl, nvp)) {
-		port = nvpair_name(nvp);
-		if (count == 0) {
-			status = i_ipadm_set_prop(iph, arg, pdp, port, proto,
-			    flags);
-		} else {
-			assert(iph->iph_flags & IPH_INIT);
-			status = i_ipadm_set_prop(iph, arg, pdp, port, proto,
-			    IPADM_OPT_APPEND);
-		}
-		++count;
+		status = i_ipadm_set_prop(iph, arg, pdp, nvpair_name(nvp),
+		    proto, flags);
 		if (status != IPADM_SUCCESS)
 			break;
 	}
-ret:
 	nvlist_free(portsnvl);
 	return (status);
 }
