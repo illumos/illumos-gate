@@ -262,7 +262,11 @@ typedef struct vnode {
 
 #define	VNODE_ALIGN	64
 /* Count of low-order 0 bits in a vnode *, based on size and alignment. */
+#if defined(_LP64)
 #define	VNODE_ALIGN_LOG2	8
+#else
+#define	VNODE_ALIGN_LOG2	7
+#endif
 
 /*
  * vnode flags.

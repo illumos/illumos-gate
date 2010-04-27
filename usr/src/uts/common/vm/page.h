@@ -113,9 +113,13 @@ typedef int	selock_t;
 #define	PAGE_LLOCK_SIZE (1 << PAGE_LLOCK_SHIFT)
 
 /*
- * The number of low order 0 bits in the page_t address.
+ * The number of low order 0 (or less variable) bits in the page_t address.
  */
+#if defined(__sparc)
 #define	PP_SHIFT		7
+#else
+#define	PP_SHIFT		6
+#endif
 
 /*
  * pp may be the root of a large page, and many low order bits will be 0.
