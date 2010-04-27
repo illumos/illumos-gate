@@ -2590,7 +2590,8 @@ lbolt_cyclic(void)
 			/*
 			 * Switching from cyclic to event driven mode.
 			 */
-			if (atomic_cas_32(&lb_info->lbi_token, 0, 1) == 0) {
+			if (panicstr == NULL &&
+			    atomic_cas_32(&lb_info->lbi_token, 0, 1) == 0) {
 
 				if (lbolt_hybrid == lbolt_event_driven) {
 					ret = atomic_dec_32_nv(

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -221,11 +220,6 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 	t->t_schedflag |= TS_DONT_SWAP;
 	t->t_bound_cpu = cp;
 	t->t_preempt++;
-
-	/*
-	 * Switch lbolt to event driven mode.
-	 */
-	lbolt_hybrid = lbolt_event_driven;
 
 	panic_enter_hw(s);
 
