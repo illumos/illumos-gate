@@ -4481,10 +4481,11 @@ devfsadm_read_link(di_node_t anynode, char *link, char **devfs_path)
 	/* We *don't* want a stat of the /devices node */
 	path = NULL;
 	(void) resolve_link(devlink, NULL, NULL, &path, 0);
-
-	/* redirect if alias to current */
-	*devfs_path = di_alias2curr(anynode, path);
-	free(path);
+	if (path != NULL) {
+		/* redirect if alias to current */
+		*devfs_path = di_alias2curr(anynode, path);
+		free(path);
+	}
 	return (*devfs_path ? DEVFSADM_SUCCESS : DEVFSADM_FAILURE);
 }
 

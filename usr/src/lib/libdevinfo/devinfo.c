@@ -3710,7 +3710,8 @@ alias_to_curr(di_node_t anynode, char *devfspath, di_node_t *nodep)
 
 	*nodep = NULL;
 
-	assert(anynode != DI_NODE_NIL);
+	if (anynode == DI_NODE_NIL || devfspath == NULL)
+		return (NULL);
 
 	pa = (caddr_t)anynode - DI_NODE(anynode)->self;
 	all = DI_ALL(pa);
@@ -3858,8 +3859,12 @@ char *
 di_alias2curr(di_node_t anynode, char *alias)
 {
 	di_node_t currnode = DI_NODE_NIL;
-	char *curr = alias_to_curr(anynode, alias, &currnode);
+	char *curr;
 
+	if (anynode == DI_NODE_NIL || alias == NULL)
+		return (NULL);
+
+	curr = alias_to_curr(anynode, alias, &currnode);
 	if (curr == NULL && currnode != DI_NODE_NIL) {
 		return (di_devfs_path(currnode));
 	} else if (curr == NULL) {
