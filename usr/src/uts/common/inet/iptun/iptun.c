@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -707,11 +706,16 @@ iptun_bind(iptun_t *iptun)
 	conn_t			*connp = iptun->iptun_connp;
 	int			error = 0;
 	ip_xmit_attr_t		*ixa;
+	ip_xmit_attr_t		*oldixa;
 	iulp_t			uinfo;
 	ip_stack_t		*ipst = connp->conn_netstack->netstack_ip;
 
-	/* Get an exclusive ixa for this thread, and replace conn_ixa */
-	ixa = conn_get_ixa(connp, B_TRUE);
+	/*
+	 * Get an exclusive ixa for this thread.
+	 * We defer updating conn_ixa until later to handle any concurrent
+	 * conn_ixa_cleanup thread.
+	 */
+	ixa = conn_get_ixa(connp, B_FALSE);
 	if (ixa == NULL)
 		return (ENOMEM);
 	ASSERT(ixa->ixa_refcnt >= 2);
@@ -818,10 +822,18 @@ insert:
 	if (error != 0)
 		goto done;
 
+	/* Atomically update v6lastdst and conn_ixa */
+	mutex_enter(&connp->conn_lock);
 	/* Record this as the "last" send even though we haven't sent any */
 	connp->conn_v6lastdst = connp->conn_faddr_v6;
 
 	iptun->iptun_flags |= IPTUN_BOUND;
+
+	oldixa = conn_replace_ixa(connp, ixa);
+	/* Done with conn_t */
+	mutex_exit(&connp->conn_lock);
+	ixa_refrele(oldixa);
+
 	/*
 	 * Now that we're bound with ip below us, this is a good
 	 * time to initialize the destination path MTU and to

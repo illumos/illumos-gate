@@ -1703,6 +1703,7 @@ tcp_send_synack(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	conn_t	*econnp = (conn_t *)arg;
 	tcp_t	*tcp = econnp->conn_tcp;
+	ip_xmit_attr_t *ixa = econnp->conn_ixa;
 
 	/* Guard against a RST having blown it away while on the squeue */
 	if (tcp->tcp_state == TCPS_CLOSED) {
@@ -1710,7 +1711,14 @@ tcp_send_synack(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 		return;
 	}
 
-	(void) conn_ip_output(mp, econnp->conn_ixa);
+	/*
+	 * In the off-chance that the eager received and responded to
+	 * some other packet while the SYN|ACK was queued, we recalculate
+	 * the ixa_pktlen. It would be better to fix the SYN/accept
+	 * multithreading scheme to avoid this complexity.
+	 */
+	ixa->ixa_pktlen = msgdsize(mp);
+	(void) conn_ip_output(mp, ixa);
 }
 
 /*

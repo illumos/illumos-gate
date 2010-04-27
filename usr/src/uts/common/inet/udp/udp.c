@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -5886,6 +5885,7 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	int		error;
 	conn_t		*connp1;
 	ip_xmit_attr_t	*ixa;
+	ip_xmit_attr_t	*oldixa;
 	uint_t		scopeid = 0;
 	uint_t		srcid = 0;
 	in6_addr_t	v6src = connp->conn_saddr_v6;
@@ -5956,8 +5956,10 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	 * conn_ixa and prevent any other thread from using/changing it.
 	 * Once connect() is done other threads can use conn_ixa since the
 	 * refcnt will be back at one.
+	 * We defer updating conn_ixa until later to handle any concurrent
+	 * conn_ixa_cleanup thread.
 	 */
-	ixa = conn_get_ixa(connp, B_TRUE);
+	ixa = conn_get_ixa(connp, B_FALSE);
 	if (ixa == NULL)
 		return (ENOMEM);
 
@@ -6095,7 +6097,10 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	connp->conn_lastsrcid = srcid;
 	/* Also remember a source to use together with lastdst */
 	connp->conn_v6lastsrc = v6src;
+
+	oldixa = conn_replace_ixa(connp, ixa);
 	mutex_exit(&connp->conn_lock);
+	ixa_refrele(oldixa);
 
 	/*
 	 * We've picked a source address above. Now we can
