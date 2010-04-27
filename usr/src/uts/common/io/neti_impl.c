@@ -392,6 +392,11 @@ net_isvalidchecksum(net_handle_t info, mblk_t *mp)
  * call to net_protocol_register().  Thus the owner is expected to do a
  * call to net_protocol_unregister() after having done a
  * net_family_unregister() to make sure things are properly cleaned up.
+ * Passing a pointer to info->netd_hooks into hook_family_add is required
+ * so that this can be set before the notify functions are called. If this
+ * does not happen, the notify function may do something that seems fine,
+ * like add a notify function to the family but cause a panic because
+ * netd_hooks is NULL when we get to hook_family_notify_register.
  */
 int
 net_family_register(net_handle_t info, hook_family_t *hf)
@@ -410,11 +415,10 @@ net_family_register(net_handle_t info, hook_family_t *hf)
 
 	ns = info->netd_stack->nts_netstack;
 	ASSERT(ns != NULL);
-	hfi = hook_family_add(hf, ns->netstack_hook);
-	if (hfi == NULL)
+	if (hook_family_add(hf, ns->netstack_hook,
+	    (void **)&info->netd_hooks) == NULL)
 		return (EEXIST);
 
-	info->netd_hooks = hfi;
 	return (0);
 }
 

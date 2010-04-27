@@ -74,15 +74,16 @@ static struct modlinkage modlinkage = {
  * 2) remove hook families from the hook stack.
  *
  * When doing teardown of both events and families, a check is made to see
- * if either structure is still "busy". If so then a boolean flag is set to
- * say that the structure is condemned. The presence of this flag being set
- * must be checked for in _add()/_register()/ functions and a failure returned
- * if it is set. It is ignored by the _find() functions because they're
- * used by _remove()/_unregister().  While setting the condemned flag when
- * trying to delete a structure would normally be keyed from the presence
- * of a reference count being greater than 1, in this implementation there
- * are no reference counts required: instead the presence of objects on
- * linked lists is taken to mean something is still "busy."
+ * if either structure is still "busy". If so then a boolean flag (FWF_DESTROY)
+ * is set to say that the structure is condemned. The presence of this flag
+ * being set must be checked for in _add()/_register()/ functions and a
+ * failure returned if it is set. It is ignored by the _find() functions
+ * because they're used by _remove()/_unregister().
+ * While setting the condemned flag when trying to delete a structure would
+ * normally be keyed from the presence of a reference count being greater
+ * than 1, in this implementation there are no reference counts required:
+ * instead the presence of objects on linked lists is taken to mean
+ * something is still "busy."
  *
  * ONLY the caller that adds the family and the events ever has a direct
  * reference to the internal structures and thus ONLY it should be doing
@@ -142,6 +143,50 @@ static struct modlinkage modlinkage = {
  *
  * A more detailed picture that describes how the family/event structures
  * are linked together can be found in <sys/hook_impl.h>
+ *
+ * Notification callbacks.
+ * =======================
+ * For each of the hook stack, hook family and hook event, it is possible
+ * to request notificatin of change to them. Why?
+ * First, lets equate the hook stack to an IP instance, a hook family to
+ * a network protocol and a hook event to IP packets on the input path.
+ * If a kernel module wants to apply security from the very start of
+ * things, it needs to know as soon as a new instance of networking
+ * is initiated. Whilst for the global zone, it is taken for granted that
+ * this instance will always exist before any interaction takes place,
+ * that is not true for zones running with an exclusive networking instance.
+ * Thus when a local zone is started and a new instance is created to support
+ * that, parties that wish to monitor it and apply a security policy from
+ * the onset need to be informed as early as possible - quite probably
+ * before any networking is started by the zone's boot scripts.
+ * Inside each instance, it is possible to have a number of network protocols
+ * (hook families) in operation. Inside the context of the global zone,
+ * it is possible to have code run before the kernel module providing the
+ * IP networking is loaded. From here, to apply the appropriate security,
+ * it is necessary to become informed of when IP is being configured into
+ * the zone and this is done by registering a notification callback with
+ * the hook stack for changes to it. The next step is to know when packets
+ * can be received through the physical_in, etc, events. This is achieved
+ * by registering a callback with the appropriate network protocol (or in
+ * this file, the correct hook family.) Thus when IP finally attaches a
+ * physical_in event to inet, the module looking to enforce a security
+ * policy can become aware of it being present. Of course there's no
+ * requirement for such a module to be present before all of the above
+ * happens and in such a case, it is reasonable for the same module to
+ * work after everything has been put in place. For this reason, when
+ * a notification callback is added, a series of fake callback events
+ * is generated to simulate the arrival of those entities. There is one
+ * final series of callbacks that can be registered - those to monitor
+ * actual hooks that are added or removed from an event. In practice,
+ * this is useful when there are multiple kernel modules participating
+ * in the processing of packets and there are behaviour dependencies
+ * involved, such that one kernel module might only register its hook
+ * if another is already present and also might want to remove its hook
+ * when the other disappears.
+ *
+ * If you know a kernel module will not be loaded before the infrastructure
+ * used in this file is present then it is not necessary to use this
+ * notification callback mechanism.
  */
 
 /*
@@ -180,10 +225,10 @@ static void hook_event_notify_run(hook_event_int_t *, hook_family_int_t *,
     char *event, char *name, hook_notify_cmd_t cmd);
 static void hook_init_kstats(hook_family_int_t *hfi, hook_event_int_t *hei,
     hook_int_t *hi);
-static int hook_notify_register(cvwaitlock_t *lock, hook_notify_head_t *head,
+static int hook_notify_register(hook_notify_head_t *head,
     hook_notify_fn_t callback, void *arg);
-static int hook_notify_unregister(cvwaitlock_t *lock,
-    hook_notify_head_t *head, hook_notify_fn_t callback);
+static int hook_notify_unregister(hook_notify_head_t *head,
+    hook_notify_fn_t callback, void **);
 static void hook_notify_run(hook_notify_head_t *head, char *family,
     char *event, char *name, hook_notify_cmd_t cmd);
 static void hook_stack_notify_run(hook_stack_t *hks, char *name,
@@ -290,10 +335,15 @@ hook_fini(void)
  * also a flag that we set to indicate that we want to do it (FWF_*_WANTED).
  * The combination of flags is required as when this function exits to do
  * the task, the structure is then free for another caller to use and
- * to indicate that it wants to do work.  The trump flags here are those
- * that indicate someone wants to destroy the structure that owns this
- * flagwait_t.  In this case, we don't try to secure the ability to run
- * and return with an error.
+ * to indicate that it wants to do work.  The flags used when a caller wants
+ * to destroy an object take precedence over those that are used for making
+ * changes to it (add/remove.) In this case, we don't try to secure the
+ * ability to run and return with an error.
+ *
+ * "wantedset" is used here to determine who has the right to clear the
+ * wanted but from the fw_flags set: only he that sets the flag has the
+ * right to clear it at the bottom of the loop, even if someone else
+ * wants to set it.
  *
  * wanted - the FWF_*_WANTED flag that describes the action being requested
  * busyset- the set of FWF_* flags we don't want set when we run
@@ -303,27 +353,41 @@ int
 hook_wait_setflag(flagwait_t *waiter, uint32_t busyset, fwflag_t wanted,
     fwflag_t newflag)
 {
+	boolean_t wantedset;
 	int waited = 0;
 
 	mutex_enter(&waiter->fw_lock);
 	if (waiter->fw_flags & FWF_DESTROY) {
+		cv_signal(&waiter->fw_cv);
 		mutex_exit(&waiter->fw_lock);
 		return (-1);
 	}
 	while (waiter->fw_flags & busyset) {
-		waiter->fw_flags |= wanted;
+		wantedset = ((waiter->fw_flags & wanted) == wanted);
+		if (!wantedset)
+			waiter->fw_flags |= wanted;
 		CVW_EXIT_WRITE(waiter->fw_owner);
 		cv_wait(&waiter->fw_cv, &waiter->fw_lock);
+		/*
+		 * This lock needs to be dropped here to preserve the order
+		 * of acquisition that is fw_owner followed by fw_lock, else
+		 * we can deadlock.
+		 */
+		mutex_exit(&waiter->fw_lock);
 		waited = 1;
 		CVW_ENTER_WRITE(waiter->fw_owner);
-		if (waiter->fw_flags & FWF_DESTROY) {
+		mutex_enter(&waiter->fw_lock);
+		if (!wantedset)
 			waiter->fw_flags &= ~wanted;
+		if (waiter->fw_flags & FWF_DESTROY) {
+			cv_signal(&waiter->fw_cv);
 			mutex_exit(&waiter->fw_lock);
 			return (-1);
 		}
-		waiter->fw_flags |= wanted;
 	}
 	waiter->fw_flags &= ~wanted;
+	ASSERT((waiter->fw_flags & wanted) == 0);
+	ASSERT((waiter->fw_flags & newflag) == 0);
 	waiter->fw_flags |= newflag;
 	mutex_exit(&waiter->fw_lock);
 	return (waited);
@@ -339,7 +403,7 @@ hook_wait_setflag(flagwait_t *waiter, uint32_t busyset, fwflag_t wanted,
  * they should now check to see if they can run.
  */
 void
-hook_wait_unsetflag(flagwait_t *waiter, uint32_t oldflag)
+hook_wait_unsetflag(flagwait_t *waiter, fwflag_t oldflag)
 {
 	mutex_enter(&waiter->fw_lock);
 	waiter->fw_flags &= ~oldflag;
@@ -358,10 +422,18 @@ hook_wait_unsetflag(flagwait_t *waiter, uint32_t oldflag)
  * It is, however, necessary to wait for all activity on the owning
  * structure to cease.
  */
-void
+int
 hook_wait_destroy(flagwait_t *waiter)
 {
+	boolean_t wanted;
+
 	ASSERT((waiter->fw_flags & FWF_DESTROY_WANTED) == 0);
+	mutex_enter(&waiter->fw_lock);
+	if (waiter->fw_flags & FWF_DESTROY_WANTED) {
+		cv_signal(&waiter->fw_cv);
+		mutex_exit(&waiter->fw_lock);
+		return (EINPROGRESS);
+	}
 	waiter->fw_flags |= FWF_DESTROY_WANTED;
 	while (!FWF_DESTROY_OK(waiter)) {
 		CVW_EXIT_WRITE(waiter->fw_owner);
@@ -374,6 +446,10 @@ hook_wait_destroy(flagwait_t *waiter)
 	 * out someone's bit.
 	 */
 	waiter->fw_flags = FWF_DESTROY_ACTIVE;
+	cv_signal(&waiter->fw_cv);
+	mutex_exit(&waiter->fw_lock);
+
+	return (0);
 }
 
 /*
@@ -397,7 +473,14 @@ hook_wait_init(flagwait_t *waiter, cvwaitlock_t *owner)
 }
 
 /*
- * Initialize the hook stack instance.
+ * Function:	hook_stack_init
+ * Returns:     void *     - pointer to new hook stack structure
+ * Parameters:  stackid(I) - identifier for the network instance that owns this
+ *              ns(I)      - pointer to the network instance data structure
+ *
+ * Allocate and initialize the hook stack instance. This function is not
+ * allowed to fail, so KM_SLEEP is used here when allocating memory. The
+ * value returned is passed back into the shutdown and destroy hooks.
  */
 /*ARGSUSED*/
 static void *
@@ -427,8 +510,20 @@ hook_stack_init(netstackid_t stackid, netstack_t *ns)
 }
 
 /*
+ * Function:	hook_stack_shutdown
+ * Returns:     void
+ * Parameters:  stackid(I) - identifier for the network instance that owns this
+ *              arg(I)     - pointer returned by hook_stack_init
+ *
  * Set the shutdown flag to indicate that we should stop accepting new
- * register calls as we're now in the cleanup process.
+ * register calls as we're now in the cleanup process. The cleanup is a
+ * two stage process and we're not required to free any memory here.
+ *
+ * The curious would wonder why isn't there any code that walks through
+ * all of the data structures and sets the flag(s) there? The answer is
+ * that it is expected that this will happen when the zone shutdown calls
+ * the shutdown callbacks for other modules that they will initiate the
+ * free'ing and shutdown of the hooks themselves. 
  */
 /*ARGSUSED*/
 static void
@@ -446,7 +541,17 @@ hook_stack_shutdown(netstackid_t stackid, void *arg)
 }
 
 /*
+ * Function:	hook_stack_destroy
+ * Returns:     void
+ * Parameters:  stackid(I) - identifier for the network instance that owns this
+ *              arg(I)     - pointer returned by hook_stack_init
+ *
  * Free the hook stack instance.
+ *
+ * The rationale for the shutdown being lazy (see the comment above for
+ * hook_stack_shutdown) also applies to the destroy being lazy. Only if
+ * the hook_stack_t data structure is unused will it go away. Else it
+ * is left up to the last user of a data structure to actually free it.
  */
 /*ARGSUSED*/
 static void
@@ -461,6 +566,10 @@ hook_stack_fini(netstackid_t stackid, void *arg)
 }
 
 /*
+ * Function:	hook_stack_remove
+ * Returns:     void
+ * Parameters:  hks(I) - pointer to an instance of a hook_stack_t
+ *
  * This function assumes that it is called with hook_stack_lock held.
  * It functions differently to hook_family/event_remove in that it does
  * the checks to see if it can be removed. This difference exists
@@ -481,11 +590,20 @@ hook_stack_remove(hook_stack_t *hks)
 
 	SLIST_REMOVE(&hook_stacks, hks, hook_stack, hks_entry);
 
-	hook_wait_destroy(&hks->hks_waiter);
+	VERIFY(hook_wait_destroy(&hks->hks_waiter) == 0);
 	CVW_DESTROY(&hks->hks_lock);
 	kmem_free(hks, sizeof (*hks));
 }
 
+/*
+ * Function:	hook_stack_get
+ * Returns:     hook_stack_t * - NULL if not found, else matching instance
+ * Parameters:  stackid(I)     - instance id to search for
+ *
+ * Search the list of currently active hook_stack_t structures for one that
+ * has a matching netstackid_t to the value passed in. The linked list can
+ * only ever have at most one match for this value.
+ */
 static hook_stack_t *
 hook_stack_get(netstackid_t stackid)
 {
@@ -501,64 +619,134 @@ hook_stack_get(netstackid_t stackid)
 
 /*
  * Function:	hook_stack_notify_register
- * Returns:	0 = success, else failure
+ * Returns:	int        - 0 = success, else failure
  * Parameters:	stackid(I) - netstack identifier
  *              callback(I)- function to be called
  *              arg(I)     - arg to provide callback when it is called
  *
  * If we're not shutting down this instance, append a new function to the
  * list of those to call when a new family of hooks is added to this stack.
+ * If the function can be successfully added to the list of callbacks
+ * activated when there is a change to the stack (addition or removal of
+ * a hook family) then generate a fake HN_REGISTER event by directly
+ * calling the callback with the relevant information for each hook
+ * family that currently exists (and isn't being shutdown.)
  */
 int
 hook_stack_notify_register(netstackid_t stackid, hook_notify_fn_t callback,
     void *arg)
 {
+	hook_family_int_t *hfi;
 	hook_stack_t *hks;
+	boolean_t canrun;
+	char buffer[16];
 	int error;
 
+	ASSERT(callback != NULL);
+
+	canrun = B_FALSE;
 	mutex_enter(&hook_stack_lock);
 	hks = hook_stack_get(stackid);
 	if (hks != NULL) {
 		if (hks->hks_shutdown != 0) {
 			error = ESHUTDOWN;
 		} else {
-			error = hook_notify_register(&hks->hks_lock,
-			    &hks->hks_nhead, callback, arg);
+			CVW_ENTER_WRITE(&hks->hks_lock);
+			canrun = (hook_wait_setflag(&hks->hks_waiter,
+			    FWF_ADD_WAIT_MASK, FWF_ADD_WANTED,
+			    FWF_ADD_ACTIVE) != -1);
+			error = hook_notify_register(&hks->hks_nhead,
+			    callback, arg);
+			CVW_EXIT_WRITE(&hks->hks_lock);
 		}
 	} else {
 		error = ESRCH;
 	}
 	mutex_exit(&hook_stack_lock);
 
+	if (error == 0 && canrun) {
+		/*
+		 * Generate fake register event for callback that
+		 * is being added, letting it know everything that
+		 * already exists.
+		 */
+		(void) snprintf(buffer, sizeof (buffer), "%u",
+		    hks->hks_netstackid);
+
+		SLIST_FOREACH(hfi, &hks->hks_familylist, hfi_entry) {
+			if (hfi->hfi_condemned || hfi->hfi_shutdown)
+				continue;
+			callback(HN_REGISTER, arg, buffer, NULL,
+			    hfi->hfi_family.hf_name);
+		}
+	}
+
+	if (canrun)
+		hook_wait_unsetflag(&hks->hks_waiter, FWF_ADD_ACTIVE);
+
 	return (error);
 }
 
 /*
  * Function:	hook_stack_notify_unregister
- * Returns:	0 = success, else failure
- * Parameters:	stackid(I) - netstack identifier
+ * Returns:	int         - 0 = success, else failure
+ * Parameters:	stackid(I)  - netstack identifier
  *              callback(I) - function to be called
  *
  * Attempt to remove a registered function from a hook stack's list of
  * callbacks to activiate when protocols are added/deleted.
+ * As with hook_stack_notify_register, if all things are going well then
+ * a fake unregister event is delivered to the callback being removed
+ * for each hook family that presently exists.
  */
 int
 hook_stack_notify_unregister(netstackid_t stackid, hook_notify_fn_t callback)
 {
+	hook_family_int_t *hfi;
 	hook_stack_t *hks;
+	boolean_t canrun;
+	char buffer[16];
+	void *arg;
 	int error;
 
 	mutex_enter(&hook_stack_lock);
 	hks = hook_stack_get(stackid);
 	if (hks != NULL) {
-		error = hook_notify_unregister(&hks->hks_lock,
-		    &hks->hks_nhead, callback);
-		if ((error == 0) && (hks->hks_shutdown == 2))
-			hook_stack_remove(hks);
+		CVW_ENTER_WRITE(&hks->hks_lock);
+		canrun = (hook_wait_setflag(&hks->hks_waiter, FWF_ADD_WAIT_MASK,
+		    FWF_ADD_WANTED, FWF_ADD_ACTIVE) != -1);
+
+		error = hook_notify_unregister(&hks->hks_nhead, callback, &arg);
+		CVW_EXIT_WRITE(&hks->hks_lock);
 	} else {
 		error = ESRCH;
 	}
 	mutex_exit(&hook_stack_lock);
+
+	if (error == 0) {
+		if (canrun) {
+			/*
+			 * Generate fake unregister event for callback that
+			 * is being removed, letting it know everything that
+			 * currently exists is now "disappearing."
+			 */
+			(void) snprintf(buffer, sizeof (buffer), "%u",
+			    hks->hks_netstackid);
+
+			SLIST_FOREACH(hfi, &hks->hks_familylist, hfi_entry) {
+				callback(HN_UNREGISTER, arg, buffer, NULL,
+				    hfi->hfi_family.hf_name);
+			}
+
+			hook_wait_unsetflag(&hks->hks_waiter, FWF_ADD_ACTIVE);
+		}
+
+		mutex_enter(&hook_stack_lock);
+		hks = hook_stack_get(stackid);
+		if ((error == 0) && (hks->hks_shutdown == 2))
+			hook_stack_remove(hks);
+		mutex_exit(&hook_stack_lock);
+	}
 
 	return (error);
 }
@@ -573,16 +761,20 @@ hook_stack_notify_unregister(netstackid_t stackid, hook_notify_fn_t callback)
  * Run through the list of callbacks on the hook stack to be called when
  * a new hook family is added
  *
- * As hook_notify_run() expects 3 names, one for the family, one for the
- * event and one for the object being introduced and we really only have
- * one name (that of the new hook family), fake the hook stack's name by
- * converting the integer to a string and for the event just pass NULL.
+ * As hook_notify_run() expects 3 names, one for the family that is associated
+ * with the cmd (HN_REGISTER or HN_UNREGISTER), one for the event and one
+ * for the object being introduced and we really only have one name (that
+ * of the new hook family), fake the hook stack's name by converting the
+ * integer to a string and for the event just pass NULL.
  */
 static void
 hook_stack_notify_run(hook_stack_t *hks, char *name,
     hook_notify_cmd_t cmd)
 {
 	char buffer[16];
+
+	ASSERT(hks != NULL);
+	ASSERT(name != NULL);
 
 	(void) snprintf(buffer, sizeof (buffer), "%u", hks->hks_netstackid);
 
@@ -591,9 +783,9 @@ hook_stack_notify_run(hook_stack_t *hks, char *name,
 
 /*
  * Function:	hook_run
- * Returns:	int - return value according to callback func
+ * Returns:	int      - return value according to callback func
  * Parameters:	token(I) - event pointer
- *		info(I) - message
+ *		info(I)  - message
  *
  * Run hooks for specific provider.  The hooks registered are stepped through
  * until either the end of the list is reached or a hook function returns a
@@ -616,14 +808,8 @@ hook_run(hook_family_int_t *hfi, hook_event_token_t token, hook_data_t info)
 	    hook_data_t, info);
 
 	/*
-	 * Hold global read lock to ensure event will not be deleted.
-	 * While it might be expected that we should also hold a read lock
-	 * on the event lock (hei_lock) to prevent the hook list from
-	 * changing while we're executing this function, both addition
-	 * to and removal from the hook list on the event is done with
-	 * a write lock held on hfi_lock. This is by design so that we
-	 * only need to get one of these locks to process a packet.
-	 * - locking is not a cheap thing to do for every packet.
+	 * If we consider that this function is only called from within the
+	 * stack while an instance is currently active, 
 	 */
 	CVW_ENTER_READ(&hfi->hfi_lock);
 
@@ -659,12 +845,23 @@ hook_run(hook_family_int_t *hfi, hook_event_token_t token, hook_data_t info)
 /*
  * Function:	hook_family_add
  * Returns:	internal family pointer - NULL = Fail
- * Parameters:	hf(I) - family pointer
+ * Parameters:	hf(I)    - family pointer
+ *              hks(I)   - pointer to an instance of a hook_stack_t
+ *              store(O) - where returned pointer will be stored
  *
- * Add new family to family list
+ * Add new family to the family list. The requirements for the addition to
+ * succeed are that the family name must not already be registered and that
+ * the hook stack is not being shutdown.
+ * If store is non-NULL, it is expected to be a pointer to the same variable
+ * that is awaiting to be assigned the return value of this function.
+ * In its current use, the returned value is assigned to netd_hooks in
+ * net_family_register. The use of "store" allows the return value to be
+ * used before this function returns. How can this happen? Through the
+ * callbacks that can be activated at the bottom of this function, when
+ * hook_stack_notify_run is called.
  */
 hook_family_int_t *
-hook_family_add(hook_family_t *hf, hook_stack_t *hks)
+hook_family_add(hook_family_t *hf, hook_stack_t *hks, void **store)
 {
 	hook_family_int_t *hfi, *new;
 
@@ -694,7 +891,12 @@ hook_family_add(hook_family_t *hf, hook_stack_t *hks)
 		return (NULL);
 	}
 
-	if (hook_wait_setflag(&hks->hks_waiter, FWF_WAIT_MASK,
+	/*
+	 * Try and set the FWF_ADD_ACTIVE flag so that we can drop all the
+	 * lock further down when calling all of the functions registered
+	 * for notification when a new hook family is added.
+	 */
+	if (hook_wait_setflag(&hks->hks_waiter, FWF_ADD_WAIT_MASK,
 	    FWF_ADD_WANTED, FWF_ADD_ACTIVE) == -1) {
 		CVW_EXIT_WRITE(&hks->hks_lock);
 		mutex_exit(&hook_stack_lock);
@@ -709,6 +911,8 @@ hook_family_add(hook_family_t *hf, hook_stack_t *hks)
 	hook_wait_init(&new->hfi_waiter, &new->hfi_lock);
 
 	new->hfi_stack = hks;
+	if (store != NULL)
+		*store = new;
 
 	/* Add to family list head */
 	SLIST_INSERT_HEAD(&hks->hks_familylist, new, hfi_entry);
@@ -725,7 +929,7 @@ hook_family_add(hook_family_t *hf, hook_stack_t *hks)
 
 /*
  * Function:	hook_family_remove
- * Returns:	int - 0 = Succ, Else = Fail
+ * Returns:	int    - 0 = success, else = failure
  * Parameters:	hfi(I) - internal family pointer
  *
  * Remove family from family list. This function has been designed to be
@@ -741,9 +945,14 @@ hook_family_remove(hook_family_int_t *hfi)
 	ASSERT(hfi != NULL);
 	hks = hfi->hfi_stack;
 
+	CVW_ENTER_WRITE(&hfi->hfi_lock);
+	notifydone = hfi->hfi_shutdown;
+	hfi->hfi_shutdown = B_TRUE;
+	CVW_EXIT_WRITE(&hfi->hfi_lock);
+
 	CVW_ENTER_WRITE(&hks->hks_lock);
 
-	if (hook_wait_setflag(&hks->hks_waiter, FWF_WAIT_MASK,
+	if (hook_wait_setflag(&hks->hks_waiter, FWF_DEL_WAIT_MASK,
 	    FWF_DEL_WANTED, FWF_DEL_ACTIVE) == -1) {
 		/*
 		 * If we're trying to destroy the hook_stack_t...
@@ -759,19 +968,13 @@ hook_family_remove(hook_family_int_t *hfi)
 	if (!SLIST_EMPTY(&hfi->hfi_head) || !TAILQ_EMPTY(&hfi->hfi_nhead)) {
 		hfi->hfi_condemned = B_TRUE;
 	} else {
+		VERIFY(hook_wait_destroy(&hfi->hfi_waiter) == 0);
 		/*
 		 * Although hfi_condemned = B_FALSE is implied from creation,
 		 * putting a comment here inside the else upsets lint.
 		 */
 		hfi->hfi_condemned = B_FALSE;
 	}
-
-	CVW_ENTER_WRITE(&hfi->hfi_lock);
-	hook_wait_destroy(&hfi->hfi_waiter);
-	notifydone = hfi->hfi_shutdown;
-	hfi->hfi_shutdown = B_TRUE;
-	CVW_EXIT_WRITE(&hfi->hfi_lock);
-
 	CVW_EXIT_WRITE(&hks->hks_lock);
 
 	if (!notifydone)
@@ -837,7 +1040,7 @@ hook_family_free(hook_family_int_t *hfi, hook_stack_t *hks)
 
 /*
  * Function:	hook_family_shutdown
- * Returns:	int - 0 = Succ, Else = Fail
+ * Returns:	int    - 0 = success, else = failure
  * Parameters:	hfi(I) - internal family pointer
  *
  * As an alternative to removing a family, we may desire to just generate
@@ -854,9 +1057,14 @@ hook_family_shutdown(hook_family_int_t *hfi)
 	ASSERT(hfi != NULL);
 	hks = hfi->hfi_stack;
 
+	CVW_ENTER_WRITE(&hfi->hfi_lock);
+	notifydone = hfi->hfi_shutdown;
+	hfi->hfi_shutdown = B_TRUE;
+	CVW_EXIT_WRITE(&hfi->hfi_lock);
+
 	CVW_ENTER_WRITE(&hks->hks_lock);
 
-	if (hook_wait_setflag(&hks->hks_waiter, FWF_WAIT_MASK,
+	if (hook_wait_setflag(&hks->hks_waiter, FWF_DEL_WAIT_MASK,
 	    FWF_DEL_WANTED, FWF_DEL_ACTIVE) == -1) {
 		/*
 		 * If we're trying to destroy the hook_stack_t...
@@ -865,10 +1073,6 @@ hook_family_shutdown(hook_family_int_t *hfi)
 		return (ENXIO);
 	}
 
-	CVW_ENTER_WRITE(&hfi->hfi_lock);
-	notifydone = hfi->hfi_shutdown;
-	hfi->hfi_shutdown = B_TRUE;
-	CVW_EXIT_WRITE(&hfi->hfi_lock);
 	CVW_EXIT_WRITE(&hks->hks_lock);
 
 	if (!notifydone)
@@ -937,7 +1141,7 @@ hook_family_find(char *family, hook_stack_t *hks)
 
 /*
  * Function:	hook_family_notify_register
- * Returns:	0 = success, else failure
+ * Returns:	int         - 0 = success, else failure
  * Parameters:	hfi(I)      - hook family
  *              callback(I) - function to be called
  *              arg(I)      - arg to provide callback when it is called
@@ -957,50 +1161,88 @@ int
 hook_family_notify_register(hook_family_int_t *hfi,
     hook_notify_fn_t callback, void *arg)
 {
+	hook_event_int_t *hei;
 	hook_stack_t *hks;
+	boolean_t canrun;
 	int error;
 
+	ASSERT(hfi != NULL);
+	canrun = B_FALSE;
 	hks = hfi->hfi_stack;
 
 	CVW_ENTER_READ(&hks->hks_lock);
-	CVW_ENTER_WRITE(&hfi->hfi_lock);
 
 	if ((hfi->hfi_stack->hks_shutdown != 0) ||
 	    hfi->hfi_condemned || hfi->hfi_shutdown) {
-		CVW_EXIT_WRITE(&hfi->hfi_lock);
 		CVW_EXIT_READ(&hks->hks_lock);
 		return (ESHUTDOWN);
 	}
 
-	error = hook_notify_register(&hfi->hfi_lock, &hfi->hfi_nhead,
-	    callback, arg);
-
+	CVW_ENTER_WRITE(&hfi->hfi_lock);
+	canrun = (hook_wait_setflag(&hfi->hfi_waiter, FWF_ADD_WAIT_MASK,
+	    FWF_ADD_WANTED, FWF_ADD_ACTIVE) != -1);
+	error = hook_notify_register(&hfi->hfi_nhead, callback, arg);
 	CVW_EXIT_WRITE(&hfi->hfi_lock);
+
 	CVW_EXIT_READ(&hks->hks_lock);
+
+	if (error == 0 && canrun) {
+		SLIST_FOREACH(hei, &hfi->hfi_head, hei_entry) {
+			callback(HN_REGISTER, arg,
+			    hfi->hfi_family.hf_name, NULL,
+			    hei->hei_event->he_name);
+		}
+	}
+
+	if (canrun)
+		hook_wait_unsetflag(&hfi->hfi_waiter, FWF_ADD_ACTIVE);
 
 	return (error);
 }
 
 /*
  * Function:	hook_family_notify_unregister
- * Returns:	0 = success, else failure
+ * Returns:	int         - 0 = success, else failure
  * Parameters:	hfi(I)      - hook family
  *              callback(I) - function to be called
  *
  * Remove a callback from the list of those executed when a new event is
- * added to a hook family.
+ * added to a hook family. If the family is not in the process of being
+ * destroyed then simulate an unregister callback for each event that is
+ * on the family. This pairs up with the hook_family_notify_register
+ * action that simulates register events.
+ * The order of what happens here is important and goes like this.
+ * 1) Remove the callback from the list of functions to be called as part
+ *    of the notify operation when an event is added or removed from the
+ *    hook family.
+ * 2) If the hook_family_int_t structure is on death row (free_family will
+ *    be set to true) then there's nothing else to do than let it be free'd.
+ * 3) If the structure isn't about to die, mark it up as being busy using
+ *    hook_wait_setflag and then drop the lock so the loop can be run.
+ * 4) if hook_wait_setflag was successful, tell all of the notify callback
+ *    functions that this family has been unregistered.
+ * 5) Cleanup
  */
 int
 hook_family_notify_unregister(hook_family_int_t *hfi,
     hook_notify_fn_t callback)
 {
+	hook_event_int_t *hei;
 	boolean_t free_family;
+	boolean_t canrun;
 	int error;
+	void *arg;
+
+	canrun = B_FALSE;
 
 	CVW_ENTER_WRITE(&hfi->hfi_lock);
 
-	error = hook_notify_unregister(&hfi->hfi_lock, &hfi->hfi_nhead,
-	    callback);
+	(void) hook_wait_setflag(&hfi->hfi_waiter, FWF_DEL_WAIT_MASK,
+	    FWF_DEL_WANTED, FWF_DEL_ACTIVE);
+
+	error = hook_notify_unregister(&hfi->hfi_nhead, callback, &arg);
+
+	hook_wait_unsetflag(&hfi->hfi_waiter, FWF_DEL_ACTIVE);
 
 	/*
 	 * If hook_family_remove has been called but the structure was still
@@ -1013,10 +1255,24 @@ hook_family_notify_unregister(hook_family_int_t *hfi,
 		free_family = B_FALSE;
 	}
 
+	if (error == 0 && !free_family) {
+		canrun = (hook_wait_setflag(&hfi->hfi_waiter, FWF_ADD_WAIT_MASK,
+		    FWF_ADD_WANTED, FWF_ADD_ACTIVE) != -1);
+	}
+
 	CVW_EXIT_WRITE(&hfi->hfi_lock);
 
-	if (free_family)
+	if (canrun) {
+		SLIST_FOREACH(hei, &hfi->hfi_head, hei_entry) {
+			callback(HN_UNREGISTER, arg,
+			    hfi->hfi_family.hf_name, NULL,
+			    hei->hei_event->he_name);
+		}
+
+		hook_wait_unsetflag(&hfi->hfi_waiter, FWF_ADD_ACTIVE);
+	} else if (free_family) {
 		hook_family_free(hfi, hfi->hfi_stack);
+	}
 
 	return (error);
 }
@@ -1025,7 +1281,7 @@ hook_family_notify_unregister(hook_family_int_t *hfi,
  * Function:	hook_event_add
  * Returns:	internal event pointer - NULL = Fail
  * Parameters:	hfi(I) - internal family pointer
- *		he(I) - event pointer
+ *		he(I)  - event pointer
  *
  * Add new event to event list on specific family.
  * This function can fail to return successfully if (1) it cannot allocate
@@ -1072,11 +1328,11 @@ hook_event_add(hook_family_int_t *hfi, hook_event_t *he)
 		hook_event_free(new, NULL);
 		return (NULL);
 	}
+	CVW_EXIT_READ(&hks->hks_lock);
 
-	if (hook_wait_setflag(&hfi->hfi_waiter, FWF_WAIT_MASK,
+	if (hook_wait_setflag(&hfi->hfi_waiter, FWF_ADD_WAIT_MASK,
 	    FWF_ADD_WANTED, FWF_ADD_ACTIVE) == -1) {
 		CVW_EXIT_WRITE(&hfi->hfi_lock);
-		CVW_EXIT_READ(&hks->hks_lock);
 		hook_event_free(new, NULL);
 		return (NULL);
 	}
@@ -1090,8 +1346,6 @@ hook_event_add(hook_family_int_t *hfi, hook_event_t *he)
 	SLIST_INSERT_HEAD(&hfi->hfi_head, new, hei_entry);
 
 	CVW_EXIT_WRITE(&hfi->hfi_lock);
-
-	CVW_EXIT_READ(&hks->hks_lock);
 
 	hook_notify_run(&hfi->hfi_nhead,
 	    hfi->hfi_family.hf_name, NULL, he->he_name, HN_REGISTER);
@@ -1142,9 +1396,9 @@ hook_event_init_kstats(hook_family_int_t *hfi, hook_event_int_t *hei)
 
 /*
  * Function:	hook_event_remove
- * Returns:	int - 0 = Succ, Else = Fail
+ * Returns:	int    - 0 = success, else = failure
  * Parameters:	hfi(I) - internal family pointer
- *		he(I) - event pointer
+ *		he(I)  - event pointer
  *
  * Remove event from event list on specific family
  *
@@ -1171,7 +1425,7 @@ hook_event_remove(hook_family_int_t *hfi, hook_event_t *he)
 	 * holding any locks but at the same time prevent other changes to
 	 * the event at the same time.
 	 */
-	if (hook_wait_setflag(&hfi->hfi_waiter, FWF_WAIT_MASK,
+	if (hook_wait_setflag(&hfi->hfi_waiter, FWF_DEL_WAIT_MASK,
 	    FWF_DEL_WANTED, FWF_DEL_ACTIVE) == -1) {
 		CVW_EXIT_WRITE(&hfi->hfi_lock);
 		return (ENXIO);
@@ -1208,7 +1462,7 @@ hook_event_remove(hook_family_int_t *hfi, hook_event_t *he)
 		 * hook_wait_destroy here to synchronise wait removing a
 		 * hook from an event.
 		 */
-		hook_wait_destroy(&hei->hei_waiter);
+		VERIFY(hook_wait_destroy(&hei->hei_waiter) == 0);
 
 		CVW_EXIT_WRITE(&hei->hei_lock);
 
@@ -1236,7 +1490,7 @@ hook_event_remove(hook_family_int_t *hfi, hook_event_t *he)
 
 /*
  * Function:	hook_event_shutdown
- * Returns:	int - 0 = Succ, Else = Fail
+ * Returns:	int    - 0 = success, else = failure
  * Parameters:	hfi(I) - internal family pointer
  *		he(I)  - event pointer
  *
@@ -1259,7 +1513,7 @@ hook_event_shutdown(hook_family_int_t *hfi, hook_event_t *he)
 	 * holding any locks but at the same time prevent other changes to
 	 * the event at the same time.
 	 */
-	if (hook_wait_setflag(&hfi->hfi_waiter, FWF_WAIT_MASK,
+	if (hook_wait_setflag(&hfi->hfi_waiter, FWF_DEL_WAIT_MASK,
 	    FWF_DEL_WANTED, FWF_DEL_ACTIVE) == -1) {
 		CVW_EXIT_WRITE(&hfi->hfi_lock);
 		return (ENXIO);
@@ -1390,7 +1644,7 @@ hook_event_copy(hook_event_t *src)
 /*
  * Function:	hook_event_find
  * Returns:	internal event pointer - NULL = Not match
- * Parameters:	hfi(I) - internal family pointer
+ * Parameters:	hfi(I)   - internal family pointer
  *		event(I) - event name string
  *
  * Search event list with event name
@@ -1414,7 +1668,7 @@ hook_event_find(hook_family_int_t *hfi, char *event)
 
 /*
  * Function:	hook_event_notify_register
- * Returns:	0 = success, else failure
+ * Returns:	int         - 0 = success, else failure
  * Parameters:	hfi(I)      - hook family
  *              event(I)    - name of the event
  *              callback(I) - function to be called
@@ -1430,8 +1684,11 @@ hook_event_notify_register(hook_family_int_t *hfi, char *event,
 {
 	hook_event_int_t *hei;
 	hook_stack_t *hks;
+	boolean_t canrun;
+	hook_int_t *h;
 	int error;
 
+	canrun = B_FALSE;
 	hks = hfi->hfi_stack;
 	CVW_ENTER_READ(&hks->hks_lock);
 	if (hks->hks_shutdown != 0) {
@@ -1454,31 +1711,38 @@ hook_event_notify_register(hook_family_int_t *hfi, char *event,
 		return (ESRCH);
 	}
 
-	/*
-	 * Grabbing the read lock on hei_lock is only so that we can
-	 * synchronise access to hei_condemned.
-	 */
-	CVW_ENTER_WRITE(&hei->hei_lock);
 	if (hei->hei_condemned || hei->hei_shutdown) {
-		CVW_EXIT_WRITE(&hei->hei_lock);
 		CVW_EXIT_READ(&hfi->hfi_lock);
 		CVW_EXIT_READ(&hks->hks_lock);
 		return (ESHUTDOWN);
 	}
 
-	error = hook_notify_register(&hei->hei_lock, &hei->hei_nhead,
-	    callback, arg);
-
+	CVW_ENTER_WRITE(&hei->hei_lock);
+	canrun = (hook_wait_setflag(&hei->hei_waiter, FWF_ADD_WAIT_MASK,
+	    FWF_ADD_WANTED, FWF_ADD_ACTIVE) != -1);
+	error = hook_notify_register(&hei->hei_nhead, callback, arg);
 	CVW_EXIT_WRITE(&hei->hei_lock);
+
 	CVW_EXIT_READ(&hfi->hfi_lock);
 	CVW_EXIT_READ(&hks->hks_lock);
+
+	if (error == 0 && canrun) {
+		TAILQ_FOREACH(h, &hei->hei_head, hi_entry) {
+			callback(HN_REGISTER, arg,
+			    hfi->hfi_family.hf_name, hei->hei_event->he_name,
+			    h->hi_hook.h_name);
+		}
+	}
+
+	if (canrun)
+		hook_wait_unsetflag(&hei->hei_waiter, FWF_ADD_ACTIVE);
 
 	return (error);
 }
 
 /*
  * Function:	hook_event_notify_unregister
- * Returns:	0 = success, else failure
+ * Returns:	int         - 0 = success, else failure
  * Parameters:	hfi(I)      - hook family
  *              event(I)    - name of the event
  *              callback(I) - function to be called
@@ -1492,7 +1756,12 @@ hook_event_notify_unregister(hook_family_int_t *hfi, char *event,
 {
 	hook_event_int_t *hei;
 	boolean_t free_event;
+	boolean_t canrun;
+	hook_int_t *h;
+	void *arg;
 	int error;
+
+	canrun = B_FALSE;
 
 	CVW_ENTER_READ(&hfi->hfi_lock);
 
@@ -1504,8 +1773,12 @@ hook_event_notify_unregister(hook_family_int_t *hfi, char *event,
 
 	CVW_ENTER_WRITE(&hei->hei_lock);
 
-	error = hook_notify_unregister(&hei->hei_lock, &hei->hei_nhead,
-	    callback);
+	(void) hook_wait_setflag(&hei->hei_waiter, FWF_DEL_WAIT_MASK,
+	    FWF_DEL_WANTED, FWF_DEL_ACTIVE);
+
+	error = hook_notify_unregister(&hei->hei_nhead, callback, &arg);
+
+	hook_wait_unsetflag(&hei->hei_waiter, FWF_DEL_ACTIVE);
 
 	/*
 	 * hei_condemned has been set if someone tried to remove the
@@ -1522,8 +1795,23 @@ hook_event_notify_unregister(hook_family_int_t *hfi, char *event,
 		free_event = B_FALSE;
 	}
 
+	if (error == 0 && !free_event) {
+		canrun = (hook_wait_setflag(&hei->hei_waiter, FWF_ADD_WAIT_MASK,
+		    FWF_ADD_WANTED, FWF_ADD_ACTIVE) != -1);
+	}
+
 	CVW_EXIT_WRITE(&hei->hei_lock);
 	CVW_EXIT_READ(&hfi->hfi_lock);
+
+	if (canrun) {
+		TAILQ_FOREACH(h, &hei->hei_head, hi_entry) {
+			callback(HN_UNREGISTER, arg,
+			    hfi->hfi_family.hf_name, hei->hei_event->he_name,
+			    h->hi_hook.h_name);
+		}
+
+		hook_wait_unsetflag(&hei->hei_waiter, FWF_ADD_ACTIVE);
+	}
 
 	if (free_event) {
 		/*
@@ -1558,10 +1846,10 @@ hook_event_notify_run(hook_event_int_t *hei, hook_family_int_t *hfi,
 
 /*
  * Function:	hook_register
- * Returns:	int- 0 = Succ, Else = Fail
- * Parameters:	hfi(I) - internal family pointer
+ * Returns:	int      - 0 = success, else = failure
+ * Parameters:	hfi(I)   - internal family pointer
  *		event(I) - event name string
- *		h(I) - hook pointer
+ *		h(I)     - hook pointer
  *
  * Add new hook to hook list on the specified family and event.
  */
@@ -1615,7 +1903,7 @@ hook_register(hook_family_int_t *hfi, char *event, hook_t *h)
 		goto bad_add;
 	}
 
-	if (hook_wait_setflag(&hei->hei_waiter, FWF_WAIT_MASK,
+	if (hook_wait_setflag(&hei->hei_waiter, FWF_ADD_WAIT_MASK,
 	    FWF_ADD_WANTED, FWF_ADD_ACTIVE) == -1) {
 		error = ENOENT;
 bad_add:
@@ -1642,17 +1930,17 @@ bad_add:
 	 * is from the original hook being registered, not the copy being
 	 * inserted.
 	 */
-	if (error == 0) {
+	if (error == 0)
 		hook_event_notify_run(hei, hfi, event, h->h_name, HN_REGISTER);
-		hook_wait_unsetflag(&hei->hei_waiter, FWF_ADD_ACTIVE);
-	}
+
+	hook_wait_unsetflag(&hei->hei_waiter, FWF_ADD_ACTIVE);
 
 	return (error);
 }
 
 /*
  * Function:	hook_insert
- * Returns:	int- 0 = Succ, else = Fail
+ * Returns:	int     - 0 = success, else = failure
  * Parameters:	head(I) - pointer to hook list to insert hook onto
  *		new(I)  - pointer to hook to be inserted
  *
@@ -1747,7 +2035,7 @@ hook_insert(hook_int_head_t *head, hook_int_t *new)
 
 /*
  * Function:	hook_insert_plain
- * Returns:	int- 0 = success, else = failure
+ * Returns:	int     - 0 = success, else = failure
  * Parameters:	head(I) - pointer to hook list to insert hook onto
  *		new(I)  - pointer to hook to be inserted
  *
@@ -1775,7 +2063,7 @@ hook_insert_plain(hook_int_head_t *head, hook_int_t *new)
 
 /*
  * Function:	hook_insert_afterbefore
- * Returns:	int- 0 = success, else = failure
+ * Returns:	int     - 0 = success, else = failure
  * Parameters:	head(I) - pointer to hook list to insert hook onto
  *		new(I)  - pointer to hook to be inserted
  *
@@ -1850,10 +2138,10 @@ hook_insert_afterbefore(hook_int_head_t *head, hook_int_t *new)
 
 /*
  * Function:	hook_unregister
- * Returns:	int - 0 = Succ, Else = Fail
- * Parameters:	hfi(I) - internal family pointer
+ * Returns:	int      - 0 = success, else = failure
+ * Parameters:	hfi(I)   - internal family pointer
  *		event(I) - event name string
- *		h(I) - hook pointer
+ *		h(I)     - hook pointer
  *
  * Remove hook from hook list on specific family, event
  */
@@ -1885,7 +2173,7 @@ hook_unregister(hook_family_int_t *hfi, char *event, hook_t *h)
 		return (ENXIO);
 	}
 
-	if (hook_wait_setflag(&hei->hei_waiter, FWF_WAIT_MASK,
+	if (hook_wait_setflag(&hei->hei_waiter, FWF_DEL_WAIT_MASK,
 	    FWF_DEL_WANTED, FWF_DEL_ACTIVE) == -1) {
 		CVW_EXIT_WRITE(&hei->hei_lock);
 		CVW_EXIT_WRITE(&hfi->hfi_lock);
@@ -1952,7 +2240,7 @@ hook_find_byname(hook_int_head_t *head, char *name)
  * Function:	hook_find
  * Returns:	internal hook pointer - NULL = Not match
  * Parameters:	hei(I) - internal event pointer
- *		h(I) - hook pointer
+ *		h(I)   - hook pointer
  *
  * Search an event's list of hooks to see if there is already one that
  * matches the hook being passed in.  Currently the only criteria for a
@@ -2100,7 +2388,7 @@ hook_init_kstats(hook_family_int_t *hfi, hook_event_int_t *hei, hook_int_t *hi)
  * Returns:	None
  * Parameters:	hi(I) - internal hook pointer
  *
- * Free alloc memory for hook
+ * Free memory allocated to support a hook.
  */
 static void
 hook_int_free(hook_int_t *hi, netstackid_t stackid)
@@ -2138,7 +2426,7 @@ hook_int_free(hook_int_t *hi, netstackid_t stackid)
 
 /*
  * Function:	hook_alloc
- * Returns:	hook_t * - pointer to new hook structure
+ * Returns:	hook_t *   - pointer to new hook structure
  * Parameters:	version(I) - version number of the API when compiled
  *
  * This function serves as the interface for consumers to obtain a hook_t
@@ -2174,9 +2462,8 @@ hook_free(hook_t *h)
 
 /*
  * Function:	hook_notify_register
- * Returns:	0 = success, else failure
- * Parameters:	lock(I)     - netstack identifier
- *              head(I)     - top of the list of callbacks
+ * Returns:	int         - 0 = success, else failure
+ * Parameters:	head(I)     - top of the list of callbacks
  *              callback(I) - function to be called
  *              arg(I)      - arg to pass back to the function
  *
@@ -2185,16 +2472,13 @@ hook_free(hook_t *h)
  * that has happened.
  */
 static int
-hook_notify_register(cvwaitlock_t *lock, hook_notify_head_t *head,
-    hook_notify_fn_t callback, void *arg)
+hook_notify_register(hook_notify_head_t *head, hook_notify_fn_t callback,
+    void *arg)
 {
 	hook_notify_t *hn;
 
-	CVW_ENTER_WRITE(lock);
-
 	TAILQ_FOREACH(hn, head, hn_entry) {
 		if (hn->hn_func == callback) {
-			CVW_EXIT_WRITE(lock);
 			return (EEXIST);
 		}
 	}
@@ -2204,38 +2488,40 @@ hook_notify_register(cvwaitlock_t *lock, hook_notify_head_t *head,
 	hn->hn_arg = arg;
 	TAILQ_INSERT_TAIL(head, hn, hn_entry);
 
-	CVW_EXIT_WRITE(lock);
-
 	return (0);
 }
 
 /*
- * Function:	hook_stack_notify_register
- * Returns:	0 = success, else failure
- * Parameters:	stackid(I) - netstack identifier
+ * Function:	hook_notify_unregister
+ * Returns:	int         - 0 = success, else failure
+ * Parameters:	stackid(I)  - netstack identifier
  *              callback(I) - function to be called
+ *              parg(O)     - pointer to storage for pointer
  *
+ * When calling this function, the provision of a valid pointer in parg
+ * allows the caller to be made aware of what argument the hook function
+ * was expecting. This then allows the simulation of HN_UNREGISTER events
+ * when a notify-unregister is performed.
  */
 static int
-hook_notify_unregister(cvwaitlock_t *lock, hook_notify_head_t *head,
-    hook_notify_fn_t callback)
+hook_notify_unregister(hook_notify_head_t *head,
+    hook_notify_fn_t callback, void **parg)
 {
 	hook_notify_t *hn;
 
-	CVW_ENTER_WRITE(lock);
+	ASSERT(parg != NULL);
 
 	TAILQ_FOREACH(hn, head, hn_entry) {
 		if (hn->hn_func == callback)
 			break;
 	}
-	if (hn == NULL) {
-		CVW_EXIT_WRITE(lock);
+
+	if (hn == NULL)
 		return (ESRCH);
-	}
+
+	*parg = hn->hn_arg;
 
 	TAILQ_REMOVE(head, hn, hn_entry);
-
-	CVW_EXIT_WRITE(lock);
 
 	kmem_free(hn, sizeof (*hn));
 

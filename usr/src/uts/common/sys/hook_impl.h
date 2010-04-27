@@ -49,7 +49,8 @@ typedef enum fwflag_e {
 	FWF_NOT_READY		= 0x100
 } fwflag_t;
 
-#define	FWF_WAIT_MASK		(FWF_ADD_ACTIVE|FWF_DEL_ACTIVE|\
+#define	FWF_ADD_WAIT_MASK	(FWF_ADD_ACTIVE|FWF_DEL_ACTIVE|FWF_ADD_WANTED)
+#define	FWF_DEL_WAIT_MASK	(FWF_ADD_ACTIVE|FWF_DEL_ACTIVE|\
     FWF_ADD_WANTED|FWF_DEL_WANTED)
 #define	FWF_UNSAFE		(FWF_DESTROY_ACTIVE|FWF_NOT_READY)
 #define	FWF_DESTROY		(FWF_DESTROY_ACTIVE|FWF_DESTROY_WANTED)
@@ -221,7 +222,8 @@ extern int hook_event_notify_unregister(hook_family_int_t *, char *,
 extern int hook_event_remove(hook_family_int_t *, hook_event_t *);
 extern int hook_event_shutdown(hook_family_int_t *, hook_event_t *);
 
-extern hook_family_int_t *hook_family_add(hook_family_t *, hook_stack_t *);
+extern hook_family_int_t *hook_family_add(hook_family_t *, hook_stack_t *,
+    void **);
 extern int hook_family_notify_register(hook_family_int_t *, hook_notify_fn_t,
     void *);
 extern int hook_family_notify_unregister(hook_family_int_t *, hook_notify_fn_t);
