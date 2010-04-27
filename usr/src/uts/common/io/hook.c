@@ -425,8 +425,6 @@ hook_wait_unsetflag(flagwait_t *waiter, fwflag_t oldflag)
 int
 hook_wait_destroy(flagwait_t *waiter)
 {
-	boolean_t wanted;
-
 	ASSERT((waiter->fw_flags & FWF_DESTROY_WANTED) == 0);
 	mutex_enter(&waiter->fw_lock);
 	if (waiter->fw_flags & FWF_DESTROY_WANTED) {

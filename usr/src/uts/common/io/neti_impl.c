@@ -401,7 +401,6 @@ net_isvalidchecksum(net_handle_t info, mblk_t *mp)
 int
 net_family_register(net_handle_t info, hook_family_t *hf)
 {
-	hook_family_int_t *hfi;
 	netstack_t *ns;
 
 	ASSERT(info != NULL);
