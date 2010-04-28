@@ -4915,7 +4915,8 @@ closevol(void)
 static void
 done(int n)
 {
-	(void) unlink(tname);
+	if (tfile != NULL)
+		(void) unlink(tname);
 	if (compress_opt != NULL)
 		(void) free(compress_opt);
 	if (mt > 0) {
