@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <arpa/inet.h>
@@ -174,10 +173,9 @@ nwamd_loc_activate(const char *object_name)
 			nwamd_object_t eobj = nwamd_object_find
 			    (NWAM_OBJECT_TYPE_LOC, enabled);
 			if (eobj == NULL) {
-				nlog(LOG_ERR, "nwamd_loc_activate: cannot "
+				nlog(LOG_INFO, "nwamd_loc_activate: could not "
 				    "find old location %s", enabled);
-				free(enabled);
-				return;
+				goto skip_disable;
 			}
 			/*
 			 * Disable if the old location was manual, since the
@@ -208,12 +206,13 @@ nwamd_loc_activate(const char *object_name)
 			}
 		}
 	}
+skip_disable:
 	free(enabled);
 
 	if (nwamd_set_string_property(NET_LOC_FMRI, NET_LOC_PG,
 	    NET_LOC_SELECTED_PROP, object_name) == 0) {
 		char *state = smf_get_state(NET_LOC_FMRI);
-		nlog(LOG_INFO, "nwam_loc_activate: set %s/%s to %s; "
+		nlog(LOG_INFO, "nwamd_loc_activate: set %s/%s to %s; "
 		    "service is in %s state", NET_LOC_PG, NET_LOC_SELECTED_PROP,
 		    object_name, state == NULL ? "unknown" : state);
 		free(state);

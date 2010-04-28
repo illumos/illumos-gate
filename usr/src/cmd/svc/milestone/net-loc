@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 . /lib/svc/share/smf_include.sh
@@ -689,8 +688,16 @@ else
 		# location hasn't been selected; default to NoNet
 		activate_loc NoNet
 	else
-		# activate selected location
-		activate_loc $sel_loc
+		# check if the selected location exists
+		$NWAMCFG list loc $sel_loc >/dev/null 2>&1
+		if [ $? -eq 1 ]; then
+			echo "location $sel_loc doesn't exist, revert to NoNet"
+			set_smf_prop $SMF_FMRI location/selected NoNet
+			refresh_svc $SMF_FMRI
+		else
+			# activate selected location
+			activate_loc $sel_loc
+		fi
 	fi
 fi
 
