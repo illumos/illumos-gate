@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -730,7 +729,7 @@ pcieb_initchild(dev_info_t *child)
 		 * Try to merge the properties from this prototype
 		 * node into real h/w nodes.
 		 */
-		if (ndi_merge_node(child, pcieb_name_child) != DDI_SUCCESS) {
+		if (ndi_merge_node(child, pcieb_name_child) == DDI_SUCCESS) {
 			/*
 			 * Merged ok - return failure to remove the node.
 			 */
