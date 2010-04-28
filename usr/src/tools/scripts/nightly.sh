@@ -1625,7 +1625,7 @@ fi
 NONTOOLSPATH="/usr/ccs/bin:$OPTHOME/SUNWspro/bin:$TEAMWARE/bin:/usr/bin"
 NONTOOLSPATH="${NONTOOLSPATH}:/usr/sbin:/usr/ucb"
 NONTOOLSPATH="${NONTOOLSPATH}:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
-TOOLSPATH="$OPTHOME/onbld/bin:$OPTHOME/onbld/bin/${MACH}
+TOOLSPATH="$OPTHOME/onbld/bin:$OPTHOME/onbld/bin/${MACH}"
 PATH="${TOOLSPATH}:${NONTOOLSPATH}"
 export PATH
 
