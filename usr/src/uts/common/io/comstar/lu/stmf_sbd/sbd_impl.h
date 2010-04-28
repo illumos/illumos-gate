@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SBD_IMPL_H
@@ -211,6 +210,7 @@ typedef struct sbd_cmd {
 #define	SBD_SCSI_CMD_ACTIVE		0x01
 #define	SBD_SCSI_CMD_ABORT_REQUESTED	0x02
 #define	SBD_SCSI_CMD_XFER_FAIL		0x04
+#define	SBD_SCSI_CMD_SYNC_WRITE		0x08
 
 /*
  * cmd types

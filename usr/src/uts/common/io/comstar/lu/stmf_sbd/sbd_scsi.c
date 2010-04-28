@@ -461,11 +461,27 @@ WRITE_XFER_DONE:
 		if (scmd->nbufs)
 			return;	/* wait for all buffers to complete */
 		scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
-		if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL)
+		if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
 			    STMF_SAA_WRITE_ERROR);
-		else
-			stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+		} else {
+			/*
+			 * If SYNC_WRITE flag is on then we need to flush
+			 * cache before sending status.
+			 * Note: this may be a no-op because of how
+			 * SL_WRITEBACK_CACHE_DISABLE and
+			 * SL_FLUSH_ON_DISABLED_WRITECACHE are set, but not
+			 * worth code complexity of checking those in this code
+			 * path, SBD_SCSI_CMD_SYNC_WRITE is rarely set.
+			 */
+			if ((scmd->flags & SBD_SCSI_CMD_SYNC_WRITE) &&
+			    (sbd_flush_data_cache(sl, 0) != SBD_SUCCESS)) {
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_WRITE_ERROR);
+			} else {
+				stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+			}
+		}
 		return;
 	}
 	sbd_do_write_xfer(task, scmd, dbuf, dbuf_reusable);
@@ -480,6 +496,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_cmd_t *scmd;
 	stmf_data_buf_t *dbuf;
+	uint8_t	sync_wr_flag = 0;
 
 	if (sl->sl_flags & SL_WRITE_PROTECTED) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
@@ -502,6 +519,18 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	} else if (op == SCMD_WRITE_G4) {
 		lba = READ_SCSI64(&task->task_cdb[2], uint64_t);
 		len = READ_SCSI32(&task->task_cdb[10], uint32_t);
+	} else if (op == SCMD_WRITE_VERIFY) {
+		lba = READ_SCSI32(&task->task_cdb[2], uint64_t);
+		len = READ_SCSI16(&task->task_cdb[7], uint32_t);
+		sync_wr_flag = SBD_SCSI_CMD_SYNC_WRITE;
+	} else if (op == SCMD_WRITE_VERIFY_G5) {
+		lba = READ_SCSI32(&task->task_cdb[2], uint64_t);
+		len = READ_SCSI32(&task->task_cdb[6], uint32_t);
+		sync_wr_flag = SBD_SCSI_CMD_SYNC_WRITE;
+	} else if (op == SCMD_WRITE_VERIFY_G4) {
+		lba = READ_SCSI64(&task->task_cdb[2], uint64_t);
+		len = READ_SCSI32(&task->task_cdb[10], uint32_t);
+		sync_wr_flag = SBD_SCSI_CMD_SYNC_WRITE;
 	} else {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_INVALID_OPCODE);
@@ -551,7 +580,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		scmd = (sbd_cmd_t *)kmem_alloc(sizeof (sbd_cmd_t), KM_SLEEP);
 		task->task_lu_private = scmd;
 	}
-	scmd->flags = SBD_SCSI_CMD_ACTIVE;
+	scmd->flags = SBD_SCSI_CMD_ACTIVE | sync_wr_flag;
 	scmd->cmd_type = SBD_CMD_SCSI_WRITE;
 	scmd->nbufs = 0;
 	scmd->addr = laddr;
@@ -1858,6 +1887,26 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	if (cdb0 == SCMD_SYNCHRONIZE_CACHE ||
 	    cdb0 == SCMD_SYNCHRONIZE_CACHE_G4) {
 		sbd_handle_sync_cache(task, initial_dbuf);
+		return;
+	}
+
+	/*
+	 * Write and Verify use the same path as write, but don't clutter the
+	 * performance path above with checking for write_verify opcodes.  We
+	 * rely on zfs's integrity checks for the "Verify" part of Write &
+	 * Verify.  (Even if we did a read to "verify" we'd merely be reading
+	 * cache, not actual media.)
+	 * Therefore we
+	 *   a) only support this if sbd_is_zvol, and
+	 *   b) run the IO through the normal write path with a forced
+	 *	sbd_flush_data_cache at the end.
+	 */
+
+	if ((sl->sl_flags & SL_ZFS_META) && (
+	    cdb0 == SCMD_WRITE_VERIFY ||
+	    cdb0 == SCMD_WRITE_VERIFY_G4 ||
+	    cdb0 == SCMD_WRITE_VERIFY_G5)) {
+		sbd_handle_write(task, initial_dbuf);
 		return;
 	}
 

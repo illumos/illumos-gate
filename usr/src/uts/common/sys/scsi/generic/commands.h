@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_GENERIC_COMMANDS_H
@@ -333,6 +332,7 @@ extern "C" {
  */
 #define	SCMD_READ_G4		0x88
 #define	SCMD_WRITE_G4		0x8a
+#define	SCMD_WRITE_VERIFY_G4	0x8e
 #define	SCMD_SVC_ACTION_IN_G4	0x9e
 #define	SCMD_SVC_ACTION_OUT_G4	0x9f
 
@@ -370,6 +370,7 @@ extern "C" {
 #define	SCMD_SVC_ACTION_OUT_G5	0xA9
 #define	SCMD_SVC_ACTION_IN_G5	0xAB
 #define	SCMD_GET_PERFORMANCE	0xAC
+#define	SCMD_WRITE_VERIFY_G5	0xAE
 #define	SCMD_VERIFY_G5		0xAF
 #define	SCMD_SECURITY_PROTO_OUT	0xB5
 
@@ -472,6 +473,7 @@ extern "C" {
 /* 0x8a */ SCMD_WRITE_G4,		"write(16)",			\
 /* 0x8c */ SCMD_READ_ATTRIBUTE,		"read_attribute",		\
 /* 0x8d */ SCMD_WRITE_ATTRIBUTE,	"write_attribute",		\
+/* 0x8e */ SCMD_WRITE_VERIFY_G4,	"write_verify(16)",		\
 /* 0x8f */ SCMD_VERIFY_G4,		"verify(16)",			\
 /* 0x91 */ SCMD_SPACE_G4,		"space(16)",			\
 /* 0x92 */ SCMD_LOCATE_G4,		"locate(16)",			\
@@ -486,6 +488,7 @@ extern "C" {
 /* 0xaa */ SCMD_WRITE_G5,		"write(12)",			\
 /* 0xab */ SCMD_SVC_ACTION_IN_G5,	"service_action_in(12)",	\
 /* 0xac */ SCMD_GET_PERFORMANCE,	"get_performance",		\
+/* 0xAE */ SCMD_WRITE_VERIFY_G5,	"write_verify(12)",		\
 /* 0xAF */ SCMD_VERIFY_G5,		"verify(12)",			\
 /* 0xb5 */ SCMD_SECURITY_PROTO_OUT,	"security_protocol_out"		\
 	/* see cdio.h for additional command-to-string translations */
