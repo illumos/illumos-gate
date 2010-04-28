@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -105,6 +104,8 @@ typedef struct uarg {
 	char	*brandname;
 	char	*auxp_auxflags; /* addr of auxflags auxv on the user stack */
 	char	*auxp_brand; /* address of first brand auxv on user stack */
+	cred_t	*pfcred;
+	boolean_t scrubenv;
 } uarg_t;
 
 /*

@@ -23,11 +23,8 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file defines the vnode operations for mounted file descriptors.
@@ -253,13 +250,10 @@ nm_access_unlocked(void *vnp, int mode, cred_t *crp)
 		if (!groupmember(nodep->nm_vattr.va_gid, crp))
 			shift += 3;
 	}
-	mode &= ~(nodep->nm_vattr.va_mode << shift);
 
-	if (mode == 0)
-		return (0);
-
-	return (secpolicy_vnode_access(crp, NMTOV(nodep),
-	    nodep->nm_vattr.va_uid, mode));
+	return (secpolicy_vnode_access2(crp, NMTOV(nodep),
+	    nodep->nm_vattr.va_uid, nodep->nm_vattr.va_mode << shift,
+	    mode));
 }
 /*
  * Set the attributes of the namenode from the attributes in vap.

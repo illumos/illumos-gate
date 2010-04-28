@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -133,6 +132,11 @@ retry_locked:
 		newcr->cr_ruid = uid;
 		newcr->cr_suid = uid;
 		newcr->cr_uid = uid;
+
+		/* Remove the PRIV_PFEXEC, we changed the real uid. */
+		if (uidchge)
+			CR_FLAGS(newcr) &= ~PRIV_PFEXEC;
+
 		crsetsid(newcr, ksp, KSID_USER);
 
 		priv_reset_PA(newcr, B_TRUE);
@@ -345,6 +349,10 @@ retry_locked:
 			crsetsid(newcr, ksp, KSID_USER);
 		}
 		if (ruid != -1) {
+			/* Remove the PRIV_PFEXEC, we changed the real uid. */
+			if (uidchge)
+				CR_FLAGS(newcr) &= ~PRIV_PFEXEC;
+
 			oldruid = newcr->cr_ruid;
 			newcr->cr_ruid = ruid;
 			ASSERT(ruid != oldruid ? uidchge : 1);

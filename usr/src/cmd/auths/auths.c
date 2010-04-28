@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,10 +34,6 @@
 #include <prof_attr.h>
 #include <auth_attr.h>
 
-
-#define	ALL_AUTHS	"All"
-#define	ALL_SUN_AUTHS	"solaris.*"
-
 #define	EXIT_OK		0
 #define	EXIT_FATAL	1
 #define	EXIT_NON_FATAL	2
@@ -49,71 +42,57 @@
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 
-#define	PROFLIST_SEP	","
-#define	AUTH_SEP	","
-#define	MAXAUTHS	4096
+#define	INCRAUTHS	512
 
+typedef struct cbs {
+	int	auth_cnt;
+	int	auth_max;
+	char	**auths;
+} cbs_t;
 
-static int show_auths(char *, char **, int, int);
-static int list_auths(userattr_t *, char **, int *);
-static void get_default_auths(char *, char **, int *);
-static void getProfiles(char *, char **, int *, char **, int *);
-static void add_auths(char *, char **, int *);
-static void free_auths(char **, int *);
+static int show_auths(char *, int);
+static int add_auth(const char *, void *, void *);
+static void free_auths(cbs_t *);
+static void simplify(cbs_t *);
 
 static char *progname = "auths";
-
 
 int
 main(int argc, char *argv[])
 {
 	int		status = EXIT_OK;
-	char		*defauths[MAXAUTHS];
-	int		defauth_cnt = 0;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
 	switch (argc) {
 	case 1:
-		get_default_auths(NULL, defauths, &defauth_cnt);
-		status = show_auths(NULL, defauths, defauth_cnt, 0);
+		status = show_auths(NULL, 0);
 		break;
 	case 2:
-		get_default_auths(argv[argc-1], defauths, &defauth_cnt);
-		status = show_auths(argv[argc-1], defauths, defauth_cnt, 0);
+		status = show_auths(argv[argc-1], 0);
 		break;
 	default:
 		while (*++argv) {
-			get_default_auths(*argv, defauths, &defauth_cnt);
-			status = show_auths(*argv, defauths, defauth_cnt, 1);
+			status = show_auths(*argv, 1);
 			if (status == EXIT_FATAL) {
 				break;
 			}
-			/* free memory allocated for default authorizations */
-			free_auths(defauths, &defauth_cnt);
-			(void) printf("\n");
 		}
 		break;
 	}
 
-	/* free memory allocated for default authorizations */
-	free_auths(defauths, &defauth_cnt);
 	status = (status == EXIT_OK) ? status : EXIT_FATAL;
-
 	return (status);
 }
 
-
 static int
-show_auths(char *username, char **defauths, int defauth_cnt, int print_name)
+show_auths(char *username, int print_name)
 {
 	int		status = EXIT_OK;
 	struct passwd	*pw;
-	userattr_t	*user;
-	char		*userauths[MAXAUTHS];
-	int		userauth_cnt = 0, old_userauth_cnt;
-	int		i, j, have_allauths, duplicate;
+	int		i;
+	cbs_t		cbs = { 0, 0, NULL };
 
 	if (username == NULL) {
 		if ((pw = getpwuid(getuid())) == NULL) {
@@ -130,221 +109,120 @@ show_auths(char *username, char **defauths, int defauth_cnt, int print_name)
 		return (status);
 	}
 
-	have_allauths = 0;
-	if (username != NULL) {
-		/* if ALL_AUTHS is default, don't need to look at other auths */
-		for (i = 0; i < defauth_cnt; i++) {
-			if (strcmp(defauths[i], ALL_AUTHS) == 0) {
-				have_allauths = 1;
-				break;
-			}
-		}
-		if (have_allauths) {
-			status = EXIT_OK;
-		} else if ((user = getusernam(username)) != NULL) {
-			status = list_auths(user, userauths, &userauth_cnt);
-			/* check if any profiles have ALL_AUTHS */
-			for (i = 0; i < userauth_cnt; i++) {
-				if (strcmp(userauths[i], ALL_AUTHS) == 0) {
-					have_allauths = 1;
-					break;
-				}
-			}
-		}
-		if ((defauth_cnt + userauth_cnt) == 0) {
-			status = EXIT_NON_FATAL;
-		}
-	}
+	(void) _enum_auths(username, add_auth, NULL, &cbs);
+
+	if (cbs.auth_cnt == 0)
+		status = EXIT_NON_FATAL;
+
 	if (status == EXIT_NON_FATAL) {
-		(void) fprintf(stderr, "%s: %s : ", progname, username);
+		(void) fprintf(stderr, "%s: %s: ", progname, username);
 		(void) fprintf(stderr, gettext("No authorizations\n"));
 	} else {
-		if (print_name) {
-			(void) printf("%s : ", username);
-		}
+		simplify(&cbs);
 
-		if (have_allauths) {
-			(void) printf("%s\n", ALL_SUN_AUTHS);
-		} else {
-			/*
-			 * combine the user auths and default auths,
-			 * and eliminate duplicates from the two
-			 */
-			old_userauth_cnt = userauth_cnt;
-			for (i = 0; i < defauth_cnt; i++) {
-				duplicate = 0;
-				for (j = 0; j < old_userauth_cnt; j++) {
-					if (strcmp(userauths[j], defauths[i]) ==
-					    0) {
-						duplicate = 1;
-						break;
-					}
-				}
-				if (!duplicate) {
-					userauths[userauth_cnt] =
-					    strdup(defauths[i]);
-					userauth_cnt++;
-				}
-			}
+		if (print_name)
+			(void) printf("%s: ", username);
 
-			/* print out the auths */
-			for (i = 0; i < (userauth_cnt - 1); i++) {
-				(void) printf("%s,", userauths[i]);
-			}
+		/* print out the auths */
+		for (i = 0; i < cbs.auth_cnt - 1; i++)
+			(void) printf("%s,", cbs.auths[i]);
 
-			/* print out the last entry, without the comma */
-			(void) printf("%s\n", userauths[userauth_cnt - 1]);
-		}
+		/* print out the last entry, without the comma */
+		(void) printf("%s\n", cbs.auths[cbs.auth_cnt - 1]);
+
+		/* free memory allocated for authorizations */
+		free_auths(&cbs);
 	}
-
-	/* free memory allocated for authorizations */
-	free_auths(userauths, &userauth_cnt);
 
 	return (status);
 }
 
-
+/*ARGSUSED*/
 static int
-list_auths(userattr_t *user, char **authArray, int *authcnt)
+add_auth(const char *authname, void *ctxt, void *res)
 {
-	int		status = EXIT_OK;
-	char		*authlist = NULL;
-	char		*proflist = NULL;
-	char		*profArray[MAXPROFS];
-	int		profcnt = 0;
+	cbs_t	*cbs = res;
 
-	authlist = kva_match(user->attr, USERATTR_AUTHS_KW);
-	if (authlist != NULL) {
-		add_auths(authlist, authArray, authcnt);
-	}
-	if ((proflist = kva_match(user->attr, USERATTR_PROFILES_KW)) == NULL) {
-		if (authcnt == 0) {
-			status = EXIT_NON_FATAL;
-		}
-	} else {
-		getProfiles(proflist, profArray, &profcnt,
-		    authArray, authcnt);
-		free_proflist(profArray, profcnt);
-	}
-	if (authcnt == 0) {
-		status = EXIT_NON_FATAL;
-	}
-	free_userattr(user);
+	if (cbs->auth_cnt >= cbs->auth_max) {
+		cbs->auth_max += INCRAUTHS;
+		cbs->auths = realloc(cbs->auths,
+		    cbs->auth_max * sizeof (char *));
 
-	return (status);
-}
-
-
-static void
-get_default_auths(char *user, char **authArray, int *authcnt)
-{
-	char *auths = NULL;
-	char *profs = NULL;
-	char *profArray[MAXPROFS];
-	int profcnt = 0;
-
-	if (user == NULL) {
-		struct passwd *pw;
-
-		if ((pw = getpwuid(getuid())) != NULL) {
-			user = pw->pw_name;
+		if (cbs->auths == NULL) {
+			(void) fprintf(stderr, "%s: ", progname);
+			(void) fprintf(stderr, gettext("Out of memory\n"));
+			exit(1);
 		}
 	}
 
-	if (_get_user_defs(user, &auths, &profs) == 0) {
-		if (auths != NULL) {
-			add_auths(auths, authArray, authcnt);
-		}
+	cbs->auths[cbs->auth_cnt] = strdup(authname);
+	cbs->auth_cnt++;
 
-		/* get authorizations from default profiles */
-		if (profs != NULL) {
-			getProfiles(profs, profArray, &profcnt,
-			    authArray, authcnt);
-			free_proflist(profArray, profcnt);
-		}
-		_free_user_defs(auths, profs);
-	}
-}
-
-void
-add_auths(char *auths, char **authArray, int *authcnt)
-{
-	char	*authname, *lasts, *real_authname;
-	int	i;
-
-	for (authname = (char *)strtok_r(auths, AUTH_SEP, &lasts);
-	    authname != NULL;
-	    authname = (char *)strtok_r(NULL, AUTH_SEP, &lasts)) {
-
-		if ((strcmp(authname, KV_WILDCARD) == 0) ||
-		    (strcmp(authname, ALL_SUN_AUTHS) == 0)) {
-			real_authname = ALL_AUTHS;
-		} else {
-			real_authname = authname;
-		}
-
-		/* check to see if authorization is already in list */
-		for (i = 0; i < *authcnt; i++) {
-			if (strcmp(real_authname, authArray[i]) == 0) {
-				break;	/* already in list */
-			}
-		}
-
-		/* not in list, add it in */
-		if (i == *authcnt) {
-			authArray[i] = strdup(real_authname);
-			*authcnt = i + 1;
-		}
-	}
-
+	return (0);
 }
 
 static void
-free_auths(char *auths[], int *auth_cnt)
+free_auths(cbs_t *cbs)
 {
 	int i;
 
-	for (i = 0; i < *auth_cnt; i++) {
-		free(auths[i]);
-	}
-	*auth_cnt = 0;
+	for (i = 0; i < cbs->auth_cnt; i++)
+		free(cbs->auths[i]);
+
+	free(cbs->auths);
 }
 
-static void
-getProfiles(char *profiles, char **profArray, int *profcnt,
-	char **authArray, int *authcnt)
+/* We have always ignored .grant in auths(1) */
+static boolean_t
+auth_match(const char *pattern, const char *auth)
 {
+	size_t len = strlen(pattern);
 
-	char		*prof;
-	char		*lasts;
-	profattr_t	*pa;
-	char		*auths;
-	int		i;
+	if (pattern[len - 1] != KV_WILDCHAR)
+		return (B_FALSE);
 
-	for (prof = (char *)strtok_r(profiles, PROFLIST_SEP, &lasts);
-	    prof != NULL;
-	    prof = (char *)strtok_r(NULL, PROFLIST_SEP, &lasts)) {
+	return (strncmp(pattern, auth, len - 1) == 0);
+}
 
-		getproflist(prof, profArray, profcnt);
+static int
+mstrptr(const void *a, const void *b)
+{
+	char *const *ap = a;
+	char *const *bp = b;
+
+	return (strcmp(*ap, *bp));
+}
+
+/*
+ * Simplify the returned authorizations: sort and match wildcards;
+ * we're using here that "*" sorts before any other character.
+ */
+static void
+simplify(cbs_t *cbs)
+{
+	int rem, i;
+
+	/* First we sort */
+	qsort(cbs->auths, cbs->auth_cnt, sizeof (cbs->auths[0]), mstrptr);
+
+	/*
+	 * Then we remove the entries which match a later entry.
+	 * We walk the list, with "i + rem + 1" the cursor for the possible
+	 * candidate for removal. With "rem" we count the removed entries
+	 * and we copy while we're looking for duplicate/superfluous entries.
+	 */
+	for (i = 0, rem = 0; i < cbs->auth_cnt - rem - 1; ) {
+		if (strcmp(cbs->auths[i], cbs->auths[i + rem + 1]) == 0 ||
+		    strchr(cbs->auths[i], KV_WILDCHAR) != NULL &&
+		    auth_match(cbs->auths[i], cbs->auths[i + rem + 1])) {
+			free(cbs->auths[i + rem + 1]);
+			rem++;
+		} else {
+			i++;
+			if (rem > 0)
+				cbs->auths[i] = cbs->auths[i + rem];
+		}
 	}
 
-	/* get authorizations from list of profiles */
-	for (i = 0; i < *profcnt; i++) {
-
-		if ((pa = getprofnam(profArray[i])) == NULL) {
-			/*
-			 *  this should never happen.
-			 *  unless the database has an undefined profile
-			 */
-			continue;
-		}
-
-		/* get auths this profile */
-		auths = kva_match(pa->attr, PROFATTR_AUTHS_KW);
-		if (auths != NULL) {
-			add_auths(auths, authArray, authcnt);
-		}
-
-		free_profattr(pa);
-	}
+	cbs->auth_cnt -= rem;
 }

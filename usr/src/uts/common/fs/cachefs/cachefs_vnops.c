@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -402,8 +401,8 @@ cachefs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 			 * cnode disallow writing while disconnected.
 			 */
 			if (crcmp(cp->c_cred, CRED()) != 0 &&
-			    secpolicy_vnode_access(CRED(), *vpp,
-			    cp->c_attr.va_uid, VWRITE) != 0) {
+			    secpolicy_vnode_access2(CRED(), *vpp,
+			    cp->c_attr.va_uid, 0, VWRITE) != 0) {
 				mutex_exit(&cp->c_statelock);
 				connected = 1;
 				continue;
@@ -9829,13 +9828,8 @@ cachefs_access_local(void *vcp, int mode, cred_t *cr)
 			shift += 3;
 	}
 
-	/* compute missing mode bits */
-	mode &= ~(cp->c_attr.va_mode << shift);
-
-	if (mode == 0)
-		return (0);
-
-	return (secpolicy_vnode_access(cr, CTOV(cp), cp->c_attr.va_uid, mode));
+	return (secpolicy_vnode_access2(cr, CTOV(cp), cp->c_attr.va_uid,
+	    cp->c_attr.va_mode << shift, mode));
 }
 
 /*
@@ -9849,8 +9843,8 @@ cachefs_access_local(void *vcp, int mode, cred_t *cr)
  * Check Algorithm, of the POSIX 1003.6 Draft Standard.
  */
 
-#define	ACL_MODE_CHECK(M, PERM, C, I) ((((M) & (PERM)) == (M)) ? 0 : \
-		    secpolicy_vnode_access(C, CTOV(I), owner, (M) & ~(PERM)))
+#define	ACL_MODE_CHECK(M, PERM, C, I) \
+    secpolicy_vnode_access2(C, CTOV(I), owner, (PERM), (M))
 
 static int
 cachefs_acl_access(struct cnode *cp, int mode, cred_t *cr)

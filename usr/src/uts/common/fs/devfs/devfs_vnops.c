@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -719,13 +718,8 @@ devfs_unlocked_access(void *vdv, int mode, struct cred *cr)
 			shift += 3;
 	}
 
-	/* compute missing mode bits */
-	mode &= ~(dv->dv_attr->va_mode << shift);
-
-	if (mode == 0)
-		return (0);
-
-	return (secpolicy_vnode_access(cr, DVTOV(dv), owner, mode));
+	return (secpolicy_vnode_access2(cr, DVTOV(dv), owner,
+	    dv->dv_attr->va_mode << shift, mode));
 }
 
 static int

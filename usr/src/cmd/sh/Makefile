@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PROG =		sh
@@ -29,7 +28,7 @@ USR_PROG =	$(PROG)
 OBJS=	args.o blok.o cmd.o defs.o error.o fault.o hash.o hashserv.o \
 	io.o msg.o print.o stak.o string.o word.o xec.o \
 	ctype.o echo.o expand.o func.o macro.o pwd.o setbrk.o test.o \
-	bltin.o jobs.o ulimit.o sh_policy.o main.o name.o service.o
+	bltin.o jobs.o ulimit.o main.o name.o service.o
 SRCS=	$(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
@@ -47,7 +46,7 @@ XGETFLAGS += -a -x sh.xcl
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -DACCT
 MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS += $(MAPFILES:%=-M%)
-LDLIBS += -lgen -lsecdb
+LDLIBS += -lgen
 
 .KEEP_STATE:
 
@@ -66,8 +65,6 @@ $(POFILE): $(POFILES)
 install: all $(ROOTHASBINPROG)
 	$(RM) $(ROOTHASBIN)/jsh
 	$(SYMLINK) sh $(ROOTHASBIN)/jsh
-	$(RM) $(ROOTHASBIN)/pfsh
-	$(SYMLINK) sh $(ROOTHASBIN)/pfsh
 	$(RM) $(ROOTHASLIB)/rsh
 	$(SYMLINK) ../bin/sh $(ROOTHASLIB)/rsh
 

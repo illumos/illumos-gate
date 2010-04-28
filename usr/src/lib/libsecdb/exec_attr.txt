@@ -20,7 +20,6 @@
 #
 
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
-
 #
 # /etc/security/exec_attr
 #
@@ -110,6 +109,25 @@ File System Management:suser:cmd:::/usr/sbin/umount:uid=0
 File System Management:suser:cmd:::/usr/sbin/umountall:uid=0
 File System Management:suser:cmd:::/usr/sbin/unshare:uid=0;gid=root
 File System Management:suser:cmd:::/usr/sbin/unshareall:uid=0;gid=root
+Forced Privilege:solaris:cmd:::/usr/bin/newtask:\
+    privs=proc_taskid,sys_resource,sys_res_config,proc_priocntl
+Forced Privilege:solaris:cmd:::/usr/bin/rcp:privs=net_privaddr
+Forced Privilege:solaris:cmd:::/usr/bin/rdist:privs=net_privaddr
+Forced Privilege:solaris:cmd:::/usr/bin/rlogin:privs=net_privaddr
+Forced Privilege:solaris:cmd:::/usr/bin/rmformat:\
+    privs=file_dac_read,file_dac_write,proc_fork,proc_exec,sys_mount,sys_devices
+Forced Privilege:solaris:cmd:::/usr/bin/rsh:privs=net_privaddr
+Forced Privilege:solaris:cmd:::/usr/bin/w:privs=proc_owner
+Forced Privilege:solaris:cmd:::/usr/lib/fs/ufs/quota:privs=file_dac_read
+Forced Privilege:solaris:cmd:::/usr/lib/fs/ufs/ufsdump:privs=net_privaddr
+Forced Privilege:solaris:cmd:::/usr/lib/fs/ufs/ufsrestore:privs=net_privaddr
+Forced Privilege:solaris:cmd:::/usr/sbin/ping:\
+    privs=net_icmpaccess,sys_ip_config
+Forced Privilege:solaris:cmd:::/usr/sbin/traceroute:\
+    privs=net_icmpaccess,net_rawaccess
+Forced Privilege:solaris:cmd:::/usr/sbin/whodo:privs=proc_owner
+Forced Privilege:solaris:cmd:::/usr/lib/fs/smbfs/mount:privs=sys_mount
+Forced Privilege:solaris:cmd:::/usr/lib/fs/smbfs/umount:privs=sys_mount
 IP Filter Management:solaris:cmd:::/usr/sbin/ipf:privs=sys_ip_config
 IP Filter Management:solaris:cmd:::/usr/sbin/ipfs:privs=sys_ip_config
 IP Filter Management:solaris:cmd:::/usr/sbin/ipmon:privs=sys_ip_config

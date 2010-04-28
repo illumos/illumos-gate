@@ -2251,15 +2251,8 @@ zfs_has_access(znode_t *zp, cred_t *cr)
 	uint32_t have = ACE_ALL_PERMS;
 
 	if (zfs_zaccess_aces_check(zp, &have, B_TRUE, cr) != 0) {
-		return (
-		    secpolicy_vnode_access(cr, ZTOV(zp),
-		    zp->z_uid, VREAD) == 0 || secpolicy_vnode_access(cr,
-		    ZTOV(zp), zp->z_uid, VWRITE) == 0 ||
-		    secpolicy_vnode_access(cr, ZTOV(zp),
-		    zp->z_uid, VEXEC) == 0 ||
-		    secpolicy_vnode_chown(cr, zp->z_uid) == 0 ||
-		    secpolicy_vnode_setdac(cr, zp->z_uid) == 0 ||
-		    secpolicy_vnode_remove(cr) == 0);
+		return (secpolicy_vnode_any_access(cr, ZTOV(zp),
+		    zp->z_uid) == 0);
 	}
 	return (B_TRUE);
 }
@@ -2379,8 +2372,9 @@ slow:
 }
 
 /*
- * Determine whether Access should be granted/denied, invoking least
- * priv subsytem when a deny is determined.
+ * Determine whether Access should be granted/denied.
+ * The least priv subsytem is always consulted as a basic privilege
+ * can define any form of access.
  */
 int
 zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
@@ -2391,6 +2385,7 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 	boolean_t 	check_privs;
 	znode_t		*xzp;
 	znode_t 	*check_zp = zp;
+	mode_t		needed_bits;
 
 	is_attr = ((zp->z_pflags & ZFS_XATTR) && (ZTOV(zp)->v_type == VDIR));
 
@@ -2427,11 +2422,35 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 		}
 	}
 
+	/*
+	 * Map the bits required to the standard vnode flags VREAD|VWRITE|VEXEC
+	 * in needed_bits.  Map the bits mapped by working_mode (currently
+	 * missing) in missing_bits.
+	 * Call secpolicy_vnode_access2() with (needed_bits & ~checkmode),
+	 * needed_bits.
+	 */
+	needed_bits = 0;
+
+	working_mode = mode;
+	if ((working_mode & (ACE_READ_ACL|ACE_READ_ATTRIBUTES)) &&
+	    zp->z_uid == crgetuid(cr))
+		working_mode &= ~(ACE_READ_ACL|ACE_READ_ATTRIBUTES);
+
+	if (working_mode & (ACE_READ_DATA|ACE_READ_NAMED_ATTRS|
+	    ACE_READ_ACL|ACE_READ_ATTRIBUTES|ACE_SYNCHRONIZE))
+		needed_bits |= VREAD;
+	if (working_mode & (ACE_WRITE_DATA|ACE_WRITE_NAMED_ATTRS|
+	    ACE_APPEND_DATA|ACE_WRITE_ATTRIBUTES|ACE_SYNCHRONIZE))
+		needed_bits |= VWRITE;
+	if (working_mode & ACE_EXECUTE)
+		needed_bits |= VEXEC;
+
 	if ((error = zfs_zaccess_common(check_zp, mode, &working_mode,
 	    &check_privs, skipaclchk, cr)) == 0) {
 		if (is_attr)
 			VN_RELE(ZTOV(xzp));
-		return (0);
+		return (secpolicy_vnode_access2(cr, ZTOV(zp), zp->z_uid,
+		    needed_bits, needed_bits));
 	}
 
 	if (error && !check_privs) {
@@ -2468,9 +2487,8 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 		if (working_mode & ACE_EXECUTE)
 			checkmode |= VEXEC;
 
-		if (checkmode)
-			error = secpolicy_vnode_access(cr, ZTOV(check_zp),
-			    zp->z_uid, checkmode);
+		error = secpolicy_vnode_access2(cr, ZTOV(check_zp), zp->z_uid,
+		    needed_bits & ~checkmode, needed_bits);
 
 		if (error == 0 && (working_mode & ACE_WRITE_OWNER))
 			error = secpolicy_vnode_chown(cr, zp->z_uid);
@@ -2493,7 +2511,11 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 				error = EACCES;
 			}
 		}
+	} else if (error == 0) {
+		error = secpolicy_vnode_access2(cr, ZTOV(zp), zp->z_uid,
+		    needed_bits, needed_bits);
 	}
+
 
 	if (is_attr)
 		VN_RELE(ZTOV(xzp));
@@ -2524,12 +2546,12 @@ zfs_zaccess_unix(znode_t *zp, mode_t mode, cred_t *cr)
 
 static int
 zfs_delete_final_check(znode_t *zp, znode_t *dzp,
-    mode_t missing_perms, cred_t *cr)
+    mode_t available_perms, cred_t *cr)
 {
 	int error;
 
-	error = secpolicy_vnode_access(cr, ZTOV(dzp),
-	    dzp->z_uid, missing_perms);
+	error = secpolicy_vnode_access2(cr, ZTOV(dzp),
+	    dzp->z_uid, available_perms, VWRITE|VEXEC);
 
 	if (error == 0)
 		error = zfs_sticky_remove_access(dzp, zp, cr);
@@ -2578,7 +2600,7 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 	uint32_t dzp_working_mode = 0;
 	uint32_t zp_working_mode = 0;
 	int dzp_error, zp_error;
-	mode_t missing_perms;
+	mode_t available_perms;
 	boolean_t dzpcheck_privs = B_TRUE;
 	boolean_t zpcheck_privs = B_TRUE;
 
@@ -2639,23 +2661,20 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 	 * only need to see if we have write/execute on directory.
 	 */
 
-	if ((dzp_error = zfs_zaccess_common(dzp, ACE_EXECUTE|ACE_WRITE_DATA,
-	    &dzp_working_mode, &dzpcheck_privs, B_FALSE, cr)) == 0)
-		return (zfs_sticky_remove_access(dzp, zp, cr));
+	dzp_error = zfs_zaccess_common(dzp, ACE_EXECUTE|ACE_WRITE_DATA,
+	    &dzp_working_mode, &dzpcheck_privs, B_FALSE, cr);
 
-	if (!dzpcheck_privs)
+	if (dzp_error != 0 && !dzpcheck_privs)
 		return (dzp_error);
 
 	/*
 	 * Fourth row
 	 */
 
-	missing_perms = (dzp_working_mode & ACE_WRITE_DATA) ? VWRITE : 0;
-	missing_perms |= (dzp_working_mode & ACE_EXECUTE) ? VEXEC : 0;
+	available_perms = (dzp_working_mode & ACE_WRITE_DATA) ? 0 : VWRITE;
+	available_perms |= (dzp_working_mode & ACE_EXECUTE) ? 0 : VEXEC;
 
-	ASSERT(missing_perms);
-
-	return (zfs_delete_final_check(zp, dzp, missing_perms, cr));
+	return (zfs_delete_final_check(zp, dzp, available_perms, cr));
 
 }
 

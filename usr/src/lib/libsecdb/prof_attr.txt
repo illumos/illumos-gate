@@ -44,6 +44,7 @@ Extended Accounting Task Management:::Manage the Task Extended Accounting servic
 Extended Accounting Net Management:::Manage the Net Extended Accounting service:auths=solaris.smf.manage.extended-accounting.net,solaris.smf.value.extended-accounting.net;profiles=acctadm;help=RtExActtNet.html
 File System Management:::Manage, mount, share file systems:profiles=SMB Management,VSCAN Management,SMBFS Management;auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
 File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
+Forced Privilege:::Commands with forced privileges associated with them:help=RtReservedProfile.html
 HAL Management:::Manage HAL SMF service:auths=solaris.smf.manage.hal;help=RtHALMngmnt.html
 Hotplug Management:::Manage Hotplug Connections:auths=solaris.smf.manage.hotplug,solaris.hotplug.*;help=RtHotplugMgmt.html
 Idmap Name Mapping Management:::Manage Name-based Mapping Rules of Identity Mapping Service:auths=solaris.admin.idmap.rules;help=RtIdmapNameRulesMngmnt.html
@@ -78,6 +79,7 @@ Rmvolmgr Management:::Manage Removable Volume Manager SMF service:auths=solaris.
 Service Management:::Manage services:auths=solaris.smf.manage,solaris.smf.modify
 Service Operator:::Administer services:auths=solaris.smf.manage,solaris.smf.modify.framework
 Software Installation:::Add application software to the system:help=RtSoftwareInstall.html
+Stop:::Last Profile evaluated, default profiles are not considered:help=RtReservedProfile.html
 System Administrator:::Can perform most non-security administrative tasks:profiles=Audit Review,Printer Management,Cron Management,Device Management,File System Management,Mail Management,Maintenance and Repair,Media Backup,Media Restore,Name Service Management,Network Management,Object Access Management,Process Management,Software Installation,User Management,Project Management,All;help=RtSysAdmin.html
 System Event Management:::Manage system events and system event channels:help=RtSysEvMngmnt.html
 User Management:::Manage users, groups, home directory:auths=solaris.profmgr.read;help=RtUserMngmnt.html

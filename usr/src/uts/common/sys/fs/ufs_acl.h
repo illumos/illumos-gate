@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_FS_UFS_ACL_H
 #define	_SYS_FS_UFS_ACL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cred.h>
@@ -162,8 +159,8 @@ typedef struct ufs_fsd {
 #define	ACL_CHECK	0x01
 #define	DEF_ACL_CHECK	0x02
 
-#define	MODE_CHECK(O, M, PERM, C, I) ((((M) & (PERM)) == (M)) ? 0 : \
-			secpolicy_vnode_access(C, ITOV(I), O, (M) & ~(PERM)))
+#define	MODE_CHECK(O, M, PERM, C, I) \
+    secpolicy_vnode_access2(C, ITOV(I), O, (PERM), M)
 
 /*
  * Check that the file type is one that accepts ACLs

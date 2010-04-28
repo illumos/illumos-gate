@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Directory operations for High Sierra filesystem
@@ -157,10 +154,8 @@ hs_access(struct vnode *vp, mode_t m, struct cred *cred)
 		if (!groupmember((uid_t)hp->hs_dirent.gid, cred))
 			shift += 3;
 	}
-	m &= ~(hp->hs_dirent.mode << shift);
-	if (m != 0)
-		return (secpolicy_vnode_access(cred, vp, hp->hs_dirent.uid, m));
-	return (0);
+	return (secpolicy_vnode_access2(cred, vp, hp->hs_dirent.uid,
+	    hp->hs_dirent.mode << shift, m));
 }
 
 #if ((HS_HASHSIZE & (HS_HASHSIZE - 1)) == 0)

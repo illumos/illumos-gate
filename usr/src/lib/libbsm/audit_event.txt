@@ -1,6 +1,5 @@
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # CDDL HEADER START
@@ -183,6 +182,7 @@
 113:AUE_SYSTEMBOOT:system booted:na
 114:AUE_ASYNC_DAEMON_EXIT:async_daemon(2) exited:no
 115:AUE_NFSSVC_EXIT:nfssvc(2) exited:no
+116:AUE_PFEXEC:execve(2) with pfexec enabled:ps,ex,ua,as
 130:AUE_GETAUID:getauid(2):aa
 131:AUE_SETAUID:setauid(2):aa
 132:AUE_GETAUDIT:getaudit(2):aa

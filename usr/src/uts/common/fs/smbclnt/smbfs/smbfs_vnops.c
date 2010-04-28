@@ -33,8 +33,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -1211,9 +1210,6 @@ smbfs_access_rwx(vfs_t *vfsp, int vtype, int mode, cred_t *cr)
 		if (!groupmember(va.va_gid, cr))
 			shift += 3;
 	}
-	mode &= ~(va.va_mode << shift);
-	if (mode == 0)
-		return (0);
 
 	/*
 	 * We need a vnode for secpolicy_vnode_access,
@@ -1223,7 +1219,9 @@ smbfs_access_rwx(vfs_t *vfsp, int vtype, int mode, cred_t *cr)
 	tvp = (va.va_type == VDIR) ?
 	    (vnode_t *)&tmpl_vdir :
 	    (vnode_t *)&tmpl_vreg;
-	return (secpolicy_vnode_access(cr, tvp, va.va_uid, mode));
+
+	return (secpolicy_vnode_access2(cr, tvp, va.va_uid,
+	    va.va_mode << shift, mode));
 }
 
 /*

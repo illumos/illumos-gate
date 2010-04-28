@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -47,6 +46,7 @@
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <libproc.h>
+#include <priv.h>
 #include "ramdata.h"
 #include "proto.h"
 #include "htbl.h"
@@ -603,7 +603,7 @@ main(int argc, char *argv[])
 	if (created) {
 		per_proc_init();
 		procadd(created, NULL);
-		show_cred(pri, TRUE);
+		show_cred(pri, TRUE, FALSE);
 	} else {		/* grab the specified processes */
 		int gotone = FALSE;
 
@@ -1127,6 +1127,7 @@ worker_thread(void *arg)
 					exit_called = TRUE;
 				break;
 			case SYS_execve:
+				show_cred(pri, FALSE, TRUE);
 				(void) sysentry(pri, dotrace);
 				if (dotrace && !cflag &&
 				    prismember(&trace, what)) {
@@ -2307,18 +2308,31 @@ fetchstring(private_t *pri, long addr, int maxleng)
 	return (pri->str_buffer);
 }
 
+static priv_set_t *
+getset(prpriv_t *p, priv_ptype_t set)
+{
+	return ((priv_set_t *)
+	    &p->pr_sets[priv_getsetbyname(set) * p->pr_setsize]);
+}
+
 void
-show_cred(private_t *pri, int new)
+show_cred(private_t *pri, int new, int loadonly)
 {
 	prcred_t cred;
+	prpriv_t *privs;
 
 	if (proc_get_cred(Pstatus(Proc)->pr_pid, &cred, 0) < 0) {
-		perror("show_cred()");
+		perror("show_cred() - credential");
 		(void) printf("%s\t*** Cannot get credentials\n", pri->pname);
 		return;
 	}
+	if ((privs = proc_get_priv(Pstatus(Proc)->pr_pid)) == NULL) {
+		perror("show_cred() - privileges");
+		(void) printf("%s\t*** Cannot get privileges\n", pri->pname);
+		return;
+	}
 
-	if (!cflag && prismember(&trace, SYS_execve)) {
+	if (!loadonly && !cflag && prismember(&trace, SYS_execve)) {
 		if (new)
 			credentials = cred;
 		if ((new && cred.pr_ruid != cred.pr_suid) ||
@@ -2339,9 +2353,29 @@ show_cred(private_t *pri, int new)
 			    (int)cred.pr_rgid,
 			    (int)cred.pr_egid,
 			    (int)cred.pr_sgid);
+		if (privdata != NULL && cred.pr_euid != 0) {
+			priv_set_t *npset = getset(privs, PRIV_PERMITTED);
+			priv_set_t *opset = getset(privdata, PRIV_PERMITTED);
+			char *s, *t;
+			if (!priv_issubset(npset, opset)) {
+				/* Use the to be freed privdata as scratch */
+				priv_inverse(opset);
+				priv_intersect(npset, opset);
+				s = priv_set_to_str(opset, ',', PRIV_STR_SHORT);
+				t = priv_set_to_str(npset, ',', PRIV_STR_SHORT);
+				(void) printf("%s    *** FPRIV: P/E: %s ***\n",
+				    pri->pname,
+				    strlen(s) > strlen(t) ? t : s);
+				free(s);
+				free(t);
+			}
+		}
 	}
 
+	if (privdata != NULL)
+		free(privdata);
 	credentials = cred;
+	privdata = privs;
 }
 
 /*
@@ -2479,7 +2513,7 @@ grabit(private_t *pri, proc_set_t *set)
 	else
 		(void) Punsetflags(Proc, PR_FORK);
 	procadd(set->pid, set->lwps);
-	show_cred(pri, TRUE);
+	show_cred(pri, TRUE, FALSE);
 	return (TRUE);
 }
 

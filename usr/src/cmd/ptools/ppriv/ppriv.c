@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Program to examine or set process privileges.
  */
@@ -60,6 +59,7 @@ static boolean_t	Don = B_FALSE;
 static boolean_t	Doff = B_FALSE;
 static boolean_t	list = B_FALSE;
 static boolean_t	mac_aware = B_FALSE;
+static boolean_t	pfexec = B_FALSE;
 static boolean_t	xpol = B_FALSE;
 static int		mode = PRIV_STR_PORT;
 
@@ -78,7 +78,7 @@ main(int argc, char **argv)
 	else
 		command = argv[0];
 
-	while ((opt = getopt(argc, argv, "lDMNevs:xS")) != EOF) {
+	while ((opt = getopt(argc, argv, "lDMNPevs:xS")) != EOF) {
 		switch (opt) {
 		case 'l':
 			list = B_TRUE;
@@ -93,6 +93,10 @@ main(int argc, char **argv)
 		case 'N':
 			set = B_TRUE;
 			Doff = B_TRUE;
+			break;
+		case 'P':
+			set = B_TRUE;
+			pfexec = B_TRUE;
 			break;
 		case 'e':
 			exec = B_TRUE;
@@ -493,7 +497,7 @@ privupdate(prpriv_t *pr, const char *arg)
 		}
 	}
 
-	if (Doff || Don || xpol) {
+	if (Doff || Don || pfexec || xpol) {
 		priv_info_uint_t *pii;
 		int sz = PRIV_PRPRIV_SIZE(pr);
 		char *x = (char *)pr + PRIV_PRPRIV_INFO_OFFSET(pr);
@@ -530,6 +534,8 @@ done:
 			fl |= PRIV_DEBUG;
 		if (Doff)
 			fl &= ~PRIV_DEBUG;
+		if (pfexec)
+			fl |= PRIV_PFEXEC;
 		if (xpol)
 			fl |= PRIV_XPOLICY;
 
@@ -551,6 +557,10 @@ privupdate_self(void)
 			fatal("setpflags(NET_MAC_AWARE)");
 		if (setpflags(NET_MAC_AWARE_INHERIT, 1) != 0)
 			fatal("setpflags(NET_MAC_AWARE_INHERIT)");
+	}
+	if (pfexec) {
+		if (setpflags(PRIV_PFEXEC, 1) != 0)
+			fatal("setpflags(PRIV_PFEXEC)");
 	}
 
 	if (sets != NULL) {
@@ -592,6 +602,8 @@ privupdate_self(void)
 		(void) setpflags(PRIV_DEBUG, Don ? 1 : 0);
 	if (xpol)
 		(void) setpflags(PRIV_XPOLICY, 1);
+	if (pfexec)
+		(void) setpflags(PRIV_PFEXEC, 1);
 }
 
 static int
@@ -649,6 +661,7 @@ static struct {
 	{ PRIV_AWARE_INHERIT, "PRIV_AWARE_INHERIT" },
 	{ PRIV_AWARE_RESET, "PRIV_AWARE_RESET" },
 	{ PRIV_XPOLICY, "PRIV_XPOLICY" },
+	{ PRIV_PFEXEC, "PRIV_PFEXEC" },
 	{ NET_MAC_AWARE, "NET_MAC_AWARE" },
 	{ NET_MAC_AWARE_INHERIT, "NET_MAC_AWARE_INHERIT" },
 };

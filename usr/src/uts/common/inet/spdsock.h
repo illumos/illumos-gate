@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_INET_SPDSOCK_H
@@ -49,7 +48,6 @@ struct spd_stack {
 	 */
 	struct spd_ext		*spds_extv_algs[SPD_EXT_MAX + 1];
 	mblk_t			*spds_mp_algs;
-	boolean_t		spds_algs_pending;
 	struct ipsec_alginfo
 			*spds_algs[IPSEC_NALGTYPES][IPSEC_MAX_ALGS];
 	int		spds_algs_exec_mode[IPSEC_NALGTYPES];

@@ -20,15 +20,14 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 SHELL=/usr/bin/ksh93
 
 PROG= ksh
 
-USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93 pfksh pfksh93 pfrksh pfrksh93
+USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93
 
 OBJECTS= \
 	pmain.o

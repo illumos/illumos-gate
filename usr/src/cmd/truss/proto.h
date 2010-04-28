@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -110,7 +109,7 @@ extern	int	fdlist(char *, fileset_t *);
 extern	int	liblist(char *, int);
 
 extern	char 	*fetchstring(private_t *, long, int);
-extern	void	show_cred(private_t *, int);
+extern	void	show_cred(private_t *, int, int);
 extern	void	errmsg(const char *, const char *);
 extern	void	abend(const char *, const char *);
 

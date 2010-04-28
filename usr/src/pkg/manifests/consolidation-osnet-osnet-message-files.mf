@@ -269,6 +269,7 @@ file path=usr/lib/help/profiles/locale/RtPriAdmin.html
 file path=usr/lib/help/profiles/locale/RtPrntAdmin.html
 file path=usr/lib/help/profiles/locale/RtProcManagement.html
 file path=usr/lib/help/profiles/locale/RtReparseMngmnt.html
+file path=usr/lib/help/profiles/locale/RtReservedProfile.html
 file path=usr/lib/help/profiles/locale/RtRightsDelegate.html
 file path=usr/lib/help/profiles/locale/RtSMBFSMngmnt.html
 file path=usr/lib/help/profiles/locale/RtSMBMngmnt.html

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -227,6 +226,7 @@
 #include <sys/vmparam.h>
 #include <sys/corectl.h>
 #include <sys/ipc_impl.h>
+#include <sys/klpd.h>
 
 #include <sys/door.h>
 #include <sys/cpuvar.h>
@@ -2043,6 +2043,8 @@ zone_free(zone_t *zone)
 		kmem_free(zone->zone_bootargs, strlen(zone->zone_bootargs) + 1);
 	if (zone->zone_initname != NULL)
 		kmem_free(zone->zone_initname, strlen(zone->zone_initname) + 1);
+	if (zone->zone_pfexecd != NULL)
+		klpd_freelist(&zone->zone_pfexecd);
 	id_free(zoneid_space, zone->zone_id);
 	mutex_destroy(&zone->zone_lock);
 	cv_destroy(&zone->zone_cv);
@@ -4478,6 +4480,12 @@ zone_destroy(zoneid_t zoneid)
 
 	/* Get rid of the zone's kstats */
 	zone_kstat_delete(zone);
+
+	/* remove the pfexecd doors */
+	if (zone->zone_pfexecd != NULL) {
+		klpd_freelist(&zone->zone_pfexecd);
+		zone->zone_pfexecd = NULL;
+	}
 
 	/* free brand specific data */
 	if (ZONE_IS_BRANDED(zone))

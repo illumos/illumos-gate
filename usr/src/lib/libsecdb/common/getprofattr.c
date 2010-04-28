@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -121,6 +118,9 @@ profstr2attr(profstr_t *prof)
 }
 
 
+extern int _enum_common_p(const char *, int (*)(const char *, kva_t *, void *,
+    void *), void *, void *, boolean_t, int *, char *[MAXPROFS]);
+
 /*
  * Given a profile name, gets the list of profiles found from
  * the whole hierarchy, using the given profile as root
@@ -128,44 +128,12 @@ profstr2attr(profstr_t *prof)
 void
 getproflist(const char *profileName, char **profArray, int *profcnt)
 {
-	profattr_t	*profattr;
-	char		*subprofiles, *lasts, *profname;
-	int		i;
-
-	/* Check if this is a duplicate */
-	for (i = 0; i < *profcnt; i++) {
-		if (strcmp(profileName, profArray[i]) == 0) {
-			/* It's a duplicate, don't need to do anything */
-			return;
-		}
-	}
-
-	profArray[*profcnt] = strdup(profileName);
-	*profcnt = *profcnt + 1;
-
-	profattr = getprofnam(profileName);
-	if (profattr == NULL) {
+	/* There can't be a "," in a profile name. */
+	if (strchr(profileName, KV_SEPCHAR) != NULL)
 		return;
-	}
 
-	if (profattr->attr == NULL) {
-		free_profattr(profattr);
-		return;
-	}
-
-	subprofiles = kva_match(profattr->attr, PROFATTR_PROFS_KW);
-	if (subprofiles == NULL) {
-		free_profattr(profattr);
-		return;
-	}
-
-	/* get execattr from each subprofiles */
-	for (profname = (char *)strtok_r(subprofiles, ",", &lasts);
-	    profname != NULL;
-	    profname = (char *)strtok_r(NULL, ",", &lasts)) {
-			getproflist(profname, profArray, profcnt);
-	}
-	free_profattr(profattr);
+	(void) _enum_common_p(profileName, NULL, NULL, NULL, B_FALSE,
+	    profcnt, profArray);
 }
 
 void

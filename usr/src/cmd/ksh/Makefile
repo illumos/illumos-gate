@@ -20,16 +20,14 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 SHELL=/usr/bin/ksh93
 
 PROG= ksh
 
-USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93 pfksh pfksh93 pfrksh pfrksh93
-
+USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93
 
 include ../Makefile.cmd
 
@@ -82,10 +80,6 @@ install:	$(ISAEXEC) $(SUBDIRS)
 	$(SYMLINK) ../usr/bin/ksh93 $(ROOTSBIN)/jsh
 	$(RM) $(ROOTBIN)/jsh
 	$(SYMLINK) ksh93 $(ROOTBIN)/jsh
-	$(RM) $(ROOTSBIN)/pfsh
-	$(SYMLINK) ../usr/bin/ksh93 $(ROOTSBIN)/pfsh
-	$(RM) $(ROOTBIN)/pfsh
-	$(SYMLINK) ksh93 $(ROOTBIN)/pfsh
 	$(RM) $(ROOTBIN)/sh
 	$(SYMLINK) $(ARCH32)/ksh93 $(ROOTBIN)/sh
 	$(RM) $(ROOTLIB)/rsh

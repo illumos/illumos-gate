@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _BSM_AUDIT_KERNEL_H
@@ -408,6 +407,15 @@ au_buff_t *au_get_buff(void), *au_free_buff(au_buff_t *);
 
 #define	AUDIT_SETSUBJ(u, c, a, k)      		\
 	AUDIT_SETSUBJ_GENERIC(u, c, a, k, curproc->p_pid)
+
+#define	AUDIT_SETPROC_GENERIC(u, c, a, p)		\
+	(au_write((u), au_to_process(crgetuid(c),	\
+	    crgetgid(c), crgetruid(c), crgetrgid(c),	\
+	    p, (a)->ai_auid, (a)->ai_asid,		\
+	    &((a)->ai_termid))));
+
+#define	AUDIT_SETPROC(u, c, a)      		\
+	AUDIT_SETPROC_GENERIC(u, c, a, curproc->p_pid)
 
 /*
  * Macros for type conversion

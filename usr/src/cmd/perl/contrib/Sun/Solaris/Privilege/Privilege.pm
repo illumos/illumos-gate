@@ -19,8 +19,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -33,14 +32,15 @@ use warnings;
 
 package Sun::Solaris::Privilege;
 
-our $VERSION = '1.3';
+our $VERSION = '1.4';
 
 use XSLoader;
 XSLoader::load(__PACKAGE__, $VERSION);
 
 our (@EXPORT_OK, %EXPORT_TAGS);
 my @constants = qw(PRIV_STR_SHORT PRIV_STR_LIT PRIV_STR_PORT PRIV_ON PRIV_OFF
-	PRIV_SET PRIV_AWARE PRIV_AWARE_RESET PRIV_DEBUG);
+	PRIV_SET PRIV_AWARE PRIV_AWARE_RESET PRIV_DEBUG PRIV_PFEXEC
+	PRIV_XPOLICY NET_MAC_AWARE NET_MAC_AWARE_INHERIT __PROC_PROTECT);
 my @syscalls = qw(setppriv getppriv setpflags getpflags);
 my @libcalls = qw(priv_addset priv_copyset priv_delset
     priv_emptyset priv_fillset priv_intersect priv_inverse priv_ineffect

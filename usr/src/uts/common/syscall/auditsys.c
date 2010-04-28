@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -106,7 +105,7 @@ getauid(caddr_t auid_p)
 {
 	const auditinfo_addr_t	*ainfo;
 
-	if (secpolicy_audit_getattr(CRED()) != 0)
+	if (secpolicy_audit_getattr(CRED(), B_FALSE) != 0)
 		return (EPERM);
 
 	ainfo = crgetauinfo(CRED());
@@ -171,7 +170,7 @@ getaudit(caddr_t info_p)
 	const auditinfo_addr_t	*ainfo;
 	model_t	model;
 
-	if (secpolicy_audit_getattr(CRED()) != 0)
+	if (secpolicy_audit_getattr(CRED(), B_FALSE) != 0)
 		return (EPERM);
 
 	model = get_udatamodel();
@@ -220,7 +219,7 @@ getaudit_addr(caddr_t info_p, int len)
 	const auditinfo_addr_t	*ainfo;
 	model_t	model;
 
-	if (secpolicy_audit_getattr(CRED()) != 0)
+	if (secpolicy_audit_getattr(CRED(), B_FALSE) != 0)
 		return (EPERM);
 
 	model = get_udatamodel();
@@ -1344,7 +1343,7 @@ auditctl(
 	case A_GETPOLICY:
 	case A_GETQCTRL:
 	case A_GETSTAT:
-		if (secpolicy_audit_getattr(CRED()) != 0)
+		if (secpolicy_audit_getattr(CRED(), B_FALSE) != 0)
 			return (EPERM);
 		break;
 	default:

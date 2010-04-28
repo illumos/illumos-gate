@@ -22,8 +22,7 @@
 /*
  * newfs: friendly front end to mkfs
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -622,7 +621,7 @@ main(int argc, char *argv[])
 	 * If alternates-per-cylinder is ever implemented:
 	 * need to get apc from dp->d_apc if no -a switch???
 	 */
-	(void) snprintf(cmd, sizeof (cmd), "pfexec mkfs -F ufs "
+	(void) snprintf(cmd, sizeof (cmd), "mkfs -F ufs "
 	    "%s%s%s%s %lld %d %d %d %d %d %d %d %d %s %d %d %d %d %s",
 	    Nflag ? "-o N " : "", binary_sb ? "-o calcbinsb " : "",
 	    text_sb ? "-o calcsb " : "", special,

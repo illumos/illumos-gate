@@ -75,21 +75,17 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 }
 
 /*
- * Obtain a privilege set "keyname" from userattr; if none is present,
- * fall back to the default, "defname".
+ * Set the privilege set.  The attributes are enumerated by _enum_attrs,
+ * including the attribues user_attr, prof_attr and policy.conf
  */
 static int
-getset(char *keyname, char *defname, userattr_t *ua, priv_set_t **res,
-    void *defp)
+getset(char *str, priv_set_t **res)
 {
-	char *str;
 	priv_set_t *tmp;
 	char *badp;
 	int len;
 
-	if ((ua == NULL || ua->attr == NULL ||
-	    (str = kva_match(ua->attr, keyname)) == NULL) &&
-	    (defp == NULL || (str = defread_r(defname, defp)) == NULL))
+	if (str == NULL)
 		return (0);
 
 	len = strlen(str) + 1;
@@ -129,6 +125,31 @@ getset(char *keyname, char *defname, userattr_t *ua, priv_set_t **res,
 	return (0);
 }
 
+typedef struct deflim {
+	char *def;
+	char *lim;
+} deflim_t;
+
+/*ARGSUSED*/
+static int
+finddeflim(const char *name, kva_t *kva, void *ctxt, void *pres)
+{
+	deflim_t *pdef = pres;
+	char *val;
+
+	if (pdef->def == NULL) {
+		val = kva_match(kva, USERATTR_DFLTPRIV_KW);
+		if (val != NULL)
+			pdef->def = strdup(val);
+	}
+	if (pdef->lim == NULL) {
+		val = kva_match(kva, USERATTR_LIMPRIV_KW);
+		if (val != NULL)
+			pdef->lim = strdup(val);
+	}
+	return (pdef->lim != NULL && pdef->def != NULL);
+}
+
 /*
  *	unix_cred - pam_sm_setcred
  *
@@ -162,7 +183,6 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	au_id_t	auid;
 	adt_session_data_t *ah;
 	adt_termid_t	*termid = NULL;
-	userattr_t	*ua;
 	priv_set_t	*lim, *def, *tset;
 	char		messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 	char		buf[PROJECT_BUFSZ];
@@ -172,7 +192,7 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	char		*kvs;
 	struct passwd	pwd;
 	char		pwbuf[NSS_BUFLEN_PASSWD];
-	void		*defp;
+	deflim_t	deflim;
 
 	for (i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "debug") == 0)
@@ -555,20 +575,23 @@ adt_done:
 		return (PAM_SYSTEM_ERR);
 	}
 
-	ua = getusernam(user);
-
-	defp = defopen_r(AUTH_POLICY);
-
 	tset = def = lim = NULL;
+	deflim.def = deflim.lim = NULL;
 
-	if (getset(USERATTR_LIMPRIV_KW, DEF_LIMITPRIV, ua, &lim, defp) != 0 ||
-	    getset(USERATTR_DFLTPRIV_KW, DEF_DFLTPRIV, ua, &def, defp) != 0) {
+	(void) _enum_attrs(user, finddeflim, NULL, &deflim);
+
+	if (getset(deflim.lim, &lim) != 0 || getset(deflim.def, &def) != 0) {
 		ret = PAM_SYSTEM_ERR;
 		goto out;
 	}
 
 	if (def == NULL) {
-		def = priv_str_to_set("basic", ",", NULL);
+		def = priv_allocset();
+		if (def == NULL) {
+			ret = PAM_SYSTEM_ERR;
+			goto out;
+		}
+		priv_basicset(def);
 		errno = 0;
 		if ((pathconf("/", _PC_CHOWN_RESTRICTED) == -1) && (errno == 0))
 			(void) priv_addset(def, PRIV_FILE_CHOWN_SELF);
@@ -627,13 +650,16 @@ adt_done:
 	 * when the uids are set to their final values.
 	 */
 	(void) setpflags(PRIV_AWARE, 0);
+	/*
+	 * Remove PRIV_PFEXEC; stop running as if we are under a profile
+	 * shell.  A user with a profile shell will set PRIV_PFEXEC.
+	 */
+	(void) setpflags(PRIV_PFEXEC, 0);
 
 out:
-	if (defp != NULL)
-		defclose_r(defp);
+	free(deflim.lim);
+	free(deflim.def);
 
-	if (ua != NULL)
-		free_userattr(ua);
 	if (lim != NULL)
 		priv_freeset(lim);
 	if (def != NULL)

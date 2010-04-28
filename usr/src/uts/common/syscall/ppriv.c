@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -253,7 +252,7 @@ setpflags(uint_t flag, uint_t val, cred_t *tcr)
 	if (val > 1 || (flag != PRIV_DEBUG && flag != PRIV_AWARE &&
 	    flag != NET_MAC_AWARE && flag != NET_MAC_AWARE_INHERIT &&
 	    flag != __PROC_PROTECT && flag != PRIV_XPOLICY &&
-	    flag != PRIV_AWARE_RESET)) {
+	    flag != PRIV_AWARE_RESET && flag != PRIV_PFEXEC)) {
 		return (EINVAL);
 	}
 
@@ -360,7 +359,8 @@ getpflags(uint_t flag, const cred_t *cr)
 {
 	if (flag != PRIV_DEBUG && flag != PRIV_AWARE &&
 	    flag != NET_MAC_AWARE && flag != NET_MAC_AWARE_INHERIT &&
-	    flag != PRIV_XPOLICY && flag != PRIV_AWARE_RESET)
+	    flag != PRIV_XPOLICY && flag != PRIV_PFEXEC &&
+	    flag != PRIV_AWARE_RESET)
 		return ((uint_t)-1);
 
 	return ((CR_FLAGS(cr) & flag) != 0);
@@ -402,6 +402,10 @@ privsys(int code, priv_op_t op, priv_ptype_t type, void *buf, size_t bufsize,
 		    buf));
 	case PRIVSYS_KLPD_UNREG:
 		return ((int)klpd_unreg((int)op, (idtype_t)itype, (id_t)type));
+	case PRIVSYS_PFEXEC_REG:
+		return ((int)pfexec_reg((int)op));
+	case PRIVSYS_PFEXEC_UNREG:
+		return ((int)pfexec_unreg((int)op));
 	}
 	return (set_errno(EINVAL));
 }

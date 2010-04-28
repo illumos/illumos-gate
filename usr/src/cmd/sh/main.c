@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
@@ -40,7 +38,6 @@
 #include	<sys/stat.h>
 #include	<sys/wait.h>
 #include	"dup.h"
-#include	"sh_policy.h"
 
 #ifdef RES
 #include	<sgtty.h>
@@ -139,15 +136,6 @@ main(int c, char *v[], char *e[])
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-
-	/*
-	 * This is a profile shell if the simple name of argv[0] is
-	 * pfsh or -pfsh
-	 */
-	if (c > 0 && (eq("pfsh", simple(*v)) || eq("-pfsh", simple(*v)))) {
-		flags |= pfshflg;
-		secpolicy_init();
-	}
 
 	/*
 	 * 'rsflag' is zero if SHELL variable is
@@ -598,25 +586,5 @@ setmode(int prof)
 	{
 		flags |= prof;
 		flags &= ~prompt;
-	}
-}
-
-/*
- * A generic call back routine to output error messages from the
- * policy backing functions called by pfsh.
- *
- * msg must contain '\n' if a new line is to be printed.
- */
-void
-secpolicy_print(int level, const char *msg)
-{
-	switch (level) {
-	case SECPOLICY_WARN:
-	default:
-		prs(_gettext(msg));
-		return;
-	case SECPOLICY_ERROR:
-		error(msg);
-		break;
 	}
 }

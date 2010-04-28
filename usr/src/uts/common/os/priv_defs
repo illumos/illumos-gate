@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
 INSERT COMMENT
  */
@@ -136,6 +135,10 @@ privilege PRIV_FILE_OWNER
 	permission bits or ACL except for the set-uid and set-gid
 	bits.
 
+basic privilege PRIV_FILE_READ
+
+	Allows a process to read objects in the filesystem.
+
 privilege PRIV_FILE_SETID
 
 	Allows a process to change the ownership of a file or write to
@@ -156,6 +159,10 @@ privilege PRIV_FILE_UPGRADE_SL
 	sensitivity label.
 	This privilege is interpreted only if the system is configured
 	with Trusted Extensions.
+
+basic privilege PRIV_FILE_WRITE
+
+	Allows a process to modify objects in the filesystem.
 
 privilege PRIV_GRAPHICS_ACCESS
 

@@ -1963,13 +1963,9 @@ ud_iaccess(struct ud_inode *ip, int32_t mode, struct cred *cr, int dolock)
 		if (!groupmember((uid_t)ip->i_gid, cr))
 			shift += 5;
 	}
-	mode &= ~(ip->i_perm << shift);
 
-	if (mode == 0)
-		goto out;
-
-	ret = secpolicy_vnode_access(cr, ITOV(ip), ip->i_uid,
-	    UD2VA_PERM(mode));
+	ret = secpolicy_vnode_access2(cr, ITOV(ip), ip->i_uid,
+	    UD2VA_PERM(ip->i_perm << shift), UD2VA_PERM(mode));
 
 out:
 	if (dolock)

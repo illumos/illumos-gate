@@ -292,6 +292,7 @@ COMMON_SUBDIRS=		\
 	pcidr		\
 	pcitool		\
 	pfexec		\
+	pfexecd		\
 	pgrep		\
 	picl		\
 	plimit		\

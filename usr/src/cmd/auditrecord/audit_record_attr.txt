@@ -2,8 +2,7 @@
 # Two "#" are comments that are copied to audit_record_attr
 # other comments are removed.
 ##
-## Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-## Use is subject to license terms.
+## Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 ##
 ## CDDL HEADER START
 ##
@@ -704,6 +703,14 @@ label=AUE_EXECVE
 #	subject,tuser10,tuser10,other,root,other,5971,367,255 197121 tmach1
 #	return,failure: No such file or directory,-1
 #	trailer,86
+
+label=AUE_PFEXEC
+  format=path1:path2:[privileges]3:[privileges]3:[proc]4:exec_args:[exec_env]5
+    comment=pathname of the executable:
+    comment=pathname of working directory:
+    comment=privileges if the limit or inheritable set are changed:
+    comment=process if ruid, euid, rgid or egid is changed:
+    comment=output if arge policy is set
 
 label=AUE_EXIT
   format=arg1:[text]2

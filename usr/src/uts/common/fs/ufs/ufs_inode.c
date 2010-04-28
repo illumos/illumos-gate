@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1566,13 +1565,9 @@ ufs_iaccess(struct inode  *ip, int mode, struct cred *cr, int dolock)
 			shift += 3;
 	}
 
-	mode &= ~(ip->i_mode << shift);
-
-	if (mode == 0)
-		goto out;
-
 	/* test missing privilege bits */
-	ret = secpolicy_vnode_access(cr, ITOV(ip), ip->i_uid, mode);
+	ret = secpolicy_vnode_access2(cr, ITOV(ip), ip->i_uid,
+	    ip->i_mode << shift, mode);
 out:
 	if (dolock)
 		rw_exit(&ip->i_contents);

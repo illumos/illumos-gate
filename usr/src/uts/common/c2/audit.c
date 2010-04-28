@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -60,7 +59,7 @@
 #include <sys/disp.h>		/* for servicing_interrupt() */
 #include <sys/devpolicy.h>
 #include <sys/crypto/ioctladmin.h>
-#include <sys/cred.h>
+#include <sys/cred_impl.h>
 #include <inet/kssl/kssl.h>
 #include <net/pfpolicy.h>
 
@@ -1232,13 +1231,13 @@ audit_vncreate_finish(struct vnode *vp, int error)
  * QUESTION:
  */
 
-/*ARGSUSED*/
 void
 audit_exec(
 	const char *argstr,	/* argument strings */
 	const char *envstr,	/* environment strings */
 	ssize_t argc,		/* total # arguments */
-	ssize_t envc)		/* total # environment variables */
+	ssize_t envc,		/* total # environment variables */
+	cred_t *pfcred)		/* the additional privileges in a profile */
 {
 	t_audit_data_t *tad;
 	au_kcontext_t	*kctx = GET_KCTX_PZ;
@@ -1249,17 +1248,52 @@ audit_exec(
 	if (!tad->tad_flag)
 		return;
 
-	/* return if not interested in argv or environment variables */
-	if (!(kctx->auk_policy & (AUDIT_ARGV|AUDIT_ARGE)))
-		return;
+	if (pfcred != NULL) {
+		p_audit_data_t *pad;
+		cred_t *cr = CRED();
+		priv_set_t pset = CR_IPRIV(cr);
 
-	if (kctx->auk_policy & AUDIT_ARGV) {
+		pad = P2A(curproc);
+
+		/* It's a different event. */
+		tad->tad_event = AUE_PFEXEC;
+
+		/* Add the current working directory to the audit trail. */
+		if (pad->pad_cwd != NULL)
+			au_uwrite(au_to_path(pad->pad_cwd));
+
+		/*
+		 * The new credential is not yet in place when audit_exec
+		 * is called.
+		 * Compute the additional bits available in the new credential
+		 * and the limit set.
+		 */
+		priv_inverse(&pset);
+		priv_intersect(&CR_IPRIV(pfcred), &pset);
+		if (!priv_isemptyset(&pset) ||
+		    !priv_isequalset(&CR_LPRIV(pfcred), &CR_LPRIV(cr))) {
+			au_uwrite(au_to_privset(
+			    priv_getsetbynum(PRIV_INHERITABLE), &pset, AUT_PRIV,
+			    0));
+			au_uwrite(au_to_privset(priv_getsetbynum(PRIV_LIMIT),
+			    &CR_LPRIV(pfcred), AUT_PRIV, 0));
+		}
+		/*
+		 * Compare the uids & gids: create a process token if changed.
+		 */
+		if (crgetuid(cr) != crgetuid(pfcred) ||
+		    crgetruid(cr) != crgetruid(pfcred) ||
+		    crgetgid(cr) != crgetgid(pfcred) ||
+		    crgetrgid(cr) != crgetrgid(pfcred)) {
+			AUDIT_SETPROC(&(u_ad), cr, crgetauinfo(cr));
+		}
+	}
+
+	if (pfcred != NULL || (kctx->auk_policy & AUDIT_ARGV) != 0)
 		au_uwrite(au_to_exec_args(argstr, argc));
-	}
 
-	if (kctx->auk_policy & AUDIT_ARGE) {
+	if (kctx->auk_policy & AUDIT_ARGE)
 		au_uwrite(au_to_exec_env(envstr, envc));
-	}
 }
 
 /*

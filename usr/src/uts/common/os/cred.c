@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -348,6 +347,7 @@ crset(proc_t *p, cred_t *cr)
 void
 crhold(cred_t *cr)
 {
+	ASSERT(cr->cr_ref != 0xdeadbeef && cr->cr_ref != 0);
 	atomic_add_32(&cr->cr_ref, 1);
 }
 
@@ -358,6 +358,7 @@ crhold(cred_t *cr)
 void
 crfree(cred_t *cr)
 {
+	ASSERT(cr->cr_ref != 0xdeadbeef && cr->cr_ref != 0);
 	if (atomic_add_32_nv(&cr->cr_ref, -1) == 0) {
 		ASSERT(cr != kcred);
 		if (cr->cr_label)
@@ -901,7 +902,7 @@ cred2ucaud(const cred_t *cr, auditinfo64_addr_t *ainfo, const cred_t *rcr)
 	auditinfo_addr_t	*ai;
 	au_tid_addr_t	tid;
 
-	if (secpolicy_audit_getattr(rcr) != 0)
+	if (secpolicy_audit_getattr(rcr, B_TRUE) != 0)
 		return (-1);
 
 	ai = CR_AUINFO(cr);	/* caller makes sure this is non-NULL */

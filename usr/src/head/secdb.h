@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SECDB_H
@@ -49,6 +48,8 @@ extern "C" {
 #define	KV_WILDCARD		"*"
 #define	KV_WILDCHAR		'*'
 #define	KV_ACTION_WILDCARD	"*;*;*;*;*"
+#define	KV_SEPCHAR		','
+#define	KV_SEPSTR		","
 
 #define	KV_FLAG_NONE		0x0000
 #define	KV_FLAG_REQUIRED	0x0001
@@ -84,8 +85,12 @@ extern kva_t *_kva_dup(kva_t *);
 extern void _kva_free(kva_t *);
 extern kva_t *_new_kva(int size);
 extern kva_t *_str2kva(char *, char *, char *);
-extern int _get_user_defs(const char *, char **, char **);
-extern void _free_user_defs(char *, char *);
+extern int _enum_auths(const char *, int (*)(const char *, void *, void *),
+    void *ctxt, void *pres);
+extern int _enum_profs(const char *,
+    int (*)(const char *, kva_t *, void *, void *), void *ctxt, void *pres);
+extern int _enum_attrs(const char *,
+    int (*)(const char *, kva_t *, void *, void *), void *ctxt, void *pres);
 
 #ifdef	__cplusplus
 }

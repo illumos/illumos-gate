@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * UNIX shell
@@ -36,7 +33,6 @@
 #include	"defs.h"
 #include	<errno.h>
 #include	<fcntl.h>
-#include	"sh_policy.h"
 
 #define	ARGMK	01
 
@@ -202,7 +198,8 @@ catpath(unsigned char *path, unsigned char *name)
 		if (argp >= brkend)
 			growstak(argp);
 	}
-	while (*argp++ = *scanp++);
+	while (*argp++ = *scanp++)
+		;
 	return (path);
 }
 
@@ -253,7 +250,6 @@ execa(unsigned char *at[], short pos)
 static unsigned char *
 execs(unsigned char *ap, unsigned char *t[])
 {
-	int		pfstatus = NOATTRS;
 	unsigned char	*p, *prefix;
 	unsigned char	*savptr;
 
@@ -261,28 +257,8 @@ execs(unsigned char *ap, unsigned char *t[])
 	trim(p = curstak());
 	sigchk();
 
-	if (flags & pfshflg) {
-		/*
-		 * Need to save the stack information, or the
-		 * first memory allocation in secpolicy_profile_lookup()
-		 * will clobber it.
-		 */
-		savptr = endstak(p + strlen((const char *)p) + 1);
-
-		pfstatus = secpolicy_pfexec((const char *)p,
-		    (char **)t, (const char **)xecenv);
-
-		if (pfstatus != NOATTRS) {
-			errno = pfstatus;
-		}
-
-		tdystak(savptr);
-	}
-
-	if (pfstatus == NOATTRS) {
-		execve((const char *)p, (char *const *)&t[0],
-		    (char *const *)xecenv);
-	}
+	execve((const char *)p, (char *const *)&t[0],
+	    (char *const *)xecenv);
 
 	switch (errno) {
 	case ENOEXEC:		/* could be a shell script */
@@ -351,7 +327,7 @@ trim(unsigned char *at)
 		last = at;
 		while (c = *current) {
 			if ((len = mbtowc(&wc, (char *)current,
-					MB_LEN_MAX)) <= 0) {
+			    MB_LEN_MAX)) <= 0) {
 				*last++ = c;
 				current++;
 				continue;
@@ -369,7 +345,7 @@ trim(unsigned char *at)
 			current++;
 			if (c = *current) {
 				if ((len = mbtowc(&wc, (char *)current,
-						MB_LEN_MAX)) <= 0) {
+				    MB_LEN_MAX)) <= 0) {
 					*last++ = c;
 					current++;
 					continue;
@@ -676,7 +652,7 @@ doacct(void)
 		sabuf.ac_etime = compress(after - before);
 
 		if ((fd = open((char *)acctnod.namval,
-				O_WRONLY | O_APPEND | O_CREAT, 0666)) != -1) {
+		    O_WRONLY | O_APPEND | O_CREAT, 0666)) != -1) {
 			write(fd, &sabuf, sizeof (sabuf));
 			close(fd);
 		}

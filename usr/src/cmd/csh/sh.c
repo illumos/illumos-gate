@@ -1,6 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -12,8 +11,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <locale.h>
 #include "sh.h"
 /* #include <sys/ioctl.h> */
@@ -22,7 +19,6 @@
 #include "sh.tconst.h"
 #include <pwd.h>
 #include <stdlib.h>
-#include "sh_policy.h"		/* for pfcsh */
 #ifdef	TRACE
 #include <stdio.h>
 #endif
@@ -38,7 +34,8 @@
 
 tchar *pathlist[] =	{ S_usrbin /* "/usr/bin" */, S_DOT /* "." */, 0 };
 tchar *dumphist[] =	{ S_history /* "history" */, S_h /* "-h" */, 0, 0 };
-tchar *loadhist[] =	{ S_source /* "source" */, S_h /* "-h" */, S_NDOThistory /* "~/.history" */, 0 };
+tchar *loadhist[] =	{ S_source /* "source" */, S_h /* "-h" */,
+    S_NDOThistory /* "~/.history" */, 0 };
 tchar HIST = '!';
 tchar HISTSUB = '^';
 int	nofile;
@@ -76,7 +73,6 @@ void	initdesc(int, char *[]);
 void	initdesc_x(int, char *[], int);
 void	closem(void);
 void	unsetfd(int);
-void	secpolicy_print(int, const char *);
 void	phup(void);
 
 #ifdef	TRACE
@@ -119,15 +115,13 @@ tprintf(fmt, a, b, c, d, e, f, g, h, i, j)
 int
 main(int c, char **av)
 {
-	tchar **v, *cp, *p, *q, *r;
+	tchar **v, *cp, *r;
 	int f;
 	struct sigvec osv;
 	struct sigaction sa;
 	tchar s_prompt[MAXHOSTNAMELEN+3];
 	char *c_max_var_len;
 	int c_max_var_len_size;
-
-	pfcshflag = 0;
 
 	/*
 	 * set up the error exit, if there is an error before
@@ -152,29 +146,6 @@ main(int c, char **av)
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-
-	/*
-	 * This is a profile shell if the simple name of argv[0] is
-	 * pfcsh or -pfcsh
-	 */
-	p = strtots(NOSTR, "pfcsh");
-	r = strtots(NOSTR, "-pfcsh");
-	if ((p != NOSTR) && (r != NOSTR) &&
-	    ((q = strtots(NOSTR, *av)) != NOSTR)) {
-		if (c > 0 && (eq(p, simple(q)) || eq(r, simple(q)))) {
-			pfcshflag = 1;
-		}
-		xfree(q);
-	}
-
-	if (p != NOSTR)
-		xfree(p);
-	if (r != NOSTR)
-		xfree(r);
-
-	if (pfcshflag == 1) {
-		secpolicy_init();
-	}
 
 	/* Copy arguments */
 	v = strblktotsblk(av, c);
@@ -250,8 +221,7 @@ main(int c, char **av)
 		if (pw != NULL) {
 			set(S_user, strtots((tchar *)0, pw->pw_name));
 			local_setenv(S_USER, strtots((tchar *)0, pw->pw_name));
-		}
-		else if (loginsh) { /* Give up setting USER variable. */
+		} else if (loginsh) { /* Give up setting USER variable. */
 	printf("Warning: USER environment variable could not be set.\n");
 		}
 	}
@@ -428,7 +398,8 @@ main(int c, char **av)
 	 */
 	if (prompt) {
 		gethostname_(s_prompt, MAXHOSTNAMELEN);
-		strcat_(s_prompt, uid == 0 ? S_SHARPSP /* "# " */ : S_PERSENTSP /* "% " */);
+		strcat_(s_prompt,
+		    uid == 0 ? S_SHARPSP /* "# " */ : S_PERSENTSP /* "% " */);
 		set(S_prompt /* "prompt" */, s_prompt);
 	}
 
@@ -478,7 +449,8 @@ retry:
 			if (ioctl(f, TIOCGPGRP,  (char *)&tpgrp) == 0 &&
 			    tpgrp != -1) {
 				if (tpgrp != shpgrp) {
-					void (*old)() = (void (*)())signal(SIGTTIN, SIG_DFL);
+					void (*old)() = (void (*)())
+					    signal(SIGTTIN, SIG_DFL);
 					(void) kill(0, SIGTTIN);
 					(void) signal(SIGTTIN, old);
 					goto retry;
@@ -530,7 +502,8 @@ printf("Warning: no access to tty; thus no job control in this shell...\n");
 		}
 
 		/* Will have value("home") here because set fast if don't */
-		srccat(value(S_home /* "home" */), S_SLADOTcshrc /* "/.cshrc" */);
+		srccat(value(S_home /* "home" */),
+		    S_SLADOTcshrc /* "/.cshrc" */);
 
 		/* Hash path */
 		if (!fast && !arginp && !onelflg && !havhash)
@@ -543,7 +516,8 @@ printf("Warning: no access to tty; thus no job control in this shell...\n");
 		 */
 		dosource(loadhist);
 		if (loginsh) {
-			srccat_inlogin(value(S_home /* "home" */), S_SLADOTlogin /* "/.login" */);
+			srccat_inlogin(value(S_home /* "home" */),
+			    S_SLADOTlogin /* "/.login" */);
 		}
 
 		/*
@@ -726,7 +700,7 @@ srcunit(int unit, bool onlyown, bool hflg)
 	reenter++;
 	if (reenter == 1) {
 		/* Setup the new values of the state stuff saved above */
-		copy((char *)&saveB, (char *)&B, sizeof saveB);
+		copy((char *)&saveB, (char *)&B, sizeof (saveB));
 		fbuf =  (tchar **) 0;
 		fseekp = feobp = fblocks = 0;
 		oSHIN = SHIN, SHIN = unit, arginp = 0, onelflg = 0;
@@ -758,7 +732,7 @@ srcunit(int unit, bool onlyown, bool hflg)
 		xfree((char *)fbuf);
 
 		/* Reset input arena */
-		copy((char *)&B, (char *)&saveB, sizeof B);
+		copy((char *)&B, (char *)&saveB, sizeof (B));
 
 		(void) close(SHIN), SHIN = oSHIN;
 		unsetfd(SHIN);
@@ -819,7 +793,8 @@ goodbye(void)
 		(void) signal(SIGTERM, SIG_IGN);
 		setintr = 0;		/* No interrupts after "logout" */
 		if (adrof(S_home /* "home" */))
-			srccat(value(S_home /* "home" */), S_SLADOTlogout /* "/.logout" */);
+			srccat(value(S_home /* "home" */),
+			    S_SLADOTlogout /* "/.logout" */);
 	}
 	rechist();
 	exitstat();
@@ -1215,7 +1190,7 @@ tchar **
 strblktotsblk(char **v, int num)
 {
 	tchar **newv =
-		(tchar **)xcalloc((unsigned)(num+ 1), sizeof (tchar **));
+	    (tchar **)xcalloc((unsigned)(num+ 1), sizeof (tchar **));
 	tchar **onewv = newv;
 
 	while (*v && num--)
@@ -1332,15 +1307,15 @@ initdesc_x(int argc, char *argv[], int is_reinit)
 	 * in the form /dev/fd/X.
 	 */
 	if (argc >= 3)
-	    if (sscanf(argv[2], "/dev/fd/%d", &script_fd) != 1)
-		script_fd = -1;
-	    else
-		fcntl(script_fd, F_SETFD, 1);	/* Make sure to close
-						 *  this file on exec.
-						 */
+		if (sscanf(argv[2], "/dev/fd/%d", &script_fd) != 1)
+			script_fd = -1;
+		else
+			/* Make sure to close this file on exec.  */
+			fcntl(script_fd, F_SETFD, 1);
 
 	if (fdinuse == NULL) {
-		nbytesused = sizeof (int) * howmany(NoFile, sizeof (int) * NBBY);
+		nbytesused = sizeof (int) *
+		    howmany(NoFile, sizeof (int) * NBBY);
 		fdinuse = (int *)xalloc(nbytesused);
 	}
 
@@ -1472,24 +1447,5 @@ unsetfd(int fd)
 				return;
 			}
 		max_fd = 0;
-	}
-}
-
-/*
- * A generic call back routine to output error messages from the
- * policy backing functions called by pfcsh.
- */
-void
-secpolicy_print(int level, const char *msg)
-{
-	switch (level) {
-	case SECPOLICY_WARN:
-	default:
-		haderr = 1;
-		printf("%s: ", msg);	/* printf() does gettext() */
-		break;
-	case SECPOLICY_ERROR:
-		bferr((char *)msg);		/* bferr() does gettext() */
-		break;
 	}
 }

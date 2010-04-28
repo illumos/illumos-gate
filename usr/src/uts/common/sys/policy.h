@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_POLICY_H
@@ -74,7 +73,7 @@ int secpolicy_acct(const cred_t *);
 int secpolicy_require_privs(const cred_t *, const struct priv_set *);
 int secpolicy_allow_setid(const cred_t *, uid_t, boolean_t);
 int secpolicy_audit_config(const cred_t *);
-int secpolicy_audit_getattr(const cred_t *);
+int secpolicy_audit_getattr(const cred_t *, boolean_t);
 int secpolicy_audit_modify(const cred_t *);
 int secpolicy_blacklist(const cred_t *);
 int secpolicy_chroot(const cred_t *);
@@ -120,6 +119,7 @@ boolean_t secpolicy_net_reply_equal(const cred_t *);
 int secpolicy_newproc(const cred_t *);
 int secpolicy_nfs(const cred_t *);
 int secpolicy_pcfs_modify_bootpartition(const cred_t *);
+int secpolicy_pfexec_register(const cred_t *);
 int secpolicy_ponline(const cred_t *);
 int secpolicy_pool(const cred_t *);
 int secpolicy_power_mgmt(const cred_t *);
@@ -148,6 +148,8 @@ int secpolicy_sys_devices(const cred_t *);
 int secpolicy_systeminfo(const cred_t *);
 int secpolicy_tasksys(const cred_t *);
 int secpolicy_vnode_access(const cred_t *, vnode_t *, uid_t, mode_t);
+int secpolicy_vnode_access2(const cred_t *, vnode_t *, uid_t, mode_t, mode_t);
+int secpolicy_vnode_any_access(const cred_t *, vnode_t *, uid_t);
 int secpolicy_vnode_chown(const cred_t *, uid_t);
 int secpolicy_vnode_create_gid(const cred_t *);
 int secpolicy_vnode_owner(const cred_t *, uid_t);
@@ -171,6 +173,8 @@ int secpolicy_xvm_control(const cred_t *);
 int secpolicy_basic_exec(const cred_t *, vnode_t *);
 int secpolicy_basic_fork(const cred_t *);
 int secpolicy_basic_link(const cred_t *);
+int secpolicy_basic_file_read(const cred_t *, vnode_t *, const char *);
+int secpolicy_basic_file_write(const cred_t *, vnode_t *, const char *);
 int secpolicy_basic_net_access(const cred_t *);
 int secpolicy_basic_proc(const cred_t *);
 int secpolicy_basic_procinfo(const cred_t *, struct proc *, struct proc *);

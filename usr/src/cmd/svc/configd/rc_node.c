@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -114,9 +113,7 @@
  * proceed if the user has been assigned at least one of a set of
  * authorization strings.  The set of enabling authorizations depends on the
  * operation and the target object.  The set of authorizations assigned to
- * a user is determined by reading /etc/security/policy.conf, querying the
- * user_attr database, and possibly querying the prof_attr database, as per
- * chkauthattr() in libsecdb.
+ * a user is determined by an algorithm defined in libsecdb.
  *
  * The fastest way to decide whether the two sets intersect is by entering the
  * strings into a hash table and detecting collisions, which takes linear time
@@ -360,7 +357,6 @@
 #include <libuutil.h>
 #include <libscf.h>
 #include <libscf_priv.h>
-#include <prof_attr.h>
 #include <pthread.h>
 #include <pwd.h>
 #include <stdio.h>
@@ -369,7 +365,7 @@
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <user_attr.h>
+#include <secdb.h>
 
 #include "configd.h"
 
@@ -388,8 +384,6 @@
 #define	AUTH_PROP_MODIFY	"modify_authorization"
 #define	AUTH_PROP_VALUE		"value_authorization"
 #define	AUTH_PROP_READ		"read_authorization"
-/* libsecdb should take care of this. */
-#define	RBAC_AUTH_SEP		","
 
 #define	MAX_VALID_CHILDREN 3
 
@@ -1498,29 +1492,24 @@ perm_add_enabling(permcheck_t *pcp, const char *auth)
  * perm_granted() returns PERM_GRANTED if the current door caller has one of
  * the enabling authorizations in pcp, PERM_DENIED if it doesn't, PERM_GONE if
  * the door client went away and PERM_FAIL if an error (usually lack of
- * memory) occurs.  check_auth_list() checks an RBAC_AUTH_SEP-separated
- * list of authorizations for existence in pcp, and check_prof_list()
- * checks the authorizations granted to an RBAC_AUTH_SEP-separated list of
- * profiles.
+ * memory) occurs.  auth_cb() checks each and every authorizations as
+ * enumerated by _enum_auths.  When we find a result other than PERM_DENIED,
+ * we short-cut the enumeration and return non-zero.
  */
-static perm_status_t
-check_auth_list(permcheck_t *pcp, char *authlist)
+
+static int
+auth_cb(const char *auth, void *ctxt, void *vres)
 {
-	char *auth, *lasts;
-	perm_status_t ret;
+	permcheck_t *pcp = ctxt;
+	int *pret = vres;
 
-	for (auth = (char *)strtok_r(authlist, RBAC_AUTH_SEP, &lasts);
-	    auth != NULL;
-	    auth = (char *)strtok_r(NULL, RBAC_AUTH_SEP, &lasts)) {
-		if (strchr(auth, KV_WILDCHAR) == NULL)
-			ret = pc_exists(pcp, auth);
-		else
-			ret = pc_match(pcp, auth);
+	if (strchr(auth, KV_WILDCHAR) == NULL)
+		*pret = pc_exists(pcp, auth);
+	else
+		*pret = pc_match(pcp, auth);
 
-		if (ret != PERM_DENIED)
-			return (ret);
-	}
-
+	if (*pret != PERM_DENIED)
+		return (1);
 	/*
 	 * If we failed, choose the most specific auth string for use in
 	 * the audit event.
@@ -1528,40 +1517,7 @@ check_auth_list(permcheck_t *pcp, char *authlist)
 	assert(pcp->pc_specific != NULL);
 	pcp->pc_auth_string = pcp->pc_specific->pce_auth;
 
-	return (PERM_DENIED);
-}
-
-static perm_status_t
-check_prof_list(permcheck_t *pcp, char *proflist)
-{
-	char *prof, *lasts, *authlist, *subproflist;
-	profattr_t *pap;
-	perm_status_t ret = PERM_DENIED;
-
-	for (prof = strtok_r(proflist, RBAC_AUTH_SEP, &lasts);
-	    prof != NULL;
-	    prof = strtok_r(NULL, RBAC_AUTH_SEP, &lasts)) {
-		pap = getprofnam(prof);
-		if (pap == NULL)
-			continue;
-
-		authlist = kva_match(pap->attr, PROFATTR_AUTHS_KW);
-		if (authlist != NULL)
-			ret = check_auth_list(pcp, authlist);
-
-		if (ret == PERM_DENIED) {
-			subproflist = kva_match(pap->attr, PROFATTR_PROFS_KW);
-			if (subproflist != NULL)
-				/* depth check to avoid infinite recursion? */
-				ret = check_prof_list(pcp, subproflist);
-		}
-
-		free_profattr(pap);
-		if (ret != PERM_DENIED)
-			return (ret);
-	}
-
-	return (ret);
+	return (0);		/* Tells that we need to continue */
 }
 
 static perm_status_t
@@ -1570,10 +1526,7 @@ perm_granted(permcheck_t *pcp)
 	ucred_t *uc;
 
 	perm_status_t ret = PERM_DENIED;
-	int rv;
 	uid_t uid;
-	userattr_t *uap;
-	char *authlist, *userattr_authlist, *proflist, *def_prof = NULL;
 	struct passwd pw;
 	char pwbuf[1024];	/* XXX should be NSS_BUFLEN_PASSWD */
 
@@ -1606,50 +1559,11 @@ perm_granted(permcheck_t *pcp)
 	}
 
 	/*
-	 * Get user's default authorizations from policy.conf
+	 * Enumerate all the auths defined for the user and return the
+	 * result in ret.
 	 */
-	rv = _get_user_defs(pw.pw_name, &authlist, &def_prof);
-
-	if (rv != 0)
+	if (_enum_auths(pw.pw_name, auth_cb, pcp, &ret) < 0)
 		return (PERM_FAIL);
-
-	if (authlist != NULL) {
-		ret = check_auth_list(pcp, authlist);
-
-		if (ret != PERM_DENIED) {
-			_free_user_defs(authlist, def_prof);
-			return (ret);
-		}
-	}
-
-	/*
-	 * Put off checking def_prof for later in an attempt to consolidate
-	 * prof_attr accesses.
-	 */
-
-	uap = getusernam(pw.pw_name);
-	if (uap != NULL) {
-		/* Get the authorizations from user_attr. */
-		userattr_authlist = kva_match(uap->attr, USERATTR_AUTHS_KW);
-		if (userattr_authlist != NULL) {
-			ret = check_auth_list(pcp, userattr_authlist);
-		}
-	}
-
-	if ((ret == PERM_DENIED) && (def_prof != NULL)) {
-		/* Check generic profiles. */
-		ret = check_prof_list(pcp, def_prof);
-	}
-
-	if ((ret == PERM_DENIED) && (uap != NULL)) {
-		proflist = kva_match(uap->attr, USERATTR_PROFILES_KW);
-		if (proflist != NULL)
-			ret = check_prof_list(pcp, proflist);
-	}
-
-	_free_user_defs(authlist, def_prof);
-	if (uap != NULL)
-		free_userattr(uap);
 
 	return (ret);
 }

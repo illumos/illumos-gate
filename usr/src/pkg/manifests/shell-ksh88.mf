@@ -1,5 +1,4 @@
-#
-# CDDL HEADER START
+# # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
 # Common Development and Distribution License (the "License").
@@ -20,8 +19,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/shell/ksh88@$(PKGVERS)
@@ -35,5 +33,5 @@ dir path=usr group=sys
 dir path=usr/has
 dir path=usr/has/bin
 file path=usr/has/bin/ksh mode=0555
-hardlink path=usr/has/bin/pfksh target=ksh
+hardlink path=usr/has/bin/pfksh target=../../bin/pfexec
 hardlink path=usr/has/bin/rksh target=ksh

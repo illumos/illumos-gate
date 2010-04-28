@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2257,6 +2256,7 @@ prt_pfl(private_t *pri, int raw, long val)
 		case PRIV_AWARE:	s = "PRIV_AWARE";	break;
 		case PRIV_XPOLICY:	s = "PRIV_XPOLICY";	break;
 		case PRIV_AWARE_RESET:  s = "PRIV_AWARE_RESET"; break;
+		case PRIV_PFEXEC:	s = "PRIV_PFEXEC";	break;
 		case NET_MAC_AWARE:	s =  "NET_MAC_AWARE";	break;
 		case NET_MAC_AWARE_INHERIT:
 			s = "NET_MAC_AWARE_INHERIT";

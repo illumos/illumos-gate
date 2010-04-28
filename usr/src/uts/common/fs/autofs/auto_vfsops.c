@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -193,6 +192,9 @@ autofs_zone_destructor(zoneid_t zoneid, void *arg)
 		return;
 	ASSERT(fngp->fng_fnnode_count == 1);
 	ASSERT(fngp->fng_unmount_threads == 0);
+
+	if (fngp->fng_autofs_daemon_dh != NULL)
+		door_ki_rele(fngp->fng_autofs_daemon_dh);
 	/*
 	 * vn_alloc() initialized the rootnode with a count of 1; we need to
 	 * make this 0 to placate auto_freefnnode().

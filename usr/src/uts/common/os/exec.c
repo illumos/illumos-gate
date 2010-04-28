@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -66,6 +65,7 @@
 #include <sys/pool.h>
 #include <sys/sdt.h>
 #include <sys/brand.h>
+#include <sys/klpd.h>
 
 #include <c2/audit.h>
 
@@ -80,8 +80,10 @@
 #define	PRIV_SETUGID		0x04	/* is setuid/setgid/forced privs */
 #define	PRIV_INCREASE		0x08	/* child runs with more privs */
 #define	MAC_FLAGS		0x10	/* need to adjust MAC flags */
+#define	PRIV_FORCED		0x20	/* has forced privileges */
 
-static int execsetid(struct vnode *, struct vattr *, uid_t *, uid_t *);
+static int execsetid(struct vnode *, struct vattr *, uid_t *, uid_t *,
+    priv_set_t *, cred_t *, const char *);
 static int hold_execsw(struct execsw *);
 
 uint_t auxv_hwcap = 0;	/* auxv AT_SUN_HWCAP value; determined on the fly */
@@ -250,6 +252,31 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	args.pathname = resolvepn.pn_path;
 	/* don't free resolvepn until we are done with args */
 	pn_free(&pn);
+
+	/*
+	 * If we're running in a profile shell, then call pfexecd.
+	 */
+	if ((CR_FLAGS(p->p_cred) & PRIV_PFEXEC) != 0) {
+		error = pfexec_call(p->p_cred, &resolvepn, &args.pfcred,
+		    &args.scrubenv);
+
+		/* Returning errno in case we're not allowed to execute. */
+		if (error > 0) {
+			if (dir != NULL)
+				VN_RELE(dir);
+			pn_free(&resolvepn);
+			VN_RELE(vp);
+			goto out;
+		}
+
+		/* Don't change the credentials when using old ptrace. */
+		if (args.pfcred != NULL &&
+		    (p->p_proc_flag & P_PR_PTRACE) != 0) {
+			crfree(args.pfcred);
+			args.pfcred = NULL;
+			args.scrubenv = B_FALSE;
+		}
+	}
 
 	/*
 	 * Specific exec handlers, or policies determined via
@@ -527,6 +554,7 @@ gexec(
 	cred_t *oldcred, *newcred = NULL;
 	int privflags = 0;
 	int setidfl;
+	priv_set_t fset;
 
 	/*
 	 * If the SNOCD or SUGID flag is set, turn it off and remember the
@@ -562,9 +590,17 @@ gexec(
 		goto bad;
 
 	if (level == 0 &&
-	    (privflags = execsetid(vp, &vattr, &uid, &gid)) != 0) {
+	    (privflags = execsetid(vp, &vattr, &uid, &gid, &fset,
+	    args->pfcred == NULL ? cred : args->pfcred, args->pathname)) != 0) {
 
-		newcred = cred = crdup(cred);
+		/* Pfcred is a credential with a ref count of 1 */
+
+		if (args->pfcred != NULL) {
+			privflags |= PRIV_INCREASE|PRIV_RESET;
+			newcred = cred = args->pfcred;
+		} else {
+			newcred = cred = crdup(cred);
+		}
 
 		/* If we can, drop the PA bit */
 		if ((privflags & PRIV_RESET) != 0)
@@ -592,17 +628,31 @@ gexec(
 		 *
 		 *	E' = P' = (I' + F) & A
 		 *
-		 * But if running under ptrace, we cap I with P.
+		 * But if running under ptrace, we cap I and F with P.
 		 */
-		if ((privflags & PRIV_RESET) != 0) {
+		if ((privflags & (PRIV_RESET|PRIV_FORCED)) != 0) {
 			if ((privflags & PRIV_INCREASE) != 0 &&
-			    (pp->p_proc_flag & P_PR_PTRACE) != 0)
+			    (pp->p_proc_flag & P_PR_PTRACE) != 0) {
 				priv_intersect(&CR_OPPRIV(cred),
 				    &CR_IPRIV(cred));
+				priv_intersect(&CR_OPPRIV(cred), &fset);
+			}
 			priv_intersect(&CR_LPRIV(cred), &CR_IPRIV(cred));
 			CR_EPRIV(cred) = CR_PPRIV(cred) = CR_IPRIV(cred);
+			if (privflags & PRIV_FORCED) {
+				priv_set_PA(cred);
+				priv_union(&fset, &CR_EPRIV(cred));
+				priv_union(&fset, &CR_PPRIV(cred));
+			}
 			priv_adjust_PA(cred);
 		}
+	} else if (level == 0 && args->pfcred != NULL) {
+		newcred = cred = args->pfcred;
+		privflags |= PRIV_INCREASE;
+		/* pfcred is not forced to adhere to these settings */
+		priv_intersect(&CR_LPRIV(cred), &CR_IPRIV(cred));
+		CR_EPRIV(cred) = CR_PPRIV(cred) = CR_IPRIV(cred);
+		priv_adjust_PA(cred);
 	}
 
 	/* SunOS 4.x buy-back */
@@ -659,7 +709,7 @@ gexec(
 	 * credentials of the process.  In privflags, it told us
 	 * whether we gained any privileges or executed a set-uid executable.
 	 */
-	setid = (privflags & (PRIV_SETUGID|PRIV_INCREASE));
+	setid = (privflags & (PRIV_SETUGID|PRIV_INCREASE|PRIV_FORCED));
 
 	/*
 	 * Use /etc/system variable to determine if the stack
@@ -692,7 +742,7 @@ gexec(
 	}
 	if (setid & PRIV_SETUGID)
 		setidfl |= EXECSETID_SETID;
-	if (setid & PRIV_INCREASE)
+	if (setid & PRIV_FORCED)
 		setidfl |= EXECSETID_PRIVS;
 
 	execvp = pp->p_exec;
@@ -718,6 +768,8 @@ gexec(
 	}
 
 	if (level == 0) {
+		uid_t oruid;
+
 		if (execvp != NULL) {
 			/*
 			 * Close the previous executable only if we are
@@ -728,6 +780,9 @@ gexec(
 		}
 
 		mutex_enter(&pp->p_crlock);
+
+		oruid = pp->p_cred->cr_ruid;
+
 		if (newcred != NULL) {
 			/*
 			 * Free the old credentials, and set the new ones.
@@ -778,6 +833,13 @@ gexec(
 			suidflags = 0;
 
 		mutex_exit(&pp->p_crlock);
+		if (newcred != NULL && oruid != newcred->cr_ruid) {
+			/* Note that the process remains in the same zone. */
+			mutex_enter(&pidlock);
+			upcount_dec(oruid, crgetzoneid(newcred));
+			upcount_inc(newcred->cr_ruid, crgetzoneid(newcred));
+			mutex_exit(&pidlock);
+		}
 		if (suidflags) {
 			mutex_enter(&pp->p_lock);
 			pp->p_flag |= suidflags;
@@ -929,11 +991,11 @@ hold_execsw(struct execsw *eswp)
 }
 
 static int
-execsetid(struct vnode *vp, struct vattr *vattrp, uid_t *uidp, uid_t *gidp)
+execsetid(struct vnode *vp, struct vattr *vattrp, uid_t *uidp, uid_t *gidp,
+    priv_set_t *fset, cred_t *cr, const char *pathname)
 {
 	proc_t *pp = ttoproc(curthread);
 	uid_t uid, gid;
-	cred_t *cr = pp->p_cred;
 	int privflags = 0;
 
 	/*
@@ -948,13 +1010,38 @@ execsetid(struct vnode *vp, struct vattr *vattrp, uid_t *uidp, uid_t *gidp)
 
 	if ((vp->v_vfsp->vfs_flag & VFS_NOSETUID) == 0) {
 		/*
-		 * Set-uid root execution only allowed if the limit set
-		 * holds all unsafe privileges.
+		 * If it's a set-uid root program we perform the
+		 * forced privilege look-aside. This has three possible
+		 * outcomes:
+		 *	no look aside information -> treat as before
+		 *	look aside in Limit set -> apply forced privs
+		 *	look aside not in Limit set -> ignore set-uid root
+		 *
+		 * Ordinary set-uid root execution only allowed if the limit
+		 * set holds all unsafe privileges.
 		 */
-		if ((vattrp->va_mode & VSUID) && (vattrp->va_uid != 0 ||
-		    priv_issubset(&priv_unsafe, &CR_LPRIV(cr)))) {
-			uid = vattrp->va_uid;
-			privflags |= PRIV_SETUGID;
+		if (vattrp->va_mode & VSUID) {
+			if (vattrp->va_uid == 0) {
+				int res = get_forced_privs(cr, pathname, fset);
+
+				switch (res) {
+				case -1:
+					if (priv_issubset(&priv_unsafe,
+					    &CR_LPRIV(cr))) {
+						uid = vattrp->va_uid;
+						privflags |= PRIV_SETUGID;
+					}
+					break;
+				case 0:
+					privflags |= PRIV_FORCED|PRIV_INCREASE;
+					break;
+				default:
+					break;
+				}
+			} else {
+				uid = vattrp->va_uid;
+				privflags |= PRIV_SETUGID;
+			}
 		}
 		if (vattrp->va_mode & VSGID) {
 			gid = vattrp->va_gid;
@@ -980,20 +1067,14 @@ execsetid(struct vnode *vp, struct vattr *vattrp, uid_t *uidp, uid_t *gidp)
 	    !priv_isequalset(&CR_PPRIV(cr), &CR_IPRIV(cr)))
 		privflags |= PRIV_RESET;
 
+	/* Child has more privileges than parent */
+	if (!priv_issubset(&CR_IPRIV(cr), &CR_PPRIV(cr)))
+		privflags |= PRIV_INCREASE;
+
 	/* If MAC-aware flag(s) are on, need to update cred to remove. */
 	if ((CR_FLAGS(cr) & NET_MAC_AWARE) ||
 	    (CR_FLAGS(cr) & NET_MAC_AWARE_INHERIT))
 		privflags |= MAC_FLAGS;
-
-	/*
-	 * When we introduce the "forced" set then we will need
-	 * to set PRIV_INCREASE here if I not a subset of P.
-	 * If the "allowed" set is introduced we will need to do
-	 * a similar thing; however, it seems more reasonable to
-	 * have the allowed set reduce "L": script language interpreters
-	 * would typically have an allowed set of "all".
-	 */
-
 	/*
 	 * Set setuid/setgid protections if no ptrace() compatibility.
 	 * For privileged processes, honor setuid/setgid even in
@@ -1498,12 +1579,18 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	 */
 	if (envp != NULL) {
 		for (;;) {
+			char *tmp = args->stk_strp;
 			if (stk_getptr(args, envp, &sp))
 				return (EFAULT);
 			if (sp == NULL)
 				break;
 			if ((error = stk_add(args, sp, UIO_USERSPACE)) != 0)
 				return (error);
+			if (args->scrubenv && strncmp(tmp, "LD_", 3) == 0) {
+				/* Undo the copied string */
+				args->stk_strp = tmp;
+				*(args->stk_offp++) = NULL;
+			}
 			envp += ptrsize;
 		}
 	}
@@ -1840,7 +1927,7 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 
 	if (AU_AUDITING())
 		audit_exec(args->stk_base, args->stk_base + args->arglen,
-		    args->na - args->ne, args->ne);
+		    args->na - args->ne, args->ne, args->pfcred);
 
 	/*
 	 * Ensure that we don't change resource associations while we

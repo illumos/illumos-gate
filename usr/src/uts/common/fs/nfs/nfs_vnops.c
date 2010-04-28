@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989 AT&T.
  *	All rights reserved.
@@ -1445,12 +1444,9 @@ nfs_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 		if (!groupmember(va.va_gid, cr))
 			shift += 3;
 	}
-found:
-	mode &= ~(va.va_mode << shift);
-	if (mode == 0)
-		return (0);
 
-	return (secpolicy_vnode_access(cr, vp, va.va_uid, mode));
+	return (secpolicy_vnode_access2(cr, vp, va.va_uid,
+	    va.va_mode << shift, mode));
 }
 
 static int nfs_do_symlink_cache = 1;

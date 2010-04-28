@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -463,6 +462,11 @@ auditme(au_kcontext_t *kctx, struct t_audit_data *tad, au_state_t estate)
 		    kctx->auk_ets[AUE_SOCKACCEPT]	|
 		    kctx->auk_ets[AUE_SOCKSEND]		|
 		    kctx->auk_ets[AUE_SOCKRECEIVE];
+		if (amask.as_success & estate || amask.as_failure & estate)
+			flag = 1;
+	} else if (tad->tad_scid == SYS_execve &&
+	    getpflags(PRIV_PFEXEC, CRED()) != 0) {
+		estate = kctx->auk_ets[AUE_PFEXEC];
 		if (amask.as_success & estate || amask.as_failure & estate)
 			flag = 1;
 	}

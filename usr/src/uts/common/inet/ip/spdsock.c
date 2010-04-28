@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -156,6 +155,7 @@ static void spdsock_wput(queue_t *, mblk_t *);
 static void spdsock_wsrv(queue_t *);
 static void spdsock_rsrv(queue_t *);
 static void *spdsock_stack_init(netstackid_t stackid, netstack_t *ns);
+static void spdsock_stack_shutdown(netstackid_t stackid, void *arg);
 static void spdsock_stack_fini(netstackid_t stackid, void *arg);
 static void spdsock_loadcheck(void *);
 static void spdsock_merge_algs(spd_stack_t *);
@@ -276,8 +276,8 @@ spdsock_ddi_init(void)
 	 * destroyed in the kernel, so we can maintain the
 	 * set of spd_stack_t's.
 	 */
-	netstack_register(NS_SPDSOCK, spdsock_stack_init, NULL,
-	    spdsock_stack_fini);
+	netstack_register(NS_SPDSOCK, spdsock_stack_init,
+	    spdsock_stack_shutdown, spdsock_stack_fini);
 
 	return (B_TRUE);
 }
@@ -340,13 +340,28 @@ spdsock_ddi_destroy(void)
 	netstack_unregister(NS_SPDSOCK);
 }
 
+/*
+ * Do pre-removal cleanup.
+ */
+/* ARGSUSED */
+static void
+spdsock_stack_shutdown(netstackid_t stackid, void *arg)
+{
+	spd_stack_t *spds = (spd_stack_t *)arg;
+
+	if (spds->spds_mp_algs != NULL) {
+		freemsg(spds->spds_mp_algs);
+		spds->spds_mp_algs = NULL;
+	}
+}
+
 /* ARGSUSED */
 static void
 spdsock_stack_fini(netstackid_t stackid, void *arg)
 {
 	spd_stack_t *spds = (spd_stack_t *)arg;
 
-	freemsg(spds->spds_mp_algs);
+	ASSERT(spds->spds_mp_algs == NULL);
 	mutex_destroy(&spds->spds_param_lock);
 	mutex_destroy(&spds->spds_alg_lock);
 	nd_free(&spds->spds_g_nd);
@@ -2794,7 +2809,6 @@ spdsock_updatealg(queue_t *q, mblk_t *mp, spd_ext_t *extv[])
 		if (spds->spds_mp_algs != NULL)
 			freemsg(spds->spds_mp_algs);
 		spds->spds_mp_algs = mp;
-		spds->spds_algs_pending = B_TRUE;
 		mutex_exit(&spds->spds_alg_lock);
 		if (auditing) {
 			cred_t *cr;
@@ -3152,9 +3166,10 @@ spdsock_update_pending_algs(netstack_t *ns)
 	spd_stack_t *spds = ns->netstack_spdsock;
 
 	mutex_enter(&spds->spds_alg_lock);
-	if (spds->spds_algs_pending) {
+	if (spds->spds_mp_algs != NULL) {
 		(void) spdsock_do_updatealg(spds->spds_extv_algs, spds);
-		spds->spds_algs_pending = B_FALSE;
+		freemsg(spds->spds_mp_algs);
+		spds->spds_mp_algs = NULL;
 	}
 	mutex_exit(&spds->spds_alg_lock);
 }

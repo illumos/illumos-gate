@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_PROF_ATTR_H
 #define	_PROF_ATTR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -49,6 +46,8 @@ extern "C" {
 #define	PROFATTR_COL2_KW		"res2"
 #define	PROFATTR_COL3_KW		"desc"
 #define	PROFATTR_COL4_KW		"attr"
+
+#define	PROFILE_STOP			"Stop"
 
 #define	DEF_PROF			"PROFS_GRANTED="
 #define	DEF_CONSUSER			"CONSOLE_USER="

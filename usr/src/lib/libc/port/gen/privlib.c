@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #pragma weak _getprivimplinfo	= getprivimplinfo
@@ -871,11 +870,7 @@ priv_emptyset(priv_set_t *set)
 void
 priv_basicset(priv_set_t *set)
 {
-	priv_data_t *d;
-
-	LOADPRIVDATA(d);
-
-	priv_copyset(d->pd_basicset, set);
+	priv_copyset(priv_basic(), set);
 }
 
 void

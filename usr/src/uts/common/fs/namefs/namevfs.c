@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -417,8 +416,8 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 	 * Make sure the user has write permissions on the
 	 * mount point (or has sufficient privileges).
 	 */
-	if (!(vattrp->va_mode & VWRITE) &&
-	    secpolicy_vnode_access(crp, mvp, vattrp->va_uid, VWRITE) != 0) {
+	if (secpolicy_vnode_access2(crp, mvp, vattrp->va_uid, vattrp->va_mode,
+	    VWRITE) != 0) {
 		error = EACCES;
 		goto out;
 	}

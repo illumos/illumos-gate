@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/project.h>
 #include <sys/modhash.h>
@@ -361,7 +358,7 @@ project_rele(kproject_t *p)
 		project_kstat_delete(p);
 
 		if (p->kpj_klpd != NULL)
-			klpd_remove(&p->kpj_klpd);
+			klpd_freelist(&p->kpj_klpd);
 
 		if (mod_hash_destroy(projects_hash, (mod_hash_key_t)p))
 			panic("unable to delete project %d zone %d", p->kpj_id,

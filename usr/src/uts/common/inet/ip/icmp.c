@@ -38,7 +38,7 @@
 #include <sys/xti_inet.h>
 #include <sys/cmn_err.h>
 #include <sys/kmem.h>
-#include <sys/cred_impl.h>
+#include <sys/cred.h>
 #include <sys/policy.h>
 #include <sys/priv.h>
 #include <sys/ucred.h>

@@ -735,7 +735,7 @@ file path=usr/bin/pagesize mode=0555
 file path=usr/bin/passwd group=sys mode=6555
 file path=usr/bin/pathchk mode=0555
 file path=usr/bin/pax mode=0555
-file path=usr/bin/pfexec mode=4555
+file path=usr/bin/pfexec mode=0555
 file path=usr/bin/pg mode=0555
 file path=usr/bin/pgrep mode=0555
 file path=usr/bin/pkg2du mode=0555
@@ -1090,6 +1090,7 @@ file path=usr/lib/help/profiles/locale/C/RtPriAdmin.html
 file path=usr/lib/help/profiles/locale/C/RtPrntAdmin.html
 file path=usr/lib/help/profiles/locale/C/RtProcManagement.html
 file path=usr/lib/help/profiles/locale/C/RtReparseMngmnt.html
+file path=usr/lib/help/profiles/locale/C/RtReservedProfile.html
 file path=usr/lib/help/profiles/locale/C/RtRightsDelegate.html
 file path=usr/lib/help/profiles/locale/C/RtSMBFSMngmnt.html
 file path=usr/lib/help/profiles/locale/C/RtSMBMngmnt.html
@@ -1144,6 +1145,7 @@ file path=usr/lib/more.help
 file path=usr/lib/newsyslog group=sys mode=0555
 file path=usr/lib/pci/pcidr mode=0555
 file path=usr/lib/pci/pcidr_plugin.so
+file path=usr/lib/pfexecd mode=0555
 file path=usr/lib/platexec mode=0555
 file path=usr/lib/rcm/modules/SUNW_aggr_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_cluster_rcm.so mode=0555
@@ -1963,6 +1965,7 @@ file path=lib/svc/manifest/system/keymap.xml group=sys mode=0444
 file path=lib/svc/manifest/system/early-manifest-import.xml group=sys mode=0444
 file path=lib/svc/manifest/system/manifest-import.xml group=sys mode=0444
 file path=lib/svc/manifest/system/name-service-cache.xml group=sys mode=0444
+file path=lib/svc/manifest/system/pfexecd.xml group=sys mode=0444
 file path=lib/svc/manifest/system/rbac.xml group=sys mode=0444
 file path=lib/svc/manifest/system/rmtmpfiles.xml group=sys mode=0444
 file path=lib/svc/manifest/system/sac.xml group=sys mode=0444
@@ -2006,20 +2009,12 @@ hardlink path=sbin/rc6 target=../sbin/rc0
 hardlink path=usr/bin/$(ARCH32)/encrypt target=decrypt
 hardlink path=usr/bin/$(ARCH32)/ksh target=ksh93
 hardlink path=usr/bin/$(ARCH32)/mac target=digest
-hardlink path=usr/bin/$(ARCH32)/pfksh target=ksh93
-hardlink path=usr/bin/$(ARCH32)/pfksh93 target=ksh93
-hardlink path=usr/bin/$(ARCH32)/pfrksh target=ksh93
-hardlink path=usr/bin/$(ARCH32)/pfrksh93 target=ksh93
 hardlink path=usr/bin/$(ARCH32)/rksh target=ksh93
 hardlink path=usr/bin/$(ARCH32)/rksh93 target=ksh93
 $(i386_ONLY)hardlink path=usr/bin/$(ARCH32)/w target=uptime
 hardlink path=usr/bin/$(ARCH64)/encrypt target=decrypt
 hardlink path=usr/bin/$(ARCH64)/ksh target=ksh93
 hardlink path=usr/bin/$(ARCH64)/mac target=digest
-hardlink path=usr/bin/$(ARCH64)/pfksh target=ksh93
-hardlink path=usr/bin/$(ARCH64)/pfksh93 target=ksh93
-hardlink path=usr/bin/$(ARCH64)/pfrksh target=ksh93
-hardlink path=usr/bin/$(ARCH64)/pfrksh93 target=ksh93
 hardlink path=usr/bin/$(ARCH64)/rksh target=ksh93
 hardlink path=usr/bin/$(ARCH64)/rksh93 target=ksh93
 hardlink path=usr/bin/$(ARCH64)/w target=uptime
@@ -2065,11 +2060,15 @@ hardlink path=usr/bin/nohup target=../../usr/lib/isaexec
 hardlink path=usr/bin/page target=../../usr/bin/more
 hardlink path=usr/bin/paste target=../../usr/bin/alias
 hardlink path=usr/bin/pdp11 target=../../usr/bin/i286
-hardlink path=usr/bin/pfcsh target=../../usr/bin/csh
-hardlink path=usr/bin/pfksh target=../../usr/lib/isaexec
-hardlink path=usr/bin/pfksh93 target=../../usr/lib/isaexec
-hardlink path=usr/bin/pfrksh target=../../usr/lib/isaexec
-hardlink path=usr/bin/pfrksh93 target=../../usr/lib/isaexec
+hardlink path=usr/bin/pfbash target=../../usr/bin/pfexec
+hardlink path=usr/bin/pfcsh target=../../usr/bin/pfexec
+hardlink path=usr/bin/pfksh target=../../usr/bin/pfexec
+hardlink path=usr/bin/pfksh93 target=../../usr/bin/pfexec
+hardlink path=usr/bin/pfrksh target=../../usr/bin/pfexec
+hardlink path=usr/bin/pfrksh93 target=../../usr/bin/pfexec
+hardlink path=usr/bin/pfsh target=../../usr/bin/pfexec
+hardlink path=usr/bin/pftcsh target=../../usr/bin/pfexec
+hardlink path=usr/bin/pfzsh target=../../usr/bin/pfexec
 hardlink path=usr/bin/pkill target=../../usr/bin/pgrep
 hardlink path=usr/bin/prctl target=../../usr/lib/isaexec
 hardlink path=usr/bin/print target=../../usr/bin/alias
@@ -2114,6 +2113,7 @@ hardlink path=usr/bin/w target=../../usr/lib/isaexec
 hardlink path=usr/bin/wait target=../../usr/bin/alias
 hardlink path=usr/bin/wc target=../../usr/bin/alias
 hardlink path=usr/has/bin/ex target=edit
+hardlink path=usr/has/bin/pfsh target=../../bin/pfexec
 hardlink path=usr/has/bin/vedit target=edit
 hardlink path=usr/has/bin/vi target=edit
 hardlink path=usr/has/bin/view target=edit
@@ -2501,6 +2501,7 @@ hardlink path=usr/share/lib/zoneinfo/W-SU \
     target=../../../../usr/share/lib/zoneinfo/Europe/Moscow
 hardlink path=usr/share/lib/zoneinfo/Zulu \
     target=../../../../usr/share/lib/zoneinfo/Etc/UTC
+hardlink path=usr/xpg4/bin/pfsh target=../../bin/pfexec
 $(sparc_ONLY)hardlink path=etc/svc/profile/platform_SUNW,Sun-Fire-V890.xml \
     target=./platform_SUNW,Sun-Fire-880.xml
 $(sparc_ONLY)hardlink \
@@ -2616,7 +2617,7 @@ link path=etc/whodo target=../usr/sbin/whodo
 link path=etc/wtmpx target=../var/adm/wtmpx
 link path=sbin/in.mpathd target=../lib/inet/in.mpathd
 link path=sbin/jsh target=../usr/bin/ksh93
-link path=sbin/pfsh target=../usr/bin/ksh93
+link path=sbin/pfsh target=../usr/bin/pfexec
 link path=sbin/sh target=../usr/bin/$(ARCH32)/ksh93
 link path=sbin/su target=../usr/bin/su
 link path=usr/adm target=../var/adm
@@ -2625,7 +2626,6 @@ link path=usr/bin/cachefsstat target=../lib/fs/cachefs/cachefsstat
 link path=usr/bin/df target=../sbin/df
 link path=usr/bin/jsh target=ksh93
 link path=usr/bin/passmgmt target=../sbin/passmgmt
-link path=usr/bin/pfsh target=ksh93
 link path=usr/bin/pwconv target=../sbin/pwconv
 link path=usr/bin/rmail target=./mail
 link path=usr/bin/sh target=$(ARCH32)/ksh93
@@ -2636,7 +2636,6 @@ link path=usr/bin/tar target=../sbin/tar
 link path=usr/bin/uname target=../../sbin/uname
 link path=usr/ccs/bin/m4 target=../../bin/m4
 link path=usr/has/bin/jsh target=sh
-link path=usr/has/bin/pfsh target=sh
 link path=usr/has/lib/rsh target=../bin/sh
 link path=usr/lib/$(ARCH64)/ld.so.1 target=../../../lib/$(ARCH64)/ld.so.1
 link path=usr/lib/cron target=../../etc/cron.d

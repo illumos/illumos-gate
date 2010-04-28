@@ -22,14 +22,11 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+#include <alloca.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <limits.h>
 #include <pwd.h>
 #include <nss_dbdefs.h>
 #include <deflt.h>
@@ -37,115 +34,261 @@
 #include <prof_attr.h>
 #include <user_attr.h>
 
+#define	COPYTOSTACK(dst, csrc)		{	\
+		size_t len = strlen(csrc) + 1;	\
+		dst = alloca(len);		\
+		(void) memcpy(dst, csrc, len);	\
+	}
 
-static int _is_authorized(const char *, char *);
-static int _chk_policy_auth(const char *, const char *, char **, int *);
-static int _chkprof_for_auth(const char *, const char *, char **, int *);
+static kva_t *get_default_attrs(const char *);
+static void free_default_attrs(kva_t *);
+
+/*
+ * Enumeration functions for auths and profiles; the enumeration functions
+ * take a callback with four arguments:
+ *	const char *		profile name (or NULL unless wantattr is false)
+ *	kva_t *			attributes (or NULL unless wantattr is true)
+ *	void *			context
+ *	void *			pointer to the result
+ * When the call back returns non-zero, the enumeration ends.
+ * The function might be NULL but only for profiles as we are always collecting
+ * all the profiles.
+ * Both the auths and the profiles arguments may be NULL.
+ *
+ * These should be the only implementation of the algorithm of "finding me
+ * all the profiles/athorizations/keywords/etc.
+ */
+
+#define	CONSUSER_PROFILE_KW		"consprofile"
+#define	DEF_LOCK_AFTER_RETRIES		"LOCK_AFTER_RETRIES="
+
+static struct dfltplcy {
+	char *attr;
+	const char *defkw;
+} dfltply[] = {
+	/* CONSUSER MUST BE FIRST! */
+	{ CONSUSER_PROFILE_KW,			DEF_CONSUSER},
+	{ PROFATTR_AUTHS_KW,			DEF_AUTH},
+	{ PROFATTR_PROFS_KW,			DEF_PROF},
+	{ USERATTR_LIMPRIV_KW,			DEF_LIMITPRIV},
+	{ USERATTR_DFLTPRIV_KW,			DEF_DFLTPRIV},
+	{ USERATTR_LOCK_AFTER_RETRIES_KW,	DEF_LOCK_AFTER_RETRIES}
+};
+
+#define	NDFLTPLY	(sizeof (dfltply)/sizeof (struct dfltplcy))
+#define	GETCONSPROF(a)	(kva_match((a), CONSUSER_PROFILE_KW))
+#define	GETPROF(a)	(kva_match((a), PROFATTR_PROFS_KW))
+
+/*
+ * Enumerate profiles from listed profiles.
+ */
 int
-chkauthattr(const char *authname, const char *username)
+_enum_common_p(const char *cprofiles,
+    int (*cb)(const char *, kva_t *, void *, void *),
+    void *ctxt, void *pres, boolean_t wantattr,
+    int *pcnt, char *profs[MAXPROFS])
 {
-	int		auth_granted = 0;
-	char		*auths;
-	char		*profiles;
-	userattr_t	*user = NULL;
-	char		*chkedprof[MAXPROFS];
-	int		chkedprof_cnt = 0;
-	int		i;
+	char *prof, *last;
+	char *profiles;
+	profattr_t *pa;
+	int i;
+	int res = 0;
 
-	if (authname == NULL || username == NULL)
+	if (cprofiles == NULL)
 		return (0);
 
-	/* Check against AUTHS_GRANTED and PROFS_GRANTED in policy.conf */
-	auth_granted = _chk_policy_auth(authname, username, chkedprof,
-	    &chkedprof_cnt);
-	if (auth_granted)
-		goto exit;
+	if (*pcnt > 0 && strcmp(profs[*pcnt - 1], PROFILE_STOP) == NULL)
+		return (0);
 
-	if ((user = getusernam(username)) == NULL)
-		goto exit;
+	COPYTOSTACK(profiles, cprofiles)
 
-	/* Check against authorizations listed in user_attr */
-	if ((auths = kva_match(user->attr, USERATTR_AUTHS_KW)) != NULL) {
-		auth_granted = _is_authorized(authname, auths);
-		if (auth_granted)
-			goto exit;
-	}
+	while (prof = strtok_r(profiles, KV_SEPSTR, &last)) {
 
-	/* Check against authorizations specified by profiles */
-	if ((profiles = kva_match(user->attr, USERATTR_PROFILES_KW)) != NULL)
-		auth_granted = _chkprof_for_auth(profiles, authname,
-		    chkedprof, &chkedprof_cnt);
+		profiles = NULL;	/* For next iterations of strtok_r */
 
-exit:
-	/* free memory allocated for checked array */
-	for (i = 0; i < chkedprof_cnt; i++) {
-		free(chkedprof[i]);
-	}
+		for (i = 0; i < *pcnt; i++)
+			if (strcmp(profs[i], prof) == 0)
+				goto cont;
 
-	if (user != NULL)
-		free_userattr(user);
+		if (*pcnt >= MAXPROFS)		/* oops: too many profs */
+			return (-1);
 
-	return (auth_granted);
-}
+		/* Add it */
+		profs[(*pcnt)++] = strdup(prof);
 
-static int
-_chkprof_for_auth(const char *profs, const char *authname,
-    char **chkedprof, int *chkedprof_cnt)
-{
+		if (strcmp(profs[*pcnt - 1], PROFILE_STOP) == 0)
+			break;
 
-	char *prof, *lasts, *auths, *profiles;
-	profattr_t	*pa;
-	int		i;
-	int		checked = 0;
+		/* find the profiles for this profile */
+		pa = getprofnam(prof);
 
-	for (prof = strtok_r((char *)profs, ",", &lasts); prof != NULL;
-	    prof = strtok_r(NULL, ",", &lasts)) {
+		if (cb != NULL && (!wantattr || pa != NULL && pa->attr != NULL))
+			res = cb(prof, pa ? pa->attr : NULL, ctxt, pres);
 
-		checked = 0;
-		/* check if this profile has been checked */
-		for (i = 0; i < *chkedprof_cnt; i++) {
-			if (strcmp(chkedprof[i], prof) == 0) {
-				checked = 1;
-				break;
-			}
-		}
-
-		if (!checked) {
-
-			chkedprof[*chkedprof_cnt] = strdup(prof);
-			*chkedprof_cnt = *chkedprof_cnt + 1;
-
-			if ((pa = getprofnam(prof)) == NULL)
-				continue;
-
-			if ((auths = kva_match(pa->attr,
-			    PROFATTR_AUTHS_KW)) != NULL) {
-				if (_is_authorized(authname, auths)) {
-					free_profattr(pa);
-					return (1);
-				}
-			}
-			if ((profiles =
-			    kva_match(pa->attr, PROFATTR_PROFS_KW)) != NULL) {
-				/* Check for authorization in subprofiles */
-				if (_chkprof_for_auth(profiles, authname,
-				    chkedprof, chkedprof_cnt)) {
-					free_profattr(pa);
-					return (1);
-				}
+		if (pa != NULL) {
+			if (res == 0 && pa->attr != NULL) {
+				res = _enum_common_p(GETPROF(pa->attr), cb,
+				    ctxt, pres, wantattr, pcnt, profs);
 			}
 			free_profattr(pa);
 		}
+		if (res != 0)
+			return (res);
+cont:
+		continue;
 	}
-	/* authorization not found in any profile */
-	return (0);
+	return (res);
+}
+
+/*
+ * Enumerate all attributes associated with a username and the profiles
+ * associated with the user.
+ */
+static int
+_enum_common(const char *username,
+    int (*cb)(const char *, kva_t *, void *, void *),
+    void *ctxt, void *pres, boolean_t wantattr)
+{
+	userattr_t *ua;
+	int res = 0;
+	int cnt = 0;
+	char *profs[MAXPROFS];
+	kva_t *kattrs;
+
+	if (cb == NULL)
+		return (-1);
+
+	ua = getusernam(username);
+
+	if (ua != NULL) {
+		if (ua->attr != NULL) {
+			if (wantattr)
+				res = cb(NULL, ua->attr, ctxt, pres);
+			if (res == 0) {
+				res = _enum_common_p(GETPROF(ua->attr),
+				    cb, ctxt, pres, wantattr, &cnt, profs);
+			}
+		}
+		free_userattr(ua);
+		if (res != 0)
+			return (res);
+	}
+
+	if ((cnt == 0 || strcmp(profs[cnt-1], PROFILE_STOP) != 0) &&
+	    (kattrs = get_default_attrs(username)) != NULL) {
+
+		res = _enum_common_p(GETCONSPROF(kattrs), cb, ctxt, pres,
+		    wantattr, &cnt, profs);
+
+		if (res == 0) {
+			res = _enum_common_p(GETPROF(kattrs), cb, ctxt, pres,
+			    wantattr, &cnt, profs);
+		}
+
+		if (res == 0 && wantattr)
+			res = cb(NULL, kattrs, ctxt, pres);
+
+		free_default_attrs(kattrs);
+	}
+
+	free_proflist(profs, cnt);
+
+	return (res);
+}
+
+/*
+ * Enumerate profiles with a username argument.
+ */
+int
+_enum_profs(const char *username,
+    int (*cb)(const char *, kva_t *, void *, void *),
+    void *ctxt, void *pres)
+{
+	return (_enum_common(username, cb, ctxt, pres, B_FALSE));
+}
+
+/*
+ * Enumerate attributes with a username argument.
+ */
+int
+_enum_attrs(const char *username,
+    int (*cb)(const char *, kva_t *, void *, void *),
+    void *ctxt, void *pres)
+{
+	return (_enum_common(username, cb, ctxt, pres, B_TRUE));
+}
+
+
+/*
+ * Enumerate authorizations in the "auths" argument.
+ */
+static int
+_enum_auths_a(const char *cauths, int (*cb)(const char *, void *, void *),
+    void *ctxt, void *pres)
+{
+	char *auth, *last, *auths;
+	int res = 0;
+
+	if (cauths == NULL || cb == NULL)
+		return (0);
+
+	COPYTOSTACK(auths, cauths)
+
+	while (auth = strtok_r(auths, KV_SEPSTR, &last)) {
+		auths = NULL;		/* For next iterations of strtok_r */
+
+		res = cb(auth, ctxt, pres);
+
+		if (res != 0)
+			return (res);
+	}
+	return (res);
+}
+
+/*
+ * Magic struct and function to allow using the _enum_attrs functions to
+ * enumerate the authorizations.
+ */
+typedef struct ccomm2auth {
+	int (*cb)(const char *, void *, void *);
+	void *ctxt;
+} ccomm2auth;
+
+/*ARGSUSED*/
+static int
+comm2auth(const char *name, kva_t *attr, void *ctxt, void *pres)
+{
+	ccomm2auth *ca = ctxt;
+	char *auths;
+
+	/* Note: PROFATTR_AUTHS_KW is equal to USERATTR_AUTHS_KW */
+	auths = kva_match(attr, PROFATTR_AUTHS_KW);
+	return (_enum_auths_a(auths, ca->cb, ca->ctxt, pres));
+}
+
+/*
+ * Enumerate authorizations for username.
+ */
+int
+_enum_auths(const char *username,
+    int (*cb)(const char *, void *, void *),
+    void *ctxt, void *pres)
+{
+	ccomm2auth c2a;
+
+	if (cb == NULL)
+		return (-1);
+
+	c2a.cb = cb;
+	c2a.ctxt = ctxt;
+
+	return (_enum_common(username, comm2auth, &c2a, pres, B_TRUE));
 }
 
 int
 _auth_match(const char *pattern, const char *auth)
 {
 	size_t len;
-	char wildcard = KV_WILDCHAR;
 	char *grant;
 
 	len = strlen(pattern);
@@ -154,7 +297,7 @@ _auth_match(const char *pattern, const char *auth)
 	 * If the wildcard is not in the last position in the string, don't
 	 * match against it.
 	 */
-	if (pattern[len-1] != wildcard)
+	if (pattern[len-1] != KV_WILDCHAR)
 		return (0);
 
 	/*
@@ -173,66 +316,32 @@ _auth_match(const char *pattern, const char *auth)
 }
 
 static int
-_is_authorized(const char *authname, char *auths)
+_is_authorized(const char *auth, void *authname, void *res)
 {
-	int	found = 0;	/* have we got a match, yet */
-	char	wildcard = '*';
-	char	*auth;		/* current authorization being compared */
-	char	*buf;
-	char	*lasts;
+	int *resp = res;
 
-	buf = strdup(auths);
-	for (auth = strtok_r(auths, ",", &lasts); auth != NULL && !found;
-	    auth = strtok_r(NULL, ",", &lasts)) {
-		if (strcmp((char *)authname, auth) == 0) {
-			/* Exact match.  We're done. */
-			found = 1;
-		} else if (strchr(auth, wildcard) != NULL) {
-			if (_auth_match(auth, authname)) {
-				found = 1;
-				break;
-			}
-		}
+	if (strcmp(authname, auth) == 0 ||
+	    (strchr(auth, KV_WILDCHAR) != NULL &&
+	    _auth_match(auth, authname))) {
+		*resp = 1;
+		return (1);
 	}
 
-	free(buf);
-
-	return (found);
+	return (0);
 }
 
-
-/*
- * read /etc/security/policy.conf for AUTHS_GRANTED.
- * return 1 if found matching authname.
- * Otherwise, read PROFS_GRANTED to see if authname exists in any
- * default profiles.
- */
-static int
-_chk_policy_auth(const char *authname, const char *username, char **chkedprof,
-    int *chkedprof_cnt)
+int
+chkauthattr(const char *authname, const char *username)
 {
-	char	*auths = NULL;
-	char	*profs = NULL;
-	int	ret = 1;
+	int		auth_granted = 0;
 
-	if (_get_user_defs(username, &auths, &profs) != 0)
+	if (authname == NULL || username == NULL)
 		return (0);
 
-	if (auths != NULL) {
-		if (_is_authorized(authname, auths))
-			goto exit;
-	}
+	(void) _enum_auths(username, _is_authorized, (char *)authname,
+	    &auth_granted);
 
-	if (profs != NULL) {
-		if (_chkprof_for_auth(profs, authname, chkedprof,
-		    chkedprof_cnt))
-			goto exit;
-	}
-	ret = 0;
-
-exit:
-	_free_user_defs(auths, profs);
-	return (ret);
+	return (auth_granted);
 }
 
 #define	CONSOLE_USER_LINK "/dev/vt/console_user"
@@ -257,77 +366,58 @@ is_cons_user(const char *user)
 	return (pw.pw_uid == cons.st_uid);
 }
 
-
-int
-_get_user_defs(const char *user, char **def_auth, char **def_prof)
+static void
+free_default_attrs(kva_t *kva)
 {
-	char *cp;
-	char *profs;
-	void	*defp;
+	int i;
 
-	if ((defp = defopen_r(AUTH_POLICY)) == NULL) {
-		if (def_auth != NULL) {
-			*def_auth = NULL;
-		}
-		if (def_prof != NULL) {
-			*def_prof = NULL;
-		}
-		return (-1);
-	}
+	for (i = 0; i < kva->length; i++)
+		free(kva->data[i].value);
 
-	if (def_auth != NULL) {
-		if ((cp = defread_r(DEF_AUTH, defp)) != NULL) {
-			if ((*def_auth = strdup(cp)) == NULL) {
-				defclose_r(defp);
-				return (-1);
-			}
-		} else {
-			*def_auth = NULL;
-		}
-	}
-	if (def_prof != NULL) {
-		if (is_cons_user(user) &&
-		    (cp = defread_r(DEF_CONSUSER, defp)) != NULL) {
-			if ((*def_prof = strdup(cp)) == NULL) {
-				defclose_r(defp);
-				return (-1);
-			}
-		}
-		if ((cp = defread_r(DEF_PROF, defp)) != NULL) {
-			int	prof_len;
-
-			if (*def_prof == NULL) {
-				if ((*def_prof = strdup(cp)) == NULL) {
-					defclose_r(defp);
-					return (-1);
-				}
-				defclose_r(defp);
-				return (0);
-			}
-
-			/* concatenate def profs with "," separator */
-			prof_len = strlen(*def_prof) + strlen(cp) + 2;
-			if ((profs = malloc(prof_len)) == NULL) {
-				free(*def_prof);
-				*def_prof = NULL;
-				defclose_r(defp);
-				return (-1);
-			}
-			(void) snprintf(profs, prof_len, "%s,%s", *def_prof,
-			    cp);
-			free(*def_prof);
-			*def_prof = profs;
-		}
-	}
-
-	defclose_r(defp);
-	return (0);
+	free(kva);
 }
 
-
-void
-_free_user_defs(char *def_auth, char *def_prof)
+/*
+ * Return the default attributes; this are ignored when a STOP profile
+ * was found.
+ */
+static kva_t *
+get_default_attrs(const char *user)
 {
-	free(def_auth);
-	free(def_prof);
+	void *defp;
+	kva_t *kva;
+	int i;
+
+	kva = malloc(sizeof (kva_t) + sizeof (kv_t) * NDFLTPLY);
+
+	if (kva == NULL)
+		return (NULL);
+
+	kva->data = (kv_t *)(void *)&kva[1];
+	kva->length = 0;
+
+	if ((defp = defopen_r(AUTH_POLICY)) == NULL)
+		goto return_null;
+
+	for (i = is_cons_user(user) ? 0 : 1; i < NDFLTPLY; i++) {
+		char *cp = defread_r(dfltply[i].defkw, defp);
+
+		if (cp == NULL)
+			continue;
+		if ((cp = strdup(cp)) == NULL)
+			goto return_null;
+
+		kva->data[kva->length].key = dfltply[i].attr;
+		kva->data[kva->length++].value = cp;
+	}
+
+	(void) defclose_r(defp);
+	return (kva);
+
+return_null:
+	if (defp != NULL)
+		(void) defclose_r(defp);
+
+	free_default_attrs(kva);
+	return (NULL);
 }

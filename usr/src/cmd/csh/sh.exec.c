@@ -1,6 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -12,13 +11,10 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sh.h"
 #include <dirent.h>
 #include <string.h>
 #include "sh.tconst.h"
-#include "sh_policy.h"
 
 
 /*
@@ -123,7 +119,8 @@ doexec(struct command *t)
 		pv = justabs;
 	else
 		pv = v->vec;
-	sav = strspl(S_SLASH /* "/" */, *av); /* / command name for postpending */
+	/* / command name for postpending */
+	sav = strspl(S_SLASH /* "/" */, *av);
 #ifdef VFORK
 	Vsav = sav;
 #endif
@@ -140,7 +137,8 @@ doexec(struct command *t)
 				goto cont;
 		}
 
-		if (pv[0][0] == 0 || eq(pv[0], S_DOT /* "." */)) { /* don't make ./xxx */
+		/* don't make ./xxx */
+		if (pv[0][0] == 0 || eq(pv[0], S_DOT /* "." */)) {
 			texec(t, *av, av);
 		} else {
 			dp = strspl(*pv, sav);
@@ -193,7 +191,6 @@ pexerr(void)
 void
 texec(struct command *cmd, tchar *f, tchar **t)
 {
-	int	pfstatus = 0;
 	struct	varent *v;
 	tchar	**vp;
 	tchar		*lastsh[2];
@@ -204,16 +201,7 @@ texec(struct command *cmd, tchar *f, tchar **t)
 	/* convert cfname and cargs from tchar to char */
 	tconvert(cmd, f, t);
 
-	if (pfcshflag == 1) {
-		pfstatus = secpolicy_pfexec((const char *)(cmd->cfname),
-		    cmd->cargs, (const char **)NULL);
-		if (pfstatus != NOATTRS) {
-			errno = pfstatus;
-		}
-	}
-	if ((pfcshflag == 0) || (pfstatus == NOATTRS)) {
-		execv(cmd->cfname, cmd->cargs);
-	}
+	execv(cmd->cfname, cmd->cargs);
 
 	/*
 	 * exec returned, free up allocations from above
@@ -257,7 +245,9 @@ texec(struct command *cmd, tchar *f, tchar **t)
 #endif
 
 			vp = lastsh;
-			vp[0] = adrof(S_shell /* "shell" */) ? value(S_shell /* "shell" */) : S_SHELLPATH /* SHELLPATH */;
+			vp[0] = adrof(S_shell /* "shell" */) ?
+			    value(S_shell /* "shell" */) :
+			    S_SHELLPATH /* SHELLPATH */;
 			vp[1] =  (tchar *) NULL;
 #ifdef OTHERSH
 			if (ff != -1 && read_(ff, ch, 1) == 1 && ch[0] != '#')
@@ -314,7 +304,7 @@ tconvert(struct command *cmd, tchar *fname, tchar **list)
 
 	len = blklen(list);
 	rc = cmd->cargs = (char **)
-		xcalloc((uint_t)(len + 1), sizeof (char **));
+	    xcalloc((uint_t)(len + 1), sizeof (char **));
 	while (len--)
 		*rc++ = tstostr(NULL, *list++);
 	*rc = NULL;
@@ -399,9 +389,7 @@ dohash(char cachearray[])
 	for (cnt = 0; cnt < (HSHSIZ / 8); cnt++)
 		cachearray[cnt] = 0;
 	if (v == 0)
-		{
 		return;
-		}
 	for (pv = v->vec; *pv; pv++, i++) {
 		if (pv[0][0] != '/')
 			continue;
@@ -420,7 +408,8 @@ dohash(char cachearray[])
 			    (dp->d_name[1] == '\0' ||
 			    dp->d_name[1] == '.' && dp->d_name[2] == '\0'))
 				continue;
-			hashval = hash(hashname(strtots(curdir_, dp->d_name)), i);
+			hashval = hash(hashname(strtots(curdir_, dp->d_name)),
+			    i);
 			bis(cachearray, hashval);
 		}
 		unsetfd(dirp->dd_fd);
@@ -449,7 +438,7 @@ hashstat(void)
 
 	if (hits+misses)
 		printf("%d hits, %d misses, %d%%\n",
-			hits, misses, 100 * hits / (hits + misses));
+		    hits, misses, 100 * hits / (hits + misses));
 }
 #endif
 

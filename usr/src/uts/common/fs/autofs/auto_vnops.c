@@ -337,10 +337,8 @@ auto_access(
 			if (groupmember(fnp->fn_gid, cred) == 0)
 				shift += 3;
 		}
-		mode &= ~(fnp->fn_mode << shift);
-		if (mode != 0)
-			error = secpolicy_vnode_access(cred, vp, fnp->fn_uid,
-			    mode);
+		error = secpolicy_vnode_access2(cred, vp, fnp->fn_uid,
+		    fnp->fn_mode << shift, mode);
 	}
 
 done:

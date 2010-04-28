@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -52,6 +51,7 @@ uid_t	Egid;			/* truss's effective gid */
 uid_t	Ruid;			/* truss's real uid */
 uid_t	Rgid;			/* truss's real gid */
 prcred_t credentials;		/* traced process credentials */
+prpriv_t *privdata;		/* traced process privileges */
 int	istty;			/* TRUE iff output is a tty */
 time_t	starttime;		/* start time */
 

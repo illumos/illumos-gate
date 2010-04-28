@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -220,88 +219,68 @@ free_execattr(execattr_t *exec)
 	}
 }
 
+typedef struct call {
+	const char	*type;
+	const char	*id;
+	int		sflag;
+} call;
+
+typedef struct result {
+	execattr_t *head;
+	execattr_t *prev;
+} result;
+
+/*ARGSUSED*/
+static int
+findexecattr(const char *prof, kva_t *kva, void *ctxt, void *res)
+{
+	execattr_t *exec;
+	call *c = ctxt;
+	result *r = res;
+
+	if ((exec = getexecprof(prof, c->type, c->id, c->sflag)) != NULL) {
+		if (IS_GET_ONE(c->sflag)) {
+			r->head = exec;
+			return (1);
+		} else if (IS_GET_ALL(c->sflag)) {
+			if (r->head == NULL) {
+				r->head = exec;
+				r->prev = get_tail(r->head);
+			} else {
+				r->prev->next = exec;
+				r->prev = get_tail(exec);
+			}
+		}
+	}
+	return (0);
+}
+
 
 static execattr_t *
 userprof(const char *username, const char *type, const char *id,
     int search_flag)
 {
 
-	int		err = 0;
-	char		*last;
-	char		*sep = ",";
-	char		*proflist = NULL;
-	char		*profname = NULL;
-	char		buf[NSS_BUFLEN_USERATTR];
 	char		pwdb[NSS_BUFLEN_PASSWD];
-	kva_t		*user_attr;
-	userstr_t	user;
-	userstr_t	*utmp;
-	execattr_t	*exec;
-	execattr_t	*head = NULL;
-	execattr_t	*prev = NULL;
 	struct passwd	pwd;
-
-	char		*profArray[MAXPROFS];
-	int		profcnt = 0;
-	int		i;
+	call		call;
+	result		result;
 
 	/*
 	 * Check if specified username is valid user
 	 */
 	if (getpwnam_r(username, &pwd, pwdb, sizeof (pwdb)) == NULL) {
-		return (head);
+		return (NULL);
 	}
 
-	utmp = _getusernam(username, &user, buf, NSS_BUFLEN_USERATTR, &err);
-	if (utmp != NULL) {
-		user_attr = _str2kva(user.attr, KV_ASSIGN, KV_DELIMITER);
-		if ((proflist = kva_match(user_attr, "profiles")) != NULL) {
-			/* Get the list of profiles for this user */
-			for (profname = _strtok_escape(proflist, sep, &last);
-			    profname != NULL;
-			    profname = _strtok_escape(NULL, sep, &last)) {
-				getproflist(profname, profArray, &profcnt);
-			}
-		}
-	}
+	result.head = result.prev = NULL;
+	call.type = type;
+	call.id = id;
+	call.sflag = search_flag;
 
-	/* Get the list of default profiles */
-	proflist = NULL;
-	(void) _get_user_defs(username, NULL, &proflist);
-	if (proflist != NULL) {
-		for (profname = _strtok_escape(proflist, sep, &last);
-		    profname != NULL;
-		    profname = _strtok_escape(NULL, sep, &last)) {
-			getproflist(profname, profArray, &profcnt);
-		}
-		_free_user_defs(NULL, proflist);
-	}
+	(void) _enum_profs(username, findexecattr, &call, &result);
 
-	if (profcnt == 0) {
-		return (head);
-	}
-
-	/* Get execs from the list of profiles */
-	for (i = 0; i < profcnt; i++) {
-		profname = profArray[i];
-		if ((exec = getexecprof(profname, type, id, search_flag)) !=
-		    NULL) {
-			if (IS_GET_ONE(search_flag)) {
-				head = exec;
-				break;
-			} else if (IS_GET_ALL(search_flag)) {
-				if (head == NULL) {
-					head = exec;
-					prev = get_tail(head);
-				} else {
-					prev->next = exec;
-					prev = get_tail(exec);
-				}
-			}
-		}
-	}
-	free_proflist(profArray, profcnt);
-	return (head);
+	return (result.head);
 }
 
 

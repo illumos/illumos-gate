@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/atomic.h>
 #include <sys/door.h>
@@ -139,21 +136,21 @@ klpd_unlink(klpd_reg_t *p)
 }
 
 /*
- * Remove the head of the klpd list and decrement its refcnt.
+ * Remove all elements of the klpd list and decrement their refcnts.
  * The lock guarding the list should be held; this function is
- * called when we are sure we want to remove the entry from the
- * list but not so sure that the reference count has dropped back to
- * 1 and is specifically intended to remove the non-list variants.
+ * called when we are sure we want to destroy the list completely
+ * list but not so sure that the reference counts of all elements have
+ * dropped back to 1.
  */
 void
-klpd_remove(klpd_reg_t **pp)
+klpd_freelist(klpd_reg_t **pp)
 {
-	klpd_reg_t *p = *pp;
-	if (p == NULL)
-		return;
-	ASSERT(p->klpd_next == NULL);
-	klpd_unlink(p);
-	klpd_rele(p);
+	klpd_reg_t *p;
+
+	while ((p = *pp) != NULL) {
+		klpd_unlink(p);
+		klpd_rele(p);
+	}
 }
 
 /*
@@ -192,7 +189,7 @@ klpd_link(klpd_reg_t *p, klpd_reg_t **listp, boolean_t single)
 static klpd_head_t *
 klpd_marshall(klpd_reg_t *p, const priv_set_t *rq, va_list ap)
 {
-	char	*comp;
+	char	*tmp;
 	uint_t	type;
 	vnode_t *vp;
 	size_t	len = sizeof (priv_set_t) + sizeof (klpd_head_t);
@@ -214,10 +211,10 @@ klpd_marshall(klpd_reg_t *p, const priv_set_t *rq, va_list ap)
 		if (vp == NULL)
 			return (NULL);
 
-		comp = va_arg(ap, char *);
+		tmp = va_arg(ap, char *);
 
-		if (comp != NULL && *comp != '\0')
-			clen = strlen(comp) + 1;
+		if (tmp != NULL && *tmp != '\0')
+			clen = strlen(tmp) + 1;
 		else
 			clen = 0;
 
@@ -242,7 +239,7 @@ klpd_marshall(klpd_reg_t *p, const priv_set_t *rq, va_list ap)
 			if (plen <= 2)
 				plen = 0;
 			kap->kla_str[plen] = '/';
-			bcopy(comp, &kap->kla_str[plen + 1], clen);
+			bcopy(tmp, &kap->kla_str[plen + 1], clen);
 		}
 		break;
 	case KLPDARG_PORT:
@@ -636,7 +633,7 @@ klpd_unreg(int did, idtype_t type, id_t id)
 		if (kpp->kpj_klpd == NULL)
 			res = ESRCH;
 		else
-			klpd_remove(&kpp->kpj_klpd);
+			klpd_freelist(&kpp->kpj_klpd);
 		mutex_exit(&klpd_mutex);
 		project_rele(kpp);
 		goto out;
@@ -720,4 +717,430 @@ crklpd_setreg(credklpd_t *crk, klpd_reg_t *new)
 
 	if (old != NULL)
 		klpd_rele(old);
+}
+
+/* Allocate and register the pfexec specific callback */
+int
+pfexec_reg(int did)
+{
+	door_handle_t dh;
+	int err = secpolicy_pfexec_register(CRED());
+	klpd_reg_t *pfx;
+	door_info_t di;
+	zone_t *myzone = crgetzone(CRED());
+
+	if (err != 0)
+		return (set_errno(err));
+
+	dh = door_ki_lookup(did);
+	if (dh == NULL || door_ki_info(dh, &di) != 0)
+		return (set_errno(EBADF));
+
+	pfx = kmem_zalloc(sizeof (*pfx), KM_SLEEP);
+
+	pfx->klpd_door = dh;
+	pfx->klpd_door_pid = di.di_target;
+	pfx->klpd_ref = 1;
+	pfx->klpd_cred = NULL;
+	mutex_enter(&myzone->zone_lock);
+	pfx = klpd_link(pfx, &myzone->zone_pfexecd, B_TRUE);
+	mutex_exit(&myzone->zone_lock);
+	if (pfx != NULL)
+		klpd_rele(pfx);
+
+	return (0);
+}
+
+int
+pfexec_unreg(int did)
+{
+	door_handle_t dh;
+	int err = 0;
+	zone_t *myzone = crgetzone(CRED());
+	klpd_reg_t *pfd;
+
+	dh = door_ki_lookup(did);
+	if (dh == NULL)
+		return (set_errno(EBADF));
+
+	mutex_enter(&myzone->zone_lock);
+	pfd = myzone->zone_pfexecd;
+	if (pfd != NULL && pfd->klpd_door == dh) {
+		klpd_unlink(pfd);
+	} else {
+		pfd = NULL;
+		err = EINVAL;
+	}
+	mutex_exit(&myzone->zone_lock);
+	door_ki_rele(dh);
+	/*
+	 * crfree() cannot be called with zone_lock held; it is called
+	 * indirectly through closing the door handle
+	 */
+	if (pfd != NULL)
+		klpd_rele(pfd);
+	if (err != 0)
+		return (set_errno(err));
+	return (0);
+}
+
+static int
+get_path(char *buf, const char *path, int len)
+{
+	size_t lc;
+	char *s;
+
+	if (len < 0)
+		len = strlen(path);
+
+	if (*path == '/' && len < MAXPATHLEN) {
+		(void) strcpy(buf, path);
+		return (0);
+	}
+	/*
+	 * Build the pathname using the current directory + resolve pathname.
+	 * The resolve pathname either starts with a normal component and
+	 * we can just concatenate them or it starts with one
+	 * or more ".." component and we can remove those; the
+	 * last one cannot be a ".." and the current directory has
+	 * more components than the number of ".." in the resolved pathname.
+	 */
+	if (dogetcwd(buf, MAXPATHLEN) != 0)
+		return (-1);
+
+	lc = strlen(buf);
+
+	while (len > 3 && strncmp("../", path, 3) == 0) {
+		len -= 3;
+		path += 3;
+
+		s = strrchr(buf, '/');
+		if (s == NULL || s == buf)
+			return (-1);
+
+		*s = '\0';
+		lc = s - buf;
+	}
+	/* Add a "/" and a NUL */
+	if (lc < 2 || lc + len + 2 >= MAXPATHLEN)
+		return (-1);
+
+	buf[lc] = '/';
+	(void) strcpy(buf + lc + 1, path);
+
+	return (0);
+}
+
+/*
+ * Perform the pfexec upcall.
+ *
+ * The pfexec upcall is different from the klpd_upcall in that a failure
+ * will lead to a denial of execution.
+ */
+int
+pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
+    boolean_t *scrub)
+{
+	klpd_reg_t *pfd;
+	pfexec_arg_t *pap;
+	pfexec_reply_t pr, *prp;
+	door_arg_t da;
+	int dres;
+	cred_t *ncr = NULL;
+	int err = -1;
+	priv_set_t *iset;
+	priv_set_t *lset;
+	zone_t *myzone = crgetzone(CRED());
+	size_t pasize = PFEXEC_ARG_SIZE(MAXPATHLEN);
+
+	/* Find registration */
+	mutex_enter(&myzone->zone_lock);
+	if ((pfd = myzone->zone_pfexecd) != NULL)
+		klpd_hold(pfd);
+	mutex_exit(&myzone->zone_lock);
+
+	if (pfd == NULL)
+		return (0);
+
+	if (pfd->klpd_door_pid == curproc->p_pid) {
+		klpd_rele(pfd);
+		return (0);
+	}
+
+	pap = kmem_zalloc(pasize, KM_SLEEP);
+
+	if (get_path(pap->pfa_path, rpnp->pn_path, rpnp->pn_pathlen) == -1)
+		goto out1;
+
+	pap->pfa_vers = PFEXEC_ARG_VERS;
+	pap->pfa_call = PFEXEC_EXEC_ATTRS;
+	pap->pfa_len = pasize;
+	pap->pfa_uid = crgetruid(cr);
+
+	da.data_ptr = (char *)pap;
+	da.data_size = pap->pfa_len;
+	da.desc_ptr = NULL;
+	da.desc_num = 0;
+	da.rbuf = (char *)&pr;
+	da.rsize = sizeof (pr);
+
+	while ((dres = door_ki_upcall(pfd->klpd_door, &da)) != 0) {
+		switch (dres) {
+		case EAGAIN:
+			delay(1);
+			continue;
+		case EINVAL:
+		case EBADF:
+			/* FALLTHROUGH */
+		case EINTR:
+			/* FALLTHROUGH */
+		default:
+			goto out;
+		}
+	}
+
+	prp = (pfexec_reply_t *)da.rbuf;
+	/*
+	 * Check the size of the result and the alignment of the
+	 * privilege sets.
+	 */
+	if (da.rsize < sizeof (pr) ||
+	    prp->pfr_ioff > da.rsize - sizeof (priv_set_t) ||
+	    prp->pfr_loff > da.rsize - sizeof (priv_set_t) ||
+	    (prp->pfr_loff & (sizeof (priv_chunk_t) - 1)) != 0 ||
+	    (prp->pfr_loff & (sizeof (priv_chunk_t) - 1)) != 0)
+		goto out;
+
+	/*
+	 * Get results:
+	 *	allow/allow with additional credentials/disallow[*]
+	 *
+	 *	euid, uid, egid, gid, privs, and limitprivs
+	 * We now have somewhat more flexibility we could even set E and P
+	 * judiciously but that would break some currently valid assumptions
+	 *	[*] Disallow is not readily supported by always including
+	 *	the Basic Solaris User profile in all user's profiles.
+	 */
+
+	if (!prp->pfr_allowed) {
+		err = EACCES;
+		goto out;
+	}
+	if (!prp->pfr_setcred) {
+		err = 0;
+		goto out;
+	}
+	ncr = crdup((cred_t *)cr);
+
+	/*
+	 * Generate the new credential set scrubenv if ruid != euid (or set)
+	 * the "I'm set-uid flag" but that is not inherited so scrubbing
+	 * the environment is a requirement.
+	 */
+	/* Set uids or gids, note that -1 will do the right thing */
+	if (crsetresuid(ncr, prp->pfr_ruid, prp->pfr_euid, prp->pfr_euid) != 0)
+		goto out;
+	if (crsetresgid(ncr, prp->pfr_rgid, prp->pfr_egid, prp->pfr_egid) != 0)
+		goto out;
+
+	*scrub = prp->pfr_scrubenv;
+
+	if (prp->pfr_clearflag)
+		CR_FLAGS(ncr) &= ~PRIV_PFEXEC;
+
+	/* We cannot exceed our Limit set, no matter what */
+	iset = PFEXEC_REPLY_IPRIV(prp);
+
+	if (iset != NULL) {
+		if (!priv_issubset(iset, &CR_LPRIV(ncr)))
+			goto out;
+		priv_union(iset, &CR_IPRIV(ncr));
+	}
+
+	/* Nor can we increate our Limit set itself */
+	lset = PFEXEC_REPLY_LPRIV(prp);
+
+	if (lset != NULL) {
+		if (!priv_issubset(lset, &CR_LPRIV(ncr)))
+			goto out;
+		CR_LPRIV(ncr) = *lset;
+	}
+
+	/* Exec will do the standard set operations */
+
+	err = 0;
+out:
+	if (da.rbuf != (char *)&pr)
+		kmem_free(da.rbuf, da.rsize);
+out1:
+	kmem_free(pap, pasize);
+	klpd_rele(pfd);
+	if (ncr != NULL) {
+		if (err == 0)
+			*pfcr = ncr;
+		else
+			crfree(ncr);
+	}
+	return (err);
+}
+
+int
+get_forced_privs(const cred_t *cr, const char *respn, priv_set_t *set)
+{
+	klpd_reg_t *pfd;
+	pfexec_arg_t *pap;
+	door_arg_t da;
+	int dres;
+	int err = -1;
+	priv_set_t *fset, pmem;
+	cred_t *zkcr;
+	zone_t *myzone = crgetzone(cr);
+	size_t pasize = PFEXEC_ARG_SIZE(MAXPATHLEN);
+
+	mutex_enter(&myzone->zone_lock);
+	if ((pfd = myzone->zone_pfexecd) != NULL)
+		klpd_hold(pfd);
+	mutex_exit(&myzone->zone_lock);
+
+	if (pfd == NULL)
+		return (-1);
+
+	if (pfd->klpd_door_pid == curproc->p_pid) {
+		klpd_rele(pfd);
+		return (0);
+	}
+
+	pap = kmem_zalloc(pasize, KM_SLEEP);
+
+	if (get_path(pap->pfa_path, respn, -1) == -1)
+		goto out1;
+
+	pap->pfa_vers = PFEXEC_ARG_VERS;
+	pap->pfa_call = PFEXEC_FORCED_PRIVS;
+	pap->pfa_len = pasize;
+	pap->pfa_uid = (uid_t)-1;			/* Not relevant */
+
+	da.data_ptr = (char *)pap;
+	da.data_size = pap->pfa_len;
+	da.desc_ptr = NULL;
+	da.desc_num = 0;
+	da.rbuf = (char *)&pmem;
+	da.rsize = sizeof (pmem);
+
+	while ((dres = door_ki_upcall(pfd->klpd_door, &da)) != 0) {
+		switch (dres) {
+		case EAGAIN:
+			delay(1);
+			continue;
+		case EINVAL:
+		case EBADF:
+		case EINTR:
+		default:
+			goto out;
+		}
+	}
+
+	/*
+	 * Check the size of the result, it's a privilege set.
+	 */
+	if (da.rsize != sizeof (priv_set_t))
+		goto out;
+
+	fset = (priv_set_t *)da.rbuf;
+
+	/*
+	 * We restrict the forced privileges with whatever is available in
+	 * the current zone.
+	 */
+	zkcr = zone_kcred();
+	priv_intersect(&CR_LPRIV(zkcr), fset);
+
+	/*
+	 * But we fail if the forced privileges are not found in the current
+	 * Limit set.
+	 */
+	if (!priv_issubset(fset, &CR_LPRIV(cr))) {
+		err = EACCES;
+	} else if (!priv_isemptyset(fset)) {
+		err = 0;
+		*set = *fset;
+	}
+out:
+	if (da.rbuf != (char *)&pmem)
+		kmem_free(da.rbuf, da.rsize);
+out1:
+	kmem_free(pap, pasize);
+	klpd_rele(pfd);
+	return (err);
+}
+
+int
+check_user_privs(const cred_t *cr, const priv_set_t *set)
+{
+	klpd_reg_t *pfd;
+	pfexec_arg_t *pap;
+	door_arg_t da;
+	int dres;
+	int err = -1;
+	zone_t *myzone = crgetzone(cr);
+	size_t pasize = PFEXEC_ARG_SIZE(sizeof (priv_set_t));
+	uint32_t res;
+
+	mutex_enter(&myzone->zone_lock);
+	if ((pfd = myzone->zone_pfexecd) != NULL)
+		klpd_hold(pfd);
+	mutex_exit(&myzone->zone_lock);
+
+	if (pfd == NULL)
+		return (-1);
+
+	if (pfd->klpd_door_pid == curproc->p_pid) {
+		klpd_rele(pfd);
+		return (0);
+	}
+
+	pap = kmem_zalloc(pasize, KM_SLEEP);
+
+	*(priv_set_t *)&pap->pfa_buf = *set;
+
+	pap->pfa_vers = PFEXEC_ARG_VERS;
+	pap->pfa_call = PFEXEC_USER_PRIVS;
+	pap->pfa_len = pasize;
+	pap->pfa_uid = crgetruid(cr);
+
+	da.data_ptr = (char *)pap;
+	da.data_size = pap->pfa_len;
+	da.desc_ptr = NULL;
+	da.desc_num = 0;
+	da.rbuf = (char *)&res;
+	da.rsize = sizeof (res);
+
+	while ((dres = door_ki_upcall(pfd->klpd_door, &da)) != 0) {
+		switch (dres) {
+		case EAGAIN:
+			delay(1);
+			continue;
+		case EINVAL:
+		case EBADF:
+		case EINTR:
+		default:
+			goto out;
+		}
+	}
+
+	/*
+	 * Check the size of the result.
+	 */
+	if (da.rsize != sizeof (res))
+		goto out;
+
+	if (*(uint32_t *)da.rbuf == 1)
+		err = 0;
+out:
+	if (da.rbuf != (char *)&res)
+		kmem_free(da.rbuf, da.rsize);
+out1:
+	kmem_free(pap, pasize);
+	klpd_rele(pfd);
+	return (err);
 }

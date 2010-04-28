@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _BSM_AUDIT_KEVENTS_H
@@ -159,8 +158,9 @@ extern "C" {
 #define	AUE_SYSTEMBOOT		113	/* =na system booted */
 #define	AUE_ASYNC_DAEMON_EXIT	114	/* =no async_daemon(2) exited */
 #define	AUE_NFSSVC_EXIT		115	/* =no nfssvc(2) exited */
+#define	AUE_PFEXEC		116	/* =ps,ex,ua,as execve(2) w/ pfexec */
 /*
- * 116 - 129 are available for future growth (old SunOS_CMW events
+ * 117 - 129 are available for future growth (old SunOS_CMW events
  * that had no libbsm or praudit support or references)
  */
 #define	AUE_GETAUID		130	/* =aa getauid(2) */

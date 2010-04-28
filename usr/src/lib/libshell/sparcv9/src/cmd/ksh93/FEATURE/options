@@ -12,9 +12,7 @@
 #ifndef SHOPT_DEVFD
 #   define SHOPT_DEVFD	1
 #endif
-#ifndef SHOPT_PFSH
-#   define SHOPT_PFSH	1
-#endif
+#undef  SHOPT_PFSH
 #undef  SHOPT_TEST_L
 #ifndef SHOPT_SYSRC
 #   define SHOPT_SYSRC	1

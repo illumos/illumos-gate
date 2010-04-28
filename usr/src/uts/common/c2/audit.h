@@ -529,7 +529,7 @@ void	audit_reboot(void);
 void	audit_vncreate_start(void);
 void	audit_setfsat_path(int argnum);
 void	audit_vncreate_finish(struct vnode *, int);
-void	audit_exec(const char *, const char *, ssize_t, ssize_t);
+void	audit_exec(const char *, const char *, ssize_t, ssize_t, cred_t *);
 void	audit_enterprom(int);
 void	audit_exitprom(int);
 void	audit_chdirec(struct vnode *, struct vnode **);

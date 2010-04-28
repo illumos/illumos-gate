@@ -18,42 +18,45 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# Makefile for the pfexec daemon.
 #
 
-PROG= pfexec
-SRCS= $(PROG:%=%.c)
-PFEXEC= pfexec
-
-BINSHELLS = bash csh ksh ksh93 rksh rksh93 sh tcsh zsh
+PROG=		pfexecd
+MANIFEST=	pfexecd.xml
+SRCS=		$(PROG:%=%.c)
+lint:	lint_SRCS
 
 include ../Makefile.cmd
 
-FILEMODE =	0555
+TARGET=	all
 
-ROOTBINPFEXEC = $(PFEXEC:%=$(ROOTBIN)/%)
+ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
+
+LDLIBS += -lsecdb
+
+# install macros and rule
+#
+GROUP=		bin
+ROOTPROG=	$(ROOTLIB)/$(PROG)
+$(ROOTPROG)	:= FILEMODE= 555
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
-install: all $(ROOTBINPFEXEC)
-	for s in $(BINSHELLS); do \
-		$(RM) $(ROOTBIN)/pf$$s; \
-		$(LN) $(ROOTBIN)/pfexec $(ROOTBIN)/pf$$s; \
-	done
-	$(RM) $(ROOTXPG4BIN)/pfsh
-	$(LN) $(ROOTBIN)/pfexec $(ROOTXPG4BIN)/pfsh
-	$(RM) $(ROOTSBIN)/pfsh
-	$(SYMLINK) ../usr/bin/pfexec $(ROOTSBIN)/pfsh
-	$(RM) $(ROOTHASBIN)/pfsh
-	$(LN) $(ROOTBIN)/pfexec $(ROOTHASBIN)/pfsh
-	$(RM) $(ROOTHASBIN)/pfksh
-	$(LN) $(ROOTBIN)/pfexec $(ROOTHASBIN)/pfksh
+install: all .WAIT $(ROOTPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 clean:
 
-lint:	lint_SRCS
+check:	$(CHKMANIFEST)
+
+${ROOTLIB}/%: %
+	${INS.file}
+
+lint: lint_SRCS
 
 include ../Makefile.targ

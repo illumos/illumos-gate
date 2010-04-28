@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -51,17 +50,10 @@
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 
-#define	PROFLIST_SEP	","
-
-
 static void usage();
 static int show_profs(char *, int);
-static int list_profs(userattr_t *, int);
 static void print_profs_long(execattr_t *);
-static void print_profs(char **, int, int);
-static void getProfiles(char *, char **, int *);
-static void getDefaultProfiles(char *, char **, int *);
-static void print_profile_privs(const char *);
+static void print_profile_privs(kva_t *);
 
 static char *progname = "profiles";
 
@@ -110,15 +102,31 @@ main(int argc, char *argv[])
 	return (status);
 }
 
+static int
+show_profs_callback(const char *prof, kva_t *pa, void *pflag, void *vcnt)
+{
+	char *indent = "";
+	const int *print_flag = pflag;
+	int *pcnt = vcnt;
+
+	(*pcnt)++;
+
+	if ((*print_flag) & PRINT_NAME) {
+		indent = "          ";
+	}
+
+	(void) printf("%s%s", indent, prof);
+	print_profile_privs(pa);
+	(void) printf("\n");
+
+	return (0);
+}
 
 static int
 show_profs(char *username, int print_flag)
 {
 	int		status = EXIT_OK;
 	struct passwd	*pw;
-	userattr_t	*user;
-	char		*profArray[MAXPROFS];
-	int		profcnt = 0;
 	execattr_t	*exec;
 
 	if (username == NULL) {
@@ -135,25 +143,23 @@ show_profs(char *username, int print_flag)
 		(void) fprintf(stderr, gettext("No such user\n"));
 		return (status);
 	}
-	if (username != NULL) {
-		if ((user = getusernam(username)) != NULL) {
-			status = list_profs(user, print_flag);
+
+	if (print_flag & PRINT_LONG) {
+		exec = getexecuser(username, KV_COMMAND, NULL,
+		    GET_ALL|__SEARCH_ALL_POLS);
+		if (exec != NULL) {
+			print_profs_long(exec);
+			free_execattr(exec);
 		} else {
-			getDefaultProfiles(username, profArray, &profcnt);
-			if (profcnt == 0) {
-				status = EXIT_NON_FATAL;
-			} else {
-				if (print_flag & PRINT_LONG) {
-					exec = getexecuser(username, KV_COMMAND,
-					    NULL, GET_ALL|__SEARCH_ALL_POLS);
-					print_profs_long(exec);
-					free_execattr(exec);
-				} else {
-					print_profs(profArray, print_flag,
-					    profcnt);
-				}
-			}
+			status = EXIT_NON_FATAL;
 		}
+	} else {
+		int cnt = 0;
+		(void) _enum_profs(username, show_profs_callback, &print_flag,
+		    &cnt);
+
+		if (cnt == 0)
+			status = EXIT_NON_FATAL;
 	}
 
 	if (status == EXIT_NON_FATAL) {
@@ -163,47 +169,6 @@ show_profs(char *username, int print_flag)
 
 	return (status);
 }
-
-
-static int
-list_profs(userattr_t *user, int print_flag)
-{
-	int		status = EXIT_OK;
-	char		*proflist = (char *)NULL;
-	execattr_t	*exec = (execattr_t *)NULL;
-	char		*profArray[MAXPROFS];
-	int		profcnt = 0;
-
-	if (print_flag & PRINT_LONG) {
-		exec = getexecuser(user->name, KV_COMMAND, NULL,
-		    GET_ALL|__SEARCH_ALL_POLS);
-		if (exec == NULL) {
-			status = EXIT_NON_FATAL;
-		}
-	} else {
-		proflist = kva_match(user->attr, USERATTR_PROFILES_KW);
-		if (proflist != NULL) {
-			getProfiles(proflist, profArray, &profcnt);
-		}
-		/* Also get any default profiles */
-		getDefaultProfiles(user->name, profArray, &profcnt);
-		if (profcnt == 0) {
-			status = EXIT_NON_FATAL;
-		}
-	}
-	if (status == EXIT_OK) {
-		if (print_flag & PRINT_LONG) {
-			print_profs_long(exec);
-			free_execattr(exec);
-		} else {
-			print_profs(profArray, print_flag, profcnt);
-		}
-	}
-	free_userattr(user);
-
-	return (status);
-}
-
 
 /*
  * print extended profile information.
@@ -242,9 +207,16 @@ print_profs_long(execattr_t *exec)
 	for (curprofile = ""; exec != NULL; exec = exec->next) {
 		/* print profile name if it is a new one */
 		if (strcmp(curprofile, exec->name) != 0) {
+			profattr_t *pa;
 			curprofile = exec->name;
+
 			(void) printf("      %s", curprofile);
-			print_profile_privs(curprofile);
+
+			pa = getprofnam(curprofile);
+			if (pa != NULL) {
+				print_profile_privs(pa->attr);
+				free_profattr(pa);
+			}
 			(void) printf("\n");
 		}
 		len = printf("          %s ", exec->id);
@@ -289,66 +261,13 @@ usage()
 }
 
 static void
-getProfiles(char *profiles, char **profArray, int *profcnt) {
-
-	char		*prof;
-	char		*lasts;
-
-	for (prof = (char *)strtok_r(profiles, PROFLIST_SEP, &lasts);
-	    prof != NULL;
-	    prof = (char *)strtok_r(NULL, PROFLIST_SEP, &lasts)) {
-
-		getproflist(prof, profArray, profcnt);
-
-	}
-}
-
-static void
-print_profile_privs(const char *profile)
+print_profile_privs(kva_t *attr)
 {
-	profattr_t *prof_entry = getprofnam(profile);
 	char *privs;
 
-	if (prof_entry) {
-		privs = kva_match(prof_entry->attr, PROFATTR_PRIVS_KW);
+	if (attr) {
+		privs = kva_match(attr, PROFATTR_PRIVS_KW);
 		if (privs)
 			(void) printf(" privs=%s", privs);
-		free_profattr(prof_entry);
-	}
-}
-
-static void
-print_profs(char **profnames, int print_flag, int profcnt)
-{
-
-	int i;
-	char *indent = "";
-
-	if (print_flag & PRINT_NAME) {
-		indent = "          ";
-	}
-
-	for (i = 0; i < profcnt; i++) {
-		(void) printf("%s%s", indent, profnames[i]);
-		print_profile_privs(profnames[i]);
-		(void) printf("\n");
-	}
-
-	free_proflist(profnames, profcnt);
-}
-
-/*
- * Get the list of default profiles from /etc/security/policy.conf
- */
-static void
-getDefaultProfiles(char *user, char **profArray, int *profcnt)
-{
-	char *profs = NULL;
-
-	if (_get_user_defs(user, NULL, &profs) == 0) {
-		if (profs != NULL) {
-			getProfiles(profs, profArray, profcnt);
-			_free_user_defs(NULL, profs);
-		}
 	}
 }

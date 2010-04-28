@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -973,7 +972,7 @@ showargs(private_t *pri, int raw)
 	if (raw)
 		showpaths(pri, &systable[SYS_execve]);
 
-	show_cred(pri, FALSE);
+	show_cred(pri, FALSE, FALSE);
 
 	if (aflag || eflag) {		/* dump args or environment */
 

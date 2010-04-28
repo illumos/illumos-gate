@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -146,6 +145,12 @@ int priv_basic_test = -1;
 #define	HAS_PRIVILEGE(cr, pr)	((pr) == PRIV_ALL ? \
 					HAS_ALLPRIVS(cr) : \
 					PRIV_ISASSERT(&CR_OEPRIV(cr), pr))
+
+#define	FAST_BASIC_CHECK(cr, priv)	\
+	if (PRIV_ISASSERT(&CR_OEPRIV(cr), priv)) { \
+		DTRACE_PROBE2(priv__ok, int, priv, boolean_t, B_FALSE); \
+		return (0); \
+	}
 
 /*
  * Policy checking functions.
@@ -338,15 +343,26 @@ priv_policy_override(const cred_t *cr, int priv, boolean_t allzone, va_list ap)
 }
 
 static int
-priv_policy_override_set(const cred_t *cr, const priv_set_t *req, ...)
+priv_policy_override_set(const cred_t *cr, const priv_set_t *req, va_list ap)
 {
-	va_list ap;
-
+	if (CR_FLAGS(cr) & PRIV_PFEXEC)
+		return (check_user_privs(cr, req));
 	if (CR_FLAGS(cr) & PRIV_XPOLICY) {
-		va_start(ap, req);
 		return (klpd_call(cr, req, ap));
 	}
 	return (-1);
+}
+
+static int
+priv_policy_override_set_va(const cred_t *cr, const priv_set_t *req, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, req);
+	ret = priv_policy_override_set(cr, req, ap);
+	va_end(ap);
+	return (ret);
 }
 
 /*
@@ -418,7 +434,7 @@ int
 priv_policy(const cred_t *cr, int priv, boolean_t allzone, int err,
     const char *msg)
 {
-	return (priv_policy_va(cr, priv, allzone, err, msg, KLPDARG_NOMORE));
+	return (priv_policy_va(cr, priv, allzone, err, msg, KLPDARG_NONE));
 }
 
 /*
@@ -465,18 +481,24 @@ priv_policy_only(const cred_t *cr, int priv, boolean_t allzone)
  * Check whether all privileges in the required set are present.
  */
 static int
-secpolicy_require_set(const cred_t *cr, const priv_set_t *req, const char *msg)
+secpolicy_require_set(const cred_t *cr, const priv_set_t *req,
+    const char *msg, ...)
 {
 	int priv;
 	int pfound = -1;
 	priv_set_t pset;
+	va_list ap;
+	int ret;
 
 	if (req == PRIV_FULLSET ? HAS_ALLPRIVS(cr) : priv_issubset(req,
 	    &CR_OEPRIV(cr))) {
 		return (0);
 	}
 
-	if (priv_policy_override_set(cr, req, KLPDARG_NOMORE) == 0)
+	va_start(ap, msg);
+	ret = priv_policy_override_set(cr, req, ap);
+	va_end(ap);
+	if (ret == 0)
 		return (0);
 
 	if (req == PRIV_FULLSET || priv_isfullset(req)) {
@@ -542,6 +564,9 @@ secpolicy_setpriority(const cred_t *cr)
 /*
  * Binding to a privileged port, port must be specified in host byte
  * order.
+ * When adding a new privilege which allows binding to currently privileged
+ * ports, then you MUST also allow processes with PRIV_NET_PRIVADDR bind
+ * to these ports because of backward compatibility.
  */
 int
 secpolicy_net_privaddr(const cred_t *cr, in_port_t port, int proto)
@@ -555,10 +580,16 @@ secpolicy_net_privaddr(const cred_t *cr, in_port_t port, int proto)
 	case 139:
 	case 445:
 		/*
-		 * NBT and SMB ports, these are extra privileged ports,
-		 * allow bind only if the SYS_SMB privilege is present.
+		 * NBT and SMB ports, these are normal privileged ports,
+		 * allow bind only if the SYS_SMB or NET_PRIVADDR privilege
+		 * is present.
+		 * Try both, if neither is present return an error for
+		 * priv SYS_SMB.
 		 */
-		priv = PRIV_SYS_SMB;
+		if (PRIV_POLICY_ONLY(cr, PRIV_NET_PRIVADDR, B_FALSE))
+			priv = PRIV_NET_PRIVADDR;
+		else
+			priv = PRIV_SYS_SMB;
 		reason = "NBT or SMB port";
 		break;
 
@@ -684,8 +715,8 @@ secpolicy_fs_common(cred_t *cr, vnode_t *mvp, const vfs_t *vfsp,
 		if ((err = secpolicy_vnode_owner(cr, va.va_uid)) != 0)
 			return (err);
 
-		if ((va.va_mode & VWRITE) == 0 &&
-		    secpolicy_vnode_access(cr, mvp, va.va_uid, VWRITE) != 0) {
+		if (secpolicy_vnode_access2(cr, mvp, va.va_uid, va.va_mode,
+		    VWRITE) != 0) {
 			return (EACCES);
 		}
 	}
@@ -839,7 +870,6 @@ secpolicy_fs_linkdir(const cred_t *cr, const vfs_t *vfsp)
  * Output:      EACCES - if privilege check fails.
  */
 
-/* ARGSUSED */
 int
 secpolicy_vnode_access(const cred_t *cr, vnode_t *vp, uid_t owner, mode_t mode)
 {
@@ -874,6 +904,116 @@ secpolicy_vnode_access(const cred_t *cr, vnode_t *vp, uid_t owner, mode_t mode)
 		    KLPDARG_VNODE, vp, (char *)NULL, KLPDARG_NOMORE));
 	}
 	return (0);
+}
+
+/*
+ * Like secpolicy_vnode_access() but we get the actual wanted mode and the
+ * current mode of the file, not the missing bits.
+ */
+int
+secpolicy_vnode_access2(const cred_t *cr, vnode_t *vp, uid_t owner,
+    mode_t curmode, mode_t wantmode)
+{
+	mode_t mode;
+
+	/* Inline the basic privileges tests. */
+	if ((wantmode & VREAD) &&
+	    !PRIV_ISASSERT(&CR_OEPRIV(cr), PRIV_FILE_READ) &&
+	    priv_policy_va(cr, PRIV_FILE_READ, B_FALSE, EACCES, NULL,
+	    KLPDARG_VNODE, vp, (char *)NULL, KLPDARG_NOMORE) != 0) {
+		return (EACCES);
+	}
+
+	if ((wantmode & VWRITE) &&
+	    !PRIV_ISASSERT(&CR_OEPRIV(cr), PRIV_FILE_WRITE) &&
+	    priv_policy_va(cr, PRIV_FILE_WRITE, B_FALSE, EACCES, NULL,
+	    KLPDARG_VNODE, vp, (char *)NULL, KLPDARG_NOMORE) != 0) {
+		return (EACCES);
+	}
+
+	mode = ~curmode & wantmode;
+
+	if (mode == 0)
+		return (0);
+
+	if ((mode & VREAD) && priv_policy_va(cr, PRIV_FILE_DAC_READ, B_FALSE,
+	    EACCES, NULL, KLPDARG_VNODE, vp, (char *)NULL,
+	    KLPDARG_NOMORE) != 0) {
+		return (EACCES);
+	}
+
+	if (mode & VWRITE) {
+		boolean_t allzone;
+
+		if (owner == 0 && cr->cr_uid != 0)
+			allzone = B_TRUE;
+		else
+			allzone = B_FALSE;
+		if (priv_policy_va(cr, PRIV_FILE_DAC_WRITE, allzone, EACCES,
+		    NULL, KLPDARG_VNODE, vp, (char *)NULL,
+		    KLPDARG_NOMORE) != 0) {
+			return (EACCES);
+		}
+	}
+
+	if (mode & VEXEC) {
+		/*
+		 * Directories use file_dac_search to override the execute bit.
+		 */
+		int p = vp->v_type == VDIR ? PRIV_FILE_DAC_SEARCH :
+		    PRIV_FILE_DAC_EXECUTE;
+
+		return (priv_policy_va(cr, p, B_FALSE, EACCES, NULL,
+		    KLPDARG_VNODE, vp, (char *)NULL, KLPDARG_NOMORE));
+	}
+	return (0);
+}
+
+/*
+ * This is a special routine for ZFS; it is used to determine whether
+ * any of the privileges in effect allow any form of access to the
+ * file.  There's no reason to audit this or any reason to record
+ * this.  More work is needed to do the "KPLD" stuff.
+ */
+int
+secpolicy_vnode_any_access(const cred_t *cr, vnode_t *vp, uid_t owner)
+{
+	static int privs[] = {
+	    PRIV_FILE_OWNER,
+	    PRIV_FILE_DAC_READ,
+	    PRIV_FILE_DAC_WRITE,
+	    PRIV_FILE_DAC_EXECUTE,
+	    PRIV_FILE_DAC_SEARCH,
+	};
+	int i;
+
+	/* Same as secpolicy_vnode_setdac */
+	if (owner == cr->cr_uid)
+		return (0);
+
+	for (i = 0; i < sizeof (privs)/sizeof (int); i++) {
+		boolean_t allzone = B_FALSE;
+		int priv;
+
+		switch (priv = privs[i]) {
+		case PRIV_FILE_DAC_EXECUTE:
+			if (vp->v_type == VDIR)
+				continue;
+			break;
+		case PRIV_FILE_DAC_SEARCH:
+			if (vp->v_type != VDIR)
+				continue;
+			break;
+		case PRIV_FILE_DAC_WRITE:
+		case PRIV_FILE_OWNER:
+			/* We know here that if owner == 0, that cr_uid != 0 */
+			allzone = owner == 0;
+			break;
+		}
+		if (PRIV_POLICY_CHOICE(cr, priv, allzone))
+			return (0);
+	}
+	return (EPERM);
 }
 
 /*
@@ -1407,14 +1547,19 @@ secpolicy_audit_modify(const cred_t *cr)
  * "Least" of the two privileges on error.
  */
 int
-secpolicy_audit_getattr(const cred_t *cr)
+secpolicy_audit_getattr(const cred_t *cr, boolean_t checkonly)
 {
-	if (!PRIV_POLICY_ONLY(cr, PRIV_SYS_AUDIT, B_FALSE)) {
-		return (PRIV_POLICY(cr, PRIV_PROC_AUDIT, B_FALSE, EPERM,
-		    NULL));
-	} else {
-		return (PRIV_POLICY(cr, PRIV_SYS_AUDIT, B_FALSE, EPERM, NULL));
-	}
+	int priv;
+
+	if (PRIV_POLICY_ONLY(cr, PRIV_SYS_AUDIT, B_FALSE))
+		priv = PRIV_SYS_AUDIT;
+	else
+		priv = PRIV_PROC_AUDIT;
+
+	if (checkonly)
+		return (!PRIV_POLICY_ONLY(cr, priv, B_FALSE));
+	else
+		return (PRIV_POLICY(cr, priv, B_FALSE, EPERM, NULL));
 }
 
 
@@ -1582,7 +1727,7 @@ secpolicy_zone_config(const cred_t *cr)
 	 * Require all privileges to avoid possibility of privilege
 	 * escalation.
 	 */
-	return (secpolicy_require_set(cr, PRIV_FULLSET, NULL));
+	return (secpolicy_require_set(cr, PRIV_FULLSET, NULL, KLPDARG_NONE));
 }
 
 /*
@@ -1857,12 +2002,20 @@ secpolicy_tasksys(const cred_t *cr)
 	return (PRIV_POLICY(cr, PRIV_PROC_TASKID, B_FALSE, EPERM, NULL));
 }
 
+int
+secpolicy_pfexec_register(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_SYS_ADMIN, B_TRUE, EPERM, NULL));
+}
+
 /*
  * Basic privilege checks.
  */
 int
 secpolicy_basic_exec(const cred_t *cr, vnode_t *vp)
 {
+	FAST_BASIC_CHECK(cr, PRIV_PROC_EXEC);
+
 	return (priv_policy_va(cr, PRIV_PROC_EXEC, B_FALSE, EPERM, NULL,
 	    KLPDARG_VNODE, vp, (char *)NULL, KLPDARG_NOMORE));
 }
@@ -1870,12 +2023,16 @@ secpolicy_basic_exec(const cred_t *cr, vnode_t *vp)
 int
 secpolicy_basic_fork(const cred_t *cr)
 {
+	FAST_BASIC_CHECK(cr, PRIV_PROC_FORK);
+
 	return (PRIV_POLICY(cr, PRIV_PROC_FORK, B_FALSE, EPERM, NULL));
 }
 
 int
 secpolicy_basic_proc(const cred_t *cr)
 {
+	FAST_BASIC_CHECK(cr, PRIV_PROC_SESSION);
+
 	return (PRIV_POLICY(cr, PRIV_PROC_SESSION, B_FALSE, EPERM, NULL));
 }
 
@@ -1900,13 +2057,37 @@ secpolicy_basic_procinfo(const cred_t *cr, proc_t *tp, proc_t *sp)
 int
 secpolicy_basic_link(const cred_t *cr)
 {
+	FAST_BASIC_CHECK(cr, PRIV_FILE_LINK_ANY);
+
 	return (PRIV_POLICY(cr, PRIV_FILE_LINK_ANY, B_FALSE, EPERM, NULL));
 }
 
 int
 secpolicy_basic_net_access(const cred_t *cr)
 {
+	FAST_BASIC_CHECK(cr, PRIV_NET_ACCESS);
+
 	return (PRIV_POLICY(cr, PRIV_NET_ACCESS, B_FALSE, EACCES, NULL));
+}
+
+/* ARGSUSED */
+int
+secpolicy_basic_file_read(const cred_t *cr, vnode_t *vp, const char *pn)
+{
+	FAST_BASIC_CHECK(cr, PRIV_FILE_READ);
+
+	return (priv_policy_va(cr, PRIV_FILE_READ, B_FALSE, EACCES, NULL,
+	    KLPDARG_VNODE, vp, (char *)pn, KLPDARG_NOMORE));
+}
+
+/* ARGSUSED */
+int
+secpolicy_basic_file_write(const cred_t *cr, vnode_t *vp, const char *pn)
+{
+	FAST_BASIC_CHECK(cr, PRIV_FILE_WRITE);
+
+	return (priv_policy_va(cr, PRIV_FILE_WRITE, B_FALSE, EACCES, NULL,
+	    KLPDARG_VNODE, vp, (char *)pn, KLPDARG_NOMORE));
 }
 
 /*
@@ -1969,7 +2150,7 @@ secpolicy_spec_open(const cred_t *cr, struct vnode *vp, int oflag)
 		priv_addset(&pset, PRIV_SYS_NET_CONFIG);
 	}
 
-	err = secpolicy_require_set(cr, &pset, "devpolicy");
+	err = secpolicy_require_set(cr, &pset, "devpolicy", KLPDARG_NONE);
 	dpfree(plcy);
 
 	return (err);
@@ -2000,7 +2181,8 @@ secpolicy_modctl(const cred_t *cr, int cmd)
 		return (0);
 	case MODLOAD:
 	case MODSETDEVPOLICY:
-		return (secpolicy_require_set(cr, PRIV_FULLSET, NULL));
+		return (secpolicy_require_set(cr, PRIV_FULLSET, NULL,
+		    KLPDARG_NONE));
 	default:
 		return (secpolicy_sys_config(cr, B_FALSE));
 	}
@@ -2025,7 +2207,7 @@ secpolicy_power_mgmt(const cred_t *cr)
 int
 secpolicy_sti(const cred_t *cr)
 {
-	return (secpolicy_require_set(cr, PRIV_FULLSET, NULL));
+	return (secpolicy_require_set(cr, PRIV_FULLSET, NULL, KLPDARG_NONE));
 }
 
 boolean_t
@@ -2146,7 +2328,7 @@ secpolicy_gart_map(const cred_t *cr)
 int
 secpolicy_zinject(const cred_t *cr)
 {
-	return (secpolicy_require_set(cr, PRIV_FULLSET, NULL));
+	return (secpolicy_require_set(cr, PRIV_FULLSET, NULL, KLPDARG_NONE));
 }
 
 /*
@@ -2205,7 +2387,7 @@ secpolicy_sadopen(const cred_t *credp)
 	else
 		priv_addset(&pset, PRIV_SYS_IP_CONFIG);
 
-	return (secpolicy_require_set(credp, &pset, "devpolicy"));
+	return (secpolicy_require_set(credp, &pset, "devpolicy", KLPDARG_NONE));
 }
 
 
@@ -2226,7 +2408,7 @@ secpolicy_require_privs(const cred_t *cr, const priv_set_t *nset)
 	priv_inverse(&rqd);
 	priv_intersect(nset, &rqd);
 
-	return (secpolicy_require_set(cr, &rqd, NULL));
+	return (secpolicy_require_set(cr, &rqd, NULL, KLPDARG_NONE));
 }
 
 /*

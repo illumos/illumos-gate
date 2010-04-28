@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -11,8 +10,6 @@
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <sys/types.h>
@@ -56,16 +53,25 @@ const char *okshells[] = {
 	"/usr/bin/pfsh",
 	"/usr/bin/pfcsh",
 	"/usr/bin/pfksh",
+	"/usr/bin/pfksh93",
 	"/usr/bin/bash",
 	"/usr/bin/tcsh",
 	"/usr/bin/zsh",
+	"/usr/bin/pfbash",
+	"/usr/bin/pftcsh",
+	"/usr/bin/pfzsh",
 	"/bin/pfsh",
 	"/bin/pfcsh",
 	"/bin/pfksh",
+	"/bin/pfksh93",
 	"/bin/bash",
 	"/bin/tcsh",
 	"/bin/zsh",
+	"/bin/pfbash",
+	"/bin/pftcsh",
+	"/bin/pfzsh",
 	"/usr/xpg4/bin/sh",
+	"/usr/xpg4/bin/pfsh",
 	"/sbin/pfsh",
 	"/usr/sfw/bin/zsh",
 	NULL
