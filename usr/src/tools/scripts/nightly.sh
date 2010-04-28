@@ -1100,11 +1100,11 @@ function use_tools {
 	fi
 	export ELFSIGN
 
-	PATH="${TOOLSROOT}/opt/onbld/bin/${MACH}:${PATH}"
+	PATH="${TOOLSROOT}/opt/onbld/bin/${MACH}:${NONTOOLSPATH}"
 	PATH="${TOOLSROOT}/opt/onbld/bin:${PATH}"
 	export PATH
 
-	ONBLD_TOOLS=${ONBLD_TOOLS:=${TOOLSROOT}/opt/onbld}
+	ONBLD_TOOLS=${TOOLSROOT}/opt/onbld
 	export ONBLD_TOOLS
 
 	echo "\n==== New environment settings. ====\n" >> $LOGFILE
@@ -1622,9 +1622,11 @@ if [ -z "$MAILTO" -o "$MAILTO" = "nobody" ]; then
 	export MAILTO
 fi
 
-PATH="$OPTHOME/onbld/bin:$OPTHOME/onbld/bin/${MACH}:/usr/ccs/bin"
-PATH="$PATH:$OPTHOME/SUNWspro/bin:$TEAMWARE/bin:/usr/bin:/usr/sbin:/usr/ucb"
-PATH="$PATH:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
+NONTOOLSPATH="/usr/ccs/bin:$OPTHOME/SUNWspro/bin:$TEAMWARE/bin:/usr/bin"
+NONTOOLSPATH="${NONTOOLSPATH}:/usr/sbin:/usr/ucb"
+NONTOOLSPATH="${NONTOOLSPATH}:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
+TOOLSPATH="$OPTHOME/onbld/bin:$OPTHOME/onbld/bin/${MACH}
+PATH="${TOOLSPATH}:${NONTOOLSPATH}"
 export PATH
 
 # roots of source trees, both relative to $SRC and absolute.
@@ -2066,7 +2068,7 @@ function create_lock {
 # options.
 #
 function allprotos {
-	roots="$ROOT $TOOLS_PROTO"
+	roots="$ROOT"
 	
 	if [[ $D_FLAG = y && $F_FLAG = n ]]; then
 		[ $MULTI_PROTO = yes ] && roots="$roots $ROOT-nd"
@@ -3013,8 +3015,11 @@ if is_source_build && [ $build_ok = y ] ; then
 		# source tree (e.g., $EXPORT_SRC).
 		#
 		TOOLS=${SRC}/tools
-		build_tools ${TOOLS}/${TOOLS_PROTO_REL}
-		TOOLS=$ORIG_TOOLS
+		TOOLS_PROTO=${TOOLS}/${TOOLS_PROTO_REL}; export TOOLS_PROTO
+		build_tools ${TOOLS_PROTO}
+		if [[ $? != 0 ]]; then
+			use_tools ${TOOLS_PROTO}
+		fi
 	fi
 
 	export EXPORT_RELEASE_BUILD ; EXPORT_RELEASE_BUILD=#
