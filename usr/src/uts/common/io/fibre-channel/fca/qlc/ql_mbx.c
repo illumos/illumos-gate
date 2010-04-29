@@ -22,8 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #pragma ident	"Copyright 2010 QLogic Corporation; ql_mbx.c"
@@ -93,7 +92,7 @@ ql_mailbox_command(ql_adapter_state_t *vha, mbx_cmd_t *mcp)
 	ql_adapter_state_t	*ha = vha->pha;
 	int			mbx_cmd = mcp->mb[0];
 
-	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+	QL_PRINT_3(CE_CONT, "(%d): started, cmd=%xh\n", ha->instance, mbx_cmd);
 
 	/* Acquire mailbox register lock. */
 	MBX_REGISTER_LOCK(ha);
@@ -178,6 +177,14 @@ ql_mailbox_command(ql_adapter_state_t *vha, mbx_cmd_t *mcp)
 				 * reached without the condition
 				 * being signaled.
 				 */
+				MBX_REGISTER_UNLOCK(ha);
+				while (INTERRUPT_PENDING(ha)) {
+					(void) ql_isr((caddr_t)ha);
+					INTR_LOCK(ha);
+					ha->intr_claimed = B_TRUE;
+					INTR_UNLOCK(ha);
+				}
+				MBX_REGISTER_LOCK(ha);
 				break;
 			}
 		}
@@ -218,11 +225,13 @@ ql_mailbox_command(ql_adapter_state_t *vha, mbx_cmd_t *mcp)
 	    ha->mailbox_flags & MBX_ABORT) {
 		rval = QL_ABORTED;
 	} else if ((ha->mailbox_flags & MBX_INTERRUPT) == 0) {
-		if (CFG_IST(ha, CFG_DUMP_MAILBOX_TIMEOUT)) {
-			(void) ql_binary_fw_dump(ha, FALSE);
+		if (!CFG_IST(ha, CFG_CTRL_8021)) {
+			if (CFG_IST(ha, CFG_DUMP_MAILBOX_TIMEOUT)) {
+				(void) ql_binary_fw_dump(ha, FALSE);
+			}
+			EL(vha, "command timeout, isp_abort_needed\n");
+			set_flags |= ISP_ABORT_NEEDED;
 		}
-		EL(vha, "command timeout, isp_abort_needed\n");
-		set_flags |= ISP_ABORT_NEEDED;
 		rval = QL_FUNCTION_TIMEOUT;
 	} else {
 		ha->mailbox_flags = (uint8_t)
@@ -588,59 +597,8 @@ ql_loop_back(ql_adapter_state_t *ha, uint16_t findex, lbp_t *lb,
 	int		rval;
 	mbx_cmd_t	mc = {0};
 	mbx_cmd_t	*mcp = &mc;
-	ql_mbx_data_t	mr = {0};
-	ql_mbx_data_t	*mrp = &mr;
-
-	uint16_t	int_loopback_bit_mask = BIT_2;
-	int		wait;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	if (CFG_IST(ha, CFG_CTRL_81XX) && (lb->options &
-	    MBC_LOOPBACK_POINT_MASK) == MBC_LOOPBACK_POINT_INTERNAL) {
-		/* save current port config */
-		rval = ql_get_port_config(ha, mrp);
-		if (rval != QL_SUCCESS) {
-			EL(ha, "ql_get_port_config failed, rval = %xh\n", rval);
-			return (rval);
-		}
-
-		/* set config to internal loopback */
-		mr.mb[1] |= int_loopback_bit_mask;
-		ha->async_event_wait &= ~(BIT_1 | BIT_0);
-
-		rval = ql_set_port_config(ha, mrp);
-
-		if (rval != QL_SUCCESS) {
-			EL(ha, "ql_set_port_config failed, rval = %xh\n", rval);
-			return (rval);
-		}
-		wait = MBC_ASYNC_EVENT_WAIT;
-		while (wait) {
-			if ((ha->async_event_wait & BIT_0) == 0) {
-				ql_delay(ha, 1000000);
-				wait--;
-			} else {
-				ha->async_event_wait &= ~BIT_0;
-				break;
-			}
-		}
-		EL(ha, "waited %d seconds for 8100 async event.\n",
-		    MBC_ASYNC_EVENT_WAIT - wait);
-
-		wait = MBC_ASYNC_EVENT_WAIT;
-		while (wait) {
-			if ((ha->async_event_wait & BIT_1) == 0) {
-				ql_delay(ha, 1000000);
-				wait--;
-			} else {
-				ha->async_event_wait &= ~(BIT_1);
-				break;
-			}
-		}
-		EL(ha, "waited %d seconds for 8030 async event.\n",
-		    MBC_ASYNC_EVENT_WAIT - wait);
-	}
 
 	mcp->mb[0] = MBC_DIAGNOSTIC_LOOP_BACK;
 	mcp->mb[1] = lb->options;
@@ -676,51 +634,6 @@ ql_loop_back(ql_adapter_state_t *ha, uint16_t findex, lbp_t *lb,
 	} else {
 		/*EMPTY*/
 		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
-	}
-
-	if (CFG_IST(ha, CFG_CTRL_81XX) && (lb->options &
-	    MBC_LOOPBACK_POINT_MASK) == MBC_LOOPBACK_POINT_INTERNAL) {
-		int		rval1;
-		uint32_t	mb1;
-
-		/* restore original port config */
-		mb1 = mrp->mb[1];
-		mrp->mb[1] = (uint16_t)(mb1 &= ~int_loopback_bit_mask);
-		ha->async_event_wait &= ~(BIT_1 | BIT_0);
-
-		rval1 = ql_set_port_config(ha, &mr);
-
-		if (rval1 != QL_SUCCESS) {
-			EL(ha, "ql_set_port_config(2) failed, rval = %xh\n",
-			    rval1);
-			return (rval1);
-		}
-
-		wait = MBC_ASYNC_EVENT_WAIT;
-		while (wait) {
-			if ((ha->async_event_wait & BIT_0) == 0) {
-				ql_delay(ha, 1000000);
-				wait--;
-			} else {
-				ha->async_event_wait &= ~BIT_0;
-				break;
-			}
-		}
-		EL(ha, "waited %d seconds for 8100 async event.\n",
-		    MBC_ASYNC_EVENT_WAIT - wait);
-
-		wait = MBC_ASYNC_EVENT_WAIT;
-		while (wait) {
-			if ((ha->async_event_wait & BIT_1) == 0) {
-				ql_delay(ha, 1000000);
-				wait--;
-			} else {
-				ha->async_event_wait &= ~BIT_1;
-				break;
-			}
-		}
-		EL(ha, "waited %d seconds for 8030 async event.\n",
-		    MBC_ASYNC_EVENT_WAIT - wait);
 	}
 	return (rval);
 }
@@ -2790,7 +2703,9 @@ ql_abort_cmd_iocb(ql_adapter_state_t *ha, ql_srb_t *sp)
 	pkt->abo.entry_type = ABORT_CMD_TYPE;
 	pkt->abo.entry_count = 1;
 	pkt->abo.n_port_hdl = (uint16_t)LE_16(tq->loop_id);
-	pkt->abo.options = AF_NO_ABTS;
+	if (!CFG_IST(ha, CFG_CTRL_8021)) {
+		pkt->abo.options = AF_NO_ABTS;
+	}
 	pkt->abo.cmd_handle = LE_32(sp->handle);
 	pkt->abo.target_id[0] = tq->d_id.b.al_pa;
 	pkt->abo.target_id[1] = tq->d_id.b.area;
@@ -2799,17 +2714,19 @@ ql_abort_cmd_iocb(ql_adapter_state_t *ha, ql_srb_t *sp)
 
 	rval = ql_issue_mbx_iocb(ha, (caddr_t)pkt, pkt_size);
 
-	if (rval == QL_SUCCESS && (pkt->abo.entry_status  & 0x3c) != 0) {
-		EL(ha, "failed, entry_status=%xh, d_id=%xh\n",
-		    pkt->abo.entry_status, tq->d_id.b24);
-		rval = QL_FUNCTION_PARAMETER_ERROR;
-	}
-
-	comp_status = (uint16_t)LE_16(pkt->abo.n_port_hdl);
-	if (rval == QL_SUCCESS && comp_status != CS_COMPLETE) {
-		EL(ha, "failed, comp_status=%xh, d_id=%xh\n",
-		    comp_status, tq->d_id.b24);
-		rval = QL_FUNCTION_FAILED;
+	if (rval == QL_SUCCESS) {
+		if ((pkt->abo.entry_status  & 0x3c) != 0) {
+			EL(ha, "failed, entry_status=%xh, d_id=%xh\n",
+			    pkt->abo.entry_status, tq->d_id.b24);
+			rval = QL_FUNCTION_PARAMETER_ERROR;
+		} else {
+			comp_status = (uint16_t)LE_16(pkt->abo.n_port_hdl);
+			if (comp_status != CS_COMPLETE) {
+				EL(ha, "failed, comp_status=%xh, d_id=%xh\n",
+				    comp_status, tq->d_id.b24);
+				rval = QL_FUNCTION_FAILED;
+			}
+		}
 	}
 
 	kmem_free(pkt, pkt_size);
@@ -2969,7 +2886,7 @@ ql_wrt_risc_ram(ql_adapter_state_t *ha, uint32_t risc_address, uint64_t bp,
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_24258081)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[0] = MBC_LOAD_RAM_EXTENDED;
 		mcp->mb[4] = MSW(word_count);
 		mcp->mb[5] = LSW(word_count);
@@ -3027,7 +2944,7 @@ ql_rd_risc_ram(ql_adapter_state_t *ha, uint32_t risc_address, uint64_t bp,
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if (CFG_IST(ha, CFG_CTRL_24258081)) {
+	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[0] = MBC_DUMP_RAM_EXTENDED;
 		mcp->mb[1] = LSW(risc_address);
 		mcp->mb[2] = MSW(LSD(bp));
@@ -4026,7 +3943,7 @@ ql_stop_firmware(ql_adapter_state_t *ha)
 	mcp->mb[0] = MBC_STOP_FIRMWARE;
 	mcp->out_mb = MBX_1|MBX_0;
 	mcp->in_mb = MBX_0;
-	mcp->timeout = MAILBOX_TOV;
+	mcp->timeout = 2;
 	rval = ql_mailbox_command(ha, mcp);
 
 	if (rval != QL_SUCCESS) {
@@ -4619,7 +4536,7 @@ ql_get_port_config(ql_adapter_state_t *ha, ql_mbx_data_t *mrp)
 /*
  * ql_flash_access
  *	The Get Port Configuration command retrieves the current configuration
- *      for the external 10G port associated with this function
+ *	for the external 10G port associated with this function
  *
  * Input:
  *	ha:	adapter state pointer.
@@ -4934,7 +4851,7 @@ ql_toggle_interrupt(ql_adapter_state_t *ha, uint16_t opt)
 	mcp->mb[1] = opt;
 	mcp->out_mb = MBX_1|MBX_0;
 	mcp->in_mb = MBX_0;
-	mcp->timeout = MAILBOX_TOV;
+	mcp->timeout = 2;
 	rval = ql_mailbox_command(ha, mcp);
 
 	if (rval != QL_SUCCESS) {

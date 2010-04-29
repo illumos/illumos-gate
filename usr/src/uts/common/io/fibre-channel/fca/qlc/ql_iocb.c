@@ -22,8 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #pragma ident	"Copyright 2010 QLogic Corporation; ql_iocb.c"
@@ -55,6 +54,7 @@ static int ql_req_pkt(ql_adapter_state_t *, request_t **);
 static void ql_continuation_iocb(ql_adapter_state_t *, ddi_dma_cookie_t *,
     uint16_t, boolean_t);
 static void ql_isp24xx_rcvbuf(ql_adapter_state_t *);
+static void ql_cmd_24xx_type_6_iocb(ql_adapter_state_t *, ql_srb_t *, void *);
 
 /*
  * ql_start_iocb
@@ -167,6 +167,7 @@ ql_start_iocb(ql_adapter_state_t *vha, ql_srb_t *sp)
 
 		/* build the iocb in the request ring */
 		pkt = ha->request_ring_ptr;
+		sp->request_ring_ptr = pkt;
 		sp->flags |= SRB_IN_TOKEN_ARRAY;
 
 		/* Zero out packet. */
@@ -642,10 +643,17 @@ ql_command_24xx_iocb(ql_adapter_state_t *ha, ql_srb_t *sp, void *arg)
 	uint16_t		seg_cnt;
 	fcp_cmd_t		*fcp = sp->fcp;
 	ql_tgt_t		*tq = sp->lun_queue->target_queue;
-	cmd_24xx_entry_t	*pkt = arg;
+	cmd7_24xx_entry_t	*pkt = arg;
 	ql_adapter_state_t	*pha = ha->pha;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	if (fcp->fcp_data_len != 0 && sp->sg_dma.dma_handle != NULL &&
+	    sp->pkt->pkt_data_cookie_cnt > 1) {
+		ql_cmd_24xx_type_6_iocb(ha, sp, arg);
+		QL_PRINT_3(CE_CONT, "(%d): cmd6 exit\n", ha->instance);
+		return;
+	}
 
 	pkt->entry_type = IOCB_CMD_TYPE_7;
 
@@ -742,6 +750,147 @@ ql_command_24xx_iocb(ql_adapter_state_t *ha, ql_srb_t *sp, void *arg)
 	if (seg_cnt) {
 		ql_continuation_iocb(pha, cp, seg_cnt, B_TRUE);
 	}
+
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+}
+
+/*
+ * ql_cmd_24xx_type_6_iocb
+ *	Setup of ISP24xx command type 6 IOCB.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	sp:	srb structure pointer.
+ *	arg:	request queue packet.
+ *
+ * Context:
+ *	Interrupt or Kernel context, no mailbox commands allowed.
+ */
+static void
+ql_cmd_24xx_type_6_iocb(ql_adapter_state_t *ha, ql_srb_t *sp, void *arg)
+{
+	uint64_t		addr;
+	ddi_dma_cookie_t	*cp;
+	uint32_t		*ptr32;
+	uint16_t		seg_cnt;
+	fcp_cmd_t		*fcp = sp->fcp;
+	ql_tgt_t		*tq = sp->lun_queue->target_queue;
+	cmd6_24xx_entry_t	*pkt = arg;
+	ql_adapter_state_t	*pha = ha->pha;
+	dma_mem_t		*cmem = &sp->sg_dma;
+	cmd6_2400_dma_t		*cdma = cmem->bp;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	pkt->entry_type = IOCB_CMD_TYPE_6;
+
+	bzero(cdma, sizeof (cmd6_2400_dma_t));
+
+	/* Set LUN number */
+	pkt->fcp_lun[2] = cdma->cmd.fcp_lun[1] = LSB(sp->lun_queue->lun_no);
+	pkt->fcp_lun[3] = cdma->cmd.fcp_lun[0] = MSB(sp->lun_queue->lun_no);
+
+	/* Set N_port handle */
+	ddi_put16(pha->hba_buf.acc_handle, &pkt->n_port_hdl, tq->loop_id);
+
+	/* Set target ID */
+	pkt->target_id[0] = tq->d_id.b.al_pa;
+	pkt->target_id[1] = tq->d_id.b.area;
+	pkt->target_id[2] = tq->d_id.b.domain;
+
+	pkt->vp_index = ha->vp_index;
+
+	/* Set ISP command timeout. */
+	if (sp->isp_timeout < 0x1999) {
+		ddi_put16(pha->hba_buf.acc_handle, &pkt->timeout,
+		    sp->isp_timeout);
+	}
+
+	/* Load SCSI CDB */
+	ddi_rep_put8(cmem->acc_handle, fcp->fcp_cdb, cdma->cmd.scsi_cdb,
+	    MAX_CMDSZ, DDI_DEV_AUTOINCR);
+
+	/*
+	 * Set tag queue control flags
+	 * Note:
+	 *	Cannot copy fcp->fcp_cntl.cntl_qtype directly,
+	 *	problem with x86 in 32bit kernel mode
+	 */
+	switch (fcp->fcp_cntl.cntl_qtype) {
+	case FCP_QTYPE_SIMPLE:
+		cdma->cmd.task = TA_STAG;
+		break;
+	case FCP_QTYPE_HEAD_OF_Q:
+		cdma->cmd.task = TA_HTAG;
+		break;
+	case FCP_QTYPE_ORDERED:
+		cdma->cmd.task = TA_OTAG;
+		break;
+	case FCP_QTYPE_ACA_Q_TAG:
+		cdma->cmd.task = TA_ACA;
+		break;
+	case FCP_QTYPE_UNTAGGED:
+		cdma->cmd.task = TA_UNTAGGED;
+		break;
+	default:
+		break;
+	}
+
+	/*
+	 * FCP_CMND Payload Data Segment
+	 */
+	cp = cmem->cookies;
+	ddi_put16(pha->hba_buf.acc_handle, &pkt->cmnd_length,
+	    sizeof (fcp_cmnd_t));
+	ddi_put32(pha->hba_buf.acc_handle, &pkt->cmnd_address[0],
+	    cp->dmac_address);
+	ddi_put32(pha->hba_buf.acc_handle, &pkt->cmnd_address[1],
+	    cp->dmac_notused);
+
+	/* Set transfer direction. */
+	if (fcp->fcp_cntl.cntl_write_data) {
+		pkt->control_flags = (uint8_t)(CF_DSD_PTR | CF_WR);
+		cdma->cmd.control_flags = CF_WR;
+		pha->xioctl->IOOutputRequests++;
+		pha->xioctl->IOOutputByteCnt += fcp->fcp_data_len;
+	} else if (fcp->fcp_cntl.cntl_read_data) {
+		pkt->control_flags = (uint8_t)(CF_DSD_PTR | CF_RD);
+		cdma->cmd.control_flags = CF_RD;
+		pha->xioctl->IOInputRequests++;
+		pha->xioctl->IOInputByteCnt += fcp->fcp_data_len;
+	}
+
+	/*
+	 * FCP_DATA Data Segment Descriptor.
+	 */
+	addr = cp->dmac_laddress + sizeof (fcp_cmnd_t);
+	ddi_put32(pha->hba_buf.acc_handle, &pkt->dseg_0_address[0], LSD(addr));
+	ddi_put32(pha->hba_buf.acc_handle, &pkt->dseg_0_address[1], MSD(addr));
+
+	/* Set data segment count. */
+	seg_cnt = (uint16_t)sp->pkt->pkt_data_cookie_cnt;
+	ddi_put16(pha->hba_buf.acc_handle, &pkt->dseg_count, seg_cnt);
+	ddi_put32(pha->hba_buf.acc_handle, &pkt->dseg_0_length,
+	    seg_cnt * 12 + 12);
+
+	/* Load total byte count. */
+	ddi_put32(pha->hba_buf.acc_handle, &pkt->total_byte_count,
+	    fcp->fcp_data_len);
+	ddi_put32(cmem->acc_handle, &cdma->cmd.dl, (uint32_t)fcp->fcp_data_len);
+	ql_chg_endian((uint8_t *)&cdma->cmd.dl, 4);
+
+	/* Load command data segments. */
+	ptr32 = (uint32_t *)cdma->cookie_list;
+	cp = sp->pkt->pkt_data_cookie;
+	while (seg_cnt--) {
+		ddi_put32(cmem->acc_handle, ptr32++, cp->dmac_address);
+		ddi_put32(cmem->acc_handle, ptr32++, cp->dmac_notused);
+		ddi_put32(cmem->acc_handle, ptr32++, (uint32_t)cp->dmac_size);
+		cp++;
+	}
+
+	/* Sync DMA buffer. */
+	(void) ddi_dma_sync(cmem->dma_handle, 0, 0, DDI_DMA_SYNC_FORDEV);
 
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 }

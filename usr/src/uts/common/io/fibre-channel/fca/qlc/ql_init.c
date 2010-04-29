@@ -22,8 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #pragma ident	"Copyright 2010 QLogic Corporation; ql_init.c"
@@ -155,6 +154,8 @@ ql_initialize_adapter(ql_adapter_state_t *ha)
 			bcopy((void *)&ha->init_ctrl_blk.cb.node_name[0],
 			    (void *)&els->node_ww_name.raw_wwn[0], 8);
 		}
+		bcopy(QL_VERSION, ha->adapter_stats->revlvl.qlddv,
+		    strlen(QL_VERSION));
 
 		/* Determine which RISC code to use. */
 		if ((rval = ql_check_isp_firmware(ha)) != QL_SUCCESS) {
@@ -2211,9 +2212,6 @@ ql_chip_diag(ql_adapter_state_t *ha)
 			ha->fw_transfer_size = REQUEST_QUEUE_SIZE;
 		}
 
-		bcopy(QL_VERSION, ha->adapter_stats->revlvl.qlddv,
-		    strlen(QL_VERSION));
-
 		rval = QL_SUCCESS;
 		if (!(CFG_IST(ha, CFG_CTRL_8021))) {
 			ql_reset_chip(ha);
@@ -2517,6 +2515,7 @@ ql_start_firmware(ql_adapter_state_t *vha)
 		ha->fw_major_version = mr.mb[1];
 		ha->fw_minor_version = mr.mb[2];
 		ha->fw_subminor_version = mr.mb[3];
+		ha->fw_attributes = mr.mb[6];
 	} else if ((rval = ql_verify_checksum(ha)) == QL_SUCCESS) {
 		/* Verify checksum of loaded RISC code. */
 		/* Start firmware execution. */
@@ -2560,7 +2559,14 @@ ql_start_firmware(ql_adapter_state_t *vha)
 			(void) ql_serdes_param(ha, &mr);
 		}
 	}
-
+	/* ETS workaround */
+	if (CFG_IST(ha, CFG_CTRL_81XX) && ql_enable_ets) {
+		if (ql_get_firmware_option(ha, &mr) == QL_SUCCESS) {
+			mr.mb[2] = (uint16_t)
+			    (mr.mb[2] | FO2_FCOE_512_MAX_MEM_WR_BURST);
+			(void) ql_set_firmware_option(ha, &mr);
+		}
+	}
 	if (rval != QL_SUCCESS) {
 		ha->task_daemon_flags &= ~FIRMWARE_LOADED;
 		EL(ha, "failed, rval = %xh\n", rval);
@@ -3179,6 +3185,7 @@ ql_configure_hba(ql_adapter_state_t *ha)
 				EL(ha, "data_rate status=%xh\n", rval);
 				state = FC_STATE_FULL_SPEED;
 			} else {
+				ha->iidma_rate = mr.mb[1];
 				if (mr.mb[1] == IIDMA_RATE_1GB) {
 					state = FC_STATE_1GBIT_SPEED;
 				} else if (mr.mb[1] == IIDMA_RATE_2GB) {
@@ -3194,6 +3201,7 @@ ql_configure_hba(ql_adapter_state_t *ha)
 				}
 			}
 		} else {
+			ha->iidma_rate = IIDMA_RATE_1GB;
 			state = FC_STATE_FULL_SPEED;
 		}
 		ha->state = FC_PORT_STATE_MASK(ha->state) | state;
@@ -3526,6 +3534,7 @@ ql_reset_chip(ql_adapter_state_t *vha)
 	}
 
 	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		ha->timeout_cnt = 0;
 		ql_8021_reset_chip(ha);
 		QL_PRINT_3(CE_CONT, "(%d): 8021 exit\n", ha->instance);
 		return;

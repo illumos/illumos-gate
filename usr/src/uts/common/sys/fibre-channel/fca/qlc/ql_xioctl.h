@@ -22,8 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _QL_XIOCTL_H
@@ -331,6 +330,36 @@ typedef struct ql_flash_layout_region {
 	uint8_t		beg_addr[4];
 	uint8_t		end_addr[4];
 } ql_flt_region_t;
+
+typedef struct ql_fp_cfg_hdr {
+	uint8_t		version[2];
+	uint8_t		len[2];
+	uint8_t		checksum[2];
+	uint8_t		NumberEntries[2];
+	uint8_t		SizeEntry[2];
+	uint8_t		unused[2];
+	uint8_t		Signature[4];
+} ql_fp_cfg_hdr_t;
+
+typedef struct ql_fp_cfg {
+	uint8_t		FunctionNumber[2];
+	uint8_t		FunctionType;
+	uint8_t		PortConfigIndex;
+	uint8_t		ConfigRegion;
+	uint8_t		VpdRegion;
+	uint8_t		DCBXRegion;
+	uint8_t		Reserved;
+} ql_fp_cfg_t;
+
+#define	FT_NIC		0
+#define	FT_FC		1
+#define	FT_ISCSI	2
+#define	FT_VNIC		3
+
+typedef struct ql_fp_cfg_map {
+	ql_fp_cfg_hdr_t	hdr;
+	ql_fp_cfg_t	cfg[6];
+} ql_fp_cfg_map_t;
 
 #define	FLASH_FW_REGION			0x01
 #define	FLASH_VPD_0_REGION		0x14

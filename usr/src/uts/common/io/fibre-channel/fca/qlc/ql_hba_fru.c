@@ -22,8 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #pragma ident	"Copyright 2010 QLogic Corporation; ql_hba_fru.c"
@@ -542,20 +541,13 @@ ql_setup_fruinfo(ql_adapter_state_t *ha)
 			ha->fru_hba_index = ql_gfru_hba_index++;
 		}
 
-		if (CFG_IST(ha, CFG_CTRL_81XX)) {
+		if (CFG_IST(ha, CFG_CTRL_8081)) {
 			/*
 			 * The FC functions on 81xx hbas are functions 2 and 3
 			 * while the Nic functions occupy 0 and 1.  Adjust
 			 * fru port index to be like previous FCAs.
 			 */
-			ha->fru_port_index -= 2;
-		}
-		if (CFG_IST(ha, CFG_CTRL_8021)) {
-			/*
-			 * The FC functions on 80xx hbas are functions 6 and 7.
-			 *  Adjust fru port index to be like previous FCAs.
-			 */
-			ha->fru_port_index -= 6;
+			ha->fru_port_index = ha->flags & FUNCTION_1 ? 1 : 0;
 		}
 
 		GLOBAL_STATE_UNLOCK();

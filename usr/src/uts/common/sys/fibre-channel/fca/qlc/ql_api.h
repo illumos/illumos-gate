@@ -22,8 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_QL_API_H
@@ -363,6 +362,7 @@ typedef struct {
 #define	R_A_TOV_DEFAULT		20			/* 0 - 65535 */
 #define	IDLE_CHECK_TIMER	300			/* 0 - 65535 */
 #define	MAX_DEVICE_LOST_RETRY	16			/* 0 - 255 */
+#define	TIMEOUT_THRESHOLD	16			/* 0 - 255 */
 
 /* Maximum outstanding commands in ISP queues (1-4095) */
 #define	MAX_OUTSTANDING_COMMANDS	0x400
@@ -1165,9 +1165,11 @@ typedef struct ql_srb {
 	/* Command IOCB context. */
 	void			(*iocb)(struct ql_adapter_state *,
 	    struct ql_srb *, void *);
+	struct cmd_entry	*request_ring_ptr;
 	uint32_t		handle;
 	uint16_t		req_cnt;
 	uint8_t			retry_count;
+	dma_mem_t		sg_dma;
 } ql_srb_t;
 
 #define	SRB_ISP_STARTED		  BIT_0   /* Command sent to ISP. */
@@ -1644,10 +1646,10 @@ typedef struct ql_adapter_state {
 	uint8_t			mpi_fw_subminor_version;
 
 	uint8_t			idc_flash_acc;
-	uint8_t			idc_restart_mpi;
+	uint8_t			idc_restart_cnt;
 	uint16_t		idc_mb[8];
-	uint8_t			restart_mpi_timer;
-	uint8_t			flash_acc_timer;
+	uint8_t			idc_restart_timer;
+	uint8_t			idc_flash_acc_timer;
 
 	/* VLAN ID and MAC address */
 	uint8_t			fcoe_vnport_mac[6];
@@ -1655,7 +1657,6 @@ typedef struct ql_adapter_state {
 	uint16_t		fcoe_vlan_id;
 	uint16_t		fcoe_fcf_idx;
 	nvram_cache_desc_t	*nvram_cache;
-	uint32_t		async_event_wait;
 
 	/* NetXen context */
 	ddi_acc_handle_t	db_dev_handle;
@@ -1674,7 +1675,9 @@ typedef struct ql_adapter_state {
 	uint32_t		bootloader_size;
 	uint32_t		bootloader_addr;
 	uint32_t		flash_fw_size;
+	uint16_t		iidma_rate;
 	uint8_t			function_number;
+	uint8_t			timeout_cnt;
 } ql_adapter_state_t;
 
 /*
@@ -1731,7 +1734,7 @@ typedef struct ql_adapter_state {
 #define	TASK_DAEMON_POWERING_DOWN	BIT_27
 #define	TD_IIDMA_NEEDED			BIT_28
 #define	SEND_PLOGI			BIT_29
-#define	IDC_ACK_NEEDED			BIT_30
+#define	IDC_EVENT			BIT_30
 
 /*
  * Mailbox flags
@@ -2164,6 +2167,8 @@ extern uint32_t		ql_ip_buffer_count;
 extern uint32_t		ql_ip_low_water;
 extern uint8_t		ql_alpa_to_index[];
 extern uint32_t		ql_gfru_hba_index;
+extern uint32_t		ql_enable_ets;
+extern uint16_t		ql_osc_wait_count;
 
 /*
  * Global Function Prototypes in ql_api.c source file.

@@ -22,8 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_QL_MBX_H
@@ -152,7 +151,6 @@ extern "C" {
 
 /* Driver defined. */
 #define	MBA_CMPLT_1_32BIT	0x9000	/* Completion 1 32bit IOSB. */
-#define	MBC_ASYNC_EVENT_WAIT	30	/* loopback async event wait time */
 /*
  * Mailbox 23 event codes
  */
@@ -280,9 +278,11 @@ extern "C" {
 #define	IDC_FUNC_SRC_MASK	(BIT_3 | BIT_2 | BIT_1 | BIT_0)
 
 /* Information opcode */
-#define	IDC_OPC_DRV_START	0x100
-#define	IDC_OPC_FLASH_ACC	0x101
-#define	IDC_OPC_RESTART_MPI	0x102
+#define	IDC_OPC_DRV_START		0x100
+#define	IDC_OPC_FLASH_ACC		0x101
+#define	IDC_OPC_RESTART_MPI		0x102
+#define	IDC_OPC_PORT_RESET_MBC		0x120
+#define	IDC_OPC_SET_PORT_CONFIG_MBC	0x122
 
 /* Function Destination Mask */
 #define	IDC_FUNC_3		BIT_3
@@ -355,6 +355,26 @@ extern "C" {
 #define	MBC_LOOPBACK_POINT_1BIT		0x01	/* 2425xx	*/
 #define	MBC_LOOPBACK_POINT_INTERNAL	0x01	/* 81xx		*/
 #define	MBC_LOOPBACK_POINT_EXTERNAL	0x02	/* 242581xx	*/
+
+/*
+ * MBC_ECHO
+ */
+#define	MBC_ECHO_ELS		BIT_15	/* echo ELS */
+#define	MBC_ECHO_64BIT		BIT_6	/* 64bit DMA address used */
+
+/*
+ * 81xx
+ * MBC_SET_PORT_CONFIG
+ * MBC_GET_PORT_CONFIG
+ */
+#define	LOOPBACK_MODE_FIELD_SIZE	0x03
+#define	LOOPBACK_MODE_FIELD_SHIFT	0x01
+#define	LOOPBACK_MODE_FIELD_MASK	((1 << LOOPBACK_MODE_FIELD_SIZE) -1)
+
+#define	LOOPBACK_MODE(mode)		((mode & LOOPBACK_MODE_FIELD_MASK) << \
+					    LOOPBACK_MODE_FIELD_SHIFT)
+#define	LOOPBACK_MODE_NONE		0x00
+#define	LOOPBACK_MODE_INTERNAL		0x02
 
 /*
  * Mbc 20h (Get ID) returns the switch capabilities in mailbox7.
@@ -462,6 +482,7 @@ typedef struct ql_mbx_data {
 #define	FO1_POST_NOTIFY_ACK_IOCB_2_ATIO	BIT_13
 #define	FO1_POST_NOTIFY_ACK_IOCB	BIT_14
 
+#define	FO2_FCOE_512_MAX_MEM_WR_BURST	BIT_9
 #define	FO2_ENABLE_SELECTIVE_CLASS_2	BIT_5
 #define	FO2_REV_LOOPBACK		BIT_1
 #define	FO2_ENABLE_ATIO_TYPE_3		BIT_0

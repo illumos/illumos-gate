@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2008 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_QL_ISR_H
@@ -36,7 +35,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2008 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -51,6 +50,8 @@ extern "C" {
  * Spurious interrupts
  */
 #define	MAX_SPURIOUS_INTR	4
+extern	uint32_t	ql_spurious_cnt;
+extern	uint32_t	ql_max_intr_loop;
 
 /*
  * Global Data in ql_isr.c source file.

@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2010 QLogic Corporation.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright 2010 QLogic Corporation */
 
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) qlc mdb source file.
@@ -173,7 +170,7 @@ int8_t *task_daemon_flags[] = {
 	"TASK_DAEMON_POWERING_DOWN",
 	"TD_IIDMA_NEEDED",
 	"SEND_PLOGI",
-	"IDC_ACK_NEEDED",
+	"IDC_EVENT",
 	NULL
 };
 

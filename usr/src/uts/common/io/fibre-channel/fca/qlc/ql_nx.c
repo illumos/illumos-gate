@@ -1637,12 +1637,17 @@ ql_8021_init_p3p(ql_adapter_state_t *ha)
 void
 ql_8021_reset_chip(ql_adapter_state_t *ha)
 {
-	/* Disable interrupts does not work. */
+	/*
+	 * Disable interrupts does not work on a per function bases
+	 * leave them enabled
+	 */
 	ql_8021_enable_intrs(ha);
 
 	ADAPTER_STATE_LOCK(ha);
 	ha->flags |= INTERRUPTS_ENABLED;
 	ADAPTER_STATE_UNLOCK(ha);
+
+	(void) ql_stop_firmware(ha);
 }
 
 static int

@@ -22,8 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #pragma ident	"Copyright 2010 QLogic Corporation; ql_api.c"
@@ -183,7 +182,8 @@ static void ql_fca_isp_els_request(ql_adapter_state_t *, fc_packet_t *,
 static void ql_isp_els_request_ctor(els_descriptor_t *,
     els_passthru_entry_t *);
 static int ql_p2p_plogi(ql_adapter_state_t *, fc_packet_t *);
-static int ql_wait_for_td_stop(ql_adapter_state_t *ha);
+static int ql_wait_for_td_stop(ql_adapter_state_t *);
+static void ql_process_idc_event(ql_adapter_state_t *);
 
 /*
  * Global data
@@ -194,6 +194,8 @@ uint32_t	ql_os_release_level;
 uint32_t	ql_disable_aif = 0;
 uint32_t	ql_disable_msi = 0;
 uint32_t	ql_disable_msix = 0;
+uint32_t	ql_enable_ets = 0;
+uint16_t	ql_osc_wait_count = 1000;
 
 /* Timer routine variables. */
 static timeout_id_t	ql_timer_timeout_id = NULL;
@@ -1185,7 +1187,7 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			break;
 
 		case 0x8021:
-			if (ha->function_number == 7) {
+			if (ha->function_number & BIT_0) {
 				ha->flags |= FUNCTION_1;
 			}
 			ha->cfg_flags |= CFG_CTRL_8021;
@@ -2591,6 +2593,7 @@ ql_init_pkt(opaque_t fca_handle, fc_packet_t *pkt, int sleep)
 {
 	ql_adapter_state_t	*ha;
 	ql_srb_t		*sp;
+	int			rval = FC_SUCCESS;
 
 	ha = ql_fca_handle_to_state(fca_handle);
 	if (ha == NULL) {
@@ -2617,10 +2620,23 @@ ql_init_pkt(opaque_t fca_handle, fc_packet_t *pkt, int sleep)
 	sp->pkt = pkt;
 	sp->ha = ha;
 	sp->magic_number = QL_FCA_BRAND;
+	sp->sg_dma.dma_handle = NULL;
+#ifndef __sparc
+	if (CFG_IST(ha, CFG_CTRL_8021)) {
+		/* Setup DMA for scatter gather list. */
+		sp->sg_dma.size = sizeof (cmd6_2400_dma_t);
+		sp->sg_dma.type = LITTLE_ENDIAN_DMA;
+		sp->sg_dma.cookie_count = 1;
+		sp->sg_dma.alignment = 64;
+		if (ql_alloc_phys(ha, &sp->sg_dma, KM_SLEEP) != QL_SUCCESS) {
+			rval = FC_NOMEM;
+		}
+	}
+#endif	/* __sparc */
 
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 
-	return (FC_SUCCESS);
+	return (rval);
 }
 
 /*
@@ -2662,7 +2678,7 @@ ql_un_init_pkt(opaque_t fca_handle, fc_packet_t *pkt)
 		rval = FC_BADPACKET;
 	} else {
 		sp->magic_number = NULL;
-
+		ql_free_phys(ha, &sp->sg_dma);
 		rval = FC_SUCCESS;
 	}
 
@@ -5000,12 +5016,12 @@ ql_els_plogi(ql_adapter_state_t *ha, fc_packet_t *pkt)
 			DEVICE_QUEUE_LOCK(tq);
 			tq->logout_sent = 0;
 			tq->flags &= ~TQF_NEED_AUTHENTICATION;
-			if (CFG_IST(ha, CFG_CTRL_24258081)) {
+			if (CFG_IST(ha, CFG_CTRL_242581)) {
 				tq->flags |= TQF_IIDMA_NEEDED;
 			}
 			DEVICE_QUEUE_UNLOCK(tq);
 
-			if (CFG_IST(ha, CFG_CTRL_24258081)) {
+			if (CFG_IST(ha, CFG_CTRL_242581)) {
 				TASK_DAEMON_LOCK(ha);
 				ha->task_daemon_flags |= TD_IIDMA_NEEDED;
 				TASK_DAEMON_UNLOCK(ha);
@@ -5091,6 +5107,8 @@ ql_p2p_plogi(ql_adapter_state_t *ha, fc_packet_t *pkt)
 	ql_tgt_t	tmp;
 	ql_tgt_t	*tq = &tmp;
 	int		rval;
+	port_id_t	d_id;
+	ql_srb_t	*sp = (ql_srb_t *)pkt->pkt_fca_private;
 
 	tq->d_id.b.al_pa = 0;
 	tq->d_id.b.area = 0;
@@ -5156,7 +5174,10 @@ ql_p2p_plogi(ql_adapter_state_t *ha, fc_packet_t *pkt)
 	}
 	(void) ddi_dma_sync(pkt->pkt_cmd_dma, 0, 0, DDI_DMA_SYNC_FORDEV);
 
-	ql_start_iocb(ha, (ql_srb_t *)pkt->pkt_fca_private);
+	d_id.b24 = pkt->pkt_cmd_fhdr.d_id;
+	tq = ql_d_id_to_queue(ha, d_id);
+	ql_timeout_insert(ha, tq, sp);
+	ql_start_iocb(ha, sp);
 
 	return (QL_CONSUMED);
 }
@@ -5412,6 +5433,7 @@ ql_els_prli(ql_adapter_state_t *ha, fc_packet_t *pkt)
 	port_id_t		d_id;
 	la_els_prli_t		acc;
 	prli_svc_param_t	*param;
+	ql_srb_t		*sp = (ql_srb_t *)pkt->pkt_fca_private;
 	int			rval = FC_SUCCESS;
 
 	QL_PRINT_3(CE_CONT, "(%d): started, d_id=%xh\n", ha->instance,
@@ -5425,7 +5447,8 @@ ql_els_prli(ql_adapter_state_t *ha, fc_packet_t *pkt)
 
 		if ((ha->topology & QL_N_PORT) &&
 		    (tq->master_state == PD_STATE_PLOGI_COMPLETED)) {
-			ql_start_iocb(ha, (ql_srb_t *)pkt->pkt_fca_private);
+			ql_timeout_insert(ha, tq, sp);
+			ql_start_iocb(ha, sp);
 			rval = QL_CONSUMED;
 		} else {
 			/* Build ACC. */
@@ -7022,6 +7045,7 @@ ql_fcp_scsi_cmd(ql_adapter_state_t *ha, fc_packet_t *pkt, ql_srb_t *sp)
 			 * Setup for commands with data transfer
 			 */
 			sp->iocb = ha->fcp_cmd;
+			sp->req_cnt = 1;
 			if (sp->fcp->fcp_data_len != 0) {
 				/*
 				 * FCP data is bound to pkt_data_dma
@@ -7032,7 +7056,9 @@ ql_fcp_scsi_cmd(ql_adapter_state_t *ha, fc_packet_t *pkt, ql_srb_t *sp)
 				}
 
 				/* Setup IOCB count. */
-				if (pkt->pkt_data_cookie_cnt > ha->cmd_segs) {
+				if (pkt->pkt_data_cookie_cnt > ha->cmd_segs &&
+				    (!CFG_IST(ha, CFG_CTRL_8021) ||
+				    sp->sg_dma.dma_handle == NULL)) {
 					uint32_t	cnt;
 
 					cnt = pkt->pkt_data_cookie_cnt -
@@ -7045,11 +7071,7 @@ ql_fcp_scsi_cmd(ql_adapter_state_t *ha, fc_packet_t *pkt, ql_srb_t *sp)
 					} else {
 						sp->req_cnt++;
 					}
-				} else {
-					sp->req_cnt = 1;
 				}
-			} else {
-				sp->req_cnt = 1;
 			}
 			QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 
@@ -8164,7 +8186,7 @@ ql_task_daemon(void *arg)
 static void
 ql_task_thread(ql_adapter_state_t *ha)
 {
-	int			loop_again, rval;
+	int			loop_again;
 	ql_srb_t		*sp;
 	ql_head_t		*head;
 	ql_link_t		*link;
@@ -8185,62 +8207,17 @@ ql_task_thread(ql_adapter_state_t *ha)
 		}
 		QL_PM_UNLOCK(ha);
 
-		/* IDC acknowledge needed. */
-		if (ha->task_daemon_flags & IDC_ACK_NEEDED) {
-			ha->task_daemon_flags &= ~IDC_ACK_NEEDED;
-			ADAPTER_STATE_LOCK(ha);
-			switch (ha->idc_mb[2]) {
-			case IDC_OPC_DRV_START:
-				if (ha->idc_restart_mpi != 0) {
-					ha->idc_restart_mpi--;
-					if (ha->idc_restart_mpi == 0) {
-						ha->restart_mpi_timer = 0;
-						ha->task_daemon_flags &=
-						    ~TASK_DAEMON_STALLED_FLG;
-					}
-				}
-				if (ha->idc_flash_acc != 0) {
-					ha->idc_flash_acc--;
-					if (ha->idc_flash_acc == 0) {
-						ha->flash_acc_timer = 0;
-						GLOBAL_HW_LOCK();
-					}
-				}
-				break;
-			case IDC_OPC_FLASH_ACC:
-				ha->flash_acc_timer = 30;
-				if (ha->idc_flash_acc == 0) {
-					GLOBAL_HW_UNLOCK();
-				}
-				ha->idc_flash_acc++;
-				break;
-			case IDC_OPC_RESTART_MPI:
-				ha->restart_mpi_timer = 30;
-				ha->idc_restart_mpi++;
-				ha->task_daemon_flags |=
-				    TASK_DAEMON_STALLED_FLG;
-				break;
-			default:
-				EL(ha, "Unknown IDC opcode=%xh\n",
-				    ha->idc_mb[2]);
-				break;
-			}
-			ADAPTER_STATE_UNLOCK(ha);
-
-			if (ha->idc_mb[1] & IDC_TIMEOUT_MASK) {
-				TASK_DAEMON_UNLOCK(ha);
-				rval = ql_idc_ack(ha);
-				if (rval != QL_SUCCESS) {
-					EL(ha, "idc_ack status=%xh\n", rval);
-				}
-				TASK_DAEMON_LOCK(ha);
-				loop_again = TRUE;
-			}
+		/* IDC event. */
+		if (ha->task_daemon_flags & IDC_EVENT) {
+			ha->task_daemon_flags &= ~IDC_EVENT;
+			TASK_DAEMON_UNLOCK(ha);
+			ql_process_idc_event(ha);
+			TASK_DAEMON_LOCK(ha);
+			loop_again = TRUE;
 		}
 
-		if (ha->flags & ADAPTER_SUSPENDED ||
-		    ha->task_daemon_flags & (TASK_DAEMON_STOP_FLG |
-		    DRIVER_STALL) ||
+		if (ha->flags & ADAPTER_SUSPENDED || ha->task_daemon_flags &
+		    (TASK_DAEMON_STOP_FLG | DRIVER_STALL) ||
 		    (ha->flags & ONLINE) == 0) {
 			ha->task_daemon_flags |= TASK_DAEMON_STALLED_FLG;
 			break;
@@ -9749,22 +9726,22 @@ ql_timer(void *arg)
 			}
 		}
 		ADAPTER_STATE_LOCK(ha);
-		if (ha->restart_mpi_timer != 0) {
-			ha->restart_mpi_timer--;
-			if (ha->restart_mpi_timer == 0 &&
-			    ha->idc_restart_mpi != 0) {
-				ha->idc_restart_mpi = 0;
-				reset_flags |= TASK_DAEMON_STALLED_FLG;
+		if (ha->idc_restart_timer != 0) {
+			ha->idc_restart_timer--;
+			if (ha->idc_restart_timer == 0) {
+				ha->idc_restart_cnt = 0;
+				reset_flags |= DRIVER_STALL;
 			}
 		}
-		if (ha->flash_acc_timer != 0) {
-			ha->flash_acc_timer--;
-			if (ha->flash_acc_timer == 0 &&
+		if (ha->idc_flash_acc_timer != 0) {
+			ha->idc_flash_acc_timer--;
+			if (ha->idc_flash_acc_timer == 0 &&
 			    ha->idc_flash_acc != 0) {
 				ha->idc_flash_acc = 1;
+				ha->idc_mb[0] = MBA_IDC_NOTIFICATION;
 				ha->idc_mb[1] = 0;
 				ha->idc_mb[2] = IDC_OPC_DRV_START;
-				set_flags |= IDC_ACK_NEEDED;
+				set_flags |= IDC_EVENT;
 			}
 		}
 		ADAPTER_STATE_UNLOCK(ha);
@@ -10013,7 +9990,6 @@ static void
 ql_cmd_timeout(ql_adapter_state_t *ha, ql_tgt_t *tq, ql_srb_t *sp,
     uint32_t *set_flags, uint32_t *reset_flags)
 {
-
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	if (!(sp->flags & SRB_ISP_STARTED)) {
@@ -10046,6 +10022,57 @@ ql_cmd_timeout(ql_adapter_state_t *ha, ql_tgt_t *tq, ql_srb_t *sp,
 		ql_done(&sp->cmd);
 
 		DEVICE_QUEUE_LOCK(tq);
+	} else if (CFG_IST(ha, CFG_CTRL_8021)) {
+		int		rval;
+		uint32_t	index;
+
+		EL(ha, "command timed out in isp=%ph, osc=%ph, index=%xh, "
+		    "spf=%xh\n", (void *)sp,
+		    (void *)ha->outstanding_cmds[sp->handle & OSC_INDEX_MASK],
+		    sp->handle & OSC_INDEX_MASK, sp->flags);
+
+		DEVICE_QUEUE_UNLOCK(tq);
+
+		INTR_LOCK(ha);
+		ha->pha->xioctl->ControllerErrorCount++;
+		if (sp->handle) {
+			ha->pha->timeout_cnt++;
+			index = sp->handle & OSC_INDEX_MASK;
+			if (ha->pha->outstanding_cmds[index] == sp) {
+				sp->request_ring_ptr->entry_type =
+				    INVALID_ENTRY_TYPE;
+				sp->request_ring_ptr->entry_count = 0;
+				ha->pha->outstanding_cmds[index] = 0;
+			}
+			INTR_UNLOCK(ha);
+
+			rval = ql_abort_command(ha, sp);
+			if (rval == QL_FUNCTION_TIMEOUT ||
+			    rval == QL_LOCK_TIMEOUT ||
+			    rval == QL_FUNCTION_PARAMETER_ERROR ||
+			    ha->pha->timeout_cnt > TIMEOUT_THRESHOLD) {
+				*set_flags |= ISP_ABORT_NEEDED;
+				EL(ha, "abort status=%xh, tc=%xh, isp_abort_"
+				    "needed\n", rval, ha->pha->timeout_cnt);
+			}
+
+			sp->handle = 0;
+			sp->flags &= ~SRB_IN_TOKEN_ARRAY;
+		} else {
+			INTR_UNLOCK(ha);
+		}
+
+		/* Set timeout status */
+		sp->pkt->pkt_reason = CS_TIMEOUT;
+
+		/* Ensure no retry */
+		sp->flags &= ~SRB_RETRY;
+
+		/* Call done routine to handle completion. */
+		ql_done(&sp->cmd);
+
+		DEVICE_QUEUE_LOCK(tq);
+
 	} else {
 		EL(ha, "command timed out in isp=%ph, osc=%ph, index=%xh, "
 		    "spf=%xh, isp_abort_needed\n", (void *)sp,
@@ -10159,7 +10186,7 @@ ql_wait_outstanding(ql_adapter_state_t *ha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	count = 3000;
+	count = ql_osc_wait_count;
 	for (index = 1; index < MAX_OUTSTANDING_COMMANDS; index++) {
 		if (ha->pha->pending_cmds.first != NULL) {
 			ql_start_iocb(ha, NULL);
@@ -10171,7 +10198,8 @@ ql_wait_outstanding(ql_adapter_state_t *ha)
 				ql_delay(ha, 10000);
 				index = 0;
 			} else {
-				EL(ha, "failed, sp=%ph\n", (void *)sp);
+				EL(ha, "failed, sp=%ph, oci=%d, hdl=%xh\n",
+				    (void *)sp, index, sp->handle);
 				break;
 			}
 		}
@@ -10256,7 +10284,7 @@ ql_iidma(ql_adapter_state_t *ha)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	if ((CFG_IST(ha, CFG_CTRL_24258081)) == 0) {
+	if ((CFG_IST(ha, CFG_CTRL_242581)) == 0) {
 		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 		return;
 	}
@@ -17802,4 +17830,134 @@ ql_nvram_cache_desc_dtor(ql_adapter_state_t *ha)
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 
 	return (rval);
+}
+
+/*
+ * ql_process_idc_event - Handle an Inter-Driver Communication async event.
+ *
+ * Input:	Pointer to the adapter state structure.
+ * Returns:	void
+ * Context:	Kernel context.
+ */
+static void
+ql_process_idc_event(ql_adapter_state_t *ha)
+{
+	int	rval;
+
+	switch (ha->idc_mb[0]) {
+	case MBA_IDC_NOTIFICATION:
+		/*
+		 * The informational opcode (idc_mb[2]) can be a
+		 * defined value or the mailbox command being executed
+		 * on another function which stimulated this IDC message.
+		 */
+		ADAPTER_STATE_LOCK(ha);
+		switch (ha->idc_mb[2]) {
+		case IDC_OPC_DRV_START:
+			if (ha->idc_flash_acc != 0) {
+				ha->idc_flash_acc--;
+				if (ha->idc_flash_acc == 0) {
+					ha->idc_flash_acc_timer = 0;
+					GLOBAL_HW_UNLOCK();
+				}
+			}
+			if (ha->idc_restart_cnt != 0) {
+				ha->idc_restart_cnt--;
+				if (ha->idc_restart_cnt == 0) {
+					ha->idc_restart_timer = 0;
+					ADAPTER_STATE_UNLOCK(ha);
+					TASK_DAEMON_LOCK(ha);
+					ha->task_daemon_flags &= ~DRIVER_STALL;
+					TASK_DAEMON_UNLOCK(ha);
+					ql_restart_queues(ha);
+				} else {
+					ADAPTER_STATE_UNLOCK(ha);
+				}
+			} else {
+				ADAPTER_STATE_UNLOCK(ha);
+			}
+			break;
+		case IDC_OPC_FLASH_ACC:
+			ha->idc_flash_acc_timer = 30;
+			if (ha->idc_flash_acc == 0) {
+				GLOBAL_HW_LOCK();
+			}
+			ha->idc_flash_acc++;
+			ADAPTER_STATE_UNLOCK(ha);
+			break;
+		case IDC_OPC_RESTART_MPI:
+			ha->idc_restart_timer = 30;
+			ha->idc_restart_cnt++;
+			ADAPTER_STATE_UNLOCK(ha);
+			TASK_DAEMON_LOCK(ha);
+			ha->task_daemon_flags |= DRIVER_STALL;
+			TASK_DAEMON_UNLOCK(ha);
+			break;
+		case IDC_OPC_PORT_RESET_MBC:
+		case IDC_OPC_SET_PORT_CONFIG_MBC:
+			ha->idc_restart_timer = 30;
+			ha->idc_restart_cnt++;
+			ADAPTER_STATE_UNLOCK(ha);
+			TASK_DAEMON_LOCK(ha);
+			ha->task_daemon_flags |= DRIVER_STALL;
+			TASK_DAEMON_UNLOCK(ha);
+			(void) ql_wait_outstanding(ha);
+			break;
+		default:
+			ADAPTER_STATE_UNLOCK(ha);
+			EL(ha, "Unknown IDC opcode=%xh %xh\n", ha->idc_mb[0],
+			    ha->idc_mb[2]);
+			break;
+		}
+		/*
+		 * If there is a timeout value associated with this IDC
+		 * notification then there is an implied requirement
+		 * that we return an ACK.
+		 */
+		if (ha->idc_mb[1] & IDC_TIMEOUT_MASK) {
+			rval = ql_idc_ack(ha);
+			if (rval != QL_SUCCESS) {
+				EL(ha, "idc_ack status=%xh %xh\n", rval,
+				    ha->idc_mb[2]);
+			}
+		}
+		break;
+	case MBA_IDC_COMPLETE:
+		/*
+		 * We don't ACK completions, only these require action.
+		 */
+		switch (ha->idc_mb[2]) {
+		case IDC_OPC_PORT_RESET_MBC:
+		case IDC_OPC_SET_PORT_CONFIG_MBC:
+			ADAPTER_STATE_LOCK(ha);
+			if (ha->idc_restart_cnt != 0) {
+				ha->idc_restart_cnt--;
+				if (ha->idc_restart_cnt == 0) {
+					ha->idc_restart_timer = 0;
+					ADAPTER_STATE_UNLOCK(ha);
+					TASK_DAEMON_LOCK(ha);
+					ha->task_daemon_flags &= ~DRIVER_STALL;
+					TASK_DAEMON_UNLOCK(ha);
+					ql_restart_queues(ha);
+				} else {
+					ADAPTER_STATE_UNLOCK(ha);
+				}
+			} else {
+				ADAPTER_STATE_UNLOCK(ha);
+			}
+			break;
+		default:
+			break; /* Don't care... */
+		}
+		break;
+	case MBA_IDC_TIME_EXTENDED:
+		QL_PRINT_10(CE_CONT, "(%d): MBA_IDC_TIME_EXTENDED="
+		    "%xh\n", ha->instance, ha->idc_mb[2]);
+		break;
+	default:
+		EL(ha, "Inconsistent IDC event =%xh %xh\n", ha->idc_mb[0],
+		    ha->idc_mb[2]);
+		ADAPTER_STATE_UNLOCK(ha);
+		break;
+	}
 }

@@ -50,6 +50,7 @@ extern "C" {
 #define	NX_P3_B1	0x41
 #define	NX_P3_B2	0x42
 #define	NX_P3P_A0	0x50
+#define	NX_P3P_B0	0x54
 
 #define	NX_IS_REVISION_P3(REVISION)	(REVISION >= NX_P3_A0)
 #define	NX_IS_REVISION_P3PLUS(REVISION)	(REVISION >= NX_P3P_A0)
@@ -81,6 +82,8 @@ extern "C" {
 #define	CRB_DRV_ACTIVE		(UNM_CAM_RAM(0x138))
 #define	CRB_DRV_STATE		(UNM_CAM_RAM(0x144))
 #define	CRB_DRV_SCRATCH		(UNM_CAM_RAM(0x148))
+#define	CRB_FCOE_PORT_0_REQIN 	(UNM_CAM_RAM(0x1b8))
+#define	CRB_FCOE_PORT_1_REQIN	(UNM_CAM_RAM(0x1bc))
 
 /* Every driver should use these Device State */
 #define	NX_DEV_COLD		1

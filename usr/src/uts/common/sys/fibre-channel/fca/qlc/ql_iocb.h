@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_QL_IOCB_H
@@ -35,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -115,7 +114,49 @@ typedef struct cmd7_24xx_entry {
 	uint8_t  vp_index;
 	uint32_t dseg_0_address[2];	/* Data segment 0 address. */
 	uint32_t dseg_0_length;		/* Data segment 0 length. */
-} cmd_24xx_entry_t;
+} cmd7_24xx_entry_t;
+
+/*
+ * ISP24xx queue - Command IOCB structure definition.
+ */
+#define	IOCB_CMD_TYPE_6		0x48
+#define	CMD_TYPE_6_DATA_SEGMENTS   1	/* Number of 64 bit data segments. */
+typedef struct cmd6_24xx_entry {
+	uint8_t  entry_type;		/* Entry type. */
+	uint8_t  entry_count;		/* Entry count. */
+	uint8_t  sys_define;		/* System defined. */
+	uint8_t  entry_status;		/* Entry Status. */
+	uint32_t handle;		/* System handle */
+	uint16_t n_port_hdl;
+	uint16_t timeout;		/* Command timeout. */
+	uint16_t dseg_count;
+	uint16_t rsp_length;
+	uint8_t  fcp_lun[8];		/* SCSI LUN ID. */
+	uint16_t control_flags;
+	uint16_t cmnd_length;
+	uint32_t cmnd_address[2];
+	uint32_t rsp_address[2];	/* Data segment 0 address. */
+	uint32_t total_byte_count;
+	uint8_t  target_id[3];		/* SCSI Target ID */
+	uint8_t  vp_index;
+	uint32_t dseg_0_address[2];	/* Data segment 0 address. */
+	uint32_t dseg_0_length;		/* Data segment 0 length. */
+} cmd6_24xx_entry_t;
+
+typedef struct fcp_cmnd {
+	uint8_t		fcp_lun[8];		/* SCSI LUN ID. */
+	uint8_t		crn;			/* Command reference number. */
+	uint8_t		task;			/* Task Attributes Values. */
+	uint8_t		task_mgmt;		/* Task management flags. */
+	uint8_t		control_flags;		/* Plus additional cdb length */
+	uint8_t		scsi_cdb[MAX_CMDSZ];
+	uint32_t	dl;
+} fcp_cmnd_t;
+
+typedef struct cmd6_2400_dma {
+	fcp_cmnd_t	cmd;
+	uint32_t	cookie_list[QL_DMA_SG_LIST_LENGTH + 1][3];
+} cmd6_2400_dma_t;
 
 /*
  * Task Management Flags.
@@ -1413,7 +1454,7 @@ typedef struct menlo_data_entry {
 typedef union ql_mbx_iocb {
 	cmd_entry_t		cmd;
 	cmd_3_entry_t		cmd3;
-	cmd_24xx_entry_t	cmd24;
+	cmd7_24xx_entry_t	cmd24;
 	ms_entry_t		ms;
 	ct_passthru_entry_t	ms24;
 	abort_cmd_entry_t	abo;

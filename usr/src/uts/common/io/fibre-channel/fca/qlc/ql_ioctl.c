@@ -22,8 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #pragma ident	"Copyright 2010 QLogic Corporation; ql_ioctl.c"
@@ -298,7 +297,13 @@ ql_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 	(void) ql_idle_notification(ha);
 
 	if (rval != 0) {
-		EL(ha, "failed, rval = %d\n", rval);
+		/*
+		 * Don't show failures caused by pps polling for
+		 * non-existant virtual ports.
+		 */
+		if (cmd != EXT_CC_VPORT_CMD) {
+			EL(ha, "failed, cmd=%d rval=%d\n", cmd, rval);
+		}
 	} else {
 		/*EMPTY*/
 		QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);

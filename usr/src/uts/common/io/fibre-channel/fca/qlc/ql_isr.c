@@ -22,8 +22,7 @@
 /* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #pragma ident	"Copyright 2010 QLogic Corporation; ql_isr.c"
@@ -91,6 +90,12 @@ static void ql_els_passthru_entry(ql_adapter_state_t *,
 static ql_srb_t *ql_verify_preprocessed_cmd(ql_adapter_state_t *, uint32_t *,
     uint32_t *, uint32_t *);
 static void ql_signal_abort(ql_adapter_state_t *ha, uint32_t *set_flags);
+
+/*
+ * Spurious interrupt counter
+ */
+uint32_t	ql_spurious_cnt = 4;
+uint32_t	ql_max_intr_loop = 16;
 
 /*
  * ql_isr
@@ -164,6 +169,7 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 	int			spurious_intr = 0;
 	boolean_t		intr = B_FALSE, daemon = B_FALSE;
 	int			intr_loop = 4;
+	boolean_t		clear_spurious = B_TRUE;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
@@ -329,10 +335,17 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 			}
 		}
 	} else {
+		uint32_t	ql_max_intr_loop_cnt = 0;
+
 		if (CFG_IST(ha, CFG_CTRL_8021)) {
 			ql_8021_clr_hw_intr(ha);
+			intr_loop = 1;
 		}
-		while ((stat = RD32_IO_REG(ha, risc2host)) & RH_RISC_INT) {
+		while (((stat = RD32_IO_REG(ha, risc2host)) & RH_RISC_INT) &&
+		    (++ql_max_intr_loop_cnt < ql_max_intr_loop)) {
+
+			clear_spurious = B_TRUE;	/* assume ok */
+
 			/* Capture FW defined interrupt info */
 			mbx = MSW(stat);
 
@@ -341,7 +354,8 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 			rval = DDI_INTR_CLAIMED;
 
 			if (CFG_IST(ha, CFG_CTRL_8021) &&
-			    RD32_IO_REG(ha, nx_risc_int) == 0) {
+			    (RD32_IO_REG(ha, nx_risc_int) == 0 ||
+			    intr_loop == 0)) {
 				break;
 			}
 
@@ -387,14 +401,19 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 					    &set_flags, &reset_flags,
 					    intr_loop);
 				} else if (++spurious_intr ==
-				    MAX_SPURIOUS_INTR) {
+				    ql_spurious_cnt) {
 					/* Process excessive spurious intr. */
 					ql_spurious_intr(ha, intr_loop);
 					EL(ha, "excessive spurious "
 					    "interrupts, isp_abort_needed\n");
 					set_flags |= ISP_ABORT_NEEDED;
+					clear_spurious = B_FALSE;
 				} else {
+					QL_PRINT_10(CE_CONT, "(%d): response "
+					    "ring index same as before\n",
+					    ha->instance);
 					intr = B_TRUE;
+					clear_spurious = B_FALSE;
 				}
 				break;
 
@@ -488,6 +507,10 @@ ql_isr_aif(caddr_t arg, caddr_t intvec)
 				EL(ha, "parity/pause exit\n");
 				mbx = RD16_IO_REG(ha, hccr); /* PCI posting */
 				break;
+			}
+
+			if (clear_spurious) {
+				spurious_intr = 0;
 			}
 		}
 	}
@@ -993,24 +1016,24 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 	case MBA_LOOP_UP:
 		if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322 |
 		    CFG_CTRL_24258081))) {
-			mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
-			if (mb[1] == IIDMA_RATE_1GB) {		/* 1GB */
+			ha->iidma_rate = RD16_IO_REG(ha, mailbox_out[1]);
+			if (ha->iidma_rate == IIDMA_RATE_1GB) {
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state) | FC_STATE_1GBIT_SPEED;
 				index = 1;
-			} else if (mb[1] == IIDMA_RATE_2GB) {	/* 2GB */
+			} else if (ha->iidma_rate == IIDMA_RATE_2GB) {
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state) | FC_STATE_2GBIT_SPEED;
 				index = 2;
-			} else if (mb[1] == IIDMA_RATE_4GB) {	/* 4GB */
+			} else if (ha->iidma_rate == IIDMA_RATE_4GB) {
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state) | FC_STATE_4GBIT_SPEED;
 				index = 4;
-			} else if (mb[1] == IIDMA_RATE_8GB) {	/* 8GB */
+			} else if (ha->iidma_rate == IIDMA_RATE_8GB) {
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state) | FC_STATE_8GBIT_SPEED;
 				index = 8;
-			} else if (mb[1] == IIDMA_RATE_10GB) {	/* 10GB */
+			} else if (ha->iidma_rate == IIDMA_RATE_10GB) {
 				ha->state = FC_PORT_STATE_MASK(
 				    ha->state) | FC_STATE_10GBIT_SPEED;
 				index = 10;
@@ -1020,6 +1043,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 				index = 0;
 			}
 		} else {
+			ha->iidma_rate = IIDMA_RATE_1GB;
 			ha->state = FC_PORT_STATE_MASK(ha->state) |
 			    FC_STATE_FULL_SPEED;
 			index = 1;
@@ -1257,7 +1281,6 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 	/* case MBA_DCBX_COMPLETED: */
 		if (CFG_IST(ha, CFG_CTRL_8081)) {
 			EL(ha, "%xh DCBX completed received\n", mb[0]);
-			ha->async_event_wait |= BIT_1;
 		} else {
 			EL(ha, "%xh Point to Point Mode received\n", mb[0]);
 		}
@@ -1336,21 +1359,29 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		    mb[0], RD16_IO_REG(ha, mailbox_out[1]));
 		break;
 
+	/*
+	 * MBA_IDC_COMPLETE &  MBA_IDC_NOTIFICATION: We won't get another
+	 * IDC async event until we ACK the current one.
+	 */
 	case MBA_IDC_COMPLETE:
+		ha->idc_mb[0] = mb[0];
+		ha->idc_mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
+		ha->idc_mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
+		ha->idc_mb[3] = RD16_IO_REG(ha, mailbox_out[3]);
+		ha->idc_mb[4] = RD16_IO_REG(ha, mailbox_out[4]);
+		ha->idc_mb[5] = RD16_IO_REG(ha, mailbox_out[5]);
+		ha->idc_mb[6] = RD16_IO_REG(ha, mailbox_out[6]);
+		ha->idc_mb[7] = RD16_IO_REG(ha, mailbox_out[7]);
 		EL(ha, "%xh Inter-driver communication complete received, "
 		    " mbx1=%xh, mbx2=%xh, mbx3=%xh, mbx4=%xh, mbx5=%xh,"
-		    " mbx6=%xh, mbx7=%xh\n", mb[0],
-		    RD16_IO_REG(ha, mailbox_out[1]),
-		    RD16_IO_REG(ha, mailbox_out[2]),
-		    RD16_IO_REG(ha, mailbox_out[3]),
-		    RD16_IO_REG(ha, mailbox_out[4]),
-		    RD16_IO_REG(ha, mailbox_out[5]),
-		    RD16_IO_REG(ha, mailbox_out[6]),
-		    RD16_IO_REG(ha, mailbox_out[7]));
-		ha->async_event_wait |= BIT_0;
+		    " mbx6=%xh, mbx7=%xh\n", mb[0], ha->idc_mb[1],
+		    ha->idc_mb[2], ha->idc_mb[3], ha->idc_mb[4], ha->idc_mb[5],
+		    ha->idc_mb[6], ha->idc_mb[7]);
+		*set_flags |= IDC_EVENT;
 		break;
 
 	case MBA_IDC_NOTIFICATION:
+		ha->idc_mb[0] = mb[0];
 		ha->idc_mb[1] = RD16_IO_REG(ha, mailbox_out[1]);
 		ha->idc_mb[2] = RD16_IO_REG(ha, mailbox_out[2]);
 		ha->idc_mb[3] = RD16_IO_REG(ha, mailbox_out[3]);
@@ -1363,7 +1394,7 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		    "mbx5=%xh, mbx6=%xh, mbx7=%xh\n", mb[0], ha->idc_mb[1],
 		    ha->idc_mb[2], ha->idc_mb[3], ha->idc_mb[4], ha->idc_mb[5],
 		    ha->idc_mb[6], ha->idc_mb[7]);
-		*set_flags |= IDC_ACK_NEEDED;
+		*set_flags |= IDC_EVENT;
 		break;
 
 	case MBA_IDC_TIME_EXTENDED:
@@ -1440,6 +1471,7 @@ ql_fast_fcp_post(ql_srb_t *sp)
 	/* Reset port down retry count on good completion. */
 	tq->port_down_retry_count = ha->port_down_retry_count;
 	tq->qfull_retry_count = ha->qfull_retry_count;
+	ha->pha->timeout_cnt = 0;
 
 	/* Remove command from watchdog queue. */
 	if (sp->flags & SRB_WATCHDOG_ENABLED) {
@@ -3315,7 +3347,8 @@ ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
 static void
 ql_signal_abort(ql_adapter_state_t *ha, uint32_t *set_flags)
 {
-	if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED | ABORT_ISP_ACTIVE))) {
+	if (!CFG_IST(ha, CFG_CTRL_8021) &&
+	    !(ha->task_daemon_flags & (ISP_ABORT_NEEDED | ABORT_ISP_ACTIVE))) {
 		*set_flags |= ISP_ABORT_NEEDED;
 	}
 }
