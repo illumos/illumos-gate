@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SUNLDI_H
@@ -67,6 +66,7 @@ typedef struct __ldi_ev_cookie		*ldi_ev_cookie_t;
 #define	LDI_EV_NONE	(-2)	/* no matching callbacks registered */
 #define	LDI_EV_OFFLINE	"LDI:EVENT:OFFLINE"
 #define	LDI_EV_DEGRADE	"LDI:EVENT:DEGRADE"
+#define	LDI_EV_DEVICE_REMOVE	"LDI:EVENT:DEVICE_REMOVE"
 
 #define	LDI_EV_CB_VERS_1	1
 #define	LDI_EV_CB_VERS		LDI_EV_CB_VERS_1

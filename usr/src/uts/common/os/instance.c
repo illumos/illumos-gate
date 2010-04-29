@@ -129,6 +129,7 @@ static char *instance_file_backup = INSTANCE_FILE INSTANCE_FILE_SUFFIX;
 #define	PTI_NOT_FOUND	1
 #define	PTI_REBUILD	2
 
+int	instance_searchme = 0;	/* testing: use complex code path */
 
 /*
  * Path to instance file magic string used for first time boot after
@@ -233,17 +234,32 @@ e_ddi_instance_init(void)
 static void
 in_preassign_instance()
 {
-	major_t m;
-	extern major_t devcnt;
+	major_t		m;
+	struct devnames	*dnp;
+	dev_info_t	*dip;
+	extern major_t	devcnt;
 
 	for (m = 0; m < devcnt; m++) {
-		struct devnames *dnp = &devnamesp[m];
-		dev_info_t *dip = dnp->dn_head;
+		dnp = &devnamesp[m];
+		dip = dnp->dn_head;
 		while (dip) {
 			DEVI(dip)->devi_instance = dnp->dn_instance;
 			dnp->dn_instance++;
 			dip = ddi_get_next(dip);
 		}
+
+		/*
+		 * The preassign instance numbers are not fully
+		 * accounted for until e_ddi_assign_instance().
+		 * We can't fully account for them now because we
+		 * don't currently have a unit-address. Because of
+		 * this, we need to remember the preassign boundary
+		 * to avoid ordering issues related to
+		 * e_ddi_assign_instance of a preassigned value .vs.
+		 * re-assignment of the same value for a dynamic
+		 * SID node created by bus_config.
+		 */
+		dnp->dn_pinstance = dnp->dn_instance;
 	}
 }
 
@@ -678,11 +694,13 @@ e_ddi_instance_majorinstance_to_path(major_t major, uint_t inst, char *path)
  * When there are no 'holes' in the allocation sequence, dn_instance is the
  * next available instance number. When dn_instance is IN_SEARCHME, hole(s)
  * exists and a slower code path executes which tries to fill holes.
+ *
+ * The block returned can't be in the preassigned range.
  */
 static int
 in_next_instance_block(major_t major, int block_size)
 {
-	unsigned int	prev;
+	int		prev;
 	struct devnames	*dnp;
 	in_drv_t	*dp;
 	int		base;
@@ -694,29 +712,38 @@ in_next_instance_block(major_t major, int block_size)
 	ASSERT(block_size);
 
 	/* check to see if we can do a quick allocation */
-	if (dnp->dn_instance != IN_SEARCHME) {
+	if (!instance_searchme && (dnp->dn_instance != IN_SEARCHME)) {
 		base = dnp->dn_instance;
 		dnp->dn_instance += block_size;
 		return (base);
 	}
+
+	/* use more complex code path */
 	dp = dnp->dn_inlist;
 
-	/* no existing entries, allocate block at 0 */
+	/* no existing entries, allocate block (after preassigns) */
 	if (dp == NULL) {
-		dnp->dn_instance = block_size;
-		return (0);
+		base = dnp->dn_pinstance;
+		dnp->dn_instance = dnp->dn_pinstance + block_size;
+		return (base);
 	}
 
+	/* see if we fit in hole at beginning (after preassigns) */
 	prev = dp->ind_instance;
-	if (prev >= block_size)
-		return (0);		/* we fit in hole at beginning */
+	if ((prev - dnp->dn_pinstance) >= block_size)
+		return (dnp->dn_pinstance);	/* we fit in beginning hole */
 
 	/* search the list for a large enough hole */
 	for (dp = dp->ind_next, hole = 0; dp; dp = dp->ind_next) {
-		if (dp->ind_instance != (prev + 1))
-			hole++;			/* we have a hole */
-		if (dp->ind_instance >= (prev + block_size + 1))
-			break;			/* we fit in hole */
+		if (dp->ind_instance >= dnp->dn_pinstance) {
+			/* not a preassign */
+			if (dp->ind_instance != (prev + 1))
+				hole++;			/* we have a hole */
+			if (dp->ind_instance >= (prev + block_size + 1))
+				break;			/* we fit in hole */
+		} else
+			hole++;		/* preassign hole */
+
 		prev = dp->ind_instance;
 	}
 

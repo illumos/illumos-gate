@@ -140,6 +140,7 @@ struct ldi_ev_cookie {
 static struct ldi_ev_cookie ldi_ev_cookies[] = {
 	{ LDI_EV_OFFLINE, 1, CT_DEV_EV_OFFLINE},
 	{ LDI_EV_DEGRADE, 0, CT_DEV_EV_DEGRADED},
+	{ LDI_EV_DEVICE_REMOVE, 0, 0},
 	{ NULL}			/* must terminate list */
 };
 

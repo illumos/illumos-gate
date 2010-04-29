@@ -4811,6 +4811,11 @@ i_ddi_log_devfs_device_remove(dev_info_t *dip)
 	if (i_ddi_node_state(dip) < DS_INITIALIZED)
 		return;
 
+	/* Inform LDI_EV_DEVICE_REMOVE callbacks. */
+	ldi_invoke_finalize(dip, DDI_DEV_T_ANY, 0, LDI_EV_DEVICE_REMOVE,
+	    LDI_EV_SUCCESS, NULL);
+
+	/* Generate EC_DEVFS_DEVI_REMOVE sysevent. */
 	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 	(void) i_log_devfs_remove_devinfo(ddi_pathname(dip, path),
 	    i_ddi_devi_class(dip), (char *)ddi_driver_name(dip),
@@ -5902,8 +5907,15 @@ devi_detach_node(dev_info_t *dip, uint_t flags)
 				flags |= NDI_DEVI_REMOVE;
 
 			if (flags & NDI_DEVI_REMOVE) {
+				/*
+				 * NOTE: If there is a consumer of LDI events,
+				 * ddi_uninitchild above would have failed
+				 * because of active devi_ref from ldi_open().
+				 */
+
 				ret = ddi_remove_child(dip, 0);
 				if (post_event && ret == NDI_SUCCESS) {
+					/* Generate EC_DEVFS_DEVI_REMOVE */
 					(void) i_log_devfs_remove_devinfo(path,
 					    class, driver, instance, flags);
 				}
@@ -8071,8 +8083,10 @@ ndi_devi_device_remove(dev_info_t *dip)
 	i_ddi_di_cache_invalidate();
 
 	/*
-	 * Generate sysevent for those interested in removal (either directly
-	 * via EC_DEVFS or indirectly via devfsadmd generated EC_DEV).
+	 * Generate sysevent for those interested in removal (either
+	 * directly via private EC_DEVFS or indirectly via devfsadmd
+	 * generated EC_DEV). This will generate LDI DEVICE_REMOVE
+	 * event too.
 	 */
 	i_ddi_log_devfs_device_remove(dip);
 

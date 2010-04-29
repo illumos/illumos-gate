@@ -6724,7 +6724,7 @@ scsi_device_unconfig(dev_info_t *self, char *name, char *addr, int *circp)
 
 	/*
 	 * We have a catch-22. We may have a demoted node that we need to find
-	 * and offline/remove. To find the node it it isn't demoted, we
+	 * and offline/remove. To find the node if it isn't demoted, we
 	 * use scsi_findchild. If it's demoted, we then use
 	 * ndi_devi_findchild_by_callback.
 	 */
@@ -6789,22 +6789,17 @@ scsi_device_unconfig(dev_info_t *self, char *name, char *addr, int *circp)
 		scsi_hba_devi_exit_phci(self, *circp);
 		rval = mdi_pi_offline(path, 0);
 		scsi_hba_devi_enter_phci(self, circp);
-		if (rval == MDI_SUCCESS) {
+
+		/* Note new device_remove */
+		if (mdi_pi_device_remove(path))
 			SCSI_HBA_LOG((_LOGUNCFG, self, NULL,
-			    "pathinfo %s offlined and removed", spathname));
-		} else if (mdi_pi_device_remove(path)) {
-			/* Offline/remove failed, note new device_remove */
-			SCSI_HBA_LOG((_LOGUNCFG, self, NULL,
-			    "pathinfo %s offline failed, "
-			    "device_remove", spathname));
-		}
+			    "pathinfo %s note device_remove", spathname));
+
 		mdi_rele_path(path);
-		if ((rval == MDI_SUCCESS) &&
-		    (mdi_pi_free(path, 0) != MDI_SUCCESS)) {	/* REMOVE */
+		if (rval == MDI_SUCCESS) {
+			(void) mdi_pi_free(path, 0);
 			SCSI_HBA_LOG((_LOGUNCFG, self, NULL,
-			    "pathinfo %s mdi_pi_free failed, "
-			    "device_remove", spathname));
-			(void) mdi_pi_device_remove(path);
+			    "pathinfo %s offlined, then freed", spathname));
 		}
 	} else {
 		ASSERT((path == NULL) && (child == NULL));

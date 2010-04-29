@@ -7271,13 +7271,33 @@ mdi_pi_device_isremoved(mdi_pathinfo_t *pip)
 	return (MDI_PI_FLAGS_IS_DEVICE_REMOVED(pip));
 }
 
+/* Return 1 if all client paths are device_removed */
+static int
+i_mdi_client_all_devices_removed(mdi_client_t *ct)
+{
+	mdi_pathinfo_t  *pip;
+	int		all_devices_removed = 1;
+
+	MDI_CLIENT_LOCK(ct);
+	for (pip = ct->ct_path_head; pip;
+	    pip = (mdi_pathinfo_t *)MDI_PI(pip)->pi_client_link) {
+		if (!mdi_pi_device_isremoved(pip)) {
+			all_devices_removed = 0;
+			break;
+		}
+	}
+	MDI_CLIENT_UNLOCK(ct);
+	return (all_devices_removed);
+}
+
 /*
- * When processing hotplug, if mdi_pi_offline-mdi_pi_free fails then this
- * interface is used to represent device removal.
+ * When processing path hotunplug, represent device removal.
  */
 int
 mdi_pi_device_remove(mdi_pathinfo_t *pip)
 {
+	mdi_client_t	*ct;
+
 	MDI_PI_LOCK(pip);
 	if (mdi_pi_device_isremoved(pip)) {
 		MDI_PI_UNLOCK(pip);
@@ -7287,7 +7307,15 @@ mdi_pi_device_remove(mdi_pathinfo_t *pip)
 	MDI_PI_FLAGS_SET_HIDDEN(pip);
 	MDI_PI_UNLOCK(pip);
 
-	i_ddi_di_cache_invalidate();
+	/*
+	 * If all paths associated with the client are now DEVICE_REMOVED,
+	 * reflect DEVICE_REMOVED in the client.
+	 */
+	ct = MDI_PI(pip)->pi_client;
+	if (ct && ct->ct_dip && i_mdi_client_all_devices_removed(ct))
+		(void) ndi_devi_device_remove(ct->ct_dip);
+	else
+		i_ddi_di_cache_invalidate();
 
 	return (1);
 }

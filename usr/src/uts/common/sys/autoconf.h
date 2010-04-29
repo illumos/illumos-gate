@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_AUTOCONF_H
@@ -58,6 +57,7 @@ struct devnames {
 	struct mperm	*dn_mperm;	/* minor permissions */
 	struct mperm	*dn_mperm_wild;	/* default minor permission */
 	struct mperm	*dn_mperm_clone; /* minor permission, clone use */
+	int		dn_pinstance;	/* Preassign instance boundary */
 };
 
 /*
