@@ -59,6 +59,7 @@
 #include <sys/condvar_impl.h>
 #include <sys/mem_config.h>
 #include <sys/mem_cage.h>
+#include <sys/kflt_mem.h>
 #include <sys/kmem.h>
 #include <sys/atomic.h>
 #include <sys/strlog.h>
@@ -129,7 +130,7 @@ static kcondvar_t freemem_cv;
  * The free list contains those pages that should be reused first.
  *
  * The implementation of the lists is machine dependent.
- * page_get_freelist(), page_get_cachelist(),
+ * PAGE_GET_FREELISTS(), page_get_cachelist(),
  * page_list_sub(), and page_list_add()
  * form the interface to the machine dependent implementation.
  *
@@ -507,10 +508,13 @@ static kphysm_setup_vector_t page_mem_config_vec = {
 static void
 page_init_mem_config(void)
 {
-	int ret;
+#ifdef DEBUG
+	ASSERT(kphysm_setup_func_register(&page_mem_config_vec,
+	    (void *)NULL) == 0);
+#else /* !DEBUG */
+	(void) kphysm_setup_func_register(&page_mem_config_vec, (void *)NULL);
+#endif /* !DEBUG */
 
-	ret = kphysm_setup_func_register(&page_mem_config_vec, (void *)NULL);
-	ASSERT(ret == 0);
 }
 
 /*
@@ -1555,9 +1559,9 @@ page_create_wait(pgcnt_t npages, uint_t flags)
 
 	ASSERT(!kcage_on ? !(flags & PG_NORELOC) : 1);
 checkagain:
-	if ((flags & PG_NORELOC) &&
-	    kcage_freemem < kcage_throttlefree + npages)
-		(void) kcage_create_throttle(npages, flags);
+
+	/* Throttle kernel memory allocations if necessary */
+	KERNEL_THROTTLE(npages, flags);
 
 	if (freemem < npages + throttlefree)
 		if (!page_create_throttle(npages, flags))
@@ -1782,7 +1786,7 @@ page_create_get_something(vnode_t *vp, u_offset_t off, struct seg *seg,
 	 */
 	flags |= PG_PANIC;
 
-	if ((flags & PG_NORELOC) != 0) {
+	if ((flags & (PG_NORELOC|PG_KFLT)) != 0) {
 		VM_STAT_ADD(pcgs_entered_noreloc);
 		/*
 		 * Requests for free pages from critical threads
@@ -1801,7 +1805,8 @@ page_create_get_something(vnode_t *vp, u_offset_t off, struct seg *seg,
 		 * kcage_freemem won't fall below minfree prior to grabbing
 		 * pages from the freelists.
 		 */
-		if (kcage_create_throttle(1, flags) == KCT_NONCRIT) {
+		/* LINTED */
+		if (KERNEL_THROTTLE_NONCRIT(1, flags)) {
 			mutex_enter(&pcgs_cagelock);
 			cagelocked = 1;
 			VM_STAT_ADD(pcgs_cagelocked);
@@ -1858,8 +1863,8 @@ page_create_get_something(vnode_t *vp, u_offset_t off, struct seg *seg,
 
 	lgrp = lgrp_mem_choose(seg, vaddr, PAGESIZE);
 
-	for (count = 0; kcage_on || count < MAX_PCGS; count++) {
-		pp = page_get_freelist(vp, off, seg, vaddr, PAGESIZE,
+	for (count = 0; kcage_on || kflt_on || count < MAX_PCGS; count++) {
+		PAGE_GET_FREELISTS(pp, vp, off, seg, vaddr, PAGESIZE,
 		    flags, lgrp);
 		if (pp == NULL) {
 			pp = page_get_cachelist(vp, off, seg, vaddr,
@@ -1869,7 +1874,7 @@ page_create_get_something(vnode_t *vp, u_offset_t off, struct seg *seg,
 			/*
 			 * Serialize.  Don't fight with other pcgs().
 			 */
-			if (!locked && (!kcage_on || !(flags & PG_NORELOC))) {
+			if (!locked && KERNEL_NOT_THROTTLED(flags)) {
 				mutex_enter(&pcgs_lock);
 				VM_STAT_ADD(pcgs_locked);
 				locked = 1;
@@ -2048,14 +2053,16 @@ page_alloc_pages(struct vnode *vp, struct seg *seg, caddr_t addr,
 	while (npgs && szc) {
 		lgrp = lgrp_mem_choose(seg, addr, pgsz);
 		if (pgflags == PG_LOCAL) {
-			pp = page_get_freelist(vp, 0, seg, addr, pgsz,
+			PAGE_GET_FREELISTS(pp, vp, 0, seg, addr, pgsz,
 			    pgflags, lgrp);
 			if (pp == NULL) {
-				pp = page_get_freelist(vp, 0, seg, addr, pgsz,
+				/* LINTED */
+				PAGE_GET_FREELISTS(pp, vp, 0, seg, addr, pgsz,
 				    0, lgrp);
 			}
 		} else {
-			pp = page_get_freelist(vp, 0, seg, addr, pgsz,
+			/* LINTED */
+			PAGE_GET_FREELISTS(pp, vp, 0, seg, addr, pgsz,
 			    0, lgrp);
 		}
 		if (pp != NULL) {
@@ -2156,10 +2163,24 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 
 	npages = btop(bytes);
 
+	if (kflt_on && ((flags & PG_NORELOC) || VN_ISKAS(vp)) &&
+	    !panicstr) {
+		/*
+		 * If the kernel freelist is active, and this is a
+		 * kernel page or one that is non-relocatable because it
+		 * is locked then set the PG_KFLT flag so that this page
+		 * will be allocated from the kernel freelist and therefore
+		 * will not fragment memory
+		 */
+		flags |= PG_KFLT;
+	}
+
 	if (!kcage_on || panicstr) {
 		/*
-		 * Cage is OFF, or we are single threaded in
-		 * panic, so make everything a RELOC request.
+		 * If the cage is off, we turn off the PG_NORELOC flag
+		 * however if the kernel freelist is active we will use
+		 * this to prevent memory fragmentation instead.
+		 * In panic do not use the cage or the kernel freelist.
 		 */
 		flags &= ~PG_NORELOC;
 	}
@@ -2174,22 +2195,13 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	}
 
 	/*
-	 * If cage is on, dampen draw from cage when available
-	 * cage space is low.
+	 * If cage or kernel freelist is on, dampen draw from cage when
+	 * available cage space is low.
 	 */
-	if ((flags & (PG_NORELOC | PG_WAIT)) ==  (PG_NORELOC | PG_WAIT) &&
-	    kcage_freemem < kcage_throttlefree + npages) {
-
-		/*
-		 * The cage is on, the caller wants PG_NORELOC
-		 * pages and available cage memory is very low.
-		 * Call kcage_create_throttle() to attempt to
-		 * control demand on the cage.
-		 */
-		if (kcage_create_throttle(npages, flags) == KCT_FAILURE) {
-			VM_STAT_ADD(page_create_large_cnt[2]);
-			return (NULL);
-		}
+	/* LINTED */
+	if (KERNEL_THROTTLE_PGCREATE(npages, flags, PG_WAIT)) {
+		VM_STAT_ADD(page_create_large_cnt[2]);
+		return (NULL);
 	}
 
 	if (!pcf_decrement_bucket(npages) &&
@@ -2210,8 +2222,9 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	else
 		lgrp = lgrp_mem_choose(seg, vaddr, bytes);
 
-	if ((rootpp = page_get_freelist(&kvp, off, seg, vaddr,
-	    bytes, flags & ~PG_MATCH_COLOR, lgrp)) == NULL) {
+	PAGE_GET_FREELISTS(rootpp, &kvp, off, seg, vaddr,
+	    bytes, flags & ~PG_MATCH_COLOR, lgrp);
+	if (rootpp == NULL) {
 		page_create_putback(npages);
 		VM_STAT_ADD(page_create_large_cnt[5]);
 		return (NULL);
@@ -2309,33 +2322,41 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 		}
 	}
 
+	if (kflt_on && ((flags & PG_NORELOC) || VN_ISKAS(vp)) &&
+	    !panicstr) {
+		/*
+		 * If the kernel freelist is active, and this is a
+		 * kernel page or one that is non-relocatable because it
+		 * is locked then set the PG_KFLT flag so that this page
+		 * will be allocated from the kernel freelist and therefore
+		 * will not fragment memory
+		 */
+		flags |= PG_KFLT;
+	}
+
 	if (!kcage_on || panicstr) {
 		/*
-		 * Cage is OFF, or we are single threaded in
-		 * panic, so make everything a RELOC request.
+		 * If the cage is off, we turn off the PG_NORELOC flag
+		 * however if the kernel freelist is active we will use
+		 * this to prevent memory fragmentation instead.
+		 * In panic do not use the cage or the kernel freelist.
 		 */
 		flags &= ~PG_NORELOC;
 	}
 
-	if (freemem <= throttlefree + npages)
-		if (!page_create_throttle(npages, flags))
+	if ((freemem <= throttlefree + npages) &&
+	    (!page_create_throttle(npages, flags))) {
 			return (NULL);
+	}
 
 	/*
-	 * If cage is on, dampen draw from cage when available
-	 * cage space is low.
+	 * If cage or kernel freelist is on, dampen draw from cage when
+	 * available cage space is low.
 	 */
-	if ((flags & PG_NORELOC) &&
-	    kcage_freemem < kcage_throttlefree + npages) {
 
-		/*
-		 * The cage is on, the caller wants PG_NORELOC
-		 * pages and available cage memory is very low.
-		 * Call kcage_create_throttle() to attempt to
-		 * control demand on the cage.
-		 */
-		if (kcage_create_throttle(npages, flags) == KCT_FAILURE)
-			return (NULL);
+	/* LINTED */
+	if (KERNEL_THROTTLE_PGCREATE(npages, flags, 0)) {
+		return (NULL);
 	}
 
 	VM_STAT_ADD(page_create_cnt[0]);
@@ -2410,7 +2431,7 @@ top:
 			 * the physical memory
 			 */
 			lgrp = lgrp_mem_choose(seg, vaddr, PAGESIZE);
-			npp = page_get_freelist(vp, off, seg, vaddr, PAGESIZE,
+			PAGE_GET_FREELISTS(npp, vp, off, seg, vaddr, PAGESIZE,
 			    flags | PG_MATCH_COLOR, lgrp);
 			if (npp == NULL) {
 				npp = page_get_cachelist(vp, off, seg,
@@ -2557,7 +2578,6 @@ fail:
 		npp->p_offset = (u_offset_t)-1;
 		page_list_add(npp, PG_FREE_LIST | PG_LIST_TAIL);
 		page_unlock(npp);
-
 	}
 
 	ASSERT(pages_req >= found_on_free);
@@ -2606,7 +2626,9 @@ page_free_toxic_pages(page_t *rootpp)
 {
 	page_t	*tpp;
 	pgcnt_t	i, pgcnt = page_get_pagecnt(rootpp->p_szc);
+#ifdef DEBUG
 	uint_t	szc = rootpp->p_szc;
+#endif
 
 	for (i = 0, tpp = rootpp; i < pgcnt; i++, tpp = tpp->p_next) {
 		ASSERT(tpp->p_szc == szc);
@@ -2780,7 +2802,9 @@ page_free_pages(page_t *pp)
 	page_t	*tpp, *rootpp = NULL;
 	pgcnt_t	pgcnt = page_get_pagecnt(pp->p_szc);
 	pgcnt_t	i;
+#ifdef DEBUG
 	uint_t	szc = pp->p_szc;
+#endif
 
 	VM_STAT_ADD(pagecnt.pc_free_pages);
 	TRACE_1(TR_FAC_VM, TR_PAGE_FREE_FREE,
@@ -3124,7 +3148,9 @@ page_destroy_pages(page_t *pp)
 	page_t	*tpp, *rootpp = NULL;
 	pgcnt_t	pgcnt = page_get_pagecnt(pp->p_szc);
 	pgcnt_t	i, pglcks = 0;
+#ifdef DEBUG
 	uint_t	szc = pp->p_szc;
+#endif
 
 	ASSERT(pp->p_szc != 0 && pp->p_szc < page_num_pagesizes());
 
@@ -3251,7 +3277,9 @@ page_rename(page_t *opp, vnode_t *vp, u_offset_t off)
 	 * large pages left lying around.
 	 */
 	if (opp->p_szc != 0) {
+#ifdef DEBUG
 		vnode_t *ovp = opp->p_vnode;
+#endif
 		ASSERT(ovp != NULL);
 		ASSERT(!IS_SWAPFSVP(ovp));
 		ASSERT(!VN_ISKAS(ovp));
@@ -3489,8 +3517,11 @@ page_hashin(page_t *pp, vnode_t *vp, u_offset_t offset, kmutex_t *hold)
 	mutex_exit(vphm);
 	if (hold == NULL)
 		mutex_exit(phm);
-	if (rc == 0)
+#ifdef VM_STATS
+	if (rc == 0) {
 		VM_STAT_ADD(hashin_already);
+	}
+#endif
 	return (rc);
 }
 
@@ -5198,8 +5229,10 @@ page_try_demote_pages(page_t *pp)
 	page_t *tpp, *rootpp = pp;
 	pfn_t	pfn = page_pptonum(pp);
 	spgcnt_t i, npgs;
-	uint_t	szc = pp->p_szc;
 	vnode_t *vp = pp->p_vnode;
+#ifdef DEBUG
+	uint_t	szc = pp->p_szc;
+#endif
 
 	ASSERT(PAGE_EXCL(pp));
 

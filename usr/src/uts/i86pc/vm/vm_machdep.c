@@ -87,6 +87,7 @@
 #include <sys/stack.h>
 #include <util/qsort.h>
 #include <sys/taskq.h>
+#include <sys/kflt_mem.h>
 
 #ifdef __xpv
 
@@ -135,36 +136,6 @@ extern uint_t page_create_putbacks;
  * Allow users to disable the kernel's use of SSE.
  */
 extern int use_sse_pagecopy, use_sse_pagezero;
-
-/*
- * combined memory ranges from mnode and memranges[] to manage single
- * mnode/mtype dimension in the page lists.
- */
-typedef struct {
-	pfn_t	mnr_pfnlo;
-	pfn_t	mnr_pfnhi;
-	int	mnr_mnode;
-	int	mnr_memrange;		/* index into memranges[] */
-	int	mnr_next;		/* next lower PA mnoderange */
-	int	mnr_exists;
-	/* maintain page list stats */
-	pgcnt_t	mnr_mt_clpgcnt;		/* cache list cnt */
-	pgcnt_t	mnr_mt_flpgcnt[MMU_PAGE_SIZES];	/* free list cnt per szc */
-	pgcnt_t	mnr_mt_totcnt;		/* sum of cache and free lists */
-#ifdef DEBUG
-	struct mnr_mts {		/* mnode/mtype szc stats */
-		pgcnt_t	mnr_mts_pgcnt;
-		int	mnr_mts_colors;
-		pgcnt_t *mnr_mtsc_pgcnt;
-	} 	*mnr_mts;
-#endif
-} mnoderange_t;
-
-#define	MEMRANGEHI(mtype)						\
-	((mtype > 0) ? memranges[mtype - 1] - 1: physmax)
-#define	MEMRANGELO(mtype)	(memranges[mtype])
-
-#define	MTYPE_FREEMEM(mt)	(mnoderanges[mt].mnr_mt_totcnt)
 
 /*
  * As the PC architecture evolved memory up was clumped into several
@@ -344,8 +315,9 @@ page_t ***page_cachelists;
  */
 hw_pagesize_t hw_page_array[MAX_NUM_LEVEL + 1];
 
-kmutex_t	*fpc_mutex[NPC_MUTEX];
-kmutex_t	*cpc_mutex[NPC_MUTEX];
+kmutex_t	*fpc_mutex[NPC_MUTEX];	/* user page freelist mutexes */
+kmutex_t	*kfpc_mutex[NPC_MUTEX];	/* kernel page freelist mutexes */
+kmutex_t	*cpc_mutex[NPC_MUTEX];	/* page cachelist mutexes */
 
 /* Lock to protect mnoderanges array for memory DR operations. */
 static kmutex_t mnoderange_lock;
@@ -1173,7 +1145,9 @@ page_get_contigpage(pgcnt_t *pgcnt, ddi_dma_attr_t *mattr, int iolock)
 			if (!*pgcnt || ((*pgcnt <= sgllen) && !pfnalign)) {
 				startpfn = pfn;
 				CONTIG_UNLOCK();
+#ifdef DEBUG
 				check_dma(mattr, pplist, *pgcnt);
+#endif
 				return (pplist);
 			}
 			minctg = howmany(*pgcnt, sgllen);
@@ -1208,7 +1182,9 @@ page_get_contigpage(pgcnt_t *pgcnt, ddi_dma_attr_t *mattr, int iolock)
 			if (!*pgcnt || ((*pgcnt <= sgllen) && !pfnalign)) {
 				startpfn = pfn;
 				CONTIG_UNLOCK();
+#ifdef DEBUG
 				check_dma(mattr, pplist, *pgcnt);
+#endif
 				return (pplist);
 			}
 			minctg = howmany(*pgcnt, sgllen);
@@ -1808,6 +1784,15 @@ page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 	}
 	colorsz = mnoderangecnt * sizeof (mnoderange_t);
 
+	if (!kflt_disable) {
+		/* size for kernel page freelists */
+		colorsz += mnoderangecnt * sizeof (page_t ***);
+		colorsz += (mnoderangecnt * KFLT_PAGE_COLORS *
+		    sizeof (page_t *));
+
+		/* size for kfpc_mutex */
+		colorsz += (max_mem_nodes * sizeof (kmutex_t) * NPC_MUTEX);
+	}
 	/* size for fpc_mutex and cpc_mutex */
 	colorsz += (2 * max_mem_nodes * sizeof (kmutex_t) * NPC_MUTEX);
 
@@ -1857,28 +1842,44 @@ page_coloring_setup(caddr_t pcmemaddr)
 		fpc_mutex[k] = (kmutex_t *)addr;
 		addr += (max_mem_nodes * sizeof (kmutex_t));
 	}
+	if (!kflt_disable) {
+		for (k = 0; k < NPC_MUTEX; k++) {
+			kfpc_mutex[k] = (kmutex_t *)addr;
+			addr += (max_mem_nodes * sizeof (kmutex_t));
+		}
+	}
 	for (k = 0; k < NPC_MUTEX; k++) {
 		cpc_mutex[k] = (kmutex_t *)addr;
 		addr += (max_mem_nodes * sizeof (kmutex_t));
 	}
-	page_freelists = (page_t ****)addr;
+	ufltp->pflt_freelists = (page_t ****)addr;
 	addr += (mnoderangecnt * sizeof (page_t ***));
 
 	page_cachelists = (page_t ***)addr;
 	addr += (mnoderangecnt * sizeof (page_t **));
 
 	for (i = 0; i < mnoderangecnt; i++) {
-		page_freelists[i] = (page_t ***)addr;
+		ufltp->pflt_freelists[i] = (page_t ***)addr;
 		addr += (mmu_page_sizes * sizeof (page_t **));
 
 		for (j = 0; j < mmu_page_sizes; j++) {
 			colors = page_get_pagecolors(j);
-			page_freelists[i][j] = (page_t **)addr;
+			ufltp->pflt_freelists[i][j] = (page_t **)addr;
 			addr += (colors * sizeof (page_t *));
 		}
 		page_cachelists[i] = (page_t **)addr;
 		addr += (page_colors * sizeof (page_t *));
 	}
+
+	if (!kflt_disable) {
+		kfltp->pflt_freelists = (page_t ****)addr;
+		addr += (mnoderangecnt * sizeof (page_t ***));
+		for (i = 0; i < mnoderangecnt; i++) {
+			kfltp->pflt_freelists[i] = (page_t ***)addr;
+			addr += (KFLT_PAGE_COLORS * sizeof (page_t *));
+		}
+	}
+	page_flt_init(ufltp, kfltp);
 }
 
 #if defined(__xpv)
@@ -1954,6 +1955,30 @@ page_create_update_flags_x86(uint_t flags)
 		flags |= (PGI_PGCPSZC0 | PGI_PGCPHIPRI);
 #endif /* __xpv */
 	return (flags);
+}
+
+int
+kernel_page_update_flags_x86(uint_t *flags)
+{
+	/*
+	 * page_get_kflt() calls this after walking the kernel pagelists and
+	 * not finding a free page to allocate. If the PGI_MT_RANGE4G flag is
+	 * set then we only walk mnodes in the greater than 4g range, so if we
+	 * didn't find a page there must be free kernel memory below this range.
+	 *
+	 * kflt_expand() calls this before trying to allocate large pages for
+	 * kernel memory.
+	 */
+	if (physmax4g) {
+		if (*flags & PGI_MT_RANGE4G) {
+			*flags &= ~PGI_MT_RANGE4G;
+			*flags |= PGI_MT_RANGE0;
+			return (1);
+		} else {
+			return (0);
+		}
+	}
+	return (0);
 }
 
 /*ARGSUSED*/
@@ -2900,7 +2925,9 @@ page_get_contigpages(
 				goto fail;
 			off += minctg * MMU_PAGESIZE;
 		}
+#ifdef DEBUG
 		check_dma(mattr, mcpl, minctg);
+#endif
 		/*
 		 * Here with a minctg run of contiguous pages, add them to the
 		 * list we will return for this request.
@@ -3104,12 +3131,14 @@ page_get_mnode_anylist(ulong_t origbin, uchar_t szc, uint_t flags,
 		for (plw.plw_count = 0;
 		    plw.plw_count < page_colors; plw.plw_count++) {
 
-			if (PAGE_FREELISTS(mnode, szc, bin, mtype) == NULL)
+			if (PAGE_FREELISTS(PFLT_USER, mnode, szc, bin, mtype)
+			    == NULL)
 				goto nextfreebin;
 
-			pcm = PC_BIN_MUTEX(mnode, bin, PG_FREE_LIST);
+			pcm = PC_FREELIST_BIN_MUTEX(PFLT_USER, mnode, bin,
+			    PG_FREE_LIST);
 			mutex_enter(pcm);
-			pp = PAGE_FREELISTS(mnode, szc, bin, mtype);
+			pp = PAGE_FREELISTS(PFLT_USER, mnode, szc, bin, mtype);
 			first_pp = pp;
 			while (pp != NULL) {
 				if (page_trylock(pp, SE_EXCL) == 0) {
@@ -3147,8 +3176,8 @@ page_get_mnode_anylist(ulong_t origbin, uchar_t szc, uint_t flags,
 				ASSERT(pp->p_szc == 0);
 
 				/* found a page with specified DMA attributes */
-				page_sub(&PAGE_FREELISTS(mnode, szc, bin,
-				    mtype), pp);
+				page_sub(PAGE_FREELISTP(PFLT_USER, mnode, szc,
+				    bin, mtype), pp);
 				page_ctr_sub(mnode, mtype, pp, PG_FREE_LIST);
 
 				if ((PP_ISFREE(pp) == 0) ||
@@ -3158,7 +3187,9 @@ page_get_mnode_anylist(ulong_t origbin, uchar_t szc, uint_t flags,
 				}
 
 				mutex_exit(pcm);
+#ifdef DEBUG
 				check_dma(dma_attr, pp, 1);
+#endif
 				VM_STAT_ADD(pga_vmstats.pgma_allocok);
 				return (pp);
 			}
@@ -3177,7 +3208,9 @@ nextfreebin:
 				    mmu_btop(dma_attr->dma_attr_addr_hi + 1),
 				    &plw);
 				if (pp != NULL) {
+#ifdef DEBUG
 					check_dma(dma_attr, pp, 1);
+#endif
 					return (pp);
 				}
 			}
@@ -3201,7 +3234,8 @@ nextfreebin:
 		for (i = 0; i <= page_colors; i++) {
 			if (PAGE_CACHELISTS(mnode, bin, mtype) == NULL)
 				goto nextcachebin;
-			pcm = PC_BIN_MUTEX(mnode, bin, PG_CACHE_LIST);
+			pcm = PC_BIN_MUTEX(PFLT_USER, mnode, bin,
+			    PG_CACHE_LIST);
 			mutex_enter(pcm);
 			pp = PAGE_CACHELISTS(mnode, bin, mtype);
 			first_pp = pp;
@@ -3245,7 +3279,9 @@ nextfreebin:
 				mutex_exit(pcm);
 				ASSERT(pp->p_vnode);
 				ASSERT(PP_ISAGED(pp) == 0);
+#ifdef DEBUG
 				check_dma(dma_attr, pp, 1);
+#endif
 				VM_STAT_ADD(pga_vmstats.pgma_allocok);
 				return (pp);
 			}
@@ -3301,7 +3337,7 @@ page_get_anylist(struct vnode *vp, u_offset_t off, struct as *as, caddr_t vaddr,
 		lgrp = lgrp_home_lgrp();
 
 	/* LINTED */
-	AS_2_BIN(as, seg, vp, vaddr, bin, 0);
+	AS_2_BIN(PFLT_USER, as, seg, vp, vaddr, bin, 0);
 
 	/*
 	 * Only hold one freelist or cachelist lock at a time, that way we
@@ -3355,7 +3391,7 @@ page_get_anylist(struct vnode *vp, u_offset_t off, struct as *as, caddr_t vaddr,
 		mtype = m;
 		do {
 			if (fullrange != 0) {
-				pp = page_get_mnode_freelist(mnode,
+				pp = page_get_mnode_freelist(ufltp, mnode,
 				    bin, mtype, szc, flags);
 				if (pp == NULL) {
 					pp = page_get_mnode_cachelist(
@@ -3367,7 +3403,9 @@ page_get_anylist(struct vnode *vp, u_offset_t off, struct as *as, caddr_t vaddr,
 			}
 			if (pp != NULL) {
 				VM_STAT_ADD(pga_vmstats.pga_allocok);
+#ifdef DEBUG
 				check_dma(dma_attr, pp, 1);
+#endif
 				return (pp);
 			}
 		} while (mtype != n &&
@@ -3479,7 +3517,9 @@ page_create_io(
 		} while (pp != plist);
 
 		if (!npages) {
+#ifdef DEBUG
 			check_dma(mattr, plist, pages_req);
+#endif
 			return (plist);
 		} else {
 			vaddr += (pages_req - npages) << MMU_PAGESHIFT;
@@ -3642,7 +3682,9 @@ top:
 		vaddr += MMU_PAGESIZE;
 	}
 
+#ifdef DEBUG
 	check_dma(mattr, plist, pages_req);
+#endif
 	return (plist);
 
 fail:
@@ -3983,4 +4025,34 @@ page_get_physical(uintptr_t seed)
 		page_downgrade(pp);
 	}
 	return (pp);
+}
+
+/*
+ * Initializes the user and kernel page freelist type structures.
+ */
+/* ARGSUSED */
+void
+page_flt_init(page_freelist_type_t *ufp, page_freelist_type_t *kfp)
+{
+	ufp->pflt_type = PFLT_USER;
+	ufp->pflt_get_free = &page_get_uflt;
+	ufp->pflt_walk_init = page_list_walk_init;
+	ufp->pflt_walk_next = page_list_walk_next_bin;
+	ufp->pflt_policy[0] = page_get_mnode_freelist;
+	ufp->pflt_policy[1] = page_get_contig_pages;
+	ufp->pflt_num_policies = 2;
+#if defined(__amd64) && !defined(__xpv)
+	if (!kflt_disable) {
+		ufp->pflt_num_policies = 3;
+		ufp->pflt_policy[1] = page_user_alloc_kflt;
+		ufp->pflt_policy[2] = page_get_contig_pages;
+
+		kfp->pflt_type = PFLT_KMEM;
+		kfp->pflt_get_free = &page_get_kflt;
+		kfp->pflt_walk_init = page_kflt_walk_init;
+		kfp->pflt_walk_next = page_list_walk_next_bin;
+		kfp->pflt_num_policies = 1;
+		kfp->pflt_policy[0] = page_get_mnode_freelist;
+	}
+#endif /* __amd64 && !__xpv */
 }

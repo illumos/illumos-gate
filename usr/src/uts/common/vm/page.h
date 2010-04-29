@@ -659,6 +659,8 @@ extern pad_mutex_t ph_mutex[];
 #define	PG_LOCAL	0x0080		/* alloc from given lgrp only */
 #define	PG_NORMALPRI	0x0100		/* PG_WAIT like priority, but */
 					/* non-blocking */
+#define	PG_KFLT		0x0200		/* alloc from kernel page freelist */
+
 /*
  * When p_selock has the SE_EWANTED bit set, threads waiting for SE_EXCL
  * access are given priority over all other waiting threads.
@@ -940,6 +942,8 @@ int	page_szc_user_filtered(size_t);
 #define	P_SWAP		0x10		/* belongs to vnode that is V_ISSWAP */
 #define	P_BOOTPAGES	0x08		/* member of bootpages list */
 #define	P_RAF		0x04		/* page retired at free */
+#define	P_KFLT		0x02		/* allocated from kernel free list */
+#define	P_USERKFLT	0x01		/* user pages from kernel free list */
 
 #define	PP_ISFREE(pp)		((pp)->p_state & P_FREE)
 #define	PP_ISAGED(pp)		(((pp)->p_state & P_FREE) && \
@@ -951,6 +955,8 @@ int	page_szc_user_filtered(size_t);
 #define	PP_ISSWAP(pp)		((pp)->p_state & P_SWAP)
 #define	PP_ISBOOTPAGES(pp)	((pp)->p_state & P_BOOTPAGES)
 #define	PP_ISRAF(pp)		((pp)->p_state & P_RAF)
+#define	PP_ISKFLT(pp)		((pp)->p_state & P_KFLT)
+#define	PP_ISUSERKFLT(pp)	((pp)->p_state & P_USERKFLT)
 
 #define	PP_SETFREE(pp)		((pp)->p_state = ((pp)->p_state & ~P_MIGRATE) \
 				| P_FREE)
@@ -960,6 +966,8 @@ int	page_szc_user_filtered(size_t);
 #define	PP_SETSWAP(pp)		((pp)->p_state |= P_SWAP)
 #define	PP_SETBOOTPAGES(pp)	((pp)->p_state |= P_BOOTPAGES)
 #define	PP_SETRAF(pp)		((pp)->p_state |= P_RAF)
+#define	PP_SETKFLT(pp)		((pp)->p_state |= P_KFLT)
+#define	PP_SETUSERKFLT(pp)	((pp)->p_state |= P_USERKFLT)
 
 #define	PP_CLRFREE(pp)		((pp)->p_state &= ~P_FREE)
 #define	PP_CLRAGED(pp)		ASSERT(!PP_ISAGED(pp))
@@ -968,6 +976,8 @@ int	page_szc_user_filtered(size_t);
 #define	PP_CLRSWAP(pp)		((pp)->p_state &= ~P_SWAP)
 #define	PP_CLRBOOTPAGES(pp)	((pp)->p_state &= ~P_BOOTPAGES)
 #define	PP_CLRRAF(pp)		((pp)->p_state &= ~P_RAF)
+#define	PP_CLRKFLT(pp)		((pp)->p_state &= ~P_KFLT)
+#define	PP_CLRUSERKFLT(pp)	((pp)->p_state &= ~P_USERKFLT)
 
 /*
  * Flags for page_t p_toxic, for tracking memory hardware errors.

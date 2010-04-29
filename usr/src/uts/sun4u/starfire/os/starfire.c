@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -295,14 +294,15 @@ plat_freelist_process(int mnode)
 				}
 
 				/* find freelist */
-				freelist = &PAGE_FREELISTS(mnode, size,
-				    color, mtype);
+				freelist = &PAGE_FREELISTS(PLT_USER, mnode,
+				    size, color, mtype);
 
 				if (*freelist == NULL)
 					continue;
 
 				/* acquire locks */
-				pcm = PC_BIN_MUTEX(mnode, color, PG_FREE_LIST);
+				pcm = PC_BIN_MUTEX(PLT_USER, mnode, color,
+				    PG_FREE_LIST);
 				mutex_enter(pcm);
 
 				/*

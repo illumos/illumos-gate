@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_MEM_CAGE_H
 #define	_SYS_MEM_CAGE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/memlist.h>
@@ -84,6 +81,28 @@ extern int kcage_next_range(int incage,
     pfn_t lo, pfn_t hi, pfn_t *nlo, pfn_t *nhi);
 
 extern kcage_dir_t kcage_startup_dir;
+
+#if defined(__sparc)
+/* Macros to throttle memory allocations from the kernel cage. */
+
+#define	KERNEL_THROTTLE_NONCRIT(npages, flags)			\
+	(kcage_create_throttle(1, flags) == KCT_NONCRIT)
+
+#define	KERNEL_THROTTLE(npages, flags)				\
+	if (((flags) & PG_NORELOC) &&				\
+	    (kcage_freemem < (kcage_throttlefree + (npages)))) {  \
+		(void) kcage_create_throttle(npages, flags);	\
+	}
+
+
+#define	KERNEL_THROTTLE_PGCREATE(npages, flags, cond)			\
+	((((flags) & (PG_NORELOC|(cond)) ==  (PG_NORELOC|(cond))) &&	\
+	    (kcage_freemem < (kcage_throttlefree + (npages)))	   &&	\
+	    (kcage_create_throttle(npages, flags) == KCT_FAILURE)) ? \
+	    1 : 0)
+
+#define	KERNEL_NOT_THROTTLED(flags) (!kcage_on || !((flags) & PG_NORELOC))
+#endif /* __sparc */
 
 #endif /* _KERNEL */
 

@@ -57,6 +57,7 @@
 #include <sys/mem_config.h>
 #include <sys/callb.h>
 #include <sys/mem_cage.h>
+#include <sys/kflt_mem.h>
 #include <sys/sdt.h>
 #include <sys/dumphdr.h>
 #include <sys/swap.h>
@@ -121,9 +122,18 @@ int	pgcplimitsearch = 1;
 	if (++pgcpfailcnt[szc] >= PGCPFAILMAX)				\
 		pgcpfailcnt[szc] = PGCPFAILMAX / 2;
 
+/*
+ * There are two page freelist types that are supported, flt_user, the user
+ * page freelist type and flt_kern, the kernel page freelist type.
+ */
+
+page_freelist_type_t flt_user;
+page_freelist_type_t flt_kern;
+page_freelist_type_t *ufltp = &flt_user;
+page_freelist_type_t *kfltp = &flt_kern;
+
 #ifdef VM_STATS
 struct vmm_vmstats_str  vmm_vmstats;
-
 #endif /* VM_STATS */
 
 #if defined(__sparc)
@@ -235,6 +245,9 @@ page_t *page_demote(int, pfn_t, pfn_t, uchar_t, uchar_t, int, int);
 page_t *page_freelist_split(uchar_t,
     uint_t, int, int, pfn_t, pfn_t, page_list_walker_t *);
 page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
+static page_t *page_get_flist(page_freelist_type_t *, uint_t, int,
+    uchar_t, uint_t, struct lgrp *);
+
 static int page_trylock_cons(page_t *pp, se_t se);
 
 /*
@@ -351,7 +364,6 @@ static int mnode_maxmrange[MAX_MEM_NODES];
  * write lock is already held.
  */
 krwlock_t page_ctrs_rwlock[MAX_MEM_NODES];
-
 
 /*
  * initialize cpu_vm_data to point at cache aligned vm_cpu_data_t.
@@ -1410,7 +1422,8 @@ page_list_add(page_t *pp, int flags)
 		 * threaded), add a page to the free list and add to the
 		 * the free region counters w/o any locking
 		 */
-		ppp = &PAGE_FREELISTS(mnode, 0, bin, mtype);
+		ASSERT(!PP_ISKFLT(pp));
+		ppp = PAGE_FREELISTP(PFLT_USER, mnode, 0, bin, mtype);
 
 		/* inline version of page_add() */
 		if (*ppp != NULL) {
@@ -1424,13 +1437,13 @@ page_list_add(page_t *pp, int flags)
 		page_ctr_add_internal(mnode, mtype, pp, flags);
 		VM_STAT_ADD(vmm_vmstats.pladd_free[0]);
 	} else {
-		pcm = PC_BIN_MUTEX(mnode, bin, flags);
+		pcm = PC_BIN_MUTEX(PP_ISKFLT(pp), mnode, bin, flags);
 
 		if (flags & PG_FREE_LIST) {
 			VM_STAT_ADD(vmm_vmstats.pladd_free[0]);
 			ASSERT(PP_ISAGED(pp));
-			ppp = &PAGE_FREELISTS(mnode, 0, bin, mtype);
-
+			ppp = PAGE_FREELISTP(PP_ISKFLT(pp), mnode, 0,
+			    bin, mtype);
 		} else {
 			VM_STAT_ADD(vmm_vmstats.pladd_cache);
 			ASSERT(pp->p_vnode);
@@ -1455,7 +1468,16 @@ page_list_add(page_t *pp, int flags)
 	if (PP_ISNORELOC(pp)) {
 		kcage_freemem_add(1);
 	}
-#endif
+#elif defined(__amd64) && !defined(__xpv)
+	if (PP_ISKFLT(pp)) {
+		kflt_freemem_add(1);
+		if (PP_ISUSERKFLT(pp)) {
+			ASSERT(kflt_user_alloc > 0);
+			atomic_add_long(&kflt_user_alloc, -1);
+			PP_CLRUSERKFLT(pp);
+		}
+	}
+#endif /* __sparc */
 	/*
 	 * It is up to the caller to unlock the page!
 	 */
@@ -1495,7 +1517,8 @@ page_list_noreloc_startup(page_t *pp)
 	ASSERT(pp->p_szc == 0);
 
 	if (PP_ISAGED(pp)) {
-		ppp = &PAGE_FREELISTS(mnode, 0, bin, mtype);
+		ASSERT(!PP_ISKFLT(pp));
+		ppp = PAGE_FREELISTP(PFLT_USER, mnode, 0, bin, mtype);
 		flags |= PG_FREE_LIST;
 	} else {
 		ppp = &PAGE_CACHELISTS(mnode, bin, mtype);
@@ -1533,7 +1556,8 @@ page_list_noreloc_startup(page_t *pp)
 	 * Get new list for page.
 	 */
 	if (PP_ISAGED(pp)) {
-		ppp = &PAGE_FREELISTS(mnode, 0, bin, mtype);
+		ASSERT(!PP_ISKFLT(pp));
+		ppp = PAGE_FREELISTP(PFLT_USER, mnode, 0, bin, mtype);
 	} else {
 		ppp = &PAGE_CACHELISTS(mnode, bin, mtype);
 	}
@@ -1591,25 +1615,31 @@ page_list_add_pages(page_t *pp, int flags)
 
 	if (flags & PG_LIST_ISINIT) {
 		ASSERT(pp->p_szc == mmu_page_sizes - 1);
-		page_vpadd(&PAGE_FREELISTS(mnode, pp->p_szc, bin, mtype), pp);
+		page_vpadd(PAGE_FREELISTP(PFLT_USER, mnode, pp->p_szc,
+		    bin, mtype), pp);
 		ASSERT(!PP_ISNORELOC(pp));
 		PLCNT_INCR(pp, mnode, mtype, pp->p_szc, flags);
 	} else {
 
 		ASSERT(pp->p_szc != 0 && pp->p_szc < mmu_page_sizes);
 
-		pcm = PC_BIN_MUTEX(mnode, bin, PG_FREE_LIST);
+		pcm = PC_BIN_MUTEX(PFLT_USER, mnode, bin, PG_FREE_LIST);
 
 		mutex_enter(pcm);
-		page_vpadd(&PAGE_FREELISTS(mnode, pp->p_szc, bin, mtype), pp);
+		ASSERT(!PP_ISKFLT(pp));
+		page_vpadd(PAGE_FREELISTP(PFLT_USER, mnode, pp->p_szc,
+		    bin, mtype), pp);
 		page_ctr_add(mnode, mtype, pp, PG_FREE_LIST);
 		mutex_exit(pcm);
 
 		pgcnt = page_get_pagecnt(pp->p_szc);
 #if defined(__sparc)
-		if (PP_ISNORELOC(pp))
+		if (PP_ISNORELOC(pp)) {
 			kcage_freemem_add(pgcnt);
-#endif
+		}
+#elif defined(__amd64) && !defined(__xpv)
+		ASSERT(!PP_ISKFLT(pp));
+#endif /* __sparc */
 		for (i = 0; i < pgcnt; i++, pp++)
 			page_unlock_nocapture(pp);
 	}
@@ -1667,7 +1697,7 @@ page_list_sub(page_t *pp, int flags)
 try_again:
 	bin = PP_2_BIN(pp);
 	mnode = PP_2_MEM_NODE(pp);
-	pcm = PC_BIN_MUTEX(mnode, bin, flags);
+	pcm = PC_BIN_MUTEX(PP_ISKFLT(pp), mnode, bin, flags);
 	mutex_enter(pcm);
 	if (PP_2_BIN(pp) != bin) {
 		mutex_exit(pcm);
@@ -1678,7 +1708,8 @@ try_again:
 	if (flags & PG_FREE_LIST) {
 		VM_STAT_ADD(vmm_vmstats.plsub_free[0]);
 		ASSERT(PP_ISAGED(pp));
-		ppp = &PAGE_FREELISTS(mnode, pp->p_szc, bin, mtype);
+		ppp = PAGE_FREELISTP(PP_ISKFLT(pp), mnode, pp->p_szc,
+		    bin, mtype);
 	} else {
 		VM_STAT_ADD(vmm_vmstats.plsub_cache);
 		ASSERT(!PP_ISAGED(pp));
@@ -1705,7 +1736,11 @@ try_again:
 		if (PP_ISNORELOC(pp)) {
 			kcage_freemem_sub(1);
 		}
-#endif
+#elif defined(__amd64) && !defined(__xpv)
+		if (PP_ISKFLT(pp)) {
+			kflt_freemem_sub(1);
+		}
+#endif /* __sparc */
 		return;
 	}
 
@@ -1740,14 +1775,16 @@ try_again:
 	ASSERT(PP_ISAGED(pp));
 	ASSERT(pp->p_szc == 0);
 
+	/* Large pages on the kernel freelist are not supported. */
+	ASSERT(!PP_ISKFLT(pp));
+
 	/*
 	 * Subtract counters before releasing pcm mutex
 	 * to avoid race with page_freelist_coalesce.
 	 */
 	bin = PP_2_BIN(pp);
 	mtype = PP_2_MTYPE(pp);
-	ppp = &PAGE_FREELISTS(mnode, pp->p_szc, bin, mtype);
-
+	ppp = PAGE_FREELISTP(PFLT_USER, mnode, pp->p_szc, bin, mtype);
 	page_sub(ppp, pp);
 	page_ctr_sub(mnode, mtype, pp, flags);
 	page_freelist_unlock(mnode);
@@ -1756,7 +1793,7 @@ try_again:
 	if (PP_ISNORELOC(pp)) {
 		kcage_freemem_sub(1);
 	}
-#endif
+#endif /* __sparc */
 }
 
 void
@@ -1776,7 +1813,7 @@ page_list_sub_pages(page_t *pp, uint_t szc)
 try_again:
 	bin = PP_2_BIN(pp);
 	mnode = PP_2_MEM_NODE(pp);
-	pcm = PC_BIN_MUTEX(mnode, bin, PG_FREE_LIST);
+	pcm = PC_BIN_MUTEX(PP_ISKFLT(pp), mnode, bin, PG_FREE_LIST);
 	mutex_enter(pcm);
 	if (PP_2_BIN(pp) != bin) {
 		mutex_exit(pcm);
@@ -1805,16 +1842,19 @@ try_again:
 	ASSERT(PP_ISAGED(pp));
 	ASSERT(pp->p_szc <= szc);
 	ASSERT(pp == PP_PAGEROOT(pp));
+	ASSERT(!PP_ISKFLT(pp));
 
 	VM_STAT_ADD(vmm_vmstats.plsub_free[pp->p_szc]);
 
 	mtype = PP_2_MTYPE(pp);
 	if (pp->p_szc != 0) {
-		page_vpsub(&PAGE_FREELISTS(mnode, pp->p_szc, bin, mtype), pp);
+		page_vpsub(PAGE_FREELISTP(PFLT_USER, mnode, pp->p_szc,
+		    bin, mtype), pp);
 		CHK_LPG(pp, pp->p_szc);
 	} else {
 		VM_STAT_ADD(vmm_vmstats.plsubpages_szc0);
-		page_sub(&PAGE_FREELISTS(mnode, pp->p_szc, bin, mtype), pp);
+		page_sub(PAGE_FREELISTP(PFLT_USER, mnode, pp->p_szc,
+		    bin, mtype), pp);
 	}
 	page_ctr_sub(mnode, mtype, pp, PG_FREE_LIST);
 
@@ -1831,7 +1871,7 @@ try_again:
 		pgcnt = page_get_pagecnt(pp->p_szc);
 		kcage_freemem_sub(pgcnt);
 	}
-#endif
+#endif /* __sparc */
 }
 
 /*
@@ -1905,7 +1945,7 @@ page_promote_size(page_t *pp, uint_t cur_szc)
 
 static uint_t page_promote_err;
 static uint_t page_promote_noreloc_err;
-
+static uint_t page_promote_kflt_err;
 /*
  * Create a single larger page (of szc new_szc) from smaller contiguous pages
  * for the given mnode starting at pfnum. Pages involved are on the freelist
@@ -1917,6 +1957,9 @@ static uint_t page_promote_noreloc_err;
  * caller and put the large page on the freelist instead.
  * If flags is PC_FREE, then the large page will be placed on the freelist,
  * and NULL will be returned.
+ * If the PC_KFLT_EXPORT flag is set, the large page will be returned to the
+ * caller unlocked, as the caller is going to put it on the user page
+ * freelist
  * The caller is responsible for locking the freelist as well as any other
  * accounting which needs to be done for a returned page.
  *
@@ -2004,6 +2047,17 @@ page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags, int mtype)
 			page_promote_err++;
 			return (NULL);
 		}
+
+		/*
+		 * page promote() can only legitimately be called for
+		 * pages from the kernel freelist from the kflt_export()
+		 * routine which sets the PC_KFLT_EXPORT flag.
+		 */
+		if (PP_ISKFLT(pp) && !(flags & PC_KFLT_EXPORT)) {
+			page_promote_kflt_err++;
+			page_promote_err++;
+			return (NULL);
+		}
 	}
 
 	pages_left = new_npgs;
@@ -2025,11 +2079,13 @@ page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags, int mtype)
 			 * PG_FREE_LIST
 			 */
 			if (pp->p_szc) {
-				page_vpsub(&PAGE_FREELISTS(mnode,
+				page_vpsub(PAGE_FREELISTP(PFLT_USER, mnode,
 				    pp->p_szc, bin, mtype), pp);
 			} else {
-				mach_page_sub(&PAGE_FREELISTS(mnode, 0,
-				    bin, mtype), pp);
+				ASSERT(!PP_ISKFLT(pp) ||
+				    (flags & PC_KFLT_EXPORT));
+				mach_page_sub(PAGE_FREELISTP(PP_ISKFLT(pp),
+				    mnode, 0, bin, mtype), pp);
 			}
 			which_list = PG_FREE_LIST;
 		} else {
@@ -2092,7 +2148,16 @@ page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags, int mtype)
 	 * return the page to the user if requested
 	 * in the properly locked state.
 	 */
-	if (flags == PC_ALLOC && (page_trylock_cons(pplist, SE_EXCL))) {
+	if ((flags & PC_ALLOC) && (page_trylock_cons(pplist, SE_EXCL))) {
+		return (pplist);
+	}
+
+	/*
+	 * If the PC_KFLT_EXPORT flag is set, kflt_export() is just going to
+	 * return this large page to the user page freelist, so there is no
+	 * need to lock it.
+	 */
+	if (flags & PC_KFLT_EXPORT) {
 		return (pplist);
 	}
 
@@ -2102,7 +2167,8 @@ page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags, int mtype)
 	bin = PP_2_BIN(pplist);
 	mnode = PP_2_MEM_NODE(pplist);
 	mtype = PP_2_MTYPE(pplist);
-	page_vpadd(&PAGE_FREELISTS(mnode, new_szc, bin, mtype), pplist);
+	page_vpadd(PAGE_FREELISTP(PFLT_USER, mnode, new_szc,
+	    bin, mtype), pplist);
 
 	page_ctr_add(mnode, mtype, pplist, PG_FREE_LIST);
 	return (NULL);
@@ -2123,7 +2189,9 @@ fail_promote:
 		pp->p_szc = 0;
 		bin = PP_2_BIN(pp);
 		mtype = PP_2_MTYPE(pp);
-		mach_page_add(&PAGE_FREELISTS(mnode, 0, bin, mtype), pp);
+		ASSERT(!PP_ISKFLT(pp));
+		mach_page_add(PAGE_FREELISTP(PFLT_USER, mnode,
+		    0, bin, mtype), pp);
 		page_ctr_add(mnode, mtype, pp, PG_FREE_LIST);
 	}
 	return (NULL);
@@ -2159,11 +2227,13 @@ page_demote(int mnode, pfn_t pfnum, pfn_t pfnmax, uchar_t cur_szc,
 	ASSERT(pplist != NULL);
 
 	ASSERT(pplist->p_szc == cur_szc);
+	ASSERT(!PP_ISKFLT(pplist));
 
 	bin = PP_2_BIN(pplist);
 	ASSERT(mnode == PP_2_MEM_NODE(pplist));
 	mtype = PP_2_MTYPE(pplist);
-	page_vpsub(&PAGE_FREELISTS(mnode, cur_szc, bin, mtype), pplist);
+	page_vpsub(PAGE_FREELISTP(PFLT_USER, mnode, cur_szc,
+	    bin, mtype), pplist);
 
 	CHK_LPG(pplist, cur_szc);
 	page_ctr_sub(mnode, mtype, pplist, PG_FREE_LIST);
@@ -2196,8 +2266,9 @@ page_demote(int mnode, pfn_t pfnum, pfn_t pfnmax, uchar_t cur_szc,
 				ret_pp = pp;
 			} else {
 				mtype = PP_2_MTYPE(pp);
-				mach_page_add(&PAGE_FREELISTS(mnode, 0, bin,
-				    mtype), pp);
+				ASSERT(!PP_ISKFLT(pp));
+				mach_page_add(PAGE_FREELISTP(PFLT_USER, mnode,
+				    0, bin, mtype), pp);
 				page_ctr_add(mnode, mtype, pp, PG_FREE_LIST);
 			}
 		} else {
@@ -2242,8 +2313,8 @@ page_demote(int mnode, pfn_t pfnum, pfn_t pfnmax, uchar_t cur_szc,
 				ret_pp = try_to_return_this_page;
 			} else {
 				mtype = PP_2_MTYPE(pp);
-				page_vpadd(&PAGE_FREELISTS(mnode, new_szc,
-				    bin, mtype), pplist);
+				page_vpadd(PAGE_FREELISTP(PFLT_USER, mnode,
+				    new_szc, bin, mtype), pplist);
 
 				page_ctr_add(mnode, mtype, pplist,
 				    PG_FREE_LIST);
@@ -2277,7 +2348,6 @@ page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
 #if defined(__sparc)
 	pfn_t pfnum0, nlo, nhi;
 #endif
-
 	if (mpss_coalesce_disable) {
 		ASSERT(szc < MMU_PAGE_SIZES);
 		VM_STAT_ADD(vmm_vmstats.page_ctrs_coalesce[szc][0]);
@@ -2435,11 +2505,21 @@ page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
 					npgs = page_get_pagecnt(ret_pp->p_szc);
 					kcage_freemem_sub(npgs);
 				}
-#endif
+#elif defined(__amd64) && !defined(__xpv)
+				/*
+				 * Only a single page size is supported on
+				 * the kernel freelist. This will need to
+				 * be changed to increase the availability
+				 * of more than one large page size.
+				 */
+				ASSERT(!PP_ISKFLT(ret_pp));
+#endif /* __sparc */
 				return (ret_pp);
 			}
+#ifdef VM_STATS
 		} else {
 			VM_STAT_ADD(vmm_vmstats.page_ctrs_changed[r][mrange]);
+#endif
 		}
 
 		page_freelist_unlock(mnode);
@@ -2605,9 +2685,10 @@ page_freelist_split(uchar_t szc, uint_t color, int mnode, int mtype,
 		/*
 		 * If page found then demote it.
 		 */
-		if (PAGE_FREELISTS(mnode, nszc, bin, mtype)) {
+		if (PAGE_FREELISTS(PFLT_USER, mnode, nszc, bin, mtype)) {
 			page_freelist_lock(mnode);
-			firstpp = pp = PAGE_FREELISTS(mnode, nszc, bin, mtype);
+			firstpp = pp = PAGE_FREELISTS(PFLT_USER, mnode,
+			    nszc, bin, mtype);
 
 			/*
 			 * If pfnhi is not PFNNULL, look for large page below
@@ -2651,7 +2732,9 @@ page_freelist_split(uchar_t szc, uint_t color, int mnode, int mtype,
 						    ret_pp->p_szc);
 						kcage_freemem_sub(npgs);
 					}
-#endif
+#elif defined(__amd64) && !defined(__xpv)
+					ASSERT(!PP_ISKFLT(pp));
+#endif /* __sparc */
 					return (ret_pp);
 				}
 			}
@@ -2809,6 +2892,42 @@ page_list_walk_init(uchar_t szc, uint_t flags, uint_t bin, int can_split,
 		plw->plw_bins[1] = 0;
 		plw->plw_ceq_mask[1] = INVALID_MASK;
 	}
+	ASSERT(bin < plw->plw_colors);
+}
+
+/*
+ * Walker variables for the kernel freelist are initialized so that all
+ * kernel page colors are treated as equivalent. This mimimizes the amount
+ * of memory used by the the kernel freelist.
+ */
+/* ARGSUSED */
+void
+page_kflt_walk_init(uchar_t szc, uint_t flags, uint_t bin, int can_split,
+    int use_ceq, page_list_walker_t *plw)
+{
+	/*
+	 * Note that the following values are only valid for pages with
+	 * szc == 0.
+	 */
+	ASSERT(szc == 0);
+
+	/* The number of colors for kernel pages */
+	plw->plw_colors = KFLT_PAGE_COLORS;
+	plw->plw_color_mask = KFLT_PAGE_COLORS - 1;
+
+	/* The marker indicates when at all the bins have been processed */
+	plw->plw_bin_marker = plw->plw_bin0 = bin;
+	plw->plw_bin_split_prev = bin;
+
+	/* Add plw_bin_step to get the next bin to process */
+	plw->plw_bin_step = vac_colors;
+
+	/* There is only 1 color group i.e. all colors are equivalent */
+	plw->plw_ceq_dif = 1;
+	plw->plw_ceq_mask[0] = 0;
+	plw->plw_do_split = 0;
+
+	ASSERT(bin < plw->plw_colors);
 }
 
 /*
@@ -2911,8 +3030,8 @@ page_list_walk_next_bin(uchar_t szc, uint_t bin, page_list_walker_t *plw)
 }
 
 page_t *
-page_get_mnode_freelist(int mnode, uint_t bin, int mtype, uchar_t szc,
-    uint_t flags)
+page_get_mnode_freelist(page_freelist_type_t *fp, int mnode, uint_t bin,
+    int mtype, uchar_t szc, uint_t flags)
 {
 	kmutex_t		*pcm;
 	page_t			*pp, *first_pp;
@@ -2930,7 +3049,6 @@ page_get_mnode_freelist(int mnode, uint_t bin, int mtype, uchar_t szc,
 		return (NULL);
 	}
 try_again:
-
 	plw_initialized = 0;
 	plw.plw_ceq_dif = 1;
 
@@ -2943,14 +3061,19 @@ try_again:
 	    plw.plw_count < plw.plw_ceq_dif; plw.plw_count++) {
 		sbin = bin;
 		do {
-			if (!PAGE_FREELISTS(mnode, szc, bin, mtype))
+			if (!PAGE_FREELISTS(PC_ISKFLT(fp), mnode, szc,
+			    bin, mtype)) {
 				goto bin_empty_1;
+			}
 
-			pcm = PC_BIN_MUTEX(mnode, bin, PG_FREE_LIST);
+			pcm = PC_BIN_MUTEX(PC_ISKFLT(fp), mnode, bin,
+			    PG_FREE_LIST);
 			mutex_enter(pcm);
-			pp = PAGE_FREELISTS(mnode, szc, bin, mtype);
-			if (pp == NULL)
+			pp = PAGE_FREELISTS(PC_ISKFLT(fp), mnode, szc,
+			    bin, mtype);
+			if (pp == NULL) {
 				goto bin_empty_0;
+			}
 
 			/*
 			 * These were set before the page
@@ -3002,10 +3125,10 @@ try_again:
 			ASSERT(mtype == PP_2_MTYPE(pp));
 			ASSERT(pp->p_szc == szc);
 			if (szc == 0) {
-				page_sub(&PAGE_FREELISTS(mnode,
+				page_sub(PAGE_FREELISTP(PC_ISKFLT(fp), mnode,
 				    szc, bin, mtype), pp);
 			} else {
-				page_vpsub(&PAGE_FREELISTS(mnode,
+				page_vpsub(PAGE_FREELISTP(PC_ISKFLT(fp), mnode,
 				    szc, bin, mtype), pp);
 				CHK_LPG(pp, szc);
 			}
@@ -3021,7 +3144,12 @@ try_again:
 
 			if (PP_ISNORELOC(pp))
 				kcage_freemem_sub(page_get_pagecnt(szc));
-#endif
+#elif defined(__amd64) && !defined(__xpv)
+			if (PP_ISKFLT(pp)) {
+				ASSERT(szc == 0);
+				kflt_freemem_sub(1);
+			}
+#endif /* __sparc */
 			VM_STAT_ADD(vmm_vmstats.pgmf_allocok[szc]);
 			return (pp);
 
@@ -3029,7 +3157,7 @@ bin_empty_0:
 			mutex_exit(pcm);
 bin_empty_1:
 			if (plw_initialized == 0) {
-				page_list_walk_init(szc, flags, bin, 1, 1,
+				PAGE_LIST_WALK_INIT(fp, szc, flags, bin, 1, 1,
 				    &plw);
 				plw_initialized = 1;
 				ASSERT(plw.plw_colors <=
@@ -3043,6 +3171,7 @@ bin_empty_1:
 			/* calculate the next bin with equivalent color */
 			bin = ADD_MASKED(bin, plw.plw_bin_step,
 			    plw.plw_ceq_mask[szc], plw.plw_color_mask);
+
 		} while (sbin != bin);
 
 		/*
@@ -3064,7 +3193,7 @@ bin_empty_1:
 			return (pp);
 
 		if (plw.plw_ceq_dif > 1)
-			bin = page_list_walk_next_bin(szc, bin, &plw);
+			bin = PAGE_LIST_WALK_NEXT(fp, szc, bin, &plw);
 	}
 
 	/* if allowed, cycle through additional mtypes */
@@ -3191,6 +3320,17 @@ skipptcpcheck:
 			}
 			return (0);
 		}
+		if (PP_ISKFLT(pp)) {
+			VM_STAT_ADD(vmm_vmstats.ptcpfailkflt[szc]);
+			ASSERT(i == 0);
+			while (i != (pgcnt_t)-1) {
+				pp = &spp[i];
+				ASSERT(PAGE_EXCL(pp));
+				page_unlock_nocapture(pp);
+				i--;
+			}
+			return (0);
+		}
 	}
 	VM_STAT_ADD(vmm_vmstats.ptcpok[szc]);
 	return (1);
@@ -3215,6 +3355,7 @@ page_claim_contig_pages(page_t *pp, uchar_t szc, int flags)
 	while (pgcnt) {
 		ASSERT(PAGE_EXCL(pp));
 		ASSERT(!PP_ISNORELOC(pp));
+		ASSERT(!PP_ISKFLT(pp));
 		if (PP_ISFREE(pp)) {
 			/*
 			 * If this is a PG_FREE_LIST page then its
@@ -3316,6 +3457,7 @@ page_claim_contig_pages(page_t *pp, uchar_t szc, int flags)
 			ASSERT(PAGE_EXCL(targpp));
 			ASSERT(!PP_ISFREE(targpp));
 			ASSERT(!PP_ISNORELOC(targpp));
+			ASSERT(!PP_ISKFLT(targpp));
 			PP_SETFREE(targpp);
 			ASSERT(PP_ISAGED(targpp));
 			ASSERT(targpp->p_szc < szc || (szc == 0 &&
@@ -3342,6 +3484,7 @@ page_claim_contig_pages(page_t *pp, uchar_t szc, int flags)
  * Trim kernel cage from pfnlo-pfnhi and store result in lo-hi. Return code
  * of 0 means nothing left after trim.
  */
+/* LINTED */
 int
 trimkcage(struct memseg *mseg, pfn_t *lo, pfn_t *hi, pfn_t pfnlo, pfn_t pfnhi)
 {
@@ -3404,14 +3547,12 @@ trimkcage(struct memseg *mseg, pfn_t *lo, pfn_t *hi, pfn_t pfnlo, pfn_t pfnhi)
  *
  * 'pfnflag' specifies the subset of the pfn range to search.
  */
-
 static page_t *
 page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
     pfn_t pfnlo, pfn_t pfnhi, pgcnt_t pfnflag)
 {
 	struct memseg *mseg;
 	pgcnt_t	szcpgcnt = page_get_pagecnt(szc);
-	pgcnt_t szcpgmask = szcpgcnt - 1;
 	pfn_t	randpfn;
 	page_t *pp, *randpp, *endpp;
 	uint_t colors, ceq_mask;
@@ -3420,13 +3561,16 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 	pfn_t hi, lo;
 	uint_t skip;
 	MEM_NODE_ITERATOR_DECL(it);
+#ifdef DEBUG
+	pgcnt_t szcpgmask = szcpgcnt - 1;
+#endif
 
 	ASSERT(szc != 0 || (flags & PGI_PGCPSZC0));
-
 	pfnlo = P2ROUNDUP(pfnlo, szcpgcnt);
 
-	if ((pfnhi - pfnlo) + 1 < szcpgcnt || pfnlo >= pfnhi)
+	if ((pfnhi - pfnlo) + 1 < szcpgcnt || pfnlo >= pfnhi) {
 		return (NULL);
+	}
 
 	ASSERT(szc < mmu_page_sizes);
 
@@ -3467,8 +3611,9 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 		szcpages = ((pfnhi - pfnlo) + 1) / szcpgcnt;
 		slotlen = howmany(szcpages, slots);
 		/* skip if 'slotid' slot is empty */
-		if (slotid * slotlen >= szcpages)
+		if (slotid * slotlen >= szcpages) {
 			return (NULL);
+		}
 		pfnlo = pfnlo + (((slotid * slotlen) % szcpages) * szcpgcnt);
 		ASSERT(pfnlo < pfnhi);
 		if (pfnhi > pfnlo + (slotlen * szcpgcnt))
@@ -3571,6 +3716,12 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 			ASSERT(!(pp->p_pagenum & szcpgmask));
 			ASSERT(((PP_2_BIN(pp) ^ bin) & ceq_mask) == 0);
 
+			/* Skip over pages on the kernel freelist */
+			if (PP_ISKFLT(pp)) {
+				pp += skip;
+				goto skip_contig;
+			}
+
 			if (page_trylock_contig_pages(mnode, pp, szc, flags)) {
 				/* pages unlocked by page_claim on failure */
 				if (page_claim_contig_pages(pp, szc, flags)) {
@@ -3593,6 +3744,7 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 					    (pfn - mseg->pages_base);
 				}
 			}
+skip_contig:
 			if (pp >= endpp) {
 				/* start from the beginning */
 				MEM_NODE_ITERATOR_INIT(lo, mnode, szc, &it);
@@ -3605,7 +3757,6 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 	memsegs_unlock(0);
 	return (NULL);
 }
-
 
 /*
  * controlling routine that searches through physical memory in an attempt to
@@ -3622,9 +3773,10 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
  * for PGI_PGCPSZC0 requests, page_get_contig_pages will relocate a base
  * pagesize page that satisfies mtype.
  */
+/* ARGSUSED */
 page_t *
-page_get_contig_pages(int mnode, uint_t bin, int mtype, uchar_t szc,
-    uint_t flags)
+page_get_contig_pages(page_freelist_type_t *fp, int mnode, uint_t bin,
+    int mtype, uchar_t szc, uint_t flags)
 {
 	pfn_t		pfnlo, pfnhi;	/* contig pages pfn range */
 	page_t		*pp;
@@ -3657,7 +3809,6 @@ page_get_contig_pages(int mnode, uint_t bin, int mtype, uchar_t szc,
 	do {
 		/* get pfn range based on mnode and mtype */
 		MNODETYPE_2_PFN(mnode, mtype, pfnlo, pfnhi);
-
 		ASSERT(pfnhi >= pfnlo);
 
 		pp = page_geti_contig_pages(mnode, bin, szc, flags,
@@ -3721,137 +3872,10 @@ page_t *
 page_get_freelist(struct vnode *vp, u_offset_t off, struct seg *seg,
 	caddr_t vaddr, size_t size, uint_t flags, struct lgrp *lgrp)
 {
-	struct as	*as = seg->s_as;
-	page_t		*pp = NULL;
-	ulong_t		bin;
-	uchar_t		szc;
-	int		mnode;
-	int		mtype;
-	page_t		*(*page_get_func)(int, uint_t, int, uchar_t, uint_t);
-	lgrp_mnode_cookie_t	lgrp_cookie;
+	page_t *pp;
 
-	page_get_func = page_get_mnode_freelist;
-
-	/*
-	 * If we aren't passed a specific lgroup, or passed a freed lgrp
-	 * assume we wish to allocate near to the current thread's home.
-	 */
-	if (!LGRP_EXISTS(lgrp))
-		lgrp = lgrp_home_lgrp();
-
-	if (kcage_on) {
-		if ((flags & (PG_NORELOC | PG_PANIC)) == PG_NORELOC &&
-		    kcage_freemem < kcage_throttlefree + btop(size) &&
-		    curthread != kcage_cageout_thread) {
-			/*
-			 * Set a "reserve" of kcage_throttlefree pages for
-			 * PG_PANIC and cageout thread allocations.
-			 *
-			 * Everybody else has to serialize in
-			 * page_create_get_something() to get a cage page, so
-			 * that we don't deadlock cageout!
-			 */
-			return (NULL);
-		}
-	} else {
-		flags &= ~PG_NORELOC;
-		flags |= PGI_NOCAGE;
-	}
-
-	/* LINTED */
-	MTYPE_INIT(mtype, vp, vaddr, flags, size);
-
-	/*
-	 * Convert size to page size code.
-	 */
-	if ((szc = page_szc(size)) == (uchar_t)-1)
-		panic("page_get_freelist: illegal page size request");
-	ASSERT(szc < mmu_page_sizes);
-
-	VM_STAT_ADD(vmm_vmstats.pgf_alloc[szc]);
-
-	/* LINTED */
-	AS_2_BIN(as, seg, vp, vaddr, bin, szc);
-
-	ASSERT(bin < PAGE_GET_PAGECOLORS(szc));
-
-	/*
-	 * Try to get a local page first, but try remote if we can't
-	 * get a page of the right color.
-	 */
-pgretry:
-	LGRP_MNODE_COOKIE_INIT(lgrp_cookie, lgrp, LGRP_SRCH_LOCAL);
-	while ((mnode = lgrp_memnode_choose(&lgrp_cookie)) >= 0) {
-		pp = page_get_func(mnode, bin, mtype, szc, flags);
-		if (pp != NULL) {
-			VM_STAT_ADD(vmm_vmstats.pgf_allocok[szc]);
-			DTRACE_PROBE4(page__get,
-			    lgrp_t *, lgrp,
-			    int, mnode,
-			    ulong_t, bin,
-			    uint_t, flags);
-			return (pp);
-		}
-	}
-	ASSERT(pp == NULL);
-
-	/*
-	 * for non-SZC0 PAGESIZE requests, check cachelist before checking
-	 * remote free lists.  Caller expected to call page_get_cachelist which
-	 * will check local cache lists and remote free lists.
-	 */
-	if (szc == 0 && ((flags & PGI_PGCPSZC0) == 0)) {
-		VM_STAT_ADD(vmm_vmstats.pgf_allocdeferred);
-		return (NULL);
-	}
-
-	ASSERT(szc > 0 || (flags & PGI_PGCPSZC0));
-
-	lgrp_stat_add(lgrp->lgrp_id, LGRP_NUM_ALLOC_FAIL, 1);
-
-	if (!(flags & PG_LOCAL)) {
-		/*
-		 * Try to get a non-local freelist page.
-		 */
-		LGRP_MNODE_COOKIE_UPGRADE(lgrp_cookie);
-		while ((mnode = lgrp_memnode_choose(&lgrp_cookie)) >= 0) {
-			pp = page_get_func(mnode, bin, mtype, szc, flags);
-			if (pp != NULL) {
-				DTRACE_PROBE4(page__get,
-				    lgrp_t *, lgrp,
-				    int, mnode,
-				    ulong_t, bin,
-				    uint_t, flags);
-				VM_STAT_ADD(vmm_vmstats.pgf_allocokrem[szc]);
-				return (pp);
-			}
-		}
-		ASSERT(pp == NULL);
-	}
-
-	/*
-	 * when the cage is off chances are page_get_contig_pages() will fail
-	 * to lock a large page chunk therefore when the cage is off it's not
-	 * called by default.  this can be changed via /etc/system.
-	 *
-	 * page_get_contig_pages() also called to acquire a base pagesize page
-	 * for page_create_get_something().
-	 */
-	if (!(flags & PG_NORELOC) && (pg_contig_disable == 0) &&
-	    (kcage_on || pg_lpgcreate_nocage || szc == 0) &&
-	    (page_get_func != page_get_contig_pages)) {
-
-		VM_STAT_ADD(vmm_vmstats.pgf_allocretry[szc]);
-		page_get_func = page_get_contig_pages;
-		goto pgretry;
-	}
-
-	if (!(flags & PG_LOCAL) && pgcplimitsearch &&
-	    page_get_func == page_get_contig_pages)
-		SETPGCPFAILCNT(szc);
-
-	VM_STAT_ADD(vmm_vmstats.pgf_allocfailed[szc]);
-	return (NULL);
+	PAGE_GET_FREELISTS(pp, vp, off, seg, vaddr, size, flags, lgrp);
+	return (pp);
 }
 
 /*
@@ -3905,7 +3929,7 @@ page_get_cachelist(struct vnode *vp, u_offset_t off, struct seg *seg,
 	}
 
 	/* LINTED */
-	AS_2_BIN(as, seg, vp, vaddr, bin, 0);
+	AS_2_BIN(PFLT_USER, as, seg, vp, vaddr, bin, 0);
 
 	ASSERT(bin < PAGE_GET_PAGECOLORS(0));
 
@@ -3940,7 +3964,7 @@ page_get_cachelist(struct vnode *vp, u_offset_t off, struct seg *seg,
 	 */
 	LGRP_MNODE_COOKIE_UPGRADE(lgrp_cookie);
 	while ((mnode = lgrp_memnode_choose(&lgrp_cookie)) >= 0) {
-		pp = page_get_mnode_freelist(mnode, bin, mtype,
+		pp = page_get_mnode_freelist(ufltp, mnode, bin, mtype,
 		    0, flags);
 		if (pp != NULL) {
 			VM_STAT_ADD(vmm_vmstats.pgc_allocokdeferred);
@@ -4003,7 +4027,16 @@ try_again:
 
 			if (!PAGE_CACHELISTS(mnode, bin, mtype))
 				goto bin_empty_1;
-			pcm = PC_BIN_MUTEX(mnode, bin, PG_CACHE_LIST);
+			/*
+			 * The first parameter is irrelevant here as the flags
+			 * parameter to this macro decides which mutex to lock.
+			 * With the PG_CACHE_LIST flag, we lock the cpc_mutex[].
+			 *
+			 * User pages from the kernel page freelist may be
+			 * on the cachelist.
+			 */
+			pcm = PC_BIN_MUTEX(PFLT_USER, mnode, bin,
+			    PG_CACHE_LIST);
 			mutex_enter(pcm);
 			pp = PAGE_CACHELISTS(mnode, bin, mtype);
 			if (pp == NULL)
@@ -4063,7 +4096,11 @@ try_again:
 				if (PP_ISNORELOC(pp)) {
 					kcage_freemem_sub(1);
 				}
-#endif
+#elif defined(__amd64) && !defined(__xpv)
+				if (PP_ISKFLT(pp)) {
+					kflt_freemem_sub(1);
+				}
+#endif /* __sparc */
 				VM_STAT_ADD(vmm_vmstats. pgmc_allocok);
 				return (pp);
 			}
@@ -4202,8 +4239,8 @@ page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp_target,
 				    (mnode = lgrp_memnode_choose(&lgrp_cookie))
 				    != -1) {
 					pplist =
-					    page_get_mnode_freelist(mnode, bin,
-					    mtype, szc, flags);
+					    page_get_mnode_freelist(ufltp,
+					    mnode, bin, mtype, szc, flags);
 				}
 
 				/*
@@ -4243,7 +4280,7 @@ page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp_target,
 			 * First try the local freelist...
 			 */
 			mnode = PP_2_MEM_NODE(like_pp);
-			pplist = page_get_mnode_freelist(mnode, bin,
+			pplist = page_get_mnode_freelist(ufltp, mnode, bin,
 			    mtype, szc, flags);
 			if (pplist != NULL)
 				break;
@@ -4282,13 +4319,12 @@ page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp_target,
 				    (mem_node_config[mnode].exists == 0))
 					continue;
 
-				pplist = page_get_mnode_freelist(mnode,
+				pplist = page_get_mnode_freelist(ufltp, mnode,
 				    bin, mtype, szc, flags);
 			}
 
 			if (pplist != NULL)
 				break;
-
 
 			/* Now try remote cachelists */
 			LGRP_MNODE_COOKIE_INIT(lgrp_cookie, lgrp,
@@ -4337,7 +4373,7 @@ page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp_target,
 				    lgrp_memnode_choose(&lgrp_cookie))
 				    != -1) {
 					pplist = page_get_contig_pages(
-					    mnode, bin, mtype, szc,
+					    ufltp, mnode, bin, mtype, szc,
 					    flags | PGI_PGCPHIPRI);
 				}
 				break;
@@ -4446,3 +4482,481 @@ page_set_colorequiv_arr(void)
 		}
 	}
 }
+
+/*
+ * The freelist type data structures allow freelist type specific allocation
+ * and policy routines to be configured.  There are two freelist types currently
+ * defined, one for kernel memory allocation and the the other for user memory.
+ * The page_get_uflt() routine is called by the PAGE_GET_FREELISTS() macro to
+ * allocate memory from the user freelist type.
+ */
+
+/* ARGSUSED */
+page_t *
+page_get_uflt(struct vnode *vp, u_offset_t off, struct seg *seg, caddr_t vaddr,
+    size_t size, uint_t flags, struct lgrp *lgrp)
+{
+	struct as	*as = seg->s_as;
+	ulong_t		bin;
+	uchar_t		szc;
+	int		mtype;
+
+	/*
+	 * If we aren't passed a specific lgroup, or passed a freed lgrp
+	 * assume we wish to allocate near the current thread's home.
+	 */
+	if (!LGRP_EXISTS(lgrp))
+		lgrp = lgrp_home_lgrp();
+
+	if (kcage_on) {
+		if ((flags & (PG_NORELOC | PG_PANIC)) == PG_NORELOC &&
+		    kcage_freemem < kcage_throttlefree + btop(size) &&
+		    curthread != kcage_cageout_thread) {
+			/*
+			 * Set a "reserve" of kcage_throttlefree pages for
+			 * PG_PANIC and cageout thread allocations.
+			 *
+			 * Everybody else has to serialize in
+			 * page_create_get_something() to get a cage page, so
+			 * that we don't deadlock cageout!
+			 */
+			return (NULL);
+		}
+	} else {
+		flags &= ~PG_NORELOC;
+		flags |= PGI_NOCAGE;
+	}
+
+	/* LINTED */
+	MTYPE_INIT(mtype, vp, vaddr, flags, size);
+
+	/*
+	 * Convert size to page size code.
+	 */
+	if ((szc = page_szc(size)) == (uchar_t)-1)
+		panic("page_get_uflt: illegal page size request");
+	ASSERT(szc < mmu_page_sizes);
+
+	VM_STAT_ADD(vmm_vmstats.pgf_alloc[szc][ufltp->pflt_type]);
+
+	/* LINTED */
+	AS_2_BIN(PFLT_USER, as, seg, vp, vaddr, bin, szc);
+
+	ASSERT(bin < PAGE_GET_PAGECOLORS(szc));
+
+	return (page_get_flist(ufltp, bin, mtype, szc, flags, lgrp));
+}
+
+/*
+ * This routine is passed a page color and inital mtype, and calls the page
+ * freelist type policy routines which actually do the allocations, first
+ * trying the local and then remote lgroups. The policy routines for user
+ * page allocations are currently configured to be:
+ *
+ *  x64 systems support two freelist types, user and kernel.
+ *
+ * The user freelist has 3 policy routines.
+ *
+ *  1. page_get_mnode_freelist to allocate a page from the user freelists.
+ *  2. page_user_alloc_kflt to allocate a page from the kernel freelists
+ *  3. page_get_contig_pages to search for a large page in physical memory.
+ *
+ * The kernel freelist has only 1 policy routine.
+ *
+ * 1. page_get_mnode_freelist to allocate a page from the kernel freelists.
+ *
+ *  Sparc, x32 and Xen, systems support only the user freelist type.
+ *
+ * The user freelist has 2 policy routines.
+ *
+ *  1. page_get_mnode_freelist to allocate a page from the user freelists.
+ *  2. page_get_contig_pages to search for a large page in physical memory.
+ *
+ */
+page_t *
+page_get_flist(page_freelist_type_t *fltp, uint_t bin, int mtype,
+    uchar_t szc, uint_t flags, struct lgrp *lgrp)
+{
+	page_t		*pp = NULL;
+	page_t		*(*page_get_func)(page_freelist_type_t *,
+	    int, uint_t, int, uchar_t, uint_t);
+	lgrp_mnode_cookie_t	lgrp_cookie;
+	int 		i;
+	int		mnode;
+
+	for (i = 0; i < fltp->pflt_num_policies; i++) {
+		page_get_func =  PAGE_GET_FREELISTS_POLICY(fltp, i);
+
+		/*
+		 * when the cage and the kernel freelist are off chances are
+		 * that page_get_contig_pages() will fail to lock a large
+		 * page chunk therefore in this case it's not called by
+		 * default. This can be changed via /etc/system.
+		 *
+		 * page_get_contig_pages() also called to acquire a base
+		 * pagesize page for page_create_get_something().
+		 */
+		if (page_get_func == page_get_contig_pages) {
+			if ((flags & PG_NORELOC) ||
+			    (pg_contig_disable != 0) ||
+			    (!kcage_on && !kflt_on &&
+			    !pg_lpgcreate_nocage && szc != 0)) {
+				continue;
+#ifdef VM_STATS
+			} else {
+				VM_STAT_ADD(
+				    vmm_vmstats.
+				    pgf_allocretry[szc][fltp->pflt_type]);
+#endif
+			}
+		}
+
+		/*
+		 * Try to get a local page first, but try remote if we can't
+		 * get a page of the right color.
+		 */
+		LGRP_MNODE_COOKIE_INIT(lgrp_cookie, lgrp, LGRP_SRCH_LOCAL);
+		while ((mnode = lgrp_memnode_choose(&lgrp_cookie)) >= 0) {
+
+			pp = page_get_func(fltp, mnode, bin, mtype, szc,
+			    flags);
+			if (pp != NULL) {
+#ifdef VM_STATS
+				VM_STAT_ADD(
+				    vmm_vmstats.
+				    pgf_allocok[szc][fltp->pflt_type]);
+#endif
+				DTRACE_PROBE4(page__get__page,
+				    lgrp_t *, lgrp,
+				    int, mnode,
+				    ulong_t, bin,
+				    uint_t, flags);
+				return (pp);
+			}
+		}
+		ASSERT(pp == NULL);
+
+		/*
+		 * for non-PGI_PGCPSZC0 PAGESIZE requests, check cachelist
+		 * before checking remote free lists. Caller expected to call
+		 * page_get_cachelist which will check local cache lists
+		 * and remote free lists.
+		 */
+		if (!PC_ISKFLT(fltp) && szc == 0 &&
+		    ((flags & PGI_PGCPSZC0) == 0)) {
+			VM_STAT_ADD(vmm_vmstats.pgf_allocdeferred);
+			return (NULL);
+		}
+
+		ASSERT(PC_ISKFLT(fltp) || szc > 0 || (flags & PGI_PGCPSZC0));
+
+		lgrp_stat_add(lgrp->lgrp_id, LGRP_NUM_ALLOC_FAIL, 1);
+
+		if (!(flags & PG_LOCAL)) {
+			/*
+			 * Try to get a non-local freelist page.
+			 */
+			LGRP_MNODE_COOKIE_UPGRADE(lgrp_cookie);
+			while ((mnode =
+			    lgrp_memnode_choose(&lgrp_cookie)) >= 0) {
+				pp = page_get_func(fltp, mnode, bin, mtype,
+				    szc, flags);
+				if (pp != NULL) {
+					DTRACE_PROBE4(page__get,
+					    lgrp_t *, lgrp,
+					    int, mnode,
+					    ulong_t, bin,
+					    uint_t, flags);
+#ifdef VM_STATS
+					VM_STAT_ADD(vmm_vmstats.
+					    pgf_allocokrem[szc]
+					    [fltp->pflt_type]);
+#endif
+					return (pp);
+				}
+			}
+			ASSERT(pp == NULL);
+		}
+
+		if (!(flags & PG_LOCAL) && pgcplimitsearch &&
+		    page_get_func == page_get_contig_pages)
+			SETPGCPFAILCNT(szc);
+	}
+
+#ifdef VM_STATS
+	VM_STAT_ADD(vmm_vmstats.pgf_allocfailed[szc][fltp->pflt_type]);
+#endif
+
+	return (NULL);
+}
+#if defined(__amd64) && !defined(__xpv)
+/*
+ * The page_get_kflt() routine is called by the PAGE_GET_FREELISTS() macro  to
+ * allocate memory from the kernel freelist type.
+ */
+/* ARGSUSED */
+page_t *
+page_get_kflt(struct vnode *vp, u_offset_t off, struct seg *seg, caddr_t vaddr,
+    size_t size, uint_t flags, struct lgrp *lgrp)
+{
+	struct as	*as = seg->s_as;
+	page_t		*pp = NULL;
+	ulong_t		bin;
+	uchar_t		szc;
+	int		mtype;
+
+	ASSERT(!kcage_on);
+	ASSERT(kflt_on);
+	ASSERT((flags & PG_KFLT) == PG_KFLT);
+
+	flags &= ~PG_NORELOC;
+	flags |= PGI_NOCAGE;
+
+	if ((flags & PG_PANIC) == 0 &&
+	    kflt_freemem < kflt_throttlefree + btop(size) &&
+	    curthread != kflt_evict_thread) {
+		return (NULL);
+	}
+
+	/* LINTED */
+	MTYPE_INIT(mtype, vp, vaddr, flags, size);
+
+	/*
+	 * If we aren't passed a specific lgroup, or passed a freed lgrp
+	 * assume we wish to allocate near to the current thread's home.
+	 */
+	if (!LGRP_EXISTS(lgrp))
+		lgrp = lgrp_home_lgrp();
+
+	/*
+	 * Convert size to page size code.
+	 */
+	if ((szc = page_szc(size)) == (uchar_t)-1)
+		panic("page_get_kflt: illegal page size request");
+	ASSERT(szc == 0);
+	ASSERT(!(flags & PG_LOCAL));
+
+	VM_STAT_ADD(vmm_vmstats.pgf_alloc[szc][kfltp->pflt_type]);
+
+	/* LINTED */
+	AS_2_BIN(PFLT_KMEM, as, seg, vp, vaddr, bin, szc);
+
+	ASSERT(bin < PAGE_GET_PAGECOLORS(szc));
+	ASSERT(bin < KFLT_PAGE_COLORS);
+
+retry:
+	pp = page_get_flist(kfltp, bin, mtype, szc, flags, lgrp);
+
+	if (pp != NULL) {
+		return (pp);
+	}
+
+#if defined(__amd64)
+	if (kernel_page_update_flags_x86(&flags)) {
+		goto retry;
+	}
+#endif
+	/*
+	 * Import memory from user page freelists.
+	 */
+
+	/* LINTED: constant in conditional context */
+	AS_2_BIN(PFLT_USER, as, seg, vp, vaddr, bin, KFLT_PAGESIZE);
+
+	ASSERT(bin < PAGE_GET_PAGECOLORS(KFLT_PAGESIZE));
+
+	if ((pp = page_import_kflt(kfltp, bin, mtype, szc,
+	    flags | PGI_NOPGALLOC | PGI_PGCPHIPRI, NULL)) != NULL) {
+		VM_STAT_ADD(vmm_vmstats.pgf_allocok[szc][kfltp->pflt_type]);
+		return (pp);
+	}
+
+	VM_STAT_ADD(vmm_vmstats.pgf_allocfailed[szc][kfltp->pflt_type]);
+	return (NULL);
+}
+
+/*
+ * This is the policy routine used to allocate user memory on the kernel
+ * freelist.
+ */
+/* ARGSUSED */
+page_t *
+page_user_alloc_kflt(page_freelist_type_t *fp, int mnode, uint_t bin, int mtype,
+    uchar_t szc, uint_t flags)
+{
+	page_t *pp;
+
+	if (szc != 0)
+		return (NULL);
+
+	if (kflt_freemem < kflt_desfree) {
+		kflt_evict_wakeup();
+	}
+	flags &= ~PG_MATCH_COLOR;
+
+	bin = USER_2_KMEM_BIN(bin);
+
+	if ((pp = page_get_mnode_freelist(kfltp, mnode,
+	    bin, mtype, szc, flags)) != NULL) {
+		VM_STAT_ADD(vmm_vmstats.puak_allocok);
+		atomic_add_long(&kflt_user_alloc, 1);
+		PP_SETUSERKFLT(pp);
+		return (pp);
+	}
+
+	VM_STAT_ADD(vmm_vmstats.puak_allocfailed);
+	return (NULL);
+}
+
+/*
+ * This routine is called in order to allocate a large page from the user page
+ * freelist and split this into small pages which are then placed on the kernel
+ * freelist. If it is is called from  kflt_expand() routine the PGI_NOPGALLOC
+ * flag is set to indicate that all pages should be placed on the freelist,
+ * otherwise a page of the requested type and color will be returned.
+ */
+/* ARGSUSED */
+page_t *
+page_import_kflt(page_freelist_type_t *fp, uint_t bin, int mtype,
+    uchar_t szc, uint_t flags, int *np)
+{
+	page_t *pp, *pplist;
+	uint_t alloc_szc = KFLT_PAGESIZE;
+	kmutex_t *pcm;
+	page_t	*ret_pp = NULL;
+	uint_t	req_bin = bin;
+	int	req_mtype = mtype;
+	int	pgcnt = 0;
+	int	pgalloc;
+	int	mnode;
+	struct lgrp *lgrp;
+
+	ASSERT(szc == 0);
+
+	flags &= ~(PG_LOCAL|PG_MATCH_COLOR);
+	lgrp = lgrp_home_lgrp();
+
+	pgalloc = ((flags & PGI_NOPGALLOC) == 0);
+
+	/* Allocate a large page from the user pagelist */
+	if ((pplist = page_get_flist(ufltp, bin, mtype, alloc_szc,
+	    flags, lgrp)) != NULL) {
+
+		VM_STAT_ADD(vmm_vmstats.pgik_allocok);
+		CHK_LPG(pplist, alloc_szc);
+		mnode = PP_2_MEM_NODE(pplist);
+		/*
+		 * Split up the large page and put the constituent pages
+		 * on the kernel freelist.
+		 */
+		while (pplist) {
+			pgcnt++;
+			pp = pplist;
+			ASSERT(pp->p_szc == alloc_szc);
+			ASSERT(PP_ISFREE(pp));
+			mach_page_sub(&pplist, pp);
+
+			pp->p_szc = 0;
+			PP_SETKFLT(pp);
+			mtype = PP_2_MTYPE(pp);
+			bin = PP_2_BIN(pp);
+			if (pgalloc && (ret_pp == NULL) &&
+			    ((bin == req_bin && mtype == req_mtype))) {
+				ret_pp = pp;
+			} else {
+				pcm = PC_BIN_MUTEX(PFLT_KMEM, mnode, bin,
+				    PG_FREE_LIST);
+				ASSERT(mtype == PP_2_MTYPE(pp));
+				mutex_enter(pcm);
+				mach_page_add(PAGE_FREELISTP(PFLT_KMEM, mnode,
+				    0, bin, mtype), pp);
+				page_ctr_add(mnode, mtype, pp, PG_FREE_LIST);
+				mutex_exit(pcm);
+				page_unlock(pp);
+			}
+		}
+
+		if (np != NULL)
+			*np = pgcnt;
+
+		if (ret_pp == NULL) {
+			kflt_freemem_add(pgcnt);
+		} else {
+			kflt_freemem_add(pgcnt - 1);
+		}
+		return (ret_pp);
+
+	} else {
+
+		VM_STAT_ADD(vmm_vmstats.pgik_allocfailed);
+		return (NULL);
+	}
+}
+
+/*
+ * This routine is called from the kflt_user_evict() thread when kernel
+ * memory is low and the thread has not managed to increase it by freeing up
+ * user pages
+ */
+void
+kflt_expand()
+{
+	ulong_t		bin;
+	int		mtype;
+	uint_t		flags;
+	spgcnt_t 	wanted;
+	caddr_t		vaddr;
+	int		np;
+	int		lpallocated  = 0;
+	int		retries;
+
+	ASSERT(kflt_on);
+	vaddr = 0;
+	flags = PGI_NOPGALLOC | PGI_PGCPHIPRI;
+
+	wanted = MAX(kflt_lotsfree, kflt_throttlefree + kflt_needfree)
+	    - kflt_freemem;
+
+	if (wanted <= 0) {
+		return;
+	}
+
+	/* LINTED */
+	MTYPE_INIT(mtype, &kvp, vaddr, flags, KFLT_PAGESIZE);
+
+#if defined(__amd64)
+	(void) kernel_page_update_flags_x86(&flags);
+#endif
+	/* LINTED */
+	AS_2_BIN(PFLT_USER, &kas, NULL, &kvp, vaddr, bin, 1);
+
+	retries = 0;
+	while (kflt_on && wanted > 0) {
+		(void) page_import_kflt(kfltp, bin, mtype, 0,
+		    flags, &np);
+
+		if (np == 0) {
+			if (lpallocated == 0 &&
+			    retries < KFLT_EXPAND_RETRIES) {
+				retries++;
+				ASSERT((flags & (PGI_NOPGALLOC | PGI_PGCPHIPRI))
+				    == (PGI_NOPGALLOC | PGI_PGCPHIPRI));
+				continue;
+			}
+			break;
+		} else {
+			wanted -= np;
+			lpallocated = 1;
+		}
+
+	}
+
+#ifdef DEBUG
+	if (lpallocated) {
+		VM_STAT_ADD(vmm_vmstats.pgkx_allocok);
+	} else {
+		VM_STAT_ADD(vmm_vmstats.pgkx_allocfailed);
+	}
+#endif
+}
+#endif /* __amd64 && !__xpv */

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -85,11 +84,7 @@ extern "C" {
 #define	PGI_MT_RANGE	0x1000000	/* mtype range */
 #define	PGI_MT_NEXT	0x2000000	/* get next mtype */
 
-extern page_t ***page_freelists[MMU_PAGE_SIZES][MAX_MEM_TYPES];
 extern page_t ***page_cachelists[MAX_MEM_TYPES];
-
-#define	PAGE_FREELISTS(mnode, szc, color, mtype) \
-	(*(page_freelists[szc][mtype][mnode] + (color)))
 
 #define	PAGE_CACHELISTS(mnode, color, mtype) \
 	(*(page_cachelists[mtype][mnode] + (color)))
@@ -291,8 +286,8 @@ extern uint_t  page_pfn_2_color_cpu(pfn_t, uchar_t, void *);
 
 #define	PP_2_MEM_NODE(pp)	(PFN_2_MEM_NODE(pp->p_pagenum))
 
-#define	PC_BIN_MUTEX(mnode, bin, flags) ((flags & PG_FREE_LIST) ?	\
-	&fpc_mutex[(bin) & (NPC_MUTEX - 1)][mnode] :			\
+#define	PC_BIN_MUTEX(iskflt, mnode, bin, flags) ((flags & PG_FREE_LIST) ? \
+	&fpc_mutex[(bin) & (NPC_MUTEX - 1)][mnode] :			  \
 	&cpc_mutex[(bin) & (NPC_MUTEX - 1)][mnode])
 
 #define	FPC_MUTEX(mnode, i)	(&fpc_mutex[i][mnode])
@@ -323,6 +318,88 @@ typedef struct page_list_walker {
 
 void	page_list_walk_init(uchar_t szc, uint_t flags, uint_t bin,
     int can_split, int use_ceq, page_list_walker_t *plw);
+
+/*
+ * Page freelists have a single freelist type, the user page freelist. The
+ * kernel page freelist is disabled on SPARC platforms. The definitions related
+ * to the freelist type structure are grouped below.
+ */
+
+#define	MAX_PFLT_POLICIES 3
+#define	MAX_PFLT_TYPE 2
+enum freelist_types {PFLT_USER, PFLT_KMEM};
+
+/*
+ * The kernel only needs a small number of page colors, far fewer than user
+ * programs.
+ */
+#define	KFLT_PAGE_COLORS 16
+	/* flag used by the kflt_export function when calling page_promote */
+#define	PC_KFLT_EXPORT 0x4
+#define	PC_ISKFLT(fltp) (fltp->pflt_type == PFLT_KMEM)
+
+typedef struct page_freelist_type page_freelist_type_t;
+extern page_freelist_type_t flt_user;
+extern page_freelist_type_t *ufltp;
+
+typedef page_t *(*pflt_get_func_p) (struct vnode *, u_offset_t, struct seg *,
+    caddr_t, size_t, uint_t, lgrp_t *);
+typedef page_t *(*pflt_policy_func_p)(page_freelist_type_t *, int, uint_t, int,
+    uchar_t, uint_t);
+typedef void (*pflt_list_walk_init_func_p)(uchar_t, uint_t, uint_t, int, int,
+    page_list_walker_t *);
+typedef uint_t (*pflt_list_walk_next_func_p)(uchar_t, uint_t,
+    page_list_walker_t *);
+
+page_t *page_get_uflt(struct vnode *, u_offset_t, struct seg *, caddr_t,
+    size_t, uint_t, struct lgrp *);
+extern page_t *page_get_mnode_freelist(page_freelist_type_t *, int, uint_t,
+    int, uchar_t, uint_t);
+extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
+extern page_t *page_get_contig_pages(page_freelist_type_t *, int, uint_t, int,
+    uchar_t, uint_t);
+extern void page_list_walk_init(uchar_t, uint_t, uint_t, int, int,
+    page_list_walker_t *);
+extern uint_t page_list_walk_next_bin(uchar_t, uint_t, page_list_walker_t *);
+
+/*
+ * Page freelists are organized as freelist types, on Sparc systems there
+ * is only a single user freelist type as the kernel cage provides a
+ * similar function to kernel freelist in that it prevents memory
+ * fragmentation.
+ *
+ * The page freelists have fixed page size and memory type dimensions.
+ * the 3rd (max_mem_nodes) and 4th (page coloring bins) dimensions are
+ * allocated dynamically.
+ */
+struct page_freelist_type {
+	int pflt_type;
+	pflt_get_func_p pflt_get_free;
+	pflt_list_walk_init_func_p pflt_walk_init;
+	pflt_list_walk_next_func_p pflt_walk_next;
+	int	pflt_num_policies;
+	pflt_policy_func_p pflt_policy[MAX_PFLT_POLICIES];
+	page_t ***pflt_freelists[MMU_PAGE_SIZES][MAX_MEM_TYPES];
+};
+
+#define	PAGE_FREELISTP(is_kflt, mnode, szc, color, mtype)		\
+	((ufltp->pflt_freelists[szc][mtype][mnode] + (color)))
+
+#define	PAGE_FREELISTS(is_kflt, mnode, szc, color, mtype)		\
+	(*(ufltp->pflt_freelists[szc][mtype][mnode] + (color)))
+
+#define	PAGE_GET_FREELISTS(pp, vp, off, seg, vaddr, size, flags, lgrp)	     \
+			pp = ufltp->pflt_get_free(vp, off, seg, vaddr, size, \
+			    flags, lgrp);
+
+#define	PAGE_GET_FREELISTS_POLICY(fp, i) 				\
+	(fp->pflt_policy[i])
+
+#define	PAGE_LIST_WALK_INIT(fp, szc, flags, bin, can_split, use_ceq, plw) \
+	fp->pflt_walk_init(szc, flags, bin, can_split, use_ceq, plw)
+
+#define	PAGE_LIST_WALK_NEXT(fp, szc, bin, plw) 				\
+	fp->pflt_walk_next(szc, bin, plw)
 
 typedef	char	hpmctr_t;
 
@@ -623,7 +700,7 @@ extern pgcnt_t shm_lpg_min_physmem;
  * 1 virtual=paddr
  * 2 bin hopping
  */
-#define	AS_2_BIN(as, seg, vp, addr, bin, szc)				\
+#define	AS_2_BIN(kflt, as, seg, vp, addr, bin, szc)			\
 switch (consistent_coloring) {						\
 	default:                                                        \
 		cmn_err(CE_WARN,					\
@@ -749,16 +826,26 @@ extern char	vm_cpu_data0[];
 
 #ifdef VM_STATS
 struct vmm_vmstats_str {
-	ulong_t pgf_alloc[MMU_PAGE_SIZES];	/* page_get_freelist */
-	ulong_t pgf_allocok[MMU_PAGE_SIZES];
-	ulong_t pgf_allocokrem[MMU_PAGE_SIZES];
-	ulong_t pgf_allocfailed[MMU_PAGE_SIZES];
-	ulong_t pgf_allocdeferred;
-	ulong_t	pgf_allocretry[MMU_PAGE_SIZES];
+				/* page_get_uflt and page_get_kflt */
+	ulong_t pgf_alloc[MMU_PAGE_SIZES][MAX_PFLT_TYPE];
+	ulong_t pgf_allocok[MMU_PAGE_SIZES][MAX_PFLT_TYPE];
+	ulong_t pgf_allocokrem[MMU_PAGE_SIZES][MAX_PFLT_TYPE];
+	ulong_t pgf_allocfailed[MMU_PAGE_SIZES][MAX_PFLT_TYPE];
+	ulong_t	pgf_allocdeferred;
+	ulong_t	pgf_allocretry[MMU_PAGE_SIZES][MAX_PFLT_TYPE];
+	ulong_t pgik_allocok;			/* page_import_kflt */
+	ulong_t pgik_allocfailed;
+	ulong_t pgkx_allocok;			/* kflt_expand */
+	ulong_t pgkx_allocfailed;
+	ulong_t puak_allocok;			/* page_user_alloc_kflt */
+	ulong_t puak_allocfailed;
+	ulong_t pgexportok;			/* kflt_export */
+	ulong_t pgexportfail;
+	ulong_t pgkflt_disable;			/* kflt_user_evict */
 	ulong_t pgc_alloc;			/* page_get_cachelist */
 	ulong_t pgc_allocok;
 	ulong_t pgc_allocokrem;
-	ulong_t	pgc_allocokdeferred;
+	ulong_t pgc_allocokdeferred;
 	ulong_t pgc_allocfailed;
 	ulong_t	pgcp_alloc[MMU_PAGE_SIZES];	/* page_get_contig_pages */
 	ulong_t	pgcp_allocfailed[MMU_PAGE_SIZES];
@@ -769,6 +856,7 @@ struct vmm_vmstats_str {
 	ulong_t	ptcpfailexcl[MMU_PAGE_SIZES];
 	ulong_t	ptcpfailszc[MMU_PAGE_SIZES];
 	ulong_t	ptcpfailcage[MMU_PAGE_SIZES];
+	ulong_t	ptcpfailkflt[MMU_PAGE_SIZES];
 	ulong_t	ptcpok[MMU_PAGE_SIZES];
 	ulong_t	pgmf_alloc[MMU_PAGE_SIZES];	/* page_get_mnode_freelist */
 	ulong_t	pgmf_allocfailed[MMU_PAGE_SIZES];
@@ -787,24 +875,24 @@ struct vmm_vmstats_str {
 	ulong_t	pfs_req[MMU_PAGE_SIZES];	/* page_freelist_split */
 	ulong_t	pfs_demote[MMU_PAGE_SIZES];
 	ulong_t	pfc_coalok[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
-	ulong_t ppr_reloc[MMU_PAGE_SIZES];	/* page_relocate */
-	ulong_t ppr_relocok[MMU_PAGE_SIZES];
+	ulong_t	ppr_reloc[MMU_PAGE_SIZES];	/* page_relocate */
 	ulong_t ppr_relocnoroot[MMU_PAGE_SIZES];
 	ulong_t ppr_reloc_replnoroot[MMU_PAGE_SIZES];
 	ulong_t ppr_relocnolock[MMU_PAGE_SIZES];
 	ulong_t ppr_relocnomem[MMU_PAGE_SIZES];
+	ulong_t ppr_relocok[MMU_PAGE_SIZES];
 	ulong_t ppr_krelocfail[MMU_PAGE_SIZES];
 	ulong_t ppr_copyfail;
 	/* page coalesce counter */
-	ulong_t	page_ctrs_coalesce[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
+	ulong_t page_ctrs_coalesce[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
 	/* candidates useful */
-	ulong_t	page_ctrs_cands_skip[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
+	ulong_t page_ctrs_cands_skip[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
 	/* ctrs changed after locking */
-	ulong_t	page_ctrs_changed[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
+	ulong_t page_ctrs_changed[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
 	/* page_freelist_coalesce failed */
-	ulong_t	page_ctrs_failed[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
-	ulong_t	page_ctrs_coalesce_all;	/* page coalesce all counter */
-	ulong_t	page_ctrs_cands_skip_all; /* candidates useful for all func */
+	ulong_t page_ctrs_failed[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
+	ulong_t page_ctrs_coalesce_all;	/* page coalesce all counter */
+	ulong_t page_ctrs_cands_skip_all; /* candidates useful for all func */
 };
 extern struct vmm_vmstats_str vmm_vmstats;
 #endif	/* VM_STATS */
