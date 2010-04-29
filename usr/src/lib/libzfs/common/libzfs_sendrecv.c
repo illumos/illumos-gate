@@ -930,11 +930,14 @@ dump_snapshot(zfs_handle_t *zhp, void *arg)
 	const char *thissnap;
 	int err;
 	boolean_t got_enoent;
+	boolean_t isfromsnap, istosnap;
+	boolean_t exclude = B_FALSE;
 
 	thissnap = strchr(zhp->zfs_name, '@') + 1;
+	isfromsnap = (sdd->fromsnap != NULL &&
+	    strcmp(sdd->fromsnap, thissnap) == 0);
 
-	if (sdd->fromsnap && !sdd->seenfrom &&
-	    strcmp(sdd->fromsnap, thissnap) == 0) {
+	if (!sdd->seenfrom && isfromsnap) {
 		sdd->seenfrom = B_TRUE;
 		(void) strcpy(sdd->prevsnap, thissnap);
 		zfs_close(zhp);
@@ -946,15 +949,37 @@ dump_snapshot(zfs_handle_t *zhp, void *arg)
 		return (0);
 	}
 
-	if (strcmp(sdd->tosnap, thissnap) == 0)
+	istosnap = (strcmp(sdd->tosnap, thissnap) == 0);
+	if (istosnap)
 		sdd->seento = B_TRUE;
+
+	if (!sdd->doall && !isfromsnap && !istosnap) {
+		if (sdd->replicate) {
+			char *snapname;
+			nvlist_t *snapprops;
+			/*
+			 * Filter out all intermediate snapshots except origin
+			 * snapshots needed to replicate clones.
+			 */
+			nvlist_t *nvfs = fsavl_find(sdd->fsavl,
+			    zhp->zfs_dmustats.dds_guid, &snapname);
+
+			VERIFY(0 == nvlist_lookup_nvlist(nvfs,
+			    "snapprops", &snapprops));
+			VERIFY(0 == nvlist_lookup_nvlist(snapprops,
+			    thissnap, &snapprops));
+			exclude = !nvlist_exists(snapprops, "is_clone_origin");
+		} else {
+			exclude = B_TRUE;
+		}
+	}
 
 	/*
 	 * If a filter function exists, call it to determine whether
 	 * this snapshot will be sent.
 	 */
-	if (sdd->filter_cb != NULL &&
-	    sdd->filter_cb(zhp, sdd->filter_cb_arg) == B_FALSE) {
+	if (exclude || (sdd->filter_cb != NULL &&
+	    sdd->filter_cb(zhp, sdd->filter_cb_arg) == B_FALSE)) {
 		/*
 		 * This snapshot is filtered out.  Don't send it, and don't
 		 * set prevsnap, so it will be as if this snapshot didn't
@@ -1019,57 +1044,32 @@ dump_filesystem(zfs_handle_t *zhp, void *arg)
 		}
 	}
 
-	if (sdd->doall) {
-		sdd->seenfrom = sdd->seento = sdd->prevsnap[0] = 0;
-		if (sdd->fromsnap == NULL || missingfrom)
-			sdd->seenfrom = B_TRUE;
+	sdd->seenfrom = sdd->seento = sdd->prevsnap[0] = 0;
+	if (sdd->fromsnap == NULL || missingfrom)
+		sdd->seenfrom = B_TRUE;
 
-		rv = zfs_iter_snapshots_sorted(zhp, dump_snapshot, arg);
-		if (!sdd->seenfrom) {
+	rv = zfs_iter_snapshots_sorted(zhp, dump_snapshot, arg);
+	if (!sdd->seenfrom) {
+		(void) fprintf(stderr,
+		    "WARNING: could not send %s@%s:\n"
+		    "incremental source (%s@%s) does not exist\n",
+		    zhp->zfs_name, sdd->tosnap,
+		    zhp->zfs_name, sdd->fromsnap);
+		sdd->err = B_TRUE;
+	} else if (!sdd->seento) {
+		if (sdd->fromsnap) {
 			(void) fprintf(stderr,
 			    "WARNING: could not send %s@%s:\n"
-			    "incremental source (%s@%s) does not exist\n",
+			    "incremental source (%s@%s) "
+			    "is not earlier than it\n",
 			    zhp->zfs_name, sdd->tosnap,
 			    zhp->zfs_name, sdd->fromsnap);
-			sdd->err = B_TRUE;
-		} else if (!sdd->seento) {
-			if (sdd->fromsnap) {
-				(void) fprintf(stderr,
-				    "WARNING: could not send %s@%s:\n"
-				    "incremental source (%s@%s) "
-				    "is not earlier than it\n",
-				    zhp->zfs_name, sdd->tosnap,
-				    zhp->zfs_name, sdd->fromsnap);
-			} else {
-				(void) fprintf(stderr, "WARNING: "
-				    "could not send %s@%s: does not exist\n",
-				    zhp->zfs_name, sdd->tosnap);
-			}
-			sdd->err = B_TRUE;
-		}
-	} else {
-		zfs_handle_t *snapzhp;
-		char snapname[ZFS_MAXNAMELEN];
-
-		(void) snprintf(snapname, sizeof (snapname), "%s@%s",
-		    zfs_get_name(zhp), sdd->tosnap);
-		snapzhp = zfs_open(zhp->zfs_hdl, snapname, ZFS_TYPE_SNAPSHOT);
-		if (snapzhp == NULL) {
-			rv = -1;
 		} else {
-			if (sdd->filter_cb == NULL ||
-			    sdd->filter_cb(snapzhp, sdd->filter_cb_arg) ==
-			    B_TRUE) {
-				boolean_t got_enoent;
-
-				rv = dump_ioctl(snapzhp,
-				    missingfrom ? NULL : sdd->fromsnap,
-				    sdd->fromorigin || missingfrom,
-				    sdd->outfd, B_FALSE, &got_enoent);
-			}
-			sdd->seento = B_TRUE;
-			zfs_close(snapzhp);
+			(void) fprintf(stderr, "WARNING: "
+			    "could not send %s@%s: does not exist\n",
+			    zhp->zfs_name, sdd->tosnap);
 		}
+		sdd->err = B_TRUE;
 	}
 
 	return (rv);
@@ -1085,6 +1085,29 @@ dump_filesystems(zfs_handle_t *rzhp, void *arg)
 	if (!sdd->replicate)
 		return (dump_filesystem(rzhp, sdd));
 
+	/* Mark the clone origin snapshots. */
+	for (fspair = nvlist_next_nvpair(sdd->fss, NULL); fspair;
+	    fspair = nvlist_next_nvpair(sdd->fss, fspair)) {
+		nvlist_t *nvfs;
+		uint64_t origin_guid = 0;
+
+		VERIFY(0 == nvpair_value_nvlist(fspair, &nvfs));
+		(void) nvlist_lookup_uint64(nvfs, "origin", &origin_guid);
+		if (origin_guid != 0) {
+			char *snapname;
+			nvlist_t *origin_nv = fsavl_find(sdd->fsavl,
+			    origin_guid, &snapname);
+			if (origin_nv != NULL) {
+				nvlist_t *snapprops;
+				VERIFY(0 == nvlist_lookup_nvlist(origin_nv,
+				    "snapprops", &snapprops));
+				VERIFY(0 == nvlist_lookup_nvlist(snapprops,
+				    snapname, &snapprops));
+				VERIFY(0 == nvlist_add_boolean(
+				    snapprops, "is_clone_origin"));
+			}
+		}
+	}
 again:
 	needagain = progress = B_FALSE;
 	for (fspair = nvlist_next_nvpair(sdd->fss, NULL); fspair;
@@ -1094,7 +1117,6 @@ again:
 		zfs_handle_t *zhp;
 		int err;
 		uint64_t origin_guid = 0;
-		nvlist_t *origin_nv;
 
 		VERIFY(nvpair_value_nvlist(fspair, &fslist) == 0);
 		if (nvlist_lookup_boolean(fslist, "sent") == 0)
@@ -1103,15 +1125,19 @@ again:
 		VERIFY(nvlist_lookup_string(fslist, "name", &fsname) == 0);
 		(void) nvlist_lookup_uint64(fslist, "origin", &origin_guid);
 
-		origin_nv = fsavl_find(sdd->fsavl, origin_guid, NULL);
-		if (origin_nv &&
-		    nvlist_lookup_boolean(origin_nv, "sent") == ENOENT) {
-			/*
-			 * origin has not been sent yet;
-			 * skip this clone.
-			 */
-			needagain = B_TRUE;
-			continue;
+		if (origin_guid != 0) {
+			nvlist_t *origin_nv = fsavl_find(sdd->fsavl,
+			    origin_guid, NULL);
+			if (origin_nv != NULL &&
+			    nvlist_lookup_boolean(origin_nv,
+			    "sent") == ENOENT) {
+				/*
+				 * origin has not been sent yet;
+				 * skip this clone.
+				 */
+				needagain = B_TRUE;
+				continue;
+			}
 		}
 
 		zhp = zfs_open(rzhp->zfs_hdl, fsname, ZFS_TYPE_DATASET);
