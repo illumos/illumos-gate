@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -133,9 +132,11 @@ _exec_files_XY_all(files_backend_ptr_t be,
 	f_size = f_stat.st_size;
 	f_time = f_stat.st_mtime;
 
-	while (f_time > read_time) {
+	while (f_time > read_time || f_buf == NULL) {
 		/*
-		 * file has been modified since we last read it.
+		 * file has been modified since we last read it
+		 * or we never read it or memory allocation
+		 * failed before.
 		 * read it into the buffer with rw lock.
 		 */
 		(void) rw_unlock(&exec_lock);
