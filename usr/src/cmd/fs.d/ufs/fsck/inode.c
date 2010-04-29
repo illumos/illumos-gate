@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -25,7 +24,6 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -230,7 +228,7 @@ ckinode(struct dinode *dp, struct inodesc *idesc, enum cki_action action)
 	if (mode == IFBLK || mode == IFCHR)
 		return (KEEPON);
 	if (mode == IFLNK && dp->di_size > MAXPATHLEN) {
-		pwarn("I=%d  Symlink longer than supported maximum",
+		pwarn("I=%d  Symlink longer than supported maximum\n",
 		    idesc->id_number);
 		init_inodesc(&cleardesc);
 		cleardesc.id_type = ADDR;
@@ -1260,12 +1258,13 @@ truncino(fsck_ino_t ino, offset_t new_length, int update)
 	fsck_ino_t parent;
 	mode_t mode;
 	caddr_t message;
-	int isdir;
+	int isdir, islink;
 	int ilevel, dblk;
 
 	dp = ginode(ino);
 	mode = (dp->di_mode & IFMT);
 	isdir = (mode == IFDIR) || (mode == IFATTRDIR);
+	islink = (mode == IFLNK);
 
 	if (isdir) {
 		/*
@@ -1346,7 +1345,7 @@ no_parent_update:
 	idesc.id_fix = DONTKNOW;
 	idesc.id_truncto = howmany(new_length, sblock.fs_bsize);
 	dp = ginode(ino);
-	if (ckinode(dp, &idesc, CKI_TRUNCATE) & ALTERED)
+	if (!islink && ckinode(dp, &idesc, CKI_TRUNCATE) & ALTERED)
 		inodirty();
 
 	/*
