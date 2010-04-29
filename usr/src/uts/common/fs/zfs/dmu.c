@@ -97,12 +97,16 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 
 int
 dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset,
-    void *tag, dmu_buf_t **dbp)
+    void *tag, dmu_buf_t **dbp, int flags)
 {
 	dnode_t *dn;
 	uint64_t blkid;
 	dmu_buf_impl_t *db;
 	int err;
+	int db_flags = DB_RF_CANFAIL;
+
+	if (flags & DMU_READ_NO_PREFETCH)
+		db_flags |= DB_RF_NOPREFETCH;
 
 	err = dnode_hold(os, object, FTAG, &dn);
 	if (err)
@@ -114,7 +118,7 @@ dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset,
 	if (db == NULL) {
 		err = EIO;
 	} else {
-		err = dbuf_read(db, NULL, DB_RF_CANFAIL);
+		err = dbuf_read(db, NULL, db_flags);
 		if (err) {
 			dbuf_rele(db, tag);
 			db = NULL;
@@ -205,7 +209,7 @@ dmu_bonus_hold(objset_t *os, uint64_t object, void *tag, dmu_buf_t **dbp)
 
 	dnode_rele(dn, FTAG);
 
-	VERIFY(0 == dbuf_read(db, NULL, DB_RF_MUST_SUCCEED));
+	VERIFY(0 == dbuf_read(db, NULL, DB_RF_MUST_SUCCEED | DB_RF_NOPREFETCH));
 
 	*dbp = &db->db;
 	return (0);

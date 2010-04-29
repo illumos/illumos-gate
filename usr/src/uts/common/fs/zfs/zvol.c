@@ -949,7 +949,8 @@ zvol_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 	} else {
 		size = zv->zv_volblocksize;
 		offset = P2ALIGN(offset, size);
-		error = dmu_buf_hold(os, object, offset, zgd, &db);
+		error = dmu_buf_hold(os, object, offset, zgd, &db,
+		    DMU_READ_NO_PREFETCH);
 		if (error == 0) {
 			zgd->zgd_db = db;
 			zgd->zgd_bp = bp;

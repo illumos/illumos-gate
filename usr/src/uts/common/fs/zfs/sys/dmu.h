@@ -367,7 +367,7 @@ int dmu_spill_hold_existing(dmu_buf_t *bonus, void *tag, dmu_buf_t **dbp);
  * The object number must be a valid, allocated object number.
  */
 int dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset,
-    void *tag, dmu_buf_t **);
+    void *tag, dmu_buf_t **, int flags);
 void dmu_buf_add_ref(dmu_buf_t *db, void* tag);
 void dmu_buf_rele(dmu_buf_t *db, void *tag);
 uint64_t dmu_buf_refcount(dmu_buf_t *db);

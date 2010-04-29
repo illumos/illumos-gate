@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/bplist.h>
@@ -154,7 +153,7 @@ bplist_cache(bplist_t *bpl, uint64_t blkid)
 			dmu_buf_rele(bpl->bpl_cached_dbuf, bpl);
 		err = dmu_buf_hold(bpl->bpl_mos,
 		    bpl->bpl_object, blkid << bpl->bpl_blockshift,
-		    bpl, &bpl->bpl_cached_dbuf);
+		    bpl, &bpl->bpl_cached_dbuf, DMU_READ_PREFETCH);
 		ASSERT(err || bpl->bpl_cached_dbuf->db_size ==
 		    1ULL << bpl->bpl_blockshift);
 	}

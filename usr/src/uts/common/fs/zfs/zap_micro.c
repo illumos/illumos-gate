@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zio.h>
@@ -451,7 +450,7 @@ zap_lockdir(objset_t *os, uint64_t obj, dmu_tx_t *tx,
 
 	*zapp = NULL;
 
-	err = dmu_buf_hold(os, obj, 0, NULL, &db);
+	err = dmu_buf_hold(os, obj, 0, NULL, &db, DMU_READ_NO_PREFETCH);
 	if (err)
 		return (err);
 
@@ -577,7 +576,7 @@ mzap_create_impl(objset_t *os, uint64_t obj, int normflags, zap_flags_t flags,
 	dmu_buf_t *db;
 	mzap_phys_t *zp;
 
-	VERIFY(0 == dmu_buf_hold(os, obj, 0, FTAG, &db));
+	VERIFY(0 == dmu_buf_hold(os, obj, 0, FTAG, &db, DMU_READ_NO_PREFETCH));
 
 #ifdef ZFS_DEBUG
 	{

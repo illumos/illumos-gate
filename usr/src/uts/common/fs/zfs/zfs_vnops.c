@@ -1032,7 +1032,8 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 		}
 #endif
 		if (error == 0)
-			error = dmu_buf_hold(os, object, offset, zgd, &db);
+			error = dmu_buf_hold(os, object, offset, zgd, &db,
+			    DMU_READ_NO_PREFETCH);
 
 		if (error == 0) {
 			zgd->zgd_db = db;
@@ -3655,7 +3656,6 @@ top:
 	 * Create a new object for the symlink.
 	 * for version 4 ZPL datsets the symlink will be an SA attribute
 	 */
-
 	zfs_mknode(dzp, vap, tx, cr, 0, &zp, &acl_ids);
 
 	if (fuid_dirtied)
