@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1918,7 +1917,7 @@ ldi_ioctl(ldi_handle_t lh, int cmd, intptr_t arg, int mode,
 	struct ldi_handle	*handlep = (struct ldi_handle *)lh;
 	vnode_t			*vp;
 	dev_t			dev;
-	int			ret, copymode;
+	int			ret, copymode, unused;
 
 	if (lh == NULL)
 		return (EINVAL);
@@ -1930,6 +1929,13 @@ ldi_ioctl(ldi_handle_t lh, int cmd, intptr_t arg, int mode,
 	if (mode & FKIOCTL)
 		mode = (mode & ~FMODELS) | FNATIVE | FKIOCTL;
 
+	/*
+	 * Some drivers assume that rvalp will always be non-NULL, so in
+	 * an attempt to avoid panics if the caller passed in a NULL
+	 * value, update rvalp to point to a temporary variable.
+	 */
+	if (rvalp == NULL)
+		rvalp = &unused;
 	vp = handlep->lh_vp;
 	dev = vp->v_rdev;
 	if (handlep->lh_type & LH_CBDEV) {
