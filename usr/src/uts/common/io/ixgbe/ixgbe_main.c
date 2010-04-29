@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,14 +20,17 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
 
 static char ixgbe_ident[] = "Intel 10Gb Ethernet";
-static char ixgbe_version[] = "ixgbe 1.1.5";
+static char ixgbe_version[] = "ixgbe 1.1.6";
 
 /*
  * Local function protoypes
@@ -3816,6 +3818,14 @@ ixgbe_set_internal_mac_loopback(ixgbe_t *ixgbe)
 		atlas |= IXGBE_ATLAS_PDN_TX_AN_QL_ALL;
 		(void) ixgbe_write_analog_reg8(&ixgbe->hw, IXGBE_ATLAS_PDN_AN,
 		    atlas);
+	} else if (hw->mac.type == ixgbe_mac_82599EB) {
+		reg = IXGBE_READ_REG(&ixgbe->hw, IXGBE_AUTOC);
+		reg |= (IXGBE_AUTOC_FLU |
+		    IXGBE_AUTOC_10G_KX4);
+		IXGBE_WRITE_REG(&ixgbe->hw, IXGBE_AUTOC, reg);
+
+		(void) ixgbe_setup_link(&ixgbe->hw, IXGBE_LINK_SPEED_10GB_FULL,
+		    B_FALSE, B_TRUE);
 	}
 }
 
