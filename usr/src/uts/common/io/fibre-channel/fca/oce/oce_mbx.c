@@ -266,6 +266,7 @@ oce_mbox_post(struct oce_dev *dev, struct oce_mbx *mbx,
 	/* now dispatch */
 	ret = oce_mbox_dispatch(dev, tmo);
 	if (ret != 0) {
+		mutex_exit(&dev->bmbx_lock);
 		return (ret);
 	}
 
