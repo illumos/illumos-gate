@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -405,26 +404,20 @@ p_print()
 	if ((cur_parts->pinfo_name != NULL) && (cur_label == L_TYPE_SOLARIS)) {
 		fmt_print("Current partition table (%s):\n",
 		    cur_parts->pinfo_name);
-		fmt_print(
-"Total disk cylinders available: %d + %d (reserved cylinders)\n\n", ncyl, acyl);
-	} else if ((cur_label == L_TYPE_EFI) && (cur_parts->pinfo_name !=
-	    NULL)) {
-		fmt_print("Current partition table (%s):\n",
-		    cur_parts->pinfo_name);
-		fmt_print(
-"Total disk sectors available: %llu + %d (reserved sectors)\n\n",
-			cur_parts->etoc->efi_last_u_lba - EFI_MIN_RESV_SIZE,
-				EFI_MIN_RESV_SIZE);
+		fmt_print("Total disk cylinders available: %d + %d "
+		    "(reserved cylinders)\n\n", ncyl, acyl);
 	} else if (cur_label == L_TYPE_SOLARIS) {
 		fmt_print("Current partition table (unnamed):\n");
-		fmt_print(
-"Total disk cylinders available: %d + %d (reserved cylinders)\n\n", ncyl, acyl);
+		fmt_print("Total disk cylinders available: %d + %d "
+		    "(reserved cylinders)\n\n", ncyl, acyl);
 	} else if (cur_label == L_TYPE_EFI) {
-		fmt_print("Current partition table (unnamed):\n");
-		fmt_print(
-"Total disk sectors available: %llu + %d (reserved sectors)\n\n",
-		cur_parts->etoc->efi_last_u_lba - EFI_MIN_RESV_SIZE,
-			EFI_MIN_RESV_SIZE);
+		fmt_print("Current partition table (%s):\n",
+		    cur_parts->pinfo_name != NULL ?
+		    cur_parts->pinfo_name : "unnamed");
+		fmt_print("Total disk sectors available: %llu + %d "
+		    "(reserved sectors)\n\n",
+		    cur_parts->etoc->efi_last_u_lba - EFI_MIN_RESV_SIZE -
+		    cur_parts->etoc->efi_first_u_lba + 1, EFI_MIN_RESV_SIZE);
 	}
 
 
