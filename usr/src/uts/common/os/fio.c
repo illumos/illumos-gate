@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1704,9 +1703,8 @@ addfpollinfo(int fd)
 }
 
 /*
- * delete curthread from fpollinfo list.
+ * Delete curthread from fpollinfo list if it is there.
  */
-/*ARGSUSED*/
 void
 delfpollinfo(int fd)
 {
@@ -1716,19 +1714,15 @@ delfpollinfo(int fd)
 	uf_info_t *fip = P_FINFO(curproc);
 
 	UF_ENTER(ufp, fip, fd);
-	if (ufp->uf_fpollinfo == NULL) {
-		UF_EXIT(ufp);
-		return;
+	for (fpipp = &ufp->uf_fpollinfo;
+	    (fpip = *fpipp) != NULL;
+	    fpipp = &fpip->fp_next) {
+		if (fpip->fp_thread == curthread) {
+			*fpipp = fpip->fp_next;
+			kmem_free(fpip, sizeof (fpollinfo_t));
+			break;
+		}
 	}
-	ASSERT(ufp->uf_busy);
-	/*
-	 * Find and delete curthread from the list.
-	 */
-	fpipp = &ufp->uf_fpollinfo;
-	while ((fpip = *fpipp)->fp_thread != curthread)
-		fpipp = &fpip->fp_next;
-	*fpipp = fpip->fp_next;
-	kmem_free(fpip, sizeof (fpollinfo_t));
 	/*
 	 * Assert that we are not still on the list, that is, that
 	 * this lwp did not call addfpollinfo twice for the same fd.
