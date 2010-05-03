@@ -3388,7 +3388,8 @@ ibcm_process_abort(ibcm_state_data_t *statep)
 			ibcm_insert_trace(statep,
 			    IBCM_TRACE_CALLED_CONN_CLOSE_EVENT);
 
-			ibtl_cm_chan_open_is_aborted(statep->channel);
+			if (statep->channel)
+				ibtl_cm_chan_open_is_aborted(statep->channel);
 
 			(void) statep->cm_handler(statep->state_cm_private,
 			    &event, &ret_args, NULL, 0);
@@ -5281,7 +5282,8 @@ ibcm_handler_conn_fail(ibcm_state_data_t *statep, uint8_t cf_code,
 
 	ibcm_path_cache_purge();
 
-	ibtl_cm_chan_open_is_aborted(statep->channel);
+	if (statep->channel)
+		ibtl_cm_chan_open_is_aborted(statep->channel);
 
 	/* Invoke CM handler w/ event passed as arg */
 	if (statep->cm_handler != NULL) {
@@ -7295,7 +7297,8 @@ ibcm_cep_state_rej(ibcm_state_data_t *statep, ibcm_rej_msg_t *rej_msgp,
 		    status);
 	}
 
-	ibtl_cm_chan_open_is_aborted(statep->channel);
+	if (statep->channel)
+		ibtl_cm_chan_open_is_aborted(statep->channel);
 
 	/* Disassociate state structure and CM */
 	IBCM_SET_CHAN_PRIVATE(statep->channel, NULL);
