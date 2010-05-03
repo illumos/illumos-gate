@@ -75,7 +75,6 @@ CORE_OBJS +=			\
 	kdi_idt.o		\
 	kdi_idthdl.o		\
 	kdi_asm.o		\
-	kflt_mem.o		\
 	lgrpplat.o		\
 	mach_kdi.o		\
 	mach_sysconfig.o	\

@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -56,7 +57,6 @@ extern "C" {
 
 extern hrtime_t		randtick();
 extern uint_t page_create_update_flags_x86(uint_t);
-extern int kernel_page_update_flags_x86(uint_t *);
 
 extern size_t plcnt_sz(size_t);
 #define	PLCNT_SZ(ctrs_sz) (ctrs_sz = plcnt_sz(ctrs_sz))
@@ -99,36 +99,6 @@ extern int mnode_range_cnt(int);
 #define	MNODE_MAX_MRANGE(mnode)	memrange_num(mem_node_config[mnode].physbase)
 
 /*
- * combined memory ranges from mnode and memranges[] to manage single
- * mnode/mtype dimension in the page lists.
- */
-typedef struct {
-	pfn_t	mnr_pfnlo;
-	pfn_t	mnr_pfnhi;
-	int	mnr_mnode;
-	int	mnr_memrange;		/* index into memranges[] */
-	int	mnr_next;		/* next lower PA mnoderange */
-	int	mnr_exists;
-	/* maintain page list stats */
-	pgcnt_t	mnr_mt_clpgcnt;		/* cache list cnt */
-	pgcnt_t	mnr_mt_flpgcnt[MMU_PAGE_SIZES];	/* free list cnt per szc */
-	pgcnt_t	mnr_mt_totcnt;		/* sum of cache and free lists */
-#ifdef DEBUG
-	struct mnr_mts {		/* mnode/mtype szc stats */
-		pgcnt_t	mnr_mts_pgcnt;
-		int	mnr_mts_colors;
-		pgcnt_t *mnr_mtsc_pgcnt;
-	} 	*mnr_mts;
-#endif
-} mnoderange_t;
-
-#define	MEMRANGEHI(mtype)						\
-	(((mtype) > 0) ? memranges[(mtype) - 1] - 1: physmax)
-#define	MEMRANGELO(mtype)	(memranges[(mtype)])
-
-#define	MTYPE_FREEMEM(mt)	(mnoderanges[(mt)].mnr_mt_totcnt)
-
-/*
  * This was really badly defined, it implicitly uses mnode_maxmrange[]
  * which is a static in vm_pagelist.c
  */
@@ -137,127 +107,16 @@ extern int mtype_2_mrange(int);
 	(mnode_maxmrange[mnode] - mtype_2_mrange(mtype))
 
 /*
- * this structure is used for walking free page lists, it
- * controls when to split large pages into smaller pages,
- * and when to coalesce smaller pages into larger pages
- */
-typedef struct page_list_walker {
-	uint_t	plw_colors;		/* num of colors for szc */
-	uint_t  plw_color_mask;		/* colors-1 */
-	uint_t	plw_bin_step;		/* next bin: 1 or 2 */
-	uint_t  plw_count;		/* loop count */
-	uint_t	plw_bin0;		/* starting bin */
-	uint_t  plw_bin_marker;		/* bin after initial jump */
-	uint_t  plw_bin_split_prev;	/* last bin we tried to split */
-	uint_t  plw_do_split;		/* set if OK to split */
-	uint_t  plw_split_next;		/* next bin to split */
-	uint_t	plw_ceq_dif;		/* number of different color groups */
-					/* to check */
-	uint_t	plw_ceq_mask[MMU_PAGE_SIZES + 1]; /* color equiv mask */
-	uint_t	plw_bins[MMU_PAGE_SIZES + 1];	/* num of bins */
-} page_list_walker_t;
-
-/*
- * Page freelists are organized as two freelist types user and kernel, with
- * their own policy and allocation routines. The definitions related to the
- * freelist type structure are grouped below.
- *
- * The page size free lists themselves are allocated dynamically with
+ * Per page size free lists. Allocated dynamically.
  * dimensions [mtype][mmu_page_sizes][colors]
  *
  * mtype specifies a physical memory range with a unique mnode.
  */
 
-#define	MAX_PFLT_POLICIES 3
-#define	MAX_PFLT_TYPE 2
-enum freelist_types {PFLT_USER, PFLT_KMEM};
+extern page_t ****page_freelists;
 
-/*
- * The kernel only needs a small number of page colors, far fewer than user
- * programs.
- */
-#define	KFLT_PAGE_COLORS 16
-
-typedef struct page_freelist_type page_freelist_type_t;
-extern page_freelist_type_t flt_user;
-extern page_freelist_type_t flt_kern;
-extern page_freelist_type_t *ufltp;
-extern page_freelist_type_t *kfltp;
-
-void page_flt_init(page_freelist_type_t *, page_freelist_type_t *);
-page_t *page_get_uflt(struct vnode *, u_offset_t, struct seg *, caddr_t,
-    size_t, uint_t, struct lgrp *);
-page_t *page_get_kflt(struct vnode *, u_offset_t, struct seg *, caddr_t,
-    size_t, uint_t, struct lgrp *);
-void page_kflt_walk_init(uchar_t, uint_t, uint_t, int, int,
-    page_list_walker_t *);
-uint_t page_kflt_walk_next_bin(uchar_t, uint_t, page_list_walker_t *);
-page_t *page_import_kflt(page_freelist_type_t *, uint_t, int, uchar_t,
-    uint_t, int *);
-page_t *page_user_alloc_kflt(page_freelist_type_t *, int, uint_t, int, uchar_t,
-	uint_t);
-void kflt_expand(void);
-
-typedef page_t *(*pflt_get_func_p) (struct vnode *, u_offset_t, struct seg *,
-    caddr_t, size_t, uint_t, lgrp_t *);
-typedef page_t *(*pflt_policy_func_p)(page_freelist_type_t *, int, uint_t, int,
-    uchar_t, uint_t);
-typedef void (*pflt_list_walk_init_func_p)(uchar_t, uint_t, uint_t, int, int,
-    page_list_walker_t *);
-typedef uint_t (*pflt_list_walk_next_func_p)(uchar_t, uint_t,
-    page_list_walker_t *);
-
-struct page_freelist_type {
-	int pflt_type;			/* type is user or kernel */
-	pflt_get_func_p pflt_get_free;  /* top-level alloc routine */
-	pflt_list_walk_init_func_p pflt_walk_init;  /* walker routines */
-	pflt_list_walk_next_func_p pflt_walk_next;
-	int	pflt_num_policies;	/* the number of policy routines */
-	/*
-	 * the policy routines are called by the allocator routine
-	 * to implement the actual allocation policies.
-	 */
-	pflt_policy_func_p pflt_policy[MAX_PFLT_POLICIES];
-	page_t ****pflt_freelists;	/* the page freelist arrays */
-};
-
-#if defined(__amd64) && !defined(__xpv)
-#define	PAGE_FREELISTP(is_kflt, mnode, szc, color, mtype)		\
-	((is_kflt) ?							\
-	(page_t **)(kfltp->pflt_freelists[mtype] + (color)) :   	\
-	((ufltp->pflt_freelists[mtype][szc] + (color))))
-
-#define	PAGE_GET_FREELISTS(pp, vp, off, seg, vaddr, size, flags, lgrp)	     \
-	{								     \
-		if (kflt_on && (((flags) & PG_KFLT) == PG_KFLT)) {	     \
-			pp = kfltp->pflt_get_free(vp, off, seg, vaddr, size, \
-			    flags, lgrp);				     \
-		} else {						     \
-			pp = ufltp->pflt_get_free(vp, off, seg, vaddr, size, \
-			    flags, lgrp);				     \
-		}							     \
-	}
-#else /* __amd64 && ! __xpv */
-#define	PAGE_FREELISTP(is_kflt, mnode, szc, color, mtype)		\
-	((ufltp->pflt_freelists[mtype][szc] + (color)))
-
-#define	PAGE_GET_FREELISTS(pp, vp, off, seg, vaddr, size, flags, lgrp)	     \
-			pp = ufltp->pflt_get_free(vp, off, seg, vaddr, size, \
-			    flags, lgrp);
-#endif /* __amd64 && ! __xpv */
-
-#define	PAGE_FREELISTS(is_kflt, mnode, szc, color, mtype)		\
-	(*(PAGE_FREELISTP(is_kflt, mnode, szc, color, mtype)))
-
-#define	PAGE_GET_FREELISTS_POLICY(fp, i) 				\
-	(fp->pflt_policy[i])
-
-#define	PAGE_LIST_WALK_INIT(fp, szc, flags, bin, can_split, use_ceq, plw) \
-	fp->pflt_walk_init(szc, flags, bin, can_split, use_ceq, plw)
-
-#define	PAGE_LIST_WALK_NEXT(fp, szc, bin, plw) 				\
-	fp->pflt_walk_next(szc, bin, plw)
-
+#define	PAGE_FREELISTS(mnode, szc, color, mtype)		\
+	(*(page_freelists[mtype][szc] + (color)))
 
 /*
  * For now there is only a single size cache list. Allocated dynamically.
@@ -271,7 +130,7 @@ extern page_t ***page_cachelists;
 	(*(page_cachelists[mtype] + (color)))
 
 /*
- * There are mutexes for the user page freelist, the kernel page freelist
+ * There are mutexes for both the page freelist
  * and the page cachelist.  We want enough locks to make contention
  * reasonable, but not too many -- otherwise page_freelist_lock() gets
  * so expensive that it becomes the bottleneck!
@@ -279,32 +138,11 @@ extern page_t ***page_cachelists;
 
 #define	NPC_MUTEX	16
 
-/*
- * The kflt_disable variable is used to determine whether the kernel freelist
- * is supported on this platform.
- */
-extern int kflt_disable;
-
 extern kmutex_t	*fpc_mutex[NPC_MUTEX];
-extern kmutex_t	*kfpc_mutex[NPC_MUTEX];
 extern kmutex_t	*cpc_mutex[NPC_MUTEX];
 
-#define	PC_ISKFLT(fltp)	(fltp->pflt_type == PFLT_KMEM)
-	/* flag used by the kflt_export function when calling page_promote */
-#define	PC_KFLT_EXPORT 0x4
-
-extern page_t *page_get_mnode_freelist(page_freelist_type_t *, int, uint_t,
-    int, uchar_t, uint_t);
+extern page_t *page_get_mnode_freelist(int, uint_t, int, uchar_t, uint_t);
 extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
-extern page_t *page_get_contig_pages(page_freelist_type_t *, int, uint_t, int,
-    uchar_t, uint_t);
-extern void page_list_walk_init(uchar_t, uint_t, uint_t, int, int,
-    page_list_walker_t *);
-extern uint_t page_list_walk_next_bin(uchar_t, uint_t, page_list_walker_t *);
-
-extern void kflt_evict_wakeup();
-extern void kflt_freemem_add(pgcnt_t);
-extern void kflt_freemem_sub(pgcnt_t);
 
 /* mem node iterator is not used on x86 */
 #define	MEM_NODE_ITERATOR_DECL(it)
@@ -391,8 +229,6 @@ extern void kflt_freemem_sub(pgcnt_t);
 		}                                                             \
 	}
 
-#define	USER_2_KMEM_BIN(bin)	((bin) & (KFLT_PAGE_COLORS - 1))
-
 /* get the color equivalency mask for the next szc */
 #define	PAGE_GET_NSZ_MASK(szc, mask)                                         \
 	((mask) >> (PAGE_GET_SHIFT((szc) + 1) - PAGE_GET_SHIFT(szc)))
@@ -404,9 +240,7 @@ extern void kflt_freemem_sub(pgcnt_t);
 /* Find the bin for the given page if it was of size szc */
 #define	PP_2_BIN_SZC(pp, szc)	(PFN_2_COLOR(pp->p_pagenum, szc, NULL))
 
-#define	PP_2_BIN(pp)		((PP_ISKFLT(pp)) ?			\
-	USER_2_KMEM_BIN(PP_2_BIN_SZC(pp, pp->p_szc)) :		\
-	(PP_2_BIN_SZC(pp, pp->p_szc)))
+#define	PP_2_BIN(pp)		(PP_2_BIN_SZC(pp, pp->p_szc))
 
 #define	PP_2_MEM_NODE(pp)	(PFN_2_MEM_NODE(pp->p_pagenum))
 #define	PP_2_MTYPE(pp)		(pfn_2_mtype(pp->p_pagenum))
@@ -414,6 +248,27 @@ extern void kflt_freemem_sub(pgcnt_t);
 
 #define	SZCPAGES(szc)		(1 << PAGE_BSZS_SHIFT(szc))
 #define	PFN_BASE(pfnum, szc)	(pfnum & ~(SZCPAGES(szc) - 1))
+
+/*
+ * this structure is used for walking free page lists
+ * controls when to split large pages into smaller pages,
+ * and when to coalesce smaller pages into larger pages
+ */
+typedef struct page_list_walker {
+	uint_t	plw_colors;		/* num of colors for szc */
+	uint_t  plw_color_mask;		/* colors-1 */
+	uint_t	plw_bin_step;		/* next bin: 1 or 2 */
+	uint_t  plw_count;		/* loop count */
+	uint_t	plw_bin0;		/* starting bin */
+	uint_t  plw_bin_marker;		/* bin after initial jump */
+	uint_t  plw_bin_split_prev;	/* last bin we tried to split */
+	uint_t  plw_do_split;		/* set if OK to split */
+	uint_t  plw_split_next;		/* next bin to split */
+	uint_t	plw_ceq_dif;		/* number of different color groups */
+					/* to check */
+	uint_t	plw_ceq_mask[MMU_PAGE_SIZES + 1]; /* color equiv mask */
+	uint_t	plw_bins[MMU_PAGE_SIZES + 1];	/* num of bins */
+} page_list_walker_t;
 
 void	page_list_walk_init(uchar_t szc, uint_t flags, uint_t bin,
     int can_split, int use_ceq, page_list_walker_t *plw);
@@ -460,19 +315,12 @@ extern void mnodetype_2_pfn(int, int, pfn_t *, pfn_t *);
 #define	MNODETYPE_2_PFN(mnode, mtype, pfnlo, pfnhi)			\
 	mnodetype_2_pfn(mnode, mtype, &pfnlo, &pfnhi)
 
-#define	PC_FREELIST_BIN_MUTEX(is_kflt, mnode, bin, flags)		\
-	((is_kflt) ? 							\
-	(&kfpc_mutex[(bin) & (NPC_MUTEX - 1)][mnode]) : 		\
-	(&fpc_mutex[(bin) & (NPC_MUTEX - 1)][mnode]))
-
-#define	PC_BIN_MUTEX(is_kflt, mnode, bin, flags)			\
-	((flags & PG_FREE_LIST) ?					\
-	PC_FREELIST_BIN_MUTEX(is_kflt, mnode, bin, flags):		\
+#define	PC_BIN_MUTEX(mnode, bin, flags) ((flags & PG_FREE_LIST) ?	\
+	&fpc_mutex[(bin) & (NPC_MUTEX - 1)][mnode] :			\
 	&cpc_mutex[(bin) & (NPC_MUTEX - 1)][mnode])
 
 #define	FPC_MUTEX(mnode, i)	(&fpc_mutex[i][mnode])
 #define	CPC_MUTEX(mnode, i)	(&cpc_mutex[i][mnode])
-#define	KFPC_MUTEX(mnode, i)	(&kfpc_mutex[i][mnode])
 
 #ifdef DEBUG
 #define	CHK_LPG(pp, szc)	chk_lpg(pp, szc)
@@ -560,8 +408,6 @@ extern int	l2cache_sz, l2cache_linesz, l2cache_assoc;
 #define	PGI_MT_NEXT	0x8000000	/* get next mtype */
 #define	PGI_MT_RANGE	(PGI_MT_RANGE0 | PGI_MT_RANGE16M | PGI_MT_RANGE4G)
 
-/* Flag to avoid allocating a page in page_import_kflt() */
-#define	PGI_NOPGALLOC	0x10000000
 
 /*
  * Maximum and default values for user heap, stack, private and shared
@@ -590,17 +436,11 @@ extern pgcnt_t shm_lpg_min_physmem;
  * hash as and addr to get a bin.
  */
 
-#define	AS_2_USER_BIN(as, seg, vp, addr, bin, szc)			    \
+#define	AS_2_BIN(as, seg, vp, addr, bin, szc)				    \
 	bin = (((((uintptr_t)(addr) >> PAGESHIFT) + ((uintptr_t)(as) >> 4)) \
 	    & page_colors_mask) >>					    \
 	    (hw_page_array[szc].hp_shift - hw_page_array[0].hp_shift))
 
-#define	AS_2_BIN(is_kflt, as, seg, vp, addr, bin, szc) {		    \
-	AS_2_USER_BIN(as, seg, vp, addr, bin, szc);			    \
-	if (is_kflt) {							    \
-		bin = USER_2_KMEM_BIN(bin);				    \
-	}								    \
-}
 /*
  * cpu private vm data - accessed thru CPU->cpu_vm_data
  *	vc_pnum_memseg: tracks last memseg visited in page_numtopp_nolock()
@@ -643,22 +483,12 @@ extern char	vm_cpu_data0[];
 
 #ifdef VM_STATS
 struct vmm_vmstats_str {
-			/* page_get_uflt and page_get_kflt */
-	ulong_t pgf_alloc[MMU_PAGE_SIZES][MAX_PFLT_TYPE];
-	ulong_t pgf_allocok[MMU_PAGE_SIZES][MAX_PFLT_TYPE];
-	ulong_t pgf_allocokrem[MMU_PAGE_SIZES][MAX_PFLT_TYPE];
-	ulong_t pgf_allocfailed[MMU_PAGE_SIZES][MAX_PFLT_TYPE];
+	ulong_t pgf_alloc[MMU_PAGE_SIZES];	/* page_get_freelist */
+	ulong_t pgf_allocok[MMU_PAGE_SIZES];
+	ulong_t pgf_allocokrem[MMU_PAGE_SIZES];
+	ulong_t pgf_allocfailed[MMU_PAGE_SIZES];
 	ulong_t	pgf_allocdeferred;
-	ulong_t	pgf_allocretry[MMU_PAGE_SIZES][MAX_PFLT_TYPE];
-	ulong_t pgik_allocok;			/* page_import_kflt */
-	ulong_t pgik_allocfailed;
-	ulong_t pgkx_allocok;			/* kflt_expand */
-	ulong_t pgkx_allocfailed;
-	ulong_t puak_allocok;			/* page_user_alloc_kflt */
-	ulong_t puak_allocfailed;
-	ulong_t pgexportok;			/* kflt_export */
-	ulong_t pgexportfail;
-	ulong_t pgkflt_disable;			/* kflt_user_evict */
+	ulong_t	pgf_allocretry[MMU_PAGE_SIZES];
 	ulong_t pgc_alloc;			/* page_get_cachelist */
 	ulong_t pgc_allocok;
 	ulong_t pgc_allocokrem;
@@ -673,7 +503,6 @@ struct vmm_vmstats_str {
 	ulong_t	ptcpfailexcl[MMU_PAGE_SIZES];
 	ulong_t	ptcpfailszc[MMU_PAGE_SIZES];
 	ulong_t	ptcpfailcage[MMU_PAGE_SIZES];
-	ulong_t	ptcpfailkflt[MMU_PAGE_SIZES];
 	ulong_t	ptcpok[MMU_PAGE_SIZES];
 	ulong_t	pgmf_alloc[MMU_PAGE_SIZES];	/* page_get_mnode_freelist */
 	ulong_t	pgmf_allocfailed[MMU_PAGE_SIZES];

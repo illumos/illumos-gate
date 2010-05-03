@@ -20,7 +20,8 @@
 #
 
 #
-# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 #	This Makefile defines file modules in the directory uts/i86xpv
@@ -74,7 +75,6 @@ CORE_OBJS +=			\
 	mach_sysconfig.o	\
 	machdep.o		\
 	mem_config_stubs.o	\
-	kflt_mem_stubs.o	\
 	memnode.o		\
 	microcode.o		\
 	mlsetup.o		\

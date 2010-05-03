@@ -20,7 +20,8 @@
 #
 
 #
-# Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #	This Makefile defines all file modules for the directory uts/sun4u
 #	and it's children. These are the source files which are sun4u
@@ -56,7 +57,6 @@ CORE_OBJS +=	mach_trap.o
 CORE_OBJS +=	mach_vm_dep.o
 CORE_OBJS +=	mach_xc.o
 CORE_OBJS +=	mem_cage.o
-CORE_OBJS +=	kflt_mem_stubs.o
 CORE_OBJS +=	mem_config.o
 CORE_OBJS +=	memlist_new.o
 CORE_OBJS +=	memscrub.o

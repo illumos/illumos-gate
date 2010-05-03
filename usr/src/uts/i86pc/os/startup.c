@@ -119,7 +119,6 @@
 #include <sys/ddi_timer.h>
 #include <sys/systeminfo.h>
 #include <sys/multiboot.h>
-#include <sys/kflt_mem.h>
 
 #ifdef	__xpv
 
@@ -234,14 +233,6 @@ int kobj_file_bufsize;	/* set in /etc/system */
 caddr_t	rm_platter_va = 0;
 uint32_t rm_platter_pa;
 
-/*
- * On 64 bit systems enable the kernel page freelist
- */
-#if defined(__amd64) && !defined(__xpv)
-int	kflt_disable = 0;
-#else
-int 	kflt_disable = 1;
-#endif /* __amd64 && !__xpv */
 int	auto_lpg_disable = 1;
 
 /*
@@ -2194,13 +2185,6 @@ startup_end(void)
 	PRM_POINT("load_tod_module()");
 	load_tod_module("xpvtod");
 #endif
-
-	/*
-	 * Create the kernel page freelist management thread for x64 systems.
-	 */
-	if (!kflt_disable) {
-		kflt_init();
-	}
 
 	/*
 	 * Configure the system.

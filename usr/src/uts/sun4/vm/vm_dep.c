@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -90,8 +91,6 @@ plcnt_t		plcnt;		/* page list count */
 #if defined(SF_ERRATA_57)
 caddr_t errata57_limit;
 #endif
-
-static void page_flt_init(page_freelist_type_t *);
 
 extern void page_relocate_hash(page_t *, page_t *);
 
@@ -725,6 +724,41 @@ map_pgszcvec(caddr_t addr, size_t size, uintptr_t off, int flags, int type,
 }
 
 /*
+ * Anchored in the table below are counters used to keep track
+ * of free contiguous physical memory. Each element of the table contains
+ * the array of counters, the size of array which is allocated during
+ * startup based on physmax and a shift value used to convert a pagenum
+ * into a counter array index or vice versa. The table has page size
+ * for rows and region size for columns:
+ *
+ *	page_counters[page_size][region_size]
+ *
+ *	page_size: 	TTE size code of pages on page_size freelist.
+ *
+ *	region_size:	TTE size code of a candidate larger page made up
+ *			made up of contiguous free page_size pages.
+ *
+ * As you go across a page_size row increasing region_size each
+ * element keeps track of how many (region_size - 1) size groups
+ * made up of page_size free pages can be coalesced into a
+ * regsion_size page. Yuck! Lets try an example:
+ *
+ * 	page_counters[1][3] is the table element used for identifying
+ *	candidate 4M pages from contiguous pages off the 64K free list.
+ *	Each index in the page_counters[1][3].array spans 4M. Its the
+ *	number of free 512K size (regsion_size - 1) groups of contiguous
+ *	64K free pages.	So when page_counters[1][3].counters[n] == 8
+ *	we know we have a candidate 4M page made up of 512K size groups
+ *	of 64K free pages.
+ */
+
+/*
+ * Per page size free lists. 3rd (max_mem_nodes) and 4th (page coloring bins)
+ * dimensions are allocated dynamically.
+ */
+page_t ***page_freelists[MMU_PAGE_SIZES][MAX_MEM_TYPES];
+
+/*
  * For now there is only a single size cache list.
  * Allocated dynamically.
  */
@@ -787,11 +821,10 @@ alloc_page_freelists(caddr_t alloc_base)
 	for (szc = 0; szc < mmu_page_sizes; szc++) {
 		clrs = page_get_pagecolors(szc);
 		for (mtype = 0; mtype < MAX_MEM_TYPES; mtype++) {
-			ufltp->pflt_freelists[szc][mtype] =
-			    (page_t ***)alloc_base;
+			page_freelists[szc][mtype] = (page_t ***)alloc_base;
 			alloc_base += (max_mem_nodes * sizeof (page_t **));
 			for (mnode = 0; mnode < max_mem_nodes; mnode++) {
-				ufltp->pflt_freelists[szc][mtype][mnode] =
+				page_freelists[szc][mtype][mnode] =
 				    (page_t **)alloc_base;
 				alloc_base += (clrs * (sizeof (page_t *)));
 			}
@@ -799,8 +832,6 @@ alloc_page_freelists(caddr_t alloc_base)
 	}
 
 	alloc_base = page_ctrs_alloc(alloc_base);
-
-	page_flt_init(ufltp);
 	return (alloc_base);
 }
 
@@ -1044,18 +1075,4 @@ get_segkmem_lpsize(size_t lpsize)
 		szc--;
 	}
 	return (PAGESIZE);
-}
-/*
- * Initializes the user page freelist type structures.
- */
-static void
-page_flt_init(page_freelist_type_t *ufp)
-{
-	ufp->pflt_type = PFLT_USER;
-	ufp->pflt_get_free = &page_get_uflt;
-	ufp->pflt_walk_init = page_list_walk_init;
-	ufp->pflt_walk_next = page_list_walk_next_bin;
-	ufp->pflt_num_policies = 2;
-	ufp->pflt_policy[0] = page_get_mnode_freelist;
-	ufp->pflt_policy[1] = page_get_contig_pages;
 }

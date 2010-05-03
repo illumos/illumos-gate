@@ -54,7 +54,6 @@
 #include <sys/disp.h>
 #include <sys/msacct.h>
 #include <sys/mem_cage.h>
-#include <sys/kflt_mem.h>
 
 #include <vm/page.h>
 #include <vm/anon.h>
@@ -630,13 +629,8 @@ clock(void)
 	/*
 	 * Wakeup the cageout thread waiters once per second.
 	 */
-	if (one_sec) {
-		if (kcage_on) {
-			kcage_tick();
-		} else if (kflt_on) {
-			kflt_tick();
-		}
-	}
+	if (one_sec)
+		kcage_tick();
 
 	if (one_sec) {
 
