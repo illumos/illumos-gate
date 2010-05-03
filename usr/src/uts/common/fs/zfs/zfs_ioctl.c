@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -62,6 +61,7 @@
 #include <sys/zfs_ctldir.h>
 #include <sys/zfs_dir.h>
 #include <sys/zvol.h>
+#include <sys/dsl_scan.h>
 #include <sharefs/share.h>
 #include <sys/dmu_objset.h>
 
@@ -117,7 +117,7 @@ void
 __dprintf(const char *file, const char *func, int line, const char *fmt, ...)
 {
 	const char *newfile;
-	char buf[256];
+	char buf[512];
 	va_list adx;
 
 	/*
@@ -1237,8 +1237,13 @@ zfs_ioc_pool_tryimport(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name              name of the pool
+ * zc_cookie            scan func (pool_scan_func_t)
+ */
 static int
-zfs_ioc_pool_scrub(zfs_cmd_t *zc)
+zfs_ioc_pool_scan(zfs_cmd_t *zc)
 {
 	spa_t *spa;
 	int error;
@@ -1246,7 +1251,10 @@ zfs_ioc_pool_scrub(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	error = spa_scrub(spa, zc->zc_cookie);
+	if (zc->zc_cookie == POOL_SCAN_NONE)
+		error = spa_scan_stop(spa);
+	else
+		error = spa_scan(spa, zc->zc_cookie);
 
 	spa_close(spa, FTAG);
 
@@ -1402,6 +1410,12 @@ zfs_ioc_vdev_add(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name		name of the pool
+ * zc_nvlist_conf	nvlist of devices to remove
+ * zc_cookie		to stop the remove?
+ */
 static int
 zfs_ioc_vdev_remove(zfs_cmd_t *zc)
 {
@@ -4250,7 +4264,7 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	    B_FALSE },
 	{ zfs_ioc_pool_tryimport, zfs_secpolicy_config, NO_NAME, B_FALSE,
 	    B_FALSE },
-	{ zfs_ioc_pool_scrub, zfs_secpolicy_config, POOL_NAME, B_TRUE,
+	{ zfs_ioc_pool_scan, zfs_secpolicy_config, POOL_NAME, B_TRUE,
 	    B_TRUE },
 	{ zfs_ioc_pool_freeze, zfs_secpolicy_config, NO_NAME, B_FALSE,
 	    B_FALSE },

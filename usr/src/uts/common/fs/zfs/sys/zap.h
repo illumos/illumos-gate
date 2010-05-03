@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_ZAP_H
@@ -259,7 +258,6 @@ int zap_remove_uint64(objset_t *os, uint64_t zapobj, const uint64_t *key,
  */
 int zap_count(objset_t *ds, uint64_t zapobj, uint64_t *count);
 
-
 /*
  * Returns (in name) the name of the entry whose (value & mask)
  * (za_first_integer) is value, or ENOENT if not found.  The string
@@ -276,6 +274,14 @@ int zap_value_search(objset_t *os, uint64_t zapobj,
  */
 int zap_join(objset_t *os, uint64_t fromobj, uint64_t intoobj, dmu_tx_t *tx);
 
+/* Same as zap_join, but set the values to 'value'. */
+int zap_join_key(objset_t *os, uint64_t fromobj, uint64_t intoobj,
+    uint64_t value, dmu_tx_t *tx);
+
+/* Same as zap_join, but add together any duplicated entries. */
+int zap_join_increment(objset_t *os, uint64_t fromobj, uint64_t intoobj,
+    dmu_tx_t *tx);
+
 /*
  * Manipulate entries where the name + value are the "same" (the name is
  * a stringified version of the value).
@@ -284,6 +290,21 @@ int zap_add_int(objset_t *os, uint64_t obj, uint64_t value, dmu_tx_t *tx);
 int zap_remove_int(objset_t *os, uint64_t obj, uint64_t value, dmu_tx_t *tx);
 int zap_lookup_int(objset_t *os, uint64_t obj, uint64_t value);
 int zap_increment_int(objset_t *os, uint64_t obj, uint64_t key, int64_t delta,
+    dmu_tx_t *tx);
+
+/* Here the key is an int and the value is a different int. */
+int zap_add_int_key(objset_t *os, uint64_t obj,
+    uint64_t key, uint64_t value, dmu_tx_t *tx);
+int zap_lookup_int_key(objset_t *os, uint64_t obj,
+    uint64_t key, uint64_t *valuep);
+
+/*
+ * They name is a stringified version of key; increment its value by
+ * delta.  Zero values will be zap_remove()-ed.
+ */
+int zap_increment_int(objset_t *os, uint64_t obj, uint64_t key, int64_t delta,
+    dmu_tx_t *tx);
+int zap_increment(objset_t *os, uint64_t obj, const char *name, int64_t delta,
     dmu_tx_t *tx);
 
 struct zap;

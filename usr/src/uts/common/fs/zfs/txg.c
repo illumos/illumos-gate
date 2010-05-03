@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -28,6 +27,7 @@
 #include <sys/dmu_impl.h>
 #include <sys/dmu_tx.h>
 #include <sys/dsl_pool.h>
+#include <sys/dsl_scan.h>
 #include <sys/callb.h>
 
 /*
@@ -136,7 +136,7 @@ txg_sync_start(dsl_pool_t *dp)
 	 * 32-bit x86.  This is due in part to nested pools and
 	 * scrub_visitbp() recursion.
 	 */
-	tx->tx_sync_thread = thread_create(NULL, 12<<10, txg_sync_thread,
+	tx->tx_sync_thread = thread_create(NULL, 32<<10, txg_sync_thread,
 	    dp, 0, &p0, TS_RUN, minclsyspri);
 
 	mutex_exit(&tx->tx_sync_lock);
@@ -366,12 +366,12 @@ txg_sync_thread(dsl_pool_t *dp)
 		uint64_t txg;
 
 		/*
-		 * We sync when we're scrubbing, there's someone waiting
+		 * We sync when we're scanning, there's someone waiting
 		 * on us, or the quiesce thread has handed off a txg to
 		 * us, or we have reached our timeout.
 		 */
 		timer = (delta >= timeout ? 0 : timeout - delta);
-		while ((dp->dp_scrub_func == SCRUB_FUNC_NONE ||
+		while ((dp->dp_scan->scn_phys.scn_state != DSS_SCANNING ||
 		    spa_load_state(spa) != SPA_LOAD_NONE ||
 		    spa_shutting_down(spa)) &&
 		    !tx->tx_exiting && timer > 0 &&

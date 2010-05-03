@@ -301,7 +301,7 @@ dump_dnode(struct backuparg *ba, uint64_t object, dnode_phys_t *dnp)
 
 /* ARGSUSED */
 static int
-backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
+backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp, arc_buf_t *pbuf,
     const zbookmark_t *zb, const dnode_phys_t *dnp, void *arg)
 {
 	struct backuparg *ba = arg;
@@ -330,7 +330,7 @@ backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		uint32_t aflags = ARC_WAIT;
 		arc_buf_t *abuf;
 
-		if (arc_read_nolock(NULL, spa, bp,
+		if (dsl_read(NULL, spa, bp, pbuf,
 		    arc_getbuf_func, &abuf, ZIO_PRIORITY_ASYNC_READ,
 		    ZIO_FLAG_CANFAIL, &aflags, zb) != 0)
 			return (EIO);
@@ -361,7 +361,7 @@ backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		arc_buf_t *abuf;
 		int blksz = BP_GET_LSIZE(bp);
 
-		if (arc_read_nolock(NULL, spa, bp,
+		if (dsl_read(NULL, spa, bp, pbuf,
 		    arc_getbuf_func, &abuf, ZIO_PRIORITY_ASYNC_READ,
 		    ZIO_FLAG_CANFAIL, &aflags, zb) != 0)
 			return (EIO);
@@ -504,6 +504,7 @@ struct recvbeginsyncarg {
 	uint64_t dsflags;
 	char clonelastname[MAXNAMELEN];
 	dsl_dataset_t *ds; /* the ds to recv into; returned from the syncfunc */
+	cred_t *cr;
 };
 
 /* ARGSUSED */
@@ -536,7 +537,7 @@ recv_new_check(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 static void
-recv_new_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+recv_new_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	struct recvbeginsyncarg *rbsa = arg2;
@@ -545,7 +546,7 @@ recv_new_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 	/* Create and open new dataset. */
 	dsobj = dsl_dataset_create_sync(dd, strrchr(rbsa->tofs, '/') + 1,
-	    rbsa->origin, flags, cr, tx);
+	    rbsa->origin, flags, rbsa->cr, tx);
 	VERIFY(0 == dsl_dataset_own_obj(dd->dd_pool, dsobj,
 	    B_TRUE, dmu_recv_tag, &rbsa->ds));
 
@@ -554,8 +555,8 @@ recv_new_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		    rbsa->ds, &rbsa->ds->ds_phys->ds_bp, rbsa->type, tx);
 	}
 
-	spa_history_internal_log(LOG_DS_REPLAY_FULL_SYNC,
-	    dd->dd_pool->dp_spa, tx, cr, "dataset = %lld", dsobj);
+	spa_history_log_internal(LOG_DS_REPLAY_FULL_SYNC,
+	    dd->dd_pool->dp_spa, tx, "dataset = %lld", dsobj);
 }
 
 /* ARGSUSED */
@@ -630,7 +631,7 @@ recv_existing_check(void *arg1, void *arg2, dmu_tx_t *tx)
 
 /* ARGSUSED */
 static void
-recv_existing_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+recv_existing_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ohds = arg1;
 	struct recvbeginsyncarg *rbsa = arg2;
@@ -641,7 +642,7 @@ recv_existing_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 	/* create and open the temporary clone */
 	dsobj = dsl_dataset_create_sync(ohds->ds_dir, rbsa->clonelastname,
-	    ohds->ds_prev, flags, cr, tx);
+	    ohds->ds_prev, flags, rbsa->cr, tx);
 	VERIFY(0 == dsl_dataset_own_obj(dp, dsobj, B_TRUE, dmu_recv_tag, &cds));
 
 	/*
@@ -655,8 +656,8 @@ recv_existing_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 	rbsa->ds = cds;
 
-	spa_history_internal_log(LOG_DS_REPLAY_INC_SYNC,
-	    dp->dp_spa, tx, cr, "dataset = %lld", dsobj);
+	spa_history_log_internal(LOG_DS_REPLAY_INC_SYNC,
+	    dp->dp_spa, tx, "dataset = %lld", dsobj);
 }
 
 
@@ -701,6 +702,7 @@ dmu_recv_begin(char *tofs, char *tosnap, char *top_ds, struct drr_begin *drrb,
 	rbsa.type = drrb->drr_type;
 	rbsa.tag = FTAG;
 	rbsa.dsflags = 0;
+	rbsa.cr = CRED();
 	versioninfo = drrb->drr_versioninfo;
 	flags = drrb->drr_flags;
 
@@ -1466,12 +1468,12 @@ recv_end_check(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 static void
-recv_end_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+recv_end_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
 	struct recvendsyncarg *resa = arg2;
 
-	dsl_dataset_snapshot_sync(ds, resa->tosnap, cr, tx);
+	dsl_dataset_snapshot_sync(ds, resa->tosnap, tx);
 
 	/* set snapshot's creation time and guid */
 	dmu_buf_will_dirty(ds->ds_prev->ds_dbuf, tx);

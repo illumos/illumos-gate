@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -148,7 +147,7 @@ dsl_deleg_can_unallow(char *ddname, nvlist_t *nvp, cred_t *cr)
 }
 
 static void
-dsl_deleg_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+dsl_deleg_set_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	nvlist_t *nvp = arg2;
@@ -183,8 +182,8 @@ dsl_deleg_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 			VERIFY(zap_update(mos, jumpobj,
 			    perm, 8, 1, &n, tx) == 0);
-			spa_history_internal_log(LOG_DS_PERM_UPDATE,
-			    dd->dd_pool->dp_spa, tx, cr,
+			spa_history_log_internal(LOG_DS_PERM_UPDATE,
+			    dd->dd_pool->dp_spa, tx,
 			    "%s %s dataset = %llu", whokey, perm,
 			    dd->dd_phys->dd_head_dataset_obj);
 		}
@@ -192,7 +191,7 @@ dsl_deleg_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 }
 
 static void
-dsl_deleg_unset_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+dsl_deleg_unset_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	nvlist_t *nvp = arg2;
@@ -215,8 +214,8 @@ dsl_deleg_unset_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 				(void) zap_remove(mos, zapobj, whokey, tx);
 				VERIFY(0 == zap_destroy(mos, jumpobj, tx));
 			}
-			spa_history_internal_log(LOG_DS_PERM_WHO_REMOVE,
-			    dd->dd_pool->dp_spa, tx, cr,
+			spa_history_log_internal(LOG_DS_PERM_WHO_REMOVE,
+			    dd->dd_pool->dp_spa, tx,
 			    "%s dataset = %llu", whokey,
 			    dd->dd_phys->dd_head_dataset_obj);
 			continue;
@@ -236,8 +235,8 @@ dsl_deleg_unset_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 				VERIFY(0 == zap_destroy(mos,
 				    jumpobj, tx));
 			}
-			spa_history_internal_log(LOG_DS_PERM_REMOVE,
-			    dd->dd_pool->dp_spa, tx, cr,
+			spa_history_log_internal(LOG_DS_PERM_REMOVE,
+			    dd->dd_pool->dp_spa, tx,
 			    "%s %s dataset = %llu", whokey, perm,
 			    dd->dd_phys->dd_head_dataset_obj);
 		}

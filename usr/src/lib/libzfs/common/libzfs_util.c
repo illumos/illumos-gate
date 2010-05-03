@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -215,6 +214,11 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_POSTSPLIT_ONLINE:
 		return (dgettext(TEXT_DOMAIN, "disk was split from this pool "
 		    "into a new one"));
+	case EZFS_SCRUBBING:
+		return (dgettext(TEXT_DOMAIN, "currently scrubbing; "
+		    "use 'zpool scrub -s' to cancel current scrub"));
+	case EZFS_NO_SCRUB:
+		return (dgettext(TEXT_DOMAIN, "there is no active scrub"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

@@ -46,6 +46,9 @@ struct dmu_tx;
 #define	OBJSET_PHYS_SIZE 2048
 #define	OBJSET_OLD_PHYS_SIZE 1024
 
+#define	OBJSET_BUF_HAS_USERUSED(buf) \
+	(arc_buf_size(buf) > OBJSET_OLD_PHYS_SIZE)
+
 #define	OBJSET_FLAG_USERACCOUNTING_COMPLETE	(1ULL<<0)
 
 typedef struct objset_phys {

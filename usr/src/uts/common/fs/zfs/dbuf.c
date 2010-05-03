@@ -363,6 +363,7 @@ dbuf_verify(dmu_buf_impl_t *db)
 		}
 	}
 	if ((db->db_blkptr == NULL || BP_IS_HOLE(db->db_blkptr)) &&
+	    (db->db_buf == NULL || db->db_buf->b_data) &&
 	    db->db.db_data && db->db_blkid != DMU_BONUS_BLKID &&
 	    db->db_state != DB_FILL && !dn->dn_free_txg) {
 		/*
@@ -477,8 +478,7 @@ dbuf_read_done(zio_t *zio, arc_buf_t *buf, void *vdb)
 		db->db_state = DB_UNCACHED;
 	}
 	cv_broadcast(&db->db_changed);
-	mutex_exit(&db->db_mtx);
-	dbuf_rele(db, NULL);
+	dbuf_rele_and_unlock(db, NULL);
 }
 
 static void
@@ -549,7 +549,7 @@ dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 	else
 		pbuf = db->db_objset->os_phys_buf;
 
-	(void) arc_read(zio, dn->dn_objset->os_spa, db->db_blkptr, pbuf,
+	(void) dsl_read(zio, dn->dn_objset->os_spa, db->db_blkptr, pbuf,
 	    dbuf_read_done, db, ZIO_PRIORITY_SYNC_READ,
 	    (*flags & DB_RF_CANFAIL) ? ZIO_FLAG_CANFAIL : ZIO_FLAG_MUSTSUCCEED,
 	    &aflags, &zb);
@@ -727,7 +727,7 @@ dbuf_unoverride(dbuf_dirty_record_t *dr)
 
 	/* free this block */
 	if (!BP_IS_HOLE(bp))
-		dsl_free(spa_get_dsl(db->db_dnode->dn_objset->os_spa), txg, bp);
+		zio_free(db->db_dnode->dn_objset->os_spa, txg, bp);
 
 	dr->dt.dl.dr_override_state = DR_NOT_OVERRIDDEN;
 	/*
@@ -919,6 +919,26 @@ dbuf_new_size(dmu_buf_impl_t *db, int size, dmu_tx_t *tx)
 	mutex_exit(&db->db_mtx);
 
 	dnode_willuse_space(db->db_dnode, size-osize, tx);
+}
+
+void
+dbuf_release_bp(dmu_buf_impl_t *db)
+{
+	objset_t *os = db->db_dnode->dn_objset;
+	zbookmark_t zb;
+
+	ASSERT(dsl_pool_sync_context(dmu_objset_pool(os)));
+	ASSERT(arc_released(os->os_phys_buf) ||
+	    list_link_active(&os->os_dsl_dataset->ds_synced_link));
+	ASSERT(db->db_parent == NULL || arc_released(db->db_parent->db_buf));
+
+	zb.zb_objset = os->os_dsl_dataset ?
+	    os->os_dsl_dataset->ds_object : 0;
+	zb.zb_object = db->db.db_object;
+	zb.zb_level = db->db_level;
+	zb.zb_blkid = db->db_blkid;
+	(void) arc_release_bp(db->db_buf, db,
+	    db->db_blkptr, os->os_spa, &zb);
 }
 
 dbuf_dirty_record_t *
@@ -1717,7 +1737,7 @@ dbuf_prefetch(dnode_t *dn, uint64_t blkid)
 			else
 				pbuf = dn->dn_objset->os_phys_buf;
 
-			(void) arc_read(NULL, dn->dn_objset->os_spa,
+			(void) dsl_read(NULL, dn->dn_objset->os_spa,
 			    bp, pbuf, NULL, NULL, ZIO_PRIORITY_ASYNC_READ,
 			    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE,
 			    &aflags, &zb);
@@ -2463,7 +2483,7 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 			if (BP_IS_HOLE(db->db_blkptr)) {
 				arc_buf_thaw(data);
 			} else {
-				arc_release(data, db);
+				dbuf_release_bp(db);
 			}
 		}
 	}

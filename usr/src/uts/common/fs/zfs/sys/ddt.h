@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_DDT_H
@@ -232,6 +231,8 @@ extern int ddt_load(spa_t *spa);
 extern void ddt_unload(spa_t *spa);
 extern void ddt_sync(spa_t *spa, uint64_t txg);
 extern int ddt_walk(spa_t *spa, ddt_bookmark_t *ddb, ddt_entry_t *dde);
+extern int ddt_object_update(ddt_t *ddt, enum ddt_type type,
+    enum ddt_class class, ddt_entry_t *dde, dmu_tx_t *tx);
 
 extern const ddt_ops_t ddt_zap_ops;
 

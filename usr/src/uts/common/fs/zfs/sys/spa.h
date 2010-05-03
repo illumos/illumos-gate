@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SPA_H
@@ -262,7 +261,7 @@ typedef struct blkptr {
 
 #define	BP_GET_UCSIZE(bp) \
 	((BP_GET_LEVEL(bp) > 0 || dmu_ot[BP_GET_TYPE(bp)].ot_metadata) ? \
-	BP_GET_PSIZE(bp) : BP_GET_LSIZE(bp));
+	BP_GET_PSIZE(bp) : BP_GET_LSIZE(bp))
 
 #define	BP_GET_NDVAS(bp)	\
 	(!!DVA_GET_ASIZE(&(bp)->blk_dva[0]) + \
@@ -432,6 +431,8 @@ extern void spa_async_suspend(spa_t *spa);
 extern void spa_async_resume(spa_t *spa);
 extern spa_t *spa_inject_addref(char *pool);
 extern void spa_inject_delref(spa_t *spa);
+extern void spa_scan_stat_init(spa_t *spa);
+extern int spa_scan_get_stats(spa_t *spa, pool_scan_stat_t *ps);
 
 #define	SPA_ASYNC_CONFIG_UPDATE	0x01
 #define	SPA_ASYNC_REMOVE	0x02
@@ -439,6 +440,14 @@ extern void spa_inject_delref(spa_t *spa);
 #define	SPA_ASYNC_RESILVER_DONE	0x08
 #define	SPA_ASYNC_RESILVER	0x10
 #define	SPA_ASYNC_AUTOEXPAND	0x20
+#define	SPA_ASYNC_REMOVE_DONE	0x40
+#define	SPA_ASYNC_REMOVE_STOP	0x80
+
+/*
+ * Controls the behavior of spa_vdev_remove().
+ */
+#define	SPA_REMOVE_UNSPARE	0x01
+#define	SPA_REMOVE_DONE		0x02
 
 /* device manipulation */
 extern int spa_vdev_add(spa_t *spa, nvlist_t *nvroot);
@@ -447,6 +456,7 @@ extern int spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot,
 extern int spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid,
     int replace_done);
 extern int spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare);
+extern boolean_t spa_vdev_remove_active(spa_t *spa);
 extern int spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath);
 extern int spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru);
 extern int spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
@@ -465,14 +475,19 @@ extern boolean_t spa_l2cache_exists(uint64_t guid, uint64_t *pool);
 extern void spa_l2cache_activate(vdev_t *vd);
 extern void spa_l2cache_drop(spa_t *spa);
 
-/* scrubbing */
-extern int spa_scrub(spa_t *spa, pool_scrub_type_t type);
+/* scanning */
+extern int spa_scan(spa_t *spa, pool_scan_func_t func);
+extern int spa_scan_stop(spa_t *spa);
 
 /* spa syncing */
 extern void spa_sync(spa_t *spa, uint64_t txg); /* only for DMU use */
 extern void spa_sync_allpools(void);
 
-#define	SYNC_PASS_DEFERRED_FREE	1	/* defer frees after this pass */
+/*
+ * DEFERRED_FREE must be large enough that regular blocks are not
+ * deferred.  XXX so can't we change it back to 1?
+ */
+#define	SYNC_PASS_DEFERRED_FREE	2	/* defer frees after this pass */
 #define	SYNC_PASS_DONT_COMPRESS	4	/* don't compress after this pass */
 #define	SYNC_PASS_REWRITE	1	/* rewrite new bps after this pass */
 
@@ -577,6 +592,7 @@ extern boolean_t spa_deflate(spa_t *spa);
 extern metaslab_class_t *spa_normal_class(spa_t *spa);
 extern metaslab_class_t *spa_log_class(spa_t *spa);
 extern int spa_max_replication(spa_t *spa);
+extern int spa_prev_software_version(spa_t *spa);
 extern int spa_busy(void);
 extern uint8_t spa_get_failmode(spa_t *spa);
 extern boolean_t spa_suspended(spa_t *spa);
@@ -632,8 +648,8 @@ extern int spa_history_get(spa_t *spa, uint64_t *offset, uint64_t *len_read,
     char *his_buf);
 extern int spa_history_log(spa_t *spa, const char *his_buf,
     history_log_type_t what);
-extern void spa_history_internal_log(history_internal_events_t event,
-    spa_t *spa, dmu_tx_t *tx, cred_t *cr, const char *fmt, ...);
+extern void spa_history_log_internal(history_internal_events_t event,
+    spa_t *spa, dmu_tx_t *tx, const char *fmt, ...);
 extern void spa_history_log_version(spa_t *spa, history_internal_events_t evt);
 
 /* error handling */

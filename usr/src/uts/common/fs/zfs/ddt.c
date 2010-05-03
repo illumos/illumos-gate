@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -35,6 +34,7 @@
 #include <sys/dsl_pool.h>
 #include <sys/zio_checksum.h>
 #include <sys/zio_compress.h>
+#include <sys/dsl_scan.h>
 
 static const ddt_ops_t *ddt_ops[DDT_TYPES] = {
 	&ddt_zap_ops,
@@ -160,7 +160,7 @@ ddt_object_lookup(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
 	    ddt->ddt_object[type][class], dde));
 }
 
-static int
+int
 ddt_object_update(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
     ddt_entry_t *dde, dmu_tx_t *tx)
 {
@@ -245,12 +245,13 @@ ddt_bp_create(enum zio_checksum checksum,
 		ddt_bp_fill(ddp, bp, ddp->ddp_phys_birth);
 
 	bp->blk_cksum = ddk->ddk_cksum;
+	bp->blk_fill = 1;
 
 	BP_SET_LSIZE(bp, DDK_GET_LSIZE(ddk));
 	BP_SET_PSIZE(bp, DDK_GET_PSIZE(ddk));
 	BP_SET_COMPRESS(bp, DDK_GET_COMPRESS(ddk));
 	BP_SET_CHECKSUM(bp, checksum);
-	BP_SET_TYPE(bp, DMU_OT_NONE);
+	BP_SET_TYPE(bp, DMU_OT_DEDUP);
 	BP_SET_LEVEL(bp, 0);
 	BP_SET_DEDUP(bp, 0);
 	BP_SET_BYTEORDER(bp, ZFS_HOST_BYTEORDER);
@@ -996,10 +997,17 @@ ddt_sync_entry(ddt_t *ddt, ddt_entry_t *dde, dmu_tx_t *tx, uint64_t txg)
 			ddt_object_create(ddt, ntype, nclass, tx);
 		VERIFY(ddt_object_update(ddt, ntype, nclass, dde, tx) == 0);
 
-		if (dp->dp_scrub_func != SCRUB_FUNC_NONE &&
-		    oclass > nclass &&
-		    nclass <= dp->dp_scrub_ddt_class_max)
-			dsl_pool_scrub_ddt_entry(dp, ddt->ddt_checksum, dde);
+		/*
+		 * If the class changes, the order that we scan this bp
+		 * changes.  If it decreases, we could miss it, so
+		 * scan it right now.  (This covers both class changing
+		 * while we are doing ddt_walk(), and when we are
+		 * traversing.)
+		 */
+		if (nclass < oclass) {
+			dsl_scan_ddt_entry(dp->dp_scan,
+			    ddt->ddt_checksum, dde, tx);
+		}
 	}
 }
 
@@ -1013,7 +1021,6 @@ ddt_sync_table(ddt_t *ddt, dmu_tx_t *tx, uint64_t txg)
 	if (avl_numnodes(&ddt->ddt_tree) == 0)
 		return;
 
-	ASSERT(spa_sync_pass(spa) == 1);
 	ASSERT(spa->spa_uberblock.ub_version >= SPA_VERSION_DEDUP);
 
 	if (spa->spa_ddt_stat_object == 0) {
@@ -1081,6 +1088,8 @@ ddt_walk(spa_t *spa, ddt_bookmark_t *ddb, ddt_entry_t *dde)
 					    ddb->ddb_type, ddb->ddb_class,
 					    &ddb->ddb_cursor, dde);
 				}
+				dde->dde_type = ddb->ddb_type;
+				dde->dde_class = ddb->ddb_class;
 				if (error == 0)
 					return (0);
 				if (error != ENOENT)

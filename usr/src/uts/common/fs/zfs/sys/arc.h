@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_ARC_H
@@ -48,7 +47,8 @@ arc_done_func_t arc_getbuf_func;
 struct arc_buf {
 	arc_buf_hdr_t		*b_hdr;
 	arc_buf_t		*b_next;
-	krwlock_t		b_lock;
+	kmutex_t		b_evict_lock;
+	krwlock_t		b_data_lock;
 	void			*b_data;
 	arc_evict_func_t	*b_efunc;
 	void			*b_private;
@@ -92,6 +92,8 @@ void arc_buf_add_ref(arc_buf_t *buf, void *tag);
 int arc_buf_remove_ref(arc_buf_t *buf, void *tag);
 int arc_buf_size(arc_buf_t *buf);
 void arc_release(arc_buf_t *buf, void *tag);
+int arc_release_bp(arc_buf_t *buf, void *tag, blkptr_t *bp, spa_t *spa,
+    zbookmark_t *zb);
 int arc_released(arc_buf_t *buf);
 int arc_has_callback(arc_buf_t *buf);
 void arc_buf_freeze(arc_buf_t *buf);

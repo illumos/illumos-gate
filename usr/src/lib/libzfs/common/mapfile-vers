@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -45,7 +44,6 @@ SUNWprivate_1.1 {
 	fletcher_4_byteswap;
 	fletcher_4_incremental_native;
 	fletcher_4_incremental_byteswap;
-	hist_event_table;
 	libzfs_errno;
 	libzfs_error_action;
 	libzfs_error_description;
@@ -73,6 +71,7 @@ SUNWprivate_1.1 {
 	zfs_get_pool_handle;
 	zfs_get_user_props;
 	zfs_get_type;
+	zfs_history_event_names;
 	zfs_hold;
 	zfs_hold_range;
 	zfs_is_mounted;
@@ -195,7 +194,7 @@ SUNWprivate_1.1 {
 	zpool_prop_values;
 	zpool_read_label;
 	zpool_refresh_stats;
-	zpool_scrub;
+	zpool_scan;
 	zpool_search_import;
 	zpool_set_history_str;
 	zpool_set_prop;

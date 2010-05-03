@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SPA_IMPL_H
@@ -150,13 +149,14 @@ struct spa {
 	kmutex_t	spa_scrub_lock;		/* resilver/scrub lock */
 	uint64_t	spa_scrub_inflight;	/* in-flight scrub I/Os */
 	uint64_t	spa_scrub_maxinflight;	/* max in-flight scrub I/Os */
-	uint64_t	spa_scrub_errors;	/* scrub I/O error count */
 	kcondvar_t	spa_scrub_io_cv;	/* scrub I/O completion */
 	uint8_t		spa_scrub_active;	/* active or suspended? */
 	uint8_t		spa_scrub_type;		/* type of scrub we're doing */
 	uint8_t		spa_scrub_finished;	/* indicator to rotate logs */
 	uint8_t		spa_scrub_started;	/* started since last boot */
 	uint8_t		spa_scrub_reopen;	/* scrub doing vdev_reopen */
+	uint64_t	spa_scan_pass_start;	/* start time per pass/reboot */
+	uint64_t	spa_scan_pass_exam;	/* examined bytes per pass */
 	kmutex_t	spa_async_lock;		/* protect async state */
 	kthread_t	*spa_async_thread;	/* thread doing async task */
 	int		spa_async_suspended;	/* async tasks suspended */
@@ -212,7 +212,8 @@ struct spa {
 	uint64_t	spa_did;		/* if procp != p0, did of t1 */
 	boolean_t	spa_autoreplace;	/* autoreplace set in open */
 	int		spa_vdev_locks;		/* locks grabbed */
-
+	uint64_t	spa_creation_version;	/* version at pool creation */
+	uint64_t	spa_prev_software_version;
 	/*
 	 * spa_refcnt & spa_config_lock must be the last elements
 	 * because refcount_t changes size based on compilation options.

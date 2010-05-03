@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <fm/fmd_fmri.h>
@@ -214,7 +213,7 @@ fmd_fmri_unusable(nvlist_t *nvl)
 		vdev_stat_t *vs;
 		uint_t c;
 
-		(void) nvlist_lookup_uint64_array(vd, ZPOOL_CONFIG_STATS,
+		(void) nvlist_lookup_uint64_array(vd, ZPOOL_CONFIG_VDEV_STATS,
 		    (uint64_t **)&vs, &c);
 
 		ret = (vs->vs_state < VDEV_STATE_DEGRADED);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -141,6 +140,7 @@
 #include <sys/uberblock_impl.h>
 #include <sys/metaslab.h>
 #include <sys/zio.h>
+#include <sys/dsl_scan.h>
 #include <sys/fs/zfs.h>
 
 /*
@@ -208,7 +208,7 @@ vdev_label_write(zio_t *zio, vdev_t *vd, int l, void *buf, uint64_t offset,
  */
 nvlist_t *
 vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
-    boolean_t isspare, boolean_t isl2cache)
+    vdev_config_flag_t flags)
 {
 	nvlist_t *nv = NULL;
 
@@ -216,7 +216,7 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 
 	VERIFY(nvlist_add_string(nv, ZPOOL_CONFIG_TYPE,
 	    vd->vdev_ops->vdev_op_type) == 0);
-	if (!isspare && !isl2cache)
+	if (!(flags & (VDEV_CONFIG_SPARE | VDEV_CONFIG_L2CACHE)))
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_ID, vd->vdev_id)
 		    == 0);
 	VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_GUID, vd->vdev_guid) == 0);
@@ -270,7 +270,8 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 	if (vd->vdev_isspare)
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_IS_SPARE, 1) == 0);
 
-	if (!isspare && !isl2cache && vd == vd->vdev_top) {
+	if (!(flags & (VDEV_CONFIG_SPARE | VDEV_CONFIG_L2CACHE)) &&
+	    vd == vd->vdev_top) {
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_METASLAB_ARRAY,
 		    vd->vdev_ms_array) == 0);
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_METASLAB_SHIFT,
@@ -281,6 +282,9 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		    vd->vdev_asize) == 0);
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_IS_LOG,
 		    vd->vdev_islog) == 0);
+		if (vd->vdev_removing)
+			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_REMOVING,
+			    vd->vdev_removing) == 0);
 	}
 
 	if (vd->vdev_dtl_smo.smo_object != 0)
@@ -293,28 +297,52 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 
 	if (getstats) {
 		vdev_stat_t vs;
+		pool_scan_stat_t ps;
+
 		vdev_get_stats(vd, &vs);
-		VERIFY(nvlist_add_uint64_array(nv, ZPOOL_CONFIG_STATS,
+		VERIFY(nvlist_add_uint64_array(nv, ZPOOL_CONFIG_VDEV_STATS,
 		    (uint64_t *)&vs, sizeof (vs) / sizeof (uint64_t)) == 0);
+
+		/* provide either current or previous scan information */
+		if (spa_scan_get_stats(spa, &ps) == 0) {
+			VERIFY(nvlist_add_uint64_array(nv,
+			    ZPOOL_CONFIG_SCAN_STATS, (uint64_t *)&ps,
+			    sizeof (pool_scan_stat_t) / sizeof (uint64_t))
+			    == 0);
+		}
 	}
 
 	if (!vd->vdev_ops->vdev_op_leaf) {
 		nvlist_t **child;
-		int c;
+		int c, idx;
 
 		ASSERT(!vd->vdev_ishole);
 
 		child = kmem_alloc(vd->vdev_children * sizeof (nvlist_t *),
 		    KM_SLEEP);
 
-		for (c = 0; c < vd->vdev_children; c++)
-			child[c] = vdev_config_generate(spa, vd->vdev_child[c],
-			    getstats, isspare, isl2cache);
+		for (c = 0, idx = 0; c < vd->vdev_children; c++) {
+			vdev_t *cvd = vd->vdev_child[c];
 
-		VERIFY(nvlist_add_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
-		    child, vd->vdev_children) == 0);
+			/*
+			 * If we're generating an nvlist of removing
+			 * vdevs then skip over any device which is
+			 * not being removed.
+			 */
+			if ((flags & VDEV_CONFIG_REMOVING) &&
+			    !cvd->vdev_removing)
+				continue;
 
-		for (c = 0; c < vd->vdev_children; c++)
+			child[idx++] = vdev_config_generate(spa, cvd,
+			    getstats, flags);
+		}
+
+		if (idx) {
+			VERIFY(nvlist_add_nvlist_array(nv,
+			    ZPOOL_CONFIG_CHILDREN, child, idx) == 0);
+		}
+
+		for (c = 0; c < idx; c++)
 			nvlist_free(child[c]);
 
 		kmem_free(child, vd->vdev_children * sizeof (nvlist_t *));
@@ -375,12 +403,11 @@ vdev_top_config_generate(spa_t *spa, nvlist_t *config)
 {
 	vdev_t *rvd = spa->spa_root_vdev;
 	uint64_t *array;
-	uint_t idx;
+	uint_t c, idx;
 
 	array = kmem_alloc(rvd->vdev_children * sizeof (uint64_t), KM_SLEEP);
 
-	idx = 0;
-	for (int c = 0; c < rvd->vdev_children; c++) {
+	for (c = 0, idx = 0; c < rvd->vdev_children; c++) {
 		vdev_t *tvd = rvd->vdev_child[c];
 
 		if (tvd->vdev_ishole)

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <ctype.h>
@@ -42,50 +41,6 @@
 #include "zfs_prop.h"
 #include "libzfs_impl.h"
 #include "zfs_comutil.h"
-
-const char *hist_event_table[LOG_END] = {
-	"invalid event",
-	"pool create",
-	"vdev add",
-	"pool remove",
-	"pool destroy",
-	"pool export",
-	"pool import",
-	"vdev attach",
-	"vdev replace",
-	"vdev detach",
-	"vdev online",
-	"vdev offline",
-	"vdev upgrade",
-	"pool clear",
-	"pool scrub",
-	"pool property set",
-	"create",
-	"clone",
-	"destroy",
-	"destroy_begin_sync",
-	"inherit",
-	"property set",
-	"quota set",
-	"permission update",
-	"permission remove",
-	"permission who remove",
-	"promote",
-	"receive",
-	"rename",
-	"reservation set",
-	"replay_inc_sync",
-	"replay_full_sync",
-	"rollback",
-	"snapshot",
-	"filesystem version upgrade",
-	"refquota set",
-	"refreservation set",
-	"pool scrub done",
-	"user hold",
-	"user release",
-	"pool split",
-};
 
 static int read_efi_label(nvlist_t *config, diskaddr_t *sb);
 
@@ -334,7 +289,8 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf, size_t len,
 			verify(nvlist_lookup_nvlist(zpool_get_config(zhp, NULL),
 			    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);
 			verify(nvlist_lookup_uint64_array(nvroot,
-			    ZPOOL_CONFIG_STATS, (uint64_t **)&vs, &vsc) == 0);
+			    ZPOOL_CONFIG_VDEV_STATS, (uint64_t **)&vs, &vsc)
+			    == 0);
 
 			(void) strlcpy(buf, zpool_state_to_name(intval,
 			    vs->vs_aux), len);
@@ -1558,28 +1514,51 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 }
 
 /*
- * Scrub the pool.
+ * Scan the pool.
  */
 int
-zpool_scrub(zpool_handle_t *zhp, pool_scrub_type_t type)
+zpool_scan(zpool_handle_t *zhp, pool_scan_func_t func)
 {
 	zfs_cmd_t zc = { 0 };
 	char msg[1024];
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
-	zc.zc_cookie = type;
+	zc.zc_cookie = func;
 
-	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_POOL_SCRUB, &zc) == 0)
+	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_POOL_SCAN, &zc) == 0 ||
+	    (errno == ENOENT && func != POOL_SCAN_NONE))
 		return (0);
 
-	(void) snprintf(msg, sizeof (msg),
-	    dgettext(TEXT_DOMAIN, "cannot scrub %s"), zc.zc_name);
+	if (func == POOL_SCAN_SCRUB) {
+		(void) snprintf(msg, sizeof (msg),
+		    dgettext(TEXT_DOMAIN, "cannot scrub %s"), zc.zc_name);
+	} else if (func == POOL_SCAN_NONE) {
+		(void) snprintf(msg, sizeof (msg),
+		    dgettext(TEXT_DOMAIN, "cannot cancel scrubbing %s"),
+		    zc.zc_name);
+	} else {
+		assert(!"unexpected result");
+	}
 
-	if (errno == EBUSY)
-		return (zfs_error(hdl, EZFS_RESILVERING, msg));
-	else
+	if (errno == EBUSY) {
+		nvlist_t *nvroot;
+		pool_scan_stat_t *ps = NULL;
+		uint_t psc;
+
+		verify(nvlist_lookup_nvlist(zhp->zpool_config,
+		    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);
+		(void) nvlist_lookup_uint64_array(nvroot,
+		    ZPOOL_CONFIG_SCAN_STATS, (uint64_t **)&ps, &psc);
+		if (ps && ps->pss_func == POOL_SCAN_SCRUB)
+			return (zfs_error(hdl, EZFS_SCRUBBING, msg));
+		else
+			return (zfs_error(hdl, EZFS_RESILVERING, msg));
+	} else if (errno == ENOENT) {
+		return (zfs_error(hdl, EZFS_NO_SCRUB, msg));
+	} else {
 		return (zpool_standard_error(hdl, errno, msg));
+	}
 }
 
 /*
@@ -2987,7 +2966,7 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 		 * open a misbehaving device, which can have undesirable
 		 * effects.
 		 */
-		if ((nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_STATS,
+		if ((nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_VDEV_STATS,
 		    (uint64_t **)&vs, &vsc) != 0 ||
 		    vs->vs_state >= VDEV_STATE_DEGRADED) &&
 		    zhp != NULL &&

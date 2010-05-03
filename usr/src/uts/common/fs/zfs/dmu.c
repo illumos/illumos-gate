@@ -84,7 +84,7 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	byteswap_uint8_array,	TRUE,	"FUID table"		},
 	{	byteswap_uint64_array,	TRUE,	"FUID table size"	},
 	{	zap_byteswap,		TRUE,	"DSL dataset next clones"},
-	{	zap_byteswap,		TRUE,	"scrub work queue"	},
+	{	zap_byteswap,		TRUE,	"scan work queue"	},
 	{	zap_byteswap,		TRUE,	"ZFS user/group used"	},
 	{	zap_byteswap,		TRUE,	"ZFS user/group quota"	},
 	{	zap_byteswap,		TRUE,	"snapshot refcount tags"},
@@ -93,7 +93,10 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	byteswap_uint8_array,	TRUE,	"System attributes"	},
 	{	zap_byteswap,		TRUE,	"SA master node"	},
 	{	zap_byteswap,		TRUE,	"SA attr registration"	},
-	{	zap_byteswap,		TRUE,	"SA attr layouts"	}, };
+	{	zap_byteswap,		TRUE,	"SA attr layouts"	},
+	{	zap_byteswap,		TRUE,	"scan translations"	},
+	{	byteswap_uint8_array,	FALSE,	"deduplicated block"	},
+};
 
 int
 dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset,
@@ -1630,6 +1633,7 @@ byteswap_uint8_array(void *vbuf, size_t size)
 void
 dmu_init(void)
 {
+	zfs_dbgmsg_init();
 	dbuf_init();
 	dnode_init();
 	zfetch_init();
@@ -1649,4 +1653,5 @@ dmu_fini(void)
 	l2arc_fini();
 	xuio_stat_fini();
 	sa_cache_fini();
+	zfs_dbgmsg_fini();
 }

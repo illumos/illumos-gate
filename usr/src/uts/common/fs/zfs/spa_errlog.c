@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -54,36 +53,6 @@
 #include <sys/zap.h>
 #include <sys/zio.h>
 
-/*
- * This is a stripped-down version of strtoull, suitable only for converting
- * lowercase hexidecimal numbers that don't overflow.
- */
-uint64_t
-strtonum(const char *str, char **nptr)
-{
-	uint64_t val = 0;
-	char c;
-	int digit;
-
-	while ((c = *str) != '\0') {
-		if (c >= '0' && c <= '9')
-			digit = c - '0';
-		else if (c >= 'a' && c <= 'f')
-			digit = 10 + c - 'a';
-		else
-			break;
-
-		val *= 16;
-		val += digit;
-
-		str++;
-	}
-
-	if (nptr)
-		*nptr = (char *)str;
-
-	return (val);
-}
 
 /*
  * Convert a bookmark to a string.

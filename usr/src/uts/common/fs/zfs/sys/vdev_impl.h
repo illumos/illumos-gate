@@ -151,7 +151,7 @@ struct vdev {
 	txg_node_t	vdev_txg_node;	/* per-txg dirty vdev linkage	*/
 	boolean_t	vdev_remove_wanted; /* async remove wanted?	*/
 	boolean_t	vdev_probe_wanted; /* async probe wanted?	*/
-	boolean_t	vdev_removing;	/* device is being removed?	*/
+	uint64_t	vdev_removing;	/* device is being removed?	*/
 	list_node_t	vdev_config_dirty_node; /* config dirty list	*/
 	list_node_t	vdev_state_dirty_node; /* state dirty list	*/
 	uint64_t	vdev_deflate_ratio; /* deflation ratio (x512)	*/

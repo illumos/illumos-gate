@@ -610,7 +610,7 @@ ndmpd_zfs_backup_send_read(ndmpd_zfs_args_t *ndmpd_zfs_args)
 	}
 
 	err = zfs_send(zhp, fromsnap, ndmpd_zfs_args->nz_snapname, flags,
-	    ndmpd_zfs_args->nz_pipe_fd[PIPE_ZFS], NULL, NULL);
+	    ndmpd_zfs_args->nz_pipe_fd[PIPE_ZFS], NULL, NULL, NULL);
 
 	if (err && !session->ns_data.dd_abort)
 		NDMPD_ZFS_LOG_ZERR(ndmpd_zfs_args, "zfs_send: %d", err);

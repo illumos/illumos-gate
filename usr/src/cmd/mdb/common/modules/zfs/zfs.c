@@ -129,6 +129,16 @@ getrefcount(uintptr_t addr, mdb_ctf_id_t *id,
 	return (GETMEMBID(addr + off, &rc_id, rc_count, *rc));
 }
 
+static boolean_t
+strisprint(const char *cp)
+{
+	for (; *cp; cp++) {
+		if (!isprint(*cp))
+			return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
 static int verbose;
 
 static int
@@ -624,8 +634,10 @@ zap_leaf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    zlc->l_entry.le_hash);
 			break;
 		case ZAP_CHUNK_ARRAY:
-			mdb_printf("    %u: array \"%s\"\n",
-			    i, zlc->l_array.la_array);
+			mdb_printf("    %u: array", i);
+			if (strisprint((char *)zlc->l_array.la_array))
+				mdb_printf(" \"%s\"", zlc->l_array.la_array);
+			mdb_printf("\n");
 			if (verbose) {
 				int j;
 				mdb_printf("        ");
@@ -806,6 +818,77 @@ abuf_find(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_warn("can't walk %s", syms[i]);
 			return (DCMD_ERR);
 		}
+	}
+
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+dbgmsg_cb(uintptr_t addr, const void *unknown, void *arg)
+{
+	static mdb_ctf_id_t id;
+	static boolean_t gotid;
+	static ulong_t off;
+
+	int *verbosep = arg;
+	time_t timestamp;
+	char buf[1024];
+
+	if (!gotid) {
+		if (mdb_ctf_lookup_by_name("struct zfs_dbgmsg", &id) == -1) {
+			mdb_warn("couldn't find struct zfs_dbgmsg");
+			return (WALK_ERR);
+		}
+		gotid = TRUE;
+		if (mdb_ctf_offsetof(id, "zdm_msg", &off) == -1) {
+			mdb_warn("couldn't find zdm_msg");
+			return (WALK_ERR);
+		}
+		off /= 8;
+	}
+
+
+	if (GETMEMBID(addr, &id, zdm_timestamp, timestamp)) {
+		return (WALK_ERR);
+	}
+
+	if (mdb_readstr(buf, sizeof (buf), addr + off) == -1) {
+		mdb_warn("failed to read zdm_msg at %p\n", addr + off);
+		return (DCMD_ERR);
+	}
+
+	if (*verbosep)
+		mdb_printf("%Y ", timestamp);
+
+	mdb_printf("%s\n", buf);
+
+	if (*verbosep)
+		(void) mdb_call_dcmd("whatis", addr, DCMD_ADDRSPEC, 0, NULL);
+
+	return (WALK_NEXT);
+}
+
+/* ARGSUSED */
+static int
+dbgmsg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	GElf_Sym sym;
+	int verbose = FALSE;
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (mdb_lookup_by_name("zfs_dbgmsgs", &sym)) {
+		mdb_warn("can't find zfs_dbgmsgs");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_pwalk("list", dbgmsg_cb, &verbose, sym.st_value) != 0) {
+		mdb_warn("can't walk zfs_dbgmsgs");
+		return (DCMD_ERR);
 	}
 
 	return (DCMD_OK);
@@ -2195,7 +2278,7 @@ reference_cb(uintptr_t addr, const void *ignored, void *arg)
 	uintptr_t ref_holder;
 	uintptr_t ref_removed;
 	uint64_t ref_number;
-	boolean_t holder_is_str;
+	boolean_t holder_is_str = B_FALSE;
 	char holder_str[128];
 	boolean_t removed = (boolean_t)arg;
 
@@ -2212,18 +2295,8 @@ reference_cb(uintptr_t addr, const void *ignored, void *arg)
 	    GETMEMBID(addr, &ref_id, ref_number, ref_number))
 		return (WALK_ERR);
 
-	if (mdb_readstr(holder_str, sizeof (holder_str), ref_holder) != -1) {
-		char *cp;
-		holder_is_str = B_TRUE;
-		for (cp = holder_str; *cp; cp++) {
-			if (!isprint(*cp)) {
-				holder_is_str = B_FALSE;
-				break;
-			}
-		}
-	} else {
-		holder_is_str = B_FALSE;
-	}
+	if (mdb_readstr(holder_str, sizeof (holder_str), ref_holder) != -1)
+		holder_is_str = strisprint(holder_str);
 
 	if (removed)
 		mdb_printf("removed ");
@@ -2940,6 +3013,8 @@ static const mdb_dcmd_t dcmds[] = {
 	    sa_attr_table},
 	{ "sa_attr", ": attr_id",
 	    "print SA attribute address when given sa_handle_t", sa_attr_print},
+	{ "zfs_dbgmsg", ":[-v]",
+	    "print zfs debug log", dbgmsg},
 	{ NULL }
 };
 

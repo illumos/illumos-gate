@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/spa.h>
@@ -419,7 +418,7 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 		    split_guid) == 0);
 	}
 
-	nvroot = vdev_config_generate(spa, vd, getstats, B_FALSE, B_FALSE);
+	nvroot = vdev_config_generate(spa, vd, getstats, 0);
 	VERIFY(nvlist_add_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, nvroot) == 0);
 	nvlist_free(nvroot);
 

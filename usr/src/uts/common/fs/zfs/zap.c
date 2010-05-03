@@ -978,6 +978,56 @@ zap_join(objset_t *os, uint64_t fromobj, uint64_t intoobj, dmu_tx_t *tx)
 }
 
 int
+zap_join_key(objset_t *os, uint64_t fromobj, uint64_t intoobj,
+    uint64_t value, dmu_tx_t *tx)
+{
+	zap_cursor_t zc;
+	zap_attribute_t za;
+	int err;
+
+	for (zap_cursor_init(&zc, os, fromobj);
+	    zap_cursor_retrieve(&zc, &za) == 0;
+	    (void) zap_cursor_advance(&zc)) {
+		if (za.za_integer_length != 8 || za.za_num_integers != 1)
+			return (EINVAL);
+		err = zap_add(os, intoobj, za.za_name,
+		    8, 1, &value, tx);
+		if (err)
+			return (err);
+	}
+	zap_cursor_fini(&zc);
+	return (0);
+}
+
+int
+zap_join_increment(objset_t *os, uint64_t fromobj, uint64_t intoobj,
+    dmu_tx_t *tx)
+{
+	zap_cursor_t zc;
+	zap_attribute_t za;
+	int err;
+
+	for (zap_cursor_init(&zc, os, fromobj);
+	    zap_cursor_retrieve(&zc, &za) == 0;
+	    (void) zap_cursor_advance(&zc)) {
+		uint64_t delta = 0;
+
+		if (za.za_integer_length != 8 || za.za_num_integers != 1)
+			return (EINVAL);
+
+		err = zap_lookup(os, intoobj, za.za_name, 8, 1, &delta);
+		if (err != 0 && err != ENOENT)
+			return (err);
+		delta += za.za_first_integer;
+		err = zap_update(os, intoobj, za.za_name, 8, 1, &delta, tx);
+		if (err)
+			return (err);
+	}
+	zap_cursor_fini(&zc);
+	return (0);
+}
+
+int
 zap_add_int(objset_t *os, uint64_t obj, uint64_t value, dmu_tx_t *tx)
 {
 	char name[20];
@@ -1005,17 +1055,34 @@ zap_lookup_int(objset_t *os, uint64_t obj, uint64_t value)
 }
 
 int
-zap_increment_int(objset_t *os, uint64_t obj, uint64_t key, int64_t delta,
-    dmu_tx_t *tx)
+zap_add_int_key(objset_t *os, uint64_t obj,
+    uint64_t key, uint64_t value, dmu_tx_t *tx)
 {
 	char name[20];
+
+	(void) snprintf(name, sizeof (name), "%llx", (longlong_t)key);
+	return (zap_add(os, obj, name, 8, 1, &value, tx));
+}
+
+int
+zap_lookup_int_key(objset_t *os, uint64_t obj, uint64_t key, uint64_t *valuep)
+{
+	char name[20];
+
+	(void) snprintf(name, sizeof (name), "%llx", (longlong_t)key);
+	return (zap_lookup(os, obj, name, 8, 1, valuep));
+}
+
+int
+zap_increment(objset_t *os, uint64_t obj, const char *name, int64_t delta,
+    dmu_tx_t *tx)
+{
 	uint64_t value = 0;
 	int err;
 
 	if (delta == 0)
 		return (0);
 
-	(void) snprintf(name, sizeof (name), "%llx", (longlong_t)key);
 	err = zap_lookup(os, obj, name, 8, 1, &value);
 	if (err != 0 && err != ENOENT)
 		return (err);
@@ -1027,6 +1094,15 @@ zap_increment_int(objset_t *os, uint64_t obj, uint64_t key, int64_t delta,
 	return (err);
 }
 
+int
+zap_increment_int(objset_t *os, uint64_t obj, uint64_t key, int64_t delta,
+    dmu_tx_t *tx)
+{
+	char name[20];
+
+	(void) snprintf(name, sizeof (name), "%llx", (longlong_t)key);
+	return (zap_increment(os, obj, name, delta, tx));
+}
 
 /*
  * Routines for iterating over the attributes.
@@ -1100,7 +1176,6 @@ again:
 	rw_exit(&zc->zc_leaf->l_rwlock);
 	return (err);
 }
-
 
 static void
 zap_stats_ptrtbl(zap_t *zap, uint64_t *tbl, int len, zap_stats_t *zs)

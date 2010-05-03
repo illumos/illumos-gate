@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -660,6 +659,9 @@ zio_free_sync(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
     enum zio_flag flags)
 {
 	zio_t *zio;
+
+	dprintf_bp(bp, "freeing in txg %llu, pass %u",
+	    (longlong_t)txg, spa->spa_sync_pass);
 
 	ASSERT(!BP_IS_HOLE(bp));
 	ASSERT(spa_syncing_txg(spa) == txg);
@@ -2073,6 +2075,8 @@ zio_ddt_write(zio_t *zio)
 	return (ZIO_PIPELINE_CONTINUE);
 }
 
+ddt_entry_t *freedde; /* for debugging */
+
 static int
 zio_ddt_free(zio_t *zio)
 {
@@ -2086,7 +2090,7 @@ zio_ddt_free(zio_t *zio)
 	ASSERT(zio->io_child_type == ZIO_CHILD_LOGICAL);
 
 	ddt_enter(ddt);
-	dde = ddt_lookup(ddt, bp, B_TRUE);
+	freedde = dde = ddt_lookup(ddt, bp, B_TRUE);
 	ddp = ddt_phys_select(dde, bp);
 	ddt_phys_decref(ddp);
 	ddt_exit(ddt);

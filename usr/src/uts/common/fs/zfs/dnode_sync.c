@@ -227,7 +227,7 @@ free_children(dmu_buf_impl_t *db, uint64_t blkid, uint64_t nblks, int trunc,
 	if (db->db_state != DB_CACHED)
 		(void) dbuf_read(db, NULL, DB_RF_MUST_SUCCEED);
 
-	arc_release(db->db_buf, db);
+	dbuf_release_bp(db);
 	bp = (blkptr_t *)db->db.db_data;
 
 	epbs = db->db_dnode->dn_phys->dn_indblkshift - SPA_BLKPTRSHIFT;

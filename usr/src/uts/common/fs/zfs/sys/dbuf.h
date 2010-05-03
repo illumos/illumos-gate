@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DBUF_H
@@ -278,6 +277,7 @@ void dbuf_evict(dmu_buf_impl_t *db);
 void dbuf_setdirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
 void dbuf_unoverride(dbuf_dirty_record_t *dr);
 void dbuf_sync_list(list_t *list, dmu_tx_t *tx);
+void dbuf_release_bp(dmu_buf_impl_t *db);
 
 void dbuf_free_range(struct dnode *dn, uint64_t start, uint64_t end,
     struct dmu_tx *);

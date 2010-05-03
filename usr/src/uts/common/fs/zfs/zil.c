@@ -36,6 +36,7 @@
 #include <sys/dsl_dataset.h>
 #include <sys/vdev.h>
 #include <sys/dmu_tx.h>
+#include <sys/dsl_pool.h>
 
 /*
  * The zfs intent log (ZIL) saves transaction records of system calls
@@ -179,7 +180,7 @@ zil_read_log_block(zilog_t *zilog, const blkptr_t *bp, blkptr_t *nbp, void *dst,
 	SET_BOOKMARK(&zb, bp->blk_cksum.zc_word[ZIL_ZC_OBJSET],
 	    ZB_ZIL_OBJECT, ZB_ZIL_LEVEL, bp->blk_cksum.zc_word[ZIL_ZC_SEQ]);
 
-	error = arc_read_nolock(NULL, zilog->zl_spa, bp, arc_getbuf_func, &abuf,
+	error = dsl_read_nolock(NULL, zilog->zl_spa, bp, arc_getbuf_func, &abuf,
 	    ZIO_PRIORITY_SYNC_READ, zio_flags, &aflags, &zb);
 
 	if (error == 0) {

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -77,7 +76,7 @@ traverse_zil_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
 	SET_BOOKMARK(&zb, td->td_objset, ZB_ZIL_OBJECT, ZB_ZIL_LEVEL,
 	    bp->blk_cksum.zc_word[ZIL_ZC_SEQ]);
 
-	(void) td->td_func(td->td_spa, zilog, bp, &zb, NULL, td->td_arg);
+	(void) td->td_func(td->td_spa, zilog, bp, NULL, &zb, NULL, td->td_arg);
 
 	return (0);
 }
@@ -102,7 +101,7 @@ traverse_zil_record(zilog_t *zilog, lr_t *lrc, void *arg, uint64_t claim_txg)
 		SET_BOOKMARK(&zb, td->td_objset, lr->lr_foid, ZB_ZIL_LEVEL,
 		    lr->lr_offset / BP_GET_LSIZE(bp));
 
-		(void) td->td_func(td->td_spa, zilog, bp, &zb, NULL,
+		(void) td->td_func(td->td_spa, zilog, bp, NULL, &zb, NULL,
 		    td->td_arg);
 	}
 	return (0);
@@ -140,7 +139,8 @@ traverse_visitbp(struct traverse_data *td, const dnode_phys_t *dnp,
 	boolean_t hard = td->td_flags & TRAVERSE_HARD;
 
 	if (bp->blk_birth == 0) {
-		err = td->td_func(td->td_spa, NULL, NULL, zb, dnp, td->td_arg);
+		err = td->td_func(td->td_spa, NULL, NULL, pbuf, zb, dnp,
+		    td->td_arg);
 		return (err);
 	}
 
@@ -160,7 +160,8 @@ traverse_visitbp(struct traverse_data *td, const dnode_phys_t *dnp,
 	}
 
 	if (td->td_flags & TRAVERSE_PRE) {
-		err = td->td_func(td->td_spa, NULL, bp, zb, dnp, td->td_arg);
+		err = td->td_func(td->td_spa, NULL, bp, pbuf, zb, dnp,
+		    td->td_arg);
 		if (err)
 			return (err);
 	}
@@ -171,7 +172,7 @@ traverse_visitbp(struct traverse_data *td, const dnode_phys_t *dnp,
 		blkptr_t *cbp;
 		int epb = BP_GET_LSIZE(bp) >> SPA_BLKPTRSHIFT;
 
-		err = arc_read(NULL, td->td_spa, bp, pbuf,
+		err = dsl_read(NULL, td->td_spa, bp, pbuf,
 		    arc_getbuf_func, &buf,
 		    ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_CANFAIL, &flags, zb);
 		if (err)
@@ -195,7 +196,7 @@ traverse_visitbp(struct traverse_data *td, const dnode_phys_t *dnp,
 		int i;
 		int epb = BP_GET_LSIZE(bp) >> DNODE_SHIFT;
 
-		err = arc_read(NULL, td->td_spa, bp, pbuf,
+		err = dsl_read(NULL, td->td_spa, bp, pbuf,
 		    arc_getbuf_func, &buf,
 		    ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_CANFAIL, &flags, zb);
 		if (err)
@@ -217,7 +218,7 @@ traverse_visitbp(struct traverse_data *td, const dnode_phys_t *dnp,
 		objset_phys_t *osp;
 		dnode_phys_t *dnp;
 
-		err = arc_read_nolock(NULL, td->td_spa, bp,
+		err = dsl_read_nolock(NULL, td->td_spa, bp,
 		    arc_getbuf_func, &buf,
 		    ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_CANFAIL, &flags, zb);
 		if (err)
@@ -252,8 +253,10 @@ traverse_visitbp(struct traverse_data *td, const dnode_phys_t *dnp,
 	if (buf)
 		(void) arc_buf_remove_ref(buf, &buf);
 
-	if (err == 0 && lasterr == 0 && (td->td_flags & TRAVERSE_POST))
-		err = td->td_func(td->td_spa, NULL, bp, zb, dnp, td->td_arg);
+	if (err == 0 && lasterr == 0 && (td->td_flags & TRAVERSE_POST)) {
+		err = td->td_func(td->td_spa, NULL, bp, pbuf, zb, dnp,
+		    td->td_arg);
+	}
 
 	return (err != 0 ? err : lasterr);
 }
@@ -275,16 +278,17 @@ traverse_dnode(struct traverse_data *td, const dnode_phys_t *dnp,
 				break;
 			lasterr = err;
 		}
-		if (dnp->dn_flags & DNODE_FLAG_SPILL_BLKPTR) {
-			SET_BOOKMARK(&czb, objset,
-			    object, 0, DMU_SPILL_BLKID);
-			err = traverse_visitbp(td, dnp, buf,
-			    (blkptr_t *)&dnp->dn_spill, &czb);
-			if (err) {
-				if (!hard)
-					break;
-				lasterr = err;
-			}
+	}
+
+	if (dnp->dn_flags & DNODE_FLAG_SPILL_BLKPTR) {
+		SET_BOOKMARK(&czb, objset,
+		    object, 0, DMU_SPILL_BLKID);
+		err = traverse_visitbp(td, dnp, buf,
+		    (blkptr_t *)&dnp->dn_spill, &czb);
+		if (err) {
+			if (!hard)
+				return (err);
+			lasterr = err;
 		}
 	}
 	return (err != 0 ? err : lasterr);
@@ -293,7 +297,8 @@ traverse_dnode(struct traverse_data *td, const dnode_phys_t *dnp,
 /* ARGSUSED */
 static int
 traverse_prefetcher(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
-    const zbookmark_t *zb, const dnode_phys_t *dnp, void *arg)
+    arc_buf_t *pbuf, const zbookmark_t *zb, const dnode_phys_t *dnp,
+    void *arg)
 {
 	struct prefetch_data *pfd = arg;
 	uint32_t aflags = ARC_NOWAIT | ARC_PREFETCH;
@@ -314,7 +319,7 @@ traverse_prefetcher(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	cv_broadcast(&pfd->pd_cv);
 	mutex_exit(&pfd->pd_mtx);
 
-	(void) arc_read_nolock(NULL, spa, bp, NULL, NULL,
+	(void) dsl_read(NULL, spa, bp, pbuf, NULL, NULL,
 	    ZIO_PRIORITY_ASYNC_READ,
 	    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE,
 	    &aflags, zb);

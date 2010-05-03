@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -37,6 +36,7 @@
 #include <sys/zap.h>
 #include <sys/zap_impl.h>
 #include <sys/zap_leaf.h>
+#include <sys/arc.h>
 
 static uint16_t *zap_leaf_rehash_entry(zap_leaf_t *l, uint16_t entry);
 
@@ -537,14 +537,6 @@ zap_entry_update(zap_entry_handle_t *zeh,
 
 	if ((int)l->l_phys->l_hdr.lh_nfree < delta_chunks)
 		return (EAGAIN);
-
-	/*
-	 * We should search other chained leaves (via
-	 * zap_entry_remove,create?) otherwise returning EAGAIN will
-	 * just send us into an infinite loop if we have to chain
-	 * another leaf block, rather than being able to split this
-	 * block.
-	 */
 
 	zap_leaf_array_free(l, &le->le_value_chunk);
 	le->le_value_chunk =

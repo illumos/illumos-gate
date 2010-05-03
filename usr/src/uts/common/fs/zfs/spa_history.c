@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/spa.h>
@@ -33,6 +32,7 @@
 #include <sys/utsname.h>
 #include <sys/cmn_err.h>
 #include <sys/sunddi.h>
+#include "zfs_comutil.h"
 #ifdef _KERNEL
 #include <sys/zone.h>
 #endif
@@ -189,7 +189,7 @@ spa_history_zone()
  */
 /*ARGSUSED*/
 static void
-spa_history_log_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+spa_history_log_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	spa_t		*spa = arg1;
 	history_arg_t	*hap = arg2;
@@ -244,6 +244,8 @@ spa_history_log_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	    hap->ha_log_type == LOG_CMD_NORMAL) {
 		VERIFY(nvlist_add_string(nvrecord, ZPOOL_HIST_CMD,
 		    history_str) == 0);
+
+		zfs_dbgmsg("command: %s", history_str);
 	} else {
 		VERIFY(nvlist_add_uint64(nvrecord, ZPOOL_HIST_INT_EVENT,
 		    hap->ha_event) == 0);
@@ -251,6 +253,11 @@ spa_history_log_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		    tx->tx_txg) == 0);
 		VERIFY(nvlist_add_string(nvrecord, ZPOOL_HIST_INT_STR,
 		    history_str) == 0);
+
+		zfs_dbgmsg("internal %s pool:%s txg:%llu %s",
+		    zfs_history_event_names[hap->ha_event], spa_name(spa),
+		    (longlong_t)tx->tx_txg, history_str);
+
 	}
 
 	VERIFY(nvlist_size(nvrecord, &reclen, NV_ENCODE_XDR) == 0);
@@ -418,7 +425,7 @@ spa_history_get(spa_t *spa, uint64_t *offp, uint64_t *len, char *buf)
 
 static void
 log_internal(history_internal_events_t event, spa_t *spa,
-    dmu_tx_t *tx, cred_t *cr, const char *fmt, va_list adx)
+    dmu_tx_t *tx, const char *fmt, va_list adx)
 {
 	history_arg_t *ha;
 
@@ -441,7 +448,7 @@ log_internal(history_internal_events_t event, spa_t *spa,
 	ha->ha_uid = 0;
 
 	if (dmu_tx_is_syncing(tx)) {
-		spa_history_log_sync(spa, ha, cr, tx);
+		spa_history_log_sync(spa, ha, tx);
 	} else {
 		dsl_sync_task_do_nowait(spa_get_dsl(spa), NULL,
 		    spa_history_log_sync, spa, ha, 0, tx);
@@ -450,8 +457,8 @@ log_internal(history_internal_events_t event, spa_t *spa,
 }
 
 void
-spa_history_internal_log(history_internal_events_t event, spa_t *spa,
-    dmu_tx_t *tx, cred_t *cr, const char *fmt, ...)
+spa_history_log_internal(history_internal_events_t event, spa_t *spa,
+    dmu_tx_t *tx, const char *fmt, ...)
 {
 	dmu_tx_t *htx = tx;
 	va_list adx;
@@ -466,7 +473,7 @@ spa_history_internal_log(history_internal_events_t event, spa_t *spa,
 	}
 
 	va_start(adx, fmt);
-	log_internal(event, spa, htx, cr, fmt, adx);
+	log_internal(event, spa, htx, fmt, adx);
 	va_end(adx);
 
 	/* if we didn't get a tx from the caller, commit the one we made */
@@ -481,7 +488,7 @@ spa_history_log_version(spa_t *spa, history_internal_events_t event)
 	uint64_t current_vers = spa_version(spa);
 
 	if (current_vers >= SPA_VERSION_ZPOOL_HISTORY) {
-		spa_history_internal_log(event, spa, NULL, CRED(),
+		spa_history_log_internal(event, spa, NULL,
 		    "pool spa %llu; zfs spa %llu; zpl %d; uts %s %s %s %s",
 		    (u_longlong_t)current_vers, SPA_VERSION, ZPL_VERSION,
 		    utsname.nodename, utsname.release, utsname.version,

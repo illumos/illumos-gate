@@ -31,6 +31,7 @@
 #include <sys/zap_impl.h>
 #include <sys/zap_leaf.h>
 #include <sys/avl.h>
+#include <sys/arc.h>
 
 #ifdef _KERNEL
 #include <sys/sunddi.h>
@@ -254,26 +255,26 @@ mze_compare(const void *arg1, const void *arg2)
 		return (+1);
 	if (mze1->mze_hash < mze2->mze_hash)
 		return (-1);
-	if (mze1->mze_phys.mze_cd > mze2->mze_phys.mze_cd)
+	if (mze1->mze_cd > mze2->mze_cd)
 		return (+1);
-	if (mze1->mze_phys.mze_cd < mze2->mze_phys.mze_cd)
+	if (mze1->mze_cd < mze2->mze_cd)
 		return (-1);
 	return (0);
 }
 
 static void
-mze_insert(zap_t *zap, int chunkid, uint64_t hash, mzap_ent_phys_t *mzep)
+mze_insert(zap_t *zap, int chunkid, uint64_t hash)
 {
 	mzap_ent_t *mze;
 
 	ASSERT(zap->zap_ismicro);
 	ASSERT(RW_WRITE_HELD(&zap->zap_rwlock));
-	ASSERT(mzep->mze_cd < zap_maxcd(zap));
 
 	mze = kmem_alloc(sizeof (mzap_ent_t), KM_SLEEP);
 	mze->mze_chunkid = chunkid;
 	mze->mze_hash = hash;
-	mze->mze_phys = *mzep;
+	mze->mze_cd = MZE_PHYS(zap, mze)->mze_cd;
+	ASSERT(MZE_PHYS(zap, mze)->mze_name[0] != 0);
 	avl_add(&zap->zap_m.zap_avl, mze);
 }
 
@@ -289,14 +290,15 @@ mze_find(zap_name_t *zn)
 	ASSERT(RW_LOCK_HELD(&zn->zn_zap->zap_rwlock));
 
 	mze_tofind.mze_hash = zn->zn_hash;
-	mze_tofind.mze_phys.mze_cd = 0;
+	mze_tofind.mze_cd = 0;
 
 again:
 	mze = avl_find(avl, &mze_tofind, &idx);
 	if (mze == NULL)
 		mze = avl_nearest(avl, idx, AVL_AFTER);
 	for (; mze && mze->mze_hash == zn->zn_hash; mze = AVL_NEXT(avl, mze)) {
-		if (zap_match(zn, mze->mze_phys.mze_name))
+		ASSERT3U(mze->mze_cd, ==, MZE_PHYS(zn->zn_zap, mze)->mze_cd);
+		if (zap_match(zn, MZE_PHYS(zn->zn_zap, mze)->mze_name))
 			return (mze);
 	}
 	if (zn->zn_matchtype == MT_BEST) {
@@ -319,12 +321,12 @@ mze_find_unused_cd(zap_t *zap, uint64_t hash)
 	ASSERT(RW_LOCK_HELD(&zap->zap_rwlock));
 
 	mze_tofind.mze_hash = hash;
-	mze_tofind.mze_phys.mze_cd = 0;
+	mze_tofind.mze_cd = 0;
 
 	cd = 0;
 	for (mze = avl_find(avl, &mze_tofind, &idx);
 	    mze && mze->mze_hash == hash; mze = AVL_NEXT(avl, mze)) {
-		if (mze->mze_phys.mze_cd != cd)
+		if (mze->mze_cd != cd)
 			break;
 		cd++;
 	}
@@ -408,7 +410,7 @@ mzap_open(objset_t *os, uint64_t obj, dmu_buf_t *db)
 				zap->zap_m.zap_num_entries++;
 				zn = zap_name_alloc(zap, mze->mze_name,
 				    MT_EXACT);
-				mze_insert(zap, i, zn->zn_hash, mze);
+				mze_insert(zap, i, zn->zn_hash);
 				zap_name_free(zn);
 			}
 		}
@@ -727,11 +729,11 @@ again:
 	    other = avl_walk(&zap->zap_m.zap_avl, other, direction)) {
 
 		if (zn == NULL) {
-			zn = zap_name_alloc(zap, mze->mze_phys.mze_name,
+			zn = zap_name_alloc(zap, MZE_PHYS(zap, mze)->mze_name,
 			    MT_FIRST);
 			allocdzn = B_TRUE;
 		}
-		if (zap_match(zn, other->mze_phys.mze_name)) {
+		if (zap_match(zn, MZE_PHYS(zap, other)->mze_name)) {
 			if (allocdzn)
 				zap_name_free(zn);
 			return (B_TRUE);
@@ -793,9 +795,10 @@ zap_lookup_norm(objset_t *os, uint64_t zapobj, const char *name,
 			} else if (integer_size != 8) {
 				err = EINVAL;
 			} else {
-				*(uint64_t *)buf = mze->mze_phys.mze_value;
+				*(uint64_t *)buf =
+				    MZE_PHYS(zap, mze)->mze_value;
 				(void) strlcpy(realname,
-				    mze->mze_phys.mze_name, rn_len);
+				    MZE_PHYS(zap, mze)->mze_name, rn_len);
 				if (ncp) {
 					*ncp = mzap_normalization_conflict(zap,
 					    zn, mze);
@@ -932,7 +935,7 @@ again:
 			if (zap->zap_m.zap_alloc_next ==
 			    zap->zap_m.zap_num_chunks)
 				zap->zap_m.zap_alloc_next = 0;
-			mze_insert(zap, i, zn->zn_hash, mze);
+			mze_insert(zap, i, zn->zn_hash);
 			return;
 		}
 	}
@@ -1017,9 +1020,19 @@ zap_update(objset_t *os, uint64_t zapobj, const char *name,
 {
 	zap_t *zap;
 	mzap_ent_t *mze;
+	uint64_t oldval;
 	const uint64_t *intval = val;
 	zap_name_t *zn;
 	int err;
+
+#ifdef ZFS_DEBUG
+	/*
+	 * If there is an old value, it shouldn't change across the
+	 * lockdir (eg, due to bprewrite's xlation).
+	 */
+	if (integer_size == 8 && num_integers == 1)
+		(void) zap_lookup(os, zapobj, name, 8, 1, &oldval);
+#endif
 
 	err = zap_lockdir(os, zapobj, tx, RW_WRITER, TRUE, TRUE, &zap);
 	if (err)
@@ -1044,9 +1057,8 @@ zap_update(objset_t *os, uint64_t zapobj, const char *name,
 	} else {
 		mze = mze_find(zn);
 		if (mze != NULL) {
-			mze->mze_phys.mze_value = *intval;
-			zap->zap_m.zap_phys->mz_chunk
-			    [mze->mze_chunkid].mze_value = *intval;
+			ASSERT3U(MZE_PHYS(zap, mze)->mze_value, ==, oldval);
+			MZE_PHYS(zap, mze)->mze_value = *intval;
 		} else {
 			mzap_addent(zn, *intval);
 		}
@@ -1245,7 +1257,7 @@ zap_cursor_retrieve(zap_cursor_t *zc, zap_attribute_t *za)
 		err = ENOENT;
 
 		mze_tofind.mze_hash = zc->zc_hash;
-		mze_tofind.mze_phys.mze_cd = zc->zc_cd;
+		mze_tofind.mze_cd = zc->zc_cd;
 
 		mze = avl_find(&zc->zc_zap->zap_m.zap_avl, &mze_tofind, &idx);
 		if (mze == NULL) {
@@ -1253,18 +1265,16 @@ zap_cursor_retrieve(zap_cursor_t *zc, zap_attribute_t *za)
 			    idx, AVL_AFTER);
 		}
 		if (mze) {
-			ASSERT(0 == bcmp(&mze->mze_phys,
-			    &zc->zc_zap->zap_m.zap_phys->mz_chunk
-			    [mze->mze_chunkid], sizeof (mze->mze_phys)));
-
+			mzap_ent_phys_t *mzep = MZE_PHYS(zc->zc_zap, mze);
+			ASSERT3U(mze->mze_cd, ==, mzep->mze_cd);
 			za->za_normalization_conflict =
 			    mzap_normalization_conflict(zc->zc_zap, NULL, mze);
 			za->za_integer_length = 8;
 			za->za_num_integers = 1;
-			za->za_first_integer = mze->mze_phys.mze_value;
-			(void) strcpy(za->za_name, mze->mze_phys.mze_name);
+			za->za_first_integer = mzep->mze_value;
+			(void) strcpy(za->za_name, mzep->mze_name);
 			zc->zc_hash = mze->mze_hash;
-			zc->zc_cd = mze->mze_phys.mze_cd;
+			zc->zc_cd = mze->mze_cd;
 			err = 0;
 		} else {
 			zc->zc_hash = -1ULL;
@@ -1313,7 +1323,7 @@ zap_cursor_move_to_key(zap_cursor_t *zc, const char *name, matchtype_t mt)
 			goto out;
 		}
 		zc->zc_hash = mze->mze_hash;
-		zc->zc_cd = mze->mze_phys.mze_cd;
+		zc->zc_cd = mze->mze_cd;
 	}
 
 out:

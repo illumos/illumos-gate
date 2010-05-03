@@ -19,12 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_ZAP_LEAF_H
 #define	_SYS_ZAP_LEAF_H
+
+#include <sys/zap.h>
 
 #ifdef	__cplusplus
 extern "C" {

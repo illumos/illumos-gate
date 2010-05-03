@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "libzfs_jni_util.h"
@@ -1055,7 +1054,7 @@ populate_DeviceStatsBean(JNIEnv *env, nvlist_t *vdev,
 	vdev_stat_t *vs;
 
 	int result = nvlist_lookup_uint64_array(
-	    vdev, ZPOOL_CONFIG_STATS, (uint64_t **)&vs, &c);
+	    vdev, ZPOOL_CONFIG_VDEV_STATS, (uint64_t **)&vs, &c);
 	if (result != 0) {
 		zjni_throw_exception(env,
 		    "could not retrieve virtual device statistics");

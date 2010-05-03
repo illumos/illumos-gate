@@ -175,23 +175,26 @@ bplist_iterate(bplist_t *bpl, uint64_t *itorp, blkptr_t *bp)
 		return (err);
 	}
 
-	if (*itorp >= bpl->bpl_phys->bpl_entries) {
-		mutex_exit(&bpl->bpl_lock);
-		return (ENOENT);
-	}
+	do {
+		if (*itorp >= bpl->bpl_phys->bpl_entries) {
+			mutex_exit(&bpl->bpl_lock);
+			return (ENOENT);
+		}
 
-	blk = *itorp >> bpl->bpl_bpshift;
-	off = P2PHASE(*itorp, 1ULL << bpl->bpl_bpshift);
+		blk = *itorp >> bpl->bpl_bpshift;
+		off = P2PHASE(*itorp, 1ULL << bpl->bpl_bpshift);
 
-	err = bplist_cache(bpl, blk);
-	if (err) {
-		mutex_exit(&bpl->bpl_lock);
-		return (err);
-	}
+		err = bplist_cache(bpl, blk);
+		if (err) {
+			mutex_exit(&bpl->bpl_lock);
+			return (err);
+		}
 
-	bparray = bpl->bpl_cached_dbuf->db_data;
-	*bp = bparray[off];
-	(*itorp)++;
+		bparray = bpl->bpl_cached_dbuf->db_data;
+		*bp = bparray[off];
+		(*itorp)++;
+	} while (bp->blk_birth == 0);
+
 	mutex_exit(&bpl->bpl_lock);
 	return (0);
 }
@@ -206,8 +209,10 @@ bplist_enqueue(bplist_t *bpl, const blkptr_t *bp, dmu_tx_t *tx)
 	ASSERT(!BP_IS_HOLE(bp));
 	mutex_enter(&bpl->bpl_lock);
 	err = bplist_hold(bpl);
-	if (err)
+	if (err) {
+		mutex_exit(&bpl->bpl_lock);
 		return (err);
+	}
 
 	blk = bpl->bpl_phys->bpl_entries >> bpl->bpl_bpshift;
 	off = P2PHASE(bpl->bpl_phys->bpl_entries, 1ULL << bpl->bpl_bpshift);

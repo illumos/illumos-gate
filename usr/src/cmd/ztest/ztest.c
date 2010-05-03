@@ -93,6 +93,7 @@
 #include <sys/metaslab_impl.h>
 #include <sys/dsl_prop.h>
 #include <sys/dsl_dataset.h>
+#include <sys/dsl_scan.h>
 #include <sys/refcount.h>
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -284,9 +285,9 @@ ztest_info_t ztest_info[] = {
 	{ ztest_spa_rename,			1,	&zopt_rarely	},
 	{ ztest_scrub,				1,	&zopt_rarely	},
 	{ ztest_dsl_dataset_promote_busy,	1,	&zopt_rarely	},
-	{ ztest_vdev_attach_detach,		1,	&zopt_rarely	},
+	{ ztest_vdev_attach_detach,		1,	&zopt_rarely },
 	{ ztest_vdev_LUN_growth,		1,	&zopt_rarely	},
-	{ ztest_vdev_add_remove,		1,	&zopt_vdevtime	},
+	{ ztest_vdev_add_remove,		1,	&zopt_vdevtime },
 	{ ztest_vdev_aux_add_remove,		1,	&zopt_vdevtime	},
 };
 
@@ -4662,9 +4663,9 @@ ztest_scrub(ztest_ds_t *zd, uint64_t id)
 	ztest_shared_t *zs = ztest_shared;
 	spa_t *spa = zs->zs_spa;
 
-	(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING);
+	(void) spa_scan(spa, POOL_SCAN_SCRUB);
 	(void) poll(NULL, 0, 100); /* wait a moment, then force a restart */
-	(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING);
+	(void) spa_scan(spa, POOL_SCAN_SCRUB);
 }
 
 /*
@@ -4817,7 +4818,7 @@ ztest_spa_import_export(char *oldname, char *newname)
 	 * Kick off a scrub to tickle scrub/export races.
 	 */
 	if (ztest_random(2) == 0)
-		(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING);
+		(void) spa_scan(spa, POOL_SCAN_SCRUB);
 
 	pool_guid = spa_guid(spa);
 	spa_close(spa, FTAG);

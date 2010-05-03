@@ -560,34 +560,6 @@ unregister:
 
 }
 
-static void
-uidacct(objset_t *os, boolean_t isgroup, uint64_t fuid,
-    int64_t delta, dmu_tx_t *tx)
-{
-	uint64_t used = 0;
-	char buf[32];
-	int err;
-	uint64_t obj = isgroup ? DMU_GROUPUSED_OBJECT : DMU_USERUSED_OBJECT;
-
-	if (delta == 0)
-		return;
-
-	(void) snprintf(buf, sizeof (buf), "%llx", (longlong_t)fuid);
-	err = zap_lookup(os, obj, buf, 8, 1, &used);
-
-	ASSERT(err == 0 || err == ENOENT);
-	/* no underflow/overflow */
-	ASSERT(delta > 0 || used >= -delta);
-	ASSERT(delta < 0 || used + delta > used);
-	used += delta;
-	if (used == 0)
-		err = zap_remove(os, obj, buf, tx);
-	else
-		err = zap_update(os, obj, buf, 8, 1, &used, tx);
-	ASSERT(err == 0);
-
-}
-
 static int
 zfs_space_delta_cb(dmu_object_type_t bonustype, void *data,
     uint64_t *userp, uint64_t *groupp)
@@ -2239,9 +2211,8 @@ zfs_set_version(zfsvfs_t *zfsvfs, uint64_t newvers)
 		sa_register_update_callback(os, zfs_sa_upgrade);
 	}
 
-	spa_history_internal_log(LOG_DS_UPGRADE,
-	    dmu_objset_spa(os), tx, CRED(),
-	    "oldver=%llu newver=%llu dataset = %llu",
+	spa_history_log_internal(LOG_DS_UPGRADE,
+	    dmu_objset_spa(os), tx, "oldver=%llu newver=%llu dataset = %llu",
 	    zfsvfs->z_version, newvers, dmu_objset_id(os));
 
 	dmu_tx_commit(tx);

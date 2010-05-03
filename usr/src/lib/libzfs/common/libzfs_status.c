@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -138,7 +137,7 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(uint64_t, uint64_t, uint64_t))
 			if (find_vdev_problem(child[c], func))
 				return (B_TRUE);
 	} else {
-		verify(nvlist_lookup_uint64_array(vdev, ZPOOL_CONFIG_STATS,
+		verify(nvlist_lookup_uint64_array(vdev, ZPOOL_CONFIG_VDEV_STATS,
 		    (uint64_t **)&vs, &c) == 0);
 
 		if (func(vs->vs_state, vs->vs_aux,
@@ -173,7 +172,8 @@ check_status(nvlist_t *config, boolean_t isimport)
 {
 	nvlist_t *nvroot;
 	vdev_stat_t *vs;
-	uint_t vsc;
+	pool_scan_stat_t *ps = NULL;
+	uint_t vsc, psc;
 	uint64_t nerr;
 	uint64_t version;
 	uint64_t stateval;
@@ -184,15 +184,24 @@ check_status(nvlist_t *config, boolean_t isimport)
 	    &version) == 0);
 	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 	    &nvroot) == 0);
-	verify(nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_STATS,
+	verify(nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_VDEV_STATS,
 	    (uint64_t **)&vs, &vsc) == 0);
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
 	    &stateval) == 0);
-	(void) nvlist_lookup_uint64(config, ZPOOL_CONFIG_HOSTID, &hostid);
+
+	/*
+	 * Currently resilvering a vdev
+	 */
+	(void) nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_SCAN_STATS,
+	    (uint64_t **)&ps, &psc);
+	if (ps && ps->pss_func == POOL_SCAN_RESILVER &&
+	    ps->pss_state == DSS_SCANNING)
+		return (ZPOOL_STATUS_RESILVERING);
 
 	/*
 	 * Pool last accessed by another system.
 	 */
+	(void) nvlist_lookup_uint64(config, ZPOOL_CONFIG_HOSTID, &hostid);
 	if (hostid != 0 && (unsigned long)hostid != gethostid() &&
 	    stateval == POOL_STATE_ACTIVE)
 		return (ZPOOL_STATUS_HOSTID_MISMATCH);
@@ -287,12 +296,6 @@ check_status(nvlist_t *config, boolean_t isimport)
 	 */
 	if (find_vdev_problem(nvroot, vdev_removed))
 		return (ZPOOL_STATUS_REMOVED_DEV);
-
-	/*
-	 * Currently resilvering
-	 */
-	if (!vs->vs_scrub_complete && vs->vs_scrub_type == POOL_SCRUB_RESILVER)
-		return (ZPOOL_STATUS_RESILVERING);
 
 	/*
 	 * Outdated, but usable, version

@@ -1343,7 +1343,7 @@ ZFS_COMMON_OBJS +=		\
 	dmu_zfetch.o		\
 	dsl_deleg.o		\
 	dsl_prop.o		\
-	dsl_scrub.o		\
+	dsl_scan.o		\
 	gzip.o			\
 	lzjb.o			\
 	metaslab.o		\
@@ -1372,6 +1372,7 @@ ZFS_COMMON_OBJS +=		\
 	zap_leaf.o		\
 	zap_micro.o		\
 	zfs_byteswap.o		\
+	zfs_debug.o		\
 	zfs_fm.o		\
 	zfs_fuid.o		\
 	zfs_sa.o		\

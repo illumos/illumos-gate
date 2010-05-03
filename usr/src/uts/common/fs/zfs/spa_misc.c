@@ -40,6 +40,7 @@
 #include <sys/dsl_pool.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_prop.h>
+#include <sys/dsl_scan.h>
 #include <sys/fs/zfs.h>
 #include <sys/metaslab_impl.h>
 #include <sys/arc.h>
@@ -888,10 +889,10 @@ spa_vdev_config_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error, char *tag)
 	vdev_dtl_reassess(spa->spa_root_vdev, 0, 0, B_FALSE);
 
 	/*
-	 * If the config changed, notify the scrub thread that it must restart.
+	 * If the config changed, notify the scrub that it must restart.
+	 * This will initiate a resilver if needed.
 	 */
 	if (error == 0 && !list_is_empty(&spa->spa_config_dirty_list)) {
-		dsl_pool_scrub_restart(spa->spa_dsl_pool);
 		config_changed = B_TRUE;
 		spa->spa_config_generation++;
 	}
@@ -1078,7 +1079,6 @@ spa_rename(const char *name, const char *newname)
 	return (0);
 }
 
-
 /*
  * Determine whether a pool with given pool_guid exists.  If device_guid is
  * non-zero, determine whether the pool exists *and* contains a device with the
@@ -1206,6 +1206,37 @@ zfs_panic_recover(const char *fmt, ...)
 	va_start(adx, fmt);
 	vcmn_err(zfs_recover ? CE_WARN : CE_PANIC, fmt, adx);
 	va_end(adx);
+}
+
+/*
+ * This is a stripped-down version of strtoull, suitable only for converting
+ * lowercase hexidecimal numbers that don't overflow.
+ */
+uint64_t
+strtonum(const char *str, char **nptr)
+{
+	uint64_t val = 0;
+	char c;
+	int digit;
+
+	while ((c = *str) != '\0') {
+		if (c >= '0' && c <= '9')
+			digit = c - '0';
+		else if (c >= 'a' && c <= 'f')
+			digit = 10 + c - 'a';
+		else
+			break;
+
+		val *= 16;
+		val += digit;
+
+		str++;
+	}
+
+	if (nptr)
+		*nptr = (char *)str;
+
+	return (val);
 }
 
 /*
@@ -1388,6 +1419,12 @@ spa_max_replication(spa_t *spa)
 	if (spa_version(spa) < SPA_VERSION_DITTO_BLOCKS)
 		return (1);
 	return (MIN(SPA_DVAS_PER_BP, spa_max_replication_override));
+}
+
+int
+spa_prev_software_version(spa_t *spa)
+{
+	return (spa->spa_prev_software_version);
 }
 
 uint64_t
@@ -1583,4 +1620,46 @@ enum zio_checksum
 spa_dedup_checksum(spa_t *spa)
 {
 	return (spa->spa_dedup_checksum);
+}
+
+/*
+ * Reset pool scan stat per scan pass (or reboot).
+ */
+void
+spa_scan_stat_init(spa_t *spa)
+{
+	/* data not stored on disk */
+	spa->spa_scan_pass_start = gethrestime_sec();
+	spa->spa_scan_pass_exam = 0;
+	vdev_scan_stat_init(spa->spa_root_vdev);
+}
+
+/*
+ * Get scan stats for zpool status reports
+ */
+int
+spa_scan_get_stats(spa_t *spa, pool_scan_stat_t *ps)
+{
+	dsl_scan_t *scn = spa->spa_dsl_pool ? spa->spa_dsl_pool->dp_scan : NULL;
+
+	if (scn == NULL || scn->scn_phys.scn_func == POOL_SCAN_NONE)
+		return (ENOENT);
+	bzero(ps, sizeof (pool_scan_stat_t));
+
+	/* data stored on disk */
+	ps->pss_func = scn->scn_phys.scn_func;
+	ps->pss_start_time = scn->scn_phys.scn_start_time;
+	ps->pss_end_time = scn->scn_phys.scn_end_time;
+	ps->pss_to_examine = scn->scn_phys.scn_to_examine;
+	ps->pss_examined = scn->scn_phys.scn_examined;
+	ps->pss_to_process = scn->scn_phys.scn_to_process;
+	ps->pss_processed = scn->scn_phys.scn_processed;
+	ps->pss_errors = scn->scn_phys.scn_errors;
+	ps->pss_state = scn->scn_phys.scn_state;
+
+	/* data not stored on disk */
+	ps->pss_pass_start = spa->spa_scan_pass_start;
+	ps->pss_pass_exam = spa->spa_scan_pass_exam;
+
+	return (0);
 }

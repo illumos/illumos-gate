@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DMU_TRAVERSE_H
@@ -37,9 +36,11 @@ extern "C" {
 struct dnode_phys;
 struct dsl_dataset;
 struct zilog;
+struct arc_buf;
 
 typedef int (blkptr_cb_t)(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
-    const zbookmark_t *zb, const struct dnode_phys *dnp, void *arg);
+    struct arc_buf *pbuf, const zbookmark_t *zb, const struct dnode_phys *dnp,
+    void *arg);
 
 #define	TRAVERSE_PRE			(1<<0)
 #define	TRAVERSE_POST			(1<<1)

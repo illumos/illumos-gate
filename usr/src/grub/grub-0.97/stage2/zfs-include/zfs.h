@@ -17,8 +17,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_FS_ZFS_H
@@ -27,7 +26,7 @@
 /*
  * On-disk version number.
  */
-#define	SPA_VERSION			24ULL
+#define	SPA_VERSION			25ULL
 
 /*
  * The following are configuration names used in the nvlist describing a pool's

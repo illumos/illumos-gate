@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DSL_DATASET_H
@@ -113,7 +112,6 @@ typedef struct dsl_dataset {
 
 	/* only used in syncing context, only valid for non-snapshots: */
 	struct dsl_dataset *ds_prev;
-	uint64_t ds_origin_txg;
 
 	/* has internal locking: */
 	bplist_t ds_deadlist;
@@ -235,8 +233,7 @@ int dsl_dataset_check_quota(dsl_dataset_t *ds, boolean_t check_quota,
     uint64_t *ref_rsrv);
 int dsl_dataset_set_quota(const char *dsname, zprop_source_t source,
     uint64_t quota);
-void dsl_dataset_set_quota_sync(void *arg1, void *arg2, cred_t *cr,
-    dmu_tx_t *tx);
+dsl_syncfunc_t dsl_dataset_set_quota_sync;
 int dsl_dataset_set_reservation(const char *dsname, zprop_source_t source,
     uint64_t reservation);
 

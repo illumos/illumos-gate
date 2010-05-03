@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -1603,6 +1602,7 @@ vdev_raidz_io_start(zio_t *zio)
 
 	return (ZIO_PIPELINE_CONTINUE);
 }
+
 
 /*
  * Report a checksum error for a child of a RAID-Z device.

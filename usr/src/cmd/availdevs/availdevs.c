@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "availdevs.h"
@@ -134,7 +133,7 @@ add_pool_to_xml(nvlist_t *config, void *data)
 	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE, &state) ||
 	    nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &devices) ||
 	    nvlist_lookup_uint64_array(
-	    devices, ZPOOL_CONFIG_STATS, (uint64_t **)&vs, &n)) {
+	    devices, ZPOOL_CONFIG_VDEV_STATS, (uint64_t **)&vs, &n)) {
 		return (-1);
 	}
 

@@ -19,14 +19,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/dsl_pool.h>
 #include <sys/dsl_dataset.h>
+#include <sys/dsl_prop.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_synctask.h>
+#include <sys/dsl_scan.h>
+#include <sys/dnode.h>
 #include <sys/dmu_tx.h>
 #include <sys/dmu_objset.h>
 #include <sys/arc.h>
@@ -50,7 +52,7 @@ kmutex_t zfs_write_limit_lock;
 
 static pgcnt_t old_physmem = 0;
 
-static int
+int
 dsl_pool_open_special_dir(dsl_pool_t *dp, const char *name, dsl_dir_t **ddp)
 {
 	uint64_t obj;
@@ -88,7 +90,6 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 	    offsetof(dsl_dataset_t, ds_synced_link));
 
 	mutex_init(&dp->dp_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&dp->dp_scrub_cancel_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	dp->dp_vnrele_taskq = taskq_create("zfs_vn_rele_taskq", 1, minclsyspri,
 	    1, 4, 0);
@@ -150,64 +151,7 @@ dsl_pool_open(spa_t *spa, uint64_t txg, dsl_pool_t **dpp)
 	if (err)
 		goto out;
 
-	/* get scrub status */
-	err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
-	    DMU_POOL_SCRUB_FUNC, sizeof (uint32_t), 1,
-	    &dp->dp_scrub_func);
-	if (err == 0) {
-		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
-		    DMU_POOL_SCRUB_QUEUE, sizeof (uint64_t), 1,
-		    &dp->dp_scrub_queue_obj);
-		if (err)
-			goto out;
-		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
-		    DMU_POOL_SCRUB_MIN_TXG, sizeof (uint64_t), 1,
-		    &dp->dp_scrub_min_txg);
-		if (err)
-			goto out;
-		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
-		    DMU_POOL_SCRUB_MAX_TXG, sizeof (uint64_t), 1,
-		    &dp->dp_scrub_max_txg);
-		if (err)
-			goto out;
-		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
-		    DMU_POOL_SCRUB_BOOKMARK, sizeof (uint64_t),
-		    sizeof (dp->dp_scrub_bookmark) / sizeof (uint64_t),
-		    &dp->dp_scrub_bookmark);
-		if (err)
-			goto out;
-		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
-		    DMU_POOL_SCRUB_DDT_BOOKMARK, sizeof (uint64_t),
-		    sizeof (dp->dp_scrub_ddt_bookmark) / sizeof (uint64_t),
-		    &dp->dp_scrub_ddt_bookmark);
-		if (err && err != ENOENT)
-			goto out;
-		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
-		    DMU_POOL_SCRUB_DDT_CLASS_MAX, sizeof (uint64_t), 1,
-		    &dp->dp_scrub_ddt_class_max);
-		if (err && err != ENOENT)
-			goto out;
-		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
-		    DMU_POOL_SCRUB_ERRORS, sizeof (uint64_t), 1,
-		    &spa->spa_scrub_errors);
-		if (err)
-			goto out;
-		if (spa_version(spa) < SPA_VERSION_DSL_SCRUB) {
-			/*
-			 * A new-type scrub was in progress on an old
-			 * pool.  Restart from the beginning, since the
-			 * old software may have changed the pool in the
-			 * meantime.
-			 */
-			dsl_pool_scrub_restart(dp);
-		}
-	} else {
-		/*
-		 * It's OK if there is no scrub in progress (and if
-		 * there was an I/O error, ignore it).
-		 */
-		err = 0;
-	}
+	err = dsl_scan_init(dp, txg);
 
 out:
 	rw_exit(&dp->dp_config_rwlock);
@@ -247,9 +191,9 @@ dsl_pool_close(dsl_pool_t *dp)
 
 	arc_flush(dp->dp_spa);
 	txg_fini(dp);
+	dsl_scan_fini(dp);
 	rw_destroy(&dp->dp_config_rwlock);
 	mutex_destroy(&dp->dp_lock);
-	mutex_destroy(&dp->dp_scrub_cancel_lock);
 	taskq_destroy(dp->dp_vnrele_taskq);
 	if (dp->dp_blkstats)
 		kmem_free(dp->dp_blkstats, sizeof (zfs_all_blkstats_t));
@@ -274,6 +218,9 @@ dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 	err = zap_create_claim(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_OT_OBJECT_DIRECTORY, DMU_OT_NONE, 0, tx);
 	ASSERT3U(err, ==, 0);
+
+	/* Initialize scan structures */
+	VERIFY3U(0, ==, dsl_scan_init(dp, txg));
 
 	/* create and open the root dir */
 	dp->dp_root_dir_obj = dsl_dir_create_sync(dp, NULL, NULL, tx);
@@ -318,6 +265,14 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	uint64_t data_written;
 	int err;
 
+	/*
+	 * We need to copy dp_space_towrite() before doing
+	 * dsl_sync_task_group_sync(), because
+	 * dsl_dataset_snapshot_reserve_space() will increase
+	 * dp_space_towrite but not actually write anything.
+	 */
+	data_written = dp->dp_space_towrite[txg & TXG_MASK];
+
 	tx = dmu_tx_create_assigned(dp, txg);
 
 	dp->dp_read_overhead = 0;
@@ -347,7 +302,7 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 
 	/*
 	 * Sync the datasets again to push out the changes due to
-	 * userquota updates.  This must be done before we process the
+	 * userspace updates.  This must be done before we process the
 	 * sync tasks, because that could cause a snapshot of a dataset
 	 * whose ds_bp will be rewritten when we do this 2nd sync.
 	 */
@@ -383,13 +338,6 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 		dsl_dir_sync(dd, tx);
 	write_time += gethrtime() - start;
 
-	if (spa_sync_pass(dp->dp_spa) == 1) {
-		dp->dp_scrub_prefetch_zio_root = zio_root(dp->dp_spa, NULL,
-		    NULL, ZIO_FLAG_CANFAIL);
-		dsl_pool_scrub_sync(dp, tx);
-		(void) zio_wait(dp->dp_scrub_prefetch_zio_root);
-	}
-
 	start = gethrtime();
 	if (list_head(&mos->os_dirty_dnodes[txg & TXG_MASK]) != NULL ||
 	    list_head(&mos->os_free_dnodes[txg & TXG_MASK]) != NULL) {
@@ -407,7 +355,6 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 
 	dmu_tx_commit(tx);
 
-	data_written = dp->dp_space_towrite[txg & TXG_MASK];
 	dp->dp_space_towrite[txg & TXG_MASK] = 0;
 	ASSERT(dp->dp_tempreserved[txg & TXG_MASK] == 0);
 
@@ -679,7 +626,7 @@ dsl_pool_create_origin(dsl_pool_t *dp, dmu_tx_t *tx)
 	dsobj = dsl_dataset_create_sync(dp->dp_root_dir, ORIGIN_DIR_NAME,
 	    NULL, 0, kcred, tx);
 	VERIFY(0 == dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
-	dsl_dataset_snapshot_sync(ds, ORIGIN_DIR_NAME, kcred, tx);
+	dsl_dataset_snapshot_sync(ds, ORIGIN_DIR_NAME, tx);
 	VERIFY(0 == dsl_dataset_hold_obj(dp, ds->ds_phys->ds_prev_snap_obj,
 	    dp, &dp->dp_origin_snap));
 	dsl_dataset_rele(ds, FTAG);

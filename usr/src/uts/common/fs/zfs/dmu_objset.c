@@ -259,11 +259,11 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 
 		dprintf_bp(os->os_rootbp, "reading %s", "");
 		/*
-		 * NB: when bprewrite scrub can change the bp,
+		 * XXX when bprewrite scrub can change the bp,
 		 * and this is called from dmu_objset_open_ds_os, the bp
 		 * could change, and we'll need a lock.
 		 */
-		err = arc_read_nolock(NULL, spa, os->os_rootbp,
+		err = dsl_read_nolock(NULL, spa, os->os_rootbp,
 		    arc_getbuf_func, &os->os_phys_buf,
 		    ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_CANFAIL, &aflags, &zb);
 		if (err) {
@@ -628,6 +628,7 @@ struct oscarg {
 	const char *lastname;
 	dmu_objset_type_t type;
 	uint64_t flags;
+	cred_t *cr;
 };
 
 /*ARGSUSED*/
@@ -659,7 +660,7 @@ dmu_objset_create_check(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 static void
-dmu_objset_create_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+dmu_objset_create_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	struct oscarg *oa = arg2;
@@ -668,7 +669,7 @@ dmu_objset_create_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	ASSERT(dmu_tx_is_syncing(tx));
 
 	dsobj = dsl_dataset_create_sync(dd, oa->lastname,
-	    oa->clone_origin, oa->flags, cr, tx);
+	    oa->clone_origin, oa->flags, oa->cr, tx);
 
 	if (oa->clone_origin == NULL) {
 		dsl_dataset_t *ds;
@@ -684,12 +685,12 @@ dmu_objset_create_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		    ds, bp, oa->type, tx);
 
 		if (oa->userfunc)
-			oa->userfunc(os, oa->userarg, cr, tx);
+			oa->userfunc(os, oa->userarg, oa->cr, tx);
 		dsl_dataset_rele(ds, FTAG);
 	}
 
-	spa_history_internal_log(LOG_DS_CREATE, dd->dd_pool->dp_spa,
-	    tx, cr, "dataset = %llu", dsobj);
+	spa_history_log_internal(LOG_DS_CREATE, dd->dd_pool->dp_spa,
+	    tx, "dataset = %llu", dsobj);
 }
 
 int
@@ -715,6 +716,7 @@ dmu_objset_create(const char *name, dmu_objset_type_t type, uint64_t flags,
 	oa.lastname = tail;
 	oa.type = type;
 	oa.flags = flags;
+	oa.cr = CRED();
 
 	err = dsl_sync_task_do(pdd->dd_pool, dmu_objset_create_check,
 	    dmu_objset_create_sync, pdd, &oa, 5);
@@ -742,6 +744,7 @@ dmu_objset_clone(const char *name, dsl_dataset_t *clone_origin, uint64_t flags)
 	oa.lastname = tail;
 	oa.clone_origin = clone_origin;
 	oa.flags = flags;
+	oa.cr = CRED();
 
 	err = dsl_sync_task_do(pdd->dd_pool, dmu_objset_create_check,
 	    dmu_objset_create_sync, pdd, &oa, 5);
@@ -795,19 +798,19 @@ snapshot_check(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 static void
-snapshot_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+snapshot_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	objset_t *os = arg1;
 	dsl_dataset_t *ds = os->os_dsl_dataset;
 	struct snaparg *sn = arg2;
 
-	dsl_dataset_snapshot_sync(ds, sn->snapname, cr, tx);
+	dsl_dataset_snapshot_sync(ds, sn->snapname, tx);
 
 	if (sn->props) {
 		dsl_props_arg_t pa;
 		pa.pa_props = sn->props;
 		pa.pa_source = ZPROP_SRC_LOCAL;
-		dsl_props_set_sync(ds->ds_prev, &pa, cr, tx);
+		dsl_props_set_sync(ds->ds_prev, &pa, tx);
 	}
 }
 
@@ -1016,11 +1019,11 @@ dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
 	/*
 	 * Create the root block IO
 	 */
-	arc_release(os->os_phys_buf, &os->os_phys_buf);
-
 	SET_BOOKMARK(&zb, os->os_dsl_dataset ?
 	    os->os_dsl_dataset->ds_object : DMU_META_OBJSET,
 	    ZB_ROOT_OBJECT, ZB_ROOT_LEVEL, ZB_ROOT_BLKID);
+	VERIFY3U(0, ==, arc_release_bp(os->os_phys_buf, &os->os_phys_buf,
+	    os->os_rootbp, os->os_spa, &zb));
 
 	dmu_write_policy(os, NULL, 0, 0, &zp);
 
@@ -1082,7 +1085,7 @@ dmu_objset_is_dirty(objset_t *os, uint64_t txg)
 	    !list_is_empty(&os->os_free_dnodes[txg & TXG_MASK]));
 }
 
-static objset_used_cb_t *used_cbs[DMU_OST_NUMTYPES];
+objset_used_cb_t *used_cbs[DMU_OST_NUMTYPES];
 
 void
 dmu_objset_register_type(dmu_objset_type_t ost, objset_used_cb_t *cb)
@@ -1649,7 +1652,7 @@ dmu_objset_prefetch(const char *name, void *arg)
 			SET_BOOKMARK(&zb, ds->ds_object, ZB_ROOT_OBJECT,
 			    ZB_ROOT_LEVEL, ZB_ROOT_BLKID);
 
-			(void) arc_read_nolock(NULL, dsl_dataset_get_spa(ds),
+			(void) dsl_read_nolock(NULL, dsl_dataset_get_spa(ds),
 			    &ds->ds_phys->ds_bp, NULL, NULL,
 			    ZIO_PRIORITY_ASYNC_READ,
 			    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE,

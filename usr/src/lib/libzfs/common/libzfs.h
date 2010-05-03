@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBZFS_H
@@ -119,6 +118,8 @@ enum {
 	EZFS_PIPEFAILED,	/* pipe create failed */
 	EZFS_THREADCREATEFAILED, /* thread create failed */
 	EZFS_POSTSPLIT_ONLINE,	/* onlining a disk after splitting it */
+	EZFS_SCRUBBING,		/* currently scrubbing */
+	EZFS_NO_SCRUB,		/* no active scrub */
 	EZFS_UNKNOWN
 };
 
@@ -224,7 +225,7 @@ typedef struct splitflags {
 /*
  * Functions to manipulate pool and vdev state
  */
-extern int zpool_scrub(zpool_handle_t *, pool_scrub_type_t);
+extern int zpool_scan(zpool_handle_t *, pool_scan_func_t);
 extern int zpool_clear(zpool_handle_t *, const char *, nvlist_t *);
 
 extern int zpool_vdev_online(zpool_handle_t *, const char *, int,
@@ -354,7 +355,7 @@ extern nvlist_t *zpool_find_import_cached(libzfs_handle_t *, const char *,
  */
 struct zfs_cmd;
 
-extern const char *hist_event_table[LOG_END];
+extern const char *zfs_history_event_names[LOG_END];
 
 extern char *zpool_vdev_name(libzfs_handle_t *, zpool_handle_t *, nvlist_t *,
     boolean_t verbose);
@@ -526,8 +527,9 @@ typedef struct sendflags {
 
 typedef boolean_t (snapfilter_cb_t)(zfs_handle_t *, void *);
 
-extern int zfs_send(zfs_handle_t *, const char *, const char *,
-    sendflags_t, int, snapfilter_cb_t, void *);
+extern int zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
+    sendflags_t flags, int outfd, snapfilter_cb_t filter_func,
+    void *cb_arg, nvlist_t **debugnvp);
 
 extern int zfs_promote(zfs_handle_t *);
 extern int zfs_hold(zfs_handle_t *, const char *, const char *, boolean_t,

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_ZAP_IMPL_H
@@ -67,8 +66,11 @@ typedef struct mzap_ent {
 	avl_node_t mze_node;
 	int mze_chunkid;
 	uint64_t mze_hash;
-	mzap_ent_phys_t mze_phys;
+	uint32_t mze_cd; /* copy from mze_phys->mze_cd */
 } mzap_ent_t;
+
+#define	MZE_PHYS(zap, mze) \
+	(&(zap)->zap_m.zap_phys->mz_chunk[(mze)->mze_chunkid])
 
 /*
  * The (fat) zap is stored in one object. It is an array of

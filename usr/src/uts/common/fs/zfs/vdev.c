@@ -39,6 +39,7 @@
 #include <sys/fs/zfs.h>
 #include <sys/arc.h>
 #include <sys/zil.h>
+#include <sys/dsl_scan.h>
 
 /*
  * Virtual device management.
@@ -486,6 +487,8 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 		    &vd->vdev_ms_shift);
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ASIZE,
 		    &vd->vdev_asize);
+		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_REMOVING,
+		    &vd->vdev_removing);
 	}
 
 	if (parent && !parent->vdev_parent) {
@@ -860,7 +863,12 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 	if (txg == 0)
 		spa_config_enter(spa, SCL_ALLOC, FTAG, RW_WRITER);
 
-	if (oldc == 0)
+	/*
+	 * If the vdev is being removed we don't activate
+	 * the metaslabs since we want to ensure that no new
+	 * allocations are performed on this device.
+	 */
+	if (oldc == 0 && !vd->vdev_removing)
 		metaslab_group_activate(vd->vdev_mg);
 
 	if (txg == 0)
@@ -1648,9 +1656,12 @@ vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg, int scrub_done)
 		return;
 
 	if (vd->vdev_ops->vdev_op_leaf) {
+		dsl_scan_t *scn = spa->spa_dsl_pool->dp_scan;
+
 		mutex_enter(&vd->vdev_dtl_lock);
 		if (scrub_txg != 0 &&
-		    (spa->spa_scrub_started || spa->spa_scrub_errors == 0)) {
+		    (spa->spa_scrub_started ||
+		    (scn && scn->scn_phys.scn_errors == 0))) {
 			/*
 			 * We completed a scrub up to scrub_txg.  If we
 			 * did it without rebooting, then the scrub dtl
@@ -2029,7 +2040,10 @@ vdev_sync(vdev_t *vd, uint64_t txg)
 		dmu_tx_commit(tx);
 	}
 
-	if (vd->vdev_removing)
+	/*
+	 * Remove the metadata associated with this vdev once it's empty.
+	 */
+	if (vd->vdev_stat.vs_alloc == 0 && vd->vdev_removing)
 		vdev_remove(vd, txg);
 
 	while ((msp = txg_list_remove(&vd->vdev_ms_list, txg)) != NULL) {
@@ -2403,7 +2417,7 @@ vdev_allocatable(vdev_t *vd)
 	 * we're asking two separate questions about it.
 	 */
 	return (!(state < VDEV_STATE_DEGRADED && state != VDEV_STATE_CLOSED) &&
-	    !vd->vdev_cant_write && !vd->vdev_ishole && !vd->vdev_removing);
+	    !vd->vdev_cant_write && !vd->vdev_ishole);
 }
 
 boolean_t
@@ -2433,7 +2447,6 @@ vdev_get_stats(vdev_t *vd, vdev_stat_t *vs)
 
 	mutex_enter(&vd->vdev_stat_lock);
 	bcopy(&vd->vdev_stat, vs, sizeof (*vs));
-	vs->vs_scrub_errors = vd->vdev_spa->spa_scrub_errors;
 	vs->vs_timestamp = gethrtime() - vs->vs_timestamp;
 	vs->vs_state = vd->vdev_state;
 	vs->vs_rsize = vdev_get_min_asize(vd);
@@ -2455,7 +2468,7 @@ vdev_get_stats(vdev_t *vd, vdev_stat_t *vs)
 				vs->vs_ops[t] += cvs->vs_ops[t];
 				vs->vs_bytes[t] += cvs->vs_bytes[t];
 			}
-			vs->vs_scrub_examined += cvs->vs_scrub_examined;
+			cvs->vs_scan_removing = cvd->vdev_removing;
 			mutex_exit(&vd->vdev_stat_lock);
 		}
 	}
@@ -2468,6 +2481,19 @@ vdev_clear_stats(vdev_t *vd)
 	vd->vdev_stat.vs_space = 0;
 	vd->vdev_stat.vs_dspace = 0;
 	vd->vdev_stat.vs_alloc = 0;
+	mutex_exit(&vd->vdev_stat_lock);
+}
+
+void
+vdev_scan_stat_init(vdev_t *vd)
+{
+	vdev_stat_t *vs = &vd->vdev_stat;
+
+	for (int c = 0; c < vd->vdev_children; c++)
+		vdev_scan_stat_init(vd->vdev_child[c]);
+
+	mutex_enter(&vd->vdev_stat_lock);
+	vs->vs_scan_processed = 0;
 	mutex_exit(&vd->vdev_stat_lock);
 }
 
@@ -2515,8 +2541,17 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 		mutex_enter(&vd->vdev_stat_lock);
 
 		if (flags & ZIO_FLAG_IO_REPAIR) {
-			if (flags & ZIO_FLAG_SCRUB_THREAD)
-				vs->vs_scrub_repaired += psize;
+			if (flags & ZIO_FLAG_SCRUB_THREAD) {
+				dsl_scan_phys_t *scn_phys =
+				    &spa->spa_dsl_pool->dp_scan->scn_phys;
+				uint64_t *processed = &scn_phys->scn_processed;
+
+				/* XXX cleanup? */
+				if (vd->vdev_ops->vdev_op_leaf)
+					atomic_add_64(processed, psize);
+				vs->vs_scan_processed += psize;
+			}
+
 			if (flags & ZIO_FLAG_SELF_HEAL)
 				vs->vs_self_healed += psize;
 		}
@@ -2600,35 +2635,6 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 		if (vd != rvd)
 			vdev_dtl_dirty(vd, DTL_MISSING, txg, 1);
 	}
-}
-
-void
-vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type, boolean_t complete)
-{
-	vdev_stat_t *vs = &vd->vdev_stat;
-
-	for (int c = 0; c < vd->vdev_children; c++)
-		vdev_scrub_stat_update(vd->vdev_child[c], type, complete);
-
-	mutex_enter(&vd->vdev_stat_lock);
-
-	if (type == POOL_SCRUB_NONE) {
-		/*
-		 * Update completion and end time.  Leave everything else alone
-		 * so we can report what happened during the previous scrub.
-		 */
-		vs->vs_scrub_complete = complete;
-		vs->vs_scrub_end = gethrestime_sec();
-	} else {
-		vs->vs_scrub_type = type;
-		vs->vs_scrub_complete = 0;
-		vs->vs_scrub_examined = 0;
-		vs->vs_scrub_repaired = 0;
-		vs->vs_scrub_start = gethrestime_sec();
-		vs->vs_scrub_end = 0;
-	}
-
-	mutex_exit(&vd->vdev_stat_lock);
 }
 
 /*
@@ -2730,7 +2736,7 @@ vdev_config_dirty(vdev_t *vd)
 		 * sketchy, but it will work.
 		 */
 		nvlist_free(aux[c]);
-		aux[c] = vdev_config_generate(spa, vd, B_TRUE, B_FALSE, B_TRUE);
+		aux[c] = vdev_config_generate(spa, vd, B_TRUE, 0);
 
 		return;
 	}

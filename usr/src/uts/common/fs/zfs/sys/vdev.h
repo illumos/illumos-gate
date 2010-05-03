@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_VDEV_H
@@ -83,8 +82,7 @@ extern void vdev_split(vdev_t *vd);
 extern void vdev_get_stats(vdev_t *vd, vdev_stat_t *vs);
 extern void vdev_clear_stats(vdev_t *vd);
 extern void vdev_stat_update(zio_t *zio, uint64_t psize);
-extern void vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type,
-    boolean_t complete);
+extern void vdev_scan_stat_init(vdev_t *vd);
 extern void vdev_propagate_state(vdev_t *vd);
 extern void vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state,
     vdev_aux_t aux);
@@ -126,9 +124,15 @@ extern int vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg,
 extern void vdev_state_dirty(vdev_t *vd);
 extern void vdev_state_clean(vdev_t *vd);
 
+typedef enum vdev_config_flag {
+	VDEV_CONFIG_SPARE = 1 << 0,
+	VDEV_CONFIG_L2CACHE = 1 << 1,
+	VDEV_CONFIG_REMOVING = 1 << 2
+} vdev_config_flag_t;
+
 extern void vdev_top_config_generate(spa_t *spa, nvlist_t *config);
 extern nvlist_t *vdev_config_generate(spa_t *spa, vdev_t *vd,
-    boolean_t getstats, boolean_t isspare, boolean_t isl2cache);
+    boolean_t getstats, vdev_config_flag_t flags);
 
 /*
  * Label routines

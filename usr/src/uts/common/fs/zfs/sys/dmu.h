@@ -118,7 +118,7 @@ typedef enum dmu_object_type {
 	DMU_OT_FUID,			/* FUID table (Packed NVLIST UINT8) */
 	DMU_OT_FUID_SIZE,		/* FUID table size UINT64 */
 	DMU_OT_NEXT_CLONES,		/* ZAP */
-	DMU_OT_SCRUB_QUEUE,		/* ZAP */
+	DMU_OT_SCAN_QUEUE,		/* ZAP */
 	DMU_OT_USERGROUP_USED,		/* ZAP */
 	DMU_OT_USERGROUP_QUOTA,		/* ZAP */
 	DMU_OT_USERREFS,		/* ZAP */
@@ -128,6 +128,8 @@ typedef enum dmu_object_type {
 	DMU_OT_SA_MASTER_NODE,		/* ZAP */
 	DMU_OT_SA_ATTR_REGISTRATION,	/* ZAP */
 	DMU_OT_SA_ATTR_LAYOUTS,		/* ZAP */
+	DMU_OT_SCAN_XLATE,		/* ZAP */
+	DMU_OT_DEDUP,			/* fake dedup BP from ddt_bp_create() */
 	DMU_OT_NUMTYPES
 } dmu_object_type_t;
 
@@ -220,23 +222,8 @@ typedef void dmu_buf_evict_func_t(struct dmu_buf *db, void *user_ptr);
 #define	DMU_POOL_TMP_USERREFS		"tmp_userrefs"
 #define	DMU_POOL_DDT			"DDT-%s-%s-%s"
 #define	DMU_POOL_DDT_STATS		"DDT-statistics"
-
-/* 4x8 zbookmark_t */
-#define	DMU_POOL_SCRUB_BOOKMARK		"scrub_bookmark"
-/* 4x8 ddt_bookmark_t */
-#define	DMU_POOL_SCRUB_DDT_BOOKMARK	"scrub_ddt_bookmark"
-/* 1x8 max_class */
-#define	DMU_POOL_SCRUB_DDT_CLASS_MAX	"scrub_ddt_class_max"
-/* 1x8 zap obj DMU_OT_SCRUB_QUEUE */
-#define	DMU_POOL_SCRUB_QUEUE		"scrub_queue"
-/* 1x8 txg */
-#define	DMU_POOL_SCRUB_MIN_TXG		"scrub_min_txg"
-/* 1x8 txg */
-#define	DMU_POOL_SCRUB_MAX_TXG		"scrub_max_txg"
-/* 1x4 enum scrub_func */
-#define	DMU_POOL_SCRUB_FUNC		"scrub_func"
-/* 1x8 count */
-#define	DMU_POOL_SCRUB_ERRORS		"scrub_errors"
+#define	DMU_POOL_CREATION_VERSION	"creation_version"
+#define	DMU_POOL_SCAN			"scan"
 
 /*
  * Allocate an object from this objset.  The range of object numbers
