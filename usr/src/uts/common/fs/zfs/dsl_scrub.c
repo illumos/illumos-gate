@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/dsl_pool.h>
@@ -270,6 +269,13 @@ dsl_free(dsl_pool_t *dp, uint64_t txg, const blkptr_t *bpp)
 	 * This function will be used by bp-rewrite wad to intercept frees.
 	 */
 	zio_free(dp->dp_spa, txg, bpp);
+}
+
+void
+dsl_free_sync(zio_t *pio, dsl_pool_t *dp, uint64_t txg, const blkptr_t *bpp)
+{
+	ASSERT(dsl_pool_sync_context(dp));
+	zio_nowait(zio_free_sync(pio, dp->dp_spa, txg, bpp, pio->io_flags));
 }
 
 static boolean_t

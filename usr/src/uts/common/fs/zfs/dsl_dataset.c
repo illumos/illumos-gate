@@ -1598,6 +1598,7 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 
 	if (ds->ds_phys->ds_next_snap_obj != 0) {
 		blkptr_t bp;
+		zio_t *pio;
 		dsl_dataset_t *ds_next;
 		uint64_t itor = 0;
 		uint64_t old_unique;
@@ -1616,6 +1617,8 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		    ds->ds_phys->ds_prev_snap_txg;
 		ASSERT3U(ds->ds_phys->ds_prev_snap_txg, ==,
 		    ds_prev ? ds_prev->ds_phys->ds_creation_txg : 0);
+
+		pio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
 
 		/*
 		 * Transfer to our deadlist (which will become next's
@@ -1639,10 +1642,10 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 				used += bp_get_dsize_sync(dp->dp_spa, &bp);
 				compressed += BP_GET_PSIZE(&bp);
 				uncompressed += BP_GET_UCSIZE(&bp);
-				dsl_free(dp, tx->tx_txg, &bp);
+				dsl_free_sync(pio, dp, tx->tx_txg, &bp);
 			}
 		}
-
+		VERIFY3U(zio_wait(pio), ==, 0);
 		ASSERT3U(used, ==, ds->ds_phys->ds_unique_bytes);
 
 		/* change snapused */

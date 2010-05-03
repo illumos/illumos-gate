@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DSL_POOL_H
@@ -137,6 +136,8 @@ void dsl_pool_tempreserve_clear(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx);
 void dsl_pool_memory_pressure(dsl_pool_t *dp);
 void dsl_pool_willuse_space(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx);
 void dsl_free(dsl_pool_t *dp, uint64_t txg, const blkptr_t *bpp);
+void dsl_free_sync(zio_t *pio, dsl_pool_t *dp, uint64_t txg,
+    const blkptr_t *bpp);
 void dsl_pool_ds_destroyed(struct dsl_dataset *ds, struct dmu_tx *tx);
 void dsl_pool_ds_snapshotted(struct dsl_dataset *ds, struct dmu_tx *tx);
 void dsl_pool_ds_clone_swapped(struct dsl_dataset *ds1, struct dsl_dataset *ds2,
