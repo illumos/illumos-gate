@@ -22,6 +22,8 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/* Portions Copyright 2010 Robert Milkowski */
+
 #include <sys/cred.h>
 #include <sys/zfs_context.h>
 #include <sys/dmu_objset.h>
@@ -89,6 +91,12 @@ dmu_objset_id(objset_t *os)
 	dsl_dataset_t *ds = os->os_dsl_dataset;
 
 	return (ds ? ds->ds_object : 0);
+}
+
+uint64_t
+dmu_objset_syncprop(objset_t *os)
+{
+	return (os->os_sync);
 }
 
 uint64_t
@@ -181,6 +189,22 @@ secondary_cache_changed_cb(void *arg, uint64_t newval)
 	    newval == ZFS_CACHE_METADATA);
 
 	os->os_secondary_cache = newval;
+}
+
+static void
+sync_changed_cb(void *arg, uint64_t newval)
+{
+	objset_t *os = arg;
+
+	/*
+	 * Inheritance and range checking should have been done by now.
+	 */
+	ASSERT(newval == ZFS_SYNC_STANDARD || newval == ZFS_SYNC_ALWAYS ||
+	    newval == ZFS_SYNC_DISABLED);
+
+	os->os_sync = newval;
+	if (os->os_zil)
+		zil_set_sync(os->os_zil, newval);
 }
 
 static void
@@ -303,6 +327,9 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 			if (err == 0)
 				err = dsl_prop_register(ds, "logbias",
 				    logbias_changed_cb, os);
+			if (err == 0)
+				err = dsl_prop_register(ds, "sync",
+				    sync_changed_cb, os);
 		}
 		if (err) {
 			VERIFY(arc_buf_remove_ref(os->os_phys_buf,
@@ -318,6 +345,7 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		os->os_dedup_checksum = ZIO_CHECKSUM_OFF;
 		os->os_dedup_verify = 0;
 		os->os_logbias = 0;
+		os->os_sync = 0;
 		os->os_primary_cache = ZFS_CACHE_ALL;
 		os->os_secondary_cache = ZFS_CACHE_ALL;
 	}
@@ -493,6 +521,8 @@ dmu_objset_evict(objset_t *os)
 			    dedup_changed_cb, os));
 			VERIFY(0 == dsl_prop_unregister(ds, "logbias",
 			    logbias_changed_cb, os));
+			VERIFY(0 == dsl_prop_unregister(ds, "sync",
+			    sync_changed_cb, os));
 		}
 		VERIFY(0 == dsl_prop_unregister(ds, "primarycache",
 		    primary_cache_changed_cb, os));

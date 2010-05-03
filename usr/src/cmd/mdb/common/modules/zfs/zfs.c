@@ -19,9 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
+/* Portions Copyright 2010 Robert Milkowski */
 
 #include <mdb/mdb_ctf.h>
 #include <sys/zfs_context.h>
@@ -329,8 +330,8 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"fzap_default_block_shift",
 		"zfs_immediate_write_sz",
 		"zfs_read_chunk_size",
-		"zil_disable",
 		"zfs_nocacheflush",
+		"zil_replay_disable",
 		"metaslab_gang_bang",
 		"metaslab_df_alloc_threshold",
 		"metaslab_df_free_pct",

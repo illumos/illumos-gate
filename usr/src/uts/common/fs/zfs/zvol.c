@@ -22,6 +22,8 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/* Portions Copyright 2010 Robert Milkowski */
+
 /*
  * ZFS volume emulation driver.
  *
@@ -525,7 +527,10 @@ zvol_create_minor(const char *name)
 	ASSERT(error == 0);
 	zv->zv_volblocksize = doi.doi_data_block_size;
 
-	zil_replay(os, zv, zvol_replay_vector);
+	if (zil_replay_disable)
+		zil_destroy(dmu_objset_zil(os), B_FALSE);
+	else
+		zil_replay(os, zv, zvol_replay_vector);
 	dmu_objset_disown(os, zvol_tag);
 	zv->zv_objset = NULL;
 
@@ -988,9 +993,6 @@ zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t resid,
 	boolean_t slogging;
 	ssize_t immediate_write_sz;
 
-	if (zil_disable)
-		return;
-
 	if (zil_replaying(zilog, tx))
 		return;
 
@@ -1182,8 +1184,10 @@ zvol_strategy(buf_t *bp)
 	}
 
 	is_dump = zv->zv_flags & ZVOL_DUMPIFIED;
-	sync = !(bp->b_flags & B_ASYNC) && !doread && !is_dump &&
-	    !(zv->zv_flags & ZVOL_WCE) && !zil_disable;
+	sync = ((!(bp->b_flags & B_ASYNC) &&
+	    !(zv->zv_flags & ZVOL_WCE)) ||
+	    (zv->zv_objset->os_sync == ZFS_SYNC_ALWAYS)) &&
+	    !doread && !is_dump;
 
 	/*
 	 * There must be no buffer changes when doing a dmu_sync() because
@@ -1363,7 +1367,8 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 		return (error);
 	}
 
-	sync = !(zv->zv_flags & ZVOL_WCE) && !zil_disable;
+	sync = !(zv->zv_flags & ZVOL_WCE) ||
+	    (zv->zv_objset->os_sync == ZFS_SYNC_ALWAYS);
 
 	rl = zfs_range_lock(&zv->zv_znode, uio->uio_loffset, uio->uio_resid,
 	    RL_WRITER);

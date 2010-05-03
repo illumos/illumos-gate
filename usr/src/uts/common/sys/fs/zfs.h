@@ -23,6 +23,8 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/* Portions Copyright 2010 Robert Milkowski */
+
 #ifndef	_SYS_FS_ZFS_H
 #define	_SYS_FS_ZFS_H
 
@@ -119,6 +121,7 @@ typedef enum {
 	ZFS_PROP_OBJSETID,		/* not exposed to the user */
 	ZFS_PROP_DEDUP,
 	ZFS_PROP_MLSLABEL,
+	ZFS_PROP_SYNC,
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -295,6 +298,12 @@ typedef enum zfs_cache_type {
 	ZFS_CACHE_METADATA = 1,
 	ZFS_CACHE_ALL = 2
 } zfs_cache_type_t;
+
+typedef enum {
+	ZFS_SYNC_STANDARD = 0,
+	ZFS_SYNC_ALWAYS = 1,
+	ZFS_SYNC_DISABLED = 2
+} zfs_sync_type_t;
 
 
 /*

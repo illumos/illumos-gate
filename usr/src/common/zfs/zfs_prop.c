@@ -22,6 +22,8 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/* Portions Copyright 2010 Robert Milkowski */
+
 #include <sys/zio.h>
 #include <sys/spa.h>
 #include <sys/u8_textprep.h>
@@ -176,7 +178,18 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
+	static zprop_index_t sync_table[] = {
+		{ "standard",	ZFS_SYNC_STANDARD },
+		{ "always",	ZFS_SYNC_ALWAYS },
+		{ "disabled",	ZFS_SYNC_DISABLED },
+		{ NULL }
+	};
+
 	/* inherit index properties */
+	zprop_register_index(ZFS_PROP_SYNC, "sync", ZFS_SYNC_STANDARD,
+	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
+	    "standard | always | disabled", "SYNC",
+	    sync_table);
 	zprop_register_index(ZFS_PROP_CHECKSUM, "checksum",
 	    ZIO_CHECKSUM_DEFAULT, PROP_INHERIT, ZFS_TYPE_FILESYSTEM |
 	    ZFS_TYPE_VOLUME,

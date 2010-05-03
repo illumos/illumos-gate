@@ -22,6 +22,8 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/* Portions Copyright 2010 Robert Milkowski */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -165,8 +167,7 @@ zfs_sync(vfs_t *vfsp, short flag, cred_t *cr)
 
 		if (zfsvfs->z_log != NULL)
 			zil_commit(zfsvfs->z_log, UINT64_MAX, 0);
-		else
-			txg_wait_synced(dp, 0);
+
 		ZFS_EXIT(zfsvfs);
 	} else {
 		/*
@@ -1024,10 +1025,6 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 	mutex_exit(&zfsvfs->z_os->os_user_ptr_lock);
 
 	zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data);
-	if (zil_disable) {
-		zil_destroy(zfsvfs->z_log, B_FALSE);
-		zfsvfs->z_log = NULL;
-	}
 
 	/*
 	 * If we are not mounting (ie: online recv), then we don't
@@ -1047,34 +1044,36 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 		else
 			zfs_unlinked_drain(zfsvfs);
 
-		if (zfsvfs->z_log) {
-			/*
-			 * Parse and replay the intent log.
-			 *
-			 * Because of ziltest, this must be done after
-			 * zfs_unlinked_drain().  (Further note: ziltest
-			 * doesn't use readonly mounts, where
-			 * zfs_unlinked_drain() isn't called.)  This is because
-			 * ziltest causes spa_sync() to think it's committed,
-			 * but actually it is not, so the intent log contains
-			 * many txg's worth of changes.
-			 *
-			 * In particular, if object N is in the unlinked set in
-			 * the last txg to actually sync, then it could be
-			 * actually freed in a later txg and then reallocated
-			 * in a yet later txg.  This would write a "create
-			 * object N" record to the intent log.  Normally, this
-			 * would be fine because the spa_sync() would have
-			 * written out the fact that object N is free, before
-			 * we could write the "create object N" intent log
-			 * record.
-			 *
-			 * But when we are in ziltest mode, we advance the "open
-			 * txg" without actually spa_sync()-ing the changes to
-			 * disk.  So we would see that object N is still
-			 * allocated and in the unlinked set, and there is an
-			 * intent log record saying to allocate it.
-			 */
+		/*
+		 * Parse and replay the intent log.
+		 *
+		 * Because of ziltest, this must be done after
+		 * zfs_unlinked_drain().  (Further note: ziltest
+		 * doesn't use readonly mounts, where
+		 * zfs_unlinked_drain() isn't called.)  This is because
+		 * ziltest causes spa_sync() to think it's committed,
+		 * but actually it is not, so the intent log contains
+		 * many txg's worth of changes.
+		 *
+		 * In particular, if object N is in the unlinked set in
+		 * the last txg to actually sync, then it could be
+		 * actually freed in a later txg and then reallocated
+		 * in a yet later txg.  This would write a "create
+		 * object N" record to the intent log.  Normally, this
+		 * would be fine because the spa_sync() would have
+		 * written out the fact that object N is free, before
+		 * we could write the "create object N" intent log
+		 * record.
+		 *
+		 * But when we are in ziltest mode, we advance the "open
+		 * txg" without actually spa_sync()-ing the changes to
+		 * disk.  So we would see that object N is still
+		 * allocated and in the unlinked set, and there is an
+		 * intent log record saying to allocate it.
+		 */
+		if (zil_replay_disable) {
+			zil_destroy(zfsvfs->z_log, B_FALSE);
+		} else {
 			zfsvfs->z_replay = B_TRUE;
 			zil_replay(zfsvfs->z_os, zfsvfs, zfs_replay_vector);
 			zfsvfs->z_replay = B_FALSE;

@@ -19,9 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
+/* Portions Copyright 2010 Robert Milkowski */
 
 #ifndef	_SYS_ZIL_IMPL_H
 #define	_SYS_ZIL_IMPL_H
@@ -86,6 +87,7 @@ struct zilog {
 	uint8_t		zl_stop_sync;	/* for debugging */
 	uint8_t		zl_writer;	/* boolean: write setup in progress */
 	uint8_t		zl_logbias;	/* latency or throughput */
+	uint8_t		zl_sync;	/* synchronous or asynchronous */
 	int		zl_parse_error;	/* last zil_parse() error */
 	uint64_t	zl_parse_blk_seq; /* highest blk seq on last parse */
 	uint64_t	zl_parse_lr_seq; /* highest lr seq on last parse */

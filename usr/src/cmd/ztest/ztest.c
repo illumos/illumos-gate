@@ -2820,6 +2820,21 @@ ztest_objset_create_cb(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx)
 	    DMU_OT_ZAP_OTHER, DMU_OT_NONE, 0, tx) == 0);
 }
 
+static int
+ztest_dataset_create(char *dsname)
+{
+	uint64_t zilset = ztest_random(100);
+	int err = dmu_objset_create(dsname, DMU_OST_OTHER, 0,
+	    ztest_objset_create_cb, NULL);
+
+	if (err || zilset < 80)
+		return (err);
+
+	(void) printf("Setting dataset %s to sync always\n", dsname);
+	return (ztest_dsl_prop_set_uint64(dsname, ZFS_PROP_SYNC,
+	    ZFS_SYNC_ALWAYS, B_FALSE));
+}
+
 /* ARGSUSED */
 static int
 ztest_objset_destroy_cb(const char *name, void *arg)
@@ -2929,8 +2944,7 @@ ztest_dmu_objset_create_destroy(ztest_ds_t *zd, uint64_t id)
 	/*
 	 * Verify that we can create a new dataset.
 	 */
-	error = dmu_objset_create(name, DMU_OST_OTHER, 0,
-	    ztest_objset_create_cb, NULL);
+	error = ztest_dataset_create(name);
 	if (error) {
 		if (error == ENOSPC) {
 			ztest_record_enospc(FTAG);
@@ -5019,8 +5033,7 @@ ztest_dataset_open(ztest_shared_t *zs, int d)
 
 	(void) rw_rdlock(&zs->zs_name_lock);
 
-	error = dmu_objset_create(name, DMU_OST_OTHER, 0,
-	    ztest_objset_create_cb, NULL);
+	error = ztest_dataset_create(name);
 	if (error == ENOSPC) {
 		(void) rw_unlock(&zs->zs_name_lock);
 		ztest_record_enospc(FTAG);

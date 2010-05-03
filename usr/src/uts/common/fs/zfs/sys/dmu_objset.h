@@ -22,6 +22,8 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/* Portions Copyright 2010 Robert Milkowski */
+
 #ifndef	_SYS_DMU_OBJSET_H
 #define	_SYS_DMU_OBJSET_H
 
@@ -77,6 +79,7 @@ struct objset {
 	uint8_t os_logbias;
 	uint8_t os_primary_cache;
 	uint8_t os_secondary_cache;
+	uint8_t os_sync;
 
 	/* no lock needed: */
 	struct dmu_tx *os_synctx; /* XXX sketchy */

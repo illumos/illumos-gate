@@ -19,9 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
+/* Portions Copyright 2010 Robert Milkowski */
 
 #ifndef	_SYS_ZIL_H
 #define	_SYS_ZIL_H
@@ -417,9 +418,11 @@ extern void	zil_resume(zilog_t *zilog);
 extern void	zil_add_block(zilog_t *zilog, const blkptr_t *bp);
 extern int	zil_bp_tree_add(zilog_t *zilog, const blkptr_t *bp);
 
+extern void	zil_set_sync(zilog_t *zilog, uint64_t syncval);
+
 extern void	zil_set_logbias(zilog_t *zilog, uint64_t slogval);
 
-extern int zil_disable;
+extern int zil_replay_disable;
 
 #ifdef	__cplusplus
 }
