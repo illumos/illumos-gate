@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -60,7 +59,7 @@ LINTTAGS  += -DSOLARIS_S11 -erroff=E_STATIC_UNUSED
 
 INC_PATH  += -I$(UTSBASE)/common/io/myri10ge -I$(UTSBASE)/common/io/myri10ge/firmware
 
-CFLAGS    += -dalign -DSOLARIS_S11
+CFLAGS    += -DSOLARIS_S11
 
 #
 # Driver depends on MAC

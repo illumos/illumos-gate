@@ -20,11 +20,8 @@
 #
 # uts/intel/nxge/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the Sun NIU
 #	10G/1G Ethernet leaf driver kernel module.
@@ -63,11 +60,6 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-#
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS	+= -dalign
 #
 # Include nxge specific header files
 #

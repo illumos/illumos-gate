@@ -20,8 +20,7 @@
 #
 # uts/intel/hxge/Makefile
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile drives the production of the Sun
 #	10G hxge Ethernet leaf driver kernel module.
@@ -60,11 +59,6 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-#
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS	+= -dalign
 #
 # Include hxge specific header files
 #
