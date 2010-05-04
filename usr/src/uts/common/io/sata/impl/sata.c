@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -54,6 +53,14 @@
 #include <sys/sata/sata_satl.h>
 
 #include <sys/scsi/impl/spc3_types.h>
+
+/*
+ * FMA header files
+ */
+#include <sys/ddifm.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#include <sys/fm/io/ddi.h>
 
 /* Debug flags - defined in sata.h */
 int	sata_debug_flags = 0;
@@ -379,6 +386,10 @@ static	void sata_fixed_sense_data_preset(struct scsi_extended_sense *);
 static  void sata_target_devid_register(dev_info_t *, sata_drive_info_t *);
 static  int sata_check_modser(char *, int);
 
+/*
+ * FMA
+ */
+static boolean_t sata_check_for_dma_error(dev_info_t *, sata_pkt_txlate_t *);
 
 
 /*
@@ -1675,7 +1686,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
  * No association with any scsi packet is made and no callback routine is
  * specified.
  *
- * Returns a pointer to sata packet upon successfull packet creation.
+ * Returns a pointer to sata packet upon successful packet creation.
  * Returns NULL, if packet cannot be created.
  */
 sata_pkt_t *
@@ -1717,13 +1728,25 @@ sata_get_error_retrieval_pkt(dev_info_t *dip, sata_device_t *sata_device,
 
 	switch (pkt_type) {
 	case SATA_ERR_RETR_PKT_TYPE_NCQ:
-		if (sata_ncq_err_ret_cmd_setup(spx, sdinfo) == SATA_SUCCESS)
+		if (sata_ncq_err_ret_cmd_setup(spx, sdinfo) == SATA_SUCCESS) {
+			if (sata_check_for_dma_error(dip, spx)) {
+				ddi_fm_service_impact(dip,
+				    DDI_SERVICE_UNAFFECTED);
+				break;
+			}
 			return (spkt);
+		}
 		break;
 
 	case SATA_ERR_RETR_PKT_TYPE_ATAPI:
-		if (sata_atapi_err_ret_cmd_setup(spx, sdinfo) == SATA_SUCCESS)
+		if (sata_atapi_err_ret_cmd_setup(spx, sdinfo) == SATA_SUCCESS) {
+			if (sata_check_for_dma_error(dip, spx)) {
+				ddi_fm_service_impact(dip,
+				    DDI_SERVICE_UNAFFECTED);
+				break;
+			}
 			return (spkt);
+		}
 		break;
 
 	default:
@@ -1765,7 +1788,7 @@ sata_free_error_retrieval_pkt(sata_pkt_t *sata_pkt)
  * No association with any scsi packet is made and no callback routine is
  * specified.
  *
- * Returns a pointer to sata packet upon successfull packet creation.
+ * Returns a pointer to sata packet upon successful packet creation.
  * Returns NULL, if packet cannot be created.
  *
  * NOTE: Input/Output value includes 64 bits accoring to SATA Spec 2.6,
@@ -2179,7 +2202,7 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 	sata_pkt_txlate_t *spx;
 	ddi_dma_attr_t cur_dma_attr;
 	int rval;
-	boolean_t new_pkt = TRUE;
+	boolean_t new_pkt = B_TRUE;
 
 	ASSERT(ap->a_hba_tran->tran_hba_dip == dip);
 
@@ -2238,7 +2261,7 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 
 		spx->txlt_total_residue = bp->b_bcount;
 	} else {
-		new_pkt = FALSE;
+		new_pkt = B_FALSE;
 		/*
 		 * Packet was preallocated/initialized by previous call
 		 */
@@ -2301,31 +2324,42 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 			bioerror(bp, EINVAL);
 			break;
 		}
-		if (new_pkt == TRUE) {
-			/*
-			 * Since this is a new packet, we can clean-up
-			 * everything
-			 */
-			sata_scsi_destroy_pkt(ap, pkt);
-		} else {
-			/*
-			 * This is a re-used packet. It will be target driver's
-			 * responsibility to eventually destroy it (which
-			 * will free allocated resources).
-			 * Here, we just "complete" the request, leaving
-			 * allocated resources intact, so the request may
-			 * be retried.
-			 */
-			spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp = NULL;
-			sata_pkt_free(spx);
-		}
-		return (NULL);
+		goto fail;
 	}
+
+	if (sata_check_for_dma_error(dip, spx)) {
+		ddi_fm_service_impact(dip, DDI_SERVICE_UNAFFECTED);
+		bioerror(bp, EFAULT);
+		goto fail;
+	}
+
+success:
 	/* Set number of bytes that are not yet accounted for */
 	pkt->pkt_resid = spx->txlt_total_residue;
 	ASSERT(pkt->pkt_resid >= 0);
 
 	return (pkt);
+
+fail:
+	if (new_pkt == B_TRUE) {
+		/*
+		 * Since this is a new packet, we can clean-up
+		 * everything
+		 */
+		sata_scsi_destroy_pkt(ap, pkt);
+	} else {
+		/*
+		 * This is a re-used packet. It will be target driver's
+		 * responsibility to eventually destroy it (which
+		 * will free allocated resources).
+		 * Here, we just "complete" the request, leaving
+		 * allocated resources intact, so the request may
+		 * be retried.
+		 */
+		spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp = NULL;
+		sata_pkt_free(spx);
+	}
+	return (NULL);
 }
 
 /*
@@ -9455,7 +9489,7 @@ sata_save_atapi_trace(sata_pkt_txlate_t *spx, int count)
 
 /*
  * Fetch inquiry data from ATAPI device
- * Returns SATA_SUCCESS if operation was successfull, SATA_FAILURE otherwise.
+ * Returns SATA_SUCCESS if operation was successful, SATA_FAILURE otherwise.
  *
  * Note:
  * inqb pointer does not point to a DMA-able buffer. It is a local buffer
@@ -9474,6 +9508,7 @@ sata_get_atapi_inquiry_data(sata_hba_inst_t *sata_hba,
 	sata_cmd_t *scmd;
 	int rval;
 	uint8_t *rqsp;
+	dev_info_t *dip = SATA_DIP(sata_hba);
 #ifdef SATA_DEBUG
 	char msg_buf[MAXPATHLEN];
 #endif
@@ -9568,17 +9603,23 @@ sata_get_atapi_inquiry_data(sata_hba_inst_t *sata_hba,
 			    DDI_DMA_SYNC_FORCPU);
 			ASSERT(rval == DDI_SUCCESS);
 		}
-		/*
-		 * Normal completion - copy data into caller's buffer
-		 */
-		bcopy(bp->b_un.b_addr, (uint8_t *)inq,
-		    sizeof (struct scsi_inquiry));
+
+		if (sata_check_for_dma_error(dip, spx)) {
+			ddi_fm_service_impact(dip, DDI_SERVICE_UNAFFECTED);
+			rval = SATA_FAILURE;
+		} else {
+			/*
+			 * Normal completion - copy data into caller's buffer
+			 */
+			bcopy(bp->b_un.b_addr, (uint8_t *)inq,
+			    sizeof (struct scsi_inquiry));
 #ifdef SATA_DEBUG
-		if (sata_debug_flags & SATA_DBG_ATAPI) {
-			sata_show_inqry_data((uint8_t *)inq);
-		}
+			if (sata_debug_flags & SATA_DBG_ATAPI) {
+				sata_show_inqry_data((uint8_t *)inq);
+			}
 #endif
-		rval = SATA_SUCCESS;
+			rval = SATA_SUCCESS;
+		}
 	} else {
 		/*
 		 * Something went wrong - analyze return - check rqsense data
@@ -13221,6 +13262,7 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 	sata_cmd_t *scmd;
 	sata_pkt_txlate_t *spx;
 	int rval;
+	dev_info_t *dip = SATA_DIP(sata_hba_inst);
 
 	spx = kmem_zalloc(sizeof (sata_pkt_txlate_t), KM_SLEEP);
 	spx->txlt_sata_hba_inst = sata_hba_inst;
@@ -13289,6 +13331,13 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 			rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			    DDI_DMA_SYNC_FORKERNEL);
 			ASSERT(rval == DDI_SUCCESS);
+			if (sata_check_for_dma_error(dip, spx)) {
+				ddi_fm_service_impact(dip,
+				    DDI_SERVICE_UNAFFECTED);
+				rval = SATA_RETRY;
+				goto fail;
+			}
+
 		}
 		if ((((sata_id_t *)(bp->b_un.b_addr))->ai_config &
 		    SATA_INCOMPLETE_DATA) == SATA_INCOMPLETE_DATA) {
@@ -14451,7 +14500,7 @@ sata_ioctl_configure(sata_hba_inst_t *sata_hba_inst,
 {
 	int cport, pmport, qual;
 	int rval;
-	boolean_t target = TRUE;
+	boolean_t target = B_TRUE;
 	sata_cport_info_t *cportinfo;
 	sata_pmport_info_t *pmportinfo = NULL;
 	dev_info_t *tdip;
@@ -14498,7 +14547,7 @@ sata_ioctl_configure(sata_hba_inst_t *sata_hba_inst,
 
 	if ((sata_device->satadev_state & SATA_PSTATE_SHUTDOWN) != 0) {
 		/* need to activate port */
-		target = FALSE;
+		target = B_FALSE;
 
 		/* Sanity check */
 		if (SATA_PORT_ACTIVATE_FUNC(sata_hba_inst) == NULL)
@@ -14566,7 +14615,7 @@ sata_ioctl_configure(sata_hba_inst_t *sata_hba_inst,
 	    SATA_DEV_IDENTIFY_RETRY) != SATA_SUCCESS)
 		return (EIO);
 
-	if (sata_device->satadev_type != SATA_DTYPE_NONE && target == FALSE) {
+	if (sata_device->satadev_type != SATA_DTYPE_NONE && target == B_FALSE) {
 		if (qual == SATA_ADDR_DPMPORT) {
 			/*
 			 * That's the transition from "inactive" port
@@ -14993,7 +15042,7 @@ sata_ioctl_activate(sata_hba_inst_t *sata_hba_inst,
 	int cport, pmport, qual;
 	sata_cport_info_t *cportinfo;
 	sata_pmport_info_t *pmportinfo = NULL;
-	boolean_t dev_existed = TRUE;
+	boolean_t dev_existed = B_TRUE;
 
 	/* Sanity check */
 	if (SATA_PORT_ACTIVATE_FUNC(sata_hba_inst) == NULL)
@@ -15020,11 +15069,11 @@ sata_ioctl_activate(sata_hba_inst_t *sata_hba_inst,
 		pmportinfo = SATA_PMPORT_INFO(sata_hba_inst, cport, pmport);
 		if (pmportinfo->pmport_state & SATA_PSTATE_SHUTDOWN ||
 		    pmportinfo->pmport_dev_type == SATA_DTYPE_NONE)
-			dev_existed = FALSE;
+			dev_existed = B_FALSE;
 	} else { /* cport */
 		if (cportinfo->cport_state & SATA_PSTATE_SHUTDOWN ||
 		    cportinfo->cport_dev_type == SATA_DTYPE_NONE)
-			dev_existed = FALSE;
+			dev_existed = B_FALSE;
 	}
 	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
 
@@ -15081,7 +15130,7 @@ sata_ioctl_activate(sata_hba_inst_t *sata_hba_inst,
 	sata_gen_sysevent(sata_hba_inst, &sata_device->satadev_addr,
 	    SE_NO_HINT);
 
-	if (dev_existed == FALSE) {
+	if (dev_existed == B_FALSE) {
 		if (qual == SATA_ADDR_PMPORT &&
 		    pmportinfo->pmport_dev_type != SATA_DTYPE_NONE) {
 			/*
@@ -16337,6 +16386,7 @@ sata_fetch_smart_data(
 	sata_cmd_t *scmd;
 	sata_pkt_txlate_t *spx;
 	int rval;
+	dev_info_t *dip = SATA_DIP(sata_hba_inst);
 
 #if ! defined(lint)
 	ASSERT(sizeof (struct smart_data) == 512);
@@ -16410,6 +16460,12 @@ sata_fetch_smart_data(
 			rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			    DDI_DMA_SYNC_FORKERNEL);
 			ASSERT(rval == DDI_SUCCESS);
+			if (sata_check_for_dma_error(dip, spx)) {
+				ddi_fm_service_impact(dip,
+				    DDI_SERVICE_UNAFFECTED);
+				rval = -1;
+				goto fail;
+			}
 		}
 		bcopy(scmd->satacmd_bp->b_un.b_addr, (uint8_t *)smart_data,
 		    sizeof (struct smart_data));
@@ -16443,6 +16499,7 @@ sata_ext_smart_selftest_read_log(
 	sata_pkt_t *spkt;
 	sata_cmd_t *scmd;
 	int rval;
+	dev_info_t *dip = SATA_DIP(sata_hba_inst);
 
 #if ! defined(lint)
 	ASSERT(sizeof (struct smart_ext_selftest_log) == 512);
@@ -16519,6 +16576,12 @@ sata_ext_smart_selftest_read_log(
 			rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			    DDI_DMA_SYNC_FORKERNEL);
 			ASSERT(rval == DDI_SUCCESS);
+			if (sata_check_for_dma_error(dip, spx)) {
+				ddi_fm_service_impact(dip,
+				    DDI_SERVICE_UNAFFECTED);
+				rval = -1;
+				goto fail;
+			}
 		}
 		bcopy(scmd->satacmd_bp->b_un.b_addr,
 		    (uint8_t *)ext_selftest_log,
@@ -16550,6 +16613,7 @@ sata_smart_selftest_log(
 	sata_cmd_t *scmd;
 	sata_pkt_txlate_t *spx;
 	int rval;
+	dev_info_t *dip = SATA_DIP(sata_hba_inst);
 
 #if ! defined(lint)
 	ASSERT(sizeof (struct smart_selftest_log) == 512);
@@ -16622,6 +16686,12 @@ sata_smart_selftest_log(
 			rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			    DDI_DMA_SYNC_FORKERNEL);
 			ASSERT(rval == DDI_SUCCESS);
+			if (sata_check_for_dma_error(dip, spx)) {
+				ddi_fm_service_impact(dip,
+				    DDI_SERVICE_UNAFFECTED);
+				rval = -1;
+				goto fail;
+			}
 		}
 		bcopy(scmd->satacmd_bp->b_un.b_addr, (uint8_t *)selftest_log,
 		    sizeof (struct smart_selftest_log));
@@ -16655,6 +16725,7 @@ sata_smart_read_log(
 	sata_cmd_t *scmd;
 	sata_pkt_txlate_t *spx;
 	int rval;
+	dev_info_t *dip = SATA_DIP(sata_hba_inst);
 
 	spx = kmem_zalloc(sizeof (sata_pkt_txlate_t), KM_SLEEP);
 	spx->txlt_sata_hba_inst = sata_hba_inst;
@@ -16724,6 +16795,12 @@ sata_smart_read_log(
 			rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			    DDI_DMA_SYNC_FORKERNEL);
 			ASSERT(rval == DDI_SUCCESS);
+			if (sata_check_for_dma_error(dip, spx)) {
+				ddi_fm_service_impact(dip,
+				    DDI_SERVICE_UNAFFECTED);
+				rval = -1;
+				goto fail;
+			}
 		}
 		bcopy(scmd->satacmd_bp->b_un.b_addr, smart_log, log_size * 512);
 		rval = 0;
@@ -16754,6 +16831,7 @@ sata_read_log_ext_directory(
 	sata_pkt_t *spkt;
 	sata_cmd_t *scmd;
 	int rval;
+	dev_info_t *dip = SATA_DIP(sata_hba_inst);
 
 #if ! defined(lint)
 	ASSERT(sizeof (struct read_log_ext_directory) == 512);
@@ -16825,6 +16903,12 @@ sata_read_log_ext_directory(
 			rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			    DDI_DMA_SYNC_FORKERNEL);
 			ASSERT(rval == DDI_SUCCESS);
+			if (sata_check_for_dma_error(dip, spx)) {
+				ddi_fm_service_impact(dip,
+				    DDI_SERVICE_UNAFFECTED);
+				rval = -1;
+				goto fail;
+			}
 		}
 		bcopy(scmd->satacmd_bp->b_un.b_addr, (uint8_t *)logdir,
 		    sizeof (struct read_log_ext_directory));
@@ -20193,6 +20277,28 @@ sata_check_device_removed(dev_info_t *tdip)
 	else
 		return (B_FALSE);
 }
+
+
+/*
+ * Check for DMA error. Return B_TRUE if error, B_FALSE otherwise.
+ */
+static boolean_t
+sata_check_for_dma_error(dev_info_t *dip, sata_pkt_txlate_t *spx)
+{
+	int fm_capability = ddi_fm_capable(dip);
+	ddi_fm_error_t de;
+
+	if (fm_capability & DDI_FM_DMACHK_CAPABLE) {
+		if (spx->txlt_buf_dma_handle != NULL) {
+			ddi_fm_dma_err_get(spx->txlt_buf_dma_handle, &de,
+			    DDI_FME_VERSION);
+			if (de.fme_status != DDI_SUCCESS)
+				return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
+}
+
 
 /* ************************ FAULT INJECTTION **************************** */
 

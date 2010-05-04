@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SI3124VAR_H
@@ -171,6 +170,7 @@ typedef struct si_ctl_state {
 	size_t sictl_intr_size;			/* Size of intr array */
 	uint_t sictl_intr_pri;			/* Interrupt priority */
 	int sictl_intr_cap;			/* Interrupt capabilities */
+	int fm_capabilities;			/* FMA capabilities */
 
 } si_ctl_state_t;
 
@@ -195,12 +195,13 @@ _NOTE(MUTEX_PROTECTS_DATA(si_ctl_state_t::sictl_mutex,
 /* progress values for si_attach */
 #define	ATTACH_PROGRESS_NONE			(1<<0)
 #define	ATTACH_PROGRESS_STATEP_ALLOC		(1<<1)
-#define	ATTACH_PROGRESS_CONF_HANDLE		(1<<2)
-#define	ATTACH_PROGRESS_BAR0_MAP		(1<<3)
-#define	ATTACH_PROGRESS_BAR1_MAP		(1<<4)
-#define	ATTACH_PROGRESS_INTR_ADDED		(1<<5)
-#define	ATTACH_PROGRESS_MUTEX_INIT		(1<<6)
-#define	ATTACH_PROGRESS_HW_INIT			(1<<7)
+#define	ATTACH_PROGRESS_INIT_FMA		(1<<2)
+#define	ATTACH_PROGRESS_CONF_HANDLE		(1<<3)
+#define	ATTACH_PROGRESS_BAR0_MAP		(1<<4)
+#define	ATTACH_PROGRESS_BAR1_MAP		(1<<5)
+#define	ATTACH_PROGRESS_INTR_ADDED		(1<<6)
+#define	ATTACH_PROGRESS_MUTEX_INIT		(1<<7)
+#define	ATTACH_PROGRESS_HW_INIT			(1<<8)
 
 #define	SI_10MS_TICKS	(drv_usectohz(10000))	/* ticks in 10 millisec */
 #define	SI_1MS_TICKS	(drv_usectohz(1000))	/* ticks in 1 millisec */
@@ -236,7 +237,7 @@ _NOTE(MUTEX_PROTECTS_DATA(si_ctl_state_t::sictl_mutex,
 #define	SIDBG_COOKIES	0x1000
 #define	SIDBG_POWER	0x2000
 
-extern int si_debug_flag;
+extern uint32_t si_debug_flags;
 
 #define	SIDBG0(flag, softp, format) \
 	if (si_debug_flags & (flag)) { \

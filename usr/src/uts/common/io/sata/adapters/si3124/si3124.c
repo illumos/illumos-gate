@@ -204,6 +204,14 @@
 #include <sys/sdt.h>
 
 /*
+ * FMA header files
+ */
+#include <sys/ddifm.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#include <sys/fm/io/ddi.h>
+
+/*
  * Function prototypes for driver entry points
  */
 static	int si_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -302,6 +310,18 @@ static	int si_initialize_port_wait_till_ready(si_ctl_state_t *, int);
 static void si_timeout_pkts(si_ctl_state_t *, si_port_state_t *, int, uint32_t);
 static	void si_watchdog_handler(si_ctl_state_t *);
 
+/*
+ * FMA Prototypes
+ */
+static void si_fm_init(si_ctl_state_t *);
+static void si_fm_fini(si_ctl_state_t *);
+static int si_fm_error_cb(dev_info_t *, ddi_fm_error_t *, const void *);
+static int si_check_acc_handle(ddi_acc_handle_t);
+static int si_check_dma_handle(ddi_dma_handle_t);
+static int si_check_ctl_handles(si_ctl_state_t *);
+static int si_check_port_handles(si_port_state_t *);
+static void si_fm_ereport(si_ctl_state_t *, char *, char *);
+
 #if SI_DEBUG
 static	void si_log(si_ctl_state_t *, uint_t, char *, ...);
 #endif	/* SI_DEBUG */
@@ -347,9 +367,10 @@ static ddi_dma_attr_t prb_sgt_dma_attr = {
 
 /* Device access attributes */
 static ddi_device_acc_attr_t accattr = {
-    DDI_DEVICE_ATTR_V0,
+    DDI_DEVICE_ATTR_V1,
     DDI_STRUCTURE_LE_ACC,
-    DDI_STRICTORDER_ACC
+    DDI_STRICTORDER_ACC,
+    DDI_DEFAULT_ACC
 };
 
 
@@ -506,6 +527,16 @@ si_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		si_ctlp->sictl_devinfop = dip;
 
 		attach_state |= ATTACH_PROGRESS_STATEP_ALLOC;
+
+		/* Initialize FMA */
+		si_ctlp->fm_capabilities = ddi_getprop(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "fm-capable",
+		    DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
+		    DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE);
+
+		si_fm_init(si_ctlp);
+
+		attach_state |= ATTACH_PROGRESS_INIT_FMA;
 
 		/* Configure pci config space handle. */
 		status = pci_config_setup(dip, &si_ctlp->sictl_pci_conf_handle);
@@ -722,6 +753,10 @@ err_out:
 		pci_config_teardown(&si_ctlp->sictl_pci_conf_handle);
 	}
 
+	if (attach_state & ATTACH_PROGRESS_INIT_FMA) {
+		si_fm_fini(si_ctlp);
+	}
+
 	if (attach_state & ATTACH_PROGRESS_STATEP_ALLOC) {
 		ddi_soft_state_free(si_statep, instance);
 	}
@@ -783,6 +818,9 @@ si_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ddi_regs_map_free(&si_ctlp->sictl_port_acc_handle);
 		ddi_regs_map_free(&si_ctlp->sictl_global_acc_handle);
 		pci_config_teardown(&si_ctlp->sictl_pci_conf_handle);
+
+		/* deinit FMA */
+		si_fm_fini(si_ctlp);
 
 		/* free the soft state. */
 		ddi_soft_state_free(si_statep, instance);
@@ -1248,25 +1286,24 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 }
 
 #define	SENDUP_PACKET(si_portp, satapkt, reason)			\
-	if ((satapkt->satapkt_cmd.satacmd_cmd_reg ==			\
-					SATAC_WRITE_FPDMA_QUEUED) ||	\
-	    (satapkt->satapkt_cmd.satacmd_cmd_reg ==			\
-					SATAC_READ_FPDMA_QUEUED)) {	\
-		si_portp->siport_pending_ncq_count--;			\
-	}								\
 	if (satapkt) {							\
+		if ((satapkt->satapkt_cmd.satacmd_cmd_reg ==		\
+					SATAC_WRITE_FPDMA_QUEUED) ||	\
+		    (satapkt->satapkt_cmd.satacmd_cmd_reg ==		\
+					SATAC_READ_FPDMA_QUEUED)) {	\
+			si_portp->siport_pending_ncq_count--;		\
+		}							\
 		satapkt->satapkt_reason = reason;			\
 		/*							\
 		 * We set the satapkt_reason in both synch and		\
 		 * non-synch cases.					\
 		 */							\
-	}								\
-	if (satapkt &&							\
-		!(satapkt->satapkt_op_mode & SATA_OPMODE_SYNCH) &&	\
-		satapkt->satapkt_comp) {				\
-		mutex_exit(&si_portp->siport_mutex);			\
-		(*satapkt->satapkt_comp)(satapkt);			\
-		mutex_enter(&si_portp->siport_mutex);			\
+		if (!(satapkt->satapkt_op_mode & SATA_OPMODE_SYNCH) &&	\
+			satapkt->satapkt_comp) {			\
+			mutex_exit(&si_portp->siport_mutex);		\
+			(*satapkt->satapkt_comp)(satapkt);		\
+			mutex_enter(&si_portp->siport_mutex);		\
+		}							\
 	}
 
 /*
@@ -2100,7 +2137,7 @@ si_find_dev_signature(
 	mutex_enter(&si_portp->siport_mutex);
 
 	slot = si_claim_free_slot(si_ctlp, si_portp, port);
-	if (slot == -1) {
+	if (slot == SI_FAILURE) {
 		/* Empty slot could not be found. */
 		if (pmp != PORTMULT_CONTROL_PORT) {
 			/* We are behind port multiplier. */
@@ -2449,7 +2486,7 @@ si_deliver_satapkt(
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
 	slot = si_claim_free_slot(si_ctlp, si_portp, port);
-	if (slot == -1) {
+	if (slot == SI_FAILURE) {
 		return (SI_FAILURE);
 	}
 
@@ -2980,6 +3017,15 @@ si_initialize_controller(si_ctl_state_t *si_ctlp)
 			}
 		}
 
+		if (si_check_ctl_handles(si_ctlp) != DDI_SUCCESS ||
+		    si_check_port_handles(si_portp) != DDI_SUCCESS) {
+			ddi_fm_service_impact(si_ctlp->sictl_devinfop,
+			    DDI_SERVICE_LOST);
+			mutex_exit(&si_portp->siport_mutex);
+			mutex_exit(&si_ctlp->sictl_mutex);
+			return (SI_FAILURE);
+		}
+
 		mutex_exit(&si_portp->siport_mutex);
 	}
 
@@ -3235,7 +3281,7 @@ si_read_portmult_reg(
 	    port, pmport, regnum);
 
 	slot = si_claim_free_slot(si_ctlp, si_portp, port);
-	if (slot == -1) {
+	if (slot == SI_FAILURE) {
 		return (SI_FAILURE);
 	}
 
@@ -3305,6 +3351,13 @@ si_read_portmult_reg(
 		    (uint32_t *)(PORT_LRAM(si_ctlp, port, slot)+i*4));
 	}
 
+	if (si_check_ctl_handles(si_ctlp) != DDI_SUCCESS ||
+	    si_check_port_handles(si_portp) != DDI_SUCCESS) {
+		ddi_fm_service_impact(si_ctlp->sictl_devinfop,
+		    DDI_SERVICE_UNAFFECTED);
+		return (SI_FAILURE);
+	}
+
 	if (((GET_FIS_COMMAND(prb->prb_fis) & 0x1) != 0) ||
 	    (GET_FIS_FEATURES(prb->prb_fis) != 0)) {
 		/* command failed. */
@@ -3350,7 +3403,7 @@ si_write_portmult_reg(
 	    port, pmport, regnum, regval);
 
 	slot = si_claim_free_slot(si_ctlp, si_portp, port);
-	if (slot == -1) {
+	if (slot == SI_FAILURE) {
 		return (SI_FAILURE);
 	}
 
@@ -3425,6 +3478,13 @@ si_write_portmult_reg(
 		    (uint32_t *)(PORT_LRAM(si_ctlp, port, slot)+i*4));
 	}
 
+	if (si_check_ctl_handles(si_ctlp) != DDI_SUCCESS ||
+	    si_check_port_handles(si_portp) != DDI_SUCCESS) {
+		ddi_fm_service_impact(si_ctlp->sictl_devinfop,
+		    DDI_SERVICE_UNAFFECTED);
+		return (SI_FAILURE);
+	}
+
 	if (((GET_FIS_COMMAND(prb->prb_fis) & 0x1) != 0) ||
 	    (GET_FIS_FEATURES(prb->prb_fis) != 0)) {
 		/* command failed */
@@ -3495,6 +3555,13 @@ si_intr(caddr_t arg1, caddr_t arg2)
 	    "si_intr: global_int_status: 0x%x",
 	    global_intr_status);
 
+	if (si_check_acc_handle(si_ctlp->sictl_global_acc_handle) !=
+	    DDI_SUCCESS) {
+		ddi_fm_service_impact(si_ctlp->sictl_devinfop,
+		    DDI_SERVICE_UNAFFECTED);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	if (!(global_intr_status & SI31xx_INTR_PORT_MASK)) {
 		/* Sorry, the interrupt is not ours. */
 		return (DDI_INTR_UNCLAIMED);
@@ -3523,6 +3590,18 @@ si_intr(caddr_t arg1, caddr_t arg2)
 		if (port_intr_status & INTR_COMMAND_COMPLETE) {
 			(void) si_intr_command_complete(si_ctlp, si_portp,
 			    port);
+
+			mutex_enter(&si_portp->siport_mutex);
+			if (si_check_ctl_handles(si_ctlp) != DDI_SUCCESS ||
+			    si_check_port_handles(si_portp) != DDI_SUCCESS) {
+				mutex_exit(&si_portp->siport_mutex);
+				ddi_fm_service_impact(si_ctlp->sictl_devinfop,
+				    DDI_SERVICE_UNAFFECTED);
+				(void) si_initialize_port_wait_till_ready(
+				    si_ctlp, port);
+			} else {
+				mutex_exit(&si_portp->siport_mutex);
+			}
 		} else {
 			/* Clear the interrupts */
 			ddi_put32(si_ctlp->sictl_port_acc_handle,
@@ -3714,19 +3793,34 @@ si_intr_command_error(
 		break;
 
 	case CMD_ERR_SDBERROR:
+		si_fm_ereport(si_ctlp, DDI_FM_DEVICE_INTERN_CORR, "SBD error");
 		si_error_recovery_SDBERROR(si_ctlp, si_portp, port);
+		ddi_fm_service_impact(si_ctlp->sictl_devinfop,
+		    DDI_SERVICE_UNAFFECTED);
 		break;
 
 	case CMD_ERR_DATAFISERROR:
+		si_fm_ereport(si_ctlp, DDI_FM_DEVICE_INTERN_CORR,
+		    "Data FIS error");
 		si_error_recovery_DATAFISERROR(si_ctlp, si_portp, port);
+		ddi_fm_service_impact(si_ctlp->sictl_devinfop,
+		    DDI_SERVICE_UNAFFECTED);
 		break;
 
 	case CMD_ERR_SENDFISERROR:
+		si_fm_ereport(si_ctlp, DDI_FM_DEVICE_INTERN_CORR,
+		    "Send FIS error");
 		si_error_recovery_SENDFISERROR(si_ctlp, si_portp, port);
+		ddi_fm_service_impact(si_ctlp->sictl_devinfop,
+		    DDI_SERVICE_UNAFFECTED);
 		break;
 
 	default:
+		si_fm_ereport(si_ctlp, DDI_FM_DEVICE_INTERN_CORR,
+		    "Unknown error");
 		si_error_recovery_default(si_ctlp, si_portp, port);
+		ddi_fm_service_impact(si_ctlp->sictl_devinfop,
+		    DDI_SERVICE_UNAFFECTED);
 		break;
 
 	}
@@ -4083,7 +4177,7 @@ si_read_log_ext(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, int port)
 	    "si_read_log_ext: port: %x", port);
 
 	slot = si_claim_free_slot(si_ctlp, si_portp, port);
-	if (slot == -1) {
+	if (slot == SI_FAILURE) {
 		return (0);
 	}
 
@@ -4162,6 +4256,14 @@ si_read_log_ext(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, int port)
 		prb_word_ptr[i] = ddi_get32(si_ctlp->sictl_port_acc_handle,
 		    (uint32_t *)(PORT_LRAM(si_ctlp, port, slot)+i*4));
 	}
+
+	if (si_check_ctl_handles(si_ctlp) != DDI_SUCCESS ||
+	    si_check_port_handles(si_portp) != DDI_SUCCESS) {
+		ddi_fm_service_impact(si_ctlp->sictl_devinfop,
+		    DDI_SERVICE_UNAFFECTED);
+		return (0);
+	}
+
 	error = GET_FIS_FEATURES(prb->prb_fis);
 
 	CLEAR_BIT(si_portp->siport_pending_tags, slot);
@@ -4332,7 +4434,7 @@ si_intr_pwr_change(
 }
 
 /*
- * Interrupt which indicates that the PHY sate has changed either from
+ * Interrupt which indicates that the PHY state has changed either from
  * Not-Ready to Ready or from Ready to Not-Ready.
  */
 static int
@@ -4508,7 +4610,7 @@ si_intr_dev_xchanged(
 }
 
 /*
- * Interrupt which indicates that the 8b/10 Decode Error counter has
+ * Interrupt which indicates that the 8b/10b Decode Error counter has
  * exceeded the programmed non-zero threshold value.
  *
  * We are not interested in this interrupt; we just log a debug message.
@@ -5397,6 +5499,182 @@ si_watchdog_handler(si_ctl_state_t *si_ctlp)
 		    (caddr_t)si_ctlp, si_watchdog_tick);
 	}
 	mutex_exit(&si_ctlp->sictl_mutex);
+}
+
+/*
+ * FMA Functions
+ */
+
+/*
+ * The IO fault service error handling callback function
+ */
+/*ARGSUSED*/
+static int
+si_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
+{
+	/*
+	 * as the driver can always deal with an error in any dma or
+	 * access handle, we can just return the fme_status value.
+	 */
+	pci_ereport_post(dip, err, NULL);
+	return (err->fme_status);
+}
+
+/*
+ * si_fm_init - initialize fma capabilities and register with IO
+ *              fault services.
+ */
+static void
+si_fm_init(si_ctl_state_t *si_ctlp)
+{
+	/*
+	 * Need to change iblock to priority for new MSI intr
+	 */
+	ddi_iblock_cookie_t fm_ibc;
+
+	/* Only register with IO Fault Services if we have some capability */
+	if (si_ctlp->fm_capabilities) {
+		/* Adjust access and dma attributes for FMA */
+		accattr.devacc_attr_access = DDI_FLAGERR_ACC;
+		prb_sgt_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
+		buffer_dma_attr.dma_attr_flags |= DDI_DMA_FLAGERR;
+
+		/*
+		 * Register capabilities with IO Fault Services.
+		 * fm_capabilities will be updated to indicate
+		 * capabilities actually supported (not requested.)
+		 */
+		ddi_fm_init(si_ctlp->sictl_devinfop, &si_ctlp->fm_capabilities,
+		    &fm_ibc);
+
+		if (si_ctlp->fm_capabilities == DDI_FM_NOT_CAPABLE)
+			cmn_err(CE_WARN, "si_fm_init: ddi_fm_init fail");
+
+		/*
+		 * Initialize pci ereport capabilities if ereport
+		 * capable (should always be.)
+		 */
+		if (DDI_FM_EREPORT_CAP(si_ctlp->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(si_ctlp->fm_capabilities)) {
+			pci_ereport_setup(si_ctlp->sictl_devinfop);
+		}
+
+		/*
+		 * Register error callback if error callback capable.
+		 */
+		if (DDI_FM_ERRCB_CAP(si_ctlp->fm_capabilities)) {
+			ddi_fm_handler_register(si_ctlp->sictl_devinfop,
+			    si_fm_error_cb, (void *) si_ctlp);
+		}
+	}
+}
+
+/*
+ * si_fm_fini - Releases fma capabilities and un-registers with IO
+ *              fault services.
+ */
+static void
+si_fm_fini(si_ctl_state_t *si_ctlp)
+{
+	/* Only unregister FMA capabilities if registered */
+	if (si_ctlp->fm_capabilities) {
+		/*
+		 * Un-register error callback if error callback capable.
+		 */
+		if (DDI_FM_ERRCB_CAP(si_ctlp->fm_capabilities)) {
+			ddi_fm_handler_unregister(si_ctlp->sictl_devinfop);
+		}
+
+		/*
+		 * Release any resources allocated by pci_ereport_setup()
+		 */
+		if (DDI_FM_EREPORT_CAP(si_ctlp->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(si_ctlp->fm_capabilities)) {
+			pci_ereport_teardown(si_ctlp->sictl_devinfop);
+		}
+
+		/* Unregister from IO Fault Services */
+		ddi_fm_fini(si_ctlp->sictl_devinfop);
+
+		/* Adjust access and dma attributes for FMA */
+		accattr.devacc_attr_access = DDI_DEFAULT_ACC;
+		prb_sgt_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+		buffer_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+	}
+}
+
+static int
+si_check_acc_handle(ddi_acc_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ASSERT(handle != NULL);
+	ddi_fm_acc_err_get(handle, &de, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+static int
+si_check_dma_handle(ddi_dma_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ASSERT(handle != NULL);
+	ddi_fm_dma_err_get(handle, &de, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+static int
+si_check_ctl_handles(si_ctl_state_t *si_ctlp)
+{
+	if ((si_check_acc_handle(si_ctlp->sictl_pci_conf_handle)
+	    != DDI_SUCCESS) ||
+	    (si_check_acc_handle(si_ctlp->sictl_global_acc_handle)
+	    != DDI_SUCCESS) ||
+	    (si_check_acc_handle(si_ctlp->sictl_port_acc_handle)
+	    != DDI_SUCCESS)) {
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * WARNING: The caller is expected to obtain the siport_mutex
+ * before calling us.
+ */
+static int
+si_check_port_handles(si_port_state_t *si_portp)
+{
+	if ((si_check_dma_handle(si_portp->siport_prbpool_dma_handle)
+	    != DDI_SUCCESS) ||
+	    (si_check_acc_handle(si_portp->siport_prbpool_acc_handle)
+	    != DDI_SUCCESS) ||
+	    (si_check_dma_handle(si_portp->siport_sgbpool_dma_handle)
+	    != DDI_SUCCESS) ||
+	    (si_check_acc_handle(si_portp->siport_sgbpool_acc_handle)
+	    != DDI_SUCCESS)) {
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+static void
+si_fm_ereport(si_ctl_state_t *si_ctlp, char *detail, char *payload)
+{
+	uint64_t ena;
+	char buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE, detail);
+	ena = fm_ena_generate(0, FM_ENA_FMT1);
+
+	if (DDI_FM_EREPORT_CAP(si_ctlp->fm_capabilities)) {
+		ddi_fm_ereport_post(si_ctlp->sictl_devinfop, buf, ena,
+		    DDI_NOSLEEP,
+		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERSION,
+		    "detailed_err_type", DATA_TYPE_STRING, payload,
+		    NULL);
+	}
 }
 
 #if SI_DEBUG

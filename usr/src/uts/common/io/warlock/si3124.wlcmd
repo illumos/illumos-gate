@@ -20,13 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-
-# usr/src/uts/sparc/si3124/si3124.wlcmd
 
 one	si_ctl_state
 one     scsi_device
@@ -103,6 +98,8 @@ add	sd_uscsi_info::ui_dkc.dkc_callback	targets warlock_dummy
 add scsi_watch_request::swr_callback targets \
         sd.c:sd_mhd_watch_cb \
         sd.c:sd_media_watch_cb
+
+root si_fm_error_cb
 
 add scsi_pkt::pkt_comp targets \
 	scsi_watch.c:scsi_watch_request_intr \
