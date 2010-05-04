@@ -590,6 +590,13 @@ static audit_special_prop_item_t special_props_list[] = {
  * The rc_pg_notify_lock protects all notification state.  The rc_pg_notify_cv
  * is used for global signalling, and each client has a cv which he waits for
  * events of interest on.
+ *
+ * rc_notify_in_use is used to protect rc_notify_list from deletions when
+ * the rc_pg_notify_lock is dropped.  Specifically, rc_notify_info_wait()
+ * must drop the lock to call rc_node_assign(), and then it reacquires the
+ * lock.  Deletions from rc_notify_list during this period are not
+ * allowed.  Insertions do not matter, because they are always done at the
+ * end of the list.
  */
 static uu_list_t	*rc_notify_info_list;
 static uu_list_t	*rc_notify_list;
@@ -7369,6 +7376,14 @@ rc_notify_info_remove_locked(rc_notify_info_t *rnip)
 	 * clean up any notifications at the beginning of the list
 	 */
 	if (uu_list_first(rc_notify_list) == me) {
+		/*
+		 * We can't call rc_notify_remove_locked() unless
+		 * rc_notify_in_use is 0.
+		 */
+		while (rc_notify_in_use) {
+			(void) pthread_cond_wait(&rc_pg_notify_cv,
+			    &rc_pg_notify_lock);
+		}
 		while ((np = uu_list_next(rc_notify_list, me)) != NULL &&
 		    np->rcn_info == NULL)
 			rc_notify_remove_locked(np);
@@ -7548,8 +7563,20 @@ rc_notify_info_wait(rc_notify_info_t *rnip, rc_node_ptr_t *out,
 		(void) pthread_mutex_lock(&rc_pg_notify_lock);
 		assert(rc_notify_in_use > 0);
 		rc_notify_in_use--;
-		if (am_first_info)
+
+		if (am_first_info) {
+			/*
+			 * While we had the lock dropped, another thread
+			 * may have also incremented rc_notify_in_use.  We
+			 * need to make sure that we're back to 0 before
+			 * removing the node.
+			 */
+			while (rc_notify_in_use) {
+				(void) pthread_cond_wait(&rc_pg_notify_cv,
+				    &rc_pg_notify_lock);
+			}
 			rc_notify_remove_locked(np);
+		}
 		if (rc_notify_in_use == 0)
 			(void) pthread_cond_broadcast(&rc_pg_notify_cv);
 		(void) pthread_mutex_unlock(&rc_pg_notify_lock);
