@@ -2117,7 +2117,8 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 				    0);
 #endif
 			if (filetype == XATTR_FILE && Hiddendir) {
-				(void) fprintf(vfile, "a %s attribute %s ",
+				(void) fprintf(vfile,
+				    gettext("a %s attribute %s "),
 				    longname, longattrname);
 
 			} else {
@@ -2277,7 +2278,7 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 		break;
 	case S_IFREG:
 		if ((infile = openat(dirfd, shortname, 0)) < 0) {
-			vperror(0, "unable to open %s%s%s%s", longname,
+			vperror(0, gettext("unable to open %s%s%s%s"), longname,
 			    rw_sysattr ? gettext(" system") : "",
 			    (filetype == XATTR_FILE) ?
 			    gettext(" attribute ") : "",
@@ -2688,7 +2689,8 @@ splitfile(char *longname, int ifd, char *name, char *prefix, int filetype)
 
 		if (vflag)
 			(void) fprintf(vfile,
-			    "+++ a %s %" FMT_blkcnt_t "K [extent #%d of %d]\n",
+			    gettext("+++ a %s %" FMT_blkcnt_t
+			    "K [extent #%d of %d]\n"),
 			    longname, K(blocks), i, extents);
 		while (blocks && read(ifd, buf, TBLOCK) > 0) {
 			blocks--;
@@ -3188,9 +3190,10 @@ doxtract(char *argv[])
 			blocks = TBLOCKS(bytes);
 			if (vflag) {
 				(void) fprintf(vfile,
-				    "x %s%s%s, %" FMT_off_t " bytes, ", namep,
+				    "x %s%s%s, %" FMT_off_t " %s, ", namep,
 				    gettext(" attribute "),
-				    xattrapath, bytes);
+				    xattrapath, bytes,
+				    gettext("bytes"));
 				if (NotTape)
 					(void) fprintf(vfile,
 					    "%" FMT_blkcnt_t "K\n", K(blocks));
@@ -3236,8 +3239,8 @@ doxtract(char *argv[])
 		if (dircreate && (!is_posix || dblock.dbuf.typeflag == '5')) {
 			dir = 1;
 			if (vflag) {
-				(void) fprintf(vfile, "x %s, 0 bytes, ",
-				    &dirname[0]);
+				(void) fprintf(vfile, "x %s, 0 %s, ",
+				    &dirname[0], gettext("bytes"));
 				if (NotTape)
 					(void) fprintf(vfile, "0K\n");
 				else
@@ -3278,7 +3281,7 @@ doxtract(char *argv[])
 			blocks = TBLOCKS(bytes);
 			if (vflag) {
 				(void) fprintf(vfile, "x %s, %" FMT_off_t
-				    " bytes, ", namep, bytes);
+				    " %s, ", namep, bytes, gettext("bytes"));
 				if (NotTape)
 					(void) fprintf(vfile, "%" FMT_blkcnt_t
 					    "K\n", K(blocks));
@@ -3320,7 +3323,7 @@ doxtract(char *argv[])
 			blocks = TBLOCKS(bytes);
 			if (vflag) {
 				(void) fprintf(vfile, "x %s, %" FMT_off_t
-				    " bytes, ", namep, bytes);
+				    " %s, ", namep, bytes, gettext("bytes"));
 				if (NotTape)
 					(void) fprintf(vfile, "%" FMT_blkcnt_t
 					    "K\n", K(blocks));
@@ -3531,7 +3534,7 @@ doxtract(char *argv[])
 			(void) fprintf(stderr, gettext(
 			    "tar: %s%s%s%s - cannot create\n"),
 			    (xattrp == NULL) ? "" : (rw_sysattr ?
-			    gettext("system attribure ") :
+			    gettext("system attribute ") :
 			    gettext("attribute ")),
 			    (xattrp == NULL) ? "" : xattrapath,
 			    (xattrp == NULL) ? "" : gettext(" of "),
@@ -3583,12 +3586,13 @@ doxtract(char *argv[])
 		blocks = TBLOCKS(bytes);
 		if (vflag) {
 			(void) fprintf(vfile,
-			    "x %s%s%s, %" FMT_off_t " bytes, ",
+			    "x %s%s%s, %" FMT_off_t " %s, ",
 			    (xattrp == NULL) ? "" : dirp,
 			    (xattrp == NULL) ? "" : (rw_sysattr ?
 			    gettext(" system attribute ") :
 			    gettext(" attribute ")),
-			    (xattrp == NULL) ? namep : xattrapath, bytes);
+			    (xattrp == NULL) ? namep : xattrapath, bytes,
+			    gettext("bytes"));
 			if (NotTape)
 				(void) fprintf(vfile, "%" FMT_blkcnt_t "K\n",
 				    K(blocks));
@@ -3773,9 +3777,10 @@ filedone:
 				 */
 				if (vflag && Tflag)
 					(void) fprintf(vfile, "x %s(A), %"
-					    FMT_blkcnt_t " bytes, %"
-					    FMT_blkcnt_t " tape blocks\n",
-					    namep, bytes, blocks);
+					    FMT_blkcnt_t " %s, %"
+					    FMT_blkcnt_t " %s\n",
+					    namep, bytes, gettext("bytes"),
+					    blocks, gettext("tape blocks"));
 
 				while (blocks-- > 0) {
 					readtape(buf);
@@ -4081,8 +4086,10 @@ canit:
 		}
 
 		if (vflag)
-			(void) fprintf(vfile, "+++ x %s [extent #%d], %"
-			    FMT_off_t " bytes, %ldK\n", name, extno, bytes,
+			(void) fprintf(vfile, "+++ x %s [%s #%d], %"
+			    FMT_off_t " %s, %ldK\n",
+			    name, gettext("extent"), extno,
+			    bytes, gettext("bytes"),
 			    (long)K(TBLOCKS(bytes)));
 		if (xblocks(issysattr, bytes, ofd) != 0) {
 			sysattrerr = 1;
@@ -4888,8 +4895,10 @@ newvol(void)
 		    "tar: cannot reopen %s (%s)\n"),
 		    dumping ? gettext("output") : gettext("input"), usefile);
 
-		(void) fprintf(stderr, "update=%d, usefile=%s, mt=%d, [%s]\n",
-		    update, usefile, mt, strerror(errno));
+#ifdef DEBUG
+		DEBUG("update=%d, usefile=%s ", update, usefile);
+		DEBUG("mt=%d, [%s]\n", mt, strerror(errno));
+#endif
 
 		done(2);
 	}
@@ -6663,7 +6672,7 @@ setPathTimes(int dirfd, char *path, timestruc_t modTime)
 	timebuf[1].tv_usec = (xhdr_flgs & _X_MTIME) ? modTime.tv_nsec/1000 : 0;
 
 	if (futimesat(dirfd, path, timebuf) < 0)
-		vperror(0, "can't set time on %s", path);
+		vperror(0, gettext("can't set time on %s"), path);
 }
 
 
@@ -6750,14 +6759,15 @@ append_secattr(
 	case UFSD_ACL:
 	case ACE_ACL:
 		if (attrtext == NULL) {
-			(void) fprintf(stderr, "acltotext failed\n");
+			(void) fprintf(stderr, gettext("acltotext failed\n"));
 			return (-1);
 		}
 		/* header: type + size = 8 */
 		newattrsize = 8 + (int)strlen(attrtext) + 1;
 		attr = (struct sec_attr *)malloc(newattrsize);
 		if (attr == NULL) {
-			(void) fprintf(stderr, "can't allocate memory\n");
+			(void) fprintf(stderr,
+			    gettext("can't allocate memory\n"));
 			return (-1);
 		}
 		attr->attr_type = attr_type;
@@ -6784,7 +6794,8 @@ append_secattr(
 		break;
 
 	default:
-		(void) fprintf(stderr, "unrecognized attribute type\n");
+		(void) fprintf(stderr,
+		    gettext("unrecognized attribute type\n"));
 		return (-1);
 	}
 
@@ -6793,7 +6804,7 @@ append_secattr(
 	*secinfo_len += newattrsize;
 	new_secinfo = (char *)malloc(*secinfo_len);
 	if (new_secinfo == NULL) {
-		(void) fprintf(stderr, "can't allocate memory\n");
+		(void) fprintf(stderr, gettext("can't allocate memory\n"));
 		*secinfo_len -= newattrsize;
 		free(attr);
 		return (-1);
@@ -7410,7 +7421,7 @@ gen_utf8_names(const char *filename)
 			errno = 0;
 #ifdef ICONV_DEBUG
 			(void) fprintf(stderr,
-			    "Opening iconv_cd with target %s\n",
+			    gettext("Opening iconv_cd with target %s\n"),
 			    nl_target);
 #endif
 			if ((iconv_cd = iconv_open("UTF-8", nl_target)) ==
@@ -9380,7 +9391,7 @@ decompress_file(void)
 		(void) fprintf(vfile, gettext("Could not exec %s: %s\n"),
 		    compress_opt, usefile, strerror(errno));
 	} else if (pid == -1) {
-		vperror(1, "Could not fork");
+		vperror(1, gettext("Could not fork"));
 	}
 	wait_pid(pid);
 	if (suffix != NULL) {
