@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -2816,7 +2815,7 @@ vgen_destroy_rxpools(void *arg)
 	while (poolp != NULL) {
 		npoolp =  poolp->nextp;
 		while (vio_destroy_mblks(poolp) != 0) {
-			drv_usecwait(vgen_rxpool_cleanup_delay);
+			delay(drv_usectohz(vgen_rxpool_cleanup_delay));
 		}
 		poolp = npoolp;
 	}

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1331,12 +1330,6 @@ vsw_ldc_reinit(vsw_ldc_t *ldcp)
 
 	ldcp->lane_in.lstate = 0;
 	ldcp->lane_out.lstate = 0;
-
-	/* Remove the fdb entry for this port/mac address */
-	vsw_fdbe_del(vswp, &(port->p_macaddr));
-
-	/* remove the port from vlans it has been assigned to */
-	vsw_vlan_remove_ids(port, VSW_VNETPORT);
 
 	/*
 	 * Remove parent port from any multicast groups
@@ -2732,12 +2725,6 @@ vsw_process_attr_info(vsw_ldc_t *ldcp, vnet_attr_msg_t *msg)
 		port->p_macaddr.ether_addr_octet[i] = macaddr & 0xFF;
 		macaddr >>= 8;
 	}
-
-	/* create the fdb entry for this port/mac address */
-	vsw_fdbe_add(vswp, port);
-
-	/* add the port to the specified vlans */
-	vsw_vlan_add_ids(port, VSW_VNETPORT);
 
 	/*
 	 * Setup device specific xmit routines. Note this could be changed

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1148,6 +1147,7 @@ vsw_fdbe_add(vsw_t *vswp, void *port)
 		cmn_err(CE_WARN, "vsw%d: Duplicate mac-address(%s) for "
 		    "the port(%d)", vswp->instance,
 		    ether_sprintf(&portp->p_macaddr), portp->p_instance);
+		kmem_free(fp, sizeof (*fp));
 	}
 }
 
