@@ -37,15 +37,13 @@ extern "C" {
 #define	IBGUIDSTRLEN 16
 #define	IBPORTSTRLEN 5
 
-#define	DLADM_IBPART_FORCE_CREATE 0x1
+#define	DLADM_PART_FORCE_CREATE 0x1
 
 typedef struct dladm_ib_attr_s {
 	datalink_id_t	dia_physlinkid;	/* IB Phys link datalink ID */
 	datalink_id_t	dia_partlinkid;	/* IB Partition datalink ID */
 	ib_pkey_t	dia_pkey;	/* IB partitions P_Key */
 	uint32_t	dia_flags;
-	char		*dia_devname;	/* IB Phys link's device name */
-	char		*dia_pname;	/* IB partition's name */
 	uint_t		dia_portnum;	/* IB Phys link's HCA port number */
 	int		dia_instance;	/* IP over IB driver instance number */
 	ib_guid_t	dia_hca_guid;	/* IB HCA GUID */
@@ -57,9 +55,9 @@ typedef struct dladm_ib_attr_s {
 typedef struct dladm_ib_attr_s dladm_part_attr_t;
 
 typedef enum {
-	DLADM_IBPART_UD_MODE = 0,
-	DLADM_IBPART_CM_MODE
-} dladm_ibpart_linkmode_t;
+	DLADM_PART_UD_MODE = 0,
+	DLADM_PART_CM_MODE
+} dladm_part_linkmode_t;
 
 extern dladm_status_t dladm_part_create(dladm_handle_t, datalink_id_t,
     ib_pkey_t, uint32_t, char *, datalink_id_t *, dladm_arg_list_t *);

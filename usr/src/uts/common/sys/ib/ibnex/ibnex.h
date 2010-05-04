@@ -288,10 +288,6 @@ typedef enum {
 #define	IBNEX_HW_NOT_IN_DEVTREE		0
 #define	IBNEX_HW_IN_DEVTREE		1
 
-/*
- * Function prototype declarations
- */
-
 #ifdef __cplusplus
 }
 #endif

@@ -433,9 +433,9 @@ static  val_desc_t	stp_p2p_vals[] = {
 	{ "auto",	P2P_AUTO		}
 };
 
-static  val_desc_t	dladm_ibpart_linkmode_vals[] = {
-	{ "cm",		DLADM_IBPART_CM_MODE	},
-	{ "ud",		DLADM_IBPART_UD_MODE	},
+static  val_desc_t	dladm_part_linkmode_vals[] = {
+	{ "cm",		DLADM_PART_CM_MODE	},
+	{ "ud",		DLADM_PART_UD_MODE	},
 };
 
 #define	VALCNT(vals)    (sizeof ((vals)) / sizeof (val_desc_t))
@@ -460,8 +460,8 @@ static prop_desc_t	prop_table[] = {
 	    get_radio, NULL, 0,
 	    DATALINK_CLASS_PHYS, DL_WIFI },
 
-	{ "linkmode",	{ "cm", DLADM_IBPART_CM_MODE },
-	    dladm_ibpart_linkmode_vals, VALCNT(dladm_ibpart_linkmode_vals),
+	{ "linkmode",	{ "cm", DLADM_PART_CM_MODE },
+	    dladm_part_linkmode_vals, VALCNT(dladm_part_linkmode_vals),
 	    set_public_prop, NULL, get_linkmode_prop, NULL, 0,
 	    DATALINK_CLASS_PART, DL_IB },
 
@@ -4465,10 +4465,10 @@ get_linkmode_prop(dladm_handle_t handle, prop_desc_t *pdp,
 		return (status);
 
 	switch (v) {
-	case DLADM_IBPART_CM_MODE:
+	case DLADM_PART_CM_MODE:
 		s = "cm";
 		break;
-	case DLADM_IBPART_UD_MODE:
+	case DLADM_PART_UD_MODE:
 		s = "ud";
 		break;
 	default:

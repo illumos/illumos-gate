@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # IBTF TI and VTI api entry points
@@ -152,6 +151,11 @@ root	ibt_alloc_io_mem
 root	ibt_free_io_mem
 root	ibt_map_mem_iov
 root	ibt_unmap_mem_iov
+root	ibt_register_part_attr_cb
+root	ibt_unregister_part_attr_cb
+root	ibt_get_part_attr
+root	ibt_get_all_part_attr
+root	ibt_free_part_attr
 
 # IBTF CI api entry points
 root	ibc_init
@@ -175,6 +179,8 @@ root	ibtl_dprintf0
 root	ibtl_cm_sm_notice_init_failure
 root	ibtl_cm_sm_notice_handler
 root	ibtl_cm_set_sm_notice_handler
+root	ibtl_cm_chan_is_opening
+root	ibtl_cm_chan_open_is_aborted
 root	ibtl_cm_chan_is_open
 root	ibtl_cm_is_chan_closing
 root	ibtl_cm_chan_is_closing

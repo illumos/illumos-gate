@@ -9152,7 +9152,7 @@ print_part(show_part_state_t *state, datalink_id_t linkid)
 		 * for a temp link the force create flag will determine
 		 * whether it was created with force flag.
 		 */
-		force_in_conf = ((attr.dia_flags & DLADM_IBPART_FORCE_CREATE)
+		force_in_conf = ((attr.dia_flags & DLADM_PART_FORCE_CREATE)
 		    != 0);
 	}
 
@@ -9487,6 +9487,7 @@ do_create_part(int argc, char *argv[], const char *use)
 	char		*altroot = NULL;
 	datalink_id_t	physlinkid = 0;
 	datalink_id_t	partlinkid = 0;
+	unsigned long	opt_pkey;
 	ib_pkey_t	pkey = 0;
 	char		*endp = NULL;
 	char		propstr[DLADM_STRSIZE];
@@ -9530,9 +9531,12 @@ do_create_part(int argc, char *argv[], const char *use)
 			 *
 			 * The P_Key is expected to be a hexadecimal number.
 			 */
-			pkey = strtoul(optarg, &endp, 16);
-			if (errno == ERANGE || *endp != '\0')
+			opt_pkey = strtoul(optarg, &endp, 16);
+			if (errno == ERANGE || opt_pkey > USHRT_MAX ||
+			    *endp != '\0')
 				die("Invalid pkey");
+
+			pkey = (ib_pkey_t)opt_pkey;
 			break;
 		case 'f':
 			flags |= DLADM_OPT_FORCE;

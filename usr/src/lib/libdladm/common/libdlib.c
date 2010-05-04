@@ -53,10 +53,10 @@
  */
 dladm_status_t dladm_part_create(dladm_handle_t, datalink_id_t, ib_pkey_t,
     uint32_t, char *, datalink_id_t *, dladm_arg_list_t *);
-static int	dladm_ibd_get_instance(char *);
 static dladm_status_t	i_dladm_part_create(dladm_handle_t,
     dladm_part_attr_t *);
-dladm_status_t	dladm_part_persist_conf(dladm_handle_t, dladm_part_attr_t *);
+static dladm_status_t	dladm_part_persist_conf(dladm_handle_t, const char *,
+    dladm_part_attr_t *);
 static dladm_status_t i_dladm_part_delete(dladm_handle_t, datalink_id_t);
 dladm_status_t	dladm_part_delete(dladm_handle_t, datalink_id_t, int);
 static int	i_dladm_part_up(dladm_handle_t, datalink_id_t, void *);
@@ -144,7 +144,7 @@ i_dladm_part_info_active(dladm_handle_t handle, datalink_id_t linkid,
 	 * forcibly, then set the force create flag.
 	 */
 	if (ioc.ioc_force_create)
-		attrp->dia_flags |= DLADM_IBPART_FORCE_CREATE;
+		attrp->dia_flags |= DLADM_PART_FORCE_CREATE;
 
 bail:
 	return (status);
@@ -213,7 +213,7 @@ i_dladm_part_info_persist(dladm_handle_t handle, datalink_id_t linkid,
 		if (status != DLADM_STATUS_NOTFOUND)
 			goto done;
 	} else if (force == B_TRUE) {
-		attrp->dia_flags |= DLADM_IBPART_FORCE_CREATE;
+		attrp->dia_flags |= DLADM_PART_FORCE_CREATE;
 	}
 
 	status = DLADM_STATUS_OK;
@@ -249,7 +249,7 @@ dladm_status_t
 dladm_ib_info(dladm_handle_t handle, datalink_id_t linkid,
     dladm_ib_attr_t *attrp, uint32_t flags)
 {
-	int instance;
+	uint_t instance;
 	ibport_ioctl_t ioc;
 	dladm_phys_attr_t	dpa;
 	dladm_status_t status = DLADM_STATUS_OK;
@@ -266,8 +266,7 @@ dladm_ib_info(dladm_handle_t handle, datalink_id_t linkid,
 	 * Get the instance number of the IP over IB driver instance which
 	 * represents this IB Phys link.
 	 */
-	instance = dladm_ibd_get_instance(dpa.dp_dev);
-	if (instance == -1)
+	if (dladm_parselink(dpa.dp_dev, NULL, &instance) != DLADM_STATUS_OK)
 		return (DLADM_STATUS_FAILED);
 
 	bzero(&ioc, sizeof (ioc));
@@ -337,7 +336,6 @@ static dladm_status_t
 i_dladm_part_create(dladm_handle_t handle, dladm_part_attr_t *pattr)
 {
 	ibpart_ioctl_t	ioc;
-	dladm_status_t	status = DLADM_STATUS_OK;
 
 	bzero(&ioc, sizeof (ioc));
 
@@ -350,9 +348,7 @@ i_dladm_part_create(dladm_handle_t handle, dladm_part_attr_t *pattr)
 	ioc.ioc_force_create		= ((pattr->dia_flags & DLADM_OPT_FORCE)
 	    != 0);
 
-	status = i_dladm_ib_ioctl(handle, IBD_CREATE_IBPART,
-	    (ibd_ioctl_t *)&ioc);
-	return (status);
+	return (i_dladm_ib_ioctl(handle, IBD_CREATE_IBPART, &ioc.ibdioc));
 }
 
 /*
@@ -360,7 +356,8 @@ i_dladm_part_create(dladm_handle_t handle, dladm_part_attr_t *pattr)
  * partition specified by pattr.
  */
 dladm_status_t
-dladm_part_persist_conf(dladm_handle_t handle, dladm_part_attr_t *pattr)
+dladm_part_persist_conf(dladm_handle_t handle, const char *pname,
+    dladm_part_attr_t *pattr)
 {
 
 	dladm_conf_t	conf;
@@ -368,9 +365,8 @@ dladm_part_persist_conf(dladm_handle_t handle, dladm_part_attr_t *pattr)
 	char 		linkover[MAXLINKNAMELEN];
 	uint64_t	u64;
 
-	status = dladm_create_conf(handle, pattr->dia_pname,
-	    pattr->dia_partlinkid, DATALINK_CLASS_PART, DL_IB, &conf);
-
+	status = dladm_create_conf(handle, pname, pattr->dia_partlinkid,
+	    DATALINK_CLASS_PART, DL_IB, &conf);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
@@ -440,7 +436,6 @@ dladm_part_create(dladm_handle_t handle, datalink_id_t physlinkid,
 	pattr.dia_pkey = pkey;
 	pattr.dia_physlinkid = physlinkid; /* IB Phys link's datalink id */
 	pattr.dia_flags = flags;
-	pattr.dia_pname = pname;
 
 	flags &= ~DLADM_OPT_FORCE;
 
@@ -471,12 +466,12 @@ dladm_part_create(dladm_handle_t handle, datalink_id_t physlinkid,
 	    DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK)
 		return (status);
 
-	pattr.dia_instance = dladm_ibd_get_instance(dpa.dp_dev);
-	if (pattr.dia_instance == -1)
+	if (dladm_parselink(dpa.dp_dev, NULL, (uint_t *)&pattr.dia_instance) !=
+	    DLADM_STATUS_OK)
 		return (DLADM_STATUS_FAILED);
 
 
-	if ((status = dladm_create_datalink_id(handle, pattr.dia_pname,
+	if ((status = dladm_create_datalink_id(handle, pname,
 	    DATALINK_CLASS_PART, DL_IB, flags, &pattr.dia_partlinkid)) !=
 	    DLADM_STATUS_OK)
 		return (status);
@@ -495,7 +490,7 @@ dladm_part_create(dladm_handle_t handle, datalink_id_t physlinkid,
 	 * to the persistent configuration.
 	 */
 	if (pattr.dia_flags & DLADM_OPT_PERSIST) {
-		status = dladm_part_persist_conf(handle, &pattr);
+		status = dladm_part_persist_conf(handle, pname, &pattr);
 		if (status != DLADM_STATUS_OK)
 			goto done;
 		conf_set = B_TRUE;
@@ -541,13 +536,10 @@ static dladm_status_t
 i_dladm_part_delete(dladm_handle_t handle, datalink_id_t partid)
 {
 	ibpart_ioctl_t ioc;
-	dladm_status_t status = DLADM_STATUS_OK;
 
 	bzero(&ioc, sizeof (ioc));
 	ioc.ioc_partid = partid;
-	status = i_dladm_ib_ioctl(handle, IBD_DELETE_IBPART,
-	    (ibd_ioctl_t *)&ioc);
-	return (status);
+	return (i_dladm_ib_ioctl(handle, IBD_DELETE_IBPART, &ioc.ibdioc));
 }
 
 /*
@@ -680,8 +672,8 @@ i_dladm_part_up(dladm_handle_t handle, datalink_id_t plinkid, void *arg)
 	/* IB Partition's datalink ID. */
 	pattr.dia_partlinkid = plinkid;
 	pattr.dia_pkey = pkey;
-	pattr.dia_instance = dladm_ibd_get_instance(dpa.dp_dev);
-	if (pattr.dia_instance == -1)
+	if (dladm_parselink(dpa.dp_dev, NULL, (uint_t *)&pattr.dia_instance) !=
+	    DLADM_STATUS_OK)
 		return (DLADM_WALK_CONTINUE);
 
 	/* Create the active IB Partition object. */
@@ -714,19 +706,4 @@ dladm_part_up(dladm_handle_t handle, datalink_id_t linkid, uint32_t flags)
 		(void) i_dladm_part_up(handle, linkid, &status);
 		return (status);
 	}
-}
-
-static int
-dladm_ibd_get_instance(char *devname)
-{
-	int instance;
-
-	/*
-	 * The devname contains the driver name followed by the instance
-	 * number. Lets just skip the driver name and get the instance. We use
-	 * strlen of ibp here to get the driver name length.
-	 */
-	instance = atoi(devname + strlen("ibp"));
-
-	return (instance);
 }
