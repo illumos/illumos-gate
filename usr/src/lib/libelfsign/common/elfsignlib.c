@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #define	ELF_TARGET_ALL	/* get definitions of all section flags */
@@ -38,7 +37,6 @@
 #include <errno.h>
 #include <libelf.h>
 #include <gelf.h>
-#include <sys/mman.h>
 #include <cryptoutil.h>
 #include <sha1.h>
 #include <sys/crypto/elfsign.h>
@@ -53,8 +51,6 @@ const char OID_sha1WithRSAEncryption[] = "1.2.840.113549.1.1.5";
 
 static ELFsign_status_t elfsign_adjustoffsets(ELFsign_t ess,
     Elf_Scn *scn, uint64_t new_size);
-static ELFsign_status_t elfsign_verify_esa(ELFsign_t ess,
-    uchar_t *sig, size_t sig_len);
 static uint32_t elfsign_switch_uint32(uint32_t i);
 static ELFsign_status_t elfsign_switch(ELFsign_t ess,
     struct filesignatures *fssp, enum ES_ACTION action);
@@ -1011,52 +1007,6 @@ elfsign_hash_mem_resident(ELFsign_t ess, uchar_t *hash, size_t *hash_len)
 	return (elfsign_hash_common(ess, hash, hash_len, B_TRUE));
 }
 
-/*
- * elfsign_hash_esa = return the hash of the esa_buffer
- *
- * IN:          ess, esa_buf, esa_buf_len, hash_len
- * OUT:         hash, hash_len
- */
-ELFsign_status_t
-elfsign_hash_esa(ELFsign_t ess, uchar_t *esa_buf, size_t esa_buf_len,
-    uchar_t **hash, size_t *hash_len)
-{
-	SHA1_CTX ctx;
-
-	cryptodebug("esa_hash version is: %s",
-	    version_to_str(ess->es_version));
-	if (ess->es_version <= FILESIG_VERSION2) {
-		/*
-		 * old rsa_md5_sha1 format
-		 * signed with MD5 digest, just pass full esa_buf
-		 */
-		*hash = esa_buf;
-		*hash_len = esa_buf_len;
-		return (ELFSIGN_SUCCESS);
-	}
-
-	if (*hash_len < SHA1_DIGEST_LENGTH)
-		return (ELFSIGN_FAILED);
-
-	bzero(*hash, *hash_len);
-	SHA1Init(&ctx);
-	SHA1Update(&ctx, esa_buf, esa_buf_len);
-	SHA1Final(*hash, &ctx);
-	*hash_len = SHA1_DIGEST_LENGTH;
-
-	{ /* DEBUG START */
-		const int hashstr_len = (*hash_len) * 2 + 1;
-		char *hashstr = malloc(hashstr_len);
-
-		if (hashstr != NULL) {
-			tohexstr(*hash, *hash_len, hashstr, hashstr_len);
-			cryptodebug("esa_hash value is: %s", hashstr);
-			free(hashstr);
-		}
-	} /* DEBUG END */
-
-	return (ELFSIGN_SUCCESS);
-}
 
 /*
  * elfsign_verify_signature - Verify the signature of the ELF object.
@@ -1203,16 +1153,8 @@ elfsign_verify_signature(ELFsign_t ess, struct ELFsign_sig_info **esipp)
 				    (ess->es_callbackctx, fssp, fslen, cert);
 			/*
 			 * The signature is verified!
-			 * Check if this is a restricted provider
 			 */
-			if (strstr(fsx.fsx_signer_DN, USAGELIMITED) == NULL)
-				ret = ELFSIGN_SUCCESS;
-			else {
-				cryptodebug("DN is tagged for usagelimited");
-				ret = elfsign_verify_esa(ess,
-				    fsx.fsx_signature, fsx.fsx_sig_len);
-			}
-			break;
+			ret = ELFSIGN_SUCCESS;
 		}
 
 		cryptodebug("elfsign_verify_signature: invalid signature");
@@ -1228,199 +1170,6 @@ cleanup:
 	return (ret);
 }
 
-/*
- * Verify the contents of the .esa file, as per Jumbo export control
- * document.  Logic in this function should remain unchanged, unless
- * a misinterpretation of the jumbo case was found or if there are
- * changes in export regulations necessitating a change.
- *
- * If the .esa file exists, but is somehow corrupted, we just return
- * that this is restricted.  This is consistent with the Jumbo export
- * case covering this library and other compenents of ON.  Do not change
- * this logic without consulting export control.
- *
- * Please see do_gen_esa() for a description of the esa file format.
- *
- */
-static ELFsign_status_t
-elfsign_verify_esa(ELFsign_t ess, uchar_t *orig_sig, size_t orig_sig_len)
-{
-	ELFsign_status_t ret = ELFSIGN_RESTRICTED;
-	char	*elfobj_esa = NULL;
-	size_t	elfobj_esa_len;
-	int	esa_fd = -1;
-	size_t	esa_buf_len = 0;
-	uchar_t *main_sig;
-	size_t	main_sig_len = 0;
-	uchar_t hash[SIG_MAX_LENGTH], *hash_ptr = hash;
-	size_t  hash_len = SIG_MAX_LENGTH;
-	char 	*esa_dn = NULL;
-	size_t	esa_dn_len = 0;
-	uchar_t	*esa_sig;
-	size_t	esa_sig_len = 0;
-	uchar_t *esa_file_buffer = NULL, *esa_file_ptr;
-	struct stat statbuf;
-	ELFCert_t cert = NULL;
-
-	cryptodebug("elfsign_verify_esa");
-
-	/* does the activation file exist? */
-	elfobj_esa_len = strlen(ess->es_pathname) + ESA_LEN + 1;
-	elfobj_esa = malloc(elfobj_esa_len);
-	if (elfobj_esa == NULL) {
-		cryptoerror(LOG_STDERR,
-		    gettext("Unable to allocate buffer for esa filename."));
-		goto cleanup;
-	}
-
-	(void) strlcpy(elfobj_esa, ess->es_pathname, elfobj_esa_len);
-	(void) strlcat(elfobj_esa, ESA, elfobj_esa_len);
-
-	if ((esa_fd = open(elfobj_esa, O_RDONLY|O_NONBLOCK)) == -1) {
-		cryptodebug("No .esa file was found, or it was unreadable");
-		goto cleanup;
-	}
-
-	cryptodebug("Reading contents of esa file %s", elfobj_esa);
-
-	if (fstat(esa_fd, &statbuf) == -1) {
-		cryptoerror(LOG_STDERR,
-		    gettext("Can't stat %s"), elfobj_esa);
-		goto cleanup;
-	}
-
-	/*
-	 * mmap the buffer to save on syscalls
-	 */
-	esa_file_buffer = (uchar_t *)mmap(NULL, statbuf.st_size, PROT_READ,
-	    MAP_PRIVATE, esa_fd, 0);
-
-	if (esa_file_buffer == MAP_FAILED) {
-		cryptoerror(LOG_STDERR,
-		    gettext("Unable to mmap file to a buffer for %s."),
-		    elfobj_esa);
-		goto cleanup;
-	}
-
-	esa_file_ptr = esa_file_buffer;
-	elfsign_buffer_len(ess, &main_sig_len, esa_file_ptr, ES_GET);
-	esa_file_ptr += sizeof (uint32_t);
-	cryptodebug("Contents of esa file: main_sig_len=%d", main_sig_len);
-	main_sig = esa_file_ptr;
-
-	esa_file_ptr += main_sig_len;
-
-	/* verify .esa main signature versus original signature */
-	if (main_sig_len != orig_sig_len ||
-	    memcmp(main_sig, orig_sig, orig_sig_len) != 0) {
-		cryptoerror(LOG_STDERR,
-		    gettext("Unable to match original signature from %s."),
-		    elfobj_esa);
-		goto cleanup;
-	}
-
-	elfsign_buffer_len(ess, &esa_dn_len, esa_file_ptr, ES_GET);
-	esa_file_ptr += sizeof (uint32_t);
-	cryptodebug("Contents of esa file: esa_dn_len=%d", esa_dn_len);
-
-	esa_dn = malloc(esa_dn_len + 1);
-	if (esa_dn == NULL) {
-		cryptoerror(LOG_ERR,
-		    gettext("Unable to allocate memory for dn buffer."));
-		goto cleanup;
-	}
-	(void) memcpy(esa_dn, esa_file_ptr, esa_dn_len);
-	esa_dn[esa_dn_len] = '\0';
-	esa_file_ptr += esa_dn_len;
-	cryptodebug("Contents of esa file: esa_dn=%s", esa_dn);
-
-	elfsign_buffer_len(ess, &esa_sig_len, esa_file_ptr, ES_GET);
-	esa_file_ptr += sizeof (uint32_t);
-	cryptodebug("Contents of esa file: esa_sig_len=%d", esa_sig_len);
-
-	esa_sig = esa_file_ptr;
-
-	cryptodebug("Read esa contents, now verifying");
-
-	/*
-	 * dn used in .esa file should not be limited.
-	 */
-	if (strstr(esa_dn, USAGELIMITED) != NULL) {
-		cryptoerror(LOG_ERR,
-		    gettext("DN for .esa file is tagged as limited for %s.\n"
-		    "Activation files should only be tagged as unlimited.\n"
-		    "Please contact vendor for this provider"),
-		    ess->es_pathname);
-		goto cleanup;
-	}
-
-	if (!elfcertlib_getcert(ess, ess->es_certpath, esa_dn, &cert,
-	    ess->es_action)) {
-		cryptodebug(gettext("unable to find certificate "
-		    "with DN=\"%s\" for %s"),
-		    esa_dn, ess->es_pathname);
-		goto cleanup;
-	}
-
-	/*
-	 * Since we've already matched the original signature
-	 * and the main file signature, we can just verify the esa signature
-	 * against the main file signature.
-	 */
-	esa_buf_len = sizeof (uint32_t) + main_sig_len;
-
-	if (elfsign_hash_esa(ess, esa_file_buffer, esa_buf_len,
-	    &hash_ptr, &hash_len) != ELFSIGN_SUCCESS) {
-		cryptoerror(LOG_STDERR,
-		    gettext("Unable to hash activation contents."));
-		goto cleanup;
-	}
-
-
-	if (!elfcertlib_verifysig(ess, cert, esa_sig, esa_sig_len,
-	    hash_ptr, hash_len)) {
-		cryptoerror(LOG_STDERR,
-		    gettext("Unable to verify .esa contents for %s"),
-		    ess->es_pathname);
-		goto cleanup;
-	}
-
-	cryptodebug("Verified esa contents");
-	if (ess->es_sigvercallback)
-		(ess->es_sigvercallback) (ess->es_callbackctx,
-		    esa_file_buffer, statbuf.st_size, cert);
-
-	/*
-	 * validate the certificate used to sign the activation file
-	 */
-	if (!elfcertlib_verifycert(ess, cert)) {
-		cryptoerror(LOG_STDERR,
-		    gettext("Unable to verify .esa certificate %s for %s"),
-		    esa_dn, ess->es_pathname);
-		goto cleanup;
-	}
-
-	cryptodebug("Verified esa certificate");
-	ret = ELFSIGN_SUCCESS;
-
-cleanup:
-	if (elfobj_esa != NULL)
-		free(elfobj_esa);
-
-	if (esa_fd != -1)
-		(void) close(esa_fd);
-
-	if (esa_file_buffer != NULL)
-		(void) munmap((caddr_t)esa_file_buffer, statbuf.st_size);
-
-	if (esa_dn != NULL)
-		free(esa_dn);
-
-	if (cert != NULL)
-		elfcertlib_releasecert(ess, cert);
-
-	return (ret);
-}
 
 static uint32_t
 elfsign_switch_uint32(uint32_t i)
@@ -1546,9 +1295,6 @@ elfsign_strerror(ELFsign_status_t elferror)
 			break;
 		case ELFSIGN_INVALID_ELFOBJ:
 			msg = gettext("unable to open as an ELF object");
-			break;
-		case ELFSIGN_RESTRICTED:
-			msg = gettext("ELF object is restricted");
 			break;
 		case ELFSIGN_UNKNOWN:
 		default:

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -537,15 +536,13 @@ kcf_resubmit_request(kcf_areq_node_t *areq)
 
 	if (mech1 && !mech2) {
 		new_pd = kcf_get_mech_provider(mech1->cm_type, NULL, NULL,
-		    &error, areq->an_tried_plist, fg,
-		    (areq->an_reqarg.cr_flag & CRYPTO_RESTRICTED), 0);
+		    &error, areq->an_tried_plist, fg, 0);
 	} else {
 		ASSERT(mech1 != NULL && mech2 != NULL);
 
 		new_pd = kcf_get_dual_provider(mech1, NULL, mech2, NULL,
 		    NULL, &prov_mt1,
-		    &prov_mt2, &error, areq->an_tried_plist, fg, fg,
-		    (areq->an_reqarg.cr_flag & CRYPTO_RESTRICTED), 0);
+		    &prov_mt2, &error, areq->an_tried_plist, fg, fg, 0);
 	}
 
 	if (new_pd == NULL)
@@ -1936,8 +1933,7 @@ out:
 
 		/* No expected recoverable failures, so no retry list */
 		pd = kcf_get_mech_provider(mops->mo_framework_mechtype, NULL,
-		    &me, &error, NULL, CRYPTO_FG_MAC_ATOMIC,
-		    (areq->an_reqarg.cr_flag & CRYPTO_RESTRICTED), ct->dd_len2);
+		    &me, &error, NULL, CRYPTO_FG_MAC_ATOMIC, ct->dd_len2);
 
 		if (pd == NULL) {
 			error = CRYPTO_MECH_NOT_SUPPORTED;
@@ -1968,7 +1964,7 @@ out:
 		/* No expected recoverable failures, so no retry list */
 		pd = kcf_get_mech_provider(dcrops->dop_framework_mechtype,
 		    NULL, NULL, &error, NULL, CRYPTO_FG_DECRYPT_ATOMIC,
-		    (areq->an_reqarg.cr_flag & CRYPTO_RESTRICTED), ct->dd_len1);
+		    ct->dd_len1);
 
 		if (pd == NULL) {
 			error = CRYPTO_MECH_NOT_SUPPORTED;
@@ -1984,12 +1980,7 @@ out:
 	ct->dd_offset1 = ct->dd_offset2;
 	ct->dd_len1 = ct->dd_len2;
 
-	/* preserve if the caller is restricted */
-	if (areq->an_reqarg.cr_flag & CRYPTO_RESTRICTED) {
-		areq->an_reqarg.cr_flag = CRYPTO_RESTRICTED;
-	} else {
-		areq->an_reqarg.cr_flag = 0;
-	}
+	areq->an_reqarg.cr_flag = 0;
 
 	areq->an_reqarg.cr_callback_func = kcf_last_req;
 	areq->an_reqarg.cr_callback_arg = next_req;

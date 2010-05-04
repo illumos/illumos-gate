@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -54,8 +50,7 @@ crypto_call_req_t *crq)
 
 	/* find a provider that supports session ops */
 	(void) kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(session_ops),
-	    CRYPTO_SESSION_OFFSET(session_open),
-	    CHECK_RESTRICT(crq), pd, &real_provider);
+	    CRYPTO_SESSION_OFFSET(session_open), pd, &real_provider);
 
 	if (real_provider != NULL) {
 		int rv;
@@ -93,14 +88,13 @@ crypto_session_close(crypto_provider_t provider, crypto_session_id_t sid,
 	kcf_provider_desc_t *pd = provider;
 
 	if (pd == NULL)
-	    return (CRYPTO_ARGUMENTS_BAD);
+		return (CRYPTO_ARGUMENTS_BAD);
 
 	ASSERT(KCF_PROV_REFHELD(pd));
 
 	/* find a provider that supports session ops */
 	(void) kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(session_ops),
-	    CRYPTO_SESSION_OFFSET(session_close), CHECK_RESTRICT(crq),
-	    pd, &real_provider);
+	    CRYPTO_SESSION_OFFSET(session_close), pd, &real_provider);
 
 	ASSERT(real_provider == pd ||
 	    pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER);
@@ -138,7 +132,7 @@ crypto_session_login(crypto_provider_t provider, crypto_session_id_t sid,
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(
 		    session_ops), CRYPTO_SESSION_OFFSET(session_login),
-		    CHECK_RESTRICT(crq), pd, &real_provider);
+		    pd, &real_provider);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -174,7 +168,7 @@ crypto_session_logout(crypto_provider_t provider, crypto_session_id_t sid,
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(
 		    session_ops), CRYPTO_SESSION_OFFSET(session_logout),
-		    CHECK_RESTRICT(crq), pd, &real_provider);
+		    pd, &real_provider);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);

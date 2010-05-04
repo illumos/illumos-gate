@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_CRYPTO_API_H
@@ -47,7 +46,6 @@ typedef uint32_t crypto_call_flag_t;
 #define	CRYPTO_ALWAYS_QUEUE	0x00000001	/* ALWAYS queue the req. */
 #define	CRYPTO_NOTIFY_OPDONE	0x00000002	/* Notify intermediate steps */
 #define	CRYPTO_SKIP_REQID	0x00000004	/* Skip request ID generation */
-#define	CRYPTO_RESTRICTED	0x00000008	/* cannot use restricted prov */
 
 typedef struct {
 	crypto_call_flag_t	cr_flag;

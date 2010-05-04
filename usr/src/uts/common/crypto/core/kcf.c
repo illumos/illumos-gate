@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -534,11 +534,11 @@ kcf_need_signature_verification(kcf_provider_desc_t *pd)
  * be called from user context or kernel context.
  *
  * We call kcfd with the full pathname of the module to be
- * verified. kcfd will return success/restricted/fail, signature length
- * and the actual signature in the ELF section of the module. If kcfd
- * returns success or restricted, we compare the signature and the length
- * with the values that krtld stored in the module structure. We log an
- * error message in case of a failure.
+ * verified. kcfd will return success/fail, signature length
+ * and the actual signature in the ELF section of the module. If
+ * kcfd returns success, we compare the signature and the length
+ * with the values that krtld stored in the module structure. We
+ * log an error message in case of a failure.
  *
  * The provider state is changed to KCF_PROV_READY on success.
  */
@@ -667,8 +667,7 @@ kcf_verify_signature(void *arg)
 
 
 		/* Check kcfd result and compare against module struct fields */
-		if (((rkda->da_u.result.status != ELFSIGN_SUCCESS) &&
-		    (rkda->da_u.result.status != ELFSIGN_RESTRICTED)) ||
+		if ((rkda->da_u.result.status != ELFSIGN_SUCCESS) ||
 		    !(rkda->da_u.result.siglen == mp->sigsize) ||
 		    (bcmp(rkda->da_u.result.signature, mp->sigdata,
 		    mp->sigsize))) {
@@ -676,11 +675,6 @@ kcf_verify_signature(void *arg)
 			    filename);
 		} else {
 			error = 0;
-		}
-
-		if (rkda->da_u.result.status == ELFSIGN_RESTRICTED) {
-			pd->pd_flags |= KCF_PROV_RESTRICTED;
-			KCF_FRMWRK_DEBUG(2, ("provider is restricted\n"));
 		}
 
 		if (rkda != kda)

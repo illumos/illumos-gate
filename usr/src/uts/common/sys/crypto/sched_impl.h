@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_CRYPTO_SCHED_IMPL_H
@@ -58,11 +57,6 @@ typedef enum kcf_call_type {
 	CRYPTO_SYNCH = 1,
 	CRYPTO_ASYNCH
 } kcf_call_type_t;
-
-#define	CHECK_RESTRICT(crq) (crq != NULL &&	\
-	((crq)->cr_flag & CRYPTO_RESTRICTED))
-
-#define	CHECK_RESTRICT_FALSE	B_FALSE
 
 #define	CHECK_FASTPATH(crq, pd) ((crq) == NULL ||	\
 	!((crq)->cr_flag & CRYPTO_ALWAYS_QUEUE)) &&	\
@@ -495,21 +489,21 @@ boolean_t kcf_get_next_logical_provider_member(kcf_provider_desc_t *,
     kcf_provider_desc_t *, kcf_provider_desc_t **);
 extern int kcf_get_hardware_provider(crypto_mech_type_t, crypto_key_t *,
     crypto_mech_type_t, crypto_key_t *,
-    boolean_t, kcf_provider_desc_t *, kcf_provider_desc_t **,
+    kcf_provider_desc_t *, kcf_provider_desc_t **,
     crypto_func_group_t);
 extern int kcf_get_hardware_provider_nomech(offset_t, offset_t,
-    boolean_t, kcf_provider_desc_t *, kcf_provider_desc_t **);
+    kcf_provider_desc_t *, kcf_provider_desc_t **);
 extern void kcf_free_triedlist(kcf_prov_tried_t *);
 extern kcf_prov_tried_t *kcf_insert_triedlist(kcf_prov_tried_t **,
     kcf_provider_desc_t *, int);
 extern kcf_provider_desc_t *kcf_get_mech_provider(crypto_mech_type_t,
     crypto_key_t *, kcf_mech_entry_t **, int *, kcf_prov_tried_t *,
-    crypto_func_group_t, boolean_t, size_t);
+    crypto_func_group_t, size_t);
 extern kcf_provider_desc_t *kcf_get_dual_provider(crypto_mechanism_t *,
     crypto_key_t *, crypto_mechanism_t *, crypto_key_t *,
     kcf_mech_entry_t **, crypto_mech_type_t *,
     crypto_mech_type_t *, int *, kcf_prov_tried_t *,
-    crypto_func_group_t, crypto_func_group_t, boolean_t, size_t);
+    crypto_func_group_t, crypto_func_group_t, size_t);
 extern crypto_ctx_t *kcf_new_ctx(crypto_call_req_t  *, kcf_provider_desc_t *,
     crypto_session_id_t);
 extern int kcf_submit_request(kcf_provider_desc_t *, crypto_ctx_t *,

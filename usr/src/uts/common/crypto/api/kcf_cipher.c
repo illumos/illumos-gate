@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -119,12 +118,12 @@ crypto_cipher_init_prov(crypto_provider_t provider, crypto_session_id_t sid,
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		if (func == CRYPTO_FG_ENCRYPT) {
 			error = kcf_get_hardware_provider(mech->cm_type, key,
-			    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq), pd,
-			    &real_provider, CRYPTO_FG_ENCRYPT);
+			    CRYPTO_MECH_INVALID, NULL, pd, &real_provider,
+			    CRYPTO_FG_ENCRYPT);
 		} else {
 			error = kcf_get_hardware_provider(mech->cm_type, key,
-			    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq), pd,
-			    &real_provider, CRYPTO_FG_DECRYPT);
+			    CRYPTO_MECH_INVALID, NULL, pd, &real_provider,
+			    CRYPTO_FG_DECRYPT);
 		}
 
 		if (error != CRYPTO_SUCCESS)
@@ -241,7 +240,7 @@ crypto_cipher_init(crypto_mechanism_t *mech, crypto_key_t *key,
 retry:
 	/* pd is returned held */
 	if ((pd = kcf_get_mech_provider(mech->cm_type, key, &me, &error,
-	    list, func, CHECK_RESTRICT(crq), 0)) == NULL) {
+	    list, func, 0)) == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);
 		return (error);
@@ -330,8 +329,8 @@ crypto_encrypt_prov(crypto_provider_t provider, crypto_session_id_t sid,
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		error = kcf_get_hardware_provider(mech->cm_type, key,
-		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq), pd,
-		    &real_provider, CRYPTO_FG_ENCRYPT_ATOMIC);
+		    CRYPTO_MECH_INVALID, NULL, pd, &real_provider,
+		    CRYPTO_FG_ENCRYPT_ATOMIC);
 
 		if (error != CRYPTO_SUCCESS)
 			return (error);
@@ -367,8 +366,7 @@ crypto_encrypt(crypto_mechanism_t *mech, crypto_data_t *plaintext,
 retry:
 	/* pd is returned held */
 	if ((pd = kcf_get_mech_provider(mech->cm_type, key, &me, &error,
-	    list, CRYPTO_FG_ENCRYPT_ATOMIC, CHECK_RESTRICT(crq),
-	    plaintext->cd_length)) == NULL) {
+	    list, CRYPTO_FG_ENCRYPT_ATOMIC, plaintext->cd_length)) == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);
 		return (error);
@@ -612,8 +610,8 @@ crypto_decrypt_prov(crypto_provider_t provider, crypto_session_id_t sid,
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider(mech->cm_type, key,
-		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq), pd,
-		    &real_provider, CRYPTO_FG_DECRYPT_ATOMIC);
+		    CRYPTO_MECH_INVALID, NULL, pd, &real_provider,
+		    CRYPTO_FG_DECRYPT_ATOMIC);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -650,8 +648,7 @@ crypto_decrypt(crypto_mechanism_t *mech, crypto_data_t *ciphertext,
 retry:
 	/* pd is returned held */
 	if ((pd = kcf_get_mech_provider(mech->cm_type, key, &me, &error,
-	    list, CRYPTO_FG_DECRYPT_ATOMIC, CHECK_RESTRICT(crq),
-	    ciphertext->cd_length)) == NULL) {
+	    list, CRYPTO_FG_DECRYPT_ATOMIC, ciphertext->cd_length)) == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);
 		return (error);

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -106,8 +105,8 @@ crypto_mac_prov(crypto_provider_t provider, crypto_session_id_t sid,
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider(mech->cm_type, key,
-		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq), pd,
-		    &real_provider, CRYPTO_FG_MAC_ATOMIC);
+		    CRYPTO_MECH_INVALID, NULL, pd, &real_provider,
+		    CRYPTO_FG_MAC_ATOMIC);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -142,8 +141,7 @@ crypto_mac(crypto_mechanism_t *mech, crypto_data_t *data,
 retry:
 	/* The pd is returned held */
 	if ((pd = kcf_get_mech_provider(mech->cm_type, key, &me, &error,
-	    list, CRYPTO_FG_MAC_ATOMIC, CHECK_RESTRICT(crq),
-	    data->cd_length)) == NULL) {
+	    list, CRYPTO_FG_MAC_ATOMIC, data->cd_length)) == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);
 		return (error);
@@ -231,8 +229,8 @@ crypto_mac_verify_prov(crypto_provider_t provider, crypto_session_id_t sid,
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider(mech->cm_type, key,
-		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq), pd,
-		    &real_provider, CRYPTO_FG_MAC_ATOMIC);
+		    CRYPTO_MECH_INVALID, NULL, pd, &real_provider,
+		    CRYPTO_FG_MAC_ATOMIC);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -267,8 +265,7 @@ crypto_mac_verify(crypto_mechanism_t *mech, crypto_data_t *data,
 retry:
 	/* The pd is returned held */
 	if ((pd = kcf_get_mech_provider(mech->cm_type, key, &me, &error,
-	    list, CRYPTO_FG_MAC_ATOMIC, CHECK_RESTRICT(crq),
-	    data->cd_length)) == NULL) {
+	    list, CRYPTO_FG_MAC_ATOMIC,  data->cd_length)) == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);
 		return (error);
@@ -385,8 +382,8 @@ crypto_mac_init_prov(crypto_provider_t provider, crypto_session_id_t sid,
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider(mech->cm_type, key,
-		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq), pd,
-		    &real_provider, CRYPTO_FG_MAC);
+		    CRYPTO_MECH_INVALID, NULL, pd, &real_provider,
+		    CRYPTO_FG_MAC);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -448,7 +445,7 @@ crypto_mac_init(crypto_mechanism_t *mech, crypto_key_t *key,
 retry:
 	/* The pd is returned held */
 	if ((pd = kcf_get_mech_provider(mech->cm_type, key, &me, &error,
-	    list, CRYPTO_FG_MAC, CHECK_RESTRICT(crq), 0)) == NULL) {
+	    list, CRYPTO_FG_MAC, 0)) == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);
 		return (error);

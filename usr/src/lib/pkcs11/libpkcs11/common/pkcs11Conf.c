@@ -698,7 +698,6 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 
 		switch (estatus) {
 		case ELFSIGN_SUCCESS:
-		case ELFSIGN_RESTRICTED:
 			break;
 		case ELFSIGN_NOTSIGNED:
 			estatus_str = "not a signed provider.";

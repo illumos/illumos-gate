@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _LIBELFSIGN_H
@@ -33,7 +32,7 @@ extern "C" {
 
 /*
  * libelfsign Private Interfaces
- * This Header file should not be shipped as part of Solaris binary or
+ * This header file should not be shipped as part of Solaris binary or
  * source products.
  */
 
@@ -49,8 +48,6 @@ extern "C" {
  */
 #define	ELFSIGN_CRYPTO		"Solaris Cryptographic Framework"
 #define	USAGELIMITED		"OU=UsageLimited"
-#define	ESA			".esa"
-#define	ESA_LEN			sizeof (".esa")
 
 typedef enum ELFCert_VStatus_e {
 	E_UNCHECKED,
@@ -134,8 +131,6 @@ extern ELFsign_status_t elfsign_hash(ELFsign_t ess, uchar_t *hash,
     size_t *hash_len);
 extern ELFsign_status_t elfsign_hash_mem_resident(ELFsign_t ess,
     uchar_t *hash, size_t *hash_len);
-extern ELFsign_status_t elfsign_hash_esa(ELFsign_t ess,
-    uchar_t *esa_buf, size_t esa_buf_len, uchar_t **hash, size_t *hash_len);
 extern void elfsign_buffer_len(ELFsign_t ess, size_t *ip, uchar_t *cp,
     enum ES_ACTION action);
 

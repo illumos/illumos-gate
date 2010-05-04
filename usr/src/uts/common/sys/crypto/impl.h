@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_CRYPTO_IMPL_H
@@ -167,7 +166,6 @@ typedef enum {
 #define	KCF_IS_PROV_REMOVED(pd)	((pd)->pd_state >= KCF_PROV_UNREGISTERING)
 
 /* Internal flags valid for pd_flags field */
-#define	KCF_PROV_RESTRICTED	0x40000000
 #define	KCF_LPROV_MEMBER	0x80000000 /* is member of a logical provider */
 
 /*

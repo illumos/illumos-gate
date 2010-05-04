@@ -1463,7 +1463,7 @@ get_provider_info(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	(void) kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(provider_ops), CRYPTO_PROVIDER_OFFSET(ext_info),
-	    CHECK_RESTRICT_FALSE, provider, &real_provider);
+	    provider, &real_provider);
 
 	if (real_provider != NULL) {
 		ASSERT(real_provider == provider ||
@@ -1729,8 +1729,7 @@ again:
 
 	/* find a hardware provider that supports session ops */
 	(void) kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(session_ops),
-	    CRYPTO_SESSION_OFFSET(session_open), CHECK_RESTRICT_FALSE,
-	    pd, &real_provider);
+	    CRYPTO_SESSION_OFFSET(session_open), pd, &real_provider);
 
 	if (real_provider != NULL) {
 		ASSERT(real_provider == pd ||
@@ -2660,8 +2659,7 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
 	}
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, &key,
-	    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT_FALSE, sp->sd_provider,
-	    &real_provider, fg))
+	    CRYPTO_MECH_INVALID, NULL, sp->sd_provider, &real_provider, fg))
 	    != CRYPTO_SUCCESS) {
 		goto out;
 	}
@@ -3226,8 +3224,8 @@ digest_init(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, NULL,
-	    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT_FALSE, sp->sd_provider,
-	    &real_provider, CRYPTO_FG_DIGEST)) != CRYPTO_SUCCESS) {
+	    CRYPTO_MECH_INVALID, NULL, sp->sd_provider, &real_provider,
+	    CRYPTO_FG_DIGEST)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -3648,8 +3646,7 @@ set_pin(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(provider_ops), CRYPTO_PROVIDER_OFFSET(set_pin),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -3727,9 +3724,8 @@ login(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(session_ops),
-	    CRYPTO_SESSION_OFFSET(session_login),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    CRYPTO_SESSION_OFFSET(session_login), sp->sd_provider,
+	    &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -3789,8 +3785,8 @@ logout(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(session_ops),
-	    CRYPTO_SESSION_OFFSET(session_logout), CHECK_RESTRICT_FALSE,
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	    CRYPTO_SESSION_OFFSET(session_logout), sp->sd_provider,
+	    &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -3924,8 +3920,8 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 	}
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, &key,
-	    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT_FALSE, sp->sd_provider,
-	    &real_provider, fg)) != CRYPTO_SUCCESS) {
+	    CRYPTO_MECH_INVALID, NULL, sp->sd_provider, &real_provider,
+	    fg)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -4343,8 +4339,7 @@ seed_random(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(random_ops), CRYPTO_RANDOM_OFFSET(seed_random),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
@@ -4429,8 +4424,8 @@ generate_random(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(random_ops),
-	    CRYPTO_RANDOM_OFFSET(generate_random), CHECK_RESTRICT_FALSE,
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	    CRYPTO_RANDOM_OFFSET(generate_random), sp->sd_provider,
+	    &real_provider)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
@@ -4570,9 +4565,8 @@ object_create(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_create),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    CRYPTO_OBJECT_OFFSET(object_create), sp->sd_provider,
+	    &real_provider)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
@@ -4666,8 +4660,8 @@ object_copy(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_copy), CHECK_RESTRICT_FALSE,
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	    CRYPTO_OBJECT_OFFSET(object_copy), sp->sd_provider,
+	    &real_provider)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
@@ -4748,8 +4742,8 @@ object_destroy(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_destroy), CHECK_RESTRICT_FALSE,
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	    CRYPTO_OBJECT_OFFSET(object_destroy), sp->sd_provider,
+	    &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -4838,8 +4832,7 @@ object_get_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
 	    CRYPTO_OBJECT_OFFSET(object_get_attribute_value),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -4918,7 +4911,7 @@ object_get_size(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_get_size), CHECK_RESTRICT_FALSE,
+	    CRYPTO_OBJECT_OFFSET(object_get_size),
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
@@ -5001,8 +4994,7 @@ object_set_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
 	    CRYPTO_OBJECT_OFFSET(object_set_attribute_value),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
@@ -5081,7 +5073,7 @@ object_find_init(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_find_init), CHECK_RESTRICT_FALSE,
+	    CRYPTO_OBJECT_OFFSET(object_find_init),
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
@@ -5181,8 +5173,8 @@ object_find_update(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_find), CHECK_RESTRICT_FALSE,
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	    CRYPTO_OBJECT_OFFSET(object_find), sp->sd_provider,
+	    &real_provider)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
@@ -5242,7 +5234,7 @@ crypto_free_find_ctx(crypto_session_data_t *sp)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_find_final), CHECK_RESTRICT_FALSE,
+	    CRYPTO_OBJECT_OFFSET(object_find_final),
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		return (rv);
 	}
@@ -5353,7 +5345,7 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	    sizeof (crypto_mech_type_t));
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, NULL,
-	    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT_FALSE, sp->sd_provider,
+	    CRYPTO_MECH_INVALID, NULL, sp->sd_provider,
 	    &real_provider, CRYPTO_FG_GENERATE)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
@@ -5486,7 +5478,7 @@ nostore_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	    sizeof (crypto_mech_type_t));
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, NULL,
-	    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT_FALSE, sp->sd_provider,
+	    CRYPTO_MECH_INVALID, NULL, sp->sd_provider,
 	    &real_provider, CRYPTO_FG_GENERATE)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
@@ -5623,7 +5615,7 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 	    sizeof (crypto_mech_type_t));
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, NULL,
-	    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT_FALSE, sp->sd_provider,
+	    CRYPTO_MECH_INVALID, NULL, sp->sd_provider,
 	    &real_provider, CRYPTO_FG_GENERATE_KEY_PAIR)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
@@ -5793,7 +5785,7 @@ nostore_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 	    sizeof (crypto_mech_type_t));
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, NULL,
-	    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT_FALSE, sp->sd_provider,
+	    CRYPTO_MECH_INVALID, NULL, sp->sd_provider,
 	    &real_provider, CRYPTO_FG_GENERATE_KEY_PAIR)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
@@ -5974,7 +5966,7 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	wrapped_key_len = STRUCT_FGET(wrap_key, wk_wrapped_key_len);
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, &key,
-	    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT_FALSE, sp->sd_provider,
+	    CRYPTO_MECH_INVALID, NULL,  sp->sd_provider,
 	    &real_provider, CRYPTO_FG_WRAP)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
@@ -6136,7 +6128,7 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, &unwrapping_key,
-	    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT_FALSE, sp->sd_provider,
+	    CRYPTO_MECH_INVALID, NULL, sp->sd_provider,
 	    &real_provider, CRYPTO_FG_UNWRAP)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
@@ -6300,7 +6292,7 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, &base_key,
-	    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT_FALSE, sp->sd_provider,
+	    CRYPTO_MECH_INVALID, NULL, sp->sd_provider,
 	    &real_provider, CRYPTO_FG_DERIVE)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
@@ -6460,7 +6452,7 @@ nostore_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, &base_key,
-	    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT_FALSE, sp->sd_provider,
+	    CRYPTO_MECH_INVALID, NULL, sp->sd_provider,
 	    &real_provider, CRYPTO_FG_DERIVE)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}

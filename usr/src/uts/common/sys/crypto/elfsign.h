@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_CRYPTO_ELFSIGN_H
@@ -49,7 +48,6 @@ typedef enum ELFsign_status_e {
 	ELFSIGN_NOTSIGNED,
 	ELFSIGN_INVALID_CERTPATH,
 	ELFSIGN_INVALID_ELFOBJ,
-	ELFSIGN_RESTRICTED,
 	ELFSIGN_UNAVAILABLE
 } ELFsign_status_t;
 

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -860,7 +859,7 @@ crypto_get_provinfo(crypto_provider_t hndl, crypto_provider_ext_info_t *info)
 	pd = (kcf_provider_desc_t *)hndl;
 	rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(provider_ops), CRYPTO_PROVIDER_OFFSET(ext_info),
-	    CHECK_RESTRICT_FALSE, pd, &real_provider);
+	    pd, &real_provider);
 
 	if (rv == CRYPTO_SUCCESS && real_provider != NULL) {
 		ASSERT(real_provider == pd ||

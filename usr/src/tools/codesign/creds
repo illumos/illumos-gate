@@ -18,20 +18,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # The following is a list of regular expressions that are matched against
 # the (temporary) signature on a crypto module created during the build
 # process. The first regular expression that matches is used to select the
 # signing credential to use for the file.
 #
-# Order is important: Files marked UsageLimited will also match the
-# "Solaris Cryptographic Framework" entry.
-#
 # Credential name	Regular expression
 # ---------------	------------------
-CryptoLimited_v2        UsageLimited
 Crypto_v2               Solaris Cryptographic Framework

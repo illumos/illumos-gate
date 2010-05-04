@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -46,7 +45,6 @@
 #include <locale.h>
 #include <errno.h>
 #include <strings.h>
-#include <langinfo.h>
 
 #include <cryptoutil.h>
 #include <sys/crypto/elfsign.h>
@@ -55,7 +53,7 @@
 #include <kmfapi.h>
 
 #define	SIGN		"sign"
-#define	SIGN_OPTS	"ac:e:F:k:P:T:v"
+#define	SIGN_OPTS	"c:e:F:k:P:T:v"
 #define	VERIFY		"verify"
 #define	VERIFY_OPTS	"c:e:v"
 #define	REQUEST		"request"
@@ -132,7 +130,6 @@ static char *getpin(void);
 static ret_t do_sign(char *);
 static ret_t do_verify(char *);
 static ret_t do_cert_request(char *);
-static ret_t do_gen_esa(char *);
 static ret_t do_list(char *);
 static void es_error(const char *fmt, ...);
 static char *time_str(time_t t);
@@ -216,11 +213,6 @@ main(int argc, char **argv)
 			cryptodebug("c=%c", c);
 
 		switch (c) {
-		case 'a':
-			/* not a normal sign operation, change the action */
-			cmd_info.es_action = ES_GET;
-			action = do_gen_esa;
-			break;
 		case 'c':
 			cmd_info.cert = optarg;
 			break;
@@ -381,10 +373,10 @@ usage(void)
 /* BEGIN CSTYLED */
 	(void) fprintf(stderr, gettext(
  "usage:\n"
- "\telfsign sign [-a] [-v] [-e <elf_object>] -c <certificate_file>\n"
+ "\telfsign sign [-v] [-e <elf_object>] -c <certificate_file>\n"
  "\t\t[-F <format>] -k <private_key_file> [elf_object]..."
  "\n"
- "\telfsign sign [-a] [-v] [-e <elf_object>] -c <certificate_file>\n"
+ "\telfsign sign [-v] [-e <elf_object>] -c <certificate_file>\n"
  "\t\t[-F <format>] -T <token_label> [-P <pin_file>] [elf_object]..."
  "\n\n"
  "\telfsign verify [-v] [-c <certificate_file>] [-e <elf_object>]\n"
@@ -410,7 +402,6 @@ getelfobj(char *elfpath)
 	estatus = elfsign_begin(elfpath, cmd_info.es_action, &(cmd_info.ess));
 	switch (estatus) {
 	case ELFSIGN_SUCCESS:
-	case ELFSIGN_RESTRICTED:
 		ret = EXIT_OKAY;
 		break;
 	case ELFSIGN_INVALID_ELFOBJ:
@@ -665,295 +656,6 @@ cleanup:
 	return (ret);
 }
 
-#define	ESA_ERROR(str, esa_file) {	\
-	int realerrno = errno;		\
-	es_error(gettext(str), esa_file, strerror(realerrno)); \
-	goto clean_esa;			\
-}
-
-/*
- * Generate the elfsign activation file (.esa) for this request.
- * The .esa file should contain the signature of main binary
- * signed with an unlimited certificate, the DN and its own signature.
- *
- * The format is as follows:
- *   -----------------------------
- * A | main signature length     |
- *   -----------------------------
- * B | main signature (copy of   |
- *   |   signature from original |
- *   |   limited-use binary      |
- *   -----------------------------
- * C | signing DN length         |
- *   -----------------------------
- * D | signing DN                |
- *   -----------------------------
- * E | esa signature length      |
- *   -----------------------------
- * F | esa signature =           |
- *   |   RSA(HASH(A||B)          |
- *   -----------------------------
- * (lengths are in the same endianness as the original object)
- *
- * cmd_info.ess set for the main binary is correct here, since this
- * is the only elf object we are actually dealing with during the .esa
- * generation.
- */
-static ret_t
-do_gen_esa(char *object)
-{
-	ret_t	ret;
-
-	/* variables used for signing and writing to .esa file */
-	char	*elfobj_esa;
-	size_t	elfobj_esa_len;
-	int	esa_fd;
-	mode_t	mode = S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH;
-	uchar_t	*esa_buf = NULL;
-	size_t	esa_buf_len = 0;
-	uchar_t hash[SIG_MAX_LENGTH], *hash_ptr = hash;
-	size_t  hash_len = SIG_MAX_LENGTH;
-	uchar_t	esa_sig[SIG_MAX_LENGTH];
-	size_t	esa_sig_len = SIG_MAX_LENGTH;
-	struct filesignatures *fssp = NULL;
-	size_t fslen;
-	ELFCert_t cert = NULL;
-	char *dn;
-	size_t dn_len;
-	uchar_t tmp_buf[sizeof (uint32_t)];
-	int realerrno = 0;
-
-	/*
-	 * variables used for finding information on signer of main
-	 * elfobject.
-	 */
-	uchar_t	orig_signature[SIG_MAX_LENGTH];
-	size_t	orig_sig_len = sizeof (orig_signature);
-
-	cryptodebug("do_gen_esa");
-	if ((ret = getelfobj(object)) != EXIT_OKAY)
-		return (ret);
-	ret = EXIT_SIGN_FAILED;
-
-	if (cmd_info.token_label &&
-	    !elfcertlib_settoken(cmd_info.ess, cmd_info.token_label)) {
-		es_error(gettext("Unable to access token: %s"),
-		    cmd_info.token_label);
-		ret = EXIT_SIGN_FAILED;
-		goto clean_esa;
-	}
-
-	if ((ret = setcertpath()) != EXIT_OKAY)
-		goto clean_esa;
-
-	/*
-	 * Find the certificate we need to sign the activation file with.
-	 */
-	if (!elfcertlib_getcert(cmd_info.ess, cmd_info.cert, NULL, &cert,
-	    cmd_info.es_action)) {
-		es_error(gettext("Unable to load certificate: %s"),
-		    cmd_info.cert);
-		ret = EXIT_BAD_CERT;
-		goto clean_esa;
-	}
-
-	if (cmd_info.privpath != NULL) {
-		if (!elfcertlib_loadprivatekey(cmd_info.ess, cert,
-		    cmd_info.privpath)) {
-			es_error(gettext("Unable to load private key: %s"),
-			    cmd_info.privpath);
-			ret = EXIT_BAD_PRIVATEKEY;
-			goto clean_esa;
-		}
-	} else {
-		char *pin = getpin();
-
-		if (pin == NULL) {
-			cryptoerror(LOG_STDERR, gettext("Unable to get PIN"));
-			ret = EXIT_BAD_PRIVATEKEY;
-			goto clean_esa;
-		}
-		if (!elfcertlib_loadtokenkey(cmd_info.ess, cert,
-		    cmd_info.token_label, pin)) {
-			es_error(gettext("Unable to access private key "
-			    "in token %s"), cmd_info.token_label);
-			ret = EXIT_BAD_PRIVATEKEY;
-			goto clean_esa;
-		}
-	}
-
-	/*
-	 * Get the DN from the certificate.
-	 */
-	if ((dn = elfcertlib_getdn(cert)) == NULL) {
-		es_error(gettext("Unable to find DN in certifiate %s"),
-		    cmd_info.cert);
-		goto clean_esa;
-	}
-	dn_len = strlen(dn);
-	cryptodebug("DN = %s", dn);
-
-	/*
-	 * Make sure they are not trying to sign .esa file with a
-	 * limited certificate.
-	 */
-	if (strstr(dn, USAGELIMITED) != NULL) {
-		es_error(gettext("Activation file must be signed with a "
-		    "certficate without %s."), USAGELIMITED);
-		goto clean_esa;
-	}
-
-	/*
-	 * Find information in the associated elfobject that will
-	 * be needed to generate the activation file.
-	 */
-	if (elfsign_signatures(cmd_info.ess, &fssp, &fslen, ES_GET) !=
-	    ELFSIGN_SUCCESS) {
-		es_error(gettext("%s must be signed first, before an "
-		    "associated activation file can be created."),
-		    object);
-		goto clean_esa;
-	}
-	if (elfsign_extract_sig(cmd_info.ess, fssp,
-	    orig_signature, &orig_sig_len) == FILESIG_UNKNOWN) {
-		es_error(gettext("elfsign can not create "
-		    "an associated activation file for the "
-		    "signature format of %s."),
-		    object);
-		goto clean_esa;
-	}
-	{ /* DEBUG START */
-		const int sigstr_len = orig_sig_len * 2 + 1;
-		char *sigstr = malloc(sigstr_len);
-
-		tohexstr(orig_signature, orig_sig_len, sigstr, sigstr_len);
-		cryptodebug("signature value is: %s", sigstr);
-		cryptodebug("sig size value is: %d", orig_sig_len);
-		free(sigstr);
-	} /* DEBUG END */
-
-	esa_buf_len = sizeof (uint32_t) + orig_sig_len;
-	esa_buf = malloc(esa_buf_len);
-	if (esa_buf == NULL) {
-		es_error(gettext("Unable to allocate memory for .esa buffer"));
-		goto clean_esa;
-	}
-
-	/*
-	 * Write eventual contents of .esa file to a temporary
-	 * buffer, so we can sign it before writing out to
-	 * the file.
-	 */
-	elfsign_buffer_len(cmd_info.ess, &orig_sig_len, esa_buf, ES_UPDATE);
-	(void) memcpy(esa_buf + sizeof (uint32_t), orig_signature,
-	    orig_sig_len);
-
-	if (elfsign_hash_esa(cmd_info.ess, esa_buf, esa_buf_len,
-	    &hash_ptr, &hash_len) != ELFSIGN_SUCCESS) {
-		es_error(gettext("Unable to calculate activation hash"));
-		goto clean_esa;
-	}
-
-	/*
-	 * sign the buffer for the .esa file
-	 */
-	if (!elfcertlib_sign(cmd_info.ess, cert,
-	    hash_ptr, hash_len, esa_sig, &esa_sig_len)) {
-		es_error(gettext("Unable to sign .esa data using key from %s"),
-		    cmd_info.privpath ?
-		    cmd_info.privpath : cmd_info.token_label);
-		goto clean_esa;
-	}
-
-	{ /* DEBUG START */
-		const int sigstr_len = esa_sig_len * 2 + 1;
-		char *sigstr = malloc(sigstr_len);
-
-		tohexstr(esa_sig, esa_sig_len, sigstr, sigstr_len);
-		cryptodebug("esa signature value is: %s", sigstr);
-		cryptodebug("esa size value is: %d", esa_sig_len);
-		free(sigstr);
-	} /* DEBUG END */
-
-	/*
-	 * Create the empty activation file once we know
-	 * we are working with the good data.
-	 */
-	elfobj_esa_len = strlen(object) + ESA_LEN + 1;
-	elfobj_esa = malloc(elfobj_esa_len);
-
-	if (elfobj_esa == NULL) {
-		es_error(gettext("Unable to allocate buffer for esa filename"));
-		goto clean_esa;
-	}
-
-	(void) strlcpy(elfobj_esa, object, elfobj_esa_len);
-	(void) strlcat(elfobj_esa, ESA, elfobj_esa_len);
-
-	cryptodebug("Creating .esa file: %s", elfobj_esa);
-
-	if ((esa_fd = open(elfobj_esa, O_WRONLY|O_CREAT|O_EXCL, mode)) == -1) {
-		ESA_ERROR("Unable to create activation file: %s. %s.",
-		    elfobj_esa);
-	}
-
-	if (write(esa_fd, esa_buf, esa_buf_len) != esa_buf_len) {
-		ESA_ERROR("Unable to write contents to %s. %s.",
-		    elfobj_esa);
-	}
-
-	{ /* DEBUG START */
-		const int sigstr_len = dn_len * 2 + 1;
-		char *sigstr = malloc(sigstr_len);
-
-		tohexstr((uchar_t *)dn, dn_len, sigstr, sigstr_len);
-		cryptodebug("dn value is: %s", sigstr);
-		cryptodebug("dn size value is: %d", dn_len);
-		free(sigstr);
-	} /* DEBUG END */
-
-	elfsign_buffer_len(cmd_info.ess, &dn_len, tmp_buf, ES_UPDATE);
-	if (write(esa_fd, tmp_buf, sizeof (tmp_buf)) != sizeof (tmp_buf)) {
-		ESA_ERROR("Unable to write dn_len to %s. %s.", elfobj_esa);
-	}
-
-	if (write(esa_fd, dn, dn_len) != dn_len) {
-		ESA_ERROR("Unable to write dn to %s. %s.", elfobj_esa);
-	}
-
-	elfsign_buffer_len(cmd_info.ess, &esa_sig_len, tmp_buf, ES_UPDATE);
-	if (write(esa_fd, tmp_buf, sizeof (tmp_buf)) != sizeof (tmp_buf)) {
-		ESA_ERROR("Unable to write .esa signature len to %s. %s.",
-		    elfobj_esa);
-	}
-
-	if (write(esa_fd, esa_sig, esa_sig_len) != esa_sig_len) {
-		realerrno = errno;
-		es_error(gettext("Unable to write .esa signature. %s."),
-		    strerror(realerrno));
-		goto clean_esa;
-	}
-
-	ret = EXIT_OKAY;
-
-clean_esa:
-	free(fssp);
-	if (esa_fd != -1)
-		(void) close(esa_fd);
-
-	if (esa_buf != NULL)
-		free(esa_buf);
-
-	bzero(esa_sig, esa_sig_len);
-
-	if (cert != NULL)
-		elfcertlib_releasecert(cmd_info.ess, cert);
-	if (cmd_info.ess != NULL)
-		elfsign_end(cmd_info.ess);
-
-	return (ret);
-}
-
 /*
  * Verify the signature of the object
  * This subcommand is intended to be used by developers during their build
@@ -982,14 +684,6 @@ do_verify(char *object)
 		(void) fprintf(stdout,
 		    gettext("elfsign: verification of %s passed.\n"),
 		    object);
-		if (cmd_info.verbose)
-			sig_info_print(esip);
-		retval = EXIT_OKAY;
-		break;
-	case ELFSIGN_RESTRICTED:
-		(void) fprintf(stdout,
-		    gettext("elfsign: verification of %s passed, "
-		    "but restricted.\n"), object);
 		if (cmd_info.verbose)
 			sig_info_print(esip);
 		retval = EXIT_OKAY;
@@ -1171,95 +865,6 @@ cleanup:
 	return (kmfrv);
 }
 
-static boolean_t
-is_restricted(void)
-{
-	char	nr[80]; /* Non-retail provider? big buffer for l10n */
-	char	*yeschar = nl_langinfo(YESSTR);
-	char	*nochar = nl_langinfo(NOSTR);
-
-	/*
-	 * Find out if user will need an activation file.
-	 * These questions cover cases #1 and #2 from the Jumbo Export
-	 * Control case.  The logic of these questions should not be modified
-	 * without consulting the jumbo case, unless there is a new
-	 * export case or a change in export/import regulations for Sun
-	 * and Sun customers.
-	 * Case #3 should be covered in the developer documentation.
-	 */
-/* BEGIN CSTYLED */
-	(void) fprintf(stdout, gettext("\n"
-"The government of the United States of America restricts the export of \n"
-"\"open cryptographic interfaces\", also known as \"crypto-with-a-hole\".\n"
-"Due to this restriction, all providers for the Solaris cryptographic\n"
-"framework must be signed, regardless of the country of origin.\n\n"));
-
-	(void) fprintf(stdout, gettext(
-"The terms \"retail\" and \"non-retail\" refer to export classifications \n"
-"for products manufactured in the USA.  These terms define the portion of the\n"
-"world where the product may be shipped.  Roughly speaking, \"retail\" is \n"
-"worldwide (minus certain excluded nations) and \"non-retail\" is domestic \n"
-"only (plus some highly favored nations).  If your provider is subject to\n"
-"USA export control, then you must obtain an export approval (classification)\n"
-"from the government of the USA before exporting your provider.  It is\n"
-"critical that you specify the obtained (or expected, when used during \n"
-"development) classification to the following questions so that your provider\n"
-"will be appropriately signed.\n\n"));
-
-	for (;;) {
-		(void) fprintf(stdout, gettext(
-"Do you have retail export approval for use without restrictions based \n"
-"on the caller (for example, IPsec)? [Yes/No] "));
-/* END CSTYLED */
-
-		(void) fflush(stdout);
-
-		(void) fgets(nr, sizeof (nr), stdin);
-		if (nr == NULL)
-			goto demand_answer;
-
-		nr[strlen(nr) - 1] = '\0';
-
-		if (strncasecmp(nochar, nr, 1) == 0) {
-/* BEGIN CSTYLED */
-			(void) fprintf(stdout, gettext("\n"
-"If you have non-retail export approval for unrestricted use of your provider\n"
-"by callers, are you also planning to receive retail approval by restricting \n"
-"which export sensitive callers (for example, IPsec) may use your \n"
-"provider? [Yes/No] "));
-/* END CSTYLED */
-
-			(void) fflush(stdout);
-
-			(void) fgets(nr, sizeof (nr), stdin);
-
-			/*
-			 * flush standard input so any remaining text
-			 * does not affect next read.
-			 */
-			(void) fflush(stdin);
-
-			if (nr == NULL)
-				goto demand_answer;
-
-			nr[strlen(nr) - 1] = '\0';
-
-			if (strncasecmp(nochar, nr, 1) == 0) {
-				return (B_FALSE);
-			} else if (strncasecmp(yeschar, nr, 1) == 0) {
-				return (B_TRUE);
-			} else
-				goto demand_answer;
-
-		} else if (strncasecmp(yeschar, nr, 1) == 0) {
-			return (B_FALSE);
-		}
-
-	demand_answer:
-		(void) fprintf(stdout,
-		    gettext("You must specify an answer.\n\n"));
-	}
-}
 
 #define	CN_MAX_LENGTH	64	/* Verisign implementation limit */
 /*
@@ -1272,26 +877,25 @@ do_cert_request(char *object)
 	const char	 PartnerDNFMT[] =
 	    "CN=%s, "
 	    "OU=Class B, "
-	    "%sOU=Solaris Cryptographic Framework, "
+	    "OU=Solaris Cryptographic Framework, "
 	    "OU=Partner Object Signing, "
 	    "O=Sun Microsystems Inc";
 	const char	 SunCDNFMT[] =
 	    "CN=%s, "
 	    "OU=Class B, "
-	    "%sOU=Solaris Cryptographic Framework, "
+	    "OU=Solaris Cryptographic Framework, "
 	    "OU=Corporate Object Signing, "
 	    "O=Sun Microsystems Inc";
 	const char	 SunSDNFMT[] =
 	    "CN=%s, "
 	    "OU=Class B, "
-	    "%sOU=Solaris Signed Execution, "
+	    "OU=Solaris Signed Execution, "
 	    "OU=Corporate Object Signing, "
 	    "O=Sun Microsystems Inc";
 	const char	 *dnfmt = NULL;
 	char	cn[CN_MAX_LENGTH + 1];
 	char	*dn = NULL;
 	size_t	dn_len;
-	char	*restriction = "";
 	KMF_RETURN   kmfret;
 	cryptodebug("do_cert_request");
 
@@ -1334,22 +938,10 @@ do_cert_request(char *object)
 		return (EXIT_INVALID_ARG);
 	}
 
-	/*
-	 * determine if there is an export restriction
-	 */
-	switch (cmd_info.internal_req) {
-	case 's':
-		restriction = "";
-		break;
-	default:
-		restriction = is_restricted() ? USAGELIMITED ", " : "";
-		break;
-	}
-
 	/* Update DN string */
-	dn_len = strlen(cn) + strlen(dnfmt) + strlen(restriction);
+	dn_len = strlen(cn) + strlen(dnfmt);
 	dn = malloc(dn_len + 1);
-	(void) snprintf(dn, dn_len, dnfmt, cn, restriction);
+	(void) snprintf(dn, dn_len, dnfmt, cn);
 
 	cryptodebug("Generating Certificate request for DN: %s", dn);
 	kmfret = create_csr(dn);

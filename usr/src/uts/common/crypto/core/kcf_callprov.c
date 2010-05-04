@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -222,7 +221,7 @@ is_valid_provider_for_mech(kcf_provider_desc_t *pd, kcf_mech_entry_t *me,
  */
 int
 kcf_get_hardware_provider(crypto_mech_type_t mech_type_1, crypto_key_t *key1,
-    crypto_mech_type_t mech_type_2, crypto_key_t *key2, boolean_t call_restrict,
+    crypto_mech_type_t mech_type_2, crypto_key_t *key2,
     kcf_provider_desc_t *old, kcf_provider_desc_t **new, crypto_func_group_t fg)
 {
 	kcf_provider_desc_t *provider, *real_pd = old;
@@ -274,12 +273,6 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1, crypto_key_t *key1,
 
 			ASSERT(provider->pd_prov_type !=
 			    CRYPTO_LOGICAL_PROVIDER);
-
-			if (call_restrict &&
-			    (provider->pd_flags & KCF_PROV_RESTRICTED)) {
-				p = p->pl_next;
-				continue;
-			}
 
 			if (!is_valid_provider_for_mech(provider, me, fg)) {
 				p = p->pl_next;
@@ -351,8 +344,7 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1, crypto_key_t *key1,
 		mutex_exit(&old->pd_lock);
 
 	} else {
-		if (!KCF_IS_PROV_USABLE(old) ||
-		    (call_restrict && (old->pd_flags & KCF_PROV_RESTRICTED))) {
+		if (!KCF_IS_PROV_USABLE(old)) {
 			real_pd = NULL;
 			rv = CRYPTO_DEVICE_ERROR;
 			goto out;
@@ -390,8 +382,7 @@ out:
  */
 int
 kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
-    boolean_t call_restrict, kcf_provider_desc_t *old,
-    kcf_provider_desc_t **new)
+    kcf_provider_desc_t *old, kcf_provider_desc_t **new)
 {
 	kcf_provider_desc_t *provider, *real_pd = old;
 	kcf_provider_desc_t *gpd = NULL;	/* good provider */
@@ -424,11 +415,6 @@ kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
 			ASSERT(provider->pd_prov_type !=
 			    CRYPTO_LOGICAL_PROVIDER);
 
-			if (call_restrict &&
-			    (provider->pd_flags & KCF_PROV_RESTRICTED)) {
-				p = p->pl_next;
-				continue;
-			}
 			if (KCF_PROV_NULL_ENTRY_POINT(provider, offset_1,
 			    offset_2, ops)) {
 				p = p->pl_next;
@@ -469,8 +455,7 @@ kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
 		}
 
 	} else {
-		if (!KCF_IS_PROV_USABLE(old) ||
-		    (call_restrict && (old->pd_flags & KCF_PROV_RESTRICTED))) {
+		if (!KCF_IS_PROV_USABLE(old)) {
 			real_pd = NULL;
 			rv = CRYPTO_DEVICE_ERROR;
 			goto out;
@@ -539,13 +524,11 @@ found:
  * number of providers in this list. If this assumption ever changes,
  * we should revisit this.
  *
- * call_restrict represents if the caller should not be allowed to
- * use restricted providers.
  */
 kcf_provider_desc_t *
 kcf_get_mech_provider(crypto_mech_type_t mech_type, crypto_key_t *key,
     kcf_mech_entry_t **mepp, int *error, kcf_prov_tried_t *triedl,
-    crypto_func_group_t fg, boolean_t call_restrict, size_t data_size)
+    crypto_func_group_t fg, size_t data_size)
 {
 	kcf_provider_desc_t *pd = NULL, *gpd = NULL;
 	kcf_prov_mech_desc_t *prov_chain, *mdesc;
@@ -602,9 +585,7 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, crypto_key_t *key,
 
 			if (!IS_FG_SUPPORTED(prov_chain, fg) ||
 			    !KCF_IS_PROV_USABLE(pd) ||
-			    IS_PROVIDER_TRIED(pd, triedl) ||
-			    (call_restrict &&
-			    (pd->pd_flags & KCF_PROV_RESTRICTED))) {
+			    IS_PROVIDER_TRIED(pd, triedl)) {
 				prov_chain = prov_chain->pm_next;
 				continue;
 			}
@@ -637,8 +618,7 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, crypto_key_t *key,
 		pd = mdesc->pm_prov_desc;
 		if (!IS_FG_SUPPORTED(mdesc, fg) ||
 		    !KCF_IS_PROV_USABLE(pd) ||
-		    IS_PROVIDER_TRIED(pd, triedl) ||
-		    (call_restrict && (pd->pd_flags & KCF_PROV_RESTRICTED)))
+		    IS_PROVIDER_TRIED(pd, triedl))
 			pd = NULL;
 	}
 
@@ -679,7 +659,7 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_key_t *key1,
     crypto_mechanism_t *mech2, crypto_key_t *key2,
     kcf_mech_entry_t **mepp, crypto_mech_type_t *prov_mt1,
     crypto_mech_type_t *prov_mt2, int *error, kcf_prov_tried_t *triedl,
-    crypto_func_group_t fg1, crypto_func_group_t fg2, boolean_t call_restrict,
+    crypto_func_group_t fg1, crypto_func_group_t fg2,
     size_t data_size)
 {
 	kcf_provider_desc_t *pd = NULL, *pdm1 = NULL, *pdm1m2 = NULL;
@@ -730,9 +710,7 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_key_t *key1,
 
 			if (!IS_FG_SUPPORTED(prov_chain, fg1) ||
 			    !KCF_IS_PROV_USABLE(pd) ||
-			    IS_PROVIDER_TRIED(pd, triedl) ||
-			    (call_restrict &&
-			    (pd->pd_flags & KCF_PROV_RESTRICTED))) {
+			    IS_PROVIDER_TRIED(pd, triedl)) {
 				prov_chain = prov_chain->pm_next;
 				continue;
 			}
@@ -807,8 +785,7 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_key_t *key1,
 		pd = mdesc->pm_prov_desc;
 		if (!IS_FG_SUPPORTED(mdesc, fg1) ||
 		    !KCF_IS_PROV_USABLE(pd) ||
-		    IS_PROVIDER_TRIED(pd, triedl) ||
-		    (call_restrict && (pd->pd_flags & KCF_PROV_RESTRICTED)))
+		    IS_PROVIDER_TRIED(pd, triedl))
 			pd = NULL;
 		else {
 			/* See if pd can do me2 too */

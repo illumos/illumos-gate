@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -56,7 +52,7 @@ crypto_object_create(crypto_provider_t provider, crypto_session_id_t sid,
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(
 		    object_ops), CRYPTO_OBJECT_OFFSET(object_create),
-		    CHECK_RESTRICT(crq), pd, &real_provider);
+		    pd, &real_provider);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -93,7 +89,7 @@ crypto_object_destroy(crypto_provider_t provider, crypto_session_id_t sid,
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(
 		    object_ops), CRYPTO_OBJECT_OFFSET(object_destroy),
-		    CHECK_RESTRICT(crq), pd, &real_provider);
+		    pd, &real_provider);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -131,7 +127,7 @@ crypto_object_copy(crypto_provider_t provider, crypto_session_id_t sid,
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(
 		    object_ops), CRYPTO_OBJECT_OFFSET(object_copy),
-		    CHECK_RESTRICT(crq), pd, &real_provider);
+		    pd, &real_provider);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -171,7 +167,7 @@ crypto_object_get_attribute_value(crypto_provider_t provider,
 		rv = kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(
 		    object_ops),
 		    CRYPTO_OBJECT_OFFSET(object_get_attribute_value),
-		    CHECK_RESTRICT(crq), pd, &real_provider);
+		    pd, &real_provider);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -210,7 +206,7 @@ crypto_object_set_attribute_value(crypto_provider_t provider,
 		rv = kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(
 		    object_ops),
 		    CRYPTO_OBJECT_OFFSET(object_set_attribute_value),
-		    CHECK_RESTRICT(crq), pd, &real_provider);
+		    pd, &real_provider);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -247,7 +243,7 @@ crypto_object_get_size(crypto_provider_t provider, crypto_session_id_t sid,
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(
 		    object_ops), CRYPTO_OBJECT_OFFSET(object_get_size),
-		    CHECK_RESTRICT(crq), pd, &real_provider);
+		    pd, &real_provider);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -289,7 +285,7 @@ crypto_object_find_init(crypto_provider_t provider, crypto_session_id_t sid,
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(
 		    object_ops), CRYPTO_OBJECT_OFFSET(object_find_init),
-		    CHECK_RESTRICT(crq), pd, &real_provider);
+		    pd, &real_provider);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -323,7 +319,7 @@ crypto_object_find_final(crypto_provider_t provider, void *cookie,
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(
 		    object_ops), CRYPTO_OBJECT_OFFSET(object_find_final),
-		    CHECK_RESTRICT(crq), pd, &real_provider);
+		    pd, &real_provider);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -360,7 +356,7 @@ crypto_object_find(crypto_provider_t provider, void *cookie,
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(
 		    object_ops), CRYPTO_OBJECT_OFFSET(object_find),
-		    CHECK_RESTRICT(crq), pd, &real_provider);
+		    pd, &real_provider);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);

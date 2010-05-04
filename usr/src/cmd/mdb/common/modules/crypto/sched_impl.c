@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/mdb_modapi.h>
@@ -66,7 +63,6 @@ static const mdb_bitmask_t call_flags[] = {
 	{ "CRYPTO_ALWAYS_QUEUE", CRYPTO_ALWAYS_QUEUE, CRYPTO_ALWAYS_QUEUE },
 	{ "CRYPTO_NOTIFY_OPDONE", CRYPTO_NOTIFY_OPDONE, CRYPTO_NOTIFY_OPDONE },
 	{ "CRYPTO_SKIP_REQID", CRYPTO_SKIP_REQID, CRYPTO_SKIP_REQID },
-	{ "CRYPTO_RESTRICTED", CRYPTO_RESTRICTED, CRYPTO_RESTRICTED },
 	{ NULL, 0, 0 }
 };
 
@@ -85,7 +81,7 @@ kcf_areq_node_simple(kcf_areq_node_t *areqn)
 
 	mdb_printf("\nan_context: %-16p\t", areqn->an_context);
 	mdb_printf("an_is_my_turn: %s\t     ", areqn->an_is_my_turn == B_FALSE ?
-			"B_FALSE" : "B_TRUE");
+	    "B_FALSE" : "B_TRUE");
 
 	mdb_printf("\ncr_reqid: %lx\n", areqn->an_reqarg.cr_reqid);
 	return (DCMD_OK);
@@ -118,35 +114,35 @@ v_kcf_areq_node(kcf_areq_node_t *areqn)
 
 	/* First column again */
 	mdb_printf("%16s: '%16b'", "cr_flag", areqn->an_reqarg.cr_flag,
-		call_flags);
+	    call_flags);
 
 	/* Second column */
 	mdb_printf("\t%16s:  %p\n", "cr_callback_func",
-		areqn->an_reqarg.cr_callback_func);
+	    areqn->an_reqarg.cr_callback_func);
 
 	/* First column again */
 	mdb_printf("%16s:  %-16p", "cr_callback_arg",
-		areqn->an_reqarg.cr_callback_arg);
+	    areqn->an_reqarg.cr_callback_arg);
 
 	/* Second column */
 	mdb_printf("\t%16s:  %lx\n", "cr_reqid",
-		(ulong_t)areqn->an_reqarg.cr_reqid);
+	    (ulong_t)areqn->an_reqarg.cr_reqid);
 
 	/* First column again */
 	mdb_printf("%16s:  %d", "an_params.rp_opgrp",
-		areqn->an_params.rp_opgrp);
+	    areqn->an_params.rp_opgrp);
 
 	/* Second column */
 	mdb_printf("\t%16s:  %d\n", "an_params.rp_optype",
-		areqn->an_params.rp_optype);
+	    areqn->an_params.rp_optype);
 
 	/* First column again */
 	mdb_printf("%16s:  %-16p", "an_context",
-		areqn->an_context);
+	    areqn->an_context);
 
 	/* Second column */
 	mdb_printf("\t%16s:  %p\n", "an_ctxchain_next",
-		areqn->an_ctxchain_next);
+	    areqn->an_ctxchain_next);
 
 	/* First column again */
 	mdb_printf("%16s:  %s", "an_is_my_turn",
@@ -158,28 +154,28 @@ v_kcf_areq_node(kcf_areq_node_t *areqn)
 
 	/* First column again */
 	mdb_printf("%16s:  %p", "an_next",
-		areqn->an_next);
+	    areqn->an_next);
 
 	/* Second column */
 	mdb_printf("\t\t%16s:  %p\n", "an_prev", areqn->an_prev);
 
 	/* First column again */
 	mdb_printf("%16s:  %p", "an_provider",
-		areqn->an_provider);
+	    areqn->an_provider);
 
 	/* Second column */
 	mdb_printf("\t\t%16s:  %p\n", "an_idnext", areqn->an_idnext);
 
 	/* First column again */
 	mdb_printf("%16s:  %p", "an_idprev",
-		areqn->an_idprev);
+	    areqn->an_idprev);
 
 	/* Second column */
 	mdb_printf("\t\t%16s:  %hx\n", "an_done", areqn->an_done);
 
 	/* First column again */
 	mdb_printf("%16s:  %d\n", "an_refcnt",
-		areqn->an_refcnt);
+	    areqn->an_refcnt);
 
 	return (DCMD_OK);
 }
@@ -247,8 +243,8 @@ areq_walk_init_common(mdb_walk_state_t *wsp, boolean_t use_first)
 	uintptr_t gswq_ptr;
 
 	if (mdb_readsym(&gswq_ptr, sizeof (gswq_ptr), "gswq") == -1) {
-	    mdb_warn("failed to read 'gswq'");
-	    return (WALK_ERR);
+		mdb_warn("failed to read 'gswq'");
+		return (WALK_ERR);
 	}
 	if (mdb_vread(&gswq_copy, sizeof (gswq_copy), gswq_ptr) == -1) {
 		mdb_warn("cannot read %p", gswq_ptr);
@@ -477,21 +473,22 @@ reqid_table_walk_init(mdb_walk_state_t *wsp)
 
 	/* see if the walker was called from the command line or mdb_pwalk */
 	if (wsp->walk_cbdata == NULL) {		/* command line */
-	    if ((wsp->walk_cbdata = mdb_zalloc(sizeof (reqid_cb_data_t),
-		UM_SLEEP)) == NULL) {
-		    mdb_warn("couldn't get cb memory for reqid_table_walker");
-		    return (WALK_ERR);
-	    }
-	    /* initialize for a simple walk, as opposed to a reqid search */
-	    cbdata = wsp->walk_cbdata;
-	    cbdata->verbose = TRUE;
-	    cbdata->cb_reqid = 0;
+		if ((wsp->walk_cbdata = mdb_zalloc(sizeof (reqid_cb_data_t),
+		    UM_SLEEP)) == NULL) {
+			mdb_warn("couldn't get cb memory for "
+			    "reqid_table_walker");
+			return (WALK_ERR);
+		}
+		/* initialize for a simple walk, as opposed to a reqid search */
+		cbdata = wsp->walk_cbdata;
+		cbdata->verbose = TRUE;
+		cbdata->cb_reqid = 0;
 	}
 
 	wdata = (reqid_data_t *)wsp->walk_data;
 
 	if (mdb_readsym(wdata->rd_tbl_ptrs, sizeof (wdata->rd_tbl_ptrs),
-		"kcf_reqid_table") == -1) {
+	    "kcf_reqid_table") == -1) {
 		mdb_warn("failed to read 'kcf_reqid_table'");
 		return (WALK_ERR);
 
@@ -520,7 +517,7 @@ reqid_table_walk_step(mdb_walk_state_t *wsp)
 #ifdef DEBUG
 	mdb_printf(
 	    "DEBUG: kcf_reqid_table at %p, sizeof kcf_reqid_table_t = %d\n",
-		wsp->walk_addr, sizeof (kcf_reqid_table_t));
+	    wsp->walk_addr, sizeof (kcf_reqid_table_t));
 #endif
 
 	status = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
@@ -679,14 +676,14 @@ crypto_find_reqid(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (argc > i)
-	    argp = &argv[i];
+		argp = &argv[i];
 
 	if ((argp != NULL)) {
-	    if (argp->a_type == MDB_TYPE_IMMEDIATE)
-		cbdata.cb_reqid = argp->a_un.a_val;
-	    else
-		cbdata.cb_reqid = (crypto_req_id_t)
-		    mdb_strtoull(argp->a_un.a_str);
+		if (argp->a_type == MDB_TYPE_IMMEDIATE)
+			cbdata.cb_reqid = argp->a_un.a_val;
+		else
+			cbdata.cb_reqid = (crypto_req_id_t)
+			    mdb_strtoull(argp->a_un.a_str);
 	}
 	status = mdb_pwalk("kcf_reqid_table", (mdb_walk_cb_t)crypto_pr_reqid,
 	    &cbdata, addr);

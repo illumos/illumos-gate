@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -71,8 +70,8 @@ crypto_encrypt_mac_prov(crypto_provider_t provider, crypto_session_id_t sid,
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider(encr_mech->cm_type, encr_key,
-		    mac_mech->cm_type, mac_key, CHECK_RESTRICT(crq), pd,
-		    &real_provider, CRYPTO_FG_ENCRYPT_MAC_ATOMIC);
+		    mac_mech->cm_type, mac_key, pd, &real_provider,
+		    CRYPTO_FG_ENCRYPT_MAC_ATOMIC);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -200,7 +199,7 @@ retry:
 	    &prov_mac_mechid, &error, list,
 	    CRYPTO_FG_ENCRYPT_ATOMIC | CRYPTO_FG_ENCRYPT_MAC_ATOMIC,
 	    CRYPTO_FG_MAC_ATOMIC | CRYPTO_FG_ENCRYPT_MAC_ATOMIC,
-	    CHECK_RESTRICT(crq), ct->dd_len1);
+	    ct->dd_len1);
 	if (pd == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);
@@ -438,8 +437,8 @@ crypto_encrypt_mac_init_prov(crypto_provider_t provider,
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider(encr_mech->cm_type, encr_key,
-		    mac_mech->cm_type, mac_key, CHECK_RESTRICT(cr), pd,
-		    &real_provider, CRYPTO_FG_ENCRYPT_MAC);
+		    mac_mech->cm_type, mac_key, pd, &real_provider,
+		    CRYPTO_FG_ENCRYPT_MAC);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);
@@ -580,8 +579,7 @@ retry:
 	pd = kcf_get_dual_provider(encr_mech, encr_key, mac_mech, mac_key,
 	    &me, &prov_encr_mechid,
 	    &prov_mac_mechid, &error, list,
-	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_MAC, CRYPTO_FG_MAC,
-	    CHECK_RESTRICT(cr), 0);
+	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_MAC, CRYPTO_FG_MAC, 0);
 	if (pd == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);
@@ -1157,8 +1155,7 @@ retry:
 	    &me, &prov_decr_mechid,
 	    &prov_mac_mechid, &error, list,
 	    CRYPTO_FG_DECRYPT_ATOMIC | CRYPTO_FG_MAC_DECRYPT_ATOMIC,
-	    CRYPTO_FG_MAC_ATOMIC | CRYPTO_FG_MAC_DECRYPT_ATOMIC,
-	    CHECK_RESTRICT(crq), ct->dd_len2);
+	    CRYPTO_FG_MAC_ATOMIC | CRYPTO_FG_MAC_DECRYPT_ATOMIC, ct->dd_len2);
 	if (pd == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);
@@ -1414,8 +1411,8 @@ crypto_mac_decrypt_common_prov(crypto_provider_t provider,
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		error = kcf_get_hardware_provider(decr_mech->cm_type, decr_key,
-		    mac_mech->cm_type, mac_key, CHECK_RESTRICT(crq), pd,
-		    &real_provider, CRYPTO_FG_MAC_DECRYPT_ATOMIC);
+		    mac_mech->cm_type, mac_key, pd, &real_provider,
+		    CRYPTO_FG_MAC_DECRYPT_ATOMIC);
 
 		if (error != CRYPTO_SUCCESS)
 			return (error);
@@ -1551,8 +1548,7 @@ retry:
 	pd = kcf_get_dual_provider(decr_mech, decr_key, mac_mech, mac_key,
 	    &me, &prov_decr_mechid,
 	    &prov_mac_mechid, &error, list,
-	    CRYPTO_FG_DECRYPT | CRYPTO_FG_MAC_DECRYPT, CRYPTO_FG_MAC,
-	    CHECK_RESTRICT(cr), 0);
+	    CRYPTO_FG_DECRYPT | CRYPTO_FG_MAC_DECRYPT, CRYPTO_FG_MAC, 0);
 	if (pd == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);
@@ -1864,8 +1860,8 @@ crypto_mac_decrypt_init_prov(crypto_provider_t provider,
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		rv = kcf_get_hardware_provider(decr_mech->cm_type, decr_key,
-		    mac_mech->cm_type, mac_key, CHECK_RESTRICT(cr), pd,
-		    &real_provider, CRYPTO_FG_MAC_DECRYPT);
+		    mac_mech->cm_type, mac_key, pd, &real_provider,
+		    CRYPTO_FG_MAC_DECRYPT);
 
 		if (rv != CRYPTO_SUCCESS)
 			return (rv);

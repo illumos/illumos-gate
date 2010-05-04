@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -165,7 +164,7 @@ kcf_rngprov_check(void)
 	kcf_provider_desc_t *pd;
 
 	if ((pd = kcf_get_mech_provider(rngmech_type, NULL, NULL, &rv,
-	    NULL, CRYPTO_FG_RANDOM, B_FALSE, 0)) != NULL) {
+	    NULL, CRYPTO_FG_RANDOM, 0)) != NULL) {
 		KCF_PROV_REFRELE(pd);
 		/*
 		 * We logged a warning once about no provider being available
@@ -223,7 +222,7 @@ rngprov_getbytes(uint8_t *ptr, size_t need, boolean_t is_taskq_thr)
 	kcf_prov_tried_t *list = NULL;
 
 	while ((pd = kcf_get_mech_provider(rngmech_type, NULL, NULL, &rv,
-	    list, CRYPTO_FG_RANDOM, B_FALSE, 0)) != NULL) {
+	    list, CRYPTO_FG_RANDOM, 0)) != NULL) {
 
 		prov_cnt++;
 
@@ -305,7 +304,7 @@ rngprov_getbytes_nblk(uint8_t *ptr, size_t len)
 	req.cr_callback_func = notify_done;
 
 	while ((pd = kcf_get_mech_provider(rngmech_type, NULL, NULL, &rv,
-	    list, CRYPTO_FG_RANDOM, CHECK_RESTRICT(&req), 0)) != NULL) {
+	    list, CRYPTO_FG_RANDOM, 0)) != NULL) {
 
 		prov_cnt ++;
 		switch (pd->pd_prov_type) {
