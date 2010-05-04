@@ -1296,6 +1296,7 @@ zfs_create(vnode_t *dvp, char *name, vattr_t *vap, vcexcl_t excl,
 	gid_t		gid = crgetgid(cr);
 	zfs_acl_ids_t   acl_ids;
 	boolean_t	fuid_dirtied;
+	boolean_t	have_acl = B_FALSE;
 
 	/*
 	 * If we have an ephemeral id, ACL, or XVATTR then
@@ -1384,9 +1385,11 @@ top:
 			goto out;
 		}
 
-		if ((error = zfs_acl_ids_create(dzp, 0, vap, cr, vsecp,
-		    &acl_ids)) != 0)
+		if (!have_acl && (error = zfs_acl_ids_create(dzp, 0, vap,
+		    cr, vsecp, &acl_ids)) != 0)
 			goto out;
+		have_acl = B_TRUE;
+
 		if (zfs_acl_ids_overquota(zfsvfs, &acl_ids)) {
 			zfs_acl_ids_free(&acl_ids);
 			error = EDQUOT;
@@ -1410,13 +1413,13 @@ top:
 		}
 		error = dmu_tx_assign(tx, TXG_NOWAIT);
 		if (error) {
-			zfs_acl_ids_free(&acl_ids);
 			zfs_dirent_unlock(dl);
 			if (error == ERESTART) {
 				dmu_tx_wait(tx);
 				dmu_tx_abort(tx);
 				goto top;
 			}
+			zfs_acl_ids_free(&acl_ids);
 			dmu_tx_abort(tx);
 			ZFS_EXIT(zfsvfs);
 			return (error);
@@ -1790,37 +1793,43 @@ zfs_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t **vpp, cred_t *cr,
 	if (flags & FIGNORECASE)
 		zf |= ZCILOOK;
 
-	if (vap->va_mask & AT_XVATTR)
+	if (vap->va_mask & AT_XVATTR) {
 		if ((error = secpolicy_xvattr((xvattr_t *)vap,
 		    crgetuid(cr), cr, vap->va_type)) != 0) {
 			ZFS_EXIT(zfsvfs);
 			return (error);
 		}
+	}
 
+	if ((error = zfs_acl_ids_create(dzp, 0, vap, cr,
+	    vsecp, &acl_ids)) != 0) {
+		ZFS_EXIT(zfsvfs);
+		return (error);
+	}
 	/*
 	 * First make sure the new directory doesn't exist.
+	 *
+	 * Existence is checked first to make sure we don't return
+	 * EACCES instead of EEXIST which can cause some applications
+	 * to fail.
 	 */
 top:
 	*vpp = NULL;
 
 	if (error = zfs_dirent_lock(&dl, dzp, dirname, &zp, zf,
 	    NULL, NULL)) {
+		zfs_acl_ids_free(&acl_ids);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
 
 	if (error = zfs_zaccess(dzp, ACE_ADD_SUBDIRECTORY, 0, B_FALSE, cr)) {
+		zfs_acl_ids_free(&acl_ids);
 		zfs_dirent_unlock(dl);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
 
-	if ((error = zfs_acl_ids_create(dzp, 0, vap, cr, vsecp,
-	    &acl_ids)) != 0) {
-		zfs_dirent_unlock(dl);
-		ZFS_EXIT(zfsvfs);
-		return (error);
-	}
 	if (zfs_acl_ids_overquota(zfsvfs, &acl_ids)) {
 		zfs_acl_ids_free(&acl_ids);
 		zfs_dirent_unlock(dl);
@@ -1847,13 +1856,13 @@ top:
 
 	error = dmu_tx_assign(tx, TXG_NOWAIT);
 	if (error) {
-		zfs_acl_ids_free(&acl_ids);
 		zfs_dirent_unlock(dl);
 		if (error == ERESTART) {
 			dmu_tx_wait(tx);
 			dmu_tx_abort(tx);
 			goto top;
 		}
+		zfs_acl_ids_free(&acl_ids);
 		dmu_tx_abort(tx);
 		ZFS_EXIT(zfsvfs);
 		return (error);
@@ -3621,27 +3630,34 @@ zfs_symlink(vnode_t *dvp, char *name, vattr_t *vap, char *link, cred_t *cr,
 	}
 	if (flags & FIGNORECASE)
 		zflg |= ZCILOOK;
-top:
-	if (error = zfs_zaccess(dzp, ACE_ADD_FILE, 0, B_FALSE, cr)) {
-		ZFS_EXIT(zfsvfs);
-		return (error);
-	}
 
 	if (len > MAXPATHLEN) {
 		ZFS_EXIT(zfsvfs);
 		return (ENAMETOOLONG);
 	}
 
+	if ((error = zfs_acl_ids_create(dzp, 0,
+	    vap, cr, NULL, &acl_ids)) != 0) {
+		ZFS_EXIT(zfsvfs);
+		return (error);
+	}
+top:
 	/*
 	 * Attempt to lock directory; fail if entry already exists.
 	 */
 	error = zfs_dirent_lock(&dl, dzp, name, &zp, zflg, NULL, NULL);
 	if (error) {
+		zfs_acl_ids_free(&acl_ids);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
 
-	VERIFY(0 == zfs_acl_ids_create(dzp, 0, vap, cr, NULL, &acl_ids));
+	if (error = zfs_zaccess(dzp, ACE_ADD_FILE, 0, B_FALSE, cr)) {
+		zfs_acl_ids_free(&acl_ids);
+		ZFS_EXIT(zfsvfs);
+		return (error);
+	}
+
 	if (zfs_acl_ids_overquota(zfsvfs, &acl_ids)) {
 		zfs_acl_ids_free(&acl_ids);
 		zfs_dirent_unlock(dl);
@@ -3663,13 +3679,13 @@ top:
 		zfs_fuid_txhold(zfsvfs, tx);
 	error = dmu_tx_assign(tx, TXG_NOWAIT);
 	if (error) {
-		zfs_acl_ids_free(&acl_ids);
 		zfs_dirent_unlock(dl);
 		if (error == ERESTART) {
 			dmu_tx_wait(tx);
 			dmu_tx_abort(tx);
 			goto top;
 		}
+		zfs_acl_ids_free(&acl_ids);
 		dmu_tx_abort(tx);
 		ZFS_EXIT(zfsvfs);
 		return (error);
