@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -98,7 +97,7 @@ extern void kdi_flush_idcache(int, int, int, int);
 extern uint64_t get_cpuaddr(uint64_t, uint64_t);
 
 
-#define	BOOT_CMD_MAX_LEN	256
+#define	BOOT_CMD_MAX_LEN	256	/* power of 2 & 16-byte aligned */
 #define	BOOT_CMD_BASE		"boot "
 
 /*
@@ -111,7 +110,7 @@ extern uint64_t get_cpuaddr(uint64_t, uint64_t);
 static void
 store_boot_cmd(char *args, boolean_t add_boot_str, boolean_t invoke_cb)
 {
-	static char	cmd_buf[BOOT_CMD_MAX_LEN];
+	static char	*cmd_buf;
 	size_t		len = 1;
 	pnode_t		node;
 	size_t		base_len = 0;
@@ -132,6 +131,10 @@ store_boot_cmd(char *args, boolean_t add_boot_str, boolean_t invoke_cb)
 	 * a domain service because it can not be safely used in that context.
 	 */
 	if ((status != H_EOK) && (invoke_cb == B_FALSE))
+		return;
+
+	cmd_buf = contig_mem_alloc(BOOT_CMD_MAX_LEN);
+	if (cmd_buf == NULL)
 		return;
 
 	if (add_boot_str) {
