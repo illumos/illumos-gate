@@ -142,15 +142,20 @@ ip_debug(int level, char *fmt, ...)
  * the specified nvlist, and then send the buffer to our remote peer.
  */
 static int
-ip_xprt_send(fmd_hdl_t *hdl, fmd_xprt_t *xp, fmd_event_t *ep, nvlist_t *nvl)
+ip_fmdo_send(fmd_hdl_t *hdl, fmd_xprt_t *xp, fmd_event_t *ep, nvlist_t *nvl)
 {
-	ip_xprt_t *ipx = fmd_xprt_getspecific(hdl, xp);
-
+	ip_xprt_t *ipx;
 	size_t size, nvsize;
 	char *buf, *nvbuf;
 	ip_hdr_t *iph;
 	ssize_t r, n;
 	int err;
+
+	if (xp == NULL) {
+		ip_debug(IP_DEBUG_FINE, "ip_fmdo_send failed: xp=NULL\n");
+		return (FMD_SEND_FAILED);
+	}
+	ipx = fmd_xprt_getspecific(hdl, xp);
 
 	/*
 	 * For testing purposes, if ip_mtbf is non-zero, use this to pseudo-
@@ -220,6 +225,35 @@ ip_xprt_send(fmd_hdl_t *hdl, fmd_xprt_t *xp, fmd_event_t *ep, nvlist_t *nvl)
 }
 
 /*
+ * Sends events over transports that are configured read only.  When the module
+ * is in read only mode it will receive all events and only send events that
+ * have a subscription set.
+ *
+ * The configuration file will have to set prop ip_rdonly true and also
+ * subscribe for events that are desired to be sent over the transport in order
+ * for this function to be used.
+ */
+/* ARGSUSED */
+static void
+ip_fmdo_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
+{
+	int err;
+	ip_xprt_t *ipx;
+
+	if (ip_rdonly) {
+		(void) pthread_mutex_lock(&ip_lock);
+
+		for (ipx = ip_xps; ipx != NULL; ipx = ipx->ipx_next) {
+			err = ip_fmdo_send(hdl, ipx->ipx_xprt, ep, nvl);
+			while (FMD_SEND_RETRY == err) {
+				err = ip_fmdo_send(hdl, ipx->ipx_xprt, ep, nvl);
+			}
+		}
+		(void) pthread_mutex_unlock(&ip_lock);
+	}
+}
+
+/*
  * Receive a chunk of data of the specified size from our remote peer.  The
  * data is received into ipx_rcvbuf, and then a pointer to the buffer is
  * returned.  NOTE: The data is only valid until the next call to ip_xprt_recv.
@@ -280,7 +314,7 @@ ip_xprt_set_addr(ip_xprt_t *ipx, const struct sockaddr *sap)
 	in_port_t port;
 	int n;
 
-	ip_debug(IP_DEBUG_FINER, "Enter ip_xprt_set_name");
+	ip_debug(IP_DEBUG_FINER, "Enter ip_xprt_set_addr");
 
 	if (sap->sa_family == AF_INET6 &&
 	    IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
@@ -446,6 +480,7 @@ ip_xprt_thread(void *arg)
 				fmd_hdl_error(ip_hdl, "failed to get peer name "
 				    "for fd %d", ipx->ipx_fd);
 				bzero(&sa, sizeof (sa));
+				break;
 			}
 			ip_xprt_set_addr(ipx, (struct sockaddr *)&sa);
 			ipx->ipx_xprt = fmd_xprt_open(ip_hdl, ipx->ipx_flags,
@@ -716,11 +751,12 @@ ip_setup_addrs()
 }
 
 /*
- * Timeout handler for the transport module.  We use three types of timeouts:
+ * Timeout handler for the transport module.  We use these types of timeouts:
  *
- * (a) arg is NULL: attempt ip_xprt_setup(), re-install timeout to retry
- * (b) arg is non-NULL, FMD_XPRT_SUSPENDED: call fmd_xprt_resume() on arg
- * (c) arg is non-NULL, !FMD_XPRT_SUSPENDED: call ip_xprt_destroy() on arg
+ * (a) arg is ip_cinfo_t: attempt ip_xprt_setup(), re-install timeout to retry
+ * (b) arg is ip_xprt_t, FMD_XPRT_SUSPENDED: call fmd_xprt_resume() on arg
+ * (c) arg is ip_xprt_t, !FMD_XPRT_SUSPENDED: call ip_xprt_destroy() on arg
+ * (d) arg is NULL, ignore as this shouldn't happen
  *
  * Case (c) is required as we need to cause the module's main thread, which
  * runs this timeout handler, to join with the transport's auxiliary thread.
@@ -729,10 +765,14 @@ ip_setup_addrs()
  */
 static void
 ip_timeout(fmd_hdl_t *hdl, id_t id, void *arg) {
+	int install_timer;
+	ip_cinfo_t *cinfo;
 	ip_xprt_t *ipx;
 
-	if (arg == NULL ||
-		arg == &ip_server || arg == &ip_server2 || arg == &ip_listen) {
+	if (arg == NULL) {
+		fmd_hdl_error(hdl, "ip_timeout failed because hg arg is NULL");
+	} else if (arg == &ip_server || arg == &ip_server2 ||
+	    arg == &ip_listen) {
 		ip_debug(IP_DEBUG_FINER,
 			"Enter ip_timeout (a) install new timer");
 		if (ip_xprt_setup(hdl, arg) != 0)
@@ -747,11 +787,13 @@ ip_timeout(fmd_hdl_t *hdl, id_t id, void *arg) {
 		} else {
 			ip_debug(IP_DEBUG_FINE, "timer %d closing ipx %p",
 				(int)id, arg);
+			cinfo = ipx->ipx_cinfo;
+			install_timer = (ipx->ipx_flags & FMD_XPRT_ACCEPT) !=
+				FMD_XPRT_ACCEPT;
 			ip_xprt_destroy(ipx);
-			if ((ipx->ipx_flags & FMD_XPRT_ACCEPT) !=
-				FMD_XPRT_ACCEPT)
+			if (install_timer)
 				(void) fmd_timer_install(
-					hdl, ipx->ipx_cinfo, NULL, ip_sleep);
+					hdl, cinfo, NULL, ip_sleep);
 		}
 	}
 }
@@ -781,12 +823,12 @@ static const fmd_prop_t fmd_props[] = {
 };
 
 static const fmd_hdl_ops_t fmd_ops = {
-	NULL,			/* fmdo_recv */
+	ip_fmdo_recv,		/* fmdo_recv */
 	ip_timeout,		/* fmdo_timeout */
 	NULL,			/* fmdo_close */
 	NULL,			/* fmdo_stats */
 	NULL,			/* fmdo_gc */
-	ip_xprt_send,		/* fmdo_send */
+	ip_fmdo_send,		/* fmdo_send */
 };
 
 static const fmd_hdl_info_t fmd_info = {
