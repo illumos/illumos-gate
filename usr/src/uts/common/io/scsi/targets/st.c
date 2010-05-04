@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ *  Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -9962,6 +9961,15 @@ st_handle_incomplete(struct scsi_tape *un, struct buf *bp)
 
 	ASSERT(mutex_owned(ST_MUTEX));
 
+	/* prevent infinite number of retries */
+	if (rinfo->pkt_retry_cnt++ > st_retry_count) {
+		ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
+		    "Recovery stopped for incomplete %s command, "
+		    "retries exhausted",
+		    st_print_scsi_cmd(pkt->pkt_cdbp[0]));
+		return (COMMAND_DONE_ERROR);
+	}
+
 	switch (pkt->pkt_reason) {
 	case CMD_INCOMPLETE:	/* tran stopped with not normal state */
 		/*
@@ -10072,29 +10080,24 @@ reset_target:
 	}
 
 
-	if (rinfo->pkt_retry_cnt++ < st_retry_count) {
-		if (un->un_pwr_mgmt == ST_PWR_SUSPENDED) {
-			rval = QUE_COMMAND;
-		} else if (bp == un->un_sbufp) {
-			if (rinfo->privatelen == sizeof (recov_info)) {
-				if (rinfo->cmd_attrib->retriable) {
-					/*
-					 * These commands can be rerun
-					 * with impunity
-					 */
-					rval = QUE_COMMAND;
-				}
-			} else {
-				cmd_attribute const *attrib;
-				attrib =
-				    st_lookup_cmd_attribute(pkt->pkt_cdbp[0]);
-				if (attrib->retriable) {
-					rval = QUE_COMMAND;
-				}
+	if (un->un_pwr_mgmt == ST_PWR_SUSPENDED) {
+		rval = QUE_COMMAND;
+	} else if (bp == un->un_sbufp) {
+		if (rinfo->privatelen == sizeof (recov_info)) {
+			if (rinfo->cmd_attrib->retriable) {
+				/*
+				 * These commands can be rerun
+				 * with impunity
+				 */
+				rval = QUE_COMMAND;
+			}
+		} else {
+			cmd_attribute const *attrib;
+			attrib = st_lookup_cmd_attribute(pkt->pkt_cdbp[0]);
+			if (attrib->retriable) {
+				rval = QUE_COMMAND;
 			}
 		}
-	} else {
-		rval = COMMAND_DONE_ERROR;
 	}
 
 	if (un->un_state >= ST_STATE_OPEN) {
