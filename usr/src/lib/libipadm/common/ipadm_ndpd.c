@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -148,24 +147,26 @@ i_ipadm_create_linklocal(ipadm_handle_t iph, ipadm_addrobj_t addr)
 	in6_addr_t ll_template = {0xfe, 0x80, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 	    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 };
 
+	/*
+	 * Create a logical interface if needed.
+	 */
+retry:
+	status = i_ipadm_do_addif(iph, addr);
+	if (status != IPADM_SUCCESS)
+		return (status);
+	if (!(iph->iph_flags & IPH_INIT)) {
+		status = i_ipadm_setlifnum_addrobj(iph, addr);
+		if (status == IPADM_ADDROBJ_EXISTS)
+			goto retry;
+		if (status != IPADM_SUCCESS)
+			return (status);
+	}
+
 	bzero(&lifr, sizeof (lifr));
 	(void) strlcpy(lifr.lifr_name, addr->ipadm_ifname, LIFNAMSIZ);
-
-	if ((err = ioctl(iph->iph_sock6, SIOCGLIFADDR, (caddr_t)&lifr)) < 0)
-		return (ipadm_errno2status(errno));
-
-	/*
-	 * If no address exists on 0th logical interface,
-	 * create link-local address on it. Else, create a new
-	 * logical interface.
-	 */
+	i_ipadm_addrobj2lifname(addr, lifr.lifr_name, sizeof (lifr.lifr_name));
 	sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
-	if (!IN6_IS_ADDR_UNSPECIFIED((&sin6->sin6_addr))) {
-		if (ioctl(iph->iph_sock6, SIOCLIFADDIF, (caddr_t)&lifr) < 0)
-			return (ipadm_errno2status(errno));
-		addr->ipadm_lifnum = i_ipadm_get_lnum(lifr.lifr_name);
-		addif = B_TRUE;
-	}
+
 	/* Create the link-local address */
 	bzero(&lifr.lifr_addr, sizeof (lifr.lifr_addr));
 	(void) plen2mask(PREFIXLEN_LINKLOCAL, AF_INET6, &lifr.lifr_addr);

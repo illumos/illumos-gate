@@ -380,19 +380,10 @@ retry:
 		}
 		if (ifname != NULL && strcmp(cifname, ifname) != 0)
 			continue;
-		if (!(ipadm_flags & IPADM_OPT_ZEROADDR)) {
-			/*
-			 * Do not list it if it is zero, unless
-			 * it is under DHCP or has a non-zero
-			 * destination address.
-			 */
-			if (sockaddrunspec(ifap->ifa_addr) &&
-			    (!(ifap->ifa_flags & IFF_DHCPRUNNING) &&
-			    (!(ifap->ifa_flags & IFF_POINTOPOINT) ||
-			    sockaddrunspec(ifap->ifa_dstaddr)))) {
-				continue;
-			}
-		}
+		if (!(ipadm_flags & IPADM_OPT_ZEROADDR) &&
+		    sockaddrunspec(ifap->ifa_addr) &&
+		    !(ifap->ifa_flags & IFF_DHCPRUNNING))
+			continue;
 
 		/* Allocate and populate the current node in the list. */
 		if ((curr = calloc(1, sizeof (ipadm_addr_info_t))) == NULL)
@@ -1902,6 +1893,7 @@ i_ipadm_lookupadd_addrobj(ipadm_handle_t iph, ipadm_addrobj_t ipaddr)
 	(void) strlcpy(larg.ia_ifname, ipaddr->ipadm_ifname,
 	    sizeof (larg.ia_ifname));
 	larg.ia_family = ipaddr->ipadm_af;
+	larg.ia_atype = ipaddr->ipadm_atype;
 
 	rvalp = &rval;
 	err = ipadm_door_call(iph, &larg, sizeof (larg), (void **)&rvalp,
@@ -1911,6 +1903,35 @@ i_ipadm_lookupadd_addrobj(ipadm_handle_t iph, ipadm_addrobj_t ipaddr)
 		(void) strlcpy(ipaddr->ipadm_aobjname, rval.ir_aobjname,
 		    sizeof (ipaddr->ipadm_aobjname));
 	}
+	if (err == EEXIST)
+		return (IPADM_ADDROBJ_EXISTS);
+	return (ipadm_errno2status(err));
+}
+
+/*
+ * Sets the logical interface number in the ipmgmtd's memory map for the
+ * address object `ipaddr'. If another address object has the same
+ * logical interface number, IPADM_ADDROBJ_EXISTS is returned.
+ */
+ipadm_status_t
+i_ipadm_setlifnum_addrobj(ipadm_handle_t iph, ipadm_addrobj_t ipaddr)
+{
+	ipmgmt_aobjop_arg_t	larg;
+	ipmgmt_retval_t		rval, *rvalp;
+	int			err;
+
+	bzero(&larg, sizeof (larg));
+	larg.ia_cmd = IPMGMT_CMD_ADDROBJ_SETLIFNUM;
+	(void) strlcpy(larg.ia_aobjname, ipaddr->ipadm_aobjname,
+	    sizeof (larg.ia_aobjname));
+	larg.ia_lnum = ipaddr->ipadm_lifnum;
+	(void) strlcpy(larg.ia_ifname, ipaddr->ipadm_ifname,
+	    sizeof (larg.ia_ifname));
+	larg.ia_family = ipaddr->ipadm_af;
+
+	rvalp = &rval;
+	err = ipadm_door_call(iph, &larg, sizeof (larg), (void **)&rvalp,
+	    sizeof (rval), B_FALSE);
 	if (err == EEXIST)
 		return (IPADM_ADDROBJ_EXISTS);
 	return (ipadm_errno2status(err));
@@ -2035,6 +2056,7 @@ i_ipadm_enable_dhcp(ipadm_handle_t iph, const char *ifname, nvlist_t *nvl)
 		ipaddr.ipadm_wait = 0;
 	else
 		ipaddr.ipadm_wait = wait;
+	ipaddr.ipadm_af = AF_INET;
 	return (i_ipadm_create_dhcp(iph, &ipaddr, IPADM_OPT_ACTIVE));
 }
 
@@ -2245,6 +2267,42 @@ i_ipadm_addr_exists_on_if(ipadm_handle_t iph, const char *ifname,
 		return (ipadm_errno2status(errno));
 	*exists = !sockaddrunspec(&lifr.lifr_addr);
 
+	return (IPADM_SUCCESS);
+}
+
+/*
+ * Adds a new logical interface in the kernel for interface
+ * `addr->ipadm_ifname', if there is a non-zero address on the 0th
+ * logical interface or if the 0th logical interface is under DHCP
+ * control. On success, it sets the lifnum in the address object `addr'.
+ */
+ipadm_status_t
+i_ipadm_do_addif(ipadm_handle_t iph, ipadm_addrobj_t addr)
+{
+	ipadm_status_t	status;
+	boolean_t	addif;
+	struct lifreq	lifr;
+	int		sock;
+
+	addr->ipadm_lifnum = 0;
+	status = i_ipadm_addr_exists_on_if(iph, addr->ipadm_ifname,
+	    addr->ipadm_af, &addif);
+	if (status != IPADM_SUCCESS)
+		return (status);
+	if (addif) {
+		/*
+		 * If there is an address on 0th logical interface,
+		 * add a new logical interface.
+		 */
+		bzero(&lifr, sizeof (lifr));
+		(void) strlcpy(lifr.lifr_name, addr->ipadm_ifname,
+		    sizeof (lifr.lifr_name));
+		sock = (addr->ipadm_af == AF_INET ? iph->iph_sock :
+		    iph->iph_sock6);
+		if (ioctl(sock, SIOCLIFADDIF, (caddr_t)&lifr) < 0)
+			return (ipadm_errno2status(errno));
+		addr->ipadm_lifnum = i_ipadm_get_lnum(lifr.lifr_name);
+	}
 	return (IPADM_SUCCESS);
 }
 
@@ -2502,7 +2560,6 @@ i_ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t ipaddr, uint32_t flags)
 	const struct sockaddr_storage	*addr = &ipaddr->ipadm_static_addr;
 	const struct sockaddr_storage	*daddr = &ipaddr->ipadm_static_dst_addr;
 	sa_family_t			af;
-	boolean_t			addif;
 	boolean_t			legacy = (iph->iph_flags & IPH_LEGACY);
 	struct ipadm_addrobj_s		legacy_addr;
 	boolean_t			default_prefixlen = B_FALSE;
@@ -2523,37 +2580,28 @@ i_ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t ipaddr, uint32_t flags)
 	(void) plen2mask(ipaddr->ipadm_static_prefixlen, af, mask);
 
 	/*
-	 * Check if the interface already has a non-zero address on 0th lif.
-	 * It it does, we create a new logical interface and add the address
-	 * on the new logical interface. If not, we replace the zero address
-	 * on 0th logical interface with the given address.
+	 * Create a new logical interface if needed; otherwise, just
+	 * use the 0th logical interface.
 	 */
-	status = i_ipadm_addr_exists_on_if(iph, ipaddr->ipadm_ifname, af,
-	    &addif);
-	if (status != IPADM_SUCCESS)
-		return (status);
-	/*
-	 * This is a "hack" to get around the problem of SIOCLIFADDIF. The
-	 * problem is that this ioctl does not include the netmask when adding
-	 * a logical interface.
-	 *
-	 * To get around this problem, we first add the logical interface with
-	 * a 0 address.  After that, we set the netmask if provided.  Finally
-	 * we set the interface address.
-	 */
-	bzero(&lifr, sizeof (lifr));
-	(void) strlcpy(lifr.lifr_name, ipaddr->ipadm_ifname,
-	    sizeof (lifr.lifr_name));
-	if (addif) {
-		if (ioctl(sock, SIOCLIFADDIF, (caddr_t)&lifr) < 0)
-			return (ipadm_errno2status(errno));
-		ipaddr->ipadm_lifnum = i_ipadm_get_lnum(lifr.lifr_name);
-	} else if (!legacy) {
+retry:
+	if (!(iph->iph_flags & IPH_LEGACY)) {
+		status = i_ipadm_do_addif(iph, ipaddr);
+		if (status != IPADM_SUCCESS)
+			return (status);
 		/*
-		 * If IPH_LEGACY is specified, the input logical interface
-		 * number is already available in ipadm_lifnum.
+		 * We don't have to set the lifnum for IPH_INIT case, because
+		 * there is no placeholder created for the address object in
+		 * this case. For IPH_LEGACY, we don't do this because the
+		 * lifnum is given by the caller and it will be set in the
+		 * end while we call the i_ipadm_addr_persist().
 		 */
-		ipaddr->ipadm_lifnum = 0;
+		if (!(iph->iph_flags & IPH_INIT)) {
+			status = i_ipadm_setlifnum_addrobj(iph, ipaddr);
+			if (status == IPADM_ADDROBJ_EXISTS)
+				goto retry;
+			if (status != IPADM_SUCCESS)
+				return (status);
+		}
 	}
 	i_ipadm_addrobj2lifname(ipaddr, lifr.lifr_name,
 	    sizeof (lifr.lifr_name));
@@ -2727,33 +2775,30 @@ ipadm_delete_addr(ipadm_handle_t iph, const char *aobjname, uint32_t flags)
 static ipadm_status_t
 i_ipadm_create_dhcp(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 {
-	struct lifreq	lifr;
-	int		sock = iph->iph_sock;
 	ipadm_status_t	status;
 	ipadm_status_t	dh_status;
-	boolean_t	addif;
 
 	if (dhcp_start_agent(DHCP_IPC_MAX_WAIT) == -1)
 		return (IPADM_DHCP_START_ERROR);
 	/*
-	 * Check if a new logical interface has to be created.
+	 * Create a new logical interface if needed; otherwise, just
+	 * use the 0th logical interface.
 	 */
-	addr->ipadm_lifnum = 0;
-	status = i_ipadm_addr_exists_on_if(iph, addr->ipadm_ifname, AF_INET,
-	    &addif);
+retry:
+	status = i_ipadm_do_addif(iph, addr);
 	if (status != IPADM_SUCCESS)
 		return (status);
-	if (addif) {
-		/*
-		 * If there is an address on 0th logical interface,
-		 * add a new logical interface.
-		 */
-		bzero(&lifr, sizeof (lifr));
-		(void) strlcpy(lifr.lifr_name, addr->ipadm_ifname,
-		    sizeof (lifr.lifr_name));
-		if (ioctl(sock, SIOCLIFADDIF, (caddr_t)&lifr) < 0)
-			return (ipadm_errno2status(errno));
-		addr->ipadm_lifnum = i_ipadm_get_lnum(lifr.lifr_name);
+	/*
+	 * We don't have to set the lifnum for IPH_INIT case, because
+	 * there is no placeholder created for the address object in this
+	 * case.
+	 */
+	if (!(iph->iph_flags & IPH_INIT)) {
+		status = i_ipadm_setlifnum_addrobj(iph, addr);
+		if (status == IPADM_ADDROBJ_EXISTS)
+			goto retry;
+		if (status != IPADM_SUCCESS)
+			return (status);
 	}
 	/* Send DHCP_START to the dhcpagent. */
 	status = i_ipadm_op_dhcp(addr, DHCP_START, NULL);

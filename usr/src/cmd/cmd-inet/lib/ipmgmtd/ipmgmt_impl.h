@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_IPMGMT_IMPL_H
@@ -130,6 +129,7 @@ extern ipmgmt_aobjmap_list_t aobjmap;
 #define	ADDROBJ_ADD		0x00000001
 #define	ADDROBJ_DELETE		0x00000002
 #define	ADDROBJ_LOOKUPADD	0x00000004
+#define	ADDROBJ_SETLIFNUM	0x00000008
 
 /*
  * A temporary file created in SMF volatile filesystem. This file captures the

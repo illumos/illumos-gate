@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -76,6 +75,7 @@ static ipmgmt_door_info_t i_ipmgmt_door_info_tbl[] = {
 	{ IPMGMT_CMD_RESETPROP,		B_TRUE,  ipmgmt_resetprop_handler },
 	{ IPMGMT_CMD_INITIF,		B_TRUE,  ipmgmt_initif_handler },
 	{ IPMGMT_CMD_ADDROBJ_LOOKUPADD,	B_TRUE,  ipmgmt_aobjop_handler },
+	{ IPMGMT_CMD_ADDROBJ_SETLIFNUM,	B_TRUE,  ipmgmt_aobjop_handler },
 	{ IPMGMT_CMD_ADDROBJ_ADD,	B_TRUE,  ipmgmt_aobjop_handler },
 	{ IPMGMT_CMD_AOBJNAME2ADDROBJ,	B_FALSE, ipmgmt_aobjop_handler },
 	{ IPMGMT_CMD_LIF2ADDROBJ,	B_FALSE, ipmgmt_aobjop_handler },
@@ -377,6 +377,7 @@ ipmgmt_aobjop_handler(void *argp)
 		(void) strlcpy(node.am_ifname, ifname,
 		    sizeof (node.am_ifname));
 		node.am_family = af;
+		node.am_atype = atype;
 		/* no logical number is associated with this addrobj yet */
 		node.am_lnum = -1;
 		/* The address object is not persisted yet. */
@@ -386,6 +387,18 @@ ipmgmt_aobjop_handler(void *argp)
 			(void) strlcpy(aobjrval.ir_aobjname, node.am_aobjname,
 			    sizeof (aobjrval.ir_aobjname));
 		}
+		break;
+	case IPMGMT_CMD_ADDROBJ_SETLIFNUM:
+		rsize = sizeof (ipmgmt_retval_t);
+		rvalp = &rval;
+		bzero(&node, sizeof (node));
+		(void) strlcpy(node.am_aobjname, aobjname,
+		    sizeof (node.am_aobjname));
+		(void) strlcpy(node.am_ifname, ifname,
+		    sizeof (node.am_ifname));
+		node.am_family = af;
+		node.am_lnum = lnum;
+		err = ipmgmt_aobjmap_op(&node, ADDROBJ_SETLIFNUM);
 		break;
 	case IPMGMT_CMD_ADDROBJ_ADD:
 		rsize = sizeof (ipmgmt_retval_t);

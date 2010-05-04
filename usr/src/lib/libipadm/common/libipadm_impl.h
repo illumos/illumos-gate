@@ -203,6 +203,9 @@ extern ipadm_status_t	i_ipadm_get_lif2addrobj(ipadm_handle_t,
 			    ipadm_addrobj_t);
 extern ipadm_status_t	i_ipadm_lookupadd_addrobj(ipadm_handle_t,
 			    ipadm_addrobj_t);
+extern ipadm_status_t	i_ipadm_setlifnum_addrobj(ipadm_handle_t,
+			    ipadm_addrobj_t);
+extern ipadm_status_t	i_ipadm_do_addif(ipadm_handle_t, ipadm_addrobj_t);
 extern ipadm_status_t	i_ipadm_delete_addrobj(ipadm_handle_t,
 			    const ipadm_addrobj_t, uint32_t);
 extern boolean_t	i_ipadm_name2atype(const char *, sa_family_t *,

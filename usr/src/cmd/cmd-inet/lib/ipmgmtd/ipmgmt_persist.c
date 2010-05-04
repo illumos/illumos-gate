@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -788,11 +787,12 @@ i_ipmgmt_lookupadd_amnode(ipmgmt_aobjmap_t *nodep)
  * (a) ADDROBJ_ADD: add or update address object in `aobjmap'
  * (b) ADDROBJ_DELETE: delete address object from `aobjmap'
  * (c) ADDROBJ_LOOKUPADD: place a stub address object in `aobjmap'
+ * (d) ADDROBJ_SETLIFNUM: Sets the lifnum for an address object in `aobjmap'
  */
 int
 ipmgmt_aobjmap_op(ipmgmt_aobjmap_t *nodep, uint32_t op)
 {
-	ipmgmt_aobjmap_t	*head, *prev;
+	ipmgmt_aobjmap_t	*head, *prev, *matched = NULL;
 	boolean_t		update = B_TRUE;
 	int			err = 0;
 	ipadm_db_op_t		db_op;
@@ -807,8 +807,14 @@ ipmgmt_aobjmap_op(ipmgmt_aobjmap_t *nodep, uint32_t op)
 		 * update, else add the new node.
 		 */
 		for (; head != NULL; head = head->am_next) {
+			/*
+			 * For IPv6, we need to distinguish between the
+			 * linklocal and non-linklocal nodes
+			 */
 			if (strcmp(head->am_aobjname,
-			    nodep->am_aobjname) == 0 && head->am_lnum == -1)
+			    nodep->am_aobjname) == 0 &&
+			    (head->am_atype != IPADM_ADDR_IPV6_ADDRCONF ||
+			    head->am_linklocal == nodep->am_linklocal))
 				break;
 		}
 
@@ -893,6 +899,30 @@ ipmgmt_aobjmap_op(ipmgmt_aobjmap_t *nodep, uint32_t op)
 	case ADDROBJ_LOOKUPADD:
 		err = i_ipmgmt_lookupadd_amnode(nodep);
 		update = B_FALSE;
+		break;
+	case ADDROBJ_SETLIFNUM:
+		update = B_FALSE;
+		for (; head != NULL; head = head->am_next) {
+			if (strcmp(head->am_ifname,
+			    nodep->am_ifname) == 0 &&
+			    head->am_family == nodep->am_family &&
+			    head->am_lnum == nodep->am_lnum) {
+				err = EEXIST;
+				break;
+			}
+			if (strcmp(head->am_aobjname,
+			    nodep->am_aobjname) == 0) {
+				matched = head;
+			}
+		}
+		if (err == EEXIST)
+			break;
+		if (matched != NULL) {
+			/* update the lifnum */
+			matched->am_lnum = nodep->am_lnum;
+		} else {
+			err = ENOENT;
+		}
 		break;
 	default:
 		assert(0);

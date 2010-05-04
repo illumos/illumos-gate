@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -373,7 +372,7 @@ i_ipadm_add_ipaddr2nvl(nvlist_t *nvl, ipadm_addrobj_t ipaddr)
 	    (err = nvlist_add_string(nvl_addr, IPADM_NVP_IPADDRHNAME,
 	    ipaddr->ipadm_static_aname)) != 0)
 		return (ipadm_errno2status(err));
-	if (!sockaddrunspec(&ipaddr->ipadm_static_dst_addr)) {
+	if (ipaddr->ipadm_static_dname[0] != '\0') {
 		if ((err = nvlist_add_string(nvl_addr, IPADM_NVP_IPDADDRHNAME,
 		    ipaddr->ipadm_static_dname)) != 0)
 			return (ipadm_errno2status(err));

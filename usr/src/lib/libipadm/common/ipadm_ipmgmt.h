@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _IPADM_IPMGMT_H
@@ -117,6 +116,7 @@ typedef enum {
 	IPMGMT_CMD_RESETPROP,		/* purge property configuration */
 	IPMGMT_CMD_INITIF,		/* retrieve interfaces to initialize */
 	IPMGMT_CMD_ADDROBJ_LOOKUPADD,	/* addr. object lookup & add */
+	IPMGMT_CMD_ADDROBJ_SETLIFNUM,	/* set lifnum on the addrobj */
 	IPMGMT_CMD_ADDROBJ_ADD,		/* add addr. object to addrobj map */
 	IPMGMT_CMD_LIF2ADDROBJ,		/* lifname to addrobj mapping */
 	IPMGMT_CMD_AOBJNAME2ADDROBJ	/* aobjname to addrobj mapping */
