@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_MISC_H
@@ -154,6 +153,10 @@ void	charmode_off(void);
 char	*alloc_string(char *s);
 char	**build_argvlist(char **, int *, int *, char *);
 int	conventional_name(char *name);
+#ifdef i386
+int	emcpower_name(char *name);
+#endif
+
 
 #if defined(_FIRMWARE_NEEDS_FDISK)
 int	fdisk_physical_name(char *name);

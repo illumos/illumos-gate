@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -190,6 +189,28 @@ getlong(uchar_t **bp)
 }
 #endif /* defined(sparc) */
 
+#ifdef i386
+/*
+ * Convert emcpowerN[a-p,p0,p1,p2,p3,p4] to emcpowerNp0 path,
+ * this is specific for emc powerpath driver.
+ */
+static void
+get_emcpower_pname(char *name, char *devname)
+{
+	char	*emcp = "emcpower";
+	char	*npt = NULL;
+	char	np[MAXNAMELEN];
+	int	i = strlen(emcp);
+
+	(void) strcpy(np, devname);
+	npt = strstr(np, emcp);
+	while ((i < strlen(npt)) && (isdigit(npt[i])))
+		i++;
+	npt[i] = '\0';
+	(void) snprintf(name, MAXNAMELEN, "/dev/rdsk/%sp0", npt);
+}
+#endif
+
 /*
  * Convert cn[tn]dn to cn[tn]dns2 path
  */
@@ -201,6 +222,13 @@ get_sname(char *name)
 	char		*rdevp = "/dev/rdsk";
 	char		np[MAXNAMELEN];
 	char		*npt;
+
+#ifdef i386
+	if (emcpower_name(cur_disk->disk_name)) {
+		get_emcpower_pname(name, cur_disk->disk_name);
+		return;
+	}
+#endif
 
 	/*
 	 * If it is a full path /dev/[r]dsk/cn[tn]dn, use this path
@@ -247,6 +275,13 @@ get_pname(char *name)
 	} else {
 		(void) strcpy(np, cur_disk->disk_name);
 	}
+
+#ifdef i386
+	if (emcpower_name(np)) {
+		get_emcpower_pname(name, np);
+		return;
+	}
+#endif
 
 	if (strncmp(rdevp, np, strlen(rdevp)) == 0 ||
 	    strncmp(devp, np, strlen(devp)) == 0) {

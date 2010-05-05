@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -673,6 +672,40 @@ conventional_name(char *name)
 	skip_digits(name);
 	return (*name == 0);
 }
+
+#ifdef i386
+/*
+ * Return true if a device name match the emc powerpath name scheme:
+ * emcpowerN[a-p,p0,p1,p2,p3,p4]
+ */
+int
+emcpower_name(char *name)
+{
+	char	*emcp = "emcpower";
+	char	*devp = "/dev/dsk";
+	char	*rdevp = "/dev/rdsk";
+
+	if (strncmp(devp, name, strlen(devp)) == 0) {
+		name += strlen(devp) + 1;
+	} else if (strncmp(rdevp, name, strlen(rdevp)) == 0) {
+		name += strlen(rdevp) + 1;
+	}
+	if (strncmp(emcp, name, strlen(emcp)) == 0) {
+		name += strlen(emcp);
+		if (isdigit(*name)) {
+			skip_digits(name);
+			if ((*name >= 'a') && (*name <= 'p')) {
+				name ++;
+				if ((*name >= '0') && (*name <= '4')) {
+					name++;
+				}
+			}
+			return (*name == '\0');
+		}
+	}
+	return (0);
+}
+#endif
 
 /*
  * Return true if a device name matches the intel physical name conventions
