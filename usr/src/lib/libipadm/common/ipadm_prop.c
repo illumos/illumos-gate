@@ -46,6 +46,7 @@
 #include <libdllink.h>
 #include <zone.h>
 #include "libipadm_impl.h"
+#include <inet/tunables.h>
 
 #define	IPADM_NONESTR	"none"
 #define	DEF_METRIC_VAL	0	/* default metric value */
@@ -65,7 +66,7 @@ static ipadm_status_t i_ipadm_validate_if(ipadm_handle_t, const char *,
 static ipadm_pd_getf_t	i_ipadm_get_prop, i_ipadm_get_ifprop_flags,
 			i_ipadm_get_mtu, i_ipadm_get_metric,
 			i_ipadm_get_usesrc, i_ipadm_get_forwarding,
-			i_ipadm_get_ecnsack;
+			i_ipadm_get_ecnsack, i_ipadm_get_hostmodel;
 
 /*
  * Callback function to set property values. These functions translate the
@@ -76,7 +77,7 @@ static ipadm_pd_setf_t	i_ipadm_set_prop, i_ipadm_set_mtu,
 			i_ipadm_set_ifprop_flags,
 			i_ipadm_set_metric, i_ipadm_set_usesrc,
 			i_ipadm_set_forwarding, i_ipadm_set_eprivport,
-			i_ipadm_set_ecnsack;
+			i_ipadm_set_ecnsack, i_ipadm_set_hostmodel;
 
 /* array of protocols we support */
 static int protocols[] = { MOD_PROTO_IP, MOD_PROTO_RAWIP,
@@ -134,6 +135,14 @@ static ipadm_prop_desc_t ipadm_ip_prop_table[] = {
 
 	{ "usesrc", IPADMPROP_CLASS_IF, MOD_PROTO_IPV6, 0,
 	    i_ipadm_set_usesrc, NULL, i_ipadm_get_usesrc },
+
+	{ "hostmodel", IPADMPROP_CLASS_MODULE, MOD_PROTO_IPV6, 0,
+	    i_ipadm_set_hostmodel, i_ipadm_get_hostmodel,
+	    i_ipadm_get_hostmodel },
+
+	{ "hostmodel", IPADMPROP_CLASS_MODULE, MOD_PROTO_IPV4, 0,
+	    i_ipadm_set_hostmodel, i_ipadm_get_hostmodel,
+	    i_ipadm_get_hostmodel },
 
 	{ NULL, 0, 0, 0, NULL, NULL, NULL }
 };
@@ -422,6 +431,102 @@ i_ipadm_set_usesrc(ipadm_handle_t iph, const void *arg,
 	if (ioctl(s, SIOCSLIFUSESRC, (caddr_t)&lifr) < 0)
 		return (ipadm_errno2status(errno));
 
+	return (IPADM_SUCCESS);
+}
+
+static struct hostmodel_strval {
+	char *esm_str;
+	ip_hostmodel_t esm_val;
+} esm_arr[] = {
+	{"weak", IP_WEAK_ES},
+	{"src-priority", IP_SRC_PRI_ES},
+	{"strong", IP_STRONG_ES},
+	{"custom", IP_MAXVAL_ES}
+};
+
+static ip_hostmodel_t
+i_ipadm_hostmodel_str2val(const char *pval)
+{
+	int i;
+
+	for (i = 0; i < A_CNT(esm_arr); i++) {
+		if (esm_arr[i].esm_str != NULL &&
+		    strcmp(pval, esm_arr[i].esm_str) == 0) {
+			return (esm_arr[i].esm_val);
+		}
+	}
+	return (IP_MAXVAL_ES);
+}
+
+static char *
+i_ipadm_hostmodel_val2str(ip_hostmodel_t pval)
+{
+	int i;
+
+	for (i = 0; i < A_CNT(esm_arr); i++) {
+		if (esm_arr[i].esm_val == pval)
+			return (esm_arr[i].esm_str);
+	}
+	return (NULL);
+}
+
+/* ARGSUSED */
+static ipadm_status_t
+i_ipadm_set_hostmodel(ipadm_handle_t iph, const void *arg,
+    ipadm_prop_desc_t *pdp, const void *pval, uint_t proto, uint_t flags)
+{
+	ip_hostmodel_t hostmodel;
+	char val[11]; /* covers uint32_max as a string */
+
+	if ((flags & IPADM_OPT_DEFAULT) == 0) {
+		hostmodel = i_ipadm_hostmodel_str2val(pval);
+		if (hostmodel == IP_MAXVAL_ES)
+			return (IPADM_INVALID_ARG);
+		(void) snprintf(val, sizeof (val), "%d", hostmodel);
+		pval = val;
+	}
+	return (i_ipadm_set_prop(iph, NULL, pdp, pval, proto, flags));
+}
+
+/* ARGSUSED */
+static ipadm_status_t
+i_ipadm_get_hostmodel(ipadm_handle_t iph, const void *arg,
+    ipadm_prop_desc_t *pdp, char *buf, uint_t *bufsize, uint_t proto,
+    uint_t valtype)
+{
+	ip_hostmodel_t hostmodel;
+	char *cp;
+	size_t nbytes;
+	ipadm_status_t status;
+
+	switch (valtype) {
+	case MOD_PROP_PERM:
+		nbytes = snprintf(buf, *bufsize, "%d", MOD_PROP_PERM_RW);
+		break;
+	case MOD_PROP_DEFAULT:
+		nbytes = snprintf(buf, *bufsize, "weak");
+		break;
+	case MOD_PROP_ACTIVE:
+		status = i_ipadm_get_prop(iph, arg, pdp, buf, bufsize, proto,
+		    valtype);
+		if (status != IPADM_SUCCESS)
+			return (status);
+		bcopy(buf, &hostmodel, sizeof (hostmodel));
+		cp = i_ipadm_hostmodel_val2str(hostmodel);
+		nbytes = snprintf(buf, *bufsize, "%s",
+		    (cp != NULL ? cp : "?"));
+		break;
+	case MOD_PROP_POSSIBLE:
+		nbytes = snprintf(buf, *bufsize, "strong,src-priority,weak");
+		break;
+	default:
+		return (IPADM_INVALID_ARG);
+	}
+	if (nbytes >= *bufsize) {
+		/* insufficient buffer space */
+		*bufsize = nbytes + 1;
+		return (IPADM_NO_BUFS);
+	}
 	return (IPADM_SUCCESS);
 }
 

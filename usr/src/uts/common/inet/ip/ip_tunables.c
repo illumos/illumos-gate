@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1990 Mentat Inc.
  */
 
 #include <inet/ip.h>
@@ -159,23 +159,14 @@ int
 ip_set_debug(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
     const char *ifname, const void* pval, uint_t flags)
 {
-	char 		*end;
 	unsigned long 	new_value;
+	int		err;
 
 	if (cr != NULL && secpolicy_net_config(cr, B_FALSE) != 0)
 		return (EPERM);
 
-	if (flags & MOD_PROP_DEFAULT) {
-		ip_debug = pinfo->prop_def_uval;
-		return (0);
-	}
-
-	if (ddi_strtoul(pval, &end, 10, &new_value) != 0 || *end != '\0')
-		return (EINVAL);
-	if (new_value < pinfo->prop_min_uval ||
-	    new_value > pinfo->prop_max_uval) {
-		return (ERANGE);
-	}
+	if ((err = mod_uint32_value(pval, pinfo, flags, &new_value)) != 0)
+		return (err);
 	ip_debug = (uint32_t)new_value;
 	return (0);
 }
@@ -328,36 +319,20 @@ ip_get_mtu(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
  * See the comments for ip[6]_strict_src_multihoming for an explanation
  * of the semanitcs.
  */
-/* ARGSUSED */
-static int
-ip_set_src_multihoming(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
-    const char *ifname, const void* pval, uint_t flags)
+void
+ip_set_src_multihoming_common(ulong_t new_value, ulong_t old_value,
+    boolean_t isv6, ip_stack_t *ipst)
 {
-	char 		*end;
-	unsigned long 	new_value, old_value;
-	boolean_t	isv6;
-	ip_stack_t	*ipst = (ip_stack_t *)cbarg;
-
-	old_value = pinfo->prop_cur_uval;
-
-	if (flags & MOD_PROP_DEFAULT) {
-		new_value = pinfo->prop_def_uval;
-	} else {
-		if (ddi_strtoul(pval, &end, 10, &new_value) != 0 ||
-		    *end != '\0')
-			return (EINVAL);
-		if (new_value < pinfo->prop_min_uval ||
-		    new_value > pinfo->prop_max_uval)
-			return (ERANGE);
-	}
-	pinfo->prop_cur_uval = new_value;
-	isv6 = (strcmp(pinfo->mpi_name, "ip6_strict_src_multihoming") == 0);
+	if (isv6)
+		ipst->ips_ipv6_strict_src_multihoming = new_value;
+	else
+		ipst->ips_ip_strict_src_multihoming = new_value;
 	if (new_value != old_value) {
 		if (!isv6) {
 			if (old_value == 0) {
 				ire_walk_v4(ip_ire_rebind_walker, NULL,
 				    ALL_ZONES, ipst);
-			} else {
+			} else if (new_value == 0) {
 				ire_walk_v4(ip_ire_unbind_walker, NULL,
 				    ALL_ZONES, ipst);
 			}
@@ -366,13 +341,147 @@ ip_set_src_multihoming(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
 			if (old_value == 0) {
 				ire_walk_v6(ip_ire_rebind_walker, NULL,
 				    ALL_ZONES, ipst);
-			} else {
+			} else if (new_value == 0) {
 				ire_walk_v6(ip_ire_unbind_walker, NULL,
 				    ALL_ZONES, ipst);
 			}
 			ipcl_walk(conn_ire_revalidate, (void *)B_TRUE, ipst);
 		}
 	}
+}
+
+/* ARGSUSED */
+static int
+ip_set_src_multihoming(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+    const char *ifname, const void* pval, uint_t flags)
+{
+	unsigned long 	new_value, old_value;
+	boolean_t	isv6;
+	ip_stack_t	*ipst = (ip_stack_t *)cbarg;
+	int		err;
+
+	old_value = pinfo->prop_cur_uval;
+
+	if ((err = mod_uint32_value(pval, pinfo, flags, &new_value)) != 0)
+		return (err);
+	pinfo->prop_cur_uval = new_value;
+	isv6 = (strcmp(pinfo->mpi_name, "ip6_strict_src_multihoming") == 0);
+	ip_set_src_multihoming_common(new_value, old_value, isv6, ipst);
+	return (0);
+}
+
+
+/* ARGSUSED */
+static int
+ip_set_hostmodel(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
+    const char *ifname, const void* pval, uint_t flags)
+{
+	ip_hostmodel_t	new_value, old_value;
+	ip_stack_t	*ipst = (ip_stack_t *)cbarg;
+	uint32_t	old_src_multihoming;
+	int		err;
+	ulong_t		tmp;
+	boolean_t	isv6;
+
+	old_value = pinfo->prop_cur_uval;
+
+	if ((err = mod_uint32_value(pval, pinfo, flags, &tmp)) != 0)
+		return (err);
+	new_value = tmp;
+	pinfo->prop_cur_uval = new_value;
+
+	switch (old_value) {
+	case IP_WEAK_ES:
+		old_src_multihoming = 0;
+		break;
+	case IP_SRC_PRI_ES:
+		old_src_multihoming = 1;
+		break;
+	case IP_STRONG_ES:
+		old_src_multihoming = 2;
+		break;
+	default:
+		ASSERT(0);
+		old_src_multihoming = IP_MAXVAL_ES;
+		break;
+	}
+	/*
+	 * Changes to src_multihoming may require ire's to be rebound/unbound,
+	 * and also require generation number resets. Changes to dst_multihoming
+	 * require a simple reset of the value.
+	 */
+	isv6 = (pinfo->mpi_proto == MOD_PROTO_IPV6);
+	if (new_value != old_value) {
+		switch (new_value) {
+		case IP_WEAK_ES:
+			ip_set_src_multihoming_common(0, old_src_multihoming,
+			    isv6, ipst);
+			if (isv6)
+				ipst->ips_ipv6_strict_dst_multihoming = 0;
+			else
+				ipst->ips_ip_strict_dst_multihoming = 0;
+			break;
+		case IP_SRC_PRI_ES:
+			ip_set_src_multihoming_common(1, old_src_multihoming,
+			    isv6, ipst);
+			if (isv6)
+				ipst->ips_ipv6_strict_dst_multihoming = 0;
+			else
+				ipst->ips_ip_strict_dst_multihoming = 0;
+			break;
+		case IP_STRONG_ES:
+			ip_set_src_multihoming_common(2, old_src_multihoming,
+			    isv6, ipst);
+			if (isv6)
+				ipst->ips_ipv6_strict_dst_multihoming = 1;
+			else
+				ipst->ips_ip_strict_dst_multihoming = 1;
+			break;
+		default:
+			return (EINVAL);
+		}
+	}
+	return (0);
+}
+
+/* ARGSUSED */
+int
+ip_get_hostmodel(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
+    void *pval, uint_t psize, uint_t flags)
+{
+	boolean_t	isv6 = (pinfo->mpi_proto == MOD_PROTO_IPV6);
+	ip_stack_t	*ipst = cbarg;
+	ip_hostmodel_t	hostmodel;
+
+	if (psize < sizeof (hostmodel))
+		return (ENOBUFS);
+	bzero(pval, psize);
+	if (!isv6) {
+		if (ipst->ips_ip_strict_src_multihoming == 0 &&
+		    ipst->ips_ip_strict_dst_multihoming == 0)
+			hostmodel = IP_WEAK_ES;
+		else if (ipst->ips_ip_strict_src_multihoming == 1 &&
+		    ipst->ips_ip_strict_dst_multihoming == 0)
+			hostmodel = IP_SRC_PRI_ES;
+		else if (ipst->ips_ip_strict_src_multihoming == 2 &&
+		    ipst->ips_ip_strict_dst_multihoming == 1)
+			hostmodel = IP_STRONG_ES;
+		else
+			hostmodel = IP_MAXVAL_ES;
+	} else {
+		if (ipst->ips_ipv6_strict_src_multihoming == 0 &&
+		    ipst->ips_ipv6_strict_dst_multihoming == 0)
+			hostmodel = IP_WEAK_ES;
+		else if (ipst->ips_ipv6_strict_src_multihoming == 1 &&
+		    ipst->ips_ipv6_strict_dst_multihoming == 0)
+			hostmodel = IP_SRC_PRI_ES;
+		else if (ipst->ips_ipv6_strict_src_multihoming == 2 &&
+		    ipst->ips_ipv6_strict_dst_multihoming == 1)
+			hostmodel = IP_STRONG_ES;
+		else
+			hostmodel = IP_MAXVAL_ES;
+	}
+	bcopy(&hostmodel, pval, sizeof (hostmodel));
 	return (0);
 }
 
@@ -811,6 +920,12 @@ mod_prop_info_t ip_propinfo_tbl[] = {
 	{ "ip_debug", MOD_PROTO_IP,
 	    ip_set_debug, ip_get_debug,
 	    {0, 20, 0}, {0} },
+
+	{ "hostmodel", MOD_PROTO_IPV4, ip_set_hostmodel, ip_get_hostmodel,
+	    {IP_WEAK_ES, IP_STRONG_ES, IP_WEAK_ES}, {IP_WEAK_ES} },
+
+	{ "hostmodel", MOD_PROTO_IPV6, ip_set_hostmodel, ip_get_hostmodel,
+	    {IP_WEAK_ES, IP_STRONG_ES, IP_WEAK_ES}, {IP_WEAK_ES} },
 
 	{ "?", MOD_PROTO_IP, NULL, mod_get_allprop, {0}, {0} },
 

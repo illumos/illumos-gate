@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1990 Mentat Inc.
  */
 
 #include <inet/tunables.h>
@@ -101,6 +101,27 @@ mod_get_boolean(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
 	return (0);
 }
 
+int
+mod_uint32_value(const void *pval, mod_prop_info_t *pinfo, uint_t flags,
+    ulong_t *new_value)
+{
+	char 		*end;
+
+	if (flags & MOD_PROP_DEFAULT) {
+		*new_value = pinfo->prop_def_uval;
+		return (0);
+	}
+
+	if (ddi_strtoul(pval, &end, 10, (ulong_t *)new_value) != 0 ||
+	    *end != '\0')
+		return (EINVAL);
+	if (*new_value < pinfo->prop_min_uval ||
+	    *new_value > pinfo->prop_max_uval) {
+		return (ERANGE);
+	}
+	return (0);
+}
+
 /*
  * Modifies the value of the property to default value or to the `pval'
  * specified by the user.
@@ -108,22 +129,13 @@ mod_get_boolean(void *cbarg, mod_prop_info_t *pinfo, const char *ifname,
 /* ARGSUSED */
 int
 mod_set_uint32(void *cbarg, cred_t *cr, mod_prop_info_t *pinfo,
-    const char *ifname, const void* pval, uint_t flags)
+    const char *ifname, const void *pval, uint_t flags)
 {
-	char 		*end;
-	unsigned long 	new_value;
+	unsigned long	new_value;
+	int		err;
 
-	if (flags & MOD_PROP_DEFAULT) {
-		pinfo->prop_cur_uval = pinfo->prop_def_uval;
-		return (0);
-	}
-
-	if (ddi_strtoul(pval, &end, 10, &new_value) != 0 || *end != '\0')
-		return (EINVAL);
-	if (new_value < pinfo->prop_min_uval ||
-	    new_value > pinfo->prop_max_uval) {
-		return (ERANGE);
-	}
+	if ((err = mod_uint32_value(pval, pinfo, flags, &new_value)) != 0)
+		return (err);
 	pinfo->prop_cur_uval = (uint32_t)new_value;
 	return (0);
 }

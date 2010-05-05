@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1990 Mentat Inc.
  */
 
 #ifndef _INET_TUNABLES_H
@@ -154,7 +154,29 @@ extern mod_prop_setf_t	mod_set_boolean, mod_set_uint32,
 extern mod_prop_getf_t	mod_get_boolean, mod_get_uint32,
 			mod_get_allprop, mod_get_extra_privports;
 
+extern int mod_uint32_value(const void *, mod_prop_info_t *, uint_t,
+    unsigned long *);
+
 #endif	/* _KERNEL */
+
+/*
+ * End-system model definitions that include the weak/strong end-system
+ * definitions in RFC 1122, Section 3.3.4.5. IP_WEAK_ES and IP_STRONG_ES
+ * conform to the corresponding  RFC 1122 definitions. The IP_SRC_PRI_ES
+ * hostmodel is similar to IP_WEAK_ES with one additional enhancement: for
+ * a packet with source S2, destination D2, the route selection algorithm
+ * will first attempt to find a route for the destination that goes out
+ * through an interface where S2 is configured and marked UP.  If such
+ * a route cannot be found, then the best-matching route for D2 will be
+ * selected, ignoring any mismatches between S2 and the interface addresses
+ * on the outgoing interface implied by the route.
+ */
+typedef enum {
+	IP_WEAK_ES = 0,
+	IP_SRC_PRI_ES,
+	IP_STRONG_ES,
+	IP_MAXVAL_ES
+} ip_hostmodel_t;
 
 #ifdef	__cplusplus
 }
