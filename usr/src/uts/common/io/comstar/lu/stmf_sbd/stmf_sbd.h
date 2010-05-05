@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_STMF_SBD_H
@@ -221,6 +220,13 @@ typedef struct sbd_lu {
 	/* zfs metadata */
 	krwlock_t	sl_zfs_meta_lock;
 	char		*sl_zfs_meta;
+	minor_t		sl_zvol_minor;		/* for direct zvol calls */
+	/* opaque handles for zvol direct calls */
+	void		*sl_zvol_minor_hdl;
+	void		*sl_zvol_objset_hdl;
+	void		*sl_zvol_zil_hdl;
+	void		*sl_zvol_rl_hdl;
+	void		*sl_zvol_bonus_hdl;
 
 	/* Backing store */
 	char		*sl_data_filename;
@@ -230,6 +236,8 @@ typedef struct sbd_lu {
 	uint64_t	sl_data_readable_size;	/* read() fails after this */
 	uint64_t	sl_data_offset;		/* After the metadata,if any */
 	uint64_t	sl_lu_size;		/* READ CAPACITY size */
+	uint64_t	sl_blksize;		/* used for zvols */
+	uint64_t	sl_max_xfer_len;	/* used for zvols */
 
 	struct sbd_it_data	*sl_it_list;
 	struct sbd_pgr		*sl_pgr;
@@ -258,6 +266,7 @@ typedef struct sbd_lu {
 #define	SL_ZFS_META			    0x10000
 #define	SL_WRITEBACK_CACHE_SET_UNSUPPORTED  0x20000
 #define	SL_FLUSH_ON_DISABLED_WRITECACHE	    0x40000
+#define	SL_CALL_ZVOL			    0x80000
 
 /*
  * sl_trans_op. LU is undergoing some transition and this field

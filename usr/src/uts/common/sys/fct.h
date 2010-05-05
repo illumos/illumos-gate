@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_FCT_H
 #define	_FCT_H
@@ -195,6 +194,13 @@ typedef struct fct_dbuf_store {
 			    uint32_t size, uint32_t *pminsize, uint32_t flags);
 	void		(*fds_free_data_buf)(struct fct_dbuf_store *fds,
 			    stmf_data_buf_t *dbuf);
+	stmf_status_t	(*fds_setup_dbuf)(struct fct_local_port *port,
+			    stmf_data_buf_t *dbuf, uint32_t flags);
+	void		(*fds_teardown_dbuf)(struct fct_dbuf_store *fds,
+			    stmf_data_buf_t *dbuf);
+
+	uint32_t		fds_max_sgl_xfer_len;
+	uint32_t		fds_copy_threshold;
 } fct_dbuf_store_t;
 
 #define	FCT_FCA_MODREV_1	1

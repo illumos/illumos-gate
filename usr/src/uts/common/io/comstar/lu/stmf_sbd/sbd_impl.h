@@ -254,6 +254,40 @@ typedef struct sbd_create_standby_lu {
  */
 #define	SBD_IT_HAS_SCSI2_RESERVATION	0x0001
 
+/*
+ * dbuf private data needed for direct zvol data transfers
+ *
+ * To further isolate the zvol knowledge, the object handles
+ * needed to call into zfs are declared void * here.
+ */
+
+typedef struct sbd_zvol_io {
+	uint64_t	zvio_offset;	/* offset into volume */
+	int		zvio_flags;	/* flags */
+	void 		*zvio_dbp;	/* array of dmu buffers */
+	void		*zvio_abp;	/* array of arc buffers */
+	uio_t		*zvio_uio;	/* for copy operations */
+} sbd_zvol_io_t;
+
+#define	ZVIO_DEFAULT	0
+#define	ZVIO_COMMIT	1
+#define	ZVIO_ABORT	2
+#define	ZVIO_SYNC	4
+#define	ZVIO_ASYNC	8
+
+/*
+ * zvol data path functions
+ */
+int sbd_zvol_get_volume_params(sbd_lu_t *sl);
+uint32_t sbd_zvol_numsegs(sbd_lu_t *sl, uint64_t off, uint32_t len);
+int sbd_zvol_alloc_read_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf);
+void sbd_zvol_rele_read_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf);
+int sbd_zvol_alloc_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf);
+void sbd_zvol_rele_write_bufs_abort(sbd_lu_t *sl, stmf_data_buf_t *dbuf);
+int sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf);
+int sbd_zvol_copy_read(sbd_lu_t *sl, uio_t *uio);
+int sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags);
+
 stmf_status_t sbd_task_alloc(struct scsi_task *task);
 void sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf);
 void sbd_dbuf_xfer_done(struct scsi_task *task, struct stmf_data_buf *dbuf);
@@ -261,6 +295,7 @@ void sbd_send_status_done(struct scsi_task *task);
 void sbd_task_free(struct scsi_task *task);
 stmf_status_t sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg,
 							uint32_t flags);
+void sbd_dbuf_free(struct scsi_task *task, struct stmf_data_buf *dbuf);
 void sbd_ctl(struct stmf_lu *lu, int cmd, void *arg);
 stmf_status_t sbd_info(uint32_t cmd, stmf_lu_t *lu, void *arg,
 				uint8_t *buf, uint32_t *bufsizep);

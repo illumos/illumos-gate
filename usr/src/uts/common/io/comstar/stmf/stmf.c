@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -2157,7 +2157,10 @@ stmf_alloc(stmf_struct_id_t struct_id, int additional_size, int flags)
 	stmf_size = stmf_sizes[struct_id].shared +
 	    stmf_sizes[struct_id].fw_private + additional_size;
 
-	sh = (__stmf_t *)kmem_zalloc(stmf_size, kmem_flag);
+	if (flags & AF_DONTZERO)
+		sh = (__stmf_t *)kmem_alloc(stmf_size, kmem_flag);
+	else
+		sh = (__stmf_t *)kmem_zalloc(stmf_size, kmem_flag);
 
 	if (sh == NULL)
 		return (NULL);
@@ -4242,6 +4245,54 @@ stmf_alloc_dbuf(scsi_task_t *task, uint32_t size, uint32_t *pminsize,
 	return (NULL);
 }
 
+stmf_status_t
+stmf_setup_dbuf(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t flags)
+{
+	stmf_i_scsi_task_t *itask =
+	    (stmf_i_scsi_task_t *)task->task_stmf_private;
+	stmf_local_port_t *lport = task->task_lport;
+	uint8_t ndx;
+	stmf_status_t ret;
+
+	ASSERT(task->task_additional_flags & TASK_AF_ACCEPT_LU_DBUF);
+	ASSERT(lport->lport_ds->ds_setup_dbuf != NULL);
+	ASSERT(dbuf->db_flags & DB_LU_DATA_BUF);
+
+	if ((task->task_additional_flags & TASK_AF_ACCEPT_LU_DBUF) == 0)
+		return (STMF_FAILURE);
+	if (lport->lport_ds->ds_setup_dbuf == NULL)
+		return (STMF_FAILURE);
+
+	ndx = stmf_first_zero[itask->itask_allocated_buf_map];
+	if (ndx == 0xff)
+		return (STMF_FAILURE);
+	ret = lport->lport_ds->ds_setup_dbuf(task, dbuf, flags);
+	if (ret == STMF_FAILURE)
+		return (STMF_FAILURE);
+	itask->itask_dbufs[ndx] = dbuf;
+	task->task_cur_nbufs++;
+	itask->itask_allocated_buf_map |= (1 << ndx);
+	dbuf->db_handle = ndx;
+
+	return (STMF_SUCCESS);
+}
+
+void
+stmf_teardown_dbuf(scsi_task_t *task, stmf_data_buf_t *dbuf)
+{
+	stmf_i_scsi_task_t *itask =
+	    (stmf_i_scsi_task_t *)task->task_stmf_private;
+	stmf_local_port_t *lport = task->task_lport;
+
+	ASSERT(task->task_additional_flags & TASK_AF_ACCEPT_LU_DBUF);
+	ASSERT(lport->lport_ds->ds_teardown_dbuf != NULL);
+	ASSERT(dbuf->db_flags & DB_LU_DATA_BUF);
+
+	itask->itask_allocated_buf_map &= ~(1 << dbuf->db_handle);
+	task->task_cur_nbufs--;
+	lport->lport_ds->ds_teardown_dbuf(lport->lport_ds, dbuf);
+}
+
 void
 stmf_free_dbuf(scsi_task_t *task, stmf_data_buf_t *dbuf)
 {
@@ -4276,7 +4327,6 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 	stmf_i_scsi_task_t *itask;
 	stmf_i_scsi_task_t **ppitask;
 	scsi_task_t *task;
-	uint64_t *p;
 	uint8_t	*l;
 	stmf_lun_map_ent_t *lun_map_ent;
 	uint16_t cdb_length;
@@ -4331,10 +4381,20 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 	} while (0);
 
 	if (!new_task) {
+		/*
+		 * Save the task_cdb pointer and zero per cmd fields.
+		 * We know the task_cdb_length is large enough by task
+		 * selection process above.
+		 */
+		uint8_t *save_cdb;
+		uintptr_t t_start, t_end;
+
 		task = itask->itask_task;
-		task->task_timeout = 0;
-		p = (uint64_t *)&task->task_flags;
-		*p++ = 0; *p++ = 0; p++; p++; *p++ = 0; *p++ = 0; *p = 0;
+		save_cdb = task->task_cdb;	/* save */
+		t_start = (uintptr_t)&task->task_flags;
+		t_end = (uintptr_t)&task->task_extended_cmd;
+		bzero((void *)t_start, (size_t)(t_end - t_start));
+		task->task_cdb = save_cdb;	/* restore */
 		itask->itask_ncmds = 0;
 	} else {
 		task = (scsi_task_t *)stmf_alloc(STMF_STRUCT_SCSI_TASK,
@@ -4596,25 +4656,38 @@ stmf_free_task_bufs(stmf_i_scsi_task_t *itask, stmf_local_port_t *lport)
 	int i;
 	uint8_t map;
 
-	if ((map = itask->itask_allocated_buf_map) != 0) {
-		for (i = 0; i < 4; i++) {
-			if (map & 1) {
-				stmf_data_buf_t *dbuf;
+	if ((map = itask->itask_allocated_buf_map) == 0)
+		return;
+	for (i = 0; i < 4; i++) {
+		if (map & 1) {
+			stmf_data_buf_t *dbuf;
 
-				dbuf = itask->itask_dbufs[i];
-				if (dbuf->db_lu_private) {
-					dbuf->db_lu_private = NULL;
-				}
-				if (dbuf->db_xfer_start_timestamp != NULL) {
-					stmf_lport_xfer_done(itask, dbuf);
-				}
+			dbuf = itask->itask_dbufs[i];
+			if (dbuf->db_xfer_start_timestamp) {
+				stmf_lport_xfer_done(itask, dbuf);
+			}
+			if (dbuf->db_flags & DB_LU_DATA_BUF) {
+				/*
+				 * LU needs to clean up buffer.
+				 * LU is required to free the buffer
+				 * in the xfer_done handler.
+				 */
+				scsi_task_t *task = itask->itask_task;
+				stmf_lu_t *lu = task->task_lu;
+
+				lu->lu_dbuf_free(task, dbuf);
+				ASSERT(((itask->itask_allocated_buf_map>>i)
+				    & 1) == 0); /* must be gone */
+			} else {
+				ASSERT(dbuf->db_lu_private == NULL);
+				dbuf->db_lu_private = NULL;
 				lport->lport_ds->ds_free_data_buf(
 				    lport->lport_ds, dbuf);
 			}
-			map >>= 1;
 		}
-		itask->itask_allocated_buf_map = 0;
+		map >>= 1;
 	}
+	itask->itask_allocated_buf_map = 0;
 }
 
 void

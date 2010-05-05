@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_ZVOL_H
@@ -59,6 +58,15 @@ extern int zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr,
 extern int zvol_busy(void);
 extern void zvol_init(void);
 extern void zvol_fini(void);
+
+extern int zvol_get_volume_params(minor_t minor, uint64_t *blksize,
+    uint64_t *max_xfer_len, void **minor_hdl, void **objset_hdl, void **zil_hdl,
+    void **rl_hdl, void **bonus_hdl);
+extern uint64_t zvol_get_volume_size(void *minor_hdl);
+extern int zvol_get_volume_wce(void *minor_hdl);
+extern void zvol_log_write_minor(void *minor_hdl, dmu_tx_t *tx, offset_t off,
+    ssize_t resid, boolean_t sync);
+
 #endif
 
 #ifdef	__cplusplus

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_STMF_H
 #define	_STMF_H
@@ -62,6 +61,22 @@ typedef void *data_seg_handle_t;
 #define	COMPANY_ID_NONE			0xFFFFFFFF
 #define	COMPANY_ID_SUN			0x00144F
 
+/*
+ * The scatter/gather list buffer format is used in 2 different
+ * contexts within stmf:
+ * 1) supplied by the port provider that the LU provider uses to exchange
+ *    data with the backing store.
+ * 2) supplied by the LU provider that the port provider uses exchange
+ *    data with the host initiator.
+ * The second format is optionally supported by the port provided as
+ * indicated by the command task flags.
+ */
+
+typedef struct stmf_sglist_ent {
+	uint32_t	seg_length;
+	uint8_t		*seg_addr;
+} stmf_sglist_ent_t;
+
 typedef struct stmf_data_buf {
 	void		*db_stmf_private;
 	void		*db_port_private;
@@ -74,10 +89,7 @@ typedef struct stmf_data_buf {
 	stmf_status_t	db_xfer_status;
 	uint8_t		db_handle;	/* To track parallel buffers */
 	hrtime_t	db_xfer_start_timestamp;
-	struct stmf_sglist_ent {
-		uint32_t	seg_length;
-		uint8_t		*seg_addr;
-	}		db_sglist[1];
+	stmf_sglist_ent_t db_sglist[1];	/* PP scatter/gather list */
 } stmf_data_buf_t;
 
 /*
@@ -89,6 +101,7 @@ typedef struct stmf_data_buf {
 #define	DB_STATUS_GOOD_SENT		0x0008
 #define	DB_DONT_CACHE			0x0010
 #define	DB_DONT_REUSE			0x0020
+#define	DB_LU_DATA_BUF			0x0040
 
 typedef struct scsi_task {
 	void		*task_stmf_private;
@@ -119,6 +132,10 @@ typedef struct scsi_task {
 	/* Fields to manage data phase */
 	uint32_t	task_cmd_xfer_length;	/* xfer len based on CDB */
 	uint32_t	task_nbytes_transferred;
+	uint32_t	task_max_xfer_len;	/* largest xfer allowed */
+	uint32_t	task_1st_xfer_len;	/* 1st xfer hint */
+	uint32_t	task_copy_threshold;	/* copy reduction threshold */
+
 
 	/* Status Phase */
 	stmf_status_t	task_completion_status;
@@ -180,6 +197,10 @@ typedef struct scsi_task {
 #define	TASK_AF_ENABLE_COMP_CONF	0x01
 #define	TASK_AF_PORT_LOAD_HIGH		0x02
 #define	TASK_AF_NO_EXPECTED_XFER_LENGTH	0x04
+/*
+ * PP sets this flag if it can process dbufs created by the LU.
+ */
+#define	TASK_AF_ACCEPT_LU_DBUF		0x08
 
 /*
  * scsi_task_t extension identifiers
@@ -208,9 +229,10 @@ typedef struct scsi_task {
  * struct allocation flags
  */
 #define	AF_FORCE_NOSLEEP	0x0001
+#define	AF_DONTZERO		0x0002
 
 typedef struct stmf_state_change_info {
-	uint64_t	st_rflags;	/* Reason behin this change */
+	uint64_t	st_rflags;	/* Reason behind this change */
 	char		*st_additional_info;
 } stmf_state_change_info_t;
 
@@ -343,6 +365,9 @@ void stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf);
 stmf_data_buf_t *stmf_alloc_dbuf(scsi_task_t *task, uint32_t size,
     uint32_t *pminsize, uint32_t flags);
 void stmf_free_dbuf(scsi_task_t *task, stmf_data_buf_t *dbuf);
+stmf_status_t stmf_setup_dbuf(scsi_task_t *task, stmf_data_buf_t *dbuf,
+    uint32_t flags);
+void stmf_teardown_dbuf(scsi_task_t *task, stmf_data_buf_t *dbuf);
 stmf_status_t stmf_xfer_data(scsi_task_t *task, stmf_data_buf_t *dbuf,
     uint32_t ioflags);
 stmf_status_t stmf_send_scsi_status(scsi_task_t *task, uint32_t ioflags);

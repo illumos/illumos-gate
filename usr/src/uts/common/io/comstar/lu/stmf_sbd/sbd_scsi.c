@@ -92,8 +92,6 @@ void sbd_handle_short_write_xfer_completion(scsi_task_t *task,
     stmf_data_buf_t *dbuf);
 void sbd_handle_short_write_transfers(scsi_task_t *task,
     stmf_data_buf_t *dbuf, uint32_t cdb_xfer_size);
-static void sbd_handle_sync_cache(struct scsi_task *task,
-    struct stmf_data_buf *initial_dbuf);
 void sbd_handle_mode_select_xfer(scsi_task_t *task, uint8_t *buf,
     uint32_t buflen);
 void sbd_handle_mode_select(scsi_task_t *task, stmf_data_buf_t *dbuf);
@@ -105,6 +103,8 @@ extern void sbd_pgr_remove_it_handle(sbd_lu_t *, sbd_it_data_t *);
 extern void sbd_handle_pgr_in_cmd(scsi_task_t *, stmf_data_buf_t *);
 extern void sbd_handle_pgr_out_cmd(scsi_task_t *, stmf_data_buf_t *);
 extern void sbd_handle_pgr_out_data(scsi_task_t *, stmf_data_buf_t *);
+void sbd_do_sgl_write_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
+    int first_xfer);
 /*
  * IMPORTANT NOTE:
  * =================
@@ -178,6 +178,269 @@ sbd_do_read_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
 	}
 }
 
+/*
+ * sbd_zcopy: Bail-out switch for reduced copy path.
+ *
+ * 0 - read & write off
+ * 1 - read & write on
+ * 2 - only read on
+ * 4 - only write on
+ */
+int sbd_zcopy = 1;	/* enable zcopy read & write path */
+uint32_t sbd_max_xfer_len = 0;		/* Valid if non-zero */
+uint32_t sbd_1st_xfer_len = 0;		/* Valid if non-zero */
+uint32_t sbd_copy_threshold = 0;		/* Valid if non-zero */
+
+static void
+sbd_do_sgl_read_xfer(struct scsi_task *task, sbd_cmd_t *scmd, int first_xfer)
+{
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	sbd_zvol_io_t *zvio;
+	int ret, final_xfer;
+	uint64_t offset;
+	uint32_t xfer_len, max_len, first_len;
+	stmf_status_t xstat;
+	stmf_data_buf_t *dbuf;
+	uint_t nblks;
+	uint64_t blksize = sl->sl_blksize;
+	size_t db_private_sz;
+	hrtime_t xfer_start, xfer_elapsed;
+	uintptr_t pad;
+
+	ASSERT(rw_read_held(&sl->sl_access_state_lock));
+	ASSERT((sl->sl_flags & SL_MEDIA_LOADED) != 0);
+
+	/*
+	 * Calculate the limits on xfer_len to the minimum of :
+	 *    - task limit
+	 *    - lun limit
+	 *    - sbd global limit if set
+	 *    - first xfer limit if set
+	 *
+	 * First, protect against silly over-ride value
+	 */
+	if (sbd_max_xfer_len && ((sbd_max_xfer_len % DEV_BSIZE) != 0)) {
+		cmn_err(CE_WARN, "sbd_max_xfer_len invalid %d, resetting\n",
+		    sbd_max_xfer_len);
+		sbd_max_xfer_len = 0;
+	}
+	if (sbd_1st_xfer_len && ((sbd_1st_xfer_len % DEV_BSIZE) != 0)) {
+		cmn_err(CE_WARN, "sbd_1st_xfer_len invalid %d, resetting\n",
+		    sbd_1st_xfer_len);
+		sbd_1st_xfer_len = 0;
+	}
+
+	max_len = MIN(task->task_max_xfer_len, sl->sl_max_xfer_len);
+	if (sbd_max_xfer_len)
+		max_len = MIN(max_len, sbd_max_xfer_len);
+	/*
+	 * Special case the first xfer if hints are set.
+	 */
+	if (first_xfer && (sbd_1st_xfer_len || task->task_1st_xfer_len)) {
+		/* global over-ride has precedence */
+		if (sbd_1st_xfer_len)
+			first_len = sbd_1st_xfer_len;
+		else
+			first_len = task->task_1st_xfer_len;
+	} else {
+		first_len = 0;
+	}
+
+	while (scmd->len && scmd->nbufs < task->task_max_nbufs) {
+
+		xfer_len = MIN(max_len, scmd->len);
+		if (first_len) {
+			xfer_len = MIN(xfer_len, first_len);
+			first_len = 0;
+		}
+		if (scmd->len == xfer_len) {
+			final_xfer = 1;
+		} else {
+			/*
+			 * Attempt to end xfer on a block boundary.
+			 * The only way this does not happen is if the
+			 * xfer_len is small enough to stay contained
+			 * within the same block.
+			 */
+			uint64_t xfer_offset, xfer_aligned_end;
+
+			final_xfer = 0;
+			xfer_offset = scmd->addr + scmd->current_ro;
+			xfer_aligned_end =
+			    P2ALIGN(xfer_offset+xfer_len, blksize);
+			if (xfer_aligned_end > xfer_offset)
+				xfer_len = xfer_aligned_end - xfer_offset;
+		}
+		/*
+		 * Allocate object to track the read and reserve
+		 * enough space for scatter/gather list.
+		 */
+		offset = scmd->addr + scmd->current_ro;
+		nblks = sbd_zvol_numsegs(sl, offset, xfer_len);
+
+		db_private_sz = sizeof (*zvio) + sizeof (uintptr_t) /* PAD */ +
+		    (nblks * sizeof (stmf_sglist_ent_t));
+		dbuf = stmf_alloc(STMF_STRUCT_DATA_BUF, db_private_sz,
+		    AF_DONTZERO);
+		/*
+		 * Setup the dbuf
+		 *
+		 * XXX Framework does not handle variable length sglists
+		 * properly, so setup db_lu_private and db_port_private
+		 * fields here. db_stmf_private is properly set for
+		 * calls to stmf_free.
+		 */
+		if (dbuf->db_port_private == NULL) {
+			/*
+			 * XXX Framework assigns space to PP after db_sglist[0]
+			 */
+			cmn_err(CE_PANIC, "db_port_private == NULL");
+		}
+		pad = (uintptr_t)&dbuf->db_sglist[nblks];
+		dbuf->db_lu_private = (void *)P2ROUNDUP(pad, sizeof (pad));
+		dbuf->db_port_private = NULL;
+		dbuf->db_buf_size = xfer_len;
+		dbuf->db_data_size = xfer_len;
+		dbuf->db_relative_offset = scmd->current_ro;
+		dbuf->db_sglist_length = (uint16_t)nblks;
+		dbuf->db_xfer_status = 0;
+		dbuf->db_handle = 0;
+
+		dbuf->db_flags = (DB_DONT_CACHE | DB_DONT_REUSE |
+		    DB_DIRECTION_TO_RPORT | DB_LU_DATA_BUF);
+		if (final_xfer)
+			dbuf->db_flags |= DB_SEND_STATUS_GOOD;
+
+		zvio = dbuf->db_lu_private;
+		/* Need absolute offset for zvol access */
+		zvio->zvio_offset = offset;
+		zvio->zvio_flags = ZVIO_SYNC;
+
+		/*
+		 * Accounting for start of read.
+		 * Note there is no buffer address for the probe yet.
+		 */
+		stmf_lu_xfer_start(task);
+		DTRACE_PROBE5(backing__store__read__start, sbd_lu_t *, sl,
+		    uint8_t *, NULL, uint64_t, xfer_len,
+		    uint64_t, offset, scsi_task_t *, task);
+		xfer_start = gethrtime();
+
+		ret = sbd_zvol_alloc_read_bufs(sl, dbuf);
+
+		xfer_elapsed = gethrtime() - xfer_start;
+
+		stmf_lu_xfer_done(task, B_TRUE /* read */, (uint64_t)xfer_len,
+		    xfer_elapsed);
+		DTRACE_PROBE6(backing__store__read__end, sbd_lu_t *, sl,
+		    uint8_t *, NULL, uint64_t, xfer_len,
+		    uint64_t, offset, int, ret, scsi_task_t *, task);
+
+		if (ret != 0) {
+			/*
+			 * Read failure from the backend.
+			 */
+			stmf_free(dbuf);
+			if (scmd->nbufs == 0) {
+				/* nothing queued, just finish */
+				scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_READ_ERROR);
+				rw_exit(&sl->sl_access_state_lock);
+			} else {
+				/* process failure when other dbufs finish */
+				scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
+			}
+			return;
+		}
+
+
+		/*
+		 * Allow PP to do setup
+		 */
+		xstat = stmf_setup_dbuf(task, dbuf, 0);
+		if (xstat != STMF_SUCCESS) {
+			/*
+			 * This could happen if the driver cannot get the
+			 * DDI resources it needs for this request.
+			 * If other dbufs are queued, try again when the next
+			 * one completes, otherwise give up.
+			 */
+			sbd_zvol_rele_read_bufs(sl, dbuf);
+			stmf_free(dbuf);
+			if (scmd->nbufs > 0) {
+				/* completion of previous dbuf will retry */
+				return;
+			}
+			/*
+			 * Done with this command.
+			 */
+			scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+			if (first_xfer)
+				stmf_scsilib_send_status(task, STATUS_QFULL, 0);
+			else
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_READ_ERROR);
+			rw_exit(&sl->sl_access_state_lock);
+			return;
+		}
+		/*
+		 * dbuf is now queued on task
+		 */
+		scmd->nbufs++;
+
+		/* XXX leave this in for FW? */
+		DTRACE_PROBE4(sbd__xfer, struct scsi_task *, task,
+		    struct stmf_data_buf *, dbuf, uint64_t, offset,
+		    uint32_t, xfer_len);
+		/*
+		 * Do not pass STMF_IOF_LU_DONE so that the zvol
+		 * state can be released in the completion callback.
+		 */
+		xstat = stmf_xfer_data(task, dbuf, 0);
+		switch (xstat) {
+		case STMF_SUCCESS:
+			break;
+		case STMF_BUSY:
+			/*
+			 * The dbuf is queued on the task, but unknown
+			 * to the PP, thus no completion will occur.
+			 */
+			sbd_zvol_rele_read_bufs(sl, dbuf);
+			stmf_teardown_dbuf(task, dbuf);
+			stmf_free(dbuf);
+			scmd->nbufs--;
+			if (scmd->nbufs > 0) {
+				/* completion of previous dbuf will retry */
+				return;
+			}
+			/*
+			 * Done with this command.
+			 */
+			rw_exit(&sl->sl_access_state_lock);
+			scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+			if (first_xfer)
+				stmf_scsilib_send_status(task, STATUS_QFULL, 0);
+			else
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_READ_ERROR);
+			return;
+		case STMF_ABORTED:
+			/*
+			 * Completion from task_done will cleanup
+			 */
+			scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+			return;
+		}
+		/*
+		 * Update the xfer progress.
+		 */
+		ASSERT(scmd->len >= xfer_len);
+		scmd->len -= xfer_len;
+		scmd->current_ro += xfer_len;
+	}
+}
+
 void
 sbd_handle_read_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 				struct stmf_data_buf *dbuf)
@@ -223,6 +486,325 @@ sbd_handle_read_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		}
 	}
 	sbd_do_read_xfer(task, scmd, dbuf);
+}
+
+/*
+ * This routine must release the DMU resources and free the dbuf
+ * in all cases.  If this is the final dbuf of the task, then drop
+ * the reader lock on the LU state. If there are no errors and more
+ * work to do, then queue more xfer operations.
+ */
+void
+sbd_handle_sgl_read_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
+				struct stmf_data_buf *dbuf)
+{
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	stmf_status_t xfer_status;
+	uint32_t data_size;
+	int scmd_err;
+
+	ASSERT(dbuf->db_lu_private);
+	ASSERT(scmd->cmd_type == SBD_CMD_SCSI_READ);
+
+	scmd->nbufs--;	/* account for this dbuf */
+	/*
+	 * Release the DMU resources.
+	 */
+	sbd_zvol_rele_read_bufs(sl, dbuf);
+	/*
+	 * Release the dbuf after retrieving needed fields.
+	 */
+	xfer_status = dbuf->db_xfer_status;
+	data_size = dbuf->db_data_size;
+	stmf_teardown_dbuf(task, dbuf);
+	stmf_free(dbuf);
+	/*
+	 * Release the state lock if this is the last completion.
+	 * If this is the last dbuf on task and all data has been
+	 * transferred or an error encountered, then no more dbufs
+	 * will be queued.
+	 */
+	scmd_err = (((scmd->flags & SBD_SCSI_CMD_ACTIVE) == 0) ||
+	    (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) ||
+	    (xfer_status != STMF_SUCCESS));
+	if (scmd->nbufs == 0 && (scmd->len == 0 || scmd_err)) {
+		/* all DMU state has been released */
+		rw_exit(&sl->sl_access_state_lock);
+	}
+
+	/*
+	 * If there have been no errors, either complete the task
+	 * or issue more data xfer operations.
+	 */
+	if (!scmd_err) {
+		/*
+		 * This chunk completed successfully
+		 */
+		task->task_nbytes_transferred += data_size;
+		if (scmd->nbufs == 0 && scmd->len == 0) {
+			/*
+			 * This command completed successfully
+			 *
+			 * Status was sent along with data, so no status
+			 * completion will occur. Tell stmf we are done.
+			 */
+			scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+			stmf_task_lu_done(task);
+			return;
+		}
+		/*
+		 * Start more xfers
+		 */
+		sbd_do_sgl_read_xfer(task, scmd, 0);
+		return;
+	}
+	/*
+	 * Sort out the failure
+	 */
+	if (scmd->flags & SBD_SCSI_CMD_ACTIVE) {
+		/*
+		 * If a previous error occurred, leave the command active
+		 * and wait for the last completion to send the status check.
+		 */
+		if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
+			if (scmd->nbufs == 0) {
+				scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_READ_ERROR);
+			}
+			return;
+		}
+		/*
+		 * Must have been a failure on current dbuf
+		 */
+		ASSERT(xfer_status != STMF_SUCCESS);
+		scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+		stmf_abort(STMF_QUEUE_TASK_ABORT, task, xfer_status, NULL);
+	}
+}
+
+void
+sbd_handle_sgl_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
+				struct stmf_data_buf *dbuf)
+{
+	sbd_zvol_io_t *zvio = dbuf->db_lu_private;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	int ret;
+	int scmd_err, scmd_xfer_done;
+	stmf_status_t xfer_status = dbuf->db_xfer_status;
+	uint32_t data_size = dbuf->db_data_size;
+	hrtime_t xfer_start;
+
+	ASSERT(zvio);
+
+	/*
+	 * Allow PP to free up resources before releasing the write bufs
+	 * as writing to the backend could take some time.
+	 */
+	stmf_teardown_dbuf(task, dbuf);
+
+	scmd->nbufs--;	/* account for this dbuf */
+	/*
+	 * All data was queued and this is the last completion,
+	 * but there could still be an error.
+	 */
+	scmd_xfer_done = (scmd->len == 0 && scmd->nbufs == 0);
+	scmd_err = (((scmd->flags & SBD_SCSI_CMD_ACTIVE) == 0) ||
+	    (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) ||
+	    (xfer_status != STMF_SUCCESS));
+
+	/* start the accounting clock */
+	stmf_lu_xfer_start(task);
+	DTRACE_PROBE5(backing__store__write__start, sbd_lu_t *, sl,
+	    uint8_t *, NULL, uint64_t, data_size,
+	    uint64_t, zvio->zvio_offset, scsi_task_t *, task);
+	xfer_start = gethrtime();
+
+	if (scmd_err) {
+		/* just return the write buffers */
+		sbd_zvol_rele_write_bufs_abort(sl, dbuf);
+		ret = 0;
+	} else {
+		if (scmd_xfer_done)
+			zvio->zvio_flags = ZVIO_COMMIT;
+		else
+			zvio->zvio_flags = 0;
+		/* write the data */
+		ret = sbd_zvol_rele_write_bufs(sl, dbuf);
+	}
+
+	/* finalize accounting */
+	stmf_lu_xfer_done(task, B_FALSE /* not read */, data_size,
+	    (gethrtime() - xfer_start));
+	DTRACE_PROBE6(backing__store__write__end, sbd_lu_t *, sl,
+	    uint8_t *, NULL, uint64_t, data_size,
+	    uint64_t, zvio->zvio_offset, int, ret,  scsi_task_t *, task);
+
+	if (ret != 0) {
+		/* update the error flag */
+		scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
+		scmd_err = 1;
+	}
+
+	/* Release the dbuf */
+	stmf_free(dbuf);
+
+	/*
+	 * Release the state lock if this is the last completion.
+	 * If this is the last dbuf on task and all data has been
+	 * transferred or an error encountered, then no more dbufs
+	 * will be queued.
+	 */
+	if (scmd->nbufs == 0 && (scmd->len == 0 || scmd_err)) {
+		/* all DMU state has been released */
+		rw_exit(&sl->sl_access_state_lock);
+	}
+	/*
+	 * If there have been no errors, either complete the task
+	 * or issue more data xfer operations.
+	 */
+	if (!scmd_err) {
+		/* This chunk completed successfully */
+		task->task_nbytes_transferred += data_size;
+		if (scmd_xfer_done) {
+			/* This command completed successfully */
+			scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+			if ((scmd->flags & SBD_SCSI_CMD_SYNC_WRITE) &&
+			    (sbd_flush_data_cache(sl, 0) != SBD_SUCCESS)) {
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_WRITE_ERROR);
+			} else {
+				stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+			}
+			return;
+		}
+		/*
+		 * Start more xfers
+		 */
+		sbd_do_sgl_write_xfer(task, scmd, 0);
+		return;
+	}
+	/*
+	 * Sort out the failure
+	 */
+	if (scmd->flags & SBD_SCSI_CMD_ACTIVE) {
+		if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
+			if (scmd->nbufs == 0) {
+				scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_WRITE_ERROR);
+			}
+			/*
+			 * Leave the command active until last dbuf completes.
+			 */
+			return;
+		}
+		scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+		ASSERT(xfer_status != STMF_SUCCESS);
+		stmf_abort(STMF_QUEUE_TASK_ABORT, task, xfer_status, NULL);
+	}
+}
+
+/*
+ * Handle a copy operation using the zvol interface.
+ *
+ * Similar to the sbd_data_read/write path, except it goes directly through
+ * the zvol interfaces. It can pass a port provider sglist in the
+ * form of uio which is lost through the vn_rdwr path.
+ *
+ * Returns:
+ *	STMF_SUCCESS - request handled
+ *	STMF_FAILURE - request not handled, caller must deal with error
+ */
+static stmf_status_t
+sbd_copy_rdwr(scsi_task_t *task, uint64_t laddr, stmf_data_buf_t *dbuf,
+    int cmd, int commit)
+{
+	sbd_lu_t		*sl = task->task_lu->lu_provider_private;
+	struct uio		uio;
+	struct iovec		*iov, *tiov, iov1[8];
+	uint32_t		len, resid;
+	int			ret, i, iovcnt, flags;
+	hrtime_t		xfer_start;
+	boolean_t		is_read;
+
+	ASSERT(cmd == SBD_CMD_SCSI_READ || cmd == SBD_CMD_SCSI_WRITE);
+
+	is_read = (cmd == SBD_CMD_SCSI_READ) ? B_TRUE : B_FALSE;
+	iovcnt = dbuf->db_sglist_length;
+	/* use the stack for small iovecs */
+	if (iovcnt > 8) {
+		iov = kmem_alloc(iovcnt * sizeof (*iov), KM_SLEEP);
+	} else {
+		iov = &iov1[0];
+	}
+
+	/* Convert dbuf sglist to iovec format */
+	len = dbuf->db_data_size;
+	resid = len;
+	tiov = iov;
+	for (i = 0; i < iovcnt; i++) {
+		tiov->iov_base = (caddr_t)dbuf->db_sglist[i].seg_addr;
+		tiov->iov_len = MIN(resid, dbuf->db_sglist[i].seg_length);
+		resid -= tiov->iov_len;
+		tiov++;
+	}
+	if (resid != 0) {
+		cmn_err(CE_WARN, "inconsistant sglist rem %d", resid);
+		if (iov != &iov1[0])
+			kmem_free(iov, iovcnt * sizeof (*iov));
+		return (STMF_FAILURE);
+	}
+	/* Setup the uio struct */
+	uio.uio_iov = iov;
+	uio.uio_iovcnt = iovcnt;
+	uio.uio_loffset = laddr;
+	uio.uio_segflg = (short)UIO_SYSSPACE;
+	uio.uio_resid = (uint64_t)len;
+	uio.uio_llimit = RLIM64_INFINITY;
+
+	/* start the accounting clock */
+	stmf_lu_xfer_start(task);
+	xfer_start = gethrtime();
+	if (is_read == B_TRUE) {
+		uio.uio_fmode = FREAD;
+		uio.uio_extflg = UIO_COPY_CACHED;
+		DTRACE_PROBE5(backing__store__read__start, sbd_lu_t *, sl,
+		    uint8_t *, NULL, uint64_t, len, uint64_t, laddr,
+		    scsi_task_t *, task);
+
+		/* Fetch the data */
+		ret = sbd_zvol_copy_read(sl, &uio);
+
+		DTRACE_PROBE6(backing__store__read__end, sbd_lu_t *, sl,
+		    uint8_t *, NULL, uint64_t, len, uint64_t, laddr, int, ret,
+		    scsi_task_t *, task);
+	} else {
+		uio.uio_fmode = FWRITE;
+		uio.uio_extflg = UIO_COPY_DEFAULT;
+		DTRACE_PROBE5(backing__store__write__start, sbd_lu_t *, sl,
+		    uint8_t *, NULL, uint64_t, len, uint64_t, laddr,
+		    scsi_task_t *, task);
+
+		flags = (commit) ? ZVIO_COMMIT : 0;
+		/* Write the data */
+		ret = sbd_zvol_copy_write(sl, &uio, flags);
+
+		DTRACE_PROBE6(backing__store__write__end, sbd_lu_t *, sl,
+		    uint8_t *, NULL, uint64_t, len, uint64_t, laddr, int, ret,
+		    scsi_task_t *, task);
+	}
+	/* finalize accounting */
+	stmf_lu_xfer_done(task, is_read, (uint64_t)len,
+	    (gethrtime() - xfer_start));
+
+	if (iov != &iov1[0])
+		kmem_free(iov, iovcnt * sizeof (*iov));
+	if (ret != 0) {
+		/* Backend I/O error */
+		return (STMF_FAILURE);
+	}
+	return (STMF_SUCCESS);
 }
 
 void
@@ -285,6 +867,95 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
+	/*
+	 * Determine if this read can directly use DMU buffers.
+	 */
+	if (sbd_zcopy & (2|1) &&		/* Debug switch */
+	    initial_dbuf == NULL &&		/* No PP buffer passed in */
+	    sl->sl_flags & SL_CALL_ZVOL &&	/* zvol backing store */
+	    (task->task_additional_flags &
+	    TASK_AF_ACCEPT_LU_DBUF))		/* PP allows it */
+	{
+		/*
+		 * Reduced copy path
+		 */
+		uint32_t copy_threshold, minsize;
+		int ret;
+
+		/*
+		 * The sl_access_state_lock will be held shared
+		 * for the entire request and released when all
+		 * dbufs have completed.
+		 */
+		rw_enter(&sl->sl_access_state_lock, RW_READER);
+		if ((sl->sl_flags & SL_MEDIA_LOADED) == 0) {
+			rw_exit(&sl->sl_access_state_lock);
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_READ_ERROR);
+			return;
+		}
+
+		/*
+		 * Check if setup is more expensive than copying the data.
+		 *
+		 * Use the global over-ride sbd_zcopy_threshold if set.
+		 */
+		copy_threshold = (sbd_copy_threshold > 0) ?
+		    sbd_copy_threshold : task->task_copy_threshold;
+		minsize = len;
+		if (len < copy_threshold &&
+		    (dbuf = stmf_alloc_dbuf(task, len, &minsize, 0)) != 0) {
+
+			ret = sbd_copy_rdwr(task, laddr, dbuf,
+			    SBD_CMD_SCSI_READ, 0);
+			/* done with the backend */
+			rw_exit(&sl->sl_access_state_lock);
+			if (ret != 0) {
+				/* backend error */
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_READ_ERROR);
+			} else {
+				/* send along good data */
+				dbuf->db_relative_offset = 0;
+				dbuf->db_data_size = len;
+				dbuf->db_flags = DB_SEND_STATUS_GOOD |
+				    DB_DIRECTION_TO_RPORT;
+				/* XXX keep for FW? */
+				DTRACE_PROBE4(sbd__xfer,
+				    struct scsi_task *, task,
+				    struct stmf_data_buf *, dbuf,
+				    uint64_t, laddr, uint32_t, len);
+				(void) stmf_xfer_data(task, dbuf,
+				    STMF_IOF_LU_DONE);
+			}
+			return;
+		}
+
+		/* committed to reduced copy */
+		if (task->task_lu_private) {
+			scmd = (sbd_cmd_t *)task->task_lu_private;
+		} else {
+			scmd = (sbd_cmd_t *)kmem_alloc(sizeof (sbd_cmd_t),
+			    KM_SLEEP);
+			task->task_lu_private = scmd;
+		}
+		/*
+		 * Setup scmd to track read progress.
+		 */
+		scmd->flags = SBD_SCSI_CMD_ACTIVE;
+		scmd->cmd_type = SBD_CMD_SCSI_READ;
+		scmd->nbufs = 0;
+		scmd->addr = laddr;
+		scmd->len = len;
+		scmd->current_ro = 0;
+
+		/*
+		 * Kick-off the read.
+		 */
+		sbd_do_sgl_read_xfer(task, scmd, 1);
+		return;
+	}
+
 	if (initial_dbuf == NULL) {
 		uint32_t maxsize, minsize, old_minsize;
 
@@ -311,6 +982,10 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			dbuf->db_data_size = len;
 			dbuf->db_flags = DB_SEND_STATUS_GOOD |
 			    DB_DIRECTION_TO_RPORT;
+			/* XXX keep for FW? */
+			DTRACE_PROBE4(sbd__xfer, struct scsi_task *, task,
+			    struct stmf_data_buf *, dbuf,
+			    uint64_t, laddr, uint32_t, len);
 			(void) stmf_xfer_data(task, dbuf, STMF_IOF_LU_DONE);
 		} else {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
@@ -403,6 +1078,224 @@ DO_WRITE_XFER_DONE:
 }
 
 void
+sbd_do_sgl_write_xfer(struct scsi_task *task, sbd_cmd_t *scmd, int first_xfer)
+{
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	sbd_zvol_io_t *zvio;
+	int ret;
+	uint32_t xfer_len, max_len, first_len;
+	stmf_status_t xstat;
+	stmf_data_buf_t *dbuf;
+	uint_t nblks;
+	uint64_t blksize = sl->sl_blksize;
+	uint64_t offset;
+	size_t db_private_sz;
+	uintptr_t pad;
+
+	ASSERT(rw_read_held(&sl->sl_access_state_lock));
+	ASSERT((sl->sl_flags & SL_MEDIA_LOADED) != 0);
+
+	/*
+	 * Calculate the limits on xfer_len to the minimum of :
+	 *    - task limit
+	 *    - lun limit
+	 *    - sbd global limit if set
+	 *    - first xfer limit if set
+	 *
+	 * First, protect against silly over-ride value
+	 */
+	if (sbd_max_xfer_len && ((sbd_max_xfer_len % DEV_BSIZE) != 0)) {
+		cmn_err(CE_WARN, "sbd_max_xfer_len invalid %d, resetting\n",
+		    sbd_max_xfer_len);
+		sbd_max_xfer_len = 0;
+	}
+	if (sbd_1st_xfer_len && ((sbd_1st_xfer_len % DEV_BSIZE) != 0)) {
+		cmn_err(CE_WARN, "sbd_1st_xfer_len invalid %d, resetting\n",
+		    sbd_1st_xfer_len);
+		sbd_1st_xfer_len = 0;
+	}
+
+	max_len = MIN(task->task_max_xfer_len, sl->sl_max_xfer_len);
+	if (sbd_max_xfer_len)
+		max_len = MIN(max_len, sbd_max_xfer_len);
+	/*
+	 * Special case the first xfer if hints are set.
+	 */
+	if (first_xfer && (sbd_1st_xfer_len || task->task_1st_xfer_len)) {
+		/* global over-ride has precedence */
+		if (sbd_1st_xfer_len)
+			first_len = sbd_1st_xfer_len;
+		else
+			first_len = task->task_1st_xfer_len;
+	} else {
+		first_len = 0;
+	}
+
+
+	while (scmd->len && scmd->nbufs < task->task_max_nbufs) {
+
+		xfer_len = MIN(max_len, scmd->len);
+		if (first_len) {
+			xfer_len = MIN(xfer_len, first_len);
+			first_len = 0;
+		}
+		if (xfer_len < scmd->len) {
+			/*
+			 * Attempt to end xfer on a block boundary.
+			 * The only way this does not happen is if the
+			 * xfer_len is small enough to stay contained
+			 * within the same block.
+			 */
+			uint64_t xfer_offset, xfer_aligned_end;
+
+			xfer_offset = scmd->addr + scmd->current_ro;
+			xfer_aligned_end =
+			    P2ALIGN(xfer_offset+xfer_len, blksize);
+			if (xfer_aligned_end > xfer_offset)
+				xfer_len = xfer_aligned_end - xfer_offset;
+		}
+		/*
+		 * Allocate object to track the write and reserve
+		 * enough space for scatter/gather list.
+		 */
+		offset = scmd->addr + scmd->current_ro;
+		nblks = sbd_zvol_numsegs(sl, offset, xfer_len);
+		db_private_sz = sizeof (*zvio) + sizeof (uintptr_t) /* PAD */ +
+		    (nblks * sizeof (stmf_sglist_ent_t));
+		dbuf = stmf_alloc(STMF_STRUCT_DATA_BUF, db_private_sz,
+		    AF_DONTZERO);
+
+		/*
+		 * Setup the dbuf
+		 *
+		 * XXX Framework does not handle variable length sglists
+		 * properly, so setup db_lu_private and db_port_private
+		 * fields here. db_stmf_private is properly set for
+		 * calls to stmf_free.
+		 */
+		if (dbuf->db_port_private == NULL) {
+			/*
+			 * XXX Framework assigns space to PP after db_sglist[0]
+			 */
+			cmn_err(CE_PANIC, "db_port_private == NULL");
+		}
+		pad = (uintptr_t)&dbuf->db_sglist[nblks];
+		dbuf->db_lu_private = (void *)P2ROUNDUP(pad, sizeof (pad));
+		dbuf->db_port_private = NULL;
+		dbuf->db_buf_size = xfer_len;
+		dbuf->db_data_size = xfer_len;
+		dbuf->db_relative_offset = scmd->current_ro;
+		dbuf->db_sglist_length = (uint16_t)nblks;
+		dbuf->db_xfer_status = 0;
+		dbuf->db_handle = 0;
+		dbuf->db_flags = (DB_DONT_CACHE | DB_DONT_REUSE |
+		    DB_DIRECTION_FROM_RPORT | DB_LU_DATA_BUF);
+
+		zvio = dbuf->db_lu_private;
+		zvio->zvio_offset = offset;
+
+		/* get the buffers */
+		ret = sbd_zvol_alloc_write_bufs(sl, dbuf);
+		if (ret != 0) {
+			/*
+			 * Could not allocate buffers from the backend;
+			 * treat it like an IO error.
+			 */
+			stmf_free(dbuf);
+			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
+			if (scmd->nbufs == 0) {
+				/*
+				 * Nothing queued, so no completions coming
+				 */
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_WRITE_ERROR);
+				rw_exit(&sl->sl_access_state_lock);
+			}
+			/*
+			 * Completions of previous buffers will cleanup.
+			 */
+			return;
+		}
+
+		/*
+		 * Allow PP to do setup
+		 */
+		xstat = stmf_setup_dbuf(task, dbuf, 0);
+		if (xstat != STMF_SUCCESS) {
+			/*
+			 * This could happen if the driver cannot get the
+			 * DDI resources it needs for this request.
+			 * If other dbufs are queued, try again when the next
+			 * one completes, otherwise give up.
+			 */
+			sbd_zvol_rele_write_bufs_abort(sl, dbuf);
+			stmf_free(dbuf);
+			if (scmd->nbufs > 0) {
+				/* completion of previous dbuf will retry */
+				return;
+			}
+			/*
+			 * Done with this command.
+			 */
+			scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+			if (first_xfer)
+				stmf_scsilib_send_status(task, STATUS_QFULL, 0);
+			else
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_WRITE_ERROR);
+			rw_exit(&sl->sl_access_state_lock);
+			return;
+		}
+
+		/*
+		 * dbuf is now queued on task
+		 */
+		scmd->nbufs++;
+
+		xstat = stmf_xfer_data(task, dbuf, 0);
+		switch (xstat) {
+		case STMF_SUCCESS:
+			break;
+		case STMF_BUSY:
+			/*
+			 * The dbuf is queued on the task, but unknown
+			 * to the PP, thus no completion will occur.
+			 */
+			sbd_zvol_rele_write_bufs_abort(sl, dbuf);
+			stmf_teardown_dbuf(task, dbuf);
+			stmf_free(dbuf);
+			scmd->nbufs--;
+			if (scmd->nbufs > 0) {
+				/* completion of previous dbuf will retry */
+				return;
+			}
+			/*
+			 * Done with this command.
+			 */
+			scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+			if (first_xfer)
+				stmf_scsilib_send_status(task, STATUS_QFULL, 0);
+			else
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_WRITE_ERROR);
+			rw_exit(&sl->sl_access_state_lock);
+			return;
+		case STMF_ABORTED:
+			/*
+			 * Completion code will cleanup.
+			 */
+			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
+			return;
+		}
+		/*
+		 * Update the xfer progress.
+		 */
+		scmd->len -= xfer_len;
+		scmd->current_ro += xfer_len;
+	}
+}
+
+void
 sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
     struct stmf_data_buf *dbuf, uint8_t dbuf_reusable)
 {
@@ -440,19 +1333,36 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 
 	laddr = scmd->addr + dbuf->db_relative_offset;
 
-	for (buflen = 0, ndx = 0; (buflen < dbuf->db_data_size) &&
-	    (ndx < dbuf->db_sglist_length); ndx++) {
-		iolen = min(dbuf->db_data_size - buflen,
-		    dbuf->db_sglist[ndx].seg_length);
-		if (iolen == 0)
-			break;
-		if (sbd_data_write(sl, task, laddr, (uint64_t)iolen,
-		    dbuf->db_sglist[ndx].seg_addr) != STMF_SUCCESS) {
+	/*
+	 * If this is going to a zvol, use the direct call to
+	 * sbd_zvol_copy_{read,write}. The direct call interface is
+	 * restricted to PPs that accept sglists, but that is not required.
+	 */
+	if (sl->sl_flags & SL_CALL_ZVOL &&
+	    (task->task_additional_flags & TASK_AF_ACCEPT_LU_DBUF) &&
+	    (sbd_zcopy & (4|1))) {
+		int commit;
+
+		commit = (scmd->len == 0 && scmd->nbufs == 0);
+		if (sbd_copy_rdwr(task, laddr, dbuf, SBD_CMD_SCSI_WRITE,
+		    commit) != STMF_SUCCESS)
 			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
-			break;
+		buflen = dbuf->db_data_size;
+	} else {
+		for (buflen = 0, ndx = 0; (buflen < dbuf->db_data_size) &&
+		    (ndx < dbuf->db_sglist_length); ndx++) {
+			iolen = min(dbuf->db_data_size - buflen,
+			    dbuf->db_sglist[ndx].seg_length);
+			if (iolen == 0)
+				break;
+			if (sbd_data_write(sl, task, laddr, (uint64_t)iolen,
+			    dbuf->db_sglist[ndx].seg_addr) != STMF_SUCCESS) {
+				scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
+				break;
+			}
+			buflen += iolen;
+			laddr += (uint64_t)iolen;
 		}
-		buflen += iolen;
-		laddr += (uint64_t)iolen;
 	}
 	task->task_nbytes_transferred += buflen;
 WRITE_XFER_DONE:
@@ -485,6 +1395,36 @@ WRITE_XFER_DONE:
 		return;
 	}
 	sbd_do_write_xfer(task, scmd, dbuf, dbuf_reusable);
+}
+
+/*
+ * Return true if copy avoidance is beneficial.
+ */
+static int
+sbd_zcopy_write_useful(scsi_task_t *task, uint64_t laddr, uint32_t len,
+    uint64_t blksize)
+{
+	/*
+	 * If there is a global copy threshold over-ride, use it.
+	 * Otherwise use the PP value with the caveat that at least
+	 * 1/2 the data must avoid being copied to be useful.
+	 */
+	if (sbd_copy_threshold > 0) {
+		return (len >= sbd_copy_threshold);
+	} else {
+		uint64_t no_copy_span;
+
+		/* sub-blocksize writes always copy */
+		if (len < task->task_copy_threshold || len < blksize)
+			return (0);
+		/*
+		 * Calculate amount of data that will avoid the copy path.
+		 * The calculation is only valid if len >= blksize.
+		 */
+		no_copy_span = P2ALIGN(laddr+len, blksize) -
+		    P2ROUNDUP(laddr, blksize);
+		return (no_copy_span >= len/2);
+	}
 }
 
 void
@@ -559,6 +1499,47 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
+	if (sbd_zcopy & (4|1) &&		/* Debug switch */
+	    initial_dbuf == NULL &&		/* No PP buf passed in */
+	    sl->sl_flags & SL_CALL_ZVOL &&	/* zvol backing store */
+	    (task->task_additional_flags &
+	    TASK_AF_ACCEPT_LU_DBUF) &&		/* PP allows it */
+	    sbd_zcopy_write_useful(task, laddr, len, sl->sl_blksize)) {
+
+		/*
+		 * XXX Note that disallowing initial_dbuf will eliminate
+		 * iSCSI from participating. For small writes, that is
+		 * probably ok. For large writes, it may be best to just
+		 * copy the data from the initial dbuf and use zcopy for
+		 * the rest.
+		 */
+		rw_enter(&sl->sl_access_state_lock, RW_READER);
+		if ((sl->sl_flags & SL_MEDIA_LOADED) == 0) {
+			rw_exit(&sl->sl_access_state_lock);
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_READ_ERROR);
+			return;
+		}
+		/*
+		 * Setup scmd to track the write progress.
+		 */
+		if (task->task_lu_private) {
+			scmd = (sbd_cmd_t *)task->task_lu_private;
+		} else {
+			scmd = (sbd_cmd_t *)kmem_alloc(sizeof (sbd_cmd_t),
+			    KM_SLEEP);
+			task->task_lu_private = scmd;
+		}
+		scmd->flags = SBD_SCSI_CMD_ACTIVE | sync_wr_flag;
+		scmd->cmd_type = SBD_CMD_SCSI_WRITE;
+		scmd->nbufs = 0;
+		scmd->addr = laddr;
+		scmd->len = len;
+		scmd->current_ro = 0;
+		sbd_do_sgl_write_xfer(task, scmd, 1);
+		return;
+	}
+
 	if ((initial_dbuf != NULL) && (task->task_flags & TF_INITIAL_BURST)) {
 		if (initial_dbuf->db_data_size > len) {
 			if (initial_dbuf->db_data_size >
@@ -589,7 +1570,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 	if (do_immediate_data) {
 		/*
-		 * Accout for data passed in this write command
+		 * Account for data passed in this write command
 		 */
 		(void) stmf_xfer_data(task, dbuf, STMF_IOF_STATS_ONLY);
 		scmd->len -= dbuf->db_data_size;
@@ -1916,9 +2897,30 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 void
 sbd_dbuf_xfer_done(struct scsi_task *task, struct stmf_data_buf *dbuf)
 {
-	sbd_cmd_t *scmd = NULL;
+	sbd_cmd_t *scmd = (sbd_cmd_t *)task->task_lu_private;
 
-	scmd = (sbd_cmd_t *)task->task_lu_private;
+	if (dbuf->db_flags & DB_LU_DATA_BUF) {
+		/*
+		 * Buffers passed in from the LU always complete
+		 * even if the task is no longer active.
+		 */
+		ASSERT(task->task_additional_flags & TASK_AF_ACCEPT_LU_DBUF);
+		ASSERT(scmd);
+		switch (scmd->cmd_type) {
+		case (SBD_CMD_SCSI_READ):
+			sbd_handle_sgl_read_xfer_completion(task, scmd, dbuf);
+			break;
+		case (SBD_CMD_SCSI_WRITE):
+			sbd_handle_sgl_write_xfer_completion(task, scmd, dbuf);
+			break;
+		default:
+			cmn_err(CE_PANIC, "Unknown cmd type, task = %p",
+			    (void *)task);
+			break;
+		}
+		return;
+	}
+
 	if ((scmd == NULL) || ((scmd->flags & SBD_SCSI_CMD_ACTIVE) == 0))
 		return;
 
@@ -2003,6 +3005,38 @@ sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 	}
 
 	return (STMF_NOT_FOUND);
+}
+
+/*
+ * This function is called during task clean-up if the
+ * DB_LU_FLAG is set on the dbuf. This should only be called for
+ * abort processing after sbd_abort has been called for the task.
+ */
+void
+sbd_dbuf_free(struct scsi_task *task, struct stmf_data_buf *dbuf)
+{
+	sbd_cmd_t *scmd = (sbd_cmd_t *)task->task_lu_private;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+
+	ASSERT(dbuf->db_lu_private);
+	ASSERT(scmd && scmd->nbufs > 0);
+	ASSERT((scmd->flags & SBD_SCSI_CMD_ACTIVE) == 0);
+	ASSERT(dbuf->db_flags & DB_LU_DATA_BUF);
+	ASSERT(task->task_additional_flags & TASK_AF_ACCEPT_LU_DBUF);
+	ASSERT((curthread->t_flag & T_INTR_THREAD) == 0);
+
+	if (scmd->cmd_type == SBD_CMD_SCSI_READ) {
+		sbd_zvol_rele_read_bufs(sl, dbuf);
+	} else if (scmd->cmd_type == SBD_CMD_SCSI_WRITE) {
+		sbd_zvol_rele_write_bufs_abort(sl, dbuf);
+	} else {
+		cmn_err(CE_PANIC, "Unknown cmd type %d, task = %p",
+		    scmd->cmd_type, (void *)task);
+	}
+	if (--scmd->nbufs == 0)
+		rw_exit(&sl->sl_access_state_lock);
+	stmf_teardown_dbuf(task, dbuf);
+	stmf_free(dbuf);
 }
 
 /* ARGSUSED */

@@ -1458,6 +1458,79 @@ zvol_getefi(void *arg, int flag, uint64_t vs, uint8_t bs)
 }
 
 /*
+ * BEGIN entry points to allow external callers access to the volume.
+ */
+/*
+ * Return the volume parameters needed for access from an external caller.
+ * These values are invariant as long as the volume is held open.
+ */
+int
+zvol_get_volume_params(minor_t minor, uint64_t *blksize,
+    uint64_t *max_xfer_len, void **minor_hdl, void **objset_hdl, void **zil_hdl,
+    void **rl_hdl, void **bonus_hdl)
+{
+	zvol_state_t *zv;
+
+	if (minor == 0)
+		return (ENXIO);
+	if ((zv = ddi_get_soft_state(zvol_state, minor)) == NULL)
+		return (ENXIO);
+	if (zv->zv_flags & ZVOL_DUMPIFIED)
+		return (ENXIO);
+
+	ASSERT(blksize && max_xfer_len && minor_hdl &&
+	    objset_hdl && zil_hdl && rl_hdl && bonus_hdl);
+
+	*blksize = zv->zv_volblocksize;
+	*max_xfer_len = (uint64_t)zvol_maxphys;
+	*minor_hdl = zv;
+	*objset_hdl = zv->zv_objset;
+	*zil_hdl = zv->zv_zilog;
+	*rl_hdl = &zv->zv_znode;
+	*bonus_hdl = zv->zv_dbuf;
+	return (0);
+}
+
+/*
+ * Return the current volume size to an external caller.
+ * The size can change while the volume is open.
+ */
+uint64_t
+zvol_get_volume_size(void *minor_hdl)
+{
+	zvol_state_t *zv = minor_hdl;
+
+	return (zv->zv_volsize);
+}
+
+/*
+ * Return the current WCE setting to an external caller.
+ * The WCE setting can change while the volume is open.
+ */
+int
+zvol_get_volume_wce(void *minor_hdl)
+{
+	zvol_state_t *zv = minor_hdl;
+
+	return ((zv->zv_flags & ZVOL_WCE) ? 1 : 0);
+}
+
+/*
+ * Entry point for external callers to zvol_log_write
+ */
+void
+zvol_log_write_minor(void *minor_hdl, dmu_tx_t *tx, offset_t off, ssize_t resid,
+    boolean_t sync)
+{
+	zvol_state_t *zv = minor_hdl;
+
+	zvol_log_write(zv, tx, off, resid, sync);
+}
+/*
+ * END entry points to allow external callers access to the volume.
+ */
+
+/*
  * Dirtbag ioctls to support mkfs(1M) for UFS filesystems.  See dkio(7I).
  */
 /*ARGSUSED*/

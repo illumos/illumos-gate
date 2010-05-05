@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_PORTIF_H
 #define	_PORTIF_H
@@ -41,8 +40,15 @@ typedef struct stmf_dbuf_store {
 
 	stmf_data_buf_t		*(*ds_alloc_data_buf)(struct scsi_task *task,
 	    uint32_t size, uint32_t *pminsize, uint32_t flags);
-	void			 (*ds_free_data_buf)(
-		struct stmf_dbuf_store *ds, stmf_data_buf_t *dbuf);
+
+	void			(*ds_free_data_buf)(
+	    struct stmf_dbuf_store *ds, stmf_data_buf_t *dbuf);
+
+	stmf_status_t		(*ds_setup_dbuf)(struct scsi_task *task,
+	    stmf_data_buf_t *dbuf, uint32_t flags);
+
+	void			(*ds_teardown_dbuf)(
+	    struct stmf_dbuf_store *ds, stmf_data_buf_t *dbuf);
 } stmf_dbuf_store_t;
 
 #define	PORTIF_REV_1	0x00010000

@@ -1405,6 +1405,7 @@ sbd_populate_and_register_lu(sbd_lu_t *sl, uint32_t *err_ret)
 	lu->lu_send_status_done = sbd_send_status_done;
 	lu->lu_task_free = sbd_task_free;
 	lu->lu_abort = sbd_abort;
+	lu->lu_dbuf_free = sbd_dbuf_free;
 	lu->lu_ctl = sbd_ctl;
 	lu->lu_info = sbd_info;
 	sl->sl_state = STMF_STATE_OFFLINE;
@@ -1432,6 +1433,8 @@ sbd_open_data_file(sbd_lu_t *sl, uint32_t *err_ret, int lu_size_valid,
 	uint64_t supported_size;
 	vattr_t vattr;
 	enum vtype vt;
+	struct dk_cinfo dki;
+	int unused;
 
 	mutex_enter(&sl->sl_lock);
 	if (vp_valid) {
@@ -1483,6 +1486,7 @@ odf_over_open:
 	}
 	/* sl_data_readable size includes any metadata. */
 	sl->sl_data_readable_size = vattr.va_size;
+
 	if (VOP_PATHCONF(sl->sl_data_vp, _PC_FILESIZEBITS, &nbits,
 	    CRED(), NULL) != 0) {
 		nbits = 0;
@@ -1531,6 +1535,21 @@ odf_over_open:
 		*err_ret = SBD_RET_FILE_ALIGN_ERROR;
 		ret = EINVAL;
 		goto odf_close_data_and_exit;
+	}
+	/*
+	 * Get the minor device for direct zvol access
+	 */
+	if (sl->sl_flags & SL_ZFS_META) {
+		if ((ret = VOP_IOCTL(sl->sl_data_vp, DKIOCINFO, (intptr_t)&dki,
+		    FKIOCTL, kcred, &unused, NULL)) != 0) {
+			cmn_err(CE_WARN, "ioctl(DKIOCINFO) failed %d", ret);
+			/* zvol reserves 0, so this would fail later */
+			sl->sl_zvol_minor = 0;
+		} else {
+			sl->sl_zvol_minor = dki.dki_unit;
+			if (sbd_zvol_get_volume_params(sl) == 0)
+				sl->sl_flags |= SL_CALL_ZVOL;
+		}
 	}
 	sl->sl_flags |= SL_MEDIA_LOADED;
 	mutex_exit(&sl->sl_lock);

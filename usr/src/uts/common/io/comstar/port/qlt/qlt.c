@@ -25,8 +25,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -1006,7 +1005,8 @@ qlt_populate_hba_fru_details(struct fct_local_port *port,
 	port_attrs->supported_speed = PORT_SPEED_1G |
 	    PORT_SPEED_2G | PORT_SPEED_4G;
 	if (qlt->qlt_25xx_chip)
-		port_attrs->supported_speed |= PORT_SPEED_8G;
+		port_attrs->supported_speed = PORT_SPEED_2G | PORT_SPEED_4G |
+		    PORT_SPEED_8G;
 	if (qlt->qlt_81xx_chip)
 		port_attrs->supported_speed = PORT_SPEED_10G;
 
@@ -1097,6 +1097,9 @@ qlt_port_start(caddr_t arg)
 	if (qlt_dmem_init(qlt) != QLT_SUCCESS) {
 		return (FCT_FAILURE);
 	}
+	/* Initialize the ddi_dma_handle free pool */
+	qlt_dma_handle_pool_init(qlt);
+
 	port = (fct_local_port_t *)fct_alloc(FCT_STRUCT_LOCAL_PORT, 0, 0);
 	if (port == NULL) {
 		goto qlt_pstart_fail_1;
@@ -1108,6 +1111,10 @@ qlt_port_start(caddr_t arg)
 	qlt->qlt_port = port;
 	fds->fds_alloc_data_buf = qlt_dmem_alloc;
 	fds->fds_free_data_buf = qlt_dmem_free;
+	fds->fds_setup_dbuf = qlt_dma_setup_dbuf;
+	fds->fds_teardown_dbuf = qlt_dma_teardown_dbuf;
+	fds->fds_max_sgl_xfer_len = QLT_DMA_SG_LIST_LENGTH * MMU_PAGESIZE;
+	fds->fds_copy_threshold = MMU_PAGESIZE;
 	fds->fds_fca_private = (void *)qlt;
 	/*
 	 * Since we keep everything in the state struct and dont allocate any
@@ -1158,6 +1165,7 @@ qlt_pstart_fail_2:
 	fct_free(port);
 	qlt->qlt_port = NULL;
 qlt_pstart_fail_1:
+	qlt_dma_handle_pool_fini(qlt);
 	qlt_dmem_fini(qlt);
 	return (QLT_FAILURE);
 }
@@ -1175,6 +1183,7 @@ qlt_port_stop(caddr_t arg)
 	fct_free(qlt->qlt_port->port_fds);
 	fct_free(qlt->qlt_port);
 	qlt->qlt_port = NULL;
+	qlt_dma_handle_pool_fini(qlt);
 	qlt_dmem_fini(qlt);
 	return (QLT_SUCCESS);
 }
@@ -1333,13 +1342,13 @@ qlt_port_online(qlt_state_t *qlt)
 		DMEM_WR16(qlt, icb+0x74,
 		    qlt81nvr->enode_mac[4] |
 		    (qlt81nvr->enode_mac[5] << 8));
-	} else {
-		DMEM_WR32(qlt, icb+0x5c, BIT_11 | BIT_5 | BIT_4 |
-		    BIT_2 | BIT_1 | BIT_0);
-		DMEM_WR32(qlt, icb+0x60, BIT_5);
-		DMEM_WR32(qlt, icb+0x64, BIT_14 | BIT_8 | BIT_7 |
-		    BIT_4);
-	}
+		} else {
+			DMEM_WR32(qlt, icb+0x5c, BIT_11 | BIT_5 | BIT_4 |
+			    BIT_2 | BIT_1 | BIT_0);
+			DMEM_WR32(qlt, icb+0x60, BIT_5);
+			DMEM_WR32(qlt, icb+0x64, BIT_14 | BIT_8 | BIT_7 |
+			    BIT_4);
+		}
 
 	if (qlt->qlt_81xx_chip) {
 		qlt_dmem_bctl_t		*bctl;
@@ -2995,7 +3004,7 @@ qlt_handle_resp_queue_update(qlt_state_t *qlt)
 		caddr_t resp = &qlt->resp_ptr[qlt->resp_ndx_to_fw << 6];
 		uint32_t ent_cnt;
 
-		ent_cnt = (uint32_t)(resp[1]);
+		ent_cnt = (uint32_t)(resp[0] == 0x51 ? resp[1] : 1);
 		if (ent_cnt > total_ent) {
 			break;
 		}
@@ -3375,11 +3384,12 @@ fatal_panic:;
 fct_status_t
 qlt_xfer_scsi_data(fct_cmd_t *cmd, stmf_data_buf_t *dbuf, uint32_t ioflags)
 {
-	qlt_dmem_bctl_t *bctl = (qlt_dmem_bctl_t *)dbuf->db_port_private;
-	qlt_state_t *qlt = (qlt_state_t *)cmd->cmd_port->port_fca_private;
-	qlt_cmd_t *qcmd = (qlt_cmd_t *)cmd->cmd_fca_private;
-	uint8_t *req;
-	uint16_t flags;
+	qlt_dmem_bctl_t	*bctl = (qlt_dmem_bctl_t *)dbuf->db_port_private;
+	qlt_state_t	*qlt = (qlt_state_t *)cmd->cmd_port->port_fca_private;
+	qlt_cmd_t	*qcmd = (qlt_cmd_t *)cmd->cmd_fca_private;
+	uint8_t		*req, rcnt;
+	uint16_t	flags;
+	uint16_t	cookie_count;
 
 	if (dbuf->db_handle == 0)
 		qcmd->dbuf = dbuf;
@@ -3394,28 +3404,114 @@ qlt_xfer_scsi_data(fct_cmd_t *cmd, stmf_data_buf_t *dbuf, uint32_t ioflags)
 	if (dbuf->db_flags & DB_SEND_STATUS_GOOD)
 		flags = (uint16_t)(flags | BIT_15);
 
+	if (dbuf->db_flags & DB_LU_DATA_BUF) {
+		/*
+		 * Data bufs from LU are in scatter/gather list format.
+		 */
+		cookie_count = qlt_get_cookie_count(dbuf);
+		rcnt = qlt_get_iocb_count(cookie_count);
+	} else {
+		cookie_count = 1;
+		rcnt = 1;
+	}
 	mutex_enter(&qlt->req_lock);
-	req = (uint8_t *)qlt_get_req_entries(qlt, 1);
+	req = (uint8_t *)qlt_get_req_entries(qlt, rcnt);
 	if (req == NULL) {
 		mutex_exit(&qlt->req_lock);
 		return (FCT_BUSY);
 	}
-	bzero(req, IOCB_SIZE);
-	req[0] = 0x12; req[1] = 0x1;
+	bzero(req, IOCB_SIZE);	/* XXX needed ? */
+	req[0] = 0x12;
+	req[1] = rcnt;
 	req[2] = dbuf->db_handle;
 	QMEM_WR32(qlt, req+4, cmd->cmd_handle);
 	QMEM_WR16(qlt, req+8, cmd->cmd_rp->rp_handle);
 	QMEM_WR16(qlt, req+10, 60);	/* 60 seconds timeout */
-	req[12] = 1;
+	QMEM_WR16(qlt, req+12, cookie_count);
 	QMEM_WR32(qlt, req+0x10, cmd->cmd_rportid);
 	QMEM_WR32(qlt, req+0x14, qcmd->fw_xchg_addr);
 	QMEM_WR16(qlt, req+0x1A, flags);
 	QMEM_WR16(qlt, req+0x20, cmd->cmd_oxid);
 	QMEM_WR32(qlt, req+0x24, dbuf->db_relative_offset);
 	QMEM_WR32(qlt, req+0x2C, dbuf->db_data_size);
-	QMEM_WR64(qlt, req+0x34, bctl->bctl_dev_addr);
-	QMEM_WR32(qlt, req+0x34+8, dbuf->db_data_size);
-	qlt_submit_req_entries(qlt, 1);
+	if (dbuf->db_flags & DB_LU_DATA_BUF) {
+		uint8_t			*qptr;	/* qlt continuation segs */
+		uint16_t		cookie_resid;
+		uint16_t		cont_segs;
+		ddi_dma_cookie_t	cookie, *ckp;
+
+		/*
+		 * See if the dma cookies are in simple array format.
+		 */
+		ckp = qlt_get_cookie_array(dbuf);
+
+		/*
+		 * Program the first segment into main record.
+		 */
+		if (ckp) {
+			ASSERT(ckp->dmac_size);
+			QMEM_WR64(qlt, req+0x34, ckp->dmac_laddress);
+			QMEM_WR32(qlt, req+0x3c, ckp->dmac_size);
+		} else {
+			qlt_ddi_dma_nextcookie(dbuf, &cookie);
+			ASSERT(cookie.dmac_size);
+			QMEM_WR64(qlt, req+0x34, cookie.dmac_laddress);
+			QMEM_WR32(qlt, req+0x3c, cookie.dmac_size);
+		}
+		cookie_resid = cookie_count-1;
+
+		/*
+		 * Program remaining segments into continuation records.
+		 */
+		while (cookie_resid) {
+			req += IOCB_SIZE;
+			if (req >= (uint8_t *)qlt->resp_ptr) {
+				req = (uint8_t *)qlt->req_ptr;
+			}
+			req[0] = 0x0a;
+			req[1] = 1;
+			req[2] = req[3] = 0;	/* tidy */
+			qptr = &req[4];
+			for (cont_segs = CONT_A64_DATA_SEGMENTS;
+			    cont_segs && cookie_resid; cont_segs--) {
+
+				if (ckp) {
+					++ckp;		/* next cookie */
+					ASSERT(ckp->dmac_size != 0);
+					QMEM_WR64(qlt, qptr,
+					    ckp->dmac_laddress);
+					qptr += 8;	/* skip over laddress */
+					QMEM_WR32(qlt, qptr, ckp->dmac_size);
+					qptr += 4;	/* skip over size */
+				} else {
+					qlt_ddi_dma_nextcookie(dbuf, &cookie);
+					ASSERT(cookie.dmac_size != 0);
+					QMEM_WR64(qlt, qptr,
+					    cookie.dmac_laddress);
+					qptr += 8;	/* skip over laddress */
+					QMEM_WR32(qlt, qptr, cookie.dmac_size);
+					qptr += 4;	/* skip over size */
+				}
+				cookie_resid--;
+			}
+			/*
+			 * zero unused remainder of IOCB
+			 */
+			if (cont_segs) {
+				size_t resid;
+				resid = (size_t)((uintptr_t)(req+IOCB_SIZE) -
+				    (uintptr_t)qptr);
+				ASSERT(resid < IOCB_SIZE);
+				bzero(qptr, resid);
+			}
+		}
+	} else {
+		/* Single, contiguous buffer */
+		QMEM_WR64(qlt, req+0x34, bctl->bctl_dev_addr);
+		QMEM_WR32(qlt, req+0x34+8, dbuf->db_data_size);
+	}
+
+	qlt_submit_req_entries(qlt, rcnt);
 	mutex_exit(&qlt->req_lock);
 
 	return (STMF_SUCCESS);
@@ -6074,7 +6170,7 @@ static int
 qlt_read_string_prop(qlt_state_t *qlt, char *prop, char **prop_val)
 {
 	return (ddi_prop_lookup_string(DDI_DEV_T_ANY, qlt->dip,
-	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, prop, prop_val));
+	    DDI_PROP_DONTPASS, prop, prop_val));
 }
 
 static int

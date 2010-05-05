@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_LPIF_H
 #define	_LPIF_H
@@ -74,6 +73,8 @@ typedef struct stmf_lu {
 		int eventid, void *arg, uint32_t flags);
 	void			*lu_proxy_reg_arg;
 	uint32_t		lu_proxy_reg_arg_len;
+	void			(*lu_dbuf_free)(struct scsi_task *task,
+		struct stmf_data_buf *dbuf);
 } stmf_lu_t;
 
 /*

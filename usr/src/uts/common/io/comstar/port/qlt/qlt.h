@@ -25,8 +25,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_QLT_H
@@ -240,6 +239,7 @@ typedef struct qlt_abts_cmd {
 } qlt_abts_cmd_t;
 
 struct qlt_dmem_bucket;
+struct qlt_ddi_dma_handle_pool;
 
 #define	QLT_INTR_FIXED	0x1
 #define	QLT_INTR_MSI	0x2
@@ -258,6 +258,9 @@ typedef struct qlt_state {
 	char			qlt_port_alias[16];
 	fct_local_port_t	*qlt_port;
 	struct qlt_dmem_bucket	**dmem_buckets;
+
+	struct qlt_dma_handle_pool
+				*qlt_dma_handle_pool;
 
 	int			instance;
 	uint8_t			qlt_state:7,
@@ -351,7 +354,6 @@ typedef struct qlt_state {
 	uint64_t	qlt_bumpbucket;		/* bigger buffer supplied */
 	uint64_t	qlt_pmintry;
 	uint64_t	qlt_pmin_ok;
-
 } qlt_state_t;
 
 /*

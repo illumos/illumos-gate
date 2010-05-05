@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -1096,6 +1095,27 @@ fct_alloc_dbuf(scsi_task_t *task, uint32_t size, uint32_t *pminsize,
 	    pminsize, flags));
 }
 
+stmf_status_t
+fct_setup_dbuf(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t flags)
+{
+	fct_local_port_t *port = (fct_local_port_t *)
+	    task->task_lport->lport_port_private;
+
+	ASSERT(port->port_fds->fds_setup_dbuf != NULL);
+	if (port->port_fds->fds_setup_dbuf == NULL)
+		return (STMF_FAILURE);
+
+	return (port->port_fds->fds_setup_dbuf(port, dbuf, flags));
+}
+
+void
+fct_teardown_dbuf(stmf_dbuf_store_t *ds, stmf_data_buf_t *dbuf)
+{
+	fct_dbuf_store_t *fds = ds->ds_port_private;
+
+	fds->fds_teardown_dbuf(fds, dbuf);
+}
+
 void
 fct_free_dbuf(stmf_dbuf_store_t *ds, stmf_data_buf_t *dbuf)
 {
@@ -1199,6 +1219,8 @@ fct_register_local_port(fct_local_port_t *port)
 	lport->lport_pp = port->port_pp;
 	port->port_fds->fds_ds->ds_alloc_data_buf = fct_alloc_dbuf;
 	port->port_fds->fds_ds->ds_free_data_buf = fct_free_dbuf;
+	port->port_fds->fds_ds->ds_setup_dbuf = fct_setup_dbuf;
+	port->port_fds->fds_ds->ds_teardown_dbuf = fct_teardown_dbuf;
 	lport->lport_ds = port->port_fds->fds_ds;
 	lport->lport_xfer_data = fct_xfer_scsi_data;
 	lport->lport_send_status = fct_send_scsi_status;
@@ -1711,6 +1733,8 @@ fct_scsi_task_free(scsi_task_t *task)
 void
 fct_post_rcvd_cmd(fct_cmd_t *cmd, stmf_data_buf_t *dbuf)
 {
+	fct_dbuf_store_t *fds;
+
 	if (cmd->cmd_type == FCT_CMD_FCP_XCHG) {
 		fct_i_cmd_t *icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
 		fct_i_local_port_t *iport =
@@ -1739,6 +1763,30 @@ fct_post_rcvd_cmd(fct_cmd_t *cmd, stmf_data_buf_t *dbuf)
 				task->task_additional_flags |=
 				    TASK_AF_PORT_LOAD_HIGH;
 		}
+		/*
+		 * If the target driver accepts sglists, fill in task fields.
+		 */
+		fds = cmd->cmd_port->port_fds;
+		if (fds->fds_setup_dbuf != NULL) {
+			task->task_additional_flags |= TASK_AF_ACCEPT_LU_DBUF;
+			task->task_copy_threshold = fds->fds_copy_threshold;
+			task->task_max_xfer_len = fds->fds_max_sgl_xfer_len;
+			/*
+			 * A single stream load encounters a little extra
+			 * latency if large xfers are done in 1 chunk.
+			 * Give a hint to the LU that starting the xfer
+			 * with a smaller chunk would be better in this case.
+			 * For any other load, use maximum chunk size.
+			 */
+			if (load == 1) {
+				/* estimate */
+				task->task_1st_xfer_len = 128*1024;
+			} else {
+				/* zero means no hint */
+				task->task_1st_xfer_len = 0;
+			}
+		}
+
 		stmf_post_task((scsi_task_t *)cmd->cmd_specific, dbuf);
 		atomic_and_32(&icmd->icmd_flags, ~ICMD_IN_TRANSITION);
 		return;
