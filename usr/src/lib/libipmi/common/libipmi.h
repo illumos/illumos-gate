@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBIPMI_H
@@ -53,6 +52,7 @@ typedef struct ipmi_handle ipmi_handle_t;
 /*
  * Basic netfn definitions.  See section 5.1.
  */
+#define	IPMI_NETFN_CHASSIS		BMC_NETFN_CHASSIS
 #define	IPMI_NETFN_APP			BMC_NETFN_APP
 #define	IPMI_NETFN_STORAGE		BMC_NETFN_STORAGE
 #define	IPMI_NETFN_SE			BMC_NETFN_SE
@@ -1846,6 +1846,9 @@ typedef struct ipmi_sunoem_fru {
 } ipmi_sunoem_fru_t;
 
 int ipmi_sunoem_update_fru(ipmi_handle_t *, ipmi_sunoem_fru_t *);
+
+#define	IPMI_CMD_CHASSIS_IDENTIFY	0x04
+int ipmi_chassis_identify(ipmi_handle_t *, boolean_t);
 
 #pragma pack()
 

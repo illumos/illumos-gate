@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <libipmi.h>
@@ -192,4 +191,34 @@ ipmi_get_channel_info(ipmi_handle_t *ihp, int number)
 	}
 
 	return (rsp->ic_data);
+}
+
+/*
+ * IPMI Chassis Identify Command
+ * See Section 28.5
+ */
+int
+ipmi_chassis_identify(ipmi_handle_t *ihp, boolean_t enable)
+{
+	ipmi_cmd_t cmd;
+	uint8_t msg_data[2];
+
+	if (enable) {
+		msg_data[0] = 0;
+		msg_data[1] = 1;
+	} else {
+		msg_data[0] = 0;
+		msg_data[1] = 0;
+	}
+
+	cmd.ic_netfn = IPMI_NETFN_CHASSIS;
+	cmd.ic_cmd = IPMI_CMD_CHASSIS_IDENTIFY;
+	cmd.ic_data = msg_data;
+	cmd.ic_dlen = sizeof (msg_data);
+	cmd.ic_lun = 0;
+
+	if (ipmi_send(ihp, &cmd) == NULL)
+		return (-1);
+
+	return (0);
 }
