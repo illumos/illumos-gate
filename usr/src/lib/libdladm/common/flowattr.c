@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <errno.h>
@@ -254,6 +253,16 @@ dladm_flow_attrlist_extract(dladm_arg_list_t *attrlist, flow_desc_t *flowdesc)
 				return (status);
 		}
 	}
+
+	/*
+	 * Make sure protocol is specified if either local or
+	 * remote port is specified.
+	 */
+	if ((flowdesc->fd_mask &
+	    (FLOW_ULP_PORT_LOCAL | FLOW_ULP_PORT_REMOTE)) != 0 &&
+	    (flowdesc->fd_mask & FLOW_IP_PROTOCOL) == 0)
+		return (DLADM_STATUS_PORT_NOPROTO);
+
 	return (status);
 }
 

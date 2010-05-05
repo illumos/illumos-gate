@@ -355,7 +355,7 @@ dladm_status2str(dladm_status_t status, char *buf)
 		s = "invalid property";
 		break;
 	case DLADM_STATUS_MINMAXBW:
-		s = "minimum value for maxbw is 1.2M";
+		s = "minimum value for maxbw is 1200K";
 		break;
 	case DLADM_STATUS_NO_HWRINGS:
 		s = "request hw rings failed";
@@ -404,6 +404,9 @@ dladm_status2str(dladm_status_t status, char *buf)
 		break;
 	case DLADM_STATUS_INVALID_PKEY_TBL_SIZE:
 		s = "invalid PKEY table size";
+		break;
+	case DLADM_STATUS_PORT_NOPROTO:
+		s = "local or remote port requires transport";
 		break;
 	default:
 		s = "<unknown error>";
