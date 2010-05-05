@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_ADAPTERS_SCSI_VHCI_H
@@ -184,6 +183,12 @@ extern int vhci_debug;
  * is being issued from the taskq and not target driver.
  */
 #define	VHCI_PKT_THRU_TASKQ		0x20
+/*
+ * Set the first time failover is being triggered. To ensure
+ * failover won't be triggered again when the packet is being
+ * retried by target driver.
+ */
+#define	VHCI_PKT_IN_FAILOVER		0x40
 
 #define	VHCI_PKT_TIMEOUT		30		/* seconds */
 #define	VHCI_PKT_RETRY_CNT		2
@@ -308,6 +313,14 @@ typedef struct scsi_vhci_lun {
 	 */
 	int			svl_waiting_for_activepath;
 	time_t			svl_wfa_time;
+
+	/*
+	 * to keep the failover status in order to return the
+	 * failure status to target driver when targer driver
+	 * retries the command which originally triggered the
+	 * failover.
+	 */
+	int			svl_failover_status;
 
 	/*
 	 * for RESERVE/RELEASE support

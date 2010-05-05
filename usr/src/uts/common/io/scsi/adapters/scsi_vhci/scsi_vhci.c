@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2361,10 +2360,14 @@ try_again:
 				return (TRAN_FATAL_ERROR);
 			}
 			mdi_rele_path(npip);
-			VHCI_DEBUG(1, (CE_NOTE, NULL, "!invoking "
-			    "mdi_failover\n"));
-			rval = mdi_failover(vhci->vhci_dip, cdip,
-			    MDI_FAILOVER_ASYNC);
+			if (!(vpkt->vpkt_state & VHCI_PKT_IN_FAILOVER)) {
+				VHCI_DEBUG(1, (CE_NOTE, NULL, "!invoking "
+				    "mdi_failover\n"));
+				rval = mdi_failover(vhci->vhci_dip, cdip,
+				    MDI_FAILOVER_ASYNC);
+			} else {
+				rval = vlun->svl_failover_status;
+			}
 			if (rval == MDI_FAILURE) {
 				VHCI_RELEASE_LUN(vlun);
 				if (pgr_sema_held) {
@@ -2381,6 +2384,7 @@ try_again:
 				if (pgr_sema_held) {
 					sema_v(&vlun->svl_pgr_sema);
 				}
+				vpkt->vpkt_state |= VHCI_PKT_IN_FAILOVER;
 				return (TRAN_BUSY);
 			}
 		}
@@ -7010,6 +7014,7 @@ check_path_again:
 	retval = MDI_SUCCESS;
 
 done:
+	vlun->svl_failover_status = retval;
 	if (flags == MDI_FAILOVER_ASYNC) {
 		VHCI_RELEASE_LUN(vlun);
 		VHCI_DEBUG(6, (CE_NOTE, NULL, "!vhci_failover(12): DONE! "

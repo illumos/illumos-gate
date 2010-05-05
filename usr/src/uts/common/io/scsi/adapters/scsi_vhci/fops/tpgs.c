@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -135,60 +134,65 @@ std_activate_explicit(struct scsi_device *sd, int xlf_capable)
  */
 static int
 std_process_cmplt_pkt(struct scsi_device *sd, struct scsi_pkt *pkt,
-    int *retry_cnt)
+    int *retry_cnt, int *retval)
 {
-	uint8_t *sns, skey, asc, ascq;
+	*retval = 1; /* fail */
 
-	/*
-	 * Re-initialize retry_cmd_cnt. Allow transport and
-	 * cmd errors to go through a full retry count when
-	 * these are encountered.  This way TRAN/CMD errors
-	 * retry count is not exhausted due to CMD_CMPLTs
-	 * delay. This allows the system
-	 * to brave a hick-up on the link at any given time,
-	 * while waiting for the fo to complete.
-	 */
-	if (pkt->pkt_state & STATE_ARQ_DONE) {
-		sns = (uint8_t *)
-		    &(((struct scsi_arq_status *)(uintptr_t)
-		    (pkt->pkt_scbp))->sts_sensedata);
-		skey = scsi_sense_key(sns);
-		asc = scsi_sense_asc(sns);
-		ascq = scsi_sense_ascq(sns);
-		if (skey == KEY_UNIT_ATTENTION) {
-			/*
-			 * tpgs access state changed
-			 */
-			if (asc == STD_SCSI_ASC_STATE_CHG &&
-			    ascq == STD_SCSI_ASCQ_STATE_CHG_SUCC) {
-				/* XXX: update path info? */
-				cmn_err(CE_WARN, "!Device failover"
-				    " state change");
-			}
-			return (1);
-		} else if (skey == KEY_NOT_READY) {
-			if ((*retry_cnt)++ >=
-			    STD_FO_MAX_RETRIES) {
-				cmn_err(CE_WARN, "!Device failover"
-				    " failed: timed out waiting "
-				    "for path to become active");
-				return (0);
-			}
-			VHCI_DEBUG(6, (CE_NOTE, NULL,
-			    "!(sd:%p)lun "
-			    "becoming active...\n", (void *)sd));
-			drv_usecwait(STD_FO_RETRY_DELAY);
-			return (1);
-		}
-		cmn_err(CE_NOTE, "!Failover failed;"
-		    " sense key:%x, ASC: %x, "
-		    "ASCQ:%x", skey, asc, ascq);
-		return (0);
-	}
 	switch (SCBP_C(pkt)) {
 		case STATUS_GOOD:
+			*retval = 0;
 			break;
 		case STATUS_CHECK:
+			if (pkt->pkt_state & STATE_ARQ_DONE) {
+				uint8_t *sns, skey, asc, ascq;
+				sns = (uint8_t *)
+				    &(((struct scsi_arq_status *)(uintptr_t)
+				    (pkt->pkt_scbp))->sts_sensedata);
+				skey = scsi_sense_key(sns);
+				asc = scsi_sense_asc(sns);
+				ascq = scsi_sense_ascq(sns);
+				if (skey == KEY_UNIT_ATTENTION) {
+					/*
+					 * tpgs access state changed
+					 */
+					if (asc == STD_SCSI_ASC_STATE_CHG &&
+					    ascq ==
+					    STD_SCSI_ASCQ_STATE_CHG_SUCC) {
+						/* XXX: update path info? */
+						cmn_err(CE_WARN,
+						    "!Device failover"
+						    " state change");
+					}
+					return (1);
+				} else if (skey == KEY_NOT_READY) {
+					if (asc ==
+					    STD_LOGICAL_UNIT_NOT_ACCESSIBLE &&
+					    ascq == STD_TGT_PORT_STANDBY) {
+						/*
+						 * Don't retry on the path
+						 * which is indicated as
+						 * standby, return failure.
+						 */
+						return (0);
+					} else if ((*retry_cnt)++ >=
+					    STD_FO_MAX_RETRIES) {
+						cmn_err(CE_WARN,
+						    "!Device failover failed: "
+						    "timed out waiting for "
+						    "path to become active");
+						return (0);
+					}
+					VHCI_DEBUG(6, (CE_NOTE, NULL,
+					    "!(sd:%p)lun becoming active...\n",
+					    (void *)sd));
+					drv_usecwait(STD_FO_RETRY_DELAY);
+					return (1);
+				}
+				cmn_err(CE_NOTE, "!Failover failed;"
+				    " sense key:%x, ASC: %x, "
+				    "ASCQ:%x", skey, asc, ascq);
+				return (0);
+			}
 			VHCI_DEBUG(4, (CE_WARN, NULL,
 			    "!(sd:%p):"
 			    " status returned CHECK during std"
@@ -310,9 +314,18 @@ retry:
 	}
 	switch (pkt->pkt_reason) {
 		case CMD_CMPLT:
+			/*
+			 * Re-initialize retry_cmd_cnt. Allow transport and
+			 * cmd errors to go through a full retry count when
+			 * these are encountered.  This way TRAN/CMD errors
+			 * retry count is not exhausted due to CMD_CMPLTs
+			 * delay. This allows the system
+			 * to brave a hick-up on the link at any given time,
+			 * while waiting for the fo to complete.
+			 */
 			retry_cmd_cnt = 0;
-			retval = std_process_cmplt_pkt(sd, pkt, &retry_cnt);
-			if (retval != 0) {
+			if (std_process_cmplt_pkt(sd, pkt, &retry_cnt,
+			    &retval) != 0) {
 				goto retry;
 			}
 			break;
@@ -346,8 +359,6 @@ retry:
 			break;
 	}
 
-
-	VHCI_DEBUG(4, (CE_NOTE, NULL, "!Path activation success\n"));
 	scsi_destroy_pkt(pkt);
 	scsi_free_consistent_buf(bp);
 	return (retval);
