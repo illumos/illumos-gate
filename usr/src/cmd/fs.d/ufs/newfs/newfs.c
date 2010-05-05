@@ -713,6 +713,7 @@ getdiskbydev(char *disk)
 {
 	struct dk_geom g;
 	struct dk_cinfo ci;
+	struct dk_minfo info;
 	diskaddr_t actual_size;
 	int fd;
 
@@ -739,6 +740,18 @@ getdiskbydev(char *disk)
 			    " Removable Media. Proceeding with system"
 			    " determined parameters.\n", disk));
 			isremovable = 0;
+		}
+
+		/* If removable check if a floppy disk */
+		if (isremovable) {
+			if (ioctl(fd, DKIOCGMEDIAINFO, &info)) {
+				dprintf(("DeBuG newfs : Unable to get media"
+				    " info from %s.\n", disk));
+			} else {
+				if (info.dki_media_type == DK_FLOPPY) {
+					isremovable = 0;
+				}
+			}
 		}
 
 		if (ioctl(fd, DKIOCHOTPLUGGABLE, &ishotpluggable)) {
