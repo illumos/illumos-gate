@@ -221,9 +221,9 @@ get_usage(zfs_help_t idx)
 	case HELP_PROMOTE:
 		return (gettext("\tpromote <clone-filesystem>\n"));
 	case HELP_RECEIVE:
-		return (gettext("\treceive [-vnF] <filesystem|volume|"
+		return (gettext("\treceive [-denuvF] <filesystem|volume|"
 		"snapshot>\n"
-		"\treceive [-vnF] -d <filesystem>\n"));
+		"\treceive [-denuvF] -d <filesystem>\n"));
 	case HELP_RENAME:
 		return (gettext("\trename <filesystem|volume|snapshot> "
 		    "<filesystem|volume|snapshot>\n"
@@ -1716,10 +1716,8 @@ zfs_do_upgrade(int argc, char **argv)
 		    "properties\n"));
 		(void) printf(gettext(" 5   System attributes\n"));
 		(void) printf(gettext("\nFor more information on a particular "
-		    "version, including supported releases, see:\n\n"));
-		(void) printf("http://www.opensolaris.org/os/community/zfs/"
-		    "version/zpl/N\n\n");
-		(void) printf(gettext("Where 'N' is the version number.\n"));
+		    "version, including supported releases,\n"));
+		(void) printf("see the ZFS Administration Guide.\n\n");
 		ret = 0;
 	} else if (argc || all) {
 		/* Upgrade filesystems */
@@ -2701,7 +2699,7 @@ zfs_do_send(int argc, char **argv)
 }
 
 /*
- * zfs receive [-denvF] <fs@snap>
+ * zfs receive [-denuvF] <fs@snap>
  *
  * Restore a backup stream from stdin.
  */

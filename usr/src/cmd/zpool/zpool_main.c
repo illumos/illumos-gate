@@ -4008,10 +4008,8 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 24  System attributes\n"));
 		(void) printf(gettext(" 25  Improved scrub stats\n"));
 		(void) printf(gettext("\nFor more information on a particular "
-		    "version, including supported releases, see:\n\n"));
-		(void) printf("http://www.opensolaris.org/os/community/zfs/"
-		    "version/N\n\n");
-		(void) printf(gettext("Where 'N' is the version number.\n"));
+		    "version, including supported releases,\n"));
+		(void) printf(gettext("see the ZFS Administration Guide.\n\n"));
 	} else if (argc == 0) {
 		int notfound;
 
