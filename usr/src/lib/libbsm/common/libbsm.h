@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _BSM_LIBBSM_H
 #define	_BSM_LIBBSM_H
 
 
+#include <ctype.h>
 #include <secdb.h>
 #include <stdio.h>
 #include <errno.h>
@@ -223,6 +223,7 @@ extern int	au_user_mask(char *, au_mask_t *);
 extern int	getauditflagsbin(char *, au_mask_t *);
 extern int	getauditflagschar(char *, au_mask_t *, int);
 extern int	getfauditflags(au_mask_t *, au_mask_t *, au_mask_t *);
+extern boolean_t __chkflags(char *, au_mask_t *, boolean_t, char **);
 
 /*
  * Functions that do system calls

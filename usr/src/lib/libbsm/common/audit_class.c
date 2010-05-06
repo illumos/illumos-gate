@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -183,7 +182,7 @@ au_class_ent_t *
 getauclassnam_r(au_class_ent_t *e, char *name)
 {
 	while (getauclassent_r(e) != NULL) {
-		if (strcmp(e->ac_name, name) == 0) {
+		if (strncmp(e->ac_name, name, AU_CLASS_NAME_MAX) == 0) {
 			return (e);
 		}
 	}
@@ -287,7 +286,8 @@ xcacheauclass(au_class_ent_t **result, char *class_name, au_class_t class_no,
 	*result = class_tbl[invalid];
 	if (flags & AU_CACHE_NAME) {
 		for (i = 0; i < lines; i++) {
-			if (strcmp(class_name, class_tbl[i]->ac_name) == 0) {
+			if (strncmp(class_name, class_tbl[i]->ac_name,
+			    AU_CLASS_NAME_MAX) == 0) {
 				*result = class_tbl[i];
 				hit = 1;
 				break;
