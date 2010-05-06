@@ -1633,9 +1633,12 @@ zfs_acl_inherit(zfsvfs_t *zfsvfs, vtype_t vtype, zfs_acl_t *paclp,
 		 * inherit_only
 		 */
 		if ((iflags & (ACE_FILE_INHERIT_ACE |
-		    ACE_DIRECTORY_INHERIT_ACE)) ==
-		    ACE_FILE_INHERIT_ACE) {
+		    ACE_DIRECTORY_INHERIT_ACE)) == ACE_FILE_INHERIT_ACE) {
 			newflags |= ACE_INHERIT_ONLY_ACE;
+			aclp->z_ops.ace_flags_set(acep,
+			    newflags|ACE_INHERITED_ACE);
+		} else {
+			newflags &= ~ACE_INHERIT_ONLY_ACE;
 			aclp->z_ops.ace_flags_set(acep,
 			    newflags|ACE_INHERITED_ACE);
 		}
