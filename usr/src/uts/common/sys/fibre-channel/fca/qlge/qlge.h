@@ -803,6 +803,7 @@ typedef struct qlge {
 
 	int 			tx_ring_size;
 	int 			rx_ring_size;
+	uint32_t		rx_copy_threshold;
 	uint32_t		rx_ring_count;
 	uint32_t		rss_ring_count;
 	uint32_t		tx_ring_first_cq_id;

@@ -238,11 +238,9 @@ ql_pci_config(qlge_t *qlge)
 	pci_config_put16(qlge->pci_handle, PCI_CONF_COMM, w);
 
 	w = pci_config_get16(qlge->pci_handle, 0x54);
-	cmn_err(CE_NOTE, "!dev_ctl old 0x%x\n", w);
 	w = (uint16_t)(w & (~0x7000));
 	w = (uint16_t)(w | 0x5000);
 	pci_config_put16(qlge->pci_handle, 0x54, w);
-	cmn_err(CE_NOTE, "!dev_ctl new 0x%x\n", w);
 
 	ql_dump_pci_config(qlge);
 }
@@ -656,13 +654,19 @@ ql_read_conf(qlge_t *qlge)
 	/* Get default rx_copy enable/disable. */
 	if ((data = ql_get_prop(qlge, "force-rx-copy")) == 0xffffffff ||
 	    data == 0) {
-		qlge->cfg_flags &= ~CFG_RX_COPY_MODE;
 		qlge->rx_copy = B_FALSE;
 		QL_PRINT(DBG_INIT, ("rx copy mode disabled\n"));
 	} else if (data == 1) {
-		qlge->cfg_flags |= CFG_RX_COPY_MODE;
 		qlge->rx_copy = B_TRUE;
 		QL_PRINT(DBG_INIT, ("rx copy mode enabled\n"));
+	}
+
+	qlge->rx_copy_threshold = qlge->rx_ring_size / 4;
+	data = ql_get_prop(qlge, "rx_copy_threshold");
+	if ((data != 0xffffffff) && (data != 0)) {
+		qlge->rx_copy_threshold = data;
+		cmn_err(CE_NOTE, "!new rx_copy_threshold %d \n",
+		    qlge->rx_copy_threshold);
 	}
 
 	/* Get mtu packet size. */
@@ -1032,7 +1036,6 @@ ql_get_sbuf_from_free_list(struct rx_ring *rx_ring)
 			free_idx = 0;
 		rx_ring->sbq_free_head = free_idx;
 		atomic_dec_32(&rx_ring->sbuf_free_count);
-		ASSERT(rx_ring->sbuf_free_count != 0);
 	}
 	return (sbq_desc);
 }
@@ -1130,7 +1133,6 @@ ql_get_lbuf_from_free_list(struct rx_ring *rx_ring)
 			free_idx = 0;
 		rx_ring->lbq_free_head = free_idx;
 		atomic_dec_32(&rx_ring->lbuf_free_count);
-		ASSERT(rx_ring->lbuf_free_count != 0);
 	}
 	return (lbq_desc);
 }
@@ -1883,6 +1885,9 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 	uint32_t actual_data_addr_low;
 	mblk_t *mp_ial = NULL;	/* ial chained packets */
 	uint32_t size;
+	uint32_t cp_offset;
+	boolean_t rx_copy = B_FALSE;
+	mblk_t *tp = NULL;
 
 	/*
 	 * Check if error flags are set
@@ -1912,7 +1917,23 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 		cmn_err(CE_WARN, "ql_build_rx_mpframe too long(%d)!", pkt_len);
 		err_flag |= 1;
 	}
+	if (qlge->rx_copy ||
+	    (rx_ring->sbuf_in_use_count <= qlge->rx_copy_threshold) ||
+	    (rx_ring->lbuf_in_use_count <= qlge->rx_copy_threshold)) {
+		rx_copy = B_TRUE;
+	}
 
+	/* if using rx copy mode, we need to allocate a big enough buffer */
+	if (rx_copy) {
+		qlge->stats.norcvbuf++;
+		tp = allocb(payload_len + header_len + qlge->ip_hdr_offset,
+		    BPRI_MED);
+		if (tp == NULL) {
+			cmn_err(CE_WARN, "rx copy failed to allocate memory");
+		} else {
+			tp->b_rptr += qlge->ip_hdr_offset;
+		}
+	}
 	/*
 	 * Handle the header buffer if present.
 	 * packet header must be valid and saved in one small buffer
@@ -1941,6 +1962,10 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 		}
 		/* get this packet */
 		mp1 = sbq_desc->mp;
+		/* Flush DMA'd data */
+		(void) ddi_dma_sync(sbq_desc->bd_dma.dma_handle,
+		    0, header_len, DDI_DMA_SYNC_FORKERNEL);
+
 		if ((err_flag != 0)|| (mp1 == NULL)) {
 			/* failed on this packet, put it back for re-arming */
 #ifdef QLGE_LOAD_UNLOAD
@@ -1948,11 +1973,14 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 #endif
 			ql_refill_sbuf_free_list(sbq_desc, B_FALSE);
 			mp1 = NULL;
+		} else if (rx_copy) {
+			if (tp != NULL) {
+				bcopy(sbq_desc->bd_dma.vaddr, tp->b_rptr,
+				    header_len);
+			}
+			ql_refill_sbuf_free_list(sbq_desc, B_FALSE);
+			mp1 = NULL;
 		} else {
-			/* Flush DMA'd data */
-			(void) ddi_dma_sync(sbq_desc->bd_dma.dma_handle,
-			    0, header_len, DDI_DMA_SYNC_FORKERNEL);
-
 			if ((qlge->ip_hdr_offset != 0)&&
 			    (header_len < SMALL_BUFFER_SIZE)) {
 				/*
@@ -2012,6 +2040,8 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 		}
 		/* get this packet */
 		mp2 = sbq_desc->mp;
+		(void) ddi_dma_sync(sbq_desc->bd_dma.dma_handle,
+		    0, payload_len, DDI_DMA_SYNC_FORKERNEL);
 		if ((err_flag != 0) || (mp2 == NULL)) {
 #ifdef QLGE_LOAD_UNLOAD
 			/* failed on this packet, put it back for re-arming */
@@ -2019,13 +2049,20 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 #endif
 			ql_refill_sbuf_free_list(sbq_desc, B_FALSE);
 			mp2 = NULL;
+		} else if (rx_copy) {
+			if (tp != NULL) {
+				bcopy(sbq_desc->bd_dma.vaddr,
+				    tp->b_rptr + header_len, payload_len);
+				tp->b_wptr =
+				    tp->b_rptr + header_len + payload_len;
+			}
+			ql_refill_sbuf_free_list(sbq_desc, B_FALSE);
+			mp2 = NULL;
 		} else {
 			/* Adjust the buffer length to match the payload_len */
 			mp2->b_wptr = mp2->b_rptr + payload_len;
 			mp2->b_next = mp2->b_cont = NULL;
 			/* Flush DMA'd data */
-			(void) ddi_dma_sync(sbq_desc->bd_dma.dma_handle,
-			    0, payload_len, DDI_DMA_SYNC_FORKERNEL);
 			QL_DUMP(DBG_RX, "\t RX packet payload dump:\n",
 			    (uint8_t *)mp2->b_rptr, 8, payload_len);
 			/*
@@ -2070,11 +2107,23 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 			goto fatal_error;
 		}
 		mp2 = lbq_desc->mp;
+		/* Flush DMA'd data */
+		(void) ddi_dma_sync(lbq_desc->bd_dma.dma_handle,
+		    0, payload_len, DDI_DMA_SYNC_FORKERNEL);
 		if ((err_flag != 0) || (mp2 == NULL)) {
 #ifdef QLGE_LOAD_UNLOAD
 			cmn_err(CE_WARN, "ignore bad data from large buffer");
 #endif
 			/* failed on this packet, put it back for re-arming */
+			ql_refill_lbuf_free_list(lbq_desc, B_FALSE);
+			mp2 = NULL;
+		} else if (rx_copy) {
+			if (tp != NULL) {
+				bcopy(lbq_desc->bd_dma.vaddr,
+				    tp->b_rptr + header_len, payload_len);
+				tp->b_wptr =
+				    tp->b_rptr + header_len + payload_len;
+			}
 			ql_refill_lbuf_free_list(lbq_desc, B_FALSE);
 			mp2 = NULL;
 		} else {
@@ -2084,9 +2133,6 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 			 */
 			mp2->b_wptr = mp2->b_rptr + payload_len;
 			mp2->b_next = mp2->b_cont = NULL;
-			/* Flush DMA'd data */
-			(void) ddi_dma_sync(lbq_desc->bd_dma.dma_handle,
-			    0, payload_len, DDI_DMA_SYNC_FORKERNEL);
 			QL_DUMP(DBG_RX, "\t RX packet payload dump:\n",
 			    (uint8_t *)mp2->b_rptr, 8, payload_len);
 			/*
@@ -2103,7 +2149,7 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 				mp2 = NULL;
 			}
 		}
-	} else if (payload_len) {
+	} else if (payload_len) { /* ial case */
 		/*
 		 * payload available but not in sml nor lrg buffer,
 		 * so, it is saved in IAL
@@ -2115,6 +2161,8 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 		sbq_desc = ql_get_sbuf_from_in_use_list(rx_ring);
 		curr_ial_ptr = (uint64_t *)sbq_desc->bd_dma.vaddr;
 		done = 0;
+		cp_offset = 0;
+
 		while (!done) {
 			ial_data_addr_low =
 			    (uint32_t)(le64_to_cpu(*curr_ial_ptr) &
@@ -2147,6 +2195,21 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 				cmn_err(CE_WARN,
 				    "ignore bad data from large buffer");
 #endif
+				ql_refill_lbuf_free_list(lbq_desc, B_FALSE);
+				mp2 = NULL;
+			} else if (rx_copy) {
+				if (tp != NULL) {
+					(void) ddi_dma_sync(
+					    lbq_desc->bd_dma.dma_handle,
+					    0, size, DDI_DMA_SYNC_FORKERNEL);
+					bcopy(lbq_desc->bd_dma.vaddr,
+					    tp->b_rptr + header_len + cp_offset,
+					    size);
+					tp->b_wptr =
+					    tp->b_rptr + size + cp_offset +
+					    header_len;
+					cp_offset += size;
+				}
 				ql_refill_lbuf_free_list(lbq_desc, B_FALSE);
 				mp2 = NULL;
 			} else {
@@ -2184,18 +2247,31 @@ ql_build_rx_mp(qlge_t *qlge, struct rx_ring *rx_ring,
 	 * concatenate message block mp2 to the tail of message header, mp1
 	 */
 	if (!err_flag) {
-		if (mp1) {
-			if (mp2) {
-				QL_PRINT(DBG_RX, ("packet in mp1 and mp2\n"));
-				linkb(mp1, mp2); /* mp1->b_cont = mp2; */
-				mp = mp1;
-			} else {
-				QL_PRINT(DBG_RX, ("packet in mp1 only\n"));
-				mp = mp1;
+		if (rx_copy) {
+			if (tp != NULL) {
+				tp->b_next = NULL;
+				tp->b_cont = NULL;
+				tp->b_wptr = tp->b_rptr +
+				    header_len + payload_len;
 			}
-		} else if (mp2) {
-			QL_PRINT(DBG_RX, ("packet in mp2 only\n"));
-			mp = mp2;
+			mp = tp;
+		} else {
+			if (mp1) {
+				if (mp2) {
+					QL_PRINT(DBG_RX,
+					    ("packet in mp1 and mp2\n"));
+					/* mp1->b_cont = mp2; */
+					linkb(mp1, mp2);
+					mp = mp1;
+				} else {
+					QL_PRINT(DBG_RX,
+					    ("packet in mp1 only\n"));
+					mp = mp1;
+				}
+			} else if (mp2) {
+				QL_PRINT(DBG_RX, ("packet in mp2 only\n"));
+				mp = mp2;
+			}
 		}
 	}
 	return (mp);
@@ -2207,6 +2283,10 @@ fatal_error:
 		ql_fm_ereport(qlge, DDI_FM_DEVICE_INVAL_STATE);
 		atomic_or_32(&qlge->flags, ADAPTER_ERROR);
 	}
+	if (tp) {
+		freemsg(tp);
+	}
+
 	/* *mp->b_wptr = 0; */
 	ql_wake_asic_reset_soft_intr(qlge);
 	return (NULL);
