@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -301,8 +300,10 @@ fdisk_is_linux_swap(ext_part_t *epp, uint32_t part_start, uint64_t *lsm_offset)
 	 * for the linux swap signature.
 	 */
 	label_offset = (part_start + DK_LABEL_LOC) * sec_sz;
-	if ((rval = lseek(epp->dev_fd, label_offset, SEEK_SET)) < 0)
+	if (lseek(epp->dev_fd, label_offset, SEEK_SET) < 0) {
+		rval = EIO;
 		goto done;
+	}
 
 	if ((rval = read(epp->dev_fd, buf, sec_sz)) < sec_sz) {
 		rval = EIO;
@@ -325,7 +326,8 @@ fdisk_is_linux_swap(ext_part_t *epp, uint32_t part_start, uint64_t *lsm_offset)
 		seek_offset += part_start;
 		seek_offset *= sec_sz;
 
-		if ((rval = lseek(epp->dev_fd, seek_offset, SEEK_SET)) < 0) {
+		if (lseek(epp->dev_fd, seek_offset, SEEK_SET) < 0) {
+			rval = EIO;
 			break;
 		}
 
