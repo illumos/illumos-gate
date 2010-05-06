@@ -4051,11 +4051,11 @@ mac_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data)
 	 */
 	if (mip->mi_nactiveclients > 1) {
 		switch (cap) {
-		case MAC_CAPAB_NO_NATIVEVLAN:
 		case MAC_CAPAB_NO_ZCOPY:
 			return (B_TRUE);
 		case MAC_CAPAB_LEGACY:
 		case MAC_CAPAB_HCKSUM:
+		case MAC_CAPAB_NO_NATIVEVLAN:
 			break;
 		default:
 			return (B_FALSE);

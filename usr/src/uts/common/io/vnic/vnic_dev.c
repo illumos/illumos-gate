@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -440,10 +439,21 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 		if (vnic->vn_addr_type == VNIC_MAC_ADDR_TYPE_FACTORY)
 			vnic->vn_slot_id = *mac_slot;
 
-		/* set the initial VNIC capabilities */
-		if (!mac_capab_get(vnic->vn_lower_mh, MAC_CAPAB_HCKSUM,
-		    &vnic->vn_hcksum_txflags))
+		/*
+		 * Set the initial VNIC capabilities. If the VNIC is created
+		 * over MACs which does not support nactive vlan, disable
+		 * VNIC's hardware checksum capability if its VID is not 0,
+		 * since the underlying MAC would get the hardware checksum
+		 * offset wrong in case of VLAN packets.
+		 */
+		if (vid == 0 || !mac_capab_get(vnic->vn_lower_mh,
+		    MAC_CAPAB_NO_NATIVEVLAN, NULL)) {
+			if (!mac_capab_get(vnic->vn_lower_mh, MAC_CAPAB_HCKSUM,
+			    &vnic->vn_hcksum_txflags))
+				vnic->vn_hcksum_txflags = 0;
+		} else {
 			vnic->vn_hcksum_txflags = 0;
+		}
 	}
 
 	/* register with the MAC module */
@@ -773,6 +783,7 @@ vnic_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 		return (B_FALSE);
 	}
 	case MAC_CAPAB_NO_NATIVEVLAN:
+		return (B_FALSE);
 	case MAC_CAPAB_NO_ZCOPY:
 		return (B_TRUE);
 	case MAC_CAPAB_VRRP: {

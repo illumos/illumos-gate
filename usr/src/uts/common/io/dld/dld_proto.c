@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1558,7 +1557,6 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	uint8_t			*ptr;
 	queue_t			*q = dsp->ds_wq;
 	mblk_t			*mp1;
-	boolean_t		is_vlan;
 	boolean_t		hcksum_capable = B_FALSE;
 	boolean_t		zcopy_capable = B_FALSE;
 	boolean_t		dld_capable = B_FALSE;
@@ -1568,17 +1566,12 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	 * Initially assume no capabilities.
 	 */
 	subsize = 0;
-	is_vlan = (mac_client_vid(dsp->ds_mch) != VLAN_ID_NONE);
 
 	/*
-	 * Check if checksum offload is supported on this MAC.  Don't
-	 * advertise DL_CAPAB_HCKSUM if the underlying MAC is VLAN incapable,
-	 * since it might not be able to do the hardware checksum offload
-	 * with the correct offset.
+	 * Check if checksum offload is supported on this MAC.
 	 */
 	bzero(&hcksum, sizeof (dl_capab_hcksum_t));
-	if ((!is_vlan || (!mac_capab_get(dsp->ds_mh, MAC_CAPAB_NO_NATIVEVLAN,
-	    NULL))) && mac_capab_get(dsp->ds_mh, MAC_CAPAB_HCKSUM,
+	if (mac_capab_get(dsp->ds_mh, MAC_CAPAB_HCKSUM,
 	    &hcksum.hcksum_txflags)) {
 		if (hcksum.hcksum_txflags != 0) {
 			hcksum_capable = B_TRUE;
