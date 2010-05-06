@@ -300,7 +300,7 @@ rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int kptr_gfp,
 	while ((prefill || rdsv3_conn_up(conn)) &&
 	    rdsv3_ib_ring_alloc(&ic->i_recv_ring, 1, &pos)) {
 		if (pos >= ic->i_recv_ring.w_nr) {
-			RDSV3_DPRINTF0("rdsv3_ib_recv_refill",
+			RDSV3_DPRINTF2("rdsv3_ib_recv_refill",
 			    "Argh - ring alloc returned pos=%u",
 			    pos);
 			ret = -EINVAL;

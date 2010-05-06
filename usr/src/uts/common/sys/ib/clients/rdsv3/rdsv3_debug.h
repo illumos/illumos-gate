@@ -82,9 +82,6 @@ extern "C" {
 #define	RDSV3_DPRINTF5		rdsv3_dprintf5
 #define	RDSV3_DPRINTF4		rdsv3_dprintf4
 #define	RDSV3_DPRINTF3		rdsv3_dprintf3
-#define	RDSV3_DPRINTF2		rdsv3_dprintf2
-#define	RDSV3_DPRINTF1		rdsv3_dprintf1
-#define	RDSV3_DPRINTF0		rdsv3_dprintf0
 
 void rdsv3_dprintf_intr(
 		char		*name,
@@ -98,6 +95,17 @@ void rdsv3_dprintf4(
 void rdsv3_dprintf3(
 		char		*name,
 		char		*fmt, ...);
+#else
+#define	RDSV3_DPRINTF_INTR	0 &&
+#define	RDSV3_DPRINTF5		0 &&
+#define	RDSV3_DPRINTF4		0 &&
+#define	RDSV3_DPRINTF3		0 &&
+#endif
+
+#define	RDSV3_DPRINTF2		rdsv3_dprintf2
+#define	RDSV3_DPRINTF1		rdsv3_dprintf1
+#define	RDSV3_DPRINTF0		rdsv3_dprintf0
+
 void rdsv3_dprintf2(
 		char		*name,
 		char		*fmt, ...);
@@ -107,15 +115,6 @@ void rdsv3_dprintf1(
 void rdsv3_dprintf0(
 		char		*name,
 		char		*fmt, ...);
-#else
-#define	RDSV3_DPRINTF_INTR	0 &&
-#define	RDSV3_DPRINTF5		0 &&
-#define	RDSV3_DPRINTF4		0 &&
-#define	RDSV3_DPRINTF3		0 &&
-#define	RDSV3_DPRINTF2		0 &&
-#define	RDSV3_DPRINTF1		0 &&
-#define	RDSV3_DPRINTF0		0 &&
-#endif
 
 void rdsv3_trace(
 		char		*name,

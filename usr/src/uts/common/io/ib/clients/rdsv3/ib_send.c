@@ -276,7 +276,7 @@ rdsv3_ib_send_cq_comp_handler(struct ib_cq *cq, void *context)
 				break;
 			default:
 #ifndef __lock_lint
-				RDSV3_DPRINTF0("rdsv3_ib_send_cq_comp_handler",
+				RDSV3_DPRINTF2("rdsv3_ib_send_cq_comp_handler",
 				    "RDS/IB: %s: unexpected opcode "
 				    "0x%x in WR!",
 				    __func__, send->s_opcode);
@@ -826,7 +826,7 @@ add_header:
 		if (0) {
 			struct rdsv3_header *hdr = &ic->i_send_hdrs[pos];
 
-			RDSV3_DPRINTF0("rdsv3_ib_xmit",
+			RDSV3_DPRINTF2("rdsv3_ib_xmit",
 			    "send WR dport=%u flags=0x%x len=%d",
 			    ntohs(hdr->h_dport),
 			    hdr->h_flags,
@@ -872,12 +872,12 @@ add_header:
 	ret = ibt_post_send(ib_get_ibt_channel_hdl(ic->i_cm_id),
 	    ic->i_send_wrs, i, &posted);
 	if (posted != i) {
-		RDSV3_DPRINTF1("rdsv3_ib_xmit",
+		RDSV3_DPRINTF2("rdsv3_ib_xmit",
 		    "ic %p first %p nwr: %d ret %d:%d",
 		    ic, first, i, ret, posted);
 	}
 	if (ret) {
-		RDSV3_DPRINTF0("rdsv3_ib_xmit",
+		RDSV3_DPRINTF2("rdsv3_ib_xmit",
 		    "RDS/IB: ib_post_send to %u.%u.%u.%u "
 		    "returned %d\n", NIPQUAD(conn->c_faddr), ret);
 		rdsv3_ib_ring_unalloc(&ic->i_send_ring, work_alloc);
@@ -1126,7 +1126,7 @@ rdsv3_ib_xmit_rdma(struct rdsv3_connection *conn, struct rdsv3_rdma_op *op)
 	status = ibt_post_send(ib_get_ibt_channel_hdl(ic->i_cm_id),
 	    ic->i_send_wrs, k, &posted);
 	if (status != IBT_SUCCESS) {
-		RDSV3_DPRINTF0("rdsv3_ib_xmit_rdma",
+		RDSV3_DPRINTF2("rdsv3_ib_xmit_rdma",
 		    "RDS/IB: rdma ib_post_send returned %d", status);
 		rdsv3_ib_ring_unalloc(&ic->i_send_ring, work_alloc);
 	}

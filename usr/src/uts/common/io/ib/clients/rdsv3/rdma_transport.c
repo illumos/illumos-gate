@@ -141,7 +141,7 @@ rdsv3_rdma_cm_event_handler(struct rdma_cm_id *cm_id,
 		    "RDS/RDMA: DISCONNECT event - dropping connection "
 		    "cm_id: %p", cm_id);
 		if (conn) {
-			RDSV3_DPRINTF0("rdsv3_rdma_cm_event_handler",
+			RDSV3_DPRINTF2("rdsv3_rdma_cm_event_handler",
 			    "RDS/RDMA: DISCONNECT event - dropping connection "
 			    "%u.%u.%u.%u ->%u.%u.%u.%u", NIPQUAD(conn->c_laddr),
 			    NIPQUAD(conn->c_faddr));
@@ -151,7 +151,7 @@ rdsv3_rdma_cm_event_handler(struct rdma_cm_id *cm_id,
 
 	default:
 		/* things like device disconnect? */
-		RDSV3_DPRINTF0("rdsv3_rdma_cm_event_handler",
+		RDSV3_DPRINTF2("rdsv3_rdma_cm_event_handler",
 		    "unknown event %u\n", event->event);
 		RDSV3_PANIC();
 		break;
@@ -187,7 +187,7 @@ rdsv3_rdma_listen_init(void)
 	cm_id = rdma_create_id(rdsv3_rdma_cm_event_handler, NULL, RDMA_PS_TCP);
 	if (IS_ERR(cm_id)) {
 		ret = PTR_ERR(cm_id);
-		RDSV3_DPRINTF0("rdsv3_rdma_listen_init",
+		RDSV3_DPRINTF2("rdsv3_rdma_listen_init",
 		    "RDS/RDMA: failed to setup listener, "
 		    "rdma_create_id() returned %d", ret);
 		goto out;
@@ -203,7 +203,7 @@ rdsv3_rdma_listen_init(void)
 	 */
 	ret = rdma_bind_addr(cm_id, (struct sockaddr *)&sin);
 	if (ret) {
-		RDSV3_DPRINTF0("rdsv3_rdma_listen_init",
+		RDSV3_DPRINTF2("rdsv3_rdma_listen_init",
 		    "RDS/RDMA: failed to setup listener, "
 		    "rdma_bind_addr() returned %d", ret);
 		goto out;
@@ -211,7 +211,7 @@ rdsv3_rdma_listen_init(void)
 
 	ret = rdma_listen(cm_id, 128);
 	if (ret) {
-		RDSV3_DPRINTF0("rdsv3_rdma_listen_init",
+		RDSV3_DPRINTF2("rdsv3_rdma_listen_init",
 		    "RDS/RDMA: failed to setup listener, "
 		    "rdma_listen() returned %d", ret);
 		goto out;

@@ -276,11 +276,6 @@ XXX
 	if (waitqueue_active(&map->m_waitq))
 #endif
 		rdsv3_wake_up(&map->m_waitq);
-#if 0
-XXX
-	if (waitqueue_active(&rds_poll_waitq))
-#endif
-		rdsv3_wake_up_all(&rdsv3_poll_waitq);
 
 	if (portmask && !list_is_empty(&rdsv3_cong_monitor)) {
 		struct rdsv3_sock *rs;
@@ -415,7 +410,7 @@ int
 rdsv3_cong_wait(struct rdsv3_cong_map *map, uint16_be_t port, int nonblock,
     struct rdsv3_sock *rs)
 {
-	int	ret = 0;
+	int ret = 0;
 
 	RDSV3_DPRINTF4("rdsv3_cong_wait", "Enter(rs: %p, mode: %d)",
 	    rs, nonblock);
@@ -448,17 +443,26 @@ rdsv3_cong_wait(struct rdsv3_cong_map *map, uint16_be_t port, int nonblock,
 	RDSV3_DPRINTF3("rdsv3_cong_wait", "waiting on map %p for port %u",
 	    map, ntohs(port));
 
+#if 0
+	ret = rdsv3_wait_sig(&map->m_waitq, !rdsv3_cong_test_bit(map, port));
+	if (ret == 0)
+		return (-ERESTART);
+	return (0);
+#else
 	mutex_enter(&map->m_waitq.waitq_mutex);
+	map->m_waitq.waitq_waiters++;
 	while (rdsv3_cong_test_bit(map, port)) {
-		if (cv_wait_sig(&map->m_waitq.waitq_cv,
-		    &map->m_waitq.waitq_mutex) == 0) {
+		ret = cv_wait_sig(&map->m_waitq.waitq_cv,
+		    &map->m_waitq.waitq_mutex);
+		if (ret == 0) {
 			ret = -ERESTART;
 			break;
 		}
 	}
+	map->m_waitq.waitq_waiters--;
 	mutex_exit(&map->m_waitq.waitq_mutex);
-
 	return (ret);
+#endif
 }
 
 void

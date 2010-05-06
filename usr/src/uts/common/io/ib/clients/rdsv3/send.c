@@ -1009,7 +1009,7 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 
 	if ((rm->m_rdma_cookie || rm->m_rdma_op) &&
 	    conn->c_trans->xmit_rdma == NULL) {
-		RDSV3_DPRINTF0("rdsv3_sendmsg", "rdma_op %p conn xmit_rdma %p",
+		RDSV3_DPRINTF2("rdsv3_sendmsg", "rdma_op %p conn xmit_rdma %p",
 		    rm->m_rdma_op, conn->c_trans->xmit_rdma);
 		ret = -EOPNOTSUPP;
 		goto out;
@@ -1051,37 +1051,37 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 			goto out;
 		}
 
+#if 0
+		ret = rdsv3_wait_sig(sk->sk_sleep,
+		    (rdsv3_send_queue_rm(rs, conn, rm, rs->rs_bound_port,
+		    dport, &queued)));
+		if (ret == 0) {
+			/* signal/timeout pending */
+			RDSV3_DPRINTF2("rdsv3_sendmsg",
+			    "woke due to signal: %d", ret);
+			ret = -ERESTART;
+			goto out;
+		}
+#else
 		mutex_enter(&sk->sk_sleep->waitq_mutex);
+		sk->sk_sleep->waitq_waiters++;
 		while (!rdsv3_send_queue_rm(rs, conn, rm, rs->rs_bound_port,
 		    dport, &queued)) {
-#if 0
-			ret = cv_timedwait_sig(&sk->sk_sleep->waitq_cv,
-			    &sk->sk_sleep->waitq_mutex,
-			    timeo * drv_usectohz(1000000) + ddi_get_lbolt());
-			if (ret <= 0) {
-				/* signal/timeout pending */
-				RDSV3_DPRINTF2("rdsv3_sendmsg",
-				    "woke due to signal/timeout: %d",
-				    ret);
-				ret = (ret == 0) ? -ERESTART : -ETIMEDOUT;
-				mutex_exit(&sk->sk_sleep->waitq_mutex);
-				goto out;
-			}
-#else
 			ret = cv_wait_sig(&sk->sk_sleep->waitq_cv,
 			    &sk->sk_sleep->waitq_mutex);
 			if (ret == 0) {
 				/* signal/timeout pending */
 				RDSV3_DPRINTF2("rdsv3_sendmsg",
-				    "woke due to signal: %d",
-				    ret);
+				    "woke due to signal: %d", ret);
 				ret = -ERESTART;
+				sk->sk_sleep->waitq_waiters--;
 				mutex_exit(&sk->sk_sleep->waitq_mutex);
 				goto out;
 			}
-#endif
 		}
+		sk->sk_sleep->waitq_waiters--;
 		mutex_exit(&sk->sk_sleep->waitq_mutex);
+#endif
 
 		RDSV3_DPRINTF5("rdsv3_sendmsg", "sendmsg woke queued %d",
 		    queued);

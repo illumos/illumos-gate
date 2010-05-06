@@ -401,7 +401,7 @@ rdsv3_ib_get_mr(struct rdsv3_iovec *args, unsigned long nents,
 		    "Return: ibmr: %p umem_cookie %p", ibmr, ibmr->umem_cookie);
 		return (ibmr);
 	} else { /* error return */
-		RDSV3_DPRINTF1("rdsv3_ib_get_mr", "map_fmr failed (errno=%d)\n",
+		RDSV3_DPRINTF2("rdsv3_ib_get_mr", "map_fmr failed (errno=%d)\n",
 		    ret);
 		ddi_umem_unlock(umem_cookie);
 		kmem_free((void *)ibmr, sizeof (*ibmr));

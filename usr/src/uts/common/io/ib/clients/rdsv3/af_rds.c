@@ -85,7 +85,6 @@ extern struct rdma_cm_id *rdsv3_rdma_listen_id;
 kmutex_t rdsv3_sock_lock;
 static unsigned long rdsv3_sock_count;
 list_t rdsv3_sock_list;
-rdsv3_wait_queue_t rdsv3_poll_waitq;
 
 /*
  * This is called as the final descriptor referencing this socket is closed.
@@ -127,6 +126,12 @@ rdsv3_release(sock_lower_handle_t proto_handle, int flgs, cred_t *cr)
 	rdsv3_sock_count--;
 	mutex_exit(&rdsv3_sock_lock);
 
+	while (sk->sk_refcount > 1) {
+		/* wait for 1 sec and try again */
+		delay(drv_usectohz(1000000));
+	}
+
+	/* this will free the rs and sk */
 	rdsv3_sk_sock_put(sk);
 
 	RDSV3_DPRINTF4("rdsv3_release", "Return (rds: %p)", rs);

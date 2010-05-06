@@ -103,7 +103,7 @@ rdsv3_connect_complete(struct rdsv3_connection *conn)
 	if (!rdsv3_conn_transition(conn, RDSV3_CONN_CONNECTING,
 	    RDSV3_CONN_UP)) {
 #ifndef __lock_lint
-		RDSV3_DPRINTF0("rdsv3_connect_complete",
+		RDSV3_DPRINTF2("rdsv3_connect_complete",
 		    "%s: Cannot transition to state UP, "
 		    "current state is %d",
 		    __func__,

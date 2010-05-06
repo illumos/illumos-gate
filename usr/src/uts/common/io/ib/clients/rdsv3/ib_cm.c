@@ -126,7 +126,7 @@ rdsv3_ib_tune_rnr(struct rdsv3_ib_connection *ic, struct ib_qp_attr *attr)
 	attr->min_rnr_timer = IB_RNR_TIMER_000_32;
 	ret = ib_modify_qp(ic->i_cm_id->qp, attr, IB_QP_MIN_RNR_TIMER);
 	if (ret)
-		RDSV3_DPRINTF0("rdsv3_ib_tune_rnr",
+		RDSV3_DPRINTF2("rdsv3_ib_tune_rnr",
 		    "ib_modify_qp(IB_QP_MIN_RNR_TIMER): err=%d", -ret);
 }
 
@@ -186,14 +186,14 @@ rdsv3_ib_cm_connect_complete(struct rdsv3_connection *conn,
 	qp_attr.qp_state = IB_QPS_RTS;
 	err = ib_modify_qp(ic->i_cm_id->qp, &qp_attr, IB_QP_STATE);
 	if (err)
-		RDSV3_DPRINTF0("rdsv3_ib_cm_connect_complete",
+		RDSV3_DPRINTF2("rdsv3_ib_cm_connect_complete",
 		    "ib_modify_qp(IB_QP_STATE, RTS): err=%d", err);
 
 	/* update ib_device with this local ipaddr & conn */
 	rds_ibdev = ib_get_client_data(ic->i_cm_id->device, &rdsv3_ib_client);
 	err = rdsv3_ib_update_ipaddr(rds_ibdev, conn->c_laddr);
 	if (err)
-		RDSV3_DPRINTF0("rdsv3_ib_cm_connect_complete",
+		RDSV3_DPRINTF2("rdsv3_ib_cm_connect_complete",
 		    "rdsv3_ib_update_ipaddr failed (%d)", err);
 	rdsv3_ib_add_conn(rds_ibdev, conn);
 
@@ -331,7 +331,7 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	 */
 	rds_ibdev = ib_get_client_data(dev, &rdsv3_ib_client);
 	if (rds_ibdev == NULL) {
-		RDSV3_DPRINTF0("rdsv3_ib_setup_qp",
+		RDSV3_DPRINTF2("rdsv3_ib_setup_qp",
 		    "RDS/IB: No client_data for device %s", dev->name);
 		return (-EOPNOTSUPP);
 	}
@@ -505,7 +505,7 @@ rdsv3_ib_protocol_compatible(struct rdma_cm_event *event)
 		while ((common >>= 1) != 0)
 			version++;
 	} else {
-		RDSV3_DPRINTF0("rdsv3_ib_protocol_compatible",
+		RDSV3_DPRINTF2("rdsv3_ib_protocol_compatible",
 		    "RDS: Connection from %u.%u.%u.%u using "
 		    "incompatible protocol version %u.%u\n",
 		    NIPQUAD(dp->dp_saddr),
@@ -623,6 +623,7 @@ rdsv3_ib_cm_handle_connect(struct rdma_cm_id *cm_id,
 	if (err) {
 		RDSV3_DPRINTF2("rdsv3_ib_cm_handle_connect",
 		    "rdsv3_ib_setup_qp failed (%d)", err);
+		mutex_exit(&conn->c_cm_lock);
 		rdsv3_conn_drop(conn);
 		goto out;
 	}
@@ -801,7 +802,7 @@ rdsv3_ib_conn_shutdown(struct rdsv3_connection *conn)
 			    ib_get_ibt_channel_hdl(ic->i_cm_id));
 
 			/* wait until all WRs are flushed */
-			rdsv3_wait_event(rdsv3_ib_ring_empty_wait,
+			rdsv3_wait_event(&rdsv3_ib_ring_empty_wait,
 			    rdsv3_ib_ring_empty(&ic->i_send_ring) &&
 			    rdsv3_ib_ring_empty(&ic->i_recv_ring));
 

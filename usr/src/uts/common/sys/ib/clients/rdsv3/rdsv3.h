@@ -580,8 +580,6 @@ void rdsv3_sock_put(struct rdsv3_sock *rs);
 void rdsv3_wake_sk_sleep(struct rdsv3_sock *rs);
 void __rdsv3_wake_sk_sleep(struct rsock *sk);
 
-extern rdsv3_wait_queue_t rdsv3_poll_waitq;
-
 /* bind.c */
 int rdsv3_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
     socklen_t len, cred_t *cr);

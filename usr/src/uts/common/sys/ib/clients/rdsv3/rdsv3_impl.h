@@ -159,61 +159,64 @@ uint_t	rdsv3_one_sec_in_hz;
 typedef struct rdsv3_wait_queue_s {
 	kmutex_t	waitq_mutex;
 	kcondvar_t	waitq_cv;
+	uint_t		waitq_waiters;
 } rdsv3_wait_queue_t;
 
 #define	rdsv3_init_waitqueue(waitqp)					\
 	mutex_init(&(waitqp)->waitq_mutex, NULL, MUTEX_DRIVER, NULL);	\
-	cv_init(&(waitqp)->waitq_cv, NULL, CV_DRIVER, NULL)
+	cv_init(&(waitqp)->waitq_cv, NULL, CV_DRIVER, NULL);		\
+	(waitqp)->waitq_waiters = 0
 
 #define	rdsv3_exit_waitqueue(waitqp)					\
+	ASSERT((waitqp)->waitq_waiters == 0);				\
 	mutex_destroy(&(waitqp)->waitq_mutex);				\
 	cv_destroy(&(waitqp)->waitq_cv)
 
 #define	rdsv3_wake_up(waitqp)	{					\
 	mutex_enter(&(waitqp)->waitq_mutex);				\
-	cv_signal(&(waitqp)->waitq_cv);					\
+	if ((waitqp)->waitq_waiters)					\
+		cv_signal(&(waitqp)->waitq_cv);				\
 	mutex_exit(&(waitqp)->waitq_mutex);				\
 	}
 
 #define	rdsv3_wake_up_all(waitqp)	{				\
 	mutex_enter(&(waitqp)->waitq_mutex);				\
-	cv_broadcast(&(waitqp)->waitq_cv);				\
+	if ((waitqp)->waitq_waiters)					\
+		cv_broadcast(&(waitqp)->waitq_cv);			\
 	mutex_exit(&(waitqp)->waitq_mutex);				\
 	}
 
+/* analogous to cv_wait */
 #define	rdsv3_wait_event(waitq, condition)				\
 {									\
-	mutex_enter(&(waitq).waitq_mutex);				\
+	mutex_enter(&(waitq)->waitq_mutex);				\
+	(waitq)->waitq_waiters++;					\
 	while (!(condition)) {						\
-		cv_wait(&(waitq).waitq_cv, &(waitq).waitq_mutex);	\
+		cv_wait(&(waitq)->waitq_cv, &(waitq)->waitq_mutex);	\
 	}								\
-	mutex_exit(&(waitq).waitq_mutex);				\
-}									\
+	(waitq)->waitq_waiters--;					\
+	mutex_exit(&(waitq)->waitq_mutex);				\
+}
 
-#ifndef __lock_lint
-#define	rdsv3_wait_event_interruptible_timeout(waitq, condition, timeo)	\
+/* analogous to cv_wait_sig */
+#define	rdsv3_wait_sig(waitqp, condition)				\
 (									\
 {									\
-	long cv_return;							\
-	mutex_enter(&((waitq).waitq_mutex));				\
-	cv_return = condition;						\
-	while (!(cv_return)) {						\
-		cv_return = cv_timedwait_sig(&((waitq).waitq_cv),	\
-		    &((waitq).waitq_mutex),				\
-		    timeo * drv_usectohz(1000000) + ddi_get_lbolt());	\
+	int cv_return = 1;						\
+	mutex_enter(&(waitqp)->waitq_mutex);				\
+	(waitqp)->waitq_waiters++;					\
+	while (!(condition)) {						\
+		cv_return = cv_wait_sig(&(waitqp)->waitq_cv,		\
+		    &(waitqp)->waitq_mutex);				\
 		if (cv_return == 0) {					\
 			break;						\
 		}							\
-		cv_return = condition;					\
 	}								\
-	mutex_exit(&((waitq).waitq_mutex));				\
+	(waitqp)->waitq_waiters--;					\
+	mutex_exit(&(waitqp)->waitq_mutex);				\
 	cv_return;							\
 }									\
 )
-#else
-#define	rdsv3_wait_event_interruptible(waitq, condition)		0
-#define	rdsv3_wait_event_interruptible_timeout(waitq, condition, timeo)	0
-#endif
 
 #define	SOCK_DEAD	1ul
 
@@ -224,7 +227,7 @@ typedef struct rsock {
 
 	kmutex_t		sk_lock;
 	ulong_t			sk_flag;
-	rdsv3_wait_queue_t	*sk_sleep;
+	rdsv3_wait_queue_t	*sk_sleep; /* Also protected by rs_recv_lock */
 	int			sk_sndbuf;
 	int			sk_rcvbuf;
 	atomic_t		sk_refcount;
@@ -350,7 +353,6 @@ void rdsv3_queue_delayed_work(rdsv3_workqueue_struct_t *wq,
 struct rsock *rdsv3_sk_alloc();
 void rdsv3_sock_init_data(struct rsock *sk);
 void rdsv3_sock_exit_data(struct rsock *sk);
-void rdsv3_poll_wait(struct rsock *sk, rdsv3_wait_queue_t *waitq, short events);
 void rdsv3_destroy_task_workqueue(rdsv3_workqueue_struct_t *wq);
 rdsv3_workqueue_struct_t *rdsv3_create_task_workqueue(char *name);
 int rdsv3_conn_constructor(void *buf, void *arg, int kmflags);

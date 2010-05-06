@@ -773,14 +773,14 @@ rdsv3_create_task_workqueue(char *name)
 	rdsv3_taskq = ddi_taskq_create(rdsv3_dev_info, name,
 	    RDSV3_NUM_TASKQ_THREADS, TASKQ_DEFAULTPRI, 0);
 	if (rdsv3_taskq == NULL) {
-		RDSV3_DPRINTF1(__FILE__,
+		RDSV3_DPRINTF2(__FILE__,
 		    "ddi_taskq_create failed for rdsv3_taskq");
 		return (NULL);
 	}
 
 	wq = kmem_zalloc(sizeof (rdsv3_workqueue_struct_t), KM_NOSLEEP);
 	if (wq == NULL) {
-		RDSV3_DPRINTF1(__FILE__, "kmem_zalloc failed for wq");
+		RDSV3_DPRINTF2(__FILE__, "kmem_zalloc failed for wq");
 		ddi_taskq_destroy(rdsv3_taskq);
 		return (NULL);
 	}
@@ -863,27 +863,6 @@ rdsv3_sock_init_data(struct rsock *sk)
 	sk->sk_protinfo = (struct rdsv3_sock *)(sk + 1);
 	sk->sk_sndbuf = RDSV3_XMIT_HIWATER;
 	sk->sk_rcvbuf = RDSV3_RECV_HIWATER;
-}
-
-/* XXX - not complete */
-void
-rdsv3_poll_wait(struct rsock *sk, rdsv3_wait_queue_t *waitq, short events)
-{
-	struct rdsv3_sock *rs = rdsv3_sk_to_rs(sk);
-
-	if (events & POLLIN) {
-		rw_enter(&rs->rs_recv_lock, RW_READER);
-		while (list_is_empty(&rs->rs_recv_queue) &&
-		    list_is_empty(&rs->rs_notify_queue)) {
-			rw_exit(&rs->rs_recv_lock);
-			mutex_enter(&waitq->waitq_mutex);
-			(void) cv_wait_sig(&waitq->waitq_cv,
-			    &waitq->waitq_mutex);
-			mutex_exit(&waitq->waitq_mutex);
-			rw_enter(&rs->rs_recv_lock, RW_READER);
-		}
-		rw_exit(&rs->rs_recv_lock);
-	}
 }
 
 /*

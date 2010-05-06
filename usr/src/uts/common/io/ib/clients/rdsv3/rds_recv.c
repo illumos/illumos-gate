@@ -520,25 +520,23 @@ rdsv3_recvmsg(struct rdsv3_sock *rs, uio_t *uio,
 			RDSV3_DPRINTF3("rdsv3_recvmsg",
 			    "Before wait (rs: %p)", rs);
 
+#if 0
+			ret = rdsv3_wait_sig(sk->sk_sleep,
+			    !(list_is_empty(&rs->rs_notify_queue) &&
+			    !rs->rs_cong_notify &&
+			    !rdsv3_next_incoming(rs, &inc)));
+			if (ret == 0) {
+				/* signal/timeout pending */
+				RDSV3_DPRINTF2("rdsv3_recvmsg",
+				    "woke due to signal");
+				ret = -ERESTART;
+			}
+#else
 			mutex_enter(&sk->sk_sleep->waitq_mutex);
+			sk->sk_sleep->waitq_waiters++;
 			while ((list_is_empty(&rs->rs_notify_queue) &&
 			    !rs->rs_cong_notify &&
 			    !rdsv3_next_incoming(rs, &inc))) {
-#if 0
-				ret = cv_timedwait_sig(&sk->sk_sleep->waitq_cv,
-				    &sk->sk_sleep->waitq_mutex,
-				    timeo * drv_usectohz(1000000) +
-				    ddi_get_lbolt());
-				if (ret <= 0) {
-					/* signal/timeout pending */
-					RDSV3_DPRINTF2("rdsv3_recvmsg",
-					    "woke due to signal/timeout: %d",
-					    ret);
-					ret = (ret == 0) ? -ERESTART :
-					    -ETIMEDOUT;
-					break;
-				}
-#else
 				ret = cv_wait_sig(&sk->sk_sleep->waitq_cv,
 				    &sk->sk_sleep->waitq_mutex);
 				if (ret == 0) {
@@ -548,9 +546,10 @@ rdsv3_recvmsg(struct rdsv3_sock *rs, uio_t *uio,
 					ret = -ERESTART;
 					break;
 				}
-#endif
 			}
+			sk->sk_sleep->waitq_waiters--;
 			mutex_exit(&sk->sk_sleep->waitq_mutex);
+#endif
 
 			RDSV3_DPRINTF5("rdsv3_recvmsg",
 			    "recvmsg woke rs: %p inc %p ret %d",

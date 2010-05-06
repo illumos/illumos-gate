@@ -66,7 +66,7 @@ rdsv3_sock_init()
 	    sizeof (struct rsock) + sizeof (struct rdsv3_sock), 0, NULL,
 	    NULL, NULL, NULL, NULL, 0);
 	if (rdsv3_alloc_cache == NULL) {
-		RDSV3_DPRINTF1("rdsv3_alloc_cache",
+		RDSV3_DPRINTF2("rdsv3_alloc_cache",
 		    "kmem_cache_create(rdsv3_alloc_cache) failed");
 		return (-1);
 	}
@@ -107,7 +107,7 @@ rdsv3_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	if (rdsv3_dev_info != NULL) {
-		RDSV3_DPRINTF1("rdsv3_attach", "Multiple RDS instances are"
+		RDSV3_DPRINTF2("rdsv3_attach", "Multiple RDS instances are"
 		    " not supported (rdsv3_dev_info: 0x%p)", rdsv3_dev_info);
 		return (DDI_FAILURE);
 	}
@@ -119,7 +119,7 @@ rdsv3_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rdsv3_trans_init();
 	ret = rdsv3_init();
 	if (ret) {
-		RDSV3_DPRINTF1("rdsv3_attach", "rdsv3_init failed: %d", ret);
+		RDSV3_DPRINTF2("rdsv3_attach", "rdsv3_init failed: %d", ret);
 		rdsv3_trans_exit();
 		mutex_destroy(&rdsv3_rdma_listen_id_lock);
 		rdsv3_dev_info = NULL;

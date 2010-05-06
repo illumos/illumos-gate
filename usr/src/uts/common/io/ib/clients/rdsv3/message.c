@@ -461,7 +461,7 @@ rdsv3_message_inc_copy_to_user(struct rdsv3_incoming *inc,
 void
 rdsv3_message_wait(struct rdsv3_message *rm)
 {
-	rdsv3_wait_event(rdsv3_message_flush_waitq,
+	rdsv3_wait_event(&rdsv3_message_flush_waitq,
 	    !test_bit(RDSV3_MSG_MAPPED, &rm->m_flags));
 }
 
