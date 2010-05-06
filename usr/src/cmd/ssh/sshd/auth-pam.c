@@ -22,8 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "includes.h"
@@ -88,42 +87,66 @@ get_method_name(Authctxt *authctxt)
 	return authctxt->method->name;
 }
 
-const
 char *
-derive_pam_svc_name(Authmethod *method)
+derive_pam_service_name(Authmethod *method)
 {
+	char *svcname = xmalloc(BUFSIZ);
+
+	/*
+	 * If PamServiceName is set we use that for everything, including
+	 * SSHv1
+	 */
+	if (options.pam_service_name != NULL) {
+		(void) strlcpy(svcname, options.pam_service_name, BUFSIZ);
+		return (svcname);
+	}
+
 	if (compat20 && method) {
 		char *method_name = method->name;
 
 		if (!method_name)
 			fatal("Userauth method unknown while starting PAM");
 
-		/* For SSHv2 we use "sshd-<userauth name> */
+		/*
+		 * For SSHv2 we use "sshd-<userauth name>
+		 * The "sshd" prefix can be changed via the PAMServicePrefix
+		 * sshd_config option.
+		 */
 		if (strcmp(method_name, "none") == 0) {
-			return "sshd-none";
+			snprintf(svcname, BUFSIZ, "%s-none",
+			    options.pam_service_prefix);
 		}
 		if (strcmp(method_name, "password") == 0) {
-			return "sshd-password";
+			snprintf(svcname, BUFSIZ, "%s-password",
+			    options.pam_service_prefix);
 		}
 		if (strcmp(method_name, "keyboard-interactive") == 0) {
 			/* "keyboard-interactive" is too long, shorten it */
-			return "sshd-kbdint";
+			snprintf(svcname, BUFSIZ, "%s-kbdint",
+			    options.pam_service_prefix);
 		}
 		if (strcmp(method_name, "publickey") == 0) {
 			/* "publickey" is too long, shorten it */
-			return "sshd-pubkey";
+			snprintf(svcname, BUFSIZ, "%s-pubkey",
+			    options.pam_service_prefix);
 		}
 		if (strcmp(method_name, "hostbased") == 0) {
 			/* "hostbased" can't really be shortened... */
-			return "sshd-hostbased";
+			snprintf(svcname, BUFSIZ, "%s-hostbased",
+			    options.pam_service_prefix);
 		}
 		if (strncmp(method_name, "gss", 3) == 0) {
 			/* "gss" is too short, elongate it */
-			return "sshd-gssapi";
+			snprintf(svcname, BUFSIZ, "%s-gssapi",
+			    options.pam_service_prefix);
 		}
+		return svcname;
+	} else {
+		/* SSHv1 doesn't get to be so cool */
+		snprintf(svcname, BUFSIZ, "%s-v1",
+		    options.pam_service_prefix);
 	}
-
-	return "sshd-v1"; /* SSHv1 doesn't get to be so cool */
+	return svcname;
 }
 
 void
@@ -131,7 +154,8 @@ new_start_pam(Authctxt *authctxt, struct pam_conv *conv)
 {
 	int		retval;
 	pam_handle_t	*pamh;
-	const char	*rhost, *svc;
+	const char	*rhost;
+	char		*svc;
 	char		*user = NULL;
 	pam_stuff	*pam;
 
@@ -142,7 +166,7 @@ new_start_pam(Authctxt *authctxt, struct pam_conv *conv)
 		fatal("Userauth method unknown while starting PAM");
 
 	/* PAM service selected here */
-	svc = derive_pam_svc_name(authctxt->method);
+	svc = derive_pam_service_name(authctxt->method);
 	debug2("Starting PAM service %s for method %s", svc,
 		get_method_name(authctxt));
 
@@ -185,6 +209,8 @@ new_start_pam(Authctxt *authctxt, struct pam_conv *conv)
 		fatal("PAM initialization failed during %s userauth",
 			get_method_name(authctxt));
 	}
+
+	free(svc);
 
 	fatal_add_cleanup((void (*)(void *)) &do_pam_cleanup_proc,
 			  (void *) authctxt->pam);

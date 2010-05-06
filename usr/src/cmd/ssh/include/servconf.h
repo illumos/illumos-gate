@@ -11,8 +11,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	$OpenBSD: servconf.h,v 1.59 2002/07/30 17:03:55 markus Exp $	*/
@@ -42,6 +41,7 @@ extern "C" {
 
 /* Magic name for internal sftp-server */
 #define	INTERNAL_SFTP_NAME	"internal-sftp"
+#define	_SSH_PAM_SERVICE_PREFIX	"sshd"
 
 typedef struct {
 	u_int	num_ports;
@@ -164,6 +164,8 @@ typedef struct {
 	int	use_openssl_engine;
 	char   *chroot_directory;
 	char   *pre_userauth_hook;
+	char   *pam_service_prefix;
+	char   *pam_service_name;
 
 }       ServerOptions;
 

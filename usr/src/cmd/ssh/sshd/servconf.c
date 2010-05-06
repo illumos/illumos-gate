@@ -9,8 +9,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "includes.h"
@@ -155,6 +154,8 @@ initialize_server_options(ServerOptions *options)
 	options->use_openssl_engine = -1;
 	options->chroot_directory = NULL;
 	options->pre_userauth_hook = NULL;
+	options->pam_service_name = NULL;
+	options->pam_service_prefix = NULL;
 }
 
 #ifdef HAVE_DEFOPEN
@@ -383,6 +384,10 @@ fill_default_server_options(ServerOptions *options)
 		options->lookup_client_hostnames = 1;
 	if (options->use_openssl_engine == -1)
 		options->use_openssl_engine = 1;
+	if (options->pam_service_prefix == NULL)
+		options->pam_service_prefix = _SSH_PAM_SERVICE_PREFIX;
+	if (options->pam_service_name == NULL)
+		options->pam_service_name = NULL;
 }
 
 /* Keyword tokens. */
@@ -421,7 +426,7 @@ typedef enum {
 	sClientAliveCountMax, sAuthorizedKeysFile, sAuthorizedKeysFile2,
 	sMaxAuthTries, sMaxAuthTriesLog, sUsePrivilegeSeparation,
 	sLookupClientHostnames, sUseOpenSSLEngine, sChrootDirectory,
-	sPreUserauthHook, sMatch,
+	sPreUserauthHook, sMatch, sPAMServicePrefix, sPAMServiceName,
 	sDeprecated
 } ServerOpCodes;
 
@@ -525,6 +530,8 @@ static struct {
 	{ "chrootdirectory", sChrootDirectory, SSHCFG_ALL },
 	{ "preuserauthhook", sPreUserauthHook, SSHCFG_ALL},
 	{ "match", sMatch, SSHCFG_ALL },
+	{ "pamserviceprefix", sPAMServicePrefix, SSHCFG_GLOBAL },
+	{ "pamservicename", sPAMServiceName, SSHCFG_GLOBAL },
 
 	{ NULL, sBadOption, 0 }
 };
@@ -1320,6 +1327,30 @@ parse_flag:
 		    filename, linenum, arg);
 		while (arg)
 		    arg = strdelim(&cp);
+		break;
+
+	case sPAMServicePrefix:
+		arg = strdelim(&cp);
+		if (!arg || *arg == '\0')
+			fatal("%s line %d: Missing argument.",
+			    filename, linenum);
+		if (options->pam_service_name != NULL)
+			fatal("%s line %d: PAMServiceName and PAMServicePrefix "
+			    "are mutually exclusive.", filename, linenum);
+		if (options->pam_service_prefix == NULL)
+			options->pam_service_prefix = xstrdup(arg);
+		break;
+
+	case sPAMServiceName:
+		arg = strdelim(&cp);
+		if (!arg || *arg == '\0')
+			fatal("%s line %d: Missing argument.",
+			    filename, linenum);
+		if (options->pam_service_prefix != NULL)
+			fatal("%s line %d: PAMServiceName and PAMServicePrefix "
+			    "are mutually exclusive.", filename, linenum);
+		if (options->pam_service_name == NULL)
+			options->pam_service_name = xstrdup(arg);
 		break;
 
 	default:

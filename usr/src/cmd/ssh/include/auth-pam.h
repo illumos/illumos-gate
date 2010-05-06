@@ -1,15 +1,3 @@
-/* $Id: auth-pam.h,v 1.16 2002/07/23 00:44:07 stevesk Exp $ */
-
-#ifndef	_AUTH_PAM_H
-#define	_AUTH_PAM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * Copyright (c) 2000 Damien Miller.  All rights reserved.
  *
@@ -34,14 +22,22 @@ extern "C" {
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
+/* $Id: auth-pam.h,v 1.16 2002/07/23 00:44:07 stevesk Exp $ */
+
+#ifndef	_AUTH_PAM_H
+#define	_AUTH_PAM_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "includes.h"
 #ifdef USE_PAM
 
-const char * derive_pam_svc_name(Authmethod *method);
+char * derive_pam_svc_name(Authmethod *method);
 void new_start_pam(Authctxt *authctxt, struct pam_conv *conv);
 int auth_pam_password(Authctxt *authctxt, const char *password);
 int do_pam_non_initial_userauth(Authctxt *authctxt);
