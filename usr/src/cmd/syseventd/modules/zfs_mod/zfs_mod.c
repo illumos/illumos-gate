@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ZFS syseventd module.
@@ -76,6 +73,7 @@
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dev.h>
 #include <unistd.h>
+#include "syseventd.h"
 
 #if defined(__i386) || defined(__amd64)
 #define	PHYS_PATH	":q"
@@ -464,6 +462,76 @@ zfs_deliver_check(nvlist_t *nvl)
 	return (0);
 }
 
+#define	DEVICE_PREFIX	"/devices"
+
+static int
+zfsdle_vdev_online(zpool_handle_t *zhp, void *data)
+{
+	char *devname = data;
+	boolean_t avail_spare, l2cache;
+	vdev_state_t newstate;
+	nvlist_t *tgt;
+
+	syseventd_print(9, "zfsdle_vdev_online: searching for %s in pool %s\n",
+	    devname, zpool_get_name(zhp));
+
+	if ((tgt = zpool_find_vdev_by_physpath(zhp, devname,
+	    &avail_spare, &l2cache, NULL)) != NULL) {
+		char *path, fullpath[MAXPATHLEN];
+		uint64_t wholedisk = 0ULL;
+
+		verify(nvlist_lookup_string(tgt, ZPOOL_CONFIG_PATH,
+		    &path) == 0);
+		verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_WHOLE_DISK,
+		    &wholedisk) == 0);
+
+		(void) strlcpy(fullpath, path, sizeof (fullpath));
+		if (wholedisk)
+			fullpath[strlen(fullpath) - 2] = '\0';
+
+		if (zpool_get_prop_int(zhp, ZPOOL_PROP_AUTOEXPAND, NULL)) {
+			syseventd_print(9, "zfsdle_vdev_online: setting device"
+			    " device %s to ONLINE state in pool %s.\n",
+			    fullpath, zpool_get_name(zhp));
+			if (zpool_get_state(zhp) != POOL_STATE_UNAVAIL)
+				(void) zpool_vdev_online(zhp, fullpath, 0,
+				    &newstate);
+		}
+		return (1);
+	}
+	return (0);
+}
+
+int
+zfs_deliver_dle(nvlist_t *nvl)
+{
+	char *devname;
+	if (nvlist_lookup_string(nvl, DEV_PHYS_PATH, &devname) != 0) {
+		syseventd_print(9, "zfs_deliver_event: no physpath\n");
+		return (-1);
+	}
+	if (strncmp(devname, DEVICE_PREFIX, strlen(DEVICE_PREFIX)) != 0) {
+		syseventd_print(9, "zfs_deliver_event: invalid "
+		    "device '%s'", devname);
+		return (-1);
+	}
+
+	/*
+	 * We try to find the device using the physical
+	 * path that has been supplied. We need to strip off
+	 * the /devices prefix before starting our search.
+	 */
+	devname += strlen(DEVICE_PREFIX);
+	if (zpool_iter(g_zfshdl, zfsdle_vdev_online, devname) != 1) {
+		syseventd_print(9, "zfs_deliver_event: device '%s' not"
+		    " found\n", devname);
+		return (1);
+	}
+	nvlist_free(nvl);
+	return (0);
+}
+
+
 /*ARGSUSED*/
 static int
 zfs_deliver_event(sysevent_t *ev, int unused)
@@ -472,7 +540,7 @@ zfs_deliver_event(sysevent_t *ev, int unused)
 	const char *subclass = sysevent_get_subclass_name(ev);
 	nvlist_t *nvl;
 	int ret;
-	boolean_t is_lofi, is_check;
+	boolean_t is_lofi, is_check, is_dle = B_FALSE;
 
 	if (strcmp(class, EC_DEV_ADD) == 0) {
 		/*
@@ -495,6 +563,9 @@ zfs_deliver_event(sysevent_t *ev, int unused)
 		 * pretend it's just been added.
 		 */
 		is_check = B_TRUE;
+	} else if (strcmp(class, EC_DEV_STATUS) == 0 &&
+	    strcmp(subclass, ESC_DEV_DLE) == 0) {
+		is_dle = B_TRUE;
 	} else {
 		return (0);
 	}
@@ -502,11 +573,12 @@ zfs_deliver_event(sysevent_t *ev, int unused)
 	if (sysevent_get_attr_list(ev, &nvl) != 0)
 		return (-1);
 
-	if (is_check)
+	if (is_dle)
+		ret = zfs_deliver_dle(nvl);
+	else if (is_check)
 		ret = zfs_deliver_check(nvl);
 	else
 		ret = zfs_deliver_add(nvl, is_lofi);
-
 
 	nvlist_free(nvl);
 	return (ret);

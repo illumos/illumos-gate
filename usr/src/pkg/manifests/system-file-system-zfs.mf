@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/zfs@$(PKGVERS)
@@ -83,8 +82,6 @@ dir path=usr/sbin
 $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
 driver name=zfs perms="* 0600 root sys" perms="zfs 0666 root sys"
-file path=etc/sysevent/config/SUNW,EC_dev_status,ESC_dev_dle,sysevent.conf \
-    group=sys
 file path=kernel/drv/$(ARCH64)/zfs group=sys opensolaris.zone=global \
     variant.opensolaris.zone=global
 $(i386_ONLY)file path=kernel/drv/zfs group=sys opensolaris.zone=global \
@@ -106,7 +103,6 @@ file path=usr/lib/$(ARCH64)/libzfs_jni.so.1
 file path=usr/lib/$(ARCH64)/libzpool.so.1
 file path=usr/lib/devfsadm/linkmod/SUNW_zfs_link.so group=sys
 file path=usr/lib/fs/zfs/fstyp.so.1 mode=0555
-file path=usr/lib/fs/zfs/zfsdle mode=0555
 file path=usr/lib/libzfs_jni.so.1
 $(i386_ONLY)file path=usr/lib/libzpool.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/zfs.so group=sys mode=0555

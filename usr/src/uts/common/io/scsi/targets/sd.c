@@ -1059,6 +1059,7 @@ static int sd_pm_idletime = 1;
 #define	sd_alloc_rqs			ssd_alloc_rqs
 #define	sd_free_rqs			ssd_free_rqs
 #define	sd_dump_memory			ssd_dump_memory
+#define	sd_get_media_info_com		ssd_get_media_info_com
 #define	sd_get_media_info		ssd_get_media_info
 #define	sd_get_media_info_ext		ssd_get_media_info_ext
 #define	sd_dkio_ctrl_info		ssd_dkio_ctrl_info
@@ -10293,7 +10294,9 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 		    (void*)SD_PATH_DIRECT) == 0) {
 			mutex_enter(SD_MUTEX(un));
 			if (un->un_f_blockcount_is_valid &&
-			    un->un_blockcount > label_cap) {
+			    un->un_blockcount > label_cap &&
+			    un->un_f_expnevent == B_FALSE) {
+				un->un_f_expnevent = B_TRUE;
 				mutex_exit(SD_MUTEX(un));
 				sd_log_lun_expansion_event(un,
 				    (nodelay ? KM_NOSLEEP : KM_SLEEP));
@@ -23289,20 +23292,17 @@ sd_dkio_ctrl_info(dev_t dev, caddr_t arg, int flag)
 	}
 }
 
-
 /*
- *    Function: sd_get_media_info
+ *    Function: sd_get_media_info_com
  *
- * Description: This routine is the driver entry point for handling ioctl
- *		requests for the media type or command set profile used by the
- *		drive to operate on the media (DKIOCGMEDIAINFO).
+ * Description: This routine returns the information required to populate
+ *		the fields for the dk_minfo/dk_minfo_ext structures.
  *
- *   Arguments: dev	- the device number
- *		arg	- pointer to user provided dk_minfo structure
- *			  specifying the media type, logical block size and
- *			  drive capacity.
- *		flag	- this argument is a pass through to ddi_copyxxx()
- *			  directly from the mode argument of ioctl().
+ *   Arguments: dev		- the device number
+ *		dki_media_type	- media_type
+ *		dki_lbsize	- logical block size
+ *		dki_capacity	- capacity in blocks
+ *		dki_pbsize	- physical block size (if requested)
  *
  * Return Code: 0
  *		EACCESS
@@ -23310,198 +23310,13 @@ sd_dkio_ctrl_info(dev_t dev, caddr_t arg, int flag)
  *		ENXIO
  *		EIO
  */
-
 static int
-sd_get_media_info(dev_t dev, caddr_t arg, int flag)
+sd_get_media_info_com(dev_t dev, uint_t *dki_media_type, uint_t *dki_lbsize,
+	diskaddr_t *dki_capacity, uint_t *dki_pbsize)
 {
 	struct sd_lun		*un = NULL;
 	struct uscsi_cmd	com;
 	struct scsi_inquiry	*sinq;
-	struct dk_minfo		media_info;
-	u_longlong_t		media_capacity;
-	uint64_t		capacity;
-	uint_t			lbasize;
-	uchar_t			*out_data;
-	uchar_t			*rqbuf;
-	int			rval = 0;
-	int			rtn;
-	sd_ssc_t		*ssc;
-	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL ||
-	    (un->un_state == SD_STATE_OFFLINE)) {
-		return (ENXIO);
-	}
-
-	SD_TRACE(SD_LOG_IOCTL_DKIO, un, "sd_get_media_info: entry\n");
-
-	out_data = kmem_zalloc(SD_PROFILE_HEADER_LEN, KM_SLEEP);
-	rqbuf = kmem_zalloc(SENSE_LENGTH, KM_SLEEP);
-
-	/* Issue a TUR to determine if the drive is ready with media present */
-	ssc = sd_ssc_init(un);
-	rval = sd_send_scsi_TEST_UNIT_READY(ssc, SD_CHECK_FOR_MEDIA);
-	if (rval == ENXIO) {
-		goto done;
-	} else if (rval != 0) {
-		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
-	}
-
-	/* Now get configuration data */
-	if (ISCD(un)) {
-		media_info.dki_media_type = DK_CDROM;
-
-		/* Allow SCMD_GET_CONFIGURATION to MMC devices only */
-		if (un->un_f_mmc_cap == TRUE) {
-			rtn = sd_send_scsi_GET_CONFIGURATION(ssc, &com, rqbuf,
-			    SENSE_LENGTH, out_data, SD_PROFILE_HEADER_LEN,
-			    SD_PATH_STANDARD);
-
-			if (rtn) {
-				/*
-				 * We ignore all failures for CD and need to
-				 * put the assessment before processing code
-				 * to avoid missing assessment for FMA.
-				 */
-				sd_ssc_assessment(ssc, SD_FMT_IGNORE);
-				/*
-				 * Failed for other than an illegal request
-				 * or command not supported
-				 */
-				if ((com.uscsi_status == STATUS_CHECK) &&
-				    (com.uscsi_rqstatus == STATUS_GOOD)) {
-					if ((rqbuf[2] != KEY_ILLEGAL_REQUEST) ||
-					    (rqbuf[12] != 0x20)) {
-						rval = EIO;
-						goto no_assessment;
-					}
-				}
-			} else {
-				/*
-				 * The GET CONFIGURATION command succeeded
-				 * so set the media type according to the
-				 * returned data
-				 */
-				media_info.dki_media_type = out_data[6];
-				media_info.dki_media_type <<= 8;
-				media_info.dki_media_type |= out_data[7];
-			}
-		}
-	} else {
-		/*
-		 * The profile list is not available, so we attempt to identify
-		 * the media type based on the inquiry data
-		 */
-		sinq = un->un_sd->sd_inq;
-		if ((sinq->inq_dtype == DTYPE_DIRECT) ||
-		    (sinq->inq_dtype == DTYPE_OPTICAL)) {
-			/* This is a direct access device  or optical disk */
-			media_info.dki_media_type = DK_FIXED_DISK;
-
-			if ((bcmp(sinq->inq_vid, "IOMEGA", 6) == 0) ||
-			    (bcmp(sinq->inq_vid, "iomega", 6) == 0)) {
-				if ((bcmp(sinq->inq_pid, "ZIP", 3) == 0)) {
-					media_info.dki_media_type = DK_ZIP;
-				} else if (
-				    (bcmp(sinq->inq_pid, "jaz", 3) == 0)) {
-					media_info.dki_media_type = DK_JAZ;
-				}
-			}
-		} else {
-			/*
-			 * Not a CD, direct access or optical disk so return
-			 * unknown media
-			 */
-			media_info.dki_media_type = DK_UNKNOWN;
-		}
-	}
-
-	/* Now read the capacity so we can provide the lbasize and capacity */
-	rval = sd_send_scsi_READ_CAPACITY(ssc, &capacity, &lbasize,
-	    SD_PATH_DIRECT);
-	switch (rval) {
-	case 0:
-		break;
-	case EACCES:
-		rval = EACCES;
-		goto done;
-	default:
-		rval = EIO;
-		goto done;
-	}
-
-	/*
-	 * If lun is expanded dynamically, update the un structure.
-	 */
-	mutex_enter(SD_MUTEX(un));
-	if ((un->un_f_blockcount_is_valid == TRUE) &&
-	    (un->un_f_tgt_blocksize_is_valid == TRUE) &&
-	    (capacity > un->un_blockcount)) {
-		sd_update_block_info(un, lbasize, capacity);
-	}
-	mutex_exit(SD_MUTEX(un));
-
-	media_info.dki_lbsize = lbasize;
-	media_capacity = capacity;
-
-	/*
-	 * sd_send_scsi_READ_CAPACITY() reports capacity in
-	 * un->un_sys_blocksize chunks. So we need to convert it into
-	 * cap.lbasize chunks.
-	 */
-	media_capacity *= un->un_sys_blocksize;
-	media_capacity /= lbasize;
-	media_info.dki_capacity = media_capacity;
-
-	if (ddi_copyout(&media_info, arg, sizeof (struct dk_minfo), flag)) {
-		rval = EFAULT;
-		/* Put goto. Anybody might add some code below in future */
-		goto no_assessment;
-	}
-done:
-	if (rval != 0) {
-		if (rval == EIO)
-			sd_ssc_assessment(ssc, SD_FMT_STATUS_CHECK);
-		else
-			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
-	}
-no_assessment:
-	sd_ssc_fini(ssc);
-	kmem_free(out_data, SD_PROFILE_HEADER_LEN);
-	kmem_free(rqbuf, SENSE_LENGTH);
-	return (rval);
-}
-
-/*
- *    Function: sd_get_media_info_ext
- *
- * Description: This routine is the driver entry point for handling ioctl
- *		requests for the media type or command set profile used by the
- *		drive to operate on the media (DKIOCGMEDIAINFOEXT). The
- *		difference this ioctl and DKIOCGMEDIAINFO is the return value
- *		of this ioctl contains both logical block size and physical
- *		block size.
- *
- *
- *   Arguments: dev	- the device number
- *		arg	- pointer to user provided dk_minfo_ext structure
- *			  specifying the media type, logical block size,
- *			  physical block size and disk capacity.
- *		flag	- this argument is a pass through to ddi_copyxxx()
- *			  directly from the mode argument of ioctl().
- *
- * Return Code: 0
- *		EACCESS
- *		EFAULT
- *		ENXIO
- *		EIO
- */
-
-static int
-sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
-{
-	struct sd_lun		*un = NULL;
-	struct uscsi_cmd	com;
-	struct scsi_inquiry	*sinq;
-	struct dk_minfo_ext	media_info_ext;
 	u_longlong_t		media_capacity;
 	uint64_t		capacity;
 	uint_t			lbasize;
@@ -23517,7 +23332,7 @@ sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
 		return (ENXIO);
 	}
 
-	SD_TRACE(SD_LOG_IOCTL_DKIO, un, "sd_get_media_info_ext: entry\n");
+	SD_TRACE(SD_LOG_IOCTL_DKIO, un, "sd_get_media_info_com: entry\n");
 
 	out_data = kmem_zalloc(SD_PROFILE_HEADER_LEN, KM_SLEEP);
 	rqbuf = kmem_zalloc(SENSE_LENGTH, KM_SLEEP);
@@ -23533,7 +23348,7 @@ sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
 
 	/* Now get configuration data */
 	if (ISCD(un)) {
-		media_info_ext.dki_media_type = DK_CDROM;
+		*dki_media_type = DK_CDROM;
 
 		/* Allow SCMD_GET_CONFIGURATION to MMC devices only */
 		if (un->un_f_mmc_cap == TRUE) {
@@ -23566,9 +23381,9 @@ sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
 				 * so set the media type according to the
 				 * returned data
 				 */
-				media_info_ext.dki_media_type = out_data[6];
-				media_info_ext.dki_media_type <<= 8;
-				media_info_ext.dki_media_type |= out_data[7];
+				*dki_media_type = out_data[6];
+				*dki_media_type <<= 8;
+				*dki_media_type |= out_data[7];
 			}
 		}
 	} else {
@@ -23580,15 +23395,15 @@ sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
 		if ((sinq->inq_dtype == DTYPE_DIRECT) ||
 		    (sinq->inq_dtype == DTYPE_OPTICAL)) {
 			/* This is a direct access device  or optical disk */
-			media_info_ext.dki_media_type = DK_FIXED_DISK;
+			*dki_media_type = DK_FIXED_DISK;
 
 			if ((bcmp(sinq->inq_vid, "IOMEGA", 6) == 0) ||
 			    (bcmp(sinq->inq_vid, "iomega", 6) == 0)) {
 				if ((bcmp(sinq->inq_pid, "ZIP", 3) == 0)) {
-					media_info_ext.dki_media_type = DK_ZIP;
+					*dki_media_type = DK_ZIP;
 				} else if (
 				    (bcmp(sinq->inq_pid, "jaz", 3) == 0)) {
-					media_info_ext.dki_media_type = DK_JAZ;
+					*dki_media_type = DK_JAZ;
 				}
 			}
 		} else {
@@ -23596,7 +23411,7 @@ sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
 			 * Not a CD, direct access or optical disk so return
 			 * unknown media
 			 */
-			media_info_ext.dki_media_type = DK_UNKNOWN;
+			*dki_media_type = DK_UNKNOWN;
 		}
 	}
 
@@ -23604,11 +23419,12 @@ sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
 	 * Now read the capacity so we can provide the lbasize,
 	 * pbsize and capacity.
 	 */
-	if (un->un_f_descr_format_supported)
+	if (dki_pbsize && un->un_f_descr_format_supported)
 		rval = sd_send_scsi_READ_CAPACITY_16(ssc, &capacity, &lbasize,
 		    &pbsize, SD_PATH_DIRECT);
 
-	if (rval != 0 || !un->un_f_descr_format_supported) {
+	if (dki_pbsize == NULL || rval != 0 ||
+	    !un->un_f_descr_format_supported) {
 		rval = sd_send_scsi_READ_CAPACITY(ssc, &capacity, &lbasize,
 		    SD_PATH_DIRECT);
 
@@ -23657,19 +23473,16 @@ sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
 	if ((un->un_f_blockcount_is_valid == TRUE) &&
 	    (un->un_f_tgt_blocksize_is_valid == TRUE) &&
 	    (capacity > un->un_blockcount)) {
+		un->un_f_expnevent = B_FALSE;
 		sd_update_block_info(un, lbasize, capacity);
 	}
 	mutex_exit(SD_MUTEX(un));
 
-	media_info_ext.dki_lbsize = lbasize;
-	media_info_ext.dki_pbsize = pbsize;
-	media_info_ext.dki_capacity = media_capacity;
+	*dki_lbsize = lbasize;
+	*dki_capacity = media_capacity;
+	if (dki_pbsize)
+		*dki_pbsize = pbsize;
 
-	if (ddi_copyout(&media_info_ext, arg, sizeof (struct dk_minfo_ext),
-	    flag)) {
-		rval = EFAULT;
-		goto no_assessment;
-	}
 done:
 	if (rval != 0) {
 		if (rval == EIO)
@@ -23682,6 +23495,75 @@ no_assessment:
 	kmem_free(out_data, SD_PROFILE_HEADER_LEN);
 	kmem_free(rqbuf, SENSE_LENGTH);
 	return (rval);
+}
+
+/*
+ *    Function: sd_get_media_info
+ *
+ * Description: This routine is the driver entry point for handling ioctl
+ *		requests for the media type or command set profile used by the
+ *		drive to operate on the media (DKIOCGMEDIAINFO).
+ *
+ *   Arguments: dev	- the device number
+ *		arg	- pointer to user provided dk_minfo structure
+ *			  specifying the media type, logical block size and
+ *			  drive capacity.
+ *		flag	- this argument is a pass through to ddi_copyxxx()
+ *			  directly from the mode argument of ioctl().
+ *
+ * Return Code: returns the value from sd_get_media_info_com
+ */
+static int
+sd_get_media_info(dev_t dev, caddr_t arg, int flag)
+{
+	struct dk_minfo		mi;
+	int			rval;
+
+	rval = sd_get_media_info_com(dev, &mi.dki_media_type,
+	    &mi.dki_lbsize, &mi.dki_capacity, NULL);
+
+	if (rval)
+		return (rval);
+	if (ddi_copyout(&mi, arg, sizeof (struct dk_minfo), flag))
+		rval = EFAULT;
+	return (rval);
+}
+
+/*
+ *    Function: sd_get_media_info_ext
+ *
+ * Description: This routine is the driver entry point for handling ioctl
+ *		requests for the media type or command set profile used by the
+ *		drive to operate on the media (DKIOCGMEDIAINFOEXT). The
+ *		difference this ioctl and DKIOCGMEDIAINFO is the return value
+ *		of this ioctl contains both logical block size and physical
+ *		block size.
+ *
+ *
+ *   Arguments: dev	- the device number
+ *		arg	- pointer to user provided dk_minfo_ext structure
+ *			  specifying the media type, logical block size,
+ *			  physical block size and disk capacity.
+ *		flag	- this argument is a pass through to ddi_copyxxx()
+ *			  directly from the mode argument of ioctl().
+ *
+ * Return Code: returns the value from sd_get_media_info_com
+ */
+static int
+sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
+{
+	struct dk_minfo_ext	mie;
+	int			rval = 0;
+
+	rval = sd_get_media_info_com(dev, &mie.dki_media_type,
+	    &mie.dki_lbsize, &mie.dki_capacity, &mie.dki_pbsize);
+
+	if (rval)
+		return (rval);
+	if (ddi_copyout(&mie, arg, sizeof (struct dk_minfo_ext), flag))
+		rval = EFAULT;
+	return (rval);
+
 }
 
 /*

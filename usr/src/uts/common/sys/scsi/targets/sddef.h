@@ -459,7 +459,8 @@ struct sd_lun {
 	    un_f_mmc_gesn_polling	:1,	/* use GET EVENT STATUS */
 						/* NOTIFICATION for polling */
 	    un_f_enable_rmw		:1,	/* Force RMW in sd driver */
-	    un_f_reserved		:4;
+	    un_f_expnevent		:1,
+	    un_f_reserved		:3;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;

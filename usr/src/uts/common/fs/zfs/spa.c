@@ -2230,17 +2230,6 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t *nvpolicy,
 
 		spa_activate(spa, spa_mode_global);
 
-		if (spa->spa_last_open_failed && (policy.zrp_request &
-		    (ZPOOL_NO_REWIND | ZPOOL_NEVER_REWIND))) {
-			if (config != NULL && spa->spa_config)
-				VERIFY(nvlist_dup(spa->spa_config,
-				    config, KM_SLEEP) == 0);
-			spa_deactivate(spa);
-			if (locked)
-				mutex_exit(&spa_namespace_lock);
-			return (spa->spa_last_open_failed);
-		}
-
 		if (state != SPA_LOAD_RECOVER)
 			spa->spa_last_ubsync_txg = spa->spa_load_txg = 0;
 
@@ -5184,7 +5173,9 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 				break;
 			case ZPOOL_PROP_AUTOEXPAND:
 				spa->spa_autoexpand = intval;
-				spa_async_request(spa, SPA_ASYNC_AUTOEXPAND);
+				if (tx->tx_txg != TXG_INITIAL)
+					spa_async_request(spa,
+					    SPA_ASYNC_AUTOEXPAND);
 				break;
 			case ZPOOL_PROP_DEDUPDITTO:
 				spa->spa_dedup_ditto = intval;
