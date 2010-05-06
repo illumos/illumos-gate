@@ -1951,8 +1951,6 @@ arp_mod_close_tail(arl_t *arl)
 	ip_stack_t	*ipst = arl->arl_ipst;
 	mblk_t		**mpp;
 
-	netstack_hold(ipst->ips_netstack);
-
 	mutex_enter(&ipst->ips_ip_mi_lock);
 	mi_close_unlink(&ipst->ips_arp_g_head, (IDP)arl);
 	mutex_exit(&ipst->ips_ip_mi_lock);
