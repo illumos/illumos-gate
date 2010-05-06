@@ -4291,6 +4291,7 @@ vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *vhci,
 	mpapi_path_data_t	*path_data;
 	mpapi_tpg_data_t	*tpg_data;
 	char			*tgt_port;
+	boolean_t		set_lu_valid;
 
 	lu_list = vhci_get_mpapi_item(vhci, NULL, MP_OBJECT_TYPE_MULTIPATH_LU,
 	    (void *)vlun);
@@ -4310,6 +4311,8 @@ vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *vhci,
 	 * is made, because subsequent matches also lead to the same TPG.
 	 */
 	tpg_list = lu_data->tpg_list->head;
+	set_lu_valid = B_FALSE;
+
 	while (tpg_list != NULL) {
 		tpg_data = tpg_list->item->idata;
 		path_list = lu_data->path_list->head;
@@ -4339,11 +4342,13 @@ vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *vhci,
 					vhci_mpapi_set_tpg_as_prop(vhci,
 					    tpg_list->item,
 					    MP_DRVR_ACCESS_STATE_ACTIVE);
+					set_lu_valid = B_TRUE;
 					break;
 				} else if (MDI_PI_IS_STANDBY(path_data->resp)) {
 					vhci_mpapi_set_tpg_as_prop(vhci,
 					    tpg_list->item,
 					    MP_DRVR_ACCESS_STATE_STANDBY);
+					set_lu_valid = B_TRUE;
 					break;
 				} else {
 					vhci_mpapi_set_tpg_as_prop(vhci,
@@ -4356,7 +4361,14 @@ vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *vhci,
 		tpg_list = tpg_list->next;
 	}
 
-	if (vhci_mpapi_chk_last_path((mdi_pathinfo_t *)path_data->resp) != -1)
+	/*
+	 * Only make LU valid if the encountered path was active or standby.
+	 * Otherwise we would cause the LU to reappear transiently after
+	 * the last path to it has gone and before it is finally marked
+	 * invalid by vhci_mpapi_set_path_state(), causing bogus visibility
+	 * events.
+	 */
+	if (set_lu_valid != B_FALSE)
 		vhci_mpapi_set_lu_valid(vhci, lu_list->item, 1);
 
 	return (rval);
