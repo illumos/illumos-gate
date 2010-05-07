@@ -2715,3 +2715,7 @@ depend fmri=runtime/perl-584 type=require
 # The loadkeys binary needs the keytables.
 #
 depend fmri=system/data/keyboard/keytables type=require
+#
+# The bootadm binary needs the etc/release file.
+#
+depend fmri=release/name type=require
