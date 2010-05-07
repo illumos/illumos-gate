@@ -5124,7 +5124,7 @@ readtape(char *buffer)
 			 * the defined defaults for the device, or on the
 			 * explicit block factor given.
 			 */
-			if (bflag || defaults_used)
+			if (bflag || defaults_used || NotTape)
 				j = nblock;
 			else
 				j = NBLOCK;
@@ -9388,8 +9388,7 @@ decompress_file(void)
 		}
 		(void) execlp(compress_opt, compress_opt, "-df",
 		    tfname, NULL);
-		(void) fprintf(vfile, gettext("Could not exec %s: %s\n"),
-		    compress_opt, usefile, strerror(errno));
+		vperror(1, gettext("Could not exec %s"), compress_opt);
 	} else if (pid == -1) {
 		vperror(1, gettext("Could not fork"));
 	}
@@ -9425,7 +9424,7 @@ compress_file(void)
 	(void) close(fd[1]);
 	(void) dup2(mt, STDOUT_FILENO);
 	(void) execlp(compress_opt, compress_opt, NULL);
-	vperror(1, "%s", gettext("Could not exec %s"), compress_opt);
+	vperror(1, gettext("Could not exec %s"), compress_opt);
 	return (0);	/*NOTREACHED*/
 }
 
@@ -9453,7 +9452,7 @@ uncompress_file(void)
 	(void) close(fd[0]);
 	(void) dup2(mt, STDIN_FILENO);
 	(void) execlp(compress_opt, compress_opt, NULL);
-	vperror(1, "%s", gettext("Could not exec %s"), compress_opt);
+	vperror(1, gettext("Could not exec %s"), compress_opt);
 	return (0);	/*NOTREACHED*/
 }
 
