@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -227,12 +224,7 @@ lo_mount(struct vfs *vfsp,
 		to_zptr = zone_find_by_path(refstr_value(vfsp->vfs_mntpt));
 
 		/*
-		 * Special case for zone devfs: the zone for /dev will
-		 * incorrectly appear as the global zone since it's not
-		 * under the zone rootpath.  So for zone devfs check allow
-		 * read-write mounts.
-		 *
-		 * Second special case for scratch zones used for Live Upgrade:
+		 * Special case for scratch zones used for Live Upgrade:
 		 * this is used to mount the zone's root from /root to /a in
 		 * the scratch zone.  As with the other special case, this
 		 * appears to be outside of the zone because it's not under

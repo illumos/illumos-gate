@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 
@@ -1594,6 +1593,18 @@ file_downgrade_sl,file_upgrade_sl,sys_trans_label ;;
 
 # Main loop for top-level window
 #
+
+/usr/bin/plabel $$ 1>/dev/null 2>&1
+if [ $? != 0 ] ; then
+	echo "$0 : Trusted Extensions must be enabled."
+	exit 1
+fi
+
+myzone=$(/sbin/zonename)
+if [ $myzone != "global" ] ; then
+	echo "$0 : must be in global zone to run."
+	exit 1
+fi
 
 mkdir $TXTMP 2>/dev/null
 deflabel=$(chk_encodings -a|grep "Default User Sensitivity"|\

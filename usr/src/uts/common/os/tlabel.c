@@ -319,6 +319,7 @@ getflabel(vnode_t *vp)
 	vnode_t		*rvp, *rvp2;
 	zone_t		*zone;
 	ts_label_t	*zl;
+	int		err;
 	boolean_t	vfs_is_held = B_FALSE;
 	char		vpath[MAXPATHLEN];
 
@@ -356,14 +357,13 @@ getflabel(vnode_t *vp)
 		}
 	}
 
-	if (vnodetopath(rootdir, rvp, vpath, sizeof (vpath), kcred) != 0) {
-		return (NULL);
-	}
-
 	/*
-	 * Sanity check - vpath may be weird for some cases, like devices.
+	 * Get the vnode path -- it may be missing or weird for some
+	 * cases, like devices.  In those cases use the label of the
+	 * current zone.
 	 */
-	if (*vpath != '/') {
+	err = vnodetopath(rootdir, rvp, vpath, sizeof (vpath), kcred);
+	if ((err != 0) || (*vpath != '/')) {
 		zone = curproc->p_zone;
 		zone_hold(zone);
 		goto zone_out;
