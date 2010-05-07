@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <string.h>
@@ -50,7 +49,9 @@ static int getOidList(di_node_t root_node,
 	di_node_t sv_node	= DI_NODE_NIL;
 	di_node_t sv_child_node	= DI_NODE_NIL;
 
-	MP_UINT64 nodeInstance	= 0;
+	int instNum;
+	int majorNum;
+	MP_UINT64 osn;
 
 
 	log(LOG_INFO, "getOidList()", " - enter");
@@ -58,9 +59,7 @@ static int getOidList(di_node_t root_node,
 
 	sv_node = di_drv_first_node("scsi_vhci", root_node);
 	if (DI_NODE_NIL == sv_node) {
-		log(LOG_INFO, "getOidList()",
-			" - di_drv_first_node() failed");
-
+		log(LOG_INFO, "getOidList()", " - di_drv_first_node() failed");
 		return (-1);
 	}
 
@@ -69,44 +68,37 @@ static int getOidList(di_node_t root_node,
 
 	while (DI_NODE_NIL != sv_child_node) {
 
-		(void) di_prop_lookup_strings(DDI_DEV_T_ANY,
-			sv_child_node,
-			"inquiry-product-id",
-			&pid);
+		(void) di_prop_lookup_strings(DDI_DEV_T_ANY, sv_child_node,
+		    "inquiry-product-id", &pid);
 
 		pidSize = strlen(pid);
 
-		(void) di_prop_lookup_strings(DDI_DEV_T_ANY,
-			sv_child_node,
-			"inquiry-vendor-id",
-			&vid);
+		(void) di_prop_lookup_strings(DDI_DEV_T_ANY, sv_child_node,
+		    "inquiry-vendor-id", &vid);
 
 		vidSize = strlen(vid);
 
 		if ((0 == strncmp(pProductID, pid, pidSize)) &&
 		    (0 == strncmp(pVendorID, vid, vidSize))) {
 
-				if (haveList) {
+			instNum = di_instance(sv_child_node);
+			majorNum = di_driver_major(sv_child_node);
 
-					nodeInstance =
-						(MP_UINT64)
-					    di_instance(sv_child_node);
+			if (haveList && numNodes < pOidList->oidCount) {
 
-					if (numNodes < pOidList->oidCount) {
+				osn = 0;
+				osn = MP_STORE_INST_TO_ID(instNum, osn);
+				osn = MP_STORE_MAJOR_TO_ID(majorNum, osn);
 
-						pOidList->oids[numNodes].
-							objectType =
-						MP_OBJECT_TYPE_MULTIPATH_LU;
+				pOidList->oids[numNodes].objectType =
+				    MP_OBJECT_TYPE_MULTIPATH_LU;
 
-						pOidList->oids[numNodes].
-							ownerId =
-							g_pluginOwnerID;
+				pOidList->oids[numNodes].ownerId =
+				    g_pluginOwnerID;
 
-						pOidList->oids[numNodes].
-							objectSequenceNumber =
-							nodeInstance;
-					}
-				}
+				pOidList->oids[numNodes].objectSequenceNumber =
+				    osn;
+			}
 
 			++numNodes;
 		}
@@ -115,12 +107,7 @@ static int getOidList(di_node_t root_node,
 	}
 
 
-	log(LOG_INFO,
-		"getOidList()",
-		" - numNodes: %d",
-		numNodes);
-
-
+	log(LOG_INFO, "getOidList()", " - numNodes: %d", numNodes);
 	log(LOG_INFO, "getOidList()", " - exit");
 
 	return (numNodes);
@@ -145,20 +132,17 @@ MP_GetMultipathLusDevProd(MP_OID oid, MP_OID_LIST **ppList)
 	char inqVendorID[256];
 
 
-
 	log(LOG_INFO, "MP_GetMultipathLusDevProd()", " - enter");
 
-
-
 	log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-		"oid.objectSequenceNumber = %llx",
-		oid.objectSequenceNumber);
+	    "oid.objectSequenceNumber = %llx",
+	    oid.objectSequenceNumber);
 
 	if (g_scsi_vhci_fd < 0) {
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
 		    "invalid driver file handle");
 		log(LOG_INFO, "MP_GetMultipathLusDevProd",
-			" - error exit");
+		    " - error exit");
 		return (MP_STATUS_FAILED);
 	}
 
@@ -175,7 +159,7 @@ MP_GetMultipathLusDevProd(MP_OID oid, MP_OID_LIST **ppList)
 	ioctlStatus = ioctl(g_scsi_vhci_fd, MP_CMD, &mp_ioctl);
 
 	log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-		" IOCTL call returned: %d", ioctlStatus);
+	    " IOCTL call returned: %d", ioctlStatus);
 
 	if (ioctlStatus < 0) {
 		ioctlStatus = errno;
@@ -184,13 +168,13 @@ MP_GetMultipathLusDevProd(MP_OID oid, MP_OID_LIST **ppList)
 	if (ioctlStatus != 0) {
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
 		    "IOCTL call failed.  IOCTL error is: %d",
-			ioctlStatus);
+		    ioctlStatus);
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
 		    "IOCTL call failed.  IOCTL error is: %s",
-			strerror(ioctlStatus));
+		    strerror(ioctlStatus));
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
 		    "IOCTL call failed.  mp_ioctl.mp_errno: %x",
-			mp_ioctl.mp_errno);
+		    mp_ioctl.mp_errno);
 
 		if (ENOTSUP == ioctlStatus) {
 			mpStatus = MP_STATUS_UNSUPPORTED;
@@ -201,49 +185,40 @@ MP_GetMultipathLusDevProd(MP_OID oid, MP_OID_LIST **ppList)
 		}
 
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-			" - error exit");
+		    " - error exit");
 
 		return (mpStatus);
 	}
 
-	(void) strncpy(inqProductID,
-			devProdInfo.prodInfo.product,
-			sizeof (devProdInfo.prodInfo.product));
+	(void) strncpy(inqProductID, devProdInfo.prodInfo.product,
+	    sizeof (devProdInfo.prodInfo.product));
 
-	(void) strncpy(inqVendorID,
-			devProdInfo.prodInfo.vendor,
-			sizeof (devProdInfo.prodInfo.vendor));
+	(void) strncpy(inqVendorID, devProdInfo.prodInfo.vendor,
+	    sizeof (devProdInfo.prodInfo.vendor));
 
 	log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-		" - inqProductID:  [%s]", inqProductID);
+	    " - inqProductID:  [%s]", inqProductID);
 	log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-		" - inqVendorID:   [%s]", inqVendorID);
-
+	    " - inqVendorID:   [%s]", inqVendorID);
 
 	root_node = di_init("/", DINFOCACHE);
 	if (DI_NODE_NIL == root_node) {
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-			" - di_init() failed");
+		    " - di_init() failed");
 
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-			" - error exit");
+		    " - error exit");
 
 		return (MP_STATUS_FAILED);
 	}
 
-	numNodes = getOidList(root_node,
-				NULL,
-				inqProductID,
-				inqVendorID);
-
+	numNodes = getOidList(root_node, NULL, inqProductID, inqVendorID);
 	if (numNodes < 0) {
 
-		log(LOG_INFO,
-			"MP_GetMultipathLusDevProd()",
-			" - unable to get OID list.");
-
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-			" - error exit");
+		    " - unable to get OID list.");
+
+		log(LOG_INFO, "MP_GetMultipathLusDevProd()", " - error exit");
 
 		di_fini(root_node);
 
@@ -256,26 +231,22 @@ MP_GetMultipathLusDevProd(MP_OID oid, MP_OID_LIST **ppList)
 		*ppList = createOidList(1);
 		if (NULL == *ppList) {
 
-			log(LOG_INFO,
-				"MP_GetMultipathLusDevProd()",
-				" - unable to create OID list.");
+			log(LOG_INFO, "MP_GetMultipathLusDevProd()",
+			    " - unable to create OID list.");
 
 			log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-				" - error exit");
+			    " - error exit");
 
 			di_fini(root_node);
 
 			return (MP_STATUS_INSUFFICIENT_MEMORY);
 		}
 
-		(*ppList)->oids[0].objectType =
-			MP_OBJECT_TYPE_MULTIPATH_LU;
-
-		(*ppList)->oids[0].ownerId =
-			g_pluginOwnerID;
+		(*ppList)->oids[0].objectType = MP_OBJECT_TYPE_MULTIPATH_LU;
+		(*ppList)->oids[0].ownerId = g_pluginOwnerID;
 
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-			" - returning empty list.");
+		    " - returning empty list.");
 
 		return (MP_STATUS_SUCCESS);
 	}
@@ -283,31 +254,27 @@ MP_GetMultipathLusDevProd(MP_OID oid, MP_OID_LIST **ppList)
 	*ppList = createOidList(numNodes);
 	if (NULL == *ppList) {
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-			"no memory for *ppList");
+		    "no memory for *ppList");
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-			" - error exit");
+		    " - error exit");
 		return (MP_STATUS_INSUFFICIENT_MEMORY);
 	}
 
 	(*ppList)->oidCount = numNodes;
 
-	numNodes = getOidList(root_node,
-				*ppList,
-				inqProductID,
-				inqVendorID);
-
+	numNodes = getOidList(root_node, *ppList, inqProductID, inqVendorID);
 
 	for (i = 0; i < (*ppList)->oidCount; i++) {
 
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-			"(*ppList)->oids[%d].objectType           = %d",
-			i, (*ppList)->oids[i].objectType);
+		    "(*ppList)->oids[%d].objectType           = %d",
+		    i, (*ppList)->oids[i].objectType);
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-			"(*ppList)->oids[%d].ownerId              = %d",
-			i, (*ppList)->oids[i].ownerId);
+		    "(*ppList)->oids[%d].ownerId              = %d",
+		    i, (*ppList)->oids[i].ownerId);
 		log(LOG_INFO, "MP_GetMultipathLusDevProd()",
-			"(*ppList)->oids[%d].objectSequenceNumber = %llx",
-			i, (*ppList)->oids[i].objectSequenceNumber);
+		    "(*ppList)->oids[%d].objectSequenceNumber = %llx",
+		    i, (*ppList)->oids[i].objectSequenceNumber);
 	}
 
 

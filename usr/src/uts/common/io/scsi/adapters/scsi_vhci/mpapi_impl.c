@@ -2772,11 +2772,11 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 			(void) strlcpy(lu->prop.name, svl->svl_lun_wwn,
 			    sizeof (lu->prop.name));
 
-			(void) strlcpy(lu->prop.deviceFileName,
-			    "/devices/scsi_vhci/ssd@g",
-			    sizeof (lu->prop.deviceFileName));
-			(void) strlcat(lu->prop.deviceFileName, lu->prop.name,
-			    sizeof (lu->prop.deviceFileName));
+			/*
+			 * deviceFileName field is currently not used.
+			 * Set to an empty string.
+			 */
+			lu->prop.deviceFileName[0] = '\0';
 
 			if ((svl != NULL) &&
 			    (SCSI_FAILOVER_IS_ASYM(svl) ||
@@ -3926,6 +3926,7 @@ vhci_mpapi_sync_lu_oid_list(struct scsi_vhci *vhci)
 	mpapi_path_data_t	*pd;
 	scsi_vhci_lun_t		*svl;
 	dev_info_t		*lun_dip;
+	uint64_t		raw_oid;
 
 	ilist = vhci->mp_priv->obj_hdr_list[MP_OBJECT_TYPE_MULTIPATH_LU]->head;
 
@@ -3933,10 +3934,18 @@ vhci_mpapi_sync_lu_oid_list(struct scsi_vhci *vhci)
 		lud = ilist->item->idata;
 		if (lud->valid == 1) {
 			svl = lud->resp;
-			ilist->item->oid.raw_oid =
-			    (uint64_t)ddi_get_instance(svl->svl_dip);
-			lud->prop.id =
-			    (uint64_t)ddi_get_instance(svl->svl_dip);
+
+			/*
+			 * Compose OID from major number and instance number.
+			 */
+			raw_oid = 0;
+			raw_oid = MP_STORE_INST_TO_ID(
+			    ddi_get_instance(svl->svl_dip), raw_oid);
+			raw_oid = MP_STORE_MAJOR_TO_ID(
+			    ddi_driver_major(svl->svl_dip), raw_oid);
+
+			ilist->item->oid.raw_oid = raw_oid;
+			lud->prop.id = raw_oid;
 		}
 		ilist = ilist->next;
 	}
@@ -3944,12 +3953,20 @@ vhci_mpapi_sync_lu_oid_list(struct scsi_vhci *vhci)
 	ilist = vhci->mp_priv->obj_hdr_list[MP_OBJECT_TYPE_PATH_LU]->head;
 	while (ilist != NULL) {
 		pd = ilist->item->idata;
-		if ((pd->valid == 1) && (MP_GET_MAJOR_FROM_ID((uint64_t)
-		    (pd->prop.logicalUnit.id)) != 0)) {
+		if (pd->valid == 1) {
 			lun_dip = mdi_pi_get_client
 			    ((mdi_pathinfo_t *)(pd->resp));
-			pd->prop.logicalUnit.id =
-			    (uint64_t)ddi_get_instance(lun_dip);
+
+			/*
+			 * Compose OID from major number and instance number.
+			 */
+			raw_oid = 0;
+			raw_oid = MP_STORE_INST_TO_ID(
+			    ddi_get_instance(lun_dip), raw_oid);
+			raw_oid = MP_STORE_MAJOR_TO_ID(
+			    ddi_driver_major(lun_dip), raw_oid);
+
+			pd->prop.logicalUnit.id = raw_oid;
 		}
 		ilist = ilist->next;
 	}

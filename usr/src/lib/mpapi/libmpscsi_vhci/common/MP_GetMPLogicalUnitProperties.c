@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <string.h>
@@ -61,14 +60,16 @@ get_devlink(di_devlink_t devlink, void *arg) {
 
 
 char
-*getDeviceFileName(MP_UINT64 instanceNum)
+*getDeviceFileName(MP_UINT64 objectSequenceNumber)
 {
 	char *deviceFileName = NULL;
 
 	di_node_t root_node = DI_NODE_NIL;
 	di_node_t cur_node  = DI_NODE_NIL;
 
-	MP_UINT64 nodeInstance = 0;
+	int instNum;
+	int majorNum;
+	MP_UINT64 osn;
 
 	char *pathName  = NULL;
 	char *minorName = "c,raw";
@@ -85,8 +86,8 @@ char
 	log(LOG_INFO, "getDeviceFileName()", " - enter");
 
 	log(LOG_INFO, "getDeviceFileName()",
-	    " - instanceNum: %llx",
-	    instanceNum);
+	    " - objectSequenceNumber: %llx",
+	    objectSequenceNumber);
 
 	root_node = di_init("/", DINFOCACHE);
 	if (DI_NODE_NIL == root_node) {
@@ -112,9 +113,14 @@ char
 
 	while (DI_NODE_NIL != cur_node) {
 
-		nodeInstance = (MP_UINT64)di_instance(cur_node);
+		instNum = di_instance(cur_node);
+		majorNum = di_driver_major(cur_node);
 
-		if (nodeInstance == instanceNum) {
+		osn = 0;
+		osn = MP_STORE_INST_TO_ID(instNum, osn);
+		osn = MP_STORE_MAJOR_TO_ID(majorNum, osn);
+
+		if (osn == objectSequenceNumber) {
 
 			log(LOG_INFO, "getDeviceFileName()",
 			    " - found node.");

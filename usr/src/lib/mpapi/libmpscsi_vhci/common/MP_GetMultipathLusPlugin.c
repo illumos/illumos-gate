@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <syslog.h>
@@ -67,7 +66,9 @@ static int getOidList(di_node_t root_node, MP_OID_LIST *pOidList)
 {
 	int numNodes = 0, state;
 
-	MP_UINT64 instNum = 0;
+	int instNum;
+	int majorNum;
+	MP_UINT64 osn;
 
 	di_node_t sv_node	= DI_NODE_NIL;
 	di_node_t sv_child_node = DI_NODE_NIL;
@@ -110,13 +111,17 @@ static int getOidList(di_node_t root_node, MP_OID_LIST *pOidList)
 		}
 
 		if (haveList && (numNodes < pOidList->oidCount)) {
-
-			instNum =
-			    (MP_UINT64)di_instance(sv_child_node);
+			instNum = di_instance(sv_child_node);
+			majorNum = di_driver_major(sv_child_node);
 
 			log(LOG_INFO, "getOidList()",
-			    " - instance number is: %llx",
-			    instNum);
+			    "instNum = %d", instNum);
+			log(LOG_INFO, "getOidList()",
+			    "majorNum = %d", majorNum);
+
+			osn = 0;
+			osn = MP_STORE_INST_TO_ID(instNum, osn);
+			osn = MP_STORE_MAJOR_TO_ID(majorNum, osn);
 
 			pOidList->oids[numNodes].objectType =
 			    MP_OBJECT_TYPE_MULTIPATH_LU;
@@ -125,7 +130,7 @@ static int getOidList(di_node_t root_node, MP_OID_LIST *pOidList)
 			    g_pluginOwnerID;
 
 			pOidList->oids[numNodes].objectSequenceNumber =
-			    instNum;
+			    osn;
 		}
 
 		++numNodes;

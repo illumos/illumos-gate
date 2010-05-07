@@ -437,6 +437,7 @@ notifyClient(sysevent_t *ev)
 
 				valAllocated = 1;
 
+				*val = 0;
 				*val = MP_STORE_INST_TO_ID(*instance, *val);
 				*val = MP_STORE_MAJOR_TO_ID(*major, *val);
 
@@ -552,7 +553,6 @@ sysevent_handler(sysevent_t *ev)
 
 	/* Is the event one of ours? */
 	if ((strncmp(EC_SUN_MP, sysevent_get_class_name(ev), 9) != 0) &&
-	    (strncmp(EC_DEVFS,  sysevent_get_class_name(ev), 8) != 0) &&
 	    (strncmp(EC_DDI,    sysevent_get_class_name(ev), 6) != 0)) {
 
 		return;
