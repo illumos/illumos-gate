@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -137,6 +137,8 @@ static struct modlinkage modlinkage = {
 
 /* driver soft state */
 void *px_state_p;
+
+int px_force_intx_support = 1;
 
 int
 _init(void)
@@ -1368,7 +1370,10 @@ px_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			*(int *)result |= intr_types;
 		}
 
-		*(int *)result &= px_p->px_supp_intr_types;
+		*(int *)result &=
+		    (px_force_intx_support ?
+		    (px_p->px_supp_intr_types | DDI_INTR_TYPE_FIXED) :
+		    px_p->px_supp_intr_types);
 		return (*(int *)result ? DDI_SUCCESS : DDI_FAILURE);
 	}
 
