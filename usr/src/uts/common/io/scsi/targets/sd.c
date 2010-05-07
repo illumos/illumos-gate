@@ -19766,7 +19766,7 @@ sd_media_change_task(void *arg)
 		sd_print_sense_msg(un, bp, &si, SD_NO_RETRY_ISSUED);
 		sd_return_failed_command(un, bp, EIO);
 	} else {
-		sd_retry_command(un, bp, SD_RETRIES_NOCHECK, sd_print_sense_msg,
+		sd_retry_command(un, bp, SD_RETRIES_UA, sd_print_sense_msg,
 		    &si, EIO, (clock_t)0, NULL);
 	}
 	mutex_exit(SD_MUTEX(un));
