@@ -20,8 +20,7 @@
  */
 
 /* 
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved. 
- * Use is subject to license terms. 
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */ 
  
 #pragma dictionary "INTEL" 
@@ -447,7 +446,7 @@ prop upset.discard@rank (0)-> EREPORT_BUS_ERROR;
 engine STAT_CPU_MEM_CE_PGFLTS;
 
 event ereport.cpu.intel.quickpath.mem_ue@chip/memory-controller
-    {within(12s)};
+    {within(12s)}, discard_if_config_unknown=1;
 
 event fault.memory.intel.page_ue@
     chip/memory-controller/dram-channel/dimm/rank,
@@ -478,7 +477,7 @@ prop error.memory.intel.dimm_ue_ep@CHIPDIMM/rank
 prop fault.memory.intel.dimm_ue@CHIPDIMM/rank (0)-> EREPORT_BUS_ERROR;
 
 event ereport.cpu.intel.quickpath.mem_ce@
-    chip/memory-controller{within(12s)};
+    chip/memory-controller {within(12s)}, discard_if_config_unknown=1;
 
 engine serd.memory.intel.page_ce@CHIPDIMM/rank, N=PAGE_CE_COUNT, T=PAGE_CE_TIME;
 event fault.memory.intel.page_ce@CHIPDIMM/rank, message=0, response=0,
@@ -513,9 +512,11 @@ CPU_MEM_DIMM_CE("2G", 4, 2week, 1000)
 CPU_MEM_DIMM_CE("1G", 4, 4week, 500)
 CPU_MEM_DIMM_CE("512M", 4, 8week, 250)
 
-event ereport.cpu.intel.quickpath.mem_unknown@chip/memory-controller {within(12s)};
-event ereport.cpu.intel.quickpath.mem_unknown@chip/memory-controller/dram-channel
-    {within(12s)};
+event ereport.cpu.intel.quickpath.mem_unknown@chip/memory-controller
+    {within(12s)}, discard_if_config_unknown=1;
+event ereport.cpu.intel.quickpath.mem_unknown@
+    chip/memory-controller/dram-channel {within(12s)},
+    discard_if_config_unknown=1;
 event ereport.cpu.intel.quickpath.mem_unknown@
     chip/memory-controller/dram-channel/dimm/rank{within(12s)};
 event upset.discard@chip/memory-controller;
@@ -531,13 +532,15 @@ prop upset.discard@
     ereport.cpu.intel.quickpath.mem_unknown@
     chip/memory-controller/dram-channel/dimm/rank;
 
-event ereport.cpu.intel.quickpath.mem_parity@chip/memory-controller {within(1s)};
+event ereport.cpu.intel.quickpath.mem_parity@chip/memory-controller
+    {within(1s)}, discard_if_config_unknown=1;
 event fault.cpu.intel.quickpath.mem_parity@chip/memory-controller;
 
 prop fault.cpu.intel.quickpath.mem_parity@chip/memory-controller (1)->
     ereport.cpu.intel.quickpath.mem_parity@chip/memory-controller;
 
-event ereport.cpu.intel.quickpath.mem_addr_parity@chip/memory-controller {within(1s)};
+event ereport.cpu.intel.quickpath.mem_addr_parity@chip/memory-controller
+    {within(1s)}, discard_if_config_unknown=1;
 event fault.cpu.intel.quickpath.mem_addr_parity@
     chip/memory-controller;
 event fault.cpu.intel.quickpath.mem_addr_parity@CHIPDIMM;
@@ -555,13 +558,15 @@ prop fault.cpu.intel.quickpath.mem_addr_parity@CHIPDIMM/rank
     { payloadprop_contains("resource", asru(CHIPDIMM/rank)) } (1)->
     ereport.cpu.intel.quickpath.mem_addr_parity@chip/memory-controller;
 
-event ereport.cpu.intel.quickpath.mem_bad_addr@chip/memory-controller {within(1s)};
+event ereport.cpu.intel.quickpath.mem_bad_addr@chip/memory-controller
+    {within(1s)}, discard_if_config_unknown=1;
 event fault.cpu.intel.quickpath.mem_bad_addr@chip/memory-controller;
 
 prop fault.cpu.intel.quickpath.mem_bad_addr@chip/memory-controller (1)->
     ereport.cpu.intel.quickpath.mem_bad_addr@chip/memory-controller;
 
-event ereport.cpu.intel.quickpath.mem_spare@chip/memory-controller {within(1s)};
+event ereport.cpu.intel.quickpath.mem_spare@chip/memory-controller
+    {within(1s)}, discard_if_config_unknown=1;
 event fault.cpu.intel.quickpath.mem_spare@
     chip/memory-controller/dram-channel/dimm;
 
@@ -569,13 +574,15 @@ prop fault.cpu.intel.quickpath.mem_spare@
     chip/memory-controller/dram-channel/dimm (1)->
     ereport.cpu.intel.quickpath.mem_spare@chip/memory-controller;
 
-event ereport.cpu.intel.quickpath.mem_bad_id@chip/memory-controller {within(1s)};
+event ereport.cpu.intel.quickpath.mem_bad_id@chip/memory-controller
+    {within(1s)}, discard_if_config_unknown=1;
 event fault.cpu.intel.quickpath.mem_bad_id@chip/memory-controller;
 
 prop fault.cpu.intel.quickpath.mem_bad_id@chip/memory-controller (1)->
     ereport.cpu.intel.quickpath.mem_bad_id@chip/memory-controller;
 
-event ereport.cpu.intel.quickpath.mem_redundant@chip/memory-controller {within(1s)};
+event ereport.cpu.intel.quickpath.mem_redundant@chip/memory-controller
+    {within(1s)}, discard_if_config_unknown=1;
 engine serd.cpu.intel.quickpath.mem_redundant@CHIPDIMM, N=2, T=72h;
 event fault.cpu.intel.quickpath.mem_redundant@CHIPDIMM,
     engine=serd.cpu.intel.quickpath.mem_redundant@CHIPDIMM;
@@ -615,7 +622,7 @@ prop fault.cpu.intel.quickpath.interconnect@chip
 /* MBox errors */
 #define EX_MEM_EVENT(leafclass, t) \
 	event ereport.cpu.intel.quickpath.leafclass@ \
-        chip/memory-controller { within(t) }
+        chip/memory-controller { within(t) }, discard_if_config_unknown=1
 
 EX_MEM_EVENT(mem_lnktrns, 1s);
 EX_MEM_EVENT(mem_lnkpers, 1s);

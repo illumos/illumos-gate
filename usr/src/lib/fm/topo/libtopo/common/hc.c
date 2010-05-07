@@ -485,19 +485,18 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    version > FM_HC_SCHEME_VERSION)
-		return (-1);
+		return (0);
 
 	/* Get authority, if present */
 	err = nvlist_lookup_nvlist(nvl, FM_FMRI_AUTHORITY, &anvl);
 	if (err != 0 && err != ENOENT)
-		return (-1);
+		return (0);
 
-	if ((err = nvlist_lookup_string(nvl, FM_FMRI_HC_ROOT, &root)) != 0)
-		return (-1);
+	(void) nvlist_lookup_string(nvl, FM_FMRI_HC_ROOT, &root);
 
 	err = nvlist_lookup_nvlist_array(nvl, FM_FMRI_HC_LIST, &hcprs, &hcnprs);
 	if (err != 0 || hcprs == NULL)
-		return (-1);
+		return (0);
 
 	(void) nvlist_lookup_string(nvl, FM_FMRI_HC_SERIAL_ID, &serial);
 	(void) nvlist_lookup_string(nvl, FM_FMRI_HC_PART, &part);
@@ -532,7 +531,8 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	topo_fmristr_build(&size, buf, buflen, "/", NULL, NULL);
 
 	/* hc-root */
-	topo_fmristr_build(&size, buf, buflen, root, NULL, NULL);
+	if (root)
+		topo_fmristr_build(&size, buf, buflen, root, NULL, NULL);
 
 	/* all the pairs */
 	for (i = 0; i < hcnprs; i++) {
