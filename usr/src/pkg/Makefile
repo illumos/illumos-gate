@@ -33,25 +33,11 @@ include $(SRC)/Makefile.buildnum
 SHELL= /usr/bin/ksh93
 
 #
-# On non-OpenSolaris systems, the fallback to the build system to
-# satisfy interconsolidation dependencies won't work.  To avoid that
-# pitfall, disable package dependency generation on such systems.
-#
-# For any OpenSolaris system, SUNWcs should be installed, and is not
-# expected to be renamed soon.
-#
 # To suppress package dependency generation on any system, regardless
 # of how it was installed, set SUPPRESSPKGDEP=true in the build
 # environment.
 #
-SUPPRESSPKGDEP :sh= \
-	tdir=`mktemp -d`; \
-	PKG_CACHEDIR=$tdir pkg list SUNWcs > /dev/null 2>&1; \
-	if [ $? -ne 0 ]; then \
-		print "true"; \
-	else \
-		print "false"; \
-	fi; rm -rf $tdir
+SUPPRESSPKGDEP= false
 
 #
 # Comment this line out or set "PKGDEBUG=" in your build environment
@@ -323,14 +309,8 @@ PKGLISTS= \
 
 .KEEP_STATE:
 
-#
-# XXX Once we can publish in parallel, we can add $(PUB_PKGS) here.
-# And then we can also remove the leading "all .WAIT" from the
-# install target, which currently allows us to at least process in
-# parallel.
-#
 .PARALLEL: $(PKGS) $(PROC_PKGS) $(DEP_PKGS) \
-	$(PROC_SYNTH_PKGS) $(DEP_SYNTH_PKGS)
+	$(PROC_SYNTH_PKGS) $(DEP_SYNTH_PKGS) $(PUB_PKGS)
 
 #
 # For a single manifest, the dependency chain looks like this:
