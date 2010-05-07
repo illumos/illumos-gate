@@ -471,7 +471,7 @@ typedef struct {
 		mutex_enter(&cqti->cq_thr_lock);			\
 		cv_signal(&cqti->cq_cv);				\
 		mutex_exit(&cqti->cq_thr_lock);				\
-	}								\
+	}
 
 #define	PMCS_CQ_RUN(hwp)						\
 	mutex_enter(&hwp->cq_lock);					\

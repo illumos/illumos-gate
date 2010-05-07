@@ -7034,6 +7034,7 @@ pmcs_flush_target_queues(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt, uint8_t queues)
 			pmcs_dma_unload(pwp, sp);
 			mutex_enter(&pwp->cq_lock);
 			STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
+			PMCS_CQ_RUN_LOCKED(pwp);
 			mutex_exit(&pwp->cq_lock);
 			mutex_enter(&tgt->wqlock);
 		}

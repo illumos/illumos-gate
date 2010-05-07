@@ -1734,7 +1734,6 @@ pmcs_scsa_cq_run(void *arg)
 	pmcs_xscsi_t *tgt;
 	pmcs_iocomp_cb_t *ioccb, *ioccb_next;
 	pmcs_cb_t callback;
-	uint32_t niodone;
 
 	DTRACE_PROBE1(pmcs__scsa__cq__run__start, pmcs_cq_thr_info_t *, cqti);
 
@@ -1744,16 +1743,12 @@ pmcs_scsa_cq_run(void *arg)
 		/*
 		 * First, check the I/O completion callback queue.
 		 */
-
 		ioccb = pwp->iocomp_cb_head;
 		pwp->iocomp_cb_head = NULL;
 		pwp->iocomp_cb_tail = NULL;
 		mutex_exit(&pwp->cq_lock);
 
-		niodone = 0;
-
 		while (ioccb) {
-			niodone++;
 			/*
 			 * Grab the lock on the work structure. The callback
 			 * routine is responsible for clearing it.
@@ -1770,7 +1765,6 @@ pmcs_scsa_cq_run(void *arg)
 		/*
 		 * Next, run the completion queue
 		 */
-
 		mutex_enter(&pwp->cq_lock);
 		sp = STAILQ_FIRST(&pwp->cq);
 		STAILQ_INIT(&pwp->cq);
@@ -1803,11 +1797,19 @@ pmcs_scsa_cq_run(void *arg)
 		DTRACE_PROBE1(pmcs__scsa__cq__run__end__loop,
 		    pmcs_cq_thr_info_t *, cqti);
 
-		mutex_enter(&cqti->cq_thr_lock);
-		cv_wait(&cqti->cq_cv, &cqti->cq_thr_lock);
-		mutex_exit(&cqti->cq_thr_lock);
-
+		/*
+		 * Check if there are more completions to do.  If so, and we've
+		 * not been told to stop, skip the wait and cycle through again.
+		 */
 		mutex_enter(&pwp->cq_lock);
+		if ((pwp->iocomp_cb_head == NULL) && STAILQ_EMPTY(&pwp->cq) &&
+		    !pwp->cq_info.cq_stop) {
+			mutex_exit(&pwp->cq_lock);
+			mutex_enter(&cqti->cq_thr_lock);
+			cv_wait(&cqti->cq_cv, &cqti->cq_thr_lock);
+			mutex_exit(&cqti->cq_thr_lock);
+			mutex_enter(&pwp->cq_lock);
+		}
 	}
 
 	mutex_exit(&pwp->cq_lock);
@@ -1885,6 +1887,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 				    STATE_GOT_STATUS;
 				mutex_enter(&pwp->cq_lock);
 				STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
+				PMCS_CQ_RUN_LOCKED(pwp);
 				mutex_exit(&pwp->cq_lock);
 				pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
 				    "%s: Failed to dma_load for tgt %d (QF)",
@@ -2209,6 +2212,7 @@ out:
 			    __func__, (void *)sp, sp->cmd_tag);
 			mutex_enter(&pwp->cq_lock);
 			STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
+			PMCS_CQ_RUN_LOCKED(pwp);
 			mutex_exit(&pwp->cq_lock);
 			pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
 			    "%s: Completing command for dead target 0x%p",
@@ -2295,6 +2299,7 @@ out:
 		if (!dead) {
 			mutex_enter(&pwp->cq_lock);
 			STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
+			PMCS_CQ_RUN_LOCKED(pwp);
 			mutex_exit(&pwp->cq_lock);
 		}
 	}
@@ -2687,6 +2692,7 @@ out:
 			    __func__, (void *)sp, sp->cmd_tag);
 			mutex_enter(&pwp->cq_lock);
 			STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
+			PMCS_CQ_RUN_LOCKED(pwp);
 			mutex_exit(&pwp->cq_lock);
 			pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
 			    "%s: Completing command for dead target 0x%p",
@@ -2738,6 +2744,7 @@ out:
 		mutex_exit(&xp->aqlock);
 		mutex_enter(&pwp->cq_lock);
 		STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
+		PMCS_CQ_RUN_LOCKED(pwp);
 		mutex_exit(&pwp->cq_lock);
 	}
 }
