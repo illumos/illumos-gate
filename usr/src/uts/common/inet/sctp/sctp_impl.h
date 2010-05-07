@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved
  */
 
 #ifndef	_INET_SCTP_SCTP_IMPL_H
@@ -912,8 +911,8 @@ extern void	sctp_congest_reset(sctp_t *);
 extern void	sctp_conn_hash_insert(sctp_tf_t *, sctp_t *, int);
 extern void	sctp_conn_hash_remove(sctp_t *);
 extern void	sctp_conn_init(conn_t *);
-extern sctp_t	*sctp_conn_match(in6_addr_t *, in6_addr_t *, uint32_t,
-		    zoneid_t, iaflags_t, sctp_stack_t *);
+extern sctp_t	*sctp_conn_match(in6_addr_t **, uint32_t, in6_addr_t *,
+		    uint32_t, zoneid_t, iaflags_t, sctp_stack_t *);
 extern sctp_t	*sctp_conn_request(sctp_t *, mblk_t *, uint_t, uint_t,
 		    sctp_init_chunk_t *, ip_recv_attr_t *);
 extern uint32_t	sctp_cumack(sctp_t *, uint32_t, mblk_t **);
@@ -1068,6 +1067,7 @@ extern int	sctp_xmit_list_clean(sctp_t *, ssize_t);
 
 extern void	sctp_zap_addrs(sctp_t *);
 extern void	sctp_zap_faddrs(sctp_t *, int);
+extern sctp_chunk_hdr_t	*sctp_first_chunk(uchar_t *, ssize_t);
 
 /* Contract private interface between SCTP and Clustering - PSARC/2005/602 */
 

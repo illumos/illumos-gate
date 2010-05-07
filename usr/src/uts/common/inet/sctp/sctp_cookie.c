@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved
  */
 
 #include <sys/types.h>
@@ -1449,7 +1448,7 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 	ipha_t *iph;
 	ip6_t *ip6h;
 	in6_addr_t dst;
-	in6_addr_t src;
+	in6_addr_t src, *srcp = &src;
 	sctp_parm_hdr_t *ph;
 	ssize_t remaining;
 	sctp_init_chunk_t *iack;
@@ -1483,18 +1482,23 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 
 	while (ph != NULL) {
 		/*
-		 * params have been put in host byteorder by
-		 * sctp_check_input()
+		 * params have been verified in sctp_check_input(),
+		 * so no need to do it again here.
 		 *
 		 * For labeled systems, there's no need to check the
 		 * label here.  It's known to be good as we checked
 		 * before allowing the connection to become bound.
+		 *
+		 * According to RFC4960 :
+		 * All integer fields in an SCTP packet MUST be transmitted
+		 * in network byte order, unless otherwise stated.
+		 * Therefore convert the param type to network byte order.
 		 */
-		if (ph->sph_type == PARM_ADDR4) {
+		if (ph->sph_type == htons(PARM_ADDR4)) {
 			IN6_INADDR_TO_V4MAPPED((struct in_addr *)(ph + 1),
-			    &src);
+			    srcp);
 
-			sctp = sctp_conn_match(&src, &dst, ports, zoneid,
+			sctp = sctp_conn_match(&srcp, 1, &dst, ports, zoneid,
 			    0, sctps);
 
 			dprint(1,
@@ -1505,9 +1509,9 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 			if (sctp != NULL) {
 				return (sctp);
 			}
-		} else if (ph->sph_type == PARM_ADDR6) {
-			src = *(in6_addr_t *)(ph + 1);
-			sctp = sctp_conn_match(&src, &dst, ports, zoneid,
+		} else if (ph->sph_type == htons(PARM_ADDR6)) {
+			srcp = (in6_addr_t *)(ph + 1);
+			sctp = sctp_conn_match(&srcp, 1, &dst, ports, zoneid,
 			    0, sctps);
 
 			dprint(1,

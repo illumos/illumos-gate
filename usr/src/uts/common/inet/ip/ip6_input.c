@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -2257,7 +2256,7 @@ repeat:
 			return;
 		}
 		connp = sctp_fanout(&ip6h->ip6_src, &ip6h->ip6_dst, ports,
-		    ira, mp, sctps);
+		    ira, mp, sctps, sctph);
 		if (connp == NULL) {
 			/* Check for raw socket or OOTB handling */
 			ip_fanout_sctp_raw(mp, NULL, ip6h, ports, ira);

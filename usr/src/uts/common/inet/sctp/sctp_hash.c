@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved
  */
 
 #include <sys/socket.h>
@@ -231,18 +230,20 @@ cl_sctp_walk_list_stack(int (*cl_callback)(cl_sctp_info_t *, void *),
 }
 
 sctp_t *
-sctp_conn_match(in6_addr_t *faddr, in6_addr_t *laddr, uint32_t ports,
-    zoneid_t zoneid, iaflags_t iraflags, sctp_stack_t *sctps)
+sctp_conn_match(in6_addr_t **faddrpp, uint32_t nfaddr, in6_addr_t *laddr,
+    uint32_t ports, zoneid_t zoneid, iaflags_t iraflags, sctp_stack_t *sctps)
 {
 	sctp_tf_t		*tf;
 	sctp_t			*sctp;
 	sctp_faddr_t		*fp;
 	conn_t			*connp;
+	in6_addr_t		**faddrs, **endaddrs = &faddrpp[nfaddr];
 
 	tf = &(sctps->sctps_conn_fanout[SCTP_CONN_HASH(sctps, ports)]);
 	mutex_enter(&tf->tf_lock);
 
-	for (sctp = tf->tf_sctp; sctp; sctp = sctp->sctp_conn_hash_next) {
+	for (sctp = tf->tf_sctp; sctp != NULL; sctp =
+	    sctp->sctp_conn_hash_next) {
 		connp = sctp->sctp_connp;
 		if (ports != connp->conn_ports)
 			continue;
@@ -254,25 +255,23 @@ sctp_conn_match(in6_addr_t *faddr, in6_addr_t *laddr, uint32_t ports,
 			continue;
 
 		/* check for faddr match */
-		for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
-			if (IN6_ARE_ADDR_EQUAL(faddr, &fp->faddr)) {
-				break;
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+			for (faddrs = faddrpp; faddrs < endaddrs; faddrs++) {
+				if (IN6_ARE_ADDR_EQUAL(*faddrs, &fp->faddr)) {
+					/* check for laddr match */
+					if (sctp_saddr_lookup(sctp, laddr, 0)
+					    != NULL) {
+						SCTP_REFHOLD(sctp);
+						mutex_exit(&tf->tf_lock);
+						return (sctp);
+					}
+				}
 			}
 		}
 
-		/* no faddr match; keep looking */
-		if (fp == NULL)
-			continue;
-
-		/* check for laddr match */
-		if (sctp_saddr_lookup(sctp, laddr, 0) != NULL) {
-			SCTP_REFHOLD(sctp);
-			goto done;
-		}
 		/* no match; continue to the next in the chain */
 	}
 
-done:
 	mutex_exit(&tf->tf_lock);
 	return (sctp);
 }
@@ -322,7 +321,7 @@ sctp_find_conn(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
 {
 	sctp_t *sctp;
 
-	sctp = sctp_conn_match(src, dst, ports, zoneid, iraflags, sctps);
+	sctp = sctp_conn_match(&src, 1, dst, ports, zoneid, iraflags, sctps);
 	if (sctp == NULL) {
 		/* Not in conn fanout; check listen fanout */
 		sctp = listen_match(dst, ports, zoneid, iraflags, sctps);
@@ -333,17 +332,162 @@ sctp_find_conn(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
 }
 
 /*
+ * This is called from sctp_fanout() with IP header src & dst addresses.
+ * First call sctp_conn_match() to get a match by passing in src & dst
+ * addresses from IP header.
+ * However sctp_conn_match() can return no match under condition such as :
+ * A host can send an INIT ACK from a different address than the INIT was sent
+ * to (in a multi-homed env).
+ * According to RFC4960, a host can send additional addresses in an INIT
+ * ACK chunk.
+ * Therefore extract all addresses from the INIT ACK chunk, pass to
+ * sctp_conn_match() to get a match.
+ */
+static sctp_t *
+sctp_lookup_by_faddrs(mblk_t *mp, sctp_hdr_t *sctph, in6_addr_t *srcp,
+    in6_addr_t *dstp, uint32_t ports, zoneid_t zoneid, sctp_stack_t *sctps,
+    iaflags_t iraflags)
+{
+	sctp_t			*sctp;
+	sctp_chunk_hdr_t	*ich;
+	sctp_init_chunk_t	*iack;
+	sctp_parm_hdr_t		*ph;
+	ssize_t			mlen, remaining;
+	uint16_t		param_type, addr_len = PARM_ADDR4_LEN;
+	in6_addr_t		src;
+	in6_addr_t		**addrbuf = NULL, **faddrpp = NULL;
+	boolean_t		isv4;
+	uint32_t		totaddr, nfaddr = 0;
+
+	/*
+	 * If we get a match with the passed-in IP header src & dst addresses,
+	 * quickly return the matched sctp.
+	 */
+	if ((sctp = sctp_conn_match(&srcp, 1, dstp, ports, zoneid, iraflags,
+	    sctps)) != NULL) {
+		return (sctp);
+	}
+
+	/*
+	 * Currently sctph is set to NULL in icmp error fanout case
+	 * (ip_fanout_sctp()).
+	 * The above sctp_conn_match() should handle that, otherwise
+	 * return no match found.
+	 */
+	if (sctph == NULL)
+		return (NULL);
+
+	/*
+	 * Do a pullup again in case the previous one was partially successful,
+	 * so try to complete the pullup here and have a single contiguous
+	 * chunk for processing of entire INIT ACK chunk below.
+	 */
+	if (mp->b_cont != NULL) {
+		if (pullupmsg(mp, -1) == 0) {
+			return (NULL);
+		}
+	}
+
+	mlen = mp->b_wptr - (uchar_t *)(sctph + 1);
+	if ((ich = sctp_first_chunk((uchar_t *)(sctph + 1), mlen)) == NULL) {
+		return (NULL);
+	}
+
+	if (ich->sch_id == CHUNK_INIT_ACK) {
+		remaining = ntohs(ich->sch_len) - sizeof (*ich) -
+		    sizeof (*iack);
+		if (remaining < sizeof (*ph)) {
+			return (NULL);
+		}
+
+		isv4 = (iraflags & IRAF_IS_IPV4) ? B_TRUE : B_FALSE;
+		if (!isv4)
+			addr_len = PARM_ADDR6_LEN;
+		totaddr = remaining/addr_len;
+
+		iack = (sctp_init_chunk_t *)(ich + 1);
+		ph = (sctp_parm_hdr_t *)(iack + 1);
+
+		addrbuf = (in6_addr_t **)
+		    kmem_zalloc(totaddr * sizeof (in6_addr_t *), KM_NOSLEEP);
+		if (addrbuf == NULL)
+			return (NULL);
+		faddrpp = addrbuf;
+
+		while (ph != NULL) {
+			/*
+			 * According to RFC4960 :
+			 * All integer fields in an SCTP packet MUST be
+			 * transmitted in network byte order,
+			 * unless otherwise stated.
+			 * Therefore convert the param type to host byte order.
+			 * Also do not add src address present in IP header
+			 * as it has already been thru sctp_conn_match() above.
+			 */
+			param_type = ntohs(ph->sph_type);
+			switch (param_type) {
+			case PARM_ADDR4:
+				IN6_INADDR_TO_V4MAPPED((struct in_addr *)
+				    (ph + 1), &src);
+				if (IN6_ARE_ADDR_EQUAL(&src, srcp))
+					break;
+				*faddrpp = (in6_addr_t *)
+				    kmem_zalloc(sizeof (in6_addr_t),
+				    KM_NOSLEEP);
+				if (*faddrpp == NULL)
+					break;
+				IN6_INADDR_TO_V4MAPPED((struct in_addr *)
+				    (ph + 1), *faddrpp);
+				nfaddr++;
+				faddrpp++;
+				break;
+			case PARM_ADDR6:
+				*faddrpp = (in6_addr_t *)(ph + 1);
+				if (IN6_ARE_ADDR_EQUAL(*faddrpp, srcp))
+					break;
+				nfaddr++;
+				faddrpp++;
+				break;
+			default:
+				break;
+			}
+			ph = sctp_next_parm(ph, &remaining);
+		}
+
+		ASSERT(nfaddr < totaddr);
+
+		if (nfaddr > 0) {
+			sctp = sctp_conn_match(addrbuf, nfaddr, dstp, ports,
+			    zoneid, iraflags, sctps);
+
+			if (isv4) {
+				for (faddrpp = addrbuf; nfaddr > 0;
+				    faddrpp++, nfaddr--) {
+					if (IN6_IS_ADDR_V4MAPPED(*faddrpp)) {
+						kmem_free(*faddrpp,
+						    sizeof (in6_addr_t));
+					}
+				}
+			}
+		}
+		kmem_free(addrbuf, totaddr * sizeof (in6_addr_t *));
+	}
+	return (sctp);
+}
+
+/*
  * Fanout to a sctp instance.
  */
 conn_t *
 sctp_fanout(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
-    ip_recv_attr_t *ira, mblk_t *mp, sctp_stack_t *sctps)
+    ip_recv_attr_t *ira, mblk_t *mp, sctp_stack_t *sctps, sctp_hdr_t *sctph)
 {
 	zoneid_t zoneid = ira->ira_zoneid;
 	iaflags_t iraflags = ira->ira_flags;
 	sctp_t *sctp;
 
-	sctp = sctp_conn_match(src, dst, ports, zoneid, iraflags, sctps);
+	sctp = sctp_lookup_by_faddrs(mp, sctph, src, dst, ports, zoneid,
+	    sctps, iraflags);
 	if (sctp == NULL) {
 		/* Not in conn fanout; check listen fanout */
 		sctp = listen_match(dst, ports, zoneid, iraflags, sctps);
@@ -417,7 +561,7 @@ ip_fanout_sctp(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h, uint32_t ports,
 		src = &map_src;
 		dst = &map_dst;
 	}
-	connp = sctp_fanout(src, dst, ports, ira, mp, sctps);
+	connp = sctp_fanout(src, dst, ports, ira, mp, sctps, NULL);
 	if (connp == NULL) {
 		ip_fanout_sctp_raw(mp, ipha, ip6h, ports, ira);
 		return;

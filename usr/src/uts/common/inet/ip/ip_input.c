@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -2601,7 +2600,8 @@ ip_fanout_v4(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 			ip_fanout_sctp_raw(mp, ipha, NULL, ports, ira);
 			return;
 		}
-		connp = sctp_fanout(&map_src, &map_dst, ports, ira, mp, sctps);
+		connp = sctp_fanout(&map_src, &map_dst, ports, ira, mp,
+		    sctps, sctph);
 		if (connp == NULL) {
 			/* Check for raw socket or OOTB handling */
 			ip_fanout_sctp_raw(mp, ipha, NULL, ports, ira);

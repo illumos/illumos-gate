@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved
  */
 
 #ifndef _INET_SCTP_IP_H
@@ -30,6 +29,7 @@
 extern "C" {
 #endif
 
+#include <netinet/sctp.h>
 #include <inet/sctp/sctp_stack.h>
 
 #define	SCTP_COMMON_HDR_LENGTH	12	/* SCTP common header length */
@@ -42,7 +42,7 @@ extern void sctp_ddi_g_destroy(void);
 extern conn_t *sctp_find_conn(in6_addr_t *, in6_addr_t *, uint32_t,
     zoneid_t, iaflags_t, sctp_stack_t *);
 extern conn_t *sctp_fanout(in6_addr_t *, in6_addr_t *, uint32_t,
-    ip_recv_attr_t *, mblk_t *, sctp_stack_t *);
+    ip_recv_attr_t *, mblk_t *, sctp_stack_t *, sctp_hdr_t *);
 
 extern void sctp_input(conn_t *, ipha_t *, ip6_t *, mblk_t *, ip_recv_attr_t *);
 extern void sctp_ootb_input(mblk_t *, ip_recv_attr_t *, ip_stack_t *);
