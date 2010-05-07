@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri \
@@ -1811,3 +1810,7 @@ $(i386_ONLY)link path=usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/libperl.so \
 $(sparc_ONLY)link path=usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/libperl.so \
     target=./libperl.so.1
 link path=usr/perl5/bin target=./5.8.4/bin
+#
+# Autoloads will fail without the pertinent objects
+#
+depend fmri=runtime/perl-584/extra type=require
