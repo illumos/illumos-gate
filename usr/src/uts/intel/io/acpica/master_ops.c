@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/kobj.h>
@@ -394,7 +393,7 @@ process_master_file()
 	struct _buf *file;
 	master_rec_t *m;
 
-	if ((file = kobj_open_file(masterfile)) == NULL) {
+	if ((file = kobj_open_file(masterfile)) == (struct _buf *)-1) {
 		cmn_err(CE_WARN, "!cannot open master file: %s", masterfile);
 		return;
 	}
