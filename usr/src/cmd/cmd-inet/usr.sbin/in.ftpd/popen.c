@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /****************************************************************************    
@@ -125,7 +124,7 @@ FILE *ftpd_popen(char *program, char *type, int closestderr)
     /* glob each piece */
     gargv[0] = argv[0];
     for (gargc = argc = 1; argv[argc]; argc++) {
-	if (!(pop = ftpglob(argv[argc])) || globerr != NULL) {	/* globbing failed */
+	if (!(pop = ftpglob(argv[argc], B_TRUE)) || globerr != NULL) {	/* globbing failed */
 	    if (pop) {
 		blkfree(pop);
 		free((char *) pop);

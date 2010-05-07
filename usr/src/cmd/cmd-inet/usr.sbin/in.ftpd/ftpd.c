@@ -1,9 +1,6 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /****************************************************************************  
  
@@ -6716,7 +6713,7 @@ void perror_reply(int code, char *string)
 static char *onefile[] =
 {"", 0};
 
-extern char **ftpglob(register char *v);
+extern char **ftpglob(register char *v, boolean_t check_ncargs);
 extern char *globerr;
 
 void send_file_list(char *whichfiles)
@@ -6790,7 +6787,7 @@ void send_file_list(char *whichfiles)
     }
     if (strpbrk(whichfiles, "~{[*?") != NULL) {
 	globerr = NULL;
-	dirlist = ftpglob(whichfiles);
+	dirlist = ftpglob(whichfiles, B_FALSE);
 	sdirlist = dirlist;	/* save to free later */
 	if (globerr != NULL) {
 	    reply(550, "%s", globerr);

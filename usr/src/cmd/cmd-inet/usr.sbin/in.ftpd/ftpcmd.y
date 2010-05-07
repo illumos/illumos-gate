@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /****************************************************************************    
@@ -1598,7 +1597,7 @@ pathname: pathstring
 			(void) strlcat(t, $1 + 3, len);
 		    else if (strcmp($1, "/..") != 0)
 			(void) strlcat(t, $1, len);
-		    globlist = ftpglob(t);
+		    globlist = ftpglob(t, B_TRUE);
 		    if (globerr) {
 			reply(550, "%s", globerr);
 			$$ = NULL;
@@ -1628,7 +1627,7 @@ pathname: pathstring
 	    else if (logged_in && $1 && strncmp($1, "~", 1) == 0) {
 		char **globlist;
 
-		globlist = ftpglob($1);
+		globlist = ftpglob($1, B_TRUE);
 		if (globerr) {
 		    reply(550, "%s", globerr);
 		    $$ = NULL;

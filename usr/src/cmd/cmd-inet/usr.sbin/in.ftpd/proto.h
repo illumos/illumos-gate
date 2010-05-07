@@ -1,9 +1,6 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /****************************************************************************    
   Copyright (c) 1999,2000 WU-FTPD Development Group.  
@@ -232,7 +229,7 @@ void fixpath(char *path);
    ** glob.c
  */
 void blkfree(char **);
-char **ftpglob(register char *);
+char **ftpglob(register char *, boolean_t check_ncargs);
 char *strspl(register char *, register char *);
 char **copyblk(register char **);
 

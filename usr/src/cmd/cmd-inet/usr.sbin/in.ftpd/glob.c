@@ -1,9 +1,6 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /****************************************************************************    
   Copyright (c) 1999,2000,2001 WU-FTPD Development Group.  
@@ -72,15 +69,15 @@ static int tglob(register char);
 static char *strend(register char *);
 static void addpath(char);
 static void ginit(char **);
-static void collect(register char *);
-static void acollect(register char *);
+static void collect(register char *, boolean_t check_ncargs);
+static void acollect(register char *, boolean_t check_ncargs);
 static void sort(void);
-static void expand(char *);
-static void matchdir(char *);
+static void expand(char *, boolean_t check_ncargs);
+static void matchdir(char *, boolean_t check_ncargs);
 static int execbrc(char *, char *);
-static int match(char *, char *);
-static int amatch(char *, char *);
-static void Gcat(register char *, register char *);
+static int match(char *, char *, boolean_t check_ncargs);
+static int amatch(char *, char *, boolean_t check_ncargs);
+static void Gcat(register char *, register char *, boolean_t check_ncargs);
 static void rscan(register char **, int (*f) (register char));
 static int tglob(register char c);
 static int gethdir(char *);
@@ -109,7 +106,7 @@ static char **sortbas;
 extern char _path_passwd[];
 #endif
 
-char **ftpglob(register char *v)
+char **ftpglob(register char *v, boolean_t check_ncargs)
 {
     char agpath[BUFSIZ];
     char *vv[2];
@@ -144,7 +141,7 @@ char **ftpglob(register char *v)
     lastgpathp = &gpath[sizeof agpath - 2];
     ginit(agargv);
     globcnt = 0;
-    collect(v);
+    collect(v, check_ncargs);
     if (globcnt == 0 && (gflag & 1)) {
 	blkfree(gargv), gargv = 0;
 	return (0);
@@ -163,24 +160,24 @@ static void ginit(char **agargv)
     gnleft = NCARGS - 4;
 }
 
-static void collect(register char *as)
+static void collect(register char *as, boolean_t check_ncargs)
 {
     if (eq(as, "{") || eq(as, "{}")) {
-	Gcat(as, "");
+	Gcat(as, "", check_ncargs);
 	sort();
     }
     else
-	acollect(as);
+	acollect(as, check_ncargs);
 }
 
-static void acollect(register char *as)
+static void acollect(register char *as, boolean_t check_ncargs)
 {
     register int ogargc = gargc;
 
     gpathp = gpath;
     *gpathp = 0;
     globbed = 0;
-    expand(as);
+    expand(as, check_ncargs);
     if (gargc != ogargc)
 	sort();
 }
@@ -203,7 +200,7 @@ static void sort(void)
     sortbas = Gvp;
 }
 
-static void expand(char *as)
+static void expand(char *as, boolean_t check_ncargs)
 {
     register char *cs;
     register char *sgpathp, *oldcs;
@@ -233,9 +230,9 @@ static void expand(char *as)
     while (!any(*cs, globchars)) {
 	if (*cs == 0) {
 	    if (!globbed)
-		Gcat(gpath, "");
+		Gcat(gpath, "", check_ncargs);
 	    else if (stat(gpath, &stb) >= 0) {
-		Gcat(gpath, "");
+		Gcat(gpath, "", check_ncargs);
 		globcnt++;
 	    }
 	    goto endit;
@@ -252,13 +249,13 @@ static void expand(char *as)
 	(void) execbrc(cs, ((char *) 0));
 	return;
     }
-    matchdir(cs);
+    matchdir(cs, check_ncargs);
   endit:
     gpathp = sgpathp;
     *gpathp = 0;
 }
 
-static void matchdir(char *pattern)
+static void matchdir(char *pattern, boolean_t check_ncargs)
 {
     struct stat stb;
 
@@ -289,8 +286,8 @@ static void matchdir(char *pattern)
     while (!globerr && ((dp = readdir(dirp)) != NULL)) {
 	if (dp->d_ino == 0)
 	    continue;
-	if (match(dp->d_name, pattern)) {
-	    Gcat(gpath, dp->d_name);
+	if (match(dp->d_name, pattern, check_ncargs)) {
+	    Gcat(gpath, dp->d_name, check_ncargs);
 	    globcnt++;
 	}
     }
@@ -371,11 +368,11 @@ static int execbrc(char *p, char *s)
 	    *pm = savec;
 	    if (s == 0) {
 		sgpathp = gpathp;
-		expand(restbuf);
+		expand(restbuf, B_TRUE);
 		gpathp = sgpathp;
 		*gpathp = 0;
 	    }
-	    else if (amatch(s, restbuf))
+	    else if (amatch(s, restbuf, B_TRUE))
 		return (1);
 	    sort();
 	    pl = pm + 1;
@@ -394,7 +391,7 @@ static int execbrc(char *p, char *s)
     return (0);
 }
 
-static int match(char *s, char *p)
+static int match(char *s, char *p, boolean_t check_ncargs)
 {
     register int c;
     register char *sentp;
@@ -404,13 +401,13 @@ static int match(char *s, char *p)
 	return (0);
     sentp = entp;
     entp = s;
-    c = amatch(s, p);
+    c = amatch(s, p, check_ncargs);
     entp = sentp;
     globbed = sglobbed;
     return (c);
 }
 
-static int amatch(char *s, char *p)
+static int amatch(char *s, char *p, boolean_t check_ncargs)
 {
     register int scc;
     int ok, lc;
@@ -460,7 +457,7 @@ static int amatch(char *s, char *p)
 	    }
 	    s--;
 	    do {
-		if (amatch(s, p))
+		if (amatch(s, p, check_ncargs))
 		    return (1);
 	    } while (*s++);
 	    return (0);
@@ -489,11 +486,11 @@ static int amatch(char *s, char *p)
 	    addpath('/');
 	    if (stat(gpath, &stb) == 0 && isdir(stb))
 		if (*p == 0) {
-		    Gcat(gpath, "");
+		    Gcat(gpath, "", check_ncargs);
 		    globcnt++;
 		}
 		else
-		    expand(p);
+		    expand(p, check_ncargs);
 	    gpathp = sgpathp;
 	    *gpathp = 0;
 	    return (0);
@@ -501,14 +498,13 @@ static int amatch(char *s, char *p)
     }
 }
 
-static void Gcat(register char *s1, register char *s2)
+static void Gcat(register char *s1, register char *s2, boolean_t check_ncargs)
 {
     register size_t len = strlen(s1) + strlen(s2) + 1;
 
     if (globerr)
 	return;
-
-    if ((len + sizeof (char *)) >= gnleft) {
+    if ((check_ncargs) && ((len + sizeof (char *)) >= gnleft)) {
 	globerr = "Arguments too long";
 	return;
     }
@@ -531,7 +527,8 @@ static void Gcat(register char *s1, register char *s2)
 	sortbas = agargv;
     }
     gargc++;
-    gnleft -= len + sizeof (char *);
+    if (check_ncargs)
+	gnleft -= len + sizeof (char *);
     gargv[gargc] = 0;
     gargv[gargc - 1] = strspl(s1, s2);
 }

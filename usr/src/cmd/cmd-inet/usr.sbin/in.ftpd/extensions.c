@@ -1,9 +1,6 @@
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /****************************************************************************  
  
@@ -837,7 +834,7 @@ void show_readme(int code, int mode)
 	    }
 	if (show) {
 	    globerr = NULL;
-	    filelist = ftpglob(ARG0);
+	    filelist = ftpglob(ARG0, B_TRUE);
 	    sfilelist = filelist;	/* save to free later */
 	    if (!globerr) {
 		while (filelist && *filelist) {
