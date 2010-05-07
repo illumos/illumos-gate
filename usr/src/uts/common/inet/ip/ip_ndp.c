@@ -2367,7 +2367,7 @@ nce_timer(void *arg)
 			    &sender6, &ncec->ncec_addr,
 			    NDP_UNICAST);
 		} else {
-			dropped = arp_request(ncec, sender4, src_ill);
+			dropped = (arp_request(ncec, sender4, src_ill) == 0);
 			mutex_exit(&ncec->ncec_lock);
 		}
 		if (!dropped) {
@@ -2421,8 +2421,8 @@ nce_timer(void *arg)
 					 * the ARP request will be sent out
 					 * as a link-layer unicast.
 					 */
-					dropped = arp_request(ncec, sender4,
-					    src_ill);
+					dropped = (arp_request(ncec, sender4,
+					    src_ill) == 0);
 					mutex_exit(&ncec->ncec_lock);
 				}
 				if (!dropped) {

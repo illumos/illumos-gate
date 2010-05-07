@@ -3459,6 +3459,31 @@ ip_set_destination_v4(ipaddr_t *src_addrp, ipaddr_t dst_addr, ipaddr_t firsthop,
 	ixa->ixa_ire_generation = generation;
 
 	/*
+	 * Ensure that ixa_dce is always set any time that ixa_ire is set,
+	 * since some callers will send a packet to conn_ip_output() even if
+	 * there's an error.
+	 */
+	if (flags & IPDF_UNIQUE_DCE) {
+		/* Fallback to the default dce if allocation fails */
+		dce = dce_lookup_and_add_v4(dst_addr, ipst);
+		if (dce != NULL)
+			generation = dce->dce_generation;
+		else
+			dce = dce_lookup_v4(dst_addr, ipst, &generation);
+	} else {
+		dce = dce_lookup_v4(dst_addr, ipst, &generation);
+	}
+	ASSERT(dce != NULL);
+	if (ixa->ixa_dce != NULL)
+		dce_refrele_notr(ixa->ixa_dce);
+#ifdef DEBUG
+	dce_refhold_notr(dce);
+	dce_refrele(dce);
+#endif
+	ixa->ixa_dce = dce;
+	ixa->ixa_dce_generation = generation;
+
+	/*
 	 * For multicast with multirt we have a flag passed back from
 	 * ire_lookup_multi_ill_v4 since we don't have an IRE for each
 	 * possible multicast address.
@@ -3561,26 +3586,6 @@ ip_set_destination_v4(ipaddr_t *src_addrp, ipaddr_t dst_addr, ipaddr_t firsthop,
 		*src_addrp = src_addr;
 		ixa->ixa_src_generation = generation;
 	}
-
-	if (flags & IPDF_UNIQUE_DCE) {
-		/* Fallback to the default dce if allocation fails */
-		dce = dce_lookup_and_add_v4(dst_addr, ipst);
-		if (dce != NULL)
-			generation = dce->dce_generation;
-		else
-			dce = dce_lookup_v4(dst_addr, ipst, &generation);
-	} else {
-		dce = dce_lookup_v4(dst_addr, ipst, &generation);
-	}
-	ASSERT(dce != NULL);
-	if (ixa->ixa_dce != NULL)
-		dce_refrele_notr(ixa->ixa_dce);
-#ifdef DEBUG
-	dce_refhold_notr(dce);
-	dce_refrele(dce);
-#endif
-	ixa->ixa_dce = dce;
-	ixa->ixa_dce_generation = generation;
 
 	/*
 	 * Make sure we don't leave an unreachable ixa_nce in place

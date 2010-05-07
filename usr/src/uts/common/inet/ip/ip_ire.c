@@ -1262,10 +1262,16 @@ ire_add_v4(ire_t *ire)
 			 * after adding, we return a held ire. This will
 			 * avoid a lookup in the caller again. If the callers
 			 * don't want to use it, they need to do a REFRELE.
+			 *
+			 * We only allow exactly one IRE_IF_CLONE for any dst,
+			 * so, if the is an IF_CLONE, return the ire without
+			 * an identical_ref, but with an ire_ref held.
 			 */
-			atomic_add_32(&ire1->ire_identical_ref, 1);
-			DTRACE_PROBE2(ire__add__exist, ire_t *, ire1,
-			    ire_t *, ire);
+			if (ire->ire_type != IRE_IF_CLONE) {
+				atomic_add_32(&ire1->ire_identical_ref, 1);
+				DTRACE_PROBE2(ire__add__exist, ire_t *, ire1,
+				    ire_t *, ire);
+			}
 			ire_refhold(ire1);
 			ire_atomic_end(irb_ptr, ire);
 			ire_delete(ire);
@@ -3458,6 +3464,13 @@ ire_to_nce_pkt(ire_t *ire, mblk_t *mp)
  * Return the generation number.
  * Returns NULL is no memory for the IRE.
  * Handles both IPv4 and IPv6.
+ *
+ * IRE_IF_CLONE entries may only be created adn added by calling
+ * ire_create_if_clone(), and we depend on the fact that ire_add will
+ * atomically ensure that attempts to add multiple identical IRE_IF_CLONE
+ * entries will not result in duplicate (i.e., ire_identical_ref > 1)
+ * CLONE entries, so that a single ire_delete is sufficient to remove the
+ * CLONE.
  */
 ire_t *
 ire_create_if_clone(ire_t *ire_if, const in6_addr_t *addr, uint_t *generationp)
@@ -3508,14 +3521,6 @@ ire_create_if_clone(ire_t *ire_if, const in6_addr_t *addr, uint_t *generationp)
 	if (generationp != NULL)
 		*generationp = nire->ire_generation;
 
-	/*
-	 * Make sure races don't add a duplicate by
-	 * catching the case when an identical was returned.
-	 */
-	if (nire != ire) {
-		ASSERT(nire->ire_identical_ref > 1);
-		ire_delete(nire);
-	}
 	return (nire);
 }
 

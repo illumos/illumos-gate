@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
  */
 
@@ -2076,6 +2073,43 @@ ip_set_destination_v6(in6_addr_t *src_addrp, const in6_addr_t *dst_addr,
 	ixa->ixa_ire_generation = generation;
 
 	/*
+	 * Ensure that ixa_dce is always set any time that ixa_ire is set,
+	 * since some callers will send a packet to conn_ip_output() even if
+	 * there's an error.
+	 */
+	ifindex = 0;
+	if (IN6_IS_ADDR_LINKSCOPE(dst_addr)) {
+		/* If we are creating a DCE we'd better have an ifindex */
+		if (ill != NULL)
+			ifindex = ill->ill_phyint->phyint_ifindex;
+		else
+			flags &= ~IPDF_UNIQUE_DCE;
+	}
+
+	if (flags & IPDF_UNIQUE_DCE) {
+		/* Fallback to the default dce if allocation fails */
+		dce = dce_lookup_and_add_v6(dst_addr, ifindex, ipst);
+		if (dce != NULL) {
+			generation = dce->dce_generation;
+		} else {
+			dce = dce_lookup_v6(dst_addr, ifindex, ipst,
+			    &generation);
+		}
+	} else {
+		dce = dce_lookup_v6(dst_addr, ifindex, ipst, &generation);
+	}
+	ASSERT(dce != NULL);
+	if (ixa->ixa_dce != NULL)
+		dce_refrele_notr(ixa->ixa_dce);
+#ifdef DEBUG
+	dce_refhold_notr(dce);
+	dce_refrele(dce);
+#endif
+	ixa->ixa_dce = dce;
+	ixa->ixa_dce_generation = generation;
+
+
+	/*
 	 * For multicast with multirt we have a flag passed back from
 	 * ire_lookup_multi_ill_v6 since we don't have an IRE for each
 	 * possible multicast address.
@@ -2179,38 +2213,6 @@ ip_set_destination_v6(in6_addr_t *src_addrp, const in6_addr_t *dst_addr,
 		ixa->ixa_nce = NULL;
 		ixa->ixa_ire_generation = IRE_GENERATION_VERIFY;
 	}
-
-
-	ifindex = 0;
-	if (IN6_IS_ADDR_LINKSCOPE(dst_addr)) {
-		/* If we are creating a DCE we'd better have an ifindex */
-		if (ill != NULL)
-			ifindex = ill->ill_phyint->phyint_ifindex;
-		else
-			flags &= ~IPDF_UNIQUE_DCE;
-	}
-
-	if (flags & IPDF_UNIQUE_DCE) {
-		/* Fallback to the default dce if allocation fails */
-		dce = dce_lookup_and_add_v6(dst_addr, ifindex, ipst);
-		if (dce != NULL) {
-			generation = dce->dce_generation;
-		} else {
-			dce = dce_lookup_v6(dst_addr, ifindex, ipst,
-			    &generation);
-		}
-	} else {
-		dce = dce_lookup_v6(dst_addr, ifindex, ipst, &generation);
-	}
-	ASSERT(dce != NULL);
-	if (ixa->ixa_dce != NULL)
-		dce_refrele_notr(ixa->ixa_dce);
-#ifdef DEBUG
-	dce_refhold_notr(dce);
-	dce_refrele(dce);
-#endif
-	ixa->ixa_dce = dce;
-	ixa->ixa_dce_generation = generation;
 
 	/*
 	 * Note that IPv6 multicast supports PMTU discovery unlike IPv4
