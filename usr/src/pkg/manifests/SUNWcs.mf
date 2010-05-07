@@ -2711,3 +2711,7 @@ link path=usr/tmp target=../var/tmp
 link path=var/ld/32 target=.
 link path=var/ld/64 target=$(ARCH64)
 depend fmri=runtime/perl-584 type=require
+#
+# The loadkeys binary needs the keytables.
+#
+depend fmri=system/data/keyboard/keytables type=require
