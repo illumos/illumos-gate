@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "bge_impl.h"
@@ -937,7 +936,7 @@ bge_nic_get64(bge_t *bgep, bge_regno_t addr)
 		data <<= 32;
 		data |= ddi_get32(bgep->io_handle, PIO_ADDR(bgep, addr));
 	} else {
-			data = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, addr));
+		data = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, addr));
 	}
 #elif defined(__sparc)
 	if (DEVICE_5723_SERIES_CHIPSETS(bgep) ||
@@ -948,9 +947,9 @@ bge_nic_get64(bge_t *bgep, bge_regno_t addr)
 		    PIO_ADDR(bgep, addr + 4));
 	} else {
 		data = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, addr));
-		}
+	}
 #else
-		data = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, addr));
+	data = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, addr));
 #endif
 
 	BGE_TRACE(("bge_nic_get64($%p, 0x%lx) = 0x%016llx",
@@ -3169,11 +3168,26 @@ bge_chip_stop(bge_t *bgep, boolean_t fault)
 	bge_regno_t regno;
 	bge_regno_t *rbp;
 	boolean_t ok;
+	uint_t asf_mode;
 
 	BGE_TRACE(("bge_chip_stop($%p)",
 	    (void *)bgep));
 
 	ASSERT(mutex_owned(bgep->genlock));
+
+	/*
+	 * In some case, some chips' internal engines may fail to reset,
+	 * so we call bge_chip_reset as a workaround.
+	 */
+	bgep->bge_chip_state = BGE_CHIP_RESET;
+#ifdef BGE_IPMI_ASF
+	asf_mode = bgep->asf_enabled? ASF_MODE_POST_INIT: ASF_MODE_NONE;
+	if (bge_chip_reset(bgep, B_TRUE, asf_mode) != DDI_SUCCESS)
+#else
+	if (bge_chip_reset(bgep, B_TRUE) != DDI_SUCCESS)
+#endif
+		ddi_fm_service_impact(bgep->devinfo,
+		    DDI_SERVICE_UNAFFECTED);
 
 	rbp = shutdown_engine_regs;
 	/*
