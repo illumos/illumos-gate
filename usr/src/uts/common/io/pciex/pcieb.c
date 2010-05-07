@@ -57,6 +57,7 @@
 
 /* panic flag */
 int pcieb_die = PF_ERR_FATAL_FLAGS;
+int pcieb_disable_41210_wkarnd = 0;
 
 /* flag to turn on MSI support */
 int pcieb_enable_msi = 1;
@@ -276,6 +277,85 @@ pcieb_probe(dev_info_t *devi)
 	return (DDI_PROBE_SUCCESS);
 }
 
+/*
+ * This is a workaround for an undocumented HW erratum with the
+ * multi-function, F0 and F2, Intel 41210 PCIe-to-PCI bridge. When
+ * Fn (cdip) attaches, this workaround is called to initialize Fn's
+ * sibling (sdip) with MPS/MRRS if it isn't already configured.
+ * Doing so prevents a malformed TLP panic.
+ */
+static void
+pcieb_41210_mps_wkrnd(dev_info_t *cdip)
+{
+	dev_info_t *sdip;
+	ddi_acc_handle_t cfg_hdl;
+	uint16_t cdip_dev_ctrl, cdip_mrrs_mps;
+	pcie_bus_t *cdip_bus_p = PCIE_DIP2BUS(cdip);
+
+	/* Get cdip's MPS/MRRS already setup by pcie_initchild_mps() */
+	ASSERT(cdip_bus_p);
+	cdip_dev_ctrl  = PCIE_CAP_GET(16, cdip_bus_p, PCIE_DEVCTL);
+	cdip_mrrs_mps  = cdip_dev_ctrl &
+	    (PCIE_DEVCTL_MAX_READ_REQ_MASK | PCIE_DEVCTL_MAX_PAYLOAD_MASK);
+
+	/* Locate sdip and set its MPS/MRRS when applicable */
+	for (sdip = ddi_get_child(ddi_get_parent(cdip)); sdip;
+	    sdip = ddi_get_next_sibling(sdip)) {
+		uint16_t sdip_dev_ctrl, sdip_mrrs_mps, cap_ptr;
+		uint32_t bus_dev_ven_id;
+
+		if (sdip == cdip || pci_config_setup(sdip, &cfg_hdl)
+		    != DDI_SUCCESS)
+			continue;
+
+		/* must be an Intel 41210 bridge */
+		bus_dev_ven_id = pci_config_get32(cfg_hdl, PCI_CONF_VENID);
+		if (!PCIEB_IS_41210_BRIDGE(bus_dev_ven_id)) {
+			pci_config_teardown(&cfg_hdl);
+			continue;
+		}
+
+		if (PCI_CAP_LOCATE(cfg_hdl, PCI_CAP_ID_PCI_E, &cap_ptr)
+		    != DDI_SUCCESS) {
+			pci_config_teardown(&cfg_hdl);
+			continue;
+		}
+
+		/* get sdip's MPS/MRRS to compare to cdip's */
+		sdip_dev_ctrl = PCI_CAP_GET16(cfg_hdl, NULL, cap_ptr,
+		    PCIE_DEVCTL);
+		sdip_mrrs_mps = sdip_dev_ctrl &
+		    (PCIE_DEVCTL_MAX_READ_REQ_MASK |
+		    PCIE_DEVCTL_MAX_PAYLOAD_MASK);
+
+		/* if sdip already attached then its MPS/MRRS is configured */
+		if (i_ddi_devi_attached(sdip)) {
+			ASSERT(sdip_mrrs_mps == cdip_mrrs_mps);
+			pci_config_teardown(&cfg_hdl);
+			continue;
+		}
+
+		/* otherwise, update sdip's MPS/MRRS if different from cdip's */
+		if (sdip_mrrs_mps != cdip_mrrs_mps) {
+			sdip_dev_ctrl = (sdip_dev_ctrl &
+			    ~(PCIE_DEVCTL_MAX_READ_REQ_MASK |
+			    PCIE_DEVCTL_MAX_PAYLOAD_MASK)) | cdip_mrrs_mps;
+
+			PCI_CAP_PUT16(cfg_hdl, NULL, cap_ptr, PCIE_DEVCTL,
+			    sdip_dev_ctrl);
+		}
+
+		/*
+		 * note: sdip's bus_mps will be updated by
+		 * pcie_initchild_mps()
+		 */
+
+		pci_config_teardown(&cfg_hdl);
+
+		break;
+	}
+}
+
 static int
 pcieb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
@@ -379,6 +459,11 @@ pcieb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	if (pcie_init(devi, NULL) != DDI_SUCCESS)
 		goto fail;
+
+	/* Intel PCIe-to-PCI 41210 bridge workaround -- if applicable */
+	if (pcieb_disable_41210_wkarnd == 0 &&
+	    PCIEB_IS_41210_BRIDGE(bus_p->bus_dev_ven_id))
+		pcieb_41210_mps_wkrnd(devi);
 
 	/*
 	 * Initialize interrupt handlers. Ignore return value.

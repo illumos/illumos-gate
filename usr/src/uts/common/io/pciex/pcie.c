@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sysmacros.h>
@@ -594,7 +594,11 @@ pcie_initchild(dev_info_t *cdip)
 	if (PCIE_IS_PCIE(bus_p)) {
 		/* Setup PCIe device control register */
 		reg16 = PCIE_CAP_GET(16, bus_p, PCIE_DEVCTL);
-		tmp16 = pcie_devctl_default;
+		/* note: MPS/MRRS are initialized in pcie_initchild_mps() */
+		tmp16 = (reg16 & (PCIE_DEVCTL_MAX_READ_REQ_MASK |
+		    PCIE_DEVCTL_MAX_PAYLOAD_MASK)) |
+		    (pcie_devctl_default & ~(PCIE_DEVCTL_MAX_READ_REQ_MASK |
+		    PCIE_DEVCTL_MAX_PAYLOAD_MASK));
 		PCIE_CAP_PUT(16, bus_p, PCIE_DEVCTL, tmp16);
 		PCIE_DBG_CAP(cdip, bus_p, "DEVCTL", 16, PCIE_DEVCTL, reg16);
 
@@ -1784,11 +1788,18 @@ pcie_initchild_mps(dev_info_t *cdip)
 		int suggested_mrrs, fabric_mps;
 		uint16_t device_mps, device_mps_cap, device_mrrs, dev_ctrl;
 
-		if ((fabric_mps = (PCIE_IS_RP(bus_p) ? bus_p :
-		    PCIE_DIP2BUS(pdip))->bus_mps) < 0)
-			return (DDI_SUCCESS);
-
 		dev_ctrl = PCIE_CAP_GET(16, bus_p, PCIE_DEVCTL);
+		if ((fabric_mps = (PCIE_IS_RP(bus_p) ? bus_p :
+		    PCIE_DIP2BUS(pdip))->bus_mps) < 0) {
+			dev_ctrl = (dev_ctrl & ~(PCIE_DEVCTL_MAX_READ_REQ_MASK |
+			    PCIE_DEVCTL_MAX_PAYLOAD_MASK)) |
+			    (pcie_devctl_default &
+			    (PCIE_DEVCTL_MAX_READ_REQ_MASK |
+			    PCIE_DEVCTL_MAX_PAYLOAD_MASK));
+
+			PCIE_CAP_PUT(16, bus_p, PCIE_DEVCTL, dev_ctrl);
+			return (DDI_SUCCESS);
+		}
 
 		device_mps_cap = PCIE_CAP_GET(16, bus_p, PCIE_DEVCAP) &
 		    PCIE_DEVCAP_MAX_PAYLOAD_MASK;

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_PCIEB_H
@@ -80,6 +79,16 @@ typedef enum {	/* same sequence as pcieb_debug_sym[] */
 #define	PCIEB_16bit_IOADDR(addr) ((uint16_t)(((uint8_t)(addr) & 0xF0) << 8))
 #define	PCIEB_LADDR(lo, hi) (((uint16_t)(hi) << 16) | (uint16_t)(lo))
 #define	PCIEB_32bit_MEMADDR(addr) (PCIEB_LADDR(0, ((uint16_t)(addr) & 0xFFF0)))
+
+/*
+ * Intel 41210 PCIe-to-PCI Bridge has two Functions F0 and F2:
+ * VID: 0x8086
+ * DID: F0 = 0x340, F2 = 0x341
+ */
+#define	PCIEB_IS_41210_F0(bus_dev_ven_id) (bus_dev_ven_id == 0x3408086)
+#define	PCIEB_IS_41210_F2(bus_dev_ven_id) (bus_dev_ven_id == 0x3418086)
+#define	PCIEB_IS_41210_BRIDGE(bus_dev_ven_id) \
+	(PCIEB_IS_41210_F0(bus_dev_ven_id) || PCIEB_IS_41210_F2(bus_dev_ven_id))
 
 typedef struct {
 	dev_info_t		*pcieb_dip;
