@@ -8830,7 +8830,7 @@ ddi_alias_to_currdip(char *alias, int i)
 	char *curr;
 	dev_info_t *currdip = NULL;
 	char *aliasdup;
-	int len;
+	int rv, len;
 
 	pair = &(ddi_aliases.dali_alias_pairs[i]);
 	len = strlen(pair->pair_alias);
@@ -8848,7 +8848,6 @@ ddi_alias_to_currdip(char *alias, int i)
 	if (alias[len] != '/' && alias[len] != '\0')
 		goto out;
 
-
 	curr = kmem_alloc(MAXPATHLEN, KM_NOSLEEP);
 	if (curr == NULL) {
 		cmn_err(CE_PANIC, "curr alloc failed");
@@ -8864,11 +8863,18 @@ ddi_alias_to_currdip(char *alias, int i)
 
 out:
 	if (currdip) {
-		(void) mod_hash_insert(ddi_aliases.dali_alias_TLB,
+		rv = mod_hash_insert(ddi_aliases.dali_alias_TLB,
 		    (mod_hash_key_t)aliasdup, (mod_hash_val_t)curr);
+		if (rv != 0) {
+			kmem_free(curr, MAXPATHLEN);
+			strfree(aliasdup);
+		}
 	} else {
-		(void) mod_hash_insert(ddi_aliases.dali_alias_TLB,
+		rv = mod_hash_insert(ddi_aliases.dali_alias_TLB,
 		    (mod_hash_key_t)aliasdup, (mod_hash_val_t)NULL);
+		if (rv != 0) {
+			strfree(aliasdup);
+		}
 		if (curr)
 			kmem_free(curr, MAXPATHLEN);
 	}
@@ -8883,6 +8889,7 @@ ddi_curr_to_alias(char *curr, int i)
 	char		*alias;
 	char		*currdup;
 	int		len;
+	int		rv;
 
 	pair = &(ddi_aliases.dali_curr_pairs[i]);
 
@@ -8920,8 +8927,11 @@ ddi_curr_to_alias(char *curr, int i)
 	}
 
 out:
-	(void) mod_hash_insert(ddi_aliases.dali_curr_TLB,
+	rv = mod_hash_insert(ddi_aliases.dali_curr_TLB,
 	    (mod_hash_key_t)currdup, (mod_hash_val_t)alias);
+	if (rv != 0) {
+		strfree(currdup);
+	}
 
 	return (alias);
 }
@@ -8930,7 +8940,6 @@ dev_info_t *
 ddi_alias_redirect(char *alias)
 {
 	char		*curr;
-	char		*aliasdup;
 	dev_info_t	*currdip;
 	int		i;
 
@@ -8950,12 +8959,6 @@ ddi_alias_redirect(char *alias)
 	    (mod_hash_key_t)alias, (mod_hash_val_t *)&curr) == 0) {
 		currdip = curr ? path_to_dip(curr) : NULL;
 		goto out;
-	}
-
-	aliasdup = ddi_strdup(alias, KM_NOSLEEP);
-	if (aliasdup == NULL) {
-		cmn_err(CE_PANIC, "aliasdup alloc failed");
-		/*NOTREACHED*/
 	}
 
 	/* The TLB has no translation, do it the hard way */
