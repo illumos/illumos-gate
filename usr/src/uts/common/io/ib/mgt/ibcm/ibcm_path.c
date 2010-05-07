@@ -3016,6 +3016,7 @@ typedef struct ibcm_ip_path_tqargs_s {
 	ibt_clnt_hdl_t		ibt_hdl;
 	kmutex_t		ip_lock;
 	kcondvar_t		ip_cv;
+	boolean_t		ip_done;
 	ibt_status_t		retval;
 	uint_t			len;
 } ibcm_ip_path_tqargs_t;
@@ -3968,13 +3969,12 @@ ippath_error:
 		(*(p_arg->func))(p_arg->arg, retval, tmp_path_p, num_path,
 		    tmp_src_ip_p);
 
-		cv_destroy(&p_arg->ip_cv);
-		mutex_destroy(&p_arg->ip_lock);
 		len = p_arg->len;
 		if (p_arg && len)
 			kmem_free(p_arg, len);
 	} else {
 		mutex_enter(&p_arg->ip_lock);
+		p_arg->ip_done = B_TRUE;
 		p_arg->retval = retval;
 		cv_signal(&p_arg->ip_cv);
 		mutex_exit(&p_arg->ip_lock);
@@ -4133,8 +4133,6 @@ ibcm_get_ip_path(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
 	}
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*path_tq))
-	mutex_init(&path_tq->ip_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&path_tq->ip_cv, NULL, CV_DRIVER, NULL);
 	bcopy(attrp, &path_tq->attr, sizeof (ibt_ip_path_attr_t));
 
 	path_tq->attr.ipa_dst_ip = (ibt_ip_addr_t *)(((uchar_t *)path_tq) +
@@ -4158,29 +4156,35 @@ ibcm_get_ip_path(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
 	path_tq->func = func;
 	path_tq->arg = arg;
 	path_tq->len = len;
+	path_tq->ip_done = B_FALSE;
+	if (func == NULL) {	/* Blocking */
+		mutex_init(&path_tq->ip_lock, NULL, MUTEX_DEFAULT, NULL);
+		cv_init(&path_tq->ip_cv, NULL, CV_DRIVER, NULL);
+	}
 
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*path_tq))
 
 	sleep_flag = ((func == NULL) ? TQ_SLEEP : TQ_NOSLEEP);
-	mutex_enter(&path_tq->ip_lock);
 	ret = taskq_dispatch(ibcm_taskq, ibcm_process_get_ip_paths, path_tq,
 	    sleep_flag);
 	if (ret == 0) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_get_ip_path: Failed to dispatch "
 		    "the TaskQ");
-		mutex_exit(&path_tq->ip_lock);
-		cv_destroy(&path_tq->ip_cv);
-		mutex_destroy(&path_tq->ip_lock);
+		if (func == NULL) {		/* Blocking */
+			cv_destroy(&path_tq->ip_cv);
+			mutex_destroy(&path_tq->ip_lock);
+		}
 		kmem_free(path_tq, len);
 		retval = IBT_INSUFF_KERNEL_RESOURCE;
 	} else {
 		if (func != NULL) {		/* Non-Blocking */
 			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_path: NonBlocking");
 			retval = IBT_SUCCESS;
-			mutex_exit(&path_tq->ip_lock);
 		} else {		/* Blocking */
 			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_path: Blocking");
-			cv_wait(&path_tq->ip_cv, &path_tq->ip_lock);
+			mutex_enter(&path_tq->ip_lock);
+			while (path_tq->ip_done != B_TRUE)
+				cv_wait(&path_tq->ip_cv, &path_tq->ip_lock);
 			retval = path_tq->retval;
 			mutex_exit(&path_tq->ip_lock);
 			cv_destroy(&path_tq->ip_cv);
