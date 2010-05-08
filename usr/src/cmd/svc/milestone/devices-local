@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
@@ -41,11 +40,9 @@ if [ $? -eq 0 ]; then
 	/usr/sbin/devfsadm >/dev/msglog 2>&1
 
 	#
-	# Flush any existing socket mappings since the major numbers of
-	# the device files may have changed.
+	# Rerun soconfig to configure any sockets that use /dev
+	# entries that were just created by devfsadm.
 	#
-	/usr/bin/awk '/^[^#]/ { print $1, $2, $3 }' /etc/sock2path | \
-		/sbin/soconfig -f /dev/fd/0 >/dev/null 2>&1
 	/sbin/soconfig -f /etc/sock2path >/dev/null 2>&1
 
 	#
