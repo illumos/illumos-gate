@@ -4446,6 +4446,12 @@ spa_vdev_remove_from_namespace(spa_t *spa, vdev_t *vd)
 		vd = vdev_alloc_common(spa, id, 0, &vdev_hole_ops);
 		vdev_add_child(rvd, vd);
 	}
+	vdev_config_dirty(rvd);
+
+	/*
+	 * Reassess the health of our root vdev.
+	 */
+	vdev_reopen(rvd);
 }
 
 /*
