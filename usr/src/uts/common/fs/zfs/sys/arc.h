@@ -112,7 +112,6 @@ zio_t *arc_write(zio_t *pio, spa_t *spa, uint64_t txg,
     blkptr_t *bp, arc_buf_t *buf, boolean_t l2arc, const zio_prop_t *zp,
     arc_done_func_t *ready, arc_done_func_t *done, void *private,
     int priority, int zio_flags, const zbookmark_t *zb);
-void arc_free(spa_t *spa, const blkptr_t *bp);
 
 void arc_set_callback(arc_buf_t *buf, arc_evict_func_t *func, void *private);
 int arc_buf_evict(arc_buf_t *buf);

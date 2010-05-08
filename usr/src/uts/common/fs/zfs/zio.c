@@ -1031,8 +1031,6 @@ zio_free_bp_init(zio_t *zio)
 	if (zio->io_child_type == ZIO_CHILD_LOGICAL) {
 		if (BP_GET_DEDUP(bp))
 			zio->io_pipeline = ZIO_DDT_FREE_PIPELINE;
-		else
-			arc_free(zio->io_spa, bp);
 	}
 
 	return (ZIO_PIPELINE_CONTINUE);

@@ -3308,45 +3308,6 @@ arc_write(zio_t *pio, spa_t *spa, uint64_t txg,
 	return (zio);
 }
 
-void
-arc_free(spa_t *spa, const blkptr_t *bp)
-{
-	arc_buf_hdr_t *ab;
-	kmutex_t *hash_lock;
-	uint64_t guid = spa_guid(spa);
-
-	/*
-	 * If this buffer is in the cache, release it, so it can be re-used.
-	 */
-	ab = buf_hash_find(guid, BP_IDENTITY(bp), BP_PHYSICAL_BIRTH(bp),
-	    &hash_lock);
-	if (ab != NULL) {
-		if (ab->b_state != arc_anon)
-			arc_change_state(arc_anon, ab, hash_lock);
-		if (HDR_IO_IN_PROGRESS(ab)) {
-			/*
-			 * This should only happen when we prefetch.
-			 */
-			ASSERT(ab->b_flags & ARC_PREFETCH);
-			ASSERT3U(ab->b_datacnt, ==, 1);
-			ab->b_flags |= ARC_FREED_IN_READ;
-			if (HDR_IN_HASH_TABLE(ab))
-				buf_hash_remove(ab);
-			ab->b_arc_access = 0;
-			buf_discard_identity(ab);
-			ab->b_buf->b_efunc = NULL;
-			ab->b_buf->b_private = NULL;
-			mutex_exit(hash_lock);
-		} else {
-			ASSERT(refcount_is_zero(&ab->b_refcnt));
-			ab->b_flags |= ARC_FREE_IN_PROGRESS;
-			mutex_exit(hash_lock);
-			arc_hdr_destroy(ab);
-			ARCSTAT_BUMP(arcstat_deleted);
-		}
-	}
-}
-
 static int
 arc_memory_throttle(uint64_t reserve, uint64_t inflight_data, uint64_t txg)
 {
