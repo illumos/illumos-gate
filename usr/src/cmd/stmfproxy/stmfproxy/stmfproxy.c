@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdio.h>
@@ -74,6 +73,7 @@ int log_debug = 0;
 int fore_ground = 0;
 int proxy_hdl;
 pt_ops_t *pt_ops;
+pthread_mutex_t send_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*
  * killHandler
@@ -144,7 +144,9 @@ postMsg(uint_t nelem, uchar_t *aluaMsg)
 	bcopy(&buflen, buf, sizeof (buflen));
 	bcopy(aluaMsg, buf + sizeof (buflen), nelem);
 
+	(void) pthread_mutex_lock(&send_mutex);
 	ns = pt_ops->stmf_proxy_send(t_handle, buf, nelem + sizeof (buflen));
+	(void) pthread_mutex_unlock(&send_mutex);
 	if (ns != nelem + sizeof (buflen)) {
 		ret = errno;
 		if (ret == 0)

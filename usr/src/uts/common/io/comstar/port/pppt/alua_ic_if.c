@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -282,7 +281,7 @@ static scsi_devid_desc_t *stmf_ic_lookup_scsi_devid_desc_and_unmarshal(
 static scsi_devid_desc_t *stmf_ic_scsi_devid_desc_unmarshal(
     nvlist_t *nvl_devid);
 static uint8_t *stmf_ic_uint8_array_unmarshal(nvlist_t *nvl, char *field_name,
-	uint16_t len, uint8_t *buf);
+	uint64_t len, uint8_t *buf);
 static char *stmf_ic_string_unmarshal(nvlist_t *nvl, char *field_name);
 
 /*
@@ -2027,7 +2026,7 @@ static uint8_t *
 stmf_ic_uint8_array_unmarshal(
     nvlist_t *nvl,
     char *field_name,
-    uint16_t len,
+    uint64_t len,
     uint8_t *buf)	/* non-NULL: copy array into buf */
 {
 	uint8_t *array = NULL;
@@ -2042,7 +2041,7 @@ stmf_ic_uint8_array_unmarshal(
 	if (len != actual_len) {
 		cmn_err(CE_WARN,
 		    "stmf_ic_uint8_array_unmarshal: wrong len (%d != %d)",
-		    len, actual_len);
+		    (int)len, actual_len);
 		return (NULL);
 	}
 

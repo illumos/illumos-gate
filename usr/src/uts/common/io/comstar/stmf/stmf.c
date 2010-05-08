@@ -85,7 +85,7 @@ stmf_status_t stmf_lun_reset_poll(stmf_lu_t *lu, struct scsi_task *task,
 void stmf_target_reset_poll(struct scsi_task *task);
 void stmf_handle_lun_reset(scsi_task_t *task);
 void stmf_handle_target_reset(scsi_task_t *task);
-void stmf_xd_to_dbuf(stmf_data_buf_t *dbuf);
+void stmf_xd_to_dbuf(stmf_data_buf_t *dbuf, int set_rel_off);
 int stmf_load_ppd_ioctl(stmf_ppioctl_data_t *ppi, uint64_t *ppi_token,
     uint32_t *err_ret);
 int stmf_delete_ppd_ioctl(stmf_ppioctl_data_t *ppi);
@@ -1784,7 +1784,7 @@ stmf_ic_rx_scsi_data(stmf_ic_scsi_data_msg_t *msg)
 	itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
 	dbuf = itask->itask_proxy_dbuf;
 
-	task->task_cmd_xfer_length = msg->icsd_data_len;
+	task->task_cmd_xfer_length += msg->icsd_data_len;
 
 	if (task->task_additional_flags &
 	    TASK_AF_NO_EXPECTED_XFER_LENGTH) {
@@ -1822,7 +1822,8 @@ stmf_ic_rx_scsi_data(stmf_ic_scsi_data_msg_t *msg)
 		return (STMF_FAILURE);
 	}
 	dbuf->db_lu_private = xd;
-	stmf_xd_to_dbuf(dbuf);
+	dbuf->db_relative_offset = task->task_nbytes_transferred;
+	stmf_xd_to_dbuf(dbuf, 0);
 
 	dbuf->db_flags = DB_DIRECTION_TO_RPORT;
 	(void) stmf_xfer_data(task, dbuf, 0);
@@ -6163,7 +6164,7 @@ stmf_scsilib_handle_report_tpgs(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		return;
 	}
 	dbuf->db_lu_private = xd;
-	stmf_xd_to_dbuf(dbuf);
+	stmf_xd_to_dbuf(dbuf, 1);
 
 	dbuf->db_flags = DB_DIRECTION_TO_RPORT;
 	(void) stmf_xfer_data(task, dbuf, 0);
@@ -6800,7 +6801,7 @@ worker_mgmt_trigger_change:
  * db_lu_private NULL.
  */
 void
-stmf_xd_to_dbuf(stmf_data_buf_t *dbuf)
+stmf_xd_to_dbuf(stmf_data_buf_t *dbuf, int set_rel_off)
 {
 	stmf_xfer_data_t *xd;
 	uint8_t *p;
@@ -6809,7 +6810,8 @@ stmf_xd_to_dbuf(stmf_data_buf_t *dbuf)
 
 	xd = (stmf_xfer_data_t *)dbuf->db_lu_private;
 	dbuf->db_data_size = 0;
-	dbuf->db_relative_offset = xd->size_done;
+	if (set_rel_off)
+		dbuf->db_relative_offset = xd->size_done;
 	for (i = 0; i < dbuf->db_sglist_length; i++) {
 		s = min(xd->size_left, dbuf->db_sglist[i].seg_length);
 		p = &xd->buf[xd->size_done];
@@ -6967,7 +6969,7 @@ stmf_dlun0_new_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 			return;
 		}
 		dbuf->db_lu_private = xd;
-		stmf_xd_to_dbuf(dbuf);
+		stmf_xd_to_dbuf(dbuf, 1);
 
 		atomic_and_32(&iss->iss_flags,
 		    ~(ISS_LUN_INVENTORY_CHANGED | ISS_GOT_INITIAL_LUNS));
@@ -6990,13 +6992,15 @@ stmf_dlun0_dbuf_done(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		    dbuf->db_xfer_status, NULL);
 		return;
 	}
-	task->task_nbytes_transferred = dbuf->db_data_size;
+	task->task_nbytes_transferred += dbuf->db_data_size;
 	if (dbuf->db_lu_private) {
 		/* There is more */
-		stmf_xd_to_dbuf(dbuf);
+		stmf_xd_to_dbuf(dbuf, 1);
 		(void) stmf_xfer_data(task, dbuf, 0);
 		return;
 	}
+
+	stmf_free_dbuf(task, dbuf);
 	/*
 	 * If this is a proxy task, it will need to be completed from the
 	 * proxy port provider. This message lets pppt know that the xfer

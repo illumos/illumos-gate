@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -349,7 +348,7 @@ pppt_msg_scsi_cmd(stmf_ic_msg_t *msg)
 	 */
 	task->task_mgmt_function = scmd->icsc_task_mgmt_function;
 
-	task->task_max_nbufs = STMF_BUFS_MAX; /* Or protocol value */
+	task->task_max_nbufs = 1; /* Don't allow parallel xfers */
 	task->task_cmd_seq_no = msg->icm_msgid;
 	task->task_expected_xfer_length =
 	    scmd->icsc_task_expected_xfer_length;

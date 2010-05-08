@@ -2655,6 +2655,12 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		    cdb0 != SCMD_PERSISTENT_RESERVE_IN &&
 		    cdb0 != SCMD_REQUEST_SENSE &&
 		    cdb0 != SCMD_READ_CAPACITY &&
+		    cdb0 != SCMD_TEST_UNIT_READY &&
+		    cdb0 != SCMD_START_STOP &&
+		    cdb0 != SCMD_READ &&
+		    cdb0 != SCMD_READ_G1 &&
+		    cdb0 != SCMD_READ_G4 &&
+		    cdb0 != SCMD_READ_G5 &&
 		    !(cdb0 == SCMD_SVC_ACTION_IN_G4 &&
 		    cdb1 == SSVC_ACTION_READ_CAPACITY_G4) &&
 		    !(cdb0 == SCMD_MAINTENANCE_IN &&
