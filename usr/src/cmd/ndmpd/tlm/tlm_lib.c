@@ -1251,9 +1251,9 @@ chkpnt_backup_successful(char *volname, char *jname, boolean_t recursive,
 	}
 
 	if (recursive) {
-		err = zfs_destroy_snaps(zhp, jname, B_FALSE);
+		err = zfs_destroy_snaps(zhp, jname, B_TRUE);
 	} else {
-		err = zfs_destroy(zhp, B_FALSE);
+		err = zfs_destroy(zhp, B_TRUE);
 	}
 
 	if (err) {

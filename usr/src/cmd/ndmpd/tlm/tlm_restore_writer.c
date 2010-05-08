@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -44,6 +43,7 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/acl.h>
+#include <sys/mkdev.h>
 #include <utime.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -100,8 +100,12 @@ static int create_sym_link(char *dst,
     char *target,
     tlm_acls_t *,
     tlm_job_stats_t *);
-static int create_fifo(char *name,
-    tlm_acls_t *);
+static int create_special(char,
+    char *name,
+    tlm_acls_t *,
+    int,
+    int,
+    tlm_job_stats_t *);
 static long load_acl_info(int lib,
     int	drv,
     long size,
@@ -861,13 +865,20 @@ tar_getdir(tlm_commands_t *commands,
 			longlink[0] = 0;
 			break;
 		case LF_FIFO:
+		case LF_BLK:
+		case LF_CHR:
 			file_name = *longname == 0 ? thname_buf :
 			    longname;
 			if (is_file_wanted(file_name, sels, exls, flags,
 			    &mchtype, &pos)) {
 				nmp = rs_new_name(rnp, name, pos, file_name);
 				if (nmp) {
-					erc = create_fifo(nmp, acls);
+					erc = create_special(
+					    tar_hdr->th_linkflag, nmp, acls,
+					    oct_atoi(tar_hdr->th_shared.
+					    th_dev.th_devmajor),
+					    oct_atoi(tar_hdr->th_shared.
+					    th_dev.th_devminor), job_stats);
 					if (erc == 0 &&
 					    PM_EXACT_OR_CHILD(mchtype))
 						(void) tlm_entry_restored(
@@ -1858,7 +1869,7 @@ create_hard_link(char *name_old, char *name_new,
 /*ARGSUSED*/
 static int
 create_sym_link(char *dst, char *target, tlm_acls_t *acls,
-    tlm_job_stats_t *job_satats)
+    tlm_job_stats_t *job_stats)
 {
 	int erc;
 	struct stat64 *st;
@@ -1869,7 +1880,7 @@ create_sym_link(char *dst, char *target, tlm_acls_t *acls,
 	st = &acls->acl_attr;
 	erc = symlink(target, dst);
 	if (erc) {
-		job_satats->js_errors++;
+		job_stats->js_errors++;
 		NDMP_LOG(LOG_DEBUG, "error %d (errno %d) softlink [%s] to [%s]",
 		    erc, errno, dst, target);
 	} else {
@@ -1881,14 +1892,48 @@ create_sym_link(char *dst, char *target, tlm_acls_t *acls,
 }
 
 /*
- * create a new FIFO
+ * create a new FIFO, char/block device special files
  */
 static int
-create_fifo(char *name, tlm_acls_t *acls)
+create_special(char flag, char *name, tlm_acls_t *acls, int major, int minor,
+    tlm_job_stats_t *job_stats)
 {
-	(void) mknod(name, 0777 + S_IFIFO, 0);
-	set_acl(name, acls);
-	return (0);
+	dev_t dev;
+	mode_t mode;
+	int erc;
+
+	switch (flag) {
+	case LF_CHR:
+		mode = S_IFCHR;
+		dev = makedev(major, minor);
+		break;
+	case LF_BLK:
+		mode = S_IFBLK;
+		dev = makedev(major, minor);
+		break;
+	case LF_FIFO:
+		mode = S_IFIFO;
+		dev = 0;
+		break;
+	default:
+		NDMP_LOG(LOG_ERR, "unsupported flag %d", flag);
+		return (-1);
+	}
+
+	/* Remove the old entry first */
+	if (rmdir(name) < 0) {
+		if (errno == ENOTDIR)
+			(void) unlink(name);
+	}
+	erc = mknod(name, 0777 | mode, dev);
+	if (erc) {
+		job_stats->js_errors++;
+		NDMP_LOG(LOG_DEBUG, "error %d (errno %d) mknod [%s] major"
+		    " %d minor %d", erc, errno, name, major, minor);
+	} else {
+		set_acl(name, acls);
+	}
+	return (erc);
 }
 
 /*

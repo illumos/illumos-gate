@@ -1,6 +1,5 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -46,6 +45,7 @@
 #include <archives.h>
 #include <tlm.h>
 #include <sys/fs/zfs.h>
+#include <sys/mkdev.h>
 #include <libzfs.h>
 #include <libcmdutils.h>
 #include <pwd.h>
@@ -74,6 +74,8 @@ static int output_xattr_header(char *fname,
 extern  libzfs_handle_t *zlibh;
 extern	mutex_t zlib_mtx;
 
+#define	S_ISPECIAL(a)	(S_ISLNK(a) || S_ISFIFO(a) || S_ISBLK(a) || \
+	S_ISCHR(a))
 
 /*
  * output_mem
@@ -497,19 +499,39 @@ output_file_header(char *name, char *link,
 	} else {
 		(void) strlcpy(tar_hdr->th_linkname, link, TLM_NAME_SIZE);
 	}
-	if (S_ISDIR(attr->st_mode)) {
+	switch (attr->st_mode & S_IFMT) {
+	case S_IFDIR:
 		tar_hdr->th_linkflag = LF_DIR;
-	} else if (S_ISFIFO(attr->st_mode)) {
+		break;
+	case S_IFIFO:
 		tar_hdr->th_linkflag = LF_FIFO;
-	} else if (attr->st_nlink > 1) {
-		/* mark file with hardlink LF_LINK */
-		tar_hdr->th_linkflag = LF_LINK;
-		(void) snprintf(tar_hdr->th_shared.th_hlink_ino,
-		    sizeof (tar_hdr->th_shared.th_hlink_ino),
-		    "%011llo ", attr->st_ino);
-	} else {
-		tar_hdr->th_linkflag = *link == 0 ? LF_NORMAL : LF_SYMLINK;
-		NDMP_LOG(LOG_DEBUG, "linkflag: '%c'", tar_hdr->th_linkflag);
+		break;
+	case S_IFBLK:
+	case S_IFCHR:
+		if (S_ISBLK(attr->st_mode))
+			tar_hdr->th_linkflag = LF_BLK;
+		else
+			tar_hdr->th_linkflag = LF_CHR;
+		(void) snprintf(tar_hdr->th_shared.th_dev.th_devmajor,
+		    sizeof (tar_hdr->th_shared.th_dev.th_devmajor), "%06o ",
+		    major(attr->st_rdev));
+		(void) snprintf(tar_hdr->th_shared.th_dev.th_devminor,
+		    sizeof (tar_hdr->th_shared.th_dev.th_devminor), "%06o ",
+		    minor(attr->st_rdev));
+		break;
+	default:
+		if (attr->st_nlink > 1) {
+			/* mark file with hardlink LF_LINK */
+			tar_hdr->th_linkflag = LF_LINK;
+			(void) snprintf(tar_hdr->th_shared.th_hlink_ino,
+			    sizeof (tar_hdr->th_shared.th_hlink_ino),
+			    "%011llo ", attr->st_ino);
+		} else {
+			tar_hdr->th_linkflag = *link == 0 ? LF_NORMAL :
+			    LF_SYMLINK;
+			NDMP_LOG(LOG_DEBUG, "linkflag: '%c'",
+			    tar_hdr->th_linkflag);
+		}
 	}
 	(void) snprintf(tar_hdr->th_size, sizeof (tar_hdr->th_size), "%011o ",
 	    (long)attr->st_size);
@@ -628,8 +650,7 @@ tlm_output_xattr(char  *dir, char *name, char *chkdir,
 	char *fnamep;
 	int rv = 0;
 
-	if (S_ISLNK(tlm_acls->acl_attr.st_mode) ||
-	    S_ISFIFO(tlm_acls->acl_attr.st_mode)) {
+	if (S_ISPECIAL(tlm_acls->acl_attr.st_mode)) {
 		return (TLM_NO_SOURCE_FILE);
 	}
 
@@ -866,8 +887,7 @@ tlm_output_file(char *dir, char *name, char *chkdir,
 	pos = tlm_get_data_offset(local_commands);
 	NDMP_LOG(LOG_DEBUG, "pos: %10lld  [%s]", pos, name);
 
-	if (S_ISLNK(tlm_acls->acl_attr.st_mode) ||
-	    S_ISFIFO(tlm_acls->acl_attr.st_mode)) {
+	if (S_ISPECIAL(tlm_acls->acl_attr.st_mode)) {
 		if (S_ISLNK(tlm_acls->acl_attr.st_mode)) {
 			file_size = tlm_readlink(fullname, snapname, linkname,
 			    TLM_MAX_PATH_NAME-1);
