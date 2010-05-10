@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -633,6 +632,8 @@ static void
 idm_state_s5_logged_in(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 {
 	switch (event_ctx->iec_event) {
+	case CE_MISC_RX:
+		/* MC/S: when removing the non-leading connection */
 	case CE_LOGOUT_THIS_CONN_RCV:
 	case CE_LOGOUT_THIS_CONN_SND:
 	case CE_LOGOUT_OTHER_CONN_RCV:
@@ -675,7 +676,6 @@ idm_state_s5_logged_in(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		idm_update_state(ic, CS_S8_CLEANUP, event_ctx);
 		break;
 	case CE_MISC_TX:
-	case CE_MISC_RX:
 	case CE_TX_PROTOCOL_ERROR:
 	case CE_RX_PROTOCOL_ERROR:
 	case CE_LOGIN_TIMEOUT:

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -120,6 +119,30 @@ static idm_status_t iscsit_init(dev_info_t *dip);
 static idm_status_t iscsit_enable_svc(iscsit_hostinfo_t *hostinfo);
 static void iscsit_disable_svc(void);
 
+static int
+iscsit_check_cmdsn_and_queue(idm_pdu_t *rx_pdu);
+
+static void
+iscsit_add_pdu_to_queue(iscsit_sess_t *ist, idm_pdu_t *rx_pdu);
+
+static idm_pdu_t *
+iscsit_remove_pdu_from_queue(iscsit_sess_t *ist, uint32_t cmdsn);
+
+static void
+iscsit_process_pdu_in_queue(iscsit_sess_t *ist);
+
+static void
+iscsit_rxpdu_queue_monitor_session(iscsit_sess_t *ist);
+
+static void
+iscsit_rxpdu_queue_monitor(void *arg);
+
+static void
+iscsit_post_staged_pdu(idm_pdu_t *rx_pdu);
+
+static void
+iscsit_post_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu);
+
 static void
 iscsit_op_scsi_task_mgmt(iscsit_conn_t *ict, idm_pdu_t *rx_pdu);
 
@@ -136,6 +159,9 @@ static void
 iscsit_pdu_op_logout_cmd(iscsit_conn_t *ict, idm_pdu_t *rx_pdu);
 
 int iscsit_cmd_window();
+
+static  int
+iscsit_sna_lt(uint32_t sn1, uint32_t sn2);
 
 void
 iscsit_set_cmdsn(iscsit_conn_t *ict, idm_pdu_t *rx_pdu);
@@ -216,6 +242,22 @@ static void iscsit_send_direct_scsi_resp(iscsit_conn_t *ict, idm_pdu_t *rx_pdu,
 static void iscsit_send_task_mgmt_resp(idm_pdu_t *tm_resp_pdu,
     uint8_t tm_status);
 
+/*
+ * MC/S: Out-of-order commands are staged on a session-wide wait
+ * queue until a system-tunable threshold is reached. A separate
+ * thread is used to scan the staging queue on all the session,
+ * If a delayed PDU does not arrive within a timeout, the target
+ * will advance to the staged PDU that is next in sequence, skipping
+ * over the missing PDU(s) to go past a hole in the sequence.
+ */
+volatile int rxpdu_queue_threshold = ISCSIT_RXPDU_QUEUE_THRESHOLD;
+
+static kmutex_t		iscsit_rxpdu_queue_monitor_mutex;
+kthread_t		*iscsit_rxpdu_queue_monitor_thr_id;
+static kt_did_t		iscsit_rxpdu_queue_monitor_thr_did;
+static boolean_t	iscsit_rxpdu_queue_monitor_thr_running;
+static kcondvar_t	iscsit_rxpdu_queue_monitor_cv;
+
 int
 _init(void)
 {
@@ -225,6 +267,12 @@ _init(void)
 	mutex_init(&iscsit_global.global_state_mutex, NULL,
 	    MUTEX_DRIVER, NULL);
 	iscsit_global.global_svc_state = ISE_DETACHED;
+
+	mutex_init(&iscsit_rxpdu_queue_monitor_mutex, NULL,
+	    MUTEX_DRIVER, NULL);
+	iscsit_rxpdu_queue_monitor_thr_id = NULL;
+	iscsit_rxpdu_queue_monitor_thr_running = B_FALSE;
+	cv_init(&iscsit_rxpdu_queue_monitor_cv, NULL, CV_DEFAULT, NULL);
 
 	if ((rc = mod_install(&modlinkage)) != 0) {
 		mutex_destroy(&iscsit_global.global_state_mutex);
@@ -249,6 +297,8 @@ _fini(void)
 	rc = mod_remove(&modlinkage);
 
 	if (rc == 0) {
+		mutex_destroy(&iscsit_rxpdu_queue_monitor_mutex);
+		cv_destroy(&iscsit_rxpdu_queue_monitor_cv);
 		mutex_destroy(&iscsit_global.global_state_mutex);
 		rw_destroy(&iscsit_global.global_rwlock);
 	}
@@ -692,6 +742,9 @@ iscsit_enable_svc(iscsit_hostinfo_t *hostinfo)
 	iscsit_global.global_dispatch_taskq = taskq_create("iscsit_dispatch",
 	    1, minclsyspri, 16, 16, TASKQ_PREPOPULATE);
 
+	/* Scan staged PDUs, meaningful in MC/S situations */
+	iscsit_rxpdu_queue_monitor_start();
+
 	return (IDM_STATUS_SUCCESS);
 
 tear_down_and_return:
@@ -752,6 +805,8 @@ iscsit_disable_svc(void)
 	iscsit_sess_t	*sess;
 
 	ASSERT(iscsit_global.global_svc_state == ISE_DISABLING);
+
+	iscsit_rxpdu_queue_monitor_stop();
 
 	/* tear down discovery sessions */
 	for (sess = avl_first(&iscsit_global.global_discovery_sessions);
@@ -853,8 +908,10 @@ iscsit_rx_pdu(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 		idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
 		break;
 	case ISCSI_OP_SCSI_TASK_MGT_MSG:
-		iscsit_set_cmdsn(ict, rx_pdu);
-		iscsit_op_scsi_task_mgmt(ict, rx_pdu);
+		if (iscsit_check_cmdsn_and_queue(rx_pdu)) {
+			iscsit_set_cmdsn(ict, rx_pdu);
+			iscsit_op_scsi_task_mgmt(ict, rx_pdu);
+		}
 		break;
 	case ISCSI_OP_NOOP_OUT:
 	case ISCSI_OP_LOGIN_CMD:
@@ -1034,10 +1091,9 @@ iscsit_build_hdr(idm_task_t *idm_task, idm_pdu_t *pdu, uint8_t opcode)
 	iscsi_data_rsp_hdr_t *dh = (iscsi_data_rsp_hdr_t *)pdu->isp_hdr;
 
 	/*
-	 * We acquired iscsit_sess_t.ist_sn_rwlock in iscsit_xfer_scsi_data
-	 * in reader mode so we expect to be locked here
+	 * We acquired iscsit_sess_t.ist_sn_mutex in iscsit_xfer_scsi_data
 	 */
-
+	ASSERT(MUTEX_HELD(&itask->it_ict->ict_sess->ist_sn_mutex));
 	/*
 	 * Lun is only required if the opcode == ISCSI_OP_SCSI_DATA_RSP
 	 * and the 'A' bit is to be set
@@ -1252,12 +1308,37 @@ iscsit_ffp_disabled(idm_conn_t *ic, idm_ffp_disable_t disable_class)
 static idm_status_t
 iscsit_conn_lost(idm_conn_t *ic)
 {
-	iscsit_conn_t *ict = ic->ic_handle;
+	iscsit_conn_t	*ict	= ic->ic_handle;
+	iscsit_sess_t	*ist	= ict->ict_sess;
+	iscsit_cbuf_t	*cbuf;
+	idm_pdu_t	*rx_pdu;
+	int i;
 
 	mutex_enter(&ict->ict_mutex);
 	ict->ict_lost = B_TRUE;
 	mutex_exit(&ict->ict_mutex);
-
+	/*
+	 * scrub the staging queue for all PDUs on this connection
+	 */
+	if (ist != NULL) {
+		mutex_enter(&ist->ist_sn_mutex);
+		for (cbuf = ist->ist_rxpdu_queue, i = 0;
+		    ((cbuf->cb_num_elems > 0) && (i < ISCSIT_RXPDU_QUEUE_LEN));
+		    i++) {
+			if (((rx_pdu = cbuf->cb_buffer[i]) != NULL) &&
+			    (rx_pdu->isp_ic == ic)) {
+				/* conn is lost, drop the pdu */
+				DTRACE_PROBE3(scrubbing__staging__queue,
+				    iscsit_sess_t *, ist, idm_conn_t *, ic,
+				    idm_pdu_t *, rx_pdu);
+				idm_pdu_complete(rx_pdu, IDM_STATUS_FAIL);
+				cbuf->cb_buffer[i] = NULL;
+				cbuf->cb_num_elems--;
+				iscsit_conn_dispatch_rele(ict);
+			}
+		}
+		mutex_exit(&ist->ist_sn_mutex);
+	}
 	/*
 	 * Make sure there aren't any PDU's transitioning from the receive
 	 * handler to the dispatch taskq.
@@ -1431,20 +1512,20 @@ iscsit_xfer_scsi_data(scsi_task_t *task, stmf_data_buf_t *dbuf,
 		 * access to the SN values.  We need to lock here to enforce
 		 * lock ordering
 		 */
-		rw_enter(&ict_sess->ist_sn_rwlock, RW_READER);
+		mutex_enter(&ict_sess->ist_sn_mutex);
 		idm_rc = idm_buf_tx_to_ini(iscsit_task->it_idm_task,
 		    ibuf->ibuf_idm_buf, dbuf->db_relative_offset,
 		    dbuf->db_data_size, &iscsit_buf_xfer_cb, dbuf);
-		rw_exit(&ict_sess->ist_sn_rwlock);
+		mutex_exit(&ict_sess->ist_sn_mutex);
 
 		return (iscsit_idm_to_stmf(idm_rc));
 	} else if (dbuf->db_flags & DB_DIRECTION_FROM_RPORT) {
 		/* Grab the SN lock (see comment above) */
-		rw_enter(&ict_sess->ist_sn_rwlock, RW_READER);
+		mutex_enter(&ict_sess->ist_sn_mutex);
 		idm_rc = idm_buf_rx_from_ini(iscsit_task->it_idm_task,
 		    ibuf->ibuf_idm_buf, dbuf->db_relative_offset,
 		    dbuf->db_data_size, &iscsit_buf_xfer_cb, dbuf);
-		rw_exit(&ict_sess->ist_sn_rwlock);
+		mutex_exit(&ict_sess->ist_sn_mutex);
 
 		return (iscsit_idm_to_stmf(idm_rc));
 	}
@@ -1821,13 +1902,23 @@ iscsit_idm_to_stmf(idm_status_t idmrc)
 	/*NOTREACHED*/
 }
 
+void
+iscsit_op_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu)
+{
+	iscsit_conn_t		*ict = ic->ic_handle;
+
+	if (iscsit_check_cmdsn_and_queue(rx_pdu)) {
+		iscsit_post_scsi_cmd(ic, rx_pdu);
+	}
+	iscsit_process_pdu_in_queue(ict->ict_sess);
+}
 
 /*
  * ISCSI protocol
  */
 
 void
-iscsit_op_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu)
+iscsit_post_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 {
 	iscsit_conn_t		*ict;
 	iscsit_task_t		*itask;
@@ -1850,7 +1941,6 @@ iscsit_op_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 		idm_pdu_complete(rx_pdu, IDM_STATUS_SUCCESS);
 		return;
 	}
-
 
 	/*
 	 * Note CmdSN and ITT in task.  IDM will have already validated this
@@ -2038,7 +2128,6 @@ iscsit_op_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 		    uint32_t, ibuf->ibuf_stmf_buf->db_relative_offset,
 		    uint64_t, 0, uint32_t, 0, uint32_t, 0, /* no raddr */
 		    uint32_t, rx_pdu->isp_datalen, int, XFER_BUF_TX_TO_INI);
-
 		stmf_post_task(task, ibuf->ibuf_stmf_buf);
 	} else {
 
@@ -2085,25 +2174,39 @@ iscsit_deferred_dispatch(idm_pdu_t *rx_pdu)
 static void
 iscsit_deferred(void *rx_pdu_void)
 {
-	idm_pdu_t *rx_pdu = rx_pdu_void;
-	idm_conn_t *ic = rx_pdu->isp_ic;
-	iscsit_conn_t *ict = ic->ic_handle;
+	idm_pdu_t		*rx_pdu = rx_pdu_void;
+	idm_conn_t		*ic = rx_pdu->isp_ic;
+	iscsit_conn_t		*ict = ic->ic_handle;
 
+	/*
+	 * NOP and Task Management Commands can be marked for immediate
+	 * delivery. Commands marked as 'Immediate' are to be considered
+	 * for execution as soon as they arrive on the target. So these
+	 * should not be checked for sequence order and put in a queue.
+	 * The CmdSN is not advanced for Immediate Commands.
+	 */
 	switch (IDM_PDU_OPCODE(rx_pdu)) {
 	case ISCSI_OP_NOOP_OUT:
-		iscsit_set_cmdsn(ict, rx_pdu);
-		iscsit_pdu_op_noop(ict, rx_pdu);
+		if (iscsit_check_cmdsn_and_queue(rx_pdu)) {
+			iscsit_set_cmdsn(ict, rx_pdu);
+			iscsit_pdu_op_noop(ict, rx_pdu);
+		}
 		break;
 	case ISCSI_OP_LOGIN_CMD:
 		iscsit_pdu_op_login_cmd(ict, rx_pdu);
-		break;
+		iscsit_conn_dispatch_rele(ict);
+		return;
 	case ISCSI_OP_TEXT_CMD:
-		iscsit_set_cmdsn(ict, rx_pdu);
-		iscsit_pdu_op_text_cmd(ict, rx_pdu);
+		if (iscsit_check_cmdsn_and_queue(rx_pdu)) {
+			iscsit_set_cmdsn(ict, rx_pdu);
+			iscsit_pdu_op_text_cmd(ict, rx_pdu);
+		}
 		break;
 	case ISCSI_OP_LOGOUT_CMD:
-		iscsit_set_cmdsn(ict, rx_pdu);
-		iscsit_pdu_op_logout_cmd(ict, rx_pdu);
+		if (iscsit_check_cmdsn_and_queue(rx_pdu)) {
+			iscsit_set_cmdsn(ict, rx_pdu);
+			iscsit_pdu_op_logout_cmd(ict, rx_pdu);
+		}
 		break;
 	default:
 		/* Protocol error.  IDM should have caught this */
@@ -2111,6 +2214,11 @@ iscsit_deferred(void *rx_pdu_void)
 		ASSERT(0);
 		break;
 	}
+	/*
+	 * Check if there are other PDUs in the session staging queue
+	 * waiting to be posted to SCSI layer.
+	 */
+	iscsit_process_pdu_in_queue(ict->ict_sess);
 
 	iscsit_conn_dispatch_rele(ict);
 }
@@ -2240,14 +2348,20 @@ iscsit_op_scsi_task_mgmt(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 			refcmdsn = ntohl(iscsi_tm->refcmdsn);
 
 			/*
-			 * Task was not found.  If RefCmdSN is within the CmdSN
-			 * window and less than CmdSN of the TM function, return
-			 * "Function Complete".  Otherwise, return
-			 * "Task Does Not Exist".
+			 * Task was not found. But the SCSI command could be
+			 * on the rxpdu wait queue. If RefCmdSN is within
+			 * the CmdSN window and less than CmdSN of the TM
+			 * function, return "Function Complete". Otherwise,
+			 * return "Task Does Not Exist".
 			 */
 
 			if (iscsit_cmdsn_in_window(ict, refcmdsn) &&
-			    (refcmdsn < cmdsn)) {
+			    iscsit_sna_lt(refcmdsn, cmdsn)) {
+				mutex_enter(&ict->ict_sess->ist_sn_mutex);
+				(void) iscsit_remove_pdu_from_queue(
+				    ict->ict_sess, refcmdsn);
+				iscsit_conn_dispatch_rele(ict);
+				mutex_exit(&ict->ict_sess->ist_sn_mutex);
 				iscsit_send_task_mgmt_resp(tm_resp_pdu,
 				    SCSI_TCP_TM_RESP_COMPLETE);
 			} else {
@@ -2473,8 +2587,12 @@ iscsit_pdu_op_logout_cmd(iscsit_conn_t	*ict, idm_pdu_t *rx_pdu)
 int
 iscsit_cmd_window()
 {
-	/* Will be better later */
-	return	(1024);
+	/*
+	 * Instead of using a pre-defined constant for the command window,
+	 * it should be made confiurable and dynamic. With MC/S, sequence
+	 * numbers will be used up at a much faster rate than with SC/S.
+	 */
+	return	(ISCSIT_MAX_WINDOW);
 }
 
 /*
@@ -2489,11 +2607,16 @@ iscsit_set_cmdsn(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 	ist = ict->ict_sess;
 
 	req = (iscsi_scsi_cmd_hdr_t *)rx_pdu->isp_hdr;
+	if (req->opcode & ISCSI_OP_IMMEDIATE) {
+		/* no cmdsn increment for immediate PDUs */
+		return;
+	}
 
-	rw_enter(&ist->ist_sn_rwlock, RW_WRITER);
+	/* Ensure that the ExpCmdSN advances in an orderly manner */
+	mutex_enter(&ist->ist_sn_mutex);
 	ist->ist_expcmdsn = ntohl(req->cmdsn) + 1;
 	ist->ist_maxcmdsn = ntohl(req->cmdsn) + iscsit_cmd_window();
-	rw_exit(&ist->ist_sn_rwlock);
+	mutex_exit(&ist->ist_sn_mutex);
 }
 
 /*
@@ -2509,16 +2632,16 @@ iscsit_pdu_tx(idm_pdu_t *pdu)
 	/*
 	 * The command sequence numbers are session-wide and must stay
 	 * consistent across the transfer, so protect the cmdsn with a
-	 * reader lock on the session. The status sequence number will
+	 * mutex lock on the session. The status sequence number will
 	 * be updated just before the transport layer transmits the PDU.
 	 */
 
-	rw_enter(&ict->ict_sess->ist_sn_rwlock, RW_READER);
+	mutex_enter(&ict->ict_sess->ist_sn_mutex);
 	/* Set ExpCmdSN and MaxCmdSN */
 	rsp->maxcmdsn = htonl(ist->ist_maxcmdsn);
 	rsp->expcmdsn = htonl(ist->ist_expcmdsn);
 	idm_pdu_tx(pdu);
-	rw_exit(&ict->ict_sess->ist_sn_rwlock);
+	mutex_exit(&ict->ict_sess->ist_sn_mutex);
 }
 
 /*
@@ -2916,7 +3039,7 @@ iscsit_cmdsn_in_window(iscsit_conn_t *ict, uint32_t cmdsn)
 
 	ist = ict->ict_sess;
 
-	rw_enter(&ist->ist_sn_rwlock, RW_READER);
+	mutex_enter(&ist->ist_sn_mutex);
 
 	/*
 	 * If cmdsn is less than ist_expcmdsn - iscsit_cmd_window() or
@@ -2928,7 +3051,335 @@ iscsit_cmdsn_in_window(iscsit_conn_t *ict, uint32_t cmdsn)
 		rval = B_FALSE;
 	}
 
-	rw_exit(&ist->ist_sn_rwlock);
+	mutex_exit(&ist->ist_sn_mutex);
 
 	return (rval);
+}
+
+/*
+ * iscsit_check_cmdsn_and_queue
+ *
+ * Independent of the order in which the iSCSI target receives non-immediate
+ * command PDU across the entire session and any multiple connections within
+ * the session, the target must deliver the commands to the SCSI layer in
+ * CmdSN order. So out-of-order non-immediate commands are queued up on a
+ * session-wide wait queue. Duplicate commands are ignored.
+ *
+ */
+static int
+iscsit_check_cmdsn_and_queue(idm_pdu_t *rx_pdu)
+{
+	idm_conn_t		*ic = rx_pdu->isp_ic;
+	iscsit_conn_t		*ict = ic->ic_handle;
+	iscsit_sess_t		*ist = ict->ict_sess;
+	iscsi_scsi_cmd_hdr_t	*hdr = (iscsi_scsi_cmd_hdr_t *)rx_pdu->isp_hdr;
+
+	mutex_enter(&ist->ist_sn_mutex);
+	if (hdr->opcode & ISCSI_OP_IMMEDIATE) {
+		/* do not queue, handle it immediately */
+		DTRACE_PROBE2(immediate__cmd, iscsit_sess_t *, ist,
+		    idm_pdu_t *, rx_pdu);
+		mutex_exit(&ist->ist_sn_mutex);
+		return (ISCSIT_CMDSN_EQ_EXPCMDSN);
+	}
+	if (iscsit_sna_lt(ist->ist_expcmdsn, ntohl(hdr->cmdsn))) {
+		/*
+		 * Out-of-order commands (cmdSN higher than ExpCmdSN)
+		 * are staged on a fixed-size circular buffer until
+		 * the missing command is delivered to the SCSI layer.
+		 * Irrespective of the order of insertion into the
+		 * staging queue, the commands are processed out of the
+		 * queue in cmdSN order only.
+		 */
+		rx_pdu->isp_queue_time = ddi_get_time();
+		iscsit_add_pdu_to_queue(ist, rx_pdu);
+		mutex_exit(&ist->ist_sn_mutex);
+		return (ISCSIT_CMDSN_GT_EXPCMDSN);
+	} else if (iscsit_sna_lt(ntohl(hdr->cmdsn), ist->ist_expcmdsn)) {
+		DTRACE_PROBE3(cmdsn__lt__expcmdsn, iscsit_sess_t *, ist,
+		    iscsit_conn_t *, ict, idm_pdu_t *, rx_pdu);
+		mutex_exit(&ist->ist_sn_mutex);
+		return (ISCSIT_CMDSN_LT_EXPCMDSN);
+	} else {
+		mutex_exit(&ist->ist_sn_mutex);
+		return (ISCSIT_CMDSN_EQ_EXPCMDSN);
+	}
+}
+
+/*
+ * iscsit_add_pdu_to_queue() adds PDUs into the array indexed by
+ * their cmdsn value. The length of the array is kept above the
+ * maximum window size. The window keeps the cmdsn within a range
+ * such that there are no collisons. e.g. the assumption is that
+ * the windowing checks make it impossible to receive PDUs that
+ * index into the same location in the array.
+ */
+static void
+iscsit_add_pdu_to_queue(iscsit_sess_t *ist, idm_pdu_t *rx_pdu)
+{
+	iscsit_cbuf_t	*cbuf	= ist->ist_rxpdu_queue;
+	iscsit_conn_t	*ict 	= rx_pdu->isp_ic->ic_handle;
+	uint32_t	cmdsn	=
+	    ((iscsi_scsi_cmd_hdr_t *)rx_pdu->isp_hdr)->cmdsn;
+	uint32_t	index;
+
+	ASSERT(MUTEX_HELD(&ist->ist_sn_mutex));
+	/*
+	 * If the connection is being torn down, then
+	 * don't add the PDU to the staging queue
+	 */
+	mutex_enter(&ict->ict_mutex);
+	if (ict->ict_lost) {
+		mutex_exit(&ict->ict_mutex);
+		idm_pdu_complete(rx_pdu, IDM_STATUS_FAIL);
+		return;
+	}
+	iscsit_conn_dispatch_hold(ict);
+	mutex_exit(&ict->ict_mutex);
+
+	index = ntohl(cmdsn) % ISCSIT_RXPDU_QUEUE_LEN;
+	ASSERT(cbuf->cb_buffer[index] == NULL);
+	cbuf->cb_buffer[index] = rx_pdu;
+	cbuf->cb_num_elems++;
+}
+
+static idm_pdu_t *
+iscsit_remove_pdu_from_queue(iscsit_sess_t *ist, uint32_t cmdsn)
+{
+	iscsit_cbuf_t	*cbuf	= ist->ist_rxpdu_queue;
+	idm_pdu_t	*pdu	= NULL;
+	uint32_t	index;
+
+	ASSERT(MUTEX_HELD(&ist->ist_sn_mutex));
+	index = cmdsn % ISCSIT_RXPDU_QUEUE_LEN;
+	if ((pdu = cbuf->cb_buffer[index]) != NULL) {
+		ASSERT(cmdsn ==
+		    ntohl(((iscsi_scsi_cmd_hdr_t *)pdu->isp_hdr)->cmdsn));
+		cbuf->cb_buffer[index] = NULL;
+		cbuf->cb_num_elems--;
+		return (pdu);
+	}
+	return (NULL);
+}
+
+/*
+ * iscsit_process_pdu_in_queue() finds the next pdu in sequence
+ * and posts it to the SCSI layer
+ */
+static void
+iscsit_process_pdu_in_queue(iscsit_sess_t *ist)
+{
+	iscsit_cbuf_t	*cbuf	= ist->ist_rxpdu_queue;
+	idm_pdu_t	*pdu = NULL;
+	uint32_t	expcmdsn;
+
+	for (;;) {
+		mutex_enter(&ist->ist_sn_mutex);
+		if (cbuf->cb_num_elems == 0) {
+			mutex_exit(&ist->ist_sn_mutex);
+			break;
+		}
+		expcmdsn = ist->ist_expcmdsn;
+		if ((pdu = iscsit_remove_pdu_from_queue(ist, expcmdsn))
+		    == NULL) {
+			mutex_exit(&ist->ist_sn_mutex);
+			break;
+		}
+		mutex_exit(&ist->ist_sn_mutex);
+		iscsit_post_staged_pdu(pdu);
+	}
+}
+
+static void
+iscsit_post_staged_pdu(idm_pdu_t *rx_pdu)
+{
+	iscsit_conn_t	*ict	= rx_pdu->isp_ic->ic_handle;
+
+	/* Post the PDU to the SCSI layer */
+	switch (IDM_PDU_OPCODE(rx_pdu)) {
+	case ISCSI_OP_NOOP_OUT:
+		iscsit_set_cmdsn(ict, rx_pdu);
+		iscsit_pdu_op_noop(ict, rx_pdu);
+		break;
+	case ISCSI_OP_TEXT_CMD:
+		iscsit_set_cmdsn(ict, rx_pdu);
+		iscsit_pdu_op_text_cmd(ict, rx_pdu);
+		break;
+	case ISCSI_OP_SCSI_TASK_MGT_MSG:
+		iscsit_set_cmdsn(ict, rx_pdu);
+		iscsit_op_scsi_task_mgmt(ict, rx_pdu);
+		break;
+	case ISCSI_OP_SCSI_CMD:
+		/* cmdSN will be incremented after creating itask */
+		iscsit_post_scsi_cmd(rx_pdu->isp_ic, rx_pdu);
+		break;
+	case ISCSI_OP_LOGOUT_CMD:
+		iscsit_set_cmdsn(ict, rx_pdu);
+		iscsit_pdu_op_logout_cmd(ict, rx_pdu);
+		break;
+	default:
+		/* No other PDUs should be placed on the queue */
+		ASSERT(0);
+	}
+	iscsit_conn_dispatch_rele(ict); /* release hold on the conn */
+}
+
+/* ARGSUSED */
+void
+iscsit_rxpdu_queue_monitor_start(void)
+{
+	mutex_enter(&iscsit_rxpdu_queue_monitor_mutex);
+	if (iscsit_rxpdu_queue_monitor_thr_running) {
+		mutex_exit(&iscsit_rxpdu_queue_monitor_mutex);
+		return;
+	}
+	iscsit_rxpdu_queue_monitor_thr_id =
+	    thread_create(NULL, 0, iscsit_rxpdu_queue_monitor, NULL,
+	    0, &p0, TS_RUN, minclsyspri);
+	while (!iscsit_rxpdu_queue_monitor_thr_running) {
+		cv_wait(&iscsit_rxpdu_queue_monitor_cv,
+		    &iscsit_rxpdu_queue_monitor_mutex);
+	}
+	mutex_exit(&iscsit_rxpdu_queue_monitor_mutex);
+
+}
+
+/* ARGSUSED */
+void
+iscsit_rxpdu_queue_monitor_stop(void)
+{
+	mutex_enter(&iscsit_rxpdu_queue_monitor_mutex);
+	if (iscsit_rxpdu_queue_monitor_thr_running) {
+		iscsit_rxpdu_queue_monitor_thr_running = B_FALSE;
+		cv_signal(&iscsit_rxpdu_queue_monitor_cv);
+		mutex_exit(&iscsit_rxpdu_queue_monitor_mutex);
+
+		thread_join(iscsit_rxpdu_queue_monitor_thr_did);
+		return;
+	}
+	mutex_exit(&iscsit_rxpdu_queue_monitor_mutex);
+}
+
+/*
+ * A separate thread is used to scan the staging queue on all the
+ * sessions, If a delayed PDU does not arrive within a timeout, the
+ * target will advance to the staged PDU that is next in sequence
+ * and exceeded the threshold wait time. It is up to the initiator
+ * to note that the target has not acknowledged a particular cmdsn
+ * and take appropriate action.
+ */
+/* ARGSUSED */
+static void
+iscsit_rxpdu_queue_monitor(void *arg)
+{
+	iscsit_tgt_t	*tgt;
+	iscsit_sess_t	*ist;
+
+	mutex_enter(&iscsit_rxpdu_queue_monitor_mutex);
+	iscsit_rxpdu_queue_monitor_thr_did = curthread->t_did;
+	iscsit_rxpdu_queue_monitor_thr_running = B_TRUE;
+	cv_signal(&iscsit_rxpdu_queue_monitor_cv);
+
+	while (iscsit_rxpdu_queue_monitor_thr_running) {
+		ISCSIT_GLOBAL_LOCK(RW_READER);
+		for (tgt = avl_first(&iscsit_global.global_target_list);
+		    tgt != NULL;
+		    tgt = AVL_NEXT(&iscsit_global.global_target_list, tgt)) {
+			mutex_enter(&tgt->target_mutex);
+			for (ist = avl_first(&tgt->target_sess_list);
+			    ist != NULL;
+			    ist = AVL_NEXT(&tgt->target_sess_list, ist)) {
+
+				iscsit_rxpdu_queue_monitor_session(ist);
+			}
+			mutex_exit(&tgt->target_mutex);
+		}
+		ISCSIT_GLOBAL_UNLOCK();
+		if (iscsit_rxpdu_queue_monitor_thr_running == B_FALSE) {
+			break;
+		}
+		(void) cv_reltimedwait(&iscsit_rxpdu_queue_monitor_cv,
+		    &iscsit_rxpdu_queue_monitor_mutex,
+		    ISCSIT_RXPDU_QUEUE_MONITOR_INTERVAL * drv_usectohz(1000000),
+		    TR_CLOCK_TICK);
+	}
+	mutex_exit(&iscsit_rxpdu_queue_monitor_mutex);
+	thread_exit();
+}
+
+static void
+iscsit_rxpdu_queue_monitor_session(iscsit_sess_t *ist)
+{
+	iscsit_cbuf_t	*cbuf	= ist->ist_rxpdu_queue;
+	idm_pdu_t	*next_pdu = NULL;
+	uint32_t	index, next_cmdsn, i;
+
+	/*
+	 * Assume that all PDUs in the staging queue have a cmdsn >= expcmdsn.
+	 * Starting with the expcmdsn, iterate over the staged PDUs to find
+	 * the next PDU with a wait time greater than the threshold. If found
+	 * advance the staged PDU to the SCSI layer, skipping over the missing
+	 * PDU(s) to get past the hole in the command sequence. It is up to
+	 * the initiator to note that the target has not acknowledged a cmdsn
+	 * and take appropriate action.
+	 *
+	 * Since the PDU(s) arrive in any random order, it is possible that
+	 * that the actual wait time for a particular PDU is much longer than
+	 * the defined threshold. e.g. Consider a case where commands are sent
+	 * over 4 different connections, and cmdsn = 1004 arrives first, then
+	 * 1003, and 1002 and 1001 are lost due to a connection failure.
+	 * So now 1003 is waiting for 1002 to be delivered, and although the
+	 * wait time of 1004 > wait time of 1003, only 1003 will be considered
+	 * by the monitor thread. 1004 will be automatically processed by
+	 * iscsit_process_pdu_in_queue() once the scan is complete and the
+	 * expcmdsn becomes current.
+	 */
+	mutex_enter(&ist->ist_sn_mutex);
+	cbuf = ist->ist_rxpdu_queue;
+	if (cbuf->cb_num_elems == 0) {
+		mutex_exit(&ist->ist_sn_mutex);
+		return;
+	}
+	for (next_pdu = NULL, i = 0; ; i++) {
+		next_cmdsn = ist->ist_expcmdsn + i; /* start at expcmdsn */
+		index = next_cmdsn % ISCSIT_RXPDU_QUEUE_LEN;
+		if ((next_pdu = cbuf->cb_buffer[index]) != NULL) {
+			/*
+			 * If the PDU wait time has not exceeded threshold
+			 * stop scanning the staging queue until the timer
+			 * fires again
+			 */
+			if ((ddi_get_time() - next_pdu->isp_queue_time)
+			    < rxpdu_queue_threshold) {
+				mutex_exit(&ist->ist_sn_mutex);
+				return;
+			}
+			/*
+			 * Remove the next PDU from the queue and post it
+			 * to the SCSI layer, skipping over the missing
+			 * PDU. Stop scanning the staging queue until
+			 * the monitor timer fires again
+			 */
+			(void) iscsit_remove_pdu_from_queue(ist, next_cmdsn);
+			mutex_exit(&ist->ist_sn_mutex);
+			DTRACE_PROBE3(advanced__to__blocked__cmdsn,
+			    iscsit_sess_t *, ist, idm_pdu_t *, next_pdu,
+			    uint32_t, next_cmdsn);
+			iscsit_post_staged_pdu(next_pdu);
+			/* Deliver any subsequent PDUs immediately */
+			iscsit_process_pdu_in_queue(ist);
+			return;
+		}
+		/*
+		 * Skipping over i PDUs, e.g. a case where commands 1001 and
+		 * 1002 are lost in the network, skip over both and post 1003
+		 * expcmdsn then becomes 1004 at the end of the scan.
+		 */
+		DTRACE_PROBE2(skipping__over__cmdsn, iscsit_sess_t *, ist,
+		    uint32_t, next_cmdsn);
+	}
+	/*
+	 * following the assumption, staged cmdsn >= expcmdsn, this statement
+	 * is never reached.
+	 */
 }

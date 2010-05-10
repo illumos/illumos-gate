@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -139,7 +138,7 @@ iscsit_sess_create(iscsit_tgt_t *tgt, iscsit_conn_t *ict,
 	}
 
 	idm_sm_audit_init(&result->ist_state_audit);
-	rw_init(&result->ist_sn_rwlock, NULL, RW_DRIVER, NULL);
+	mutex_init(&result->ist_sn_mutex, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&result->ist_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&result->ist_cv, NULL, CV_DEFAULT, NULL);
 	list_create(&result->ist_events, sizeof (sess_event_ctx_t),
@@ -148,7 +147,7 @@ iscsit_sess_create(iscsit_tgt_t *tgt, iscsit_conn_t *ict,
 	    offsetof(iscsit_conn_t, ict_sess_ln));
 	avl_create(&result->ist_task_list, iscsit_task_itt_compare,
 	    sizeof (iscsit_task_t), offsetof(iscsit_task_t, it_sess_ln));
-
+	result->ist_rxpdu_queue = kmem_zalloc(sizeof (iscsit_cbuf_t), KM_SLEEP);
 	result->ist_state = SS_Q1_FREE;
 	result->ist_last_state = SS_Q1_FREE;
 	bcopy(isid, result->ist_isid, ISCSI_ISID_LEN);
@@ -252,11 +251,12 @@ iscsit_sess_destroy(iscsit_sess_t *ist)
 		kmem_free(ist->ist_target_alias,
 		    strlen(ist->ist_target_alias) + 1);
 	avl_destroy(&ist->ist_task_list);
+	kmem_free(ist->ist_rxpdu_queue, sizeof (iscsit_cbuf_t));
 	list_destroy(&ist->ist_conn_list);
 	list_destroy(&ist->ist_events);
 	cv_destroy(&ist->ist_cv);
 	mutex_destroy(&ist->ist_mutex);
-	rw_destroy(&ist->ist_sn_rwlock);
+	mutex_destroy(&ist->ist_sn_mutex);
 	kmem_free(ist, sizeof (*ist));
 }
 

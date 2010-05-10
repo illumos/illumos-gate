@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_IDM_IMPL_H_
 #define	_IDM_IMPL_H_
@@ -373,6 +372,7 @@ typedef struct idm_pdu_s {
 	uint32_t	isp_flags;
 	uint_t		isp_hdrbuflen;
 	uint_t		isp_databuflen;
+	time_t		isp_queue_time;
 } idm_pdu_t;
 
 /*
@@ -521,8 +521,6 @@ uint32_t idm_crc32c_continued(void *address, unsigned long length,
     uint32_t crc);
 
 void idm_listbuf_insert(list_t *lst, idm_buf_t *buf);
-
-int idm_task_compare(const void *v1, const void *v2);
 
 idm_conn_t *idm_lookup_conn(uint8_t *isid, uint16_t tsih, uint16_t cid);
 

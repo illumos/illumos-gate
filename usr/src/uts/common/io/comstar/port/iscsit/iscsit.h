@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef _ISCSIT_H_
 #define	_ISCSIT_H_
@@ -36,7 +35,7 @@
  */
 #define	ISCSIT_MIN_VERSION			0x00
 #define	ISCSIT_MAX_VERSION			0x00
-#define	ISCSIT_MAX_CONNECTIONS			1 /* No MC/S support */
+#define	ISCSIT_MAX_CONNECTIONS			32 /* MC/S support  */
 #define	ISCSIT_MAX_RECV_DATA_SEGMENT_LENGTH	(32*1024)
 #define	ISCSIT_MAX_BURST_LENGTH			(512*1024)
 #define	ISCSIT_MAX_FIRST_BURST_LENGTH		ISCSI_DEFAULT_FIRST_BURST_LENGTH
@@ -55,11 +54,33 @@
 /* Max targets per system */
 #define	ISCSIT_MAX_TARGETS	1024
 
+#define	ISCSIT_MAX_WINDOW	1024
+#define	ISCSIT_RXPDU_QUEUE_LEN	2048
+
+#define	ISCSIT_CMDSN_LT_EXPCMDSN	-1
+#define	ISCSIT_CMDSN_EQ_EXPCMDSN	1
+#define	ISCSIT_CMDSN_GT_EXPCMDSN	0
+/*
+ * MC/S: A timeout is maintained to recover from lost CmdSN (holes in the
+ * CmdSN ordering). When the timeout is reached, the ExpCmdSN is advanced
+ * past the hole to continue processing the queued commands. This value is
+ * system-tunable (volatile rxpdu_queue_threshold) and should be in the
+ * range from 5 to 30 seconds.
+ */
+#define	ISCSIT_RXPDU_QUEUE_THRESHOLD		5	/* 5 seconds */
+#define	ISCSIT_RXPDU_QUEUE_MONITOR_INTERVAL	5	/* 5 seconds */
+
 /* Time in seconds to wait between calls to stmf_deregister_local_port */
 #define	TGT_DEREG_RETRY_SECONDS	1
 
 #define	ISCSIT_GLOBAL_LOCK(rw) rw_enter(&iscsit_global.global_rwlock, (rw))
 #define	ISCSIT_GLOBAL_UNLOCK() rw_exit(&iscsit_global.global_rwlock)
+
+/* Circular buffer to hold the out-of-order PDUs in MC/S */
+typedef struct {
+	idm_pdu_t	*cb_buffer[ISCSIT_RXPDU_QUEUE_LEN];
+	int		cb_num_elems;
+} iscsit_cbuf_t;
 
 /*
  * Used for serial number arithmetic (RFC 1982)
@@ -337,7 +358,7 @@ typedef struct {
 	iscsit_tgt_t		*ist_tgt;
 	idm_refcnt_t		ist_refcnt;
 	kmem_cache_t		*ist_task_cache;
-	krwlock_t		ist_sn_rwlock;
+	kmutex_t		ist_sn_mutex;
 	kmutex_t		ist_mutex;
 	kcondvar_t		ist_cv;
 	iscsit_session_state_t	ist_state;
@@ -363,6 +384,7 @@ typedef struct {
 	uint32_t		ist_expcmdsn;
 	uint32_t		ist_maxcmdsn;
 	avl_tree_t		ist_task_list;
+	iscsit_cbuf_t		*ist_rxpdu_queue;
 } iscsit_sess_t;
 
 /* Update iscsit_ils_name table whenever login states are modified */
@@ -821,5 +843,11 @@ int
 iscsit_verify_chap_resp(iscsit_conn_login_t *lsm,
     unsigned int chap_i, uchar_t *chap_c, unsigned int challenge_len,
     uchar_t *chap_r, unsigned int resp_len);
+
+void
+iscsit_rxpdu_queue_monitor_start(void);
+
+void
+iscsit_rxpdu_queue_monitor_stop(void);
 
 #endif /* _ISCSIT_H_ */

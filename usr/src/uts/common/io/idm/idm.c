@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -54,7 +53,6 @@ static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modlmisc, NULL
 };
 
-extern int idm_task_compare(const void *t1, const void *t2);
 extern void idm_wd_thread(void *arg);
 
 static int _idm_init(void);
