@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -116,8 +115,6 @@ _topo_fini(topo_mod_t *mod)
 {
 	topo_mod_dprintf(mod, "module finishing.\n");
 
-	x86pi_hbr_enum_fini(mod);
-
 	/* Unregister from libtopo */
 	topo_mod_unregister(mod);
 }
@@ -202,6 +199,9 @@ x86pi_enum_start(topo_mod_t *mod, x86pi_enum_t *x86pi)
 	 */
 	fac_done = 0;
 	rv = x86pi_enum_gentopo(mod, x86pi->t_parent, shp);
+
+	x86pi_hbr_enum_fini(mod);
+
 	if (rv != 0) {
 		return (-1);
 	}
