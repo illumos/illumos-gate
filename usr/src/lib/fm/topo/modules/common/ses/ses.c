@@ -37,6 +37,15 @@
 #include <sys/libdevid.h>
 #include <sys/scsi/scsi_types.h>
 #include <sys/byteorder.h>
+#include <pthread.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <sys/ctfs.h>
+#include <libcontract.h>
+#include <poll.h>
+#include <sys/contract/device.h>
+#include <libsysevent.h>
+#include <sys/sysevent/eventdefs.h>
 
 #include "disk.h"
 #include "ses.h"
@@ -199,12 +208,422 @@ static const topo_method_t ses_enclosure_methods[] = {
 	{ NULL }
 };
 
+/*
+ * Functions for tracking ses devices which we were unable to open. We retry
+ * these at regular intervals using ses_recheck_dir() and if we find that we
+ * can now open any of them then we send a sysevent to indicate that a new topo
+ * snapshot should be taken.
+ */
+typedef struct ses_open_fail_list {
+	struct ses_open_fail_list	*sof_next;
+	char				*sof_path;
+} ses_open_fail_list_t;
+
+static ses_open_fail_list_t *ses_sofh;
+static pthread_mutex_t ses_sofmt;
+
+static void
+ses_recheck_dir(topo_mod_t *mod)
+{
+	ses_target_t *target;
+	sysevent_id_t eid;
+	ses_open_fail_list_t *sof;
+
+	/*
+	 * check list of "unable to open" devices
+	 */
+	(void) pthread_mutex_lock(&ses_sofmt);
+	for (sof = ses_sofh; sof != NULL; sof = sof->sof_next) {
+		/*
+		 * see if we can open it now
+		 */
+		if ((target = ses_open(LIBSES_VERSION,
+		    sof->sof_path)) == NULL) {
+			topo_mod_dprintf(mod,
+			    "recheck_dir - still can't open %s", sof->sof_path);
+			continue;
+		}
+
+		/*
+		 * ok - better force a new snapshot
+		 */
+		topo_mod_dprintf(mod,
+		    "recheck_dir - can now open %s", sof->sof_path);
+		(void) sysevent_post_event(EC_PLATFORM, ESC_PLATFORM_SP_RESET,
+		    SUNW_VENDOR, "fmd", NULL, &eid);
+		ses_close(target);
+		break;
+	}
+	(void) pthread_mutex_unlock(&ses_sofmt);
+}
+
+static void
+ses_sof_alloc(topo_mod_t *mod, char *path)
+{
+	ses_open_fail_list_t *sof;
+
+	(void) pthread_mutex_lock(&ses_sofmt);
+	sof = topo_mod_zalloc(mod, sizeof (*sof));
+	topo_mod_dprintf(mod, "sof_alloc %s", path);
+	sof->sof_path = path;
+	sof->sof_next = ses_sofh;
+	ses_sofh = sof;
+	(void) pthread_mutex_unlock(&ses_sofmt);
+}
+
+static void
+ses_sof_freeall(topo_mod_t *mod)
+{
+	ses_open_fail_list_t *sof, *next_sof;
+
+	(void) pthread_mutex_lock(&ses_sofmt);
+	for (sof = ses_sofh; sof != NULL; sof = next_sof) {
+		next_sof = sof->sof_next;
+		topo_mod_dprintf(mod, "sof_freeall %s", sof->sof_path);
+		topo_mod_strfree(mod, sof->sof_path);
+		topo_mod_free(mod, sof, sizeof (*sof));
+	}
+	ses_sofh = NULL;
+	(void) pthread_mutex_unlock(&ses_sofmt);
+}
+
+/*
+ * functions for verifying that the ses_enum_target_t held in a device
+ * contract's cookie field is still valid (it may have been freed by
+ * ses_release()).
+ */
+typedef struct ses_stp_list {
+	struct ses_stp_list	*ssl_next;
+	ses_enum_target_t	*ssl_tgt;
+} ses_stp_list_t;
+
+static ses_stp_list_t *ses_sslh;
+static pthread_mutex_t ses_sslmt;
+
+static void
+ses_ssl_alloc(topo_mod_t *mod, ses_enum_target_t *stp)
+{
+	ses_stp_list_t *ssl;
+
+	(void) pthread_mutex_lock(&ses_sslmt);
+	ssl = topo_mod_zalloc(mod, sizeof (*ssl));
+	topo_mod_dprintf(mod, "ssl_alloc %p", stp);
+	ssl->ssl_tgt = stp;
+	ssl->ssl_next = ses_sslh;
+	ses_sslh = ssl;
+	(void) pthread_mutex_unlock(&ses_sslmt);
+}
+
+static void
+ses_ssl_free(topo_mod_t *mod, ses_enum_target_t *stp)
+{
+	ses_stp_list_t *ssl, *prev_ssl;
+
+	(void) pthread_mutex_lock(&ses_sslmt);
+	prev_ssl = NULL;
+	for (ssl = ses_sslh; ssl != NULL; ssl = ssl->ssl_next) {
+		if (ssl->ssl_tgt == stp) {
+			topo_mod_dprintf(mod, "ssl_free %p", ssl->ssl_tgt);
+			if (prev_ssl == NULL)
+				ses_sslh = ssl->ssl_next;
+			else
+				prev_ssl->ssl_next = ssl->ssl_next;
+			topo_mod_free(mod, ssl, sizeof (*ssl));
+			break;
+		}
+		prev_ssl = ssl;
+	}
+	(void) pthread_mutex_unlock(&ses_sslmt);
+}
+
+static int
+ses_ssl_valid(ses_enum_target_t *stp)
+{
+	ses_stp_list_t *ssl;
+
+	for (ssl = ses_sslh; ssl != NULL; ssl = ssl->ssl_next)
+		if (ssl->ssl_tgt == stp)
+			return (1);
+	return (0);
+}
+
+/*
+ * Functions for creating and destroying a background thread
+ * (ses_contract_thread) used for detecting when ses devices have been
+ * retired/unretired.
+ */
+static struct ses_thread_s {
+	pthread_mutex_t mt;
+	pthread_t tid;
+	int thr_sig;
+	int doexit;
+	int count;
+} sesthread = {
+	PTHREAD_MUTEX_INITIALIZER,
+	0,
+	SIGTERM,
+	0,
+	0
+};
+
+static void *
+ses_contract_thread(void *arg)
+{
+	int efd, ctlfd, statfd;
+	ct_evthdl_t ev;
+	ctevid_t evid;
+	uint_t event;
+	char path[PATH_MAX];
+	ses_enum_target_t *stp;
+	ct_stathdl_t stathdl;
+	ctid_t ctid;
+	topo_mod_t *mod = (topo_mod_t *)arg;
+	struct pollfd fds;
+	int pollret;
+
+	topo_mod_dprintf(mod, "start contract event thread");
+	efd = open64(CTFS_ROOT "/device/pbundle", O_RDONLY);
+	fds.fd = efd;
+	fds.events = POLLIN;
+	fds.revents = 0;
+	for (;;) {
+		/* check if we've been asked to exit */
+		(void) pthread_mutex_lock(&sesthread.mt);
+		if (sesthread.doexit) {
+			(void) pthread_mutex_unlock(&sesthread.mt);
+			break;
+		}
+		(void) pthread_mutex_unlock(&sesthread.mt);
+
+		/* poll until an event arrives */
+		if ((pollret = poll(&fds, 1, 10000)) <= 0) {
+			if (pollret == 0)
+				ses_recheck_dir(mod);
+			continue;
+		}
+
+		/* read the event */
+		(void) pthread_mutex_lock(&ses_sslmt);
+		topo_mod_dprintf(mod, "read contract event");
+		if (ct_event_read(efd, &ev) != 0) {
+			(void) pthread_mutex_unlock(&ses_sslmt);
+			continue;
+		}
+
+		/* see if it is an event we are expecting */
+		ctid = ct_event_get_ctid(ev);
+		topo_mod_dprintf(mod, "got contract event ctid=%d", ctid);
+		event = ct_event_get_type(ev);
+		if (event != CT_DEV_EV_OFFLINE && event != CT_EV_NEGEND) {
+			topo_mod_dprintf(mod, "bad contract event %x", event);
+			ct_event_free(ev);
+			(void) pthread_mutex_unlock(&ses_sslmt);
+			continue;
+		}
+
+		/* find target pointer saved in cookie */
+		evid = ct_event_get_evid(ev);
+		(void) snprintf(path, PATH_MAX, CTFS_ROOT "/device/%ld/status",
+		    ctid);
+		statfd = open64(path, O_RDONLY);
+		ct_status_read(statfd, CTD_COMMON, &stathdl);
+		stp = (ses_enum_target_t *)(uintptr_t)
+		    ct_status_get_cookie(stathdl);
+		ct_status_free(stathdl);
+		close(statfd);
+
+		/* check if target pointer is still valid */
+		if (ses_ssl_valid(stp) == 0) {
+			topo_mod_dprintf(mod, "contract already abandoned %x",
+			    event);
+			(void) snprintf(path, PATH_MAX,
+			    CTFS_ROOT "/device/%ld/ctl", ctid);
+			ctlfd = open64(path, O_WRONLY);
+			if (event != CT_EV_NEGEND)
+				ct_ctl_ack(ctlfd, evid);
+			else
+				ct_ctl_abandon(ctlfd);
+			close(ctlfd);
+			ct_event_free(ev);
+			(void) pthread_mutex_unlock(&ses_sslmt);
+			continue;
+		}
+
+		/* find control device for ack/abandon */
+		(void) pthread_mutex_lock(&stp->set_lock);
+		(void) snprintf(path, PATH_MAX, CTFS_ROOT "/device/%ld/ctl",
+		    ctid);
+		ctlfd = open64(path, O_WRONLY);
+		if (event != CT_EV_NEGEND) {
+			/* if this is an offline event, do the offline */
+			topo_mod_dprintf(mod, "got contract offline event");
+			if (stp->set_target) {
+				topo_mod_dprintf(mod, "contract thread rele");
+				ses_snap_rele(stp->set_snap);
+				ses_close(stp->set_target);
+				stp->set_target = NULL;
+			}
+			ct_ctl_ack(ctlfd, evid);
+		} else {
+			/* if this is the negend, then abandon the contract */
+			topo_mod_dprintf(mod, "got contract negend");
+			if (stp->set_ctid) {
+				topo_mod_dprintf(mod, "abandon old contract %d",
+				    stp->set_ctid);
+				stp->set_ctid = NULL;
+			}
+			ct_ctl_abandon(ctlfd);
+		}
+		close(ctlfd);
+		(void) pthread_mutex_unlock(&stp->set_lock);
+		ct_event_free(ev);
+		(void) pthread_mutex_unlock(&ses_sslmt);
+	}
+	close(efd);
+	return (NULL);
+}
+
+int
+find_thr_sig(void)
+{
+	int i;
+	sigset_t oset, rset;
+	int sig[] = {SIGTERM, SIGUSR1, SIGUSR2};
+	int sig_sz = sizeof (sig) / sizeof (int);
+	int rc = SIGTERM;
+
+	/* prefered set of signals that are likely used to terminate threads */
+	(void) sigemptyset(&oset);
+	(void) pthread_sigmask(SIG_SETMASK, NULL, &oset);
+	for (i = 0; i < sig_sz; i++) {
+		if (sigismember(&oset, sig[i]) == 0) {
+			return (sig[i]);
+		}
+	}
+
+	/* reserved set of signals that are not allowed to terminate thread */
+	(void) sigemptyset(&rset);
+	(void) sigaddset(&rset, SIGABRT);
+	(void) sigaddset(&rset, SIGKILL);
+	(void) sigaddset(&rset, SIGSTOP);
+	(void) sigaddset(&rset, SIGCANCEL);
+
+	/* Find signal that is not masked and not in the reserved list. */
+	for (i = 1; i < MAXSIG; i++) {
+		if (sigismember(&rset, i) == 1) {
+			continue;
+		}
+		if (sigismember(&oset, i) == 0) {
+			return (i);
+		}
+	}
+
+	return (rc);
+}
+
+/*ARGSUSED*/
+static void
+ses_handler(int sig)
+{
+}
+
+static void
+ses_thread_init(void *arg)
+{
+	pthread_attr_t *attr = NULL;
+	struct sigaction act;
+
+	(void) pthread_mutex_lock(&sesthread.mt);
+	sesthread.count++;
+	if (sesthread.tid == 0) {
+		/* find a suitable signal to use for killing the thread below */
+		sesthread.thr_sig = find_thr_sig();
+
+		/* if don't have a handler for this signal, create one */
+		(void) sigaction(sesthread.thr_sig, NULL, &act);
+		if (act.sa_handler == SIG_DFL || act.sa_handler == SIG_IGN)
+			act.sa_handler = ses_handler;
+		(void) sigaction(sesthread.thr_sig, &act, NULL);
+
+		/* create a thread to listen for offline events */
+		(void) pthread_create(&sesthread.tid,
+		    attr, ses_contract_thread, arg);
+	}
+	(void) pthread_mutex_unlock(&sesthread.mt);
+}
+
+static void
+ses_thread_fini()
+{
+	(void) pthread_mutex_lock(&sesthread.mt);
+	if (--sesthread.count > 0) {
+		(void) pthread_mutex_unlock(&sesthread.mt);
+		return;
+	}
+	sesthread.doexit = 1;
+	(void) pthread_mutex_unlock(&sesthread.mt);
+	(void) pthread_kill(sesthread.tid, sesthread.thr_sig);
+	(void) pthread_join(sesthread.tid, NULL);
+	sesthread.tid = 0;
+}
+
+static void
+ses_create_contract(topo_mod_t *mod, ses_enum_target_t *stp)
+{
+	int tfd, len, rval;
+	char link_path[PATH_MAX];
+
+	stp->set_ctid = NULL;
+
+	/* convert "/dev" path into "/devices" path */
+	if ((len = readlink(stp->set_devpath, link_path, PATH_MAX)) < 0) {
+		topo_mod_dprintf(mod, "readlink failed");
+		return;
+	}
+	link_path[len] = '\0';
+
+	/* set up template to create new contract */
+	tfd = open64(CTFS_ROOT "/device/template", O_RDWR);
+	ct_tmpl_set_critical(tfd, CT_DEV_EV_OFFLINE);
+	ct_tmpl_set_cookie(tfd, (uint64_t)(uintptr_t)stp);
+
+	/* strip "../../devices" off the front and create the contract */
+	if ((rval = ct_dev_tmpl_set_minor(tfd, &link_path[13])) != 0)
+		topo_mod_dprintf(mod, "failed to set minor %s rval = %d",
+		    &link_path[13], rval);
+	else if ((rval = ct_tmpl_create(tfd, &stp->set_ctid)) != 0)
+		topo_mod_dprintf(mod, "failed to create ctid rval = %d", rval);
+	else
+		topo_mod_dprintf(mod, "created ctid=%d", stp->set_ctid);
+	close(tfd);
+}
+
 static void
 ses_target_free(topo_mod_t *mod, ses_enum_target_t *stp)
 {
 	if (--stp->set_refcount == 0) {
-		ses_snap_rele(stp->set_snap);
-		ses_close(stp->set_target);
+		/* check if already closed due to contract offline request */
+		(void) pthread_mutex_lock(&stp->set_lock);
+		if (stp->set_target) {
+			ses_snap_rele(stp->set_snap);
+			ses_close(stp->set_target);
+			stp->set_target = NULL;
+		}
+		if (stp->set_ctid) {
+			int ctlfd;
+			char path[PATH_MAX];
+
+			topo_mod_dprintf(mod, "abandon old contract %d",
+			    stp->set_ctid);
+			(void) snprintf(path, PATH_MAX,
+			    CTFS_ROOT "/device/%ld/ctl", stp->set_ctid);
+			ctlfd = open64(path, O_WRONLY);
+			ct_ctl_abandon(ctlfd);
+			close(ctlfd);
+			stp->set_ctid = NULL;
+		}
+		(void) pthread_mutex_unlock(&stp->set_lock);
+		ses_ssl_free(mod, stp);
 		topo_mod_strfree(mod, stp->set_devpath);
 		topo_mod_free(mod, stp, sizeof (ses_enum_target_t));
 	}
@@ -385,7 +804,40 @@ ses_node_lock(topo_mod_t *mod, tnode_t *tn)
 	 */
 	now = gethrtime();
 
-	if (now - tp->set_snaptime > (ses_snap_freq * 1000 * 1000) &&
+	if (tp->set_target == NULL) {
+		/*
+		 * We may have closed the device but not yet abandoned the
+		 * contract (ie we've had the offline event but not yet the
+		 * negend). If so, just return failure.
+		 */
+		if (tp->set_ctid != NULL) {
+			(void) topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP);
+			(void) pthread_mutex_unlock(&tp->set_lock);
+			return (NULL);
+		}
+
+		/*
+		 * The device has been closed due to a contract offline
+		 * request, then we need to reopen it and create a new contract.
+		 */
+		if ((tp->set_target =
+		    ses_open(LIBSES_VERSION, tp->set_devpath)) == NULL) {
+			sysevent_id_t eid;
+
+			(void) topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP);
+			(void) pthread_mutex_unlock(&tp->set_lock);
+			topo_mod_dprintf(mod, "recheck_dir - "
+			    "can no longer open %s", tp->set_devpath);
+			(void) sysevent_post_event(EC_PLATFORM,
+			    ESC_PLATFORM_SP_RESET, SUNW_VENDOR, "fmd", NULL,
+			    &eid);
+			return (NULL);
+		}
+		topo_mod_dprintf(mod, "reopen contract");
+		ses_create_contract(mod, tp);
+		tp->set_snap = ses_snap_hold(tp->set_target);
+		tp->set_snaptime = gethrtime();
+	} else if (now - tp->set_snaptime > (ses_snap_freq * 1000 * 1000) &&
 	    (snap = ses_snap_new(tp->set_target)) != NULL) {
 		if (ses_snap_generation(snap) !=
 		    ses_snap_generation(tp->set_snap)) {
@@ -2335,10 +2787,13 @@ ses_process_dir(const char *dirpath, ses_enum_data_t *sdp)
 		    ses_open(LIBSES_VERSION, path)) == NULL) {
 			topo_mod_dprintf(mod, "failed to open ses target "
 			    "'%s': %s", dp->d_name, ses_errmsg());
-			topo_mod_strfree(mod, stp->set_devpath);
+			ses_sof_alloc(mod, stp->set_devpath);
 			topo_mod_free(mod, stp, sizeof (ses_enum_target_t));
 			continue;
 		}
+		topo_mod_dprintf(mod, "open contract");
+		ses_ssl_alloc(mod, stp);
+		ses_create_contract(mod, stp);
 
 		stp->set_refcount = 1;
 		sdp->sed_target = stp;
@@ -2369,8 +2824,10 @@ ses_release(topo_mod_t *mod, tnode_t *tn)
 {
 	ses_enum_target_t *stp;
 
-	if ((stp = topo_node_getspecific(tn)) != NULL)
+	if ((stp = topo_node_getspecific(tn)) != NULL) {
+		topo_node_setspecific(tn, NULL);
 		ses_target_free(mod, stp);
+	}
 }
 
 /*ARGSUSED*/
@@ -2393,6 +2850,7 @@ ses_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
 	 * gather information about any available enclosures.
 	 */
 	if ((data = topo_mod_getspecific(mod)) == NULL) {
+		ses_sof_freeall(mod);
 		if ((data = topo_mod_zalloc(mod, sizeof (ses_enum_data_t))) ==
 		    NULL)
 			return (-1);
@@ -2466,17 +2924,24 @@ static topo_modinfo_t ses_info =
 int
 _topo_init(topo_mod_t *mod, topo_version_t version)
 {
+	int rval;
+
 	if (getenv("TOPOSESDEBUG") != NULL)
 		topo_mod_setdebug(mod);
 
 	topo_mod_dprintf(mod, "initializing %s enumerator\n",
 	    SES_ENCLOSURE);
 
-	return (topo_mod_register(mod, &ses_info, TOPO_VERSION));
+	if ((rval = topo_mod_register(mod, &ses_info, TOPO_VERSION)) == 0)
+		ses_thread_init(mod);
+
+	return (rval);
 }
 
 void
 _topo_fini(topo_mod_t *mod)
 {
+	ses_thread_fini();
+	ses_sof_freeall(mod);
 	topo_mod_unregister(mod);
 }

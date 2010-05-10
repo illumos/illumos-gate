@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libdevinfo.h>
 #include <sys/modctl.h>
@@ -69,10 +66,14 @@ static void rio_assert(di_retire_t *dp, const char *EXstr, int line,
 
 static int disk_select(di_node_t node, rcm_arg_t *rp);
 static int nexus_select(di_node_t node, rcm_arg_t *rp);
+static int enclosure_select(di_node_t node, rcm_arg_t *rp);
+static int smp_select(di_node_t node, rcm_arg_t *rp);
 
 di_selector_t supported_devices[] = {
 	{"disk",	disk_select},
 	{"nexus",	nexus_select},
+	{"enclosure",	enclosure_select},
+	{"smp",		smp_select},
 	{NULL, 		NULL}
 };
 
@@ -99,6 +100,83 @@ rio_assert(di_retire_t *dp, const char *EXstr, int line, const char *file)
 	    "Assertion failed: %s, file %s, line %d\n",
 	    EXstr, file, line);
 	dp->rt_abort(dp->rt_hdl, buf);
+}
+
+/*ARGSUSED*/
+static int
+enclosure_minor(di_node_t node, di_minor_t minor, void *arg)
+{
+	rcm_arg_t *rp = (rcm_arg_t *)arg;
+	di_retire_t *dp = rp->rcm_dp;
+
+	rp->rcm_supp = 1;
+	dp->rt_debug(dp->rt_hdl, "[INFO]: enclosure_minor: "
+	    "IDed this node as enclosure\n");
+	return (DI_WALK_TERMINATE);
+}
+
+static int
+enclosure_select(di_node_t node, rcm_arg_t *rp)
+{
+	rcm_arg_t rarg;
+	di_retire_t	*dp = rp->rcm_dp;
+
+	rarg.rcm_dp = dp;
+
+	/*
+	 * Check if this is an enclosure minor. If any one minor is DDI_NT_SGEN
+	 * or DDI_NT_SCSI_ENCLOSURE we assume it is an enclosure.
+	 */
+	rarg.rcm_supp = 0;
+	if (di_walk_minor(node, DDI_NT_SCSI_ENCLOSURE, 0, &rarg,
+	    enclosure_minor) != 0) {
+		dp->rt_debug(dp->rt_hdl, "[INFO]: enclosure_select:"
+		    "di_walk_minor failed. Returning NOTSUP\n");
+		return (0);
+	}
+	if (di_walk_minor(node, "ddi_generic:scsi", 0, &rarg,
+	    enclosure_minor) != 0) {
+		dp->rt_debug(dp->rt_hdl, "[INFO]: enclosure_select:"
+		    "di_walk_minor failed. Returning NOTSUP\n");
+		return (0);
+	}
+
+	return (rarg.rcm_supp);
+}
+
+/*ARGSUSED*/
+static int
+smp_minor(di_node_t node, di_minor_t minor, void *arg)
+{
+	rcm_arg_t *rp = (rcm_arg_t *)arg;
+	di_retire_t *dp = rp->rcm_dp;
+
+	rp->rcm_supp = 1;
+	dp->rt_debug(dp->rt_hdl, "[INFO]: smp_minor: "
+	    "IDed this node as smp\n");
+	return (DI_WALK_TERMINATE);
+}
+
+static int
+smp_select(di_node_t node, rcm_arg_t *rp)
+{
+	rcm_arg_t rarg;
+	di_retire_t	*dp = rp->rcm_dp;
+
+	rarg.rcm_dp = dp;
+
+	/*
+	 * Check if this is an smp minor. If any one minor is DDI_NT_SMP
+	 * we assume it is an smp.
+	 */
+	rarg.rcm_supp = 0;
+	if (di_walk_minor(node, DDI_NT_SMP, 0, &rarg, smp_minor) != 0) {
+		dp->rt_debug(dp->rt_hdl, "[INFO]: smp_select:"
+		    "di_walk_minor failed. Returning NOTSUP\n");
+		return (0);
+	}
+
+	return (rarg.rcm_supp);
 }
 
 /*ARGSUSED*/

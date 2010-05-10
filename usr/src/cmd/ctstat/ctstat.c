@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -33,6 +32,7 @@
 #include <errno.h>
 #include <libuutil.h>
 #include <sys/contract/process.h>
+#include <sys/contract/device.h>
 #include <limits.h>
 #include <libcontract.h>
 #include <libcontract_priv.h>
@@ -245,6 +245,41 @@ verb_crit(ct_stathdl_t hdl)
 }
 
 /*
+ * verb_minor
+ *
+ * Display the minor device
+ */
+static void
+verb_minor(ct_stathdl_t hdl)
+{
+	int err;
+	char *buf;
+
+	if (err = ct_dev_status_get_minor(hdl, &buf))
+		verb_error(err);
+	else
+		(void) printf("%s\n", buf);
+}
+
+/*
+ * verb_state
+ *
+ * Display the state of the device
+ */
+static void
+verb_dev_state(ct_stathdl_t hdl)
+{
+	int err;
+	uint_t state;
+
+	if (err = ct_dev_status_get_dev_state(hdl, &state))
+		verb_error(err);
+	else
+		(void) printf("%s\n", state == CT_DEV_EV_ONLINE ? "online" :
+		    state == CT_DEV_EV_DEGRADED ? "degraded" : "offline");
+}
+
+/*
  * verb_fatal
  *
  * Display the events in the fatal event set.
@@ -391,6 +426,12 @@ static verbout_t vprocess[] = {
 	NULL
 };
 
+static verbout_t vdevice[] = {
+	"device", verb_minor,
+	"dev_state", verb_dev_state,
+	NULL
+};
+
 /*
  * print_verbose
  *
@@ -437,6 +478,7 @@ struct {
 	verbout_t *verbout;
 } cttypes[] = {
 	{ "process", vprocess },
+	{ "device", vdevice },
 	{ NULL }
 };
 

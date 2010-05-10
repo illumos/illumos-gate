@@ -3983,6 +3983,81 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 }
 
 /*
+ * i_mdi_pi_online():
+ *		Online a mdi_pathinfo node and call the vHCI driver's callback
+ */
+static int
+i_mdi_pi_online(mdi_pathinfo_t *pip, int flags)
+{
+	mdi_vhci_t	*vh = NULL;
+	mdi_client_t	*ct = NULL;
+	mdi_phci_t	*ph;
+	int		(*f)();
+	int		rv;
+
+	MDI_PI_LOCK(pip);
+	ph = MDI_PI(pip)->pi_phci;
+	vh = ph->ph_vhci;
+	ct = MDI_PI(pip)->pi_client;
+	MDI_PI_SET_ONLINING(pip)
+	MDI_PI_UNLOCK(pip);
+	f = vh->vh_ops->vo_pi_state_change;
+	if (f != NULL)
+		rv = (*f)(vh->vh_dip, pip, MDI_PATHINFO_STATE_ONLINE, 0,
+		    flags);
+	MDI_CLIENT_LOCK(ct);
+	MDI_PI_LOCK(pip);
+	cv_broadcast(&MDI_PI(pip)->pi_state_cv);
+	MDI_PI_UNLOCK(pip);
+	if (rv == MDI_SUCCESS) {
+		dev_info_t	*cdip = ct->ct_dip;
+
+		rv = MDI_SUCCESS;
+		i_mdi_client_update_state(ct);
+		if (MDI_CLIENT_STATE(ct) == MDI_CLIENT_STATE_OPTIMAL ||
+		    MDI_CLIENT_STATE(ct) == MDI_CLIENT_STATE_DEGRADED) {
+			if (cdip && !i_ddi_devi_attached(cdip)) {
+				MDI_CLIENT_UNLOCK(ct);
+				rv = ndi_devi_online(cdip, 0);
+				MDI_CLIENT_LOCK(ct);
+				if ((rv != NDI_SUCCESS) &&
+				    (MDI_CLIENT_STATE(ct) ==
+				    MDI_CLIENT_STATE_DEGRADED)) {
+					MDI_CLIENT_SET_OFFLINE(ct);
+				}
+				if (rv != NDI_SUCCESS) {
+					/* Reset the path state */
+					MDI_PI_LOCK(pip);
+					MDI_PI(pip)->pi_state =
+					    MDI_PI_OLD_STATE(pip);
+					MDI_PI_UNLOCK(pip);
+				}
+			}
+		}
+		switch (rv) {
+		case NDI_SUCCESS:
+			MDI_CLIENT_SET_REPORT_DEV_NEEDED(ct);
+			i_mdi_report_path_state(ct, pip);
+			rv = MDI_SUCCESS;
+			break;
+		case NDI_BUSY:
+			rv = MDI_BUSY;
+			break;
+		default:
+			rv = MDI_FAILURE;
+			break;
+		}
+	} else {
+		/* Reset the path state */
+		MDI_PI_LOCK(pip);
+		MDI_PI(pip)->pi_state = MDI_PI_OLD_STATE(pip);
+		MDI_PI_UNLOCK(pip);
+	}
+	MDI_CLIENT_UNLOCK(ct);
+	return (rv);
+}
+
+/*
  * mdi_pi_get_node_name():
  *              Get the name associated with a mdi_pathinfo node.
  *              Since pathinfo nodes are not directly named, we
@@ -5526,12 +5601,28 @@ mdi_phci_retire_finalize(dev_info_t *dip, int phci_only, void *constraint)
 void
 mdi_phci_unretire(dev_info_t *dip)
 {
+	mdi_phci_t	*ph;
+	mdi_pathinfo_t	*pip;
+	mdi_pathinfo_t	*next;
+
 	ASSERT(MDI_PHCI(dip));
 
 	/*
 	 * Online the phci
 	 */
 	i_mdi_phci_online(dip);
+
+	ph = i_devi_get_phci(dip);
+	MDI_PHCI_LOCK(ph);
+	pip = ph->ph_path_head;
+	while (pip != NULL) {
+		MDI_PI_LOCK(pip);
+		next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
+		MDI_PI_UNLOCK(pip);
+		(void) i_mdi_pi_online(pip, 0);
+		pip = next;
+	}
+	MDI_PHCI_UNLOCK(ph);
 }
 
 /*ARGSUSED*/

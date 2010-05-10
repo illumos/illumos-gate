@@ -54,6 +54,7 @@ typedef struct ses_enum_target {
 	char			*set_devpath;
 	int			set_refcount;
 	pthread_mutex_t		set_lock;
+	ctid_t			set_ctid;
 } ses_enum_target_t;
 
 #define	TOPO_PGROUP_SES		"ses"

@@ -219,7 +219,8 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 	}
 
 	/* set the storage group public /dev name */
-	if (topo_prop_set_string(dtn, TOPO_PGROUP_STORAGE,
+	if (dnode->ddn_lpath != NULL &&
+	    topo_prop_set_string(dtn, TOPO_PGROUP_STORAGE,
 	    TOPO_STORAGE_LOGICAL_DISK_NAME, TOPO_PROP_IMMUTABLE,
 	    dnode->ddn_lpath, &err) != 0) {
 		topo_mod_dprintf(mod, "disk_set_props: "
@@ -738,7 +739,6 @@ dev_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 			if (dnode->ddn_lpath == NULL) {
 				topo_mod_dprintf(mod, "dev_di_node_add: "
 				    "failed to determine logical path");
-				goto error;
 			}
 		}
 	}
@@ -807,12 +807,14 @@ dev_walk_di_nodes(di_node_t node, void *arg)
 	char			*s;
 
 	/*
-	 * if it's not a scsi_vhci client and doesn't have a target port
-	 * then we're not interested
+	 * if it's not a scsi_vhci client and doesn't have a target_port
+	 * or target property then we're not interested
 	 */
 	if (di_path_client_next_path(node, NULL) == NULL &&
+	    (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+	    SCSI_ADDR_PROP_TARGET_PORT, &s) <= 0 ||
 	    di_prop_lookup_strings(DDI_DEV_T_ANY, node,
-	    SCSI_ADDR_PROP_TARGET_PORT, &s) <= 0) {
+	    SCSI_ADDR_PROP_TARGET, &s) <= 0)) {
 		return (DI_WALK_CONTINUE);
 	}
 	(void) di_prop_lookup_strings(DDI_DEV_T_ANY, node,

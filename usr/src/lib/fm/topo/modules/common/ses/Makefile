@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = ses
 CLASS = common
@@ -36,4 +34,4 @@ include ../../Makefile.plugin
 CPPFLAGS += -I../disk
 
 LDLIBS += -L$(ROOTLIBDIR)/scsi -R/usr/lib/scsi -lses
-LDLIBS += -ldevinfo -ldevid -ldiskstatus
+LDLIBS += -ldevinfo -ldevid -ldiskstatus -lcontract -lsysevent
