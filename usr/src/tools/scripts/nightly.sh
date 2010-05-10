@@ -1076,6 +1076,23 @@ function build_tools {
 function use_tools {
 	TOOLSROOT=$1
 
+	#
+	# If we're not building ON workspace, then the TOOLSROOT
+	# settings here are clearly ignored by the workspace
+	# makefiles, prepending nonexistent directories to PATH is
+	# harmless, and we clearly do not wish to override
+	# ONBLD_TOOLS.
+	#
+	# If we're building an ON workspace, then the prepended PATH
+	# elements should supercede the preexisting ONBLD_TOOLS paths,
+	# and we want to override ONBLD_TOOLS to catch the tools that
+	# don't have specific path env vars here.
+	#
+	# So the only conditional behavior is overriding ONBLD_TOOLS,
+	# and we check for "an ON workspace" by looking for
+	# ${TOOLSROOT}/opt/onbld.
+	#
+
 	STABS=${TOOLSROOT}/opt/onbld/bin/${MACH}/stabs
 	export STABS
 	CTFSTABS=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfstabs
@@ -1100,12 +1117,14 @@ function use_tools {
 	fi
 	export ELFSIGN
 
-	PATH="${TOOLSROOT}/opt/onbld/bin/${MACH}:${NONTOOLSPATH}"
+	PATH="${TOOLSROOT}/opt/onbld/bin/${MACH}:${PATH}"
 	PATH="${TOOLSROOT}/opt/onbld/bin:${PATH}"
 	export PATH
 
-	ONBLD_TOOLS=${TOOLSROOT}/opt/onbld
-	export ONBLD_TOOLS
+	if [ -d "${TOOLSROOT}/opt/onbld" ]; then
+		ONBLD_TOOLS=${TOOLSROOT}/opt/onbld
+		export ONBLD_TOOLS
+	fi
 
 	echo "\n==== New environment settings. ====\n" >> $LOGFILE
 	echo "STABS=${STABS}" >> $LOGFILE
@@ -1622,11 +1641,9 @@ if [ -z "$MAILTO" -o "$MAILTO" = "nobody" ]; then
 	export MAILTO
 fi
 
-NONTOOLSPATH="/usr/ccs/bin:$OPTHOME/SUNWspro/bin:$TEAMWARE/bin:/usr/bin"
-NONTOOLSPATH="${NONTOOLSPATH}:/usr/sbin:/usr/ucb"
-NONTOOLSPATH="${NONTOOLSPATH}:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
-TOOLSPATH="$OPTHOME/onbld/bin:$OPTHOME/onbld/bin/${MACH}"
-PATH="${TOOLSPATH}:${NONTOOLSPATH}"
+PATH="$OPTHOME/onbld/bin:$OPTHOME/onbld/bin/${MACH}:/usr/ccs/bin"
+PATH="$PATH:$OPTHOME/SUNWspro/bin:$TEAMWARE/bin:/usr/bin:/usr/sbin:/usr/ucb"
+PATH="$PATH:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
 export PATH
 
 # roots of source trees, both relative to $SRC and absolute.
