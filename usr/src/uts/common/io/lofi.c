@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -794,8 +793,13 @@ lofi_mapped_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
 			if (mapoffset == 0 && xfersize == MAXBSIZE)
 				smflags |= SM_DONTNEED;
 		} else {
-			if (error == 0)		/* write back good pages */
-				smflags |= SM_WRITE;
+			/*
+			 * Write back good pages, it is okay to
+			 * always release asynchronous here as we'll
+			 * follow with VOP_FSYNC for B_SYNC buffers.
+			 */
+			if (error == 0)
+				smflags |= SM_WRITE | SM_ASYNC;
 		}
 		(void) segmap_fault(kas.a_hat, segkmap, mapaddr,
 		    len, F_SOFTUNLOCK, srw);
@@ -951,6 +955,7 @@ lofi_strategy_task(void *arg)
 {
 	struct buf *bp = (struct buf *)arg;
 	int error;
+	int syncflag = 0;
 	struct lofi_state *lsp;
 	offset_t offset;
 	caddr_t	bufaddr;
@@ -982,6 +987,14 @@ lofi_strategy_task(void *arg)
 		error = EIO;
 		goto errout;
 	}
+
+	/*
+	 * If we're writing and the buffer was not B_ASYNC
+	 * we'll follow up with a VOP_FSYNC() to force any
+	 * asynchronous I/O to stable storage.
+	 */
+	if (!(bp->b_flags & B_READ) && !(bp->b_flags & B_ASYNC))
+		syncflag = FSYNC;
 
 	/*
 	 * We used to always use vn_rdwr here, but we cannot do that because
@@ -1206,6 +1219,9 @@ done:
 		if (uncompressed_seg != NULL)
 			kmem_free(uncompressed_seg, lsp->ls_uncomp_seg_sz);
 	} /* end of handling compressed files */
+
+	if ((error == 0) && (syncflag != 0))
+		error = VOP_FSYNC(lsp->ls_vp, syncflag, kcred, NULL);
 
 errout:
 	if (bufinited && lsp->ls_kstat) {
