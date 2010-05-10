@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_MSGS_H
 #define	_MSGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -35,7 +31,9 @@ extern "C" {
 
 #define	SYNTAX_ERR	gettext("ERROR: Ignoring rules syntax error: %s\n")
 #define	SYNTAX_ABORT	gettext("ABORTING: Syntax error(s) in the rules file\n")
-#define	INVALID_FILE	gettext("WARNING: Ignoring invalid file: %s\n")
+#define	UNKNOWN_FILE	gettext("WARNING: unknown directory entry: %s\n")
+#define	CANTLIST_DIR	gettext("WARNING: cannot list directory: %s\n")
+#define	INTERNAL_ERR	gettext("WARNING: internal error at %s\n")
 #define	INVALID_SUBTREE	gettext("WARNING: Ignoring invalid subtree: %s\n")
 #define	RULES_ERR	gettext("ERROR: -r option requires a filename\n")
 #define	INPUT_ERR \

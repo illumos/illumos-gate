@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <signal.h>
@@ -257,11 +256,12 @@ create_manifest_rule(char *reloc_root, FILE *rule_fp)
 		}
 
 		/*
-		 * Walk the subtree and invoke the callback function
-		 * walker()
+		 * Walk the subtree and invoke the callback function walker()
+		 * Use FTW_ANYERR to get FTW_NS and FTW_DNR entries *and*
+		 * to continue past those errors.
 		 */
 		subtree_root = root;
-		(void) nftw64(root->subtree, &walker, 20, FTW_PHYS);
+		(void) nftw64(root->subtree, &walker, 20, FTW_PHYS|FTW_ANYERR);
 
 		/*
 		 * Ugly but necessary:
@@ -357,21 +357,28 @@ walker(const char *name, const struct stat64 *sp, int type, struct FTW *ftwx)
 				compute_chksum = 0;
 		}
 		break;
-	case FTW_SL:	/* symbolic link	*/
-	case FTW_DP:	/* end of directory	*/
-	case FTW_DNR:	/* unreadable directory	*/
-	case FTW_NS:	/* unstatable file	*/
+	case FTW_SL:	/* symbolic link, FTW_PHYS	*/
+	case FTW_SLN:	/* symbolic link, ~FTW_PHYS	*/
 		break;
-	case FTW_D:	/* enter directory 		*/
+	case FTW_DP:	/* end of directory, FTW_DEPTH	*/
+	case FTW_D:	/* enter directory, ~FTW_DEPTH	*/
 		dir_flag = B_TRUE;
 		ret = statvfs64(name, &path_vfs);
 		if (ret < 0)
 			eval_err = WARNING_EXIT;
 		break;
-	default:
-		(void) fprintf(stderr, INVALID_FILE, name);
+	case FTW_NS:	/* unstatable file	*/
+		(void) fprintf(stderr, UNKNOWN_FILE, name);
 		eval_err = WARNING_EXIT;
-		break;
+		return (0);
+	case FTW_DNR:	/* unreadable directory	*/
+		(void) fprintf(stderr, CANTLIST_DIR, name);
+		eval_err = WARNING_EXIT;
+		return (0);
+	default:
+		(void) fprintf(stderr, INTERNAL_ERR, name);
+		eval_err = WARNING_EXIT;
+		return (0);
 	}
 
 	/* This is the function which really processes the file */
