@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -41,6 +40,7 @@
 #include <syslog.h>
 #include <bsm/devices.h>
 #include <bsm/devalloc.h>
+#include <tsol/label.h>
 
 #define	DA_DEFS	"/etc/security/tsol/devalloc_defaults"
 
@@ -565,27 +565,92 @@ _build_defattrs(da_args *dargs, strentry_t **head_defent)
 }
 
 /*
+ * We have to handle the "standard" types in devlist differently than
+ * other devices, which are not covered by our auto-naming conventions.
+ *
+ * buf must be a buffer of size DA_MAX_NAME + 1
+ */
+int
+da_std_type(da_args *dargs, char *namebuf)
+{
+	char *type = dargs->devinfo->devtype;
+	int system_labeled;
+
+	system_labeled = is_system_labeled();
+
+	/* check safely for sizes */
+	if (strcmp(DA_AUDIO_TYPE, type) == 0) {
+		(void) strlcpy(namebuf, DA_AUDIO_NAME, DA_MAXNAME);
+		return (1);
+	}
+	if (strcmp(DA_CD_TYPE, type) == 0) {
+		if (system_labeled)
+			(void) strlcpy(namebuf, DA_CD_NAME, DA_MAXNAME);
+		else
+			(void) strlcpy(namebuf, DA_CD_TYPE, DA_MAXNAME);
+		return (1);
+	}
+	if (strcmp(DA_FLOPPY_TYPE, type) == 0) {
+		if (system_labeled)
+			(void) strlcpy(namebuf, DA_FLOPPY_NAME, DA_MAXNAME);
+		else
+			(void) strlcpy(namebuf, DA_FLOPPY_TYPE, DA_MAXNAME);
+		return (1);
+	}
+	if (strcmp(DA_TAPE_TYPE, type) == 0) {
+		if (system_labeled)
+			(void) strlcpy(namebuf, DA_TAPE_NAME, DA_MAXNAME);
+		else
+			(void) strlcpy(namebuf, DA_TAPE_TYPE, DA_MAXNAME);
+		return (1);
+	}
+	if (strcmp(DA_RMDISK_TYPE, type) == 0) {
+		(void) strlcpy(namebuf, DA_RMDISK_NAME, DA_MAXNAME);
+		return (1);
+	}
+	namebuf[0] = '\0';
+	return (0);
+}
+
+/*
+ * allocatable: returns
+ * -1 if no auths field,
+ * 0 if not allocatable (marked '*')
+ * 1 if not marked '*'
+ */
+static int
+allocatable(da_args *dargs)
+{
+
+	if (!dargs->devinfo->devauths)
+		return (-1);
+	if (strcmp("*", dargs->devinfo->devauths) == 0)
+		return (0);
+	return (1);
+}
+
+/*
  * _rebuild_lists -
  *
- *      If dargs->optflag & DA_EVENT, does not assume the dargs list is
- *      complete or completely believable, since devfsadm caches
- *      ONLY what it has been exposed to via syseventd.
+ *	If dargs->optflag & DA_EVENT, does not assume the dargs list is
+ *	complete or completely believable, since devfsadm caches
+ *	ONLY what it has been exposed to via syseventd.
  *
  *	Cycles through all the entries in the /etc files, stores them
- *      in memory, takes note of device->dname numbers (i.e. rmdisk0,
- *      rmdisk12)
+ *	in memory, takes note of device->dname numbers (e.g. rmdisk0,
+ *	rmdisk12)
  *
- *      Cycles through again, adds dargs entry
+ *	Cycles through again, adds dargs entry
  *	with the name tname%d (lowest unused number for the device type)
  *	to the list of things for the caller to write out to a file,
- *      IFF it is a new entry.
+ *	IFF it is a new entry.
  *
- *      It is an error for it to already be there.
+ *	It is an error for it to already be there, if it is allocatable.
  *
  *	Add:
- *         Returns 0 if successful and 2 on error.
- *      Remove:
- *         Returns 0 if not found, 1 if found,  2 on error.
+ *	    Returns 0 if successful and 2 on error.
+ *	Remove:
+ *	    Returns 0 if not found, 1 if found,  2 on error.
  */
 static int
 _rebuild_lists(da_args *dargs, strentry_t **head_devallocp,
@@ -597,12 +662,15 @@ _rebuild_lists(da_args *dargs, strentry_t **head_devallocp,
 	strentry_t	*tail_str;
 	strentry_t	*tmp_str;
 	uint64_t	tmp_bitmap = 0;
-	int		tmp = 0;
-	char		new_devname[DA_MAXNAME + 1];
-	char		errmsg[DA_MAXNAME + 1 + (PATH_MAX * 2) + 80];
+	uint_t		tmp = 0;
 	char		*realname;
-	int		suffix = DA_MAX_DEVNO + 1;
+	int		suffix;
 	int		found = 0;
+	int		stdtype = 1;
+	int		is_allocatable = 1;
+	char		new_devname[DA_MAXNAME + 1];
+	char		defname[DA_MAXNAME + 1]; /* default name for type */
+	char		errmsg[DA_MAXNAME + 1 + (PATH_MAX * 2) + 80];
 
 	if (dargs->optflag & (DA_MAPS_ONLY | DA_ALLOC_ONLY))
 		return (2);
@@ -610,11 +678,17 @@ _rebuild_lists(da_args *dargs, strentry_t **head_devallocp,
 	if (dargs->optflag & DA_FORCE)
 		return (2);
 
+	if (dargs->optflag & DA_ADD) {
+		stdtype = da_std_type(dargs, defname);
+		is_allocatable = allocatable(dargs);
+	}
+
 	/* read both files, maps first so we can compare actual devices */
 
 	/* build device_maps */
 	setdmapent();
 	while ((devmapp = getdmapent()) != NULL) {
+		suffix = DA_MAX_DEVNO + 1;
 		if ((rc = dmap_matchtype(devmapp, dargs->devinfo->devtype))
 		    == 1) {
 			if (dargs->optflag & DA_REMOVE) {
@@ -632,7 +706,9 @@ _rebuild_lists(da_args *dargs, strentry_t **head_devallocp,
 				}
 				if (strstr(realname, dargs->devinfo->devlist)
 				    != NULL) {
-					if (dargs->devinfo->devname != NULL)
+					/* if need to free and safe to free */
+					if (dargs->devinfo->devname != NULL &&
+					    (dargs->optflag & DA_EVENT) != 0)
 						free(dargs->devinfo->devname);
 					dargs->devinfo->devname =
 					    strdup(devmapp->dmap_devname);
@@ -650,19 +726,25 @@ _rebuild_lists(da_args *dargs, strentry_t **head_devallocp,
 				if (rc == 0) {
 					/*
 					 * Same type, different device.  Record
-					 * device suffix already in use.
+					 * device suffix already in use, if
+					 * applicable.
 					 */
-					if (suffix > DA_MAX_DEVNO) {
-						freedmapent(devmapp);
-						enddmapent();
-						return (2);
-					}
-					tmp_bitmap |= (uint64_t)(1LL << suffix);
+					if ((suffix < DA_MAX_DEVNO &&
+					    suffix != -1) && stdtype)
+						tmp_bitmap |=
+						    (uint64_t)(1LL << suffix);
+				} else if ((rc == 1) && !is_allocatable) {
+					rc = 0;
 				} else {
 					/*
-					 * Match on add is an error
+					 * Match allocatable on add is an error
 					 * or mapping attempt returned error
 					 */
+					(void) snprintf(errmsg, sizeof (errmsg),
+					    "Cannot add %s on node %s",
+					    dargs->devinfo->devtype,
+					    devmapp->dmap_devname);
+					syslog(LOG_ERR, "%s", errmsg);
 					freedmapent(devmapp);
 					enddmapent();
 					return (2);
@@ -670,8 +752,27 @@ _rebuild_lists(da_args *dargs, strentry_t **head_devallocp,
 			} else
 				/* add other transaction types as needed */
 				return (2);
-
-		}  /* if same type */
+		} else if ((dargs->optflag & DA_ADD) &&
+		    (stdtype || is_allocatable) &&
+		    dmap_exact_dev(devmapp, dargs->devinfo->devlist,
+		    &suffix)) {
+			/*
+			 * no dups w/o DA_FORCE, even if type differs,
+			 * if there is a chance this operation is
+			 * machine-driven.  The 5 "standard types"
+			 * can be machine-driven adds, and tend to
+			 * be allocatable.
+			 */
+			(void) snprintf(errmsg, sizeof (errmsg),
+			    "Cannot add %s on node %s type %s",
+			    dargs->devinfo->devtype,
+			    devmapp->dmap_devname,
+			    devmapp->dmap_devtype);
+			syslog(LOG_ERR, "%s", errmsg);
+			freedmapent(devmapp);
+			enddmapent();
+			return (2);
+		}
 
 		tmp_str = _dmap2strentry(devmapp);
 		if (tmp_str == NULL) {
@@ -700,11 +801,13 @@ _rebuild_lists(da_args *dargs, strentry_t **head_devallocp,
 
 
 	if (dargs->optflag & DA_ADD) {
+		int len;
 		/*
-		 * Since we got here from an event, we know the stored
-		 * devname is a useless guess, since the files had not
-		 * been read when the name was chosen, and we don't keep
-		 * them anywhere else that is sufficiently definitive.
+		 * If we got here from an event, or from devfsadm,
+		 * we know the stored devname is a useless guess,
+		 * since the files had not been read when the name
+		 * was chosen, and we don't keep them anywhere else
+		 * that is sufficiently definitive.
 		 */
 
 		for (tmp = 0; tmp <= DA_MAX_DEVNO; tmp++)
@@ -714,11 +817,22 @@ _rebuild_lists(da_args *dargs, strentry_t **head_devallocp,
 		if (tmp > DA_MAX_DEVNO)
 			return (2);
 
-		(void) snprintf(new_devname, DA_MAXNAME + 1, "%s%u",
-		    dargs->devinfo->devtype, tmp);
-		if (dargs->devinfo->devname != NULL)
-			free(dargs->devinfo->devname);
-		dargs->devinfo->devname = strdup(new_devname);
+		/*
+		 * Let the caller choose the name unless BOTH the name and
+		 * device type one of: cdrom, floppy, audio, rmdisk, or tape.
+		 * (or sr, fd for unlabeled)
+		 */
+		len = strlen(defname);
+		if (stdtype &&
+		    (strncmp(dargs->devinfo->devname, defname, len) == 0)) {
+			(void) snprintf(new_devname, DA_MAXNAME + 1, "%s%u",
+			    defname, tmp);
+			/* if need to free and safe to free */
+			if (dargs->devinfo->devname != NULL &&
+			    (dargs->optflag & DA_EVENT) != 0)
+				free(dargs->devinfo->devname);
+			dargs->devinfo->devname = strdup(new_devname);
+		}
 	}
 
 	/*
@@ -772,6 +886,7 @@ _rebuild_lists(da_args *dargs, strentry_t **head_devallocp,
 
 	return (0);  /* Successful DA_ADD */
 }
+
 /*
  * _build_lists -
  *	Cycles through all the entries, stores them in memory. removes entries
@@ -784,6 +899,7 @@ _build_lists(da_args *dargs, strentry_t **head_devallocp,
     strentry_t **head_devmapp)
 {
 	int		rc = 0;
+	int		found = 0;
 	devalloc_t	*devallocp;
 	devmap_t	*devmapp;
 	strentry_t	*tail_str;
@@ -796,15 +912,7 @@ _build_lists(da_args *dargs, strentry_t **head_devallocp,
 	setdaent();
 	while ((devallocp = getdaent()) != NULL) {
 		rc = da_match(devallocp, dargs);
-		if (rc && dargs->optflag & DA_ADD &&
-		    !(dargs->optflag & DA_FORCE)) {
-			/*
-			 * During DA_ADD, we keep an existing entry unless
-			 * we have DA_FORCE set to override that entry.
-			 */
-			dargs->optflag |= DA_NO_OVERRIDE;
-			rc = 0;
-		}
+		/* if in _build_lists and DA_ADD is set, so is DA_FORCE */
 		if (rc == 0) {
 			tmp_str = _da2strentry(dargs, devallocp);
 			if (tmp_str == NULL) {
@@ -820,7 +928,9 @@ _build_lists(da_args *dargs, strentry_t **head_devallocp,
 				tail_str->se_next = tmp_str;
 				tail_str = tmp_str;
 			}
-		}
+		} else if (rc == 1)
+			found = 1;
+
 		freedaent(devallocp);
 	}
 	enddaent();
@@ -834,15 +944,6 @@ dmap_only:
 	setdmapent();
 	while ((devmapp = getdmapent()) != NULL) {
 		rc = dm_match(devmapp, dargs);
-		if (rc && dargs->optflag & DA_ADD &&
-		    !(dargs->optflag & DA_FORCE)) {
-			/*
-			 * During DA_ADD, we keep an existing entry unless
-			 * we have DA_FORCE set to override that entry.
-			 */
-			dargs->optflag |= DA_NO_OVERRIDE;
-			rc = 0;
-		}
 		if (rc == 0) {
 			tmp_str = _dmap2strentry(devmapp);
 			if (tmp_str == NULL) {
@@ -863,6 +964,9 @@ dmap_only:
 	}
 	enddmapent();
 
+	/* later code cleanup may cause the use of "found" in other cases */
+	if (dargs->optflag & DA_REMOVE)
+		return (found);
 	return (rc);
 }
 
@@ -1387,8 +1491,8 @@ da_update_defattrs(da_args *dargs)
 /*
  * da_update_device -
  *	Writes existing entries and the SINGLE change requested by da_args,
- *      to device_allocate and device_maps.
- * 	Returns 0 on success, -1 on error.
+ *	to device_allocate and device_maps.
+ *	Returns 0 on success, -1 on error.
  */
 int
 da_update_device(da_args *dargs)

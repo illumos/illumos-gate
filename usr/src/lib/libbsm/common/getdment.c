@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
  */
 
 #include <string.h>
@@ -54,6 +54,7 @@ static struct _dmapbuff {
 devmap_t	*dmap_interpret(char *, devmap_t *);
 static devmap_t	*dmap_interpretf(char *, devmap_t *);
 static devmap_t *dmap_dlexpand(devmap_t *);
+static int dmap_resolve_link(char *devpath, char **devfs_path);
 
 int	dmap_matchdev(devmap_t *, char *);
 int	dmap_matchname(devmap_t *, char *);
@@ -284,9 +285,7 @@ getdmaptype(char *type)
 /*
  * dmap_match_one_dev -
  *    Checks if the specified devmap_t contains strings
- *    for the same logical link as the device specified.
- *    This guarantees that the beginnings of a devlist build
- *    match a more-complete devlist for the same device.
+ *    for the same link as the device specified.
  *
  *    Returns 1 for a match, else returns 0.
  */
@@ -295,6 +294,9 @@ dmap_match_one_dev(devmap_t *dmap, char *dev)
 {
 	char **dva;
 	char *dv;
+	char *dmap_link;
+	char *dev_link;
+	char stage_link[PATH_MAX + 1];
 
 	if (dmap->dmap_devarray == NULL)
 		return (0);
@@ -303,6 +305,22 @@ dmap_match_one_dev(devmap_t *dmap, char *dev)
 		if (strstr(dev, dv) != NULL)
 			return (1);
 	}
+	/* check if both refer to same physical device */
+	(void) strncpy(stage_link, dmap->dmap_devarray[0], sizeof (stage_link));
+	if (dmap_resolve_link(stage_link, &dmap_link) != 0)
+		return (0);
+	(void) strncpy(stage_link, dev, sizeof (stage_link));
+	if (dmap_resolve_link(stage_link, &dev_link) != 0) {
+		free(dmap_link);
+		return (0);
+	}
+	if (strcmp(dev_link, dmap_link) == 0) {
+		free(dmap_link);
+		free(dev_link);
+		return (1);
+	}
+	free(dmap_link);
+	free(dev_link);
 	return (0);
 }
 
@@ -328,8 +346,11 @@ dmap_matchdev(devmap_t *dmap, char *dev)
 }
 
 /*
- * Requires a match of the /dev/?dsk links, not just the logical devname
+ * Requires a match of the /dev/? links, not just the logical devname
  * Returns 1 for match found, 0 for match not found, 2 for invalid arguments.
+ *
+ * Also looks for an instance number at the end of the logical name, and
+ * puts instance or -1 into *num.
  */
 int
 dmap_exact_dev(devmap_t *dmap, char *dev, int *num)
@@ -341,7 +362,7 @@ dmap_exact_dev(devmap_t *dmap, char *dev, int *num)
 	dv = dmap->dmap_devname;
 	dv +=  strcspn(dmap->dmap_devname, "0123456789");
 	if (sscanf(dv, "%d", num) != 1)
-		return (2);
+		*num = -1;
 	/* during some add processes, dev can be shorter than dmap */
 	return (dmap_match_one_dev(dmap, dev));
 }
