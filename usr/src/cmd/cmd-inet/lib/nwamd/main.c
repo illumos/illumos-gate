@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <errno.h>
@@ -376,6 +375,15 @@ main(int argc, char *argv[])
 	}
 
 	/*
+	 * Create the event queue before starting event sources, including
+	 * signal handling, so we are ready to handle incoming events.  Also
+	 * start before attempting to upgrade, in case there's a problem
+	 * upgrading and we need to retry (in which case we schedule an event
+	 * to do so).
+	 */
+	nwamd_event_queue_init();
+
+	/*
 	 * Handle upgrade of legacy config.  Absence of version property
 	 * (which did not exist in phase 0 or 0.5) is the indication that
 	 * we need to upgrade to phase 1 (version 1).
@@ -389,13 +397,6 @@ main(int argc, char *argv[])
 	 */
 	nwamd_object_lists_init();
 
-	/*
-	 * Start the event handling thread before starting event sources,
-	 * including signal handling, so we are ready to handle incoming
-	 * events.
-	 */
-	nwamd_event_queue_init();
-
 	init_signalhandling();
 
 	/* Enqueue init event */
@@ -403,6 +404,7 @@ main(int argc, char *argv[])
 	if (event == NULL)
 		pfail("nwamd could not create init event, exiting");
 	nwamd_event_enqueue(event);
+
 	/*
 	 * Collect initial user configuration.
 	 */

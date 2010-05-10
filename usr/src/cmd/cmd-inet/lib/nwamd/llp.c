@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -306,10 +305,20 @@ upgrade_llp_config(void)
 	default:
 		break;
 	}
-	if ((err = nwam_ncp_create(NWAM_NCP_NAME_USER, 0, &user_ncp))
-	    != NWAM_SUCCESS) {
+
+	err = nwam_ncp_create(NWAM_NCP_NAME_USER, 0, &user_ncp);
+	switch (err) {
+	case NWAM_SUCCESS:
+		break;
+	case NWAM_ERROR_BIND:
+	case NWAM_ERROR_INTERNAL:
 		nlog(LOG_ERR, "upgrade_llp_config: "
-		    "could not create user NCP: %s", nwam_strerror(err));
+		    "could not create User NCP: %s", nwam_strerror(err));
+		llp_list_free();
+		return (EAGAIN);
+	default:
+		nlog(LOG_ERR, "upgrade_llp_config: error creating User NCP: %s",
+		    nwam_strerror(err));
 		llp_list_free();
 		return (0);
 	}
@@ -402,21 +411,22 @@ upgrade_llp_config(void)
 			    nwam_strerror(err));
 			/* Schedule a retry - root filesystem may be readonly */
 			llp_list_free();
+			nwam_ncu_free(ip_ncu);
+			nwam_ncu_free(phys_ncu);
+			(void) nwam_ncp_destroy(user_ncp, 0);
 			return (EAGAIN);
 		}
-		nwam_ncu_free(ip_ncu);
-		nwam_ncu_free(phys_ncu);
 	}
 
 	if (err != NWAM_SUCCESS) {
 		nlog(LOG_ERR, "upgrade_llp_config: llp %s: "
 		    "could not set value for property %s: %s", wp->llp_lname,
 		    prop, nwam_strerror(err));
-		nwam_ncu_free(ip_ncu);
-		nwam_ncu_free(phys_ncu);
-		exit(EXIT_FAILURE);
 	}
 	llp_list_free();
+	nwam_ncu_free(ip_ncu);
+	nwam_ncu_free(phys_ncu);
+	nwam_ncp_free(user_ncp);
 	return (0);
 }
 
@@ -452,8 +462,12 @@ nwamd_handle_upgrade(nwamd_event_t event)
 		 */
 		upgrade_event = nwamd_event_init(NWAM_EVENT_TYPE_UPGRADE,
 		    NWAM_OBJECT_TYPE_NCP, 0, NULL);
-		if (upgrade_event == NULL)
+		if (upgrade_event == NULL) {
+			nlog(LOG_ERR, "nwamd_handle_upgrade: "
+			    "could not create retry event to upgrade "
+			    "%s configuration", LLPFILE);
 			return;
+		}
 		nwamd_event_enqueue_timed(upgrade_event,
 		    NWAMD_READONLY_RETRY_INTERVAL);
 		return;

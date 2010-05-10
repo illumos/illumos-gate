@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <arpa/inet.h>
@@ -116,23 +115,34 @@ nwamd_ncp_handle_enable_event(nwamd_event_t event)
 
 	nwamd_fini_ncus();
 
-	err = nwam_ncp_read(new_ncp, 0, &new_ncph);
-	switch (err) {
-	case NWAM_ENTITY_NOT_FOUND:
+	if ((err = nwam_ncp_read(new_ncp, 0, &new_ncph))
+	    == NWAM_ENTITY_NOT_FOUND) {
 		err = nwam_ncp_create(new_ncp, 0, &new_ncph);
-		break;
-	case NWAM_SUCCESS:
-		break;
-	default:
-		nlog(LOG_ERR, "nwamd_ncp_handle_enable_event: error %s",
-		    nwam_strerror(err));
-		return;
 	}
-	nwam_ncp_free(new_ncph);
 
 	if (err == NWAM_SUCCESS) {
+		nwam_ncp_free(new_ncph);
 		nwamd_object_set_state(NWAM_OBJECT_TYPE_NCP, new_ncp,
 		    NWAM_STATE_ONLINE, NWAM_AUX_STATE_ACTIVE);
+	} else if (initial_ncp_enable) {
+		/*
+		 * We weren't able to enable the NCP when nwamd starts up,
+		 * retry in a few seconds.
+		 */
+		nwamd_event_t retry_event = nwamd_event_init_object_action
+		    (NWAM_OBJECT_TYPE_NCP, new_ncp, NULL, NWAM_ACTION_ENABLE);
+		if (retry_event == NULL) {
+			nlog(LOG_ERR, "nwamd_ncp_handle_enable_event: "
+			    "could not create retry event to enable %s NCP",
+			    new_ncp);
+			return;
+		}
+
+		nlog(LOG_ERR, "nwamd_ncp_handle_enable_event: "
+		    "failed to enable %s NCP, retrying in %d seconds",
+		    new_ncp, NWAMD_READONLY_RETRY_INTERVAL);
+		nwamd_event_enqueue_timed(retry_event,
+		    NWAMD_READONLY_RETRY_INTERVAL);
 	} else {
 		nlog(LOG_ERR, "nwamd_ncp_handle_enable_event: error %s",
 		    nwam_strerror(err));
@@ -239,7 +249,6 @@ find_next_priority_group_cb(nwamd_object_t object, void *data)
 	}
 	return (0);
 }
-
 
 /* Set current_pg to next pg in NCP that is >= start_pg */
 boolean_t

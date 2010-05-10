@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <arpa/inet.h>
@@ -1275,21 +1274,10 @@ nwamd_ncu_handle_link_action_event(nwamd_event_t event)
 	if ((err = nwam_ncp_read(NWAM_NCP_NAME_AUTOMATIC, 0, &ncph))
 	    == NWAM_ENTITY_NOT_FOUND) {
 		/* Automatic NCP doesn't exist, create it */
-		if ((err = nwam_ncp_create(NWAM_NCP_NAME_AUTOMATIC, 0,
-		    &ncph)) != NWAM_SUCCESS) {
-			nlog(LOG_ERR,
-			    "nwamd_ncu_handle_link_action_event: "
-			    "could not create %s NCP: %s",
-			    NWAM_NCP_NAME_AUTOMATIC,
-			    nwam_strerror(err));
-			goto cleanup_exit;
-		}
-	} else if (err != NWAM_SUCCESS) {
-		nlog(LOG_ERR, "nwamd_ncu_handle_link_action_event: "
-		    "failed to read Automatic NCP: %s",
-		    nwam_strerror(err));
-		goto cleanup_exit;
+		err = nwam_ncp_create(NWAM_NCP_NAME_AUTOMATIC, 0, &ncph);
 	}
+	if (err != NWAM_SUCCESS)
+		goto fail;
 
 	/* add or remove NCUs from Automatic NCP */
 	if (action == NWAM_ACTION_ADD) {
@@ -1323,8 +1311,24 @@ nwamd_ncu_handle_link_action_event(nwamd_event_t event)
 		nwamd_create_ncu_check_event(NEXT_FEW_SECONDS);
 	}
 
-cleanup_exit:
+fail:
 	free(name);
+	if (err != NWAM_SUCCESS) {
+		nwamd_event_t retry_event = nwamd_event_init_link_action(name,
+		    action);
+		if (retry_event == NULL) {
+			nlog(LOG_ERR, "nwamd_ncu_handle_link_action_event: "
+			    "could not create retry event to read/create "
+			    "%s NCP", NWAM_NCP_NAME_AUTOMATIC);
+			return;
+		}
+
+		nlog(LOG_ERR, "nwamd_ncu_handle_link_action_event: "
+		    "could not read/create %s NCP, retrying in %d seconds",
+		    NWAM_NCP_NAME_AUTOMATIC, NWAMD_READONLY_RETRY_INTERVAL);
+		nwamd_event_enqueue_timed(retry_event,
+		    NWAMD_READONLY_RETRY_INTERVAL);
+	}
 }
 
 /*
@@ -1529,6 +1533,7 @@ nwamd_ncu_handle_init_event(nwamd_event_t event)
 		nlog(LOG_DEBUG,
 		    "nwamd_ncu_handle_init_event: active NCP handle NULL");
 		nwamd_event_do_not_send(event);
+		free(name);
 		(void) pthread_mutex_unlock(&active_ncp_mutex);
 		return;
 	}
