@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,8 +20,11 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_IGB_SW_H
@@ -165,7 +167,6 @@ extern "C" {
 #define	RX_DRAIN_TIME			200
 
 #define	STALL_WATCHDOG_TIMEOUT		8	/* 8 seconds */
-#define	MAX_LINK_DOWN_TIMEOUT		8	/* 8 seconds */
 
 /*
  * Defined for IP header alignment.
@@ -565,7 +566,6 @@ typedef struct igb {
 	link_state_t		link_state;
 	uint32_t		link_speed;
 	uint32_t		link_duplex;
-	uint32_t		link_down_timeout;
 	boolean_t		link_complete;
 	timeout_id_t		link_tid;
 

@@ -30,7 +30,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.14";
+static char igb_version[] = "igb 1.1.15";
 
 /*
  * Local function protoypes
@@ -3013,7 +3013,6 @@ igb_link_check(igb_t *igb)
 			igb->link_speed = speed;
 			igb->link_duplex = duplex;
 			igb->link_state = LINK_STATE_UP;
-			igb->link_down_timeout = 0;
 			link_changed = B_TRUE;
 			if (!igb->link_complete)
 				igb_stop_link_timer(igb);
@@ -3024,16 +3023,6 @@ igb_link_check(igb_t *igb)
 			igb->link_duplex = 0;
 			igb->link_state = LINK_STATE_DOWN;
 			link_changed = B_TRUE;
-		}
-
-		if (igb->igb_state & IGB_STARTED) {
-			if (igb->link_down_timeout < MAX_LINK_DOWN_TIMEOUT) {
-				igb->link_down_timeout++;
-			} else if (igb->link_down_timeout ==
-			    MAX_LINK_DOWN_TIMEOUT) {
-				igb_tx_clean(igb);
-				igb->link_down_timeout++;
-			}
 		}
 	}
 
