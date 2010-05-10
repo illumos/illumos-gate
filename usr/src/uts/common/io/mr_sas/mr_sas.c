@@ -152,11 +152,19 @@ static struct dev_ops mrsas_ops = {
 	nulldev,		/* probe */
 	mrsas_attach,		/* attach */
 	mrsas_detach,		/* detach */
+#ifdef  __sparc
 	mrsas_reset,		/* reset */
+#else	/* __sparc */
+	nodev,
+#endif  /* __sparc */
 	&mrsas_cb_ops,		/* char/block ops */
 	NULL,			/* bus ops */
 	NULL,			/* power */
-	ddi_quiesce_not_supported,		/* quiesce */
+#ifdef	__sparc
+	ddi_quiesce_not_needed
+#else	/* __sparc */
+	mrsas_quiesce		/* quiesce */
+#endif	/* __sparc */
 };
 
 char _depends_on[] = "misc/scsi";
@@ -1062,6 +1070,7 @@ mrsas_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
  *                                                                            *
  * ************************************************************************** *
  */
+#ifdef	__sparc
 /*ARGSUSED*/
 static int
 mrsas_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
@@ -1091,7 +1100,50 @@ mrsas_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 
 	return (DDI_SUCCESS);
 }
+#else /* __sparc */
+/*ARGSUSED*/
+static int
+mrsas_quiesce(dev_info_t *dip)
+{
+	int	instance_no;
 
+	struct mrsas_instance	*instance;
+
+	instance_no = ddi_get_instance(dip);
+	instance = (struct mrsas_instance *)ddi_get_soft_state
+	    (mrsas_state, instance_no);
+
+	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
+
+	if (!instance) {
+		con_log(CL_ANN1, (CE_WARN, "mr_sas:%d could not get adapter "
+		    "in quiesce", instance_no));
+		return (DDI_FAILURE);
+	}
+	if (instance->deadadapter || instance->adapterresetinprogress) {
+		con_log(CL_ANN1, (CE_WARN, "mr_sas:%d adapter is not in "
+		    "healthy state", instance_no));
+		return (DDI_FAILURE);
+	}
+
+	if (abort_aen_cmd(instance, instance->aen_cmd)) {
+		con_log(CL_ANN1, (CE_WARN, "mrsas_quiesce: "
+		    "failed to abort prevous AEN command QUIESCE"));
+	}
+
+	instance->func_ptr->disable_intr(instance);
+
+	con_log(CL_ANN1, (CE_NOTE, "flushing cache for instance %d",
+	    instance_no));
+
+	flush_cache(instance);
+
+	if (wait_for_outstanding(instance)) {
+		return (DDI_FAILURE);
+	}
+	return (DDI_SUCCESS);
+}
+#endif	/* __sparc */
 
 /*
  * ************************************************************************** *
@@ -2288,11 +2340,15 @@ alloc_space_for_mfi(struct mrsas_instance *instance)
 	/* add all the commands to command pool (instance->cmd_pool) */
 	reserve_cmd	=	APP_RESERVE_CMDS;
 	INIT_LIST_HEAD(&instance->app_cmd_pool_list);
-	for (i = 0; i < reserve_cmd; i++) {
+	for (i = 0; i < reserve_cmd-1; i++) {
 		cmd	= instance->cmd_list[i];
 		cmd->index	= i;
 		mlist_add_tail(&cmd->list, &instance->app_cmd_pool_list);
 	}
+	/*
+	 * reserve slot instance->cmd_list[APP_RESERVE_CMDS-1]
+	 * for abort_aen_cmd
+	 */
 	for (i = reserve_cmd; i < max_cmd; i++) {
 		cmd			= instance->cmd_list[i];
 		cmd->index	= i;
@@ -2424,11 +2480,11 @@ abort_aen_cmd(struct mrsas_instance *instance,
 	struct mrsas_cmd		*cmd;
 	struct mrsas_abort_frame	*abort_fr;
 
-	cmd = get_mfi_pkt(instance);
+	cmd = instance->cmd_list[APP_RESERVE_CMDS-1];
 
 	if (!cmd) {
-		con_log(CL_ANN, (CE_WARN,
-		    "abort_aen_cmd():Failed to get a cmd for ctrl info"));
+		con_log(CL_ANN1, (CE_WARN,
+		    "abort_aen_cmd():Failed to get a cmd for abort_aen_cmd"));
 		DTRACE_PROBE2(abort_mfi_err, uint16_t, instance->fw_outstanding,
 		    uint16_t, instance->max_fw_cmds);
 		return (DDI_FAILURE);
@@ -2459,9 +2515,9 @@ abort_aen_cmd(struct mrsas_instance *instance,
 	cmd->sync_cmd = MRSAS_TRUE;
 	cmd->frame_count = 1;
 
-	if (instance->func_ptr->issue_cmd_in_sync_mode(instance, cmd)) {
-		con_log(CL_ANN, (CE_WARN,
-		    "abort_aen_cmd: issue_cmd_in_sync_mode failed"));
+	if (instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd)) {
+		con_log(CL_ANN1, (CE_WARN,
+		    "abort_aen_cmd: issue_cmd_in_poll_mode failed"));
 		ret = -1;
 	} else {
 		ret = 0;
@@ -2470,9 +2526,7 @@ abort_aen_cmd(struct mrsas_instance *instance,
 	instance->aen_cmd->abort_aen = 1;
 	instance->aen_cmd = 0;
 
-	(void) mrsas_common_check(instance, cmd);
-
-	return_mfi_pkt(instance, cmd);
+	atomic_add_16(&instance->fw_outstanding, (-1));
 
 	return (ret);
 }
@@ -3007,9 +3061,13 @@ flush_cache(struct mrsas_instance *instance)
 
 	cmd = instance->cmd_list[max_cmd];
 
-	if (cmd == NULL)
+	if (!cmd) {
+		con_log(CL_ANN1, (CE_WARN,
+		    "flush_cache():Failed to get a cmd for flush_cache"));
+		DTRACE_PROBE2(flush_cache_err, uint16_t,
+		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
 		return;
-
+	}
 	dcmd = &cmd->frame->dcmd;
 
 	(void) memset(dcmd->mbox.b, 0, DCMD_MBOX_SZ);
@@ -4090,7 +4148,27 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 
 	return (cmd);
 }
+#ifndef __sparc
+static int
+wait_for_outstanding(struct mrsas_instance *instance)
+{
+	int		i;
+	uint32_t	wait_time = 90;
 
+	for (i = 0; i < wait_time; i++) {
+		if (!instance->fw_outstanding) {
+			break;
+		}
+		drv_usecwait(MILLISEC); /* wait for 1000 usecs */;
+	}
+
+	if (instance->fw_outstanding) {
+		return (1);
+	}
+
+	return (0);
+}
+#endif  /* __sparc */
 /*
  * issue_mfi_pthru
  */
@@ -5447,7 +5525,7 @@ issue_cmd_in_poll_mode_ppc(struct mrsas_instance *instance,
 
 	if (ddi_get8(cmd->frame_dma_obj.acc_handle, &frame_hdr->cmd_status)
 	    == MFI_CMD_STATUS_POLL_MODE) {
-		con_log(CL_ANN, (CE_NOTE, "issue_cmd_in_poll_mode: "
+		con_log(CL_ANN1, (CE_NOTE, "issue_cmd_in_poll_mode: "
 		    "cmd polling timed out"));
 		return (DDI_FAILURE);
 	}

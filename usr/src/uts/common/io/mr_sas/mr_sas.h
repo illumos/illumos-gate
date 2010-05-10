@@ -49,7 +49,7 @@ extern "C" {
 /*
  * MegaRAID SAS2.0 Driver meta data
  */
-#define	MRSAS_VERSION				"LSIv2.5"
+#define	MRSAS_VERSION				"LSIv2.6"
 #define	MRSAS_RELDATE				"Apr 21, 2010"
 
 #define	MRSAS_TRUE				1
@@ -1691,7 +1691,11 @@ struct mrsas_aen {
 #ifndef	KMDB_MODULE
 static int	mrsas_getinfo(dev_info_t *, ddi_info_cmd_t,  void *, void **);
 static int	mrsas_attach(dev_info_t *, ddi_attach_cmd_t);
+#ifdef __sparc
 static int	mrsas_reset(dev_info_t *, ddi_reset_cmd_t);
+#else /* __sparc */
+static int	mrsas_quiesce(dev_info_t *);
+#endif	/* __sparc */
 static int	mrsas_detach(dev_info_t *, ddi_detach_cmd_t);
 static int	mrsas_open(dev_t *, int, int, cred_t *);
 static int	mrsas_close(dev_t, int, int, cred_t *);
@@ -1755,6 +1759,9 @@ static void	fill_up_drv_ver(struct mrsas_drv_ver *dv);
 static struct mrsas_cmd *build_cmd(struct mrsas_instance *instance,
 		    struct scsi_address *ap, struct scsi_pkt *pkt,
 		    uchar_t *cmd_done);
+#ifndef __sparc
+static int	wait_for_outstanding(struct mrsas_instance *instance);
+#endif  /* __sparc */
 static int	register_mfi_aen(struct mrsas_instance *instance,
 		    uint32_t seq_num, uint32_t class_locale_word);
 static int	issue_mfi_pthru(struct mrsas_instance *instance, struct
