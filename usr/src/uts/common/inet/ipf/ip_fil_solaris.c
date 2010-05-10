@@ -3,8 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #if !defined(lint)
@@ -2717,4 +2716,184 @@ fr_info_t *fin;
 
 	return (rv);
 }
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_buf_sum						    */
+/* Returns:     unsigned int - sum of buffer buf			    */
+/* Parameters:  buf - pointer to buf we want to sum up			    */
+/*              len - length of buffer buf				    */
+/*                                                                          */
+/* Sums buffer buf. The result is used for chksum calculation. The buf	    */
+/* argument must be aligned.						    */
+/* ------------------------------------------------------------------------ */
+static uint32_t fr_buf_sum(buf, len)
+const void *buf;
+unsigned int len;
+{
+	uint32_t	sum = 0;
+	uint16_t	*b = (uint16_t *)buf;
+
+	while (len > 1) {
+		sum += *b++;
+		len -= 2;
+	}
+
+	if (len == 1)
+		sum += htons((*(unsigned char *)b) << 8);
+
+	return (sum);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_calc_chksum						    */
+/* Returns:     void							    */
+/* Parameters:  fin - pointer to fr_info_t instance with packet data	    */
+/*              pkt - pointer to duplicated packet			    */
+/*                                                                          */
+/* Calculates all chksums (L3, L4) for packet pkt. Works for both IP	    */
+/* versions.								    */
+/* ------------------------------------------------------------------------ */
+void fr_calc_chksum(fin, pkt)
+fr_info_t *fin;
+mb_t *pkt;
+{
+	struct pseudo_hdr {
+		union {
+			struct in_addr	in4;
+#ifdef USE_INET6
+			struct in6_addr	in6;
+#endif
+		} src_addr;
+		union {
+			struct in_addr	in4;
+#ifdef USE_INET6
+			struct in6_addr	in6;
+#endif
+		} dst_addr;
+		char		zero;
+		char		proto;
+		uint16_t	len;
+	}	phdr;
+	uint32_t	sum, ip_sum;
+	void	*buf;
+	uint16_t	*l4_csum_p;
+	tcphdr_t	*tcp;
+	udphdr_t	*udp;
+	icmphdr_t	*icmp;
+#ifdef USE_INET6
+	struct icmp6_hdr	*icmp6;
+#endif
+	ip_t		*ip;
+	unsigned int	len;
+	int		pld_len;
+
+	/*
+	 * We need to pullup the packet to the single continuous buffer to avoid
+	 * potential misaligment of b_rptr member in mblk chain.
+	 */
+	if (pullupmsg(pkt, -1) == 0) {
+		cmn_err(CE_WARN, "Failed to pullup loopback pkt -> chksum"
+		    " will not be computed by IPF");
+		return;
+	}
+
+	/*
+	 * It is guaranteed IP header starts right at b_rptr, because we are
+	 * working with a copy of the original packet.
+	 *
+	 * Compute pseudo header chksum for TCP and UDP.
+	 */
+	if ((fin->fin_p == IPPROTO_UDP) ||
+	    (fin->fin_p == IPPROTO_TCP)) {
+		bzero(&phdr, sizeof (phdr));
+#ifdef USE_INET6
+		if (fin->fin_v == 6) {
+			phdr.src_addr.in6 = fin->fin_srcip6;
+			phdr.dst_addr.in6 = fin->fin_dstip6;
+		} else {
+			phdr.src_addr.in4 = fin->fin_src;
+			phdr.dst_addr.in4 = fin->fin_dst;
+		}
+#else
+		phdr.src_addr.in4 = fin->fin_src;
+		phdr.dst_addr.in4 = fin->fin_dst;
+#endif
+		phdr.zero = (char) 0;
+		phdr.proto = fin->fin_p;
+		phdr.len = htons((uint16_t)fin->fin_dlen);
+		sum = fr_buf_sum(&phdr, (unsigned int)sizeof (phdr));
+	} else {
+		sum = 0;
+	}
+
+	/*
+	 * Set pointer to the L4 chksum field in the packet, set buf pointer to
+	 * the L4 header start.
+	 */
+	switch (fin->fin_p) {
+		case IPPROTO_UDP:
+			udp = (udphdr_t *)(pkt->b_rptr + fin->fin_hlen);
+			l4_csum_p = &udp->uh_sum;
+			buf = udp;
+			break;
+		case IPPROTO_TCP:
+			tcp = (tcphdr_t *)(pkt->b_rptr + fin->fin_hlen);
+			l4_csum_p = &tcp->th_sum;
+			buf = tcp;
+			break;
+		case IPPROTO_ICMP:
+			icmp = (icmphdr_t *)(pkt->b_rptr + fin->fin_hlen);
+			l4_csum_p = &icmp->icmp_cksum;
+			buf = icmp;
+			break;
+#ifdef USE_INET6
+		case IPPROTO_ICMPV6:
+			icmp6 = (struct icmp6_hdr *)(pkt->b_rptr + fin->fin_hlen);
+			l4_csum_p = &icmp6->icmp6_cksum;
+			buf = icmp6;
+			break;
+#endif
+		default:
+			l4_csum_p = NULL;
+	}
+
+	/*
+	 * Compute L4 chksum if needed.
+	 */
+	if (l4_csum_p != NULL) {
+		*l4_csum_p = (uint16_t)0;
+		pld_len = fin->fin_dlen;
+		len = pkt->b_wptr - (unsigned char *)buf;
+		ASSERT(len == pld_len);
+		/*
+		 * Add payload sum to pseudoheader sum.
+		 */
+		sum += fr_buf_sum(buf, len);
+		while (sum >> 16)
+			sum = (sum & 0xFFFF) + (sum >> 16);
+
+		*l4_csum_p = ~((uint16_t)sum);
+		DTRACE_PROBE1(l4_sum, uint16_t, *l4_csum_p);
+	}
+
+	/*
+	 * The IP header chksum is needed just for IPv4.
+	 */
+	if (fin->fin_v == 4) {
+		/*
+		 * Compute IPv4 header chksum.
+		 */
+		ip = (ip_t *)pkt->b_rptr;
+		ip->ip_sum = (uint16_t)0;
+		ip_sum = fr_buf_sum(ip, (unsigned int)fin->fin_hlen);
+		while (ip_sum >> 16)
+			ip_sum = (ip_sum & 0xFFFF) + (ip_sum >> 16);
+
+		ip->ip_sum = ~((uint16_t)ip_sum);
+		DTRACE_PROBE1(l3_sum, uint16_t, ip->ip_sum);
+	}
+
+	return;
+}
+
 #endif	/* _KERNEL && SOLARIS2 >= 10 */

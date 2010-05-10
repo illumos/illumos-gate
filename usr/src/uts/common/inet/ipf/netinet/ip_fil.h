@@ -1361,9 +1361,10 @@ extern	int	iplioctl __P((dev_t, int, intptr_t, int, cred_t *, int *));
 #   else
 extern	int	iplioctl __P((dev_t, int, int *, int, cred_t *, int *));
 #   endif
-#   if SOLARIS2 >= 10
+#   if SOLARIS2 >= 10 && defined(_KERNEL)
 extern	int	fr_make_rst __P((fr_info_t *));
 extern	int	fr_make_icmp __P((fr_info_t *));
+extern	void	fr_calc_chksum __P((fr_info_t *, mb_t *));
 #   endif
 extern	int	iplopen __P((dev_t *, int, int, cred_t *));
 extern	int	iplclose __P((dev_t, int, int, cred_t *));

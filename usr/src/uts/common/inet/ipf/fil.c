@@ -2603,7 +2603,13 @@ ipf_stack_t *ifs;
 #endif
 	}
 
-	if (pass & (FR_RETRST|FR_RETICMP)) {
+	/*
+	 * We don't want to send RST for packets, which are going to be
+	 * dropped, just because they don't fit into TCP window. Those packets
+	 * will be dropped silently. In other words, we want to drop packet,
+	 * while keeping session alive.
+	 */
+	if ((pass & (FR_RETRST|FR_RETICMP)) && ((fin->fin_flx & FI_OOW) == 0)) {
 		/*
 		 * Should we return an ICMP packet to indicate error
 		 * status passing through the packet filter ?
@@ -2729,10 +2735,21 @@ filtered:
 		}
 
 		/*
-		 * Generate a duplicated packet.
+		 * Send a duplicated packet.
 		 */
-		if (mc != NULL)
+		if (mc != NULL) {
+#if defined(_KERNEL) && (SOLARIS2 >= 10)
+			/*
+			 * We are going to compute chksum for copies of loopback packets
+			 * only. IP stack does not compute chksums at all for loopback
+			 * packets. We want to get it fixed in their copies, since those
+			 * are going to be sent to network.
+			 */
+			if (IPF_IS_LOOPBACK(qpi->qpi_flags))
+				fr_calc_chksum(fin, mc);
+#endif
 			(void) fr_fastroute(mc, &mc, fin, &fr->fr_dif);
+		}
 	}
 
 	if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT))
