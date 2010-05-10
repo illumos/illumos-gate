@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #include <stdlib.h>
 #include <stdio.h>
@@ -1466,7 +1465,7 @@ list_tpg(char *tpg, boolean_t verbose, boolean_t script)
 		first_portal = B_TRUE;
 
 		portal = ptr->tpg_portal_list;
-		for (; portal != NULL; portal = portal->next) {
+		for (; portal != NULL; portal = portal->portal_next) {
 			ret = sockaddr_to_str(&(portal->portal_addr), &pstr);
 			if (ret != 0) {
 				/* invalid addr? */

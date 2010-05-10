@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/time.h>
@@ -828,7 +827,7 @@ it_tpg_to_nv(it_tpg_t *tpg, nvlist_t **nvl)
 			if (ret != 0) {
 				break;
 			}
-			ptr = ptr->next;
+			ptr = ptr->portal_next;
 			i++;
 		}
 	}
@@ -1028,7 +1027,7 @@ it_portal_lookup(it_tpg_t *tpg, struct sockaddr_storage *sa)
 
 	for (cfg_portal = tpg->tpg_portal_list;
 	    cfg_portal != NULL;
-	    cfg_portal = cfg_portal->next) {
+	    cfg_portal = cfg_portal->portal_next) {
 		if (it_sa_compare(sa, &cfg_portal->portal_addr) == 0)
 			return (cfg_portal);
 	}
@@ -1043,7 +1042,7 @@ it_sns_svr_lookup(it_config_t *cfg, struct sockaddr_storage *sa)
 
 	for (cfg_portal = cfg->config_isns_svr_list;
 	    cfg_portal != NULL;
-	    cfg_portal = cfg_portal->next) {
+	    cfg_portal = cfg_portal->portal_next) {
 		if (it_sa_compare(sa, &cfg_portal->portal_addr) == 0)
 			return (cfg_portal);
 	}
@@ -1399,7 +1398,7 @@ it_array_to_portallist(char **arr, uint32_t count, uint32_t default_port,
 				portal = NULL;
 				break;
 			}
-			tmp = tmp->next;
+			tmp = tmp->portal_next;
 		}
 
 		if (!portal) {
@@ -1410,12 +1409,12 @@ it_array_to_portallist(char **arr, uint32_t count, uint32_t default_port,
 		 * The first time through the loop, *portallist == NULL
 		 * because we assigned it to NULL above.  Subsequently
 		 * prev will have been set.  Therefor it's OK to put
-		 * lint override before prev->next assignment.
+		 * lint override before prev->portal_next assignment.
 		 */
 		if (*portallist == NULL) {
 			*portallist = portal;
 		} else {
-			prev->next = portal;
+			prev->portal_next = portal;
 		}
 
 		prev = portal;
@@ -1461,7 +1460,7 @@ it_config_free_cmn(it_config_t *cfg)
 		it_portal_t	*pp_next;
 
 		while (pp) {
-			pp_next = pp->next;
+			pp_next = pp->portal_next;
 			iscsit_free(pp, sizeof (it_portal_t));
 			pp = pp_next;
 		}
@@ -1548,7 +1547,7 @@ it_tpg_free_cmn(it_tpg_t *tpg)
 		portalp = tpgp->tpg_portal_list;
 
 		while (portalp) {
-			pnext = portalp->next;
+			pnext = portalp->portal_next;
 			iscsit_free(portalp, sizeof (it_portal_t));
 			portalp = pnext;
 		}

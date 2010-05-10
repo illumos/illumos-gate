@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _ISCSIT_COMMON_H_
@@ -202,7 +201,7 @@ typedef struct it_tgt_s {
  */
 typedef struct it_portal_s {
 	struct sockaddr_storage portal_addr;
-	struct it_portal_s	*next;
+	struct it_portal_s	*portal_next;
 } it_portal_t;
 
 /*

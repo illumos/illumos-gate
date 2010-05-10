@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -427,7 +426,7 @@ it_config_setprop(it_config_t *cfg, nvlist_t *proplist, nvlist_t **errlist)
 		if (ret == 0) {
 			isns = cfg->config_isns_svr_list;
 			while (isns) {
-				pnext = isns->next;
+				pnext = isns->portal_next;
 				free(isns);
 				isns = pnext;
 			}
@@ -449,7 +448,7 @@ it_config_setprop(it_config_t *cfg, nvlist_t *proplist, nvlist_t **errlist)
 					ret = ENOMEM;
 				} else {
 					for (isns = newisnslist; isns != NULL;
-					    isns = isns->next) {
+					    isns = isns->portal_next) {
 						(void) sockaddr_to_str(
 						    &(isns->portal_addr),
 						    &(newarray[i++]));
@@ -1200,7 +1199,7 @@ it_portal_create(it_config_t *cfg, it_tpg_t *tpg, it_portal_t **portal,
 	ctpg = cfg->config_tpg_list;
 	while (ctpg) {
 		ptr = ctpg->tpg_portal_list;
-		for (; ptr != NULL; ptr = ptr->next) {
+		for (; ptr != NULL; ptr = ptr->portal_next) {
 			if (it_sa_compare(&(ptr->portal_addr), &sa) != 0) {
 				continue;
 			}
@@ -1226,7 +1225,7 @@ it_portal_create(it_config_t *cfg, it_tpg_t *tpg, it_portal_t **portal,
 
 	(void) memcpy(&(ptr->portal_addr), &sa,
 	    sizeof (struct sockaddr_storage));
-	ptr->next = tpg->tpg_portal_list;
+	ptr->portal_next = tpg->tpg_portal_list;
 	tpg->tpg_portal_list = ptr;
 	tpg->tpg_portal_count++;
 	tpg->tpg_generation++;
@@ -1253,7 +1252,7 @@ void
 it_portal_delete(it_config_t *cfg, it_tpg_t *tpg, it_portal_t *portal)
 {
 	it_portal_t	*ptr;
-	it_portal_t	*prev;
+	it_portal_t	*prev = NULL;
 
 	if (!cfg || !tpg || !portal) {
 		return;
@@ -1266,7 +1265,7 @@ it_portal_delete(it_config_t *cfg, it_tpg_t *tpg, it_portal_t *portal)
 			break;
 		}
 		prev = ptr;
-		ptr = ptr->next;
+		ptr = ptr->portal_next;
 	}
 
 	if (!ptr) {
@@ -1274,9 +1273,9 @@ it_portal_delete(it_config_t *cfg, it_tpg_t *tpg, it_portal_t *portal)
 	}
 
 	if (prev) {
-		prev->next = ptr->next;
+		prev->portal_next = ptr->portal_next;
 	} else {
-		tpg->tpg_portal_list = ptr->next;
+		tpg->tpg_portal_list = ptr->portal_next;
 	}
 	tpg->tpg_portal_count--;
 	tpg->tpg_generation++;

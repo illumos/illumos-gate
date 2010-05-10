@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -1626,7 +1625,7 @@ iscsit_tpg_modify(iscsit_tpg_t *tpg, it_tpg_t *cfg_tpg)
 
 	for (cfg_portal = cfg_tpg->tpg_portal_list;
 	    cfg_portal != NULL;
-	    cfg_portal = cfg_portal->next) {
+	    cfg_portal = cfg_portal->portal_next) {
 		if ((portal = iscsit_tpg_portal_lookup_locked(tpg,
 		    &cfg_portal->portal_addr)) == NULL) {
 			(void) iscsit_portal_create(tpg,
