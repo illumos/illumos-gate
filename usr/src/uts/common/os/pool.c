@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/pool.h>
@@ -675,13 +674,14 @@ pool_xtransfer(int type, id_t src_pset, id_t dst_pset, uint_t size, id_t *ids)
 	case PREC_PSET:
 		ret = pool_pset_xtransfer((psetid_t)src_pset,
 		    (psetid_t)dst_pset, size, ids);
-
-		if ((src_pool =  pool_lookup_id_by_pset(src_pset)) == -1)
-			return (EINVAL);
-		if ((dst_pool =  pool_lookup_id_by_pset(dst_pset)) == -1)
-			return (EINVAL);
-		pool_event_dispatch(POOL_E_CHANGE, src_pool);
-		pool_event_dispatch(POOL_E_CHANGE, dst_pool);
+		if (ret == 0) {
+			if ((src_pool =  pool_lookup_id_by_pset(src_pset)) !=
+			    POOL_INVALID)
+				pool_event_dispatch(POOL_E_CHANGE, src_pool);
+			if ((dst_pool =  pool_lookup_id_by_pset(dst_pset)) !=
+			    POOL_INVALID)
+				pool_event_dispatch(POOL_E_CHANGE, dst_pool);
+		}
 		break;
 	default:
 		ret = EINVAL;
