@@ -350,6 +350,7 @@ lofi_free_handle(dev_t dev, minor_t minor, struct lofi_state *lsp,
 {
 	dev_t	newdev;
 	char	namebuf[50];
+	int	i;
 
 	ASSERT(mutex_owned(&lofi_lock));
 
@@ -388,6 +389,20 @@ lofi_free_handle(dev_t dev, minor_t minor, struct lofi_state *lsp,
 	if (lsp->ls_uncomp_seg_sz > 0) {
 		kmem_free(lsp->ls_comp_index_data, lsp->ls_comp_index_data_sz);
 		lsp->ls_uncomp_seg_sz = 0;
+	}
+
+	/*
+	 * Free pre-allocated compressed buffers
+	 */
+	if (lsp->ls_comp_bufs != NULL) {
+		for (i = 0; i < lofi_taskq_nthreads; i++) {
+			if (lsp->ls_comp_bufs[i].bufsize > 0)
+				kmem_free(lsp->ls_comp_bufs[i].buf,
+				    lsp->ls_comp_bufs[i].bufsize);
+		}
+		kmem_free(lsp->ls_comp_bufs,
+		    sizeof (struct compbuf) * lofi_taskq_nthreads);
+		mutex_destroy(&lsp->ls_comp_bufs_lock);
 	}
 
 	mutex_destroy(&lsp->ls_vp_lock);
@@ -1023,6 +1038,7 @@ lofi_strategy_task(void *arg)
 		u_offset_t sdiff;
 		uint32_t comp_data_sz;
 		uint64_t i;
+		int j;
 
 		/*
 		 * From here on we're dealing primarily with compressed files
@@ -1114,12 +1130,36 @@ lofi_strategy_task(void *arg)
 		bp->b_bcount = comp_data_sz;
 
 		/*
-		 * Allocate fixed size memory blocks to hold compressed
-		 * segments and one uncompressed segment since we
-		 * uncompress segments one at a time
+		 * Buffers to hold compressed segments are pre-allocated
+		 * on a per-thread basis. Find a pre-allocated buffer
+		 * that is not currently in use and mark it for use.
 		 */
-		compressed_seg = kmem_alloc(bp->b_bcount, KM_SLEEP);
-		uncompressed_seg = kmem_alloc(lsp->ls_uncomp_seg_sz, KM_SLEEP);
+		mutex_enter(&lsp->ls_comp_bufs_lock);
+		for (j = 0; j < lofi_taskq_nthreads; j++) {
+			if (lsp->ls_comp_bufs[j].inuse == 0) {
+				lsp->ls_comp_bufs[j].inuse = 1;
+				break;
+			}
+		}
+
+		mutex_exit(&lsp->ls_comp_bufs_lock);
+		ASSERT(j < lofi_taskq_nthreads);
+
+		/*
+		 * If the pre-allocated buffer size does not match
+		 * the size of the I/O request, re-allocate it with
+		 * the appropriate size
+		 */
+		if (lsp->ls_comp_bufs[j].bufsize < bp->b_bcount) {
+			if (lsp->ls_comp_bufs[j].bufsize > 0)
+				kmem_free(lsp->ls_comp_bufs[j].buf,
+				    lsp->ls_comp_bufs[j].bufsize);
+			lsp->ls_comp_bufs[j].buf = kmem_alloc(bp->b_bcount,
+			    KM_SLEEP);
+			lsp->ls_comp_bufs[j].bufsize = bp->b_bcount;
+		}
+		compressed_seg = lsp->ls_comp_bufs[j].buf;
+
 		/*
 		 * Map in the calculated number of blocks
 		 */
@@ -1132,11 +1172,12 @@ lofi_strategy_task(void *arg)
 			goto done;
 
 		/*
-		 * We have the compressed blocks, now uncompress them
+		 * decompress compressed blocks start
 		 */
 		cmpbuf = compressed_seg + sdiff;
 		for (i = sblkno; i <= eblkno; i++) {
 			ASSERT(i < lsp->ls_comp_index_sz - 1);
+			uchar_t *useg;
 
 			/*
 			 * The last segment is special in that it is
@@ -1163,12 +1204,27 @@ lofi_strategy_task(void *arg)
 			/*
 			 * The first byte in a compressed segment is a flag
 			 * that indicates whether this segment is compressed
-			 * at all
+			 * at all.
+			 *
+			 * The variable 'useg' is used (instead of
+			 * uncompressed_seg) in this loop to keep a
+			 * reference to the uncompressed segment.
+			 *
+			 * N.B. If 'useg' is replaced with uncompressed_seg,
+			 * it leads to memory leaks and heap corruption in
+			 * corner cases where compressed segments lie
+			 * adjacent to uncompressed segments.
 			 */
 			if (*cmpbuf == UNCOMPRESSED) {
-				bcopy((cmpbuf + SEGHDR), uncompressed_seg,
-				    (cmpbytes - SEGHDR));
+				useg = cmpbuf + SEGHDR;
 			} else {
+				if (uncompressed_seg == NULL)
+					uncompressed_seg =
+					    kmem_alloc(lsp->ls_uncomp_seg_sz,
+					    KM_SLEEP);
+				useg = uncompressed_seg;
+				uncompressed_seg_index = i;
+
 				if (li->l_decompress((cmpbuf + SEGHDR),
 				    (cmpbytes - SEGHDR), uncompressed_seg,
 				    &seglen, li->l_level) != 0) {
@@ -1176,8 +1232,6 @@ lofi_strategy_task(void *arg)
 					goto done;
 				}
 			}
-
-			uncompressed_seg_index = i;
 
 			/*
 			 * Determine how much uncompressed data we
@@ -1187,7 +1241,7 @@ lofi_strategy_task(void *arg)
 			if (i == eblkno)
 				xfersize -= (lsp->ls_uncomp_seg_sz - eblkoff);
 
-			bcopy((uncompressed_seg + sblkoff), bufaddr, xfersize);
+			bcopy((useg + sblkoff), bufaddr, xfersize);
 
 			cmpbuf += cmpbytes;
 			bufaddr += xfersize;
@@ -1196,10 +1250,16 @@ lofi_strategy_task(void *arg)
 
 			if (bp->b_resid == 0)
 				break;
-		}
+		} /* decompress compressed blocks ends */
 
 		/*
-		 * Add the data for the last decopressed segment to
+		 * Skip to done if there is no uncompressed data to cache
+		 */
+		if (uncompressed_seg == NULL)
+			goto done;
+
+		/*
+		 * Add the data for the last decompressed segment to
 		 * the cache.
 		 *
 		 * In case the uncompressed segment data was added to (and
@@ -1214,8 +1274,11 @@ lofi_strategy_task(void *arg)
 		mutex_exit(&lsp->ls_comp_cache_lock);
 
 done:
-		if (compressed_seg != NULL)
-			kmem_free(compressed_seg, comp_data_sz);
+		if (compressed_seg != NULL) {
+			mutex_enter(&lsp->ls_comp_bufs_lock);
+			lsp->ls_comp_bufs[j].inuse = 0;
+			mutex_exit(&lsp->ls_comp_bufs_lock);
+		}
 		if (uncompressed_seg != NULL)
 			kmem_free(uncompressed_seg, lsp->ls_uncomp_seg_sz);
 	} /* end of handling compressed files */
@@ -1727,6 +1790,13 @@ lofi_map_compressed_file(struct lofi_state *lsp, char *buf)
 		    BE_64(lsp->ls_comp_seg_index[i]);
 	}
 
+	/*
+	 * Finally setup per-thread pre-allocated buffers
+	 */
+	lsp->ls_comp_bufs = kmem_zalloc(lofi_taskq_nthreads *
+	    sizeof (struct compbuf), KM_SLEEP);
+	mutex_init(&lsp->ls_comp_bufs_lock, NULL, MUTEX_DRIVER, NULL);
+
 	return (error);
 }
 
@@ -2011,6 +2081,7 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 		goto propout;
 
 	/* initialize these variables for all lofi files */
+	lsp->ls_comp_bufs = NULL;
 	lsp->ls_uncomp_seg_sz = 0;
 	lsp->ls_vp_comp_size = lsp->ls_vp_size;
 	lsp->ls_comp_algorithm[0] = '\0';

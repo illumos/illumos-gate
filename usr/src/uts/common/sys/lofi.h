@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -190,6 +189,15 @@ extern uint32_t lofi_max_files;
 	((vtype == VREG) || (vtype == VBLK) || (vtype == VCHR))
 
 /*
+ * Pre-allocated memory buffers for the purpose of compression
+ */
+struct compbuf {
+	void		*buf;
+	uint32_t	bufsize;
+	int		inuse;
+};
+
+/*
  * Need exactly 6 bytes to identify encrypted lofi image
  */
 extern const char lofi_crypto_magic[6];
@@ -243,6 +251,10 @@ struct lofi_state {
 	caddr_t		ls_comp_index_data; /* index pages loaded from file */
 	uint32_t	ls_comp_index_data_sz;
 	u_offset_t	ls_vp_comp_size; /* actual compressed file size */
+
+	/* pre-allocated list of buffers for compressed segment data */
+	kmutex_t	ls_comp_bufs_lock;
+	struct compbuf	*ls_comp_bufs;
 
 	/* lock and anchor for compressed segment caching */
 	kmutex_t	ls_comp_cache_lock;	/* protects ls_comp_cache */
