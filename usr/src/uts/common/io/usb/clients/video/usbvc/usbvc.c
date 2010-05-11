@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -2841,20 +2840,22 @@ usbvc_read_buf(usbvc_state_t *usbvcp, struct buf *bp)
 	buf_residue = buf->filled - buf->len_read;
 	len_to_copy = min(bp->b_bcount, buf_residue);
 
+	bcopy(buf->data + buf->len_read, bp->b_un.b_addr, len_to_copy);
+	bp->b_private = NULL;
+	buf->len_read += len_to_copy;
+	bp->b_resid = bp->b_bcount - len_to_copy;
+
 	if (len_to_copy == buf_residue) {
 		/*
 		 * the bp can accommodate all the remaining bytes of
 		 * the buf. Then we can reuse this buf.
 		 */
+		buf->len_read = 0;
 		list_remove(&usbvcp->usbvc_curr_strm->buf_read.uv_buf_done,
 		    buf);
 		list_insert_tail(&usbvcp->usbvc_curr_strm->buf_read.uv_buf_free,
 		    buf);
 	}
-	bcopy(buf->data + buf->len_read, bp->b_un.b_addr, len_to_copy);
-	bp->b_private = NULL;
-	buf->len_read += len_to_copy;
-	bp->b_resid = bp->b_bcount - len_to_copy;
 
 	return (USB_SUCCESS);
 }
