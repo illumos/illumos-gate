@@ -22,8 +22,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -382,31 +381,9 @@ main(int argc, char **argv, char **envp)
 
 
 static int
-is_runnable(GElf_Ehdr *ehdr)
-{
-	if ((ehdr->e_ident[EI_CLASS] == ELFCLASS32) &&
-	    (ehdr->e_ident[EI_DATA] == M_DATA))
-		return (ELFCLASS32);
-
-#if	defined(__sparc)
-	if ((ehdr->e_machine == EM_SPARCV9) &&
-	    (ehdr->e_ident[EI_DATA] == M_DATA) &&
-	    (conv_sys_eclass() == ELFCLASS64))
-		return (ELFCLASS64);
-#elif	defined(__x86)
-	if ((ehdr->e_machine == EM_AMD64) &&
-	    (ehdr->e_ident[EI_DATA] == ELFDATA2LSB) &&
-	    (conv_sys_eclass() == ELFCLASS64))
-		return (ELFCLASS64);
-#endif
-
-	return (ELFCLASSNONE);
-}
-
-
-static int
 elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 {
+	Conv_inv_buf_t	inv_buf;
 	GElf_Ehdr 	ehdr;
 	GElf_Phdr 	phdr;
 	int		dynamic = 0, interp = 0, cnt, class;
@@ -421,34 +398,63 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 	}
 
 	/*
-	 * check class and encoding
+	 * Compatible machine
 	 */
-	if ((class = is_runnable(&ehdr)) == ELFCLASSNONE) {
-		(void) fprintf(stderr, MSG_INTL(MSG_ELF_CLASSDATA),
-		    cname, fname);
+	if ((ehdr.e_machine != M_MACH_32) && (ehdr.e_machine != M_MACH_64) &&
+	    (ehdr.e_machine != M_MACHPLUS)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ELF_MACHTYPE), cname, fname,
+		    conv_ehdr_mach(ehdr.e_machine, 0, &inv_buf));
 		return (1);
 	}
 
 	/*
-	 * check type
+	 * Compatible encoding (byte order)
+	 */
+	if (ehdr.e_ident[EI_DATA] != M_DATA) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ELF_DATA), cname, fname,
+		    conv_ehdr_data(ehdr.e_ident[EI_DATA], 0, &inv_buf));
+		return (1);
+	}
+
+	/*
+	 * Compatible class
+	 */
+	switch (class = ehdr.e_ident[EI_CLASS]) {
+	case ELFCLASS32:
+		/*
+		 * If M_MACH is not the same thing as M_MACHPLUS and this
+		 * is an M_MACHPLUS object, then the corresponding header
+		 * flag must be set.
+		 */
+		if ((ehdr.e_machine != M_MACH) &&
+		    ((ehdr.e_flags & M_FLAGSPLUS) == 0)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ELF_MACHFLAGS),
+			    cname, fname);
+			return (1);
+		}
+		break;
+	case ELFCLASS64:
+		/* Requires 64-bit kernel */
+		if (conv_sys_eclass() == ELFCLASS32) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ELF_KCLASS32),
+			    cname, fname, conv_ehdr_class(class, 0, &inv_buf));
+			return (1);
+		}
+		break;
+	default:
+		(void) fprintf(stderr, MSG_INTL(MSG_ELF_CLASS), cname, fname,
+		    conv_ehdr_class(class, 0, &inv_buf));
+		return (1);
+	}
+
+	/*
+	 * Object type
 	 */
 	if ((ehdr.e_type != ET_EXEC) && (ehdr.e_type != ET_DYN) &&
 	    (ehdr.e_type != ET_REL)) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ELF_BADMAGIC),
 		    cname, fname);
 		return (1);
-	}
-	if ((class == ELFCLASS32) && (ehdr.e_machine != M_MACH)) {
-		if (ehdr.e_machine != M_MACHPLUS) {
-			(void) fprintf(stderr, MSG_INTL(MSG_ELF_MACHTYPE),
-			    cname, fname);
-			return (1);
-		}
-		if ((ehdr.e_flags & M_FLAGSPLUS) == 0) {
-			(void) fprintf(stderr, MSG_INTL(MSG_ELF_MACHFLAGS),
-			    cname, fname);
-			return (1);
-		}
 	}
 
 	/*

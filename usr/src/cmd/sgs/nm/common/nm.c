@@ -380,7 +380,7 @@ static void
 usage()
 {
 	(void) fprintf(stderr, gettext(
-"Usage: nm [-APvChlnV] [-efox] [-r | -R]  [-g | -u] [-t d|o|x] file ...\n"));
+"Usage: nm [-ACDhLlnPpRrsTVv] [-efox] [-g | -u] [-t d|o|x] file ...\n"));
 }
 
 /*

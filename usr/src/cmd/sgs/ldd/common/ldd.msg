@@ -1,6 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -21,7 +20,6 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 @ _START_
@@ -56,9 +54,14 @@
 # ELF messages
 
 @ MSG_ELF_LIBELF	"%s: libelf: version not supported: %d"
-@ MSG_ELF_CLASSDATA	"%s: %s: has wrong class or data encoding\n"
 @ MSG_ELF_BADMAGIC	"%s: %s: bad magic number\n"
-@ MSG_ELF_MACHTYPE	"%s: %s: wrong machine type\n"
+@ MSG_ELF_CLASS		"%s: %s: ELF class: %s: unrecognized\n"
+@ MSG_ELF_KCLASS32	"%s: %s: ELF class: %s: is incompatible with 32-bit \
+			 system\n"
+@ MSG_ELF_MACHTYPE	"%s: %s: ELF machine type: %s: is incompatible with \
+			 system\n"
+@ MSG_ELF_DATA		"%s: %s: ELF byte order: %s: is incompatible with \
+			 system\n"
 @ MSG_ELF_MACHFLAGS	"%s: %s: wrong machine flags\n"
 
 @ MSG_ELF_GETEHDR	"%s: %s: elf_getehdr: %s\n"

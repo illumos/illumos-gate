@@ -1577,3 +1577,5 @@ Bugid   Risk Synopsis
 6938111 nm `No symbol table data' message goes to stdout
 6941727 ld relocation cache memory use is excessive
 6932220 ld -z allextract skips objects that lack global symbols
+6939573 ldd should provide better diagnostics for incompatible objects
+6948379 nm usage message omits several options
