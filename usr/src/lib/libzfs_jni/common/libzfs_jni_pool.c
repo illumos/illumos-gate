@@ -507,6 +507,23 @@ populate_DiskVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 			}
 			regfree(&re);
 		}
+		if (regcomp(&re, "^(/dev/dsk/.*)s[0-9]+/old$", REG_EXTENDED) ==
+		    0) {
+			if (regexec(&re, path, 2, matches, 0) == 0) {
+				regmatch_t *match = matches + 1;
+				if (match->rm_so != -1 && match->rm_eo != -1) {
+					char *tmp = strdup(path);
+					if (tmp != NULL) {
+						(void) strcpy(tmp +
+						    match->rm_eo, "/old");
+						pathUTF = (*env)->NewStringUTF(
+						    env, tmp);
+						free(tmp);
+					}
+				}
+			}
+			regfree(&re);
+		}
 
 		if (pathUTF == NULL) {
 			pathUTF = (*env)->NewStringUTF(env, path);

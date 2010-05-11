@@ -1562,6 +1562,38 @@ zpool_scan(zpool_handle_t *zhp, pool_scan_func_t func)
 }
 
 /*
+ * This provides a very minimal check whether a given string is likely a
+ * c#t#d# style string.  Users of this are expected to do their own
+ * verification of the s# part.
+ */
+#define	CTD_CHECK(str)  (str && str[0] == 'c' && isdigit(str[1]))
+
+/*
+ * More elaborate version for ones which may start with "/dev/dsk/"
+ * and the like.
+ */
+static int
+ctd_check_path(char *str) {
+	/*
+	 * If it starts with a slash, check the last component.
+	 */
+	if (str && str[0] == '/') {
+		char *tmp = strrchr(str, '/');
+
+		/*
+		 * If it ends in "/old", check the second-to-last
+		 * component of the string instead.
+		 */
+		if (tmp != str && strcmp(tmp, "/old") == 0) {
+			for (tmp--; *tmp != '/'; tmp--)
+				;
+		}
+		str = tmp + 1;
+	}
+	return (CTD_CHECK(str));
+}
+
+/*
  * Find a vdev that matches the search criteria specified. We use the
  * the nvpair name to determine how we should look for the device.
  * 'avail_spare' is set to TRUE if the provided guid refers to an AVAIL
@@ -1615,24 +1647,51 @@ vdev_to_nvlist_iter(nvlist_t *nv, nvlist_t *search, boolean_t *avail_spare,
 			break;
 
 		/*
-		 * Search for the requested value. We special case the search
-		 * for ZPOOL_CONFIG_PATH when it's a wholedisk and when
-		 * Looking for a top-level vdev name (i.e. ZPOOL_CONFIG_TYPE).
+		 * Search for the requested value. Special cases:
+		 *
+		 * - ZPOOL_CONFIG_PATH for whole disk entries.  These end in
+		 *   "s0" or "s0/old".  The "s0" part is hidden from the user,
+		 *   but included in the string, so this matches around it.
+		 * - looking for a top-level vdev name (i.e. ZPOOL_CONFIG_TYPE).
+		 *
 		 * Otherwise, all other searches are simple string compares.
 		 */
-		if (strcmp(srchkey, ZPOOL_CONFIG_PATH) == 0 && val) {
+		if (strcmp(srchkey, ZPOOL_CONFIG_PATH) == 0 &&
+		    ctd_check_path(val)) {
 			uint64_t wholedisk = 0;
 
 			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
 			    &wholedisk);
 			if (wholedisk) {
+				int slen = strlen(srchval);
+				int vlen = strlen(val);
+
+				if (slen != vlen - 2)
+					break;
+
 				/*
-				 * For whole disks, the internal path has 's0',
-				 * but the path passed in by the user doesn't.
+				 * make_leaf_vdev() should only set
+				 * wholedisk for ZPOOL_CONFIG_PATHs which
+				 * will include "/dev/dsk/", giving plenty of
+				 * room for the indices used next.
 				 */
-				if (strlen(srchval) == strlen(val) - 2 &&
-				    strncmp(srchval, val, strlen(srchval)) == 0)
+				ASSERT(vlen >= 6);
+
+				/*
+				 * strings identical except trailing "s0"
+				 */
+				if (strcmp(&val[vlen - 2], "s0") == 0 &&
+				    strncmp(srchval, val, slen) == 0)
 					return (nv);
+
+				/*
+				 * strings identical except trailing "s0/old"
+				 */
+				if (strcmp(&val[vlen - 6], "s0/old") == 0 &&
+				    strcmp(&srchval[slen - 4], "/old") == 0 &&
+				    strncmp(srchval, val, slen - 4) == 0)
+					return (nv);
+
 				break;
 			}
 		} else if (strcmp(srchkey, ZPOOL_CONFIG_TYPE) == 0 && val) {
@@ -3003,10 +3062,23 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 
 		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
 		    &value) == 0 && value) {
+			int pathlen = strlen(path);
 			char *tmp = zfs_strdup(hdl, path);
-			if (tmp == NULL)
-				return (NULL);
-			tmp[strlen(path) - 2] = '\0';
+
+			/*
+			 * If it starts with c#, and ends with "s0", chop
+			 * the "s0" off, or if it ends with "s0/old", remove
+			 * the "s0" from the middle.
+			 */
+			if (CTD_CHECK(tmp)) {
+				if (strcmp(&tmp[pathlen - 2], "s0") == 0) {
+					tmp[pathlen - 2] = '\0';
+				} else if (pathlen > 6 &&
+				    strcmp(&tmp[pathlen - 6], "s0/old") == 0) {
+					(void) strcpy(&tmp[pathlen - 6],
+					    "/old");
+				}
+			}
 			return (tmp);
 		}
 	} else {
