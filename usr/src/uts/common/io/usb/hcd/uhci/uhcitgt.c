@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -455,9 +454,38 @@ uhci_hcdi_pipe_reset(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 	    ph->p_usba_device->usb_root_hub_dip);
 	uhci_pipe_private_t	*pp = (uhci_pipe_private_t *)ph->p_hcd_private;
 	usb_ep_descr_t		*eptd = &ph->p_ep;
+	int i = 0;
+	uint_t new_port_status = 0, old_port_status = 0;
 
 	USB_DPRINTF_L2(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_hcdi_pipe_reset: usb_flags = 0x%x", usb_flags);
+
+	/*
+	 * Under some circumstances, uhci internal hub's port
+	 * may become disabled because of some errors(see UHCI HCD Spec)
+	 * to make the UHCI driver robust enough, we should try to
+	 * re-enable it again here because HCD has already know something
+	 * bad happened.
+	 */
+	USB_DPRINTF_L2(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
+	    "uhci_hcdi_pipe_reset: try "
+	    "to enable disabled ports if necessary.");
+	for (i = 0; i < uhcip->uhci_root_hub.rh_num_ports; i++) {
+		old_port_status = Get_OpReg16(PORTSC[i]);
+		if (!(old_port_status & HCR_PORT_ENABLE)) {
+			Set_OpReg16(PORTSC[i],
+			    (old_port_status | HCR_PORT_ENABLE));
+			drv_usecwait(UHCI_ONE_MS * 2);
+			new_port_status = Get_OpReg16(PORTSC[i]);
+			/*
+			 * Refresh Root Hub port status
+			 */
+			uhcip->uhci_root_hub.rh_port_status[i] =
+			    new_port_status;
+			uhcip->uhci_root_hub.rh_port_changes[i] |=
+			    ((old_port_status ^ new_port_status) & 0xff);
+		}
+	}
 
 	/*
 	 * Return failure immediately for any other pipe reset on the root
