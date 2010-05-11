@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_INET_KSSL_KSSL_H
@@ -62,6 +61,10 @@ typedef struct kssl_tokinfo_s {
 	uint32_t ck_rv;			/* PKCS #11 specific error */
 } kssl_tokinfo_t;
 
+/* Code point for Signalling Cipher Suite Value (SCSV) */
+#define	SSL_SCSV			0x00ff
+
+/* Cipher suites */
 #define	SSL_RSA_WITH_NULL_SHA		0x0002
 #define	SSL_RSA_WITH_RC4_128_MD5	0x0004
 #define	SSL_RSA_WITH_RC4_128_SHA	0x0005
@@ -69,8 +72,12 @@ typedef struct kssl_tokinfo_s {
 #define	SSL_RSA_WITH_3DES_EDE_CBC_SHA	0x000a
 #define	TLS_RSA_WITH_AES_128_CBC_SHA	0x002f
 #define	TLS_RSA_WITH_AES_256_CBC_SHA	0x0035
+/* total number of cipher suites supported */
 #define	CIPHER_SUITE_COUNT		7
 #define	CIPHER_NOTSET			0xffff
+
+/* TLS extension types */
+#define	TLSEXT_RENEGOTIATION_INFO	0xff01
 
 #define	DEFAULT_SID_TIMEOUT		86400	/* 24 hours in seconds */
 #define	DEFAULT_SID_CACHE_NENTRIES	5000

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_INET_KSSL_KSSLPROTO_H
@@ -320,6 +319,7 @@ typedef struct ssl_s {
 	int			sslcnt;
 	uchar_t			major_version;
 	uchar_t			minor_version;
+	boolean_t		secure_renegotiation;
 } ssl_t;
 
 #define	IS_TLS(s) (s->major_version == 3 && s->minor_version == 1)

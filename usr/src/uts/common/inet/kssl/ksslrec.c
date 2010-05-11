@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -467,8 +466,9 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 	uint_t sidlen, cslen, cmlen;
 	uchar_t *suitesp;
 	uint_t i, j;
-	uint16_t suite;
+	uint16_t suite, selected_suite;
 	int ch_msglen = KSSL_SSL3_CH_MIN_MSGLEN;
+	boolean_t suite_found = B_FALSE;
 
 	ASSERT(mp->b_wptr >= mp->b_rptr + msglen);
 	ASSERT(ssl->msg.type == client_hello);
@@ -524,8 +524,7 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 	 * This check can't be a "!=" since there can be
 	 * compression methods other than CompressionMethod.null.
 	 * Also, there can be extra data (TLS extensions) after the
-	 * compression methods field. We do not support any TLS
-	 * extensions and hence ignore them.
+	 * compression methods field.
 	 */
 	if (msglen < ch_msglen) {
 		DTRACE_PROBE2(kssl_err__invalid_message_length_after_cslen,
@@ -533,41 +532,87 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 		goto falert;
 	}
 
-	/* The length has to be even since a cipher suite is 2-byte long */
+	/* The length has to be even since a cipher suite is 2-byte long. */
 	if (cslen & 0x1) {
 		DTRACE_PROBE1(kssl_err__uneven_cipher_suite_length,
 		    uint_t, cslen);
 		goto falert;
 	}
 	suitesp = mp->b_rptr;
+
+	/* session resumption checks */
 	if (ssl->sid.cached == B_TRUE) {
 		suite = ssl->sid.cipher_suite;
 		for (j = 0; j < cslen; j += 2) {
+			DTRACE_PROBE2(kssl_cipher_suite_check_resumpt,
+			    uint16_t, suite,
+			    uint16_t,
+			    (uint16_t)((suitesp[j] << 8) + suitesp[j+1]));
+			/* Check for regular (true) cipher suite. */
 			if (suitesp[j] == ((suite >> 8) & 0xff) &&
 			    suitesp[j + 1] == (suite & 0xff)) {
-				break;
+				DTRACE_PROBE1(kssl_cipher_suite_found_resumpt,
+				    uint16_t, suite);
+				suite_found = B_TRUE;
+				selected_suite = suite;
 			}
+
+			/* Check for SCSV. */
+			if (suitesp[j] ==  ((SSL_SCSV >> 8) & 0xff) &&
+			    suitesp[j + 1] == (SSL_SCSV & 0xff)) {
+				DTRACE_PROBE(kssl_scsv_found_resumpt);
+				ssl->secure_renegotiation = B_TRUE;
+			}
+
+			/*
+			 * If we got cipher suite match and SCSV we can
+			 * terminate the cycle now.
+			 */
+			if (suite_found && ssl->secure_renegotiation)
+				break;
 		}
-		if (j < cslen) {
+		if (suite_found)
 			goto suite_found;
-		}
 		kssl_uncache_sid(&ssl->sid, ssl->kssl_entry);
 	}
 
-	/* Check if this server is capable of the cipher suite */
+	/* Check if this server is capable of the cipher suite. */
 	for (i = 0; i < ssl->kssl_entry->kssl_cipherSuites_nentries; i++) {
 		suite = ssl->kssl_entry->kssl_cipherSuites[i];
 		for (j = 0; j < cslen; j += 2) {
+			DTRACE_PROBE2(kssl_cipher_suite_check, uint16_t, suite,
+			    uint16_t,
+			    (uint16_t)((suitesp[j] << 8) + suitesp[j+1]));
+			/* Check for regular (true) cipher suite. */
 			if (suitesp[j] == ((suite >> 8) & 0xff) &&
 			    suitesp[j + 1] == (suite & 0xff)) {
-				break;
+				DTRACE_PROBE1(kssl_cipher_suite_found,
+				    uint16_t, suite);
+				suite_found = B_TRUE;
+				selected_suite = suite;
 			}
+
+			/* Check for SCSV. */
+			if (suitesp[j] ==  ((SSL_SCSV >> 8) & 0xff) &&
+			    suitesp[j + 1] == (SSL_SCSV & 0xff)) {
+				DTRACE_PROBE(kssl_scsv_found);
+				ssl->secure_renegotiation = B_TRUE;
+			}
+
+			/*
+			 * If we got cipher suite match and SCSV or went
+			 * through the whole list of client cipher suites
+			 * (hence we know if SCSV was present or not) we
+			 * can terminate the cycle now.
+			 */
+			if (suite_found &&
+			    (ssl->secure_renegotiation || (i > 0)))
+				break;
 		}
-		if (j < cslen) {
+		if (suite_found)
 			break;
-		}
 	}
-	if (i == ssl->kssl_entry->kssl_cipherSuites_nentries) {
+	if (!suite_found) {
 		if (ssl->sslcnt == 1) {
 			DTRACE_PROBE(kssl_no_cipher_suite_found);
 			KSSL_COUNTER(no_suite_found, 1);
@@ -620,20 +665,115 @@ suite_found:
 		goto falert;
 	}
 
-	mp->b_rptr = msgend;
-
+	/* Find the suite in the internal cipher suite table. */
 	for (i = 0; i < cipher_suite_defs_nentries; i++) {
-		if (suite == cipher_suite_defs[i].suite) {
+		if (selected_suite == cipher_suite_defs[i].suite) {
 			break;
 		}
 	}
 
+	/* Get past the remaining compression methods (minus null method). */
+	mp->b_rptr += cmlen - 1;
+
 	ASSERT(i < cipher_suite_defs_nentries);
 
-	ssl->pending_cipher_suite = suite;
+	ssl->pending_cipher_suite = selected_suite;
 	ssl->pending_malg = cipher_suite_defs[i].malg;
 	ssl->pending_calg = cipher_suite_defs[i].calg;
 	ssl->pending_keyblksz = cipher_suite_defs[i].keyblksz;
+
+	/* Parse TLS extensions (if any). */
+	if (ch_msglen + 2 < msglen) {
+		/* Get the length of the extensions. */
+		uint16_t ext_total_len = ((uint_t)mp->b_rptr[0] << 8) +
+		    (uint_t)mp->b_rptr[1];
+		DTRACE_PROBE1(kssl_total_length_extensions, uint16_t,
+		    ext_total_len);
+		/*
+		 * Consider zero extensions length as invalid extension
+		 * encoding.
+		 */
+		if (ext_total_len == 0) {
+			DTRACE_PROBE1(kssl_err__zero_extensions_length,
+			    mblk_t *, mp);
+			goto falert;
+		}
+		ch_msglen += 2;
+		if (ch_msglen + ext_total_len > msglen) {
+			DTRACE_PROBE2(kssl_err__invalid_extensions_length,
+			    int, msglen, int, ch_msglen);
+			goto falert;
+		}
+		mp->b_rptr += 2;
+
+		/*
+		 * Go through the TLS extensions. This is only done to check
+		 * for the presence of renegotiation_info extension. We do not
+		 * support any other TLS extensions and hence ignore them.
+		 */
+		while (mp->b_rptr < msgend) {
+			uint16_t ext_len, ext_type;
+
+			/*
+			 * Check that the extension has at least type and
+			 * length (2 + 2 bytes).
+			 */
+			if (ch_msglen + 4 > msglen) {
+				DTRACE_PROBE(kssl_err__invalid_ext_format);
+				goto falert;
+			}
+
+			/* Get extension type and length */
+			ext_type = ((uint_t)mp->b_rptr[0] << 8) +
+			    (uint_t)mp->b_rptr[1];
+			mp->b_rptr += 2;
+			ext_len = ((uint_t)mp->b_rptr[0] << 8) +
+			    (uint_t)mp->b_rptr[1];
+			mp->b_rptr += 2;
+			ch_msglen += 4;
+			DTRACE_PROBE3(kssl_ext_detected, uint16_t, ext_type,
+			    uint16_t, ext_len, mblk_t *, mp);
+
+			/*
+			 * Make sure the contents of the extension are
+			 * accessible.
+			 */
+			if (ch_msglen + ext_len > msglen) {
+				DTRACE_PROBE1(
+				    kssl_err__invalid_ext_len,
+				    uint16_t, ext_len);
+				goto falert;
+			}
+
+			switch (ext_type) {
+			case TLSEXT_RENEGOTIATION_INFO:
+				/*
+				 * Search for empty "renegotiation_info"
+				 * extension (encoded as ff 01 00 01 00).
+				 */
+				DTRACE_PROBE(kssl_reneg_info_found);
+				if ((ext_len != 1) ||
+				    (*mp->b_rptr != 0)) {
+					DTRACE_PROBE2(
+					    kssl_err__non_empty_reneg_info,
+					    uint16_t, ext_len,
+					    mblk_t *, mp);
+					goto falert;
+				}
+				ssl->secure_renegotiation = B_TRUE;
+				break;
+			default:
+				/* FALLTHRU */
+				break;
+			}
+
+			/* jump to the next extension */
+			ch_msglen += ext_len;
+			mp->b_rptr += ext_len;
+		}
+	}
+
+	mp->b_rptr = msgend;
 
 	if (ssl->sid.cached == B_TRUE) {
 		err = kssl_send_server_hello(ssl);
@@ -669,7 +809,7 @@ suite_found:
 	(void) random_get_pseudo_bytes(ssl->sid.session_id,
 	    SSL3_SESSIONID_BYTES);
 	ssl->sid.client_addr = ssl->faddr;
-	ssl->sid.cipher_suite = suite;
+	ssl->sid.cipher_suite = selected_suite;
 
 	err = kssl_send_server_hello(ssl);
 	if (err != 0) {
@@ -822,15 +962,20 @@ kssl_rsa_unwrap(uchar_t *buf, size_t *lenp)
 
 #define	KSSL_SSL3_SH_RECLEN	(74)
 #define	KSSL_SSL3_FIN_MSGLEN	(36)
+#define	KSSL_EMPTY_RENEG_INFO_LEN	(7)
 
 #define	KSSL_SSL3_MAX_CCP_FIN_MSGLEN	(128)	/* comfortable upper bound */
 
+/*
+ * Send ServerHello record to the client.
+ */
 static int
 kssl_send_server_hello(ssl_t *ssl)
 {
 	mblk_t *mp;
 	uchar_t *buf;
 	uchar_t *msgstart;
+	uint16_t reclen = KSSL_SSL3_SH_RECLEN;
 
 	mp = allocb(ssl->tcp_mss, BPRI_HI);
 	if (mp == NULL) {
@@ -840,12 +985,15 @@ kssl_send_server_hello(ssl_t *ssl)
 	ssl->handshake_sendbuf = mp;
 	buf = mp->b_wptr;
 
+	if (ssl->secure_renegotiation)
+		reclen += KSSL_EMPTY_RENEG_INFO_LEN;
+
 	/* 5 byte record header */
 	buf[0] = content_handshake;
 	buf[1] = ssl->major_version;
 	buf[2] = ssl->minor_version;
-	buf[3] = KSSL_SSL3_SH_RECLEN >> 8;
-	buf[4] = KSSL_SSL3_SH_RECLEN & 0xff;
+	buf[3] = reclen >> 8;
+	buf[4] = reclen & 0xff;
 	buf += SSL3_HDR_LEN;
 
 	msgstart = buf;
@@ -853,9 +1001,9 @@ kssl_send_server_hello(ssl_t *ssl)
 	/* 6 byte message header */
 	buf[0] = (uchar_t)server_hello;			/* message type */
 	buf[1] = 0;					/* message len byte 0 */
-	buf[2] = ((KSSL_SSL3_SH_RECLEN - 4) >> 8) &
+	buf[2] = ((reclen - 4) >> 8) &
 	    0xff;					/* message len byte 1 */
-	buf[3] = (KSSL_SSL3_SH_RECLEN - 4) & 0xff;	/* message len byte 2 */
+	buf[3] = (reclen - 4) & 0xff;	/* message len byte 2 */
 
 	buf[4] = ssl->major_version;	/* version byte 0 */
 	buf[5] = ssl->minor_version;	/* version byte 1 */
@@ -874,11 +1022,30 @@ kssl_send_server_hello(ssl_t *ssl)
 	buf[1] = ssl->pending_cipher_suite & 0xff;
 
 	buf[2] = 0;	/* No compression */
+	buf += 3;
 
-	mp->b_wptr = buf + 3;
+	/*
+	 * Add "renegotiation_info" extension if the ClientHello message
+	 * contained either SCSV value in cipher suite list or
+	 * "renegotiation_info" extension. This is per RFC 5746, section 3.6.
+	 */
+	if (ssl->secure_renegotiation) {
+		/* Extensions length */
+		buf[0] = 0x00;
+		buf[1] = 0x05;
+		/* empty renegotiation_info extension encoding (section 3.2) */
+		buf[2] = 0xff;
+		buf[3] = 0x01;
+		buf[4] = 0x00;
+		buf[5] = 0x01;
+		buf[6] = 0x00;
+		buf += KSSL_EMPTY_RENEG_INFO_LEN;
+	}
+
+	mp->b_wptr = buf;
 	ASSERT(mp->b_wptr < mp->b_datap->db_lim);
 
-	kssl_update_handshake_hashes(ssl, msgstart, KSSL_SSL3_SH_RECLEN);
+	kssl_update_handshake_hashes(ssl, msgstart, reclen);
 	return (0);
 }
 
@@ -1196,6 +1363,7 @@ kssl_send_certificate_and_server_hello_done(ssl_t *ssl)
 	int cert_len;
 	uchar_t *msgbuf;
 	Certificate_t *cert;
+	uint16_t reclen = KSSL_SSL3_SH_RECLEN;
 
 	cert = ssl->kssl_entry->ke_server_certificate;
 	if (cert == NULL) {
@@ -1204,11 +1372,14 @@ kssl_send_certificate_and_server_hello_done(ssl_t *ssl)
 	cert_buf = cert->msg;
 	cert_len = cert->len;
 
+	if (ssl->secure_renegotiation)
+		reclen += KSSL_EMPTY_RENEG_INFO_LEN;
+
 	mp = ssl->handshake_sendbuf;
 	mss = ssl->tcp_mss;
 	ASSERT(mp != NULL);
 	cur_reclen = mp->b_wptr - mp->b_rptr - SSL3_HDR_LEN;
-	ASSERT(cur_reclen == KSSL_SSL3_SH_RECLEN);
+	ASSERT(cur_reclen == reclen);
 	/* Assume MSS is at least 80 bytes */
 	ASSERT(mss > cur_reclen + SSL3_HDR_LEN);
 	ASSERT(cur_reclen < SSL3_MAX_RECORD_LENGTH); /* XXX */
@@ -1247,7 +1418,7 @@ kssl_send_certificate_and_server_hello_done(ssl_t *ssl)
 			mp->b_wptr[0] = content_handshake;
 			mp->b_wptr[1] = ssl->major_version;
 			mp->b_wptr[2] = ssl->minor_version;
-			cur_reclen = MIN(len, SSL3_MAX_RECORD_LENGTH);
+			cur_reclen = MIN(len, reclen);
 			mp->b_wptr[3] = (cur_reclen >> 8) & 0xff;
 			mp->b_wptr[4] = (cur_reclen) & 0xff;
 			mp->b_wptr += SSL3_HDR_LEN;
@@ -1258,8 +1429,7 @@ kssl_send_certificate_and_server_hello_done(ssl_t *ssl)
 
 	/* adjust the record length field for the first record */
 	mp = ssl->handshake_sendbuf;
-	cur_reclen = MIN(KSSL_SSL3_SH_RECLEN + cert_len,
-	    SSL3_MAX_RECORD_LENGTH);
+	cur_reclen = MIN(reclen + cert_len, SSL3_MAX_RECORD_LENGTH);
 	mp->b_rptr[3] = (cur_reclen >> 8) & 0xff;
 	mp->b_rptr[4] = (cur_reclen) & 0xff;
 
@@ -1457,12 +1627,20 @@ kssl_send_finished(ssl_t *ssl, int update_hsh)
 	SSL3Hashes ssl3hashes;
 	size_t finish_len;
 	int ret;
+	uint16_t adj_len = 0;
 
 	mp = ssl->handshake_sendbuf;
 	ASSERT(mp != NULL);
 	buf = mp->b_wptr;
-	ASSERT(buf - mp->b_rptr == SSL3_HDR_LEN + KSSL_SSL3_SH_RECLEN +
-	    SSL3_HDR_LEN + 1 || buf - mp->b_rptr == SSL3_HDR_LEN + 1);
+	if (ssl->secure_renegotiation)
+		adj_len = KSSL_EMPTY_RENEG_INFO_LEN;
+	/*
+	 * It should be either a message with Server Hello record or just plain
+	 * SSL header (data packet).
+	 */
+	ASSERT(buf - mp->b_rptr ==
+	    SSL3_HDR_LEN + KSSL_SSL3_SH_RECLEN + SSL3_HDR_LEN + 1 + adj_len ||
+	    buf - mp->b_rptr == SSL3_HDR_LEN + 1);
 
 	rstart = buf;
 
@@ -1882,8 +2060,9 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 	uchar_t *suitesp;
 	uchar_t *rand;
 	uint_t i, j;
-	uint16_t suite;
+	uint16_t suite, selected_suite;
 	int ch_recsz = KSSL2_CH_MIN_RECSZ;
+	boolean_t suite_found = B_FALSE;
 
 	ASSERT(mp->b_wptr >= mp->b_rptr + recsz);
 	ASSERT(ssl->hs_waitstate == wait_client_hello);
@@ -1939,20 +2118,43 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 	for (i = 0; i < ssl->kssl_entry->kssl_cipherSuites_nentries; i++) {
 		suite = ssl->kssl_entry->kssl_cipherSuites[i];
 		for (j = 0; j < cslen; j += 3) {
+			DTRACE_PROBE2(kssl_cipher_suite_check_v2,
+			    uint16_t, suite,
+			    uint16_t,
+			    (uint16_t)((suitesp[j+1] << 8) + suitesp[j+2]));
 			if (suitesp[j] != 0) {
 				continue;
 			}
 
+			/* Check for regular (true) cipher suite. */
 			if (suitesp[j + 1] == ((suite >> 8) & 0xff) &&
 			    suitesp[j + 2] == (suite & 0xff)) {
-				break;
+				DTRACE_PROBE1(kssl_cipher_suite_found,
+				    uint16_t, suite);
+				suite_found = B_TRUE;
+				selected_suite = suite;
 			}
+
+			/* Check for SCSV. */
+			if (suitesp[j + 1] ==  ((SSL_SCSV >> 8) & 0xff) &&
+			    suitesp[j + 2] == (SSL_SCSV & 0xff)) {
+				DTRACE_PROBE(kssl_scsv_found);
+				ssl->secure_renegotiation = B_TRUE;
+			}
+			/*
+			 * If we got cipher suite match and SCSV or went
+			 * through the whole list of client cipher suites
+			 * (hence we know if SCSV was present or not) we
+			 * can terminate the cycle now.
+			 */
+			if (suite_found &&
+			    (ssl->secure_renegotiation || (i > 0)))
+				break;
 		}
-		if (j < cslen) {
+		if (suite_found)
 			break;
-		}
 	}
-	if (i == ssl->kssl_entry->kssl_cipherSuites_nentries) {
+	if (!suite_found) {
 		DTRACE_PROBE(kssl_err__no_SSLv2_cipher_suite);
 		ssl->activeinput = B_FALSE;
 		/*
@@ -1971,14 +2173,14 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 	mp->b_rptr = recend;
 
 	for (i = 0; i < cipher_suite_defs_nentries; i++) {
-		if (suite == cipher_suite_defs[i].suite) {
+		if (selected_suite == cipher_suite_defs[i].suite) {
 			break;
 		}
 	}
 
 	ASSERT(i < cipher_suite_defs_nentries);
 
-	ssl->pending_cipher_suite = suite;
+	ssl->pending_cipher_suite = selected_suite;
 	ssl->pending_malg = cipher_suite_defs[i].malg;
 	ssl->pending_calg = cipher_suite_defs[i].calg;
 	ssl->pending_keyblksz = cipher_suite_defs[i].keyblksz;
@@ -1988,7 +2190,7 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 	(void) random_get_pseudo_bytes(ssl->sid.session_id,
 	    SSL3_SESSIONID_BYTES);
 	ssl->sid.client_addr = ssl->faddr;
-	ssl->sid.cipher_suite = suite;
+	ssl->sid.cipher_suite = selected_suite;
 
 	err = kssl_send_server_hello(ssl);
 	if (err != 0) {

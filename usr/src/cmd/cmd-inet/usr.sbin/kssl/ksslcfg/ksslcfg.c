@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <arpa/inet.h> /* inet_addr() */
@@ -65,19 +64,26 @@ KSSL_DEBUG(const char *format, ...)
 	}
 }
 
+/*
+ * Convert string to port number and check for errors. Return 0 on error,
+ * 1 on success.
+ */
 int
 get_portnum(const char *s, ushort_t *rport)
 {
-	unsigned long port;
+	long long tmp_port;
+	char *ep;
 
 	errno = 0;
-	port = strtoul(s, NULL, 10);
-	if (port > USHRT_MAX || port == 0 || errno != 0) {
+	tmp_port = strtoll(s, &ep, 10);
+	if (s == ep || *ep != '\0' || errno != 0)
 		return (0);
-	}
+	if (tmp_port < 1 || tmp_port > 65535)
+		return (0);
 
 	if (rport != NULL)
-		*rport = (ushort_t)port;
+		*rport = (ushort_t)tmp_port;
+
 	return (1);
 }
 

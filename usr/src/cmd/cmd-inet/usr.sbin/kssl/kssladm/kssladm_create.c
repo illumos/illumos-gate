@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <errno.h>
@@ -929,6 +928,9 @@ int
 parse_and_set_addr(char *server_address, char *server_port,
     struct sockaddr_in6 *addr)
 {
+	long long tmp_port;
+	char *ep;
+
 	if (server_port == NULL) {
 		return (-1);
 	}
@@ -952,12 +954,19 @@ parse_and_set_addr(char *server_address, char *server_port,
 	}
 
 	errno = 0;
-	addr->sin6_port = strtol(server_port, NULL, 10);
-	if (addr->sin6_port == 0 || errno != 0) {
+	tmp_port = strtoll(server_port, &ep, 10);
+	if (server_port == ep || *ep != '\0' || errno != 0) {
 		(void) fprintf(stderr, "Error: Invalid Port value: %s\n",
 		    server_port);
 		return (-1);
 	}
+	if (tmp_port < 1 || tmp_port > 65535) {
+		(void) fprintf(stderr, "Error: Port out of range: %s\n",
+		    server_port);
+		return (-1);
+	}
+	/* It is safe to convert since the value is inside the boundaries. */
+	addr->sin6_port = tmp_port;
 
 	return (0);
 }

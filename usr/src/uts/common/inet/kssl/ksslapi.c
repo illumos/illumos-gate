@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -984,6 +983,7 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 			    /* ignore client renegotiation for now */
 			    ssl->hs_waitstate == idle_handshake) {
 				mp->b_rptr = recend;
+				DTRACE_PROBE(kssl_renegotiation_request);
 			}
 			if (mp->b_rptr == recend) {
 				mp->b_rptr = real_recend;
