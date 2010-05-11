@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 PATH=/usr/bin:/usr/sbin
@@ -35,27 +34,30 @@ DEFAULTONEXTRAPUB="on-extra"
 
 usage()
 {
-	echo "usage: $0 [-e URI [-E pub]] [-O] [-s beName] -t beName [-u URI [-U pub]] [-vZ]"
-	echo "usage: $0 [ -d dir ][ -O ][ -s beName ] -t beName [-vZ]"
-	echo "Use -s to specify the source BE to clone (default is the active BE)."
-	echo "Use -t to specify the target BE name."
-	echo "Use -u to specify the origin URI for the publisher packaging repository"
-	echo "\t(default is \$ONURI if set in the environment, otherwise"
-	echo "\t$DEFAULTONURI )."
-	echo "Use -U to specify the publisher prefix for the packaging repository"
-	echo "\t(default is \$ONPUB if set in the environment, otherwise"
-	echo "\t$DEFAULTONPUB )."
-	echo "Use -e to specify the origin URI for the extra repository (default is"
-	echo "\t\$ONEXTRAURI if set in the environment, otherwise"
-	echo "\t$DEFAULTONEXTRAURI )."
-	echo "Use -E to specify the publisher prefix for the extra repository (default"
-	echo "\tis \$ONEXTRAPUB if set in the environment, otherwise"
-	echo "\t$DEFAULTONEXTRAPUB )."
-	echo "Use -d to specify a directory containing redist and extra directories."
-	echo "\tNote that -d overrides -u, -U, -e and -E."
-	echo "Use -O for open mode, meaning that no extra repository will be used."
-	echo "Use -v for verbose mode."
-	echo "Use -Z to skip updating zones."
+	echo "usage: $0 [opts] [-s beName] -t beName"
+	echo "usage: $0 [opts] -r"
+	echo
+	echo "\t-d repodir : directory for repositories"
+	echo "\t-e uri : origin URI for extra repository"
+	echo "\t-E prefix : prefix for extra repository"
+	echo "\t-O : open mode, no extra repository will be used"
+	echo "\t-r : start repository servers only"
+	echo "\t-s : source BE to clone"
+	echo "\t-t : new BE name"
+	echo "\t-u uri : origin URI for redist repository"
+	echo "\t-U prefix:  prefix for redist repository"
+	echo "\t-v : verbose"
+	echo "\t-Z : skip updating zones"
+	echo
+	echo "Update to an ON build:"
+	echo "\tonu -t newbe -d /path/to/my/ws/packages/\`uname -p\`/nightly"
+	echo
+	echo "Update to the nightly build:"
+	echo "\tonu -t newbe"
+	echo
+	echo "Re-enable the publishers, and start any pkg.depotd servers"
+	echo "necessary in the current BE:"
+	echo "\tonu -r -d /path/to/my/ws/packages/\`uname -p\`/nightly"
 	exit 1
 }
 
@@ -85,17 +87,49 @@ do_cmd()
 	exit_error "$*" failed: exit code $exit_code
 }
 
+configure_publishers()
+{
+	root=$1
+
+	do_cmd pkg -R $root set-publisher --no-refresh --non-sticky opensolaris.org
+	do_cmd pkg -R $root set-publisher -e --no-refresh -P -O $uri $redistpub
+	[ $open -eq 0 ] && {
+		do_cmd pkg -R $root set-publisher -e \
+		    --no-refresh -O $extrauri $extrapub
+	}
+	do_cmd pkg -R $root refresh --full
+}
+
+#
+# If we're working from a repodir, disable the new publishers in the new
+# BE; they won't work without further configuration, in which case the
+# -r option should be used.
+#
+unconfigure_publishers()
+{
+	root=$1
+
+	if [ -n "$repodir" ]; then
+		do_cmd pkg -R $root set-publisher -P opensolaris.org
+		do_cmd pkg -R $root set-publisher -d $redistpub
+		[ $open -eq 0 ] && {
+			do_cmd pkg -R $root set-publisher -d $extrapub
+		}
+	fi
+}
+
 update()
 {
-	tmpdir=$1
+	root=$1
 
-	do_cmd pkg -R $tmpdir set-publisher --non-sticky opensolaris.org
-	pkg -R $tmpdir list entire > /dev/null 2>&1
-	[ $? -eq 0 ] && do_cmd pkg -R $tmpdir uninstall entire
-	do_cmd pkg -R $tmpdir set-publisher -P -O $uri $redistpub
-	[ $open -eq 0 ] && do_cmd pkg -R $tmpdir set-publisher -O $extrauri $extrapub
-	do_cmd pkg -R $tmpdir refresh --full
-	do_cmd pkg -R $tmpdir image-update
+	pkg -R $root list entire > /dev/null 2>&1
+	[ $? -eq 0 ] && do_cmd pkg -R $root uninstall entire
+
+	configure_publishers $root
+
+	do_cmd pkg -R $root image-update
+
+	unconfigure_publishers $root
 }
 
 update_zone()
@@ -114,10 +148,6 @@ update_zone()
 
 	if [ "$zone_warned" = 0 ]; then
 		echo "WARNING: Use of onu(1) will prevent use of zone attach in the new BE" >&2
-		if [ -n "$repodir" ]; then
-			echo "WARNING: use of -d option will prevent new zone installs in the new BE" >&2
-		fi
-
 		echo "See onu(1)" >&2
 		zone_warned=1
 	fi
@@ -149,10 +179,11 @@ redistport=13000
 extraport=13001
 no_zones=0
 zone_warned=0
+reposonly=0
 
 trap cleanup 1 2 3 15
 
-while getopts :d:E:e:Os:t:U:u:vZ i ; do
+while getopts :d:E:e:Ors:t:U:u:vZ i ; do
 	case $i in
 	d)
 		repodir=$OPTARG
@@ -165,6 +196,9 @@ while getopts :d:E:e:Os:t:U:u:vZ i ; do
 		;;
 	O)
 		open=1
+		;;
+	r)
+		reposonly=1
 		;;
 	s)
 		sourcebe=$OPTARG
@@ -190,7 +224,15 @@ while getopts :d:E:e:Os:t:U:u:vZ i ; do
 done
 shift `expr $OPTIND - 1`
 
-[ -z "$targetbe" ] && usage
+[ -n "$1" ] && usage
+
+if [ "$reposonly" -eq 1 ]; then
+	[ -n "$sourcebe" ] && usage
+	[ -n "$targetbe" ] && usage
+	[ "$no_zones" -eq 1 ] && usage
+else
+	[ -z "$targetbe" ] && usage
+fi
 [ -z "$uri" ] && uri=$ONURI
 [ -z "$uri" ] && uri=$DEFAULTONURI
 [ -z "$redistpub" ] && redistpub=$ONPUB
@@ -232,6 +274,17 @@ if [ -n "$repodir" ]; then
 		extrapid=$!
 		extrauri="http://localhost:$extraport/"
 	fi
+fi
+
+if [ "$reposonly" -eq 1 ]; then
+	configure_publishers /
+	if [ "$redistpid" -ne 0 ]; then
+		echo "$redistpub pkg.depotd running with pid $redistpid"
+	fi
+	if [ "$extrapid" -ne 0 ]; then
+		echo "$extrapub pkg.depotd running with pid $extrapid"
+	fi
+	exit 0
 fi
 
 createargs=""
