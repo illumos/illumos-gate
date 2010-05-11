@@ -1129,9 +1129,9 @@ pmcs_process_sata_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 {
 	_NOTE(ARGUNUSED(amt));
 	pmcwork_t *pwrk = NULL;
-	pmcs_phy_t *pptr;
+	pmcs_phy_t *pptr = NULL;
 	uint32_t status, htag, *w;
-	char *path;
+	char *path = NULL;
 
 	w = iomb;
 	htag = LE_32(w[1]);
@@ -1148,26 +1148,29 @@ pmcs_process_sata_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	 * Othewise, other errors are indicative that things need to
 	 * be aborted.
 	 */
-	path = NULL;
 	if (htag) {
 		pwrk = pmcs_tag2wp(pwp, htag, B_TRUE);
-		if (pwrk) {
-			pptr = pwrk->phy;
-			path = pptr->path;
-		}
 	}
+
+	if (pwrk) {
+		pptr = pwrk->phy;
+		path = pptr->path;
+	} else {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: "
+		    "cannot find work structure for SATA completion", __func__);
+		return;
+	}
+
 	if (status != PMCOUT_STATUS_XFER_CMD_FRAME_ISSUED) {
 		char buf[20];
 		const char *emsg = pmcs_status_str(status);
 
-		ASSERT(pptr != NULL);
 		if (emsg == NULL) {
 			(void) snprintf(buf, sizeof (buf), "Status 0x%x",
 			    status);
 			emsg = buf;
 		}
 		if (status == PMCOUT_STATUS_XFER_ERROR_ABORTED_NCQ_MODE) {
-			ASSERT(pptr != NULL);
 			pptr->need_rl_ext = 1;
 			htag = 0;
 		} else {
@@ -1182,22 +1185,16 @@ pmcs_process_sata_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		 * schedule above force the completion of
 		 * problem commands.
 		 */
-		if (pwrk) {
-			mutex_exit(&pwrk->lock);
-		}
+		mutex_exit(&pwrk->lock);
 	} else if (status == PMCOUT_STATUS_XFER_CMD_FRAME_ISSUED) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, NULL,
 		    "%s: tag %x put onto the wire for %s",
 		    __func__, htag, path);
-		if (pwrk) {
-			pwrk->onwire = 1;
-			mutex_exit(&pwrk->lock);
-		}
+		pwrk->onwire = 1;
+		mutex_exit(&pwrk->lock);
 	}
 
-	if (pptr) {
-		mutex_exit(&pptr->phy_lock);
-	}
+	mutex_exit(&pptr->phy_lock);
 }
 
 static void

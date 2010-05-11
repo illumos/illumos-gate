@@ -433,8 +433,11 @@ pmcs_scsa_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	pwp = ITRAN2PMC(tran);
 	mutex_enter(&pwp->lock);
-	mutex_enter(&target->statlock);
 	phyp = target->phy;
+	if (phyp) {
+		mutex_enter(&phyp->phy_lock);
+	}
+	mutex_enter(&target->statlock);
 
 	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, target,
 	    "%s: for @%s tgt 0x%p phy 0x%p", __func__, unit_address,
@@ -443,6 +446,9 @@ pmcs_scsa_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	if (target->recover_wait) {
 		mutex_exit(&target->statlock);
+		if (phyp) {
+			mutex_exit(&phyp->phy_lock);
+		}
 		mutex_exit(&pwp->lock);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, target, "%s: "
 		    "Target 0x%p in device state recovery, fail tran_tgt_free",
@@ -483,6 +489,9 @@ pmcs_scsa_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		mutex_exit(&target->statlock);
 	}
 
+	if (phyp) {
+		mutex_exit(&phyp->phy_lock);
+	}
 	mutex_exit(&pwp->lock);
 }
 
@@ -1353,6 +1362,7 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 	pmcs_iport_t *iport;
 	pmcs_hw_t *pwp;
 	pmcs_xscsi_t *tgt;
+	pmcs_phy_t *phyp;
 	char *tgt_port;
 
 	iport = ddi_get_soft_state(pmcs_iport_softstate,
@@ -1389,12 +1399,14 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 		return;
 	}
 
-	mutex_enter(&tgt->statlock);
-	if (tgt->phy) {
-		if (!IS_ROOT_PHY(tgt->phy)) {
-			pmcs_dec_phy_ref_count(tgt->phy);
+	phyp = tgt->phy;
+	if (phyp) {
+		mutex_enter(&phyp->phy_lock);
+		if (!IS_ROOT_PHY(phyp)) {
+			pmcs_dec_phy_ref_count(phyp);
 		}
 	}
+	mutex_enter(&tgt->statlock);
 
 	if (--tgt->ref_count == 0) {
 		/*
@@ -1408,15 +1420,18 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 		    (void *)tgt, tgt->target_num);
 		pwp->targets[tgt->target_num] = NULL;
 		tgt->target_num = PMCS_INVALID_TARGET_NUM;
-		if (tgt->phy) {
-			tgt->phy->target = NULL;
-			tgt->phy = NULL;
+		if (phyp) {
+			phyp->target = NULL;
 		}
+		tgt->phy = NULL;
 		pmcs_destroy_target(tgt);
 	} else {
 		mutex_exit(&tgt->statlock);
 	}
 
+	if (phyp) {
+		mutex_exit(&phyp->phy_lock);
+	}
 	mutex_exit(&pwp->lock);
 }
 
