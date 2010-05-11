@@ -57,11 +57,8 @@
 #define	UID(A)		(A.st_uid)
 #define	GID(A)		(A.st_gid)
 #define	IDENTICAL(A, B)	(A.st_dev == B.st_dev && A.st_ino == B.st_ino)
-#define	ISBLK(A)	((A.st_mode & S_IFMT) == S_IFBLK)
-#define	ISCHR(A)	((A.st_mode & S_IFMT) == S_IFCHR)
 #define	ISDIR(A)	((A.st_mode & S_IFMT) == S_IFDIR)
 #define	ISDOOR(A)	((A.st_mode & S_IFMT) == S_IFDOOR)
-#define	ISFIFO(A)	((A.st_mode & S_IFMT) == S_IFIFO)
 #define	ISLNK(A)	((A.st_mode & S_IFMT) == S_IFLNK)
 #define	ISREG(A)	(((A).st_mode & S_IFMT) == S_IFREG)
 #define	ISDEV(A)	((A.st_mode & S_IFMT) == S_IFCHR || \
@@ -69,17 +66,11 @@
 			(A.st_mode & S_IFMT) == S_IFIFO)
 #define	ISSOCK(A)	((A.st_mode & S_IFMT) == S_IFSOCK)
 
-#define	BLKSIZE	4096
-#define	PATHSIZE 1024
-#define	DOT	"."
-#define	DOTDOT	".."
 #define	DELIM	'/'
 #define	EQ(x, y)	(strcmp(x, y) == 0)
 #define	FALSE	0
 #define	MODEBITS (S_ISUID|S_ISGID|S_ISVTX|S_IRWXU|S_IRWXG|S_IRWXO)
 #define	TRUE 1
-#define	MAXMAPSIZE	(1024*1024*8)	/* map at most 8MB */
-#define	SMALLFILESIZE	(32*1024)	/* don't use mmap on little files */
 
 static char		*dname(char *);
 static int		lnkfil(char *, char *);
