@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -650,6 +649,7 @@ ds_snmp_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	minor_t minor;
 	size_t len;
 	caddr_t tmpbufp;
+	size_t orig_size;
 
 	/*
 	 * Check if there was an sc reset; if yes, wait until we have the
@@ -669,6 +669,7 @@ ds_snmp_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	if ((sp = ddi_get_soft_state(ds_snmp_statep, minor)) == NULL)
 		return (ENXIO);
 
+	orig_size = uiop->uio_resid;
 	len = uiop->uio_resid + sizeof (ds_snmp_msg_t);
 	tmpbufp = kmem_alloc(len, KM_SLEEP);
 
@@ -695,6 +696,7 @@ ds_snmp_write(dev_t dev, struct uio *uiop, cred_t *credp)
 		if (cv_wait_sig(&sp->state_cv, &sp->lock) == 0) {
 			mutex_exit(&sp->lock);
 			kmem_free(tmpbufp, len);
+			uiop->uio_resid = orig_size;
 			return (EINTR);
 		}
 		/*
