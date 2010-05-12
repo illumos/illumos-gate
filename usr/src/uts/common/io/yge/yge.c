@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -178,7 +177,6 @@ static void yge_setup_rambuffer(yge_dev_t *);
 static int yge_init_port(yge_port_t *);
 static void yge_uninit_port(yge_port_t *);
 static int yge_register_port(yge_port_t *);
-static int yge_unregister_port(yge_port_t *);
 
 static void yge_tick(void *);
 static uint_t yge_intr(caddr_t, caddr_t);
@@ -1378,16 +1376,6 @@ yge_register_port(yge_port_t *port)
 		return (DDI_FAILURE);
 	}
 
-	return (DDI_SUCCESS);
-}
-
-static int
-yge_unregister_port(yge_port_t *port)
-{
-	if ((port->p_mh) && (mac_unregister(port->p_mh) != 0)) {
-		return (DDI_FAILURE);
-	}
-	port->p_mh = NULL;
 	return (DDI_SUCCESS);
 }
 
@@ -3479,7 +3467,7 @@ static int
 yge_ddi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	yge_dev_t	*dev;
-	int		rv;
+	mac_handle_t	mh;
 
 	switch (cmd) {
 	case DDI_DETACH:
@@ -3488,8 +3476,14 @@ yge_ddi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		/* attempt to unregister MACs from Nemo */
 		for (int i = 0; i < dev->d_num_port; i++) {
-			rv = yge_unregister_port(dev->d_port[i]);
-			if (rv != DDI_SUCCESS) {
+
+			if (((mh = dev->d_port[i]->p_mh) != NULL) &&
+			    (mac_disable(mh) != 0)) {
+				/*
+				 * We'd really like a mac_enable to reenable
+				 * any MACs that we previously disabled.  Too
+				 * bad GLDv3 doesn't have one.
+				 */
 				return (DDI_FAILURE);
 			}
 		}
@@ -3497,6 +3491,12 @@ yge_ddi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ASSERT(dip == dev->d_dip);
 		yge_detach(dev);
 		ddi_set_driver_private(dip, 0);
+		for (int i = 0; i < dev->d_num_port; i++) {
+			if ((mh = dev->d_port[i]->p_mh) != NULL) {
+				/* This can't fail after mac_disable above. */
+				(void) mac_unregister(mh);
+			}
+		}
 		kmem_free(dev->d_port[1], sizeof (yge_port_t));
 		kmem_free(dev->d_port[0], sizeof (yge_port_t));
 		kmem_free(dev, sizeof (*dev));
