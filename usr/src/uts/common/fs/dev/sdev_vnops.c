@@ -508,7 +508,7 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred,
 	struct vnode *vp = NULL;
 	struct sdev_node *dv = NULL;
 	int len;
-	int bkstore = 0;
+	int bkstore;
 
 	/* bail out early */
 	len = strlen(nm);
@@ -555,17 +555,25 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred,
 		return (error);
 	}
 
+	bkstore = SDEV_IS_PERSIST(dv) ? 1 : 0;
+	if (!rw_tryupgrade(&parent->sdev_contents)) {
+		rw_exit(&parent->sdev_contents);
+		rw_enter(&parent->sdev_contents, RW_WRITER);
+	}
+
+	/* we do not support unlinking a non-empty directory */
+	if (vp->v_type == VDIR && dv->sdev_nlink > 2) {
+		rw_exit(&parent->sdev_contents);
+		VN_RELE(vp);
+		return (EBUSY);
+	}
+
 	/*
 	 * sdev_dirdelete does the real job of:
 	 *  - make sure no open ref count
 	 *  - destroying the sdev_node
 	 *  - releasing the hold on attrvp
 	 */
-	bkstore = SDEV_IS_PERSIST(dv) ? 1 : 0;
-	if (!rw_tryupgrade(&parent->sdev_contents)) {
-		rw_exit(&parent->sdev_contents);
-		rw_enter(&parent->sdev_contents, RW_WRITER);
-	}
 	error = sdev_cache_update(parent, &dv, nm, SDEV_CACHE_DELETE);
 	rw_exit(&parent->sdev_contents);
 
