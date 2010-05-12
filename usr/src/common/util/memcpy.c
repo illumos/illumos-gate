@@ -20,20 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * The SunStudio compiler may generate calls to _memcpy and so we
- * need to make sure that the correct symbol exists for these calls,
- * whether it be libc (first case below) or the kernel (second case).
- */
 
 #if !defined(_KMDB) && !defined(_BOOT) && !defined(_KERNEL)
 
@@ -41,6 +32,10 @@
 
 #endif /* !_KMDB && !_BOOT && !_KERNEL */
 
+/*
+ * The SunStudio compiler may generate calls to _memcpy; So we
+ * need to make sure that the correct symbol exists for these calls.
+ */
 #pragma weak _memcpy = memcpy
 
 #include <sys/types.h>

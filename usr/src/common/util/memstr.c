@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(_BOOT)
 #include <sys/salib.h>
@@ -35,7 +32,12 @@
  * Implementations of functions described in memory(3C).
  * These functions match the section 3C manpages.
  */
-
+/*
+ * The SunStudio compiler may generate calls to _memmove, _memset,
+ * and _memcpy; So we need to make sure that the correct symbols
+ * exist for these calls.
+ */
+#pragma weak _memmove = memmove
 void *
 memmove(void *s1, const void *s2, size_t n)
 {
@@ -47,6 +49,7 @@ memmove(void *s1, const void *s2, size_t n)
 	return (s1);
 }
 
+#pragma weak _memset = memset
 void *
 memset(void *s, int c, size_t n)
 {
@@ -77,10 +80,6 @@ memcmp(const void *s1, const void *s2, size_t n)
 	return (0);
 }
 
-/*
- * The SunStudio compiler may generate calls to _memcpy and so we
- * need to make sure that the correct symbol exists for these calls.
- */
 #pragma weak _memcpy = memcpy
 void *
 memcpy(void *s1, const void *s2, size_t n)

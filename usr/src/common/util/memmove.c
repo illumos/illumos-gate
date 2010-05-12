@@ -20,21 +20,23 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(_KMDB) && !defined(_KERNEL)
 
-#pragma weak _memmove = memmove
-
 #include "lint.h"
+
 #endif /* !_KMDB && !_KERNEL */
+
+/*
+ * The SunStudio compiler may generate calls to _memmove; So we
+ * need to make sure that the correct symbol exists for these calls.
+ */
+#pragma weak _memmove = memmove
 
 #include <sys/types.h>
 
