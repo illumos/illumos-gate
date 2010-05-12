@@ -1654,7 +1654,7 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 	zilog_t *zilog = zfsvfs->z_log;
 	uint64_t mode;
 	uint64_t mtime[2], ctime[2];
-	sa_bulk_attr_t bulk[2];
+	sa_bulk_attr_t bulk[3];
 	int count = 0;
 	int error;
 
@@ -1706,6 +1706,8 @@ log:
 
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MTIME(zfsvfs), NULL, mtime, 16);
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_CTIME(zfsvfs), NULL, ctime, 16);
+	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs),
+	    NULL, &zp->z_pflags, 8);
 	zfs_tstamp_update_setup(zp, CONTENT_MODIFIED, mtime, ctime, B_TRUE);
 	error = sa_bulk_update(zp->z_sa_hdl, bulk, count, tx);
 	ASSERT(error == 0);
