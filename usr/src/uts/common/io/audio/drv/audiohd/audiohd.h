@@ -58,7 +58,6 @@ extern "C" {
 #define	AUDIOHD_DEV_CONFIG	"onboard1"
 #define	AUDIOHD_DEV_VERSION	"a"
 
-#define	AUDIOHD_FMT_PCM		0x001
 /*
  * Only for Intel hardware:
  * PCI Express traffic class select register in PCI configure space
@@ -476,6 +475,13 @@ extern "C" {
 
 #define	AUDIOHD_CODEC_FAILURE	(uint32_t)(-1)
 
+/* Higher sample/bits support */
+#define	AUDIOHD_BIT_DEPTH16	0x00020000
+#define	AUDIOHD_BIT_DEPTH24	0x00080000
+#define	AUDIOHD_SAMP_RATE48	0x00000040
+#define	AUDIOHD_SAMP_RATE96	0x00000100
+#define	AUDIOHD_SAMP_RATE192	0x00000400
+
 /*
  * buffer descriptor list entry of stream descriptor
  */
@@ -838,6 +844,11 @@ struct audiohd_state {
 
 	uint_t		hda_out_ports;
 	uint_t		in_port;
+
+	/* Higher sample/rate */
+	uint32_t	sample_rate;
+	uint32_t	sample_bit_depth;
+	uint8_t		sample_packed_bytes;
 
 	/*
 	 * Controls

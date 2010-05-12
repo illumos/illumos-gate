@@ -21,8 +21,7 @@
 /*
  * Copyright (C) 4Front Technologies 1996-2008.
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * This program is a general purpose test facility for audio output.
@@ -80,6 +79,7 @@ typedef struct chancfg {
 
 typedef struct testcfg {
 	int		nchan;
+	uint32_t	rate;
 	chancfg_t	*tests[16];
 } testcfg_t;
 
@@ -124,21 +124,21 @@ chancfg_t ch_rrear_7 = { CH_RREAR, NM_RREAR, 0 };
 chancfg_t ch_7 = { CH_7, NM_70, 0 };
 
 testcfg_t test_stereo = {
-	2, { &ch_left, &ch_right, &ch_stereo, NULL }
+	2, 48000, { &ch_left, &ch_right, &ch_stereo, NULL }
 };
 
 testcfg_t test_quad = {
-	4, { &ch_left, &ch_right, &ch_stereo,
+	4, 48000, { &ch_left, &ch_right, &ch_stereo,
 	&ch_lsurr_4, &ch_rsurr_4, &ch_4, NULL }
 };
 
 testcfg_t test_51 = {
-	6, { &ch_left, &ch_right, &ch_stereo,
+	6, 48000, { &ch_left, &ch_right, &ch_stereo,
 	&ch_lsurr_5, &ch_rsurr_5, &ch_center, &ch_lfe, &ch_5, NULL }
 };
 
 testcfg_t test_71 = {
-	8, { &ch_left, &ch_right, &ch_stereo,
+	8, 48000, { &ch_left, &ch_right, &ch_stereo,
 	&ch_lsurr_7, &ch_rsurr_7, &ch_lrear_7, &ch_rrear_7,
 	&ch_center, &ch_lfe, &ch_7, NULL }
 };
@@ -174,7 +174,7 @@ void
 prepare(testcfg_t *tcfg)
 {
 	int	nsamples;
-	int	i;
+	int	i, j;
 	chancfg_t	*ccfg;
 	if ((sample_buf = malloc(2000000)) == NULL) {
 		perror("malloc");
@@ -188,11 +188,14 @@ prepare(testcfg_t *tcfg)
 		int16_t		*src, *dst;
 		int		ch;
 		int		samp;
+		int		rate_multiple;
 
 		src = sample_buf;
+		rate_multiple = tcfg->rate / 48000;
 
 		if (ccfg->flags != CFLAG_LFE) {
-			ccfg->len = nsamples * tcfg->nchan * sizeof (int16_t);
+			ccfg->len = nsamples * tcfg->nchan *
+			    sizeof (int16_t) * rate_multiple;
 			ccfg->data = malloc(ccfg->len);
 			if ((dst = ccfg->data) == NULL) {
 				perror("malloc");
@@ -200,9 +203,11 @@ prepare(testcfg_t *tcfg)
 			}
 			for (samp = 0; samp < nsamples; samp++) {
 				for (ch = 0; ch < tcfg->nchan; ch++) {
-					*dst = ((1U << ch) & ccfg->mask) ?
-					    *src : 0;
-					dst++;
+					for (j = 0; j < rate_multiple; j++) {
+						*dst = ((1U << ch) & ccfg->mask)
+						    ? *src : 0;
+						dst++;
+					}
 				}
 				src += 2;
 			}
@@ -243,7 +248,6 @@ testdsp(int hd, int flags, testcfg_t *tcfg)
 	 * regardless of the device we do not need to support any
 	 * other formats.
 	 */
-
 	tmp = AFMT_S16_NE;
 	if (ioctl(hd, SNDCTL_DSP_SETFMT, &tmp) == -1 || tmp != AFMT_S16_NE) {
 		(void) printf(_("Device doesn't support native 16-bit PCM\n"));
@@ -265,17 +269,16 @@ testdsp(int hd, int flags, testcfg_t *tcfg)
 	/*
 	 * Set up the sample rate.
 	 */
-
-	tmp = SAMPLE_RATE;
+	tmp = tcfg->rate;
 	if (ioctl(hd, SNDCTL_DSP_SPEED, &tmp) == -1) {
 		perror("SNDCTL_DSP_SPEED");
 		return (-3);
 	}
 
 	sample_rate = tmp;
-	if (sample_rate != SAMPLE_RATE) {
+	if (sample_rate != tcfg->rate) {
 		(void) printf(_("The device doesn't support %d Hz\n"),
-		    SAMPLE_RATE);
+		    tcfg->rate);
 		return (-3);
 	}
 	(void) printf("\n");
@@ -489,7 +492,7 @@ main(int argc, char *argv[])
 	 * Simple command line switch handling.
 	 */
 
-	while ((i = getopt(argc, argv, "l2457")) != EOF) {
+	while ((i = getopt(argc, argv, "l2457r:")) != EOF) {
 		switch (i) {
 		case 'l':
 			flags |= TF_LOOP;
@@ -506,12 +509,16 @@ main(int argc, char *argv[])
 		case '7':
 			tcfg = &test_71;
 			break;
+		case 'r':
+			tcfg->rate = atoi(optarg);
+			break;
 		default:
 			(void) printf(_("Usage: %s [options...] [device]\n"
 			    "	-2	Stereo test\n"
 			    "	-4	Quadraphonic 4.0 test\n"
 			    "	-5	Surround 5.1 test\n"
 			    "	-7	Surround 7.1 test\n"
+			    "	-r	Sample Rate (48000|96000|192000)\n"
 			    "	-l	Loop test\n"), argv[0]);
 			exit(-1);
 		}

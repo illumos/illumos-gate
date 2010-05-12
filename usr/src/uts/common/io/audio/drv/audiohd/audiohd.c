@@ -471,9 +471,16 @@ _info(struct modinfo *modinfop)
 static int
 audiohd_engine_format(void *arg)
 {
-	_NOTE(ARGUNUSED(arg));
+	audiohd_port_t *port = arg;
+	audiohd_state_t *statep = port->statep;
 
-	return (AUDIO_FORMAT_S16_LE);
+	switch (statep->sample_bit_depth) {
+	case AUDIOHD_BIT_DEPTH24:
+		return (AUDIO_FORMAT_S32_LE);
+	case AUDIOHD_BIT_DEPTH16:
+	default:
+		return (AUDIO_FORMAT_S16_LE);
+	}
 }
 
 static int
@@ -487,9 +494,10 @@ audiohd_engine_channels(void *arg)
 static int
 audiohd_engine_rate(void *arg)
 {
-	_NOTE(ARGUNUSED(arg));
+	audiohd_port_t *port = arg;
+	audiohd_state_t *statep = port->statep;
 
-	return (48000);
+	return (statep->sample_rate);
 }
 static void
 audiohd_free_path(audiohd_state_t *statep)
@@ -608,7 +616,7 @@ audiohd_init_play_path(audiohd_path_t *path)
 		    codec->index,
 		    path->adda_wid,
 		    AUDIOHDC_VERB_SET_CONV_FMT,
-		    AUDIOHD_FMT_PCM << 4 |
+		    statep->port[PORT_DAC]->format << 4 |
 		    statep->pchan - 1);
 	/* multichannel supported */
 	} else {
@@ -643,7 +651,7 @@ audiohd_init_play_path(audiohd_path_t *path)
 		    codec->index,
 		    path->adda_wid,
 		    AUDIOHDC_VERB_SET_CONV_FMT,
-		    AUDIOHD_FMT_PCM << 4 |
+		    statep->port[PORT_DAC]->format << 4 |
 		    statep->pchan - 1);
 	}
 }
@@ -708,7 +716,7 @@ audiohd_init_record_path(audiohd_path_t *path)
 	    codec->index,
 	    path->adda_wid,
 	    AUDIOHDC_VERB_SET_CONV_FMT,
-	    AUDIOHD_FMT_PCM << 4 | statep->rchan - 1);
+	    statep->port[PORT_ADC]->format << 4 | statep->rchan - 1);
 }
 
 static void
@@ -877,7 +885,7 @@ audiohd_update_port(audiohd_port_t *port)
 
 	pos = AUDIOHD_REG_GET32(port->regoff + AUDIOHD_SDREG_OFFSET_LPIB);
 	/* Convert the position into a frame count */
-	pos /= (port->nchan * 2);
+	pos /= (port->nchan * statep->sample_packed_bytes);
 
 	ASSERT(pos <= port->nframes);
 	if (pos >= port->curpos) {
@@ -2801,6 +2809,9 @@ audiohd_create_codec(audiohd_state_t *statep)
 	uint32_t	i, j, len;
 	wid_t		wid;
 	char		buf[128];
+	int		rate, bits;
+	dev_info_t	*dip = statep->hda_dip;
+
 
 	mask = statep->hda_codec_mask;
 	ASSERT(mask != 0);
@@ -2908,6 +2919,29 @@ audiohd_create_codec(audiohd_state_t *statep)
 		    AUDIOHDC_VERB_GET_PARAM, AUDIOHDC_PAR_STREAM);
 		codec->pcm_format = audioha_codec_verb_get(statep, i, wid,
 		    AUDIOHDC_VERB_GET_PARAM, AUDIOHDC_PAR_PCM);
+
+		statep->sample_rate = 48000;
+		rate = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS, "sample-rate", 48000);
+		if (rate == 192000 &&
+		    (codec->pcm_format & AUDIOHD_SAMP_RATE192)) {
+			statep->sample_rate = 192000;
+		} else if (rate == 96000 &&
+		    (codec->pcm_format & AUDIOHD_SAMP_RATE96)) {
+			statep->sample_rate = 96000;
+		} else {
+			statep->sample_rate = 48000;
+		}
+
+		statep->sample_bit_depth = AUDIOHD_BIT_DEPTH16;
+		bits = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS, "sample-bits", 16);
+		if (bits == 24 &&
+		    (codec->pcm_format & AUDIOHD_BIT_DEPTH24)) {
+			statep->sample_bit_depth = AUDIOHD_BIT_DEPTH24;
+		} else {
+			statep->sample_bit_depth = AUDIOHD_BIT_DEPTH16;
+		}
 
 		nums = audioha_codec_verb_get(statep, i, wid,
 		    AUDIOHDC_VERB_GET_PARAM,
@@ -4741,10 +4775,38 @@ audiohd_allocate_port(audiohd_state_t *statep)
 			return (DDI_FAILURE);
 		}
 
-		port->format = AUDIOHD_FMT_PCM;
-		port->nframes = 1024 * AUDIOHD_BDLE_NUMS;
-		port->fragsize = 1024 * port->nchan * 2;
-		port->bufsize = port->nframes * port->nchan * 2;
+		switch (statep->sample_rate) {
+		case 192000:
+			port->format = 0x18 << 4;
+			break;
+		case 96000:
+			port->format = 0x08 << 4;
+			break;
+		case 48000:
+		default: /* 48kHz is default */
+			port->format = 0x00;
+			break;
+		}
+
+		switch (statep->sample_bit_depth) {
+		case AUDIOHD_BIT_DEPTH24:
+			port->format |= 0x3;
+			statep->sample_packed_bytes = 4;
+			break;
+		case AUDIOHD_BIT_DEPTH16:
+		default: /* 16 bits is default */
+			port->format |= 0x1;
+			statep->sample_packed_bytes = 2;
+			break;
+		}
+
+		port->nframes = 1024 * AUDIOHD_BDLE_NUMS *
+		    statep->sample_rate / 48000;
+		port->fragsize = 1024 * port->nchan *
+		    statep->sample_packed_bytes *
+		    statep->sample_rate / 48000;
+		port->bufsize = port->nframes * port->nchan *
+		    statep->sample_packed_bytes;
 
 		/* allocate dma handle */
 		rc = ddi_dma_alloc_handle(dip, &dma_attr, DDI_DMA_SLEEP,
