@@ -1983,6 +1983,7 @@ is_iscsit_enabled(void)
 	state = smf_get_state(ISCSIT_FMRI);
 	if (state != NULL) {
 		if (strcmp(state, SCF_STATE_STRING_ONLINE) == 0) {
+			free(state);
 			return (B_TRUE);
 		}
 		free(state);
