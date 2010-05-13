@@ -8470,6 +8470,46 @@ i_ddi_decr_locked_memory(proc_t *procp, rctl_qty_t dec)
 }
 
 /*
+ * The cookie->upd_max_lock_rctl flag is used to determine if we should
+ * charge device locked memory to the max-locked-memory rctl.  Tracking
+ * device locked memory causes the rctl locks to get hot under high-speed
+ * I/O such as RDSv3 over IB.  If there is no max-locked-memory rctl limit,
+ * we bypass charging the locked memory to the rctl altogether.  The cookie's
+ * flag tells us if the rctl value should be updated when unlocking the memory,
+ * in case the rctl gets changed after the memory was locked.  Any device
+ * locked memory in that rare case will not be counted toward the rctl limit.
+ *
+ * When tracking the locked memory, the kproject_t parameter is always NULL
+ * in the code paths:
+ *	i_ddi_incr_locked_memory -> rctl_incr_locked_mem
+ *	i_ddi_decr_locked_memory -> rctl_decr_locked_mem
+ * Thus, we always use the tk_proj member to check the projp setting.
+ */
+static void
+init_lockedmem_rctl_flag(struct ddi_umem_cookie *cookie)
+{
+	proc_t		*p;
+	kproject_t	*projp;
+	zone_t		*zonep;
+
+	ASSERT(cookie);
+	p = cookie->procp;
+	ASSERT(p);
+
+	zonep = p->p_zone;
+	projp = p->p_task->tk_proj;
+
+	ASSERT(zonep);
+	ASSERT(projp);
+
+	if (zonep->zone_locked_mem_ctl == UINT64_MAX &&
+	    projp->kpj_data.kpd_locked_mem_ctl == UINT64_MAX)
+		cookie->upd_max_lock_rctl = 0;
+	else
+		cookie->upd_max_lock_rctl = 1;
+}
+
+/*
  * This routine checks if the max-locked-memory resource ctl is
  * exceeded, if not increments it, grabs a hold on the project.
  * Returns 0 if successful otherwise returns error code
@@ -8481,6 +8521,9 @@ umem_incr_devlockmem(struct ddi_umem_cookie *cookie)
 	int		ret;
 
 	ASSERT(cookie);
+	if (cookie->upd_max_lock_rctl == 0)
+		return (0);
+
 	procp = cookie->procp;
 	ASSERT(procp);
 
@@ -8499,6 +8542,9 @@ static void
 umem_decr_devlockmem(struct ddi_umem_cookie *cookie)
 {
 	proc_t		*proc;
+
+	if (cookie->upd_max_lock_rctl == 0)
+		return;
 
 	proc = (proc_t *)cookie->procp;
 	if (!proc)
@@ -8623,6 +8669,7 @@ umem_lockmemory(caddr_t addr, size_t len, int flags, ddi_umem_cookie_t *cookie,
 	 * The size field is needed for lockmem accounting.
 	 */
 	p->size = len;
+	init_lockedmem_rctl_flag(p);
 
 	if (umem_incr_devlockmem(p) != 0) {
 		/*
@@ -8919,6 +8966,7 @@ ddi_umem_lock(caddr_t addr, size_t len, int flags, ddi_umem_cookie_t *cookie)
 	 * The size field is needed for lockmem accounting.
 	 */
 	p->size = len;
+	init_lockedmem_rctl_flag(p);
 
 	if (umem_incr_devlockmem(p) != 0) {
 		/*

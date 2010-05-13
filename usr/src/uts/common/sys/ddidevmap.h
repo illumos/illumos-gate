@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DDIDEVMAP_H
 #define	_SYS_DDIDEVMAP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -92,7 +89,7 @@ struct ddi_umem_cookie {
 	 */
 	ulong_t		cook_refcnt;	/* cookie reference count */
 	struct ddi_umem_cookie *unl_forw;   /* list ptr for unlock cookies */
-	void		*reserved;	/* unused */
+	ulong_t		upd_max_lock_rctl;  /* track max-locked mem rctl? */
 };
 
 typedef struct as *ddi_as_handle_t;
