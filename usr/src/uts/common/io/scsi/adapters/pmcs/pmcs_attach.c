@@ -89,6 +89,16 @@ static int disable_msi = 1;
 static int disable_msi = 0;
 #endif
 
+/*
+ * DEBUG: testing: allow detach with an active port:
+ *
+ * # echo 'detach_driver_unconfig/W 10'		| mdb -kw
+ * # echo 'scsi_hba_bus_unconfig_remove/W 1'	| mdb -kw
+ * # echo 'pmcs`detach_with_active_port/W 1'	| mdb -kw
+ * # modunload -i <pmcs_driver_index>
+ */
+static int detach_with_active_port = 0;
+
 static uint16_t maxqdepth = 0xfffe;
 
 /*
@@ -114,7 +124,6 @@ static boolean_t pmcs_fabricate_wwid(pmcs_hw_t *);
 
 static void pmcs_create_all_phy_stats(pmcs_iport_t *);
 int pmcs_update_phy_stats(kstat_t *, int);
-static void pmcs_destroy_phy_stats(pmcs_iport_t *);
 
 static void pmcs_fm_fini(pmcs_hw_t *pwp);
 static void pmcs_fm_init(pmcs_hw_t *pwp);
@@ -805,9 +814,9 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		num_threads = PMCS_MAX_CQ_THREADS;
 	}
 
-	pwp->cq_info.cq_thr_info = kmem_zalloc(sizeof (pmcs_cq_thr_info_t) *
-	    num_threads, KM_SLEEP);
 	pwp->cq_info.cq_threads = num_threads;
+	pwp->cq_info.cq_thr_info = kmem_zalloc(
+	    sizeof (pmcs_cq_thr_info_t) * pwp->cq_info.cq_threads, KM_SLEEP);
 	pwp->cq_info.cq_next_disp_thr = 0;
 	pwp->cq_info.cq_stop = B_FALSE;
 
@@ -1020,6 +1029,17 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/*
+	 * Create the iportmap for this HBA instance
+	 */
+	if (scsi_hba_iportmap_create(dip, iportmap_csync_usec,
+	    iportmap_stable_usec, &pwp->hss_iportmap) != DDI_SUCCESS) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: pmcs%d iportmap_create failed", __func__, inst);
+		goto failure;
+	}
+	ASSERT(pwp->hss_iportmap);
+
+	/*
 	 * Create the phymap for this HBA instance
 	 */
 	if (sas_phymap_create(dip, phymap_stable_usec, PHYMAP_MODE_SIMPLE, NULL,
@@ -1030,17 +1050,6 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto failure;
 	}
 	ASSERT(pwp->hss_phymap);
-
-	/*
-	 * Create the iportmap for this HBA instance
-	 */
-	if (scsi_hba_iportmap_create(dip, iportmap_csync_usec,
-	    iportmap_stable_usec, &pwp->hss_iportmap) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: pmcs%d iportmap_create failed", __func__, inst);
-		goto failure;
-	}
-	ASSERT(pwp->hss_iportmap);
 
 	/*
 	 * Start the PHYs.
@@ -1155,7 +1164,6 @@ pmcs_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			return (DDI_FAILURE);
 		}
 	}
-
 	switch (cmd) {
 	case DDI_DETACH:
 		if (iport) {
@@ -1229,7 +1237,8 @@ pmcs_iport_unattach(pmcs_iport_t *iport)
 	rw_enter(&pwp->iports_lock, RW_WRITER);
 	mutex_enter(&iport->lock);
 
-	if (iport->ua_state == UA_ACTIVE) {
+	if ((iport->ua_state == UA_ACTIVE) &&
+	    (detach_with_active_port == 0)) {
 		mutex_exit(&iport->lock);
 		rw_exit(&pwp->iports_lock);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
@@ -1279,8 +1288,6 @@ pmcs_iport_unattach(pmcs_iport_t *iport)
 	}
 	mutex_exit(&iport->refcnt_lock);
 
-	/* Delete kstats */
-	pmcs_destroy_phy_stats(iport);
 
 	/* Destroy the iport target map */
 	if (pmcs_iport_tgtmap_destroy(iport) == B_FALSE) {
@@ -1350,6 +1357,8 @@ pmcs_unattach(pmcs_hw_t *pwp)
 			}
 		}
 		mutex_exit(&pwp->cq_lock);
+		kmem_free(pwp->cq_info.cq_thr_info,
+		    sizeof (pmcs_cq_thr_info_t) * pwp->cq_info.cq_threads);
 
 		/*
 		 * Stop the interrupt coalescing timer thread
@@ -1430,40 +1439,20 @@ pmcs_unattach(pmcs_hw_t *pwp)
 		pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_MASK, 0xffffffff);
 	}
 
-	if (pwp->hss_iportmap != NULL) {
-		/* Destroy the iportmap */
-		scsi_hba_iportmap_destroy(pwp->hss_iportmap);
-	}
-
 	if (pwp->hss_phymap != NULL) {
 		/* Destroy the phymap */
 		sas_phymap_destroy(pwp->hss_phymap);
+	}
+
+	if (pwp->hss_iportmap != NULL) {
+		/* Destroy the iportmap */
+		scsi_hba_iportmap_destroy(pwp->hss_iportmap);
 	}
 
 	/* Destroy the iports lock and list */
 	rw_destroy(&pwp->iports_lock);
 	ASSERT(list_is_empty(&pwp->iports));
 	list_destroy(&pwp->iports);
-
-	/* Destroy pwp's lock */
-	if (pwp->locks_initted) {
-		mutex_destroy(&pwp->lock);
-		mutex_destroy(&pwp->dma_lock);
-		mutex_destroy(&pwp->axil_lock);
-		mutex_destroy(&pwp->cq_lock);
-		mutex_destroy(&pwp->config_lock);
-		mutex_destroy(&pwp->ict_lock);
-		mutex_destroy(&pwp->wfree_lock);
-		mutex_destroy(&pwp->pfree_lock);
-		mutex_destroy(&pwp->dead_phylist_lock);
-#ifdef	DEBUG
-		mutex_destroy(&pwp->dbglock);
-#endif
-		cv_destroy(&pwp->config_cv);
-		cv_destroy(&pwp->ict_cv);
-		cv_destroy(&pwp->drain_cv);
-		pwp->locks_initted = 0;
-	}
 
 	/*
 	 * Free DMA handles and associated consistent memory
@@ -1613,6 +1602,10 @@ pmcs_unattach(pmcs_hw_t *pwp)
 	/*
 	 * Do last property and SCSA cleanup
 	 */
+	if (pwp->smp_tran) {
+		smp_hba_tran_free(pwp->smp_tran);
+		pwp->smp_tran = NULL;
+	}
 	if (pwp->tran) {
 		scsi_hba_tran_free(pwp->tran);
 		pwp->tran = NULL;
@@ -1638,6 +1631,26 @@ pmcs_unattach(pmcs_hw_t *pwp)
 	if (pwp->iqpt) {
 		kmem_free(pwp->iqpt, sizeof (pmcs_iqp_trace_t));
 		pwp->iqpt = NULL;
+	}
+
+	/* Destroy pwp's lock */
+	if (pwp->locks_initted) {
+		mutex_destroy(&pwp->lock);
+		mutex_destroy(&pwp->dma_lock);
+		mutex_destroy(&pwp->axil_lock);
+		mutex_destroy(&pwp->cq_lock);
+		mutex_destroy(&pwp->config_lock);
+		mutex_destroy(&pwp->ict_lock);
+		mutex_destroy(&pwp->wfree_lock);
+		mutex_destroy(&pwp->pfree_lock);
+		mutex_destroy(&pwp->dead_phylist_lock);
+#ifdef	DEBUG
+		mutex_destroy(&pwp->dbglock);
+#endif
+		cv_destroy(&pwp->config_cv);
+		cv_destroy(&pwp->ict_cv);
+		cv_destroy(&pwp->drain_cv);
+		pwp->locks_initted = 0;
 	}
 
 	ddi_soft_state_free(pmcs_softc_state, ddi_get_instance(pwp->dip));
@@ -3149,34 +3162,6 @@ pmcs_update_phy_stats(kstat_t *ks, int rw)
 fail:
 	mutex_exit(&pptr->phy_lock);
 	return (ret);
-}
-
-static void
-pmcs_destroy_phy_stats(pmcs_iport_t *iport)
-{
-	pmcs_phy_t		*phyp;
-
-	ASSERT(iport != NULL);
-	mutex_enter(&iport->lock);
-	phyp = iport->pptr;
-	if (phyp == NULL) {
-		mutex_exit(&iport->lock);
-		return;
-	}
-
-	for (phyp = list_head(&iport->phys);
-	    phyp != NULL;
-	    phyp = list_next(&iport->phys, phyp)) {
-
-		mutex_enter(&phyp->phy_lock);
-		if (phyp->phy_stats != NULL) {
-			kstat_delete(phyp->phy_stats);
-			phyp->phy_stats = NULL;
-		}
-		mutex_exit(&phyp->phy_lock);
-	}
-
-	mutex_exit(&iport->lock);
 }
 
 /*ARGSUSED*/

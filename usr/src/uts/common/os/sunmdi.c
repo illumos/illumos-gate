@@ -1828,7 +1828,7 @@ mdi_failover(dev_info_t *vdip, dev_info_t *cdip, int flags)
 	 * checks again.
 	 */
 	if ((MDI_CLIENT_IS_DETACHED(ct)) || (MDI_CLIENT_IS_FAILED(ct)) ||
-	    (!i_ddi_devi_attached(ct->ct_dip))) {
+	    (!i_ddi_devi_attached(cdip))) {
 		/*
 		 * Client is in failed state. Nothing more to do.
 		 */
@@ -6046,7 +6046,7 @@ i_mdi_client_post_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, int error)
 	case DDI_DETACH:
 		MDI_DEBUG(2, (MDI_NOTE, dip,
 		    "client post_detach: called %p", (void *)ct));
-		if (DEVI_IS_ATTACHING(ct->ct_dip)) {
+		if (DEVI_IS_ATTACHING(dip)) {
 			MDI_DEBUG(4, (MDI_NOTE, dip,
 			    "i_mdi_pm_rele_client\n"));
 			i_mdi_pm_rele_client(ct, ct->ct_path_count);
@@ -6912,7 +6912,7 @@ i_mdi_pm_pre_unconfig_one(dev_info_t *child, int *held, int flags)
 	while (MDI_CLIENT_IS_POWER_TRANSITION(ct))
 		cv_wait(&ct->ct_powerchange_cv, &ct->ct_mutex);
 
-	if (!i_ddi_devi_attached(ct->ct_dip)) {
+	if (!i_ddi_devi_attached(child)) {
 		MDI_DEBUG(4, (MDI_NOTE, child, "node detached already\n"));
 		MDI_CLIENT_UNLOCK(ct);
 		return (MDI_SUCCESS);
@@ -7007,9 +7007,9 @@ i_mdi_pm_post_config_one(dev_info_t *child)
 
 	/* another thread might have powered it down or detached it */
 	if ((MDI_CLIENT_IS_POWERED_DOWN(ct) &&
-	    !DEVI_IS_ATTACHING(ct->ct_dip)) ||
-	    (!i_ddi_devi_attached(ct->ct_dip) &&
-	    !DEVI_IS_ATTACHING(ct->ct_dip))) {
+	    !DEVI_IS_ATTACHING(child)) ||
+	    (!i_ddi_devi_attached(child) &&
+	    !DEVI_IS_ATTACHING(child))) {
 		MDI_DEBUG(4, (MDI_NOTE, child, "i_mdi_pm_reset_client\n"));
 		i_mdi_pm_reset_client(ct);
 	} else {
@@ -7080,9 +7080,9 @@ i_mdi_pm_post_unconfig_one(dev_info_t *child)
 
 	/* failure detaching or another thread just attached it */
 	if ((MDI_CLIENT_IS_POWERED_DOWN(ct) &&
-	    i_ddi_devi_attached(ct->ct_dip)) ||
-	    (!i_ddi_devi_attached(ct->ct_dip) &&
-	    !DEVI_IS_ATTACHING(ct->ct_dip))) {
+	    i_ddi_devi_attached(child)) ||
+	    (!i_ddi_devi_attached(child) &&
+	    !DEVI_IS_ATTACHING(child))) {
 		MDI_DEBUG(4, (MDI_NOTE, child, "i_mdi_pm_reset_client\n"));
 		i_mdi_pm_reset_client(ct);
 	} else {
@@ -7194,7 +7194,7 @@ mdi_power(dev_info_t *vdip, mdi_pm_op_t op, void *args, char *devnm, int flags)
 				i_mdi_pm_hold_client(ct, ct->ct_path_count);
 			}
 		} else {
-			if (DEVI_IS_ATTACHING(ct->ct_dip)) {
+			if (DEVI_IS_ATTACHING(client_dip)) {
 				MDI_DEBUG(4, (MDI_NOTE, client_dip,
 				    "i_mdi_pm_rele_client\n"));
 				i_mdi_pm_rele_client(ct, ct->ct_path_count);

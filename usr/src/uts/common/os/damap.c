@@ -130,9 +130,6 @@ damap_create(char *name, damap_rptmode_t mode, int map_opts,
 	if (configure_cb == NULL || unconfig_cb == NULL || name == NULL)
 		return (DAM_EINVAL);
 
-	DTRACE_PROBE3(damap__create, char *, name,
-	    damap_rptmode_t, mode, int, stable_usec);
-
 	mapp = kmem_zalloc(sizeof (*mapp), KM_SLEEP);
 	mapp->dam_options = map_opts;
 	mapp->dam_stable_ticks = drv_usectohz(stable_usec);
@@ -151,6 +148,11 @@ damap_create(char *name, damap_rptmode_t mode, int map_opts,
 	bitset_init(&mapp->dam_stable_set);
 	bitset_init(&mapp->dam_report_set);
 	*damapp = (damap_t *)mapp;
+
+	DTRACE_PROBE5(damap__create,
+	    char *, mapp->dam_name, damap_t *, mapp,
+	    damap_rptmode_t, mode, int, map_opts, int, stable_usec);
+
 	return (DAM_SUCCESS);
 }
 
@@ -216,7 +218,8 @@ damap_destroy(damap_t *damapp)
 
 	ASSERT(mapp);
 
-	DTRACE_PROBE1(damap__destroy, char *, mapp->dam_name);
+	DTRACE_PROBE2(damap__destroy,
+	    char *, mapp->dam_name, damap_t *, mapp);
 
 	mutex_enter(&mapp->dam_lock);
 
@@ -287,8 +290,9 @@ damap_sync(damap_t *damapp, int sync_usec)
 	int	rv;
 
 	ASSERT(mapp);
-	DTRACE_PROBE2(damap__map__sync__start, char *, mapp->dam_name,
-	    dam_t *, mapp);
+	DTRACE_PROBE3(damap__map__sync__start,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    int, sync_usec);
 
 	/*
 	 * Block when waiting for
@@ -301,8 +305,8 @@ damap_sync(damap_t *damapp, int sync_usec)
 again:	while ((mapp->dam_flags & WAITFOR_FLAGS) ||
 	    (!bitset_is_null(&mapp->dam_report_set)) ||
 	    (mapp->dam_tid != 0)) {
-		DTRACE_PROBE2(damap__map__sync__waiting, char *, mapp->dam_name,
-		    dam_t *, mapp);
+		DTRACE_PROBE2(damap__map__sync__waiting,
+		    char *, mapp->dam_name, dam_t *, mapp);
 
 		/* Wait for condition relayed via timeout */
 		if (sync_usec) {
@@ -330,8 +334,9 @@ again:	while ((mapp->dam_flags & WAITFOR_FLAGS) ||
 	}
 	mutex_exit(&mapp->dam_lock);
 
-	DTRACE_PROBE3(damap__map__sync__end, char *, mapp->dam_name,
-	    int, rv, dam_t *, mapp);
+	DTRACE_PROBE3(damap__map__sync__end,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    int, rv);
 	return (rv);
 }
 
@@ -404,8 +409,9 @@ damap_addr_add(damap_t *damapp, char *address, damap_id_t *addridp,
 	if (!mapp || !address || (mapp->dam_rptmode != DAMAP_REPORT_PERADDR))
 		return (DAM_EINVAL);
 
-	DTRACE_PROBE3(damap__addr__add, char *, mapp->dam_name,
-	    char *, address, dam_t *, mapp);
+	DTRACE_PROBE3(damap__addr__add,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    char *, address);
 
 	mutex_enter(&mapp->dam_lock);
 	if ((dam_map_alloc(mapp) != DAM_SUCCESS) ||
@@ -422,8 +428,9 @@ damap_addr_add(damap_t *damapp, char *address, damap_id_t *addridp,
 	 * the existing report
 	 */
 	if (DAM_IN_REPORT(mapp, addrid)) {
-		DTRACE_PROBE3(damap__addr__add__jitter, char *, mapp->dam_name,
-		    char *, address, dam_t *, mapp);
+		DTRACE_PROBE3(damap__addr__add__jitter,
+		    char *, mapp->dam_name, dam_t *, mapp,
+		    char *, address);
 		DAM_INCR_STAT(mapp, dam_jitter);
 		dam_addr_report_release(mapp, addrid);
 		passp->da_jitter++;
@@ -459,8 +466,9 @@ damap_addr_del(damap_t *damapp, char *address)
 	if (!mapp || !address || (mapp->dam_rptmode != DAMAP_REPORT_PERADDR))
 		return (DAM_EINVAL);
 
-	DTRACE_PROBE3(damap__addr__del, char *, mapp->dam_name,
-	    char *, address, dam_t *, mapp);
+	DTRACE_PROBE3(damap__addr__del,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    char *, address);
 	mutex_enter(&mapp->dam_lock);
 	if (dam_map_alloc(mapp) != DAM_SUCCESS) {
 		mutex_exit(&mapp->dam_lock);
@@ -478,8 +486,9 @@ damap_addr_del(damap_t *damapp, char *address)
 	passp = ddi_get_soft_state(mapp->dam_da, addrid);
 	ASSERT(passp);
 	if (DAM_IN_REPORT(mapp, addrid)) {
-		DTRACE_PROBE3(damap__addr__del__jitter, char *, mapp->dam_name,
-		    char *, address, dam_t *, mapp);
+		DTRACE_PROBE3(damap__addr__del__jitter,
+		    char *, mapp->dam_name, dam_t *, mapp,
+		    char *, address);
 		DAM_INCR_STAT(mapp, dam_jitter);
 		dam_addr_report_release(mapp, addrid);
 		passp->da_jitter++;
@@ -501,11 +510,11 @@ damap_addrset_flush_locked(damap_t *damapp)
 		return (DAM_EINVAL);
 	}
 
-	DTRACE_PROBE2(damap__addrset__flush__locked__enter, char *,
-	    mapp->dam_name, dam_t *, mapp);
+	DTRACE_PROBE2(damap__addrset__flush__locked__enter,
+	    char *, mapp->dam_name, dam_t *, mapp);
 	if (mapp->dam_flags & DAM_SETADD) {
-		DTRACE_PROBE2(damap__addrset__flush__locked__reset, char *,
-		    mapp->dam_name, dam_t *, mapp);
+		DTRACE_PROBE2(damap__addrset__flush__locked__reset,
+		    char *, mapp->dam_name, dam_t *, mapp);
 
 		/*
 		 * cancel stabilization timeout
@@ -548,8 +557,8 @@ damap_addrset_begin(damap_t *damapp)
 		return (DAM_EINVAL);
 	}
 
-	DTRACE_PROBE2(damap__addrset__begin, char *, mapp->dam_name, dam_t *,
-	    mapp);
+	DTRACE_PROBE2(damap__addrset__begin,
+	    char *, mapp->dam_name, dam_t *, mapp);
 
 	mutex_enter(&mapp->dam_lock);
 	if (dam_map_alloc(mapp) != DAM_SUCCESS) {
@@ -585,8 +594,8 @@ damap_addrset_flush(damap_t *damapp)
 		return (DAM_EINVAL);
 	}
 
-	DTRACE_PROBE2(damap__addrset__flush, char *, mapp->dam_name,
-	    dam_t *, mapp);
+	DTRACE_PROBE2(damap__addrset__flush,
+	    char *, mapp->dam_name, dam_t *, mapp);
 
 	mutex_enter(&mapp->dam_lock);
 	rv = damap_addrset_flush_locked(damapp);
@@ -620,8 +629,8 @@ damap_addrset_add(damap_t *damapp, char *address, damap_id_t *ridx,
 	if (!mapp || !address || (mapp->dam_rptmode != DAMAP_REPORT_FULLSET))
 		return (DAM_EINVAL);
 
-	DTRACE_PROBE3(damap__addrset__add, char *, mapp->dam_name,
-	    char *, address, dam_t *, mapp);
+	DTRACE_PROBE3(damap__addrset__add,
+	    char *, mapp->dam_name, dam_t *, mapp, char *, address);
 
 	mutex_enter(&mapp->dam_lock);
 	if (!(mapp->dam_flags & DAM_SETADD)) {
@@ -637,8 +646,9 @@ damap_addrset_add(damap_t *damapp, char *address, damap_id_t *ridx,
 	passp = ddi_get_soft_state(mapp->dam_da, addrid);
 	ASSERT(passp);
 	if (DAM_IN_REPORT(mapp, addrid)) {
-		DTRACE_PROBE3(damap__addrset__add__jitter, char *,
-		    mapp->dam_name, char *, address, dam_t *, mapp);
+		DTRACE_PROBE3(damap__addrset__add__jitter,
+		    char *, mapp->dam_name, dam_t *, mapp,
+		    char *, address);
 		dam_addr_report_release(mapp, addrid);
 		passp->da_jitter++;
 	}
@@ -671,8 +681,8 @@ damap_addrset_end(damap_t *damapp, int flags)
 	if (!mapp || (mapp->dam_rptmode != DAMAP_REPORT_FULLSET))
 		return (DAM_EINVAL);
 
-	DTRACE_PROBE2(damap__addrset__end, char *, mapp->dam_name,
-	    dam_t *, mapp);
+	DTRACE_PROBE2(damap__addrset__end,
+	    char *, mapp->dam_name, dam_t *, mapp);
 
 	mutex_enter(&mapp->dam_lock);
 	if (!(mapp->dam_flags & DAM_SETADD)) {
@@ -681,8 +691,8 @@ damap_addrset_end(damap_t *damapp, int flags)
 	}
 
 	if (flags & DAMAP_END_RESET) {
-		DTRACE_PROBE2(damap__addrset__end__reset, char *,
-		    mapp->dam_name, dam_t *, mapp);
+		DTRACE_PROBE2(damap__addrset__end__reset,
+		    char *, mapp->dam_name, dam_t *, mapp);
 		dam_sched_timeout(NULL, mapp, 0);
 		for (i = 1; i < mapp->dam_high; i++)
 			if (DAM_IN_REPORT(mapp, i))
@@ -755,8 +765,9 @@ damap_id_rele(damap_t *damapp, damap_id_t addrid)
 	ASSERT(passp);
 
 	addr = damap_id2addr(damapp, addrid);
-	DTRACE_PROBE4(damap__id__rele, char *, mapp->dam_name, char *, addr,
-	    dam_t *, mapp, int, passp->da_ref);
+	DTRACE_PROBE4(damap__id__rele,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    char *, addr, int, passp->da_ref);
 
 	mutex_enter(&mapp->dam_lock);
 
@@ -890,8 +901,9 @@ damap_lookup(damap_t *damapp, char *address)
 	id_t addrid = 0;
 	dam_da_t *passp = NULL;
 
-	DTRACE_PROBE3(damap__lookup, char *, mapp->dam_name,
-	    char *, address, dam_t *, mapp);
+	DTRACE_PROBE3(damap__lookup,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    char *, address);
 	mutex_enter(&mapp->dam_lock);
 	if (!mapp->dam_high)
 		addrid = 0;
@@ -911,8 +923,9 @@ damap_lookup(damap_t *damapp, char *address)
 		}
 	}
 	mutex_exit(&mapp->dam_lock);
-	DTRACE_PROBE4(damap__lookup__return, char *, mapp->dam_name,
-	    char *, address, dam_t *, mapp, int, addrid);
+	DTRACE_PROBE4(damap__lookup__return,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    char *, address, int, addrid);
 	return ((damap_id_t)addrid);
 }
 
@@ -935,14 +948,14 @@ damap_lookup_all(damap_t *damapp, damap_id_list_t *id_listp)
 	char	 *addrp;
 	dam_da_t *passp;
 
-	DTRACE_PROBE2(damap__lookup__all, char *, mapp->dam_name,
-	    dam_t *, mapp);
+	DTRACE_PROBE2(damap__lookup__all,
+	    char *, mapp->dam_name, dam_t *, mapp);
 	mutex_enter(&mapp->dam_lock);
 	if (!mapp->dam_high) {
 		*id_listp = (damap_id_list_t)NULL;
 		mutex_exit(&mapp->dam_lock);
-		DTRACE_PROBE3(damap__lookup__all__nomap, char *,
-		    mapp->dam_name, dam_t *, mapp, int, 0);
+		DTRACE_PROBE2(damap__lookup__all__nomap,
+		    char *, mapp->dam_name, dam_t *, mapp);
 		return (0);
 	}
 	bsp = kmem_alloc(sizeof (*bsp), KM_SLEEP);
@@ -955,9 +968,9 @@ damap_lookup_all(damap_t *damapp, damap_id_list_t *id_listp)
 			ASSERT(passp);
 			if (passp) {
 				addrp = damap_id2addr(damapp, i);
-				DTRACE_PROBE3(damap__lookup__all__item, char *,
-				    mapp->dam_name, char *, addrp, dam_t *,
-				    mapp);
+				DTRACE_PROBE3(damap__lookup__all__item,
+				    char *, mapp->dam_name, dam_t *, mapp,
+				    char *, addrp);
 				passp->da_ref++;
 				n_ids++;
 			}
@@ -1020,8 +1033,9 @@ dam_addr_activate(dam_t *mapp, id_t addrid)
 	 * copy the reported nvlist and provider private data
 	 */
 	addrstr = ddi_strid_id2str(mapp->dam_addr_hash, addrid);
-	DTRACE_PROBE3(damap__addr__activate__start, char *, mapp->dam_name,
-	    char *, addrstr, dam_t *, mapp);
+	DTRACE_PROBE3(damap__addr__activate__start,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    char *, addrstr);
 	passp->da_nvl = passp->da_nvl_rpt;
 	passp->da_ppriv = passp->da_ppriv_rpt;
 	passp->da_ppriv_rpt = NULL;
@@ -1045,12 +1059,14 @@ dam_addr_activate(dam_t *mapp, id_t addrid)
 		passp->da_flags |= DA_FAILED_CONFIG;
 		mutex_exit(&mapp->dam_lock);
 		DTRACE_PROBE3(damap__addr__activate__config__failure,
-		    char *, mapp->dam_name, char *, addrstr, dam_t *, mapp);
+		    char *, mapp->dam_name, dam_t *, mapp,
+		    char *, addrstr);
 		dam_deact_cleanup(mapp, addrid, addrstr,
 		    DAMAP_DEACT_RSN_CFG_FAIL);
 	} else {
-		DTRACE_PROBE3(damap__addr__activate__end, char *,
-		    mapp->dam_name, char *, addrstr, dam_t *, mapp);
+		DTRACE_PROBE3(damap__addr__activate__end,
+		    char *, mapp->dam_name, dam_t *, mapp,
+		    char *, addrstr);
 	}
 }
 
@@ -1063,8 +1079,9 @@ dam_addr_deactivate(dam_t *mapp, id_t addrid)
 	char *addrstr;
 
 	addrstr = ddi_strid_id2str(mapp->dam_addr_hash, addrid);
-	DTRACE_PROBE3(damap__addr__deactivate__start, char *, mapp->dam_name,
-	    char *, addrstr, dam_t *, mapp);
+	DTRACE_PROBE3(damap__addr__deactivate__start,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    char *, addrstr);
 
 	/*
 	 * call the unconfiguration callback
@@ -1101,8 +1118,9 @@ dam_deact_cleanup(dam_t *mapp, id_t addrid, char *addrstr,
 		nvlist_free(passp->da_nvl_rpt);
 	passp->da_nvl_rpt = NULL;
 
-	DTRACE_PROBE3(damap__addr__deactivate__end, char *, mapp->dam_name,
-	    char *, addrstr, dam_t *, mapp);
+	DTRACE_PROBE3(damap__addr__deactivate__end,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    char *, addrstr);
 
 	(void) dam_addr_release(mapp, addrid);
 	mutex_exit(&mapp->dam_lock);
@@ -1190,8 +1208,8 @@ dam_addrset_deactivate(dam_t *mapp, bitset_t *deactivate)
 	cfg_tqd_t *tqd = NULL;
 	char tqn[TASKQ_NAMELEN];
 
-	DTRACE_PROBE2(damap__addrset__deactivate, char *, mapp->dam_name,
-	    dam_t *, mapp);
+	DTRACE_PROBE2(damap__addrset__deactivate,
+	    char *, mapp->dam_name, dam_t *, mapp);
 
 	if (mapp->dam_options & DAMAP_MTCONFIG) {
 		/*
@@ -1240,8 +1258,9 @@ dam_addr_release(dam_t *mapp, id_t addrid)
 	ASSERT(passp);
 
 	addrstr = ddi_strid_id2str(mapp->dam_addr_hash, addrid);
-	DTRACE_PROBE3(damap__addr__release, char *, mapp->dam_name,
-	    char *, addrstr, dam_t *, mapp);
+	DTRACE_PROBE3(damap__addr__release,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    char *, addrstr);
 
 	/*
 	 * defer releasing the address until outstanding references
@@ -1249,8 +1268,8 @@ dam_addr_release(dam_t *mapp, id_t addrid)
 	 */
 	if (passp->da_ref > 1) {
 		DTRACE_PROBE4(damap__addr__release__outstanding__refs,
-		    char *, mapp->dam_name, char *, addrstr, dam_t *, mapp,
-		    int, passp->da_ref);
+		    char *, mapp->dam_name, dam_t *, mapp,
+		    char *, addrstr, int, passp->da_ref);
 		return;
 	}
 
@@ -1259,7 +1278,8 @@ dam_addr_release(dam_t *mapp, id_t addrid)
 	 */
 	if (DAM_IN_REPORT(mapp, addrid)) {
 		DTRACE_PROBE3(damap__addr__release__report__pending,
-		    char *, mapp->dam_name, char *, addrstr, dam_t *, mapp);
+		    char *, mapp->dam_name, dam_t *, mapp,
+		    char *, addrstr);
 		return;
 	}
 
@@ -1280,8 +1300,8 @@ dam_stabilize_map(void *arg)
 	int has_cfg, has_uncfg;
 	uint32_t i, n_active;
 
-	DTRACE_PROBE2(damap__stabilize__map, char *, mapp->dam_name,
-	    dam_t *, mapp);
+	DTRACE_PROBE2(damap__stabilize__map,
+	    char *, mapp->dam_name, dam_t *, mapp);
 
 	bitset_init(&delta);
 	bitset_resize(&delta, mapp->dam_size);
@@ -1309,8 +1329,8 @@ dam_stabilize_map(void *arg)
 		bitset_fini(&uncfg);
 		bitset_fini(&cfg);
 		bitset_fini(&delta);
-		DTRACE_PROBE2(damap__stabilize__map__nochange, char *,
-		    mapp->dam_name, dam_t *, mapp);
+		DTRACE_PROBE2(damap__stabilize__map__nochange,
+		    char *, mapp->dam_name, dam_t *, mapp);
 		return;
 	}
 
@@ -1357,8 +1377,9 @@ dam_stabilize_map(void *arg)
 			n_active++;
 	DAM_SET_STAT(mapp, dam_active, n_active);
 
-	DTRACE_PROBE3(damap__map__stable__end, char *, mapp->dam_name,
-	    dam_t *, mapp, int, n_active);
+	DTRACE_PROBE3(damap__map__stable__end,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    int, n_active);
 
 	mapp->dam_flags &= ~DAM_SPEND;
 	cv_signal(&mapp->dam_sync_cv);
@@ -1384,8 +1405,8 @@ dam_addr_stable_cb(void *arg)
 
 	mutex_enter(&mapp->dam_lock);
 	if (mapp->dam_tid == 0) {
-		DTRACE_PROBE2(damap__map__addr__stable__cancelled, char *,
-		    mapp->dam_name, dam_t *, mapp);
+		DTRACE_PROBE2(damap__map__addr__stable__cancelled,
+		    char *, mapp->dam_name, dam_t *, mapp);
 		mutex_exit(&mapp->dam_lock);
 		return;
 	}
@@ -1399,10 +1420,10 @@ dam_addr_stable_cb(void *arg)
 	if (mapp->dam_flags & DAM_SPEND) {
 		DAM_INCR_STAT(mapp, dam_overrun);
 		mapp->dam_stable_overrun++;
+		DTRACE_PROBE2(damap__map__addr__stable__overrun,
+		    char *, mapp->dam_name, dam_t *, mapp);
 		dam_sched_timeout(dam_addr_stable_cb, mapp,
 		    mapp->dam_stable_ticks);
-		DTRACE_PROBE2(damap__map__addr__stable__overrun, char *,
-		    mapp->dam_name, dam_t *, mapp);
 		mutex_exit(&mapp->dam_lock);
 		return;
 	}
@@ -1410,39 +1431,24 @@ dam_addr_stable_cb(void *arg)
 	DAM_SET_STAT(mapp, dam_overrun, 0);
 	mapp->dam_stable_overrun = 0;
 
-	/*
-	 * copy the current active set to the stable map
-	 * for each address being reported, decrement its
-	 * stabilize deadline, and if stable, add or remove the
-	 * address from the stable set
-	 */
-	bitset_copy(&mapp->dam_active_set, &mapp->dam_stable_set);
+	/* See if any reports stabalized and compute next timeout. */
 	ts = ddi_get_lbolt64();
 	next_ticks = mapp->dam_stable_ticks;
 	for (i = 1; i < mapp->dam_high; i++) {
-		if (!bitset_in_set(&mapp->dam_report_set, i))
-			continue;
-		passp = ddi_get_soft_state(mapp->dam_da, i);
-		ASSERT(passp);
+		if (bitset_in_set(&mapp->dam_report_set, i)) {
+			passp = ddi_get_soft_state(mapp->dam_da, i);
+			ASSERT(passp);
 
-		/* report has stabilized */
-		if (passp->da_deadline <= ts) {
-			bitset_del(&mapp->dam_report_set, i);
-			if (passp->da_flags & DA_RELE)
-				bitset_del(&mapp->dam_stable_set, i);
-			else
-				bitset_add(&mapp->dam_stable_set, i);
-			spend++;
-			continue;
+			if (passp->da_deadline <= ts)
+				spend++;	/* report has stabilized */
+			else {
+				/* not stabilized, determine next map timeout */
+				tpend++;
+				delta_ticks = passp->da_deadline - ts;
+				if (delta_ticks < next_ticks)
+					next_ticks = delta_ticks;
+			}
 		}
-
-		/*
-		 * not stabilized, determine next map timeout
-		 */
-		tpend++;
-		delta_ticks = passp->da_deadline - ts;
-		if (delta_ticks < next_ticks)
-			next_ticks = delta_ticks;
 	}
 
 	/*
@@ -1451,16 +1457,52 @@ dam_addr_stable_cb(void *arg)
 	if (spend) {
 		if (taskq_dispatch(system_taskq, dam_stabilize_map,
 		    mapp, TQ_NOSLEEP | TQ_NOQUEUE)) {
+			DTRACE_PROBE2(damap__map__addr__stable__start,
+			    char *, mapp->dam_name, dam_t *, mapp);
+
+			/*
+			 * The stable_set we compute below stays pending until
+			 * processed by dam_stabilize_map. We can't set
+			 * DAM_SPEND (or bitset_del things from the
+			 * report_set) until we *know* that we can handoff the
+			 * result to dam_stabilize_map. If dam_stabilize_map
+			 * starts executing before we are complete, it will
+			 * block on the dam_lock mutex until we are ready.
+			 */
 			mapp->dam_flags |= DAM_SPEND;
-			DTRACE_PROBE2(damap__map__addr__stable__start, char *,
-			    mapp->dam_name, dam_t *, mapp);
+
+			/*
+			 * Copy the current active_set to the stable_set, then
+			 * add or remove stabilized report_set address from
+			 * the stable set (and delete them from the report_set).
+			 */
+			bitset_copy(&mapp->dam_active_set,
+			    &mapp->dam_stable_set);
+			for (i = 1; i < mapp->dam_high; i++) {
+				if (!bitset_in_set(&mapp->dam_report_set, i))
+					continue;
+
+				passp = ddi_get_soft_state(mapp->dam_da, i);
+				if (passp->da_deadline > ts)
+					continue; /* report not stabilized */
+
+				/* report has stabilized */
+				if (passp->da_flags & DA_RELE)
+					bitset_del(&mapp->dam_stable_set, i);
+				else
+					bitset_add(&mapp->dam_stable_set, i);
+
+				bitset_del(&mapp->dam_report_set, i);
+			}
 		} else {
-			tpend++;
+			DTRACE_PROBE2(damap__map__addr__stable__spendfail,
+			    char *, mapp->dam_name, dam_t *, mapp);
 
 			/*
 			 * Avoid waiting the entire stabalization
 			 * time again if taskq_diskpatch fails.
 			 */
+			tpend++;
 			delta_ticks = drv_usectohz(
 			    damap_taskq_dispatch_retry_usec);
 			if (delta_ticks < next_ticks)
@@ -1472,9 +1514,12 @@ dam_addr_stable_cb(void *arg)
 	 * reschedule the stabilization timer if there are reports
 	 * still pending
 	 */
-	if (tpend)
+	if (tpend) {
+		DTRACE_PROBE2(damap__map__addr__stable__tpend, char *,
+		    mapp->dam_name, dam_t *, mapp);
 		dam_sched_timeout(dam_addr_stable_cb, mapp,
 		    (clock_t)next_ticks);
+	}
 
 	mutex_exit(&mapp->dam_lock);
 }
@@ -1509,8 +1554,8 @@ dam_addrset_stable_cb(void *arg)
 		dam_sched_timeout(dam_addrset_stable_cb, mapp,
 		    drv_usectohz(damap_taskq_dispatch_retry_usec));
 
-		DTRACE_PROBE2(damap__map__addrset__stable__overrun, char *,
-		    mapp->dam_name, dam_t *, mapp);
+		DTRACE_PROBE2(damap__map__addrset__stable__overrun,
+		    char *, mapp->dam_name, dam_t *, mapp);
 		mutex_exit(&mapp->dam_lock);
 		return;
 	}
@@ -1523,8 +1568,8 @@ dam_addrset_stable_cb(void *arg)
 	mapp->dam_flags &= ~DAM_SETADD;
 	/* NOTE: don't need cv_signal since DAM_SPEND is still set */
 
-	DTRACE_PROBE2(damap__map__addrset__stable__start, char *,
-	    mapp->dam_name, dam_t *, mapp);
+	DTRACE_PROBE2(damap__map__addrset__stable__start,
+	    char *, mapp->dam_name, dam_t *, mapp);
 	mutex_exit(&mapp->dam_lock);
 }
 
@@ -1537,8 +1582,9 @@ dam_sched_timeout(void (*timeout_cb)(), dam_t *mapp, clock_t ticks)
 {
 	timeout_id_t tid;
 
-	DTRACE_PROBE3(damap__sched__timeout, char *, mapp->dam_name,
-	    dam_t *, mapp, int, ticks);
+	DTRACE_PROBE4(damap__sched__timeout,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    int, ticks, timeout_id_t, mapp->dam_tid);
 
 	ASSERT(mutex_owned(&mapp->dam_lock));
 	if ((tid = mapp->dam_tid) != 0) {
@@ -1562,8 +1608,9 @@ dam_addr_report(dam_t *mapp, dam_da_t *passp, id_t addrid, int rpt_type)
 {
 	char *addrstr = damap_id2addr((damap_t *)mapp, addrid);
 
-	DTRACE_PROBE4(damap__addr__report, char *, mapp->dam_name,
-	    char *, addrstr, dam_t *, mapp, int, rpt_type);
+	DTRACE_PROBE4(damap__addr__report,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    char *, addrstr, int, rpt_type);
 
 	ASSERT(mutex_owned(&mapp->dam_lock));
 	ASSERT(!DAM_IN_REPORT(mapp, addrid));
@@ -1588,8 +1635,9 @@ dam_addr_report_release(dam_t *mapp, id_t addrid)
 	dam_da_t *passp;
 	char *addrstr = damap_id2addr((damap_t *)mapp, addrid);
 
-	DTRACE_PROBE3(damap__addr__report__release, char *, mapp->dam_name,
-	    char *, addrstr, dam_t *, mapp);
+	DTRACE_PROBE3(damap__addr__report__release,
+	    char *, mapp->dam_name, dam_t *, mapp,
+	    char *, addrstr);
 
 	ASSERT(mutex_owned(&mapp->dam_lock));
 	passp = ddi_get_soft_state(mapp->dam_da, addrid);

@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -99,7 +96,7 @@ scsi_ifsetcap(struct scsi_address *ap, char *cap, int value, int whom)
 	int cidx;
 
 	rval = (*A_TO_TRAN(ap)->tran_setcap)(ap, cap, value, whom);
-	if (rval == 1) {
+	if ((rval == 1) || A_TO_TRAN(ap)->tran_setup_pkt) {
 		cidx = scsi_hba_lookup_capstr(cap);
 		if (cidx == SCSI_CAP_SECTOR_SIZE) {
 			/*

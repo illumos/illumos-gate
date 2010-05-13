@@ -747,6 +747,12 @@ in_next_instance_block(major_t major, int block_size)
 		prev = dp->ind_instance;
 	}
 
+	/* Don't return anything in the preassign area. */
+	if (prev < dnp->dn_pinstance) {
+		prev = dnp->dn_pinstance - 1;
+		hole++;			/* preassign hole */
+	}
+
 	/*
 	 * If hole is zero then all holes are patched and we can resume
 	 * quick allocations.

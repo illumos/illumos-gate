@@ -134,6 +134,9 @@ char	*scsi_binding_set_spi = "spi";
 /* enable NDI_DEVI_DEBUG for bus_[un]config operations */
 int	scsi_hba_bus_config_debug = 0;
 
+/* DEBUG: enable NDI_DEVI_REMOVE for bus_unconfig of dynamic node */
+int	scsi_hba_bus_unconfig_remove = 0;
+
 /* number of probe serilization messages */
 int	scsi_hba_wait_msg = 5;
 
@@ -8351,6 +8354,10 @@ scsi_hba_bus_unconfig(dev_info_t *self, uint_t flags,
 	scsi_hba_barrier_purge(self);
 	scsi_hba_devi_exit(self, circ);
 
+	/* DEBUG: for testing, allow bus_unconfig do drive removal. */
+	if (scsi_hba_bus_unconfig_remove)
+		flags |= NDI_DEVI_REMOVE;
+
 	/* Check if self is HBA-only node. */
 	if (tran->tran_hba_flags & SCSI_HBA_HBA) {
 		/* The bus_config request is to unconfigure iports below HBA. */
@@ -9821,6 +9828,11 @@ scsi_lunmap_lookup(dev_info_t *self, damap_t *lundam, char *addr)
 #else
 #define	SAS_PHY_UA_LEN		SAS_PHY_NAME_LEN
 #endif
+typedef struct impl_sas_physet {	/* needed for name2phys destroy */
+	struct impl_sas_physet		*physet_next;
+	char				*physet_name;
+	bitset_t			*physet_phys;
+} impl_sas_physet_t;
 typedef struct impl_sas_phymap {
 	dev_info_t			*phymap_self;
 
@@ -9841,6 +9853,8 @@ typedef struct impl_sas_phymap {
 	sas_phymap_activate_cb_t	phymap_acp;
 	sas_phymap_deactivate_cb_t	phymap_dcp;
 	void				*phymap_private;
+
+	struct impl_sas_physet		*phymap_physets;
 } impl_sas_phymap_t;
 
 /* Detect noisy phy: max changes per stabilization period per phy. */
@@ -10062,16 +10076,9 @@ sas_phymap_create(dev_info_t *self, int settle_usec,
 	    ddi_driver_name(self), ddi_get_instance(self));
 	SCSI_HBA_LOG((_LOGPHY, self, NULL, "%s", context));
 
-	if (damap_create(context, DAMAP_REPORT_PERADDR, DAMAP_SERIALCONFIG,
-	    settle_usec, NULL, NULL, NULL,
-	    phymap, sas_phymap_config, sas_phymap_unconfig,
-	    &phymap->phymap_dam) != DAM_SUCCESS)
-		goto fail;
-
 	if (ddi_soft_state_init(&phymap->phymap_phy2name,
 	    SAS_PHY_NAME_LEN, SAS_PHY_NPHY) != 0)
 		goto fail;
-
 	if (ddi_soft_state_bystr_init(&phymap->phymap_name2phys,
 	    sizeof (bitset_t), SAS_PHY_NPHY) != 0)
 		goto fail;
@@ -10082,6 +10089,13 @@ sas_phymap_create(dev_info_t *self, int settle_usec,
 	if (ddi_soft_state_bystr_init(&phymap->phymap_ua2name,
 	    SAS_PHY_NAME_LEN, SAS_PHY_NPHY) != 0)
 		goto fail;
+
+	if (damap_create(context, DAMAP_REPORT_PERADDR, DAMAP_SERIALCONFIG,
+	    settle_usec, NULL, NULL, NULL,
+	    phymap, sas_phymap_config, sas_phymap_unconfig,
+	    &phymap->phymap_dam) != DAM_SUCCESS)
+		goto fail;
+
 
 	*handlep = (sas_phymap_t *)phymap;
 	return (DDI_SUCCESS);
@@ -10096,11 +10110,34 @@ sas_phymap_destroy(sas_phymap_t *handle)
 {
 	impl_sas_phymap_t	*phymap = (impl_sas_phymap_t *)handle;
 	char			*context;
+	struct impl_sas_physet	*physet, *nphyset;
+	bitset_t		*phys;
+	char			*name;
 
 	context = phymap->phymap_dam ?
 	    damap_name(phymap->phymap_dam) : "unknown";
 	SCSI_HBA_LOG((_LOGPHY, phymap->phymap_self, NULL, "%s", context));
 
+	if (phymap->phymap_dam)
+		damap_destroy(phymap->phymap_dam);
+
+	/* free the bitsets of allocated physets */
+	for (physet = phymap->phymap_physets; physet; physet = nphyset) {
+		nphyset = physet->physet_next;
+		phys = physet->physet_phys;
+		name = physet->physet_name;
+
+		if (phys)
+			bitset_fini(phys);
+		if (name) {
+			ddi_soft_state_bystr_free(
+			    phymap->phymap_name2phys, name);
+			strfree(name);
+		}
+		kmem_free(physet, sizeof (*physet));
+	}
+
+	/* free the maps */
 	if (phymap->phymap_ua2name)
 		ddi_soft_state_bystr_fini(&phymap->phymap_ua2name);
 	if (phymap->phymap_name2ua)
@@ -10108,12 +10145,9 @@ sas_phymap_destroy(sas_phymap_t *handle)
 
 	if (phymap->phymap_name2phys)
 		ddi_soft_state_bystr_fini(&phymap->phymap_name2phys);
-
 	if (phymap->phymap_phy2name)
 		ddi_soft_state_fini(&phymap->phymap_phy2name);
 
-	if (phymap->phymap_dam)
-		damap_destroy(phymap->phymap_dam);
 	mutex_destroy(&phymap->phymap_lock);
 	kmem_free(phymap, sizeof (*phymap));
 }
@@ -10127,9 +10161,9 @@ sas_phymap_phy_add(sas_phymap_t *handle,
 	char			*context = damap_name(phymap->phymap_dam);
 	char			port[SAS_PHY_NAME_LEN];
 	char			*name;
-	bitset_t		*phys;
 	int			phy2name_allocated = 0;
-	int			name2phys_allocated = 0;
+	bitset_t		*phys;
+	struct impl_sas_physet	*physet;
 	int			rv;
 
 	/* Create the SAS port name from the local and remote addresses. */
@@ -10184,13 +10218,17 @@ sas_phymap_phy_add(sas_phymap_t *handle,
 			    "%s: %s: no name2phys", context, name));
 			goto fail;
 		}
-		name2phys_allocated = 1;
 
-		/* Initialize bitset of phys */
+		/* Initialize bitset of phys. */
 		bitset_init(phys);
 		bitset_resize(phys, SAS_PHY_NPHY);
 
-		/* NOTE: no bitset_fini of phys needed */
+		/* Keep a list of information for destroy. */
+		physet = kmem_zalloc(sizeof (*physet), KM_SLEEP);
+		physet->physet_name = strdup(name);
+		physet->physet_phys = phys;
+		physet->physet_next = phymap->phymap_physets;
+		phymap->phymap_physets = physet;
 	}
 	ASSERT(phys);
 
@@ -10243,8 +10281,6 @@ sas_phymap_phy_add(sas_phymap_t *handle,
 
 fail:	if (phy2name_allocated)
 		ddi_soft_state_free(phymap->phymap_phy2name, phy);
-	if (name2phys_allocated)
-		ddi_soft_state_bystr_free(phymap->phymap_name2phys, name);
 	mutex_exit(&phymap->phymap_lock);
 	return (DDI_FAILURE);
 }

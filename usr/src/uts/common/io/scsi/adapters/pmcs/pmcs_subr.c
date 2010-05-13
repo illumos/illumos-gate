@@ -1419,15 +1419,17 @@ pmcs_deregister_devices(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 	/*
 	 * Start at the maximum level and walk back to level 0.  This only
 	 * gets done during detach after all threads and timers have been
-	 * destroyed, so there's no need to hold the softstate or PHY lock.
+	 * destroyed.
 	 */
 	while (phyp) {
 		if (phyp->children) {
 			pmcs_deregister_devices(pwp, phyp->children);
 		}
+		pmcs_lock_phy(phyp);
 		if (phyp->valid_device_id) {
 			pmcs_deregister_device(pwp, phyp);
 		}
+		pmcs_unlock_phy(phyp);
 		phyp = phyp->sibling;
 	}
 }
@@ -7508,33 +7510,30 @@ pmcs_phy_destructor(void *buf, void *arg)
 void
 pmcs_free_all_phys(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 {
-	pmcs_phy_t *tphyp, *nphyp;
+	pmcs_phy_t *tphyp, *nphyp, *cphyp;
 
 	if (phyp == NULL) {
 		return;
 	}
 
-	tphyp = phyp;
-	while (tphyp) {
+	for (tphyp = phyp; tphyp; tphyp = nphyp) {
 		nphyp = tphyp->sibling;
+		cphyp = tphyp->children;
 
-		if (tphyp->children) {
-			pmcs_free_all_phys(pwp, tphyp->children);
+		if (cphyp) {
 			tphyp->children = NULL;
+			pmcs_free_all_phys(pwp, cphyp);
 		}
+
 		if (!IS_ROOT_PHY(tphyp)) {
 			kmem_cache_free(pwp->phy_cache, tphyp);
 		}
-
-		tphyp = nphyp;
 	}
 
 	mutex_enter(&pwp->dead_phylist_lock);
-	tphyp = pwp->dead_phys;
-	while (tphyp) {
+	for (tphyp = pwp->dead_phys; tphyp; tphyp = nphyp) {
 		nphyp = tphyp->dead_next;
 		kmem_cache_free(pwp->phy_cache, tphyp);
-		tphyp = nphyp;
 	}
 	pwp->dead_phys = NULL;
 	mutex_exit(&pwp->dead_phylist_lock);
