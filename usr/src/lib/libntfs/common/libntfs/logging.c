@@ -42,6 +42,7 @@
 #include <syslog.h>
 #endif
 
+#include "compat.h"
 #include "logging.h"
 
 #ifndef PATH_SEP

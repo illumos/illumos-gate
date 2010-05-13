@@ -28,6 +28,8 @@
 #include <glib/gmessages.h>
 #include <glib/gutils.h>	/* for g_atexit() */
 
+#include "compat.h"
+
 static void vfs_module_shutdown_atexit(void);
 
 /**
