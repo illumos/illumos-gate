@@ -23,14 +23,11 @@
 /*	  All Rights Reserved 	*/
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_ASY_H
 #define	_SYS_ASY_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -171,10 +168,10 @@ extern "C" {
 /*
  * Ring buffer and async line management definitions.
  */
-#define	RINGBITS	10		/* # of bits in ring ptrs */
+#define	RINGBITS	16		/* # of bits in ring ptrs */
 #define	RINGSIZE	(1<<RINGBITS)   /* size of ring */
 #define	RINGMASK	(RINGSIZE-1)
-#define	RINGFRAC	8		/* fraction of ring to force flush */
+#define	RINGFRAC	12		/* fraction of ring to force flush */
 
 #define	RING_INIT(ap)  ((ap)->async_rput = (ap)->async_rget = 0)
 #define	RING_CNT(ap)   (((ap)->async_rput >= (ap)->async_rget) ? \
@@ -275,6 +272,10 @@ struct asycom {
 	ddi_iblock_cookie_t asy_iblock;
 	kmutex_t	asy_excl;	/* asy adaptive mutex */
 	kmutex_t	asy_excl_hi;	/* asy spinlock mutex */
+	kmutex_t	asy_soft_lock;	/* soft lock for guarding softpend. */
+	int		asysoftpend;	/* Flag indicating soft int pending. */
+	ddi_softintr_t	asy_softintr_id;
+	ddi_iblock_cookie_t asy_soft_iblock;
 
 	/*
 	 * The asy_soft_sr mutex should only be taken by the soft interrupt
@@ -327,8 +328,8 @@ struct asyncline {
 	 */
 	uchar_t		*async_optr;	/* output pointer */
 	int		async_ocnt;	/* output count */
-	ushort_t	async_rput;	/* producing pointer for input */
-	ushort_t	async_rget;	/* consuming pointer for input */
+	uint_t		async_rput;	/* producing pointer for input */
+	uint_t		async_rget;	/* consuming pointer for input */
 
 	/*
 	 * Each character stuffed into the ring has two bytes associated
@@ -432,19 +433,17 @@ struct asyncline {
  * ASYSETSOFT macro to pend a soft interrupt if one isn't already pending.
  */
 
-extern kmutex_t	asy_soft_lock;		/* ptr to lock for asysoftpend */
-extern int asysoftpend;			/* secondary interrupt pending */
-
 #define	ASYSETSOFT(asy)	{			\
-	mutex_enter(&asy_soft_lock);		\
-	asy->asy_flags |= ASY_NEEDSOFT;		\
-	if (!asysoftpend) {			\
-		asysoftpend = 1;		\
-		mutex_exit(&asy_soft_lock);	\
-		ddi_trigger_softintr(asy_softintr_id);	\
-	}					\
-	else					\
-		mutex_exit(&asy_soft_lock);	\
+	if (mutex_tryenter(&asy->asy_soft_lock)) {	\
+		asy->asy_flags |= ASY_NEEDSOFT;		\
+		if (!asy->asysoftpend) {		\
+			asy->asysoftpend = 1;		\
+			mutex_exit(&asy->asy_soft_lock);	\
+			ddi_trigger_softintr(asy->asy_softintr_id);	\
+		}					\
+		else					\
+			mutex_exit(&asy->asy_soft_lock);	\
+	}							\
 }
 
 #ifdef __cplusplus

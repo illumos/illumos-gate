@@ -24,8 +24,7 @@
 /*	  All Rights Reserved					*/
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -213,11 +212,6 @@ static void	async_flowcontrol_hw_output(struct asycom *asy,
 		(ddi_prop_op(DDI_DEV_T_ANY, (devi), PROP_LEN_AND_VAL_BUF, \
 		(pflag), (pname), (caddr_t)(pval), (plen)))
 
-static ddi_iblock_cookie_t asy_soft_iblock;
-ddi_softintr_t asy_softintr_id;
-static	int asy_addedsoft = 0;
-int	asysoftpend;	/* soft interrupt pending */
-kmutex_t asy_soft_lock;	/* lock protecting asysoftpend */
 kmutex_t asy_glob_lock; /* lock protecting global data manipulation */
 void *asy_soft_state;
 
@@ -400,14 +394,10 @@ _fini(void)
 		    modldrv.drv_linkinfo);
 		ASSERT(max_asy_instance == -1);
 		mutex_destroy(&asy_glob_lock);
-		if (asy_addedsoft)
-			ddi_remove_softintr(asy_softintr_id);
-		asy_addedsoft = 0;
 		/* free "motherboard-serial-ports" property if allocated */
 		if (com_ports != NULL && com_ports != (int *)standard_com_ports)
 			ddi_prop_free(com_ports);
 		com_ports = NULL;
-		mutex_destroy(&asy_soft_lock);
 		ddi_soft_state_fini(&asy_soft_state);
 	}
 	return (i);
@@ -637,6 +627,8 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		cv_destroy(&async->async_flags_cv);
 		ddi_remove_intr(devi, 0, asy->asy_iblock);
 		ddi_regs_map_free(&asy->asy_iohandle);
+		ddi_remove_softintr(asy->asy_softintr_id);
+		mutex_destroy(&asy->asy_soft_lock);
 		asy_soft_state_free(asy);
 		DEBUGNOTE1(ASY_DEBUG_INIT, "asy%d: shutdown complete",
 		    instance);
@@ -964,7 +956,7 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if ((ddi_get_iblock_cookie(devi, 0, &asy->asy_iblock) !=
 	    DDI_SUCCESS) ||
 	    (ddi_get_soft_iblock_cookie(devi, DDI_SOFTINT_MED,
-	    &asy_soft_iblock) != DDI_SUCCESS)) {
+	    &asy->asy_soft_iblock) != DDI_SUCCESS)) {
 		ddi_regs_map_free(&asy->asy_iohandle);
 		cmn_err(CE_CONT,
 		    "asy%d: could not hook interrupt for UART @ %p\n",
@@ -976,17 +968,20 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	/*
 	 * Initialize mutexes before accessing the hardware
 	 */
-	mutex_init(&asy->asy_excl, NULL, MUTEX_DRIVER, asy_soft_iblock);
+	mutex_init(&asy->asy_soft_lock, NULL, MUTEX_DRIVER,
+	    (void *)asy->asy_soft_iblock);
+	mutex_init(&asy->asy_excl, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&asy->asy_excl_hi, NULL, MUTEX_DRIVER,
 	    (void *)asy->asy_iblock);
-	mutex_init(&asy->asy_soft_sr, NULL, MUTEX_DRIVER, asy_soft_iblock);
-
+	mutex_init(&asy->asy_soft_sr, NULL, MUTEX_DRIVER,
+	    (void *)asy->asy_soft_iblock);
 	mutex_enter(&asy->asy_excl);
 	mutex_enter(&asy->asy_excl_hi);
 
 	if (asy_identify_chip(devi, asy) != DDI_SUCCESS) {
 		mutex_exit(&asy->asy_excl_hi);
 		mutex_exit(&asy->asy_excl);
+		mutex_destroy(&asy->asy_soft_lock);
 		mutex_destroy(&asy->asy_excl);
 		mutex_destroy(&asy->asy_excl_hi);
 		mutex_destroy(&asy->asy_soft_sr);
@@ -1017,25 +1012,21 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 */
 	asy->asy_dip = devi;
 
-	mutex_enter(&asy_glob_lock);
-	if (asy_addedsoft == 0) { /* install the soft interrupt handler */
-		if (ddi_add_softintr(devi, DDI_SOFTINT_MED,
-		    &asy_softintr_id, NULL, 0, asysoftintr,
-		    (caddr_t)0) != DDI_SUCCESS) {
-			mutex_destroy(&asy->asy_excl);
-			mutex_destroy(&asy->asy_excl_hi);
-			ddi_regs_map_free(&asy->asy_iohandle);
-			mutex_exit(&asy_glob_lock);
-			cmn_err(CE_CONT,
-			    "Can not set soft interrupt for ASY driver\n");
-			asy_soft_state_free(asy);
-			return (DDI_FAILURE);
-		}
-		mutex_init(&asy_soft_lock, NULL, MUTEX_DRIVER,
-		    (void *)asy->asy_iblock);
-		asy_addedsoft++;
+	/*
+	 * Install per instance software interrupt handler.
+	 */
+	if (ddi_add_softintr(devi, DDI_SOFTINT_MED,
+	    &(asy->asy_softintr_id), NULL, 0, asysoftintr,
+	    (caddr_t)asy) != DDI_SUCCESS) {
+		mutex_destroy(&asy->asy_soft_lock);
+		mutex_destroy(&asy->asy_excl);
+		mutex_destroy(&asy->asy_excl_hi);
+		ddi_regs_map_free(&asy->asy_iohandle);
+		cmn_err(CE_CONT,
+		    "Can not set soft interrupt for ASY driver\n");
+		asy_soft_state_free(asy);
+		return (DDI_FAILURE);
 	}
-	mutex_exit(&asy_glob_lock);
 
 	mutex_enter(&asy->asy_excl);
 	mutex_enter(&asy->asy_excl_hi);
@@ -1047,6 +1038,8 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    (caddr_t)asy) != DDI_SUCCESS) {
 		mutex_exit(&asy->asy_excl_hi);
 		mutex_exit(&asy->asy_excl);
+		ddi_remove_softintr(asy->asy_softintr_id);
+		mutex_destroy(&asy->asy_soft_lock);
 		mutex_destroy(&asy->asy_excl);
 		mutex_destroy(&asy->asy_excl_hi);
 		ddi_regs_map_free(&asy->asy_iohandle);
@@ -1091,6 +1084,8 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 		ddi_remove_minor_node(devi, NULL);
 		ddi_remove_intr(devi, 0, asy->asy_iblock);
+		ddi_remove_softintr(asy->asy_softintr_id);
+		mutex_destroy(&asy->asy_soft_lock);
 		mutex_destroy(&asy->asy_excl);
 		mutex_destroy(&asy->asy_excl_hi);
 		cv_destroy(&async->async_flags_cv);
@@ -2237,7 +2232,7 @@ asyintr(caddr_t argasy)
 	    asy->asy_ioaddr + ISR) & 0x0F;
 	async = asy->asy_priv;
 
-	if ((async == NULL) || asy_addedsoft == 0 ||
+	if ((async == NULL) ||
 	    !(async->async_flags & (ASYNC_ISOPEN|ASYNC_WOPEN))) {
 		if (interrupt_id & NOINTERRUPT)
 			return (DDI_INTR_UNCLAIMED);
@@ -2615,37 +2610,44 @@ async_msint_retry:
 uint_t
 asysoftintr(caddr_t intarg)
 {
-	struct asycom *asy;
+	struct asycom *asy = (struct asycom *)intarg;
+	struct asyncline *async;
 	int rv;
-	int instance;
+	uint_t cc;
 
 	/*
 	 * Test and clear soft interrupt.
 	 */
-	mutex_enter(&asy_soft_lock);
+	mutex_enter(&asy->asy_soft_lock);
 	DEBUGCONT0(ASY_DEBUG_PROCS, "asysoftintr: enter\n");
-	rv = asysoftpend;
+	rv = asy->asysoftpend;
 	if (rv != 0)
-		asysoftpend = 0;
-	mutex_exit(&asy_soft_lock);
+		asy->asysoftpend = 0;
+	mutex_exit(&asy->asy_soft_lock);
 
 	if (rv) {
-		/*
-		 * Note - we can optimize the loop by remembering the last
-		 * device that requested soft interrupt
-		 */
-		for (instance = 0; instance <= max_asy_instance; instance++) {
-			asy = ddi_get_soft_state(asy_soft_state, instance);
-			if (asy == NULL || asy->asy_priv == NULL)
-				continue;
-			mutex_enter(&asy_soft_lock);
-			if (asy->asy_flags & ASY_NEEDSOFT) {
-				asy->asy_flags &= ~ASY_NEEDSOFT;
-				mutex_exit(&asy_soft_lock);
-				async_softint(asy);
-			} else
-				mutex_exit(&asy_soft_lock);
+		if (asy->asy_priv == NULL)
+			return (rv ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
+		async = (struct asyncline *)asy->asy_priv;
+		mutex_enter(&asy->asy_excl_hi);
+		if (asy->asy_flags & ASY_NEEDSOFT) {
+			asy->asy_flags &= ~ASY_NEEDSOFT;
+			mutex_exit(&asy->asy_excl_hi);
+			async_softint(asy);
+			mutex_enter(&asy->asy_excl_hi);
 		}
+
+		/*
+		 * There are some instances where the softintr is not
+		 * scheduled and hence not called. It so happens that
+		 * causes the last few characters to be stuck in the
+		 * ringbuffer. Hence, call the handler once again so
+		 * the last few characters are cleared.
+		 */
+		cc = RING_CNT(async);
+		mutex_exit(&asy->asy_excl_hi);
+		if (cc > 0)
+			(void) async_softint(asy);
 	}
 	return (rv ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
 }
@@ -2657,7 +2659,7 @@ static void
 async_softint(struct asycom *asy)
 {
 	struct asyncline *async = asy->asy_priv;
-	short	cc;
+	uint_t	cc;
 	mblk_t	*bp;
 	queue_t	*q;
 	uchar_t	val;
@@ -2667,16 +2669,16 @@ async_softint(struct asycom *asy)
 	int instance = UNIT(async->async_dev);
 
 	DEBUGCONT1(ASY_DEBUG_PROCS, "async%d_softint\n", instance);
-	mutex_enter(&asy_soft_lock);
+	mutex_enter(&asy->asy_excl_hi);
 	if (asy->asy_flags & ASY_DOINGSOFT) {
 		asy->asy_flags |= ASY_DOINGSOFT_RETRY;
-		mutex_exit(&asy_soft_lock);
+		mutex_exit(&asy->asy_excl_hi);
 		return;
 	}
 	asy->asy_flags |= ASY_DOINGSOFT;
 begin:
 	asy->asy_flags &= ~ASY_DOINGSOFT_RETRY;
-	mutex_exit(&asy_soft_lock);
+	mutex_exit(&asy->asy_excl_hi);
 	mutex_enter(&asy->asy_excl);
 	tp = &async->async_ttycommon;
 	q = tp->t_readq;
@@ -2813,7 +2815,7 @@ begin:
 		RING_INIT(async);
 		goto rv;
 	}
-	if ((cc = RING_CNT(async)) <= 0)
+	if ((cc = RING_CNT(async)) == 0)
 		goto rv;
 	mutex_exit(&asy->asy_excl_hi);
 
@@ -2950,14 +2952,14 @@ rv:
 		}
 		async->async_sw_overrun = 0;
 	}
-	mutex_exit(&asy->asy_excl_hi);
-	mutex_exit(&asy->asy_excl);
-	mutex_enter(&asy_soft_lock);
 	if (asy->asy_flags & ASY_DOINGSOFT_RETRY) {
+		mutex_exit(&asy->asy_excl_hi);
+		mutex_exit(&asy->asy_excl);
 		goto begin;
 	}
 	asy->asy_flags &= ~ASY_DOINGSOFT;
-	mutex_exit(&asy_soft_lock);
+	mutex_exit(&asy->asy_excl_hi);
+	mutex_exit(&asy->asy_excl);
 	DEBUGCONT1(ASY_DEBUG_PROCS, "async%d_softint: done\n", instance);
 }
 
