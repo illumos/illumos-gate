@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -35,3 +34,5 @@ kernel/drv/amd64/dprov		i386
 kernel/drv/dprov		i386
 kernel/drv/dprov.conf
 kernel/drv/sparcv9/dprov	sparc
+
+usr/has/bin/pfksh

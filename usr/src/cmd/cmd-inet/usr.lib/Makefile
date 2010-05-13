@@ -18,9 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 SUBDIRS=	bridged dhcp dsvclockd ilbd in.chargend in.daytimed \
@@ -31,6 +31,7 @@ SUBDIRS=	bridged dhcp dsvclockd ilbd in.chargend in.daytimed \
 MSGSUBDIRS=	dsvclockd ilbd in.dhcpd inetd ncaconfd vrrpd wanboot
 
 include ../../Makefile.cmd
+include ./Makefile.lib
 
 $(CLOSED_BUILD)SUBDIRS += \
 	$(CLOSED)/cmd/cmd-inet/usr.lib/ike-certutils \
@@ -50,7 +51,12 @@ _msg:=		TARGET= _msg
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all clean clobber lint: $(SUBDIRS)
+
+install: $(SUBDIRS)
+	-$(RM) $(ROOTLIBINET)/in.iked
+	-$(LN) $(ISAEXEC) $(ROOTLIBINET)/in.iked
+
 
 _msg: $(MSGSUBDIRS) 
 
