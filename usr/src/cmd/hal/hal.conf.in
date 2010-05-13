@@ -32,6 +32,8 @@
            send_destination="org.freedesktop.Hal"/>
     <allow send_interface="org.freedesktop.Hal.Device.CPUFreq"
            send_destination="org.freedesktop.Hal"/>
+    <allow send_interface="org.freedesktop.Hal.Device.NetworkDiscovery"
+           send_destination="org.freedesktop.Hal"/>
   </policy>
 
   <!-- Default policy for the exported interfaces -->

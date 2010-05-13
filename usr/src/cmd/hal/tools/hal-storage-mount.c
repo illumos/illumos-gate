@@ -701,11 +701,7 @@ handle_mount (LibHalContext *hal_ctx,
 			if (!g_file_test (mount_dir, G_FILE_TEST_EXISTS)) {
 				break;
 			}
-#ifdef sun
-			if (calling_uid == 0) {
-				break;
-			}
-#endif
+
 			if (explicit_mount_point_given) {
 				mount_point_not_available (mount_dir);
 			}

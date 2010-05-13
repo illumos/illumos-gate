@@ -574,6 +574,11 @@ void
 hald_runner_kill_all(HalDevice *device) {
   DBusMessage *msg, *reply;
   DBusError err;
+  
+  /* hald_runner has not yet started, just return */
+  if (runner_connection == NULL) {
+    return;
+  }
 
   running_processes_remove_device (device);
 

@@ -1,11 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Licensed under the Academic Free License version 2.1
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -272,7 +269,7 @@ number_of_interfaces(int s)
 	struct lifnum n;
 
 	memset(&n, 0 , sizeof (n));
-	n.lifn_family = AF_UNSPEC;
+	n.lifn_family = AF_INET;
 	if (ioctl(s, SIOCGLIFNUM, (char *)&n) == 0)
 		rc = n.lifn_count;
 
@@ -286,27 +283,20 @@ broadcast_address(int s, char *ifname)
 	struct lifreq r;
 
 	memset(&r, 0, sizeof (r));
-	strncpy((char *)&r.lifr_name, ifname, sizeof (r.lifr_name));
-	if (ioctl(s, SIOCGLIFBRDADDR, (char *)&r) == 0) {
-		char buf[INET6_ADDRSTRLEN];
-
-		switch (r.lifr_broadaddr.ss_family) {
-		case AF_INET: {
-			struct sockaddr_in *s =
-				(struct sockaddr_in *)&r.lifr_broadaddr;
-			result = (char *)inet_ntop(AF_INET, &s->sin_addr,
-							buf, sizeof (buf));
-			}
-			break;
-		case AF_INET6: {
-			struct sockaddr_in6 *s =
-				(struct sockaddr_in6 *)&r.lifr_broadaddr;
-			result = (char *)inet_ntop(AF_INET6, &s->sin6_addr,
-							buf, sizeof (buf));
-			}
-			break;
-		}
-
+	strlcpy(r.lifr_name, ifname, sizeof (r.lifr_name));
+	if (ioctl(s, SIOCGLIFFLAGS, (caddr_t)&r) < 0) {
+		HAL_DEBUG(("broadcast_address: ioctl(SIOCGLIFFLAGS) failed."));
+		return (NULL);
+	}
+	if ((r.lifr_flags & (IFF_UP | IFF_LOOPBACK)) != IFF_UP) {
+		return (NULL);
+	}
+	if (ioctl(s, SIOCGLIFBRDADDR, (char *)&r) >= 0) {
+		char buf[INET_ADDRSTRLEN];
+		struct sockaddr_in *s =
+		    (struct sockaddr_in *)&r.lifr_broadaddr;
+		result = (char *)inet_ntop(AF_INET,
+		    &s->sin_addr, buf, sizeof (buf));
 		if (result != NULL)
 			result = strdup(result);
 	}
@@ -328,8 +318,8 @@ broadcast_addresses()
 	count = number_of_interfaces(s);
 
 	memset(&c, 0, sizeof (c));
-	c.lifc_family = AF_UNSPEC;
-	c.lifc_flags = IFF_BROADCAST;
+	c.lifc_family = AF_INET;
+	c.lifc_flags = 0;
 	c.lifc_buf = calloc(count, sizeof (struct lifreq));
 	c.lifc_len = (count * sizeof (struct lifreq));
 
