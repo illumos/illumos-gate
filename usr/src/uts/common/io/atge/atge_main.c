@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1121,15 +1120,14 @@ atge_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_DETACH:
-		mii_stop(atgep->atge_mii);
 
 		/*
 		 * First unregister with MAC layer before stopping DMA
 		 */
-		if (mac_unregister(atgep->atge_mh) != DDI_SUCCESS)
+		if (mac_disable(atgep->atge_mh) != DDI_SUCCESS)
 			return (DDI_FAILURE);
 
-		atgep->atge_mh = NULL;
+		mii_stop(atgep->atge_mii);
 
 		mutex_enter(&atgep->atge_intr_lock);
 		mutex_enter(&atgep->atge_tx_lock);
@@ -1144,6 +1142,7 @@ atge_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		atge_remove_intr(atgep);
 		pci_config_teardown(&atgep->atge_conf_handle);
 
+		(void) mac_unregister(atgep->atge_mh);
 		mutex_destroy(&atgep->atge_intr_lock);
 		mutex_destroy(&atgep->atge_tx_lock);
 		mutex_destroy(&atgep->atge_rx_lock);
