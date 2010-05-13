@@ -162,7 +162,7 @@ PDIR= packages.$(PKGMACH)
 # Publication from the tools proto area is managed in the
 # publication rule.
 #
-$(PDIR)/SUNWonbld.dep:= PKGROOT= $(TOOLSROOT)
+$(PDIR)/developer-build-onbld.dep:= PKGROOT= $(TOOLSROOT)
 
 PKGPUBLISHER= $(PKGPUBLISHER_REDIST)
 $(PKGDEST)/repo.extra:= PKGPUBLISHER= $(PKGPUBLISHER_NONREDIST)
@@ -299,9 +299,6 @@ PUB_PKGS= $(SYNTH_PKGS:%=$(PDIR)/%.pub) $(PKGS:%=$(PDIR)/%.pub)
 # such packages are not included in the incorporation or group packages,
 # there is no need to build noincorp package lists.
 #
-# Since packages depend on their incorporation, noincorp necessarily
-# implies nodepend, or it would inadvertently pull in other packages.
-#
 PKGLISTS= \
 	$(REPOS:%=$(PDIR)/packages.%.current) \
 	$(REPOS:%=$(PDIR)/packages.%.renamed) \
@@ -423,7 +420,17 @@ $(PDIR)/gendeps: $(DEP_SYNTH_PKGS) $(DEP_PKGS)
 		print "Resolving dependencies"; \
 		pkgdepend resolve -m $(DEP_PKGS); \
 		for p in $(DEP_PKGS:%.dep=%); do \
-			$(MV) $$p.dep.res $$p.res; \
+			if [ "$$(print $$p.metadata.*)" = \
+			     "$$(print $$p.metadata.noincorp.*)" ]; \
+			then \
+				print "Removing dependency versions from $$p"; \
+				$(PKGMOGRIFY) $(PKGMOG_VERBOSE) \
+				    -O $$p.res -I transforms \
+				    strip_versions $$p.dep.res; \
+				$(RM) $$p.dep.res; \
+			else \
+				$(MV) $$p.dep.res $$p.res; \
+			fi; \
 		done; \
 	fi
 	$(PKGDEBUG)for p in $(DEP_SYNTH_PKGS:%.dep=%); \
@@ -533,8 +540,7 @@ $(PDIR)/%.mog: manifests/%.mf
 		`$(PKGMOGRIFY) $(PKGMOG_VERBOSE) $(PM_INC:%= -I %) \
 		$(PKGMOG_DEFINES:%=-D %) -O $(@) $(<) $(PM_TRANSFORMS)`; \
 	if [ -f $(@) ]; then \
-		if [ \( "$$NODEPEND" != "false" \) -o \
-		     \( "$$PKGSTAT" = "noincorp" \) ]; then \
+		if [ "$$NODEPEND" != "false" ]; then \
 			 $(TOUCH) $(@:%.mog=%.nodepend); \
 		fi; \
 		$(LN) -s $(@F) \

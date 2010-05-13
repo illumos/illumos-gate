@@ -30,8 +30,7 @@ set name=info.classification \
     value="org.opensolaris.category.2008:Development/Distribution Tools"
 
 #
-# This package should be neither incorporated, nor should it
-# have automated dependencies generated.  This allows the tools
+# This package should not be incorporated.  This allows the tools
 # to be upgraded without upgrading the entire system.
 #
 set name=org.opensolaris.noincorp value=true
