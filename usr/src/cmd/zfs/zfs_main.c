@@ -221,9 +221,9 @@ get_usage(zfs_help_t idx)
 	case HELP_PROMOTE:
 		return (gettext("\tpromote <clone-filesystem>\n"));
 	case HELP_RECEIVE:
-		return (gettext("\treceive [-denuvF] <filesystem|volume|"
+		return (gettext("\treceive [-vnFu] <filesystem|volume|"
 		"snapshot>\n"
-		"\treceive [-denuvF] -d <filesystem>\n"));
+		"\treceive [-vnFu] [-d | -e] <filesystem>\n"));
 	case HELP_RENAME:
 		return (gettext("\trename <filesystem|volume|snapshot> "
 		    "<filesystem|volume|snapshot>\n"
@@ -2699,7 +2699,7 @@ zfs_do_send(int argc, char **argv)
 }
 
 /*
- * zfs receive [-denuvF] <fs@snap>
+ * zfs receive [-vnFu] [-d | -e] <fs@snap>
  *
  * Restore a backup stream from stdin.
  */
