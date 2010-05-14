@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Purpose: Creative/Ensoniq AudioPCI97  driver (ES1371/ES1373)
@@ -848,8 +847,8 @@ audioens_attach(dev_info_t *dip)
 
 	if (pci_config_setup(dip, &pcih) != DDI_SUCCESS) {
 		audio_dev_warn(dev->osdev, "pci_config_setup failed");
-		kmem_free(dev, sizeof (*dev));
 		mutex_destroy(&dev->mutex);
+		kmem_free(dev, sizeof (*dev));
 		return (DDI_FAILURE);
 	}
 
