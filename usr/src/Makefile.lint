@@ -176,6 +176,7 @@ COMMON_SUBDIRS = \
 	cmd/itadm \
 	cmd/kbd \
 	cmd/killall \
+	cmd/ldap \
 	cmd/last \
 	cmd/lastcomm \
 	cmd/ldapcachemgr \

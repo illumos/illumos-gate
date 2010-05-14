@@ -19,15 +19,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # cmd/ldap/Makefile.com
 # Native LDAP II commands (makestyle clean).
 #
 include $(SRC)/cmd/Makefile.cmd
-
-LINTOUT=	lint.out
 
 LDAPMOD=	ldapmodify
 LDAPADD=	ldapadd
@@ -82,6 +79,9 @@ CLOBBERFILES += $(OBJS) $(PROG) $(LDAPCLIENTPROG) $(LDAPADDENTPROG) \
 
 # creating /var/ldap directory
 ROOTVAR_LDAP=	$(ROOT)/var/ldap
+
+LINTFLAGS += -erroff=E_INCONS_ARG_DECL2
+LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2
 
 all:=           TARGET= all
 install:=       TARGET= install
@@ -168,29 +168,27 @@ FRC:
 clean:
 	$(RM) $(OBJS)
 
-lint: lintns_ldaplist lintns_ldapaddent lintns_ldapclient \
-	$(LDAPPROG:%=lintc_%)
+# Not linted Mozilla upstream commands
+lint: lintns_ldaplist lintns_ldapaddent lintns_ldapclient
 
 lintns_ldaplist := C99MODE = $(C99_ENABLE)
 
 lintns_ldaplist:
-	$(LINT.c) $(LDAPLISTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap \
-		> $(LINTOUT) 2>&1
+	$(LINT.c) $(LDAPLISTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap
 
 lintns_ldapaddent := C99MODE = $(C99_ENABLE)
 
 lintns_ldapaddent:
 	$(LINT.c) $(LDAPADDENTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap -lnsl \
-		-lsecdb >> $(LINTOUT) 2>&1
+		-lsecdb
 
 lintns_ldapclient := C99MODE = $(C99_ENABLE)
 
 lintns_ldapclient:
-	$(LINT.c) $(LDAPCLIENTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap -lscf \
-		>> $(LINTOUT) 2>&1
+	$(LINT.c) $(LDAPCLIENTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap -lscf
 
 lintc_%:
 	$(LINT.c) $(@:lintc_%=../common/%.c) $(LDAPCOMMSRC:%=../common/%) \
-		 $(LDLIBS) >> $(LINTOUT) 2>&1
+		 $(LDLIBS)
 
 include $(SRC)/cmd/Makefile.targ
