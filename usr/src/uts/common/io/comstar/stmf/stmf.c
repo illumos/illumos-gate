@@ -1867,7 +1867,13 @@ stmf_proxy_scsi_cmd(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	if (task->task_mgmt_function) {
 		itask->itask_proxy_msg_id |= MSG_ID_TM_BIT;
 	} else {
-		itask->itask_flags |= ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK;
+		uint32_t new, old;
+		do {
+			new = old = itask->itask_flags;
+			if (new & ITASK_BEING_ABORTED)
+				return (STMF_FAILURE);
+			new |= ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK;
+		} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
 	}
 	if (dbuf) {
 		ic_cmd_msg = ic_scsi_cmd_msg_alloc(itask->itask_proxy_msg_id,
