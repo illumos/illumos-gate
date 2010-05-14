@@ -766,6 +766,30 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 	return (0);
 }
 
+static int
+zfs_dropname(zfs_dirlock_t *dl, znode_t *zp, znode_t *dzp, dmu_tx_t *tx,
+    int flag)
+{
+	int error;
+
+	if (zp->z_zfsvfs->z_norm) {
+		if (((zp->z_zfsvfs->z_case == ZFS_CASE_INSENSITIVE) &&
+		    (flag & ZCIEXACT)) ||
+		    ((zp->z_zfsvfs->z_case == ZFS_CASE_MIXED) &&
+		    !(flag & ZCILOOK)))
+			error = zap_remove_norm(zp->z_zfsvfs->z_os,
+			    dzp->z_id, dl->dl_name, MT_EXACT, tx);
+		else
+			error = zap_remove_norm(zp->z_zfsvfs->z_os,
+			    dzp->z_id, dl->dl_name, MT_FIRST, tx);
+	} else {
+		error = zap_remove(zp->z_zfsvfs->z_os,
+		    dzp->z_id, dl->dl_name, tx);
+	}
+
+	return (error);
+}
+
 /*
  * Unlink zp from dl, and mark zp for deletion if this was the last link.
  * Can fail if zp is a mount point (EBUSY) or a non-empty directory (EEXIST).
@@ -806,6 +830,18 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 			return (EEXIST);
 		}
 
+		/*
+		 * If we get here, we are going to try to remove the object.
+		 * First try removing the name from the directory; if that
+		 * fails, return the error.
+		 */
+		error = zfs_dropname(dl, zp, dzp, tx, flag);
+		if (error != 0) {
+			mutex_exit(&zp->z_lock);
+			vn_vfsunlock(vp);
+			return (error);
+		}
+
 		if (zp->z_links <= zp_is_dir) {
 			zfs_panic_recover("zfs: link count on %s is %u, "
 			    "should be at least %u",
@@ -833,6 +869,10 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 		ASSERT(error == 0);
 		mutex_exit(&zp->z_lock);
 		vn_vfsunlock(vp);
+	} else {
+		error = zfs_dropname(dl, zp, dzp, tx, flag);
+		if (error != 0)
+			return (error);
 	}
 
 	mutex_enter(&dzp->z_lock);
@@ -852,22 +892,6 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 	error = sa_bulk_update(dzp->z_sa_hdl, bulk, count, tx);
 	ASSERT(error == 0);
 	mutex_exit(&dzp->z_lock);
-
-	if (zp->z_zfsvfs->z_norm) {
-		if (((zp->z_zfsvfs->z_case == ZFS_CASE_INSENSITIVE) &&
-		    (flag & ZCIEXACT)) ||
-		    ((zp->z_zfsvfs->z_case == ZFS_CASE_MIXED) &&
-		    !(flag & ZCILOOK)))
-			error = zap_remove_norm(zp->z_zfsvfs->z_os,
-			    dzp->z_id, dl->dl_name, MT_EXACT, tx);
-		else
-			error = zap_remove_norm(zp->z_zfsvfs->z_os,
-			    dzp->z_id, dl->dl_name, MT_FIRST, tx);
-	} else {
-		error = zap_remove(zp->z_zfsvfs->z_os,
-		    dzp->z_id, dl->dl_name, tx);
-	}
-	ASSERT(error == 0);
 
 	if (unlinkedp != NULL)
 		*unlinkedp = unlinked;

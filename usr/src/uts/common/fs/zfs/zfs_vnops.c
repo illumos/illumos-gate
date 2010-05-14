@@ -3553,14 +3553,33 @@ top:
 			ASSERT3U(error, ==, 0);
 
 			error = zfs_link_destroy(sdl, szp, tx, ZRENAMING, NULL);
-			ASSERT3U(error, ==, 0);
+			if (error == 0) {
+				zfs_log_rename(zilog, tx, TX_RENAME |
+				    (flags & FIGNORECASE ? TX_CI : 0),
+				    sdzp, sdl->dl_name, tdzp, tdl->dl_name,
+				    szp);
 
-			zfs_log_rename(zilog, tx,
-			    TX_RENAME | (flags & FIGNORECASE ? TX_CI : 0),
-			    sdzp, sdl->dl_name, tdzp, tdl->dl_name, szp);
-
-			/* Update path information for the target vnode */
-			vn_renamepath(tdvp, ZTOV(szp), tnm, strlen(tnm));
+				/*
+				 * Update path information for the target vnode
+				 */
+				vn_renamepath(tdvp, ZTOV(szp), tnm,
+				    strlen(tnm));
+			} else {
+				/*
+				 * At this point, we have successfully created
+				 * the target name, but have failed to remove
+				 * the source name.  Since the create was done
+				 * with the ZRENAMING flag, there are
+				 * complications; for one, the link count is
+				 * wrong.  The easiest way to deal with this
+				 * is to remove the newly created target, and
+				 * return the original error.  This must
+				 * succeed; fortunately, it is very unlikely to
+				 * fail, since we just created it.
+				 */
+				VERIFY3U(zfs_link_destroy(tdl, szp, tx,
+				    ZRENAMING, NULL), ==, 0);
+			}
 		}
 	}
 
