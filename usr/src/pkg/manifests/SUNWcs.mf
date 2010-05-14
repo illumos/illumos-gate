@@ -1515,6 +1515,7 @@ file path=usr/share/lib/zoneinfo/America/Aruba
 file path=usr/share/lib/zoneinfo/America/Asuncion
 file path=usr/share/lib/zoneinfo/America/Atikokan
 file path=usr/share/lib/zoneinfo/America/Bahia
+file path=usr/share/lib/zoneinfo/America/Bahia_Banderas
 file path=usr/share/lib/zoneinfo/America/Barbados
 file path=usr/share/lib/zoneinfo/America/Belem
 file path=usr/share/lib/zoneinfo/America/Belize
