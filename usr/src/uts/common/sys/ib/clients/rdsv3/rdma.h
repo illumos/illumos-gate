@@ -99,6 +99,8 @@ rdsv3_rdma_cookie_offset(rdsv3_rdma_cookie_t cookie)
 }
 
 int rdsv3_get_mr(struct rdsv3_sock *rs, const void *optval, int optlen);
+int rdsv3_get_mr_for_dest(struct rdsv3_sock *rs, const void *optval,
+    int optlen);
 int rdsv3_free_mr(struct rdsv3_sock *rs, const void *optval, int optlen);
 void rdsv3_rdma_drop_keys(struct rdsv3_sock *rs);
 int rdsv3_cmsg_rdma_args(struct rdsv3_sock *rs, struct rdsv3_message *rm,

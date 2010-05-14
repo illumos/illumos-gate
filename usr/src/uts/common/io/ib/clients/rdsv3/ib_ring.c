@@ -174,7 +174,7 @@ rdsv3_ib_ring_empty(struct rdsv3_ib_work_ring *ring)
 int
 rdsv3_ib_ring_low(struct rdsv3_ib_work_ring *ring)
 {
-	return (__rdsv3_ib_ring_used(ring) <= (ring->w_nr >> 1));
+	return (__rdsv3_ib_ring_used(ring) <= (ring->w_nr >> 2));
 }
 
 /*

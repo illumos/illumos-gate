@@ -64,7 +64,7 @@
 #include <sys/ib/clients/rdsv3/rdsv3_impl.h>
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
 
-list_t			transports;
+struct rdsv3_transport *transports[RDS_TRANS_COUNT];
 krwlock_t		trans_sem; /* this was a semaphore */
 
 int
@@ -74,7 +74,17 @@ rdsv3_trans_register(struct rdsv3_transport *trans)
 
 	rw_enter(&trans_sem, RW_WRITER);
 
-	list_insert_tail(&transports, trans);
+	if (transports[trans->t_type]) {
+		cmn_err(CE_WARN,
+		    "RDSV3 Transport type %d already registered\n",
+		    trans->t_type);
+		rw_exit(&trans_sem);
+		return (1);
+	} else {
+		transports[trans->t_type] = trans;
+		RDSV3_DPRINTF2("rdsv3_trans_register",
+		    "Registered RDS/%s transport\n", trans->t_name);
+	}
 
 	rw_exit(&trans_sem);
 
@@ -90,7 +100,7 @@ rdsv3_trans_unregister(struct rdsv3_transport *trans)
 
 	rw_enter(&trans_sem, RW_WRITER);
 
-	list_remove(&transports, trans);
+	transports[trans->t_type] = NULL;
 
 	rw_exit(&trans_sem);
 
@@ -100,8 +110,8 @@ rdsv3_trans_unregister(struct rdsv3_transport *trans)
 struct rdsv3_transport *
 rdsv3_trans_get_preferred(uint32_be_t addr)
 {
-	struct rdsv3_transport *trans;
 	struct rdsv3_transport *ret = NULL;
+	int i;
 
 	RDSV3_DPRINTF4("rdsv3_trans_get_preferred", "Enter(addr: %x)",
 	    ntohl(addr));
@@ -110,9 +120,9 @@ rdsv3_trans_get_preferred(uint32_be_t addr)
 		return (&rdsv3_loop_transport);
 
 	rw_enter(&trans_sem, RW_READER);
-	RDSV3_FOR_EACH_LIST_NODE(trans, &transports, t_item) {
-		if (trans->laddr_check(addr) == 0) {
-			ret = trans;
+	for (i = 0; i < RDS_TRANS_COUNT; i++) {
+		if (transports[i] && (transports[i]->laddr_check(addr) == 0)) {
+			ret = transports[i];
 			break;
 		}
 	}

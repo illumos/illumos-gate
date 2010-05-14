@@ -141,11 +141,11 @@ struct rdsv3_ib_connection {
 
 	/* sending acks */
 	unsigned long		i_ack_flags;
-#ifndef KERNEL_HAS_ATOMIC64
+#ifdef KERNEL_HAS_ATOMIC64
+	atomic64_t		i_ack_next;	/* next ACK to send */
+#else
 	kmutex_t		i_ack_lock;	/* protect i_ack_next */
 	uint64_t		i_ack_next;	/* next ACK to send */
-#else
-	atomic64_t		i_ack_next;	/* next ACK to send */
 #endif
 	struct rdsv3_header	*i_ack;
 	ibt_send_wr_t		i_ack_wr;
@@ -338,7 +338,7 @@ void rdsv3_ib_send_add_credits(struct rdsv3_connection *conn,
 void rdsv3_ib_advertise_credits(struct rdsv3_connection *conn,
     unsigned int posted);
 int rdsv3_ib_send_grab_credits(struct rdsv3_ib_connection *ic, uint32_t wanted,
-    uint32_t *adv_credits, int need_posted, int max_posted);
+    uint32_t *adv_credits, int need_posted);
 
 /* ib_stats.c */
 RDSV3_DECLARE_PER_CPU(struct rdsv3_ib_statistics, rdsv3_ib_stats);

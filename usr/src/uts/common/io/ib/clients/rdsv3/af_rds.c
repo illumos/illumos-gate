@@ -85,6 +85,7 @@ extern struct rdma_cm_id *rdsv3_rdma_listen_id;
 kmutex_t rdsv3_sock_lock;
 static unsigned long rdsv3_sock_count;
 list_t rdsv3_sock_list;
+rdsv3_wait_queue_t rdsv3_poll_waitq;
 
 /*
  * This is called as the final descriptor referencing this socket is closed.
@@ -217,6 +218,19 @@ rdsv3_poll(sock_lower_handle_t proto_handle, short events, int anyyet,
 	RDSV3_DPRINTF4("rdsv3_poll", "enter(%p %x %d)", rs, events, anyyet);
 #endif
 
+	/*
+	 * If rs_seen_congestion is on, wait until it's off.
+	 * This is implemented for the following OFED code.
+	 * 	if (rs->rs_seen_congestion)
+	 *		poll_wait(file, &rds_poll_waitq, wait);
+	 */
+	mutex_enter(&rdsv3_poll_waitq.waitq_mutex);
+	while (rs->rs_seen_congestion) {
+		cv_wait(&rdsv3_poll_waitq.waitq_cv,
+		    &rdsv3_poll_waitq.waitq_mutex);
+	}
+	mutex_exit(&rdsv3_poll_waitq.waitq_mutex);
+
 	rw_enter(&rs->rs_recv_lock, RW_READER);
 	if (!rs->rs_cong_monitor) {
 		/*
@@ -238,6 +252,13 @@ rdsv3_poll(sock_lower_handle_t proto_handle, short events, int anyyet,
 	if (rs->rs_snd_bytes < rdsv3_sk_sndbuf(rs))
 		mask |= (POLLOUT | POLLWRNORM);
 	rw_exit(&rs->rs_recv_lock);
+
+	/* clear state any time we wake a seen-congested socket */
+	if (mask) {
+		mutex_enter(&rdsv3_poll_waitq.waitq_mutex);
+		rs->rs_seen_congestion = 0;
+		mutex_exit(&rdsv3_poll_waitq.waitq_mutex);
+	}
 
 #if 0
 	RDSV3_DPRINTF4("rdsv3_poll", "return(%p %x)", rs, mask);
@@ -509,6 +530,9 @@ rdsv3_setsockopt(sock_lower_handle_t proto_handle, int level,
 		break;
 	case RDSV3_GET_MR:
 		ret = rdsv3_get_mr(rs, optval, optlen);
+		break;
+	case RDSV3_GET_MR_FOR_DEST:
+		ret = rdsv3_get_mr_for_dest(rs, optval, optlen);
 		break;
 	case RDSV3_FREE_MR:
 		ret = rdsv3_free_mr(rs, optval, optlen);
@@ -974,6 +998,7 @@ rdsv3_init()
 	RDSV3_DPRINTF4("rdsv3_init", "Enter");
 
 	rdsv3_cong_init();
+
 	ret = rdsv3_conn_init();
 	if (ret)
 		goto out;

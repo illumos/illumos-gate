@@ -131,8 +131,7 @@ rdsv3_loop_recv(struct rdsv3_connection *conn)
 	return (0);
 }
 
-struct rdsv3_loop_connection
-{
+struct rdsv3_loop_connection {
 	struct list_node loop_node;
 	struct rdsv3_connection *conn;
 };

@@ -383,13 +383,13 @@ rdsv3_ib_send_cq_comp_handler(struct ib_cq *cq, void *context)
  */
 int
 rdsv3_ib_send_grab_credits(struct rdsv3_ib_connection *ic,
-    uint32_t wanted, uint32_t *adv_credits, int need_posted, int max_posted)
+    uint32_t wanted, uint32_t *adv_credits, int need_posted)
 {
 	unsigned int avail, posted, got = 0, advertise;
 	long oldval, newval;
 
-	RDSV3_DPRINTF4("rdsv3_ib_send_grab_credits", "ic: %p, %d %d %d %d",
-	    ic, wanted, *adv_credits, need_posted, max_posted);
+	RDSV3_DPRINTF4("rdsv3_ib_send_grab_credits", "ic: %p, %d %d %d",
+	    ic, wanted, *adv_credits, need_posted);
 
 	*adv_credits = 0;
 	if (!ic->i_flowctl)
@@ -426,7 +426,7 @@ try_again:
 	 * available.
 	 */
 	if (posted && (got || need_posted)) {
-		advertise = min(posted, max_posted);
+		advertise = min(posted, RDSV3_MAX_ADV_CREDIT);
 		newval -= IB_SET_POST_CREDITS(advertise);
 	}
 
@@ -436,8 +436,9 @@ try_again:
 
 	*adv_credits = advertise;
 
-	RDSV3_DPRINTF4("rdsv3_ib_send_grab_credits", "ic: %p, %d %d %d %d",
-	    ic, got, *adv_credits, need_posted, max_posted);
+	RDSV3_DPRINTF4("rdsv3_ib_send_grab_credits", "ic: %p, %d %d %d",
+	    ic, got, *adv_credits, need_posted);
+
 	return (got);
 }
 
@@ -631,7 +632,7 @@ rdsv3_ib_xmit(struct rdsv3_connection *conn, struct rdsv3_message *rm,
 	credit_alloc = work_alloc;
 	if (ic->i_flowctl) {
 		credit_alloc = rdsv3_ib_send_grab_credits(ic, work_alloc,
-		    &posted, 0, RDSV3_MAX_ADV_CREDIT);
+		    &posted, 0);
 		adv_credits += posted;
 		if (credit_alloc < work_alloc) {
 			rdsv3_ib_ring_unalloc(&ic->i_send_ring,
@@ -640,7 +641,7 @@ rdsv3_ib_xmit(struct rdsv3_connection *conn, struct rdsv3_message *rm,
 			flow_controlled++;
 		}
 		if (work_alloc == 0) {
-			set_bit(RDSV3_LL_SEND_FULL, &conn->c_flags);
+			rdsv3_ib_ring_unalloc(&ic->i_send_ring, work_alloc);
 			rdsv3_ib_stats_inc(s_ib_tx_throttle);
 			ret = -ENOMEM;
 			goto out;
@@ -717,12 +718,10 @@ rdsv3_ib_xmit(struct rdsv3_connection *conn, struct rdsv3_message *rm,
 		/*
 		 * Update adv_credits since we reset the ACK_REQUIRED bit.
 		 */
-		(void) rdsv3_ib_send_grab_credits(ic, 0, &posted, 1,
-		    RDSV3_MAX_ADV_CREDIT - adv_credits);
+		(void) rdsv3_ib_send_grab_credits(ic, 0, &posted, 1);
 		adv_credits += posted;
 		ASSERT(adv_credits <= 255);
-	} else if (ic->i_rm != rm)
-		RDSV3_PANIC();
+	}
 
 	send = &ic->i_sends[pos];
 	first = send;
@@ -885,13 +884,8 @@ add_header:
 			ic->i_rm = prev->s_rm;
 			prev->s_rm = NULL;
 		}
-#if 1
-		RDSV3_DPRINTF2("rdsv3_ib_xmit", "ibt_post_send FAIL");
-		ret = -EAGAIN;
-#else
-		/* Finesse this later */
-		RDSV3_PANIC();
-#endif
+		RDSV3_DPRINTF2("rdsv3_ib_xmit", "ibt_post_send failed\n");
+		rdsv3_conn_drop(ic->conn);
 		goto out;
 	}
 
@@ -1127,7 +1121,8 @@ rdsv3_ib_xmit_rdma(struct rdsv3_connection *conn, struct rdsv3_rdma_op *op)
 	    ic->i_send_wrs, k, &posted);
 	if (status != IBT_SUCCESS) {
 		RDSV3_DPRINTF2("rdsv3_ib_xmit_rdma",
-		    "RDS/IB: rdma ib_post_send returned %d", status);
+		    "RDS/IB: rdma ib_post_send to %u.%u.%u.%u "
+		    "returned %d", NIPQUAD(conn->c_faddr), status);
 		rdsv3_ib_ring_unalloc(&ic->i_send_ring, work_alloc);
 	}
 	return (status);

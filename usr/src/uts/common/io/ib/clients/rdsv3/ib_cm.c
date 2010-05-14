@@ -344,9 +344,15 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	/* Protection domain and memory range */
 	ic->i_pd = rds_ibdev->pd;
 
+	/*
+	 * IB_CQ_VECTOR_LEAST_ATTACHED and/or the corresponding feature is
+	 * not implmeneted in Hermon yet, but we can pass it to ib_create_cq()
+	 * anyway.
+	 */
 	ic->i_send_cq = ib_create_cq(dev, rdsv3_ib_send_cq_comp_handler,
 	    rdsv3_ib_cq_event_handler, conn,
-	    ic->i_send_ring.w_nr + 1, 0);
+	    ic->i_send_ring.w_nr + 1,
+	    IB_CQ_VECTOR_LEAST_ATTACHED);
 	if (IS_ERR(ic->i_send_cq)) {
 		ret = PTR_ERR(ic->i_send_cq);
 		ic->i_send_cq = NULL;
@@ -355,9 +361,15 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 		goto out;
 	}
 
+	/*
+	 * IB_CQ_VECTOR_LEAST_ATTACHED and/or the corresponding feature is
+	 * not implmeneted in Hermon yet, but we can pass it to ib_create_cq()
+	 * anyway.
+	 */
 	ic->i_recv_cq = ib_create_cq(dev, rdsv3_ib_recv_cq_comp_handler,
 	    rdsv3_ib_cq_event_handler, conn,
-	    ic->i_recv_ring.w_nr, 0);
+	    ic->i_recv_ring.w_nr,
+	    IB_CQ_VECTOR_LEAST_ATTACHED);
 	if (IS_ERR(ic->i_recv_cq)) {
 		ret = PTR_ERR(ic->i_recv_cq);
 		ic->i_recv_cq = NULL;

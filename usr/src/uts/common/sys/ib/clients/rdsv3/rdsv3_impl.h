@@ -102,6 +102,19 @@ typedef unsigned int	atomic_t;
 	!atomic_clear_long_excl(((ulong_t *)(void *)p) + (b >> 5), (b & 0x1f))
 #endif
 
+/*
+ * These macros and/or constants are used instead of Linux
+ * generic_{test,__{clear,set}}_le_bit().
+ */
+#if defined(sparc)
+#define	LE_BIT_XOR	((BITS_PER_LONG-1) & ~0x7)
+#else
+#define	LE_BIT_XOR	0
+#endif
+
+#define	set_le_bit(b, p)	set_bit(b ^ LE_BIT_XOR, p)
+#define	clear_le_bit(b, p)	clear_bit(b ^ LE_BIT_XOR, p)
+#define	test_le_bit(b, p)	test_bit(b ^ LE_BIT_XOR, p)
 
 uint_t	rdsv3_one_sec_in_hz;
 
@@ -393,7 +406,8 @@ rdsv3_sk_sock_orphan(struct rsock *sk)
 	set_bit(SOCK_DEAD, &sk->sk_flag);
 }
 
-#define	rdsv3_rcvtimeo(a, b)	3600	/* check this value on linux */
+#define	rdsv3_sndtimeo(a, b)	b ? 0 : 3600	/* check this value on linux */
+#define	rdsv3_rcvtimeo(a, b)	b ? 0 : 3600	/* check this value on linux */
 
 void rdsv3_ib_free_conn(void *arg);
 

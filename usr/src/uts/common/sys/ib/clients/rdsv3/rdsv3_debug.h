@@ -130,6 +130,7 @@ void rdsv3_vprintk(
 /* defined in rds_debug.c */
 void rdsv3_logging_initialization();
 void rdsv3_logging_destroy();
+int rdsv3_printk_ratelimit(void);
 
 #ifdef __cplusplus
 }

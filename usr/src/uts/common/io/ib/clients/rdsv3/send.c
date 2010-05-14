@@ -499,9 +499,8 @@ rdsv3_rdma_send_complete(struct rdsv3_message *rm, int status)
 
 	ro = rm->m_rdma_op;
 	if (test_bit(RDSV3_MSG_ON_SOCK, &rm->m_flags) &&
-	    ro && ro->r_notify &&
-	    (notifier = ro->r_notifier) != NULL) {
-		ro->r_notifier = NULL;
+	    ro && ro->r_notify && ro->r_notifier) {
+		notifier = ro->r_notifier;
 		rs = rm->m_rs;
 		rdsv3_sk_sock_hold(rdsv3_rs_to_sk(rs));
 
@@ -509,6 +508,8 @@ rdsv3_rdma_send_complete(struct rdsv3_message *rm, int status)
 		mutex_enter(&rs->rs_lock);
 		list_insert_tail(&rs->rs_notify_queue, notifier);
 		mutex_exit(&rs->rs_lock);
+
+		ro->r_notifier = NULL;
 	}
 
 	mutex_exit(&rm->m_rs_lock);
@@ -601,6 +602,7 @@ rdsv3_send_remove_from_sock(struct list *messages, int status)
 	RDSV3_DPRINTF4("rdsv3_send_remove_from_sock", "Enter");
 
 	while (!list_is_empty(messages)) {
+		int was_on_sock = 0;
 		rm = list_remove_head(messages);
 
 		/*
@@ -633,17 +635,16 @@ rdsv3_send_remove_from_sock(struct list *messages, int status)
 
 			list_remove_node(&rm->m_sock_item);
 			rdsv3_send_sndbuf_remove(rs, rm);
-
-			if (ro &&
-			    (notifier = ro->r_notifier) != NULL &&
+			if (ro && ro->r_notifier &&
 			    (status || ro->r_notify)) {
+				notifier = ro->r_notifier;
 				list_insert_tail(&rs->rs_notify_queue,
 				    notifier);
 				if (!notifier->n_status)
 					notifier->n_status = status;
 				rm->m_rdma_op->r_notifier = NULL;
 			}
-			rdsv3_message_put(rm);
+			was_on_sock = 1;
 			rm->m_rs = NULL;
 		}
 		mutex_exit(&rs->rs_lock);
@@ -651,6 +652,8 @@ rdsv3_send_remove_from_sock(struct list *messages, int status)
 unlock_and_drop:
 		mutex_exit(&rm->m_rs_lock);
 		rdsv3_message_put(rm);
+		if (was_on_sock)
+			rdsv3_message_put(rm);
 	}
 
 	if (rs) {
@@ -936,7 +939,7 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 	int ret = 0;
 	int queued = 0, allocated_mr = 0;
 	int nonblock = msg->msg_flags & MSG_DONTWAIT;
-	long timeo = rdsv3_rcvtimeo(sk, nonblock);
+	long timeo = rdsv3_sndtimeo(sk, nonblock);
 
 	RDSV3_DPRINTF4("rdsv3_sendmsg", "Enter(rs: %p)", rs);
 
@@ -976,6 +979,15 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 
 	rm->m_daddr = daddr;
 
+	/* Parse any control messages the user may have included. */
+	ret = rdsv3_cmsg_send(rs, rm, msg, &allocated_mr);
+	if (ret) {
+		RDSV3_DPRINTF2("rdsv3_sendmsg",
+		    "rdsv3_cmsg_send(rs: %p rm: %p msg: %p) returned: %d",
+		    rs, rm, msg, ret);
+		goto out;
+	}
+
 	/*
 	 * rdsv3_conn_create has a spinlock that runs with IRQ off.
 	 * Caching the conn in the socket helps a lot.
@@ -998,15 +1010,6 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 	}
 	mutex_exit(&rs->rs_conn_lock);
 
-	/* Parse any control messages the user may have included. */
-	ret = rdsv3_cmsg_send(rs, rm, msg, &allocated_mr);
-	if (ret) {
-		RDSV3_DPRINTF2("rdsv3_sendmsg",
-		    "rdsv3_cmsg_send(rs: %p rm: %p msg: %p) returned: %d",
-		    rs, rm, msg, ret);
-		goto out;
-	}
-
 	if ((rm->m_rdma_cookie || rm->m_rdma_op) &&
 	    conn->c_trans->xmit_rdma == NULL) {
 		RDSV3_DPRINTF2("rdsv3_sendmsg", "rdma_op %p conn xmit_rdma %p",
@@ -1026,6 +1029,11 @@ rdsv3_sendmsg(struct rdsv3_sock *rs, uio_t *uio, struct nmsghdr *msg,
 
 	ret = rdsv3_cong_wait(conn->c_fcong, dport, nonblock, rs);
 	if (ret) {
+		mutex_enter(&rdsv3_poll_waitq.waitq_mutex);
+		rs->rs_seen_congestion = 1;
+		cv_signal(&rdsv3_poll_waitq.waitq_cv);
+		mutex_exit(&rdsv3_poll_waitq.waitq_mutex);
+
 		RDSV3_DPRINTF2("rdsv3_sendmsg",
 		    "rdsv3_cong_wait (dport: %d) returned: %d", dport, ret);
 		goto out;

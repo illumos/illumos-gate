@@ -80,6 +80,7 @@ rdsv3_find_bound(uint32_be_t addr, uint16_be_t port)
 
 	RDSV3_DPRINTF5("rdsv3_find_bound", "returning rs %p for %u.%u.%u.%u:%x",
 	    rs, NIPQUAD(addr), port);
+
 	return (rs);
 }
 
@@ -122,7 +123,6 @@ rdsv3_add_bound(struct rdsv3_sock *rs, uint32_be_t addr, uint16_be_t *port)
 		RDSV3_DPRINTF5("rdsv3_add_bound",
 		    "rs %p binding to %u.%u.%u.%u:%x",
 		    rs, NIPQUAD(addr), *port);
-
 	}
 
 	mutex_exit(&rdsv3_bind_lock);
@@ -143,7 +143,6 @@ rdsv3_remove_bound(struct rdsv3_sock *rs)
 		RDSV3_DPRINTF5("rdsv3_remove_bound",
 		    "rs %p unbinding from %u.%u.%u.%u:%x",
 		    rs, NIPQUAD(rs->rs_bound_addr), rs->rs_bound_port);
-
 		avl_remove(&rdsv3_bind_tree, rs);
 		rdsv3_sock_put(rs);
 		rs->rs_bound_addr = 0;
@@ -192,6 +191,10 @@ rdsv3_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	rs->rs_transport = rdsv3_trans_get_preferred(sin->sin_addr.s_addr);
 	if (rs->rs_transport == NULL) {
 		rdsv3_remove_bound(rs);
+		if (rdsv3_printk_ratelimit()) {
+			RDSV3_DPRINTF1("rdsv3_bind",
+			    "RDS: rdsv3_bind() could not find a transport.\n");
+		}
 		return (EADDRNOTAVAIL);
 	}
 

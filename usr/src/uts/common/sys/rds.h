@@ -88,6 +88,7 @@ extern "C" {
 /* deprecated: RDS_BARRIER 4 */
 #define	RDSV3_RECVERR			5
 #define	RDSV3_CONG_MONITOR		6
+#define	RDSV3_GET_MR_FOR_DEST		7
 
 /*
  * Control message types for SOL_RDS.
@@ -113,93 +114,6 @@ extern "C" {
 #define	RDSV3_CMSG_RDMA_MAP		3
 #define	RDSV3_CMSG_RDMA_STATUS		4
 #define	RDSV3_CMSG_CONG_UPDATE		5
-
-/*
- * RDMA related types
- */
-
-/*
- * This encapsulates a remote memory location.
- * In the current implementation, it contains the R_Key
- * of the remote memory region, and the offset into it
- * (so that the application does not have to worry about
- * alignment).
- */
-typedef uint64_t	rdsv3_rdma_cookie_t;
-
-struct rdsv3_iovec {
-	uint64_t	addr;
-	uint64_t	bytes;
-};
-
-struct rdsv3_get_mr_args {
-	struct rdsv3_iovec vec;
-	uint64_t	cookie_addr;
-	uint64_t	flags;
-};
-
-struct rdsv3_free_mr_args {
-	rdsv3_rdma_cookie_t cookie;
-	uint64_t	flags;
-};
-
-struct rdsv3_rdma_args {
-	rdsv3_rdma_cookie_t cookie;
-	struct rdsv3_iovec remote_vec;
-	uint64_t	local_vec_addr;
-	uint64_t	nr_local;
-	uint64_t	flags;
-	uint64_t	user_token;
-};
-
-struct rdsv3_rdma_notify {
-	uint64_t	user_token;
-	int32_t		status;
-};
-
-#define	RDSV3_RDMA_SUCCESS	0
-#define	RDSV3_RDMA_REMOTE_ERROR	1
-#define	RDSV3_RDMA_CANCELED	2
-#define	RDSV3_RDMA_DROPPED	3
-#define	RDSV3_RDMA_OTHER_ERROR	4
-
-/*
- * Common set of flags for all RDMA related structs
- */
-#define	RDSV3_RDMA_READWRITE	0x0001
-#define	RDSV3_RDMA_FENCE	0x0002	/* use FENCE for immediate send */
-#define	RDSV3_RDMA_INVALIDATE	0x0004	/* invalidate R_Key after freeing MR */
-#define	RDSV3_RDMA_USE_ONCE	0x0008	/* free MR after use */
-#define	RDSV3_RDMA_DONTWAIT	0x0010	/* Don't wait in SET_BARRIER */
-#define	RDSV3_RDMA_NOTIFY_ME	0x0020	/* Notify when operation completes */
-
-/*
- * Congestion monitoring.
- * Congestion control in RDS happens at the host connection
- * level by exchanging a bitmap marking congested ports.
- * By default, a process sleeping in poll() is always woken
- * up when the congestion map is updated.
- * With explicit monitoring, an application can have more
- * fine-grained control.
- * The application installs a 64bit mask value in the socket,
- * where each bit corresponds to a group of ports.
- * When a congestion update arrives, RDS checks the set of
- * ports that are now uncongested against the list bit mask
- * installed in the socket, and if they overlap, we queue a
- * cong_notification on the socket.
- *
- * To install the congestion monitor bitmask, use RDS_CONG_MONITOR
- * with the 64bit mask.
- * Congestion updates are received via RDS_CMSG_CONG_UPDATE
- * control messages.
- *
- * The correspondence between bits and ports is
- *	1 << (portnum % 64)
- */
-#define	RDSV3_CONG_MONITOR_SIZE	64
-#define	RDSV3_CONG_MONITOR_BIT(port)	\
-	(((unsigned int) port) % RDSV3_CONG_MONITOR_SIZE)
-#define	RDSV3_CONG_MONITOR_MASK(port) (1ULL << RDSV3_CONG_MONITOR_BIT(port))
 
 /* rds-info related */
 
@@ -234,6 +148,8 @@ struct rdsv3_info_counter {
 #define	RDSV3_INFO_CONNECTION_FLAG_SENDING	0x01
 #define	RDSV3_INFO_CONNECTION_FLAG_CONNECTING	0x02
 #define	RDSV3_INFO_CONNECTION_FLAG_CONNECTED	0x04
+
+#define	TRANSNAMSIZ	16
 
 #ifndef __lock_lint
 #pragma pack(1)
@@ -278,7 +194,7 @@ struct rdsv3_info_flow {
 #endif
 
 #define	RDSV3_INFO_MESSAGE_FLAG_ACK		0x01
-#define	RDSV3_INFO_MESSAGE_FLAG_FAST_ACK		0x02
+#define	RDSV3_INFO_MESSAGE_FLAG_FAST_ACK	0x02
 
 #ifndef __lock_lint
 #pragma pack(1)
@@ -367,6 +283,103 @@ struct rdsv3_info_rdma_connection {
 #define	rdsv3_info_ib_connection rdsv3_info_rdma_connection
 #define	rdma_fmr_max rdma_mr_max
 #define	rdma_fmr_size rdma_mr_size
+
+/*
+ * Congestion monitoring.
+ * Congestion control in RDS happens at the host connection
+ * level by exchanging a bitmap marking congested ports.
+ * By default, a process sleeping in poll() is always woken
+ * up when the congestion map is updated.
+ * With explicit monitoring, an application can have more
+ * fine-grained control.
+ * The application installs a 64bit mask value in the socket,
+ * where each bit corresponds to a group of ports.
+ * When a congestion update arrives, RDS checks the set of
+ * ports that are now uncongested against the list bit mask
+ * installed in the socket, and if they overlap, we queue a
+ * cong_notification on the socket.
+ *
+ * To install the congestion monitor bitmask, use RDS_CONG_MONITOR
+ * with the 64bit mask.
+ * Congestion updates are received via RDS_CMSG_CONG_UPDATE
+ * control messages.
+ *
+ * The correspondence between bits and ports is
+ *	1 << (portnum % 64)
+ */
+#define	RDSV3_CONG_MONITOR_SIZE	64
+#define	RDSV3_CONG_MONITOR_BIT(port)	\
+	(((unsigned int) port) % RDSV3_CONG_MONITOR_SIZE)
+#define	RDSV3_CONG_MONITOR_MASK(port) (1ULL << RDSV3_CONG_MONITOR_BIT(port))
+
+/*
+ * RDMA related types
+ */
+
+/*
+ * This encapsulates a remote memory location.
+ * In the current implementation, it contains the R_Key
+ * of the remote memory region, and the offset into it
+ * (so that the application does not have to worry about
+ * alignment).
+ */
+typedef uint64_t	rdsv3_rdma_cookie_t;
+
+struct rdsv3_iovec {
+	uint64_t	addr;
+	uint64_t	bytes;
+};
+
+struct rdsv3_get_mr_args {
+	struct rdsv3_iovec vec;
+	uint64_t	cookie_addr;
+	uint64_t	flags;
+};
+
+#if 1 /* 1 at 1.5.1 */
+#include <sys/socket_impl.h>
+struct rdsv3_get_mr_for_dest_args {
+	struct sockaddr_storage	dest_addr;
+	struct rdsv3_iovec 	vec;
+	uint64_t		cookie_addr;
+	uint64_t		flags;
+};
+#endif
+
+struct rdsv3_free_mr_args {
+	rdsv3_rdma_cookie_t cookie;
+	uint64_t	flags;
+};
+
+struct rdsv3_rdma_args {
+	rdsv3_rdma_cookie_t cookie;
+	struct rdsv3_iovec remote_vec;
+	uint64_t	local_vec_addr;
+	uint64_t	nr_local;
+	uint64_t	flags;
+	uint64_t	user_token;
+};
+
+struct rdsv3_rdma_notify {
+	uint64_t	user_token;
+	int32_t		status;
+};
+
+#define	RDSV3_RDMA_SUCCESS	0
+#define	RDSV3_RDMA_REMOTE_ERROR	1
+#define	RDSV3_RDMA_CANCELED	2
+#define	RDSV3_RDMA_DROPPED	3
+#define	RDSV3_RDMA_OTHER_ERROR	4
+
+/*
+ * Common set of flags for all RDMA related structs
+ */
+#define	RDSV3_RDMA_READWRITE	0x0001
+#define	RDSV3_RDMA_FENCE	0x0002	/* use FENCE for immediate send */
+#define	RDSV3_RDMA_INVALIDATE	0x0004	/* invalidate R_Key after freeing MR */
+#define	RDSV3_RDMA_USE_ONCE	0x0008	/* free MR after use */
+#define	RDSV3_RDMA_DONTWAIT	0x0010	/* Don't wait in SET_BARRIER */
+#define	RDSV3_RDMA_NOTIFY_ME	0x0020	/* Notify when operation completes */
 
 #ifdef	__cplusplus
 }

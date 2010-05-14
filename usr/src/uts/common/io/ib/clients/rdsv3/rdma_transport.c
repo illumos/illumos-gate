@@ -143,7 +143,7 @@ rdsv3_rdma_cm_event_handler(struct rdma_cm_id *cm_id,
 		if (conn) {
 			RDSV3_DPRINTF2("rdsv3_rdma_cm_event_handler",
 			    "RDS/RDMA: DISCONNECT event - dropping connection "
-			    "%u.%u.%u.%u ->%u.%u.%u.%u", NIPQUAD(conn->c_laddr),
+			    "%u.%u.%u.%u->%u.%u.%u.%u", NIPQUAD(conn->c_laddr),
 			    NIPQUAD(conn->c_faddr));
 			rdsv3_conn_drop(conn);
 		}
@@ -152,22 +152,14 @@ rdsv3_rdma_cm_event_handler(struct rdma_cm_id *cm_id,
 	default:
 		/* things like device disconnect? */
 		RDSV3_DPRINTF2("rdsv3_rdma_cm_event_handler",
-		    "unknown event %u\n", event->event);
+		    "unknown event %u!\n", event->event);
 		RDSV3_PANIC();
 		break;
 	}
 
 out:
-	if (conn) {
-#ifndef __lock_lint
-		// struct rds_iw_connection *ic = conn->c_transport_data;
-
-		/* If we return non-zero, we must to hang on to the cm_id */
-		// BUG_ON(ic->i_cm_id == cm_id && ret);
-#endif
-
+	if (conn)
 		mutex_exit(&conn->c_cm_lock);
-	}
 
 	RDSV3_DPRINTF2("rdsv3_rdma_cm_event_handler",
 	    "id %p event %u handling ret %d", cm_id, event->event, ret);
@@ -235,7 +227,6 @@ static void rdsv3_rdma_listen_stop(void)
 {
 	RDSV3_DPRINTF2("rdsv3_rdma_listen_stop", "cm %p", rdsv3_rdma_listen_id);
 	rdma_destroy_id(rdsv3_rdma_listen_id);
-
 	RDSV3_DPRINTF2("rdsv3_rdma_listen_stop", "Return");
 }
 

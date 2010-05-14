@@ -68,9 +68,6 @@ unsigned int  rdsv3_sysctl_max_unacked_bytes = (16 << 20);
 
 unsigned int rdsv3_sysctl_ping_enable = 1;
 
-unsigned long rdsv3_sysctl_trace_flags = 0;
-unsigned int  rdsv3_sysctl_trace_level = 0;
-
 void
 rdsv3_sysctl_exit(void)
 {

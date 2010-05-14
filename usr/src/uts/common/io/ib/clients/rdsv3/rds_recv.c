@@ -569,6 +569,7 @@ rdsv3_recvmsg(struct rdsv3_sock *rs, uio_t *uio,
 		    "copying inc %p from %u.%u.%u.%u:%u to user", inc,
 		    NIPQUAD(inc->i_conn->c_faddr),
 		    ntohs(inc->i_hdr.h_sport));
+
 		ret = inc->i_conn->c_trans->inc_copy_to_user(inc, uio, size);
 		if (ret < 0)
 			break;

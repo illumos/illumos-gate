@@ -705,6 +705,13 @@ int ib_modify_qp(struct ib_qp *qp, struct ib_qp_attr *qp_attr,
 int ib_destroy_qp(struct ib_qp *qp);
 
 /*
+ * IB_CQ_VECTOR_LEAST_ATTACHED: The constant specifies that
+ *      the CQ will be attached to the completion vector that has
+ *      the least number of CQs already attached to it.
+ */
+#define	IB_CQ_VECTOR_LEAST_ATTACHED	0xffffffff
+
+/*
  * ib_create_cq - Creates a CQ on the specified device.
  * @device: The device on which to create the CQ.
  * @comp_handler: A user-specified callback that is invoked when a

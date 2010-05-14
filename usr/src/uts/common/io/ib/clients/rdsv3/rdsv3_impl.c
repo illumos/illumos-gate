@@ -958,29 +958,32 @@ rdsv3_mr_compare(const void *mr1, const void *mr2)
 }
 
 /* transport.c */
-extern list_t			transports;
+extern struct rdsv3_transport *transports[];
 extern krwlock_t		trans_sem;
 
 void
 rdsv3_trans_exit(void)
 {
 	struct rdsv3_transport *trans;
+	int i;
 
 	RDSV3_DPRINTF2("rdsv3_trans_exit", "Enter");
 
 	/* currently, only IB transport */
 	rw_enter(&trans_sem, RW_READER);
-	if (!list_is_empty(&transports))
-		trans = list_head(&transports);
-	else
-		trans = NULL;
+	trans = NULL;
+	for (i = 0; i < RDS_TRANS_COUNT; i++) {
+		if (transports[i]) {
+			trans = transports[i];
+			break;
+		}
+	}
 	rw_exit(&trans_sem);
 
 	/* trans->exit() will remove the trans from the list */
 	if (trans)
 		trans->exit();
 
-	list_destroy(&transports);
 	rw_destroy(&trans_sem);
 
 	RDSV3_DPRINTF2("rdsv3_trans_exit", "Return");
@@ -991,8 +994,6 @@ rdsv3_trans_init()
 {
 	RDSV3_DPRINTF2("rdsv3_trans_init", "Enter");
 
-	list_create(&transports, sizeof (struct rdsv3_transport),
-	    offsetof(struct rdsv3_transport, t_item));
 	rw_init(&trans_sem, NULL, RW_DRIVER, NULL);
 
 	RDSV3_DPRINTF2("rdsv3_trans_init", "Return");
@@ -1270,4 +1271,25 @@ rdsv3_ib_free_hdrs(ib_device_t *dev, struct rdsv3_ib_connection *ic)
 
 	ic->i_mr = NULL;
 	RDSV3_DPRINTF4("rdsv3_ib_free_hdrs", "Return(dev: %p)", dev);
+}
+
+/*
+ * atomic_add_unless - add unless the number is a given value
+ * @v: pointer of type atomic_t
+ * @a: the amount to add to v...
+ * @u: ...unless v is equal to u.
+ *
+ * Atomically adds @a to @v, so long as it was not @u.
+ * Returns non-zero if @v was not @u, and zero otherwise.
+ */
+int
+atomic_add_unless(atomic_t *v, uint_t a, ulong_t u)
+{
+	uint_t c, old;
+
+	c = *v;
+	while (c != u && (old = atomic_cas_uint(v, c, c + a)) != c) {
+		c = old;
+	}
+	return ((ulong_t)c != u);
 }

@@ -315,6 +315,36 @@ rdsv3_get_mr(struct rdsv3_sock *rs, const void *optval, int optlen)
 	return (__rdsv3_rdma_map(rs, &args, NULL, NULL));
 }
 
+int
+rdsv3_get_mr_for_dest(struct rdsv3_sock *rs, const void *optval,
+    int optlen)
+{
+	struct rdsv3_get_mr_for_dest_args args;
+	struct rdsv3_get_mr_args new_args;
+
+	if (optlen != sizeof (struct rdsv3_get_mr_for_dest_args))
+		return (-EINVAL);
+
+#if 1
+	bcopy((struct rdsv3_get_mr_for_dest_args *)optval, &args,
+	    sizeof (struct rdsv3_get_mr_for_dest_args));
+#else
+	if (ddi_copyin(optval, &args, optlen, 0))
+		return (-EFAULT);
+#endif
+
+	/*
+	 * Initially, just behave like get_mr().
+	 * TODO: Implement get_mr as wrapper around this
+	 *	 and deprecate it.
+	 */
+	new_args.vec = args.vec;
+	new_args.cookie_addr = args.cookie_addr;
+	new_args.flags = args.flags;
+
+	return (__rdsv3_rdma_map(rs, &new_args, NULL, NULL));
+}
+
 /*
  * Free the MR indicated by the given R_Key
  */

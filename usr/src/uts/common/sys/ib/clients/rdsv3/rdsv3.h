@@ -77,44 +77,6 @@ extern "C" {
  */
 #define	RDSV3_PORT	18634
 
-#include <sys/ib/clients/rdsv3/info.h>
-
-/*
- * RDS trace facilities
- */
-enum {
-	RDSV3_BIND = 0,
-	RDSV3_CONG,
-	RDSV3_CONNECTION,
-	RDSV3_RDMA,
-	RDSV3_PAGE,
-	RDSV3_SEND,
-	RDSV3_RECV,
-	RDSV3_THREADS,
-	RDSV3_INFO,
-	RDSV3_MESSAGE,
-	RDSV3_IB,
-	RDSV3_IB_CM,
-	RDSV3_IB_RDMA,
-	RDSV3_IB_RING,
-	RDSV3_IB_RECV,
-	RDSV3_IB_SEND,
-	RDSV3_TCP,
-	RDSV3_TCP_CONNECT,
-	RDSV3_TCP_LISTEN,
-	RDSV3_TCP_RECV,
-	RDSV3_TCP_SEND
-};
-
-enum {
-	RDSV3_ALWAYS = 0,
-	RDSV3_MINIMAL,
-	RDSV3_LOW,
-	RDSV3_MEDIUM,
-	RDSV3_HIGH,
-	RDSV3_VERBOSE
-};
-
 /*
  * This is the sad making.  Some kernels have a bug in the per_cpu() api which
  * makes DEFINE_PER_CPU trigger an oops on insmod because the per-cpu section
@@ -147,7 +109,6 @@ struct rdsv3_cong_map {
 	struct list		m_conn_list;
 	unsigned long		m_page_addrs[RDSV3_CONG_MAP_PAGES];
 };
-
 
 /*
  * This is how we will track the connection state:
@@ -218,7 +179,7 @@ struct rdsv3_connection {
 #define	RDSV3_FLAG_CONG_BITMAP		0x01
 #define	RDSV3_FLAG_ACK_REQUIRED		0x02
 #define	RDSV3_FLAG_RETRANSMITTED	0x04
-#define	RDSV3_MAX_ADV_CREDIT		255
+#define	RDSV3_MAX_ADV_CREDIT		127
 
 /*
  * Maximum space available for extension headers.
@@ -393,9 +354,15 @@ struct rdsv3_notifier {
  *		   flag and header.
  */
 
+#define	RDS_TRANS_IB    0
+#define	RDS_TRANS_IWARP 1
+#define	RDS_TRANS_TCP   2
+#define	RDS_TRANS_COUNT 3
+
 struct rdsv3_transport {
+	char			t_name[TRANSNAMSIZ];
 	struct list_node	t_item;
-	char			*t_name;
+	unsigned int		t_type;
 	unsigned int		t_prefer_loopback:1;
 
 	int (*laddr_check)(uint32_be_t addr);
@@ -435,7 +402,6 @@ struct rdsv3_transport {
 
 struct rdsv3_sock {
 	struct rsock		*rs_sk;
-
 	uint64_t		rs_user_addr;
 	uint64_t		rs_user_bytes;
 
@@ -465,6 +431,8 @@ struct rdsv3_sock {
 
 	/* flag indicating we were congested or not */
 	int			rs_congested;
+	/* seen congestion (ENOBUFS) when sending? */
+	int			rs_seen_congestion;
 
 	/* rs_lock protects all these adjacent members before the newline */
 	kmutex_t		rs_lock;
@@ -580,6 +548,8 @@ void rdsv3_sock_put(struct rdsv3_sock *rs);
 void rdsv3_wake_sk_sleep(struct rdsv3_sock *rs);
 void __rdsv3_wake_sk_sleep(struct rsock *sk);
 
+extern rdsv3_wait_queue_t rdsv3_poll_waitq;
+
 /* bind.c */
 int rdsv3_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
     socklen_t len, cred_t *cr);
@@ -687,12 +657,12 @@ struct rdsv3_message *rdsv3_cong_update_alloc(struct rdsv3_connection *conn);
 RDSV3_DECLARE_PER_CPU(struct rdsv3_statistics, rdsv3_stats);
 #define	rdsv3_stats_inc_which(which, member) do {		\
 	rdsv3_per_cpu(which, get_cpu()).member++;		\
-	put_cpu();					\
+	put_cpu();						\
 } while (0)
 #define	rdsv3_stats_inc(member) rdsv3_stats_inc_which(rdsv3_stats, member)
-#define	rdsv3_stats_add_which(which, member, count) do {		\
+#define	rdsv3_stats_add_which(which, member, count) do {	\
 	rdsv3_per_cpu(which, get_cpu()).member += count;	\
-	put_cpu();					\
+	put_cpu();						\
 } while (0)
 #define	rdsv3_stats_add(member, count)	\
 	rdsv3_stats_add_which(rdsv3_stats, member, count)

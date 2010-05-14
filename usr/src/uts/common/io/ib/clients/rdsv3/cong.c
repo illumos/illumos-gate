@@ -269,6 +269,7 @@ rdsv3_cong_map_updated(struct rdsv3_cong_map *map, uint64_t portmask)
 	RDSV3_DPRINTF4("rdsv3_cong_map_updated",
 	    "waking map %p for %u.%u.%u.%u",
 	    map, NIPQUAD(map->m_addr));
+
 	rdsv3_stats_inc(s_cong_update_received);
 	atomic_add_32(&rdsv3_cong_generation, 1);
 #if 0
@@ -308,16 +309,6 @@ rdsv3_cong_updated_since(unsigned long *recent)
 }
 
 /*
- * These should be using generic_{test,__{clear,set}}_le_bit() but some old
- * kernels don't have them.  Sigh.
- */
-#if defined(sparc)
-#define	LE_BIT_XOR	((BITS_PER_LONG-1) & ~0x7)
-#else
-#define	LE_BIT_XOR	0
-#endif
-
-/*
  * We're called under the locking that protects the sockets receive buffer
  * consumption.  This makes it a lot easier for the caller to only call us
  * when it knows that an existing set bit needs to be cleared, and vice versa.
@@ -336,8 +327,7 @@ rdsv3_cong_set_bit(struct rdsv3_cong_map *map, uint16_be_t port)
 
 	i = ntohs(port) / RDSV3_CONG_MAP_PAGE_BITS;
 	off = ntohs(port) % RDSV3_CONG_MAP_PAGE_BITS;
-
-	set_bit(off ^ LE_BIT_XOR, (void *)map->m_page_addrs[i]);
+	set_le_bit(off, (void *)map->m_page_addrs[i]);
 }
 
 void
@@ -352,8 +342,7 @@ rdsv3_cong_clear_bit(struct rdsv3_cong_map *map, uint16_be_t port)
 
 	i = ntohs(port) / RDSV3_CONG_MAP_PAGE_BITS;
 	off = ntohs(port) % RDSV3_CONG_MAP_PAGE_BITS;
-
-	clear_bit(off ^ LE_BIT_XOR, (void *)map->m_page_addrs[i]);
+	clear_le_bit(off, (void *)map->m_page_addrs[i]);
 }
 
 static int
@@ -368,10 +357,8 @@ rdsv3_cong_test_bit(struct rdsv3_cong_map *map, uint16_be_t port)
 	RDSV3_DPRINTF5("rdsv3_cong_test_bit", "port: 0x%x i = %lx off = %lx",
 	    ntohs(port), i, off);
 
-	return (test_bit(off ^ LE_BIT_XOR, (void *)map->m_page_addrs[i]));
+	return (test_le_bit(off, (void *)map->m_page_addrs[i]));
 }
-
-#undef LE_BIT_XOR
 
 void
 rdsv3_cong_add_socket(struct rdsv3_sock *rs)

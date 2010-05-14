@@ -26,6 +26,7 @@
 #include <sys/cmn_err.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/time.h>
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
 
 /*
@@ -345,4 +346,56 @@ rdsv3_trace(char *name, uint8_t lvl, char *fmt, ...)
 	va_start(ap, fmt);
 	rdsv3_vlog(name, lvl, fmt, ap);
 	va_end(ap);
+}
+
+#define	DEFAULT_RATELIMIT_INTERVAL	5
+#define	DEFAULT_RATELIMIT_BURST	10
+
+struct ratelimit_state {
+	clock_t interval;
+	int burst;
+	int printed;
+	int missed;
+	hrtime_t begin;
+	kmutex_t lock;
+};
+
+#define	DEFINE_RATELIMIT_STATE(name, interval, burst)		\
+	static struct ratelimit_state name = {interval, burst, }
+
+DEFINE_RATELIMIT_STATE(rdsv3_printk_ratelimit_state,
+    DEFAULT_RATELIMIT_INTERVAL,
+    DEFAULT_RATELIMIT_BURST);
+
+int
+rdsv3_printk_ratelimit(void)
+{
+	struct ratelimit_state *rs = &rdsv3_printk_ratelimit_state;
+	hrtime_t current = gethrtime();
+	int rtn = 0;
+
+	if (rs->interval) {
+		return (1);
+	}
+	mutex_enter(&rs->lock);
+	if (!rs->begin) {
+		rs->begin = current;
+	}
+	if (current < rs->begin + TICK_TO_NSEC(rs->interval)) {
+		if (rs->missed) {
+			RDSV3_DPRINTF0("rdsv3_printk_ratelimit: ",
+			    "%d callbacks suppressed\n", rs->missed);
+			rs->begin = 0;
+			rs->printed = 0;
+			rs->missed = 0;
+		}
+	}
+	if (rs->burst && rs->burst > rs->printed) {
+		rs->printed++;
+		rtn = 1;
+	} else {
+		rs->missed++;
+	}
+	mutex_exit(&rs->lock);
+	return (rtn);
 }

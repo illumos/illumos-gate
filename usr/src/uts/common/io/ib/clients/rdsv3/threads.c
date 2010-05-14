@@ -162,10 +162,12 @@ rdsv3_queue_reconnect(struct rdsv3_connection *conn)
 	}
 
 	(void) random_get_pseudo_bytes((uint8_t *)&rand, sizeof (rand));
+
 	RDSV3_DPRINTF5("rdsv3",
 	    "%lu delay %lu ceil conn %p for %u.%u.%u.%u -> %u.%u.%u.%u",
 	    rand % conn->c_reconnect_jiffies, conn->c_reconnect_jiffies,
 	    conn, NIPQUAD(conn->c_laddr), NIPQUAD(conn->c_faddr));
+
 	rdsv3_queue_delayed_work(rdsv3_wq, &conn->c_conn_w,
 	    rand % conn->c_reconnect_jiffies);
 
@@ -186,10 +188,12 @@ rdsv3_connect_worker(struct rdsv3_work_s *work)
 	if (rdsv3_conn_transition(conn, RDSV3_CONN_DOWN,
 	    RDSV3_CONN_CONNECTING)) {
 		ret = conn->c_trans->conn_connect(conn);
+
 		RDSV3_DPRINTF5("rdsv3",
 		    "connect conn %p for %u.%u.%u.%u -> %u.%u.%u.%u "
 		    "ret %d", conn, NIPQUAD(conn->c_laddr),
 		    NIPQUAD(conn->c_faddr), ret);
+
 		RDSV3_DPRINTF2("rdsv3_connect_worker",
 		    "conn %p for %u.%u.%u.%u to %u.%u.%u.%u dispatched, ret %d",
 		    conn, NIPQUAD(conn->c_laddr), NIPQUAD(conn->c_faddr), ret);

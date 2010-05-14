@@ -171,6 +171,8 @@ rdsv3_ib_recv_clear_ring(struct rdsv3_ib_connection *ic)
 		rdsv3_ib_frag_drop_page(&ic->i_frag);
 }
 
+extern int atomic_add_unless(atomic_t *, uint_t, ulong_t);
+
 static int
 rdsv3_ib_recv_refill_one(struct rdsv3_connection *conn,
     struct rdsv3_ib_recv_work *recv,
@@ -186,9 +188,8 @@ rdsv3_ib_recv_refill_one(struct rdsv3_connection *conn,
 	    conn, recv);
 
 	if (recv->r_ibinc == NULL) {
-		if (atomic_add_32_nv(&rdsv3_ib_allocation, 1) >
-		    rdsv3_ib_sysctl_max_recv_allocation) {
-			atomic_add_32(&rdsv3_ib_allocation, -1);
+		if (!atomic_add_unless(&rdsv3_ib_allocation, 1,
+		    rdsv3_ib_sysctl_max_recv_allocation)) {
 			rdsv3_ib_stats_inc(s_ib_rx_alloc_limit);
 			goto out;
 		}
@@ -322,7 +323,9 @@ rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int kptr_gfp,
 		    recv->r_ibinc, recv->r_frag, ret);
 		if (ret) {
 			RDSV3_DPRINTF2("rdsv3_ib_recv_refill",
-			    "Return: conn: %p, posted: %d", conn, ret);
+			    "recv post on %u.%u.%u.%u returned %d, "
+			    "disconnecting and reconnecting\n",
+			    NIPQUAD(conn->c_faddr), ret);
 			rdsv3_conn_drop(conn);
 			ret = -1;
 			break;
@@ -538,12 +541,8 @@ rdsv3_ib_send_ack(struct rdsv3_ib_connection *ic, unsigned int adv_credits)
 		clear_bit(IB_ACK_IN_FLIGHT, &ic->i_ack_flags);
 		set_bit(IB_ACK_REQUESTED, &ic->i_ack_flags);
 		rdsv3_ib_stats_inc(s_ib_ack_send_failure);
-#if 1
-		RDSV3_DPRINTF2("rdsv3_ib_send_ack", "ibt_post_send FAIL");
-#else
-		/* Need to finesse this later. */
-		RDSV3_PANIC();
-#endif
+		RDSV3_DPRINTF2("rdsv3_ib_send_ack", "sending ack failed\n");
+		rdsv3_conn_drop(ic->conn);
 	} else {
 		rdsv3_ib_stats_inc(s_ib_ack_sent);
 	}
@@ -605,8 +604,7 @@ rdsv3_ib_attempt_ack(struct rdsv3_ib_connection *ic)
 	}
 
 	/* Can we get a send credit? */
-	if (!rdsv3_ib_send_grab_credits(ic, 1, &adv_credits, 0,
-	    RDSV3_MAX_ADV_CREDIT)) {
+	if (!rdsv3_ib_send_grab_credits(ic, 1, &adv_credits, 0)) {
 		rdsv3_ib_stats_inc(s_ib_tx_throttle);
 		clear_bit(IB_ACK_IN_FLIGHT, &ic->i_ack_flags);
 		return;

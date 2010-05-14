@@ -175,8 +175,7 @@ rdsv3_ib_remove_one(struct ib_device *device)
 	if (ib_dealloc_pd(rds_ibdev->pd)) {
 #ifndef __lock_lint
 		RDSV3_DPRINTF2("rdsv3_ib_remove_one",
-		    "%s-%d Failed to dealloc pd %p",
-		    __func__, __LINE__, rds_ibdev->pd);
+		    "Failed to dealloc pd %p\n", rds_ibdev->pd);
 #endif
 	}
 #endif
@@ -286,8 +285,8 @@ rds_ib_laddr_check(uint32_be_t addr)
 	 * IB and iWARP capable NICs.
 	 */
 	cm_id = rdma_create_id(NULL, NULL, RDMA_PS_TCP);
-	if (IS_ERR(cm_id))
-		return (PTR_ERR(cm_id));
+	if (!cm_id)
+		return (-EADDRNOTAVAIL);
 
 	(void) memset(&sin, 0, sizeof (sin));
 	sin.sin_family = AF_INET;
@@ -355,6 +354,7 @@ struct rdsv3_transport rdsv3_ib_transport = {
 	.free_mr		= rdsv3_ib_free_mr,
 	.flush_mrs		= rdsv3_ib_flush_mrs,
 	.t_name			= "infiniband",
+	.t_type			= RDS_TRANS_IB
 };
 #else
 struct rdsv3_transport rdsv3_ib_transport;
