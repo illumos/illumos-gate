@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_AC97_H
@@ -509,7 +508,7 @@ extern "C" {
 #define	AC97_VENDOR_AKM			0x414b4d00	/* Asahi Kasei */
 #define	AC97_VENDOR_ALC			0x414c4300	/* Realtek */
 #define	AC97_VENDOR_ALG			0x414c4700	/* Realtek */
-#define	AC97_VENDOR_CMI			0x43d44900	/* Cmedia */
+#define	AC97_VENDOR_CMI			0x434d4900	/* Cmedia */
 #define	AC97_VENDOR_CRY			0x43525900	/* Cirrus Logic */
 #define	AC97_VENDOR_CXT			0x43585400	/* Conexant */
 #define	AC97_VENDOR_EMC			0x454d4300	/* eMicro */
