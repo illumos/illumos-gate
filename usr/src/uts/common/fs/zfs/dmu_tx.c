@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -311,8 +310,14 @@ dmu_tx_count_write(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 			dmu_buf_impl_t *db;
 
 			rw_enter(&dn->dn_struct_rwlock, RW_READER);
-			db = dbuf_hold_level(dn, 0, start, FTAG);
+			err = dbuf_hold_impl(dn, 0, start, FALSE, FTAG, &db);
 			rw_exit(&dn->dn_struct_rwlock);
+
+			if (err) {
+				txh->txh_tx->tx_err = err;
+				return;
+			}
+
 			dmu_tx_count_twig(txh, dn, db, 0, start, B_FALSE,
 			    history);
 			dbuf_rele(db, FTAG);
@@ -430,7 +435,7 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 	 * The struct_rwlock protects us against dn_nlevels
 	 * changing, in case (against all odds) we manage to dirty &
 	 * sync out the changes after we check for being dirty.
-	 * Also, dbuf_hold_level() wants us to have the struct_rwlock.
+	 * Also, dbuf_hold_impl() wants us to have the struct_rwlock.
 	 */
 	rw_enter(&dn->dn_struct_rwlock, RW_READER);
 	epbs = dn->dn_indblkshift - SPA_BLKPTRSHIFT;
@@ -518,7 +523,11 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 		blkoff = P2PHASE(blkid, epb);
 		tochk = MIN(epb - blkoff, nblks);
 
-		dbuf = dbuf_hold_level(dn, 1, blkid >> epbs, FTAG);
+		err = dbuf_hold_impl(dn, 1, blkid >> epbs, FALSE, FTAG, &dbuf);
+		if (err) {
+			txh->txh_tx->tx_err = err;
+			break;
+		}
 
 		txh->txh_memory_tohold += dbuf->db.db_size;
 

@@ -1168,6 +1168,7 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 
 			parent = dbuf_hold_level(dn, db->db_level+1,
 			    db->db_blkid >> epbs, FTAG);
+			ASSERT(parent != NULL);
 			parent_held = TRUE;
 		}
 		if (drop_struct_lock)

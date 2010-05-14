@@ -968,6 +968,7 @@ dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx, boolean_t have_read)
 
 		/* dirty the left indirects */
 		db = dbuf_hold_level(dn, old_nlevels, 0, FTAG);
+		ASSERT(db != NULL);
 		new = dbuf_dirty(db, tx);
 		dbuf_rele(db, FTAG);
 
