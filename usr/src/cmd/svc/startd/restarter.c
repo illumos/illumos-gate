@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1708,6 +1707,7 @@ again:
 
 		case RESTARTER_EVENT_TYPE_ADMIN_MAINT_OFF:
 			unmaintain_instance(h, inst, RUNMAINT_CLEAR);
+			reset_start_times(inst);
 			break;
 
 		case RESTARTER_EVENT_TYPE_ADMIN_REFRESH:
