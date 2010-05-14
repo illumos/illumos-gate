@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -2511,7 +2510,7 @@ aac_get_adapter_info(struct aac_softstate *softs,
 
 	ddi_put8(acc, &fibp->data[0], 0);
 	if (aac_sync_fib(softs, RequestAdapterInfo,
-	    sizeof (struct aac_fib_header)) != AACOK) {
+	    AAC_FIB_SIZEOF(struct aac_adapter_info)) != AACOK) {
 		AACDB_PRINT(softs, CE_WARN, "RequestAdapterInfo failed");
 		rval = AACERR;
 		goto finish;
@@ -2551,7 +2550,8 @@ aac_get_adapter_info(struct aac_softstate *softs,
 		}
 		ddi_put8(acc, &fibp->data[0], 0);
 		if (aac_sync_fib(softs, RequestSupplementAdapterInfo,
-		    sizeof (struct aac_fib_header)) != AACOK) {
+		    AAC_FIB_SIZEOF(struct aac_supplement_adapter_info))
+		    != AACOK) {
 			AACDB_PRINT(softs, CE_WARN,
 			    "RequestSupplementAdapterInfo failed");
 			rval = AACERR;
@@ -2858,12 +2858,11 @@ aac_common_attach(struct aac_softstate *softs)
 	AAC_ENABLE_INTR(softs); /* Enable the interrupts we can handle */
 
 	if (aac_get_adapter_info(softs, NULL, &sinf) == AACOK) {
+		softs->feature_bits = sinf.FeatureBits;
+		softs->support_opt2 = sinf.SupportedOptions2;
+
 		/* Get adapter names */
 		if (CARD_IS_UNKNOWN(softs->card)) {
-
-			softs->feature_bits = sinf.FeatureBits;
-			softs->support_opt2 = sinf.SupportedOptions2;
-
 			char *p, *p0, *p1;
 
 			/*
@@ -2932,8 +2931,22 @@ aac_common_attach(struct aac_softstate *softs)
 		goto error;
 	}
 
+	/* Check for JBOD support. Default disable */
+	char *data;
+	if (softs->feature_bits & AAC_FEATURE_SUPPORTED_JBOD) {
+		if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, softs->devinfo_p,
+		    0, "jbod-enable", &data) == DDI_SUCCESS)) {
+			if (strcmp(data, "yes") == 0) {
+				AACDB_PRINT(softs, CE_NOTE,
+				    "Enable JBOD access");
+				softs->flags |= AAC_FLAGS_JBOD;
+			}
+			ddi_prop_free(data);
+		}
+	}
+
 	/* Setup phys. devices */
-	if (softs->flags & AAC_FLAGS_NONDASD) {
+	if (softs->flags & (AAC_FLAGS_NONDASD | AAC_FLAGS_JBOD)) {
 		uint32_t bus_max, tgt_max;
 		uint32_t bus, tgt;
 		int index;
@@ -3552,6 +3565,32 @@ aac_probe_containers(struct aac_softstate *softs)
 }
 
 static int
+aac_probe_jbod(struct aac_softstate *softs, int tgt, int event)
+{
+	ASSERT(AAC_MAX_LD <= tgt < AAC_MAX_DEV(softs));
+	struct aac_device *dvp;
+	dvp = AAC_DEV(softs, tgt);
+
+	switch (event) {
+	case AAC_CFG_ADD:
+		AACDB_PRINT(softs, CE_NOTE,
+		    ">>> Jbod %d added", tgt - AAC_MAX_LD);
+		dvp->flags |= AAC_DFLAG_VALID;
+		dvp->type = AAC_DEV_PD;
+		break;
+	case AAC_CFG_DELETE:
+		AACDB_PRINT(softs, CE_NOTE,
+		    ">>> Jbod %d deleted", tgt - AAC_MAX_LD);
+		dvp->flags &= ~AAC_DFLAG_VALID;
+		break;
+	default:
+		return (AACERR);
+	}
+	(void) aac_handle_dr(softs, tgt, 0, event);
+	return (AACOK);
+}
+
+static int
 aac_alloc_comm_space(struct aac_softstate *softs)
 {
 	size_t rlen;
@@ -4159,6 +4198,15 @@ aac_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 			softs->containers[tgt].dev.dip = tgt_dip;
 	} else {
 		dvp = (struct aac_device *)&softs->nondasds[AAC_PD(tgt)];
+		/*
+		 * Save the tgt_dip for the given target if one doesn't exist
+		 * already. Dip's for non-existance tgt's will be cleared in
+		 * tgt_free.
+		 */
+
+		if (softs->nondasds[AAC_PD(tgt)].dev.dip  == NULL &&
+		    strcmp(ddi_driver_name(sd->sd_dev), "sd") == 0)
+			softs->nondasds[AAC_PD(tgt)].dev.dip  = tgt_dip;
 	}
 
 	if (softs->flags & AAC_FLAGS_BRKUP) {
@@ -4192,6 +4240,8 @@ aac_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		if (softs->containers[tgt].dev.dip == tgt_dip)
 			softs->containers[tgt].dev.dip = NULL;
 	} else {
+		if (softs->nondasds[AAC_PD(tgt)].dev.dip == tgt_dip)
+			softs->nondasds[AAC_PD(tgt)].dev.dip = NULL;
 		softs->nondasds[AAC_PD(tgt)].dev.flags &= ~AAC_DFLAG_VALID;
 	}
 	mutex_exit(&softs->io_lock);
@@ -6403,13 +6453,16 @@ aac_handle_aif(struct aac_softstate *softs, struct aac_aif_command *aif)
 	ddi_acc_handle_t acc = softs->comm_space_acc_handle;
 	int en_type;
 	int devcfg_needed;
+	int cid;
+	uint32_t bus_id, tgt_id;
+	enum aac_cfg_event event = AAC_CFG_NULL_EXIST;
 
 	devcfg_needed = 0;
 	en_type = LE_32((uint32_t)aif->data.EN.type);
 
 	switch (LE_32((uint32_t)aif->command)) {
 	case AifCmdDriverNotify: {
-		int cid = LE_32(aif->data.EN.data.ECC.container[0]);
+		cid = LE_32(aif->data.EN.data.ECC.container[0]);
 
 		switch (en_type) {
 		case AifDenMorphComplete:
@@ -6424,6 +6477,7 @@ aac_handle_aif(struct aac_softstate *softs, struct aac_aif_command *aif)
 	}
 
 	case AifCmdEventNotify:
+		cid = LE_32(aif->data.EN.data.ECC.container[0]);
 		switch (en_type) {
 		case AifEnAddContainer:
 		case AifEnDeleteContainer:
@@ -6437,6 +6491,20 @@ aac_handle_aif(struct aac_softstate *softs, struct aac_aif_command *aif)
 			if (ddi_get32(acc, &aif-> \
 			    data.EN.data.ECE.eventType) == CT_PUP_MISSING_DRIVE)
 				devcfg_needed = 1;
+			break;
+		case AifEnAddJBOD:
+			if (!(softs->flags & AAC_FLAGS_JBOD))
+				return (AACERR);
+			event = AAC_CFG_ADD;
+			bus_id = (cid >> 24) & 0xf;
+			tgt_id = cid & 0xffff;
+			break;
+		case AifEnDeleteJBOD:
+			if (!(softs->flags & AAC_FLAGS_JBOD))
+				return (AACERR);
+			event = AAC_CFG_DELETE;
+			bus_id = (cid >> 24) & 0xf;
+			tgt_id = cid & 0xffff;
 			break;
 		}
 		if (softs->devcfg_wait_on == en_type)
@@ -6467,6 +6535,11 @@ aac_handle_aif(struct aac_softstate *softs, struct aac_aif_command *aif)
 		(void) aac_probe_containers(softs);
 	}
 
+	if (event != AAC_CFG_NULL_EXIST) {
+		ASSERT(en_type == AifEnAddJBOD || en_type == AifEnDeleteJBOD);
+		(void) aac_probe_jbod(softs,
+		    AAC_P2VTGT(softs, bus_id, tgt_id), event);
+	}
 	return (AACOK);
 }
 
@@ -7151,23 +7224,32 @@ aac_probe_lun(struct aac_softstate *softs, struct scsi_device *sd)
 		return (NDI_FAILURE);
 	} else {
 		int dtype;
+		int qual; /* device qualifier */
 
 		if (scsi_hba_probe(sd, NULL) != SCSIPROBE_EXISTS)
 			return (NDI_FAILURE);
 
 		dtype = sd->sd_inq->inq_dtype & DTYPE_MASK;
+		qual = dtype >> 5;
 
 		AACDB_PRINT(softs, CE_NOTE,
 		    "Phys. device found: tgt %d dtype %d: %s",
 		    tgt, dtype, sd->sd_inq->inq_vid);
 
-		/* Only non-DASD exposed */
-		if (dtype != DTYPE_RODIRECT /* CDROM */ &&
-		    dtype != DTYPE_SEQUENTIAL /* TAPE */ &&
-		    dtype != DTYPE_ESI /* SES */)
-			return (NDI_FAILURE);
+		/* Only non-DASD and JBOD mode DASD are allowed exposed */
+		if (dtype == DTYPE_RODIRECT /* CDROM */ ||
+		    dtype == DTYPE_SEQUENTIAL /* TAPE */ ||
+		    dtype == DTYPE_ESI /* SES */) {
+			if (!(softs->flags & AAC_FLAGS_NONDASD))
+				return (NDI_FAILURE);
+			AACDB_PRINT(softs, CE_NOTE, "non-DASD %d found", tgt);
 
-		AACDB_PRINT(softs, CE_NOTE, "non-DASD %d found", tgt);
+		} else if (dtype == DTYPE_DIRECT) {
+			if (!(softs->flags & AAC_FLAGS_JBOD) || qual != 0)
+				return (NDI_FAILURE);
+			AACDB_PRINT(softs, CE_NOTE, "JBOD DASD %d found", tgt);
+		}
+
 		mutex_enter(&softs->io_lock);
 		softs->nondasds[AAC_PD(tgt)].dev.flags |= AAC_DFLAG_VALID;
 		mutex_exit(&softs->io_lock);
@@ -7356,6 +7438,12 @@ aac_tran_bus_config(dev_info_t *parent, uint_t flags, ddi_bus_config_op_t op,
 		if (aac_parse_devname(arg, &tgt, &lun) != AACOK) {
 			rval = NDI_FAILURE;
 			break;
+		}
+		if (tgt >= AAC_MAX_LD) {
+			if (tgt >= AAC_MAX_DEV(softs)) {
+				rval = NDI_FAILURE;
+				break;
+			}
 		}
 
 		AAC_DEVCFG_BEGIN(softs, tgt);

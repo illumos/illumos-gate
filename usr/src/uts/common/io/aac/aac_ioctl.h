@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -32,7 +31,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *    $FreeBSD: /repoman/r/ncvs/src/sys/sys/aac_ioctl.h,v 1.11 2004/12/09 22:20:25 scottl Exp $
+ *    $FreeBSD: /repoman/r/ncvs/src/sys/sys/aac_ioctl.h,
+ *    v 1.11 2004/12/09 22:20:25 scottl Exp $
  */
 
 #ifndef	_AAC_IOCTL_H_
@@ -116,7 +116,10 @@ struct aac_delete_disk {
 typedef union {
 	struct {
 		uint32_t largeLBA  : 1;	/* disk support greater 2TB */
-		uint32_t fReserved : 31;
+		uint32_t IoctlBuf  : 1; /* ARCIOCTL call support */
+		uint32_t AIFSupport: 1; /* AIF support */
+		uint32_t JBODSupport:1; /* firmware+driver both support JBOD */
+		uint32_t fReserved : 28;
 	} fBits;
 	uint32_t fValue;
 } featuresState;

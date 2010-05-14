@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -55,7 +54,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	2
-#define	AAC_DRIVER_BUGFIX_LEVEL		10
+#define	AAC_DRIVER_BUGFIX_LEVEL		11
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -166,6 +165,8 @@ struct aac_card_type {
 #define	AAC_DFLAG_CONFIGURING	(1 << 1)
 
 #define	AAC_DEV_IS_VALID(dvp)	((dvp)->flags & AAC_DFLAG_VALID)
+#define	AAC_P2VTGT(softs, bus, tgt) \
+		((softs)->tgt_max * (bus) + (tgt) + AAC_MAX_LD)
 
 /*
  * Device config change events
@@ -337,6 +338,7 @@ struct aac_cmd {
 #define	AAC_FLAGS_34SG		(1 << 9) /* quirk: 34 scatter gather maximum */
 #define	AAC_FLAGS_NONDASD	(1 << 10) /* non-DASD device supported */
 #define	AAC_FLAGS_BRKUP		(1 << 11) /* pkt breakup support */
+#define	AAC_FLAGS_JBOD		(1 << 12) /* JBOD mode support */
 
 struct aac_softstate;
 struct aac_interface {

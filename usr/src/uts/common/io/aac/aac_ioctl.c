@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -763,11 +762,16 @@ aac_supported_features(struct aac_softstate *softs, intptr_t arg, int mode)
 	if (f->feat.fValue == 0) {
 		f->feat.fBits.largeLBA =
 		    (softs->flags & AAC_FLAGS_LBA_64BIT) ? 1 : 0;
+		f->feat.fBits.JBODSupport =
+		    (softs->flags & AAC_FLAGS_JBOD) ? 1 : 0;
 		/* TODO: In the future, add other features state here as well */
 	} else {
 		if (f->feat.fBits.largeLBA)
 			f->feat.fBits.largeLBA =
 			    (softs->flags & AAC_FLAGS_LBA_64BIT) ? 1 : 0;
+		if (f->feat.fBits.JBODSupport)
+			f->feat.fBits.JBODSupport =
+			    (softs->flags & AAC_FLAGS_JBOD) ? 1 : 0;
 		/* TODO: Add other features state and data in the future */
 	}
 

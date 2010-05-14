@@ -1,6 +1,5 @@
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -146,6 +145,10 @@ extern "C" {
 #define	AAC_SUPPORTED_IGNORE_RESET		0x02
 #define	AAC_SUPPORTED_POWER_MANAGEMENT		0x04
 #define	AAC_SUPPORTED_ARCIO_PHYDEV		0x08
+/*
+ * FeatureBits of RequestSupplementAdapterInfo used in the driver
+ */
+#define	AAC_FEATURE_SUPPORTED_JBOD		0x08000000
 
 #pragma	pack(1)
 
@@ -1259,6 +1262,8 @@ typedef enum {
 	AifEnBatteryNeedsRecond,	/* The battery needs reconditioning */
 	AifEnClusterEvent,		/* Some cluster event */
 	AifEnDiskSetEvent,		/* A disk set event occured. */
+	AifEnAddJBOD = 30,	/* A new JBOD type drive was created (30) */
+	AifEnDeleteJBOD = 31,	/* A JBOD type drive was deleted (31) */
 	AifDriverNotifyStart = 199,	/* Notifies for host driver go here */
 	/* Host driver notifications start here */
 	AifDenMorphComplete,		/* A morph operation completed */
