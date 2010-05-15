@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -164,15 +163,19 @@ get_thread_specific_data()
 /*
  * This function is called by nftw(3C) every time that it finds an object
  * in a directory of interest.  If the object is a file, process() checks
- * to see if it is a manifest file by insuring that it has a .xml
+ * to see if it is a service bundle file by insuring that it has a .xml
  * extension.
  *
- * If the file is a manifest file, and the CHECKHASH flag is set process()
- * calls mhash_test_file() to see if it is a new manifest.  Manfest data
- * for selected manifests is added to tsd_array in our thread specific data.
+ * If the file is a service bundle file, and the CHECKHASH flag is set process()
+ * calls mhash_test_file() to see if it is a new bundle.  Bundle file data
+ * for selected bundles is added to tsd_array in our thread specific data.
+ *
+ * Assume given file is a manifest unless BUNDLE_PROF flag is set to indicate
+ * it's a profile. For profile bundles, call mhash_test_file() with the
+ * appropriate argument.
  *
  * The CHECKEXT flag may be set if this was not a directory search request
- * but a single manifest file check that was determined by the caller to
+ * but a single service bundle file check that was determined by the caller to
  * be found based not on the extension of the file.
  */
 /*ARGSUSED*/
@@ -180,6 +183,7 @@ static int
 process(const char *fn, const struct stat *sp, int ftw_type,
     struct FTW *ftws)
 {
+	int is_profile;
 	char *suffix_match;
 	uchar_t hash[MHASH_SIZE];
 	char *pname;
@@ -203,8 +207,9 @@ process(const char *fn, const struct stat *sp, int ftw_type,
 	}
 
 	if (tsdp->tsd_flags & CHECKHASH) {
-		if (mhash_test_file(tsdp->tsd_hndl, fn, 0, &pname, hash) ==
-		    MHASH_NEWFILE) {
+		is_profile = (tsdp->tsd_flags & BUNDLE_PROF) ? 1 : 0;
+		if (mhash_test_file(tsdp->tsd_hndl, fn, is_profile, &pname,
+		    hash) == MHASH_NEWFILE) {
 			return (add_pointer(tsdp, fn, pname, hash));
 		}
 	} else {
@@ -216,22 +221,22 @@ process(const char *fn, const struct stat *sp, int ftw_type,
 
 /*
  * This function returns a pointer to an array of manifest_info_t pointers.
- * There is one manifest_info_t pointer for each manifest file in the
+ * There is one manifest_info_t pointer for each service bundle file in the
  * directory, dir, that satifies the selection criteria.  The array is
  * returned to arrayp.  The array will be terminated with a NULL pointer.
  * It is the responsibility of the caller to free the memory associated
  * with the array by calling free_manifest_array().
  *
  * flags :
- * 	0x1 - CHECKHASH - do the hash check and only return manifest
+ * 	0x1 - CHECKHASH - do the hash check and only return bundle
  * 	files that do not have a hash entry in the smf/manifest table
- * 	or the hash value has changed due to the manifest file having
- * 	been modified.  If not set then all manifest files found are
- * 	returned, regardless of the hash status.
+ * 	or the hash value has changed due to the bundle file having
+ * 	been modified.  If not set then all service bundle files found
+ * 	are returned, regardless of the hash status.
  *
  * 	0x2 - CHECKEXT - Check the extension of the file is .xml
  *
- * On success a count of the number of selected manifests is returned.
+ * On success a count of the number of selected bundles is returned.
  * Note, however, that *arrayp will be set to NULL if the selection is
  * empty, and a count of 0 will be returned.  In the case of failure, -1
  * will be returned and errno will be set.

@@ -19,9 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # 0a  Initialization.
@@ -33,6 +31,7 @@
 activity=false
 
 EMI_SERVICE="svc:/system/early-manifest-import:default"
+PROFILE_DIR_SITE="/etc/svc/profile/site"
 
 X=
 early=false
@@ -59,7 +58,7 @@ function svccfg_apply {
 function cleanup_needwork {
 	if [ "$early" == true ]; then
 		smfmfiles=`/usr/bin/svcprop smf/manifest | \
-		    awk '(/^lib_) && (/\/manifestfile /) {print $3}'`
+		    awk '(/^lib_/ && /\/manifestfile /) {print $3}'`
 	else
 		smfmfiles=`/usr/bin/svcprop smf/manifest | \
 		    awk '/\/manifestfile / {print $3}'`
@@ -164,9 +163,11 @@ function preserve_system_profiles {
 	generic_prof="/var/svc/profile/generic.xml"
 	ns_prof="/var/svc/profile/name_service.xml"
 	inetd_prof="/var/svc/profile/inetd_services.xml"
+	platform_prof="/var/svc/profile/platform.xml"
 	[ -L "$generic_prof" ] && mv $generic_prof /etc/svc/profile/
 	[ -L "$ns_prof" ] && mv $ns_prof /etc/svc/profile/
 	[ -L "$inetd_prof" ] && mv $inetd_prof /etc/svc/profile/
+	[ -L "$platform_prof" ] && mv $platform_prof /etc/svc/profile/
 
 	return 0
 }
@@ -318,11 +319,16 @@ function handle_upgrade {
 }
 
 #
-# 5.  Site profile is applied last to give administrator the final say.
+# 5.  Giving administrator the final say, apply site.xml profile and profiles
+#     under /etc/svc/profile/site directory.
 #
 function apply_site_profile {
         typeset prefix="$1/svc/profile"
 	[ -f $prefix/site.xml ] && svccfg_apply $prefix/site.xml
+
+	if [ -d $PROFILE_DIR_SITE -a "$1" = "/etc" ]; then
+		svccfg_apply $PROFILE_DIR_SITE
+	fi
 }
 
 #

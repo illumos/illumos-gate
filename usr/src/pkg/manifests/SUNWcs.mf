@@ -75,6 +75,7 @@ dir path=etc/security/spool group=sys
 dir path=etc/skel group=sys
 dir path=etc/svc group=sys
 dir path=etc/svc/profile group=sys
+dir path=etc/svc/profile/site group=sys
 dir path=etc/svc/volatile group=sys
 dir path=etc/sysevent group=sys
 dir path=etc/sysevent/config group=sys

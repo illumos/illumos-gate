@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _MANIFEST_FIND_H
@@ -36,6 +35,8 @@ extern "C" {
 
 #define	CHECKHASH	0x1
 #define	CHECKEXT	0x2
+#define	BUNDLE_PROF	0x4
+#define	BUNDLE_MFST	0x8
 
 typedef struct manifest_info {
 	const char	*mi_path;	/* Path of manifest file */
@@ -44,7 +45,7 @@ typedef struct manifest_info {
 } manifest_info_t;
 
 /*
- * Declare functions that are used for finding manifest files in a
+ * Declare functions that are used for finding service bundle files in a
  * directory.
  */
 

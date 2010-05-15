@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ *  Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -852,23 +851,12 @@ engine_cleanup(int flags)
 	return (r);
 }
 
-int
-engine_apply(const char *file, int apply_changes)
+static int
+apply_profile(manifest_info_t *info, int apply_changes)
 {
-	int ret;
-	bundle_t *b;
-	char *pname;
-	uchar_t hash[MHASH_SIZE];
+	bundle_t *b = internal_bundle_new();
 
-	lscf_prep_hndl();
-
-	ret = mhash_test_file(g_hndl, file, 1, &pname, hash);
-	if (ret != MHASH_NEWFILE)
-		return (ret);
-
-	b = internal_bundle_new();
-
-	if (lxml_get_bundle_file(b, file, SVCCFG_OP_APPLY) != 0) {
+	if (lxml_get_bundle_file(b, info->mi_path, SVCCFG_OP_APPLY) != 0) {
 		internal_bundle_free(b);
 		return (-1);
 	}
@@ -878,27 +866,121 @@ engine_apply(const char *file, int apply_changes)
 		return (0);
 	}
 
-	if (lscf_bundle_apply(b, file) != 0) {
+	if (lscf_bundle_apply(b, info->mi_path) != 0) {
 		internal_bundle_free(b);
 		return (-1);
 	}
 
 	internal_bundle_free(b);
 
-	if (pname) {
+	if (info->mi_prop) {
 		apply_action_t apply;
 		char *errstr;
 
 		apply = (est->sc_in_emi == 1) ? APPLY_LATE : APPLY_NONE;
-		if (mhash_store_entry(g_hndl, pname, file, hash, apply,
-		    &errstr)) {
+		if (mhash_store_entry(g_hndl, info->mi_prop, info->mi_path,
+		    info->mi_hash, apply, &errstr)) {
 			semerr(errstr);
 		}
-
-		free(pname);
 	}
 
 	return (0);
+}
+
+int
+engine_apply(const char *file, int apply_changes)
+{
+	int rc = 0;
+	int isdir;
+	int dont_exit;
+	int profile_count;
+	int fm_flags;
+	struct stat sb;
+	manifest_info_t **profiles = NULL;
+	manifest_info_t **entry;
+	manifest_info_t *pfile;
+
+	lscf_prep_hndl();
+
+	/* Determine which profile(s) must be applied. */
+
+	profile_count = 0;
+	fm_flags = BUNDLE_PROF | CHECKHASH;
+
+	/* Determine if argument is a directory or file. */
+	if (stat(file, &sb) == -1) {
+		semerr(gettext("Unable to stat file %s.  %s\n"), file,
+		    strerror(errno));
+		rc = -1;
+		goto out;
+	}
+
+	if (sb.st_mode & S_IFDIR) {
+		fm_flags |= CHECKEXT;
+		isdir = 1;
+	} else if (sb.st_mode & S_IFREG) {
+		isdir = 0;
+	} else {
+		semerr(gettext("%s is not a directory or regular "
+		    "file\n"), file);
+		rc = -1;
+		goto out;
+	}
+
+	/* Get list of profiles to be applied. */
+	if ((profile_count = find_manifests(file, &profiles, fm_flags)) < 0) {
+		if (isdir) {
+			semerr(gettext("Could not hash directory %s\n"), file);
+		} else {
+			semerr(gettext("Could not hash file %s\n"), file);
+		}
+		rc = -1;
+		goto out;
+	}
+
+	if (profile_count == 0) {
+		/* No profiles to process. */
+		if (g_verbose) {
+			warn(gettext("No changes were necessary\n"));
+		}
+		goto out;
+	}
+
+	/*
+	 * We don't want to exit if we encounter an error.  We should go ahead
+	 * and process all of the profiles.
+	 */
+	dont_exit = est->sc_cmd_flags & SC_CMD_DONT_EXIT;
+	est->sc_cmd_flags |= SC_CMD_DONT_EXIT;
+
+	for (entry = profiles; *entry != NULL; entry++) {
+		pfile = *entry;
+
+		if (apply_profile(pfile, apply_changes) == 0) {
+			if (g_verbose) {
+				warn(gettext("Successfully applied: %s\n"),
+				    pfile->mi_path);
+			}
+		} else {
+			warn(gettext("WARNING: Failed to apply %s\n"),
+			    pfile->mi_path);
+			rc = -1;
+		}
+	}
+
+	if (dont_exit == 0)
+		est->sc_cmd_flags &= ~SC_CMD_DONT_EXIT;
+
+	/* exit(1) appropriately if any profile failed to be applied. */
+	if ((rc == -1) &&
+	    (est->sc_cmd_flags & (SC_CMD_IACTIVE | SC_CMD_DONT_EXIT)) == 0) {
+		free_manifest_array(profiles);
+		exit(1);
+	}
+
+out:
+	free_manifest_array(profiles);
+	return (rc);
 }
 
 int

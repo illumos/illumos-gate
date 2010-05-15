@@ -19,8 +19,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -152,6 +151,7 @@ DIRS= \
 	/etc/sfw \
 	/etc/svc \
 	/etc/svc/profile \
+	/etc/svc/profile/site \
 	/etc/svc/volatile \
 	/etc/tm  \
 	/etc/usb   \
