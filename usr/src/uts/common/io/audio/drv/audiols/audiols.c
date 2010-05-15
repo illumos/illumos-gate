@@ -668,7 +668,7 @@ audigyls_hwinit(audigyls_dev_t *dev)
 		audigyls_i2c_write(dev, 0x15, 0x2);
 		tries = 0;
 	again:
-		for (i = 0; i < sizeof (spi_dac); i++) {
+		for (i = 0; i < (sizeof (spi_dac) / sizeof (spi_dac[0])); i++) {
 			if (!audigyls_spi_write(dev, spi_dac[i]) &&
 			    tries < 100) {
 				tries++;
