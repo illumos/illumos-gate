@@ -23,8 +23,7 @@
 
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -792,16 +791,61 @@ path_mount_entry(struct df_request *dfrp, dev_t devno)
 	}
 	/*
 	 * If the mnt point is lofs, search from the top of entries from
-	 * /etc/mnttab and return the first entry that matches the devid
+	 * /etc/mnttab and return the entry that best matches the pathname.
 	 * For non-lofs mount points, return the first entry from the bottom
 	 * of the entries in /etc/mnttab that matches on the devid field
 	 */
 	match = NULL;
 	if (dfrp->dfr_fstype && EQ(dfrp->dfr_fstype, MNTTYPE_LOFS)) {
+		struct extmnttab *entryp;
+		char *path, *mountp;
+		char p, m;
+		int score;
+		int best_score = 0;
+		int best_index = -1;
+
 		for (i = 0; i < mount_table_entries; i++) {
-			if (match = devid_matches(i, devno))
+			entryp = mount_table[i].mte_mount;
+
+			if (!EQ(entryp->mnt_fstype, MNTTYPE_LOFS))
+				continue;
+
+			path = dirpath;
+			mountp = entryp->mnt_mountp;
+			score = 0;
+			/*
+			 * Count the number of matching characters
+			 * until either path or mountpoint is exhausted
+			 */
+			while ((p = *path++) == (m = *mountp++)) {
+				score++;
+
+				if (p == '\0' || m == '\0')
+					break;
+			}
+
+			/* Both exhausted so we have a match */
+			if (p == '\0' && m == '\0') {
+				best_index = i;
 				break;
+			}
+
+			/*
+			 * We have exhausted the mountpoint and the current
+			 * character in the path is a '/' hence the full path
+			 * traverses this mountpoint.
+			 * Record this as the best candidate so far.
+			 */
+			if (p == '/' && m == '\0') {
+				if (score > best_score) {
+					best_index = i;
+					best_score = score;
+				}
+			}
 		}
+
+		if (best_index > -1)
+			match = &mount_table[best_index];
 	} else {
 		for (i = mount_table_entries - 1; i >= 0; i--) {
 			if (tmatch = devid_matches(i, devno)) {
@@ -1849,6 +1893,7 @@ create_request_list(
 			dfrp->dfr_cmd_arg = arg;
 
 			if (valid_stat[i]) {
+				dfrp->dfr_fstype = arg_stat[i].st_fstype;
 				if (S_ISBLK(arg_stat[i].st_mode)) {
 					bdev_mount_entry(dfrp);
 					dfrp->dfr_valid = TRUE;
