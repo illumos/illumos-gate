@@ -619,7 +619,9 @@ static	off_t	high;
 
 static	FILE	*tfile;
 static	FILE	*vfile = stdout;
-static	char	tname[] = "/tmp/tarXXXXXX";
+static	char	*tmpdir;
+static	char	*tmp_suffix = "/tarXXXXXX";
+static	char	*tname;
 static	char	archive[] = "archive0=";
 static	char	*Xfile;
 static	char	*usefile;
@@ -1074,6 +1076,31 @@ main(int argc, char *argv[])
 			(void) signal(SIGQUIT, onquit);
 		if (uflag) {
 			int tnum;
+			struct stat sbuf;
+
+			tmpdir = getenv("TMPDIR");
+			/*
+			 * If the name is invalid or this isn't a directory,
+			 * or the directory is not writable, then reset to
+			 * a default temporary directory.
+			 */
+			if (tmpdir == NULL || *tmpdir == '\0' ||
+			    (strlen(tmpdir) + strlen(tmp_suffix)) > PATH_MAX) {
+				tmpdir = "/tmp";
+			} else if (stat(tmpdir, &sbuf) < 0 ||
+			    (sbuf.st_mode & S_IFMT) != S_IFDIR ||
+			    (sbuf.st_mode & S_IWRITE) == 0) {
+				tmpdir = "/tmp";
+			}
+
+			if ((tname = calloc(1, strlen(tmpdir) +
+			    strlen(tmp_suffix) + 1)) == NULL) {
+				vperror(1, gettext("tar: out of memory, "
+				    "cannot create temporary file\n"));
+			}
+			(void) strcpy(tname, tmpdir);
+			(void) strcat(tname, tmp_suffix);
+
 			if ((tnum = mkstemp(tname)) == -1)
 				vperror(1, "%s", tname);
 			if ((tfile = fdopen(tnum, "w")) == NULL)
@@ -1284,13 +1311,27 @@ dorep(char *argv[])
 		}
 		backtape();			/* was called by endtape */
 		if (tfile != NULL) {
-			char buf[200];
+			/*
+			 * Buffer size is calculated to be the size of the
+			 * tmpdir string, plus 6 times the size of the tname
+			 * string, plus a value that is known to be greater
+			 * than the command pipeline string.
+			 */
+			int buflen = strlen(tmpdir) + (6 * strlen(tname)) + 100;
+			char *buf;
 
-			(void) sprintf(buf, "sort +0 -1 +1nr %s -o %s; awk '$1 "
+			if ((buf = (char *)calloc(1, buflen)) == NULL) {
+				vperror(1, gettext("tar: out of memory, "
+				    "cannot create sort command file\n"));
+			}
+
+			(void) snprintf(buf, buflen, "env 'TMPDIR=%s' "
+			    "sort +0 -1 +1nr %s -o %s; awk '$1 "
 			    "!= prev {print; prev=$1}' %s >%sX;mv %sX %s",
-			    tname, tname, tname, tname, tname, tname);
+			    tmpdir, tname, tname, tname, tname, tname, tname);
 			(void) fflush(tfile);
 			(void) system(buf);
+			free(buf);
 			(void) freopen(tname, "r", tfile);
 			(void) fstat(fileno(tfile), &stbuf);
 			high = stbuf.st_size;
