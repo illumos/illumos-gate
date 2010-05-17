@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -1645,7 +1644,6 @@ hid_cpr_suspend(hid_state_t *hidp)
 	switch (hidp->hid_dev_state) {
 	case USB_DEV_ONLINE:
 	case USB_DEV_PWRED_DOWN:
-	case USB_DEV_DISCONNECTED:
 		prev_state = hidp->hid_dev_state;
 		hidp->hid_dev_state = USB_DEV_SUSPENDED;
 		mutex_exit(&hidp->hid_mutex);
@@ -1669,6 +1667,11 @@ hid_cpr_suspend(hid_state_t *hidp)
 			hid_save_device_state(hidp);
 		}
 
+		break;
+	case USB_DEV_DISCONNECTED:
+		hidp->hid_dev_state = USB_DEV_SUSPENDED;
+		hid_save_device_state(hidp);
+		retval = USB_SUCCESS;
 		break;
 	case USB_DEV_SUSPENDED:
 	default:
