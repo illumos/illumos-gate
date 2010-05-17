@@ -445,6 +445,7 @@ static void doxtract(char *argv[], int cnt);
 static void dotable(char *argv[]);
 static void doxtract(char *argv[]);
 #endif
+static int is_directory(char *name);
 static int has_dot_dot(char *name);
 static int is_absolute(char *name);
 static char *make_relative_name(char *name, char **stripped_prefix);
@@ -1961,7 +1962,8 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 		goto out;
 	}
 
-	if (Fflag && checkf(shortname, stbuf.st_mode, Fflag) == 0)
+	if (Fflag &&
+	    checkf(longname, (stbuf.st_mode & S_IFMT) == S_IFDIR, Fflag) == 0)
 		goto out;
 
 	if (Xflag) {
@@ -3178,14 +3180,7 @@ doxtract(char *argv[])
 		}
 
 		if (Fflag) {
-			char *s;
-
-			if ((s = strrchr(namep, '/')) == 0)
-				s = namep;
-
-			else
-				s++;
-			if (checkf(s, stbuf.st_mode, Fflag) == 0) {
+			if (checkf(namep, is_directory(namep), Fflag) == 0) {
 				passtape();
 				continue;
 			}
@@ -4271,6 +4266,12 @@ dotable(char *argv[])
 		if (dblock.dbuf.typeflag != 'A')
 			++tcnt;
 
+		if (Fflag) {
+			if (checkf(namep, is_directory(namep), Fflag) == 0) {
+				passtape();
+				continue;
+			}
+		}
 		/*
 		 * ACL support:
 		 * aclchar is introduced to indicate if there are
@@ -4814,31 +4815,72 @@ checkw(char c, char *name)
 }
 
 /*
- * When the F flag is set, exclude RCS and SCCS directories.  If F is set
- * twice, also exclude .o files, and files names errs, core, and a.out.
+ * When the F flag is set, exclude RCS and SCCS directories (and any files
+ * or directories under them).  If F is set twice, also exclude .o files,
+ * and files names errs, core, and a.out.
+ *
+ * Return 0 if file should be excluded, 1 otherwise.
  */
 
 static int
-checkf(char *name, int mode, int howmuch)
+checkf(char *longname, int is_dir, int howmuch)
 {
-	int l;
+	static char fullname[PATH_MAX + 1];
+	char *dir, *name;
 
-	if ((mode & S_IFMT) == S_IFDIR) {
-		if ((strcmp(name, "SCCS") == 0) || (strcmp(name, "RCS") == 0))
-			return (0);
+#if defined(O_XATTR)
+	/*
+	 * If there is an xattr_buf structure associated with this file,
+	 * always return 1.
+	 */
+	if (xattrp) {
 		return (1);
 	}
-	if ((l = (int)strlen(name)) < 3)
+#endif
+
+	/*
+	 * First check to see if the base name is an RCS or SCCS directory.
+	 */
+	if (strlcpy(fullname, longname, sizeof (fullname)) >= sizeof (fullname))
 		return (1);
-	if (howmuch > 1 && name[l-2] == '.' && name[l-1] == 'o')
-		return (0);
-	if (howmuch > 1) {
+
+	name = basename(fullname);
+	if (is_dir) {
+		if ((strcmp(name, "SCCS") == 0) || (strcmp(name, "RCS") == 0))
+			return (0);
+	}
+
+	/*
+	 * If two -F command line options were given then exclude .o files,
+	 * and files named errs, core, and a.out.
+	 */
+	if (howmuch > 1 && !is_dir) {
+		size_t l = strlen(name);
+
+		if (l >= 3 && name[l - 2] == '.' && name[l - 1] == 'o')
+			return (0);
 		if (strcmp(name, "core") == 0 || strcmp(name, "errs") == 0 ||
 		    strcmp(name, "a.out") == 0)
 			return (0);
 	}
 
-	/* SHOULD CHECK IF IT IS EXECUTABLE */
+	/*
+	 * At this point, check to see if this file has a parent directory
+	 * named RCS or SCCS.  If so, then this file should be excluded too.
+	 * The strcpy() operation is done again, because basename(3C) may
+	 * modify the path string passed to it.
+	 */
+	if (strlcpy(fullname, longname, sizeof (fullname)) >= sizeof (fullname))
+		return (1);
+
+	dir = dirname(fullname);
+	while (strcmp(dir, ".") != 0) {
+		name = basename(dir);
+		if ((strcmp(name, "SCCS") == 0) || (strcmp(name, "RCS") == 0))
+			return (0);
+		dir = dirname(dir);
+	}
+
 	return (1);
 }
 
@@ -6111,6 +6153,30 @@ fill_in_attr_info(char *attr, char *longname, char *attrparent, int atparentfd,
 	(*attrinfo)->attr_parentfd = atparentfd;
 
 	return (0);
+}
+
+/*
+ * Test to see if name is a directory.
+ *
+ * Return 1 if true, 0 otherwise.
+ */
+
+static int
+is_directory(char *name)
+{
+#if defined(O_XATTR)
+	/*
+	 * If there is an xattr_buf structure associated with this file,
+	 * then the directory test is based on whether the name has a
+	 * trailing slash.
+	 */
+	if (xattrp)
+		return (name[strlen(name) - 1] == '/');
+#endif
+	if (is_posix)
+		return (dblock.dbuf.typeflag == '5');
+	else
+		return (name[strlen(name) - 1] == '/');
 }
 
 /*
