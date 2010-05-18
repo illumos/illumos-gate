@@ -19,34 +19,34 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-default: all
+PROG =		s10_replacefile
+PROGS =		$(PROG)
+OBJS =		s10_replacefile
 
-include Makefile.s10
+all:		$(PROG)
 
-# Build everything in parallel; use .WAIT for dependencies
-.PARALLEL:
+include ../Makefile.s10
+include $(SRC)/cmd/Makefile.cmd
 
-SUBDIRS =	librtld_db s10_npreload s10_brand s10_support s10_replacefile \
-		zone cmd
-MSGSUBDIRS =	s10_support zone
+# override the install directory
+ROOTBIN =	$(ROOTBRANDDIR)
+CLOBBERFILES =	$(OBJS) $(ROOTPROGS)
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+UTSBASE =	$(SRC)/uts
+
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-D_REENTRANT
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+install:	all $(ROOTPROGS)
 
-_msg: $(MSGSUBDIRS)
+clean:
+		$(RM) $(PROG) $(OBJS)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+lint:		lint_PROG
 
-FRC:
+include $(SRC)/cmd/Makefile.targ

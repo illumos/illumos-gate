@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # NOTE: this script runs in the global zone and touches the non-global
@@ -49,6 +48,12 @@ trap_cleanup()
 		error "$e_shutdown" "$ZONENAME"
 		/usr/sbin/zoneadm -z $ZONENAME halt
 	fi
+
+	#
+	# Delete temporary files created during the hollow package removal
+	# process.
+	#
+	rm -f $hollow_pkgs $hollow_file_list $hollow_dir_list
 
 	exit $EXIT_CODE
 }
@@ -539,6 +544,9 @@ e_exitfail=$(gettext "Postprocessing failed.")
 #
 safe_dir /etc
 safe_dir /var
+safe_dir /var/sadm
+safe_dir /var/sadm/install
+safe_dir /var/sadm/pkg
 safe_opt_dir /etc/dfs
 safe_opt_dir /etc/lu
 safe_opt_dir /etc/zones
@@ -586,6 +594,88 @@ if (( $? != 0 )); then
 	/usr/bin/rm -f $SMFTMPFILE
 	fatal "$e_exitfail"
 fi
+
+#
+# Remove all files and directories installed by hollow packages.  Such files
+# and directories shouldn't exist inside zones.
+#
+hollow_pkgs=$(mktemp -t .hollow.pkgs.XXXXXX)
+hollow_file_list=$(mktemp $ZONEROOT/.hollow.pkgs.files.XXXXXX)
+hollow_dir_list=$(mktemp $ZONEROOT/.hollow.pkgs.dirs.XXXXXX)
+[ -f "$hollow_pkgs" -a -f "$hollow_file_list" -a -f "$hollow_dir_list" ] || {
+	error "$e_tmpfile"
+	rm -f $hollow_pkgs $hollow_file_list $hollow_dir_list
+	fatal "$e_exitfail"
+}
+for pkg_name in $ZONEROOT/var/sadm/pkg/*; do
+	grep 'SUNW_PKG_HOLLOW=true' $pkg_name/pkginfo >/dev/null 2>&1 && \
+	    basename $pkg_name >>$hollow_pkgs
+done
+/usr/bin/nawk -v hollowpkgs=$hollow_pkgs -v filelist=$hollow_file_list \
+    -v dirlist=$hollow_dir_list '
+	BEGIN {
+		while (getline p <hollowpkgs > 0)
+			pkgs[p] = 1;
+		close(hollowpkgs);
+	}
+	{
+		# fld is the field where the pkg names begin.
+		# nm is the file/dir entry name.
+		if ($2 == "f") {
+			fld=10;
+			nm=$1;
+		} else if ($2 == "d") {
+			fld=7;
+			nm=$1;
+		} else if ($2 == "s" || $2 == "l") {
+			fld=4;
+			split($1, a, "=");
+			nm=a[1];
+		} else {
+			next;
+		}
+
+		# Determine whether the file or directory is delivered by any
+		# non-hollow packages.  Files and directories can be
+		# delivered by multiple pkgs.  The file or directory should only
+		# be removed if it is only delivered by hollow packages.
+		for (i = fld; i <= NF; i++) {
+			if (pkgs[get_pkg_name($i)] != 1) {
+				# We encountered a non-hollow package.  Skip
+				# this entry.
+				next;
+			}
+		}
+
+		# The file or directory is only delivered by hollow packages.
+		# Mark it for removal.
+		if (fld != 7)
+			print nm >>filelist
+		else
+			print nm >>dirlist
+	}
+
+	# Get the clean pkg name from the fld entry.
+	function get_pkg_name(fld) {
+		# Remove any pkg control prefix (e.g. *, !)
+		first = substr(fld, 1, 1)
+		if (match(first, /[A-Za-z]/)) {
+			pname = fld 
+		} else {
+			pname = substr(fld, 2)
+		}
+
+		# Then remove any class action script name
+		pos = index(pname, ":")
+		if (pos != 0)
+			pname = substr(pname, 1, pos - 1)
+                return (pname)
+        }
+' $ZONEROOT/var/sadm/install/contents
+/usr/sbin/zlogin -S $ZONENAME "cat /$(basename $hollow_file_list) | xargs rm -f"
+/usr/sbin/zlogin -S $ZONENAME "sort -r /$(basename $hollow_dir_list) | \
+    xargs rmdir >/dev/null 2>&1"
+rm -f $hollow_pkgs $hollow_file_list $hollow_dir_list
 
 # cleanup SMF services
 fix_smf
