@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -37,78 +36,19 @@
 #include <sys/sdcard/sda_impl.h>
 
 /*
- * Static Variables.
- */
-
-static struct bus_ops sda_host_bus_ops = {
-	BUSO_REV,			/* busops_rev */
-	nullbusmap,			/* bus_map */
-	NULL,				/* bus_get_intrspec (OBSOLETE) */
-	NULL,				/* bus_add_intrspec (OBSOLETE) */
-	NULL,				/* bus_remove_intrspec (OBSOLETE) */
-	i_ddi_map_fault,		/* bus_map_fault */
-	ddi_dma_map,			/* bus_dma_map */
-	ddi_dma_allochdl,		/* bus_dma_allochdl */
-	ddi_dma_freehdl,		/* bus_dma_freehdl */
-	ddi_dma_bindhdl,		/* bus_dma_bindhdl */
-	ddi_dma_unbindhdl,		/* bus_dma_unbindhdl */
-	ddi_dma_flush,			/* bus_dma_flush */
-	ddi_dma_win,			/* bus_dma_win */
-	ddi_dma_mctl,			/* bus_dma_ctl */
-	sda_nexus_bus_ctl,		/* bus_ctl */
-	ddi_bus_prop_op,		/* bus_prop_op */
-	NULL,				/* bus_get_eventcookie */
-	NULL,				/* bus_add_eventcall */
-	NULL,				/* bus_remove_eventcall */
-	NULL,				/* bus_post_event */
-	NULL,				/* bus_intr_ctl (OBSOLETE) */
-	NULL, /* sda_nexus_bus_config, */		/* bus_config */
-	NULL, /* sda_nexus_bus_unconfig, */		/* bus_unconfig */
-	NULL,				/* bus_fm_init */
-	NULL,				/* bus_fm_fini */
-	NULL,				/* bus_fm_access_enter */
-	NULL,				/* bus_fm_access_exit */
-	NULL,				/* bus_power */
-	NULL,				/* bus_intr_op */
-};
-
-static struct cb_ops sda_host_cb_ops = {
-	sda_nexus_open,			/* cb_open */
-	sda_nexus_close,		/* cb_close */
-	nodev,				/* cb_strategy */
-	nodev,				/* cb_print */
-	nodev,				/* cb_dump */
-	nodev,				/* cb_read */
-	nodev,				/* cb_write */
-	sda_nexus_ioctl,		/* cb_ioctl */
-	nodev,				/* cb_devmap */
-	nodev,				/* cb_mmap */
-	nodev,				/* cb_segmap */
-	nochpoll,			/* cb_poll */
-	ddi_prop_op,			/* cb_prop_op */
-	NULL,				/* cb_str */
-	D_MP,				/* cb_flag */
-	CB_REV,				/* cb_rev */
-	nodev,				/* cb_aread */
-	nodev,				/* cb_awrite */
-};
-
-/*
  * Implementation.
  */
 
 void
 sda_host_init_ops(struct dev_ops *devops)
 {
-	devops->devo_getinfo = sda_nexus_getinfo;
-	devops->devo_cb_ops = &sda_host_cb_ops;
-	devops->devo_bus_ops = &sda_host_bus_ops;
+	bd_mod_init(devops);
 }
 
 void
 sda_host_fini_ops(struct dev_ops *devops)
 {
-	devops->devo_bus_ops = NULL;
+	bd_mod_fini(devops);
 }
 
 sda_host_t *
@@ -173,22 +113,12 @@ sda_host_attach(sda_host_t *h)
 		sda_host_detect(h, i);
 	}
 
-	/*
-	 * Register (create) nexus minor nodes.
-	 */
-	sda_nexus_register(h);
-
 	return (DDI_SUCCESS);
 }
 
 void
 sda_host_detach(sda_host_t *h)
 {
-	/*
-	 * Unregister nexus minor nodes.
-	 */
-	sda_nexus_unregister(h);
-
 	/*
 	 * Detach slots.
 	 */

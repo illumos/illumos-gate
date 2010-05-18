@@ -19,32 +19,17 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#
-# MAPFILE HEADER START
-#
-# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
-# Object versioning must comply with the rules detailed in
-#
-#	usr/src/lib/README.mapfiles
-#
-# You should not be making modifications here until you've read the most current
-# copy of that file. If you need help, contact a gatekeeper for guidance.
-#
-# MAPFILE HEADER END
-#
+include ../Makefile.targ
+include ../../../../Makefile.lib
+include ../../../../Makefile.targ
+include ../../Makefile.com
+include ../../../../Makefile.lib.64
 
-SUNWprivate_1.1 {
-    global:
-	cfga_change_state;
-	cfga_help;
-	cfga_list_ext;
-	cfga_private_func;
-	cfga_test;
-	cfga_version;
-    local:
-	*;
-};
+.KEEP_STATE:
+
+all:    $(LIBS) $(TXTS)
+
+install: all $(PLUGINDIR64) .WAIT $(PLUGINS64)

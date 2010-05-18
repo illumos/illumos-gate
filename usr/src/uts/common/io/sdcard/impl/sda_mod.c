@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -53,11 +52,9 @@ _init(void)
 	int	rv;
 
 	sda_cmd_init();
-	sda_nexus_init();
 
 	if ((rv = mod_install(&modlinkage)) != 0) {
 		sda_cmd_fini();
-		sda_nexus_fini();
 	}
 
 	return (rv);
@@ -70,7 +67,6 @@ _fini(void)
 
 	if ((rv = mod_remove(&modlinkage)) == 0) {
 		sda_cmd_fini();
-		sda_nexus_fini();
 	}
 	return (rv);
 }

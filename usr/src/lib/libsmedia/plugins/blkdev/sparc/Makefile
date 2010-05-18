@@ -19,52 +19,16 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-LIBRARY= sdcard.a
-VERS= .1
-
-OBJECTS= cfga_sdcard.o
-
-# include library definitions
-include ../../../Makefile.lib
-
-SRCDIR =	../common
-ROOTLIBDIR=	$(ROOT)/usr/lib/cfgadm
-ROOTLIBDIR64=	$(ROOTLIBDIR)/$(MACH64)
-
-LIBS=	$(DYNLIB)
-
-LINTFLAGS +=	-DDEBUG
-LINTFLAGS64 +=	-DDEBUG
-
-CFLAGS +=	$(CCVERBOSE)
-CFLAGS64 +=	$(CCVERBOSE)
-
-LDLIBS +=	-lc -ldevice -ldevinfo -lrcm
+include ../Makefile.targ
+include ../../../../Makefile.lib
+include ../../../../Makefile.targ
+include ../../Makefile.com
 
 .KEEP_STATE:
 
-all:	$(LIBS)
+all:    $(LIBS) $(TXTS)
 
-lint:	lintcheck
-
-# Install rules
-
-$(ROOTLIBDIR)/%: % $(ROOTLIBDIR)
-	$(INS.file)
-
-$(ROOTLIBDIR64)/%: % $(ROOTLIBDIR64)
-	$(INS.file)
-
-$(ROOTLIBDIR) $(ROOTLIBDIR64):
-	$(INS.dir)
-
-# include library targets
-include ../../../Makefile.targ
-
-objs/%.o pics/%.o: ../common/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
+install: all $(PLUGINDIR) .WAIT $(PLUGINS)

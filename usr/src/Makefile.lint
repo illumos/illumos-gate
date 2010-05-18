@@ -329,7 +329,6 @@ COMMON_SUBDIRS = \
 	lib/auditd_plugins \
 	lib/brand/sn1 \
 	lib/brand/solaris10 \
-	lib/cfgadm_plugins/sdcard \
 	lib/crypt_modules \
 	lib/extendedFILE \
 	lib/libadutils \

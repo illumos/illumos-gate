@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -45,9 +44,6 @@ MODULE		= sdhost
 OBJECTS		= $(SDHOST_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SDHOST_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-WARLOCK_OUT	= $(SDHOST_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -73,7 +69,7 @@ DEBUG_DEFS	+= $(DEBUG_FLGS)
 CFLAGS += $(CCVERBOSE)
 
 #
-# dependency on scsi module
+# dependency on sda module
 #
 LDFLAGS += -dy -Nmisc/sda
 
@@ -102,26 +98,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-SDA_LLS		= $(SDA_OBJS:%.o= -l ../sda/%.ll)
-BLK2SCSA_LLS	= $(BLK2SCSA_OBJS:%.o= -l ../blk2scsa/%.ll)
-
-warlock:	$(WARLOCK_OK)
-
-blk2scsa.wl:
-	@cd ../blk2scsa; pwd; $(MAKE) warlock
-
-sda.wl:
-	@cd ../sda; pwd; $(MAKE) warlock
-
-$(WARLOCK_OK):	$(WARLOCK_OUT) $(WLCMD_DIR)/sdhost.wlcmd blk2scsa.wl sda.wl
-	$(WARLOCK) -c $(WLCMD_DIR)/sdhost.wlcmd $(WARLOCK_OUT) \
-		$(SDA_LLS) $(BLK2SCSA_LLS) \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll:	$(UTSBASE)/common/io/sdcard/adapters/sdhost/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<

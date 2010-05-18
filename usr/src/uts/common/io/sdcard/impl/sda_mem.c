@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -30,23 +29,16 @@
 #include <sys/types.h>
 #include <sys/note.h>
 #include <sys/conf.h>
-#include <sys/scsi/adapters/blk2scsa.h>
+#include <sys/blkdev.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sdcard/sda.h>
 #include <sys/sdcard/sda_impl.h>
 
-static int sda_mem_attach(dev_info_t *, ddi_attach_cmd_t);
-static int sda_mem_detach(dev_info_t *, ddi_detach_cmd_t);
-static int sda_mem_quiesce(dev_info_t *);
-static b2s_err_t sda_mem_b2s_errno(sda_err_t);
-static boolean_t sda_mem_b2s_request(void *, b2s_request_t *);
-static boolean_t sda_mem_b2s_rw(sda_slot_t *, b2s_request_t *);
-static void sda_mem_b2s_done(sda_cmd_t *);
+static int sda_mem_errno(sda_err_t);
+static int sda_mem_rw(sda_slot_t *, bd_xfer_t *, uint8_t, uint16_t);
+static void sda_mem_done(sda_cmd_t *);
 static void sda_mem_getstring(uint32_t *, char *, int, int);
-static int sda_mem_parse_cid_csd(sda_slot_t *, dev_info_t *);
-static int sda_mem_cmd(sda_slot_t *, uint8_t, uint32_t, uint8_t, uint32_t *);
-
 
 /*
  * To minimize complexity and reduce layering, we implement almost the
@@ -56,417 +48,160 @@ static int sda_mem_cmd(sda_slot_t *, uint8_t, uint32_t, uint8_t, uint32_t *);
  */
 
 /*
- * SCSA layer supplies a cb_ops, but we don't want it, because we
- * don't want to expose a SCSI attachment point.  (Our parent handles
- * the attachment point, the SCSI one would be confusing.)  We have to
- * supply a stubbed out one, to prevent SCSA from trying to create minor
- * nodes on our behalf.
- *
- * Perhaps at some future point we might want to expose a separate set
- * of ioctls for these nodes, but for now we rely on our parent to do
- * all that work.
- */
-static struct cb_ops sda_mem_ops = {
-	nodev,			/* cb_open */
-	nodev,			/* cb_close */
-	nodev,			/* cb_strategy */
-	nodev,			/* cb_print */
-	nodev,			/* cb_dump */
-	nodev,			/* cb_read */
-	nodev,			/* cb_write */
-	nodev,			/* cb_ioctl */
-	nodev,			/* cb_devmap */
-	nodev,			/* cb_mmap */
-	nodev,			/* cb_segmap */
-	nochpoll,		/* cb_chpoll */
-	ddi_prop_op,		/* cb_prop_op */
-	NULL,			/* cb_stream */
-	D_MP			/* cb_flag */
-};
-
-/*
- * Here are the public functions.
- */
-void
-sda_mem_init(struct modlinkage *modlp)
-{
-	struct dev_ops *devo;
-
-	devo = ((struct modldrv *)(modlp->ml_linkage[0]))->drv_dev_ops;
-	devo->devo_attach = sda_mem_attach;
-	devo->devo_detach = sda_mem_detach;
-	devo->devo_quiesce = sda_mem_quiesce;
-
-	devo->devo_cb_ops = &sda_mem_ops;
-
-	/* it turns out that this can't ever really fail */
-	(void) b2s_mod_init(modlp);
-}
-
-void
-sda_mem_fini(struct modlinkage *modlp)
-{
-	b2s_mod_fini(modlp);
-}
-
-/*
  * Everything beyond this is private.
  */
 
 int
-sda_mem_cmd(sda_slot_t *slot, uint8_t cmd, uint32_t arg, uint8_t rtype,
-    uint32_t *resp)
+sda_mem_errno(sda_err_t errno)
 {
-	sda_cmd_t	*cmdp;
-	int		errno;
-
-	cmdp = sda_cmd_alloc(slot, cmd, arg, rtype, NULL, KM_SLEEP);
-	if (cmdp == NULL) {
-		return (ENOMEM);
+	/* the hot path */
+	if (errno == SDA_EOK) {
+		return (0);
 	}
-	errno = sda_cmd_exec(slot, cmdp, resp);
-	sda_cmd_free(cmdp);
 
-	return (errno);
+	switch (errno) {
+	case SDA_ENOMEM:
+		return (ENOMEM);
+	case SDA_ETIME:
+		return (ETIMEDOUT);
+	case SDA_EWPROTECT:
+		return (EROFS);
+	case SDA_ESUSPENDED:
+	case SDA_ENODEV:
+		return (ENODEV);
+	case SDA_EFAULT:
+	case SDA_ECRC7:
+	case SDA_EPROTO:
+	case SDA_ERESET:
+	case SDA_EIO:
+	case SDA_ERESID:
+	default:
+		return (EIO);
+	}
 }
 
-boolean_t
-sda_mem_b2s_rw(sda_slot_t *slot, b2s_request_t *reqp)
+void
+sda_mem_done(sda_cmd_t *cmdp)
+{
+	bd_xfer_t	*xfer = sda_cmd_data(cmdp);
+	int		errno = sda_cmd_errno(cmdp);
+
+	bd_xfer_done(xfer, sda_mem_errno(errno));
+	sda_cmd_free(cmdp);
+}
+
+int
+sda_mem_rw(sda_slot_t *slot, bd_xfer_t *xfer, uint8_t cmd, uint16_t flags)
 {
 	sda_cmd_t	*cmdp;
 	uint64_t	nblks;
 	uint64_t	blkno;
 	uint16_t	rblen;
-	int		rv;
-	uint8_t		index;
-	uint16_t	flags;
 
-	blkno = reqp->br_lba;
-	nblks = reqp->br_nblks;
+	blkno = xfer->x_blkno;
+	nblks = xfer->x_nblks;
 
-	switch (reqp->br_cmd) {
-	case B2S_CMD_READ:
-		if (nblks > 1) {
-			index = CMD_READ_MULTI;
-			flags = SDA_CMDF_DAT | SDA_CMDF_MEM | SDA_CMDF_READ |
-			    SDA_CMDF_AUTO_CMD12;
-		} else {
-			index = CMD_READ_SINGLE;
-			flags = SDA_CMDF_DAT | SDA_CMDF_MEM | SDA_CMDF_READ;
-		}
-		break;
-	case B2S_CMD_WRITE:
-		if (nblks > 1) {
-			index = CMD_WRITE_MULTI;
-			flags = SDA_CMDF_DAT | SDA_CMDF_MEM | SDA_CMDF_WRITE |
-			    SDA_CMDF_AUTO_CMD12;
-		} else {
-			index = CMD_WRITE_SINGLE;
-			flags = SDA_CMDF_DAT | SDA_CMDF_MEM | SDA_CMDF_WRITE;
-		}
-		break;
-	default:
-		ASSERT(0);
-		break;
+	ASSERT(nblks != 0);
+
+	if ((blkno + nblks) > slot->s_nblks) {
+		return (EINVAL);
 	}
 
-	cmdp = sda_cmd_alloc(slot, index, blkno << slot->s_bshift,
-	    R1, reqp, KM_NOSLEEP);
+	cmdp = sda_cmd_alloc(slot, cmd, blkno << slot->s_bshift,
+	    R1, xfer, KM_NOSLEEP);
 	if (cmdp == NULL) {
-		b2s_request_done(reqp, B2S_ENOMEM, 0);
-		return (B_TRUE);
+		return (ENOMEM);
 	}
 
 	if (slot->s_hostp->h_dma != NULL) {
-		b2s_request_dma(reqp, &cmdp->sc_ndmac, &cmdp->sc_dmacs);
+		cmdp->sc_dmah = xfer->x_dmah;
+		cmdp->sc_ndmac = xfer->x_ndmac;
+		cmdp->sc_dmac = xfer->x_dmac;
 		cmdp->sc_kvaddr = 0;
 	} else {
 		cmdp->sc_ndmac = 0;
-	}
-	if ((slot->s_caps & SLOT_CAP_NOPIO) == 0) {
-		size_t	maplen;
-		b2s_request_mapin(reqp, &cmdp->sc_kvaddr, &maplen);
-	}
-
-	if (nblks == 0) {
-		/*
-		 * This is not strictly a failure, but no work to do.
-		 * We have to do it late here because we don't want to
-		 * by pass the above media readiness checks.
-		 */
-		rv = B2S_EOK;
-		goto failed;
-	}
-	if (nblks > 0xffff) {
-		rv = B2S_EINVAL;
-		goto failed;
+		cmdp->sc_kvaddr = xfer->x_kaddr;
 	}
 
 	rblen = slot->s_blksz;
 
-	if ((blkno + nblks) > slot->s_nblks) {
-		rv = B2S_EBLKADDR;
-		goto failed;
-	}
-
-	cmdp->sc_rtype = R1;
+	/* other fields are set by sda_cmd_alloc */
 	cmdp->sc_blksz = rblen;
 	cmdp->sc_nblks = (uint16_t)nblks;
-	cmdp->sc_index = index;
 	cmdp->sc_flags = flags;
 
-	sda_cmd_submit(slot, cmdp, sda_mem_b2s_done);
-	return (B_TRUE);
-
-failed:
-	sda_cmd_free(cmdp);
-	b2s_request_done(reqp, rv, 0);
-	return (B_TRUE);
+	sda_cmd_submit(slot, cmdp, sda_mem_done);
+	return (0);
 }
 
-boolean_t
-sda_mem_b2s_format(sda_slot_t *slot, b2s_request_t *reqp)
+int
+sda_mem_bd_read(void *arg, bd_xfer_t *xfer)
 {
-	sda_cmd_t	*cmdp;
-	int		rv;
+	sda_slot_t	*slot = arg;
+	uint8_t		cmd;
+	uint16_t	flags;
 
-
-	rv = sda_mem_cmd(slot, CMD_ERASE_START, 0, R1, NULL);
-	if (rv != 0) {
-		b2s_request_done(reqp, sda_mem_b2s_errno(rv), 0);
-		return (B_TRUE);
-	}
-	rv = sda_mem_cmd(slot, CMD_ERASE_END, slot->s_nblks - 1, R1, NULL);
-	if (rv != 0) {
-		b2s_request_done(reqp, sda_mem_b2s_errno(rv), 0);
-		return (B_TRUE);
+	if (xfer->x_nblks > 1) {
+		cmd = CMD_READ_MULTI;
+		flags = SDA_CMDF_DAT | SDA_CMDF_MEM | SDA_CMDF_READ |
+		    SDA_CMDF_AUTO_CMD12;
+	} else {
+		cmd = CMD_READ_SINGLE;
+		flags = SDA_CMDF_DAT | SDA_CMDF_MEM | SDA_CMDF_READ;
 	}
 
-	cmdp = sda_cmd_alloc(slot, CMD_ERASE, 0, R1b, reqp, KM_NOSLEEP);
-	if (cmdp == NULL) {
-		b2s_request_done(reqp, B2S_ENOMEM, 0);
-		return (B_TRUE);
-	}
-	cmdp->sc_flags = SDA_CMDF_DAT | SDA_CMDF_MEM;
-
-	sda_cmd_submit(slot, cmdp, sda_mem_b2s_done);
-	return (B_TRUE);
+	return (sda_mem_rw(slot, xfer, cmd, flags));
 }
 
-b2s_err_t
-sda_mem_b2s_errno(sda_err_t errno)
+int
+sda_mem_bd_write(void *arg, bd_xfer_t *xfer)
 {
-	/* the hot path */
-	if (errno == SDA_EOK) {
-		return (B2S_EOK);
+	sda_slot_t	*slot = arg;
+	uint8_t		cmd;
+	uint16_t	flags;
+
+	if ((slot->s_flags & SLOTF_WRITABLE) == 0) {
+		return (EROFS);
+	}
+	if (xfer->x_nblks > 1) {
+		cmd = CMD_WRITE_MULTI;
+		flags = SDA_CMDF_DAT | SDA_CMDF_MEM | SDA_CMDF_WRITE |
+		    SDA_CMDF_AUTO_CMD12;
+	} else {
+		cmd = CMD_WRITE_SINGLE;
+		flags = SDA_CMDF_DAT | SDA_CMDF_MEM | SDA_CMDF_WRITE;
 	}
 
-	switch (errno) {
-	case SDA_ENOMEM:
-		return (B2S_ENOMEM);
-	case SDA_ETIME:
-		return (B2S_ETIMEDOUT);
-	case SDA_EWPROTECT:
-		return (B2S_EWPROTECT);
-	case SDA_ESUSPENDED:
-	case SDA_ENODEV:
-		return (B2S_ENOMEDIA);
-	case SDA_EFAULT:
-	case SDA_ECRC7:
-	case SDA_EPROTO:
-		return (B2S_EHARDWARE);
-	case SDA_ERESET:
-		return (B2S_ERESET);
-	case SDA_EIO:
-	case SDA_ERESID:
-	default:
-		return (B2S_EIO);
-	}
+	return (sda_mem_rw(slot, xfer, cmd, flags));
 }
 
 void
-sda_mem_b2s_done(sda_cmd_t *cmdp)
-{
-	b2s_request_t	*reqp = sda_cmd_data(cmdp);
-	int		errno = sda_cmd_errno(cmdp);
-
-	b2s_request_done(reqp, sda_mem_b2s_errno(errno), cmdp->sc_resid);
-	sda_cmd_free(cmdp);
-}
-
-boolean_t
-sda_mem_b2s_request(void *arg, b2s_request_t *reqp)
+sda_mem_bd_driveinfo(void *arg, bd_drive_t *drive)
 {
 	sda_slot_t	*slot = arg;
-	int		rv;
 
-	switch (reqp->br_cmd) {
-	case B2S_CMD_WRITE:
-		if ((slot->s_flags & SLOTF_WRITABLE) == 0) {
-			rv = B2S_EWPROTECT;
-		} else {
-			return (sda_mem_b2s_rw(slot, reqp));
-		}
-		break;
-
-	case B2S_CMD_READ:
-		return (sda_mem_b2s_rw(slot, reqp));
-
-	case B2S_CMD_INQUIRY:
-		reqp->br_inquiry.inq_vendor = "OSOL";
-		reqp->br_inquiry.inq_product =
-		    slot->s_flags & SLOTF_MMC ? "MultiMediaCard" :
-		    slot->s_flags & SLOTF_SDHC ? "SDHC Memory Card" :
-		    "SD Memory Card";
-		reqp->br_inquiry.inq_revision = "";
-		reqp->br_inquiry.inq_serial = "";
-		rv = B2S_EOK;
-		break;
-
-	case B2S_CMD_GETMEDIA:
-		if (!slot->s_ready) {
-			rv = B2S_ENODEV;
-		} else {
-			reqp->br_media.media_blksz = slot->s_blksz;
-			reqp->br_media.media_nblks = slot->s_nblks;
-			/* detect read-only cards */
-			if (slot->s_flags & SLOTF_WRITABLE) {
-				reqp->br_media.media_flags = 0;
-			} else {
-				reqp->br_media.media_flags =
-				    B2S_MEDIA_FLAG_READ_ONLY;
-			}
-			rv = B2S_EOK;
-		}
-		break;
-
-	case B2S_CMD_FORMAT:
-		return (sda_mem_b2s_format(slot, reqp));
-
-	case B2S_CMD_ABORT:
-		sda_slot_mem_reset(slot, SDA_EABORT);
-		rv = B2S_EOK;
-		break;
-
-	case B2S_CMD_RESET:
-		sda_slot_mem_reset(slot, SDA_ERESET);
-		rv = B2S_EOK;
-		break;
-
-	case B2S_CMD_START:
-	case B2S_CMD_STOP:
-	case B2S_CMD_SYNC:
-		rv = B2S_EOK;
-		break;
-
-	case B2S_CMD_LOCK:
-	case B2S_CMD_UNLOCK:
-	default:
-		rv = B2S_ENOTSUP;
-		break;
-	}
-
-	b2s_request_done(reqp, rv, 0);
-	return (B_TRUE);
+	drive->d_qsize = 4;	/* we queue up internally, 4 is enough */
+	drive->d_maxxfer = 65536;
+	drive->d_removable = B_TRUE;
+	drive->d_hotpluggable = B_FALSE;
+	drive->d_target = slot->s_slot_num;
 }
 
 int
-sda_mem_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+sda_mem_bd_mediainfo(void *arg, bd_media_t *media)
 {
-	sda_slot_t		*slot;
-	b2s_nexus_t		*nexus;
-	b2s_nexus_info_t	nexinfo;
-	b2s_leaf_info_t		leafinfo;
+	sda_slot_t	*slot = arg;
 
-	switch (cmd) {
-	case DDI_ATTACH:
-		if ((slot = ddi_get_parent_data(dip)) == NULL) {
-			return (DDI_FAILURE);
-		}
-
-		if (sda_mem_parse_cid_csd(slot, dip) != DDI_SUCCESS) {
-			return (DDI_FAILURE);
-		}
-
-		nexinfo.nexus_version = B2S_VERSION_0;
-		nexinfo.nexus_private = slot;
-		nexinfo.nexus_dip = dip;
-		nexinfo.nexus_dma_attr = slot->s_hostp->h_dma;
-		nexinfo.nexus_request = sda_mem_b2s_request;
-
-		nexus = b2s_alloc_nexus(&nexinfo);
-		if (nexus == NULL) {
-			return (DDI_FAILURE);
-		}
-
-		leafinfo.leaf_target = 0;
-		leafinfo.leaf_lun = 0;
-		leafinfo.leaf_flags =
-		    B2S_LEAF_REMOVABLE | B2S_LEAF_HOTPLUGGABLE;
-		leafinfo.leaf_unique_id = slot->s_uuid;
-		leafinfo.leaf_eui = 0;
-
-		slot->s_leaf = b2s_attach_leaf(nexus, &leafinfo);
-		if (slot->s_leaf == NULL) {
-			b2s_free_nexus(nexus);
-			return (DDI_FAILURE);
-		}
-
-		slot->s_nexus = nexus;
-		if (b2s_attach_nexus(nexus) != DDI_SUCCESS) {
-			slot->s_nexus = NULL;
-			b2s_free_nexus(nexus);
-			return (DDI_FAILURE);
-		}
-		slot->s_nexus = nexus;
-
-		return (DDI_SUCCESS);
-
-
-	case DDI_RESUME:
-		return (DDI_SUCCESS);
-
-	default:
-		return (DDI_FAILURE);
+	sda_slot_enter(slot);
+	if (!slot->s_ready) {
+		sda_slot_exit(slot);
+		return (ENXIO);
 	}
-}
-
-int
-sda_mem_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
-{
-	sda_slot_t	*slot;
-	b2s_nexus_t	*nexus;
-
-	switch (cmd) {
-	case DDI_DETACH:
-		if ((slot = ddi_get_parent_data(dip)) == NULL) {
-			return (DDI_FAILURE);
-		}
-		if ((nexus = slot->s_nexus) == NULL) {
-			/* nothing to do */
-			return (DDI_SUCCESS);
-		}
-		if (b2s_detach_nexus(nexus) != DDI_SUCCESS) {
-			return (DDI_FAILURE);
-		}
-		slot->s_nexus = NULL;
-		b2s_free_nexus(nexus);
-		return (DDI_SUCCESS);
-
-	case DDI_SUSPEND:
-		return (DDI_SUCCESS);
-
-	default:
-		return (DDI_FAILURE);
-	}
-}
-
-int
-sda_mem_quiesce(dev_info_t *dip)
-{
-	_NOTE(ARGUNUSED(dip));
-	/* no work to do */
-	return (DDI_SUCCESS);
+	media->m_nblks = slot->s_nblks;
+	media->m_blksize = slot->s_blksz;
+	media->m_readonly = slot->s_flags & SLOTF_WRITABLE ? B_FALSE : B_TRUE;
+	sda_slot_exit(slot);
+	return (0);
 }
 
 uint32_t
@@ -510,7 +245,7 @@ sda_mem_maxclk(sda_slot_t *slot)
 }
 
 int
-sda_mem_parse_cid_csd(sda_slot_t *slot, dev_info_t *dip)
+sda_mem_parse_cid_csd(sda_slot_t *slot)
 {
 	uint32_t	*rcid;
 	uint32_t	*rcsd;
@@ -519,8 +254,6 @@ sda_mem_parse_cid_csd(sda_slot_t *slot, dev_info_t *dip)
 	uint16_t	bshift;
 	uint32_t	cmult;
 	uint32_t	csize;
-	char		date[16];
-	char		*dtype;
 
 	rcid = slot->s_rcid;
 	rcsd = slot->s_rcsd;
@@ -531,7 +264,6 @@ sda_mem_parse_cid_csd(sda_slot_t *slot, dev_info_t *dip)
 		switch (csdver) {
 		case 0:
 			csize = sda_mem_getbits(rcsd, 73, 12);
-			/* see comment above */
 			rblen = (1 << sda_mem_getbits(rcsd, 83, 4));
 			cmult = (4 << sda_mem_getbits(rcsd, 49, 3));
 			bshift = 9;
@@ -548,7 +280,6 @@ sda_mem_parse_cid_csd(sda_slot_t *slot, dev_info_t *dip)
 			return (DDI_FAILURE);
 		}
 
-		dtype = slot->s_flags & SLOTF_SDHC ? "sdhc" : "sdcard";
 		slot->s_mfg = sda_mem_getbits(rcid, 127, 8);
 		sda_mem_getstring(rcid, slot->s_oem, 119, 2);
 		sda_mem_getstring(rcid, slot->s_prod, 103, 5);
@@ -564,8 +295,6 @@ sda_mem_parse_cid_csd(sda_slot_t *slot, dev_info_t *dip)
 			    csdver);
 			return (DDI_FAILURE);
 		}
-
-		dtype = "mmc";
 
 		switch (sda_mem_getbits(rcsd, 125, 4)) {
 		case 0:	/* MMC 1.0 - 1.2 */
@@ -633,33 +362,6 @@ sda_mem_parse_cid_csd(sda_slot_t *slot, dev_info_t *dip)
 	    (slot->s_perm_wp != 0) || (slot->s_temp_wp != 0)) {
 		slot->s_flags &= ~SLOTF_WRITABLE;
 	}
-	(void) snprintf(date, sizeof (date), "%02d-%04d",
-	    slot->s_month, slot->s_year);
-
-#define	prop_set_int(name, val)		\
-	(void) ddi_prop_update_int(DDI_DEV_T_NONE, dip, name, val)
-#define	prop_set_str(name, val)		\
-	(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip, name, val)
-#define	prop_set_bool(name, val)	\
-	if (val) (void) ddi_prop_create(DDI_DEV_T_NONE, dip, 0, name, NULL, 0)
-
-	prop_set_str("device-type", dtype);
-	prop_set_int("mfg-id", slot->s_mfg);
-	prop_set_str("product-id", slot->s_prod);
-	prop_set_str("oem-id", slot->s_oem);
-	prop_set_str("mfg-date", date);
-
-	prop_set_int("block-size", slot->s_blksz);
-	prop_set_int("num-blocks", slot->s_nblks);
-	prop_set_int("max-freq", slot->s_maxclk);
-	prop_set_bool("dsr-implemented", slot->s_dsr);
-	prop_set_int("ccc", slot->s_ccc);
-	prop_set_bool("perm-wp", slot->s_perm_wp);
-	prop_set_bool("temp-wp", slot->s_temp_wp);
-
-#undef	prop_set_int
-#undef	prop_set_str
-#undef	prop_set_bool
 
 	return (DDI_SUCCESS);
 }

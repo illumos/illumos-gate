@@ -2,14 +2,11 @@
  *
  * devinfo_storage.h : definitions for storage devices
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Licensed under the Academic Free License version 2.1
  *
  **************************************************************************/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef DEVINFO_STORAGE_H
 #define DEVINFO_STORAGE_H
@@ -19,6 +16,7 @@
 extern DevinfoDevHandler devinfo_ide_handler;
 extern DevinfoDevHandler devinfo_scsi_handler;
 extern DevinfoDevHandler devinfo_pcata_handler;
+extern DevinfoDevHandler devinfo_blkdev_handler;
 extern DevinfoDevHandler devinfo_floppy_handler;
 extern DevinfoDevHandler devinfo_lofi_handler;
 

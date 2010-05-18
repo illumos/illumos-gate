@@ -19,16 +19,17 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-root	sda_host_log
-root	sdhost_poll
+include ../Makefile.targ
+include ../../../../Makefile.lib
+include ../../../../Makefile.targ
+include ../../Makefile.com
+include ../../../../Makefile.lib.64
 
-add sda_slot::s_ops.so_cmd	targets sdhost_cmd \
-					sdhost_halt
-add sda_slot::s_ops.so_getprop	targets sdhost_getprop
-add sda_slot::s_ops.so_reset	targets sdhost_reset
-add sda_slot::s_ops.so_setprop	targets sdhost_setprop
+.KEEP_STATE:
 
+all:    $(LIBS) $(TXTS)
+
+install: all $(PLUGINDIR64) .WAIT $(PLUGINS64)

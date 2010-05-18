@@ -295,14 +295,12 @@ file path=usr/lib/cfgadm/$(ARCH64)/ib.so.1
 file path=usr/lib/cfgadm/$(ARCH64)/pci.so.1
 $(i386_ONLY)file path=usr/lib/cfgadm/$(ARCH64)/sata.so.1
 file path=usr/lib/cfgadm/$(ARCH64)/scsi.so.1
-file path=usr/lib/cfgadm/$(ARCH64)/sdcard.so.1
 file path=usr/lib/cfgadm/$(ARCH64)/shp.so.1
 file path=usr/lib/cfgadm/$(ARCH64)/usb.so.1
 file path=usr/lib/cfgadm/ib.so.1
 file path=usr/lib/cfgadm/pci.so.1
 $(i386_ONLY)file path=usr/lib/cfgadm/sata.so.1
 file path=usr/lib/cfgadm/scsi.so.1
-file path=usr/lib/cfgadm/sdcard.so.1
 file path=usr/lib/cfgadm/shp.so.1
 file path=usr/lib/cfgadm/usb.so.1
 file path=usr/lib/extendedFILE.so.1
@@ -916,14 +914,12 @@ link path=usr/lib/cfgadm/$(ARCH64)/ib.so target=./ib.so.1
 link path=usr/lib/cfgadm/$(ARCH64)/pci.so target=./pci.so.1
 $(i386_ONLY)link path=usr/lib/cfgadm/$(ARCH64)/sata.so target=./sata.so.1
 link path=usr/lib/cfgadm/$(ARCH64)/scsi.so target=./scsi.so.1
-link path=usr/lib/cfgadm/$(ARCH64)/sdcard.so target=./sdcard.so.1
 link path=usr/lib/cfgadm/$(ARCH64)/shp.so target=./shp.so.1
 link path=usr/lib/cfgadm/$(ARCH64)/usb.so target=./usb.so.1
 link path=usr/lib/cfgadm/ib.so target=./ib.so.1
 link path=usr/lib/cfgadm/pci.so target=./pci.so.1
 $(i386_ONLY)link path=usr/lib/cfgadm/sata.so target=./sata.so.1
 link path=usr/lib/cfgadm/scsi.so target=./scsi.so.1
-link path=usr/lib/cfgadm/sdcard.so target=./sdcard.so.1
 link path=usr/lib/cfgadm/shp.so target=./shp.so.1
 link path=usr/lib/cfgadm/usb.so target=./usb.so.1
 link path=usr/lib/lib300.so target=./lib300.so.1

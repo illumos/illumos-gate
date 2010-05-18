@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -54,10 +53,6 @@
 		sda_host_transfer;
 		sda_host_fault;
 		sda_host_log;
-
-		# project private interfaces used by sdcard
-		sda_mem_init;
-		sda_mem_fini;
 
 	local:
 		*;

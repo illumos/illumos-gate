@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SDCARD_SDA_H
@@ -222,8 +221,9 @@ struct sda_cmd {
 
 	uint32_t		sc_resid;
 
+	ddi_dma_handle_t	sc_dmah;
 	uint_t			sc_ndmac;	/* # DMA cookies */
-	ddi_dma_cookie_t	*sc_dmacs;	/* actual DMA cookies */
+	ddi_dma_cookie_t	sc_dmac;	/* actual DMA cookies */
 	caddr_t			sc_kvaddr;	/* kernel virtual address */
 
 #define	SDA_CMDF_READ		0x0001		/* transfer direction */
@@ -235,8 +235,6 @@ struct sda_cmd {
 #define	SDA_CMDF_INIT		0x0400		/* initialization command */
 #define	SDA_CMDF_MEM		0x0800		/* memory target command */
 };
-
-_NOTE(SCHEME_PROTECTS_DATA("unshared request", sda_cmd))
 
 /*
  * The framework has two APIs.  The first API is for host controllers,

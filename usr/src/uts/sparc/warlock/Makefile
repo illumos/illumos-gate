@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	sparc architecture dependent
 #
@@ -94,7 +93,6 @@ warlock.scsi:
 	@cd ../ses; $(MAKE) clean; $(MAKE) warlock
 	@cd ../st; $(MAKE) clean; $(MAKE) warlock
 	@cd ../ssd; $(MAKE) clean; $(MAKE) warlock
-	@cd ../blk2scsa; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/uata; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/glm; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/mpt; $(MAKE) clean; $(MAKE) warlock

@@ -19,26 +19,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * SD card slot support.
- *
- * NB that this file contains a fair bit of non-DDI compliant code.
- * But writing a nexus driver would be impossible to do with only DDI
- * compliant interfaces.
  */
 
 #include <sys/types.h>
-#include <sys/sysmacros.h>
-#include <sys/cpuvar.h>
 #include <sys/cmn_err.h>
 #include <sys/varargs.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/sunndi.h>
 #include <sys/sdcard/sda_impl.h>
 
 
@@ -256,39 +248,31 @@ sda_slot_insert(void *arg)
 		sda_slot_power_off(slot);
 		sda_slot_abort(slot, SDA_ENODEV);
 		sda_slot_exit(slot);
-		sda_nexus_remove(slot);
 
+	} else if ((slot->s_flags & SLOTF_MEMORY) == 0) {
+		/*
+		 * SDIO: For SDIO, we can write the card's
+		 * MANFID tuple in CIS to the UUID.  Until we
+		 * support SDIO, we just suppress creating
+		 * devinfo nodes.
+		 */
+		sda_slot_err(slot, "Non-memory target not supported");
 	} else {
-		sda_nexus_insert(slot);
+
+		sda_slot_enter(slot);
+		if (sda_mem_parse_cid_csd(slot) != DDI_SUCCESS) {
+			sda_slot_err(slot,
+			    "Unable to parse card identification");
+		} else {
+			slot->s_warn = B_FALSE;
+			slot->s_ready = B_TRUE;
+		}
+		sda_slot_exit(slot);
 	}
 
 	slot->s_stamp = ddi_get_time();
 	slot->s_intransit = 0;
-}
-
-void
-sda_slot_mem_reset(sda_slot_t *slot, sda_err_t errno)
-{
-	sda_cmd_t	*cmdp;
-
-	sda_slot_enter(slot);
-	cmdp = list_head(&slot->s_cmdlist);
-	while (cmdp != NULL) {
-		sda_cmd_t	*next;
-		next = list_next(&slot->s_cmdlist, cmdp);
-		if (cmdp->sc_flags & SDA_CMDF_MEM) {
-			list_remove(&slot->s_cmdlist, cmdp);
-			sda_cmd_notify(cmdp, 0, errno);
-			mutex_enter(&slot->s_evlock);
-			list_insert_tail(&slot->s_abortlist, cmdp);
-			mutex_exit(&slot->s_evlock);
-		}
-		cmdp = next;
-	}
-	sda_slot_exit(slot);
-
-	/* wake up to process the abort list */
-	sda_slot_wakeup(slot);
+	bd_state_change(slot->s_bdh);
 }
 
 void
@@ -300,14 +284,13 @@ sda_slot_abort(sda_slot_t *slot, sda_err_t errno)
 
 	if ((cmdp = slot->s_xfrp) != NULL) {
 		slot->s_xfrp = NULL;
-		sda_cmd_notify(cmdp, SDA_CMDF_BUSY | SDA_CMDF_DAT, errno);
+		sda_cmd_notify(cmdp, 0, errno);
+		list_insert_tail(&slot->s_abortlist, cmdp);
 	}
 	while ((cmdp = list_head(&slot->s_cmdlist)) != NULL) {
 		list_remove(&slot->s_cmdlist, cmdp);
 		sda_cmd_notify(cmdp, 0, errno);
-		mutex_enter(&slot->s_evlock);
 		list_insert_tail(&slot->s_abortlist, cmdp);
-		mutex_exit(&slot->s_evlock);
 	}
 
 	sda_slot_wakeup(slot);
@@ -421,9 +404,8 @@ sda_slot_handle_detect(sda_slot_t *slot)
 		 */
 		sda_slot_reset(slot);
 
-		sda_nexus_remove(slot);
-
 		slot->s_intransit = 0;
+		bd_state_change(slot->s_bdh);
 	}
 	sda_slot_exit(slot);
 
@@ -490,6 +472,17 @@ sda_slot_fini(sda_slot_t *slot)
 	cv_destroy(&slot->s_evcv);
 }
 
+static bd_ops_t sda_bd_ops = {
+	BD_OPS_VERSION_0,
+	sda_mem_bd_driveinfo,
+	sda_mem_bd_mediainfo,
+	NULL,			/* devid_init */
+	NULL,			/* sync_cache */
+	sda_mem_bd_read,
+	sda_mem_bd_write,
+	NULL			/* dump */
+};
+
 void
 sda_slot_attach(sda_slot_t *slot)
 {
@@ -511,6 +504,9 @@ sda_slot_attach(sda_slot_t *slot)
 	 * card initialization.
 	 */
 
+	slot->s_bdh = bd_alloc_handle(slot, &sda_bd_ops, h->h_dma, KM_SLEEP);
+	ASSERT(slot->s_bdh);
+
 	sda_slot_enter(slot);
 
 	(void) snprintf(name, sizeof (name), "slot_%d_hp_tq",
@@ -521,6 +517,8 @@ sda_slot_attach(sda_slot_t *slot)
 		/* Generally, this failure should never occur */
 		sda_slot_err(slot, "Unable to create hotplug slot taskq");
 		sda_slot_exit(slot);
+		bd_free_handle(slot->s_bdh);
+		slot->s_bdh = NULL;
 		return;
 	}
 
@@ -533,6 +531,8 @@ sda_slot_attach(sda_slot_t *slot)
 		/* Generally, this failure should never occur */
 		sda_slot_err(slot, "Unable to create main slot taskq");
 		sda_slot_exit(slot);
+		bd_free_handle(slot->s_bdh);
+		slot->s_bdh = NULL;
 		return;
 	}
 	(void) ddi_taskq_dispatch(slot->s_main_tq, sda_slot_thread, slot,
@@ -560,6 +560,8 @@ sda_slot_attach(sda_slot_t *slot)
 	}
 
 	sda_slot_exit(slot);
+
+	(void) bd_attach_handle(h->h_dip, slot->s_bdh);
 }
 
 void
@@ -568,6 +570,8 @@ sda_slot_detach(sda_slot_t *slot)
 	/*
 	 * Shut down the thread.
 	 */
+	(void) bd_detach_handle(slot->s_bdh);
+
 	mutex_enter(&slot->s_evlock);
 	slot->s_detach = B_TRUE;
 	cv_broadcast(&slot->s_evcv);
@@ -581,6 +585,8 @@ sda_slot_detach(sda_slot_t *slot)
 		ddi_taskq_destroy(slot->s_main_tq);
 	if (slot->s_hp_tq)
 		ddi_taskq_destroy(slot->s_hp_tq);
+
+	bd_free_handle(slot->s_bdh);
 }
 
 void
@@ -681,15 +687,6 @@ sda_slot_thread(void *arg)
 			continue;
 		}
 
-		if (slot->s_reap) {
-			/*
-			 * Do not sleep while holding the evlock.  If this
-			 * fails, we'll just try again the next cycle.
-			 */
-			(void) ddi_taskq_dispatch(slot->s_hp_tq,
-			    sda_nexus_reap, slot, DDI_NOSLEEP);
-		}
-
 		if ((slot->s_xfrp != NULL) && (gethrtime() > slot->s_xfrtmo)) {
 			/*
 			 * The device stalled processing the data request.
@@ -710,8 +707,7 @@ sda_slot_thread(void *arg)
 
 			/*
 			 * We use a timed wait if we are waiting for a
-			 * data transfer to complete, or if we might
-			 * need to reap child nodes.  Otherwise we
+			 * data transfer to complete.  Otherwise we
 			 * avoid the timed wait to avoid waking CPU
 			 * (power savings.)
 			 */
@@ -731,16 +727,7 @@ sda_slot_thread(void *arg)
 
 		slot->s_wake = B_FALSE;
 
-		/*
-		 * Possibly reap child nodes.
-		 */
-		if (slot->s_reap) {
-			slot->s_reap = B_FALSE;
-			mutex_exit(&slot->s_evlock);
-			sda_nexus_reap(slot);
-		} else {
-			mutex_exit(&slot->s_evlock);
-		}
+		mutex_exit(&slot->s_evlock);
 
 		/*
 		 * We're awake now, so look for work to do.  First
@@ -826,12 +813,6 @@ sda_slot_thread(void *arg)
 		 */
 		if ((!slot->s_ready) && (cmdp->sc_flags & SDA_CMDF_MEM)) {
 			rv = SDA_ENODEV;
-			if (!slot->s_warn) {
-				sda_slot_err(slot,
-				    "Device removed while in use.  "
-				    "Please reinsert!");
-				slot->s_warn = B_TRUE;
-			}
 		} else {
 			rv = slot->s_ops.so_cmd(slot->s_prv, cmdp);
 		}

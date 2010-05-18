@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "sdhost.h"
@@ -368,7 +367,7 @@ sdhost_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	shp->sh_host = sda_host_alloc(dip, shp->sh_numslots, &sdhost_ops,
-	    &shp->sh_dmaattr);
+	    NULL);
 	if (shp->sh_host == NULL) {
 		cmn_err(CE_WARN, "Failed allocating SD host structure");
 		goto failed;

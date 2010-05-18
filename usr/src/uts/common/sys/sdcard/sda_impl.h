@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SDCARD_SDA_IMPL_H
@@ -29,6 +28,7 @@
 #include <sys/list.h>
 #include <sys/ksynch.h>
 #include <sys/note.h>
+#include <sys/blkdev.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sdcard/sda.h>
@@ -153,23 +153,8 @@ struct sda_slot {
 	uint8_t		s_perm_wp;	/* permanent write protect set? */
 	uint8_t		s_temp_wp;	/* temporary write protect set? */
 
-	char		s_uuid[40];	/* fabricated universal unique id */
-
-	struct b2s_nexus	*s_nexus;
-	struct b2s_leaf		*s_leaf;
+	bd_handle_t	s_bdh;		/* block dev handle */
 };
-
-_NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_lock, sda_slot::s_circular))
-_NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_wake))
-_NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_detach))
-_NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_detect))
-_NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_suspend))
-_NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_fault))
-_NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_xfrdone))
-_NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_errno))
-_NOTE(SCHEME_PROTECTS_DATA("slot_enter", sda_slot::s_warn))
-_NOTE(SCHEME_PROTECTS_DATA("slot_enter", sda_slot::s_xfrtmo))
-_NOTE(SCHEME_PROTECTS_DATA("slot_enter", sda_slot::s_xfrp))
 
 /*
  * Per host state.  One per devinfo node.  There could be multiple
@@ -188,10 +173,6 @@ struct sda_host {
 #define	HOST_XOPEN	(1U << 2)	/* exclusive open */
 #define	HOST_SOPEN	(1U << 3)	/* shared open */
 };
-
-_NOTE(SCHEME_PROTECTS_DATA("stable data", sda_host::h_dip))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", sda_host::h_nslot))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", sda_host::h_dma))
 
 /*
  * Useful function-like macros.
@@ -230,6 +211,11 @@ void sda_mem_init(struct modlinkage *);
 void sda_mem_fini(struct modlinkage *);
 uint32_t sda_mem_maxclk(sda_slot_t *);
 uint32_t sda_mem_getbits(uint32_t *, int, int);
+int sda_mem_parse_cid_csd(sda_slot_t *);
+int sda_mem_bd_read(void *, bd_xfer_t *);
+int sda_mem_bd_write(void *, bd_xfer_t *);
+void sda_mem_bd_driveinfo(void *, bd_drive_t *);
+int sda_mem_bd_mediainfo(void *, bd_media_t *);
 
 
 /*
@@ -269,7 +255,6 @@ void sda_slot_power_off(sda_slot_t *);
 void sda_slot_reset(sda_slot_t *);
 void sda_slot_shutdown(sda_slot_t *);
 void sda_slot_transfer(sda_slot_t *, sda_err_t);
-void sda_slot_mem_reset(sda_slot_t *, sda_err_t);
 void sda_slot_fault(sda_slot_t *, sda_fault_t);
 /*PRINTFLIKE2*/
 void sda_slot_err(sda_slot_t *, const char *, ...);

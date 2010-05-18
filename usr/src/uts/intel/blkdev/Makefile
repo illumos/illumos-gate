@@ -20,13 +20,11 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
-# This makefile drives the production of the blk2scsa driver
-# intel architecture dependent
+# This makefile drives the production of the blkdev driver
 #
 
 #
@@ -37,13 +35,10 @@ UTSBASE   = ../..
 #
 # Define the module and object file sets.
 #
-MODULE		= blk2scsa
-OBJECTS		= $(BLK2SCSA_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(BLK2SCSA_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-WARLOCK_OUT	= $(BLK2SCSA_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
+MODULE		= blkdev
+OBJECTS		= $(BLKDEV_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(BLKDEV_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
 #
 # Include common rules.
@@ -60,7 +55,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Note dependancy on misc/scsi.
 #
-LDFLAGS += -dy -N"misc/scsi"
+LDFLAGS += -dy -Nmisc/cmlb
 
 #
 # Default build targets.
@@ -87,20 +82,3 @@ install:	$(INSTALL_DEPS)
 # Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-WLCC	=	wlcc
-TOUCH	=	touch
-WARLOCK	=	warlock
-
-warlock:	$(WARLOCK_OK)
-
-$(WARLOCK_OK):	$(WARLOCK_OUT) 
-	$(WARLOCK) -c $(WLCMD_DIR)/blk2scsa.wlcmd \
-		$(WARLOCK_OUT) \
-		-l ../warlock/scsi.ll -l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll:	$(UTSBASE)/common/io/scsi/adapters/blk2scsa/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
-
-

@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # uts/intel/warlock/Makefile
 #
@@ -52,7 +51,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #	lock_lint rules
 #
 all:	warlock warlock.1394 warlock.ecpp warlock.scsi \
-	warlock.usb warlock.ib warlock.sata warlock.sdcard warlock.wc
+	warlock.usb warlock.ib warlock.sata warlock.wc
 
 warlock: $(MODULE).ok 
 
@@ -88,7 +87,6 @@ warlock.scsi:
 	@cd ../sd; $(MAKE) clean; $(MAKE) warlock
 	@cd ../ses; $(MAKE) clean; $(MAKE) warlock
 	@cd ../st; $(MAKE) clean; $(MAKE) warlock
-	@cd ../blk2scsa; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/glm; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/mpt; $(MAKE) clean; $(MAKE) warlock
 
@@ -119,10 +117,6 @@ warlock.sata:
 	@cd ../ahci; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/marvell88sx; \
 		$(MAKE) clean; $(MAKE) warlock
-
-warlock.sdcard:
-	@cd ../sda; $(MAKE) clean; $(MAKE) warlock
-	@cd ../sdhost; $(MAKE) clean; $(MAKE) warlock
 
 warlock.wc:
 	@cd ../wc; $(MAKE) clean; $(MAKE) warlock

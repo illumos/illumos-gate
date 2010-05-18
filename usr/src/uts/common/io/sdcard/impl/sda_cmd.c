@@ -19,18 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
  * SD card common framework.  This module provides most of the common
  * functionality so that SecureDigital host adapters and client devices
  * (such as the sdcard driver) can share common code.
- *
- * NB that this file contains a fair bit of non-DDI compliant code.
- * But writing a nexus driver would be impossible to do with only DDI
- * compliant interfaces.
  */
 
 #include <sys/types.h>
@@ -74,7 +69,8 @@ typedef struct sda_cmd_impl {
 #define	c_resid		c_public.sc_resid
 #define	c_flags		c_public.sc_flags
 #define	c_ndmac		c_public.sc_ndmac
-#define	c_dmacs		c_public.sc_dmacs
+#define	c_dmah		c_public.sc_dmah
+#define	c_dmac		c_public.sc_dmac
 #define	c_kvaddr	c_public.sc_kvaddr
 
 /*
@@ -224,14 +220,21 @@ sda_cmd_submit(sda_slot_t *slot, sda_cmd_t *cmdp, void (*done)(sda_cmd_t *))
 		errno = SDA_ENODEV;
 	}
 	if (errno != SDA_EOK) {
-		sda_slot_exit(slot);
-		/* fail it synchronously */
-		sda_cmd_notify(cmdp, SDA_CMDF_DAT | SDA_CMDF_BUSY, errno);
-		return;
-	}
+		/*
+		 * We have to return failure conditions asynchronously.
+		 * What we do in this case is mark the command failed,
+		 * and move it to the abortlist so that the slot thread
+		 * will execute the failure notification asynchronously.
+		 *
+		 * NB: using 0 for flags ensures that we don't execute
+		 * the notification callback yet, we're just stashing
+		 * the errno.
+		 */
+		sda_cmd_notify(cmdp, 0, errno);
+		list_insert_tail(&slot->s_abortlist, cmdp);
 
-	/* Initialization commands go to the head of the class */
-	if (c->c_flags & SDA_CMDF_INIT) {
+	} else if (c->c_flags & SDA_CMDF_INIT) {
+		/* Initialization commands go to the head of the class */
 		list_insert_head(&slot->s_cmdlist, c);
 	} else {
 		list_insert_tail(&slot->s_cmdlist, c);
@@ -274,8 +277,10 @@ sda_cmd_alloc(sda_slot_t *slot, sda_index_t index, uint32_t argument,
 	c->c_blksz = 0;
 
 	c->c_kvaddr = 0;
+	c->c_dmah = 0;
 	c->c_ndmac = 0;
-	c->c_dmacs = NULL;
+	c->c_dmah = NULL;
+	bzero(&c->c_dmac, sizeof (c->c_dmac));
 	c->c_flags = 0;
 
 	c->c_slot = slot;
@@ -309,7 +314,8 @@ sda_cmd_alloc_acmd(sda_slot_t *slot, sda_index_t index, uint32_t argument,
 
 	c->c_kvaddr = 0;
 	c->c_ndmac = 0;
-	c->c_dmacs = NULL;
+	c->c_dmah = NULL;
+	bzero(&c->c_dmac, sizeof (c->c_dmac));
 	c->c_flags = 0;
 
 	c->c_slot = slot;

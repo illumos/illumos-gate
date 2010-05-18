@@ -201,7 +201,7 @@ ALL_DEFS	 = $(MACHINE_DEFS) $(DEBUG_DEFS) $(OPTION_DEFS)
 #
 #	Common Drivers (usually pseudo drivers) (/kernel/drv):
 #
-DRV_KMODS	+= aggr arp audio bl bofi clone cn conskbd consms cpuid
+DRV_KMODS	+= aggr arp audio bl blkdev bofi clone cn conskbd consms cpuid
 DRV_KMODS	+= crypto cryptoadm devinfo dump
 DRV_KMODS	+= dtrace fasttrap fbt lockstat profile sdt systrace dcpc
 DRV_KMODS	+= fssnap icmp icmp6 ip ip6 ipnet ipsecah
@@ -425,7 +425,6 @@ MISC_KMODS	+= qlc_fw_2400
 MISC_KMODS	+= qlc_fw_2500
 MISC_KMODS	+= qlc_fw_6322
 MISC_KMODS	+= qlc_fw_8100
-MISC_KMODS	+= blk2scsa
 MISC_KMODS	+= spuni
 MISC_KMODS	+= hwa1480_fw uwba
 MISC_KMODS	+= mii

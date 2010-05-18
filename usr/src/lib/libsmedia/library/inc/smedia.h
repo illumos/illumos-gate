@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SMEDIA_H_
@@ -62,6 +61,7 @@ typedef	void	*smedia_handle_t;
 #define	IF_SCSI		0x0
 #define	IF_FLOPPY	0x1
 #define	IF_PCMCIA	0x2
+#define	IF_BLOCK	0x3
 
 
 typedef struct smmedium_property {
@@ -86,6 +86,7 @@ typedef struct smmedium_property {
 #define	SM_SCSI_FLOPPY		0x10005 /* SCSI floppy device */
 #define	SM_PCMCIA_MEM		0x20006 /* PCMCIA memory card (Obsolete) */
 #define	SM_PCMCIA_ATA		0x20007 /* PCMCIA ata card */
+#define	SM_BLOCK		0x20008	/* Generic block device */
 #define	SM_NOT_PRESENT		0xFFFF
 
 

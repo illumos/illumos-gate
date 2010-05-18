@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -44,13 +43,10 @@ $(i386_ONLY)dir path=kernel/drv group=sys
 $(i386_ONLY)dir path=kernel/drv/$(ARCH64) group=sys
 $(i386_ONLY)dir path=kernel/misc group=sys
 $(i386_ONLY)dir path=kernel/misc/$(ARCH64) group=sys
-$(i386_ONLY)driver name=sdcard perms="* 0644 root root"
 $(i386_ONLY)driver name=sdhost perms="* 0644 root root" \
     alias=pciclass,080500 \
     alias=pciclass,080501
-$(i386_ONLY)file path=kernel/drv/$(ARCH64)/sdcard group=sys
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/sdhost group=sys
-$(i386_ONLY)file path=kernel/drv/sdcard group=sys
 $(i386_ONLY)file path=kernel/drv/sdhost group=sys
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/sda group=sys mode=0755 \
     reboot-needed=true

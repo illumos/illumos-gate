@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -45,8 +44,6 @@ MODULE		= sda
 OBJECTS		= $(SDA_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SDA_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-WARLOCK_OUT	= $(SDA_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
 
 #
 #	Include common rules.
@@ -72,11 +69,11 @@ DEBUG_DEFS	+= $(DEBUG_FLGS)
 CFLAGS += $(CCVERBOSE)
 
 #
-# dependency on blk2scsa module, scope limiting mapfile
+# dependency on blkdev module, scope limiting mapfile
 # Note that we have to allow CTFMERGE to use fuzzy matching
 #
 MAPFILE		= $(UTSBASE)/common/io/sdcard/impl/mapfile
-LDFLAGS		+= -dy -Nmisc/blk2scsa -B reduce -M $(MAPFILE)
+LDFLAGS		+= -dy -Ndrv/blkdev -B reduce -M $(MAPFILE)
 CTFMRGFLAGS	+= -f
 
 #
@@ -104,15 +101,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK		= warlock
-
-warlock:	$(WARLOCK_OK)
-
-$(WARLOCK_OK):	$(WARLOCK_OUT)
-	$(TOUCH) $@
-
-%.ll:	$(UTSBASE)/common/io/sdcard/impl/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<

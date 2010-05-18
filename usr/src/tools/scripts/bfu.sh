@@ -8454,6 +8454,22 @@ mondo_loop() {
 	rm -rf $usr/ucb/tek
 	rm -rf $usr/ucb/vplot
 
+	# Remove blk2scsa
+	rm -f $root/kernel/drv/blk2scsa
+	rm -f $root/kernel/drv/amd64/blk2scsa
+	rm -f $root/kernel/drv/sparcv9/blk2scsa
+
+	# Remove sdcard kernel module and cfgadm plugin - use blkdev now
+	rm -f $root/kernel/drv/sdcard
+	rm -f $root/kernel/drv/amd64/sdcard
+	rm -f $root/kernel/drv/sparcv9/sdcard
+	rm -f $usr/lib/cfgadm/sdcard.so.1
+	rm -f $usr/lib/cfgadm/sdcard.so
+	rm -f $usr/lib/cfgadm/amd64/sdcard.so.1
+	rm -f $usr/lib/cfgadm/amd64/sdcard.so
+	rm -f $usr/lib/cfgadm/sparcv9/sdcard.so.1
+	rm -f $usr/lib/cfgadm/sparcv9/sdcard.so	
+
 	#
 	# Remove legacy pcmcia bits
 	#

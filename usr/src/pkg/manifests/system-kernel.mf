@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -632,7 +631,6 @@ $(i386_ONLY)file path=kernel/misc/$(ARCH64)/acpica group=sys mode=0755 \
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/agpmaster group=sys mode=0755 \
     reboot-needed=true
 file path=kernel/misc/$(ARCH64)/bignum group=sys mode=0755 reboot-needed=true
-file path=kernel/misc/$(ARCH64)/blk2scsa group=sys mode=0755 reboot-needed=true
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/bootdev group=sys mode=0755 \
     reboot-needed=true
 file path=kernel/misc/$(ARCH64)/busra group=sys mode=0755 reboot-needed=true
@@ -683,8 +681,6 @@ $(i386_ONLY)file path=kernel/misc/acpica group=sys mode=0755 reboot-needed=true
 $(i386_ONLY)file path=kernel/misc/agpmaster group=sys mode=0755 \
     reboot-needed=true
 $(i386_ONLY)file path=kernel/misc/bignum group=sys mode=0755 reboot-needed=true
-$(i386_ONLY)file path=kernel/misc/blk2scsa group=sys mode=0755 \
-    reboot-needed=true
 $(i386_ONLY)file path=kernel/misc/bootdev group=sys mode=0755 reboot-needed=true
 $(i386_ONLY)file path=kernel/misc/busra group=sys mode=0755 reboot-needed=true
 $(i386_ONLY)file path=kernel/misc/cardbus group=sys mode=0755 reboot-needed=true

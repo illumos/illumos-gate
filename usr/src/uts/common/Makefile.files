@@ -468,6 +468,8 @@ AUDIOTS_OBJS +=	audiots.o
 
 AC97_OBJS += ac97.o ac97_ad.o ac97_alc.o ac97_cmi.o
 
+BLKDEV_OBJS += blkdev.o
+
 CARDBUS_OBJS += cardbus.o cardbus_hp.o cardbus_cfg.o
 
 CONSKBD_OBJS += conskbd.o
@@ -1939,9 +1941,7 @@ AAC_OBJS = aac.o aac_ioctl.o
 #
 #	sdcard modules
 #
-SDA_OBJS =	sda_cmd.o sda_host.o sda_init.o sda_mem.o sda_mod.o \
-		sda_nexus.o sda_slot.o
-SDCARD_OBJS =	sdcard.o
+SDA_OBJS =	sda_cmd.o sda_host.o sda_init.o sda_mem.o sda_mod.o sda_slot.o
 SDHOST_OBJS =	sdhost.o
 
 #

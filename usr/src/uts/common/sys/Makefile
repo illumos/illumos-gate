@@ -85,6 +85,7 @@ CHKHDRS=			\
 	bitmap.h		\
 	bitset.h		\
 	bl.h			\
+	blkdev.h		\
 	bmc_intf.h		\
 	bofi.h			\
 	bofi_impl.h		\
@@ -935,8 +936,7 @@ SCSITARGETSHDRS=	\
 	sddef.h		\
 	smp.h
 
-SCSIADHDRS=		\
-	blk2scsa.h
+SCSIADHDRS=
 
 SCSICADHDRS=
 
