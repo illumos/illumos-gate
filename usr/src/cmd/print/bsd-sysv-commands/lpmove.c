@@ -20,9 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* $Id: lpmove.c 146 2006-03-24 00:26:54Z njacobs $ */
@@ -142,13 +140,20 @@ main(int ac, char *av[])
 						 * user is denied
 						 * permission
 						 */
-						fprintf(stderr, gettext(
-						    "UX:lpmove: ERROR:"\
-						    " You aren't allowed"\
-						    " to do that.\n\t"\
-						    "  TO FIX: You must"\
-						    " be logged in as"\
-						    " \"lp\" or \"root\".\n"));
+						fprintf(stderr, "UX:lpmove: ");
+						fprintf(stderr,
+						    gettext("ERROR: "));
+						fprintf(stderr, gettext("You "
+						    "aren't allowed to do"
+						    " that."));
+						fprintf(stderr, "\n\t");
+						fprintf(stderr,
+						    gettext("TO FIX"));
+						fprintf(stderr, ": ");
+						fprintf(stderr, gettext("You "
+						    "must be logged in as "
+						    "\"lp\" or \"root\"."));
+						fprintf(stderr, "\n");
 						exit_code = 1;
 					} else {
 						fprintf(stderr, gettext(
