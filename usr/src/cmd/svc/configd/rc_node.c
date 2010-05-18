@@ -6835,15 +6835,21 @@ tx_allow_value(const void *cmds_arg, size_t cmds_sz, rc_node_t *pg)
 		case REP_PROTOCOL_TX_ENTRY_REPLACE:
 			/* Check type */
 			(void) pthread_mutex_lock(&pg->rn_lock);
+			ok = B_FALSE;
 			if (rc_node_find_named_child(pg,
 			    (const char *)cmds[0].rptc_data,
 			    REP_PROTOCOL_ENTITY_PROPERTY, &prop) ==
 			    REP_PROTOCOL_SUCCESS) {
-				ok = (prop != NULL &&
-				    prop->rn_valtype == cmds[0].rptc_type);
-			} else {
-				/* Return more particular error? */
-				ok = B_FALSE;
+				if (prop != NULL) {
+					ok = prop->rn_valtype ==
+					    cmds[0].rptc_type;
+					/*
+					 * rc_node_find_named_child()
+					 * places a hold on prop which we
+					 * do not need to hang on to.
+					 */
+					rc_node_rele(prop);
+				}
 			}
 			(void) pthread_mutex_unlock(&pg->rn_lock);
 			if (ok)
