@@ -3,9 +3,8 @@
     CDDL HEADER START
 
     The contents of this file are subject to the terms of the
-    Common Development and Distribution License, Version 1.0 only
-    (the "License").  You may not use this file except in compliance
-    with the License.
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
 
     You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
     or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
 
     CDDL HEADER END
 
--- Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
--- Use is subject to license terms.
+-- Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 --
--- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!-- Tag=Overview --> 
 
@@ -31,7 +28,7 @@
 
 <p> 
  
-Use Solaris Print Manager to select a naming service, to install attached
+Use Oracle Solaris Print Manager to select a naming service, to install attached
 or network printers, and to add, modify, or remove access to installed
 printers. Five windows or dialogs and 11 tasks -- listed below -- are described
 in the help volume. To view one of the help articles, select it
@@ -39,9 +36,9 @@ in the See also pulldown menu and click the Show button.
 
 <p>
 
-If you need more information about printing, see the "Solaris Print
+If you need more information about printing, see the "Oracle Solaris Print
 Manager Administration Guide" AnswerBook or the "Setting Up Printers"
-chapter in the Solaris System Administrator AnswerBook.
+chapter in the Oracle Solaris System Administrator AnswerBook.
 
 <p> 
 
@@ -60,7 +57,7 @@ Modify Printer Properties
 <p> 
 <b>Tasks</b>
 <p>
-To Start Solaris Print Manager
+To Start Oracle Solaris Print Manager
 <br>
 To Add Access to an Installed Printer
 <br>
@@ -74,7 +71,7 @@ To Delete a Printer
 <br>
 To Select a Naming Service
 <br> 
-To Exit Solaris Print Manager
+To Exit Oracle Solaris Print Manager
 <br> 
 To Find a Printer
 <br> 
@@ -83,14 +80,14 @@ To Show the Command-Line Console
 To Confirm All Actions
 <p> 
 
-<b>More About Printing and Solaris Print Manager </b>
+<b>More About Printing and Oracle Solaris Print Manager </b>
 
 <p> 
 
-If you need more information about printing or about Solaris Print
+If you need more information about printing or about Oracle Solaris Print
 Manager, including a description of mouseless navigation, see the
-"Solaris Print Manager Administration Guide" AnswerBook or the
-"Setting Up Printers" chapter in the Solaris System Administrator
+"Oracle Solaris Print Manager Administration Guide" AnswerBook or the
+"Setting Up Printers" chapter in the Oracle Solaris System Administrator
 AnswerBook.
 
 <p>

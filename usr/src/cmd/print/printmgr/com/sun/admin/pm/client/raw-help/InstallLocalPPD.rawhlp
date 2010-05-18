@@ -19,10 +19,8 @@
 
     CDDL HEADER END
 
--- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
--- Use is subject to license terms.
+-- Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 --
--- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!-- Tag=InstallLocal -->
 
@@ -33,7 +31,7 @@
 Once you have physically connected the printer to the printer server,
 use the New Attached Printer dialog to install the printer, which
 makes the printer available for printing from the computer on which
-you are running Solaris Print Manager.
+you are running Oracle Solaris Print Manager.
 
 <p>
 
@@ -48,8 +46,8 @@ you are running Solaris Print Manager.
 
 <b> Printer Server:</b> This is the computer you have selected to act
 as the server for print actions. You must be logged on to this
-computer and be running Solaris Print Manager on it.  Solaris Print
-Manager sets up this system with the appropriate software to manage
+computer and be running Oracle Solaris Print Manager on it. Oracle
+Solaris Print Manager sets up this system with the appropriate software to manage
 local and remote printers.
 
 <p> 
@@ -95,7 +93,7 @@ printer information), precedes the name of the Printer Driver.
 
 <b> Options: Default Printer:</b> If checked, designates this printer
 as the default printer for printing jobs from the computer on which
-you are running Solaris Print Manager. If you are using a naming
+you are running Oracle Solaris Print Manager. If you are using a naming
 service, this printer will be the default printer for the naming
 service, also.
 

@@ -19,10 +19,8 @@
 
     CDDL HEADER END
 
--- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
--- Use is subject to license terms.
+-- Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 --
--- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!-- Tag=Overview --> 
 
@@ -30,9 +28,9 @@
 
 <p> 
  
-The Solaris Print Manager has tool-wide settings that may be selected.
+The Oracle Solaris Print Manager has tool-wide settings that may be selected.
 Each of these choices applies to all further tasks utilized within the
-Solaris Print Manager.  For example, once Show Command-Line Console has been
+Oracle Solaris Print Manager.  For example, once Show Command-Line Console has been
 selected, or checked, the Console will be visible for all tasks until
 this selection is turned off, or unchecked.
 
@@ -50,7 +48,7 @@ The default is off.
 <p> 
 
 <b> Confirm All Actions: </b> 
-When Confirm All Actions is selected, all subsequent Solaris Print
+When Confirm All Actions is selected, all subsequent Oracle Solaris Print
 Manager actions will require confirmation before being performed.
 
 <p>
@@ -77,7 +75,7 @@ The default is on.
 <p>
 <b> Use localhost for Print Server Name: </b> 
 
-The print server name utilized by the Solaris Print System  may be 
+The print server name utilized by the Oracle Solaris Print System may be 
 either the hostname or "localhost". This applies to the tasks for adding 
 new local printers in the "files" Name Service: New Attached Printer
 and New Network Printer. The use of "localhost" is recommended.

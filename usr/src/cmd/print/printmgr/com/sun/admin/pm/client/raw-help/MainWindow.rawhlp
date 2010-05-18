@@ -1,4 +1,4 @@
-<TITLE> Solaris Print Manager Main Window </TITLE>
+<TITLE> Oracle Solaris Print Manager Main Window </TITLE>
 <!--
     CDDL HEADER START
 
@@ -19,8 +19,7 @@
 
     CDDL HEADER END
 
--- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
--- Use is subject to license terms.
+-- Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 -->
 <!-- Tag=MainWindow -->
 
@@ -28,7 +27,7 @@
 
 <p>
 
-The main window is the starting point for any Solaris Print Manager
+The main window is the starting point for any Oracle Solaris Print Manager
 activities. 
 
 <p>
@@ -48,7 +47,7 @@ Delete Printer
 <p>
 
 <b> List of Printers: </b> This is the list of printers installed on
-the computer on which you are running Solaris Print Manager, or, if a
+the computer on which you are running Oracle Solaris Print Manager, or, if a
 naming service is being used, all printers in the naming service.
 
 <p>
@@ -76,7 +75,7 @@ The footer panel at the bottom of the window has two or three entries:
 <p> 
 
 <b> Default Printer: </b> If no naming service is being used, the
-default printer for the computer on which you are running Solaris
+default printer for the computer on which you are running Oracle Solaris
 Print Manager. If a naming service is being used, the default printer
 for the naming service.
 
@@ -100,7 +99,7 @@ this domain.
 <KEYWORDS>
 "Print Manager menu" "Printer menu" "Tools menu" "Help menu" "list
 of printers" printers "printer name" "printer server" description
-"default printer" "naming service" domain solaris print manager main
+"default printer" "naming service" domain Oracle solaris print manager main
 window
 </KEYWORDS>
 

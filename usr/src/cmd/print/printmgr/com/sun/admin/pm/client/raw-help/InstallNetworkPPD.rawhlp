@@ -19,10 +19,8 @@
 
     CDDL HEADER END
 
--- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
--- Use is subject to license terms.
+-- Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 --
--- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!-- Tag=InstallNetwork --> 
 
@@ -46,8 +44,8 @@ thus making the printer available for printing from the network.
 
 <b> Printer Server:</b> This is the computer you have selected to act
 as the server for print actions. You must be logged on to this
-computer and be running Solaris Print Manager on it.  Solaris Print
-Manager sets up this system with the appropriate software to manage
+computer and be running Oracle Solaris Print Manager on it. Oracle
+Solaris Print Manager sets up this system with the appropriate software to manage
 local and remote printers.
 
 <p> 

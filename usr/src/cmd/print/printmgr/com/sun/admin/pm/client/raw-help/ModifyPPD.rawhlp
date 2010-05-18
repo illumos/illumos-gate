@@ -19,10 +19,8 @@
 
     CDDL HEADER END
 
--- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
--- Use is subject to license terms.
+-- Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 --
--- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!-- Tag=ModifyPPD -->
 
@@ -44,7 +42,7 @@ Printer box.
 <b> Printer Server:</b> Cannot be modified. 
 This is the computer you have selected to act
 as the server for print actions. You must be logged on to this
-computer and be running Solaris Print Manager on it.  
+computer and be running Oracle Solaris Print Manager on it.  
 
 <p> 
 
@@ -92,7 +90,7 @@ printer information), precedes the name of the Printer Driver.
 
 <b> Options: Default Printer:</b> If checked, designates this printer
 as the default printer for printing jobs from the computer on which
-you are running Solaris Print Manager. If you are using a naming
+you are running Oracle Solaris Print Manager. If you are using a naming
 service, this printer will be the default printer for the naming
 service, also.
 

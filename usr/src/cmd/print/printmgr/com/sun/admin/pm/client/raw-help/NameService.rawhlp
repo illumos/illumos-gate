@@ -19,8 +19,7 @@
 
     CDDL HEADER END
 
--- Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
--- Use is subject to license terms.
+-- Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 -->
 <!-- Tag=NameService -->
 
@@ -29,7 +28,7 @@
 <p>
 
 You can select "files" or a naming service (NIS or LDAP) when you
-start up Solaris Print Manager or when you choose Select Naming
+start up Oracle Solaris Print Manager or when you choose Select Naming
 Service from the Print Manager menu. See the descriptions of each
 of the choices below.
 
@@ -111,7 +110,7 @@ this naming service.
 	
 <p>
 
-3) For NIS servers running pre-2.6 Solaris, you need to set up an
+3) For NIS servers running pre-2.6 Oracle Solaris, you need to set up an
 rhosts entry on the NIS server allowing root on the print server root
 access on the NIS server. You must have explicit permissions on the
 NIS master server to update the maps.  This means an entry for your

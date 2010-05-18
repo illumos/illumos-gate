@@ -3,9 +3,8 @@
     CDDL HEADER START
 
     The contents of this file are subject to the terms of the
-    Common Development and Distribution License, Version 1.0 only
-    (the "License").  You may not use this file except in compliance
-    with the License.
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
 
     You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
     or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
 
     CDDL HEADER END
 
--- Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
--- Use is subject to license terms.
+-- Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 --
--- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!-- Tag=NISAuthentication -->
 
@@ -55,7 +52,7 @@ Click Cancel if you don't know the password for the NIS master.
 
 <p>
 
-<b>Note:</b> Keep the following in mind if you are using Solaris Print
+<b>Note:</b> Keep the following in mind if you are using Oracle Solaris Print
 Manager to update printer information in the NIS name service:
 
 <p>
@@ -67,7 +64,7 @@ information.
 
 <p>
 	
-- If your NIS servers are running Solaris 2.5 and compatible 
+- If your NIS servers are running Oracle Solaris 2.5 and compatible 
 versions, you must have explicit permissions on the NIS master 
 server to update the maps. This means an entry for your system 
 name must reside in root's .rhosts file on the NIS master server.
@@ -76,7 +73,7 @@ name must reside in root's .rhosts file on the NIS master server.
 
 - If you have modified the yp makefile to use something other
 than /etc/printers.conf as the source for the NIS map,
-printers.conf.byname, do not use Solaris Print Manager to modify NIS.
+printers.conf.byname, do not use Oracle Solaris Print Manager to modify NIS.
 
 </CONTENT>
 

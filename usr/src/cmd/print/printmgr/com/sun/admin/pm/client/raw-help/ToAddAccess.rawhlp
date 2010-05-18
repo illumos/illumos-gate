@@ -3,9 +3,8 @@
     CDDL HEADER START
 
     The contents of this file are subject to the terms of the
-    Common Development and Distribution License, Version 1.0 only
-    (the "License").  You may not use this file except in compliance
-    with the License.
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
 
     You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
     or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
 
     CDDL HEADER END
 
--- Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
--- Use is subject to license terms.
+-- Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 --
--- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!-- Tag=ToAddAccess --> 
 
@@ -63,7 +60,7 @@ to add access to a remote printer.
 
 <p> 
 
-Note that Solaris Print Manager does not check for the validity of
+Note that Oracle Solaris Print Manager does not check for the validity of
 Printer Name or Printer Server. 
 
 <p>
@@ -79,7 +76,7 @@ the default printer for all users in the domain.
 <p>
 
 If no naming service is being used, this printer will be designated as
-the default printer for the computer on which you are running Solaris
+the default printer for the computer on which you are running Oracle Solaris
 Print Manager.
 
 <p>
@@ -103,7 +100,7 @@ will be prompted for the password when you click Apply or OK. Enter the
 password and click OK.
 
 <p>
-   The list of printers displayed in the Solaris Print Manager main window
+   The list of printers displayed in the Oracle Solaris Print Manager main window
    is updated to include the new printer.
 <p>
    The Add Access dialog will remain displayed if you click Apply,

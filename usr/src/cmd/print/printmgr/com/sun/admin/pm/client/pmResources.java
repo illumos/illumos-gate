@@ -20,11 +20,7 @@
  */
 /*
  *
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- *
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * pmResources.java
  * Localizable resource strings
@@ -42,12 +38,12 @@ import java.util.*;
  *	string 2 is the string to be localized
  *
  * For example, in the tuple
- *	{"info_name", "Solaris Print Manager"}
+ *	{"info_name", "Oracle Solaris Print Manager"}
  *
  *	"info_name" is the resource key that must
  *			not be modified in any way
  *
- *       "Solaris Print Manager" is the corresponding
+ *       "Oracle Solaris Print Manager" is the corresponding
  *                        text to be localized
  */
 
@@ -57,20 +53,19 @@ public class pmResources extends ListResourceBundle {
 	/*
 	 * Descriptive strings used in the 'About' dialog
 	 */
-        {"info_name", "Solaris Print Manager"},
+        {"info_name", "Oracle Solaris Print Manager"},
         {"info_version", "Version 1.0"},
 	{"info_authors", "Authors: Wendy Phillips"},
 
 	// Note: the copyright notice is displayed on two lines.
 	{"info_copyright1", "Copyright \251 "},
 	/* JSTYLED */
-	{"info_copyright2", " Sun Microsystems, Inc.  All rights reserved.  Use is subject to license terms. Third-party software, including font technology, is copyrighted and licensed from Sun suppliers.  Sun, Sun Microsystems, the Sun logo and Solaris are trademarks or registered trademarks of Sun Microsystems, Inc. in the U.S. and other countries.  Federal Acquisitions:  Commercial Software - Government Users Subject to Standard License Terms and Conditions."},
-
+	{"info_copyright2", " (c) Oracle and/or its affiliates. All rights reserved."},
 
 	/*
 	 * Main window title, the application name
 	 */
-	{"Solaris.Print.Manager", "Solaris Print Manager"},
+	{"Solaris.Print.Manager", "Oracle Solaris Print Manager"},
 
 
         /*
@@ -172,80 +167,80 @@ public class pmResources extends ListResourceBundle {
 	 * 'Select Naming Service' dialog title
 	 */
         {"SPM:Select.Naming.Service",
-                "Solaris Print Manager: Select Naming Service"},
+                "Oracle Solaris Print Manager: Select Naming Service"},
 
 
 	/*
 	 * 'Command-Line Console' dialog title
 	 */
         {"SPM:Command-Line.Console",
-                "Solaris Print Manager: Command-Line Console"},
+                "Oracle Solaris Print Manager: Command-Line Console"},
 
 
 	/*
 	 * 'Delete Printer' confirmation dialog title
 	 */
-        {"SPM:Delete.Printer", "Solaris Print Manager: Delete Printer"},
+        {"SPM:Delete.Printer", "Oracle Solaris Print Manager: Delete Printer"},
 
 
 	/*
 	 * 'Add Access to Printer' dialog title
 	 */
         {"SPM:Add.Access.To.Printer",
-                "Solaris Print Manager: Add Access to Printer"},
+                "Oracle Solaris Print Manager: Add Access to Printer"},
 
 
 	/*
 	 * 'Add Attached Printer' dialog title
 	 */
         {"SPM:New.Attached.Printer",
-                "Solaris Print Manager: New Attached Printer"},
+                "Oracle Solaris Print Manager: New Attached Printer"},
 
 
 	/*
 	 * 'Add Network Printer' dialog title
 	 */
         {"SPM:New.Network.Printer",
-                "Solaris Print Manager: New Network Printer"},
+                "Oracle Solaris Print Manager: New Network Printer"},
 
 
 	/*
 	 * 'Modify Printer Properties' dialog title
 	 */
         {"SPM:Modify.Printer.Properties",
-                "Solaris Print Manager: Modify Printer Properties"},
+                "Oracle Solaris Print Manager: Modify Printer Properties"},
 
 
 	/*
 	 * 'Find Printer' dialog title
 	 */
-        {"SPM:Find.Printer", "Solaris Print Manager: Find Printer"},
+        {"SPM:Find.Printer", "Oracle Solaris Print Manager: Find Printer"},
 
 
 	/*
 	 * 'Help' dialog title
 	 */
-        {"SPM:Help", "Solaris Print Manager: Help"},
+        {"SPM:Help", "Oracle Solaris Print Manager: Help"},
 
 
         /*
          * 'About Print Manager' dialog title
          */
-        {"About.Solaris.Print.Manager", "About Solaris Print Manager"},
+        {"About.Solaris.Print.Manager", "About Oracle Solaris Print Manager"},
 
 
 	/*
 	 * 'User Input of Printer Port' dialog title
 	 */
         {"SPM:Specify.Printer.Port",
-		"Solaris Print Manager: Specify Printer Port"},
+		"Oracle Solaris Print Manager: Specify Printer Port"},
 
 
 	/*
 	 * 'User Input of Printer Type' dialog title
 	 */
         {"SPM:Specify.Printer.Type",
-		"Solaris Print Manager: Specify Printer Type"},
+		"Oracle Solaris Print Manager: Specify Printer Type"},
 
 
 	/*
