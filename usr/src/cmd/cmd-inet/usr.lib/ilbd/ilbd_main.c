@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -117,8 +116,8 @@
  */
 #define	ILBD_VERSION	"1.0"
 #define	ILBD_COPYRIGHT	\
-	"Copyright 2009 Sun Microsystems, Inc.  All rights reserved.\n" \
-	"Use is subject to license terms.\n"
+	"Copyright (c) 2005, 2010, Oracle and/or its affiliates. " \
+	"All rights reserved.\n"
 
 /*
  * Global reply buffer to client request.  Note that ilbd is single threaded,
@@ -622,10 +621,12 @@ new_req(int ev_port, int listener, void *ev_obj)
 	res = getpeerucred(new_sd, &cli->cli_peer_ucredp);
 	if (res == -1) {
 		logperror("new_req: getpeerucred failed");
+		free(cli);
 		goto clean_up;
 	}
 	if ((uid = ucred_getruid(cli->cli_peer_ucredp)) == (uid_t)-1) {
 		logperror("new_req: ucred_getruid failed");
+		free(cli);
 		goto clean_up;
 	}
 	cli->cli_pw_bufsz = (size_t)sysconf(_SC_GETPW_R_SIZE_MAX);
