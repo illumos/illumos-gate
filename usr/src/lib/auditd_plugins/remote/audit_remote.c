@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * send audit records to remote host
  *
@@ -635,8 +634,7 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 				rc = AUDITD_NO_MEMORY;
 				break;
 			}
-			__audit_dowarn2("plugin", "audit_remote.so",
-			    gettext("auditd record delivery failed"),
+			__audit_dowarn2("plugin", "audit_remote.so", "retry",
 			    ext_error, attempts + 1);
 			free(rsn_msg);
 			free(ext_error);
@@ -672,9 +670,7 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 					break;
 				}
 				__audit_dowarn2("plugin", "audit_remote.so",
-				    "unsuccessful attempt to deliver audit "
-				    "record",
-				    ext_error, nosuccess_cnt);
+				    "retry", ext_error, nosuccess_cnt);
 				free(ext_error);
 				(void) sleep(NOSUCCESS_DELAY);
 			}
