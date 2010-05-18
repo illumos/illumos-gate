@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -1599,7 +1598,11 @@ usbms_rput(queue_t		*q,
 	case M_ERROR:
 		usbmsp->usbms_protoerr = 1;
 		usbmsp->usbms_flags &= ~USBMS_QWAIT;
-		freemsg(mp);
+		if (*mp->b_rptr == ENODEV) {
+			putnext(q, mp);
+		} else {
+			freemsg(mp);
+		}
 
 		return;
 	default:
