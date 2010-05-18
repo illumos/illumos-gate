@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -1134,7 +1133,8 @@ qcn_receive_read(void)
 				/*
 				 * on break enter the debugger
 				 */
-				abort_sequence_enter((char *)NULL);
+				if (abort_enable != KIOCABORTALTERNATE)
+					abort_sequence_enter((char *)NULL);
 				break;
 
 			case H_HUP :
@@ -1171,7 +1171,8 @@ qcn_receive_getchr(void)
 			}
 		} else {
 			if (rv == H_BREAK) {
-				abort_sequence_enter((char *)NULL);
+				if (abort_enable != KIOCABORTENABLE)
+					abort_sequence_enter((char *)NULL);
 			}
 
 			if (rv == H_HUP)  {
@@ -1196,7 +1197,8 @@ qcn_poll_handler(void *unused)
 	while (1) {
 		rv = hv_cngetchar(&buf);
 		if (rv == H_BREAK) {
-			abort_sequence_enter((char *)NULL);
+			if (abort_enable != KIOCABORTALTERNATE)
+				abort_sequence_enter((char *)NULL);
 		}
 
 		if (rv == H_HUP)  {
