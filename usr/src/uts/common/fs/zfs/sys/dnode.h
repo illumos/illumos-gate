@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DNODE_H
@@ -73,7 +72,6 @@ extern "C" {
 #define	DN_ID_CHKED_SPILL	0x2
 #define	DN_ID_OLD_EXIST		0x4
 #define	DN_ID_NEW_EXIST		0x8
-#define	DN_ID_SYNC		0x10
 
 /*
  * Derived constants.

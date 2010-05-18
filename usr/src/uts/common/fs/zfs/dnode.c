@@ -470,6 +470,8 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 	/* clean up any unreferenced dbufs */
 	dnode_evict_dbufs(dn);
 
+	dn->dn_id_flags = 0;
+
 	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
 	dnode_setdirty(dn, tx);
 	if (dn->dn_datablksz != blocksize) {
@@ -679,14 +681,10 @@ dnode_hold_impl(objset_t *os, uint64_t object, int flag,
 	if (dn->dn_free_txg ||
 	    ((flag & DNODE_MUST_BE_ALLOCATED) && type == DMU_OT_NONE) ||
 	    ((flag & DNODE_MUST_BE_FREE) &&
-	    (type != DMU_OT_NONE || (dn->dn_id_flags & DN_ID_SYNC)))) {
+	    (type != DMU_OT_NONE || !refcount_is_zero(&dn->dn_holds)))) {
 		mutex_exit(&dn->dn_mtx);
 		dbuf_rele(db, FTAG);
 		return (type == DMU_OT_NONE ? ENOENT : EEXIST);
-	}
-	if (flag & DNODE_MUST_BE_FREE) {
-		ASSERT(refcount_is_zero(&dn->dn_holds));
-		ASSERT(!(dn->dn_id_flags & DN_ID_SYNC));
 	}
 	mutex_exit(&dn->dn_mtx);
 
