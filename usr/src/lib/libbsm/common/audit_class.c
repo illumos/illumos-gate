@@ -99,14 +99,14 @@ getauclassent()
 au_class_ent_t *
 getauclassent_r(au_class_ent_t *au_class_entry)
 {
-	int	i, error = 0, found = 0;
-	char	*s, input[256];
-	unsigned long v;
+	int		i, error = 0, found = 0;
+	char		*s, input[256];
+	au_class_t	v;
 
 	if (au_class_entry == (au_class_ent_t *)NULL ||
 	    au_class_entry->ac_name == (char *)NULL ||
 	    au_class_entry->ac_desc == (char *)NULL) {
-		return ((au_class_ent_t *)NULL);
+		return (NULL);
 	}
 
 	/* open audit class file if it isn't already */
@@ -114,7 +114,7 @@ getauclassent_r(au_class_ent_t *au_class_entry)
 	if (!au_class_file) {
 		if (!(au_class_file = fopen(au_class_fname, "rF"))) {
 			(void) mutex_unlock(&mutex_classfile);
-			return ((au_class_ent_t *)0);
+			return (NULL);
 		}
 	}
 
@@ -125,15 +125,14 @@ getauclassent_r(au_class_ent_t *au_class_entry)
 				continue;
 			}
 			found = 1;
-			s = input;
 
 			/* parse bitfield */
 			i = strcspn(s, ":");
 			s[i] = '\0';
 			if (strncmp(s, "0x", 2) == 0) {
-				(void) sscanf(&s[2], "%lx", &v);
+				(void) sscanf(&s[2], "%x", &v);
 			} else {
-				(void) sscanf(s, "%lu", &v);
+				(void) sscanf(s, "%u", &v);
 			}
 			au_class_entry->ac_class = v;
 			s = &s[i+1];
@@ -160,7 +159,7 @@ getauclassent_r(au_class_ent_t *au_class_entry)
 	if (!error && found) {
 		return (au_class_entry);
 	} else {
-		return ((au_class_ent_t *)0);
+		return (NULL);
 	}
 }
 
@@ -186,7 +185,7 @@ getauclassnam_r(au_class_ent_t *e, char *name)
 			return (e);
 		}
 	}
-	return ((au_class_ent_t *)NULL);
+	return (NULL);
 }
 
 
@@ -234,7 +233,7 @@ xcacheauclass(au_class_ent_t **result, char *class_name, au_class_t class_no,
 		}
 		(void) fclose(fp);
 		class_tbl = (au_class_ent_t **)calloc((size_t)lines + 1,
-		    sizeof (au_class_ent_t));
+		    sizeof (class_tbl));
 		if (class_tbl == NULL) {
 			(void) mutex_unlock(&mutex_classcache);
 			return (-2);
