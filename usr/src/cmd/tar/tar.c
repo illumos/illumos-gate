@@ -6213,6 +6213,17 @@ has_dot_dot(char *name)
 static int
 is_absolute(char *name)
 {
+#if defined(O_XATTR)
+	/*
+	 * If this is an extended attribute (whose name will begin with
+	 * "/dev/null/", always return 0 as they should be extracted with
+	 * the name intact, to allow other tar archiving programs that
+	 * don't understand extended attributes, to correctly throw them away.
+	 */
+	if (xattrp)
+		return (0);
+#endif
+
 	return (name[0] == '/');
 }
 
