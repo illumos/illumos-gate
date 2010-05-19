@@ -2902,6 +2902,7 @@ zpool_vdev_clear(zpool_handle_t *zhp, uint64_t guid)
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	zc.zc_guid = guid;
+	zc.zc_cookie = ZPOOL_NO_REWIND;
 
 	if (ioctl(hdl->libzfs_fd, ZFS_IOC_CLEAR, &zc) == 0)
 		return (0);
