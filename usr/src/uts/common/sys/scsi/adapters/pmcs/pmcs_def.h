@@ -103,6 +103,7 @@ struct pmcs_phy {
 		dead		: 1,	/* dead */
 		changed		: 1,	/* this phy is changing */
 		reenumerate	: 1,	/* attempt re-enumeration */
+		virtual		: 1,	/* This is a virtual PHY */
 		deregister_wait : 1;	/* phy waiting to get deregistered */
 	clock_t		config_stop;	/* When config attempts will stop */
 	hrtime_t	abort_all_start;

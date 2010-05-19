@@ -125,19 +125,23 @@ void
 pmcs_smhba_set_scsi_device_props(pmcs_hw_t *pwp, pmcs_phy_t *pptr,
     struct scsi_device *sd)
 {
-	char		*addr;
+	char		*paddr, *addr;
 	int		ua_form = 1;
-	uint64_t	wwn;
+	uint64_t	wwn, pwwn;
 	pmcs_phy_t	*pphy;
 
 	pphy = pptr->parent;
 
 	if (pphy != NULL) {
+		paddr = kmem_zalloc(PMCS_MAX_UA_SIZE, KM_SLEEP);
+		pwwn = pmcs_barray2wwn(pphy->sas_address);
+		(void) scsi_wwn_to_wwnstr(pwwn, ua_form, paddr);
+
 		addr = kmem_zalloc(PMCS_MAX_UA_SIZE, KM_SLEEP);
-		wwn = pmcs_barray2wwn(pphy->sas_address);
+		wwn = pmcs_barray2wwn(pptr->sas_address);
 		(void) scsi_wwn_to_wwnstr(wwn, ua_form, addr);
 
-		if (pphy->dtype == SATA) {
+		if ((pptr->dtype == SATA) || pptr->virtual) {
 			(void) scsi_device_prop_update_string(sd,
 			    SCSI_DEVICE_PROP_PATH,
 			    SCSI_ADDR_PROP_BRIDGE_PORT, addr);
@@ -145,9 +149,10 @@ pmcs_smhba_set_scsi_device_props(pmcs_hw_t *pwp, pmcs_phy_t *pptr,
 		if (pphy->dtype == EXPANDER) {
 			(void) scsi_device_prop_update_string(sd,
 			    SCSI_DEVICE_PROP_PATH,
-			    SCSI_ADDR_PROP_ATTACHED_PORT, addr);
+			    SCSI_ADDR_PROP_ATTACHED_PORT, paddr);
 		}
 		kmem_free(addr, PMCS_MAX_UA_SIZE);
+		kmem_free(paddr, PMCS_MAX_UA_SIZE);
 	}
 
 	if (pptr->dtype != EXPANDER) {

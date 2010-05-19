@@ -794,12 +794,12 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 
 		if (type == PMCS_PHYOP_HARD_RESET) {
 			mbar = "SMP PHY CONTROL/HARD RESET";
-			iomb[6] = BE_32((phynum << 24) |
-			    (PMCS_PHYOP_HARD_RESET << 16));
+			iomb[6] = BE_32((phynum << 16) |
+			    (PMCS_PHYOP_HARD_RESET << 8));
 		} else {
 			mbar = "SMP PHY CONTROL/LINK RESET";
-			iomb[6] = BE_32((phynum << 24) |
-			    (PMCS_PHYOP_LINK_RESET << 16));
+			iomb[6] = BE_32((phynum << 16) |
+			    (PMCS_PHYOP_LINK_RESET << 8));
 		}
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 		    "%s: sending %s to %s for phy 0x%x",
@@ -4567,6 +4567,8 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 
 	pmcs_wwn2barray(BE_64(sdr->sdr_sas_addr), sas_address);
 	pmcs_wwn2barray(BE_64(sdr->sdr_attached_sas_addr), att_sas_address);
+
+	pptr->virtual = sdr->sdr_virtual_phy;
 
 	/*
 	 * Set the routing attribute regardless of the PHY type.
