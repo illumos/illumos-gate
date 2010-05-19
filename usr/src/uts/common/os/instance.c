@@ -260,6 +260,7 @@ in_preassign_instance()
 		 * SID node created by bus_config.
 		 */
 		dnp->dn_pinstance = dnp->dn_instance;
+		dnp->dn_instance = IN_SEARCHME;
 	}
 }
 
@@ -718,46 +719,41 @@ in_next_instance_block(major_t major, int block_size)
 		return (base);
 	}
 
-	/* use more complex code path */
-	dp = dnp->dn_inlist;
+	/*
+	 * Use more complex code path, start by skipping preassign entries.
+	 */
+	for (dp = dnp->dn_inlist; dp; dp = dp->ind_next)
+		if (dp->ind_instance >= dnp->dn_pinstance)
+			break;		/* beyond preassign */
 
-	/* no existing entries, allocate block (after preassigns) */
+	/* No non-preassign entries, allocate block at preassign base. */
 	if (dp == NULL) {
 		base = dnp->dn_pinstance;
-		dnp->dn_instance = dnp->dn_pinstance + block_size;
+		if (base == 0)
+			dnp->dn_instance = block_size;
 		return (base);
 	}
 
-	/* see if we fit in hole at beginning (after preassigns) */
+	/* See if we fit in hole at beginning (after preassigns) */
 	prev = dp->ind_instance;
 	if ((prev - dnp->dn_pinstance) >= block_size)
 		return (dnp->dn_pinstance);	/* we fit in beginning hole */
 
 	/* search the list for a large enough hole */
 	for (dp = dp->ind_next, hole = 0; dp; dp = dp->ind_next) {
-		if (dp->ind_instance >= dnp->dn_pinstance) {
-			/* not a preassign */
-			if (dp->ind_instance != (prev + 1))
-				hole++;			/* we have a hole */
-			if (dp->ind_instance >= (prev + block_size + 1))
-				break;			/* we fit in hole */
-		} else
-			hole++;		/* preassign hole */
-
+		if (dp->ind_instance != (prev + 1))
+			hole++;			/* we have a hole */
+		if (dp->ind_instance >= (prev + block_size + 1))
+			break;			/* we fit in hole */
 		prev = dp->ind_instance;
-	}
-
-	/* Don't return anything in the preassign area. */
-	if (prev < dnp->dn_pinstance) {
-		prev = dnp->dn_pinstance - 1;
-		hole++;			/* preassign hole */
 	}
 
 	/*
 	 * If hole is zero then all holes are patched and we can resume
-	 * quick allocations.
+	 * quick allocations, but don't resume quick allocation if there is
+	 * a preassign.
 	 */
-	if (hole == 0)
+	if ((hole == 0) && (dnp->dn_pinstance == 0))
 		dnp->dn_instance = prev + 1 + block_size;
 
 	return (prev + 1);
@@ -1361,7 +1357,6 @@ in_hashdrv(in_drv_t *dp)
 		dp->ind_next = NULL;
 		mp->ind_next = dp;
 	} else {
-		ASSERT(dnp->dn_instance == IN_SEARCHME);
 		dp->ind_next = pp->ind_next;
 		pp->ind_next = dp;
 	}
