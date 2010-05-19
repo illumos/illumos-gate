@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
  */
 
@@ -416,11 +413,19 @@ ire_add_v6(ire_t *ire)
 			 * after adding, we return a held ire. This will
 			 * avoid a lookup in the caller again. If the callers
 			 * don't want to use it, they need to do a REFRELE.
+			 *
+			 * We only allow exactly one IRE_IF_CLONE for any dst,
+			 * so, if the is an IF_CLONE, return the ire without
+			 * an identical_ref, but with an ire_ref held.
 			 */
+			if (ire->ire_type != IRE_IF_CLONE) {
+				atomic_add_32(&ire1->ire_identical_ref, 1);
+				DTRACE_PROBE2(ire__add__exist, ire_t *, ire1,
+				    ire_t *, ire);
+			}
 			ip1dbg(("found dup ire existing %p new %p",
 			    (void *)ire1, (void *)ire));
 			ire_refhold(ire1);
-			atomic_add_32(&ire1->ire_identical_ref, 1);
 			ire_atomic_end(irb_ptr, ire);
 			ire_delete(ire);
 			return (ire1);
