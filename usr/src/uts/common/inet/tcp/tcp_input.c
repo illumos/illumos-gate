@@ -3616,7 +3616,7 @@ process_ack:
 			} else {
 				SQUEUE_ENTER_ONE(listener->tcp_connp->conn_sqp,
 				    mp, tcp_send_conn_ind,
-				    listener->tcp_connp, NULL, SQ_PROCESS,
+				    listener->tcp_connp, NULL, SQ_NODRAIN,
 				    SQTAG_TCP_CONN_IND);
 			}
 		}
