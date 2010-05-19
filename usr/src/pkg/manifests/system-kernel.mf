@@ -120,7 +120,7 @@ $(i386_ONLY)driver name=intel_nb5000 \
 $(i386_ONLY)driver name=intel_nhm \
     alias=pci8086,3423 \
     alias=pci8086,372a
-$(i386_ONLY)driver name=intel_nhmex alias=pci8086,3422
+$(i386_ONLY)driver name=intel_nhmex alias=pci8086,3438
 driver name=ip perms="ip 0666 root sys" \
     policy="read_priv_set=net_rawaccess write_priv_set=net_rawaccess"
 driver name=ip6 perms="ip6 0666 root sys" \
