@@ -465,7 +465,6 @@ rdsv3_rdma_free_op(struct rdsv3_rdma_op *ro)
 	kmem_free(ro, sizeof (*ro));
 }
 
-extern struct umem_callback_ops rdsv3_umem_cbops;
 /*
  * args is a pointer to an in-kernel copy in the sendmsg cmsg.
  */
@@ -481,7 +480,6 @@ rdsv3_rdma_prepare(struct rdsv3_sock *rs, struct rdsv3_rdma_args *args)
 	ddi_umem_cookie_t umem_cookie;
 	size_t umem_len;
 	caddr_t umem_addr;
-	int umem_flags;
 	int ret;
 
 	if (rs->rs_bound_addr == 0) {
@@ -568,10 +566,9 @@ rdsv3_rdma_prepare(struct rdsv3_sock *rs, struct rdsv3_rdma_args *args)
 		umem_len = ptob(btopr(vec.bytes +
 		    ((uintptr_t)vec.addr & PAGEOFFSET)));
 		umem_addr = (caddr_t)((uintptr_t)vec.addr & ~PAGEOFFSET);
-		umem_flags = (DDI_UMEMLOCK_WRITE | DDI_UMEMLOCK_READ |
-		    DDI_UMEMLOCK_LONGTERM);
-		ret = umem_lockmemory(umem_addr, umem_len, umem_flags,
-		    &umem_cookie, &rdsv3_umem_cbops, NULL);
+		ret = umem_lockmemory(umem_addr, umem_len,
+		    DDI_UMEMLOCK_WRITE | DDI_UMEMLOCK_READ,
+		    &umem_cookie, NULL, NULL);
 		if (ret != 0) {
 			RDSV3_DPRINTF2("rdsv3_rdma_prepare",
 			    "umem_lockmemory() returned %d", ret);

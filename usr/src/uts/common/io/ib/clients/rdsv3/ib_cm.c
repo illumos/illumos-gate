@@ -178,7 +178,7 @@ rdsv3_ib_cm_connect_complete(struct rdsv3_connection *conn,
 	 * Post receive buffers - as a side effect, this will update
 	 * the posted credit count.
 	 */
-	(void) rdsv3_ib_recv_refill(conn, KM_NOSLEEP, 0, 1);
+	(void) rdsv3_ib_recv_refill(conn, KM_NOSLEEP, 1);
 
 	/* Tune RNR behavior */
 	rdsv3_ib_tune_rnr(ic, &qp_attr);
@@ -335,6 +335,7 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 		    "RDS/IB: No client_data for device %s", dev->name);
 		return (-EOPNOTSUPP);
 	}
+	ic->rds_ibdev = rds_ibdev;
 
 	if (rds_ibdev->max_wrs < ic->i_send_ring.w_nr + 1)
 		rdsv3_ib_ring_resize(&ic->i_send_ring, rds_ibdev->max_wrs - 1);
@@ -442,13 +443,11 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	if (ic->i_send_wrs == NULL) {
 		ret = -ENOMEM;
 		RDSV3_DPRINTF2("rdsv3_ib_setup_qp",
-		    "WR allocation failed: %d", ret);
+		    "Send WR allocation failed: %d", ret);
 		goto out;
 	}
 	sgl = (ibt_wr_ds_t *)((uint8_t *)ic->i_send_wrs +
 	    (RDSV3_IB_SEND_WRS * sizeof (ibt_send_wr_t)));
-	RDSV3_DPRINTF4("rdsv3_ib_setup_qp", "i_send_wrs: %p sgl: %p",
-	    ic->i_send_wrs, sgl);
 	for (i = 0; i < RDSV3_IB_SEND_WRS; i++) {
 		wrp = &ic->i_send_wrs[i];
 		wrp->wr_sgl = &sgl[i * RDSV3_IB_MAX_SGE];
@@ -464,6 +463,16 @@ rdsv3_ib_setup_qp(struct rdsv3_connection *conn)
 	}
 	(void) memset(ic->i_recvs, 0, ic->i_recv_ring.w_nr *
 	    sizeof (struct rdsv3_ib_recv_work));
+
+	ic->i_recv_wrs =
+	    kmem_alloc(ic->i_recv_ring.w_nr * sizeof (ibt_recv_wr_t),
+	    KM_NOSLEEP);
+	if (ic->i_recv_wrs == NULL) {
+		ret = -ENOMEM;
+		RDSV3_DPRINTF2("rdsv3_ib_setup_qp",
+		    "Recv WR allocation failed: %d", ret);
+		goto out;
+	}
 
 	rdsv3_ib_recv_init_ack(ic);
 
@@ -839,7 +848,7 @@ rdsv3_ib_conn_shutdown(struct rdsv3_connection *conn)
 		/*
 		 * Move connection back to the nodev list.
 		 */
-		if (ic->rds_ibdev)
+		if (ic->i_on_dev_list)
 			rdsv3_ib_remove_conn(ic->rds_ibdev, conn);
 
 		ic->i_cm_id = NULL;
@@ -851,7 +860,8 @@ rdsv3_ib_conn_shutdown(struct rdsv3_connection *conn)
 		ic->i_recv_hdrs = NULL;
 		ic->i_ack = NULL;
 	}
-	ASSERT(!ic->rds_ibdev);
+
+	ASSERT(!ic->i_on_dev_list);
 
 	/* Clear pending transmit */
 	if (ic->i_rm) {
@@ -969,7 +979,7 @@ rdsv3_ib_conn_free(void *arg)
 	 * A race with shutdown() or connect() would cause problems
 	 * (since rds_ibdev would change) but that should never happen.
 	 */
-	lock_ptr = ic->rds_ibdev ?
+	lock_ptr = ic->i_on_dev_list ?
 	    &ic->rds_ibdev->spinlock : &ib_nodev_conns_lock;
 
 	mutex_enter(lock_ptr);

@@ -64,52 +64,7 @@
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
 
 static struct kmem_cache *rdsv3_ib_incoming_slab;
-static struct kmem_cache *rdsv3_ib_frag_slab;
 static atomic_t	rdsv3_ib_allocation = ATOMIC_INIT(0);
-
-static void
-rdsv3_ib_frag_drop_page(struct rdsv3_page_frag *frag)
-{
-	RDSV3_DPRINTF5("rdsv3_ib_frag_drop_page",
-	    "frag %p page %p offset %d", frag, frag->f_page, frag->f_offset);
-	kmem_free(frag->f_page, PAGE_SIZE);
-	frag->f_page = NULL;
-}
-
-static void
-rdsv3_ib_frag_free(struct rdsv3_page_frag *frag)
-{
-	RDSV3_DPRINTF5("rdsv3_ib_frag_free", "frag %p page %p",
-	    frag, frag->f_page);
-	ASSERT(frag->f_page == NULL);
-	kmem_cache_free(rdsv3_ib_frag_slab, frag);
-}
-
-/*
- * We map a page at a time.  Its fragments are posted in order.  This
- * is called in fragment order as the fragments get send completion events.
- * Only the last frag in the page performs the unmapping.
- *
- * It's OK for ring cleanup to call this in whatever order it likes because
- * DMA is not in flight and so we can unmap while other ring entries still
- * hold page references in their frags.
- */
-static void
-rdsv3_ib_recv_unmap_page(struct rdsv3_ib_connection *ic,
-    struct rdsv3_ib_recv_work *recv)
-{
-	struct rdsv3_page_frag *frag = recv->r_frag;
-
-#if 0
-	RDSV3_DPRINTF5("rdsv3_ib_recv_unmap_page",
-	    "recv %p frag %p page %p\n", recv, frag, frag->f_page);
-#endif
-	if (frag->f_mapped) {
-		(void) ibt_unmap_mem_iov(
-		    ib_get_ibt_hca_hdl(ic->i_cm_id->device), frag->f_mapped);
-		frag->f_mapped = 0;
-	}
-}
 
 void
 rdsv3_ib_recv_init_ring(struct rdsv3_ib_connection *ic)
@@ -124,8 +79,6 @@ rdsv3_ib_recv_init_ring(struct rdsv3_ib_connection *ic)
 	for (i = 0, recv = ic->i_recvs; i < ic->i_recv_ring.w_nr; i++, recv++) {
 		recv->r_ibinc = NULL;
 		recv->r_frag = NULL;
-
-		recv->r_wr.recv.wr_id = i;
 
 		/* initialize the hdr sgl permanently */
 		recv->r_sge[0].ds_va = (ib_vaddr_t)(uintptr_t)hdrp++;
@@ -146,10 +99,7 @@ rdsv3_ib_recv_clear_one(struct rdsv3_ib_connection *ic,
 		recv->r_ibinc = NULL;
 	}
 	if (recv->r_frag) {
-		rdsv3_ib_recv_unmap_page(ic, recv);
-		if (recv->r_frag->f_page)
-			rdsv3_ib_frag_drop_page(recv->r_frag);
-		rdsv3_ib_frag_free(recv->r_frag);
+		kmem_cache_free(ic->rds_ibdev->ib_frag_slab, recv->r_frag);
 		recv->r_frag = NULL;
 	}
 
@@ -166,23 +116,18 @@ rdsv3_ib_recv_clear_ring(struct rdsv3_ib_connection *ic)
 
 	for (i = 0; i < ic->i_recv_ring.w_nr; i++)
 		rdsv3_ib_recv_clear_one(ic, &ic->i_recvs[i]);
-
-	if (ic->i_frag.f_page)
-		rdsv3_ib_frag_drop_page(&ic->i_frag);
 }
 
 extern int atomic_add_unless(atomic_t *, uint_t, ulong_t);
 
 static int
 rdsv3_ib_recv_refill_one(struct rdsv3_connection *conn,
-    struct rdsv3_ib_recv_work *recv,
-    int kptr_gfp, int page_gfp)
+    struct rdsv3_ib_recv_work *recv, int kmflags)
 {
 	struct rdsv3_ib_connection *ic = conn->c_transport_data;
 	ibt_mi_hdl_t mi_hdl;
 	ibt_iov_attr_t iov_attr;
 	ibt_iov_t iov_arr[1];
-	int ret = -ENOMEM;
 
 	RDSV3_DPRINTF5("rdsv3_ib_recv_refill_one", "conn: %p, recv: %p",
 	    conn, recv);
@@ -194,86 +139,30 @@ rdsv3_ib_recv_refill_one(struct rdsv3_connection *conn,
 			goto out;
 		}
 		recv->r_ibinc = kmem_cache_alloc(rdsv3_ib_incoming_slab,
-		    kptr_gfp);
+		    kmflags);
 		if (recv->r_ibinc == NULL) {
 			atomic_add_32(&rdsv3_ib_allocation, -1);
 			goto out;
 		}
-		list_create(&recv->r_ibinc->ii_frags,
-		    sizeof (struct rdsv3_page_frag),
-		    offsetof(struct rdsv3_page_frag, f_item));
 		rdsv3_inc_init(&recv->r_ibinc->ii_inc, conn, conn->c_faddr);
 	}
 
 	if (recv->r_frag == NULL) {
-		recv->r_frag = kmem_cache_alloc(rdsv3_ib_frag_slab, kptr_gfp);
+		recv->r_frag = kmem_cache_alloc(ic->rds_ibdev->ib_frag_slab,
+		    kmflags);
 		if (recv->r_frag == NULL)
 			goto out;
-		list_link_init(&recv->r_frag->f_item);
-		recv->r_frag->f_page = NULL;
 	}
 
-	if (ic->i_frag.f_page == NULL) {
-		ic->i_frag.f_page = kmem_alloc(PAGE_SIZE, page_gfp);
-		if (ic->i_frag.f_page == NULL)
-			goto out;
-		ic->i_frag.f_offset = 0;
-	}
-
-	iov_attr.iov_as = NULL;
-	iov_attr.iov = &iov_arr[0];
-	iov_attr.iov_buf = NULL;
-	iov_attr.iov_list_len = 1;
-	iov_attr.iov_wr_nds = 1;
-	iov_attr.iov_lso_hdr_sz = 0;
-	iov_attr.iov_flags = IBT_IOV_SLEEP | IBT_IOV_RECV;
-
-	/* Data */
-	iov_arr[0].iov_addr = ic->i_frag.f_page + ic->i_frag.f_offset;
-	iov_arr[0].iov_len = RDSV3_FRAG_SIZE;
-
-	/*
-	 * Header comes from pre-registered buffer, so don't map it.
-	 * Map the data only and stick in the header sgl quietly after
-	 * the call.
-	 */
-	recv->r_wr.recv.wr_sgl = &recv->r_sge[1];
-	recv->r_wr.recv.wr_nds = 1;
-
-	ret = ibt_map_mem_iov(ib_get_ibt_hca_hdl(ic->i_cm_id->device),
-	    &iov_attr, &recv->r_wr, &mi_hdl);
-	if (ret != IBT_SUCCESS) {
-		RDSV3_DPRINTF2("rdsv3_ib_recv_refill_one",
-		    "ibt_map_mem_iov failed: %d", ret);
-		goto out;
-	}
-
-	/* stick in the header */
-	recv->r_wr.recv.wr_sgl = &recv->r_sge[0];
-	recv->r_wr.recv.wr_nds = RDSV3_IB_RECV_SGE;
-
-	/*
-	 * Once we get the RDSV3_PAGE_LAST_OFF frag then rdsv3_ib_frag_unmap()
-	 * must be called on this recv.  This happens as completions hit
-	 * in order or on connection shutdown.
-	 */
-	recv->r_frag->f_page = ic->i_frag.f_page;
-	recv->r_frag->f_offset = ic->i_frag.f_offset;
-	recv->r_frag->f_mapped = mi_hdl;
-
-	if (ic->i_frag.f_offset < RDSV3_PAGE_LAST_OFF) {
-		ic->i_frag.f_offset += RDSV3_FRAG_SIZE;
-	} else {
-		ic->i_frag.f_page = NULL;
-		ic->i_frag.f_offset = 0;
-	}
-
-	ret = 0;
+	/* Data sge, structure copy */
+	recv->r_sge[1] = recv->r_frag->f_sge;
 
 	RDSV3_DPRINTF5("rdsv3_ib_recv_refill_one", "Return: conn: %p, recv: %p",
 	    conn, recv);
+
+	return (0);
 out:
-	return (ret);
+	return (-ENOMEM);
 }
 
 /*
@@ -285,61 +174,65 @@ out:
  * -1 is returned if posting fails due to temporary resource exhaustion.
  */
 int
-rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int kptr_gfp,
-    int page_gfp, int prefill)
+rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int kmflags, int prefill)
 {
 	struct rdsv3_ib_connection *ic = conn->c_transport_data;
 	struct rdsv3_ib_recv_work *recv;
-	unsigned int succ_wr;
 	unsigned int posted = 0;
-	int ret = 0;
-	uint32_t pos;
+	int ret = 0, avail;
+	uint32_t pos, i;
 
 	RDSV3_DPRINTF4("rdsv3_ib_recv_refill", "conn: %p, prefill: %d",
 	    conn, prefill);
 
-	while ((prefill || rdsv3_conn_up(conn)) &&
-	    rdsv3_ib_ring_alloc(&ic->i_recv_ring, 1, &pos)) {
-		if (pos >= ic->i_recv_ring.w_nr) {
+	if (prefill || rdsv3_conn_up(conn)) {
+		uint_t w_nr = ic->i_recv_ring.w_nr;
+
+		avail = rdsv3_ib_ring_alloc(&ic->i_recv_ring, w_nr, &pos);
+		if ((avail <= 0) || (pos >= w_nr)) {
 			RDSV3_DPRINTF2("rdsv3_ib_recv_refill",
-			    "Argh - ring alloc returned pos=%u",
-			    pos);
-			ret = -EINVAL;
-			break;
+			    "Argh - ring alloc returned pos=%u, avail: %d",
+			    pos, avail);
+			return (-EINVAL);
 		}
 
-		recv = &ic->i_recvs[pos];
-		ret = rdsv3_ib_recv_refill_one(conn, recv, kptr_gfp, page_gfp);
-		if (ret) {
-			ret = -1;
-			break;
+		/* populate the WRs */
+		for (i = 0; i < avail; i++) {
+			recv = &ic->i_recvs[pos];
+			ret = rdsv3_ib_recv_refill_one(conn, recv, kmflags);
+			if (ret) {
+				rdsv3_ib_ring_unalloc(&ic->i_recv_ring,
+				    avail - i);
+				break;
+			}
+			ic->i_recv_wrs[i].wr_id = (ibt_wrid_t)(uintptr_t)recv;
+			ic->i_recv_wrs[i].wr_nds = RDSV3_IB_RECV_SGE;
+			ic->i_recv_wrs[i].wr_sgl = &recv->r_sge[0];
+
+			pos = (pos + 1) % w_nr;
 		}
 
-		/* XXX when can this fail? */
-		ret = ibt_post_recv(ib_get_ibt_channel_hdl(ic->i_cm_id),
-		    &recv->r_wr.recv, 1, &succ_wr);
-		RDSV3_DPRINTF5("rdsv3_ib_recv_refill",
-		    "recv %p ibinc %p frag %p ret %d\n", recv,
-		    recv->r_ibinc, recv->r_frag, ret);
-		if (ret) {
-			RDSV3_DPRINTF2("rdsv3_ib_recv_refill",
-			    "recv post on %u.%u.%u.%u returned %d, "
-			    "disconnecting and reconnecting\n",
-			    NIPQUAD(conn->c_faddr), ret);
-			rdsv3_conn_drop(conn);
-			ret = -1;
-			break;
+		if (i) {
+			/* post the WRs at one shot */
+			ret = ibt_post_recv(ib_get_ibt_channel_hdl(ic->i_cm_id),
+			    &ic->i_recv_wrs[0], i, &posted);
+			RDSV3_DPRINTF3("rdsv3_ib_recv_refill",
+			    "attempted: %d posted: %d WRs ret %d",
+			    i, posted, ret);
+			if (ret) {
+				RDSV3_DPRINTF2("rdsv3_ib_recv_refill",
+				    "disconnecting and reconnecting\n",
+				    NIPQUAD(conn->c_faddr), ret);
+				rdsv3_ib_ring_unalloc(&ic->i_recv_ring,
+				    i - posted);
+				rdsv3_conn_drop(conn);
+			}
 		}
-
-		posted++;
 	}
 
 	/* We're doing flow control - update the window. */
 	if (ic->i_flowctl && posted)
 		rdsv3_ib_advertise_credits(conn, posted);
-
-	if (ret)
-		rdsv3_ib_ring_unalloc(&ic->i_recv_ring, 1);
 
 	RDSV3_DPRINTF4("rdsv3_ib_recv_refill", "Return: conn: %p, posted: %d",
 	    conn, posted);
@@ -352,6 +245,8 @@ rdsv3_ib_inc_purge(struct rdsv3_incoming *inc)
 	struct rdsv3_ib_incoming *ibinc;
 	struct rdsv3_page_frag *frag;
 	struct rdsv3_page_frag *pos;
+	struct rdsv3_ib_connection *ic =
+	    (struct rdsv3_ib_connection *)inc->i_conn->c_transport_data;
 
 	RDSV3_DPRINTF4("rdsv3_ib_inc_purge", "inc: %p", inc);
 
@@ -361,8 +256,7 @@ rdsv3_ib_inc_purge(struct rdsv3_incoming *inc)
 
 	RDSV3_FOR_EACH_LIST_NODE_SAFE(frag, pos, &ibinc->ii_frags, f_item) {
 		list_remove_node(&frag->f_item);
-		rdsv3_ib_frag_drop_page(frag);
-		rdsv3_ib_frag_free(frag);
+		kmem_cache_free(ic->rds_ibdev->ib_frag_slab, frag);
 	}
 
 	RDSV3_DPRINTF4("rdsv3_ib_inc_purge", "Return: inc: %p", inc);
@@ -842,20 +736,6 @@ rdsv3_ib_process_recv(struct rdsv3_connection *conn,
 		 */
 		rdsv3_ib_stats_inc(s_ib_ack_received);
 
-		/*
-		 * Usually the frags make their way on to incs and are then
-		 * freed as
-		 * the inc is freed.  We don't go that route, so we have to
-		 * drop the
-		 * page ref ourselves.  We can't just leave the page on the recv
-		 * because that confuses the dma mapping of pages and each
-		 * recv's use
-		 * of a partial page.  We can leave the frag, though, it will be
-		 * reused.
-		 *
-		 * FIXME: Fold this into the code path below.
-		 */
-		rdsv3_ib_frag_drop_page(recv->r_frag);
 		return;
 	}
 
@@ -971,9 +851,7 @@ rdsv3_poll_cq(struct rdsv3_ib_connection *ic, struct rdsv3_ib_ack_state *state)
 		    wc.wc_bytes_xfer, ntohl(wc.wc_immed_data));
 		rdsv3_ib_stats_inc(s_ib_rx_cq_event);
 
-		recv = &ic->i_recvs[rdsv3_ib_ring_oldest(&ic->i_recv_ring)];
-
-		rdsv3_ib_recv_unmap_page(ic, recv);
+		recv = (struct rdsv3_ib_recv_work *)(uintptr_t)wc.wc_id;
 
 		/*
 		 * Also process recvs in connecting state because it is possible
@@ -1072,7 +950,7 @@ rdsv3_ib_recv(struct rdsv3_connection *conn)
 	 * we're really low and we want the caller to back off for a bit.
 	 */
 	mutex_enter(&ic->i_recv_mutex);
-	if (rdsv3_ib_recv_refill(conn, KM_NOSLEEP, 0, 0))
+	if (rdsv3_ib_recv_refill(conn, KM_NOSLEEP, 0))
 		ret = -ENOMEM;
 	else
 		rdsv3_ib_stats_inc(s_ib_rx_refill_from_thread);
@@ -1088,33 +966,28 @@ rdsv3_ib_recv(struct rdsv3_connection *conn)
 
 uint_t	MaxRecvMemory = 128 * 1024 * 1024;
 
+extern int rdsv3_ib_inc_constructor(void *buf, void *arg, int kmflags);
+extern void rdsv3_ib_inc_destructor(void *buf, void *arg);
+
 int
 rdsv3_ib_recv_init(void)
 {
-	int ret = -ENOMEM;
-
 	RDSV3_DPRINTF4("rdsv3_ib_recv_init", "Enter");
 
 	/* XXX - hard code it to 128 MB */
 	rdsv3_ib_sysctl_max_recv_allocation = MaxRecvMemory / RDSV3_FRAG_SIZE;
 
 	rdsv3_ib_incoming_slab = kmem_cache_create("rdsv3_ib_incoming",
-	    sizeof (struct rdsv3_ib_incoming), 0, NULL, NULL, NULL,
-	    NULL, NULL, 0);
-	if (rdsv3_ib_incoming_slab == NULL)
-		goto out;
-
-	rdsv3_ib_frag_slab = kmem_cache_create("rdsv3_ib_frag",
-	    sizeof (struct rdsv3_page_frag),
-	    0, NULL, NULL, NULL, NULL, NULL, 0);
-	if (rdsv3_ib_frag_slab == NULL)
-		kmem_cache_destroy(rdsv3_ib_incoming_slab);
-	else
-		ret = 0;
+	    sizeof (struct rdsv3_ib_incoming), 0, rdsv3_ib_inc_constructor,
+	    rdsv3_ib_inc_destructor, NULL, NULL, NULL, 0);
+	if (rdsv3_ib_incoming_slab == NULL) {
+		RDSV3_DPRINTF2("rdsv3_ib_recv_init", "kmem_cache_create "
+		    "failed");
+		return (-ENOMEM);
+	}
 
 	RDSV3_DPRINTF4("rdsv3_ib_recv_init", "Return");
-out:
-	return (ret);
+	return (0);
 }
 
 void
@@ -1122,6 +995,5 @@ rdsv3_ib_recv_exit(void)
 {
 	RDSV3_DPRINTF4("rdsv3_ib_recv_exit", "Enter");
 	kmem_cache_destroy(rdsv3_ib_incoming_slab);
-	kmem_cache_destroy(rdsv3_ib_frag_slab);
 	RDSV3_DPRINTF4("rdsv3_ib_recv_exit", "Return");
 }

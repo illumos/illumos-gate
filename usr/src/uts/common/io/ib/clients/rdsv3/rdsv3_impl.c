@@ -924,6 +924,89 @@ rdsv3_conn_compare(const void *conn1, const void *conn2)
 	return (1);
 }
 
+/* rdsv3_ib_incoming cache */
+/* ARGSUSED */
+int
+rdsv3_ib_inc_constructor(void *buf, void *arg, int kmflags)
+{
+	list_create(&((struct rdsv3_ib_incoming *)buf)->ii_frags,
+	    sizeof (struct rdsv3_page_frag),
+	    offsetof(struct rdsv3_page_frag, f_item));
+
+	return (0);
+}
+
+/* ARGSUSED */
+void
+rdsv3_ib_inc_destructor(void *buf, void *arg)
+{
+	list_destroy(&((struct rdsv3_ib_incoming *)buf)->ii_frags);
+}
+
+/* ib_frag_slab cache */
+/* ARGSUSED */
+int
+rdsv3_ib_frag_constructor(void *buf, void *arg, int kmflags)
+{
+	struct rdsv3_page_frag *frag = (struct rdsv3_page_frag *)buf;
+	struct rdsv3_ib_device *rds_ibdev = (struct rdsv3_ib_device *)arg;
+	ibt_iov_attr_t iov_attr;
+	ibt_iov_t iov_arr[1];
+	ibt_all_wr_t wr;
+
+	bzero(frag, sizeof (struct rdsv3_page_frag));
+	list_link_init(&frag->f_item);
+
+	frag->f_page = kmem_alloc(PAGE_SIZE, kmflags);
+	if (frag->f_page == NULL) {
+		RDSV3_DPRINTF2("rdsv3_ib_frag_constructor",
+		    "kmem_alloc for %d failed", PAGE_SIZE);
+		return (-1);
+	}
+	frag->f_offset = 0;
+
+	iov_attr.iov_as = NULL;
+	iov_attr.iov = &iov_arr[0];
+	iov_attr.iov_buf = NULL;
+	iov_attr.iov_list_len = 1;
+	iov_attr.iov_wr_nds = 1;
+	iov_attr.iov_lso_hdr_sz = 0;
+	iov_attr.iov_flags = IBT_IOV_SLEEP | IBT_IOV_RECV;
+
+	iov_arr[0].iov_addr = frag->f_page;
+	iov_arr[0].iov_len = PAGE_SIZE;
+
+	wr.recv.wr_nds = 1;
+	wr.recv.wr_sgl = &frag->f_sge;
+
+	if (ibt_map_mem_iov(ib_get_ibt_hca_hdl(rds_ibdev->dev),
+	    &iov_attr, &wr, &frag->f_mapped) != IBT_SUCCESS) {
+		RDSV3_DPRINTF2("rdsv3_ib_frag_constructor",
+		    "ibt_map_mem_iov failed");
+		kmem_free(frag->f_page, PAGE_SIZE);
+		return (-1);
+	}
+
+	return (0);
+}
+
+/* ARGSUSED */
+void
+rdsv3_ib_frag_destructor(void *buf, void *arg)
+{
+	struct rdsv3_page_frag *frag = (struct rdsv3_page_frag *)buf;
+	struct rdsv3_ib_device *rds_ibdev = (struct rdsv3_ib_device *)arg;
+
+	/* unmap the page */
+	if (ibt_unmap_mem_iov(ib_get_ibt_hca_hdl(rds_ibdev->dev),
+	    frag->f_mapped) != IBT_SUCCESS)
+		RDSV3_DPRINTF2("rdsv3_ib_frag_destructor",
+		    "ibt_unmap_mem_iov failed");
+
+	/* free the page */
+	kmem_free(frag->f_page, PAGE_SIZE);
+}
+
 /* loop.c */
 extern kmutex_t loop_conns_lock;
 extern list_t loop_conns;

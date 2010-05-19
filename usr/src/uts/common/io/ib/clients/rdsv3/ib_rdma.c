@@ -216,10 +216,9 @@ rdsv3_ib_add_conn(struct rdsv3_ib_device *rds_ibdev,
 
 	mutex_enter(&rds_ibdev->spinlock);
 	list_insert_tail(&rds_ibdev->conn_list, ic);
+	ic->i_on_dev_list = B_TRUE;
 	mutex_exit(&rds_ibdev->spinlock);
 	mutex_exit(&ib_nodev_conns_lock);
-
-	ic->rds_ibdev = rds_ibdev;
 }
 
 void
@@ -237,13 +236,12 @@ rdsv3_ib_remove_conn(struct rdsv3_ib_device *rds_ibdev,
 	mutex_enter(&rds_ibdev->spinlock);
 	ASSERT(list_link_active(&ic->ib_node));
 	list_remove_node(&ic->ib_node);
+	ic->i_on_dev_list = B_FALSE;
 	mutex_exit(&rds_ibdev->spinlock);
 
 	list_insert_tail(&ib_nodev_conns, ic);
 
 	mutex_exit(&ib_nodev_conns_lock);
-
-	ic->rds_ibdev = NULL;
 
 	RDSV3_DPRINTF4("rdsv3_ib_remove_conn",
 	    "Return: rds_ibdev: %p, conn: %p", rds_ibdev, conn);
@@ -334,21 +332,6 @@ rdsv3_ib_get_mr_info(struct rdsv3_ib_device *rds_ibdev,
 	iinfo->rdma_mr_size = rds_ibdev->fmr_message_size;
 }
 
-static void
-rdsv3_umem_cb(ddi_umem_cookie_t *umem_cookie)
-{
-	/* LINTED E_FUNC_SET_NOT_USED */
-	ddi_umem_cookie_t *cp = umem_cookie;
-	RDSV3_DPRINTF5("rdsv3_umem_cb", "Enter: umem_cookie %p", umem_cookie);
-	/* all umem_cookies are freed at socket fd close */
-	/* there should be no umem_cookies when clearing the addr space */
-}
-
-struct umem_callback_ops rdsv3_umem_cbops = {
-	UMEM_CALLBACK_VERSION,
-	rdsv3_umem_cb,
-};
-
 void *
 rdsv3_ib_get_mr(struct rdsv3_iovec *args, unsigned long nents,
 	struct rdsv3_sock *rs, uint32_t *key_ret)
@@ -358,7 +341,6 @@ rdsv3_ib_get_mr(struct rdsv3_iovec *args, unsigned long nents,
 	ddi_umem_cookie_t umem_cookie;
 	size_t umem_len;
 	caddr_t umem_addr;
-	int umem_flags;
 	int ret;
 	struct buf *bp;
 
@@ -377,10 +359,9 @@ rdsv3_ib_get_mr(struct rdsv3_iovec *args, unsigned long nents,
 	umem_len   = ptob(btopr(args->bytes +
 	    ((uintptr_t)args->addr & PAGEOFFSET)));
 	umem_addr  = (caddr_t)((uintptr_t)args->addr & ~PAGEOFFSET);
-	umem_flags = (DDI_UMEMLOCK_WRITE | DDI_UMEMLOCK_READ |
-	    DDI_UMEMLOCK_LONGTERM);
-	ret = umem_lockmemory(umem_addr, umem_len, umem_flags,
-	    &umem_cookie, &rdsv3_umem_cbops, NULL);
+	ret = umem_lockmemory(umem_addr, umem_len,
+	    DDI_UMEMLOCK_WRITE | DDI_UMEMLOCK_READ,
+	    &umem_cookie, NULL, NULL);
 	if (ret != 0) {
 		kmem_free((void *) ibmr, sizeof (*ibmr));
 		ibmr = ERR_PTR(ret);

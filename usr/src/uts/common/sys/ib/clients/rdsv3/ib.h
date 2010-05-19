@@ -60,6 +60,7 @@ struct rdsv3_page_frag {
 	struct list_node	f_item;
 	caddr_t			f_page;
 	unsigned long		f_offset;
+	ibt_wr_ds_t		f_sge;
 	ibt_mi_hdl_t 		f_mapped;
 };
 
@@ -89,9 +90,8 @@ struct rdsv3_ib_send_work {
 
 struct rdsv3_ib_recv_work {
 	struct rdsv3_ib_incoming 	*r_ibinc;
-	struct rdsv3_page_frag	*r_frag;
-	ibt_all_wr_t		r_wr;
-	ibt_wr_ds_t		r_sge[2];
+	struct rdsv3_page_frag		*r_frag;
+	ibt_wr_ds_t			r_sge[2];
 };
 
 struct rdsv3_ib_work_ring {
@@ -107,6 +107,7 @@ struct rdsv3_ib_device;
 struct rdsv3_ib_connection {
 
 	struct list_node	ib_node;
+	boolean_t		i_on_dev_list;
 	struct rdsv3_ib_device	*rds_ibdev;
 	struct rdsv3_connection	*conn;
 
@@ -134,6 +135,7 @@ struct rdsv3_ib_connection {
 	struct rdsv3_header	*i_recv_hdrs;
 	uint64_t		i_recv_hdrs_dma;
 	struct rdsv3_ib_recv_work *i_recvs;
+	ibt_recv_wr_t		*i_recv_wrs;
 	struct rdsv3_page_frag	i_frag;
 	uint64_t		i_ack_recv;	/* last ACK received */
 	processorid_t		i_recv_tasklet_cpuid;
@@ -189,7 +191,7 @@ struct rdsv3_ib_device {
 	struct list		conn_list;
 	ib_device_t		*dev;
 	struct ib_pd		*pd;
-	ibt_lkey_t		local_dma_lkey;
+	struct kmem_cache	*ib_frag_slab;
 	struct rds_ib_mr_pool	*mr_pool;
 	unsigned int		fmr_max_remaps;
 	unsigned int		max_fmrs;
@@ -296,8 +298,8 @@ void rdsv3_ib_flush_mrs(void);
 int rdsv3_ib_recv_init(void);
 void rdsv3_ib_recv_exit(void);
 int rdsv3_ib_recv(struct rdsv3_connection *conn);
-int rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int kptr_gfp,
-    int page_gfp, int prefill);
+int rdsv3_ib_recv_refill(struct rdsv3_connection *conn, int kmflags,
+    int prefill);
 void rdsv3_ib_inc_purge(struct rdsv3_incoming *inc);
 void rdsv3_ib_inc_free(struct rdsv3_incoming *inc);
 int rdsv3_ib_inc_copy_to_user(struct rdsv3_incoming *inc, uio_t *uiop,

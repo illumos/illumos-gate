@@ -70,11 +70,15 @@ struct list	rdsv3_ib_devices;
 kmutex_t ib_nodev_conns_lock;
 list_t ib_nodev_conns;
 
+extern int rdsv3_ib_frag_constructor(void *buf, void *arg, int kmflags);
+extern void rdsv3_ib_frag_destructor(void *buf, void *arg);
+
 void
 rdsv3_ib_add_one(ib_device_t *device)
 {
 	struct rdsv3_ib_device *rds_ibdev;
 	ibt_hca_attr_t *dev_attr;
+	char name[64];
 
 	RDSV3_DPRINTF4("rdsv3_ib_add_one", "device: %p", device);
 
@@ -88,14 +92,14 @@ rdsv3_ib_add_one(ib_device_t *device)
 		return;
 
 	if (ibt_query_hca(ib_get_ibt_hca_hdl(device), dev_attr)) {
-		RDSV3_DPRINTF5("rdsv3_ib_add_one",
+		RDSV3_DPRINTF2("rdsv3_ib_add_one",
 		    "Query device failed for %s", device->name);
 		goto free_attr;
 	}
 
 	/* We depend on Reserved Lkey */
 	if (!(dev_attr->hca_flags2 & IBT_HCA2_RES_LKEY)) {
-		RDSV3_DPRINTF5("rdsv3_ib_add_one",
+		RDSV3_DPRINTF2("rdsv3_ib_add_one",
 		    "Reserved Lkey support is required: %s",
 		    device->name);
 		goto free_attr;
@@ -118,6 +122,20 @@ rdsv3_ib_add_one(ib_device_t *device)
 	if (rdsv3_ib_create_mr_pool(rds_ibdev) != 0) {
 		goto free_dev;
 	}
+
+	(void) snprintf(name, 64, "RDSV3_IB_FRAG_%llx",
+	    (longlong_t)htonll(dev_attr->hca_node_guid));
+	rds_ibdev->ib_frag_slab = kmem_cache_create(name,
+	    sizeof (struct rdsv3_page_frag), 0, rdsv3_ib_frag_constructor,
+	    rdsv3_ib_frag_destructor, NULL, (void *)rds_ibdev, NULL, 0);
+	if (rds_ibdev->ib_frag_slab == NULL) {
+		RDSV3_DPRINTF2("rdsv3_ib_add_one",
+		    "kmem_cache_create for ib_frag_slab failed for device: %s",
+		    device->name);
+		rdsv3_ib_destroy_mr_pool(rds_ibdev);
+		goto free_dev;
+	}
+
 
 	list_create(&rds_ibdev->ipaddr_list, sizeof (struct rdsv3_ib_ipaddr),
 	    offsetof(struct rdsv3_ib_ipaddr, list));
@@ -161,6 +179,8 @@ rdsv3_ib_remove_one(struct ib_device *device)
 	rdsv3_ib_destroy_conns(rds_ibdev);
 
 	rdsv3_ib_destroy_mr_pool(rds_ibdev);
+
+	kmem_cache_destroy(rds_ibdev->ib_frag_slab);
 
 #if 0
 	while (ib_dealloc_pd(rds_ibdev->pd)) {
