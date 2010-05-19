@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _GCPU_H
@@ -85,6 +84,7 @@ typedef struct gcpu_logout {
 	uint64_t gcl_flags;		/* Flags */
 	pc_t gcl_stack[FM_STK_DEPTH];	/* saved stack trace, if any */
 	int gcl_stackdepth;		/* saved stack trace depth */
+	int ismc;			/* is a machine check flag */
 	int gcl_nbanks;			/* number of banks in array below */
 	void *gcl_ms_logout;		/* Model-specific area after gcl_data */
 	gcpu_bank_logout_t gcl_data[1];	/* Bank logout areas - must be last */

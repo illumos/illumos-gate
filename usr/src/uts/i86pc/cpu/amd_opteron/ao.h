@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _AO_H
@@ -175,7 +174,7 @@ extern void ao_ms_mca_init(cmi_hdl_t, int);
 extern uint64_t ao_ms_poll_ownermask(cmi_hdl_t, hrtime_t);
 extern uint32_t ao_ms_error_action(cmi_hdl_t, int, int, uint64_t,
     uint64_t, uint64_t, void *);
-extern cms_cookie_t ao_ms_disp_match(cmi_hdl_t, int, uint64_t, uint64_t,
+extern cms_cookie_t ao_ms_disp_match(cmi_hdl_t, int, int, uint64_t, uint64_t,
     uint64_t, void *);
 extern void ao_ms_ereport_class(cmi_hdl_t, cms_cookie_t, const char **,
     const char **);

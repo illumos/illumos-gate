@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -942,8 +941,10 @@ gcpu_mca_drain(void *ignored, const void *data, const errorq_elem_t *eqe)
 {
 	const gcpu_logout_t *gcl = data;
 	const gcpu_bank_logout_t *gbl;
+	int ismc;
 	int i;
 
+	ismc = gcl->ismc;
 	for (i = 0, gbl = &gcl->gcl_data[0]; i < gcl->gcl_nbanks; i++, gbl++) {
 		const gcpu_error_disp_t *gened;
 		cms_cookie_t mscookie;
@@ -961,8 +962,8 @@ gcpu_mca_drain(void *ignored, const void *data, const errorq_elem_t *eqe)
 			/*
 			 * Now see if an model-specific match can be made.
 			 */
-			mscookie = cms_disp_match(gcl->gcl_gcpu->gcpu_hdl, i,
-			    gbl->gbl_status, gbl->gbl_addr, gbl->gbl_misc,
+			mscookie = cms_disp_match(gcl->gcl_gcpu->gcpu_hdl, ismc,
+			    i, gbl->gbl_status, gbl->gbl_addr, gbl->gbl_misc,
 			    gcl->gcl_ms_logout);
 
 			/*
@@ -1386,6 +1387,7 @@ gcpu_mca_process(cmi_hdl_t hdl, struct regs *rp, int nerr, gcpu_data_t *gcpu,
 	 */
 	if (ismc && !(gcl->gcl_mcg_status & MCG_STATUS_RIPV))
 		disp |= CMI_ERRDISP_RIPV_INVALID;
+	gcl->ismc = ismc;
 
 	for (i = 0, gbl = &gcl->gcl_data[0]; i < nbanks; i++, gbl++) {
 		uint64_t mcistatus = gbl->gbl_status;

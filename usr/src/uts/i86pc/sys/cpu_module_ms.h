@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_CPU_MODULE_MS_H
@@ -110,8 +109,8 @@ typedef void *cms_cookie_t;
 extern uint32_t cms_error_action(cmi_hdl_t, int, int, uint64_t, uint64_t,
     uint64_t, void *);
 
-extern cms_cookie_t cms_disp_match(cmi_hdl_t, int, uint64_t, uint64_t, uint64_t,
-    void *);
+extern cms_cookie_t cms_disp_match(cmi_hdl_t, int, int, uint64_t, uint64_t,
+    uint64_t, void *);
 extern void cms_ereport_class(cmi_hdl_t, cms_cookie_t, const char **,
     const char **);
 extern nvlist_t *cms_ereport_detector(cmi_hdl_t, int, cms_cookie_t,

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -75,6 +74,7 @@ uint8_t	err_counter_index[MAX_CPU_NODES];
 
 #define	GINTEL_ERROR_MEM	0x1000
 #define	GINTEL_ERROR_QUICKPATH	0x2000
+#define	GINTEL_ERROR_UNKNOWN	0x4000
 
 #define	GINTEL_ERR_SPARE_MEM	(GINTEL_ERROR_MEM | 1)
 #define	GINTEL_ERR_MEM_UE	(GINTEL_ERROR_MEM | 2)
@@ -96,6 +96,7 @@ uint8_t	err_counter_index[MAX_CPU_NODES];
 #define	CPU_GENERATION_DONT_CARE	0
 #define	CPU_GENERATION_NEHALEM_EP	1
 
+#define	INTEL_CPU_6_ID			0x6
 #define	INTEL_NEHALEM_CPU_FAMILY_ID	0x6
 #define	INTEL_NEHALEM_CPU_MODEL_ID	0x1A
 
@@ -165,15 +166,25 @@ uint32_t
 gintel_error_action(cmi_hdl_t hdl, int ismc, int bank,
     uint64_t status, uint64_t addr, uint64_t misc, void *mslogout)
 {
-	if ((status & MSR_MC_STATUS_PCC) == 0)
-		return (gintel_error_action_return);
-	else
-		return (gintel_error_action_return & ~CMS_ERRSCOPE_POISONED);
+	uint32_t rc;
+
+	if (ismc == 0 && bank == 0 &&
+	    cmi_hdl_family(hdl) == INTEL_CPU_6_ID &&
+	    cmi_hdl_model(hdl) < INTEL_NEHALEM_CPU_MODEL_ID &&
+	    MCAX86_ERRCODE_ISBUS_INTERCONNECT(MCAX86_ERRCODE(status)) &&
+	    MCAX86_MSERRCODE(status) == 0) {
+		rc = CMS_ERRSCOPE_CURCONTEXT_OK | CMS_ERRSCOPE_CLEARED_UC;
+	} else if ((status & MSR_MC_STATUS_PCC) == 0) {
+		rc = gintel_error_action_return;
+	} else {
+		rc = gintel_error_action_return & ~CMS_ERRSCOPE_POISONED;
+	}
+	return (rc);
 }
 
 /*ARGSUSED*/
 cms_cookie_t
-gintel_disp_match(cmi_hdl_t hdl, int bank, uint64_t status,
+gintel_disp_match(cmi_hdl_t hdl, int ismc, int bank, uint64_t status,
     uint64_t addr, uint64_t misc, void *mslogout)
 {
 	cms_cookie_t rt = (cms_cookie_t)NULL;
@@ -209,6 +220,12 @@ gintel_disp_match(cmi_hdl_t hdl, int bank, uint64_t status,
 	} else if (quickpath &&
 	    MCAX86_ERRCODE_ISBUS_INTERCONNECT(MCAX86_ERRCODE(status))) {
 		rt = (cms_cookie_t)GINTEL_ERROR_QUICKPATH;
+	} else if (ismc == 0 && bank == 0 &&
+	    cmi_hdl_family(hdl) == INTEL_CPU_6_ID &&
+	    cmi_hdl_model(hdl) < INTEL_NEHALEM_CPU_MODEL_ID &&
+	    MCAX86_ERRCODE_ISBUS_INTERCONNECT(MCAX86_ERRCODE(status)) &&
+	    MCAX86_MSERRCODE(status) == 0) {
+		rt = (cms_cookie_t)GINTEL_ERROR_UNKNOWN;
 	}
 	return (rt);
 }
@@ -249,6 +266,9 @@ gintel_ereport_class(cmi_hdl_t hdl, cms_cookie_t mscookie,
 		break;
 	case GINTEL_ERR_MEM_UNKNOWN:
 		*leafclsp = "quickpath.mem_unknown";
+		break;
+	case GINTEL_ERROR_UNKNOWN:
+		*leafclsp = "unknown";
 		break;
 	}
 }
@@ -298,7 +318,8 @@ gintel_ereport_detector(cmi_hdl_t hdl, int bankno, cms_cookie_t mscookie,
 	if (mscookie) {
 		if ((nvl = fm_nvlist_create(nva)) == NULL)
 			return (NULL);
-		if ((uintptr_t)mscookie & GINTEL_ERROR_QUICKPATH) {
+		if (((uintptr_t)mscookie & GINTEL_ERROR_QUICKPATH) ||
+		    ((uintptr_t)mscookie & GINTEL_ERROR_UNKNOWN)) {
 			fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 2,
 			    "motherboard", 0,
 			    "chip", cmi_hdl_chipid(hdl));
@@ -550,7 +571,7 @@ gintel_bankctl_skipinit(cmi_hdl_t hdl, int banknum)
 		return (0);
 }
 
-cms_api_ver_t _cms_api_version = CMS_API_VERSION_1;
+cms_api_ver_t _cms_api_version = CMS_API_VERSION_2;
 
 const cms_ops_t _cms_ops = {
 	gintel_init,		/* cms_init */

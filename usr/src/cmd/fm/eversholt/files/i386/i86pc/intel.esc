@@ -194,9 +194,11 @@ CMPND_FLT_PROP_2(bus_interconnect_io, bus_interconnect_io, 10, 72h);
 
 event upset.discard@chip/core/strand;
 
+event ereport.cpu.intel.unknown@chip {within(15s)};
 prop upset.discard@chip/core/strand (0)->
     ereport.cpu.intel.external@chip/core/strand,
-    ereport.cpu.intel.unknown@chip/core/strand;
+    ereport.cpu.intel.unknown@chip/core/strand,
+    ereport.cpu.intel.unknown@chip;
 
 /* errors detected in northbridge */
 

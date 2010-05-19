@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _AUTHAMD_H
@@ -112,7 +111,7 @@ extern void authamd_bank_logout(cmi_hdl_t, int, uint64_t, uint64_t,
     uint64_t, void *);
 extern uint32_t authamd_error_action(cmi_hdl_t, int, int, uint64_t,
     uint64_t, uint64_t, void *);
-extern cms_cookie_t authamd_disp_match(cmi_hdl_t, int, uint64_t, uint64_t,
+extern cms_cookie_t authamd_disp_match(cmi_hdl_t, int, int, uint64_t, uint64_t,
     uint64_t, void *);
 extern void authamd_ereport_class(cmi_hdl_t, cms_cookie_t, const char **,
     const char **);

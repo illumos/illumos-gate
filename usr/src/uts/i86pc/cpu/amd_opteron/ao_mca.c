@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -240,7 +239,7 @@ ao_disp_match_one(const ao_error_disp_t *aed, uint64_t status, uint32_t rev,
 
 /*ARGSUSED*/
 cms_cookie_t
-ao_ms_disp_match(cmi_hdl_t hdl, int banknum, uint64_t status,
+ao_ms_disp_match(cmi_hdl_t hdl, int ismc, int banknum, uint64_t status,
     uint64_t addr, uint64_t misc, void *mslogout)
 {
 	ao_ms_data_t *ao = cms_hdl_getcmsdata(hdl);
@@ -558,7 +557,8 @@ ao_ms_error_action(cmi_hdl_t hdl, int ismc, int banknum,
 	if (retval)
 		return (retval);
 
-	aed = ao_ms_disp_match(hdl, banknum, status, addr, misc, mslogout);
+	aed = ao_ms_disp_match(hdl, ismc, banknum, status, addr, misc,
+	    mslogout);
 
 	/*
 	 * If we do not recognise the error let the cpu module apply

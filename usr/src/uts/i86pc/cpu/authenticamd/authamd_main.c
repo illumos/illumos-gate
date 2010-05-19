@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -910,7 +909,8 @@ authamd_error_action(cmi_hdl_t hdl, int ismc, int bank,
 	if (rv)
 		return (rv);
 
-	disp = authamd_disp_match(hdl, bank, status, addr, misc, mslogout);
+	disp = authamd_disp_match(hdl, ismc, bank, status, addr, misc,
+	    mslogout);
 
 	if (disp == &authamd_gart_disp) {
 		/*
@@ -934,7 +934,7 @@ authamd_error_action(cmi_hdl_t hdl, int ismc, int bank,
  */
 /*ARGSUSED*/
 cms_cookie_t
-authamd_disp_match(cmi_hdl_t hdl, int bank, uint64_t status,
+authamd_disp_match(cmi_hdl_t hdl, int ismc, int bank, uint64_t status,
     uint64_t addr, uint64_t misc, void *mslogout)
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
@@ -1120,7 +1120,7 @@ authamd_msrinject(cmi_hdl_t hdl, uint_t msr, uint64_t val)
 	return (rv);
 }
 
-cms_api_ver_t _cms_api_version = CMS_API_VERSION_1;
+cms_api_ver_t _cms_api_version = CMS_API_VERSION_2;
 
 const cms_ops_t _cms_ops = {
 	authamd_init,			/* cms_init */

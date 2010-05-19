@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_CPU_MODULE_MS_IMPL_H
@@ -45,9 +44,9 @@ typedef uint32_t cms_api_ver_t;
 	(((v) & 0xfff00000) == _CMS_API_VERSION_MAGIC)
 #define	CMS_API_VERSION_TOPRINT(v) ((v) & 0x000fffff)
 
-#define	CMS_API_VERSION_1	_CMS_API_VERSION(1)
+#define	CMS_API_VERSION_2	_CMS_API_VERSION(2)
 
-#define	CMS_API_VERSION		CMS_API_VERSION_1
+#define	CMS_API_VERSION		CMS_API_VERSION_2
 
 typedef struct cms_ops {
 	int (*cms_init)(cmi_hdl_t, void **);
@@ -65,7 +64,7 @@ typedef struct cms_ops {
 	    uint64_t, uint64_t, void *);
 	uint32_t (*cms_error_action)(cmi_hdl_t, int, int, uint64_t,
 	    uint64_t, uint64_t, void *);
-	cms_cookie_t (*cms_disp_match)(cmi_hdl_t, int, uint64_t, uint64_t,
+	cms_cookie_t (*cms_disp_match)(cmi_hdl_t, int, int, uint64_t, uint64_t,
 	    uint64_t, void *);
 	void (*cms_ereport_class)(cmi_hdl_t, cms_cookie_t, const char **,
 	    const char **);

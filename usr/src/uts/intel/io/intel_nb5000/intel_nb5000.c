@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1088,7 +1087,7 @@ intel_pex_5400_err(uint32_t pex_fat, uint32_t pex_nf_cor)
 	return (rt);
 }
 
-static void
+static int
 log_pex_err(uint64_t ferr, nb_regs_t *rp, int willpanic, int *interpose)
 {
 	uint8_t pex = (uint8_t)-1;
@@ -1105,6 +1104,11 @@ log_pex_err(uint64_t ferr, nb_regs_t *rp, int willpanic, int *interpose)
 	*interpose |= t;
 	rp->nb.pex_regs.pex_nf_corr_nerr = PEX_NF_NERR_RD(pex, &t);
 	*interpose |= t;
+	if (rp->nb.pex_regs.pex_fat_ferr == 0 &&
+	    rp->nb.pex_regs.pex_fat_nerr == 0 &&
+	    rp->nb.pex_regs.pex_nf_corr_ferr == 0 &&
+	    rp->nb.pex_regs.pex_nf_corr_nerr == 0)
+		return (0);
 	rp->nb.pex_regs.uncerrsev = UNCERRSEV_RD(pex);
 	rp->nb.pex_regs.rperrsts = RPERRSTS_RD(pex);
 	rp->nb.pex_regs.rperrsid = RPERRSID_RD(pex);
@@ -1132,6 +1136,7 @@ log_pex_err(uint64_t ferr, nb_regs_t *rp, int willpanic, int *interpose)
 		if (*interpose)
 			PEXDEVSTS_WR(pex, 0);
 	}
+	return (1);
 }
 
 static void
@@ -1332,8 +1337,9 @@ log_ferr(uint64_t ferr, uint32_t *nerrp, nb_logout_t *log, int willpanic)
 
 	log->acl_timestamp = gethrtime_waitfree();
 	if ((ferr & (GE_PCIEX_FATAL | GE_PCIEX_NF)) != 0) {
-		log_pex_err(ferr, rp, willpanic, &interpose);
 		*nerrp = nerr & ~(GE_PCIEX_FATAL | GE_PCIEX_NF);
+		if (log_pex_err(ferr, rp, willpanic, &interpose) == 0)
+			return;
 	} else if ((ferr & GE_FBD_FATAL) != 0) {
 		log_fat_fbd_err(rp, willpanic, &interpose);
 		*nerrp = nerr & ~GE_NERR_FBD_FATAL;
@@ -1378,8 +1384,9 @@ log_nerr(uint32_t *errp, nb_logout_t *log, int willpanic)
 	err = *errp;
 	log->acl_timestamp = gethrtime_waitfree();
 	if ((err & (GE_PCIEX_FATAL | GE_PCIEX_NF)) != 0) {
-		log_pex_err(err, rp, willpanic, &interpose);
 		*errp = err & ~(GE_PCIEX_FATAL | GE_PCIEX_NF);
+		if (log_pex_err(err, rp, willpanic, &interpose) == 0)
+			return;
 	} else if ((err & GE_NERR_FBD_FATAL) != 0) {
 		log_fat_fbd_err(rp, willpanic, &interpose);
 		*errp = err & ~GE_NERR_FBD_FATAL;

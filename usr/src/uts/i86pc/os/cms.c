@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -586,13 +585,13 @@ cms_error_action(cmi_hdl_t hdl, int ismc, int banknum, uint64_t status,
 }
 
 cms_cookie_t
-cms_disp_match(cmi_hdl_t hdl, int banknum, uint64_t status, uint64_t addr,
-    uint64_t misc, void *mslogout)
+cms_disp_match(cmi_hdl_t hdl, int ismc, int banknum, uint64_t status,
+    uint64_t addr, uint64_t misc, void *mslogout)
 {
 	cms_t *cms = HDL2CMS(hdl);
 
 	if (CMS_OP_PRESENT(cms, cms_disp_match))
-		return (CMS_OPS(cms)->cms_disp_match(hdl, banknum,
+		return (CMS_OPS(cms)->cms_disp_match(hdl, ismc, banknum,
 		    status, addr, misc, mslogout));
 	else
 		return (NULL);
