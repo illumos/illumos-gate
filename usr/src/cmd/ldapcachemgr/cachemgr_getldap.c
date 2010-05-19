@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -527,7 +526,8 @@ getldap_get_rootDSE(void *arg)
 	int		exitrc = NS_LDAP_SUCCESS;
 	pid_t		ppid;
 	int		server_found = 0;
-
+	char		errmsg[MAXERROR];
+	ns_ldap_return_code	rc;
 	ns_ldap_error_t *error = NULL;
 
 	if (current_admin.debug_level >= DBG_ALL) {
@@ -574,14 +574,21 @@ getldap_get_rootDSE(void *arg)
 	 * in the field with broken configuration (invalid credentials) and we
 	 * don't want them to be disturbed.
 	 */
-	if (__ns_ldap_getRootDSE(serverInfo->sinfo[1].addr,
+	if (rc = __ns_ldap_getRootDSE(serverInfo->sinfo[1].addr,
 	    &rootDSE,
 	    &error,
 	    SA_ALLOW_FALLBACK) != NS_LDAP_SUCCESS) {
 		(void) mutex_lock(&serverInfo->mutex[1]);
 		serverInfo->sinfo[1].server_status = INFO_SERVER_ERROR;
 		serverInfo->sinfo[1].info_status = INFO_STATUS_ERROR;
-		serverInfo->sinfo[1].errormsg =	strdup(error->message);
+		if (error && error->message) {
+			serverInfo->sinfo[1].errormsg = strdup(error->message);
+		} else {
+			(void) snprintf(errmsg, sizeof (errmsg), "%s %s "
+			    "(rc = %d)", gettext("Can not get the root DSE from"
+			    " server"), serverInfo->sinfo[1].addr, rc);
+			serverInfo->sinfo[1].errormsg = strdup(errmsg);
+		}
 
 		if (error != NULL) {
 			(void) __ns_ldap_freeError(&error);
