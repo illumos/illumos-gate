@@ -5234,7 +5234,7 @@ uint8_t id, int select)
 {
 	hda_codec_t		*codec;
 	audiohd_path_t		*path;
-	audiohd_widget_t	*widget, *sumwgt;
+	audiohd_widget_t	*widget, *sumwgt = NULL;
 	audiohd_pin_t		*pin;
 	int			i, j;
 	wid_t			wid;
@@ -5242,22 +5242,26 @@ uint8_t id, int select)
 	codec = statep->codec[index];
 	if (codec == NULL)
 		return;
+
 	for (i = 0; i < statep->pathnum; i++) {
 		path = statep->path[i];
 		if (path->codec != codec || path->path_type != RECORD)
 			continue;
 		sumwgt = codec->widget[path->sum_wid];
-		if (path && sumwgt &&
-		    (sumwgt->type == WTYPE_AUDIO_SEL)) {
-			for (j = 0; j < path->pin_nums; j++) {
-				wid = path->pin_wid[j];
-				widget = codec->widget[wid];
-				if (widget == NULL)
-					return;
-				pin = (audiohd_pin_t *)widget->priv;
-				if (select &&
-				    pin->device == DTYPE_MIC_IN &&
-				    pin->wid == id &&
+
+		for (j = 0; j < path->pin_nums; j++) {
+			wid = path->pin_wid[j];
+			widget = codec->widget[wid];
+			pin = (audiohd_pin_t *)widget->priv;
+
+			if (pin->device != DTYPE_MIC_IN)
+				continue;
+
+			if (sumwgt != NULL &&
+			    sumwgt->type == WTYPE_AUDIO_SEL) {
+				/* Have a selector to choose input pin */
+
+				if (select && pin->wid == id &&
 				    (((pin->config >>
 				    AUDIOHD_PIN_CONTP_OFF) &
 				    AUDIOHD_PIN_CONTP_MASK) ==
@@ -5271,13 +5275,11 @@ uint8_t id, int select)
 					statep->port[PORT_ADC]->index =
 					    path->tag;
 					return;
-				} else if (!select &&
-				    pin->device == DTYPE_MIC_IN &&
-				    pin->wid == id &&
+				} else if (!select && pin->wid != id &&
 				    (((pin->config >>
 				    AUDIOHD_PIN_CONTP_OFF) &
 				    AUDIOHD_PIN_CONTP_MASK) ==
-				    AUDIOHD_PIN_CON_JACK)) {
+				    AUDIOHD_PIN_CON_FIXED)) {
 					(void) audioha_codec_verb_get(
 					    statep,
 					    index,
@@ -5288,12 +5290,44 @@ uint8_t id, int select)
 					    path->tag;
 					return;
 				}
+			} else {
+				/*
+				 * No selector widget in the path,
+				 * mute unselected input pin
+				 */
+
+				/* Open all input pin, and then mute others */
+				audiohd_set_pin_volume(statep, DTYPE_MIC_IN);
+
+				if (select == 1) {
+					/* Select external mic, mute internal */
+					if (wid != id) {
+						(void)
+						    audioha_codec_4bit_verb_get(
+						    statep, path->codec->index,
+						    wid,
+						    AUDIOHDC_VERB_SET_AMP_MUTE,
+						    path->mute_dir |
+						    AUDIOHDC_AMP_SET_LNR |
+						    AUDIOHDC_AMP_SET_MUTE);
+					}
+				} else {
+					/* Select internal mic, mute external */
+					if (wid == id) {
+						(void)
+						    audioha_codec_4bit_verb_get(
+						    statep, path->codec->index,
+						    wid,
+						    AUDIOHDC_VERB_SET_AMP_MUTE,
+						    path->mute_dir |
+						    AUDIOHDC_AMP_SET_LNR |
+						    AUDIOHDC_AMP_SET_MUTE);
+					}
+				}
 			}
-			if (path == NULL)
-				break;
-			sumwgt = codec->widget[path->sum_wid];
 		}
 	}
+
 	/*
 	 * If the input istream > 1, we should set the record stream tag
 	 * respectively. All the input streams sharing one tag may make the
