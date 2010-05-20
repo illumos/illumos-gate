@@ -27,8 +27,6 @@
 ../closed/uts/intel/adpu320
 ../closed/uts/intel/io/lsimega
 ../closed/uts/intel/lsimega
-../closed/uts/intel/spwr
-../closed/uts/intel/io/spwr
 common/net/wanboot
 lib/libwanboot
 lib/libwanbootutil

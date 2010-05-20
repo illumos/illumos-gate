@@ -20,8 +20,7 @@
 #
 # uts/intel/Makefile
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #	This makefile drives the production of all implementation architecture
 #	independent modules for Intel processors.
@@ -39,10 +38,9 @@ LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
 
 # EXPORT DELETE START
 $(CLOSED_BUILD)LINT_LIBS	+= $(SVVS_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-$(CLOSED_BUILD)LINT_CLOSED_XMOD5	= $(CLOSED_XMODS:bnx=)
-$(CLOSED_BUILD)LINT_CLOSED_XMOD4	= $(LINT_CLOSED_XMOD5:bnxe=)
-$(CLOSED_BUILD)LINT_CLOSED_XMOD3	= $(LINT_CLOSED_XMOD4:lsimega=)
-$(CLOSED_BUILD)LINT_CLOSED_XMOD2	= $(LINT_CLOSED_XMOD3:spwr=)
+$(CLOSED_BUILD)LINT_CLOSED_XMOD4	= $(CLOSED_XMODS:bnx=)
+$(CLOSED_BUILD)LINT_CLOSED_XMOD3	= $(LINT_CLOSED_XMOD4:bnxe=)
+$(CLOSED_BUILD)LINT_CLOSED_XMOD2	= $(LINT_CLOSED_XMOD3:lsimega=)
 $(CLOSED_BUILD)LINT_CLOSED_XMOD1	= $(LINT_CLOSED_XMOD2:adpu320=)
 $(CLOSED_BUILD)LINT_LIBS	+= $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 

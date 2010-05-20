@@ -745,7 +745,6 @@ XMOD_PKGS= \
 	SUNWibsdpib \
 	SUNWkdc \
 	SUNWlsimega \
-	SUNWspwr \
 	SUNWsvvs \
 	SUNWwbint \
 	SUNWwbsup

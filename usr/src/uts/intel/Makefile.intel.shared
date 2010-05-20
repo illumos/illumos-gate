@@ -699,8 +699,7 @@ $(CLOSED_BUILD)CLOSED_XMODS =		\
 	bnx		\
 	bnxe		\
 	lsimega		\
-	sdpib		\
-	spwr
+	sdpib
 
 
 #
