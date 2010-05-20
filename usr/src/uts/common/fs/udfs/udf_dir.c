@@ -1323,7 +1323,7 @@ ud_diraddentry(struct ud_inode *tdp, char *namep,
 	fid->fid_icb.lad_ext_prn = SWAP_16(sip->i_icb_prn);
 	fid->fid_iulen = 0;
 
-	temp = udf_vfsp->udf_lbsize - F_LEN;
+	temp = MIN(udf_vfsp->udf_lbsize - F_LEN, MAXNAMELEN);
 	if ((error = ud_compress(namelen, &temp,
 	    (uint8_t *)namep, fid->fid_spec)) == 0) {
 		fid->fid_idlen = (uint8_t)temp;
