@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-#ifndef	_INLINE_H
-#define	_INLINE_H
+#ifndef	_INLINE_GEN_H
+#define	_INLINE_GEN_H
 
 #include	<sys/types.h>
 #include	<sys/mman.h>
+#include	<rtld.h>
 
 inline static mmapobj_result_t *
 find_segment(caddr_t roffset, Rt_map *lmp)
@@ -49,4 +49,4 @@ find_segment(caddr_t roffset, Rt_map *lmp)
 	return (NULL);
 }
 
-#endif	/* _INLINE_H */
+#endif	/* _INLINE_GEN_H */

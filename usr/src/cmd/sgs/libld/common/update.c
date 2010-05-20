@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1315,13 +1314,18 @@ update_osym(Ofl_desc *ofl)
 				 * Flag that the symbol has a direct association
 				 * with the external reference (this is an old
 				 * tagging, that has no real effect by itself).
-				 * And flag whether this reference is lazy
-				 * loadable.
 				 */
 				syminfo[ndx].si_flags |= SYMINFO_FLG_DIRECT;
+
+				/*
+				 * Flag any lazy or deferred reference.
+				 */
 				if (sdp->sd_flags & FLG_SY_LAZYLD)
 					syminfo[ndx].si_flags |=
 					    SYMINFO_FLG_LAZYLOAD;
+				if (sdp->sd_flags & FLG_SY_DEFERRED)
+					syminfo[ndx].si_flags |=
+					    SYMINFO_FLG_DEFERRED;
 
 				/*
 				 * Enable direct symbol bindings if:
@@ -1412,6 +1416,16 @@ update_osym(Ofl_desc *ofl)
 				if (sdp->sd_flags & FLG_SY_INTPOSE) {
 					syminfo[ndx].si_flags |=
 					    SYMINFO_FLG_INTERPOSE;
+				}
+
+				/*
+				 * Indicate that this symbol is deferred, and
+				 * hence should not be bound to during BIND_NOW
+				 * relocations.
+				 */
+				if (sdp->sd_flags & FLG_SY_DEFERRED) {
+					syminfo[ndx].si_flags |=
+					    SYMINFO_FLG_DEFERRED;
 				}
 
 				/*
@@ -2097,13 +2111,15 @@ update_odynamic(Ofl_desc *ofl)
 		/*
 		 * Create and set up the DT_POSFLAG_1 entry here if required.
 		 */
-		if ((ifl->ifl_flags & (FLG_IF_LAZYLD|FLG_IF_GRPPRM)) &&
-		    (ifl->ifl_flags & (FLG_IF_NEEDED)) && not_relobj) {
+		if ((ifl->ifl_flags & MSK_IF_POSFLAG1) &&
+		    (ifl->ifl_flags & FLG_IF_NEEDED) && not_relobj) {
 			dyn->d_tag = DT_POSFLAG_1;
 			if (ifl->ifl_flags & FLG_IF_LAZYLD)
 				dyn->d_un.d_val = DF_P1_LAZYLOAD;
 			if (ifl->ifl_flags & FLG_IF_GRPPRM)
 				dyn->d_un.d_val |= DF_P1_GROUPPERM;
+			if (ifl->ifl_flags & FLG_IF_DEFERRED)
+				dyn->d_un.d_val |= DF_P1_DEFERRED;
 			dyn++;
 		}
 

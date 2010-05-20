@@ -2203,13 +2203,14 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 		} else if (dyn->d_tag == DT_SUNW_RTLDINF) {
 			/*
-			 * If a library has the SUNW_RTLDINF .dynamic entry
-			 * then we must not permit lazyloading of this library.
-			 * This is because critical startup information (TLS
-			 * routines) are provided as part of these interfaces
-			 * and we must have them as part of process startup.
+			 * If this dependency has the DT_SUNW_RTLDINF .dynamic
+			 * entry, then ensure no specialized dependency
+			 * processing is in effect.  This tag identifies libc,
+			 * which provides critical startup information (TLS
+			 * routines, threads initialization, etc.) that must
+			 * be exercised as part of process initialization.
 			 */
-			ifl->ifl_flags &= ~FLG_IF_LAZYLD;
+			ifl->ifl_flags &= ~MSK_IF_POSFLAG1;
 		}
 	}
 
@@ -3279,8 +3280,9 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				ifl->ifl_soname = soname;
 
 			/*
-			 * If direct bindings, lazy loading, or group
-			 * permissions need to be established, mark this object.
+			 * If direct bindings, lazy loading, group permissions,
+			 * or deferred dependencies need to be established, mark
+			 * this object.
 			 */
 			if (ofl->ofl_flags1 & FLG_OF1_ZDIRECT)
 				ifl->ifl_flags |= FLG_IF_DIRECT;
@@ -3288,14 +3290,16 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				ifl->ifl_flags |= FLG_IF_LAZYLD;
 			if (ofl->ofl_flags1 & FLG_OF1_GRPPRM)
 				ifl->ifl_flags |= FLG_IF_GRPPRM;
+			if (ofl->ofl_flags1 & FLG_OF1_DEFERRED)
+				ifl->ifl_flags |=
+				    (FLG_IF_LAZYLD | FLG_IF_DEFERRED);
+
 			error = process_elf(ifl, elf, ofl);
 
 			/*
-			 * At this point we know if this file will be
-			 * lazyloaded, or whether bindings to it must be direct.
-			 * In either case, a syminfo section is required.
+			 * Determine whether this dependency requires a syminfo.
 			 */
-			if (ifl->ifl_flags & (FLG_IF_LAZYLD | FLG_IF_DIRECT))
+			if (ifl->ifl_flags & MSK_IF_SYMINFO)
 				ofl->ofl_flags |= FLG_OF_SYMINFO;
 
 			break;

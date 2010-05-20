@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<string.h>
@@ -203,11 +202,14 @@ conv_dl_info(int request)
 		MSG_RTLD_DI_SETSIGNAL,	/* MSG_ORIG(MSG_RTLD_DI_SETSIGNAL) */
 		MSG_RTLD_DI_ARGSINFO,	/* MSG_ORIG(MSG_RTLD_DI_ARGSINFO) */
 		MSG_RTLD_DI_MMAPS,	/* MSG_ORIG(MSG_RTLD_DI_MMAPS) */
-		MSG_RTLD_DI_MMAPCNT	/* MSG_ORIG(MSG_RTLD_DI_MMAPCNT) */
+		MSG_RTLD_DI_MMAPCNT,	/* MSG_ORIG(MSG_RTLD_DI_MMAPCNT) */
+		MSG_RTLD_DI_DEFERRED,	/* MSG_ORIG(MSG_RTLD_DI_DEFERRED) */
+		MSG_RTLD_DI_DEFERRED_SYM
+					/* MSG_ORIG(MSG_RTLD_DI_DEFERRED_SYM) */
 	};
 	static Conv_inv_buf_t	inv_buf;
 
-#if	(RTLD_DI_MAX != RTLD_DI_MMAPCNT)
+#if	(RTLD_DI_MAX != RTLD_DI_DEFERRED_SYM)
 #error	"RTLD_DI_MAX has grown"
 #endif
 	if (request && (request <= RTLD_DI_MAX))

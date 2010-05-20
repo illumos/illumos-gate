@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -42,7 +41,8 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
-#include	"_inline.h"
+#include	"_inline_gen.h"
+#include	"_inline_reloc.h"
 #include	"msg.h"
 
 extern void	elf_rtbndr(Rt_map *, ulong_t, caddr_t);
@@ -385,6 +385,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 	uchar_t		rtype;
 	long		reladd, value, pvalue;
 	Sym		*symref, *psymref, *symdef, *psymdef;
+	Syminfo		*sip;
 	char		*name, *pname;
 	Rt_map		*_lmp, *plmp;
 	int		ret = 1, noplt = 0;
@@ -419,7 +420,6 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 	 */
 	if ((pltbgn = (ulong_t)JMPREL(lmp)) != 0)
 		pltend = pltbgn + (ulong_t)(PLTRELSZ(lmp));
-
 
 	relsiz = (ulong_t)(RELENT(lmp));
 	basebgn = ADDR(lmp);
@@ -509,6 +509,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 	    (FLAGS(lmp) & FLG_RT_FIXED))
 		noplt = 1;
 
+	sip = SYMINFO(lmp);
 	/*
 	 * Loop through relocations.
 	 */
@@ -527,11 +528,12 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 		    ((FLAGS(lmp) & FLG_RT_FIXED) == 0) && (DBG_ENABLED == 0)) {
 			if (relacount) {
 				relbgn = elf_reloc_relative_count(relbgn,
-				    relacount, relsiz, basebgn, lmp, textrel);
+				    relacount, relsiz, basebgn, lmp,
+				    textrel, 0);
 				relacount = 0;
 			} else {
 				relbgn = elf_reloc_relative(relbgn, relend,
-				    relsiz, basebgn, lmp, textrel);
+				    relsiz, basebgn, lmp, textrel, 0);
 			}
 			if (relbgn >= relend)
 				break;
@@ -552,26 +554,9 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 			if (plthint && (plt == 0) &&
 			    (rtype == R_AMD64_JUMP_SLOT) &&
 			    ((MODE(lmp) & RTLD_NOW) == 0)) {
-				/*
-				 * The PLT relocations (for lazy bindings)
-				 * are additive to what's already in the GOT.
-				 * This differs to what happens in
-				 * elf_reloc_relacount() and that's why we
-				 * just do it inline here.
-				 */
-				for (roffset = ((Rela *)relbgn)->r_offset;
-				    plthint; plthint--) {
-					roffset += basebgn;
-
-					/*
-					 * Perform the actual relocation.
-					 */
-					*((ulong_t *)roffset) += basebgn;
-
-					relbgn += relsiz;
-					roffset = ((Rela *)relbgn)->r_offset;
-
-				}
+				relbgn = elf_reloc_relative_count(relbgn,
+				    plthint, relsiz, basebgn, lmp, textrel, 1);
+				plthint = 0;
 				continue;
 			}
 			roffset += basebgn;
@@ -618,6 +603,14 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 		 * address.
 		 */
 		if (rsymndx) {
+			/*
+			 * If a Syminfo section is provided, determine if this
+			 * symbol is deferred, and if so, skip this relocation.
+			 */
+			if (sip && is_sym_deferred((ulong_t)rel, basebgn, lmp,
+			    textrel, sip, rsymndx))
+				continue;
+
 			/*
 			 * Get the local symbol table entry.
 			 */

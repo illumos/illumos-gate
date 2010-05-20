@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 @ MSG_DT_NULL_CF		"DT_NULL"			# 0
@@ -396,6 +395,11 @@
 @ MSG_DF_P1_GROUPPERM_CF	"DF_P1_GROUPPERM"	# 0x00000002
 @ MSG_DF_P1_GROUPPERM_CFNP		"GROUPPERM"
 @ MSG_DF_P1_GROUPPERM_NF		"groupperm"
+@ MSG_DF_P1_GROUPPERM_DEF		"GROUP"
+@ MSG_DF_P1_DEFERRED_CF		"DF_P1_DEFERRED"	# 0x00000004
+@ MSG_DF_P1_DEFERRED_CFNP		"DEFERRED"
+@ MSG_DF_P1_DEFERRED_NF			"deferred"
+@ MSG_DF_P1_DEFERRED_DEF		"DEFERRED"
 
 
 @ MSG_DTF_1_PARINIT_CF		"DTF_1_PARINIT"		# 0x00000001

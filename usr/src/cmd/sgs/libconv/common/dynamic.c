@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -42,6 +41,7 @@ conv_dyn_posflag1_strings(Conv_fmt_flags_t fmt_flags)
 #define	POSSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
 	MSG_DF_P1_LAZYLOAD_CF_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 	MSG_DF_P1_GROUPPERM_CF_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+	MSG_DF_P1_DEFERRED_CF_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 	CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 	/*
@@ -62,22 +62,26 @@ conv_dyn_posflag1_strings(Conv_fmt_flags_t fmt_flags)
 
 	static const Val_desc vda_def[] = {
 		{ DF_P1_LAZYLOAD,	MSG_DF_P1_LAZYLOAD_DEF },
-		{ DF_P1_GROUPPERM,	MSG_DF_P1_GROUPPERM_CFNP },
+		{ DF_P1_GROUPPERM,	MSG_DF_P1_GROUPPERM_DEF },
+		{ DF_P1_DEFERRED,	MSG_DF_P1_DEFERRED_DEF },
 		{ 0,			0 }
 	};
 	static const Val_desc vda_cf[] = {
 		{ DF_P1_LAZYLOAD,	MSG_DF_P1_LAZYLOAD_CF },
 		{ DF_P1_GROUPPERM,	MSG_DF_P1_GROUPPERM_CF },
+		{ DF_P1_DEFERRED,	MSG_DF_P1_DEFERRED_CF },
 		{ 0,			0 }
 	};
 	static const Val_desc vda_cfnp[] = {
 		{ DF_P1_LAZYLOAD,	MSG_DF_P1_LAZYLOAD_CFNP },
 		{ DF_P1_GROUPPERM,	MSG_DF_P1_GROUPPERM_CFNP },
+		{ DF_P1_DEFERRED,	MSG_DF_P1_DEFERRED_CFNP },
 		{ 0,			0 }
 	};
 	static const Val_desc vda_nf[] = {
 		{ DF_P1_LAZYLOAD,	MSG_DF_P1_LAZYLOAD_NF },
 		{ DF_P1_GROUPPERM,	MSG_DF_P1_GROUPPERM_NF },
+		{ DF_P1_DEFERRED,	MSG_DF_P1_DEFERRED_NF },
 		{ 0,			0 }
 	};
 

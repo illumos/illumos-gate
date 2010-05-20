@@ -20,15 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Update any dynamic entry offsets.  One issue with dynamic entries is that
  * you only know whether they refer to a value or an offset if you know each
  * type.  Thus we check for all types we know about, it a type is found that
  * we don't know about then return and error as we have no idea what to do.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<libelf.h>
 #include	<link.h>
@@ -59,30 +57,31 @@ update_dynamic(Cache *cache, Cache *_cache, Rt_map *lmp, int flags,
 	 * Loop through the dynamic table updating all offsets.
 	 */
 	while (dyn->d_tag != DT_NULL) {
+		Rt_map	*dlmp;
+
 		switch ((Xword)dyn->d_tag) {
 		case DT_NEEDED:
-			if (posdyn) {
-				Rt_map	*dlmp;
+			if (posdyn == 0)
+				break;
 
-				/*
-				 * Determine whether this dependency has been
-				 * loaded (this is the most generic way to check
-				 * any alias names), and if it has been bound
-				 * to, undo any lazy-loading position flag.
-				 */
-				if (dlmp = is_so_loaded(LIST(lmp),
-				    (strs + dyn->d_un.d_val), NULL)) {
-					Bnd_desc	*bdp;
-					Aliste		idx;
+			/*
+			 * Determine whether this dependency has been loaded
+			 * (this is the most generic way to check any alias
+			 * names), and if it has been bound to, undo any
+			 * lazy-loading or deferred position flag.
+			 */
+			if (dlmp = is_so_loaded(LIST(lmp),
+			    (strs + dyn->d_un.d_val), NULL)) {
+				Bnd_desc	*bdp;
+				Aliste		idx;
 
-					for (APLIST_TRAVERSE(DEPENDS(lmp), idx,
-					    bdp)) {
-						if (dlmp == bdp->b_depend) {
-							posdyn->d_un.d_val &=
-							    ~DF_P1_LAZYLOAD;
-							break;
-						}
-					}
+				for (APLIST_TRAVERSE(DEPENDS(lmp), idx, bdp)) {
+					if (dlmp != bdp->b_depend)
+						continue;
+
+					posdyn->d_un.d_val &=
+					    ~(DF_P1_LAZYLOAD | DF_P1_DEFERRED);
+					break;
 				}
 			}
 			break;

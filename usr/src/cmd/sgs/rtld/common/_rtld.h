@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	__RTLD_H
 #define	__RTLD_H
@@ -270,7 +269,7 @@ struct fdesc {
 #define	RT_FL_THREADS	0x00000001	/* threads are enabled */
 #define	RT_FL_WARNFLTR	0x00000002	/* warn of missing filtees (ldd) */
 #define	RT_FL_DBNOTIF	0x00000004	/* binding activity going on */
-
+#define	RT_FL_DEFERRED	0x00000008	/* load deferred dependencies (ldd) */
 #define	RT_FL_NOBIND	0x00000010	/* don't carry out plt binding */
 #define	RT_FL_NOVERSION	0x00000020	/* disable version checking */
 #define	RT_FL_SECURE	0x00000040	/* setuid/segid flag */

@@ -150,6 +150,8 @@ SUNWprivate_4.79 {
 		Dbg64_file_config_dis;
 		Dbg32_file_config_obj;
 		Dbg64_file_config_obj;
+		Dbg32_file_deferred;
+		Dbg64_file_deferred;
 		Dbg32_file_del_rescan;
 		Dbg64_file_del_rescan;
 		Dbg32_file_delete;

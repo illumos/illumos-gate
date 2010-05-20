@@ -29,7 +29,7 @@
  * Print the list of shared objects required by a dynamic executable or shared
  * object.
  *
- * usage is: ldd [-d | -r] [-c] [-e envar] [-i] [-f] [-L] [-l] [-p] [-s]
+ * usage is: ldd [-d | -r] [-D] [-c] [-e envar] [-i] [-f] [-L] [-l] [-p] [-s]
  *		[-U | -u] [-v] [-w] file(s)
  *
  * ldd opens the file and verifies the information in the elf header.
@@ -53,6 +53,12 @@
  *
  * If -c is specified we also set LD_NOCONFIG=1, thus disabling any
  * configuration file use.
+ *
+ * If -D is specified we skip deferred dependency processing.  By default,
+ * ldd loads all deferred dependencies.  However, during normal process
+ * execution, deferred dependencies are only loaded when an explicit binding
+ * to an individual deferred reference is made.  As no user code is executed
+ * under ldd, explicit references to deferred symbols can't be triggered.
  *
  * If -e is specified the associated environment variable is set for the
  * child process that will produce ldd's diagnostics.
@@ -80,7 +86,7 @@
  *
  * If -v is specified we also set LD_VERBOSE=1, thus enabling the runtime
  * linker to indicate all object dependencies (not just the first object
- * loaded) together with any versionig requirements.
+ * loaded) together with any versioning requirements.
  *
  * If -U or -u is specified unused dependencies are detected.  -u causes
  * LD_UNUSED=1 to be set, which causes dependencies that are unused within the
@@ -141,7 +147,8 @@ static char	bind[] =	"LD_BIND_NOW= ",
 		uref[] =	"LD_UNREF= ",
 		used[] =	"LD_UNUSED= ",
 		weak[] =	"LD_NOUNRESWEAK= ",
-		nope[] =	"LD_NOPAREXT= ";
+		nope[] =	"LD_NOPAREXT= ",
+		defr[] =	"LD_DEFERRED= ";
 static char	*load;
 
 static const char	*prefile_32, *prefile_64, *prefile;
@@ -155,8 +162,8 @@ main(int argc, char **argv, char **envp)
 	Elf	*elf;
 	int	cflag = 0, dflag = 0, fflag = 0, iflag = 0, Lflag = 0;
 	int	lflag = 0, rflag = 0, sflag = 0, Uflag = 0, uflag = 0;
-	int	pflag = 0, vflag = 0, wflag = 0, nfile, var, error = 0;
-
+	int	Dflag = 0, pflag = 0, vflag = 0, wflag = 0;
+	int	nfile, var, error = 0;
 	Aliste	idx;
 
 	/*
@@ -184,6 +191,9 @@ main(int argc, char **argv, char **envp)
 		switch (var) {
 		case 'c' :			/* enable config search */
 			cflag = 1;
+			break;
+		case 'D' :			/* skip deferred dependencies */
+			Dflag = 1;
 			break;
 		case 'd' :			/* perform data relocations */
 			dflag = 1;
@@ -313,6 +323,7 @@ main(int argc, char **argv, char **envp)
 	used[sizeof (used) - 2] = (uflag) ? '1' : '\0';
 	weak[sizeof (weak) - 2] = (wflag) ? '1' : '\0';
 	nope[sizeof (nope) - 2] = (pflag) ? '1' : '\0';
+	defr[sizeof (defr) - 2] = (Dflag) ? '\0' : '1';
 
 	/*
 	 * coordinate libelf's version information
@@ -722,7 +733,7 @@ run(int nfile, char *cname, char *fname, const char *ename, int class)
 		    (putenv(init) != 0) || (putenv(lazy) != 0) ||
 		    (putenv(uref) != 0) || (putenv(used) != 0) ||
 		    (putenv(weak) != 0) || (putenv(load) != 0) ||
-		    (putenv(nope) != 0)) {
+		    (putenv(nope) != 0) || (putenv(defr) != 0)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ENV_FAILED), cname);
 			exit(1);
 		}

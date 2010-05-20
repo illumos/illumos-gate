@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -37,7 +36,7 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
-#include	"_inline.h"
+#include	"_inline_gen.h"
 #include	"msg.h"
 
 /*

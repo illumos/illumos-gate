@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -42,7 +41,8 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
-#include	"_inline.h"
+#include	"_inline_gen.h"
+#include	"_inline_reloc.h"
 #include	"msg.h"
 
 extern void	iflush_range(caddr_t, size_t);
@@ -740,10 +740,11 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 	ulong_t		relbgn, relend, relsiz, basebgn, pltbgn, pltend;
 	ulong_t		pltndx, roffset, rsymndx, psymndx = 0;
 	uint_t		dsymndx, binfo, pbinfo;
-	Byte		rtype;
+	uchar_t		rtype;
 	long		reladd;
 	Addr		value, pvalue;
 	Sym		*symref, *psymref, *symdef, *psymdef;
+	Syminfo		*sip;
 	char		*name, *pname;
 	Rt_map		*_lmp, *plmp;
 	int		ret = 1, noplt = 0;
@@ -864,6 +865,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 	if (pltbgn && ((MODE(lmp) & RTLD_NOW) == 0))
 		noplt = 1;
 
+	sip = SYMINFO(lmp);
 	/*
 	 * Loop through relocations.
 	 */
@@ -872,7 +874,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 		uint_t			sb_flags = 0;
 		Addr			vaddr;
 
-		rtype = (Byte)ELF_R_TYPE(((Rela *)relbgn)->r_info, M_MACH);
+		rtype = ELF_R_TYPE(((Rela *)relbgn)->r_info, M_MACH);
 
 		/*
 		 * If this is a RELATIVE relocation in a shared object
@@ -885,23 +887,22 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 		    ((FLAGS(lmp) & FLG_RT_FIXED) == 0) && (DBG_ENABLED == 0)) {
 			if (relacount) {
 				relbgn = elf_reloc_relative_count(relbgn,
-				    relacount, relsiz, basebgn, lmp, textrel);
+				    relacount, relsiz, basebgn, lmp,
+				    textrel, 0);
 				relacount = 0;
 			} else {
 				relbgn = elf_reloc_relative(relbgn, relend,
-				    relsiz, basebgn, lmp, textrel);
+				    relsiz, basebgn, lmp, textrel, 0);
 			}
 			if (relbgn >= relend)
 				break;
-			rtype = (Byte)ELF_R_TYPE(((Rela *)relbgn)->r_info,
-			    M_MACH);
+			rtype = ELF_R_TYPE(((Rela *)relbgn)->r_info, M_MACH);
 		}
 
 		roffset = ((Rela *)relbgn)->r_offset;
 
 		reladd = (long)(((Rela *)relbgn)->r_addend);
 		rsymndx = ELF_R_SYM(((Rela *)relbgn)->r_info);
-
 		rel = (Rela *)relbgn;
 		relbgn += relsiz;
 
@@ -961,6 +962,14 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 		 * address.
 		 */
 		if (rsymndx) {
+			/*
+			 * If a Syminfo section is provided, determine if this
+			 * symbol is deferred, and if so, skip this relocation.
+			 */
+			if (sip && is_sym_deferred((ulong_t)rel, basebgn, lmp,
+			    textrel, sip, rsymndx))
+				continue;
+
 			/*
 			 * Get the local symbol table entry.
 			 */

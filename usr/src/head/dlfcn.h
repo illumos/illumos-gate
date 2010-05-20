@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  *	Copyright (c) 1989 AT&T
  *	  All Rights Reserved
@@ -101,6 +100,11 @@ typedef struct {
 					/*  by unwind block */
 } Dl_amd64_unwindinfo;
 typedef	Dl_amd64_unwindinfo	Dl_amd64_unwindinfo_t;
+
+typedef	struct {
+	const char	*dld_refname;	/* reference name */
+	const char	*dld_depname;	/* new dependency name */
+} Dl_definfo_t;
 
 #endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
 
@@ -214,19 +218,24 @@ extern Dl_amd64_unwindinfo  *dlamd64getunwind();
 #define	RTLD_DI_LINKMAP		2		/* obtain link-map */
 #define	RTLD_DI_CONFIGADDR	3		/* obtain config addr */
 #define	RTLD_DI_SERINFO		4		/* obtain search path info or */
-#define	RTLD_DI_SERINFOSIZE	5		/*	associated info size */
+#define	RTLD_DI_SERINFOSIZE	5		/*    associated info size */
 #define	RTLD_DI_ORIGIN		6		/* obtain objects origin */
 #define	RTLD_DI_PROFILENAME	7		/* obtain profile object name */
-						/*	internal use only */
+						/*    internal use only */
 #define	RTLD_DI_PROFILEOUT	8		/* obtain profile output name */
-						/*	internal use only */
+						/*    internal use only */
 #define	RTLD_DI_GETSIGNAL	9		/* get termination signal */
 #define	RTLD_DI_SETSIGNAL	10		/* set termination signal */
 #define	RTLD_DI_ARGSINFO	11		/* get process arguments */
-						/*	environment and auxv */
+						/*    environment and auxv */
 #define	RTLD_DI_MMAPS		12		/* obtain objects mappings or */
-#define	RTLD_DI_MMAPCNT		13		/*	mapping count */
-#define	RTLD_DI_MAX		13
+#define	RTLD_DI_MMAPCNT		13		/*    mapping count */
+#define	RTLD_DI_DEFERRED	14		/* assign new dependency to a */
+						/*    deferred dependency */
+#define	RTLD_DI_DEFERRED_SYM	15		/* assign new dependency to a */
+						/*    deferred dependency */
+						/*    using a symbol name */
+#define	RTLD_DI_MAX		15
 
 #if !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
 /*

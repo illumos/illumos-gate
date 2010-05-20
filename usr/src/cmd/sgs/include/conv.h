@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_CONV_H
@@ -208,7 +207,7 @@ typedef union {
 } Conv_seg_flags_buf_t;
 
 /* conv_dyn_posflag1() */
-#define	CONV_DYN_POSFLAG1_BUFSIZE	57
+#define	CONV_DYN_POSFLAG1_BUFSIZE	72
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_DYN_POSFLAG1_BUFSIZE];
@@ -271,7 +270,7 @@ typedef union {
 } Conv_dwarf_ehe_buf_t;
 
 /* conv_syminfo_flags() */
-#define	CONV_SYMINFO_FLAGS_BUFSIZE	193
+#define	CONV_SYMINFO_FLAGS_BUFSIZE	230
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_SYMINFO_FLAGS_BUFSIZE];

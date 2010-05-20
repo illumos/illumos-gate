@@ -476,6 +476,7 @@ struct ofl_desc {
 #define	FLG_OF1_NOINTRP	0x0000000008	/* -z nointerp flag set */
 #define	FLG_OF1_ZDIRECT	0x0000000010	/* -z direct flag set */
 #define	FLG_OF1_NDIRECT	0x0000000020	/* no-direct bindings specified */
+#define	FLG_OF1_DEFERRED 0x0000000040	/* deferred dependency recording */
 
 #define	FLG_OF1_RELDYN	0x0000000100	/* process .dynamic in rel obj */
 #define	FLG_OF1_NRLXREL	0x0000000200	/* -z norelaxreloc flag set */
@@ -844,10 +845,8 @@ struct ifl_desc {			/* input file descriptor */
 #define	FLG_IF_IGNORE	0x00000080	/* ignore unused dependencies */
 #define	FLG_IF_NODIRECT	0x00000100	/* object contains symbols that */
 					/*	cannot be directly bound to */
-#define	FLG_IF_LAZYLD	0x00000200	/* bindings to this object should be */
-					/*	lazy loaded */
-#define	FLG_IF_GRPPRM	0x00000400	/* this dependency should have the */
-					/*	DF_P1_GROUPPERM flag set */
+#define	FLG_IF_LAZYLD	0x00000200	/* dependency should be lazy loaded */
+#define	FLG_IF_GRPPRM	0x00000400	/* dependency establishes a group */
 #define	FLG_IF_DISPPEND 0x00000800	/* displacement relocation done */
 					/*	in the ld time. */
 #define	FLG_IF_DISPDONE 0x00001000	/* displacement relocation done */
@@ -862,6 +861,18 @@ struct ifl_desc {			/* input file descriptor */
 					/*	required */
 #define	FLG_IF_OTOSCAP	0x00040000	/* convert object capabilities to */
 					/*	symbol capabilities */
+#define	FLG_IF_DEFERRED	0x00080000	/* dependency is deferred */
+
+/*
+ * Symbol states that require the generation of a DT_POSFLAG_1 .dynamic entry.
+ */
+#define	MSK_IF_POSFLAG1	(FLG_IF_LAZYLD | FLG_IF_GRPPRM | FLG_IF_DEFERRED)
+
+/*
+ * Symbol states that require an associated Syminfo entry.
+ */
+#define	MSK_IF_SYMINFO	(FLG_IF_LAZYLD | FLG_IF_DIRECT | FLG_IF_DEFERRED)
+
 
 struct is_desc {			/* input section descriptor */
 	const char	*is_name;	/* original section name */
@@ -1267,6 +1278,8 @@ struct sym_avlnode {
 #define	FLG_SY_OVERLAP	0x0080000000000	/* move entry overlap detected */
 #define	FLG_SY_CAP	0x0100000000000	/* symbol is associated with */
 					/*    capabilities */
+#define	FLG_SY_DEFERRED	0x0200000000000	/* symbol should not be bound to */
+					/*	during BIND_NOW relocations */
 
 /*
  * A symbol can only be truly hidden if it is not a capabilities symbol.

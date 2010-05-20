@@ -889,6 +889,7 @@ All the above changes are incorporated in the following patches:
 5076838 elfdump(1) is built with a CTF section (the wrong one)
 5080344 Hardware capabilities are not enforced for a.out
 5079061 RTLD_DEFAULT can be expensive
+	PSARC/2004/747 New dlsym(3c) Handle - RTLD_PROBE
 5064973 allow normal relocs against TLS symbols for some sections
 5085792 LD_XXXX_64 should override LD_XXXX
 5096272 every executable or library has a .SUNW_dof section
@@ -1284,10 +1285,18 @@ All the above changes are incorporated in the following patches:
 	Solaris/SunOS 5.10_sparc	patch T141444-06
 	Solaris/SunOS 5.10_x86		patch T141445-06
 --------------------------------------------------------------------------------
-All the above changes plus:
-	6850124 dlopen reports "No such file or directory" in spite of ENOMEM
-		when mmap fails in anon_map()
-are incorporated in the following patches:
+
+-------------------------------------
+Solaris 10 XXXX (9th Q-update - s10u9)
+-------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+6850124 dlopen reports "No such file or directory" in spite of ENOMEM
+	when mmap fails in anon_map()
+6826513 ldd gets confused by a crle(1) LD_PRELOAD setting
+6684577 ld should propagate SHF_LINK_ORDER flag to ET_REL objects
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
 	Solaris/SunOS 5.10_sparc	patch T143895-01
 	Solaris/SunOS 5.10_x86		patch T143896-01
 --------------------------------------------------------------------------------
@@ -1450,7 +1459,6 @@ Bugid   Risk Synopsis
 6724774 elfdump -n doesn't print siginfo structure
 6728555 Fix for amd64 aw (6617475) breaks pure gcc builds
 6734598 ld(1) archive processing failure due to mismatched file descriptors (D)
-6684577 ld should propagate SHF_LINK_ORDER flag to ET_REL objects
 6735939 ld(1) discarded symbol relocations errors (Studio and GNU).
 6354160 Solaris linker includes more than one copy of code in binary when
 	linking gnu object code
@@ -1501,7 +1509,6 @@ Bugid   Risk Synopsis
 	pfinstall does it again.
 6807050 GNU linkonce sections can create duplicate and incompatible
 	eh_frame FDE entries
-6826513 ldd gets confused by a crle(1) LD_PRELOAD setting
 --------------------------------------------------------------------------------
 
 --------------
@@ -1577,5 +1584,8 @@ Bugid   Risk Synopsis
 6938111 nm `No symbol table data' message goes to stdout
 6941727 ld relocation cache memory use is excessive
 6932220 ld -z allextract skips objects that lack global symbols
-6939573 ldd should provide better diagnostics for incompatible objects
-6948379 nm usage message omits several options
+6943772 Testing for a symbols existence with RTLD_PROBE is compromised by
+	RTLD_BIND_NOW
+	PSARC/2010/XXX Deferred symbol references
+6943432 dlsym(RTLD_PROBE) should only bind to symbol definitions
+6668759 an external method for determining whether an ELF dependency is optional

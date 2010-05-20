@@ -144,6 +144,9 @@
 			 sections\n"
 @ MSG_ARG_DETAIL_ZNC	"\t[-z nocompstrtab]\n\t\t\tdisable compression of \
 			 string tables\n"
+@ MSG_ARG_DETAIL_ZDEF	"\t[-z deferred | nodeferred]\n\
+			 \t\t\tenable|disable deferred identification of \
+			 shared object\n\t\t\tdependencies\n"
 @ MSG_ARG_DETAIL_ZDFS	"\t[-z defs], [--no-undefined]\n\
 			 \t\t\tdisallow undefined symbol references\n"
 @ MSG_ARG_DETAIL_ZDRS	"\t[-z direct | nodirect]\n\
@@ -231,7 +234,7 @@
 			 against text\n"
 @ MSG_ARG_DETAIL_ZWRAP	"\t[-z wrap=symbol], [-wrap=symbol], [--wrap=symbol]\n\
 			 \t\t\twrap symbol references\n"
-@ MSG_ARG_DETAIL_ZV	"\t[-z verbose]\t\
+@ MSG_ARG_DETAIL_ZVER	"\t[-z verbose]\t\
 			 generate warnings for suspicious processings\n"
 
 #
@@ -1380,6 +1383,8 @@
 @ MSG_ARG_REDUCE	"reduce"
 @ MSG_ARG_STATIC	"static"
 @ MSG_ARG_SYMBOLCAP	"symbolcap"
+@ MSG_ARG_DEFERRED	"deferred"
+@ MSG_ARG_NODEFERRED	"nodeferred"
 
 @ MSG_ARG_LCOM		"L,"
 @ MSG_ARG_PCOM		"P,"

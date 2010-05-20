@@ -31,8 +31,8 @@
 
 # Argument usage messages.
 
-@ MSG_ARG_USAGE		"usage: %s [-d | -r] [-c] [-e envar] [-f] [-i] [-L] \
-			 [-l] [-p] [-s] [-U | -u] [-v] [-w] file(s)\n"
+@ MSG_ARG_USAGE		"usage: %s [-d | -r] [-c] [-D] [-e envar] [-f] [-i] \
+			 [-L] [-l] [-p] [-s] [-U | -u] [-v] [-w] file(s)\n"
 
 # Environment messages.
 
@@ -100,7 +100,7 @@
 
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
 
-@ MSG_STR_GETOPT	"cde:fiLlprsUuvw"
+@ MSG_STR_GETOPT	"cDde:fiLlprsUuvw"
 @ MSG_STR_FMT1		"%s=./%s %s"
 @ MSG_STR_FMT2		"%s=%s %s"
 @ MSG_STR_FMT3		"%s:\n"

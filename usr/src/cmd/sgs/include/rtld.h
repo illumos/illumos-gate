@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	_RTLD_H
 #define	_RTLD_H
@@ -597,8 +596,9 @@ typedef	cond_t	Rt_cond;
  * loading and filtee processing.
  */
 typedef struct {
-	uint_t	di_flags;
-	void	*di_info;
+	uint_t		di_flags;
+	void		*di_info;
+	const char	*di_name;
 } Dyninfo;
 
 #define	FLG_DI_STDFLTR	0x00001		/* .dynamic entry for DT_FILTER */
@@ -609,14 +609,21 @@ typedef struct {
 
 #define	FLG_DI_POSFLAG1	0x00010		/* .dynamic entry for DT_POSFLAG_1 */
 #define	FLG_DI_NEEDED	0x00020		/* .dynamic entry for DT_NEEDED */
-#define	FLG_DI_LAZY	0x00100		/* lazy needed entry - preceded by */
-					/*    DF_P1_LAZYLOAD (DT_POSFLAG_1) */
-#define	FLG_DI_GROUP	0x00200		/* group needed entry - preceded by */
-					/*    DF_P1_GROUPPERM (DT_POSFLAG_1) */
+#define	FLG_DI_REGISTER	0x00040		/* .dynamic entry for DT_REGISTER */
+#define	FLG_DI_IGNORE	0x00080		/* .dynamic entry should be ignored */
 
-#define	FLG_DI_LDD_DONE	0x01000		/* entry has been processed (ldd) */
-#define	FLG_DI_LAZYFAIL	0x02000		/* the lazy loading of this entry */
+#define	FLG_DI_LAZY	0x00100		/* lazy needed entry, preceded by */
+					/*    DF_P1_LAZYLOAD (DT_POSFLAG_1) */
+#define	FLG_DI_GROUP	0x00200		/* group needed entry, preceded by */
+					/*    DF_P1_GROUPPERM (DT_POSFLAG_1) */
+#define	FLG_DI_DEFERRED	0x00400		/* deferred needed entry, preceded by */
+					/*    DF_P1_DEFERRED (DT_POSFLAG_1) */
+
+#define	FLG_DI_LAZYFAIL	0x01000		/* the lazy loading of this entry */
 					/*    failed */
+#define	FLG_DI_LDD_DONE	0x02000		/* entry has been processed (ldd) */
+#define	FLG_DI_DEF_DONE	0x04000		/* entry has been processed (dlinfo) */
+
 /*
  * Data structure to track AVL tree of pathnames.  This structure provides the
  * basis of both the "not-found" node tree, and the "full-path" node tree.  Both

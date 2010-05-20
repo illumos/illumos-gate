@@ -20,13 +20,10 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
+ *
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -45,7 +42,8 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
-#include	"_inline.h"
+#include	"_inline_gen.h"
+#include	"_inline_reloc.h"
 #include	"msg.h"
 
 /*
@@ -173,7 +171,7 @@ elf_cap_check(Fdesc *fdp, Ehdr *ehdr, Rej_desc *rej)
 	Dyn	*dyn = NULL;
 	char	*str = NULL;
 	Addr	base;
-	int	cnt;
+	uint_t	cnt, dyncnt;
 
 	/*
 	 * If this is a shared object, the base address of the shared object is
@@ -191,6 +189,7 @@ elf_cap_check(Fdesc *fdp, Ehdr *ehdr, Rej_desc *rej)
 		if (phdr->p_type == PT_DYNAMIC) {
 			/* LINTED */
 			dyn = (Dyn *)((uintptr_t)phdr->p_vaddr + base);
+			dyncnt = phdr->p_filesz / sizeof (Dyn);
 		} else if (phdr->p_type == PT_SUNWCAP) {
 			/* LINTED */
 			cap = (Cap *)((uintptr_t)phdr->p_vaddr + base);
@@ -203,14 +202,14 @@ elf_cap_check(Fdesc *fdp, Ehdr *ehdr, Rej_desc *rej)
 		 * table.  Required for CA_SUNW_MACH and CA_SUNW_PLAT
 		 * processing.
 		 */
-		while (dyn) {
+		while (dyn && dyncnt) {
 			if (dyn->d_tag == DT_NULL) {
 				break;
 			} else if (dyn->d_tag == DT_STRTAB) {
 				str = (char *)(dyn->d_un.d_ptr + base);
 				break;
 			}
-			dyn++;
+			dyn++, dyncnt--;
 		}
 	}
 
@@ -311,9 +310,10 @@ elf_verify(caddr_t addr, size_t size, Fdesc *fdp, const char *name,
  * to perform plt relocation on ld.so.1's link-map.  The first time lazy loading
  * is called we get here to perform these initializations:
  *
- *  -	elf_needed() is called to set up the DYNINFO() indexes for each lazy
- *	dependency.  Typically, for all other objects, this is called during
- *	analyze_so(), but as ld.so.1 is set-contained we skip this processing.
+ *  -	elf_needed() is called to establish any ld.so.1 dependencies.  These
+ *	dependencies should all be lazy loaded, so this routine is typically a
+ * 	no-op.  However, we call elf_needed() for completeness, in case any
+ *	NEEDED initialization is required.
  *
  *  -	For intel, ld.so.1's JMPSLOT relocations need relative updates. These
  *	are by default skipped thus delaying all relative relocation processing
@@ -328,10 +328,6 @@ elf_rtld_load()
 	if (lml->lm_flags & LML_FLG_PLTREL)
 		return (1);
 
-	/*
-	 * As we need to refer to the DYNINFO() information, insure that it has
-	 * been initialized.
-	 */
 	if (elf_needed(lml, ALIST_OFF_DATA, lmp, NULL) == 0)
 		return (0);
 
@@ -349,9 +345,8 @@ elf_rtld_load()
 	 */
 	(void) elf_reloc_relative_count((ulong_t)JMPREL(lmp),
 	    (ulong_t)(PLTRELSZ(lmp) / RELENT(lmp)), (ulong_t)RELENT(lmp),
-	    (ulong_t)ADDR(lmp), lmp, NULL);
+	    (ulong_t)ADDR(lmp), lmp, NULL, 0);
 #endif
-
 	lml->lm_flags |= LML_FLG_PLTREL;
 	return (1);
 }
@@ -371,10 +366,11 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	Aliste		lmco;
 
 	/*
-	 * If this dependency has already been processed, we're done.
+	 * If this dependency should be ignored, or has already been processed,
+	 * we're done.
 	 */
 	if (((nlmp = (Rt_map *)dip->di_info) != NULL) ||
-	    (dip->di_flags & FLG_DI_LDD_DONE))
+	    (dip->di_flags & (FLG_DI_IGNORE | FLG_DI_LDD_DONE)))
 		return (nlmp);
 
 	/*
@@ -391,7 +387,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	/*
 	 * Determine the initial dependency name.
 	 */
-	name = STRTAB(clmp) + DYN(clmp)[ndx].d_un.d_val;
+	name = dip->di_name;
 	DBG_CALL(Dbg_file_lazyload(clmp, name, sym));
 
 	/*
@@ -632,104 +628,71 @@ static int
 elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 {
 	Alist		*palp = NULL;
-	Dyn		*dyn, *pdyn;
-	ulong_t		ndx = 0;
-	uint_t		lazy, flags;
+	Dyn		*dyn;
+	Dyninfo		*dip;
 	Word		lmflags = lml->lm_flags;
-	Word		lmtflags = lml->lm_tflags;
 
 	/*
-	 * Process each shared object on needed list.
+	 * A DYNINFO() structure is created during link-map generation that
+	 * parallels the DYN() information, and defines any flags that
+	 * influence a dependencies loading.
 	 */
-	if (DYN(clmp) == NULL)
-		return (1);
+	for (dyn = DYN(clmp), dip = DYNINFO(clmp);
+	    !(dip->di_flags & FLG_DI_IGNORE); dyn++, dip++) {
+		uint_t		flags = 0, silent = 0;
+		const char	*name = dip->di_name;
+		Rt_map		*nlmp = NULL;
 
-	for (dyn = (Dyn *)DYN(clmp), pdyn = NULL; dyn->d_tag != DT_NULL;
-	    pdyn = dyn++, ndx++) {
-		Dyninfo	*dip = &DYNINFO(clmp)[ndx];
-		Rt_map	*nlmp = NULL;
-		char	*name;
-		int	silent = 0;
-
-		switch (dyn->d_tag) {
-		case DT_POSFLAG_1:
-			dip->di_flags |= FLG_DI_POSFLAG1;
+		if ((dip->di_flags & FLG_DI_NEEDED) == 0)
 			continue;
-		case DT_NEEDED:
-		case DT_USED:
-			lazy = flags = 0;
-			dip->di_flags |= FLG_DI_NEEDED;
 
-			if (pdyn && (pdyn->d_tag == DT_POSFLAG_1)) {
-				if ((pdyn->d_un.d_val & DF_P1_LAZYLOAD) &&
-				    ((lmtflags & LML_TFLG_NOLAZYLD) == 0)) {
-					dip->di_flags |= FLG_DI_LAZY;
-					lazy = 1;
-				}
-				if (pdyn->d_un.d_val & DF_P1_GROUPPERM) {
-					dip->di_flags |= FLG_DI_GROUP;
-					flags =
-					    (FLG_RT_SETGROUP | FLG_RT_PUBHDL);
-				}
+		/*
+		 * Skip any deferred dependencies, unless ldd(1) has forced
+		 * their processing.  By default, deferred dependencies are
+		 * only processed when an explicit binding to an individual
+		 * deferred reference is made.
+		 */
+		if ((dip->di_flags & FLG_DI_DEFERRED) &&
+		    ((rtld_flags & RT_FL_DEFERRED) == 0))
+			continue;
+
+		/*
+		 * NOTE, libc.so.1 can't be lazy loaded.  Although a lazy
+		 * position flag won't be produced when a RTLDINFO .dynamic
+		 * entry is found (introduced with the UPM in Solaris 10), it
+		 * was possible to mark libc for lazy loading on previous
+		 * releases.  To reduce the overhead of testing for this
+		 * occurrence, only carry out this check for the first object
+		 * on the link-map list (there aren't many applications built
+		 * without libc).
+		 */
+		if ((dip->di_flags & FLG_DI_LAZY) && (lml->lm_head == clmp) &&
+		    (strcmp(name, MSG_ORIG(MSG_FIL_LIBC)) == 0))
+			dip->di_flags &= ~FLG_DI_LAZY;
+
+		/*
+		 * Don't bring in lazy loaded objects yet unless we've been
+		 * asked to attempt to load all available objects (crle(1) sets
+		 * LD_FLAGS=loadavail).  Even under RTLD_NOW we don't process
+		 * this - RTLD_NOW will cause relocation processing which in
+		 * turn might trigger lazy loading, but its possible that the
+		 * object has a lazy loaded file with no bindings (i.e., it
+		 * should never have been a dependency in the first place).
+		 */
+		if (dip->di_flags & FLG_DI_LAZY) {
+			if ((lmflags & LML_FLG_LOADAVAIL) == 0) {
+				LAZY(clmp)++;
+				continue;
 			}
 
-			name = (char *)STRTAB(clmp) + dyn->d_un.d_val;
-
 			/*
-			 * NOTE, libc.so.1 can't be lazy loaded.  Although a
-			 * lazy position flag won't be produced when a RTLDINFO
-			 * .dynamic entry is found (introduced with the UPM in
-			 * Solaris 10), it was possible to mark libc for lazy
-			 * loading on previous releases.  To reduce the overhead
-			 * of testing for this occurrence, only carry out this
-			 * check for the first object on the link-map list
-			 * (there aren't many applications built without libc).
+			 * Silence any error messages - see description under
+			 * elf_lookup_filtee().
 			 */
-			if (lazy && (lml->lm_head == clmp) &&
-			    (strcmp(name, MSG_ORIG(MSG_FIL_LIBC)) == 0))
-				lazy = 0;
-
-			/*
-			 * Don't bring in lazy loaded objects yet unless we've
-			 * been asked to attempt to load all available objects
-			 * (crle(1) sets LD_FLAGS=loadavail).  Even under
-			 * RTLD_NOW we don't process this - RTLD_NOW will cause
-			 * relocation processing which in turn might trigger
-			 * lazy loading, but its possible that the object has a
-			 * lazy loaded file with no bindings (i.e., it should
-			 * never have been a dependency in the first place).
-			 */
-			if (lazy) {
-				if ((lmflags & LML_FLG_LOADAVAIL) == 0) {
-					LAZY(clmp)++;
-					lazy = flags = 0;
-					continue;
-				}
-
-				/*
-				 * Silence any error messages - see description
-				 * under elf_lookup_filtee().
-				 */
-				if ((rtld_flags & RT_FL_SILENCERR) == 0) {
-					rtld_flags |= RT_FL_SILENCERR;
-					silent = 1;
-				}
+			if ((rtld_flags & RT_FL_SILENCERR) == 0) {
+				rtld_flags |= RT_FL_SILENCERR;
+				silent = 1;
 			}
-			break;
-		case DT_AUXILIARY:
-			dip->di_flags |= FLG_DI_AUXFLTR;
-			continue;
-		case DT_SUNW_AUXILIARY:
-			dip->di_flags |= (FLG_DI_AUXFLTR | FLG_DI_SYMFLTR);
-			continue;
-		case DT_FILTER:
-			dip->di_flags |= FLG_DI_STDFLTR;
-			continue;
-		case DT_SUNW_FILTER:
-			dip->di_flags |= (FLG_DI_STDFLTR | FLG_DI_SYMFLTR);
-			continue;
-		default:
-			continue;
 		}
 
 		DBG_CALL(Dbg_file_needed(clmp, name));
@@ -744,6 +707,12 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 		 */
 		if (lml->lm_flags & LML_FLG_TRC_ENABLE)
 			dip->di_flags |= FLG_DI_LDD_DONE;
+
+		/*
+		 * Identify any group permission requirements.
+		 */
+		if (dip->di_flags & FLG_DI_GROUP)
+			flags = (FLG_RT_SETGROUP | FLG_RT_PUBHDL);
 
 		/*
 		 * Establish the objects name, load it and establish a binding
@@ -889,7 +858,7 @@ _elf_lookup_filtee(Slookup *slp, Sresult *srp, uint_t *binfo, uint_t ndx,
 	 * defined.  Otherwise, process the filtee reference.  Any token
 	 * expansion is also completed at this point (i.e., $PLATFORM).
 	 */
-	filtees = (char *)STRTAB(ilmp) + DYN(ilmp)[ndx].d_un.d_val;
+	filtees = dip->di_name;
 	if (dip->di_info == NULL) {
 		if (rtld_flags2 & RT_FL2_FLTCFG) {
 			elf_config_flt(lml, PATHNAME(ilmp), filtees,
@@ -1777,13 +1746,67 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 	 * dynamic structure.
 	 */
 	if (dyn) {
-		uint_t		dynndx = 0;
+		Dyninfo		*dip;
+		uint_t		dynndx;
 		Xword		pltpadsz = 0;
 		Rti_desc	*rti;
+		Dyn		*pdyn;
+		Word		lmtflags = lml->lm_tflags;
+		int		ignore = 0;
 
-		/* CSTYLED */
-		for ( ; dyn->d_tag != DT_NULL; ++dyn, dynndx++) {
+		/*
+		 * Note, we use DT_NULL to terminate processing, and the
+		 * dynamic entry count as a fall back.  Normally, a DT_NULL
+		 * entry marks the end of the dynamic section.  Any non-NULL
+		 * items following the first DT_NULL are silently ignored.
+		 * This situation should only occur through use of elfedit(1)
+		 * or a similar tool.
+		 */
+		for (dynndx = 0, pdyn = NULL, dip = DYNINFO(lmp);
+		    dynndx < dyncnt; dynndx++, pdyn = dyn++, dip++) {
+
+			if (ignore) {
+				dip->di_flags |= FLG_DI_IGNORE;
+				continue;
+			}
+
 			switch ((Xword)dyn->d_tag) {
+			case DT_NULL:
+				dip->di_flags |= ignore = FLG_DI_IGNORE;
+				break;
+			case DT_POSFLAG_1:
+				dip->di_flags |= FLG_DI_POSFLAG1;
+				break;
+			case DT_NEEDED:
+			case DT_USED:
+				dip->di_flags |= FLG_DI_NEEDED;
+
+				/* BEGIN CSTYLED */
+				if (pdyn && (pdyn->d_tag == DT_POSFLAG_1)) {
+				    /*
+				     * Identify any non-deferred lazy load for
+				     * future processing, unless LD_NOLAZYLOAD
+				     * has been set.
+				     */
+				    if ((pdyn->d_un.d_val & DF_P1_LAZYLOAD) &&
+					((lmtflags & LML_TFLG_NOLAZYLD) == 0))
+					    dip->di_flags |= FLG_DI_LAZY;
+
+				    /*
+				     * Identify any group permission
+				     * requirements.
+				     */
+				    if (pdyn->d_un.d_val & DF_P1_GROUPPERM)
+					    dip->di_flags |= FLG_DI_GROUP;
+
+				    /*
+				     * Identify any deferred dependencies.
+				     */
+				    if (pdyn->d_un.d_val & DF_P1_DEFERRED)
+					    dip->di_flags |= FLG_DI_DEFERRED;
+				}
+				/* END CSTYLED */
+				break;
 			case DT_SYMTAB:
 				SYMTAB(lmp) = (void *)(dyn->d_un.d_ptr + base);
 				break;
@@ -1886,11 +1909,13 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 				rpath = dyn->d_un.d_val;
 				break;
 			case DT_FILTER:
+				dip->di_flags |= FLG_DI_STDFLTR;
 				fltr = dyn->d_un.d_val;
 				OBJFLTRNDX(lmp) = dynndx;
 				FLAGS1(lmp) |= FL1_RT_OBJSFLTR;
 				break;
 			case DT_AUXILIARY:
+				dip->di_flags |= FLG_DI_AUXFLTR;
 				if (!(rtld_flags & RT_FL_NOAUXFLTR)) {
 					fltr = dyn->d_un.d_val;
 					OBJFLTRNDX(lmp) = dynndx;
@@ -1898,10 +1923,14 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 				FLAGS1(lmp) |= FL1_RT_OBJAFLTR;
 				break;
 			case DT_SUNW_FILTER:
+				dip->di_flags |=
+				    (FLG_DI_STDFLTR | FLG_DI_SYMFLTR);
 				SYMSFLTRCNT(lmp)++;
 				FLAGS1(lmp) |= FL1_RT_SYMSFLTR;
 				break;
 			case DT_SUNW_AUXILIARY:
+				dip->di_flags |=
+				    (FLG_DI_AUXFLTR | FLG_DI_SYMFLTR);
 				if (!(rtld_flags & RT_FL_NOAUXFLTR)) {
 					SYMAFLTRCNT(lmp)++;
 				}
@@ -2105,6 +2134,7 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 				break;
 			case DT_DEPRECATED_SPARC_REGISTER:
 			case M_DT_REGISTER:
+				dip->di_flags |= FLG_DI_REGISTER;
 				FLAGS(lmp) |= FLG_RT_REGSYMS;
 				break;
 			case DT_SUNW_CAP:
@@ -2126,6 +2156,28 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 			}
 		}
 
+		/*
+		 * Update any Dyninfo string pointers now that STRTAB() is
+		 * known.
+		 */
+		for (dynndx = 0, dyn = DYN(lmp), dip = DYNINFO(lmp);
+		    !(dip->di_flags & FLG_DI_IGNORE); dyn++, dip++) {
+
+			switch ((Xword)dyn->d_tag) {
+			case DT_NEEDED:
+			case DT_USED:
+			case DT_FILTER:
+			case DT_AUXILIARY:
+			case DT_SUNW_FILTER:
+			case DT_SUNW_AUXILIARY:
+				dip->di_name = STRTAB(lmp) + dyn->d_un.d_val;
+				break;
+			}
+		}
+
+		/*
+		 * Assign any padding.
+		 */
 		if (PLTPAD(lmp)) {
 			if (pltpadsz == (Xword)0)
 				PLTPAD(lmp) = NULL;
@@ -2199,7 +2251,7 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 		RELENT(lmp) = sizeof (M_RELOC);
 
 	/*
-	 * Establish any per-object auditing.  If we're establishing `main's
+	 * Establish any per-object auditing.  If we're establishing main's
 	 * link-map its too early to go searching for audit objects so just
 	 * hold the object name for later (see setup()).
 	 */
@@ -2667,7 +2719,7 @@ elf_lazy_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 		return (NULL);
 
 	for (APLIST_TRAVERSE(alist, idx1, lmp1)) {
-		uint_t	cnt = 0;
+		uint_t	dynndx;
 		Dyninfo	*dip, *pdip;
 
 		/*
@@ -2677,8 +2729,8 @@ elf_lazy_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 		 * objects lazy DT_NEEDED entries can be examined.
 		 */
 		lmp = lmp1;
-		for (dip = DYNINFO(lmp), pdip = NULL; cnt < DYNINFOCNT(lmp);
-		    cnt++, pdip = dip++) {
+		for (dynndx = 0, dip = DYNINFO(lmp), pdip = NULL;
+		    !(dip->di_flags & FLG_DI_IGNORE); dynndx++, pdip = dip++) {
 			Grp_hdl		*ghp;
 			Grp_desc	*gdp;
 			Rt_map		*nlmp, *llmp;
@@ -2743,7 +2795,7 @@ elf_lazy_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 			 * either case, the handle associated with the object
 			 * is then used to carry out the symbol search.
 			 */
-			if ((nlmp = elf_lazy_load(lmp, &sl1, cnt, name,
+			if ((nlmp = elf_lazy_load(lmp, &sl1, dynndx, name,
 			    FLG_RT_PRIHDL, &ghp, in_nfavl)) == NULL)
 				continue;
 
@@ -2956,95 +3008,4 @@ elf_reloc_error(Rt_map *lmp, const char *name, void *rel, uint_t binfo)
 	    demangle(name));
 
 	return (0);
-}
-
-/*
- * Generic relative relocation function.
- */
-inline static ulong_t
-_elf_reloc_relative(ulong_t rbgn, ulong_t base, Rt_map *lmp, APlist **textrel)
-{
-	mmapobj_result_t	*mpp;
-	ulong_t			roffset;
-
-	roffset = ((M_RELOC *)rbgn)->r_offset;
-	roffset += base;
-
-	/*
-	 * If this relocation is against an address that is not associated with
-	 * a mapped segment, fall back to the generic relocation loop to
-	 * collect the associated error.
-	 */
-	if ((mpp = find_segment((caddr_t)roffset, lmp)) == NULL)
-		return (0);
-
-	/*
-	 * If this relocation is against a segment that does not provide write
-	 * access, set the write permission for all non-writable mappings.
-	 */
-	if (((mpp->mr_prot & PROT_WRITE) == 0) && textrel &&
-	    ((set_prot(lmp, mpp, 1) == 0) ||
-	    (aplist_append(textrel, mpp, AL_CNT_TEXTREL) == NULL)))
-		return (0);
-
-	/*
-	 * Perform the actual relocation.  Note, for backward compatibility,
-	 * SPARC relocations are added to the offset contents (there was a time
-	 * when the offset was used to contain the addend, rather than using
-	 * the addend itself).
-	 */
-#if	defined(__sparc)
-	*((ulong_t *)roffset) += base + ((M_RELOC *)rbgn)->r_addend;
-#elif	defined(__amd64)
-	*((ulong_t *)roffset) = base + ((M_RELOC *)rbgn)->r_addend;
-#else
-	*((ulong_t *)roffset) += base;
-#endif
-	return (1);
-}
-
-/*
- * When a generic relocation loop realizes that it's dealing with relative
- * relocations, but no DT_RELCOUNT .dynamic tag is present, this tighter loop
- * is entered as an optimization.
- */
-ulong_t
-elf_reloc_relative(ulong_t rbgn, ulong_t rend, ulong_t rsize, ulong_t base,
-    Rt_map *lmp, APlist **textrel)
-{
-	char	rtype;
-
-	do {
-		if (_elf_reloc_relative(rbgn, base, lmp, textrel) == 0)
-			break;
-
-		rbgn += rsize;
-		if (rbgn >= rend)
-			break;
-
-		/*
-		 * Make sure the next type is a relative relocation.
-		 */
-		rtype = ELF_R_TYPE(((M_RELOC *)rbgn)->r_info, M_MACH);
-
-	} while (rtype == M_R_RELATIVE);
-
-	return (rbgn);
-}
-
-/*
- * This is the tightest loop for RELATIVE relocations for those objects built
- * with the DT_RELACOUNT .dynamic entry.
- */
-ulong_t
-elf_reloc_relative_count(ulong_t rbgn, ulong_t rcount, ulong_t rsize,
-    ulong_t base, Rt_map *lmp, APlist **textrel)
-{
-	for (; rcount; rcount--) {
-		if (_elf_reloc_relative(rbgn, base, lmp, textrel) == 0)
-			break;
-
-		rbgn += rsize;
-	}
-	return (rbgn);
 }

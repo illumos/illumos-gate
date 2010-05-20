@@ -330,6 +330,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_file_config_obj	Dbg64_file_config_obj
 #define	Dbg_file_del_rescan	Dbg64_file_del_rescan
 #define	Dbg_file_delete		Dbg64_file_delete
+#define	Dbg_file_deferred	Dbg64_file_deferred
 #define	Dbg_file_elf		Dbg64_file_elf
 #define	Dbg_file_filtee		Dbg64_file_filtee
 #define	Dbg_file_filter		Dbg64_file_filter
@@ -561,6 +562,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_file_config_obj	Dbg32_file_config_obj
 #define	Dbg_file_del_rescan	Dbg32_file_del_rescan
 #define	Dbg_file_delete		Dbg32_file_delete
+#define	Dbg_file_deferred	Dbg32_file_deferred
 #define	Dbg_file_elf		Dbg32_file_elf
 #define	Dbg_file_filtee		Dbg32_file_filtee
 #define	Dbg_file_filter		Dbg32_file_filter
@@ -827,6 +829,7 @@ extern	void	Dbg_file_config_obj(Lm_list *, const char *, const char *,
 		    const char *);
 extern	void	Dbg_file_del_rescan(Lm_list *);
 extern	void	Dbg_file_delete(Rt_map *);
+extern	void	Dbg_file_deferred(Lm_list *, const char *, const char *);
 extern	void	Dbg_file_elf(Lm_list *, const char *, Addr, size_t,
 		    const char *, Aliste);
 extern	void	Dbg_file_filtee(Lm_list *, const char *, const char *, int);

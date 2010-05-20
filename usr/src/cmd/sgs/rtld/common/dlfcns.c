@@ -20,13 +20,10 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
+ *
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -44,7 +41,7 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
-#include	"_inline.h"
+#include	"_inline_gen.h"
 #include	"msg.h"
 
 /*
@@ -1184,13 +1181,31 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Sresult *srp, uint_t *binfo,
 }
 
 /*
+ * Determine whether a symbol resides in a caller.  This may be a reference,
+ * which is associated with a specific dependency.
+ */
+inline static Sym *
+sym_lookup_in_caller(Rt_map *clmp, Slookup *slp, Sresult *srp, uint_t *binfo)
+{
+	if (THIS_IS_ELF(clmp) && SYMINTP(clmp)(slp, srp, binfo, NULL)) {
+		Sym	*sym = srp->sr_sym;
+
+		slp->sl_rsymndx = (((ulong_t)sym -
+		    (ulong_t)SYMTAB(clmp)) / SYMENT(clmp));
+		slp->sl_rsym = sym;
+		return (sym);
+	}
+	return (NULL);
+}
+
+/*
  * Core dlsym activity.  Selects symbol lookup method from handle.
  */
 static void *
 dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
     int *in_nfavl)
 {
-	Sym		*sym = NULL;
+	Sym		*sym;
 	int		ret = 0;
 	Syminfo		*sip;
 	Slookup		sl;
@@ -1215,14 +1230,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 	SLOOKUP_INIT(sl, name, clmp, clmp, ld_entry_cnt, elf_hash(name),
 	    0, 0, 0, LKUP_SYMNDX);
 	SRESULT_INIT(sr, name);
-
-	if (THIS_IS_ELF(clmp) && SYMINTP(clmp)(&sl, &sr, &binfo, NULL)) {
-		sym = sr.sr_sym;
-
-		sl.sl_rsymndx = (((ulong_t)sym -
-		    (ulong_t)SYMTAB(clmp)) / SYMENT(clmp));
-		sl.sl_rsym = sym;
-	}
+	sym = sym_lookup_in_caller(clmp, &sl, &sr, &binfo);
 
 	SRESULT_INIT(sr, name);
 
@@ -1238,9 +1246,10 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		    DBG_DLSYM_SINGLETON));
 
 		sl.sl_imap = hlmp;
-		sl.sl_flags = LKUP_SPEC;
 		if (handle == RTLD_PROBE)
-			sl.sl_flags |= LKUP_NOFALLBACK;
+			sl.sl_flags = LKUP_NOFALLBACK;
+		else
+			sl.sl_flags = LKUP_SPEC;
 		ret = LM_LOOKUP_SYM(clmp)(&sl, &sr, &binfo, in_nfavl);
 
 	} else if (handle == RTLD_NEXT) {
@@ -1272,7 +1281,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		}
 
 		/*
-		 * If the handle is RTLD_NEXT start searching in the next link
+		 * If the handle is RTLD_NEXT, start searching in the next link
 		 * map from the callers.  Determine permissions from the
 		 * present link map.  Indicate to lookup_sym() that we're on an
 		 * RTLD_NEXT request so that it will use the callers link map to
@@ -1331,7 +1340,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		    DBG_DLSYM_PROBE));
 
 		sl.sl_imap = hlmp;
-		sl.sl_flags = (LKUP_SPEC | LKUP_NOFALLBACK);
+		sl.sl_flags = LKUP_NOFALLBACK;
 		ret = LM_LOOKUP_SYM(clmp)(&sl, &sr, &binfo, in_nfavl);
 
 	} else {
@@ -1731,6 +1740,31 @@ get_linkmap_id(Lm_list *lml)
 }
 
 /*
+ * Set a new deferred dependency name.
+ */
+static int
+set_def_need(Lm_list *lml, Dyninfo *dyip, const char *name)
+{
+	/*
+	 * If this dependency has already been established, then this dlinfo()
+	 * call is too late.
+	 */
+	if (dyip->di_info) {
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_DEF_DEPLOADED),
+		    dyip->di_name);
+		return (-1);
+	}
+
+	/*
+	 * Assign the new dependency name.
+	 */
+	DBG_CALL(Dbg_file_deferred(lml, dyip->di_name, name));
+	dyip->di_flags |= FLG_DI_DEF_DONE;
+	dyip->di_name = name;
+	return (0);
+}
+
+/*
  * Extract information for a dlopen() handle.
  */
 static int
@@ -1947,7 +1981,7 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 			 */
 			(void) strcpy(strs, pdp->pd_pname);
 			path->dls_name = strs;
-			path->dls_flags = pdp->pd_flags;
+			path->dls_flags = (pdp->pd_flags & LA_SER_MASK);
 
 			strs = strs + _size;
 			path++;
@@ -2003,6 +2037,119 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 		return (0);
 	}
 
+	/*
+	 * Assign a new dependency name to a deferred dependency.
+	 */
+	if ((request == RTLD_DI_DEFERRED) ||
+	    (request == RTLD_DI_DEFERRED_SYM)) {
+		Dl_definfo_t	*dfip = (Dl_definfo_t *)p;
+		Dyninfo		*dyip;
+		const char	*dname, *rname;
+
+		/*
+		 * Verify the names.
+		 */
+		if ((dfip->dld_refname == NULL) ||
+		    (dfip->dld_depname == NULL)) {
+			eprintf(LIST(clmp), ERR_FATAL,
+			    MSG_INTL(MSG_ARG_ILLNAME));
+			return (-1);
+		}
+
+		dname = dfip->dld_depname;
+		rname = dfip->dld_refname;
+
+		/*
+		 * A deferred dependency can be determined by referencing a
+		 * symbol family member that is associated to the dependency,
+		 * or by looking for the dependency by its name.
+		 */
+		if (request == RTLD_DI_DEFERRED_SYM) {
+			Slookup		sl;
+			Sresult		sr;
+			uint_t		binfo;
+			Syminfo		*sip;
+
+			/*
+			 * Lookup the symbol in the associated object.
+			 */
+			SLOOKUP_INIT(sl, rname, lmp, lmp, ld_entry_cnt,
+			    elf_hash(rname), 0, 0, 0, LKUP_SYMNDX);
+			SRESULT_INIT(sr, rname);
+			if (sym_lookup_in_caller(clmp, &sl, &sr,
+			    &binfo) == NULL) {
+				eprintf(LIST(clmp), ERR_FATAL,
+				    MSG_INTL(MSG_DEF_NOSYMFOUND), rname);
+				return (-1);
+			}
+
+			/*
+			 * Use the symbols index to reference the Syminfo entry
+			 * and thus find the associated dependency.
+			 */
+			if (sl.sl_rsymndx && ((sip = SYMINFO(clmp)) != NULL)) {
+				/* LINTED */
+				sip = (Syminfo *)((char *)sip +
+				    (sl.sl_rsymndx * SYMINENT(lmp)));
+
+				if ((sip->si_flags & SYMINFO_FLG_DEFERRED) &&
+				    (sip->si_boundto < SYMINFO_BT_LOWRESERVE) &&
+				    ((dyip = DYNINFO(lmp)) != NULL)) {
+					dyip += sip->si_boundto;
+
+					if (!(dyip->di_flags & FLG_DI_IGNORE))
+						return (set_def_need(lml,
+						    dyip, dname));
+				}
+			}
+
+			/*
+			 * No deferred symbol found.
+			 */
+			eprintf(LIST(clmp), ERR_FATAL,
+			    MSG_INTL(MSG_DEF_NOSYMFOUND), rname);
+			return (-1);
+
+		} else {
+			Dyn	*dyn;
+
+			/*
+			 * Using the target objects dependency information, find
+			 * the associated deferred dependency.
+			 */
+			for (dyn = DYN(lmp), dyip = DYNINFO(lmp);
+			    !(dyip->di_flags & FLG_DI_IGNORE); dyn++, dyip++) {
+				const char	*oname;
+
+				if ((dyip->di_flags & FLG_DI_DEFERRED) == 0)
+					continue;
+
+				if (strcmp(rname, dyip->di_name) == 0)
+					return (set_def_need(lml, dyip, dname));
+
+				/*
+				 * If this dependency name has been changed by
+				 * a previous dlinfo(), check the original
+				 * dynamic entry string.  The user might be
+				 * attempting to re-change an entry using the
+				 * original name as the reference.
+				 */
+				if ((dyip->di_flags & FLG_DI_DEF_DONE) == 0)
+					continue;
+
+				oname = STRTAB(lmp) + dyn->d_un.d_val;
+				if (strcmp(rname, oname) == 0)
+					return (set_def_need(lml, dyip, dname));
+			}
+
+			/*
+			 * No deferred dependency found.
+			 */
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_DEF_NODEPFOUND),
+			    rname);
+			return (-1);
+		}
+	}
 	return (0);
 }
 
@@ -2027,7 +2174,6 @@ dlinfo(void *handle, int request, void *p)
 		leave(LIST(clmp), 0);
 	return (error);
 }
-
 
 /*
  * GNU defined function to iterate through the program headers for all

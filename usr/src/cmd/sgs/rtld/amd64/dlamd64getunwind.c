@@ -20,10 +20,8 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-#pragma ident	"@(#)dlamd64getunwind.c	1.10	08/07/30 SMI"
 
 #include	<string.h>
 #include	<dlfcn.h>
@@ -31,7 +29,7 @@
 #include	<debug.h>
 #include	"_rtld.h"
 #include	"_elf.h"
-#include	"_inline.h"
+#include	"_inline_gen.h"
 #include	"msg.h"
 
 

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Audit interfaces.  Auditing can be enabled in two ways:
  *
@@ -92,6 +91,7 @@ _audit_objfilter(APlist *list, Rt_map *frlmp, const char *ref, Rt_map *felmp,
 
 	for (APLIST_TRAVERSE(list, idx, alp)) {
 		Audit_client	*fracp, *feacp;
+		int		ret;
 
 		if (alp->al_objfilter == NULL)
 			continue;
@@ -103,10 +103,11 @@ _audit_objfilter(APlist *list, Rt_map *frlmp, const char *ref, Rt_map *felmp,
 			continue;
 
 		leave(LIST(alp->al_lmp), thr_flg_reenter);
-		if ((*alp->al_objfilter)(&(fracp->ac_cookie), ref,
-		    &(feacp->ac_cookie), flags) == 0)
-			return (0);
+		ret = (*alp->al_objfilter)(&(fracp->ac_cookie), ref,
+		    &(feacp->ac_cookie), flags);
 		(void) enter(thr_flg_reenter);
+		if (ret == 0)
+			return (0);
 	}
 	return (1);
 }

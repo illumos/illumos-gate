@@ -663,6 +663,7 @@
 @ MSG_FIL_FILTEE_3	"file=%s;  filtee skipped  (auditing directed)"
 @ MSG_FIL_FIXNAME	"file=%s;  required name=%s"
 @ MSG_FIL_PROMOTE	"file=%s;  promoting mode to %s"
+@ MSG_FIL_DEFERRED	"file=%s;  deferred dependency exchanged for file=%s"
 @ MSG_FIL_AOUT		"file=%s  [ AOUT ]; generating link map"
 @ MSG_FIL_ELF		"file=%s  [ ELF ]; generating link map%s"
 @ MSG_FIL_LDSO		"file=%s  [ ELF ]"

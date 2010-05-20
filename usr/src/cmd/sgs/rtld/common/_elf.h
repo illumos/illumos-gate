@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #ifndef	__ELF_DOT_H
 #define	__ELF_DOT_H
@@ -71,10 +70,6 @@ extern	int	elf_reloc(Rt_map *, uint_t, int *, APlist **);
 extern	void	elf_reloc_bad(Rt_map *, void *, uchar_t, ulong_t,
 		    ulong_t);
 extern	int	elf_reloc_error(Rt_map *, const char *, void *, uint_t);
-extern	ulong_t	elf_reloc_relative(ulong_t, ulong_t, ulong_t, ulong_t,
-		    Rt_map *, APlist **);
-extern	ulong_t	elf_reloc_relative_count(ulong_t, ulong_t, ulong_t, ulong_t,
-		    Rt_map *, APlist **);
 extern	int	elf_rtld_load();
 extern	long	elf_static_tls(Rt_map *, Sym *, void *, uchar_t, char *,
 		    ulong_t, long);

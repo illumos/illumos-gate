@@ -141,6 +141,8 @@ void	Dbg32_file_cntl(Lm_list *, Aliste, Aliste);
 void	Dbg64_file_cntl(Lm_list *, Aliste, Aliste);
 void	Dbg32_file_cleanup(Lm_list *, const char *, Aliste);
 void	Dbg64_file_cleanup(Lm_list *, const char *, Aliste);
+void	Dbg32_file_deferred(Lm_list *, const char *, const char *);
+void	Dbg64_file_deferred(Lm_list *, const char *, const char *);
 void	Dbg32_file_del_rescan(Lm_list *);
 void	Dbg64_file_del_rescan(Lm_list *);
 void	Dbg32_file_delete(Rt_map *);

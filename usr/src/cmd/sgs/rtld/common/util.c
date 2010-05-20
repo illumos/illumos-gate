@@ -20,13 +20,10 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
+ *
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1468,6 +1465,7 @@ static	u_longlong_t		prmisa;		/* permanent ISA specific */
 #define	ENV_FLG_MACHCAP		0x0020000000000ULL
 #define	ENV_FLG_PLATCAP		0x0040000000000ULL
 #define	ENV_FLG_CAP_FILES	0x0080000000000ULL
+#define	ENV_FLG_DEFERRED	0x0100000000000ULL
 
 #define	SEL_REPLACE		0x0001
 #define	SEL_PERMANT		0x0002
@@ -1603,7 +1601,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		}
 	}
 	/*
-	 * The LD_DEBUG family and LD_DEMANGLE.
+	 * The LD_DEBUG family, LD_DEFERRED (internal, used by ldd(1)), and
+	 * LD_DEMANGLE.
 	 */
 	else if (*s1 == 'D') {
 		if ((len == MSG_LD_DEBUG_SIZE) && (strncmp(s1,
@@ -1617,6 +1616,11 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			select |= SEL_ACT_STR;
 			str = &dbg_file;
 			variable = ENV_FLG_DEBUG_OUTPUT;
+		} else if ((len == MSG_LD_DEFERRED_SIZE) && (strncmp(s1,
+		    MSG_ORIG(MSG_LD_DEFERRED), MSG_LD_DEFERRED_SIZE) == 0)) {
+			select |= SEL_ACT_RT;
+			val = RT_FL_DEFERRED;
+			variable = ENV_FLG_DEFERRED;
 		} else if ((len == MSG_LD_DEMANGLE_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_DEMANGLE), MSG_LD_DEMANGLE_SIZE) == 0)) {
 			select |= SEL_ACT_RT;

@@ -995,10 +995,9 @@ make_dynamic(Ofl_desc *ofl)
 		}
 
 		/*
-		 * If this object is a lazyload reserve a DT_POSFLAG_1 entry.
+		 * If this object requires a DT_POSFLAG_1 entry, reserve it.
 		 */
-		if ((ifl->ifl_flags & (FLG_IF_LAZYLD | FLG_IF_GRPPRM)) &&
-		    not_relobj)
+		if ((ifl->ifl_flags & MSK_IF_POSFLAG1) && not_relobj)
 			cnt++;
 
 		if (st_insert(strtbl, ifl->ifl_soname) == -1)
@@ -1593,6 +1592,7 @@ make_cap(Ofl_desc *ofl, Word shtype, const char *shname, int ident)
 		ld_cap_move_symtoobj(ofl);
 		ofl->ofl_capsymcnt = 0;
 		ofl->ofl_capgroups = NULL;
+		ofl->ofl_flags &= ~FLG_OF_OTOSCAP;
 	}
 
 	/*

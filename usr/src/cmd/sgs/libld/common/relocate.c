@@ -972,12 +972,15 @@ ld_reloc_plt(Rel_desc *rsp, Ofl_desc *ofl)
 		(*ld_targ.t_mr.mr_assign_plt_ndx)(sdp, ofl);
 
 		/*
-		 * If this symbol is binding to a LAZYLOADED object then
-		 * set the LAZYLD symbol flag.
+		 * If this symbol is binding to a lazy loadable, or deferred
+		 * dependency, then identify the symbol.
 		 */
-		if (sdp->sd_file &&
-		    (sdp->sd_file->ifl_flags & FLG_IF_LAZYLD))
-			sdp->sd_flags |= FLG_SY_LAZYLD;
+		if (sdp->sd_file) {
+			if (sdp->sd_file->ifl_flags & FLG_IF_LAZYLD)
+				sdp->sd_flags |= FLG_SY_LAZYLD;
+			if (sdp->sd_file->ifl_flags & FLG_IF_DEFERRED)
+				sdp->sd_flags |= FLG_SY_DEFERRED;
+		}
 
 		rsp->rel_rtype = ld_targ.t_m.m_r_jmp_slot;
 		if ((*ld_targ.t_mr.mr_add_outrel)(FLG_REL_PLT, rsp, ofl) ==

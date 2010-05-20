@@ -20,13 +20,10 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  *	Copyright (c) 1988 AT&T
  *	All Rights Reserved
+ *
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -43,7 +40,7 @@
 #include	"_a.out.h"
 #include	"_rtld.h"
 #include	"_audit.h"
-#include	"_inline.h"
+#include	"_inline_gen.h"
 #include	"msg.h"
 
 extern void	iflush_range(caddr_t, size_t);

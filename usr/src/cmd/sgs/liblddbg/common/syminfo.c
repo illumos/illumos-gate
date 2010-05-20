@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 #include	<sgs.h>
 #include	<stdio.h>
@@ -98,6 +97,10 @@ Elf_syminfo_entry(Lm_list *lml, Word ndx, Syminfo *sip, const char *name,
 	if (flags & SYMINFO_FLG_INTERPOSE) {
 		flagstr[flgndx++] = 'I';
 		flags &= ~SYMINFO_FLG_INTERPOSE;
+	}
+	if (flags & SYMINFO_FLG_DEFERRED) {
+		flagstr[flgndx++] = 'P';
+		flags &= ~SYMINFO_FLG_DEFERRED;
 	}
 
 	/*

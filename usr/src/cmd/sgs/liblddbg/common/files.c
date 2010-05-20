@@ -589,6 +589,16 @@ Dbg_file_mode_promote(Rt_map *lmp, int mode)
 }
 
 void
+Dbg_file_deferred(Lm_list *lml, const char *oname, const char *nname)
+{
+	if (DBG_NOTCLASS(DBG_C_FILES))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_DEFERRED), oname, nname);
+}
+
+void
 Dbg_file_cntl(Lm_list *lml, Aliste flmco, Aliste tlmco)
 {
 	Lm_cntl	*lmc;

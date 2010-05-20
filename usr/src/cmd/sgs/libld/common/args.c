@@ -175,6 +175,7 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZAE));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZAL));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZC));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZDEF));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZDFS));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZDRS));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZE));
@@ -213,7 +214,7 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTO));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTW));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZWRAP));
-	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZV));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZVER));
 }
 
 /*
@@ -1331,12 +1332,14 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_LAZYLOAD)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_NOGROUPPERM)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_NOLAZYLOAD)) &&
+			    strcmp(optarg, MSG_ORIG(MSG_ARG_NODEFERRED)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_RECORD)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_ALTEXEC64)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_WEAKEXT)) &&
 			    strncmp(optarg, MSG_ORIG(MSG_ARG_TARGET),
 			    MSG_ARG_TARGET_SIZE) &&
-			    strcmp(optarg, MSG_ORIG(MSG_ARG_RESCAN_NOW))) {
+			    strcmp(optarg, MSG_ORIG(MSG_ARG_RESCAN_NOW)) &&
+			    strcmp(optarg, MSG_ORIG(MSG_ARG_DEFERRED))) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),
 				    MSG_ORIG(MSG_ARG_Z), optarg);
@@ -1718,6 +1721,12 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 					if (ld_rescan_archives(ofl, 1, ndx) ==
 					    S_ERROR)
 						return (S_ERROR);
+				} else if (strcmp(optarg,
+				    MSG_ORIG(MSG_ARG_DEFERRED)) == 0) {
+					ofl->ofl_flags1 |= FLG_OF1_DEFERRED;
+				} else if (strcmp(optarg,
+				    MSG_ORIG(MSG_ARG_NODEFERRED)) == 0) {
+					ofl->ofl_flags1 &= ~FLG_OF1_DEFERRED;
 				}
 			default:
 				break;

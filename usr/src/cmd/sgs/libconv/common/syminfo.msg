@@ -19,8 +19,7 @@
 # CDDL HEADER END
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 @ MSG_SYMINFO_FLG_DIRECT_CF		"SYMINFO_FLG_DIRECT"		# 0x001
@@ -50,6 +49,9 @@
 @ MSG_SYMINFO_FLG_CAP_CF		"SYMINFO_FLG_CAP"		# 0x100
 @ MSG_SYMINFO_FLG_CAP_CFNP			"CAP"
 @ MSG_SYMINFO_FLG_CAP_NF			"cap"
+@ MSG_SYMINFO_FLG_DEFERRED_CF		"SYMINFO_FLG_DEFERRED"		# 0x200
+@ MSG_SYMINFO_FLG_DEFERRED_CFNP			"DEFERRED"
+@ MSG_SYMINFO_FLG_DEFERRED_NF			"deferred"
 
 @ MSG_SYMINFO_BT_EXTERN_CF	"SYMINFO_BT_EXTERN"		# 0xfffc
 @ MSG_SYMINFO_BT_EXTERN_CFNP		"EXTERN"

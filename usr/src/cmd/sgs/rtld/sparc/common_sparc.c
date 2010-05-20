@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include	<stdio.h>
@@ -93,6 +92,7 @@ int
 elf_regsyms(Rt_map *lmp)
 {
 	Dyn	*dyn;
+	Dyninfo	*dip;
 	Sym	*symdef;
 	ulong_t	rsymndx;
 
@@ -102,11 +102,11 @@ elf_regsyms(Rt_map *lmp)
 	 * register symbol it identifies and confirm that it doesn't conflict
 	 * with any other register symbols.
 	 */
-	for (dyn = DYN(lmp); dyn->d_tag != DT_NULL; dyn++) {
+	for (dyn = DYN(lmp), dip = DYNINFO(lmp);
+	    !(dip->di_flags & FLG_DI_IGNORE); dyn++, dip++) {
 		Reglist	*rp;
 
-		if ((dyn->d_tag != DT_SPARC_REGISTER) &&
-		    (dyn->d_tag != DT_DEPRECATED_SPARC_REGISTER))
+		if ((dip->di_flags & FLG_DI_REGISTER) == 0)
 			continue;
 
 		/*

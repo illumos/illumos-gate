@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_LINK_H
@@ -260,6 +259,8 @@ typedef struct {
 #define	DF_P1_GROUPPERM	0x00000002	/* following object's symbols are */
 					/*	not available for general */
 					/*	symbol bindings. */
+#define	DF_P1_DEFERRED	0x00000004	/* following object is deferred */
+
 /*
  * Values for the DT_FLAGS_1 .dynamic entry.
  */
@@ -472,6 +473,8 @@ typedef struct {
 					/* 	auxiliary filter */
 #define	SYMINFO_FLG_INTERPOSE	0x0080	/* symbol defines an interposer */
 #define	SYMINFO_FLG_CAP		0x0100	/* symbol is capabilities specific */
+#define	SYMINFO_FLG_DEFERRED	0x0200	/* symbol should not be included in */
+					/*	BIND_NOW relocations */
 
 /*
  * Syminfo.si_boundto values.

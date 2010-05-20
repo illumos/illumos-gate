@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -46,6 +45,8 @@ conv_syminfo_flags_strings(Conv_fmt_flags_t fmt_flags)
 	MSG_SYMINFO_FLG_NOEXTDIRECT_CF_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 	MSG_SYMINFO_FLG_AUXILIARY_CF_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 	MSG_SYMINFO_FLG_INTERPOSE_CF_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+	MSG_SYMINFO_FLG_CAP_CF_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+	MSG_SYMINFO_FLG_DEFERRED_CF_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 	CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 	/*
@@ -74,6 +75,7 @@ conv_syminfo_flags_strings(Conv_fmt_flags_t fmt_flags)
 		{ SYMINFO_FLG_AUXILIARY, MSG_SYMINFO_FLG_AUXILIARY_CF },
 		{ SYMINFO_FLG_INTERPOSE, MSG_SYMINFO_FLG_INTERPOSE_CF },
 		{ SYMINFO_FLG_CAP,	MSG_SYMINFO_FLG_CAP_CF },
+		{ SYMINFO_FLG_DEFERRED,	MSG_SYMINFO_FLG_DEFERRED_CF },
 		{ 0 }
 	};
 	static const Val_desc vda_cfnp[] = {
@@ -86,6 +88,7 @@ conv_syminfo_flags_strings(Conv_fmt_flags_t fmt_flags)
 		{ SYMINFO_FLG_AUXILIARY, MSG_SYMINFO_FLG_AUXILIARY_CFNP },
 		{ SYMINFO_FLG_INTERPOSE, MSG_SYMINFO_FLG_INTERPOSE_CFNP },
 		{ SYMINFO_FLG_CAP,	MSG_SYMINFO_FLG_CAP_CFNP },
+		{ SYMINFO_FLG_DEFERRED,	MSG_SYMINFO_FLG_DEFERRED_CFNP },
 		{ 0 }
 	};
 	static const Val_desc vda_nf[] = {
@@ -98,6 +101,7 @@ conv_syminfo_flags_strings(Conv_fmt_flags_t fmt_flags)
 		{ SYMINFO_FLG_AUXILIARY, MSG_SYMINFO_FLG_AUXILIARY_NF },
 		{ SYMINFO_FLG_INTERPOSE, MSG_SYMINFO_FLG_INTERPOSE_NF },
 		{ SYMINFO_FLG_CAP,	MSG_SYMINFO_FLG_CAP_NF },
+		{ SYMINFO_FLG_DEFERRED,	MSG_SYMINFO_FLG_DEFERRED_NF },
 		{ 0 }
 	};
 

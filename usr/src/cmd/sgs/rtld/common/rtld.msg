@@ -50,6 +50,7 @@
 
 @ MSG_ARG_ILLPATH	"illegal pathname"
 @ MSG_ARG_ILLSYM	"illegal symbol name"
+@ MSG_ARG_ILLNAME	"illegal name"
 @ MSG_ARG_INVADDR	"address 0x%llx does not fall within any mapped object"
 @ MSG_ARG_INVHNDL	"invalid handle: 0x%llx"
 @ MSG_ARG_ILLVAL	"illegal request value"
@@ -61,7 +62,6 @@
 @ MSG_ARG_ILLFLAGS	"illegal flags value: %d"
 @ MSG_ARG_ILLINFO	"non-null info field required for flags value: %d"
 @ MSG_ARG_INVSIG	"invalid signal supplied: %d"
-
 
 # General error diagnostics
 
@@ -245,6 +245,12 @@
 @ MSG_ERR_EXPAND1	"%s: %s: path name too long"
 @ MSG_ERR_EXPAND2	"%s: %s: token %s could not be expanded"
 
+# Specific dlinfo() messages.
+
+@ MSG_DEF_NODEPFOUND	"%s: no deferred dependency found"
+@ MSG_DEF_NOSYMFOUND	"%s: no deferred symbol found"
+@ MSG_DEF_DEPLOADED	"%s: deferred dependency is already loaded"
+
 # Error diagnostic standard prefixes.
 
 @ MSG_ERR_WARNING	"warning: "
@@ -391,6 +397,7 @@
 @ MSG_LD_UNREF		"UNREF"
 @ MSG_LD_UNUSED		"UNUSED"
 @ MSG_LD_VERBOSE	"VERBOSE"
+@ MSG_LD_DEFERRED	"DEFERRED"
 @ MSG_LD_WARN		"WARN"
 
 @ MSG_LD_BRAND_PREFIX	"BRAND_"
