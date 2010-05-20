@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -62,6 +61,7 @@
 #include <vm/seg.h>
 #include <vm/seg_vn.h>
 #include <vm/seg_vn.h>
+#include <vm/seg_kpm.h>
 
 #include <sys/modctl.h>
 #include <sys/syscall.h>
@@ -3043,7 +3043,11 @@ door_copy(struct as *as, caddr_t src, caddr_t dest, uint_t len)
 	/*
 	 * Map destination page into kernel address
 	 */
-	kaddr = (caddr_t)ppmapin(pp, PROT_READ | PROT_WRITE, (caddr_t)-1);
+	if (kpm_enable)
+		kaddr = (caddr_t)hat_kpm_mapin(pp, (struct kpme *)NULL);
+	else
+		kaddr = (caddr_t)ppmapin(pp, PROT_READ | PROT_WRITE,
+		    (caddr_t)-1);
 
 	/*
 	 * Copy from src to dest
@@ -3053,7 +3057,10 @@ door_copy(struct as *as, caddr_t src, caddr_t dest, uint_t len)
 	/*
 	 * Unmap destination page from kernel
 	 */
-	ppmapout(kaddr);
+	if (kpm_enable)
+		hat_kpm_mapout(pp, (struct kpme *)NULL, kaddr);
+	else
+		ppmapout(kaddr);
 	/*
 	 * Unlock destination page
 	 */
