@@ -374,6 +374,7 @@ devid_iter(const char *devpath, zfs_process_func_t func, boolean_t wholedisk)
 	(void) zpool_iter(g_zfshdl, zfs_iter_pool, &data);
 
 	devid_str_free(devidstr);
+	devid_free(devid);
 
 	return (data.dd_found);
 }
@@ -497,8 +498,10 @@ zfsdle_vdev_online(zpool_handle_t *zhp, void *data)
 				(void) zpool_vdev_online(zhp, fullpath, 0,
 				    &newstate);
 		}
+		zpool_close(zhp);
 		return (1);
 	}
+	zpool_close(zhp);
 	return (0);
 }
 
@@ -600,4 +603,5 @@ slm_init()
 void
 slm_fini()
 {
+	libzfs_fini(g_zfshdl);
 }
