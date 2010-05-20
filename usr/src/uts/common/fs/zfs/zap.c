@@ -927,6 +927,21 @@ fzap_remove(zap_name_t *zn, dmu_tx_t *tx)
 	return (err);
 }
 
+void
+fzap_prefetch(zap_name_t *zn)
+{
+	uint64_t idx, blk;
+	zap_t *zap = zn->zn_zap;
+	int bs;
+
+	idx = ZAP_HASH_IDX(zn->zn_hash,
+	    zap->zap_f.zap_phys->zap_ptrtbl.zt_shift);
+	if (zap_idx_to_blk(zap, idx, &blk) != 0)
+		return;
+	bs = FZAP_BLOCK_SHIFT(zap);
+	dmu_prefetch(zap->zap_objset, zap->zap_object, blk << bs, 1 << bs);
+}
+
 /*
  * Helper functions for consumers.
  */

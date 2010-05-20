@@ -812,6 +812,29 @@ zap_lookup_norm(objset_t *os, uint64_t zapobj, const char *name,
 }
 
 int
+zap_prefetch_uint64(objset_t *os, uint64_t zapobj, const uint64_t *key,
+    int key_numints)
+{
+	zap_t *zap;
+	int err;
+	zap_name_t *zn;
+
+	err = zap_lockdir(os, zapobj, NULL, RW_READER, TRUE, FALSE, &zap);
+	if (err)
+		return (err);
+	zn = zap_name_alloc_uint64(zap, key, key_numints);
+	if (zn == NULL) {
+		zap_unlockdir(zap);
+		return (ENOTSUP);
+	}
+
+	fzap_prefetch(zn);
+	zap_name_free(zn);
+	zap_unlockdir(zap);
+	return (err);
+}
+
+int
 zap_lookup_uint64(objset_t *os, uint64_t zapobj, const uint64_t *key,
     int key_numints, uint64_t integer_size, uint64_t num_integers, void *buf)
 {

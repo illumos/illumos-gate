@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -79,6 +78,13 @@ ddt_zap_lookup(objset_t *os, uint64_t object, ddt_entry_t *dde)
 	ddt_decompress(cbuf, dde->dde_phys, csize, sizeof (dde->dde_phys));
 
 	return (0);
+}
+
+static void
+ddt_zap_prefetch(objset_t *os, uint64_t object, ddt_entry_t *dde)
+{
+	(void) zap_prefetch_uint64(os, object, (uint64_t *)&dde->dde_key,
+	    DDT_KEY_WORDS);
 }
 
 static int
@@ -143,6 +149,7 @@ const ddt_ops_t ddt_zap_ops = {
 	ddt_zap_create,
 	ddt_zap_destroy,
 	ddt_zap_lookup,
+	ddt_zap_prefetch,
 	ddt_zap_update,
 	ddt_zap_remove,
 	ddt_zap_walk,

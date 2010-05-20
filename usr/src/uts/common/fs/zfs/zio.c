@@ -52,6 +52,7 @@ uint8_t zio_priority_table[ZIO_PRIORITY_TABLE_SIZE] = {
 	6,	/* ZIO_PRIORITY_ASYNC_READ	*/
 	10,	/* ZIO_PRIORITY_RESILVER	*/
 	20,	/* ZIO_PRIORITY_SCRUB		*/
+	2,	/* ZIO_PRIORITY_DDT_PREFETCH	*/
 };
 
 /*

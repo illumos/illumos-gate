@@ -215,7 +215,8 @@ void dsl_dataset_block_born(dsl_dataset_t *ds, const blkptr_t *bp,
     dmu_tx_t *tx);
 int dsl_dataset_block_kill(dsl_dataset_t *ds, const blkptr_t *bp,
     dmu_tx_t *tx, boolean_t async);
-boolean_t dsl_dataset_block_freeable(dsl_dataset_t *ds, uint64_t blk_birth);
+boolean_t dsl_dataset_block_freeable(dsl_dataset_t *ds, const blkptr_t *bp,
+    uint64_t blk_birth);
 uint64_t dsl_dataset_prev_snap_txg(dsl_dataset_t *ds);
 
 void dsl_dataset_dirty(dsl_dataset_t *ds, dmu_tx_t *tx);

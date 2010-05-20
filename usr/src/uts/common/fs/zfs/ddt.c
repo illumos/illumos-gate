@@ -160,6 +160,17 @@ ddt_object_lookup(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
 	    ddt->ddt_object[type][class], dde));
 }
 
+static void
+ddt_object_prefetch(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
+    ddt_entry_t *dde)
+{
+	if (!ddt_object_exists(ddt, type, class))
+		return;
+
+	ddt_ops[type]->ddt_op_prefetch(ddt->ddt_os,
+	    ddt->ddt_object[type][class], dde);
+}
+
 int
 ddt_object_update(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
     ddt_entry_t *dde, dmu_tx_t *tx)
@@ -711,6 +722,30 @@ ddt_lookup(ddt_t *ddt, const blkptr_t *bp, boolean_t add)
 	cv_broadcast(&dde->dde_cv);
 
 	return (dde);
+}
+
+void
+ddt_prefetch(spa_t *spa, const blkptr_t *bp)
+{
+	ddt_t *ddt;
+	ddt_entry_t dde;
+
+	if (!BP_GET_DEDUP(bp))
+		return;
+
+	/*
+	 * We remove the DDT once it's empty and only prefetch dedup blocks
+	 * when there are entries in the DDT.  Thus no locking is required
+	 * as the DDT can't disappear on us.
+	 */
+	ddt = ddt_select(spa, bp);
+	ddt_key_fill(&dde.dde_key, bp);
+
+	for (enum ddt_type type = 0; type < DDT_TYPES; type++) {
+		for (enum ddt_class class = 0; class < DDT_CLASSES; class++) {
+			ddt_object_prefetch(ddt, type, class, &dde);
+		}
+	}
 }
 
 int

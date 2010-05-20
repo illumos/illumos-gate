@@ -195,7 +195,7 @@ dmu_tx_count_twig(dmu_tx_hold_t *txh, dnode_t *dn, dmu_buf_impl_t *db,
 	}
 
 	freeable = (bp && (freeable ||
-	    dsl_dataset_block_freeable(ds, bp->blk_birth)));
+	    dsl_dataset_block_freeable(ds, bp, bp->blk_birth)));
 
 	if (freeable)
 		txh->txh_space_tooverwrite += space;
@@ -390,7 +390,7 @@ dmu_tx_count_dnode(dmu_tx_hold_t *txh)
 
 	if (dn && dn->dn_dbuf->db_blkptr &&
 	    dsl_dataset_block_freeable(dn->dn_objset->os_dsl_dataset,
-	    dn->dn_dbuf->db_blkptr->blk_birth)) {
+	    dn->dn_dbuf->db_blkptr, dn->dn_dbuf->db_blkptr->blk_birth)) {
 		txh->txh_space_tooverwrite += space;
 		txh->txh_space_tounref += space;
 	} else {
@@ -465,7 +465,7 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 			blkptr_t *bp = dn->dn_phys->dn_blkptr;
 			ASSERT3U(blkid + i, <, dn->dn_nblkptr);
 			bp += blkid + i;
-			if (dsl_dataset_block_freeable(ds, bp->blk_birth)) {
+			if (dsl_dataset_block_freeable(ds, bp, bp->blk_birth)) {
 				dprintf_bp(bp, "can free old%s", "");
 				space += bp_get_dsize(spa, bp);
 			}
@@ -550,7 +550,8 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 		bp += blkoff;
 
 		for (i = 0; i < tochk; i++) {
-			if (dsl_dataset_block_freeable(ds, bp[i].blk_birth)) {
+			if (dsl_dataset_block_freeable(ds, &bp[i],
+			    bp[i].blk_birth)) {
 				dprintf_bp(&bp[i], "can free old%s", "");
 				space += bp_get_dsize(spa, &bp[i]);
 			}
@@ -690,6 +691,7 @@ dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, const char *name)
 		 * the size will change between now and the dbuf dirty call.
 		 */
 		if (dsl_dataset_block_freeable(dn->dn_objset->os_dsl_dataset,
+		    &dn->dn_phys->dn_blkptr[0],
 		    dn->dn_phys->dn_blkptr[0].blk_birth)) {
 			txh->txh_space_tooverwrite += SPA_MAXBLOCKSIZE;
 		} else {
@@ -1279,7 +1281,7 @@ dmu_tx_hold_spill(dmu_tx_t *tx, uint64_t object)
 		txh->txh_space_tounref = 0;
 	} else {
 		if (dsl_dataset_block_freeable(dn->dn_objset->os_dsl_dataset,
-		    bp->blk_birth))
+		    bp, bp->blk_birth))
 			txh->txh_space_tooverwrite += SPA_MAXBLOCKSIZE;
 		else
 			txh->txh_space_towrite += SPA_MAXBLOCKSIZE;

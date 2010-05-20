@@ -868,7 +868,7 @@ dbuf_block_freeable(dmu_buf_impl_t *db)
 	/* If we don't exist or are in a snapshot, we can't be freed */
 	if (birth_txg)
 		return (ds == NULL ||
-		    dsl_dataset_block_freeable(ds, birth_txg));
+		    dsl_dataset_block_freeable(ds, db->db_blkptr, birth_txg));
 	else
 		return (FALSE);
 }
@@ -1725,6 +1725,8 @@ dbuf_prefetch(dnode_t *dn, uint64_t blkid)
 
 	if (dbuf_findbp(dn, 0, blkid, TRUE, &db, &bp) == 0) {
 		if (bp && !BP_IS_HOLE(bp)) {
+			int priority = dn->dn_type == DMU_OT_DDT_ZAP ?
+			    ZIO_PRIORITY_DDT_PREFETCH : ZIO_PRIORITY_ASYNC_READ;
 			arc_buf_t *pbuf;
 			dsl_dataset_t *ds = dn->dn_objset->os_dsl_dataset;
 			uint32_t aflags = ARC_NOWAIT | ARC_PREFETCH;
@@ -1739,7 +1741,7 @@ dbuf_prefetch(dnode_t *dn, uint64_t blkid)
 				pbuf = dn->dn_objset->os_phys_buf;
 
 			(void) dsl_read(NULL, dn->dn_objset->os_spa,
-			    bp, pbuf, NULL, NULL, ZIO_PRIORITY_ASYNC_READ,
+			    bp, pbuf, NULL, NULL, priority,
 			    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE,
 			    &aflags, &zb);
 		}
@@ -2033,7 +2035,7 @@ dmu_buf_freeable(dmu_buf_t *dbuf)
 
 	if (db->db_blkptr)
 		res = dsl_dataset_block_freeable(db->db_objset->os_dsl_dataset,
-		    db->db_blkptr->blk_birth);
+		    db->db_blkptr, db->db_blkptr->blk_birth);
 
 	return (res);
 }
