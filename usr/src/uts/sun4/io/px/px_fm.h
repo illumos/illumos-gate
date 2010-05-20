@@ -101,6 +101,8 @@ extern void px_bus_enter(dev_info_t *dip, ddi_acc_handle_t handle);
 extern void px_bus_exit(dev_info_t *dip, ddi_acc_handle_t handle);
 extern int px_fm_attach(px_t *px_p);
 extern void px_fm_detach(px_t *px_p);
+extern void px_fm_cb_enable(px_t *px_p);
+extern void px_fm_cb_disable(px_t *px_p);
 extern int px_fm_init_child(dev_info_t *, dev_info_t *, int,
     ddi_iblock_cookie_t *);
 extern void px_fm_acc_setup(ddi_map_req_t *, dev_info_t *, pci_regspec_t *rp);

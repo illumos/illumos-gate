@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -46,8 +46,6 @@
 extern uint_t px_ranges_phi_mask;
 
 static uint_t px_pec_error_intr(caddr_t a);
-static int    px_pec_msg_add_intr(px_t *px_p);
-static void   px_pec_msg_rem_intr(px_t *px_p);
 
 int
 px_pec_attach(px_t *px_p)
@@ -57,7 +55,6 @@ px_pec_attach(px_t *px_p)
 	int nrange = px_p->px_ranges_length / sizeof (pci_ranges_t);
 	dev_info_t *dip = px_p->px_dip;
 	pci_ranges_t *rangep = px_p->px_ranges_p;
-	int ret;
 
 	/*
 	 * Allocate a state structure for the PEC and cross-link it
@@ -74,15 +71,6 @@ px_pec_attach(px_t *px_p)
 	(void) snprintf(pec_p->pec_nameaddr_str,
 	    sizeof (pec_p->pec_nameinst_str) - len,
 	    "%s@%s", NAMEADDR(dip));
-
-	/*
-	 * Add interrupt handlers to process correctable/fatal/non fatal
-	 * PCIE messages.
-	 */
-	if ((ret = px_pec_msg_add_intr(px_p)) != DDI_SUCCESS) {
-		px_pec_msg_rem_intr(px_p);
-		return (ret);
-	}
 
 	/*
 	 * Get this pec's mem32 and mem64 segments to determine whether
@@ -140,12 +128,6 @@ px_pec_detach(px_t *px_p)
 	mutex_destroy(&pec_p->pec_pokefault_mutex);
 
 	/*
-	 * Remove interrupt handlers to process correctable/fatal/non fatal
-	 * PCIE messages.
-	 */
-	px_pec_msg_rem_intr(px_p);
-
-	/*
 	 * Free the pec state structure.
 	 */
 	kmem_free(pec_p, sizeof (px_pec_t));
@@ -158,7 +140,7 @@ px_pec_detach(px_t *px_p)
  * Add interrupt handlers to process correctable/fatal/non fatal
  * PCIE messages.
  */
-static int
+int
 px_pec_msg_add_intr(px_t *px_p)
 {
 	dev_info_t		*dip = px_p->px_dip;
@@ -254,7 +236,7 @@ px_pec_msg_add_intr(px_t *px_p)
  * PCIE messages. For now, all these PCIe messages are mapped to
  * same MSIQ.
  */
-static void
+void
 px_pec_msg_rem_intr(px_t *px_p)
 {
 	dev_info_t		*dip = px_p->px_dip;

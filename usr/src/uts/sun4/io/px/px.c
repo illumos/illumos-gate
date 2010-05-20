@@ -51,10 +51,11 @@
  */
 static int px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
+static int px_enable_err_intr(px_t *px_p);
+static void px_disable_err_intr(px_t *px_p);
 static int px_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
 	void *arg, void **result);
 static int px_cb_attach(px_t *);
-static void px_cb_detach(px_t *);
 static int px_pwr_setup(dev_info_t *dip);
 static void px_pwr_teardown(dev_info_t *dip);
 static void px_set_mps(px_t *px_p);
@@ -309,9 +310,9 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/*
 		 * All of the error handlers have been registered
-		 * by now so it's time to activate the interrupt.
+		 * by now so it's time to activate all the interrupt.
 		 */
-		if ((ret = px_err_add_intr(&px_p->px_fault)) != DDI_SUCCESS)
+		if ((px_enable_err_intr(px_p)) != DDI_SUCCESS)
 			goto err_bad_intr;
 
 		if (px_lib_hotplug_init(dip, (void *)&regops) == DDI_SUCCESS) {
@@ -383,7 +384,7 @@ err_bad_pcitool_node:
 		(void) pcie_uninit(dip);
 err_bad_hotplug:
 		(void) px_lib_hotplug_uninit(dip);
-		px_err_rem_intr(&px_p->px_fault);
+		px_disable_err_intr(px_p);
 err_bad_intr:
 		px_fm_detach(px_p);
 err_bad_dma:
@@ -395,7 +396,6 @@ err_bad_msi:
 err_bad_msiq:
 		px_mmu_detach(px_p);
 err_bad_mmu:
-		px_cb_detach(px_p);
 err_bad_cb:
 		px_ib_detach(px_p);
 err_bad_ib:
@@ -498,7 +498,7 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		pxtool_uninit(dip);
 
-		px_err_rem_intr(&px_p->px_fault);
+		px_disable_err_intr(px_p);
 		px_fm_detach(px_p);
 		px_pec_detach(px_p);
 		px_pwr_teardown(dip);
@@ -506,7 +506,6 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		px_msi_detach(px_p);
 		px_msiq_detach(px_p);
 		px_mmu_detach(px_p);
-		px_cb_detach(px_p);
 		px_ib_detach(px_p);
 		if (px_lib_dev_fini(dip) != DDI_SUCCESS) {
 			DBG(DBG_DETACH, dip, "px_lib_dev_fini failed\n");
@@ -545,6 +544,45 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 }
 
+static int
+px_enable_err_intr(px_t *px_p)
+{
+	/* Add FMA Callback handler for failed PIO Loads */
+	px_fm_cb_enable(px_p);
+
+	/* Add Common Block mondo handler */
+	if (px_cb_add_intr(&px_p->px_cb_fault) != DDI_SUCCESS)
+		goto cb_bad;
+
+	/* Add PEU Block Mondo Handler */
+	if (px_err_add_intr(&px_p->px_fault) != DDI_SUCCESS)
+		goto peu_bad;
+
+	/* Enable interrupt handler for PCIE Fabric Error Messages */
+	if (px_pec_msg_add_intr(px_p) != DDI_SUCCESS)
+		goto msg_bad;
+
+	return (DDI_SUCCESS);
+
+msg_bad:
+	px_err_rem_intr(&px_p->px_fault);
+peu_bad:
+	px_cb_rem_intr(&px_p->px_cb_fault);
+cb_bad:
+	px_fm_cb_disable(px_p);
+
+	return (DDI_FAILURE);
+}
+
+static void
+px_disable_err_intr(px_t *px_p)
+{
+	px_pec_msg_rem_intr(px_p);
+	px_err_rem_intr(&px_p->px_fault);
+	px_cb_rem_intr(&px_p->px_cb_fault);
+	px_fm_cb_disable(px_p);
+}
+
 int
 px_cb_attach(px_t *px_p)
 {
@@ -561,13 +599,7 @@ px_cb_attach(px_t *px_p)
 	fault_p->px_err_func = px_err_cb_intr;
 	fault_p->px_intr_ino = px_p->px_inos[PX_INTR_XBC];
 
-	return (px_cb_add_intr(fault_p));
-}
-
-void
-px_cb_detach(px_t *px_p)
-{
-	px_cb_rem_intr(&px_p->px_cb_fault);
+	return (DDI_SUCCESS);
 }
 
 /*

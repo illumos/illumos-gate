@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -64,6 +64,8 @@ hvio_config_put(devhandle_t dev_hdl, pci_device_t bdf, pci_config_offset_t off,
 	ENTRY(hvio_config_get)
 	mov	HVIO_CONFIG_GET, %o5
 	ta	FAST_TRAP
+	sllx	%o1, 32, %o1
+	or	%o0, %o1, %o0
 	movrnz	%o1, -1, %o2
 	stx	%o2, [%o4]
 	retl
@@ -83,6 +85,8 @@ hvio_config_put(devhandle_t dev_hdl, pci_device_t bdf, pci_config_offset_t off,
 	ENTRY(hvio_config_put)
 	mov	HVIO_CONFIG_PUT, %o5
 	ta	FAST_TRAP
+	sllx	%o1, 32, %o1
+	or	%o0, %o1, %o0
 	retl
 	nop
 	SET_SIZE(hvio_config_put)

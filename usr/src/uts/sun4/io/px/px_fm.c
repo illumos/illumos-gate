@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -100,11 +100,6 @@ px_fm_attach(px_t *px_p)
 	bus_p->bus_rp_bdf = px_p->px_bdf;
 	bus_p->bus_rp_dip = dip;
 
-	/*
-	 * register error callback in parent
-	 */
-	ddi_fm_handler_register(dip, px_fm_callback, px_p);
-
 	return (DDI_SUCCESS);
 }
 
@@ -116,11 +111,25 @@ px_fm_detach(px_t *px_p)
 {
 	int i;
 
-	ddi_fm_handler_unregister(px_p->px_dip);
 	mutex_destroy(&px_p->px_fm_mutex);
 	ddi_fm_fini(px_p->px_dip);
 	for (i = 0; i < 5; i++)
 		pcie_rc_fini_pfd(&px_p->px_pfd_arr[i]);
+}
+
+/*
+ * register error callback in parent
+ */
+void
+px_fm_cb_enable(px_t *px_p)
+{
+	ddi_fm_handler_register(px_p->px_dip, px_fm_callback, px_p);
+}
+
+void
+px_fm_cb_disable(px_t *px_p)
+{
+	ddi_fm_handler_unregister(px_p->px_dip);
 }
 
 /*

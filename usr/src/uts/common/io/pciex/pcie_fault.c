@@ -2302,7 +2302,12 @@ pf_hdl_lookup(dev_info_t *dip, uint64_t ena, uint32_t flag, uint64_t addr,
 	if ((addr == NULL) && !PCIE_CHECK_VALID_BDF(bdf))
 		return (PF_HDL_NOTFOUND);
 
-	if (!(flag & (PF_ADDR_DMA | PF_ADDR_PIO | PF_ADDR_CFG))) {
+	/*
+	 * Disable DMA handle lookup until DMA errors can be handled and
+	 * reported synchronously.  When enabled again, check for the
+	 * PF_ADDR_DMA flag
+	 */
+	if (!(flag & (PF_ADDR_PIO | PF_ADDR_CFG))) {
 		return (PF_HDL_NOTFOUND);
 	}
 
@@ -2482,32 +2487,29 @@ pf_hdl_compare(dev_info_t *dip, ddi_fm_error_t *derr, uint32_t flag,
  *
  * Returns either PF_HDL_NOTFOUND or PF_HDL_FOUND.
  */
+/* ARGSUSED */
 static int
 pf_log_hdl_lookup(dev_info_t *rpdip, ddi_fm_error_t *derr, pf_data_t *pfd_p,
 	boolean_t is_primary)
 {
-	int		lookup = PF_HDL_NOTFOUND;
-
-	if (is_primary) {
-		pf_pcie_adv_err_regs_t *reg_p = PCIE_ADV_REG(pfd_p);
-		if (pf_tlp_decode(PCIE_PFD2BUS(pfd_p), reg_p) == DDI_SUCCESS) {
-			lookup = pf_hdl_lookup(rpdip, derr->fme_ena,
-			    reg_p->pcie_ue_tgt_trans,
-			    reg_p->pcie_ue_tgt_addr,
-			    reg_p->pcie_ue_tgt_bdf);
-		}
-	} else {
-		pf_pcie_adv_bdg_err_regs_t *reg_p = PCIE_ADV_BDG_REG(pfd_p);
-		uint16_t cmd;
-		if (pf_pci_decode(pfd_p, &cmd) == DDI_SUCCESS) {
-			lookup = pf_hdl_lookup(rpdip, derr->fme_ena,
-			    reg_p->pcie_sue_tgt_trans,
-			    reg_p->pcie_sue_tgt_addr,
-			    reg_p->pcie_sue_tgt_bdf);
-		}
-	}
-
-	return (lookup);
+	/*
+	 * Disabling this function temporarily until errors can be handled
+	 * synchronously.
+	 *
+	 * This function is currently only called during the middle of a fabric
+	 * scan.  If the fabric scan is called synchronously with an error seen
+	 * in the RP/RC, then the related errors in the fabric will have a
+	 * PF_ERR_MATCHED_RC error severity.  pf_log_hdl_lookup code will be by
+	 * passed when the severity is PF_ERR_MATCHED_RC.  Handle lookup would
+	 * have already happened in RP/RC error handling in a synchronous
+	 * manner.  Errors unrelated should panic, because they are being
+	 * handled asynchronously.
+	 *
+	 * If fabric scan is called asynchronously from any RP/RC error, then
+	 * DMA/PIO UE errors seen in the fabric should panic.  pf_lop_hdl_lookup
+	 * will return PF_HDL_NOTFOUND to ensure that the system panics.
+	 */
+	return (PF_HDL_NOTFOUND);
 }
 
 /*
