@@ -995,19 +995,15 @@ setifaddr(char *addr, int64_t param)
 		if (istatus != IPADM_SUCCESS)
 			ipadmerr_exit(istatus, "setifaddr");
 
-		if (strchr(addr, '/') == NULL) {
-			/*
-			 * lifr.lifr_addr, which is updated by set_mask_lifreq()
-			 * will contain the right mask to use.
-			 */
-			prefixlen = mask2plen(&lifr.lifr_addr);
-			(void) snprintf(cidraddr, sizeof (cidraddr), "%s/%d",
-			    addrstr, prefixlen);
-			addr = cidraddr;
-		} else {
-			addr = addrstr;
-		}
-		istatus = ipadm_set_addr(ipaddr, addr, af);
+		/*
+		 * lifr.lifr_addr, which is updated by set_mask_lifreq()
+		 * will contain the right mask to use.
+		 */
+		prefixlen = mask2plen(&lifr.lifr_addr);
+		(void) snprintf(cidraddr, sizeof (cidraddr), "%s/%d",
+		    addrstr, prefixlen);
+
+		istatus = ipadm_set_addr(ipaddr, cidraddr, af);
 		if (istatus != IPADM_SUCCESS)
 			ipadmerr_exit(istatus, "could not set address");
 		/*
