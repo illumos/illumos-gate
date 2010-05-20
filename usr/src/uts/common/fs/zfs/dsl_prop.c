@@ -623,7 +623,8 @@ dsl_prop_set_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 		err = zap_remove(mos, zapobj, propname, tx);
 		ASSERT(err == 0 || err == ENOENT);
 		if (version >= SPA_VERSION_RECVD_PROPS &&
-		    zap_contains(mos, zapobj, ZPROP_HAS_RECVD) == 0) {
+		    dsl_prop_get_ds(ds, ZPROP_HAS_RECVD, 8, 1, &dummy,
+		    NULL) == 0) {
 			dummy = 0;
 			err = zap_update(mos, zapobj, inheritstr,
 			    8, 1, &dummy, tx);
