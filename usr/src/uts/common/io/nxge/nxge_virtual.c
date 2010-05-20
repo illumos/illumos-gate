@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/nxge/nxge_impl.h>
@@ -1722,6 +1721,9 @@ nxge_get_config_properties(p_nxge_t nxgep)
 
 	nxgep->niu_hw_type = NIU_HW_TYPE_DEFAULT;
 	if (nxgep->niu_type == N2_NIU) {
+
+		uchar_t *s_prop_val;
+
 		/*
 		 * For NIU, the next generation KT has
 		 * a few differences in features that the
@@ -1742,6 +1744,94 @@ nxge_get_config_properties(p_nxge_t nxgep)
 		}
 
 		ddi_prop_free(prop_val);
+		/*
+		 * Some Serdes and PHY properties may also be provided as OBP
+		 * properties
+		 */
+		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+		    "tx-cfg-l", &s_prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+			nxgep->srds_prop.tx_cfg_l =
+			    (uint16_t)(*(uint32_t *)s_prop_val);
+			NXGE_DEBUG_MSG((nxgep, VPD_CTL,
+			    "nxge_get_config_properties: "
+			    "tx_cfg_l 0x%x, Read from OBP",
+			    nxgep->srds_prop.tx_cfg_l));
+			nxgep->srds_prop.prop_set |= NXGE_SRDS_TXCFGL;
+			ddi_prop_free(s_prop_val);
+		}
+		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+		    "tx-cfg-h", &s_prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+			nxgep->srds_prop.tx_cfg_h =
+			    (uint16_t)(*(uint32_t *)s_prop_val);
+			NXGE_DEBUG_MSG((nxgep, VPD_CTL,
+			    "nxge_get_config_properties: "
+			    "tx_cfg_h 0x%x, Read from OBP",
+			    nxgep->srds_prop.tx_cfg_h));
+			nxgep->srds_prop.prop_set |= NXGE_SRDS_TXCFGH;
+			ddi_prop_free(s_prop_val);
+		}
+		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+		    "rx-cfg-l", &s_prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+			nxgep->srds_prop.rx_cfg_l =
+			    (uint16_t)(*(uint32_t *)s_prop_val);
+			NXGE_DEBUG_MSG((nxgep, VPD_CTL,
+			    "nxge_get_config_properties: "
+			    "rx_cfg_l 0x%x, Read from OBP",
+			    nxgep->srds_prop.rx_cfg_l));
+			nxgep->srds_prop.prop_set |= NXGE_SRDS_RXCFGL;
+			ddi_prop_free(s_prop_val);
+		}
+		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+		    "rx-cfg-h", &s_prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+			nxgep->srds_prop.rx_cfg_h =
+			    (uint16_t)(*(uint32_t *)s_prop_val);
+			NXGE_DEBUG_MSG((nxgep, VPD_CTL,
+			    "nxge_get_config_properties: "
+			    "rx_cfg_h 0x%x, Read from OBP",
+			    nxgep->srds_prop.rx_cfg_h));
+			nxgep->srds_prop.prop_set |= NXGE_SRDS_RXCFGH;
+			ddi_prop_free(s_prop_val);
+		}
+		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+		    "pll-cfg", &s_prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+			nxgep->srds_prop.pll_cfg_l =
+			    (uint16_t)(*(uint32_t *)s_prop_val);
+			NXGE_DEBUG_MSG((nxgep, VPD_CTL,
+			    "nxge_get_config_properties: "
+			    "pll_cfg_l 0x%x, Read from OBP",
+			    nxgep->srds_prop.pll_cfg_l));
+			nxgep->srds_prop.prop_set |= NXGE_SRDS_PLLCFGL;
+			ddi_prop_free(s_prop_val);
+		}
+		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+		    "phy-reg-values", &s_prop_val, &prop_len) ==
+		    DDI_PROP_SUCCESS) {
+
+			int tun_cnt, i;
+			uchar_t *arr = s_prop_val;
+
+			tun_cnt = prop_len / 6; /* 3 values, 2 bytes each */
+			nxgep->phy_prop.arr =
+			    KMEM_ZALLOC(sizeof (nxge_phy_mdio_val_t) * tun_cnt,
+			    KM_SLEEP);
+			nxgep->phy_prop.cnt = tun_cnt;
+			for (i = 0; i < tun_cnt; i++) {
+				nxgep->phy_prop.arr[i].dev = *(uint16_t *)arr;
+				arr += 2;
+				nxgep->phy_prop.arr[i].reg = *(uint16_t *)arr;
+				arr += 2;
+				nxgep->phy_prop.arr[i].val = *(uint16_t *)arr;
+				arr += 2;
+				NXGE_DEBUG_MSG((nxgep, VPD_CTL,
+				    "nxge_get_config_properties: From OBP, "
+				    "read PHY <dev.reg.val> = "
+				    "<0x%x.0x%x.0x%x>",
+				    nxgep->phy_prop.arr[i].dev,
+				    nxgep->phy_prop.arr[i].reg,
+				    nxgep->phy_prop.arr[i].val));
+			}
+			ddi_prop_free(s_prop_val);
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, VPD_CTL, " <== nxge_get_config_properties"));

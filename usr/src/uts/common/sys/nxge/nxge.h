@@ -649,6 +649,8 @@ struct _nxge_t {
 	uint32_t		xcvr_addr;
 	uint16_t		chip_id;
 	nxge_nlp_conn_t		nlp_conn;
+	nxge_phy_prop_t		phy_prop;
+	nxge_serdes_prop_t	srds_prop;
 
 	nxge_mac_t		mac;
 	nxge_ipp_t		ipp;

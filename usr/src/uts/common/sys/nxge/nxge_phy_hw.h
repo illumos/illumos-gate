@@ -999,6 +999,23 @@ typedef struct _nxge_nlp_initseq_t {
 	uint16_t	val;
 } nxge_nlp_initseq_t, *p_nxge_nlp_initseq_t;
 
+/*
+ * struct for PHY dev, register and value triple properties
+ */
+typedef struct _nxge_phy_mdio_val_t {
+	uint16_t	dev;
+	uint16_t	reg;
+	uint16_t	val;
+} nxge_phy_mdio_val_t, *p_nxge_phy_mdio_val_t;
+
+/*
+ * struct for PHY register configurable property
+ */
+typedef struct _nxge_phy_prop_t {
+	int	cnt;
+	p_nxge_phy_mdio_val_t arr;
+} nxge_phy_prop_t, *p_nxge_phy_prop_t;
+
 #ifdef	__cplusplus
 }
 #endif

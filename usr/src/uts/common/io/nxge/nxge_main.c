@@ -18,10 +18,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1047,6 +1045,15 @@ nxge_unattach(p_nxge_t nxgep)
 	 * Tear down the kstat setup.
 	 */
 	nxge_destroy_kstats(nxgep);
+
+	/*
+	 * Free any memory allocated for PHY properties
+	 */
+	if (nxgep->phy_prop.cnt > 0) {
+		KMEM_FREE(nxgep->phy_prop.arr,
+		    sizeof (nxge_phy_mdio_val_t) * nxgep->phy_prop.cnt);
+		nxgep->phy_prop.cnt = 0;
+	}
 
 	/*
 	 * Destroy all mutexes.

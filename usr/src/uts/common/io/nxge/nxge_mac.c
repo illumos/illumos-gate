@@ -1744,49 +1744,62 @@ nxge_n2_kt_serdes_init(p_nxge_t nxgep)
 	    nxgep->mac.portmode == PORT_10G_COPPER ||
 	    nxgep->mac.portmode == PORT_10G_TN1010 ||
 	    nxgep->mac.portmode == PORT_10G_SERDES) {
-		tx_cfg_l.bits.entx = K_CFGTX_ENABLE_TX;
-		/* 0x1e21 */
-		tx_cfg_l.bits.swing = K_CFGTX_SWING_2000MV;
-		tx_cfg_l.bits.rate = K_CFGTX_RATE_HALF;
+
+		/* Take tunables from OBP if present, otherwise use defaults */
+		if (nxgep->srds_prop.prop_set & NXGE_SRDS_TXCFGL) {
+			tx_cfg_l.value = nxgep->srds_prop.tx_cfg_l;
+		} else {
+			tx_cfg_l.bits.entx = K_CFGTX_ENABLE_TX;
+			/* 0x1e21 */
+			tx_cfg_l.bits.swing = K_CFGTX_SWING_2000MV;
+			tx_cfg_l.bits.rate = K_CFGTX_RATE_HALF;
+		}
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_n2_kt_serdes_init port<%d> tx_cfg_l 0x%x",
 		    portn, tx_cfg_l.value));
 
-		/* channel 0: enable syn. master */
-		/* 0x40 */
-		tx_cfg_h.bits.msync = K_CFGTX_ENABLE_MSYNC;
+		if (nxgep->srds_prop.prop_set & NXGE_SRDS_TXCFGH) {
+			tx_cfg_h.value = nxgep->srds_prop.tx_cfg_h;
+		} else {
+			/* channel 0: enable syn. master */
+			/* 0x40 */
+			tx_cfg_h.bits.msync = K_CFGTX_ENABLE_MSYNC;
+		}
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_n2_kt_serdes_init port<%d> tx_cfg_h 0x%x",
 		    portn, tx_cfg_h.value));
-		/* 0x4821 */
-		rx_cfg_l.bits.enrx = K_CFGRX_ENABLE_RX;
-		rx_cfg_l.bits.rate = K_CFGRX_RATE_HALF;
-		rx_cfg_l.bits.align = K_CFGRX_ALIGN_EN;
-		rx_cfg_l.bits.los = K_CFGRX_LOS_ENABLE;
+
+		if (nxgep->srds_prop.prop_set & NXGE_SRDS_RXCFGL) {
+			rx_cfg_l.value = nxgep->srds_prop.rx_cfg_l;
+		} else {
+			/* 0x4821 */
+			rx_cfg_l.bits.enrx = K_CFGRX_ENABLE_RX;
+			rx_cfg_l.bits.rate = K_CFGRX_RATE_HALF;
+			rx_cfg_l.bits.align = K_CFGRX_ALIGN_EN;
+			rx_cfg_l.bits.los = K_CFGRX_LOS_ENABLE;
+		}
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_n2_kt_serdes_init port<%d> rx_cfg_l 0x%x",
 		    portn, rx_cfg_l.value));
 
-		/* 0x0008 */
-		rx_cfg_h.bits.eq = K_CFGRX_EQ_ADAPTIVE;
+		if (nxgep->srds_prop.prop_set & NXGE_SRDS_RXCFGH) {
+			rx_cfg_h.value = nxgep->srds_prop.rx_cfg_h;
+		} else {
+			/* 0x0008 */
+			rx_cfg_h.bits.eq = K_CFGRX_EQ_ADAPTIVE;
+		}
 
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_n2_kt_serdes_init port<%d> rx_cfg_h 0x%x",
 		    portn, rx_cfg_h.value));
 
-		/* Set loopback mode if necessary */
-		if (nxgep->statsp->port_stats.lb_mode == nxge_lb_serdes10g) {
-			tx_cfg_h.bits.loopback = K_CFGTX_INNER_CML_ENA_LOOPBACK;
-			rx_cfg_h.bits.loopback = K_CFGTX_INNER_CML_ENA_LOOPBACK;
-			rx_cfg_l.bits.los = 0;
-
-			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-			    "==> nxge_n2_kt_serdes_init port<%d>: "
-			    "loopback 0x%x", portn, tx_cfg_h.value));
+		if (nxgep->srds_prop.prop_set & NXGE_SRDS_PLLCFGL) {
+			pll_cfg_l.value = nxgep->srds_prop.pll_cfg_l;
+		} else {
+			/* 0xa1: Initialize PLL for 10G */
+			pll_cfg_l.bits.mpy = K_CFGPLL_MPY_20X;
+			pll_cfg_l.bits.enpll = K_CFGPLL_ENABLE_PLL;
 		}
-		/* 0xa1: Initialize PLL for 10G */
-		pll_cfg_l.bits.mpy = K_CFGPLL_MPY_20X;
-		pll_cfg_l.bits.enpll = K_CFGPLL_ENABLE_PLL;
 
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_n2_kt_serdes_init port<%d> pll_cfg_l 0x%x",
@@ -1798,6 +1811,17 @@ nxge_n2_kt_serdes_init(p_nxge_t nxgep)
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_n2_kt_serdes_init port<%d> pll_cfg_l 0x%x",
 		    portn, pll_cfg_l.value));
+
+		/* Set loopback mode if necessary */
+		if (nxgep->statsp->port_stats.lb_mode == nxge_lb_serdes10g) {
+			tx_cfg_h.bits.loopback = K_CFGTX_INNER_CML_ENA_LOOPBACK;
+			rx_cfg_h.bits.loopback = K_CFGTX_INNER_CML_ENA_LOOPBACK;
+			rx_cfg_l.bits.los = 0;
+
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "==> nxge_n2_kt_serdes_init port<%d>: "
+			    "loopback 0x%x", portn, tx_cfg_h.value));
+		}
 #ifdef  NXGE_DEBUG
 		nxge_mdio_read(nxgep, portn, ESR_N2_DEV_ADDR,
 		    ESR_N2_PLL_CFG_L_REG, &cfg.value);
@@ -2527,6 +2551,28 @@ fail:
 	return (status);
 }
 
+#define	NXGE_SET_PHY_TUNABLES(nxgep, phy_port, stat)			\
+{									\
+	int i;								\
+									\
+	if (nxgep->phy_prop.cnt > 0) {					\
+		for (i = 0; i < nxgep->phy_prop.cnt; i++) {		\
+			if ((stat = nxge_mdio_write(nxgep, phy_port,	\
+			    nxgep->phy_prop.arr[i].dev,			\
+			    nxgep->phy_prop.arr[i].reg,			\
+			    nxgep->phy_prop.arr[i].val)) != NXGE_OK) {	\
+				break;					\
+			}						\
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,			\
+			    "From OBP, write<dev.reg.val> = "		\
+			    "<0x%x.0x%x.0x%x>",				\
+			    nxgep->phy_prop.arr[i].dev,			\
+			    nxgep->phy_prop.arr[i].reg,			\
+			    nxgep->phy_prop.arr[i].val));		\
+		}							\
+	}								\
+}
+
 /* Initialize the BCM 8704 xcvr */
 
 static nxge_status_t
@@ -2548,6 +2594,7 @@ nxge_BCM8704_xcvr_init(p_nxge_t nxgep)
 #ifdef	NXGE_DEBUG
 	portn = nxgep->mac.portnum;
 #endif
+
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_BCM8704_xcvr_init: port<%d>",
 	    portn));
 
@@ -2644,6 +2691,16 @@ nxge_BCM8704_xcvr_init(p_nxge_t nxgep)
 		goto fail;
 
 	NXGE_DELAY(1000000);
+
+	/*
+	 * Set XAUI link tunables from OBP if present.
+	 */
+	NXGE_SET_PHY_TUNABLES(nxgep, phy_port_addr, status);
+	if (status != NXGE_OK) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_BCM8704_xcvr_init: Failed setting PHY tunables"));
+		goto fail;
+	}
 
 	/* Set BCM8704 Internal Loopback mode if necessary */
 	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
@@ -2768,6 +2825,16 @@ nxge_BCM8706_xcvr_init(p_nxge_t nxgep)
 	}
 
 	NXGE_DELAY(1000000);
+
+	/*
+	 * Set XAUI link tunables from OBP if present.
+	 */
+	NXGE_SET_PHY_TUNABLES(nxgep, phy_port_addr, status);
+	if (status != NXGE_OK) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_BCM8706_xcvr_init: Failed setting PHY tunables"));
+		goto fail;
+	}
 
 	/* Set BCM8706 Internal Loopback mode if necessary */
 	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
@@ -3498,6 +3565,17 @@ nxge_nlp2020_xcvr_init(p_nxge_t nxgep)
 		    NLP2020_GPIO_ADDR, NLP2020_GPIO_CTL_REG,
 		    NLP2020_GPIO_INACT);
 	}
+
+	/*
+	 * Set XAUI link tunables from OBP if present.
+	 */
+	NXGE_SET_PHY_TUNABLES(nxgep, phy_port_addr, status);
+	if (status != NXGE_OK) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_nlp2020_xcvr_init: Failed setting PHY tunables"));
+		goto fail;
+	}
+
 	/* It takes ~2s for EDC to settle */
 	drv_usecwait(2000000);
 

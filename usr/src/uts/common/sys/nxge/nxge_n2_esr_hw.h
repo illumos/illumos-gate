@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_NXGE_NXGE_N2_ESR_HW_H
@@ -671,6 +670,25 @@ typedef	union _k_esr_ti_stsrx_l {
 } k_esr_ti_stsrx_l_t;
 
 #define	K_TESTCFG_INNER_CML_EN_LOOOPBACK	0x3
+
+/*
+ * struct for Serdes properties
+ */
+typedef struct _nxge_serdes_prop_t {
+	uint16_t	tx_cfg_l;
+	uint16_t	tx_cfg_h;
+	uint16_t	rx_cfg_l;
+	uint16_t	rx_cfg_h;
+	uint16_t	pll_cfg_l;
+	uint16_t	prop_set;
+} nxge_serdes_prop_t, *p_nxge_serdes_prop_t;
+
+/* Bit array with 1 bit for every serdes property set */
+#define	NXGE_SRDS_TXCFGL	0x1
+#define	NXGE_SRDS_TXCFGH	0x2
+#define	NXGE_SRDS_RXCFGL	0x4
+#define	NXGE_SRDS_RXCFGH	0x8
+#define	NXGE_SRDS_PLLCFGL	0x10
 
 #ifdef	__cplusplus
 }
