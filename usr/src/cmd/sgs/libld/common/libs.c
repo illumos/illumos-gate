@@ -312,92 +312,50 @@ ld_ar_member(Ar_desc * adp, Elf_Arsym * arsym, Ar_aux * aup, Ar_mem * amp)
 }
 
 /*
- * Prepare an object from the given archive to be input to the link.
- * Creates a path name for the object, and passes it to any registered
- * support libraries.
+ * Return the archive member's name.
  *
  * entry:
  *	name - Name of archive
- *	fd - Open file descriptor for archive
- *	adp - Archive descriptor
+ *	arelf - ELF descriptor for archive member.
  *	ofl - output descriptor
- *	arelf - Address of variable containing pointer to ELF descriptor
- *		for archive member.
- *	arsym - NULL, or archive symbol entry that is triggering the
- *		pending extraction of this archive member.
- *	arname - Address of pointer to be set to name of archive member.
- *	arpath - Address of pointer to be set to constructed path name
- *		for object.
  *
  * exit:
- *	This routine can return one of the following:
- *	S_ERROR:  Fatal error encountered.
- *	0: Caller should skip this archive member and not continue with it.
- *	1: Caller should procede with this archive member. *arname and *arpath
- *		have been updated. *arelf may have been replaced by a support
- *		library with a different object to use.
+ *	Returns pointer to archive member name on success, NULL on error.
  */
-static uintptr_t
-archive_prepare(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl,
-    Elf **arelf, Elf_Arsym *arsym, const char **arname, const char **arpath)
+static const char *
+ar_member_name(const char *name, Elf *arelf, Ofl_desc *ofl)
 {
 	Elf_Arhdr	*arhdr;
-	size_t		len, off;
-	char		*path;
 
-	/*
-	 * Construct the member filename.
-	 */
-	if ((arhdr = elf_getarhdr(*arelf)) == NULL) {
+	if ((arhdr = elf_getarhdr(arelf)) == NULL) {
 		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETARHDR),
 		    name);
 		ofl->ofl_flags |= FLG_OF_FATAL;
-		return (S_ERROR);
+		return (NULL);
 	}
-	*arname = arhdr->ar_name;
+	return (arhdr->ar_name);
+}
 
-	if (arsym != NULL) {	/* symbol resolution driven extraction */
-		off = arsym->as_off;
-	} else {		/* allextract extraction */
-		/*
-		 * Skip the symbol table, string table, or any other special
-		 * archive member. These all start with a '/' character.
-		 */
-		if (**arname == '/') {
-			(void) elf_end(*arelf);
-			return (0);
-		}
+/*
+ * Construct the member's full pathname, using the format "%s(%s)".
+ *
+ * entry:
+ *	name - Name of archive
+ *	arname - Name of archive member
+ * exit:
+ *	Returns pointer to constructed pathname on success, NULL on error.
+ */
+static const char *
+ar_member_path(const char *name, const char *arname)
+{
+	size_t		len;
+	char		*path;
 
-		/*
-		 * ld_sup_open() requires the offset of this archive
-		 * member within the file. We don't have a direct
-		 * way of obtaining that, but elf_getbase() gives
-		 * us the base offset for the object data, and we
-		 * know that the archive header is directly above it
-		 * without any additional padding.
-		 */
-		off = elf_getbase(*arelf) - sizeof (struct ar_hdr);
-	}
-
-	/*
-	 * Construct the member's full pathname, using
-	 * the format "%s(%s)".
-	 */
-	len = strlen(name) + strlen(*arname) + 3;
+	len = strlen(name) + strlen(arname) + 3;
 	if ((path = libld_malloc(len)) == NULL)
-		return (S_ERROR);
-	(void) snprintf(path, len, MSG_ORIG(MSG_FMT_ARMEM), name, *arname);
-	*arpath = path;
-
-	/*
-	 * Determine whether the support libraries wish to process this
-	 * open. See comments in ld_process_open().
-	 */
-	ld_sup_open(ofl, arpath, arname, &fd, (FLG_IF_EXTRACT | FLG_IF_NEEDED),
-	    arelf, adp->ad_elf, off, elf_kind(*arelf));
-
-	/* Return 1 if *arelf is not NULL, and 0 if it is */
-	return (*arelf != NULL);
+		return (NULL);
+	(void) snprintf(path, len, MSG_ORIG(MSG_FMT_ARMEM), name, arname);
+	return (path);
 }
 
 /*
@@ -420,7 +378,7 @@ archive_prepare(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl,
  *	1: The archive member has been input to the link.
  */
 static uintptr_t
-archive_input(int fd, Ar_desc *adp, Ofl_desc *ofl, Elf *arelf,
+ar_input(int fd, Ar_desc *adp, Ofl_desc *ofl, Elf *arelf,
     const char *arpath, Rej_desc *rej)
 {
 	Rej_desc	_rej = { 0 };
@@ -495,7 +453,7 @@ sym_vis[STV_NUM] = {
  *	was rejected, and TRUE is returned.
  */
 static Boolean
-archive_extract_bysym(const char *name, int fd, Ar_desc *adp,
+ar_extract_bysym(const char *name, int fd, Ar_desc *adp,
     Ofl_desc *ofl, Boolean *found, Rej_desc *rej)
 {
 	Elf_Arsym *	arsym;
@@ -646,11 +604,27 @@ archive_extract_bysym(const char *name, int fd, Ar_desc *adp,
 					return (FALSE);
 				}
 
-				switch (archive_prepare(name, fd, adp, ofl,
-				    &arelf, NULL, &arname, &arpath)) {
-				case S_ERROR:
+				/* Get member filename */
+				if ((arname = ar_member_name(name, arelf,
+				    ofl)) == NULL)
 					return (FALSE);
-				case 0:		/* Ignore this archive member */
+
+				/* Construct the member's full pathname */
+				if ((arpath = ar_member_path(name, arname)) ==
+				    NULL)
+					return (S_ERROR);
+
+				/*
+				 * Determine whether the support libraries wish
+				 * to process this open. See comments in
+				 * ld_process_open().
+				 */
+				ld_sup_open(ofl, &arpath, &arname, &fd,
+				    (FLG_IF_EXTRACT | FLG_IF_NEEDED),
+				    &arelf, adp->ad_elf, arsym->as_off,
+				    elf_kind(arelf));
+				if (arelf == NULL) {
+					/* Ignore this archive member */
 					aup->au_mem = FLG_ARMEM_PROC;
 					continue;
 				}
@@ -712,7 +686,7 @@ archive_extract_bysym(const char *name, int fd, Ar_desc *adp,
 			 */
 			DBG_CALL(Dbg_syms_ar_resolve(ofl->ofl_lml,
 			    name, arname, arsym));
-			switch (archive_input(fd, adp, ofl, arelf, arpath,
+			switch (ar_input(fd, adp, ofl, arelf, arpath,
 			    rej)) {
 			case S_ERROR:
 				return (FALSE);
@@ -758,12 +732,13 @@ archive_extract_bysym(const char *name, int fd, Ar_desc *adp,
  *	was rejected, and TRUE is returned.
  */
 static Boolean
-archive_extract_all(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl,
+ar_extract_all(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl,
     Boolean *found, Rej_desc *rej)
 {
 	Elf_Cmd		cmd = ELF_C_READ;
 	Elf		*arelf;
 	const char	*arname, *arpath;
+	size_t		off, next_off;
 
 	DBG_CALL(Dbg_file_ar(ofl->ofl_lml, name, FALSE));
 
@@ -772,21 +747,53 @@ archive_extract_all(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl,
 		 * Call elf_next() so that the next call to elf_begin() will
 		 * fetch the archive member following this one. We do this now
 		 * because it simplifies the logic below, and because the
-		 * support libraries called via archive_prepare() can set our
-		 * handle to NULL.
+		 * support libraries called below can set our handle to NULL.
 		 */
 		cmd = elf_next(arelf);
 
-		switch (archive_prepare(name, fd, adp, ofl, &arelf, NULL,
-		    &arname, &arpath)) {
-		case S_ERROR:
+		/* Get member filename */
+		if ((arname = ar_member_name(name, arelf, ofl)) == NULL)
 			return (FALSE);
-		case 0:		/* Ignore this archive member */
+
+		/*
+		 * Skip the symbol table, string table, or any other special
+		 * archive member. These all start with a '/' character.
+		 */
+		if (*arname == '/') {
+			(void) elf_end(arelf);
 			continue;
 		}
 
+		/* Obtain archive member offset within the file */
+		off = _elf_getarhdrbase(arelf);
+
+		/*
+		 * ld_sup_open() will reset the current iteration point for
+		 * the archive to point at this member rather than the next
+		 * one for the benefit of the support libraries. Since
+		 * this loop relies on the current position not changing
+		 * underneath it, we save and restore the current
+		 * position around the support library call.
+		 */
+		next_off = _elf_getnextoff(adp->ad_elf);
+
+		/* Construct the member's full pathname */
+		if ((arpath = ar_member_path(name, arname)) == NULL)
+			return (S_ERROR);
+
+		/*
+		 * Determine whether the support libraries wish to process
+		 * this open. See comments in ld_process_open().
+		 */
+		ld_sup_open(ofl, &arpath, &arname, &fd,
+		    (FLG_IF_EXTRACT | FLG_IF_NEEDED), &arelf, adp->ad_elf,
+		    off, elf_kind(arelf));
+		(void) elf_rand(adp->ad_elf, next_off);
+		if (arelf == NULL)
+			continue;
+
 		DBG_CALL(Dbg_syms_ar_force(ofl->ofl_lml, name, arname));
-		switch (archive_input(fd, adp, ofl, arelf, arpath, rej)) {
+		switch (ar_input(fd, adp, ofl, arelf, arpath, rej)) {
 		case S_ERROR:
 			return (FALSE);
 		case 0:
@@ -848,10 +855,10 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 		return (TRUE);
 
 	if (ofl->ofl_flags1 & FLG_OF1_ALLEXRT) {
-		if (!archive_extract_all(name, fd, adp, ofl, &found, &rej))
+		if (!ar_extract_all(name, fd, adp, ofl, &found, &rej))
 			return (FALSE);
 	} else {
-		if (!archive_extract_bysym(name, fd, adp, ofl, &found, &rej))
+		if (!ar_extract_bysym(name, fd, adp, ofl, &found, &rej))
 			return (FALSE);
 	}
 

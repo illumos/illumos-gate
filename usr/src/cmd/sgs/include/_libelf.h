@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	__LIBELF_H
@@ -43,6 +42,8 @@ extern "C" {
 typedef void _elf_execfill_func_t(void *, off_t, size_t);
 
 extern void		_elf_execfill(_elf_execfill_func_t *);
+extern size_t		_elf_getnextoff(Elf *);
+extern off_t		_elf_getarhdrbase(Elf *);
 extern Elf64_Off	_elf_getxoff(Elf_Data *);
 extern GElf_Xword	_gelf_getdyndtflags_1(Elf *);
 extern int		_elf_swap_wrimage(Elf *);

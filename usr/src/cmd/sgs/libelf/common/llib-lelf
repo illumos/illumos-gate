@@ -20,11 +20,8 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved. 
- * Use is subject to license terms.
+ * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  */ 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* LINTLIBRARY */
 /* PROTOLIB1 */
@@ -33,8 +30,7 @@
  * Generic interface definition for usr/src/lib/libelf.
  */
 
-#include <libelf.h>
-#include <gelf.h>
+#include <_libelf.h>
 #include <nlist.h>
 
 
@@ -145,6 +141,11 @@ int		nlist(const char *, struct nlist *);
 /*
  * Private Symbols
  */
-Elf64_Off	_elf_getxoff(Elf_Data *);
-int		_elf_swap_wrimage(Elf *);
-uint_t		_elf_sys_encoding(void);
+extern void		_elf_execfill(_elf_execfill_func_t *);
+extern off_t		_elf_getarhdrbase(Elf *);
+extern size_t		_elf_getnextoff(Elf *);
+Elf64_Off		_elf_getxoff(Elf_Data *);
+int			_elf_swap_wrimage(Elf *);
+uint_t			_elf_sys_encoding(void);
+
+extern GElf_Xword	_gelf_getdyndtflags_1(Elf *);

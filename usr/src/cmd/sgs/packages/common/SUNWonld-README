@@ -1589,3 +1589,4 @@ Bugid   Risk Synopsis
 	PSARC/2010/XXX Deferred symbol references
 6943432 dlsym(RTLD_PROBE) should only bind to symbol definitions
 6668759 an external method for determining whether an ELF dependency is optional
+6954032 Support library with ld_open and -z allextract in snv_139 do not mix

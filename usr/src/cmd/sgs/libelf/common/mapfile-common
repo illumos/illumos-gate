@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -161,6 +160,8 @@ SUNW_0.7 {
 SUNWprivate_1.1 {
     global:
 	_elf_execfill;
+	_elf_getarhdrbase;
+	_elf_getnextoff;
 	_elf_getxoff;
 	_elf_outsync;
 	_elf_sys_encoding;

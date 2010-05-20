@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "libelf.h"
 #include "decl.h"
@@ -52,4 +49,28 @@ elf_rand(Elf * elf, size_t off)
 	elf->ed_nextoff = off;
 	ELFUNLOCK(elf)
 	return (off);
+}
+
+/*
+ * Private function used to obtain the current value of the next
+ * offset field for an archive header. Returns 0 for error, and
+ * the offset otherwise.
+ */
+size_t
+_elf_getnextoff(Elf *elf)
+{
+	size_t	off;
+
+	if (elf == NULL)
+		return (0);
+	ELFWLOCK(elf)
+	if (elf->ed_kind != ELF_K_AR) {
+		_elf_seterr(EREQ_AR, 0);
+		ELFUNLOCK(elf)
+		return (0);
+	}
+	off = elf->ed_nextoff;
+	ELFUNLOCK(elf)
+	return (off);
+
 }
