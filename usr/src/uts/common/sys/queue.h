@@ -662,6 +662,15 @@ struct {								\
 #define	CIRCLEQ_NEXT(elm, field)	((elm)->field.cqe_next)
 #define	CIRCLEQ_PREV(elm, field)	((elm)->field.cqe_prev)
 
+#define	CIRCLEQ_LOOP_NEXT(head, elm, field)				\
+	(((elm)->field.cqe_next == (void *)(head))			\
+	    ? ((head)->cqh_first)					\
+	    : (elm->field.cqe_next))
+#define	CIRCLEQ_LOOP_PREV(head, elm, field)				\
+	(((elm)->field.cqe_prev == (void *)(head))			\
+	    ? ((head)->cqh_last)					\
+	    : (elm->field.cqe_prev))
+
 #ifdef	__cplusplus
 }
 #endif
