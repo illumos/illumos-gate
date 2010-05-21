@@ -480,9 +480,12 @@ disk_declare_addr(topo_mod_t *mod, tnode_t *parent, topo_list_t *listp,
 
 		for (i = 0; i < dnode->ddn_target_port_count; i++) {
 			if (strncmp(dnode->ddn_target_port[i], addr,
-			    strcspn(dnode->ddn_target_port[i], ":")) == 0)
+			    strcspn(dnode->ddn_target_port[i], ":")) == 0) {
+				topo_mod_dprintf(mod, "disk_declare_addr: "
+				    "found disk matching addr %s", addr);
 				return (disk_declare(mod, parent, dnode,
 				    childp));
+			}
 		}
 	}
 
@@ -798,23 +801,24 @@ error:
 	return (-1);
 }
 
-
 /* di_walk_node callback for disk_list_gather */
 static int
 dev_walk_di_nodes(di_node_t node, void *arg)
 {
 	char			*devidstr = NULL;
 	char			*s;
+	int			*val;
 
 	/*
-	 * if it's not a scsi_vhci client and doesn't have a target_port
-	 * or target property then we're not interested
+	 * If it's not a scsi_vhci client and doesn't have a target_port
+	 * property and doesn't have a target property then it's not a storage
+	 * device and we're not interested.
 	 */
 	if (di_path_client_next_path(node, NULL) == NULL &&
-	    (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
-	    SCSI_ADDR_PROP_TARGET_PORT, &s) <= 0 ||
 	    di_prop_lookup_strings(DDI_DEV_T_ANY, node,
-	    SCSI_ADDR_PROP_TARGET, &s) <= 0)) {
+	    SCSI_ADDR_PROP_TARGET_PORT, &s) <= 0 &&
+	    di_prop_lookup_ints(DDI_DEV_T_ANY, node,
+	    SCSI_ADDR_PROP_TARGET, &val) <= 0) {
 		return (DI_WALK_CONTINUE);
 	}
 	(void) di_prop_lookup_strings(DDI_DEV_T_ANY, node,
