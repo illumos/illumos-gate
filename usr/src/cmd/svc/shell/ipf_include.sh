@@ -19,9 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 IPFILTER_FMRI="svc:/network/ipfilter:default"
@@ -916,13 +914,6 @@ create_services_rules()
 #
 service_update_rules()
 {
-	#
-	# If ipfilter isn't online or global policy is 'custom',
-	# nothing should be done.
-	#
-	service_check_state $SMF_FMRI $SMF_ONLINE || return 0
-	[ "`get_global_def_policy`" = "custom" ] && return 0
-
 	svc=$1
 
 	ipfile=`fmri_to_file $svc $IPF_SUFFIX`
@@ -991,6 +982,13 @@ service_update()
 {
 	svc=$1
 	ret=0
+
+	#
+	# If ipfilter isn't online or global policy is 'custom',
+	# nothing should be done.
+	#
+	service_check_state $SMF_FMRI $SMF_ONLINE || return 0
+	[ "`get_global_def_policy`" = "custom" ] && return 0
 
 	ipf_get_lock
 	service_update_rules $svc || ret=1
