@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "libscf_impl.h"
@@ -2708,6 +2707,8 @@ scferror:
 	scf_clean_propvec(properties);
 
 out:
+	scf_value_destroy(v);
+	scf_property_destroy(p);
 	scf_pg_destroy(pg);
 	scf_snapshot_destroy(snap);
 	scf_instance_destroy(i);
