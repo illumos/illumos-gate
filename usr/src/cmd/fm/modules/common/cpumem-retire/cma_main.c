@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <cma.h>
@@ -224,6 +223,8 @@ static const cma_subscriber_t cma_subrs[] = {
 	    NULL },
 	{ "fault.memory.datapath", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
+	{ "fault.memory.datapath", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
 	{ "fault.memory.link-c", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
 	{ "fault.memory.link-u", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
@@ -340,6 +341,10 @@ static const cma_subscriber_t cma_subrs[] = {
 	{ "fault.memory.bank", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
 	{ "fault.memory.datapath", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.datapath", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.datapath", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    NULL },
 
 	/*

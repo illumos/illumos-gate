@@ -128,6 +128,15 @@ extern cmd_evdisp_t cmd_mem_synd_check(fmd_hdl_t *, uint64_t, uint8_t,
     uint16_t, uint8_t, cmd_cpu_t *);
 extern void cmd_dimm_close(fmd_hdl_t *, void *);
 extern void cmd_bank_close(fmd_hdl_t *, void *);
+extern int cmd_same_datapath_dimms(cmd_dimm_t *, cmd_dimm_t *);
+extern void cmd_gen_datapath_fault(fmd_hdl_t *, cmd_dimm_t *, cmd_dimm_t *,
+    uint16_t, nvlist_t *);
+extern void cmd_to_hashed_addr(uint64_t *, uint64_t, const char *);
+
+#ifdef sun4u
+extern char *cmd_cpu_getfrustr_by_id(fmd_hdl_t *, uint32_t);
+#endif
+
 #ifdef sun4v
 extern void cmd_branch_close(fmd_hdl_t *, void *);
 extern cmd_evdisp_t cmd_fb(fmd_hdl_t *, fmd_event_t *, nvlist_t *,

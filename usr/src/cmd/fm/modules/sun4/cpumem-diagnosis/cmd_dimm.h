@@ -80,7 +80,8 @@ extern "C" {
 #define	DIMM_MKVERSION(version)	((version) << 4 | 1)
 
 #define	CMD_DIMM_VERSION_1	DIMM_MKVERSION(1)	/* 17 */
-#define	CMD_DIMM_VERSION	CMD_DIMM_VERSION_1
+#define	CMD_DIMM_VERSION_2	DIMM_MKVERSION(2)	/* 33 */
+#define	CMD_DIMM_VERSION	CMD_DIMM_VERSION_2
 
 #define	CMD_DIMM_VERSIONED(dimm)	((dimm)->dimm_version & 1)
 
@@ -96,12 +97,23 @@ typedef struct cmd_dimm_0 {
 	cmd_bank_t *dimm0_bank;		/* This DIMM's bank (if discovered) */
 } cmd_dimm_0_t;
 
+typedef struct cmd_dimm_1 {
+	cmd_header_t dimm1_header;	/* Nodetype must be CMD_NT_DIMM */
+	uint_t dimm1_version;		/* DIMM version */
+	cmd_fmri_t dimm1_asru;		/* ASRU for this DIMM */
+	uint_t dimm1_flags;		/* CMD_MEM_F_* */
+	uint_t dimm1_nretired;		/* # ret'd pages for CEs in DIMM */
+} cmd_dimm_1_t;
+
+
 typedef struct cmd_dimm_pers {
 	cmd_header_t dimmp_header;	/* Nodetype must be CMD_NT_DIMM */
 	uint_t dimmp_version;
 	cmd_fmri_t dimmp_asru;		/* ASRU for this DIMM */
 	uint_t dimmp_flags;		/* CMD_MEM_F_* */
 	uint_t dimmp_nretired;		/* # ret'd pages for CEs in DIMM */
+	uint64_t dimmp_phys_addr_low;	/* retired pages low addr */
+	uint64_t dimmp_phys_addr_hi;	/* retired pages hi addr */
 } cmd_dimm_pers_t;
 
 /*
@@ -118,7 +130,15 @@ typedef struct cmd_mq {
 	uint16_t mq_unit_position;	/* bit for sun4u, nibble for sun4v */
 	fmd_event_t *mq_ep;		/* ereport - for potential fault */
 	char *mq_serdnm;		/* serd eng to retain CE events */
+	uint16_t mq_dupce_count;	/* dup CEs */
+	cmd_list_t mq_dupce_tstamp;	/* list of dup CEs time stamp */
+	uint32_t mq_cpuid;		/* ereport detector */
 } cmd_mq_t;
+
+typedef struct tstamp {
+	cmd_list_t ts_l;
+	uint64_t tstamp;
+} tstamp_t;
 
 struct cmd_dimm {
 	cmd_dimm_pers_t dimm_pers;
@@ -126,6 +146,7 @@ struct cmd_dimm {
 	const char *dimm_unum;		/* This DIMM's name */
 	cmd_case_t dimm_case;		/* Open CE case against this DIMM */
 	fmd_stat_t dimm_retstat;	/* retirement statistics, this DIMM */
+	uint16_t dimm_syl_error;	/* bad r/w symbol-in-error */
 	cmd_list_t
 	    mq_root[CMD_MAX_CKWDS];	/* per-checkword CEs to correlate */
 };
@@ -133,11 +154,16 @@ struct cmd_dimm {
 #define	CMD_MQ_TIMELIM	(72*60*60)	/* 72 hours */
 #define	CMD_MQ_SERDT	MAXINT		/* Never expected to fire */
 #define	CMD_MQ_SERDN	2		/* Dup CEs not allowed */
+#define	CMD_MQ_512KB	0x80000		/* space between low & hi retired */
+					/* page addrss */
+#define	CMD_PAGE_RATIO	0.0625		/* bad r/w page ratio (1/16) */
 
 #define	CMD_DIMM_MAXSIZE \
-	MAX(sizeof (cmd_dimm_0_t), sizeof (cmd_dimm_pers_t))
+	MAX(MAX(sizeof (cmd_dimm_0_t), sizeof (cmd_dimm_pers_t)), \
+	MAX(sizeof (cmd_dimm_1_t), sizeof (cmd_dimm_pers_t)))
 #define	CMD_DIMM_MINSIZE \
-	MIN(sizeof (cmd_dimm_0_t), sizeof (cmd_dimm_pers_t))
+	MIN(MIN(sizeof (cmd_dimm_0_t), sizeof (cmd_dimm_pers_t)), \
+	MIN(sizeof (cmd_dimm_1_t), sizeof (cmd_dimm_pers_t)))
 
 #define	dimm_header		dimm_pers.dimmp_header
 #define	dimm_nodetype		dimm_pers.dimmp_header.hdr_nodetype
@@ -147,6 +173,8 @@ struct cmd_dimm {
 #define	dimm_asru_nvl		dimm_pers.dimmp_asru.fmri_nvl
 #define	dimm_flags		dimm_pers.dimmp_flags
 #define	dimm_nretired		dimm_pers.dimmp_nretired
+#define	dimm_phys_addr_hi	dimm_pers.dimmp_phys_addr_hi
+#define	dimm_phys_addr_low	dimm_pers.dimmp_phys_addr_low
 
 extern cmd_dimm_t *cmd_dimm_lookup(fmd_hdl_t *, nvlist_t *);
 extern cmd_dimm_t *cmd_dimm_create(fmd_hdl_t *, nvlist_t *);
@@ -171,6 +199,8 @@ extern void cmd_dimm_gc(fmd_hdl_t *);
 extern void cmd_dimm_fini(fmd_hdl_t *);
 
 extern void cmd_dimmlist_free(fmd_hdl_t *);
+extern void cmd_dimm_save_symbol_error(cmd_dimm_t *, uint16_t);
+extern int cmd_dimm_check_symbol_error(cmd_dimm_t *, uint16_t);
 
 #ifdef __cplusplus
 }

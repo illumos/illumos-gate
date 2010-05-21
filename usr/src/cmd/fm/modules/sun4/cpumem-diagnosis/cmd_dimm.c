@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -28,6 +27,7 @@
  */
 
 #include <cmd_mem.h>
+#include <limits.h>
 #include <cmd_dimm.h>
 #include <cmd_bank.h>
 #include <cmd.h>
@@ -111,6 +111,7 @@ cmd_dimm_free(fmd_hdl_t *hdl, cmd_dimm_t *dimm, int destroy)
 	cmd_case_t *cc = &dimm->dimm_case;
 	int i;
 	cmd_mq_t *q;
+	tstamp_t  *tsp, *next;
 
 #ifdef sun4v
 	cmd_branch_t *branch;
@@ -134,6 +135,15 @@ cmd_dimm_free(fmd_hdl_t *hdl, cmd_dimm_t *dimm, int destroy)
 				fmd_hdl_strfree(hdl, q->mq_serdnm);
 				q->mq_serdnm = NULL;
 			}
+
+			for (tsp = cmd_list_next(&q->mq_dupce_tstamp);
+			    tsp != NULL; tsp = next) {
+				next = cmd_list_next(tsp);
+				cmd_list_delete(&q->mq_dupce_tstamp,
+				    &tsp->ts_l);
+				fmd_hdl_free(hdl, tsp, sizeof (tstamp_t));
+			}
+
 			cmd_list_delete(&dimm->mq_root[i], q);
 			fmd_hdl_free(hdl, q, sizeof (cmd_mq_t));
 		}
@@ -235,6 +245,9 @@ cmd_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru)
 	dimm = fmd_hdl_zalloc(hdl, sizeof (cmd_dimm_t), FMD_SLEEP);
 	dimm->dimm_nodetype = CMD_NT_DIMM;
 	dimm->dimm_version = CMD_DIMM_VERSION;
+	dimm->dimm_phys_addr_low = ULLONG_MAX;
+	dimm->dimm_phys_addr_hi = 0;
+	dimm->dimm_syl_error = USHRT_MAX;
 
 	cmd_bufname(dimm->dimm_bufname, sizeof (dimm->dimm_bufname), "dimm_%s",
 	    unum);
@@ -288,7 +301,7 @@ cmd_dimm_lookup(fmd_hdl_t *hdl, nvlist_t *asru)
 }
 
 static cmd_dimm_t *
-dimm_v0tov1(fmd_hdl_t *hdl, cmd_dimm_0_t *old, size_t oldsz)
+dimm_v0tov2(fmd_hdl_t *hdl, cmd_dimm_0_t *old, size_t oldsz)
 {
 	cmd_dimm_t *new;
 
@@ -302,13 +315,40 @@ dimm_v0tov1(fmd_hdl_t *hdl, cmd_dimm_0_t *old, size_t oldsz)
 	new->dimm_version = CMD_DIMM_VERSION;
 	new->dimm_asru = old->dimm0_asru;
 	new->dimm_nretired = old->dimm0_nretired;
+	new->dimm_phys_addr_hi = 0;
+	new->dimm_phys_addr_low = ULLONG_MAX;
 
 	fmd_hdl_free(hdl, old, oldsz);
 	return (new);
 }
 
 static cmd_dimm_t *
-dimm_wrapv1(fmd_hdl_t *hdl, cmd_dimm_pers_t *pers, size_t psz)
+dimm_v1tov2(fmd_hdl_t *hdl, cmd_dimm_1_t *old, size_t oldsz)
+{
+
+	cmd_dimm_t *new;
+
+	if (oldsz != sizeof (cmd_dimm_1_t)) {
+		fmd_hdl_abort(hdl, "size of state doesn't match size of "
+		    "version 1 state (%u bytes).\n", sizeof (cmd_dimm_1_t));
+	}
+
+	new = fmd_hdl_zalloc(hdl, sizeof (cmd_dimm_t), FMD_SLEEP);
+
+	new->dimm_header = old->dimm1_header;
+	new->dimm_version = CMD_DIMM_VERSION;
+	new->dimm_asru = old->dimm1_asru;
+	new->dimm_nretired = old->dimm1_nretired;
+	new->dimm_flags = old->dimm1_flags;
+	new->dimm_phys_addr_hi = 0;
+	new->dimm_phys_addr_low = ULLONG_MAX;
+
+	fmd_hdl_free(hdl, old, oldsz);
+	return (new);
+}
+
+static cmd_dimm_t *
+dimm_wrapv2(fmd_hdl_t *hdl, cmd_dimm_pers_t *pers, size_t psz)
 {
 	cmd_dimm_t *dimm;
 
@@ -346,7 +386,8 @@ cmd_dimm_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 			    fmd_case_uuid(hdl, cp));
 		} else if (dimmsz > CMD_DIMM_MAXSIZE ||
 		    dimmsz < CMD_DIMM_MINSIZE) {
-			fmd_hdl_abort(hdl, "dimm buffer referenced by case %s "
+			fmd_hdl_abort(hdl,
+			    "dimm buffer referenced by case %s "
 			    "is out of bounds (is %u bytes, max %u, min %u)\n",
 			    fmd_case_uuid(hdl, cp), dimmsz,
 			    CMD_DIMM_MAXSIZE, CMD_DIMM_MINSIZE);
@@ -364,7 +405,11 @@ cmd_dimm_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 		if (CMD_DIMM_VERSIONED(dimm)) {
 			switch (dimm->dimm_version) {
 			case CMD_DIMM_VERSION_1:
-				dimm = dimm_wrapv1(hdl, (cmd_dimm_pers_t *)dimm,
+				dimm = dimm_v1tov2(hdl, (cmd_dimm_1_t *)dimm,
+				    dimmsz);
+				break;
+			case CMD_DIMM_VERSION_2:
+				dimm = dimm_wrapv2(hdl, (cmd_dimm_pers_t *)dimm,
 				    dimmsz);
 				break;
 			default:
@@ -374,7 +419,7 @@ cmd_dimm_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 				break;
 			}
 		} else {
-			dimm = dimm_v0tov1(hdl, (cmd_dimm_0_t *)dimm, dimmsz);
+			dimm = dimm_v0tov2(hdl, (cmd_dimm_0_t *)dimm, dimmsz);
 			migrated = 1;
 		}
 
@@ -452,4 +497,36 @@ cmd_dimm_fini(fmd_hdl_t *hdl)
 
 	while ((dimm = cmd_list_next(&cmd.cmd_dimms)) != NULL)
 		cmd_dimm_free(hdl, dimm, FMD_B_FALSE);
+}
+
+
+void
+cmd_dimm_save_symbol_error(cmd_dimm_t *dimm, uint16_t upos)
+{
+	cmd_dimm_t *d = NULL, *next = NULL;
+
+	for (d = cmd_list_next(&cmd.cmd_dimms); d != NULL; d = next) {
+		next = cmd_list_next(d);
+		if (cmd_same_datapath_dimms(dimm, d))
+			d->dimm_syl_error = upos;
+	}
+}
+
+int
+cmd_dimm_check_symbol_error(cmd_dimm_t *dimm, uint16_t synd)
+{
+	int upos;
+	cmd_dimm_t *d, *next;
+
+	if ((upos = cmd_synd2upos(synd)) < 0)
+		return (0);
+
+	for (d = cmd_list_next(&cmd.cmd_dimms); d != NULL; d = next) {
+		next = cmd_list_next(d);
+		if (cmd_same_datapath_dimms(dimm, d) &&
+		    (d->dimm_syl_error == upos))
+			return (1);
+	}
+
+	return (0);
 }

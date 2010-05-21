@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -567,6 +566,10 @@ static const fmd_prop_t fmd_props[] = {
 	{ "thresh_abs_sysmem", FMD_TYPE_UINT64, "0" },
 	{ "thresh_abs_badrw", FMD_TYPE_UINT64, "128" },
 	{ "max_perm_ce_dimm", FMD_TYPE_UINT32, "128" },
+	{ "low_ce_thresh", FMD_TYPE_UINT32, "128" },
+	{ "hi_ce_thresh", FMD_TYPE_UINT32, "512" },
+	{ "dupce", FMD_TYPE_UINT32, "120"},
+	{ "nupos", FMD_TYPE_UINT32, "4"},
 #ifdef sun4v
 	{ "fbr_n", FMD_TYPE_UINT32, "14" },
 	{ "fbr_t", FMD_TYPE_TIME, "30min"},
@@ -834,6 +837,11 @@ _fmd_init(fmd_hdl_t *hdl)
 	cmd.cmd_xxcu_ntrw = fmd_prop_get_int32(hdl, "num_xxcu_waiters");
 	cmd.cmd_xxcu_trw = fmd_hdl_zalloc(hdl, sizeof (cmd_xxcu_trw_t) *
 	    cmd.cmd_xxcu_ntrw, FMD_SLEEP);
+	cmd.cmd_low_ce_thresh = fmd_prop_get_int32(hdl, "low_ce_thresh");
+	cmd.cmd_hi_ce_thresh = fmd_prop_get_int32(hdl, "hi_ce_thresh");
+	cmd.cmd_dupce = fmd_prop_get_int32(hdl, "dupce");
+	cmd.cmd_nupos = fmd_prop_get_int32(hdl, "nupos");
+
 #ifdef sun4v
 	cmd.cmd_delta_ena = fmd_prop_get_int64(hdl, "delta_ena");
 #endif

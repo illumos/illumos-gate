@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -32,6 +31,7 @@
 #include <gmem_dimm.h>
 #include <gmem.h>
 #include <errno.h>
+#include <limits.h>
 #include <string.h>
 #include <strings.h>
 #include <fcntl.h>
@@ -61,6 +61,7 @@ gmem_dimm_free(fmd_hdl_t *hdl, gmem_dimm_t *dimm, int destroy)
 	gmem_case_t *cc = &dimm->dimm_case;
 	int i;
 	gmem_mq_t *q;
+	tstamp_t *tsp, *next;
 
 	if (cc->cc_cp != NULL) {
 		gmem_case_fini(hdl, cc->cc_cp, destroy);
@@ -82,6 +83,15 @@ gmem_dimm_free(fmd_hdl_t *hdl, gmem_dimm_t *dimm, int destroy)
 				fmd_hdl_strfree(hdl, q->mq_serdnm);
 				q->mq_serdnm = NULL;
 			}
+
+			for (tsp = gmem_list_next(&q->mq_dupce_tstamp);
+			    tsp != NULL; tsp = next) {
+				next = gmem_list_next(tsp);
+				gmem_list_delete(&q->mq_dupce_tstamp,
+				    &tsp->ts_l);
+				fmd_hdl_free(hdl, tsp, sizeof (tstamp_t));
+			}
+
 			gmem_list_delete(&dimm->mq_root[i], q);
 			fmd_hdl_free(hdl, q, sizeof (gmem_mq_t));
 		}
@@ -139,6 +149,9 @@ gmem_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru)
 	dimm = fmd_hdl_zalloc(hdl, sizeof (gmem_dimm_t), FMD_SLEEP);
 	dimm->dimm_nodetype = GMEM_NT_DIMM;
 	dimm->dimm_version = GMEM_DIMM_VERSION;
+	dimm->dimm_phys_addr_low = ULLONG_MAX;
+	dimm->dimm_phys_addr_hi = 0;
+	dimm->dimm_syl_error = USHRT_MAX;
 
 	gmem_bufname(dimm->dimm_bufname, sizeof (dimm->dimm_bufname), "dimm_%s",
 	    serial);
@@ -177,8 +190,30 @@ gmem_dimm_lookup(fmd_hdl_t *hdl, nvlist_t *asru)
 	return (dimm);
 }
 
+
 static gmem_dimm_t *
-gmem_dimm_wrapv0(fmd_hdl_t *hdl, gmem_dimm_pers_t *pers, size_t psz)
+gmem_dimm_v0tov1(fmd_hdl_t *hdl, gmem_dimm_0_t *old, size_t oldsz)
+{
+	gmem_dimm_t *new;
+	if (oldsz != sizeof (gmem_dimm_0_t)) {
+		fmd_hdl_abort(hdl, "size of state doesn't match size of "
+		    "version 0 state (%u bytes).\n", sizeof (gmem_dimm_0_t));
+	}
+
+	new = fmd_hdl_zalloc(hdl, sizeof (gmem_dimm_t), FMD_SLEEP);
+	new->dimm_header = old->dimm0_header;
+	new->dimm_version = GMEM_DIMM_VERSION;
+	new->dimm_asru = old->dimm0_asru;
+	new->dimm_nretired = old->dimm0_nretired;
+	new->dimm_phys_addr_hi = 0;
+	new->dimm_phys_addr_low = ULLONG_MAX;
+
+	fmd_hdl_free(hdl, old, oldsz);
+	return (new);
+}
+
+static gmem_dimm_t *
+gmem_dimm_wrapv1(fmd_hdl_t *hdl, gmem_dimm_pers_t *pers, size_t psz)
 {
 	gmem_dimm_t *dimm;
 
@@ -205,6 +240,7 @@ gmem_dimm_restore(fmd_hdl_t *hdl, fmd_case_t *cp, gmem_case_ptr_t *ptr)
 	}
 
 	if (dimm == NULL) {
+		int migrated = 0;
 		size_t dimmsz;
 
 		fmd_hdl_debug(hdl, "restoring dimm from %s\n", ptr->ptr_name);
@@ -230,16 +266,28 @@ gmem_dimm_restore(fmd_hdl_t *hdl, fmd_case_t *cp, gmem_case_ptr_t *ptr)
 		fmd_hdl_debug(hdl, "found %d in version field\n",
 		    dimm->dimm_version);
 
-		switch (dimm->dimm_version) {
-		case GMEM_DIMM_VERSION_0:
-			dimm = gmem_dimm_wrapv0(hdl, (gmem_dimm_pers_t *)dimm,
+		if (GMEM_DIMM_VERSIONED(dimm)) {
+
+			switch (dimm->dimm_version) {
+			case GMEM_DIMM_VERSION_1:
+				dimm = gmem_dimm_wrapv1(hdl,
+				    (gmem_dimm_pers_t *)dimm, dimmsz);
+				break;
+			default:
+				fmd_hdl_abort(hdl, "unknown version (found %d) "
+				    "for dimm state referenced by case %s.\n",
+				    dimm->dimm_version, fmd_case_uuid(hdl, cp));
+				break;
+			}
+		} else {
+			dimm = gmem_dimm_v0tov1(hdl, (gmem_dimm_0_t *)dimm,
 			    dimmsz);
-			break;
-		default:
-			fmd_hdl_abort(hdl, "unknown version (found %d) "
-			    "for dimm state referenced by case %s.\n",
-			    dimm->dimm_version, fmd_case_uuid(hdl, cp));
-			break;
+			migrated = 1;
+		}
+
+		if (migrated) {
+			GMEM_STAT_BUMP(dimm_migrat);
+			gmem_dimm_dirty(hdl, dimm);
 		}
 
 		gmem_fmri_restore(hdl, &dimm->dimm_asru);
@@ -431,4 +479,83 @@ gmem_dimm_present(fmd_hdl_t *hdl, nvlist_t *asru)
 	if (dimm != NULL)
 		nvlist_free(dimm);
 	return (1);
+}
+
+static int
+gmem_find_dimm_chip(nvlist_t *nvl, uint32_t *chip)
+{
+
+	char *name, *id, *end;
+	nvlist_t **hcl;
+	uint_t n;
+	int i;
+	int rc = 0;
+
+	if (nvlist_lookup_nvlist_array(nvl, FM_FMRI_HC_LIST, &hcl, &n) < 0)
+		return (0);
+	for (i = 0; i < n; i++) {
+		(void) nvlist_lookup_string(hcl[i], FM_FMRI_HC_NAME, &name);
+		(void) nvlist_lookup_string(hcl[i], FM_FMRI_HC_ID, &id);
+
+		if (strcmp(name, "chip") == 0) {
+			*chip = (uint32_t)strtoul(id, &end, 10);
+			rc = 1;
+			break;
+		}
+	}
+	return (rc);
+}
+
+int
+gmem_same_datapath_dimms(fmd_hdl_t *hdl, gmem_dimm_t *d1, gmem_dimm_t *d2)
+{
+	nvlist_t *rsrc1, *rsrc2;
+	uint32_t chip1, chip2;
+
+	rsrc1 = gmem_find_dimm_rsc(hdl, d1->dimm_serial);
+	rsrc2 = gmem_find_dimm_rsc(hdl, d2->dimm_serial);
+
+	if (rsrc1 == NULL || rsrc2 == NULL)
+		return (0);
+
+	if (gmem_find_dimm_chip(rsrc1, &chip1) &&
+	    gmem_find_dimm_chip(rsrc2, &chip2)) {
+		if (chip1 == chip2) {
+			nvlist_free(rsrc1);
+			nvlist_free(rsrc2);
+			return (1);
+		}
+	}
+
+	nvlist_free(rsrc1);
+	nvlist_free(rsrc2);
+	return (0);
+}
+
+int
+gmem_check_symbol_error(fmd_hdl_t *hdl, gmem_dimm_t *d, uint16_t upos)
+{
+	gmem_dimm_t *dimm = NULL, *next = NULL;
+
+	for (dimm = gmem_list_next(&gmem.gm_dimms); dimm != NULL;
+	    dimm = next) {
+		next = gmem_list_next(dimm);
+		if (gmem_same_datapath_dimms(hdl, dimm, d) &&
+		    dimm->dimm_syl_error == upos)
+			return (1);
+	}
+	return (0);
+}
+
+void
+gmem_save_symbol_error(fmd_hdl_t *hdl, gmem_dimm_t *d, uint16_t upos)
+{
+	gmem_dimm_t *dimm = NULL, *next = NULL;
+
+	for (dimm = gmem_list_next(&gmem.gm_dimms); dimm != NULL;
+	    dimm = next) {
+		next = gmem_list_next(dimm);
+		if (gmem_same_datapath_dimms(hdl, dimm, d))
+			dimm->dimm_syl_error = upos;
+	}
 }

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _GMEM_H
@@ -49,6 +48,7 @@ typedef struct gmem_stat {
 	fmd_stat_t ce_interm;		/* # of intermittent CEs seen */
 	fmd_stat_t ce_clearable_persis;	/* # of clearable persistent CEs seen */
 	fmd_stat_t ce_sticky;		/* # of sticky CEs seen */
+	fmd_stat_t dimm_migrat;		/* # of DIMMs migrated to new version */
 } gmem_stat_t;
 
 typedef struct gmem_serd {
@@ -67,6 +67,9 @@ typedef struct gmem {
 	uint32_t gm_ce_n;		/* serd n */
 	uint64_t gm_ce_t;		/* serd t */
 	uint32_t gm_filter_ratio;	/* serd filter ratio */
+	uint32_t gm_low_ce_thresh;	/* low threshold retired pages */
+	uint32_t gm_nupos;		/* same number of upos */
+	uint32_t gm_dupce;		/* number of dup CEs */
 } gmem_t;
 
 extern gmem_t gmem;

@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _CMD_H
 #define	_CMD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdarg.h>
 #include <fm/fmd_api.h>
@@ -249,6 +246,10 @@ typedef struct cmd {
 	cmd_serd_t cmd_miscregs_serd;   /* params for misregs serd */
 	cmd_serd_t cmd_dcache_serd;	/* params for dcache serd */
 	cmd_serd_t cmd_icache_serd;	/* params for icache serd */
+	uint32_t cmd_low_ce_thresh;	/* low ce thershold */
+	uint32_t cmd_hi_ce_thresh;	/* hi ce threshold */
+	uint32_t cmd_dupce;		/* max 5b CEs */
+	uint32_t cmd_nupos;		/* min number of equal upos */
 #ifdef sun4u
 	uint16_t cmd_dp_flag;		/* datapath error in progress if set */
 #endif

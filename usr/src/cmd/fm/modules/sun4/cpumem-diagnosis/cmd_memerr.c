@@ -40,6 +40,7 @@
 #include <strings.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
 #include <sys/async.h>
@@ -85,97 +86,256 @@ cmd_mem_name2type(const char *name, int minorvers)
 	return (CE_DISP_UNKNOWN);
 }
 
+/*
+ * check if a dimm has n CEs with the same symbol-in-error
+ */
+static int
+upos_thresh_check(cmd_dimm_t *dimm, uint16_t upos, uint32_t threshold)
+{
+	int i;
+	cmd_mq_t *ip, *next;
+	int count = 0;
+
+	for (i = 0; i < CMD_MAX_CKWDS; i++) {
+		for (ip = cmd_list_next(&dimm->mq_root[i]); ip != NULL;
+		    ip = next) {
+			next = cmd_list_next(ip);
+			if (ip->mq_unit_position == upos) {
+				count++;
+				if (count >= threshold)
+					return (1);
+			}
+		}
+	}
+	return (0);
+}
+
+/*
+ * check if smaller number of retired pages > 1/16 of larger
+ * number of retired pages
+ */
+static int
+check_bad_rw_retired_pages(fmd_hdl_t *hdl, cmd_dimm_t *d1, cmd_dimm_t *d2)
+{
+	uint_t sret, lret;
+	double ratio;
+	uint_t d1_nretired, d2_nretired;
+
+	sret = lret = 0;
+
+	d1_nretired = d1->dimm_nretired;
+	d2_nretired = d2->dimm_nretired;
+
+	if (d1->dimm_bank != NULL)
+		d1_nretired += d1->dimm_bank->bank_nretired;
+
+	if (d2->dimm_bank != NULL)
+		d2_nretired += d2->dimm_bank->bank_nretired;
+
+	if (d2_nretired < d1_nretired) {
+		sret = d2_nretired;
+		lret = d1_nretired;
+	} else if (d2_nretired > d1_nretired) {
+		sret = d1_nretired;
+		lret = d2_nretired;
+	} else
+		return (0);
+
+	ratio = lret * CMD_PAGE_RATIO;
+
+	if (sret > ratio) {
+		fmd_hdl_debug(hdl, "sret=%d lret=%d ratio=%.3f\n",
+		    sret, lret, ratio);
+		return (1);
+	}
+	return (0);
+}
+
+/*
+ * check bad rw between two DIMMs
+ * the check succeeds if
+ * - each DIMM has 4 CEs with the same symbol-in-error.
+ * - the smaller number of retired pages > 1/16 larger number of retired pages
+ */
+static int
+check_bad_rw_between_dimms(fmd_hdl_t *hdl, cmd_dimm_t *d1, cmd_dimm_t *d2,
+    uint16_t *rupos)
+{
+	int i;
+	cmd_mq_t *ip, *next;
+	uint16_t upos;
+
+	for (i = 0; i < CMD_MAX_CKWDS; i++) {
+		for (ip = cmd_list_next(&d1->mq_root[i]); ip != NULL;
+		    ip = next) {
+			next = cmd_list_next(ip);
+			upos = ip->mq_unit_position;
+			if (upos_thresh_check(d1, upos, cmd.cmd_nupos)) {
+				if (upos_thresh_check(d2, upos,
+				    cmd.cmd_nupos)) {
+					if (check_bad_rw_retired_pages(hdl,
+					    d1, d2)) {
+						*rupos = upos;
+						return (1);
+					}
+				}
+			}
+		}
+	}
+
+	return (0);
+}
+
+static void
+bad_reader_writer_check(fmd_hdl_t *hdl, cmd_dimm_t *ce_dimm, nvlist_t *det)
+{
+	cmd_dimm_t *d, *next;
+	uint16_t upos;
+
+	for (d = cmd_list_next(&cmd.cmd_dimms); d != NULL; d = next) {
+		next = cmd_list_next(d);
+		if (d == ce_dimm)
+			continue;
+		if (!cmd_same_datapath_dimms(ce_dimm, d))
+			continue;
+		if (check_bad_rw_between_dimms(hdl, ce_dimm, d, &upos)) {
+			cmd_gen_datapath_fault(hdl, ce_dimm, d, upos, det);
+			cmd_dimm_save_symbol_error(ce_dimm, upos);
+			fmd_hdl_debug(hdl,
+			    "check_bad_rw_dimms succeeded: %s %s",
+			    ce_dimm->dimm_unum, d->dimm_unum);
+			return;
+		}
+	}
+}
+
+/*
+ * rule 5a checking. The check succeeds if
+ * - nretired >= 512
+ * - nretired >= 128 and (addr_hi - addr_low) / (nretired - 1) > 512KB
+ */
 static void
 ce_thresh_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 {
 	nvlist_t *flt;
 	fmd_case_t *cp;
-	cmd_dimm_t *d;
-	nvlist_t *dflt;
-	uint_t nret, dret;
-	int foundrw;
+	uint_t nret;
+	uint64_t delta_addr = 0;
 
-	if (dimm->dimm_flags & CMD_MEM_F_FAULTING) {
+	if (dimm->dimm_flags & CMD_MEM_F_FAULTING)
 		/* We've already complained about this DIMM */
 		return;
-	}
 
 	nret = dimm->dimm_nretired;
 	if (dimm->dimm_bank != NULL)
 		nret += dimm->dimm_bank->bank_nretired;
 
-	if (!cmd_mem_thresh_check(hdl, nret))
-		return; /* Don't warn until over specified % of system memory */
-
-	/* Look for CEs on DIMMs in other banks */
-	for (foundrw = 0, dret = 0, d = cmd_list_next(&cmd.cmd_dimms);
-	    d != NULL; d = cmd_list_next(d)) {
-		if (d == dimm) {
-			dret += d->dimm_nretired;
-			continue;
-		}
-
-		if (dimm->dimm_bank != NULL && d->dimm_bank == dimm->dimm_bank)
-			continue;
-
-		if (d->dimm_nretired > cmd.cmd_thresh_abs_badrw) {
-			foundrw = 1;
-			dret += d->dimm_nretired;
-		}
-	}
-
-	if (foundrw) {
-		/*
-		 * Found a DIMM in another bank with a significant number of
-		 * retirements.  Something strange is going on, perhaps in the
-		 * datapath or with a bad CPU.  A real person will need to
-		 * figure out what's really happening.  Emit a fault designed
-		 * to trigger just that.
-		 */
-		cp = fmd_case_open(hdl, NULL);
-		for (d = cmd_list_next(&cmd.cmd_dimms); d != NULL;
-		    d = cmd_list_next(d)) {
-
-			if (d != dimm && d->dimm_bank != NULL &&
-			    d->dimm_bank == dimm->dimm_bank)
-				continue;
-
-			if (d->dimm_nretired <= cmd.cmd_thresh_abs_badrw)
-				continue;
-
-			if (!(d->dimm_flags & CMD_MEM_F_FAULTING)) {
-				d->dimm_flags |= CMD_MEM_F_FAULTING;
-				cmd_dimm_dirty(hdl, d);
-			}
-
-			flt = cmd_dimm_create_fault(hdl, d,
-			    "fault.memory.datapath",
-			    d->dimm_nretired * 100 / dret);
-			fmd_case_add_suspect(hdl, cp, flt);
-		}
-
-		fmd_case_solve(hdl, cp);
+	if (nret < cmd.cmd_low_ce_thresh)
 		return;
+
+	if (dimm->dimm_phys_addr_hi >= dimm->dimm_phys_addr_low)
+		delta_addr =
+		    (dimm->dimm_phys_addr_hi - dimm->dimm_phys_addr_low) /
+		    (nret - 1);
+
+	if (nret >= cmd.cmd_hi_ce_thresh || delta_addr > CMD_MQ_512KB) {
+
+		dimm->dimm_flags |= CMD_MEM_F_FAULTING;
+		cmd_dimm_dirty(hdl, dimm);
+
+		cp = fmd_case_open(hdl, NULL);
+		flt = cmd_dimm_create_fault(hdl, dimm,
+		    "fault.memory.dimm-page-retires-excessive", CMD_FLTMAXCONF);
+		fmd_case_add_suspect(hdl, cp, flt);
+		fmd_case_solve(hdl, cp);
+		fmd_hdl_debug(hdl, "ce_thresh_check succeeded nretired %d\n",
+		    nret);
+
 	}
+}
 
-	dimm->dimm_flags |= CMD_MEM_F_FAULTING;
-	cmd_dimm_dirty(hdl, dimm);
+/*
+ * rule 5b checking. The check succeeds if
+ * more than 120 non-intermittent CEs are reported against one symbol
+ * position of one afar in 72 hours.
+ */
+static void
+mq_5b_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
+{
+	nvlist_t *flt;
+	fmd_case_t *cp;
+	cmd_mq_t *ip, *next;
+	int cw;
 
-	cp = fmd_case_open(hdl, NULL);
-	dflt = cmd_dimm_create_fault(hdl, dimm,
-	    "fault.memory.dimm-page-retires-excessive",
-	    CMD_FLTMAXCONF);
-	fmd_case_add_suspect(hdl, cp, dflt);
-	fmd_case_solve(hdl, cp);
+	for (cw = 0; cw < CMD_MAX_CKWDS; cw++) {
+		for (ip = cmd_list_next(&dimm->mq_root[cw]);
+		    ip != NULL; ip = next) {
+			next = cmd_list_next(ip);
+			if (ip->mq_dupce_count >= cmd.cmd_dupce) {
+				cp = fmd_case_open(hdl, NULL);
+				flt = cmd_dimm_create_fault(hdl, dimm,
+				    "fault.memory.dimm-page-retires-excessive",
+				    CMD_FLTMAXCONF);
+				dimm->dimm_flags |= CMD_MEM_F_FAULTING;
+				cmd_dimm_dirty(hdl, dimm);
+				fmd_case_add_suspect(hdl, cp, flt);
+				fmd_case_solve(hdl, cp);
+				fmd_hdl_debug(hdl,
+				    "mq_5b_check succeeded: duplicate CE=%d",
+				    ip->mq_dupce_count);
+				return;
+			}
+		}
+	}
+}
+
+/*
+ * delete the expired duplicate CE time stamps
+ */
+void
+mq_prune_dup(fmd_hdl_t *hdl, cmd_mq_t *ip, uint64_t now)
+{
+	tstamp_t *tsp, *next;
+
+	for (tsp = cmd_list_next(&ip->mq_dupce_tstamp); tsp != NULL;
+	    tsp = next) {
+		next = cmd_list_next(tsp);
+		if (tsp->tstamp < now - CMD_MQ_TIMELIM) {
+			cmd_list_delete(&ip->mq_dupce_tstamp, &tsp->ts_l);
+			fmd_hdl_free(hdl, tsp, sizeof (tstamp_t));
+			ip->mq_dupce_count--;
+		}
+	}
+}
+
+void
+mq_update(fmd_hdl_t *hdl, fmd_event_t *ep, cmd_mq_t *ip, uint64_t now,
+    uint32_t cpuid)
+{
+	tstamp_t *tsp;
+
+	ip->mq_tstamp = now;
+	ip->mq_cpuid = cpuid;
+	ip->mq_ep = ep;
+
+	if (fmd_serd_exists(hdl, ip->mq_serdnm))
+		fmd_serd_destroy(hdl, ip->mq_serdnm);
+	fmd_serd_create(hdl, ip->mq_serdnm, CMD_MQ_SERDN, CMD_MQ_SERDT);
+	(void) fmd_serd_record(hdl, ip->mq_serdnm, ep);
+
+	tsp = fmd_hdl_zalloc(hdl, sizeof (tstamp_t), FMD_SLEEP);
+	tsp->tstamp = now;
+	cmd_list_append(&ip->mq_dupce_tstamp, tsp);
+	ip->mq_dupce_count++;
 }
 
 /* Create a fresh index block for MQSC CE correlation. */
-
 cmd_mq_t *
 mq_create(fmd_hdl_t *hdl, fmd_event_t *ep,
-    uint64_t afar, uint16_t upos, uint64_t now)
+    uint64_t afar, uint16_t upos, uint64_t now, uint32_t cpuid)
 {
 	cmd_mq_t *cp;
+	tstamp_t *tsp;
 	uint16_t ckwd = (afar & 0x30) >> 4;
 
 	cp = fmd_hdl_zalloc(hdl, sizeof (cmd_mq_t), FMD_SLEEP);
@@ -186,6 +346,12 @@ mq_create(fmd_hdl_t *hdl, fmd_event_t *ep,
 	cp->mq_ep = ep;
 	cp->mq_serdnm =
 	    cmd_mq_serdnm_create(hdl, "mq", afar, ckwd, upos);
+
+	tsp = fmd_hdl_zalloc(hdl, sizeof (tstamp_t), FMD_SLEEP);
+	tsp->tstamp = now;
+	cmd_list_append(&cp->mq_dupce_tstamp, tsp);
+	cp->mq_dupce_count = 1;
+	cp->mq_cpuid = cpuid;
 
 	/*
 	 * Create SERD to keep this event from being removed
@@ -210,14 +376,22 @@ cmd_mq_t *
 mq_destroy(fmd_hdl_t *hdl, cmd_list_t *lp, cmd_mq_t *ip)
 {
 	cmd_mq_t *jp = cmd_list_next(ip);
+	tstamp_t *tsp, *next;
 
 	if (ip->mq_serdnm != NULL) {
-		if (fmd_serd_exists(hdl, ip->mq_serdnm)) {
+		if (fmd_serd_exists(hdl, ip->mq_serdnm))
 			fmd_serd_destroy(hdl, ip->mq_serdnm);
-		}
 		fmd_hdl_strfree(hdl, ip->mq_serdnm);
 		ip->mq_serdnm = NULL;
 	}
+
+	for (tsp = cmd_list_next(&ip->mq_dupce_tstamp); tsp != NULL;
+	    tsp = next) {
+		next = cmd_list_next(tsp);
+		cmd_list_delete(&ip->mq_dupce_tstamp, &tsp->ts_l);
+		fmd_hdl_free(hdl, tsp, sizeof (tstamp_t));
+	}
+
 	cmd_list_delete(lp, &ip->mq_l);
 	fmd_hdl_free(hdl, ip, sizeof (cmd_mq_t));
 
@@ -232,7 +406,7 @@ mq_destroy(fmd_hdl_t *hdl, cmd_list_t *lp, cmd_mq_t *ip)
 
 void
 mq_add(fmd_hdl_t *hdl, cmd_dimm_t *dimm, fmd_event_t *ep,
-    uint64_t afar, uint16_t synd, uint64_t now)
+    uint64_t afar, uint16_t synd, uint64_t now, uint32_t cpuid)
 {
 	cmd_mq_t *ip, *jp;
 	int cw, unit_position;
@@ -249,16 +423,16 @@ mq_add(fmd_hdl_t *hdl, cmd_dimm_t *dimm, fmd_event_t *ep,
 		    ip->mq_phys_addr == afar) {
 			/*
 			 * Found a duplicate cw, unit_position, and afar.
-			 * Delete this node, to be superseded by the new
-			 * node added below.
+			 * update the mq_t with the new information
 			 */
-			ip = mq_destroy(hdl, &dimm->mq_root[cw], ip);
+			mq_update(hdl, ep, ip, now, cpuid);
+			return;
 		} else {
 			ip = cmd_list_next(ip);
 		}
 	}
 
-	jp = mq_create(hdl, ep, afar, unit_position, now);
+	jp = mq_create(hdl, ep, afar, unit_position, now, cpuid);
 	if (ip == NULL)
 		cmd_list_append(&dimm->mq_root[cw], jp);
 	else
@@ -286,6 +460,7 @@ mq_prune(fmd_hdl_t *hdl, cmd_dimm_t *dimm, uint64_t now)
 				ip = mq_destroy(hdl, &dimm->mq_root[cw], ip);
 			} else {
 				/* tstamp < now - ce_t */
+				mq_prune_dup(hdl, ip, now);
 				ip = cmd_list_next(ip);
 			}
 		} /* per checkword */
@@ -402,6 +577,12 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	cmd_dimm_t *dimm;
 	cmd_page_t *page;
 	const char *uuid;
+	uint64_t *now;
+	uint_t nelem;
+	uint32_t cpuid;
+	nvlist_t *det;
+	uint64_t addr;
+	int skip_error = 0;
 
 	if (afar_status != AFLT_STAT_VALID ||
 	    synd_status != AFLT_STAT_VALID)
@@ -433,19 +614,36 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		    &dimm->dimm_header, CMD_PTR_DIMM_CASE, &uuid);
 	}
 
+	if (nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &det) != 0)
+		return (CMD_EVD_BAD);
+
 	/*
 	 * Add to MQSC correlation lists all CEs which pass validity
 	 * checks above.
+	 * Add mq_t when there is no bad r/w or dimm fault.
+	 * Always prune the expired mq_t.
 	 */
-	if (!(dimm->dimm_flags & CMD_MEM_F_FAULTING)) {
-		uint64_t *now;
-		uint_t nelem;
-		if (nvlist_lookup_uint64_array(nvl,
-		    "__tod", &now, &nelem) == 0) {
+	skip_error = cmd_dimm_check_symbol_error(dimm, synd);
 
-			mq_add(hdl, dimm, ep, afar, synd, *now);
-			mq_prune(hdl, dimm, *now);
+	if (nvlist_lookup_uint64_array(nvl,
+	    "__tod", &now, &nelem) == 0) {
+
+		if (!skip_error || !(dimm->dimm_flags & CMD_MEM_F_FAULTING)) {
+			if (nvlist_lookup_uint32(det, FM_FMRI_CPU_ID, &cpuid)
+			    != 0)
+				cpuid = ULONG_MAX;
+
+			mq_add(hdl, dimm, ep, afar, synd, *now, cpuid);
+		}
+
+		mq_prune(hdl, dimm, *now);
+
+		if (!skip_error)
+			bad_reader_writer_check(hdl, dimm, det);
+
+		if (!(dimm->dimm_flags & CMD_MEM_F_FAULTING)) {
 			mq_check(hdl, dimm);
+			mq_5b_check(hdl, dimm);
 		}
 	}
 
@@ -495,6 +693,9 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		return (CMD_EVD_BAD);
 	}
 
+	if (cmd_dimm_check_symbol_error(dimm, synd))
+		return (CMD_EVD_REDUND);
+
 	if (page == NULL)
 		page = cmd_page_create(hdl, asru, afar);
 
@@ -533,6 +734,21 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		fmd_case_add_ereport(hdl, page->page_case.cc_cp, ep);
 		break;	/* to retire */
 	}
+
+	if (page->page_flags & CMD_MEM_F_FAULTING ||
+	    fmd_nvl_fmri_unusable(hdl, page->page_asru_nvl))
+		return (CMD_EVD_OK);
+
+	/*
+	 * convert a unhashed address to hashed address
+	 */
+	cmd_to_hashed_addr(&addr, afar, class);
+
+	if (afar > dimm->dimm_phys_addr_hi)
+		dimm->dimm_phys_addr_hi = addr;
+
+	if (afar < dimm->dimm_phys_addr_low)
+		dimm->dimm_phys_addr_low = addr;
 
 	dimm->dimm_nretired++;
 	dimm->dimm_retstat.fmds_value.ui64++;

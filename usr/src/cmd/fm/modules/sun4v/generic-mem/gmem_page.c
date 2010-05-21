@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -327,6 +326,8 @@ gmem_page_fault(fmd_hdl_t *hdl, nvlist_t *fru, nvlist_t *rsc,
 	if (page != NULL) {
 		if (page->page_flags & GMEM_F_FAULTING ||
 		    gmem_page_unusable(hdl, page)) {
+			if (rsc != NULL)
+				nvlist_free(rsc);
 			page->page_flags |= GMEM_F_FAULTING;
 			return (0);
 		}

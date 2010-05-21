@@ -37,6 +37,7 @@
 #include <strings.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 #include <unistd.h>
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
@@ -628,3 +629,303 @@ cmd_synd2upos(uint16_t syndrome) {
 }
 
 const char *fmd_fmri_get_platform();
+
+#define	DP_MAX	25
+
+const char *slotname[] = {
+	"Slot A", "Slot B", "Slot C", "Slot D"};
+
+typedef struct fault_info {
+	uint32_t id;
+	int count;
+} fault_info_t;
+
+struct plat2id_map {
+	char *platnm;
+	int id;
+} id_plat[] = {
+	{"SUNW,Sun-Fire-15000",		1},
+	{"SUNW,Sun-Fire",		2},
+	{"SUNW,Netra-T12",		2},
+	{"SUNW,Sun-Fire-480R", 		3},
+	{"SUNW,Sun-Fire-V490",		3},
+	{"SUNW,Sun-Fire-V440",		3},
+	{"SUNW,Sun-Fire-V445",		3},
+	{"SUNW,Netra-440",		3},
+	{"SUNW,Sun-Fire-880",		4},
+	{"SUNW,Sun-Fire-V890",		4},
+	{NULL,				0}
+};
+
+/*ARGSUSED*/
+void
+cmd_to_hashed_addr(uint64_t *addr, uint64_t afar, const char *class)
+{
+	*addr = afar;
+}
+
+/*ARGSUSED*/
+int
+cmd_same_datapath_dimms(cmd_dimm_t *d1, cmd_dimm_t *d2)
+{
+	return (1);
+}
+
+static int
+cmd_get_platform()
+{
+	const char *platname;
+	int id = -1;
+	int i;
+
+	platname = fmd_fmri_get_platform();
+	for (i = 0; id_plat[i].platnm != NULL; i++) {
+		if (strcmp(platname, id_plat[i].platnm) == 0) {
+			id = id_plat[i].id;
+			break;
+		}
+	}
+	return (id);
+}
+
+static int
+cmd_get_boardid(uint32_t cpuid)
+{
+	int boardid;
+	int id = cmd_get_platform();
+
+	switch (id) {
+	case 1:
+		boardid = ((cpuid >> 5) & 0x1f);
+		break;
+	case 2:
+		boardid = ((cpuid & 0x1f) / 4);
+		break;
+
+	case 3:
+		cpuid = cpuid & 0x07;
+		boardid = ((cpuid % 2) == 0) ? 0 : 1;
+		break;
+	case 4:
+		cpuid = cpuid & 0x07;
+		if ((cpuid % 2) == 0)
+			boardid = (cpuid < 4) ? 0 : 2;
+		else
+			boardid = (cpuid < 5) ? 1 : 3;
+		break;
+	default:
+		boardid = 5;
+		break;
+	}
+
+	return (boardid);
+}
+
+static void
+cmd_get_faulted_comp(fmd_hdl_t *hdl, cmd_dimm_t *d1, cmd_dimm_t *d2,
+    uint16_t upos, fault_info_t **fault_list, int cpu)
+{
+	cmd_mq_t *ip;
+	int i, j, k, idj;
+	uint32_t id;
+	uint32_t *cpuid = NULL;
+	int max_rpt;
+
+	max_rpt = 2 * cmd.cmd_nupos;
+
+	cpuid = fmd_hdl_alloc(hdl, max_rpt * sizeof (uint32_t), FMD_SLEEP);
+
+	if (cpuid == NULL)
+		return;
+
+	for (i = 0, j = 0; i < CMD_MAX_CKWDS; i++) {
+		for (ip = cmd_list_next(&d1->mq_root[i]); ip != NULL;
+		    ip = cmd_list_next(ip)) {
+			if (upos == ip->mq_unit_position) {
+				cpuid[j] = ip->mq_cpuid;
+				j++;
+			}
+			if (j >= cmd.cmd_nupos)
+				break;
+		}
+		if (j >= cmd.cmd_nupos)
+			break;
+	}
+
+	for (i = 0; i < CMD_MAX_CKWDS; i++) {
+		for (ip = cmd_list_next(&d2->mq_root[i]); ip != NULL;
+		    ip = cmd_list_next(ip)) {
+			if (upos == ip->mq_unit_position) {
+				cpuid[j] = ip->mq_cpuid;
+				j++;
+			}
+			if (j >= max_rpt)
+				break;
+		}
+		if (j >= max_rpt)
+			break;
+	}
+
+	for (i = 0, k = 0; i < max_rpt; i++) {
+		if (cpuid[i] == ULONG_MAX)
+			continue;
+		id = (cpu == 0) ? cmd_get_boardid(cpuid[i]) : cpuid[i];
+		fault_list[k] = fmd_hdl_alloc(hdl,
+		    sizeof (fault_info_t), FMD_SLEEP);
+		if (fault_list[k] == NULL)
+			break;
+		fault_list[k]->count = 1;
+		fault_list[k]->id = id;
+		for (j = i + 1; j < max_rpt; j++) {
+			if (cpuid[j] == ULONG_MAX)
+				continue;
+			idj = (cpu == 0) ? cmd_get_boardid(cpuid[j]) : cpuid[j];
+			if (id == idj) {
+				fault_list[k]->count++;
+				cpuid[j] = ULONG_MAX;
+			}
+		}
+		k++;
+	}
+
+	fmd_hdl_free(hdl, cpuid, max_rpt * sizeof (uint32_t));
+}
+
+/*ARGSUSED*/
+static nvlist_t *
+cmd_board_mkfru(fmd_hdl_t *hdl, char *frustr)
+{
+	nvlist_t *hcel, *fru;
+	int err;
+
+	if (frustr == NULL)
+		return (NULL);
+
+	if (nvlist_alloc(&hcel, NV_UNIQUE_NAME, 0) != 0)
+		return (NULL);
+
+	err = nvlist_add_string(hcel, FM_FMRI_HC_NAME,
+	    FM_FMRI_LEGACY_HC);
+	err |= nvlist_add_string(hcel, FM_FMRI_HC_ID, frustr);
+	if (err != 0) {
+		nvlist_free(hcel);
+		return (NULL);
+	}
+
+	if (nvlist_alloc(&fru, NV_UNIQUE_NAME, 0) != 0) {
+		nvlist_free(hcel);
+		return (NULL);
+	}
+	err = nvlist_add_uint8(fru, FM_VERSION, FM_HC_SCHEME_VERSION);
+	err |= nvlist_add_string(fru, FM_FMRI_SCHEME,
+	    FM_FMRI_SCHEME_HC);
+	err |= nvlist_add_string(fru, FM_FMRI_HC_ROOT, "");
+	err |= nvlist_add_uint32(fru, FM_FMRI_HC_LIST_SZ, 1);
+	err |= nvlist_add_nvlist_array(fru, FM_FMRI_HC_LIST, &hcel, 1);
+	if (err != 0) {
+		nvlist_free(fru);
+		nvlist_free(hcel);
+		return (NULL);
+	}
+	nvlist_free(hcel);
+	return (fru);
+}
+
+/*
+ * Startcat, Serengeti, V4xx, and V8xx: fault the system boards of
+ * the detectors in proportion to the number of ereports out of 8
+ * Other systems: fault the detectors in proportion to the number of
+ * ereports out of 8
+ */
+void
+cmd_gen_datapath_fault(fmd_hdl_t *hdl, cmd_dimm_t *d1, cmd_dimm_t *d2,
+    uint16_t upos, nvlist_t *det)
+{
+	char frustr[DP_MAX];
+	fmd_case_t *cp;
+	int i, ratio, type, fault_cpu, max_rpt;
+	uint32_t id;
+	uint8_t cpumask;
+	char *cpustr;
+	fault_info_t **fault_list = NULL;
+	nvlist_t *fru = NULL, *asru = NULL, *flt = NULL;
+
+	max_rpt = cmd.cmd_nupos * 2;
+	fault_list = fmd_hdl_alloc(hdl,
+	    max_rpt * sizeof (fault_info_t *), FMD_SLEEP);
+
+	if (fault_list == NULL)
+		return;
+
+	for (i = 0; i < max_rpt; i++)
+		fault_list[i] = NULL;
+
+	type = cmd_get_platform();
+
+	fault_cpu = (type == -1) ? 1 : 0;
+
+	cmd_get_faulted_comp(hdl, d1, d2, upos, fault_list, fault_cpu);
+
+	cp = fmd_case_open(hdl, NULL);
+
+	for (i = 0; i < max_rpt; i++) {
+		if (fault_list[i] == NULL)
+			continue;
+		id = fault_list[i]->id;
+
+		switch (type) {
+		case 1:
+			(void) snprintf(frustr, DP_MAX, "EX%d", id);
+			break;
+		case 2:
+			(void) snprintf(frustr, DP_MAX, "/N0/SB%d", id);
+			break;
+		case 3:
+		case 4:
+			(void) snprintf(frustr, DP_MAX, slotname[id]);
+			break;
+		default:
+			cpustr = cmd_cpu_getfrustr_by_id(hdl, id);
+			if (nvlist_lookup_uint8(det, FM_FMRI_CPU_MASK, &cpumask)
+			    == 0) {
+				asru = cmd_cpu_fmri_create(id, cpumask);
+				(void) fmd_nvl_fmri_expand(hdl, asru);
+			}
+			break;
+		}
+
+		ratio = (fault_list[i]->count * 100) / (cmd.cmd_nupos * 2);
+
+		if (fault_cpu) {
+			fru = cmd_cpu_mkfru(hdl, cpustr, NULL, NULL);
+			fmd_hdl_strfree(hdl, cpustr);
+			if (fru == NULL) {
+				nvlist_free(asru);
+				break;
+			}
+			flt = cmd_nvl_create_fault(hdl, "fault.memory.datapath",
+			    ratio, asru, fru, asru);
+			nvlist_free(asru);
+		} else {
+			fru = cmd_board_mkfru(hdl, frustr);
+			if (fru == NULL)
+				break;
+			flt = cmd_nvl_create_fault(hdl, "fault.memory.datapath",
+			    ratio, fru, fru, fru);
+		}
+
+		fmd_case_add_suspect(hdl, cp, flt);
+
+		/* free up memory */
+		nvlist_free(fru);
+	}
+
+	fmd_case_solve(hdl, cp);
+
+	for (i = 0; i < max_rpt; i++) {
+		if (fault_list[i] != NULL)
+			fmd_hdl_free(hdl, fault_list[i], sizeof (fault_info_t));
+	}
+
+	fmd_hdl_free(hdl, fault_list, sizeof (fault_info_t *) * max_rpt);
+}

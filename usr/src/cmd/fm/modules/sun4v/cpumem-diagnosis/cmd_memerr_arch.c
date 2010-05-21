@@ -55,6 +55,11 @@
 
 #define	VF_TS3_FCR	0x000000000000FFFFULL
 #define	VF_L2ESYR_C2C	0x8000000000000000ULL
+#define	OFFBIT		0xFFFFFFFFFFFC07FFULL
+#define	BIT28_32	0x00000001F0000000ULL
+#define	BIT13_17	0x000000000003E000ULL
+#define	BIT18_19	0x00000000000C0000ULL
+#define	BIT11_12	0x0000000000001800ULL
 #define	UTS2_CPUS_PER_CHIP	64
 #define	FBR_ERROR	".fbr"
 #define	DSU_ERROR	".dsu"
@@ -678,4 +683,78 @@ cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri) {
 		return (NULL); /* doesn't have serial id */
 
 	return (cmd_find_dimm_by_sn(hdl, FM_FMRI_SCHEME_HC, *snp));
+}
+
+/*
+ * formula to convert an unhashed address to hashed address
+ * PA[17:11] = (PA[32:28] xor PA[17:13]) :: ((PA[19:18] xor PA[12:11])
+ */
+void
+cmd_to_hashed_addr(uint64_t *addr, uint64_t afar, const char *class)
+{
+
+	if (strstr(class, "ultraSPARC-T1") != NULL)
+		*addr = afar;
+	else {
+		*addr = (afar & OFFBIT) |
+		    ((afar & BIT28_32) >> 15) ^ (afar & BIT13_17) |
+		    ((afar & BIT18_19) >> 7) ^ (afar & BIT11_12);
+	}
+}
+
+int
+cmd_same_datapath_dimms(cmd_dimm_t *d1, cmd_dimm_t *d2)
+{
+	char *p, *q;
+
+	p = strstr(d1->dimm_unum, "CMP");
+	q = strstr(d2->dimm_unum, "CMP");
+	if (p != NULL && q != NULL) {
+		if (strncmp(p, q, 4) == 0)
+			return (1);
+	}
+	return (0);
+}
+
+/*
+ * fault the FRU of the common CMP
+ */
+/*ARGSUSED*/
+void
+cmd_gen_datapath_fault(fmd_hdl_t *hdl, cmd_dimm_t *d1, cmd_dimm_t *d2,
+    uint16_t upos, nvlist_t *det)
+{
+	fmd_case_t *cp;
+	char *frustr;
+	nvlist_t *rsrc, *fltlist;
+	char *s;
+	uint_t len;
+
+	s = strstr(d1->dimm_unum, "CMP");
+	if (s == NULL)
+		return;
+
+	frustr = fmd_hdl_zalloc(hdl, strlen(d1->dimm_unum), FMD_SLEEP);
+	len = strlen(d1->dimm_unum) -  strlen(s);
+
+	(void) strncpy(frustr, d1->dimm_unum, len);
+
+	rsrc = cmd_mkboard_fru(hdl, frustr, NULL, NULL);
+
+	fmd_hdl_free(hdl, frustr, strlen(d1->dimm_unum));
+
+	if (rsrc == NULL)
+		return;
+
+	(void) nvlist_add_nvlist(rsrc, FM_FMRI_AUTHORITY, cmd.cmd_auth);
+
+	cp = fmd_case_open(hdl, NULL);
+
+	fltlist = fmd_nvl_create_fault(hdl, "fault.memory.datapath", 100,
+	    rsrc, NULL, rsrc);
+
+	fmd_case_add_suspect(hdl, cp, fltlist);
+	fmd_case_solve(hdl, cp);
+
+	nvlist_free(rsrc);
 }

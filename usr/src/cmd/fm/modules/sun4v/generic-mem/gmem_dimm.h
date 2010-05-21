@@ -59,11 +59,20 @@ extern "C" {
 #define	DIMM_MKVERSION(version)	(version)
 
 #define	GMEM_DIMM_VERSION_0	DIMM_MKVERSION(0)
-#define	GMEM_DIMM_VERSION	GMEM_DIMM_VERSION_0
+#define	GMEM_DIMM_VERSION_1	DIMM_MKVERSION(1)
+#define	GMEM_DIMM_VERSION	GMEM_DIMM_VERSION_1
 
 #define	GMEM_DIMM_VERSIONED(dimm)	((dimm)->dimm_version)
 
 #define	GMEM_DIMM_STAT_PREFIX		"DIMM_"
+
+typedef struct gmem_dimm_0 {
+	gmem_header_t dimm0_header;	/* Nodetype must be GMEM_NT_DIMM */
+	uint_t dimm0_version;		/* DIMM version */
+	gmem_fmri_t dimm0_asru;		/* ASRU for this DIMM */
+	uint_t dimm0_flags;		/* GMEM_MEM_F_* */
+	uint_t dimm0_nretired;		/* # ret'd pages for CEs in DIMM */
+} gmem_dimm_0_t;
 
 typedef struct gmem_dimm_pers {
 	gmem_header_t dimmp_header;	/* Nodetype must be GMEM_NT_DIMM */
@@ -71,6 +80,8 @@ typedef struct gmem_dimm_pers {
 	gmem_fmri_t dimmp_asru;		/* ASRU for this DIMM */
 	uint_t dimmp_flags;		/* GMEM_MEM_F_* */
 	uint_t dimmp_nretired;		/* # ret'd pages for CEs in DIMM */
+	uint64_t dimmp_phys_addr_hi;	/* retired page addr high */
+	uint64_t dimmp_phys_addr_low;	/* retired page addr low */
 } gmem_dimm_pers_t;
 
 /*
@@ -87,13 +98,21 @@ typedef struct gmem_mq {
 	uint16_t mq_unit_position;	/* bit for sun4u, nibble for sun4v */
 	fmd_event_t *mq_ep;		/* ereport - for potential fault */
 	char *mq_serdnm;		/* serd eng to retain CE events */
+	uint16_t mq_dupce_count;		/* count dup CEs */
+	gmem_list_t mq_dupce_tstamp;	/* list dup CE time stamp */
 } gmem_mq_t;
+
+typedef struct tstamp {
+	gmem_list_t ts_l;
+	uint64_t tstamp;
+} tstamp_t;
 
 struct gmem_dimm {
 	gmem_dimm_pers_t dimm_pers;
 	char *dimm_serial;		/* Dimm serial number */
 	gmem_case_t dimm_case;		/* Open CE case against this DIMM */
 	fmd_stat_t dimm_retstat;	/* retirement statistics, this DIMM */
+	uint16_t dimm_syl_error;	/* bad rw symbol-in-error */
 	gmem_list_t
 	    mq_root[GMEM_MAX_CKWDS];	/* per-checkword CEs to correlate */
 };
@@ -101,9 +120,12 @@ struct gmem_dimm {
 #define	GMEM_MQ_TIMELIM		(72*60*60)	/* 72 hours */
 #define	GMEM_MQ_SERDT		MAXINT		/* Never expected to fire */
 #define	GMEM_MQ_SERDN		2		/* Dup CEs not allowed */
+#define	GMEM_MQ_512KB		0x80000		/* space between hi-low addr */
+#define	GMEM_MQ_RATIO		0.0625		/* bad r/w page ratio (1/16) */
 
-#define	GMEM_DIMM_MAXSIZE sizeof (gmem_dimm_pers_t)
-#define	GMEM_DIMM_MINSIZE sizeof (gmem_dimm_pers_t)
+
+#define	GMEM_DIMM_MAXSIZE MAX(sizeof (gmem_dimm_0_t), sizeof (gmem_dimm_pers_t))
+#define	GMEM_DIMM_MINSIZE MIN(sizeof (gmem_dimm_0_t), sizeof (gmem_dimm_pers_t))
 
 #define	dimm_header		dimm_pers.dimmp_header
 #define	dimm_nodetype		dimm_pers.dimmp_header.hdr_nodetype
@@ -113,6 +135,8 @@ struct gmem_dimm {
 #define	dimm_asru_nvl		dimm_pers.dimmp_asru.fmri_nvl
 #define	dimm_flags		dimm_pers.dimmp_flags
 #define	dimm_nretired		dimm_pers.dimmp_nretired
+#define	dimm_phys_addr_hi	dimm_pers.dimmp_phys_addr_hi
+#define	dimm_phys_addr_low	dimm_pers.dimmp_phys_addr_low
 
 extern gmem_dimm_t *gmem_dimm_lookup(fmd_hdl_t *, nvlist_t *);
 extern gmem_dimm_t *gmem_dimm_create(fmd_hdl_t *, nvlist_t *);
@@ -129,6 +153,9 @@ extern void gmem_dimm_destroy(fmd_hdl_t *, gmem_dimm_t *);
 extern void gmem_dimm_validate(fmd_hdl_t *);
 extern void gmem_dimm_gc(fmd_hdl_t *);
 extern void gmem_dimm_fini(fmd_hdl_t *);
+extern int gmem_same_datapath_dimms(fmd_hdl_t *, gmem_dimm_t *, gmem_dimm_t *);
+extern int gmem_check_symbol_error(fmd_hdl_t *, gmem_dimm_t *, uint16_t);
+extern void gmem_save_symbol_error(fmd_hdl_t *, gmem_dimm_t *, uint16_t);
 
 #ifdef __cplusplus
 }

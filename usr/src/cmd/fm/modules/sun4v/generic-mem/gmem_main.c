@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <gmem_state.h>
@@ -113,6 +112,7 @@ static gmem_stat_t gm_stats = {
 	{ "ce_interm", FMD_TYPE_UINT64, "intermittent CEs" },
 	{ "ce_clearable_persis", FMD_TYPE_UINT64, "clearable persistent CEs" },
 	{ "ce_sticky", FMD_TYPE_UINT64, "sticky CEs" },
+	{ "dimm_migrat", FMD_TYPE_UINT64, "DIMMs migrated to new version" }
 };
 
 static const fmd_prop_t fmd_props[] = {
@@ -120,6 +120,9 @@ static const fmd_prop_t fmd_props[] = {
 	{ "ce_t", FMD_TYPE_TIME, "72h" },
 	{ "filter_ratio", FMD_TYPE_UINT32, "0" },
 	{ "max_retired_pages", FMD_TYPE_UINT32, "512" },
+	{ "low_ce_thresh", FMD_TYPE_UINT32, "128"},
+	{ "nupos", FMD_TYPE_UINT32, "4"},
+	{ "dupce", FMD_TYPE_UINT32, "120"},
 	{ NULL, 0, NULL }
 };
 
@@ -199,6 +202,10 @@ _fmd_init(fmd_hdl_t *hdl)
 	gmem.gm_ce_n = fmd_prop_get_int32(hdl, "ce_n");
 	gmem.gm_ce_t = fmd_prop_get_int64(hdl, "ce_t");
 	gmem.gm_filter_ratio = fmd_prop_get_int32(hdl, "filter_ratio");
+	gmem.gm_low_ce_thresh = fmd_prop_get_int32(hdl, "low_ce_thresh");
+	gmem.gm_nupos = fmd_prop_get_int32(hdl, "nupos");
+	gmem.gm_dupce = fmd_prop_get_int32(hdl, "dupce");
+
 
 	if (gmem_state_restore(hdl) < 0) {
 		_fmd_fini(hdl);

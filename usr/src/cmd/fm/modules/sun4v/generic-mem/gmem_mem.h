@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _GMEM_MEM_H
@@ -43,6 +42,7 @@ extern "C" {
 
 #define	GMEM_ERPT_PAYLOAD_DIAGNOSE	"diagnose"
 #define	GMEM_ERPT_PAYLOAD_RESOURCE	"resource"
+#define	GMEM_ERPT_PAYLOAD_DETECTOR	"detector"
 #define	GMEM_ERPT_PAYLOAD_PHYSADDR	"phys-addr"
 #define	GMEM_ERPT_PAYLOAD_OFFSET	"offset"
 #define	GMEM_ERPT_PAYLOAD_SERDN		"serd_n"
