@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Portions Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Portions Copyright (c) 2010, Oracle and/or its affiliates.
+ * All rights reserved.
  */
 
 /*
@@ -581,10 +581,10 @@ typedef struct immu {
 } immu_t;
 
 /* properties that control DVMA */
-#define	DDI_DVMA_MAPTYPE_PROP	"ddi-dvma-mapping"
+#define	DDI_DVMA_MAPTYPE_ROOTNEX_PROP	"immu-dvma-mapping"
 
-/* property values */
-#define	DDI_DVMA_MAPTYPE_UNITY	"unity"
+#define	DDI_DVMA_MAPTYPE_UNITY		"unity"
+#define	DDI_DVMA_MAPTYPE_XLATE		"xlate"
 
 typedef enum immu_maptype {
 	IMMU_MAPTYPE_BAD = 0,    /* 0 is always bad */
@@ -651,6 +651,8 @@ typedef struct immu_devi {
 	/* dmar unit to which this dip belongs */
 	immu_t		*imd_immu;
 
+	immu_flags_t	imd_dvma_flags;
+
 	/* domain ptr */
 	domain_t	*imd_domain;
 	dev_info_t	*imd_ddip;
@@ -697,7 +699,6 @@ extern list_t ioapic_drhd_list;
 
 /* Various features */
 extern boolean_t immu_enable;
-extern boolean_t immu_dvma_enable;
 extern boolean_t immu_gfxdvma_enable;
 extern boolean_t immu_intrmap_enable;
 extern boolean_t immu_qinv_enable;
@@ -713,6 +714,8 @@ extern boolean_t immu_dmar_print;
 
 /* tunables */
 extern int64_t immu_flush_gran;
+
+extern immu_flags_t immu_global_dvma_flags;
 
 /* ################### Interfaces exported outside IOMMU code ############## */
 void immu_init(void);

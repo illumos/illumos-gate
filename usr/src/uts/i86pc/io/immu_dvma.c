@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Portions Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Portions Copyright (c) 2010, Oracle and/or its affiliates.
+ * All rights reserved.
  */
 /*
  * Copyright (c) 2009, Intel Corporation.
@@ -721,6 +721,8 @@ create_immu_devi(dev_info_t *rdip, int bus, int dev, int func,
 
 	immu_devi->imd_domain = NULL;
 
+	immu_devi->imd_dvma_flags = immu_global_dvma_flags;
+
 	return (immu_devi);
 }
 
@@ -1211,6 +1213,8 @@ device_domain(dev_info_t *rdip, dev_info_t **ddipp, immu_flags_t immu_flags)
 		ddi_err(DER_WARN, rdip, "No IMMU unit found for device");
 		return (NULL);
 	}
+
+	immu_flags |= immu_devi_get(rdip)->imd_dvma_flags;
 
 	dvarg.dva_rdip = rdip;
 	dvarg.dva_ddip = NULL;
@@ -3106,7 +3110,6 @@ immu_dvma_map(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq, memrng_t *mrng,
 
 	immu_flags |= dma_to_immu_flags(dmareq);
 
-
 	immu = immu_dvma_get_immu(rdip, immu_flags);
 	if (immu == NULL) {
 		/*
@@ -3116,7 +3119,6 @@ immu_dvma_map(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq, memrng_t *mrng,
 		ddi_err(DER_WARN, rdip, "No IMMU unit found for device");
 		return (DDI_DMA_NORESOURCES);
 	}
-
 
 	/*
 	 * redirect isa devices attached under lpc to lpc dip

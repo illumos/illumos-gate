@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Portions Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Portions Copyright (c) 2010, Oracle and/or its affiliates.
+ * All rights reserved.
  */
 /*
  * Copyright (c) 2009, Intel Corporation.
@@ -88,6 +88,8 @@ boolean_t immu_dmar_print;
 /* Tunables */
 int64_t immu_flush_gran = 5;
 
+immu_flags_t immu_global_dvma_flags;
+
 /* ############  END OPTIONS section ################ */
 
 /*
@@ -105,6 +107,11 @@ boolean_t immu_quiesced;
 /* Globals used only in this file */
 static char **black_array;
 static uint_t nblacks;
+
+static char **unity_driver_array;
+static uint_t nunity;
+static char **xlate_driver_array;
+static uint_t nxlate;
 /* ###################### Utility routines ############################# */
 
 /*
@@ -164,36 +171,50 @@ map_bios_rsvd_mem(dev_info_t *dip)
 
 
 /*
- * Check if the driver requests physical mapping
+ * Check if the driver requests a specific type of mapping.
  */
 /*ARGSUSED*/
 static void
-check_physical(dev_info_t *dip, void *arg)
+check_conf(dev_info_t *dip, void *arg)
 {
-	char *val;
+	immu_devi_t *immu_devi;
+	const char *dname;
+	uint_t i;
+	int hasprop = 0;
 
 	/*
-	 * Check for the DVMA unity mapping property on the device
+	 * Only PCI devices can use an IOMMU. Legacy ISA devices
+	 * are handled in check_lpc.
 	 */
-	val = NULL;
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, DDI_DVMA_MAPTYPE_PROP, &val) == DDI_SUCCESS) {
-		ASSERT(val);
-		if (strcmp(val, DDI_DVMA_MAPTYPE_UNITY) != 0) {
-			ddi_err(DER_WARN, dip, "%s value \"%s\" is not valid",
-			    DDI_DVMA_MAPTYPE_PROP, val);
-		} else {
-			int e;
+	if (!DEVI_IS_PCI(dip))
+		return;
 
-			ddi_err(DER_NOTE, dip,
-			    "Using unity DVMA mapping for device");
-			e = immu_dvma_map(NULL, NULL, NULL, 0, dip,
-			    IMMU_FLAGS_UNITY);
-			/* for unity mode, map will return USE_PHYSICAL */
-			ASSERT(e == DDI_DMA_USE_PHYSICAL);
+	dname = ddi_driver_name(dip);
+	if (dname == NULL)
+		return;
+	immu_devi = immu_devi_get(dip);
+
+	for (i = 0; i < nunity; i++) {
+		if (strcmp(unity_driver_array[i], dname) == 0) {
+			hasprop = 1;
+			immu_devi->imd_dvma_flags |= IMMU_FLAGS_UNITY;
 		}
-		ddi_prop_free(val);
 	}
+
+	for (i = 0; i < nxlate; i++) {
+		if (strcmp(xlate_driver_array[i], dname) == 0) {
+			hasprop = 1;
+			immu_devi->imd_dvma_flags &= ~IMMU_FLAGS_UNITY;
+		}
+	}
+
+	/*
+	 * Report if we changed the value from the default.
+	 */
+	if (hasprop && (immu_devi->imd_dvma_flags ^ immu_global_dvma_flags))
+		ddi_err(DER_LOG, dip, "using %s DVMA mapping",
+		    immu_devi->imd_dvma_flags & IMMU_FLAGS_UNITY ?
+		    DDI_DVMA_MAPTYPE_UNITY : DDI_DVMA_MAPTYPE_XLATE);
 }
 
 /*
@@ -204,6 +225,8 @@ static void
 check_usb(dev_info_t *dip, void *arg)
 {
 	const char *drv = ddi_driver_name(dip);
+	immu_devi_t *immu_devi;
+
 
 	if (drv == NULL ||
 	    (strcmp(drv, "uhci") != 0 && strcmp(drv, "ohci") != 0 &&
@@ -211,16 +234,20 @@ check_usb(dev_info_t *dip, void *arg)
 		return;
 	}
 
+	immu_devi = immu_devi_get(dip);
+
+	/*
+	 * If unit mappings are already specified, globally or
+	 * locally, we're done here, since that covers both
+	 * quirks below.
+	 */
+	if (immu_devi->imd_dvma_flags & IMMU_FLAGS_UNITY)
+		return;
+
 	/* This must come first since it does unity mapping */
 	if (immu_quirk_usbfullpa == B_TRUE) {
-		int e;
-		ddi_err(DER_NOTE, dip, "Applying USB FULL PA quirk");
-		e = immu_dvma_map(NULL, NULL, NULL, 0, dip, IMMU_FLAGS_UNITY);
-		/* for unity mode, map will return USE_PHYSICAL */
-		ASSERT(e == DDI_DMA_USE_PHYSICAL);
-	}
-
-	if (immu_quirk_usbrmrr == B_TRUE) {
+		immu_devi->imd_dvma_flags |= IMMU_FLAGS_UNITY;
+	} else if (immu_quirk_usbrmrr == B_TRUE) {
 		ddi_err(DER_LOG, dip, "Applying USB RMRR quirk");
 		map_bios_rsvd_mem(dip);
 	}
@@ -252,17 +279,14 @@ static void
 check_gfx(dev_info_t *dip, void *arg)
 {
 	immu_devi_t *immu_devi;
-	int e;
 
 	immu_devi = immu_devi_get(dip);
 	ASSERT(immu_devi);
 	if (immu_devi->imd_display == B_TRUE) {
+		immu_devi->imd_dvma_flags |= IMMU_FLAGS_UNITY;
 		ddi_err(DER_LOG, dip, "IMMU: Found GFX device");
 		/* This will put the immu_devi on the GFX "specials" list */
 		(void) immu_dvma_get_immu(dip, IMMU_FLAGS_SLEEP);
-		e = immu_dvma_map(NULL, NULL, NULL, 0, dip, IMMU_FLAGS_UNITY);
-		/* for unity mode, map will return USE_PHYSICAL */
-		ASSERT(e == DDI_DMA_USE_PHYSICAL);
 	}
 }
 
@@ -294,9 +318,9 @@ check_pre_startup_quirks(dev_info_t *dip, void *arg)
 
 	check_lpc(dip, arg);
 
-	check_usb(dip, arg);
+	check_conf(dip, arg);
 
-	check_physical(dip, arg);
+	check_usb(dip, arg);
 
 	return (DDI_WALK_CONTINUE);
 }
@@ -313,6 +337,24 @@ pre_startup_quirks(void)
 	walk_tree(check_pre_startup_quirks, NULL);
 
 	immu_dmar_rmrr_map();
+}
+
+static int
+get_conf_str(char *bopt, char **val)
+{
+	int ret;
+
+	/*
+	 * Check the rootnex.conf property
+	 * Fake up a dev_t since searching the global
+	 * property list needs it
+	 */
+	ret = ddi_prop_lookup_string(
+	    makedevice(ddi_name_to_major("rootnex"), 0),
+	    root_devinfo, DDI_PROP_DONTPASS | DDI_PROP_ROOTNEX_GLOBAL,
+	    bopt, val);
+
+	return (ret);
 }
 
 /*
@@ -332,13 +374,10 @@ get_conf_opt(char *bopt, boolean_t *kvar)
 	 * Fake up a dev_t since searching the global
 	 * property list needs it
 	 */
-	if (ddi_prop_lookup_string(makedevice(ddi_name_to_major("rootnex"), 0),
-	    root_devinfo, DDI_PROP_DONTPASS | DDI_PROP_ROOTNEX_GLOBAL,
-	    bopt, &val) != DDI_PROP_SUCCESS) {
-		return;
-	}
 
-	ASSERT(val);
+	if (get_conf_str(bopt, &val) != DDI_PROP_SUCCESS)
+		return;
+
 	if (strcmp(val, "true") == 0) {
 		*kvar = B_TRUE;
 	} else if (strcmp(val, "false") == 0) {
@@ -355,33 +394,81 @@ get_conf_opt(char *bopt, boolean_t *kvar)
  * get_bootopt()
  * 	check a boot option  (always a boolean)
  */
+static int
+get_boot_str(char *bopt, char **val)
+{
+	int ret;
+
+	ret = ddi_prop_lookup_string(DDI_DEV_T_ANY, root_devinfo,
+	    DDI_PROP_DONTPASS, bopt, val);
+
+	return (ret);
+}
+
 static void
 get_bootopt(char *bopt, boolean_t *kvar)
 {
 	char *val = NULL;
 
-	ASSERT(bopt);
-	ASSERT(kvar);
-
 	/*
 	 * All boot options set at the GRUB menu become
 	 * properties on the rootnex.
 	 */
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, root_devinfo,
-	    DDI_PROP_DONTPASS, bopt, &val) == DDI_SUCCESS) {
-		ASSERT(val);
-		if (strcmp(val, "true") == 0) {
-			*kvar = B_TRUE;
-		} else if (strcmp(val, "false") == 0) {
-			*kvar = B_FALSE;
-		} else {
-			ddi_err(DER_WARN, NULL, "boot option %s=\"%s\" ",
-			    "is not set to true or false. Ignoring option.",
-			    bopt, val);
-		}
-		ddi_prop_free(val);
+	if (get_boot_str(bopt, &val) != DDI_PROP_SUCCESS)
+		return;
+
+	if (strcmp(val, "true") == 0) {
+		*kvar = B_TRUE;
+	} else if (strcmp(val, "false") == 0) {
+		*kvar = B_FALSE;
+	} else {
+		ddi_err(DER_WARN, NULL, "boot option %s=\"%s\" ",
+		    "is not set to true or false. Ignoring option.",
+		    bopt, val);
 	}
+	ddi_prop_free(val);
 }
+
+static void
+get_boot_dvma_mode(void)
+{
+	char *val = NULL;
+
+	if (get_boot_str(DDI_DVMA_MAPTYPE_ROOTNEX_PROP, &val)
+	    != DDI_PROP_SUCCESS)
+		return;
+
+	if (strcmp(val, DDI_DVMA_MAPTYPE_UNITY) == 0) {
+		immu_global_dvma_flags |= IMMU_FLAGS_UNITY;
+	} else if (strcmp(val, DDI_DVMA_MAPTYPE_XLATE) == 0) {
+		immu_global_dvma_flags &= ~IMMU_FLAGS_UNITY;
+	} else {
+		ddi_err(DER_WARN, NULL, "bad value \"%s\" for boot option %s",
+		    val, DDI_DVMA_MAPTYPE_ROOTNEX_PROP);
+	}
+	ddi_prop_free(val);
+}
+
+static void
+get_conf_dvma_mode(void)
+{
+	char *val = NULL;
+
+	if (get_conf_str(DDI_DVMA_MAPTYPE_ROOTNEX_PROP, &val)
+	    != DDI_PROP_SUCCESS)
+		return;
+
+	if (strcmp(val, DDI_DVMA_MAPTYPE_UNITY) == 0) {
+		immu_global_dvma_flags |= IMMU_FLAGS_UNITY;
+	} else if (strcmp(val, DDI_DVMA_MAPTYPE_XLATE) == 0) {
+		immu_global_dvma_flags &= ~IMMU_FLAGS_UNITY;
+	} else {
+		ddi_err(DER_WARN, NULL, "bad value \"%s\" for rootnex "
+		    "option %s", val, DDI_DVMA_MAPTYPE_ROOTNEX_PROP);
+	}
+	ddi_prop_free(val);
+}
+
 
 static void
 get_conf_tunables(char *bopt, int64_t *ivar)
@@ -442,6 +529,8 @@ read_conf_options(void)
 
 	/* get tunables */
 	get_conf_tunables("immu-flush-gran", &immu_flush_gran);
+
+	get_conf_dvma_mode();
 }
 
 static void
@@ -461,6 +550,33 @@ read_boot_options(void)
 
 	/* debug printing */
 	get_bootopt("immu-dmar-print", &immu_dmar_print);
+
+	get_boot_dvma_mode();
+}
+
+static void
+mapping_list_setup(void)
+{
+	char **string_array;
+	uint_t nstrings;
+
+	if (ddi_prop_lookup_string_array(
+	    makedevice(ddi_name_to_major("rootnex"), 0), root_devinfo,
+	    DDI_PROP_DONTPASS | DDI_PROP_ROOTNEX_GLOBAL,
+	    "immu-dvma-unity-drivers",
+	    &string_array, &nstrings) == DDI_PROP_SUCCESS) {
+		unity_driver_array = string_array;
+		nunity = nstrings;
+	}
+
+	if (ddi_prop_lookup_string_array(
+	    makedevice(ddi_name_to_major("rootnex"), 0), root_devinfo,
+	    DDI_PROP_DONTPASS | DDI_PROP_ROOTNEX_GLOBAL,
+	    "immu-dvma-xlate-drivers",
+	    &string_array, &nstrings) == DDI_PROP_SUCCESS) {
+		xlate_driver_array = string_array;
+		nxlate = nstrings;
+	}
 }
 
 /*
@@ -903,6 +1019,8 @@ immu_init(void)
 		immu_enable = B_FALSE;
 		return;
 	}
+
+	mapping_list_setup();
 
 	/*
 	 * Check blacklists
