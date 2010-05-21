@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -55,12 +54,14 @@ pmcs_register_dump_int(pmcs_hw_t *pwp)
 {
 	int n = 0;
 	uint32_t size_left = 0;
+	uint32_t scratch = 0;
 	uint8_t slice = 0;
 	caddr_t buf = NULL;
 
+	ASSERT(mutex_owned(&pwp->lock));
+
 	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 	    "pmcs%d: Internal register dump", ddi_get_instance(pwp->dip));
-	ASSERT(mutex_owned(&pwp->lock));
 
 	if (pwp->regdumpp == NULL) {
 		pwp->regdumpp =
@@ -94,6 +95,14 @@ pmcs_register_dump_int(pmcs_hw_t *pwp)
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: HBA dead, skipping AAP1/IOP registers and event logs",
 		    __func__);
+		goto skip_logs;
+	}
+
+	scratch = pmcs_rd_msgunit(pwp, PMCS_MSGU_SCRATCH1);
+	if ((scratch & PMCS_MSGU_AAP_STATE_MASK) == PMCS_MSGU_AAP_STATE_ERROR) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: MSGU in error state, skipping AAP1/IOP registers and "
+		    "event logs", __func__);
 		goto skip_logs;
 	}
 

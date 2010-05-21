@@ -49,6 +49,7 @@ static int pmcs_expander_content_discover(pmcs_hw_t *, pmcs_phy_t *,
     pmcs_phy_t *);
 
 static int pmcs_smp_function_result(pmcs_hw_t *, smp_response_frame_t *);
+static void pmcs_flush_nonio_cmds(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt);
 static boolean_t pmcs_validate_devid(pmcs_phy_t *, pmcs_phy_t *, uint32_t);
 static void pmcs_clear_phys(pmcs_hw_t *, pmcs_phy_t *);
 static int pmcs_configure_new_devices(pmcs_hw_t *, pmcs_phy_t *);
@@ -583,14 +584,13 @@ pmcs_echo_test(pmcs_hw_t *pwp)
 		}
 
 		WAIT_FOR(pwrk, 250, result);
+		pmcs_pwork(pwp, pwrk);
 
 		echo_end = gethrtime();
 		DTRACE_PROBE2(pmcs__echo__test__wait__end,
 		    hrtime_t, echo_end, int, result);
-
 		echo_total += (echo_end - echo_start);
 
-		pmcs_pwork(pwp, pwrk);
 		if (result) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: command timed out on echo test #%d",
@@ -743,6 +743,7 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 	uint32_t status;
 	int result, level, phynum;
 	struct pmcwork *pwrk;
+	pmcs_iport_t *iport;
 	uint32_t htag;
 
 	ASSERT(mutex_owned(&pptr->phy_lock));
@@ -837,17 +838,16 @@ pmcs_reset_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t type)
 	COPY_MESSAGE(msg, iomb, amt);
 	htag = pwrk->htag;
 
-	/* SMP serialization */
-	pmcs_smp_acquire(pptr->iport);
-
+	pmcs_hold_iport(pptr->iport);
+	iport = pptr->iport;
+	pmcs_smp_acquire(iport);
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
 	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 1000, result);
 	pmcs_pwork(pwp, pwrk);
-	/* Release SMP lock before reacquiring PHY lock */
-	pmcs_smp_release(pptr->iport);
+	pmcs_smp_release(iport);
+	pmcs_rele_iport(iport);
 	pmcs_lock_phy(pptr);
 
 	if (result) {
@@ -931,7 +931,6 @@ pmcs_stop_phy(pmcs_hw_t *pwp, int phynum)
 		 */
 		INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
 		WAIT_FOR(pwrk, 1000, result);
-
 		pmcs_pwork(pwp, pwrk);
 		if (result) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG,
@@ -996,9 +995,7 @@ pmcs_sas_diag_execute(pmcs_hw_t *pwp, uint32_t cmd, uint32_t cmd_desc,
 	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
 
 	WAIT_FOR(pwrk, 1000, result);
-
 	pmcs_pwork(pwp, pwrk);
-
 	if (result) {
 		pmcs_timed_out(pwp, htag, __func__);
 		return (DDI_FAILURE);
@@ -1085,9 +1082,7 @@ pmcs_get_time_stamp(pmcs_hw_t *pwp, uint64_t *fw_ts, hrtime_t *sys_hr_ts)
 	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
 
 	WAIT_FOR(pwrk, 1000, result);
-
 	pmcs_pwork(pwp, pwrk);
-
 	if (result) {
 		pmcs_timed_out(pwp, htag, __func__);
 		return (-1);
@@ -1222,7 +1217,7 @@ pmcs_abort_handler(pmcs_hw_t *pwp)
 		if ((pptr->iport == NULL) ||
 		    (pptr->iport->ua_state != UA_ACTIVE)) {
 			tgt = pptr->target;
-			if (tgt) {
+			if (tgt != NULL) {
 				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, tgt,
 				    "%s: Clearing target 0x%p, inactive iport",
 				    __func__, (void *) tgt);
@@ -1305,8 +1300,8 @@ pmcs_register_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 250, result);
-	pmcs_lock_phy(pptr);
 	pmcs_pwork(pwp, pwrk);
+	pmcs_lock_phy(pptr);
 
 	if (result) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, pmcs_timeo, __func__);
@@ -1403,11 +1398,12 @@ pmcs_deregister_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	} else {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 		    "%s: device %s deregistered", __func__, pptr->path);
-		pptr->valid_device_id = 0;
-		pptr->device_id = PMCS_INVALID_DEVICE_ID;
-		pptr->configured = 0;
-		pptr->deregister_wait = 0;
 	}
+
+	pptr->device_id = PMCS_INVALID_DEVICE_ID;
+	pptr->configured = 0;
+	pptr->deregister_wait = 0;
+	pptr->valid_device_id = 0;
 }
 
 /*
@@ -2171,9 +2167,7 @@ pmcs_get_iport_by_ua(pmcs_hw_t *pwp, char *ua)
 		mutex_enter(&iport->lock);
 		if (strcmp(iport->ua, ua) == 0) {
 			mutex_exit(&iport->lock);
-			mutex_enter(&iport->refcnt_lock);
-			iport->refcnt++;
-			mutex_exit(&iport->refcnt_lock);
+			pmcs_hold_iport(iport);
 			break;
 		}
 		mutex_exit(&iport->lock);
@@ -2288,7 +2282,7 @@ pmcs_promote_next_phy(pmcs_phy_t *prev_primary)
 	prev_primary->children = NULL;
 	prev_primary->target = NULL;
 	pptr->device_id = prev_primary->device_id;
-	pptr->valid_device_id = 1;
+	pptr->valid_device_id = prev_primary->valid_device_id;
 	pmcs_unlock_phy(prev_primary);
 
 	/*
@@ -2298,6 +2292,21 @@ pmcs_promote_next_phy(pmcs_phy_t *prev_primary)
 	pmcs_unlock_phy(pptr);
 
 	return (pptr);
+}
+
+void
+pmcs_hold_iport(pmcs_iport_t *iport)
+{
+	/*
+	 * Grab a reference to this iport.
+	 */
+	ASSERT(iport);
+	mutex_enter(&iport->refcnt_lock);
+	iport->refcnt++;
+	mutex_exit(&iport->refcnt_lock);
+
+	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG2, NULL, NULL, "%s: iport "
+	    "[0x%p] refcnt (%d)", __func__, (void *)iport, iport->refcnt);
 }
 
 void
@@ -2314,7 +2323,7 @@ pmcs_rele_iport(pmcs_iport_t *iport)
 	if (iport->refcnt == 0) {
 		cv_signal(&iport->refcnt_cv);
 	}
-	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL, "%s: iport "
+	pmcs_prt(iport->pwp, PMCS_PRT_DEBUG2, NULL, NULL, "%s: iport "
 	    "[0x%p] refcnt (%d)", __func__, (void *)iport, iport->refcnt);
 }
 
@@ -2992,15 +3001,12 @@ pmcs_configure_new_devices(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 			goto next_phy;
 		}
 
-		/*
-		 * Confirm that this target's iport is configured
-		 */
+		/* Confirm that this iport is configured */
 		root_phy = pmcs_get_root_phy(pptr);
 		wwn = pmcs_barray2wwn(root_phy->sas_address);
 		pmcs_unlock_phy(pptr);
 		iport = pmcs_get_iport_by_wwn(pwp, wwn);
 		if (iport == NULL) {
-			/* No iport for this tgt, restart */
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 			    "%s: iport not yet configured, "
 			    "retry discovery", __func__);
@@ -4143,6 +4149,7 @@ static int
 pmcs_expander_get_nphy(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 {
 	struct pmcwork *pwrk;
+	pmcs_iport_t *iport;
 	char buf[64];
 	const uint_t rdoff = 0x100;	/* returned data offset */
 	smp_response_frame_t *srf;
@@ -4166,6 +4173,7 @@ again:
 	(void) memset(pwp->scratch, 0x77, PMCS_SCRATCH_SIZE);
 	pwrk->arg = pwp->scratch;
 	pwrk->dtype = pptr->dtype;
+	pwrk->xp = pptr->target;
 	pwrk->htag |= PMCS_TAG_NONIO_CMD;
 	mutex_enter(&pwp->iqp_lock[PMCS_IQ_OTHER]);
 	ptr = GET_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
@@ -4199,20 +4207,19 @@ again:
 
 	COPY_MESSAGE(ptr, msg, PMCS_MSG_SIZE);
 
-	/* SMP serialization */
-	pmcs_smp_acquire(pptr->iport);
-
+	pmcs_hold_iport(pptr->iport);
+	iport = pptr->iport;
+	pmcs_smp_acquire(iport);
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
 	htag = pwrk->htag;
 	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 1000, result);
-	/* Release SMP lock before reacquiring PHY lock */
-	pmcs_smp_release(pptr->iport);
+	pmcs_pwork(pwp, pwrk);
+	pmcs_smp_release(iport);
+	pmcs_rele_iport(iport);
 	pmcs_lock_phy(pptr);
 
-	pmcs_pwork(pwp, pwrk);
 
 	mutex_enter(&pwp->config_lock);
 	if (pwp->config_changed) {
@@ -4378,6 +4385,7 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
     pmcs_phy_t *pptr)
 {
 	struct pmcwork *pwrk;
+	pmcs_iport_t *iport;
 	char buf[64];
 	uint8_t sas_address[8];
 	uint8_t att_sas_address[8];
@@ -4403,6 +4411,7 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 	(void) memset(pwp->scratch, 0x77, PMCS_SCRATCH_SIZE);
 	pwrk->arg = pwp->scratch;
 	pwrk->dtype = expander->dtype;
+	pwrk->xp = expander->target;
 	pwrk->htag |= PMCS_TAG_NONIO_CMD;
 	msg[0] = LE_32(PMCS_HIPRI(pwp, PMCS_OQ_GENERAL, PMCIN_SMP_REQUEST));
 	msg[1] = LE_32(pwrk->htag);
@@ -4437,24 +4446,18 @@ pmcs_expander_content_discover(pmcs_hw_t *pwp, pmcs_phy_t *expander,
 
 	COPY_MESSAGE(ptr, msg, PMCS_MSG_SIZE);
 
-	/* SMP serialization */
-	pmcs_smp_acquire(expander->iport);
-
+	pmcs_hold_iport(expander->iport);
+	iport = expander->iport;
+	pmcs_smp_acquire(iport);
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
 	htag = pwrk->htag;
 	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-
-	/*
-	 * Drop PHY lock while waiting so other completions aren't potentially
-	 * blocked.
-	 */
 	pmcs_unlock_phy(expander);
 	WAIT_FOR(pwrk, 1000, result);
-	/* Release SMP lock before reacquiring PHY lock */
-	pmcs_smp_release(expander->iport);
-	pmcs_lock_phy(expander);
-
 	pmcs_pwork(pwp, pwrk);
+	pmcs_smp_release(iport);
+	pmcs_rele_iport(iport);
+	pmcs_lock_phy(expander);
 
 	mutex_enter(&pwp->config_lock);
 	if (pwp->config_changed) {
@@ -4885,6 +4888,7 @@ pmcs_abort(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint32_t tag, int all_cmds,
 	}
 
 	pwrk->dtype = pptr->dtype;
+	pwrk->xp = pptr->target;
 	pwrk->htag |= PMCS_TAG_NONIO_CMD;
 	if (wait) {
 		pwrk->arg = msg;
@@ -4913,6 +4917,7 @@ pmcs_abort(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint32_t tag, int all_cmds,
 	if (ptr == NULL) {
 		mutex_exit(&pwp->iqp_lock[PMCS_IQ_OTHER]);
 		pmcs_pwork(pwp, pwrk);
+		pptr->abort_all_start = 0;
 		pmcs_prt(pwp, PMCS_PRT_ERR, pptr, NULL, pmcs_nomsg, __func__);
 		return (ENOMEM);
 	}
@@ -4938,24 +4943,11 @@ pmcs_abort(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint32_t tag, int all_cmds,
 	}
 
 	abt_htag = pwrk->htag;
-	pmcs_unlock_phy(pwrk->phy);
+	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 1000, result);
-	pmcs_lock_phy(pwrk->phy);
-
-	tgt = pwrk->xp;
 	pmcs_pwork(pwp, pwrk);
-
-	if (tgt != NULL) {
-		mutex_enter(&tgt->aqlock);
-		if (!STAILQ_EMPTY(&tgt->aq)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-			    "%s: Abort complete (result=0x%x), but "
-			    "aq not empty (tgt 0x%p), waiting",
-			    __func__, result, (void *)tgt);
-			cv_wait(&tgt->abort_cv, &tgt->aqlock);
-		}
-		mutex_exit(&tgt->aqlock);
-	}
+	pmcs_lock_phy(pptr);
+	tgt = pptr->target;
 
 	if (all_cmds) {
 		pptr->abort_all_start = 0;
@@ -5110,8 +5102,9 @@ pmcs_ssp_tmf(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint8_t tmf, uint32_t tag,
 	 * Set a timeout to 20 seconds
 	 */
 	WAIT_FOR(pwrk, 20000, result);
-	pmcs_lock_phy(pptr);
 	pmcs_pwork(pwp, pwrk);
+	pmcs_lock_phy(pptr);
+	xp = pptr->target;
 
 	if (result) {
 		if (xp == NULL) {
@@ -5289,6 +5282,7 @@ pmcs_sata_abort_ncq(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 
 	pwrk->arg = msg;
 	pwrk->dtype = pptr->dtype;
+	pwrk->xp = pptr->target;
 
 	mutex_enter(&pwp->iqp_lock[PMCS_IQ_OTHER]);
 	ptr = GET_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
@@ -5303,8 +5297,8 @@ pmcs_sata_abort_ncq(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, 250, result);
-	pmcs_lock_phy(pptr);
 	pmcs_pwork(pwp, pwrk);
+	pmcs_lock_phy(pptr);
 
 	tgt = pptr->target;
 	if (result) {
@@ -5980,6 +5974,7 @@ pmcs_spinup_release(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 
 		pwrk->dtype = phyp->dtype;
 		pwrk->state = PMCS_WORK_STATE_ONCHIP;
+		pwrk->xp = phyp->target;
 		mutex_exit(&pwrk->lock);
 		INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
 		return;
@@ -5996,9 +5991,9 @@ pmcs_spinup_release(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 			continue;
 		}
 
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, NULL,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, tphyp, NULL,
 		    "%s: Issuing spinup release for PHY %s", __func__,
-		    phyp->path);
+		    tphyp->path);
 
 		mutex_enter(&pwp->iqp_lock[PMCS_IQ_OTHER]);
 		msg = GET_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
@@ -6017,8 +6012,9 @@ pmcs_spinup_release(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		msg[1] = LE_32(pwrk->htag);
 		msg[2] = LE_32((0x10 << 8) | tphyp->phynum);
 
-		pwrk->dtype = phyp->dtype;
+		pwrk->dtype = tphyp->dtype;
 		pwrk->state = PMCS_WORK_STATE_ONCHIP;
+		pwrk->xp = tphyp->target;
 		mutex_exit(&pwrk->lock);
 		INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
 		pmcs_unlock_phy(tphyp);
@@ -6051,9 +6047,6 @@ pmcs_kill_devices(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 			}
 		}
 
-		/*
-		 * pmcs_remove_device requires the softstate lock.
-		 */
 		mutex_enter(&pwp->lock);
 		pmcs_lock_phy(phyp);
 		if (phyp->dead && phyp->valid_device_id) {
@@ -6067,7 +6060,6 @@ pmcs_kill_devices(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 			mutex_exit(&pwp->lock);
 
 			rval = pmcs_kill_device(pwp, phyp);
-
 			if (rval) {
 				pmcs_unlock_phy(phyp);
 				return (rval);
@@ -6089,9 +6081,7 @@ pmcs_kill_devices(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 int
 pmcs_kill_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 {
-	int r, result;
-	uint32_t msg[PMCS_MSG_SIZE], *ptr, status;
-	struct pmcwork *pwrk;
+	int rval;
 
 	pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, "kill %s device @ %s",
 	    pmcs_get_typename(pptr->dtype), pptr->path);
@@ -6111,61 +6101,20 @@ pmcs_kill_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 			cv_wait(&pptr->abort_all_cv, &pptr->phy_lock);
 		}
 	} else if (pptr->abort_pending) {
-		r = pmcs_abort(pwp, pptr, pptr->device_id, 1, 1);
-
-		if (r) {
+		rval = pmcs_abort(pwp, pptr, pptr->device_id, 1, 1);
+		if (rval) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "%s: ABORT_ALL returned non-zero status (%d) for "
-			    "PHY 0x%p", __func__, r, (void *)pptr);
-			return (r);
+			    "PHY 0x%p", __func__, rval, (void *)pptr);
+			return (rval);
 		}
 		pptr->abort_pending = 0;
 	}
 
-	if (pptr->valid_device_id == 0) {
-		return (0);
+	if (pptr->valid_device_id) {
+		pmcs_deregister_device(pwp, pptr);
 	}
 
-	if ((pwrk = pmcs_gwork(pwp, PMCS_TAG_TYPE_WAIT, pptr)) == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, pptr, NULL, pmcs_nowrk, __func__);
-		return (ENOMEM);
-	}
-	pwrk->arg = msg;
-	pwrk->dtype = pptr->dtype;
-	msg[0] = LE_32(PMCS_HIPRI(pwp, PMCS_OQ_GENERAL,
-	    PMCIN_DEREGISTER_DEVICE_HANDLE));
-	msg[1] = LE_32(pwrk->htag);
-	msg[2] = LE_32(pptr->device_id);
-
-	mutex_enter(&pwp->iqp_lock[PMCS_IQ_OTHER]);
-	ptr = GET_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-	if (ptr == NULL) {
-		mutex_exit(&pwp->iqp_lock[PMCS_IQ_OTHER]);
-		mutex_exit(&pwrk->lock);
-		pmcs_prt(pwp, PMCS_PRT_ERR, pptr, NULL, pmcs_nomsg, __func__);
-		return (ENOMEM);
-	}
-
-	COPY_MESSAGE(ptr, msg, 3);
-	pwrk->state = PMCS_WORK_STATE_ONCHIP;
-	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-
-	pmcs_unlock_phy(pptr);
-	WAIT_FOR(pwrk, 250, result);
-	pmcs_lock_phy(pptr);
-	pmcs_pwork(pwp, pwrk);
-
-	if (result) {
-		return (ETIMEDOUT);
-	}
-	status = LE_32(msg[2]);
-	if (status != PMCOUT_STATUS_OK) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
-		    "%s: status 0x%x when trying to deregister device %s",
-		    __func__, status, pptr->path);
-	}
-
-	pptr->device_id = PMCS_INVALID_DEVICE_ID;
 	PHY_CHANGED(pwp, pptr);
 	RESTART_DISCOVERY(pwp);
 	pptr->valid_device_id = 0;
@@ -7077,6 +7026,7 @@ pmcs_flush_target_queues(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt, uint8_t queues)
 			    "target 0x%p", __func__, (void *)sp, sp->cmd_tag,
 			    (void *)tgt);
 			mutex_exit(&tgt->aqlock);
+
 			/*
 			 * Mark the work structure as dead and complete it
 			 */
@@ -7112,16 +7062,17 @@ pmcs_flush_target_queues(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt, uint8_t queues)
 
 	if (queues == PMCS_TGT_ALL_QUEUES) {
 		mutex_exit(&tgt->statlock);
-		(void) pmcs_flush_nonio_cmds(pwp);
+		pmcs_flush_nonio_cmds(pwp, tgt);
 		mutex_enter(&tgt->statlock);
 	}
 }
 
 /*
- * Clean up work structures with no associated pmcs_cmd_t struct
+ * Flush non-IO commands for this target. This cleans up the off-queue
+ * work with no pmcs_cmd_t associated.
  */
-void
-pmcs_flush_nonio_cmds(pmcs_hw_t *pwp)
+static void
+pmcs_flush_nonio_cmds(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt)
 {
 	int i;
 	pmcwork_t *p;
@@ -7129,6 +7080,10 @@ pmcs_flush_nonio_cmds(pmcs_hw_t *pwp)
 	for (i = 0; i < pwp->max_cmd; i++) {
 		p = &pwp->work[i];
 		mutex_enter(&p->lock);
+		if (p->xp != tgt) {
+			mutex_exit(&p->lock);
+			continue;
+		}
 		if (p->htag & PMCS_TAG_NONIO_CMD) {
 			if (!PMCS_COMMAND_ACTIVE(p) || PMCS_COMMAND_DONE(p)) {
 				mutex_exit(&p->lock);
@@ -7916,9 +7871,7 @@ pmcs_add_phy_to_iport(pmcs_iport_t *iport, pmcs_phy_t *phyp)
 	mutex_enter(&phyp->phy_lock);
 	pmcs_create_one_phy_stats(iport, phyp);
 	mutex_exit(&phyp->phy_lock);
-	mutex_enter(&iport->refcnt_lock);
-	iport->refcnt++;
-	mutex_exit(&iport->refcnt_lock);
+	pmcs_hold_iport(iport);
 }
 
 /*
@@ -8189,7 +8142,7 @@ pmcs_tgtmap_activate_cb(void *tgtmap_priv, char *tgt_addr,
 	 * will point to the target.  The PHY will be locked, so we'll need
 	 * to unlock it.
 	 */
-	if (target) {
+	if (target != NULL) {
 		pmcs_unlock_phy(target->phy);
 	}
 

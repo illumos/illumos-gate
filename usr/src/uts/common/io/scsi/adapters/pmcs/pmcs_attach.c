@@ -2109,6 +2109,7 @@ pmcs_check_commands(pmcs_hw_t *pwp)
 		pwrk->state = PMCS_WORK_STATE_TIMED_OUT;
 		phyp = pwrk->phy;
 		target = pwrk->xp;
+		ASSERT(target != NULL);
 		mutex_exit(&pwrk->lock);
 
 		pmcs_lock_phy(phyp);

@@ -99,8 +99,8 @@ pmcs_get_dev_state(pmcs_hw_t *pwp, pmcs_phy_t *phyp, pmcs_xscsi_t *xp,
 	}
 	pmcs_unlock_phy(phyp);
 	WAIT_FOR(pwrk, 1000, result);
-	pmcs_lock_phy(phyp);
 	pmcs_pwork(pwp, pwrk);
+	pmcs_lock_phy(phyp);
 
 	if (xp != NULL) {
 		mutex_enter(&xp->statlock);
@@ -191,8 +191,8 @@ pmcs_set_dev_state(pmcs_hw_t *pwp, pmcs_phy_t *phyp, pmcs_xscsi_t *xp,
 	}
 	pmcs_unlock_phy(phyp);
 	WAIT_FOR(pwrk, 1000, result);
-	pmcs_lock_phy(phyp);
 	pmcs_pwork(pwp, pwrk);
+	pmcs_lock_phy(phyp);
 	if (xp != NULL) {
 		mutex_enter(&xp->statlock);
 	}
@@ -643,12 +643,12 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 		return;
 	} else {
 		pmcs_lock_phy(pptr);
-		if (tgt) {
+		if (tgt != NULL) {
 			mutex_enter(&tgt->statlock);
 		}
 		if (event == PMCOUT_STATUS_OPEN_CNX_ERROR_IT_NEXUS_LOSS) {
-			if (tgt && tgt->dev_state !=
-			    PMCS_DEVICE_STATE_NON_OPERATIONAL) {
+			if ((tgt != NULL) && (tgt->dev_state !=
+			    PMCS_DEVICE_STATE_NON_OPERATIONAL)) {
 				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
 				    "%s: Device at %s is non-operational",
 				    __func__, pptr->path);
@@ -656,7 +656,7 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 				    PMCS_DEVICE_STATE_NON_OPERATIONAL;
 			}
 			pptr->abort_pending = 1;
-			if (tgt) {
+			if (tgt != NULL) {
 				mutex_exit(&tgt->statlock);
 			}
 			pmcs_unlock_phy(pptr);
@@ -678,7 +678,7 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 				(void) memcpy(pwrk->arg, iomb, amt);
 			}
 			cv_signal(&pwrk->sleep_cv);
-			if (tgt) {
+			if (tgt != NULL) {
 				mutex_exit(&tgt->statlock);
 			}
 			pmcs_unlock_phy(pptr);
@@ -686,7 +686,7 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 			return;
 		}
 
-		if (!tgt) {
+		if (tgt == NULL) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, NULL,
 			    "%s: Not scheduling SSP event recovery for NULL tgt"
 			    " pwrk(%p) tag(0x%x)", __func__, (void *)pwrk,
@@ -795,6 +795,7 @@ pmcs_tgt_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk)
 	return;
 out:
 	/* Abort failed, do full device recovery */
+	ASSERT(tgt != NULL);
 	mutex_enter(&tgt->statlock);
 	if (!pmcs_get_dev_state(pwp, pptr, tgt, &dstate))
 		tgt->dev_state = dstate;

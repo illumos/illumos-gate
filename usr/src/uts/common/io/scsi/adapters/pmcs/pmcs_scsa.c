@@ -1008,6 +1008,7 @@ static int
 pmcs_smp_start(struct smp_pkt *smp_pkt)
 {
 	struct pmcwork *pwrk;
+	pmcs_iport_t *iport;
 	const uint_t rdoff = SAS_SMP_MAX_PAYLOAD;
 	uint32_t msg[PMCS_MSG_SIZE], *ptr, htag, status;
 	uint64_t wwn;
@@ -1104,18 +1105,18 @@ pmcs_smp_start(struct smp_pkt *smp_pkt)
 	msg[15] = 0;
 
 	COPY_MESSAGE(ptr, msg, PMCS_MSG_SIZE);
-	/* SMP serialization */
-	pmcs_smp_acquire(pptr->iport);
 
+	pmcs_hold_iport(pptr->iport);
+	iport = pptr->iport;
+	pmcs_smp_acquire(iport);
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
 	htag = pwrk->htag;
 	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-
 	pmcs_unlock_phy(pptr);
 	WAIT_FOR(pwrk, smp_pkt->smp_pkt_timeout * 1000, result);
 	pmcs_pwork(pwp, pwrk);
-	/* Release SMP lock before reacquiring PHY lock */
-	pmcs_smp_release(pptr->iport);
+	pmcs_smp_release(iport);
+	pmcs_rele_iport(iport);
 	pmcs_lock_phy(pptr);
 
 	if (result) {
@@ -1844,6 +1845,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	uint32_t iq, *ptr;
 	sas_ssp_cmd_iu_t sc;
 
+	ASSERT(xp != NULL);
 	mutex_enter(&xp->statlock);
 	if (!xp->assigned) {
 		mutex_exit(&xp->statlock);
@@ -2341,6 +2343,7 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	uint64_t lba;
 
 	xp = pwrk->xp;
+	ASSERT(xp != NULL);
 
 	/*
 	 * First, see if this is just a plain read/write command.

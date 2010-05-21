@@ -297,7 +297,6 @@ boolean_t pmcs_set_nvmd(pmcs_hw_t *pwp, pmcs_nvmd_type_t nvmd_type,
 void pmcs_complete_work_impl(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
     size_t amt);
 void pmcs_flush_target_queues(pmcs_hw_t *, pmcs_xscsi_t *, uint8_t);
-void pmcs_flush_nonio_cmds(pmcs_hw_t *);
 boolean_t pmcs_iport_has_targets(pmcs_hw_t *, pmcs_iport_t *);
 void pmcs_free_dma_chunklist(pmcs_hw_t *);
 void pmcs_dev_state_recovery(pmcs_hw_t *, pmcs_phy_t *);
@@ -310,6 +309,7 @@ void pmcs_ssp_event_recovery(pmcs_hw_t *);
 
 pmcs_iport_t *pmcs_get_iport_by_wwn(pmcs_hw_t *pwp, uint64_t wwn);
 pmcs_phy_t *pmcs_promote_next_phy(pmcs_phy_t *pptr);
+void pmcs_hold_iport(pmcs_iport_t *iport);
 void pmcs_rele_iport(pmcs_iport_t *iport);
 int pmcs_iport_configure_phys(pmcs_iport_t *iport);
 void pmcs_iport_teardown_phys(pmcs_iport_t *iport);

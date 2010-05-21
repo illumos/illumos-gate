@@ -701,6 +701,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			    pptr = pptr->sibling) {
 				pmcs_lock_phy(pptr);
 				if (pptr->portid == portid) {
+					pptr->pend_dtype = NOTHING;
 					pptr->dtype = NOTHING;
 					pptr->portid =
 					    PMCS_IPORT_INVALID_PORT_ID;
@@ -768,6 +769,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			iport = subphy->iport;
 			subphy->iport = NULL;
 			subphy->portid = PMCS_PHY_INVALID_PORT_ID;
+			subphy->pend_dtype = NOTHING;
 			subphy->dtype = NOTHING;
 			mutex_exit(&subphy->phy_lock);
 
@@ -849,6 +851,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		subphy->deregister_wait = 1;
 		subphy->iport = NULL;
 		subphy->portid = PMCS_PHY_INVALID_PORT_ID;
+		subphy->pend_dtype = NOTHING;
 		subphy->dtype = NOTHING;
 		pmcs_unlock_phy(subphy);
 		SCHEDULE_WORK(pwp, PMCS_WORK_DEREGISTER_DEV);
@@ -1204,7 +1207,7 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	struct pmcwork *pwrk;
 	uint32_t htag = LE_32(((uint32_t *)iomb)[1]);
 	uint32_t status = LE_32(((uint32_t *)iomb)[2]);
-	uint32_t scp = LE_32(((uint32_t *)iomb)[3]) & 0x1;
+	uint32_t scope = LE_32(((uint32_t *)iomb)[3]) & 0x1;
 	char *path;
 
 	pwrk = pmcs_tag2wp(pwp, htag, B_TRUE);
@@ -1216,10 +1219,6 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 	pptr = pwrk->phy;
 	if (pptr) {
-		/*
-		 * Don't use pmcs_lock_phy here since it could potentially lock
-		 * other PHYs beneath, which is unnecessary in this context.
-		 */
 		pptr->abort_pending = 0;
 		pptr->abort_sent = 0;
 
@@ -1227,7 +1226,7 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		 * Don't do this if the status was ABORT_IN_PROGRESS and
 		 * the scope bit was set
 		 */
-		if ((status != PMCOUT_STATUS_IO_ABORT_IN_PROGRESS) || !scp) {
+		if ((status != PMCOUT_STATUS_IO_ABORT_IN_PROGRESS) || !scope) {
 			pptr->abort_all_start = 0;
 			cv_signal(&pptr->abort_all_cv);
 		}
@@ -1239,7 +1238,7 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 	switch (status) {
 	case PMCOUT_STATUS_OK:
-		if (scp) {
+		if (scope) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "%s: abort all succeeded for %s. (htag=0x%x)",
 			    __func__, path, htag);
@@ -1251,15 +1250,15 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		break;
 
 	case PMCOUT_STATUS_IO_NOT_VALID:
-		if (scp) {
+		if (scope) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "%s: ABORT %s failed (DEV NOT VALID) for %s. "
-			    "(htag=0x%x)", __func__, scp ? "all" : "tag",
+			    "(htag=0x%x)", __func__, scope ? "all" : "tag",
 			    path, htag);
 		} else {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "%s: ABORT %s failed (I/O NOT VALID) for %s. "
-			    "(htag=0x%x)", __func__, scp ? "all" : "tag",
+			    "(htag=0x%x)", __func__, scope ? "all" : "tag",
 			    path, htag);
 		}
 		break;
@@ -1267,13 +1266,13 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	case PMCOUT_STATUS_IO_ABORT_IN_PROGRESS:
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, "%s: ABORT %s failed "
 		    "for %s, htag 0x%x (ABORT IN PROGRESS)", __func__,
-		    scp ? "all" : "tag", path, htag);
+		    scope ? "all" : "tag", path, htag);
 		break;
 
 	default:
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, "%s: Unknown status "
 		    "%d for ABORT %s, htag 0x%x, PHY %s", __func__, status,
-		    scp ? "all" : "tag", htag, path);
+		    scope ? "all" : "tag", htag, path);
 		break;
 	}
 
