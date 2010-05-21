@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _NV_SATA_H
@@ -46,6 +45,13 @@ typedef struct nv_port nv_port_t;
 #ifdef SGPIO_SUPPORT
 typedef struct nv_sgp_cmn nv_sgp_cmn_t;
 #endif
+
+/*
+ * sizes of strings to allocate
+ */
+#define	NV_STR_LEN	10
+#define	NV_LOGBUF_LEN	512
+#define	NV_REASON_LEN	30
 
 typedef struct nv_ctl {
 	/*
@@ -113,7 +119,7 @@ struct nv_port {
 
 	struct nv_ctl	*nvp_ctlp; /* back pointer to controller */
 
-	uint8_t		nvp_port_num; /* port number, ie 1 or 2 */
+	uint8_t		nvp_port_num; /* port number, ie 0 or 1 */
 
 	uint8_t		nvp_type;	/* SATA_DTYPE_{NONE,ATADISK,UNKNOWN} */
 	uint32_t	nvp_signature;	/* sig acquired from task file regs */
@@ -168,6 +174,7 @@ struct nv_port {
 	 */
 	int		nvp_ncq_run;
 	int		nvp_non_ncq_run;
+	int		nvp_seq;
 
 	timeout_id_t	nvp_timeout_id;
 
@@ -186,6 +193,8 @@ struct nv_port {
 	uint8_t		nvp_last_cmd;
 	uint8_t		nvp_previous_cmd;
 	int		nvp_reset_count;
+	char		nvp_first_reset_reason[NV_REASON_LEN];
+	char		nvp_reset_reason[NV_REASON_LEN];
 	clock_t		intr_duration;	/* max length of port intr (ticks) */
 	clock_t		intr_start_time;
 	int		intr_loop_cnt;
@@ -264,28 +273,28 @@ struct nv_sgp_cbp2cmn {
 /*
  * nv_debug_flags
  */
-#define	NVDBG_ALWAYS	0x0001
-#define	NVDBG_INIT	0x0002
-#define	NVDBG_ENTRY	0x0004
-#define	NVDBG_DELIVER	0x0008
-#define	NVDBG_EVENT	0x0010
-#define	NVDBG_SYNC	0x0020
-#define	NVDBG_PKTCOMP	0x0040
-#define	NVDBG_TIMEOUT	0x0080
-#define	NVDBG_INFO	0x0100
-#define	NVDBG_VERBOSE	0x0200
-#define	NVDBG_INTR	0x0400
-#define	NVDBG_ERRS	0x0800
-#define	NVDBG_COOKIES	0x1000
-#define	NVDBG_HOT	0x2000
-#define	NVDBG_RESET	0x4000
-#define	NVDBG_ATAPI	0x8000
+#define	NVDBG_ALWAYS	0x00001
+#define	NVDBG_INIT	0x00002
+#define	NVDBG_ENTRY	0x00004
+#define	NVDBG_DELIVER	0x00008
+#define	NVDBG_EVENT	0x00010
+#define	NVDBG_SYNC	0x00020
+#define	NVDBG_PKTCOMP	0x00040
+#define	NVDBG_TIMEOUT	0x00080
+#define	NVDBG_INFO	0x00100
+#define	NVDBG_VERBOSE	0x00200
+#define	NVDBG_INTR	0x00400
+#define	NVDBG_ERRS	0x00800
+#define	NVDBG_COOKIES	0x01000
+#define	NVDBG_HOT	0x02000
+#define	NVDBG_RESET	0x04000
+#define	NVDBG_ATAPI	0x08000
 
-#ifdef DEBUG
-#define	NVLOG(a) nv_log a
-#else
-#define	NVLOG(a)
-#endif
+#define	NVLOG(flag, nvc, nvp, fmt, args ...)		\
+	if (nv_debug_flags & (flag)) {			\
+		nv_log(nvc, nvp, fmt, ## args);		\
+	}
+
 
 #define	NV_SUCCESS	0
 #define	NV_FAILURE	-1
@@ -660,11 +669,6 @@ typedef struct prde {
 #define	NV_INTR_CLEAR_ALL	0x4
 #define	NV_INTR_DISABLE_NON_BLOCKING		0x8
 
-/*
- * sizes of strings to allocate
- */
-#define	NV_STRING_10	10
-#define	NV_STRING_512	512
 
 #define	NV_BYTES_PER_SEC 512
 

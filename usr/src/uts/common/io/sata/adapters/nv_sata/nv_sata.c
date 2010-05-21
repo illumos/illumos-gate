@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -120,7 +119,6 @@ static int nv_start_pkt_pio(nv_port_t *nvp, int slot);
 static void nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp);
 static int nv_start_dma(nv_port_t *nvp, int slot);
 static void nv_intr_dma(nv_port_t *nvp, struct nv_slot *spkt);
-static void nv_log(uint_t flag, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, ...);
 static void nv_uninit_ctl(nv_ctl_t *nvc);
 static void mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
 static void ck804_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
@@ -136,7 +134,7 @@ static void nv_port_state_change(nv_port_t *nvp, int event, uint8_t addr_type,
     int state);
 static void nv_common_reg_init(nv_ctl_t *nvc);
 static void ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status);
-static void nv_reset(nv_port_t *nvp);
+static void nv_reset(nv_port_t *nvp, char *reason);
 static void nv_complete_io(nv_port_t *nvp,  sata_pkt_t *spkt, int slot);
 static void nv_timeout(void *);
 static int nv_poll_wait(nv_port_t *nvp, sata_pkt_t *spkt);
@@ -164,6 +162,7 @@ static void nv_init_port_link_processing(nv_ctl_t *nvc);
 static void nv_setup_timeout(nv_port_t *nvp, int time);
 static void nv_monitor_reset(nv_port_t *nvp);
 static int nv_bm_status_clear(nv_port_t *nvp);
+static void nv_log(nv_ctl_t *nvc, nv_port_t *nvp, const char *fmt, ...);
 
 #ifdef SGPIO_SUPPORT
 static int nv_open(dev_t *devp, int flag, int otyp, cred_t *credp);
@@ -397,11 +396,11 @@ int nv_usec_delay = NV_WAIT_REG_CHECK;
  * The following is needed for nv_vcmn_err()
  */
 static kmutex_t nv_log_mutex; /* protects nv_log_buf */
-static char nv_log_buf[NV_STRING_512];
-int nv_debug_flags = NVDBG_ALWAYS;
+static char nv_log_buf[NV_LOGBUF_LEN];
+int nv_debug_flags =
+    NVDBG_HOT|NVDBG_RESET|NVDBG_ALWAYS|NVDBG_TIMEOUT|NVDBG_EVENT;
 int nv_log_to_console = B_FALSE;
 
-int nv_log_delay = 0;
 int nv_prom_print = B_FALSE;
 
 /*
@@ -616,9 +615,6 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	case DDI_ATTACH:
 
-		NVLOG((NVDBG_INIT, NULL, NULL,
-		    "nv_attach(): DDI_ATTACH inst %d", inst));
-
 		attach_state = ATTACH_PROGRESS_NONE;
 
 		status = ddi_soft_state_zalloc(nv_statep, inst);
@@ -631,14 +627,16 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		nvc->nvc_dip = dip;
 
+		NVLOG(NVDBG_INIT, nvc, NULL, "nv_attach(): DDI_ATTACH", NULL);
+
 		attach_state |= ATTACH_PROGRESS_STATEP_ALLOC;
 
 		if (pci_config_setup(dip, &pci_conf_handle) == DDI_SUCCESS) {
 			nvc->nvc_revid = pci_config_get8(pci_conf_handle,
 			    PCI_CONF_REVID);
-			NVLOG((NVDBG_INIT, NULL, NULL,
+			NVLOG(NVDBG_INIT, nvc, NULL,
 			    "inst %d: silicon revid is %x nv_debug_flags=%x",
-			    inst, nvc->nvc_revid, nv_debug_flags));
+			    inst, nvc->nvc_revid, nv_debug_flags);
 		} else {
 			break;
 		}
@@ -657,6 +655,7 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (subclass & PCI_MASS_RAID) {
 			cmn_err(CE_WARN,
 			    "attach failed: RAID mode not supported");
+
 			break;
 		}
 
@@ -675,9 +674,9 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			    &nvc->nvc_bar_hdl[bar]);
 
 			if (status != DDI_SUCCESS) {
-				NVLOG((NVDBG_INIT, nvc, NULL,
+				NVLOG(NVDBG_INIT, nvc, NULL,
 				    "ddi_regs_map_setup failure for bar"
-				    " %d status = %d", bar, status));
+				    " %d status = %d", bar, status);
 				break;
 			}
 		}
@@ -690,7 +689,8 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		status = nv_init_ctl(nvc, pci_conf_handle);
 
 		if (status == NV_FAILURE) {
-			NVLOG((NVDBG_INIT, nvc, NULL, "nv_init_ctl failed"));
+			NVLOG(NVDBG_INIT, nvc, NULL, "nv_init_ctl failed",
+			    NULL);
 
 			break;
 		}
@@ -711,21 +711,19 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (ddi_intr_get_supported_types(dip, &intr_types) !=
 		    DDI_SUCCESS) {
 			nv_cmn_err(CE_WARN, nvc, NULL,
-			    "!ddi_intr_get_supported_types failed");
-			NVLOG((NVDBG_INIT, nvc, NULL,
-			    "interrupt supported types failed"));
+			    "ddi_intr_get_supported_types failed");
 
 			break;
 		}
 
-		NVLOG((NVDBG_INIT, nvc, NULL,
+		NVLOG(NVDBG_INIT, nvc, NULL,
 		    "ddi_intr_get_supported_types() returned: 0x%x",
-		    intr_types));
+		    intr_types);
 
 #ifdef NV_MSI_SUPPORTED
 		if (intr_types & DDI_INTR_TYPE_MSI) {
-			NVLOG((NVDBG_INIT, nvc, NULL,
-			    "using MSI interrupt type"));
+			NVLOG(NVDBG_INIT, nvc, NULL,
+			    "using MSI interrupt type", NULL);
 
 			/*
 			 * Try MSI first, but fall back to legacy if MSI
@@ -734,11 +732,11 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			if (nv_add_msi_intrs(nvc) == DDI_SUCCESS) {
 				nvc->nvc_intr_type = DDI_INTR_TYPE_MSI;
 				attach_state |= ATTACH_PROGRESS_INTR_ADDED;
-				NVLOG((NVDBG_INIT, nvc, NULL,
-				    "MSI interrupt setup done"));
+				NVLOG(NVDBG_INIT, nvc, NULL,
+				    "MSI interrupt setup done", NULL);
 			} else {
 				nv_cmn_err(CE_CONT, nvc, NULL,
-				    "!MSI registration failed "
+				    "MSI registration failed "
 				    "will try Legacy interrupts");
 			}
 		}
@@ -751,26 +749,26 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (!(attach_state & ATTACH_PROGRESS_INTR_ADDED) &&
 		    (intr_types & DDI_INTR_TYPE_FIXED)) {
 
-			NVLOG((NVDBG_INIT, nvc, NULL,
-			    "using Legacy interrupt type"));
+			NVLOG(NVDBG_INIT, nvc, NULL,
+			    "using Legacy interrupt type", NULL);
 
 			if (nv_add_legacy_intrs(nvc) == DDI_SUCCESS) {
 				nvc->nvc_intr_type = DDI_INTR_TYPE_FIXED;
 				attach_state |= ATTACH_PROGRESS_INTR_ADDED;
-				NVLOG((NVDBG_INIT, nvc, NULL,
-				    "Legacy interrupt setup done"));
+				NVLOG(NVDBG_INIT, nvc, NULL,
+				    "Legacy interrupt setup done", NULL);
 			} else {
 				nv_cmn_err(CE_WARN, nvc, NULL,
-				    "!legacy interrupt setup failed");
-				NVLOG((NVDBG_INIT, nvc, NULL,
-				    "legacy interrupt setup failed"));
+				    "legacy interrupt setup failed");
+				NVLOG(NVDBG_INIT, nvc, NULL,
+				    "legacy interrupt setup failed", NULL);
 				break;
 			}
 		}
 
 		if (!(attach_state & ATTACH_PROGRESS_INTR_ADDED)) {
-			NVLOG((NVDBG_INIT, nvc, NULL,
-			    "no interrupts registered"));
+			NVLOG(NVDBG_INIT, nvc, NULL,
+			    "no interrupts registered", NULL);
 			break;
 		}
 
@@ -806,7 +804,7 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		pci_config_teardown(&pci_conf_handle);
 
-		NVLOG((NVDBG_INIT, nvc, NULL, "nv_attach DDI_SUCCESS"));
+		NVLOG(NVDBG_INIT, nvc, NULL, "nv_attach DDI_SUCCESS", NULL);
 
 		return (DDI_SUCCESS);
 
@@ -814,8 +812,8 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		nvc = ddi_get_soft_state(nv_statep, inst);
 
-		NVLOG((NVDBG_INIT, nvc, NULL,
-		    "nv_attach(): DDI_RESUME inst %d", inst));
+		NVLOG(NVDBG_INIT, nvc, NULL,
+		    "nv_attach(): DDI_RESUME inst %d", inst);
 
 		if (pci_config_setup(dip, &pci_conf_handle) != DDI_SUCCESS) {
 			return (DDI_FAILURE);
@@ -918,7 +916,7 @@ nv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	case DDI_DETACH:
 
-		NVLOG((NVDBG_INIT, nvc, NULL, "nv_detach: DDI_DETACH"));
+		NVLOG(NVDBG_INIT, nvc, NULL, "nv_detach: DDI_DETACH", NULL);
 
 		/*
 		 * Remove interrupts
@@ -973,7 +971,7 @@ nv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	case DDI_SUSPEND:
 
-		NVLOG((NVDBG_INIT, nvc, NULL, "nv_detach: DDI_SUSPEND"));
+		NVLOG(NVDBG_INIT, nvc, NULL, "nv_detach: DDI_SUSPEND", NULL);
 
 		for (i = 0; i < NV_MAX_PORTS(nvc); i++) {
 			nv_suspend(&(nvc->nvc_port[i]));
@@ -1229,9 +1227,9 @@ nv_sata_probe(dev_info_t *dip, sata_device_t *sd)
 	nvp = &(nvc->nvc_port[cport]);
 	ASSERT(nvp != NULL);
 
-	NVLOG((NVDBG_RESET, nvc, nvp,
+	NVLOG(NVDBG_ENTRY, nvc, nvp,
 	    "nv_sata_probe: enter cport: 0x%x, pmport: 0x%x, "
-	    "qual: 0x%x", cport, pmport, qual));
+	    "qual: 0x%x", cport, pmport, qual);
 
 	mutex_enter(&nvp->nvp_mutex);
 
@@ -1250,8 +1248,8 @@ nv_sata_probe(dev_info_t *dip, sata_device_t *sd)
 	}
 
 	if (nvp->nvp_state & NV_PORT_FAILED) {
-		NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp,
-		    "probe: port failed"));
+		NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
+		    "probe: port failed", NULL);
 		sd->satadev_type = SATA_DTYPE_NONE;
 		sd->satadev_state = SATA_PSTATE_FAILED;
 		mutex_exit(&nvp->nvp_mutex);
@@ -1327,15 +1325,20 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 	nv_port_t *nvp = &(nvc->nvc_port[cport]);
 	int ret;
 
-	NVLOG((NVDBG_ENTRY, nvc, nvp, "nv_sata_start: opmode: 0x%x cmd=%x",
-	    spkt->satapkt_op_mode, spkt->satapkt_cmd.satacmd_cmd_reg));
+	NVLOG(NVDBG_ENTRY, nvc, nvp, "nv_sata_start: opmode: 0x%x cmd=%x",
+	    spkt->satapkt_op_mode, spkt->satapkt_cmd.satacmd_cmd_reg);
 
 	mutex_enter(&nvp->nvp_mutex);
 
+	/*
+	 * record number of commands for debugging
+	 */
+	nvp->nvp_seq++;
+
 	if ((nvp->nvp_state & NV_PORT_INIT) == 0) {
 		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
-		NVLOG((NVDBG_ERRS, nvc, nvp,
-		    "nv_sata_start: port not yet initialized"));
+		NVLOG(NVDBG_ERRS, nvc, nvp,
+		    "nv_sata_start: port not yet initialized", NULL);
 		nv_copy_registers(nvp, &spkt->satapkt_device, NULL);
 		mutex_exit(&nvp->nvp_mutex);
 
@@ -1344,8 +1347,8 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 
 	if (nvp->nvp_state & NV_PORT_INACTIVE) {
 		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
-		NVLOG((NVDBG_ERRS, nvc, nvp,
-		    "nv_sata_start: NV_PORT_INACTIVE"));
+		NVLOG(NVDBG_ERRS, nvc, nvp,
+		    "nv_sata_start: NV_PORT_INACTIVE", NULL);
 		nv_copy_registers(nvp, &spkt->satapkt_device, NULL);
 		mutex_exit(&nvp->nvp_mutex);
 
@@ -1354,8 +1357,8 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 
 	if (nvp->nvp_state & NV_PORT_FAILED) {
 		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
-		NVLOG((NVDBG_ERRS, nvc, nvp,
-		    "nv_sata_start: NV_PORT_FAILED state"));
+		NVLOG(NVDBG_ERRS, nvc, nvp,
+		    "nv_sata_start: NV_PORT_FAILED state", NULL);
 		nv_copy_registers(nvp, &spkt->satapkt_device, NULL);
 		mutex_exit(&nvp->nvp_mutex);
 
@@ -1363,8 +1366,8 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 	}
 
 	if (nvp->nvp_state & NV_PORT_RESET) {
-		NVLOG((NVDBG_VERBOSE, nvc, nvp,
-		    "still waiting for reset completion"));
+		NVLOG(NVDBG_ERRS, nvc, nvp,
+		    "still waiting for reset completion", NULL);
 		spkt->satapkt_reason = SATA_PKT_BUSY;
 		mutex_exit(&nvp->nvp_mutex);
 
@@ -1382,8 +1385,8 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 
 	if (nvp->nvp_type == SATA_DTYPE_NONE) {
 		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
-		NVLOG((NVDBG_ERRS, nvc, nvp,
-		    "nv_sata_start: SATA_DTYPE_NONE"));
+		NVLOG(NVDBG_ERRS, nvc, nvp,
+		    "nv_sata_start: SATA_DTYPE_NONE", NULL);
 		nv_copy_registers(nvp, &spkt->satapkt_device, NULL);
 		mutex_exit(&nvp->nvp_mutex);
 
@@ -1408,8 +1411,8 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 	 */
 	if (spkt->satapkt_cmd.satacmd_flags.sata_clear_dev_reset) {
 		nvp->nvp_state &= ~NV_PORT_RESTORE;
-		NVLOG((NVDBG_RESET, nvc, nvp,
-		    "nv_sata_start: clearing NV_PORT_RESTORE"));
+		NVLOG(NVDBG_RESET, nvc, nvp,
+		    "nv_sata_start: clearing NV_PORT_RESTORE", NULL);
 	}
 
 	/*
@@ -1425,8 +1428,8 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 	    !(spkt->satapkt_cmd.satacmd_flags.sata_ignore_dev_reset) &&
 	    (ddi_in_panic() == 0)) {
 		spkt->satapkt_reason = SATA_PKT_BUSY;
-		NVLOG((NVDBG_VERBOSE, nvc, nvp,
-		    "nv_sata_start: waiting for restore "));
+		NVLOG(NVDBG_RESET, nvc, nvp,
+		    "nv_sata_start: waiting for restore ", NULL);
 		mutex_exit(&nvp->nvp_mutex);
 
 		return (SATA_TRAN_BUSY);
@@ -1434,8 +1437,8 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 
 	if (nvp->nvp_state & NV_PORT_ABORTING) {
 		spkt->satapkt_reason = SATA_PKT_BUSY;
-		NVLOG((NVDBG_ERRS, nvc, nvp,
-		    "nv_sata_start: NV_PORT_ABORTING"));
+		NVLOG(NVDBG_ERRS, nvc, nvp,
+		    "nv_sata_start: NV_PORT_ABORTING", NULL);
 		mutex_exit(&nvp->nvp_mutex);
 
 		return (SATA_TRAN_BUSY);
@@ -1484,15 +1487,16 @@ nv_start_sync(nv_port_t *nvp, sata_pkt_t *spkt)
 	nv_ctl_t *nvc = nvp->nvp_ctlp;
 	int ret;
 
-	NVLOG((NVDBG_SYNC, nvp->nvp_ctlp, nvp, "nv_sata_satapkt_sync: entry"));
+	NVLOG(NVDBG_SYNC, nvp->nvp_ctlp, nvp, "nv_sata_satapkt_sync: entry",
+	    NULL);
 
 	if (nvp->nvp_ncq_run != 0 || nvp->nvp_non_ncq_run != 0) {
 		spkt->satapkt_reason = SATA_PKT_BUSY;
-		NVLOG((NVDBG_SYNC, nvp->nvp_ctlp, nvp,
+		NVLOG(NVDBG_SYNC, nvp->nvp_ctlp, nvp,
 		    "nv_sata_satapkt_sync: device is busy, sync cmd rejected"
 		    "ncq_run: %d non_ncq_run: %d  spkt: %p",
 		    nvp->nvp_ncq_run, nvp->nvp_non_ncq_run,
-		    (&(nvp->nvp_slot[0]))->nvslot_spkt));
+		    (&(nvp->nvp_slot[0]))->nvslot_spkt);
 
 		return (SATA_TRAN_BUSY);
 	}
@@ -1503,8 +1507,8 @@ nv_start_sync(nv_port_t *nvp, sata_pkt_t *spkt)
 	if (!(spkt->satapkt_op_mode & SATA_OPMODE_POLLING) &&
 	    servicing_interrupt()) {
 		spkt->satapkt_reason = SATA_PKT_BUSY;
-		NVLOG((NVDBG_SYNC, nvp->nvp_ctlp, nvp,
-		    "SYNC mode not allowed during interrupt"));
+		NVLOG(NVDBG_SYNC, nvp->nvp_ctlp, nvp,
+		    "SYNC mode not allowed during interrupt", NULL);
 
 		return (SATA_TRAN_BUSY);
 
@@ -1532,8 +1536,8 @@ nv_start_sync(nv_port_t *nvp, sata_pkt_t *spkt)
 
 		(*(nvc->nvc_set_intr))(nvp, NV_INTR_ENABLE);
 
-		NVLOG((NVDBG_SYNC, nvp->nvp_ctlp, nvp, "nv_sata_satapkt_sync:"
-		    " done % reason %d", ret));
+		NVLOG(NVDBG_SYNC, nvp->nvp_ctlp, nvp, "nv_sata_satapkt_sync:"
+		    " done % reason %d", ret);
 
 		return (ret);
 	}
@@ -1549,8 +1553,8 @@ nv_start_sync(nv_port_t *nvp, sata_pkt_t *spkt)
 		spkt->satapkt_reason = SATA_PKT_TIMEOUT;
 	}
 
-	NVLOG((NVDBG_SYNC, nvp->nvp_ctlp, nvp, "nv_sata_satapkt_sync:"
-	    " done % reason %d", spkt->satapkt_reason));
+	NVLOG(NVDBG_SYNC, nvp->nvp_ctlp, nvp, "nv_sata_satapkt_sync:"
+	    " done % reason %d", spkt->satapkt_reason);
 
 	return (SATA_TRAN_ACCEPTED);
 }
@@ -1565,13 +1569,14 @@ nv_poll_wait(nv_port_t *nvp, sata_pkt_t *spkt)
 	nv_slot_t *nv_slotp = &(nvp->nvp_slot[0]); /* not NCQ aware */
 #endif
 
-	NVLOG((NVDBG_SYNC, nvc, nvp, "nv_poll_wait: enter"));
+	NVLOG(NVDBG_SYNC, nvc, nvp, "nv_poll_wait: enter", NULL);
 
 	for (;;) {
 
 		NV_DELAY_NSEC(400);
 
-		NVLOG((NVDBG_SYNC, nvc, nvp, "nv_poll_wait: before nv_wait"));
+		NVLOG(NVDBG_SYNC, nvc, nvp, "nv_poll_wait: before nv_wait",
+		    NULL);
 		if (nv_wait(nvp, 0, SATA_STATUS_BSY,
 		    NV_SEC2USEC(spkt->satapkt_time), NV_NOSLEEP) == B_FALSE) {
 			mutex_enter(&nvp->nvp_mutex);
@@ -1580,32 +1585,34 @@ nv_poll_wait(nv_port_t *nvp, sata_pkt_t *spkt)
 			nvp->nvp_state |= NV_PORT_RESET;
 			nvp->nvp_state &= ~(NV_PORT_RESTORE |
 			    NV_PORT_RESET_RETRY);
-			nv_reset(nvp);
+			nv_reset(nvp, "poll_wait");
 			nv_complete_io(nvp, spkt, 0);
 			mutex_exit(&nvp->nvp_mutex);
-			NVLOG((NVDBG_SYNC, nvc, nvp, "nv_poll_wait: "
-			    "SATA_STATUS_BSY"));
+			NVLOG(NVDBG_SYNC, nvc, nvp, "nv_poll_wait: "
+			    "SATA_STATUS_BSY", NULL);
 
 			return (SATA_TRAN_ACCEPTED);
 		}
 
-		NVLOG((NVDBG_SYNC, nvc, nvp, "nv_poll_wait: before nvc_intr"));
+		NVLOG(NVDBG_SYNC, nvc, nvp, "nv_poll_wait: before nvc_intr",
+		    NULL);
 
 		/*
 		 * Simulate interrupt.
 		 */
 		ret = (*(nvc->nvc_interrupt))((caddr_t)nvc, NULL);
-		NVLOG((NVDBG_SYNC, nvc, nvp, "nv_poll_wait: after nvc_intr"));
+		NVLOG(NVDBG_SYNC, nvc, nvp, "nv_poll_wait: after nvc_intr",
+		    NULL);
 
 		if (ret != DDI_INTR_CLAIMED) {
-			NVLOG((NVDBG_SYNC, nvc, nvp, "nv_poll_wait:"
-			    " unclaimed -- resetting"));
+			NVLOG(NVDBG_SYNC, nvc, nvp, "nv_poll_wait:"
+			    " unclaimed -- resetting", NULL);
 			mutex_enter(&nvp->nvp_mutex);
 			nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
 			nvp->nvp_state |= NV_PORT_RESET;
 			nvp->nvp_state &= ~(NV_PORT_RESTORE |
 			    NV_PORT_RESET_RETRY);
-			nv_reset(nvp);
+			nv_reset(nvp, "poll_wait intr not claimed");
 			spkt->satapkt_reason = SATA_PKT_TIMEOUT;
 			nv_complete_io(nvp, spkt, 0);
 			mutex_exit(&nvp->nvp_mutex);
@@ -1639,7 +1646,7 @@ nv_sata_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 	int c_a, ret;
 
 	ASSERT(cport < NV_MAX_PORTS(nvc));
-	NVLOG((NVDBG_ENTRY, nvc, nvp, "nv_sata_abort %d %p", flag, spkt));
+	NVLOG(NVDBG_ENTRY, nvc, nvp, "nv_sata_abort %d %p", flag, spkt);
 
 	mutex_enter(&nvp->nvp_mutex);
 
@@ -1657,15 +1664,15 @@ nv_sata_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 	c_a = nv_abort_active(nvp, spkt, SATA_PKT_ABORTED, B_TRUE);
 
 	if (c_a) {
-		NVLOG((NVDBG_ENTRY, nvc, nvp,
-		    "packets aborted running=%d", c_a));
+		NVLOG(NVDBG_ENTRY, nvc, nvp,
+		    "packets aborted running=%d", c_a);
 		ret = SATA_SUCCESS;
 	} else {
 		if (spkt == NULL) {
-			NVLOG((NVDBG_ENTRY, nvc, nvp, "no spkts to abort"));
+			NVLOG(NVDBG_ENTRY, nvc, nvp, "no spkts to abort", NULL);
 		} else {
-			NVLOG((NVDBG_ENTRY, nvc, nvp,
-			    "can't find spkt to abort"));
+			NVLOG(NVDBG_ENTRY, nvc, nvp,
+			    "can't find spkt to abort", NULL);
 		}
 		ret = SATA_FAILURE;
 	}
@@ -1694,13 +1701,13 @@ nv_abort_active(nv_port_t *nvp, sata_pkt_t *spkt, int abort_reason, int flag)
 	 * return if the port is not configured
 	 */
 	if (nvp->nvp_slot == NULL) {
-		NVLOG((NVDBG_ENTRY, nvp->nvp_ctlp, nvp,
-		    "nv_abort_active: not configured so returning"));
+		NVLOG(NVDBG_ENTRY, nvp->nvp_ctlp, nvp,
+		    "nv_abort_active: not configured so returning", NULL);
 
 		return (0);
 	}
 
-	NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp, "nv_abort_active"));
+	NVLOG(NVDBG_ENTRY, nvp->nvp_ctlp, nvp, "nv_abort_active", NULL);
 
 	nvp->nvp_state |= NV_PORT_ABORTING;
 
@@ -1744,7 +1751,7 @@ nv_abort_active(nv_port_t *nvp, sata_pkt_t *spkt, int abort_reason, int flag)
 				nvp->nvp_state |= NV_PORT_RESET;
 				nvp->nvp_state &= ~(NV_PORT_RESTORE |
 				    NV_PORT_RESET_RETRY);
-				nv_reset(nvp);
+				nv_reset(nvp, "abort_active");
 			}
 		}
 
@@ -1772,7 +1779,7 @@ nv_sata_reset(dev_info_t *dip, sata_device_t *sd)
 
 	ASSERT(cport < NV_MAX_PORTS(nvc));
 
-	NVLOG((NVDBG_ENTRY, nvc, nvp, "nv_sata_reset"));
+	NVLOG(NVDBG_ENTRY, nvc, nvp, "nv_sata_reset", NULL);
 
 	mutex_enter(&nvp->nvp_mutex);
 
@@ -1783,19 +1790,19 @@ nv_sata_reset(dev_info_t *dip, sata_device_t *sd)
 	case SATA_ADDR_DCPORT:
 		nvp->nvp_state |= NV_PORT_RESET;
 		nvp->nvp_state &= ~NV_PORT_RESTORE;
-		nv_reset(nvp);
+		nv_reset(nvp, "sata_reset");
 		(void) nv_abort_active(nvp, NULL, SATA_PKT_RESET, B_FALSE);
 
 		break;
 	case SATA_ADDR_CNTRL:
-		NVLOG((NVDBG_ENTRY, nvc, nvp,
-		    "nv_sata_reset: constroller reset not supported"));
+		NVLOG(NVDBG_ENTRY, nvc, nvp,
+		    "nv_sata_reset: conroller reset not supported", NULL);
 
 		break;
 	case SATA_ADDR_PMPORT:
 	case SATA_ADDR_DPMPORT:
-		NVLOG((NVDBG_ENTRY, nvc, nvp,
-		    "nv_sata_reset: port multipliers not supported"));
+		NVLOG(NVDBG_ENTRY, nvc, nvp,
+		    "nv_sata_reset: port multipliers not supported", NULL);
 		/*FALLTHROUGH*/
 	default:
 		/*
@@ -1838,7 +1845,7 @@ nv_sata_activate(dev_info_t *dip, sata_device_t *sd)
 	nv_port_t *nvp = &(nvc->nvc_port[cport]);
 
 	ASSERT(cport < NV_MAX_PORTS(nvc));
-	NVLOG((NVDBG_ENTRY, nvc, nvp, "nv_sata_activate"));
+	NVLOG(NVDBG_ENTRY, nvc, nvp, "nv_sata_activate", NULL);
 
 	mutex_enter(&nvp->nvp_mutex);
 
@@ -1854,7 +1861,7 @@ nv_sata_activate(dev_info_t *dip, sata_device_t *sd)
 	nvp->nvp_signature = 0;
 	nvp->nvp_state |= NV_PORT_RESET; /* | NV_PORT_PROBE; */
 	nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
-	nv_reset(nvp);
+	nv_reset(nvp, "sata_activate");
 
 	mutex_exit(&nvp->nvp_mutex);
 
@@ -1873,7 +1880,7 @@ nv_sata_deactivate(dev_info_t *dip, sata_device_t *sd)
 	nv_port_t *nvp = &(nvc->nvc_port[cport]);
 
 	ASSERT(cport < NV_MAX_PORTS(nvc));
-	NVLOG((NVDBG_ENTRY, nvc, nvp, "nv_sata_deactivate"));
+	NVLOG(NVDBG_ENTRY, nvc, nvp, "nv_sata_deactivate", NULL);
 
 	mutex_enter(&nvp->nvp_mutex);
 
@@ -1913,8 +1920,8 @@ nv_start_common(nv_port_t *nvp, sata_pkt_t *spkt)
 	nv_slot_t *nv_slotp;
 	boolean_t dma_cmd;
 
-	NVLOG((NVDBG_DELIVER, nvc, nvp, "nv_start_common  entered: cmd: 0x%x",
-	    sata_cmdp->satacmd_cmd_reg));
+	NVLOG(NVDBG_DELIVER, nvc, nvp, "nv_start_common  entered: cmd: 0x%x",
+	    sata_cmdp->satacmd_cmd_reg);
 
 	if ((cmd == SATAC_WRITE_FPDMA_QUEUED) ||
 	    (cmd == SATAC_READ_FPDMA_QUEUED)) {
@@ -1941,8 +1948,8 @@ nv_start_common(nv_port_t *nvp, sata_pkt_t *spkt)
 		    nvp->nvp_sactive);
 		ASSERT((sactive & on_bit) == 0);
 		nv_put32(nvc->nvc_bar_hdl[5], nvp->nvp_sactive, on_bit);
-		NVLOG((NVDBG_INIT, nvc, nvp, "setting SACTIVE onbit: %X",
-		    on_bit));
+		NVLOG(NVDBG_DELIVER, nvc, nvp, "setting SACTIVE onbit: %X",
+		    on_bit);
 		nvp->nvp_sactive_cache |= on_bit;
 
 		ncq = NVSLOT_NCQ;
@@ -1981,11 +1988,11 @@ nv_start_common(nv_port_t *nvp, sata_pkt_t *spkt)
 	}
 
 	if (sata_cmdp->satacmd_num_dma_cookies != 0 && dma_cmd == B_TRUE) {
-		NVLOG((NVDBG_DELIVER, nvc,  nvp, "DMA command"));
+		NVLOG(NVDBG_DELIVER, nvc,  nvp, "DMA command", NULL);
 		nv_slotp->nvslot_start = nv_start_dma;
 		nv_slotp->nvslot_intr = nv_intr_dma;
 	} else if (spkt->satapkt_cmd.satacmd_cmd_reg == SATAC_PACKET) {
-		NVLOG((NVDBG_DELIVER, nvc,  nvp, "packet command"));
+		NVLOG(NVDBG_DELIVER, nvc,  nvp, "packet command", NULL);
 		nv_slotp->nvslot_start = nv_start_pkt_pio;
 		nv_slotp->nvslot_intr = nv_intr_pkt_pio;
 		if ((direction == SATA_DIR_READ) ||
@@ -2004,11 +2011,11 @@ nv_start_common(nv_port_t *nvp, sata_pkt_t *spkt)
 			sata_free_dma_resources(spkt);
 		}
 	} else if (direction == SATA_DIR_NODATA_XFER) {
-		NVLOG((NVDBG_DELIVER, nvc, nvp, "non-data command"));
+		NVLOG(NVDBG_DELIVER, nvc, nvp, "non-data command", NULL);
 		nv_slotp->nvslot_start = nv_start_nodata;
 		nv_slotp->nvslot_intr = nv_intr_nodata;
 	} else if (direction == SATA_DIR_READ) {
-		NVLOG((NVDBG_DELIVER, nvc, nvp, "pio in command"));
+		NVLOG(NVDBG_DELIVER, nvc, nvp, "pio in command", NULL);
 		nv_slotp->nvslot_start = nv_start_pio_in;
 		nv_slotp->nvslot_intr = nv_intr_pio_in;
 		nv_slotp->nvslot_byte_count =
@@ -2024,7 +2031,7 @@ nv_start_common(nv_port_t *nvp, sata_pkt_t *spkt)
 		 */
 		sata_free_dma_resources(spkt);
 	} else if (direction == SATA_DIR_WRITE) {
-		NVLOG((NVDBG_DELIVER, nvc, nvp, "pio out command"));
+		NVLOG(NVDBG_DELIVER, nvc, nvp, "pio out command", NULL);
 		nv_slotp->nvslot_start = nv_start_pio_out;
 		nv_slotp->nvslot_intr = nv_intr_pio_out;
 		nv_slotp->nvslot_byte_count =
@@ -2090,7 +2097,9 @@ static void
 nv_read_signature(nv_port_t *nvp)
 {
 	ddi_acc_handle_t cmdhdl = nvp->nvp_cmd_hdl;
+	int retry_once = 0;
 
+	retry:
 	/*
 	 * Task file error register bit 0 set to 1 indicate that drive
 	 * is ready and have sent D2H FIS with a signature.
@@ -2098,8 +2107,9 @@ nv_read_signature(nv_port_t *nvp)
 	if (nv_check_tfr_error != 0) {
 		uint8_t tfr_error = nv_get8(cmdhdl, nvp->nvp_error);
 		if (!(tfr_error & SATA_ERROR_ILI)) {
-			NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp,
-			    "nv_read_signature: signature not ready"));
+			NVLOG(NVDBG_VERBOSE, nvp->nvp_ctlp, nvp,
+			    "nv_read_signature: signature not ready", NULL);
+
 			return;
 		}
 	}
@@ -2109,31 +2119,43 @@ nv_read_signature(nv_port_t *nvp)
 	nvp->nvp_signature |= (nv_get8(cmdhdl, nvp->nvp_lcyl) << 16);
 	nvp->nvp_signature |= (nv_get8(cmdhdl, nvp->nvp_hcyl) << 24);
 
-	NVLOG((NVDBG_ENTRY, nvp->nvp_ctlp, nvp,
-	    "nv_read_signature: 0x%x ", nvp->nvp_signature));
+	NVLOG(NVDBG_VERBOSE, nvp->nvp_ctlp, nvp,
+	    "nv_read_signature: 0x%x ", nvp->nvp_signature);
 
 	switch (nvp->nvp_signature) {
 
 	case NV_SIG_DISK:
-		NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp, "drive is a disk"));
+		NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp, "drive is a disk", NULL);
 		nvp->nvp_type = SATA_DTYPE_ATADISK;
 		break;
 	case NV_SIG_ATAPI:
-		NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
-		    "drive is an optical device"));
+		NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
+		    "drive is an optical device", NULL);
 		nvp->nvp_type = SATA_DTYPE_ATAPICD;
 		break;
 	case NV_SIG_PM:
-		NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
-		    "device is a port multiplier"));
+		NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
+		    "device is a port multiplier", NULL);
 		nvp->nvp_type = SATA_DTYPE_PMULT;
 		break;
 	case NV_SIG_NOTREADY:
-		NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
-		    "signature not ready"));
+		NVLOG(NVDBG_VERBOSE, nvp->nvp_ctlp, nvp,
+		    "signature not ready", NULL);
 		nvp->nvp_type = SATA_DTYPE_UNKNOWN;
 		break;
 	default:
+		if (retry_once++ == 0) {
+			/*
+			 * this is a rare corner case where the controller
+			 * was in the middle of updating the registers as the
+			 * driver is reading them.  If this happens, wait a
+			 * bit and retry, but just once.
+			 */
+			NV_DELAY_NSEC(1000000);
+
+			goto retry;
+		}
+
 		nv_cmn_err(CE_WARN, nvp->nvp_ctlp, nvp, "signature %X not"
 		    " recognized", nvp->nvp_signature);
 		nvp->nvp_type = SATA_DTYPE_UNKNOWN;
@@ -2213,7 +2235,7 @@ int nv_reset_length = NV_RESET_LENGTH;
  * Entered with nvp mutex held
  */
 static void
-nv_reset(nv_port_t *nvp)
+nv_reset(nv_port_t *nvp, char *reason)
 {
 	ddi_acc_handle_t bar5_hdl = nvp->nvp_ctlp->nvc_bar_hdl[5];
 	ddi_acc_handle_t cmdhdl = nvp->nvp_cmd_hdl;
@@ -2224,9 +2246,7 @@ nv_reset(nv_port_t *nvp)
 
 	ASSERT(mutex_owned(&nvp->nvp_mutex));
 
-	NVLOG((NVDBG_RESET, nvc, nvp, "nv_reset()"));
 	serr = nv_get32(bar5_hdl, nvp->nvp_serror);
-	NVLOG((NVDBG_RESET, nvc, nvp, "nv_reset: serr 0x%x", serr));
 
 	/*
 	 * stop DMA engine.
@@ -2236,6 +2256,30 @@ nv_reset(nv_port_t *nvp)
 
 	nvp->nvp_state |= NV_PORT_RESET;
 	nvp->nvp_reset_time = ddi_get_lbolt();
+	nvp->nvp_reset_count++;
+
+	if (strcmp(reason, "attach") != 0) {
+		nv_cmn_err(CE_NOTE, nvc, nvp, "nv_reset: reason: %s serr 0x%x",
+		    reason, serr);
+		/*
+		 * keep a record of why the first reset occurred, for debugging
+		 */
+		if (nvp->nvp_first_reset_reason[0] == '\0') {
+			(void) strncpy(nvp->nvp_first_reset_reason,
+			    reason, NV_REASON_LEN);
+			nvp->nvp_first_reset_reason[NV_REASON_LEN - 1] = '\0';
+		}
+	}
+
+	NVLOG(NVDBG_RESET, nvc, nvp, "nv_reset_count: %d",
+	    nvp->nvp_reset_count);
+
+	(void) strncpy(nvp->nvp_reset_reason, reason, NV_REASON_LEN);
+
+	/*
+	 * ensure there is terminating NULL
+	 */
+	nvp->nvp_reset_reason[NV_REASON_LEN - 1] = '\0';
 
 	/*
 	 * Issue hardware reset; retry if necessary.
@@ -2267,8 +2311,8 @@ nv_reset(nv_port_t *nvp)
 
 		sstatus = nv_get32(bar5_hdl, nvp->nvp_sstatus);
 		sctrl = nv_get32(bar5_hdl, nvp->nvp_sctrl);
-		NVLOG((NVDBG_RESET, nvc, nvp, "nv_reset: applied (%d); "
-		    "sctrl 0x%x, sstatus 0x%x", i, sctrl, sstatus));
+		NVLOG(NVDBG_RESET, nvc, nvp, "nv_reset: applied (%d); "
+		    "sctrl 0x%x, sstatus 0x%x", i, sctrl, sstatus);
 
 		/* de-assert reset in PHY */
 		nv_put32(bar5_hdl, nvp->nvp_sctrl,
@@ -2293,12 +2337,12 @@ nv_reset(nv_port_t *nvp)
 	}
 	serr = nv_get32(bar5_hdl, nvp->nvp_serror);
 	if (reset == 0) {
-		NVLOG((NVDBG_RESET, nvc, nvp, "nv_reset not succeeded "
-		    "(serr 0x%x) after %d attempts", serr, i));
+		NVLOG(NVDBG_RESET, nvc, nvp, "nv_reset not succeeded "
+		    "(serr 0x%x) after %d attempts", serr, i);
 	} else {
-		NVLOG((NVDBG_RESET, nvc, nvp, "nv_reset succeeded (serr 0x%x)"
+		NVLOG(NVDBG_RESET, nvc, nvp, "nv_reset succeeded (serr 0x%x)"
 		    "after %dms", serr, TICK_TO_MSEC(ddi_get_lbolt() -
-		    nvp->nvp_reset_time)));
+		    nvp->nvp_reset_time));
 	}
 	nvp->nvp_reset_time = ddi_get_lbolt();
 
@@ -2369,9 +2413,9 @@ mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	if (nvc->nvc_revid >= 0xa3) {
 		if (nv_sata_40bit_dma == B_TRUE) {
 			uint32_t reg32;
-			NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
+			NVLOG(NVDBG_INIT, nvp->nvp_ctlp, nvp,
 			    "rev id is %X.  40-bit DMA addressing"
-			    " enabled", nvc->nvc_revid));
+			    " enabled", nvc->nvc_revid);
 			nvc->dma_40bit = B_TRUE;
 
 			reg32 = pci_config_get32(pci_conf_handle,
@@ -2392,8 +2436,8 @@ mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 			pci_config_put32(pci_conf_handle, NV_SATA_CFG_23,
 			    reg32 & 0xffff0000);
 		} else {
-			NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
-			    "40-bit DMA disabled by nv_sata_40bit_dma"));
+			NVLOG(NVDBG_INIT, nvp->nvp_ctlp, nvp,
+			    "40-bit DMA disabled by nv_sata_40bit_dma", NULL);
 		}
 	} else {
 		nv_cmn_err(CE_NOTE, nvp->nvp_ctlp, nvp, "rev id is %X and is "
@@ -2466,7 +2510,7 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	uint32_t reg32;
 	uint8_t reg8, reg8_save;
 
-	NVLOG((NVDBG_INIT, nvc, NULL, "nv_init_ctl entered"));
+	NVLOG(NVDBG_INIT, nvc, NULL, "nv_init_ctl entered", NULL);
 
 	ck804 = B_TRUE;
 #ifdef SGPIO_SUPPORT
@@ -2511,12 +2555,12 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	nv_put8(bar5_hdl, (uint8_t *)(bar5 + NV_BAR5_TRAN_LEN_CH_X), reg8_save);
 
 	if (ck804 == B_TRUE) {
-		NVLOG((NVDBG_INIT, nvc, NULL, "controller is CK804"));
+		NVLOG(NVDBG_INIT, nvc, NULL, "controller is CK804", NULL);
 		nvc->nvc_interrupt = ck804_intr;
 		nvc->nvc_reg_init = ck804_reg_init;
 		nvc->nvc_set_intr = ck804_set_intr;
 	} else {
-		NVLOG((NVDBG_INIT, nvc, NULL, "controller is MCP51/MCP55"));
+		NVLOG(NVDBG_INIT, nvc, NULL, "controller is MCP51/MCP55", NULL);
 		nvc->nvc_interrupt = mcp5x_intr;
 		nvc->nvc_reg_init = mcp5x_reg_init;
 		nvc->nvc_set_intr = mcp5x_set_intr;
@@ -2629,12 +2673,12 @@ nv_init_port(nv_port_t *nvp)
 	dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
 	if (nvp->nvp_state & NV_PORT_INIT) {
-		NVLOG((NVDBG_INIT, nvc, nvp,
-		    "nv_init_port previously initialized"));
+		NVLOG(NVDBG_INIT, nvc, nvp,
+		    "nv_init_port previously initialized", NULL);
 
 		return (NV_SUCCESS);
 	} else {
-		NVLOG((NVDBG_INIT, nvc, nvp, "nv_init_port initializing"));
+		NVLOG(NVDBG_INIT, nvc, nvp, "nv_init_port initializing", NULL);
 	}
 
 	nvp->nvp_sg_dma_hdl = kmem_zalloc(sizeof (ddi_dma_handle_t) *
@@ -2742,7 +2786,7 @@ nv_init_port_link_processing(nv_ctl_t *nvc)
 			mutex_enter(&nvp->nvp_mutex);
 			if (!(nvp->nvp_state & NV_PORT_RESET)) {
 				nvp->nvp_state |= NV_PORT_RESET | NV_PORT_PROBE;
-				nv_reset(nvp);
+				nv_reset(nvp, "attach");
 			}
 			mutex_exit(&nvp->nvp_mutex);
 		}
@@ -2766,11 +2810,11 @@ nv_init_port_link_processing(nv_ctl_t *nvc)
 				    nvp->nvp_type == SATA_DTYPE_NONE) {
 					nvp->nvp_type = SATA_DTYPE_UNKNOWN;
 				}
-				NVLOG((NVDBG_INIT, nvc, nvp,
+				NVLOG(NVDBG_INIT, nvc, nvp,
 				    "nv_init_port_link_processing()"
 				    "link up; time from reset %dms",
 				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time)));
+				    nvp->nvp_reset_time));
 				links_up++;
 			}
 			mutex_exit(&nvp->nvp_mutex);
@@ -2779,8 +2823,8 @@ nv_init_port_link_processing(nv_ctl_t *nvc)
 			break;
 		}
 	}
-	NVLOG((NVDBG_RESET, nvc, nvp, "nv_init_port_link_processing():"
-	    "%d links up", links_up));
+	NVLOG(NVDBG_RESET, nvc, nvp, "nv_init_port_link_processing():"
+	    "%d links up", links_up);
 	/*
 	 * At this point, if any device is attached, the link is established.
 	 * Wait till devices are ready to be accessed, no more than 200ms.
@@ -2801,12 +2845,12 @@ nv_init_port_link_processing(nv_ctl_t *nvc)
 				/*
 				 * Reset already processed
 				 */
-				NVLOG((NVDBG_RESET, nvc, nvp,
+				NVLOG(NVDBG_RESET, nvc, nvp,
 				    "nv_init_port_link_processing()"
 				    "device ready; port state %x; "
 				    "time from reset %dms", nvp->nvp_state,
 				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time)));
+				    nvp->nvp_reset_time));
 
 				ready_ports++;
 			}
@@ -2817,8 +2861,8 @@ nv_init_port_link_processing(nv_ctl_t *nvc)
 		}
 		drv_usecwait(NV_ONE_MSEC);
 	}
-	NVLOG((NVDBG_RESET, nvc, nvp, "nv_init_port_link_processing():"
-	    "%d devices ready", ready_ports));
+	NVLOG(NVDBG_RESET, nvc, nvp, "nv_init_port_link_processing():"
+	    "%d devices ready", ready_ports);
 }
 
 /*
@@ -2842,8 +2886,8 @@ nv_uninit_port(nv_port_t *nvp)
 	 */
 	nvp->nvp_state &= ~NV_PORT_INIT;
 
-	NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
-	    "nv_uninit_port uninitializing"));
+	NVLOG(NVDBG_INIT, nvp->nvp_ctlp, nvp,
+	    "nv_uninit_port uninitializing", NULL);
 
 #ifdef SGPIO_SUPPORT
 	if (nvp->nvp_type == SATA_DTYPE_ATADISK) {
@@ -2913,7 +2957,7 @@ nv_common_reg_init(nv_ctl_t *nvc)
 		nvp = &(nvc->nvc_port[port]);
 		nvp->nvp_ctlp = nvc;
 		nvp->nvp_port_num = port;
-		NVLOG((NVDBG_INIT, nvc, nvp, "setting up port mappings"));
+		NVLOG(NVDBG_INIT, nvc, nvp, "setting up port mappings", NULL);
 
 		nvp->nvp_cmd_hdl = nvc->nvc_bar_hdl[bar];
 		nvp->nvp_cmd_addr = nvc->nvc_bar_addr[bar];
@@ -2937,12 +2981,12 @@ nv_uninit_ctl(nv_ctl_t *nvc)
 	int port;
 	nv_port_t *nvp;
 
-	NVLOG((NVDBG_INIT, nvc, NULL, "nv_uninit_ctl entered"));
+	NVLOG(NVDBG_INIT, nvc, NULL, "nv_uninit_ctl entered", NULL);
 
 	for (port = 0; port < NV_MAX_PORTS(nvc); port++) {
 		nvp = &(nvc->nvc_port[port]);
 		mutex_enter(&nvp->nvp_mutex);
-		NVLOG((NVDBG_INIT, nvc, nvp, "uninitializing port"));
+		NVLOG(NVDBG_INIT, nvc, nvp, "uninitializing port", NULL);
 		nv_uninit_port(nvp);
 		mutex_exit(&nvp->nvp_mutex);
 		mutex_destroy(&nvp->nvp_mutex);
@@ -3008,8 +3052,8 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 		CK804_INT_PDEV_PM, CK804_INT_SDEV_PM,
 	};
 
-	NVLOG((NVDBG_INTR, nvc, NULL,
-	    "ck804_intr_process entered intr_status=%x", intr_status));
+	NVLOG(NVDBG_INTR, nvc, NULL,
+	    "ck804_intr_process entered intr_status=%x", intr_status);
 
 	/*
 	 * For command completion interrupt, explicit clear is not required.
@@ -3023,8 +3067,8 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 			continue;
 		}
 
-		NVLOG((NVDBG_INTR, nvc, NULL,
-		    "ck804_intr_process interrupt on port %d", port));
+		NVLOG(NVDBG_INTR, nvc, NULL,
+		    "ck804_intr_process interrupt on port %d", port);
 
 		nvp = &(nvc->nvc_port[port]);
 
@@ -3039,9 +3083,9 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 		 */
 		if (nvp->nvp_slot == NULL) {
 			status = nv_get8(nvp->nvp_ctl_hdl, nvp->nvp_status);
-			NVLOG((NVDBG_ALWAYS, nvc, nvp, "spurious interrupt "
+			NVLOG(NVDBG_ALWAYS, nvc, nvp, "spurious interrupt "
 			    "received before initialization "
-			    "completed status=%x", status));
+			    "completed status=%x", status);
 			mutex_exit(&nvp->nvp_mutex);
 
 			/*
@@ -3055,8 +3099,8 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 
 		if ((&(nvp->nvp_slot[0]))->nvslot_spkt == NULL)  {
 			status = nv_get8(nvp->nvp_ctl_hdl, nvp->nvp_status);
-			NVLOG((NVDBG_ALWAYS, nvc, nvp, "spurious interrupt "
-			    " no command in progress status=%x", status));
+			NVLOG(NVDBG_ALWAYS, nvc, nvp, "spurious interrupt "
+			    " no command in progress status=%x", status);
 			mutex_exit(&nvp->nvp_mutex);
 
 			/*
@@ -3124,9 +3168,9 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 
 		if ((port_mask_pm[port] & intr_status) != 0) {
 			clear_bits = port_mask_pm[port];
-			NVLOG((NVDBG_HOT, nvc, nvp,
+			NVLOG(NVDBG_HOT, nvc, nvp,
 			    "clearing PM interrupt bit: %x",
-			    intr_status & port_mask_pm[port]));
+			    intr_status & port_mask_pm[port]);
 		}
 
 		if ((port_mask_hot[port] & intr_status) == 0) {
@@ -3172,9 +3216,9 @@ ck804_intr_process(nv_ctl_t *nvc, uint8_t intr_status)
 		 * make 10 additional attempts to clear the interrupt
 		 */
 		for (i = 0; (intr_status & clear_bits) && (i < 10); i++) {
-			NVLOG((NVDBG_ALWAYS, nvc, nvp, "inst_status=%x "
+			NVLOG(NVDBG_ALWAYS, nvc, nvp, "inst_status=%x "
 			    "still not clear try=%d", intr_status,
-			    ++nvcleared));
+			    ++nvcleared);
 			nv_put8(bar5_hdl, nvc->nvc_ck804_int_status,
 			    clear_bits);
 			intr_status = nv_get8(bar5_hdl,
@@ -3221,7 +3265,7 @@ mcp5x_intr_port(nv_port_t *nvp)
 
 	nvp->intr_start_time = ddi_get_lbolt();
 
-	NVLOG((NVDBG_INTR, nvc, nvp, "mcp55_intr_port entered"));
+	NVLOG(NVDBG_INTR, nvc, nvp, "mcp55_intr_port entered", NULL);
 
 	do {
 		/*
@@ -3229,7 +3273,7 @@ mcp5x_intr_port(nv_port_t *nvp)
 		 */
 		int_status = nv_get16(bar5_hdl, nvp->nvp_mcp5x_int_status);
 
-		NVLOG((NVDBG_INTR, nvc, nvp, "int_status = %x", int_status));
+		NVLOG(NVDBG_INTR, nvc, nvp, "int_status = %x", int_status);
 
 		/*
 		 * MCP5X_INT_IGNORE interrupts will show up in the status,
@@ -3247,8 +3291,8 @@ mcp5x_intr_port(nv_port_t *nvp)
 		}
 
 		if (int_status & MCP5X_INT_COMPLETE) {
-			NVLOG((NVDBG_INTR, nvc, nvp,
-			    "mcp5x_packet_complete_intr"));
+			NVLOG(NVDBG_INTR, nvc, nvp,
+			    "mcp5x_packet_complete_intr", NULL);
 			/*
 			 * since int_status was set, return DDI_INTR_CLAIMED
 			 * from the DDI's perspective even though the packet
@@ -3266,7 +3310,8 @@ mcp5x_intr_port(nv_port_t *nvp)
 		}
 
 		if (int_status & MCP5X_INT_DMA_SETUP) {
-			NVLOG((NVDBG_INTR, nvc, nvp, "mcp5x_dma_setup_intr"));
+			NVLOG(NVDBG_INTR, nvc, nvp, "mcp5x_dma_setup_intr",
+			    NULL);
 
 			/*
 			 * Needs to be cleared before starting the BM, so do it
@@ -3280,7 +3325,6 @@ mcp5x_intr_port(nv_port_t *nvp)
 		}
 
 		if (int_status & MCP5X_INT_REM) {
-			NVLOG((NVDBG_HOT, nvc, nvp, "mcp5x device removed"));
 			clear |= MCP5X_INT_REM;
 			ret = DDI_INTR_CLAIMED;
 
@@ -3289,7 +3333,6 @@ mcp5x_intr_port(nv_port_t *nvp)
 			mutex_exit(&nvp->nvp_mutex);
 
 		} else if (int_status & MCP5X_INT_ADD) {
-			NVLOG((NVDBG_HOT, nvc, nvp, "mcp5x device added"));
 			clear |= MCP5X_INT_ADD;
 			ret = DDI_INTR_CLAIMED;
 
@@ -3319,8 +3362,8 @@ mcp5x_intr_port(nv_port_t *nvp)
 	} while (loop_cnt++ < nv_max_intr_loops);
 
 	if (loop_cnt > nvp->intr_loop_cnt) {
-		NVLOG((NVDBG_INTR, nvp->nvp_ctlp, nvp,
-		    "Exiting with multiple intr loop count %d", loop_cnt));
+		NVLOG(NVDBG_INTR, nvp->nvp_ctlp, nvp,
+		    "Exiting with multiple intr loop count %d", loop_cnt);
 		nvp->intr_loop_cnt = loop_cnt;
 	}
 
@@ -3334,15 +3377,15 @@ mcp5x_intr_port(nv_port_t *nvp)
 			bmstatus = nv_get8(nvp->nvp_bm_hdl, nvp->nvp_bmisx);
 			int_status2 = nv_get16(nvp->nvp_ctlp->nvc_bar_hdl[5],
 			    nvp->nvp_mcp5x_int_status);
-			NVLOG((NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
+			NVLOG(NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
 			    "mcp55_intr_port: Exiting with altstatus %x, "
 			    "bmicx %x, int_status2 %X, int_status %X, ret %x,"
 			    " loop_cnt %d ", status, bmstatus, int_status2,
-			    int_status, ret, loop_cnt));
+			    int_status, ret, loop_cnt);
 		}
 	}
 
-	NVLOG((NVDBG_INTR, nvc, nvp, "mcp55_intr_port: finished ret=%d", ret));
+	NVLOG(NVDBG_INTR, nvc, nvp, "mcp55_intr_port: finished ret=%d", ret);
 
 	/*
 	 * To facilitate debugging, keep track of the length of time spent in
@@ -3406,8 +3449,8 @@ mcp5x_dma_setup_intr(nv_ctl_t *nvc, nv_port_t *nvp)
 
 	slot = (slot >> tag_shift[port]) & MCP_SATA_AE_NCQ_DMA_SETUP_TAG_MASK;
 
-	NVLOG((NVDBG_INTR, nvc, nvp, "mcp5x_dma_setup_intr slot %d"
-	    " nvp_slot_sactive %X", slot, nvp->nvp_sactive_cache));
+	NVLOG(NVDBG_INTR, nvc, nvp, "mcp5x_dma_setup_intr slot %d"
+	    " nvp_slot_sactive %X", slot, nvp->nvp_sactive_cache);
 
 	/*
 	 * halt the DMA engine.  This step is necessary according to
@@ -3418,8 +3461,8 @@ mcp5x_dma_setup_intr(nv_ctl_t *nvc, nv_port_t *nvp)
 	bmicx = nv_get8(bmhdl, nvp->nvp_bmicx);
 
 	if (bmicx & BMICX_SSBM) {
-		NVLOG((NVDBG_INTR, nvc, nvp, "BM was already enabled for "
-		    "another packet.  Cancelling and reprogramming"));
+		NVLOG(NVDBG_INTR, nvc, nvp, "BM was already enabled for "
+		    "another packet.  Cancelling and reprogramming", NULL);
 		nv_put8(bmhdl, nvp->nvp_bmicx,  bmicx & ~BMICX_SSBM);
 	}
 	nv_put8(bmhdl, nvp->nvp_bmicx,  bmicx & ~BMICX_SSBM);
@@ -3452,7 +3495,7 @@ mcp5x_packet_complete_intr(nv_ctl_t *nvc, nv_port_t *nvp)
 	bmstatus = nv_get8(bmhdl, nvp->nvp_bmisx);
 
 	if (!(bmstatus & (BMISX_IDEINTS | BMISX_IDERR))) {
-		NVLOG((NVDBG_INTR, nvc, nvp, "BMISX_IDEINTS not set"));
+		NVLOG(NVDBG_INTR, nvc, nvp, "BMISX_IDEINTS not set", NULL);
 		mutex_exit(&nvp->nvp_mutex);
 
 		return (NV_FAILURE);
@@ -3626,7 +3669,7 @@ nv_start_async(nv_port_t *nvp, sata_pkt_t *spkt)
 {
 	uint8_t cmd, ncq;
 
-	NVLOG((NVDBG_ENTRY, nvp->nvp_ctlp, nvp, "nv_start_async: entry"));
+	NVLOG(NVDBG_ENTRY, nvp->nvp_ctlp, nvp, "nv_start_async: entry", NULL);
 
 	cmd = spkt->satapkt_cmd.satacmd_cmd_reg;
 
@@ -3676,9 +3719,9 @@ nv_start_async(nv_port_t *nvp, sata_pkt_t *spkt)
 
 		ASSERT(nvp->nvp_queue_depth > 1);
 
-		NVLOG((NVDBG_ENTRY, nvp->nvp_ctlp, nvp,
+		NVLOG(NVDBG_ENTRY, nvp->nvp_ctlp, nvp,
 		    "nv_process_queue: nvp_queue_depth set to %d",
-		    nvp->nvp_queue_depth));
+		    nvp->nvp_queue_depth);
 	}
 #endif
 
@@ -3705,16 +3748,16 @@ nv_add_legacy_intrs(nv_ctl_t *nvc)
 	int		actual, count = 0;
 	int		x, y, rc, inum = 0;
 
-	NVLOG((NVDBG_ENTRY, nvc, NULL, "nv_add_legacy_intrs"));
+	NVLOG(NVDBG_INIT, nvc, NULL, "nv_add_legacy_intrs", NULL);
 
 	/*
 	 * get number of interrupts
 	 */
 	rc = ddi_intr_get_nintrs(devinfo, DDI_INTR_TYPE_FIXED, &count);
 	if ((rc != DDI_SUCCESS) || (count == 0)) {
-		NVLOG((NVDBG_INTR, nvc, NULL,
+		NVLOG(NVDBG_INIT, nvc, NULL,
 		    "ddi_intr_get_nintrs() failed, "
-		    "rc %d count %d", rc, count));
+		    "rc %d count %d", rc, count);
 
 		return (DDI_FAILURE);
 	}
@@ -3812,7 +3855,7 @@ nv_add_msi_intrs(nv_ctl_t *nvc)
 	int		count, avail, actual;
 	int		x, y, rc, inum = 0;
 
-	NVLOG((NVDBG_ENTRY, nvc, NULL, "nv_add_msi_intrs"));
+	NVLOG(NVDBG_INIT, nvc, NULL, "nv_add_msi_intrs", NULL);
 
 	/*
 	 * get number of interrupts
@@ -3865,8 +3908,8 @@ nv_add_msi_intrs(nv_ctl_t *nvc)
 	 * Use interrupt count returned or abort?
 	 */
 	if (actual < count) {
-		NVLOG((NVDBG_INIT, nvc, NULL,
-		    "Requested: %d, Received: %d", count, actual));
+		NVLOG(NVDBG_INIT, nvc, NULL,
+		    "Requested: %d, Received: %d", count, actual);
 	}
 
 	nvc->nvc_intr_cnt = actual;
@@ -3941,7 +3984,7 @@ nv_rem_intrs(nv_ctl_t *nvc)
 	int x, i;
 	nv_port_t *nvp;
 
-	NVLOG((NVDBG_ENTRY, nvc, NULL, "nv_rem_intrs"));
+	NVLOG(NVDBG_INIT, nvc, NULL, "nv_rem_intrs", NULL);
 
 	/*
 	 * prevent controller from generating interrupts by
@@ -3983,33 +4026,36 @@ nv_rem_intrs(nv_ctl_t *nvc)
 static void
 nv_vcmn_err(int ce, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, va_list ap)
 {
-	char port[NV_STRING_10];
-	char inst[NV_STRING_10];
-
-	mutex_enter(&nv_log_mutex);
+	char port[NV_STR_LEN];
+	char inst[NV_STR_LEN];
+	dev_info_t *dip;
 
 	if (nvc) {
-		(void) snprintf(inst, NV_STRING_10, "inst %d",
+		(void) snprintf(inst, NV_STR_LEN, "inst %d",
 		    ddi_get_instance(nvc->nvc_dip));
+		dip = nvc->nvc_dip;
 	} else {
 		inst[0] = '\0';
 	}
 
 	if (nvp) {
-		(void) sprintf(port, " port %d", nvp->nvp_port_num);
+		(void) sprintf(port, "port%d", nvp->nvp_port_num);
+		dip = nvp->nvp_ctlp->nvc_dip;
 	} else {
 		port[0] = '\0';
 	}
 
-	(void) sprintf(nv_log_buf, "nv_sata %s%s%s", inst, port,
+	mutex_enter(&nv_log_mutex);
+
+	(void) sprintf(nv_log_buf, "nv_sata %s %s%s", inst, port,
 	    (inst[0]|port[0] ? ": " :""));
 
 	(void) vsnprintf(&nv_log_buf[strlen(nv_log_buf)],
-	    NV_STRING_512 - strlen(nv_log_buf), fmt, ap);
+	    NV_LOGBUF_LEN - strlen(nv_log_buf), fmt, ap);
 
 	/*
-	 * normally set to log to console but in some debug situations it
-	 * may be useful to log only to a file.
+	 * Log to console or log to file, depending on
+	 * nv_log_to_console setting.
 	 */
 	if (nv_log_to_console) {
 		if (nv_prom_print) {
@@ -4022,6 +4068,15 @@ nv_vcmn_err(int ce, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, va_list ap)
 	} else {
 		cmn_err(ce, "!%s", nv_log_buf);
 	}
+
+
+	(void) sprintf(nv_log_buf, "%s%s", port, (port[0] ? ": " :""));
+
+	(void) vsnprintf(&nv_log_buf[strlen(nv_log_buf)],
+	    NV_LOGBUF_LEN - strlen(nv_log_buf), fmt, ap);
+
+	sata_trace_debug(dip, nv_log_buf);
+
 
 	mutex_exit(&nv_log_mutex);
 }
@@ -4041,32 +4096,42 @@ nv_cmn_err(int ce, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, ...)
 }
 
 
-#if defined(DEBUG)
-/*
- * prefixes the instance and port number if possible to the debug message
- */
 static void
-nv_log(uint_t flag, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, ...)
+nv_log(nv_ctl_t *nvc, nv_port_t *nvp, const char *fmt, ...)
 {
 	va_list ap;
 
-	if ((nv_debug_flags & flag) == 0) {
+	va_start(ap, fmt);
+
+	if (nvp == NULL && nvc == NULL) {
+		sata_vtrace_debug(NULL, fmt, ap);
+		va_end(ap);
+
 		return;
 	}
 
-	va_start(ap, fmt);
-	nv_vcmn_err(CE_NOTE, nvc, nvp, fmt, ap);
-	va_end(ap);
+	if (nvp == NULL && nvc != NULL) {
+		sata_vtrace_debug(nvc->nvc_dip, fmt, ap);
+		va_end(ap);
 
-	/*
-	 * useful for some debugging situations
-	 */
-	if (nv_log_delay) {
-		drv_usecwait(nv_log_delay);
+		return;
 	}
 
+	/*
+	 * nvp is not NULL, but nvc might be.  Reference nvp for both
+	 * port and dip.
+	 */
+	mutex_enter(&nv_log_mutex);
+
+	(void) snprintf(nv_log_buf, NV_LOGBUF_LEN, "port%d: %s",
+	    nvp->nvp_port_num, fmt);
+
+	sata_vtrace_debug(nvp->nvp_ctlp->nvc_dip, nv_log_buf, ap);
+
+	mutex_exit(&nv_log_mutex);
+
+	va_end(ap);
 }
-#endif /* DEBUG */
 
 
 /*
@@ -4109,7 +4174,8 @@ nv_program_taskfile_regs(nv_port_t *nvp, int slot)
 	switch (spkt->satapkt_cmd.satacmd_addr_type) {
 
 	case ATA_ADDR_LBA:
-		NVLOG((NVDBG_DELIVER, nvp->nvp_ctlp, nvp, "ATA_ADDR_LBA mode"));
+		NVLOG(NVDBG_DELIVER, nvp->nvp_ctlp, nvp, "ATA_ADDR_LBA mode",
+		    NULL);
 
 		nv_put8(cmdhdl, nvp->nvp_count, satacmd->satacmd_sec_count_lsb);
 		nv_put8(cmdhdl, nvp->nvp_hcyl, satacmd->satacmd_lba_high_lsb);
@@ -4119,8 +4185,8 @@ nv_program_taskfile_regs(nv_port_t *nvp, int slot)
 		break;
 
 	case ATA_ADDR_LBA28:
-		NVLOG((NVDBG_DELIVER, nvp->nvp_ctlp, nvp,
-		    "ATA_ADDR_LBA28 mode"));
+		NVLOG(NVDBG_DELIVER, nvp->nvp_ctlp, nvp,
+		    "ATA_ADDR_LBA28 mode", NULL);
 		/*
 		 * NCQ only uses 48-bit addressing
 		 */
@@ -4134,8 +4200,8 @@ nv_program_taskfile_regs(nv_port_t *nvp, int slot)
 		break;
 
 	case ATA_ADDR_LBA48:
-		NVLOG((NVDBG_DELIVER, nvp->nvp_ctlp, nvp,
-		    "ATA_ADDR_LBA48 mode"));
+		NVLOG(NVDBG_DELIVER, nvp->nvp_ctlp, nvp,
+		    "ATA_ADDR_LBA48 mode", NULL);
 
 		/*
 		 * for NCQ, tag goes into count register and real sector count
@@ -4256,8 +4322,8 @@ nv_start_dma_engine(nv_port_t *nvp, int slot)
 		direction = BMICX_RWCON_READ_FROM_MEMORY;
 	}
 
-	NVLOG((NVDBG_DELIVER, nvp->nvp_ctlp, nvp,
-	    "nv_start_dma_engine entered"));
+	NVLOG(NVDBG_DELIVER, nvp->nvp_ctlp, nvp,
+	    "nv_start_dma_engine entered", NULL);
 
 #if NOT_USED
 	/*
@@ -4373,13 +4439,13 @@ nv_start_dma(nv_port_t *nvp, int slot)
 	 */
 
 	if (ncq == B_FALSE) {
-		NVLOG((NVDBG_DELIVER, nvp->nvp_ctlp, nvp,
+		NVLOG(NVDBG_DELIVER, nvp->nvp_ctlp, nvp,
 		    "NOT NCQ so starting DMA NOW non_ncq_commands=%d"
-		    " cmd = %X", non_ncq_commands++, cmd));
+		    " cmd = %X", non_ncq_commands++, cmd);
 		nv_start_dma_engine(nvp, slot);
 	} else {
-		NVLOG((NVDBG_DELIVER, nvp->nvp_ctlp, nvp, "?NCQ, so program "
-		    "DMA later ncq_commands=%d cmd = %X", ncq_commands++, cmd));
+		NVLOG(NVDBG_DELIVER, nvp->nvp_ctlp, nvp, "NCQ, so program "
+		    "DMA later ncq_commands=%d cmd = %X", ncq_commands++, cmd);
 	}
 #endif /* NCQ */
 
@@ -4471,7 +4537,7 @@ nv_start_pio_out(nv_port_t *nvp, int slot)
 	nv_complete_io(nvp, spkt, 0);
 	nvp->nvp_state |= NV_PORT_RESET;
 	nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
-	nv_reset(nvp);
+	nv_reset(nvp, "pio_out");
 
 	return (SATA_TRAN_PORT_ERROR);
 }
@@ -4488,8 +4554,8 @@ nv_start_pkt_pio(nv_port_t *nvp, int slot)
 	ddi_acc_handle_t cmdhdl = nvp->nvp_cmd_hdl;
 	sata_cmd_t *satacmd = &spkt->satapkt_cmd;
 
-	NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-	    "nv_start_pkt_pio: start"));
+	NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+	    "nv_start_pkt_pio: start", NULL);
 
 	/*
 	 * Write the PACKET command to the command register.  Normally
@@ -4503,8 +4569,8 @@ nv_start_pkt_pio(nv_port_t *nvp, int slot)
 	/* make certain the drive selected */
 	if (nv_wait(nvp, SATA_STATUS_DRDY, SATA_STATUS_BSY,
 	    NV_SEC2USEC(5), 0) == B_FALSE) {
-		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-		    "nv_start_pkt_pio: drive select failed"));
+		NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_start_pkt_pio: drive select failed", NULL);
 		return (SATA_TRAN_PORT_ERROR);
 	}
 
@@ -4548,20 +4614,20 @@ nv_start_pkt_pio(nv_port_t *nvp, int slot)
 		    (SATA_STATUS_ERR | SATA_STATUS_DF)) {
 			spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
 
-			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-			    "nv_start_pkt_pio: device error (HP0)"));
+			NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_start_pkt_pio: device error (HP0)", NULL);
 		} else {
 			spkt->satapkt_reason = SATA_PKT_TIMEOUT;
 
-			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-			    "nv_start_pkt_pio: timeout (HP0)"));
+			NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_start_pkt_pio: timeout (HP0)", NULL);
 		}
 
 		nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
 		nv_complete_io(nvp, spkt, 0);
 		nvp->nvp_state |= NV_PORT_RESET;
 		nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
-		nv_reset(nvp);
+		nv_reset(nvp, "start_pkt_pio");
 
 		return (SATA_TRAN_PORT_ERROR);
 	}
@@ -4580,8 +4646,8 @@ nv_start_pkt_pio(nv_port_t *nvp, int slot)
 	 * ATAPI protocol state - HP3: INTRQ_wait
 	 */
 
-	NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-	    "nv_start_pkt_pio: exiting into HP3"));
+	NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+	    "nv_start_pkt_pio: exiting into HP3", NULL);
 
 	return (SATA_TRAN_ACCEPTED);
 }
@@ -4599,7 +4665,7 @@ nv_intr_nodata(nv_port_t *nvp, nv_slot_t *nv_slotp)
 	ddi_acc_handle_t ctlhdl = nvp->nvp_ctl_hdl;
 	ddi_acc_handle_t cmdhdl = nvp->nvp_cmd_hdl;
 
-	NVLOG((NVDBG_INTR, nvp->nvp_ctlp, nvp, "nv_intr_nodata entered"));
+	NVLOG(NVDBG_INTR, nvp->nvp_ctlp, nvp, "nv_intr_nodata entered", NULL);
 
 	status = nv_get8(cmdhdl, nvp->nvp_status);
 
@@ -4642,7 +4708,7 @@ nv_intr_pio_in(nv_port_t *nvp, nv_slot_t *nv_slotp)
 		sata_cmdp->satacmd_error_reg = nv_get8(cmdhdl, nvp->nvp_error);
 		nvp->nvp_state |= NV_PORT_RESET;
 		nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
-		nv_reset(nvp);
+		nv_reset(nvp, "intr_pio_in");
 
 		return;
 	}
@@ -4805,8 +4871,8 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 	/* ATAPI protocol state - HP2: Check_Status_B */
 
 	status = nv_get8(cmdhdl, nvp->nvp_status);
-	NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-	    "nv_intr_pkt_pio: status 0x%x", status));
+	NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+	    "nv_intr_pkt_pio: status 0x%x", status);
 
 	if (status & SATA_STATUS_BSY) {
 		if ((nv_slotp->nvslot_flags & NVSLOT_RQSENSE) != 0) {
@@ -4818,11 +4884,11 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 			nvp->nvp_state |= NV_PORT_RESET;
 			nvp->nvp_state &= ~(NV_PORT_RESTORE |
 			    NV_PORT_RESET_RETRY);
-			nv_reset(nvp);
+			nv_reset(nvp, "intr_pkt_pio");
 		}
 
-		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-		    "nv_intr_pkt_pio: busy - status 0x%x", status));
+		NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: busy - status 0x%x", status);
 
 		return;
 	}
@@ -4845,8 +4911,8 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 		sata_cmdp->satacmd_error_reg = nv_get8(cmdhdl,
 		    nvp->nvp_error);
 
-		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-		    "nv_intr_pkt_pio: device fault"));
+		NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: device fault", NULL);
 
 		return;
 	}
@@ -4879,8 +4945,8 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 			nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
 		}
 
-		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-		    "nv_intr_pkt_pio: error (status 0x%x)", status));
+		NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: error (status 0x%x)", status);
 
 		return;
 	}
@@ -4898,9 +4964,9 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 			    (uint16_t)nv_get8(cmdhdl, nvp->nvp_hcyl) << 8;
 			ctlr_count |= nv_get8(cmdhdl, nvp->nvp_lcyl);
 
-			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
 			    "nv_intr_pkt_pio: ctlr byte count - %d",
-			    ctlr_count));
+			    ctlr_count);
 
 			if (ctlr_count == 0) {
 				/* no data to transfer - some devices do this */
@@ -4908,8 +4974,8 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 				spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
 				nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
 
-				NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-				    "nv_intr_pkt_pio: done (no data)"));
+				NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+				    "nv_intr_pkt_pio: done (no data)", NULL);
 
 				return;
 			}
@@ -4931,8 +4997,8 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 					    (ushort_t *)nvp->nvp_data);
 			}
 
-			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-			    "nv_intr_pkt_pio: transition to HP2"));
+			NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_intr_pkt_pio: transition to HP2", NULL);
 		} else {
 			/* still in ATAPI state - HP2 */
 
@@ -4950,8 +5016,8 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 			nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
 			spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
 
-			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-			    "nv_intr_pkt_pio: request sense done"));
+			NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_intr_pkt_pio: request sense done", NULL);
 		}
 
 		return;
@@ -4974,20 +5040,20 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 			spkt->satapkt_reason = SATA_PKT_COMPLETED;
 			nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
 
-			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-			    "nv_intr_pkt_pio: done (no data)"));
+			NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_intr_pkt_pio: done (no data)", NULL);
 
 			return;
 		}
 
 		count = min(ctlr_count, nv_slotp->nvslot_byte_count);
 
-		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-		    "nv_intr_pkt_pio: drive_bytes 0x%x", ctlr_count));
+		NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: drive_bytes 0x%x", ctlr_count);
 
-		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
 		    "nv_intr_pkt_pio: byte_count 0x%x",
-		    nv_slotp->nvslot_byte_count));
+		    nv_slotp->nvslot_byte_count);
 
 		/* transfer the data */
 
@@ -5007,8 +5073,8 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 					(void) ddi_get16(cmdhdl,
 					    (ushort_t *)nvp->nvp_data);
 
-				NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-				    "nv_intr_pkt_pio: bytes remained"));
+				NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+				    "nv_intr_pkt_pio: bytes remained", NULL);
 			}
 		} else {
 			ddi_rep_put16(cmdhdl,
@@ -5020,19 +5086,18 @@ nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 		nv_slotp->nvslot_v_addr += count;
 		nv_slotp->nvslot_byte_count -= count;
 
-		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-		    "nv_intr_pkt_pio: transition to HP2"));
+		NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: transition to HP2", NULL);
 	} else {
 		/* still in ATAPI state - HP2 */
 
 		spkt->satapkt_reason = SATA_PKT_COMPLETED;
 		nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
 
-		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-		    "nv_intr_pkt_pio: done"));
+		NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: done", NULL);
 	}
 }
-
 
 /*
  * ATA command, DMA data in/out
@@ -5079,13 +5144,13 @@ nv_intr_dma(nv_port_t *nvp, struct nv_slot *nv_slotp)
 	 * check for bus master errors
 	 */
 	if (bm_status & BMISX_IDERR) {
-		spkt->satapkt_reason = SATA_PKT_RESET;   /* ? */
+		spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
 		sata_cmdp->satacmd_status_reg = nv_get8(ctlhdl,
 		    nvp->nvp_altstatus);
 		sata_cmdp->satacmd_error_reg = nv_get8(cmdhdl, nvp->nvp_error);
 		nvp->nvp_state |= NV_PORT_RESET;
 		nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
-		nv_reset(nvp);
+		nv_reset(nvp, "intr_dma");
 
 		return;
 	}
@@ -5269,9 +5334,9 @@ nv_port_state_change(nv_port_t *nvp, int event, uint8_t addr_type, int state)
 {
 	sata_device_t sd;
 
-	NVLOG((NVDBG_EVENT, nvp->nvp_ctlp, nvp,
+	NVLOG(NVDBG_EVENT, nvp->nvp_ctlp, nvp,
 	    "nv_port_state_change: event 0x%x type 0x%x state 0x%x "
-	    "time %ld (ticks)", event, addr_type, state, ddi_get_lbolt()));
+	    "time %ld (ticks)", event, addr_type, state, ddi_get_lbolt());
 
 	bzero((void *)&sd, sizeof (sata_device_t));
 	sd.satadev_rev = SATA_DEVICE_REV;
@@ -5325,11 +5390,11 @@ nv_monitor_reset(nv_port_t *nvp)
 
 		if (TICK_TO_MSEC(ddi_get_lbolt() - nvp->nvp_reset_time) >=
 		    NV_LINK_DOWN_TIMEOUT) {
-			NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp,
+			NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 			    "nv_monitor_reset: no link - ending signature "
 			    "acquisition; time after reset %ldms",
 			    TICK_TO_MSEC(ddi_get_lbolt() -
-			    nvp->nvp_reset_time)));
+			    nvp->nvp_reset_time));
 		}
 		nvp->nvp_state &= ~(NV_PORT_RESET | NV_PORT_RESET_RETRY |
 		    NV_PORT_PROBE | NV_PORT_HOTPLUG_DELAY);
@@ -5341,9 +5406,9 @@ nv_monitor_reset(nv_port_t *nvp)
 		return;
 	}
 
-	NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp,
+	NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 	    "nv_monitor_reset: link up after reset; time %ldms",
-	    TICK_TO_MSEC(ddi_get_lbolt() - nvp->nvp_reset_time)));
+	    TICK_TO_MSEC(ddi_get_lbolt() - nvp->nvp_reset_time));
 
 sig_read:
 	if (nvp->nvp_signature != 0) {
@@ -5385,27 +5450,27 @@ sig_read:
 					/*
 					 * Retry reset.
 					 */
-					NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp,
+					NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 					    "nv_monitor_reset: retrying reset "
 					    "time after first reset: %ldms",
 					    TICK_TO_MSEC(ddi_get_lbolt() -
-					    nvp->nvp_reset_time)));
+					    nvp->nvp_reset_time));
 					nvp->nvp_state |= NV_PORT_RESET_RETRY;
-					nv_reset(nvp);
+					nv_reset(nvp, "monitor_reset 1");
 					goto sig_read;
 				}
 
-				NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp,
+				NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 				    "nv_monitor_reset: terminating signature "
 				    "acquisition (1); time after reset: %ldms",
 				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time)));
+				    nvp->nvp_reset_time));
 			} else {
-				NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp,
+				NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 				    "nv_monitor_reset: signature acquired; "
 				    "time after reset: %ldms",
 				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time)));
+				    nvp->nvp_reset_time));
 			}
 		}
 		/*
@@ -5432,11 +5497,11 @@ acquire_signature:
 			/*
 			 * Got device signature.
 			 */
-			NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp,
+			NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 			    "nv_monitor_reset: signature acquired; "
 			    "time after reset: %ldms",
 			    TICK_TO_MSEC(ddi_get_lbolt() -
-			    nvp->nvp_reset_time)));
+			    nvp->nvp_reset_time));
 
 			/* Clear internal reset state */
 			nvp->nvp_state &=
@@ -5486,13 +5551,13 @@ acquire_signature:
 				 * while waiting for a signature, reset
 				 * device again.
 				 */
-				NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp,
+				NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 				    "nv_monitor_reset: retrying reset "
 				    "time after first reset: %ldms",
 				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time)));
+				    nvp->nvp_reset_time));
 				nvp->nvp_state |= NV_PORT_RESET_RETRY;
-				nv_reset(nvp);
+				nv_reset(nvp, "monitor_reset 2");
 				drv_usecwait(1000);
 				goto acquire_signature;
 			}
@@ -5516,11 +5581,11 @@ acquire_signature:
 				nvp->nvp_state &= ~NV_PORT_PROBE;
 			}
 			nvp->nvp_type = dev_type;
-			NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp,
+			NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 			    "nv_monitor_reset: terminating signature "
 			    "acquisition (2); time after reset: %ldms",
 			    TICK_TO_MSEC(ddi_get_lbolt() -
-			    nvp->nvp_reset_time)));
+			    nvp->nvp_reset_time));
 		}
 	}
 
@@ -5555,10 +5620,10 @@ nv_delay_hotplug_notification(nv_port_t *nvp)
 
 	if (TICK_TO_MSEC(ddi_get_lbolt() - nvp->nvp_reset_time) >=
 	    nv_hotplug_delay) {
-		NVLOG((NVDBG_RESET, nvp->nvp_ctlp, nvp,
+		NVLOG(NVDBG_RESET, nvp->nvp_ctlp, nvp,
 		    "nv_delay_hotplug_notification: notifying framework after "
 		    "%dms delay", TICK_TO_MSEC(ddi_get_lbolt() -
-		    nvp->nvp_reset_time)));
+		    nvp->nvp_reset_time));
 		nvp->nvp_state &= ~NV_PORT_HOTPLUG_DELAY;
 		nv_port_state_change(nvp, SATA_EVNT_DEVICE_ATTACHED,
 		    SATA_ADDR_CPORT, 0);
@@ -5596,8 +5661,8 @@ nv_timeout(void *arg)
 	 * If the port is not in the init state, ignore it.
 	 */
 	if ((nvp->nvp_state & NV_PORT_INIT) == 0) {
-		NVLOG((NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
-		    "nv_timeout: port uninitialized"));
+		NVLOG(NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
+		    "nv_timeout: port uninitialized", NULL);
 		next_timeout = 0;
 
 		goto finished;
@@ -5657,21 +5722,21 @@ nv_timeout(void *arg)
 			uint32_t serr = nv_get32(nvp->nvp_ctlp->nvc_bar_hdl[5],
 			    nvp->nvp_serror);
 
-			NVLOG((NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
+			nv_cmn_err(CE_NOTE, nvp->nvp_ctlp, nvp,
 			    "nv_timeout: aborting: "
 			    "nvslot_stime: %ld max ticks till timeout: "
-			    "%ld cur_time: %ld cmd=%x lba=%d",
+			    "%ld cur_time: %ld cmd=%x lba=%d seq=%d",
 			    nv_slotp->nvslot_stime,
 			    drv_usectohz(MICROSEC *
 			    spkt->satapkt_time), ddi_get_lbolt(),
-			    cmd, lba));
+			    cmd, lba, nvp->nvp_seq);
 
-			NVLOG((NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
-			    "nv_timeout: SError at timeout: 0x%x", serr));
+			NVLOG(NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
+			    "nv_timeout: SError at timeout: 0x%x", serr);
 
-			NVLOG((NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
+			NVLOG(NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
 			    "nv_timeout: previous cmd=%x",
-			    nvp->nvp_previous_cmd));
+			    nvp->nvp_previous_cmd);
 
 			if (nvp->nvp_mcp5x_int_status != NULL) {
 				status = nv_get8(nvp->nvp_ctl_hdl,
@@ -5681,10 +5746,10 @@ nv_timeout(void *arg)
 				int_status = nv_get16(
 				    nvp->nvp_ctlp->nvc_bar_hdl[5],
 				    nvp->nvp_mcp5x_int_status);
-				NVLOG((NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
+				NVLOG(NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
 				    "nv_timeout: altstatus %x, bmicx %x, "
 				    "int_status %X", status, bmstatus,
-				    int_status));
+				    int_status);
 
 				if (int_status & MCP5X_INT_COMPLETE) {
 					/*
@@ -5692,15 +5757,17 @@ nv_timeout(void *arg)
 					 * Issue warning message once
 					 */
 					if (!intr_warn_once) {
-						cmn_err(CE_WARN,
+						nv_cmn_err(CE_WARN,
+						    nvp->nvp_ctlp,
+						    nvp,
 						    "nv_sata: missing command "
 						    "completion interrupt(s)!");
 						intr_warn_once = 1;
 					}
-					NVLOG((NVDBG_TIMEOUT, nvp->nvp_ctlp,
+					NVLOG(NVDBG_TIMEOUT, nvp->nvp_ctlp,
 					    nvp, "timeout detected with "
 					    "interrupt ready - calling "
-					    "int directly"));
+					    "int directly", NULL);
 					mutex_exit(&nvp->nvp_mutex);
 					(void) mcp5x_intr_port(nvp);
 					mutex_enter(&nvp->nvp_mutex);
@@ -5718,13 +5785,11 @@ nv_timeout(void *arg)
 			}
 
 		} else {
-#ifdef NV_DEBUG
-			if (nv_debug_flags & NVDBG_VERBOSE) {
-				NVLOG((NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
-				    "nv_timeout:"
-				    " still in use so restarting timeout"));
-			}
-#endif
+			NVLOG(NVDBG_VERBOSE, nvp->nvp_ctlp, nvp,
+			    "nv_timeout:"
+			    " still in use so restarting timeout",
+			    NULL);
+
 			next_timeout = NV_ONE_SEC;
 		}
 	} else {
@@ -5732,13 +5797,9 @@ nv_timeout(void *arg)
 		 * there was no active packet, so do not re-enable timeout
 		 */
 		next_timeout = 0;
-#ifdef NV_DEBUG
-		if (nv_debug_flags & NVDBG_VERBOSE) {
-			NVLOG((NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
-			    "nv_timeout: no active packet so not re-arming "
-			    "timeout"));
-		}
-#endif
+		NVLOG(NVDBG_VERBOSE, nvp->nvp_ctlp, nvp,
+		    "nv_timeout: no active packet so not re-arming "
+		    "timeout", NULL);
 	}
 
 finished:
@@ -5782,8 +5843,8 @@ ck804_set_intr(nv_port_t *nvp, int flag)
 	mutex_enter(&nvc->nvc_mutex);
 
 	if (flag & NV_INTR_CLEAR_ALL) {
-		NVLOG((NVDBG_INTR, nvc, nvp,
-		    "ck804_set_intr: NV_INTR_CLEAR_ALL"));
+		NVLOG(NVDBG_INTR, nvc, nvp,
+		    "ck804_set_intr: NV_INTR_CLEAR_ALL", NULL);
 
 		intr_status = nv_get8(nvc->nvc_bar_hdl[5],
 		    (uint8_t *)(nvc->nvc_ck804_int_status));
@@ -5794,15 +5855,15 @@ ck804_set_intr(nv_port_t *nvp, int flag)
 			    (uint8_t *)(nvc->nvc_ck804_int_status),
 			    clear_all_bits[port]);
 
-			NVLOG((NVDBG_INTR, nvc, nvp,
+			NVLOG(NVDBG_INTR, nvc, nvp,
 			    "interrupt bits cleared %x",
-			    intr_status & clear_all_bits[port]));
+			    intr_status & clear_all_bits[port]);
 		}
 	}
 
 	if (flag & NV_INTR_DISABLE) {
-		NVLOG((NVDBG_INTR, nvc, nvp,
-		    "ck804_set_intr: NV_INTR_DISABLE"));
+		NVLOG(NVDBG_INTR, nvc, nvp,
+		    "ck804_set_intr: NV_INTR_DISABLE", NULL);
 		int_en = nv_get8(bar5_hdl,
 		    (uint8_t *)(bar5 + CK804_SATA_INT_EN));
 		int_en &= ~intr_bits[port];
@@ -5811,7 +5872,8 @@ ck804_set_intr(nv_port_t *nvp, int flag)
 	}
 
 	if (flag & NV_INTR_ENABLE) {
-		NVLOG((NVDBG_INTR, nvc, nvp, "ck804_set_intr: NV_INTR_ENABLE"));
+		NVLOG(NVDBG_INTR, nvc, nvp, "ck804_set_intr: NV_INTR_ENABLE",
+		    NULL);
 		int_en = nv_get8(bar5_hdl,
 		    (uint8_t *)(bar5 + CK804_SATA_INT_EN));
 		int_en |= intr_bits[port];
@@ -5845,24 +5907,25 @@ mcp5x_set_intr(nv_port_t *nvp, int flag)
 
 	ASSERT(mutex_owned(&nvp->nvp_mutex));
 
-	NVLOG((NVDBG_HOT, nvc, nvp, "mcp055_set_intr: enter flag: %d", flag));
+	NVLOG(NVDBG_INTR, nvc, nvp, "mcp055_set_intr: enter flag: %d", flag);
 
 	if (flag & NV_INTR_CLEAR_ALL) {
-		NVLOG((NVDBG_INTR, nvc, nvp,
-		    "mcp5x_set_intr: NV_INTR_CLEAR_ALL"));
+		NVLOG(NVDBG_INTR, nvc, nvp,
+		    "mcp5x_set_intr: NV_INTR_CLEAR_ALL", NULL);
 		nv_put16(bar5_hdl, nvp->nvp_mcp5x_int_status, MCP5X_INT_CLEAR);
 	}
 
 	if (flag & NV_INTR_ENABLE) {
-		NVLOG((NVDBG_INTR, nvc, nvp, "mcp5x_set_intr: NV_INTR_ENABLE"));
+		NVLOG(NVDBG_INTR, nvc, nvp, "mcp5x_set_intr: NV_INTR_ENABLE",
+		    NULL);
 		int_en = nv_get16(bar5_hdl, nvp->nvp_mcp5x_int_ctl);
 		int_en |= intr_bits;
 		nv_put16(bar5_hdl, nvp->nvp_mcp5x_int_ctl, int_en);
 	}
 
 	if (flag & NV_INTR_DISABLE) {
-		NVLOG((NVDBG_INTR, nvc, nvp,
-		    "mcp5x_set_intr: NV_INTR_DISABLE"));
+		NVLOG(NVDBG_INTR, nvc, nvp,
+		    "mcp5x_set_intr: NV_INTR_DISABLE", NULL);
 		int_en = nv_get16(bar5_hdl, nvp->nvp_mcp5x_int_ctl);
 		int_en &= ~intr_bits;
 		nv_put16(bar5_hdl, nvp->nvp_mcp5x_int_ctl, int_en);
@@ -5873,7 +5936,7 @@ mcp5x_set_intr(nv_port_t *nvp, int flag)
 static void
 nv_resume(nv_port_t *nvp)
 {
-	NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp, "nv_resume()"));
+	NVLOG(NVDBG_INIT, nvp->nvp_ctlp, nvp, "nv_resume()", NULL);
 
 	mutex_enter(&nvp->nvp_mutex);
 
@@ -5894,7 +5957,7 @@ nv_resume(nv_port_t *nvp)
 	 */
 	nvp->nvp_state |= NV_PORT_RESET;
 	nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
-	nv_reset(nvp);
+	nv_reset(nvp, "resume");
 
 	mutex_exit(&nvp->nvp_mutex);
 }
@@ -5903,7 +5966,7 @@ nv_resume(nv_port_t *nvp)
 static void
 nv_suspend(nv_port_t *nvp)
 {
-	NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp, "nv_suspend()"));
+	NVLOG(NVDBG_INIT, nvp->nvp_ctlp, nvp, "nv_suspend()", NULL);
 
 	mutex_enter(&nvp->nvp_mutex);
 
@@ -6068,8 +6131,8 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
 	clock_t nv_lbolt = ddi_get_lbolt();
 
 
-	NVLOG((NVDBG_HOT, nvp->nvp_ctlp, nvp, "nv_report_add_remove() - "
-	    "time (ticks) %d", nv_lbolt));
+	NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp, "nv_report_add_remove() - "
+	    "time (ticks) %d flags %x", nv_lbolt, flags);
 
 	/*
 	 * wait up to 1ms for sstatus to settle and reflect the true
@@ -6094,8 +6157,8 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
 		drv_usecwait(1);
 	}
 
-	NVLOG((NVDBG_HOT, nvp->nvp_ctlp, nvp,
-	    "sstatus took %d us for DEVPRE_PHYCOM to settle", i));
+	NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
+	    "sstatus took %d us for DEVPRE_PHYCOM to settle", i);
 
 	if (flags == NV_PORT_HOTREMOVED) {
 
@@ -6109,8 +6172,8 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
 		nvp->nvp_signature = 0;
 		nvp->nvp_state &= ~(NV_PORT_RESET | NV_PORT_RESET_RETRY |
 		    NV_PORT_RESTORE);
-		NVLOG((NVDBG_HOT, nvp->nvp_ctlp, nvp,
-		    "nv_report_add_remove() hot removed"));
+		NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
+		    "nv_report_add_remove() hot removed", NULL);
 		nv_port_state_change(nvp,
 		    SATA_EVNT_DEVICE_DETACHED,
 		    SATA_ADDR_CPORT, 0);
@@ -6132,9 +6195,9 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
 				 * Real device attach - there was no device
 				 * attached to this port before this report
 				 */
-				NVLOG((NVDBG_HOT, nvp->nvp_ctlp, nvp,
+				NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
 				    "nv_report_add_remove() new device hot"
-				    "plugged"));
+				    "plugged", NULL);
 				nvp->nvp_reset_time = ddi_get_lbolt();
 				if (!(nvp->nvp_state &
 				    (NV_PORT_RESET_RETRY | NV_PORT_RESET))) {
@@ -6149,11 +6212,8 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
 						nvp->nvp_state |=
 						    NV_PORT_RESET |
 						    NV_PORT_PROBE;
-						nv_reset(nvp);
-						NVLOG((NVDBG_HOT,
-						    nvp->nvp_ctlp, nvp,
-						    "nv_report_add_remove() "
-						    "resetting device"));
+						nv_reset(nvp,
+						    "report_add_remove");
 					} else {
 						nvp->nvp_type =
 						    SATA_DTYPE_UNKNOWN;
@@ -6193,7 +6253,7 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
 				return;
 			}
 			/*
-			 * Othervise it is a bogus attach, indicating recovered
+			 * Otherwise it is a bogus attach, indicating recovered
 			 * link loss. No real need to report it after-the-fact.
 			 * But we may keep some statistics, or notify the
 			 * sata module by reporting LINK_LOST/LINK_ESTABLISHED
@@ -6201,29 +6261,29 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
 			 * Anyhow, we may want to terminate signature
 			 * acquisition.
 			 */
-			NVLOG((NVDBG_HOT, nvp->nvp_ctlp, nvp,
+			NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
 			    "nv_report_add_remove() ignoring plug interrupt "
-			    "- recovered link?"));
+			    "- recovered link?", NULL);
 
 			if (nvp->nvp_state &
 			    (NV_PORT_RESET_RETRY | NV_PORT_RESET)) {
-				NVLOG((NVDBG_HOT, nvp->nvp_ctlp, nvp,
+				NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp,
 				    "nv_report_add_remove() - "
 				    "time since last reset %dms",
 				    TICK_TO_MSEC(ddi_get_lbolt() -
-				    nvp->nvp_reset_time)));
+				    nvp->nvp_reset_time));
 				/*
 				 * If the driver does not have to wait for
 				 * a signature, then terminate reset processing
 				 * now.
 				 */
 				if (nv_wait_for_signature == 0) {
-					NVLOG((NVDBG_RESET, nvp->nvp_ctlp,
+					NVLOG(NVDBG_RESET, nvp->nvp_ctlp,
 					    nvp, "nv_report_add_remove() - ",
 					    "terminating signature acquisition",
 					    ", time after reset: %dms",
 					    TICK_TO_MSEC(ddi_get_lbolt() -
-					    nvp->nvp_reset_time)));
+					    nvp->nvp_reset_time));
 
 					nvp->nvp_state &= ~(NV_PORT_RESET |
 					    NV_PORT_RESET_RETRY);
@@ -6251,9 +6311,9 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
 			}
 			return;
 		}
-		NVLOG((NVDBG_HOT, nvp->nvp_ctlp, nvp, "nv_report_add_remove()"
+		NVLOG(NVDBG_HOT, nvp->nvp_ctlp, nvp, "nv_report_add_remove()"
 		    "ignoring add dev interrupt - "
-		    "link is down or no device!"));
+		    "link is down or no device!", NULL);
 	}
 
 }
@@ -6283,8 +6343,8 @@ nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 	ddi_acc_handle_t cmdhdl = nvp->nvp_cmd_hdl;
 	int cdb_len = spkt->satapkt_cmd.satacmd_acdb_len;
 
-	NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-	    "nv_start_rqsense_pio: start"));
+	NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+	    "nv_start_rqsense_pio: start", NULL);
 
 	/* clear the local request sense buffer before starting the command */
 	bzero(nv_slotp->nvslot_rqsense_buff, SATA_ATAPI_RQSENSE_LEN);
@@ -6297,8 +6357,8 @@ nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 	/* make certain the drive selected */
 	if (nv_wait(nvp, SATA_STATUS_DRDY, SATA_STATUS_BSY,
 	    NV_SEC2USEC(5), 0) == B_FALSE) {
-		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-		    "nv_start_rqsense_pio: drive select failed"));
+		NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_start_rqsense_pio: drive select failed", NULL);
 		return (NV_FAILURE);
 	}
 
@@ -6326,18 +6386,20 @@ nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 	    4000000, 0) == B_FALSE) {
 		if (nv_get8(cmdhdl, nvp->nvp_status) &
 		    (SATA_STATUS_ERR | SATA_STATUS_DF)) {
-			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-			    "nv_start_rqsense_pio: rqsense dev error (HP0)"));
+			NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_start_rqsense_pio: rqsense dev error (HP0)",
+			    NULL);
 		} else {
-			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-			    "nv_start_rqsense_pio: rqsense timeout (HP0)"));
+			NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_start_rqsense_pio: rqsense timeout (HP0)",
+			    NULL);
 		}
 
 		nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
 		nv_complete_io(nvp, spkt, 0);
 		nvp->nvp_state |= NV_PORT_RESET;
 		nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
-		nv_reset(nvp);
+		nv_reset(nvp, "rqsense_pio");
 
 		return (NV_FAILURE);
 	}
@@ -6351,8 +6413,8 @@ nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 	    (ushort_t *)nvp->nvp_data,
 	    (cdb_len >> 1), DDI_DEV_NO_AUTOINCR);
 
-	NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
-	    "nv_start_rqsense_pio: exiting into HP3"));
+	NVLOG(NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+	    "nv_start_rqsense_pio: exiting into HP3", NULL);
 
 	return (NV_SUCCESS);
 }
@@ -6478,8 +6540,8 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 	/* confirm that the SGPIO registers are there */
 	if (nv_sgp_detect(pci_conf_handle, &csrp, &cbp) != NV_SUCCESS) {
-		NVLOG((NVDBG_INIT, nvc, NULL,
-		    "SGPIO registers not detected"));
+		NVLOG(NVDBG_INIT, nvc, NULL,
+		    "SGPIO registers not detected", NULL);
 		return;
 	}
 
@@ -6493,7 +6555,7 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	/* initialize the SGPIO h/w */
 	if (nv_sgp_init(nvc) == NV_FAILURE) {
 		nv_cmn_err(CE_WARN, nvc, NULL,
-		    "!Unable to initialize SGPIO");
+		    "Unable to initialize SGPIO");
 	}
 
 	/*
@@ -6524,7 +6586,7 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 		 */
 		nvc->nvc_sgp_cmn = NULL;
 		nv_cmn_err(CE_WARN, nvc, NULL,
-		    "!LED handling not initialized - too many controllers");
+		    "LED handling not initialized - too many controllers");
 	} else if (cmn == NULL) {
 		/*
 		 * Allocate the shared space, point the SGPIO scratch register
@@ -6536,7 +6598,7 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 		    KM_SLEEP);
 		if (cmn == NULL) {
 			nv_cmn_err(CE_WARN, nvc, NULL,
-			    "!Failed to allocate shared data");
+			    "Failed to allocate shared data");
 			return;
 		}
 
@@ -6577,7 +6639,7 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 		if (cmn->nvs_taskq == NULL) {
 			cmn->nvs_taskq_delay = 0;
 			nv_cmn_err(CE_WARN, nvc, NULL,
-			    "!Failed to start activity LED taskq");
+			    "Failed to start activity LED taskq");
 		} else {
 			cmn->nvs_taskq_delay = SGPIO_LOOP_WAIT_USECS;
 			(void) ddi_taskq_dispatch(cmn->nvs_taskq,
@@ -6654,8 +6716,9 @@ nv_sgp_init(nv_ctl_t *nvc)
 
 			/* break on error */
 			if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_ERROR) {
-				NVLOG((NVDBG_ALWAYS, nvc, NULL,
-				    "Command error during initialization"));
+				NVLOG(NVDBG_VERBOSE, nvc, NULL,
+				    "Command error during initialization",
+				    NULL);
 				rval = NV_FAILURE;
 				break;
 			}
@@ -6663,8 +6726,9 @@ nv_sgp_init(nv_ctl_t *nvc)
 			/* command processing is taking place */
 			if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_OK) {
 				if (SGPIO_CSR_SEQ(status) != seq) {
-					NVLOG((NVDBG_ALWAYS, nvc, NULL,
-					    "Sequence number change error"));
+					NVLOG(NVDBG_VERBOSE, nvc, NULL,
+					    "Sequence number change error",
+					    NULL);
 				}
 
 				break;
@@ -6684,9 +6748,9 @@ nv_sgp_init(nv_ctl_t *nvc)
 		return (rval);
 
 	if (SGPIO_CSR_SSTAT(status) != SGPIO_STATE_OPERATIONAL) {
-		NVLOG((NVDBG_ALWAYS, nvc, NULL,
+		NVLOG(NVDBG_VERBOSE, nvc, NULL,
 		    "SGPIO logic not operational after init - state %d",
-		    SGPIO_CSR_SSTAT(status)));
+		    SGPIO_CSR_SSTAT(status));
 		/*
 		 * Should return (NV_FAILURE) but the hardware can be
 		 * operational even if the SGPIO Status does not indicate
@@ -6700,14 +6764,14 @@ nv_sgp_init(nv_ctl_t *nvc)
 	 */
 	drive_count = SGP_CR0_DRV_CNT(nvc->nvc_sgp_cbp->sgpio_cr0);
 	if (drive_count != SGPIO_DRV_CNT_VALUE) {
-		NVLOG((NVDBG_INIT, nvc, NULL,
+		NVLOG(NVDBG_INIT, nvc, NULL,
 		    "SGPIO reported undocumented drive count - %d",
-		    drive_count));
+		    drive_count);
 	}
 
-	NVLOG((NVDBG_INIT, nvc, NULL,
+	NVLOG(NVDBG_INIT, nvc, NULL,
 	    "initialized ctlr: %d csr: 0x%08x",
-	    nvc->nvc_ctlr_num, nvc->nvc_sgp_csr));
+	    nvc->nvc_ctlr_num, nvc->nvc_sgp_csr);
 
 	return (rval);
 }
@@ -6903,8 +6967,9 @@ nv_sgp_activity_led_ctl(void *arg)
 		mutex_exit(&cmn->nvs_slock);
 
 		if (nv_sgp_write_data(nvc) == NV_FAILURE) {
-			NVLOG((NVDBG_VERBOSE, nvc, NULL,
-			    "nv_sgp_write_data failure updating active LED"));
+			NVLOG(NVDBG_VERBOSE, nvc, NULL,
+			    "nv_sgp_write_data failure updating active LED",
+			    NULL);
 		}
 
 		/* now rest for the interval */
@@ -7018,7 +7083,7 @@ nv_sgp_locate(nv_ctl_t *nvc, int drive, int value)
 
 	if (nv_sgp_write_data(nvc) == NV_FAILURE) {
 		nv_cmn_err(CE_WARN, nvc, NULL,
-		    "!nv_sgp_write_data failure updating OK2RM/Locate LED");
+		    "nv_sgp_write_data failure updating OK2RM/Locate LED");
 	}
 }
 
@@ -7059,7 +7124,7 @@ nv_sgp_error(nv_ctl_t *nvc, int drive, int value)
 
 	if (nv_sgp_write_data(nvc) == NV_FAILURE) {
 		nv_cmn_err(CE_WARN, nvc, NULL,
-		    "!nv_sgp_write_data failure updating Fail/Error LED");
+		    "nv_sgp_write_data failure updating Fail/Error LED");
 	}
 }
 
