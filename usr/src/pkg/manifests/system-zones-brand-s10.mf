@@ -85,6 +85,7 @@ file path=usr/lib/brand/solaris10/s10_automountd mode=0755
 file path=usr/lib/brand/solaris10/s10_boot mode=0755
 file path=usr/lib/brand/solaris10/s10_isaexec_wrapper mode=0755
 file path=usr/lib/brand/solaris10/s10_native mode=0755
+file path=usr/lib/brand/solaris10/s10_python_wrapper mode=0755
 file path=usr/lib/brand/solaris10/s10_replacefile mode=0755
 file path=usr/lib/brand/solaris10/s10_support mode=0755
 file path=usr/lib/brand/solaris10/smf_disable.lst mode=0444

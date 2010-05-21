@@ -102,7 +102,6 @@ s10_verify(char *xmlfile)
 	struct zone_fstab	fstab;
 	struct zone_devtab	devtab;
 	zone_iptype_t		iptype;
-	struct zone_dstab	dstab;
 
 	if ((handle = zonecfg_init_handle()) == NULL)
 		s10_err(gettext("internal libzonecfg.so.1 error"), 0);
@@ -161,17 +160,6 @@ s10_verify(char *xmlfile)
 		s10_err(gettext("solaris10 zones do not currently support "
 		    "exclusive ip-type stacks"));
 	}
-
-	if (zonecfg_setdsent(handle) != Z_OK) {
-		zonecfg_fini_handle(handle);
-		s10_err(gettext("zonecfg provided an invalid XML file"));
-	}
-	if (zonecfg_getdsent(handle, &dstab) == Z_OK && !override) {
-		zonecfg_fini_handle(handle);
-		s10_err(gettext("solaris10 zones do not currently support "
-		    "delegated datasets"));
-	}
-	(void) zonecfg_enddsent(handle);
 
 	zonecfg_fini_handle(handle);
 	return (0);

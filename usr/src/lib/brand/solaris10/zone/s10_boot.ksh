@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # s10 boot script.
 #
@@ -81,6 +80,14 @@ replace_with_native() {
 	fi
 }
 
+replace_with_native_py() {
+	path_dname=$ZONEROOT/`dirname $1`
+	if [ ! -h $path_dname -a -d $path_dname ]; then
+		safe_replace $ZONEROOT/$1 $BRANDDIR/s10_python_wrapper $2 $3 \
+		    remove
+	fi
+}
+
 wrap_with_native() {
 	safe_wrap $ZONEROOT/$1 $BRANDDIR/s10_isaexec_wrapper $2 $3
 }
@@ -128,6 +135,10 @@ wrap_with_native() {
 #
 safe_dir /usr
 safe_dir /usr/lib
+safe_dir /usr/lib/fs
+safe_dir /usr/lib/fs/ufs
+safe_dir /usr/lib/fs/zfs
+safe_dir /usr/lib/zfs
 safe_dir /usr/bin
 safe_dir /usr/sbin
 safe_dir /sbin
@@ -149,6 +160,24 @@ replace_with_native /sbin/ifconfig 0555 root:bin
 # S10 container, the kernel will return EINVAL. So we need this.
 #
 replace_with_native /usr/sbin/ndd 0555 root:bin
+
+#
+# Replace various ZFS-related programs with native wrappers.  These commands
+# either link with libzfs, dlopen libzfs or link with libraries that link
+# or dlopen libzfs.  Commands which fall into these categories but which can
+# only be used in the global zone are not wrapped.  The libdiskmgt dm_in_use
+# code uses libfs, but only the zpool_in_use() -> zpool_read_label() code path.
+# That code does not issue ioctls on /dev/zfs and does not need wrapping.
+#
+replace_with_native /sbin/zfs 0555 root:bin
+replace_with_native /sbin/zpool 0555 root:bin
+replace_with_native /usr/lib/fs/ufs/quota 0555 root:bin
+replace_with_native /usr/lib/fs/zfs/fstyp 0555 root:bin
+replace_with_native /usr/lib/fs/zfs/zfsdle 0555 root:bin
+replace_with_native /usr/lib/zfs/availdevs 0555 root:bin
+replace_with_native /usr/sbin/df 0555 root:bin
+replace_with_native /usr/sbin/zstreamdump 0555 root:bin
+replace_with_native_py /usr/lib/zfs/pyzfs.py 0555 root:bin
 
 #
 # Replace automount and automountd with native wrappers.
