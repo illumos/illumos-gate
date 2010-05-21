@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -123,10 +120,10 @@ config_error(cfga_err_t err, const char *func_name, const char *errstr,
 
 	if (errstr != NULL && *errstr != '\0') {
 		syslog(LOG_DEBUG, "%s: %s (%s), ap_id = %s\n",
-				func_name, ep, errstr, ap_id);
+		    func_name, ep, errstr, ap_id);
 	} else {
 		syslog(LOG_DEBUG, "%s: %s , ap_id = %s\n",
-				func_name, ep, ap_id);
+		    func_name, ep, ap_id);
 	}
 
 }
@@ -146,7 +143,7 @@ scf_get_slotinfo(char *ap_pid, cfga_stat_t *r_state, cfga_stat_t *o_state)
 	 * Get the attachment point information.
 	 */
 	rv = config_list_ext(1, (char *const *)&ap_pid, &stat, &nlist, NULL,
-		NULL, &errstr, 0);
+	    NULL, &errstr, 0);
 
 	if (rv != CFGA_OK) {
 		config_error(rv, "config_list_ext", errstr, ap_pid);
@@ -155,24 +152,24 @@ scf_get_slotinfo(char *ap_pid, cfga_stat_t *r_state, cfga_stat_t *o_state)
 	assert(nlist == 1);
 
 	syslog(LOG_DEBUG, "\n"
-			"ap_log_id       = %.*s\n"
-			"ap_phys_id      = %.*s\n"
-			"ap_r_state      = %d\n"
-			"ap_o_state      = %d\n"
-			"ap_cond         = %d\n"
-			"ap_busy         = %6d\n"
-			"ap_status_time  = %s"
-			"ap_info         = %.*s\n"
-			"ap_type         = %.*s\n",
-			sizeof (stat->ap_log_id), stat->ap_log_id,
-			sizeof (stat->ap_phys_id), stat->ap_phys_id,
-			stat->ap_r_state,
-			stat->ap_o_state,
-			stat->ap_cond,
-			stat->ap_busy,
-			asctime(localtime(&stat->ap_status_time)),
-			sizeof (stat->ap_info), stat->ap_info,
-			sizeof (stat->ap_type), stat->ap_type);
+	    "ap_log_id       = %.*s\n"
+	    "ap_phys_id      = %.*s\n"
+	    "ap_r_state      = %d\n"
+	    "ap_o_state      = %d\n"
+	    "ap_cond         = %d\n"
+	    "ap_busy         = %6d\n"
+	    "ap_status_time  = %s"
+	    "ap_info         = %.*s\n"
+	    "ap_type         = %.*s\n",
+	    sizeof (stat->ap_log_id), stat->ap_log_id,
+	    sizeof (stat->ap_phys_id), stat->ap_phys_id,
+	    stat->ap_r_state,
+	    stat->ap_o_state,
+	    stat->ap_cond,
+	    stat->ap_busy,
+	    asctime(localtime(&stat->ap_status_time)),
+	    sizeof (stat->ap_info), stat->ap_info,
+	    sizeof (stat->ap_type), stat->ap_type);
 
 	/* Copy the slot status. */
 	*r_state = stat->ap_r_state;
@@ -267,8 +264,8 @@ scf_get_devinfo(char *dev_name, char *dev_model, const char *pci_name)
 	 */
 	if ((pci_node = di_init(pci_name, DINFOCPYALL)) == DI_NODE_NIL) {
 		syslog(LOG_NOTICE,
-			"Could not get dev info snapshot. errno=%d\n",
-			errno);
+		    "Could not get dev info snapshot. errno=%d\n",
+		    errno);
 		return (-1); /* changed */
 	}
 
@@ -293,7 +290,7 @@ scf_get_devinfo(char *dev_name, char *dev_model, const char *pci_name)
 			if (sscanf(tmp, "%x", &devid) != 1) {
 				devid = 0;
 				syslog(LOG_DEBUG,
-					"no bus addrress on device\n");
+				    "no bus addrress on device\n");
 				goto one_child;
 			}
 		}
@@ -312,7 +309,7 @@ scf_get_devinfo(char *dev_name, char *dev_model, const char *pci_name)
 			 *   Case 2. devid == sdevid && funcid > sfuncid
 			 */
 			if ((devid > sdevid) || ((devid == sdevid) &&
-					(funcid > sfuncid))) {
+			    (funcid > sfuncid))) {
 				ap_node = child_node;
 				devid   = sdevid;
 				funcid  = sfuncid;
@@ -348,12 +345,12 @@ one_child:
 	if (di_prop_lookup_strings(DDI_DEV_T_ANY, ap_node, "model", &tmp) > 0) {
 		if (tmp != NULL) {
 			(void) strlcpy((char *)dev_model, tmp,
-						SCFDATA_DEV_INFO);
+			    SCFDATA_DEV_INFO);
 		}
 	}
 
 	syslog(LOG_DEBUG, "device: %s@%x,%x [model: %s]\n",
-		dev_name, devid, funcid, dev_model);
+	    dev_name, devid, funcid, dev_model);
 
 out:
 	di_fini(pci_node);
@@ -409,8 +406,9 @@ notify_scf_of_hotplug(sysevent_t *ev)
 		goto out;
 	}
 
-	/* Enough to check "px" at the beginning of string */
-	if (strncmp("px", publisher, strlen("px")) != 0) {
+	/* Enough to check "px" and "pcieb" at the beginning of string */
+	if (strncmp("px", publisher, strlen("px")) != 0 &&
+	    strncmp("pcieb", publisher, strlen("pcieb")) != 0) {
 		/* Just return when not px event */
 		syslog(LOG_DEBUG, "Event is not a px publisher event\n");
 		goto out;
@@ -459,7 +457,7 @@ notify_scf_of_hotplug(sysevent_t *ev)
 	 */
 	if (o_state == CFGA_STAT_CONFIGURED) {
 		rc = scf_get_devinfo(dev_name, dev_model,
-			(char *)pci_notify_dev_info.pci_name);
+		    (char *)pci_notify_dev_info.pci_name);
 		if (rc != 0) {
 			goto out;
 		}
@@ -484,7 +482,7 @@ notify_scf_of_hotplug(sysevent_t *ev)
 	(void) strlcpy(sdata.dev_model, dev_model, sizeof (sdata.dev_model));
 
 	(void) memcpy((void *)&(scfdata.buf), (void *)&sdata,
-			sizeof (scf_slotinfo_t));
+	    sizeof (scf_slotinfo_t));
 
 	pci_notify_dev_info.r_state	= (uint32_t)r_state;
 	pci_notify_dev_info.o_state	= (uint32_t)o_state;
