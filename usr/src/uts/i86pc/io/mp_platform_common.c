@@ -639,8 +639,8 @@ acpi_probe(char *modname)
 	iflag_t			sci_flags;
 	volatile uint32_t	*ioapic;
 	int			ioapic_ix;
-	uint32_t		local_ids[NCPU];
-	uint32_t		proc_ids[NCPU];
+	uint32_t		*local_ids;
+	uint32_t		*proc_ids;
 	uchar_t			hid;
 	int			warned = 0;
 
@@ -655,6 +655,16 @@ acpi_probe(char *modname)
 	    APIC_LOCAL_MEMLEN, PROT_READ | PROT_WRITE);
 	if (!apicadr)
 		return (PSM_FAILURE);
+
+	if ((local_ids = (uint32_t *)kmem_zalloc(NCPU * sizeof (uint32_t),
+	    KM_NOSLEEP)) == NULL)
+		return (PSM_FAILURE);
+
+	if ((proc_ids = (uint32_t *)kmem_zalloc(NCPU * sizeof (uint32_t),
+	    KM_NOSLEEP)) == NULL) {
+		kmem_free(local_ids, NCPU * sizeof (uint32_t));
+		return (PSM_FAILURE);
+	}
 
 	id = apic_reg_ops->apic_read(APIC_LID_REG);
 	local_ids[0] = (uchar_t)(id >> 24);
@@ -982,6 +992,8 @@ acpi_probe(char *modname)
 		}
 #endif
 
+		kmem_free(local_ids, NCPU * sizeof (uint32_t));
+		kmem_free(proc_ids, NCPU * sizeof (uint32_t));
 		return (PSM_SUCCESS);
 	}
 	/* if setting APIC mode failed above, we fall through to cleanup */
@@ -1005,6 +1017,8 @@ cleanup:
 	acpi_nmi_scnt = 0;
 	acpi_nmi_cp = NULL;
 	acpi_nmi_ccnt = 0;
+	kmem_free(local_ids, NCPU * sizeof (uint32_t));
+	kmem_free(proc_ids, NCPU * sizeof (uint32_t));
 	return (PSM_FAILURE);
 }
 
