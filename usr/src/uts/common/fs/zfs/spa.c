@@ -943,6 +943,8 @@ spa_unload(spa_t *spa)
 		spa->spa_async_zio_root = NULL;
 	}
 
+	bpobj_close(&spa->spa_deferred_bpobj);
+
 	/*
 	 * Close the dsl pool.
 	 */
@@ -1662,6 +1664,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	uint64_t config_cache_txg = spa->spa_config_txg;
 	int orig_mode = spa->spa_mode;
 	int parse;
+	uint64_t obj;
 
 	/*
 	 * If this is an untrusted config, access the pool in read-only mode.
@@ -1840,8 +1843,10 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		return (spa_load(spa, state, SPA_IMPORT_EXISTING, B_TRUE));
 	}
 
-	if (spa_dir_prop(spa, DMU_POOL_SYNC_BPLIST,
-	    &spa->spa_deferred_bplist_obj) != 0)
+	if (spa_dir_prop(spa, DMU_POOL_SYNC_BPOBJ, &obj) != 0)
+		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
+	error = bpobj_open(&spa->spa_deferred_bpobj, spa->spa_meta_objset, obj);
+	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 
 	/*
@@ -2687,7 +2692,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	uint64_t txg = TXG_INITIAL;
 	nvlist_t **spares, **l2cache;
 	uint_t nspares, nl2cache;
-	uint64_t version;
+	uint64_t version, obj;
 
 	/*
 	 * If this pool already exists, return failure.
@@ -2834,20 +2839,20 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	}
 
 	/*
-	 * Create the deferred-free bplist object.  Turn off compression
+	 * Create the deferred-free bpobj.  Turn off compression
 	 * because sync-to-convergence takes longer if the blocksize
 	 * keeps changing.
 	 */
-	spa->spa_deferred_bplist_obj = bplist_create(spa->spa_meta_objset,
-	    1 << 14, tx);
-	dmu_object_set_compress(spa->spa_meta_objset,
-	    spa->spa_deferred_bplist_obj, ZIO_COMPRESS_OFF, tx);
-
+	obj = bpobj_alloc(spa->spa_meta_objset, 1 << 14, tx);
+	dmu_object_set_compress(spa->spa_meta_objset, obj,
+	    ZIO_COMPRESS_OFF, tx);
 	if (zap_add(spa->spa_meta_objset,
-	    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_SYNC_BPLIST,
-	    sizeof (uint64_t), 1, &spa->spa_deferred_bplist_obj, tx) != 0) {
-		cmn_err(CE_PANIC, "failed to add bplist");
+	    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_SYNC_BPOBJ,
+	    sizeof (uint64_t), 1, &obj, tx) != 0) {
+		cmn_err(CE_PANIC, "failed to add bpobj");
 	}
+	VERIFY3U(0, ==, bpobj_open(&spa->spa_deferred_bpobj,
+	    spa->spa_meta_objset, obj));
 
 	/*
 	 * Create the pool's history object.
@@ -4946,34 +4951,23 @@ spa_async_request(spa_t *spa, int task)
  * SPA syncing routines
  * ==========================================================================
  */
-static void
-spa_sync_deferred_bplist(spa_t *spa, bplist_t *bpl, dmu_tx_t *tx, uint64_t txg)
+
+static int
+bpobj_enqueue_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
 {
-	blkptr_t blk;
-	uint64_t itor = 0;
-	uint8_t c = 1;
-
-	while (bplist_iterate(bpl, &itor, &blk) == 0) {
-		ASSERT(blk.blk_birth < txg);
-		zio_free(spa, txg, &blk);
-	}
-
-	bplist_vacate(bpl, tx);
-
-	/*
-	 * Pre-dirty the first block so we sync to convergence faster.
-	 * (Usually only the first block is needed.)
-	 */
-	dmu_write(bpl->bpl_mos, spa->spa_deferred_bplist_obj, 0, 1, &c, tx);
+	bpobj_t *bpo = arg;
+	bpobj_enqueue(bpo, bp, tx);
+	return (0);
 }
 
-static void
-spa_sync_free(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
+static int
+spa_free_sync_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
 {
 	zio_t *zio = arg;
 
 	zio_nowait(zio_free_sync(zio, zio->io_spa, dmu_tx_get_txg(tx), bp,
 	    zio->io_flags));
+	return (0);
 }
 
 static void
@@ -5204,6 +5198,42 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 /*
+ * Perform one-time upgrade on-disk changes.  spa_version() does not
+ * reflect the new version this txg, so there must be no changes this
+ * txg to anything that the upgrade code depends on after it executes.
+ * Therefore this must be called after dsl_pool_sync() does the sync
+ * tasks.
+ */
+static void
+spa_sync_upgrades(spa_t *spa, dmu_tx_t *tx)
+{
+	dsl_pool_t *dp = spa->spa_dsl_pool;
+
+	ASSERT(spa->spa_sync_pass == 1);
+
+	if (spa->spa_ubsync.ub_version < SPA_VERSION_ORIGIN &&
+	    spa->spa_uberblock.ub_version >= SPA_VERSION_ORIGIN) {
+		dsl_pool_create_origin(dp, tx);
+
+		/* Keeping the origin open increases spa_minref */
+		spa->spa_minref += 3;
+	}
+
+	if (spa->spa_ubsync.ub_version < SPA_VERSION_NEXT_CLONES &&
+	    spa->spa_uberblock.ub_version >= SPA_VERSION_NEXT_CLONES) {
+		dsl_pool_upgrade_clones(dp, tx);
+	}
+
+	if (spa->spa_ubsync.ub_version < SPA_VERSION_DIR_CLONES &&
+	    spa->spa_uberblock.ub_version >= SPA_VERSION_DIR_CLONES) {
+		dsl_pool_upgrade_dir_clones(dp, tx);
+
+		/* Keeping the freedir open increases spa_minref */
+		spa->spa_minref += 3;
+	}
+}
+
+/*
  * Sync the specified transaction group.  New blocks may be dirtied as
  * part of the process, so we iterate until it converges.
  */
@@ -5212,7 +5242,7 @@ spa_sync(spa_t *spa, uint64_t txg)
 {
 	dsl_pool_t *dp = spa->spa_dsl_pool;
 	objset_t *mos = spa->spa_meta_objset;
-	bplist_t *defer_bpl = &spa->spa_deferred_bplist;
+	bpobj_t *defer_bpo = &spa->spa_deferred_bpobj;
 	bplist_t *free_bpl = &spa->spa_free_bplist[txg & TXG_MASK];
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd;
@@ -5251,8 +5281,6 @@ spa_sync(spa_t *spa, uint64_t txg)
 	}
 	spa_config_exit(spa, SCL_STATE, FTAG);
 
-	VERIFY(0 == bplist_open(defer_bpl, mos, spa->spa_deferred_bplist_obj));
-
 	tx = dmu_tx_create_assigned(dp, txg);
 
 	/*
@@ -5276,19 +5304,6 @@ spa_sync(spa_t *spa, uint64_t txg)
 		}
 	}
 
-	if (spa->spa_ubsync.ub_version < SPA_VERSION_ORIGIN &&
-	    spa->spa_uberblock.ub_version >= SPA_VERSION_ORIGIN) {
-		dsl_pool_create_origin(dp, tx);
-
-		/* Keeping the origin open increases spa_minref */
-		spa->spa_minref += 3;
-	}
-
-	if (spa->spa_ubsync.ub_version < SPA_VERSION_NEXT_CLONES &&
-	    spa->spa_uberblock.ub_version >= SPA_VERSION_NEXT_CLONES) {
-		dsl_pool_upgrade_clones(dp, tx);
-	}
-
 	/*
 	 * If anything has changed in this txg, or if someone is waiting
 	 * for this txg to sync (eg, spa_vdev_remove()), push the
@@ -5299,9 +5314,13 @@ spa_sync(spa_t *spa, uint64_t txg)
 	if (!txg_list_empty(&dp->dp_dirty_datasets, txg) ||
 	    !txg_list_empty(&dp->dp_dirty_dirs, txg) ||
 	    !txg_list_empty(&dp->dp_sync_tasks, txg) ||
-	    ((dp->dp_scan->scn_phys.scn_state == DSS_SCANNING ||
-	    txg_sync_waiting(dp)) && !spa_shutting_down(spa)))
-		spa_sync_deferred_bplist(spa, defer_bpl, tx, txg);
+	    ((dsl_scan_active(dp->dp_scan) ||
+	    txg_sync_waiting(dp)) && !spa_shutting_down(spa))) {
+		zio_t *zio = zio_root(spa, NULL, NULL, 0);
+		VERIFY3U(bpobj_iterate(defer_bpo,
+		    spa_free_sync_cb, zio, tx), ==, 0);
+		VERIFY3U(zio_wait(zio), ==, 0);
+	}
 
 	/*
 	 * Iterate to convergence.
@@ -5319,10 +5338,12 @@ spa_sync(spa_t *spa, uint64_t txg)
 
 		if (pass <= SYNC_PASS_DEFERRED_FREE) {
 			zio_t *zio = zio_root(spa, NULL, NULL, 0);
-			bplist_sync(free_bpl, spa_sync_free, zio, tx);
+			bplist_iterate(free_bpl, spa_free_sync_cb,
+			    zio, tx);
 			VERIFY(zio_wait(zio) == 0);
 		} else {
-			bplist_sync(free_bpl, bplist_enqueue_cb, defer_bpl, tx);
+			bplist_iterate(free_bpl, bpobj_enqueue_cb,
+			    defer_bpo, tx);
 		}
 
 		ddt_sync(spa, txg);
@@ -5331,11 +5352,10 @@ spa_sync(spa_t *spa, uint64_t txg)
 		while (vd = txg_list_remove(&spa->spa_vdev_txg_list, txg))
 			vdev_sync(vd, txg);
 
+		if (pass == 1)
+			spa_sync_upgrades(spa, tx);
+
 	} while (dmu_objset_is_dirty(mos, txg));
-
-	ASSERT(list_is_empty(&free_bpl->bpl_queue));
-
-	bplist_close(defer_bpl);
 
 	/*
 	 * Rewrite the vdev configuration (which includes the uberblock)
@@ -5423,8 +5443,6 @@ spa_sync(spa_t *spa, uint64_t txg)
 	ASSERT(txg_list_empty(&dp->dp_dirty_datasets, txg));
 	ASSERT(txg_list_empty(&dp->dp_dirty_dirs, txg));
 	ASSERT(txg_list_empty(&spa->spa_vdev_txg_list, txg));
-	ASSERT(list_is_empty(&defer_bpl->bpl_queue));
-	ASSERT(list_is_empty(&free_bpl->bpl_queue));
 
 	spa->spa_sync_pass = 0;
 

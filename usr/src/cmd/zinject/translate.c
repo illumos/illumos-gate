@@ -359,8 +359,8 @@ translate_record(err_type_t type, const char *object, const char *range,
 		case TYPE_CONFIG:
 			record->zi_type = DMU_OT_PACKED_NVLIST;
 			break;
-		case TYPE_BPLIST:
-			record->zi_type = DMU_OT_BPLIST;
+		case TYPE_BPOBJ:
+			record->zi_type = DMU_OT_BPOBJ;
 			break;
 		case TYPE_SPACEMAP:
 			record->zi_type = DMU_OT_SPACE_MAP;

@@ -39,6 +39,7 @@
 #include <sys/zap.h>
 #include <sys/zio_checksum.h>
 #include <sys/zfs_znode.h>
+#include <zfs_fletcher.h>
 #include <sys/avl.h>
 #include <sys/ddt.h>
 

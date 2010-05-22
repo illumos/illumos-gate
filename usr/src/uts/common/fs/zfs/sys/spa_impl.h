@@ -35,6 +35,7 @@
 #include <sys/avl.h>
 #include <sys/refcount.h>
 #include <sys/bplist.h>
+#include <sys/bpobj.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -140,8 +141,7 @@ struct spa {
 	uint64_t	spa_config_object;	/* MOS object for pool config */
 	uint64_t	spa_config_generation;	/* config generation number */
 	uint64_t	spa_syncing_txg;	/* txg currently syncing */
-	uint64_t	spa_deferred_bplist_obj; /* object for deferred frees */
-	bplist_t	spa_deferred_bplist;	/* deferred-free bplist */
+	bpobj_t		spa_deferred_bpobj;	/* deferred-free bplist */
 	bplist_t	spa_free_bplist[TXG_SIZE]; /* bplist of stuff to free */
 	uberblock_t	spa_ubsync;		/* last synced uberblock */
 	uberblock_t	spa_uberblock;		/* current uberblock */

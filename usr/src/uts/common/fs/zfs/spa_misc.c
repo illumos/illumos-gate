@@ -445,8 +445,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	cv_init(&spa->spa_suspend_cv, NULL, CV_DEFAULT, NULL);
 
 	for (int t = 0; t < TXG_SIZE; t++)
-		bplist_init(&spa->spa_free_bplist[t]);
-	bplist_init(&spa->spa_deferred_bplist);
+		bplist_create(&spa->spa_free_bplist[t]);
 
 	(void) strlcpy(spa->spa_name, name, sizeof (spa->spa_name));
 	spa->spa_state = POOL_STATE_UNINITIALIZED;
@@ -524,8 +523,7 @@ spa_remove(spa_t *spa)
 	spa_config_lock_destroy(spa);
 
 	for (int t = 0; t < TXG_SIZE; t++)
-		bplist_fini(&spa->spa_free_bplist[t]);
-	bplist_fini(&spa->spa_deferred_bplist);
+		bplist_destroy(&spa->spa_free_bplist[t]);
 
 	cv_destroy(&spa->spa_async_cv);
 	cv_destroy(&spa->spa_proc_cv);

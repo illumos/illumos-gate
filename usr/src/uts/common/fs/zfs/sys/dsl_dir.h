@@ -69,7 +69,8 @@ typedef struct dsl_dir_phys {
 	uint64_t dd_deleg_zapobj; /* dataset delegation permissions */
 	uint64_t dd_flags;
 	uint64_t dd_used_breakdown[DD_USED_NUM];
-	uint64_t dd_pad[14]; /* pad out to 256 bytes for good measure */
+	uint64_t dd_clones; /* dsl_dir objects */
+	uint64_t dd_pad[13]; /* pad out to 256 bytes for good measure */
 } dsl_dir_phys_t;
 
 struct dsl_dir {
@@ -143,6 +144,7 @@ timestruc_t dsl_dir_snap_cmtime(dsl_dir_t *dd);
 #define	MOS_DIR_NAME "$MOS"
 #define	ORIGIN_DIR_NAME "$ORIGIN"
 #define	XLATION_DIR_NAME "$XLATION"
+#define	FREE_DIR_NAME "$FREE"
 
 #ifdef ZFS_DEBUG
 #define	dprintf_dd(dd, fmt, ...) do { \

@@ -32,6 +32,7 @@
 #include <sys/bplist.h>
 #include <sys/dsl_synctask.h>
 #include <sys/zfs_context.h>
+#include <sys/dsl_deadlist.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -82,7 +83,7 @@ typedef struct dsl_dataset_phys {
 	uint64_t ds_num_children;	/* clone/snap children; ==0 for head */
 	uint64_t ds_creation_time;	/* seconds since 1970 */
 	uint64_t ds_creation_txg;
-	uint64_t ds_deadlist_obj;	/* DMU_OT_BPLIST */
+	uint64_t ds_deadlist_obj;	/* DMU_OT_DEADLIST */
 	uint64_t ds_used_bytes;
 	uint64_t ds_compressed_bytes;
 	uint64_t ds_uncompressed_bytes;
@@ -114,7 +115,8 @@ typedef struct dsl_dataset {
 	struct dsl_dataset *ds_prev;
 
 	/* has internal locking: */
-	bplist_t ds_deadlist;
+	dsl_deadlist_t ds_deadlist;
+	bplist_t ds_pending_deadlist;
 
 	/* to protect against multiple concurrent incremental recv */
 	kmutex_t ds_recvlock;
@@ -160,7 +162,7 @@ struct dsl_ds_destroyarg {
 	boolean_t need_prep;		/* do we need to retry due to EBUSY? */
 };
 
-#define	dsl_dataset_is_snapshot(ds)	\
+#define	dsl_dataset_is_snapshot(ds) \
 	((ds)->ds_phys->ds_num_children != 0)
 
 #define	DS_UNIQUE_IS_ACCURATE(ds)	\

@@ -39,7 +39,7 @@
 # This file and the associated version are Solaris specific and are
 # not a part of the open source distribution of GRUB.
 #
-VERSION=17
+VERSION=18
 dboot
 xVM
 zfs

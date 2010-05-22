@@ -371,9 +371,7 @@ txg_sync_thread(dsl_pool_t *dp)
 		 * us, or we have reached our timeout.
 		 */
 		timer = (delta >= timeout ? 0 : timeout - delta);
-		while ((dp->dp_scan->scn_phys.scn_state != DSS_SCANNING ||
-		    spa_load_state(spa) != SPA_LOAD_NONE ||
-		    spa_shutting_down(spa)) &&
+		while (!dsl_scan_active(dp->dp_scan) &&
 		    !tx->tx_exiting && timer > 0 &&
 		    tx->tx_synced_txg >= tx->tx_sync_txg_waiting &&
 		    tx->tx_quiesced_txg == 0) {

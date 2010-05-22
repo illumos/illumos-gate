@@ -4007,6 +4007,8 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 23  Slim ZIL\n"));
 		(void) printf(gettext(" 24  System attributes\n"));
 		(void) printf(gettext(" 25  Improved scrub stats\n"));
+		(void) printf(gettext(" 26  Improved snapshot deletion "
+		    "performance\n"));
 		(void) printf(gettext("\nFor more information on a particular "
 		    "version, including supported releases,\n"));
 		(void) printf(gettext("see the ZFS Administration Guide.\n\n"));

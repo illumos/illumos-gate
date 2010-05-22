@@ -69,7 +69,7 @@
  * 		mos		Any data in the MOS
  * 		mosdir		object directory
  * 		config		pool configuration
- * 		bplist		blkptr list
+ * 		bpobj		blkptr list
  * 		spacemap	spacemap
  * 		metaslab	metaslab
  * 		errlog		persistent error log
@@ -163,7 +163,7 @@ static const char *errtable[TYPE_INVAL] = {
 	"mosdir",
 	"metaslab",
 	"config",
-	"bplist",
+	"bpobj",
 	"spacemap",
 	"errlog",
 	"uber",
@@ -193,8 +193,8 @@ type_to_name(uint64_t type)
 		return ("metaslab");
 	case DMU_OT_PACKED_NVLIST:
 		return ("config");
-	case DMU_OT_BPLIST:
-		return ("bplist");
+	case DMU_OT_BPOBJ:
+		return ("bpobj");
 	case DMU_OT_SPACE_MAP:
 		return ("spacemap");
 	case DMU_OT_ERROR_LOG:
@@ -285,7 +285,7 @@ usage(void)
 	    "\t\t\ton a ZFS filesystem.\n"
 	    "\n"
 	    "\t-t <mos>\tInject errors into the MOS for objects of the given\n"
-	    "\t\t\ttype.  Valid types are: mos, mosdir, config, bplist,\n"
+	    "\t\t\ttype.  Valid types are: mos, mosdir, config, bpobj,\n"
 	    "\t\t\tspacemap, metaslab, errlog.  The only valid <object> is\n"
 	    "\t\t\tthe poolname.\n");
 }

@@ -33,6 +33,7 @@
 #include <sys/dnode.h>
 #include <sys/ddt.h>
 #include <sys/arc.h>
+#include <sys/bpobj.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -71,6 +72,7 @@ typedef struct dsl_pool {
 	struct objset *dp_meta_objset;
 	struct dsl_dir *dp_root_dir;
 	struct dsl_dir *dp_mos_dir;
+	struct dsl_dir *dp_free_dir;
 	struct dsl_dataset *dp_origin_snap;
 	uint64_t dp_root_dir_obj;
 	struct taskq *dp_vnrele_taskq;
@@ -82,6 +84,7 @@ typedef struct dsl_pool {
 	uint64_t dp_throughput; /* bytes per millisec */
 	uint64_t dp_write_limit;
 	uint64_t dp_tmp_userrefs_obj;
+	bpobj_t dp_free_bpobj;
 
 	struct dsl_scan *dp_scan;
 
@@ -130,6 +133,7 @@ int dsl_read_nolock(zio_t *pio, spa_t *spa, const blkptr_t *bpp,
     uint32_t *arc_flags, const zbookmark_t *zb);
 void dsl_pool_create_origin(dsl_pool_t *dp, dmu_tx_t *tx);
 void dsl_pool_upgrade_clones(dsl_pool_t *dp, dmu_tx_t *tx);
+void dsl_pool_upgrade_dir_clones(dsl_pool_t *dp, dmu_tx_t *tx);
 
 taskq_t *dsl_pool_vnrele_taskq(dsl_pool_t *dp);
 

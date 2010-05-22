@@ -38,7 +38,7 @@ typedef enum {
 	TYPE_MOSDIR,		/* MOS object directory		*/
 	TYPE_METASLAB,		/* metaslab objects		*/
 	TYPE_CONFIG,		/* MOS config			*/
-	TYPE_BPLIST,		/* block pointer list		*/
+	TYPE_BPOBJ,		/* block pointer list		*/
 	TYPE_SPACEMAP,		/* space map objects		*/
 	TYPE_ERRLOG,		/* persistent error log		*/
 	TYPE_LABEL_UBERBLOCK,	/* label specific uberblock	*/

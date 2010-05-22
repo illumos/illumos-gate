@@ -51,8 +51,8 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	byteswap_uint64_array,	TRUE,	"object array"		},
 	{	byteswap_uint8_array,	TRUE,	"packed nvlist"		},
 	{	byteswap_uint64_array,	TRUE,	"packed nvlist size"	},
-	{	byteswap_uint64_array,	TRUE,	"bplist"		},
-	{	byteswap_uint64_array,	TRUE,	"bplist header"		},
+	{	byteswap_uint64_array,	TRUE,	"bpobj"			},
+	{	byteswap_uint64_array,	TRUE,	"bpobj header"		},
 	{	byteswap_uint64_array,	TRUE,	"SPA space map header"	},
 	{	byteswap_uint64_array,	TRUE,	"SPA space map"		},
 	{	byteswap_uint64_array,	TRUE,	"ZIL intent log"	},
@@ -96,6 +96,10 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	zap_byteswap,		TRUE,	"SA attr layouts"	},
 	{	zap_byteswap,		TRUE,	"scan translations"	},
 	{	byteswap_uint8_array,	FALSE,	"deduplicated block"	},
+	{	zap_byteswap,		TRUE,	"DSL deadlist map"	},
+	{	byteswap_uint64_array,	TRUE,	"DSL deadlist map hdr"	},
+	{	zap_byteswap,		TRUE,	"DSL dir clones"	},
+	{	byteswap_uint64_array,	TRUE,	"bpobj subobj"		},
 };
 
 int

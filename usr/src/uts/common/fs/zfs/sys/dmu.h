@@ -77,8 +77,8 @@ typedef enum dmu_object_type {
 	DMU_OT_OBJECT_ARRAY,		/* UINT64 */
 	DMU_OT_PACKED_NVLIST,		/* UINT8 (XDR by nvlist_pack/unpack) */
 	DMU_OT_PACKED_NVLIST_SIZE,	/* UINT64 */
-	DMU_OT_BPLIST,			/* UINT64 */
-	DMU_OT_BPLIST_HDR,		/* UINT64 */
+	DMU_OT_BPOBJ,			/* UINT64 */
+	DMU_OT_BPOBJ_HDR,		/* UINT64 */
 	/* spa: */
 	DMU_OT_SPACE_MAP_HEADER,	/* UINT64 */
 	DMU_OT_SPACE_MAP,		/* UINT64 */
@@ -130,6 +130,10 @@ typedef enum dmu_object_type {
 	DMU_OT_SA_ATTR_LAYOUTS,		/* ZAP */
 	DMU_OT_SCAN_XLATE,		/* ZAP */
 	DMU_OT_DEDUP,			/* fake dedup BP from ddt_bp_create() */
+	DMU_OT_DEADLIST,		/* ZAP */
+	DMU_OT_DEADLIST_HDR,		/* UINT64 */
+	DMU_OT_DSL_CLONES,		/* ZAP */
+	DMU_OT_BPOBJ_SUBOBJ,		/* UINT64 */
 	DMU_OT_NUMTYPES
 } dmu_object_type_t;
 
@@ -211,7 +215,7 @@ typedef void dmu_buf_evict_func_t(struct dmu_buf *db, void *user_ptr);
 #define	DMU_POOL_DIRECTORY_OBJECT	1
 #define	DMU_POOL_CONFIG			"config"
 #define	DMU_POOL_ROOT_DATASET		"root_dataset"
-#define	DMU_POOL_SYNC_BPLIST		"sync_bplist"
+#define	DMU_POOL_SYNC_BPOBJ		"sync_bplist"
 #define	DMU_POOL_ERRLOG_SCRUB		"errlog_scrub"
 #define	DMU_POOL_ERRLOG_LAST		"errlog_last"
 #define	DMU_POOL_SPARES			"spares"
@@ -224,6 +228,7 @@ typedef void dmu_buf_evict_func_t(struct dmu_buf *db, void *user_ptr);
 #define	DMU_POOL_DDT_STATS		"DDT-statistics"
 #define	DMU_POOL_CREATION_VERSION	"creation_version"
 #define	DMU_POOL_SCAN			"scan"
+#define	DMU_POOL_FREE_BPOBJ		"free_bpobj"
 
 /*
  * Allocate an object from this objset.  The range of object numbers

@@ -77,7 +77,7 @@ typedef struct dsl_scan {
 	boolean_t scn_pausing;
 	uint64_t scn_restart_txg;
 	uint64_t scn_sync_start_time;
-	zio_t *scn_prefetch_zio_root;
+	zio_t *scn_zio_root;
 
 	/* for debugging / information */
 	uint64_t scn_visited_this_txg;
@@ -99,6 +99,7 @@ void dsl_scan_ds_destroyed(struct dsl_dataset *ds, struct dmu_tx *tx);
 void dsl_scan_ds_snapshotted(struct dsl_dataset *ds, struct dmu_tx *tx);
 void dsl_scan_ds_clone_swapped(struct dsl_dataset *ds1, struct dsl_dataset *ds2,
     struct dmu_tx *tx);
+boolean_t dsl_scan_active(dsl_scan_t *scn);
 
 #ifdef	__cplusplus
 }

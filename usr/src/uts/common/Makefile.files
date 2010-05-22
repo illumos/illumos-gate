@@ -1327,6 +1327,7 @@ TRANS_OBJS += mdtrans.o trans_ioctl.o trans_log.o
 ZFS_COMMON_OBJS +=		\
 	arc.o			\
 	bplist.o		\
+	bpobj.o			\
 	dbuf.o			\
 	ddt.o			\
 	ddt_zap.o		\
@@ -1340,6 +1341,7 @@ ZFS_COMMON_OBJS +=		\
 	dnode_sync.o		\
 	dsl_dir.o		\
 	dsl_dataset.o		\
+	dsl_deadlist.o		\
 	dsl_pool.o		\
 	dsl_synctask.o		\
 	dmu_zfetch.o		\

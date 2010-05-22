@@ -38,6 +38,7 @@
 #include <sys/fs/zfs.h>
 #include <sys/zfs_znode.h>
 #include <sys/spa_impl.h>
+#include <sys/dsl_deadlist.h>
 
 int zfs_no_write_throttle = 0;
 int zfs_write_limit_shift = 3;			/* 1/8th of physical memory */
@@ -104,6 +105,7 @@ dsl_pool_open(spa_t *spa, uint64_t txg, dsl_pool_t **dpp)
 	dsl_pool_t *dp = dsl_pool_open_impl(spa, txg);
 	dsl_dir_t *dd;
 	dsl_dataset_t *ds;
+	uint64_t obj;
 
 	rw_enter(&dp->dp_config_rwlock, RW_WRITER);
 	err = dmu_objset_open_impl(spa, NULL, &dp->dp_meta_rootbp,
@@ -143,6 +145,20 @@ dsl_pool_open(spa_t *spa, uint64_t txg, dsl_pool_t **dpp)
 			goto out;
 	}
 
+	if (spa_version(spa) >= SPA_VERSION_DEADLISTS) {
+		err = dsl_pool_open_special_dir(dp, FREE_DIR_NAME,
+		    &dp->dp_free_dir);
+		if (err)
+			goto out;
+
+		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+		    DMU_POOL_FREE_BPOBJ, sizeof (uint64_t), 1, &obj);
+		if (err)
+			goto out;
+		VERIFY3U(0, ==, bpobj_open(&dp->dp_free_bpobj,
+		    dp->dp_meta_objset, obj));
+	}
+
 	err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_TMP_USERREFS, sizeof (uint64_t), 1,
 	    &dp->dp_tmp_userrefs_obj);
@@ -177,8 +193,12 @@ dsl_pool_close(dsl_pool_t *dp)
 		dsl_dataset_drop_ref(dp->dp_origin_snap, dp);
 	if (dp->dp_mos_dir)
 		dsl_dir_close(dp->dp_mos_dir, dp);
+	if (dp->dp_free_dir)
+		dsl_dir_close(dp->dp_free_dir, dp);
 	if (dp->dp_root_dir)
 		dsl_dir_close(dp->dp_root_dir, dp);
+
+	bpobj_close(&dp->dp_free_bpobj);
 
 	/* undo the dmu_objset_open_impl(mos) from dsl_pool_open() */
 	if (dp->dp_meta_objset)
@@ -208,7 +228,7 @@ dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 	dmu_tx_t *tx = dmu_tx_create_assigned(dp, txg);
 	objset_t *os;
 	dsl_dataset_t *ds;
-	uint64_t dsobj;
+	uint64_t obj;
 
 	/* create and open the MOS (meta-objset) */
 	dp->dp_meta_objset = dmu_objset_create_impl(spa,
@@ -232,14 +252,29 @@ dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 	VERIFY(0 == dsl_pool_open_special_dir(dp,
 	    MOS_DIR_NAME, &dp->dp_mos_dir));
 
+	if (spa_version(spa) >= SPA_VERSION_DEADLISTS) {
+		/* create and open the free dir */
+		(void) dsl_dir_create_sync(dp, dp->dp_root_dir,
+		    FREE_DIR_NAME, tx);
+		VERIFY(0 == dsl_pool_open_special_dir(dp,
+		    FREE_DIR_NAME, &dp->dp_free_dir));
+
+		/* create and open the free_bplist */
+		obj = bpobj_alloc(dp->dp_meta_objset, SPA_MAXBLOCKSIZE, tx);
+		VERIFY(zap_add(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+		    DMU_POOL_FREE_BPOBJ, sizeof (uint64_t), 1, &obj, tx) == 0);
+		VERIFY3U(0, ==, bpobj_open(&dp->dp_free_bpobj,
+		    dp->dp_meta_objset, obj));
+	}
+
 	if (spa_version(spa) >= SPA_VERSION_DSL_SCRUB)
 		dsl_pool_create_origin(dp, tx);
 
 	/* create the root dataset */
-	dsobj = dsl_dataset_create_sync_dd(dp->dp_root_dir, NULL, 0, tx);
+	obj = dsl_dataset_create_sync_dd(dp->dp_root_dir, NULL, 0, tx);
 
 	/* create the root objset */
-	VERIFY(0 == dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
+	VERIFY(0 == dsl_dataset_hold_obj(dp, obj, FTAG, &ds));
 	os = dmu_objset_create_impl(dp->dp_spa, ds,
 	    dsl_dataset_get_blkptr(ds), DMU_OST_ZFS, tx);
 #ifdef _KERNEL
@@ -250,6 +285,14 @@ dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 	dmu_tx_commit(tx);
 
 	return (dp);
+}
+
+static int
+deadlist_enqueue_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
+{
+	dsl_deadlist_t *dl = arg;
+	dsl_deadlist_insert(dl, bp, tx);
+	return (0);
 }
 
 void
@@ -315,13 +358,14 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	err = zio_wait(zio);
 
 	/*
-	 * If anything was added to a deadlist during a zio done callback,
-	 * it had to be put on the deferred queue.  Enqueue it for real now.
+	 * Move dead blocks from the pending deadlist to the on-disk
+	 * deadlist.
 	 */
 	for (ds = list_head(&dp->dp_synced_datasets); ds;
-	    ds = list_next(&dp->dp_synced_datasets, ds))
-		bplist_sync(&ds->ds_deadlist,
-		    bplist_enqueue_cb, &ds->ds_deadlist, tx);
+	    ds = list_next(&dp->dp_synced_datasets, ds)) {
+		bplist_iterate(&ds->ds_pending_deadlist,
+		    deadlist_enqueue_cb, &ds->ds_deadlist, tx);
+	}
 
 	while (dstg = txg_list_remove(&dp->dp_sync_tasks, txg)) {
 		/*
@@ -610,6 +654,65 @@ dsl_pool_upgrade_clones(dsl_pool_t *dp, dmu_tx_t *tx)
 
 	VERIFY3U(0, ==, dmu_objset_find_spa(dp->dp_spa, NULL, upgrade_clones_cb,
 	    tx, DS_FIND_CHILDREN));
+}
+
+/* ARGSUSED */
+static int
+upgrade_dir_clones_cb(spa_t *spa, uint64_t dsobj, const char *dsname, void *arg)
+{
+	dmu_tx_t *tx = arg;
+	dsl_dataset_t *ds;
+	dsl_pool_t *dp = spa_get_dsl(spa);
+	objset_t *mos = dp->dp_meta_objset;
+
+	VERIFY3U(0, ==, dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
+
+	if (ds->ds_dir->dd_phys->dd_origin_obj) {
+		dsl_dataset_t *origin;
+
+		VERIFY3U(0, ==, dsl_dataset_hold_obj(dp,
+		    ds->ds_dir->dd_phys->dd_origin_obj, FTAG, &origin));
+
+		if (origin->ds_dir->dd_phys->dd_clones == 0) {
+			dmu_buf_will_dirty(origin->ds_dir->dd_dbuf, tx);
+			origin->ds_dir->dd_phys->dd_clones = zap_create(mos,
+			    DMU_OT_DSL_CLONES, DMU_OT_NONE, 0, tx);
+		}
+
+		VERIFY3U(0, ==, zap_add_int(dp->dp_meta_objset,
+		    origin->ds_dir->dd_phys->dd_clones, dsobj, tx));
+
+		dsl_dataset_rele(origin, FTAG);
+	}
+
+	dsl_dataset_rele(ds, FTAG);
+	return (0);
+}
+
+void
+dsl_pool_upgrade_dir_clones(dsl_pool_t *dp, dmu_tx_t *tx)
+{
+	ASSERT(dmu_tx_is_syncing(tx));
+	uint64_t obj;
+
+	(void) dsl_dir_create_sync(dp, dp->dp_root_dir, FREE_DIR_NAME, tx);
+	VERIFY(0 == dsl_pool_open_special_dir(dp,
+	    FREE_DIR_NAME, &dp->dp_free_dir));
+
+	/*
+	 * We can't use bpobj_alloc(), because spa_version() still
+	 * returns the old version, and we need a new-version bpobj with
+	 * subobj support.  So call dmu_object_alloc() directly.
+	 */
+	obj = dmu_object_alloc(dp->dp_meta_objset, DMU_OT_BPOBJ,
+	    SPA_MAXBLOCKSIZE, DMU_OT_BPOBJ_HDR, sizeof (bpobj_phys_t), tx);
+	VERIFY3U(0, ==, zap_add(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+	    DMU_POOL_FREE_BPOBJ, sizeof (uint64_t), 1, &obj, tx));
+	VERIFY3U(0, ==, bpobj_open(&dp->dp_free_bpobj,
+	    dp->dp_meta_objset, obj));
+
+	VERIFY3U(0, ==, dmu_objset_find_spa(dp->dp_spa, NULL,
+	    upgrade_dir_clones_cb, tx, DS_FIND_CHILDREN));
 }
 
 void

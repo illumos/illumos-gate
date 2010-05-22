@@ -652,7 +652,7 @@ zio_write_override(zio_t *zio, blkptr_t *bp, int copies)
 void
 zio_free(spa_t *spa, uint64_t txg, const blkptr_t *bp)
 {
-	bplist_enqueue_deferred(&spa->spa_free_bplist[txg & TXG_MASK], bp);
+	bplist_append(&spa->spa_free_bplist[txg & TXG_MASK], bp);
 }
 
 zio_t *

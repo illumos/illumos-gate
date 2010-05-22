@@ -412,7 +412,7 @@ dsl_dir_create_sync(dsl_pool_t *dp, dsl_dir_t *pds, const char *name,
 {
 	objset_t *mos = dp->dp_meta_objset;
 	uint64_t ddobj;
-	dsl_dir_phys_t *dsphys;
+	dsl_dir_phys_t *ddphys;
 	dmu_buf_t *dbuf;
 
 	ddobj = dmu_object_alloc(mos, DMU_OT_DSL_DIR, 0,
@@ -427,17 +427,17 @@ dsl_dir_create_sync(dsl_pool_t *dp, dsl_dir_t *pds, const char *name,
 	}
 	VERIFY(0 == dmu_bonus_hold(mos, ddobj, FTAG, &dbuf));
 	dmu_buf_will_dirty(dbuf, tx);
-	dsphys = dbuf->db_data;
+	ddphys = dbuf->db_data;
 
-	dsphys->dd_creation_time = gethrestime_sec();
+	ddphys->dd_creation_time = gethrestime_sec();
 	if (pds)
-		dsphys->dd_parent_obj = pds->dd_object;
-	dsphys->dd_props_zapobj = zap_create(mos,
+		ddphys->dd_parent_obj = pds->dd_object;
+	ddphys->dd_props_zapobj = zap_create(mos,
 	    DMU_OT_DSL_PROPS, DMU_OT_NONE, 0, tx);
-	dsphys->dd_child_dir_zapobj = zap_create(mos,
+	ddphys->dd_child_dir_zapobj = zap_create(mos,
 	    DMU_OT_DSL_DIR_CHILD_MAP, DMU_OT_NONE, 0, tx);
 	if (spa_version(dp->dp_spa) >= SPA_VERSION_USED_BREAKDOWN)
-		dsphys->dd_flags |= DD_FLAG_USED_BREAKDOWN;
+		ddphys->dd_flags |= DD_FLAG_USED_BREAKDOWN;
 	dmu_buf_rele(dbuf, FTAG);
 
 	return (ddobj);

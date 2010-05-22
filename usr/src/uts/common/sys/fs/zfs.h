@@ -334,14 +334,15 @@ typedef enum {
 #define	SPA_VERSION_23			23ULL
 #define	SPA_VERSION_24			24ULL
 #define	SPA_VERSION_25			25ULL
+#define	SPA_VERSION_26			26ULL
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
  * format change. Go to usr/src/grub/grub-0.97/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.  Also bump the version number in
  * usr/src/grub/capability.
  */
-#define	SPA_VERSION			SPA_VERSION_25
-#define	SPA_VERSION_STRING		"25"
+#define	SPA_VERSION			SPA_VERSION_26
+#define	SPA_VERSION_STRING		"26"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -358,7 +359,7 @@ typedef enum {
 #define	SPA_VERSION_DITTO_BLOCKS	SPA_VERSION_2
 #define	SPA_VERSION_SPARES		SPA_VERSION_3
 #define	SPA_VERSION_RAIDZ2		SPA_VERSION_3
-#define	SPA_VERSION_BPLIST_ACCOUNT	SPA_VERSION_3
+#define	SPA_VERSION_BPOBJ_ACCOUNT	SPA_VERSION_3
 #define	SPA_VERSION_RAIDZ_DEFLATE	SPA_VERSION_3
 #define	SPA_VERSION_DNODE_BYTES		SPA_VERSION_3
 #define	SPA_VERSION_ZPOOL_HISTORY	SPA_VERSION_4
@@ -388,6 +389,8 @@ typedef enum {
 #define	SPA_VERSION_SLIM_ZIL		SPA_VERSION_23
 #define	SPA_VERSION_SA			SPA_VERSION_24
 #define	SPA_VERSION_SCAN		SPA_VERSION_25
+#define	SPA_VERSION_DIR_CLONES		SPA_VERSION_26
+#define	SPA_VERSION_DEADLISTS		SPA_VERSION_26
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change

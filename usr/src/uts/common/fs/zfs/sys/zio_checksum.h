@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_ZIO_CHECKSUM_H
 #define	_SYS_ZIO_CHECKSUM_H
 
 #include <sys/zio.h>
-#include <zfs_fletcher.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -68,6 +66,7 @@ extern zio_checksum_t zio_checksum_SHA256;
 extern void zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
     void *data, uint64_t size);
 extern int zio_checksum_error(zio_t *zio, zio_bad_cksum_t *out);
+extern enum zio_checksum spa_dedup_checksum(spa_t *spa);
 
 #ifdef	__cplusplus
 }

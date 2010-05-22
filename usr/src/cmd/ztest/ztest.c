@@ -94,6 +94,7 @@
 #include <sys/dsl_prop.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_scan.h>
+#include <sys/zio_checksum.h>
 #include <sys/refcount.h>
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -3136,9 +3137,9 @@ ztest_dsl_dataset_promote_busy(ztest_ds_t *zd, uint64_t id)
 		fatal(0, "dmu_objset_create(%s) = %d", clone2name, error);
 	}
 
-	error = dsl_dataset_own(snap1name, B_FALSE, FTAG, &ds);
+	error = dsl_dataset_own(snap2name, B_FALSE, FTAG, &ds);
 	if (error)
-		fatal(0, "dsl_dataset_own(%s) = %d", snap1name, error);
+		fatal(0, "dsl_dataset_own(%s) = %d", snap2name, error);
 	error = dsl_dataset_promote(clone2name, NULL);
 	if (error != EBUSY)
 		fatal(0, "dsl_dataset_promote(%s), %d, not EBUSY", clone2name,
