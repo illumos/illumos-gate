@@ -170,8 +170,10 @@ _enum_common(const char *username,
 			}
 		}
 		free_userattr(ua);
-		if (res != 0)
+		if (res != 0) {
+			free_proflist(profs, cnt);
 			return (res);
+		}
 	}
 
 	if ((cnt == 0 || strcmp(profs[cnt-1], PROFILE_STOP) != 0) &&

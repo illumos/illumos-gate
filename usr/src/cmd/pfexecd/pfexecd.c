@@ -354,7 +354,7 @@ callback_pfexec(pfexec_arg_t *pap)
 	gid_t gid, egid;
 	struct passwd pw, *pwd;
 	char buf[1024];
-	execattr_t *exec;
+	execattr_t *exec = NULL;
 	char *value;
 	priv_set_t *lset, *iset;
 	size_t mysz = repsz - 2 * setsz;
@@ -367,8 +367,10 @@ callback_pfexec(pfexec_arg_t *pap)
 
 	exec = getexecuser(pwd->pw_name, KV_COMMAND, path, GET_ONE);
 
-	if (exec == NULL && removeisapath(path))
+	if ((exec == NULL || exec->attr == NULL) && removeisapath(path)) {
+		free_execattr(exec);
 		exec = getexecuser(pwd->pw_name, KV_COMMAND, path, GET_ONE);
+	}
 
 	if (exec == NULL) {
 		res->pfr_allowed = B_FALSE;
@@ -446,6 +448,8 @@ ret:
 	return;
 
 stdexec:
+	free_execattr(exec);
+
 	res->pfr_scrubenv = B_FALSE;
 	res->pfr_setcred = B_FALSE;
 	res->pfr_allowed = B_TRUE;
