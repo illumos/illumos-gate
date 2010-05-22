@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -73,6 +72,7 @@ static int	i_ddi_irm_reduce_by_policy(ddi_irm_pool_t *, int, int);
 static void	i_ddi_irm_reduce_new(ddi_irm_pool_t *, int);
 static void	i_ddi_irm_insertion_sort(list_t *, ddi_irm_req_t *);
 static int	i_ddi_irm_notify(ddi_irm_pool_t *, ddi_irm_req_t *);
+static int	i_ddi_irm_modify_increase(ddi_irm_req_t *, int);
 
 /*
  * OS Initialization Routines
@@ -259,7 +259,6 @@ ndi_irm_destroy(ddi_irm_pool_t *pool_p)
 int
 i_ddi_irm_insert(dev_info_t *dip, int type, int count)
 {
-	ddi_cb_t	*cb_p;
 	ddi_irm_req_t	*req_p;
 	devinfo_intr_t	*intr_p;
 	ddi_irm_pool_t	*pool_p;
@@ -291,13 +290,12 @@ i_ddi_irm_insert(dev_info_t *dip, int type, int count)
 	}
 
 	/* Check for IRM support from the driver */
-	if (((cb_p = DEVI(dip)->devi_cb_p) != NULL) && DDI_IRM_HAS_CB(cb_p) &&
-	    (type == DDI_INTR_TYPE_MSIX))
+	if (i_ddi_irm_supported(dip, type) == DDI_SUCCESS)
 		irm_flag = B_TRUE;
 
 	/* Determine request size */
 	nreq = (irm_flag) ? count :
-	    MIN(count, i_ddi_intr_get_current_navail(dip, type));
+	    MIN(count, i_ddi_intr_get_limit(dip, type, pool_p));
 	nmin = (irm_flag) ? 1 : nreq;
 	npartial = MIN(nreq, pool_p->ipool_defsz);
 
@@ -308,7 +306,7 @@ i_ddi_irm_insert(dev_info_t *dip, int type, int count)
 	req_p->ireq_pool_p = pool_p;
 	req_p->ireq_nreq = nreq;
 	req_p->ireq_flags = DDI_IRM_FLAG_NEW;
-	if (DDI_IRM_HAS_CB(cb_p))
+	if (irm_flag)
 		req_p->ireq_flags |= DDI_IRM_FLAG_CALLBACK;
 
 	/* Lock the pool */
@@ -397,8 +395,11 @@ i_ddi_irm_modify(dev_info_t *dip, int nreq)
 	devinfo_intr_t	*intr_p;
 	ddi_irm_req_t	*req_p;
 	ddi_irm_pool_t	*pool_p;
+	int		type;
+	int		retval = DDI_SUCCESS;
 
 	ASSERT(dip != NULL);
+	ASSERT(nreq > 0);
 
 	DDI_INTR_IRMDBG((CE_CONT, "i_ddi_irm_modify: dip %p nreq %d\n",
 	    (void *)dip, nreq));
@@ -409,44 +410,154 @@ i_ddi_irm_modify(dev_info_t *dip, int nreq)
 		return (DDI_EINVAL);
 	}
 
-	/* Check that the operation is supported */
-	if (!(intr_p = DEVI(dip)->devi_intr_p) ||
-	    !(req_p = intr_p->devi_irm_req_p) ||
-	    !DDI_IRM_IS_REDUCIBLE(req_p)) {
-		DDI_INTR_IRMDBG((CE_CONT, "i_ddi_irm_modify: not supported\n"));
+	/* Do nothing if not mapped to an IRM pool */
+	if (((intr_p = DEVI(dip)->devi_intr_p) == NULL) ||
+	    ((req_p = intr_p->devi_irm_req_p) == NULL))
+		return (DDI_SUCCESS);
+
+	/* Do nothing if new size is the same */
+	if (nreq == req_p->ireq_nreq)
+		return (DDI_SUCCESS);
+
+	/* Do not allow MSI requests to be resized */
+	if ((type = req_p->ireq_type) == DDI_INTR_TYPE_MSI) {
+		DDI_INTR_IRMDBG((CE_CONT, "i_ddi_irm_modify: invalid type\n"));
 		return (DDI_ENOTSUP);
 	}
 
+	/* Select the pool */
+	if ((pool_p = req_p->ireq_pool_p) == NULL) {
+		DDI_INTR_IRMDBG((CE_CONT, "i_ddi_irm_modify: missing pool\n"));
+		return (DDI_FAILURE);
+	}
+
 	/* Validate request size is not too large */
-	if (nreq > intr_p->devi_intr_sup_nintrs) {
+	if (nreq > i_ddi_intr_get_limit(dip, type, pool_p)) {
 		DDI_INTR_IRMDBG((CE_CONT, "i_ddi_irm_modify: invalid args\n"));
 		return (DDI_EINVAL);
 	}
 
-	/*
-	 * Modify request, but only if new size is different.
-	 */
-	if (nreq != req_p->ireq_nreq) {
+	/* Lock the pool */
+	mutex_enter(&pool_p->ipool_lock);
 
-		/* Lock the pool */
-		pool_p = req_p->ireq_pool_p;
-		mutex_enter(&pool_p->ipool_lock);
+	/*
+	 * Process the modification.
+	 *
+	 *	- To increase a non-IRM request, call the implementation in
+	 *	  i_ddi_irm_modify_increase().
+	 *
+	 *	- To decrease a non-IRM request, directly update the pool and
+	 *	  request, then queue the pool for later rebalancing.
+	 *
+	 *	- To modify an IRM request, always queue the pool for later
+	 *	  rebalancing.  IRM consumers rely upon callbacks for changes.
+	 */
+	if ((nreq > req_p->ireq_nreq) &&
+	    (i_ddi_irm_supported(dip, type) != DDI_SUCCESS)) {
+
+		retval = i_ddi_irm_modify_increase(req_p, nreq);
+
+	} else {
 
 		/* Update pool and request */
 		pool_p->ipool_reqno -= req_p->ireq_nreq;
 		pool_p->ipool_reqno += nreq;
+		if (i_ddi_irm_supported(dip, type) != DDI_SUCCESS) {
+			pool_p->ipool_minno -= req_p->ireq_navail;
+			pool_p->ipool_resno -= req_p->ireq_navail;
+			pool_p->ipool_minno += nreq;
+			pool_p->ipool_resno += nreq;
+			req_p->ireq_navail = nreq;
+		}
 		req_p->ireq_nreq = nreq;
 
-		/* Re-sort request in the pool */
+		/* Re-sort request into the pool */
 		list_remove(&pool_p->ipool_req_list, req_p);
 		i_ddi_irm_insertion_sort(&pool_p->ipool_req_list, req_p);
 
-		/* Queue pool to be rebalanced */
+		/* Queue pool for asynchronous rebalance */
 		i_ddi_irm_enqueue(pool_p, B_FALSE);
-
-		/* Unlock the pool */
-		mutex_exit(&pool_p->ipool_lock);
 	}
+
+	/* Unlock the pool */
+	mutex_exit(&pool_p->ipool_lock);
+
+	return (retval);
+}
+
+/*
+ * i_ddi_irm_modify_increase()
+ *
+ *	Increase a non-IRM request.  The additional interrupts are
+ *	directly taken from the pool when possible.  Otherwise, an
+ *	immediate, synchronous rebalance is performed.  A temporary
+ *	proxy request is used for any rebalance operation to ensure
+ *	the request is not reduced below its current allocation.
+ *
+ *	NOTE: pool must already be locked.
+ */
+static int
+i_ddi_irm_modify_increase(ddi_irm_req_t *req_p, int nreq)
+{
+	dev_info_t	*dip = req_p->ireq_dip;
+	ddi_irm_pool_t	*pool_p = req_p->ireq_pool_p;
+	ddi_irm_req_t	new_req;
+	int		count, delta;
+
+	ASSERT(MUTEX_HELD(&pool_p->ipool_lock));
+
+	/* Compute number of additional vectors */
+	count = nreq - req_p->ireq_nreq;
+
+	/* Check for minimal fit */
+	if ((pool_p->ipool_minno + count) > pool_p->ipool_totsz) {
+		cmn_err(CE_WARN, "%s%d: interrupt pool too full.\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+		return (DDI_EAGAIN);
+	}
+
+	/* Update the pool */
+	pool_p->ipool_reqno += count;
+	pool_p->ipool_minno += count;
+
+	/* Attempt direct implementation */
+	if ((pool_p->ipool_resno + count) <= pool_p->ipool_totsz) {
+		req_p->ireq_nreq += count;
+		req_p->ireq_navail += count;
+		pool_p->ipool_resno += count;
+		return (DDI_SUCCESS);
+	}
+
+	/* Rebalance required: fail if pool is not active */
+	if ((pool_p->ipool_flags & DDI_IRM_FLAG_ACTIVE) == 0) {
+		pool_p->ipool_reqno -= count;
+		pool_p->ipool_minno -= count;
+		return (DDI_EAGAIN);
+	}
+
+	/* Insert temporary proxy request */
+	bzero(&new_req, sizeof (ddi_irm_req_t));
+	new_req.ireq_dip = dip;
+	new_req.ireq_nreq = count;
+	new_req.ireq_pool_p = pool_p;
+	new_req.ireq_type = req_p->ireq_type;
+	new_req.ireq_flags = DDI_IRM_FLAG_NEW;
+	i_ddi_irm_insertion_sort(&pool_p->ipool_req_list, &new_req);
+
+	/* Synchronously rebalance */
+	i_ddi_irm_enqueue(pool_p, B_TRUE);
+
+	/* Remove proxy request, and merge into original request */
+	req_p->ireq_nreq += count;
+	if ((delta = (count - new_req.ireq_navail)) > 0) {
+		req_p->ireq_nreq -= delta;
+		pool_p->ipool_reqno -= delta;
+		pool_p->ipool_minno -= delta;
+	}
+	req_p->ireq_navail += new_req.ireq_navail;
+	list_remove(&pool_p->ipool_req_list, req_p);
+	list_remove(&pool_p->ipool_req_list, &new_req);
+	i_ddi_irm_insertion_sort(&pool_p->ipool_req_list, req_p);
 
 	return (DDI_SUCCESS);
 }
@@ -590,6 +701,21 @@ i_ddi_irm_set_cb(dev_info_t *dip, boolean_t has_cb_flag)
 
 	/* Unlock the pool */
 	mutex_exit(&pool_p->ipool_lock);
+}
+
+/*
+ * i_ddi_irm_supported()
+ *
+ *	Query if IRM is supported by a driver using a specific interrupt type.
+ *	Notice that IRM is limited to MSI-X users with registered callbacks.
+ */
+int
+i_ddi_irm_supported(dev_info_t *dip, int type)
+{
+	ddi_cb_t	*cb_p = DEVI(dip)->devi_cb_p;
+
+	return ((DDI_IRM_HAS_CB(cb_p) && (type == DDI_INTR_TYPE_MSIX)) ?
+	    DDI_SUCCESS : DDI_ENOTSUP);
 }
 
 /*

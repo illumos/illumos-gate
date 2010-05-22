@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -223,66 +222,88 @@ i_ddi_intr_set_current_nenables(dev_info_t *dip, int nintrs)
 		intr_p->devi_intr_curr_nenables = nintrs;
 }
 
+/*
+ * i_ddi_intr_get_current_navail:
+ *
+ *	Return the number of interrupts currently available.
+ *	If a precise number set by IRM is not available, then
+ *	return the limit determined by i_ddi_intr_get_limit().
+ */
 uint_t
 i_ddi_intr_get_current_navail(dev_info_t *dip, int type)
 {
-	ddi_intr_handle_impl_t	hdl;
-	devinfo_intr_t		*intr_p = DEVI(dip)->devi_intr_p;
-	ddi_cb_t		*cb_p;
+	devinfo_intr_t		*intr_p;
 	ddi_irm_pool_t		*pool_p;
 	ddi_irm_req_t		*req_p;
-	uint_t			navail = 0, nintrs;
+	uint_t			navail;
 
-	/* Get maximum number of supported interrupts */
-	nintrs = i_ddi_intr_get_supported_nintrs(dip, type);
+	/* Check for a precise number from IRM */
+	if (((intr_p = DEVI(dip)->devi_intr_p) != NULL) &&
+	    ((req_p = intr_p->devi_irm_req_p) != NULL) &&
+	    (type == req_p->ireq_type) &&
+	    ((pool_p = req_p->ireq_pool_p) != NULL)) {
+		/*
+		 * Lock to be sure a rebalance is not in progress.
+		 * (Should be changed to a rwlock.)
+		 */
+		mutex_enter(&pool_p->ipool_navail_lock);
+		navail = req_p->ireq_navail;
+		mutex_exit(&pool_p->ipool_navail_lock);
+		return (navail);
+	}
 
-	/* Check for an interrupt pool */
-	pool_p = i_ddi_intr_get_pool(dip, type);
+	/* Otherwise, return the limit */
+	return (i_ddi_intr_get_limit(dip, type, NULL));
+}
 
-	/*
-	 * If a pool exists, then IRM determines the availability.
-	 * Otherwise, use the older INTROP method.
-	 */
-	if (pool_p) {
-		if (intr_p && (req_p = intr_p->devi_irm_req_p) &&
-		    (type == req_p->ireq_type)) {
-			mutex_enter(&pool_p->ipool_navail_lock);
-			navail = req_p->ireq_navail;
-			mutex_exit(&pool_p->ipool_navail_lock);
-			return (navail);
-		}
-		if ((type == DDI_INTR_TYPE_MSIX) &&
-		    (cb_p = DEVI(dip)->devi_cb_p) &&
-		    (cb_p->cb_flags & DDI_CB_FLAG_INTR)) {
-			return (nintrs);
-		}
-		navail = pool_p->ipool_defsz;
+/*
+ * i_ddi_intr_get_limit:
+ *
+ *	Return the limit of how many interrupts a driver can allocate.
+ */
+uint_t
+i_ddi_intr_get_limit(dev_info_t *dip, int type, ddi_irm_pool_t *pool_p)
+{
+	ddi_intr_handle_impl_t	hdl;
+	uint_t			limit, nintrs;
+
+	/* Check for interrupt pool */
+	if (pool_p == NULL)
+		pool_p = i_ddi_intr_get_pool(dip, type);
+
+	/* Get default limit, from interrupt pool or by INTROP method */
+	if (pool_p != NULL) {
+		limit = pool_p->ipool_defsz;
 	} else {
 		bzero(&hdl, sizeof (ddi_intr_handle_impl_t));
 		hdl.ih_dip = dip;
 		hdl.ih_type = type;
-
 		if (i_ddi_intr_ops(dip, dip, DDI_INTROP_NAVAIL, &hdl,
-		    (void *)&navail) != DDI_SUCCESS) {
+		    (void *)&limit) != DDI_SUCCESS)
 			return (0);
-		}
 	}
 
+	/* Get maximum supported by the device */
+	nintrs = i_ddi_intr_get_supported_nintrs(dip, type);
+
+	/* No limit if device and system both support IRM */
+	if ((pool_p != NULL) && (i_ddi_irm_supported(dip, type) == DDI_SUCCESS))
+		return (nintrs);
+
+	/* Limit cannot exceed what device supports */
+	limit = MIN(limit, nintrs);
+
+	/* Impose a global MSI-X limit on x86 */
 #if defined(__i386) || defined(__amd64)
-	/* Global tunable workaround */
-	if (type == DDI_INTR_TYPE_MSIX) {
-		navail = MIN(nintrs, ddi_msix_alloc_limit);
-	}
+	if (type == DDI_INTR_TYPE_MSIX)
+		limit = MIN(limit, ddi_msix_alloc_limit);
 #endif
 
-	/* Always restrict MSI to a precise limit */
+	/* Impose a global MSI limit on all platforms */
 	if (type == DDI_INTR_TYPE_MSI)
-		navail = MIN(navail, DDI_MAX_MSI_ALLOC);
+		limit = MIN(limit, DDI_MAX_MSI_ALLOC);
 
-	/* Ensure availability doesn't exceed what's supported */
-	navail = MIN(navail, nintrs);
-
-	return (navail);
+	return (limit);
 }
 
 ddi_intr_msix_t *

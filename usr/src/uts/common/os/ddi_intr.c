@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -242,6 +241,10 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 		}
 	}
 
+	/* Synchronously adjust IRM associations for non-IRM aware drivers */
+	if (curr_nintrs && (i_ddi_irm_supported(dip, type) != DDI_SUCCESS))
+		(void) i_ddi_irm_modify(dip, count + curr_nintrs);
+
 	/* Get how many interrupts are currently available */
 	navail = i_ddi_intr_get_current_navail(dip, type);
 
@@ -259,7 +262,10 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: "
 			    "DDI_INTR_ALLOC_STRICT flag is passed, "
 			    "return failure\n"));
-			i_ddi_intr_devi_fini(dip);
+			if (curr_nintrs == 0)
+				i_ddi_intr_devi_fini(dip);
+			else if (i_ddi_irm_supported(dip, type) != DDI_SUCCESS)
+				(void) i_ddi_irm_modify(dip, curr_nintrs);
 			return (DDI_EAGAIN);
 		}
 		count = navail - curr_nintrs;
@@ -369,8 +375,16 @@ ddi_intr_free(ddi_intr_handle_t h)
 		if (hdlp->ih_flags & DDI_INTR_MSIX_DUP)
 			atomic_dec_32(&hdlp->ih_main->ih_dup_cnt);
 		else {
-			i_ddi_intr_set_current_nintrs(hdlp->ih_dip,
-			    i_ddi_intr_get_current_nintrs(hdlp->ih_dip) - 1);
+			int	n, curr_type;
+
+			n = i_ddi_intr_get_current_nintrs(hdlp->ih_dip) - 1;
+			curr_type = i_ddi_intr_get_current_type(hdlp->ih_dip);
+
+			i_ddi_intr_set_current_nintrs(hdlp->ih_dip, n);
+
+			if ((i_ddi_irm_supported(hdlp->ih_dip, curr_type)
+			    != DDI_SUCCESS) && (n > 0))
+				(void) i_ddi_irm_modify(hdlp->ih_dip, n);
 
 			if (hdlp->ih_type & DDI_INTR_TYPE_FIXED)
 				i_ddi_set_intr_handle(hdlp->ih_dip,
@@ -1047,10 +1061,29 @@ ddi_intr_get_pending(ddi_intr_handle_t h, int *pendingp)
 int
 ddi_intr_set_nreq(dev_info_t *dip, int nreq)
 {
+	int	curr_type, nintrs;
+
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_set_nreq: dip %p, nreq %d\n",
 	    (void *)dip, nreq));
 
-	if (dip == NULL)
+	ASSERT(dip != NULL);
+	ASSERT(nreq > 0);
+
+	/* Sanity check inputs */
+	if ((dip == NULL) || (nreq < 1))
+		return (DDI_EINVAL);
+
+	curr_type = i_ddi_intr_get_current_type(dip);
+
+	/* Only valid for IRM drivers actively using interrupts */
+	if ((curr_type == 0) ||
+	    (i_ddi_irm_supported(dip, curr_type) != DDI_SUCCESS))
+		return (DDI_ENOTSUP);
+
+	/* Range check */
+	if (ddi_intr_get_nintrs(dip, curr_type, &nintrs) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+	if (nreq > nintrs)
 		return (DDI_EINVAL);
 
 	return (i_ddi_irm_modify(dip, nreq));

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_DDI_INTR_IMPL_H
@@ -329,6 +328,8 @@ void	i_ddi_intr_set_current_nintrs(dev_info_t *dip, int nintrs);
 uint_t	i_ddi_intr_get_current_nenables(dev_info_t *dip);
 void	i_ddi_intr_set_current_nenables(dev_info_t *dip, int nintrs);
 uint_t	i_ddi_intr_get_current_navail(dev_info_t *dip, int intr_type);
+uint_t	i_ddi_intr_get_limit(dev_info_t *dip, int intr_type,
+	    ddi_irm_pool_t *pool_p);
 
 ddi_irm_pool_t	*i_ddi_intr_get_pool(dev_info_t *dip, int intr_type);
 
@@ -337,6 +338,7 @@ int	i_ddi_irm_insert(dev_info_t *dip, int intr_type, int count);
 int	i_ddi_irm_modify(dev_info_t *dip, int nreq);
 int	i_ddi_irm_remove(dev_info_t *dip);
 void	i_ddi_irm_set_cb(dev_info_t *dip, boolean_t cb_flag);
+int	i_ddi_irm_supported(dev_info_t *dip, int type);
 
 ddi_intr_handle_t i_ddi_get_intr_handle(dev_info_t *dip, int inum);
 void	i_ddi_set_intr_handle(dev_info_t *dip, int inum, ddi_intr_handle_t hdl);
