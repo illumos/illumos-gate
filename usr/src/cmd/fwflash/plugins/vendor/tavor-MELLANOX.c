@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -143,7 +142,6 @@ vendorvrfy(struct devicelist *devicenode)
 	bzero(temppsid, 17);
 	bcopy(vps->vsdpsid+0xd0, &rawpsid, 16);
 
-#if defined(_LITTLE_ENDIAN)
 	for (i = 0; i < 16; i += 4) {
 		temppsid[i]   = rawpsid[i+3];
 		temppsid[i+1] = rawpsid[i+2];
@@ -153,9 +151,6 @@ vendorvrfy(struct devicelist *devicenode)
 	logmsg(MSG_INFO,
 	    "tavor: have raw '%s', want munged '%s'\n",
 	    rawpsid, temppsid);
-#else
-	bcopy(vps->vsdpsid+0xd0, &temppsid, 16);
-#endif
 	logmsg(MSG_INFO, "tavor_vrfy: PSID file '%s' HCA's PSID '%s'\n",
 	    (temppsid != NULL) ? temppsid : "(null)",
 	    (encap->info.mlx_psid != NULL) ? encap->info.mlx_psid : "(null)");

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -380,10 +379,14 @@ fw_identify(int start)
 			    tempdev->ident->pid,
 			    tempdev->ident->revid,
 			    tempdev->index,
-			    tempdev->addresses[0],
-			    tempdev->addresses[1],
-			    tempdev->addresses[2],
-			    tempdev->addresses[3],
+			    (tempdev->addresses[0] ? tempdev->addresses[0] :
+			    "(not supported)"),
+			    (tempdev->addresses[1] ? tempdev->addresses[1] :
+			    "(not supported)"),
+			    (tempdev->addresses[2] ? tempdev->addresses[2] :
+			    "(not supported)"),
+			    (tempdev->addresses[3] ? tempdev->addresses[3] :
+			    "(not supported)"),
 			    tempdev->plugin);
 		}
 	}
@@ -428,11 +431,12 @@ fw_devinfo(struct devicelist *thisdev)
 
 	if (encap->pn_len != 0) {
 		if (strlen(encap->info.mlx_id))
-			fprintf(stdout, gettext("\tProduct\t\t   : %s (%s)\n"),
-			    encap->info.mlx_pn, encap->info.mlx_id);
+			fprintf(stdout, gettext("\tProduct\t\t   : "
+			    "%s %X (%s)\n"), encap->info.mlx_pn,
+			    encap->hwrev, encap->info.mlx_id);
 		else
-			fprintf(stdout, gettext("\tProduct\t\t   : %s \n"),
-			    encap->info.mlx_pn);
+			fprintf(stdout, gettext("\tProduct\t\t   : %s %X\n"),
+			    encap->info.mlx_pn, encap->hwrev);
 
 		if (strlen(encap->info.mlx_psid))
 			fprintf(stdout, gettext("\tPSID\t\t   : %s\n"),

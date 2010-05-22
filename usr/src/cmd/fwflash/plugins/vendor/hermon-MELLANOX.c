@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -124,7 +123,7 @@ vendorvrfy(struct devicelist *devicenode)
 		resp = getchar();
 		if (resp != 'Y' && resp != 'y') {
 			logmsg(MSG_ERROR, gettext("Not proceeding with "
-			    "flash operation of %s on %s"),
+			    "flash operation of %s on %s \n"),
 			    verifier->imgfile, devicenode->drvname);
 			return (FWFLASH_FAILURE);
 		}
@@ -170,7 +169,9 @@ cnx_check_hwver_img(ib_cnx_encap_ident_t *handle)
 		logmsg(MSG_INFO, ("A2 board found.\r\n"));
 	} else if (hwver == 0xA3 && local_hwver == 0xA3) {
 		logmsg(MSG_INFO, ("A3 board found.\r\n"));
-	} else {
+	} else if (hwver == 0xB0 && local_hwver == 0xB0) {
+		logmsg(MSG_INFO, ("B0 board found.\r\n"));
+	} else if (hwver != local_hwver) {
 		return ((uint16_t)(local_hwver << 8) | hwver);
 	}
 	return (0);

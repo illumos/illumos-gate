@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -711,7 +710,7 @@ fw_identify(int start)
 		struct devicelist *tempdev;
 
 		TAILQ_FOREACH(tempdev, fw_devices, nextdev) {
-			logmsg(MSG_INFO, "ib:fw_identify:\n");
+			logmsg(MSG_INFO, "fw_identify:\n");
 			logmsg(MSG_INFO, "\ttempdev @ 0x%lx\n"
 			    "\t\taccess_devname: %s\n"
 			    "\t\tdrvname: %s\tclassname: %s\n"
@@ -731,10 +730,14 @@ fw_identify(int start)
 			    tempdev->ident->pid,
 			    tempdev->ident->revid,
 			    tempdev->index,
-			    tempdev->addresses[0],
-			    tempdev->addresses[1],
-			    tempdev->addresses[2],
-			    tempdev->addresses[3],
+			    (tempdev->addresses[0] ? tempdev->addresses[0] :
+			    "(not supported)"),
+			    (tempdev->addresses[1] ? tempdev->addresses[1] :
+			    "(not supported)"),
+			    (tempdev->addresses[2] ? tempdev->addresses[2] :
+			    "(not supported)"),
+			    (tempdev->addresses[3] ? tempdev->addresses[3] :
+			    "(not supported)"),
 			    tempdev->plugin);
 		}
 	}
@@ -775,12 +778,13 @@ fw_devinfo(struct devicelist *thisdev)
 	if (encap->pn_len != 0) {
 		fprintf(stdout,
 		    gettext("\tFirmware revision : %s\n"
-		    "\tProduct\t\t: %s\n"
+		    "\tProduct\t\t: %s %X\n"
 		    "\tPSID\t\t: %s\n"),
 		    thisdev->ident->revid,
 		    encap->info.mlx_pn,
+		    encap->hwrev,
 		    encap->info.mlx_psid);
-		} else {
+	} else {
 		fprintf(stdout,
 		    gettext("\tFirmware revision : %s\n"
 		    "\tNo hardware information available for this "
@@ -875,6 +879,11 @@ tavor_identify(struct devicelist *thisdev)
 	}
 
 	manuf->hwrev = init_ioctl.tf_hwrev;
+
+	logmsg(MSG_INFO, "tavor_identify: init_ioctl: hwrev: %X, "
+	    "fwver: %d.%d.%04d\n", init_ioctl.tf_hwrev,
+	    init_ioctl.tf_fwrev.tfi_maj, init_ioctl.tf_fwrev.tfi_min,
+	    init_ioctl.tf_fwrev.tfi_sub);
 
 	/*
 	 * Determine whether the attached driver supports the Intel or

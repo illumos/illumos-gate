@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _HDRS_MELLANOX_H
@@ -154,6 +153,9 @@ mlx_mdr_t mlx_mdr[] = {
 	{ "MHET2X-2TC",		"MT_02B0110001",	"Cougar Cub 256" },
 	{ "MHET2X-2TC",		"MT_02B0120001",	"Cougar Cub 256" },
 	{ "375-3481-01",	"SUN0040000001",	"Sun Cougar Cub SDR" },
+	{ "375-3259-01",	"SUN0010000001",	"Sun Cougar Cub 256" },
+	{ "375-3259-03",	"SUN0010000001",	"Sun Cougar Cub 256" },
+	{ "375-3260-03",	"SUN0020000001",	"Sun Cougar Cub 256" },
 	{ "MHX-CE128-T",	"MT_0000000001",	"Cougar 128" },
 	{ "MTPB23108-CE128",	"MT_0000000001",	"Cougar 128" },
 	{ "MHX-CE256-T",	"MT_0010000001",	"Cougar 256" },
@@ -173,20 +175,54 @@ mlx_mdr_t mlx_mdr[] = {
 	{ "X1289A-Z",		"SUN0010010001",	"Sun IB NEM DDR" },
 	{ "375-3548-01",	"SUN0060000001", "Sun IB EM DDR X4216A-Z" },
 	{ "375-3549-01",	"SUN0070000001", "Sun PCIe DDR X4217A" },
+	{ "375-3549-01",	"SUN0070130001", "Sun Eagle DDR" },
 	{ "375-3481-01",	"SUN0050000001",	"Sun PCIe EM SDR" },
+	{ "375-3439-01",	"SUN0051000001",	"Sun PUMA" },
 	{ "MHGH29-XSC",		"MT_0A60110002", "Eagle DDR PCIe Gen 2.0" },
 	{ "MHGH29-XSC",		"MT_0A60120005", "Eagle DDR PCIe Gen 2.0" },
 	{ "MHGH29-XTC",		"MT_0A50110002", "Eagle DDR PCIe Gen 2.0" },
 	{ "MHGH29-XTC",		"MT_0A50120005", "Eagle DDR PCIe Gen 2.0" },
 	{ "375-3605-01",	"SUN0160000001",	"Sun Mirage QDR" },
 	{ "375-3606-01",	"SUN0150000001",	"Sun Falcon QDR" },
+	{ "375-3606-02",	"SUN0150000009",	"Sun Falcon QDR" },
+	{ "375-3606-03",	"SUN0150000009",	"Sun Falcon QDR" },
 	{ "MHJH29-XTC",		"MT_04E0110003",	"Eagle QDR" },
 	{ "MHJH29-XSC",		"MT_0500120005", "Eagle QDR PCIe Gen 2.0" },
 	{ "MHQH29-XTC",		"MT_04E0120005", "Eagle QDR PCIe Gen 2.0" },
 	{ "MHQH19-XTC",		"MT_0C40110009", "Falcon QDR PCIe Gen 2.0" },
 	{ "MHQH29-XTC",		"MT_0BB0110003", "Falcon QDR PCIe Gen 2.0" },
 	{ "MHQH29-XTC",		"MT_0BB0120003", "Falcon QDR PCIe Gen 2.0" },
-	{ "375-3551-05",	"SUN0080000001",	"Sun C48-IB-NEM" }
+	{ "375-3551-05",	"SUN0080000001",	"Sun C48-IB-NEM" },
+	{ "MHEH28B-XSR",	"MT_0D10110001", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHEH28B-XTR",	"MT_0D20110001", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHGH28B-XSR",	"MT_0D10110002", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHGH28B-XTR",	"MT_0D20110002", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHGH18B-XTR",	"MT_0D30110002", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MNEH28B-XSR",	"MT_0D40110004", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MNEH28B-XTR",	"MT_0D50110004", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MNEH29B-XSR",	"MT_0D40110010", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MNEH29B-XTR",	"MT_0D50110010", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHGH29B-XSR",	"MT_0D10110008", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHGH29B-XTR",	"MT_0D20110008", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHJH29B-XSR",	"MT_0D10110009", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHJH29B-XTR",	"MT_0D20110009", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHGH19B-XSR",	"MT_0D60110008", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHGH19B-XTR",	"MT_0D30110008", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHJH19B-XTR",	"MT_0D30110009", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHQH29B-XSR",	"MT_0D70110009", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHQH29B-XTR",	"MT_0D80110009", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHRH29B-XSR",	"MT_0D70110008", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHRH29B-XTR",	"MT_0D80110008", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHQH19B-XTR",	"MT_0D90110009", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHRH19B-XTR",	"MT_0D90110008", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MNPH28C-XSR",	"MT_0DA0110004", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MNPH28C-XTR",	"MT_0DB0110004", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MNPH29C-XSR",	"MT_0DA0110010", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MNPH29C-XTR",	"MT_0DB0110010", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MNZH29-XSR",		"MT_0DC0110009", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MNZH29-XTR",		"MT_0DD0110009", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MHQH19B-XNR",	"MT_0DF0110009", "Osprey CX-2 PCIe Gen 2.0" },
+	{ "MNQH19-XTR",		"MT_0D80110017", "Osprey CX-2 PCIe Gen 2.0" }
 };
 
 /* Get mlx_mdr[] array size */
