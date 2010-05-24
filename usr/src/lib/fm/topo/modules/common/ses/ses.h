@@ -58,11 +58,30 @@ typedef struct ses_enum_target {
 } ses_enum_target_t;
 
 #define	TOPO_PGROUP_SES		"ses"
+/* Applied  any SES standard related topo node. */
 #define	TOPO_PROP_NODE_ID	"node-id"
 #define	TOPO_PROP_TARGET_PATH	"target-path"
-#define	TOPO_PROP_PATHS		"paths"
+/*
+ * Applied to host SES target related info on an expander node.
+ * In oder to avoid the same prop name across different property groups
+ * in the expander node, property group prefix is added to the names of
+ * individual properties.
+ */
+#define	TOPO_PROP_SES_DEVID	"ses-devid"
+#define	TOPO_PROP_SES_DEV_PATH	"ses-devfs-path"
+#define	TOPO_PROP_SES_PHYS_PATH	"ses-phys-path"
+#define	TOPO_PROP_SES_TARGET_PORT "ses-target-port"
+
+#define	TOPO_PGROUP_SMP		"smp"
+/* host SMP target related info for an expander node. */
+#define	TOPO_PROP_SMP_DEVID	"smp-devid"
+#define	TOPO_PROP_SMP_DEV_PATH	"smp-devfs-path"
+#define	TOPO_PROP_SMP_PHYS_PATH	"smp-phys-path"
+#define	TOPO_PROP_SMP_TARGET_PORT	"smp-target-port"
+
 #define	TOPO_PROP_SAS_ADDR	"sas-address"
 #define	TOPO_PROP_PHY_COUNT	"phy-count"
+#define	TOPO_PROP_PATHS		"paths"
 #define	TOPO_PROP_CHASSIS_TYPE	"chassis-type"
 #define	TOPO_PROP_SAS_PHY_MASK	"phy-mask"
 #define	TOPO_PROP_SAS_CONNECTOR_TYPE	"sas-connector-type"

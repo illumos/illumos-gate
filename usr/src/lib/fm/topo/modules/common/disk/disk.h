@@ -65,6 +65,10 @@ typedef struct dev_di_node {
 	char		*ddn_devid;	/* devid of device */
 	char		*ddn_dpath;	/* path to devinfo (may be vhci) */
 	char		**ddn_ppath;	/* physical path to device (phci) */
+	/*
+	 * the ppath count also indicates number of target port and
+	 * possible number of attached port and bridge port.
+	 */
 	int		ddn_ppath_count;
 
 	char		*ddn_lpath;	/* logical path (public /dev name) */
@@ -74,9 +78,11 @@ typedef struct dev_di_node {
 	char		*ddn_serial;
 	char		*ddn_firm;
 	char		*ddn_cap;
+	uchar_t		ddn_dtype;	/* scsi inquiry device type. */
 
-	char		**ddn_target_port;
-	int		ddn_target_port_count;
+	char		**ddn_target_port;  /* target-port devinfo prop */
+	char		**ddn_attached_port; /* attached-port devinfo prop */
+	char		**ddn_bridge_port;  /* bridge-port devinfo prop */
 } dev_di_node_t;
 
 struct topo_list;

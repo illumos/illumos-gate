@@ -164,15 +164,15 @@ typedef enum {
 	SES_DUP_SUBCHASSIS	= 0x8
 } ses_chassis_type_e;
 
-static const topo_pgroup_info_t io_pgroup = {
-	TOPO_PGROUP_IO,
+static const topo_pgroup_info_t storage_pgroup = {
+	TOPO_PGROUP_STORAGE,
 	TOPO_STABILITY_PRIVATE,
 	TOPO_STABILITY_PRIVATE,
 	1
 };
 
-static const topo_pgroup_info_t storage_pgroup = {
-	TOPO_PGROUP_STORAGE,
+static const topo_pgroup_info_t smp_pgroup = {
+	TOPO_PGROUP_SMP,
 	TOPO_STABILITY_PRIVATE,
 	TOPO_STABILITY_PRIVATE,
 	1
@@ -1376,8 +1376,8 @@ ses_set_expander_props(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	uint_t pcount;
 	uint64_t sasaddr, connidx;
 	char sasaddr_str[17];
-	boolean_t found = B_FALSE;
-	dev_di_node_t *dnode;
+	boolean_t found = B_FALSE, ses_found = B_FALSE;
+	dev_di_node_t *dnode, *sesdnode;
 
 	props = ses_node_props(np);
 
@@ -1400,10 +1400,16 @@ ses_set_expander_props(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	/* search matching dev_di_node. */
 	for (dnode = topo_list_next(&sdp->sed_devs); dnode != NULL;
 	    dnode = topo_list_next(dnode)) {
-		if (strstr(dnode->ddn_dpath, sasaddr_str) != NULL) {
-			found = B_TRUE;
-			break;
+		for (i = 0; i < dnode->ddn_ppath_count; i++) {
+			if ((dnode->ddn_target_port[i] != NULL) &&
+			    (strstr(dnode->ddn_target_port[i],
+			    sasaddr_str) != NULL)) {
+				found = B_TRUE;
+				break;
+			}
 		}
+		if (found)
+			break;
 	}
 
 	if (!found) {
@@ -1413,27 +1419,35 @@ ses_set_expander_props(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 		    SES_EXP_PROP_SAS_ADDR);
 		/* continue on to get storage group props. */
 	} else {
-		/* create/set the devfs-path and devid in the io group */
-		if (topo_pgroup_create(tnode, &io_pgroup, &err) != 0) {
+		/* create/set the devfs-path and devid in the smp group */
+		if (topo_pgroup_create(tnode, &smp_pgroup, &err) != 0) {
 			topo_mod_dprintf(mod, "ses_set_expander_props: "
-			    "create io error %s\n", topo_strerror(err));
+			    "failed to create smp property group %s\n",
+			    topo_strerror(err));
 			goto error;
 		} else {
-			if (topo_prop_set_string(tnode, TOPO_PGROUP_IO,
-			    TOPO_IO_DEV_PATH, TOPO_PROP_IMMUTABLE,
+			if (topo_prop_set_string(tnode, TOPO_PGROUP_SMP,
+			    TOPO_PROP_SMP_TARGET_PORT, TOPO_PROP_IMMUTABLE,
+			    dnode->ddn_target_port[i], &err) != 0) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set %S error %s\n", TOPO_PROP_SAS_ADDR,
+				    topo_strerror(err));
+			}
+			if (topo_prop_set_string(tnode, TOPO_PGROUP_SMP,
+			    TOPO_PROP_SMP_DEV_PATH, TOPO_PROP_IMMUTABLE,
 			    dnode->ddn_dpath, &err) != 0) {
 				topo_mod_dprintf(mod, "ses_set_expander_props: "
 				    "set dev error %s\n", topo_strerror(err));
 			}
-			if (topo_prop_set_string(tnode, TOPO_PGROUP_IO,
-			    TOPO_IO_DEVID, TOPO_PROP_IMMUTABLE,
+			if (topo_prop_set_string(tnode, TOPO_PGROUP_SMP,
+			    TOPO_PROP_SMP_DEVID, TOPO_PROP_IMMUTABLE,
 			    dnode->ddn_devid, &err) != 0) {
 				topo_mod_dprintf(mod, "ses_set_expander_props: "
 				    "set devid error %s\n", topo_strerror(err));
 			}
 			if (dnode->ddn_ppath_count != 0 &&
-			    topo_prop_set_string_array(tnode, TOPO_PGROUP_IO,
-			    TOPO_IO_PHYS_PATH, TOPO_PROP_IMMUTABLE,
+			    topo_prop_set_string_array(tnode, TOPO_PGROUP_SMP,
+			    TOPO_PROP_SMP_PHYS_PATH, TOPO_PROP_IMMUTABLE,
 			    (const char **)dnode->ddn_ppath,
 			    dnode->ddn_ppath_count, &err) != 0) {
 				topo_mod_dprintf(mod, "ses_set_expander_props: "
@@ -1443,13 +1457,79 @@ ses_set_expander_props(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 		}
 	}
 
+	/* update the ses property group with SES target info */
+	if (topo_pgroup_info(tnode, TOPO_PGROUP_SES, &err) == NULL) {
+		/* the SES property group should exist. */
+		topo_mod_dprintf(mod, "ses_set_expander_props: "
+		    "ses pgroup info error %s\n", topo_strerror(err));
+		goto error;
+	} else {
+		/* locate assciated enclosure dev_di_node. */
+		for (sesdnode = topo_list_next(&sdp->sed_devs);
+		    sesdnode != NULL; sesdnode = topo_list_next(sesdnode)) {
+			for (i = 0; i < sesdnode->ddn_ppath_count; i++) {
+				/*
+				 * check if attached port exists and
+				 * its node type is enclosure and
+				 * attached port is same as sas address of
+				 * the expander and
+				 * bridge port for virtual phy indication
+				 * exist.
+				 */
+				if ((sesdnode->ddn_attached_port[i] != NULL) &&
+				    (sesdnode->ddn_dtype == DTYPE_ESI) &&
+				    (strstr(sesdnode->ddn_attached_port[i],
+				    sasaddr_str) != NULL) &&
+				    (sesdnode->ddn_bridge_port[i] != NULL)) {
+					ses_found = B_TRUE;
+					break;
+				}
+			}
+			if (ses_found) break;
+		}
+
+		if (ses_found) {
+			if (topo_prop_set_string(tnode, TOPO_PGROUP_SES,
+			    TOPO_PROP_SES_TARGET_PORT, TOPO_PROP_IMMUTABLE,
+			    sesdnode->ddn_target_port[i], &err) != 0) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set ses %S error %s\n", TOPO_PROP_SAS_ADDR,
+				    topo_strerror(err));
+			}
+			if (topo_prop_set_string(tnode, TOPO_PGROUP_SES,
+			    TOPO_PROP_SES_DEV_PATH, TOPO_PROP_IMMUTABLE,
+			    sesdnode->ddn_dpath, &err) != 0) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set ses dev error %s\n",
+				    topo_strerror(err));
+			}
+			if (topo_prop_set_string(tnode, TOPO_PGROUP_SES,
+			    TOPO_PROP_SES_DEVID, TOPO_PROP_IMMUTABLE,
+			    sesdnode->ddn_devid, &err) != 0) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set ses devid error %s\n",
+				    topo_strerror(err));
+			}
+			if (sesdnode->ddn_ppath_count != 0 &&
+			    topo_prop_set_string_array(tnode, TOPO_PGROUP_SES,
+			    TOPO_PROP_SES_PHYS_PATH, TOPO_PROP_IMMUTABLE,
+			    (const char **)sesdnode->ddn_ppath,
+			    sesdnode->ddn_ppath_count, &err) != 0) {
+				topo_mod_dprintf(mod, "ses_set_expander_props: "
+				    "set ses phys-path error %s\n",
+				    topo_strerror(err));
+			}
+
+		}
+	}
+
 	/* create the storage group */
 	if (topo_pgroup_create(tnode, &storage_pgroup, &err) != 0) {
 		topo_mod_dprintf(mod, "ses_set_expander_props: "
 		    "create storage error %s\n", topo_strerror(err));
 		goto error;
 	} else {
-		/* set the SAS address prop of the expander. */
+		/* set the SAS address prop out of expander element status. */
 		if (topo_prop_set_string(tnode, TOPO_PGROUP_STORAGE,
 		    TOPO_PROP_SAS_ADDR, TOPO_PROP_IMMUTABLE, sasaddr_str,
 		    &err) != 0) {

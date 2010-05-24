@@ -478,9 +478,10 @@ disk_declare_addr(topo_mod_t *mod, tnode_t *parent, topo_list_t *listp,
 		if (dnode->ddn_target_port == NULL)
 			continue;
 
-		for (i = 0; i < dnode->ddn_target_port_count; i++) {
-			if (strncmp(dnode->ddn_target_port[i], addr,
-			    strcspn(dnode->ddn_target_port[i], ":")) == 0) {
+		for (i = 0; i < dnode->ddn_ppath_count; i++) {
+			if ((dnode->ddn_target_port[i] != NULL) &&
+			    (strncmp(dnode->ddn_target_port[i], addr,
+			    strcspn(dnode->ddn_target_port[i], ":"))) == 0) {
 				topo_mod_dprintf(mod, "disk_declare_addr: "
 				    "found disk matching addr %s", addr);
 				return (disk_declare(mod, parent, dnode,
@@ -540,10 +541,21 @@ dev_di_node_free(topo_mod_t *mod, dev_di_node_t *dnode)
 	/* free the stuff we point to */
 	if (dnode->ddn_devid)
 		topo_mod_strfree(mod, dnode->ddn_devid);
-	for (i = 0; i < dnode->ddn_ppath_count; i++)
+	for (i = 0; i < dnode->ddn_ppath_count; i++) {
+		/* topo_mod_strfree does NULL checking. */
 		topo_mod_strfree(mod, dnode->ddn_ppath[i]);
+		topo_mod_strfree(mod, dnode->ddn_target_port[i]);
+		topo_mod_strfree(mod, dnode->ddn_attached_port[i]);
+		topo_mod_strfree(mod, dnode->ddn_bridge_port[i]);
+	}
 	topo_mod_free(mod, dnode->ddn_ppath,
-	    dnode->ddn_ppath_count * sizeof (uintptr_t));
+	    dnode->ddn_ppath_count * sizeof (char *));
+	topo_mod_free(mod, dnode->ddn_target_port,
+	    dnode->ddn_ppath_count * sizeof (char *));
+	topo_mod_free(mod, dnode->ddn_attached_port,
+	    dnode->ddn_ppath_count * sizeof (char *));
+	topo_mod_free(mod, dnode->ddn_bridge_port,
+	    dnode->ddn_ppath_count * sizeof (char *));
 	topo_mod_strfree(mod, dnode->ddn_dpath);
 	topo_mod_strfree(mod, dnode->ddn_lpath);
 
@@ -552,11 +564,6 @@ dev_di_node_free(topo_mod_t *mod, dev_di_node_t *dnode)
 	topo_mod_strfree(mod, dnode->ddn_serial);
 	topo_mod_strfree(mod, dnode->ddn_firm);
 	topo_mod_strfree(mod, dnode->ddn_cap);
-
-	for (i = 0; i < dnode->ddn_target_port_count; i++)
-		topo_mod_strfree(mod, dnode->ddn_target_port[i]);
-	topo_mod_free(mod, dnode->ddn_target_port,
-	    dnode->ddn_target_port_count * sizeof (uintptr_t));
 
 	/* free self */
 	topo_mod_free(mod, dnode, sizeof (dev_di_node_t));
@@ -578,9 +585,9 @@ dev_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	int		*dblksizep;
 	uint_t		dblksize;
 	char		lentry[MAXPATHLEN];
-	int		pathcount, portcount;
+	int		pathcount;
 	int		*inq_dtype, itype;
-	int 		ret, i;
+	int 		i;
 
 	if (devid) {
 		/*
@@ -638,18 +645,15 @@ dev_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	 * To resolve this issue disk_declare_path() needs to use the
 	 * special di_devfs_path_match() interface.
 	 */
-	pathcount = portcount = 0;
+	pathcount = 0;
 	pnode = NULL;
 	while ((pnode = di_path_client_next_path(node, pnode)) != NULL) {
-		if ((ret = di_path_prop_lookup_strings(pnode,
-		    SCSI_ADDR_PROP_TARGET_PORT, &s)) > 0)
-			portcount += ret;
 		pathcount++;
 	}
 
 	if (pathcount == 0) {
 		if ((dnode->ddn_ppath =
-		    topo_mod_zalloc(mod, sizeof (uintptr_t))) == NULL)
+		    topo_mod_zalloc(mod, sizeof (char *))) == NULL)
 			goto error;
 
 		dnode->ddn_ppath_count = 1;
@@ -657,39 +661,70 @@ dev_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 		    dnode->ddn_dpath)) == NULL)
 			goto error;
 
-		if ((ret = di_prop_lookup_strings(DDI_DEV_T_ANY, node,
-		    SCSI_ADDR_PROP_TARGET_PORT, &s)) > 0) {
-			if ((dnode->ddn_target_port = topo_mod_zalloc(mod,
-			    ret * sizeof (uintptr_t))) == NULL)
+		if ((dnode->ddn_target_port = topo_mod_zalloc(mod,
+		    sizeof (char *))) == NULL)
+			goto error;
+
+		if ((dnode->ddn_attached_port = topo_mod_zalloc(mod,
+		    sizeof (char *))) == NULL)
+			goto error;
+
+		if ((dnode->ddn_bridge_port = topo_mod_zalloc(mod,
+		    sizeof (char *))) == NULL)
+			goto error;
+
+		/* There should be only one target port for a devinfo node. */
+		if ((di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+		    SCSI_ADDR_PROP_TARGET_PORT, &s)) == 1) {
+			if ((dnode->ddn_target_port[0] =
+			    topo_mod_strdup(mod,
+			    scsi_wwnstr_skip_ua_prefix(s))) ==
+			    NULL)
 				goto error;
-			dnode->ddn_target_port_count = ret;
-
-			for (i = 0; i < ret; i++) {
-				if ((dnode->ddn_target_port[i] =
-				    topo_mod_strdup(mod,
-				    scsi_wwnstr_skip_ua_prefix(s))) ==
-				    NULL)
-					goto error;
-
-				s += strlen(s) + 1;
-			}
 		}
+
+		if ((di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+		    SCSI_ADDR_PROP_ATTACHED_PORT, &s)) == 1) {
+			/* There should be one attached port if any. */
+			if ((dnode->ddn_attached_port[0] =
+			    topo_mod_strdup(mod,
+			    scsi_wwnstr_skip_ua_prefix(s))) ==
+			    NULL)
+				goto error;
+		}
+
+		if ((di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+		    SCSI_ADDR_PROP_BRIDGE_PORT, &s)) == 1) {
+			/* There should be one bridge port if any. */
+			if ((dnode->ddn_bridge_port[0] =
+			    topo_mod_strdup(mod,
+			    scsi_wwnstr_skip_ua_prefix(s))) ==
+			    NULL)
+				goto error;
+		}
+
 	} else {
+		/* processing a scsi_vhci device. */
 		if ((dnode->ddn_ppath = topo_mod_zalloc(mod,
-		    pathcount * sizeof (uintptr_t))) == NULL)
+		    pathcount * sizeof (char *))) == NULL)
 			goto error;
 
 		dnode->ddn_ppath_count = pathcount;
 
-		if (portcount != 0 &&
-		    ((dnode->ddn_target_port = topo_mod_zalloc(mod,
-		    portcount * sizeof (uintptr_t)))) == NULL)
+		if ((dnode->ddn_target_port = topo_mod_zalloc(mod,
+		    pathcount * sizeof (char *))) == NULL)
 			goto error;
 
-		dnode->ddn_target_port_count = portcount;
+		if ((dnode->ddn_attached_port = topo_mod_zalloc(mod,
+		    pathcount * sizeof (char *))) == NULL)
+			goto error;
+
+		if ((dnode->ddn_bridge_port = topo_mod_zalloc(mod,
+		    pathcount * sizeof (char *))) == NULL)
+			goto error;
 
 		pnode = NULL;
-		pathcount = portcount = 0;
+		pathcount = 0;
 		while ((pnode = di_path_client_next_path(node,
 		    pnode)) != NULL) {
 			if ((path = di_path_devfs_path(pnode)) == NULL) {
@@ -703,18 +738,31 @@ dev_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 			if (dnode->ddn_ppath[pathcount] == NULL)
 				goto error;
 
-			if ((ret = di_path_prop_lookup_strings(pnode,
-			    SCSI_ADDR_PROP_TARGET_PORT, &s)) > 0) {
-				for (i = 0; i < ret; i++) {
-					if ((dnode->ddn_target_port[portcount] =
-					    topo_mod_strdup(mod,
-					    scsi_wwnstr_skip_ua_prefix(s))) ==
-					    NULL)
-						goto error;
+			if ((di_path_prop_lookup_strings(pnode,
+			    SCSI_ADDR_PROP_TARGET_PORT, &s)) == 1) {
+				if ((dnode->ddn_target_port[pathcount] =
+				    topo_mod_strdup(mod,
+				    scsi_wwnstr_skip_ua_prefix(s))) ==
+				    NULL)
+					goto error;
+			}
 
-					portcount++;
-					s += strlen(s) + 1;
-				}
+			if ((di_path_prop_lookup_strings(pnode,
+			    SCSI_ADDR_PROP_ATTACHED_PORT, &s)) == 1) {
+				if ((dnode->ddn_attached_port[pathcount] =
+				    topo_mod_strdup(mod,
+				    scsi_wwnstr_skip_ua_prefix(s))) ==
+				    NULL)
+					goto error;
+			}
+
+			if ((di_path_prop_lookup_strings(pnode,
+			    SCSI_ADDR_PROP_BRIDGE_PORT, &s)) == 1) {
+				if ((dnode->ddn_bridge_port[pathcount] =
+				    topo_mod_strdup(mod,
+				    scsi_wwnstr_skip_ua_prefix(s))) ==
+				    NULL)
+					goto error;
 			}
 
 			pathcount++;
@@ -727,6 +775,7 @@ dev_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	 */
 	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "inquiry-device-type",
 	    &inq_dtype) > 0) {
+		dnode->ddn_dtype = *inq_dtype;
 		itype = (*inq_dtype) & DTYPE_MASK;
 		if (itype == DTYPE_DIRECT) {
 			mlen = strlen(dnode->ddn_dpath) + strlen(extn) + 1;
@@ -744,6 +793,8 @@ dev_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 				    "failed to determine logical path");
 			}
 		}
+	} else {
+		dnode->ddn_dtype = DTYPE_UNKNOWN;
 	}
 
 	/* cache various bits of optional information about the device. */
