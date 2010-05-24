@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/ddi.h>
@@ -60,9 +59,6 @@ static kv_status_t iser_handle_numerical(nvpair_t *nvp, uint64_t value,
 static kv_status_t iser_handle_boolean(nvpair_t *nvp, boolean_t value,
     const idm_kv_xlate_t *ikvx, boolean_t iser_value, nvlist_t *request_nvl,
     nvlist_t *response_nvl, nvlist_t *negotiated_nvl);
-static kv_status_t iser_handle_digest(nvpair_t *choices,
-    const idm_kv_xlate_t *ikvx, nvlist_t *request_nvl, nvlist_t *response_nvl,
-    nvlist_t *negotiated_nvl);
 static kv_status_t iser_handle_key(nvpair_t *nvp, const idm_kv_xlate_t *ikvx,
     nvlist_t *request_nvl, nvlist_t *response_nvl, nvlist_t *negotiated_nvl);
 static kv_status_t iser_process_request_nvlist(nvlist_t *request_nvl,
@@ -631,8 +627,6 @@ iser_handle_key(nvpair_t *nvp, const idm_kv_xlate_t *ikvx,
 		/* Booleans */
 	case KI_RDMA_EXTENSIONS:
 	case KI_IMMEDIATE_DATA:
-	case KI_IFMARKER:
-	case KI_OFMARKER:
 		nvrc = nvpair_value_boolean_value(nvp, &bool_val);
 		ASSERT(nvrc == 0);
 		break;
@@ -647,14 +641,13 @@ iser_handle_key(nvpair_t *nvp, const idm_kv_xlate_t *ikvx,
 		break;
 	}
 
-	/* Now handle the values according to the key name */
+	/*
+	 * Now handle the values according to the key name. Keys not
+	 * specifically handled here will be negotiated by the iscsi
+	 * target. Negotiated values take effect when
+	 * iser_notice_key_values gets called.
+	 */
 	switch (ikvx->ik_key_id) {
-	case KI_HEADER_DIGEST:
-	case KI_DATA_DIGEST:
-		/* Ensure "None" */
-		kvrc = iser_handle_digest(nvp, ikvx, request_nvl, response_nvl,
-		    negotiated_nvl);
-		break;
 	case KI_RDMA_EXTENSIONS:
 		/* Ensure "Yes" */
 		kvrc = iser_handle_boolean(nvp, bool_val, ikvx, B_TRUE,
@@ -677,8 +670,6 @@ iser_handle_key(nvpair_t *nvp, const idm_kv_xlate_t *ikvx,
 		    request_nvl, response_nvl, negotiated_nvl);
 		break;
 	case KI_IMMEDIATE_DATA:
-	case KI_OFMARKER:
-	case KI_IFMARKER:
 		/* Ensure "No" */
 		kvrc = iser_handle_boolean(nvp, bool_val, ikvx, B_FALSE,
 		    request_nvl, response_nvl, negotiated_nvl);
@@ -703,52 +694,6 @@ iser_handle_key(nvpair_t *nvp, const idm_kv_xlate_t *ikvx,
 	return (kvrc);
 }
 
-/* Ensure that "None" is an option in the digest list, and select it */
-static kv_status_t
-iser_handle_digest(nvpair_t *choices, const idm_kv_xlate_t *ikvx,
-    nvlist_t *request_nvl, nvlist_t *response_nvl, nvlist_t *negotiated_nvl)
-{
-	kv_status_t		kvrc = KV_VALUE_ERROR;
-	int			nvrc = 0;
-	nvpair_t		*digest_choice;
-	char			*digest_choice_string;
-
-	/*
-	 * Loop through all digest choices.  We need to enforce no
-	 * "None" for both header and data digest.  If we find our
-	 * required value, add the value to our negotiated values list
-	 * and respond with that value in the login response. If not,
-	 * indicate a value error for the iSCSI layer to work with.
-	 */
-	digest_choice = idm_get_next_listvalue(choices, NULL);
-	while (digest_choice != NULL) {
-		nvrc = nvpair_value_string(digest_choice,
-		    &digest_choice_string);
-		ASSERT(nvrc == 0);
-
-		if (strcasecmp(digest_choice_string, "none") == 0) {
-
-			/* Add to negotiated values list */
-			nvrc = nvlist_add_string(negotiated_nvl,
-			    ikvx->ik_key_name, digest_choice_string);
-			kvrc = idm_nvstat_to_kvstat(nvrc);
-			if (nvrc == 0) {
-				/* Add to login response list */
-				nvrc = nvlist_add_string(response_nvl,
-				    ikvx->ik_key_name, digest_choice_string);
-				kvrc = idm_nvstat_to_kvstat(nvrc);
-				/* Remove from the request (we've handled it) */
-				(void) nvlist_remove_all(request_nvl,
-				    ikvx->ik_key_name);
-			}
-			break;
-		}
-		digest_choice = idm_get_next_listvalue(choices,
-		    digest_choice);
-	}
-
-	return (kvrc);
-}
 
 /* Validate a proposed boolean value, and set the alternate if necessary */
 static kv_status_t
@@ -880,6 +825,7 @@ iser_notice_key_values(idm_conn_t *ic, nvlist_t *negotiated_nvl)
 	boolean_t		boolean_val;
 	uint64_t		uint64_val;
 	int			nvrc;
+	char			*digest_choice_string;
 
 	iser_conn = (iser_conn_t *)ic->ic_transport_private;
 
@@ -887,16 +833,24 @@ iser_notice_key_values(idm_conn_t *ic, nvlist_t *negotiated_nvl)
 	 * Validate the final negotiated operational parameters,
 	 * and save a copy.
 	 */
-	if ((nvrc = nvlist_lookup_boolean_value(negotiated_nvl,
-	    "HeaderDigest", &boolean_val)) != ENOENT) {
+	if ((nvrc = nvlist_lookup_string(negotiated_nvl,
+	    "HeaderDigest", &digest_choice_string)) != ENOENT) {
 		ASSERT(nvrc == 0);
-		iser_conn->ic_op_params.op_header_digest = boolean_val;
+
+		/*
+		 * Per the iSER RFC, override the negotiated value with "None"
+		 */
+		iser_conn->ic_op_params.op_header_digest = B_FALSE;
 	}
 
-	if ((nvrc = nvlist_lookup_boolean_value(negotiated_nvl,
-	    "DataDigest", &boolean_val)) != ENOENT) {
+	if ((nvrc = nvlist_lookup_string(negotiated_nvl,
+	    "DataDigest", &digest_choice_string)) != ENOENT) {
 		ASSERT(nvrc == 0);
-		iser_conn->ic_op_params.op_data_digest = boolean_val;
+
+		/*
+		 * Per the iSER RFC, override the negotiated value with "None"
+		 */
+		iser_conn->ic_op_params.op_data_digest = B_FALSE;
 	}
 
 	if ((nvrc = nvlist_lookup_boolean_value(negotiated_nvl,
@@ -908,13 +862,19 @@ iser_notice_key_values(idm_conn_t *ic, nvlist_t *negotiated_nvl)
 	if ((nvrc = nvlist_lookup_boolean_value(negotiated_nvl,
 	    "OFMarker", &boolean_val)) != ENOENT) {
 		ASSERT(nvrc == 0);
-		iser_conn->ic_op_params.op_ofmarker = boolean_val;
+		/*
+		 * Per the iSER RFC, override the negotiated value with "No"
+		 */
+		iser_conn->ic_op_params.op_ofmarker = B_FALSE;
 	}
 
 	if ((nvrc = nvlist_lookup_boolean_value(negotiated_nvl,
 	    "IFMarker", &boolean_val)) != ENOENT) {
 		ASSERT(nvrc == 0);
-		iser_conn->ic_op_params.op_ifmarker = boolean_val;
+		/*
+		 * Per the iSER RFC, override the negotiated value with "No"
+		 */
+		iser_conn->ic_op_params.op_ifmarker = B_FALSE;
 	}
 
 	if ((nvrc = nvlist_lookup_uint64(negotiated_nvl,

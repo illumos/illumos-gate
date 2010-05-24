@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -734,7 +733,7 @@ iser_ib_post_recv_async(ibt_channel_hdl_t chanhdl)
 	 * it must hold the mutex cross the check and the call to this function
 	 */
 	ASSERT(mutex_owned(&chan->ic_conn->ic_lock));
-	ASSERT((chan->ic_conn->ic_stage >= ISER_CONN_STAGE_IC_CONNECTED) &&
+	ASSERT((chan->ic_conn->ic_stage >= ISER_CONN_STAGE_ALLOCATED) &&
 	    (chan->ic_conn->ic_stage <= ISER_CONN_STAGE_LOGGED_IN));
 	idm_conn_hold(chan->ic_conn->ic_idmc);
 	status = ddi_taskq_dispatch(iser_taskq, iser_ib_post_recv_task,
