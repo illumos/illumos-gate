@@ -5007,6 +5007,14 @@ closevol(void)
 static void
 done(int n)
 {
+	/*
+	 * If we were terminated in some way, and we would otherwise have
+	 * exited with a value of 0, adjust to 1, so that external callers
+	 * can determine this by looking at the exit status.
+	 */
+	if (term && n == 0)
+		n = 1;
+
 	if (tfile != NULL)
 		(void) unlink(tname);
 	if (compress_opt != NULL)
