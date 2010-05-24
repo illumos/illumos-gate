@@ -21,15 +21,15 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
 # Various database lookup classes/methods, i.e.:
 #     * monaco
 #     * bugs.opensolaris.org (b.o.o.)
-#     * arc.opensolaris.org/cgi-bin/arc.cgi (for ARC)
+#     * arc.opensolaris.org/cgi-bin/arc.cgi (for ARC off SWAN)
+#     * candi.sfbay.sun.com/cgi-bin/arc.cgi (for ARC on SWAN)
 #
 
 import csv
@@ -246,7 +246,10 @@ class ARCException(Exception):
 
 def ARC(arclist, arcPath=None):
 	if not arcPath:
-		arcPath = "http://arc.opensolaris.org/cgi-bin/arc.cgi"
+		if onSWAN():
+			arcPath = "http://candi.sfbay.sun.com/cgi-bin/arc.cgi"
+		else:
+			arcPath = "http://arc.opensolaris.org/cgi-bin/arc.cgi"
 	fields = ["present", "arc", "year", "case", "status", "title"]
 	opts = [("case", "%s/%s" % (a, c)) for a, c in arclist]
 	req = urllib2.Request(arcPath, urllib.urlencode(opts))
