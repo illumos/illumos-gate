@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <assert.h>
@@ -86,9 +85,10 @@ ipmi_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 	ipmi_entity_t *ep;
 	boolean_t present;
 	nvlist_t *nvl;
-	int err;
-	char *name;
+	int err, i;
+	char *name, **names;
 	ipmi_sdr_t *sdrp;
+	uint_t nelems;
 
 	if ((ihp = topo_mod_ipmi_hold(mod)) == NULL)
 		return (topo_mod_seterrno(mod, ETOPO_METHOD_UNKNOWN));
@@ -119,8 +119,9 @@ ipmi_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 			    present);
 			topo_mod_strfree(mod, name);
 		} else {
-			if (topo_prop_get_string(tn, TOPO_PGROUP_IPMI,
-			    TOPO_PROP_IPMI_ENTITY_REF, &name, &err) != 0) {
+			if (topo_prop_get_string_array(tn, TOPO_PGROUP_IPMI,
+			    TOPO_PROP_IPMI_ENTITY_REF, &names, &nelems, &err)
+			    != 0) {
 				/*
 				 * Not all nodes have an entity_ref attribute.
 				 * For these cases, return ENOTSUP so that we
@@ -132,16 +133,22 @@ ipmi_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 				    ETOPO_METHOD_NOTSUP));
 			}
 
-			if ((ep = ipmi_entity_lookup_sdr(ihp, name)) == NULL) {
-				topo_mod_strfree(mod, name);
+			for (i = 0; i < nelems; i++)
+				if ((ep = ipmi_entity_lookup_sdr(ihp, names[i]))
+				    != NULL)
+					break;
+
+			for (i = 0; i < nelems; i++)
+				topo_mod_strfree(mod, names[i]);
+			topo_mod_free(mod, names, (nelems * sizeof (char *)));
+
+			if (ep == NULL) {
 				topo_mod_dprintf(mod,
-				    "Failed to lookup ipmi entity "
-				    "%s (%s)\n", name, ipmi_errmsg(ihp));
+				    "Failed to get present state of %s=%d\n",
+				    topo_node_name(tn), topo_node_instance(tn));
 				topo_mod_ipmi_rele(mod);
 				return (-1);
 			}
-
-			topo_mod_strfree(mod, name);
 			topo_node_setspecific(tn, ep);
 		}
 	}
@@ -156,7 +163,8 @@ ipmi_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 		}
 
 		topo_mod_dprintf(mod,
-		    "ipmi_entity_present() = %d\n", present);
+		    "ipmi_entity_present(%d, %d) = %d\n", ep->ie_type,
+		    ep->ie_instance, present);
 	}
 
 	topo_mod_ipmi_rele(mod);
