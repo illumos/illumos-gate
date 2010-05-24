@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -301,6 +300,7 @@ static const struct {
 	{SCF_TYPE_FMRI,		REP_PROTOCOL_SUBTYPE_FMRI,	"fmri"},
 	{SCF_TYPE_HOST,		REP_PROTOCOL_SUBTYPE_HOST,	"host"},
 	{SCF_TYPE_HOSTNAME,	REP_PROTOCOL_SUBTYPE_HOSTNAME,	"hostname"},
+	{SCF_TYPE_NET_ADDR,	REP_PROTOCOL_SUBTYPE_NETADDR,	"net_address"},
 	{SCF_TYPE_NET_ADDR_V4,	REP_PROTOCOL_SUBTYPE_NETADDR_V4,
 	    "net_address_v4"},
 	{SCF_TYPE_NET_ADDR_V6,	REP_PROTOCOL_SUBTYPE_NETADDR_V6,
@@ -4845,6 +4845,7 @@ scf_value_set_from_string(scf_value_t *v, scf_type_t type, const char *str)
 	case SCF_TYPE_FMRI:
 	case SCF_TYPE_HOST:
 	case SCF_TYPE_HOSTNAME:
+	case SCF_TYPE_NET_ADDR:
 	case SCF_TYPE_NET_ADDR_V4:
 	case SCF_TYPE_NET_ADDR_V6:
 		ty = scf_type_to_protocol_type(type);

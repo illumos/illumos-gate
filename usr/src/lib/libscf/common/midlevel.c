@@ -256,6 +256,7 @@ fill_prop(scf_property_t *prop, const char *pgname, const char *propname,
 		case SCF_TYPE_USTRING:
 		case SCF_TYPE_HOST:
 		case SCF_TYPE_HOSTNAME:
+		case SCF_TYPE_NET_ADDR:
 		case SCF_TYPE_NET_ADDR_V4:
 		case SCF_TYPE_NET_ADDR_V6:
 		case SCF_TYPE_URI:
@@ -332,6 +333,7 @@ error1:
 	case SCF_TYPE_USTRING:
 	case SCF_TYPE_HOST:
 	case SCF_TYPE_HOSTNAME:
+	case SCF_TYPE_NET_ADDR:
 	case SCF_TYPE_NET_ADDR_V4:
 	case SCF_TYPE_NET_ADDR_V6:
 	case SCF_TYPE_URI:
@@ -1751,6 +1753,7 @@ scf_simple_prop_free(scf_simple_prop_t *prop)
 	case SCF_TYPE_USTRING:
 	case SCF_TYPE_HOST:
 	case SCF_TYPE_HOSTNAME:
+	case SCF_TYPE_NET_ADDR:
 	case SCF_TYPE_NET_ADDR_V4:
 	case SCF_TYPE_NET_ADDR_V6:
 	case SCF_TYPE_URI:
@@ -2317,6 +2320,7 @@ scf_next_val(scf_simple_prop_t *prop, scf_type_t type)
 	case SCF_TYPE_USTRING:
 	case SCF_TYPE_HOST:
 	case SCF_TYPE_HOSTNAME:
+	case SCF_TYPE_NET_ADDR:
 	case SCF_TYPE_NET_ADDR_V4:
 	case SCF_TYPE_NET_ADDR_V6:
 	case SCF_TYPE_URI:
@@ -3000,4 +3004,51 @@ out:
 	scf_pg_destroy(pg);
 
 	return (ret);
+}
+
+/*
+ * Check the "application/auto_enable" property for the passed FMRI.
+ * scf_simple_prop_get() should find the property on an instance
+ * or on the service FMRI.  The routine returns:
+ * -1: inconclusive (likely no such property or FMRI)
+ *  0: auto_enable is false
+ *  1: auto_enable is true
+ */
+static int
+is_auto_enabled(char *fmri)
+{
+	scf_simple_prop_t *prop;
+	int retval = -1;
+	uint8_t *ret;
+
+	prop = scf_simple_prop_get(NULL, fmri, SCF_GROUP_APPLICATION,
+	    "auto_enable");
+	if (!prop)
+		return (retval);
+	ret = scf_simple_prop_next_boolean(prop);
+	retval = (*ret != 0);
+	scf_simple_prop_free(prop);
+	return (retval);
+}
+
+/*
+ * Check an array of services and enable any that don't have the
+ * "application/auto_enable" property set to "false", which is
+ * the interface to turn off this behaviour (see PSARC 2004/739).
+ */
+void
+_check_services(char **svcs)
+{
+	char *s;
+
+	for (; *svcs; svcs++) {
+		if (is_auto_enabled(*svcs) == 0)
+			continue;
+		if ((s = smf_get_state(*svcs)) != NULL) {
+			if (strcmp(SCF_STATE_STRING_DISABLED, s) == 0)
+				(void) smf_enable_instance(*svcs,
+				    SMF_TEMPORARY);
+			free(s);
+		}
+	}
 }

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBSCF_H
@@ -85,7 +84,8 @@ typedef enum {
 	SCF_TYPE_HOST = 300,
 	SCF_TYPE_HOSTNAME,
 	SCF_TYPE_NET_ADDR_V4,
-	SCF_TYPE_NET_ADDR_V6
+	SCF_TYPE_NET_ADDR_V6,
+	SCF_TYPE_NET_ADDR
 } scf_type_t;
 
 typedef struct scf_time {

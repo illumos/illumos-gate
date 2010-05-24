@@ -18,9 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # cmd/fs.d/nfs/mount/Makefile
 
@@ -48,7 +46,7 @@ UNCHECKED_HDRS=	webnfs.h
 #
 POFILE= mount.po
 
-LDLIBS += -lrpcsvc -lnsl -lsocket
+LDLIBS += -lrpcsvc -lnsl -lsocket -lscf
 CPPFLAGS += -I. -I../.. -I../lib
 CFLAGS += $(CCVERBOSE)
 

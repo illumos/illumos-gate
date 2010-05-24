@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY= libnsl.a
@@ -203,7 +202,7 @@ CCFLAGS64 +=	-_CC=-features=conststrings
 
 LIBMP =		-lmp
 lint :=		LIBMP =
-LDLIBS +=	$(LIBMP) -lmd -lscf -lc
+LDLIBS +=	$(LIBMP) -lmd -lc
 
 $(LINTLIB):=	SRCS=$(SRCDIR)/$(LINTSRC)
 LINTFLAGS +=	-m -DPORTMAP

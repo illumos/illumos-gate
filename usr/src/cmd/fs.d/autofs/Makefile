@@ -18,9 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # cmd/fs.d/autofs/Makefile
 
@@ -82,9 +80,9 @@ POFILE= autofs.po
 GREP= egrep
 SED= sed
 
-$(AUTO) := 	LDLIBS += -lnsl -lsldap
-$(MOUNT):=	LDLIBS += -lnsl
-$(TYPEPROG) :=	LDLIBS += -lrpcsvc -lsocket -lnsl -lsldap -lkstat
+$(AUTO) := 	LDLIBS += -lnsl -lsldap -lscf
+$(MOUNT):=	LDLIBS += -lscf
+$(TYPEPROG) :=	LDLIBS += -lrpcsvc -lsocket -lnsl -lsldap -lkstat -lscf
 
 CFLAGS +=	$(CCVERBOSE) -D_FILE_OFFSET_BITS=64
 CPPFLAGS=	-I. -I.. -I../nfs/lib $(CPPFLAGS.master) -D_REENTRANT  \

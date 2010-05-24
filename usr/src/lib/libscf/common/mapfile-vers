@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -318,6 +317,7 @@ SUNWprivate_1.1 {
 	scf_get_boot_config_ovr;
 	scf_is_fastboot_default;
 	scf_fastreboot_default_set_transient;
+	_check_services;
     local:
 	*;
 };

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -118,7 +117,6 @@ extern boolean_t nfsl_errs_to_syslog;
 
 /* imported functions */
 extern int exportfs(char *, struct exportdata *);
-extern void _check_services(char **);
 extern int nfs_getseconfig_default(seconfig_t *);
 extern int nfs_getseconfig_byname(char *, seconfig_t *);
 extern bool_t nfs_get_root_principal(seconfig_t *, char *, caddr_t *);

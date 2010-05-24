@@ -43,6 +43,7 @@
 #include <pwd.h>
 #include <limits.h>
 #include <libscf.h>
+#include <libscf_priv.h>
 #include <strings.h>
 #include "libshare_smb.h"
 #include <rpcsvc/daemon_utils.h>

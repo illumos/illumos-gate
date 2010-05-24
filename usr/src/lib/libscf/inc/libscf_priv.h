@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBSCF_PRIV_H
@@ -545,6 +544,13 @@ int scf_fastreboot_default_set_transient(boolean_t);
  * first.
  */
 int scf_is_compatible_type(scf_type_t, scf_type_t);
+
+/*
+ * Check an array of services and enable any that don't have the
+ * "application/auto_enable" property set to "false", which is
+ * the interface to turn off this behaviour (see PSARC 2004/739).
+ */
+void _check_services(char **);
 
 #ifdef	__cplusplus
 }

@@ -20,10 +20,10 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+#include <assert.h>
 #include <repcache_protocol.h>
 #include "scf_type.h"
 #include <errno.h>
@@ -31,6 +31,10 @@
 #include <libscf_priv.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 #define	UTF8_TOP_N(n) \
 	(0xff ^ (0xff >> (n)))		/* top N bits set */
@@ -228,6 +232,67 @@ valid_fmri(const char *str)
 	return (ret);
 }
 
+/*
+ * check_prefix()
+ * Return 1 if the prefix is a valid IPv4 or IPv6 network prefix, 0 otherwise
+ */
+static int
+check_net_prefix(const char *p, int max_len)
+{
+	char *end;
+	int len;
+
+	len = strtol(p, &end, 10);
+	if (p == end || len < 0 || len > max_len)
+		return (0);
+
+	return (1);
+}
+
+/*
+ * Return 1 if the supplied IP address is valid, 0 otherwise.
+ */
+static int
+valid_ip(int af, const char *str)
+{
+	void *unused[4];
+	const char *addr = str;
+	char buf[INET6_ADDRSTRLEN]; /* enough for both IPv4 and IPv6 */
+	char *net_prefix;
+	int buf_sz;
+	int plen;
+
+	switch (af) {
+	case AF_INET:
+		buf_sz = INET_ADDRSTRLEN;
+		plen = 32; /* bit size of an IPv4 */
+		break;
+
+	case AF_INET6:
+		buf_sz = INET6_ADDRSTRLEN;
+		plen = 128; /* bit size of an IPv6 */
+		break;
+
+	default:
+		assert(0);
+		abort();
+	}
+
+	/* check network prefix for the IP address */
+	if ((net_prefix = strchr(str, '/')) != NULL) {
+		if (check_net_prefix(++net_prefix, plen) == 0)
+			return (0);
+
+		(void) strlcpy(buf, str, buf_sz);
+		if ((net_prefix = strchr(buf, '/')) != NULL)
+			*net_prefix = '\0';
+
+		addr = buf;
+	}
+
+	return (inet_pton(af, addr, unused));
+}
+
 rep_protocol_value_type_t
 scf_proto_underlying_type(rep_protocol_value_type_t t)
 {
@@ -252,10 +317,12 @@ scf_proto_underlying_type(rep_protocol_value_type_t t)
 		return (REP_PROTOCOL_SUBTYPE_USTRING);
 	case REP_PROTOCOL_SUBTYPE_HOSTNAME:
 		return (REP_PROTOCOL_SUBTYPE_HOST);
+	case REP_PROTOCOL_SUBTYPE_NETADDR:
+		return (REP_PROTOCOL_SUBTYPE_HOST);
 	case REP_PROTOCOL_SUBTYPE_NETADDR_V4:
-		return (REP_PROTOCOL_SUBTYPE_HOST);
+		return (REP_PROTOCOL_SUBTYPE_NETADDR);
 	case REP_PROTOCOL_SUBTYPE_NETADDR_V6:
-		return (REP_PROTOCOL_SUBTYPE_HOST);
+		return (REP_PROTOCOL_SUBTYPE_NETADDR);
 
 	case REP_PROTOCOL_TYPE_INVALID:
 	default:
@@ -347,17 +414,20 @@ valid_encoded_value(rep_protocol_value_type_t t, const char *v)
 
 	case REP_PROTOCOL_SUBTYPE_HOST:
 		return (valid_encoded_value(REP_PROTOCOL_SUBTYPE_HOSTNAME, v) ||
-		    valid_encoded_value(REP_PROTOCOL_SUBTYPE_NETADDR_V4, v) ||
-		    valid_encoded_value(REP_PROTOCOL_SUBTYPE_NETADDR_V6, v));
+		    valid_encoded_value(REP_PROTOCOL_SUBTYPE_NETADDR, v));
 
 	case REP_PROTOCOL_SUBTYPE_HOSTNAME:
 		/* XXX check for valid hostname */
 		return (valid_utf8(v));
 
+	case REP_PROTOCOL_SUBTYPE_NETADDR:
+		return (valid_ip(AF_INET, v) || valid_ip(AF_INET6, v));
+
 	case REP_PROTOCOL_SUBTYPE_NETADDR_V4:
+		return (valid_ip(AF_INET, v));
+
 	case REP_PROTOCOL_SUBTYPE_NETADDR_V6:
-		/* XXX check for valid netaddr */
-		return (valid_utf8(v));
+		return (valid_ip(AF_INET6, v));
 
 	case REP_PROTOCOL_TYPE_INVALID:
 	default:

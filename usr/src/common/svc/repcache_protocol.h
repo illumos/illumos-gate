@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_REPCACHE_PROTOCOL_H
 #define	_REPCACHE_PROTOCOL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The Repository Cache Protocol
@@ -576,6 +573,7 @@ typedef enum rep_protocol_value_type {
 
 	REP_PROTOCOL_SUBTYPE_HOST	= REP_PROTOCOL_TYPE_STRING|('h' << 8),
 	REP_PROTOCOL_SUBTYPE_HOSTNAME	= REP_PROTOCOL_TYPE_STRING|('N' << 8),
+	REP_PROTOCOL_SUBTYPE_NETADDR	= REP_PROTOCOL_TYPE_STRING|('n' << 8),
 	REP_PROTOCOL_SUBTYPE_NETADDR_V4	= REP_PROTOCOL_TYPE_STRING|('4' << 8),
 	REP_PROTOCOL_SUBTYPE_NETADDR_V6	= REP_PROTOCOL_TYPE_STRING|('6' << 8)
 } rep_protocol_value_type_t;

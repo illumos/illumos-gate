@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 LIBRARY =	libscf.a
@@ -44,7 +43,7 @@ $(NATIVE_BUILD)VERS =
 $(NATIVE_BUILD)LIBS = $(DYNLIB)
 
 LDLIBS_i386 += -lsmbios
-LDLIBS +=	-luutil -lc -lgen
+LDLIBS +=	-luutil -lc -lgen -lnsl
 LDLIBS +=	$(LDLIBS_$(MACH))
 
 SRCDIR =	../common
@@ -64,7 +63,8 @@ LIBUUTIL =	$(SRC)/lib/libuutil
 MY_NATIVE_CPPFLAGS =\
 		-DNATIVE_BUILD $(DTEXTDOM) \
 		-I../inc -I$(COMDIR) -I$(LIBUUTIL)/common -I$(ROOTHDRDIR)
-MY_NATIVE_LDLIBS = -L$(LIBUUTIL)/native -R$(LIBUUTIL)/native -luutil -lc -lgen
+MY_NATIVE_LDLIBS = -L$(LIBUUTIL)/native -R$(LIBUUTIL)/native -luutil -lc -lgen \
+		   -lnsl
 MY_NATIVE_LDLIBS_i386 = -lsmbios
 MY_NATIVE_LDLIBS += $(MY_NATIVE_LDLIBS_$(MACH))
 
