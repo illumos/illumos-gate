@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1783,7 +1782,7 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 		fp->ixa->ixa_flags &= ~IXAF_IS_IPV4;
 	}
 	fp->cwnd = sctps->sctps_slow_start_initial * fp->sfa_pmss;
-	fp->rto = MIN(sctp->sctp_rto_initial, sctp->sctp_init_rto_max);
+	fp->rto = MIN(sctp->sctp_rto_initial, sctp->sctp_rto_max_init);
 	SCTP_MAX_RTO(sctp, fp);
 	fp->srtt = -1;
 	fp->rtt_updates = 0;

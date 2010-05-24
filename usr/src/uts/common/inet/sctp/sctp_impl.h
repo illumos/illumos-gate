@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_INET_SCTP_SCTP_IMPL_H
@@ -166,11 +166,11 @@ typedef struct sctpt_s {
 	    sctp, struct sctp_faddr_s, fp);		\
 }
 
-#define	SCTP_CALC_RXT(sctp, fp)				\
-{							\
-	if (((fp)->rto <<= 1) > (sctp)->sctp_rto_max)	\
-		(fp)->rto = (sctp)->sctp_rto_max;	\
-	SCTP_MAX_RTO(sctp, fp);				\
+#define	SCTP_CALC_RXT(sctp, fp, max)	\
+{					\
+	if (((fp)->rto <<= 1) > (max))	\
+		(fp)->rto = (max);	\
+	SCTP_MAX_RTO(sctp, fp);		\
 }
 
 
@@ -766,7 +766,7 @@ typedef struct sctp_s {
 	int32_t		sctp_pa_max_rxt; /* Max per-assoc retransmit cnt */
 	int32_t		sctp_pp_max_rxt; /* Max per-path retransmit cnt */
 	uint32_t	sctp_rto_max;
-	uint32_t	sctp_init_rto_max;
+	uint32_t	sctp_rto_max_init;
 	uint32_t	sctp_rto_min;
 	uint32_t	sctp_rto_initial;
 

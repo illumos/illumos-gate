@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -504,7 +503,8 @@ sctp_heartbeat_timer(sctp_t *sctp)
 						    sctp->sctp_rto_initial;
 						goto dead_addr;
 					} else {
-						SCTP_CALC_RXT(sctp, fp);
+						SCTP_CALC_RXT(sctp, fp,
+						    sctp->sctp_rto_max);
 						fp->hb_expiry = now + fp->rto;
 					}
 					break;
@@ -568,6 +568,7 @@ void
 sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 {
 	mblk_t 		*mp;
+	uint32_t	rto_max = sctp->sctp_rto_max;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	ASSERT(fp != NULL);
@@ -646,6 +647,7 @@ rxmit_init:
 			(void) conn_ip_output(mp, fp->ixa);
 			BUMP_LOCAL(sctp->sctp_opkts);
 		}
+		rto_max = sctp->sctp_rto_max_init;
 		break;
 	case SCTPS_COOKIE_ECHOED:
 		BUMP_LOCAL(sctp->sctp_T1expire);
@@ -659,6 +661,7 @@ rxmit_init:
 		(void) conn_ip_output(mp, fp->ixa);
 		BUMP_LOCAL(sctp->sctp_opkts);
 		BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
+		rto_max = sctp->sctp_rto_max_init;
 		break;
 	case SCTPS_SHUTDOWN_SENT:
 		BUMP_LOCAL(sctp->sctp_T2expire);
@@ -682,7 +685,7 @@ rxmit_init:
 
 	fp->strikes++;
 	sctp->sctp_strikes++;
-	SCTP_CALC_RXT(sctp, fp);
+	SCTP_CALC_RXT(sctp, fp, rto_max);
 
 	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 }

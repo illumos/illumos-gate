@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -891,7 +890,7 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 		sctp->sctp_irwnd = psctp->sctp_rwnd;
 		sctp->sctp_pd_point = psctp->sctp_pd_point;
 		sctp->sctp_rto_max = psctp->sctp_rto_max;
-		sctp->sctp_init_rto_max = psctp->sctp_init_rto_max;
+		sctp->sctp_rto_max_init = psctp->sctp_rto_max_init;
 		sctp->sctp_rto_min = psctp->sctp_rto_min;
 		sctp->sctp_rto_initial = psctp->sctp_rto_initial;
 		sctp->sctp_pa_max_rxt = psctp->sctp_pa_max_rxt;
@@ -932,7 +931,7 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 		sctp->sctp_irwnd = sctp->sctp_rwnd;
 		sctp->sctp_pd_point = sctp->sctp_rwnd;
 		sctp->sctp_rto_max = MSEC_TO_TICK(sctps->sctps_rto_maxg);
-		sctp->sctp_init_rto_max = sctp->sctp_rto_max;
+		sctp->sctp_rto_max_init = sctp->sctp_rto_max;
 		sctp->sctp_rto_min = MSEC_TO_TICK(sctps->sctps_rto_ming);
 		sctp->sctp_rto_initial = MSEC_TO_TICK(
 		    sctps->sctps_rto_initialg);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1810,7 +1809,7 @@ out:
 		oldfp->strikes++;
 		sctp->sctp_strikes++;
 
-		SCTP_CALC_RXT(sctp, oldfp);
+		SCTP_CALC_RXT(sctp, oldfp, sctp->sctp_rto_max);
 		if (oldfp != fp && oldfp->suna != 0)
 			SCTP_FADDR_TIMER_RESTART(sctp, oldfp, fp->rto);
 		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
@@ -2026,7 +2025,7 @@ done_bundle:
 restart_timer:
 	oldfp->strikes++;
 	sctp->sctp_strikes++;
-	SCTP_CALC_RXT(sctp, oldfp);
+	SCTP_CALC_RXT(sctp, oldfp, sctp->sctp_rto_max);
 	/*
 	 * If there is still some data in the oldfp, restart the
 	 * retransmission timer.  If there is no data, the heartbeat will

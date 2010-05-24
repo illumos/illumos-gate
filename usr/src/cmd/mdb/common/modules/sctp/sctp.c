@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -873,7 +872,7 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    sctp->sctp_strikes, sctp->sctp_max_init_rxt,
 		    sctp->sctp_pa_max_rxt, sctp->sctp_pp_max_rxt,
 		    sctp->sctp_rto_max, sctp->sctp_rto_min,
-		    sctp->sctp_rto_initial, sctp->sctp_init_rto_max,
+		    sctp->sctp_rto_initial, sctp->sctp_rto_max_init,
 		    sctp->sctp_rxt_nxttsn, sctp->sctp_rxt_maxtsn);
 	}
 

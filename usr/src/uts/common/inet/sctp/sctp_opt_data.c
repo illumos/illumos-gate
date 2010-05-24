@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -336,7 +335,7 @@ sctp_get_initmsg(sctp_t *sctp, void *ptr)
 	si->sinit_num_ostreams = sctp->sctp_num_ostr;
 	si->sinit_max_instreams = sctp->sctp_num_istr;
 	si->sinit_max_attempts = sctp->sctp_max_init_rxt;
-	si->sinit_max_init_timeo = TICK_TO_MSEC(sctp->sctp_init_rto_max);
+	si->sinit_max_init_timeo = TICK_TO_MSEC(sctp->sctp_rto_max_init);
 
 	return (sizeof (*si));
 }
@@ -389,7 +388,7 @@ sctp_set_initmsg(sctp_t *sctp, const void *invalp, uint_t inlen)
 		sctp->sctp_max_init_rxt = si->sinit_max_attempts;
 
 	if (si->sinit_max_init_timeo != 0) {
-		sctp->sctp_init_rto_max =
+		sctp->sctp_rto_max_init =
 		    MSEC_TO_TICK(si->sinit_max_init_timeo);
 	}
 	return (0);

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -883,7 +882,7 @@ sctp_rc_timer(sctp_t *sctp, sctp_faddr_t *fp)
 
 	fp->strikes++;
 	sctp->sctp_strikes++;
-	SCTP_CALC_RXT(sctp, fp);
+	SCTP_CALC_RXT(sctp, fp, sctp->sctp_rto_max);
 
 	nfp = sctp_rotate_faddr(sctp, fp);
 	sctp->sctp_cchunk_pend = 0;
