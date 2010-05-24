@@ -1536,6 +1536,18 @@ while getopts AaBCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  A )	A_FLAG=y
+		#
+		# If ELF_DATA_BASELINE_DIR is not defined, and we are on SWAN
+		# (based on CLOSED_IS_PRESENT), then refuse to run. The value
+		# of ELF version checking is greatly enhanced by including
+		# the baseline gate comparison.
+		if [ "$CLOSED_IS_PRESENT" = 'yes' -a \
+		     "$ELF_DATA_BASELINE_DIR" = '' ]; then
+			echo "ELF_DATA_BASELINE_DIR must be set if the A" \
+			    "flag is present in\nNIGHTLY_OPTIONS and closed" \
+			    "sources are present. Update environment file."
+			exit 1;
+		fi
 		;;
 	  a )	a_FLAG=y
 		;;
@@ -3265,15 +3277,31 @@ if [[ ($build_ok = y) && ( ($A_FLAG = y) || ($r_FLAG = y) ) ]]; then
 				>> $mail_msg_file
 		fi
 
-	       	echo "\n==== Compare versioning and ABI information to" \
-		    "baseline ====\n"  | tee -a $LOGFILE >> $mail_msg_file
+		# If ELF_DATA_BASELINE_DIR is defined, compare the new interface
+		# description file to that from the baseline gate. Issue a
+		# warning if the baseline is not present, and keep going.
+		if [[ "$ELF_DATA_BASELINE_DIR" != '' ]]; then
+			base_ifile="$ELF_DATA_BASELINE_DIR/interface"
 
-		# Compare new interface to baseline interface. Report errors.
-		interface_cmp -d -o $SRC/tools/abi/interface.$MACH \
-			$elf_ddir/interface > $elf_ddir/interface.cmp
-		if [[ -s $elf_ddir/interface.cmp ]]; then
-			tee -a $LOGFILE < $elf_ddir/interface.cmp \
-				>> $mail_msg_file
+		       	echo "\n==== Compare versioning and ABI information" \
+			    "to baseline ====\n\nBaseline:  $base_ifile"  | \
+			    tee -a $LOGFILE >> $mail_msg_file
+
+			if [[ -f $base_ifile ]]; then
+				interface_cmp -d -o $base_ifile \
+				    $elf_ddir/interface > $elf_ddir/interface.cmp
+				if [[ -s $elf_ddir/interface.cmp ]]; then
+					echo | tee -a $LOGFILE >> $mail_msg_file
+					tee -a $LOGFILE < \
+					    $elf_ddir/interface.cmp \
+					    >> $mail_msg_file
+				fi
+			else
+			       	echo "baseline not available. comparison" \
+                                    "skipped" | \
+				    tee -a $LOGFILE >> $mail_msg_file
+			fi
+
 		fi
 	fi
 
@@ -3318,6 +3346,30 @@ if [[ ($build_ok = y) && ( ($A_FLAG = y) || ($r_FLAG = y) ) ]]; then
 				$elf_ddir/runtime.attr \
 				>> $mail_msg_file
 		fi
+	fi
+
+	# If -u set, copy contents of ELF-data.$MACH to the parent workspace.
+	if [[ "$u_FLAG" = "y" ]]; then
+		p_elf_ddir=$PARENT_WS/usr/src/ELF-data.$MACH
+
+		# If parent lacks the ELF-data.$MACH directory, create it
+		if [[ ! -d $p_elf_ddir ]]; then
+			staffer mkdir -p $p_elf_ddir
+		fi
+
+		# These files are used asynchronously by other builds for ABI
+		# verification, as above for the -A option. As such, we require
+		# the file replacement to be atomic. Copy the data to a temp
+		# file in the same filesystem and then rename into place. 
+		(
+			cd $elf_ddir
+			for elf_dfile in *; do
+				staffer cp $elf_dfile \
+				    ${p_elf_ddir}/${elf_dfile}.new
+				staffer mv -f ${p_elf_ddir}/${elf_dfile}.new \
+				    ${p_elf_ddir}/${elf_dfile}
+			done
+		)
 	fi
 fi
 

@@ -71,18 +71,19 @@ PERLFILES= \
 	wdiff
 
 PERLMODULES= \
-	onbld_elfmod.pm
+	onbld_elfmod.pm \
+	onbld_elfmod_vertype.pm
 
 
 PYFILES= \
- 	cddlchk \
- 	copyrightchk \
- 	hdrchk \
- 	hg-active \
- 	mapfilechk \
- 	rtichk \
+	cddlchk \
+	copyrightchk \
+	hdrchk \
+	hg-active \
+	mapfilechk \
+	rtichk \
 	validate_pkg \
- 	wsdiff
+	wsdiff
 
 MAN1FILES= \
 	Install.1 \

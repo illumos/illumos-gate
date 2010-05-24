@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -533,47 +532,58 @@ sub compare {
 			# We want to ensure that version numbers in an
 			# inheritance chain don't go up by more than 1 in
 			# any given release. If the version names are in the
-			# standard SUNW_x.y[.z] format, we can compare the
+			# numbered <PREFIX>x.y[.z] format, we can compare the
 			# two top versions and see if this has happened.
 			#
-			# For a given SUNW_x.y[.z], valid sucessors would
-			# be SUNW_x.(y+1) or SUNW_x.y.(z+1), where z is
+			# For a given <PREFIX>x.y[.z], valid sucessors would
+			# be <PREFIX>x.(y+1) or <PREFIX>x.y.(z+1), where z is
 			# assumed to be 0 if not present.
 			#			
 			# This check only makes sense when the new interface
 			# is a direct decendent of the old one, as specified
 			# via the -d option. If the two interfaces are more
 			# than one release apart, we should not do this test.
-			if ($opt{d} && $old_top && !$new_top &&
-			    ($name =~ /^SUNW_(\d+)\.(\d+)(\.(\d+))?/)) {
-				my $iname1 = "SUNW_$1." . ($2 + 1);
-				my $iname2;
-				if (defined($4)) {
-			    		$iname2 = "SUNW_$1.$2." . ($4 + 1);
-				} else {
-			    		$iname2 = "SUNW_$1.$2.1";
-				}
+			next if !($opt{d} && $old_top && !$new_top);
 
-				if (defined($new->{'VERSION_INFO'}{$iname1}) ||
-				    defined($new->{'VERSION_INFO'}{$iname2})) {
-					my $i_top =
-					    $new->{'VERSION_INFO'}{$iname1}[0] ||
-					    $new->{'VERSION_INFO'}{$iname2}[0];
-					if (!$i_top) {
-						onbld_elfmod::OutMsg2(\*STDOUT,
-						    \$Ttl, $old_obj, $new_obj,
-						    "$name: inconsistant " .
-						    "version increment: " .
-						    "expect $iname1 or $iname2 ".
-						    "to replace top version");
-					}
-				} else {
- 					onbld_elfmod::OutMsg2(\*STDOUT,
+			# Known numbered version?
+			#
+			# Key to @Cat contents:
+			# [0]   'NUMBERED'
+			# [1]	number of dot separated numeric fields. 2 or 3.
+			# [2]   prefix
+			# [3]   major #
+			# [4]   minor #
+			# [5]   micro # (only if [1] is 3)
+			my @Cat = onbld_elfmod_vertype::Category($name, '');
+			next if ($Cat[0] ne 'NUMBERED');
+
+			my $iname1 = "$Cat[2]$Cat[3]." . ($Cat[4] + 1);
+			my $iname2;
+			if ($Cat[1] == 3) {
+			    $iname2 = "$Cat[2]$Cat[3].$Cat[4]." . ($Cat[5] + 1);
+			} else {
+			    $iname2 = "$Cat[2]$Cat[3].$Cat[4].1";
+			}
+
+			if (defined($new->{'VERSION_INFO'}{$iname1}) ||
+			    defined($new->{'VERSION_INFO'}{$iname2})) {
+				my $i_top =
+				    $new->{'VERSION_INFO'}{$iname1}[0] ||
+				    $new->{'VERSION_INFO'}{$iname2}[0];
+				if (!$i_top) {
+					onbld_elfmod::OutMsg2(\*STDOUT,
 					    \$Ttl, $old_obj, $new_obj,
-				            "$name: expected superseding " .
-					    "top version to $name not " .
-					    "present: $iname1 or $iname2");
+					    "$name: inconsistant " .
+					    "version increment: " .
+					    "expect $iname1 or $iname2 ".
+					    "to replace top version");
 				}
+			} else {
+ 				onbld_elfmod::OutMsg2(\*STDOUT,
+				    \$Ttl, $old_obj, $new_obj,
+			            "$name: expected superseding " .
+				    "top version to $name not " .
+				    "present: $iname1 or $iname2");
 			}
 		}
 
@@ -619,22 +629,37 @@ sub compare {
 # Establish a program name for any error diagnostics.
 chomp($Prog = `basename $0`);
 
-# The onbld_elfmod package is maintained in the same directory as this
-# script, and is installed in ../lib/perl. Use the local one if present,
-# and the installed one otherwise.
-my $moddir = dirname($0);
-$moddir = "$moddir/../lib/perl" if ! -f "$moddir/onbld_elfmod.pm";
-require "$moddir/onbld_elfmod.pm";
-
 # Check that we have arguments. Normally, 2 plain arguments are required,
 # but if -t is present, only one is allowed.
-if ((getopts('de:ot', \%opt) == 0) || (scalar(@ARGV) != ($opt{t} ? 1 : 2))) {
-	print "usage: $Prog [-dot] [-e exfile] old new\n";
+if ((getopts('c:de:ot', \%opt) == 0) || (scalar(@ARGV) != ($opt{t} ? 1 : 2))) {
+	print "usage: $Prog [-dot] [-c vtype_mod] [-e exfile] old new\n";
+	print "\t[-c vtype_mod]\tsupply alternative version category module\n";
 	print "\t[-d]\t\tnew is a direct decendent of old\n";
 	print "\t[-e exfile]\texceptions file\n";
 	print "\t[-o]\t\tproduce one-liner output (prefixed with pathname)\n";
 	print "\t[-t]\tParse old, and recreate to stdout\n";
 	exit 1;
+}
+
+# We depend on the onbld_elfmod and onbld_elfmod_vertype perl modules.
+# Both modules are maintained in the same directory as this script,
+# and are installed in ../lib/perl. Use the local one if present,
+# and the installed one otherwise.
+#
+# The caller is allowed to supply an alternative implementation for
+# onbld_elfmod_vertype via the -c option. In this case, the alternative
+# implementation is expected to provide the same interface as the standard
+# copy, and is loaded instead.
+#
+my $moddir = my $vermoddir = dirname($0);
+$moddir = "$moddir/../lib/perl" if ! -f "$moddir/onbld_elfmod.pm";
+require "$moddir/onbld_elfmod.pm";
+if ($opt{c}) {
+	require "$opt{c}";
+} else {
+	$vermoddir = "$vermoddir/../lib/perl"
+	    if ! -f "$vermoddir/onbld_elfmod_vertype.pm";
+	require "$vermoddir/onbld_elfmod_vertype.pm";
 }
 
 # Locate and process the exceptions file

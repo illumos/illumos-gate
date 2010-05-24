@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #	Configuration variables for the runtime environment of the nightly
@@ -96,6 +95,17 @@ LOCKNAME="`basename $CODEMGR_WS`_nightly.lock"; export LOCKNAME
 ATLOG="$CODEMGR_WS/log";			export ATLOG
 LOGFILE="$ATLOG/nightly.log";			export LOGFILE
 MACH=`uname -p`;				export MACH
+
+# When the -A flag is specified, and ELF_DATA_BASELINE_DIR is defined,
+# the ELF interface description file resulting from the build is compared
+# to that from the specified directory. This ensures that our object
+# versioning evolves in a backward compatible manner.
+#
+# You should not need to change this unless you wish to use locally cached
+# baseline files. If you use this, it must be local (or nfs): nightly cannot
+# copy over ssh or http.
+#
+ELF_DATA_BASELINE_DIR="/ws/onnv-gate/usr/src/ELF-data-baseline.$MACH";	export ELF_DATA_BASELINE_DIR
 
 # This is usually just needed if the closed tree is missing, or when
 # building a project gate with the -O (cap oh) flag.

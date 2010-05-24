@@ -20,14 +20,13 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-# This file provides exceptions to the usual rules applied to sharable
-# objects by intf_cmp. All strings are Perl regular expressions that
-# are compared to file, version, and symbol names. In addition to the
-# standard Perl syntax, there is one extension:
+# This file provides exceptions to the usual rules applied to shared
+# objects by interface_cmp. All strings are Perl regular expressions
+# that are compared to file, version, and symbol names. In addition
+# to the standard Perl syntax, there is one extension:
 #
 #	MACH(dir)
 #

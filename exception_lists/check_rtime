@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 # This file provides exceptions to the usual rules applied to ELF objects by
@@ -61,7 +60,14 @@ SKIP		^usr/platform/.*/libpsvcpolicy_psr\.so\.1
 SKIP		^usr/platform/.*/libpsvcpolicy\.so\.1
 SKIP		^usr/lib/sysevent/modules/picl_slm.so$
 
-# Objects that don't require a non-executable stack definition
+# Objects that are allowed to have executable data segments
+EXEC_DATA	^MACH(lib)/ld\.so\.1$
+EXEC_DATA	^lib/libc\.so\.1$	# 6524709, 32-bit, needed for x86 only
+EXEC_DATA	^opt/SUNWdtrt/tst/.*/ustack/tst\.helper\.exe$
+EXEC_DATA	^platform/.*/MACH(kernel)/unix$
+EXEC_DATA	^platform/.*/multiboot$
+
+# Objects that are allowed to have an executable stack
 EXEC_STACK	^platform/.*/MACH(kernel)/unix$
 EXEC_STACK	^platform/.*/multiboot$
 

@@ -1,5 +1,4 @@
-.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-.\" Use is subject to license terms.
+.\" Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 .\"
 .\" CDDL HEADER START
 .\"
@@ -20,7 +19,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH interface_cmp 1 "2 July 2009"
+.TH interface_cmp 1 "25 March 2010"
 .SH NAME
 interface_cmp \- compare shared object interface descriptions
 .SH SYNOPSIS
@@ -53,6 +52,21 @@ processed as part of the comparison.
 .SH OPTIONS
 .LP
 The following options are supported:
+.TP 4
+.B \-c vertype_module
+By default,
+.I interface_cmp
+is customized for the versioning conventions used by the Solaris
+OSnet code base. This specialized information, which includes
+the recognition of the SUNW_ prefix and other special names, is
+contained in a perl module named onbld_elfmod_vertype.pm, which
+is delivered with the SUNWonbld tools. This module is loaded by
+.I interface_cmp
+at runtime. The \fB-c\fP option can be used to supply
+an alternative module, customized for a different code base, allowing
+.I interface_cmp
+to operate on code from other projects. The alternative module must
+supply the same module and calling interfaces as the standard module.
 .TP 4
 .B \-d
 Asserts that the \fBnew\fP interface is a direct descendant of

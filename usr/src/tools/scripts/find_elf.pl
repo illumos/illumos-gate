@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -186,7 +185,7 @@ sub ProcFile {
 	# see if it is an ELF file, because that's a relatively expensive
 	# test. The tradeoff is that the alias hash will contain some files
 	# we don't care about. That is a small cost.
-	if ($IsSymLink || $AliasedPath) {
+	if (($IsSymLink || $AliasedPath) && !$opt{a}) {
 		$alias_hash{$name} = $uniqid;
 		return;
 	}
@@ -236,9 +235,16 @@ sub ProcDir {
 	if (opendir(DIR, $FullDir)) {
 		foreach $Entry (readdir(DIR)) {
 
-			if ($Entry =~ /^\./) {
-				next;
+			# In fast mode, we skip any file name that starts
+			# with a dot, which by side effect also skips the
+			# '.' and '..' entries. In regular mode, we must
+			# explicitly filter out those entries.
+			if ($opt{f}) {
+				next if ($Entry =~ /^\./);
+			} else {
+				next if ($Entry =~ /^\.\.?$/);
 			}
+
 			$NewFull = join('/', $FullDir, $Entry);
 
 			# We need to follow symlinks in order to capture
@@ -313,8 +319,9 @@ require "$moddir/onbld_elfmod.pm";
 
 # Check that we have arguments.
 @SaveArgv = @ARGV;
-if ((getopts('frs', \%opt) == 0) || (scalar(@ARGV) != 1)) {
+if ((getopts('afrs', \%opt) == 0) || (scalar(@ARGV) != 1)) {
 	print "usage: $Prog [-frs] file | dir\n";
+	print "\t[-a]\texpand symlink aliases\n";
 	print "\t[-f]\tuse file name at mode to speed search\n";
 	print "\t[-r]\treport relative paths\n";
 	print "\t[-s]\tonly remote sharable (ET_DYN) objects\n";
@@ -356,7 +363,7 @@ ARG: {
 		next;
 	}
 
-	print "$Arg is not a file or directory\n";
+	print STDERR "$Prog: not a file or directory: $Arg\n";
 	$Error = 1;
 }
 

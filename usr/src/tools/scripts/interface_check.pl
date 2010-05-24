@@ -21,8 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -126,12 +125,16 @@ sub ProcFile {
 
 	$Ttl = 0;
 
-	# If this object does not follow the runtime versioned name convention,
-	# and it does not reside underneath a directory identified as
-	# containing plugin objects intended for use with dlopen() only,
-	# issue a warning.
+	# If this object is not a symlink, does not follow the runtime
+	# versioned name convention, and it does not reside underneath
+	# a directory identified as containing plugin objects intended
+	# for use with dlopen() only, issue a warning.
+	#
+	# Note that it can only be a symlink if the user specified
+	# a single file on the command line, because the use of
+	# 'find_elf -a' is required for a symlink to be seen.
 	$NotPlugin = !defined($EXRE_plugin) || ($RelPath !~ $EXRE_plugin);
-	if (($File !~ /\.so\./) && $NotPlugin) {
+	if (($File !~ /\.so\./) && $NotPlugin && (! -l $FullPath)) {
 		onbld_elfmod::OutMsg($ErrFH, \$Ttl, $RelPath,
 		    "does not have a versioned name");
 	}
@@ -155,12 +158,25 @@ sub ProcFile {
 		$TopVer{$Line} = 1;
 	}
 
+	# Determine the name used for the base version. It should match the
+	# soname if the object has one, and the object basename otherwise.
+	#
+	# Note that elfedit writes an error to stderr if the object lacks an
+	# soname, so we direct stderr to /dev/null.
+	my $soname =
+	    `elfedit -r -osimple -e 'dyn:value dt_soname' $FullPath 2>/dev/null`;
+	if ($soname eq '') {
+		$soname = $File;
+	} else {
+		chomp $soname;
+	}
+
 	# First determine what versions exist that offer interfaces.  pvs -dos
 	# will list these.  Note that other versions may exist, ones that
 	# don't offer interfaces ... we'll get to those next.
 	%Vers = ();
 	$VersCnt = 0;
-	my %TopSUNWVers = ();
+	my %TopNumberedVers = ();
 	foreach my $Line (split(/\n/, `pvs -dos $FullPath 2>&1`)) {
 		my($Ver) = $Line;
 		
@@ -174,37 +190,41 @@ sub ProcFile {
 		$Vers{$Ver} = 1;
 		$VersCnt++;
 
-		# We expect the public SUNW_major.minor.micro versions to use
-		# inheritance, so there should only be one top version for
-		# each major number. It is possible, though rare, to have
-		# more than one top version if the major numbers differ.
+		# Identify the version type
+		my @Cat = onbld_elfmod_vertype::Category($Ver, $soname);
+
+
+		# Numbered public versions have the form
 		#
-		# %TopSUNWVers uses the major name as the key, with each
-		# value yielding an array reference to the top versions for
-		# that major number.
-		if ($Ver =~ /^(SUNW_[0-9]+)[0-9.]+$/) {
-			push @{$TopSUNWVers{$1}}, $Ver if $TopVer{$Ver};
+		#	<prefix>major.minor[.micro]
+		#
+		# with 2 or three numeric values. We expect these versions to
+		# use inheritance, so there should only be one top version for
+		# each major number. It is possible, though rare, to have more
+		# than one top version if the major numbers differ.
+		#
+		# %TopNumberedVers uses the prefix and major number as the
+		# key. Each key holds a reference to an array which contains
+		# the top versions with the same prefix and major number.
+		if ($Cat[0] eq 'NUMBERED') {
+			push @{$TopNumberedVers{"$Cat[2]$Cat[3]"}}, $Ver
+			    if $TopVer{$Ver};
 			next;
 		}
 
-		# Having already handled SUNW_ public versions above, is it
-		# a different version name that we recognise?
-		#
-		# Along with the standard version names, each object exports
-		# a "base" version which contains the linker generated symbols
-		# _etext, _edata, etc., and is named using the objects SONAME.
-		# This name should typically match the file name.
-		next if (($Ver =~ /^SYSVABI_1.[23]$/) ||
-		    ($Ver =~ /^SISCD_2.3[ab]*$/) ||
-		    ($Ver =~ /^SUNWprivate(_[0-9.]+)?$/) ||
-		    ($Ver =~ /$File/));
-
-		# If we get here, it's a non-standard version.
-		if (!defined($EXRE_nonstd_vername) ||
-		    ($RelPath !~ $EXRE_nonstd_vername)) {
-			onbld_elfmod::OutMsg($ErrFH, \$Ttl, $RelPath,
-			   "non-standard version name: $Ver");
+		# If it is a non-standard version, and there's not an
+		# exception in place for it, report an error.
+		if ($Cat[0] eq 'UNKNOWN') {
+			if (!defined($EXRE_nonstd_vername) ||
+			    ($RelPath !~ $EXRE_nonstd_vername)) {
+				onbld_elfmod::OutMsg($ErrFH, \$Ttl, $RelPath,
+				   "non-standard version name: $Ver");
+			}
+			next;
 		}
+
+		# If we are here, it is one of PLAIN, PRIVATE, or SONAME,
+		# all of which we quietly accept.
 		next;
 	}
 
@@ -217,14 +237,14 @@ sub ProcFile {
 		return;
 	}
 
-	# If this file has multiple inheritance chains with the public
-	# SUNW_ name, that's wrong.
-	foreach my $Ver (sort keys %TopSUNWVers) {
-		if (scalar(@{$TopSUNWVers{$Ver}}) > 1) {
+	# If this file has multiple inheritance chains starting with the
+	# same prefix and major number, that's wrong.
+	foreach my $Ver (sort keys %TopNumberedVers) {
+		if (scalar(@{$TopNumberedVers{$Ver}}) > 1) {
 			onbld_elfmod::OutMsg($ErrFH, \$Ttl, $RelPath,
 			    "multiple $Ver inheritance chains (missing " .
 			    "inheritance?): " .
-			    join(', ', @{$TopSUNWVers{$Ver}}));
+			    join(', ', @{$TopNumberedVers{$Ver}}));
 		}
 	}
 
@@ -237,21 +257,10 @@ sub ProcFile {
 	#		symname2
 	#		...
 	#
-	# There are two types of version that we suppress from this
-	# output:
-	#
-	# 	BASE
-	#	The "base" version is used to hold symbols that must be
-	#	public, but which are not part of the versioning interface
-	#	(_end, _GLOBAL_OFFSET_TABLE_, _PROCEDURE_LINKAGE_TABLE_, etc).
-	#
-	#	Private
-	#	Any version with "private" in its name is skipped. We
-	#	expect these to be SUNWprivate, but are extra lenient in
-	#	what we accept.
-	#
-	# If an object only has base or private versions, we do not produce
-	# an interface description for that object.
+	# We suppress base and private versions from this output.
+	# Everything else goes in, whether it's a version we recognize
+	# or not. If an object only has base or private versions, we do
+	# not produce an interface description for that object.
 	#
 	if ($opt{i}) {
 		my $header_done = 0;
@@ -261,22 +270,29 @@ sub ProcFile {
 			# Skip base version
 			next if ($Line =~ /\[BASE\]/);
 
-			# Skip private versions
-			next if ($Line =~ /private/i);
-
 			# Directly inherited versions follow the version name
 			# in a comma separated list within {} brackets. Capture
 			# that information, for use with our VERSION line.
 			my $InheritVers = ($Line =~ /(\{.*\});$/) ? "\t$1" : '';
 
+			# Extract the version name
 			$Line =~ s/^\s*([^;: ]*).*/$1/; 
 
-			# Older versions of pvs have a bug that prevents
-			# them from printing [BASE] on the base version.
-			# Work around this by excluding versions that end
-			# with a '.so.*' suffix.
-			# SONAME of the object.
-			next if $Line =~ /\.so\.\d+$/;
+			# Skip version if it is in the SONAME or PRIVATE
+			# categories.
+			#
+			# The above test for BASE should have caught the
+			# SONAME already, but older versions of pvs have a
+			# bug that prevents them from printing [BASE] on
+			# the base version. In order to solidify things even
+			# more, we also exclude versions that end with
+			# a '.so.*' suffix.
+			my @Cat = onbld_elfmod_vertype::Category($Line, $soname);
+			if (($Cat[0] eq 'SONAME') ||
+			    ($Cat[0] eq 'PRIVATE') ||
+			    ($Line =~ /\.so\.\d+$/)) {
+			    next;
+			}
 
 			# We want to output the symbols in sorted order, so
 			# we gather them first, and then sort the results.
@@ -396,28 +412,43 @@ sub ProcFindElf {
 # Establish a program name for any error diagnostics.
 chomp($Prog = `basename $0`);
 
-# The onbld_elfmod package is maintained in the same directory as this
-# script, and is installed in ../lib/perl. Use the local one if present,
-# and the installed one otherwise.
-my $moddir = dirname($0);
-$moddir = "$moddir/../lib/perl" if ! -f "$moddir/onbld_elfmod.pm";
-require "$moddir/onbld_elfmod.pm";
-
 # Check that we have arguments.
 @SaveArgv = @ARGV;
-if ((getopts('E:e:f:hIi:ow:', \%opt) == 0) || (!$opt{f} && ($#ARGV == -1))) {
-	print "usage: $Prog [-hIo] [-E errfile] [-e exfile] [-f listfile]\n";
-	print "\t\t[-i intffile] [-w outdir] file | dir, ...\n";
+if ((getopts('c:E:e:f:hIi:ow:', \%opt) == 0) || (!$opt{f} && ($#ARGV == -1))) {
+	print "usage: $Prog [-hIo] [-c vtype_mod] [-E errfile] [-e exfile]\n";
+	print "\t\t[-f listfile] [-i intffile] [-w outdir] file | dir, ...\n";
 	print "\n";
+	print "\t[-c vtype_mod]\tsupply alternative version category module\n";
 	print "\t[-E errfile]\tdirect error output to file\n";
 	print "\t[-e exfile]\texceptions file\n";
 	print "\t[-f listfile]\tuse file list produced by find_elf -r\n";
-	print "\t[-h]\tdo not produce a CDDL/Copyright header comment\n";
-	print "\t[-I]\tExpand inheritance in -i output (debugging)\n";
+	print "\t[-h]\t\tdo not produce a CDDL/Copyright header comment\n";
+	print "\t[-I]\t\tExpand inheritance in -i output (debugging)\n";
 	print "\t[-i intffile]\tcreate interface description output file\n";
 	print "\t[-o]\t\tproduce one-liner output (prefixed with pathname)\n";
 	print "\t[-w outdir]\tinterpret all files relative to given directory\n";
 	exit 1;
+}
+
+# We depend on the onbld_elfmod and onbld_elfmod_vertype perl modules.
+# Both modules are maintained in the same directory as this script,
+# and are installed in ../lib/perl. Use the local one if present,
+# and the installed one otherwise.
+#
+# The caller is allowed to supply an alternative implementation for
+# onbld_elfmod_vertype via the -c option. In this case, the alternative
+# implementation is expected to provide the same interface as the standard
+# copy, and is loaded instead.
+#
+my $moddir = my $vermoddir = dirname($0);
+$moddir = "$moddir/../lib/perl" if ! -f "$moddir/onbld_elfmod.pm";
+require "$moddir/onbld_elfmod.pm";
+if ($opt{c}) {
+	require "$opt{c}";
+} else {
+	$vermoddir = "$vermoddir/../lib/perl"
+	    if ! -f "$vermoddir/onbld_elfmod_vertype.pm";
+	require "$vermoddir/onbld_elfmod_vertype.pm";
 }
 
 # If -w, change working directory to given location
@@ -452,10 +483,13 @@ $ObjCnt = 0;
 # If we were passed a file previously produced by 'find_elf -r', use it.
 ProcFindElf($opt{f}) if $opt{f};
 
-# Process each argument
+# Process each argument: Run find_elf to find the files given by
+# $Arg. If the argument is a regular file (not a directory) then disable
+# find_elf's alias checking so that the file is processed whether or not
+# it is a symlink.
 foreach my $Arg (@ARGV) {
-	# Run find_elf to find the files given by $Arg and process them
-	ProcFindElf("find_elf -frs $Arg|");
+	my $flag_a = (-d $Arg) ? '' : '-a';
+	ProcFindElf("find_elf -frs $flag_a $Arg|");
 }
 
 # Close any working output files.

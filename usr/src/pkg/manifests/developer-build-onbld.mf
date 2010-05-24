@@ -162,6 +162,7 @@ file path=opt/onbld/gk/.login
 file path=opt/onbld/gk/gen_make.machines mode=0755
 file path=opt/onbld/lib/$(ARCH)/libdwarf.so.1
 file path=opt/onbld/lib/perl/onbld_elfmod.pm
+file path=opt/onbld/lib/perl/onbld_elfmod_vertype.pm
 file path=opt/onbld/lib/python2.4/onbld/Checks/CStyle.py mode=0444
 file path=opt/onbld/lib/python2.4/onbld/Checks/CStyle.pyc mode=0444
 file path=opt/onbld/lib/python2.4/onbld/Checks/Cddl.py mode=0444

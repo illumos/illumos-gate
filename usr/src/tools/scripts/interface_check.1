@@ -1,5 +1,4 @@
-.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-.\" Use is subject to license terms.
+.\" Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 .\"
 .\" CDDL HEADER START
 .\"
@@ -20,11 +19,11 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH interface_check 1 "2 July 2009"
+.TH interface_check 1 "25 March 2010"
 .SH NAME
 interface_check \- check shared object interfaces
 .SH SYNOPSIS
-\fBinterface_check [-hIo] [-E errfile] [-e exfile] [-f listfile] [-i intffile] [-w outdir] file | dir, ...\fP
+\fBinterface_check [-hIo] [-c vertype_module] [-E errfile] [-e exfile] [-f listfile] [-i intffile] [-w outdir] file | dir, ...\fP
 .LP
 .SH DESCRIPTION
 .IX "OS-Net build tools" "interface_check" "" "\fBinterface_check\fP"
@@ -32,7 +31,7 @@ The
 .I interface_check
 command attempts to check a number of ELF versioning attributes
 for consistency with common build rules and practices.
-In addition, a complete breakdown of the files version definitions can
+In addition, a complete breakdown of the file's version definitions can
 be captured using the
 .B -i
 option, and the interface description file created can be used with
@@ -81,7 +80,7 @@ foo.so.1: no versions found
 .TP
 \(bu
 Version definitions should follow a standard naming convention, i.e.,
-\fBSUNW_\fIx.y\fP, \fBSUNWprivate_\fIx.y\fP, or \fIfilename\fP.  The
+\fBSUNW_\fIx.y\fP\fP, \fBSUNWprivate_\fIx.y\fP\fP, or \fIfilename\fP.  The
 latter version is a base version and is used to capture any reserved
 interface symbols (i.e., \fI_end\fP, \fI_etext\fP, etc.).  Any non-conforming
 version names are displayed as:
@@ -124,6 +123,21 @@ detected by inspecting this database with
 .SH OPTIONS
 .LP
 The following options are supported:
+.TP 4
+.B \-c vertype_module
+By default,
+.I interface_check
+is customized for the versioning conventions used by the Solaris
+OSnet code base. This specialized information, which includes
+the recognition of the SUNW_ prefix and other special names, is
+contained in a perl module named onbld_elfmod_vertype.pm, which
+is delivered with the SUNWonbld tools. This module is loaded by
+.I interface_check
+at runtime. The \fB-c\fP option can be used to supply
+an alternative module, customized for a different code base, allowing
+.I interface_check
+to operate on code from other projects. The alternative module must
+supply the same module and calling interfaces as the standard module.
 .TP 4
 .B \-E errfile
 Direct error messages for the analyzed objects to \fIerrfile\fP instead 
@@ -304,7 +318,7 @@ by which this object is known. Every version exported by the object
 is designated by a VERSION or TOP_VERSION directive. A TOP_VERSION is
 a version at the top of the version inheritance chain, and VERSION
 is used for versions lower in the chain. Inherited versions are shown
-within {} brakets following the version name. Following each version directive
+within {} brackets following the version name. Following each version directive
 are SYMBOL directives, each describing a symbol defined by
 that version.
 .P

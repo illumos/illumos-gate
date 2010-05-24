@@ -22,10 +22,10 @@
 
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 
-# This file provides exceptions to the usual rules applied to sharable
-# objects by intf_check. All strings are Perl regular expressions that
-# are compared to file names. In addition to the standard Perl syntax,
-# there is one extension:
+# This file provides exceptions to the usual rules applied to shared
+# objects by interface_check. All strings are Perl regular expressions
+# that are compared to file names. In addition to the standard Perl
+# syntax, there is one extension:
 #
 #	MACH(dir)
 #
@@ -39,7 +39,7 @@
 #	lib/sparcv9
 
 
-# Sharable objects underneath these parts of the tree are taken to be plugins.
+# Shared objects underneath these parts of the tree are taken to be plugins.
 # Plugins are not required to have versioned file names, and are not required
 # to be internally versioned.
 #

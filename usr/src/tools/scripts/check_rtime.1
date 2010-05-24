@@ -1,5 +1,4 @@
-.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-.\" Use is subject to license terms.
+.\" Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 .\"
 .\" CDDL HEADER START
 .\"
@@ -20,7 +19,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH check_rtime 1 "29 January 2009"
+.TH check_rtime 1 "09 March 2010"
 .SH NAME
 .I check_rtime
 \- check ELF runtime attributes
@@ -67,7 +66,7 @@ at runtime.  This error condition often goes unnoticed
 because the existing use of the object is as a dependency itself,
 and the objects' dependencies are already satisfied by the
 caller.  However, if the object itself is unable to satisfy its
-dependencies its use in new environments may be compromised.
+dependencies, its use in new environments may be compromised.
 .sp
 A missing or erroneous \fBrunpath\fP is the typical reason why
 an object can not locate its dependencies.  Use of the link-editors
@@ -111,7 +110,7 @@ also result in unnecessary processing at link-edit time.
 .sp
 Dependency lists (typically defined via \fB$(LDLIBS)\fP)
 that have been yanked-and-put
-between \fIMakefiles\fP without verifying their need, is a typical
+between \fIMakefiles\fP without verifying their need, are a typical
 reason why unused dependencies exist.  Unused dependencies are
 displayed as:
 .sp
@@ -164,7 +163,7 @@ These checks are carried out for the following reasons:
 \(bu
 A concatenated relocation section (\fI.SUNW_reloc\fP)
 provides optimal symbol table
-access as runtime, and thus reduces the overhead of relocating
+access at runtime, and thus reduces the overhead of relocating
 the shared object.  In past releases, the link-edit of a dynamic object with
 the \fB-z combreloc\fP option was required to generate a combined
 relocation section.  However, with the integration of 6642769, this section
@@ -178,7 +177,7 @@ concatenated relocation section. A missing concatenated relocation section
 is displayed as:
 .sp
 .RS 6
-foo: SUNW_reloc section missing  <no -zcombreloc?>
+foo: .SUNW_reloc section missing  <no -zcombreloc?>
 .RE
 .TP
 \(bu
@@ -250,7 +249,7 @@ foo: application requires non-executable stack \\
 .sp
 .TP
 \(bu
-X86 applications should have a non-executable data segment defined to make
+x86 applications should have a non-executable data segment defined to make
 them less vulnerable to buffer overflow attacks.
 .sp
 Not inheriting the \fB$(LDFLAGS)\fP macro in \fIcmd/Makefile.cmd\fP
@@ -268,9 +267,8 @@ foo: application requires non-executable data \\
 Solaris ELF files contain symbol sort sections used by DTrace to
 map addresses in memory to the related function or variable symbols. There
 are two such sections, \fI.SUNW_dynsymsort\fP for
-regular symbols, and \fI.SUNW_dyntlssort\fP for thread
-local symbols. To ensure that the best
-names are shown for each
+regular symbols, and \fI.SUNW_dyntlssort\fP for thread-local
+symbols. To ensure that the best names are shown for each
 such address, and that the same name is given across Solaris releases,
 .I check_rtime
 enforces the rule that only one symbol can appear in the sort sections for
@@ -286,7 +284,7 @@ symbol.
 .sp
 Duplicate entries in a symbol sort section are
 displayed in one of the following ways, depending on
-whether the section is for regular, or thread local symbols:
+whether the section is for regular or thread-local symbols:
 .sp
 .RS 6
 foo: .SUNW_dynsymsort: duplicate ADDRESS: sym1, sym2
@@ -343,7 +341,7 @@ foo: NEEDED=bar.so.1
 .sp
 .LP
 .I check_rtime
-uses \fBmcs(1)\fP to inspect an objects \fI.comment\fP section.
+uses \fBmcs(1)\fP to inspect an object's \fI.comment\fP section.
 During development, this section contains numerous file identifiers
 marked with the tag "\fB@(#)\fP".  For release builds these sections
 are deleted and rewritten under control of the \fB$(POST_PROCESS)\fP
@@ -476,6 +474,19 @@ lib/sparcv9
 The exceptions understood by
 .I check_rtime
 are:
+.sp
+.ne 2
+.mk
+.na
+\fBEXEC_DATA\fR
+.ad
+.RS 17n
+.rt
+.sp
+Executables that are not required to have non-executable writable
+data segments
+.RE
+
 .sp
 .ne 2
 .mk
@@ -666,7 +677,7 @@ bind to the underlying system.
 .LP
 .SH ENVIRONMENT VARIABLES
 .LP
-When the \fB-D\fP or \fB-d\fP option isn't in use
+When the \fB-D\fP or \fB-d\fP option isn't in use,
 .I check_rtime
 uses the following environment variables to
 establish an alternative dependency mapping:
@@ -685,7 +696,7 @@ under this directory will be used to establish an alternative dependency
 mapping.
 .RE
 .sp
-If \fBldd(1)\fP supports the \fB-U\fP option it will be used to determine
+If \fBldd(1)\fP supports the \fB-U\fP option, it will be used to determine
 any unreferenced dependencies.  Otherwise \fBldd(1)\fP uses the older
 \fB-u\fP option which only detects unused references.  If the following
 environment variable exists, and indicates an earlier release than \fB5.10\fP

@@ -21,9 +21,7 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
+# Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -83,9 +81,17 @@ use vars  qw($ErrFH $ErrTtl $InfoFH $InfoTtl $OutCnt1 $OutCnt2);
 #
 #	defined($EXRE_exec_stack) && ($foo =~ $EXRE_exec_stack)
 #
+# or if the test is to make sure the item is not specified:
+#
+#	!defined($EXRE_exec_stack) || ($foo !~ $EXRE_exec_stack)
+#
 # ----
 #
 # The exceptions are:
+#
+#   EXEC_DATA
+#	Objects that are not required to have non-executable writable
+#	data segments.
 #
 #   EXEC_STACK
 #	Objects that are not required to have a non-executable stack
@@ -131,7 +137,8 @@ use vars  qw($ErrFH $ErrTtl $InfoFH $InfoTtl $OutCnt1 $OutCnt2);
 #	Objects with unused runpaths
 #
 
-use vars  qw($EXRE_exec_stack $EXRE_nocrlealt $EXRE_nodirect $EXRE_nosymsort);
+use vars  qw($EXRE_exec_data $EXRE_exec_stack $EXRE_nocrlealt);
+use vars  qw($EXRE_nodirect $EXRE_nosymsort);
 use vars  qw($EXRE_olddep $EXRE_skip $EXRE_stab $EXRE_textrel $EXRE_undef_ref);
 use vars  qw($EXRE_unref_obj $EXRE_unused_deps $EXRE_unused_obj);
 use vars  qw($EXRE_unused_rpath);
@@ -208,7 +215,7 @@ sub ProcFile {
 		# first line), or we're processing an archive, bail.
 		if ($Header eq 'None') {
 			if (($Line =~ /invalid file/) ||
-			    ($Line =~ /$FullPath(.*):/)) {
+			    ($Line =~ /\Q$FullPath\E(.*):/)) {
 				return;
 			}
 		}
@@ -238,7 +245,7 @@ sub ProcFile {
 		}
 
 		if (($Header eq 'Phdr') &&
-		    ($Line =~ /\[ PF_X  PF_W  PF_R \]/)) {
+		    ($Line =~ /\[ PF_X\s+PF_W\s+PF_R \]/)) {
 			# RWX segment seen.
 			$RWX = 1;
 			next;
@@ -247,8 +254,8 @@ sub ProcFile {
 		if (($Header eq 'Phdr') &&
 		    ($Line =~ /\[ PT_LOAD \]/ && $RWX && $IsX86)) {
 			# Seen an RWX PT_LOAD segment.
-			if (defined($EXRE_exec_stack) &&
-			    ($RelPath !~ $EXRE_exec_stack)) {
+			if (!defined($EXRE_exec_data) ||
+			    ($RelPath !~ $EXRE_exec_data)) {
 				onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath,
 				    "application requires non-executable " .
 				    "data\t<no -Mmapfile_noexdata?>");
@@ -603,7 +610,7 @@ ELF:	foreach my $Line (@Elf) {
 	# combined relocation section indicating it was built with -z combreloc.
 	if (($Type eq 'DYN') && $Relsz && ($Relsz != $Pltsz) && ($Sun == 0)) {
 		onbld_elfmod::OutMsg($ErrFH, $ErrTtl, $RelPath,
-		    "SUNW_reloc section missing\t\t<no -zcombreloc?>");
+		    ".SUNW_reloc section missing\t\t<no -zcombreloc?>");
 	}
 
 	# No objects released to a customer should have any .stabs sections

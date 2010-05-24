@@ -1,5 +1,4 @@
-.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-.\" Use is subject to license terms.
+.\" Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 .\"
 .\" CDDL HEADER START
 .\"
@@ -20,28 +19,34 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH find_elf 1 "2 July 2009"
+.TH find_elf 1 "25 March 2010"
 .SH NAME
-find_elf \- Locate ELF sharable objects and executables
+find_elf \- Locate ELF shared objects and executables
 .SH SYNOPSIS
-\fBfind_elf [-frs] path\fP
+\fBfind_elf [-afrs] path\fP
 .LP
 .SH DESCRIPTION
 .IX "OS-Net build tools" "find_elf" "" "\fBfind_elf\fP"
 The
 .I find_elf
 command descends a directory hierarchy and produces one line
-of output on stdout for each ELF executable or sharable object found.
+of output on stdout for each ELF executable or shared object found.
 .LP
 .SH OPTIONS
 .LP
 The following options are supported:
 .TP 4
+.B \-a
+Disable alias processing. Symbolic links are treated as independent
+files, each such link results in a separate OBJECT output line,
+and ALIAS lines are not issued.
+.TP 4
 .B \-f
 Fast Mode. When reading directories, the file name and modes are
 used to eliminate files from consideration and speed up the search:
+Directories with names that start with a '.' character are skipped.
 Executables must have the execute bit set, and
-sharable objects must end with a .so extension. Files that do not
+shared objects must end with a .so extension. Files that do not
 meet these requirements are silently eliminated from consideration without
 further analysis.
 .TP 4
@@ -50,7 +55,7 @@ Report file names as relative paths, relative to the given file or directory,
 instead of fully qualified.
 .TP 4
 .B \-s
-Only report sharable objects.
+Only report shared objects.
 .LP
 .SH OUTPUT
 .LP
@@ -82,7 +87,7 @@ OBJECT [32 | 64] [DYN | EXEC] [VERDEF | NOVERDEF] object-path
 The first field provides the ELF class of the object, and will be
 either 32 or 64. 
 The second field provides the type of object, either
-a sharable object (DYN) or executable (EXEC).
+a shared object (DYN) or executable (EXEC).
 The third field will be VERDEF if the object contains ELF
 version definitions, and NOVERDEF if the object is not versioned.
 The final field gives the path to the object.
@@ -93,7 +98,7 @@ objects, this often happens for one of two reasons:
 .TP
 .ie t \(bu
 .el o
-Compilation symlinks, used to provide a non-versioned name for a sharable object.
+Compilation symlinks, used to provide a non-versioned name for a shared object.
 .RE
 .RS +4
 .TP
@@ -113,6 +118,10 @@ mapping it to the main name for the object:
 ALIAS object-path alias-path
 .fi
 .in -4
+.sp
+The \fB-a\fP option alters the handling of aliased names. When \fB-a\fP is
+specified, each file results in a separate OBJECT line, as if they were
+independent files rather than the same file with different names.
 .sp
 .PP
 .SH EXAMPLES
@@ -148,7 +157,7 @@ produces the following output for the above hierarchy:
 .sp
 .in +4
 .nf
-% find_elf -rh /usr/lib/foo
+% find_elf -r /usr/lib/foo
 PREFIX /usr/lib/foo
 OBJECT 64 DYN  VERDEF  amd64/libfoo.so.1
 ALIAS                  amd64/libfoo.so.1  64/libfoo.so
@@ -158,6 +167,46 @@ OBJECT 32 DYN  VERDEF  libfoo.so.1
 ALIAS                  libfoo.so.1        32/libfoo.so
 ALIAS                  libfoo.so.1        32/libfoo.so.1
 ALIAS                  libfoo.so.1        libfoo.so
+.fi
+.in -4
+.sp
+Contrast this with the output when \fB-a\fP is used to treat
+each name as an independent file:
+.sp
+.in +4
+.nf
+% find_elf -ar /usr/lib/foo
+PREFIX /usr/lib/foo
+OBJECT 32 DYN  VERDEF  32/libfoo.so
+OBJECT 32 DYN  VERDEF  32/libfoo.so.1
+OBJECT 64 DYN  VERDEF  64/libfoo.so
+OBJECT 64 DYN  VERDEF  64/libfoo.so.1
+OBJECT 64 DYN  VERDEF  amd64/libfoo.so.1
+OBJECT 64 DYN  VERDEF  amd64/libfoo.so
+OBJECT 32 DYN  VERDEF  libfoo.so.1
+OBJECT 32 DYN  VERDEF  libfoo.so
+.fi
+.in -4
+.sp
+When
+.I find_elf
+is used to process an alias for which no target object is given,
+there will be no output. For example, using /lib/libc.so, which
+is a compilation symlink for /lib/libc.so.1:
+.sp
+.in +4
+.nf
+% find_elf /lib/libc.so
+.fi
+.in -4
+.sp
+In such situations, the \fB-a\fP option can be used to produce
+the desired output:
+.sp
+.in +4
+.nf
+% find_elf -a /lib/libc.so
+OBJECT 32 DYN  VERDEF   /lib/libc.so
 .fi
 .in -4
 .sp
