@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -368,7 +367,7 @@ ndmpd_api_file_recovered_v2(void *cookie, char *name, int error)
 		request.error = NDMP_PERMISSION_ERR;
 	}
 
-	if (ndmp_send_request(session->ns_connection, NDMP_LOG_FILE,
+	if (ndmp_send_request_lock(session->ns_connection, NDMP_LOG_FILE,
 	    NDMP_NO_ERR, (void *)&request, 0) < 0) {
 		NDMP_LOG(LOG_DEBUG, "Sending log file request");
 		return (-1);
@@ -648,7 +647,7 @@ ndmpd_api_file_recovered_v3(void *cookie, char *name, int error)
 		request.error = NDMP_PERMISSION_ERR;
 	}
 
-	if (ndmp_send_request(session->ns_connection, NDMP_LOG_FILE,
+	if (ndmp_send_request_lock(session->ns_connection, NDMP_LOG_FILE,
 	    NDMP_NO_ERR, (void *)&request, 0) < 0) {
 		NDMP_LOG(LOG_DEBUG, "Error sending log file request");
 		return (-1);
@@ -847,7 +846,7 @@ ndmpd_api_file_recovered_v4(void *cookie, char *name, int error)
 		break;
 	}
 
-	if (ndmp_send_request(session->ns_connection, NDMP_LOG_FILE,
+	if (ndmp_send_request_lock(session->ns_connection, NDMP_LOG_FILE,
 	    NDMP_NO_ERR, (void *)&request, 0) < 0) {
 		NDMP_LOG(LOG_DEBUG, "Error sending log file request");
 		return (-1);

@@ -3852,7 +3852,8 @@ ndmpd_local_write_v3(ndmpd_session_t *session, char *data, ulong_t length)
 		}
 
 		session->ns_mover.md_position += n;
-		session->ns_mover.md_data_written += n;
+		session->ns_mover.md_data_written +=
+		    session->ns_mover.md_w_index;
 		session->ns_mover.md_record_num++;
 		session->ns_mover.md_w_index = 0;
 		return (0);
