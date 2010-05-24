@@ -980,6 +980,7 @@ secpolicy_vnode_any_access(const cred_t *cr, vnode_t *vp, uid_t owner)
 {
 	static int privs[] = {
 	    PRIV_FILE_OWNER,
+	    PRIV_FILE_CHOWN,
 	    PRIV_FILE_DAC_READ,
 	    PRIV_FILE_DAC_WRITE,
 	    PRIV_FILE_DAC_EXECUTE,
@@ -1006,6 +1007,7 @@ secpolicy_vnode_any_access(const cred_t *cr, vnode_t *vp, uid_t owner)
 			break;
 		case PRIV_FILE_DAC_WRITE:
 		case PRIV_FILE_OWNER:
+		case PRIV_FILE_CHOWN:
 			/* We know here that if owner == 0, that cr_uid != 0 */
 			allzone = owner == 0;
 			break;
