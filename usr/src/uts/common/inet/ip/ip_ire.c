@@ -2356,9 +2356,6 @@ ip_ire_fini(ip_stack_t *ipst)
 {
 	int i;
 
-	rw_destroy(&ipst->ips_ire_dep_lock);
-	rw_destroy(&ipst->ips_ip6_ire_head_lock);
-
 	ire_make_condemned(ipst->ips_ire_reject_v6);
 	ire_refrele_notr(ipst->ips_ire_reject_v6);
 	ipst->ips_ire_reject_v6 = NULL;
@@ -2383,6 +2380,9 @@ ip_ire_fini(ip_stack_t *ipst)
 
 	rn_freehead(ipst->ips_ip_ftable);
 	ipst->ips_ip_ftable = NULL;
+
+	rw_destroy(&ipst->ips_ire_dep_lock);
+	rw_destroy(&ipst->ips_ip6_ire_head_lock);
 
 	mutex_destroy(&ipst->ips_ire_ft_init_lock);
 

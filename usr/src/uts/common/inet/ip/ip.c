@@ -4356,11 +4356,7 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	arp_hook_destroy(ipst);
 	ip_net_destroy(ipst);
 
-	mutex_destroy(&ipst->ips_capab_taskq_lock);
-	cv_destroy(&ipst->ips_capab_taskq_cv);
-
 	ipmp_destroy(ipst);
-	rw_destroy(&ipst->ips_srcid_lock);
 
 	ip_kstat_fini(stackid, ipst->ips_ip_mibkp);
 	ipst->ips_ip_mibkp = NULL;
@@ -4379,9 +4375,6 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 
 	dce_stack_destroy(ipst);
 	ip_mrouter_stack_destroy(ipst);
-
-	mutex_destroy(&ipst->ips_ip_mi_lock);
-	rw_destroy(&ipst->ips_ill_g_usesrc_lock);
 
 	ret = untimeout(ipst->ips_igmp_timeout_id);
 	if (ret == -1) {
@@ -4412,13 +4405,6 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 		ipst->ips_mld_slowtimeout_id = 0;
 	}
 
-	mutex_destroy(&ipst->ips_igmp_timer_lock);
-	mutex_destroy(&ipst->ips_mld_timer_lock);
-	mutex_destroy(&ipst->ips_igmp_slowtimeout_lock);
-	mutex_destroy(&ipst->ips_mld_slowtimeout_lock);
-	mutex_destroy(&ipst->ips_ip_addr_avail_lock);
-	rw_destroy(&ipst->ips_ill_g_lock);
-
 	ip_ire_fini(ipst);
 	ip6_asp_free(ipst);
 	conn_drain_fini(ipst);
@@ -4435,6 +4421,21 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 		kstat_delete_netstack(ipst->ips_loopback_ksp, stackid);
 		ipst->ips_loopback_ksp = NULL;
 	}
+
+	mutex_destroy(&ipst->ips_capab_taskq_lock);
+	cv_destroy(&ipst->ips_capab_taskq_cv);
+
+	rw_destroy(&ipst->ips_srcid_lock);
+
+	mutex_destroy(&ipst->ips_ip_mi_lock);
+	rw_destroy(&ipst->ips_ill_g_usesrc_lock);
+
+	mutex_destroy(&ipst->ips_igmp_timer_lock);
+	mutex_destroy(&ipst->ips_mld_timer_lock);
+	mutex_destroy(&ipst->ips_igmp_slowtimeout_lock);
+	mutex_destroy(&ipst->ips_mld_slowtimeout_lock);
+	mutex_destroy(&ipst->ips_ip_addr_avail_lock);
+	rw_destroy(&ipst->ips_ill_g_lock);
 
 	kmem_free(ipst->ips_phyint_g_list, sizeof (phyint_list_t));
 	ipst->ips_phyint_g_list = NULL;
