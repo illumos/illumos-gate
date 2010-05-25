@@ -3284,8 +3284,9 @@ if [[ ($build_ok = y) && ( ($A_FLAG = y) || ($r_FLAG = y) ) ]]; then
 			base_ifile="$ELF_DATA_BASELINE_DIR/interface"
 
 		       	echo "\n==== Compare versioning and ABI information" \
-			    "to baseline ====\n\nBaseline:  $base_ifile"  | \
+			    "to baseline ====\n"  | \
 			    tee -a $LOGFILE >> $mail_msg_file
+		       	echo "Baseline:  $base_ifile\n" >> $LOGFILE
 
 			if [[ -f $base_ifile ]]; then
 				interface_cmp -d -o $base_ifile \
