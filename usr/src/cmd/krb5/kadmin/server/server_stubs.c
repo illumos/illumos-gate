@@ -1,6 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 
@@ -2176,7 +2175,7 @@ generic_ret *init_2_svc(krb5_ui_4 *arg, struct svc_req *rqstp)
 
 	/* Solaris Kerberos */
      if (ret.code != 0)
-	 errmsg = krb5_get_error_message(handle ? handle->context : NULL, ret.code);
+	 errmsg = krb5_get_error_message(NULL, ret.code);
 
 	audit_kadmind_auth(rqstp->rq_xprt, l_port,
 			(ret.api_version == KADM5_API_VERSION_1 ?
@@ -2198,7 +2197,7 @@ generic_ret *init_2_svc(krb5_ui_4 *arg, struct svc_req *rqstp)
 		      client_addr(rqstp, buf),
 		      rqstp->rq_cred.oa_flavor);
 	if (errmsg != NULL)
-		krb5_free_error_message(handle ? handle->context : NULL, errmsg);
+		krb5_free_error_message(NULL, errmsg);
 	free(client_name);
 	free(service_name);
 

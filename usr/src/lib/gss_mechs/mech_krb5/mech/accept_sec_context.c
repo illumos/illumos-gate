@@ -625,6 +625,12 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
        }
 
        /* verify that the checksum is correct */
+       if (authdat->checksum == NULL) {
+          /* missing checksum counts as "inappropriate type" */
+          code = KRB5KRB_AP_ERR_INAPP_CKSUM;
+          major_status = GSS_S_FAILURE;
+          goto fail;
+       }
 
        /*
 	 The checksum may be either exactly 24 bytes, in which case
