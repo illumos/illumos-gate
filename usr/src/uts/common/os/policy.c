@@ -1672,6 +1672,17 @@ secpolicy_pset(const cred_t *cr)
 	return (PRIV_POLICY(cr, PRIV_SYS_RES_CONFIG, B_FALSE, EPERM, NULL));
 }
 
+/*
+ * Processor set binding.
+ */
+int
+secpolicy_pbind(const cred_t *cr)
+{
+	if (PRIV_POLICY_ONLY(cr, PRIV_SYS_RES_CONFIG, B_FALSE))
+		return (secpolicy_pset(cr));
+	return (PRIV_POLICY(cr, PRIV_SYS_RES_BIND, B_FALSE, EPERM, NULL));
+}
+
 int
 secpolicy_ponline(const cred_t *cr)
 {

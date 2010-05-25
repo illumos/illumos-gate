@@ -431,8 +431,13 @@ privilege PRIV_SYS_PPP_CONFIG
 	Allows a process to create and destroy PPP (sppp) interfaces.
 	Allows a process to configure PPP tunnels (sppptun).
 
+privilege PRIV_SYS_RES_BIND
+
+	Allows a process to bind processes to processor sets.
+
 privilege PRIV_SYS_RES_CONFIG
 
+	Allows all that PRIV_SYS_RES_BIND allows.
 	Allows a process to create and delete processor sets, assign
 	CPUs to processor sets and override the PSET_NOESCAPE property.
 	Allows a process to change the operational status of CPUs in

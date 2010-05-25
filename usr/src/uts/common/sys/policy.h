@@ -118,6 +118,7 @@ int secpolicy_net_rawaccess(const cred_t *);
 boolean_t secpolicy_net_reply_equal(const cred_t *);
 int secpolicy_newproc(const cred_t *);
 int secpolicy_nfs(const cred_t *);
+int secpolicy_pbind(const cred_t *);
 int secpolicy_pcfs_modify_bootpartition(const cred_t *);
 int secpolicy_pfexec_register(const cred_t *);
 int secpolicy_ponline(const cred_t *);

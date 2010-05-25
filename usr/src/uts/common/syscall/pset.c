@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -283,7 +282,7 @@ pset_bind_thread(kthread_t *tp, psetid_t pset, psetid_t *oldpset, void *projbuf,
 		 * PSET_NOESCAPE attribute.
 		 */
 		if ((tp->t_cpupart->cp_attr & PSET_NOESCAPE) &&
-		    secpolicy_pset(CRED()) != 0)
+		    secpolicy_pbind(CRED()) != 0)
 			return (EPERM);
 		if ((error = cpupart_bind_thread(tp, pset, 0,
 		    projbuf, zonebuf)) == 0)
@@ -561,7 +560,7 @@ pset_bind(psetid_t pset, idtype_t idtype, id_t id, psetid_t *opset)
 		if (cpupart_get_cpus(&pset, NULL, NULL) != 0) {
 			pool_unlock();
 			return (set_errno(EINVAL));
-		} else if (pset != PS_NONE && secpolicy_pset(CRED()) != 0) {
+		} else if (pset != PS_NONE && secpolicy_pbind(CRED()) != 0) {
 			pool_unlock();
 			return (set_errno(EPERM));
 		}
