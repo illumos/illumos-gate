@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Solaris specific functions to reduce the initialization
@@ -513,10 +510,12 @@ pkcs11_ObjectToKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE obj,
 	CK_RV rv;
 	CK_ATTRIBUTE template;
 
-	if (hSession == NULL || rawkey == NULL || rawkey_len == NULL ||
-	    *rawkey_len == 0) {
+	if (hSession == NULL)
+		return (CKR_SESSION_HANDLE_INVALID);
+	if (obj == NULL)
+		return (CKR_OBJECT_HANDLE_INVALID);
+	if (rawkey == NULL || rawkey_len == NULL)
 		return (CKR_ARGUMENTS_BAD);
-	}
 
 	template.type = CKA_VALUE;
 	template.pValue = NULL;

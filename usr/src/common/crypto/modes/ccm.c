@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _KERNEL
@@ -430,8 +429,8 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 			    [ctx->ccm_remainder_len], pt_part);
 			ctx->ccm_remainder_len += pt_part;
 			ccm_decrypt_incomplete_block(ctx, encrypt_block);
+			ctx->ccm_processed_data_len += ctx->ccm_remainder_len;
 			ctx->ccm_remainder_len = 0;
-			ctx->ccm_processed_data_len += pt_part;
 			return (CRYPTO_SUCCESS);
 		} else {
 			/* let rest of the code handle this */
