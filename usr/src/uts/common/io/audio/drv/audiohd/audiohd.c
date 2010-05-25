@@ -91,6 +91,11 @@ static	int	audiohd_beep;
 static	int	audiohd_beep_divider;
 static	int	audiohd_beep_vol = 1;
 
+/* Warlock annotation */
+_NOTE(SCHEME_PROTECTS_DATA("unshared data", audiohd_beep))
+_NOTE(SCHEME_PROTECTS_DATA("unshared data", audiohd_beep_divider))
+_NOTE(SCHEME_PROTECTS_DATA("unshared data", audiohd_beep_vol))
+
 static ddi_device_acc_attr_t hda_dev_accattr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
@@ -316,6 +321,9 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	statep = kmem_zalloc(sizeof (*statep), KM_SLEEP);
 	ddi_set_driver_private(dip, statep);
 
+	mutex_init(&statep->hda_mutex, NULL, MUTEX_DRIVER, 0);
+	mutex_enter(&statep->hda_mutex);
+
 	/* interrupt cookie and initialize mutex */
 	if (audiohd_init_state(statep, dip) != DDI_SUCCESS) {
 		cmn_err(CE_WARN,
@@ -362,8 +370,6 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* disable interrupts and clear interrupt status */
 	audiohd_disable_intr(statep);
 
-	mutex_init(&statep->hda_mutex, NULL, MUTEX_DRIVER, 0);
-
 	/*
 	 * Register audio controls.
 	 */
@@ -376,8 +382,10 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	ddi_report_dev(dip);
 
+	mutex_exit(&statep->hda_mutex);
 	return (DDI_SUCCESS);
 error:
+	mutex_exit(&statep->hda_mutex);
 	audiohd_destroy(statep);
 	return (DDI_FAILURE);
 }
@@ -515,6 +523,7 @@ audiohd_free_path(audiohd_state_t *statep)
 static void
 audiohd_destroy(audiohd_state_t *statep)
 {
+	mutex_enter(&statep->hda_mutex);
 	audiohd_stop_dma(statep);
 	if (statep->hda_ksp)
 		kstat_delete(statep->hda_ksp);
@@ -524,6 +533,7 @@ audiohd_destroy(audiohd_state_t *statep)
 	audiohd_del_controls(statep);
 	audiohd_fini_controller(statep);
 	audiohd_fini_pci(statep);
+	mutex_exit(&statep->hda_mutex);
 	mutex_destroy(&statep->hda_mutex);
 	if (statep->adev)
 		audio_dev_free(statep->adev);
@@ -832,13 +842,16 @@ static int
 audiohd_engine_open(void *arg, int flag, unsigned *nframes, caddr_t *bufp)
 {
 	audiohd_port_t	*port = arg;
+	audiohd_state_t	*statep = port->statep;
 
 	_NOTE(ARGUNUSED(flag));
 
+	mutex_enter(&statep->hda_mutex);
 	port->count = 0;
 	port->curpos = 0;
 	*nframes = port->nframes;
 	*bufp = port->samp_kaddr;
+	mutex_exit(&statep->hda_mutex);
 
 	return (0);
 }
@@ -853,6 +866,7 @@ audiohd_engine_start(void *arg)
 	mutex_enter(&statep->hda_mutex);
 
 	if ((rv = audiohd_reset_port(port)) != 0) {
+		mutex_exit(&statep->hda_mutex);
 		return (rv);
 	}
 	/* Start DMA */
@@ -990,8 +1004,12 @@ static int
 audiohd_get_control(void *arg, uint64_t *val)
 {
 	audiohd_ctrl_t	*ac = arg;
+	audiohd_state_t	*statep = ac->statep;
 
+	mutex_enter(&statep->hda_mutex);
 	*val = ac->val;
+	mutex_exit(&statep->hda_mutex);
+
 	return (0);
 }
 
@@ -1880,7 +1898,9 @@ audiohd_quiesce(dev_info_t *dip)
 
 	statep = ddi_get_driver_private(dip);
 
+	mutex_enter(&statep->hda_mutex);
 	audiohd_stop_dma(statep);
+	mutex_exit(&statep->hda_mutex);
 
 	return (DDI_SUCCESS);
 }
@@ -1889,35 +1909,41 @@ static void
 audiohd_beep_on(void *arg)
 {
 	hda_codec_t *codec = ((audiohd_widget_t *)arg)->codec;
-	audiohd_state_t *statep = codec->soft_statep;
+	audiohd_state_t *statep = codec->statep;
 	int caddr = codec->index;
 	wid_t wid = ((audiohd_widget_t *)arg)->wid_wid;
 
+	mutex_enter(&statep->hda_mutex);
 	(void) audioha_codec_verb_get(statep, caddr, wid,
 	    AUDIOHDC_VERB_SET_BEEP_GEN, audiohd_beep_divider);
+	mutex_exit(&statep->hda_mutex);
 }
 
 static void
 audiohd_beep_off(void *arg)
 {
 	hda_codec_t *codec = ((audiohd_widget_t *)arg)->codec;
-	audiohd_state_t *statep = codec->soft_statep;
+	audiohd_state_t *statep = codec->statep;
 	int caddr = codec->index;
 	wid_t wid = ((audiohd_widget_t *)arg)->wid_wid;
 
+	mutex_enter(&statep->hda_mutex);
 	(void) audioha_codec_verb_get(statep, caddr, wid,
 	    AUDIOHDC_VERB_SET_BEEP_GEN, AUDIOHDC_MUTE_BEEP_GEN);
+	mutex_exit(&statep->hda_mutex);
 }
 
 static void
 audiohd_beep_freq(void *arg, int freq)
 {
 	hda_codec_t 	*codec = ((audiohd_widget_t *)arg)->codec;
+	audiohd_state_t	*statep = codec->statep;
 	uint32_t	vid = codec->vid >> 16;
+	int		divider;
 
 	_NOTE(ARGUNUSED(arg));
 	if (freq == 0) {
-		audiohd_beep_divider = 0;
+		divider = 0;
 	} else {
 		if (freq > AUDIOHDC_MAX_BEEP_GEN)
 			freq = AUDIOHDC_MAX_BEEP_GEN;
@@ -1930,17 +1956,20 @@ audiohd_beep_freq(void *arg, int freq)
 			 * Sigmatel HD codec specification:
 			 * frequency = 48000 * (257 - Divider) / 1024
 			 */
-			audiohd_beep_divider = 257 - freq * 1024 /
-			    AUDIOHDC_SAMPR48000;
+			divider = 257 - freq * 1024 / AUDIOHDC_SAMPR48000;
 			break;
 		default:
-			audiohd_beep_divider = AUDIOHDC_SAMPR48000 / freq;
+			divider = AUDIOHDC_SAMPR48000 / freq;
 			break;
 		}
 	}
 
 	if (audiohd_beep_vol == 0)
-		audiohd_beep_divider = 0;
+		divider = 0;
+
+	mutex_enter(&statep->hda_mutex);
+	audiohd_beep_divider = divider;
+	mutex_exit(&statep->hda_mutex);
 }
 
 /*
@@ -2070,12 +2099,10 @@ audiohd_fini_pci(audiohd_state_t *statep)
 {
 	if (statep->hda_reg_handle != NULL) {
 		ddi_regs_map_free(&statep->hda_reg_handle);
-		statep->hda_reg_handle = NULL;
 	}
 
 	if (statep->hda_pci_handle != NULL) {
 		pci_config_teardown(&statep->hda_pci_handle);
-		statep->hda_pci_handle = NULL;
 	}
 
 }	/* audiohd_fini_pci() */
@@ -2484,7 +2511,7 @@ audiohd_get_conns_from_entry(hda_codec_t *codec, audiohd_widget_t *widget,
 static void
 audiohd_get_conns(hda_codec_t *codec, wid_t wid)
 {
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 	audiohd_widget_t	*widget = codec->widget[wid];
 	uint8_t	caddr = codec->index;
 	uint32_t	entry;
@@ -2547,7 +2574,7 @@ static void
 audiohd_get_pin_config(audiohd_widget_t *widget)
 {
 	hda_codec_t		*codec = widget->codec;
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 	audiohd_pin_t		*pin, *prev, *p;
 
 	int		caddr = codec->index;
@@ -2643,7 +2670,7 @@ static int
 audiohd_create_widgets(hda_codec_t *codec)
 {
 	audiohd_widget_t	*widget;
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 	wid_t	wid;
 	uint32_t	type, widcap;
 	int		caddr = codec->index;
@@ -2956,7 +2983,7 @@ audiohd_create_codec(audiohd_state_t *statep)
 		 * We output the codec information to syslog
 		 */
 		statep->codec[i] = codec;
-		codec->soft_statep = statep;
+		codec->statep = statep;
 		(void) audiohd_create_widgets(codec);
 	}
 
@@ -3104,7 +3131,7 @@ audiohd_do_build_output_path(hda_codec_t *codec, int mixer, int *mnum,
 	audiohd_state_t		*statep;
 	int			i;
 
-	statep = codec->soft_statep;
+	statep = codec->statep;
 
 	for (pin = codec->first_pin; pin; pin = pin->next) {
 		if ((pin->cap & AUDIOHD_PIN_CAP_MASK) == 0)
@@ -3218,8 +3245,8 @@ audiohd_build_output_amp(hda_codec_t *codec)
 	int		i, j;
 	uint32_t	gain;
 
-	for (i = 0; i < codec->soft_statep->pathnum; i++) {
-		path = codec->soft_statep->path[i];
+	for (i = 0; i < codec->statep->pathnum; i++) {
+		path = codec->statep->path[i];
 		if (path == NULL || path->path_type != PLAY ||
 		    path->codec != codec)
 			continue;
@@ -3380,7 +3407,7 @@ audiohd_build_output_amp(hda_codec_t *codec)
 static void
 audiohd_finish_output_path(hda_codec_t *codec)
 {
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 	audiohd_path_t		*path;
 	audiohd_widget_t	*widget;
 	audiohd_pin_t		*pin;
@@ -3388,8 +3415,8 @@ audiohd_finish_output_path(hda_codec_t *codec)
 	wid_t			wid, next;
 	int			i, j;
 
-	for (i = 0; i < codec->soft_statep->pathnum; i++) {
-		path = codec->soft_statep->path[i];
+	for (i = 0; i < codec->statep->pathnum; i++) {
+		path = codec->statep->path[i];
 		if (!path || path->path_type != PLAY || path->codec != codec)
 			continue;
 		for (j = 0; j < path->pin_nums; j++) {
@@ -3488,7 +3515,7 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 {
 	audiohd_widget_t	*widget = codec->widget[wid];
 	audiohd_pin_t		*pin;
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 	uint_t			caddr = codec->index;
 	int			retval = -1;
 	int			num, i;
@@ -3614,7 +3641,7 @@ audiohd_build_input_path(hda_codec_t *codec)
 	int			i;
 	int			retval;
 	uint8_t			rtag = 0;
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 
 	for (wid = codec->first_wid; wid <= codec->last_wid; wid++) {
 
@@ -3680,8 +3707,8 @@ audiohd_build_input_amp(hda_codec_t *codec)
 	int			i, j;
 	int			weight;
 
-	for (i = 0; i < codec->soft_statep->pathnum; i++) {
-		path = codec->soft_statep->path[i];
+	for (i = 0; i < codec->statep->pathnum; i++) {
+		path = codec->statep->path[i];
 		if (path == NULL || path->path_type != RECORD ||
 		    path->codec != codec)
 			continue;
@@ -3846,15 +3873,15 @@ audiohd_build_input_amp(hda_codec_t *codec)
 static void
 audiohd_finish_input_path(hda_codec_t *codec)
 {
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 	audiohd_path_t		*path;
 	audiohd_widget_t	*w, *wsum;
 	uint_t			caddr = codec->index;
 	wid_t			wid;
 	int			i, j;
 
-	for (i = 0; i < codec->soft_statep->pathnum; i++) {
-		path = codec->soft_statep->path[i];
+	for (i = 0; i < codec->statep->pathnum; i++) {
+		path = codec->statep->path[i];
 		if (path == NULL || path->path_type != RECORD ||
 		    path->codec != codec)
 			continue;
@@ -4075,7 +4102,7 @@ audiohd_build_monitor_path(hda_codec_t *codec)
 {
 	audiohd_path_t		*path;
 	audiohd_widget_t	*widget, *w;
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 	wid_t			wid, next;
 	int			i, j, k, l, find;
 	int			mixernum = 0;
@@ -4186,7 +4213,7 @@ audiohd_do_finish_monitor_path(hda_codec_t *codec, audiohd_widget_t *wgt)
 	uint_t			caddr = codec->index;
 	audiohd_widget_t 	*widget = wgt;
 	audiohd_widget_t	*w;
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 	wid_t			wid;
 	int			i;
 	int			share = 0;
@@ -4236,7 +4263,7 @@ audiohd_finish_monitor_path(hda_codec_t *codec)
 {
 	audiohd_path_t		*path;
 	audiohd_widget_t	*widget;
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 	wid_t			wid;
 	int 			i, j, k;
 
@@ -4317,7 +4344,7 @@ audiohd_build_monitor_amp(hda_codec_t *codec)
 {
 	audiohd_path_t		*path;
 	audiohd_widget_t	*widget, *w;
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 	audiohd_pin_t		*pin;
 	wid_t			wid, id;
 	int			i, j, k;
@@ -4417,7 +4444,7 @@ audiohd_build_beep_path(hda_codec_t *codec)
 	int			i;
 	boolean_t		beeppath = B_FALSE;
 
-	statep = codec->soft_statep;
+	statep = codec->statep;
 
 	for (pin = codec->first_pin; pin; pin = pin->next) {
 		if ((pin->cap & AUDIOHD_PIN_CAP_MASK) == 0)
@@ -4508,8 +4535,8 @@ audiohd_build_beep_amp(hda_codec_t *codec)
 	int			i, j;
 	uint32_t		gain;
 
-	for (i = 0; i < codec->soft_statep->pathnum; i++) {
-		path = codec->soft_statep->path[i];
+	for (i = 0; i < codec->statep->pathnum; i++) {
+		path = codec->statep->path[i];
 		if (path == NULL || path->path_type != BEEP ||
 		    path->codec != codec)
 			continue;
@@ -4585,15 +4612,15 @@ audiohd_build_beep_amp(hda_codec_t *codec)
 static void
 audiohd_finish_beep_path(hda_codec_t *codec)
 {
-	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_state_t		*statep = codec->statep;
 	audiohd_path_t		*path;
 	audiohd_widget_t	*widget;
 	uint_t			caddr = codec->index;
 	wid_t			wid, next;
 	int			i, j;
 
-	for (i = 0; i < codec->soft_statep->pathnum; i++) {
-		path = codec->soft_statep->path[i];
+	for (i = 0; i < codec->statep->pathnum; i++) {
+		path = codec->statep->path[i];
 		if (!path || path->path_type != BEEP || path->codec != codec)
 			continue;
 		if (path->pin_nums == 0) {
