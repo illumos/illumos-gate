@@ -598,7 +598,7 @@ libipadm:	libnsl libinetutil libsocket libdlpi libnvpair libdhcpagent \
 		libdladm libsecdb
 libiscsit:	libc libnvpair libstmf libuuid libnsl
 libkmf:		libcryptoutil pkcs11
-libnsl:		libmd5 libscf
+libnsl:		libmd5
 libmapid:	libresolv
 librdc:		libsocket libnsl libnsctl libunistat libdscfg
 libuuid:	libdlpi
@@ -633,7 +633,7 @@ libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
 		libdhcputil
 libwanbootutil:	libnsl
 pam_modules:	libproject passwdutil smbsrv
-libscf:		libuutil libmd libgen libsmbios
+libscf:		libuutil libmd libgen libsmbios libnsl
 libinetsvc:	libscf
 librestart:	libuutil libscf
 ../cmd/sgs/libdl:	../cmd/sgs/libconv
