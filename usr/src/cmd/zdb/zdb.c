@@ -1290,8 +1290,12 @@ dump_znode(objset_t *os, uint64_t object, void *data, size_t size)
 			VERIFY(zap_lookup(os, MASTER_NODE_OBJ, ZFS_SA_ATTRS,
 			    8, 1, &sa_attrs) == 0);
 		}
-		sa_attr_table = sa_setup(os, sa_attrs,
-		    zfs_attr_table, ZPL_END);
+		if ((error = sa_setup(os, sa_attrs, zfs_attr_table,
+		    ZPL_END, &sa_attr_table)) != 0) {
+			(void) printf("sa_setup failed errno %d, can't "
+			    "display znode contents\n", error);
+			return;
+		}
 		sa_loaded = B_TRUE;
 	}
 

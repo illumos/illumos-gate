@@ -1125,6 +1125,7 @@ dmu_objset_do_userquota_updates(objset_t *os, dmu_tx_t *tx)
 	ASSERT(list_head(list) == NULL || dmu_objset_userused_enabled(os));
 
 	while (dn = list_head(list)) {
+		int flags;
 		ASSERT(!DMU_OBJECT_IS_SPECIAL(dn->dn_object));
 		ASSERT(dn->dn_phys->dn_type == DMU_OT_NONE ||
 		    dn->dn_phys->dn_flags &
@@ -1148,18 +1149,19 @@ dmu_objset_do_userquota_updates(objset_t *os, dmu_tx_t *tx)
 		 * a bprewrite.
 		 */
 
-		mutex_enter(&dn->dn_mtx);
-		ASSERT(dn->dn_id_flags);
-		if (dn->dn_id_flags & DN_ID_OLD_EXIST)  {
+		flags = dn->dn_id_flags;
+		ASSERT(flags);
+		if (flags & DN_ID_OLD_EXIST)  {
 			do_userquota_update(os, dn->dn_oldused, dn->dn_oldflags,
 			    dn->dn_olduid, dn->dn_oldgid, B_TRUE, tx);
 		}
-		if (dn->dn_id_flags & DN_ID_NEW_EXIST) {
+		if (flags & DN_ID_NEW_EXIST) {
 			do_userquota_update(os, DN_USED_BYTES(dn->dn_phys),
 			    dn->dn_phys->dn_flags,  dn->dn_newuid,
 			    dn->dn_newgid, B_FALSE, tx);
 		}
 
+		mutex_enter(&dn->dn_mtx);
 		dn->dn_oldused = 0;
 		dn->dn_oldflags = 0;
 		if (dn->dn_id_flags & DN_ID_NEW_EXIST) {
@@ -1242,7 +1244,8 @@ dmu_objset_userquota_get_ids(dnode_t *dn, boolean_t before, dmu_tx_t *tx)
 
 			if (RW_WRITE_HELD(&dn->dn_struct_rwlock))
 				rf |= DB_RF_HAVESTRUCT;
-			error = dmu_spill_hold_by_dnode(dn, rf,
+			error = dmu_spill_hold_by_dnode(dn,
+			    rf | DB_RF_MUST_SUCCEED,
 			    FTAG, (dmu_buf_t **)&db);
 			ASSERT(error == 0);
 			mutex_enter(&db->db_mtx);

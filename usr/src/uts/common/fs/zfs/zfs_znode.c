@@ -1822,7 +1822,10 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 	zfsvfs.z_use_sa = USE_SA(version, os);
 	zfsvfs.z_norm = norm;
 
-	zfsvfs.z_attr_table = sa_setup(os, sa_obj, zfs_attr_table, ZPL_END);
+	error = sa_setup(os, sa_obj, zfs_attr_table, ZPL_END,
+	    &zfsvfs.z_attr_table);
+
+	ASSERT(error == 0);
 
 	/*
 	 * Fold case on file systems that are always or sometimes case
@@ -1939,7 +1942,9 @@ zfs_obj_to_path(objset_t *osp, uint64_t obj, char *buf, int len)
 	if (error != 0 && error != ENOENT)
 		return (error);
 
-	sa_table = sa_setup(osp, sa_obj, zfs_attr_table, ZPL_END);
+	if ((error = sa_setup(osp, sa_obj, zfs_attr_table,
+	    ZPL_END, &sa_table)) != 0)
+		return (error);
 
 	for (;;) {
 		uint64_t pobj;

@@ -246,8 +246,11 @@ dmu_spill_hold_by_dnode(dnode_t *dn, uint32_t flags, void *tag, dmu_buf_t **dbp)
 		rw_exit(&dn->dn_struct_rwlock);
 
 	ASSERT(db != NULL);
-	err = dbuf_read(db, NULL, DB_RF_MUST_SUCCEED | flags);
-	*dbp = &db->db;
+	err = dbuf_read(db, NULL, flags);
+	if (err == 0)
+		*dbp = &db->db;
+	else
+		dbuf_rele(db, tag);
 	return (err);
 }
 
@@ -265,7 +268,8 @@ dmu_spill_hold_existing(dmu_buf_t *bonus, void *tag, dmu_buf_t **dbp)
 		rw_exit(&dn->dn_struct_rwlock);
 		return (ENOENT);
 	}
-	err = dmu_spill_hold_by_dnode(dn, DB_RF_HAVESTRUCT, tag, dbp);
+	err = dmu_spill_hold_by_dnode(dn,
+	    DB_RF_HAVESTRUCT | DB_RF_CANFAIL, tag, dbp);
 	rw_exit(&dn->dn_struct_rwlock);
 	return (err);
 }
@@ -274,7 +278,7 @@ int
 dmu_spill_hold_by_bonus(dmu_buf_t *bonus, void *tag, dmu_buf_t **dbp)
 {
 	return (dmu_spill_hold_by_dnode(((dmu_buf_impl_t *)bonus)->db_dnode,
-	    0, tag, dbp));
+	    DB_RF_CANFAIL, tag, dbp));
 }
 
 /*
@@ -1413,7 +1417,8 @@ void
 dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 {
 	dmu_object_type_t type = dn ? dn->dn_type : DMU_OT_OBJSET;
-	boolean_t ismd = (level > 0 || dmu_ot[type].ot_metadata);
+	boolean_t ismd = (level > 0 || dmu_ot[type].ot_metadata ||
+	    (wp & WP_SPILL));
 	enum zio_checksum checksum = os->os_checksum;
 	enum zio_compress compress = os->os_compress;
 	enum zio_checksum dedup_checksum = os->os_dedup_checksum;
