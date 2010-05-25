@@ -10288,7 +10288,7 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 	 * event when the lun is not opened in NDELAY mode. The event handler
 	 * should open the lun in NDELAY mode.
 	 */
-	if (!(flag & FNDELAY)) {
+	if (!nodelay) {
 		mutex_exit(SD_MUTEX(un));
 		if (cmlb_efi_label_capacity(un->un_cmlbhandle, &label_cap,
 		    (void*)SD_PATH_DIRECT) == 0) {
