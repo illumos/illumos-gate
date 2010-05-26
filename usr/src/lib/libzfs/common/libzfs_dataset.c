@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <ctype.h>
@@ -1212,39 +1211,46 @@ badlabel:
 		(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 		goto error;
 	}
-
-	/*
-	 * If this is an existing volume, and someone is setting the volsize,
-	 * make sure that it matches the reservation, or add it if necessary.
-	 */
-	if (zhp != NULL && type == ZFS_TYPE_VOLUME &&
-	    nvlist_lookup_uint64(ret, zfs_prop_to_name(ZFS_PROP_VOLSIZE),
-	    &intval) == 0) {
-		uint64_t old_volsize = zfs_prop_get_int(zhp,
-		    ZFS_PROP_VOLSIZE);
-		uint64_t old_reservation;
-		uint64_t new_reservation;
-		zfs_prop_t resv_prop;
-
-		if (zfs_which_resv_prop(zhp, &resv_prop) < 0)
-			goto error;
-		old_reservation = zfs_prop_get_int(zhp, resv_prop);
-
-		if (old_volsize == old_reservation &&
-		    nvlist_lookup_uint64(ret, zfs_prop_to_name(resv_prop),
-		    &new_reservation) != 0) {
-			if (nvlist_add_uint64(ret,
-			    zfs_prop_to_name(resv_prop), intval) != 0) {
-				(void) no_memory(hdl);
-				goto error;
-			}
-		}
-	}
 	return (ret);
 
 error:
 	nvlist_free(ret);
 	return (NULL);
+}
+
+int
+zfs_add_synthetic_resv(zfs_handle_t *zhp, nvlist_t *nvl)
+{
+	uint64_t old_volsize;
+	uint64_t new_volsize;
+	uint64_t old_reservation;
+	uint64_t new_reservation;
+	zfs_prop_t resv_prop;
+
+	/*
+	 * If this is an existing volume, and someone is setting the volsize,
+	 * make sure that it matches the reservation, or add it if necessary.
+	 */
+	old_volsize = zfs_prop_get_int(zhp, ZFS_PROP_VOLSIZE);
+	if (zfs_which_resv_prop(zhp, &resv_prop) < 0)
+		return (-1);
+	old_reservation = zfs_prop_get_int(zhp, resv_prop);
+	if ((zvol_volsize_to_reservation(old_volsize, zhp->zfs_props) !=
+	    old_reservation) || nvlist_lookup_uint64(nvl,
+	    zfs_prop_to_name(resv_prop), &new_reservation) != ENOENT) {
+		return (0);
+	}
+	if (nvlist_lookup_uint64(nvl, zfs_prop_to_name(ZFS_PROP_VOLSIZE),
+	    &new_volsize) != 0)
+		return (-1);
+	new_reservation = zvol_volsize_to_reservation(new_volsize,
+	    zhp->zfs_props);
+	if (nvlist_add_uint64(nvl, zfs_prop_to_name(resv_prop),
+	    new_reservation) != 0) {
+		(void) no_memory(zhp->zfs_hdl);
+		return (-1);
+	}
+	return (1);
 }
 
 void
@@ -1346,6 +1352,7 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 	zfs_prop_t prop;
 	boolean_t do_prefix;
 	uint64_t idx;
+	int added_resv;
 
 	(void) snprintf(errbuf, sizeof (errbuf),
 	    dgettext(TEXT_DOMAIN, "cannot set property for '%s'"),
@@ -1365,6 +1372,11 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 	nvl = realprops;
 
 	prop = zfs_name_to_prop(propname);
+
+	if (prop == ZFS_PROP_VOLSIZE) {
+		if ((added_resv = zfs_add_synthetic_resv(zhp, nvl)) == -1)
+			goto error;
+	}
 
 	if ((cl = changelist_gather(zhp, prop, 0, 0)) == NULL)
 		goto error;
@@ -1400,6 +1412,22 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 
 	if (ret != 0) {
 		zfs_setprop_error(hdl, prop, errno, errbuf);
+		if (added_resv && errno == ENOSPC) {
+			/* clean up the volsize property we tried to set */
+			uint64_t old_volsize = zfs_prop_get_int(zhp,
+			    ZFS_PROP_VOLSIZE);
+			nvlist_free(nvl);
+			zcmd_free_nvlists(&zc);
+			if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+				goto error;
+			if (nvlist_add_uint64(nvl,
+			    zfs_prop_to_name(ZFS_PROP_VOLSIZE),
+			    old_volsize) != 0)
+				goto error;
+			if (zcmd_write_src_nvlist(hdl, &zc, nvl) != 0)
+				goto error;
+			(void) zfs_ioctl(hdl, ZFS_IOC_SET_PROP, &zc);
+		}
 	} else {
 		if (do_prefix)
 			ret = changelist_postfix(cl);
@@ -1474,7 +1502,7 @@ zfs_prop_inherit(zfs_handle_t *zhp, const char *propname, boolean_t received)
 		return (zfs_error(hdl, EZFS_PROPTYPE, errbuf));
 
 	/*
-	 * Normalize the name, to get rid of shorthand abbrevations.
+	 * Normalize the name, to get rid of shorthand abbreviations.
 	 */
 	propname = zfs_prop_to_name(prop);
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
