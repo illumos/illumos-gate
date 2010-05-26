@@ -203,6 +203,7 @@ CCFLAGS64 +=	-_CC=-features=conststrings
 LIBMP =		-lmp
 lint :=		LIBMP =
 LDLIBS +=	$(LIBMP) -lmd -lc
+DYNFLAGS +=	$(ZNODELETE)
 
 $(LINTLIB):=	SRCS=$(SRCDIR)/$(LINTSRC)
 LINTFLAGS +=	-m -DPORTMAP
