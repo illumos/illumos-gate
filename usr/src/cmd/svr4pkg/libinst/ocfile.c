@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -199,12 +198,14 @@ set_cfdir(char *cfdir)
 int
 ocfile(PKGserver *server, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
 {
-	struct	stat64	statb;
+	struct	stat64	statb, statl;
 	struct	statvfs64	svfsb;
 	fsblkcnt_t free_blocks;
 	fsblkcnt_t need_blocks;
+	fsblkcnt_t log_blocks;
 	VFP_T		*tmpvfp = (VFP_T *)NULL;
 	char		contents[PATH_MAX];
+	char		logfile[PATH_MAX];
 	int		n;
 	off_t		cdiff_alloc;
 	PKGserver	newserver;
@@ -274,31 +275,40 @@ ocfile(PKGserver *server, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
 	}
 
 	free_blocks = (((fsblkcnt_t)svfsb.f_frsize > 0) ?
-			howmany(svfsb.f_frsize, DEV_BSIZE) :
-			howmany(svfsb.f_bsize, DEV_BSIZE)) * svfsb.f_bfree;
+	    howmany(svfsb.f_frsize, DEV_BSIZE) :
+	    howmany(svfsb.f_bsize, DEV_BSIZE)) * svfsb.f_bfree;
 
-	/*
-	 * If we're removing a package, then the log might grow to the size
-	 * of the full contents file.
-	 */
+	/* determine blocks used by the logfile */
+	(void) snprintf(logfile, sizeof (logfile), "%s/" PKGLOG, pkgadm_dir);
 
-	if (map_blks == 0LL)
-		map_blks = nblk(statb.st_size, svfsb.f_bsize, svfsb.f_frsize);
+	if (stat64(logfile, &statl) == -1)
+		log_blocks = 0;
+	else
+		log_blocks = nblk(statl.st_size, svfsb.f_bsize, svfsb.f_frsize);
 
 	/*
 	 * Calculate the number of blocks we need to be able to operate on
-	 * the contents file.
+	 * the contents file and the log file.
+	 * When adding a package (map_blks > 0), we add the size of the
+	 * pkgmap file times 1.5 as the pkgmap is a bit smaller then the
+	 * lines added to the contents file.  That data is written both to
+	 * the new contents file and the log file (2 * 1.5 * map_blks).
+	 * The new contents file is limited by the size of the current
+	 * contents file and the increased log file.
+	 * If we're removing a package, then the log might grow to the size
+	 * of the full contents file but then the new contents file would
+	 * be zero and so we only need to add the size of the contents file.
 	 */
-	need_blocks = map_blks +
-		/* Max of the log file */
-		nblk(MAXLOGFILESIZE, svfsb.f_bsize, svfsb.f_frsize) +
-		/* Current content file */
-		nblk(statb.st_size, svfsb.f_bsize, svfsb.f_frsize);
+	need_blocks = map_blks * 3 +
+	    /* Current log file */
+	    log_blocks +
+	    /* Current contents file */
+	    nblk(statb.st_size, svfsb.f_bsize, svfsb.f_frsize);
 
 	if ((need_blocks + 10) > free_blocks) {
 		progerr(gettext(ERR_CFBACK), contents);
 		progerr(gettext(ERR_CFBACK1), need_blocks, free_blocks,
-			DEV_BSIZE);
+		    DEV_BSIZE);
 		pkgcloseserver(newserver);
 		return (0);
 	}
@@ -496,8 +506,8 @@ swapcfile(PKGserver server, VFP_T **a_cfTmpVfp, char *pkginst, int dbchg)
 
 	(void) strftime(timeb, sizeof (timeb), "%c\n", timep);
 	(void) snprintf(line, sizeof (line),
-		gettext("# Last modified by %s for %s package\n# %s"),
-		get_prog_name(), pkginst, timeb);
+	    gettext("# Last modified by %s for %s package\n# %s"),
+	    get_prog_name(), pkginst, timeb);
 	vfpPuts(*a_cfTmpVfp, line);
 
 	/* commit temporary contents file bytes to storage */
@@ -662,7 +672,7 @@ vcfile(void)
 	 */
 
 	(void) snprintf(contents, sizeof (contents),
-			"%s/contents", get_PKGADM());
+	    "%s/contents", get_PKGADM());
 
 	/*
 	 * Attempt to create the file - will only be successful
@@ -716,7 +726,7 @@ vcfile(void)
 
 		if (errno == EACCES) {
 			progerr(gettext(ERR_ACCESS_CONT), contents,
-					strerror(lerrno));
+			    strerror(lerrno));
 			logerr(gettext(ERR_ERRNO), lerrno, strerror(lerrno));
 			return (0);	/* failure */
 		}
