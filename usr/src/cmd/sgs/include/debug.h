@@ -458,6 +458,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_syms_cap_local	Dbg64_syms_cap_local
 #define	Dbg_syms_cap_lookup	Dbg64_syms_cap_lookup
 #define	Dbg_syms_cap_title	Dbg64_syms_cap_title
+#define	Dbg_syms_copy_reloc	Dbg64_syms_copy_reloc
 #define	Dbg_syms_created	Dbg64_syms_created
 #define	Dbg_syms_discarded	Dbg64_syms_discarded
 #define	Dbg_syms_dup_discarded	Dbg64_syms_dup_discarded
@@ -473,7 +474,6 @@ extern	void		Dbg_help(void);
 #define	Dbg_syms_old		Dbg64_syms_old
 #define	Dbg_syms_process	Dbg64_syms_process
 #define	Dbg_syms_reduce		Dbg64_syms_reduce
-#define	Dbg_syms_reloc		Dbg64_syms_reloc
 #define	Dbg_syms_resolved	Dbg64_syms_resolved
 #define	Dbg_syms_resolving	Dbg64_syms_resolving
 #define	Dbg_syms_sec_entry	Dbg64_syms_sec_entry
@@ -690,6 +690,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_syms_cap_local	Dbg32_syms_cap_local
 #define	Dbg_syms_cap_lookup	Dbg32_syms_cap_lookup
 #define	Dbg_syms_cap_title	Dbg32_syms_cap_title
+#define	Dbg_syms_copy_reloc	Dbg32_syms_copy_reloc
 #define	Dbg_syms_created	Dbg32_syms_created
 #define	Dbg_syms_discarded	Dbg32_syms_discarded
 #define	Dbg_syms_dup_discarded	Dbg32_syms_dup_discarded
@@ -706,7 +707,6 @@ extern	void		Dbg_help(void);
 #define	Dbg_syms_old		Dbg32_syms_old
 #define	Dbg_syms_process	Dbg32_syms_process
 #define	Dbg_syms_reduce		Dbg32_syms_reduce
-#define	Dbg_syms_reloc		Dbg32_syms_reloc
 #define	Dbg_syms_resolved	Dbg32_syms_resolved
 #define	Dbg_syms_resolving	Dbg32_syms_resolving
 #define	Dbg_syms_sec_entry	Dbg32_syms_sec_entry
@@ -981,6 +981,7 @@ extern	void	Dbg_syms_cap_local(Ofl_desc *, Word, const char *, Sym *,
 extern	void	Dbg_syms_cap_lookup(Rt_map *, uint_t, const char *, uint_t,
 		    Half, Syscapset *);
 extern	void	Dbg_syms_cap_title(Ofl_desc *);
+extern	void	Dbg_syms_copy_reloc(Ofl_desc *, Sym_desc *, Word);
 extern	void	Dbg_syms_created(Lm_list *, const char *);
 extern	void	Dbg_syms_discarded(Lm_list *, Sym_desc *);
 extern	void	Dbg_syms_dup_discarded(Lm_list *, Word ndx, Sym_desc *);
@@ -1001,7 +1002,6 @@ extern	void	Dbg_syms_old(Ofl_desc *, Sym_desc *);
 extern	void	Dbg_syms_process(Lm_list *, Ifl_desc *);
 extern	void	Dbg_syms_reduce(Ofl_desc *, int, Sym_desc *, int,
 		    const char *);
-extern	void	Dbg_syms_reloc(Ofl_desc *, Sym_desc *);
 extern	void	Dbg_syms_resolved(Ofl_desc *, Sym_desc *);
 extern	void	Dbg_syms_resolving(Ofl_desc *, Word, const char *, int, int,
 		    Sym *, Sym *, Sym_desc *, Ifl_desc *);

@@ -975,6 +975,8 @@
 			 (-z symbolcap)"
 @ MSG_SYM_CAP_LOCAL	"symbol[%d]=%s  creating local capability \
 			 (-z symbolcap)"
+@ MSG_SYM_COPY_DST	"symbol=%s;  copy destination: alignment: 0x%x"
+@ MSG_SYM_COPY_REF	"symbol=%s;  copy reference"
 
 @ MSG_SYM_AOUT		"symbol=%s;  (original AOUT name)"
 @ MSG_SYM_LOOKUP	"symbol=%s;  lookup in file=%s  [ %s ]"
@@ -1592,7 +1594,7 @@
 
 @ MSG_SYM_GLOBAL	"global"
 @ MSG_SYM_LOCAL		"local"
-@ MSG_SYM_COPY		"copy rel"
+@ MSG_SYM_COPY		"copy"
 
 @ MSG_DLSYM_NEXT	"[ RTLD_NEXT ]"
 @ MSG_DLSYM_DEFAULT	"[ RTLD_DEFAULT ]"

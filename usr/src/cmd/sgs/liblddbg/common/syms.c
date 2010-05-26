@@ -481,7 +481,7 @@ Dbg_syms_resolved(Ofl_desc *ofl, Sym_desc *sdp)
 }
 
 void
-Dbg_syms_reloc(Ofl_desc *ofl, Sym_desc *sdp)
+Dbg_syms_copy_reloc(Ofl_desc *ofl, Sym_desc *sdp, Word align)
 {
 	static Boolean	symbol_title = TRUE;
 	Conv_inv_buf_t	inv_buf;
@@ -496,8 +496,20 @@ Dbg_syms_reloc(Ofl_desc *ofl, Sym_desc *sdp)
 
 		symbol_title = FALSE;
 	}
-	dbg_print(lml, MSG_INTL(MSG_SYM_UPDATE),
-	    Dbg_demangle_name(sdp->sd_name));
+
+	/*
+	 * Copy relocation symbols come in pairs, the original reference
+	 * (within a dependency), and the new destination (within the .bss of
+	 * the executable).  The latter is accompanied with a computed
+	 * alignment.
+	 */
+	if (align) {
+		dbg_print(lml, MSG_INTL(MSG_SYM_COPY_DST),
+		    Dbg_demangle_name(sdp->sd_name), EC_WORD(align));
+	} else {
+		dbg_print(lml, MSG_INTL(MSG_SYM_COPY_REF),
+		    Dbg_demangle_name(sdp->sd_name));
+	}
 
 	if (DBG_NOTDETAIL())
 		return;

@@ -29,7 +29,7 @@
  * Print the list of shared objects required by a dynamic executable or shared
  * object.
  *
- * usage is: ldd [-d | -r] [-D] [-c] [-e envar] [-i] [-f] [-L] [-l] [-p] [-s]
+ * usage is: ldd [-d | -r] [-c] [-D] [-e envar] [-i] [-f] [-L] [-l] [-p] [-s]
  *		[-U | -u] [-v] [-w] file(s)
  *
  * ldd opens the file and verifies the information in the elf header.

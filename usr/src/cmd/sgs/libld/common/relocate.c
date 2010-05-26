@@ -1007,6 +1007,22 @@ ld_reloc_plt(Rel_desc *rsp, Ofl_desc *ofl)
 }
 
 /*
+ * Round up to the next power of 2.  Used to ensure section alignments that can
+ * be used for copy relocation symbol alignments are sane values.
+ */
+static Word
+nlpo2(Word val)
+{
+	val--;
+	val |= (val >> 1);
+	val |= (val >> 2);
+	val |= (val >> 4);
+	val |= (val >> 8);
+	val |= (val >> 16);
+	return (++val);
+}
+
+/*
  * process GLOBAL undefined and ref_dyn_need symbols.
  */
 static uintptr_t
@@ -1056,7 +1072,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 
 	/*
 	 * If the reference isn't to an object (normally because a .type
-	 * directive hasn't defined in some assembler source), then simply apply
+	 * directive wasn't defined in some assembler source), then apply
 	 * a generic relocation (this has a tendency to result in text
 	 * relocations).
 	 */
@@ -1074,7 +1090,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 	/*
 	 * Prepare for generating a copy relocation.
 	 *
-	 * If this symbol is one of an alias pair, we need to insure both
+	 * If this symbol is one of an alias pair, we need to ensure both
 	 * symbols become part of the output (the strong symbol will be used to
 	 * maintain the symbols state).  And, if we did raise the precedence of
 	 * a symbol we need to check and see if this is a weak symbol.  If it is
@@ -1131,8 +1147,14 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 	 * to the executables .bss at runtime.
 	 */
 	if (!(RELAUX_GET_USYM(rsp)->sd_flags & FLG_SY_MVTOCOMM)) {
-		Word		rtype = rsp->rel_rtype;
+		Word		rtype = rsp->rel_rtype, w2align;
 		Copy_rel	cr;
+
+		/*
+		 * Diagnose the original copy reference, as this symbol
+		 * information will be overridden with the new destination.
+		 */
+		DBG_CALL(Dbg_syms_copy_reloc(ofl, sdp, 0));
 
 		/*
 		 * Indicate that the symbol(s) against which we're relocating
@@ -1171,9 +1193,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		}
 
 		/*
-		 * Assign the symbol to the bss and insure sufficient alignment
-		 * (we don't know the real alignment so we have to make the
-		 * worst case guess).
+		 * Assign the symbol to the bss.
 		 */
 		_sdp = RELAUX_GET_USYM(rsp);
 		stval = _sdp->sd_sym->st_value;
@@ -1181,9 +1201,37 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 			return (S_ERROR);
 		_sdp->sd_shndx = _sdp->sd_sym->st_shndx = SHN_COMMON;
 		_sdp->sd_flags |= FLG_SY_SPECSEC;
-		_sdp->sd_sym->st_value =
-		    (_sdp->sd_sym->st_size < (ld_targ.t_m.m_word_align * 2)) ?
-		    ld_targ.t_m.m_word_align : ld_targ.t_m.m_word_align * 2;
+
+		/*
+		 * Ensure the symbol has sufficient alignment.  The symbol
+		 * definition has no alignment information that can be used,
+		 * hence we use a heuristic.  Historically, twice the native
+		 * word alignment was sufficient for any data type, however,
+		 * the developer may have requested larger alignments (pragma
+		 * align).  The most conservative approach is to use a power
+		 * of two alignment, determined from the alignment of the
+		 * section containing the symbol definition.  Note that this
+		 * can result in some bloat to the .bss as the not every item
+		 * of copied data might need the section alignment.
+		 *
+		 * COMMON symbols carry their alignment requirements in the
+		 * symbols st_value field.  This alignment is applied to the
+		 * symbol when it is eventually transformed into .bss.
+		 */
+		w2align = ld_targ.t_m.m_word_align * 2;
+		if (_sdp->sd_sym->st_size < w2align)
+			_sdp->sd_sym->st_value = ld_targ.t_m.m_word_align;
+		else {
+			Shdr	*shdr;
+			Word	isalign;
+
+			if (_sdp->sd_isc &&
+			    ((shdr = _sdp->sd_isc->is_shdr) != NULL) &&
+			    ((isalign = shdr->sh_addralign) != 0))
+				_sdp->sd_sym->st_value = nlpo2(isalign);
+			else
+				_sdp->sd_sym->st_value = w2align;
+		}
 
 		/*
 		 * Whether or not the symbol references initialized data we
@@ -1213,7 +1261,13 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		rsp->rel_rtype = rtype;
 
 		/*
-		 * If this symbol is a protected symbol, warn it.
+		 * If this symbol is a protected symbol, warn the user.  A
+		 * potential issue exists as the copy relocated symbol within
+		 * the executable can be visible to others, whereas the shared
+		 * object that defined the original copy data symbol is pre-
+		 * bound to reference it's own definition.  Any modification
+		 * of the symbols data could lead to inconsistencies for the
+		 * various users.
 		 */
 		if (_sdp->sd_flags & FLG_SY_PROT) {
 			Conv_inv_buf_t inv_buf;
@@ -1224,7 +1278,8 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 			    ld_targ.t_m.m_r_copy, 0, &inv_buf),
 			    _sdp->sd_file->ifl_name, _sdp->sd_name);
 		}
-		DBG_CALL(Dbg_syms_reloc(ofl, sdp));
+		DBG_CALL(Dbg_syms_copy_reloc(ofl, _sdp,
+		    _sdp->sd_sym->st_value));
 	}
 	return (ld_add_actrel(NULL, rsp, ofl));
 }

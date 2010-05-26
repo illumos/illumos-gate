@@ -1542,12 +1542,14 @@ dladdr_core(Rt_map *almp, void *addr, Dl_info_t *dlip, void **info, int flags)
 int
 dladdr(void *addr, Dl_info_t *dlip)
 {
-	int	entry, error;
+	int	entry, ret;
 	Rt_map	*clmp, *almp;
+	Lm_list	*clml;
 
 	entry = enter(0);
 
 	clmp = _caller(caller(), CL_EXECDEF);
+	clml = LIST(clmp);
 
 	DBG_CALL(Dbg_dl_dladdr(clmp, addr));
 
@@ -1557,17 +1559,17 @@ dladdr(void *addr, Dl_info_t *dlip)
 	 * indicate the failure.
 	 */
 	if ((almp = _caller(addr, CL_NONE)) == NULL) {
-		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR),
+		eprintf(clml, ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR),
 		    EC_NATPTR(addr));
-		error = 0;
+		ret = 0;
 	} else {
 		dladdr_core(almp, addr, dlip, 0, 0);
-		error = 1;
+		ret = 1;
 	}
 
 	if (entry)
-		leave(0, 0);
-	return (error);
+		leave(clml, 0);
+	return (ret);
 }
 
 #pragma weak _dladdr1 = dladdr1

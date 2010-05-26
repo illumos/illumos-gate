@@ -40,7 +40,7 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.79 {
+SUNWprivate_4.80 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -398,6 +398,8 @@ SUNWprivate_4.79 {
 		Dbg64_syms_cap_lookup;
 		Dbg32_syms_cap_title;
 		Dbg64_syms_cap_title;
+		Dbg32_syms_copy_reloc;
+		Dbg64_syms_copy_reloc;
 		Dbg32_syms_created;
 		Dbg64_syms_created;
 		Dbg32_syms_discarded;
@@ -429,8 +431,6 @@ SUNWprivate_4.79 {
 		Dbg64_syms_process;
 		Dbg32_syms_reduce;
 		Dbg64_syms_reduce;
-		Dbg32_syms_reloc;
-		Dbg64_syms_reloc;
 		Dbg32_syms_resolved;
 		Dbg64_syms_resolved;
 		Dbg32_syms_resolving;

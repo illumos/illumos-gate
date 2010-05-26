@@ -1295,6 +1295,8 @@ Bugid   Risk Synopsis
 	when mmap fails in anon_map()
 6826513 ldd gets confused by a crle(1) LD_PRELOAD setting
 6684577 ld should propagate SHF_LINK_ORDER flag to ET_REL objects
+6524709 executables using /usr/lib/libc.so.1 as the ELF interpreter dump core
+	(link-editor components only)
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
 	Solaris/SunOS 5.10_sparc	patch T143895-01
@@ -1342,8 +1344,6 @@ Bugid   Risk Synopsis
 	PSARC/2007/074 -L option for nm(1) to display SHT_SUNW_LDYNSYM symbols
 6523787 dlopen() handle gets mistakenly orphaned - results in access to freed
 	memory
-6524709 executables using /usr/lib/libc.so.1 as the ELF interpreter dump core
-	(link-editor components only)
 6531189 SEGV in dladdr()
 6527318 dlopen(name, RTLD_NOLOAD) returns handle for unloaded library
 6518359 extern mapfiles references to _init/_fini can create INIT/FINI
@@ -1590,3 +1590,5 @@ Bugid   Risk Synopsis
 6943432 dlsym(RTLD_PROBE) should only bind to symbol definitions
 6668759 an external method for determining whether an ELF dependency is optional
 6954032 Support library with ld_open and -z allextract in snv_139 do not mix
+6949596 wrong section alignment generated in joint compilation with shared
+	library

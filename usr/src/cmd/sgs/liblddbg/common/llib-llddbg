@@ -419,6 +419,8 @@ void	Dbg64_syms_cap_lookup(Rt_map *, uint_t, const char *, uint_t, Half,
 	    Syscapset *);
 void	Dbg32_syms_cap_title(Ofl_desc *);
 void	Dbg64_syms_cap_title(Ofl_desc *);
+void	Dbg32_syms_copy_reloc(Ofl_desc *, Sym_desc *, Word);
+void	Dbg64_syms_copy_reloc(Ofl_desc *, Sym_desc *, Word);
 void	Dbg32_syms_created(Lm_list *, const char *);
 void	Dbg64_syms_created(Lm_list *, const char *);
 void	Dbg32_syms_discarded(Lm_list *, Sym_desc *);
@@ -444,8 +446,6 @@ void	Dbg32_syms_process(Lm_list *, Ifl_desc *);
 void	Dbg64_syms_process(Lm_list *, Ifl_desc *);
 void	Dbg32_syms_reduce(Ofl_desc *, int, Sym_desc *, int, const char *);
 void	Dbg64_syms_reduce(Ofl_desc *, int, Sym_desc *, int, const char *);
-void	Dbg32_syms_reloc(Ofl_desc *, Sym_desc *);
-void	Dbg64_syms_reloc(Ofl_desc *, Sym_desc *);
 void	Dbg32_syms_resolved(Ofl_desc *, Sym_desc *);
 void	Dbg64_syms_resolved(Ofl_desc *, Sym_desc *);
 void	Dbg32_syms_resolving(Ofl_desc *, Elf32_Word, const char *, int, int,
