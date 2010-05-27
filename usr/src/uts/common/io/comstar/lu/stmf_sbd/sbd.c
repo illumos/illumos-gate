@@ -89,6 +89,7 @@ sbd_status_t sbd_read_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz,
     uint64_t off);
 sbd_status_t sbd_write_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz,
     uint64_t off);
+sbd_status_t sbd_update_zfs_prop(sbd_lu_t *sl);
 int sbd_is_zvol(char *path);
 int sbd_zvolget(char *zvol_name, char **comstarprop);
 int sbd_zvolset(char *zvol_name, char *comstarprop);
@@ -1960,6 +1961,18 @@ over_meta_open:
 		goto scm_err_out;
 	}
 
+	/*
+	 * Update the zvol separately as this need only be called upon
+	 * completion of the metadata initialization.
+	 */
+	if (sl->sl_flags & SL_ZFS_META) {
+		if (sbd_update_zfs_prop(sl) != SBD_SUCCESS) {
+			*err_ret = SBD_RET_META_CREATION_FAILED;
+			ret = EIO;
+			goto scm_err_out;
+		}
+	}
+
 	ret = sbd_populate_and_register_lu(sl, err_ret);
 	if (ret) {
 		goto scm_err_out;
@@ -3371,11 +3384,6 @@ sbd_read_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz, uint64_t off)
 sbd_status_t
 sbd_write_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz, uint64_t off)
 {
-	char		*ptr, *ah_meta;
-	char		*dp = NULL;
-	int		i, num;
-	char		*file;
-
 	ASSERT(sl->sl_zfs_meta);
 	if ((off + sz) > (ZAP_MAXVALUELEN / 2 - 1)) {
 		return (SBD_META_CORRUPTED);
@@ -3389,9 +3397,36 @@ sbd_write_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz, uint64_t off)
 			    meta_align) & (~meta_align);
 		}
 	}
-	ptr = ah_meta = kmem_zalloc(ZAP_MAXVALUELEN, KM_SLEEP);
 	rw_enter(&sl->sl_zfs_meta_lock, RW_WRITER);
 	bcopy(buf, &sl->sl_zfs_meta[off], sz);
+	rw_exit(&sl->sl_zfs_meta_lock);
+	/*
+	 * During creation of a logical unit, sbd_update_zfs_prop will be
+	 * called separately to avoid multiple calls as each meta section
+	 * create/update will result in a call to sbd_write_zfs_meta().
+	 * We only need to update the zvol once during create.
+	 */
+	mutex_enter(&sl->sl_lock);
+	if (sl->sl_trans_op != SL_OP_CREATE_REGISTER_LU) {
+		mutex_exit(&sl->sl_lock);
+		return (sbd_update_zfs_prop(sl));
+	}
+	mutex_exit(&sl->sl_lock);
+	return (SBD_SUCCESS);
+}
+
+sbd_status_t
+sbd_update_zfs_prop(sbd_lu_t *sl)
+{
+	char	*ptr, *ah_meta;
+	char	*dp = NULL;
+	int	i, num;
+	char	*file;
+	sbd_status_t ret = SBD_SUCCESS;
+
+	ASSERT(sl->sl_zfs_meta);
+	ptr = ah_meta = kmem_zalloc(ZAP_MAXVALUELEN, KM_SLEEP);
+	rw_enter(&sl->sl_zfs_meta_lock, RW_READER);
 	/* convert local copy to ascii hex */
 	dp = sl->sl_zfs_meta;
 	for (i = 0; i < sl->sl_total_meta_size; i++, dp++) {
@@ -3403,15 +3438,12 @@ sbd_write_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz, uint64_t off)
 	*ah_meta = NULL;
 	file = sbd_get_zvol_name(sl);
 	if (sbd_zvolset(file, (char *)ptr)) {
-		rw_exit(&sl->sl_zfs_meta_lock);
-		kmem_free(ptr, ZAP_MAXVALUELEN);
-		kmem_free(file, strlen(file) + 1);
-		return (SBD_META_CORRUPTED);
+		ret = SBD_META_CORRUPTED;
 	}
 	rw_exit(&sl->sl_zfs_meta_lock);
 	kmem_free(ptr, ZAP_MAXVALUELEN);
 	kmem_free(file, strlen(file) + 1);
-	return (SBD_SUCCESS);
+	return (ret);
 }
 
 int
