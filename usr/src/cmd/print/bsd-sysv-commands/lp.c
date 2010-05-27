@@ -34,7 +34,9 @@
 #include <libintl.h>
 #include <papi.h>
 #include "common.h"
-
+#include <pwd.h>
+#include <grp.h>
+#include <sys/types.h>
 #ifdef HAVE_LIBMAGIC	/* for mimetype auto-detection */
 #include <magic.h>
 #endif /* HAVE_LIBMAGIC */
@@ -77,9 +79,17 @@ main(int ac, char *av[])
 	int validate = 0;
 	int modify = -1;
 	int c;
+	uid_t ruid;
+	struct passwd *pw;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain("SUNW_OST_OSCMD");
+
+	ruid = getuid();
+	if ((pw = getpwuid(ruid)) != NULL)
+		(void) initgroups(pw->pw_name, pw->pw_gid);
+	(void) setuid(ruid);
+
 
 	while ((c = getopt(ac, av, "DEH:P:S:T:cd:f:i:mn:o:pq:rst:Vwy:")) != EOF)
 		switch (c) {
