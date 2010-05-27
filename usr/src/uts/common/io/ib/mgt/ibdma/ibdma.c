@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -240,6 +239,8 @@ ibdma_ibt_async_handler(void *clnt, ibt_hca_hdl_t hdl,
 
 	case IBT_EVENT_PORT_UP:
 	case IBT_ERROR_PORT_DOWN:
+	case IBT_PORT_CHANGE_EVENT:
+	case IBT_CLNT_REREG_EVENT:
 		break;
 
 	case IBT_HCA_ATTACH_EVENT:
@@ -268,8 +269,10 @@ ibdma_ibt_async_handler(void *clnt, ibt_hca_hdl_t hdl,
 		break;
 
 	default:
+#ifdef	DEBUG
 		cmn_err(CE_NOTE, "ibt_async_handler, unhandled event(%d)",
 		    code);
+#endif
 		break;
 	}
 

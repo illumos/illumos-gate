@@ -355,7 +355,6 @@ srpt_ioc_detach()
 		    (void *)ioc->ioc_ibt_hdl);
 
 		list_remove(&srpt_ctxt->sc_ioc_list, ioc);
-		ASSERT(ioc->ioc_tgt_port != NULL);
 		srpt_ioc_fini(ioc);
 		srpt_ctxt->sc_num_iocs--;
 	}
@@ -655,6 +654,7 @@ srpt_ioc_fini(srpt_ioc_t *ioc)
 	 * Note driver flows will have already taken all SRP
 	 * services running on the I/O Controller off-line.
 	 */
+	ASSERT(ioc->ioc_tgt_port == NULL);
 	rw_enter(&ioc->ioc_rwlock, RW_WRITER);
 	if (ioc->ioc_ibt_hdl != NULL) {
 		if (ioc->ioc_stmf_ds != NULL) {
