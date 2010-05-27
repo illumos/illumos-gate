@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/sdt_impl.h>
@@ -106,6 +105,8 @@ sdt_provider_t sdt_providers[] = {
 	{ "proc", "__proc_", &stab_attr, 0 },
 	{ "io", "__io_", &stab_attr, 0 },
 	{ "ip", "__ip_", &stab_attr, 0 },
+	{ "tcp", "__tcp_", &stab_attr, 0 },
+	{ "udp", "__udp_", &stab_attr, 0 },
 	{ "mib", "__mib_", &stab_attr, 0 },
 	{ "fsinfo", "__fsinfo_", &fsinfo_attr, 0 },
 	{ "iscsi", "__iscsi_", &iscsi_attr, 0 },
@@ -887,6 +888,60 @@ sdt_argdesc_t sdt_args[] = {
 	{ "ip", "receive", 4, 4, "ipha_t *", "ipv4info_t *" },
 	{ "ip", "receive", 5, 5, "ip6_t *", "ipv6info_t *" },
 	{ "ip", "receive", 6, 6, "int" }, /* used by __dtrace_ipsr_ill_t */
+
+	{ "tcp", "connect-established", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "tcp", "connect-established", 1, 1, "ip_xmit_attr_t *",
+	    "csinfo_t *" },
+	{ "tcp", "connect-established", 2, 2, "void_ip_t *", "ipinfo_t *" },
+	{ "tcp", "connect-established", 3, 3, "tcp_t *", "tcpsinfo_t *" },
+	{ "tcp", "connect-established", 4, 4, "tcph_t *", "tcpinfo_t *" },
+	{ "tcp", "connect-refused", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "tcp", "connect-refused", 1, 1, "ip_xmit_attr_t *", "csinfo_t *" },
+	{ "tcp", "connect-refused", 2, 2, "void_ip_t *", "ipinfo_t *" },
+	{ "tcp", "connect-refused", 3, 3, "tcp_t *", "tcpsinfo_t *" },
+	{ "tcp", "connect-refused", 4, 4, "tcph_t *", "tcpinfo_t *" },
+	{ "tcp", "connect-request", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "tcp", "connect-request", 1, 1, "ip_xmit_attr_t *", "csinfo_t *" },
+	{ "tcp", "connect-request", 2, 2, "void_ip_t *", "ipinfo_t *" },
+	{ "tcp", "connect-request", 3, 3, "tcp_t *", "tcpsinfo_t *" },
+	{ "tcp", "connect-request", 4, 4, "tcph_t *", "tcpinfo_t *" },
+	{ "tcp", "accept-established", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "tcp", "accept-established", 1, 1, "ip_xmit_attr_t *", "csinfo_t *" },
+	{ "tcp", "accept-established", 2, 2, "void_ip_t *", "ipinfo_t *" },
+	{ "tcp", "accept-established", 3, 3, "tcp_t *", "tcpsinfo_t *" },
+	{ "tcp", "accept-established", 4, 4, "tcph_t *", "tcpinfo_t *" },
+	{ "tcp", "accept-refused", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "tcp", "accept-refused", 1, 1, "ip_xmit_attr_t *", "csinfo_t *" },
+	{ "tcp", "accept-refused", 2, 2, "void_ip_t *", "ipinfo_t *" },
+	{ "tcp", "accept-refused", 3, 3, "tcp_t *", "tcpsinfo_t *" },
+	{ "tcp", "accept-refused", 4, 4, "tcph_t *", "tcpinfo_t *" },
+	{ "tcp", "state-change", 0, 0, "void", "void" },
+	{ "tcp", "state-change", 1, 1, "ip_xmit_attr_t *", "csinfo_t *" },
+	{ "tcp", "state-change", 2, 2, "void", "void" },
+	{ "tcp", "state-change", 3, 3, "tcp_t *", "tcpsinfo_t *" },
+	{ "tcp", "state-change", 4, 4, "void", "void" },
+	{ "tcp", "state-change", 5, 5, "int32_t", "tcplsinfo_t *" },
+	{ "tcp", "send", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "tcp", "send", 1, 1, "ip_xmit_attr_t *", "csinfo_t *" },
+	{ "tcp", "send", 2, 2, "__dtrace_tcp_void_ip_t *", "ipinfo_t *" },
+	{ "tcp", "send", 3, 3, "tcp_t *", "tcpsinfo_t *" },
+	{ "tcp", "send", 4, 4, "__dtrace_tcp_tcph_t *", "tcpinfo_t *" },
+	{ "tcp", "receive", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "tcp", "receive", 1, 1, "ip_xmit_attr_t *", "csinfo_t *" },
+	{ "tcp", "receive", 2, 2, "__dtrace_tcp_void_ip_t *", "ipinfo_t *" },
+	{ "tcp", "receive", 3, 3, "tcp_t *", "tcpsinfo_t *" },
+	{ "tcp", "receive", 4, 4, "__dtrace_tcp_tcph_t *", "tcpinfo_t *" },
+
+	{ "udp", "send", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "udp", "send", 1, 1, "ip_xmit_attr_t *", "csinfo_t *" },
+	{ "udp", "send", 2, 2, "void_ip_t *", "ipinfo_t *" },
+	{ "udp", "send", 3, 3, "udp_t *", "udpsinfo_t *" },
+	{ "udp", "send", 4, 4, "udpha_t *", "udpinfo_t *" },
+	{ "udp", "receive", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "udp", "receive", 1, 1, "ip_xmit_attr_t *", "csinfo_t *" },
+	{ "udp", "receive", 2, 2, "void_ip_t *", "ipinfo_t *" },
+	{ "udp", "receive", 3, 3, "udp_t *", "udpsinfo_t *" },
+	{ "udp", "receive", 4, 4, "udpha_t *", "udpinfo_t *" },
 
 	{ "sysevent", "post", 0, 0, "evch_bind_t *", "syseventchaninfo_t *" },
 	{ "sysevent", "post", 1, 1, "sysevent_impl_t *", "syseventinfo_t *" },

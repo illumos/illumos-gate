@@ -21,13 +21,11 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #
-# Test ip:::{send,receive} of IPv4 UDP to a remote host.
+# Test {udp,ip}:::{send,receive} of IPv4 UDP to a remote host.
 #
 # This may fail due to:
 #
@@ -42,6 +40,7 @@
 # following counts were traced:
 #
 # 1 x ip:::send (UDP sent to ping's base UDP port)
+# 1 x udp:::send (UDP sent to ping's base UDP port)
 # 
 
 if (( $# != 1 )); then
@@ -64,19 +63,26 @@ fi
 $dtrace -c "/usr/sbin/ping -U $dest" -qs /dev/stdin <<EOF | grep -v 'is alive'
 BEGIN
 {
-	send = 0;
+	ipsend = udpsend = 0;
 }
 
 ip:::send
 /args[2]->ip_saddr == "$source" && args[2]->ip_daddr == "$dest" &&
     args[4]->ipv4_protocol == IPPROTO_UDP/
 {
-	send++;
+	ipsend++;
+}
+
+udp:::send
+/args[2]->ip_saddr == "$source" && args[2]->ip_daddr == "$dest"/
+{
+	udpsend++;
 }
 
 END
 {
 	printf("Minimum UDP events seen\n\n");
-	printf("ip:::send - %s\n", send >= 1 ? "yes" : "no");
+	printf("ip:::send - %s\n", ipsend >= 1 ? "yes" : "no");
+	printf("udp:::send - %s\n", udpsend >= 1 ? "yes" : "no");
 }
 EOF

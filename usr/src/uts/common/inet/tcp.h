@@ -348,6 +348,7 @@ typedef struct tcp_s {
 	tcpha_t	*tcp_tcpha;		/* TCP header in conn_ht_iphc */
 
 	uint16_t tcp_last_sent_len;	/* Record length for nagle */
+	uint16_t tcp_last_recv_len;	/* Used by DTrace */
 	uint16_t tcp_dupack_cnt;	/* # of consequtive duplicate acks */
 
 	kmutex_t	*tcp_acceptor_lockp;	/* Ptr to tf_lock */

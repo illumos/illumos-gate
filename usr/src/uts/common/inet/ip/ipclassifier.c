@@ -586,6 +586,7 @@ ipcl_conn_create(uint32_t type, int sleep, netstack_t *ns)
 		netstack_hold(ns);
 		connp->conn_netstack = ns;
 		connp->conn_ixa->ixa_ipst = ns->netstack_ip;
+		connp->conn_ixa->ixa_conn_id = (long)connp;
 		ipcl_globalhash_insert(connp);
 		return (connp);
 
@@ -621,6 +622,7 @@ ipcl_conn_create(uint32_t type, int sleep, netstack_t *ns)
 	netstack_hold(ns);
 	connp->conn_netstack = ns;
 	connp->conn_ixa->ixa_ipst = ns->netstack_ip;
+	connp->conn_ixa->ixa_conn_id = (long)connp;
 	ipcl_globalhash_insert(connp);
 	return (connp);
 }

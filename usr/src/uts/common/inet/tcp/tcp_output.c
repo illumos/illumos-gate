@@ -1693,6 +1693,11 @@ tcp_send_data(tcp_t *tcp, mblk_t *mp)
 		return;
 	}
 
+	DTRACE_TCP5(send, mblk_t *, NULL, ip_xmit_attr_t *, connp->conn_ixa,
+	    __dtrace_tcp_void_ip_t *, mp->b_rptr, tcp_t *, tcp,
+	    __dtrace_tcp_tcph_t *,
+	    &mp->b_rptr[connp->conn_ixa->ixa_ip_hdr_length]);
+
 	ASSERT(connp->conn_ixa->ixa_notify_cookie == connp->conn_tcp);
 	(void) conn_ip_output(mp, connp->conn_ixa);
 }
@@ -2586,6 +2591,21 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq, uint32_t ack, int ctl,
 	tcpha->tha_sum = htons(sizeof (tcpha_t));
 	tcpha->tha_flags = (uint8_t)ctl;
 	if (ctl & TH_RST) {
+		if (ctl & TH_ACK) {
+			/*
+			 * Probe connection rejection here.
+			 * tcp_xmit_listeners_reset() drops non-SYN segments
+			 * that do not specify TH_ACK in their flags without
+			 * calling this function.  As a consequence, if this
+			 * function is called with a TH_RST|TH_ACK ctl argument,
+			 * it is being called in response to a SYN segment
+			 * and thus the tcp:::accept-refused probe point
+			 * is valid here.
+			 */
+			DTRACE_TCP5(accept__refused, mblk_t *, NULL,
+			    void, NULL, void_ip_t *, mp->b_rptr, tcp_t *, NULL,
+			    tcph_t *, tcpha);
+		}
 		TCPS_BUMP_MIB(tcps, tcpOutRsts);
 		TCPS_BUMP_MIB(tcps, tcpOutControl);
 	}
@@ -2615,6 +2635,10 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq, uint32_t ack, int ctl,
 		 */
 		ixa->ixa_flags |= IXAF_NO_IPSEC;
 	}
+
+	DTRACE_TCP5(send, mblk_t *, NULL, ip_xmit_attr_t *, ixa,
+	    __dtrace_tcp_void_ip_t *, mp->b_rptr, tcp_t *, NULL,
+	    __dtrace_tcp_tcph_t *, tcpha);
 
 	/*
 	 * NOTE:  one might consider tracing a TCP packet here, but
@@ -2657,6 +2681,14 @@ tcp_xmit_listeners_reset(mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst,
 	uint_t		ip_hdr_len = ira->ira_ip_hdr_length;
 
 	TCP_STAT(tcps, tcp_no_listener);
+
+	/*
+	 * DTrace this "unknown" segment as a tcp:::receive, as we did
+	 * just receive something that was TCP.
+	 */
+	DTRACE_TCP5(receive, mblk_t *, NULL, ip_xmit_attr_t *, NULL,
+	    __dtrace_tcp_void_ip_t *, mp->b_rptr, tcp_t *, NULL,
+	    __dtrace_tcp_tcph_t *, &mp->b_rptr[ip_hdr_len]);
 
 	if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
 		policy_present = ipss->ipsec_inbound_v4_policy_present;
@@ -3031,11 +3063,25 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 				tcp->tcp_fin_sent = B_TRUE;
 				switch (tcp->tcp_state) {
 				case TCPS_SYN_RCVD:
+					tcp->tcp_state = TCPS_FIN_WAIT_1;
+					DTRACE_TCP6(state__change, void, NULL,
+					    ip_xmit_attr_t *, ixa, void, NULL,
+					    tcp_t *, tcp, void, NULL,
+					    int32_t, TCPS_SYN_RCVD);
+					break;
 				case TCPS_ESTABLISHED:
 					tcp->tcp_state = TCPS_FIN_WAIT_1;
+					DTRACE_TCP6(state__change, void, NULL,
+					    ip_xmit_attr_t *, ixa, void, NULL,
+					    tcp_t *, tcp, void, NULL,
+					    int32_t, TCPS_ESTABLISHED);
 					break;
 				case TCPS_CLOSE_WAIT:
 					tcp->tcp_state = TCPS_LAST_ACK;
+					DTRACE_TCP6(state__change, void, NULL,
+					    ip_xmit_attr_t *, ixa, void, NULL,
+					    tcp_t *, tcp, void, NULL,
+					    int32_t, TCPS_CLOSE_WAIT);
 					break;
 				}
 				if (tcp->tcp_suna == tcp->tcp_snxt)

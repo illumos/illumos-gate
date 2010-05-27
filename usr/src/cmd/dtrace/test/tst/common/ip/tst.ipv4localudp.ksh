@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Test ip:::{send,receive} of IPv4 UDP to a local address.
@@ -42,8 +40,14 @@
 # following counts were traced:
 #
 # 1 x ip:::send (UDP sent to ping's base UDP port)
+# 1 x udp:::send (UDP sent to ping's base UDP port)
 # 1 x ip:::receive (UDP received)
 # 
+# No udp:::receive event is expected as the response ping -U elicits is
+# an ICMP PORT_UNREACHABLE response rather than a UDP packet, and locally
+# the echo request UDP packet only reaches IP, so the udp:::receive probe
+# is not triggered by it.
+#
 
 if (( $# != 1 )); then
 	print -u2 "expected one argument: <dtrace-path>"
@@ -56,27 +60,34 @@ local=127.0.0.1
 $dtrace -c "/usr/sbin/ping -U $local" -qs /dev/stdin <<EOF | grep -v 'is alive'
 BEGIN
 {
-	send = receive = 0;
+	ipsend = udpsend = ipreceive = 0;
 }
 
 ip:::send
 /args[2]->ip_saddr == "$local" && args[2]->ip_daddr == "$local" &&
     args[4]->ipv4_protocol == IPPROTO_UDP/
 {
-	send++;
+	ipsend++;
+}
+
+udp:::send
+/args[2]->ip_saddr == "$local" && args[2]->ip_daddr == "$local"/
+{
+	udpsend++;
 }
 
 ip:::receive
 /args[2]->ip_saddr == "$local" && args[2]->ip_daddr == "$local" &&
     args[4]->ipv4_protocol == IPPROTO_UDP/
 {
-	receive++;
+	ipreceive++;
 }
 
 END
 {
 	printf("Minimum UDP events seen\n\n");
-	printf("ip:::send - %s\n", send >= 1 ? "yes" : "no");
-	printf("ip:::receive - %s\n", receive >= 1 ? "yes" : "no");
+	printf("ip:::send - %s\n", ipsend >= 1 ? "yes" : "no");
+	printf("ip:::receive - %s\n", ipreceive >= 1 ? "yes" : "no");
+	printf("udp:::send - %s\n", udpsend >= 1 ? "yes" : "no");
 }
 EOF

@@ -21,13 +21,11 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #
-# Test ip:::{send,receive} of IPv4 TCP to a remote host.
+# Test {tcp,ip}:::{send,receive} of IPv4 TCP to a remote host.
 #
 # This may fail due to:
 #
@@ -42,7 +40,9 @@
 # following packet counts were traced:
 #
 # 3 x ip:::send (2 during the TCP handshake, then a FIN)
+# 3 x tcp:::send (2 during the TCP handshake, then a FIN)
 # 2 x ip:::receive (1 during the TCP handshake, then the FIN ACK)
+# 2 x tcp:::receive (1 during the TCP handshake, then the FIN ACK)
 # 
 
 if (( $# != 1 )); then
@@ -81,28 +81,42 @@ EOPERL
 $dtrace -c '/usr/bin/perl test.pl' -qs /dev/stdin <<EODTRACE
 BEGIN
 {
-	send = receive = 0;
+	ipsend = tcpsend = ipreceive = tcpreceive = 0;
 }
 
 ip:::send
 /args[2]->ip_saddr == "$source" && args[2]->ip_daddr == "$dest" &&
     args[4]->ipv4_protocol == IPPROTO_TCP/
 {
-	send++;
+	ipsend++;
+}
+
+tcp:::send
+/args[2]->ip_saddr == "$source" && args[2]->ip_daddr == "$dest"/
+{
+	tcpsend++;
 }
 
 ip:::receive
 /args[2]->ip_saddr == "$dest" && args[2]->ip_daddr == "$source" &&
     args[4]->ipv4_protocol == IPPROTO_TCP/
 {
-	receive++;
+	ipreceive++;
+}
+
+tcp:::receive
+/args[2]->ip_saddr == "$dest" && args[2]->ip_daddr == "$source"/
+{
+	tcpreceive++;
 }
 
 END
 {
 	printf("Minimum TCP events seen\n\n");
-	printf("ip:::send - %s\n", send >= 3 ? "yes" : "no");
-	printf("ip:::receive - %s\n", receive >= 2 ? "yes" : "no");
+	printf("ip:::send - %s\n", ipsend >= 3 ? "yes" : "no");
+	printf("ip:::receive - %s\n", ipreceive >= 2 ? "yes" : "no");
+	printf("tcp:::send - %s\n", tcpsend >= 3 ? "yes" : "no");
+	printf("tcp:::receive - %s\n", tcpreceive >= 2 ? "yes" : "no");
 }
 EODTRACE
 

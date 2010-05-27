@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file is a sed script which is first preprocessed by cpp or cc -E to
@@ -33,9 +30,11 @@
  * Refer to the rules in libdtrace/Makefile.com for more information.
  */
 
+#include <sys/netstack.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <inet/ip.h>
+#include <inet/tcp.h>
 
 #define	SED_REPLACE(x)	s/#x/x/g
 
@@ -73,3 +72,7 @@ SED_REPLACE(IPPROTO_PIM)
 SED_REPLACE(IPPROTO_SCTP)
 SED_REPLACE(IPPROTO_RAW)
 SED_REPLACE(IPPROTO_MAX)
+
+SED_REPLACE(TCP_MIN_HEADER_LENGTH)
+
+SED_REPLACE(GLOBAL_NETSTACKID)

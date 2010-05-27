@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/developer/dtrace@$(PKGVERS)
@@ -125,13 +124,27 @@ file path=usr/demo/dtrace/spec.d
 file path=usr/demo/dtrace/specopen.d
 file path=usr/demo/dtrace/ssd.d
 file path=usr/demo/dtrace/syscall.d
+file path=usr/demo/dtrace/tcp1stbyte.d
+file path=usr/demo/dtrace/tcpbytes.d
+file path=usr/demo/dtrace/tcpbytesstat.d
+file path=usr/demo/dtrace/tcpconnlat.d
+file path=usr/demo/dtrace/tcpio.d
+file path=usr/demo/dtrace/tcpioflags.d
 file path=usr/demo/dtrace/tcprst.d
+file path=usr/demo/dtrace/tcpsnoop.d
+file path=usr/demo/dtrace/tcpstate.d
+file path=usr/demo/dtrace/tcptop.d
 file path=usr/demo/dtrace/tick.d
 file path=usr/demo/dtrace/ticktime.d
 file path=usr/demo/dtrace/time.d
 file path=usr/demo/dtrace/tracewrite.d
 file path=usr/demo/dtrace/trunc.d
 file path=usr/demo/dtrace/trussrw.d
+file path=usr/demo/dtrace/udpbytes.d
+file path=usr/demo/dtrace/udpbytesstat.d
+file path=usr/demo/dtrace/udpio.d
+file path=usr/demo/dtrace/udpsnoop.d
+file path=usr/demo/dtrace/udptop.d
 file path=usr/demo/dtrace/userfunc.d
 file path=usr/demo/dtrace/whatfor.d
 file path=usr/demo/dtrace/whatlock.d
@@ -180,6 +193,8 @@ file path=usr/lib/dtrace/scsi.d
 file path=usr/lib/dtrace/signal.d
 file path=usr/lib/dtrace/srp.d
 file path=usr/lib/dtrace/sysevent.d
+file path=usr/lib/dtrace/tcp.d
+file path=usr/lib/dtrace/udp.d
 file path=usr/lib/dtrace/unistd.d
 file path=usr/lib/libdtrace.so.1
 file path=usr/lib/libdtrace_jni.so.1

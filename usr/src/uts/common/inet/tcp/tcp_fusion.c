@@ -642,6 +642,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	tcp->tcp_snxt += send_size;
 	tcp->tcp_suna = tcp->tcp_snxt;
 	peer_tcp->tcp_rnxt += recv_size;
+	peer_tcp->tcp_last_recv_len = recv_size;
 	peer_tcp->tcp_rack = peer_tcp->tcp_rnxt;
 
 	TCPS_BUMP_MIB(tcps, tcpOutDataSegs);
@@ -654,7 +655,12 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	BUMP_LOCAL(tcp->tcp_obsegs);
 	BUMP_LOCAL(peer_tcp->tcp_ibsegs);
 
-	DTRACE_PROBE2(tcp__fuse__output, tcp_t *, tcp, uint_t, send_size);
+	DTRACE_TCP5(send, void, NULL, ip_xmit_attr_t *, connp->conn_ixa,
+	    __dtrace_tcp_void_ip_t *, NULL, tcp_t *, tcp,
+	    __dtrace_tcp_tcph_t *, NULL);
+	DTRACE_TCP5(receive, void, NULL, ip_xmit_attr_t *,
+	    peer_connp->conn_ixa, __dtrace_tcp_void_ip_t *, NULL,
+	    tcp_t *, peer_tcp, __dtrace_tcp_tcph_t *, NULL);
 
 	if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
 	    !TCP_IS_DETACHED(peer_tcp)) {

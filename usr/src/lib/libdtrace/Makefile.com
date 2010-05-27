@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 #
 
@@ -87,6 +86,8 @@ DLIBSRCS += \
 	scsi.d \
 	srp.d \
 	sysevent.d \
+	tcp.d \
+	udp.d \
 	unistd.d
 
 include ../../Makefile.lib
@@ -104,6 +105,8 @@ CLEANFILES += ../common/net.sed ../common/net.d
 CLEANFILES += ../common/errno.d ../common/signal.d
 CLEANFILES += ../common/dt_errtags.c ../common/dt_names.c
 CLEANFILES += ../common/sysevent.sed ../common/sysevent.d
+CLEANFILES += ../common/tcp.sed ../common/tcp.d
+CLEANFILES += ../common/udp.sed ../common/udp.d
 
 CLOBBERFILES += drti.o
 
@@ -181,6 +184,12 @@ pics/dt_lex.o pics/dt_grammar.o := CCVERBOSE =
 
 ../common/sysevent.d: ../common/sysevent.sed ../common/sysevent.d.in
 	sed -f ../common/sysevent.sed < ../common/sysevent.d.in > $@
+
+../common/tcp.d: ..//common/tcp.sed ../common/tcp.d.in
+	sed -f ../common/tcp.sed < ../common/tcp.d.in > $@
+
+../common/udp.d: ../common/udp.sed ../common/udp.d.in
+	sed -f ../common/udp.sed < ../common/udp.d.in > $@
 
 pics/%.o: ../$(MACH)/%.c
 	$(COMPILE.c) -o $@ $<

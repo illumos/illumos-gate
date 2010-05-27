@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -140,6 +139,7 @@ typedef struct ixamblk_s {
 	uint32_t	ixm_ident;		/* For IPv6 fragment header */
 	uint32_t	ixm_xmit_hint;
 
+	uint64_t	ixm_conn_id;		/* Used by DTrace */
 	cred_t		*ixm_cred;	/* For getpeerucred - refhold if set */
 	pid_t		ixm_cpid;	/* For getpeerucred */
 
@@ -265,6 +265,7 @@ ip_xmit_attr_to_mblk(ip_xmit_attr_t *ixa)
 		crhold(ixa->ixa_cred);
 	}
 	ixm->ixm_cpid = ixa->ixa_cpid;
+	ixm->ixm_conn_id = ixa->ixa_conn_id;
 
 	if (ixa->ixa_flags & IXAF_IPSEC_SECURE) {
 		if (ixa->ixa_ipsec_ah_sa != NULL) {
@@ -404,6 +405,7 @@ ip_xmit_attr_from_mblk(mblk_t *ixamp, ip_xmit_attr_t *ixa)
 		ixm->ixm_cred = NULL;
 	}
 	ixa->ixa_cpid = ixm->ixm_cpid;
+	ixa->ixa_conn_id = ixm->ixm_conn_id;
 
 	ixa->ixa_ipsec_ah_sa = ixm->ixm_ipsec_ah_sa;
 	ixa->ixa_ipsec_esp_sa = ixm->ixm_ipsec_esp_sa;
@@ -828,6 +830,7 @@ conn_replace_ixa(conn_t *connp, ip_xmit_attr_t *ixa)
 
 	oldixa = connp->conn_ixa;
 	IXA_REFHOLD(ixa);
+	ixa->ixa_conn_id = oldixa->ixa_conn_id;
 	connp->conn_ixa = ixa;
 	return (oldixa);
 }

@@ -2427,6 +2427,13 @@ udp_input(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		}
 	}
 
+	/*
+	 * DTrace this UDP input as udp:::receive (this is for IPv4, IPv6 and
+	 * loopback traffic).
+	 */
+	DTRACE_UDP5(receive, mblk_t *, NULL, ip_xmit_attr_t *, connp->conn_ixa,
+	    void_ip_t *, rptr, udp_t *, udp, udpha_t *, udpha);
+
 	/* Walk past the headers unless IP_RECVHDR was set. */
 	if (!udp->udp_rcvhdr) {
 		mp->b_rptr = rptr + hdr_length;
@@ -3135,6 +3142,10 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 	/* We're done.  Pass the packet to ip. */
 	BUMP_MIB(&us->us_udp_mib, udpHCOutDatagrams);
 
+	DTRACE_UDP5(send, mblk_t *, NULL, ip_xmit_attr_t *, ixa,
+	    void_ip_t *, mp->b_rptr, udp_t *, udp, udpha_t *,
+	    &mp->b_rptr[ixa->ixa_ip_hdr_length]);
+
 	error = conn_ip_output(mp, ixa);
 	/* No udpOutErrors if an error since IP increases its error counter */
 	switch (error) {
@@ -3285,6 +3296,10 @@ udp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 	/* We're done.  Pass the packet to ip. */
 	BUMP_MIB(&us->us_udp_mib, udpHCOutDatagrams);
 
+	DTRACE_UDP5(send, mblk_t *, NULL, ip_xmit_attr_t *, ixa,
+	    void_ip_t *, mp->b_rptr, udp_t *, udp, udpha_t *,
+	    &mp->b_rptr[ixa->ixa_ip_hdr_length]);
+
 	error = conn_ip_output(mp, ixa);
 	/* No udpOutErrors if an error since IP increases its error counter */
 	switch (error) {
@@ -3410,6 +3425,10 @@ udp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 
 	/* We're done.  Pass the packet to ip. */
 	BUMP_MIB(&us->us_udp_mib, udpHCOutDatagrams);
+
+	DTRACE_UDP5(send, mblk_t *, NULL, ip_xmit_attr_t *, ixa,
+	    void_ip_t *, mp->b_rptr, udp_t *, udp, udpha_t *,
+	    &mp->b_rptr[ixa->ixa_ip_hdr_length]);
 
 	error = conn_ip_output(mp, ixa);
 	/* No udpOutErrors if an error since IP increases its error counter */
@@ -4211,6 +4230,10 @@ udp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 
 	/* We're done.  Pass the packet to ip. */
 	BUMP_MIB(&us->us_udp_mib, udpHCOutDatagrams);
+
+	DTRACE_UDP5(send, mblk_t *, NULL, ip_xmit_attr_t *, ixa,
+	    void_ip_t *, data_mp->b_rptr, udp_t *, udp, udpha_t *,
+	    &data_mp->b_rptr[ixa->ixa_ip_hdr_length]);
 
 	error = conn_ip_output(data_mp, ixa);
 	/* No udpOutErrors if an error since IP increases its error counter */

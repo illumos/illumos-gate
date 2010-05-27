@@ -2106,6 +2106,7 @@ struct ip_xmit_attr_s {
 
 	uint32_t	ixa_ident;		/* For IPv6 fragment header */
 
+	uint64_t	ixa_conn_id;		/* Used by DTrace */
 	/*
 	 * Cached LSO information.
 	 */

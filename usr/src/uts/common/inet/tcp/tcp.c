@@ -872,7 +872,13 @@ tcp_clean_death(tcp_t *tcp, int err)
 			if (!tcp->tcp_tconnind_started) {
 				CONN_DEC_REF(connp);
 			} else {
+				int32_t oldstate = tcp->tcp_state;
+
 				tcp->tcp_state = TCPS_BOUND;
+				DTRACE_TCP6(state__change, void, NULL,
+				    ip_xmit_attr_t *, connp->conn_ixa,
+				    void, NULL, tcp_t *, tcp, void, NULL,
+				    int32_t, oldstate);
 			}
 		} else {
 			tcp_close_detached(tcp);
@@ -1212,6 +1218,7 @@ tcp_closei_local(tcp_t *tcp)
 {
 	conn_t		*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	int32_t		oldstate;
 
 	if (!TCP_IS_SOCKET(tcp))
 		tcp_acceptor_hash_remove(tcp);
@@ -1301,6 +1308,12 @@ tcp_closei_local(tcp_t *tcp)
 		(void) tcp_time_wait_remove(tcp, NULL);
 	CL_INET_DISCONNECT(connp);
 	ipcl_hash_remove(connp);
+	oldstate = tcp->tcp_state;
+	tcp->tcp_state = TCPS_CLOSED;
+	/* Need to probe before ixa_cleanup() is called */
+	DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+	    connp->conn_ixa, void, NULL, tcp_t *, tcp, void, NULL,
+	    int32_t, oldstate);
 	ixa_cleanup(connp->conn_ixa);
 
 	/*
@@ -1313,7 +1326,6 @@ tcp_closei_local(tcp_t *tcp)
 	ASSERT(tcp->tcp_time_wait_next == NULL);
 	ASSERT(tcp->tcp_time_wait_prev == NULL);
 	ASSERT(tcp->tcp_time_wait_expire == 0);
-	tcp->tcp_state = TCPS_CLOSED;
 
 	/* Release any SSL context */
 	if (tcp->tcp_kssl_ent != NULL) {
@@ -1763,9 +1775,15 @@ tcp_disconnect_common(tcp_t *tcp, t_scalar_t seqnum)
 		}
 		if (tcp->tcp_conn_req_max && lconnp == NULL) {
 			tcp->tcp_state = TCPS_LISTEN;
+			DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+			    connp->conn_ixa, void, NULL, tcp_t *, tcp, void,
+			    NULL, int32_t, old_state);
 		} else if (old_state > TCPS_BOUND) {
 			tcp->tcp_conn_req_max = 0;
 			tcp->tcp_state = TCPS_BOUND;
+			DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+			    connp->conn_ixa, void, NULL, tcp_t *, tcp, void,
+			    NULL, int32_t, old_state);
 
 			/*
 			 * If this end point is not going to become a listener,
@@ -1854,6 +1872,7 @@ tcp_reinit(tcp_t *tcp)
 	mblk_t		*mp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp  = tcp->tcp_connp;
+	int32_t		oldstate;
 
 	/* tcp_reinit should never be called for detached tcp_t's */
 	ASSERT(tcp->tcp_listener == NULL);
@@ -1958,6 +1977,7 @@ tcp_reinit(tcp_t *tcp)
 
 	connp->conn_laddr_v6 = connp->conn_bound_addr_v6;
 	connp->conn_saddr_v6 = connp->conn_bound_addr_v6;
+	oldstate = tcp->tcp_state;
 
 	if (tcp->tcp_conn_req_max != 0) {
 		/*
@@ -2002,6 +2022,10 @@ tcp_reinit(tcp_t *tcp)
 	 * Initialize to default values
 	 */
 	tcp_init_values(tcp);
+
+	DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+	    connp->conn_ixa, void, NULL, tcp_t *, tcp, void, NULL,
+	    int32_t, oldstate);
 
 	ASSERT(tcp->tcp_ptpbhn != NULL);
 	tcp->tcp_rwnd = connp->conn_rcvbuf;
@@ -2648,6 +2672,7 @@ tcp_create_common(cred_t *credp, boolean_t isv6, boolean_t issocket,
 	    tcps->tcps_wroff_xtra;
 
 	SOCK_CONNID_INIT(tcp->tcp_connid);
+	/* DTrace ignores this - it isn't a tcp:::state-change */
 	tcp->tcp_state = TCPS_IDLE;
 	tcp_init_values(tcp);
 	return (connp);
@@ -2993,6 +3018,7 @@ int
 tcp_do_unbind(conn_t *connp)
 {
 	tcp_t *tcp = connp->conn_tcp;
+	int32_t oldstate;
 
 	switch (tcp->tcp_state) {
 	case TCPS_BOUND:
@@ -3018,7 +3044,11 @@ tcp_do_unbind(conn_t *connp)
 	connp->conn_laddr_v6 = ipv6_all_zeros;
 	connp->conn_saddr_v6 = ipv6_all_zeros;
 	tcp_bind_hash_remove(tcp);
+	oldstate = tcp->tcp_state;
 	tcp->tcp_state = TCPS_IDLE;
+	DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+	    connp->conn_ixa, void, NULL, tcp_t *, tcp, void, NULL,
+	    int32_t, oldstate);
 
 	ip_unbind(connp);
 	bzero(&connp->conn_ports, sizeof (connp->conn_ports));
@@ -4574,6 +4604,11 @@ tcp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	if (tcps->tcps_ecn_permitted == 2)
 		tcp->tcp_ecn_ok = B_TRUE;
 
+	/* Trace change from BOUND -> SYN_SENT here */
+	DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+	    connp->conn_ixa, void, NULL, tcp_t *, tcp, void, NULL,
+	    int32_t, TCPS_BOUND);
+
 	TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
 	syn_mp = tcp_xmit_mp(tcp, NULL, 0, NULL, NULL,
 	    tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
@@ -4584,6 +4619,15 @@ tcp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 		 * this thread issues a "connected" up call.
 		 */
 		SOCK_CONNID_BUMP(tcp->tcp_connid);
+		/*
+		 * DTrace sending the first SYN as a
+		 * tcp:::connect-request event.
+		 */
+		DTRACE_TCP5(connect__request, mblk_t *, NULL,
+		    ip_xmit_attr_t *, connp->conn_ixa,
+		    void_ip_t *, syn_mp->b_rptr, tcp_t *, tcp,
+		    tcph_t *,
+		    &syn_mp->b_rptr[connp->conn_ixa->ixa_ip_hdr_length]);
 		tcp_send_data(tcp, syn_mp);
 	}
 
@@ -4607,6 +4651,7 @@ tcp_do_listen(conn_t *connp, struct sockaddr *sa, socklen_t len,
 	tcp_t		*tcp = connp->conn_tcp;
 	int		error = 0;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	int32_t		oldstate;
 
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
@@ -4674,6 +4719,9 @@ do_listen:
 		 */
 		if (tcp->tcp_state != TCPS_LISTEN) {
 			tcp->tcp_state = TCPS_LISTEN;
+			DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+			    connp->conn_ixa, void, NULL, tcp_t *, tcp,
+			    void, NULL, int32_t, TCPS_BOUND);
 			/* Initialize the chain. Don't need the eager_lock */
 			tcp->tcp_eager_next_q0 = tcp->tcp_eager_prev_q0 = tcp;
 			tcp->tcp_eager_next_drop_q0 = tcp;
@@ -4699,7 +4747,11 @@ do_listen:
 	error = ip_laddr_fanout_insert(connp);
 	if (error != 0) {
 		/* Undo the bind - release the port number */
+		oldstate = tcp->tcp_state;
 		tcp->tcp_state = TCPS_IDLE;
+		DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+		    connp->conn_ixa, void, NULL, tcp_t *, tcp, void, NULL,
+		    int32_t, oldstate);
 		connp->conn_bound_addr_v6 = ipv6_all_zeros;
 
 		connp->conn_laddr_v6 = ipv6_all_zeros;

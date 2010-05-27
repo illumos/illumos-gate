@@ -1322,6 +1322,10 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	tcpha = (tcpha_t *)&mp->b_rptr[ip_hdr_len];
 	flags = (unsigned int)tcpha->tha_flags & 0xFF;
 
+	DTRACE_TCP5(receive, mblk_t *, NULL, ip_xmit_attr_t *, lconnp->conn_ixa,
+	    __dtrace_tcp_void_ip_t *, mp->b_rptr, tcp_t *, listener,
+	    __dtrace_tcp_tcph_t *, tcpha);
+
 	if (!(flags & TH_SYN)) {
 		if ((flags & TH_RST) || (flags & TH_URG)) {
 			freemsg(mp);
@@ -1653,13 +1657,6 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		goto error3;
 	}
 
-	/*
-	 * No need to check for multicast destination since ip will only pass
-	 * up multicasts to those that have expressed interest
-	 * TODO: what about rejecting broadcasts?
-	 * Also check that source is not a multicast or broadcast address.
-	 */
-	eager->tcp_state = TCPS_SYN_RCVD;
 	SOCK_CONNID_BUMP(eager->tcp_connid);
 
 	/*
@@ -1770,6 +1767,10 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	eager->tcp_tcpha->tha_ack = htonl(eager->tcp_rnxt);
 	TCPS_BUMP_MIB(tcps, tcpPassiveOpens);
 	eager->tcp_state = TCPS_SYN_RCVD;
+	DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+	    econnp->conn_ixa, void, NULL, tcp_t *, eager, void, NULL,
+	    int32_t, TCPS_LISTEN);
+
 	mp1 = tcp_xmit_mp(eager, eager->tcp_xmit_head, eager->tcp_mss,
 	    NULL, NULL, eager->tcp_iss, B_FALSE, NULL, B_FALSE);
 	if (mp1 == NULL) {
@@ -1825,6 +1826,10 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	 * only used by one thread at a time.
 	 */
 	if (econnp->conn_sqp == lconnp->conn_sqp) {
+		DTRACE_TCP5(send, mblk_t *, NULL, ip_xmit_attr_t *,
+		    econnp->conn_ixa, __dtrace_tcp_void_ip_t *, mp1->b_rptr,
+		    tcp_t *, eager, __dtrace_tcp_tcph_t *,
+		    &mp1->b_rptr[econnp->conn_ixa->ixa_ip_hdr_length]);
 		(void) conn_ip_output(mp1, econnp->conn_ixa);
 		CONN_DEC_REF(econnp);
 	} else {
@@ -2344,6 +2349,10 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		    mp1->b_datap->db_type == M_DATA);
 	}
 
+	DTRACE_TCP5(receive, mblk_t *, NULL, ip_xmit_attr_t *, connp->conn_ixa,
+	    __dtrace_tcp_void_ip_t *, iphdr, tcp_t *, tcp,
+	    __dtrace_tcp_tcph_t *, tcpha);
+
 	if (tcp->tcp_state == TCPS_TIME_WAIT) {
 		tcp_time_wait_processing(tcp, mp, seg_seq, seg_ack,
 		    seg_len, tcpha, ira);
@@ -2443,9 +2452,14 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 			ASSERT(tcp->tcp_suna + 1 == seg_ack);
 		}
 		if (flags & TH_RST) {
-			freemsg(mp);
-			if (flags & TH_ACK)
+			if (flags & TH_ACK) {
+				DTRACE_TCP5(connect__refused, mblk_t *, NULL,
+				    ip_xmit_attr_t *, connp->conn_ixa,
+				    void_ip_t *, iphdr, tcp_t *, tcp,
+				    tcph_t *, tcpha);
 				(void) tcp_clean_death(tcp, ECONNREFUSED);
+			}
+			freemsg(mp);
 			return;
 		}
 		if (!(flags & TH_SYN)) {
@@ -2504,7 +2518,9 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 			/*
 			 * tcp_sendmsg() checks tcp_state without entering
 			 * the squeue so tcp_state should be updated before
-			 * sending up connection confirmation
+			 * sending up connection confirmation.  Probe the
+			 * state change below when we are sure the connection
+			 * confirmation has been sent.
 			 */
 			tcp->tcp_state = TCPS_ESTABLISHED;
 			if (!tcp_conn_con(tcp, iphdr, mp,
@@ -2557,6 +2573,18 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 			 * possible on the accepting host.
 			 */
 			flags |= TH_ACK_NEEDED;
+
+			/*
+			 * Trace connect-established here.
+			 */
+			DTRACE_TCP5(connect__established, mblk_t *, NULL,
+			    ip_xmit_attr_t *, tcp->tcp_connp->conn_ixa,
+			    void_ip_t *, iphdr, tcp_t *, tcp, tcph_t *, tcpha);
+
+			/* Trace change from SYN_SENT -> ESTABLISHED here */
+			DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+			    connp->conn_ixa, void, NULL, tcp_t *, tcp,
+			    void, NULL, int32_t, TCPS_SYN_SENT);
 
 			/*
 			 * Special case for loopback.  At this point we have
@@ -2654,6 +2682,9 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 			break;
 		}
 		tcp->tcp_state = TCPS_SYN_RCVD;
+		DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+		    connp->conn_ixa, void_ip_t *, NULL, tcp_t *, tcp,
+		    tcph_t *, NULL, int32_t, TCPS_SYN_SENT);
 		mp1 = tcp_xmit_mp(tcp, tcp->tcp_xmit_head, tcp->tcp_mss,
 		    NULL, NULL, tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
 		if (mp1 != NULL) {
@@ -3628,7 +3659,9 @@ process_ack:
 		 *
 		 * tcp_sendmsg() checks tcp_state without entering
 		 * the squeue so tcp_state should be updated before
-		 * sending up connection confirmation.
+		 * sending up connection confirmation.  Probe the state
+		 * change below when we are sure sending of the confirmation
+		 * has succeeded.
 		 */
 		tcp->tcp_state = TCPS_ESTABLISHED;
 
@@ -3646,6 +3679,21 @@ process_ack:
 				TCP_STAT(tcps, tcp_fusion_unfusable);
 				tcp->tcp_unfusable = B_TRUE;
 			}
+			/*
+			 * For simultaneous active open, trace receipt of final
+			 * ACK as tcp:::connect-established.
+			 */
+			DTRACE_TCP5(connect__established, mblk_t *, NULL,
+			    ip_xmit_attr_t *, connp->conn_ixa, void_ip_t *,
+			    iphdr, tcp_t *, tcp, tcph_t *, tcpha);
+		} else {
+			/*
+			 * For passive open, trace receipt of final ACK as
+			 * tcp:::accept-established.
+			 */
+			DTRACE_TCP5(accept__established, mlbk_t *, NULL,
+			    ip_xmit_attr_t *, connp->conn_ixa, void_ip_t *,
+			    iphdr, tcp_t *, tcp, tcph_t *, tcpha);
 		}
 		TCPS_CONN_INC(tcps);
 
@@ -3687,6 +3735,11 @@ process_ack:
 		tcp->tcp_swl1 = seg_seq;
 		tcp->tcp_swl2 = seg_ack;
 		tcp->tcp_valid_bits &= ~TCP_ISS_VALID;
+
+		/* Trace change from SYN_RCVD -> ESTABLISHED here */
+		DTRACE_TCP6(state__change, void, NULL, ip_xmit_attr_t *,
+		    connp->conn_ixa, void, NULL, tcp_t *, tcp, void, NULL,
+		    int32_t, TCPS_SYN_RCVD);
 
 		/* Fuse when both sides are in ESTABLISHED state */
 		if (tcp->tcp_loopback && do_tcp_fusion)
@@ -4353,6 +4406,10 @@ est:
 		case TCPS_FIN_WAIT_1:
 			if (tcp->tcp_fin_acked) {
 				tcp->tcp_state = TCPS_FIN_WAIT_2;
+				DTRACE_TCP6(state__change, void, NULL,
+				    ip_xmit_attr_t *, connp->conn_ixa,
+				    void, NULL, tcp_t *, tcp, void, NULL,
+				    int32_t, TCPS_FIN_WAIT_1);
 				/*
 				 * We implement the non-standard BSD/SunOS
 				 * FIN_WAIT_2 flushing algorithm.
@@ -4383,8 +4440,13 @@ est:
 			}
 			goto xmit_check;
 		case TCPS_CLOSING:
-			if (tcp->tcp_fin_acked)
+			if (tcp->tcp_fin_acked) {
 				SET_TIME_WAIT(tcps, tcp, connp);
+				DTRACE_TCP6(state__change, void, NULL,
+				    ip_xmit_attr_t *, connp->conn_ixa, void,
+				    NULL, tcp_t *, tcp, void, NULL, int32_t,
+				    TCPS_CLOSING);
+			}
 			/*FALLTHRU*/
 		case TCPS_CLOSE_WAIT:
 			freemsg(mp);
@@ -4414,18 +4476,37 @@ est:
 				flags |= TH_ORDREL_NEEDED;
 			switch (tcp->tcp_state) {
 			case TCPS_SYN_RCVD:
+				tcp->tcp_state = TCPS_CLOSE_WAIT;
+				DTRACE_TCP6(state__change, void, NULL,
+				    ip_xmit_attr_t *, connp->conn_ixa,
+				    void, NULL, tcp_t *, tcp, void, NULL,
+				    int32_t, TCPS_SYN_RCVD);
+				/* Keepalive? */
+				break;
 			case TCPS_ESTABLISHED:
 				tcp->tcp_state = TCPS_CLOSE_WAIT;
+				DTRACE_TCP6(state__change, void, NULL,
+				    ip_xmit_attr_t *, connp->conn_ixa,
+				    void, NULL, tcp_t *, tcp, void, NULL,
+				    int32_t, TCPS_ESTABLISHED);
 				/* Keepalive? */
 				break;
 			case TCPS_FIN_WAIT_1:
 				if (!tcp->tcp_fin_acked) {
 					tcp->tcp_state = TCPS_CLOSING;
+					DTRACE_TCP6(state__change, void, NULL,
+					    ip_xmit_attr_t *, connp->conn_ixa,
+					    void, NULL, tcp_t *, tcp, void,
+					    NULL, int32_t, TCPS_FIN_WAIT_1);
 					break;
 				}
 				/* FALLTHRU */
 			case TCPS_FIN_WAIT_2:
 				SET_TIME_WAIT(tcps, tcp, connp);
+				DTRACE_TCP6(state__change, void, NULL,
+				    ip_xmit_attr_t *, connp->conn_ixa, void,
+				    NULL, tcp_t *, tcp, void, NULL, int32_t,
+				    TCPS_FIN_WAIT_2);
 				if (seg_len) {
 					/*
 					 * implies data piggybacked on FIN.

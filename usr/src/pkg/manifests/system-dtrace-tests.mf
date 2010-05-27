@@ -20,8 +20,7 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/dtrace/tests@$(PKGVERS)
@@ -835,6 +834,10 @@ file path=opt/SUNWdtrt/tst/common/ip/tst.ipv6localicmp.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/ip/tst.ipv6localicmp.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/ip/tst.ipv6remoteicmp.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/ip/tst.ipv6remoteicmp.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.localtcpstate.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.localtcpstate.ksh.out mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.remotetcpstate.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/ip/tst.remotetcpstate.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/java_api/test.jar
 file path=opt/SUNWdtrt/tst/common/java_api/tst.Abort.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/java_api/tst.Abort.ksh.out mode=0444

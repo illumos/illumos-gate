@@ -113,3 +113,13 @@ title: ip Provider
 index: 101
 url: http://wikis.sun.com/display/DTrace/ip+Provider
 
+name: tcp
+title: tcp Provider
+index: 102
+url: http://wikis.sun.com/display/DTrace/tcp+Provider
+
+name: udp
+title: udp Provider
+index: 103
+url: http://wikis.sun.com/display/DTrace/udp+Provider
+

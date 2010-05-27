@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #pragma D depends_on module ip
@@ -98,12 +97,13 @@ typedef struct pktinfo {
 } pktinfo_t;
 
 /*
- * csinfo is where connection state info can be made available if
- * connection IDs become supported by the kernel in the future.
- * The cs_addr member is currently always NULL.
+ * csinfo is where connection state info is made available.
  */
 typedef struct csinfo {
 	uintptr_t cs_addr;
+	uint64_t cs_cid;
+	pid_t cs_pid;
+	zoneid_t cs_zoneid;
 } csinfo_t;
 
 /*
@@ -181,6 +181,17 @@ typedef uintptr_t void_ip_t;
  */
 typedef ill_t __dtrace_ipsr_ill_t;
 
+/*
+ * __dtrace_tcp_void_ip_t is used by the translator to take either the
+ * non-NULL void_ip_t * passed in or, if it is NULL, uses arg3 (tcp_t *)
+ * from the tcp:::send and tcp:::recieve probes to translate to an ipinfo_t.
+ * When no headers are available in the TCP fusion case for tcp:::send
+ * and tcp:::receive case, this allows us to present the consumer with header
+ * data based on the tcp_t * content in order to hide the implementation
+ * details of TCP fusion.
+ */
+typedef void * __dtrace_tcp_void_ip_t;
+
 #pragma D binding "1.5" translator
 translator pktinfo_t < mblk_t *M > {
 	pkt_addr = NULL;
@@ -189,6 +200,21 @@ translator pktinfo_t < mblk_t *M > {
 #pragma D binding "1.5" translator
 translator csinfo_t < conn_t *C > {
 	cs_addr = NULL;
+};
+
+#pragma D binding "1.6.3" translator
+translator csinfo_t < ip_xmit_attr_t *C > {
+	cs_addr = (uintptr_t)C;
+	cs_cid = C ? C->ixa_conn_id : NULL;
+	cs_pid = C ? C->ixa_cpid : -1;
+	cs_zoneid = C ?
+	    (C->ixa_ipst == NULL || C->ixa_ipst->ips_netstack == NULL ||
+	    C->ixa_ipst->ips_netstack->netstack_stackid ==
+	    @GLOBAL_NETSTACKID@ ||
+	    C->ixa_cred == NULL ||
+	    C->ixa_cred->cr_zone == NULL ||
+	    C->ixa_cred->cr_uid == -1 ?
+	    C->ixa_zoneid : C->ixa_cred->cr_zone->zone_id) : -1;
 };
 
 #pragma D binding "1.5" translator
@@ -231,6 +257,50 @@ translator ifinfo_t < __dtrace_ipsr_ill_t *I > {
 	    : 0;
 	if_local = arg6;		/* probe dependent */
 	if_addr = (uintptr_t)I;
+};
+
+/*
+ * Translate to an ipinfo_t * from either the non-NULL void_ip_t * passed in,
+ * or use arg3 (tcp_t *) to fabricate ip header info.
+ */
+#pragma D binding "1.6.3" translator
+translator ipinfo_t < __dtrace_tcp_void_ip_t *I > {
+	ip_ver = I != NULL ? *(uint8_t *)I >> 4 :
+	    arg3 != NULL ? ((tcp_t *)arg3)->tcp_connp->conn_ipversion : 0;
+	ip_plength =
+	    I != NULL && *(uint8_t *)I >> 4 == 4 ?
+	    ntohs(((ipha_t *)I)->ipha_length) -
+	    ((((ipha_t *)I)->ipha_version_and_hdr_length & 0xf) << 2) :
+	    I != NULL && *(uint8_t *)I >> 4 == 6 ?
+	    ntohs(((ip6_t *)I)->ip6_ctlun.ip6_un1.ip6_un1_plen) :
+	    I != NULL ? 0 :
+	    arg3 != NULL && probename == "send" ?
+	    ((tcp_t *)arg3)->tcp_last_sent_len + @TCP_MIN_HEADER_LENGTH@ :
+	    arg3 != NULL && probename == "receive" ?
+	    ((tcp_t *)arg3)->tcp_last_recv_len + @TCP_MIN_HEADER_LENGTH@ :
+	    0;
+	ip_saddr =
+	    I != NULL && *(uint8_t *)I >> 4 == 4 ?
+	    inet_ntoa(&((ipha_t *)I)->ipha_src) :
+	    I != NULL && *(uint8_t *)I >> 4 == 6 ?
+	    inet_ntoa6(&((ip6_t *)I)->ip6_src) :
+	    I != NULL ? "<unknown>" :
+	    arg3 != NULL && probename == "send" ?
+	    inet_ntoa6(&((tcp_t *)arg3)->tcp_connp->connua_v6addr.connua_laddr):
+	    arg3 != NULL && probename == "receive" ?
+	    inet_ntoa6(&((tcp_t *)arg3)->tcp_connp->connua_v6addr.connua_faddr):
+	    "<unknown>";
+	ip_daddr =
+	    I != NULL && *(uint8_t *)I >> 4 == 4 ?
+	    inet_ntoa(&((ipha_t *)I)->ipha_dst) :
+	    I != NULL && *(uint8_t *)I >> 4 == 6 ?
+	    inet_ntoa6(&((ip6_t *)I)->ip6_dst) :
+	    I != NULL ? "<unknown>" :
+	    arg3 != NULL && probename == "send" ?
+	    inet_ntoa6(&((tcp_t *)arg3)->tcp_connp->connua_v6addr.connua_faddr):
+	    arg3 != NULL && probename == "receive" ?
+	    inet_ntoa6(&((tcp_t *)arg3)->tcp_connp->connua_v6addr.connua_laddr):
+	    "<unknown>";
 };
 
 #pragma D binding "1.5" translator

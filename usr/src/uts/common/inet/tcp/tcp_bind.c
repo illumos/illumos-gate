@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -880,6 +879,11 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * number.
 			 */
 			tcp->tcp_state = TCPS_BOUND;
+			DTRACE_TCP6(state__change, void, NULL,
+			    ip_xmit_attr_t *, connp->conn_ixa,
+			    void, NULL, tcp_t *, tcp, void, NULL,
+			    int32_t, TCPS_IDLE);
+
 			connp->conn_lport = htons(port);
 
 			ASSERT(&tcps->tcps_bind_fanout[TCP_BIND_HASH(

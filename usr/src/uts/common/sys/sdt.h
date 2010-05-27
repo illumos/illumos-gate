@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_SDT_H
@@ -280,6 +279,56 @@ extern "C" {
 	DTRACE_PROBE7(__ip_##name, type1, arg1, type2, arg2, 		\
 	    type3, arg3, type4, arg4, type5, arg5, type6, arg6,		\
 	    type7, arg7);
+
+#define	DTRACE_TCP(name)						\
+	DTRACE_PROBE(__tcp_##name);
+
+#define	DTRACE_TCP1(name, type1, arg1)					\
+	DTRACE_PROBE1(__tcp_##name, type1, arg1);
+
+#define	DTRACE_TCP2(name, type1, arg1, type2, arg2)			\
+	DTRACE_PROBE2(__tcp_##name, type1, arg1, type2, arg2);
+
+#define	DTRACE_TCP3(name, type1, arg1, type2, arg2, type3, arg3)	\
+	DTRACE_PROBE3(__tcp_##name, type1, arg1, type2, arg2, type3, arg3);
+
+#define	DTRACE_TCP4(name, type1, arg1, type2, arg2,			\
+    type3, arg3, type4, arg4)						\
+	DTRACE_PROBE4(__tcp_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3, type4, arg4);
+
+#define	DTRACE_TCP5(name, type1, arg1, type2, arg2,			\
+    type3, arg3, type4, arg4, type5, arg5)				\
+	DTRACE_PROBE5(__tcp_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3, type4, arg4, type5, arg5);
+
+#define	DTRACE_TCP6(name, type1, arg1, type2, arg2,			\
+    type3, arg3, type4, arg4, type5, arg5, type6, arg6)			\
+	DTRACE_PROBE6(__tcp_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3, type4, arg4, type5, arg5, type6, arg6);
+
+#define	DTRACE_UDP(name)						\
+	DTRACE_PROBE(__udp_##name);
+
+#define	DTRACE_UDP1(name, type1, arg1)					\
+	DTRACE_PROBE1(__udp_##name, type1, arg1);
+
+#define	DTRACE_UDP2(name, type1, arg1, type2, arg2)			\
+	DTRACE_PROBE2(__udp_##name, type1, arg1, type2, arg2);
+
+#define	DTRACE_UDP3(name, type1, arg1, type2, arg2, type3, arg3)	\
+	DTRACE_PROBE3(__udp_##name, type1, arg1, type2, arg2, type3, arg3);
+
+#define	DTRACE_UDP4(name, type1, arg1, type2, arg2,			\
+    type3, arg3, type4, arg4)						\
+	DTRACE_PROBE4(__udp_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3, type4, arg4);
+
+#define	DTRACE_UDP5(name, type1, arg1, type2, arg2,			\
+    type3, arg3, type4, arg4, type5, arg5)				\
+	DTRACE_PROBE5(__udp_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3, type4, arg4, type5, arg5);
+
 
 #define	DTRACE_SYSEVENT2(name, type1, arg1, type2, arg2)		\
 	DTRACE_PROBE2(__sysevent_##name, type1, arg1, type2, arg2);
