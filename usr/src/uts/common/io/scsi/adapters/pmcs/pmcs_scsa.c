@@ -2211,7 +2211,15 @@ out:
 		pwrk->phy = NULL;
 	}
 
-	pmcs_pwork(pwp, pwrk);
+	/*
+	 * We may arrive here due to a command timing out, which in turn
+	 * could be addressed in a different context.  So, free the work
+	 * back, but only after confirming it's not already been freed
+	 * elsewhere.
+	 */
+	if (!PMCS_COMMAND_DONE(pwrk)) {
+		pmcs_pwork(pwp, pwrk);
+	}
 
 	/*
 	 * If the device is gone, we only put this command on the completion
@@ -2697,7 +2705,15 @@ out:
 		pwrk->phy = NULL;
 	}
 
-	pmcs_pwork(pwp, pwrk);
+	/*
+	 * We may arrive here due to a command timing out, which in turn
+	 * could be addressed in a different context.  So, free the work
+	 * back, but only after confirming it's not already been freed
+	 * elsewhere.
+	 */
+	if (!PMCS_COMMAND_DONE(pwrk)) {
+		pmcs_pwork(pwp, pwrk);
+	}
 
 	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);

@@ -248,6 +248,7 @@ struct pmcwork {
 	pmcs_work_state_t	last_state;
 	hrtime_t		finish;
 };
+#define	PMCS_ABT_HTAG_ALL	0xffffffff
 
 #define	PMCS_REC_EVENT	0xffffffff	/* event recovery */
 

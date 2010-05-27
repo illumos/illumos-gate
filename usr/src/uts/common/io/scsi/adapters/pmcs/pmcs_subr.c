@@ -4906,6 +4906,7 @@ pmcs_abort(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint32_t tag, int all_cmds,
 		msg[3] = 0;
 		msg[4] = LE_32(1);
 		pwrk->ptr = NULL;
+		pwrk->abt_htag = PMCS_ABT_HTAG_ALL;
 		pptr->abort_all_start = gethrtime();
 	} else {
 		msg[3] = LE_32(tag);
@@ -4955,9 +4956,14 @@ pmcs_abort(pmcs_hw_t *pwp, pmcs_phy_t *pptr, uint32_t tag, int all_cmds,
 	}
 
 	if (result) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
-		    "%s: Abort (htag 0x%08x) request timed out",
-		    __func__, abt_htag);
+		if (all_cmds) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
+			    "%s: Abort all request timed out", __func__);
+		} else {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, tgt,
+			    "%s: Abort (htag 0x%08x) request timed out",
+			    __func__, abt_htag);
+		}
 		if (tgt != NULL) {
 			mutex_enter(&tgt->statlock);
 			if ((tgt->dev_state != PMCS_DEVICE_STATE_IN_RECOVERY) &&
@@ -7103,6 +7109,8 @@ void
 pmcs_complete_work_impl(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
     size_t amt)
 {
+	pmcs_phy_t	*pptr;
+
 	switch (PMCS_TAG_TYPE(pwrk->htag)) {
 	case PMCS_TAG_TYPE_CBACK:
 	{
@@ -7121,6 +7129,23 @@ pmcs_complete_work_impl(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 #ifdef DEBUG
 		pmcs_check_iomb_status(pwp, iomb);
 #endif
+		/*
+		 * If this was an abort all cmd, clear the phy's
+		 * 'abort_all_start' time and signal the abort_all_cv.
+		 */
+		if (pwrk->abt_htag == PMCS_ABT_HTAG_ALL) {
+			pptr = pwrk->phy;
+			if (pptr != NULL) {
+				mutex_exit(&pwrk->lock);
+				mutex_enter(&pptr->phy_lock);
+				if (pptr->abort_all_start) {
+					pptr->abort_all_start = 0;
+					cv_signal(&pptr->abort_all_cv);
+				}
+				mutex_exit(&pptr->phy_lock);
+				mutex_enter(&pwrk->lock);
+			}
+		}
 		pmcs_pwork(pwp, pwrk);
 		break;
 	default:
