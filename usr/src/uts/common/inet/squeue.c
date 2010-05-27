@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -1383,8 +1382,13 @@ squeue_wakeup_conn(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 }
 
 int
-squeue_synch_enter(squeue_t *sqp, conn_t *connp, mblk_t *use_mp)
+squeue_synch_enter(conn_t *connp, mblk_t *use_mp)
 {
+	squeue_t *sqp;
+
+again:
+	sqp = connp->conn_sqp;
+
 	mutex_enter(&sqp->sq_lock);
 	if (sqp->sq_first == NULL && !(sqp->sq_state & SQS_PROC)) {
 		/*
@@ -1400,6 +1404,19 @@ squeue_synch_enter(squeue_t *sqp, conn_t *connp, mblk_t *use_mp)
 		sqp->sq_run = curthread;
 		mutex_exit(&sqp->sq_lock);
 
+		/*
+		 * Handle squeue switching. The conn's squeue can only change
+		 * while there is a thread in the squeue, which is why we do
+		 * the check after entering the squeue. If it has changed, exit
+		 * this squeue and redo everything with the new sqeueue.
+		 */
+		if (sqp != connp->conn_sqp) {
+			mutex_enter(&sqp->sq_lock);
+			sqp->sq_state &= ~SQS_PROC;
+			sqp->sq_run = NULL;
+			mutex_exit(&sqp->sq_lock);
+			goto again;
+		}
 #if SQUEUE_DEBUG
 		sqp->sq_curmp = NULL;
 		sqp->sq_curproc = NULL;
@@ -1443,8 +1460,10 @@ squeue_synch_enter(squeue_t *sqp, conn_t *connp, mblk_t *use_mp)
 }
 
 void
-squeue_synch_exit(squeue_t *sqp, conn_t *connp)
+squeue_synch_exit(conn_t *connp)
 {
+	squeue_t *sqp = connp->conn_sqp;
+
 	mutex_enter(&sqp->sq_lock);
 	if (sqp->sq_run == curthread) {
 		ASSERT(sqp->sq_state & SQS_PROC);

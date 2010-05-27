@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SQUEUE_H
@@ -85,8 +84,8 @@ extern void squeue_enter(squeue_t *, mblk_t *, mblk_t *,
 extern uintptr_t *squeue_getprivate(squeue_t *, sqprivate_t);
 
 struct conn_s;
-extern int squeue_synch_enter(squeue_t *, struct conn_s *, mblk_t *);
-extern void squeue_synch_exit(squeue_t *, struct conn_s *);
+extern int squeue_synch_enter(struct conn_s *, mblk_t *);
+extern void squeue_synch_exit(struct conn_s *);
 
 #ifdef	__cplusplus
 }
