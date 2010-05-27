@@ -144,6 +144,9 @@ UNREF_OBJ	/lib.*\ of\ .*libcimapi\.so
 UNREF_OBJ	/lib.*\ of\ .*libdbus-1\.so\.3
 UNREF_OBJ	/lib.*\ of\ .*libdbus-glib-1\.so\.2
 UNREF_OBJ	/lib.*\ of\ .*libgconf-2\.so\.4
+UNREF_OBJ	/lib.*\ of\ .*libglib-2.0\.so\.0
+UNREF_OBJ	/lib.*\ of\ .*libgmodule-2.0\.so\.0
+UNREF_OBJ	/lib.*\ of\ .*libgobject-2.0\.so\.0
 UNREF_OBJ	/lib.*\ of\ .*libgnomevfs-2\.so\.0
 UNREF_OBJ	/lib.*\ of\ .*libgthread-2\.0\.so\.0
 UNREF_OBJ	/lib.*\ of\ .*libjvm\.so
