@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -253,7 +252,9 @@ static char QNXstr[] = "QNX 4.x";
 static char QNX2str[] = "QNX part 2";
 static char QNX3str[] = "QNX part 3";
 static char LINNATstr[] = "Linux native";
+#ifdef i386
 static char LINSWAPstr[] = "Linux swap";
+#endif
 static char NTFSVOL1str[] = "NT volset 1";
 static char NTFSVOL2str[] = "NT volset 2";
 static char BSDstr[] = "BSD OS";
@@ -745,7 +746,7 @@ update_disk_and_exit(boolean_t table_changed)
 				/* Nothing to do */
 				break;
 			default:
-				fprintf(stderr, "Error in"
+				(void) fprintf(stderr, "Error in"
 				    " fdisk_commit_ext_part\n");
 				exit(rval);
 		}
@@ -1193,17 +1194,17 @@ main(int argc, char *argv[])
 			case FDISK_EBADMAGIC:
 				break;
 			case FDISK_ENOVGEOM:
-				fprintf(stderr, "Could not get virtual"
+				(void) fprintf(stderr, "Could not get virtual"
 				    " geometry for this device\n");
 				exit(1);
 				break;
 			case FDISK_ENOPGEOM:
-				fprintf(stderr, "Could not get physical"
+				(void) fprintf(stderr, "Could not get physical"
 				    " geometry for this device\n");
 				exit(1);
 				break;
 			case FDISK_ENOLGEOM:
-				fprintf(stderr, "Could not get label"
+				(void) fprintf(stderr, "Could not get label"
 				    " geometry for this device\n");
 				exit(1);
 				break;
@@ -1770,7 +1771,7 @@ load(int funct, char *file)
 	uint32_t	begsec, endsec, relsect;
 	logical_drive_t *temp;
 	int part_count = 0, ldcnt = 0;
-	uint32_t ext_beg_sec, ext_end_sec;
+	uint32_t ext_beg_sec;
 	uint32_t old_ext_beg_sec = 0, old_ext_num_sec = 0;
 	uint32_t new_ext_beg_sec = 0, new_ext_num_sec = 0;
 	int ext_part_inited = 0;
@@ -1807,9 +1808,10 @@ load(int funct, char *file)
 
 			if (fdisk_is_dos_extended((uchar_t)id)) {
 				if (ext_part_present) {
-					fprintf(stderr, "Extended partition"
+					(void) fprintf(stderr,
+					    "Extended partition"
 					    " already exists\n");
-					fprintf(stderr, "fdisk: Error on"
+					(void) fprintf(stderr, "fdisk: Error on"
 					    " entry \"%s\".\n", line);
 					exit(1);
 				}
@@ -1835,7 +1837,7 @@ load(int funct, char *file)
 				new_ext_num_sec = numsect;
 				if ((old_ext_beg_sec != new_ext_beg_sec) ||
 				    (old_ext_num_sec != new_ext_num_sec)) {
-					fdisk_init_ext_part(epp,
+					(void) fdisk_init_ext_part(epp,
 					    new_ext_beg_sec, new_ext_num_sec);
 					ext_part_inited = 1;
 				}
@@ -1846,9 +1848,10 @@ load(int funct, char *file)
 				int offset = MAX_LOGDRIVE_OFFSET;
 				if (!ext_part_present) {
 					/* Erroneous input file */
-					fprintf(stderr, "More than 4 primary"
+					(void) fprintf(stderr,
+					    "More than 4 primary"
 					    " partitions found in input\n");
-					fprintf(stderr, "Exiting...\n");
+					(void) fprintf(stderr, "Exiting...\n");
 					exit(1);
 				}
 
@@ -1863,7 +1866,7 @@ load(int funct, char *file)
 				 * the input file, initialize the EBR.
 				 */
 				if (!ext_part_inited) {
-					fdisk_init_ext_part(epp,
+					(void) fdisk_init_ext_part(epp,
 					    new_ext_beg_sec, new_ext_num_sec);
 					ext_part_inited = 1;
 				}
@@ -1878,7 +1881,8 @@ load(int funct, char *file)
 					 * less than offset.
 					 */
 					if (rsect < offset) {
-						fprintf(stderr, "Minimum of "
+						(void) fprintf(stderr,
+						    "Minimum of "
 						    "63 free sectors required "
 						    "before the beginning of "
 						    "a logical drive.");
@@ -1896,16 +1900,17 @@ load(int funct, char *file)
 					}
 				}
 				if (ldcnt >= MAX_EXT_PARTS) {
-					fprintf(stderr, "\nError : Number of "
+					(void) fprintf(stderr,
+					    "\nError : Number of "
 					    "logical drives exceeds limit of "
 					    "%d.\n", MAX_EXT_PARTS);
 					exit(1);
 				}
 
 				if (id > FDISK_MAX_VALID_PART_ID) {
-					fprintf(stderr, "Invalid partition "
-					    "ID\n");
-					fprintf(stderr, "fdisk: Error on"
+					(void) fprintf(stderr,
+					    "Invalid partition ID\n");
+					(void) fprintf(stderr, "fdisk: Error on"
 					    " entry \"%s\".\n", line);
 					exit(1);
 				}
@@ -1914,7 +1919,7 @@ load(int funct, char *file)
 				if (fdisk_validate_logical_drive(epp,
 				    begsec, offset, numsect) == 0) {
 					if (id == EFI_PMBR) {
-						fprintf(stderr, "EFI "
+						(void) fprintf(stderr, "EFI "
 						    "partitions not supported "
 						    "inside extended "
 						    "partition\n");
@@ -1924,7 +1929,7 @@ load(int funct, char *file)
 					    endsec, id);
 					continue;
 				} else {
-					fprintf(stderr, "fdisk: Error on"
+					(void) fprintf(stderr, "fdisk: Error on"
 					    " entry \"%s\".\n", line);
 					exit(1);
 				}
@@ -2038,7 +2043,7 @@ load(int funct, char *file)
 				    sizeof (struct ipart));
 #ifdef i386
 				if (fdisk_is_dos_extended(id)) {
-					fdisk_delete_ext_part(epp);
+					(void) fdisk_delete_ext_part(epp);
 				}
 #endif
 				return;
@@ -2132,7 +2137,7 @@ load(int funct, char *file)
 
 #ifdef i386
 		if (id > FDISK_MAX_VALID_PART_ID) {
-			printf("Invalid partition ID\n");
+			(void) printf("Invalid partition ID\n");
 			exit(1);
 		}
 
@@ -2148,7 +2153,7 @@ load(int funct, char *file)
 
 		if (fdisk_ext_part_exists(epp) &&
 		    (rsect >= (ext_beg_sec = fdisk_get_ext_beg_sec(epp))) &&
-		    (rsect <= (ext_end_sec = fdisk_get_ext_end_sec(epp)))) {
+		    (rsect <= (fdisk_get_ext_end_sec(epp)))) {
 			int offset = MAX_LOGDRIVE_OFFSET;
 
 			/*
@@ -2174,9 +2179,9 @@ load(int funct, char *file)
 			}
 
 			if (ldcnt >= MAX_EXT_PARTS) {
-				printf("\nNumber of logical drives exceeds "
-				    "limit of %d.\n", MAX_EXT_PARTS);
-				printf("Failing further additions.\n");
+				(void) printf("\nNumber of logical drives "
+				    "exceeds limit of %d.\n", MAX_EXT_PARTS);
+				(void) printf("Failing further additions.\n");
 				exit(1);
 			}
 
@@ -2582,13 +2587,13 @@ pars_fdisk(
 			line[i] = ' ';
 		}
 	}
-	strncpy(buf, line, 256);
+	(void) strncpy(buf, line, 256);
 	errno = 0;
 	tok = strtok(buf, ": \t\n");
 	while (tok != NULL) {
 		for (p = tok; *p != '\0'; p++) {
 			if (!isdigit(*p)) {
-				printf("Invalid input %s in line %s.\n",
+				(void) printf("Invalid input %s in line %s.\n",
 				    tok, line);
 				exit(1);
 			}
@@ -2596,7 +2601,8 @@ pars_fdisk(
 
 		test = strtoll(tok, (char **)NULL, 10);
 		if ((test < 0) || (test > 0xFFFFFFFF) || (errno != 0)) {
-			printf("Invalid input %s in line %s.\n", tok, line);
+			(void) printf("Invalid input %s in line %s.\n", tok,
+			    line);
 			exit(1);
 		}
 		tok = strtok(NULL, ": \t\n");
@@ -2632,7 +2638,7 @@ validate_part(int id, uint32_t rsect, uint32_t numsect)
 	}
 #ifdef i386
 	if (id > FDISK_MAX_VALID_PART_ID) {
-		fprintf(stderr, "Invalid partition ID\n");
+		(void) fprintf(stderr, "Invalid partition ID\n");
 		return (-1);
 	}
 #endif
@@ -2698,10 +2704,11 @@ stage0(void)
 				if (fdisk_ext_part_exists(epp)) {
 					ext_part_menu();
 				} else {
-					printf(Q_LINE);
-					printf("\nNo extended partition found"
-					    "\n");
-					printf("Press enter to continue\n");
+					(void) printf(Q_LINE);
+					(void) printf("\nNo extended partition"
+					    " found\n");
+					(void) printf("Press enter to "
+					    "continue\n");
 					ext_read_input(s);
 				}
 				break;
@@ -2729,7 +2736,7 @@ stage0(void)
 							/* Nothing to do */
 							break;
 						case FDISK_EMOUNTED:
-							printf(Q_LINE);
+							(void) printf(Q_LINE);
 							preach_and_continue();
 							continue;
 						default:
@@ -2740,6 +2747,7 @@ stage0(void)
 				}
 				(void) close(Dev);
 				exit(0);
+				/* NOTREACHED */
 #else
 			case '5':
 				/* update disk partition table, if changed */
@@ -2883,11 +2891,12 @@ pcreate(void)
 		case '7':
 #ifdef i386
 			if (ext_part_present) {
-				printf(Q_LINE);
-				printf(E_LINE);
-				fprintf(stderr,
+				(void) printf(Q_LINE);
+				(void) printf(E_LINE);
+				(void) fprintf(stderr,
 				    "Extended partition already exists\n");
-				fprintf(stderr, "Press enter to continue\n");
+				(void) fprintf(stderr,
+				    "Press enter to continue\n");
 				ext_read_input(s);
 				continue;
 			}
@@ -2920,11 +2929,12 @@ pcreate(void)
 		case 'E':
 #ifdef i386
 			if (ext_part_present) {
-				printf(Q_LINE);
-				printf(E_LINE);
-				fprintf(stderr,
+				(void) printf(Q_LINE);
+				(void) printf(E_LINE);
+				(void) fprintf(stderr,
 				    "Extended partition already exists\n");
-				fprintf(stderr, "Press enter to continue\n");
+				(void) fprintf(stderr,
+				    "Press enter to continue\n");
 				ext_read_input(s);
 				continue;
 			}
@@ -2989,7 +2999,7 @@ pcreate(void)
 			 * extended partition
 			 */
 			if (fdisk_is_dos_extended(Table[i].systid)) {
-				fdisk_init_ext_part(epp,
+				(void) fdisk_init_ext_part(epp,
 				    LE_32(Table[i].relsect),
 				    LE_32(Table[i].numsect));
 			}
@@ -3553,7 +3563,7 @@ DEL1:	(void) printf(Q_LINE);
 			ext_read_input(s);
 			return (1);
 		}
-		fdisk_delete_ext_part(epp);
+		(void) fdisk_delete_ext_part(epp);
 	} else {
 #endif
 		(void) printf(Q_LINE);
@@ -4910,7 +4920,7 @@ preach_and_continue()
 void
 id_to_name(uchar_t sysid, char *buffer)
 {
-	strcpy(buffer, fdisk_part_types[sysid]);
+	(void) strcpy(buffer, fdisk_part_types[sysid]);
 }
 
 /*
@@ -4939,8 +4949,8 @@ ext_invalid_option(char ch)
 static void
 ext_read_input(char *buf)
 {
-	fgets(buf, 16, stdin);
-	fflush(stdin);
+	(void) fgets(buf, 16, stdin);
+	(void) fflush(stdin);
 }
 
 /*
@@ -4951,7 +4961,7 @@ ext_read_options(char *buf)
 {
 	ext_read_input(buf);
 	if ((strlen(buf) != 2) || (ext_invalid_option(buf[0]))) {
-		printf("\nUnknown Command\n");
+		(void) printf("\nUnknown Command\n");
 		return (-1);
 	}
 	return (0);
@@ -4980,16 +4990,16 @@ ext_print_part_types()
 	}
 
 	if (rowmax < 3) {
-		fprintf(stderr, "Window size too small."
+		(void) fprintf(stderr, "Window size too small."
 		    " Try resizing the window\n");
 		return;
 	}
 
-	printf("List of known partition types : \n");
-	printf("PartID          Partition Type\n");
-	printf("======          ==============\n");
+	(void) printf("List of known partition types : \n");
+	(void) printf("PartID          Partition Type\n");
+	(void) printf("======          ==============\n");
 	for (i = 0; i <= FDISK_MAX_VALID_PART_ID; i++) {
-		printf("%-3d          %s\n", i, fdisk_part_types[i]);
+		(void) printf("%-3d          %s\n", i, fdisk_part_types[i]);
 		rowcount++;
 		if (rowcount == rowmax) {
 			/*
@@ -4997,8 +5007,8 @@ ext_print_part_types()
 			 * printing the partition IDs, but one.
 			 */
 			rowmax = ws.ws_row - 1;
-			fprintf(stderr, "\nPress enter to see next page or 'q'"
-			    " to quit : ");
+			(void) fprintf(stderr, "\nPress enter to see next "
+			    "page or 'q' to quit : ");
 			ext_read_input(buf);
 			if ((strlen(buf) == 2) && (tolower(buf[0]) == 'q')) {
 				return;
@@ -5015,7 +5025,7 @@ ext_read_valid_part_num(int *pno)
 	int len, i;
 
 	for (;;) {
-		printf("Enter the partition number : ");
+		(void) printf("Enter the partition number : ");
 		ext_read_input(buf);
 
 		len = strlen(buf);
@@ -5041,7 +5051,7 @@ ext_read_valid_part_num(int *pno)
 
 		break;
 print_error_and_continue:
-		printf("Invalid partition number\n");
+		(void) printf("Invalid partition number\n");
 		continue;
 	}
 }
@@ -5053,12 +5063,13 @@ ext_read_valid_part_id(uchar_t *partid)
 	int len, i, id;
 
 	for (;;) {
-		printf("Enter the ID ( Type I for list of partition IDs ) : ");
+		(void) printf("Enter the ID ( Type I for list of "
+		    "partition IDs ) : ");
 		ext_read_input(buf);
 		len = strlen(buf);
 
 		if ((len < 2) || (len > (FDISK_MAX_VALID_PART_ID_DIGITS + 1))) {
-			printf("Invalid partition ID\n");
+			(void) printf("Invalid partition ID\n");
 			continue;
 		}
 
@@ -5070,7 +5081,7 @@ ext_read_valid_part_id(uchar_t *partid)
 		/* Check if there is a non-digit in the input */
 		for (i = 0; i < len-1; i++) {
 			if (!isdigit(buf[i])) {
-				printf("Invalid partition ID\n");
+				(void) printf("Invalid partition ID\n");
 				break;
 			}
 		}
@@ -5081,7 +5092,7 @@ ext_read_valid_part_id(uchar_t *partid)
 
 		/* Check if the (now) valid number is greater than the limit */
 		if ((id = atoi(buf)) > FDISK_MAX_VALID_PART_ID) {
-			printf("Invalid partition ID\n");
+			(void) printf("Invalid partition ID\n");
 			continue;
 		}
 
@@ -5089,14 +5100,15 @@ ext_read_valid_part_id(uchar_t *partid)
 
 		/* Disallow multiple extended partitions */
 		if (fdisk_is_dos_extended(*partid)) {
-			printf("Multiple extended partitions not allowed\n");
+			(void) printf("Multiple extended partitions not "
+			    "allowed\n");
 			continue;
 		}
 
 		/* Disallow EFI partitions within extended partition */
 		if (*partid == EFI_PMBR) {
-			printf("EFI partitions within an extended partition"
-			    " is not allowed\n");
+			(void) printf("EFI partitions within an extended "
+			    "partition is not allowed\n");
 			continue;
 		}
 
@@ -5110,14 +5122,14 @@ delete_logical_drive()
 	int pno;
 
 	if (!fdisk_get_logical_drive_count(epp)) {
-		printf("\nNo logical drives defined.\n");
+		(void) printf("\nNo logical drives defined.\n");
 		return;
 	}
 
-	printf("\n");
+	(void) printf("\n");
 	ext_read_valid_part_num(&pno);
 	fdisk_delete_logical_drive(epp, pno);
-	printf("Partition %d deleted\n", pno);
+	(void) printf("Partition %d deleted\n", pno);
 }
 
 static int
@@ -5136,7 +5148,7 @@ ext_read_valid_partition_start(uint32_t *begsec)
 
 	first_free_cyl = FDISK_SECT_TO_CYL(epp, first_free_sec);
 	for (;;) {
-		printf("Enter the beginning cylinder (Default - %d) : ",
+		(void) printf("Enter the beginning cylinder (Default - %d) : ",
 		    first_free_cyl);
 		ext_read_input(buf);
 		len = strlen(buf);
@@ -5146,14 +5158,15 @@ ext_read_valid_partition_start(uint32_t *begsec)
 		}
 
 		if (len > (FDISK_MAX_VALID_CYL_NUM_DIGITS + 1)) {
-			printf("Input too long\n");
-			printf("Invalid beginning cylinder number\n");
+			(void) printf("Input too long\n");
+			(void) printf("Invalid beginning cylinder number\n");
 			continue;
 		}
 		/* Check if there is a non-digit in the input */
 		for (i = 0; i < len - 1; i++) {
 			if (!isdigit(buf[i])) {
-				printf("Invalid beginning cylinder number\n");
+				(void) printf("Invalid beginning cylinder "
+				    "number\n");
 				break;
 			}
 		}
@@ -5172,14 +5185,18 @@ ext_read_valid_partition_start(uint32_t *begsec)
 				break;
 
 			case FDISK_EOVERLAP:
-				printf("Partition boundary overlaps with ");
-				printf("existing partitions\n");
-				printf("Invalid beginning cylinder number\n");
+				(void) printf("Partition boundary overlaps "
+				    "with ");
+				(void) printf("existing partitions\n");
+				(void) printf("Invalid beginning cylinder "
+				    "number\n");
 				continue;
 
 			case FDISK_EOOBOUND:
-				printf("Cylinder boundary beyond the limits\n");
-				printf("Invalid beginning cylinder number\n");
+				(void) printf("Cylinder boundary beyond the "
+				    "limits\n");
+				(void) printf("Invalid beginning cylinder "
+				    "number\n");
 				continue;
 		}
 		return (FDISK_SUCCESS);
@@ -5204,7 +5221,6 @@ static void
 ext_read_valid_partition_size(uint32_t begsec, uint32_t *endsec)
 {
 	char buf[80];
-	uint32_t tempcyl;
 	uint32_t last_free_sec;
 	uint32_t last_free_cyl;
 	int i, len, ch, mbgb = 0, scale = FDISK_SECTS_PER_CYL(epp);
@@ -5215,7 +5231,7 @@ ext_read_valid_partition_size(uint32_t begsec, uint32_t *endsec)
 	uint32_t remdr, spc, poss_end;
 
 	if (sectsize == EINVAL) {
-		fprintf(stderr, "Unsupported geometry statistics.\n");
+		(void) fprintf(stderr, "Unsupported geometry statistics.\n");
 		exit(1);
 	}
 
@@ -5223,10 +5239,12 @@ ext_read_valid_partition_size(uint32_t begsec, uint32_t *endsec)
 	last_free_cyl = FDISK_SECT_TO_CYL(epp, last_free_sec);
 
 	for (;;) {
-		printf("Enter the size in cylinders (Default End Cylinder -");
-		printf(" %u)\n", last_free_cyl);
-		printf("Type +<size>K, +<size>M or +<size>G to enter size in");
-		printf("KB, MB or GB : ");
+		(void) printf("Enter the size in cylinders (Default End "
+		    "Cylinder -");
+		(void) printf(" %u)\n", last_free_cyl);
+		(void) printf("Type +<size>K, +<size>M or +<size>G to enter "
+		    "size in");
+		(void) printf("KB, MB or GB : ");
 		ext_read_input(buf);
 		len = strlen(buf);
 		mbgb = 0;
@@ -5247,7 +5265,7 @@ ext_read_valid_partition_size(uint32_t begsec, uint32_t *endsec)
 			}
 
 			if (!((ch == 'K') || (ch == 'M') || (ch == 'G'))) {
-				printf("Invalid partition size\n");
+				(void) printf("Invalid partition size\n");
 				continue;
 			}
 
@@ -5258,12 +5276,12 @@ ext_read_valid_partition_size(uint32_t begsec, uint32_t *endsec)
 		}
 
 		if (copy_len > FDISK_MAX_VALID_CYL_NUM_DIGITS) {
-			printf("Input too long\n");
-			printf("Invalid partition size\n");
+			(void) printf("Input too long\n");
+			(void) printf("Invalid partition size\n");
 			continue;
 		}
 
-		strncpy(numbuf, &buf[mbgb], copy_len);
+		(void) strncpy(numbuf, &buf[mbgb], copy_len);
 		numbuf[copy_len] = '\0';
 
 		for (i = mbgb; i < copy_len + mbgb; i++) {
@@ -5273,15 +5291,15 @@ ext_read_valid_partition_size(uint32_t begsec, uint32_t *endsec)
 		}
 
 		if (i < copy_len + mbgb) {
-			printf("Invalid partition size\n");
+			(void) printf("Invalid partition size\n");
 			continue;
 		}
 
 		size = (atoll(numbuf) * (scale));
 
 		if (size == 0) {
-			printf("Zero size is invalid\n");
-			printf("Invalid partition size\n");
+			(void) printf("Zero size is invalid\n");
+			(void) printf("Invalid partition size\n");
 			continue;
 		}
 
@@ -5290,10 +5308,10 @@ ext_read_valid_partition_size(uint32_t begsec, uint32_t *endsec)
 		}
 
 		if (size > (last_free_sec - begsec + 1)) {
-			printf("Cylinder boundary beyond the limits");
-			printf(" or overlaps with existing");
-			printf(" partitions\n");
-			printf("Invalid partition size\n");
+			(void) printf("Cylinder boundary beyond the limits");
+			(void) printf(" or overlaps with existing");
+			(void) printf(" partitions\n");
+			(void) printf("Invalid partition size\n");
 			continue;
 		}
 
@@ -5304,7 +5322,7 @@ ext_read_valid_partition_size(uint32_t begsec, uint32_t *endsec)
 		 */
 		spc = FDISK_SECTS_PER_CYL(epp);
 		poss_end = begsec + size - 1;
-		if (remdr = (poss_end % spc)) {
+		if ((remdr = (poss_end % spc)) != 0) {
 			poss_end += spc - remdr - 1;
 		}
 		*endsec = (poss_end > last_free_sec) ? last_free_sec :
@@ -5343,22 +5361,24 @@ add_logical_drive()
 	int rval;
 
 	if (fdisk_get_logical_drive_count(epp) >= MAX_EXT_PARTS) {
-		printf("\nNumber of logical drives exceeds limit of %d.\n",
-		    MAX_EXT_PARTS);
-		printf("Command did not succeed. Press enter to continue\n");
+		(void) printf("\nNumber of logical drives exceeds limit of "
+		    "%d.\n", MAX_EXT_PARTS);
+		(void) printf("Command did not succeed. Press enter to "
+		    "continue\n");
 		ext_read_input(buf);
 		return;
 	}
 
-	printf("\n");
+	(void) printf("\n");
 	rval = ext_read_valid_partition_start(&begsec);
 	switch (rval) {
 		case FDISK_SUCCESS:
 			break;
 
 		case FDISK_EOOBOUND:
-			printf("\nNo space left in the extended partition\n");
-			printf("Press enter to continue\n");
+			(void) printf("\nNo space left in the extended "
+			    "partition\n");
+			(void) printf("Press enter to continue\n");
 			ext_read_input(buf);
 			return;
 	}
@@ -5367,7 +5387,7 @@ add_logical_drive()
 	ext_read_valid_part_id(&partid);
 	fdisk_add_logical_drive(epp, begsec, endsec, partid);
 
-	printf("New partition with ID %d added\n", partid);
+	(void) printf("New partition with ID %d added\n", partid);
 }
 
 static void
@@ -5377,16 +5397,17 @@ ext_change_logical_drive_id()
 	uchar_t partid;
 
 	if (!fdisk_get_logical_drive_count(epp)) {
-		printf("\nNo logical drives defined.\n");
+		(void) printf("\nNo logical drives defined.\n");
 		return;
 	}
 
-	printf("\n");
+	(void) printf("\n");
 	ext_read_valid_part_num(&pno);
 	ext_read_valid_part_id(&partid);
 	fdisk_change_logical_drive_id(epp, pno, partid);
 
-	printf("Partition ID of partition %d changed to %d\n", pno, partid);
+	(void) printf("Partition ID of partition %d changed to %d\n", pno,
+	    partid);
 }
 
 #ifdef DEBUG
@@ -5399,35 +5420,35 @@ ext_print_logdrive_layout_debug()
 	logical_drive_t *temp;
 
 	if (!fdisk_get_logical_drive_count(epp)) {
-		printf("\nNo logical drives defined.\n");
+		(void) printf("\nNo logical drives defined.\n");
 		return;
 	}
 
-	printf("\n\n");
+	(void) printf("\n\n");
 	puts("#  start block  end block    abs start    abs end      OSType");
 	for (temp = head, pno = 5; temp != NULL; temp = temp->next, pno++) {
 		/* Print the logical drive details */
 		id_to_name(temp->parts[0].systid, namebuff);
-		printf("%d: %.10u   %.10u   %.10u   %.10u",
+		(void) printf("%d: %.10u   %.10u   %.10u   %.10u",
 		    pno,
 		    LE_32(temp->parts[0].relsect),
 		    LE_32(temp->parts[0].numsect),
 		    temp->abs_secnum,
 		    temp->abs_secnum + temp->numsect - 1 +
 		    MAX_LOGDRIVE_OFFSET);
-		printf("   %s\n", namebuff);
+		(void) printf("   %s\n", namebuff);
 		/*
 		 * Print the second entry in the EBR which is information
 		 * about the location and the size of the next extended
 		 * partition.
 		 */
 		id_to_name(temp->parts[1].systid, namebuff);
-		printf("%d: %.10u   %.10u   %.10s   %.10s",
+		(void) printf("%d: %.10u   %.10u   %.10s   %.10s",
 		    pno,
 		    LE_32(temp->parts[1].relsect),
 		    LE_32(temp->parts[1].numsect),
 		    "          ", "          ");
-		printf("   %s\n", namebuff);
+		(void) printf("   %s\n", namebuff);
 	}
 }
 #endif
@@ -5445,25 +5466,26 @@ ext_print_logical_drive_layout()
 	int pno;
 
 	if (numcyl == EINVAL) {
-		fprintf(stderr, "Unsupported geometry statistics.\n");
+		(void) fprintf(stderr, "Unsupported geometry statistics.\n");
 		exit(1);
 	}
 
 	if (!fdisk_get_logical_drive_count(epp)) {
-		printf("\nNo logical drives defined.\n");
+		(void) printf("\nNo logical drives defined.\n");
 		return;
 	}
 
-	printf("\n");
-	printf("Number of cylinders in disk              : %u\n", numcyl);
-	printf("Beginning cylinder of extended partition : %u\n",
+	(void) printf("\n");
+	(void) printf("Number of cylinders in disk              : %u\n",
+	    numcyl);
+	(void) printf("Beginning cylinder of extended partition : %u\n",
 	    fdisk_get_ext_beg_cyl(epp));
-	printf("Ending cylinder of extended partition    : %u\n",
+	(void) printf("Ending cylinder of extended partition    : %u\n",
 	    fdisk_get_ext_end_cyl(epp));
-	printf("\n");
-	printf("Part#   StartCyl   EndCyl     Length    %%     "
+	(void) printf("\n");
+	(void) printf("Part#   StartCyl   EndCyl     Length    %%     "
 	"Part ID (Type)\n");
-	printf("=====   ========   ========   =======   ==="
+	(void) printf("=====   ========   ========   =======   ==="
 	"   ==============\n");
 	for (temp = fdisk_get_ld_head(epp), pno = 5; temp != NULL;
 	    temp = temp->next, pno++) {
@@ -5480,9 +5502,9 @@ ext_print_logical_drive_layout()
 			    temp->logdrive_offset;
 			if (fdisk_is_linux_swap(epp, part_start,
 			    NULL) == 0)
-				strcpy(namebuff, LINSWAPstr);
+				(void) strcpy(namebuff, LINSWAPstr);
 			else
-				strcpy(namebuff, SUstr);
+				(void) strcpy(namebuff, SUstr);
 		} else {
 			id_to_name(sysid, namebuff);
 		}
@@ -5505,27 +5527,28 @@ ext_print_logical_drive_layout()
 		if (percent > 100) {
 			percent = 100;
 		}
-		printf("%-5d   %-8u   %-8u   %-7u   %-3d   %-3d (%-.28s)\n",
+		(void) printf("%-5d   %-8u   %-8u   %-7u   %-3d   "
+		    "%-3d (%-.28s)\n",
 		    pno, startcyl, endcyl, length, percent, sysid, namebuff);
 	}
 #ifdef DEBUG
 	ext_print_logdrive_layout_debug();
 #endif
-	printf("\n");
+	(void) printf("\n");
 }
 
 static void
 ext_print_help_menu()
 {
-	printf("\n");
-	printf("a	Add a logical drive\n");
-	printf("d	Delete a logical drive\n");
-	printf("h	Print this help menu\n");
-	printf("i	Change the id of the logical drive\n");
-	printf("p	Print the logical drive layout\n");
-	printf("r	Return to the main fdisk menu\n");
-	printf("        (To commit or cancel the changes)\n");
-	printf("\n");
+	(void) printf("\n");
+	(void) printf("a	Add a logical drive\n");
+	(void) printf("d	Delete a logical drive\n");
+	(void) printf("h	Print this help menu\n");
+	(void) printf("i	Change the id of the logical drive\n");
+	(void) printf("p	Print the logical drive layout\n");
+	(void) printf("r	Return to the main fdisk menu\n");
+	(void) printf("        (To commit or cancel the changes)\n");
+	(void) printf("\n");
 }
 
 static void
@@ -5537,30 +5560,32 @@ ext_part_menu()
 
 	int i;
 
-	printf(CLR_SCR);
+	(void) printf(CLR_SCR);
 
 	if (fdisk_corrupt_logical_drives(epp)) {
-		printf("One or more logical drives seem to be corrupt.\n");
-		printf("Displaying only sane logical drives.\n");
+		(void) printf("One or more logical drives seem to be "
+		    "corrupt.\n");
+		(void) printf("Displaying only sane logical drives.\n");
 	}
 
 	if (bbsig_disp_flag && fdisk_invalid_bb_sig(epp, &bbsigp)) {
-		printf("The following logical drives have a wrong boot block"
-		    " signature :\n\n");
+		(void) printf("The following logical drives have a wrong "
+		    "boot block signature :\n\n");
 		for (i = 0; bbsigp[i]; i++) {
-			printf("%d ", bbsigp[i]);
+			(void) printf("%d ", bbsigp[i]);
 		}
-		printf("\n\n");
-		printf("They will be corrected when you choose to commit\n");
+		(void) printf("\n\n");
+		(void) printf("They will be corrected when you choose to "
+		    "commit\n");
 		bbsig_disp_flag = 0;
 	}
 
-	printf("Extended partition menu\n");
+	(void) printf("Extended partition menu\n");
 
 	for (;;) {
-		printf("\nEnter Command (Type h for help) : ");
+		(void) printf("\nEnter Command (Type h for help) : ");
 		if ((ext_read_options(buf)) < 0) {
-			printf("\nCommand Options : \n");
+			(void) printf("\nCommand Options : \n");
 			ext_print_help_menu();
 			continue;
 		}
@@ -5581,14 +5606,14 @@ ext_part_menu()
 				ext_print_logical_drive_layout();
 				break;
 			case 'r':
-				printf(CLR_SCR);
+				(void) printf(CLR_SCR);
 				return;
 			default : /* NOTREACHED */
 				break;
 		}
 	}
 }
-#endif
+#endif /* i386 */
 
 static int
 nopartdefined()

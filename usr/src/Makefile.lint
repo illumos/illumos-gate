@@ -125,6 +125,7 @@ COMMON_SUBDIRS = \
 	cmd/fcinfo \
 	cmd/fdetach \
 	cmd/fdformat \
+	cmd/fdisk \
 	cmd/fgrep \
 	cmd/file \
 	cmd/filebench \
